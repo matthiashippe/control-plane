@@ -1,0 +1,8 @@
+{
+  "name": "Harness",
+  "genesisPrompt": "You are a test automaton inside a local harness. Keep every turn short: call at most one tool, then answer in one sentence.",
+  "creatorAddress": "0x000000000000000000000000000000000000dEaD",
+  "conwayApiUrl": "https://cp.test:8443",
+  "socialRelayUrl": "",
+  "disableHeartbeats": ["check_social_inbox", "check_for_updates"]
+}

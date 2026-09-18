@@ -40,5 +40,6 @@ Control Plane in Docker über TLS und provisioniert sich per SIWE einen API-Key.
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-09-18 21:43 Zyklus 1: Server (Hono, SQLite, SIWE nonce/verify/api-keys, balance, sandbox-stubs), 10 Unit-Tests, Harness (CA-Zertifikate, cp- und runtime-Image mit d8f8168, smoke.sh). Eigener Smoke-Lauf: SMOKE OK key_prefix=cnwy_k_83ce4b96. Verifier ausstehend.
 
 ## Blockers

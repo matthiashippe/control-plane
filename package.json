@@ -1,0 +1,39 @@
+{
+  "name": "control-plane",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Conway-kompatibles Control Plane für die Automaton-Runtime",
+  "type": "module",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "packageManager": "pnpm@10.28.1",
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "dev": "tsx src/index.ts",
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "e2e:smoke": "bash harness/e2e/smoke.sh",
+    "e2e": "bash harness/e2e/full.sh"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.14.0",
+    "better-sqlite3": "^11.0.0",
+    "hono": "^4.7.0",
+    "viem": "^2.48.11"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.0",
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.9.3",
+    "vitest": "^3.1.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "better-sqlite3",
+      "esbuild"
+    ]
+  }
+}

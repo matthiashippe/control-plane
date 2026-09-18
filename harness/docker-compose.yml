@@ -1,0 +1,44 @@
+# Harness: Control Plane hinter TLS (eigene CA) und die unveränderte Upstream-Runtime.
+# Anvil (USDC-Mock) kommt mit Goal 2 dazu.
+services:
+  cp:
+    build:
+      context: ..
+      dockerfile: harness/cp/Dockerfile
+    environment:
+      CP_HOST: 0.0.0.0
+      CP_PORT: "8443"
+      CP_DB_PATH: /data/cp.db
+      CP_TLS_CERT: /certs/cp.test.pem
+      CP_TLS_KEY: /certs/cp.test-key.pem
+      NODE_EXTRA_CA_CERTS: /certs/ca.pem
+    volumes:
+      - ./certs:/certs:ro
+      - cp-data:/data
+    networks:
+      default:
+        aliases:
+          - cp.test
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('https://cp.test:8443/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+  runtime:
+    build:
+      context: ./runtime
+    environment:
+      CONWAY_API_URL: https://cp.test:8443
+      NODE_EXTRA_CA_CERTS: /certs/ca.pem
+    volumes:
+      - ./certs:/certs:ro
+      - ./runtime/setup.json:/setup.json:ro
+      - runtime-home:/home/automaton
+    depends_on:
+      cp:
+        condition: service_healthy
+
+volumes:
+  cp-data:
+  runtime-home:
