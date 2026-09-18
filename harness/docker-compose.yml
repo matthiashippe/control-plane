@@ -1,6 +1,29 @@
-# Harness: Control Plane hinter TLS (eigene CA) und die unveränderte Upstream-Runtime.
-# Anvil (USDC-Mock) kommt mit Goal 2 dazu.
+# Harness: lokale Chain (Anvil, chainId 8453, USDC-Mock an der Mainnet-Adresse), Control Plane
+# hinter TLS (eigene CA) mit lokalem Settler, unveränderte Upstream-Runtime.
+x-anvil-account-0-key: &relayer-key "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+
 services:
+  chain:
+    image: ghcr.io/foundry-rs/foundry:latest
+    entrypoint: ["anvil"]
+    command: ["--chain-id", "8453", "--host", "0.0.0.0", "--port", "8545", "--silent"]
+    healthcheck:
+      test: ["CMD-SHELL", "cast chain-id --rpc-url http://127.0.0.1:8545 | grep -q 8453"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+  chain-tools:
+    build:
+      context: ./chain
+    environment:
+      RPC_URL: http://chain:8545
+      USDC_ADDRESS: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+      FUNDER_KEY: *relayer-key
+    depends_on:
+      chain:
+        condition: service_healthy
+
   cp:
     build:
       context: ..
@@ -12,6 +35,13 @@ services:
       CP_TLS_CERT: /certs/cp.test.pem
       CP_TLS_KEY: /certs/cp.test-key.pem
       NODE_EXTRA_CA_CERTS: /certs/ca.pem
+      # Topup: payTo ist Anvil-Account 1, der Settler sendet mit Account 0 (nur Harness).
+      CP_PAY_TO: "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
+      CP_NETWORK: base
+      CP_USDC_ADDRESS: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+      CP_SETTLER: local
+      CP_RPC_URL: http://chain:8545
+      CP_SETTLER_KEY: *relayer-key
     volumes:
       - ./certs:/certs:ro
       - cp-data:/data
@@ -31,6 +61,7 @@ services:
     environment:
       CONWAY_API_URL: https://cp.test:8443
       NODE_EXTRA_CA_CERTS: /certs/ca.pem
+      AUTOMATON_RPC_URL: http://chain:8545
     volumes:
       - ./certs:/certs:ro
       - ./runtime/setup.json:/setup.json:ro

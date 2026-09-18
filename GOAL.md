@@ -53,5 +53,6 @@ idempotent und im Ledger nachvollziehbar.
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-09-18 21:55 Zyklus 1: Ledger/Payments-Schema, Settler-Interface + LocalSettler (nur Harness), /pay als x402-v1-Seller mit Offline-Signaturprüfung und Idempotenz per Nonce, 10 Unit-Tests (test/pay.test.ts), Harness: Anvil + MockUSDC per anvil_setCode, chain-tools (setup/fund/balance), topup.sh. Eigene Läufe: TOPUP OK balance_cents=500 ledger_rows=1 (Runtime-Log 'Bootstrap topup: +$5'), SMOKE OK. Verifier ausstehend.
 
 ## Blockers

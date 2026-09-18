@@ -8,6 +8,9 @@
  *   CP_TLS_CERT   PEM-Zertifikat; zusammen mit CP_TLS_KEY wird HTTPS gesprochen.
  *   CP_TLS_KEY    PEM-Key
  *   CP_SIWE_DOMAIN  Default "conway.tech" (der Runtime-Client sendet genau das)
+ *   CP_PAY_TO     Wallet, an die Topups gehen; ohne sie antwortet /pay 503
+ *   CP_NETWORK    "base" (Default) oder "base-sepolia"; CP_CHAIN_ID, CP_USDC_ADDRESS überschreiben
+ *   CP_SETTLER    "local" nur im Harness (CP_RPC_URL, CP_SETTLER_KEY, CP_USDC_ADDRESS)
  */
 
 import fs from "node:fs";
@@ -16,6 +19,8 @@ import { createServer as createHttpsServer } from "node:https";
 import { serve } from "@hono/node-server";
 import { createApp, VERSION } from "./app.js";
 import { openDb } from "./db.js";
+import { payConfigFromEnv } from "./payments/pay.js";
+import { settlerFromEnv } from "./payments/settler.js";
 
 const port = Number(process.env.CP_PORT || 8402);
 const host = process.env.CP_HOST || "127.0.0.1";
@@ -23,9 +28,13 @@ const dbPath = process.env.CP_DB_PATH || path.resolve("data", "control-plane.db"
 fs.mkdirSync(path.dirname(dbPath), { recursive: true });
 
 const db = openDb(dbPath);
+const pay = payConfigFromEnv(process.env);
+const settler = settlerFromEnv(process.env);
 const app = createApp({
   db,
   siwe: process.env.CP_SIWE_DOMAIN ? { domain: process.env.CP_SIWE_DOMAIN } : undefined,
+  pay,
+  settler,
 });
 
 const tlsCert = process.env.CP_TLS_CERT;
@@ -41,7 +50,8 @@ serve(
   },
   (info) => {
     console.log(
-      `[control-plane] v${VERSION} ${tls ? "https" : "http"}://${info.address}:${info.port} db=${dbPath}`,
+      `[control-plane] v${VERSION} ${tls ? "https" : "http"}://${info.address}:${info.port} db=${dbPath} ` +
+        `pay=${pay ? `${pay.network}->${pay.payTo}` : "off"} settler=${settler?.kind ?? "none"}`,
     );
   },
 );

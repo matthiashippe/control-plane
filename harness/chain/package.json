@@ -1,0 +1,9 @@
+{
+  "name": "harness-chain",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "solc": "^0.8.28",
+    "viem": "^2.48.11"
+  }
+}

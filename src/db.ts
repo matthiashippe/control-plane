@@ -47,7 +47,71 @@ function migrate(db: Db): void {
       revoked_at TEXT
     );
     CREATE INDEX IF NOT EXISTS api_keys_address ON api_keys(address);
+
+    -- Jede Saldo-Änderung ist genau eine Ledger-Zeile, geschrieben in derselben Transaktion.
+    CREATE TABLE IF NOT EXISTS ledger (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      address     TEXT NOT NULL REFERENCES wallets(address),
+      kind        TEXT NOT NULL,                -- topup | inference | transfer_in | transfer_out
+      delta_cents INTEGER NOT NULL,
+      ref         TEXT,                         -- Idempotenzschlüssel / Fremdreferenz (x402-Nonce, tx-Hash, ...)
+      meta        TEXT,                         -- JSON
+      created_at  TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS ledger_address ON ledger(address, id);
+
+    -- x402-Zahlungen, Schlüssel ist die Authorization-Nonce der EIP-3009-Signatur.
+    CREATE TABLE IF NOT EXISTS payments (
+      nonce         TEXT PRIMARY KEY,
+      from_address  TEXT NOT NULL,
+      to_address    TEXT NOT NULL,              -- Empfänger der Credits (aus dem Pfad)
+      value_atomic  TEXT NOT NULL,              -- bigint als String
+      credits_cents INTEGER NOT NULL,
+      status        TEXT NOT NULL,              -- pending | settled | failed
+      tx_hash       TEXT,
+      error         TEXT,
+      created_at    TEXT NOT NULL,
+      settled_at    TEXT
+    );
   `);
+}
+
+export interface LedgerEntry {
+  address: string;
+  kind: "topup" | "inference" | "transfer_in" | "transfer_out";
+  deltaCents: number;
+  ref?: string;
+  meta?: Record<string, unknown>;
+}
+
+/**
+ * Bucht eine Saldo-Änderung samt Ledger-Zeile. Muss innerhalb einer db.transaction() laufen,
+ * wenn mehrere Buchungen zusammengehören; für sich allein ist die Funktion atomar.
+ * Wirft, wenn der Saldo negativ würde.
+ */
+export function postLedger(db: Db, entry: LedgerEntry): { balanceCents: number } {
+  const address = entry.address.toLowerCase();
+  const run = db.transaction(() => {
+    ensureWallet(db, address);
+    const res = db
+      .prepare(
+        "UPDATE wallets SET balance_cents = balance_cents + ? WHERE address = ? AND balance_cents + ? >= 0",
+      )
+      .run(entry.deltaCents, address, entry.deltaCents);
+    if (res.changes !== 1) throw new Error("insufficient_balance");
+    db.prepare(
+      "INSERT INTO ledger (address, kind, delta_cents, ref, meta, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+    ).run(
+      address,
+      entry.kind,
+      entry.deltaCents,
+      entry.ref ?? null,
+      entry.meta ? JSON.stringify(entry.meta) : null,
+      new Date().toISOString(),
+    );
+    return { balanceCents: getBalanceCents(db, address) };
+  });
+  return run();
 }
 
 export function ensureWallet(db: Db, address: string): void {

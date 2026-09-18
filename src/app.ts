@@ -7,6 +7,8 @@
 import { Hono } from "hono";
 import type { Db } from "./db.js";
 import { getBalanceCents } from "./db.js";
+import { handlePay, type PayConfig } from "./payments/pay.js";
+import type { Settler } from "./payments/settler.js";
 import {
   AuthError,
   createApiKey,
@@ -22,6 +24,9 @@ export const VERSION = "0.1.0";
 export interface AppOptions {
   db: Db;
   siwe?: Partial<SiweConfig>;
+  /** Ohne pay/settler antwortet /pay mit 503. */
+  pay?: PayConfig | null;
+  settler?: Settler | null;
 }
 
 type Env = { Variables: { address: `0x${string}` } };
@@ -40,6 +45,21 @@ export function createApp(opts: AppOptions) {
   });
 
   app.get("/health", (c) => c.json({ ok: true, version: VERSION }));
+
+  // ─── Topup (x402, ohne API-Key: der Runtime-Client sendet hier keinen) ───
+
+  app.get("/pay/:usd/:address", async (c) => {
+    const pay = opts.pay ?? null;
+    const settler = opts.settler ?? null;
+    if (!pay) return c.json({ error: "payments_unavailable" }, 503);
+    const res = await handlePay(db, settler, pay, {
+      usd: c.req.param("usd"),
+      recipient: c.req.param("address"),
+      paymentHeader: c.req.header("x-payment"),
+    });
+    for (const [k, v] of Object.entries(res.headers ?? {})) c.header(k, v);
+    return c.json(res.body, res.status as 200);
+  });
 
   // ─── Provisionierung ───────────────────────────────────────────
 
