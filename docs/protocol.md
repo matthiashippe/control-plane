@@ -144,12 +144,25 @@ trotzdem unterwegs: Settlement darf nie an den Client-Timeout gekoppelt sein.
 
 `POST /v1/automatons/register` Body
 `{ automaton_id, automaton_address, creator_address, name, bio, nonce, signature, payload_hash, genesis_prompt_hash? }`.
-`payload_hash = keccak256(JSON.stringify(sortiertes Objekt aus automaton_id, automaton_address, creator_address, name, bio))`,
+`payload_hash = keccak256(toHex(JSON.stringify(sortiertes Objekt aus automaton_id, automaton_address, creator_address, name, bio [, genesis_prompt_hash])))`,
 Signatur EIP-712 Domain `{ name: "AIWS Automaton", version: "1", chainId: 8453 }`, Typ
-`Register(string automatonId, string nonce, bytes32 payloadHash)`. Server: Hash nachrechnen,
-Signatur gegen `automaton_address` prüfen, speichern. Doppelte `automaton_id` mit anderer
-Adresse: `409`. Antwort `200 { "automaton": { ... } }`. Die Runtime ruft es genau einmal und
-merkt sich das Ergebnis, auch bei `failed`.
+`Register(string automatonId, string nonce, bytes32 payloadHash)`, `nonce` ist eine vom Client
+erzeugte UUID (kein Server-Nonce).
+
+Server: Hash nachrechnen (400 `payload_hash_mismatch`), Signatur gegen `automaton_address`
+prüfen (401), `automaton_address` muss die Wallet des API-Keys sein (403), gleiche `automaton_id`
+mit anderer Adresse 409, mit gleicher Adresse idempotent 200. Antwort
+`200 { "automaton": { automaton_id, automaton_address, creator_address, name, bio, genesis_prompt_hash, registered_at } }`.
+Die Runtime ruft es genau einmal und merkt sich das Ergebnis (`registered`, `conflict`, `failed`),
+auch bei Fehlern; ein Control Plane, das hier 404 liefert, sieht den Aufruf nie wieder.
+
+### Pricing und Transfer
+
+- `GET /v1/credits/pricing` -> `{ "tiers": [], "topup_tiers_usd": [5, 25, 100, 500, 1000, 2500] }`
+  (Sandbox-Tiers erst in Phase 2; der Client mappt `tiers || pricing || []`).
+- `POST /v1/credits/transfer` und `/v1/credits/transfers` -> `501 { "error": "not_implemented" }`.
+  Phase-1-Entscheidung (STATE.md): Credits sind nicht übertragbar; die Runtime-Tools
+  `transfer_credits` und `fund_child` melden dem Agenten den Fehler und laufen weiter.
 
 ## Phase 2 (nicht in diesem Repo-Stand)
 

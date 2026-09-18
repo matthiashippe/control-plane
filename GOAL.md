@@ -51,5 +51,6 @@ einen einzigen Conway-API-Fehler im Runtime-Log durch.
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-09-18 22:40 Zyklus 1: src/registry.ts (Hash nachrechnen, EIP-712, 403 bei fremder Adresse, 409/idempotent), Tabelle automatons, /v1/credits/pricing, Transfer 501 auf beiden Pfaden, 8 Unit-Tests (register.test.ts), full.sh mit Fehlerzählung, protocol.md Registry/Pricing/Transfer. Eigene Läufe: E2E OK turns=5 registered=true api_errors=0 ledger_consistent=true balance_cents=489; INFERENCE OK, TOPUP OK, SMOKE OK; 38 Unit-Tests. Verifier ausstehend.
 
 ## Blockers

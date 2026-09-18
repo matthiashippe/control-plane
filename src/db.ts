@@ -75,6 +75,18 @@ function migrate(db: Db): void {
       created_at    TEXT NOT NULL,
       settled_at    TEXT
     );
+
+    -- Registrierte Automatons (POST /v1/automatons/register), eine Zeile je automaton_id.
+    CREATE TABLE IF NOT EXISTS automatons (
+      automaton_id        TEXT PRIMARY KEY,
+      address             TEXT NOT NULL,
+      creator_address     TEXT NOT NULL,
+      name                TEXT NOT NULL,
+      bio                 TEXT NOT NULL DEFAULT '',
+      genesis_prompt_hash TEXT,
+      registered_at       TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS automatons_address ON automatons(address);
   `);
 }
 

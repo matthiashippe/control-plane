@@ -8,7 +8,8 @@ import { Hono } from "hono";
 import type { Db } from "./db.js";
 import { getBalanceCents } from "./db.js";
 import { Catalog, handleChat } from "./inference/proxy.js";
-import { handlePay, type PayConfig } from "./payments/pay.js";
+import { handlePay, TOPUP_TIERS_USD, type PayConfig } from "./payments/pay.js";
+import { handleRegister } from "./registry.js";
 import type { Settler } from "./payments/settler.js";
 import {
   AuthError,
@@ -116,6 +117,26 @@ export function createApp(opts: AppOptions) {
     const res = await handleChat(db, opts.catalog, c.get("address"), body);
     return c.json(res.body as Record<string, unknown>, res.status as 200);
   });
+
+  app.get("/v1/credits/pricing", (c) => c.json({ tiers: [], topup_tiers_usd: TOPUP_TIERS_USD }));
+
+  // Entscheidung in STATE.md: Credits sind in Phase 1 nicht übertragbar.
+  app.post("/v1/credits/transfer", (c) =>
+    c.json({ error: "not_implemented", reason: "credit transfers are disabled in phase 1" }, 501),
+  );
+  app.post("/v1/credits/transfers", (c) =>
+    c.json({ error: "not_implemented", reason: "credit transfers are disabled in phase 1" }, 501),
+  );
+
+  // ─── Registry ─────────────────────────────────────────────────
+
+  app.post("/v1/automatons/register", async (c) => {
+    const body = await c.req.json().catch(() => null);
+    const res = await handleRegister(db, c.get("address"), body);
+    return c.json(res.body, res.status as 200);
+  });
+
+  // ─── Sandboxes (Phase 2) ──────────────────────────────────────
 
   app.get("/v1/sandboxes", (c) => c.json({ sandboxes: [] }));
   app.all("/v1/sandboxes/*", (c) => c.json({ error: "not_implemented" }, 501));
