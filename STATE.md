@@ -1,6 +1,6 @@
 # Loop State: control-plane
 
-Last run: 2026-09-18 22:04 (Goal 2 DONE)
+Last run: 2026-09-18 22:28 (Goal 3 DONE)
 
 ## High Priority (Build-Queue, ein Goal je Zeile, Reihenfolge bindend)
 
@@ -10,15 +10,24 @@ Last run: 2026-09-18 22:04 (Goal 2 DONE)
    liefert einen `cnwy_k_`-Key. Status: DONE 18.09.2026, `goals/2026-09-18-goal-1-harness-geruest.md`
 2. **Goal 2, Topup** (DONE 18.09.2026, `goals/2026-09-18-goal-2-topup.md`): `/pay/5/<addr>` als x402-v1-Seller mit lokalem Settler gegen Anvil;
    Bootstrap-Topup der Runtime verbucht 500 Cents; dieselbe Signatur zweimal = eine Gutschrift.
-3. **Goal 3, Inferenz** (ACTIVE, GOAL.md): `/v1/chat/completions` Proxy mit Mock-Provider und serverseitiger
+3. **Goal 3, Inferenz** (DONE 18.09.2026, `goals/2026-09-18-goal-3-inferenz.md`; Fund: Runtime fragt `gpt-5.2`/`gpt-5-mini` aus der Routing-Matrix, Katalog-Aliase nötig): `/v1/chat/completions` Proxy mit Mock-Provider und serverseitiger
    Abbuchung (Listenpreis x 1,3); fünf Turns der Runtime, Ledger-Summe = Abbuchung, 402-Format bei
    leerem Konto.
-4. **Goal 4, Rest von Phase 1**: `/v1/automatons/register` (EIP-712-Prüfung), `/v1/models`,
-   `/v1/credits/pricing`, `/v1/credits/transfer` (idempotent), Sandbox-Stubs; kompletter Erstlauf
-   der Upstream-Runtime grün (`pnpm e2e`).
+4. **Goal 4, Rest von Phase 1** (ACTIVE, GOAL.md): `/v1/automatons/register` (EIP-712-Prüfung),
+   `/v1/credits/pricing`, Sandbox-Stubs, `/v1/credits/transfer` vorerst 501 (Entscheidung unten);
+   kompletter Erstlauf der Upstream-Runtime grün (`pnpm e2e`).
 5. **Goal 5, Betrieb**: Anthropic als erster echter Provider, Deploy auf `srv1336627` mit Caddy,
    Facilitator CDP oder PayAI, Statusseite, einmalige Abnahme mit Wegwerf-Wallet auf Base Mainnet.
    Braucht Entscheidungen: Domain, payTo-Wallet.
+
+## Entscheidungen bei Matthias
+
+- **Credit-Transfer** (`POST /v1/credits/transfer`, Runtime-Tools `transfer_credits`, `fund_child`):
+  Handoff-Leitplanke sagt "nicht übertragbar" (E-Geld-Abgrenzung, Recherche 6.2), Constraints
+  erlauben Transfer innerhalb des Control Plane. Phase 1 antwortet 501; Solo-Automatons brauchen
+  ihn nicht. Option für später: Transfer nur zwischen Wallets desselben `creator_address`.
+- Domain und Markenname, payTo-Wallet (HTC), Inferenz-Einkauf im Betrieb: unverändert offen
+  (siehe Goal 5).
 
 ## Watch List
 
