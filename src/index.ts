@@ -11,6 +11,8 @@
  *   CP_PAY_TO     Wallet, an die Topups gehen; ohne sie antwortet /pay 503
  *   CP_NETWORK    "base" (Default) oder "base-sepolia"; CP_CHAIN_ID, CP_USDC_ADDRESS überschreiben
  *   CP_SETTLER    "local" nur im Harness (CP_RPC_URL, CP_SETTLER_KEY, CP_USDC_ADDRESS)
+ *   CP_PROVIDER   Komma-Liste der Inferenz-Provider; "mock" für Harness und Tests
+ *   CP_MODEL_ALIASES  "gpt-5.2=<modell>,gpt-5-mini=<modell>": IDs, die die Runtime hart anfragt
  */
 
 import fs from "node:fs";
@@ -19,6 +21,8 @@ import { createServer as createHttpsServer } from "node:https";
 import { serve } from "@hono/node-server";
 import { createApp, VERSION } from "./app.js";
 import { openDb } from "./db.js";
+import { MockProvider } from "./inference/mock.js";
+import { aliasesFromEnv, Catalog, providersFromEnv } from "./inference/proxy.js";
 import { payConfigFromEnv } from "./payments/pay.js";
 import { settlerFromEnv } from "./payments/settler.js";
 
@@ -30,11 +34,14 @@ fs.mkdirSync(path.dirname(dbPath), { recursive: true });
 const db = openDb(dbPath);
 const pay = payConfigFromEnv(process.env);
 const settler = settlerFromEnv(process.env);
+const providers = providersFromEnv(process.env, { mock: () => new MockProvider() });
+const catalog = providers.length ? new Catalog(providers, aliasesFromEnv(process.env)) : null;
 const app = createApp({
   db,
   siwe: process.env.CP_SIWE_DOMAIN ? { domain: process.env.CP_SIWE_DOMAIN } : undefined,
   pay,
   settler,
+  catalog,
 });
 
 const tlsCert = process.env.CP_TLS_CERT;
@@ -51,7 +58,8 @@ serve(
   (info) => {
     console.log(
       `[control-plane] v${VERSION} ${tls ? "https" : "http"}://${info.address}:${info.port} db=${dbPath} ` +
-        `pay=${pay ? `${pay.network}->${pay.payTo}` : "off"} settler=${settler?.kind ?? "none"}`,
+        `pay=${pay ? `${pay.network}->${pay.payTo}` : "off"} settler=${settler?.kind ?? "none"} ` +
+        `providers=${providers.map((p) => p.id).join(",") || "none"}`,
     );
   },
 );

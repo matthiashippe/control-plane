@@ -42,6 +42,9 @@ services:
       CP_SETTLER: local
       CP_RPC_URL: http://chain:8545
       CP_SETTLER_KEY: *relayer-key
+      # Inferenz: Mock-Provider, kein Netz.
+      CP_PROVIDER: mock
+      CP_MODEL_ALIASES: "gpt-5.2=mock-1,gpt-5-mini=mock-1,gpt-5.3=mock-1"
     volumes:
       - ./certs:/certs:ro
       - cp-data:/data

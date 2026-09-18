@@ -16,7 +16,8 @@
     "test": "vitest run",
     "e2e:smoke": "bash harness/e2e/smoke.sh",
     "e2e": "bash harness/e2e/full.sh",
-    "e2e:topup": "bash harness/e2e/topup.sh"
+    "e2e:topup": "bash harness/e2e/topup.sh",
+    "e2e:inference": "bash harness/e2e/inference.sh"
   },
   "dependencies": {
     "@hono/node-server": "^1.14.0",

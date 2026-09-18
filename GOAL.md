@@ -43,6 +43,10 @@ leeres Konto bekommt das 402-Format, das die Runtime versteht.
 - [ ] Harness: Runtime-Konfiguration `inferenceModel: "mock-1"` in setup.json; `inference.sh`
       wartet auf fünf `Turn`-Zeilen im Runtime-Log, liest Saldo und Ledger und prüft Konsistenz
 - [ ] `docs/protocol.md` Abschnitt Inferenz um Millicents und Vorprüfung ergänzt
+- [ ] Katalog-Aliase (`CP_MODEL_ALIASES`): die Runtime fragt für Agent-Turns `gpt-5.2`/`gpt-5-mini`
+      aus ihrer Routing-Matrix statt `inferenceModel` (Harness-Fund in Zyklus 1); Aliase lösen auf
+      das reale Modell auf, `/v1/models` listet sie mit `provider: "other"` und beiden Preisfeldern
+      (`input_per_million`, `input_per_1k`); Fund in docs/protocol.md dokumentiert
 
 ## Deny List
 - Kein echter Provider (Anthropic kommt in Goal 5), kein Netzzugriff aus dem Provider
@@ -53,5 +57,6 @@ leeres Konto bekommt das 402-Format, das die Runtime versteht.
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-09-18 22:15 Zyklus 1: Millicents-Umstellung (db, pay, Tests), Provider-Interface, MockProvider, Catalog + Proxy mit Vorprüfung/402/Abbuchung, /v1/models, inference.sh. Erster E2E-Lauf scheiterte: Runtime fragt `gpt-5.2` statt `inferenceModel` (Routing-Matrix). Fix: Katalog-Aliase, `provider: "other"`, `input_per_1k`. Danach INFERENCE OK turns=5 balance_cents=489 inference_rows=5 ledger_consistent=true; topup.sh an laufende Inferenz angepasst (Gutschrift 500 000 mc in einer Zeile statt Saldo == 500); TOPUP OK, SMOKE OK; 30 Unit-Tests. Verifier ausstehend.
 
 ## Blockers

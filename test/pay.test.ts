@@ -82,15 +82,15 @@ function setup() {
   const pay = (usd: number | string, header?: string) =>
     app.request(`/pay/${usd}/${account.address}`, { headers: header ? { "x-payment": header } : {} });
   const ledgerRows = () =>
-    db.prepare("SELECT kind, delta_cents, ref FROM ledger WHERE address = ?").all(account.address.toLowerCase()) as {
+    db.prepare("SELECT kind, delta_mc, ref FROM ledger WHERE address = ?").all(account.address.toLowerCase()) as {
       kind: string;
-      delta_cents: number;
+      delta_mc: number;
       ref: string;
     }[];
   const balance = () =>
-    (db.prepare("SELECT balance_cents FROM wallets WHERE address = ?").get(account.address.toLowerCase()) as
-      | { balance_cents: number }
-      | undefined)?.balance_cents ?? 0;
+    (db.prepare("SELECT balance_mc FROM wallets WHERE address = ?").get(account.address.toLowerCase()) as
+      | { balance_mc: number }
+      | undefined)?.balance_mc ?? 0;
   return { db, settler, app, account, pay, ledgerRows, balance };
 }
 
@@ -134,8 +134,8 @@ describe("/pay x402-Seller", () => {
     expect(body.tx_hash).toMatch(/^0x/);
     expect(settler.calls).toHaveLength(1);
     expect(settler.calls[0].value).toBe(5_000_000n);
-    expect(balance()).toBe(500);
-    expect(ledgerRows()).toEqual([{ kind: "topup", delta_cents: 500, ref: expect.stringMatching(/^0x[0-9a-f]{64}$/) }]);
+    expect(balance()).toBe(500_000);
+    expect(ledgerRows()).toEqual([{ kind: "topup", delta_mc: 500_000, ref: expect.stringMatching(/^0x[0-9a-f]{64}$/) }]);
   });
 
   it("ist idempotent: dieselbe Signatur zweimal ergibt dieselbe Antwort und eine Gutschrift", async () => {
@@ -146,7 +146,7 @@ describe("/pay x402-Seller", () => {
     expect(secondRes.status).toBe(200);
     expect(await secondRes.json()).toEqual(first);
     expect(settler.calls).toHaveLength(1);
-    expect(balance()).toBe(500);
+    expect(balance()).toBe(500_000);
     expect(ledgerRows()).toHaveLength(1);
   });
 
@@ -203,7 +203,7 @@ describe("/pay x402-Seller", () => {
 
     const retry = await pay(5, header);
     expect(retry.status).toBe(200);
-    expect(balance()).toBe(500);
+    expect(balance()).toBe(500_000);
     expect(settler.calls).toHaveLength(2);
   });
 

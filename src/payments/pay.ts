@@ -7,7 +7,7 @@
  */
 
 import { isAddress, verifyTypedData, type Address, type Hex } from "viem";
-import { postLedger, type Db } from "../db.js";
+import { MC_PER_CENT, mcToCents, postLedger, type Db } from "../db.js";
 import type { Authorization, Settler } from "./settler.js";
 
 export const TOPUP_TIERS_USD = [5, 25, 100, 500, 1000, 2500] as const;
@@ -175,18 +175,22 @@ export async function verifyAuthorizationSignature(
 interface PaymentRow {
   nonce: string;
   status: "pending" | "settled" | "failed";
-  credits_cents: number;
+  credits_mc: number;
   to_address: string;
   tx_hash: string | null;
 }
 
 function settledResponse(db: Db, row: PaymentRow): PayResponse {
   const balance = db
-    .prepare("SELECT balance_cents FROM wallets WHERE address = ?")
-    .get(row.to_address) as { balance_cents: number } | undefined;
+    .prepare("SELECT balance_mc FROM wallets WHERE address = ?")
+    .get(row.to_address) as { balance_mc: number } | undefined;
   return {
     status: 200,
-    body: { credits_cents: row.credits_cents, balance_cents: balance?.balance_cents ?? 0, tx_hash: row.tx_hash },
+    body: {
+      credits_cents: mcToCents(row.credits_mc),
+      balance_cents: mcToCents(balance?.balance_mc ?? 0),
+      tx_hash: row.tx_hash,
+    },
   };
 }
 
@@ -236,7 +240,7 @@ export async function handlePay(
   if (auth.validAfter > nowSec + 60n) return paymentRequiredResponse(cfg, usd, recipient, "authorization_not_yet_valid");
 
   // Idempotenz: dieselbe Nonce liefert dieselbe Antwort, egal wie oft sie kommt.
-  const existing = db.prepare("SELECT nonce, status, credits_cents, to_address, tx_hash FROM payments WHERE nonce = ?").get(auth.nonce) as
+  const existing = db.prepare("SELECT nonce, status, credits_mc, to_address, tx_hash FROM payments WHERE nonce = ?").get(auth.nonce) as
     | PaymentRow
     | undefined;
   if (existing?.status === "settled") return settledResponse(db, existing);
@@ -247,6 +251,7 @@ export async function handlePay(
   }
 
   const creditsCents = usd * 100;
+  const creditsMc = creditsCents * MC_PER_CENT;
   const nowIso = new Date(now).toISOString();
   const claim = db.transaction(() => {
     if (existing?.status === "failed") {
@@ -258,8 +263,8 @@ export async function handlePay(
     }
     try {
       db.prepare(
-        "INSERT INTO payments (nonce, from_address, to_address, value_atomic, credits_cents, status, created_at) VALUES (?, ?, ?, ?, ?, 'pending', ?)",
-      ).run(auth.nonce, auth.from.toLowerCase(), recipient, auth.value.toString(), creditsCents, nowIso);
+        "INSERT INTO payments (nonce, from_address, to_address, value_atomic, credits_mc, status, created_at) VALUES (?, ?, ?, ?, ?, 'pending', ?)",
+      ).run(auth.nonce, auth.from.toLowerCase(), recipient, auth.value.toString(), creditsMc, nowIso);
       return true;
     } catch {
       return false; // Rennen: ein anderer Request hat die Nonce gerade angelegt
@@ -279,10 +284,10 @@ export async function handlePay(
   }
 
   const book = db.transaction(() => {
-    const { balanceCents } = postLedger(db, {
+    const { balanceMc } = postLedger(db, {
       address: recipient,
       kind: "topup",
-      deltaCents: creditsCents,
+      deltaMc: creditsMc,
       ref: auth.nonce,
       meta: { tx_hash: result.txHash, from: auth.from.toLowerCase(), value_atomic: auth.value.toString(), usd },
     });
@@ -291,13 +296,13 @@ export async function handlePay(
       new Date().toISOString(),
       auth.nonce,
     );
-    return balanceCents;
+    return balanceMc;
   });
-  const balanceCents = book();
+  const balanceMc = book();
 
   return {
     status: 200,
-    body: { credits_cents: creditsCents, balance_cents: balanceCents, tx_hash: result.txHash ?? null },
+    body: { credits_cents: creditsCents, balance_cents: mcToCents(balanceMc), tx_hash: result.txHash ?? null },
     headers: {
       "X-Payment-Response": Buffer.from(JSON.stringify({ success: true, txHash: result.txHash ?? null, network: cfg.network })).toString("base64"),
     },

@@ -4,5 +4,6 @@
   "creatorAddress": "0x000000000000000000000000000000000000dEaD",
   "conwayApiUrl": "https://cp.test:8443",
   "socialRelayUrl": "",
+  "inferenceModel": "mock-1",
   "disableHeartbeats": ["check_social_inbox", "check_for_updates"]
 }

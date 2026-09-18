@@ -114,13 +114,31 @@ trotzdem unterwegs: Settlement darf nie an den Client-Timeout gekoppelt sein.
   optional `temperature`, `tools` (function-Schema) + `tool_choice: "auto"`. Timeout clientseitig
   `INFERENCE_TIMEOUT_MS`.
 - Antwort: `{ id, model, choices: [{ message: { role, content, tool_calls? }, finish_reason }], usage: { prompt_tokens, completion_tokens, total_tokens } }`.
-- Abrechnung: serverseitig nach `usage`, Preis = Listenpreis x 1,3 (Conways Faktor, gemessen),
-  Abbuchung atomar mit dem Ledger-Eintrag. Bei `balance_cents` unter dem geschätzten Maximum:
+- **Welche Modell-IDs die Runtime anfragt (Harness-Fund 18.09.2026):** nicht das konfigurierte
+  `inferenceModel`, sondern die Kandidaten ihrer Routing-Matrix (`src/inference/types.ts`,
+  `DEFAULT_ROUTING_MATRIX`): tier high/normal `gpt-5.2` (dann `gpt-5.3` bzw. `gpt-5-mini`),
+  low_compute/critical `gpt-5-mini`; `inferenceModel` ist nur Fallback, wenn keine Baseline-ID
+  enabled ist. Ein Drop-in-Katalog muss `gpt-5.2`, `gpt-5-mini` und `gpt-5.3` bedienen; das
+  Control Plane bildet sie per `CP_MODEL_ALIASES` auf reale Modelle ab und antwortet mit der
+  angefragten ID im Feld `model`.
+- `GET /v1/models` -> `{ "data": [ { id, provider, owned_by, available, context_window, max_tokens,
+  supports_tools, parameter_style, pricing: { input_per_million, output_per_million, input_per_1k, output_per_1k } } ] }`.
+  Zwei Leser im Upstream: `conway/client.ts` liest `input_per_million`, die Model-Registry
+  (`refreshFromApi`, per Heartbeat) liest `input_per_1k`. `provider` ist `"other"`: die Registry
+  deaktiviert beim Start jedes Modell außerhalb ihrer Baseline, dessen Provider nicht `ollama` oder
+  `other` ist, und `other` wird sicher über `conwayApiUrl` geroutet (bei `openai`/`anthropic` plus
+  eigenem Key in der Config ginge die Runtime am Control Plane vorbei).
+- Abrechnung: serverseitig nach `usage`, Verkaufspreis = Listenpreis x 1,3 (Conways Faktor,
+  gemessen). Saldo intern in Millicents (1/1000 Cent), Kosten je Call
+  `ceil((prompt x in + completion x out) x 0,1 x 1,3)` mc mit Preisen in USD je Million Tokens;
+  API zeigt `balance_cents = floor(mc / 1000)`. Abbuchung und Ledger-Zeile (`kind = inference`) in
+  einer Transaktion; die Abbuchung übersteigt nie den Saldo, ein Rest steht als `uncollected_mc`
+  im meta (Agent bleibt bei 0 = critical statt negativ = dead).
+- Vorprüfung vor dem Call: geschätzte Prompt-Tokens (Zeichen/4) plus maximale Ausgabe gegen den
+  Saldo; reicht er nicht:
   `402 { "error": "INSUFFICIENT_CREDITS", "details": { "required_cents", "current_balance_cents" } }`
-  (Format, das `topupForSandbox` parst).
-- `GET /v1/models` -> `{ "data": [ { "id", "provider", "available": true, "pricing": { "input_per_million", "output_per_million" } } ] }`.
-  Runtime-Default-Modell ist `gpt-5.2`; der Katalog muss entweder diese ID führen oder der Nutzer
-  setzt `inferenceModel`. Der Katalog nennt nur Modelle, die der konfigurierte Provider liefert.
+  (Format, das `topupForSandbox` parst; der Agent-Loop versucht bei 402 einen Topup und wiederholt einmal).
+- Unbekanntes Modell: `404 { "error": "model_not_found" }`. `stream: true`: 400.
 
 ### Registry
 

@@ -7,6 +7,7 @@
 import { Hono } from "hono";
 import type { Db } from "./db.js";
 import { getBalanceCents } from "./db.js";
+import { Catalog, handleChat } from "./inference/proxy.js";
 import { handlePay, type PayConfig } from "./payments/pay.js";
 import type { Settler } from "./payments/settler.js";
 import {
@@ -27,6 +28,8 @@ export interface AppOptions {
   /** Ohne pay/settler antwortet /pay mit 503. */
   pay?: PayConfig | null;
   settler?: Settler | null;
+  /** Ohne Katalog antworten /v1/chat/completions und /v1/models mit 503. */
+  catalog?: Catalog | null;
 }
 
 type Env = { Variables: { address: `0x${string}` } };
@@ -99,6 +102,20 @@ export function createApp(opts: AppOptions) {
   app.get("/v1/credits/balance", (c) =>
     c.json({ balance_cents: getBalanceCents(db, c.get("address")) }),
   );
+
+  // ─── Inferenz ─────────────────────────────────────────────────
+
+  app.get("/v1/models", (c) => {
+    if (!opts.catalog) return c.json({ error: "inference_unavailable" }, 503);
+    return c.json(opts.catalog.listModels());
+  });
+
+  app.post("/v1/chat/completions", async (c) => {
+    if (!opts.catalog) return c.json({ error: "inference_unavailable" }, 503);
+    const body = await c.req.json().catch(() => null);
+    const res = await handleChat(db, opts.catalog, c.get("address"), body);
+    return c.json(res.body as Record<string, unknown>, res.status as 200);
+  });
 
   app.get("/v1/sandboxes", (c) => c.json({ sandboxes: [] }));
   app.all("/v1/sandboxes/*", (c) => c.json({ error: "not_implemented" }, 501));
