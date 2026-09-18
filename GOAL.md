@@ -1,0 +1,57 @@
+# GOAL.md
+
+## Status
+ACTIVE
+
+## Active Objective
+Topup: `/pay/{usd}/{address}` als x402-v1-Seller; die unveränderte Upstream-Runtime kauft beim
+Start automatisch 5 USD Credits mit USDC auf einer lokalen Anvil-Chain, die Gutschrift ist
+idempotent und im Ledger nachvollziehbar.
+
+## Done Condition
+- [ ] `pnpm test` grün, `test/pay.test.ts` mit mindestens 6 Tests: 402-Angebot im Format aus
+      docs/protocol.md; gültige EIP-3009-Signatur (viem `signTypedData`, Domain "USD Coin"/"2") ->
+      `200 { credits_cents: 500 }` und Balance 500; dieselbe Signatur zweimal -> gleiche Antwort, eine
+      Ledger-Zeile, Balance bleibt 500; falsche Signatur -> 402; falscher Betrag -> 402; Tier 7 -> 400
+      Prüfung: `pnpm test` exit 0, `grep -c "it(" test/pay.test.ts` >= 6
+- [ ] `pnpm e2e:topup` grün
+      Prüfung: `pnpm e2e:topup` exit 0, Ausgabe enthält `TOPUP OK balance_cents=500 ledger_rows=1`
+      und eine Runtime-Logzeile mit `Bootstrap topup: +$5`
+- [ ] Der Smoke-Test aus Goal 1 bleibt grün
+      Prüfung: `pnpm e2e:smoke` exit 0 mit `SMOKE OK`
+- [ ] Nach den E2E-Läufen ist die Umgebung abgeräumt
+      Prüfung: `docker compose -f harness/docker-compose.yml ps -q` ist leer
+- [ ] goal-verifier PASS
+
+## Acceptance Criteria
+- [ ] `GET /pay/{usd}/{address}` ohne `X-Payment`: 402, Body und Header `X-Payment-Required`
+      (base64 desselben JSON) mit `accepts[0]` = `{ scheme: "exact", network: "base" | "eip155:8453",
+      maxAmountRequired, payTo, asset, maxTimeoutSeconds }`; Tiers 5/25/100/500/1000/2500, sonst 400
+- [ ] Mit `X-Payment` (base64 JSON, x402 v1, `payload.signature` + `payload.authorization`):
+      Signatur offline geprüft (EIP-712 `TransferWithAuthorization`), `to` == payTo, `value` ==
+      Tier in atomaren USDC, `validBefore` in der Zukunft; erst dann Settlement
+- [ ] Settlement über ein `Settler`-Interface; im Harness `CP_SETTLER=local` (sendet
+      `transferWithAuthorization` selbst an Anvil); ohne Settler-Konfiguration antwortet `/pay` 503.
+      Kein Facilitator-Code, der außerhalb von `harness`-Konfiguration selbst settlet
+- [ ] Gutschrift, Ledger-Zeile (`kind = topup`) und Payment-Status `settled` in einer
+      SQLite-Transaktion; Idempotenzschlüssel ist die Authorization-Nonce; Wiederholung liefert
+      dieselbe Antwort ohne zweite Gutschrift; Settlement ist nicht an den Client-Timeout gekoppelt
+- [ ] Harness: Service `chain` (Anvil, chainId 8453), USDC-Mock per `anvil_setCode` an der
+      Mainnet-Adresse `0x8335...2913` mit EIP-3009 und EIP-712-Domain wie Circle; Runtime-Container
+      mit `AUTOMATON_RPC_URL=http://chain:8545`; Wallet der Runtime wird nach `provision` per Skript
+      mit 6 USDC ausgestattet
+- [ ] `docs/protocol.md` bleibt die Referenz; Abweichungen, die beim Bau auffallen, werden dort
+      korrigiert
+
+## Deny List
+- Kein Inferenz-Endpunkt (Goal 3), kein Register/Transfer (Goal 4), kein `deploy/`
+- Kein Patch an der Runtime (harness/runtime/ nur Dockerfile, entrypoint, setup-Skript, setup.json)
+- Credits nie auszahlbar; kein Endpunkt, der USDC zurücküberweist
+
+## Budget
+- max Zyklen: 8
+- max Versuche pro Gap: 3
+
+## Progress Log
+
+## Blockers
