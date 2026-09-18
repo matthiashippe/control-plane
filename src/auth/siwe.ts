@@ -1,9 +1,9 @@
 /**
  * SIWE-Provisionierung: nonce -> verify (access_token) -> api-keys (cnwy_k_...).
  *
- * Der Runtime-Client (provision.ts) sendet Domain "conway.tech", chainId 8453 und
- * uri "<conwayApiUrl>/v1/auth/verify" fest. Wir prüfen Domain und chainId gegen die Konfiguration
- * und die uri nur auf den Pfad, weil der Host je Deployment anders heißt.
+ * Der Runtime-Client (provision.ts) sendet Domain "conway.tech" und chainId 8453 fest; die uri
+ * ist "<conwayApiUrl>/v1/auth/verify" und damit je Deployment anders. Geprüft werden Domain,
+ * chainId, Nonce und Signatur; die uri wird nicht geprüft.
  */
 
 import { createHash, randomBytes } from "node:crypto";
