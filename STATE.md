@@ -1,6 +1,6 @@
 # Loop State: control-plane
 
-Last run: 2026-09-18 21:52 (Goal 1 DONE)
+Last run: 2026-09-18 22:04 (Goal 2 DONE)
 
 ## High Priority (Build-Queue, ein Goal je Zeile, Reihenfolge bindend)
 
@@ -8,9 +8,9 @@ Last run: 2026-09-18 21:52 (Goal 1 DONE)
    Mainnet-Adresse), Control Plane hinter TLS (eigene CA), Upstream-Runtime `d8f8168` unverändert.
    Done: `pnpm e2e:smoke` grün: `/health` über TLS aus dem Runtime-Container, `automaton --provision`
    liefert einen `cnwy_k_`-Key. Status: DONE 18.09.2026, `goals/2026-09-18-goal-1-harness-geruest.md`
-2. **Goal 2, Topup** (ACTIVE, GOAL.md): `/pay/5/<addr>` als x402-v1-Seller mit lokalem Settler gegen Anvil;
+2. **Goal 2, Topup** (DONE 18.09.2026, `goals/2026-09-18-goal-2-topup.md`): `/pay/5/<addr>` als x402-v1-Seller mit lokalem Settler gegen Anvil;
    Bootstrap-Topup der Runtime verbucht 500 Cents; dieselbe Signatur zweimal = eine Gutschrift.
-3. **Goal 3, Inferenz**: `/v1/chat/completions` Proxy mit Mock-Provider und serverseitiger
+3. **Goal 3, Inferenz** (ACTIVE, GOAL.md): `/v1/chat/completions` Proxy mit Mock-Provider und serverseitiger
    Abbuchung (Listenpreis x 1,3); fünf Turns der Runtime, Ledger-Summe = Abbuchung, 402-Format bei
    leerem Konto.
 4. **Goal 4, Rest von Phase 1**: `/v1/automatons/register` (EIP-712-Prüfung), `/v1/models`,

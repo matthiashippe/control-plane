@@ -20,3 +20,4 @@ Append one entry per run. Prune entries older than 30 days.
 ## Recent Runs
 
 <!-- Loop appends below this line -->- 2026-09-18 21:52 | goal-1 harness-geruest | Zyklen: 1 | Verifier: PASS (Sonnet, 86k Tokens, 163 s) | Ergebnis: SIWE-Provisionierung der Upstream-Runtime über TLS im Docker-Harness | Eskalation: keine
+- 2026-09-18 22:04 | goal-2 topup | Zyklen: 1 | Verifier: PASS (Sonnet, 98k Tokens, 313 s) | Ergebnis: Bootstrap-Topup der Upstream-Runtime über /pay (x402 v1) gegen Anvil, Ledger idempotent | Eskalation: keine
