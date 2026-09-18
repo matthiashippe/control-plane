@@ -7,4 +7,7 @@ x402-Topup (USDC auf Base), Inferenz mit serverseitiger Abbuchung.
 
 Protokoll: `docs/protocol.md`. Bauplan und Stand: `STATE.md`. Arbeitsweise: `LOOP.md`.
 
-Status 18.09.2026: Goal 1 (Harness-Gerüst) in Arbeit. Nichts davon läuft öffentlich.
+Status 18.09.2026: Phase 1 läuft im Docker-Harness komplett gegen die unveränderte Upstream-Runtime
+(`pnpm e2e`: Provisionierung, Registrierung, Bootstrap-Topup über x402, fünf Turns, Schlaf, ohne
+API-Fehler). Nichts davon läuft öffentlich; Goal 5 (Betrieb) wartet auf Domain, payTo-Wallet und
+Einkaufsquelle.

@@ -1,6 +1,6 @@
 # Loop State: control-plane
 
-Last run: 2026-09-18 22:28 (Goal 3 DONE)
+Last run: 2026-09-18 22:52 (Goal 4 DONE, Phase 1 im Harness komplett)
 
 ## High Priority (Build-Queue, ein Goal je Zeile, Reihenfolge bindend)
 
@@ -13,10 +13,10 @@ Last run: 2026-09-18 22:28 (Goal 3 DONE)
 3. **Goal 3, Inferenz** (DONE 18.09.2026, `goals/2026-09-18-goal-3-inferenz.md`; Fund: Runtime fragt `gpt-5.2`/`gpt-5-mini` aus der Routing-Matrix, Katalog-Aliase nötig): `/v1/chat/completions` Proxy mit Mock-Provider und serverseitiger
    Abbuchung (Listenpreis x 1,3); fünf Turns der Runtime, Ledger-Summe = Abbuchung, 402-Format bei
    leerem Konto.
-4. **Goal 4, Rest von Phase 1** (ACTIVE, GOAL.md): `/v1/automatons/register` (EIP-712-Prüfung),
+4. **Goal 4, Rest von Phase 1** (DONE 18.09.2026, `goals/2026-09-18-goal-4-phase-1-komplett.md`): `/v1/automatons/register` (EIP-712-Prüfung),
    `/v1/credits/pricing`, Sandbox-Stubs, `/v1/credits/transfer` vorerst 501 (Entscheidung unten);
    kompletter Erstlauf der Upstream-Runtime grün (`pnpm e2e`).
-5. **Goal 5, Betrieb**: Anthropic als erster echter Provider, Deploy auf `srv1336627` mit Caddy,
+5. **Goal 5, Betrieb** (WARTET auf Entscheidungen, kein GOAL.md angelegt): Anthropic als erster echter Provider, Deploy auf `srv1336627` mit Caddy,
    Facilitator CDP oder PayAI, Statusseite, einmalige Abnahme mit Wegwerf-Wallet auf Base Mainnet.
    Braucht Entscheidungen: Domain, payTo-Wallet.
 
