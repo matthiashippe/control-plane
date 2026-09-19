@@ -1,6 +1,28 @@
 # Loop State: control-plane
 
-Last run: 2026-09-19 17:20 (Goal 5b DONE, Dienst live auf cp.hippe.eu)
+Last run: 2026-09-19 18:00 (Goal 7 DONE, GTM auf die gemessene Marktgröße korrigiert)
+
+## Lage (Stand 19.09.2026, belegt in `docs/research/2026-09-19-nachfrage.md`)
+
+Der Markt, auf den dieser Dienst zielt, ist on-chain gemessen und klein: im ganzen Conway-Umfeld
+fließen 290 bis 430 USDC im Monat von 44 Wallets, der Einbruch um 93 Prozent kam im April und
+damit drei Monate vor der Störung. Neue Betroffene kommen kaum nach, seit dem 29.08.2026 wurde
+kein neues Issue zum Provisionierungsproblem mehr eröffnet. Das ursprüngliche Ziel von 1 bis 3k
+USD Marge im Monat ist an diesem Markt nicht erreichbar, und zwar um den Faktor zehn bis
+fünfundzwanzig. Matthias hat am 19.09. entschieden, den Dienst trotzdem die 30 Tage laufen zu
+lassen, weil er rund 10 EUR im Monat kostet und fertig gebaut ist.
+
+**Positionierung:** Nicht "wir ersetzen Conway", sondern: die Runtime denkt ohne erreichbaren
+Kontostand überhaupt nicht (`getFinancialState` liefert `-1`, `getSurvivalTier(-1)` ergibt `dead`,
+die Routing-Matrix hat für `dead` keinen Kandidaten, es geht kein einziger Inferenz-Request
+hinaus), und wir liefern genau diese Abrechnungsschicht. Dazu gehört, den kostenlosen Weg über
+Ollama selbst zu dokumentieren, weil wer ihn kennt ohnehin kein Kunde war.
+
+**Messgröße für den 30-Tage-Test (bis 19.10.2026): fünf fremde Automatons.** Fremd heißt: ein
+`creator_address`, der nicht uns gehört. Aktueller Stand 1 (unser eigener). Unter drei am
+19.10. wird abgeschaltet, mit zwei Wochen Vorlauf auf der Startseite. Ablesbar über
+`curl -s https://cp.hippe.eu/v1/status | python3 -c 'import sys,json;print(json.load(sys.stdin)["automatons"])'`
+minus eins, genauer über `ops/status.sh` (`db.wallets`, `db.automatons`).
 
 ## High Priority (Build-Queue, ein Goal je Zeile, Reihenfolge bindend)
 
@@ -23,34 +45,67 @@ Last run: 2026-09-19 17:20 (Goal 5b DONE, Dienst live auf cp.hippe.eu)
    als Facilitator. Beide Abnahmestufen bestanden (Stufe 1 Tier-1-Topup `0xab5932…0733a`,
    Stufe 2 Erstlauf der Upstream-Runtime mit Bootstrap-Topup `0x6cde28b0…54dc68`, fünf Turns,
    keine API-Fehler). Tier 1 danach aus dem Betrieb genommen.
+6. **Goal 6, Veröffentlichung** (DONE 19.09.2026): Repo public unter
+   github.com/matthiashippe/control-plane mit PolyForm Noncommercial, öffentliche Startseite und
+   `/v1/status`, drei Antworten in den Conway-Issues #339, #377, #393, PR `xpaysh/awesome-x402#1564`
+   (Stand 19.09. 18:00: offen, unkommentiert, keine Antwort auf die drei Kommentare).
+7. **Goal 7, Nachfrage messen** (DONE 19.09.2026, `goals/2026-09-19-goal-7-nachfrage.md`,
+   Ergebnis in `docs/research/2026-09-19-nachfrage.md`, Rohdaten in `docs/research/data/`): F1 bis F4
+   beantwortet, GTM-Plan hier oben korrigiert.
 
-**Nächste Schritte (kein Goal, Entscheidung offen):**
-- Ops-Triage als Loop scharf schalten: `/loop 1d Run $ops-triage` (L1, report-only, Datenquelle
-  `ops/status.sh`, Schwellen in `ops/README.md`).
-- Go-to-Market für den 30-Tage-Test (Messgröße: 50 provisionierte Automatons, aktuell 1):
-  sachliche Antworten in den Conway-Issues #339 und #377, README-Abschnitt im Fork `htc/vm`,
-  Eintrag bei awesome-x402. Braucht Matthias' Go, weil es Außenwirkung hat.
-- Phase 2 (Sandboxes, Social-Relay) erst, wenn Nachfrage messbar ist.
+**Nächstes Goal (Goal 8, aus der Konsequenz der Recherche):**
+- `docs/ohne-control-plane.md`: der kostenlose Weg, belegt am Upstream-Code, inklusive der beiden
+  Auswege (Ollama über `modelStrategy.inferenceModel`, `last_known_balance` in der lokalen
+  KV-Tabelle) und der Grenze, an der er endet.
+- Die restlichen Issue-Threads (#353, #355, #356, #359, #371, #372, #373, #376, #379, #380, #385, #390,
+  #392) bekommen je eine Antwort, die zuerst das Problem des Fragenden löst und uns erst danach
+  als Option nennt. Höchstens drei pro Tag.
+- `.well-known/x402` und `llms.txt` auf cp.hippe.eu, damit andere Agenten den Dienst maschinell
+  finden.
+- HN-Artikel als Entwurf: die Daten im Mittelpunkt (Tod einer Agenten-Ökonomie in neun Monaten),
+  der Dienst als Fußnote. Titel und Freigabe bei Matthias vor dem Posten.
+
+**Danach (Prüfauftrag, kein Goal):** Taugt das Gebaute als generisches x402-Abrechnungs-Gateway für
+andere Agenten-Dienste? SIWE-Provisionierung, Prepaid-Credits, idempotentes Settlement und
+Abrechnung nach echten Einkaufskosten sind nicht Conway-spezifisch. Das ist der einzige Pfad, auf
+dem die Zahl 1 bis 3k je wieder auftaucht, und deshalb der nächste Rechercheauftrag, nicht mehr
+Reichweite für Conway-Flüchtlinge.
+
+**Offen, ohne Goal:** Ops-Triage als Loop scharf schalten (`/loop 1d Run $ops-triage`, L1,
+report-only, Datenquelle `ops/status.sh`, Schwellen in `ops/README.md`). Phase 2 (Sandboxes,
+Social-Relay) erst, wenn Nachfrage messbar ist, also frühestens nach dem 19.10.
 
 ## Entscheidungen bei Matthias
 
+- **Impressum**: Auf der Startseite stehen nur Firma, Stadt und Mail. Das DDG verlangt für einen
+  gewerblichen Dienst eine ladungsfähige Anschrift. Matthias muss sagen, welche Adresse drauf soll.
+  Blockiert nichts technisch, ist aber ein Rechtsrisiko, solange der Dienst öffentlich ist.
+- **HN-Artikel**: Titel und Freigabe vor dem Posten.
+- **Steuerfrage**: USt auf Nutzungsguthaben, B2B-Ausland, Reverse Charge. Vor dem ersten
+  Fremdnutzer zu klären, also im 30-Tage-Fenster.
 - **Credit-Transfer** (`POST /v1/credits/transfer`, Runtime-Tools `transfer_credits`, `fund_child`):
   Handoff-Leitplanke sagt "nicht übertragbar" (E-Geld-Abgrenzung, Recherche 6.2), Constraints
   erlauben Transfer innerhalb des Control Plane. Phase 1 antwortet 501; Solo-Automatons brauchen
   ihn nicht. Option für später: Transfer nur zwischen Wallets desselben `creator_address`.
 - Erledigt am 19.09.2026: Domain `cp.hippe.eu`, payTo `0x9141…d614`, SSH-Key auf `srv1336627`,
-  Einkauf OpenRouter. Offen bleibt der Go für Go-to-Market und die Steuerfrage (USt auf
-  Nutzungsguthaben, B2B-Ausland, Reverse Charge) vor dem ersten Fremdnutzer.
+  Einkauf OpenRouter, Go für Go-to-Market, Weiterbetrieb trotz gemessener Marktgröße.
 
 ## Watch List
 
+- **30-Tage-Messung**: fremde Automatons auf cp.hippe.eu, Ziel fünf bis 19.10.2026, Abschaltung
+  unter drei.
 - Upstream-Drift: `Conway-Research/automaton` main gegen `d8f8168` (Protokolländerungen an
-  provision.ts, topup.ts, x402.ts, conway/client.ts, conway/inference.ts).
-- Conway-Issues #339, #377 (Onboarding kaputt), #393 (doppelte Abbuchung) als GTM-Einstieg,
-  erst nach Goal 5.
+  provision.ts, topup.ts, x402.ts, conway/client.ts, conway/inference.ts). Letzter Upstream-Commit
+  26.08.2026 (README), letztes Release 27.02.2026, keine Maintainer-Antwort seit 07.03.2026.
+- Reaktionen auf unsere Außenwirkung: Issues #339, #377, #393 und PR `xpaysh/awesome-x402#1564`.
 - Facilitator-Preise: PayAI ab 21.09.2026 0,00212 USD je Settlement; CDP 1.000 frei pro Monat.
+- OpenRouter-Guthaben: 19,81 USD Rest am 19.09.2026, fließt nur bei echter Nutzung ab.
 
 ## Recent Noise (ignored this run)
+
+- Wallet `0x7f0376c6…d7b82` schickt in hoher Frequenz Mikrobeträge an Conways payTo (7 Transfers
+  über zusammen 0,034 USDC in der Stunde vor 15:53 UTC am 19.09.). Hochgerechnet unter 25 USDC im
+  Monat, ändert am Bild nichts, war im Vollscan enthalten.
 
 ---
 Run log: loop-run-log.md

@@ -34,8 +34,21 @@ zwei Zahlungen je Wallet, was zum Retry-Bug aus Issue #393 passt.
 
 ### Beleg
 
+Die Rohdaten liegen unter `data/2026-09-19-conway-payto-transfers.csv` (9.012 Zeilen, keine
+Duplikate), die Monatstabelle oben ist daraus mit dem Skript in `data/README.md` reproduzierbar,
+ohne den Scan zu wiederholen.
+
+Unsicherheit der Erhebung: Der öffentliche RPC `mainnet.base.org` erlaubt höchstens 2.000 Blöcke je
+`eth_getLogs` und antwortet bei schnellen Schleifen mit "over rate limit", weshalb die 5.652 Chunks
+sequenziell mit Wiederholung bei Fehlschlag liefen und der Vollscan rund 30 Minuten dauerte. Jeder
+Chunk wurde erst nach einer erfolgreichen Antwort als erledigt gezählt, und die Chunk-Grenzen
+lückenlos aneinandergesetzt, weshalb der Scan lückenlos ist. `base-rpc.publicnode.com` als
+Ausweichknoten antwortet auf Python-urllib mit 403, mit curl geht es. Basescan V1 ist abgeschaltet
+und kam nicht in Frage. Was der Datensatz nicht zeigt: ob hinter einer Wallet ein Mensch, ein
+Automat oder ein Wiederholungsversuch steht.
+
 Eigene Nachrechnung eines Chunks (Block 51.518.702 bis 51.520.317), erwartet und erhalten:
-4 Logs, 10,003386 USDC, 2 Wallets.
+4 Logs, 10,003386 USDC, 2 Wallets. Am 19.09.2026 um 18:10 von einem zweiten Lauf bestätigt.
 
 ```
 curl -s -X POST https://mainnet.base.org -H "Content-Type: application/json" \
@@ -48,10 +61,11 @@ viermal 5 USDC geschickt, ohne Gegenleistung. Der Transfer vom 18.09. 18:00:33 U
 
 ## F2: Wie viele Betroffene kommen nach?
 
-Zwölf Issues zum Provisionierungsproblem zwischen 17.07. und 29.08.2026, dazu drei Grenzfälle
-(#385, #390, #392). Betroffene Personen (Autoren und Kommentatoren, ohne Bots, ohne uns):
-Juli 6, August 12, September 3. Letzte 30 Tage: 11 Personen. Letzte 14 Tage: 3 Personen, alle als
-Kommentatoren auf alten Threads.
+Zwölf Issues zum Provisionierungsproblem zwischen 17.07. und 29.08.2026 (#339, #353, #355, #356,
+#359, #371, #372, #373, #376, #377, #379, #380), dazu drei Grenzfälle (#385, #390, #392).
+Betroffene Personen (Autoren und Kommentatoren, ohne Bots, ohne uns): Juli 6, August 12,
+September 3. Letzte 30 Tage: 11 Personen. Letzte 14 Tage: 3 Personen, alle als Kommentatoren auf
+alten Threads. Über alle zwölf Issues sind es 20 Personen, mit den Grenzfällen 26.
 
 **Seit dem 29.08.2026 wurde kein neues Issue zu diesem Fehler mehr eröffnet**, also seit 21 Tagen.
 Wer heute neu ankommt, scheitert vorher an der Installation (#390) oder fragt nach lokalen Modellen
@@ -59,22 +73,34 @@ Wer heute neu ankommt, scheitert vorher an der Installation (#390) oder fragt na
 vom 26.08.2026 änderte die README, das letzte Release ist vom 27.02.2026. Von 52 Issue-Kommentaren
 seit dem 17.07. stammt keiner von einem Mitglied der Organisation.
 
-Der identifizierbare Kreis liegt damit bei rund 25 Personen. Die on-chain gemessenen 44 zahlenden
+Der identifizierbare Kreis liegt damit bei 26 Personen, davon 20 in den
+Provisionierungs-Issues selbst. Die on-chain gemessenen 44 zahlenden
 Wallets der letzten 30 Tage sind größtenteils andere, stille Nutzer, die nie ein Issue geschrieben
 haben. **Für diese Gruppe existiert kein Kontaktkanal**: eine Wallet-Adresse ist kein Mensch, der
 Social-Relay ist tot, Discussions sind deaktiviert, einen Discord gibt es nicht.
 
 ### Beleg
 
+Die Personenzahlen je Monat liefert `data/f2-betroffene.sh` (Issue-Liste und Zähldefinition stehen
+im Kopf des Skripts). Ausgabe am 19.09.2026: Juli 6, August 12, September 3, gesamt 20, letzte
+30 Tage 11, letzte 14 Tage 3; mit den drei Grenzfällen gesamt 26.
+
+Der Zustand des Upstream-Repos:
+
 ```
-gh api -X GET search/issues -f q='repo:Conway-Research/automaton is:issue created:>=2026-06-01' --jq '.total_count'
-gh api --paginate "repos/Conway-Research/automaton/issues/comments?since=2026-07-17T00:00:00Z&per_page=100" --jq '.[].author_association' | sort | uniq -c
 gh api "repos/Conway-Research/automaton/issues?state=all&sort=created&direction=desc&per_page=15" --jq '.[] | select(.pull_request == null) | "\(.number) \(.created_at[0:10])"'
+gh api --paginate "repos/Conway-Research/automaton/issues/comments?since=2026-07-17T00:00:00Z&per_page=100" --jq '.[].author_association' | sort | uniq -c
+gh api repos/Conway-Research/automaton --jq '{pushed_at}'
 ```
+
+Unsicherheit: Gezählt sind nur Menschen, die sich auf GitHub gemeldet haben. Wer still aufgab, wer
+per Mail schrieb oder wer das Repo nie fand, taucht nicht auf. Die Zahl ist also eine Untergrenze
+für die Betroffenen und keine Schätzung der Gesamtzahl.
 
 ## F3: Gibt es schon einen Ersatz?
 
-Nein. Suche über GitHub-Code (`conwayApiUrl` 182 Treffer, `api.conway.tech` 187, `cnwy_k_` 83),
+**Null.** Kein einziger zweiter Dienst, kein Fork mit eigener Serverimplementierung. Suche über
+GitHub-Code (`conwayApiUrl` 182 Treffer, `api.conway.tech` 187, `cnwy_k_` 83),
 1.440 Forks, npm und Web: keine zweite Serverimplementierung. Die vier Forks mit eigenen Commits
 zeigen unverändert auf `api.conway.tech`. Zwei Blogposts (Starlog 08.09., BV-7X 18.02.) beschreiben
 das Lock-in und empfehlen, die Infrastrukturschicht zu ersetzen, ohne dass es jemand getan hätte.
@@ -99,6 +125,10 @@ Korrektur zum Agentenbericht: Die Behauptung, in #393 stehe ein Marketing-Pitch 
 ist falsch. In #393 steht genau ein Kommentar, und der ist unserer.
 
 ## F4: Was kann ein blockierter Nutzer umsonst tun?
+
+**Ohne erreichbaren Kontostand geht null Inferenz-Requests hinaus, gemessen an elf Turns in einem
+eigenen Containerlauf.** Was ein Ausweg den Nutzer an Arbeit kostet, ist nicht ermittelbar: es
+hängt daran, ob er schon Ollama betreibt und ob seine Hardware ein brauchbares Modell trägt.
 
 Die Runtime startet ohne echte Provisionierung: `conwayApiKey` wird nie geprüft, ein beliebiger
 String in `automaton.json` genügt (`identity/provision.ts:25-34`, `conway/client.ts:56-64`). Danach
@@ -166,8 +196,8 @@ monatlich Geld in ein totes System schiebt, also echten Schmerz hat.
    verlinken ihn aus den Issue-Antworten. Das ist der glaubwürdigste Weg, in dieser kleinen
    Community ernst genommen zu werden, und kostet uns nichts, weil dieser Nutzerkreis nie gezahlt
    hätte.
-4. Die restlichen Issue-Threads (#353, #355, #356, #359, #372, #373, #376, #379, #380, #385, #390,
-   #392) bekommen je eine Antwort, die zuerst das jeweilige Problem löst (auch ohne uns) und uns
+4. Die restlichen Issue-Threads (#353, #355, #356, #359, #371, #372, #373, #376, #379, #380, #385,
+   #390, #392) bekommen je eine Antwort, die zuerst das jeweilige Problem löst (auch ohne uns) und uns
    erst danach als Option nennt. Höchstens drei pro Tag.
 5. Kein bezahltes Marketing, keine On-Chain-Ansprache der zahlenden Wallets. Letzteres wäre
    technisch möglich (0-Wert-Transaktion mit Calldata), ist aber Spam und beschädigt genau das
