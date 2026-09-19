@@ -77,10 +77,21 @@ Social-Relay) erst, wenn Nachfrage messbar ist, also frühestens nach dem 19.10.
 
 ## Entscheidungen bei Matthias
 
-- **Impressum**: Auf der Startseite stehen nur Firma, Stadt und Mail. Das DDG verlangt für einen
-  gewerblichen Dienst eine ladungsfähige Anschrift. Matthias muss sagen, welche Adresse drauf soll.
-  Blockiert nichts technisch, ist aber ein Rechtsrisiko, solange der Dienst öffentlich ist.
-- **HN-Artikel**: Titel und Freigabe vor dem Posten.
+- **Impressum: bewusst offen gelassen** (Matthias, 19.09.2026). Auf der Startseite stehen nur Firma,
+  Stadt und Mail; das DDG verlangt für einen gewerblichen Dienst eine ladungsfähige Anschrift. Im
+  Brain steht keine Geschäftsadresse für HTC, und die dort hinterlegte Frankfurter Adresse ist als
+  Fahrt-Startadresse vermerkt, also vermutlich privat. Eine geratene Adresse wäre schlimmer als
+  keine, und die private öffentlich zu machen ist seine Entscheidung. Das Risiko ist bewusst
+  getragen und bei einer Handvoll Nutzern klein. **Wiedervorlage 03.10.2026**: nachfragen, ob eine
+  Anschrift feststeht oder ein Impressumsservice gemietet werden soll. Die Seite steht dann in
+  zehn Minuten.
+- **HN-Artikel**: Titel entschieden am 19.09.2026: "1,582 wallets funded an AI agent in February.
+  By June, three were left." Der Text ist fertig (`docs/artikel-agentenoekonomie.md`). Offen bleibt,
+  ob und wann er rausgeht; posten muss Matthias selbst. Vor dem Posten die Zahlen nachziehen, der
+  Datensatz endet am 19.09.
+- **Meldeweg für Ausfälle**: `ops/watchdog.sh` läuft, schreibt aber nur ins Log auf der VM, weil
+  `CP_ALERT_WEBHOOK` nicht gesetzt ist. Welcher Dienst die Meldungen bekommt (ntfy, Slack, Discord),
+  ist eine Entscheidung über einen Drittanbieter und liegt bei Matthias.
 - **Steuerfrage**: USt auf Nutzungsguthaben, B2B-Ausland, Reverse Charge. Vor dem ersten
   Fremdnutzer zu klären, also im 30-Tage-Fenster.
 - **Credit-Transfer** (`POST /v1/credits/transfer`, Runtime-Tools `transfer_credits`, `fund_child`):

@@ -1,21 +1,24 @@
-# Artikel-Entwurf: Was on-chain vom Automaton-Hype übrig ist
+# Artikel: 1,582 wallets funded an AI agent in February. By June, three were left.
 
-**Status: Entwurf. Nicht gepostet.** Titel und Text brauchen Matthias' Freigabe, bevor irgendwas
-rausgeht. Der Text steht unten auf Englisch, weil er nach Hacker News soll.
+**Status: fertig, nicht gepostet.** Der Titel ist entschieden, der Text steht unten auf Englisch,
+weil er nach Hacker News soll. Das Posten macht Matthias selbst.
 
-## Zu entscheiden
+## Stand der Entscheidungen
 
-1. **Titel.** Drei Vorschläge, absteigend nach meiner Präferenz:
-   - "1,582 wallets funded an AI agent in February. By June, three were left."
-     Das ist die stärkste Zahl im Datensatz und behauptet nichts, was nicht belegt ist.
-   - "I scanned every USDC payment to an AI agent platform for nine months"
-     Methodisch ehrlich, aber schwächer, weil es die Pointe verschenkt.
-   - "An agent economy died in nine months, and the chain recorded all of it"
-     Griffig, aber zu groß: der Datensatz zeigt ein Projekt, nicht eine Ökonomie.
-2. **Ob unser Dienst überhaupt vorkommt.** Der Entwurf nennt ihn in einem Satz am Ende. Weniger
-   geht kaum, mehr macht den Text zur Werbung und wird auf HN entsprechend behandelt.
-3. **Zeitpunkt.** Der Datensatz ist vom 19.09.2026. Je länger er liegt, desto mehr muss er vor dem
-   Posten nachgezogen werden.
+**Titel steht** (Matthias, 19.09.2026): "1,582 wallets funded an AI agent in February. By June,
+three were left." Die Zahl ist aus dem Datensatz gerechnet (`docs/research/data/artikel-zahlen.py`)
+und behauptet nichts, was nicht belegt ist. Die beiden Alternativen ("I scanned every USDC
+payment…" und "An agent economy died in nine months…") sind verworfen: die erste verschenkt die
+Pointe, die zweite überdehnt den Befund von einem Projekt auf eine ganze Ökonomie und wäre auf HN
+im ersten Kommentar zerlegt worden.
+
+**Offen: ob und wann er rausgeht.** Der Text ist fertig. Gepostet wird er von Matthias selbst, ich
+habe keinen HN-Zugang und würde unter seinem Klarnamen ohnehin nichts veröffentlichen.
+
+**Vor dem Posten nachziehen:** Der Datensatz endet am 19.09.2026 14:59 UTC. Liegt der Text länger
+als ein, zwei Wochen, die Monatstabelle und die 30-Tage-Zahl neu rechnen, sonst stimmt der erste
+Absatz nicht mehr. Der Vollscan muss dafür nicht wiederholt werden, es reicht, ab dem letzten Block
+der CSV weiterzuscannen.
 
 ## Was der Text nicht tut
 
