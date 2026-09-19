@@ -51,8 +51,16 @@ und die Zahlung auf Basescan sichtbar.
       `harness/state/mainnet-wallet.json` (gitignored), zeigt Adresse und USDC-Saldo, wartet auf
       Guthaben, signiert x402 v1 wie der Runtime-Client, ruft `/pay/1/<addr>` gegen `CP_URL`,
       prüft 200, `credits_cents`, `tx_hash`, und liest den Saldo per SIWE-provisioniertem Key
-- [ ] Stufe 2 (Runtime-Erstlauf mit 5 USDC gegen cp.hippe.eu) ist als `pnpm e2e:prod` vorbereitet,
-      wird in diesem Goal aber nicht ausgeführt (Go von Matthias, STATE.md)
+- [ ] Stufe 2 (`pnpm e2e:prod`, Runtime-Erstlauf als Container auf der VM gegen cp.hippe.eu mit
+      5 USDC) ist ausgeführt (Go von Matthias am 19.09.2026, "ums Geld soll's nicht gehen")
+      Prüfung (ohne Geld): `harness/e2e/prod.sh` und Skript `e2e:prod` in package.json existieren;
+      `eth_getTransactionReceipt` für
+      `0x6cde28b017fa62b14ed9f3425cbc417dd56137e2d4a4022161f880478954dc68` hat status 0x1 und ein
+      USDC-Transfer-Log über 5000000 von der Wegwerf-Wallet an payTo; VM-Ledger zeigt zwei Payments
+      `settled` (100000 und 500000 mc) und mindestens fünf Inferenz-Zeilen für die Wegwerf-Wallet;
+      auf der VM existieren weder Container `abnahme` noch Volume `abnahme-home` noch
+      `/opt/control-plane/abnahme`; `/opt/control-plane/.env` enthält Tier 1 nicht mehr
+      (`curl -s -o /dev/null -w '%{http_code}' https://cp.hippe.eu/pay/1/<addr>` = 400)
 - [ ] docs/protocol.md: Facilitator-Abschnitt (PayAI v1, Gebühr ab 21.09.2026), Betreiber-Tiers
 
 ## Deny List
@@ -70,6 +78,8 @@ und die Zahlung auf Basescan sichtbar.
 - 2026-09-19 11:55 Zyklus 1 (Teil ohne VM): FacilitatorSettler (PayAI v1 pass-through, 7 Unit-Tests), Tiers konfigurierbar (CP_TOPUP_TIERS_USD), DNS cp.hippe.eu -> 76.13.144.207 gesetzt und aufgelöst, deploy/ (Compose prod, Caddyfile, .env.example, setup-vm.sh, up.sh, README), harness/e2e/mainnet.ts (Stufe 1), protocol.md Facilitator-Abschnitt. 54 Unit-Tests, E2E OK offline. Offen: VM-Setup, Deploy, Stufe 1 (braucht SSH-Key und 1 USDC auf der Wegwerf-Wallet). Verifier erst nach Deploy.
 - 2026-09-19 15:45 VM: alten openclaw-Container samt Volumes, /root/outlook-bridge und Compose-Verzeichnis entfernt (Freigabe von Matthias), setup-vm.sh (Docker 29.2.1 vorhanden, UFW aktiv), .env per SSH-stdin mit OpenRouter-Key (Mode 600), up.sh: cp healthy, Caddy mit LE-Zertifikat; `curl https://cp.hippe.eu/health` 200 ssl_verify=0; 402-Angebot für Tier 1 korrekt.
 - 2026-09-19 16:20 Stufe 1: Matthias hat 2 USDC von Arbitrum nach Base gebridged und 1 USDC an die Wegwerf-Wallet 0xd24F…924F gesendet. `CP_URL=https://cp.hippe.eu pnpm e2e:mainnet` -> `MAINNET OK tier=1 credits_cents=100 tx=0xab5932250f3ad00e2efbbc5adb74defd045b4d719f9759baedc1b2ae3440733a`. Receipt: status 0x1, Block 51518599, Relayer 0xc6699d2aada6c36dfea5c248dd70f9cb0235cb63 (PayAI), Transfer 1,0 USDC an payTo. VM-Ledger: payment settled mit tx_hash, topup 100000 mc. Verifier ausstehend.
+- 2026-09-19 16:35 Verifier (Sonnet): REJECT. Gaps: `pnpm e2e:prod` fehlte, Repo-README auf altem Stand.
+- 2026-09-19 16:50 Zyklus 2: harness/e2e/prod.sh + setup.prod.json (Runtime-Container auf der VM, Wegwerf-Wallet als Runtime-Wallet, Aufräumen inklusive), README auf Live-Stand. Zwei Anläufe (fehlendes Zielverzeichnis für rsync; uid des Runtime-Users ist nicht 1000), dann `PROD OK topup=true registered=true turns=5 api_errors=0 ledger_consistent=true uncollected_mc=0 tx=0x6cde28b017fa62b14ed9f3425cbc417dd56137e2d4a4022161f880478954dc68`. Bootstrap-Topup 3 s (Timeout der Runtime 15 s). Danach Tier 1 aus .env entfernt, up.sh, /pay/1 -> 400. Verifier ausstehend.
 
 ## Blockers
 - (erledigt 19.09.2026, 15:40) SSH-Key im hPanel hinterlegt, Zugang geht.

@@ -20,6 +20,7 @@ echo "Wegwerf-Wallet $addr, USDC auf Base: $usdc"
 python3 -c "import sys; sys.exit(0 if float('$usdc') >= 5 else 1)" || { echo "PROD FAIL: mindestens 5 USDC nötig (Bootstrap-Topup der Runtime kauft 5 USD)"; exit 1; }
 
 echo "--- Runtime-Image auf der VM bauen"
+"${SSH[@]}" 'mkdir -p /opt/control-plane/abnahme/runtime'
 rsync -az -e "ssh -i $KEY -o StrictHostKeyChecking=accept-new" runtime/ "$HOST:/opt/control-plane/abnahme/runtime/"
 "${SSH[@]}" 'cd /opt/control-plane/abnahme/runtime && docker build -q -t abnahme-runtime . >/dev/null && echo image ok'
 
@@ -30,11 +31,12 @@ PK="$1"; CPURL="$2"
 docker rm -f abnahme >/dev/null 2>&1 || true
 docker volume rm -f abnahme-home >/dev/null 2>&1 || true
 docker volume create abnahme-home >/dev/null
-# Wallet-Datei im Format der Runtime (identity/wallet.ts), Besitzer = User automaton (uid 1000).
-docker run --rm -v abnahme-home:/home/automaton -e PK="$PK" alpine sh -c '
+# Wallet-Datei im Format der Runtime (identity/wallet.ts), Besitzer = User automaton des Images.
+UID_RT=$(docker run --rm --entrypoint id abnahme-runtime -u)
+docker run --rm -v abnahme-home:/home/automaton -e PK="$PK" -e UID_RT="$UID_RT" alpine sh -c '
   mkdir -p /home/automaton/.automaton && chmod 700 /home/automaton/.automaton &&
   printf "{\n  \"chainType\": \"evm\",\n  \"privateKey\": \"%s\",\n  \"createdAt\": \"%s\"\n}\n" "$PK" "$(date -u +%FT%TZ)" > /home/automaton/.automaton/wallet.json &&
-  chmod 600 /home/automaton/.automaton/wallet.json && chown -R 1000:1000 /home/automaton'
+  chmod 600 /home/automaton/.automaton/wallet.json && chown -R "$UID_RT:$UID_RT" /home/automaton'
 docker run --rm -v abnahme-home:/home/automaton -v /opt/control-plane/abnahme/runtime/setup.prod.json:/setup.json:ro \
   -e CONWAY_API_URL="$CPURL" abnahme-runtime provision 2>&1 | grep -v privateKey | tail -3
 docker run -d --name abnahme -v abnahme-home:/home/automaton -e CONWAY_API_URL="$CPURL" abnahme-runtime run >/dev/null
