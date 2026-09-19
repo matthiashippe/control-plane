@@ -58,6 +58,8 @@ awesome-x402 gelistet. Messgröße bleibt: provisionierte Automatons (heute 1).
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-09-19 18:40 Zyklus 2 (Veroeffentlichung): Repo public unter github.com/matthiashippe/control-plane, Lizenz PolyForm Noncommercial 1.0.0 (lesen, selbst betreiben, nicht als Dienst verkaufen), README fuer Fremdleser neu geschrieben, Quell-Link auf der Seite. Vorher History auf Secrets geprueft (nur Transaktions-Hashes und die payTo-Adresse, beide oeffentlich) und die VM gehaertet: Passwort-Login war aktiv (cloud-init setzt PasswordAuthentication yes und gewinnt per first-match), jetzt nur noch Schluessel, Zugang verifiziert.
+- 2026-09-19 18:50 Zyklus 2 (GTM): drei Kommentare gepostet, #339 (issuecomment-5742781023), #377 (5742781149), #393 (5742781237); awesome-x402 PR xpaysh/awesome-x402#1564 offen.
 - 2026-09-19 18:05 Zyklus 1 (Seite): src/public/index.html (statisch, keine externen Ressourcen), `/` und `/v1/status` in app.ts, Modellliste entdoppelt (ein Eintrag je echtem Modell plus Aliase), Dockerfile kopiert public in dist, 7 Tests in public.test.ts. Deployt und im Browser geprüft: Live-Werte laden (online, 1 Automaton, 2 Modelle), Preise 2,275/18,20 und 0,325/2,60 USD je 1M. Eigener Fund beim Gegenlesen: die Seite versprach Rückzahlung nicht genutzter Credits, das verstößt gegen die Regulatorik-Leitplanke in loop-constraints.md; ersetzt durch zwei Wochen Vorlauf vor einer Abschaltung, plus Test, der jede Auszahlungs-Formulierung verbietet.
 
 ## Blockers
