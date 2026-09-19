@@ -16,6 +16,9 @@ services:
       - cp-data:/data
     expose:
       - "8402"
+    labels:
+      # Ohne dieses Label fasst der autoheal-Dienst den Container nicht an.
+      autoheal: "true"
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8402/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 10s
@@ -24,6 +27,23 @@ services:
     logging:
       driver: json-file
       options: { max-size: "20m", max-file: "5" }
+
+  # Docker startet einen Container nur neu, wenn sein Prozess endet, nicht wenn er unhealthy ist.
+  # Am 19.09.2026 hing der Startprozess still: Healthcheck rot, Container "Up", Dienst 502, und
+  # ohne Eingriff wäre das so geblieben. Dieser Dienst startet unhealthy markierte Container neu.
+  autoheal:
+    image: willfarrell/autoheal:1.2.0
+    restart: unless-stopped
+    environment:
+      AUTOHEAL_CONTAINER_LABEL: autoheal
+      AUTOHEAL_INTERVAL: "30"
+      AUTOHEAL_START_PERIOD: "60"
+      DOCKER_SOCK: /var/run/docker.sock
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    logging:
+      driver: json-file
+      options: { max-size: "5m", max-file: "3" }
 
   caddy:
     image: caddy:2-alpine

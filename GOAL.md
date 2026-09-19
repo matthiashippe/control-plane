@@ -123,6 +123,26 @@ und den Artikel schreiben, der den Datensatz statt des Produkts in den Mittelpun
   * **#356** hat mit 491 ms Round-Trip selbst bewiesen, dass es nicht am Client liegt. Die Antwort
     wiederholt seine Analyse nicht, sondern bestätigt sie und geht weiter.
 
+- Zyklus 6 (19.09.2026, 19:05 bis 19:40): Zwei Dinge.
+  * **Absicherung gegen genau den heutigen Ausfall.** Docker startet einen Container nur neu, wenn
+    sein Prozess endet, nicht wenn er `unhealthy` ist. Der hängende Container von heute Nachmittag
+    wäre ohne Eingriff für immer so geblieben. Ein `autoheal`-Dienst (`willfarrell/autoheal:1.2.0`,
+    Label `autoheal=true` auf `cp`) steht jetzt in `docker-compose.prod.yml` und ist ausgerollt.
+    Geprüft, nicht behauptet: Node-Prozess im laufenden Container mit SIGSTOP angehalten, nach
+    90 Sekunden `unhealthy` (sechs Fehlschläge à 15 s), nach 120 Sekunden von autoheal neu
+    gestartet, danach wieder `healthy` und extern HTTP 200. Log: `Container /deploy-cp-1 found to
+    be unhealthy - Restarting container now`. Nebenbei gelernt: Der Healthcheck-Status bleibt bis
+    zum sechsten Fehlschlag auf `healthy`, ein erster Testlauf über 40 Sekunden war deshalb
+    wertlos.
+  * **Alle dreizehn Issue-Antworten liegen als Entwurf** unter `.scratch/gtm/issue-antworten/`
+    (#353, #355, #356, #359, #371, #372, #373, #376, #379, #380, #385, #390, #392). Keine ist
+    gepostet. Drei davon nennen den Dienst bewusst gar nicht: #373 (reiner Windows-Bug, den wir
+    vollständig ohne uns lösen), #380 (versehentlich eröffnetes Issue ohne Frage) und in der
+    Substanz auch #390 (Anfänger, der eine Installationsanleitung braucht, keine Codepfade).
+    #392 ist eine Korrektur: der dort gegebene Rat "bypass the system and use openai api, it
+    works" funktioniert nachweislich nicht, weil der Tier vorher auf `dead` steht. #371 beantwortet
+    die drei Fragen, die der Autor dem Team gestellt und nie beantwortet bekommen hat.
+
 ## Vorfall 19.09.2026: Start hängt am Preisabruf
 
 `src/index.ts:47` ruft beim Start `await provider.init()`, und `refreshPrices` holte den Katalog
