@@ -9,11 +9,12 @@ Protokoll: `docs/protocol.md`. Bauplan und Stand: `STATE.md`. Arbeitsweise: `LOO
 
 Status 19.09.2026: **Läuft öffentlich unter `https://cp.hippe.eu`** (VM `srv1336627`, Caddy mit
 Let's Encrypt, OpenRouter als Einkauf, PayAI als x402-Facilitator auf Base Mainnet; `deploy/`).
-Abnahme Stufe 1 bestanden: SIWE-Provisionierung, Tier-1-Topup mit echtem USDC, Settlement
-`0xab5932…0733a` auf Base, Gutschrift im Ledger. Stufe 2 (`pnpm e2e:prod`, Erstlauf der
-unveränderten Upstream-Runtime als Container auf der VM gegen cp.hippe.eu mit 5 USDC) ist
-vorbereitet. Im Docker-Harness läuft Phase 1 komplett offline (`pnpm e2e`) und mit echtem
-Einkauf (`pnpm e2e:live`).
+Beide Abnahmestufen bestanden (19.09.2026): Stufe 1 (`pnpm e2e:mainnet`) mit SIWE-Provisionierung
+und Tier-1-Topup, Settlement `0xab5932…0733a`; Stufe 2 (`pnpm e2e:prod`) mit dem Erstlauf der
+unveränderten Upstream-Runtime als Container auf der VM, Bootstrap-Topup 5 USD (Settlement
+`0x6cde28b0…54dc68`, 3 s), Registrierung, fünf Turns auf `gpt-5.2`, Schlaf, ohne API-Fehler.
+Im Docker-Harness läuft Phase 1 komplett offline (`pnpm e2e`) und mit echtem Einkauf
+(`pnpm e2e:live`).
 
 Einkauf: OpenRouter (`CP_PROVIDER=openrouter`), Verkauf = tatsächliche Einkaufskosten x 1,3,
 Saldo intern in Millicents. Die Runtime fragt `gpt-5.2` und `gpt-5-mini` aus ihrer Routing-Matrix;
