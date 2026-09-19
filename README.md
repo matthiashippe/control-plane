@@ -68,7 +68,7 @@ pnpm dev                       # local, http://127.0.0.1:8402
 
 CI runs on every push and every pull request (`.github/workflows/ci.yml`):
 `pnpm install --frozen-lockfile`, `pnpm build` (which is `tsc`, so the typecheck is covered) and
-`pnpm test` on Node 22, about two minutes per run. It deliberately does not run `pnpm e2e`. That
+`pnpm test` on Node 22, well under a minute per run. It deliberately does not run `pnpm e2e`. That
 job would clone the pinned upstream runtime and build three container images on every push, which
 costs 12 to 18 minutes and can fail for reasons outside this repository: the upstream repo, the
 moving `ghcr.io/foundry-rs/foundry:latest` tag, or the 240 second window that

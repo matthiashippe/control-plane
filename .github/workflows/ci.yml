@@ -18,8 +18,8 @@
 #      Runtime diese Kerne; ein langsamer Lauf meldet turns=4 und damit E2E FAIL, ohne echten
 #      Fehler. Genau diese Sorte Zufallsrot macht eine Pipeline wertlos.
 #   3. Kein Layer-Cache: jeder Lauf baut alle drei Images neu (apt-get, git clone, pnpm install,
-#      tsc, solc-Compile des USDC-Mocks). Geschätzt 12 bis 18 Minuten pro Push, gegen etwa zwei
-#      Minuten für den Job unten.
+#      tsc, solc-Compile des USDC-Mocks). Geschätzt 12 bis 18 Minuten pro Push, gegen 18 Sekunden
+#      für den Job unten (gemessener Lauf 35463794754, kalter Cache).
 #
 # Der Harness bleibt damit das, was er ist: ein Test, den ein Mensch vor einem Release von Hand
 # fährt, auf einer Maschine mit Docker und warmem Image-Cache:
@@ -53,9 +53,9 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "22"
 
@@ -72,7 +72,7 @@ jobs:
         run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
 
       - name: pnpm-Store cachen
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ steps.pnpm-store.outputs.path }}
           key: ${{ runner.os }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
