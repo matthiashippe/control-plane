@@ -176,3 +176,42 @@ describe("Öffentliche Seite und Status", () => {
     expect(txt).not.toMatch(/refund|cash out|withdraw/i);
   });
 });
+
+describe("Auslieferung durch Caddy", () => {
+  it("hält den CSP-Hash im Caddyfile mit dem Inline-Skript der Seite synchron", async () => {
+    // Die Content-Security-Policy erlaubt das Inline-Skript per sha256-Hash statt per
+    // 'unsafe-inline'. Ändert jemand das Skript, ohne den Hash im Caddyfile nachzuziehen,
+    // blockiert der Browser es und die Seite zeigt keine Live-Zahlen mehr, ohne dass ein
+    // Test anschlägt. Genau das fängt dieser Test.
+    const fs = await import("node:fs");
+    const crypto = await import("node:crypto");
+    const html = fs.readFileSync(new URL("../src/public/index.html", import.meta.url), "utf-8");
+    const caddyfile = fs.readFileSync(new URL("../deploy/Caddyfile", import.meta.url), "utf-8");
+
+    const script = /<script>([\s\S]*?)<\/script>/.exec(html);
+    expect(script, "Seite hat kein Inline-Skript mehr: dann kann der Hash aus der CSP raus").not.toBeNull();
+
+    const hash = "sha256-" + crypto.createHash("sha256").update(script![1]).digest("base64");
+    expect(caddyfile, `CSP-Hash im Caddyfile passt nicht zum Skript. Erwartet: ${hash}`).toContain(hash);
+  });
+
+  it("begrenzt die Größe eines Request-Bodys in der Caddy-Konfiguration", async () => {
+    const fs = await import("node:fs");
+    const caddyfile = fs.readFileSync(new URL("../deploy/Caddyfile", import.meta.url), "utf-8");
+    expect(caddyfile).toMatch(/request_body\s*\{[\s\S]*?max_size\s+\d+\s*[KMG]?B/);
+  });
+
+  it("setzt die Sicherheits-Header, die ein zahlungsverarbeitender Dienst braucht", async () => {
+    const fs = await import("node:fs");
+    const caddyfile = fs.readFileSync(new URL("../deploy/Caddyfile", import.meta.url), "utf-8");
+    for (const header of [
+      "Strict-Transport-Security",
+      "X-Content-Type-Options",
+      "X-Frame-Options",
+      "Referrer-Policy",
+      "Content-Security-Policy",
+    ]) {
+      expect(caddyfile, `${header} fehlt im Caddyfile`).toContain(header);
+    }
+  });
+});

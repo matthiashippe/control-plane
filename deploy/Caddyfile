@@ -4,6 +4,25 @@
 
 cp.hippe.eu {
 	encode zstd gzip
+
+	# Ohne Limit nimmt der Dienst beliebig grosse Bodies an; /v1/auth/nonce antwortete auf 3 MB
+	# Muell mit 200. 1 MB ist reichlich: der groesste echte Request ist ein Inferenz-Prompt.
+	request_body {
+		max_size 1MB
+	}
+
+	header {
+		# Der Dienst nimmt Zahlungen entgegen, also nie wieder ueber Klartext.
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		# Die Seite laedt nichts von aussen. Das Inline-Script ist per Hash erlaubt, damit
+		# 'unsafe-inline' nicht noetig ist. Aendert sich das Skript, muss der Hash mit.
+		Content-Security-Policy "default-src 'none'; script-src 'sha256-kYizXh7KDC5Ph+y8MyaKjm3ysvtfuJrxIcalJ9hQpPI='; style-src 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+		-Server
+	}
+
 	reverse_proxy cp:8402 {
 		# x402 und Inferenz können lange dauern; Caddy soll nicht vor dem Control Plane abbrechen.
 		transport http {

@@ -49,3 +49,46 @@ Stufe 1: `CP_URL=https://cp.hippe.eu pnpm e2e:mainnet` (Wegwerf-Wallet, 1 USDC, 
 Stufe 2: `pnpm e2e:prod` (Upstream-Runtime als Container auf der VM gegen cp.hippe.eu, Wegwerf-
 Wallet aus Stufe 1 mit 5 USDC; baut, läuft, räumt den Container wieder ab), nur nach Go.
 Danach `CP_TOPUP_TIERS_USD` in `.env` wieder ohne Tier 1 setzen und `deploy/up.sh`.
+
+## Härtung in Caddy (19.09.2026, vor dem Launch)
+
+- **`request_body max_size 1MB`.** Vorher nahm der Dienst beliebig große Bodies an; ein 3 MB großer
+  Müll-Body an `/v1/auth/nonce` wurde mit 200 beantwortet. Geprüft: 2 MB an `/v1/auth/verify`
+  ergeben jetzt 413, 500 KB laufen normal durch (400 "Malformed SIWE message").
+- **Sicherheits-Header**: HSTS (ein Jahr, mit Subdomains), `X-Content-Type-Options: nosniff`,
+  `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin` und eine CSP, die
+  `default-src 'none'` setzt. Die Seite lädt nichts von außen.
+- **Die CSP erlaubt das Inline-Skript per sha256-Hash**, nicht per `'unsafe-inline'`. Wer das
+  Skript in `src/public/index.html` ändert, muss den Hash im Caddyfile nachziehen. Ein Test in
+  `test/public.test.ts` rechnet den Hash nach und schlägt sonst fehl, weil der Browser sonst still
+  blockiert und die Seite ohne Live-Zahlen dasteht.
+
+**Achtung beim Ausrollen einer Caddyfile-Änderung:** `deploy/up.sh` und `docker compose up -d caddy`
+reichen nicht. Der Caddyfile ist ein Datei-Bind-Mount, und rsync ersetzt die Datei durch eine neue
+Inode, die der laufende Container nicht sieht; auch `caddy reload` liest dann noch die alte Fassung.
+Nötig ist:
+
+```
+ssh -i ~/.ssh/id_ed25519_automaton root@76.13.144.207 \
+  'cd /opt/control-plane/repo/deploy && docker compose -f docker-compose.prod.yml up -d --force-recreate caddy'
+```
+
+Vorher validieren, sonst startet Caddy nicht und der Dienst ist komplett weg:
+
+```
+docker run --rm -v /opt/control-plane/repo/deploy/Caddyfile:/etc/caddy/Caddyfile:ro \
+  caddy:2-alpine caddy validate --config /etc/caddy/Caddyfile
+```
+
+## Lastmessung (19.09.2026)
+
+Gemessen mit `ab` auf der VM selbst, damit die eigene Leitung nicht das Ergebnis bestimmt:
+
+| Ziel | Durchsatz |
+|---|---|
+| App direkt, Startseite | 7.814 req/s |
+| App direkt, `/v1/status` (SQLite je Request) | 6.667 req/s |
+| Durch Caddy mit TLS, neue Verbindungen | 348 req/s |
+
+Während 2.000 Verbindungen mit 50 parallel von außen blieb die Last der VM bei 0,01 und der
+Speicher bei 735 MB von 3.915. Der begrenzende Faktor ist der TLS-Handshake, nicht die Anwendung.
