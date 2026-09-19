@@ -16,7 +16,7 @@ GOAL.md selbst aus. Reihenfolge der Slices steht in STATE.md.
 | Pattern | Cadence | Level | Befehl | Status |
 |---|---|---|---|---|
 | Daily Triage (Repo: CI, Issues, Upstream-Drift von Conway-Research/automaton) | 1d | L1 report-only | `/loop 1d Run $loop-triage, update STATE.md` | ab erstem Push |
-| Ops-Triage (VM: /health, Ledger-Summen, Settlements, Provisionierungen) | 1d, später 2h | L1 report-only | `/loop 1d Run $loop-triage ops` | ab Deploy (Goal 5) |
+| Ops-Triage (cp.hippe.eu: Health, Zertifikat, Ledger, Marge, OpenRouter-Guthaben, Provisionierungen) | 1d, später 2h | L1 report-only | `/loop 1d Run $ops-triage` | ab 19.09.2026, Datenquelle `ops/status.sh` |
 | PR Babysitter | 15m bei offenen PRs | L2 assisted | `/loop 15m $pr-babysitter` | nach erster Triage-Woche |
 | Dependency Sweeper (viem, siwe, hono, better-sqlite3: security-only) | 1d | L2 patch-only | Dependabot + Verifier | nach erster Triage-Woche |
 
