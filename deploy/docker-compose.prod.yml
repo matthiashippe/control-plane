@@ -59,6 +59,11 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
       - caddy-config:/config
+      # Zugriffslog in ein Volume, nicht nur nach stdout. Am 19.09.2026 hat ein Neustart des
+      # Caddy-Containers die gesamte Zugriffshistorie gelöscht, genau in dem Moment, in dem sie
+      # gebraucht wurde: Der einzige zahlende Kunde hörte im selben Fenster auf zu pollen, und es
+      # war nicht mehr feststellbar, wann sein letzter Request kam.
+      - caddy-logs:/var/log/caddy
     depends_on:
       cp:
         condition: service_healthy
@@ -70,3 +75,4 @@ volumes:
   cp-data:
   caddy-data:
   caddy-config:
+  caddy-logs:
