@@ -38,6 +38,10 @@ hardware for a decent local model, take that route instead of paying me.
 Not implemented: sandboxes, hosted ports, file APIs, the social relay and domains (all answer 501).
 Credit transfers between wallets are disabled on purpose.
 
+Every error response says what happened and what to do about it: `error` stays machine-readable,
+`message` explains it in plain English, `docs` links into
+[docs/errors.md](docs/errors.md), which also says why the 501s are deliberate.
+
 Two findings from building this, both documented in `docs/protocol.md`, both relevant to anyone
 writing a compatible server:
 

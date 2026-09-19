@@ -8,6 +8,7 @@
  */
 
 import { getAvailableMc, getBalanceMc, mcToCents, postLedger, releaseMc, reserveMc, type Db } from "../db.js";
+import { DOC } from "../errors.js";
 import type { ChatProvider, ChatRequest, ChatResponse, ModelSpec, Usage } from "./provider.js";
 import { estimateTokens, ProviderBadRequestError, ProviderUnavailableError } from "./provider.js";
 
@@ -43,6 +44,11 @@ export class Catalog {
 
   get(model: string): CatalogEntry | undefined {
     return this.entries.get(this.aliases.get(model) ?? model);
+  }
+
+  /** Alle anfragbaren IDs, echte Modelle zuerst, danach die Aliase. Für Fehlermeldungen. */
+  modelIds(): string[] {
+    return [...this.entries.keys(), ...this.aliases.keys()];
   }
 
   /**
@@ -130,15 +136,67 @@ export async function handleChat(
   address: string,
   body: unknown,
 ): Promise<ChatResult> {
-  if (typeof body !== "object" || body === null) return { status: 400, body: { error: "invalid_body" } };
+  if (typeof body !== "object" || body === null) {
+    return {
+      status: 400,
+      body: {
+        error: "invalid_body",
+        message:
+          "The body must be JSON in the OpenAI chat completions format: " +
+          '{"model": "...", "messages": [...]}. Check the Content-Type header as well.',
+        docs: DOC.inference,
+      },
+    };
+  }
   const req = body as Partial<ChatRequest>;
   if (typeof req.model !== "string" || !Array.isArray(req.messages)) {
-    return { status: 400, body: { error: "model and messages are required" } };
+    return {
+      status: 400,
+      body: {
+        error: "model and messages are required",
+        message:
+          'Send "model" as a string and "messages" as an array of {role, content} objects, like ' +
+          "any OpenAI-compatible endpoint. GET /v1/models lists the model IDs this instance serves.",
+        docs: DOC.inference,
+      },
+    };
   }
-  if (req.stream) return { status: 400, body: { error: "streaming_not_supported" } };
+  if (req.stream) {
+    return {
+      status: 400,
+      body: {
+        error: "streaming_not_supported",
+        message:
+          "This endpoint does not stream. Usage is metered and charged server side from the " +
+          "provider's usage report once the answer is complete, which a stream does not give us. " +
+          'Send "stream": false, as the automaton runtime does.',
+        docs: DOC.inference,
+      },
+    };
+  }
 
   const entry = catalog.get(req.model);
-  if (!entry) return { status: 404, body: { error: "model_not_found", model: req.model } };
+  if (!entry) {
+    // Welche IDs es gibt, gehört in die Antwort: Die Runtime fragt die Kandidaten ihrer
+    // Routing-Matrix ("gpt-5.2", "gpt-5-mini", "gpt-5.3") und nicht das konfigurierte Modell,
+    // und wer eine davon nicht bedient, sucht sonst am falschen Ende.
+    const verfuegbar = catalog.modelIds();
+    const gezeigt = verfuegbar.slice(0, 12);
+    const rest = verfuegbar.length - gezeigt.length;
+    return {
+      status: 404,
+      body: {
+        error: "model_not_found",
+        model: req.model,
+        message:
+          `This instance does not serve a model called "${req.model}". Available: ` +
+          `${gezeigt.join(", ")}${rest > 0 ? ` and ${rest} more` : ""}. ` +
+          "GET /v1/models has the full catalogue with prices; the IDs the runtime asks for are " +
+          "mapped to real models by the operator, so the list differs between instances.",
+        docs: DOC.models,
+      },
+    };
+  }
 
   const requested = req.max_completion_tokens ?? req.max_tokens ?? DEFAULT_MAX_TOKENS;
   const maxTokens = Math.max(1, Math.min(HARD_MAX_TOKENS, Math.floor(Number(requested) || DEFAULT_MAX_TOKENS)));
@@ -157,7 +215,14 @@ export async function handleChat(
       status: 402,
       body: {
         error: "INSUFFICIENT_CREDITS",
-        message: `Insufficient credits: need ${mcToCents(requiredMc) + 1} cents, have ${mcToCents(availableMc)} cents`,
+        // Wortlaut und `details` bleiben: Die Runtime sucht den Marker im ganzen Körper und liest
+        // `details.required_cents`/`details.current_balance_cents`, um den Topup-Tier zu wählen
+        // (Upstream `src/conway/topup.ts:103`). Angehängt wird nur der Weg zum Nachkaufen.
+        message:
+          `Insufficient credits: need ${mcToCents(requiredMc) + 1} cents, have ${mcToCents(availableMc)} cents. ` +
+          "Buy credits with GET /pay/{usd}/{this wallet} and sign the x402 offer, or send USDC to " +
+          "the wallet and let the runtime's bootstrap topup do it. Nothing was charged for this call.",
+        docs: DOC.inference,
         details: {
           required_cents: Math.ceil(requiredMc / 1000),
           current_balance_cents: mcToCents(availableMc),
@@ -175,11 +240,38 @@ export async function handleChat(
     // Mandanten dauerhaft blockiert.
     releaseMc(db, address, requiredMc);
     if (err instanceof ProviderUnavailableError) {
+      // Der Upstream-Text bleibt im Log. Nach außen ging er bisher mit, und das ist zweierlei
+      // falsch: Er verrät den Zustand unseres Einkaufs, und er sagt dem Leser nicht, was er tun
+      // kann. Was er wissen muss, ist, dass es nicht an seinem Guthaben liegt.
       console.error(`[inference] provider ${err.provider} unavailable (status ${err.upstreamStatus ?? "none"}): ${err.message}`);
-      return { status: 503, body: { error: "provider_unavailable", provider: err.provider, message: err.message } };
+      return {
+        status: 503,
+        body: {
+          error: "provider_unavailable",
+          provider: err.provider,
+          message:
+            "The upstream model provider did not answer this request. Nothing was charged and the " +
+            "reserved amount was released, so this is not a credit problem. It is retryable: back " +
+            "off and try again, the runtime does that on its own. If it holds for more than a few " +
+            "minutes, GET /v1/status tells you which models the instance still serves.",
+          docs: DOC.inference,
+        },
+      };
     }
     if (err instanceof ProviderBadRequestError) {
-      return { status: 400, body: { error: "provider_rejected_request", provider: err.provider, details: err.body } };
+      return {
+        status: 400,
+        body: {
+          error: "provider_rejected_request",
+          provider: err.provider,
+          details: err.body,
+          message:
+            "The model provider rejected this request body; its answer is in `details`. Usually a " +
+            "parameter it does not support or a malformed tool schema. Nothing was charged. Fix " +
+            "the body and retry; retrying unchanged will fail the same way.",
+          docs: DOC.inference,
+        },
+      };
     }
     throw err;
   }

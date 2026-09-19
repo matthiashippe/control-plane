@@ -123,6 +123,26 @@ describe("/pay x402-Seller", () => {
     expect(((await res.json()) as { error: string }).error).toBe("invalid_tier");
   });
 
+  it("antwortet auf eine Nonce, die gerade gesettelt wird, mit 409 und sagt, dass nichts doppelt bucht", async () => {
+    const { pay, account, db, balance, settler } = setup();
+    const nonce = `0x${"7c".repeat(32)}` as Hex;
+    const header = await signPayment({ account, to: PAY_TO, value: 5_000_000n, nonce });
+    // Der Zustand, den ein zweiter Request sieht, während der erste noch settlet.
+    db.prepare(
+      "INSERT INTO payments (nonce, from_address, to_address, value_atomic, credits_mc, status, created_at) VALUES (?, ?, ?, ?, ?, 'pending', ?)",
+    ).run(nonce, account.address.toLowerCase(), account.address.toLowerCase(), "5000000", 500_000, new Date().toISOString());
+
+    const res = await pay(5, header);
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as { error: string; message: string; docs: string };
+    expect(body.error).toBe("settlement_in_progress");
+    expect(body.message).toMatch(/idempotency key/);
+    expect(body.message).toMatch(/nothing is charged twice/i);
+    expect(body.docs).toContain("#payments");
+    expect(settler.calls, "der zweite Versuch settlet nicht noch einmal").toHaveLength(0);
+    expect(balance()).toBe(0);
+  });
+
   it("verbucht eine gültige Zahlung: 200, credits_cents 500, Balance 500, eine Ledger-Zeile", async () => {
     const { pay, account, settler, ledgerRows, balance } = setup();
     const header = await signPayment({ account, to: PAY_TO, value: 5_000_000n });
@@ -196,7 +216,13 @@ describe("/pay x402-Seller", () => {
     settler.failNext = true;
     const failed = await pay(5, header);
     expect(failed.status).toBe(402);
-    expect(((await failed.json()) as { error: string }).error).toMatch(/^settlement_failed/);
+    const fehler = (await failed.json()) as { error: string; message: string; docs: string };
+    expect(fehler.error).toMatch(/^settlement_failed/);
+    expect(fehler.message, "sagt, dass nichts gutgeschrieben wurde und was zu prüfen ist").toMatch(
+      /no credits\s+were added/,
+    );
+    expect(fehler.message).toContain("Basescan");
+    expect(fehler.docs).toContain("docs/errors.md#payments");
     expect(balance()).toBe(0);
     expect(ledgerRows()).toHaveLength(0);
     expect((db.prepare("SELECT status FROM payments").get() as { status: string }).status).toBe("failed");

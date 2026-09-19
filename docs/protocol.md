@@ -190,6 +190,20 @@ auch bei Fehlern; ein Control Plane, das hier 404 liefert, sieht den Aufruf nie 
   Phase-1-Entscheidung (STATE.md): Credits sind nicht übertragbar; die Runtime-Tools
   `transfer_credits` und `fund_child` melden dem Agenten den Fehler und laufen weiter.
 
+## Fehlerkörper
+
+`error` ist das stabile Feld und bleibt Wort für Wort, wie es hier steht. Daneben steht in jeder
+Fehlerantwort ein `message` im Klartext (was ist passiert, was ist der nächste Schritt) und meist
+ein `docs` mit einer URL auf den passenden Abschnitt von `docs/errors.md`.
+
+Die Runtime entscheidet nach Statuscode und liest von unseren Körpern genau zwei Dinge: den
+Marker `INSUFFICIENT_CREDITS`, den sie im gesamten Fehlertext sucht (`err.message` ist bei ihr
+`Conway API error: <method> <path> -> <status>: <body>`, `src/conway/client.ts:73`), und bei einem
+402 die Felder `details.required_cents` und `details.current_balance_cents`, mit denen
+`topupForSandbox` den Tier wählt (`src/conway/topup.ts:103`). Der x402-Client liest aus dem
+402-Körper nur `x402Version` und `accepts`. Alles andere darf ergänzt werden, nichts davon darf
+verschwinden, und keine Meldung nimmt den Marker in den Mund, die nicht Guthabenmangel meint.
+
 ## Phase 2 (nicht in diesem Repo-Stand)
 
 Sandboxes (`/v1/sandboxes`, `/exec`, `/files/*`, `/ports/*`), Social-Relay (`/v1/messages`,

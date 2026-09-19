@@ -145,7 +145,19 @@ describe("OpenRouterProvider", () => {
       const before = balance();
       const res = await chat({ model: "gpt-5.2", messages: [{ role: "user", content: "hi" }] });
       expect(res.status).toBe(503);
-      expect(((await res.json()) as { error: string; provider: string }).error).toBe("provider_unavailable");
+      const text = await res.text();
+      const body = JSON.parse(text) as { error: string; provider: string; message: string; docs: string };
+      expect(body.error).toBe("provider_unavailable");
+      expect(body.provider, "das Feld provider bleibt").toBe("openrouter");
+      // Der Upstream-Text gehört ins Log, nicht in die Antwort: er sagt dem Leser nichts und
+      // verrät den Zustand unseres Einkaufs.
+      expect(text).not.toContain("nope");
+      expect(text).not.toContain(String(status));
+      expect(body.message, "der Leser muss wissen, dass es nicht an seinem Guthaben liegt").toMatch(
+        /not a credit problem/,
+      );
+      expect(body.message).toMatch(/retryable/);
+      expect(body.docs).toContain("docs/errors.md#inference");
       expect(balance()).toBe(before);
       expect(rows()).toHaveLength(0);
     }
@@ -164,7 +176,14 @@ describe("OpenRouterProvider", () => {
     const { chat } = appWith(provider);
     const res = await chat({ model: "gpt-5.2", messages: [{ role: "user", content: "hi" }] });
     expect(res.status).toBe(400);
-    expect(((await res.json()) as { error: string }).error).toBe("provider_rejected_request");
+    const body = (await res.json()) as { error: string; details: { error: { message: string } }; message: string };
+    expect(body.error).toBe("provider_rejected_request");
+    expect(body.details.error.message, "die Antwort des Providers auf den eigenen Body bleibt erhalten").toBe(
+      "bad tools schema",
+    );
+    expect(body.message, "und daneben steht, was das heißt und dass nichts abgebucht wurde").toMatch(
+      /Nothing was charged/,
+    );
   });
 
   it("bricht bei Timeout mit ProviderUnavailableError ab", async () => {

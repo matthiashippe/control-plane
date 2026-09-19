@@ -133,7 +133,11 @@ describe("Öffentliche Seite und Status", () => {
     expect((await app.request("/v1/models")).status).toBe(401);
     const missing = await app.request("/gibtsnicht");
     expect(missing.status).toBe(404);
-    expect(await missing.json()).toEqual({ error: "not_found" });
+    const body = (await missing.json()) as { error: string; message: string; docs: string };
+    expect(Object.keys(body).sort()).toEqual(["docs", "error", "message"]);
+    expect(body.error).toBe("not_found");
+    expect(body.message).toContain("/.well-known/x402");
+    expect(body.docs).toContain("docs/errors.md");
   });
 
   it("nennt auf der Seite den Betreiber und eine Kontaktmöglichkeit", async () => {
