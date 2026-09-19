@@ -53,6 +53,21 @@ das niemand abholt, war verschwendete Rechenzeit.
 ausgerollt, was dabei auffiel. Wer nichts gefunden hat, schreibt das auch, mit den Zahlen, die er
 gesehen hat. Ein stiller Zyklus ist ein Befund, kein Nichts.
 
+## Handwerk
+
+**Niemals `git add -A`.** In diesem Repo arbeiten parallel Agenten, lokal und auf dem code-host.
+Ein pauschales `add` nimmt deren halbfertige Dateien mit und stellt sie unter eine fremde
+Commit-Message. Genau das ist am 19.09. dreimal passiert: `deploy/rollout.sh` und
+`deploy/rollout-remote.sh` landeten in Commits über die Deploy-Sperre, die Kennzahl und die CI.
+Der Inhalt war heil, die Historie erzählt Unsinn. Also immer die Dateien nennen, die zur
+Änderung gehören, und vor dem Commit einmal `git status --short` lesen.
+
+**Jeder Deploy läuft über `deploy/rollout.sh`**, nicht über `deploy/up.sh`. `up.sh` mischt Bauen
+und Umschalten: Schlägt der Build fehl, ist der alte Container längst zerstört. `rollout.sh` baut
+erst, beweist das neue Image an einem Kanarienvogel gegen eine Kopie der Datenbank, wartet auf ein
+ruhiges Fenster (keine `pending`-Zahlung, keine laufende Reservierung) und schaltet erst dann um.
+`up.sh` bleibt für den Kaltstart, wenn der Dienst ohnehin unten ist.
+
 ## Was dauerhaft gilt
 
 - **Der Kunde geht vor.** Bei jeder Abwägung zwischen Fortschritt und seiner Verfügbarkeit gewinnt
