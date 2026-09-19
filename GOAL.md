@@ -31,7 +31,7 @@ und den Artikel schreiben, der den Datensatz statt des Produkts in den Mittelpun
       löst zuerst das Problem des Fragenden, auch ohne uns, und nennt uns erst danach als Option
       Prüfung: für jeden beantworteten Thread ein `issuecomment`-Link im Progress Log, und der
       Kommentartext enthält vor jeder Erwähnung von `cp.hippe.eu` eine Lösung ohne uns
-- [ ] Der HN-Artikel liegt als Entwurf unter `docs/artikel-agentenoekonomie.md`, mit den Zahlen aus
+- [x] Der HN-Artikel liegt als Entwurf unter `docs/artikel-agentenoekonomie.md`, mit den Zahlen aus
       dem Datensatz, ohne Produktwerbung über eine Fußnote hinaus, und ist **nicht** gepostet
       Prüfung: die Datei existiert, jede Zahl darin steht so auch in
       `docs/research/2026-09-19-nachfrage.md` oder folgt aus `docs/research/data/`
@@ -90,8 +90,20 @@ und den Artikel schreiben, der den Datensatz statt des Produkts in den Mittelpun
   auf "not money, not redeemable and not transferable" umgestellt, die Formulierung, die die
   Startseite schon benutzt.
 
+- Zyklus 3 (19.09.2026, 18:33 bis 18:40): Artikel-Entwurf `docs/artikel-agentenoekonomie.md`
+  geschrieben, nicht gepostet. Die tragende Zahl ist neu aus dem Datensatz gerechnet: von den
+  1.582 Wallets, die im Februar zahlten, zahlten ab Juni noch drei. Dazu 62.616,09 USDC Gesamtvolumen
+  von 2.491 Wallets, Februar-Anteil 60,6 Prozent, Median-Transfer 5,00 USDC, 1.035 Wallets mit genau
+  einer Zahlung. Alle diese Zahlen liefert `docs/research/data/artikel-zahlen.py`, damit nichts im
+  Artikel steht, was nicht aus dem Datensatz folgt. Der Dienst kommt in einem Satz vor, als
+  Offenlegung am Ende. Keine Wallet-Adresse wird einzeln genannt. Titel, Freigabe und Zeitpunkt
+  liegen bei Matthias, die drei Titelvorschläge stehen oben in der Datei.
+
 ## Blockers
 
+- **Issue-Antworten frühestens morgen.** Am 19.09. sind bereits drei Kommentare rausgegangen
+  (#339, #377, #393), und die eigene Regel erlaubt höchstens drei pro Tag. Die dreizehn offenen
+  Threads warten damit auf den nächsten Tag.
 - **Deploy steht aus.** Drei Done-Conditions prüfen gegen `https://cp.hippe.eu` (Startseiten-Link,
   `.well-known/x402`, `llms.txt`) und sind lokal fertig und grün, aber noch nicht ausgerollt.
   `loop-constraints.md` verbietet Änderungen an `deploy/**` ohne Menschen; das Ausrollen einer
