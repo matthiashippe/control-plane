@@ -1,6 +1,6 @@
 # Loop State: control-plane
 
-Last run: 2026-09-19 11:20 (Goal 5a DONE, OpenRouter als Einkauf)
+Last run: 2026-09-19 17:20 (Goal 5b DONE, Dienst live auf cp.hippe.eu)
 
 ## High Priority (Build-Queue, ein Goal je Zeile, Reihenfolge bindend)
 
@@ -18,10 +18,19 @@ Last run: 2026-09-19 11:20 (Goal 5a DONE, OpenRouter als Einkauf)
    kompletter Erstlauf der Upstream-Runtime grün (`pnpm e2e`).
 5a. **OpenRouter als Einkauf** (DONE 19.09.2026, `goals/2026-09-19-goal-5a-openrouter.md`):
    Live-Lauf der Upstream-Runtime auf gpt-5.2, 5 Turns, 5,55 Cent Einkauf, 7,22 Cent Abbuchung.
-5b. **Betrieb** (WARTET, kein GOAL.md): Deploy auf `srv1336627` (76.13.144.207) mit Caddy und
-   Docker, Facilitator PayAI zuerst, sonst CDP; Statusseite; einmalige Abnahme mit Wegwerf-Wallet
-   und 6 USDC auf Base Mainnet gegen die payTo-Adresse. Braucht von Matthias: Domain (Vorschlag
-   `cp.hippe.eu`), payTo-Adresse auf Base, SSH-Key im hPanel für die VM (19.09.: Permission denied).
+5b. **Betrieb** (DONE 19.09.2026, `goals/2026-09-19-goal-5b-betrieb.md`): läuft unter
+   `https://cp.hippe.eu` auf `srv1336627`, Caddy mit Let's Encrypt, OpenRouter als Einkauf, PayAI
+   als Facilitator. Beide Abnahmestufen bestanden (Stufe 1 Tier-1-Topup `0xab5932…0733a`,
+   Stufe 2 Erstlauf der Upstream-Runtime mit Bootstrap-Topup `0x6cde28b0…54dc68`, fünf Turns,
+   keine API-Fehler). Tier 1 danach aus dem Betrieb genommen.
+
+**Nächste Schritte (kein Goal, Entscheidung offen):**
+- Ops-Triage als Loop scharf schalten: `/loop 1d Run $ops-triage` (L1, report-only, Datenquelle
+  `ops/status.sh`, Schwellen in `ops/README.md`).
+- Go-to-Market für den 30-Tage-Test (Messgröße: 50 provisionierte Automatons, aktuell 1):
+  sachliche Antworten in den Conway-Issues #339 und #377, README-Abschnitt im Fork `htc/vm`,
+  Eintrag bei awesome-x402. Braucht Matthias' Go, weil es Außenwirkung hat.
+- Phase 2 (Sandboxes, Social-Relay) erst, wenn Nachfrage messbar ist.
 
 ## Entscheidungen bei Matthias
 
@@ -29,9 +38,9 @@ Last run: 2026-09-19 11:20 (Goal 5a DONE, OpenRouter als Einkauf)
   Handoff-Leitplanke sagt "nicht übertragbar" (E-Geld-Abgrenzung, Recherche 6.2), Constraints
   erlauben Transfer innerhalb des Control Plane. Phase 1 antwortet 501; Solo-Automatons brauchen
   ihn nicht. Option für später: Transfer nur zwischen Wallets desselben `creator_address`.
-- Domain und Markenname (Vorschlag `cp.hippe.eu`, Zone liegt im HTC-Cloudflare), payTo-Wallet
-  (Base-Adresse unter Matthias' Kontrolle, nicht Hanses), SSH-Key auf `srv1336627`: offen, am
-  19.09.2026 im Chat konkret angefragt. Einkauf ist entschieden: OpenRouter (Key in secrets.env).
+- Erledigt am 19.09.2026: Domain `cp.hippe.eu`, payTo `0x9141…d614`, SSH-Key auf `srv1336627`,
+  Einkauf OpenRouter. Offen bleibt der Go für Go-to-Market und die Steuerfrage (USt auf
+  Nutzungsguthaben, B2B-Ausland, Reverse Charge) vor dem ersten Fremdnutzer.
 
 ## Watch List
 
