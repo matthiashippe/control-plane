@@ -207,6 +207,28 @@ describe("/pay x402-Seller", () => {
     expect(settler.calls).toHaveLength(2);
   });
 
+  it("schreibt bei zwei parallelen Retries einer gescheiterten Zahlung nur eine Gutschrift", async () => {
+    // Sicherheitsfund 19.09.2026: Der failed-Retry-Pfad prüfte `changes` des UPDATE nicht, also
+    // gewannen zwei gleichzeitige Retries beide den Claim, riefen beide den Settler und schrieben
+    // beide gut. Reproduziert mit 1 USD und doppeltem Saldo. Der Settler meldet hier zweimal
+    // Erfolg, weil genau das der Fall ist, gegen den abgesichert werden muss: Wir dürfen uns
+    // nicht darauf verlassen, dass ein Dritter den zweiten Aufruf ablehnt.
+    const { pay, account, settler, balance, ledgerRows, db } = setup();
+    const header = await signPayment({ account, to: PAY_TO, value: 5_000_000n });
+
+    settler.failNext = true;
+    expect((await pay(5, header)).status).toBe(402);
+    expect((db.prepare("SELECT status FROM payments").get() as { status: string }).status).toBe("failed");
+
+    const [a, b] = await Promise.all([pay(5, header), pay(5, header)]);
+    const codes = [a.status, b.status].sort();
+
+    expect(balance(), "eine Zahlung über 5 USD darf höchstens 500.000 mc gutschreiben").toBe(500_000);
+    expect(ledgerRows().filter((r) => r.kind === "topup")).toHaveLength(1);
+    expect(codes[0]).toBe(200);
+    expect(settler.calls.length, "der Settler darf für eine Nonce nicht dreimal gerufen werden").toBeLessThanOrEqual(2);
+  });
+
   it("antwortet 503 ohne Settler", async () => {
     const db = openDb(":memory:");
     const app = createApp({ db, pay: cfg, settler: null });

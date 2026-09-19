@@ -25,6 +25,12 @@ const SLEEP_AT_REQUEST = 5;
 export class MockProvider implements ChatProvider {
   readonly id = "mock";
   private readonly counts = new Map<string, number>();
+  /**
+   * Alle Aufrufe über alle Keys. Beim echten Provider entspricht jeder davon einem Einkauf, der
+   * Geld kostet, auch wenn er hinterher nicht abgerechnet werden kann. Tests, die Guthabendeckung
+   * prüfen, müssen genau das messen und nicht nur den Endsaldo.
+   */
+  totalCalls = 0;
 
   models(): ModelSpec[] {
     return [MOCK_MODEL];
@@ -37,6 +43,7 @@ export class MockProvider implements ChatProvider {
   async chat(req: ChatRequest & { maxTokens: number; apiKeyId: string }): Promise<ChatResponse> {
     const n = this.requestCount(req.apiKeyId) + 1;
     this.counts.set(req.apiKeyId, n);
+    this.totalCalls += 1;
     const offered = new Set((req.tools ?? []).map((t: ToolDef) => t.function.name));
 
     let content: string | null = null;

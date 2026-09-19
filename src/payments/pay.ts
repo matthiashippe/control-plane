@@ -258,11 +258,13 @@ export async function handlePay(
   const nowIso = new Date(now).toISOString();
   const claim = db.transaction(() => {
     if (existing?.status === "failed") {
-      db.prepare("UPDATE payments SET status = 'pending', error = NULL, created_at = ? WHERE nonce = ? AND status = 'failed'").run(
-        nowIso,
-        auth.nonce,
-      );
-      return true;
+      // `changes` prüfen, sonst gewinnen zwei parallele Retries beide den Claim, settlen beide
+      // und schreiben zwei Gutschriften für dieselbe Zahlung. Der WHERE-Filter allein reicht
+      // nicht: Er verhindert nur, dass ein Nicht-failed-Zustand überschrieben wird.
+      const res = db
+        .prepare("UPDATE payments SET status = 'pending', error = NULL, created_at = ? WHERE nonce = ? AND status = 'failed'")
+        .run(nowIso, auth.nonce);
+      return res.changes === 1;
     }
     try {
       db.prepare(

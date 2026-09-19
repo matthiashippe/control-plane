@@ -24,6 +24,7 @@ function migrate(db: Db): void {
     CREATE TABLE IF NOT EXISTS wallets (
       address     TEXT PRIMARY KEY,             -- lowercase 0x-Adresse
       balance_mc  INTEGER NOT NULL DEFAULT 0,   -- Millicents
+      reserved_mc INTEGER NOT NULL DEFAULT 0,   -- laufende Inferenz-Calls, siehe reserveMc()
       created_at    TEXT NOT NULL
     );
 
@@ -61,6 +62,9 @@ function migrate(db: Db): void {
       created_at  TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS ledger_address ON ledger(address, id);
+    -- Zweite Verteidigungslinie gegen doppelte Gutschriften: Eine x402-Nonce darf höchstens
+    -- eine topup-Zeile erzeugen, auch wenn ein Claim-Rennen im Code durchrutscht.
+    CREATE UNIQUE INDEX IF NOT EXISTS ledger_topup_ref ON ledger(ref) WHERE kind = 'topup' AND ref IS NOT NULL;
 
     -- x402-Zahlungen, Schlüssel ist die Authorization-Nonce der EIP-3009-Signatur.
     CREATE TABLE IF NOT EXISTS payments (
@@ -88,6 +92,19 @@ function migrate(db: Db): void {
     );
     CREATE INDEX IF NOT EXISTS automatons_address ON automatons(address);
   `);
+
+  // Bestehende Datenbanken kennen reserved_mc noch nicht. SQLite hat kein "ADD COLUMN IF NOT
+  // EXISTS", deshalb erst nachsehen.
+  const spalten = db.prepare("PRAGMA table_info(wallets)").all() as { name: string }[];
+  if (!spalten.some((c) => c.name === "reserved_mc")) {
+    db.exec("ALTER TABLE wallets ADD COLUMN reserved_mc INTEGER NOT NULL DEFAULT 0");
+  }
+
+  // Reservierungen gehören zu laufenden Requests. Ein frisch gestarteter Prozess hat keine, also
+  // sind übriggebliebene Werte Reste eines Absturzes mitten im Provider-Call. Sie hier
+  // zurückzusetzen ist nur korrekt, solange genau ein Prozess auf dieser Datei arbeitet, und
+  // genau so läuft der Dienst (ein Container, eine SQLite-Datei).
+  db.exec("UPDATE wallets SET reserved_mc = 0 WHERE reserved_mc <> 0");
 }
 
 export const MC_PER_CENT = 1000;
@@ -102,6 +119,11 @@ export interface LedgerEntry {
   deltaMc: number;
   ref?: string;
   meta?: Record<string, unknown>;
+  /**
+   * Reservierung, die mit dieser Buchung aufgelöst wird, in derselben Transaktion. Sonst gäbe es
+   * zwischen Freigabe und Abbuchung ein Fenster, in dem ein paralleler Call das Guthaben sieht.
+   */
+  releaseReservedMc?: number;
 }
 
 /**
@@ -118,6 +140,9 @@ export function postLedger(db: Db, entry: LedgerEntry): { balanceMc: number } {
       .prepare("UPDATE wallets SET balance_mc = balance_mc + ? WHERE address = ? AND balance_mc + ? >= 0")
       .run(entry.deltaMc, address, entry.deltaMc);
     if (res.changes !== 1) throw new Error("insufficient_balance");
+    if (entry.releaseReservedMc) {
+      db.prepare("UPDATE wallets SET reserved_mc = max(0, reserved_mc - ?) WHERE address = ?").run(entry.releaseReservedMc, address);
+    }
     db.prepare(
       "INSERT INTO ledger (address, kind, delta_mc, ref, meta, created_at) VALUES (?, ?, ?, ?, ?, ?)",
     ).run(
@@ -137,6 +162,38 @@ export function ensureWallet(db: Db, address: string): void {
   db.prepare(
     "INSERT OR IGNORE INTO wallets (address, balance_mc, created_at) VALUES (?, 0, ?)",
   ).run(address.toLowerCase(), new Date().toISOString());
+}
+
+/**
+ * Reserviert Guthaben für einen laufenden Call. Atomar: Die Bedingung steht im UPDATE selbst,
+ * deshalb können zwei gleichzeitige Requests nicht beide dasselbe Guthaben sehen und verbrauchen.
+ * Genau das war der Fehler davor, als vor dem Provider-Call nur der Saldo gelesen wurde.
+ * Gibt false zurück, wenn das verfügbare Guthaben (Saldo minus bereits Reserviertes) nicht reicht.
+ */
+export function reserveMc(db: Db, address: string, mc: number): boolean {
+  if (!Number.isInteger(mc) || mc < 0) throw new Error("reserve_mc must be a non-negative integer");
+  const addr = address.toLowerCase();
+  const run = db.transaction(() => {
+    ensureWallet(db, addr);
+    const res = db
+      .prepare("UPDATE wallets SET reserved_mc = reserved_mc + ? WHERE address = ? AND balance_mc - reserved_mc - ? >= 0")
+      .run(mc, addr, mc);
+    return res.changes === 1;
+  });
+  return run();
+}
+
+/** Gibt eine Reservierung zurück, ohne zu buchen (Provider-Fehler, abgebrochener Call). */
+export function releaseMc(db: Db, address: string, mc: number): void {
+  db.prepare("UPDATE wallets SET reserved_mc = max(0, reserved_mc - ?) WHERE address = ?").run(mc, address.toLowerCase());
+}
+
+/** Saldo minus laufende Reservierungen. Das ist, was ein neuer Call tatsächlich ausgeben darf. */
+export function getAvailableMc(db: Db, address: string): number {
+  const row = db
+    .prepare("SELECT balance_mc - reserved_mc AS available FROM wallets WHERE address = ?")
+    .get(address.toLowerCase()) as { available: number } | undefined;
+  return row?.available ?? 0;
 }
 
 export function getBalanceMc(db: Db, address: string): number {

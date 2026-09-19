@@ -7,7 +7,7 @@
  * `uncollected_mc` im meta, damit der Agent bei 0 stehen bleibt (critical) statt negativ (dead).
  */
 
-import { getBalanceMc, mcToCents, postLedger, type Db } from "../db.js";
+import { getAvailableMc, getBalanceMc, mcToCents, postLedger, releaseMc, reserveMc, type Db } from "../db.js";
 import type { ChatProvider, ChatRequest, ChatResponse, ModelSpec, Usage } from "./provider.js";
 import { estimateTokens, ProviderBadRequestError, ProviderUnavailableError } from "./provider.js";
 
@@ -145,16 +145,22 @@ export async function handleChat(
 
   const estimatedPrompt = estimateTokens(req.messages, req.tools);
   const requiredMc = costMc(entry.spec, { prompt_tokens: estimatedPrompt, completion_tokens: maxTokens });
-  const balanceBefore = getBalanceMc(db, address);
-  if (balanceBefore < requiredMc) {
+
+  // Reservieren statt nur prüfen. Zwischen Prüfung und Abbuchung liegt der Provider-Call, also ein
+  // `await`: Wer hier nur den Saldo liest, lässt beliebig viele gleichzeitige Calls dieselbe
+  // Deckung sehen. Mit 1 USD Guthaben und 200 parallelen Requests waren so rund 65 USD echte
+  // Einkaufskosten erreichbar (Sicherheitsprüfung 19.09.2026). `reserveMc` entscheidet atomar in
+  // der Datenbank und ist damit gegen dieses Rennen dicht.
+  if (!reserveMc(db, address, requiredMc)) {
+    const availableMc = getAvailableMc(db, address);
     return {
       status: 402,
       body: {
         error: "INSUFFICIENT_CREDITS",
-        message: `Insufficient credits: need ${mcToCents(requiredMc) + 1} cents, have ${mcToCents(balanceBefore)} cents`,
+        message: `Insufficient credits: need ${mcToCents(requiredMc) + 1} cents, have ${mcToCents(availableMc)} cents`,
         details: {
           required_cents: Math.ceil(requiredMc / 1000),
-          current_balance_cents: mcToCents(balanceBefore),
+          current_balance_cents: mcToCents(availableMc),
           model: req.model,
         },
       },
@@ -165,6 +171,9 @@ export async function handleChat(
   try {
     response = await entry.provider.chat({ ...(req as ChatRequest), model: entry.spec.id, maxTokens, apiKeyId: address });
   } catch (err) {
+    // Jeder Ausgang ohne Buchung muss die Reservierung zurückgeben, sonst bleibt Guthaben des
+    // Mandanten dauerhaft blockiert.
+    releaseMc(db, address, requiredMc);
     if (err instanceof ProviderUnavailableError) {
       console.error(`[inference] provider ${err.provider} unavailable (status ${err.upstreamStatus ?? "none"}): ${err.message}`);
       return { status: 503, body: { error: "provider_unavailable", provider: err.provider, message: err.message } };
@@ -179,12 +188,15 @@ export async function handleChat(
 
   const actualMc = costMc(entry.spec, response.usage);
   const boughtMc = purchaseMc(entry.spec, response.usage);
+  // Der Saldo deckt mindestens die Reservierung, mehr kann nur anfallen, wenn die Prompt-Schätzung
+  // zu niedrig lag. Dann wird gebucht, was da ist, und der Rest als `uncollected_mc` festgehalten.
   const balanceNow = getBalanceMc(db, address);
   const chargeMc = Math.min(actualMc, balanceNow);
   postLedger(db, {
     address,
     kind: "inference",
     deltaMc: -chargeMc,
+    releaseReservedMc: requiredMc,
     ref: response.id,
     meta: {
       model: entry.spec.id,

@@ -213,3 +213,70 @@ describe("Inferenz-Proxy", () => {
     expect(res.status).toBe(401);
   });
 });
+
+/**
+ * Wie setup(), aber mit einem Provider, der vor der Antwort tatsächlich auf I/O wartet. Nur dann
+ * überlappen sich die Requests im Event-Loop so, wie es bei einem echten Anbieter passiert.
+ */
+function setupLangsam(balanceMc: number) {
+  const basis = setup(balanceMc);
+  const echt = basis.provider.chat.bind(basis.provider);
+  basis.provider.chat = async (req: Parameters<typeof echt>[0]) => {
+    await new Promise((r) => setTimeout(r, 15));
+    return echt(req);
+  };
+  return basis;
+}
+
+describe("Guthabendeckung unter Parallelität", () => {
+  it("lässt parallele Calls nicht dasselbe Guthaben doppelt verbrauchen", async () => {
+    // Sicherheitsfund 19.09.2026: Zwischen Saldoprüfung und Abbuchung liegt der Provider-Call.
+    // Vorher las jeder gleichzeitige Request denselben Saldo, alle kamen durch, und abgebucht
+    // wurde am Ende nur, was noch da war. Mit 1 USD Guthaben waren so rund 65 USD echte
+    // Einkaufskosten erreichbar. Der Provider zählt hier mit: entscheidend ist nicht nur der
+    // Endsaldo, sondern wie oft überhaupt eingekauft wurde.
+    // Der Provider muss wirklich warten, sonst gibt es kein Rennen: Ein synchron antwortender
+    // Mock läuft im Event-Loop nacheinander ab und der Fehler bleibt unsichtbar.
+    // 500 mc decken genau drei Calls à 160 mc. Mit 40 gleichzeitigen Anfragen ist der Überzug
+    // das Dreizehnfache des Guthabens, wenn die Deckung nicht atomar geprüft wird.
+    const { chat, request, balance, inferenceRows, provider } = setupLangsam(500);
+
+    const antworten = await Promise.all(Array.from({ length: 40 }, (_, i) => chat(request(i))));
+    const codes = antworten.map((r) => r.status);
+    const ok = codes.filter((c) => c === 200).length;
+    const abgelehnt = codes.filter((c) => c === 402).length;
+
+    expect(ok + abgelehnt, "andere Statuscodes als 200/402 sind hier ein Fehler").toBe(40);
+    expect(balance(), "der Saldo darf nie unter null fallen").toBeGreaterThanOrEqual(0);
+
+    const gebucht = inferenceRows().reduce((sum, r) => sum + Math.abs(r.delta_mc), 0);
+    expect(gebucht, "es darf nicht mehr abgebucht werden als eingezahlt wurde").toBeLessThanOrEqual(500);
+    expect(ok, "mit 500 mc sind höchstens drei Calls à 160 mc gedeckt").toBeLessThanOrEqual(3);
+    expect(inferenceRows(), "jeder erfolgreiche Call schreibt genau eine Ledger-Zeile").toHaveLength(ok);
+
+    // Der eigentliche Schaden war nicht der Saldo, sondern der Einkauf beim Provider: Jeder
+    // durchgelassene Call kostet echtes Geld, auch wenn er nicht abgerechnet werden kann.
+    const unbezahlt = inferenceRows()
+      .map((r) => JSON.parse(r.meta) as { uncollected_mc: number })
+      .reduce((sum, m) => sum + (m.uncollected_mc || 0), 0);
+    expect(unbezahlt, "kein Call darf unbezahlt durchlaufen").toBe(0);
+    expect(provider.totalCalls, "jeder Provider-Aufruf kostet echtes Geld, auch ein nicht abrechenbarer").toBe(ok);
+  });
+
+  it("gibt die Reservierung zurück, wenn der Provider ausfällt", async () => {
+    // Sonst bleibt Guthaben nach einem Provider-Fehler dauerhaft blockiert und der Mandant kommt
+    // nicht mehr an sein eigenes Geld.
+    const { db, chat, request, address } = setup(50_000);
+    const reserviert = () =>
+      (db.prepare("SELECT reserved_mc FROM wallets WHERE address = ?").get(address) as { reserved_mc: number }).reserved_mc;
+
+    expect(reserviert()).toBe(0);
+    const res = await chat({ ...request(1), model: "gibt-es-nicht" });
+    expect(res.status).toBe(404);
+    expect(reserviert(), "ein abgelehnter Call darf nichts reservieren").toBe(0);
+
+    const ok = await chat(request(2));
+    expect(ok.status).toBe(200);
+    expect(reserviert(), "nach einem erfolgreichen Call ist nichts mehr reserviert").toBe(0);
+  });
+});
