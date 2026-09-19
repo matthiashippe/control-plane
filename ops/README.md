@@ -41,6 +41,24 @@ einen lokalen Start gedacht und ersetzt den Lauf gegen den echten Endpunkt nicht
 | `openrouter.left` | unter 5 USD | Matthias fragen, ob nachgeladen wird; sonst droht 503 für alle Mandanten |
 | `vm.disk_used` | über 80 % | Logs rotieren (json-file max 20m x 5), alte Images prüfen |
 | `db.day.margin_mc` | negativ | Verkaufspreis deckt den Einkauf nicht: Markup oder Katalog prüfen |
+| `db.zahlen_ohne_zu_denken` | ein Eintrag über 24 h | Kunde hat bezahlt und kauft keine Inferenz. Kein Alarm, aber nachsehen |
+
+### Zahlen, ohne zu denken
+
+Die Liste `db.zahlen_ohne_zu_denken` nennt jede Wallet mit Guthaben, die seit ihrer letzten
+Aufladung **keinen einzigen Inferenz-Aufruf** gemacht hat, mit den Stunden seither und ob sie
+überhaupt je gedacht hat. Das ist die stillste Art, einen Kunden zu verlieren: Das Guthaben liegt
+da, die Runtime pollt vielleicht noch ihren Kontostand, und es passiert nichts.
+
+Genau diesen Fall gab es am 19.09.2026 mit dem ersten zahlenden Kunden, und aufgefallen ist er nur,
+weil jemand zufällig ins Ledger sah. Die Ursache lag außerhalb unseres Codes (die Runtime kaufte
+ihre Turns nicht bei uns, siehe `docs/research/`), aber das ändert nichts daran, dass wir es
+merken müssen.
+
+Bewusst **kein Alarm**: Ein frisch aufgeladener Automat, der gerade schläft, ist normal, und ein
+Wecker, der jede Nacht klingelt, wird abgeschaltet. Ab einem Eintrag, der älter als 24 Stunden ist,
+lohnt der Blick in die Caddy-Logs: Kommen von der Adresse überhaupt noch Anfragen, und mit welchem
+Statuscode? Wenn ja und alles 200, liegt es an seiner Seite. Wenn nein, ist er weg.
 
 ## Watchdog auf der VM
 
