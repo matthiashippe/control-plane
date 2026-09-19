@@ -133,7 +133,11 @@ describe("Öffentliche Seite und Status", () => {
     expect((await app.request("/v1/models")).status).toBe(401);
     const missing = await app.request("/gibtsnicht");
     expect(missing.status).toBe(404);
-    expect(await missing.json()).toEqual({ error: "not_found" });
+    const body = (await missing.json()) as { error: string; message: string; docs: string };
+    expect(Object.keys(body).sort()).toEqual(["docs", "error", "message"]);
+    expect(body.error).toBe("not_found");
+    expect(body.message).toContain("/.well-known/x402");
+    expect(body.docs).toContain("docs/errors.md");
   });
 
   it("nennt auf der Seite den Betreiber und eine Kontaktmöglichkeit", async () => {
@@ -260,5 +264,21 @@ describe("Auslieferung durch Caddy", () => {
     ]) {
       expect(caddyfile, `${header} fehlt im Caddyfile`).toContain(header);
     }
+  });
+});
+
+describe("Favicon", () => {
+  it("liefert ein Icon statt 404, und die Seite trägt es selbst im Head", async () => {
+    // Zwei Besucher haben am 19.09.2026 favicon.ico abgerufen und 404 bekommen. Das kostet nichts
+    // und sieht sonst unfertig aus. Der data-URI im Head spart den Request ganz, die Route fängt
+    // Clients, die trotzdem fragen.
+    const { app } = setup();
+    const res = await app.request("/favicon.ico");
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toMatch(/image\/svg\+xml/);
+    expect((await res.text()).length).toBeGreaterThan(50);
+
+    const html = await (await app.request("/")).text();
+    expect(html, "ohne den data-URI fragt jeder Browser die Route an").toMatch(/rel="icon"/);
   });
 });

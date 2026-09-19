@@ -96,7 +96,11 @@ describe("Registry", () => {
     const { body } = await buildRegister({ signer: other, automatonAddress: account.address });
     const res = await post("/v1/automatons/register", body);
     expect(res.status).toBe(401);
-    expect(((await res.json()) as { error: string }).error).toBe("invalid_signature");
+    const fehler = (await res.json()) as { error: string; message: string; docs: string };
+    expect(fehler.error).toBe("invalid_signature");
+    expect(fehler.message, "die Meldung nennt Domain und Typ, gegen die geprüft wird").toContain("AIWS Automaton");
+    expect(fehler.message).toContain("Register(string automatonId, string nonce, bytes32 payloadHash)");
+    expect(fehler.docs).toContain("docs/errors.md#registration");
   });
 
   it("lehnt eine automaton_address ab, die nicht die Wallet des API-Keys ist (403)", async () => {
@@ -105,7 +109,10 @@ describe("Registry", () => {
     const { body } = await buildRegister({ signer: other });
     const res = await post("/v1/automatons/register", body);
     expect(res.status).toBe(403);
-    expect(((await res.json()) as { error: string }).error).toBe("address_mismatch");
+    const fehler = (await res.json()) as { error: string; message: string };
+    expect(fehler.error).toBe("address_mismatch");
+    expect(fehler.message).toContain("automaton_address must be the wallet of the API key");
+    expect(fehler.message, "und der Weg dahin").toContain("automaton --provision");
   });
 
   it("ist idempotent für dieselbe ID und Adresse, 409 für dieselbe ID mit anderer Adresse", async () => {
@@ -134,6 +141,12 @@ describe("Registry", () => {
       body: JSON.stringify(conflict),
     });
     expect(res.status).toBe(409);
+    const konflikt = (await res.json()) as { error: string; message: string };
+    expect(konflikt.error).toBe("automaton_id_conflict");
+    expect(konflikt.message, "sagt, dass IDs nicht umgehängt werden und was stattdessen geht").toMatch(
+      /different wallet/,
+    );
+    expect(konflikt.message).toMatch(/Pick a new automaton_id/);
   });
 
   it("liefert /v1/credits/pricing im Format, das der Runtime-Client mappt", async () => {

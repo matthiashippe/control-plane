@@ -28,10 +28,15 @@ export const DEFAULT_SIWE_CONFIG: SiweConfig = {
   sessionTtlMs: 10 * 60 * 1000,
 };
 
+/**
+ * `message` ist der Wortlaut, den Conway heute liefert, und landet unverändert im Feld `error`.
+ * `hint` ist der Satz für den Menschen davor und geht als `message` in den Körper (src/errors.ts).
+ */
 export class AuthError extends Error {
   constructor(
     public readonly status: number,
     message: string,
+    public readonly hint?: string,
   ) {
     super(message);
     this.name = "AuthError";
@@ -62,31 +67,66 @@ export async function verifySiwe(
   now = Date.now(),
 ): Promise<{ accessToken: string; address: Address }> {
   if (input.chainType && input.chainType !== "evm") {
-    throw new AuthError(400, `chain_type ${input.chainType} not supported`);
+    throw new AuthError(
+      400,
+      `chain_type ${input.chainType} not supported`,
+      "This control plane provisions EVM wallets only. Send chain_type \"evm\" or leave it out; " +
+        "Solana automatons cannot be provisioned here and cannot pay with x402.",
+    );
   }
   if (typeof input.message !== "string" || typeof input.signature !== "string") {
-    throw new AuthError(400, "message and signature are required");
+    throw new AuthError(
+      400,
+      "message and signature are required",
+      "POST a JSON body with the SIWE message as sent by the runtime and its EIP-191 signature: " +
+        '{ "message": "<siwe text>", "signature": "0x..." }.',
+    );
   }
 
   const parsed = parseSiweMessage(input.message);
   if (!parsed.address || !parsed.nonce || !parsed.domain || parsed.chainId === undefined) {
-    throw new AuthError(400, "Malformed SIWE message");
+    throw new AuthError(
+      400,
+      "Malformed SIWE message",
+      "The message must be a SIWE text carrying address, domain, chainId and nonce. " +
+        "The runtime builds it for you with `automaton --provision`.",
+    );
   }
   if (parsed.domain !== cfg.domain) {
-    throw new AuthError(401, `Invalid domain: expected ${cfg.domain}`);
+    throw new AuthError(
+      401,
+      `Invalid domain: expected ${cfg.domain}`,
+      `Sign a SIWE message whose domain is exactly ${cfg.domain}. The runtime hard-codes that ` +
+        "domain, so this normally only happens when a message is signed by hand.",
+    );
   }
   if (parsed.chainId !== cfg.chainId) {
-    throw new AuthError(401, `Invalid chainId: expected ${cfg.chainId}`);
+    throw new AuthError(
+      401,
+      `Invalid chainId: expected ${cfg.chainId}`,
+      `The SIWE message must state chainId ${cfg.chainId} (Base). Credits are bought in USDC on ` +
+        "Base, so provisioning is tied to the same chain.",
+    );
   }
   if (parsed.expirationTime && parsed.expirationTime.getTime() < now) {
-    throw new AuthError(401, "Message expired");
+    throw new AuthError(
+      401,
+      "Message expired",
+      "The expirationTime in the SIWE message has passed. Fetch a fresh nonce from " +
+        "POST /v1/auth/nonce and sign again.",
+    );
   }
 
   const nonceRow = db
     .prepare("SELECT issued_at, consumed_at FROM siwe_nonces WHERE nonce = ?")
     .get(parsed.nonce) as { issued_at: number; consumed_at: number | null } | undefined;
   if (!nonceRow || nonceRow.consumed_at !== null || now - nonceRow.issued_at > cfg.nonceTtlMs) {
-    throw new AuthError(401, "Invalid or expired nonce");
+    throw new AuthError(
+      401,
+      "Invalid or expired nonce",
+      "Every nonce from POST /v1/auth/nonce is good for ten minutes and exactly one verify. " +
+        "Fetch a new one and sign a new message.",
+    );
   }
 
   let ok = false;
@@ -100,7 +140,12 @@ export async function verifySiwe(
     ok = false;
   }
   if (!ok) {
-    throw new AuthError(401, "Invalid signature");
+    throw new AuthError(
+      401,
+      "Invalid signature",
+      "The signature does not recover to the address in the SIWE message. Sign the message text " +
+        "verbatim (EIP-191 personal_sign) with the key of that address.",
+    );
   }
 
   const address = parsed.address.toLowerCase() as Address;
@@ -109,7 +154,14 @@ export async function verifySiwe(
     const res = db
       .prepare("UPDATE siwe_nonces SET consumed_at = ? WHERE nonce = ? AND consumed_at IS NULL")
       .run(now, parsed.nonce);
-    if (res.changes !== 1) throw new AuthError(401, "Invalid or expired nonce");
+    if (res.changes !== 1) {
+      throw new AuthError(
+        401,
+        "Invalid or expired nonce",
+        "This nonce was used by another request while yours was in flight. " +
+          "Fetch a new one from POST /v1/auth/nonce and sign a new message.",
+      );
+    }
     ensureWallet(db, address);
     db.prepare("INSERT INTO sessions (token, address, expires_at) VALUES (?, ?, ?)").run(
       accessToken,
@@ -137,7 +189,12 @@ export function createApiKey(
     .prepare("SELECT address, expires_at FROM sessions WHERE token = ?")
     .get(accessToken) as { address: Address; expires_at: number } | undefined;
   if (!session || session.expires_at < now) {
-    throw new AuthError(401, "Invalid or expired access token");
+    throw new AuthError(
+      401,
+      "Invalid or expired access token",
+      "The access_token from POST /v1/auth/verify lives ten minutes and is sent as " +
+        "`Authorization: Bearer <access_token>`. Run nonce and verify again to get a fresh one.",
+    );
   }
   const key = `cnwy_k_${randomBytes(16).toString("hex")}`;
   const keyPrefix = key.slice(0, "cnwy_k_".length + 8);

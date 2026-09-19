@@ -9,6 +9,7 @@
 
 import { isAddress, keccak256, toHex, verifyTypedData, type Address, type Hex } from "viem";
 import type { Db } from "./db.js";
+import { DOC } from "./errors.js";
 
 export interface RegisterBody {
   automaton_id: string;
@@ -67,9 +68,31 @@ function describe(row: AutomatonRow): Record<string, unknown> {
 }
 
 export async function handleRegister(db: Db, keyAddress: Address, raw: unknown): Promise<RegisterResult> {
-  if (typeof raw !== "object" || raw === null) return { status: 400, body: { error: "invalid_body" } };
+  if (typeof raw !== "object" || raw === null) {
+    return {
+      status: 400,
+      body: {
+        error: "invalid_body",
+        message:
+          "The body must be a JSON object with the registration fields. The runtime sends it once " +
+          "on its first start; see the docs if you are building the call yourself.",
+        docs: DOC.registration,
+      },
+    };
+  }
   const b = raw as Partial<RegisterBody>;
-  if (b.chain_type && b.chain_type !== "evm") return { status: 400, body: { error: `chain_type ${b.chain_type} not supported` } };
+  if (b.chain_type && b.chain_type !== "evm") {
+    return {
+      status: 400,
+      body: {
+        error: `chain_type ${b.chain_type} not supported`,
+        message:
+          'Only EVM automatons can register here. Send chain_type "evm" or leave it out; Solana ' +
+          "wallets can neither be provisioned nor pay with x402 on this control plane.",
+        docs: DOC.registration,
+      },
+    };
+  }
   const str = (v: unknown) => (typeof v === "string" ? v : undefined);
   const automatonId = str(b.automaton_id);
   const automatonAddress = str(b.automaton_address);
@@ -81,9 +104,42 @@ export async function handleRegister(db: Db, keyAddress: Address, raw: unknown):
   const payloadHash = str(b.payload_hash);
   const genesisPromptHash = str(b.genesis_prompt_hash);
   if (!automatonId || !automatonAddress || !creatorAddress || !name || !nonce || !signature || !payloadHash) {
-    return { status: 400, body: { error: "missing_fields" } };
+    const fehlend = Object.entries({
+      automaton_id: automatonId,
+      automaton_address: automatonAddress,
+      creator_address: creatorAddress,
+      name,
+      nonce,
+      signature,
+      payload_hash: payloadHash,
+    })
+      .filter(([, wert]) => !wert)
+      .map(([feld]) => feld);
+    return {
+      status: 400,
+      body: {
+        error: "missing_fields",
+        message:
+          `These fields are missing or empty: ${fehlend.join(", ")}. A registration needs ` +
+          "automaton_id, automaton_address, creator_address, name, nonce, payload_hash and " +
+          "signature; bio and genesis_prompt_hash are optional.",
+        docs: DOC.registration,
+      },
+    };
   }
-  if (!isAddress(automatonAddress) || !isAddress(creatorAddress)) return { status: 400, body: { error: "invalid_address" } };
+  if (!isAddress(automatonAddress) || !isAddress(creatorAddress)) {
+    return {
+      status: 400,
+      body: {
+        error: "invalid_address",
+        message:
+          "automaton_address and creator_address must both be EVM addresses (0x plus 40 hex " +
+          "characters). The signature is checked against automaton_address, so a typo there ends " +
+          "here and not later.",
+        docs: DOC.registration,
+      },
+    };
+  }
 
   // Ohne Längengrenzen kann ein einziger kostenlos erzeugter Key die Platte füllen: 100
   // Registrierungen mit je 900 KB `bio` ergaben im Sicherheitsreview 90 MiB in 21 Sekunden, und
@@ -102,7 +158,19 @@ export async function handleRegister(db: Db, keyAddress: Address, raw: unknown):
     payload_hash: [payloadHash, 66],
   } as Record<string, [string, number]>).find(([, [wert, max]]) => wert.length > max);
   if (zuLang) {
-    return { status: 400, body: { error: "field_too_long", field: zuLang[0], max_length: zuLang[1][1] } };
+    return {
+      status: 400,
+      body: {
+        error: "field_too_long",
+        field: zuLang[0],
+        max_length: zuLang[1][1],
+        message:
+          `The field ${zuLang[0]} is ${zuLang[1][0].length} characters long, the limit is ` +
+          `${zuLang[1][1]}. Registration costs nothing and everything sent here is stored, so ` +
+          "every field has a cap; shorten it and register again.",
+        docs: DOC.registration,
+      },
+    };
   }
 
   // Ein Wallet betreibt seine Automatons, keine Registrierungsfarm. Die Grenze ist großzügig
@@ -112,7 +180,20 @@ export async function handleRegister(db: Db, keyAddress: Address, raw: unknown):
     db.prepare("SELECT count(*) AS n FROM automatons WHERE address = ?").get(automatonAddress.toLowerCase()) as { n: number }
   ).n;
   if (vorhanden >= AUTOMATONS_JE_WALLET) {
-    return { status: 429, body: { error: "too_many_automatons", limit: AUTOMATONS_JE_WALLET } };
+    return {
+      status: 429,
+      body: {
+        error: "too_many_automatons",
+        limit: AUTOMATONS_JE_WALLET,
+        message:
+          `This wallet has already registered ${AUTOMATONS_JE_WALLET} automatons, which is the cap ` +
+          "per wallet. Registration is free, so the cap is what keeps a single key from filling " +
+          "the disk. Each automaton has its own wallet and its own API key: register the next one " +
+          "from that wallet. If you genuinely need more under one wallet, say so at " +
+          "https://github.com/matthiashippe/control-plane/issues.",
+        docs: DOC.registration,
+      },
+    };
   }
 
   const payload: Record<string, string> = {
@@ -125,7 +206,18 @@ export async function handleRegister(db: Db, keyAddress: Address, raw: unknown):
   if (genesisPromptHash) payload.genesis_prompt_hash = genesisPromptHash;
   const expectedHash = hashRegisterPayload(payload);
   if (expectedHash.toLowerCase() !== payloadHash.toLowerCase()) {
-    return { status: 400, body: { error: "payload_hash_mismatch" } };
+    return {
+      status: 400,
+      body: {
+        error: "payload_hash_mismatch",
+        message:
+          "payload_hash does not match the fields in this request. It is the keccak256 of the JSON " +
+          "of {automaton_id, automaton_address, creator_address, name, bio} plus " +
+          "genesis_prompt_hash when present, with the keys sorted alphabetically and no extra " +
+          "whitespace. The runtime computes it for you; hash the body you actually send.",
+        docs: DOC.registration,
+      },
+    };
   }
 
   let ok = false;
@@ -141,16 +233,51 @@ export async function handleRegister(db: Db, keyAddress: Address, raw: unknown):
   } catch {
     ok = false;
   }
-  if (!ok) return { status: 401, body: { error: "invalid_signature" } };
+  if (!ok) {
+    return {
+      status: 401,
+      body: {
+        error: "invalid_signature",
+        message:
+          "The EIP-712 signature does not verify against automaton_address. Sign the type " +
+          "Register(string automatonId, string nonce, bytes32 payloadHash) with the domain " +
+          '{name: "AIWS Automaton", version: "1", chainId: 8453} using the automaton\'s own key, ' +
+          "over the same nonce and payload_hash you send here.",
+        docs: DOC.registration,
+      },
+    };
+  }
 
   if (automatonAddress.toLowerCase() !== keyAddress.toLowerCase()) {
-    return { status: 403, body: { error: "address_mismatch", message: "automaton_address must be the wallet of the API key" } };
+    return {
+      status: 403,
+      body: {
+        error: "address_mismatch",
+        message:
+          "automaton_address must be the wallet of the API key used for this call. An automaton " +
+          "registers itself: provision a key from its own wallet (`automaton --provision`) and " +
+          "register with that key.",
+        docs: DOC.registration,
+      },
+    };
   }
 
   const address = automatonAddress.toLowerCase();
   const existing = db.prepare("SELECT * FROM automatons WHERE automaton_id = ?").get(automatonId) as AutomatonRow | undefined;
   if (existing) {
-    if (existing.address !== address) return { status: 409, body: { error: "automaton_id_conflict" } };
+    if (existing.address !== address) {
+      return {
+        status: 409,
+        body: {
+          error: "automaton_id_conflict",
+          message:
+            "This automaton_id already belongs to a different wallet, and identities are not " +
+            "reassigned. Pick a new automaton_id (the runtime generates a UUID when it has none) " +
+            "or register from the wallet that owns this one.",
+          docs: DOC.registration,
+        },
+      };
+    }
     return { status: 200, body: { automaton: describe(existing) } };
   }
 

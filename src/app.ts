@@ -10,6 +10,7 @@ import { fileURLToPath } from "node:url";
 import { Hono } from "hono";
 import type { Db } from "./db.js";
 import { getBalanceCents } from "./db.js";
+import { DOC } from "./errors.js";
 import { Catalog, handleChat, MARKUP } from "./inference/proxy.js";
 import { clientSchluessel, RateLimiter, type RateLimitOptions } from "./ratelimit.js";
 import { handlePay, TOPUP_TIERS_USD, type PayConfig } from "./payments/pay.js";
@@ -60,6 +61,26 @@ export interface AppOptions {
 
 type Env = { Variables: { address: `0x${string}` } };
 
+/** Diese Instanz hat keine Zahlungs-Wallet konfiguriert, also kann hier niemand Credits kaufen. */
+const PAYMENTS_UNAVAILABLE = {
+  error: "payments_unavailable",
+  message:
+    "This instance has no payment wallet configured, so credits cannot be bought here. " +
+    "GET /.well-known/x402 shows whether topups are available; operators enable them by setting " +
+    "CP_PAY_TO and a settler.",
+  docs: DOC.payments,
+};
+
+/** Kein Inferenz-Provider konfiguriert: Modelle und Chat-Completions gibt es dann nicht. */
+const INFERENCE_UNAVAILABLE = {
+  error: "inference_unavailable",
+  message:
+    "No inference provider is configured on this instance, so there are no models to list and " +
+    "nothing to bill. GET /v1/status shows the models an instance actually serves; operators " +
+    "enable inference by setting CP_PROVIDER.",
+  docs: DOC.inference,
+};
+
 export function createApp(opts: AppOptions) {
   const { db } = opts;
   const siweCfg: SiweConfig = { ...DEFAULT_SIWE_CONFIG, ...opts.siwe };
@@ -67,24 +88,55 @@ export function createApp(opts: AppOptions) {
 
   app.onError((err, c) => {
     if (err instanceof AuthError) {
-      return c.json({ error: err.message }, err.status as 400 | 401);
+      // `error` bleibt der Conway-Wortlaut, `message` sagt, was jetzt zu tun ist.
+      return c.json(
+        { error: err.message, ...(err.hint ? { message: err.hint, docs: DOC.authentication } : {}) },
+        err.status as 400 | 401,
+      );
     }
+    // Der Stacktrace bleibt im Log. Nach außen geht nur, dass es unsere Schuld war und dass die
+    // Anfrage nichts gekostet hat; alles andere wäre ein Blick in fremde Interna.
     console.error(`[app] ${c.req.method} ${c.req.path}: ${err.stack || err.message}`);
-    return c.json({ error: "internal_error" }, 500);
+    return c.json(
+      {
+        error: "internal_error",
+        message:
+          "This request failed inside the control plane, not in your call. Nothing was charged " +
+          "for it. Retry with backoff; if it keeps failing, the operator wants to know at " +
+          "https://github.com/matthiashippe/control-plane/issues.",
+        docs: DOC.service,
+      },
+      500,
+    );
   });
 
   // Die Pfade ohne API-Key schreiben in die Datenbank, `/pay` ruft zusätzlich den Facilitator.
   // Ein API-Key kostet nichts, deshalb muss die Grenze vor der Authentifizierung greifen.
-  const limiter = opts.rateLimit === null ? null : new RateLimiter(opts.rateLimit ?? { limit: 60, fensterMs: 60_000 });
+  const rateLimitOpts: RateLimitOptions = opts.rateLimit ?? { limit: 60, fensterMs: 60_000 };
+  const limiter = opts.rateLimit === null ? null : new RateLimiter(rateLimitOpts);
   const OFFENE_PFADE = ["/v1/auth/nonce", "/v1/auth/verify", "/v1/auth/api-keys", "/pay/"];
   if (limiter) {
+    const fensterSek = Math.round(rateLimitOpts.fensterMs / 1000);
     app.use("*", async (c, next) => {
       const pfad = c.req.path;
       if (!OFFENE_PFADE.some((p) => pfad.startsWith(p))) return next();
       const { erlaubt, retryAfterSec } = limiter.pruefe(clientSchluessel(c.req.raw.headers));
       if (!erlaubt) {
         c.header("Retry-After", String(retryAfterSec));
-        return c.json({ error: "rate_limited", retry_after_seconds: retryAfterSec }, 429);
+        return c.json(
+          {
+            error: "rate_limited",
+            retry_after_seconds: retryAfterSec,
+            message:
+              `More than ${rateLimitOpts.limit} requests in ${fensterSek} seconds from your address to the ` +
+              "endpoints that work without an API key (/v1/auth/*, /pay/*). Those write to the database " +
+              "and /pay also calls a payment facilitator that costs money per call, so they are capped " +
+              `to keep the service up for everyone. Wait ${retryAfterSec} seconds and retry; calls to ` +
+              "/v1/* with an API key are not capped.",
+            docs: DOC.rateLimits,
+          },
+          429,
+        );
       }
       return next();
     });
@@ -100,6 +152,15 @@ export function createApp(opts: AppOptions) {
   // Impressumspflicht nach § 5 DDG: "leicht erkennbar und unmittelbar erreichbar". Die Angaben
   // stehen auf der Startseite; dieser Pfad ist der Weg, den Leute und Prüfer zuerst raten.
   app.get("/impressum", (c) => c.redirect("/#impressum", 302));
+
+  // Die Seite trägt ihr Icon als data-URI im Head, trotzdem fragen manche Clients stur nach
+  // /favicon.ico und bekamen 404. Das kostet nichts und sieht sonst unfertig aus.
+  const FAVICON =
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">' +
+    '<rect width="32" height="32" rx="6" fill="#0b0e14"/>' +
+    '<circle cx="16" cy="12" r="5.5" fill="none" stroke="#58d6a0" stroke-width="2.5"/>' +
+    '<rect x="7" y="21" width="18" height="3.5" rx="1.75" fill="#58d6a0"/></svg>';
+  app.get("/favicon.ico", (c) => c.body(FAVICON, 200, { "Content-Type": "image/svg+xml", "Cache-Control": "public, max-age=86400" }));
 
   app.get("/health", (c) => c.json({ ok: true, version: VERSION }));
 
@@ -254,7 +315,7 @@ export function createApp(opts: AppOptions) {
   app.get("/pay/:usd/:address", async (c) => {
     const pay = opts.pay ?? null;
     const settler = opts.settler ?? null;
-    if (!pay) return c.json({ error: "payments_unavailable" }, 503);
+    if (!pay) return c.json(PAYMENTS_UNAVAILABLE, 503);
     const res = await handlePay(db, settler, pay, {
       usd: c.req.param("usd"),
       recipient: c.req.param("address"),
@@ -284,7 +345,15 @@ export function createApp(opts: AppOptions) {
 
   app.post("/v1/auth/api-keys", async (c) => {
     const auth = c.req.header("authorization") ?? "";
-    if (!auth.startsWith("Bearer ")) throw new AuthError(401, "Bearer token required");
+    if (!auth.startsWith("Bearer ")) {
+      throw new AuthError(
+        401,
+        "Bearer token required",
+        "This call needs the short-lived access_token from POST /v1/auth/verify, sent as " +
+          "`Authorization: Bearer <access_token>`. The API key it returns is sent raw on /v1/* " +
+          "calls, without the Bearer prefix.",
+      );
+    }
     const body = (await c.req.json().catch(() => ({}))) as { name?: string };
     const { key, keyPrefix } = createApiKey(db, auth.slice(7), body.name ?? "conway-automaton");
     return c.json({ key, key_prefix: keyPrefix });
@@ -294,7 +363,16 @@ export function createApp(opts: AppOptions) {
 
   app.use("/v1/*", async (c, next) => {
     const address = resolveApiKey(db, c.req.header("authorization"));
-    if (!address) throw new AuthError(401, "Invalid API key");
+    if (!address) {
+      throw new AuthError(
+        401,
+        "Invalid API key",
+        "Send the control plane API key (cnwy_k_...) raw in the Authorization header, without " +
+          "the Bearer prefix. A key from another control plane does not work here: get one with " +
+          "`automaton --provision` against this instance, or walk the three auth endpoints " +
+          "yourself (nonce, verify, api-keys).",
+      );
+    }
     c.set("address", address);
     await next();
   });
@@ -306,12 +384,12 @@ export function createApp(opts: AppOptions) {
   // ─── Inferenz ─────────────────────────────────────────────────
 
   app.get("/v1/models", (c) => {
-    if (!opts.catalog) return c.json({ error: "inference_unavailable" }, 503);
+    if (!opts.catalog) return c.json(INFERENCE_UNAVAILABLE, 503);
     return c.json(opts.catalog.listModels());
   });
 
   app.post("/v1/chat/completions", async (c) => {
-    if (!opts.catalog) return c.json({ error: "inference_unavailable" }, 503);
+    if (!opts.catalog) return c.json(INFERENCE_UNAVAILABLE, 503);
     const body = await c.req.json().catch(() => null);
     const res = await handleChat(db, opts.catalog, c.get("address"), body);
     return c.json(res.body as Record<string, unknown>, res.status as 200);
@@ -319,13 +397,24 @@ export function createApp(opts: AppOptions) {
 
   app.get("/v1/credits/pricing", (c) => c.json({ tiers: [], topup_tiers_usd: opts.pay?.tiers ?? TOPUP_TIERS_USD }));
 
-  // Entscheidung in STATE.md: Credits sind in Phase 1 nicht übertragbar.
-  app.post("/v1/credits/transfer", (c) =>
-    c.json({ error: "not_implemented", reason: "credit transfers are disabled in phase 1" }, 501),
-  );
-  app.post("/v1/credits/transfers", (c) =>
-    c.json({ error: "not_implemented", reason: "credit transfers are disabled in phase 1" }, 501),
-  );
+  // Entscheidung in STATE.md: Credits sind in Phase 1 nicht übertragbar. Das ist keine Lücke im
+  // Bau, sondern Regulatorik, und genau das steht jetzt auch in der Antwort: Credits, die zwischen
+  // Wallets wandern können, sind ein Zahlungsdienst, und der Betreiber ist eine Person ohne
+  // Lizenz. Die Runtime-Tools `transfer_credits` und `fund_child` reichen diesen Körper an den
+  // Agenten durch (Upstream `src/agent/tools.ts:3401`), deshalb steht der gangbare Weg dabei.
+  const TRANSFER_501 = {
+    error: "not_implemented",
+    reason: "credit transfers are disabled in phase 1",
+    message:
+      "Credits cannot be moved between wallets here, and that is a deliberate regulatory line, " +
+      "not a missing feature: credits buy usage of this service, they are not money, not " +
+      "redeemable and not transferable, which keeps the operator out of payment-service " +
+      "licensing. To fund another automaton, send USDC to that automaton's own wallet and let " +
+      "its runtime buy credits (it bootstraps a $5 topup when its balance runs low).",
+    docs: DOC.transfers,
+  };
+  app.post("/v1/credits/transfer", (c) => c.json(TRANSFER_501, 501));
+  app.post("/v1/credits/transfers", (c) => c.json(TRANSFER_501, 501));
 
   // ─── Registry ─────────────────────────────────────────────────
 
@@ -337,11 +426,48 @@ export function createApp(opts: AppOptions) {
 
   // ─── Sandboxes (Phase 2) ──────────────────────────────────────
 
+  // Der 501 ist inhaltlich richtig und bleibt: Die Runtime fängt ihn ab und startet statt der
+  // Sandbox einen lokalen Worker (Upstream `src/agent/loop.ts:304`, "Conway sandbox unavailable,
+  // spawning local worker"), der weiterarbeitet und seine Inferenz weiter hier kauft. Eine
+  // freundliche 200-Attrappe wäre schädlich: `spawnChild` legte ein halbes Kind an und liefe am
+  // nächsten Endpunkt auf. Was fehlte, war der Satz, dass das Absicht ist.
+  const SANDBOX_HINWEIS =
+    "This control plane runs no sandboxes: it sells provisioning, credits and inference, nothing " +
+    "that boots a VM. The 501 is the intended answer, not an outage. Your runtime handles it by " +
+    "spawning a local worker instead, which keeps the task running and its inference billed here; " +
+    'to skip the attempt entirely, leave "sandboxId" empty in ~/.automaton/automaton.json.';
   app.get("/v1/sandboxes", (c) => c.json({ sandboxes: [] }));
-  app.all("/v1/sandboxes/*", (c) => c.json({ error: "not_implemented" }, 501));
-  app.post("/v1/sandboxes", (c) => c.json({ error: "not_implemented" }, 501));
+  // Die Route für den Erstellungsversuch steht vor der Wildcard: `/v1/sandboxes/*` matcht in Hono
+  // auch `/v1/sandboxes`, und dann bekäme ein `POST /v1/sandboxes` den Text der Unterpfade
+  // ("nichts, worin man etwas ausführen könnte") statt der Antwort auf seine eigene Frage.
+  app.post("/v1/sandboxes", (c) =>
+    c.json({ error: "not_implemented", message: SANDBOX_HINWEIS, docs: DOC.sandboxes }, 501),
+  );
+  app.all("/v1/sandboxes/*", (c) =>
+    c.json(
+      {
+        error: "not_implemented",
+        message:
+          "There is no sandbox to exec in, copy files to or expose a port from. " + SANDBOX_HINWEIS,
+        docs: DOC.sandboxes,
+      },
+      501,
+    ),
+  );
 
-  app.notFound((c) => c.json({ error: "not_found" }, 404));
+  app.notFound((c) =>
+    c.json(
+      {
+        error: "not_found",
+        message:
+          "No such endpoint here. This control plane implements the part of the Conway API that " +
+          "the automaton runtime actually calls: auth, credits, topup, registration, models and " +
+          "chat completions. The full list is at GET /.well-known/x402.",
+        docs: DOC.service,
+      },
+      404,
+    ),
+  );
 
   return app;
 }

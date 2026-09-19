@@ -8,6 +8,7 @@
 
 import { isAddress, verifyTypedData, type Address, type Hex } from "viem";
 import { MC_PER_CENT, mcToCents, postLedger, type Db } from "../db.js";
+import { DOC } from "../errors.js";
 import type { Authorization, Settler } from "./settler.js";
 
 /** Die Tiers, die der Runtime-Client kennt (`TOPUP_TIERS` in topup.ts). */
@@ -69,10 +70,94 @@ export function buildPaymentRequired(cfg: PayConfig, usd: number, recipient: Add
   };
 }
 
+/**
+ * Warum ein bezahlter Versuch abgelehnt wurde, in einem Satz, der sagt, was zu tun ist. Der
+ * Runtime-Client liest aus diesem Körper nur `x402Version` und `accepts` (Upstream
+ * `src/conway/x402.ts`, `normalizePaymentRequired`), Zusatzfelder ignoriert er. Der Mensch, der
+ * den Topup von Hand nachstellt, liest genau sie.
+ */
+function zahlungsHinweis(cfg: PayConfig, usd: number, error: string): string | null {
+  if (error.startsWith("wrong_amount")) {
+    return (
+      `The signed authorization does not carry the amount of the ${usd} USD tier. Sign exactly ` +
+      `${tierToAtomic(usd).toString()} atomic USDC units (6 decimals), the value in ` +
+      "accepts[0].maxAmountRequired above, or call /pay/{another tier}/{address}."
+    );
+  }
+  if (error.startsWith("settlement_failed")) {
+    return (
+      "The authorization was signed correctly but could not be settled on chain, so no credits " +
+      "were added. The usual causes are too little USDC in the wallet or an authorization that " +
+      "has already been spent. Check the wallet on Basescan, then sign a fresh authorization " +
+      "with a new nonce and retry."
+    );
+  }
+  switch (error) {
+    case "malformed_payment":
+      return (
+        "The X-Payment header could not be read. It must be base64 of the x402 v1 JSON " +
+        "{x402Version, scheme, network, payload: {signature, authorization: {from, to, value, " +
+        "validAfter, validBefore, nonce}}}; the offer in this body says what to sign."
+      );
+    case "unsupported_scheme":
+      return 'Only the x402 scheme "exact" is settled here. Sign the offer in accepts[0] above.';
+    case "wrong_network":
+      return (
+        `The payment was signed for a different network. This instance settles on ${cfg.network} ` +
+        `(chainId ${cfg.chainId}); sign the offer in accepts[0] above.`
+      );
+    case "wrong_recipient":
+      return (
+        `The authorization pays a different address. USDC has to go to ${cfg.payTo}, exactly the ` +
+        "payTo of the offer above, or nothing is credited."
+      );
+    case "recipient_must_match_payer":
+      return (
+        "Credits go to the wallet that signed the payment, and that signer is not the address in " +
+        "the URL. This is deliberate: a signed x402 header is worth money, and without this check " +
+        "anyone who catches one could redirect the credits while the USDC keeps leaving the " +
+        "signer. Call /pay/{usd}/{the signing wallet}. To fund a different automaton, send USDC " +
+        "to its wallet and let its own runtime buy credits."
+      );
+    case "authorization_expired":
+      return (
+        "The authorization's validBefore is already in the past. Sign a fresh one; " +
+        `maxTimeoutSeconds in the offer above (${cfg.maxTimeoutSeconds} s) is how long it stays valid.`
+      );
+    case "authorization_not_yet_valid":
+      return (
+        "The authorization's validAfter lies more than a minute in the future, so it cannot be " +
+        "settled yet. Set it to roughly now (the runtime uses now minus 60 seconds) and sign again."
+      );
+    case "invalid_signature":
+      return (
+        "The EIP-3009 signature does not verify against the `from` address of the authorization. " +
+        'Sign TransferWithAuthorization with the EIP-712 domain {name: "USD Coin", version: "2", ' +
+        `chainId: ${cfg.chainId}, verifyingContract: ${cfg.usdcAddress}} over exactly the values ` +
+        "you send. A wrong chainId or USDC address is the usual cause. Nothing was charged."
+      );
+    default:
+      return null;
+  }
+}
+
 function paymentRequiredResponse(cfg: PayConfig, usd: number, recipient: Address, error?: string): PayResponse {
   const required = buildPaymentRequired(cfg, usd, recipient);
   const body: Record<string, unknown> = { ...required };
-  if (error) body.error = error;
+  if (error) {
+    body.error = error;
+    const hinweis = zahlungsHinweis(cfg, usd, error);
+    if (hinweis) {
+      body.message = hinweis;
+      body.docs = DOC.payments;
+    }
+  } else {
+    body.message =
+      `Payment required: ${usd} USD in USDC on ${cfg.network} buys ${usd * 100} credit cents for ` +
+      `${recipient}. Sign the offer in accepts[0] as an EIP-3009 TransferWithAuthorization and ` +
+      "repeat this request with the X-Payment header; the runtime does this for you.";
+    body.docs = DOC.payments;
+  }
   return {
     status: 402,
     body,
@@ -200,6 +285,19 @@ function settledResponse(db: Db, row: PaymentRow): PayResponse {
   };
 }
 
+/**
+ * Dieselbe Autorisierung ist bereits unterwegs. Kein Fehler des Aufrufers, nur ein Rennen: die
+ * Nonce ist der Idempotenzschlüssel, eine Wiederholung bucht nie zweimal.
+ */
+const SETTLEMENT_IN_PROGRESS = {
+  error: "settlement_in_progress",
+  message:
+    "This payment authorization is already being settled by another request. Nothing is lost and " +
+    "nothing is charged twice: the authorization nonce is the idempotency key. Wait a few seconds " +
+    "and repeat the identical request to see the result.",
+  docs: DOC.payments,
+};
+
 export interface PayRequest {
   usd: string;
   recipient: string;
@@ -215,14 +313,44 @@ export async function handlePay(
 ): Promise<PayResponse> {
   const usd = Number(req.usd);
   if (!cfg.tiers.includes(usd)) {
-    return { status: 400, body: { error: "invalid_tier", tiers: cfg.tiers } };
+    return {
+      status: 400,
+      body: {
+        error: "invalid_tier",
+        tiers: cfg.tiers,
+        message:
+          `${req.usd} is not a tier this instance sells. Call /pay/{tier}/{address} with one of ` +
+          `${cfg.tiers.join(", ")} USD. Tiers are fixed because the offer has to be signed ` +
+          "before the money moves.",
+        docs: DOC.payments,
+      },
+    };
   }
   if (!isAddress(req.recipient)) {
-    return { status: 400, body: { error: "invalid_address" } };
+    return {
+      status: 400,
+      body: {
+        error: "invalid_address",
+        message:
+          "The address in the path is not an EVM address (0x plus 40 hex characters). The credits " +
+          "are booked to that wallet, so it has to be the automaton's own wallet.",
+        docs: DOC.payments,
+      },
+    };
   }
   const recipient = req.recipient.toLowerCase() as Address;
   if (!settler) {
-    return { status: 503, body: { error: "payments_unavailable" } };
+    return {
+      status: 503,
+      body: {
+        error: "payments_unavailable",
+        message:
+          "This instance can quote a price but has no settler configured, so a payment could not " +
+          "be redeemed on chain. Do not sign anything; check GET /.well-known/x402 to see whether " +
+          "topups are available here.",
+        docs: DOC.payments,
+      },
+    };
   }
   if (!req.paymentHeader) {
     return paymentRequiredResponse(cfg, usd, recipient);
@@ -258,7 +386,7 @@ export async function handlePay(
     | PaymentRow
     | undefined;
   if (existing?.status === "settled") return settledResponse(db, existing);
-  if (existing?.status === "pending") return { status: 409, body: { error: "settlement_in_progress" } };
+  if (existing?.status === "pending") return { status: 409, body: SETTLEMENT_IN_PROGRESS };
 
   if (!(await verifyAuthorizationSignature(cfg, auth, payment.signature))) {
     return paymentRequiredResponse(cfg, usd, recipient, "invalid_signature");
@@ -286,7 +414,7 @@ export async function handlePay(
       return false; // Rennen: ein anderer Request hat die Nonce gerade angelegt
     }
   });
-  if (!claim()) return { status: 409, body: { error: "settlement_in_progress" } };
+  if (!claim()) return { status: 409, body: SETTLEMENT_IN_PROGRESS };
 
   // Ab hier darf ein Client-Abbruch nichts mehr ändern: Settlement und Buchung laufen zu Ende.
   const result = await settler.settle(auth, payment.signature, `/pay/${usd}/${recipient}`);

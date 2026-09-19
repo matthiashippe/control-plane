@@ -123,7 +123,11 @@ describe("SIWE-Provisionierung", () => {
     const signature = await account.signMessage({ message });
     const res = await req("/v1/auth/verify", json({ message, signature }));
     expect(res.status).toBe(401);
-    expect(await res.json()).toEqual({ error: "Invalid or expired nonce" });
+    const body = (await res.json()) as { error: string; message: string; docs: string };
+    // Der Wortlaut in `error` bleibt der, den Conway liefert; daneben steht, was zu tun ist.
+    expect(body.error).toBe("Invalid or expired nonce");
+    expect(body.message).toContain("POST /v1/auth/nonce");
+    expect(body.docs).toContain("docs/errors.md#authentication");
   });
 
   it("lehnt eine verbrauchte Nonce beim zweiten Mal ab", async () => {
@@ -134,7 +138,9 @@ describe("SIWE-Provisionierung", () => {
     expect((await req("/v1/auth/verify", json({ message, signature }))).status).toBe(200);
     const again = await req("/v1/auth/verify", json({ message, signature }));
     expect(again.status).toBe(401);
-    expect(await again.json()).toEqual({ error: "Invalid or expired nonce" });
+    const body = (await again.json()) as { error: string; message: string };
+    expect(body.error).toBe("Invalid or expired nonce");
+    expect(body.message).toMatch(/ten minutes and exactly one verify/);
   });
 
   it("lehnt eine falsche chainId ab", async () => {
