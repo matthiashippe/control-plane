@@ -4,62 +4,48 @@
 ACTIVE
 
 ## Active Objective
-Go-to-Market: `cp.hippe.eu` hat eine öffentliche Startseite mit Anleitung und Live-Status, der
-Dienst ist in den drei meistbetroffenen Conway-Issues sachlich als Workaround genannt und in
-awesome-x402 gelistet. Messgröße bleibt: provisionierte Automatons (heute 1).
+Die vier Annahmen unter dem GTM-Plan mit belegbaren Daten prüfen, bevor weitere Reichweite gekauft
+oder erarbeitet wird: Wie groß ist die zahlende Nachfrage wirklich (on-chain), wie viele neue
+Betroffene kommen pro Woche nach, gibt es schon einen kompatiblen Ersatz, und was kostet ein
+blockierter Nutzer die Alternative "ohne Control Plane weiterlaufen".
 
 ## Done Condition
-- [ ] `pnpm test` grün, `test/public.test.ts` mit mindestens 5 Tests: `GET /` liefert HTML mit
-      `cp.hippe.eu`, der Setup-Zeile (`conwayApiUrl`) und den Tiers; `GET /v1/status` liefert
-      `{ ok, version, models[], topup_tiers_usd[], markup, phase, automatons }` ohne Auth und ohne
-      personenbezogene Daten (keine Adressen, keine Key-Prefixe, keine Salden); `/` und
-      `/v1/status` brauchen keinen API-Key; unbekannte Pfade bleiben 404 JSON
-      Prüfung: `pnpm test` exit 0, `grep -c "it(" test/public.test.ts` >= 5
-- [ ] Seite ist live und zeigt echte Werte
-      Prüfung: `curl -s https://cp.hippe.eu/ | grep -c "conwayApiUrl"` >= 1 und
-      `curl -s https://cp.hippe.eu/v1/status` enthält `"models"` mit mindestens zwei Einträgen
-      und `"automatons"` als Zahl; `models` enthält einen Eintrag je echtem Modell mit `aliases`
-- [ ] Drei Issue-Antworten sind gepostet, je eine in #339, #377 und #393, mit Link auf die Seite
-      Prüfung: `gh api repos/Conway-Research/automaton/issues/339/comments --jq '[.[]|select(.user.login=="matthiashippe")]|length'` = 1, ebenso für 377 und 393
-- [ ] awesome-x402: PR offen oder gemerged
-      Prüfung: `gh pr list --repo xpaysh/awesome-x402 --author matthiashippe --state all` zeigt den PR
-- [ ] Offline-Läufe bleiben grün
-      Prüfung: `pnpm e2e` enthält `E2E OK`
-- [ ] goal-verifier PASS
+- [ ] `docs/research/2026-09-19-nachfrage.md` existiert und beantwortet die vier Fragen mit je
+      einer Zahl oder einem ausdrücklichen "nicht ermittelbar", jeweils mit dem Befehl oder der
+      URL, aus der die Zahl stammt
+      Prüfung: die Datei enthält die Abschnitte `## F1` bis `## F4`, je einen Abschnitt
+      `### Beleg` mit reproduzierbarem Befehl, und einen Abschnitt `## Konsequenz für den Plan`
+- [ ] F1 (Zahlungsfluss an Conway): Monatswerte 2026 für USDC-Zuflüsse an Conways payTo
+      `0x21DD37E3E4eA6CCC0a5C98A4944702eDE6E7Be10` auf Base, plus Zahl der zahlenden Wallets je
+      Monat und die letzten 30 Tage; Quelle ist die Kette, nicht eine Behauptung aus dem Handoff
+- [ ] F2 (Zulauf): Zahl unterschiedlicher GitHub-Nutzer mit Provisionierungs-Problem je Monat seit
+      Juli 2026 und die Rate der letzten 30 Tage; dazu, ob nach dem 26.08.2026 noch Upstream-
+      Aktivität stattfand
+- [ ] F3 (Wettbewerb): Gibt es einen anderen öffentlich erreichbaren Conway-kompatiblen Dienst
+      oder Fork, der das Problem löst? Belegt durch Suche in GitHub-Code, Forks, npm und Web
+- [ ] F4 (kostenlose Alternative): Was genau kann ein blockierter Nutzer ohne Control Plane tun,
+      belegt am Upstream-Code `Conway-Research/automaton@d8f8168`: kommt die Runtime ohne
+      `--provision` hoch, wie weit läuft sie mit eigenem OpenAI-Key, was bricht, und was kostet
+      ihn das an Arbeit. Ergebnis ist die ehrliche Antwort auf "warum sollte jemand zahlen"
+- [ ] Der GTM-Plan in STATE.md ist nach den Funden angepasst, inklusive Abbruchkriterium
+- [ ] goal-verifier PASS (prüft die Zahlen stichprobenartig selbst nach)
 
 ## Acceptance Criteria
-- [ ] Startseite: statisches HTML aus `src/public/index.html`, vom Control Plane ausgeliefert,
-      ohne externe Skripte, Schriften oder Tracker; Inhalt englisch, sachlich, ohne Werbevokabular;
-      Status-Werte per `fetch("/v1/status")` nachgeladen, Seite bleibt ohne JavaScript lesbar
-- [ ] Inhalt der Seite: was der Dienst ist, die eine Zeile in `~/.automaton/automaton.json`,
-      Topup-Tiers, Aufschlag 1,3 auf den Einkaufspreis, was Phase 1 NICHT kann (keine Sandboxes,
-      kein Social-Relay, keine Credit-Transfers, keine Auszahlung), wer ihn betreibt, Kontakt,
-      Hinweis auf das Upstream-Issue-Problem
-- [ ] `/v1/status` ist bewusst arm: Modelle mit Verkaufspreisen, Tiers, Markup, Phase, Version,
-      Anzahl registrierter Automatons. Keine Wallet-Adressen, keine Salden, keine Key-Prefixe
-- [ ] Issue-Antworten: je Issue ein Kommentar, der zuerst den Befund bestätigt (eigene Probe
-      18.09.2026: `/v1/auth/verify` -> 401), dann den Workaround in zwei Zeilen nennt, offenlegt
-      dass ich den Dienst betreibe und er Geld kostet, und keine Kritik an den Maintainern enthält.
-      In #393 zusätzlich: unser `/pay` ist idempotent über die Authorization-Nonce
-- [ ] awesome-x402: Eintrag in der passenden Kategorie (Facilitators/Infrastructure), eine Zeile,
-      Repo-Konventionen aus CONTRIBUTING eingehalten
-- [ ] Keine Massenaktion: höchstens drei Issues, kein Kommentar in Issues ohne Bezug, keine
-      Wiederholung in weiteren Threads
+- [ ] Jede Zahl ist reproduzierbar: RPC-Aufruf, `gh`-Befehl, npm-API-URL oder Dateipfad
+- [ ] Keine Zahl aus dem alten Handoff wird übernommen, ohne sie neu zu belegen
+- [ ] Unsicherheit wird benannt (Zeitraum, Lücken, Rate-Limits), nicht geglättet
+- [ ] Die Konsequenz steht als Entscheidung da, nicht als Optionsliste: was wir tun, was wir lassen
+- [ ] Wenn die Daten gegen das Produkt sprechen, steht das genau so in der Datei
 
 ## Deny List
-- Keine Kommentare in mehr als drei fremden Issues, kein Anschreiben einzelner Nutzer
-- Keine Behauptung über Conway oder dessen Betreiber, die nicht belegt ist
-- Keine Preis- oder Verfügbarkeitszusage, die der Dienst nicht hält (kein SLA, kein Support-Versprechen)
-- Keine private Wohnanschrift auf der Seite ohne ausdrückliche Freigabe
-- Kein Deploy von ungeprüftem Stand: erst Tests, dann `deploy/up.sh`
+- Keine weiteren Kommentare in fremden Issues in diesem Goal
+- Keine Zahlungen, keine Änderung am laufenden Dienst
+- Keine Kontaktaufnahme zu einzelnen Wallet-Adressen oder Nutzern
 
 ## Budget
 - max Zyklen: 8
 - max Versuche pro Gap: 3
 
 ## Progress Log
-- 2026-09-19 18:40 Zyklus 2 (Veroeffentlichung): Repo public unter github.com/matthiashippe/control-plane, Lizenz PolyForm Noncommercial 1.0.0 (lesen, selbst betreiben, nicht als Dienst verkaufen), README fuer Fremdleser neu geschrieben, Quell-Link auf der Seite. Vorher History auf Secrets geprueft (nur Transaktions-Hashes und die payTo-Adresse, beide oeffentlich) und die VM gehaertet: Passwort-Login war aktiv (cloud-init setzt PasswordAuthentication yes und gewinnt per first-match), jetzt nur noch Schluessel, Zugang verifiziert.
-- 2026-09-19 18:50 Zyklus 2 (GTM): drei Kommentare gepostet, #339 (issuecomment-5742781023), #377 (5742781149), #393 (5742781237); awesome-x402 PR xpaysh/awesome-x402#1564 offen.
-- 2026-09-19 18:05 Zyklus 1 (Seite): src/public/index.html (statisch, keine externen Ressourcen), `/` und `/v1/status` in app.ts, Modellliste entdoppelt (ein Eintrag je echtem Modell plus Aliase), Dockerfile kopiert public in dist, 7 Tests in public.test.ts. Deployt und im Browser geprüft: Live-Werte laden (online, 1 Automaton, 2 Modelle), Preise 2,275/18,20 und 0,325/2,60 USD je 1M. Eigener Fund beim Gegenlesen: die Seite versprach Rückzahlung nicht genutzter Credits, das verstößt gegen die Regulatorik-Leitplanke in loop-constraints.md; ersetzt durch zwei Wochen Vorlauf vor einer Abschaltung, plus Test, der jede Auszahlungs-Formulierung verbietet.
 
 ## Blockers
