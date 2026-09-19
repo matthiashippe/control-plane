@@ -108,6 +108,97 @@ export function createApp(opts: AppOptions) {
     });
   });
 
+  /**
+   * Maschinenlesbare Beschreibung für andere Agenten und Crawler. Bewusst ohne Zahlen, die
+   * sich täglich ändern; die Preise stehen in /v1/status und /v1/models.
+   */
+  app.get("/.well-known/x402", (c) => {
+    const pay = opts.pay ?? null;
+    return c.json({
+      x402Version: 1,
+      service: "conway-compatible control plane",
+      description:
+        "Prepaid credits for the unmodified Conway automaton runtime: SIWE provisioning, " +
+        "USDC topups over x402 on Base, inference billed at purchase cost plus a fixed markup.",
+      endpoints: {
+        status: "/v1/status",
+        models: "/v1/models",
+        pricing: "/v1/credits/pricing",
+        topup: "/pay/{usd}/{address}",
+        register: "/v1/automatons/register",
+        inference: "/v1/chat/completions",
+      },
+      accepts: pay
+        ? [
+            {
+              scheme: "exact",
+              network: pay.network,
+              chainId: pay.chainId,
+              asset: pay.usdcAddress,
+              payTo: pay.payTo,
+              maxTimeoutSeconds: pay.maxTimeoutSeconds,
+              amounts_usd: pay.tiers,
+            },
+          ]
+        : [],
+      markup: MARKUP,
+      credits: {
+        redeemable: false,
+        transferable: false,
+        note: "Credits pay for usage of this service only. They are not money, not redeemable and not transferable.",
+      },
+      free_alternative:
+        "https://github.com/matthiashippe/control-plane/blob/main/docs/ohne-control-plane.md",
+      source: "https://github.com/matthiashippe/control-plane",
+    });
+  });
+
+  /**
+   * llms.txt nach dem Vorschlag von llmstxt.org: kurz, faktisch, ohne Werbung.
+   */
+  app.get("/llms.txt", (c) => {
+    const pay = opts.pay ?? null;
+    const tiers = (pay?.tiers ?? TOPUP_TIERS_USD).join(", ");
+    const body = [
+      "# control-plane",
+      "",
+      "> A drop-in replacement for api.conway.tech: the subset of the Conway API that the",
+      "> unmodified automaton runtime actually calls. Prepaid credits, paid with USDC on Base",
+      "> over x402, inference billed at purchase cost times " + MARKUP + ".",
+      "",
+      "Run by one person, no SLA. Credits are not redeemable and not transferable.",
+      "",
+      "## Use it",
+      "",
+      "- Set conwayApiUrl in ~/.automaton/automaton.json to https://cp.hippe.eu, then run automaton --provision.",
+      "- Topup tiers in USD: " + tiers + ".",
+      pay ? "- Payment goes to " + pay.payTo + " on " + pay.network + " (USDC " + pay.usdcAddress + ")." : "- Payments are not configured on this instance.",
+      "",
+      "## Endpoints",
+      "",
+      "- /v1/status: models, prices, tiers, number of registered automatons (public, no key).",
+      "- /v1/models, /v1/credits/pricing: catalog and prices.",
+      "- /pay/{usd}/{address}: x402 topup.",
+      "- /v1/automatons/register: EIP-712 registration.",
+      "- /v1/chat/completions: OpenAI-compatible inference, billed against credits.",
+      "- /.well-known/x402: the same facts as JSON.",
+      "",
+      "## You may not need this",
+      "",
+      "The runtime does not think at all when it cannot reach a balance endpoint, but two free",
+      "ways around that exist and neither is documented upstream: a local Ollama model, or",
+      "setting the cached balance in the runtime's own SQLite state and using your own OpenAI key.",
+      "Both are written up at",
+      "https://github.com/matthiashippe/control-plane/blob/main/docs/ohne-control-plane.md",
+      "",
+      "## Source",
+      "",
+      "https://github.com/matthiashippe/control-plane (PolyForm Noncommercial)",
+      "",
+    ].join("\n");
+    return c.text(body);
+  });
+
   // ─── Topup (x402, ohne API-Key: der Runtime-Client sendet hier keinen) ───
 
   app.get("/pay/:usd/:address", async (c) => {

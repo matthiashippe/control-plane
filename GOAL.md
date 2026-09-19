@@ -21,7 +21,7 @@ und den Artikel schreiben, der den Datensatz statt des Produkts in den Mittelpun
 - [~] Die Startseite und die README verlinken `docs/ohne-control-plane.md` sichtbar, nicht versteckt
       Prüfung: `curl -s https://cp.hippe.eu/ | grep -c "ohne-control-plane"` ist mindestens 1,
       `grep -c "ohne-control-plane" README.md` ist mindestens 1
-- [ ] `.well-known/x402` und `llms.txt` sind auf `https://cp.hippe.eu` erreichbar und inhaltlich
+- [~] `.well-known/x402` und `llms.txt` sind auf `https://cp.hippe.eu` erreichbar und inhaltlich
       korrekt: Endpunkte, Preise, Tiers, payTo, Netz, und der Hinweis auf den kostenlosen Weg
       Prüfung: `curl -s https://cp.hippe.eu/.well-known/x402 | python3 -m json.tool` und
       `curl -s https://cp.hippe.eu/llms.txt` liefern beide 200 mit Inhalt; ein Test in
@@ -81,5 +81,19 @@ und den Artikel schreiben, der den Datensatz statt des Produkts in den Mittelpun
   verlinken das Dokument. Die Prüfung gegen `https://cp.hippe.eu` steht noch aus, weil dafür ein
   Deploy nötig ist. In der README ist außerdem die Issue-Liste von neun auf zwölf korrigiert,
   inklusive des bisher fehlenden #371.
+- Zyklus 2 (19.09.2026, 18:28 bis 18:32): `/.well-known/x402` und `/llms.txt` in `src/app.ts`
+  gebaut, beide führen den kostenlosen Weg als eigenes Feld. Vier neue Tests in
+  `test/public.test.ts` halten Endpunkte, Zahlungsangebot (payTo, chainId, Tiers), Markup und die
+  Regulatorik-Grenze fest. `pnpm test` 65 Tests grün, `pnpm e2e` `E2E OK turns=5 registered=true
+  api_errors=0 ledger_consistent=true`. Ein Test schlug zuerst an, weil im Text "not refundable"
+  stand und die Assertion jedes "refund" verbietet; statt die Assertion aufzuweichen ist der Text
+  auf "not money, not redeemable and not transferable" umgestellt, die Formulierung, die die
+  Startseite schon benutzt.
 
 ## Blockers
+
+- **Deploy steht aus.** Drei Done-Conditions prüfen gegen `https://cp.hippe.eu` (Startseiten-Link,
+  `.well-known/x402`, `llms.txt`) und sind lokal fertig und grün, aber noch nicht ausgerollt.
+  `loop-constraints.md` verbietet Änderungen an `deploy/**` ohne Menschen; das Ausrollen einer
+  geprüften Version ist erlaubt, aber der Push auf `main` braucht laut derselben Datei eine
+  Ankündigung im Chat. Beides liegt bei Matthias.

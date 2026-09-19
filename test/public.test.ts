@@ -103,4 +103,64 @@ describe("Öffentliche Seite und Status", () => {
     expect(html).toContain("not redeemable");
     expect(html).not.toMatch(/refund|pay ?out|cash out|redeem your|withdraw/);
   });
+
+  it("verlinkt den kostenlosen Weg sichtbar, damit niemand zahlt, der nicht muss", async () => {
+    const { app } = setup();
+    const html = await (await app.request("/")).text();
+    expect(html).toContain("ohne-control-plane.md");
+    expect(html).toMatch(/you may not need this/i);
+  });
+
+  it("liefert /.well-known/x402 mit Endpunkten, Zahlungsangebot und dem kostenlosen Weg", async () => {
+    const { app } = setup();
+    const res = await app.request("/.well-known/x402");
+    expect(res.status).toBe(200);
+    const doc = (await res.json()) as Record<string, any>;
+    expect(doc.x402Version).toBe(1);
+    expect(doc.endpoints.topup).toBe("/pay/{usd}/{address}");
+    expect(doc.endpoints.inference).toBe("/v1/chat/completions");
+    expect(doc.markup).toBe(MARKUP);
+    expect(doc.credits).toMatchObject({ redeemable: false, transferable: false });
+    expect(doc.free_alternative).toContain("ohne-control-plane.md");
+    expect(JSON.stringify(doc)).not.toMatch(/refund|cash out|withdraw/i);
+  });
+
+  it("nennt in /.well-known/x402 das Zahlungsangebot, sobald Pay konfiguriert ist", async () => {
+    const db = openDb(":memory:");
+    const app = createApp({
+      db,
+      catalog: new Catalog([new MockProvider()], { "gpt-5.2": "mock-1" }),
+      pay: {
+        payTo: "0x914102284463F4F58B1D2f6DB9aC80BFcaA7d614",
+        network: "base",
+        chainId: 8453,
+        usdcAddress: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+        maxTimeoutSeconds: 120,
+        tiers: [5, 25],
+      },
+    });
+    const doc = (await (await app.request("/.well-known/x402")).json()) as Record<string, any>;
+    expect(doc.accepts).toHaveLength(1);
+    expect(doc.accepts[0]).toMatchObject({
+      scheme: "exact",
+      network: "base",
+      chainId: 8453,
+      payTo: "0x914102284463F4F58B1D2f6DB9aC80BFcaA7d614",
+      amounts_usd: [5, 25],
+    });
+  });
+
+  it("liefert llms.txt als Text mit Setup-Zeile, Tiers und dem kostenlosen Weg", async () => {
+    const { app } = setup();
+    const res = await app.request("/llms.txt");
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toMatch(/text\/plain/);
+    const txt = await res.text();
+    expect(txt).toContain("# control-plane");
+    expect(txt).toContain("conwayApiUrl");
+    expect(txt).toContain("cp.hippe.eu");
+    expect(txt).toContain("ohne-control-plane.md");
+    expect(txt).toMatch(/not redeemable and not transferable/i);
+    expect(txt).not.toMatch(/refund|cash out|withdraw/i);
+  });
 });
