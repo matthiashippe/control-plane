@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { privateKeyToAccount, generatePrivateKey } from "viem/accounts";
 import type { Address, Hex } from "viem";
 import { createApp } from "../src/app.js";
-import { openDb } from "../src/db.js";
+import { openDb, postLedger } from "../src/db.js";
 import type { PayConfig } from "../src/payments/pay.js";
 import type { Authorization, Settler, SettleResult } from "../src/payments/settler.js";
 
@@ -227,6 +227,43 @@ describe("/pay x402-Seller", () => {
     expect(ledgerRows().filter((r) => r.kind === "topup")).toHaveLength(1);
     expect(codes[0]).toBe(200);
     expect(settler.calls.length, "der Settler darf für eine Nonce nicht dreimal gerufen werden").toBeLessThanOrEqual(2);
+  });
+
+  it("schreibt Credits nur der Adresse gut, die auch bezahlt hat", async () => {
+    // Sicherheitsfund 19.09.2026: Die EIP-3009-Signatur deckt Betrag, Empfänger der USDC und
+    // Nonce, aber nicht den Pfad, der bestimmt, wer die Credits bekommt. Ohne Bindung leitet ein
+    // abgefangener Header die Gutschrift auf eine fremde Adresse um, während das Geld weiterhin
+    // vom Signierer abfließt.
+    const { app, account, settler, db } = setup();
+    const fremd = privateKeyToAccount(generatePrivateKey()).address;
+    const header = await signPayment({ account, to: PAY_TO, value: 5_000_000n });
+
+    const res = await app.request(`/pay/5/${fremd}`, { headers: { "X-Payment": header } });
+    expect(res.status).toBe(402);
+    expect(((await res.json()) as { error: string }).error).toContain("recipient_must_match_payer");
+    expect(settler.calls, "es darf nicht einmal gesettelt werden").toHaveLength(0);
+    const fremdSaldo = db.prepare("SELECT balance_mc FROM wallets WHERE address = ?").get(fremd.toLowerCase()) as
+      | { balance_mc: number }
+      | undefined;
+    expect(fremdSaldo?.balance_mc ?? 0).toBe(0);
+
+    const eigen = await app.request(`/pay/5/${account.address}`, { headers: { "X-Payment": header } });
+    expect(eigen.status, "auf die eigene Adresse muss es gehen").toBe(200);
+  });
+
+  it("verrät bei einem wiederholten Zahlungs-Header nicht den aktuellen Kontostand", async () => {
+    // Diese Antwort gibt es ohne API-Key. Läse sie den Saldo frisch, wäre ein alter Header ein
+    // Kontostandsmelder für einen fremden Mandanten.
+    const { app, account, pay, db } = setup();
+    const header = await signPayment({ account, to: PAY_TO, value: 5_000_000n });
+    const erst = (await (await pay(5, header)).json()) as { balance_cents: number };
+    expect(erst.balance_cents).toBe(500);
+
+    postLedger(db, { address: account.address.toLowerCase(), kind: "topup", deltaMc: 7_000_000, ref: "spaeter" });
+
+    const wieder = (await (await pay(5, header)).json()) as { balance_cents: number };
+    expect(wieder.balance_cents, "es muss der Stand von damals sein, nicht der heutige").toBe(500);
+    void app;
   });
 
   it("antwortet 503 ohne Settler", async () => {

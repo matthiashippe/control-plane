@@ -181,17 +181,20 @@ interface PaymentRow {
   credits_mc: number;
   to_address: string;
   tx_hash: string | null;
+  balance_after_mc: number | null;
 }
 
 function settledResponse(db: Db, row: PaymentRow): PayResponse {
-  const balance = db
-    .prepare("SELECT balance_mc FROM wallets WHERE address = ?")
-    .get(row.to_address) as { balance_mc: number } | undefined;
+  // Bewusst NICHT den aktuellen Saldo lesen. Diese Antwort gibt es ohne API-Key, sobald jemand
+  // einen bereits verbrauchten Zahlungs-Header wiederholt. Mit dem aktuellen Wert wäre das ein
+  // Kontostandsmelder für fremde Mandanten (Sicherheitsprüfung 19.09.2026). Der Saldo zum
+  // Zeitpunkt der Gutschrift steht in der Zahlung selbst und verrät nichts Neues.
+  void db;
   return {
     status: 200,
     body: {
       credits_cents: mcToCents(row.credits_mc),
-      balance_cents: mcToCents(balance?.balance_mc ?? 0),
+      balance_cents: mcToCents(row.balance_after_mc ?? row.credits_mc),
       tx_hash: row.tx_hash,
     },
   };
@@ -235,6 +238,14 @@ export async function handlePay(
   if (auth.to.toLowerCase() !== cfg.payTo.toLowerCase()) {
     return paymentRequiredResponse(cfg, usd, recipient, "wrong_recipient");
   }
+  // Die EIP-3009-Signatur deckt Betrag, Empfänger der USDC und Nonce, aber nicht den Pfad, der
+  // bestimmt, WER die Credits bekommt. Ohne diese Prüfung kann jeder, der einen signierten
+  // Header in die Hände bekommt, die Gutschrift auf eine beliebige Adresse umleiten, während das
+  // Geld weiter vom Signierer abfließt (Sicherheitsprüfung 19.09.2026). Die Runtime lädt immer
+  // ihre eigene Wallet auf, also schränkt das keinen echten Ablauf ein.
+  if (auth.from.toLowerCase() !== recipient.toLowerCase()) {
+    return paymentRequiredResponse(cfg, usd, recipient, "recipient_must_match_payer");
+  }
   if (auth.value !== expected) {
     return paymentRequiredResponse(cfg, usd, recipient, `wrong_amount: expected ${expected}`);
   }
@@ -243,7 +254,7 @@ export async function handlePay(
   if (auth.validAfter > nowSec + 60n) return paymentRequiredResponse(cfg, usd, recipient, "authorization_not_yet_valid");
 
   // Idempotenz: dieselbe Nonce liefert dieselbe Antwort, egal wie oft sie kommt.
-  const existing = db.prepare("SELECT nonce, status, credits_mc, to_address, tx_hash FROM payments WHERE nonce = ?").get(auth.nonce) as
+  const existing = db.prepare("SELECT nonce, status, credits_mc, to_address, tx_hash, balance_after_mc FROM payments WHERE nonce = ?").get(auth.nonce) as
     | PaymentRow
     | undefined;
   if (existing?.status === "settled") return settledResponse(db, existing);
@@ -296,9 +307,10 @@ export async function handlePay(
       ref: auth.nonce,
       meta: { tx_hash: result.txHash, from: auth.from.toLowerCase(), value_atomic: auth.value.toString(), usd },
     });
-    db.prepare("UPDATE payments SET status = 'settled', tx_hash = ?, settled_at = ? WHERE nonce = ?").run(
+    db.prepare("UPDATE payments SET status = 'settled', tx_hash = ?, settled_at = ?, balance_after_mc = ? WHERE nonce = ?").run(
       result.txHash ?? null,
       new Date().toISOString(),
+      balanceMc,
       auth.nonce,
     );
     return balanceMc;

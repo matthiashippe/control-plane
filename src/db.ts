@@ -73,6 +73,7 @@ function migrate(db: Db): void {
       to_address    TEXT NOT NULL,              -- Empfänger der Credits (aus dem Pfad)
       value_atomic  TEXT NOT NULL,              -- bigint als String
       credits_mc    INTEGER NOT NULL,
+      balance_after_mc INTEGER,       -- Saldo direkt nach der Gutschrift, siehe settledResponse()
       status        TEXT NOT NULL,              -- pending | settled | failed
       tx_hash       TEXT,
       error         TEXT,
@@ -98,6 +99,13 @@ function migrate(db: Db): void {
   const spalten = db.prepare("PRAGMA table_info(wallets)").all() as { name: string }[];
   if (!spalten.some((c) => c.name === "reserved_mc")) {
     db.exec("ALTER TABLE wallets ADD COLUMN reserved_mc INTEGER NOT NULL DEFAULT 0");
+  }
+
+  // Saldo direkt nach der Gutschrift. Wird gebraucht, damit die Antwort auf einen wiederholten
+  // Zahlungs-Header nicht den aktuellen Kontostand verrät: Diese Antwort gibt es ohne API-Key.
+  const zahlungsSpalten = db.prepare("PRAGMA table_info(payments)").all() as { name: string }[];
+  if (!zahlungsSpalten.some((c) => c.name === "balance_after_mc")) {
+    db.exec("ALTER TABLE payments ADD COLUMN balance_after_mc INTEGER");
   }
 
   // Reservierungen gehören zu laufenden Requests. Ein frisch gestarteter Prozess hat keine, also

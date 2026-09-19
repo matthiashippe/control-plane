@@ -31,6 +31,16 @@ cp.hippe.eu {
 	}
 	log {
 		output stdout
-		format json
+		# X-Payment enthält eine gültige EIP-3009-Signatur. Caddy redigiert von sich aus nur
+		# Authorization, deshalb hier ausdrücklich. Solange die Nonce on-chain unverbraucht ist,
+		# ist so ein Header verwertbar.
+		format filter {
+			wrap json
+			fields {
+				request>headers>X-Payment delete
+				request>headers>Authorization delete
+				request>headers>Cookie delete
+			}
+		}
 	}
 }
