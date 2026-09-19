@@ -94,6 +94,7 @@ describe("Öffentliche Seite und Status", () => {
     const html = await (await app.request("/")).text();
     expect(html).toMatch(/Hanseatic Tech Company/);
     expect(html).toMatch(/mailto:[^"]+@/);
+    expect(html).toContain("github.com/matthiashippe/control-plane");
   });
 
   it("verspricht keine Auszahlung von Credits (Regulatorik: kein Rückzahlungsanspruch)", async () => {

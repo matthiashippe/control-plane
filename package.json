@@ -2,7 +2,7 @@
   "name": "control-plane",
   "version": "0.1.0",
   "private": true,
-  "description": "Conway-kompatibles Control Plane für die Automaton-Runtime",
+  "description": "Conway-compatible control plane for the automaton runtime: SIWE provisioning, USDC credits over x402 on Base, OpenAI-compatible inference with server-side metering",
   "type": "module",
   "engines": {
     "node": ">=20.0.0"
@@ -41,5 +41,10 @@
       "better-sqlite3",
       "esbuild"
     ]
+  },
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/matthiashippe/control-plane"
   }
 }
