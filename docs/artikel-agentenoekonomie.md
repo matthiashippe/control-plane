@@ -45,7 +45,7 @@ means the whole thing is measurable, so I measured it.
 
 I scanned every USDC transfer to the platform's receiving address from January 1 to September 19,
 2026: 5,652 sequential `eth_getLogs` calls against the public Base RPC, 2,000 blocks at a time,
-9,012 transfer events, about 30 minutes of walking the chain. The raw data is a CSV in the repo
+9,026 transfer events, about 30 minutes of walking the chain. The raw data is a CSV in the repo
 linked at the bottom, so you do not have to take my word for any number here.
 
 | Month | USDC | Paying wallets | Transfers |
@@ -57,7 +57,7 @@ linked at the bottom, so you do not have to take my word for any number here.
 | June | 420.00 | 34 | 68 |
 | July | 360.00 | 24 | 60 |
 | August | 415.00 | 40 | 83 |
-| September (to the 19th) | 290.01 | 30 | 62 |
+| September (to the 19th) | 290.05 | 30 | 76 |
 
 Total over nine months: 62,616 USDC from 2,491 distinct wallets. February alone is 61 percent of
 it. The median payment was exactly 5 USDC, the smallest tier on offer.
@@ -76,7 +76,7 @@ whole dataset paid exactly once and never again. Whatever the product did after 
 it did not make people spend a second 5 USDC.
 
 **A small group still pays into a system that cannot deliver.** In the last 30 days of the scan,
-44 wallets sent 430 USDC in 90 transfers. That is two payments per wallet on average, which fits an
+44 wallets sent 430 USDC in 104 transfers. That is well over two payments per wallet, which fits an
 open issue about retry-driven duplicate topups: a failed payment gets retried with a fresh nonce
 and the second one settles too. The onboarding has been broken since July. The last commit to the
 repository was in August and only touched the README. No maintainer has answered an issue since
