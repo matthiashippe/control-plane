@@ -62,9 +62,6 @@ function migrate(db: Db): void {
       created_at  TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS ledger_address ON ledger(address, id);
-    -- Zweite Verteidigungslinie gegen doppelte Gutschriften: Eine x402-Nonce darf höchstens
-    -- eine topup-Zeile erzeugen, auch wenn ein Claim-Rennen im Code durchrutscht.
-    CREATE UNIQUE INDEX IF NOT EXISTS ledger_topup_ref ON ledger(ref) WHERE kind = 'topup' AND ref IS NOT NULL;
 
     -- x402-Zahlungen, Schlüssel ist die Authorization-Nonce der EIP-3009-Signatur.
     CREATE TABLE IF NOT EXISTS payments (
@@ -101,6 +98,26 @@ function migrate(db: Db): void {
     db.exec("ALTER TABLE wallets ADD COLUMN reserved_mc INTEGER NOT NULL DEFAULT 0");
   }
 
+  // Zweite Verteidigungslinie gegen doppelte Gutschriften: Eine x402-Nonce darf höchstens eine
+  // topup-Zeile erzeugen, auch wenn die Prüfung im Code durchrutscht. Der Index kann aber nicht
+  // angelegt werden, wenn eine Bestandsdatenbank bereits Duplikate enthält, also genau das
+  // Ergebnis des Fehlers, gegen den er schützt. Ein harter Abbruch wäre hier das Schlechtere:
+  // Zusammen mit dem autoheal-Dienst würde daraus eine Neustartschleife, und der Dienst wäre
+  // dauerhaft weg. Deshalb laut warnen und ohne Index weiterlaufen; die Prüfung in pay.ts bleibt.
+  try {
+    db.exec("CREATE UNIQUE INDEX IF NOT EXISTS ledger_topup_ref ON ledger(ref) WHERE kind = 'topup' AND ref IS NOT NULL");
+  } catch {
+    const doppelte = db
+      .prepare("SELECT ref, count(*) AS n FROM ledger WHERE kind = 'topup' AND ref IS NOT NULL GROUP BY ref HAVING n > 1")
+      .all() as { ref: string; n: number }[];
+    console.error(
+      `[db] ACHTUNG: ledger_topup_ref konnte nicht angelegt werden, ${doppelte.length} x402-Nonce(n) haben mehr als eine ` +
+        `Gutschrift: ${doppelte.map((d) => `${d.ref} (${d.n}x)`).join(", ")}. ` +
+        `Die Buchhaltung stimmt nicht. Prüfen mit: SELECT * FROM ledger WHERE kind='topup' AND ref IN (...). ` +
+        `Der Dienst läuft weiter, die Absicherung gegen neue Doppelbuchungen steckt in pay.ts.`,
+    );
+  }
+
   // Saldo direkt nach der Gutschrift. Wird gebraucht, damit die Antwort auf einen wiederholten
   // Zahlungs-Header nicht den aktuellen Kontostand verrät: Diese Antwort gibt es ohne API-Key.
   const zahlungsSpalten = db.prepare("PRAGMA table_info(payments)").all() as { name: string }[];
@@ -113,6 +130,26 @@ function migrate(db: Db): void {
   // zurückzusetzen ist nur korrekt, solange genau ein Prozess auf dieser Datei arbeitet, und
   // genau so läuft der Dienst (ein Container, eine SQLite-Datei).
   db.exec("UPDATE wallets SET reserved_mc = 0 WHERE reserved_mc <> 0");
+
+  // Dasselbe für Zahlungen, die im Zustand `pending` hängen: Auch sie gehören zu einem Request,
+  // der nicht mehr läuft. Sie hier stehen zu lassen wäre das Schlimmste von allem, denn die
+  // Nonce antwortet dann dauerhaft mit 409 und niemand kann es erneut versuchen, obwohl die
+  // USDC möglicherweise schon geflossen sind. Sie werden deshalb auf `failed` gesetzt, was den
+  // Retry-Pfad öffnet, und ausdrücklich protokolliert: Ist die Zahlung on-chain durchgelaufen,
+  // hat der Zahler Geld ohne Credits und das muss ein Mensch ansehen.
+  const haengend = db
+    .prepare("SELECT nonce, from_address, to_address, credits_mc FROM payments WHERE status = 'pending'")
+    .all() as { nonce: string; from_address: string; to_address: string; credits_mc: number }[];
+  if (haengend.length) {
+    db.exec("UPDATE payments SET status = 'failed', error = 'interrupted_by_restart' WHERE status = 'pending'");
+    for (const z of haengend) {
+      console.error(
+        `[db] ACHTUNG: Zahlung ${z.nonce} hing beim Neustart in 'pending' und ist jetzt 'failed'. ` +
+          `Zahler ${z.from_address}, Empfänger ${z.to_address}, ${z.credits_mc} mc. Prüfen, ob die ` +
+          `Autorisierung on-chain gesettelt wurde: Dann ist Geld geflossen, ohne dass Credits gebucht sind.`,
+      );
+    }
+  }
 }
 
 export const MC_PER_CENT = 1000;

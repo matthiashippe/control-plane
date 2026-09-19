@@ -78,6 +78,27 @@ was found is in `loop-run-log.md`. The method is [loop
 engineering](https://github.com/cobusgreyling/loop-engineering); `LOOP.md` and `loop-constraints.md`
 are the operating rules, `STATE.md` is the current queue.
 
+## Known and deliberate
+
+Things a reader might flag, with the reasoning, so nobody spends an evening on a report that
+lands on "yes, we know".
+
+- **The SIWE message says `conway.tech`, not `cp.hippe.eu`.** The unmodified runtime builds that
+  message and this service has to accept what it sends, so the domain is fixed by compatibility.
+  It means you never sign anything naming this service. A cross-service replay still fails,
+  because the nonce has to come from this instance's database and is consumed on first use.
+- **The container runs as root.** No known attack path, but it holds the database and the
+  OpenRouter key. A `USER node` attempt failed because the named volume is mounted over the image
+  with root ownership and SQLite then comes up read-only. It needs an entrypoint that drops
+  privileges after fixing ownership, in a maintenance window.
+- **Credits are not redeemable and not transferable**, and `POST /v1/credits/transfer` answers 501.
+  That is a regulatory boundary, not an unfinished feature.
+- **One operator, one server, one SQLite file.** Backups run daily, the service restarts itself
+  when a health check fails, and a watchdog alerts on downtime. There is no failover.
+
+Security reports are welcome at matthias@hanseatictech.de. The billing paths were reviewed before
+launch; the findings and their fixes are in the git history.
+
 ## License
 
 [PolyForm Noncommercial 1.0.0](LICENSE.md): read it, audit it, run it for yourself, change it.

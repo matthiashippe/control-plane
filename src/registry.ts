@@ -88,10 +88,19 @@ export async function handleRegister(db: Db, keyAddress: Address, raw: unknown):
   // Ohne Längengrenzen kann ein einziger kostenlos erzeugter Key die Platte füllen: 100
   // Registrierungen mit je 900 KB `bio` ergaben im Sicherheitsreview 90 MiB in 21 Sekunden, und
   // eine volle Platte heißt, dass SQLite nicht mehr schreibt und auch Gutschriften ausfallen.
-  const zuLang = Object.entries({ automaton_id: [automatonId, 128], name: [name, 200], bio: [bio, 2000], nonce: [nonce, 128] } as Record<
-    string,
-    [string, number]
-  >).find(([, [wert, max]]) => wert.length > max);
+  // Jedes Feld, das gespeichert wird, braucht eine Grenze. Die erste Fassung dieser Prüfung
+  // vergaß `genesis_prompt_hash`, und damit blieb der Angriff offen: 950 KB je Registrierung,
+  // 25 Registrierungen je Wallet (Gegenprüfung 19.09.2026). Ein Keccak-Hash ist 66 Zeichen lang.
+  const zuLang = Object.entries({
+    automaton_id: [automatonId, 128],
+    name: [name, 200],
+    bio: [bio, 2000],
+    nonce: [nonce, 128],
+    genesis_prompt_hash: [genesisPromptHash ?? "", 66],
+    creator_address: [creatorAddress, 42],
+    signature: [signature, 132],
+    payload_hash: [payloadHash, 66],
+  } as Record<string, [string, number]>).find(([, [wert, max]]) => wert.length > max);
   if (zuLang) {
     return { status: 400, body: { error: "field_too_long", field: zuLang[0], max_length: zuLang[1][1] } };
   }

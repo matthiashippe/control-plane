@@ -183,33 +183,45 @@ export async function handleChat(
     }
     throw err;
   }
-  // Der Client soll die ID wiedersehen, die er angefragt hat (Alias oder echte ID).
-  response.model = req.model;
+  // Ab hier darf nichts mehr ohne Freigabe der Reservierung enden. Die Gegenprüfung vom
+  // 19.09.2026 hat gezeigt, dass ein Fehler nach der Provider-Antwort (unvollständige `usage`,
+  // Schreibfehler der Datenbank bei voller Platte) sonst Guthaben des Mandanten blockiert, bis
+  // der Prozess neu startet.
+  let gebucht = false;
+  try {
+    // Der Client soll die ID wiedersehen, die er angefragt hat (Alias oder echte ID).
+    response.model = req.model;
 
-  const actualMc = costMc(entry.spec, response.usage);
-  const boughtMc = purchaseMc(entry.spec, response.usage);
+    const actualMc = costMc(entry.spec, response.usage);
+    const boughtMc = purchaseMc(entry.spec, response.usage);
   // Der Saldo deckt mindestens die Reservierung, mehr kann nur anfallen, wenn die Prompt-Schätzung
   // zu niedrig lag. Dann wird gebucht, was da ist, und der Rest als `uncollected_mc` festgehalten.
-  const balanceNow = getBalanceMc(db, address);
-  const chargeMc = Math.min(actualMc, balanceNow);
-  postLedger(db, {
-    address,
-    kind: "inference",
-    deltaMc: -chargeMc,
-    releaseReservedMc: requiredMc,
-    ref: response.id,
-    meta: {
-      model: entry.spec.id,
-      requested_model: req.model,
-      provider: entry.provider.id,
-      usage: response.usage,
-      cost_mc: actualMc,
-      cost_usd: response.usage.cost_usd ?? null,
-      purchase_mc: boughtMc,
-      margin_mc: chargeMc - boughtMc,
-      uncollected_mc: actualMc - chargeMc,
-    },
-  });
+    const balanceNow = getBalanceMc(db, address);
+    const chargeMc = Math.min(actualMc, balanceNow);
+    postLedger(db, {
+      address,
+      kind: "inference",
+      deltaMc: -chargeMc,
+      releaseReservedMc: requiredMc,
+      ref: response.id,
+      meta: {
+        model: entry.spec.id,
+        requested_model: req.model,
+        provider: entry.provider.id,
+        usage: response.usage,
+        cost_mc: actualMc,
+        cost_usd: response.usage.cost_usd ?? null,
+        purchase_mc: boughtMc,
+        margin_mc: chargeMc - boughtMc,
+        uncollected_mc: actualMc - chargeMc,
+      },
+    });
+    gebucht = true;
+  } finally {
+    // postLedger löst die Reservierung selbst auf. Nur wenn es gar nicht so weit kam, muss hier
+    // freigegeben werden.
+    if (!gebucht) releaseMc(db, address, requiredMc);
+  }
 
   return { status: 200, body: response };
 }

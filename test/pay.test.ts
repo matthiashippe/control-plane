@@ -273,3 +273,39 @@ describe("/pay x402-Seller", () => {
     expect(res.status).toBe(503);
   });
 });
+
+describe("Aufräumen beim Start", () => {
+  it("löst hängende pending-Zahlungen, damit die Nonce nicht dauerhaft blockiert", async () => {
+    // Gegenprüfung 19.09.2026: Stirbt der Prozess zwischen Claim und Settlement, bleibt die
+    // Zahlung `pending`. Die Nonce antwortet dann für immer mit 409, und ein Retry ist unmöglich,
+    // obwohl die USDC schon geflossen sein können. Nach dem Neustart muss der Weg wieder offen
+    // sein.
+    const datei = `/tmp/cp-pending-${Date.now()}.db`;
+    try {
+      const db1 = openDb(datei);
+      db1.prepare("INSERT INTO wallets (address, balance_mc, created_at) VALUES (?, 0, ?)").run("0xa", new Date().toISOString());
+      db1
+        .prepare(
+          "INSERT INTO payments (nonce, from_address, to_address, value_atomic, credits_mc, status, created_at) VALUES (?, ?, ?, ?, ?, 'pending', ?)",
+        )
+        .run("haengt", "0xa", "0xa", "5000000", 500_000, new Date().toISOString());
+      db1.close();
+
+      // Neustart des Prozesses
+      const db2 = openDb(datei);
+      const row = db2.prepare("SELECT status, error FROM payments WHERE nonce = ?").get("haengt") as { status: string; error: string };
+      expect(row.status, "pending blockiert die Nonce dauerhaft und muss aufgelöst werden").toBe("failed");
+      expect(row.error).toBe("interrupted_by_restart");
+      db2.close();
+    } finally {
+      const fs = await import("node:fs");
+      for (const suffix of ["", "-wal", "-shm"]) {
+        try {
+          fs.unlinkSync(datei + suffix);
+        } catch {
+          /* egal */
+        }
+      }
+    }
+  });
+});

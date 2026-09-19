@@ -35,6 +35,8 @@ async function buildRegister(params: {
   name?: string;
   bio?: string;
   genesisPrompt?: string;
+  /** Roher Wert statt keccak(genesisPrompt): nötig, um die Längenprüfung selbst zu treffen. */
+  genesisPromptHashRaw?: string;
 }) {
   const automatonId = params.automatonId ?? crypto.randomUUID();
   const automatonAddress = params.automatonAddress ?? params.signer.address;
@@ -43,7 +45,7 @@ async function buildRegister(params: {
   const bio = params.bio ?? "";
   const nonce = crypto.randomUUID();
   const payload: Record<string, string> = { automaton_id: automatonId, automaton_address: automatonAddress, creator_address: creatorAddress, name, bio };
-  const genesisPromptHash = params.genesisPrompt ? keccak256(toHex(params.genesisPrompt)) : undefined;
+  const genesisPromptHash = params.genesisPromptHashRaw ?? (params.genesisPrompt ? keccak256(toHex(params.genesisPrompt)) : undefined);
   if (genesisPromptHash) payload.genesis_prompt_hash = genesisPromptHash;
   const payloadHash = hashRegisterPayload(payload);
   const signature = await params.signer.signTypedData({
@@ -170,6 +172,31 @@ describe("Grenzen bei der Registrierung", () => {
     const grenze = await buildRegister({ signer: account, bio: "x".repeat(2000) });
     const ok = await post("/v1/automatons/register", grenze.body);
     expect(ok.status, "genau auf der Grenze muss es noch durchgehen").toBe(200);
+  });
+
+  it("deckelt auch genesis_prompt_hash, nicht nur bio", async () => {
+    // Die erste Fassung der Längenprüfung vergaß dieses Feld, und damit blieb der ganze Angriff
+    // offen: 950 KB je Registrierung waren weiterhin möglich. Der Payload-Hash wird hier über den
+    // langen Wert mitberechnet und die Signatur passt, sonst würde `payload_hash_mismatch` den
+    // Test grün färben, ohne dass die Längenprüfung je greift.
+    const { post, account } = setup();
+    const { body } = await buildRegister({ signer: account, genesisPromptHashRaw: "0x" + "a".repeat(950_000) });
+    const res = await post("/v1/automatons/register", body);
+    expect(res.status).toBe(400);
+    const fehler = (await res.json()) as { error: string; field?: string };
+    expect(fehler.error).toBe("field_too_long");
+    expect(fehler.field).toBe("genesis_prompt_hash");
+  });
+
+  it("schreibt nach abgewiesenen Registrierungen nichts in die Datenbank", async () => {
+    const { post, account, db } = setup();
+    for (const feld of ["bio", "name", "genesis_prompt_hash"] as const) {
+      const { body } = await buildRegister({ signer: account });
+      (body as Record<string, unknown>)[feld] = "x".repeat(900_000);
+      await post("/v1/automatons/register", body);
+    }
+    const zeilen = (db.prepare("SELECT count(*) AS n FROM automatons").get() as { n: number }).n;
+    expect(zeilen, "kein abgewiesener Versuch darf eine Zeile hinterlassen").toBe(0);
   });
 
   it("begrenzt die Zahl der Automatons je Wallet", async () => {
