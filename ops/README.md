@@ -25,7 +25,37 @@ Das Skript ändert nichts und startet nichts. Es ist die Datenquelle für den Op
 | `vm.disk_used` | über 80 % | Logs rotieren (json-file max 20m x 5), alte Images prüfen |
 | `db.day.margin_mc` | negativ | Verkaufspreis deckt den Einkauf nicht: Markup oder Katalog prüfen |
 
+## Watchdog auf der VM
+
+`ops/watchdog.sh` läuft dort per Cron alle fünf Minuten (`/var/log/cp-watchdog.log`) und ist die
+einzige Instanz, die einen Ausfall bemerkt, ohne dass jemand hinschaut. Er prüft `/health` von
+außen (zwei Versuche mit 20 s Abstand, damit ein einzelner Aussetzer nicht alarmiert) und die
+Restlaufzeit des Zertifikats. Gemeldet wird der **Wechsel** des Zustands, nicht jeder Lauf: ein
+Ausfall meldet einmal, die Rückkehr meldet einmal.
+
+Ohne `CP_ALERT_WEBHOOK` schreibt er nur ins Log. Mit gesetzter URL (ntfy, Slack, Discord, egal)
+schickt er eine Zeile Text dorthin. Damit die Zustellung greift, die Variable in den Cron-Eintrag
+aufnehmen:
+
+```
+*/5 * * * * CP_ALERT_WEBHOOK=https://ntfy.sh/<zufälliges-topic> /opt/control-plane/repo/ops/watchdog.sh >> /var/log/cp-watchdog.log 2>&1
+```
+
+**Offen:** Die Webhook-URL ist noch nicht gesetzt, weil sie eine Entscheidung über einen
+Drittanbieter ist. Bis dahin steht ein Ausfall nur im Log auf der VM.
+
+## Selbstheilung
+
+Der `autoheal`-Dienst im Compose startet Container neu, die der Healthcheck als `unhealthy`
+markiert. Das ist nötig, weil Docker von sich aus nur bei einem beendeten Prozess neu startet:
+Am 19.09.2026 hing der Startprozess still, der Container blieb "Up" und unhealthy, und der Dienst
+war 502, bis jemand von Hand eingriff. Geprüft mit SIGSTOP auf den Node-Prozess: nach 90 Sekunden
+`unhealthy`, nach 120 Sekunden automatisch neu gestartet.
+
 ## Kennzahl des 30-Tage-Tests
 
-`db.automatons` ist die Messgröße (Ziel: 50 provisionierte Automatons in 30 Tagen).
+`db.automatons` ist die Messgröße. **Ziel: fünf fremde Automatons in 30 Tagen** (Stand 19.09.2026,
+nach der Nachfragemessung von 50 nach unten korrigiert). Fremd heißt: ein `creator_address`, der
+nicht uns gehört, der eigene zählt nicht mit. Unter drei am 19.10.2026 wird abgeschaltet, mit zwei
+Wochen Vorlauf auf der Startseite.
 `db.keys` zählt ausgestellte API-Keys, `db.day.topups` die Zahlungen des letzten Tages.
