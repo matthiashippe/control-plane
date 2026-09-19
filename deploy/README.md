@@ -36,5 +36,6 @@ Die Datei enthält nur Key-Hashes, Salden und Ledger, keine Klartext-Keys.
 ## Abnahme
 
 Stufe 1: `CP_URL=https://cp.hippe.eu pnpm e2e:mainnet` (Wegwerf-Wallet, 1 USDC, Tier 1).
-Stufe 2: `pnpm e2e:prod` (Upstream-Runtime im Docker gegen cp.hippe.eu, 5 USDC), nur nach Go.
+Stufe 2: `pnpm e2e:prod` (Upstream-Runtime als Container auf der VM gegen cp.hippe.eu, Wegwerf-
+Wallet aus Stufe 1 mit 5 USDC; baut, läuft, räumt den Container wieder ab), nur nach Go.
 Danach `CP_TOPUP_TIERS_USD` in `.env` wieder ohne Tier 1 setzen und `deploy/up.sh`.

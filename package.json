@@ -20,7 +20,8 @@
     "e2e:inference": "bash harness/e2e/inference.sh",
     "e2e:openrouter": "tsx harness/e2e/openrouter-smoke.ts",
     "e2e:live": "bash harness/e2e/live.sh",
-    "e2e:mainnet": "tsx harness/e2e/mainnet.ts"
+    "e2e:mainnet": "tsx harness/e2e/mainnet.ts",
+    "e2e:prod": "bash harness/e2e/prod.sh"
   },
   "dependencies": {
     "@hono/node-server": "^1.14.0",
