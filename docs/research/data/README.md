@@ -3,7 +3,13 @@
 ## `2026-09-19-conway-payto-transfers.csv`
 
 Alle USDC-Transfers an Conways payTo `0x21DD37E3E4eA6CCC0a5C98A4944702eDE6E7Be10` auf Base,
-lückenlos vom 01.01.2026 bis 19.09.2026 14:59 UTC. 9.012 Zeilen, keine Duplikate. Der erste
+lückenlos vom 01.01.2026 bis 19.09.2026 16:14 UTC. 9.026 Zeilen, keine Duplikate.
+
+Nachgezogen am 19.09.2026 um 21:45 (Blöcke 51.518.686 bis 51.528.050): 14 weitere Transfers über
+zusammen **0,04 USDC**, alle von derselben Wallet `0x7f0376c6…d7b82`, die in hoher Frequenz
+Kleinstbeträge schickt. In fünf Stunden kam also von niemand anderem Geld. Falle dabei: Der
+öffentliche RPC antwortet auf Pythons Standard-User-Agent mit 403, ein eigener `User-Agent`-Header
+behebt das. Der erste
 Transfer im Zeitraum fällt auf den 01.02.2026 13:33:45 UTC, im Januar gab es keinen.
 
 Spalten: `block`, `timestamp_utc`, `from` (zahlende Wallet), `usdc` (Betrag, sechs Dezimalstellen),
