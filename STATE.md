@@ -65,11 +65,22 @@ minus eins, genauer über `ops/status.sh` (`db.wallets`, `db.automatons`).
 - HN-Artikel als Entwurf: die Daten im Mittelpunkt (Tod einer Agenten-Ökonomie in neun Monaten),
   der Dienst als Fußnote. Titel und Freigabe bei Matthias vor dem Posten.
 
-**Danach (Prüfauftrag, kein Goal):** Taugt das Gebaute als generisches x402-Abrechnungs-Gateway für
-andere Agenten-Dienste? SIWE-Provisionierung, Prepaid-Credits, idempotentes Settlement und
-Abrechnung nach echten Einkaufskosten sind nicht Conway-spezifisch. Das ist der einzige Pfad, auf
-dem die Zahl 1 bis 3k je wieder auftaucht, und deshalb der nächste Rechercheauftrag, nicht mehr
-Reichweite für Conway-Flüchtlinge.
+**Gateway-These: geprüft und gescheitert** (19.09.2026, `docs/research/2026-09-20-x402-gateway.md`).
+Der x402-Markt selbst ist echt und wächst: on-chain gemessen nehmen die zehn größten Verkäufer
+3.407 USDC je Woche ein, rund 14.500 im Monat, das 34-fache des Conway-Marktes, und die
+npm-Downloads von `x402` sind zwölf Monate in Folge gestiegen. Die These scheitert trotzdem, und
+zwar an der Konkurrenz statt an der Nachfrage: **Jeder untersuchte Kandidat hat die
+Abrechnungsschicht bereits**, mehrere davon unter MIT-Lizenz veröffentlicht. BlockRun.AI stellt mit
+ClawRouter genau unsere Architektur offen bereit (6.606 Sterne, 651 Forks). Wir würden nicht gegen
+einen Preis konkurrieren, sondern gegen null.
+
+Damit ist der letzte Pfad zu den ursprünglich anvisierten 1 bis 3k USD zu. Was bleibt, ist der
+30-Tage-Test mit fünf zahlenden Betreibern als Messgröße, und danach die ehrliche Entscheidung, ob
+der Dienst für 10 EUR im Monat weiterläuft, weil er jemandem nützt, oder ob er abgeschaltet wird.
+
+**Nebenbefund, der zum Nachdenken taugt:** Unser eigener Automat auf `srv1327036` kauft über seinen
+x402-Shim seit Tagen bei JarvisClaw ein, also bei genau der Sorte Dienst, die diese Recherche als
+Wettbewerb ausweist. Wir sind Kunde des Marktes, in den wir verkaufen wollten.
 
 **Offen, ohne Goal:** Ops-Triage als Loop scharf schalten (`/loop 1d Run $ops-triage`, L1,
 report-only, Datenquelle `ops/status.sh`, Schwellen in `ops/README.md`). Phase 2 (Sandboxes,
