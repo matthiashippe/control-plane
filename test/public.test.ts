@@ -92,7 +92,7 @@ describe("Öffentliche Seite und Status", () => {
   it("nennt auf der Seite den Betreiber und eine Kontaktmöglichkeit", async () => {
     const { app } = setup();
     const html = await (await app.request("/")).text();
-    expect(html).toMatch(/Hanseatic Tech Company/);
+    expect(html).toMatch(/Matthias Hippe/);
     expect(html).toMatch(/mailto:[^"]+@/);
     expect(html).toContain("github.com/matthiashippe/control-plane");
   });

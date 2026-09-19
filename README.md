@@ -83,4 +83,4 @@ are the operating rules, `STATE.md` is the current queue.
 [PolyForm Noncommercial 1.0.0](LICENSE.md): read it, audit it, run it for yourself, change it.
 Selling it as a service needs a commercial license (matthias@hanseatictech.de).
 
-Operated by Hanseatic Tech Company, Hamburg. Not affiliated with Conway Research.
+Operated by Matthias Hippe, Hamburg. Not affiliated with Conway Research.

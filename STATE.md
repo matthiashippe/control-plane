@@ -77,14 +77,16 @@ Social-Relay) erst, wenn Nachfrage messbar ist, also frühestens nach dem 19.10.
 
 ## Entscheidungen bei Matthias
 
-- **Impressum: erledigt am 19.09.2026.** Anschrift von Matthias: Hanseatic Tech Company,
-  Matthias Hippe, San-Francisco-Straße 1, 20457 Hamburg. Steht auf der Startseite unter
-  `#impressum`, `/impressum` leitet dorthin, ein Test in `test/public.test.ts` hält es fest.
-  **Noch zu prüfen, wenn die Angaben existieren:** USt-IdNr (Pflichtangabe nach § 5 DDG, sobald
-  vorhanden), Registergericht und Registernummer (falls HTC eingetragen ist), und ob eine
-  Telefonnummer gewünscht ist. Die E-Mail allein gilt als schneller Kontaktweg, ist aber die
-  knappere Auslegung. Diese drei Angaben kenne ich nicht und habe sie deshalb weggelassen, statt
-  etwas zu erfinden.
+- **Impressum: erledigt am 19.09.2026.** Matthias betreibt den Dienst als Privatperson ohne
+  Gewerbe, deshalb steht dort kein Firmenname mehr, sondern: Matthias Hippe,
+  San-Francisco-Straße 1, 20457 Hamburg, plus E-Mail und Verantwortlicher nach § 18 MStV. Auf der
+  Startseite unter `#impressum`, `/impressum` leitet dorthin, ein Test in `test/public.test.ts`
+  hält es fest. USt-IdNr und Registereintrag entfallen mangels Gewerbe; eine Telefonnummer ist
+  nicht angegeben, weil die E-Mail als schneller Kontaktweg gilt.
+  **Wichtig, unabhängig vom Gewerbe:** Die Impressumspflicht nach § 5 DDG bleibt bestehen, weil
+  der Dienst entgeltlich ist. "Privat" heißt hier nur, dass keine Firma dahintersteht, nicht dass
+  die Pflichten entfallen. Dasselbe gilt für die Steuerfrage unten: Einnahmen aus dem Verkauf von
+  Credits sind steuerpflichtig, auch ohne Gewerbeanmeldung.
 - **HN-Artikel**: Titel entschieden am 19.09.2026: "1,582 wallets funded an AI agent in February.
   By June, three were left." Der Text ist fertig (`docs/artikel-agentenoekonomie.md`). Offen bleibt,
   ob und wann er rausgeht; posten muss Matthias selbst. Vor dem Posten die Zahlen nachziehen, der
@@ -93,7 +95,10 @@ Social-Relay) erst, wenn Nachfrage messbar ist, also frühestens nach dem 19.10.
   `CP_ALERT_WEBHOOK` nicht gesetzt ist. Welcher Dienst die Meldungen bekommt (ntfy, Slack, Discord),
   ist eine Entscheidung über einen Drittanbieter und liegt bei Matthias.
 - **Steuerfrage**: USt auf Nutzungsguthaben, B2B-Ausland, Reverse Charge. Vor dem ersten
-  Fremdnutzer zu klären, also im 30-Tage-Fenster.
+  Fremdnutzer zu klären, also im 30-Tage-Fenster. Seit dem 19.09. mit dem Zusatz, dass kein Gewerbe
+  angemeldet ist: Das ändert nichts an der Steuerpflicht der Einnahmen, kann aber die Frage
+  aufwerfen, ab welchem Umfang die Tätigkeit als gewerblich gilt. Bei fünf Automatons in 30 Tagen
+  ist das theoretisch, bei Erfolg nicht mehr.
 - **Credit-Transfer** (`POST /v1/credits/transfer`, Runtime-Tools `transfer_credits`, `fund_child`):
   Handoff-Leitplanke sagt "nicht übertragbar" (E-Geld-Abgrenzung, Recherche 6.2), Constraints
   erlauben Transfer innerhalb des Control Plane. Phase 1 antwortet 501; Solo-Automatons brauchen
