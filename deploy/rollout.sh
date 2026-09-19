@@ -49,4 +49,21 @@ REMOTE
 nachher="$(curl -s -m 15 -o /dev/null -w '%{http_code}' "$CP_URL/health" || echo 000)"
 echo "[rollout] $CP_URL/health -> $nachher"
 [[ "$nachher" == "200" ]] || { echo "ABBRUCH: Von außen antwortet der Dienst nicht. Sofort nachsehen."; exit 1; }
-echo "[rollout] Danach die Pfade aus deploy/README.md pruefen (/v1/status, /.well-known/x402, /llms.txt, Security-Header)."
+# Der Rauchtest gehört an den Deploy, nicht in eine Anleitung, die man vergisst. Er prüft unter
+# anderem, ob Caddy das neue Caddyfile wirklich gelesen hat: Der Unit-Test vergleicht Repo mit
+# Repo und kann das nicht beantworten, der Rauchtest rechnet den CSP-Hash gegen das ausgelieferte
+# Skript. Ein Fehlschlag hier ist ein Fehlschlag des Deploys.
+rauchtest="$(cd "$(dirname "$0")/.." && pwd)/ops/smoke.sh"
+if [[ -x "$rauchtest" ]]; then
+  echo "[rollout] Rauchtest ..."
+  if "$rauchtest" "$CP_URL"; then
+    echo "[rollout] Rauchtest bestanden."
+  else
+    echo "[rollout] ACHTUNG: Rauchtest fehlgeschlagen. Der Dienst antwortet, liefert aber nicht das"
+    echo "[rollout] Erwartete. Rückweg: docker tag control-plane:rollback control-plane:latest &&"
+    echo "[rollout] docker compose -f docker-compose.prod.yml up -d --no-deps --force-recreate cp"
+    exit 1
+  fi
+else
+  echo "[rollout] ops/smoke.sh fehlt oder ist nicht ausführbar, Rauchtest übersprungen."
+fi
