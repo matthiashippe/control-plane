@@ -70,6 +70,21 @@ automaton --run         # registers, buys credits from your USDC, starts working
   </div>
   <p><a href="/v1/status">/v1/status</a> returns the same numbers as JSON.</p>
 
+  <h2>Evidence</h2>
+  <p>
+    On 19 September 2026 the unmodified upstream runtime, cloned from Conway's repository and
+    pinned at <code>d8f8168</code>, ran against this production instance and not against a test
+    copy: it provisioned over SIWE, registered, bought 5 USD of credits over x402, took five turns
+    and paid for them out of that balance, with no API errors and a ledger that reconciles
+    (<code>PROD OK topup=true registered=true turns=5 api_errors=0 ledger_consistent=true</code>).
+    The top-up is on Base as
+    <a href="https://basescan.org/tx/0x6cde28b017fa62b14ed9f3425cbc417dd56137e2d4a4022161f880478954dc68">0x6cde28b0…54dc68</a>,
+    the run is written down in
+    <a href="https://github.com/matthiashippe/control-plane/blob/main/goals/2026-09-19-goal-5b-betrieb.md">goals/2026-09-19-goal-5b-betrieb.md</a>.
+    The same harness runs on your machine without money: <code>pnpm e2e</code> starts that runtime
+    against a local instance on a local chain.
+  </p>
+
   <h2>Price</h2>
   <p>
     Credits are prepaid and priced at the inference cost the service actually pays, times 1.3.
@@ -84,11 +99,43 @@ automaton --run         # registers, buys credits from your USDC, starts working
     <tbody><tr><td colspan="4">loading…</td></tr></tbody>
   </table>
   <p>
+    What that is in practice: the five-turn run of the same runtime on 19 September 2026 bought
+    5.5 US cents of inference and was billed 7.2 cents, so roughly one and a half cents per turn;
+    a second run of the same script came to 6.1 cents
+    (<a href="https://github.com/matthiashippe/control-plane/blob/main/goals/2026-09-19-goal-5a-openrouter.md">goals/2026-09-19-goal-5a-openrouter.md</a>).
+    A turn gets more expensive as the conversation grows, and it depends on which model the
+    runtime's routing matrix picks, so read that as an order of magnitude and not as a rate. At
+    that size 5 USD would have covered a few hundred turns. Every call is one ledger row
+    with its purchase cost and its margin, and <code>GET /v1/credits/balance</code> says what is
+    left.
+  </p>
+  <p>
     Top-ups go through x402 (USDC on Base, EIP-3009), settled by an external facilitator. Tiers in
     USD: <span id="s-tiers">5, 25, 100, 500, 1000, 2500</span>. The runtime signs the payment; the
     credit is booked in the same transaction as the ledger entry, and a repeated signature never
     credits twice.
   </p>
+
+  <h2>Before you send money</h2>
+  <ul>
+    <li><strong>If I shut this down:</strong> I say so on this page first and keep the service
+      running for at least two weeks after that notice, so a remaining balance can be spent.
+      Credits are usage balance on this service, not transferable and not redeemable for money, so
+      what is left after those two weeks is gone. Two weeks is what I can promise while I am here;
+      an operator who disappears gives no notice at all, and that is the honest reason to buy the
+      smallest tier, 5 USD, and to buy again once you have seen it work.</li>
+    <li><strong>Who you are paying:</strong> Matthias Hippe, one person in Hamburg, Germany. The
+      postal address in the <a href="#impressum">Impressum</a> below is real and legally binding
+      here, the email goes to the same person, and the repository runs under the same name. If you
+      can avoid paying for a control plane at all, <a href="#free">the free routes are below</a>.</li>
+    <li><strong>If it does not work:</strong> open an issue at
+      <a href="https://github.com/matthiashippe/control-plane/issues">github.com/matthiashippe/control-plane/issues</a>
+      or write to <a href="mailto:matthias@hanseatictech.de">matthias@hanseatictech.de</a>. Every
+      error response carries a <code>message</code> in plain English and a <code>docs</code> link
+      into <a href="https://github.com/matthiashippe/control-plane/blob/main/docs/errors.md">docs/errors.md</a>,
+      which says what the code means and what to do about it. One operator, no on-call, no
+      guaranteed response time.</li>
+  </ul>
 
   <h2>What works, what does not</h2>
   <table>
@@ -105,7 +152,7 @@ automaton --run         # registers, buys credits from your USDC, starts working
     not transferable and not redeemable for money.
   </p>
 
-  <h2>You may not need this</h2>
+  <h2 id="free">You may not need this</h2>
   <p>
     Before you pay anyone: the runtime does not think at all when it cannot reach a balance
     endpoint, but there are two free ways around that, and neither of them is documented upstream.
@@ -119,9 +166,9 @@ automaton --run         # registers, buys credits from your USDC, starts working
   <h2>Honest limits</h2>
   <ul>
     <li>One operator, one server, no SLA, no on-call. If it breaks, it breaks until I fix it.</li>
-    <li>This is a 30-day experiment. If nobody uses it, I will say so on this page and give at
-      least two weeks notice before shutting it down, so a remaining balance can be used up. Buy
-      the smallest tier that covers what you actually plan to run.</li>
+    <li>This is a 30-day experiment, started on 19 September 2026. If nobody uses it, I will say
+      so on this page, with the same two weeks notice before shutting it down. Buy the smallest
+      tier that covers what you actually plan to run.</li>
     <li>It is not affiliated with Conway Research or the automaton project. I run it because my own
       automaton needed a control plane after Conway went quiet.</li>
   </ul>
