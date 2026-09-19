@@ -1,7 +1,7 @@
 # GOAL.md
 
 ## Status
-WAITING (SSH-Key auf srv1336627)
+ACTIVE
 
 ## Active Objective
 Betrieb: Das Control Plane läuft unter `https://cp.hippe.eu` auf `srv1336627` mit Caddy (Let's
@@ -20,10 +20,15 @@ und die Zahlung auf Basescan sichtbar.
       Prüfung: `dig +short cp.hippe.eu` = `76.13.144.207`
 - [ ] Dienst läuft mit gültigem Zertifikat
       Prüfung: `curl -s https://cp.hippe.eu/health` -> `{"ok":true,...}` ohne `-k`
-- [ ] `pnpm e2e:mainnet` grün (Stufe 1, Wegwerf-Wallet, 1 USDC, Tier 1)
-      Prüfung: `pnpm e2e:mainnet` exit 0, Ausgabe `MAINNET OK tier=1 credits_cents=100 tx=0x...`,
-      Transaktion auf `https://basescan.org/tx/<hash>` mit USDC-Transfer an
-      `0x914102284463F4F58B1D2f6DB9aC80BFcaA7d614`
+- [ ] `pnpm e2e:mainnet` grün (Stufe 1, Wegwerf-Wallet, 1 USDC, Tier 1); ausgeführt am 19.09.2026,
+      16:20, Ausgabe im Progress Log; die Wallet ist danach leer, der Lauf wird nicht wiederholt
+      Prüfung (ohne Geld): `eth_getTransactionReceipt` für
+      `0xab5932250f3ad00e2efbbc5adb74defd045b4d719f9759baedc1b2ae3440733a` über
+      `https://mainnet.base.org` hat `status 0x1` und ein USDC-Transfer-Log (Topic
+      `0xddf252ad...`) von `0xd24f37d0838e62621ed24111164485ded0f0924f` an
+      `0x914102284463f4f58b1d2f6db9ac80bfcaa7d614` über 1000000; auf der VM liefert
+      `docker compose -f docker-compose.prod.yml exec -T cp node -e ...` (siehe deploy/README, Abnahme)
+      ein Payment `settled` mit diesem tx_hash und eine Ledger-Zeile `topup` 100000 mc
 - [ ] Offline-Läufe bleiben grün
       Prüfung: `pnpm e2e` enthält `E2E OK`
 - [ ] goal-verifier PASS
@@ -41,6 +46,7 @@ und die Zahlung auf Basescan sichtbar.
       `README.md` (Erstinstallation, Update, Logs, Backup der SQLite)
 - [ ] Auf der VM: Docker, Compose, UFW (22, 80, 443), Dienst per Compose mit `restart: unless-stopped`;
       Secrets nur in `/opt/control-plane/.env` (Mode 600), nie im Repo
+      (SSH: `ssh -i ~/.ssh/id_ed25519_automaton root@76.13.144.207`)
 - [ ] `harness/e2e/mainnet.ts`: erzeugt oder lädt eine Wegwerf-Wallet unter
       `harness/state/mainnet-wallet.json` (gitignored), zeigt Adresse und USDC-Saldo, wartet auf
       Guthaben, signiert x402 v1 wie der Runtime-Client, ruft `/pay/1/<addr>` gegen `CP_URL`,
@@ -62,7 +68,8 @@ und die Zahlung auf Basescan sichtbar.
 
 ## Progress Log
 - 2026-09-19 11:55 Zyklus 1 (Teil ohne VM): FacilitatorSettler (PayAI v1 pass-through, 7 Unit-Tests), Tiers konfigurierbar (CP_TOPUP_TIERS_USD), DNS cp.hippe.eu -> 76.13.144.207 gesetzt und aufgelöst, deploy/ (Compose prod, Caddyfile, .env.example, setup-vm.sh, up.sh, README), harness/e2e/mainnet.ts (Stufe 1), protocol.md Facilitator-Abschnitt. 54 Unit-Tests, E2E OK offline. Offen: VM-Setup, Deploy, Stufe 1 (braucht SSH-Key und 1 USDC auf der Wegwerf-Wallet). Verifier erst nach Deploy.
+- 2026-09-19 15:45 VM: alten openclaw-Container samt Volumes, /root/outlook-bridge und Compose-Verzeichnis entfernt (Freigabe von Matthias), setup-vm.sh (Docker 29.2.1 vorhanden, UFW aktiv), .env per SSH-stdin mit OpenRouter-Key (Mode 600), up.sh: cp healthy, Caddy mit LE-Zertifikat; `curl https://cp.hippe.eu/health` 200 ssl_verify=0; 402-Angebot für Tier 1 korrekt.
+- 2026-09-19 16:20 Stufe 1: Matthias hat 2 USDC von Arbitrum nach Base gebridged und 1 USDC an die Wegwerf-Wallet 0xd24F…924F gesendet. `CP_URL=https://cp.hippe.eu pnpm e2e:mainnet` -> `MAINNET OK tier=1 credits_cents=100 tx=0xab5932250f3ad00e2efbbc5adb74defd045b4d719f9759baedc1b2ae3440733a`. Receipt: status 0x1, Block 51518599, Relayer 0xc6699d2aada6c36dfea5c248dd70f9cb0235cb63 (PayAI), Transfer 1,0 USDC an payTo. VM-Ledger: payment settled mit tx_hash, topup 100000 mc. Verifier ausstehend.
 
 ## Blockers
-- SSH auf `srv1336627` (76.13.144.207): `Permission denied (publickey)`; Matthias hinterlegt
-  `~/.ssh/id_ed25519_automaton.pub` im Hostinger-hPanel (Stand 19.09.2026, 11:40)
+- (erledigt 19.09.2026, 15:40) SSH-Key im hPanel hinterlegt, Zugang geht.
