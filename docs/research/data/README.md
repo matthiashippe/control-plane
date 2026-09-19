@@ -40,3 +40,32 @@ Grenzen des Datensatzes: Er zeigt Zuflüsse an eine einzelne Adresse. Ob hinter 
 Mensch, ein Automat oder ein Wiederholungsversuch steht, steht nicht drin. Die hohe Zahl von
 Transfers je Wallet in den letzten Monaten (zwei im Schnitt) passt zum Retry-Verhalten aus
 Issue #393 und bedeutet nicht zwei Kaufentscheidungen.
+
+## `2026-09-20-x402-sellers-7d.csv` und `x402-sellers-scan.py`
+
+Zuflussmessung für 19 x402-Verkäufer-Wallets auf Base über sieben Tage, Grundlage von
+`../2026-09-20-x402-gateway.md`, Abschnitt G1. Erhoben am 19.09.2026 ab 19:15 UTC in zwei Läufen
+(Head-Block 51.528.083 und 51.528.206, Fenster je 302.400 Blöcke, 152 Chunks à 2.000 Blöcke,
+kein fehlgeschlagener Chunk, zusammen 153.705 Transfer-Events).
+
+Spalten: `seller_address` (payTo aus dem jeweiligen Zahlungsmanifest des Dienstes),
+`name`, `transfers_7d`, `usdc_7d`, `unique_payers_7d`.
+
+Adressauswahl: Rang 1 bis 10 des on-chain erhobenen Verkäufer-Rankings von
+`https://agent402.tools/api/leaderboard` (Abruf 19.09.2026 18:20 UTC), Conways payTo als Referenz
+zur Vorgängermessung, dazu neun selbst geprüfte Dienste mit Prepaid- oder Bündelabrechnung, deren
+payTo aus `/.well-known/x402` beziehungsweise aus der 402-Antwort stammt.
+
+Wiederholung mit `python3 x402-sellers-scan.py 302400` (rund fünf Minuten, das Skript enthält die
+Adressliste im Kopf). Der öffentliche RPC `mainnet.base.org` begrenzt `eth_getLogs` auf 2.000
+Blöcke und antwortet Python-urllib ohne User-Agent nicht, deshalb der curl-UA im Header. Alle
+Adressen stehen als OR-Liste in `topics[2]`, damit ein Durchlauf für alle Verkäufer reicht.
+
+Gegenprobe zur Fremdquelle am selben Tag: AX1 Console 104.682 Zahlungen und 2.093,64 USDC
+gegenüber 104.477 und 2.089,54 USD im Leaderboard, StableEnrich 10.911 und 395,57 gegenüber
+10.943 und 395,82. Die Abweichung bei BlockRun.AI (248,86 gegenüber 207,30) kommt daher, dass das
+Leaderboard Einzelzahlungen über 0,75 USD abschneidet.
+
+Grenzen: Gemessen sind Zuflüsse an einzelne Adressen auf Base. Wer über mehrere Wallets oder auf
+Solana abrechnet, erscheint zu klein. Sieben Tage sind kurz genug, dass ein einzelner Großkäufer
+das Bild kippt.
