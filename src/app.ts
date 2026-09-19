@@ -361,6 +361,32 @@ export function createApp(opts: AppOptions) {
 
   // ─── Alles ab hier braucht einen API-Key (roh im Authorization-Header) ───
 
+  // Vorher die Methode prüfen, sonst fällt eine falsche Methode auf einem schlüssellosen Pfad in
+  // die Auth-Middleware und wird als "kein API-Key" abgewiesen. Ein `GET /v1/auth/verify` bekam so
+  // ein 401 mit der Aufforderung, einen Schlüssel zu schicken, den dieser Pfad gar nicht braucht.
+  // Für einen Scanner egal, für jemanden, der die Methode verwechselt, eine Sackgasse.
+  const ERLAUBTE_METHODEN: Record<string, string[]> = {
+    "/v1/auth/nonce": ["POST"],
+    "/v1/auth/verify": ["POST"],
+    "/v1/auth/api-keys": ["POST"],
+  };
+  app.use("/v1/auth/*", async (c, next) => {
+    const erlaubt = ERLAUBTE_METHODEN[c.req.path];
+    if (erlaubt && !erlaubt.includes(c.req.method)) {
+      c.header("Allow", erlaubt.join(", "));
+      return c.json(
+        {
+          error: "method_not_allowed",
+          message: `${c.req.path} accepts ${erlaubt.join(" and ")}, not ${c.req.method}. This endpoint needs no API key.`,
+          allow: erlaubt,
+          docs: DOC.authentication,
+        },
+        405,
+      );
+    }
+    return next();
+  });
+
   app.use("/v1/*", async (c, next) => {
     const address = resolveApiKey(db, c.req.header("authorization"));
     if (!address) {

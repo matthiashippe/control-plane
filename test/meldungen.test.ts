@@ -595,3 +595,36 @@ describe("Gegenprobe: keine Interna in den Körpern", () => {
     }
   });
 });
+
+describe("Falsche HTTP-Methode", () => {
+  it("antwortet auf einem schlüssellosen Pfad mit 405 statt 401", async () => {
+    // Gesehen am 20.09.2026: Ein GET auf /v1/auth/verify fiel durch die Route in die
+    // Auth-Middleware und wurde als "kein API-Key" abgewiesen. Die Meldung forderte einen
+    // Schlüssel, den dieser Pfad gar nicht braucht. Wer die Methode verwechselt, landete damit in
+    // einer Sackgasse.
+    const { app } = setup();
+    for (const pfad of ["/v1/auth/nonce", "/v1/auth/verify", "/v1/auth/api-keys"]) {
+      const res = await app.request(pfad, { method: "GET" });
+      expect(res.status, `${pfad} mit GET`).toBe(405);
+      expect(res.headers.get("allow")).toBe("POST");
+      const body = (await res.json()) as { error: string; message: string; allow: string[] };
+      expect(body.error).toBe("method_not_allowed");
+      expect(body.message, "die Meldung muss sagen, dass hier kein Schlüssel nötig ist").toMatch(/no API key/i);
+      expect(body.allow).toEqual(["POST"]);
+    }
+  });
+
+  it("lässt die richtige Methode unverändert durch", async () => {
+    const { app } = setup();
+    const res = await app.request("/v1/auth/nonce", { method: "POST" });
+    expect(res.status).toBe(200);
+    expect((await res.json()) as { nonce: string }).toHaveProperty("nonce");
+  });
+
+  it("gibt auf geschützten Pfaden weiterhin 401, nicht 405", async () => {
+    // Dort ist 401 richtig: Ohne Schlüssel gibt es keinen Zugang, unabhängig von der Methode.
+    // Alles andere würde verraten, welche Pfade es gibt.
+    const { app } = setup();
+    expect((await app.request("/v1/credits/balance", { method: "DELETE" })).status).toBe(401);
+  });
+});
