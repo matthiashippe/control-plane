@@ -106,6 +106,23 @@ und den Artikel schreiben, der den Datensatz statt des Produkts in den Mittelpun
   (payTo, chainId 8453, Tiers), `/llms.txt` liefert Text mit Setup-Zeile und dem kostenlosen Weg.
   Guthaben und Registrierung unverändert.
 
+- Zyklus 5 (19.09.2026, 18:52 bis 19:05): Drei Antwort-Entwürfe für morgen unter
+  `.scratch/gtm/issue-antworten/` (#353, #355, #356), nicht gepostet. Beim Lesen der Threads kam
+  Substanz dazu, die die Antworten verändert hat:
+  * **PR #370** von tharun7702592295-cyber (offen seit 16.08.) routet Inferenz bereits auf lokales
+    Ollama plus NVIDIA NIM. Die Arbeit ist älter als unsere und löst dasselbe Problem. Jede Antwort
+    nennt sie, bevor sie unseren Weg nennt. Der sachliche Unterschied ist, dass unser Weg ohne
+    Patch auskommt, nicht dass er besser wäre.
+  * **#355 enthält zwei Bugs**, nicht einen: Der Windows-HOME-Fehler (`process.env.HOME || "/root"`
+    statt `os.homedir()`) ist lokal lösbar, und der Fragende hat den Workaround selbst gefunden.
+    Nur SIWE ist serverseitig. Die Antwort trennt das, weil sonst ein lösbares Problem unter einem
+    unlösbaren begraben bleibt.
+  * **Rickh07** hat am 17.09. in #355 einen Retry-auf-401-Ansatz angekündigt und hält den Fehler für
+    intermittierend. Das ist er nicht, er ist dauerhaft. Die Antwort widerspricht sachlich, weil ein
+    Retry sonst als Lösung missverstanden wird.
+  * **#356** hat mit 491 ms Round-Trip selbst bewiesen, dass es nicht am Client liegt. Die Antwort
+    wiederholt seine Analyse nicht, sondern bestätigt sie und geht weiter.
+
 ## Vorfall 19.09.2026: Start hängt am Preisabruf
 
 `src/index.ts:47` ruft beim Start `await provider.init()`, und `refreshPrices` holte den Katalog
