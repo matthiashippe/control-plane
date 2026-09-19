@@ -1,5 +1,7 @@
 # control-plane
 
+[![CI](https://github.com/matthiashippe/control-plane/actions/workflows/ci.yml/badge.svg)](https://github.com/matthiashippe/control-plane/actions/workflows/ci.yml)
+
 A drop-in replacement for `api.conway.tech`: the subset of the Conway API that the unmodified
 [automaton runtime](https://github.com/Conway-Research/automaton) actually calls. An automaton
 owner changes one line in `~/.automaton/automaton.json` and keeps running:
@@ -63,6 +65,16 @@ pnpm e2e                       # full harness: unmodified runtime d8f8168 in Doc
                                # this server, local Anvil chain, mock provider, no real money
 pnpm dev                       # local, http://127.0.0.1:8402
 ```
+
+CI runs on every push and every pull request (`.github/workflows/ci.yml`):
+`pnpm install --frozen-lockfile`, `pnpm build` (which is `tsc`, so the typecheck is covered) and
+`pnpm test` on Node 22, about two minutes per run. It deliberately does not run `pnpm e2e`. That
+job would clone the pinned upstream runtime and build three container images on every push, which
+costs 12 to 18 minutes and can fail for reasons outside this repository: the upstream repo, the
+moving `ghcr.io/foundry-rs/foundry:latest` tag, or the 240 second window that
+`harness/e2e/full.sh` allows for five turns on a runner with 2 vCPU. The harness therefore stays a
+manual check before a release (`pnpm e2e:smoke`, `pnpm e2e`), and the full reasoning is in the
+header of the workflow file.
 
 The harness in `harness/` is the point of this repo as much as the server is: it boots the
 **unmodified** upstream runtime against a local chain and verifies a complete first run

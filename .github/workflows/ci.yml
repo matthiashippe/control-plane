@@ -1,0 +1,92 @@
+# CI für das Control Plane: prüft bei jedem Push und bei jedem Pull Request, dass das Repo
+# installiert, typgeprüft baut und die Unit-Tests bestehen. Node 22, pnpm über corepack in der
+# Version aus dem packageManager-Feld, pnpm-Store gecacht.
+#
+# WARUM `pnpm e2e` HIER NICHT LÄUFT
+# Der Harness (harness/docker-compose.yml) fährt drei Container hoch: Anvil als lokale Chain, das
+# Control Plane hinter TLS und die unveränderte Upstream-Runtime. Er würde in GitHub Actions
+# technisch laufen, aber nicht verlässlich, aus drei Gründen:
+#
+#   1. Drei Fremdabhängigkeiten pro Lauf, die niemand hier kontrolliert. harness/runtime/Dockerfile
+#      klont bei jedem Build https://github.com/Conway-Research/automaton (Pin d8f8168) und
+#      installiert 279 Pakete aus dessen Lockfile; docker-compose.yml zieht
+#      ghcr.io/foundry-rs/foundry:latest, also einen beweglichen Tag. Wird das Upstream-Repo
+#      privat geschaltet, verschwindet der gepinnte Commit oder ändert Foundry das CLI von anvil
+#      bzw. cast, ist CI rot, ohne dass sich in diesem Repo etwas geändert hat.
+#   2. harness/e2e/full.sh wartet in einem harten Fenster von 240 Sekunden auf fünf Turns und den
+#      Schlaf der Runtime. Auf einem GitHub-Runner mit 2 vCPU teilen sich Anvil, Control Plane und
+#      Runtime diese Kerne; ein langsamer Lauf meldet turns=4 und damit E2E FAIL, ohne echten
+#      Fehler. Genau diese Sorte Zufallsrot macht eine Pipeline wertlos.
+#   3. Kein Layer-Cache: jeder Lauf baut alle drei Images neu (apt-get, git clone, pnpm install,
+#      tsc, solc-Compile des USDC-Mocks). Geschätzt 12 bis 18 Minuten pro Push, gegen etwa zwei
+#      Minuten für den Job unten.
+#
+# Der Harness bleibt damit das, was er ist: ein Test, den ein Mensch vor einem Release von Hand
+# fährt, auf einer Maschine mit Docker und warmem Image-Cache:
+#
+#     pnpm e2e:smoke   # Provisionierung über TLS, etwa 2 Minuten
+#     pnpm e2e         # kompletter Erstlauf mit fünf Turns, etwa 6 bis 10 Minuten
+#
+# Ein Ergebnis des Handlaufs gehört in den PR, wenn der Change die Provisionierung, die
+# Zahlungspfade oder die Inferenz berührt.
+
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+
+jobs:
+  build-test:
+    name: install, build, test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      # Erst Node, dann corepack: der Shim gehört zur aktiven Node-Version, und die Version von
+      # pnpm kommt aus dem packageManager-Feld in package.json, nicht aus einem zweiten Ort.
+      - name: pnpm über corepack aktivieren
+        run: |
+          corepack enable
+          corepack prepare --activate
+          pnpm --version
+
+      - name: pnpm-Store-Pfad ermitteln
+        id: pnpm-store
+        run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+
+      - name: pnpm-Store cachen
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: ${{ runner.os }}-pnpm-
+
+      # --frozen-lockfile: ein Lockfile, das nicht zu package.json passt, ist hier ein Fehler und
+      # kein Anlass, still aufzulösen.
+      - name: Abhängigkeiten installieren
+        run: pnpm install --frozen-lockfile
+
+      # pnpm build ist tsc über src/, deckt den Typecheck mit ab.
+      - name: Bauen
+        run: pnpm build
+
+      # Unit-Tests (vitest), ohne Docker und ohne Netz: Provider und Facilitator sind gemockt.
+      - name: Tests
+        run: pnpm test
