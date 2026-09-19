@@ -118,7 +118,7 @@ export function createApp(opts: AppOptions) {
     return c.json(res.body as Record<string, unknown>, res.status as 200);
   });
 
-  app.get("/v1/credits/pricing", (c) => c.json({ tiers: [], topup_tiers_usd: TOPUP_TIERS_USD }));
+  app.get("/v1/credits/pricing", (c) => c.json({ tiers: [], topup_tiers_usd: opts.pay?.tiers ?? TOPUP_TIERS_USD }));
 
   // Entscheidung in STATE.md: Credits sind in Phase 1 nicht übertragbar.
   app.post("/v1/credits/transfer", (c) =>

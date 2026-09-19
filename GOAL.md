@@ -1,7 +1,7 @@
 # GOAL.md
 
 ## Status
-ACTIVE
+WAITING (SSH-Key auf srv1336627)
 
 ## Active Objective
 Betrieb: Das Control Plane läuft unter `https://cp.hippe.eu` auf `srv1336627` mit Caddy (Let's
@@ -61,6 +61,7 @@ und die Zahlung auf Basescan sichtbar.
 - Geld: 1 USDC (Stufe 1), kommt auf die payTo-Adresse
 
 ## Progress Log
+- 2026-09-19 11:55 Zyklus 1 (Teil ohne VM): FacilitatorSettler (PayAI v1 pass-through, 7 Unit-Tests), Tiers konfigurierbar (CP_TOPUP_TIERS_USD), DNS cp.hippe.eu -> 76.13.144.207 gesetzt und aufgelöst, deploy/ (Compose prod, Caddyfile, .env.example, setup-vm.sh, up.sh, README), harness/e2e/mainnet.ts (Stufe 1), protocol.md Facilitator-Abschnitt. 54 Unit-Tests, E2E OK offline. Offen: VM-Setup, Deploy, Stufe 1 (braucht SSH-Key und 1 USDC auf der Wegwerf-Wallet). Verifier erst nach Deploy.
 
 ## Blockers
 - SSH auf `srv1336627` (76.13.144.207): `Permission denied (publickey)`; Matthias hinterlegt

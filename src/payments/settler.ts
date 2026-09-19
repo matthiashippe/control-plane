@@ -15,6 +15,8 @@ import {
   type Hex,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
+import { FacilitatorSettler } from "./facilitator.js";
+import type { PayConfig } from "./pay.js";
 
 export interface Authorization {
   from: Address;
@@ -33,7 +35,8 @@ export interface SettleResult {
 
 export interface Settler {
   readonly kind: string;
-  settle(auth: Authorization, signature: Hex): Promise<SettleResult>;
+  /** `resource` ist der Pfad des bezahlten Requests (Facilitatoren wollen ihn in den Requirements). */
+  settle(auth: Authorization, signature: Hex, resource?: string): Promise<SettleResult>;
 }
 
 const TRANSFER_WITH_AUTHORIZATION_ABI = [
@@ -107,9 +110,20 @@ export class LocalSettler implements Settler {
 }
 
 /** Baut den Settler aus der Umgebung. Ohne CP_SETTLER gibt es keinen, /pay antwortet dann 503. */
-export function settlerFromEnv(env: NodeJS.ProcessEnv): Settler | null {
+export function settlerFromEnv(env: NodeJS.ProcessEnv, pay: PayConfig | null): Settler | null {
   const kind = env.CP_SETTLER;
   if (!kind) return null;
+  if (kind === "facilitator") {
+    if (!pay) throw new Error("CP_SETTLER=facilitator braucht CP_PAY_TO");
+    return new FacilitatorSettler({
+      url: env.CP_FACILITATOR_URL || "https://facilitator.payai.network",
+      authHeader: env.CP_FACILITATOR_AUTH || undefined,
+      network: pay.network,
+      payTo: pay.payTo,
+      usdcAddress: pay.usdcAddress,
+      maxTimeoutSeconds: pay.maxTimeoutSeconds,
+    });
+  }
   if (kind === "local") {
     const rpcUrl = env.CP_RPC_URL;
     const relayerKey = env.CP_SETTLER_KEY as Hex | undefined;

@@ -10,7 +10,9 @@
  *   CP_SIWE_DOMAIN  Default "conway.tech" (der Runtime-Client sendet genau das)
  *   CP_PAY_TO     Wallet, an die Topups gehen; ohne sie antwortet /pay 503
  *   CP_NETWORK    "base" (Default) oder "base-sepolia"; CP_CHAIN_ID, CP_USDC_ADDRESS überschreiben
- *   CP_SETTLER    "local" nur im Harness (CP_RPC_URL, CP_SETTLER_KEY, CP_USDC_ADDRESS)
+ *   CP_SETTLER    "facilitator" im Betrieb (CP_FACILITATOR_URL, optional CP_FACILITATOR_AUTH),
+ *                 "local" nur im Harness (CP_RPC_URL, CP_SETTLER_KEY, CP_USDC_ADDRESS)
+ *   CP_TOPUP_TIERS_USD  Default "5,25,100,500,1000,2500"; Betreiber dürfen ergänzen
  *   CP_PROVIDER   Komma-Liste der Inferenz-Provider; "mock" für Harness und Tests
  *   CP_MODEL_ALIASES  "gpt-5.2=<modell>,gpt-5-mini=<modell>": IDs, die die Runtime hart anfragt;
  *                 ohne Angabe liefert der OpenRouter-Provider seine Defaults
@@ -36,7 +38,7 @@ fs.mkdirSync(path.dirname(dbPath), { recursive: true });
 
 const db = openDb(dbPath);
 const pay = payConfigFromEnv(process.env);
-const settler = settlerFromEnv(process.env);
+const settler = settlerFromEnv(process.env, pay);
 const providers = providersFromEnv(process.env, {
   mock: () => new MockProvider(),
   openrouter: () => openRouterFromEnv(process.env),

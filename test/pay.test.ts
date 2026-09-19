@@ -9,7 +9,7 @@ import type { Authorization, Settler, SettleResult } from "../src/payments/settl
 const USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" as Address;
 const PAY_TO = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8" as Address;
 
-const cfg: PayConfig = { payTo: PAY_TO, network: "base", chainId: 8453, usdcAddress: USDC, maxTimeoutSeconds: 300 };
+const cfg: PayConfig = { payTo: PAY_TO, network: "base", chainId: 8453, usdcAddress: USDC, maxTimeoutSeconds: 300, tiers: [5, 25, 100, 500, 1000, 2500] };
 
 /** Settler, der zählt und nach Wunsch scheitert. */
 class FakeSettler implements Settler {

@@ -97,9 +97,16 @@ Client: `src/conway/topup.ts` + `src/conway/x402.ts`, x402 **v1-Stil, handgebaut
    als Idempotenzschlüssel, Wiederholung derselben Signatur liefert dieselbe Antwort ohne zweite Gutschrift.
 3. Antwort `200 { "credits_cents": 500, "balance_cents": <neu>, "tx_hash": "0x.." }`
    (Client liest `credits_cents`, sonst `amount_cents`, sonst `amountUsd*100`).
-4. Settlement: Facilitator (`/verify`, `/settle` mit `paymentPayload` + `paymentRequirements`),
-   CDP oder PayAI; kein eigener Facilitator (Regulatorik 6.3). Im Harness: lokaler Settler gegen
-   Anvil-Fork, der `transferWithAuthorization` selbst sendet. Nur dort.
+4. Settlement: Facilitator (`/verify`, dann `/settle`, Body `{ x402Version: 1, paymentPayload,
+   paymentRequirements }`), kein eigener Facilitator (Regulatorik 6.3). PayAI
+   (`https://facilitator.payai.network`, `/supported` am 19.09.2026: `x402Version 1, exact, base`)
+   nimmt den v1-Payload der Runtime 1:1; Requirements v1 mit `network: "base"`, `maxAmountRequired`,
+   `payTo`, `asset`, `maxTimeoutSeconds`, `resource` und `extra: { name: "USD Coin", version: "2" }`
+   (EIP-712-Domain, mit der der Client signiert). PayAI berechnet ab 21.09.2026 0,00212 USD je
+   Settlement; CDP (1.000 frei je Monat) braucht `CP_FACILITATOR_AUTH`. Im Harness: lokaler Settler
+   gegen Anvil, der `transferWithAuthorization` selbst sendet. Nur dort.
+   Betreiber-Tiers: `CP_TOPUP_TIERS_USD` erweitert die Liste (z. B. `1` für Abnahmen); die
+   Runtime kennt nur die sechs Standard-Tiers.
 
 Bootstrap: Beim Start kauft die Runtime automatisch 5 USD, sobald `balance_cents < 500` und die
 USDC-Balance der Wallet (RPC aus `AUTOMATON_RPC_URL`, Default Base Mainnet) über 5 liegt, mit

@@ -7,3 +7,4 @@ dist/
 harness/certs/
 harness/state/
 .scratch/
+!deploy/.env.example

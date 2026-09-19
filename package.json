@@ -19,7 +19,8 @@
     "e2e:topup": "bash harness/e2e/topup.sh",
     "e2e:inference": "bash harness/e2e/inference.sh",
     "e2e:openrouter": "tsx harness/e2e/openrouter-smoke.ts",
-    "e2e:live": "bash harness/e2e/live.sh"
+    "e2e:live": "bash harness/e2e/live.sh",
+    "e2e:mainnet": "tsx harness/e2e/mainnet.ts"
   },
   "dependencies": {
     "@hono/node-server": "^1.14.0",

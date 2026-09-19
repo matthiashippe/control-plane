@@ -1,0 +1,17 @@
+{
+	email matthias@hanseatictech.de
+}
+
+cp.hippe.eu {
+	encode zstd gzip
+	reverse_proxy cp:8402 {
+		# x402 und Inferenz können lange dauern; Caddy soll nicht vor dem Control Plane abbrechen.
+		transport http {
+			response_header_timeout 180s
+		}
+	}
+	log {
+		output stdout
+		format json
+	}
+}

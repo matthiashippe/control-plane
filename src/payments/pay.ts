@@ -10,6 +10,7 @@ import { isAddress, verifyTypedData, type Address, type Hex } from "viem";
 import { MC_PER_CENT, mcToCents, postLedger, type Db } from "../db.js";
 import type { Authorization, Settler } from "./settler.js";
 
+/** Die Tiers, die der Runtime-Client kennt (`TOPUP_TIERS` in topup.ts). */
 export const TOPUP_TIERS_USD = [5, 25, 100, 500, 1000, 2500] as const;
 
 export interface PayConfig {
@@ -19,6 +20,8 @@ export interface PayConfig {
   chainId: number;
   usdcAddress: Address;
   maxTimeoutSeconds: number;
+  /** Angebotene Tiers in USD; Betreiber dürfen ergänzen (z. B. 1 für Abnahmen). */
+  tiers: readonly number[];
 }
 
 export interface PayResponse {
@@ -208,8 +211,8 @@ export async function handlePay(
   now = Date.now(),
 ): Promise<PayResponse> {
   const usd = Number(req.usd);
-  if (!(TOPUP_TIERS_USD as readonly number[]).includes(usd)) {
-    return { status: 400, body: { error: "invalid_tier", tiers: TOPUP_TIERS_USD } };
+  if (!cfg.tiers.includes(usd)) {
+    return { status: 400, body: { error: "invalid_tier", tiers: cfg.tiers } };
   }
   if (!isAddress(req.recipient)) {
     return { status: 400, body: { error: "invalid_address" } };
@@ -273,7 +276,7 @@ export async function handlePay(
   if (!claim()) return { status: 409, body: { error: "settlement_in_progress" } };
 
   // Ab hier darf ein Client-Abbruch nichts mehr ändern: Settlement und Buchung laufen zu Ende.
-  const result = await settler.settle(auth, payment.signature);
+  const result = await settler.settle(auth, payment.signature, `/pay/${usd}/${recipient}`);
   if (!result.ok) {
     db.prepare("UPDATE payments SET status = 'failed', error = ?, tx_hash = ? WHERE nonce = ?").run(
       result.error ?? "settlement_failed",
@@ -318,11 +321,17 @@ export function payConfigFromEnv(env: NodeJS.ProcessEnv): PayConfig | null {
   const usdc = env.CP_USDC_ADDRESS || (network === "base"
     ? "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
     : "0x036CbD53842c5426634e7929541eC2318f3dCF7e");
+  const tiers = (env.CP_TOPUP_TIERS_USD || TOPUP_TIERS_USD.join(","))
+    .split(",")
+    .map((s) => Number(s.trim()))
+    .filter((n) => Number.isInteger(n) && n > 0);
+  if (!tiers.length) throw new Error("CP_TOPUP_TIERS_USD ist leer");
   return {
     payTo: payTo as Address,
     network,
     chainId: Number(env.CP_CHAIN_ID || (network === "base" ? 8453 : 84532)),
     usdcAddress: usdc as Address,
     maxTimeoutSeconds: Number(env.CP_PAY_TIMEOUT_SECONDS || 300),
+    tiers,
   };
 }

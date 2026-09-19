@@ -1,0 +1,48 @@
+# Betrieb auf srv1336627: Control Plane (nur im Compose-Netz) hinter Caddy (Let's Encrypt).
+# Secrets kommen aus /opt/control-plane/.env (Mode 600), nie aus dem Repo.
+services:
+  cp:
+    build:
+      context: ..
+      dockerfile: harness/cp/Dockerfile
+    image: control-plane:latest
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      CP_HOST: 0.0.0.0
+      CP_PORT: "8402"
+      CP_DB_PATH: /data/cp.db
+    volumes:
+      - cp-data:/data
+    expose:
+      - "8402"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8402/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    logging:
+      driver: json-file
+      options: { max-size: "20m", max-file: "5" }
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      cp:
+        condition: service_healthy
+    logging:
+      driver: json-file
+      options: { max-size: "20m", max-file: "5" }
+
+volumes:
+  cp-data:
+  caddy-data:
+  caddy-config:
