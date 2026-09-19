@@ -49,6 +49,29 @@ ist**: Wer das Topic kennt, liest die Meldungen mit und kann selbst welche sende
 Geprüft am 19.09.2026: Ein simulierter Ausfall (`CP_URL` auf einen 404-Pfad) löste von der VM aus
 eine Meldung mit Priorität `high` aus, die über ntfy abrufbar war.
 
+## Backup
+
+`ops/backup.sh` läuft täglich um 3:17 UTC per Cron auf der VM (`/var/log/cp-backup.log`), schreibt
+nach `/opt/control-plane/backups/` und hält 14 Tage vor. Schlägt es fehl, geht eine Meldung über
+denselben Webhook raus wie beim Watchdog.
+
+Es benutzt `VACUUM INTO` aus der laufenden Anwendung heraus, **nicht** `cp cp.db`: Die Datenbank
+läuft im WAL-Modus, die `.db`-Datei ist wenige Kilobyte groß und der Inhalt steht im `-wal` daneben.
+Ein `cp` der `.db` allein ergibt ein leeres Backup, das erst auffällt, wenn man es braucht. Genau
+so stand es bis zum 19.09.2026 in `deploy/README.md`. Das Skript prüft deshalb selbst, ob die
+Ausgabe größer als 20 KB ist, und meldet sonst einen Fehler.
+
+Ein Backup zurückspielen (der Dienst muss dabei stehen):
+
+```
+ssh -i ~/.ssh/id_ed25519_automaton root@76.13.144.207
+cd /opt/control-plane/repo/deploy
+docker compose -f docker-compose.prod.yml stop cp
+docker run --rm -v deploy_cp-data:/data -v /opt/control-plane/backups:/bak alpine \
+  sh -c "cp /bak/<datei>.db /data/cp.db && rm -f /data/cp.db-wal /data/cp.db-shm"
+docker compose -f docker-compose.prod.yml start cp
+```
+
 ## Selbstheilung
 
 Der `autoheal`-Dienst im Compose startet Container neu, die der Healthcheck als `unhealthy`
