@@ -256,23 +256,39 @@ fi
 # Schritt 5: Caddyfile. Getrennt und nach dem Dienst, weil es den Dienst nicht anfasst.
 ########################################################################################
 # Der Kern des Problems: `./Caddyfile:/etc/caddy/Caddyfile:ro` ist ein Datei-Bind-Mount und hängt
-# an der Inode. rsync schreibt eine neue Datei, der laufende Container sieht weiter die alte, und
-# `caddy reload` liest die Datei aus Sicht des Containers, also ebenfalls die alte. Deshalb wird
-# hier nicht die Datei mit der letzten Fassung im Repo verglichen, sondern mit dem, was der
-# laufende Container tatsächlich vor sich hat. Das erkennt auch den Fall, dass ein früherer Deploy
-# die Datei geändert hat, ohne dass sie je wirksam wurde.
+# unter Linux an der Inode. rsync schreibt eine neue Datei, der laufende Container sieht weiter die
+# alte, und `caddy reload` liest die Datei aus Containersicht, also ebenfalls die alte.
+#
+# Deshalb zwei Signale statt eines Dateivergleichs gegen git:
+#  1. Was liest der Container gerade? Weicht das vom Repo-Stand ab, sitzt der Container auf der
+#     alten Inode. Das ist der Linux-Fall.
+#  2. Mit welchem Hash wurde Caddy zuletzt absichtlich erzeugt? Der steht in einer Stempeldatei
+#     ausserhalb des rsync-Ziels, damit `--delete` sie nicht wegräumt. Sie fängt den umgekehrten
+#     Fall: Datei im Container aktuell, aber Caddy hat sie nie geladen, weil es seither nicht neu
+#     gestartet ist. Caddy liest den Caddyfile nur beim Start, nicht laufend.
+# Fehlt die Stempeldatei (erster Lauf), entscheidet Signal 1 allein, und der Stempel wird angelegt.
+STAMP="${CP_CADDY_STAMP:-$DIR/../../caddyfile.sha256}"
 ist_hash="$(dc exec -T "$CADDY_SVC" sha256sum /etc/caddy/Caddyfile 2>/dev/null | awk '{print $1}')"
 soll_hash="$(hash_datei "$DIR/Caddyfile")"
 
+caddy_aendern=0
+grund=""
 if [[ -z "$ist_hash" ]]; then
-  warn "Caddy antwortet nicht, Caddyfile gilt als geändert"
-  ist_hash="unbekannt"
+  warn "Caddy antwortet nicht auf exec, Caddyfile gilt sicherheitshalber als geändert"
+  ist_hash="unbekannt"; caddy_aendern=1; grund="Caddy nicht erreichbar"
+elif [[ "$ist_hash" != "$soll_hash" ]]; then
+  caddy_aendern=1
+  grund="Container liest $(cut -c1-12 <<<"$ist_hash"), Repo hat $(cut -c1-12 <<<"$soll_hash") (Inode-Falle)"
+elif [[ -f "$STAMP" && "$(cat "$STAMP" 2>/dev/null)" != "$soll_hash" ]]; then
+  caddy_aendern=1
+  grund="Caddy wurde zuletzt mit $(cut -c1-12 < "$STAMP") erzeugt, im Repo steht $(cut -c1-12 <<<"$soll_hash")"
 fi
 
-if [[ "$ist_hash" == "$soll_hash" ]]; then
+if [[ "$caddy_aendern" == "0" ]]; then
   log "Caddyfile unverändert ($(cut -c1-12 <<<"$soll_hash")), Caddy bleibt stehen"
+  printf '%s' "$soll_hash" > "$STAMP" 2>/dev/null || true
 else
-  log "Caddyfile geändert: Container hat $(cut -c1-12 <<<"$ist_hash"), Repo hat $(cut -c1-12 <<<"$soll_hash")"
+  log "Caddyfile geändert: $grund"
   caddy_cid="$(dc ps -q "$CADDY_SVC" 2>/dev/null)"
   caddy_image="caddy:2-alpine"
   [[ -n "$caddy_cid" ]] && caddy_image="$(docker inspect --format '{{.Config.Image}}' "$caddy_cid")"
@@ -314,6 +330,7 @@ else
     abbruch "Caddy läuft nicht mit der neuen Fassung und es gibt keine Rücklage. Sofort von Hand nachsehen."
   fi
   rm -f "$ruecklage"
+  printf '%s' "$soll_hash" > "$STAMP" 2>/dev/null || warn "Stempeldatei $STAMP nicht schreibbar; der nächste Lauf erzeugt Caddy sicherheitshalber erneut."
   log "Caddyfile ist wirksam ($(cut -c1-12 <<<"$neu_hash"))"
 fi
 

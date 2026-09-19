@@ -14,9 +14,15 @@ zahlenden Kunden. Ab hier gibt es keinen Projektabschluss mehr, nur noch Zyklen.
 ```
 curl -s -o /dev/null -w "%{http_code}\n" https://cp.hippe.eu/health
 ssh -i ~/.ssh/id_ed25519_automaton root@76.13.144.207 \
-  'docker logs deploy-autoheal-1 2>&1 | grep -c unhealthy; tail -3 /var/log/cp-watchdog.log'
+  'docker logs deploy-autoheal-1 2>&1 | grep -c "found to be unhealthy"; tail -3 /var/log/cp-watchdog.log'
 ops/status.sh    # braucht OPENROUTER_API_KEY aus ~/brain/connectors/secrets.env
 ```
+
+Der Filter muss `found to be unhealthy` lauten, nicht nur `unhealthy`: Die Startzeile von autoheal
+("Monitoring containers for unhealthy status") enthält das Wort ebenfalls und färbt die Zählung um
+eins nach oben. Genau das hat beim ersten Lauf einen Eingriff vorgetäuscht, den es nie gab.
+Stand 19.09.2026, 21:40: **drei** echte Eingriffe (16:58, 18:36, 18:38 UTC), alle vor dem Fix am
+Startpfad, seither keiner.
 
 Dazu der Verkehr der letzten Stunde aus den Caddy-Logs: Welche Pfade, welche Statuscodes, welche
 Clients. **Jeder 4xx und 5xx, den ein echter Nutzer gesehen hat, schlägt jede Aufgabe aus dem
