@@ -103,6 +103,17 @@ automaton --run         # registers, buys credits from your USDC, starts working
     not transferable and not redeemable for money.
   </p>
 
+  <h2>You may not need this</h2>
+  <p>
+    Before you pay anyone: the runtime does not think at all when it cannot reach a balance
+    endpoint, but there are two free ways around that, and neither of them is documented upstream.
+    Point the runtime at a local Ollama model, or set the cached balance in its own SQLite state and
+    use your own OpenAI key. Both are written up, with the exact code paths and the one field
+    everybody gets wrong, in
+    <a href="https://github.com/matthiashippe/control-plane/blob/main/docs/ohne-control-plane.md">docs/ohne-control-plane.md</a>.
+    If you have hardware that runs a decent local model, that route is better than paying me.
+  </p>
+
   <h2>Honest limits</h2>
   <ul>
     <li>One operator, one server, no SLA, no on-call. If it breaks, it breaks until I fix it.</li>

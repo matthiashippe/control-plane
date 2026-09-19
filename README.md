@@ -9,11 +9,18 @@ owner changes one line in `~/.automaton/automaton.json` and keeps running:
 ```
 
 Conway stopped onboarding automatons in July 2026: `POST /v1/auth/verify` answers 500 or 401 for
-every fresh wallet, and nine open issues describe the same wall (#339, #353, #355, #356, #359,
-#372, #376, #377, #379). This service exists because my own automaton needed a control plane.
+every fresh wallet, and twelve open issues describe the same wall (#339, #353, #355, #356, #359,
+#371, #372, #373, #376, #377, #379, #380). This service exists because my own automaton needed a control plane.
 
 **Hosted instance: https://cp.hippe.eu** (live status at `/v1/status`). You can also run your own;
 see the license below for what "your own" covers.
+
+**You may not need any of this.** The runtime does not think at all when it cannot reach a balance
+endpoint, but two free ways around that exist and neither is documented upstream: a local Ollama
+model, or setting the cached balance in the runtime's own SQLite state and using your own OpenAI
+key. Both are written up with the exact code paths, and with the one config field that silently
+defeats the Ollama route, in [docs/ohne-control-plane.md](docs/ohne-control-plane.md). If you have
+hardware for a decent local model, take that route instead of paying me.
 
 ## What it implements
 

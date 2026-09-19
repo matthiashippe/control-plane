@@ -10,7 +10,7 @@ Betroffenen in den offenen Issues je einmal helfen, den Dienst maschinenlesbar a
 und den Artikel schreiben, der den Datensatz statt des Produkts in den Mittelpunkt stellt.
 
 ## Done Condition
-- [ ] `docs/ohne-control-plane.md` existiert und erklärt den kostenlosen Weg so, dass ein
+- [x] `docs/ohne-control-plane.md` existiert und erklärt den kostenlosen Weg so, dass ein
       blockierter Nutzer ihn ohne uns gehen kann: warum die Runtime ohne erreichbaren Kontostand
       gar nicht denkt (mit Dateiverweisen auf `d8f8168`), der Ollama-Weg über
       `modelStrategy.inferenceModel` und `ollamaBaseUrl`, der Weg über `last_known_balance` in der
@@ -18,7 +18,7 @@ und den Artikel schreiben, der den Datensatz statt des Produkts in den Mittelpun
       Prüfung: die Datei nennt mindestens vier Codestellen mit Datei und Zeile, jede davon
       stichprobenartig gegen `harness/` nachgeprüft; sie enthält einen Abschnitt, der sagt, wann
       man uns nicht braucht
-- [ ] Die Startseite und die README verlinken `docs/ohne-control-plane.md` sichtbar, nicht versteckt
+- [~] Die Startseite und die README verlinken `docs/ohne-control-plane.md` sichtbar, nicht versteckt
       Prüfung: `curl -s https://cp.hippe.eu/ | grep -c "ohne-control-plane"` ist mindestens 1,
       `grep -c "ohne-control-plane" README.md` ist mindestens 1
 - [ ] `.well-known/x402` und `llms.txt` sind auf `https://cp.hippe.eu` erreichbar und inhaltlich
@@ -57,5 +57,29 @@ und den Artikel schreiben, der den Datensatz statt des Produkts in den Mittelpun
 - max Versuche pro Gap: 3
 
 ## Progress Log
+
+- Zyklus 1 (19.09.2026, 18:05 bis 18:30): `docs/ohne-control-plane.md` geschrieben. Beide Wege sind
+  nicht nur im Code nachgelesen, sondern im Container gegen die gepinnte Upstream-Runtime `d8f8168`
+  durchgespielt, mit einem lokalen Stub als Ollama-Ersatz (kein Ollama auf dem Mac):
+  1. Ausgangslage bestätigt: `conwayApiUrl` ins Leere, Ollama erreichbar und registriert
+     (`Ollama: registered 1 model(s)`), Runtime trotzdem `tier: dead, model: gpt-5-mini`,
+     Turn um Turn `0 tools, 0 tokens`, kein ausgehender Request. Ursache ist das zweite Feld
+     `modelStrategy.inferenceModel`, das der Setup-Assistent auf `gpt-5.2` stehen lässt, auch wenn
+     oben schon das lokale Modell steht.
+  2. Nach dem Umstellen von `modelStrategy` auf das lokale Modell: `Routing inference (tier: dead,
+     model: stub-llm:latest)`, ein Treffer auf `/v1/chat/completions` des lokalen Servers, Turn mit
+     18 Tokens statt 0.
+  3. KV-Weg: `last_known_balance` mit 5000 Cents in `state.db` hebt den Tier von `dead` auf `high`
+     (`Balance API failed, using cached balance`). Mit eigenem, absichtlich ungültigem OpenAI-Key
+     und abgeschaltetem Ollama kam `Inference error (openai): 401: Incorrect API key provided`,
+     der Request verlässt also die Maschine.
+  4. Nebenfund, der in der Recherche fehlte: Null Credits ergeben `critical`, nicht `dead`
+     (`src/conway/credits.ts:38-44`). Wer pleite ist, denkt weiter; wer seinen Abrechnungsserver
+     nicht erreicht, denkt gar nicht. Steht jetzt im Dokument.
+  Container und Volume danach entfernt, `pnpm test` 61 Tests grün.
+  Startseite (`src/public/index.html`, neuer Abschnitt "You may not need this") und README
+  verlinken das Dokument. Die Prüfung gegen `https://cp.hippe.eu` steht noch aus, weil dafür ein
+  Deploy nötig ist. In der README ist außerdem die Issue-Liste von neun auf zwölf korrigiert,
+  inklusive des bisher fehlenden #371.
 
 ## Blockers
