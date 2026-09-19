@@ -228,6 +228,108 @@ describe("Öffentliche Seite und Status", () => {
   });
 });
 
+describe("Die Fragen eines Zweiflers", () => {
+  // Wer über einen GitHub-Issue hierher kommt, überlegt, ob er einem Fremden Geld in
+  // Kryptowährung schickt. Die Antworten darauf gehören dorthin, wo er über das Geld nachdenkt,
+  // also zwischen die Preisangabe und die Funktionsübersicht, nicht an das Ende der Seite.
+  function geldteil(html: string) {
+    const von = html.indexOf("<h2>Price</h2>");
+    const bis = html.indexOf("<h2>What works");
+    expect(von, "Abschnitt Price fehlt").toBeGreaterThan(-1);
+    expect(bis, "Abschnitt 'What works, what does not' fehlt oder steht vor dem Preis").toBeGreaterThan(von);
+    return html.slice(von, bis);
+  }
+  const seite = async () => await (await setup().app.request("/")).text();
+
+  it("beantwortet an der Preisangabe, was mit dem Guthaben passiert, wenn der Dienst abgeschaltet wird", async () => {
+    // Die zwei Wochen Vorlauf standen vorher nur unter "Honest limits", weit unter den Tiers.
+    const geld = geldteil(await seite());
+    expect(geld).toMatch(/shut this down|shutting it down/i);
+    expect(geld, "die Frist gehört neben den Preis").toMatch(/at least two weeks/i);
+    expect(geld, "was mit dem Rest passiert, muss dort stehen").toMatch(/is gone/i);
+    expect(geld).toMatch(/not redeemable for money/i);
+  });
+
+  it("verspricht auch in der Abschaltklausel kein Geld zurück", async () => {
+    // Credits sind nie auszahlbar (loop-constraints.md, Regulatorik). Eine Abschaltklausel ist
+    // genau die Stelle, an der sich sonst ein gut gemeintes Rückzahlungsversprechen einschleicht.
+    const html = (await seite()).toLowerCase();
+    expect(html).not.toMatch(/refund|pay ?out|cash out|redeem your|withdraw|money back|reimburs|compensat/);
+    expect(html).toContain("not transferable and not redeemable");
+  });
+
+  it("nennt neben dem Preis, wer das Geld bekommt, und nicht erst im Impressum", async () => {
+    const geld = geldteil(await seite());
+    expect(geld).toContain("Matthias Hippe");
+    expect(geld).toMatch(/Hamburg/);
+    expect(geld, "Verweis auf die ladungsfähige Anschrift").toContain('href="#impressum"');
+    expect(geld, "auch hier der Hinweis auf den kostenlosen Weg").toMatch(/href="#free"/);
+  });
+
+  it("sagt an derselben Stelle, wie man Hilfe bekommt, ohne eine Reaktionszeit zuzusagen", async () => {
+    const geld = geldteil(await seite());
+    expect(geld).toContain("github.com/matthiashippe/control-plane/issues");
+    expect(geld).toMatch(/mailto:[^"]+@/);
+    expect(geld).toContain("docs/errors.md");
+    expect(geld).toMatch(/no\s+guaranteed response time/i);
+    const html = await seite();
+    expect(html, "keine Reaktionszeit, kein Bereitschaftsdienst").not.toMatch(
+      /within \d+\s*(minutes?|hours?|business days?|days?)|24\/7|round the clock/i,
+    );
+  });
+
+  it("belegt mit dem Abnahmelauf, dass die unveränderte Runtime gegen diese Produktion lief", async () => {
+    const html = await seite();
+    expect(html, "Upstream-Pin, damit nachvollziehbar ist, was da lief").toContain("d8f8168");
+    expect(html).toMatch(/PROD OK topup=true registered=true turns=5 api_errors=0 ledger_consistent=true/);
+    expect(html).toContain("goals/2026-09-19-goal-5b-betrieb.md");
+    expect(html, "jeder kann denselben Lauf ohne Geld wiederholen").toMatch(/pnpm e2e/);
+  });
+
+  it("nennt keine Transaktion als Beleg, die nicht in den Goal-Protokollen steht", async () => {
+    // Eine Zahl auf der Seite, die im Repo nicht nachprüfbar ist, ist eine Behauptung.
+    const fs = await import("node:fs");
+    const html = await seite();
+    const belege = fs
+      .readdirSync(new URL("../goals/", import.meta.url))
+      .map((f) => fs.readFileSync(new URL(`../goals/${f}`, import.meta.url), "utf-8"))
+      .join("\n");
+    const hashes = html.match(/0x[0-9a-f]{64}/g) ?? [];
+    expect(hashes.length, "die Seite soll mindestens einen On-Chain-Beleg nennen").toBeGreaterThan(0);
+    for (const h of hashes) expect(belege, `${h} steht in keinem Goal-Protokoll`).toContain(h);
+  });
+
+  it("beziffert an der Preisangabe, was ein Turn tatsächlich gekostet hat, aus dem protokollierten Lauf", async () => {
+    const fs = await import("node:fs");
+    const log = fs.readFileSync(new URL("../goals/2026-09-19-goal-5a-openrouter.md", import.meta.url), "utf-8");
+    const kosten = [...log.matchAll(/cost_usd=([0-9.]+) \(Marge|LIVE OK[^\n]*cost_usd=([0-9.]+)/g)]
+      .map((m) => Number(m[1] ?? m[2]))
+      .filter((n) => n > 0.01);
+    expect(kosten.length, "im Protokoll stehen die Kosten der Fünf-Turn-Läufe").toBeGreaterThanOrEqual(2);
+
+    const geld = geldteil(await seite());
+    for (const einkauf of kosten) {
+      const berechnet = (einkauf * 100 * MARKUP).toFixed(1);
+      expect(geld, `${berechnet} cents (Einkauf ${einkauf} USD mal ${MARKUP}) fehlt auf der Seite`).toContain(berechnet);
+    }
+    expect(geld, "Einkaufspreis des ersten Laufs").toContain((kosten[0] * 100).toFixed(1));
+    expect(geld).toMatch(/cents? per turn/i);
+    expect(geld, "keine Zusage, sondern eine Größenordnung").toMatch(/order of magnitude/i);
+  });
+
+  it("bleibt nüchtern: keine Verfügbarkeitszusage, keine Nutzerzahlen, kein Werbevokabular", async () => {
+    const html = await seite();
+    expect(html).toMatch(/no SLA/);
+    expect(html).not.toMatch(/uptime|99\.9|guaranteed availability/i);
+    expect(html, "Nutzerzahlen kommen live aus /v1\/status, nicht aus dem HTML").not.toMatch(
+      /trusted by|thousands of|hundreds of (users|operators|teams)|loved by/i,
+    );
+    expect(html).not.toMatch(
+      /seamless|effortless|revolutionary|cutting.edge|unleash|supercharge|blazing|game.?changer|best.in.class|world.class/i,
+    );
+  });
+});
+
 describe("Auslieferung durch Caddy", () => {
   it("hält den CSP-Hash im Caddyfile mit dem Inline-Skript der Seite synchron", async () => {
     // Die Content-Security-Policy erlaubt das Inline-Skript per sha256-Hash statt per
