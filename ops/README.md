@@ -41,8 +41,13 @@ aufnehmen:
 */5 * * * * CP_ALERT_WEBHOOK=https://ntfy.sh/<zufälliges-topic> /opt/control-plane/repo/ops/watchdog.sh >> /var/log/cp-watchdog.log 2>&1
 ```
 
-**Offen:** Die Webhook-URL ist noch nicht gesetzt, weil sie eine Entscheidung über einen
-Drittanbieter ist. Bis dahin steht ein Ausfall nur im Log auf der VM.
+Die Zustellung ist seit dem 19.09.2026 scharf: Der Crontab auf `srv1336627` setzt
+`CP_ALERT_WEBHOOK` auf ein ntfy-Topic. **Die URL steht nicht in diesem Repo, weil es öffentlich
+ist**: Wer das Topic kennt, liest die Meldungen mit und kann selbst welche senden. Sie liegt in
+`~/brain/connectors/secrets.env` als `CP_ALERT_WEBHOOK` und im Crontab der VM.
+
+Geprüft am 19.09.2026: Ein simulierter Ausfall (`CP_URL` auf einen 404-Pfad) löste von der VM aus
+eine Meldung mit Priorität `high` aus, die über ntfy abrufbar war.
 
 ## Selbstheilung
 

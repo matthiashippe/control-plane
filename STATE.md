@@ -91,9 +91,10 @@ Social-Relay) erst, wenn Nachfrage messbar ist, also frühestens nach dem 19.10.
   By June, three were left." Der Text ist fertig (`docs/artikel-agentenoekonomie.md`). Offen bleibt,
   ob und wann er rausgeht; posten muss Matthias selbst. Vor dem Posten die Zahlen nachziehen, der
   Datensatz endet am 19.09.
-- **Meldeweg für Ausfälle**: `ops/watchdog.sh` läuft, schreibt aber nur ins Log auf der VM, weil
-  `CP_ALERT_WEBHOOK` nicht gesetzt ist. Welcher Dienst die Meldungen bekommt (ntfy, Slack, Discord),
-  ist eine Entscheidung über einen Drittanbieter und liegt bei Matthias.
+- **Meldeweg für Ausfälle: erledigt am 19.09.2026.** `ops/watchdog.sh` meldet über ein ntfy-Topic,
+  die URL liegt in `~/brain/connectors/secrets.env` (nicht hier, das Repo ist öffentlich) und im
+  Crontab der VM. Ende zu Ende geprüft. Damit Matthias die Meldungen auf dem Handy bekommt, muss er
+  das Topic einmal in der ntfy-App abonnieren; die URL im Browser zu öffnen reicht am Rechner.
 - **Steuerfrage**: USt auf Nutzungsguthaben, B2B-Ausland, Reverse Charge. Vor dem ersten
   Fremdnutzer zu klären, also im 30-Tage-Fenster. Seit dem 19.09. mit dem Zusatz, dass kein Gewerbe
   angemeldet ist: Das ändert nichts an der Steuerpflicht der Einnahmen, kann aber die Frage
