@@ -173,3 +173,51 @@ describe("SIWE-Provisionierung", () => {
     expect(((await res.json()) as { ok: boolean }).ok).toBe(true);
   });
 });
+
+/** Ein vollständiger Erstlauf mit eigener Wallet: nonce, verify, api-keys. */
+async function provisionieren(app: ReturnType<typeof setup>["app"]): Promise<{ ok: boolean; keyPrefix?: string }> {
+  const account = privateKeyToAccount(generatePrivateKey());
+  const nonceRes = await app.request("/v1/auth/nonce", { method: "POST" });
+  if (nonceRes.status !== 200) return { ok: false };
+  const { nonce } = (await nonceRes.json()) as { nonce: string };
+
+  const message = buildMessage({ address: account.address, nonce });
+  const signature = await account.signMessage({ message });
+  const verifyRes = await app.request("/v1/auth/verify", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ message, signature }),
+  });
+  if (verifyRes.status !== 200) return { ok: false };
+  const { access_token } = (await verifyRes.json()) as { access_token: string };
+
+  const keyRes = await app.request("/v1/auth/api-keys", {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: `Bearer ${access_token}` },
+    body: JSON.stringify({ name: "last" }),
+  });
+  if (keyRes.status !== 200) return { ok: false };
+  const { key } = (await keyRes.json()) as { key: string };
+  return { ok: true, keyPrefix: key };
+}
+
+describe("Provisionierung unter Last", () => {
+  it("hält zwanzig gleichzeitige Erstläufe aus, ohne einen zu verlieren", async () => {
+    // Ein Artikel mit Reichweite bringt Erstläufe im Pulk, und jeder davon schreibt viermal in die
+    // SQLite (Nonce, Session, Wallet, Schlüssel). better-sqlite3 arbeitet synchron, blockiert also
+    // den Event-Loop, und eine Änderung, die den Pfad versehentlich serialisiert oder eine
+    // Sperre hält, würde hier auffallen. Gemessen am 19.09.2026 waren 100 gleichzeitige
+    // Provisionierungen in 206 ms durch; dieser Test prüft nur, dass keine verloren geht.
+    const { app, db } = setup();
+
+    const laeufe = await Promise.all(Array.from({ length: 20 }, () => provisionieren(app)));
+
+    expect(laeufe.filter((l) => l.ok), "jeder Erstlauf muss durchkommen").toHaveLength(20);
+    const schluessel = new Set(laeufe.map((l) => l.keyPrefix));
+    expect(schluessel.size, "jeder bekommt einen eigenen Schlüssel").toBe(20);
+    const inDb = (db.prepare("SELECT count(*) AS n FROM api_keys").get() as { n: number }).n;
+    expect(inDb).toBe(20);
+    const wallets = (db.prepare("SELECT count(*) AS n FROM wallets").get() as { n: number }).n;
+    expect(wallets).toBe(20);
+  });
+});
