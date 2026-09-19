@@ -189,7 +189,7 @@ if [[ "$cp_wechsel" == "1" && "$CANARY" != "0" ]]; then
     aufraeumen_canary
     abbruch "Das neue Image wird nicht gesund (${HEALTH_TIMEOUT}s). Nicht umgeschaltet, der alte Container läuft weiter."
   fi
-  log "Kanarienvogel war nach ${canary_dauer}s gesund. So lange dauert gleich auch der Wechsel."
+  log "Kanarienvogel antwortete nach ${canary_dauer}s. Grössenordnung für die gleich folgende Unterbrechung."
   aufraeumen_canary
 fi
 
@@ -240,9 +240,21 @@ JS
   if ! dc up -d --no-deps --force-recreate "$SVC"; then
     abbruch "Compose konnte '$SVC' nicht ersetzen. Zustand mit 'docker compose -f $FILE ps' prüfen."
   fi
+  t1=$(date +%s)
   neu_cid="$(dc ps -q "$SVC")"
-  if warte_gesund "$neu_cid" "$HEALTH_TIMEOUT"; then
-    log "neuer Container gesund nach $(( $(date +%s) - t0 ))s Unterbrechung"
+  if warte_http "$neu_cid" "$cp_port" "$HEALTH_TIMEOUT"; then
+    # Zwei Zahlen statt einer, weil eine allein lügt: Während Compose arbeitet, bedient der alte
+    # Container noch. Der Ausfall ist höchstens der zweite Wert, gemessen bis zur ersten Antwort
+    # des neuen Prozesses (inklusive der Laufzeit des Prüf-Aufrufs selbst).
+    log "Wechsel: $(( t1 - t0 ))s Compose, danach höchstens $(( $(date +%s) - t1 ))s ohne Antwort"
+    # `healthy` ist trotzdem abzuwarten: Solange Docker den Container als unhealthy führt, greift
+    # der autoheal-Dienst zu und startet ihn neu. Ein Deploy, der einen Neustart durch autoheal
+    # hinterlässt, ist kein erfolgreicher Deploy.
+    if warte_gesund "$neu_cid" "$HEALTH_TIMEOUT"; then
+      log "healthy nach $(( $(date +%s) - t0 ))s (Healthcheck-Intervall, kein Ausfall)"
+    else
+      warn "Der Container antwortet, wird von Docker aber nicht healthy. autoheal wird ihn neu starten. Healthcheck prüfen."
+    fi
   else
     # Der Kanarienvogel hat gesagt, dass das Image startet. Wenn es hier trotzdem klemmt, liegt es
     # an der echten Datenbank oder am Volume, und dann hilft nur zurück. Logs vorher sichern, der
