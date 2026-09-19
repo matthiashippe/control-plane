@@ -8,6 +8,7 @@
  */
 
 import { getAvailableMc, getBalanceMc, mcToCents, postLedger, releaseMc, reserveMc, type Db } from "../db.js";
+import { AnfrageZusammenleger, anfrageSchluessel } from "./dedupe.js";
 import { DOC } from "../errors.js";
 import type { ChatProvider, ChatRequest, ChatResponse, ModelSpec, Usage } from "./provider.js";
 import { estimateTokens, ProviderBadRequestError, ProviderUnavailableError } from "./provider.js";
@@ -130,7 +131,32 @@ export interface ChatResult {
   body: Record<string, unknown> | ChatResponse;
 }
 
-export async function handleChat(
+/**
+ * Prozessweit, weil der Dienst als ein Container läuft (siehe `src/ratelimit.ts` zur selben
+ * Annahme). Ein zweiter Prozess auf derselben Datenbank ist ohnehin ausgeschlossen, das erklärt
+ * `deploy/README.md` unter "Warum kein echtes Blau/Grün".
+ */
+const zusammenleger = new AnfrageZusammenleger<ChatResult>();
+
+/** Nur für Tests: Wie viele Anfragen gerade laufen. */
+export function laufendeAnfragen(): number {
+  return zusammenleger.anzahlLaufend();
+}
+
+export async function handleChat(db: Db, catalog: Catalog, address: string, body: unknown): Promise<ChatResult> {
+  // Läuft für dieselbe Adresse gerade eine identische Anfrage, wird auf deren Ergebnis gewartet,
+  // statt ein zweites Mal einzukaufen und abzubuchen. Siehe `dedupe.ts` für den Grund.
+  const schluessel = anfrageSchluessel(address, body);
+  const { wert, zusammengelegt } = await zusammenleger.ausfuehren(schluessel, () =>
+    handleChatOhneZusammenlegung(db, catalog, address, body),
+  );
+  if (zusammengelegt) {
+    console.log(`[inference] identische Anfrage mit einer laufenden zusammengelegt (${schluessel.slice(0, 12)})`);
+  }
+  return wert;
+}
+
+async function handleChatOhneZusammenlegung(
   db: Db,
   catalog: Catalog,
   address: string,

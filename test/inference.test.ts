@@ -280,3 +280,57 @@ describe("Guthabendeckung unter Parallelität", () => {
     expect(reserviert(), "nach einem erfolgreichen Call ist nichts mehr reserviert").toBe(0);
   });
 });
+
+describe("Zusammenlegung gleichzeitiger identischer Anfragen", () => {
+  it("kauft für einen Retry, der während des ersten Aufrufs kommt, nicht zweimal ein", async () => {
+    // Die Upstream-Runtime bricht nach 60 Sekunden ab (INFERENCE_TIMEOUT_MS) und wiederholt bei
+    // 429, 500, 502, 503 und 504. Unser Aufruf beim Einkaufsanbieter läuft bis zu 120 Sekunden.
+    // Dauert eine Antwort dazwischen, sieht der Client einen Timeout und schickt denselben Request
+    // erneut, während der erste noch läuft. Ohne Zusammenlegung zahlt der Kunde doppelt für eine
+    // Antwort, die er einmal bekommt. Genau das ist der Fehler, den wir bei Conway dokumentieren
+    // (Issue #393, retry-driven duplicate topups).
+    const { chat, request, balance, inferenceRows, provider } = setupLangsam(500_000);
+    const anfrage = request(1);
+
+    const [a, b] = await Promise.all([chat(anfrage), chat(anfrage)]);
+
+    expect(a.status).toBe(200);
+    expect(b.status).toBe(200);
+    expect(provider.totalCalls, "der Einkauf darf nur einmal stattfinden").toBe(1);
+    expect(inferenceRows(), "und es darf nur einmal abgebucht werden").toHaveLength(1);
+
+    const beide = [(await a.json()) as { id: string }, (await b.json()) as { id: string }];
+    expect(beide[0].id, "beide bekommen dieselbe Antwort").toBe(beide[1].id);
+    expect(500_000 - balance()).toBe(Math.abs(inferenceRows()[0].delta_mc));
+  });
+
+  it("legt Anfragen verschiedener Mandanten niemals zusammen", async () => {
+    // Der Schlüssel enthält die Adresse. Zwei Kunden mit zufällig gleichem Prompt dürfen sich
+    // weder die Antwort noch die Abbuchung teilen.
+    const eins = setupLangsam(500_000);
+    const zwei = setupLangsam(500_000);
+    const gleich = eins.request(7);
+
+    const [a, b] = await Promise.all([eins.chat(gleich), zwei.chat(gleich)]);
+    expect(a.status).toBe(200);
+    expect(b.status).toBe(200);
+    expect(eins.provider.totalCalls).toBe(1);
+    expect(zwei.provider.totalCalls).toBe(1);
+    expect(eins.inferenceRows()).toHaveLength(1);
+    expect(zwei.inferenceRows()).toHaveLength(1);
+  });
+
+  it("legt nacheinander gestellte gleiche Anfragen NICHT zusammen", async () => {
+    // Nur was gleichzeitig läuft, wird zusammengelegt. Wer zweimal dasselbe fragt und auf die
+    // erste Antwort gewartet hat, bekommt eine zweite Antwort und zahlt dafür. Sonst wäre die
+    // Varianz bei temperature > 0 dahin, und ein Agent, der bewusst wiederholt, bekäme Konserven.
+    const { chat, request, inferenceRows, provider } = setupLangsam(500_000);
+    const anfrage = request(2);
+
+    expect((await chat(anfrage)).status).toBe(200);
+    expect((await chat(anfrage)).status).toBe(200);
+
+    expect(provider.totalCalls).toBe(2);
+    expect(inferenceRows()).toHaveLength(2);
+  });
+});
