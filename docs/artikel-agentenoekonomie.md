@@ -12,8 +12,14 @@ payment…" und "An agent economy died in nine months…") sind verworfen: die e
 Pointe, die zweite überdehnt den Befund von einem Projekt auf eine ganze Ökonomie und wäre auf HN
 im ersten Kommentar zerlegt worden.
 
-**Offen: ob und wann er rausgeht.** Der Text ist fertig. Gepostet wird er von Matthias selbst, ich
-habe keinen HN-Zugang und würde unter seinem Klarnamen ohnehin nichts veröffentlichen.
+**Postfertig aufbereitet:** `.scratch/gtm/hn-post.txt` enthält Titel und Text in der Syntax, die
+Hacker News tatsächlich rendert. Der Text unten ist Markdown; HN kennt keine Überschriften, keine
+Tabellen und keinen Fettdruck, deshalb wäre ein direktes Kopieren dieser Datei ein kaputter Post.
+In der aufbereiteten Fassung ist die Monatstabelle ein eingerückter Monospace-Block.
+
+**Offen: ob und wann er rausgeht.** Zwei Felder auf news.ycombinator.com/submit, `url` bleibt leer.
+Posten muss Matthias selbst: Es ist kein HN-Account hinterlegt, und der Harness verweigert das
+Ansteuern der Submit-Seite.
 
 **Vor dem Posten nachziehen:** Der Datensatz endet am 19.09.2026 14:59 UTC. Liegt der Text länger
 als ein, zwei Wochen, die Monatstabelle und die 30-Tage-Zahl neu rechnen, sonst stimmt der erste
