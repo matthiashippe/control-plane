@@ -18,6 +18,8 @@ export interface OpenRouterOptions {
   referer?: string;
   title?: string;
   timeoutMs?: number;
+  /** Timeout für den Preisabruf. Kurz, weil er den Start blockiert. Default 15 s. */
+  priceFetchTimeoutMs?: number;
   priceRefreshMs?: number;
   now?: () => number;
 }
@@ -43,6 +45,7 @@ export class OpenRouterProvider implements ChatProvider {
   private readonly baseUrl: string;
   private readonly fetchImpl: typeof fetch;
   private readonly timeoutMs: number;
+  private readonly priceFetchTimeoutMs: number;
   private readonly priceRefreshMs: number;
   private readonly now: () => number;
   private lastRefresh = 0;
@@ -53,6 +56,7 @@ export class OpenRouterProvider implements ChatProvider {
     this.baseUrl = (opts.baseUrl ?? "https://openrouter.ai/api/v1").replace(/\/$/, "");
     this.fetchImpl = opts.fetch ?? fetch;
     this.timeoutMs = opts.timeoutMs ?? 120_000;
+    this.priceFetchTimeoutMs = opts.priceFetchTimeoutMs ?? 15_000;
     this.priceRefreshMs = opts.priceRefreshMs ?? 60 * 60 * 1000;
     this.now = opts.now ?? Date.now;
   }
@@ -73,7 +77,21 @@ export class OpenRouterProvider implements ChatProvider {
   }
 
   async refreshPrices(): Promise<void> {
-    const res = await this.fetchImpl(`${this.baseUrl}/models`, { headers: this.headers() });
+    // Mit Timeout, weil dieser Aufruf den Start blockiert: ohne ihn hängt der Prozess still,
+    // der Healthcheck schlägt fehl und Compose bricht ab, ohne dass eine Zeile im Log steht.
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), this.priceFetchTimeoutMs);
+    let res: Response;
+    try {
+      res = await this.fetchImpl(`${this.baseUrl}/models`, { headers: this.headers(), signal: controller.signal });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new Error(
+        controller.signal.aborted ? `GET /models: timeout after ${this.priceFetchTimeoutMs} ms` : `GET /models: ${msg}`,
+      );
+    } finally {
+      clearTimeout(timer);
+    }
     if (!res.ok) throw new Error(`GET /models -> ${res.status}`);
     const body = (await res.json()) as { data?: OpenRouterModelRow[] };
     const rows = new Map((body.data ?? []).map((m) => [m.id, m]));

@@ -179,4 +179,31 @@ describe("OpenRouterProvider", () => {
     await provider.init();
     await expect(provider.chat({ model: "openai/gpt-5.2", messages: [{ role: "user", content: "hi" }], maxTokens: 10, apiKeyId: "x" })).rejects.toBeInstanceOf(ProviderUnavailableError);
   });
+
+  it("bricht den Preisabruf beim Start nach dem Timeout ab, statt still zu hängen", async () => {
+    // Regression: am 19.09.2026 blieb der Start unbegrenzt in GET /models stehen. Der Prozess gab
+    // keine Zeile aus, der Healthcheck schlug an, Compose brach ab und der Dienst war 502.
+    const { impl } = stubFetch({
+      "/models": (rec) =>
+        new Promise((_, reject) => {
+          (rec.init.signal as AbortSignal).addEventListener("abort", () => reject(new Error("aborted")));
+        }),
+    });
+    const provider = new OpenRouterProvider({
+      apiKey: KEY,
+      models: ["openai/gpt-5.2"],
+      fetch: impl,
+      priceRefreshMs: 0,
+      priceFetchTimeoutMs: 20,
+    });
+    const started = Date.now();
+    await expect(provider.init()).rejects.toThrow(/timeout after 20 ms/);
+    expect(Date.now() - started).toBeLessThan(2000);
+  });
+
+  it("nennt den Grund, wenn der Preisabruf beim Start aus einem anderen Grund scheitert", async () => {
+    const { impl } = stubFetch({ "/models": () => Promise.reject(new Error("ECONNREFUSED")) });
+    const provider = new OpenRouterProvider({ apiKey: KEY, models: ["openai/gpt-5.2"], fetch: impl, priceRefreshMs: 0 });
+    await expect(provider.init()).rejects.toThrow(/GET \/models: ECONNREFUSED/);
+  });
 });

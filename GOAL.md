@@ -18,10 +18,10 @@ und den Artikel schreiben, der den Datensatz statt des Produkts in den Mittelpun
       Prüfung: die Datei nennt mindestens vier Codestellen mit Datei und Zeile, jede davon
       stichprobenartig gegen `harness/` nachgeprüft; sie enthält einen Abschnitt, der sagt, wann
       man uns nicht braucht
-- [~] Die Startseite und die README verlinken `docs/ohne-control-plane.md` sichtbar, nicht versteckt
+- [x] Die Startseite und die README verlinken `docs/ohne-control-plane.md` sichtbar, nicht versteckt
       Prüfung: `curl -s https://cp.hippe.eu/ | grep -c "ohne-control-plane"` ist mindestens 1,
       `grep -c "ohne-control-plane" README.md` ist mindestens 1
-- [~] `.well-known/x402` und `llms.txt` sind auf `https://cp.hippe.eu` erreichbar und inhaltlich
+- [x] `.well-known/x402` und `llms.txt` sind auf `https://cp.hippe.eu` erreichbar und inhaltlich
       korrekt: Endpunkte, Preise, Tiers, payTo, Netz, und der Hinweis auf den kostenlosen Weg
       Prüfung: `curl -s https://cp.hippe.eu/.well-known/x402 | python3 -m json.tool` und
       `curl -s https://cp.hippe.eu/llms.txt` liefern beide 200 mit Inhalt; ein Test in
@@ -99,13 +99,46 @@ und den Artikel schreiben, der den Datensatz statt des Produkts in den Mittelpun
   Offenlegung am Ende. Keine Wallet-Adresse wird einzeln genannt. Titel, Freigabe und Zeitpunkt
   liegen bei Matthias, die drei Titelvorschläge stehen oben in der Datei.
 
+- Zyklus 4 (19.09.2026, 18:41 bis 18:50): Deploy auf `srv1336627`. Dabei ist der Dienst
+  ausgefallen, rund neun Minuten lang 502. Ursache und Behandlung stehen unten unter "Vorfall".
+  Nach dem Neustart des Containers sind alle drei Done-Conditions live geprüft: die Startseite
+  verlinkt `ohne-control-plane.md`, `/.well-known/x402` liefert Endpunkte und Zahlungsangebot
+  (payTo, chainId 8453, Tiers), `/llms.txt` liefert Text mit Setup-Zeile und dem kostenlosen Weg.
+  Guthaben und Registrierung unverändert.
+
+## Vorfall 19.09.2026: Start hängt am Preisabruf
+
+`src/index.ts:47` ruft beim Start `await provider.init()`, und `refreshPrices` holte den Katalog
+von OpenRouter **ohne Timeout**. Beim Deploy blieb dieser Aufruf stehen. Der Prozess gab keine
+einzige Zeile aus, der Healthcheck (`/health` auf 8402) schlug sechsmal fehl, Caddy hängt per
+`depends_on: service_healthy` daran, und von außen kam 502. Im Log stand nichts, weil die
+Startmeldung erst nach `init()` kommt.
+
+Diagnose: OpenRouter war von der VM aus die ganze Zeit erreichbar (200 in 209 ms aus dem Container),
+und derselbe Start mit derselben Compose-Umgebung lief von Hand sofort durch. Es war also kein
+Ausfall bei OpenRouter, sondern ein einzelner hängender Request ohne Abbruchkriterium.
+
+Sofortmaßnahme: `docker compose -f docker-compose.prod.yml up -d --force-recreate cp`, danach
+`healthy` in zwölf Sekunden.
+
+Dauerhafter Fix: `priceFetchTimeoutMs` (Default 15 s) auf dem Preisabruf, mit `AbortController`
+wie beim Chat-Request. Scheitert der Abruf, wirft `init()` mit klarer Meldung, der Prozess endet,
+und `restart: unless-stopped` startet ihn neu. Zwei Regressionstests in `test/openrouter.test.ts`
+halten das fest. Die Entscheidung "ohne Preise startet das Control Plane nicht" bleibt bestehen,
+nur das stille Hängen ist weg.
+
+Nebenbefund: Das dokumentierte Backup-Verfahren in `deploy/README.md` war doppelt kaputt. Es nannte
+das Volume `control-plane_cp-data` (leer; das echte heißt `deploy_cp-data`), und es kopierte
+`cp.db` ohne das WAL. Da die Datei nur 4 KB groß ist und 346 KB im `-wal` standen, wäre das
+Backup leer gewesen. Korrigiert auf `VACUUM INTO` über die laufende Anwendung. Das Backup vor
+diesem Deploy liegt als `/opt/control-plane/cp-2026-09-19-1634.db` auf der VM, 73 KB, geprüft
+(1 Wallet, 1 Automaton, 2 Zahlungen).
+
 ## Blockers
 
 - **Issue-Antworten frühestens morgen.** Am 19.09. sind bereits drei Kommentare rausgegangen
   (#339, #377, #393), und die eigene Regel erlaubt höchstens drei pro Tag. Die dreizehn offenen
   Threads warten damit auf den nächsten Tag.
-- **Deploy steht aus.** Drei Done-Conditions prüfen gegen `https://cp.hippe.eu` (Startseiten-Link,
-  `.well-known/x402`, `llms.txt`) und sind lokal fertig und grün, aber noch nicht ausgerollt.
-  `loop-constraints.md` verbietet Änderungen an `deploy/**` ohne Menschen; das Ausrollen einer
-  geprüften Version ist erlaubt, aber der Push auf `main` braucht laut derselben Datei eine
-  Ankündigung im Chat. Beides liegt bei Matthias.
+- **Der Fix am Preisabruf ist noch nicht ausgerollt.** Er ist committet und getestet, läuft aber
+  noch nicht auf der VM. Solange gilt: Wenn der Start erneut hängt, hilft
+  `docker compose -f docker-compose.prod.yml up -d --force-recreate cp`.

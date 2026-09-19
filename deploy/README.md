@@ -26,11 +26,21 @@ ssh -i ~/.ssh/id_ed25519_automaton root@76.13.144.207 \
 
 ## Backup der SQLite
 
+Das Volume heißt `deploy_cp-data` (Compose leitet den Projektnamen vom Verzeichnis `deploy/` ab),
+nicht `control-plane_cp-data`; letzteres existiert auch, ist aber leer. Und die DB läuft im
+WAL-Modus: `cp.db` ist nur wenige Kilobyte groß, der Inhalt steht im `-wal`. Ein `cp` der `.db`
+allein ergibt ein leeres Backup. Deshalb über die laufende Anwendung sichern:
+
 ```
 ssh -i ~/.ssh/id_ed25519_automaton root@76.13.144.207 \
-  'docker run --rm -v control-plane_cp-data:/data -v /opt/control-plane:/out alpine \
-   sh -c "cp /data/cp.db /out/cp-$(date +%F).db"'
+  'cd /opt/control-plane/repo/deploy && docker compose -f docker-compose.prod.yml exec -T cp \
+   node -e "const D=require(\"better-sqlite3\");new D(process.env.CP_DB_PATH,{readonly:true}).exec(\"VACUUM INTO '"'"'/data/backup-tmp.db'"'"'\")"
+   docker run --rm -v deploy_cp-data:/data -v /opt/control-plane:/out alpine \
+     sh -c "mv /data/backup-tmp.db /out/cp-$(date +%F-%H%M).db"'
 ```
+
+Prüfen, dass das Backup nicht leer ist: Es sollte deutlich größer als 4 KB sein und die Tabellen
+`wallets`, `automatons` und `payments` enthalten.
 Die Datei enthält nur Key-Hashes, Salden und Ledger, keine Klartext-Keys.
 
 ## Abnahme
