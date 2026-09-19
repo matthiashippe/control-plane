@@ -123,19 +123,28 @@ export function createApp(opts: AppOptions) {
       byUpstream.set(upstream, entry);
     }
     const models = [...byUpstream.values()];
-    // Gezählt werden zahlende Betreiber, nicht Registrierungen. Zwei Gründe: Die Registrierung
-    // ist kostenlos und beliebig oft möglich (im Sicherheitsreview stand hier nach einer Stunde
-    // `automatons: 100`), und selbst mit Zahlung würde eine einzige Wallet mit 25 Automatons die
-    // Zahl verfünfundzwanzigfachen. Diese Zahl ist die öffentliche Kennzahl und die Messgröße des
-    // 30-Tage-Tests; sie muss teuer zu bewegen sein, und ein zahlender Betreiber ist genau das.
+    // Gezählt werden zahlende Wallets, nicht Registrierungen und auch nicht Einträge in der
+    // `automatons`-Tabelle. Zwei Fehler, die diese Zahl schon hinter sich hat:
+    //
+    // Erstens ist die Registrierung kostenlos und beliebig oft möglich; im Sicherheitsreview vom
+    // 19.09.2026 stand hier nach einer Stunde Arbeit `automatons: 100`.
+    //
+    // Zweitens, und das fiel erst beim ersten echten Kunden auf: Wer einen bereits registrierten
+    // Automaton von `api.conway.tech` auf uns umbiegt, schickt nie ein Register. Die Runtime
+    // prüft ihr Flag `conwayRegistrationStatus` nur beim Prozessstart und setzt es nie zurück
+    // (Upstream `src/index.ts:249-255`). Über die `automatons`-Tabelle gezählt war unser erster
+    // zahlender Kunde deshalb unsichtbar, während unser eigener Abnahmelauf die Zahl füllte.
+    // Genau falsch herum.
+    //
+    // Eine Zahlung dagegen ist teuer, eindeutig und on-chain nachprüfbar. Das ist die Zahl.
     const automatons = (
-      db
-        .prepare(
-          `SELECT count(DISTINCT a.address) AS n
-             FROM automatons a
-             JOIN ledger l ON l.address = a.address AND l.kind = 'topup'`,
-        )
-        .get() as { n: number }
+      db.prepare("SELECT count(DISTINCT address) AS n FROM ledger WHERE kind = 'topup'").get() as { n: number }
+    ).n;
+
+    // Wie viele davon tatsächlich Inferenz bei uns kaufen. Der Unterschied ist die eigentliche
+    // Frage des Dienstes: Zahlen allein heißt noch nicht, dass jemand hier denkt.
+    const active = (
+      db.prepare("SELECT count(DISTINCT address) AS n FROM ledger WHERE kind = 'inference'").get() as { n: number }
     ).n;
     return c.json({
       ok: true,
@@ -145,6 +154,7 @@ export function createApp(opts: AppOptions) {
       models,
       topup_tiers_usd: opts.pay?.tiers ?? TOPUP_TIERS_USD,
       automatons,
+      active,
     });
   });
 

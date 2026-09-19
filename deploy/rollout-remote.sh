@@ -42,6 +42,23 @@ gesundheit() {
   docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$1" 2>/dev/null || echo "weg"
 }
 
+# Fragt /health von innerhalb des Containers ab. Das ist das ehrliche Ende einer Unterbrechung:
+# Sobald der Prozess antwortet, bekommt auch Caddy wieder 200. Dockers `healthy` kommt später, weil
+# es erst beim nächsten Intervall geprüft wird (10 s in Produktion). Gemessen am 19.09.2026 lokal:
+# 0,3 s echter Ausfall, 19 s bis `healthy`. Wer nur auf `healthy` schaut, meldet einen Ausfall, den
+# es nicht gab.
+warte_http() {
+  local cid="$1" port="$2" frist="$3" start
+  start=$(date +%s)
+  while :; do
+    docker exec "$cid" node -e \
+      "fetch('http://127.0.0.1:${port}/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" >/dev/null 2>&1 && return 0
+    [[ "$(docker inspect --format '{{.State.Status}}' "$cid" 2>/dev/null)" == "running" ]] || return 1
+    (( $(date +%s) - start >= frist )) && return 1
+    sleep 1
+  done
+}
+
 # Wartet, bis der Container `healthy` meldet. Gibt 1 zurück, wenn die Frist abläuft oder der
 # Container vorher stirbt: Ein Container, der beim Start abstürzt, wird von `restart: unless-stopped`
 # endlos neu gestartet, und ohne diese Abbruchbedingung würde hier bis zum Timeout gewartet, obwohl
@@ -83,6 +100,8 @@ docker tag "$alt_image_id" "$ROLLBACK_TAG" >/dev/null || abbruch "Rollback-Tag k
 log "läuft: $image_ref ($(cut -c8-19 <<<"$alt_image_id")), gesichert als $ROLLBACK_TAG"
 
 daten_volume="$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/data"}}{{.Name}}{{end}}{{end}}' "$alt_cid")"
+cp_port="$(docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$alt_cid" | sed -n 's/^CP_PORT=//p' | head -1)"
+cp_port="${cp_port:-8402}"
 
 ########################################################################################
 # Schritt 2: Bauen, ohne den laufenden Container anzufassen.
@@ -143,16 +162,13 @@ if [[ "$cp_wechsel" == "1" && "$CANARY" != "0" ]]; then
   # Secrets nicht in der Prozessliste oder dauerhaft auf der Platte landen.
   ( umask 077; docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$alt_cid" \
       | grep -v '^CP_DB_PATH=' > "$canary_env" )
-  canary_port="$(docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$alt_cid" \
-      | sed -n 's/^CP_PORT=//p' | head -1)"
-  canary_port="${canary_port:-8402}"
 
   # Bewusst `docker run` im Default-Netz statt `compose run`: Im Compose-Netz könnte der
   # Kanarienvogel den DNS-Alias des Dienstes erben, und dann schickt Caddy die Hälfte des echten
   # Verkehrs an einen Container, der auf einer Datenbank-Kopie rechnet. Ausgehendes Netz braucht er
   # trotzdem, denn der Preisabruf bei OpenRouter ist die Stelle, an der der Start am 19.09. zweimal
   # hängen blieb; genau das soll hier auffliegen.
-  log "Kanarienvogel startet (Port $canary_port, DB /data/rollout-canary.db) ..."
+  log "Kanarienvogel startet (Port $cp_port, DB /data/rollout-canary.db) ..."
   if ! docker run -d --name "$canary_name" \
         --env-file "$canary_env" \
         -e CP_DB_PATH=/data/rollout-canary.db \
@@ -163,15 +179,7 @@ if [[ "$cp_wechsel" == "1" && "$CANARY" != "0" ]]; then
   fi
 
   start=$(date +%s); canary_ok=0
-  while :; do
-    if docker exec "$canary_name" node -e \
-        "fetch('http://127.0.0.1:${canary_port}/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" >/dev/null 2>&1; then
-      canary_ok=1; break
-    fi
-    [[ "$(docker inspect --format '{{.State.Status}}' "$canary_name" 2>/dev/null)" == "running" ]] || break
-    (( $(date +%s) - start >= HEALTH_TIMEOUT )) && break
-    sleep 2
-  done
+  warte_http "$canary_name" "$cp_port" "$HEALTH_TIMEOUT" && canary_ok=1
   canary_dauer=$(( $(date +%s) - start ))
 
   if [[ "$canary_ok" != "1" ]]; then

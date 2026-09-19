@@ -85,6 +85,31 @@ describe("Öffentliche Seite und Status", () => {
     expect(await zahl(), "ein zweiter zahlender Betreiber zählt dazu").toBe(2);
   });
 
+  it("zählt auch eine zahlende Wallet ohne Eintrag in der automatons-Tabelle", async () => {
+    // Der erste echte Kunde am 19.09.2026 hatte einen bereits registrierten Automaton von
+    // api.conway.tech auf uns umgebogen. Die Runtime prüft ihr Registrierungs-Flag nur beim
+    // Prozessstart und schickt dann nie ein Register (Upstream src/index.ts:249-255). Über die
+    // automatons-Tabelle gezählt war er unsichtbar, während unser eigener Abnahmelauf die Zahl
+    // füllte. Wer zahlt, zählt, mit oder ohne Registrierung.
+    const { app, db } = setup();
+    const zahl = async () => ((await (await app.request("/v1/status")).json()) as { automatons: number }).automatons;
+    postLedger(db, { address: "0xumsteiger", kind: "topup", deltaMc: 500_000, ref: "x402-nonce-3" });
+    expect(await zahl()).toBe(1);
+  });
+
+  it("weist getrennt aus, wie viele zahlende Wallets tatsächlich Inferenz kaufen", async () => {
+    // Zahlen heißt noch nicht denken. Der Unterschied zwischen beiden Zahlen ist die eigentliche
+    // Frage des Dienstes.
+    const { app, db } = setup();
+    const status = async () => (await (await app.request("/v1/status")).json()) as { automatons: number; active: number };
+
+    postLedger(db, { address: "0xzahler", kind: "topup", deltaMc: 500_000, ref: "n-1" });
+    expect(await status()).toMatchObject({ automatons: 1, active: 0 });
+
+    postLedger(db, { address: "0xzahler", kind: "inference", deltaMc: -1_000, ref: "gen-1" });
+    expect(await status()).toMatchObject({ automatons: 1, active: 1 });
+  });
+
   it("gibt in /v1/status nichts preis, was einen Mandanten identifiziert", async () => {
     const { app, db } = setup();
     db.prepare("INSERT INTO wallets (address, balance_mc, created_at) VALUES (?, ?, ?)").run("0xdeadbeef", 123456, new Date().toISOString());
