@@ -49,6 +49,8 @@ export interface Usage {
   prompt_tokens: number;
   completion_tokens: number;
   total_tokens: number;
+  /** Tatsächliche Einkaufskosten in USD, wenn der Provider sie meldet (OpenRouter `usage.cost`). */
+  cost_usd?: number;
 }
 
 export interface ChatResponse {
@@ -62,6 +64,29 @@ export interface ChatResponse {
     finish_reason: "stop" | "tool_calls" | "length";
   }>;
   usage: Usage;
+}
+
+/** Provider-Ausfall (kein Guthaben, Rate-Limit, 5xx, Timeout): nicht dem Automaton anlasten. */
+export class ProviderUnavailableError extends Error {
+  constructor(
+    public readonly provider: string,
+    public readonly upstreamStatus: number | null,
+    message: string,
+  ) {
+    super(message);
+    this.name = "ProviderUnavailableError";
+  }
+}
+
+/** Unser Request war fehlerhaft (Provider antwortet 400): durchreichen. */
+export class ProviderBadRequestError extends Error {
+  constructor(
+    public readonly provider: string,
+    public readonly body: unknown,
+  ) {
+    super("provider rejected request");
+    this.name = "ProviderBadRequestError";
+  }
 }
 
 export interface ChatProvider {

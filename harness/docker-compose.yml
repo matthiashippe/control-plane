@@ -42,9 +42,11 @@ services:
       CP_SETTLER: local
       CP_RPC_URL: http://chain:8545
       CP_SETTLER_KEY: *relayer-key
-      # Inferenz: Mock-Provider, kein Netz.
-      CP_PROVIDER: mock
-      CP_MODEL_ALIASES: "gpt-5.2=mock-1,gpt-5-mini=mock-1,gpt-5.3=mock-1"
+      # Inferenz: Mock-Provider ohne Netz; e2e:live setzt CP_PROVIDER=openrouter und reicht den
+      # Key aus der Host-Umgebung durch (nie in einer Datei).
+      CP_PROVIDER: ${CP_PROVIDER:-mock}
+      CP_MODEL_ALIASES: ${CP_MODEL_ALIASES-gpt-5.2=mock-1,gpt-5-mini=mock-1,gpt-5.3=mock-1}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
     volumes:
       - ./certs:/certs:ro
       - cp-data:/data
@@ -67,7 +69,7 @@ services:
       AUTOMATON_RPC_URL: http://chain:8545
     volumes:
       - ./certs:/certs:ro
-      - ./runtime/setup.json:/setup.json:ro
+      - ${SETUP_JSON:-./runtime/setup.json}:/setup.json:ro
       - runtime-home:/home/automaton
     depends_on:
       cp:

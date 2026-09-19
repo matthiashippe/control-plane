@@ -42,7 +42,8 @@ angelastet; die unveränderte Upstream-Runtime fährt im Harness echte Turns üb
       `openrouter`), `OPENROUTER_API_KEY` wird nur aus der Umgebung des Hosts durchgereicht, nie in
       Dateien; `e2e:live` bricht ohne Key mit klarer Meldung ab
 - [ ] `docs/protocol.md` und README: Einkaufsquelle, Alias-Default, Kostenformel
-- [ ] Key erscheint in keiner Ausgabe, keinem Log, keiner Datei im Repo (`git grep sk-or-` leer)
+- [ ] Key erscheint in keiner Ausgabe, keinem Log, keiner Datei im Repo
+      (`git grep -nE 'sk-or-v1-[0-9a-f]{20,}'` leer; der Test-Fake `sk-or-v1-test` zählt nicht)
 
 ## Deny List
 - Kein `deploy/`, kein Mainnet, kein Facilitator-Code (Goal 5b)
@@ -54,5 +55,6 @@ angelastet; die unveränderte Upstream-Runtime fährt im Harness echte Turns üb
 - OpenRouter-Ausgaben in diesem Goal: unter 2 USD gesamt
 
 ## Progress Log
+- 2026-09-19 11:05 Zyklus 1: OpenRouterProvider (Katalog aus /models, Refresh, usage.cost), Provider-Fehlerklassen und 503/400-Mapping im Proxy, purchase_mc/margin_mc im Ledger, Default-Aliase, Compose per Env umschaltbar, setup.live.json (maxTurnsPerCycle 6), openrouter-smoke.ts, live.sh, 9 Unit-Tests. Fund: gpt-5-mini liefert mit max_tokens 16 leeren Content (Reasoning-Tokens). Eigene Läufe: OPENROUTER OK cost_usd=0.00017875; LIVE OK turns=5 api_errors=0 ledger_consistent=true uncollected_mc=0 cost_usd=0.055499 (Marge 1665 mc); E2E OK ohne Key; 47 Unit-Tests. Verifier ausstehend.
 
 ## Blockers

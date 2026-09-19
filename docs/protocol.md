@@ -139,6 +139,25 @@ trotzdem unterwegs: Settlement darf nie an den Client-Timeout gekoppelt sein.
   `402 { "error": "INSUFFICIENT_CREDITS", "details": { "required_cents", "current_balance_cents" } }`
   (Format, das `topupForSandbox` parst; der Agent-Loop versucht bei 402 einen Topup und wiederholt einmal).
 - Unbekanntes Modell: `404 { "error": "model_not_found" }`. `stream: true`: 400.
+- Provider-Ausfall (kein Guthaben beim Einkauf, Rate-Limit, 5xx, Timeout, Upstream-Fehler im
+  200-Body): `503 { "error": "provider_unavailable" }` ohne Abbuchung. Die Runtime behandelt 503
+  als retrybar (Backoff, Circuit Breaker) und kauft keine Credits nach, was bei einem 402 passieren
+  würde. Ein 400 des Providers auf unseren Body geht als `400 provider_rejected_request` durch.
+
+## Einkauf (Betrieb)
+
+Provider `openrouter` (`CP_PROVIDER=openrouter`, `OPENROUTER_API_KEY`, `CP_OPENROUTER_MODELS`,
+Default `openai/gpt-5.2,openai/gpt-5-mini`): OpenAI-kompatible Chat-Completions, Body 1:1 plus
+`usage: { include: true }`. Preise beim Start aus `GET /api/v1/models` (USD je Token, mal 1e6),
+stündlich erneuert; fehlt ein konfiguriertes Modell, startet das Control Plane nicht.
+Default-Aliase `gpt-5.2 -> openai/gpt-5.2`, `gpt-5-mini -> openai/gpt-5-mini` (kein `gpt-5.3`:
+OpenRouter führt nur die Codex-Variante, und die Runtime fragt `gpt-5.3` nur, wenn `gpt-5.2`
+deaktiviert ist). `usage.cost` (USD) sind die tatsächlichen Einkaufskosten; Abbuchung
+`ceil(cost_usd x 100 000 x 1,3)` mc, Ledger-meta mit `cost_usd`, `purchase_mc`, `margin_mc`.
+Reasoning-Modelle (gpt-5*) zählen Denk-Tokens zu `completion_tokens`; mit `max_tokens` unter
+etwa 100 kommt keine Antwort (Harness-Fund 19.09.2026), die Runtime schickt 2048 bis 8192.
+Messung 19.09.2026: fünf Turns der Upstream-Runtime auf `gpt-5.2` mit je rund 12k Prompt-Tokens
+kosteten 5,55 Cent Einkauf, 7,22 Cent Abbuchung, 1,67 Cent Marge.
 
 ### Registry
 

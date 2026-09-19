@@ -79,6 +79,7 @@ const config = createConfig({
 config.conwayApiUrl = setup.conwayApiUrl;
 if (setup.socialRelayUrl !== undefined) config.socialRelayUrl = setup.socialRelayUrl;
 if (setup.inferenceModel) config.inferenceModel = setup.inferenceModel;
+if (setup.maxTurnsPerCycle) config.maxTurnsPerCycle = Number(setup.maxTurnsPerCycle);
 saveConfig(config);
 console.log(`automaton.json written (${getConfigPath()}, api: ${config.conwayApiUrl})`);
 

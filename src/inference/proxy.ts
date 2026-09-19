@@ -9,7 +9,7 @@
 
 import { getBalanceMc, mcToCents, postLedger, type Db } from "../db.js";
 import type { ChatProvider, ChatRequest, ChatResponse, ModelSpec, Usage } from "./provider.js";
-import { estimateTokens } from "./provider.js";
+import { estimateTokens, ProviderBadRequestError, ProviderUnavailableError } from "./provider.js";
 
 export const MARKUP = 1.3;
 const DEFAULT_MAX_TOKENS = 4096;
@@ -95,13 +95,28 @@ export function sellPrice(listUsdPerMillion: number): number {
   return Math.round(listUsdPerMillion * MARKUP * 10_000) / 10_000;
 }
 
+const MC_PER_USD = 100_000;
+
 /**
- * Kosten in Millicents. Listenpreis USD/1M Tokens ist zugleich Micro-USD je Token;
- * 1 Micro-USD = 0,1 mc, mal Markup.
+ * Kosten in Millicents. Meldet der Provider die tatsächlichen Einkaufskosten (`cost_usd`), gilt
+ * die mal Markup; sonst Listenpreis: USD/1M Tokens ist zugleich Micro-USD je Token, 1 Micro-USD
+ * = 0,1 mc, mal Markup.
  */
-export function costMc(spec: ModelSpec, usage: Pick<Usage, "prompt_tokens" | "completion_tokens">): number {
+export function costMc(spec: ModelSpec, usage: Pick<Usage, "prompt_tokens" | "completion_tokens" | "cost_usd">): number {
+  if (typeof usage.cost_usd === "number" && Number.isFinite(usage.cost_usd) && usage.cost_usd >= 0) {
+    return Math.ceil(usage.cost_usd * MC_PER_USD * MARKUP);
+  }
   const microUsd = usage.prompt_tokens * spec.inputPerMillion + usage.completion_tokens * spec.outputPerMillion;
   return Math.ceil(microUsd * 0.1 * MARKUP);
+}
+
+/** Einkaufskosten in mc (ohne Markup), für die Margen-Spalte im Ledger. */
+export function purchaseMc(spec: ModelSpec, usage: Pick<Usage, "prompt_tokens" | "completion_tokens" | "cost_usd">): number {
+  if (typeof usage.cost_usd === "number" && Number.isFinite(usage.cost_usd) && usage.cost_usd >= 0) {
+    return Math.ceil(usage.cost_usd * MC_PER_USD);
+  }
+  const microUsd = usage.prompt_tokens * spec.inputPerMillion + usage.completion_tokens * spec.outputPerMillion;
+  return Math.ceil(microUsd * 0.1);
 }
 
 export interface ChatResult {
@@ -146,11 +161,24 @@ export async function handleChat(
     };
   }
 
-  const response = await entry.provider.chat({ ...(req as ChatRequest), model: entry.spec.id, maxTokens, apiKeyId: address });
+  let response: ChatResponse;
+  try {
+    response = await entry.provider.chat({ ...(req as ChatRequest), model: entry.spec.id, maxTokens, apiKeyId: address });
+  } catch (err) {
+    if (err instanceof ProviderUnavailableError) {
+      console.error(`[inference] provider ${err.provider} unavailable (status ${err.upstreamStatus ?? "none"}): ${err.message}`);
+      return { status: 503, body: { error: "provider_unavailable", provider: err.provider, message: err.message } };
+    }
+    if (err instanceof ProviderBadRequestError) {
+      return { status: 400, body: { error: "provider_rejected_request", provider: err.provider, details: err.body } };
+    }
+    throw err;
+  }
   // Der Client soll die ID wiedersehen, die er angefragt hat (Alias oder echte ID).
   response.model = req.model;
 
   const actualMc = costMc(entry.spec, response.usage);
+  const boughtMc = purchaseMc(entry.spec, response.usage);
   const balanceNow = getBalanceMc(db, address);
   const chargeMc = Math.min(actualMc, balanceNow);
   postLedger(db, {
@@ -164,6 +192,9 @@ export async function handleChat(
       provider: entry.provider.id,
       usage: response.usage,
       cost_mc: actualMc,
+      cost_usd: response.usage.cost_usd ?? null,
+      purchase_mc: boughtMc,
+      margin_mc: chargeMc - boughtMc,
       uncollected_mc: actualMc - chargeMc,
     },
   });

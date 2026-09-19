@@ -1,0 +1,10 @@
+{
+  "name": "HarnessLive",
+  "genesisPrompt": "You are a test automaton inside a disposable local harness. Nothing you do here matters. Keep every turn short: call at most one cheap read-only tool (check_credits, system_synopsis, list_models, view_soul), then answer in one sentence. After your fifth turn, call the sleep tool with duration_seconds 600.",
+  "creatorAddress": "0x000000000000000000000000000000000000dEaD",
+  "conwayApiUrl": "https://cp.test:8443",
+  "socialRelayUrl": "",
+  "inferenceModel": "gpt-5.2",
+  "maxTurnsPerCycle": 6,
+  "disableHeartbeats": ["check_social_inbox", "check_for_updates"]
+}
