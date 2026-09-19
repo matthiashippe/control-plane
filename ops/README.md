@@ -12,6 +12,23 @@ OPENROUTER_API_KEY=$(grep '^OPENROUTER_API_KEY=' ~/brain/connectors/secrets.env 
 Das Skript ändert nichts und startet nichts. Es ist die Datenquelle für den Ops-Triage-Loop
 (`/loop 1d Run $ops-triage`), der daraus die Abschnitte in `STATE.md` schreibt.
 
+## Rauchtest nach dem Deploy
+
+`ops/smoke.sh [BASIS_URL]` (Default `https://cp.hippe.eu`) prüft von außen, ob der Dienst nach
+einem Deploy wirklich tut, was er soll: `/health`, `/v1/status` mit Modellen, Markup und der
+Automaton-Zahl, die Startseite mit Link auf `ohne-control-plane.md` und Impressum-Anker, die 302
+von `/impressum`, `/.well-known/x402` mit Zahlungsangebot, `/llms.txt` mit der Setup-Zeile, die
+Sicherheits-Header, den CSP-Hash gegen das ausgelieferte Inline-Skript, das Body-Limit (1,1 MB an
+`/v1/auth/verify` muss 413 geben) und die 401 von `/v1/credits/balance` ohne Key. Je Prüfung eine
+Zeile, am Ende eine Zusammenfassung, `exit 1` bei jedem Fehler. Das Skript schreibt nichts und
+braucht keinen API-Key.
+
+Ein Standardlauf stellt **eine** Anfrage auf einen rate-limitierten Pfad (60 je Minute und Client,
+`src/ratelimit.ts`) und zählt sie in der Zusammenfassung mit. Die Grenze selbst prüft nur
+`--mit-ratelimit`, weil dieser Test den Aufrufer für den Rest der Minute aussperrt. `--ohne-proxy`
+überspringt die drei Prüfungen, die an Caddy hängen (Header, CSP-Hash, Body-Limit); das ist für
+einen lokalen Start gedacht und ersetzt den Lauf gegen den echten Endpunkt nicht.
+
 ## Schwellen, bei denen gehandelt werden muss
 
 | Signal | Schwelle | Aktion |

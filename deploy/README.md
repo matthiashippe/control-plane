@@ -17,6 +17,12 @@ Let's-Encrypt-Zertifikat, SQLite unter dem Volume `cp-data`. Secrets liegen nur 
 
 `deploy/up.sh` (rsync des Repo-Stands, `docker compose up -d --build`). Die DB bleibt im Volume.
 
+Direkt nach jedem `up.sh` und nach jedem Ausrollen einer Caddyfile-Änderung `ops/smoke.sh` laufen
+lassen: Der Rauchtest prüft in einem Durchgang Health, Status, Startseite, Impressum-Weiterleitung,
+`/.well-known/x402`, `llms.txt`, die Sicherheits-Header, den CSP-Hash gegen das ausgelieferte
+Inline-Skript, das Body-Limit und die 401 ohne API-Key, und endet mit `exit 1`, sobald eine dieser
+Prüfungen fehlschlägt.
+
 ## Logs
 
 ```
