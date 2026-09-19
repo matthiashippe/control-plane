@@ -3,26 +3,38 @@
 > Bindend für jeden Loop- und Goal-Lauf in diesem Repo. Der `loop-constraints`-Skill und der
 > `/goal`-Skill lesen diese Datei zu Beginn jedes Laufs.
 
-## Nachtlauf 19./20.09.2026 (gilt bis Matthias es aufhebt)
+## Deploy (Stand 19.09.2026, 21:30, ersetzt die Nacht-Sperre)
 
-**Kein Deploy auf die VM, aus keinem Grund.** Kein `deploy/up.sh`, kein `docker compose` auf
-`srv1336627`, kein Neustart eines Produktionscontainers, keine Änderung am Caddyfile im Betrieb.
-Zwei Gründe, beide hart: Seit dem 19.09. um 18:40 UTC hängt ein **zahlender fremder Kunde** am
-Dienst (Wallet `0x0629a685…488e`, 5 USDC on-chain), und morgen früh entscheidet das Kriterium
-"Nacht ohne autoheal-Eingriff" darüber, ob der HN-Artikel rausgeht. Ein Deploy zerstört beides.
-Fertige Arbeit wird committet und wartet auf das Ausrollen am Morgen.
+Matthias hat ausdrücklich alle Rechte zum Ausrollen gegeben. Die Sperre ist damit aufgehoben,
+die Sorgfalt nicht. Seit dem 19.09. um 18:40 UTC hängt ein **zahlender fremder Kunde** am Dienst
+(Wallet `0x0629a685…488e`, 5 USDC on-chain). Jeder Deploy trifft ihn, und heute hat er wegen
+unserer Deploys bereits zwölf 502er gesehen.
 
-**Lesende Zugriffe auf die VM sind erlaubt** (Logs, `ops/status.sh`, SQLite read-only), und zwar
-sparsam. Wenn der Dienst ausfällt: **nicht selbst reparieren**, sondern autoheal seine Arbeit
-machen lassen, den Vorfall in `.scratch/gtm/nachtlauf.md` protokollieren und weiterarbeiten. Nur
-wenn der Dienst nach zehn Minuten immer noch nicht antwortet, ist ein Eingriff erlaubt, und dann
-der kleinstmögliche (`docker compose -f docker-compose.prod.yml up -d --force-recreate cp`).
+**Vor jedem Deploy, ohne Ausnahme:**
+- `pnpm test` grün, und bei jeder Änderung am Laufzeitpfad auch `pnpm e2e` grün.
+- Der Grund steht in einem Satz: Was wird besser, und für wen? Ein Deploy ohne Antwort darauf
+  wartet bis zum Morgen.
+- Bei einer Änderung an `deploy/**`: vorher `caddy validate`, und daran denken, dass ein
+  Caddyfile-Bind-Mount ein `--force-recreate` braucht (siehe `deploy/README.md`).
 
-**Keine Außenwirkung.** Keine Issue-Kommentare, kein HN-Post, keine Nachricht an Dritte, kein
-Eintrag in fremde Repos. Die drei Issue-Antworten des Tages gehen morgen raus, von einer wachen
-Session.
+**Nach jedem Deploy, ohne Ausnahme:**
+- Von außen prüfen: `/health`, `/v1/status`, und dass der Container `healthy` ist.
+- In die Caddy-Logs sehen, ob der Kunde in diesem Fenster einen Fehler bekommen hat.
+- Das Ergebnis in `.scratch/gtm/nachtlauf.md` protokollieren, auch wenn alles gut ging.
 
-**Keine Zahlungen, keine On-Chain-Transaktionen, keine Wallet-Operationen.**
+**Was trotzdem nicht passiert:**
+- Kein Deploy, dessen Nutzen kleiner ist als eine Minute Ausfall für den Kunden. Reine
+  Aufräumarbeiten, Kommentare und Dokumentation warten auf das nächste ohnehin fällige Ausrollen.
+- Keine zwei Deploys hintereinander ohne dazwischen liegende Prüfung.
+- Keine Außenwirkung: keine Issue-Kommentare, kein HN-Post, keine Nachricht an Dritte. Die drei
+  Issue-Antworten des Tages gehen morgen raus, von einer wachen Session.
+- Keine Zahlungen, keine On-Chain-Transaktionen, keine Wallet-Operationen.
+
+**Wenn der Dienst nach einem Deploy nicht zurückkommt:** autoheal greift nach 90 Sekunden. Erst
+wenn er nach fünf Minuten immer noch nicht antwortet, selbst eingreifen, und dann mit dem
+kleinstmöglichen Schritt (`docker compose -f docker-compose.prod.yml up -d --force-recreate cp`).
+Jeder autoheal-Eingriff kommt ins Protokoll, weil er morgen früh Teil der Entscheidung über den
+Artikel ist.
 
 ## Push und Merge
 - Kein Push auf `main` ohne Ankündigung im Chat. Fertige, geprüfte Goals werden committet
