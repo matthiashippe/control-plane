@@ -207,3 +207,50 @@ describe("OpenRouterProvider", () => {
     await expect(provider.init()).rejects.toThrow(/GET \/models: ECONNREFUSED/);
   });
 });
+
+describe("Start ohne erreichbaren OpenRouter", () => {
+  it("liefert einen Snapshot der Preise und lädt ihn zurück", async () => {
+    // Das ist die Grundlage dafür, dass der Start nicht an einem Drittanbieter hängt.
+    const { impl } = stubFetch({ "/models": () => json(MODELS_BODY) });
+    const a = new OpenRouterProvider({ apiKey: KEY, models: ["openai/gpt-5.2", "openai/gpt-5-mini"], fetch: impl, priceRefreshMs: 0 });
+    await a.init();
+    const snapshot = a.snapshot();
+    expect(snapshot.length).toBe(2);
+
+    // Ein zweiter Provider, dessen Abruf scheitert, kommt über den Snapshot trotzdem hoch.
+    const { impl: kaputt } = stubFetch({ "/models": () => Promise.reject(new Error("ECONNREFUSED")) });
+    const b = new OpenRouterProvider({ apiKey: KEY, models: ["openai/gpt-5.2"], fetch: kaputt, priceRefreshMs: 0 });
+    await expect(b.init()).rejects.toThrow();
+    b.loadSnapshot(JSON.parse(JSON.stringify(snapshot)));
+
+    expect(b.models().map((m) => m.id).sort()).toEqual(snapshot.map((m) => m.id).sort());
+    const preis = b.models().find((m) => m.id === "openai/gpt-5.2");
+    expect(preis?.inputPerMillion, "die Preise müssen den Neustart überleben").toBe(
+      snapshot.find((m) => m.id === "openai/gpt-5.2")?.inputPerMillion,
+    );
+  });
+
+  it("deckt den Timeout auch das Lesen der Antwort ab, nicht nur den Verbindungsaufbau", async () => {
+    // Die erste Fassung löschte den Timer direkt nach dem `fetch`. Die Modellliste von OpenRouter
+    // ist über ein Megabyte groß; ein hängender Download hängt genauso wie ein hängender
+    // Verbindungsaufbau, und genau das kostete den Dienst am 19.09.2026 zweimal die Erreichbarkeit.
+    const { impl } = stubFetch({
+      "/models": (rec) => {
+        const signal = rec.init.signal as AbortSignal;
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          // Antwort kommt sofort, aber der Body niemals.
+          json: () =>
+            new Promise((_, reject) => {
+              signal.addEventListener("abort", () => reject(new Error("aborted")));
+            }),
+        } as unknown as Response);
+      },
+    });
+    const p = new OpenRouterProvider({ apiKey: KEY, models: ["openai/gpt-5.2"], fetch: impl, priceRefreshMs: 0, priceFetchTimeoutMs: 30 });
+    const start = Date.now();
+    await expect(p.init()).rejects.toThrow(/timeout after 30 ms/);
+    expect(Date.now() - start, "der Start darf nicht hängen bleiben").toBeLessThan(2000);
+  });
+});

@@ -24,7 +24,7 @@ import path from "node:path";
 import { createServer as createHttpsServer } from "node:https";
 import { serve } from "@hono/node-server";
 import { createApp, VERSION } from "./app.js";
-import { cleanupExpired, openDb } from "./db.js";
+import { cleanupExpired, getKV, openDb, setKV } from "./db.js";
 import { MockProvider } from "./inference/mock.js";
 import { OpenRouterProvider, openRouterFromEnv } from "./inference/openrouter.js";
 import { aliasesFromEnv, Catalog, providersFromEnv } from "./inference/proxy.js";
@@ -43,7 +43,30 @@ const providers = providersFromEnv(process.env, {
   mock: () => new MockProvider(),
   openrouter: () => openRouterFromEnv(process.env),
 });
-for (const p of providers) if (p instanceof OpenRouterProvider) await p.init();
+// Preise beim Start laden. Der Dienst darf ohne Preise nicht abrechnen, aber er darf auch nicht
+// sterben, nur weil OpenRouter gerade langsam ist: Am 19.09.2026 hing der Start zweimal genau hier
+// und der Dienst war von außen weg. Deshalb wird der letzte erfolgreiche Katalog gespeichert und
+// als Rückfalloption benutzt. Nur wenn es auch den nicht gibt, ist der Start zu Recht ein Fehler.
+const PREIS_CACHE_KEY = "openrouter_price_snapshot";
+for (const p of providers) {
+  if (!(p instanceof OpenRouterProvider)) continue;
+  try {
+    await p.init();
+    setKV(db, PREIS_CACHE_KEY, JSON.stringify(p.snapshot()));
+  } catch (err) {
+    const grund = err instanceof Error ? err.message : String(err);
+    const zwischengespeichert = getKV(db, PREIS_CACHE_KEY);
+    if (!zwischengespeichert) {
+      console.error(`[openrouter] Preisabruf fehlgeschlagen (${grund}) und kein Katalog gespeichert. Start nicht möglich.`);
+      throw err;
+    }
+    p.loadSnapshot(JSON.parse(zwischengespeichert));
+    console.error(
+      `[openrouter] Preisabruf fehlgeschlagen (${grund}). Weiter mit dem gespeicherten Katalog; ` +
+        `der stündliche Refresh zieht ihn nach. Preise können veraltet sein.`,
+    );
+  }
+}
 const aliases = process.env.CP_MODEL_ALIASES
   ? aliasesFromEnv(process.env)
   : Object.assign({}, ...providers.map((p) => (p instanceof OpenRouterProvider ? p.defaultAliases() : {})));

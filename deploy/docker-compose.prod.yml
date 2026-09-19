@@ -24,6 +24,10 @@ services:
       interval: 10s
       timeout: 5s
       retries: 6
+      # Ohne start_period zählt Docker Fehlschläge ab der ersten Sekunde mit. Der Start lädt den
+      # Preiskatalog von OpenRouter, das dauert, und ein langsamer Start darf nicht als Ausfall
+      # gelten und autoheal auslösen.
+      start_period: 45s
     logging:
       driver: json-file
       options: { max-size: "20m", max-file: "5" }

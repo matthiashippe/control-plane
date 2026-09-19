@@ -28,6 +28,13 @@ function migrate(db: Db): void {
       created_at    TEXT NOT NULL
     );
 
+    -- Kleinkram, der einen Neustart überleben muss (z. B. der letzte Preiskatalog).
+    CREATE TABLE IF NOT EXISTS kv (
+      key        TEXT PRIMARY KEY,
+      value      TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS siwe_nonces (
       nonce       TEXT PRIMARY KEY,
       issued_at   INTEGER NOT NULL,             -- Unix ms
@@ -262,6 +269,22 @@ export function cleanupExpired(db: Db, now = Date.now()): { nonces: number; sess
     return { nonces, sessions, payments };
   });
   return run();
+}
+
+/** Schlüssel-Wert-Ablage für Kleinkram, der einen Neustart überleben muss. */
+export function setKV(db: Db, key: string, value: string): void {
+  db.prepare("INSERT INTO kv (key, value, updated_at) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET value = ?, updated_at = ?").run(
+    key,
+    value,
+    new Date().toISOString(),
+    value,
+    new Date().toISOString(),
+  );
+}
+
+export function getKV(db: Db, key: string): string | null {
+  const row = db.prepare("SELECT value FROM kv WHERE key = ?").get(key) as { value: string } | undefined;
+  return row?.value ?? null;
 }
 
 export function getBalanceMc(db: Db, address: string): number {

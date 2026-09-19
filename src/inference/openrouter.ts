@@ -78,22 +78,27 @@ export class OpenRouterProvider implements ChatProvider {
 
   async refreshPrices(): Promise<void> {
     // Mit Timeout, weil dieser Aufruf den Start blockiert: ohne ihn hängt der Prozess still,
-    // der Healthcheck schlägt fehl und Compose bricht ab, ohne dass eine Zeile im Log steht.
+    // der Healthcheck schlägt fehl und der Dienst antwortet nicht, ohne dass eine Zeile im Log
+    // steht. Der Timer deckt ausdrücklich AUCH das Lesen des Bodys: Die Modellliste von
+    // OpenRouter ist über ein Megabyte groß, und ein hängender Download hängt genauso wie ein
+    // hängender Verbindungsaufbau. Die erste Fassung löschte den Timer direkt nach dem `fetch`
+    // und ließ damit genau die Hälfte ungeschützt.
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.priceFetchTimeoutMs);
-    let res: Response;
+    let body: { data?: OpenRouterModelRow[] };
     try {
-      res = await this.fetchImpl(`${this.baseUrl}/models`, { headers: this.headers(), signal: controller.signal });
+      const res = await this.fetchImpl(`${this.baseUrl}/models`, { headers: this.headers(), signal: controller.signal });
+      if (!res.ok) throw new Error(`GET /models -> ${res.status}`);
+      body = (await res.json()) as { data?: OpenRouterModelRow[] };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
+      if (msg.startsWith("GET /models ->")) throw err;
       throw new Error(
         controller.signal.aborted ? `GET /models: timeout after ${this.priceFetchTimeoutMs} ms` : `GET /models: ${msg}`,
       );
     } finally {
       clearTimeout(timer);
     }
-    if (!res.ok) throw new Error(`GET /models -> ${res.status}`);
-    const body = (await res.json()) as { data?: OpenRouterModelRow[] };
     const rows = new Map((body.data ?? []).map((m) => [m.id, m]));
     const missing: string[] = [];
     for (const id of this.opts.models) {
@@ -129,6 +134,21 @@ export class OpenRouterProvider implements ChatProvider {
   }
 
   /** Aliase, deren Ziel im Katalog liegt. */
+  /**
+   * Die geladenen Preise, damit der Aufrufer sie zwischenspeichern kann. Ein Startpfad, der
+   * zwingend einen Drittanbieter erreichen muss, ist ein Ausfallgrund: Am 19.09.2026 hing der
+   * Start zweimal an genau diesem Aufruf und der Dienst war weg.
+   */
+  snapshot(): ModelSpec[] {
+    return [...this.specs.values()];
+  }
+
+  /** Lädt Preise aus einem Snapshot, wenn der Abruf beim Start nicht durchkam. */
+  loadSnapshot(specs: ModelSpec[]): void {
+    this.specs.clear();
+    for (const spec of specs) this.specs.set(spec.id, spec);
+  }
+
   defaultAliases(): Record<string, string> {
     const out: Record<string, string> = {};
     for (const [alias, target] of Object.entries(DEFAULT_OPENROUTER_ALIASES)) {
