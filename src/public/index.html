@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>cp.hippe.eu — Conway-compatible control plane</title>
+<meta name="description" content="A drop-in replacement for api.conway.tech: SIWE provisioning, USDC credits over x402 on Base, OpenAI-compatible inference. Point your automaton at it by changing one line.">
+<style>
+  :root {
+    --bg: #fbfbf9; --fg: #1d1d1b; --muted: #5d5d57; --line: #dedcd4;
+    --code-bg: #f2f1ec; --accent: #1f4f3f;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #14150f; --fg: #eceade; --muted: #a3a294; --line: #2e2f27; --code-bg: #1d1e17; --accent: #8fc3ae; }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font: 16px/1.65 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  main { max-width: 46rem; margin: 0 auto; padding: 3rem 1rem 5rem; }
+  h1 { font-size: 1.7rem; line-height: 1.25; margin: 0 0 .4rem; letter-spacing: -0.01em; }
+  h2 { font-size: 1.05rem; margin: 2.4rem 0 .6rem; letter-spacing: .02em; text-transform: uppercase; color: var(--muted); }
+  p, li { margin: .6rem 0; }
+  a { color: var(--accent); }
+  code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .88rem; }
+  pre { background: var(--code-bg); border: 1px solid var(--line); border-radius: 6px; padding: .9rem 1rem; overflow-x: auto; }
+  code:not(pre code) { background: var(--code-bg); padding: .1rem .3rem; border-radius: 3px; }
+  .lede { color: var(--muted); font-size: 1.05rem; }
+  table { border-collapse: collapse; width: 100%; margin: .8rem 0; font-size: .93rem; }
+  th, td { text-align: left; padding: .4rem .6rem .4rem 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; }
+  .status { display: flex; flex-wrap: wrap; gap: 1.4rem; margin: .8rem 0; font-size: .93rem; }
+  .status div { min-width: 7rem; }
+  .status .k { color: var(--muted); display: block; font-size: .8rem; }
+  .status .v { font-variant-numeric: tabular-nums; }
+  footer { margin-top: 3rem; padding-top: 1.2rem; border-top: 1px solid var(--line); color: var(--muted); font-size: .88rem; }
+  ul { padding-left: 1.1rem; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Conway-compatible control plane</h1>
+  <p class="lede">
+    Conway stopped onboarding automatons in July 2026: <code>POST /v1/auth/verify</code> has been
+    answering 500 or 401 for every fresh wallet since then. This service speaks the same API, so an
+    unmodified automaton runtime can run against it. You change one line of config.
+  </p>
+
+  <h2>Setup</h2>
+  <p>In <code>~/.automaton/automaton.json</code>, set the control plane URL:</p>
+  <pre><code>"conwayApiUrl": "https://cp.hippe.eu"</code></pre>
+  <p>Then provision and run as usual:</p>
+  <pre><code>automaton --provision   # SIWE with your wallet, issues an API key
+automaton --run         # registers, buys credits from your USDC, starts working</code></pre>
+  <p>
+    Nothing else changes. Your wallet stays on your machine; this service only ever sees
+    signatures. On the first run the runtime buys the smallest credit tier automatically if the
+    wallet holds enough USDC on Base.
+  </p>
+
+  <h2>Live</h2>
+  <div class="status" id="status">
+    <div><span class="k">status</span><span class="v" id="s-health">loading…</span></div>
+    <div><span class="k">automatons</span><span class="v" id="s-automatons">–</span></div>
+    <div><span class="k">models</span><span class="v" id="s-models">–</span></div>
+    <div><span class="k">version</span><span class="v" id="s-version">–</span></div>
+  </div>
+  <p><a href="/v1/status">/v1/status</a> returns the same numbers as JSON.</p>
+
+  <h2>Price</h2>
+  <p>
+    Credits are prepaid and priced at the inference cost the service actually pays, times 1.3.
+    The runtime asks for <code>gpt-5.2</code> and <code>gpt-5-mini</code> from its own routing
+    matrix, whatever <code>inferenceModel</code> says; those names are served as aliases, so you do
+    not have to touch the runtime.
+    The ledger records the purchase cost and the margin for every call, so the markup is one
+    number you can check against the model list below, not a mystery.
+  </p>
+  <table id="models">
+    <thead><tr><th>model</th><th>also answers to</th><th>input / 1M</th><th>output / 1M</th></tr></thead>
+    <tbody><tr><td colspan="4">loading…</td></tr></tbody>
+  </table>
+  <p>
+    Top-ups go through x402 (USDC on Base, EIP-3009), settled by an external facilitator. Tiers in
+    USD: <span id="s-tiers">5, 25, 100, 500, 1000, 2500</span>. The runtime signs the payment; the
+    credit is booked in the same transaction as the ledger entry, and a repeated signature never
+    credits twice.
+  </p>
+
+  <h2>What works, what does not</h2>
+  <table>
+    <tr><th>Provisioning (SIWE), API keys</th><td>works</td></tr>
+    <tr><th>Credits: balance, top-up over x402</th><td>works</td></tr>
+    <tr><th>Inference, OpenAI-compatible, with tools</th><td>works</td></tr>
+    <tr><th>Automaton registry</th><td>works</td></tr>
+    <tr><th>Sandboxes, hosted ports, file APIs</th><td>not implemented, answers 501</td></tr>
+    <tr><th>Social relay, domains</th><td>not implemented</td></tr>
+    <tr><th>Credit transfers between wallets</th><td>disabled, answers 501</td></tr>
+  </table>
+  <p>
+    Credits are usage balance only: they pay for calls on this service and nothing else. They are
+    not transferable and not redeemable for money.
+  </p>
+
+  <h2>Honest limits</h2>
+  <ul>
+    <li>One operator, one server, no SLA, no on-call. If it breaks, it breaks until I fix it.</li>
+    <li>This is a 30-day experiment. If nobody uses it, I will say so on this page and give at
+      least two weeks notice before shutting it down, so a remaining balance can be used up. Buy
+      the smallest tier that covers what you actually plan to run.</li>
+    <li>It is not affiliated with Conway Research or the automaton project. I run it because my own
+      automaton needed a control plane after Conway went quiet.</li>
+  </ul>
+
+  <footer>
+    Operated by Hanseatic Tech Company, Hamburg, Germany.
+    Contact: <a href="mailto:matthias@hanseatictech.de">matthias@hanseatictech.de</a>.
+    <span id="imprint-note"></span>
+  </footer>
+</main>
+<script>
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  fetch("/v1/status").then((r) => r.json()).then((s) => {
+    set("s-health", s.ok ? "online" : "degraded");
+    set("s-automatons", s.automatons);
+    set("s-models", s.models.length);
+    set("s-version", s.version);
+    set("s-tiers", s.topup_tiers_usd.join(", "));
+    const body = document.querySelector("#models tbody");
+    body.innerHTML = "";
+    for (const m of s.models) {
+      const tr = document.createElement("tr");
+      const price = (n) => "$" + Number(n).toFixed(n < 1 ? 4 : 2);
+      const aliases = (m.aliases || []).map((a) => "<code>" + a + "</code>").join(" ") || "—";
+      tr.innerHTML = "<td><code>" + m.id + "</code></td><td>" + aliases + "</td><td>" + price(m.input_per_million) + "</td><td>" + price(m.output_per_million) + "</td>";
+      body.appendChild(tr);
+    }
+  }).catch(() => set("s-health", "status unavailable"));
+</script>
+</body>
+</html>

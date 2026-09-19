@@ -18,7 +18,7 @@ awesome-x402 gelistet. Messgröße bleibt: provisionierte Automatons (heute 1).
 - [ ] Seite ist live und zeigt echte Werte
       Prüfung: `curl -s https://cp.hippe.eu/ | grep -c "conwayApiUrl"` >= 1 und
       `curl -s https://cp.hippe.eu/v1/status` enthält `"models"` mit mindestens zwei Einträgen
-      und `"automatons"` als Zahl
+      und `"automatons"` als Zahl; `models` enthält einen Eintrag je echtem Modell mit `aliases`
 - [ ] Drei Issue-Antworten sind gepostet, je eine in #339, #377 und #393, mit Link auf die Seite
       Prüfung: `gh api repos/Conway-Research/automaton/issues/339/comments --jq '[.[]|select(.user.login=="matthiashippe")]|length'` = 1, ebenso für 377 und 393
 - [ ] awesome-x402: PR offen oder gemerged
@@ -58,5 +58,6 @@ awesome-x402 gelistet. Messgröße bleibt: provisionierte Automatons (heute 1).
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-09-19 18:05 Zyklus 1 (Seite): src/public/index.html (statisch, keine externen Ressourcen), `/` und `/v1/status` in app.ts, Modellliste entdoppelt (ein Eintrag je echtem Modell plus Aliase), Dockerfile kopiert public in dist, 7 Tests in public.test.ts. Deployt und im Browser geprüft: Live-Werte laden (online, 1 Automaton, 2 Modelle), Preise 2,275/18,20 und 0,325/2,60 USD je 1M. Eigener Fund beim Gegenlesen: die Seite versprach Rückzahlung nicht genutzter Credits, das verstößt gegen die Regulatorik-Leitplanke in loop-constraints.md; ersetzt durch zwei Wochen Vorlauf vor einer Abschaltung, plus Test, der jede Auszahlungs-Formulierung verbietet.
 
 ## Blockers

@@ -4,10 +4,13 @@
  * "Feature nicht verfügbar".
  */
 
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { Hono } from "hono";
 import type { Db } from "./db.js";
 import { getBalanceCents } from "./db.js";
-import { Catalog, handleChat } from "./inference/proxy.js";
+import { Catalog, handleChat, MARKUP } from "./inference/proxy.js";
 import { handlePay, TOPUP_TIERS_USD, type PayConfig } from "./payments/pay.js";
 import { handleRegister } from "./registry.js";
 import type { Settler } from "./payments/settler.js";
@@ -22,6 +25,22 @@ import {
 } from "./auth/siwe.js";
 
 export const VERSION = "0.1.0";
+
+/**
+ * Startseite. Liegt als Datei neben dem Quellcode und wird einmal beim Start gelesen; sie lädt
+ * ihre Zahlen per fetch von /v1/status nach, damit die HTML-Datei statisch bleibt.
+ */
+const PUBLIC_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), "public");
+function loadIndexHtml(): string | null {
+  for (const candidate of [path.join(PUBLIC_DIR, "index.html"), path.resolve("src/public/index.html")]) {
+    try {
+      return fs.readFileSync(candidate, "utf-8");
+    } catch {
+      continue;
+    }
+  }
+  return null;
+}
 
 export interface AppOptions {
   db: Db;
@@ -48,7 +67,46 @@ export function createApp(opts: AppOptions) {
     return c.json({ error: "internal_error" }, 500);
   });
 
+  const indexHtml = loadIndexHtml();
+
+  app.get("/", (c) => {
+    if (!indexHtml) return c.json({ ok: true, version: VERSION, note: "no index page built" });
+    return c.html(indexHtml);
+  });
+
   app.get("/health", (c) => c.json({ ok: true, version: VERSION }));
+
+  /**
+   * Öffentlicher Status für die Startseite. Bewusst arm: nichts, was einen Mandanten
+   * identifiziert (keine Adressen, keine Salden, keine Key-Prefixe).
+   */
+  app.get("/v1/status", (c) => {
+    // Ein Eintrag je echtem Modell; die IDs, die die Runtime hart anfragt, stehen als Aliase daneben.
+    const byUpstream = new Map<string, { id: string; aliases: string[]; input_per_million: number; output_per_million: number }>();
+    for (const m of opts.catalog?.listModels().data ?? []) {
+      const upstream = (m.upstream_model as string) ?? (m.id as string);
+      const pricing = m.pricing as { input_per_million: number; output_per_million: number };
+      const entry = byUpstream.get(upstream) ?? {
+        id: upstream,
+        aliases: [],
+        input_per_million: pricing.input_per_million,
+        output_per_million: pricing.output_per_million,
+      };
+      if (m.id !== upstream) entry.aliases.push(m.id as string);
+      byUpstream.set(upstream, entry);
+    }
+    const models = [...byUpstream.values()];
+    const automatons = (db.prepare("SELECT count(*) AS n FROM automatons").get() as { n: number }).n;
+    return c.json({
+      ok: true,
+      version: VERSION,
+      phase: 1,
+      markup: MARKUP,
+      models,
+      topup_tiers_usd: opts.pay?.tiers ?? TOPUP_TIERS_USD,
+      automatons,
+    });
+  });
 
   // ─── Topup (x402, ohne API-Key: der Runtime-Client sendet hier keinen) ───
 
