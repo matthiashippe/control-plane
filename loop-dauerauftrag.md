@@ -62,6 +62,14 @@ Commit-Message. Genau das ist am 19.09. dreimal passiert: `deploy/rollout.sh` un
 Der Inhalt war heil, die Historie erzählt Unsinn. Also immer die Dateien nennen, die zur
 Änderung gehören, und vor dem Commit einmal `git status --short` lesen.
 
+**Änderungen bündeln, nicht einzeln ausrollen.** Am 19.09.2026 ging in einer Stunde dreimal ein
+Deploy raus (Kennzahl, Startseite, Logging), und nach dem dritten hörte der einzige zahlende Kunde
+auf zu pollen. Ob das die Ursache war, ließ sich nicht mehr feststellen, aber die Frage stellt sich
+nur, weil jede Änderung sofort ausgerollt wurde. Solange der Dienst eine Handvoll Nutzer hat, gilt:
+höchstens ein Deploy je Zyklus, und kleine Verbesserungen sammeln sich bis zum nächsten ohnehin
+fälligen. Der Wechsel kostet rund 16 Sekunden ohne Antwort, und die trifft jedes Mal denselben
+Menschen.
+
 **Jeder Deploy läuft über `deploy/rollout.sh`**, nicht über `deploy/up.sh`. `up.sh` mischt Bauen
 und Umschalten: Schlägt der Build fehl, ist der alte Container längst zerstört. `rollout.sh` baut
 erst, beweist das neue Image an einem Kanarienvogel gegen eine Kopie der Datenbank, wartet auf ein
