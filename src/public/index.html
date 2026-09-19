@@ -62,7 +62,8 @@ automaton --run         # registers, buys credits from your USDC, starts working
   <h2>Live</h2>
   <div class="status" id="status">
     <div><span class="k">status</span><span class="v" id="s-health">loading…</span></div>
-    <div><span class="k">automatons</span><span class="v" id="s-automatons">–</span></div>
+    <div><span class="k">paying wallets</span><span class="v" id="s-automatons">–</span></div>
+    <div><span class="k">buying inference</span><span class="v" id="s-active">–</span></div>
     <div><span class="k">models</span><span class="v" id="s-models">–</span></div>
     <div><span class="k">version</span><span class="v" id="s-version">–</span></div>
   </div>
@@ -163,6 +164,7 @@ automaton --run         # registers, buys credits from your USDC, starts working
   fetch("/v1/status").then((r) => r.json()).then((s) => {
     set("s-health", s.ok ? "online" : "degraded");
     set("s-automatons", s.automatons);
+    set("s-active", s.active);
     set("s-models", s.models.length);
     set("s-version", s.version);
     set("s-tiers", s.topup_tiers_usd.join(", "));
