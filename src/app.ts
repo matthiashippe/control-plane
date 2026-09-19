@@ -123,14 +123,15 @@ export function createApp(opts: AppOptions) {
       byUpstream.set(upstream, entry);
     }
     const models = [...byUpstream.values()];
-    // Nur Automatons zählen, hinter denen eine echte Zahlung steht. Die Registrierung allein ist
-    // kostenlos und beliebig oft möglich: Im Sicherheitsreview stand hier nach einer Stunde
-    // Arbeit `automatons: 100`. Diese Zahl ist die öffentliche Kennzahl des Dienstes und die
-    // Messgröße des 30-Tage-Tests, deshalb darf sie nicht kostenlos setzbar sein.
+    // Gezählt werden zahlende Betreiber, nicht Registrierungen. Zwei Gründe: Die Registrierung
+    // ist kostenlos und beliebig oft möglich (im Sicherheitsreview stand hier nach einer Stunde
+    // `automatons: 100`), und selbst mit Zahlung würde eine einzige Wallet mit 25 Automatons die
+    // Zahl verfünfundzwanzigfachen. Diese Zahl ist die öffentliche Kennzahl und die Messgröße des
+    // 30-Tage-Tests; sie muss teuer zu bewegen sein, und ein zahlender Betreiber ist genau das.
     const automatons = (
       db
         .prepare(
-          `SELECT count(DISTINCT a.automaton_id) AS n
+          `SELECT count(DISTINCT a.address) AS n
              FROM automatons a
              JOIN ledger l ON l.address = a.address AND l.kind = 'topup'`,
         )

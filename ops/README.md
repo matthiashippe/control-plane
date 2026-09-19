@@ -82,8 +82,14 @@ war 502, bis jemand von Hand eingriff. Geprüft mit SIGSTOP auf den Node-Prozess
 
 ## Kennzahl des 30-Tage-Tests
 
-`db.automatons` ist die Messgröße. **Ziel: fünf fremde Automatons in 30 Tagen** (Stand 19.09.2026,
-nach der Nachfragemessung von 50 nach unten korrigiert). Fremd heißt: ein `creator_address`, der
-nicht uns gehört, der eigene zählt nicht mit. Unter drei am 19.10.2026 wird abgeschaltet, mit zwei
-Wochen Vorlauf auf der Startseite.
+**Ziel: fünf zahlende fremde Betreiber in 30 Tagen** (Stand 19.09.2026, nach der Nachfragemessung
+von 50 nach unten korrigiert). Unter drei am 19.10.2026 wird abgeschaltet, mit zwei Wochen Vorlauf
+auf der Startseite.
+
+Die Zahl in `/v1/status` zählt **distinkte Wallets mit mindestens einer Gutschrift**, nicht
+Registrierungen und nicht Automatons. Beides wäre manipulierbar: Ein API-Key kostet nichts, eine
+Registrierung auch, und selbst mit Zahlung könnte eine einzige Wallet 25 Automatons anlegen und die
+Kennzahl verfünfundzwanzigfachen. Wer die Zahl bewegen will, muss zahlen, und genau das ist der
+Punkt der Messung. Der eigene Automat ist in der Zahl enthalten, für die Messgröße also eins
+abziehen.
 `db.keys` zählt ausgestellte API-Keys, `db.day.topups` die Zahlungen des letzten Tages.

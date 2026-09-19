@@ -78,7 +78,11 @@ describe("Öffentliche Seite und Status", () => {
     expect(await zahl(), "auch zwanzig kostenlose Registrierungen zählen nicht").toBe(0);
 
     postLedger(db, { address: "0xabc", kind: "topup", deltaMc: 500_000, ref: "x402-nonce-1" });
-    expect(await zahl(), "sobald eine Zahlung vorliegt, zählen die Automatons dieser Wallet").toBe(20);
+    expect(await zahl(), "eine zahlende Wallet ist eine, egal wie viele Automatons sie registriert").toBe(1);
+
+    anlegen("b-1", "0xbbb");
+    postLedger(db, { address: "0xbbb", kind: "topup", deltaMc: 500_000, ref: "x402-nonce-2" });
+    expect(await zahl(), "ein zweiter zahlender Betreiber zählt dazu").toBe(2);
   });
 
   it("gibt in /v1/status nichts preis, was einen Mandanten identifiziert", async () => {
