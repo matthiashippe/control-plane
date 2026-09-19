@@ -97,6 +97,18 @@ describe("Öffentliche Seite und Status", () => {
     expect(html).toContain("github.com/matthiashippe/control-plane");
   });
 
+  it("führt ein Impressum mit ladungsfähiger Anschrift (§ 5 DDG), erreichbar unter /impressum", async () => {
+    const { app } = setup();
+    const html = await (await app.request("/")).text();
+    expect(html).toMatch(/id="impressum"/);
+    expect(html).toMatch(/Matthias Hippe/);
+    expect(html).toMatch(/San-Francisco-Straße 1/);
+    expect(html).toMatch(/20457 Hamburg/);
+    const redirect = await app.request("/impressum");
+    expect(redirect.status).toBe(302);
+    expect(redirect.headers.get("location")).toBe("/#impressum");
+  });
+
   it("verspricht keine Auszahlung von Credits (Regulatorik: kein Rückzahlungsanspruch)", async () => {
     const { app } = setup();
     const html = (await (await app.request("/")).text()).toLowerCase();

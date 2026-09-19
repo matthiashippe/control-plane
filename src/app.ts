@@ -74,6 +74,10 @@ export function createApp(opts: AppOptions) {
     return c.html(indexHtml);
   });
 
+  // Impressumspflicht nach § 5 DDG: "leicht erkennbar und unmittelbar erreichbar". Die Angaben
+  // stehen auf der Startseite; dieser Pfad ist der Weg, den Leute und Prüfer zuerst raten.
+  app.get("/impressum", (c) => c.redirect("/#impressum", 302));
+
   app.get("/health", (c) => c.json({ ok: true, version: VERSION }));
 
   /**

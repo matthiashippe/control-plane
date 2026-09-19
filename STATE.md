@@ -77,14 +77,14 @@ Social-Relay) erst, wenn Nachfrage messbar ist, also frühestens nach dem 19.10.
 
 ## Entscheidungen bei Matthias
 
-- **Impressum: bewusst offen gelassen** (Matthias, 19.09.2026). Auf der Startseite stehen nur Firma,
-  Stadt und Mail; das DDG verlangt für einen gewerblichen Dienst eine ladungsfähige Anschrift. Im
-  Brain steht keine Geschäftsadresse für HTC, und die dort hinterlegte Frankfurter Adresse ist als
-  Fahrt-Startadresse vermerkt, also vermutlich privat. Eine geratene Adresse wäre schlimmer als
-  keine, und die private öffentlich zu machen ist seine Entscheidung. Das Risiko ist bewusst
-  getragen und bei einer Handvoll Nutzern klein. **Wiedervorlage 03.10.2026**: nachfragen, ob eine
-  Anschrift feststeht oder ein Impressumsservice gemietet werden soll. Die Seite steht dann in
-  zehn Minuten.
+- **Impressum: erledigt am 19.09.2026.** Anschrift von Matthias: Hanseatic Tech Company,
+  Matthias Hippe, San-Francisco-Straße 1, 20457 Hamburg. Steht auf der Startseite unter
+  `#impressum`, `/impressum` leitet dorthin, ein Test in `test/public.test.ts` hält es fest.
+  **Noch zu prüfen, wenn die Angaben existieren:** USt-IdNr (Pflichtangabe nach § 5 DDG, sobald
+  vorhanden), Registergericht und Registernummer (falls HTC eingetragen ist), und ob eine
+  Telefonnummer gewünscht ist. Die E-Mail allein gilt als schneller Kontaktweg, ist aber die
+  knappere Auslegung. Diese drei Angaben kenne ich nicht und habe sie deshalb weggelassen, statt
+  etwas zu erfinden.
 - **HN-Artikel**: Titel entschieden am 19.09.2026: "1,582 wallets funded an AI agent in February.
   By June, three were left." Der Text ist fertig (`docs/artikel-agentenoekonomie.md`). Offen bleibt,
   ob und wann er rausgeht; posten muss Matthias selbst. Vor dem Posten die Zahlen nachziehen, der
