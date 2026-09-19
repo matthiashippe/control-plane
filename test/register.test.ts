@@ -152,3 +152,36 @@ describe("Registry", () => {
     }
   });
 });
+
+describe("Grenzen bei der Registrierung", () => {
+  it("weist überlange Felder ab, damit niemand die Platte füllt", async () => {
+    // Sicherheitsfund 19.09.2026: Ein kostenlos erzeugter API-Key konnte über `bio` 90 MiB in
+    // 21 Sekunden schreiben. Eine volle Platte heißt, dass SQLite nicht mehr schreibt und auch
+    // Gutschriften ausfallen.
+    const { post, account } = setup();
+
+    const zuLang = await buildRegister({ signer: account, bio: "x".repeat(2001) });
+    const res = await post("/v1/automatons/register", zuLang.body);
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string; field: string };
+    expect(body.error).toBe("field_too_long");
+    expect(body.field).toBe("bio");
+
+    const grenze = await buildRegister({ signer: account, bio: "x".repeat(2000) });
+    const ok = await post("/v1/automatons/register", grenze.body);
+    expect(ok.status, "genau auf der Grenze muss es noch durchgehen").toBe(200);
+  });
+
+  it("begrenzt die Zahl der Automatons je Wallet", async () => {
+    const { post, account } = setup();
+    for (let i = 0; i < 25; i++) {
+      const { body } = await buildRegister({ signer: account });
+      const res = await post("/v1/automatons/register", body);
+      expect(res.status, `Registrierung ${i + 1} muss durchgehen`).toBe(200);
+    }
+    const { body } = await buildRegister({ signer: account });
+    const res = await post("/v1/automatons/register", body);
+    expect(res.status).toBe(429);
+    expect(((await res.json()) as { error: string }).error).toBe("too_many_automatons");
+  });
+});

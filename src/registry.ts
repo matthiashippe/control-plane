@@ -85,6 +85,27 @@ export async function handleRegister(db: Db, keyAddress: Address, raw: unknown):
   }
   if (!isAddress(automatonAddress) || !isAddress(creatorAddress)) return { status: 400, body: { error: "invalid_address" } };
 
+  // Ohne Längengrenzen kann ein einziger kostenlos erzeugter Key die Platte füllen: 100
+  // Registrierungen mit je 900 KB `bio` ergaben im Sicherheitsreview 90 MiB in 21 Sekunden, und
+  // eine volle Platte heißt, dass SQLite nicht mehr schreibt und auch Gutschriften ausfallen.
+  const zuLang = Object.entries({ automaton_id: [automatonId, 128], name: [name, 200], bio: [bio, 2000], nonce: [nonce, 128] } as Record<
+    string,
+    [string, number]
+  >).find(([, [wert, max]]) => wert.length > max);
+  if (zuLang) {
+    return { status: 400, body: { error: "field_too_long", field: zuLang[0], max_length: zuLang[1][1] } };
+  }
+
+  // Ein Wallet betreibt seine Automatons, keine Registrierungsfarm. Die Grenze ist großzügig
+  // genug für jeden echten Anwendungsfall und deckelt den Missbrauch.
+  const AUTOMATONS_JE_WALLET = 25;
+  const vorhanden = (
+    db.prepare("SELECT count(*) AS n FROM automatons WHERE address = ?").get(automatonAddress.toLowerCase()) as { n: number }
+  ).n;
+  if (vorhanden >= AUTOMATONS_JE_WALLET) {
+    return { status: 429, body: { error: "too_many_automatons", limit: AUTOMATONS_JE_WALLET } };
+  }
+
   const payload: Record<string, string> = {
     automaton_id: automatonId,
     automaton_address: automatonAddress,

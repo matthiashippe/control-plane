@@ -11,6 +11,7 @@ import { Hono } from "hono";
 import type { Db } from "./db.js";
 import { getBalanceCents } from "./db.js";
 import { Catalog, handleChat, MARKUP } from "./inference/proxy.js";
+import { clientSchluessel, RateLimiter, type RateLimitOptions } from "./ratelimit.js";
 import { handlePay, TOPUP_TIERS_USD, type PayConfig } from "./payments/pay.js";
 import { handleRegister } from "./registry.js";
 import type { Settler } from "./payments/settler.js";
@@ -50,6 +51,11 @@ export interface AppOptions {
   settler?: Settler | null;
   /** Ohne Katalog antworten /v1/chat/completions und /v1/models mit 503. */
   catalog?: Catalog | null;
+  /**
+   * Grenze für die Pfade ohne API-Key. `null` schaltet sie ab, was nur Tests tun sollten, die
+   * absichtlich viele Anfragen fahren.
+   */
+  rateLimit?: RateLimitOptions | null;
 }
 
 type Env = { Variables: { address: `0x${string}` } };
@@ -66,6 +72,23 @@ export function createApp(opts: AppOptions) {
     console.error(`[app] ${c.req.method} ${c.req.path}: ${err.stack || err.message}`);
     return c.json({ error: "internal_error" }, 500);
   });
+
+  // Die Pfade ohne API-Key schreiben in die Datenbank, `/pay` ruft zusätzlich den Facilitator.
+  // Ein API-Key kostet nichts, deshalb muss die Grenze vor der Authentifizierung greifen.
+  const limiter = opts.rateLimit === null ? null : new RateLimiter(opts.rateLimit ?? { limit: 60, fensterMs: 60_000 });
+  const OFFENE_PFADE = ["/v1/auth/nonce", "/v1/auth/verify", "/v1/auth/api-keys", "/pay/"];
+  if (limiter) {
+    app.use("*", async (c, next) => {
+      const pfad = c.req.path;
+      if (!OFFENE_PFADE.some((p) => pfad.startsWith(p))) return next();
+      const { erlaubt, retryAfterSec } = limiter.pruefe(clientSchluessel(c.req.raw.headers));
+      if (!erlaubt) {
+        c.header("Retry-After", String(retryAfterSec));
+        return c.json({ error: "rate_limited", retry_after_seconds: retryAfterSec }, 429);
+      }
+      return next();
+    });
+  }
 
   const indexHtml = loadIndexHtml();
 
@@ -100,7 +123,19 @@ export function createApp(opts: AppOptions) {
       byUpstream.set(upstream, entry);
     }
     const models = [...byUpstream.values()];
-    const automatons = (db.prepare("SELECT count(*) AS n FROM automatons").get() as { n: number }).n;
+    // Nur Automatons zählen, hinter denen eine echte Zahlung steht. Die Registrierung allein ist
+    // kostenlos und beliebig oft möglich: Im Sicherheitsreview stand hier nach einer Stunde
+    // Arbeit `automatons: 100`. Diese Zahl ist die öffentliche Kennzahl des Dienstes und die
+    // Messgröße des 30-Tage-Tests, deshalb darf sie nicht kostenlos setzbar sein.
+    const automatons = (
+      db
+        .prepare(
+          `SELECT count(DISTINCT a.automaton_id) AS n
+             FROM automatons a
+             JOIN ledger l ON l.address = a.address AND l.kind = 'topup'`,
+        )
+        .get() as { n: number }
+    ).n;
     return c.json({
       ok: true,
       version: VERSION,

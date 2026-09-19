@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createApp } from "../src/app.js";
-import { openDb } from "../src/db.js";
+import { openDb, postLedger } from "../src/db.js";
 import { MockProvider } from "../src/inference/mock.js";
 import { Catalog, MARKUP } from "../src/inference/proxy.js";
 
@@ -54,13 +54,31 @@ describe("Öffentliche Seite und Status", () => {
     expect(body.automatons).toBe(0);
   });
 
-  it("zählt registrierte Automatons in /v1/status mit", async () => {
+  it("zählt in /v1/status nur Automatons, hinter denen eine Zahlung steht", async () => {
+    // Die Registrierung ist kostenlos und beliebig oft möglich, ein API-Key ebenso. Zählte der
+    // Endpunkt jede Registrierung, könnte jeder die öffentliche Kennzahl des Dienstes und damit
+    // die Messgröße des 30-Tage-Tests auf einen beliebigen Wert setzen. Im Sicherheitsreview vom
+    // 19.09.2026 stand dort nach kurzer Zeit 100.
     const { app, db } = setup();
-    db.prepare(
-      "INSERT INTO automatons (automaton_id, address, creator_address, name, bio, registered_at) VALUES (?, ?, ?, ?, '', ?)",
-    ).run("a-1", "0xabc", "0xdef", "Test", new Date().toISOString());
-    const body = (await (await app.request("/v1/status")).json()) as { automatons: number };
-    expect(body.automatons).toBe(1);
+    const zahl = async () => ((await (await app.request("/v1/status")).json()) as { automatons: number }).automatons;
+    const anlegen = (id: string, address: string) => {
+      db.prepare("INSERT OR IGNORE INTO wallets (address, balance_mc, created_at) VALUES (?, 0, ?)").run(
+        address,
+        new Date().toISOString(),
+      );
+      db.prepare(
+        "INSERT INTO automatons (automaton_id, address, creator_address, name, bio, registered_at) VALUES (?, ?, ?, ?, '', ?)",
+      ).run(id, address, "0xdef", "Test", new Date().toISOString());
+    };
+
+    anlegen("a-1", "0xabc");
+    expect(await zahl(), "eine Registrierung ohne Zahlung zählt nicht").toBe(0);
+
+    for (let i = 2; i <= 20; i++) anlegen(`a-${i}`, "0xabc");
+    expect(await zahl(), "auch zwanzig kostenlose Registrierungen zählen nicht").toBe(0);
+
+    postLedger(db, { address: "0xabc", kind: "topup", deltaMc: 500_000, ref: "x402-nonce-1" });
+    expect(await zahl(), "sobald eine Zahlung vorliegt, zählen die Automatons dieser Wallet").toBe(20);
   });
 
   it("gibt in /v1/status nichts preis, was einen Mandanten identifiziert", async () => {

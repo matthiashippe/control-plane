@@ -24,7 +24,7 @@ import path from "node:path";
 import { createServer as createHttpsServer } from "node:https";
 import { serve } from "@hono/node-server";
 import { createApp, VERSION } from "./app.js";
-import { openDb } from "./db.js";
+import { cleanupExpired, openDb } from "./db.js";
 import { MockProvider } from "./inference/mock.js";
 import { OpenRouterProvider, openRouterFromEnv } from "./inference/openrouter.js";
 import { aliasesFromEnv, Catalog, providersFromEnv } from "./inference/proxy.js";
@@ -55,6 +55,21 @@ const app = createApp({
   settler,
   catalog,
 });
+
+// Aufräumen: Beim Start einmal, danach stündlich. `siwe_nonces` wächst sonst mit jedem Aufruf von
+// /v1/auth/nonce, und der braucht keinen API-Key.
+const cleanup = () => {
+  try {
+    const weg = cleanupExpired(db);
+    if (weg.nonces || weg.sessions || weg.payments) {
+      console.log(`[cleanup] ${weg.nonces} Nonces, ${weg.sessions} Sessions, ${weg.payments} alte failed-Payments entfernt`);
+    }
+  } catch (err) {
+    console.error(`[cleanup] fehlgeschlagen: ${err instanceof Error ? err.message : String(err)}`);
+  }
+};
+cleanup();
+setInterval(cleanup, 60 * 60 * 1000).unref();
 
 const tlsCert = process.env.CP_TLS_CERT;
 const tlsKey = process.env.CP_TLS_KEY;

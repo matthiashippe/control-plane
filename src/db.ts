@@ -196,6 +196,29 @@ export function getAvailableMc(db: Db, address: string): number {
   return row?.available ?? 0;
 }
 
+/**
+ * Räumt Zeilen weg, die nur noch Platz kosten. Ohne das wächst `siwe_nonces` mit jedem Aufruf von
+ * `/v1/auth/nonce` unbegrenzt, und dieser Pfad braucht keinen API-Key (Sicherheitsprüfung
+ * 19.09.2026). Gibt zurück, wie viele Zeilen je Tabelle verschwunden sind.
+ *
+ * Nonces bleiben so lange, wie eine Signatur gültig sein kann, plus Puffer. Payments werden nur
+ * im Zustand `failed` verworfen, und auch nur alte: `settled` ist der Beleg für eine Gutschrift
+ * und wird nie gelöscht.
+ */
+export function cleanupExpired(db: Db, now = Date.now()): { nonces: number; sessions: number; payments: number } {
+  const NONCE_MAX_ALTER_MS = 24 * 60 * 60 * 1000;
+  const FAILED_PAYMENT_MAX_ALTER_TAGE = 30;
+  const run = db.transaction(() => {
+    const nonces = db.prepare("DELETE FROM siwe_nonces WHERE issued_at < ?").run(now - NONCE_MAX_ALTER_MS).changes;
+    const sessions = db.prepare("DELETE FROM sessions WHERE expires_at < ?").run(now).changes;
+    const payments = db
+      .prepare("DELETE FROM payments WHERE status = 'failed' AND created_at < ?")
+      .run(new Date(now - FAILED_PAYMENT_MAX_ALTER_TAGE * 24 * 60 * 60 * 1000).toISOString()).changes;
+    return { nonces, sessions, payments };
+  });
+  return run();
+}
+
 export function getBalanceMc(db: Db, address: string): number {
   const row = db
     .prepare("SELECT balance_mc FROM wallets WHERE address = ?")
