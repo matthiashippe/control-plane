@@ -2,6 +2,13 @@
 # Deploy auf die VM: Repo-Stand per rsync nach /opt/control-plane, dann Compose bauen und starten.
 #   deploy/up.sh            (Host aus CP_DEPLOY_HOST, Default root@76.13.144.207)
 # Voraussetzung: deploy/setup-vm.sh einmal gelaufen, /opt/control-plane/.env vorhanden.
+#
+# NUR FÜR DEN KALTSTART: Erstinstallation, oder wenn der Dienst ohnehin schon unten ist.
+# `up -d --build` zerstört den alten Container, bevor feststeht, ob der neue hochkommt, und Caddy
+# antwortet in dieser Zeit mit 502. Für das Update eines laufenden Dienstes deshalb
+# **deploy/rollout.sh** nehmen: baut erst, beweist das Image an einer Kopie der Datenbank und
+# schaltet erst dann um. Auch Caddyfile-Änderungen wirken nur über rollout.sh (Inode-Falle, siehe
+# deploy/README.md).
 set -euo pipefail
 HOST="${CP_DEPLOY_HOST:-root@76.13.144.207}"
 KEY="${CP_DEPLOY_KEY:-$HOME/.ssh/id_ed25519_automaton}"
