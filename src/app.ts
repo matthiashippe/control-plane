@@ -198,6 +198,14 @@ export function createApp(opts: AppOptions) {
     '<rect width="32" height="32" rx="6" fill="#0b0e14"/>' +
     '<circle cx="16" cy="12" r="5.5" fill="none" stroke="#58d6a0" stroke-width="2.5"/>' +
     '<rect x="7" y="21" width="18" height="3.5" rx="1.75" fill="#58d6a0"/></svg>';
+  /**
+   * Suchmaschinen duerfen alles lesen. Die Datei existiert trotzdem, weil ihr Fehlen jeden Crawler
+   * einen 404 kostet und weil sie der Ort ist, an dem eine spaetere Einschraenkung stehen wuerde.
+   */
+  app.get("/robots.txt", (c) =>
+    c.text("User-agent: *\nAllow: /\n", 200, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "public, max-age=86400" }),
+  );
+
   app.get("/favicon.ico", (c) => c.body(FAVICON, 200, { "Content-Type": "image/svg+xml", "Cache-Control": "public, max-age=86400" }));
 
   app.get("/health", (c) => c.json({ ok: true, version: VERSION }));

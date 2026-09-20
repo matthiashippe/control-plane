@@ -414,3 +414,40 @@ describe("Nichts ausliefern, was nicht ausgeliefert werden soll", () => {
     }
   });
 });
+
+/**
+ * Was eine geteilte URL hergibt. Der Artikel und die Reddit-Beitraege stellen die Adresse in
+ * Threads, und ohne diese Angaben zeigen Reddit, Discord, Slack und Hacker News nur die nackte
+ * Adresse. Wer sie nicht kennt, klickt dann nicht.
+ */
+describe("Vorschau und Auffindbarkeit", () => {
+  it("liefert robots.txt statt eines 404", async () => {
+    const db = openDb(":memory:");
+    const res = await createApp({ db }).request("/robots.txt");
+    expect(res.status).toBe(200);
+    const text = await res.text();
+    expect(text).toMatch(/User-agent: \*/);
+    expect(text, "nichts darf versehentlich gesperrt sein").not.toMatch(/Disallow: \/\s*$/m);
+  });
+
+  it("traegt Titel, Beschreibung und Adresse fuer die Vorschau", async () => {
+    const db = openDb(":memory:");
+    const html = await (await createApp({ db }).request("/")).text();
+    for (const feld of ["og:title", "og:description", "og:url", "og:type", "twitter:card"]) {
+      expect(html, `${feld} fehlt`).toMatch(new RegExp(feld));
+    }
+    expect(html).toMatch(/rel="canonical" href="https:\/\/cp\.hippe\.eu\/"/);
+    // Die Beschreibung muss sagen, wofuer das hier der Ersatz ist, sonst ist die Vorschau leer.
+    expect(html).toMatch(/og:description" content="[^"]*api\.conway\.tech/);
+  });
+
+  it("verwendet keinen Gedankenstrich in der Copy", async () => {
+    const db = openDb(":memory:");
+    const html = await (await createApp({ db }).request("/")).text();
+    // Nur der Text, den ein Besucher liest. Das Inline-Skript bleibt aussen vor: Seine Zeichen
+    // sind Code, und eine Aenderung daran macht den CSP-Hash im Caddyfile ungueltig.
+    const copy = html.replace(/<script[\s\S]*?<\/script>/g, "");
+    const treffer = copy.match(/[\u2013\u2014]/g) ?? [];
+    expect(treffer, `Gedankenstriche in der Copy: ${treffer.length}`).toEqual([]);
+  });
+});

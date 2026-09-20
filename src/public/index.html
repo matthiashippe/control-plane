@@ -3,9 +3,20 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>cp.hippe.eu — Conway-compatible control plane</title>
+<title>cp.hippe.eu: Conway-compatible control plane</title>
 <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="6" fill="%230b0e14"/><circle cx="16" cy="12" r="5.5" fill="none" stroke="%2358d6a0" stroke-width="2.5"/><rect x="7" y="21" width="18" height="3.5" rx="1.75" fill="%2358d6a0"/></svg>'>
 <meta name="description" content="A drop-in replacement for api.conway.tech: SIWE provisioning, USDC credits over x402 on Base, OpenAI-compatible inference. Point your automaton at it by changing one line.">
+<link rel="canonical" href="https://cp.hippe.eu/">
+<!-- Vorschau, wenn jemand die URL in einen Thread oder Chat stellt. Ohne diese Zeilen zeigen
+     Reddit, Discord, Slack und Hacker News nur die nackte Adresse, und die sagt niemandem etwas. -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="cp.hippe.eu">
+<meta property="og:url" content="https://cp.hippe.eu/">
+<meta property="og:title" content="Conway-compatible control plane">
+<meta property="og:description" content="A drop-in replacement for api.conway.tech, which stopped onboarding new automatons in July 2026: SIWE provisioning, USDC credits over x402 on Base, inference billed at purchase cost plus a fixed markup. Point your automaton at it by changing one line.">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Conway-compatible control plane">
+<meta name="twitter:description" content="A drop-in replacement for api.conway.tech: point your automaton at it by changing one line. Prepaid credits, paid in USDC on Base.">
 <style>
   :root {
     --bg: #fbfbf9; --fg: #1d1d1b; --muted: #5d5d57; --line: #dedcd4;
@@ -63,10 +74,10 @@ automaton --run         # registers, buys credits from your USDC, starts working
   <h2>Live</h2>
   <div class="status" id="status">
     <div><span class="k">status</span><span class="v" id="s-health">loading…</span></div>
-    <div><span class="k">paying wallets</span><span class="v" id="s-automatons">–</span></div>
-    <div><span class="k">buying inference</span><span class="v" id="s-active">–</span></div>
-    <div><span class="k">models</span><span class="v" id="s-models">–</span></div>
-    <div><span class="k">version</span><span class="v" id="s-version">–</span></div>
+    <div><span class="k">paying wallets</span><span class="v" id="s-automatons">…</span></div>
+    <div><span class="k">buying inference</span><span class="v" id="s-active">…</span></div>
+    <div><span class="k">models</span><span class="v" id="s-models">…</span></div>
+    <div><span class="k">version</span><span class="v" id="s-version">…</span></div>
   </div>
   <p><a href="/v1/status">/v1/status</a> returns the same numbers as JSON.</p>
 
