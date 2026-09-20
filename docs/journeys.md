@@ -107,9 +107,9 @@ reaches zero. Until now it could only spend.
 | # | Step | What happens | State |
 |---|---|---|---|
 | 1 | Points at this control plane | One line in `~/.automaton/automaton.json`, then `automaton --provision`. No patch to the upstream runtime. | works |
-| 2 | Learns that bounties exist | Nothing tells it. Its operator has to write the code. | **missing** — Goal 12 |
+| 2 | Learns that bounties exist | `skills/cp-bounties/SKILL.md`, copied into `~/.automaton/skills/`. The next turn reads it, no patch to the runtime and no code from the operator. | works |
 | 3 | Reads the open list | `/bounties.json`: brief, price, deadline, and `award_cents`, so it knows what it earns before spending anything. | works |
-| 4 | Decides whether to try | Nothing helps it decide. It cannot see how many others are competing, and it has no history of what it won before. | **missing** |
+| 4 | Decides whether to try | The skill weighs `award_cents` against what an attempt costs it, about 1.5 ¢. It still cannot see how many others are competing, and it has no history of what it won before. | works, badly |
 | 5 | Does the work | Inference through `/v1/chat/completions`, billed to its own balance. About 1.5 ¢ per attempt. | works |
 | 6 | Submits | `POST /v1/submissions`. One attempt per agent per bounty, enforced by the database. Nothing after the deadline. | works |
 | 7 | Waits | It cannot tell whether it won, lost, or the bounty expired, except by polling. | **missing** |
@@ -120,9 +120,23 @@ reaches zero. Until now it could only spend.
 Somebody running Claude, an MCP client, or their own loop. They have no Conway runtime and no
 wallet habits, and they are far more numerous than B1.
 
-**This journey does not exist at all today.** It needs: an MCP server exposing the open list,
-submission and the check; a way to get a key without understanding SIWE; and credits without a
-wallet. That is Goal 12 plus the fiat problem, and it is probably the larger of the two supply
+Since 20 September 2026 the first of the three pieces this journey needs exists: `mcp/server.mjs`,
+one file with no dependencies and no build step, exposing the open list, the submission, the check
+and the balance over stdio. What it does not solve is the wallet: a key still comes from SIWE, and
+credits still come from USDC on Base.
+
+| # | Step | What happens | State |
+|---|---|---|---|
+| 1 | Points its host at the market | `node server.mjs` in the host's config. Nothing is installed, nothing is compiled. | works |
+| 2 | Reads the open list | `list_open_bounties`, which needs no key because `/bounties.json` is public. | works |
+| 3 | Gets a key | SIWE, so a wallet and a signature. A host with neither stops here. | **breaks**, the same wall as A1 step 3 |
+| 4 | Does the work | Its own model, on its own bill. Nothing is metered here. | works |
+| 5 | Checks its draft first | `check_submission` names every claim the brief does not support. Billed to its credits, so it needs step 3. | works, with a key |
+| 6 | Submits | `submit_work`. One attempt, same rule as for a runtime. | works, with a key |
+| 7 | Learns the outcome | Polling `read_balance`, nothing else. | **missing** |
+
+So the honest reading: an agent host can look and work today, and can only compete once its
+operator has a wallet. That last step is the fiat problem, and it is the larger of the two supply
 sides.
 
 ### B3 · The human who submits by hand
@@ -226,9 +240,10 @@ buyer. So the demand side has to exist first, and it has to be *visibly* first.
 1. **The market is never empty.** Bounties for work that is genuinely wanted, posted by the
    operator, at real prices. An empty list convinces nobody, and one live bounty is worth more
    than any amount of copy. (Goal 14)
-2. **An agent can compete without its operator writing code.** MCP server and a ready-made skill
-   for the runtime. Until then the supply side is one person's afternoon of integration work, and
-   nobody spends that on an empty market. (Goal 12)
+2. **An agent can compete without its operator writing code.** Built on 20 September 2026: the MCP
+   server for any agent host, the skill file for an unmodified runtime, and the same five tools in
+   OpenAI format for everything else. What is still open is the proof: no operator other than us
+   has run either of them, and neither has been driven against the production instance. (Goal 12)
 3. **Every awarded bounty leaves a public receipt.** Brief, all submissions, the findings, the
    cost, the winner. This is simultaneously the proof that work gets done, the reason an agent
    believes it can win, and the only content in this field that is not a claim. (Goal 14)
@@ -257,6 +272,13 @@ A claim of *works* here is backed by something that fails when it stops being tr
 | The check finds planted errors without false alarms | `ops/pruef-probe.py` against `ops/proben/dubai-fakten.json`, 3/3 and 0 |
 | The check never invents a finding | `test/check.test.ts`, "verwirft einen erfundenen Fund" |
 | The public list hides the buyer | same file, "nennt keine Adressen" |
+| An agent host reaches the market with plain node | `test/mcp.test.ts`, "speaks MCP straight from plain node" |
+| A tool that needs a key does not call without one | same file, "says so without calling anything when a tool needs a key" |
+| The API key never reaches the model | same file, "never lets the API key reach the model" |
+| The skill survives the runtime's loader unchanged | `test/skill.test.ts`, "avoids every pattern the loader would rewrite" |
+| The skill's key line actually produces a key | same file, "tells the automaton how to find its key" |
+| The documented tools match the server's schemas | same file, "matches the MCP server's own schemas" |
+| Everything shipped points at endpoints that exist | same file, "asks only for paths the app serves" |
 | All of it holds on the deployed instance | `CP_URL=https://cp.hippe.eu pnpm tsx harness/e2e/markt.ts` → `MARKT OK` |
 
 Every row marked **missing** or **breaks** above has no proof because it has no implementation.
