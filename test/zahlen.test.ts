@@ -85,3 +85,46 @@ describe("Die Zahlen im x402-Nachfragebericht stimmen mit den Rohdaten", () => {
     expect(conway, "im Bericht steht: genau einer").toBe(1);
   });
 });
+
+/**
+ * Dieselbe Prüfung für den Conway-Datensatz. Die Monatstabelle steht in zwei Dokumenten und im
+ * Artikel; wenn die CSV je neu erhoben wird, müssen die Texte mitwandern oder rot werden.
+ */
+describe("Die Conway-Zahlen stimmen mit der Transferliste", () => {
+  const zeilen = csv("2026-09-19-conway-payto-transfers.csv");
+  const bericht = text("2026-09-19-nachfrage.md");
+  const monat = (m: string) => zeilen.filter((r) => (r.timestamp_utc ?? "").startsWith(m));
+
+  it("nennt die richtige Zahl der Februar-Wallets", () => {
+    const feb = new Set(monat("2026-02").map((r) => (r.from ?? "").toLowerCase()));
+    expect(feb.size).toBe(1582);
+    expect(bericht).toMatch(/1[.,]582/);
+  });
+
+  it("nennt die richtige Gesamtsumme und Wallet-Zahl", () => {
+    const summe = zeilen.reduce((a, r) => a + Number(r.usdc ?? 0), 0);
+    expect(Math.round(summe)).toBe(62621);
+    expect(new Set(zeilen.map((r) => (r.from ?? "").toLowerCase())).size).toBe(2492);
+    expect(zeilen.length).toBe(9027);
+  });
+
+  it("belegt die Kohortenaussage, die im Artikeltitel steht", () => {
+    const feb = new Set(monat("2026-02").map((r) => (r.from ?? "").toLowerCase()));
+    const abJuni = new Set(
+      zeilen.filter((r) => (r.timestamp_utc ?? "") >= "2026-06").map((r) => (r.from ?? "").toLowerCase()),
+    );
+    const imJuni = new Set(monat("2026-06").map((r) => (r.from ?? "").toLowerCase()));
+    expect([...feb].filter((w) => abJuni.has(w)).length, "drei zahlten ab Juni noch einmal").toBe(3);
+    expect([...feb].filter((w) => imJuni.has(w)).length, "genau eine im Juni selbst: der Titel").toBe(1);
+    expect(imJuni.size, "die Junizeile der Tabelle").toBe(34);
+  });
+
+  it("belegt die Zahl der Einmalzahler", () => {
+    const zaehler = new Map<string, number>();
+    for (const r of zeilen) {
+      const w = (r.from ?? "").toLowerCase();
+      zaehler.set(w, (zaehler.get(w) ?? 0) + 1);
+    }
+    expect([...zaehler.values()].filter((n) => n === 1).length).toBe(1036);
+  });
+});
