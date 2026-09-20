@@ -43,7 +43,7 @@ self-running AI agent that pays for its own inference: you fund its wallet with 
 tokens, it keeps itself alive. The code is on GitHub. The payments are on Base. That second part
 means the whole thing is measurable, so I measured it.
 
-I scanned every USDC transfer to the platform's receiving address from January 1 to September 19,
+I scanned every USDC transfer to the platform's receiving address from January 1 to September 20,
 2026: 5,652 sequential `eth_getLogs` calls against the public Base RPC, 2,000 blocks at a time,
 9,027 transfer events, about 30 minutes of walking the chain. The raw data is a CSV in the repo
 linked at the bottom, so you do not have to take my word for any number here.
