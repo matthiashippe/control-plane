@@ -18,9 +18,15 @@ HEUTE="$(date -u +%F)"
 mkdir -p "$ZIEL/roh"
 
 tmp="$(mktemp)"
-trap 'rm -f "$tmp"' EXIT
+# Die Fehlerausgabe des Scans wird erst am Ende benannt. Vorher hiess sie immer `letzter-lauf.err`,
+# auch nach einem sauberen Lauf, und stand dann mit den blossen Fortschrittszeilen ("# cdp: 14960
+# Eintraege") im Verzeichnis. Wer nachsieht, liest eine Fehlermeldung, die keine ist; am 20.09.2026
+# hat genau das einen Loop-Zyklus gekostet. Jetzt heisst sie nur im Fehlerfall `.err`.
+stderr_tmp="$(mktemp)"
+trap 'rm -f "$tmp" "$stderr_tmp"' EXIT
 
-if ! python3 "$REPO/docs/research/data/x402-verzeichnis-scan.py" > "$tmp" 2>"$ZIEL/letzter-lauf.err"; then
+if ! python3 "$REPO/docs/research/data/x402-verzeichnis-scan.py" > "$tmp" 2>"$stderr_tmp"; then
+  cp "$stderr_tmp" "$ZIEL/letzter-lauf.err"
   echo "[x402] Scan fehlgeschlagen, siehe $ZIEL/letzter-lauf.err" >&2
   [[ -n "${CP_ALERT_WEBHOOK:-}" ]] && curl -fsS -m 10 -d "x402-Scan fehlgeschlagen auf $(hostname)" "$CP_ALERT_WEBHOOK" >/dev/null || true
   exit 1
@@ -44,5 +50,11 @@ fi
 printf '%s\n' "$zeile" >> "$ZIEL/kennzahlen.ndjson"
 gzip -c "$tmp" > "$ZIEL/roh/$HEUTE.csv.gz"
 find "$ZIEL/roh" -name '*.csv.gz' -mtime +60 -delete
+
+# Ab hier ist der Lauf gelungen: Die Ausgabe heisst `.log`, und ein `.err` aus einem frueheren
+# Fehlversuch verschwindet. Damit bedeutet eine vorhandene `.err` im Verzeichnis immer, dass der
+# letzte Lauf schiefging, und nur dann.
+cp "$stderr_tmp" "$ZIEL/letzter-lauf.log"
+rm -f "$ZIEL/letzter-lauf.err"
 
 echo "[x402] $HEUTE: $zeilen Zeilen, $(du -h "$ZIEL/roh/$HEUTE.csv.gz" | cut -f1) gepackt, Reihe jetzt $(wc -l < "$ZIEL/kennzahlen.ndjson") Punkte"

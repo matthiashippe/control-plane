@@ -59,6 +59,46 @@ Rules you must follow exactly:
 Answer with JSON only, no prose, in this shape:
 {"befunde": [{"zitat": "...", "art": "rechenfehler"|"widerspruch"|"unbelegt", "begruendung": "one short sentence"}]}"""
 
+# Fuer schoepferische Auftraege. Der Lauf vom 20.09. hat gezeigt, warum es die zweite Fassung
+# braucht: Auf Werbetext meldete die strenge Pruefung 23 Befunde auf 9 Einreichungen, also praktisch
+# jeden Satz. Werbetext erfindet immer, weil ein Briefing von hundert Woertern einen Text von
+# hundert Woertern nicht decken kann. Gemeldet wird deshalb nur, was den Auftraggeber bindet.
+ANWEISUNG_SCHOEPFERISCH = """You check a submitted piece of creative copy against the briefing it
+was written for.
+
+Creative copy necessarily adds. A hundred-word briefing cannot cover a hundred-word text, so the
+writer fills in connective tissue, rhythm and framing. That is the work, not a defect. Do not
+report it.
+
+Report ONLY what the client could be held to if it is not true. Ask of each candidate: if a
+customer arrived expecting this and it did not exist, would the client have a problem? If no, it is
+not a finding.
+
+A finding, list these:
+- "rechenfehler": the copy derives a number from the briefing and gets it WRONG. Compute the
+  correct value yourself and put it in "begruendung".
+- "widerspruch": the copy states something the briefing contradicts.
+- "unbelegt": the copy commits the client to something the briefing does not support. Equipment or
+  specifications not listed, a service not offered, a contact or booking channel that may not
+  exist, a credential, a certification, a guarantee, a price, a date, an availability, a capacity.
+
+NOT a finding, never list these:
+- Tone, rhythm, framing, or any self-description of care, quality, attention or experience.
+- A claim that follows from the briefing by correct arithmetic or as a necessary consequence.
+- Plausible detail that binds the client to nothing.
+
+Rules you must follow exactly:
+- Every finding MUST include "zitat": the exact substring from the SUBMISSION, copied character for
+  character, long enough to locate but no longer than one sentence. Never paraphrase it. Never
+  quote from the briefing in this field.
+- If the copy commits the client to nothing unsupported, return an empty list. That is a valid and
+  common answer. Do not invent findings to appear thorough.
+
+Answer with JSON only, no prose, in this shape:
+{"befunde": [{"zitat": "...", "art": "rechenfehler"|"widerspruch"|"unbelegt", "begruendung": "one short sentence"}]}"""
+
+ANWEISUNGEN = {"faktisch": ANWEISUNG, "schoepferisch": ANWEISUNG_SCHOEPFERISCH}
+
 
 def normalisieren(s: str) -> str:
     """Zitatvergleich ohne die Unterschiede, die kein Mensch als Unterschied liest.
@@ -75,11 +115,11 @@ def normalisieren(s: str) -> str:
     return re.sub(r"\s+", " ", s).strip().lower()
 
 
-def frage(modell: str, briefing: str, einreichung: str, key: str) -> dict:
+def frage(modell: str, briefing: str, einreichung: str, key: str, art: str = "faktisch") -> dict:
     rumpf = json.dumps({
         "model": modell,
         "messages": [
-            {"role": "system", "content": ANWEISUNG},
+            {"role": "system", "content": ANWEISUNGEN[art]},
             {"role": "user", "content": f"BRIEFING:\n{briefing}\n\n---\n\nSUBMISSION:\n{einreichung}"},
         ],
         "response_format": {"type": "json_object"},
@@ -95,6 +135,9 @@ def main() -> int:
     p = argparse.ArgumentParser()
     p.add_argument("--ergebnisse", required=True, help="ergebnisse.json aus ops/auftragstest.py")
     p.add_argument("--modell", default="openai/gpt-5.2")
+    p.add_argument("--art", choices=sorted(ANWEISUNGEN), default="faktisch",
+                   help="faktisch: jede ungedeckte Behauptung. schoepferisch: nur was den "
+                        "Auftraggeber bindet.")
     a = p.parse_args()
 
     key = os.environ.get("OPENROUTER_API_KEY")
@@ -112,7 +155,7 @@ def main() -> int:
         text = e["text"]
         text_norm = normalisieren(text)
         try:
-            roh = frage(a.modell, briefing, text, key)
+            roh = frage(a.modell, briefing, text, key, a.art)
         except urllib.error.HTTPError as ex:
             print(f"── {e['name']}: FEHLER {ex.code}", file=sys.stderr)
             continue
@@ -140,8 +183,8 @@ def main() -> int:
     if gesamt:
         print(f"Pruefergüte: {gesamt - verworfen} von {gesamt} Befunden belegt "
               f"({100*(gesamt-verworfen)//gesamt} %), {verworfen} verworfen.")
-    ziel = pfad.parent / "erfindungspruefung.json"
-    ziel.write_text(json.dumps({"modell": a.modell, "bericht": bericht},
+    ziel = pfad.parent / f"erfindungspruefung-{a.art}.json"
+    ziel.write_text(json.dumps({"modell": a.modell, "art": a.art, "bericht": bericht},
                                ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"Geschrieben nach {ziel}")
     return 0
