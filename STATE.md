@@ -143,6 +143,17 @@ Publikum daran scheitern. Matthias am 20.09.: "nicht halbgar sondern komplett in
     Conway-Runtime, die einen bestehenden Automaton mitbieten laesst, ohne Patch am Upstream.
     (c) Die Werkzeugdefinitionen im OpenAI-Format in `docs/bounties.md`. (d) Jeder Weg einmal gegen
     die Produktion gefahren und im Abnahmelauf festgehalten.
+    Status 20.09.2026: (a) bis (c) gebaut. `mcp/server.mjs` ist eine Datei ohne Abhaengigkeiten und
+    ohne Build-Schritt, stdio, fuenf Werkzeuge (`list_open_bounties`, `submit_work`,
+    `read_my_submission`, `check_submission`, `read_balance`), Schluessel aus `CP_API_KEY`,
+    Basis-URL aus `CP_URL` mit Default `https://cp.hippe.eu`. `skills/cp-bounties/SKILL.md` liegt
+    im Format der Upstream-Defaults (Pin d8f8168) und wird nur ins Skills-Verzeichnis kopiert. Die
+    Werkzeugdefinitionen in `docs/bounties.md` werden aus denselben Schemata erzeugt, ein Test
+    faellt bei Abweichung. 33 neue Pruefungen, jede mit Gegenprobe, `pnpm test` bei 281.
+    Offen ist (d): kein Weg ist gegen die Produktion gefahren, und noch niemand ausser uns hat
+    einen davon benutzt. Dazu fehlt ausserdem die Sichtbarkeit: weder `/llms.txt` noch die
+    Startseite nennen den MCP-Weg, beides braucht ein Ausrollen und wartet auf das naechste
+    ohnehin faellige.
 13. **Goal 13, GTM mit Kill-Kriterium**: Ein Plan, der eine Zahl nennt, ab der er beendet wird.
     Done: (a) Jeder Kanal mit gemessener Ausgangslage statt Hoffnung, in der Reihenfolge, in der er
     gefahren wird, mit Datum. (b) Der Artikel, die Reddit-Beitraege und die Issue-Antworten haengen
