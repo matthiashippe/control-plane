@@ -139,3 +139,34 @@ describe("Tiers aus der Umgebung", () => {
     expect(() => payConfigFromEnv({ CP_PAY_TO: PAY_TO, CP_TOPUP_TIERS_USD: "abc" })).toThrow(/leer/);
   });
 });
+
+describe("Die Antwort des Facilitators ist nachlesbar", () => {
+  it("protokolliert sie, ohne die Signatur preiszugeben", async () => {
+    const zeilen: string[] = [];
+    const echtesLog = console.log;
+    console.log = (...a: unknown[]) => void zeilen.push(a.join(" "));
+    try {
+      const { impl } = stub({
+        "/verify": () => new Response(JSON.stringify({ isValid: true }), { status: 200 }),
+        "/settle": () =>
+          new Response(JSON.stringify({ success: true, transaction: "0xabc", bazaar: { catalogued: true } }), { status: 200 }),
+      });
+      const settler = new FacilitatorSettler({
+        url: "https://facilitator.example",
+        network: "base",
+        payTo: PAY_TO,
+        usdcAddress: USDC,
+        maxTimeoutSeconds: 300,
+        fetch: impl,
+      });
+      const res = await settler.settle(AUTH, SIG, "https://cp.hippe.eu/pay/5/0xabc");
+      expect(res.ok).toBe(true);
+    } finally {
+      console.log = echtesLog;
+    }
+    const zeile = zeilen.find((z) => z.includes("[facilitator] settle"));
+    expect(zeile, "ohne diese Zeile tappen wir bei der Katalogisierung im Dunkeln").toBeTruthy();
+    expect(zeile).toMatch(/catalogued/);
+    expect(zeile, "die Signatur gehoert nicht ins Log").not.toMatch(new RegExp(SIG.slice(0, 20)));
+  });
+});

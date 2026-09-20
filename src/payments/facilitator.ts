@@ -89,6 +89,11 @@ export class FacilitatorSettler implements Settler {
     const settle = await this.post("/settle", body);
     if (!settle.ok) return { ok: false, error: `settle: ${settle.error}` };
     const s = settle.data as { success?: boolean; errorReason?: string; transaction?: string; txHash?: string };
+    // Die Antwort des Facilitators einmal vollstaendig ins Log. Sie enthaelt keine Signatur und
+    // kein Geheimnis, aber sie ist die einzige Stelle, an der steht, ob er den Verkaeufer in sein
+    // Verzeichnis uebernommen hat. Am 20.09. lief ein Settlement sauber durch, und wir standen
+    // danach trotzdem nicht im Verzeichnis, ohne dass irgendwo nachzulesen war warum.
+    console.log(`[facilitator] settle -> ${JSON.stringify(settle.data).slice(0, 600)}`);
     if (!s.success) return { ok: false, error: `settle failed: ${s.errorReason ?? "unknown"}` };
     const txHash = (s.transaction || s.txHash || "") as Hex;
     return { ok: true, txHash: txHash || undefined };
