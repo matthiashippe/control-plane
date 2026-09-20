@@ -11,8 +11,10 @@ owner changes one line in `~/.automaton/automaton.json` and keeps running:
 ```
 
 Conway stopped onboarding automatons in July 2026: `POST /v1/auth/verify` answers 500 or 401 for
-every fresh wallet, and twelve open issues describe the same wall (#339, #353, #355, #356, #359,
-#371, #372, #373, #376, #377, #379, #380). This service exists because my own automaton needed a control plane.
+every fresh wallet. Ten issues since July 17 report it and have not stopped (#339, #353, #355,
+#356, #359, #371, #372, #376, #377, #379), with two earlier reports from March 27 (#293, #294),
+one of those after 30 USDC had already been sent. This service exists because my own automaton
+needed a control plane.
 
 **Hosted instance: https://cp.hippe.eu** (live status at `/v1/status`). You can also run your own;
 see the license below for what "your own" covers.
@@ -23,6 +25,20 @@ model, or setting the cached balance in the runtime's own SQLite state and using
 key. Both are written up with the exact code paths, and with the one config field that silently
 defeats the Ollama route, in [docs/ohne-control-plane.md](docs/ohne-control-plane.md). If you have
 hardware for a decent local model, take that route instead of paying me.
+
+## The data behind all this
+
+Two datasets, both raw, both under CC0, both re-runnable without any API key:
+
+| What | Data | How it was collected |
+|---|---|---|
+| Every USDC transfer to Conway's receiving address, Jan 1 to Sep 20 2026 (9,027 transfers, 2,492 wallets) | [`2026-09-19-conway-payto-transfers.csv`](docs/research/data/2026-09-19-conway-payto-transfers.csv) | 5,652 sequential `eth_getLogs` calls against the public Base RPC |
+| Every service in both public x402 directories, with Coinbase's per-service demand figures (21,545 entries, 2,627 providers) | [`2026-09-20-x402-verzeichnis.csv`](docs/research/data/2026-09-20-x402-verzeichnis.csv) | [`x402-verzeichnis-scan.py`](docs/research/data/x402-verzeichnis-scan.py), two unauthenticated endpoints |
+
+The write-ups: [what the directory data shows](docs/research/2026-09-20-x402-nachfrage.md) (14,960
+paid APIs, 130 with twenty or more customers a month) and [where the Conway money
+went](docs/research/2026-09-19-nachfrage.md). Every figure in both is re-derived from the CSVs by
+the test suite, so a stale number fails CI rather than sitting there.
 
 ## What it implements
 
