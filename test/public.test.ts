@@ -451,3 +451,17 @@ describe("Vorschau und Auffindbarkeit", () => {
     expect(treffer, `Gedankenstriche in der Copy: ${treffer.length}`).toEqual([]);
   });
 });
+
+describe("Die Marktmessung steht auf der Seite", () => {
+  it("nennt Umfang und Kernzahl und verlinkt die Rohdaten", async () => {
+    const db = openDb(":memory:");
+    const html = await (await createApp({ db }).request("/")).text();
+    expect(html).toMatch(/21,545 listed services/);
+    // "130 von 21.545" waere falsch: gemessen sind nur die 14.918 mit Nachfragedaten.
+    expect(html).toMatch(/14,918 of them/);
+    expect(html).toMatch(/130 of those have twenty or more/);
+    expect(html, "ohne Link auf die Rohdaten ist es eine Behauptung").toMatch(
+      /docs\/research\/data/,
+    );
+  });
+});
