@@ -1,98 +1,98 @@
-// Prüft eine zurückgespielte SQLite, bevor der Dienst wieder darauf startet.
+// Checks a restored SQLite before the service starts on it again.
 //
-// Lokal:       node ops/restore-pruefen.cjs /pfad/zur/cp.db
-// Im Container: docker compose -f docker-compose.prod.yml exec -T cp node - < ops/restore-pruefen.cjs
+// Locally:          node ops/restore-pruefen.cjs /path/to/cp.db
+// In the container: docker compose -f docker-compose.prod.yml exec -T cp node - < ops/restore-pruefen.cjs
 //
-// Ausgabe: je Prüfung eine Zeile, am Ende eine JSON-Zusammenfassung. Exit 1, sobald eine Prüfung
-// fehlschlägt. Die Datei wird nur gelesen (readonly), auch der Schema-Abgleich schreibt nichts.
+// Output: one line per check, a JSON summary at the end. Exit 1 as soon as one check fails. The
+// file is only read (readonly); the schema comparison writes nothing either.
 const Database = require("better-sqlite3");
 
-const pfad = process.argv[2] || process.env.CP_DB_PATH || "/data/cp.db";
-const db = new Database(pfad, { readonly: true, fileMustExist: true });
+const path = process.argv[2] || process.env.CP_DB_PATH || "/data/cp.db";
+const db = new Database(path, { readonly: true, fileMustExist: true });
 const one = (sql, ...a) => db.prepare(sql).get(...a);
 const all = (sql, ...a) => db.prepare(sql).all(...a);
 
-let fehler = 0;
-const ergebnis = { datei: pfad };
-function pruefe(name, ok, detail) {
-  console.log(`${ok ? "ok  " : "FEHL"}  ${name}${detail ? `: ${detail}` : ""}`);
-  if (!ok) fehler++;
+let failures = 0;
+const result = { file: path };
+function check(name, ok, detail) {
+  console.log(`${ok ? "ok  " : "FAIL"}  ${name}${detail ? `: ${detail}` : ""}`);
+  if (!ok) failures++;
 }
 
-// 1. Ist die Datei überhaupt heil? Ein halb kopiertes Backup fällt hier auf, nicht erst im Betrieb.
+// 1. Is the file intact at all? A half-copied backup shows up here, not later in production.
 const integrity = one("PRAGMA integrity_check").integrity_check;
-ergebnis.integrity_check = integrity;
-pruefe("integrity_check", integrity === "ok", integrity);
+result.integrity_check = integrity;
+check("integrity_check", integrity === "ok", integrity);
 
 const fk = all("PRAGMA foreign_key_check");
-ergebnis.foreign_key_violations = fk.length;
-pruefe("foreign_key_check", fk.length === 0, `${fk.length} Verletzungen`);
+result.foreign_key_violations = fk.length;
+check("foreign_key_check", fk.length === 0, `${fk.length} violations`);
 
-// 2. Schema-Stand. Ein Backup, das älter ist als die letzte Migration, kennt diese Spalten nicht.
-// Das ist kein Abbruchgrund: openDb() migriert beim Start. Es muss nur jemand wissen.
-const spalten = (t) => db.prepare(`PRAGMA table_info(${t})`).all().map((c) => c.name);
-const tabellen = all("SELECT name FROM sqlite_master WHERE type='table'").map((r) => r.name);
-const fehlend = [];
-if (!spalten("wallets").includes("reserved_mc")) fehlend.push("wallets.reserved_mc");
-if (!spalten("payments").includes("balance_after_mc")) fehlend.push("payments.balance_after_mc");
-if (!tabellen.includes("kv")) fehlend.push("kv");
-ergebnis.schema_fehlt = fehlend;
-if (fehlend.length) {
-  console.log(`hinw  Schema älter als der Code: ${fehlend.join(", ")} fehlt. openDb() ergänzt das beim Start.`);
+// 2. Schema level. A backup older than the last migration does not know these columns. That is no
+// reason to abort: openDb() migrates on start. Somebody just has to know.
+const columns = (t) => db.prepare(`PRAGMA table_info(${t})`).all().map((c) => c.name);
+const tables = all("SELECT name FROM sqlite_master WHERE type='table'").map((r) => r.name);
+const missing = [];
+if (!columns("wallets").includes("reserved_mc")) missing.push("wallets.reserved_mc");
+if (!columns("payments").includes("balance_after_mc")) missing.push("payments.balance_after_mc");
+if (!tables.includes("kv")) missing.push("kv");
+result.schema_missing = missing;
+if (missing.length) {
+  console.log(`note  schema older than the code: ${missing.join(", ")} missing. openDb() adds that on start.`);
 } else {
-  pruefe("Schema aktuell", true);
+  check("schema up to date", true);
 }
 
-// 3. Die eigentliche Frage: Deckt sich jede Wallet mit ihren Ledgerzeilen? Jede Saldo-Änderung ist
-// genau eine Ledgerzeile in derselben Transaktion, also muss die Summe exakt stimmen. Tut sie es
-// nicht, war der Snapshot nicht konsistent und das Backup ist wertlos.
-const schief = all(`
+// 3. The real question: does every wallet match its ledger rows? Every balance change is exactly
+// one ledger row in the same transaction, so the sum has to match exactly. If it does not, the
+// snapshot was not consistent and the backup is worthless.
+const mismatched = all(`
   SELECT w.address, w.balance_mc, coalesce(l.s, 0) AS ledger_sum_mc
   FROM wallets w
   LEFT JOIN (SELECT address, sum(delta_mc) AS s FROM ledger GROUP BY address) l ON l.address = w.address
   WHERE w.balance_mc <> coalesce(l.s, 0)
 `);
-const summen = one("SELECT count(*) n, coalesce(sum(balance_mc),0) s FROM wallets");
-const ledgerSumme = one("SELECT count(*) n, coalesce(sum(delta_mc),0) s FROM ledger");
-ergebnis.wallets = summen.n;
-ergebnis.balance_mc = summen.s;
-ergebnis.ledger_rows = ledgerSumme.n;
-ergebnis.ledger_sum_mc = ledgerSumme.s;
-pruefe("balance_mc == ledger_sum_mc je Wallet", schief.length === 0,
-  schief.length ? schief.map((r) => `${r.address} ${r.balance_mc} vs ${r.ledger_sum_mc}`).join("; ") : `${summen.n} Wallets, ${summen.s} mc`);
-pruefe("Summe über alle Wallets", summen.s === ledgerSumme.s, `${summen.s} mc vs ${ledgerSumme.s} mc im Ledger`);
+const totals = one("SELECT count(*) n, coalesce(sum(balance_mc),0) s FROM wallets");
+const ledgerTotals = one("SELECT count(*) n, coalesce(sum(delta_mc),0) s FROM ledger");
+result.wallets = totals.n;
+result.balance_mc = totals.s;
+result.ledger_rows = ledgerTotals.n;
+result.ledger_sum_mc = ledgerTotals.s;
+check("balance_mc == ledger_sum_mc per wallet", mismatched.length === 0,
+  mismatched.length ? mismatched.map((r) => `${r.address} ${r.balance_mc} vs ${r.ledger_sum_mc}`).join("; ") : `${totals.n} wallets, ${totals.s} mc`);
+check("sum across all wallets", totals.s === ledgerTotals.s, `${totals.s} mc vs ${ledgerTotals.s} mc in the ledger`);
 
-// 4. Zahlungen. `settled` ist der Beleg für eine Gutschrift: Jede muss ihre topup-Ledgerzeile
-// haben, sonst hat jemand bezahlt und keine Credits bekommen.
-const zahlungen = {};
-for (const r of all("SELECT status, count(*) n FROM payments GROUP BY status")) zahlungen[r.status] = r.n;
-ergebnis.payments = zahlungen;
-const ohneBuchung = all(`
+// 4. Payments. `settled` is the receipt of a credit: every one of them must have its topup ledger
+// row, otherwise somebody paid and got no credits.
+const payments = {};
+for (const r of all("SELECT status, count(*) n FROM payments GROUP BY status")) payments[r.status] = r.n;
+result.payments = payments;
+const unbooked = all(`
   SELECT p.nonce FROM payments p
   WHERE p.status = 'settled' AND NOT EXISTS (SELECT 1 FROM ledger l WHERE l.kind = 'topup' AND l.ref = p.nonce)
 `);
-ergebnis.settled_ohne_buchung = ohneBuchung.length;
-pruefe("jede settled-Zahlung hat ihre topup-Zeile", ohneBuchung.length === 0,
-  ohneBuchung.length ? ohneBuchung.map((r) => r.nonce).join(", ") : `${zahlungen.settled || 0} settled`);
+result.settled_without_booking = unbooked.length;
+check("every settled payment has its topup row", unbooked.length === 0,
+  unbooked.length ? unbooked.map((r) => r.nonce).join(", ") : `${payments.settled || 0} settled`);
 
-const doppelt = all("SELECT ref, count(*) n FROM ledger WHERE kind='topup' AND ref IS NOT NULL GROUP BY ref HAVING n > 1");
-ergebnis.doppelte_topups = doppelt.length;
-pruefe("keine doppelte Gutschrift je x402-Nonce", doppelt.length === 0,
-  doppelt.map((r) => `${r.ref} (${r.n}x)`).join(", "));
+const duplicates = all("SELECT ref, count(*) n FROM ledger WHERE kind='topup' AND ref IS NOT NULL GROUP BY ref HAVING n > 1");
+result.duplicate_topups = duplicates.length;
+check("no duplicate credit per x402 nonce", duplicates.length === 0,
+  duplicates.map((r) => `${r.ref} (${r.n}x)`).join(", "));
 
-// 5. Bestände, die beim ersten Start wieder verschwinden: Das Backup kommt aus dem laufenden
-// Betrieb, also stehen dort Reservierungen und `pending`-Zahlungen von Requests, die es nicht
-// mehr gibt. openDb() setzt beides zurück, pending wird zu failed. Wer zählt, zählt vorher.
-ergebnis.offene_reservierungen = spalten("wallets").includes("reserved_mc")
+// 5. State that disappears again on the first start: the backup comes out of running production,
+// so it carries reservations and `pending` payments of requests that no longer exist. openDb()
+// resets both, pending becomes failed. Whoever counts, counts beforehand.
+result.open_reservations = columns("wallets").includes("reserved_mc")
   ? one("SELECT count(*) n FROM wallets WHERE reserved_mc <> 0").n : null;
-ergebnis.pending_payments = zahlungen.pending || 0;
-if (ergebnis.offene_reservierungen || ergebnis.pending_payments) {
-  console.log(`hinw  ${ergebnis.offene_reservierungen} Wallet(s) mit Reservierung, ${ergebnis.pending_payments} Zahlung(en) in 'pending'. ` +
-    `Der erste Start setzt Reservierungen auf 0 und 'pending' auf 'failed' und protokolliert jede davon.`);
+result.pending_payments = payments.pending || 0;
+if (result.open_reservations || result.pending_payments) {
+  console.log(`note  ${result.open_reservations} wallet(s) with a reservation, ${result.pending_payments} payment(s) in 'pending'. ` +
+    `The first start sets reservations to 0 and 'pending' to 'failed' and logs every one of them.`);
 }
 
-ergebnis.keys = one("SELECT count(*) n FROM api_keys WHERE revoked_at IS NULL").n;
-ergebnis.automatons = one("SELECT count(*) n FROM automatons").n;
-ergebnis.fehler = fehler;
-console.log(JSON.stringify(ergebnis));
-process.exit(fehler ? 1 : 0);
+result.keys = one("SELECT count(*) n FROM api_keys WHERE revoked_at IS NULL").n;
+result.automatons = one("SELECT count(*) n FROM automatons").n;
+result.failures = failures;
+console.log(JSON.stringify(result));
+process.exit(failures ? 1 : 0);
