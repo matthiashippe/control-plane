@@ -30,6 +30,12 @@ THREADS = [
     ("1wk1qfk", "r/AI_Agents: How do you handle service discovery for agents that need to pay for APIs"),
 ]
 
+# Eigene Beitraege, nicht nur Kommentare unter fremden. Hier zaehlen Kommentare Dritter als
+# Antwort an uns, nicht nur direkte Antworten auf einen eigenen Kommentar.
+EIGENE_POSTS = [
+    ("1wli6lq", "r/ethdev: An agent that made 603 payments in 41 hours got address-poisoned"),
+]
+
 
 def hole(url: str, roh: bool = False):
     req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "*/*"})
@@ -84,6 +90,30 @@ def main() -> None:
             for a in fremde_antworten:
                 print(f"     {a.get('author')}: {a.get('body', '')[:160]}")
         print()
+    for pid, titel in EIGENE_POSTS:
+        print(f"── {titel}")
+        permalink = f"https://www.reddit.com/r/ethdev/comments/{pid}/"
+        daten = hole(f"https://arctic-shift.photon-reddit.com/api/posts/ids?ids={pid}")
+        if isinstance(daten, dict) and "__fehler" not in daten:
+            eintraege = daten.get("data", [])
+            if eintraege:
+                p = eintraege[0]
+                t = datetime.datetime.fromtimestamp(p["created_utc"], datetime.timezone.utc)
+                weg = p.get("removed_by_category") or p.get("banned_by")
+                permalink = "https://www.reddit.com" + p.get("permalink", "")
+                print(f"   geschrieben {t:%Y-%m-%d %H:%M} UTC, im Archiv {'ENTFERNT (' + str(weg) + ')' if weg else 'in Ordnung'}")
+        print(f"   LIVE: {live(permalink)}")
+        # Antworten auf den Post selbst.
+        kom = hole(f"https://arctic-shift.photon-reddit.com/api/comments/search?link_id={pid}&limit=100")
+        if isinstance(kom, dict) and "__fehler" not in kom:
+            fremde = [c for c in kom.get("data", []) if c.get("author") != KONTO]
+            print(f"   Antworten: {len(fremde)}")
+            for a in fremde:
+                offen += 1
+                print(f"     ⚠ {a.get('author')}: {a.get('body', '')[:200]}")
+        print(f"   {permalink}")
+        print()
+
     if offen:
         print(f"{offen} unbeantwortete Antwort(en). Eine Frage, die stehenbleibt, kostet mehr als keine Antwort.")
 
