@@ -52,3 +52,24 @@ Issue #393 und bedeutet nicht zwei Kaufentscheidungen.
 CC0 1.0 Universal, siehe `LICENSE.md` in diesem Verzeichnis. Das weicht bewusst von der
 PolyForm-Noncommercial-Lizenz des Repositorys ab: Ein Beleg, den kommerzielle Leser nicht
 verwenden dürfen, ist als Beleg wertlos.
+
+## `2026-09-20-betroffene-accounts-90-tage.csv`
+
+Jede einzelne Wortmeldung, aus der die Zahl in `../2026-09-20-wo-die-betroffenen-sind.md` besteht.
+57 Zeilen, 46 eindeutige Accounts, Fenster 22.06.2026 bis 20.09.2026.
+
+Spalten: `ring` (Kern, Rand, Handelnd), `account`, `datum`, `beleg` (Art des Beitrags), `url`
+(direkter Link auf Issue, Kommentar oder Commit).
+
+`Kern` sind die 27 Accounts, die über die kaputte Anmeldung geschrieben haben; `Rand` die 9 zu
+anderen Ausfällen derselben Plattform; `Handelnd` die 10, die keine Frage gestellt, sondern Code
+gegen das Problem committet haben. Bots mit Bot-Kennung und unsere eigenen Beiträge sind nicht
+enthalten. Abzuziehen sind `babu234-del` und `mesikewisdom19-source` als Rauschen, womit 25
+belastbare Accounts im Kern bleiben.
+
+Nachzählen:
+
+```
+awk -F, 'NR>1 {print $2}' 2026-09-20-betroffene-accounts-90-tage.csv | sort -u | wc -l   # 46
+awk -F, 'NR>1 && $1=="Kern" {print $2}' 2026-09-20-betroffene-accounts-90-tage.csv | sort -u | wc -l  # 27
+```

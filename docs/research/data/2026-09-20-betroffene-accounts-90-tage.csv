@@ -1,0 +1,58 @@
+ring,account,datum,beleg,url
+Handelnd,tiz823,2026-08-12,Arbeit im eigenen Fork fortgesetzt,https://github.com/Conway-Research/automaton/pull/365
+Handelnd,ChristianErdtmann,2026-08-28,Planner sah immer 0 Credits,https://github.com/ChristianErdtmann/automatonFork
+Handelnd,WhiteBookCapital,2026-09-05,BYOK-Instanz bestaetigt,https://github.com/Conway-Research/automaton/pull/383
+Handelnd,darkknite144-afk,2026-09-11,Lauf ohne echte Mittel,https://github.com/darkknite144-afk/automaton-demo
+Handelnd,robleds,2026-09-12,Isolated mode ohne Conway Cloud,https://github.com/robleds/automaton/commit/01b91ffdce20a1fb2a31452d14b6207a87434700
+Handelnd,vkdlsjf623,2026-09-18,Diagnose creditsCents=-1,https://github.com/vkdlsjf623/automaton/commit/107caa5a7e6a83a69ba5f3ba140003611bdd3e3a
+Handelnd,Pritamkumarsahoo69,2026-09-19,eigene On-chain-Zahlungspruefung,https://github.com/Pritamkumarsahoo69/automaton-v2
+Handelnd,hopetmpy,2026-09-19,Abspaltung ABOS vom Upstream,https://github.com/hopetmpy/ABOS
+Handelnd,joukinneto,2026-09-20,OmniRoute-Gateway im Fork,https://github.com/joukinneto/-jkdd-continuous-automaton/commit/69a900c8bdbb0072f7a01cdc2b1c6ffd8590b55c
+Handelnd,MechanicalMindVonMisses,2026-09-20,"Mock-Conway-Client, offline",https://github.com/MechanicalMindVonMisses/trading-agent-automaton
+Kern,GigisAssistant,2026-07-14,Kommentar in #293,https://github.com/Conway-Research/automaton/issues/293#issuecomment-4973991879
+Kern,JoTalbot,2026-07-14,Kommentar in #293,https://github.com/Conway-Research/automaton/issues/293#issuecomment-4974001492
+Kern,syedhassan-aifinpay,2026-07-17,Issue #339 eroeffnet,https://github.com/Conway-Research/automaton/issues/339
+Kern,vigramstr1998-Alpha,2026-07-27,Issue #353 eroeffnet,https://github.com/Conway-Research/automaton/issues/353
+Kern,2262244275,2026-07-27,Issue #355 eroeffnet,https://github.com/Conway-Research/automaton/issues/355
+Kern,MrDecryptDecipher,2026-07-27,Kommentar in #353,https://github.com/Conway-Research/automaton/issues/353#issuecomment-5088024414
+Kern,Gowtham-Rajendran,2026-07-28,Issue #356 eroeffnet,https://github.com/Conway-Research/automaton/issues/356
+Kern,babu234-del,2026-07-29,Kommentar in #356,https://github.com/Conway-Research/automaton/issues/356#issuecomment-5112415067
+Kern,vigramstr1998-Alpha,2026-08-01,Kommentar in #353,https://github.com/Conway-Research/automaton/issues/353#issuecomment-5148616790
+Kern,Fitcha06,2026-08-05,Issue #359 eroeffnet,https://github.com/Conway-Research/automaton/issues/359
+Kern,fernandolobo25-eng,2026-08-09,Kommentar in #339,https://github.com/Conway-Research/automaton/issues/339#issuecomment-5232930129
+Kern,phfer,2026-08-09,Kommentar in #339,https://github.com/Conway-Research/automaton/issues/339#issuecomment-5234325041
+Kern,xuanwuao172-afk,2026-08-20,Issue #371 eroeffnet,https://github.com/Conway-Research/automaton/issues/371
+Kern,asimov4242,2026-08-22,Issue #372 eroeffnet,https://github.com/Conway-Research/automaton/issues/372
+Kern,asimov4242,2026-08-22,Issue #373 eroeffnet,https://github.com/Conway-Research/automaton/issues/373
+Kern,xuanwuao172-afk,2026-08-22,Kommentar in #371,https://github.com/Conway-Research/automaton/issues/371#issuecomment-5381055233
+Kern,Kosea1234,2026-08-26,Issue #376 eroeffnet,https://github.com/Conway-Research/automaton/issues/376
+Kern,Kosea1234,2026-08-26,Kommentar in #359,https://github.com/Conway-Research/automaton/issues/359#issuecomment-5427659602
+Kern,caioholland1-cpu,2026-08-27,Issue #377 eroeffnet,https://github.com/Conway-Research/automaton/issues/377
+Kern,vena-digital,2026-08-27,Kommentar in #377,https://github.com/Conway-Research/automaton/issues/377#issuecomment-5441892151
+Kern,lukacsbenedek4-arch,2026-08-29,Issue #379 eroeffnet,https://github.com/Conway-Research/automaton/issues/379
+Kern,YourFutureSiteDev,2026-08-29,Kommentar in #377,https://github.com/Conway-Research/automaton/issues/377#issuecomment-5461185796
+Kern,lukacsbenedek4-arch,2026-08-29,Kommentar in #339,https://github.com/Conway-Research/automaton/issues/339#issuecomment-5461400454
+Kern,mesikewisdom19-source,2026-08-29,Kommentar in #373,https://github.com/Conway-Research/automaton/issues/373#issuecomment-5463658273
+Kern,mesikewisdom19-source,2026-08-29,Kommentar in #373,https://github.com/Conway-Research/automaton/issues/373#issuecomment-5463705200
+Kern,dzenansabotic12,2026-09-10,Issue #390 eroeffnet,https://github.com/Conway-Research/automaton/issues/390
+Kern,copacarmine,2026-09-12,Kommentar in #376,https://github.com/Conway-Research/automaton/issues/376#issuecomment-5645625649
+Kern,Todor-5rov,2026-09-13,Kommentar in #390,https://github.com/Conway-Research/automaton/issues/390#issuecomment-5654065092
+Kern,atila-altindag,2026-09-13,Kommentar in #379,https://github.com/Conway-Research/automaton/issues/379#issuecomment-5655467960
+Kern,victorargo,2026-09-14,Kommentar in #390,https://github.com/Conway-Research/automaton/issues/390#issuecomment-5662908082
+Kern,SAM-0x5,2026-09-17,Issue #392 eroeffnet,https://github.com/Conway-Research/automaton/issues/392
+Kern,cv-scvd,2026-09-17,Issue #393 eroeffnet,https://github.com/Conway-Research/automaton/issues/393
+Kern,Rickh07,2026-09-17,Kommentar in #355,https://github.com/Conway-Research/automaton/issues/355#issuecomment-5717819158
+Rand,dabossindashell,2026-06-26,Kommentar in #219,https://github.com/Conway-Research/automaton/issues/219#issuecomment-4810603395
+Rand,sonnyproto,2026-07-10,Issue #335 eroeffnet,https://github.com/Conway-Research/automaton/issues/335
+Rand,dabossindashell,2026-07-10,Kommentar in #219,https://github.com/Conway-Research/automaton/issues/219#issuecomment-4939403288
+Rand,sy64t6c527-cyber,2026-07-16,Kommentar in #335,https://github.com/Conway-Research/automaton/issues/335#issuecomment-4990415081
+Rand,abuzar-rasool,2026-07-16,Kommentar in #335,https://github.com/Conway-Research/automaton/issues/335#issuecomment-4995709157
+Rand,ferchosud-bit,2026-08-16,Kommentar in #296,https://github.com/Conway-Research/automaton/issues/296#issuecomment-5308473651
+Rand,YeLengXi,2026-08-16,Kommentar in #296,https://github.com/Conway-Research/automaton/issues/296#issuecomment-5308476002
+Rand,Pasblinn,2026-08-23,Kommentar in #335,https://github.com/Conway-Research/automaton/issues/335#issuecomment-5384281416
+Rand,Pasblinn,2026-08-24,Kommentar in #335,https://github.com/Conway-Research/automaton/issues/335#issuecomment-5400332985
+Rand,Pasblinn,2026-08-24,Kommentar in #335,https://github.com/Conway-Research/automaton/issues/335#issuecomment-5400390231
+Rand,Pasblinn,2026-08-24,Kommentar in #335,https://github.com/Conway-Research/automaton/issues/335#issuecomment-5400829377
+Rand,mesikewisdom19-source,2026-08-29,Issue #380 eroeffnet,https://github.com/Conway-Research/automaton/issues/380
+Rand,Filipposcmd,2026-09-09,Issue #385 eroeffnet,https://github.com/Conway-Research/automaton/issues/385
+Rand,Mozcko,2026-09-10,Kommentar in #385,https://github.com/Conway-Research/automaton/issues/385#issuecomment-5612297137
