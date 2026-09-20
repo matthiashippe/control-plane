@@ -1,9 +1,9 @@
 /**
- * `POST /v1/automatons/register` (docs/protocol.md, Abschnitt Registry).
+ * `POST /v1/automatons/register` (docs/protocol.md, section Registry).
  *
- * Die Runtime ruft es genau einmal beim ersten Start. Wir rechnen den Payload-Hash nach, prüfen
- * die EIP-712-Signatur gegen `automaton_address` und verlangen, dass diese Adresse die Wallet des
- * API-Keys ist. Doppelte IDs mit anderer Adresse sind ein Konflikt (409), dieselbe Adresse ist
+ * The runtime calls it exactly once on its first start. We recompute the payload hash, check the
+ * EIP-712 signature against `automaton_address` and require that this address is the wallet of the
+ * API key. A duplicate ID with a different address is a conflict (409), the same address is
  * idempotent.
  */
 
@@ -38,7 +38,7 @@ const REGISTER_TYPES = {
   ],
 } as const;
 
-/** Exakt wie `canonicalizePayload` + `hashIdentityPayload` im Runtime-Client. */
+/** Exactly like `canonicalizePayload` + `hashIdentityPayload` in the runtime client. */
 export function hashRegisterPayload(payload: Record<string, string>): Hex {
   const sorted: Record<string, string> = {};
   for (const key of Object.keys(payload).sort()) sorted[key] = payload[key];
@@ -104,7 +104,7 @@ export async function handleRegister(db: Db, keyAddress: Address, raw: unknown):
   const payloadHash = str(b.payload_hash);
   const genesisPromptHash = str(b.genesis_prompt_hash);
   if (!automatonId || !automatonAddress || !creatorAddress || !name || !nonce || !signature || !payloadHash) {
-    const fehlend = Object.entries({
+    const missing = Object.entries({
       automaton_id: automatonId,
       automaton_address: automatonAddress,
       creator_address: creatorAddress,
@@ -113,14 +113,14 @@ export async function handleRegister(db: Db, keyAddress: Address, raw: unknown):
       signature,
       payload_hash: payloadHash,
     })
-      .filter(([, wert]) => !wert)
-      .map(([feld]) => feld);
+      .filter(([, value]) => !value)
+      .map(([field]) => field);
     return {
       status: 400,
       body: {
         error: "missing_fields",
         message:
-          `These fields are missing or empty: ${fehlend.join(", ")}. A registration needs ` +
+          `These fields are missing or empty: ${missing.join(", ")}. A registration needs ` +
           "automaton_id, automaton_address, creator_address, name, nonce, payload_hash and " +
           "signature; bio and genesis_prompt_hash are optional.",
         docs: DOC.registration,
@@ -141,13 +141,13 @@ export async function handleRegister(db: Db, keyAddress: Address, raw: unknown):
     };
   }
 
-  // Ohne Längengrenzen kann ein einziger kostenlos erzeugter Key die Platte füllen: 100
-  // Registrierungen mit je 900 KB `bio` ergaben im Sicherheitsreview 90 MiB in 21 Sekunden, und
-  // eine volle Platte heißt, dass SQLite nicht mehr schreibt und auch Gutschriften ausfallen.
-  // Jedes Feld, das gespeichert wird, braucht eine Grenze. Die erste Fassung dieser Prüfung
-  // vergaß `genesis_prompt_hash`, und damit blieb der Angriff offen: 950 KB je Registrierung,
-  // 25 Registrierungen je Wallet (Gegenprüfung 19.09.2026). Ein Keccak-Hash ist 66 Zeichen lang.
-  const zuLang = Object.entries({
+  // Without length caps a single key created for free can fill the disk: 100 registrations with
+  // 900 KB of `bio` each produced 90 MiB in 21 seconds during the security review, and a full disk
+  // means SQLite stops writing and credits fail too. Every field that is stored needs a cap. The
+  // first version of this check forgot `genesis_prompt_hash`, which left the attack open: 950 KB
+  // per registration, 25 registrations per wallet (counter-check 19.09.2026). A keccak hash is 66
+  // characters long.
+  const tooLong = Object.entries({
     automaton_id: [automatonId, 128],
     name: [name, 200],
     bio: [bio, 2000],
@@ -156,37 +156,37 @@ export async function handleRegister(db: Db, keyAddress: Address, raw: unknown):
     creator_address: [creatorAddress, 42],
     signature: [signature, 132],
     payload_hash: [payloadHash, 66],
-  } as Record<string, [string, number]>).find(([, [wert, max]]) => wert.length > max);
-  if (zuLang) {
+  } as Record<string, [string, number]>).find(([, [value, max]]) => value.length > max);
+  if (tooLong) {
     return {
       status: 400,
       body: {
         error: "field_too_long",
-        field: zuLang[0],
-        max_length: zuLang[1][1],
+        field: tooLong[0],
+        max_length: tooLong[1][1],
         message:
-          `The field ${zuLang[0]} is ${zuLang[1][0].length} characters long, the limit is ` +
-          `${zuLang[1][1]}. Registration costs nothing and everything sent here is stored, so ` +
+          `The field ${tooLong[0]} is ${tooLong[1][0].length} characters long, the limit is ` +
+          `${tooLong[1][1]}. Registration costs nothing and everything sent here is stored, so ` +
           "every field has a cap; shorten it and register again.",
         docs: DOC.registration,
       },
     };
   }
 
-  // Ein Wallet betreibt seine Automatons, keine Registrierungsfarm. Die Grenze ist großzügig
-  // genug für jeden echten Anwendungsfall und deckelt den Missbrauch.
-  const AUTOMATONS_JE_WALLET = 25;
-  const vorhanden = (
+  // A wallet runs its own automatons, not a registration farm. The cap is generous enough for
+  // every real use case and puts a lid on abuse.
+  const AUTOMATONS_PER_WALLET = 25;
+  const existingCount = (
     db.prepare("SELECT count(*) AS n FROM automatons WHERE address = ?").get(automatonAddress.toLowerCase()) as { n: number }
   ).n;
-  if (vorhanden >= AUTOMATONS_JE_WALLET) {
+  if (existingCount >= AUTOMATONS_PER_WALLET) {
     return {
       status: 429,
       body: {
         error: "too_many_automatons",
-        limit: AUTOMATONS_JE_WALLET,
+        limit: AUTOMATONS_PER_WALLET,
         message:
-          `This wallet has already registered ${AUTOMATONS_JE_WALLET} automatons, which is the cap ` +
+          `This wallet has already registered ${AUTOMATONS_PER_WALLET} automatons, which is the cap ` +
           "per wallet. Registration is free, so the cap is what keeps a single key from filling " +
           "the disk. Each automaton has its own wallet and its own API key: register the next one " +
           "from that wallet. If you genuinely need more under one wallet, say so at " +

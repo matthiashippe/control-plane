@@ -14,7 +14,7 @@ Das Skript ändert nichts und startet nichts. Es ist die Datenquelle für den Op
 
 ## Rauchtest nach dem Deploy
 
-`ops/smoke.sh [BASIS_URL]` (Default `https://cp.hippe.eu`) prüft von außen, ob der Dienst nach
+`ops/smoke.sh [BASE_URL]` (Default `https://cp.hippe.eu`) prüft von außen, ob der Dienst nach
 einem Deploy wirklich tut, was er soll: `/health`, `/v1/status` mit Modellen, Markup und der
 Automaton-Zahl, die Startseite mit Link auf `ohne-control-plane.md` und Impressum-Anker, die 302
 von `/impressum`, `/.well-known/x402` mit Zahlungsangebot, `/llms.txt` mit der Setup-Zeile, die
@@ -25,7 +25,7 @@ braucht keinen API-Key.
 
 Ein Standardlauf stellt **eine** Anfrage auf einen rate-limitierten Pfad (60 je Minute und Client,
 `src/ratelimit.ts`) und zählt sie in der Zusammenfassung mit. Die Grenze selbst prüft nur
-`--mit-ratelimit`, weil dieser Test den Aufrufer für den Rest der Minute aussperrt. `--ohne-proxy`
+`--with-ratelimit`, weil dieser Test den Aufrufer für den Rest der Minute aussperrt. `--no-proxy`
 überspringt die drei Prüfungen, die an Caddy hängen (Header, CSP-Hash, Body-Limit); das ist für
 einen lokalen Start gedacht und ersetzt den Lauf gegen den echten Endpunkt nicht.
 
@@ -41,11 +41,11 @@ einen lokalen Start gedacht und ersetzt den Lauf gegen den echten Endpunkt nicht
 | `openrouter.left` | unter 5 USD | Matthias fragen, ob nachgeladen wird; sonst droht 503 für alle Mandanten |
 | `vm.disk_used` | über 80 % | Logs rotieren (json-file max 20m x 5), alte Images prüfen |
 | `db.day.margin_mc` | negativ | Verkaufspreis deckt den Einkauf nicht: Markup oder Katalog prüfen |
-| `db.zahlen_ohne_zu_denken` | ein Eintrag über 24 h | Kunde hat bezahlt und kauft keine Inferenz. Kein Alarm, aber nachsehen |
+| `db.paying_without_thinking` | ein Eintrag über 24 h | Kunde hat bezahlt und kauft keine Inferenz. Kein Alarm, aber nachsehen |
 
 ### Zahlen, ohne zu denken
 
-Die Liste `db.zahlen_ohne_zu_denken` nennt jede Wallet mit Guthaben, die seit ihrer letzten
+Die Liste `db.paying_without_thinking` nennt jede Wallet mit Guthaben, die seit ihrer letzten
 Aufladung **keinen einzigen Inferenz-Aufruf** gemacht hat, mit den Stunden seither und ob sie
 überhaupt je gedacht hat. Das ist die stillste Art, einen Kunden zu verlieren: Das Guthaben liegt
 da, die Runtime pollt vielleicht noch ihren Kontostand, und es passiert nichts.

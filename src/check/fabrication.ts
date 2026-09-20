@@ -1,27 +1,26 @@
 /**
- * Welche Behauptung in einer Einreichung steht nicht im Briefing?
+ * Which claim in a submission is not in the briefing?
  *
- * Der Auftragsmarkt, auf den dieser Dienst zulaeuft, lebt davon, dass ein Auftraggeber die Arbeit
- * bewerten kann, ohne Fachmann zu sein. Geschmack kann er nicht bewerten, erfundene Tatsachen
- * schon, und die sind das Risiko: Im Testlauf vom 20.09.2026 schrieb ein Agent "Viewings available
- * on short notice" in ein Dubai-Expose, eine Zusage, die im Briefing nicht steht und fuer die der
- * Verkaeufer haftet.
+ * The bounty market this service is heading for depends on a buyer being able to judge the work
+ * without being an expert. They cannot judge taste, but they can judge invented facts, and those
+ * are the risk: in the test run of 20.09.2026 an agent wrote "Viewings available on short notice"
+ * into a Dubai listing, a promise the briefing does not contain and for which the seller is liable.
  *
- * Die Kommandozeilenfassung samt Messreihe liegt in `ops/erfindungspruefung.py`, die Probe mit
- * bekannter Wahrheit in `ops/proben/dubai-fakten.json`. Gemessen am 20.09.2026: auf ein faktisches
- * Briefing drei von drei gepflanzten Fehlern gefunden, kein Fehlalarm; auf Werbetext 23 Befunde
- * auf neun Einreichungen, weshalb es dort die zweite Betriebsart gibt.
+ * The command line version including the measurement series is in `ops/erfindungspruefung.py`, the
+ * sample with known ground truth in `ops/proben/dubai-fakten.json`. Measured on 20.09.2026: on a
+ * factual briefing three out of three planted errors found, no false alarm; on marketing copy 23
+ * findings across nine submissions, which is why the second mode exists for that case.
  *
- * Dieses Modul enthaelt bewusst nur Text und reine Logik. Der Modellaufruf laeuft ueber
- * `handleChat`, damit Abrechnung, Reservierung, Zusammenlegung und Marge dieselben sind wie bei
- * jeder anderen Inferenz.
+ * This module deliberately holds nothing but text and pure logic. The model call runs through
+ * `handleChat`, so billing, reservation, coalescing and margin are the same as for any other
+ * inference.
  */
 
-/** Was der Auftraggeber bestellt hat. Faktisch sperrt, schoepferisch fragt zurueck. */
+/** What the buyer ordered. Factual blocks, creative asks back. */
 export type CheckMode = "factual" | "creative";
 
 export interface Finding {
-  /** Woertliches Zitat aus der Einreichung. Der Anker, an dem der Finding ueberprueft wird. */
+  /** Verbatim quote from the submission. The anchor against which the finding is checked. */
   quote: string;
   kind: "miscalculation" | "contradiction" | "unsupported";
   reason: string;
@@ -87,11 +86,11 @@ ${SHARED_RULES}`;
 export const INSTRUCTION_FACTUAL: Record<CheckMode, string> = { factual: FACTUAL, creative: CREATIVE };
 
 /**
- * Zitatvergleich ohne die Unterschiede, die kein Mensch als Unterschied liest.
+ * Quote comparison without the differences no human reads as a difference.
  *
- * Die Modelle liefern typografische Zeichen (geschuetzter Bindestrich, Apostroph, Geviertstrich),
- * und der Pruefer normalisiert sie beim Zitieren oft still zu ASCII. Ohne diese Angleichung faellt
- * ein korrekter Finding als "nicht auffindbar" durch.
+ * The models deliver typographic characters (non-breaking hyphen, apostrophe, em dash), and when
+ * quoting, the checker often silently normalises them to ASCII. Without this alignment a correct
+ * finding falls through as "not findable".
  */
 export function normalise(s: string): string {
   let t = s.normalize("NFKC");
@@ -107,22 +106,22 @@ export function normalise(s: string): string {
 
 export interface CheckResult {
   findings: Finding[];
-  /** Befunde, deren Zitat sich in der Einreichung nicht wiederfinden liess. */
+  /** Findings whose quote could not be found in the submission. */
   discarded: number;
 }
 
 /**
- * Der Pruefer wird selbst geprueft.
+ * The checker is itself checked.
  *
- * Ein Modell, das Erfindungen sucht, erfindet Funde: Es zitiert Saetze, die in der Einreichung gar
- * nicht vorkommen. Ein solcher Finding ist schlimmer als ein uebersehener, weil er einen ehrlichen
- * Text beschuldigt. Deshalb zaehlt nur, was sich woertlich wiederfinden laesst; der Rest wird
- * discarded und gezaehlt, damit die Quote sichtbar bleibt.
+ * A model that looks for fabrications fabricates findings: it quotes sentences that do not appear
+ * in the submission at all. Such a finding is worse than a missed one, because it accuses an honest
+ * text. So only what can be found verbatim counts; the rest is discarded and counted, so the rate
+ * stays visible.
  */
-export function verifyFindings(einreichung: string, raw: unknown): CheckResult {
+export function verifyFindings(submission: string, raw: unknown): CheckResult {
   const list = (raw as { findings?: unknown })?.findings;
   if (!Array.isArray(list)) return { findings: [], discarded: 0 };
-  const haystack = normalise(einreichung);
+  const haystack = normalise(submission);
   const findings: Finding[] = [];
   let discarded = 0;
   for (const entry of list) {
@@ -138,10 +137,10 @@ export function verifyFindings(einreichung: string, raw: unknown): CheckResult {
   return { findings, discarded };
 }
 
-/** Die Nachrichten fuer den Modellaufruf. Getrennt, damit der Aufbau testbar bleibt. */
-export function messages(briefing: string, einreichung: string, kind: CheckMode) {
+/** The messages for the model call. Kept separate so the construction stays testable. */
+export function messages(briefing: string, submission: string, kind: CheckMode) {
   return [
     { role: "system" as const, content: INSTRUCTION_FACTUAL[kind] },
-    { role: "user" as const, content: `BRIEFING:\n${briefing}\n\n---\n\nSUBMISSION:\n${einreichung}` },
+    { role: "user" as const, content: `BRIEFING:\n${briefing}\n\n---\n\nSUBMISSION:\n${submission}` },
   ];
 }

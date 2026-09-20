@@ -1,9 +1,9 @@
 /**
- * Backup und Zurückspielen, nachgestellt ohne Docker.
+ * Backup and restore, reproduced without Docker.
  *
- * Hintergrund: Am 19.09.2026 lief `ops/backup.sh` seit Tagen, aber niemand hatte je ein Backup
- * zurückgespielt. Die Übung dazu steht in `ops/README.md`, Abschnitt "Ein Backup zurückspielen";
- * diese Tests halten die drei Stellen fest, an denen sie schiefgeht.
+ * Background: on 19.09.2026 `ops/backup.sh` had been running for days, but nobody had ever restored
+ * a backup. The drill for that is in `ops/README.md`, section "Ein Backup zurueckspielen"; these
+ * tests pin down the three places where it goes wrong.
  */
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
@@ -15,48 +15,48 @@ import { openDb, postLedger } from "../src/db.js";
 
 const REPO = process.cwd();
 const VACUUM = path.join(REPO, "ops", "backup-vacuum.cjs");
-const PRUEFEN = path.join(REPO, "ops", "restore-pruefen.cjs");
+const CHECK_SCRIPT = path.join(REPO, "ops", "restore-pruefen.cjs");
 
-const verzeichnisse: string[] = [];
-const offen: Database.Database[] = [];
+const directories: string[] = [];
+const openConnections: Database.Database[] = [];
 
 afterEach(() => {
-  for (const db of offen.splice(0)) {
+  for (const db of openConnections.splice(0)) {
     try {
       db.close();
     } catch {
-      /* schon zu */
+      /* already closed */
     }
   }
-  for (const dir of verzeichnisse.splice(0)) fs.rmSync(dir, { recursive: true, force: true });
+  for (const dir of directories.splice(0)) fs.rmSync(dir, { recursive: true, force: true });
 });
 
 function tmpDir(): string {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "cp-backup-"));
-  verzeichnisse.push(dir);
+  directories.push(dir);
   return dir;
 }
 
 /**
- * Baut eine Datenbank wie im Betrieb: Schema in der .db, Daten im WAL, Verbindung offen. Genau
- * dieser Zustand macht eine Kopie der .db allein wertlos.
+ * Builds a database like the one in production: schema in the .db, data in the WAL, connection
+ * open. It is exactly this state that makes a copy of the .db alone worthless.
  */
-function betriebsDatenbank(dir: string): { pfad: string; db: ReturnType<typeof openDb> } {
-  const pfad = path.join(dir, "cp.db");
-  openDb(pfad).close(); // erster Start: Schema anlegen und auschecken, danach ist die .db klein
-  const db = openDb(pfad);
-  offen.push(db);
+function productionDatabase(dir: string): { file: string; db: ReturnType<typeof openDb> } {
+  const file = path.join(dir, "cp.db");
+  openDb(file).close(); // first start: create the schema and check it out, after that the .db is small
+  const db = openDb(file);
+  openConnections.push(db);
   for (let i = 0; i < 3; i++) {
-    const adresse = `0x${String(i).repeat(40)}`;
+    const address = `0x${String(i).repeat(40)}`;
     const nonce = `0xnonce${i}`;
-    postLedger(db, { address: adresse, kind: "topup", deltaMc: 500_000 * (i + 1), ref: nonce });
-    postLedger(db, { address: adresse, kind: "inference", deltaMc: -(137 + i), meta: { model: "gpt-5.2", margin_mc: 12 } });
+    postLedger(db, { address, kind: "topup", deltaMc: 500_000 * (i + 1), ref: nonce });
+    postLedger(db, { address, kind: "inference", deltaMc: -(137 + i), meta: { model: "gpt-5.2", margin_mc: 12 } });
     db.prepare(
       `INSERT INTO payments (nonce, from_address, to_address, value_atomic, credits_mc, balance_after_mc, status, tx_hash, created_at, settled_at)
        VALUES (?,?,?,?,?,?, 'settled', ?, ?, ?)`,
-    ).run(nonce, adresse, adresse, "5000000", 500_000 * (i + 1), 500_000 * (i + 1), `0xtx${i}`, "2026-09-19T03:00:00Z", "2026-09-19T03:00:01Z");
+    ).run(nonce, address, address, "5000000", 500_000 * (i + 1), 500_000 * (i + 1), `0xtx${i}`, "2026-09-19T03:00:00Z", "2026-09-19T03:00:01Z");
     db.prepare("INSERT INTO api_keys (address, key_hash, key_prefix, name, created_at) VALUES (?,?,?,?,?)").run(
-      adresse,
+      address,
       `hash${i}`.padEnd(64, "0"),
       `cp_live_${i}`,
       `key-${i}`,
@@ -64,19 +64,19 @@ function betriebsDatenbank(dir: string): { pfad: string; db: ReturnType<typeof o
     );
     db.prepare(
       "INSERT INTO automatons (automaton_id, address, creator_address, name, bio, registered_at) VALUES (?,?,?,?,?,?)",
-    ).run(`aut-${i}`, adresse, adresse, `Automat ${i}`, "", "2026-09-19T03:00:00Z");
+    ).run(`aut-${i}`, address, address, `Automaton ${i}`, "", "2026-09-19T03:00:00Z");
   }
-  return { pfad, db };
+  return { file, db };
 }
 
-/** Liest eine Datei so, wie es ein Mensch nach dem Zurückspielen täte: Ist sie heil, ist sie voll? */
-function zustand(pfad: string): Record<string, unknown> {
-  const db = new Database(pfad, { readonly: true });
-  const feld = (sql: string): number | string => {
+/** Reads a file the way a human would after a restore: is it intact, is it full? */
+function state(file: string): Record<string, unknown> {
+  const db = new Database(file, { readonly: true });
+  const value = (sql: string): number | string => {
     try {
       return (db.prepare(sql).get() as { n: number }).n;
     } catch (err) {
-      return `FEHLER: ${(err as Error).message}`;
+      return `ERROR: ${(err as Error).message}`;
     }
   };
   const out = {
@@ -84,134 +84,134 @@ function zustand(pfad: string): Record<string, unknown> {
       try {
         return (db.prepare("PRAGMA integrity_check").get() as { integrity_check: string }).integrity_check;
       } catch (err) {
-        return `FEHLER: ${(err as Error).message}`;
+        return `ERROR: ${(err as Error).message}`;
       }
     })(),
-    wallets: feld("SELECT count(*) n FROM wallets"),
-    balance_mc: feld("SELECT coalesce(sum(balance_mc),0) n FROM wallets"),
-    ledger: feld("SELECT count(*) n FROM ledger"),
-    ledger_sum_mc: feld("SELECT coalesce(sum(delta_mc),0) n FROM ledger"),
-    settled: feld("SELECT count(*) n FROM payments WHERE status = 'settled'"),
-    keys: feld("SELECT count(*) n FROM api_keys"),
+    wallets: value("SELECT count(*) n FROM wallets"),
+    balance_mc: value("SELECT coalesce(sum(balance_mc),0) n FROM wallets"),
+    ledger: value("SELECT count(*) n FROM ledger"),
+    ledger_sum_mc: value("SELECT coalesce(sum(delta_mc),0) n FROM ledger"),
+    settled: value("SELECT count(*) n FROM payments WHERE status = 'settled'"),
+    keys: value("SELECT count(*) n FROM api_keys"),
   };
   db.close();
   return out;
 }
 
-function backup(quelle: string, ziel: string): Record<string, unknown> {
-  const ausgabe = execFileSync(process.execPath, [VACUUM], {
-    env: { ...process.env, CP_DB_PATH: quelle, CP_BACKUP_TMP: ziel },
+function backup(source: string, target: string): Record<string, unknown> {
+  const output = execFileSync(process.execPath, [VACUUM], {
+    env: { ...process.env, CP_DB_PATH: source, CP_BACKUP_TMP: target },
     encoding: "utf8",
   });
-  return JSON.parse(ausgabe.trim().split("\n").pop() as string);
+  return JSON.parse(output.trim().split("\n").pop() as string);
 }
 
-describe("Backup erzeugen (ops/backup-vacuum.cjs)", () => {
-  it("holt den Inhalt aus dem WAL, eine Kopie der .db allein nicht", () => {
+describe("creating a backup (ops/backup-vacuum.cjs)", () => {
+  it("gets the content out of the WAL, which a copy of the .db alone does not", () => {
     const dir = tmpDir();
-    const { pfad } = betriebsDatenbank(dir);
+    const { file } = productionDatabase(dir);
 
-    // Das, wovor der Kopf des Skripts warnt: cp der .db, während der Inhalt im -wal steht.
-    const naiv = path.join(dir, "naiv.db");
-    fs.copyFileSync(pfad, naiv);
-    const naivZustand = zustand(naiv);
-    expect(naivZustand.wallets, "die nackte Kopie enthält keine Zeile").toBe(0);
-    expect(naivZustand.integrity, "und sieht trotzdem heil aus, deshalb fällt sie nicht auf").toBe("ok");
-    expect(fs.statSync(naiv).size, "und liegt weit über jeder Größenschwelle, die das abfangen sollte").toBeGreaterThan(20480);
+    // What the header of the script warns about: cp of the .db while the content sits in the -wal.
+    const naive = path.join(dir, "naive.db");
+    fs.copyFileSync(file, naive);
+    const naiveState = state(naive);
+    expect(naiveState.wallets, "the bare copy contains no row").toBe(0);
+    expect(naiveState.integrity, "and still looks intact, which is why it goes unnoticed").toBe("ok");
+    expect(fs.statSync(naive).size, "and sits far above any size threshold meant to catch it").toBeGreaterThan(20480);
 
-    const ergebnis = backup(pfad, path.join(dir, "backup-tmp.db"));
-    expect(ergebnis.probleme).toEqual([]);
-    expect(ergebnis.wallets).toBe(3);
-    expect(zustand(path.join(dir, "backup-tmp.db"))).toMatchObject({ integrity: "ok", wallets: 3, settled: 3, keys: 3 });
+    const result = backup(file, path.join(dir, "backup-tmp.db"));
+    expect(result.problems).toEqual([]);
+    expect(result.wallets).toBe(3);
+    expect(state(path.join(dir, "backup-tmp.db"))).toMatchObject({ integrity: "ok", wallets: 3, settled: 3, keys: 3 });
   });
 
-  it("läuft auch, wenn die Zieldatei vom letzten Lauf noch liegt", () => {
+  it("runs even when the target file from the last run is still there", () => {
     const dir = tmpDir();
-    const { pfad } = betriebsDatenbank(dir);
-    const ziel = path.join(dir, "backup-tmp.db");
+    const { file } = productionDatabase(dir);
+    const target = path.join(dir, "backup-tmp.db");
 
-    // Rohes VACUUM INTO scheitert an einer vorhandenen Datei. Blieb sie nach einem misslungenen
-    // Abtransport liegen, schlug ab da jedes weitere Backup fehl, jeden Tag aufs Neue.
-    backup(pfad, ziel);
-    const roh = new Database(pfad, { readonly: true });
-    expect(() => roh.exec(`VACUUM INTO ('${ziel}')`)).toThrow(/output file already exists/);
-    roh.close();
+    // A raw VACUUM INTO fails on an existing file. If it was left behind after a failed transfer,
+    // every further backup failed from then on, day after day.
+    backup(file, target);
+    const raw = new Database(file, { readonly: true });
+    expect(() => raw.exec(`VACUUM INTO ('${target}')`)).toThrow(/output file already exists/);
+    raw.close();
 
-    expect(backup(pfad, ziel).wallets).toBe(3);
+    expect(backup(file, target).wallets).toBe(3);
   });
 
-  it("nimmt ein Backup nicht ab, dessen Salden nicht zu den Ledgerzeilen passen", () => {
+  it("does not accept a backup whose balances do not match the ledger rows", () => {
     const dir = tmpDir();
-    const { pfad, db } = betriebsDatenbank(dir);
+    const { file, db } = productionDatabase(dir);
     db.prepare("UPDATE wallets SET balance_mc = balance_mc + 4711 WHERE address = ?").run("0x" + "0".repeat(40));
 
-    expect(() => backup(pfad, path.join(dir, "backup-tmp.db"))).toThrow(/ohne passende Ledgersumme/);
+    expect(() => backup(file, path.join(dir, "backup-tmp.db"))).toThrow(/without a matching ledger sum/);
   });
 
-  it("nimmt keine halb ausgeführte Buchung mit, auch wenn parallel geschrieben wird", () => {
+  it("does not take along a half-executed booking, even with a concurrent writer", () => {
     const dir = tmpDir();
-    const { pfad, db } = betriebsDatenbank(dir);
+    const { file, db } = productionDatabase(dir);
 
-    // Ein Schreiber mitten in der Transaktion: Saldo erhöht, Ledgerzeile noch nicht geschrieben.
-    // Sieht das Backup diesen Zwischenstand, ist es als Beleg wertlos.
+    // A writer in the middle of its transaction: balance raised, ledger row not yet written. If the
+    // backup sees that intermediate state, it is worthless as a receipt.
     db.exec("BEGIN IMMEDIATE");
     db.prepare("UPDATE wallets SET balance_mc = balance_mc + 999_000 WHERE address = ?").run("0x" + "1".repeat(40));
-    const ergebnis = backup(pfad, path.join(dir, "backup-tmp.db"));
+    const result = backup(file, path.join(dir, "backup-tmp.db"));
     db.exec("ROLLBACK");
 
-    expect(ergebnis.probleme).toEqual([]);
-    const b = zustand(path.join(dir, "backup-tmp.db"));
-    expect(b.balance_mc, "Saldo und Ledger müssen sich im Backup exakt decken").toBe(b.ledger_sum_mc);
+    expect(result.problems).toEqual([]);
+    const b = state(path.join(dir, "backup-tmp.db"));
+    expect(b.balance_mc, "balance and ledger have to match exactly in the backup").toBe(b.ledger_sum_mc);
   });
 });
 
-describe("Backup zurückspielen (ops/README.md)", () => {
-  it("ergibt eine heile, vollständige Datenbank, wenn -wal und -shm entfernt werden", () => {
+describe("restoring a backup (ops/README.md)", () => {
+  it("yields an intact, complete database when -wal and -shm are removed", () => {
     const dir = tmpDir();
-    const { pfad } = betriebsDatenbank(dir);
-    const sicherung = path.join(dir, "cp-backup.db");
-    backup(pfad, sicherung);
+    const { file } = productionDatabase(dir);
+    const saved = path.join(dir, "cp-backup.db");
+    backup(file, saved);
 
-    const ziel = tmpDir();
-    const zielPfad = path.join(ziel, "cp.db");
-    fs.copyFileSync(sicherung, zielPfad);
-    for (const suffix of ["-wal", "-shm"]) fs.rmSync(zielPfad + suffix, { force: true });
+    const targetDir = tmpDir();
+    const targetFile = path.join(targetDir, "cp.db");
+    fs.copyFileSync(saved, targetFile);
+    for (const suffix of ["-wal", "-shm"]) fs.rmSync(targetFile + suffix, { force: true });
 
-    expect(zustand(zielPfad)).toMatchObject({ integrity: "ok", wallets: 3, settled: 3, keys: 3 });
-    // Und der Dienst kommt dagegen hoch: openDb() migriert, räumt auf und öffnet.
-    const db = openDb(zielPfad);
-    offen.push(db);
+    expect(state(targetFile)).toMatchObject({ integrity: "ok", wallets: 3, settled: 3, keys: 3 });
+    // And the service comes up on it: openDb() migrates, cleans up and opens.
+    const db = openDb(targetFile);
+    openConnections.push(db);
     expect((db.prepare("SELECT count(*) n FROM wallets").get() as { n: number }).n).toBe(3);
   });
 
-  it("ergibt eine kaputte Datenbank, wenn die -wal und -shm der alten liegen bleiben", () => {
+  it("yields a broken database when the -wal and -shm of the old one are left behind", () => {
     const dir = tmpDir();
-    const { pfad } = betriebsDatenbank(dir);
-    const sicherung = path.join(dir, "cp-backup.db");
-    backup(pfad, sicherung);
+    const { file } = productionDatabase(dir);
+    const saved = path.join(dir, "cp-backup.db");
+    backup(file, saved);
 
-    // Der Stand der alten Datenbank, so wie er nach einem harten Stopp im Volume liegt: .db plus
-    // -wal plus -shm. Das Backup wird darüber kopiert, die Begleitdateien bleiben stehen.
-    const ziel = tmpDir();
-    const zielPfad = path.join(ziel, "cp.db");
-    for (const suffix of ["", "-wal", "-shm"]) fs.copyFileSync(pfad + suffix, zielPfad + suffix);
-    fs.copyFileSync(sicherung, zielPfad);
+    // The state of the old database as it sits in the volume after a hard stop: .db plus -wal plus
+    // -shm. The backup is copied over it, the companion files stay.
+    const targetDir = tmpDir();
+    const targetFile = path.join(targetDir, "cp.db");
+    for (const suffix of ["", "-wal", "-shm"]) fs.copyFileSync(file + suffix, targetFile + suffix);
+    fs.copyFileSync(saved, targetFile);
 
-    const kaputt = zustand(zielPfad);
-    const heil = { integrity: "ok", wallets: 3, balance_mc: 2_999_586, ledger: 6, ledger_sum_mc: 2_999_586, settled: 3, keys: 3 };
-    expect(zustand(sicherung), "das Backup selbst ist in Ordnung").toEqual(heil);
-    expect(kaputt, "die Mischung aus neuer .db und altem WAL ist es nicht").not.toEqual(heil);
+    const broken = state(targetFile);
+    const intact = { integrity: "ok", wallets: 3, balance_mc: 2_999_586, ledger: 6, ledger_sum_mc: 2_999_586, settled: 3, keys: 3 };
+    expect(state(saved), "the backup itself is fine").toEqual(intact);
+    expect(broken, "the mixture of new .db and old WAL is not").not.toEqual(intact);
     expect(
-      String(kaputt.integrity) !== "ok" || kaputt.settled !== 3 || typeof kaputt.ledger_sum_mc === "string",
-      `erwartet war eine beschädigte oder unvollständige Datei, gefunden: ${JSON.stringify(kaputt)}`,
+      String(broken.integrity) !== "ok" || broken.settled !== 3 || typeof broken.ledger_sum_mc === "string",
+      `expected a corrupted or incomplete file, found: ${JSON.stringify(broken)}`,
     ).toBe(true);
   });
 
-  it("nimmt ein Backup an, das älter ist als die letzten Migrationen", () => {
+  it("accepts a backup that is older than the latest migrations", () => {
     const dir = tmpDir();
-    const alt = path.join(dir, "cp-alt.db");
-    // Schema aus der Zeit vor reserved_mc, balance_after_mc und der kv-Tabelle.
-    const db = new Database(alt);
+    const old = path.join(dir, "cp-old.db");
+    // Schema from before reserved_mc, balance_after_mc and the kv table.
+    const db = new Database(old);
     db.exec(`
       CREATE TABLE wallets (address TEXT PRIMARY KEY, balance_mc INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL);
       CREATE TABLE siwe_nonces (nonce TEXT PRIMARY KEY, issued_at INTEGER NOT NULL, consumed_at INTEGER);
@@ -227,59 +227,59 @@ describe("Backup zurückspielen (ops/README.md)", () => {
         name TEXT NOT NULL, bio TEXT NOT NULL DEFAULT '', genesis_prompt_hash TEXT, registered_at TEXT NOT NULL);
     `);
     db.prepare("INSERT INTO wallets (address, balance_mc, created_at) VALUES (?,?,?)").run("0xa", 499_863, "2026-09-05T03:17:00Z");
-    db.prepare("INSERT INTO ledger (address, kind, delta_mc, ref, created_at) VALUES (?,?,?,?,?)").run("0xa", "topup", 500_000, "0xalt", "2026-09-05T03:17:00Z");
+    db.prepare("INSERT INTO ledger (address, kind, delta_mc, ref, created_at) VALUES (?,?,?,?,?)").run("0xa", "topup", 500_000, "0xold", "2026-09-05T03:17:00Z");
     db.prepare("INSERT INTO ledger (address, kind, delta_mc, created_at) VALUES (?,?,?,?)").run("0xa", "inference", -137, "2026-09-05T03:18:00Z");
     db.prepare(
       "INSERT INTO payments (nonce, from_address, to_address, value_atomic, credits_mc, status, created_at, settled_at) VALUES (?,?,?,?,?, 'settled', ?, ?)",
-    ).run("0xalt", "0xa", "0xa", "5000000", 500_000, "2026-09-05T03:17:00Z", "2026-09-05T03:17:01Z");
+    ).run("0xold", "0xa", "0xa", "5000000", 500_000, "2026-09-05T03:17:00Z", "2026-09-05T03:17:01Z");
     db.close();
 
-    const vorher = new Database(alt, { readonly: true });
-    const spalten = (t: string) => (vorher.prepare(`PRAGMA table_info(${t})`).all() as { name: string }[]).map((c) => c.name);
-    expect(spalten("wallets")).not.toContain("reserved_mc");
-    expect(spalten("payments")).not.toContain("balance_after_mc");
-    vorher.close();
+    const before = new Database(old, { readonly: true });
+    const columnsBefore = (t: string) => (before.prepare(`PRAGMA table_info(${t})`).all() as { name: string }[]).map((c) => c.name);
+    expect(columnsBefore("wallets")).not.toContain("reserved_mc");
+    expect(columnsBefore("payments")).not.toContain("balance_after_mc");
+    before.close();
 
-    const migriert = openDb(alt);
-    offen.push(migriert);
-    const namen = (t: string) => (migriert.prepare(`PRAGMA table_info(${t})`).all() as { name: string }[]).map((c) => c.name);
-    expect(namen("wallets"), "der erste Start ergänzt reserved_mc").toContain("reserved_mc");
-    expect(namen("payments"), "und balance_after_mc").toContain("balance_after_mc");
-    expect(namen("kv"), "und legt die kv-Tabelle an").toContain("value");
-    expect((migriert.prepare("SELECT balance_mc n FROM wallets WHERE address = '0xa'").get() as { n: number }).n, "die Salden bleiben unberührt").toBe(499_863);
-    expect((migriert.prepare("SELECT count(*) n FROM kv").get() as { n: number }).n, "der Preiskatalog aus dem kv ist weg, der Start hängt wieder an OpenRouter").toBe(0);
+    const migrated = openDb(old);
+    openConnections.push(migrated);
+    const names = (t: string) => (migrated.prepare(`PRAGMA table_info(${t})`).all() as { name: string }[]).map((c) => c.name);
+    expect(names("wallets"), "the first start adds reserved_mc").toContain("reserved_mc");
+    expect(names("payments"), "and balance_after_mc").toContain("balance_after_mc");
+    expect(names("kv"), "and creates the kv table").toContain("value");
+    expect((migrated.prepare("SELECT balance_mc n FROM wallets WHERE address = '0xa'").get() as { n: number }).n, "the balances stay untouched").toBe(499_863);
+    expect((migrated.prepare("SELECT count(*) n FROM kv").get() as { n: number }).n, "the price catalogue from the kv is gone, the start hangs on OpenRouter again").toBe(0);
   });
 });
 
-describe("Zurückgespielte Datei prüfen (ops/restore-pruefen.cjs)", () => {
-  function pruefe(pfad: string): { code: number; ausgabe: string } {
+describe("checking a restored file (ops/restore-pruefen.cjs)", () => {
+  function check(file: string): { code: number; output: string } {
     try {
-      return { code: 0, ausgabe: execFileSync(process.execPath, [PRUEFEN, pfad], { encoding: "utf8" }) };
+      return { code: 0, output: execFileSync(process.execPath, [CHECK_SCRIPT, file], { encoding: "utf8" }) };
     } catch (err) {
       const e = err as { status: number; stdout: string };
-      return { code: e.status, ausgabe: e.stdout };
+      return { code: e.status, output: e.stdout };
     }
   }
 
-  it("nimmt ein sauberes Backup ab", () => {
+  it("accepts a clean backup", () => {
     const dir = tmpDir();
-    const { pfad } = betriebsDatenbank(dir);
-    const sicherung = path.join(dir, "cp-backup.db");
-    backup(pfad, sicherung);
+    const { file } = productionDatabase(dir);
+    const saved = path.join(dir, "cp-backup.db");
+    backup(file, saved);
 
-    const { code, ausgabe } = pruefe(sicherung);
+    const { code, output } = check(saved);
     expect(code).toBe(0);
-    expect(ausgabe).toContain("balance_mc == ledger_sum_mc je Wallet");
-    expect(JSON.parse(ausgabe.trim().split("\n").pop() as string)).toMatchObject({ fehler: 0, wallets: 3, settled_ohne_buchung: 0 });
+    expect(output).toContain("balance_mc == ledger_sum_mc per wallet");
+    expect(JSON.parse(output.trim().split("\n").pop() as string)).toMatchObject({ failures: 0, wallets: 3, settled_without_booking: 0 });
   });
 
-  it("schlägt an, wenn eine x402-Nonce zwei Gutschriften hat", () => {
-    // Der Bestandsfehler, wegen dem ledger_topup_ref nur mit try/catch angelegt wird. In einer
-    // aktuellen Datenbank hält der Index ihn auf, ein altes Backup kann ihn noch enthalten: Dann
-    // meldet der Start ihn nur ins Log und läuft weiter, und ohne diese Prüfung merkt es niemand.
+  it("fires when one x402 nonce has two credits", () => {
+    // The legacy bug that is why ledger_topup_ref is only created inside a try/catch. In a current
+    // database the index stops it, an old backup can still contain it: then the start only reports
+    // it to the log and carries on, and without this check nobody notices.
     const dir = tmpDir();
-    const alt = path.join(dir, "cp-alt.db");
-    const db = new Database(alt);
+    const old = path.join(dir, "cp-old.db");
+    const db = new Database(old);
     db.exec(`
       CREATE TABLE wallets (address TEXT PRIMARY KEY, balance_mc INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL);
       CREATE TABLE ledger (id INTEGER PRIMARY KEY AUTOINCREMENT, address TEXT NOT NULL, kind TEXT NOT NULL,
@@ -299,15 +299,15 @@ describe("Zurückgespielte Datei prüfen (ops/restore-pruefen.cjs)", () => {
     `);
     db.close();
 
-    const { code, ausgabe } = pruefe(alt);
-    expect(code, "eine doppelte Gutschrift darf nicht durchgehen").toBe(1);
-    expect(ausgabe).toContain("0xnonce0 (2x)");
+    const { code, output } = check(old);
+    expect(code, "a duplicate credit must not pass").toBe(1);
+    expect(output).toContain("0xnonce0 (2x)");
   });
 
-  it("meldet ein Backup, dessen Schema älter ist als der Code, ohne es abzulehnen", () => {
+  it("reports a backup whose schema is older than the code without rejecting it", () => {
     const dir = tmpDir();
-    const alt = path.join(dir, "cp-alt.db");
-    const db = new Database(alt);
+    const old = path.join(dir, "cp-old.db");
+    const db = new Database(old);
     db.exec(`
       CREATE TABLE wallets (address TEXT PRIMARY KEY, balance_mc INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL);
       CREATE TABLE ledger (id INTEGER PRIMARY KEY AUTOINCREMENT, address TEXT NOT NULL, kind TEXT NOT NULL,
@@ -322,10 +322,10 @@ describe("Zurückgespielte Datei prüfen (ops/restore-pruefen.cjs)", () => {
     `);
     db.close();
 
-    const { code, ausgabe } = pruefe(alt);
-    expect(code, "ein altes Schema ist kein Grund, das Backup zu verwerfen").toBe(0);
-    expect(ausgabe).toContain("Schema älter als der Code");
-    expect(JSON.parse(ausgabe.trim().split("\n").pop() as string).schema_fehlt).toEqual([
+    const { code, output } = check(old);
+    expect(code, "an old schema is no reason to discard the backup").toBe(0);
+    expect(output).toContain("schema older than the code");
+    expect(JSON.parse(output.trim().split("\n").pop() as string).schema_missing).toEqual([
       "wallets.reserved_mc",
       "payments.balance_after_mc",
       "kv",

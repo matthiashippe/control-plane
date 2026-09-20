@@ -1,4 +1,4 @@
-// Läuft im cp-Container (node - < ops/db-report.cjs), liest die SQLite read-only.
+// Runs inside the cp container (node - < ops/db-report.cjs), reads the SQLite read-only.
 const db = require("better-sqlite3")("/data/cp.db", { readonly: true });
 const day = new Date(Date.now() - 86400e3).toISOString();
 const one = (sql, ...a) => db.prepare(sql).get(...a);
@@ -20,15 +20,15 @@ const i = one(
 );
 report.day = { topups: t.n, topup_mc: t.s, calls: i.n, spend_mc: -i.s, margin_mc: i.m, purchase_usd: Number((i.c || 0).toFixed(4)) };
 
-// Kunden, die bezahlt haben und trotzdem nicht denken. Das ist die stillste Art, einen Kunden zu
-// verlieren: Das Guthaben liegt da, die Runtime pollt vielleicht noch, aber es kommt kein einziger
-// Inferenz-Aufruf. Genau diesen Fall hatten wir am 19.09.2026 und gemerkt haben wir ihn nur, weil
-// jemand zufällig ins Ledger sah. Ohne diese Zahl fällt es niemandem auf.
-report.zahlen_ohne_zu_denken = all(
+// Customers who paid and still do not think. That is the quietest way to lose a customer: the
+// credit sits there, the runtime may still be polling, but not a single inference call arrives. We
+// had exactly that case on 19.09.2026 and only noticed it because somebody happened to look into
+// the ledger. Without this number nobody notices.
+report.paying_without_thinking = all(
   `select w.address,
           w.balance_mc,
-          (select max(created_at) from ledger l2 where l2.address = w.address and l2.kind = 'topup') as letzter_topup,
-          (select max(created_at) from ledger l3 where l3.address = w.address and l3.kind = 'inference') as letzte_inferenz
+          (select max(created_at) from ledger l2 where l2.address = w.address and l2.kind = 'topup') as last_topup,
+          (select max(created_at) from ledger l3 where l3.address = w.address and l3.kind = 'inference') as last_inference
      from wallets w
     where w.balance_mc > 0
       and exists (select 1 from ledger lt where lt.address = w.address and lt.kind = 'topup')
@@ -40,8 +40,8 @@ report.zahlen_ohne_zu_denken = all(
 ).map((r) => ({
   address: r.address.slice(0, 10) + "…",
   balance_mc: r.balance_mc,
-  stunden_seit_topup: Number(((Date.now() - Date.parse(r.letzter_topup)) / 3600e3).toFixed(1)),
-  je_gedacht: r.letzte_inferenz !== null,
+  hours_since_topup: Number(((Date.now() - Date.parse(r.last_topup)) / 3600e3).toFixed(1)),
+  ever_thought: r.last_inference !== null,
 }));
 
 console.log(JSON.stringify(report));

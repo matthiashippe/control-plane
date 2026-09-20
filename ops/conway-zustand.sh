@@ -1,41 +1,41 @@
 #!/usr/bin/env bash
-# Stimmt noch, was wir auf unserer Startseite ueber Conway behaupten?
+# Is what we claim about Conway on our landing page still true?
 #
-# Die Startseite sagt, Conways Anmeldung sei seit Juli 2026 kaputt, und belegt es mit einem
-# Provisionierungsversuch. Das ist eine Aussage ueber einen fremden Dienst, die jederzeit falsch
-# werden kann: Repariert Conway den Pfad, steht auf unserer Seite eine Unwahrheit, und wir
-# erfuehren es als Letzte. Also wird sie nachgeprueft, nicht geglaubt.
+# The landing page says Conway's sign-up has been broken since July 2026 and backs that up with a
+# provisioning attempt. That is a statement about somebody else's service and can become false at
+# any time: if Conway fixes the path, our page carries an untruth and we would be the last to find
+# out. So it gets checked, not believed.
 #
-# Kostet nichts: eine Wegwerf-Wallet, kein Geld, genau der Weg, den die zwoelf Melder in den
-# Issues gegangen sind.
+# Costs nothing: a throwaway wallet, no money, exactly the route the twelve reporters in the issues
+# took.
 #
 #   ops/conway-zustand.sh
 #
-# Rueckgabe 0: Anmeldung weiterhin kaputt, unsere Aussage haelt.
-# Rueckgabe 1: Anmeldung funktioniert wieder. Dann muss die Startseite geaendert werden.
+# Exit 0: sign-up still broken, our statement holds.
+# Exit 1: sign-up works again. Then the landing page has to change.
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
 BASE="${CONWAY_URL:-https://api.conway.tech}"
 
-echo "── Selbstauskunft von $BASE"
-wurzel=$(curl -s -m 15 "$BASE/" || echo '{}')
-echo "   $wurzel"
+echo "-- What $BASE says about itself"
+root=$(curl -s -m 15 "$BASE/" || echo '{}')
+echo "   $root"
 
-echo "── Provisionierungsversuch mit frischer Wallet"
-aus=$(CP_URL="$BASE" timeout 120 pnpm -s tsx harness/e2e/provisionierung.ts 2>&1)
-echo "$aus" | sed 's/^/   /'
+echo "-- Provisioning attempt with a fresh wallet"
+out=$(CP_URL="$BASE" timeout 120 pnpm -s tsx harness/e2e/provisionierung.ts 2>&1)
+echo "$out" | sed 's/^/   /'
 
-if printf '%s' "$aus" | grep -q "PROVISIONIERUNG FAIL"; then
-  grund=$(printf '%s' "$aus" | grep -o 'PROVISIONIERUNG FAIL:.*' | head -1)
+if printf '%s' "$out" | grep -q "PROVISIONIERUNG FAIL"; then
+  reason=$(printf '%s' "$out" | grep -o 'PROVISIONIERUNG FAIL:.*' | head -1)
   echo
-  echo "KAPUTT: $grund"
-  echo "Unsere Aussage auf der Startseite haelt. Stand: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  echo "BROKEN: $reason"
+  echo "Our statement on the landing page holds. As of: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
   exit 0
 fi
 
 echo
-echo "ACHTUNG: Die Provisionierung bei Conway lief durch."
-echo "Damit ist die Aussage auf src/public/index.html und im README falsch geworden."
-echo "Beides aendern, bevor jemand es nachprueft. Stand: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+echo "WARNING: provisioning at Conway went through."
+echo "That makes the statement on src/public/index.html and in the README false."
+echo "Change both before somebody checks it. As of: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 exit 1

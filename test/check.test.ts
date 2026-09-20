@@ -6,15 +6,15 @@ import { Catalog } from "../src/inference/proxy.js";
 import { MOCK_MODEL } from "../src/inference/mock.js";
 import type { ChatProvider } from "../src/inference/provider.js";
 import { hashApiKey } from "../src/auth/siwe.js";
-import { verifyFindings, messages, normalise } from "../src/check/erfindung.js";
+import { verifyFindings, messages, normalise } from "../src/check/fabrication.js";
 
-const EINREICHUNG =
+const SUBMISSION =
   "Marina Promenade, Dubai Marina. Two bedrooms, 1,240 sqft on the 11th floor. " +
   "Service charge is AED 18 per sqft per year, which comes to AED 22,320 a year. " +
   "Viewings available on short notice.";
 
-/** Provider, der genau die Antwort liefert, die der Test braucht. */
-function antwortet(inhalt: string): ChatProvider {
+/** A provider that returns exactly the answer the test needs. */
+function answering(content: string): ChatProvider {
   return {
     id: "stub",
     models: () => [{ ...MOCK_MODEL, id: "stub-1", provider: "stub" }],
@@ -23,15 +23,15 @@ function antwortet(inhalt: string): ChatProvider {
       object: "chat.completion",
       created: 0,
       model: "stub-1",
-      choices: [{ index: 0, message: { role: "assistant" as const, content: inhalt }, finish_reason: "stop" }],
+      choices: [{ index: 0, message: { role: "assistant" as const, content }, finish_reason: "stop" }],
       usage: { prompt_tokens: 100, completion_tokens: 50, total_tokens: 150 },
     }),
   };
 }
 
-function setup(inhalt: string, balanceMc = 500_000) {
+function setup(content: string, balanceMc = 500_000) {
   const db = openDb(":memory:");
-  const app = createApp({ db, catalog: new Catalog([antwortet(inhalt)]) });
+  const app = createApp({ db, catalog: new Catalog([answering(content)]) });
   const address = privateKeyToAccount(generatePrivateKey()).address.toLowerCase();
   const key = "cnwy_k_" + "cd".repeat(16);
   db.prepare("INSERT INTO wallets (address, balance_mc, created_at) VALUES (?, ?, ?)").run(address, 0, new Date().toISOString());
@@ -39,53 +39,53 @@ function setup(inhalt: string, balanceMc = 500_000) {
     address, hashApiKey(key), key.slice(0, 15), "test", new Date().toISOString(),
   );
   if (balanceMc > 0) postLedger(db, { address, kind: "topup", deltaMc: balanceMc, ref: "seed" });
-  const check = (body: unknown, mitKey = true) =>
+  const check = (body: unknown, withKey = true) =>
     app.request("/v1/check", {
       method: "POST",
-      headers: { "content-type": "application/json", ...(mitKey ? { authorization: key } : {}) },
+      headers: { "content-type": "application/json", ...(withKey ? { authorization: key } : {}) },
       body: JSON.stringify(body),
     });
   const balance = () => (db.prepare("SELECT balance_mc FROM wallets WHERE address = ?").get(address) as { balance_mc: number }).balance_mc;
   return { db, app, check, balance };
 }
 
-const FINDING = { quote: "Viewings available on short notice.", kind: "unsupported", reason: "Steht nicht im Briefing." };
+const FINDING = { quote: "Viewings available on short notice.", kind: "unsupported", reason: "Not in the briefing." };
 
-describe("Zitatpruefung", () => {
-  it("gleicht typografische Zeichen an, sonst faellt ein richtiger Befund durch", () => {
+describe("quote verification", () => {
+  it("aligns typographic characters, otherwise a correct finding falls through", () => {
     expect(normalise("AED 18‑per’sqft")).toBe("aed 18-per'sqft");
   });
 
-  it("behaelt einen Befund, dessen Zitat woertlich in der Einreichung steht", () => {
-    const { findings, discarded } = verifyFindings(EINREICHUNG, { findings: [FINDING] });
+  it("keeps a finding whose quote is in the submission verbatim", () => {
+    const { findings, discarded } = verifyFindings(SUBMISSION, { findings: [FINDING] });
     expect(findings).toHaveLength(1);
     expect(discarded).toBe(0);
   });
 
-  it("verwirft einen erfundenen Fund, denn der beschuldigt einen ehrlichen Text", () => {
-    const erfunden = { ...FINDING, quote: "Free parking for all visitors." };
-    const { findings, discarded } = verifyFindings(EINREICHUNG, { findings: [erfunden] });
+  it("discards a fabricated finding, because that one accuses an honest text", () => {
+    const invented = { ...FINDING, quote: "Free parking for all visitors." };
+    const { findings, discarded } = verifyFindings(SUBMISSION, { findings: [invented] });
     expect(findings).toHaveLength(0);
     expect(discarded).toBe(1);
   });
 
-  it("findet ein Zitat auch mit anderen Anfuehrungs- und Bindestrichen wieder", () => {
-    const anders = { ...FINDING, quote: "Service charge is AED 18 per sqft per year" };
-    expect(verifyFindings(EINREICHUNG, { findings: [anders] }).findings).toHaveLength(1);
+  it("finds a quote again even with different quotation marks and hyphens", () => {
+    const different = { ...FINDING, quote: "Service charge is AED 18 per sqft per year" };
+    expect(verifyFindings(SUBMISSION, { findings: [different] }).findings).toHaveLength(1);
   });
 
-  it("verwirft Befunde ohne Zitat oder mit unbekannter Art", () => {
-    const roh = { findings: [{ kind: "unsupported", reason: "x" }, { ...FINDING, kind: "taste" }] };
-    const { findings, discarded } = verifyFindings(EINREICHUNG, roh);
+  it("discards findings without a quote or with an unknown kind", () => {
+    const raw = { findings: [{ kind: "unsupported", reason: "x" }, { ...FINDING, kind: "taste" }] };
+    const { findings, discarded } = verifyFindings(SUBMISSION, raw);
     expect(findings).toHaveLength(0);
     expect(discarded).toBe(2);
   });
 
-  it("vertraegt eine Antwort ohne Befundliste", () => {
-    expect(verifyFindings(EINREICHUNG, { irgendwas: 1 })).toEqual({ findings: [], discarded: 0 });
+  it("tolerates an answer without a findings list", () => {
+    expect(verifyFindings(SUBMISSION, { whatever: 1 })).toEqual({ findings: [], discarded: 0 });
   });
 
-  it("schickt fuer faktisch und schoepferisch verschiedene Anweisungen", () => {
+  it("sends different instructions for factual and creative", () => {
     const f = messages("b", "e", "factual")[0].content;
     const s = messages("b", "e", "creative")[0].content;
     expect(f).not.toBe(s);
@@ -95,57 +95,57 @@ describe("Zitatpruefung", () => {
 });
 
 describe("POST /v1/check", () => {
-  it("liefert geprüfte Befunde und rechnet wie jede andere Inferenz ab", async () => {
+  it("returns verified findings and bills like any other inference", async () => {
     const { check, balance } = setup(JSON.stringify({ findings: [FINDING] }));
-    const vorher = balance();
-    const res = await check({ briefing: "A listing brief.", submission: EINREICHUNG });
+    const before = balance();
+    const res = await check({ briefing: "A listing brief.", submission: SUBMISSION });
     expect(res.status).toBe(200);
     const body = (await res.json()) as { kind: string; findings: unknown[]; discarded: number };
     expect(body.kind).toBe("factual");
     expect(body.findings).toHaveLength(1);
     expect(body.discarded).toBe(0);
-    expect(balance(), "der Aufruf wird abgerechnet").toBeLessThan(vorher);
+    expect(balance(), "the call is billed").toBeLessThan(before);
   });
 
-  it("gibt einen erfundenen Fund nicht heraus, sondern zaehlt ihn als discarded", async () => {
-    const erfunden = { ...FINDING, quote: "Includes a private beach." };
-    const { check } = setup(JSON.stringify({ findings: [erfunden] }));
-    const res = await check({ briefing: "A listing brief.", submission: EINREICHUNG });
+  it("does not hand out a fabricated finding but counts it as discarded", async () => {
+    const invented = { ...FINDING, quote: "Includes a private beach." };
+    const { check } = setup(JSON.stringify({ findings: [invented] }));
+    const res = await check({ briefing: "A listing brief.", submission: SUBMISSION });
     const body = (await res.json()) as { findings: unknown[]; discarded: number };
     expect(body.findings).toHaveLength(0);
     expect(body.discarded).toBe(1);
   });
 
-  it("nimmt kind=creative an", async () => {
+  it("accepts kind=creative", async () => {
     const { check } = setup(JSON.stringify({ findings: [] }));
     const res = await check({ briefing: "b", submission: "e", kind: "creative" });
     expect(((await res.json()) as { kind: string }).kind).toBe("creative");
   });
 
-  it("verlangt briefing und submission", async () => {
+  it("requires briefing and submission", async () => {
     const { check } = setup(JSON.stringify({ findings: [] }));
-    const res = await check({ submission: "nur das" });
+    const res = await check({ submission: "only this" });
     expect(res.status).toBe(400);
     expect(((await res.json()) as { error: string }).error).toBe("invalid_request");
   });
 
-  it("deckelt die Laenge, sonst kauft ein Aufruf ein Kontextfenster ein", async () => {
+  it("caps the length, otherwise one call buys a whole context window", async () => {
     const { check, balance } = setup(JSON.stringify({ findings: [] }));
-    const vorher = balance();
+    const before = balance();
     const res = await check({ briefing: "b", submission: "x".repeat(20_001) });
     expect(res.status).toBe(400);
     expect(((await res.json()) as { error: string }).error).toBe("too_long");
-    expect(balance(), "abgelehnt heisst nicht abgerechnet").toBe(vorher);
+    expect(balance(), "rejected means not billed").toBe(before);
   });
 
-  it("verschweigt nicht, wenn das Modell kein JSON liefert", async () => {
+  it("does not hide it when the model returns no JSON", async () => {
     const { check } = setup("Sorry, I cannot do that.");
     const res = await check({ briefing: "b", submission: "e" });
     expect(res.status).toBe(502);
     expect(((await res.json()) as { error: string }).error).toBe("unparseable_answer");
   });
 
-  it("braucht einen API-Key", async () => {
+  it("needs an API key", async () => {
     const { check } = setup(JSON.stringify({ findings: [] }));
     const res = await check({ briefing: "b", submission: "e" }, false);
     expect(res.status).toBe(401);

@@ -11,7 +11,7 @@ const PAY_TO = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8" as Address;
 
 const cfg: PayConfig = { payTo: PAY_TO, network: "base", chainId: 8453, usdcAddress: USDC, maxTimeoutSeconds: 300, tiers: [5, 25, 100, 500, 1000, 2500] };
 
-/** Settler, der zählt und nach Wunsch scheitert. */
+/** A settler that counts and fails on request. */
 class FakeSettler implements Settler {
   readonly kind = "fake";
   calls: Authorization[] = [];
@@ -26,7 +26,7 @@ class FakeSettler implements Settler {
   }
 }
 
-/** Baut den X-Payment-Header so, wie signPayment() im Runtime-Client (src/conway/x402.ts). */
+/** Builds the X-Payment header the way signPayment() does in the runtime client (src/conway/x402.ts). */
 async function signPayment(params: {
   account: ReturnType<typeof privateKeyToAccount>;
   to: Address;
@@ -94,8 +94,8 @@ function setup() {
   return { db, settler, app, account, pay, ledgerRows, balance };
 }
 
-describe("/pay x402-Seller", () => {
-  it("antwortet ohne X-Payment mit 402 und dem Angebot in Body und Header", async () => {
+describe("/pay as an x402 seller", () => {
+  it("answers 402 without X-Payment and puts the offer in the body and the header", async () => {
     const { pay, account } = setup();
     const res = await pay(5);
     expect(res.status).toBe(402);
@@ -116,18 +116,18 @@ describe("/pay x402-Seller", () => {
     expect(decoded.accepts[0].maxAmountRequired).toBe("5000000");
   });
 
-  it("lehnt einen ungültigen Tier mit 400 ab", async () => {
+  it("rejects an invalid tier with 400", async () => {
     const { pay } = setup();
     const res = await pay(7);
     expect(res.status).toBe(400);
     expect(((await res.json()) as { error: string }).error).toBe("invalid_tier");
   });
 
-  it("antwortet auf eine Nonce, die gerade gesettelt wird, mit 409 und sagt, dass nichts doppelt bucht", async () => {
+  it("answers 409 for a nonce that is being settled and says that nothing is booked twice", async () => {
     const { pay, account, db, balance, settler } = setup();
     const nonce = `0x${"7c".repeat(32)}` as Hex;
     const header = await signPayment({ account, to: PAY_TO, value: 5_000_000n, nonce });
-    // Der Zustand, den ein zweiter Request sieht, während der erste noch settlet.
+    // The state a second request sees while the first one is still settling.
     db.prepare(
       "INSERT INTO payments (nonce, from_address, to_address, value_atomic, credits_mc, status, created_at) VALUES (?, ?, ?, ?, ?, 'pending', ?)",
     ).run(nonce, account.address.toLowerCase(), account.address.toLowerCase(), "5000000", 500_000, new Date().toISOString());
@@ -139,17 +139,17 @@ describe("/pay x402-Seller", () => {
     expect(body.message).toMatch(/idempotency key/);
     expect(body.message).toMatch(/nothing is charged twice/i);
     expect(body.docs).toContain("#payments");
-    expect(settler.calls, "der zweite Versuch settlet nicht noch einmal").toHaveLength(0);
+    expect(settler.calls, "the second attempt does not settle again").toHaveLength(0);
     expect(balance()).toBe(0);
   });
 
-  it("verbucht eine gültige Zahlung: 200, credits_cents 501 mit Schwellenbonus, eine Ledger-Zeile", async () => {
+  it("books a valid payment: 200, credits_cents 501 with the threshold bonus, one ledger row", async () => {
     const { pay, account, settler, ledgerRows, balance } = setup();
     const header = await signPayment({ account, to: PAY_TO, value: 5_000_000n });
     const res = await pay(5, header);
     expect(res.status).toBe(200);
     const body = (await res.json()) as { credits_cents: number; balance_cents: number; tx_hash: string };
-    // 500 Cent gekauft plus ein Cent, der über die Tier-Schwelle der Runtime hebt (> 500).
+    // 500 cents bought plus one cent that lifts it above the runtime tier threshold (> 500).
     expect(body.credits_cents).toBe(501);
     expect(body.balance_cents).toBe(501);
     expect(body.tx_hash).toMatch(/^0x/);
@@ -159,7 +159,7 @@ describe("/pay x402-Seller", () => {
     expect(ledgerRows()).toEqual([{ kind: "topup", delta_mc: 501_000, ref: expect.stringMatching(/^0x[0-9a-f]{64}$/) }]);
   });
 
-  it("ist idempotent: dieselbe Signatur zweimal ergibt dieselbe Antwort und eine Gutschrift", async () => {
+  it("is idempotent: the same signature twice gives the same answer and one credit", async () => {
     const { pay, account, settler, ledgerRows, balance } = setup();
     const header = await signPayment({ account, to: PAY_TO, value: 5_000_000n });
     const first = await (await pay(5, header)).json();
@@ -167,14 +167,14 @@ describe("/pay x402-Seller", () => {
     expect(secondRes.status).toBe(200);
     expect(await secondRes.json()).toEqual(first);
     expect(settler.calls).toHaveLength(1);
-    expect(balance(), "der Schwellenbonus darf bei einem Retry nicht ein zweites Mal greifen").toBe(501_000);
+    expect(balance(), "the threshold bonus must not apply a second time on a retry").toBe(501_000);
     expect(ledgerRows()).toHaveLength(1);
   });
 
-  it("lehnt eine Signatur eines anderen Signierers mit 402 ab, ohne zu settlen", async () => {
+  it("rejects a signature from a different signer with 402, without settling", async () => {
     const { pay, account, settler, balance } = setup();
     const other = privateKeyToAccount(generatePrivateKey());
-    // Header behauptet from = account, signiert hat aber other.
+    // The header claims from = account, but other signed it.
     const forged = await signPayment({ account: other, to: PAY_TO, value: 5_000_000n });
     const tampered = JSON.parse(Buffer.from(forged, "base64").toString("utf-8"));
     tampered.payload.authorization.from = account.address;
@@ -185,7 +185,7 @@ describe("/pay x402-Seller", () => {
     expect(balance()).toBe(0);
   });
 
-  it("lehnt einen falschen Betrag mit 402 ab", async () => {
+  it("rejects a wrong amount with 402", async () => {
     const { pay, account, settler } = setup();
     const header = await signPayment({ account, to: PAY_TO, value: 1_000_000n });
     const res = await pay(5, header);
@@ -194,7 +194,7 @@ describe("/pay x402-Seller", () => {
     expect(settler.calls).toHaveLength(0);
   });
 
-  it("lehnt einen falschen Empfänger (payTo) mit 402 ab", async () => {
+  it("rejects a wrong recipient (payTo) with 402", async () => {
     const { pay, account, settler } = setup();
     const header = await signPayment({ account, to: account.address, value: 5_000_000n });
     const res = await pay(5, header);
@@ -203,7 +203,7 @@ describe("/pay x402-Seller", () => {
     expect(settler.calls).toHaveLength(0);
   });
 
-  it("lehnt eine abgelaufene Autorisierung ab", async () => {
+  it("rejects an expired authorization", async () => {
     const { pay, account } = setup();
     const header = await signPayment({ account, to: PAY_TO, value: 5_000_000n, validBefore: BigInt(Math.floor(Date.now() / 1000) - 10) });
     const res = await pay(5, header);
@@ -211,19 +211,19 @@ describe("/pay x402-Seller", () => {
     expect(((await res.json()) as { error: string }).error).toBe("authorization_expired");
   });
 
-  it("bucht nichts, wenn das Settlement scheitert, und erlaubt danach einen zweiten Versuch", async () => {
+  it("books nothing when the settlement fails and allows a second attempt afterwards", async () => {
     const { pay, account, settler, balance, ledgerRows, db } = setup();
     const header = await signPayment({ account, to: PAY_TO, value: 5_000_000n });
     settler.failNext = true;
     const failed = await pay(5, header);
     expect(failed.status).toBe(402);
-    const fehler = (await failed.json()) as { error: string; message: string; docs: string };
-    expect(fehler.error).toMatch(/^settlement_failed/);
-    expect(fehler.message, "sagt, dass nichts gutgeschrieben wurde und was zu prüfen ist").toMatch(
+    const error = (await failed.json()) as { error: string; message: string; docs: string };
+    expect(error.error).toMatch(/^settlement_failed/);
+    expect(error.message, "says that nothing was credited and what to check").toMatch(
       /no credits\s+were added/,
     );
-    expect(fehler.message).toContain("Basescan");
-    expect(fehler.docs).toContain("docs/errors.md#payments");
+    expect(error.message).toContain("Basescan");
+    expect(error.docs).toContain("docs/errors.md#payments");
     expect(balance()).toBe(0);
     expect(ledgerRows()).toHaveLength(0);
     expect((db.prepare("SELECT status FROM payments").get() as { status: string }).status).toBe("failed");
@@ -234,12 +234,12 @@ describe("/pay x402-Seller", () => {
     expect(settler.calls).toHaveLength(2);
   });
 
-  it("schreibt bei zwei parallelen Retries einer gescheiterten Zahlung nur eine Gutschrift", async () => {
-    // Sicherheitsfund 19.09.2026: Der failed-Retry-Pfad prüfte `changes` des UPDATE nicht, also
-    // gewannen zwei gleichzeitige Retries beide den Claim, riefen beide den Settler und schrieben
-    // beide gut. Reproduziert mit 1 USD und doppeltem Saldo. Der Settler meldet hier zweimal
-    // Erfolg, weil genau das der Fall ist, gegen den abgesichert werden muss: Wir dürfen uns
-    // nicht darauf verlassen, dass ein Dritter den zweiten Aufruf ablehnt.
+  it("writes only one credit for two parallel retries of a failed payment", async () => {
+    // Security finding 19.09.2026: the failed-retry path did not check `changes` of the UPDATE, so
+    // two concurrent retries both won the claim, both called the settler and both credited.
+    // Reproduced with 1 USD and a doubled balance. The settler reports success twice here, because
+    // that is exactly the case we have to be safe against: we must not rely on a third party
+    // rejecting the second call.
     const { pay, account, settler, balance, ledgerRows, db } = setup();
     const header = await signPayment({ account, to: PAY_TO, value: 5_000_000n });
 
@@ -250,50 +250,50 @@ describe("/pay x402-Seller", () => {
     const [a, b] = await Promise.all([pay(5, header), pay(5, header)]);
     const codes = [a.status, b.status].sort();
 
-    expect(balance(), "eine Zahlung über 5 USD darf höchstens einmal 501.000 mc gutschreiben").toBe(501_000);
+    expect(balance(), "a payment of 5 USD may credit 501,000 mc at most once").toBe(501_000);
     expect(ledgerRows().filter((r) => r.kind === "topup")).toHaveLength(1);
     expect(codes[0]).toBe(200);
-    expect(settler.calls.length, "der Settler darf für eine Nonce nicht dreimal gerufen werden").toBeLessThanOrEqual(2);
+    expect(settler.calls.length, "the settler must not be called three times for one nonce").toBeLessThanOrEqual(2);
   });
 
-  it("schreibt Credits nur der Adresse gut, die auch bezahlt hat", async () => {
-    // Sicherheitsfund 19.09.2026: Die EIP-3009-Signatur deckt Betrag, Empfänger der USDC und
-    // Nonce, aber nicht den Pfad, der bestimmt, wer die Credits bekommt. Ohne Bindung leitet ein
-    // abgefangener Header die Gutschrift auf eine fremde Adresse um, während das Geld weiterhin
-    // vom Signierer abfließt.
+  it("credits only the address that actually paid", async () => {
+    // Security finding 19.09.2026: the EIP-3009 signature covers the amount, the recipient of the
+    // USDC and the nonce, but not the path that decides who gets the credits. Without that binding
+    // an intercepted header redirects the credit to somebody else's address while the money still
+    // leaves the signer.
     const { app, account, settler, db } = setup();
-    const fremd = privateKeyToAccount(generatePrivateKey()).address;
+    const stranger = privateKeyToAccount(generatePrivateKey()).address;
     const header = await signPayment({ account, to: PAY_TO, value: 5_000_000n });
 
-    const res = await app.request(`/pay/5/${fremd}`, { headers: { "X-Payment": header } });
+    const res = await app.request(`/pay/5/${stranger}`, { headers: { "X-Payment": header } });
     expect(res.status).toBe(402);
     expect(((await res.json()) as { error: string }).error).toContain("recipient_must_match_payer");
-    expect(settler.calls, "es darf nicht einmal gesettelt werden").toHaveLength(0);
-    const fremdSaldo = db.prepare("SELECT balance_mc FROM wallets WHERE address = ?").get(fremd.toLowerCase()) as
+    expect(settler.calls, "it must not even settle").toHaveLength(0);
+    const strangerBalance = db.prepare("SELECT balance_mc FROM wallets WHERE address = ?").get(stranger.toLowerCase()) as
       | { balance_mc: number }
       | undefined;
-    expect(fremdSaldo?.balance_mc ?? 0).toBe(0);
+    expect(strangerBalance?.balance_mc ?? 0).toBe(0);
 
-    const eigen = await app.request(`/pay/5/${account.address}`, { headers: { "X-Payment": header } });
-    expect(eigen.status, "auf die eigene Adresse muss es gehen").toBe(200);
+    const own = await app.request(`/pay/5/${account.address}`, { headers: { "X-Payment": header } });
+    expect(own.status, "onto the own address it has to work").toBe(200);
   });
 
-  it("verrät bei einem wiederholten Zahlungs-Header nicht den aktuellen Kontostand", async () => {
-    // Diese Antwort gibt es ohne API-Key. Läse sie den Saldo frisch, wäre ein alter Header ein
-    // Kontostandsmelder für einen fremden Mandanten.
+  it("does not leak the current balance on a repeated payment header", async () => {
+    // This answer is served without an API key. If it read the balance fresh, an old header would
+    // be a balance reporter for somebody else's tenant.
     const { app, account, pay, db } = setup();
     const header = await signPayment({ account, to: PAY_TO, value: 5_000_000n });
-    const erst = (await (await pay(5, header)).json()) as { balance_cents: number };
-    expect(erst.balance_cents).toBe(501);
+    const first = (await (await pay(5, header)).json()) as { balance_cents: number };
+    expect(first.balance_cents).toBe(501);
 
-    postLedger(db, { address: account.address.toLowerCase(), kind: "topup", deltaMc: 7_000_000, ref: "spaeter" });
+    postLedger(db, { address: account.address.toLowerCase(), kind: "topup", deltaMc: 7_000_000, ref: "later" });
 
-    const wieder = (await (await pay(5, header)).json()) as { balance_cents: number };
-    expect(wieder.balance_cents, "es muss der Stand von damals sein, nicht der heutige").toBe(501);
+    const again = (await (await pay(5, header)).json()) as { balance_cents: number };
+    expect(again.balance_cents, "it has to be the balance from back then, not today's").toBe(501);
     void app;
   });
 
-  it("antwortet 503 ohne Settler", async () => {
+  it("answers 503 without a settler", async () => {
     const db = openDb(":memory:");
     const app = createApp({ db, pay: cfg, settler: null });
     const res = await app.request(`/pay/5/${PAY_TO}`);
@@ -301,36 +301,35 @@ describe("/pay x402-Seller", () => {
   });
 });
 
-describe("Aufräumen beim Start", () => {
-  it("löst hängende pending-Zahlungen, damit die Nonce nicht dauerhaft blockiert", async () => {
-    // Gegenprüfung 19.09.2026: Stirbt der Prozess zwischen Claim und Settlement, bleibt die
-    // Zahlung `pending`. Die Nonce antwortet dann für immer mit 409, und ein Retry ist unmöglich,
-    // obwohl die USDC schon geflossen sein können. Nach dem Neustart muss der Weg wieder offen
-    // sein.
-    const datei = `/tmp/cp-pending-${Date.now()}.db`;
+describe("cleanup on start", () => {
+  it("resolves stuck pending payments so the nonce is not blocked forever", async () => {
+    // Counter-check 19.09.2026: if the process dies between the claim and the settlement, the
+    // payment stays `pending`. The nonce then answers 409 forever and a retry is impossible,
+    // although the USDC may already have moved. After the restart the route has to be open again.
+    const file = `/tmp/cp-pending-${Date.now()}.db`;
     try {
-      const db1 = openDb(datei);
+      const db1 = openDb(file);
       db1.prepare("INSERT INTO wallets (address, balance_mc, created_at) VALUES (?, 0, ?)").run("0xa", new Date().toISOString());
       db1
         .prepare(
           "INSERT INTO payments (nonce, from_address, to_address, value_atomic, credits_mc, status, created_at) VALUES (?, ?, ?, ?, ?, 'pending', ?)",
         )
-        .run("haengt", "0xa", "0xa", "5000000", 500_000, new Date().toISOString());
+        .run("stuck", "0xa", "0xa", "5000000", 500_000, new Date().toISOString());
       db1.close();
 
-      // Neustart des Prozesses
-      const db2 = openDb(datei);
-      const row = db2.prepare("SELECT status, error FROM payments WHERE nonce = ?").get("haengt") as { status: string; error: string };
-      expect(row.status, "pending blockiert die Nonce dauerhaft und muss aufgelöst werden").toBe("failed");
+      // Restart of the process
+      const db2 = openDb(file);
+      const row = db2.prepare("SELECT status, error FROM payments WHERE nonce = ?").get("stuck") as { status: string; error: string };
+      expect(row.status, "pending blocks the nonce forever and has to be resolved").toBe("failed");
       expect(row.error).toBe("interrupted_by_restart");
       db2.close();
     } finally {
       const fs = await import("node:fs");
       for (const suffix of ["", "-wal", "-shm"]) {
         try {
-          fs.unlinkSync(datei + suffix);
+          fs.unlinkSync(file + suffix);
         } catch {
-          /* egal */
+          /* does not matter */
         }
       }
     }

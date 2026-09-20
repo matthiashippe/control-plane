@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Lesender Statusbericht des laufenden Control Plane als JSON. Ändert nichts, startet nichts.
+# Read-only status report of the running control plane, as JSON. Changes nothing, starts nothing.
 #   OPENROUTER_API_KEY=... ops/status.sh
 set -uo pipefail
 HOST="${CP_DEPLOY_HOST:-root@76.13.144.207}"

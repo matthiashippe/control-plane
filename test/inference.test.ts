@@ -12,7 +12,7 @@ const TOOLS = ["check_credits", "system_synopsis", "list_models", "view_soul", "
   function: { name, description: name, parameters: { type: "object", properties: {} } },
 }));
 
-/** Legt Wallet und API-Key direkt in der DB an (Provisionierung ist in auth.test.ts geprüft). */
+/** Creates wallet and API key straight in the DB (provisioning is covered in auth.test.ts). */
 function setup(balanceMc = 500_000) {
   const db = openDb(":memory:");
   const provider = new MockProvider();
@@ -57,8 +57,8 @@ function setup(balanceMc = 500_000) {
   return { db, app, key, address, chat, balance, inferenceRows, request, provider };
 }
 
-describe("Inferenz-Proxy", () => {
-  it("antwortet im OpenAI-Format mit usage und einem Tool-Call", async () => {
+describe("inference proxy", () => {
+  it("answers in the OpenAI format with usage and a tool call", async () => {
     const { chat, request } = setup();
     const res = await chat(request());
     expect(res.status).toBe(200);
@@ -79,7 +79,7 @@ describe("Inferenz-Proxy", () => {
     expect(body.usage.total_tokens).toBe(body.usage.prompt_tokens + body.usage.completion_tokens);
   });
 
-  it("bucht je Call genau die Kosten aus usage x Listenpreis x 1,3 in Millicents ab", async () => {
+  it("charges exactly usage x list price x 1.3 in millicents per call", async () => {
     const { chat, request, balance, inferenceRows } = setup();
     const before = balance();
     const body = (await (await chat(request())).json()) as { id: string; usage: { prompt_tokens: number; completion_tokens: number } };
@@ -93,7 +93,7 @@ describe("Inferenz-Proxy", () => {
     expect(JSON.parse(rows[0].meta)).toMatchObject({ model: "mock-1", cost_mc: expected, uncollected_mc: 0 });
   });
 
-  it("senkt den Saldo über fünf Calls exakt um die Summe der Ledger-Zeilen und schickt am fünften den sleep-Call", async () => {
+  it("lowers the balance over five calls by exactly the sum of the ledger rows and sends the sleep call on the fifth", async () => {
     const { chat, request, balance, inferenceRows } = setup();
     const start = balance();
     const names: string[] = [];
@@ -109,7 +109,7 @@ describe("Inferenz-Proxy", () => {
     expect(sum).toBeLessThan(0);
   });
 
-  it("antwortet bei leerem Konto mit dem 402-Format, das die Runtime parst, und bucht nichts", async () => {
+  it("answers an empty account with the 402 shape the runtime parses, and charges nothing", async () => {
     const { chat, request, inferenceRows } = setup(0);
     const res = await chat(request());
     expect(res.status).toBe(402);
@@ -120,8 +120,8 @@ describe("Inferenz-Proxy", () => {
     expect(inferenceRows()).toHaveLength(0);
   });
 
-  it("bucht nie mehr ab als den Saldo und vermerkt den Rest als uncollected_mc", async () => {
-    // Provider, dessen gemeldete usage die Vorprüfung weit übersteigt (Tokenizer-Drift im Extrem).
+  it("never charges more than the balance and records the rest as uncollected_mc", async () => {
+    // A provider whose reported usage far exceeds the up-front estimate (tokenizer drift, extreme case).
     const greedy: ChatProvider = {
       id: "greedy",
       models: () => [{ ...MOCK_MODEL, id: "greedy-1", provider: "greedy" }],
@@ -151,21 +151,21 @@ describe("Inferenz-Proxy", () => {
     expect(meta.uncollected_mc).toBe(125_000);
   });
 
-  it("lehnt ein unbekanntes Modell mit 404 ab", async () => {
+  it("rejects an unknown model with 404", async () => {
     const { chat, request } = setup();
     const res = await chat({ ...request(), model: "gpt-5.2" });
     expect(res.status).toBe(404);
     expect(((await res.json()) as { error: string }).error).toBe("model_not_found");
   });
 
-  it("liefert /v1/models mit Verkaufspreisen = Listenpreis x 1,3", async () => {
+  it("serves /v1/models with sale prices = list price x 1.3", async () => {
     const { app, key } = setup();
     const res = await app.request("/v1/models", { headers: { authorization: key } });
     expect(res.status).toBe(200);
     const body = (await res.json()) as { data: { id: string; provider: string; available: boolean; pricing: { input_per_million: number; output_per_million: number } }[] };
     expect(body.data).toHaveLength(1);
-    // provider "other": einziger Wert, den die Upstream-Registry beim Neustart nicht deaktiviert
-    // und der sicher über das Control Plane geroutet wird.
+    // provider "other": the only value the upstream registry does not disable on restart and that
+    // is reliably routed through the control plane.
     expect(body.data[0]).toMatchObject({ id: "mock-1", provider: "other", owned_by: "mock", available: true });
     expect((body.data[0] as unknown as { pricing: { input_per_1k: number } }).pricing.input_per_1k).toBeCloseTo(
       sellPrice(MOCK_MODEL.inputPerMillion) / 1000,
@@ -176,7 +176,7 @@ describe("Inferenz-Proxy", () => {
     expect(body.data[0].pricing.output_per_million).toBeCloseTo(MOCK_MODEL.outputPerMillion * 1.3, 6);
   });
 
-  it("bedient die IDs der Upstream-Routing-Matrix per Alias und antwortet mit der angefragten ID", async () => {
+  it("serves the IDs of the upstream routing matrix via aliases and answers with the requested ID", async () => {
     const { db, key, address } = setup();
     const app = createApp({ db, catalog: new Catalog([new MockProvider()], { "gpt-5.2": "mock-1", "gpt-5-mini": "mock-1" }) });
     const res = await app.request("/v1/chat/completions", {
@@ -192,10 +192,10 @@ describe("Inferenz-Proxy", () => {
     expect(meta).toMatchObject({ model: "mock-1", requested_model: "gpt-5.2" });
     const models = (await (await app.request("/v1/models", { headers: { authorization: key } })).json()) as { data: { id: string }[] };
     expect(models.data.map((m) => m.id).sort()).toEqual(["gpt-5-mini", "gpt-5.2", "mock-1"]);
-    expect(() => new Catalog([new MockProvider()], { "gpt-5.2": "nope" })).toThrow(/unbekanntes Modell/);
+    expect(() => new Catalog([new MockProvider()], { "gpt-5.2": "nope" })).toThrow(/unknown model/);
   });
 
-  it("akzeptiert max_completion_tokens und lehnt stream ab", async () => {
+  it("accepts max_completion_tokens and rejects stream", async () => {
     const { chat, request } = setup();
     const ok = await chat({ ...request(), max_tokens: undefined, max_completion_tokens: 256 });
     expect(ok.status).toBe(200);
@@ -203,7 +203,7 @@ describe("Inferenz-Proxy", () => {
     expect(bad.status).toBe(400);
   });
 
-  it("verlangt einen API-Key", async () => {
+  it("requires an API key", async () => {
     const { app, request } = setup();
     const res = await app.request("/v1/chat/completions", {
       method: "POST",
@@ -215,120 +215,120 @@ describe("Inferenz-Proxy", () => {
 });
 
 /**
- * Wie setup(), aber mit einem Provider, der vor der Antwort tatsächlich auf I/O wartet. Nur dann
- * überlappen sich die Requests im Event-Loop so, wie es bei einem echten Anbieter passiert.
+ * Like setup(), but with a provider that really waits on I/O before answering. Only then do the
+ * requests overlap in the event loop the way they do with a real provider.
  */
-function setupLangsam(balanceMc: number) {
-  const basis = setup(balanceMc);
-  const echt = basis.provider.chat.bind(basis.provider);
-  basis.provider.chat = async (req: Parameters<typeof echt>[0]) => {
+function setupSlow(balanceMc: number) {
+  const base = setup(balanceMc);
+  const real = base.provider.chat.bind(base.provider);
+  base.provider.chat = async (req: Parameters<typeof real>[0]) => {
     await new Promise((r) => setTimeout(r, 15));
-    return echt(req);
+    return real(req);
   };
-  return basis;
+  return base;
 }
 
-describe("Guthabendeckung unter Parallelität", () => {
-  it("lässt parallele Calls nicht dasselbe Guthaben doppelt verbrauchen", async () => {
-    // Sicherheitsfund 19.09.2026: Zwischen Saldoprüfung und Abbuchung liegt der Provider-Call.
-    // Vorher las jeder gleichzeitige Request denselben Saldo, alle kamen durch, und abgebucht
-    // wurde am Ende nur, was noch da war. Mit 1 USD Guthaben waren so rund 65 USD echte
-    // Einkaufskosten erreichbar. Der Provider zählt hier mit: entscheidend ist nicht nur der
-    // Endsaldo, sondern wie oft überhaupt eingekauft wurde.
-    // Der Provider muss wirklich warten, sonst gibt es kein Rennen: Ein synchron antwortender
-    // Mock läuft im Event-Loop nacheinander ab und der Fehler bleibt unsichtbar.
-    // 500 mc decken genau drei Calls à 160 mc. Mit 40 gleichzeitigen Anfragen ist der Überzug
-    // das Dreizehnfache des Guthabens, wenn die Deckung nicht atomar geprüft wird.
-    const { chat, request, balance, inferenceRows, provider } = setupLangsam(500);
+describe("credit coverage under concurrency", () => {
+  it("does not let parallel calls spend the same credit twice", async () => {
+    // Security finding 19.09.2026: between the balance check and the charge sits the provider call.
+    // Before, every concurrent request read the same balance, all of them went through, and in the
+    // end only what was left got charged. With 1 USD of credit roughly 65 USD of real purchase cost
+    // was reachable that way. The provider counts along here: what matters is not only the final
+    // balance but how often anything was bought at all.
+    // The provider has to really wait, otherwise there is no race: a mock answering synchronously
+    // runs one after the other in the event loop and the bug stays invisible.
+    // 500 mc cover exactly three calls at 160 mc. With 40 concurrent requests the overdraft is
+    // thirteen times the credit if coverage is not checked atomically.
+    const { chat, request, balance, inferenceRows, provider } = setupSlow(500);
 
-    const antworten = await Promise.all(Array.from({ length: 40 }, (_, i) => chat(request(i))));
-    const codes = antworten.map((r) => r.status);
+    const answers = await Promise.all(Array.from({ length: 40 }, (_, i) => chat(request(i))));
+    const codes = answers.map((r) => r.status);
     const ok = codes.filter((c) => c === 200).length;
-    const abgelehnt = codes.filter((c) => c === 402).length;
+    const rejected = codes.filter((c) => c === 402).length;
 
-    expect(ok + abgelehnt, "andere Statuscodes als 200/402 sind hier ein Fehler").toBe(40);
-    expect(balance(), "der Saldo darf nie unter null fallen").toBeGreaterThanOrEqual(0);
+    expect(ok + rejected, "status codes other than 200/402 are a bug here").toBe(40);
+    expect(balance(), "the balance must never fall below zero").toBeGreaterThanOrEqual(0);
 
-    const gebucht = inferenceRows().reduce((sum, r) => sum + Math.abs(r.delta_mc), 0);
-    expect(gebucht, "es darf nicht mehr abgebucht werden als eingezahlt wurde").toBeLessThanOrEqual(500);
-    expect(ok, "mit 500 mc sind höchstens drei Calls à 160 mc gedeckt").toBeLessThanOrEqual(3);
-    expect(inferenceRows(), "jeder erfolgreiche Call schreibt genau eine Ledger-Zeile").toHaveLength(ok);
+    const charged = inferenceRows().reduce((sum, r) => sum + Math.abs(r.delta_mc), 0);
+    expect(charged, "no more may be charged than was paid in").toBeLessThanOrEqual(500);
+    expect(ok, "500 mc cover at most three calls at 160 mc").toBeLessThanOrEqual(3);
+    expect(inferenceRows(), "every successful call writes exactly one ledger row").toHaveLength(ok);
 
-    // Der eigentliche Schaden war nicht der Saldo, sondern der Einkauf beim Provider: Jeder
-    // durchgelassene Call kostet echtes Geld, auch wenn er nicht abgerechnet werden kann.
-    const unbezahlt = inferenceRows()
+    // The real damage was not the balance but the purchase at the provider: every call let through
+    // costs real money, even when it cannot be billed.
+    const unpaid = inferenceRows()
       .map((r) => JSON.parse(r.meta) as { uncollected_mc: number })
       .reduce((sum, m) => sum + (m.uncollected_mc || 0), 0);
-    expect(unbezahlt, "kein Call darf unbezahlt durchlaufen").toBe(0);
-    expect(provider.totalCalls, "jeder Provider-Aufruf kostet echtes Geld, auch ein nicht abrechenbarer").toBe(ok);
+    expect(unpaid, "no call may run through unpaid").toBe(0);
+    expect(provider.totalCalls, "every provider call costs real money, even one that cannot be billed").toBe(ok);
   });
 
-  it("gibt die Reservierung zurück, wenn der Provider ausfällt", async () => {
-    // Sonst bleibt Guthaben nach einem Provider-Fehler dauerhaft blockiert und der Mandant kommt
-    // nicht mehr an sein eigenes Geld.
+  it("gives the reservation back when the provider fails", async () => {
+    // Otherwise credit stays blocked for good after a provider error and the tenant can no longer
+    // reach their own money.
     const { db, chat, request, address } = setup(50_000);
-    const reserviert = () =>
+    const reserved = () =>
       (db.prepare("SELECT reserved_mc FROM wallets WHERE address = ?").get(address) as { reserved_mc: number }).reserved_mc;
 
-    expect(reserviert()).toBe(0);
-    const res = await chat({ ...request(1), model: "gibt-es-nicht" });
+    expect(reserved()).toBe(0);
+    const res = await chat({ ...request(1), model: "does-not-exist" });
     expect(res.status).toBe(404);
-    expect(reserviert(), "ein abgelehnter Call darf nichts reservieren").toBe(0);
+    expect(reserved(), "a rejected call must not reserve anything").toBe(0);
 
     const ok = await chat(request(2));
     expect(ok.status).toBe(200);
-    expect(reserviert(), "nach einem erfolgreichen Call ist nichts mehr reserviert").toBe(0);
+    expect(reserved(), "after a successful call nothing is reserved any more").toBe(0);
   });
 });
 
-describe("Zusammenlegung gleichzeitiger identischer Anfragen", () => {
-  it("kauft für einen Retry, der während des ersten Aufrufs kommt, nicht zweimal ein", async () => {
-    // Die Upstream-Runtime bricht nach 60 Sekunden ab (INFERENCE_TIMEOUT_MS) und wiederholt bei
-    // 429, 500, 502, 503 und 504. Unser Aufruf beim Einkaufsanbieter läuft bis zu 120 Sekunden.
-    // Dauert eine Antwort dazwischen, sieht der Client einen Timeout und schickt denselben Request
-    // erneut, während der erste noch läuft. Ohne Zusammenlegung zahlt der Kunde doppelt für eine
-    // Antwort, die er einmal bekommt. Genau das ist der Fehler, den wir bei Conway dokumentieren
-    // (Issue #393, retry-driven duplicate topups).
-    const { chat, request, balance, inferenceRows, provider } = setupLangsam(500_000);
-    const anfrage = request(1);
+describe("coalescing of concurrent identical requests", () => {
+  it("does not buy twice for a retry that arrives during the first call", async () => {
+    // The upstream runtime aborts after 60 seconds (INFERENCE_TIMEOUT_MS) and retries on 429, 500,
+    // 502, 503 and 504. Our call at the purchasing provider runs for up to 120 seconds. If an answer
+    // takes somewhere in between, the client sees a timeout and sends the same request again while
+    // the first one is still running. Without coalescing the customer pays twice for an answer they
+    // get once. That is exactly the bug we document about Conway (issue #393, retry-driven
+    // duplicate topups).
+    const { chat, request, balance, inferenceRows, provider } = setupSlow(500_000);
+    const req = request(1);
 
-    const [a, b] = await Promise.all([chat(anfrage), chat(anfrage)]);
+    const [a, b] = await Promise.all([chat(req), chat(req)]);
 
     expect(a.status).toBe(200);
     expect(b.status).toBe(200);
-    expect(provider.totalCalls, "der Einkauf darf nur einmal stattfinden").toBe(1);
-    expect(inferenceRows(), "und es darf nur einmal abgebucht werden").toHaveLength(1);
+    expect(provider.totalCalls, "the purchase may happen only once").toBe(1);
+    expect(inferenceRows(), "and it may be charged only once").toHaveLength(1);
 
-    const beide = [(await a.json()) as { id: string }, (await b.json()) as { id: string }];
-    expect(beide[0].id, "beide bekommen dieselbe Antwort").toBe(beide[1].id);
+    const both = [(await a.json()) as { id: string }, (await b.json()) as { id: string }];
+    expect(both[0].id, "both get the same answer").toBe(both[1].id);
     expect(500_000 - balance()).toBe(Math.abs(inferenceRows()[0].delta_mc));
   });
 
-  it("legt Anfragen verschiedener Mandanten niemals zusammen", async () => {
-    // Der Schlüssel enthält die Adresse. Zwei Kunden mit zufällig gleichem Prompt dürfen sich
-    // weder die Antwort noch die Abbuchung teilen.
-    const eins = setupLangsam(500_000);
-    const zwei = setupLangsam(500_000);
-    const gleich = eins.request(7);
+  it("never coalesces requests from different tenants", async () => {
+    // The key contains the address. Two customers who happen to send the same prompt must share
+    // neither the answer nor the charge.
+    const first = setupSlow(500_000);
+    const second = setupSlow(500_000);
+    const same = first.request(7);
 
-    const [a, b] = await Promise.all([eins.chat(gleich), zwei.chat(gleich)]);
+    const [a, b] = await Promise.all([first.chat(same), second.chat(same)]);
     expect(a.status).toBe(200);
     expect(b.status).toBe(200);
-    expect(eins.provider.totalCalls).toBe(1);
-    expect(zwei.provider.totalCalls).toBe(1);
-    expect(eins.inferenceRows()).toHaveLength(1);
-    expect(zwei.inferenceRows()).toHaveLength(1);
+    expect(first.provider.totalCalls).toBe(1);
+    expect(second.provider.totalCalls).toBe(1);
+    expect(first.inferenceRows()).toHaveLength(1);
+    expect(second.inferenceRows()).toHaveLength(1);
   });
 
-  it("legt nacheinander gestellte gleiche Anfragen NICHT zusammen", async () => {
-    // Nur was gleichzeitig läuft, wird zusammengelegt. Wer zweimal dasselbe fragt und auf die
-    // erste Antwort gewartet hat, bekommt eine zweite Antwort und zahlt dafür. Sonst wäre die
-    // Varianz bei temperature > 0 dahin, und ein Agent, der bewusst wiederholt, bekäme Konserven.
-    const { chat, request, inferenceRows, provider } = setupLangsam(500_000);
-    const anfrage = request(2);
+  it("does NOT coalesce identical requests sent one after the other", async () => {
+    // Only what runs at the same time is coalesced. Whoever asks the same thing twice and waited
+    // for the first answer gets a second answer and pays for it. Otherwise the variance at
+    // temperature > 0 would be gone, and an agent repeating on purpose would get canned answers.
+    const { chat, request, inferenceRows, provider } = setupSlow(500_000);
+    const req = request(2);
 
-    expect((await chat(anfrage)).status).toBe(200);
-    expect((await chat(anfrage)).status).toBe(200);
+    expect((await chat(req)).status).toBe(200);
+    expect((await chat(req)).status).toBe(200);
 
     expect(provider.totalCalls).toBe(2);
     expect(inferenceRows()).toHaveLength(2);
@@ -336,34 +336,34 @@ describe("Zusammenlegung gleichzeitiger identischer Anfragen", () => {
 });
 
 /**
- * Der letzte Ausgang ohne Buchung: Der Einkauf beim Anbieter hat stattgefunden, die Antwort ist
- * da, und erst danach geht etwas schief. Der Code hält dafür eine Freigabe im `finally` bereit,
- * seit ein solcher Fall am 19.09.2026 auffiel. Eine Gegenprobe am 20.09. zeigte, dass diese
- * Freigabe entfernt werden kann, ohne dass ein einziger Test rot wird: Der Pfad war ungeschützt.
+ * The last exit without a booking: the purchase at the provider has happened, the answer is there,
+ * and only afterwards something goes wrong. The code keeps a release in the `finally` for that,
+ * ever since such a case surfaced on 19.09.2026. A counter-check on 20.09. showed that this
+ * release can be removed without a single test turning red: the path was unprotected.
  *
- * Er kostet den Kunden mehr als ein Anbieterausfall. Bei einem Ausfall ist nichts eingekauft und
- * nichts reserviert. Hier ist eingekauft, und ohne Freigabe bleibt sein Guthaben blockiert, bis
- * der Prozess neu startet.
+ * It costs the customer more than a provider outage does. On an outage nothing is bought and
+ * nothing is reserved. Here something is bought, and without the release their credit stays
+ * blocked until the process restarts.
  */
-describe("Fehler nach der Antwort des Anbieters", () => {
-  it("gibt die Reservierung frei, wenn die Abrechnung an kaputten Zahlen scheitert", async () => {
+describe("errors after the provider's answer", () => {
+  it("releases the reservation when billing fails on broken numbers", async () => {
     const { db, provider, chat, request, address, balance, inferenceRows } = setup(500_000);
-    const reserviert = () =>
+    const reserved = () =>
       (db.prepare("SELECT reserved_mc FROM wallets WHERE address = ?").get(address) as { reserved_mc: number }).reserved_mc;
-    const vorher = balance();
+    const before = balance();
 
-    // Ein Anbieter, der antwortet, aber unbrauchbare Verbrauchszahlen liefert. NaN kommt bis in
-    // die Buchung durch und SQLite lehnt es ab, also wirft postLedger nach dem Einkauf.
-    const echt = provider.chat.bind(provider);
-    provider.chat = async (req: Parameters<typeof echt>[0]) => {
-      const antwort = await echt(req);
-      return { ...antwort, usage: { ...antwort.usage, prompt_tokens: NaN, completion_tokens: NaN, cost_usd: NaN } };
+    // A provider that answers but delivers unusable usage numbers. NaN makes it all the way into
+    // the booking and SQLite rejects it, so postLedger throws after the purchase.
+    const real = provider.chat.bind(provider);
+    provider.chat = async (req: Parameters<typeof real>[0]) => {
+      const answer = await real(req);
+      return { ...answer, usage: { ...answer.usage, prompt_tokens: NaN, completion_tokens: NaN, cost_usd: NaN } };
     };
 
     const res = await chat(request(1));
-    expect(res.status, "ein Fehler nach dem Einkauf darf kein 200 sein").toBeGreaterThanOrEqual(400);
-    expect(reserviert(), "sonst bleibt das Guthaben blockiert, bis der Prozess neu startet").toBe(0);
-    expect(balance(), "abgebucht werden kann nichts, wenn die Zahlen kaputt sind").toBe(vorher);
+    expect(res.status, "an error after the purchase must not be a 200").toBeGreaterThanOrEqual(400);
+    expect(reserved(), "otherwise the credit stays blocked until the process restarts").toBe(0);
+    expect(balance(), "nothing can be charged when the numbers are broken").toBe(before);
     expect(inferenceRows()).toHaveLength(0);
   });
 });

@@ -49,7 +49,7 @@ function settler(impl: typeof fetch, authHeader?: string) {
 }
 
 describe("FacilitatorSettler", () => {
-  it("sendet verify und settle mit v1-Payload (1:1 wie die Runtime) und v1-Requirements mit extra USD Coin/2", async () => {
+  it("sends verify and settle with the v1 payload (identical to the runtime) and v1 requirements with extra USD Coin/2", async () => {
     const { impl, calls } = stub({
       "/verify": () => json({ isValid: true, payer: AUTH.from }),
       "/settle": () => json({ success: true, transaction: "0x" + "cd".repeat(32), network: "base", payer: AUTH.from }),
@@ -85,7 +85,7 @@ describe("FacilitatorSettler", () => {
     }
   });
 
-  it("settlet nicht, wenn verify isValid false meldet", async () => {
+  it("does not settle when verify reports isValid false", async () => {
     const { impl, calls } = stub({
       "/verify": () => json({ isValid: false, invalidReason: "insufficient_funds" }),
       "/settle": () => json({ success: true }),
@@ -96,7 +96,7 @@ describe("FacilitatorSettler", () => {
     expect(calls.map((c) => c.path)).toEqual(["/verify"]);
   });
 
-  it("meldet settle success false mit errorReason", async () => {
+  it("reports settle success false together with errorReason", async () => {
     const { impl } = stub({
       "/verify": () => json({ isValid: true }),
       "/settle": () => json({ success: false, errorReason: "invalid_nonce", transaction: "" }),
@@ -105,14 +105,14 @@ describe("FacilitatorSettler", () => {
     expect(res).toEqual({ ok: false, error: "settle failed: invalid_nonce" });
   });
 
-  it("meldet HTTP-Fehler des Facilitators als Fehler, ohne zu werfen", async () => {
+  it("reports an HTTP error from the facilitator as an error without throwing", async () => {
     const { impl } = stub({ "/verify": () => new Response("upstream down", { status: 503 }) });
     const res = await settler(impl).settle(AUTH, SIG);
     expect(res.ok).toBe(false);
     expect(res.error).toMatch(/^verify: 503/);
   });
 
-  it("setzt den Authorization-Header, wenn konfiguriert (CDP)", async () => {
+  it("sets the Authorization header when it is configured (CDP)", async () => {
     const { impl, calls } = stub({
       "/verify": () => json({ isValid: true }),
       "/settle": () => json({ success: true, transaction: "0x" + "ef".repeat(32) }),
@@ -121,7 +121,7 @@ describe("FacilitatorSettler", () => {
     expect(calls.every((c) => c.headers.Authorization === "Bearer cdp-jwt")).toBe(true);
   });
 
-  it("bricht bei Timeout ab", async () => {
+  it("aborts on a timeout", async () => {
     const impl = (async (_input: unknown, init?: RequestInit) =>
       new Promise<Response>((_, reject) => (init?.signal as AbortSignal).addEventListener("abort", () => reject(new Error("aborted"))))) as typeof fetch;
     const res = await settler(impl).settle(AUTH, SIG);
@@ -130,21 +130,22 @@ describe("FacilitatorSettler", () => {
   });
 });
 
-describe("Tiers aus der Umgebung", () => {
-  it("nimmt die Runtime-Tiers als Default und erlaubt Betreiber-Tiers", () => {
+describe("tiers from the environment", () => {
+  it("takes the runtime tiers as the default and allows operator tiers", () => {
     const base = payConfigFromEnv({ CP_PAY_TO: PAY_TO });
     expect(base?.tiers).toEqual([5, 25, 100, 500, 1000, 2500]);
     const withOne = payConfigFromEnv({ CP_PAY_TO: PAY_TO, CP_TOPUP_TIERS_USD: "1,5,25" });
     expect(withOne?.tiers).toEqual([1, 5, 25]);
+    // The wording comes from src/payments/pay.ts, which this language pass does not touch.
     expect(() => payConfigFromEnv({ CP_PAY_TO: PAY_TO, CP_TOPUP_TIERS_USD: "abc" })).toThrow(/leer/);
   });
 });
 
-describe("Die Antwort des Facilitators ist nachlesbar", () => {
-  it("protokolliert sie, ohne die Signatur preiszugeben", async () => {
-    const zeilen: string[] = [];
-    const echtesLog = console.log;
-    console.log = (...a: unknown[]) => void zeilen.push(a.join(" "));
+describe("the facilitator answer can be read up afterwards", () => {
+  it("logs it without giving away the signature", async () => {
+    const lines: string[] = [];
+    const realLog = console.log;
+    console.log = (...a: unknown[]) => void lines.push(a.join(" "));
     try {
       const { impl } = stub({
         "/verify": () => new Response(JSON.stringify({ isValid: true }), { status: 200 }),
@@ -162,11 +163,11 @@ describe("Die Antwort des Facilitators ist nachlesbar", () => {
       const res = await settler.settle(AUTH, SIG, "https://cp.hippe.eu/pay/5/0xabc");
       expect(res.ok).toBe(true);
     } finally {
-      console.log = echtesLog;
+      console.log = realLog;
     }
-    const zeile = zeilen.find((z) => z.includes("[facilitator] settle"));
-    expect(zeile, "ohne diese Zeile tappen wir bei der Katalogisierung im Dunkeln").toBeTruthy();
-    expect(zeile).toMatch(/catalogued/);
-    expect(zeile, "die Signatur gehoert nicht ins Log").not.toMatch(new RegExp(SIG.slice(0, 20)));
+    const line = lines.find((l) => l.includes("[facilitator] settle"));
+    expect(line, "without this line we are in the dark about the cataloguing").toBeTruthy();
+    expect(line).toMatch(/catalogued/);
+    expect(line, "the signature does not belong in the log").not.toMatch(new RegExp(SIG.slice(0, 20)));
   });
 });

@@ -1,7 +1,6 @@
 /**
- * Hono-App mit den Routen, die die Automaton-Runtime aufruft (docs/protocol.md).
- * Alles Unbekannte antwortet 404 mit JSON-Fehler; die Runtime behandelt das als
- * "Feature nicht verfügbar".
+ * Hono app with the routes the automaton runtime calls (docs/protocol.md). Anything unknown answers
+ * 404 with a JSON error; the runtime treats that as "feature not available".
  */
 
 import fs from "node:fs";
@@ -9,7 +8,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Hono } from "hono";
 import type { Db } from "./db.js";
-import { verifyFindings, messages, type CheckMode } from "./check/erfindung.js";
+import { verifyFindings, messages, type CheckMode } from "./check/fabrication.js";
 import {
   createBounty,
   cancelBounty,
@@ -26,7 +25,7 @@ import {
 import { mcToCents, getBalanceCents, MC_PER_CENT } from "./db.js";
 import { DOC } from "./errors.js";
 import { Catalog, handleChat, MARKUP } from "./inference/proxy.js";
-import { clientSchluessel, RateLimiter, type RateLimitOptions } from "./ratelimit.js";
+import { clientKey, RateLimiter, type RateLimitOptions } from "./ratelimit.js";
 import { handlePay, TOPUP_TIERS_USD, type PayConfig } from "./payments/pay.js";
 import { handleRegister } from "./registry.js";
 import type { Settler } from "./payments/settler.js";
@@ -43,8 +42,8 @@ import {
 export const VERSION = "0.1.0";
 
 /**
- * Startseite. Liegt als Datei neben dem Quellcode und wird einmal beim Start gelesen; sie lädt
- * ihre Zahlen per fetch von /v1/status nach, damit die HTML-Datei statisch bleibt.
+ * Landing page. Sits as a file next to the source and is read once on start; it pulls its numbers
+ * from /v1/status with fetch, so the HTML file stays static.
  */
 const PUBLIC_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), "public");
 function loadIndexHtml(): string | null {
@@ -61,21 +60,21 @@ function loadIndexHtml(): string | null {
 export interface AppOptions {
   db: Db;
   siwe?: Partial<SiweConfig>;
-  /** Ohne pay/settler antwortet /pay mit 503. */
+  /** Without pay/settler, /pay answers 503. */
   pay?: PayConfig | null;
   settler?: Settler | null;
-  /** Ohne Katalog antworten /v1/chat/completions und /v1/models mit 503. */
+  /** Without a catalogue, /v1/chat/completions and /v1/models answer 503. */
   catalog?: Catalog | null;
   /**
-   * Grenze für die Pfade ohne API-Key. `null` schaltet sie ab, was nur Tests tun sollten, die
-   * absichtlich viele Anfragen fahren.
+   * Cap for the paths without an API key. `null` switches it off, which only tests that
+   * deliberately run many requests should do.
    */
   rateLimit?: RateLimitOptions | null;
 }
 
 type Env = { Variables: { address: `0x${string}` } };
 
-/** Diese Instanz hat keine Zahlungs-Wallet konfiguriert, also kann hier niemand Credits kaufen. */
+/** This instance has no payment wallet configured, so nobody can buy credits here. */
 const PAYMENTS_UNAVAILABLE = {
   error: "payments_unavailable",
   message:
@@ -85,7 +84,7 @@ const PAYMENTS_UNAVAILABLE = {
   docs: DOC.payments,
 };
 
-/** Kein Inferenz-Provider konfiguriert: Modelle und Chat-Completions gibt es dann nicht. */
+/** No inference provider configured: then there are no models and no chat completions. */
 const INFERENCE_UNAVAILABLE = {
   error: "inference_unavailable",
   message:
@@ -96,19 +95,10 @@ const INFERENCE_UNAVAILABLE = {
 };
 
 /**
- * Die oeffentliche Basis-URL dieses Requests. Sie macht die `resource` im Zahlungsangebot absolut,
- * was ein x402-Facilitator braucht, um den Dienst in sein Verzeichnis aufzunehmen.
- *
- * Der Host-Header ist faelschbar, und das ist hier vertretbar: Er faerbt nur die Kennung des
- * Angebots ein. Wohin das Geld geht, steht in `payTo` aus der Umgebung, und die Signatur des
- * Zahlers deckt `resource` nicht ab. Ein Betreiber, der das nicht mag, setzt CP_PUBLIC_URL; die
- * Umgebung schlaegt den Header.
+ * The paths under /v1 that really exist. The auth middleware lets everything else through, so that
+ * a typo or a badly joined base URL comes back as a 404 instead of a 401.
  */
-/**
- * Die Pfade unter /v1, die es wirklich gibt. Die Auth-Middleware laesst alles andere durch, damit
- * ein Tippfehler oder eine falsch zusammengesetzte Basis-URL als 404 zurueckkommt statt als 401.
- */
-const V1_ROUTEN = new Set([
+const V1_ROUTES = new Set([
   "/v1/auth/api-keys",
   "/v1/auth/nonce",
   "/v1/auth/verify",
@@ -129,12 +119,21 @@ const V1_ROUTEN = new Set([
   "/v1/status",
 ]);
 
+/**
+ * The public base URL of this request. It makes the `resource` in the payment offer absolute, which
+ * an x402 facilitator needs to take the service into its directory.
+ *
+ * The Host header can be forged, and that is acceptable here: it only colours the identifier of the
+ * offer. Where the money goes is in `payTo` from the environment, and the payer's signature does
+ * not cover `resource`. An operator who dislikes that sets CP_PUBLIC_URL; the environment beats the
+ * header.
+ */
 function requestOrigin(c: { req: { header: (name: string) => string | undefined; url: string } }): string | undefined {
   const host = c.req.header("host");
   if (!host || !/^[a-z0-9.-]+(:\d{1,5})?$/i.test(host)) return undefined;
-  const gemeldet = c.req.header("x-forwarded-proto")?.split(",")[0]?.trim().toLowerCase();
-  const proto = gemeldet === "https" || gemeldet === "http"
-    ? gemeldet
+  const reported = c.req.header("x-forwarded-proto")?.split(",")[0]?.trim().toLowerCase();
+  const proto = reported === "https" || reported === "http"
+    ? reported
     : c.req.url.startsWith("https:") ? "https" : "http";
   return `${proto}://${host}`;
 }
@@ -146,14 +145,14 @@ export function createApp(opts: AppOptions) {
 
   app.onError((err, c) => {
     if (err instanceof AuthError) {
-      // `error` bleibt der Conway-Wortlaut, `message` sagt, was now zu tun ist.
+      // `error` stays the Conway wording, `message` says what to do now.
       return c.json(
         { error: err.message, ...(err.hint ? { message: err.hint, docs: DOC.authentication } : {}) },
         err.status as 400 | 401,
       );
     }
-    // Der Stacktrace bleibt im Log. Nach außen geht nur, dass es unsere Schuld war und dass die
-    // Anfrage nichts gekostet hat; alles andere wäre ein Blick in fremde Interna.
+    // The stack trace stays in the log. What goes out is only that it was our fault and that the
+    // request cost nothing; anything else would be a look into internals that are not the caller's.
     console.error(`[app] ${c.req.method} ${c.req.path}: ${err.stack || err.message}`);
     return c.json(
       {
@@ -168,30 +167,30 @@ export function createApp(opts: AppOptions) {
     );
   });
 
-  // Die Pfade ohne API-Key schreiben in die Datenbank, `/pay` ruft zusätzlich den Facilitator.
-  // Ein API-Key kostet nichts, deshalb muss die Grenze vor der Authentifizierung greifen.
-  // Empfaenger der Vermittlungsgebuehr ist die Adresse, an die auch die x402-Zahlungen gehen:
-  // der Betreiber. Ein eigener Konfigwert waere eine zweite Stelle, an der dieselbe Tatsache
-  // steht, und .env liegt ausserdem hinter der Pfadsperre aus loop-constraints.md.
+  // The paths without an API key write to the database, and `/pay` additionally calls the
+  // facilitator. An API key costs nothing, so the cap has to take effect before authentication.
+  // The recipient of the brokerage fee is the address the x402 payments go to as well: the
+  // operator. A config value of its own would be a second place stating the same fact, and .env
+  // also sits behind the path lock from loop-constraints.md.
   const feeTo = opts.pay?.payTo?.toLowerCase() ?? null;
 
-  const rateLimitOpts: RateLimitOptions = opts.rateLimit ?? { limit: 60, fensterMs: 60_000 };
+  const rateLimitOpts: RateLimitOptions = opts.rateLimit ?? { limit: 60, windowMs: 60_000 };
   const limiter = opts.rateLimit === null ? null : new RateLimiter(rateLimitOpts);
-  const OFFENE_PFADE = ["/v1/auth/nonce", "/v1/auth/verify", "/v1/auth/api-keys", "/pay/"];
+  const OPEN_PATHS = ["/v1/auth/nonce", "/v1/auth/verify", "/v1/auth/api-keys", "/pay/"];
   if (limiter) {
-    const fensterSek = Math.round(rateLimitOpts.fensterMs / 1000);
+    const windowSec = Math.round(rateLimitOpts.windowMs / 1000);
     app.use("*", async (c, next) => {
-      const pfad = c.req.path;
-      if (!OFFENE_PFADE.some((p) => pfad.startsWith(p))) return next();
-      const { erlaubt, retryAfterSec } = limiter.pruefe(clientSchluessel(c.req.raw.headers));
-      if (!erlaubt) {
+      const reqPath = c.req.path;
+      if (!OPEN_PATHS.some((p) => reqPath.startsWith(p))) return next();
+      const { allowed, retryAfterSec } = limiter.check(clientKey(c.req.raw.headers));
+      if (!allowed) {
         c.header("Retry-After", String(retryAfterSec));
         return c.json(
           {
             error: "rate_limited",
             retry_after_seconds: retryAfterSec,
             message:
-              `More than ${rateLimitOpts.limit} requests in ${fensterSek} seconds from your address to the ` +
+              `More than ${rateLimitOpts.limit} requests in ${windowSec} seconds from your address to the ` +
               "endpoints that work without an API key (/v1/auth/*, /pay/*). Those write to the database " +
               "and /pay also calls a payment facilitator that costs money per call, so they are capped " +
               `to keep the service up for everyone. Wait ${retryAfterSec} seconds and retry; calls to ` +
@@ -212,20 +211,20 @@ export function createApp(opts: AppOptions) {
     return c.html(indexHtml);
   });
 
-  // Impressumspflicht nach § 5 DDG: "leicht erkennbar und unmittelbar erreichbar". Die Angaben
-  // stehen auf der Startseite; dieser Pfad ist der Weg, den Leute und Prüfer zuerst raten.
+  // German law (DDG § 5) requires an imprint that is "easy to recognise and directly reachable".
+  // The details are on the landing page; this path is the one people and auditors guess first.
   app.get("/impressum", (c) => c.redirect("/#impressum", 302));
 
-  // Die Seite trägt ihr Icon als data-URI im Head, trotzdem fragen manche Clients stur nach
-  // /favicon.ico und bekamen 404. Das kostet nichts und sieht sonst unfertig aus.
+  // The page carries its icon as a data URI in the head, yet some clients stubbornly ask for
+  // /favicon.ico and used to get a 404. This costs nothing and looks unfinished otherwise.
   const FAVICON =
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">' +
     '<rect width="32" height="32" rx="6" fill="#0b0e14"/>' +
     '<circle cx="16" cy="12" r="5.5" fill="none" stroke="#58d6a0" stroke-width="2.5"/>' +
     '<rect x="7" y="21" width="18" height="3.5" rx="1.75" fill="#58d6a0"/></svg>';
   /**
-   * Suchmaschinen duerfen alles lesen. Die Datei existiert trotzdem, weil ihr Fehlen jeden Crawler
-   * einen 404 kostet und weil sie der Ort ist, an dem eine spaetere Einschraenkung stehen wuerde.
+   * Search engines may read everything. The file exists anyway, because its absence costs every
+   * crawler a 404 and because it is the place where a later restriction would go.
    */
   app.get("/robots.txt", (c) =>
     c.text("User-agent: *\nAllow: /\n", 200, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "public, max-age=86400" }),
@@ -236,11 +235,11 @@ export function createApp(opts: AppOptions) {
   app.get("/health", (c) => c.json({ ok: true, version: VERSION }));
 
   /**
-   * Öffentlicher Status für die Startseite. Bewusst arm: nichts, was einen Mandanten
-   * identifiziert (keine Adressen, keine Salden, keine Key-Prefixe).
+   * Public status for the landing page. Deliberately poor: nothing that identifies a tenant (no
+   * addresses, no balances, no key prefixes).
    */
   app.get("/v1/status", (c) => {
-    // Ein Eintrag je echtem Modell; die IDs, die die Runtime hart anfragt, stehen als Aliase daneben.
+    // One entry per real model; the IDs the runtime hard-codes sit next to them as aliases.
     const byUpstream = new Map<string, { id: string; aliases: string[]; input_per_million: number; output_per_million: number }>();
     for (const m of opts.catalog?.listModels().data ?? []) {
       const upstream = (m.upstream_model as string) ?? (m.id as string);
@@ -255,26 +254,27 @@ export function createApp(opts: AppOptions) {
       byUpstream.set(upstream, entry);
     }
     const models = [...byUpstream.values()];
-    // Gezählt werden zahlende Wallets, nicht Registrierungen und auch nicht Einträge in der
-    // `automatons`-Tabelle. Zwei Fehler, die diese Zahl schon hinter sich hat:
+    // What is counted are paying wallets, not registrations and not rows in the `automatons`
+    // table either. Two mistakes this number already has behind it:
     //
-    // Erstens ist die Registrierung kostenlos und beliebig oft möglich; im Sicherheitsreview vom
-    // 19.09.2026 stand hier nach einer Stunde Arbeit `automatons: 100`.
+    // First, registration is free and possible as often as you like; during the security review of
+    // 19.09.2026 this said `automatons: 100` after an hour of work.
     //
-    // Zweitens, und das fiel erst beim ersten echten Kunden auf: Wer einen bereits registrierten
-    // Automaton von `api.conway.tech` auf uns umbiegt, schickt nie ein Register. Die Runtime
-    // prüft ihr Flag `conwayRegistrationStatus` nur beim Prozessstart und setzt es nie zurück
-    // (Upstream `src/index.ts:249-255`). Über die `automatons`-Tabelle gezählt war unser erster
-    // zahlender Kunde deshalb unsichtbar, während unser eigener Abnahmelauf die Zahl füllte.
-    // Genau falsch herum.
+    // Second, and that only showed up with the first real customer: whoever points an already
+    // registered automaton from `api.conway.tech` at us never sends a register. The runtime checks
+    // its `conwayRegistrationStatus` flag only at process start and never resets it (upstream
+    // `src/index.ts:249-255`). Counted through the `automatons` table our first paying customer was
+    // therefore invisible, while our own acceptance run filled the number. Exactly the wrong way
+    // round.
     //
-    // Eine Zahlung dagegen ist teuer, eindeutig und on-chain nachprüfbar. Das ist die Zahl.
+    // A payment, by contrast, is expensive, unambiguous and verifiable on chain. That is the
+    // number.
     const automatons = (
       db.prepare("SELECT count(DISTINCT address) AS n FROM ledger WHERE kind = 'topup'").get() as { n: number }
     ).n;
 
-    // Wie viele davon tatsächlich Inferenz bei uns kaufen. Der Unterschied ist die eigentliche
-    // Frage des Dienstes: Zahlen allein heißt noch nicht, dass jemand hier denkt.
+    // How many of those actually buy inference from us. The difference is the real question of the
+    // service: paying alone does not yet mean somebody thinks here.
     const active = (
       db.prepare("SELECT count(DISTINCT address) AS n FROM ledger WHERE kind = 'inference'").get() as { n: number }
     ).n;
@@ -287,9 +287,9 @@ export function createApp(opts: AppOptions) {
       topup_tiers_usd: opts.pay?.tiers ?? TOPUP_TIERS_USD,
       automatons,
       active,
-      // Am 20.09.2026 rief jemand von einem privaten Anschluss in Madrid genau diesen Endpunkt
-      // mit curl ab, ohne vorher die Startseite zu laden, und war danach wieder weg. Wer nur
-      // diesen Pfad kennt, soll von hier aus weiterkommen, ohne raten zu muessen.
+      // On 20.09.2026 somebody on a private line in Madrid called exactly this endpoint with curl,
+      // without loading the landing page first, and was gone afterwards. Whoever knows only this
+      // path should be able to get on from here without guessing.
       docs: {
         service: requestOrigin(c) ?? "https://cp.hippe.eu",
         endpoints: "/.well-known/x402",
@@ -300,8 +300,8 @@ export function createApp(opts: AppOptions) {
   });
 
   /**
-   * Maschinenlesbare Beschreibung für andere Agenten und Crawler. Bewusst ohne Zahlen, die
-   * sich täglich ändern; die Preise stehen in /v1/status und /v1/models.
+   * Machine-readable description for other agents and crawlers. Deliberately without numbers that
+   * change daily; the prices are in /v1/status and /v1/models.
    */
   app.get("/.well-known/x402", (c) => {
     const pay = opts.pay ?? null;
@@ -311,8 +311,8 @@ export function createApp(opts: AppOptions) {
       description:
         "Prepaid credits for the unmodified Conway automaton runtime: SIWE provisioning, " +
         "USDC topups over x402 on Base, inference billed at purchase cost plus a fixed markup.",
-      // Die Basis, an die die Pfade darunter gehoeren. Ohne sie raet ein Skript, und am
-      // 20.09.2026 riet eines falsch: es verkettete zwei Endpunkte zu /v1/status/v1/models.
+      // The base the paths below belong to. Without it a script guesses, and on 20.09.2026 one
+      // guessed wrong: it joined two endpoints into /v1/status/v1/models.
       base_url: requestOrigin(c) ?? null,
       endpoints: {
         status: "/v1/status",
@@ -350,22 +350,19 @@ export function createApp(opts: AppOptions) {
   });
 
   /**
-   * llms.txt nach dem Vorschlag von llmstxt.org: kurz, faktisch, ohne Werbung.
-   */
-  /**
-   * Die offenen Auftraege, ohne Schluessel.
+   * The open bounties, without a key.
    *
-   * Ein Markt, den nur sehen kann, who schon eine Wallet und Guthaben hat, ist keiner. Conway
-   * hatte ueberhaupt kein oeffentliches Verzeichnis: /v1/registry, /v1/automatons und
-   * /v1/leaderboard antworten dort bis heute mit 404, und deshalb wurde der Bugtracker zur Buehne,
-   * auf der sich Agenten gegenseitig begruessten und Preislisten austauschten.
+   * A market only visible to whoever already has a wallet and credit is not a market. Conway had no
+   * public directory at all: /v1/registry, /v1/automatons and /v1/leaderboard answer 404 there to
+   * this day, which is why the bug tracker became the stage where agents greeted each other and
+   * traded price lists.
    *
-   * Bewusst ausserhalb von /v1: Die Auth-Middleware schuetzt dort jeden Pfad aus V1_ROUTEN, und
-   * ein absichtlich ausgelassener /v1-Pfad waere von einem vergessenen nicht zu unterscheiden.
-   * Hier steht schon am Namen, dass es oeffentlich ist.
+   * Deliberately outside /v1: the auth middleware protects every path from V1_ROUTES there, and a
+   * deliberately omitted /v1 path would be indistinguishable from a forgotten one. Here the name
+   * itself says that it is public.
    *
-   * Damit ist jedes Briefing oeffentlich, und das sagen docs/bounties.md und /llms.txt auch, bevor
-   * jemand eines einstellt.
+   * This makes every brief public, and docs/bounties.md and /llms.txt say so before anybody posts
+   * one.
    */
   app.get("/bounties.json", (c) => {
     releaseExpired(db);
@@ -391,6 +388,9 @@ export function createApp(opts: AppOptions) {
     );
   });
 
+  /**
+   * llms.txt following the proposal from llmstxt.org: short, factual, no advertising.
+   */
   app.get("/llms.txt", (c) => {
     const pay = opts.pay ?? null;
     const tiers = (pay?.tiers ?? TOPUP_TIERS_USD).join(", ");
@@ -469,7 +469,7 @@ export function createApp(opts: AppOptions) {
     return c.text(body);
   });
 
-  // ─── Topup (x402, ohne API-Key: der Runtime-Client sendet hier keinen) ───
+  // --- Topup (x402, without an API key: the runtime client sends none here) ---
 
   app.get("/pay/:usd/:address", async (c) => {
     const pay = opts.pay ?? null;
@@ -484,7 +484,7 @@ export function createApp(opts: AppOptions) {
     return c.json(res.body, res.status as 200);
   });
 
-  // ─── Provisionierung ───────────────────────────────────────────
+  // --- Provisioning ---------------------------------------------
 
   app.post("/v1/auth/nonce", (c) => c.json({ nonce: issueNonce(db) }));
 
@@ -518,26 +518,26 @@ export function createApp(opts: AppOptions) {
     return c.json({ key, key_prefix: keyPrefix });
   });
 
-  // ─── Alles ab hier braucht einen API-Key (roh im Authorization-Header) ───
+  // --- Everything from here needs an API key (raw in the Authorization header) ---
 
-  // Vorher die Methode prüfen, sonst fällt eine falsche Methode auf einem schlüssellosen Pfad in
-  // die Auth-Middleware und wird als "kein API-Key" abgewiesen. Ein `GET /v1/auth/verify` bekam so
-  // ein 401 mit der Aufforderung, einen Schlüssel zu schicken, den dieser Pfad gar nicht braucht.
-  // Für einen Scanner egal, für jemanden, der die Methode verwechselt, eine Sackgasse.
-  const ERLAUBTE_METHODEN: Record<string, string[]> = {
+  // Check the method first, otherwise a wrong method on a keyless path falls into the auth
+  // middleware and is rejected as "no API key". A `GET /v1/auth/verify` used to get a 401 asking for
+  // a key this path does not need at all. Irrelevant for a scanner, a dead end for somebody who
+  // mixed up the method.
+  const ALLOWED_METHODS: Record<string, string[]> = {
     "/v1/auth/nonce": ["POST"],
     "/v1/auth/verify": ["POST"],
     "/v1/auth/api-keys": ["POST"],
   };
   app.use("/v1/auth/*", async (c, next) => {
-    const erlaubt = ERLAUBTE_METHODEN[c.req.path];
-    if (erlaubt && !erlaubt.includes(c.req.method)) {
-      c.header("Allow", erlaubt.join(", "));
+    const allowed = ALLOWED_METHODS[c.req.path];
+    if (allowed && !allowed.includes(c.req.method)) {
+      c.header("Allow", allowed.join(", "));
       return c.json(
         {
           error: "method_not_allowed",
-          message: `${c.req.path} accepts ${erlaubt.join(" and ")}, not ${c.req.method}. This endpoint needs no API key.`,
-          allow: erlaubt,
+          message: `${c.req.path} accepts ${allowed.join(" and ")}, not ${c.req.method}. This endpoint needs no API key.`,
+          allow: allowed,
           docs: DOC.authentication,
         },
         405,
@@ -547,10 +547,10 @@ export function createApp(opts: AppOptions) {
   });
 
   app.use("/v1/*", async (c, next) => {
-    // Ein Pfad, den es nicht gibt, ist kein Schluesselproblem. Ohne diese Zeile beantwortet die
-    // Middleware auch /v1/status/v1/models mit 401 "Invalid API key", und der Aufrufer sucht
-    // stundenlang an seinem Schluessel statt an seiner URL. Beobachtet am 20.09.2026 um 09:26 UTC.
-    if (!V1_ROUTEN.has(c.req.path)) return next();
+    // A path that does not exist is not a key problem. Without this line the middleware answers
+    // /v1/status/v1/models with 401 "Invalid API key" too, and the caller spends hours on their key
+    // instead of their URL. Observed on 20.09.2026 at 09:26 UTC.
+    if (!V1_ROUTES.has(c.req.path)) return next();
     const address = resolveApiKey(db, c.req.header("authorization"));
     if (!address) {
       throw new AuthError(
@@ -571,16 +571,15 @@ export function createApp(opts: AppOptions) {
   );
 
   /**
-   * Die eigenen Buchungen, neueste zuerst.
+   * Your own bookings, newest first.
    *
-   * Die Startseite verspricht, dass jeder Aufruf eine Ledger-Zeile mit Einkaufspreis und Marge
-   * ist. Einsehen konnte ein Kunde diese Zeilen bisher nicht, und damit war das Versprechen
-   * unbelegbar. Wichtiger noch ist der Fall, der uns am 19.09. begegnet ist: Ein Kunde zahlt,
-   * danach passiert nichts, und er hat keine Moeglichkeit zu unterscheiden, ob sein Geld nicht
-   * ankam oder seine Runtime nicht denkt. Eine leere Liste bei vorhandenem Guthaben beantwortet
-   * genau das.
+   * The landing page promises that every call is a ledger row with purchase price and margin. Until
+   * now a customer could not look at those rows, which made the promise unprovable. More important
+   * is the case we ran into on 19.09.: a customer pays, nothing happens afterwards, and they have
+   * no way to tell whether their money did not arrive or their runtime does not think. An empty
+   * list with credit present answers exactly that.
    *
-   * Nur die eigene Adresse, die aus dem API-Key kommt. Kein Parameter waehlt eine fremde.
+   * Only your own address, the one from the API key. No parameter picks somebody else's.
    */
   app.get("/v1/credits/history", (c) => {
     const limit = Math.min(Math.max(Number(c.req.query("limit") ?? 50) || 50, 1), 200);
@@ -591,35 +590,35 @@ export function createApp(opts: AppOptions) {
       .all(c.get("address"), limit) as { kind: string; delta_mc: number; created_at: string; meta: string | null }[];
     return c.json({
       balance_cents: getBalanceCents(db, c.get("address")),
-      entries: rows.map((z) => {
+      entries: rows.map((row) => {
         const meta = (() => {
           try {
-            return z.meta ? (JSON.parse(z.meta) as Record<string, unknown>) : {};
+            return row.meta ? (JSON.parse(row.meta) as Record<string, unknown>) : {};
           } catch {
             return {};
           }
         })();
-        const eintrag: Record<string, unknown> = {
-          kind: z.kind,
-          cents: mcToCents(z.delta_mc),
-          at: z.created_at,
+        const entry: Record<string, unknown> = {
+          kind: row.kind,
+          cents: mcToCents(row.delta_mc),
+          at: row.created_at,
         };
-        if (z.kind === "inference") {
-          eintrag.model = meta.model;
-          // Was der Aufruf im Einkauf gekostet hat und was davon unsere Marge war, in derselben
-          // Einheit wie die Abbuchung. Wer nachrechnen will, kann es.
-          eintrag.purchase_usd = meta.cost_usd;
-          eintrag.margin_cents = typeof meta.margin_mc === "number" ? mcToCents(meta.margin_mc) : undefined;
+        if (row.kind === "inference") {
+          entry.model = meta.model;
+          // What the call cost us at purchase and how much of that was our margin, in the same unit
+          // as the charge. Whoever wants to recompute it, can.
+          entry.purchase_usd = meta.cost_usd;
+          entry.margin_cents = typeof meta.margin_mc === "number" ? mcToCents(meta.margin_mc) : undefined;
           const usage = meta.usage as { total_tokens?: number } | undefined;
-          eintrag.total_tokens = usage?.total_tokens;
+          entry.total_tokens = usage?.total_tokens;
         }
-        if (z.kind === "topup") eintrag.tx_hash = meta.tx_hash;
-        return eintrag;
+        if (row.kind === "topup") entry.tx_hash = meta.tx_hash;
+        return entry;
       }),
     });
   });
 
-  // ─── Inferenz ─────────────────────────────────────────────────
+  // --- Inference ------------------------------------------------
 
   app.get("/v1/models", (c) => {
     if (!opts.catalog) return c.json(INFERENCE_UNAVAILABLE, 503);
@@ -634,25 +633,25 @@ export function createApp(opts: AppOptions) {
   });
 
   /**
-   * Welche Behauptung in einer Einreichung steht nicht in ihrem Briefing?
+   * Which claim in a submission is not in its briefing?
    *
-   * Das erste Stueck des Auftragsmarkts, auf den dieser Dienst zulaeuft, und es traegt allein:
-   * Wer Arbeit bestellt hat, kann Geschmack nicht beurteilen, erfundene Tatsachen schon, und die
-   * sind das Risiko. Am 20.09.2026 schrieb ein Agent "Viewings available on short notice" in ein
-   * Dubai-Expose, eine Zusage, die im Briefing nicht steht und fuer die der Verkaeufer haftet.
+   * The first piece of the bounty market this service is heading for, and it carries on its own:
+   * whoever ordered the work cannot judge taste, but they can judge invented facts, and those are
+   * the risk. On 20.09.2026 an agent wrote "Viewings available on short notice" into a Dubai
+   * listing, a promise the briefing does not contain and for which the seller is liable.
    *
-   * Abgerechnet wird ueber `handleChat`, also genau wie jede andere Inferenz, mit derselben
-   * Reservierung, derselben Marge und derselben Ledger-Zeile. Ein eigener Abrechnungsweg waere
-   * eine zweite Stelle, an der Geld verlorengehen kann.
+   * Billing runs through `handleChat`, so exactly like any other inference, with the same
+   * reservation, the same margin and the same ledger row. A billing path of its own would be a
+   * second place where money can go missing.
    *
-   * Jeder Befund traegt ein woertliches Zitat, und jedes Zitat wird gegen die Einreichung
-   * geprueft, bevor es zurueckgeht: Ein Modell, das Erfindungen sucht, erfindet Funde, und ein
-   * erfundener Fund beschuldigt einen ehrlichen Text. `discarded` sagt, wie viele so rausfielen.
+   * Every finding carries a verbatim quote, and every quote is checked against the submission
+   * before it goes back: a model that looks for fabrications fabricates findings, and a fabricated
+   * finding accuses an honest text. `discarded` says how many fell out that way.
    */
   app.post("/v1/check", async (c) => {
     if (!opts.catalog) return c.json(INFERENCE_UNAVAILABLE, 503);
-    const roh = await c.req.json().catch(() => null);
-    const b = (typeof roh === "object" && roh !== null ? roh : {}) as Record<string, unknown>;
+    const raw = await c.req.json().catch(() => null);
+    const b = (typeof raw === "object" && raw !== null ? raw : {}) as Record<string, unknown>;
     const briefing = typeof b.briefing === "string" ? b.briefing.trim() : "";
     const submission = typeof b.submission === "string" ? b.submission.trim() : "";
     const kind: CheckMode = b.kind === "creative" ? "creative" : "factual";
@@ -670,74 +669,73 @@ export function createApp(opts: AppOptions) {
         400,
       );
     }
-    // Ohne Deckel kauft ein einziger Aufruf ein Kontextfenster ein, und bezahlt wird erst danach.
-    const GRENZE = 20_000;
-    if (briefing.length > GRENZE || submission.length > GRENZE) {
+    // Without a cap a single call buys a whole context window, and payment only comes afterwards.
+    const LIMIT = 20_000;
+    if (briefing.length > LIMIT || submission.length > LIMIT) {
       return c.json(
         {
           error: "too_long",
-          message: `briefing and submission are limited to ${GRENZE} characters each; yours are ` +
+          message: `briefing and submission are limited to ${LIMIT} characters each; yours are ` +
             `${briefing.length} and ${submission.length}. Check one piece of work at a time.`,
           docs: DOC.inference,
         },
         400,
       );
     }
-    const modell = typeof b.model === "string" ? b.model : opts.catalog.modelIds()[0];
+    const model = typeof b.model === "string" ? b.model : opts.catalog.modelIds()[0];
     const res = await handleChat(db, opts.catalog, c.get("address"), {
-      model: modell,
+      model,
       messages: messages(briefing, submission, kind),
       response_format: { type: "json_object" },
     });
     if (res.status !== 200) return c.json(res.body as Record<string, unknown>, res.status as 400);
 
-    const antwort = res.body as { choices?: { message?: { content?: string } }[]; usage?: unknown; model?: string };
-    const text = antwort.choices?.[0]?.message?.content ?? "";
-    let geparst: unknown = null;
+    const answer = res.body as { choices?: { message?: { content?: string } }[]; usage?: unknown; model?: string };
+    const text = answer.choices?.[0]?.message?.content ?? "";
+    let parsed: unknown = null;
     try {
-      geparst = JSON.parse(text);
+      parsed = JSON.parse(text);
     } catch {
-      // Bezahlt ist der Aufruf trotzdem, also wird er nicht verschwiegen. Der Aufrufer sieht, dass
-      // das Modell keine verwertbare Antwort gab, und nicht eine leere Befundliste, die er fuer
-      // ein sauberes Ergebnis halten koennte.
+      // The call is paid for anyway, so it is not swept under the rug. The caller sees that the
+      // model gave no usable answer, rather than an empty list of findings they could mistake for a
+      // clean result.
       return c.json(
         {
           error: "unparseable_answer",
           message: "The model did not return JSON. The call was billed; try again.",
-          model: antwort.model,
-          usage: antwort.usage,
+          model: answer.model,
+          usage: answer.usage,
         },
         502,
       );
     }
-    const { findings, discarded } = verifyFindings(submission, geparst);
-    return c.json({ kind, findings: findings, discarded: discarded, model: antwort.model, usage: antwort.usage });
+    const { findings, discarded } = verifyFindings(submission, parsed);
+    return c.json({ kind, findings: findings, discarded: discarded, model: answer.model, usage: answer.usage });
   });
 
-  // ─── Auftraege ────────────────────────────────────────────────
+  // --- Bounties -------------------------------------------------
 
   /**
-   * Der Auftragsmarkt, auf den dieser Dienst zulaeuft: Ein Mensch schreibt eine Arbeit aus, mehrere
-   * Agenten bewerben sich, der Gewinner bekommt das Geld. Conway ist an der anderen Seite dieses
-   * Marktes gestorben, naemlich an 18.000 Verkaeufern ohne einen einzigen Kaeufer.
+   * The bounty market this service is heading for: a human posts a piece of work, several agents
+   * compete for it, the winner gets the money. Conway died on the other side of this market, namely
+   * on 18,000 sellers without a single buyer.
    *
-   * Die Pfade sind bewusst alle exakt und haben kein Segment mit einer ID: Die Auth-Middleware
-   * oben vergleicht gegen V1_ROUTEN mit `has()`, und ein Pfad mit variablem Segment stuende
-   * dadurch voellig ohne Schluessel offen. Die zurueckzuziehende ID steht deshalb im Rumpf.
+   * The paths are all exact on purpose and have no segment carrying an ID: the auth middleware
+   * above compares against V1_ROUTES with `has()`, and a path with a variable segment would
+   * therefore stand wide open without a key. The ID to cancel is in the body for that reason.
    */
-  // Einmal beim Aufbau der App, also bei jedem Start und jedem Deploy: Ein Auftrag, dessen Frist
-  // waehrend eines Stillstands verstrichen ist, gibt sein Geld zurueck, ohne dass jemand ihn
-  // anfassen muss.
+  // Once while the app is being built, so on every start and every deploy: a bounty whose deadline
+  // passed during a standstill gives its money back without anybody having to touch it.
   //
-  // Und er darf den Start nicht verhindern: Waere er ungeschuetzt, liesse eine gestoerte Datenbank
-  // die App gar nicht erst entstehen, und zusammen mit autoheal wuerde daraus eine
-  // Neustartschleife. Dieselbe Abwaegung wie beim ledger_topup_ref-Index in src/db.ts: laut warnen
-  // und weiterlaufen. Der naechste Aufruf einer Auftragsroute holt den Durchlauf ohnehin nach.
+  // And it must not prevent the start: unguarded, a broken database would keep the app from coming
+  // into existence at all, and together with autoheal that would turn into a restart loop. The same
+  // trade-off as with the ledger_topup_ref index in src/db.ts: warn loudly and keep running. The
+  // next call to a bounty route catches up on the pass anyway.
   try {
     const n = releaseExpired(db);
-    if (n > 0) console.log(`[bounties] ${n} abgelaufene Auftraege released`);
+    if (n > 0) console.log(`[bounties] released ${n} expired bounties`);
   } catch (e) {
-    console.error("[bounties] Freigabe abgelaufener Auftraege beim Start fehlgeschlagen:", (e as Error).message);
+    console.error("[bounties] releasing expired bounties on start failed:", (e as Error).message);
   }
 
   const bountyView = (b: Bounty) => ({
@@ -745,7 +743,8 @@ export function createApp(opts: AppOptions) {
     kind: b.kind,
     brief: b.brief,
     price_cents: mcToCents(b.price_mc),
-    // Was beim Gewinner ankommt. Steht neben dem Preis, damit ein Agent nicht selbst rechnen muss.
+    // What arrives at the winner. Stands next to the price so an agent does not have to do the
+    // arithmetic.
     award_cents: mcToCents(b.price_mc - (feeTo ? feeMc(b.price_mc) : 0)),
     fee_percent: feeTo ? FEE_PERCENT : 0,
     deadline: b.deadline,
@@ -755,15 +754,15 @@ export function createApp(opts: AppOptions) {
 
   app.post("/v1/bounties", async (c) => {
     releaseExpired(db);
-    const roh = await c.req.json().catch(() => null);
-    const b = (typeof roh === "object" && roh !== null ? roh : {}) as Record<string, unknown>;
-    const preisCents = typeof b.price_cents === "number" ? b.price_cents : NaN;
+    const raw = await c.req.json().catch(() => null);
+    const b = (typeof raw === "object" && raw !== null ? raw : {}) as Record<string, unknown>;
+    const priceCents = typeof b.price_cents === "number" ? b.price_cents : NaN;
     try {
       const bounty = createBounty(db, {
         creator: c.get("address"),
         kind: b.kind === "creative" ? "creative" : "factual",
         brief: typeof b.brief === "string" ? b.brief : "",
-        priceMc: Number.isInteger(preisCents) ? preisCents * MC_PER_CENT : NaN,
+        priceMc: Number.isInteger(priceCents) ? priceCents * MC_PER_CENT : NaN,
         deadline: typeof b.deadline === "string" ? b.deadline : "",
       });
       return c.json(bountyView(bounty), 201);
@@ -783,8 +782,8 @@ export function createApp(opts: AppOptions) {
 
   app.post("/v1/bounties/cancel", async (c) => {
     releaseExpired(db);
-    const roh = await c.req.json().catch(() => null);
-    const id = (roh as { id?: unknown } | null)?.id;
+    const raw = await c.req.json().catch(() => null);
+    const id = (raw as { id?: unknown } | null)?.id;
     if (typeof id !== "string" || !id) {
       return c.json({ error: "id_required", message: 'Send {"id": "<bounty id>"}.', docs: DOC.payments }, 400);
     }
@@ -800,8 +799,8 @@ export function createApp(opts: AppOptions) {
 
   app.post("/v1/submissions", async (c) => {
     releaseExpired(db);
-    const roh = await c.req.json().catch(() => null);
-    const b = (typeof roh === "object" && roh !== null ? roh : {}) as Record<string, unknown>;
+    const raw = await c.req.json().catch(() => null);
+    const b = (typeof raw === "object" && raw !== null ? raw : {}) as Record<string, unknown>;
     if (typeof b.bounty_id !== "string" || !b.bounty_id) {
       return c.json({ error: "bounty_id_required", message: 'Send {"bounty_id": "...", "body": "..."}.', docs: DOC.payments }, 400);
     }
@@ -823,10 +822,10 @@ export function createApp(opts: AppOptions) {
     const id = c.req.query("bounty_id");
     if (!id) return c.json({ error: "bounty_id_required", message: "Pass ?bounty_id=...", docs: DOC.payments }, 400);
     try {
-      const liste = submissionsFor(db, id, c.get("address"));
+      const list = submissionsFor(db, id, c.get("address"));
       return c.json({
         bounty_id: id,
-        submissions: liste.map((s) => ({ id: s.id, agent: s.agent, body: s.body, created_at: s.created_at })),
+        submissions: list.map((s) => ({ id: s.id, agent: s.agent, body: s.body, created_at: s.created_at })),
       });
     } catch (e) {
       if (e instanceof BountyError) return c.json({ error: e.code, message: e.hint, docs: DOC.payments }, e.status as 400);
@@ -836,8 +835,8 @@ export function createApp(opts: AppOptions) {
 
   app.post("/v1/bounties/award", async (c) => {
     releaseExpired(db);
-    const roh = await c.req.json().catch(() => null);
-    const b = (typeof roh === "object" && roh !== null ? roh : {}) as Record<string, unknown>;
+    const raw = await c.req.json().catch(() => null);
+    const b = (typeof raw === "object" && raw !== null ? raw : {}) as Record<string, unknown>;
     if (typeof b.bounty_id !== "string" || typeof b.submission_id !== "string" || !b.bounty_id || !b.submission_id) {
       return c.json(
         { error: "ids_required", message: 'Send {"bounty_id": "...", "submission_id": "..."}.', docs: DOC.payments },
@@ -860,11 +859,11 @@ export function createApp(opts: AppOptions) {
 
   app.get("/v1/credits/pricing", (c) => c.json({ tiers: [], topup_tiers_usd: opts.pay?.tiers ?? TOPUP_TIERS_USD }));
 
-  // Entscheidung in STATE.md: Credits sind in Phase 1 nicht übertragbar. Das ist keine Lücke im
-  // Bau, sondern Regulatorik, und genau das steht now auch in der Antwort: Credits, die zwischen
-  // Wallets wandern können, sind ein Zahlungsdienst, und der Betreiber ist eine Person ohne
-  // Lizenz. Die Runtime-Tools `transfer_credits` und `fund_child` reichen diesen Körper an den
-  // Agenten durch (Upstream `src/agent/tools.ts:3401`), deshalb steht der gangbare Weg dabei.
+  // Decision in STATE.md: credits are not transferable in phase 1. That is not a gap in the build
+  // but regulation, and that is exactly what the answer says now: credits that can move between
+  // wallets are a payment service, and the operator is a single person without a licence. The
+  // runtime tools `transfer_credits` and `fund_child` pass this body through to the agent (upstream
+  // `src/agent/tools.ts:3401`), so the workable route is stated alongside.
   const TRANSFER_501 = {
     error: "not_implemented",
     reason: "credit transfers are disabled in phase 1",
@@ -884,7 +883,7 @@ export function createApp(opts: AppOptions) {
   app.post("/v1/credits/transfer", (c) => c.json(TRANSFER_501, 501));
   app.post("/v1/credits/transfers", (c) => c.json(TRANSFER_501, 501));
 
-  // ─── Registry ─────────────────────────────────────────────────
+  // --- Registry -------------------------------------------------
 
   app.post("/v1/automatons/register", async (c) => {
     const body = await c.req.json().catch(() => null);
@@ -892,31 +891,31 @@ export function createApp(opts: AppOptions) {
     return c.json(res.body, res.status as 200);
   });
 
-  // ─── Sandboxes (Phase 2) ──────────────────────────────────────
+  // --- Sandboxes (phase 2) --------------------------------------
 
-  // Der 501 ist inhaltlich richtig und bleibt: Die Runtime fängt ihn ab und startet statt der
-  // Sandbox einen lokalen Worker (Upstream `src/agent/loop.ts:304`, "Conway sandbox unavailable,
-  // spawning local worker"), der weiterarbeitet und seine Inferenz weiter hier kauft. Eine
-  // freundliche 200-Attrappe wäre schädlich: `spawnChild` legte ein halbes Kind an und liefe am
-  // nächsten Endpunkt auf. Was fehlte, war der Satz, dass das Absicht ist.
-  const SANDBOX_HINWEIS =
+  // The 501 is right in substance and stays: the runtime catches it and starts a local worker
+  // instead of the sandbox (upstream `src/agent/loop.ts:304`, "Conway sandbox unavailable, spawning
+  // local worker"), which keeps working and keeps buying its inference here. A friendly 200 dummy
+  // would be harmful: `spawnChild` would create half a child and run aground at the next endpoint.
+  // What was missing was the sentence saying that this is intentional.
+  const SANDBOX_NOTE =
     "This control plane runs no sandboxes: it sells provisioning, credits and inference, nothing " +
     "that boots a VM. The 501 is the intended answer, not an outage. Your runtime handles it by " +
     "spawning a local worker instead, which keeps the task running and its inference billed here; " +
     'to skip the attempt entirely, leave "sandboxId" empty in ~/.automaton/automaton.json.';
   app.get("/v1/sandboxes", (c) => c.json({ sandboxes: [] }));
-  // Die Route für den Erstellungsversuch steht vor der Wildcard: `/v1/sandboxes/*` matcht in Hono
-  // auch `/v1/sandboxes`, und dann bekäme ein `POST /v1/sandboxes` den Text der Unterpfade
-  // ("nichts, worin man etwas ausführen könnte") statt der Antwort auf seine eigene Frage.
+  // The route for the creation attempt stands before the wildcard: in Hono `/v1/sandboxes/*` also
+  // matches `/v1/sandboxes`, and then a `POST /v1/sandboxes` would get the text for the sub-paths
+  // ("nothing to exec in") instead of the answer to its own question.
   app.post("/v1/sandboxes", (c) =>
-    c.json({ error: "not_implemented", message: SANDBOX_HINWEIS, docs: DOC.sandboxes }, 501),
+    c.json({ error: "not_implemented", message: SANDBOX_NOTE, docs: DOC.sandboxes }, 501),
   );
   app.all("/v1/sandboxes/*", (c) =>
     c.json(
       {
         error: "not_implemented",
         message:
-          "There is no sandbox to exec in, copy files to or expose a port from. " + SANDBOX_HINWEIS,
+          "There is no sandbox to exec in, copy files to or expose a port from. " + SANDBOX_NOTE,
         docs: DOC.sandboxes,
       },
       501,
@@ -924,13 +923,13 @@ export function createApp(opts: AppOptions) {
   );
 
   app.notFound((c) => {
-    // Eine doppelte /v1-Stufe heisst fast immer: Jemand hat eine Basis-URL, die schon einen Pfad
-    // enthaelt, mit einem Endpunkt verkettet. Der Hinweis spart ihm die Suche am falschen Ende.
-    const doppelt = (c.req.path.match(/\/v1\//g) ?? []).length > 1;
+    // A doubled /v1 step almost always means somebody joined a base URL that already contains a
+    // path with an endpoint. The hint saves them from searching at the wrong end.
+    const doubled = (c.req.path.match(/\/v1\//g) ?? []).length > 1;
     return c.json(
       {
         error: "not_found",
-        message: doppelt
+        message: doubled
           ? "No such endpoint, and this path carries /v1/ twice, which usually means a base URL " +
             "that already contains a path was joined with an endpoint. The base URL of this " +
             "control plane is the bare origin, with no path: set conwayApiUrl to " +

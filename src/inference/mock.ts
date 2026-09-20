@@ -1,10 +1,10 @@
 /**
- * Mock-Provider für Harness und Unit-Tests: kein Netz, deterministisch.
+ * Mock provider for the harness and unit tests: no network, deterministic.
  *
- * Je API-Key zählt er Requests. Request 1 bis 4 antwortet er mit je einem harmlosen Tool-Call
- * aus TOOL_SEQUENCE (nur wenn das Tool angeboten wird), Request 5 mit einem `sleep`-Tool-Call,
- * damit die Runtime den Zyklus sauber beendet. Danach Text. Die Runtime legt SOUL.md, Skills und
- * Register an, bevor sie die Turns fährt; das beeinflusst den Zähler nicht.
+ * It counts requests per API key. Requests 1 to 4 are answered with one harmless tool call each
+ * from TOOL_SEQUENCE (only when that tool is offered), request 5 with a `sleep` tool call so the
+ * runtime ends its cycle cleanly. Text after that. The runtime creates SOUL.md, skills and the
+ * registry before it runs its turns; that does not affect the counter.
  */
 
 import { randomUUID } from "node:crypto";
@@ -26,9 +26,9 @@ export class MockProvider implements ChatProvider {
   readonly id = "mock";
   private readonly counts = new Map<string, number>();
   /**
-   * Alle Aufrufe über alle Keys. Beim echten Provider entspricht jeder davon einem Einkauf, der
-   * Geld kostet, auch wenn er hinterher nicht abgerechnet werden kann. Tests, die Guthabendeckung
-   * prüfen, müssen genau das messen und nicht nur den Endsaldo.
+   * All calls across all keys. With a real provider each of them is a purchase that costs money,
+   * even when it cannot be billed afterwards. Tests that check credit coverage have to measure
+   * exactly that and not only the final balance.
    */
   totalCalls = 0;
 

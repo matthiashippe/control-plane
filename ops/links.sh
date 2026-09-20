@@ -1,45 +1,45 @@
 #!/usr/bin/env bash
-# Fuehren alle Links der Startseite noch irgendwohin?
+# Do all the links on the landing page still lead somewhere?
 #
-# Nicht im Rauchtest, sondern hier: Der Rauchtest laeuft bei jedem Deploy und darf nicht von
-# GitHub oder Basescan abhaengen. Diese Pruefung gehoert vor Momente, in denen Fremde die Seite
-# lesen, also vor einen Artikel oder einen Beitrag, der die Adresse verbreitet.
+# Not in the smoke test but here: the smoke test runs on every deploy and must not depend on GitHub
+# or Basescan. This check belongs before moments when strangers read the page, so before an article
+# or a post that spreads the address.
 #
-#   ops/links.sh                gegen die Produktion
+#   ops/links.sh                against production
 #   ops/links.sh http://localhost:8402
 set -euo pipefail
 
-BASIS="${1:-https://cp.hippe.eu}"
-fehler=0
+BASE="${1:-https://cp.hippe.eu}"
+broken=0
 
-echo "Links auf $BASIS/"
-seite=$(curl -fsS --max-time 20 "$BASIS/")
+echo "Links on $BASE/"
+page=$(curl -fsS --max-time 20 "$BASE/")
 
-# Externe Ziele, jeweils einmal, Weiterleitungen folgend.
+# External targets, once each, following redirects.
 while read -r url; do
   [[ -z "$url" ]] && continue
   code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 25 -L "$url" || echo "000")
   if [[ "$code" == "200" ]]; then
     printf '  OK   %s\n' "$url"
   else
-    printf '  FEHL %s  -> %s\n' "$url" "$code"
-    fehler=$((fehler + 1))
+    printf '  FAIL %s  -> %s\n' "$url" "$code"
+    broken=$((broken + 1))
   fi
-done < <(printf '%s' "$seite" | grep -oE 'href="https?://[^"]+"' | sed 's/href="//; s/"$//' | sort -u)
+done < <(printf '%s' "$page" | grep -oE 'href="https?://[^"]+"' | sed 's/href="//; s/"$//' | sort -u)
 
-# Anker innerhalb der Seite: ein href="#impressum" ohne id="impressum" faellt sonst niemandem auf.
-while read -r anker; do
-  [[ -z "$anker" ]] && continue
-  if printf '%s' "$seite" | grep -q "id=\"$anker\""; then
-    printf '  OK   #%s\n' "$anker"
+# Anchors inside the page: an href="#impressum" without id="impressum" would go unnoticed otherwise.
+while read -r anchor; do
+  [[ -z "$anchor" ]] && continue
+  if printf '%s' "$page" | grep -q "id=\"$anchor\""; then
+    printf '  OK   #%s\n' "$anchor"
   else
-    printf '  FEHL #%s  -> kein Element mit dieser id\n' "$anker"
-    fehler=$((fehler + 1))
+    printf '  FAIL #%s  -> no element with that id\n' "$anchor"
+    broken=$((broken + 1))
   fi
-done < <(printf '%s' "$seite" | grep -oE 'href="#[^"]+"' | sed 's/href="#//; s/"$//' | sort -u)
+done < <(printf '%s' "$page" | grep -oE 'href="#[^"]+"' | sed 's/href="#//; s/"$//' | sort -u)
 
-if [[ "$fehler" -gt 0 ]]; then
-  echo "$fehler Link(s) kaputt."
+if [[ "$broken" -gt 0 ]]; then
+  echo "$broken link(s) broken."
   exit 1
 fi
-echo "Alle Links in Ordnung."
+echo "All links fine."
