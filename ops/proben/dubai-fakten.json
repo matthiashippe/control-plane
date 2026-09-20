@@ -1,0 +1,26 @@
+{
+  "zweck": "Bekannte Wahrheit fuer ops/erfindungspruefung.py. Vier Einreichungen gegen dasselbe faktische Briefing: eine saubere, und je eine mit einem gepflanzten Fehler jeder Befundart. Die saubere pruefft auf Fehlalarm, die drei anderen darauf, dass die Arten ueberhaupt ausloesen. Bewusst nuechterne Faktentexte statt Werbetext: Werbetext erfindet immer, und dann misst die Probe das Genre statt den Pruefer.",
+  "briefing": "FACT SHEET for a listing description. 2 bed, 2 bath, 1,240 sqft, 11th floor, Marina Promenade, Dubai Marina. Chiller free. One parking bay. Vacant now. Building has a pool and a gym. Eight minutes on foot to DMCC metro. Service charge AED 18 per sqft per year. Asking AED 2.35m.\n\nWrite a factual summary. State only what this sheet supports. Buyers compare net yield, so give them the annual service charge total.",
+  "proben": [
+    {
+      "name": "sauber",
+      "erwartet": [],
+      "text": "Marina Promenade, Dubai Marina. Two bedrooms, two bathrooms, 1,240 sqft on the 11th floor. Chiller free, one parking bay, vacant now. The building has a pool and a gym, and DMCC metro is eight minutes on foot. Service charge is AED 18 per sqft per year, which comes to AED 22,320 a year for this unit. Asking AED 2.35m."
+    },
+    {
+      "name": "rechenfehler",
+      "erwartet": [{"art": "rechenfehler", "muster": "31,000"}],
+      "text": "Marina Promenade, Dubai Marina. Two bedrooms, two bathrooms, 1,240 sqft on the 11th floor. Chiller free, one parking bay, vacant now. Service charge is AED 18 per sqft per year, which comes to about AED 31,000 a year for this unit. Asking AED 2.35m."
+    },
+    {
+      "name": "widerspruch",
+      "erwartet": [{"art": "widerspruch", "muster": "chiller"}],
+      "text": "Marina Promenade, Dubai Marina. Two bedrooms, two bathrooms, 1,240 sqft on the 11th floor. One parking bay, vacant now. Chiller charges are billed separately on top of the service charge. Service charge is AED 18 per sqft per year. Asking AED 2.35m."
+    },
+    {
+      "name": "unbelegt",
+      "erwartet": [{"art": "unbelegt", "muster": "play area"}],
+      "text": "Marina Promenade, Dubai Marina. Two bedrooms, two bathrooms, 1,240 sqft on the 11th floor. Chiller free, one parking bay, vacant now. The building has a pool, a gym and a children's play area. DMCC metro is eight minutes on foot. Service charge is AED 18 per sqft per year. Asking AED 2.35m."
+    }
+  ]
+}
