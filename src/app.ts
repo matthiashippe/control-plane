@@ -10,7 +10,14 @@ import { fileURLToPath } from "node:url";
 import { Hono } from "hono";
 import type { Db } from "./db.js";
 import { befundePruefen, nachrichten, type Auftragsart } from "./check/erfindung.js";
-import { mcToCents,getBalanceCents } from "./db.js";
+import {
+  auftragEinstellen,
+  auftragZurueckziehen,
+  offeneAuftraege,
+  BountyError,
+  type Bounty,
+} from "./bounties/store.js";
+import { mcToCents, getBalanceCents, MC_PER_CENT } from "./db.js";
 import { DOC } from "./errors.js";
 import { Catalog, handleChat, MARKUP } from "./inference/proxy.js";
 import { clientSchluessel, RateLimiter, type RateLimitOptions } from "./ratelimit.js";
@@ -100,6 +107,8 @@ const V1_ROUTEN = new Set([
   "/v1/auth/nonce",
   "/v1/auth/verify",
   "/v1/automatons/register",
+  "/v1/bounties",
+  "/v1/bounties/withdraw",
   "/v1/chat/completions",
   "/v1/check",
   "/v1/credits/balance",
@@ -619,6 +628,69 @@ export function createApp(opts: AppOptions) {
     }
     const { befunde, verworfen } = befundePruefen(submission, geparst);
     return c.json({ kind, findings: befunde, discarded: verworfen, model: antwort.model, usage: antwort.usage });
+  });
+
+  // ─── Auftraege ────────────────────────────────────────────────
+
+  /**
+   * Der Auftragsmarkt, auf den dieser Dienst zulaeuft: Ein Mensch schreibt eine Arbeit aus, mehrere
+   * Agenten bewerben sich, der Gewinner bekommt das Geld. Conway ist an der anderen Seite dieses
+   * Marktes gestorben, naemlich an 18.000 Verkaeufern ohne einen einzigen Kaeufer.
+   *
+   * Die Pfade sind bewusst alle exakt und haben kein Segment mit einer ID: Die Auth-Middleware
+   * oben vergleicht gegen V1_ROUTEN mit `has()`, und ein Pfad mit variablem Segment stuende
+   * dadurch voellig ohne Schluessel offen. Die zurueckzuziehende ID steht deshalb im Rumpf.
+   */
+  const bountyAntwort = (b: Bounty) => ({
+    id: b.id,
+    kind: b.kind,
+    brief: b.brief,
+    price_cents: mcToCents(b.price_mc),
+    deadline: b.deadline,
+    status: b.status,
+    created_at: b.created_at,
+  });
+
+  app.post("/v1/bounties", async (c) => {
+    const roh = await c.req.json().catch(() => null);
+    const b = (typeof roh === "object" && roh !== null ? roh : {}) as Record<string, unknown>;
+    const preisCents = typeof b.price_cents === "number" ? b.price_cents : NaN;
+    try {
+      const auftrag = auftragEinstellen(db, {
+        creator: c.get("address"),
+        kind: b.kind === "creative" ? "creative" : "factual",
+        brief: typeof b.brief === "string" ? b.brief : "",
+        priceMc: Number.isInteger(preisCents) ? preisCents * MC_PER_CENT : NaN,
+        deadline: typeof b.deadline === "string" ? b.deadline : "",
+      });
+      return c.json(bountyAntwort(auftrag), 201);
+    } catch (e) {
+      if (e instanceof BountyError) {
+        return c.json({ error: e.code, message: e.hint, docs: DOC.payments }, e.status as 400);
+      }
+      throw e;
+    }
+  });
+
+  app.get("/v1/bounties", (c) => {
+    const limit = Number(c.req.query("limit") ?? 50) || 50;
+    return c.json({ bounties: offeneAuftraege(db, limit).map(bountyAntwort) });
+  });
+
+  app.post("/v1/bounties/withdraw", async (c) => {
+    const roh = await c.req.json().catch(() => null);
+    const id = (roh as { id?: unknown } | null)?.id;
+    if (typeof id !== "string" || !id) {
+      return c.json({ error: "id_required", message: 'Send {"id": "<bounty id>"}.', docs: DOC.payments }, 400);
+    }
+    try {
+      return c.json(bountyAntwort(auftragZurueckziehen(db, id, c.get("address"))));
+    } catch (e) {
+      if (e instanceof BountyError) {
+        return c.json({ error: e.code, message: e.hint, docs: DOC.payments }, e.status as 400);
+      }
+      throw e;
+    }
   });
 
   app.get("/v1/credits/pricing", (c) => c.json({ tiers: [], topup_tiers_usd: opts.pay?.tiers ?? TOPUP_TIERS_USD }));

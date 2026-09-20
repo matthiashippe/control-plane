@@ -96,6 +96,28 @@ function migrate(db: Db): void {
       registered_at       TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS automatons_address ON automatons(address);
+
+    -- Ausgeschriebene Auftraege. Der Preis ist beim Einstellen bereits vom Guthaben des
+    -- Auftraggebers abgebucht und liegt als Ledger-Zeile bounty_hold fest; die Spalte
+    -- price_mc sagt nur noch, wie viel zurueckzugeben oder auszuzahlen ist.
+    --
+    -- Bewusst NICHT ueber wallets.reserved_mc: Diese Spalte wird bei jedem Start auf null
+    -- gesetzt (siehe migrate() weiter unten), weil sie abgebrochene Inferenz-Reservierungen
+    -- aufraeumt. Ein Deploy wuerde damit jede Hinterlegung still freigeben, und der Auftraggeber
+    -- haette sein Geld zurueck, waehrend sein Auftrag weiter ausgeschrieben ist.
+    CREATE TABLE IF NOT EXISTS bounties (
+      id          TEXT PRIMARY KEY,
+      creator     TEXT NOT NULL REFERENCES wallets(address),
+      kind        TEXT NOT NULL,                -- factual | creative
+      brief       TEXT NOT NULL,
+      price_mc    INTEGER NOT NULL,
+      deadline    TEXT NOT NULL,                -- ISO 8601
+      status      TEXT NOT NULL,                -- open | cancelled
+      created_at  TEXT NOT NULL,
+      closed_at   TEXT
+    );
+    CREATE INDEX IF NOT EXISTS bounties_status ON bounties(status, deadline);
+    CREATE INDEX IF NOT EXISTS bounties_creator ON bounties(creator, id);
   `);
 
   // Bestehende Datenbanken kennen reserved_mc noch nicht. SQLite hat kein "ADD COLUMN IF NOT
@@ -167,7 +189,10 @@ export function mcToCents(mc: number): number {
 
 export interface LedgerEntry {
   address: string;
-  kind: "topup" | "inference" | "transfer_in" | "transfer_out";
+  // bounty_hold bucht den Preis beim Einstellen ab, bounty_release gibt ihn beim
+  // Zurueckziehen wieder frei. Beides sind echte Saldo-Aenderungen und keine Reservierung,
+  // damit sie einen Neustart ueberleben (src/bounties/store.ts sagt, warum).
+  kind: "topup" | "inference" | "transfer_in" | "transfer_out" | "bounty_hold" | "bounty_release";
   deltaMc: number;
   ref?: string;
   meta?: Record<string, unknown>;
