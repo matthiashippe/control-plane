@@ -18,6 +18,8 @@ import {
   einreichen,
   einreichungen,
   vergeben,
+  gebuehrMc,
+  GEBUEHR_PROZENT,
   BountyError,
   type Bounty,
 } from "./bounties/store.js";
@@ -168,6 +170,11 @@ export function createApp(opts: AppOptions) {
 
   // Die Pfade ohne API-Key schreiben in die Datenbank, `/pay` ruft zusätzlich den Facilitator.
   // Ein API-Key kostet nichts, deshalb muss die Grenze vor der Authentifizierung greifen.
+  // Empfaenger der Vermittlungsgebuehr ist die Adresse, an die auch die x402-Zahlungen gehen:
+  // der Betreiber. Ein eigener Konfigwert waere eine zweite Stelle, an der dieselbe Tatsache
+  // steht, und .env liegt ausserdem hinter der Pfadsperre aus loop-constraints.md.
+  const gebuehrAn = opts.pay?.payTo?.toLowerCase() ?? null;
+
   const rateLimitOpts: RateLimitOptions = opts.rateLimit ?? { limit: 60, fensterMs: 60_000 };
   const limiter = opts.rateLimit === null ? null : new RateLimiter(rateLimitOpts);
   const OFFENE_PFADE = ["/v1/auth/nonce", "/v1/auth/verify", "/v1/auth/api-keys", "/pay/"];
@@ -366,12 +373,15 @@ export function createApp(opts: AppOptions) {
     return c.json(
       {
         note: "Open bounties, visible without a key. Everything in a brief is public. " +
+          "price_cents is what the buyer pays, award_cents is what the winning agent receives. " +
           "Competing needs an API key: see /llms.txt.",
         open: offeneAuftraege(db, limit).map((b) => ({
           id: b.id,
           kind: b.kind,
           brief: b.brief,
           price_cents: mcToCents(b.price_mc),
+          award_cents: mcToCents(b.price_mc - (gebuehrAn ? gebuehrMc(b.price_mc) : 0)),
+          fee_percent: gebuehrAn ? GEBUEHR_PROZENT : 0,
           deadline: b.deadline,
           created_at: b.created_at,
         })),
@@ -418,7 +428,8 @@ export function createApp(opts: AppOptions) {
       "it is awarded, so a bounty always has the money behind it. It returns to the buyer if the",
       "bounty is cancelled, or when the deadline passes unawarded. Credits stay credits throughout.",
       "",
-      "- /bounties.json: the open bounties, no key needed. Every brief is public.",
+      "- /bounties.json: the open bounties, no key needed. Every brief is public. price_cents is",
+      "  what the buyer pays, award_cents is what the winner receives after the " + GEBUEHR_PROZENT + "% fee.",
       "- /v1/bounties: POST to post one, GET for the open ones.",
       "- /v1/bounties/cancel, /v1/bounties/award: take it back, or pay a winner.",
       "- /v1/submissions: POST to compete, GET to see your own. One attempt per agent per bounty,",
@@ -721,6 +732,9 @@ export function createApp(opts: AppOptions) {
     kind: b.kind,
     brief: b.brief,
     price_cents: mcToCents(b.price_mc),
+    // Was beim Gewinner ankommt. Steht neben dem Preis, damit ein Agent nicht selbst rechnen muss.
+    award_cents: mcToCents(b.price_mc - (gebuehrAn ? gebuehrMc(b.price_mc) : 0)),
+    fee_percent: gebuehrAn ? GEBUEHR_PROZENT : 0,
     deadline: b.deadline,
     status: b.status,
     created_at: b.created_at,
@@ -818,7 +832,12 @@ export function createApp(opts: AppOptions) {
       );
     }
     try {
-      const auftrag = vergeben(db, { bountyId: b.bounty_id, submissionId: b.submission_id, wer: c.get("address") });
+      const auftrag = vergeben(db, {
+        bountyId: b.bounty_id,
+        submissionId: b.submission_id,
+        wer: c.get("address"),
+        gebuehrAn,
+      });
       return c.json({ ...bountyAntwort(auftrag), winner_submission: auftrag.winner_submission });
     } catch (e) {
       if (e instanceof BountyError) return c.json({ error: e.code, message: e.hint, docs: DOC.payments }, e.status as 400);

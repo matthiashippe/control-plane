@@ -42,6 +42,27 @@ export const BRIEF_MAX = 20_000;
 export const PREIS_MIN_MC = 1_000;
 export const PREIS_MAX_MC = 100_000_000;
 /** Laenger als 30 Tage bindet Geld ohne Gegenwert; kuerzer als eine Minute schafft niemand. */
+/**
+ * Die Vermittlungsgebuehr, in Prozent des Auftragspreises.
+ *
+ * Zehn Prozent, getragen vom Gewinner und vom Auszahlbetrag abgezogen. Upwork nimmt zehn, Fiverr
+ * zwanzig; in einem Markt ohne Liquiditaet ist die niedrigere Zahl richtig, und sie ist spaeter
+ * leichter zu erhoehen als zu senken.
+ *
+ * Der Kaeufer zahlt genau den Preis, den er ausschreibt: Er soll nicht rechnen muessen, was ein
+ * Auftrag "wirklich" kostet. Der Agent sieht dafuer schon in der oeffentlichen Liste, was bei ihm
+ * ankommt, und nicht erst nach der Vergabe.
+ *
+ * Gerundet wird zugunsten des Gewinners: Die Gebuehr wird abgerundet, damit sie nie ueber zehn
+ * Prozent liegt. Beide Zeilen zusammen ergeben exakt den hinterlegten Betrag, es entsteht und
+ * verschwindet kein Millicent.
+ */
+export const GEBUEHR_PROZENT = 10;
+
+export function gebuehrMc(preisMc: number): number {
+  return Math.floor((preisMc * GEBUEHR_PROZENT) / 100);
+}
+
 export const FRIST_MIN_MS = 60_000;
 export const FRIST_MAX_MS = 30 * 24 * 3_600_000;
 
@@ -140,7 +161,7 @@ export function auftragZurueckziehen(db: Db, id: string, wer: string): Bounty {
   const adresse = wer.toLowerCase();
   const auftrag = auftragLesen(db, id);
   if (!auftrag) throw new BountyError("not_found", 404, "No bounty with that id.");
-  if (auftrag.creator !== adresse) throw new BountyError("not_yours", 403, "Only the address that posted a bounty can withdraw it.");
+  if (auftrag.creator !== adresse) throw new BountyError("not_yours", 403, "Only the address that posted a bounty can cancel it.");
   if (auftrag.status !== "open") throw new BountyError("not_open", 409, `This bounty is already ${auftrag.status}.`);
 
   const run = db.transaction(() => {
@@ -293,7 +314,10 @@ export function einreichungen(db: Db, bountyId: string, wer: string): Submission
  * ist eine Entscheidung von Matthias und keine des Loops; wenn sie kommt, ist sie eine eigene
  * Ledger-Zeile neben dieser.
  */
-export function vergeben(db: Db, a: { bountyId: string; submissionId: string; wer: string }): Bounty {
+export function vergeben(
+  db: Db,
+  a: { bountyId: string; submissionId: string; wer: string; gebuehrAn?: string | null },
+): Bounty {
   const adresse = a.wer.toLowerCase();
   const auftrag = auftragLesen(db, a.bountyId);
   if (!auftrag) throw new BountyError("not_found", 404, "No bounty with that id.");
@@ -313,13 +337,31 @@ export function vergeben(db: Db, a: { bountyId: string; submissionId: string; we
       .prepare("UPDATE bounties SET status = 'awarded', closed_at = ?, winner_submission = ? WHERE id = ? AND status = 'open'")
       .run(new Date().toISOString(), einreichung.id, a.bountyId);
     if (res.changes !== 1) throw new BountyError("not_open", 409, "This bounty is no longer open.");
+    // Ohne Empfaenger keine Gebuehr: Eine Instanz ohne konfigurierte Betreiberadresse soll nicht
+    // still Geld einbehalten, das dann niemandem gehoert und die Buchhaltung sprengt.
+    const gebuehr = a.gebuehrAn ? gebuehrMc(auftrag.price_mc) : 0;
     postLedger(db, {
       address: einreichung.agent,
       kind: "bounty_award",
-      deltaMc: auftrag.price_mc,
+      deltaMc: auftrag.price_mc - gebuehr,
       ref: `bounty-award:${a.bountyId}`,
-      meta: { bounty_id: a.bountyId, submission_id: einreichung.id, from: auftrag.creator },
+      meta: {
+        bounty_id: a.bountyId,
+        submission_id: einreichung.id,
+        from: auftrag.creator,
+        price_mc: auftrag.price_mc,
+        fee_mc: gebuehr,
+      },
     });
+    if (gebuehr > 0) {
+      postLedger(db, {
+        address: a.gebuehrAn as string,
+        kind: "bounty_fee",
+        deltaMc: gebuehr,
+        ref: `bounty-fee:${a.bountyId}`,
+        meta: { bounty_id: a.bountyId, submission_id: einreichung.id, percent: GEBUEHR_PROZENT },
+      });
+    }
   });
   run();
   return auftragLesen(db, a.bountyId)!;

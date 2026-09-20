@@ -6,7 +6,7 @@ import Database from "better-sqlite3";
 import { privateKeyToAccount, generatePrivateKey } from "viem/accounts";
 import { createApp } from "../src/app.js";
 import { openDb, postLedger, MC_PER_CENT } from "../src/db.js";
-import { abgelaufeneFreigeben } from "../src/bounties/store.js";
+import { abgelaufeneFreigeben, GEBUEHR_PROZENT, gebuehrMc } from "../src/bounties/store.js";
 import { hashApiKey } from "../src/auth/siwe.js";
 
 const IN_EINER_STUNDE = () => new Date(Date.now() + 3_600_000).toISOString();
@@ -436,5 +436,87 @@ describe("Die oeffentliche Auftragsliste", () => {
     const { app } = setup();
     const res = await app.request("/bounties.json?limit=99999", { method: "GET" });
     expect(res.status).toBe(200);
+  });
+});
+
+const BETREIBER = "0x914102284463f4f58b1d2f6db9ac80bfcaa7d614";
+const PAY = {
+  payTo: BETREIBER as `0x${string}`,
+  network: "base" as const,
+  chainId: 8453,
+  usdcAddress: "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913" as `0x${string}`,
+  maxTimeoutSeconds: 60,
+  tiers: [5] as const,
+};
+
+/** Wie setup(), aber mit konfigurierter Betreiberadresse, also mit Gebuehr. */
+function setupMitGebuehr(balanceMc = 500_000) {
+  const db = openDb(":memory:");
+  const app = createApp({ db, pay: PAY });
+  const ledgerSumme = () => (db.prepare("SELECT coalesce(sum(delta_mc), 0) AS s FROM ledger").get() as { s: number }).s;
+  const saldenSumme = () => (db.prepare("SELECT coalesce(sum(balance_mc), 0) AS s FROM wallets").get() as { s: number }).s;
+  const betreiber = () =>
+    ((db.prepare("SELECT balance_mc FROM wallets WHERE address = ?").get(BETREIBER) as { balance_mc: number } | undefined)
+      ?.balance_mc) ?? 0;
+  return { db, app, a: konto(db, app, balanceMc, 1), b: konto(db, app, balanceMc, 2), ledgerSumme, saldenSumme, betreiber };
+}
+
+describe("Vermittlungsgebuehr", () => {
+  it("zieht zehn Prozent vom Auszahlbetrag ab und schreibt sie dem Betreiber gut", async () => {
+    const { a, b, betreiber } = setupMitGebuehr();
+    const { id } = (await (await a.einstellen(auftrag())).json()) as { id: string };
+    const { id: sid } = (await (await b.einreichen2({ bounty_id: id, body: "die Arbeit" })).json()) as { id: string };
+    await a.vergeben({ bounty_id: id, submission_id: sid });
+
+    const preisMc = 200 * MC_PER_CENT;
+    const gebuehr = gebuehrMc(preisMc);
+    expect(gebuehr).toBe(preisMc / 10);
+    expect(b.saldo(), "der Gewinner bekommt den Preis minus Gebuehr").toBe(500_000 + preisMc - gebuehr);
+    expect(betreiber(), "die Gebuehr landet beim Betreiber").toBe(gebuehr);
+  });
+
+  it("laesst den Kaeufer genau den ausgeschriebenen Preis zahlen, nicht mehr", async () => {
+    const { a, b } = setupMitGebuehr();
+    const { id } = (await (await a.einstellen(auftrag())).json()) as { id: string };
+    const { id: sid } = (await (await b.einreichen2({ bounty_id: id, body: "x" })).json()) as { id: string };
+    await a.vergeben({ bounty_id: id, submission_id: sid });
+    expect(a.saldo(), "er hat beim Einstellen 200 Cent bezahlt und sonst nichts").toBe(500_000 - 200 * MC_PER_CENT);
+  });
+
+  it("verliert und erschafft dabei keinen Millicent", async () => {
+    const { a, b, ledgerSumme, saldenSumme } = setupMitGebuehr();
+    const { id } = (await (await a.einstellen(auftrag())).json()) as { id: string };
+    const { id: sid } = (await (await b.einreichen2({ bounty_id: id, body: "x" })).json()) as { id: string };
+    await a.vergeben({ bounty_id: id, submission_id: sid });
+    expect(ledgerSumme()).toBe(saldenSumme());
+    expect(saldenSumme(), "nur die beiden Startguthaben sind im System").toBe(1_000_000);
+  });
+
+  it("rundet zugunsten des Gewinners, die Gebuehr liegt nie ueber zehn Prozent", () => {
+    for (const preisMc of [1_000, 1_001, 1_009, 7_777, 123_456]) {
+      const g = gebuehrMc(preisMc);
+      expect(g * 100).toBeLessThanOrEqual(preisMc * GEBUEHR_PROZENT);
+      expect(g + (preisMc - g), "beide Zeilen ergeben zusammen den hinterlegten Betrag").toBe(preisMc);
+    }
+  });
+
+  it("nennt den Auszahlbetrag schon in der oeffentlichen Liste, damit ein Agent nicht rechnen muss", async () => {
+    const { app, a } = setupMitGebuehr();
+    await a.einstellen(auftrag());
+    const body = (await (await app.request("/bounties.json", { method: "GET" })).json()) as
+      { open: { price_cents: number; award_cents: number; fee_percent: number }[] };
+    expect(body.open[0].price_cents).toBe(200);
+    expect(body.open[0].award_cents).toBe(180);
+    expect(body.open[0].fee_percent).toBe(GEBUEHR_PROZENT);
+  });
+
+  it("nimmt ohne konfigurierte Betreiberadresse keine Gebuehr, statt Geld einzubehalten, das niemandem gehoert", async () => {
+    const { app, a, b } = setup();
+    const { id } = (await (await a.einstellen(auftrag())).json()) as { id: string };
+    const { id: sid } = (await (await b.einreichen2({ bounty_id: id, body: "x" })).json()) as { id: string };
+    await a.vergeben({ bounty_id: id, submission_id: sid });
+    expect(b.saldo()).toBe(500_000 + 200 * MC_PER_CENT);
+    const liste = (await (await app.request("/bounties.json", { method: "GET" })).json()) as { open: unknown[] };
+    expect(liste.open).toHaveLength(0);
   });
 });

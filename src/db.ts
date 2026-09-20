@@ -216,7 +216,7 @@ export interface LedgerEntry {
   // damit sie einen Neustart ueberleben (src/bounties/store.ts sagt, warum).
   kind:
     | "topup" | "inference" | "transfer_in" | "transfer_out"
-    | "bounty_hold" | "bounty_release" | "bounty_award";
+    | "bounty_hold" | "bounty_release" | "bounty_award" | "bounty_fee";
   deltaMc: number;
   ref?: string;
   meta?: Record<string, unknown>;
