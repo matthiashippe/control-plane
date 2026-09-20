@@ -176,6 +176,31 @@ Wettbewerb ausweist. Wir sind Kunde des Marktes, in den wir verkaufen wollten.
 report-only, Datenquelle `ops/status.sh`, Schwellen in `ops/README.md`). Phase 2 (Sandboxes,
 Social-Relay) erst, wenn Nachfrage messbar ist, also frühestens nach dem 19.10.
 
+15. **Goal 15, Das Journeybuch** (AKTIV, weil Goal 10 auf Matthias' Namensentscheidung wartet):
+    `docs/journeys.md` ist die Referenz, gegen die alles andere geprueft wird. Matthias am 20.09.:
+    "das ist unsere bibel, denn erst wenn es auf beiden seiten etwas gibt dann geht es".
+    Done: (a) Beide Seiten vollstaendig, je Schritt was passiert, welcher Endpunkt beruehrt wird,
+    was er kostet und ein Zustand aus `works`, `breaks` oder `missing` samt dem Goal, das ihn
+    schliesst. (b) Jede Behauptung `works` ist mit einem Test oder einem ops-Aufruf belegt, der
+    fehlschlaegt, wenn sie aufhoert zu stimmen; die Belegtabelle steht am Ende des Dokuments.
+    (c) Die Fehlerwege sind mitgezeichnet, also was passiert, wenn niemand einreicht, alles
+    schlecht ist, der Kaeufer verschwindet oder einem Agenten mitten in der Arbeit das Geld
+    ausgeht. (d) Ein Kaltstart-Abschnitt sagt die Reihenfolge, in der die beiden Seiten gefuellt
+    werden, und nennt die eine Zahl, an der man sieht, dass es funktioniert hat.
+    (e) `ops/journeys-pruefen.sh` haelt jeden im Dokument genannten Pfad gegen die laufende
+    Instanz, mit Gegenprobe: ein erfundener Pfad muss den Lauf rot machen.
+    Status: (a) bis (e) erledigt am 20.09.2026. Offen bleiben zwei Entscheidungen, die im Dokument
+    benannt und nicht entschieden sind: ob eine Einreichung ihre Herkunft ausweisen muss (B3), und
+    was passiert, wenn ein Kaeufer nach der Vergabe widerspricht.
+
+**Die zwei offenen Fragen aus dem Journeybuch gehoeren Matthias:**
+- **Duerfen Menschen einreichen?** Heute kann jeder mit einem Schluessel selbst arbeiten und
+  abgeben, und nichts an einer Einreichung sagt, woher sie kommt. Ein Agentenmarkt, der still auf
+  Menschen laeuft, waere genau die Sorte Luege, die dieses Projekt sonst vermeidet.
+- **Was passiert bei Widerspruch nach der Vergabe?** Heute nichts: keine Rueckabwicklung, keine
+  Schlichtung. Solange die Betraege klein sind, ist das vertretbar; es muss entschieden sein,
+  bevor jemand 50 USD ausschreibt.
+
 ## Entscheidungen bei Matthias
 
 - **Impressum: erledigt am 19.09.2026.** Matthias betreibt den Dienst als Privatperson ohne

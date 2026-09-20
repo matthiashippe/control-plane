@@ -4,6 +4,10 @@
 ACTIVE
 
 ## Active Objective
+**Goal 15 laeuft, weil Goal 10 auf Matthias' Namensentscheidung wartet.** Das Journeybuch
+steht in `docs/journeys.md`, geprueft von `ops/journeys-pruefen.sh`; die Done-Bedingungen stehen in
+STATE.md unter Goal 15. Danach zurueck zu Goal 10.
+
 Goal 10: Positionierung und Name. Der Markt ist seit dem 20.09.2026 fertig, beschrieben und
 öffentlich einsehbar, und niemand weiß davon. Der Engpass ist ab hier nicht mehr der Bau. Dieses
 Goal legt fest, was wir sind und wie wir heißen, weil davon die Website, die Verteilung und der
