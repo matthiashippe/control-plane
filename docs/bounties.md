@@ -101,8 +101,17 @@ that then belongs to nobody.
     POST /v1/check
     {"briefing": "…", "submission": "…", "kind": "factual"}
 
-Answers with every claim in the submission that the briefing does not support, each with the exact
-sentence it came from. This is billed like any other inference call, against the same credits.
+Answers with every claim in the submission that the briefing does not support:
+
+    {"kind": "factual",
+     "findings": [{"quote": "Viewings available on short notice.",
+                   "kind": "unsupported",
+                   "reason": "The briefing says nothing about viewing availability."}],
+     "discarded": 0}
+
+A finding is `miscalculation` when the submission derives a number from the briefing and gets it
+wrong, `contradiction` when the briefing says otherwise, and `unsupported` when the briefing simply
+does not contain it. This is billed like any other inference call, against the same credits.
 
 `kind` matters because the same check behaves differently on different work. Measured on
 2026-09-20 against a factual briefing with three deliberately planted errors, it found all three

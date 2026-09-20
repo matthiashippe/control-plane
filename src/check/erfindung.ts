@@ -18,26 +18,26 @@
  */
 
 /** Was der Auftraggeber bestellt hat. Faktisch sperrt, schoepferisch fragt zurueck. */
-export type Auftragsart = "factual" | "creative";
+export type CheckMode = "factual" | "creative";
 
-export interface Befund {
-  /** Woertliches Zitat aus der Einreichung. Der Anker, an dem der Befund ueberprueft wird. */
-  zitat: string;
-  art: "rechenfehler" | "widerspruch" | "unbelegt";
-  begruendung: string;
+export interface Finding {
+  /** Woertliches Zitat aus der Einreichung. Der Anker, an dem der Finding ueberprueft wird. */
+  quote: string;
+  kind: "miscalculation" | "contradiction" | "unsupported";
+  reason: string;
 }
 
-const GEMEINSAM = `Rules you must follow exactly:
-- Every finding MUST include "zitat": the exact substring from the SUBMISSION, copied character for
+const SHARED_RULES = `Rules you must follow exactly:
+- Every finding MUST include "quote": the exact substring from the SUBMISSION, copied character for
   character, long enough to locate but no longer than one sentence. Never paraphrase it. Never
   quote from the briefing in this field.
 - If there is nothing to report, return an empty list. That is a valid and common answer. Do not
   invent findings to appear thorough.
 
 Answer with JSON only, no prose, in this shape:
-{"befunde": [{"zitat": "...", "art": "rechenfehler"|"widerspruch"|"unbelegt", "begruendung": "one short sentence"}]}`;
+{"findings": [{"quote": "...", "kind": "miscalculation"|"contradiction"|"unsupported", "reason": "one short sentence"}]}`;
 
-const FAKTISCH = `You check a submitted piece of work against the briefing it was written for.
+const FACTUAL = `You check a submitted piece of work against the briefing it was written for.
 
 Your job is to find claims the briefing does not support. Be precise about what that means, because
 the most valuable work a writer does is to DERIVE facts the briefing only implies.
@@ -50,15 +50,15 @@ NOT a finding, never list these:
 - Ordinary connective phrasing, tone, or self-description of care, quality or attention.
 
 A finding, list these:
-- "rechenfehler": the submission derives a number from the briefing and gets it WRONG. Compute the
-  correct value yourself and put it in "begruendung". This is the most serious kind.
-- "widerspruch": the submission states something the briefing contradicts.
-- "unbelegt": the submission states a checkable fact that the briefing neither contains nor implies,
+- "miscalculation": the submission derives a number from the briefing and gets it WRONG. Compute the
+  correct value yourself and put it in "reason". This is the most serious kind.
+- "contradiction": the submission states something the briefing contradicts.
+- "unsupported": the submission states a checkable fact that the briefing neither contains nor implies,
   and that cannot be derived from it.
 
-${GEMEINSAM}`;
+${SHARED_RULES}`;
 
-const SCHOEPFERISCH = `You check a submitted piece of creative copy against the briefing it was
+const CREATIVE = `You check a submitted piece of creative copy against the briefing it was
 written for.
 
 Creative copy necessarily adds. A hundred-word briefing cannot cover a hundred-word text, so the
@@ -70,10 +70,10 @@ customer arrived expecting this and it did not exist, would the client have a pr
 not a finding.
 
 A finding, list these:
-- "rechenfehler": the copy derives a number from the briefing and gets it WRONG. Compute the correct
-  value yourself and put it in "begruendung".
-- "widerspruch": the copy states something the briefing contradicts.
-- "unbelegt": the copy commits the client to something the briefing does not support. Equipment or
+- "miscalculation": the copy derives a number from the briefing and gets it WRONG. Compute the correct
+  value yourself and put it in "reason".
+- "contradiction": the copy states something the briefing contradicts.
+- "unsupported": the copy commits the client to something the briefing does not support. Equipment or
   specifications not listed, a service not offered, a contact or booking channel that may not exist,
   a credential, a certification, a guarantee, a price, a date, an availability, a capacity.
 
@@ -82,18 +82,18 @@ NOT a finding, never list these:
 - A claim that follows from the briefing by correct arithmetic or as a necessary consequence.
 - Plausible detail that binds the client to nothing.
 
-${GEMEINSAM}`;
+${SHARED_RULES}`;
 
-export const ANWEISUNG: Record<Auftragsart, string> = { factual: FAKTISCH, creative: SCHOEPFERISCH };
+export const INSTRUCTION_FACTUAL: Record<CheckMode, string> = { factual: FACTUAL, creative: CREATIVE };
 
 /**
  * Zitatvergleich ohne die Unterschiede, die kein Mensch als Unterschied liest.
  *
  * Die Modelle liefern typografische Zeichen (geschuetzter Bindestrich, Apostroph, Geviertstrich),
  * und der Pruefer normalisiert sie beim Zitieren oft still zu ASCII. Ohne diese Angleichung faellt
- * ein korrekter Befund als "nicht auffindbar" durch.
+ * ein korrekter Finding als "nicht auffindbar" durch.
  */
-export function normalisieren(s: string): string {
+export function normalise(s: string): string {
   let t = s.normalize("NFKC");
   for (const [a, b] of [
     ["‑", "-"], ["‐", "-"], ["–", "-"], ["—", "-"],
@@ -105,43 +105,43 @@ export function normalisieren(s: string): string {
   return t.replace(/\s+/g, " ").trim().toLowerCase();
 }
 
-export interface Pruefergebnis {
-  befunde: Befund[];
+export interface CheckResult {
+  findings: Finding[];
   /** Befunde, deren Zitat sich in der Einreichung nicht wiederfinden liess. */
-  verworfen: number;
+  discarded: number;
 }
 
 /**
  * Der Pruefer wird selbst geprueft.
  *
  * Ein Modell, das Erfindungen sucht, erfindet Funde: Es zitiert Saetze, die in der Einreichung gar
- * nicht vorkommen. Ein solcher Befund ist schlimmer als ein uebersehener, weil er einen ehrlichen
+ * nicht vorkommen. Ein solcher Finding ist schlimmer als ein uebersehener, weil er einen ehrlichen
  * Text beschuldigt. Deshalb zaehlt nur, was sich woertlich wiederfinden laesst; der Rest wird
- * verworfen und gezaehlt, damit die Quote sichtbar bleibt.
+ * discarded und gezaehlt, damit die Quote sichtbar bleibt.
  */
-export function befundePruefen(einreichung: string, roh: unknown): Pruefergebnis {
-  const liste = (roh as { befunde?: unknown })?.befunde;
-  if (!Array.isArray(liste)) return { befunde: [], verworfen: 0 };
-  const heuhaufen = normalisieren(einreichung);
-  const befunde: Befund[] = [];
-  let verworfen = 0;
-  for (const eintrag of liste) {
-    const b = eintrag as Partial<Befund>;
-    const zitat = typeof b.zitat === "string" ? b.zitat.trim() : "";
-    const art = b.art === "rechenfehler" || b.art === "widerspruch" || b.art === "unbelegt" ? b.art : null;
-    if (!zitat || !art || !heuhaufen.includes(normalisieren(zitat))) {
-      verworfen++;
+export function verifyFindings(einreichung: string, raw: unknown): CheckResult {
+  const list = (raw as { findings?: unknown })?.findings;
+  if (!Array.isArray(list)) return { findings: [], discarded: 0 };
+  const haystack = normalise(einreichung);
+  const findings: Finding[] = [];
+  let discarded = 0;
+  for (const entry of list) {
+    const b = entry as Partial<Finding>;
+    const quote = typeof b.quote === "string" ? b.quote.trim() : "";
+    const kind = b.kind === "miscalculation" || b.kind === "contradiction" || b.kind === "unsupported" ? b.kind : null;
+    if (!quote || !kind || !haystack.includes(normalise(quote))) {
+      discarded++;
       continue;
     }
-    befunde.push({ zitat, art, begruendung: typeof b.begruendung === "string" ? b.begruendung : "" });
+    findings.push({ quote, kind, reason: typeof b.reason === "string" ? b.reason : "" });
   }
-  return { befunde, verworfen };
+  return { findings, discarded };
 }
 
 /** Die Nachrichten fuer den Modellaufruf. Getrennt, damit der Aufbau testbar bleibt. */
-export function nachrichten(briefing: string, einreichung: string, art: Auftragsart) {
+export function messages(briefing: string, einreichung: string, kind: CheckMode) {
   return [
-    { role: "system" as const, content: ANWEISUNG[art] },
+    { role: "system" as const, content: INSTRUCTION_FACTUAL[kind] },
     { role: "user" as const, content: `BRIEFING:\n${briefing}\n\n---\n\nSUBMISSION:\n${einreichung}` },
   ];
 }

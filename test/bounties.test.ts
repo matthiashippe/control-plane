@@ -6,7 +6,7 @@ import Database from "better-sqlite3";
 import { privateKeyToAccount, generatePrivateKey } from "viem/accounts";
 import { createApp } from "../src/app.js";
 import { openDb, postLedger, MC_PER_CENT } from "../src/db.js";
-import { abgelaufeneFreigeben, GEBUEHR_PROZENT, gebuehrMc } from "../src/bounties/store.js";
+import { releaseExpired, FEE_PERCENT, feeMc } from "../src/bounties/store.js";
 import { hashApiKey } from "../src/auth/siwe.js";
 
 const IN_EINER_STUNDE = () => new Date(Date.now() + 3_600_000).toISOString();
@@ -31,8 +31,8 @@ function konto(db: ReturnType<typeof openDb>, app: ReturnType<typeof createApp>,
     zurueckziehen: (b: unknown) => ruf("/v1/bounties/cancel", "POST", b),
     liste: () => ruf("/v1/bounties", "GET"),
     einreichen2: (b: unknown) => ruf("/v1/submissions", "POST", b),
-    vergeben: (b: unknown) => ruf("/v1/bounties/award", "POST", b),
-    einreichungen: (id: string) => ruf(`/v1/submissions?bounty_id=${id}`, "GET"),
+    awardBounty: (b: unknown) => ruf("/v1/bounties/award", "POST", b),
+    submissionsFor: (id: string) => ruf(`/v1/submissions?bounty_id=${id}`, "GET"),
     ohneKey: () => app.request("/v1/bounties", { method: "GET" }),
     saldo: () => (db.prepare("SELECT balance_mc FROM wallets WHERE address = ?").get(address) as { balance_mc: number }).balance_mc,
   };
@@ -50,13 +50,13 @@ function setup(balanceMc = 500_000) {
 }
 
 const AUFTRAG = { brief: "Write a listing description.", kind: "factual", price_cents: 200, deadline: "" };
-const auftrag = (ueber: Record<string, unknown> = {}) => ({ ...AUFTRAG, deadline: IN_EINER_STUNDE(), ...ueber });
+const bounty = (ueber: Record<string, unknown> = {}) => ({ ...AUFTRAG, deadline: IN_EINER_STUNDE(), ...ueber });
 
 describe("Auftrag einstellen", () => {
   it("bucht den Preis sofort ab, denn ein Auftrag ohne hinterlegtes Geld ist ein leeres Versprechen", async () => {
     const { a } = setup();
     const vorher = a.saldo();
-    const res = await a.einstellen(auftrag());
+    const res = await a.einstellen(bounty());
     expect(res.status).toBe(201);
     const body = (await res.json()) as { id: string; price_cents: number; status: string };
     expect(body.price_cents).toBe(200);
@@ -67,7 +67,7 @@ describe("Auftrag einstellen", () => {
   it("legt bei zu kleinem Guthaben gar keinen Auftrag an und lässt den Saldo unberührt", async () => {
     const { a, db } = setup(50_000); // 50 Cent
     const vorher = a.saldo();
-    const res = await a.einstellen(auftrag({ price_cents: 200 }));
+    const res = await a.einstellen(bounty({ price_cents: 200 }));
     expect(res.status).toBe(402);
     expect(a.saldo()).toBe(vorher);
     expect((db.prepare("SELECT count(*) AS n FROM bounties").get() as { n: number }).n).toBe(0);
@@ -85,7 +85,7 @@ describe("Auftrag einstellen", () => {
       [{ deadline: new Date(Date.now() + 40 * 24 * 3_600_000).toISOString() }, "deadline_too_far"],
     ];
     for (const [ueber, code] of faelle) {
-      const res = await a.einstellen(auftrag(ueber));
+      const res = await a.einstellen(bounty(ueber));
       expect(res.status, JSON.stringify(ueber)).toBe(400);
       expect(((await res.json()) as { error: string }).error, JSON.stringify(ueber)).toBe(code);
     }
@@ -97,7 +97,7 @@ describe("Auftrag zurückziehen", () => {
   it("gibt genau den hinterlegten Betrag zurück", async () => {
     const { a } = setup();
     const vorher = a.saldo();
-    const { id } = (await (await a.einstellen(auftrag())).json()) as { id: string };
+    const { id } = (await (await a.einstellen(bounty())).json()) as { id: string };
     const res = await a.zurueckziehen({ id });
     expect(res.status).toBe(200);
     expect(((await res.json()) as { status: string }).status).toBe("cancelled");
@@ -106,7 +106,7 @@ describe("Auftrag zurückziehen", () => {
 
   it("zahlt beim zweiten Aufruf nicht noch einmal aus", async () => {
     const { a } = setup();
-    const { id } = (await (await a.einstellen(auftrag())).json()) as { id: string };
+    const { id } = (await (await a.einstellen(bounty())).json()) as { id: string };
     await a.zurueckziehen({ id });
     const nachErstem = a.saldo();
     const res = await a.zurueckziehen({ id });
@@ -116,7 +116,7 @@ describe("Auftrag zurückziehen", () => {
 
   it("lässt nur den Auftraggeber zurückziehen", async () => {
     const { a, b } = setup();
-    const { id } = (await (await a.einstellen(auftrag())).json()) as { id: string };
+    const { id } = (await (await a.einstellen(bounty())).json()) as { id: string };
     const res = await b.zurueckziehen({ id });
     expect(res.status).toBe(403);
     expect(b.saldo(), "fremdes Geld landet auch nicht beim Fremden").toBe(500_000);
@@ -132,8 +132,8 @@ describe("Auftrag zurückziehen", () => {
 describe("Auftragsliste", () => {
   it("zeigt offene Aufträge, aber keine zurückgezogenen", async () => {
     const { a } = setup();
-    const { id } = (await (await a.einstellen(auftrag())).json()) as { id: string };
-    await a.einstellen(auftrag({ price_cents: 100 }));
+    const { id } = (await (await a.einstellen(bounty())).json()) as { id: string };
+    await a.einstellen(bounty({ price_cents: 100 }));
     expect((((await (await a.liste()).json()) as { bounties: unknown[] })).bounties).toHaveLength(2);
     await a.zurueckziehen({ id });
     expect((((await (await a.liste()).json()) as { bounties: unknown[] })).bounties).toHaveLength(1);
@@ -141,7 +141,7 @@ describe("Auftragsliste", () => {
 
   it("zeigt abgelaufene Aufträge nicht mehr", async () => {
     const { a, db } = setup();
-    const { id } = (await (await a.einstellen(auftrag())).json()) as { id: string };
+    const { id } = (await (await a.einstellen(bounty())).json()) as { id: string };
     db.prepare("UPDATE bounties SET deadline = ? WHERE id = ?").run(new Date(Date.now() - 1000).toISOString(), id);
     expect((((await (await a.liste()).json()) as { bounties: unknown[] })).bounties).toHaveLength(0);
   });
@@ -156,7 +156,7 @@ describe("Buchhaltung", () => {
   it("hält Ledger und Salden nach Einstellen und Zurückziehen deckungsgleich", async () => {
     const { a, ledgerSumme, saldenSumme } = setup();
     expect(ledgerSumme()).toBe(saldenSumme());
-    const { id } = (await (await a.einstellen(auftrag())).json()) as { id: string };
+    const { id } = (await (await a.einstellen(bounty())).json()) as { id: string };
     expect(ledgerSumme(), "das hinterlegte Geld ist aus den Salden heraus").toBe(saldenSumme());
     await a.zurueckziehen({ id });
     expect(ledgerSumme()).toBe(saldenSumme());
@@ -165,14 +165,14 @@ describe("Buchhaltung", () => {
 
   it("schreibt für jede Bewegung eine Ledger-Zeile mit Bezug auf den Auftrag", async () => {
     const { a, db } = setup();
-    const { id } = (await (await a.einstellen(auftrag())).json()) as { id: string };
+    const { id } = (await (await a.einstellen(bounty())).json()) as { id: string };
     await a.zurueckziehen({ id });
-    const zeilen = db
+    const rows = db
       .prepare("SELECT kind, delta_mc, ref FROM ledger WHERE ref LIKE ? ORDER BY id")
       .all(`%${id}`) as { kind: string; delta_mc: number; ref: string }[];
-    expect(zeilen.map((z) => z.kind)).toEqual(["bounty_hold", "bounty_release"]);
-    expect(zeilen[0].delta_mc).toBe(-200 * MC_PER_CENT);
-    expect(zeilen[1].delta_mc).toBe(200 * MC_PER_CENT);
+    expect(rows.map((z) => z.kind)).toEqual(["bounty_hold", "bounty_release"]);
+    expect(rows[0].delta_mc).toBe(-200 * MC_PER_CENT);
+    expect(rows[1].delta_mc).toBe(200 * MC_PER_CENT);
   });
 });
 
@@ -180,7 +180,7 @@ describe("Verfall bei abgelaufener Frist", () => {
   /** Setzt die Frist in die Vergangenheit, ohne die Pruefung beim Einstellen zu umgehen. */
   async function abgelaufenerAuftrag() {
     const s = setup();
-    const { id } = (await (await s.a.einstellen(auftrag())).json()) as { id: string };
+    const { id } = (await (await s.a.einstellen(bounty())).json()) as { id: string };
     s.db.prepare("UPDATE bounties SET deadline = ? WHERE id = ?").run(new Date(Date.now() - 1000).toISOString(), id);
     return { ...s, id };
   }
@@ -188,30 +188,30 @@ describe("Verfall bei abgelaufener Frist", () => {
   it("gibt das hinterlegte Geld zurueck, sonst liegt es für immer", async () => {
     const { a, db, id } = await abgelaufenerAuftrag();
     expect(a.saldo(), "vorher liegt das Geld fest").toBe(500_000 - 200 * MC_PER_CENT);
-    expect(abgelaufeneFreigeben(db)).toBe(1);
+    expect(releaseExpired(db)).toBe(1);
     expect(a.saldo()).toBe(500_000);
     expect((db.prepare("SELECT status FROM bounties WHERE id = ?").get(id) as { status: string }).status).toBe("expired");
   });
 
   it("unterscheidet abgelaufen von zurückgezogen, weil es zwei verschiedene Geschichten sind", async () => {
     const { db, id } = await abgelaufenerAuftrag();
-    abgelaufeneFreigeben(db);
+    releaseExpired(db);
     const zeile = db.prepare("SELECT kind, ref FROM ledger WHERE ref = ?").get(`bounty-expired:${id}`) as { kind: string };
     expect(zeile.kind).toBe("bounty_release");
   });
 
   it("zahlt beim zweiten Durchlauf nicht noch einmal aus", async () => {
     const { a, db } = await abgelaufenerAuftrag();
-    abgelaufeneFreigeben(db);
+    releaseExpired(db);
     const nachErstem = a.saldo();
-    expect(abgelaufeneFreigeben(db)).toBe(0);
+    expect(releaseExpired(db)).toBe(0);
     expect(a.saldo()).toBe(nachErstem);
   });
 
   it("lässt laufende Aufträge unberührt", async () => {
     const { a, db } = setup();
-    await a.einstellen(auftrag());
-    expect(abgelaufeneFreigeben(db)).toBe(0);
+    await a.einstellen(bounty());
+    expect(releaseExpired(db)).toBe(0);
     expect(a.saldo()).toBe(500_000 - 200 * MC_PER_CENT);
   });
 
@@ -224,7 +224,7 @@ describe("Verfall bei abgelaufener Frist", () => {
 
   it("hält Ledger und Salden auch nach dem Verfall deckungsgleich", async () => {
     const { db, ledgerSumme, saldenSumme } = await abgelaufenerAuftrag();
-    abgelaufeneFreigeben(db);
+    releaseExpired(db);
     expect(ledgerSumme()).toBe(saldenSumme());
     expect(saldenSumme()).toBe(1_000_000);
   });
@@ -251,11 +251,11 @@ describe("Der Verfall darf den Start nicht verhindern", () => {
   });
 });
 
-describe("Einreichen und vergeben: der Weg des Geldes zum Gewinner", () => {
+describe("Einreichen und awardBounty: der Weg des Geldes zum Gewinner", () => {
   /** Auftraggeber a, Bewerber b. */
   async function markt() {
     const s = setup();
-    const { id } = (await (await s.a.einstellen(auftrag())).json()) as { id: string };
+    const { id } = (await (await s.a.einstellen(bounty())).json()) as { id: string };
     return { ...s, id };
   }
 
@@ -265,7 +265,7 @@ describe("Einreichen und vergeben: der Weg des Geldes zum Gewinner", () => {
     expect(res.status).toBe(201);
     const { id: sid } = (await res.json()) as { id: string };
 
-    const vergabe = await a.vergeben({ bounty_id: id, submission_id: sid });
+    const vergabe = await a.awardBounty({ bounty_id: id, submission_id: sid });
     expect(vergabe.status).toBe(200);
     expect(((await vergabe.json()) as { status: string }).status).toBe("awarded");
     expect(b.saldo(), "der Gewinner bekommt den Preis").toBe(500_000 + 200 * MC_PER_CENT);
@@ -277,17 +277,17 @@ describe("Einreichen und vergeben: der Weg des Geldes zum Gewinner", () => {
   it("vergibt kein zweites Mal, sonst entstünde Geld aus dem Nichts", async () => {
     const { a, b, id } = await markt();
     const { id: sid } = (await (await b.einreichen2({ bounty_id: id, body: "x" })).json()) as { id: string };
-    await a.vergeben({ bounty_id: id, submission_id: sid });
+    await a.awardBounty({ bounty_id: id, submission_id: sid });
     const nachErster = b.saldo();
-    const zweite = await a.vergeben({ bounty_id: id, submission_id: sid });
+    const zweite = await a.awardBounty({ bounty_id: id, submission_id: sid });
     expect(zweite.status).toBe(409);
     expect(b.saldo()).toBe(nachErster);
   });
 
-  it("lässt nur den Auftraggeber vergeben", async () => {
+  it("lässt nur den Auftraggeber awardBounty", async () => {
     const { a, b, id } = await markt();
     const { id: sid } = (await (await b.einreichen2({ bounty_id: id, body: "x" })).json()) as { id: string };
-    const res = await b.vergeben({ bounty_id: id, submission_id: sid });
+    const res = await b.awardBounty({ bounty_id: id, submission_id: sid });
     expect(res.status).toBe(403);
     expect(b.saldo(), "niemand vergibt sich selbst fremdes Geld").toBe(500_000);
     void a;
@@ -318,9 +318,9 @@ describe("Einreichen und vergeben: der Weg des Geldes zum Gewinner", () => {
 
   it("weist eine Einreichung ab, die zu einem anderen Auftrag gehört", async () => {
     const { a, b, id } = await markt();
-    const { id: id2 } = (await (await a.einstellen(auftrag({ price_cents: 100 }))).json()) as { id: string };
+    const { id: id2 } = (await (await a.einstellen(bounty({ price_cents: 100 }))).json()) as { id: string };
     const { id: sid } = (await (await b.einreichen2({ bounty_id: id2, body: "gehört zu 2" })).json()) as { id: string };
-    const res = await a.vergeben({ bounty_id: id, submission_id: sid });
+    const res = await a.awardBounty({ bounty_id: id, submission_id: sid });
     expect(res.status).toBe(400);
     expect(((await res.json()) as { error: string }).error).toBe("submission_other_bounty");
   });
@@ -330,9 +330,9 @@ describe("Einreichen und vergeben: der Weg des Geldes zum Gewinner", () => {
     const c = konto(db, app, 500_000, 3);
     await b.einreichen2({ bounty_id: id, body: "von b" });
     await c.einreichen2({ bounty_id: id, body: "von c" });
-    const alsAuftraggeber = (await (await a.einreichungen(id)).json()) as { submissions: unknown[] };
+    const alsAuftraggeber = (await (await a.submissionsFor(id)).json()) as { submissions: unknown[] };
     expect(alsAuftraggeber.submissions, "er muss auswählen können").toHaveLength(2);
-    const alsBewerber = (await (await b.einreichungen(id)).json()) as { submissions: { body: string }[] };
+    const alsBewerber = (await (await b.submissionsFor(id)).json()) as { submissions: { body: string }[] };
     expect(alsBewerber.submissions, "sonst schreibt einer vom anderen ab").toHaveLength(1);
     expect(alsBewerber.submissions[0].body).toBe("von b");
   });
@@ -340,7 +340,7 @@ describe("Einreichen und vergeben: der Weg des Geldes zum Gewinner", () => {
   it("schreibt für die Vergabe eine Ledger-Zeile mit Bezug auf Auftrag und Einreichung", async () => {
     const { a, b, db, id } = await markt();
     const { id: sid } = (await (await b.einreichen2({ bounty_id: id, body: "x" })).json()) as { id: string };
-    await a.vergeben({ bounty_id: id, submission_id: sid });
+    await a.awardBounty({ bounty_id: id, submission_id: sid });
     const zeile = db.prepare("SELECT kind, delta_mc, address, meta FROM ledger WHERE ref = ?").get(`bounty-award:${id}`) as
       { kind: string; delta_mc: number; address: string; meta: string };
     expect(zeile.kind).toBe("bounty_award");
@@ -398,26 +398,26 @@ describe("Migration auf einen Bestand, der die Auftragstabelle schon hat", () =>
 describe("Die oeffentliche Auftragsliste", () => {
   it("zeigt offene Aufträge ohne Schlüssel, denn ein Markt, den nur Mitglieder sehen, ist keiner", async () => {
     const { app, a } = setup();
-    await a.einstellen(auftrag());
+    await a.einstellen(bounty());
     const res = await app.request("/bounties.json", { method: "GET" });
     expect(res.status).toBe(200);
     const body = (await res.json()) as { open: { brief: string; price_cents: number }[]; note: string };
     expect(body.open).toHaveLength(1);
     expect(body.open[0].price_cents).toBe(200);
-    expect(body.note, "wer hier liest, soll wissen, dass Briefings öffentlich sind").toMatch(/public/i);
+    expect(body.note, "who hier liest, soll wissen, dass Briefings öffentlich sind").toMatch(/public/i);
   });
 
   it("nennt keine Adressen, denn öffentlich ist der Auftrag und nicht der Auftraggeber", async () => {
     const { app, a } = setup();
-    await a.einstellen(auftrag());
+    await a.einstellen(bounty());
     const text = await (await app.request("/bounties.json", { method: "GET" })).text();
     expect(text).not.toContain(a.address);
   });
 
   it("zeigt zurückgezogene und abgelaufene Aufträge nicht", async () => {
     const { app, a, db } = setup();
-    const { id } = (await (await a.einstellen(auftrag())).json()) as { id: string };
-    const { id: id2 } = (await (await a.einstellen(auftrag({ price_cents: 100 }))).json()) as { id: string };
+    const { id } = (await (await a.einstellen(bounty())).json()) as { id: string };
+    const { id: id2 } = (await (await a.einstellen(bounty({ price_cents: 100 }))).json()) as { id: string };
     await a.zurueckziehen({ id });
     db.prepare("UPDATE bounties SET deadline = ? WHERE id = ?").run(new Date(Date.now() - 1000).toISOString(), id2);
     const body = (await (await app.request("/bounties.json", { method: "GET" })).json()) as { open: unknown[] };
@@ -426,7 +426,7 @@ describe("Die oeffentliche Auftragsliste", () => {
 
   it("gibt beim Abruf abgelaufenes Geld zurück, auch ohne dass jemand angemeldet ist", async () => {
     const { app, a, db } = setup();
-    const { id } = (await (await a.einstellen(auftrag())).json()) as { id: string };
+    const { id } = (await (await a.einstellen(bounty())).json()) as { id: string };
     db.prepare("UPDATE bounties SET deadline = ? WHERE id = ?").run(new Date(Date.now() - 1000).toISOString(), id);
     await app.request("/bounties.json", { method: "GET" });
     expect(a.saldo()).toBe(500_000);
@@ -464,57 +464,57 @@ function setupMitGebuehr(balanceMc = 500_000) {
 describe("Vermittlungsgebuehr", () => {
   it("zieht zehn Prozent vom Auszahlbetrag ab und schreibt sie dem Betreiber gut", async () => {
     const { a, b, betreiber } = setupMitGebuehr();
-    const { id } = (await (await a.einstellen(auftrag())).json()) as { id: string };
+    const { id } = (await (await a.einstellen(bounty())).json()) as { id: string };
     const { id: sid } = (await (await b.einreichen2({ bounty_id: id, body: "die Arbeit" })).json()) as { id: string };
-    await a.vergeben({ bounty_id: id, submission_id: sid });
+    await a.awardBounty({ bounty_id: id, submission_id: sid });
 
     const preisMc = 200 * MC_PER_CENT;
-    const gebuehr = gebuehrMc(preisMc);
-    expect(gebuehr).toBe(preisMc / 10);
-    expect(b.saldo(), "der Gewinner bekommt den Preis minus Gebuehr").toBe(500_000 + preisMc - gebuehr);
-    expect(betreiber(), "die Gebuehr landet beim Betreiber").toBe(gebuehr);
+    const fee = feeMc(preisMc);
+    expect(fee).toBe(preisMc / 10);
+    expect(b.saldo(), "der Gewinner bekommt den Preis minus Gebuehr").toBe(500_000 + preisMc - fee);
+    expect(betreiber(), "die Gebuehr landet beim Betreiber").toBe(fee);
   });
 
   it("laesst den Kaeufer genau den ausgeschriebenen Preis zahlen, nicht mehr", async () => {
     const { a, b } = setupMitGebuehr();
-    const { id } = (await (await a.einstellen(auftrag())).json()) as { id: string };
+    const { id } = (await (await a.einstellen(bounty())).json()) as { id: string };
     const { id: sid } = (await (await b.einreichen2({ bounty_id: id, body: "x" })).json()) as { id: string };
-    await a.vergeben({ bounty_id: id, submission_id: sid });
+    await a.awardBounty({ bounty_id: id, submission_id: sid });
     expect(a.saldo(), "er hat beim Einstellen 200 Cent bezahlt und sonst nichts").toBe(500_000 - 200 * MC_PER_CENT);
   });
 
   it("verliert und erschafft dabei keinen Millicent", async () => {
     const { a, b, ledgerSumme, saldenSumme } = setupMitGebuehr();
-    const { id } = (await (await a.einstellen(auftrag())).json()) as { id: string };
+    const { id } = (await (await a.einstellen(bounty())).json()) as { id: string };
     const { id: sid } = (await (await b.einreichen2({ bounty_id: id, body: "x" })).json()) as { id: string };
-    await a.vergeben({ bounty_id: id, submission_id: sid });
+    await a.awardBounty({ bounty_id: id, submission_id: sid });
     expect(ledgerSumme()).toBe(saldenSumme());
     expect(saldenSumme(), "nur die beiden Startguthaben sind im System").toBe(1_000_000);
   });
 
   it("rundet zugunsten des Gewinners, die Gebuehr liegt nie ueber zehn Prozent", () => {
     for (const preisMc of [1_000, 1_001, 1_009, 7_777, 123_456]) {
-      const g = gebuehrMc(preisMc);
-      expect(g * 100).toBeLessThanOrEqual(preisMc * GEBUEHR_PROZENT);
+      const g = feeMc(preisMc);
+      expect(g * 100).toBeLessThanOrEqual(preisMc * FEE_PERCENT);
       expect(g + (preisMc - g), "beide Zeilen ergeben zusammen den hinterlegten Betrag").toBe(preisMc);
     }
   });
 
   it("nennt den Auszahlbetrag schon in der oeffentlichen Liste, damit ein Agent nicht rechnen muss", async () => {
     const { app, a } = setupMitGebuehr();
-    await a.einstellen(auftrag());
+    await a.einstellen(bounty());
     const body = (await (await app.request("/bounties.json", { method: "GET" })).json()) as
       { open: { price_cents: number; award_cents: number; fee_percent: number }[] };
     expect(body.open[0].price_cents).toBe(200);
     expect(body.open[0].award_cents).toBe(180);
-    expect(body.open[0].fee_percent).toBe(GEBUEHR_PROZENT);
+    expect(body.open[0].fee_percent).toBe(FEE_PERCENT);
   });
 
   it("nimmt ohne konfigurierte Betreiberadresse keine Gebuehr, statt Geld einzubehalten, das niemandem gehoert", async () => {
     const { app, a, b } = setup();
-    const { id } = (await (await a.einstellen(auftrag())).json()) as { id: string };
+    const { id } = (await (await a.einstellen(bounty())).json()) as { id: string };
     const { id: sid } = (await (await b.einreichen2({ bounty_id: id, body: "x" })).json()) as { id: string };
-    await a.vergeben({ bounty_id: id, submission_id: sid });
+    await a.awardBounty({ bounty_id: id, submission_id: sid });
     expect(b.saldo()).toBe(500_000 + 200 * MC_PER_CENT);
     const liste = (await (await app.request("/bounties.json", { method: "GET" })).json()) as { open: unknown[] };
     expect(liste.open).toHaveLength(0);

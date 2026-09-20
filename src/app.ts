@@ -9,17 +9,17 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Hono } from "hono";
 import type { Db } from "./db.js";
-import { befundePruefen, nachrichten, type Auftragsart } from "./check/erfindung.js";
+import { verifyFindings, messages, type CheckMode } from "./check/erfindung.js";
 import {
-  auftragEinstellen,
-  auftragZurueckziehen,
-  offeneAuftraege,
-  abgelaufeneFreigeben,
-  einreichen,
-  einreichungen,
-  vergeben,
-  gebuehrMc,
-  GEBUEHR_PROZENT,
+  createBounty,
+  cancelBounty,
+  openBounties,
+  releaseExpired,
+  submitWork,
+  submissionsFor,
+  awardBounty,
+  feeMc,
+  FEE_PERCENT,
   BountyError,
   type Bounty,
 } from "./bounties/store.js";
@@ -146,7 +146,7 @@ export function createApp(opts: AppOptions) {
 
   app.onError((err, c) => {
     if (err instanceof AuthError) {
-      // `error` bleibt der Conway-Wortlaut, `message` sagt, was jetzt zu tun ist.
+      // `error` bleibt der Conway-Wortlaut, `message` sagt, was now zu tun ist.
       return c.json(
         { error: err.message, ...(err.hint ? { message: err.hint, docs: DOC.authentication } : {}) },
         err.status as 400 | 401,
@@ -173,7 +173,7 @@ export function createApp(opts: AppOptions) {
   // Empfaenger der Vermittlungsgebuehr ist die Adresse, an die auch die x402-Zahlungen gehen:
   // der Betreiber. Ein eigener Konfigwert waere eine zweite Stelle, an der dieselbe Tatsache
   // steht, und .env liegt ausserdem hinter der Pfadsperre aus loop-constraints.md.
-  const gebuehrAn = opts.pay?.payTo?.toLowerCase() ?? null;
+  const feeTo = opts.pay?.payTo?.toLowerCase() ?? null;
 
   const rateLimitOpts: RateLimitOptions = opts.rateLimit ?? { limit: 60, fensterMs: 60_000 };
   const limiter = opts.rateLimit === null ? null : new RateLimiter(rateLimitOpts);
@@ -355,7 +355,7 @@ export function createApp(opts: AppOptions) {
   /**
    * Die offenen Auftraege, ohne Schluessel.
    *
-   * Ein Markt, den nur sehen kann, wer schon eine Wallet und Guthaben hat, ist keiner. Conway
+   * Ein Markt, den nur sehen kann, who schon eine Wallet und Guthaben hat, ist keiner. Conway
    * hatte ueberhaupt kein oeffentliches Verzeichnis: /v1/registry, /v1/automatons und
    * /v1/leaderboard antworten dort bis heute mit 404, und deshalb wurde der Bugtracker zur Buehne,
    * auf der sich Agenten gegenseitig begruessten und Preislisten austauschten.
@@ -368,20 +368,20 @@ export function createApp(opts: AppOptions) {
    * jemand eines einstellt.
    */
   app.get("/bounties.json", (c) => {
-    abgelaufeneFreigeben(db);
+    releaseExpired(db);
     const limit = Math.min(Math.max(Number(c.req.query("limit") ?? 50) || 50, 1), 100);
     return c.json(
       {
         note: "Open bounties, visible without a key. Everything in a brief is public. " +
           "price_cents is what the buyer pays, award_cents is what the winning agent receives. " +
           "Competing needs an API key: see /llms.txt.",
-        open: offeneAuftraege(db, limit).map((b) => ({
+        open: openBounties(db, limit).map((b) => ({
           id: b.id,
           kind: b.kind,
           brief: b.brief,
           price_cents: mcToCents(b.price_mc),
-          award_cents: mcToCents(b.price_mc - (gebuehrAn ? gebuehrMc(b.price_mc) : 0)),
-          fee_percent: gebuehrAn ? GEBUEHR_PROZENT : 0,
+          award_cents: mcToCents(b.price_mc - (feeTo ? feeMc(b.price_mc) : 0)),
+          fee_percent: feeTo ? FEE_PERCENT : 0,
           deadline: b.deadline,
           created_at: b.created_at,
         })),
@@ -429,7 +429,7 @@ export function createApp(opts: AppOptions) {
       "bounty is cancelled, or when the deadline passes unawarded. Credits stay credits throughout.",
       "",
       "- /bounties.json: the open bounties, no key needed. Every brief is public. price_cents is",
-      "  what the buyer pays, award_cents is what the winner receives after the " + GEBUEHR_PROZENT + "% fee.",
+      "  what the buyer pays, award_cents is what the winner receives after the " + FEE_PERCENT + "% fee.",
       "- /v1/bounties: POST to post one, GET for the open ones.",
       "- /v1/bounties/cancel, /v1/bounties/award: take it back, or pay a winner.",
       "- /v1/submissions: POST to compete, GET to see your own. One attempt per agent per bounty,",
@@ -571,14 +571,14 @@ export function createApp(opts: AppOptions) {
    */
   app.get("/v1/credits/history", (c) => {
     const limit = Math.min(Math.max(Number(c.req.query("limit") ?? 50) || 50, 1), 200);
-    const zeilen = db
+    const rows = db
       .prepare(
         "SELECT kind, delta_mc, created_at, meta FROM ledger WHERE address = ? ORDER BY id DESC LIMIT ?",
       )
       .all(c.get("address"), limit) as { kind: string; delta_mc: number; created_at: string; meta: string | null }[];
     return c.json({
       balance_cents: getBalanceCents(db, c.get("address")),
-      entries: zeilen.map((z) => {
+      entries: rows.map((z) => {
         const meta = (() => {
           try {
             return z.meta ? (JSON.parse(z.meta) as Record<string, unknown>) : {};
@@ -642,7 +642,7 @@ export function createApp(opts: AppOptions) {
     const b = (typeof roh === "object" && roh !== null ? roh : {}) as Record<string, unknown>;
     const briefing = typeof b.briefing === "string" ? b.briefing.trim() : "";
     const submission = typeof b.submission === "string" ? b.submission.trim() : "";
-    const kind: Auftragsart = b.kind === "creative" ? "creative" : "factual";
+    const kind: CheckMode = b.kind === "creative" ? "creative" : "factual";
     if (!briefing || !submission) {
       return c.json(
         {
@@ -673,7 +673,7 @@ export function createApp(opts: AppOptions) {
     const modell = typeof b.model === "string" ? b.model : opts.catalog.modelIds()[0];
     const res = await handleChat(db, opts.catalog, c.get("address"), {
       model: modell,
-      messages: nachrichten(briefing, submission, kind),
+      messages: messages(briefing, submission, kind),
       response_format: { type: "json_object" },
     });
     if (res.status !== 200) return c.json(res.body as Record<string, unknown>, res.status as 400);
@@ -697,8 +697,8 @@ export function createApp(opts: AppOptions) {
         502,
       );
     }
-    const { befunde, verworfen } = befundePruefen(submission, geparst);
-    return c.json({ kind, findings: befunde, discarded: verworfen, model: antwort.model, usage: antwort.usage });
+    const { findings, discarded } = verifyFindings(submission, geparst);
+    return c.json({ kind, findings: findings, discarded: discarded, model: antwort.model, usage: antwort.usage });
   });
 
   // ─── Auftraege ────────────────────────────────────────────────
@@ -721,39 +721,39 @@ export function createApp(opts: AppOptions) {
   // Neustartschleife. Dieselbe Abwaegung wie beim ledger_topup_ref-Index in src/db.ts: laut warnen
   // und weiterlaufen. Der naechste Aufruf einer Auftragsroute holt den Durchlauf ohnehin nach.
   try {
-    const n = abgelaufeneFreigeben(db);
-    if (n > 0) console.log(`[bounties] ${n} abgelaufene Auftraege freigegeben`);
+    const n = releaseExpired(db);
+    if (n > 0) console.log(`[bounties] ${n} abgelaufene Auftraege released`);
   } catch (e) {
     console.error("[bounties] Freigabe abgelaufener Auftraege beim Start fehlgeschlagen:", (e as Error).message);
   }
 
-  const bountyAntwort = (b: Bounty) => ({
+  const bountyView = (b: Bounty) => ({
     id: b.id,
     kind: b.kind,
     brief: b.brief,
     price_cents: mcToCents(b.price_mc),
     // Was beim Gewinner ankommt. Steht neben dem Preis, damit ein Agent nicht selbst rechnen muss.
-    award_cents: mcToCents(b.price_mc - (gebuehrAn ? gebuehrMc(b.price_mc) : 0)),
-    fee_percent: gebuehrAn ? GEBUEHR_PROZENT : 0,
+    award_cents: mcToCents(b.price_mc - (feeTo ? feeMc(b.price_mc) : 0)),
+    fee_percent: feeTo ? FEE_PERCENT : 0,
     deadline: b.deadline,
     status: b.status,
     created_at: b.created_at,
   });
 
   app.post("/v1/bounties", async (c) => {
-    abgelaufeneFreigeben(db);
+    releaseExpired(db);
     const roh = await c.req.json().catch(() => null);
     const b = (typeof roh === "object" && roh !== null ? roh : {}) as Record<string, unknown>;
     const preisCents = typeof b.price_cents === "number" ? b.price_cents : NaN;
     try {
-      const auftrag = auftragEinstellen(db, {
+      const bounty = createBounty(db, {
         creator: c.get("address"),
         kind: b.kind === "creative" ? "creative" : "factual",
         brief: typeof b.brief === "string" ? b.brief : "",
         priceMc: Number.isInteger(preisCents) ? preisCents * MC_PER_CENT : NaN,
         deadline: typeof b.deadline === "string" ? b.deadline : "",
       });
-      return c.json(bountyAntwort(auftrag), 201);
+      return c.json(bountyView(bounty), 201);
     } catch (e) {
       if (e instanceof BountyError) {
         return c.json({ error: e.code, message: e.hint, docs: DOC.payments }, e.status as 400);
@@ -763,20 +763,20 @@ export function createApp(opts: AppOptions) {
   });
 
   app.get("/v1/bounties", (c) => {
-    abgelaufeneFreigeben(db);
+    releaseExpired(db);
     const limit = Number(c.req.query("limit") ?? 50) || 50;
-    return c.json({ bounties: offeneAuftraege(db, limit).map(bountyAntwort) });
+    return c.json({ bounties: openBounties(db, limit).map(bountyView) });
   });
 
   app.post("/v1/bounties/cancel", async (c) => {
-    abgelaufeneFreigeben(db);
+    releaseExpired(db);
     const roh = await c.req.json().catch(() => null);
     const id = (roh as { id?: unknown } | null)?.id;
     if (typeof id !== "string" || !id) {
       return c.json({ error: "id_required", message: 'Send {"id": "<bounty id>"}.', docs: DOC.payments }, 400);
     }
     try {
-      return c.json(bountyAntwort(auftragZurueckziehen(db, id, c.get("address"))));
+      return c.json(bountyView(cancelBounty(db, id, c.get("address"))));
     } catch (e) {
       if (e instanceof BountyError) {
         return c.json({ error: e.code, message: e.hint, docs: DOC.payments }, e.status as 400);
@@ -786,14 +786,14 @@ export function createApp(opts: AppOptions) {
   });
 
   app.post("/v1/submissions", async (c) => {
-    abgelaufeneFreigeben(db);
+    releaseExpired(db);
     const roh = await c.req.json().catch(() => null);
     const b = (typeof roh === "object" && roh !== null ? roh : {}) as Record<string, unknown>;
     if (typeof b.bounty_id !== "string" || !b.bounty_id) {
       return c.json({ error: "bounty_id_required", message: 'Send {"bounty_id": "...", "body": "..."}.', docs: DOC.payments }, 400);
     }
     try {
-      const s = einreichen(db, {
+      const s = submitWork(db, {
         bountyId: b.bounty_id,
         agent: c.get("address"),
         body: typeof b.body === "string" ? b.body : "",
@@ -806,11 +806,11 @@ export function createApp(opts: AppOptions) {
   });
 
   app.get("/v1/submissions", (c) => {
-    abgelaufeneFreigeben(db);
+    releaseExpired(db);
     const id = c.req.query("bounty_id");
     if (!id) return c.json({ error: "bounty_id_required", message: "Pass ?bounty_id=...", docs: DOC.payments }, 400);
     try {
-      const liste = einreichungen(db, id, c.get("address"));
+      const liste = submissionsFor(db, id, c.get("address"));
       return c.json({
         bounty_id: id,
         submissions: liste.map((s) => ({ id: s.id, agent: s.agent, body: s.body, created_at: s.created_at })),
@@ -822,7 +822,7 @@ export function createApp(opts: AppOptions) {
   });
 
   app.post("/v1/bounties/award", async (c) => {
-    abgelaufeneFreigeben(db);
+    releaseExpired(db);
     const roh = await c.req.json().catch(() => null);
     const b = (typeof roh === "object" && roh !== null ? roh : {}) as Record<string, unknown>;
     if (typeof b.bounty_id !== "string" || typeof b.submission_id !== "string" || !b.bounty_id || !b.submission_id) {
@@ -832,13 +832,13 @@ export function createApp(opts: AppOptions) {
       );
     }
     try {
-      const auftrag = vergeben(db, {
+      const bounty = awardBounty(db, {
         bountyId: b.bounty_id,
         submissionId: b.submission_id,
-        wer: c.get("address"),
-        gebuehrAn,
+        who: c.get("address"),
+        feeTo,
       });
-      return c.json({ ...bountyAntwort(auftrag), winner_submission: auftrag.winner_submission });
+      return c.json({ ...bountyView(bounty), winner_submission: bounty.winner_submission });
     } catch (e) {
       if (e instanceof BountyError) return c.json({ error: e.code, message: e.hint, docs: DOC.payments }, e.status as 400);
       throw e;
@@ -848,7 +848,7 @@ export function createApp(opts: AppOptions) {
   app.get("/v1/credits/pricing", (c) => c.json({ tiers: [], topup_tiers_usd: opts.pay?.tiers ?? TOPUP_TIERS_USD }));
 
   // Entscheidung in STATE.md: Credits sind in Phase 1 nicht übertragbar. Das ist keine Lücke im
-  // Bau, sondern Regulatorik, und genau das steht jetzt auch in der Antwort: Credits, die zwischen
+  // Bau, sondern Regulatorik, und genau das steht now auch in der Antwort: Credits, die zwischen
   // Wallets wandern können, sind ein Zahlungsdienst, und der Betreiber ist eine Person ohne
   // Lizenz. Die Runtime-Tools `transfer_credits` und `fund_child` reichen diesen Körper an den
   // Agenten durch (Upstream `src/agent/tools.ts:3401`), deshalb steht der gangbare Weg dabei.

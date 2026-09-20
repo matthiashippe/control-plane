@@ -6,7 +6,7 @@ import { Catalog } from "../src/inference/proxy.js";
 import { MOCK_MODEL } from "../src/inference/mock.js";
 import type { ChatProvider } from "../src/inference/provider.js";
 import { hashApiKey } from "../src/auth/siwe.js";
-import { befundePruefen, nachrichten, normalisieren } from "../src/check/erfindung.js";
+import { verifyFindings, messages, normalise } from "../src/check/erfindung.js";
 
 const EINREICHUNG =
   "Marina Promenade, Dubai Marina. Two bedrooms, 1,240 sqft on the 11th floor. " +
@@ -49,45 +49,45 @@ function setup(inhalt: string, balanceMc = 500_000) {
   return { db, app, check, balance };
 }
 
-const BEFUND = { zitat: "Viewings available on short notice.", art: "unbelegt", begruendung: "Steht nicht im Briefing." };
+const FINDING = { quote: "Viewings available on short notice.", kind: "unsupported", reason: "Steht nicht im Briefing." };
 
 describe("Zitatpruefung", () => {
   it("gleicht typografische Zeichen an, sonst faellt ein richtiger Befund durch", () => {
-    expect(normalisieren("AED 18‑per’sqft")).toBe("aed 18-per'sqft");
+    expect(normalise("AED 18‑per’sqft")).toBe("aed 18-per'sqft");
   });
 
   it("behaelt einen Befund, dessen Zitat woertlich in der Einreichung steht", () => {
-    const { befunde, verworfen } = befundePruefen(EINREICHUNG, { befunde: [BEFUND] });
-    expect(befunde).toHaveLength(1);
-    expect(verworfen).toBe(0);
+    const { findings, discarded } = verifyFindings(EINREICHUNG, { findings: [FINDING] });
+    expect(findings).toHaveLength(1);
+    expect(discarded).toBe(0);
   });
 
   it("verwirft einen erfundenen Fund, denn der beschuldigt einen ehrlichen Text", () => {
-    const erfunden = { ...BEFUND, zitat: "Free parking for all visitors." };
-    const { befunde, verworfen } = befundePruefen(EINREICHUNG, { befunde: [erfunden] });
-    expect(befunde).toHaveLength(0);
-    expect(verworfen).toBe(1);
+    const erfunden = { ...FINDING, quote: "Free parking for all visitors." };
+    const { findings, discarded } = verifyFindings(EINREICHUNG, { findings: [erfunden] });
+    expect(findings).toHaveLength(0);
+    expect(discarded).toBe(1);
   });
 
   it("findet ein Zitat auch mit anderen Anfuehrungs- und Bindestrichen wieder", () => {
-    const anders = { ...BEFUND, zitat: "Service charge is AED 18 per sqft per year" };
-    expect(befundePruefen(EINREICHUNG, { befunde: [anders] }).befunde).toHaveLength(1);
+    const anders = { ...FINDING, quote: "Service charge is AED 18 per sqft per year" };
+    expect(verifyFindings(EINREICHUNG, { findings: [anders] }).findings).toHaveLength(1);
   });
 
   it("verwirft Befunde ohne Zitat oder mit unbekannter Art", () => {
-    const roh = { befunde: [{ art: "unbelegt", begruendung: "x" }, { ...BEFUND, art: "geschmack" }] };
-    const { befunde, verworfen } = befundePruefen(EINREICHUNG, roh);
-    expect(befunde).toHaveLength(0);
-    expect(verworfen).toBe(2);
+    const roh = { findings: [{ kind: "unsupported", reason: "x" }, { ...FINDING, kind: "taste" }] };
+    const { findings, discarded } = verifyFindings(EINREICHUNG, roh);
+    expect(findings).toHaveLength(0);
+    expect(discarded).toBe(2);
   });
 
   it("vertraegt eine Antwort ohne Befundliste", () => {
-    expect(befundePruefen(EINREICHUNG, { irgendwas: 1 })).toEqual({ befunde: [], verworfen: 0 });
+    expect(verifyFindings(EINREICHUNG, { irgendwas: 1 })).toEqual({ findings: [], discarded: 0 });
   });
 
   it("schickt fuer faktisch und schoepferisch verschiedene Anweisungen", () => {
-    const f = nachrichten("b", "e", "factual")[0].content;
-    const s = nachrichten("b", "e", "creative")[0].content;
+    const f = messages("b", "e", "factual")[0].content;
+    const s = messages("b", "e", "creative")[0].content;
     expect(f).not.toBe(s);
     expect(s).toContain("would the client have a problem");
     expect(f).toContain("Do the multiplication yourself");
@@ -96,7 +96,7 @@ describe("Zitatpruefung", () => {
 
 describe("POST /v1/check", () => {
   it("liefert geprüfte Befunde und rechnet wie jede andere Inferenz ab", async () => {
-    const { check, balance } = setup(JSON.stringify({ befunde: [BEFUND] }));
+    const { check, balance } = setup(JSON.stringify({ findings: [FINDING] }));
     const vorher = balance();
     const res = await check({ briefing: "A listing brief.", submission: EINREICHUNG });
     expect(res.status).toBe(200);
@@ -107,9 +107,9 @@ describe("POST /v1/check", () => {
     expect(balance(), "der Aufruf wird abgerechnet").toBeLessThan(vorher);
   });
 
-  it("gibt einen erfundenen Fund nicht heraus, sondern zaehlt ihn als verworfen", async () => {
-    const erfunden = { ...BEFUND, zitat: "Includes a private beach." };
-    const { check } = setup(JSON.stringify({ befunde: [erfunden] }));
+  it("gibt einen erfundenen Fund nicht heraus, sondern zaehlt ihn als discarded", async () => {
+    const erfunden = { ...FINDING, quote: "Includes a private beach." };
+    const { check } = setup(JSON.stringify({ findings: [erfunden] }));
     const res = await check({ briefing: "A listing brief.", submission: EINREICHUNG });
     const body = (await res.json()) as { findings: unknown[]; discarded: number };
     expect(body.findings).toHaveLength(0);
@@ -117,20 +117,20 @@ describe("POST /v1/check", () => {
   });
 
   it("nimmt kind=creative an", async () => {
-    const { check } = setup(JSON.stringify({ befunde: [] }));
+    const { check } = setup(JSON.stringify({ findings: [] }));
     const res = await check({ briefing: "b", submission: "e", kind: "creative" });
     expect(((await res.json()) as { kind: string }).kind).toBe("creative");
   });
 
   it("verlangt briefing und submission", async () => {
-    const { check } = setup(JSON.stringify({ befunde: [] }));
+    const { check } = setup(JSON.stringify({ findings: [] }));
     const res = await check({ submission: "nur das" });
     expect(res.status).toBe(400);
     expect(((await res.json()) as { error: string }).error).toBe("invalid_request");
   });
 
   it("deckelt die Laenge, sonst kauft ein Aufruf ein Kontextfenster ein", async () => {
-    const { check, balance } = setup(JSON.stringify({ befunde: [] }));
+    const { check, balance } = setup(JSON.stringify({ findings: [] }));
     const vorher = balance();
     const res = await check({ briefing: "b", submission: "x".repeat(20_001) });
     expect(res.status).toBe(400);
@@ -146,7 +146,7 @@ describe("POST /v1/check", () => {
   });
 
   it("braucht einen API-Key", async () => {
-    const { check } = setup(JSON.stringify({ befunde: [] }));
+    const { check } = setup(JSON.stringify({ findings: [] }));
     const res = await check({ briefing: "b", submission: "e" }, false);
     expect(res.status).toBe(401);
   });
