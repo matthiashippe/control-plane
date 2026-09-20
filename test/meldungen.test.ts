@@ -628,3 +628,47 @@ describe("Falsche HTTP-Methode", () => {
     expect((await app.request("/v1/credits/balance", { method: "DELETE" })).status).toBe(401);
   });
 });
+
+/**
+ * Beobachtet am 20.09.2026 um 09:26 UTC, vier Minuten nach drei Issue-Kommentaren: Ein Aufrufer
+ * aus Helsinki (python-httpx) holte `/v1/status/v1/models` und `/v1/auth/verify/v1/models`. Beide
+ * Male kam 401 "Invalid API key" zurueck, weil die Auth-Middleware vor dem Routing greift. Der
+ * Mann sucht dann an seinem Schluessel, waehrend seine Basis-URL das Problem ist.
+ */
+describe("Ein Pfad, den es nicht gibt, ist kein Schluesselproblem", () => {
+  it("antwortet auf einen verketteten Pfad mit 404 statt 401", async () => {
+    const db = openDb(":memory:");
+    const app = createApp({ db });
+    const res = await app.request("/v1/status/v1/models");
+    expect(res.status, "401 schickt den Aufrufer an die falsche Stelle").toBe(404);
+  });
+
+  it("nennt beim doppelten /v1/ die Ursache: eine Basis-URL mit Pfad", async () => {
+    const db = openDb(":memory:");
+    const app = createApp({ db });
+    const body = (await (await app.request("/v1/auth/verify/v1/models")).json()) as {
+      error: string;
+      message: string;
+      docs: string;
+    };
+    expect(body.error).toBe("not_found");
+    expect(body.message).toMatch(/\/v1\/ twice/);
+    expect(body.message, "der naechste Schritt muss dastehen").toMatch(/conwayApiUrl/);
+    expect(body.docs).toBeTruthy();
+  });
+
+  it("laesst einen unbekannten Pfad ohne Doppelung bei der allgemeinen Antwort", async () => {
+    const db = openDb(":memory:");
+    const app = createApp({ db });
+    const body = (await (await app.request("/v1/gibtsnicht")).json()) as { message: string };
+    expect(body.message).toMatch(/No such endpoint here/);
+    expect(body.message).not.toMatch(/twice/);
+  });
+
+  it("schuetzt die echten Routen weiterhin: /v1/models ohne Schluessel bleibt 401", async () => {
+    const db = openDb(":memory:");
+    const app = createApp({ db });
+    const res = await app.request("/v1/models");
+    expect(res.status, "sonst waere die Auth-Pruefung loechrig").toBe(401);
+  });
+});

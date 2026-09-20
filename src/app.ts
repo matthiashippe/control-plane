@@ -90,6 +90,25 @@ const INFERENCE_UNAVAILABLE = {
  * Zahlers deckt `resource` nicht ab. Ein Betreiber, der das nicht mag, setzt CP_PUBLIC_URL; die
  * Umgebung schlaegt den Header.
  */
+/**
+ * Die Pfade unter /v1, die es wirklich gibt. Die Auth-Middleware laesst alles andere durch, damit
+ * ein Tippfehler oder eine falsch zusammengesetzte Basis-URL als 404 zurueckkommt statt als 401.
+ */
+const V1_ROUTEN = new Set([
+  "/v1/auth/api-keys",
+  "/v1/auth/nonce",
+  "/v1/auth/verify",
+  "/v1/automatons/register",
+  "/v1/chat/completions",
+  "/v1/credits/balance",
+  "/v1/credits/pricing",
+  "/v1/credits/transfer",
+  "/v1/credits/transfers",
+  "/v1/models",
+  "/v1/sandboxes",
+  "/v1/status",
+]);
+
 function requestOrigin(c: { req: { header: (name: string) => string | undefined; url: string } }): string | undefined {
   const host = c.req.header("host");
   if (!host || !/^[a-z0-9.-]+(:\d{1,5})?$/i.test(host)) return undefined;
@@ -407,6 +426,10 @@ export function createApp(opts: AppOptions) {
   });
 
   app.use("/v1/*", async (c, next) => {
+    // Ein Pfad, den es nicht gibt, ist kein Schluesselproblem. Ohne diese Zeile beantwortet die
+    // Middleware auch /v1/status/v1/models mit 401 "Invalid API key", und der Aufrufer sucht
+    // stundenlang an seinem Schluessel statt an seiner URL. Beobachtet am 20.09.2026 um 09:26 UTC.
+    if (!V1_ROUTEN.has(c.req.path)) return next();
     const address = resolveApiKey(db, c.req.header("authorization"));
     if (!address) {
       throw new AuthError(
@@ -500,19 +523,26 @@ export function createApp(opts: AppOptions) {
     ),
   );
 
-  app.notFound((c) =>
-    c.json(
+  app.notFound((c) => {
+    // Eine doppelte /v1-Stufe heisst fast immer: Jemand hat eine Basis-URL, die schon einen Pfad
+    // enthaelt, mit einem Endpunkt verkettet. Der Hinweis spart ihm die Suche am falschen Ende.
+    const doppelt = (c.req.path.match(/\/v1\//g) ?? []).length > 1;
+    return c.json(
       {
         error: "not_found",
-        message:
-          "No such endpoint here. This control plane implements the part of the Conway API that " +
-          "the automaton runtime actually calls: auth, credits, topup, registration, models and " +
-          "chat completions. The full list is at GET /.well-known/x402.",
+        message: doppelt
+          ? "No such endpoint, and this path carries /v1/ twice, which usually means a base URL " +
+            "that already contains a path was joined with an endpoint. The base URL of this " +
+            "control plane is the bare origin, with no path: set conwayApiUrl to " +
+            "https://cp.hippe.eu and let the runtime append /v1/... itself."
+          : "No such endpoint here. This control plane implements the part of the Conway API that " +
+            "the automaton runtime actually calls: auth, credits, topup, registration, models and " +
+            "chat completions. The full list is at GET /.well-known/x402.",
         docs: DOC.service,
       },
       404,
-    ),
-  );
+    );
+  });
 
   return app;
 }
