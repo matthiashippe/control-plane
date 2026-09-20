@@ -1,35 +1,39 @@
 #!/usr/bin/env python3
-"""Welche Behauptung im Ergebnis steht nicht im Briefing?
+"""Which claim in a result is not in the briefing?
 
-Der Auftragsmarkt lebt davon, dass ein Auftraggeber die Arbeit bewerten kann, ohne Fachmann zu
-sein. Geschmack kann er nicht bewerten, erfundene Tatsachen schon, und die sind in den Maerkten,
-auf die wir zielen, das eigentliche Risiko: Im Testlauf vom 20.09. hat `opti-7734` in ein
-Dubai-Expose "Viewings available on short notice" geschrieben, eine Zusage, die im Briefing nicht
-steht und fuer die am Ende jemand haftet.
+The bounty market depends on a buyer being able to judge the work without being an expert. They
+cannot judge taste, but they can judge invented facts, and in the markets we aim at those are the
+real risk: in the test run of 20.09. `opti-7734` wrote "Viewings available on short notice" into a
+Dubai listing, a promise the briefing does not contain and for which somebody is liable in the end.
 
-Das Skript nimmt die Ergebnisse aus ops/auftragstest.py und laesst jede Einreichung gegen ihr
-eigenes Briefing pruefen. Drei Befundarten werden unterschieden, weil sie verschieden schwer
-wiegen: `rechenfehler` leitet aus dem Briefing eine Zahl ab und rechnet falsch, `widerspruch` sagt
-etwas anderes als das Briefing, `unbelegt` sagt etwas, das dort weder steht noch folgt.
+The script takes the results from ops/auftragstest.py and has every submission checked against its
+own briefing. Three kinds of finding are told apart because they weigh differently:
+`rechenfehler` derives a number from the briefing and gets it wrong, `widerspruch` says something
+other than the briefing, `unbelegt` says something that is neither in it nor follows from it.
 
-Was korrekt aus dem Briefing hergeleitet ist, ist ausdruecklich KEIN Befund. Der erste Lauf am
-20.09. hat genau das falsch gemacht: Er meldete die richtige Rechnung AED 18 mal 1.240 sqft gleich
-22.320 AED als Erfindung und haette damit das Beste bestraft, was die Agenten getan haben, naemlich
-die Zahl auszurechnen, nach der das Briefing ausdruecklich verlangt.
+What is correctly derived from the briefing is explicitly NOT a finding. The first run on 20.09.
+got exactly that wrong: it reported the correct calculation AED 18 times 1,240 sqft equals AED
+22,320 as an invention and would thereby have punished the best thing the agents did, namely
+working out the number the briefing explicitly asks for.
 
-**Der Pruefer wird selbst geprueft.** Ein Modell, das Erfindungen sucht, erfindet Funde: Es zitiert
-Saetze, die in der Einreichung gar nicht vorkommen. Deshalb muss jeder Befund ein woertliches
-Zitat mitbringen, und jedes Zitat wird programmatisch in der Einreichung wiedergefunden, bevor der
-Befund zaehlt. Was sich nicht wiederfinden laesst, faellt raus und wird als `verworfen` gezaehlt.
-Diese Quote ist die Guete des Pruefers und gehoert in jeden Bericht.
+**The checker is itself checked.** A model that looks for fabrications fabricates findings: it
+quotes sentences that do not appear in the submission at all. So every finding has to bring a
+verbatim quote, and every quote is found again in the submission programmatically before the
+finding counts. What cannot be found again drops out and is counted as `verworfen`. That rate is
+the quality of the checker and belongs in every report.
 
-  OPENROUTER_API_KEY=... ops/erfindungspruefung.py --ergebnisse <pfad/ergebnisse.json>
+The JSON keys of the prompt and of the report (befunde, zitat, art, begruendung and the three
+kinds rechenfehler, widerspruch, unbelegt) stay German on purpose: the same names are in the
+published data set docs/research/data/2026-09-20-auftragstest.json, which is linked from the
+landing page under CC0, and they can only be renamed together with it.
+
+  OPENROUTER_API_KEY=... ops/erfindungspruefung.py --ergebnisse <path/ergebnisse.json>
 """
 import argparse, json, os, pathlib, re, sys, unicodedata, urllib.error, urllib.request
 
 API = "https://openrouter.ai/api/v1/chat/completions"
 
-ANWEISUNG = """You check a submitted piece of work against the briefing it was written for.
+INSTRUCTION_FACTUAL = """You check a submitted piece of work against the briefing it was written for.
 
 Your job is to find claims the briefing does not support. Be precise about what that means, because
 the most valuable work a writer does is to DERIVE facts the briefing only implies.
@@ -59,11 +63,11 @@ Rules you must follow exactly:
 Answer with JSON only, no prose, in this shape:
 {"befunde": [{"zitat": "...", "art": "rechenfehler"|"widerspruch"|"unbelegt", "begruendung": "one short sentence"}]}"""
 
-# Fuer schoepferische Auftraege. Der Lauf vom 20.09. hat gezeigt, warum es die zweite Fassung
-# braucht: Auf Werbetext meldete die strenge Pruefung 23 Befunde auf 9 Einreichungen, also praktisch
-# jeden Satz. Werbetext erfindet immer, weil ein Briefing von hundert Woertern einen Text von
-# hundert Woertern nicht decken kann. Gemeldet wird deshalb nur, was den Auftraggeber bindet.
-ANWEISUNG_SCHOEPFERISCH = """You check a submitted piece of creative copy against the briefing it
+# For creative bounties. The run of 20.09. showed why the second version is needed: on marketing
+# copy the strict check reported 23 findings across 9 submissions, so practically every sentence.
+# Marketing copy always invents, because a briefing of a hundred words cannot cover a text of a
+# hundred words. So only what binds the buyer is reported.
+INSTRUCTION_CREATIVE = """You check a submitted piece of creative copy against the briefing it
 was written for.
 
 Creative copy necessarily adds. A hundred-word briefing cannot cover a hundred-word text, so the
@@ -97,15 +101,15 @@ Rules you must follow exactly:
 Answer with JSON only, no prose, in this shape:
 {"befunde": [{"zitat": "...", "art": "rechenfehler"|"widerspruch"|"unbelegt", "begruendung": "one short sentence"}]}"""
 
-ANWEISUNGEN = {"faktisch": ANWEISUNG, "schoepferisch": ANWEISUNG_SCHOEPFERISCH}
+INSTRUCTIONS = {"faktisch": INSTRUCTION_FACTUAL, "schoepferisch": INSTRUCTION_CREATIVE}
 
 
-def normalisieren(s: str) -> str:
-    """Zitatvergleich ohne die Unterschiede, die kein Mensch als Unterschied liest.
+def normalise(s: str) -> str:
+    """Quote comparison without the differences no human reads as a difference.
 
-    Die Modelle liefern typografische Zeichen (geschuetzter Bindestrich U+2011, Apostroph U+2019,
-    Geviertstrich), und der Pruefer normalisiert sie beim Zitieren oft still zu ASCII. Ohne diese
-    Angleichung faellt ein korrekter Befund als "nicht auffindbar" durch.
+    The models deliver typographic characters (non-breaking hyphen U+2011, apostrophe U+2019, em
+    dash), and when quoting, the checker often silently normalises them to ASCII. Without this
+    alignment a correct finding falls through as "not findable".
     """
     s = unicodedata.normalize("NFKC", s)
     for a, b in [("‑", "-"), ("‐", "-"), ("–", "-"), ("—", "-"),
@@ -115,78 +119,78 @@ def normalisieren(s: str) -> str:
     return re.sub(r"\s+", " ", s).strip().lower()
 
 
-def frage(modell: str, briefing: str, einreichung: str, key: str, art: str = "faktisch") -> dict:
-    rumpf = json.dumps({
-        "model": modell,
+def ask(model: str, briefing: str, submission: str, key: str, mode: str = "faktisch") -> dict:
+    body = json.dumps({
+        "model": model,
         "messages": [
-            {"role": "system", "content": ANWEISUNGEN[art]},
-            {"role": "user", "content": f"BRIEFING:\n{briefing}\n\n---\n\nSUBMISSION:\n{einreichung}"},
+            {"role": "system", "content": INSTRUCTIONS[mode]},
+            {"role": "user", "content": f"BRIEFING:\n{briefing}\n\n---\n\nSUBMISSION:\n{submission}"},
         ],
         "response_format": {"type": "json_object"},
     }).encode()
-    req = urllib.request.Request(API, data=rumpf, headers={
+    req = urllib.request.Request(API, data=body, headers={
         "Authorization": f"Bearer {key}", "Content-Type": "application/json"})
     with urllib.request.urlopen(req, timeout=180) as r:
-        antwort = json.loads(r.read())
-    return json.loads(antwort["choices"][0]["message"]["content"] or "{}")
+        answer = json.loads(r.read())
+    return json.loads(answer["choices"][0]["message"]["content"] or "{}")
 
 
 def main() -> int:
     p = argparse.ArgumentParser()
-    p.add_argument("--ergebnisse", required=True, help="ergebnisse.json aus ops/auftragstest.py")
+    p.add_argument("--ergebnisse", required=True, help="ergebnisse.json from ops/auftragstest.py")
     p.add_argument("--modell", default="openai/gpt-5.2")
-    p.add_argument("--art", choices=sorted(ANWEISUNGEN), default="faktisch",
-                   help="faktisch: jede ungedeckte Behauptung. schoepferisch: nur was den "
-                        "Auftraggeber bindet.")
+    p.add_argument("--art", choices=sorted(INSTRUCTIONS), default="faktisch",
+                   help="faktisch: every unsupported claim. schoepferisch: only what binds the "
+                        "buyer.")
     a = p.parse_args()
 
     key = os.environ.get("OPENROUTER_API_KEY")
     if not key:
-        print("OPENROUTER_API_KEY fehlt", file=sys.stderr)
+        print("OPENROUTER_API_KEY is missing", file=sys.stderr)
         return 2
 
-    pfad = pathlib.Path(a.ergebnisse)
-    daten = json.loads(pfad.read_text(encoding="utf-8"))
-    briefing = daten["auftrag"]
+    path = pathlib.Path(a.ergebnisse)
+    data = json.loads(path.read_text(encoding="utf-8"))
+    briefing = data["auftrag"]
 
-    gesamt = verworfen = 0
-    bericht = []
-    for e in daten["ergebnisse"]:
+    total = discarded = 0
+    report = []
+    for e in data["ergebnisse"]:
         text = e["text"]
-        text_norm = normalisieren(text)
+        text_norm = normalise(text)
         try:
-            roh = frage(a.modell, briefing, text, key, a.art)
+            raw = ask(a.modell, briefing, text, key, a.art)
         except urllib.error.HTTPError as ex:
-            print(f"── {e['name']}: FEHLER {ex.code}", file=sys.stderr)
+            print(f"-- {e['name']}: ERROR {ex.code}", file=sys.stderr)
             continue
 
-        echte, falsche = [], []
-        for b in roh.get("befunde", []) or []:
-            zitat = (b.get("zitat") or "").strip()
-            if zitat and normalisieren(zitat) in text_norm:
-                echte.append(b)
+        kept, dropped = [], []
+        for b in raw.get("befunde", []) or []:
+            quote = (b.get("zitat") or "").strip()
+            if quote and normalise(quote) in text_norm:
+                kept.append(b)
             else:
-                falsche.append(b)
-        gesamt += len(echte) + len(falsche)
-        verworfen += len(falsche)
+                dropped.append(b)
+        total += len(kept) + len(dropped)
+        discarded += len(dropped)
 
-        print(f"── {e['name']}: {len(echte)} Befund(e)"
-              + (f", {len(falsche)} verworfen (Zitat nicht auffindbar)" if falsche else ""))
-        for b in echte:
+        print(f"-- {e['name']}: {len(kept)} finding(s)"
+              + (f", {len(dropped)} discarded (quote not findable)" if dropped else ""))
+        for b in kept:
             print(f"   [{b.get('art','?')}] \"{b['zitat']}\"")
             print(f"       {b.get('begruendung','')}")
-        for b in falsche:
-            print(f"   VERWORFEN: {b.get('zitat','')[:70]!r}")
+        for b in dropped:
+            print(f"   DISCARDED: {b.get('zitat','')[:70]!r}")
         print()
-        bericht.append({"name": e["name"], "befunde": echte, "verworfen": falsche})
+        report.append({"name": e["name"], "befunde": kept, "verworfen": dropped})
 
-    if gesamt:
-        print(f"Pruefergüte: {gesamt - verworfen} von {gesamt} Befunden belegt "
-              f"({100*(gesamt-verworfen)//gesamt} %), {verworfen} verworfen.")
-    ziel = pfad.parent / f"erfindungspruefung-{a.art}.json"
-    ziel.write_text(json.dumps({"modell": a.modell, "art": a.art, "bericht": bericht},
-                               ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"Geschrieben nach {ziel}")
+    if total:
+        print(f"Checker quality: {total - discarded} of {total} findings backed by a quote "
+              f"({100*(total-discarded)//total} %), {discarded} discarded.")
+    target = path.parent / f"erfindungspruefung-{a.art}.json"
+    target.write_text(json.dumps({"modell": a.modell, "art": a.art, "bericht": report},
+                                 ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"Written to {target}")
     return 0
 
 
