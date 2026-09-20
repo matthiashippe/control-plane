@@ -1,422 +1,421 @@
 #!/usr/bin/env bash
-# Rauchtest nach einem Deploy: prüft von außen, ob der Dienst tut, was er soll.
+# Smoke test after a deploy: checks from the outside whether the service does what it should.
 #
-#   ops/smoke.sh [BASIS_URL] [--ohne-proxy] [--mit-ratelimit]
+#   ops/smoke.sh [BASE_URL] [--no-proxy] [--with-ratelimit]
 #
-# Ohne Argument läuft er gegen https://cp.hippe.eu. Jede Prüfung gibt eine Zeile aus, am Ende
-# steht eine Zusammenfassung; sobald eine Prüfung fehlschlägt, endet das Skript mit 1.
+# Without an argument it runs against https://cp.hippe.eu. Every check prints one line, a summary
+# follows at the end; as soon as one check fails the script exits with 1.
 #
-# Warum es das gibt: Am 19.09.2026 wurde diese Liste nach jedem Deploy von Hand zusammengetippt
-# und dabei zweimal etwas übersehen. Die Prüfungen sind keine Theorie, jede steht für einen
-# Fehler, der an dem Tag real im Betrieb war: Die Sicherheits-Header fehlten komplett, das
-# Body-Limit fehlte (3 MB Müll an /v1/auth/nonce wurden mit 200 beantwortet), und der CSP-Hash
-# hängt am Inline-Skript der Startseite, das heißt jede Änderung an der Seite kann die Live-Zahlen
-# still abschalten.
+# Why this exists: on 19.09.2026 this list was typed out by hand after every deploy, and twice
+# something was missed doing so. The checks are not theory, each one stands for a bug that was
+# really in production that day: the security headers were missing entirely, the body limit was
+# missing (3 MB of junk to /v1/auth/nonce were answered with a 200), and the CSP hash hangs on the
+# inline script of the landing page, which means every change to the page can silently switch off
+# the live numbers.
 #
-# Das Skript schreibt nichts, startet nichts und braucht keinen API-Key.
+# The script writes nothing, starts nothing and needs no API key.
 #
-# RATE LIMIT: `/v1/auth/*` und `/pay/` sind auf 60 Anfragen je Minute und Client begrenzt
-# (src/ratelimit.ts). Ein Standardlauf stellt genau EINE Anfrage auf einen begrenzten Pfad (den
-# Body-Limit-Test an /v1/auth/verify) und kann das Limit damit nicht auslösen. Der Lauf zählt
-# mit und nennt die Zahl in der Zusammenfassung. Die Grenze selbst wird nur mit
-# `--mit-ratelimit` geprüft, weil dieser Test den ausführenden Rechner für den Rest der Minute
-# aussperrt; nach einem Deploy ist das nicht erwünscht.
+# RATE LIMIT: `/v1/auth/*` and `/pay/` are capped at 60 requests per minute and client
+# (src/ratelimit.ts). A standard run makes exactly ONE request against a capped path (the body
+# limit test at /v1/auth/verify) and therefore cannot trip the limit. The run counts along and
+# names the number in the summary. The limit itself is only checked with `--with-ratelimit`,
+# because that test locks the executing machine out for the rest of the minute; after a deploy
+# that is not what anybody wants.
 set -uo pipefail
 
-BASIS="https://cp.hippe.eu"
-OHNE_PROXY=0
-MIT_RATELIMIT=0
+BASE="https://cp.hippe.eu"
+NO_PROXY=0
+WITH_RATELIMIT=0
 
 while (($#)); do
   case "$1" in
-    --ohne-proxy) OHNE_PROXY=1 ;;
-    --mit-ratelimit) MIT_RATELIMIT=1 ;;
+    --no-proxy) NO_PROXY=1 ;;
+    --with-ratelimit) WITH_RATELIMIT=1 ;;
     -h | --help)
-      sed -n '2,26p' "$0" | sed 's/^# \{0,1\}//'
+      sed -n '2,23p' "$0" | sed 's/^# \{0,1\}//'
       exit 0
       ;;
     -*)
-      echo "Unbekannter Schalter: $1" >&2
+      echo "unknown switch: $1" >&2
       exit 2
       ;;
-    *) BASIS="${1%/}" ;;
+    *) BASE="${1%/}" ;;
   esac
   shift
 done
 
-command -v python3 >/dev/null || { echo "python3 fehlt, wird für die JSON-Prüfungen gebraucht" >&2; exit 2; }
-command -v openssl >/dev/null || { echo "openssl fehlt, wird für den CSP-Hash gebraucht" >&2; exit 2; }
+command -v python3 >/dev/null || { echo "python3 is missing, it is needed for the JSON checks" >&2; exit 2; }
+command -v openssl >/dev/null || { echo "openssl is missing, it is needed for the CSP hash" >&2; exit 2; }
 
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
-GEPRUEFT=0
-FEHLER=0
-UEBERSPRUNGEN=0
-# Anfragen auf die Pfade, die der Rate Limiter zählt. Siehe Kopf der Datei.
-BEGRENZTE_ANFRAGEN=0
+CHECKED=0
+FAILURES=0
+SKIPPED=0
+# Requests against the paths the rate limiter counts. See the header of this file.
+CAPPED_REQUESTS=0
 
 if [[ -t 1 ]]; then
-  F_OK=$'\033[32m'; F_ROT=$'\033[31m'; F_GRAU=$'\033[90m'; F_AUS=$'\033[0m'
+  C_OK=$'\033[32m'; C_RED=$'\033[31m'; C_GREY=$'\033[90m'; C_OFF=$'\033[0m'
 else
-  F_OK=""; F_ROT=""; F_GRAU=""; F_AUS=""
+  C_OK=""; C_RED=""; C_GREY=""; C_OFF=""
 fi
 
 ok() {
-  GEPRUEFT=$((GEPRUEFT + 1))
-  printf '%sOK%s      %s\n' "$F_OK" "$F_AUS" "$1"
+  CHECKED=$((CHECKED + 1))
+  printf '%sOK%s      %s\n' "$C_OK" "$C_OFF" "$1"
 }
 
-fehler() {
-  GEPRUEFT=$((GEPRUEFT + 1))
-  FEHLER=$((FEHLER + 1))
-  printf '%sFEHLER%s  %s\n' "$F_ROT" "$F_AUS" "$1"
+fail() {
+  CHECKED=$((CHECKED + 1))
+  FAILURES=$((FAILURES + 1))
+  printf '%sFAIL%s    %s\n' "$C_RED" "$C_OFF" "$1"
 }
 
-uebersprungen() {
-  UEBERSPRUNGEN=$((UEBERSPRUNGEN + 1))
-  printf '%sÜBERSPRUNGEN%s  %s%s%s\n' "$F_GRAU" "$F_AUS" "$F_GRAU" "$1" "$F_AUS"
+skipped() {
+  SKIPPED=$((SKIPPED + 1))
+  printf '%sSKIPPED%s %s%s%s\n' "$C_GREY" "$C_OFF" "$C_GREY" "$1" "$C_OFF"
 }
 
-# Ein GET; legt Body unter $TMP/<name>.body und Header unter $TMP/<name>.head ab und gibt den
-# Statuscode aus. 000 heißt: keine Antwort (DNS, TLS, Verbindung).
-hole() {
-  local name="$1" pfad="$2"
+# One GET; puts the body under $TMP/<name>.body and the headers under $TMP/<name>.head and prints
+# the status code. 000 means: no answer at all (DNS, TLS, connection).
+fetch() {
+  local name="$1" path="$2"
   shift 2
-  local ausgabe
-  # curl schreibt bei einem Verbindungsfehler selbst "000" und beendet mit einem Fehlercode;
-  # deshalb wird der Code nicht angehängt, sondern nur ein leeres Ergebnis ersetzt.
-  ausgabe=$(curl -sS --max-time 20 -o "$TMP/$name.body" -D "$TMP/$name.head" -w '%{http_code}' \
-    "$@" "$BASIS$pfad" 2>"$TMP/$name.err")
-  echo "${ausgabe:-000}"
+  local output
+  # On a connection error curl prints "000" itself and exits with an error code; that is why the
+  # code is not appended here, only an empty result is substituted.
+  output=$(curl -sS --max-time 20 -o "$TMP/$name.body" -D "$TMP/$name.head" -w '%{http_code}' \
+    "$@" "$BASE$path" 2>"$TMP/$name.err")
+  echo "${output:-000}"
 }
 
-# Kopfzeile aus einer gespeicherten Antwort, Name ohne Doppelpunkt, Vergleich ohne Groß/Klein.
-kopf() {
+# A header line from a stored answer, name without the colon, compared case-insensitively.
+header() {
   grep -i "^$2:" "$TMP/$1.head" | tail -1 | cut -d: -f2- | tr -d '\r' | sed 's/^ *//'
 }
 
-# Wert aus einer JSON-Antwort. Pfad mit Punkten, Listen über den Index: "accepts.0.scheme".
-# Exit 1 = Feld fehlt, Exit 2 = die Antwort ist gar kein JSON.
-jsonwert() {
+# A value from a JSON answer. Path with dots, lists by index: "accepts.0.scheme".
+# Exit 1 = field missing, exit 2 = the answer is not JSON at all.
+json_value() {
   python3 - "$TMP/$1.body" "$2" <<'PY'
 import json, sys
 try:
-    daten = json.load(open(sys.argv[1], encoding="utf-8"))
+    data = json.load(open(sys.argv[1], encoding="utf-8"))
 except Exception as e:
-    print(f"kein gueltiges JSON: {e}", file=sys.stderr)
+    print(f"not valid JSON: {e}", file=sys.stderr)
     sys.exit(2)
-wert = daten
-for teil in sys.argv[2].split("."):
-    if not teil:
+value = data
+for part in sys.argv[2].split("."):
+    if not part:
         continue
     try:
-        wert = wert[int(teil)] if isinstance(wert, list) else wert[teil]
+        value = value[int(part)] if isinstance(value, list) else value[part]
     except Exception:
         sys.exit(1)
-if isinstance(wert, bool):
-    print("true" if wert else "false")
-elif isinstance(wert, (dict, list)):
-    print(json.dumps(wert, separators=(",", ":"), ensure_ascii=False))
+if isinstance(value, bool):
+    print("true" if value else "false")
+elif isinstance(value, (dict, list)):
+    print(json.dumps(value, separators=(",", ":"), ensure_ascii=False))
 else:
-    print(wert)
+    print(value)
 PY
 }
 
-echo "Rauchtest gegen $BASIS"
+echo "Smoke test against $BASE"
 echo
 
-# ─── 1. /health ────────────────────────────────────────────────────────────────
-# Die Prüfung, an der alles andere hängt: Antwortet der Container überhaupt und ist er durch
-# Caddy erreichbar. Der Watchdog auf der VM fragt genau diesen Pfad ab (ops/watchdog.sh).
-code=$(hole health /health)
+# --- 1. /health ---------------------------------------------------------------
+# The check everything else hangs on: does the container answer at all, and is it reachable
+# through Caddy. The watchdog on the VM asks for exactly this path (ops/watchdog.sh).
+code=$(fetch health /health)
 if [[ "$code" == "000" ]]; then
-  fehler "/health: keine Antwort ($(tr -d '\n' <"$TMP/health.err"))"
+  fail "/health: no answer ($(tr -d '\n' <"$TMP/health.err"))"
   echo
-  echo "Abbruch: Der Dienst ist von hier aus nicht erreichbar, die übrigen Prüfungen wären nur Timeouts."
+  echo "Aborting: the service is not reachable from here, the remaining checks would be timeouts only."
   exit 1
 elif [[ "$code" != "200" ]]; then
-  fehler "/health: $code statt 200"
-elif [[ "$(jsonwert health ok)" != "true" ]]; then
-  fehler "/health: 200, aber ok ist nicht true ($(head -c 200 "$TMP/health.body"))"
+  fail "/health: $code instead of 200"
+elif [[ "$(json_value health ok)" != "true" ]]; then
+  fail "/health: 200, but ok is not true ($(head -c 200 "$TMP/health.body"))"
 else
-  ok "/health: 200, ok:true, Version $(jsonwert health version)"
+  ok "/health: 200, ok:true, version $(json_value health version)"
 fi
 
-# ─── 2. /v1/status ─────────────────────────────────────────────────────────────
-# Der öffentliche Status ohne API-Key. Die Startseite zieht ihre Zahlen von hier, und die
-# Automaton-Zahl ist die Messgröße des 30-Tage-Tests. Fehlt hier ein Feld, steht die Seite mit
-# leeren Kästen da, ohne dass sonst etwas auffällt.
-code=$(hole status /v1/status)
+# --- 2. /v1/status ------------------------------------------------------------
+# The public status without an API key. The landing page pulls its numbers from here, and the
+# automaton count is the metric of the 30 day trial. If a field is missing here, the page sits
+# there with empty boxes without anything else standing out.
+code=$(fetch status /v1/status)
 if [[ "$code" != "200" ]]; then
-  fehler "/v1/status: $code statt 200"
+  fail "/v1/status: $code instead of 200"
 else
-  modelle=$(jsonwert status models)
-  anzahl_modelle=$(python3 -c 'import json,sys; print(len(json.loads(sys.argv[1])))' "$modelle" 2>/dev/null || echo 0)
-  markup=$(jsonwert status markup)
-  automatons=$(jsonwert status automatons)
-  tiers=$(jsonwert status topup_tiers_usd)
-  mangel=""
-  # Ohne Modelle kann die Runtime nicht denken, und der Preis-Cache aus src/index.ts wäre leer.
-  [[ "$anzahl_modelle" -gt 0 ]] || mangel="$mangel models leer;"
-  # Markup unter 1 hieße: Wir verkaufen unter Einkauf. Am 19.09. war der Katalog schon einmal weg.
-  python3 -c 'import sys; sys.exit(0 if float(sys.argv[1]) >= 1 else 1)' "$markup" 2>/dev/null || mangel="$mangel markup=$markup;"
-  # Die Zahl muss da und eine Zahl sein; sie zählt zahlende Betreiber, nicht Registrierungen.
-  [[ "$automatons" =~ ^[0-9]+$ ]] || mangel="$mangel automatons=$automatons;"
-  [[ "$tiers" == *"["* ]] || mangel="$mangel topup_tiers_usd fehlt;"
-  if [[ -n "$mangel" ]]; then
-    fehler "/v1/status: $mangel"
+  models=$(json_value status models)
+  model_count=$(python3 -c 'import json,sys; print(len(json.loads(sys.argv[1])))' "$models" 2>/dev/null || echo 0)
+  markup=$(json_value status markup)
+  automatons=$(json_value status automatons)
+  tiers=$(json_value status topup_tiers_usd)
+  problems=""
+  # Without models the runtime cannot think, and the price cache from src/index.ts would be empty.
+  [[ "$model_count" -gt 0 ]] || problems="$problems models empty;"
+  # A markup below 1 would mean we sell below purchase. On 19.09. the catalogue was gone once already.
+  python3 -c 'import sys; sys.exit(0 if float(sys.argv[1]) >= 1 else 1)' "$markup" 2>/dev/null || problems="$problems markup=$markup;"
+  # The number has to be there and be a number; it counts paying operators, not registrations.
+  [[ "$automatons" =~ ^[0-9]+$ ]] || problems="$problems automatons=$automatons;"
+  [[ "$tiers" == *"["* ]] || problems="$problems topup_tiers_usd missing;"
+  if [[ -n "$problems" ]]; then
+    fail "/v1/status: $problems"
   else
-    ok "/v1/status: 200, $anzahl_modelle Modell(e), Markup $markup, Automatons $automatons, Tiers $tiers"
+    ok "/v1/status: 200, $model_count model(s), markup $markup, automatons $automatons, tiers $tiers"
   fi
 fi
 
-# ─── 3. Version aus /health und /v1/status stimmen überein ─────────────────────
-# Billige Gegenprobe, dass wirklich ein einziger Stand läuft: Beide Zahlen kommen aus derselben
-# Konstante in src/app.ts. Weichen sie ab, antwortet noch ein alter Container mit.
-v_health=$(jsonwert health version 2>/dev/null)
-v_status=$(jsonwert status version 2>/dev/null)
+# --- 3. the version from /health and /v1/status match --------------------------
+# A cheap counter-check that a single build is really running: both numbers come from the same
+# constant in src/app.ts. If they differ, an old container is still answering alongside.
+v_health=$(json_value health version 2>/dev/null)
+v_status=$(json_value status version 2>/dev/null)
 if [[ -n "$v_health" && "$v_health" == "$v_status" ]]; then
-  ok "Version konsistent: $v_health in /health und /v1/status"
+  ok "version consistent: $v_health in /health and /v1/status"
 else
-  fehler "Version uneinheitlich: /health=$v_health, /v1/status=$v_status"
+  fail "version inconsistent: /health=$v_health, /v1/status=$v_status"
 fi
 
-# ─── 4. Startseite ─────────────────────────────────────────────────────────────
-# Zwei Inhalte sind nicht kosmetisch: Der Link auf without-control-plane.md ist das Versprechen,
-# den kostenlosen Weg zu zeigen, bevor jemand zahlt, und der Impressum-Anker ist die Pflicht
-# nach § 5 DDG ("leicht erkennbar und unmittelbar erreichbar").
-code=$(hole seite /)
+# --- 4. landing page ----------------------------------------------------------
+# Two pieces of content are not cosmetic: the link to without-control-plane.md is the promise to
+# show the free route before anybody pays, and the imprint anchor is the obligation under German
+# law (DDG § 5, "easy to recognise and directly reachable").
+code=$(fetch page /)
 if [[ "$code" != "200" ]]; then
-  fehler "/: $code statt 200"
+  fail "/: $code instead of 200"
 else
-  mangel=""
-  [[ "$(kopf seite content-type)" == *"text/html"* ]] || mangel="$mangel content-type=$(kopf seite content-type);"
-  grep -q "docs/without-control-plane.md" "$TMP/seite.body" || mangel="$mangel Link auf without-control-plane.md fehlt;"
-  grep -q 'id="impressum"' "$TMP/seite.body" || mangel="$mangel Anker id=impressum fehlt;"
-  grep -q 'href="#impressum"' "$TMP/seite.body" || mangel="$mangel Verweis href=#impressum fehlt;"
-  if [[ -n "$mangel" ]]; then
-    fehler "/: $mangel"
+  problems=""
+  [[ "$(header page content-type)" == *"text/html"* ]] || problems="$problems content-type=$(header page content-type);"
+  grep -q "docs/without-control-plane.md" "$TMP/page.body" || problems="$problems link to without-control-plane.md missing;"
+  grep -q 'id="impressum"' "$TMP/page.body" || problems="$problems anchor id=impressum missing;"
+  grep -q 'href="#impressum"' "$TMP/page.body" || problems="$problems reference href=#impressum missing;"
+  if [[ -n "$problems" ]]; then
+    fail "/: $problems"
   else
-    ok "/: 200 HTML, Link auf without-control-plane.md, Impressum-Anker und -Verweis vorhanden"
+    ok "/: 200 HTML, link to without-control-plane.md, imprint anchor and reference present"
   fi
 fi
 
-# ─── 5. /impressum ─────────────────────────────────────────────────────────────
-# Der Pfad, den Menschen und Prüfer zuerst raten. Er muss auf den Anker der Startseite führen,
-# nicht ins Leere; eine 404 an dieser Stelle ist ein Abmahngrund und kein Schönheitsfehler.
-code=$(hole impressum /impressum)
-ziel=$(kopf impressum location)
-if [[ "$code" == "302" && "$ziel" == "/#impressum" ]]; then
-  ok "/impressum: 302 auf /#impressum"
+# --- 5. /impressum ------------------------------------------------------------
+# The path people and auditors guess first. It has to lead to the anchor on the landing page and
+# not into nothing; a 404 here is grounds for a warning letter, not a blemish.
+code=$(fetch impressum /impressum)
+target=$(header impressum location)
+if [[ "$code" == "302" && "$target" == "/#impressum" ]]; then
+  ok "/impressum: 302 to /#impressum"
 else
-  fehler "/impressum: $code auf '$ziel', erwartet 302 auf /#impressum"
+  fail "/impressum: $code to '$target', expected 302 to /#impressum"
 fi
 
-# ─── 6. /.well-known/x402 ──────────────────────────────────────────────────────
-# Die maschinenlesbare Beschreibung, über die fremde Agenten den Dienst finden und bezahlen.
-# Ohne gültiges `accepts` weiß ein Client nicht, wohin er zahlen soll, und der Topup schlägt fehl,
-# bevor jemand merkt, dass die Seite selbst noch aussieht wie immer.
-code=$(hole x402 /.well-known/x402)
+# --- 6. /.well-known/x402 -----------------------------------------------------
+# The machine-readable description through which other agents find the service and pay it. Without
+# a valid `accepts` a client does not know where to pay, and the topup fails before anybody notices
+# that the page itself still looks the way it always did.
+code=$(fetch x402 /.well-known/x402)
 if [[ "$code" != "200" ]]; then
-  fehler "/.well-known/x402: $code statt 200"
+  fail "/.well-known/x402: $code instead of 200"
 else
-  x402version=$(jsonwert x402 x402Version)
-  guelt=$?
-  mangel=""
-  [[ $guelt -eq 2 ]] && mangel="$mangel kein gültiges JSON;"
-  [[ "$x402version" == "1" ]] || mangel="$mangel x402Version=$x402version;"
-  for feld in status models topup register inference; do
-    jsonwert x402 "endpoints.$feld" >/dev/null 2>&1 || mangel="$mangel endpoints.$feld fehlt;"
+  x402version=$(json_value x402 x402Version)
+  valid=$?
+  problems=""
+  [[ $valid -eq 2 ]] && problems="$problems not valid JSON;"
+  [[ "$x402version" == "1" ]] || problems="$problems x402Version=$x402version;"
+  for field in status models topup register inference; do
+    json_value x402 "endpoints.$field" >/dev/null 2>&1 || problems="$problems endpoints.$field missing;"
   done
-  # Das Zahlungsangebot: Netz, Asset und Empfänger. `accepts` ist leer, wenn CP_PAY_TO auf der VM
-  # nicht gesetzt ist; dann antwortet auch /pay mit 503 und niemand kann aufladen.
-  schema=$(jsonwert x402 accepts.0.scheme 2>/dev/null)
-  payto=$(jsonwert x402 accepts.0.payTo 2>/dev/null)
-  netz=$(jsonwert x402 accepts.0.network 2>/dev/null)
-  asset=$(jsonwert x402 accepts.0.asset 2>/dev/null)
-  [[ "$schema" == "exact" ]] || mangel="$mangel accepts[0].scheme=$schema;"
-  [[ "$payto" =~ ^0x[0-9a-fA-F]{40}$ ]] || mangel="$mangel payTo=$payto;"
-  [[ -n "$netz" ]] || mangel="$mangel network fehlt;"
-  [[ "$asset" =~ ^0x[0-9a-fA-F]{40}$ ]] || mangel="$mangel asset=$asset;"
-  if [[ -n "$mangel" ]]; then
-    fehler "/.well-known/x402: $mangel"
+  # The payment offer: network, asset and recipient. `accepts` is empty when CP_PAY_TO is not set
+  # on the VM; then /pay answers 503 as well and nobody can top up.
+  scheme=$(json_value x402 accepts.0.scheme 2>/dev/null)
+  payto=$(json_value x402 accepts.0.payTo 2>/dev/null)
+  network=$(json_value x402 accepts.0.network 2>/dev/null)
+  asset=$(json_value x402 accepts.0.asset 2>/dev/null)
+  [[ "$scheme" == "exact" ]] || problems="$problems accepts[0].scheme=$scheme;"
+  [[ "$payto" =~ ^0x[0-9a-fA-F]{40}$ ]] || problems="$problems payTo=$payto;"
+  [[ -n "$network" ]] || problems="$problems network missing;"
+  [[ "$asset" =~ ^0x[0-9a-fA-F]{40}$ ]] || problems="$problems asset=$asset;"
+  if [[ -n "$problems" ]]; then
+    fail "/.well-known/x402: $problems"
   else
-    ok "/.well-known/x402: 200 JSON, x402Version 1, Endpunkte vollständig, Zahlung exact auf $netz an $payto"
+    ok "/.well-known/x402: 200 JSON, x402Version 1, endpoints complete, payment exact on $network to $payto"
   fi
 fi
 
-# ─── 7. /llms.txt ──────────────────────────────────────────────────────────────
-# Die Kurzbeschreibung für andere Modelle und Crawler. Die Setup-Zeile ist der einzige Teil, den
-# jemand wirklich abtippt; fehlt sie, ist die Datei nur noch Werbung.
-code=$(hole llms /llms.txt)
+# --- 7. /llms.txt -------------------------------------------------------------
+# The short description for other models and crawlers. The setup line is the only part anybody
+# really types out; without it the file is nothing but advertising.
+code=$(fetch llms /llms.txt)
 if [[ "$code" != "200" ]]; then
-  fehler "/llms.txt: $code statt 200"
+  fail "/llms.txt: $code instead of 200"
 else
-  mangel=""
-  [[ "$(kopf llms content-type)" == *"text/plain"* ]] || mangel="$mangel content-type=$(kopf llms content-type);"
-  grep -q "conwayApiUrl" "$TMP/llms.body" || mangel="$mangel conwayApiUrl fehlt;"
-  grep -q "automaton --provision" "$TMP/llms.body" || mangel="$mangel 'automaton --provision' fehlt;"
-  if [[ -n "$mangel" ]]; then
-    fehler "/llms.txt: $mangel"
+  problems=""
+  [[ "$(header llms content-type)" == *"text/plain"* ]] || problems="$problems content-type=$(header llms content-type);"
+  grep -q "conwayApiUrl" "$TMP/llms.body" || problems="$problems conwayApiUrl missing;"
+  grep -q "automaton --provision" "$TMP/llms.body" || problems="$problems 'automaton --provision' missing;"
+  if [[ -n "$problems" ]]; then
+    fail "/llms.txt: $problems"
   else
-    ok "/llms.txt: 200 Text mit der Setup-Zeile (conwayApiUrl, automaton --provision)"
+    ok "/llms.txt: 200 text with the setup line (conwayApiUrl, automaton --provision)"
   fi
 fi
 
-# ─── 8. Sicherheits-Header ─────────────────────────────────────────────────────
-# Die Header setzt Caddy, nicht die Anwendung (deploy/Caddyfile). Am 19.09. fehlten sie komplett,
-# und beim Ausrollen einer Caddyfile-Änderung ist genau das die Falle: Der Caddyfile ist ein
-# Datei-Bind-Mount, rsync tauscht die Inode aus, der laufende Container sieht die neue Fassung
-# nicht, und selbst `caddy reload` liest dann noch die alte. Ein grünes `docker compose up -d`
-# beweist hier gar nichts, diese Prüfung schon.
-if ((OHNE_PROXY)); then
-  uebersprungen "Sicherheits-Header: --ohne-proxy, die Header kommen von Caddy und fehlen bei einem direkten App-Start"
+# --- 8. security headers ------------------------------------------------------
+# The headers are set by Caddy, not by the application (deploy/Caddyfile). On 19.09. they were
+# missing entirely, and when rolling out a Caddyfile change that is exactly the trap: the Caddyfile
+# is a file bind mount, rsync swaps the inode, the running container does not see the new version,
+# and even `caddy reload` then still reads the old one. A green `docker compose up -d` proves
+# nothing here, this check does.
+if ((NO_PROXY)); then
+  skipped "security headers: --no-proxy, the headers come from Caddy and are absent on a direct app start"
 else
-  mangel=""
-  hsts=$(kopf seite strict-transport-security)
-  [[ "$hsts" == *"max-age="* ]] || mangel="$mangel HSTS ($hsts);"
-  [[ "$(kopf seite x-content-type-options)" == "nosniff" ]] || mangel="$mangel nosniff;"
-  [[ "$(kopf seite x-frame-options)" == "DENY" ]] || mangel="$mangel X-Frame-Options DENY;"
-  [[ "$(kopf seite referrer-policy)" == "strict-origin-when-cross-origin" ]] || mangel="$mangel Referrer-Policy;"
-  csp=$(kopf seite content-security-policy)
-  [[ "$csp" == *"default-src 'none'"* ]] || mangel="$mangel CSP default-src 'none';"
-  if [[ -n "$mangel" ]]; then
-    fehler "Sicherheits-Header:$mangel"
+  problems=""
+  hsts=$(header page strict-transport-security)
+  [[ "$hsts" == *"max-age="* ]] || problems="$problems HSTS ($hsts);"
+  [[ "$(header page x-content-type-options)" == "nosniff" ]] || problems="$problems nosniff;"
+  [[ "$(header page x-frame-options)" == "DENY" ]] || problems="$problems X-Frame-Options DENY;"
+  [[ "$(header page referrer-policy)" == "strict-origin-when-cross-origin" ]] || problems="$problems Referrer-Policy;"
+  csp=$(header page content-security-policy)
+  [[ "$csp" == *"default-src 'none'"* ]] || problems="$problems CSP default-src 'none';"
+  if [[ -n "$problems" ]]; then
+    fail "security headers:$problems"
   else
-    ok "Sicherheits-Header: HSTS, nosniff, DENY, Referrer-Policy und CSP stehen"
+    ok "security headers: HSTS, nosniff, DENY, Referrer-Policy and CSP are in place"
   fi
 fi
 
-# ─── 9. CSP-Hash passt zum ausgelieferten Inline-Skript ────────────────────────
-# Die CSP erlaubt das Inline-Skript der Startseite per sha256-Hash statt per 'unsafe-inline'.
-# Passt der Hash nicht zum Skript, blockiert der Browser es still: Die Seite lädt, sieht richtig
-# aus und zeigt dauerhaft keine Live-Zahlen. Kein Statuscode verrät das.
-# `test/public.test.ts` prüft Repo gegen Repo; hier wird geprüft, was der Server wirklich
-# ausliefert, und genau das ist nach einem Deploy die offene Frage.
-if ((OHNE_PROXY)); then
-  uebersprungen "CSP-Hash: --ohne-proxy, ohne Caddy gibt es keinen CSP-Header (Repo-Abgleich macht pnpm test)"
-elif [[ ! -s "$TMP/seite.body" ]]; then
-  fehler "CSP-Hash: keine Startseite geladen, nicht prüfbar"
+# --- 9. the CSP hash matches the inline script that is served ------------------
+# The CSP allows the inline script of the landing page by sha256 hash instead of 'unsafe-inline'.
+# If the hash does not match the script, the browser blocks it silently: the page loads, looks
+# right and shows no live numbers ever again. No status code gives that away.
+# `test/public.test.ts` checks repo against repo; here we check what the server really serves, and
+# that is exactly the open question after a deploy.
+if ((NO_PROXY)); then
+  skipped "CSP hash: --no-proxy, without Caddy there is no CSP header (the repo comparison is done by pnpm test)"
+elif [[ ! -s "$TMP/page.body" ]]; then
+  fail "CSP hash: no landing page loaded, cannot check"
 else
-  seiten_hash=$(python3 - "$TMP/seite.body" <<'PY'
+  page_hash=$(python3 - "$TMP/page.body" <<'PY'
 import base64, hashlib, re, sys
 html = open(sys.argv[1], encoding="utf-8").read()
-# Dieselbe Regex wie in test/public.test.ts, damit beide denselben Skriptinhalt hashen.
-treffer = re.search(r"<script>([\s\S]*?)</script>", html)
-if not treffer:
+# The same regex as in test/public.test.ts, so both hash the same script content.
+match = re.search(r"<script>([\s\S]*?)</script>", html)
+if not match:
     sys.exit(1)
-print("sha256-" + base64.b64encode(hashlib.sha256(treffer.group(1).encode("utf-8")).digest()).decode())
+print("sha256-" + base64.b64encode(hashlib.sha256(match.group(1).encode("utf-8")).digest()).decode())
 PY
   )
-  csp=$(kopf seite content-security-policy)
-  if [[ -z "$seiten_hash" ]]; then
-    # Kein Inline-Skript mehr: Dann darf auch kein Hash mehr in der CSP stehen.
+  csp=$(header page content-security-policy)
+  if [[ -z "$page_hash" ]]; then
+    # No inline script any more: then no hash may be left in the CSP either.
     if [[ "$csp" == *"sha256-"* ]]; then
-      fehler "CSP-Hash: Die Seite hat kein Inline-Skript mehr, die CSP führt aber noch einen sha256-Hash"
+      fail "CSP hash: the page has no inline script any more, but the CSP still carries a sha256 hash"
     else
-      ok "CSP-Hash: kein Inline-Skript auf der Seite, keiner in der CSP"
+      ok "CSP hash: no inline script on the page, none in the CSP"
     fi
-  elif [[ "$csp" == *"$seiten_hash"* ]]; then
-    ok "CSP-Hash: ${seiten_hash:0:22}… deckt das ausgelieferte Inline-Skript"
+  elif [[ "$csp" == *"$page_hash"* ]]; then
+    ok "CSP hash: ${page_hash:0:22}… covers the inline script that is served"
   else
-    fehler "CSP-Hash passt nicht: Die Seite braucht '$seiten_hash', die CSP erlaubt '$csp'. Live-Zahlen sind blockiert."
+    fail "CSP hash does not match: the page needs '$page_hash', the CSP allows '$csp'. The live numbers are blocked."
   fi
 fi
 
-# ─── 10. Body-Limit ────────────────────────────────────────────────────────────
-# Vor dem 19.09. nahm der Dienst beliebig große Bodies an; 3 MB Müll an /v1/auth/nonce ergaben
-# eine 200. Das Limit setzt Caddy (`request_body max_size 1MB`), nicht die Anwendung, es fällt
-# also bei jedem Caddyfile-Problem als Erstes aus. Gesendet wird ein syntaktisch gültiger
-# SIWE-Request mit überlangem `message`: Greift das Limit, kommt 413; fehlt es, antwortet die
-# Anwendung mit 400 "Malformed SIWE message", und genau diese 400 ist der Alarm.
-# Kosten für das Rate Limit: genau eine Anfrage auf einen begrenzten Pfad.
-if ((OHNE_PROXY)); then
-  uebersprungen "Body-Limit: --ohne-proxy, das Limit steht in deploy/Caddyfile und existiert ohne Caddy nicht"
+# --- 10. body limit -----------------------------------------------------------
+# Before 19.09. the service accepted bodies of any size; 3 MB of junk to /v1/auth/nonce produced a
+# 200. The limit is set by Caddy (`request_body max_size 1MB`), not by the application, so it is
+# the first thing to fall out on any Caddyfile problem. What is sent is a syntactically valid SIWE
+# request with an over-long `message`: if the limit takes hold, a 413 comes back; if it is missing,
+# the application answers 400 "Malformed SIWE message", and that 400 is the alarm.
+# Cost for the rate limit: exactly one request against a capped path.
+if ((NO_PROXY)); then
+  skipped "body limit: --no-proxy, the limit is in deploy/Caddyfile and does not exist without Caddy"
 else
-  python3 - "$TMP/gross.json" <<'PY'
+  python3 - "$TMP/big.json" <<'PY'
 import json, sys
-# Knapp über 1 MB, damit das Limit sicher greift und der Test trotzdem schnell ist.
+# Just above 1 MB, so the limit takes hold for sure and the test still stays fast.
 json.dump({"message": "a" * 1_100_000, "signature": "0x00", "chain_type": "evm"}, open(sys.argv[1], "w"))
 PY
-  BEGRENZTE_ANFRAGEN=$((BEGRENZTE_ANFRAGEN + 1))
+  CAPPED_REQUESTS=$((CAPPED_REQUESTS + 1))
   code=$(curl -sS --max-time 30 -o "$TMP/limit.body" -D "$TMP/limit.head" -w '%{http_code}' \
     -X POST -H 'content-type: application/json' -H 'Expect: 100-continue' \
-    --data-binary @"$TMP/gross.json" "$BASIS/v1/auth/verify" 2>"$TMP/limit.err")
+    --data-binary @"$TMP/big.json" "$BASE/v1/auth/verify" 2>"$TMP/limit.err")
   code="${code:-000}"
   if [[ "$code" == "413" ]]; then
-    ok "Body-Limit: 1,1 MB an /v1/auth/verify ergibt 413"
+    ok "body limit: 1.1 MB to /v1/auth/verify gives a 413"
   elif [[ "$code" == "000" ]]; then
-    # Caddy kann die Verbindung auch schließen, statt sauber zu antworten. Das ist ein Hinweis
-    # darauf, dass eine Grenze greift, aber kein Beleg, und deshalb nicht grün.
-    fehler "Body-Limit: keine Antwort auf 1,1 MB ($(tr -d '\n' <"$TMP/limit.err")). Ohne 413 ist nicht belegt, dass die Grenze greift."
+    # Caddy may also close the connection instead of answering cleanly. That is a hint that a limit
+    # takes hold, but no proof, and therefore not green.
+    fail "body limit: no answer to 1.1 MB ($(tr -d '\n' <"$TMP/limit.err")). Without a 413 it is not proven that the limit takes hold."
   else
-    fehler "Body-Limit: 1,1 MB an /v1/auth/verify ergibt $code statt 413. Das Limit im Caddyfile greift nicht."
+    fail "body limit: 1.1 MB to /v1/auth/verify gives $code instead of 413. The limit in the Caddyfile does not take hold."
   fi
 fi
 
-# ─── 11. /v1/credits/balance ohne Key ──────────────────────────────────────────
-# Die Sperre vor allen /v1/*-Pfaden hinter dem API-Key. Fällt sie aus, liest jeder den Saldo
-# fremder Wallets; im Sicherheitsreview vom 19.09. war genau das der teuerste Fund.
-# Nicht rate-limited: /v1/credits/balance steht nicht in OFFENE_PFADE (src/app.ts).
-code=$(hole balance /v1/credits/balance)
+# --- 11. /v1/credits/balance without a key ------------------------------------
+# The lock in front of all /v1/* paths behind the API key. If it fails, anybody reads the balance
+# of other people's wallets; in the security review of 19.09. that was the most expensive finding.
+# Not rate limited: /v1/credits/balance is not in OPEN_PATHS (src/app.ts).
+code=$(fetch balance /v1/credits/balance)
 if [[ "$code" == "401" ]]; then
-  ok "/v1/credits/balance ohne Key: 401"
+  ok "/v1/credits/balance without a key: 401"
 else
-  fehler "/v1/credits/balance ohne Key: $code statt 401 ($(head -c 200 "$TMP/balance.body"))"
+  fail "/v1/credits/balance without a key: $code instead of 401 ($(head -c 200 "$TMP/balance.body"))"
 fi
 
-# ─── 12. Rate Limit (nur auf Anforderung) ──────────────────────────────────────
-# Ausdrücklich abseits des Standardlaufs: Der Test sperrt den ausführenden Rechner für den Rest
-# des Minutenfensters aus, und wer ihn versehentlich nach einem Deploy fährt, sperrt damit den
-# Betreiber von seinem eigenen Dienst aus. Läuft zuletzt, damit die Sperre keine andere Prüfung
-# trifft.
-if ((MIT_RATELIMIT)); then
+# --- 12. rate limit (only on request) -----------------------------------------
+# Deliberately outside the standard run: the test locks the executing machine out for the rest of
+# the minute window, and whoever runs it by accident after a deploy locks the operator out of their
+# own service. Runs last, so the lockout does not hit another check.
+if ((WITH_RATELIMIT)); then
   echo
-  echo "$F_GRAU--mit-ratelimit: 65 Anfragen an /v1/auth/nonce. Diese IP bekommt danach bis zum Ende des Minutenfensters 429.$F_AUS"
-  gesperrt_bei=0
+  echo "$C_GREY--with-ratelimit: 65 requests to /v1/auth/nonce. This IP will get 429 until the end of the minute window.$C_OFF"
+  blocked_at=0
   for i in $(seq 1 65); do
-    BEGRENZTE_ANFRAGEN=$((BEGRENZTE_ANFRAGEN + 1))
+    CAPPED_REQUESTS=$((CAPPED_REQUESTS + 1))
     rl=$(curl -sS --max-time 10 -o "$TMP/rl.body" -D "$TMP/rl.head" -w '%{http_code}' \
-      -X POST "$BASIS/v1/auth/nonce" 2>/dev/null)
+      -X POST "$BASE/v1/auth/nonce" 2>/dev/null)
     rl="${rl:-000}"
     if [[ "$rl" == "429" ]]; then
-      gesperrt_bei=$i
+      blocked_at=$i
       break
     fi
   done
-  retry=$(kopf rl retry-after)
-  # Geprüft wird, DASS die Grenze greift und einen brauchbaren Retry-After liefert, nicht die
-  # exakte Zahl: Der Limiter zählt in einem laufenden Minutenfenster, und wenn davor schon jemand
-  # von derselben Adresse aus gefragt hat, kommt die 429 früher als bei 60. Eine feste Untergrenze
-  # wäre hier also kein Befund, sondern ein Zufallsgenerator.
-  hinweis=""
-  ((gesperrt_bei > 0 && gesperrt_bei < 30)) && hinweis=" (das Minutenfenster war vorher schon angebrochen)"
-  if ((gesperrt_bei == 0)); then
-    fehler "Rate Limit: 65 Anfragen an /v1/auth/nonce ohne eine einzige 429. Die Grenze greift nicht."
+  retry=$(header rl retry-after)
+  # What is checked is THAT the limit takes hold and delivers a usable Retry-After, not the exact
+  # number: the limiter counts inside a running minute window, and if somebody from the same address
+  # asked before, the 429 comes earlier than at 60. A fixed lower bound would therefore not be a
+  # finding here but a random number generator.
+  note=""
+  ((blocked_at > 0 && blocked_at < 30)) && note=" (the minute window had already started)"
+  if ((blocked_at == 0)); then
+    fail "rate limit: 65 requests to /v1/auth/nonce without a single 429. The limit does not take hold."
   elif [[ ! "$retry" =~ ^[0-9]+$ ]] || ((retry < 1 || retry > 60)); then
-    fehler "Rate Limit: 429 bei Anfrage $gesperrt_bei, aber Retry-After ist '$retry' statt einer Sekundenzahl bis 60."
+    fail "rate limit: 429 at request $blocked_at, but Retry-After is '$retry' instead of a number of seconds up to 60."
   else
-    ok "Rate Limit: Anfrage $gesperrt_bei ergibt 429 mit Retry-After ${retry}s$hinweis"
+    ok "rate limit: request $blocked_at gives a 429 with Retry-After ${retry}s$note"
   fi
 else
-  uebersprungen "Rate Limit: nur mit --mit-ratelimit, weil der Test den Aufrufer für eine Minute aussperrt"
+  skipped "rate limit: only with --with-ratelimit, because the test locks the caller out for a minute"
 fi
 
-# ─── Zusammenfassung ───────────────────────────────────────────────────────────
+# --- summary ------------------------------------------------------------------
 echo
-echo "$GEPRUEFT Prüfungen, $FEHLER Fehler, $UEBERSPRUNGEN übersprungen."
-if ((MIT_RATELIMIT)); then
-  echo "Anfragen auf rate-limitierte Pfade in diesem Lauf: $BEGRENZTE_ANFRAGEN. Die Grenze liegt bei 60 je Minute und Client; --mit-ratelimit überschreitet sie absichtlich."
+echo "$CHECKED checks, $FAILURES failures, $SKIPPED skipped."
+if ((WITH_RATELIMIT)); then
+  echo "Requests against rate limited paths in this run: $CAPPED_REQUESTS. The limit is 60 per minute and client; --with-ratelimit exceeds it on purpose."
 else
-  echo "Anfragen auf rate-limitierte Pfade in diesem Lauf: $BEGRENZTE_ANFRAGEN von 60 je Minute und Client."
+  echo "Requests against rate limited paths in this run: $CAPPED_REQUESTS of 60 per minute and client."
 fi
-if ((UEBERSPRUNGEN > 0)) && ((OHNE_PROXY)); then
-  echo "Achtung: --ohne-proxy lässt die Prüfungen aus, die an Caddy hängen (Header, CSP-Hash, Body-Limit)."
-  echo "Ein Lauf ohne Proxy ersetzt den Rauchtest gegen den echten Endpunkt nicht."
+if ((SKIPPED > 0)) && ((NO_PROXY)); then
+  echo "Careful: --no-proxy leaves out the checks that hang on Caddy (headers, CSP hash, body limit)."
+  echo "A run without the proxy does not replace the smoke test against the real endpoint."
 fi
-if ((FEHLER > 0)); then
-  echo "${F_ROT}Rauchtest fehlgeschlagen.$F_AUS"
+if ((FAILURES > 0)); then
+  echo "${C_RED}Smoke test failed.$C_OFF"
   exit 1
 fi
-echo "${F_OK}Rauchtest bestanden.$F_AUS"
+echo "${C_OK}Smoke test passed.$C_OFF"
