@@ -280,3 +280,24 @@ Kennzahl verfünfundzwanzigfachen. Wer die Zahl bewegen will, muss zahlen, und g
 Punkt der Messung. Der eigene Automat ist in der Zahl enthalten, für die Messgröße also eins
 abziehen.
 `db.keys` zählt ausgestellte API-Keys, `db.day.topups` die Zahlungen des letzten Tages.
+
+## Zeitreihe der x402-Verzeichnisse
+
+`ops/x402-zeitreihe.sh`, taeglich um 4:40 UTC per Cron. Scannt beide oeffentlichen
+x402-Verzeichnisse (Coinbase und PayAI) und schreibt nach `/opt/control-plane/x402`:
+
+- `kennzahlen.ndjson`: eine Zeile je Lauf. Das ist die Reihe, sie bleibt dauerhaft.
+- `roh/JJJJ-MM-TT.csv.gz`: der vollstaendige Scan, rund 540 KB gepackt, 60 Tage Aufbewahrung.
+
+**Nicht ins Repo-Verzeichnis verschieben.** `deploy/rollout.sh` spiegelt `/opt/control-plane/repo`
+mit `--delete`; alles darin waere nach dem naechsten Deploy weg.
+
+Das Skript bricht ab, statt einen falschen Punkt zu schreiben, wenn der Scan weniger als 1.000
+Zeilen liefert oder die Kennzahlen unplausibel sind. Beide Faelle melden sich ueber
+`CP_ALERT_WEBHOOK`. Eine Luecke in der Reihe ist ehrlicher als ein erfundener Wert.
+
+Abholen fuer eine Auswertung:
+
+```
+scp -i ~/.ssh/id_ed25519_automaton root@76.13.144.207:/opt/control-plane/x402/kennzahlen.ndjson .
+```
