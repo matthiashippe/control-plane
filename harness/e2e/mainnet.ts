@@ -17,6 +17,7 @@ import { createPublicClient, erc20Abi, formatUnits, http, type Address, type Hex
 import { base } from "viem/chains";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { createSiweMessage } from "viem/siwe";
+import { SCHWELLEN_BONUS_CENTS } from "../../src/payments/pay.js";
 
 const CP_URL = (process.env.CP_URL || "").replace(/\/$/, "");
 if (!CP_URL) {
@@ -152,8 +153,12 @@ const balRes = await fetch(`${CP_URL}/v1/credits/balance`, { headers: { authoriz
 const bal = (await balRes.json()) as { balance_cents: number };
 const after = await usdcBalance();
 console.log(`Credits: ${bal.balance_cents} Cents, USDC danach: ${after}`);
-if (paid.credits_cents !== TIER * 100 || bal.balance_cents < TIER * 100 || !paid.tx_hash) {
-  console.error("MAINNET FAIL: Gutschrift oder tx_hash stimmen nicht");
+// Der Dienst legt auf jeden Topup den Schwellenbonus drauf, damit ein 5-USD-Kunde ueber der
+// Tier-Schwelle der Runtime landet (`> 500` Cent, nicht `>= 500`). Der Abnahmelauf muss das
+// mitrechnen, sonst meldet er FAIL bei korrektem Verhalten: genau das ist am 20.09. passiert.
+const erwartet = TIER * 100 + SCHWELLEN_BONUS_CENTS;
+if (paid.credits_cents !== erwartet || bal.balance_cents < erwartet || !paid.tx_hash) {
+  console.error(`MAINNET FAIL: erwartet ${erwartet} Cent, bekam ${paid.credits_cents}, tx=${paid.tx_hash}`);
   process.exit(1);
 }
 console.log(`MAINNET OK tier=${TIER} credits_cents=${paid.credits_cents} tx=${paid.tx_hash} basescan=https://basescan.org/tx/${paid.tx_hash}`);
