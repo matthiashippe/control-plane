@@ -2,6 +2,9 @@
 # Own CA plus server certificate for cp.test. The runtime only accepts HTTPS; the runtime
 # container gets the CA over NODE_EXTRA_CA_CERTS. Idempotent.
 set -euo pipefail
+# mkdir, because harness/certs/ is gitignored and therefore missing in a fresh clone: without
+# it every e2e run died on the very first line with "cd: ./certs: No such file or directory".
+mkdir -p "$(dirname "$0")/certs"
 cd "$(dirname "$0")/certs"
 if [[ -f ca.pem && -f cp.test.pem && -f cp.test-key.pem ]]; then
   echo "certs present"
