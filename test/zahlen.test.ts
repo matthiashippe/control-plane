@@ -55,11 +55,11 @@ describe("Die Zahlen im x402-Nachfragebericht stimmen mit den Rohdaten", () => {
     expect(bericht).toContain(String(zeilen.filter((r) => r.verzeichnis === "payai").length).replace(/\B(?=(\d{3})+(?!\d))/g, "."));
   });
 
-  it("nennt die richtige Zahl der Dienste mit mindestens zwanzig Zahlern", () => {
+  it("nennt die richtige Zahl der Dienste mit zwanzig Zahlern oder mehr", () => {
     const n = cdp.filter((r) => (zahl(r.unique_payers_30d) ?? 0) >= 20).length;
     expect(n, "die Kernaussage der Ueberschrift").toBe(130);
     expect(bericht).toMatch(new RegExp(`\\b${n}\\b`));
-    expect(bericht).toMatch(new RegExp(`${n} mehr als zwanzig Kunden`));
+    expect(bericht).toMatch(new RegExp(`${n} zwanzig Kunden oder mehr`));
   });
 
   it("nennt die richtige Zahl der Dienste mit genau einer zahlenden Wallet", () => {
