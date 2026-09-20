@@ -26,7 +26,7 @@ function setup() {
   return { db, app, account, key, post };
 }
 
-/** Baut den Register-Body exakt wie `registerAutomaton` im Runtime-Client (src/conway/client.ts). */
+/** Builds the register body exactly like `registerAutomaton` in the runtime client (src/conway/client.ts). */
 async function buildRegister(params: {
   signer: Account;
   automatonId?: string;
@@ -35,7 +35,7 @@ async function buildRegister(params: {
   name?: string;
   bio?: string;
   genesisPrompt?: string;
-  /** Roher Wert statt keccak(genesisPrompt): nötig, um die Längenprüfung selbst zu treffen. */
+  /** A raw value instead of keccak(genesisPrompt): needed to hit the length check itself. */
   genesisPromptHashRaw?: string;
 }) {
   const automatonId = params.automatonId ?? crypto.randomUUID();
@@ -59,13 +59,13 @@ async function buildRegister(params: {
 }
 
 describe("Registry", () => {
-  it("hashRegisterPayload entspricht dem Runtime-Client (sortierte Keys, keccak256 des JSON)", () => {
+  it("hashRegisterPayload matches the runtime client (sorted keys, keccak256 of the JSON)", () => {
     const payload = { name: "n", automaton_id: "a", bio: "", creator_address: "0xc", automaton_address: "0xa" };
     const expected = keccak256(toHex(JSON.stringify({ automaton_address: "0xa", automaton_id: "a", bio: "", creator_address: "0xc", name: "n" })));
     expect(hashRegisterPayload(payload)).toBe(expected);
   });
 
-  it("registriert einen Automaton mit gültiger Signatur und liefert { automaton }", async () => {
+  it("registers an automaton with a valid signature and returns { automaton }", async () => {
     const { post, account, db } = setup();
     const { body, automatonId } = await buildRegister({ signer: account, genesisPrompt: "be useful" });
     const res = await post("/v1/automatons/register", body);
@@ -81,7 +81,7 @@ describe("Registry", () => {
     expect(db.prepare("SELECT count(*) AS n FROM automatons").get()).toEqual({ n: 1 });
   });
 
-  it("lehnt einen manipulierten Payload-Hash mit 400 ab", async () => {
+  it("rejects a tampered payload hash with 400", async () => {
     const { post, account } = setup();
     const { body } = await buildRegister({ signer: account });
     body.name = "Tampered";
@@ -90,32 +90,32 @@ describe("Registry", () => {
     expect(((await res.json()) as { error: string }).error).toBe("payload_hash_mismatch");
   });
 
-  it("lehnt eine fremde Signatur mit 401 ab", async () => {
+  it("rejects a signature from somebody else with 401", async () => {
     const { post, account } = setup();
     const other = privateKeyToAccount(generatePrivateKey());
     const { body } = await buildRegister({ signer: other, automatonAddress: account.address });
     const res = await post("/v1/automatons/register", body);
     expect(res.status).toBe(401);
-    const fehler = (await res.json()) as { error: string; message: string; docs: string };
-    expect(fehler.error).toBe("invalid_signature");
-    expect(fehler.message, "die Meldung nennt Domain und Typ, gegen die geprüft wird").toContain("AIWS Automaton");
-    expect(fehler.message).toContain("Register(string automatonId, string nonce, bytes32 payloadHash)");
-    expect(fehler.docs).toContain("docs/errors.md#registration");
+    const error = (await res.json()) as { error: string; message: string; docs: string };
+    expect(error.error).toBe("invalid_signature");
+    expect(error.message, "the message names the domain and type it is checked against").toContain("AIWS Automaton");
+    expect(error.message).toContain("Register(string automatonId, string nonce, bytes32 payloadHash)");
+    expect(error.docs).toContain("docs/errors.md#registration");
   });
 
-  it("lehnt eine automaton_address ab, die nicht die Wallet des API-Keys ist (403)", async () => {
+  it("rejects an automaton_address that is not the wallet of the API key (403)", async () => {
     const { post } = setup();
     const other = privateKeyToAccount(generatePrivateKey());
     const { body } = await buildRegister({ signer: other });
     const res = await post("/v1/automatons/register", body);
     expect(res.status).toBe(403);
-    const fehler = (await res.json()) as { error: string; message: string };
-    expect(fehler.error).toBe("address_mismatch");
-    expect(fehler.message).toContain("automaton_address must be the wallet of the API key");
-    expect(fehler.message, "und der Weg dahin").toContain("automaton --provision");
+    const error = (await res.json()) as { error: string; message: string };
+    expect(error.error).toBe("address_mismatch");
+    expect(error.message).toContain("automaton_address must be the wallet of the API key");
+    expect(error.message, "and the way to get there").toContain("automaton --provision");
   });
 
-  it("ist idempotent für dieselbe ID und Adresse, 409 für dieselbe ID mit anderer Adresse", async () => {
+  it("is idempotent for the same ID and address, 409 for the same ID with a different address", async () => {
     const first = setup();
     const { body, automatonId } = await buildRegister({ signer: first.account });
     expect((await first.post("/v1/automatons/register", body)).status).toBe(200);
@@ -123,7 +123,7 @@ describe("Registry", () => {
     expect(again.status).toBe(200);
     expect(first.db.prepare("SELECT count(*) AS n FROM automatons").get()).toEqual({ n: 1 });
 
-    // Zweite Wallet mit eigenem Key auf derselben DB, gleiche automaton_id.
+    // A second wallet with its own key on the same DB, same automaton_id.
     const other = privateKeyToAccount(generatePrivateKey());
     const otherKey = "cnwy_k_" + "ef".repeat(16);
     first.db.prepare("INSERT INTO wallets (address, balance_mc, created_at) VALUES (?, 0, ?)").run(other.address.toLowerCase(), new Date().toISOString());
@@ -141,15 +141,15 @@ describe("Registry", () => {
       body: JSON.stringify(conflict),
     });
     expect(res.status).toBe(409);
-    const konflikt = (await res.json()) as { error: string; message: string };
-    expect(konflikt.error).toBe("automaton_id_conflict");
-    expect(konflikt.message, "sagt, dass IDs nicht umgehängt werden und was stattdessen geht").toMatch(
+    const conflictBody = (await res.json()) as { error: string; message: string };
+    expect(conflictBody.error).toBe("automaton_id_conflict");
+    expect(conflictBody.message, "says that IDs are not reassigned and what works instead").toMatch(
       /different wallet/,
     );
-    expect(konflikt.message).toMatch(/Pick a new automaton_id/);
+    expect(conflictBody.message).toMatch(/Pick a new automaton_id/);
   });
 
-  it("liefert /v1/credits/pricing im Format, das der Runtime-Client mappt", async () => {
+  it("serves /v1/credits/pricing in the shape the runtime client maps", async () => {
     const { app, key } = setup();
     const res = await app.request("/v1/credits/pricing", { headers: { authorization: key } });
     expect(res.status).toBe(200);
@@ -158,7 +158,7 @@ describe("Registry", () => {
     expect(body.topup_tiers_usd).toEqual([5, 25, 100, 500, 1000, 2500]);
   });
 
-  it("antwortet auf Transfers mit 501 (Phase-1-Entscheidung), auf beiden Pfaden", async () => {
+  it("answers transfers with 501 (the phase 1 decision), on both paths", async () => {
     const { post } = setup();
     for (const path of ["/v1/credits/transfer", "/v1/credits/transfers"]) {
       const res = await post(path, { to_address: "0x000000000000000000000000000000000000dEaD", amount_cents: 100 });
@@ -168,56 +168,55 @@ describe("Registry", () => {
   });
 });
 
-describe("Grenzen bei der Registrierung", () => {
-  it("weist überlange Felder ab, damit niemand die Platte füllt", async () => {
-    // Sicherheitsfund 19.09.2026: Ein kostenlos erzeugter API-Key konnte über `bio` 90 MiB in
-    // 21 Sekunden schreiben. Eine volle Platte heißt, dass SQLite nicht mehr schreibt und auch
-    // Gutschriften ausfallen.
+describe("limits on registration", () => {
+  it("rejects over-long fields, so nobody fills the disk", async () => {
+    // Security finding 19.09.2026: an API key created for free could write 90 MiB in 21 seconds
+    // through `bio`. A full disk means SQLite stops writing and credits fail too.
     const { post, account } = setup();
 
-    const zuLang = await buildRegister({ signer: account, bio: "x".repeat(2001) });
-    const res = await post("/v1/automatons/register", zuLang.body);
+    const tooLong = await buildRegister({ signer: account, bio: "x".repeat(2001) });
+    const res = await post("/v1/automatons/register", tooLong.body);
     expect(res.status).toBe(400);
     const body = (await res.json()) as { error: string; field: string };
     expect(body.error).toBe("field_too_long");
     expect(body.field).toBe("bio");
 
-    const grenze = await buildRegister({ signer: account, bio: "x".repeat(2000) });
-    const ok = await post("/v1/automatons/register", grenze.body);
-    expect(ok.status, "genau auf der Grenze muss es noch durchgehen").toBe(200);
+    const atLimit = await buildRegister({ signer: account, bio: "x".repeat(2000) });
+    const ok = await post("/v1/automatons/register", atLimit.body);
+    expect(ok.status, "exactly on the limit it still has to pass").toBe(200);
   });
 
-  it("deckelt auch genesis_prompt_hash, nicht nur bio", async () => {
-    // Die erste Fassung der Längenprüfung vergaß dieses Feld, und damit blieb der ganze Angriff
-    // offen: 950 KB je Registrierung waren weiterhin möglich. Der Payload-Hash wird hier über den
-    // langen Wert mitberechnet und die Signatur passt, sonst würde `payload_hash_mismatch` den
-    // Test grün färben, ohne dass die Längenprüfung je greift.
+  it("caps genesis_prompt_hash too, not only bio", async () => {
+    // The first version of the length check forgot this field, which left the whole attack open:
+    // 950 KB per registration were still possible. The payload hash here is computed over the long
+    // value and the signature matches, otherwise `payload_hash_mismatch` would colour the test
+    // green without the length check ever taking hold.
     const { post, account } = setup();
     const { body } = await buildRegister({ signer: account, genesisPromptHashRaw: "0x" + "a".repeat(950_000) });
     const res = await post("/v1/automatons/register", body);
     expect(res.status).toBe(400);
-    const fehler = (await res.json()) as { error: string; field?: string };
-    expect(fehler.error).toBe("field_too_long");
-    expect(fehler.field).toBe("genesis_prompt_hash");
+    const error = (await res.json()) as { error: string; field?: string };
+    expect(error.error).toBe("field_too_long");
+    expect(error.field).toBe("genesis_prompt_hash");
   });
 
-  it("schreibt nach abgewiesenen Registrierungen nichts in die Datenbank", async () => {
+  it("writes nothing to the database after rejected registrations", async () => {
     const { post, account, db } = setup();
-    for (const feld of ["bio", "name", "genesis_prompt_hash"] as const) {
+    for (const field of ["bio", "name", "genesis_prompt_hash"] as const) {
       const { body } = await buildRegister({ signer: account });
-      (body as Record<string, unknown>)[feld] = "x".repeat(900_000);
+      (body as Record<string, unknown>)[field] = "x".repeat(900_000);
       await post("/v1/automatons/register", body);
     }
-    const zeilen = (db.prepare("SELECT count(*) AS n FROM automatons").get() as { n: number }).n;
-    expect(zeilen, "kein abgewiesener Versuch darf eine Zeile hinterlassen").toBe(0);
+    const rows = (db.prepare("SELECT count(*) AS n FROM automatons").get() as { n: number }).n;
+    expect(rows, "no rejected attempt may leave a row behind").toBe(0);
   });
 
-  it("begrenzt die Zahl der Automatons je Wallet", async () => {
+  it("caps the number of automatons per wallet", async () => {
     const { post, account } = setup();
     for (let i = 0; i < 25; i++) {
       const { body } = await buildRegister({ signer: account });
       const res = await post("/v1/automatons/register", body);
-      expect(res.status, `Registrierung ${i + 1} muss durchgehen`).toBe(200);
+      expect(res.status, `registration ${i + 1} has to pass`).toBe(200);
     }
     const { body } = await buildRegister({ signer: account });
     const res = await post("/v1/automatons/register", body);
