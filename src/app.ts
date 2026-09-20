@@ -263,6 +263,15 @@ export function createApp(opts: AppOptions) {
       topup_tiers_usd: opts.pay?.tiers ?? TOPUP_TIERS_USD,
       automatons,
       active,
+      // Am 20.09.2026 rief jemand von einem privaten Anschluss in Madrid genau diesen Endpunkt
+      // mit curl ab, ohne vorher die Startseite zu laden, und war danach wieder weg. Wer nur
+      // diesen Pfad kennt, soll von hier aus weiterkommen, ohne raten zu muessen.
+      docs: {
+        service: requestOrigin(c) ?? "https://cp.hippe.eu",
+        endpoints: "/.well-known/x402",
+        setup: "Set conwayApiUrl in ~/.automaton/automaton.json to this origin, then run automaton --provision",
+        free_alternative: "https://github.com/matthiashippe/control-plane/blob/main/docs/without-control-plane.md",
+      },
     });
   });
 

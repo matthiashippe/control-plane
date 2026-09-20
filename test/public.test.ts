@@ -566,3 +566,27 @@ describe("GET /v1/credits/history", () => {
     expect(txt).toMatch(/v1\/credits\/history/);
   });
 });
+
+describe("Wer nur /v1/status kennt, findet von dort weiter", () => {
+  it("nennt Herkunft, Endpunktliste, Einrichtung und den kostenlosen Weg", async () => {
+    const db = openDb(":memory:");
+    const res = await createApp({ db }).request("/v1/status", {
+      headers: { host: "cp.hippe.eu", "x-forwarded-proto": "https" },
+    });
+    const body = (await res.json()) as { docs?: Record<string, string> };
+    expect(body.docs, "ohne das ist der Endpunkt eine Sackgasse").toBeTruthy();
+    expect(body.docs?.service).toBe("https://cp.hippe.eu");
+    expect(body.docs?.endpoints).toBe("/.well-known/x402");
+    expect(body.docs?.setup).toMatch(/conwayApiUrl/);
+    // Der kostenlose Weg gehoert auch hierhin, nicht nur auf die Seite, die er nicht gelesen hat.
+    expect(body.docs?.free_alternative).toMatch(/without-control-plane/);
+  });
+
+  it("bleibt maschinenlesbar: die bisherigen Felder aendern sich nicht", async () => {
+    const db = openDb(":memory:");
+    const body = (await (await createApp({ db }).request("/v1/status")).json()) as Record<string, unknown>;
+    for (const feld of ["ok", "version", "markup", "models", "topup_tiers_usd", "automatons", "active"]) {
+      expect(body, `${feld} fehlt`).toHaveProperty(feld);
+    }
+  });
+});
