@@ -10,7 +10,13 @@ import { describe, expect, it } from "vitest";
 import type { Address, Hex } from "viem";
 import { createApp } from "../src/app.js";
 import { openDb } from "../src/db.js";
-import { buildPaymentRequired, payConfigFromEnv, payResource, type PayConfig } from "../src/payments/pay.js";
+import {
+  buildPaymentRequired,
+  payConfigFromEnv,
+  payResource,
+  SCHWELLEN_BONUS_CENTS,
+  type PayConfig,
+} from "../src/payments/pay.js";
 import { buildV1Requirements } from "../src/payments/facilitator.js";
 import type { Authorization, Settler, SettleResult } from "../src/payments/settler.js";
 
@@ -107,5 +113,27 @@ describe("Deklaration fuer das Facilitator-Verzeichnis", () => {
   it("laesst CP_PUBLIC_URL den Host-Header schlagen", () => {
     const aus = payConfigFromEnv({ CP_PAY_TO: PAY_TO, CP_PUBLIC_URL: "https://beispiel.test/" } as NodeJS.ProcessEnv);
     expect(aus?.publicOrigin).toBe("https://beispiel.test");
+  });
+});
+
+/**
+ * Der Schwellenbonus. Die Runtime staffelt nach Kontostand, und die Schwelle fuer die beste Stufe
+ * lautet `> 500` Cent. Ihr Bootstrap-Topup nimmt den kleinsten Tier. Ohne den Bonus startet jeder
+ * Neukunde systematisch eine Stufe unter dem, wofuer er bezahlt hat.
+ */
+describe("Schwellenbonus", () => {
+  it("hebt einen 5-USD-Topup ueber die Schwelle der Runtime, nicht genau darauf", () => {
+    const UPSTREAM_SCHWELLE_HIGH = 500; // getSurvivalTier: cents > 500
+    const gutschrift = 5 * 100 + SCHWELLEN_BONUS_CENTS;
+    expect(gutschrift).toBeGreaterThan(UPSTREAM_SCHWELLE_HIGH);
+    expect(gutschrift - 5 * 100, "mehr als ein Cent waere ein Geschenk ohne Zweck").toBe(1);
+  });
+
+  it("steht offen auf der Seite, weil er auch uns nuetzt", async () => {
+    const html = await import("node:fs/promises").then((fs) =>
+      fs.readFile(new URL("../src/public/index.html", import.meta.url), "utf8"),
+    );
+    expect(html).toMatch(/501 cents/);
+    expect(html, "der Grund muss dabeistehen, sonst ist es ein Verkaufstrick").toMatch(/above<\/em> 500 cents/);
   });
 });

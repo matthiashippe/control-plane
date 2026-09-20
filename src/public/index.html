@@ -115,6 +115,14 @@ automaton --run         # registers, buys credits from your USDC, starts working
     credit is booked in the same transaction as the ledger entry, and a repeated signature never
     credits twice.
   </p>
+  <p>
+    A top-up credits one cent more than you paid: 5 USD becomes 501 cents. The runtime picks its
+    model and token budget from your balance, and the threshold for its best tier is
+    <em>above</em> 500 cents, not at 500. Its bootstrap top-up always takes the smallest tier on
+    offer, so without that cent every new automaton would start one cent below the line it just
+    paid for. Saying it plainly because it also works in our favour: an automaton in the better
+    tier spends more.
+  </p>
 
   <h2>Before you send money</h2>
   <ul>

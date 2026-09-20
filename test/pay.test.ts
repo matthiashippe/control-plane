@@ -143,19 +143,20 @@ describe("/pay x402-Seller", () => {
     expect(balance()).toBe(0);
   });
 
-  it("verbucht eine gültige Zahlung: 200, credits_cents 500, Balance 500, eine Ledger-Zeile", async () => {
+  it("verbucht eine gültige Zahlung: 200, credits_cents 501 mit Schwellenbonus, eine Ledger-Zeile", async () => {
     const { pay, account, settler, ledgerRows, balance } = setup();
     const header = await signPayment({ account, to: PAY_TO, value: 5_000_000n });
     const res = await pay(5, header);
     expect(res.status).toBe(200);
     const body = (await res.json()) as { credits_cents: number; balance_cents: number; tx_hash: string };
-    expect(body.credits_cents).toBe(500);
-    expect(body.balance_cents).toBe(500);
+    // 500 Cent gekauft plus ein Cent, der über die Tier-Schwelle der Runtime hebt (> 500).
+    expect(body.credits_cents).toBe(501);
+    expect(body.balance_cents).toBe(501);
     expect(body.tx_hash).toMatch(/^0x/);
     expect(settler.calls).toHaveLength(1);
     expect(settler.calls[0].value).toBe(5_000_000n);
-    expect(balance()).toBe(500_000);
-    expect(ledgerRows()).toEqual([{ kind: "topup", delta_mc: 500_000, ref: expect.stringMatching(/^0x[0-9a-f]{64}$/) }]);
+    expect(balance()).toBe(501_000);
+    expect(ledgerRows()).toEqual([{ kind: "topup", delta_mc: 501_000, ref: expect.stringMatching(/^0x[0-9a-f]{64}$/) }]);
   });
 
   it("ist idempotent: dieselbe Signatur zweimal ergibt dieselbe Antwort und eine Gutschrift", async () => {
@@ -166,7 +167,7 @@ describe("/pay x402-Seller", () => {
     expect(secondRes.status).toBe(200);
     expect(await secondRes.json()).toEqual(first);
     expect(settler.calls).toHaveLength(1);
-    expect(balance()).toBe(500_000);
+    expect(balance(), "der Schwellenbonus darf bei einem Retry nicht ein zweites Mal greifen").toBe(501_000);
     expect(ledgerRows()).toHaveLength(1);
   });
 
@@ -229,7 +230,7 @@ describe("/pay x402-Seller", () => {
 
     const retry = await pay(5, header);
     expect(retry.status).toBe(200);
-    expect(balance()).toBe(500_000);
+    expect(balance()).toBe(501_000);
     expect(settler.calls).toHaveLength(2);
   });
 
@@ -249,7 +250,7 @@ describe("/pay x402-Seller", () => {
     const [a, b] = await Promise.all([pay(5, header), pay(5, header)]);
     const codes = [a.status, b.status].sort();
 
-    expect(balance(), "eine Zahlung über 5 USD darf höchstens 500.000 mc gutschreiben").toBe(500_000);
+    expect(balance(), "eine Zahlung über 5 USD darf höchstens einmal 501.000 mc gutschreiben").toBe(501_000);
     expect(ledgerRows().filter((r) => r.kind === "topup")).toHaveLength(1);
     expect(codes[0]).toBe(200);
     expect(settler.calls.length, "der Settler darf für eine Nonce nicht dreimal gerufen werden").toBeLessThanOrEqual(2);
@@ -283,12 +284,12 @@ describe("/pay x402-Seller", () => {
     const { app, account, pay, db } = setup();
     const header = await signPayment({ account, to: PAY_TO, value: 5_000_000n });
     const erst = (await (await pay(5, header)).json()) as { balance_cents: number };
-    expect(erst.balance_cents).toBe(500);
+    expect(erst.balance_cents).toBe(501);
 
     postLedger(db, { address: account.address.toLowerCase(), kind: "topup", deltaMc: 7_000_000, ref: "spaeter" });
 
     const wieder = (await (await pay(5, header)).json()) as { balance_cents: number };
-    expect(wieder.balance_cents, "es muss der Stand von damals sein, nicht der heutige").toBe(500);
+    expect(wieder.balance_cents, "es muss der Stand von damals sein, nicht der heutige").toBe(501);
     void app;
   });
 

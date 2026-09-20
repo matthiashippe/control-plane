@@ -61,6 +61,21 @@ export function tierToAtomic(usd: number): bigint {
 }
 
 /**
+ * Ein Cent obendrauf auf jeden Topup.
+ *
+ * Die Runtime staffelt ihre Denkfaehigkeit nach dem Kontostand, und die Schwelle fuer die beste
+ * Stufe lautet `> 500` Cent, nicht `>= 500` (Upstream `src/types.ts`, `getSurvivalTier`). Ihr
+ * Bootstrap-Topup nimmt automatisch den kleinsten angebotenen Tier. Wer bei uns mit 5 USD startet,
+ * laege ohne diesen Cent genau einen Cent unter der Schwelle und bekaeme dauerhaft das kleinere
+ * Modell und die Haelfte der Token, obwohl er fuer die Stufe bezahlt hat.
+ *
+ * Der Bonus kostet uns 0,0077 USD je Kunde (ein Cent Verkaufswert bei Markup 1,3). Er steht offen
+ * auf der Preisseite, denn ungesagt saehe er wie ein Verkaufstrick aus: Ein Kunde in der besseren
+ * Stufe verbraucht auch mehr.
+ */
+export const SCHWELLEN_BONUS_CENTS = 1;
+
+/**
  * Die Kennung des bezahlten Endpunkts. Absolut, sobald der Betreiber seine Basis-URL kennt,
  * denn ein Facilitator uebernimmt nur absolute URLs in sein Verzeichnis.
  */
@@ -411,7 +426,7 @@ export async function handlePay(
     return paymentRequiredResponse(cfg, usd, recipient, "invalid_signature");
   }
 
-  const creditsCents = usd * 100;
+  const creditsCents = usd * 100 + SCHWELLEN_BONUS_CENTS;
   const creditsMc = creditsCents * MC_PER_CENT;
   const nowIso = new Date(now).toISOString();
   const claim = db.transaction(() => {
@@ -452,7 +467,7 @@ export async function handlePay(
       kind: "topup",
       deltaMc: creditsMc,
       ref: auth.nonce,
-      meta: { tx_hash: result.txHash, from: auth.from.toLowerCase(), value_atomic: auth.value.toString(), usd },
+      meta: { tx_hash: result.txHash, from: auth.from.toLowerCase(), value_atomic: auth.value.toString(), usd, bonus_cents: SCHWELLEN_BONUS_CENTS },
     });
     db.prepare("UPDATE payments SET status = 'settled', tx_hash = ?, settled_at = ?, balance_after_mc = ? WHERE nonce = ?").run(
       result.txHash ?? null,
