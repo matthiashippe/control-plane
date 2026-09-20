@@ -9,6 +9,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Hono } from "hono";
 import type { Db } from "./db.js";
+import { befundePruefen, nachrichten, type Auftragsart } from "./check/erfindung.js";
 import { mcToCents,getBalanceCents } from "./db.js";
 import { DOC } from "./errors.js";
 import { Catalog, handleChat, MARKUP } from "./inference/proxy.js";
@@ -100,6 +101,7 @@ const V1_ROUTEN = new Set([
   "/v1/auth/verify",
   "/v1/automatons/register",
   "/v1/chat/completions",
+  "/v1/check",
   "/v1/credits/balance",
   "/v1/credits/history",
   "/v1/credits/pricing",
@@ -536,6 +538,87 @@ export function createApp(opts: AppOptions) {
     const body = await c.req.json().catch(() => null);
     const res = await handleChat(db, opts.catalog, c.get("address"), body);
     return c.json(res.body as Record<string, unknown>, res.status as 200);
+  });
+
+  /**
+   * Welche Behauptung in einer Einreichung steht nicht in ihrem Briefing?
+   *
+   * Das erste Stueck des Auftragsmarkts, auf den dieser Dienst zulaeuft, und es traegt allein:
+   * Wer Arbeit bestellt hat, kann Geschmack nicht beurteilen, erfundene Tatsachen schon, und die
+   * sind das Risiko. Am 20.09.2026 schrieb ein Agent "Viewings available on short notice" in ein
+   * Dubai-Expose, eine Zusage, die im Briefing nicht steht und fuer die der Verkaeufer haftet.
+   *
+   * Abgerechnet wird ueber `handleChat`, also genau wie jede andere Inferenz, mit derselben
+   * Reservierung, derselben Marge und derselben Ledger-Zeile. Ein eigener Abrechnungsweg waere
+   * eine zweite Stelle, an der Geld verlorengehen kann.
+   *
+   * Jeder Befund traegt ein woertliches Zitat, und jedes Zitat wird gegen die Einreichung
+   * geprueft, bevor es zurueckgeht: Ein Modell, das Erfindungen sucht, erfindet Funde, und ein
+   * erfundener Fund beschuldigt einen ehrlichen Text. `discarded` sagt, wie viele so rausfielen.
+   */
+  app.post("/v1/check", async (c) => {
+    if (!opts.catalog) return c.json(INFERENCE_UNAVAILABLE, 503);
+    const roh = await c.req.json().catch(() => null);
+    const b = (typeof roh === "object" && roh !== null ? roh : {}) as Record<string, unknown>;
+    const briefing = typeof b.briefing === "string" ? b.briefing.trim() : "";
+    const submission = typeof b.submission === "string" ? b.submission.trim() : "";
+    const kind: Auftragsart = b.kind === "creative" ? "creative" : "factual";
+    if (!briefing || !submission) {
+      return c.json(
+        {
+          error: "invalid_request",
+          message:
+            'Send {"briefing": "...", "submission": "...", "kind": "factual"|"creative"}. ' +
+            "The briefing is what was ordered, the submission is what came back. " +
+            '"factual" reports every claim the briefing does not support; "creative" reports only ' +
+            "what the client could be held to, because copy necessarily adds.",
+          docs: DOC.inference,
+        },
+        400,
+      );
+    }
+    // Ohne Deckel kauft ein einziger Aufruf ein Kontextfenster ein, und bezahlt wird erst danach.
+    const GRENZE = 20_000;
+    if (briefing.length > GRENZE || submission.length > GRENZE) {
+      return c.json(
+        {
+          error: "too_long",
+          message: `briefing and submission are limited to ${GRENZE} characters each; yours are ` +
+            `${briefing.length} and ${submission.length}. Check one piece of work at a time.`,
+          docs: DOC.inference,
+        },
+        400,
+      );
+    }
+    const modell = typeof b.model === "string" ? b.model : opts.catalog.modelIds()[0];
+    const res = await handleChat(db, opts.catalog, c.get("address"), {
+      model: modell,
+      messages: nachrichten(briefing, submission, kind),
+      response_format: { type: "json_object" },
+    });
+    if (res.status !== 200) return c.json(res.body as Record<string, unknown>, res.status as 400);
+
+    const antwort = res.body as { choices?: { message?: { content?: string } }[]; usage?: unknown; model?: string };
+    const text = antwort.choices?.[0]?.message?.content ?? "";
+    let geparst: unknown = null;
+    try {
+      geparst = JSON.parse(text);
+    } catch {
+      // Bezahlt ist der Aufruf trotzdem, also wird er nicht verschwiegen. Der Aufrufer sieht, dass
+      // das Modell keine verwertbare Antwort gab, und nicht eine leere Befundliste, die er fuer
+      // ein sauberes Ergebnis halten koennte.
+      return c.json(
+        {
+          error: "unparseable_answer",
+          message: "The model did not return JSON. The call was billed; try again.",
+          model: antwort.model,
+          usage: antwort.usage,
+        },
+        502,
+      );
+    }
+    const { befunde, verworfen } = befundePruefen(submission, geparst);
+    return c.json({ kind, findings: befunde, discarded: verworfen, model: antwort.model, usage: antwort.usage });
   });
 
   app.get("/v1/credits/pricing", (c) => c.json({ tiers: [], topup_tiers_usd: opts.pay?.tiers ?? TOPUP_TIERS_USD }));
