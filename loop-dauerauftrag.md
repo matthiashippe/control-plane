@@ -62,6 +62,14 @@ Commit-Message. Genau das ist am 19.09. dreimal passiert: `deploy/rollout.sh` un
 Der Inhalt war heil, die Historie erzählt Unsinn. Also immer die Dateien nennen, die zur
 Änderung gehören, und vor dem Commit einmal `git status --short` lesen.
 
+**Commit-Texte immer über ein Heredoc, nie über `-m "..."`.** In doppelten Anführungszeichen führt
+die Shell Backticks und `$` aus. Am 20.09. verschwand so ein Codestück mitten aus einer
+Commit-Message: Aus dem Satz, der erklärte, woran der erste Entwurf gescheitert war, wurde
+"baute den IP-Filter mit  zusammen". Der Fehler ist lautlos, der Commit geht durch, und auf main
+ist er nur noch mit einem force-push zu beheben, der mehr kostet als er wert ist. Also:
+`git commit -F -` mit `<<'EOF'`, die einfachen Anführungszeichen um das EOF sind der Teil, der
+die Ersetzung abschaltet.
+
 **Änderungen bündeln, nicht einzeln ausrollen.** Am 19.09.2026 ging in einer Stunde dreimal ein
 Deploy raus (Kennzahl, Startseite, Logging), und nach dem dritten hörte der einzige zahlende Kunde
 auf zu pollen. Ob das die Ursache war, ließ sich nicht mehr feststellen, aber die Frage stellt sich
