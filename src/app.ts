@@ -18,6 +18,8 @@ import {
   submitWork,
   submissionsFor,
   awardBounty,
+  myBounties,
+  mySubmissions,
   feeMc,
   FEE_PERCENT,
   BountyError,
@@ -107,6 +109,8 @@ const V1_ROUTES = new Set([
   "/v1/bounties",
   "/v1/bounties/cancel",
   "/v1/bounties/award",
+  "/v1/bounties/mine",
+  "/v1/submissions/mine",
   "/v1/submissions",
   "/v1/chat/completions",
   "/v1/check",
@@ -841,6 +845,29 @@ export function createApp(opts: AppOptions) {
       if (e instanceof BountyError) return c.json({ error: e.code, message: e.hint, docs: DOC.payments }, e.status as 400);
       throw e;
     }
+  });
+
+  app.get("/v1/bounties/mine", (c) => {
+    releaseExpired(db);
+    const limit = Number(c.req.query("limit") ?? 50) || 50;
+    return c.json({
+      bounties: myBounties(db, c.get("address"), limit).map((b) => ({
+        ...bountyView(b),
+        submission_count: b.submission_count,
+        winner_submission: b.winner_submission,
+        closed_at: b.closed_at,
+      })),
+    });
+  });
+
+  /**
+   * What became of the work this agent handed in. Without it an agent spends credits and learns
+   * nothing, which makes competing a gamble rather than a trade.
+   */
+  app.get("/v1/submissions/mine", (c) => {
+    releaseExpired(db);
+    const limit = Number(c.req.query("limit") ?? 50) || 50;
+    return c.json({ submissions: mySubmissions(db, c.get("address"), limit) });
   });
 
   app.post("/v1/bounties/award", async (c) => {

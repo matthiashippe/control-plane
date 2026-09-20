@@ -363,3 +363,73 @@ export function awardBounty(
   run();
   return getBounty(db, a.bountyId)!;
 }
+
+export interface MyBounty extends Bounty {
+  submission_count: number;
+}
+
+/**
+ * The jobs this address posted, whatever became of them.
+ *
+ * `GET /v1/bounties` lists what is open, which is the right answer for an agent looking for work
+ * and the wrong one for the person who paid. docs/journeys.md marks the repeat buyer as the
+ * commercially important one and notes that their journey has no steps of its own: no view of
+ * their own jobs, no way to repeat a brief that worked. This is the first of those.
+ */
+export function myBounties(db: Db, who: string, limit = 50): MyBounty[] {
+  return db
+    .prepare(
+      `SELECT b.*, (SELECT count(*) FROM submissions s WHERE s.bounty_id = b.id) AS submission_count
+         FROM bounties b WHERE b.creator = ? ORDER BY b.created_at DESC LIMIT ?`,
+    )
+    .all(who.toLowerCase(), Math.min(Math.max(limit, 1), 200)) as MyBounty[];
+}
+
+export type Outcome = "pending" | "won" | "lost" | "expired" | "cancelled";
+
+export interface MySubmission {
+  id: string;
+  bounty_id: string;
+  created_at: string;
+  outcome: Outcome;
+  price_cents_if_won: number;
+  deadline: string;
+}
+
+/**
+ * What became of the work this agent handed in.
+ *
+ * Without it an agent spends credits and learns nothing: docs/journeys.md has Side B step 7 as
+ * `missing` for exactly that reason. Competing is only rational if the result comes back, and an
+ * agent that cannot tell a loss from a job nobody awarded cannot decide whether to try again.
+ *
+ * `won` is not guessed from the balance. A bounty carries the id of the submission it was awarded
+ * to, so the answer comes from the same row that moved the money.
+ */
+export function mySubmissions(db: Db, who: string, limit = 50): MySubmission[] {
+  const rows = db
+    .prepare(
+      `SELECT s.id, s.bounty_id, s.created_at, b.status, b.deadline, b.price_mc, b.winner_submission
+         FROM submissions s JOIN bounties b ON b.id = s.bounty_id
+        WHERE s.agent = ? ORDER BY s.created_at DESC LIMIT ?`,
+    )
+    .all(who.toLowerCase(), Math.min(Math.max(limit, 1), 200)) as {
+    id: string; bounty_id: string; created_at: string; status: Status;
+    deadline: string; price_mc: number; winner_submission: string | null;
+  }[];
+  return rows.map((r) => {
+    let outcome: Outcome;
+    if (r.status === "awarded") outcome = r.winner_submission === r.id ? "won" : "lost";
+    else if (r.status === "expired") outcome = "expired";
+    else if (r.status === "cancelled") outcome = "cancelled";
+    else outcome = "pending";
+    return {
+      id: r.id,
+      bounty_id: r.bounty_id,
+      created_at: r.created_at,
+      outcome,
+      price_cents_if_won: Math.floor(r.price_mc / 1000),
+      deadline: r.deadline,
+    };
+  });
+}

@@ -33,6 +33,8 @@ function account(db: ReturnType<typeof openDb>, app: ReturnType<typeof createApp
     submit: (b: unknown) => call("/v1/submissions", "POST", b),
     awardBounty: (b: unknown) => call("/v1/bounties/award", "POST", b),
     submissionsFor: (id: string) => call(`/v1/submissions?bounty_id=${id}`, "GET"),
+    myBounties: () => call("/v1/bounties/mine", "GET"),
+    mySubmissions: () => call("/v1/submissions/mine", "GET"),
     withoutKey: () => app.request("/v1/bounties", { method: "GET" }),
     balance: () => (db.prepare("SELECT balance_mc FROM wallets WHERE address = ?").get(address) as { balance_mc: number }).balance_mc,
   };
@@ -518,5 +520,82 @@ describe("brokerage fee", () => {
     expect(b.balance()).toBe(500_000 + 200 * MC_PER_CENT);
     const list = (await (await app.request("/bounties.json", { method: "GET" })).json()) as { open: unknown[] };
     expect(list.open).toHaveLength(0);
+  });
+});
+
+describe("Seeing your own side of the market", () => {
+  it("shows a buyer the jobs they posted, whatever became of them", async () => {
+    const { a, b } = setup();
+    const { id } = (await (await a.postBounty(bounty())).json()) as { id: string };
+    await a.postBounty(bounty({ price_cents: 100 }));
+    await a.cancel({ id });
+    const body = (await (await a.myBounties()).json()) as { bounties: { status: string; submission_count: number }[] };
+    expect(body.bounties, "the open one and the cancelled one").toHaveLength(2);
+    expect(body.bounties.map((x) => x.status).sort()).toEqual(["cancelled", "open"]);
+    // The counter-check: GET /v1/bounties would have shown only the open one, and that is exactly
+    // the gap this closes.
+    const open = (await (await a.list()).json()) as { bounties: unknown[] };
+    expect(open.bounties).toHaveLength(1);
+    void b;
+  });
+
+  it("shows nobody else's jobs", async () => {
+    const { a, b } = setup();
+    await a.postBounty(bounty());
+    const body = (await (await b.myBounties()).json()) as { bounties: unknown[] };
+    expect(body.bounties).toHaveLength(0);
+  });
+
+  it("counts the submissions a job has drawn", async () => {
+    const { db, app, a, b } = setup();
+    const c = account(db, app, 500_000, 3);
+    const { id } = (await (await a.postBounty(bounty())).json()) as { id: string };
+    await b.submit({ bounty_id: id, body: "from b" });
+    await c.submit({ bounty_id: id, body: "from c" });
+    const body = (await (await a.myBounties()).json()) as { bounties: { submission_count: number }[] };
+    expect(body.bounties[0].submission_count).toBe(2);
+  });
+
+  it("tells an agent it won, and the other one that it lost", async () => {
+    const { db, app, a, b } = setup();
+    const c = account(db, app, 500_000, 3);
+    const { id } = (await (await a.postBounty(bounty())).json()) as { id: string };
+    const { id: sid } = (await (await b.submit({ bounty_id: id, body: "from b" })).json()) as { id: string };
+    await c.submit({ bounty_id: id, body: "from c" });
+    await a.awardBounty({ bounty_id: id, submission_id: sid });
+
+    const won = (await (await b.mySubmissions()).json()) as { submissions: { outcome: string }[] };
+    const lost = (await (await c.mySubmissions()).json()) as { submissions: { outcome: string }[] };
+    expect(won.submissions[0].outcome).toBe("won");
+    // Without this the winner's answer would also be right if the code simply said "won" to
+    // everyone who submitted to an awarded job.
+    expect(lost.submissions[0].outcome).toBe("lost");
+  });
+
+  it("says pending while the job is still open, and expired once the deadline passed", async () => {
+    const { db, a, b } = setup();
+    const { id } = (await (await a.postBounty(bounty())).json()) as { id: string };
+    await b.submit({ bounty_id: id, body: "work" });
+    const pending = (await (await b.mySubmissions()).json()) as { submissions: { outcome: string }[] };
+    expect(pending.submissions[0].outcome).toBe("pending");
+
+    db.prepare("UPDATE bounties SET deadline = ? WHERE id = ?").run(new Date(Date.now() - 1000).toISOString(), id);
+    const after = (await (await b.mySubmissions()).json()) as { submissions: { outcome: string }[] };
+    expect(after.submissions[0].outcome, "the request itself expires it first").toBe("expired");
+  });
+
+  it("names the price the agent would have earned, so a loss can be weighed", async () => {
+    const { a, b } = setup();
+    const { id } = (await (await a.postBounty(bounty())).json()) as { id: string };
+    await b.submit({ bounty_id: id, body: "work" });
+    const body = (await (await b.mySubmissions()).json()) as { submissions: { price_cents_if_won: number }[] };
+    expect(body.submissions[0].price_cents_if_won).toBe(200);
+  });
+
+  it("needs an API key on both paths", async () => {
+    const { app } = setup();
+    for (const path of ["/v1/bounties/mine", "/v1/submissions/mine"]) {
+      expect((await app.request(path, { method: "GET" })).status, path).toBe(401);
+    }
   });
 });
