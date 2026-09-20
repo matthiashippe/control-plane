@@ -28,7 +28,7 @@ function konto(db: ReturnType<typeof openDb>, app: ReturnType<typeof createApp>,
   return {
     address,
     einstellen: (b: unknown) => ruf("/v1/bounties", "POST", b),
-    zurueckziehen: (b: unknown) => ruf("/v1/bounties/withdraw", "POST", b),
+    zurueckziehen: (b: unknown) => ruf("/v1/bounties/cancel", "POST", b),
     liste: () => ruf("/v1/bounties", "GET"),
     einreichen2: (b: unknown) => ruf("/v1/submissions", "POST", b),
     vergeben: (b: unknown) => ruf("/v1/bounties/award", "POST", b),

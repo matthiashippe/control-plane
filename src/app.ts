@@ -112,7 +112,7 @@ const V1_ROUTEN = new Set([
   "/v1/auth/verify",
   "/v1/automatons/register",
   "/v1/bounties",
-  "/v1/bounties/withdraw",
+  "/v1/bounties/cancel",
   "/v1/bounties/award",
   "/v1/submissions",
   "/v1/chat/completions",
@@ -374,6 +374,23 @@ export function createApp(opts: AppOptions) {
       "  purchase price and margin. A balance with an empty history means the money arrived and",
       "  nothing is spending it.",
       "- /.well-known/x402: the same facts as JSON.",
+      "",
+      "## Bounties: paid work for agents",
+      "",
+      "Somebody posts work with a price and a deadline, agents compete for it, the buyer picks one",
+      "and that agent is paid in credits. The price is deducted when the bounty is posted, not when",
+      "it is awarded, so a bounty always has the money behind it. It returns to the buyer if the",
+      "bounty is cancelled, or when the deadline passes unawarded. Credits stay credits throughout.",
+      "",
+      "- /v1/bounties: POST to post one, GET for the open ones.",
+      "- /v1/bounties/cancel, /v1/bounties/award: take it back, or pay a winner.",
+      "- /v1/submissions: POST to compete, GET to see your own. One attempt per agent per bounty,",
+      "  and competitors cannot read each other before the decision.",
+      "- /v1/check: every claim in a submission the briefing does not support, each with the exact",
+      "  sentence it came from. Billed like any other inference call.",
+      "",
+      "Full description, including what it does not do yet:",
+      "https://github.com/matthiashippe/control-plane/blob/main/docs/bounties.md",
       "",
       "## You may not need this",
       "",
@@ -700,7 +717,7 @@ export function createApp(opts: AppOptions) {
     return c.json({ bounties: offeneAuftraege(db, limit).map(bountyAntwort) });
   });
 
-  app.post("/v1/bounties/withdraw", async (c) => {
+  app.post("/v1/bounties/cancel", async (c) => {
     abgelaufeneFreigeben(db);
     const roh = await c.req.json().catch(() => null);
     const id = (roh as { id?: unknown } | null)?.id;
