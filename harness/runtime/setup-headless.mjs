@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 /**
- * Headless-Erstlauf gegen das unveränderte Upstream-dist: schreibt automaton.json, heartbeat.yml,
- * SOUL.md und Default-Skills, wie es der interaktive Wizard (`--setup`) täte, gesteuert durch eine
- * JSON-Datei. Kein Patch an der Runtime, nur ihre exportierten Funktionen.
+ * Headless first run against the unmodified upstream dist: writes automaton.json, heartbeat.yml,
+ * SOUL.md and the default skills, the way the interactive wizard (`--setup`) would, driven by a
+ * JSON file. No patch to the runtime, only its exported functions.
  *
  *   node setup-headless.mjs /setup.json
  *
  * setup.json: name, genesisPrompt, creatorAddress, conwayApiUrl, optional conwayApiKey
- * (leer = Provisionierung folgt per `--provision`), socialRelayUrl ("" schaltet den Relay ab),
+ * (empty = provisioning follows via `--provision`), socialRelayUrl ("" turns the relay off),
  * inferenceModel, treasuryPolicy, disableHeartbeats.
  */
 

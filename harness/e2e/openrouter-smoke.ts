@@ -1,12 +1,12 @@
 /**
- * Ein echter Call über OpenRouter: Key, Katalog, Mapping und usage.cost. Kosten unter 0,01 USD.
+ * One real call over OpenRouter: key, catalogue, mapping and usage.cost. Costs below 0.01 USD.
  *   OPENROUTER_API_KEY=... pnpm e2e:openrouter
  */
 import { OpenRouterProvider } from "../../src/inference/openrouter.js";
 
 const apiKey = process.env.OPENROUTER_API_KEY;
 if (!apiKey) {
-  console.error("OPENROUTER FAIL: OPENROUTER_API_KEY fehlt in der Umgebung");
+  console.error("OPENROUTER FAIL: OPENROUTER_API_KEY missing from the environment");
   process.exit(2);
 }
 const provider = new OpenRouterProvider({ apiKey, models: ["openai/gpt-5.2", "openai/gpt-5-mini"], priceRefreshMs: 0 });
@@ -14,13 +14,13 @@ await provider.init();
 const specs = provider.models();
 const mini = specs.find((s) => s.id === "openai/gpt-5-mini");
 if (!mini || mini.inputPerMillion <= 0) {
-  console.error("OPENROUTER FAIL: Preise fehlen", specs);
+  console.error("OPENROUTER FAIL: prices missing", specs);
   process.exit(1);
 }
 const res = await provider.chat({
   model: "openai/gpt-5-mini",
   messages: [{ role: "user", content: "Reply with exactly: OK" }],
-  // gpt-5-mini denkt vor der Antwort; Reasoning-Tokens zählen zu completion_tokens.
+  // gpt-5-mini thinks before answering; reasoning tokens count towards completion_tokens.
   maxTokens: 256,
   apiKeyId: "smoke",
 });
@@ -31,7 +31,7 @@ if (typeof cost !== "number" || cost <= 0 || cost > 0.01) {
   process.exit(1);
 }
 if (!/ok/i.test(text)) {
-  console.error(`OPENROUTER FAIL: unerwartete Antwort: ${JSON.stringify(text)} finish_reason=${res.choices[0].finish_reason} usage=${JSON.stringify(res.usage)}`);
+  console.error(`OPENROUTER FAIL: unexpected reply: ${JSON.stringify(text)} finish_reason=${res.choices[0].finish_reason} usage=${JSON.stringify(res.usage)}`);
   process.exit(1);
 }
 console.log(

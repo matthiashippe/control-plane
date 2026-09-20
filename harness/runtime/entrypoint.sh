@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Kommandos: provision | run | health | shell
+# Commands: provision | run | health | shell
 set -euo pipefail
 cd /opt/automaton
-API="${CONWAY_API_URL:?CONWAY_API_URL fehlt}"
+API="${CONWAY_API_URL:?CONWAY_API_URL missing}"
 
 case "${1:-run}" in
   health)
@@ -12,8 +12,8 @@ case "${1:-run}" in
         .catch((e) => { console.error("health failed:", e.message); process.exit(1); });'
     ;;
   provision)
-    # 1. Wallet anlegen (Upstream-CLI), 2. automaton.json ohne Key (Headless-Setup),
-    # 3. SIWE-Provisionierung gegen das Control Plane (schreibt config.json mit dem Key).
+    # 1. create the wallet (upstream CLI), 2. automaton.json without a key (headless setup),
+    # 3. SIWE provisioning against the control plane (writes config.json holding the key).
     node dist/index.js --init
     node /opt/harness/setup-headless.mjs /setup.json
     node dist/index.js --provision

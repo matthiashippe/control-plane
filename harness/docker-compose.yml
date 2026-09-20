@@ -1,5 +1,5 @@
-# Harness: lokale Chain (Anvil, chainId 8453, USDC-Mock an der Mainnet-Adresse), Control Plane
-# hinter TLS (eigene CA) mit lokalem Settler, unveränderte Upstream-Runtime.
+# Harness: local chain (Anvil, chainId 8453, USDC mock at the mainnet address), control plane
+# behind TLS (own CA) with a local settler, unmodified upstream runtime.
 x-anvil-account-0-key: &relayer-key "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
 
 services:
@@ -35,15 +35,15 @@ services:
       CP_TLS_CERT: /certs/cp.test.pem
       CP_TLS_KEY: /certs/cp.test-key.pem
       NODE_EXTRA_CA_CERTS: /certs/ca.pem
-      # Topup: payTo ist Anvil-Account 1, der Settler sendet mit Account 0 (nur Harness).
+      # Topup: payTo is Anvil account 1, the settler sends with account 0 (harness only).
       CP_PAY_TO: "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
       CP_NETWORK: base
       CP_USDC_ADDRESS: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
       CP_SETTLER: local
       CP_RPC_URL: http://chain:8545
       CP_SETTLER_KEY: *relayer-key
-      # Inferenz: Mock-Provider ohne Netz; e2e:live setzt CP_PROVIDER=openrouter und reicht den
-      # Key aus der Host-Umgebung durch (nie in einer Datei).
+      # Inference: mock provider without network; e2e:live sets CP_PROVIDER=openrouter and passes
+      # the key through from the host environment (never from a file).
       CP_PROVIDER: ${CP_PROVIDER:-mock}
       CP_MODEL_ALIASES: ${CP_MODEL_ALIASES-gpt-5.2=mock-1,gpt-5-mini=mock-1,gpt-5.3=mock-1}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}

@@ -1,175 +1,173 @@
-# Betriebsbeobachtung (L1, report-only)
+# Operational observation (L1, report-only)
 
-`ops/status.sh` liest den Zustand des laufenden Control Plane und gibt JSON aus: Health und
-Zertifikatsrestlaufzeit über HTTPS, Compose-Zustand, Platte, Speicher, Neustarts und Fehlerzahl
-der letzten 24 h auf der VM, Kennzahlen aus der SQLite (`ops/db-report.cjs`, read-only im
-Container), OpenRouter-Guthaben und den USDC-Saldo der payTo-Adresse auf Base.
+`ops/status.sh` reads the state of the running control plane and prints JSON: health and remaining
+certificate lifetime over HTTPS, compose state, disk, memory, restarts and the error count of the
+last 24 h on the VM, figures out of the SQLite (`ops/db-report.cjs`, read-only inside the
+container), the OpenRouter balance and the USDC balance of the payTo address on Base.
 
 ```
 OPENROUTER_API_KEY=$(grep '^OPENROUTER_API_KEY=' ~/brain/connectors/secrets.env | cut -d= -f2) ops/status.sh
 ```
 
-Das Skript ändert nichts und startet nichts. Es ist die Datenquelle für den Ops-Triage-Loop
-(`/loop 1d Run $ops-triage`), der daraus die Abschnitte in `STATE.md` schreibt.
+The script changes nothing and starts nothing. It is the data source for the ops triage loop
+(`/loop 1d Run $ops-triage`), which writes the sections in `STATE.md` from it.
 
-## Rauchtest nach dem Deploy
+## Smoke test after a deploy
 
-`ops/smoke.sh [BASE_URL]` (Default `https://cp.hippe.eu`) prüft von außen, ob der Dienst nach
-einem Deploy wirklich tut, was er soll: `/health`, `/v1/status` mit Modellen, Markup und der
-Automaton-Zahl, die Startseite mit Link auf `ohne-control-plane.md` und Impressum-Anker, die 302
-von `/impressum`, `/.well-known/x402` mit Zahlungsangebot, `/llms.txt` mit der Setup-Zeile, die
-Sicherheits-Header, den CSP-Hash gegen das ausgelieferte Inline-Skript, das Body-Limit (1,1 MB an
-`/v1/auth/verify` muss 413 geben) und die 401 von `/v1/credits/balance` ohne Key. Je Prüfung eine
-Zeile, am Ende eine Zusammenfassung, `exit 1` bei jedem Fehler. Das Skript schreibt nichts und
-braucht keinen API-Key.
+`ops/smoke.sh [BASE_URL]` (default `https://cp.hippe.eu`) checks from the outside whether the
+service really does what it should after a deploy: `/health`, `/v1/status` with models, markup and
+the automaton count, the landing page with its link to `ohne-control-plane.md` and the imprint
+anchor, the 302 from `/impressum`, `/.well-known/x402` with a payment offer, `/llms.txt` with the
+setup line, the security headers, the CSP hash against the inline script actually served, the body
+limit (1.1 MB to `/v1/auth/verify` has to give 413) and the 401 from `/v1/credits/balance` without a
+key. One line per check, a summary at the end, `exit 1` on any failure. The script writes nothing
+and needs no API key.
 
-Ein Standardlauf stellt **eine** Anfrage auf einen rate-limitierten Pfad (60 je Minute und Client,
-`src/ratelimit.ts`) und zählt sie in der Zusammenfassung mit. Die Grenze selbst prüft nur
-`--with-ratelimit`, weil dieser Test den Aufrufer für den Rest der Minute aussperrt. `--no-proxy`
-überspringt die drei Prüfungen, die an Caddy hängen (Header, CSP-Hash, Body-Limit); das ist für
-einen lokalen Start gedacht und ersetzt den Lauf gegen den echten Endpunkt nicht.
+A standard run makes **one** request against a rate-limited path (60 per minute and client,
+`src/ratelimit.ts`) and counts it in the summary. The limit itself is only checked by
+`--with-ratelimit`, because that test locks the caller out for the rest of the minute. `--no-proxy`
+skips the three checks that hang off Caddy (headers, CSP hash, body limit); that is meant for a
+local start and does not replace the run against the real endpoint.
 
-## Schwellen, bei denen gehandelt werden muss
+## Thresholds that call for action
 
-| Signal | Schwelle | Aktion |
+| Signal | Threshold | Action |
 |---|---|---|
-| `health.status` | nicht 200 | sofort melden, Logs lesen, Compose-Zustand prüfen |
-| `cert_days_left` | unter 20 | Caddy-Logs prüfen (ACME), DNS auf DNS-only kontrollieren |
-| `vm.restarts` | steigt zwischen zwei Läufen | Logs der letzten Stunde lesen, Ursache in STATE.md |
-| `vm.errors_24h` | über 0 | `provider_unavailable` (OpenRouter), `settlement_failed` (PayAI) unterscheiden |
-| `db.stuck_payments` | über 0 | Payment hängt in `pending`: Nonce und Facilitator-Antwort prüfen |
-| `openrouter.left` | unter 5 USD | Matthias fragen, ob nachgeladen wird; sonst droht 503 für alle Mandanten |
-| `vm.disk_used` | über 80 % | Logs rotieren (json-file max 20m x 5), alte Images prüfen |
-| `db.day.margin_mc` | negativ | Verkaufspreis deckt den Einkauf nicht: Markup oder Katalog prüfen |
-| `db.paying_without_thinking` | ein Eintrag über 24 h | Kunde hat bezahlt und kauft keine Inferenz. Kein Alarm, aber nachsehen |
+| `health.status` | not 200 | report immediately, read the logs, check the compose state |
+| `cert_days_left` | below 20 | check the Caddy logs (ACME), verify DNS is set to DNS-only |
+| `vm.restarts` | rises between two runs | read the logs of the last hour, put the cause in STATE.md |
+| `vm.errors_24h` | above 0 | tell `provider_unavailable` (OpenRouter) and `settlement_failed` (PayAI) apart |
+| `db.stuck_payments` | above 0 | a payment hangs in `pending`: check the nonce and the facilitator response |
+| `openrouter.left` | below 5 USD | ask Matthias whether to top up; otherwise every tenant faces a 503 |
+| `vm.disk_used` | above 80 % | rotate the logs (json-file max 20m x 5), check for old images |
+| `db.day.margin_mc` | negative | the sale price does not cover the purchase: check markup or catalogue |
+| `db.paying_without_thinking` | one entry older than 24 h | a customer paid and buys no inference. No alarm, but go and look |
 
-### Zahlen, ohne zu denken
+### Paying without thinking
 
-Die Liste `db.paying_without_thinking` nennt jede Wallet mit Guthaben, die seit ihrer letzten
-Aufladung **keinen einzigen Inferenz-Aufruf** gemacht hat, mit den Stunden seither und ob sie
-überhaupt je gedacht hat. Das ist die stillste Art, einen Kunden zu verlieren: Das Guthaben liegt
-da, die Runtime pollt vielleicht noch ihren Kontostand, und es passiert nichts.
+The list `db.paying_without_thinking` names every wallet with credits that has not made **a single
+inference call** since its last topup, with the hours since then and whether it ever thought at all.
+That is the quietest way to lose a customer: the credits sit there, the runtime maybe still polls
+its balance, and nothing happens.
 
-Genau diesen Fall gab es am 19.09.2026 mit dem ersten zahlenden Kunden, und aufgefallen ist er nur,
-weil jemand zufällig ins Ledger sah. Die Ursache lag außerhalb unseres Codes (die Runtime kaufte
-ihre Turns nicht bei uns, siehe `docs/research/`), aber das ändert nichts daran, dass wir es
-merken müssen.
+This exact case happened on 19.09.2026 with the first paying customer, and it was only noticed
+because somebody happened to look into the ledger. The cause lay outside our code (that runtime did
+not buy its turns from us, see `docs/research/`), but that does not change the fact that we have to
+notice it.
 
-Bewusst **kein Alarm**: Ein frisch aufgeladener Automat, der gerade schläft, ist normal, und ein
-Wecker, der jede Nacht klingelt, wird abgeschaltet. Ab einem Eintrag, der älter als 24 Stunden ist,
-lohnt der Blick in die Caddy-Logs: Kommen von der Adresse überhaupt noch Anfragen, und mit welchem
-Statuscode? Wenn ja und alles 200, liegt es an seiner Seite. Wenn nein, ist er weg.
+Deliberately **no alarm**: a freshly topped-up automaton that happens to be asleep is normal, and an
+alarm clock that rings every night gets switched off. From one entry older than 24 hours on, the
+look into the Caddy logs pays off: are requests from that address still coming in at all, and with
+which status code? If yes and all 200, it is on their side. If no, they are gone.
 
-## Watchdog auf der VM
+## Watchdog on the VM
 
-`ops/watchdog.sh` läuft dort per Cron alle fünf Minuten (`/var/log/cp-watchdog.log`) und ist die
-einzige Instanz, die einen Ausfall bemerkt, ohne dass jemand hinschaut. Er prüft `/health` von
-außen (zwei Versuche mit 20 s Abstand, damit ein einzelner Aussetzer nicht alarmiert) und die
-Restlaufzeit des Zertifikats. Gemeldet wird der **Wechsel** des Zustands, nicht jeder Lauf: ein
-Ausfall meldet einmal, die Rückkehr meldet einmal.
+`ops/watchdog.sh` runs there by cron every five minutes (`/var/log/cp-watchdog.log`) and is the only
+instance that notices an outage without anybody looking. It checks `/health` from the outside (two
+attempts 20 s apart, so a single hiccup does not raise an alarm) and the remaining lifetime of the
+certificate. What gets reported is the **change** of state, not every run: an outage reports once,
+the return reports once.
 
-Ohne `CP_ALERT_WEBHOOK` schreibt er nur ins Log. Mit gesetzter URL (ntfy, Slack, Discord, egal)
-schickt er eine Zeile Text dorthin. Damit die Zustellung greift, die Variable in den Cron-Eintrag
-aufnehmen:
+Without `CP_ALERT_WEBHOOK` it only writes to the log. With the URL set (ntfy, Slack, Discord, no
+matter which) it sends one line of text there. For delivery to work, put the variable into the cron
+entry:
 
 ```
-*/5 * * * * CP_ALERT_WEBHOOK=https://ntfy.sh/<zufälliges-topic> /opt/control-plane/repo/ops/watchdog.sh >> /var/log/cp-watchdog.log 2>&1
+*/5 * * * * CP_ALERT_WEBHOOK=https://ntfy.sh/<random-topic> /opt/control-plane/repo/ops/watchdog.sh >> /var/log/cp-watchdog.log 2>&1
 ```
 
-Die Zustellung ist seit dem 19.09.2026 scharf: Der Crontab auf `srv1336627` setzt
-`CP_ALERT_WEBHOOK` auf ein ntfy-Topic. **Die URL steht nicht in diesem Repo, weil es öffentlich
-ist**: Wer das Topic kennt, liest die Meldungen mit und kann selbst welche senden. Sie liegt in
-`~/brain/connectors/secrets.env` als `CP_ALERT_WEBHOOK` und im Crontab der VM.
+Delivery has been armed since 19.09.2026: the crontab on `srv1336627` sets `CP_ALERT_WEBHOOK` to an
+ntfy topic. **The URL is not in this repo, because the repo is public**: whoever knows the topic
+reads the messages along with us and can send some of their own. It lives in
+`~/brain/connectors/secrets.env` as `CP_ALERT_WEBHOOK` and in the crontab of the VM.
 
-Geprüft am 19.09.2026: Ein simulierter Ausfall (`CP_URL` auf einen 404-Pfad) löste von der VM aus
-eine Meldung mit Priorität `high` aus, die über ntfy abrufbar war.
+Checked on 19.09.2026: a simulated outage (`CP_URL` pointed at a 404 path) triggered a message with
+priority `high` from the VM that was readable over ntfy.
 
 ## Backup
 
-`ops/backup.sh` läuft täglich um 3:17 UTC per Cron auf der VM (`/var/log/cp-backup.log`), schreibt
-nach `/opt/control-plane/backups/` und hält 14 Tage vor. Schlägt es fehl, geht eine Meldung über
-denselben Webhook raus wie beim Watchdog.
+`ops/backup.sh` runs daily at 3:17 UTC by cron on the VM (`/var/log/cp-backup.log`), writes to
+`/opt/control-plane/backups/` and keeps 14 days. If it fails, a message goes out over the same
+webhook as the watchdog uses.
 
-Es benutzt `VACUUM INTO` aus der laufenden Anwendung heraus, **nicht** `cp cp.db`: Die Datenbank
-läuft im WAL-Modus, die `.db`-Datei trägt nur den Stand des letzten Checkpoints, alles danach steht
-im `-wal` daneben. Bei dem Verkehr, den dieser Dienst hat, läuft tagelang kein Checkpoint. Am
-19.09.2026 lokal nachgestellt: Nach Schema, fünf Wallets, zehn Zahlungen und den zugehörigen
-Buchungen war `cp.db` 86 KB groß und enthielt **null Zeilen**, der gesamte Inhalt lag in den 943 KB
-des `-wal`. Eine Kopie der `.db` allein bestand `PRAGMA integrity_check` trotzdem mit "ok". Bei mehr
-Schreiblast greift der automatische Checkpoint, dann ist die Kopie nicht leer, sondern auf dem Stand
-von irgendwann vorher: in derselben Übung 1141 statt 1747 Ledgerzeilen.
+It uses `VACUUM INTO` from inside the running application, **not** `cp cp.db`: the database runs in
+WAL mode, the `.db` file only carries the state of the last checkpoint, everything after that sits
+in the `-wal` next to it. At the traffic this service has, no checkpoint runs for days. Reproduced
+locally on 19.09.2026: after the schema, five wallets, ten payments and the matching ledger entries,
+`cp.db` was 86 KB and held **zero rows**, the entire content sat in the 943 KB of the `-wal`. A copy
+of the `.db` alone still passed `PRAGMA integrity_check` with "ok". Under more write load the
+automatic checkpoint kicks in, and then the copy is not empty but at some earlier state: in the same
+exercise 1141 instead of 1747 ledger rows.
 
-Der Node-Teil steht seit dem 19.09.2026 in `ops/backup-vacuum.cjs` und wird in den laufenden
-Container eingespeist (`docker compose exec -T cp node - < ops/backup-vacuum.cjs`, wie bei
-`db-report.cjs`). Er räumt Reste des letzten Laufs weg, schreibt den Snapshot und prüft ihn, solange
-er noch im Volume liegt: `integrity_check`, Salden gegen Ledgersummen und die Zeilenzahlen gegen die
-Quelle. Zwei Fehler des alten Skripts sind damit weg:
+The Node part has lived in `ops/backup-vacuum.cjs` since 19.09.2026 and is fed into the running
+container (`docker compose exec -T cp node - < ops/backup-vacuum.cjs`, as with `db-report.cjs`). It
+clears out leftovers of the last run, writes the snapshot and checks it while it still sits in the
+volume: `integrity_check`, balances against ledger sums and the row counts against the source. Two
+faults of the old script are gone with it:
 
-- Blieb `backup-tmp.db` nach einem misslungenen Abtransport liegen, scheiterte **jedes weitere
-  Backup** an `output file already exists`, jeden Tag aufs Neue, und im Log stand nur
-  "VACUUM INTO im Container fehlgeschlagen" ohne den Grund. Die Fehlerausgabe des Containers steht
-  jetzt in der Meldung.
-- Die Prüfung "Ausgabe größer als 20 KB" konnte den Fehler nicht fangen, für den sie gedacht war:
-  Das Schema allein wiegt rund 80 KB, eine inhaltsleere Kopie liegt weit darüber. Stattdessen
-  vergleicht `ops/backup.sh` die Größe der abtransportierten Datei mit der, die der Container
-  gemeldet hat, und der Container prüft den Inhalt. Weicht sie ab, wird die Datei verworfen statt
-  als Torso im Bestand zu liegen.
+- If `backup-tmp.db` stayed behind after a failed transfer, **every further backup** failed at
+  `output file already exists`, day after day, and the log only said "backup inside the
+  container failed" without the reason. The container's error output is now part of the message.
+- The check "output larger than 20 KB" could not catch the fault it was written for: the schema
+  alone weighs about 80 KB, so a copy void of content sits far above that. Instead `ops/backup.sh`
+  compares the size of the transferred file with the one the container reported, and the container
+  checks the content. If they differ, the file is discarded instead of lying in the archive as a
+  torso.
 
-Der Node-Teil hängt in `test/backup.test.ts`, die Bash darum herum lief am 19.09.2026 gegen eine
-Docker-Attrappe (ein `docker` im PATH, das die beiden Aufrufe lokal nachbildet): Normalfall,
-Container-Teil scheitert, Abtransport scheitert, Abtransport bricht mitten drin ab. In allen vier
-Fällen steht der Grund im Log, und der Lauf danach kommt wieder durch.
+The Node part hangs in `test/backup.test.ts`, the bash around it ran on 19.09.2026 against a Docker
+dummy (a `docker` in PATH that imitates the two calls locally): the normal case, the container part
+failing, the transfer failing, the transfer breaking off halfway. In all four cases the reason ends
+up in the log, and the run after that comes through again.
 
-## Ein Backup zurückspielen
+## Restoring a backup
 
-Am 19.09.2026 einmal vollständig nachgespielt, weil es bis dahin niemand getan hatte. Nachgespielt
-wurde lokal gegen eine SQLite mit dem Schema aus `src/db.ts`, gefüllt mit Wallets, Zahlungen in
-allen drei Zuständen, Ledgerzeilen aller vier Arten, API-Keys, Automatons und einem `-wal`, das
-nicht leer war, mit einem zweiten Prozess, der während des Backups weiterschrieb. Was dabei
-herauskam, steht unten unter "Die vier Fallen". Die Docker-Zeilen selbst sind auf der VM **nicht**
-gelaufen, der Weg dazwischen schon.
+Played through completely once on 19.09.2026, because until then nobody had. It was played through
+locally against a SQLite with the schema from `src/db.ts`, filled with wallets, payments in all
+three states, ledger rows of all four kinds, API keys, automatons and a `-wal` that was not empty,
+with a second process writing along during the backup. What came out of it is below under "The four
+traps". The Docker lines themselves have **not** run on the VM, the path in between has.
 
-**1. Backup aussuchen und prüfen, bevor der Dienst angefasst wird.** Das Prüfskript liest nur, der
-Dienst läuft dabei weiter:
+**1. Pick a backup and check it before the service is touched.** The checking script only reads, the
+service keeps running while it does:
 
 ```
 ls -la /opt/control-plane/backups/
 docker run --rm -v /opt/control-plane/backups:/bak:ro -v /opt/control-plane/repo/ops:/ops:ro \
   -e NODE_PATH=/app/node_modules --entrypoint node control-plane:latest \
-  /ops/restore-pruefen.cjs /bak/<datei>.db
+  /ops/restore-pruefen.cjs /bak/<file>.db
 ```
 
-`ops/restore-pruefen.cjs` prüft `integrity_check`, `foreign_key_check`, ob jede Wallet mit der Summe
-ihrer Ledgerzeilen übereinstimmt, ob jede `settled`-Zahlung ihre `topup`-Zeile hat und ob eine
-x402-Nonce mehr als eine Gutschrift trägt. Es endet mit `exit 1`, sobald eine dieser Prüfungen
-fehlschlägt. Erst wenn es durchläuft, ist der Ausfall gerechtfertigt.
+`ops/restore-pruefen.cjs` checks `integrity_check`, `foreign_key_check`, whether every wallet matches
+the sum of its ledger rows, whether every `settled` payment has its `topup` row and whether an x402
+nonce carries more than one credit. It ends with `exit 1` as soon as one of those checks fails. Only
+once it runs through is the outage justified.
 
-**2. Dienst stoppen.** Ab hier sieht jeder Aufrufer 502, auch der zahlende Kunde:
+**2. Stop the service.** From here on every caller sees a 502, the paying customer included:
 
 ```
 cd /opt/control-plane/repo/deploy
 docker compose -f docker-compose.prod.yml stop cp
 ```
 
-**3. Den alten Stand vollständig wegschieben, nicht überschreiben.** Alle drei Dateien zusammen,
-sonst ist der alte Stand entwertet und das Zurückspielen unumkehrbar:
+**3. Move the old state aside completely, do not overwrite it.** All three files together, otherwise
+the old state is devalued and the restore is irreversible:
 
 ```
 docker run --rm -v deploy_cp-data:/data alpine sh -c \
-  'mkdir -p /data/vor-restore && mv /data/cp.db /data/cp.db-wal /data/cp.db-shm /data/vor-restore/ 2>/dev/null; ls -la /data /data/vor-restore'
+  'mkdir -p /data/pre-restore && mv /data/cp.db /data/cp.db-wal /data/cp.db-shm /data/pre-restore/ 2>/dev/null; ls -la /data /data/pre-restore'
 ```
 
-**4. Backup einspielen:**
+**4. Put the backup in:**
 
 ```
 docker run --rm -v deploy_cp-data:/data -v /opt/control-plane/backups:/bak:ro alpine \
-  sh -c "cp /bak/<datei>.db /data/cp.db && ls -la /data"
+  sh -c "cp /bak/<file>.db /data/cp.db && ls -la /data"
 ```
 
-Im Verzeichnis dürfen danach nur `cp.db` und `vor-restore/` liegen. Liegt dort noch ein `cp.db-wal`
-oder `cp.db-shm`, nicht starten, sondern Schritt 3 nachholen.
+Afterwards only `cp.db` and `pre-restore/` may sit in that directory. If a `cp.db-wal` or `cp.db-shm`
+is still there, do not start, catch up on step 3 instead.
 
-**5. Starten und von außen prüfen:**
+**5. Start and check from the outside:**
 
 ```
 docker compose -f docker-compose.prod.yml start cp
@@ -178,125 +176,124 @@ docker compose -f docker-compose.prod.yml exec -T cp node - < /opt/control-plane
 /opt/control-plane/repo/ops/smoke.sh
 ```
 
-Im Log stehen die Meldungen, die der erste Start auf einer zurückgespielten Datei erzeugt, und sie
-gehören gelesen, nicht überflogen: jede Zahlung, die im Backup `pending` war, wird auf `failed`
-gesetzt und einzeln protokolliert. Sie stammt aus einem Request, den es nicht mehr gibt, und wenn
-ihre Autorisierung on-chain durchlief, hat jemand bezahlt, ohne Credits zu bekommen. Reservierungen
-(`reserved_mc`) setzt der Start auf 0.
+The log holds the messages the first start on a restored file produces, and they belong read, not
+skimmed: every payment that was `pending` in the backup is set to `failed` and logged individually.
+It stems from a request that no longer exists, and if its authorization went through on chain,
+somebody paid without getting credits. Reservations (`reserved_mc`) are set to 0 by the start.
 
-**6. Den Preiskatalog im Blick behalten.** Der Fallback-Katalog steht in der `kv`-Tabelle. Nach
-einem Backup, das älter ist als die Tabelle, ist er weg: gemessen mit `CP_PROVIDER=openrouter` und
-einem Preisabruf, der nicht durchkam, startete der Dienst dann gar nicht
-("Preisabruf fehlgeschlagen und kein Katalog gespeichert. Start nicht möglich."), während dieselbe
-Datei mit einem Eintrag im `kv` normal hochkam und `/v1/status` die gespeicherten Preise auslieferte.
-Ist OpenRouter beim Start erreichbar, füllt sich der Eintrag von selbst wieder.
+**6. Keep an eye on the price catalogue.** The fallback catalogue lives in the `kv` table. After a
+backup older than that table it is gone: measured with `CP_PROVIDER=openrouter` and a price fetch
+that did not come through, the service then did not start at all ("[openrouter] price fetch failed
+(...) and no catalogue is stored. Cannot start."), while the same file with an entry in `kv` came up
+normally and `/v1/status` served the stored prices. If OpenRouter is reachable at startup, the entry
+fills itself back in.
 
-**7. Aufräumen,** wenn der Dienst ein paar Tage sauber läuft: `vor-restore/` aus dem Volume löschen.
+**7. Clean up** once the service has run cleanly for a few days: delete `pre-restore/` from the
+volume.
 
-### Die vier Fallen
+### The four traps
 
-**Die `-wal` und `-shm` der alten Datenbank bleiben liegen.** Das ist die schwerste und die
-wahrscheinlichste, denn der Prozess hat keinen SIGTERM-Handler und schließt die SQLite-Verbindung
-nie: Nach jedem `stop` liegt garantiert ein nicht-leerer `-wal` im Volume (gemessen: SIGTERM bis
-Prozessende 54 ms, danach 8 KB `-wal` und 32 KB `-shm`, mit der einzigen geschriebenen Zeile darin).
-Kopiert man das Backup darüber, ohne die beiden zu entfernen, legt SQLite die alten WAL-Frames über
-die neue Datei. Das Ergebnis ist keine Fehlermeldung, sondern eine Datenbank, die oben heil aussieht
-und unten kaputt ist: `wallets` und `ledger` zeigen den alten Stand,
-`select count(*) from payments where status='settled'` liefert **0 ohne Fehler**, `api_keys` wirft
-`database disk image is malformed`, und `integrity_check` meldet
-`btreeInitPage() returns error code 11`. Dieselbe Datei mit entfernten Begleitdateien ist in
-Ordnung. Festgehalten in `test/backup.test.ts`.
+**The `-wal` and `-shm` of the old database stay behind.** That is the worst and the most likely one,
+because the process has no SIGTERM handler and never closes the SQLite connection: after every `stop`
+there is guaranteed to be a non-empty `-wal` in the volume (measured: 54 ms from SIGTERM to process
+end, after that 8 KB of `-wal` and 32 KB of `-shm`, with the single written row inside). Copy the
+backup over it without removing those two, and SQLite lays the old WAL frames over the new file. The
+result is not an error message but a database that looks intact on top and is broken underneath:
+`wallets` and `ledger` show the old state,
+`select count(*) from payments where status='settled'` returns **0 without an error**, `api_keys`
+throws `database disk image is malformed`, and `integrity_check` reports
+`btreeInitPage() returns error code 11`. The same file with the companion files removed is fine.
+Pinned down in `test/backup.test.ts`.
 
-**Der Dienst läuft beim Zurückspielen noch.** Das sieht zunächst nach Erfolg aus: Direkt nach dem
-Kopieren meldet die Datei `integrity_check: ok` und exakt den Backup-Stand, und der laufende Prozess
-schreibt ohne eine einzige Fehlermeldung weiter. Erst sein nächster Checkpoint schreibt seine alten
-Seiten über die neue Datei, und dann ist sie malformed, mit `settled` auf 0. Wer nach dem Kopieren
-prüft und zufrieden ist, prüft zu früh. Deshalb steht der Stop vor dem Kopieren und die Prüfung
-danach.
+**The service is still running during the restore.** At first that looks like success: right after
+the copy the file reports `integrity_check: ok` and exactly the backup state, and the running process
+keeps writing without a single error message. Only its next checkpoint writes its old pages over the
+new file, and then it is malformed, with `settled` at 0. Whoever checks right after the copy and is
+satisfied checks too early. That is why the stop comes before the copy and the check after it.
 
-**Das Backup ist älter als die letzte Migration.** Der harmloseste Fall, gegen die Erwartung. Ein
-Backup ohne `wallets.reserved_mc`, ohne `payments.balance_after_mc` und ohne die `kv`-Tabelle wurde
-beim Start in 0,94 Sekunden migriert, die Spalten und die Tabelle kamen dazu, der Index
-`ledger_topup_ref` ebenfalls, die Salden blieben unverändert, `/health` und `/v1/status` antworteten
-normal. `ops/restore-pruefen.cjs` meldet fehlende Spalten als Hinweis und lehnt das Backup nicht ab.
-Zwei Nachwirkungen bleiben: Der Preiskatalog im `kv` ist leer (Schritt 6), und enthält das alte
-Backup eine x402-Nonce mit zwei Gutschriften, lässt sich `ledger_topup_ref` nicht anlegen. Der Start
-läuft dann weiter und meldet es nur ins Log, wo es niemand sieht. Genau dafür prüft
-`restore-pruefen.cjs` auf doppelte Gutschriften.
+**The backup is older than the last migration.** The most harmless case, against expectation. A
+backup without `wallets.reserved_mc`, without `payments.balance_after_mc` and without the `kv` table
+was migrated in 0.94 seconds at startup, the columns and the table were added, the index
+`ledger_topup_ref` as well, the balances stayed unchanged, `/health` and `/v1/status` answered
+normally. `ops/restore-pruefen.cjs` reports missing columns as a hint and does not reject the backup.
+Two after-effects remain: the price catalogue in `kv` is empty (step 6), and if the old backup holds
+an x402 nonce with two credits, `ledger_topup_ref` cannot be created. The start then carries on and
+only writes it to the log, where nobody sees it. That is exactly what `restore-pruefen.cjs` checks
+for with its duplicate-credit check.
 
-**Das Backup ist leer und niemand merkt es.** Eine Kopie der `.db` ohne `-wal` hat vollständiges
-Schema, 86 KB Größe und `integrity_check: ok`, aber keine einzige Zeile. Keine Größenschwelle fängt
-das, und beim Zurückspielen stünde jeder Kunde auf 0 Credits. Deshalb zählt `backup-vacuum.cjs` die
-Zeilen im Backup gegen die Quelle, und deshalb läuft `restore-pruefen.cjs` vor dem Einspielen.
+**The backup is empty and nobody notices.** A copy of the `.db` without its `-wal` has a complete
+schema, a size of 86 KB and `integrity_check: ok`, but not a single row. No size threshold catches
+that, and on restore every customer would stand at 0 credits. That is why `backup-vacuum.cjs` counts
+the rows in the backup against the source, and why `restore-pruefen.cjs` runs before it is put in.
 
-### Dauer und Ausfall
+### Duration and outage
 
-Lokal gemessen, `VACUUM INTO` aus einem lesenden Prozess bei parallel schreibendem zweiten Prozess,
-Start mit `CP_PROVIDER=mock` über `tsx`:
+Measured locally, `VACUUM INTO` from a reading process with a second process writing in parallel,
+start with `CP_PROVIDER=mock` over `tsx`:
 
-| Datenbank | Backup | `VACUUM INTO` | Kopieren und Aufräumen | Start bis `/health` 200 |
+| Database | Backup | `VACUUM INTO` | Copy and clean-up | Start until `/health` 200 |
 |---|---|---|---|---|
-| 1,3 MB | 1,3 MB | 13 ms | 7 ms | 0,92 s |
-| 11 MB | 11 MB | 82 ms | 18 ms | 0,86 s |
-| 101 MB | 97 MB | 750 ms | 503 ms | 0,92 s |
+| 1.3 MB | 1.3 MB | 13 ms | 7 ms | 0.92 s |
+| 11 MB | 11 MB | 82 ms | 18 ms | 0.86 s |
+| 101 MB | 97 MB | 750 ms | 503 ms | 0.92 s |
 
-Der Dateiteil des Zurückspielens liegt also selbst bei 100 MB unter einer Sekunde. Den Ausfall
-bestimmt nicht er, sondern der Container-Wechsel drumherum, der bei den Deploys am 19.09.2026 rund
-16 Sekunden ohne Antwort kostete. Dazu kommt im Container der Preisabruf beim Start, der am
-19.09. zweimal hing; mit gefülltem `kv` fällt er auf den gespeicherten Katalog zurück. Realistisch
-zu planen ist eine halbe Minute 502 für jeden Aufrufer, und die Prüfung des Backups aus Schritt 1
-gehört davor, nicht hinein.
+So the file part of a restore stays below a second even at 100 MB. What determines the outage is not
+that but the container switch around it, which cost about 16 seconds without an answer during the
+deploys on 19.09.2026. On top of that comes the price fetch at container startup, which hung twice on
+19.09.; with a filled `kv` it falls back on the stored catalogue. Realistically half a minute of 502
+for every caller is what to plan for, and the backup check from step 1 belongs before that, not
+inside it.
 
-### Was hinterher stimmen muss
+### What has to hold afterwards
 
-`ops/restore-pruefen.cjs` prüft das alles und endet mit `exit 1`, sobald etwas davon nicht gilt:
+`ops/restore-pruefen.cjs` checks all of this and ends with `exit 1` as soon as one of them does not
+hold:
 
-- `PRAGMA integrity_check` ist `ok`, `foreign_key_check` ist leer.
-- Für jede Wallet gilt `balance_mc` gleich der Summe ihrer `ledger.delta_mc`, und die Gesamtsummen
-  beider Seiten stimmen überein.
-- Jede `settled`-Zahlung hat ihre `topup`-Ledgerzeile, und keine x402-Nonce hat zwei.
-- Die Zahlen aus `ops/status.sh` (`db.wallets`, `db.keys`, `db.automatons`) passen zum letzten Lauf
-  vor dem Ausfall, abzüglich dessen, was seit dem Backup dazugekommen war.
-- `ops/smoke.sh` läuft von außen durch.
+- `PRAGMA integrity_check` is `ok`, `foreign_key_check` is empty.
+- For every wallet `balance_mc` equals the sum of its `ledger.delta_mc`, and the totals of both sides
+  match.
+- Every `settled` payment has its `topup` ledger row, and no x402 nonce has two.
+- The numbers from `ops/status.sh` (`db.wallets`, `db.keys`, `db.automatons`) match the last run
+  before the outage, minus whatever came in after the backup.
+- `ops/smoke.sh` runs through from the outside.
 
-## Selbstheilung
+## Self-healing
 
-Der `autoheal`-Dienst im Compose startet Container neu, die der Healthcheck als `unhealthy`
-markiert. Das ist nötig, weil Docker von sich aus nur bei einem beendeten Prozess neu startet:
-Am 19.09.2026 hing der Startprozess still, der Container blieb "Up" und unhealthy, und der Dienst
-war 502, bis jemand von Hand eingriff. Geprüft mit SIGSTOP auf den Node-Prozess: nach 90 Sekunden
-`unhealthy`, nach 120 Sekunden automatisch neu gestartet.
+The `autoheal` service in the compose file restarts containers the healthcheck marks as `unhealthy`.
+That is needed because Docker on its own only restarts on a terminated process: on 19.09.2026 the
+startup process hung silently, the container stayed "Up" and unhealthy, and the service was 502 until
+somebody intervened by hand. Checked with SIGSTOP on the Node process: `unhealthy` after 90 seconds,
+restarted automatically after 120 seconds.
 
-## Kennzahl des 30-Tage-Tests
+## The figure of the 30-day test
 
-**Ziel: fünf zahlende fremde Betreiber in 30 Tagen** (Stand 19.09.2026, nach der Nachfragemessung
-von 50 nach unten korrigiert). Unter drei am 19.10.2026 wird abgeschaltet, mit zwei Wochen Vorlauf
-auf der Startseite.
+**Goal: five paying outside operators in 30 days** (as of 19.09.2026, revised down from 50 after the
+demand measurement). Below three on 19.10.2026 it gets switched off, with two weeks of notice on the
+landing page.
 
-Die Zahl in `/v1/status` zählt **distinkte Wallets mit mindestens einer Gutschrift**, nicht
-Registrierungen und nicht Automatons. Beides wäre manipulierbar: Ein API-Key kostet nichts, eine
-Registrierung auch, und selbst mit Zahlung könnte eine einzige Wallet 25 Automatons anlegen und die
-Kennzahl verfünfundzwanzigfachen. Wer die Zahl bewegen will, muss zahlen, und genau das ist der
-Punkt der Messung. Der eigene Automat ist in der Zahl enthalten, für die Messgröße also eins
-abziehen.
-`db.keys` zählt ausgestellte API-Keys, `db.day.topups` die Zahlungen des letzten Tages.
+The number in `/v1/status` counts **distinct wallets with at least one credit**, not registrations
+and not automatons. Both would be gameable: an API key costs nothing, a registration does not either,
+and even with a payment a single wallet could create 25 automatons and multiply the figure by
+twenty-five. Whoever wants to move the number has to pay, and that is the whole point of the
+measurement. Our own automaton is included in the number, so subtract one for the actual figure.
+`db.keys` counts issued API keys, `db.day.topups` the payments of the last day.
 
-## Zeitreihe der x402-Verzeichnisse
+## Time series of the x402 directories
 
-`ops/x402-zeitreihe.sh`, taeglich um 4:40 UTC per Cron. Scannt beide oeffentlichen
-x402-Verzeichnisse (Coinbase und PayAI) und schreibt nach `/opt/control-plane/x402`:
+`ops/x402-zeitreihe.sh`, daily at 4:40 UTC by cron. Scans both public x402 directories (Coinbase and
+PayAI) and writes to `/opt/control-plane/x402`:
 
-- `kennzahlen.ndjson`: eine Zeile je Lauf. Das ist die Reihe, sie bleibt dauerhaft.
-- `roh/JJJJ-MM-TT.csv.gz`: der vollstaendige Scan, rund 540 KB gepackt, 60 Tage Aufbewahrung.
+- `kennzahlen.ndjson`: one line per run. That is the series, it stays for good.
+- `roh/YYYY-MM-DD.csv.gz`: the full scan, about 540 KB packed, kept for 60 days.
 
-**Nicht ins Repo-Verzeichnis verschieben.** `deploy/rollout.sh` spiegelt `/opt/control-plane/repo`
-mit `--delete`; alles darin waere nach dem naechsten Deploy weg.
+**Do not move it into the repo directory.** `deploy/rollout.sh` mirrors `/opt/control-plane/repo`
+with `--delete`; anything in there would be gone after the next deploy.
 
-Das Skript bricht ab, statt einen falschen Punkt zu schreiben, wenn der Scan weniger als 1.000
-Zeilen liefert oder die Kennzahlen unplausibel sind. Beide Faelle melden sich ueber
-`CP_ALERT_WEBHOOK`. Eine Luecke in der Reihe ist ehrlicher als ein erfundener Wert.
+The script aborts instead of writing a false point when the scan yields fewer than 1,000 lines or the
+figures are implausible. Both cases report themselves over `CP_ALERT_WEBHOOK`. A gap in the series is
+more honest than an invented value.
 
-Abholen fuer eine Auswertung:
+Fetching it for an analysis:
 
 ```
 scp -i ~/.ssh/id_ed25519_automaton root@76.13.144.207:/opt/control-plane/x402/kennzahlen.ndjson .

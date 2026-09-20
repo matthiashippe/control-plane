@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Upstream-Runtime gegen das Control Plane mit OpenRouter als echtem Provider. Kostet Geld
-# (Budget unter 0,50 USD je Lauf): maxTurnsPerCycle 6, Genesis-Prompt verlangt billige Tools.
+# Upstream runtime against the control plane with OpenRouter as the real provider. Costs money
+# (budget below 0.50 USD per run): maxTurnsPerCycle 6, the genesis prompt asks for cheap tools.
 #   OPENROUTER_API_KEY=... pnpm e2e:live
 set -euo pipefail
 cd "$(dirname "$0")/.."
-[[ -n "${OPENROUTER_API_KEY:-}" ]] || { echo "LIVE FAIL: OPENROUTER_API_KEY fehlt in der Umgebung"; exit 2; }
+[[ -n "${OPENROUTER_API_KEY:-}" ]] || { echo "LIVE FAIL: OPENROUTER_API_KEY missing from the environment"; exit 2; }
 export CP_PROVIDER=openrouter
 export CP_MODEL_ALIASES=""
 export SETUP_JSON=./runtime/setup.live.json
@@ -23,10 +23,10 @@ echo "--- provision"
 out=$("${COMPOSE[@]}" run --rm --no-deps runtime provision 2>&1) || { echo "$out"; echo "LIVE FAIL: provision"; exit 1; }
 key=$(printf '%s\n' "$out" | grep -o '"apiKey": *"cnwy_k_[0-9a-f]*"' | head -1 | grep -o 'cnwy_k_[0-9a-f]*')
 wallet=$(printf '%s\n' "$out" | grep -o '"walletAddress": *"0x[0-9a-fA-F]*"' | head -1 | grep -o '0x[0-9a-fA-F]*')
-[[ -n "$key" && -n "$wallet" ]] || { echo "$out"; echo "LIVE FAIL: Key oder Wallet fehlt"; exit 1; }
+[[ -n "$key" && -n "$wallet" ]] || { echo "$out"; echo "LIVE FAIL: key or wallet missing"; exit 1; }
 "${COMPOSE[@]}" run --rm chain-tools fund "$wallet" 6 >/dev/null
 
-echo "--- Runtime gegen OpenRouter, warten auf Turns und Schlaf (max 6 Turns je Zyklus)"
+echo "--- runtime against OpenRouter, wait for turns and sleep (at most 6 turns per cycle)"
 "${COMPOSE[@]}" up -d --no-deps runtime
 deadline=$((SECONDS + 300))
 while (( SECONDS < deadline )); do
@@ -42,7 +42,7 @@ turns=$(printf '%s\n' "$logs" | grep -c 'Turn [0-9A-Za-z_-]*: [0-9]* tools' || t
 api_errors=$(printf '%s\n' "$logs" | grep -c 'Conway API error\|registration failed\|Inference error' || true)
 printf '%s\n' "$logs" | grep -E "registered|Bootstrap topup: \+|Turn [0-9A-Za-z_-]*:|\[TOOL\]|\[SLEEP\]|Sleeping for|Inference error|ERROR|FATAL" | head -40 || true
 
-echo "--- Ledger"
+echo "--- ledger"
 ledger=$("${COMPOSE[@]}" exec -T cp node -e '
   const db = require("better-sqlite3")("/data/cp.db", { readonly: true });
   const w = db.prepare("SELECT balance_mc FROM wallets ORDER BY created_at LIMIT 1").get();
@@ -61,7 +61,7 @@ cost_usd=$(printf '%s\n' "$ledger" | grep -o '"cost_usd":[0-9.]*' | grep -o '[0-
 cleanup
 trap - EXIT
 remaining=$("${COMPOSE[@]}" ps -q | wc -l | tr -d ' ')
-[[ "$remaining" == "0" ]] || { echo "LIVE FAIL: Container übrig"; exit 1; }
+[[ "$remaining" == "0" ]] || { echo "LIVE FAIL: containers left behind"; exit 1; }
 if [[ "$turns" -lt 3 || "$api_errors" != "0" || "$consistent" != "true" || "$uncollected" != "0" ]]; then
   echo "LIVE FAIL turns=$turns api_errors=$api_errors ledger_consistent=$consistent uncollected_mc=$uncollected cost_usd=$cost_usd"
   exit 1

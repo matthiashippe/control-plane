@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Kompletter Erstlauf der unveränderten Upstream-Runtime gegen das Control Plane:
-# Provisionierung, Registrierung, Bootstrap-Topup, fünf Turns, Schlaf. Kein Conway-API-Fehler erlaubt.
+# Complete first run of the unmodified upstream runtime against the control plane:
+# provisioning, registration, bootstrap topup, five turns, sleep. No Conway API error allowed.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 COMPOSE=(docker compose -f docker-compose.yml)
@@ -17,11 +17,11 @@ echo "--- provision"
 out=$("${COMPOSE[@]}" run --rm --no-deps runtime provision 2>&1) || { echo "$out"; echo "E2E FAIL: provision"; exit 1; }
 key=$(printf '%s\n' "$out" | grep -o '"apiKey": *"cnwy_k_[0-9a-f]*"' | head -1 | grep -o 'cnwy_k_[0-9a-f]*')
 wallet=$(printf '%s\n' "$out" | grep -o '"walletAddress": *"0x[0-9a-fA-F]*"' | head -1 | grep -o '0x[0-9a-fA-F]*')
-[[ -n "$key" && -n "$wallet" ]] || { echo "$out"; echo "E2E FAIL: Key oder Wallet fehlt"; exit 1; }
+[[ -n "$key" && -n "$wallet" ]] || { echo "$out"; echo "E2E FAIL: key or wallet missing"; exit 1; }
 echo "wallet=$wallet key_prefix=${key:0:15}"
 "${COMPOSE[@]}" run --rm chain-tools fund "$wallet" 6 >/dev/null
 
-echo "--- Runtime starten, auf Registrierung, Topup, fünf Turns und Schlaf warten"
+echo "--- start runtime, wait for registration, topup, five turns and sleep"
 "${COMPOSE[@]}" up -d --no-deps runtime
 deadline=$((SECONDS + 240))
 while (( SECONDS < deadline )); do
@@ -38,7 +38,7 @@ registered=false
 printf '%s\n' "$logs" | grep -q 'Automaton identity registered\.' && registered=true
 printf '%s\n' "$logs" | grep -E "registered|registration|Bootstrap topup: \+|Turn [0-9A-Za-z_-]*:|\[SLEEP\]|Sleeping for|Conway API error|ERROR|FATAL" | head -30 || true
 
-echo "--- Saldo und Ledger"
+echo "--- balance and ledger"
 balance=$("${COMPOSE[@]}" run --rm --no-deps -e KEY="$key" runtime node -e '
   fetch(process.env.CONWAY_API_URL + "/v1/credits/balance", { headers: { authorization: process.env.KEY } })
     .then(async (r) => { console.log(r.status, await r.text()); process.exit(r.ok ? 0 : 1); })' 2>&1)
@@ -58,7 +58,7 @@ db_registered=$(printf '%s\n' "$ledger" | grep -c "\"address\":\"$(printf '%s' "
 cleanup
 trap - EXIT
 remaining=$("${COMPOSE[@]}" ps -q | wc -l | tr -d ' ')
-[[ "$remaining" == "0" ]] || { echo "E2E FAIL: Container übrig"; exit 1; }
+[[ "$remaining" == "0" ]] || { echo "E2E FAIL: containers left behind"; exit 1; }
 if [[ "$turns" -lt 5 || "$registered" != "true" || "$api_errors" != "0" || "$consistent" != "true" || "$db_registered" != "1" || "$balance_cents" -ge 500 ]]; then
   echo "E2E FAIL turns=$turns registered=$registered api_errors=$api_errors ledger_consistent=$consistent db_registered=$db_registered balance_cents=$balance_cents"
   exit 1

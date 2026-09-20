@@ -1,13 +1,13 @@
 /**
- * Abnahme Stufe 1 gegen das laufende Control Plane auf Base Mainnet: eine Wegwerf-Wallet
- * provisioniert sich per SIWE, kauft über `/pay/<tier>/<addr>` Credits mit echtem USDC (x402 v1,
- * signiert wie der Runtime-Client) und liest den Saldo zurück.
+ * Acceptance stage 1 against the running control plane on Base mainnet: a throwaway wallet
+ * provisions itself over SIWE, buys credits through `/pay/<tier>/<addr>` with real USDC (x402 v1,
+ * signed the way the runtime client signs) and reads the balance back.
  *
- *   CP_URL=https://cp.hippe.eu pnpm e2e:mainnet            (Tier 1, Default)
+ *   CP_URL=https://cp.hippe.eu pnpm e2e:mainnet            (tier 1, the default)
  *   CP_URL=... CP_TIER=5 pnpm e2e:mainnet
  *
- * Die Wallet liegt unter harness/state/mainnet-wallet.json (gitignored). Der Key verlässt diesen
- * Rechner nicht; das Control Plane sieht nur Signaturen.
+ * The wallet lives at harness/state/mainnet-wallet.json (gitignored). The key never leaves this
+ * machine; the control plane only ever sees signatures.
  */
 
 import fs from "node:fs";
@@ -21,7 +21,7 @@ import { SCHWELLEN_BONUS_CENTS } from "../../src/payments/pay.js";
 
 const CP_URL = (process.env.CP_URL || "").replace(/\/$/, "");
 if (!CP_URL) {
-  console.error("MAINNET FAIL: CP_URL fehlt (z. B. https://cp.hippe.eu)");
+  console.error("MAINNET FAIL: CP_URL missing (e.g. https://cp.hippe.eu)");
   process.exit(2);
 }
 const TIER = Number(process.env.CP_TIER || 1);
@@ -46,21 +46,21 @@ async function usdcBalance(): Promise<number> {
   return Number(formatUnits(raw, 6));
 }
 
-console.log(`Wegwerf-Wallet: ${account.address}`);
+console.log(`throwaway wallet: ${account.address}`);
 let balance = await usdcBalance();
-console.log(`USDC auf Base: ${balance}`);
+console.log(`USDC on Base: ${balance}`);
 const deadline = Date.now() + 15 * 60 * 1000;
 while (balance < TIER && Date.now() < deadline) {
-  console.log(`warte auf mindestens ${TIER} USDC an ${account.address} (aktuell ${balance}) ...`);
+  console.log(`waiting for at least ${TIER} USDC at ${account.address} (currently ${balance}) ...`);
   await new Promise((r) => setTimeout(r, 10_000));
   balance = await usdcBalance();
 }
 if (balance < TIER) {
-  console.error(`MAINNET FAIL: nur ${balance} USDC auf der Wallet`);
+  console.error(`MAINNET FAIL: only ${balance} USDC on the wallet`);
   process.exit(1);
 }
 
-// 1. SIWE-Provisionierung wie provision.ts der Runtime.
+// 1. SIWE provisioning, the way the runtime's provision.ts does it.
 const nonceRes = await fetch(`${CP_URL}/v1/auth/nonce`, { method: "POST" });
 const { nonce } = (await nonceRes.json()) as { nonce: string };
 const message = createSiweMessage({
@@ -87,20 +87,20 @@ const { access_token } = (await verifyRes.json()) as { access_token: string };
 const keyRes = await fetch(`${CP_URL}/v1/auth/api-keys`, {
   method: "POST",
   headers: { "content-type": "application/json", authorization: `Bearer ${access_token}` },
-  body: JSON.stringify({ name: "mainnet-abnahme" }),
+  body: JSON.stringify({ name: "mainnet-acceptance" }),
 });
 const { key, key_prefix } = (await keyRes.json()) as { key: string; key_prefix: string };
-console.log(`provisioniert: ${key_prefix}`);
+console.log(`provisioned: ${key_prefix}`);
 
-// 2. 402-Angebot holen, dann x402 v1 signieren wie signPayment() in src/conway/x402.ts.
+// 2. fetch the 402 offer, then sign x402 v1 the way signPayment() in src/conway/x402.ts does.
 const offerRes = await fetch(`${CP_URL}/pay/${TIER}/${account.address}`);
 if (offerRes.status !== 402) {
-  console.error(`MAINNET FAIL: erwartet 402, bekam ${offerRes.status} ${await offerRes.text()}`);
+  console.error(`MAINNET FAIL: expected 402, got ${offerRes.status} ${await offerRes.text()}`);
   process.exit(1);
 }
 const offer = (await offerRes.json()) as { accepts: Array<{ maxAmountRequired: string; payTo: Address; asset: Address; maxTimeoutSeconds: number; network: string }> };
 const req = offer.accepts[0];
-console.log(`Angebot: ${req.maxAmountRequired} atomare USDC an ${req.payTo} (${req.network})`);
+console.log(`offer: ${req.maxAmountRequired} atomic USDC to ${req.payTo} (${req.network})`);
 const value = BigInt(req.maxAmountRequired);
 const now = Math.floor(Date.now() / 1000);
 const validAfter = BigInt(now - 60);
@@ -142,23 +142,24 @@ const paidRes = await fetch(`${CP_URL}/pay/${TIER}/${account.address}`, {
 });
 const paidText = await paidRes.text();
 if (paidRes.status !== 200) {
-  console.error(`MAINNET FAIL: bezahlter Request ${paidRes.status} ${paidText}`);
+  console.error(`MAINNET FAIL: paid request ${paidRes.status} ${paidText}`);
   process.exit(1);
 }
 const paid = JSON.parse(paidText) as { credits_cents: number; balance_cents: number; tx_hash: string | null };
-console.log(`Antwort: ${paidText}`);
+console.log(`response: ${paidText}`);
 
-// 3. Saldo mit dem Key lesen, USDC-Saldo danach.
+// 3. read the balance with the key, then the USDC balance afterwards.
 const balRes = await fetch(`${CP_URL}/v1/credits/balance`, { headers: { authorization: key } });
 const bal = (await balRes.json()) as { balance_cents: number };
 const after = await usdcBalance();
-console.log(`Credits: ${bal.balance_cents} Cents, USDC danach: ${after}`);
-// Der Dienst legt auf jeden Topup den Schwellenbonus drauf, damit ein 5-USD-Kunde ueber der
-// Tier-Schwelle der Runtime landet (`> 500` Cent, nicht `>= 500`). Der Abnahmelauf muss das
-// mitrechnen, sonst meldet er FAIL bei korrektem Verhalten: genau das ist am 20.09. passiert.
-const erwartet = TIER * 100 + SCHWELLEN_BONUS_CENTS;
-if (paid.credits_cents !== erwartet || bal.balance_cents < erwartet || !paid.tx_hash) {
-  console.error(`MAINNET FAIL: erwartet ${erwartet} Cent, bekam ${paid.credits_cents}, tx=${paid.tx_hash}`);
+console.log(`credits: ${bal.balance_cents} cents, USDC afterwards: ${after}`);
+// The service adds the threshold bonus on top of every topup so that a 5 USD customer ends up
+// above the runtime's tier threshold (`> 500` cents, not `>= 500`). The acceptance run has to
+// account for that, otherwise it reports FAIL on correct behaviour: exactly what happened on
+// 20.09.
+const expected = TIER * 100 + SCHWELLEN_BONUS_CENTS;
+if (paid.credits_cents !== expected || bal.balance_cents < expected || !paid.tx_hash) {
+  console.error(`MAINNET FAIL: expected ${expected} cents, got ${paid.credits_cents}, tx=${paid.tx_hash}`);
   process.exit(1);
 }
 console.log(`MAINNET OK tier=${TIER} credits_cents=${paid.credits_cents} tx=${paid.tx_hash} basescan=https://basescan.org/tx/${paid.tx_hash}`);

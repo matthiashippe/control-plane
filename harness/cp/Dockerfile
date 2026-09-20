@@ -8,10 +8,10 @@ RUN pnpm build && cp -r src/public dist/public
 ENV CP_HOST=0.0.0.0 CP_PORT=8443 CP_DB_PATH=/data/cp.db
 EXPOSE 8443
 
-# Offen (Härtung, kein bekannter Angriffspfad): Der Prozess läuft als root. Ein Versuch mit
-# `USER node` am 19.09.2026 scheiterte daran, dass das benannte Volume `deploy_cp-data` mit
-# root-Rechten existiert und darüber gemountet wird; `chown` im Image greift dann nicht, und
-# SQLite kommt mit SQLITE_READONLY nicht hoch. Sauber lösbar mit einem Entrypoint, der als root
-# chownt und dann per `su-exec` herunterschaltet, oder indem das Volume einmalig umgestellt und
-# der Wechsel in einem Wartungsfenster gefahren wird. Nicht zwischen Tür und Angel.
+# Open (hardening, no known attack path): the process runs as root. An attempt with `USER node`
+# on 19.09.2026 failed because the named volume `deploy_cp-data` exists with root ownership and is
+# mounted over the image, so `chown` inside the image has no effect and SQLite refuses to come up
+# with SQLITE_READONLY. Cleanly solvable with an entrypoint that chowns as root and then drops
+# down via `su-exec`, or by converting the volume once and making the switch inside a maintenance
+# window. Not something to squeeze in between two other things.
 CMD ["node", "dist/index.js"]

@@ -2,10 +2,10 @@
 pragma solidity ^0.8.20;
 
 /**
- * Harness-Mock für USDC auf Base: ERC-20 mit EIP-3009 transferWithAuthorization und der
- * EIP-712-Domain, die der Runtime-Client signiert ("USD Coin", version "2", chainId, this).
- * Wird per anvil_setCode an die Mainnet-Adresse gelegt; deshalb kein Konstruktor und keine
- * Immutables: Domain-Separator wird zur Laufzeit berechnet. mint() ist absichtlich offen.
+ * Harness mock for USDC on Base: ERC-20 with EIP-3009 transferWithAuthorization and the EIP-712
+ * domain the runtime client signs ("USD Coin", version "2", chainId, this). It is placed at the
+ * mainnet address via anvil_setCode, hence no constructor and no immutables: the domain separator
+ * is computed at runtime. mint() is deliberately open.
  */
 contract MockUSDC {
     string public constant name = "USD Coin";

@@ -1,5 +1,5 @@
 {
-  "name": "AbnahmeProd",
+  "name": "AcceptanceProd",
   "genesisPrompt": "You are a test automaton inside a disposable acceptance run. Nothing you do here matters. Keep every turn short: call at most one cheap read-only tool (check_credits, system_synopsis, list_models, view_soul), then answer in one sentence. After your fifth turn, call the sleep tool with duration_seconds 3600.",
   "creatorAddress": "0x914102284463F4F58B1D2f6DB9aC80BFcaA7d614",
   "conwayApiUrl": "https://cp.hippe.eu",
