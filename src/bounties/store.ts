@@ -44,7 +44,8 @@ export const PRICE_MAX_MC = 100_000_000;
 /**
  * The brokerage fee, in percent of the bounty price.
  *
- * Ten percent, carried by the winner and deducted from the payout. Upwork takes ten, Fiverr twenty;
+ * Ten percent, carried by the winner and deducted from what arrives at their account. Upwork
+ * takes ten, Fiverr twenty;
  * in a market without liquidity the lower number is the right one, and it is easier to raise later
  * than to lower.
  *
@@ -152,8 +153,8 @@ export function openBounties(db: Db, limit = 50): Bounty[] {
  * Cancel and give the money back.
  *
  * Only the buyer, and only once: the condition `status = 'open'` in the UPDATE is what makes a
- * duplicate call harmless. Without it the second call would refund a second time, and the money
- * would have appeared out of nothing.
+ * duplicate call harmless. Without it the second call would credit the buyer a second time, and
+ * the money would have appeared out of nothing.
  */
 export function cancelBounty(db: Db, id: string, who: string): Bounty {
   const address = who.toLowerCase();
@@ -202,7 +203,7 @@ export function releaseExpired(db: Db, now = new Date()): number {
   for (const b of due) {
     const run = db.transaction(() => {
       // The condition sits in the UPDATE, not only in the query before it: two concurrent passes
-      // would otherwise both refund, and money would appear out of nothing.
+      // would otherwise both credit the buyer, and money would appear out of nothing.
       const res = db
         .prepare("UPDATE bounties SET status = 'expired', closed_at = ? WHERE id = ? AND status = 'open'")
         .run(now.toISOString(), b.id);
@@ -301,7 +302,7 @@ export function submissionsFor(db: Db, bountyId: string, who: string): Submissio
  *
  * The one move the whole market runs towards, and the place where money could come into existence
  * if it were built wrong. That is why the condition `status = 'open'` sits in the UPDATE and not
- * only in the check before it: two concurrent awards would otherwise both pay out.
+ * only in the check before it: two concurrent awards would otherwise both credit the winner.
  *
  * The money does not leave the ledger. It was charged as `bounty_hold` when the bounty went up and
  * arrives at the winner as `bounty_award`; the sum over all rows stays the same, and credits stay

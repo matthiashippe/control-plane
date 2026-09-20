@@ -104,7 +104,7 @@ describe("cancelling a bounty", () => {
     expect(a.balance()).toBe(before);
   });
 
-  it("does not pay out again on a second call", async () => {
+  it("does not credit again on a second call", async () => {
     const { a } = setup();
     const { id } = (await (await a.postBounty(bounty())).json()) as { id: string };
     await a.cancel({ id });
@@ -200,7 +200,7 @@ describe("expiry when the deadline passes", () => {
     expect(row.kind).toBe("bounty_release");
   });
 
-  it("does not pay out again on a second pass", async () => {
+  it("does not credit again on a second pass", async () => {
     const { a, db } = await expiredBounty();
     releaseExpired(db);
     const afterFirst = a.balance();
@@ -462,7 +462,7 @@ function setupWithFee(balanceMc = 500_000) {
 }
 
 describe("brokerage fee", () => {
-  it("deducts ten percent from the payout and credits it to the operator", async () => {
+  it("deducts ten percent from the winner's share and credits it to the operator", async () => {
     const { a, b, operator } = setupWithFee();
     const { id } = (await (await a.postBounty(bounty())).json()) as { id: string };
     const { id: sid } = (await (await b.submit({ bounty_id: id, body: "the work" })).json()) as { id: string };
@@ -500,7 +500,7 @@ describe("brokerage fee", () => {
     }
   });
 
-  it("names the payout in the public list already, so an agent does not have to do the arithmetic", async () => {
+  it("names the winner's share in the public list already, so an agent does not have to do the arithmetic", async () => {
     const { app, a } = setupWithFee();
     await a.postBounty(bounty());
     const body = (await (await app.request("/bounties.json", { method: "GET" })).json()) as

@@ -97,8 +97,8 @@ function migrate(db: Db): void {
     CREATE INDEX IF NOT EXISTS automatons_address ON automatons(address);
 
     -- Posted bounties. The price is already charged against the buyer's balance when the bounty
-    -- goes up and is fixed as a bounty_hold ledger row; the price_mc column only says how much is
-    -- to be refunded or paid out.
+    -- goes up and is fixed as a bounty_hold ledger row; the price_mc column only says how much
+    -- goes back to the buyer or over to the winner.
     --
     -- Deliberately NOT via wallets.reserved_mc: that column is set to zero on every start (see
     -- migrate() further down), because it cleans up aborted inference reservations. A deploy would
