@@ -42,6 +42,29 @@ jq -r --argjson seit "$seit" "select(.ts > \$seit) | (.request.headers.Referer /
   | grep -v '^-$' | grep -v 'cp\.hippe\.eu' | sort | uniq -c | sort -rn || echo "  keine"
 
 echo
+# Die Startseite holt ihre Zahlen per `fetch("/v1/status")` nach (src/public/index.html). Ein
+# echter Browser hinterlaesst deshalb ZWEI Zeilen, `/` und kurz darauf `/v1/status`. Ein Abrufer
+# ohne JavaScript hinterlaesst nur die erste, egal wie echt sein User-Agent aussieht. Am
+# 20.09.2026 kamen zwei Zugriffe aus demselben /24 von Web2Objects LLC mit einem
+# Mac-Safari-Kennstring und luden beide nichts nach: ein Proxy-Crawler, kein Mensch.
+#
+# Was `JS` NICHT beweist: dass ein Mensch davorsass. Moderne Crawler fuehren JavaScript aus, und
+# von den neun IPs, die am 20.09. beides holten, lagen die meisten in Rechenzentrumsbereichen
+# (34.x, 52.x, 205.169.x). Die Spalte trennt zwei Klassen von Abrufern, nicht Mensch von Maschine.
+# Zusammen mit der Herkunft der IP wird sie aussagekraeftig, allein nicht.
+echo "── Hat jemand die Seite wirklich geoeffnet? (JS = Browser, roh = Abrufer) ──"
+jq -r --argjson seit "$seit" --argjson eigene "$eigene_json" \
+  "select(.ts > \$seit) | $FREMD | select(.request.uri == \"/\" or .request.uri == \"/v1/status\") | [.request.remote_ip, .request.uri] | @tsv" "$log" \
+  | sort -u | awk -F'\t' '{ gesehen[$1] = gesehen[$1] $2 " " } END {
+      leer = 1
+      for (ip in gesehen) {
+        js = (gesehen[ip] ~ /\/v1\/status/ && gesehen[ip] ~ /\/ /) ? "JS " : "roh"
+        printf "   %-4s %s\n", js, ip; leer = 0
+      }
+      if (leer) print "   niemand hat / oder /v1/status geholt"
+    }' | sort -k1,1 -k2,2
+
+echo
 echo "── Fehlerantworten an Fremde (was ein Besucher zu sehen bekam) ──"
 jq -r --argjson seit "$seit" --argjson eigene "$eigene_json" \
   "select(.ts > \$seit) | $FREMD | select(.status >= 400) | select(.request.uri | test(\"wp-|php|\\\\.env|\\\\.git|admin|xmlrpc\") | not) | [(.status|tostring), .request.uri] | @tsv" "$log" \
