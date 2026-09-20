@@ -1,30 +1,29 @@
 /**
- * Fehlerantworten, die einem Menschen sagen, was los ist und was er tun kann.
+ * Error answers that tell a human what happened and what they can do.
  *
- * Regeln, die hier durchgehalten werden und an denen jede neue Meldung gemessen wird:
+ * Rules that are kept here and against which every new message is measured:
  *
- * - Das Feld `error` bleibt, wie es ist. Die Upstream-Runtime entscheidet zwar nach Statuscode
- *   und nicht nach unserem Körper, aber sie packt den ganzen Body in `err.message`
- *   (`src/conway/client.ts:73` der Revision d8f8168) und sucht darin den Marker
- *   `INSUFFICIENT_CREDITS` (`src/conway/topup.ts:97`, `src/agent/tools.ts:1655`,
- *   `src/agent/loop.ts:247`). Ergänzt wird deshalb nur, nie ersetzt, und keine Meldung nimmt
- *   diesen Marker in den Mund, die nicht wirklich Guthabenmangel meint.
- * - `message` ist ein bis drei Sätze: was passiert ist, warum es so gewollt ist, und der nächste
- *   Schritt. Kein Stacktrace, kein Dateipfad, kein Hinweis auf andere Mandanten.
- * - `docs` zeigt auf den passenden Abschnitt von `docs/errors.md`.
+ * - The `error` field stays as it is. The upstream runtime decides by status code and not by our
+ *   body, but it stuffs the whole body into `err.message` (`src/conway/client.ts:73` of revision
+ *   d8f8168) and looks for the marker `INSUFFICIENT_CREDITS` in it (`src/conway/topup.ts:97`,
+ *   `src/agent/tools.ts:1655`, `src/agent/loop.ts:247`). So things are only added, never replaced,
+ *   and no message that does not really mean a lack of credit takes that marker in its mouth.
+ * - `message` is one to three sentences: what happened, why it is meant to be that way, and the
+ *   next step. No stack trace, no file path, no hint about other tenants.
+ * - `docs` points at the matching section of `docs/errors.md`.
  *
- * Englisch, weil die Leser fremde Betreiber und ihre Agenten sind: dieselbe Sprache wie
- * `/llms.txt`, `/.well-known/x402` und die bestehenden Meldungen.
+ * English, because the readers are other operators and their agents: the same language as
+ * `/llms.txt`, `/.well-known/x402` and the existing messages.
  */
 
 const DOCS_BASE = "https://github.com/matthiashippe/control-plane/blob/main/docs/errors.md";
 
-/** URL auf einen Abschnitt der Fehlerdokumentation. */
+/** URL of a section in the error documentation. */
 export function docs(anchor: string): string {
   return `${DOCS_BASE}#${anchor}`;
 }
 
-/** Anker in `docs/errors.md`. Als Konstanten, damit Tippfehler beim Bauen auffallen. */
+/** Anchors in `docs/errors.md`. As constants, so typos show up at build time. */
 export const DOC = {
   authentication: docs("authentication"),
   inference: docs("inference"),

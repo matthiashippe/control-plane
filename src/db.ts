@@ -1,10 +1,9 @@
 /**
- * SQLite-Schema des Control Plane.
+ * SQLite schema of the control plane.
  *
- * Geld liegt als Integer-Millicents (1/1000 Cent) in `wallets.balance_mc`, damit Inferenz-Calls im
- * Bruchteil eines Cents abgerechnet werden können; die API zeigt `balance_cents` = floor(mc/1000).
- * Jede Saldo-Änderung läuft in derselben Transaktion wie ihre Ledger-Zeile. Keys werden nur
- * gehasht gespeichert.
+ * Money sits as integer millicents (1/1000 of a cent) in `wallets.balance_mc`, so inference calls
+ * can be billed at a fraction of a cent; the API shows `balance_cents` = floor(mc/1000). Every
+ * balance change runs in the same transaction as its ledger row. Keys are only stored hashed.
  */
 
 import Database from "better-sqlite3";
@@ -22,13 +21,13 @@ export function openDb(path: string): Db {
 function migrate(db: Db): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS wallets (
-      address     TEXT PRIMARY KEY,             -- lowercase 0x-Adresse
-      balance_mc  INTEGER NOT NULL DEFAULT 0,   -- Millicents
-      reserved_mc INTEGER NOT NULL DEFAULT 0,   -- laufende Inferenz-Calls, siehe reserveMc()
+      address     TEXT PRIMARY KEY,             -- lowercase 0x address
+      balance_mc  INTEGER NOT NULL DEFAULT 0,   -- millicents
+      reserved_mc INTEGER NOT NULL DEFAULT 0,   -- inference calls in flight, see reserveMc()
       created_at    TEXT NOT NULL
     );
 
-    -- Kleinkram, der einen Neustart überleben muss (z. B. der letzte Preiskatalog).
+    -- Small things that have to survive a restart (the last price catalogue, for example).
     CREATE TABLE IF NOT EXISTS kv (
       key        TEXT PRIMARY KEY,
       value      TEXT NOT NULL,
@@ -42,7 +41,7 @@ function migrate(db: Db): void {
     );
 
     CREATE TABLE IF NOT EXISTS sessions (
-      token      TEXT PRIMARY KEY,              -- access_token aus /v1/auth/verify
+      token      TEXT PRIMARY KEY,              -- access_token from /v1/auth/verify
       address    TEXT NOT NULL REFERENCES wallets(address),
       expires_at INTEGER NOT NULL
     );
@@ -50,7 +49,7 @@ function migrate(db: Db): void {
     CREATE TABLE IF NOT EXISTS api_keys (
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
       address    TEXT NOT NULL REFERENCES wallets(address),
-      key_hash   TEXT NOT NULL UNIQUE,          -- sha256 hex des vollen Keys
+      key_hash   TEXT NOT NULL UNIQUE,          -- sha256 hex of the full key
       key_prefix TEXT NOT NULL,
       name       TEXT NOT NULL,
       created_at TEXT NOT NULL,
@@ -58,26 +57,26 @@ function migrate(db: Db): void {
     );
     CREATE INDEX IF NOT EXISTS api_keys_address ON api_keys(address);
 
-    -- Jede Saldo-Änderung ist genau eine Ledger-Zeile, geschrieben in derselben Transaktion.
+    -- Every balance change is exactly one ledger row, written in the same transaction.
     CREATE TABLE IF NOT EXISTS ledger (
       id          INTEGER PRIMARY KEY AUTOINCREMENT,
       address     TEXT NOT NULL REFERENCES wallets(address),
       kind        TEXT NOT NULL,                -- topup | inference | transfer_in | transfer_out
-      delta_mc    INTEGER NOT NULL,             -- Millicents, negativ = Abbuchung
-      ref         TEXT,                         -- Idempotenzschlüssel / Fremdreferenz (x402-Nonce, tx-Hash, ...)
+      delta_mc    INTEGER NOT NULL,             -- millicents, negative = charge
+      ref         TEXT,                         -- idempotency key / foreign reference (x402 nonce, tx hash, ...)
       meta        TEXT,                         -- JSON
       created_at  TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS ledger_address ON ledger(address, id);
 
-    -- x402-Zahlungen, Schlüssel ist die Authorization-Nonce der EIP-3009-Signatur.
+    -- x402 payments, keyed by the authorization nonce of the EIP-3009 signature.
     CREATE TABLE IF NOT EXISTS payments (
       nonce         TEXT PRIMARY KEY,
       from_address  TEXT NOT NULL,
-      to_address    TEXT NOT NULL,              -- Empfänger der Credits (aus dem Pfad)
-      value_atomic  TEXT NOT NULL,              -- bigint als String
+      to_address    TEXT NOT NULL,              -- recipient of the credits (from the path)
+      value_atomic  TEXT NOT NULL,              -- bigint as a string
       credits_mc    INTEGER NOT NULL,
-      balance_after_mc INTEGER,       -- Saldo direkt nach der Gutschrift, siehe settledResponse()
+      balance_after_mc INTEGER,       -- balance right after the credit, see settledResponse()
       status        TEXT NOT NULL,              -- pending | settled | failed
       tx_hash       TEXT,
       error         TEXT,
@@ -85,7 +84,7 @@ function migrate(db: Db): void {
       settled_at    TEXT
     );
 
-    -- Registrierte Automatons (POST /v1/automatons/register), eine Zeile je automaton_id.
+    -- Registered automatons (POST /v1/automatons/register), one row per automaton_id.
     CREATE TABLE IF NOT EXISTS automatons (
       automaton_id        TEXT PRIMARY KEY,
       address             TEXT NOT NULL,
@@ -97,14 +96,14 @@ function migrate(db: Db): void {
     );
     CREATE INDEX IF NOT EXISTS automatons_address ON automatons(address);
 
-    -- Ausgeschriebene Auftraege. Der Preis ist beim Einstellen bereits vom Guthaben des
-    -- Auftraggebers abgebucht und liegt als Ledger-Zeile bounty_hold fest; die Spalte
-    -- price_mc sagt nur noch, wie viel zurueckzugeben oder auszuzahlen ist.
+    -- Posted bounties. The price is already charged against the buyer's balance when the bounty
+    -- goes up and is fixed as a bounty_hold ledger row; the price_mc column only says how much is
+    -- to be refunded or paid out.
     --
-    -- Bewusst NICHT ueber wallets.reserved_mc: Diese Spalte wird bei jedem Start auf null
-    -- gesetzt (siehe migrate() weiter unten), weil sie abgebrochene Inferenz-Reservierungen
-    -- aufraeumt. Ein Deploy wuerde damit jede Hinterlegung still freigeben, und der Auftraggeber
-    -- haette sein Geld zurueck, waehrend sein Auftrag weiter ausgeschrieben ist.
+    -- Deliberately NOT via wallets.reserved_mc: that column is set to zero on every start (see
+    -- migrate() further down), because it cleans up aborted inference reservations. A deploy would
+    -- therefore silently release every hold, and the buyer would have their money back while their
+    -- bounty is still posted.
     CREATE TABLE IF NOT EXISTS bounties (
       id          TEXT PRIMARY KEY,
       creator     TEXT NOT NULL REFERENCES wallets(address),
@@ -120,9 +119,9 @@ function migrate(db: Db): void {
     CREATE INDEX IF NOT EXISTS bounties_status ON bounties(status, deadline);
     CREATE INDEX IF NOT EXISTS bounties_creator ON bounties(creator, id);
 
-    -- Eine Bewerbung auf einen Auftrag. Der eindeutige Index ueber (bounty_id, agent) ist die
-    -- Regel: ein Versuch je Agent und Auftrag. Ohne ihn koennte ein Agent denselben Auftrag
-    -- hundertmal bewerben und damit die Auswahl des Auftraggebers zuschuetten.
+    -- One entry for a bounty. The unique index over (bounty_id, agent) is the rule: one attempt
+    -- per agent and bounty. Without it an agent could enter the same bounty a hundred times and
+    -- bury the buyer's choice.
     CREATE TABLE IF NOT EXISTS submissions (
       id          TEXT PRIMARY KEY,
       bounty_id   TEXT NOT NULL REFERENCES bounties(id),
@@ -130,74 +129,79 @@ function migrate(db: Db): void {
       body        TEXT NOT NULL,
       created_at  TEXT NOT NULL
     );
-    CREATE UNIQUE INDEX IF NOT EXISTS submissions_einmal ON submissions(bounty_id, agent);
+    CREATE UNIQUE INDEX IF NOT EXISTS submissions_once ON submissions(bounty_id, agent);
     CREATE INDEX IF NOT EXISTS submissions_bounty ON submissions(bounty_id, id);
   `);
 
-  // Bestehende Datenbanken kennen reserved_mc noch nicht. SQLite hat kein "ADD COLUMN IF NOT
-  // EXISTS", deshalb erst nachsehen.
-  const spalten = db.prepare("PRAGMA table_info(wallets)").all() as { name: string }[];
-  if (!spalten.some((c) => c.name === "reserved_mc")) {
+  // Existing databases do not know reserved_mc yet. SQLite has no "ADD COLUMN IF NOT EXISTS", so
+  // look first.
+  const walletColumns = db.prepare("PRAGMA table_info(wallets)").all() as { name: string }[];
+  if (!walletColumns.some((c) => c.name === "reserved_mc")) {
     db.exec("ALTER TABLE wallets ADD COLUMN reserved_mc INTEGER NOT NULL DEFAULT 0");
   }
 
-  // Dieselbe Sache fuer die Auftragstabelle: `CREATE TABLE IF NOT EXISTS` legt keine Spalte in
-  // einer Tabelle nach, die es schon gibt, und die Produktionsdatenbank hat `bounties` seit dem
-  // Deploy vom 20.09.2026 ohne diese Spalte.
-  const bountySpalten = db.prepare("PRAGMA table_info(bounties)").all() as { name: string }[];
-  if (bountySpalten.length > 0 && !bountySpalten.some((c) => c.name === "winner_submission")) {
+  // Same thing for the bounty table: `CREATE TABLE IF NOT EXISTS` does not add a column to a table
+  // that already exists, and the production database has had `bounties` without this column since
+  // the deploy of 20.09.2026.
+  const bountyColumns = db.prepare("PRAGMA table_info(bounties)").all() as { name: string }[];
+  if (bountyColumns.length > 0 && !bountyColumns.some((c) => c.name === "winner_submission")) {
     db.exec("ALTER TABLE bounties ADD COLUMN winner_submission TEXT");
   }
 
-  // Zweite Verteidigungslinie gegen doppelte Gutschriften: Eine x402-Nonce darf höchstens eine
-  // topup-Zeile erzeugen, auch wenn die Prüfung im Code durchrutscht. Der Index kann aber nicht
-  // angelegt werden, wenn eine Bestandsdatenbank bereits Duplikate enthält, also genau das
-  // Ergebnis des Fehlers, gegen den er schützt. Ein harter Abbruch wäre hier das Schlechtere:
-  // Zusammen mit dem autoheal-Dienst würde daraus eine Neustartschleife, und der Dienst wäre
-  // dauerhaft weg. Deshalb laut warnen und ohne Index weiterlaufen; die Prüfung in pay.ts bleibt.
+  // The unique index over (bounty_id, agent) used to be called `submissions_einmal`. The name was
+  // the last German identifier in the schema; the index above creates the English one, and this
+  // drops the old one so a database from before the rename does not carry both. Dropping is safe
+  // because both cover the same columns with the same uniqueness.
+  db.exec("DROP INDEX IF EXISTS submissions_einmal");
+
+  // Second line of defence against duplicate credits: an x402 nonce may produce at most one topup
+  // row, even if the check in the code slips through. The index cannot be created, however, when an
+  // existing database already contains duplicates, which is exactly the result of the bug it
+  // protects against. A hard abort would be the worse option here: together with the autoheal
+  // service it would turn into a restart loop and the service would be gone for good. So warn
+  // loudly and keep running without the index; the check in pay.ts stays.
   try {
     db.exec("CREATE UNIQUE INDEX IF NOT EXISTS ledger_topup_ref ON ledger(ref) WHERE kind = 'topup' AND ref IS NOT NULL");
   } catch {
-    const doppelte = db
+    const duplicates = db
       .prepare("SELECT ref, count(*) AS n FROM ledger WHERE kind = 'topup' AND ref IS NOT NULL GROUP BY ref HAVING n > 1")
       .all() as { ref: string; n: number }[];
     console.error(
-      `[db] ACHTUNG: ledger_topup_ref konnte nicht angelegt werden, ${doppelte.length} x402-Nonce(n) haben mehr als eine ` +
-        `Gutschrift: ${doppelte.map((d) => `${d.ref} (${d.n}x)`).join(", ")}. ` +
-        `Die Buchhaltung stimmt nicht. Prüfen mit: SELECT * FROM ledger WHERE kind='topup' AND ref IN (...). ` +
-        `Der Dienst läuft weiter, die Absicherung gegen neue Doppelbuchungen steckt in pay.ts.`,
+      `[db] WARNING: ledger_topup_ref could not be created, ${duplicates.length} x402 nonce(s) have more than one ` +
+        `credit: ${duplicates.map((d) => `${d.ref} (${d.n}x)`).join(", ")}. ` +
+        `The books do not add up. Inspect with: SELECT * FROM ledger WHERE kind='topup' AND ref IN (...). ` +
+        `The service keeps running, the guard against new double bookings sits in pay.ts.`,
     );
   }
 
-  // Saldo direkt nach der Gutschrift. Wird gebraucht, damit die Antwort auf einen wiederholten
-  // Zahlungs-Header nicht den aktuellen Kontostand verrät: Diese Antwort gibt es ohne API-Key.
-  const zahlungsSpalten = db.prepare("PRAGMA table_info(payments)").all() as { name: string }[];
-  if (!zahlungsSpalten.some((c) => c.name === "balance_after_mc")) {
+  // Balance right after the credit. Needed so the answer to a repeated payment header does not
+  // leak the current balance: that answer is served without an API key.
+  const paymentColumns = db.prepare("PRAGMA table_info(payments)").all() as { name: string }[];
+  if (!paymentColumns.some((c) => c.name === "balance_after_mc")) {
     db.exec("ALTER TABLE payments ADD COLUMN balance_after_mc INTEGER");
   }
 
-  // Reservierungen gehören zu laufenden Requests. Ein frisch gestarteter Prozess hat keine, also
-  // sind übriggebliebene Werte Reste eines Absturzes mitten im Provider-Call. Sie hier
-  // zurückzusetzen ist nur korrekt, solange genau ein Prozess auf dieser Datei arbeitet, und
-  // genau so läuft der Dienst (ein Container, eine SQLite-Datei).
+  // Reservations belong to requests in flight. A freshly started process has none, so leftover
+  // values are the remains of a crash in the middle of a provider call. Resetting them here is only
+  // correct as long as exactly one process works on this file, and that is exactly how the service
+  // runs (one container, one SQLite file).
   db.exec("UPDATE wallets SET reserved_mc = 0 WHERE reserved_mc <> 0");
 
-  // Dasselbe für Zahlungen, die im Zustand `pending` hängen: Auch sie gehören zu einem Request,
-  // der nicht mehr läuft. Sie hier stehen zu lassen wäre das Schlimmste von allem, denn die
-  // Nonce antwortet dann dauerhaft mit 409 und niemand kann es erneut versuchen, obwohl die
-  // USDC möglicherweise schon geflossen sind. Sie werden deshalb auf `failed` gesetzt, was den
-  // Retry-Pfad öffnet, und ausdrücklich protokolliert: Ist die Zahlung on-chain durchgelaufen,
-  // hat der Zahler Geld ohne Credits und das muss ein Mensch ansehen.
-  const haengend = db
+  // The same for payments stuck in state `pending`: they too belong to a request that is no longer
+  // running. Leaving them here would be the worst of all, because the nonce then answers 409
+  // forever and nobody can try again, although the USDC may already have moved. They are therefore
+  // set to `failed`, which opens the retry path, and explicitly logged: if the payment did settle
+  // on chain, the payer has spent money without credits and a human has to look at it.
+  const stuck = db
     .prepare("SELECT nonce, from_address, to_address, credits_mc FROM payments WHERE status = 'pending'")
     .all() as { nonce: string; from_address: string; to_address: string; credits_mc: number }[];
-  if (haengend.length) {
+  if (stuck.length) {
     db.exec("UPDATE payments SET status = 'failed', error = 'interrupted_by_restart' WHERE status = 'pending'");
-    for (const z of haengend) {
+    for (const p of stuck) {
       console.error(
-        `[db] ACHTUNG: Zahlung ${z.nonce} hing beim Neustart in 'pending' und ist jetzt 'failed'. ` +
-          `Zahler ${z.from_address}, Empfänger ${z.to_address}, ${z.credits_mc} mc. Prüfen, ob die ` +
-          `Autorisierung on-chain gesettelt wurde: Dann ist Geld geflossen, ohne dass Credits gebucht sind.`,
+        `[db] WARNING: payment ${p.nonce} was stuck in 'pending' across a restart and is now 'failed'. ` +
+          `Payer ${p.from_address}, recipient ${p.to_address}, ${p.credits_mc} mc. Check whether the ` +
+          `authorization settled on chain: if it did, money moved without credits being booked.`,
       );
     }
   }
@@ -211,9 +215,9 @@ export function mcToCents(mc: number): number {
 
 export interface LedgerEntry {
   address: string;
-  // bounty_hold bucht den Preis beim Einstellen ab, bounty_release gibt ihn beim
-  // Zurueckziehen wieder frei. Beides sind echte Saldo-Aenderungen und keine Reservierung,
-  // damit sie einen Neustart ueberleben (src/bounties/store.ts sagt, warum).
+  // bounty_hold charges the price when the bounty goes up, bounty_release frees it again when the
+  // bounty is taken back. Both are real balance changes and not reservations, so they survive a
+  // restart (src/bounties/store.ts says why).
   kind:
     | "topup" | "inference" | "transfer_in" | "transfer_out"
     | "bounty_hold" | "bounty_release" | "bounty_award" | "bounty_fee";
@@ -221,16 +225,16 @@ export interface LedgerEntry {
   ref?: string;
   meta?: Record<string, unknown>;
   /**
-   * Reservierung, die mit dieser Buchung aufgelöst wird, in derselben Transaktion. Sonst gäbe es
-   * zwischen Freigabe und Abbuchung ein Fenster, in dem ein paralleler Call das Guthaben sieht.
+   * Reservation that is resolved together with this booking, in the same transaction. Otherwise
+   * there would be a window between release and charge in which a parallel call sees the credit.
    */
   releaseReservedMc?: number;
 }
 
 /**
- * Bucht eine Saldo-Änderung samt Ledger-Zeile. Muss innerhalb einer db.transaction() laufen,
- * wenn mehrere Buchungen zusammengehören; für sich allein ist die Funktion atomar.
- * Wirft, wenn der Saldo negativ würde.
+ * Books a balance change together with its ledger row. Has to run inside a db.transaction() when
+ * several bookings belong together; on its own the function is atomic. Throws when the balance
+ * would go negative.
  */
 export function postLedger(db: Db, entry: LedgerEntry): { balanceMc: number } {
   const address = entry.address.toLowerCase();
@@ -266,10 +270,10 @@ export function ensureWallet(db: Db, address: string): void {
 }
 
 /**
- * Reserviert Guthaben für einen laufenden Call. Atomar: Die Bedingung steht im UPDATE selbst,
- * deshalb können zwei gleichzeitige Requests nicht beide dasselbe Guthaben sehen und verbrauchen.
- * Genau das war der Fehler davor, als vor dem Provider-Call nur der Saldo gelesen wurde.
- * Gibt false zurück, wenn das verfügbare Guthaben (Saldo minus bereits Reserviertes) nicht reicht.
+ * Reserves credit for a call in flight. Atomic: the condition sits inside the UPDATE itself, so two
+ * concurrent requests cannot both see and spend the same credit. That was exactly the bug before,
+ * when only the balance was read ahead of the provider call. Returns false when the available
+ * credit (balance minus what is already reserved) is not enough.
  */
 export function reserveMc(db: Db, address: string, mc: number): boolean {
   if (!Number.isInteger(mc) || mc < 0) throw new Error("reserve_mc must be a non-negative integer");
@@ -284,12 +288,12 @@ export function reserveMc(db: Db, address: string, mc: number): boolean {
   return run();
 }
 
-/** Gibt eine Reservierung zurück, ohne zu buchen (Provider-Fehler, abgebrochener Call). */
+/** Gives a reservation back without booking anything (provider error, aborted call). */
 export function releaseMc(db: Db, address: string, mc: number): void {
   db.prepare("UPDATE wallets SET reserved_mc = max(0, reserved_mc - ?) WHERE address = ?").run(mc, address.toLowerCase());
 }
 
-/** Saldo minus laufende Reservierungen. Das ist, was ein neuer Call tatsächlich ausgeben darf. */
+/** Balance minus reservations in flight. That is what a new call may actually spend. */
 export function getAvailableMc(db: Db, address: string): number {
   const row = db
     .prepare("SELECT balance_mc - reserved_mc AS available FROM wallets WHERE address = ?")
@@ -298,29 +302,28 @@ export function getAvailableMc(db: Db, address: string): number {
 }
 
 /**
- * Räumt Zeilen weg, die nur noch Platz kosten. Ohne das wächst `siwe_nonces` mit jedem Aufruf von
- * `/v1/auth/nonce` unbegrenzt, und dieser Pfad braucht keinen API-Key (Sicherheitsprüfung
- * 19.09.2026). Gibt zurück, wie viele Zeilen je Tabelle verschwunden sind.
+ * Clears out rows that only cost space. Without it `siwe_nonces` grows without bound on every call
+ * to `/v1/auth/nonce`, and that path needs no API key (security review 19.09.2026). Returns how
+ * many rows disappeared per table.
  *
- * Nonces bleiben so lange, wie eine Signatur gültig sein kann, plus Puffer. Payments werden nur
- * im Zustand `failed` verworfen, und auch nur alte: `settled` ist der Beleg für eine Gutschrift
- * und wird nie gelöscht.
+ * Nonces stay as long as a signature can be valid, plus a buffer. Payments are only discarded in
+ * state `failed`, and only old ones: `settled` is the receipt of a credit and is never deleted.
  */
 export function cleanupExpired(db: Db, now = Date.now()): { nonces: number; sessions: number; payments: number } {
-  const NONCE_MAX_ALTER_MS = 24 * 60 * 60 * 1000;
-  const FAILED_PAYMENT_MAX_ALTER_TAGE = 30;
+  const NONCE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+  const FAILED_PAYMENT_MAX_AGE_DAYS = 30;
   const run = db.transaction(() => {
-    const nonces = db.prepare("DELETE FROM siwe_nonces WHERE issued_at < ?").run(now - NONCE_MAX_ALTER_MS).changes;
+    const nonces = db.prepare("DELETE FROM siwe_nonces WHERE issued_at < ?").run(now - NONCE_MAX_AGE_MS).changes;
     const sessions = db.prepare("DELETE FROM sessions WHERE expires_at < ?").run(now).changes;
     const payments = db
       .prepare("DELETE FROM payments WHERE status = 'failed' AND created_at < ?")
-      .run(new Date(now - FAILED_PAYMENT_MAX_ALTER_TAGE * 24 * 60 * 60 * 1000).toISOString()).changes;
+      .run(new Date(now - FAILED_PAYMENT_MAX_AGE_DAYS * 24 * 60 * 60 * 1000).toISOString()).changes;
     return { nonces, sessions, payments };
   });
   return run();
 }
 
-/** Schlüssel-Wert-Ablage für Kleinkram, der einen Neustart überleben muss. */
+/** Key-value store for small things that have to survive a restart. */
 export function setKV(db: Db, key: string, value: string): void {
   db.prepare("INSERT INTO kv (key, value, updated_at) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET value = ?, updated_at = ?").run(
     key,

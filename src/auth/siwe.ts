@@ -1,9 +1,9 @@
 /**
- * SIWE-Provisionierung: nonce -> verify (access_token) -> api-keys (cnwy_k_...).
+ * SIWE provisioning: nonce -> verify (access_token) -> api-keys (cnwy_k_...).
  *
- * Der Runtime-Client (provision.ts) sendet Domain "conway.tech" und chainId 8453 fest; die uri
- * ist "<conwayApiUrl>/v1/auth/verify" und damit je Deployment anders. Geprüft werden Domain,
- * chainId, Nonce und Signatur; die uri wird nicht geprüft.
+ * The runtime client (provision.ts) hard-codes domain "conway.tech" and chainId 8453; the uri is
+ * "<conwayApiUrl>/v1/auth/verify" and therefore differs per deployment. Domain, chainId, nonce and
+ * signature are checked; the uri is not.
  */
 
 import { createHash, randomBytes } from "node:crypto";
@@ -12,12 +12,12 @@ import { parseSiweMessage } from "viem/siwe";
 import { ensureWallet, type Db } from "../db.js";
 
 export interface SiweConfig {
-  /** Erwartete SIWE-Domain, Default "conway.tech" (der Client hat sie fest verdrahtet). */
+  /** Expected SIWE domain, default "conway.tech" (the client hard-codes it). */
   domain: string;
   chainId: number;
-  /** Lebensdauer einer Nonce in ms. */
+  /** Lifetime of a nonce in ms. */
   nonceTtlMs: number;
-  /** Lebensdauer eines access_token in ms. */
+  /** Lifetime of an access_token in ms. */
   sessionTtlMs: number;
 }
 
@@ -29,8 +29,9 @@ export const DEFAULT_SIWE_CONFIG: SiweConfig = {
 };
 
 /**
- * `message` ist der Wortlaut, den Conway heute liefert, und landet unverändert im Feld `error`.
- * `hint` ist der Satz für den Menschen davor und geht als `message` in den Körper (src/errors.ts).
+ * `message` is the wording Conway serves today and ends up unchanged in the `error` field. `hint`
+ * is the sentence for the human in front of it and goes into the body as `message`
+ * (src/errors.ts).
  */
 export class AuthError extends Error {
   constructor(
@@ -44,7 +45,7 @@ export class AuthError extends Error {
 }
 
 export function issueNonce(db: Db, now = Date.now()): string {
-  // 16 Bytes reichen; alphanumerisch, wie SIWE es verlangt (mindestens 8 Zeichen).
+  // 16 bytes are enough; alphanumeric, as SIWE demands (at least 8 characters).
   const nonce = randomBytes(16).toString("hex");
   db.prepare("INSERT INTO siwe_nonces (nonce, issued_at) VALUES (?, ?)").run(nonce, now);
   return nonce;
@@ -57,8 +58,8 @@ export interface VerifyInput {
 }
 
 /**
- * Prüft Message und Signatur, verbraucht die Nonce und gibt ein access_token aus.
- * Wortlaut der Fehler folgt dem, was Conway heute liefert ("Invalid or expired nonce").
+ * Checks message and signature, consumes the nonce and issues an access_token. The wording of the
+ * errors follows what Conway serves today ("Invalid or expired nonce").
  */
 export async function verifySiwe(
   db: Db,
@@ -178,7 +179,7 @@ export function hashApiKey(key: string): string {
   return createHash("sha256").update(key).digest("hex");
 }
 
-/** Stellt einen API-Key für die Session aus. Der volle Key wird nie gespeichert. */
+/** Issues an API key for the session. The full key is never stored. */
 export function createApiKey(
   db: Db,
   accessToken: string,
@@ -204,7 +205,7 @@ export function createApiKey(
   return { key, keyPrefix, address: session.address };
 }
 
-/** Löst einen API-Key (roh aus dem Authorization-Header) zur Wallet-Adresse auf. */
+/** Resolves an API key (raw from the Authorization header) to its wallet address. */
 export function resolveApiKey(db: Db, rawKey: string | undefined): Address | null {
   if (!rawKey) return null;
   const key = rawKey.startsWith("Bearer ") ? rawKey.slice(7) : rawKey;
