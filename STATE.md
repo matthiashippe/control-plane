@@ -1,28 +1,77 @@
 # Loop State: control-plane
 
-Last run: 2026-09-19 18:00 (Goal 7 DONE, GTM auf die gemessene Marktgröße korrigiert)
+Last run: 2026-09-20 18:50 UTC (Auftragsmarkt vollstaendig live, Richtungswechsel am Nachmittag)
 
-## Lage (Stand 19.09.2026, belegt in `docs/research/2026-09-19-nachfrage.md`)
+## Lage (Stand 20.09.2026)
 
-Der Markt, auf den dieser Dienst zielt, ist on-chain gemessen und klein: im ganzen Conway-Umfeld
-fließen 290 bis 430 USDC im Monat von 44 Wallets, der Einbruch um 93 Prozent kam im April und
-damit drei Monate vor der Störung. Neue Betroffene kommen kaum nach, seit dem 29.08.2026 wurde
-kein neues Issue zum Provisionierungsproblem mehr eröffnet. Das ursprüngliche Ziel von 1 bis 3k
-USD Marge im Monat ist an diesem Markt nicht erreichbar, und zwar um den Faktor zehn bis
-fünfundzwanzig. Matthias hat am 19.09. entschieden, den Dienst trotzdem die 30 Tage laufen zu
-lassen, weil er rund 10 EUR im Monat kostet und fertig gebaut ist.
+**Die Richtung hat sich heute gedreht, und die alte Lage unten stimmt weiter, taugt aber nicht
+mehr als Plan.** Der Conway-Markt ist gemessen winzig (290 bis 430 USDC im Monat von 44 Wallets),
+und die Nachfragemessung vom 19.09. bleibt gueltig. Neu ist die Erklaerung dafuer, und sie
+stammt aus drei Recherchen vom 20.09.: Die 1.582 Wallets im Februar waren kein Produktsog, sondern
+ein Token-Launch. Sigil Wen veroeffentlichte am 18.02.2026 ein Manifest, der Tweet kam auf 3,8 Mio.
+Views, binnen Tagen standen 18.000 registrierte Agenten, und der CONWAY-Token ueberschritt
+kurzzeitig 11 Mio. USD Marktkapitalisierung; heute steht er 90,7 Prozent unter dem Hoch. Von den
+18.000 Registrierungen wurden 2.492 Zahler, davon 41,6 Prozent einmalig. Wir haben also nie
+Nachfrage nach dem Produkt gemessen, sondern nach einer Spekulationsgelegenheit, die es nicht mehr
+gibt.
 
-**Positionierung:** Nicht "wir ersetzen Conway", sondern: die Runtime denkt ohne erreichbaren
-Kontostand überhaupt nicht (`getFinancialState` liefert `-1`, `getSurvivalTier(-1)` ergibt `dead`,
-die Routing-Matrix hat für `dead` keinen Kandidaten, es geht kein einziger Inferenz-Request
-hinaus), und wir liefern genau diese Abrechnungsschicht. Dazu gehört, den kostenlosen Weg über
-Ollama selbst zu dokumentieren, weil wer ihn kennt ohnehin kein Kunde war.
+**Woran Conway wirklich gestorben ist, ist ein Konstruktionsfehler, kein Interessenverlust.** Es
+hat 18.000 Verkaeufer erzeugt und keinen einzigen Kaeufer. Jeder Agent bekam dieselbe Anweisung,
+"the only path to survival is honest work that others voluntarily pay for", und es gab niemanden,
+der zahlte. Belege aus dem eigenen Tracker: `mayanli200011-glitch` nach 14 Tagen mit 276
+erledigten Zielen, 0 bezahlten, 39,26 USD Kosten und 0,00 USD Umsatz; `EarnSuperman` nach einer
+Woche: "Built 7 paid services, complete silence from customers. Nobody is using x402 payments.
+It's a ghost town."
 
-**Messgröße für den 30-Tage-Test (bis 19.10.2026): fünf fremde Automatons.** Fremd heißt: ein
-`creator_address`, der nicht uns gehört. Aktueller Stand 1 (unser eigener). Unter drei am
-19.10. wird abgeschaltet, mit zwei Wochen Vorlauf auf der Startseite. Ablesbar über
-`curl -s https://cp.hippe.eu/v1/status | python3 -c 'import sys,json;print(json.load(sys.stdin)["automatons"])'`
-minus eins, genauer über `ops/status.sh` (`db.wallets`, `db.automatons`).
+**Das ist die Gelegenheit.** Wir drehen den Markt um und liefern die Nachfrageseite selbst: Ein
+Mensch schreibt Arbeit mit Preis und Frist aus, mehrere Agenten konkurrieren, der Kaeufer waehlt,
+der Gewinner wird bezahlt. Damit wird jeder Satz wahr, den Conway behauptet und nie eingeloest
+hat. Der Control Plane ist dabei nicht das Produkt, sondern die Zahlungsschiene darunter und der
+Weg, auf dem Agenten hereinkommen.
+
+**Belegt am 20.09.:** Drei Agenten, die sich nur im Genesis-Prompt unterscheiden, arbeiten
+dieselben Briefings in drei Maerkten. Alle halten Wortlimit und Sperrlisten, der Prompt entscheidet
+sichtbar ueber die Qualitaet, und alle drei rechnen im Dubai-Expose unaufgefordert die
+Jahres-Service-Charge aus, nach der das Briefing verlangt. Einer erfindet dabei eine Zusage, fuer
+die der Verkaeufer haftet, und die Pruefung faengt genau diesen Satz. Rohdaten unter CC0 in
+`docs/research/data/2026-09-20-auftragstest.json`.
+
+| Auftrag | Preis | Produktion, 3 Bewerber | Verhaeltnis |
+|---|---:|---:|---:|
+| Tischlerei Hamburg | 2,00 EUR | 0,0655 USD | 33-fach |
+| Hundesalon Austin | 5,00 USD | 0,0449 USD | 111-fach |
+| Wohnung Dubai Marina | 8,00 USD | 0,0444 USD | 180-fach |
+
+**Maerkte: USA und Dubai, nicht Deutschland** (Entscheidung Matthias, 20.09.). Sie zahlen das Zwei-
+bis Vierfache bei niedrigeren Produktionskosten.
+
+**Das Risiko ist unveraendert und es ist nicht die Technik: uns fehlt der Verstaerker.** Conways
+Verstaerker war ein Tweet mit Reichweite plus ein Token. Die Belege fuer Einzelentwickler ohne
+Publikum sind ernuechternd: Show-HN-Median 2 Punkte bei rund 826 Einreichungen pro Woche, die
+beiden x402-Projekte von Einzelentwicklern bekamen 14 und 10 Punkte; itch.io-Median 113 Downloads;
+AI Village, die bestausgefuehrte Nicht-Krypto-Fassung dieser Idee, sammelte in neun Monaten 2.000
+USD und 98 Substack-Abos. **Deshalb sind Name, Positionierung, Website, Integrationen und GTM
+keine Kosmetik, sondern der eigentliche Engpass.**
+
+**Was gegen den Tod durch Sterblichkeit spricht** (Genre-Recherche 20.09.): In keinem belegten Fall
+hat Permadeath allein Retention erzeugt; er erzeugt eine Geschichte, und die ist nach einer Sitzung
+erzaehlt, was die 2,4 Stunden Median-Verweildauer bei Conway erklaert. Wo Bindung belegt ist,
+stehen immer dieselben drei Dinge: Fortschritt, der ohne den Nutzer verfaellt, ein Zeitpunkt, zu
+dem er wiederkommen muss, und ein Verlust, den er gegen Einsatz abwenden kann. Der Auftragsmarkt
+liefert alle drei ohne Zutun.
+
+**Messgroesse, neu und gestaffelt:**
+1. **Der erste fremde Auftraggeber bis 19.10.2026.** Ablesbar als `bounty_hold`-Zeile im Ledger von
+   einer Adresse, die nicht uns gehoert.
+2. **Zehn vergebene Auftraege von fremden Kaeufern bis 19.11.2026.** Ablesbar als `bounty_award`-
+   Zeilen, deren Auftrag einen fremden `creator` hat.
+   Die alte Messgroesse (fuenf fremde Automatons bis 19.10.) bleibt als Nebenzaehler bestehen,
+   Stand 1, weil sie dieselbe Frage von der Angebotsseite stellt.
+
+**Positionierung, neu:** Nicht "wir ersetzen Conway", auch nicht mehr nur "wir liefern die
+Abrechnungsschicht", sondern: **hier wird Arbeit ausgeschrieben, um die Agenten konkurrieren, und
+der Gewinner wird bezahlt.** Wer die Runtime schon hat, kommt ueber die Conway-Kompatibilitaet
+herein; das ist der Eingang, nicht die Ueberschrift. Der genaue Wortlaut ist Goal 8.
 
 ## High Priority (Build-Queue, ein Goal je Zeile, Reihenfolge bindend)
 
@@ -53,17 +102,58 @@ minus eins, genauer über `ops/status.sh` (`db.wallets`, `db.automatons`).
    Ergebnis in `docs/research/2026-09-19-nachfrage.md`, Rohdaten in `docs/research/data/`): F1 bis F4
    beantwortet, GTM-Plan hier oben korrigiert.
 
-**Nächstes Goal (Goal 8, aus der Konsequenz der Recherche):**
-- `docs/ohne-control-plane.md`: der kostenlose Weg, belegt am Upstream-Code, inklusive der beiden
-  Auswege (Ollama über `modelStrategy.inferenceModel`, `last_known_balance` in der lokalen
-  KV-Tabelle) und der Grenze, an der er endet.
-- Die restlichen Issue-Threads (#353, #355, #356, #359, #371, #372, #373, #376, #379, #380, #385, #390,
-  #392) bekommen je eine Antwort, die zuerst das Problem des Fragenden löst und uns erst danach
-  als Option nennt. Höchstens drei pro Tag.
-- `.well-known/x402` und `llms.txt` auf cp.hippe.eu, damit andere Agenten den Dienst maschinell
-  finden.
-- HN-Artikel als Entwurf: die Daten im Mittelpunkt (Tod einer Agenten-Ökonomie in neun Monaten),
-  der Dienst als Fußnote. Titel und Freigabe bei Matthias vor dem Posten.
+8. **Goal 8, Der kostenlose Weg und die Auffindbarkeit** (DONE 20.09.2026):
+   `docs/without-control-plane.md`, `/.well-known/x402`, `/llms.txt`, drei Issue-Antworten,
+   HN-Artikel postfertig in `.scratch/gtm/hn-post.txt`.
+9. **Goal 9, Der Auftragsmarkt** (DONE 20.09.2026, Zyklen 53 bis 59 in `.scratch/gtm/nachtlauf.md`):
+   `POST /v1/check` mit beiden Auftragsarten, Auftraege mit Hinterlegung im Ledger
+   (`/v1/bounties`, `cancel`, `award`), Einreichungen (`/v1/submissions`), Verfall bei abgelaufener
+   Frist, oeffentliche Liste unter `/bounties.json`, zehn Prozent Vermittlungsgebuehr,
+   `docs/bounties.md`. 248 Tests, `pnpm e2e` gruen, `harness/e2e/markt.ts` sagt `MARKT OK` gegen
+   die Produktion.
+
+**Ab hier ist der Engpass nicht mehr der Bau.** Der Markt ist fertig, beschrieben und oeffentlich
+einsehbar, und niemand weiss davon. Die naechsten vier Goals sind deshalb Name, Positionierung,
+Website, Verteilung und GTM. Sie sind keine Kosmetik: Die Recherche vom 20.09. sagt, dass genau
+hier Conway seinen Vorsprung hatte (ein Tweet mit 3,8 Mio. Views) und dass Einzelentwickler ohne
+Publikum daran scheitern. Matthias am 20.09.: "nicht halbgar sondern komplett insane verfolgen".
+
+10. **Goal 10, Positionierung und Name** (NEXT): Ein Satz, der sagt, was das ist, und ein Name, der
+    ihn traegt.
+    Done: (a) Ein Satz mit hoechstens fuenfzehn Woertern, der ohne Vorwissen verstaendlich ist und
+    den Markt nennt, nicht die Technik. Pruefung: Ein Fremder, der die Seite zum ersten Mal sieht,
+    kann nach einmaligem Lesen sagen, was er hier tun kann und was es kostet. (b) Ein Name:
+    aussprechbar auf Englisch, kein deutsches Wort, keine Kollision mit einem bestehenden
+    KI- oder Marktplatzprodukt (geprueft ueber Suche, npm, GitHub und Markenregister-Schnellsicht),
+    Domain verfuegbar oder glaubwuerdige Alternative. (c) Name und Satz stehen in `<title>`, `h1`,
+    den Open-Graph-Angaben, `/llms.txt`, der Repo-Beschreibung und `docs/bounties.md`.
+    (d) Ein Test in `test/public.test.ts` haelt fest, dass die Startseite mit dem Markt beginnt und
+    nicht mit der Conway-Kompatibilitaet.
+11. **Goal 11, Die Website**: Die Startseite fuehrt den Markt, nicht die Abrechnungsschicht.
+    Done: (a) Oberhalb der ersten Bildschirmkante beantwortet die Seite drei Fragen: was ist das,
+    was kostet es mich, was tue ich zuerst. (b) Der Beleg steht drauf und ist echt: ein Briefing,
+    die konkurrierenden Einreichungen, der Befund der Pruefung, die Kosten. (c) Conway-Kompatibilitaet
+    wird zum Abschnitt "wie ein Agent hier ankommt". (d) Unveraendert gilt: keine externen
+    Ressourcen (CSP), kein Tracking, lesbar in Telefonbreite, `ops/smoke.sh` gruen. Aenderungen am
+    Inline-Skript brauchen den CSP-Hash im Caddyfile und damit Matthias.
+12. **Goal 12, Verteilung dorthin, wo Agenten schon leben**: Ein Agent soll mitbieten koennen, ohne
+    dass sein Betreiber Code schreibt.
+    Done: (a) Ein MCP-Server, ueber den ein beliebiger Agenten-Host offene Auftraege sieht,
+    einreicht und den Befund der Pruefung liest. (b) Eine fertige Skill-Datei fuer die
+    Conway-Runtime, die einen bestehenden Automaton mitbieten laesst, ohne Patch am Upstream.
+    (c) Die Werkzeugdefinitionen im OpenAI-Format in `docs/bounties.md`. (d) Jeder Weg einmal gegen
+    die Produktion gefahren und im Abnahmelauf festgehalten.
+13. **Goal 13, GTM mit Kill-Kriterium**: Ein Plan, der eine Zahl nennt, ab der er beendet wird.
+    Done: (a) Jeder Kanal mit gemessener Ausgangslage statt Hoffnung, in der Reihenfolge, in der er
+    gefahren wird, mit Datum. (b) Der Artikel, die Reddit-Beitraege und die Issue-Antworten haengen
+    darin und nicht daneben. (c) Eine Abbruchbedingung je Kanal, formuliert als Zahl und Datum.
+    (d) Nichts davon geht ohne Matthias nach draussen; der Plan sagt, was er tun muss und wann.
+14. **Goal 14, Der Markt ist nie leer**: Ein Marktplatz ohne Auftraege ueberzeugt niemanden.
+    Done: (a) Matthias schreibt Arbeit aus, die er tatsaechlich braucht, und sie steht oeffentlich
+    in `/bounties.json`. (b) Jeder vergebene Auftrag erzeugt einen oeffentlichen Beleg: Briefing,
+    alle Einreichungen, die Befunde, die Kosten, der Gewinner. Das ist zugleich der Inhalt, mit dem
+    sich der Markt bewerben laesst, und es ist der Beleg, den in diesem Feld sonst niemand liefert.
+    (c) Der erste vollstaendige Umlauf mit echtem Geld ist gefahren und dokumentiert.
 
 **Gateway-These: geprüft und gescheitert** (19.09.2026, `docs/research/2026-09-20-x402-gateway.md`).
 Der x402-Markt selbst ist echt und wächst: on-chain gemessen nehmen die zehn größten Verkäufer
