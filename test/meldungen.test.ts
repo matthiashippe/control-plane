@@ -122,7 +122,7 @@ describe("Credit-Transfers: 501 mit der Regulatorik als Grund", () => {
 describe("Rate Limit: wie lange und warum", () => {
   it("sagt im 429, welche Grenze gilt, warum es sie gibt und wann es weitergeht", async () => {
     const db = openDb(":memory:");
-    const app = createApp({ db, rateLimit: { limit: 3, fensterMs: 60_000 } });
+    const app = createApp({ db, rateLimit: { limit: 3, windowMs: 60_000 } });
     const ruf = () => app.request("/v1/auth/nonce", { method: "POST", headers: { "x-forwarded-for": "203.0.113.42" } });
     for (let i = 0; i < 3; i++) expect((await ruf()).status).toBe(200);
 

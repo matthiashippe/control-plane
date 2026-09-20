@@ -26,7 +26,7 @@ import {
 import { mcToCents, getBalanceCents, MC_PER_CENT } from "./db.js";
 import { DOC } from "./errors.js";
 import { Catalog, handleChat, MARKUP } from "./inference/proxy.js";
-import { clientSchluessel, RateLimiter, type RateLimitOptions } from "./ratelimit.js";
+import { clientKey, RateLimiter, type RateLimitOptions } from "./ratelimit.js";
 import { handlePay, TOPUP_TIERS_USD, type PayConfig } from "./payments/pay.js";
 import { handleRegister } from "./registry.js";
 import type { Settler } from "./payments/settler.js";
@@ -175,23 +175,23 @@ export function createApp(opts: AppOptions) {
   // steht, und .env liegt ausserdem hinter der Pfadsperre aus loop-constraints.md.
   const feeTo = opts.pay?.payTo?.toLowerCase() ?? null;
 
-  const rateLimitOpts: RateLimitOptions = opts.rateLimit ?? { limit: 60, fensterMs: 60_000 };
+  const rateLimitOpts: RateLimitOptions = opts.rateLimit ?? { limit: 60, windowMs: 60_000 };
   const limiter = opts.rateLimit === null ? null : new RateLimiter(rateLimitOpts);
-  const OFFENE_PFADE = ["/v1/auth/nonce", "/v1/auth/verify", "/v1/auth/api-keys", "/pay/"];
+  const OPEN_PATHS = ["/v1/auth/nonce", "/v1/auth/verify", "/v1/auth/api-keys", "/pay/"];
   if (limiter) {
-    const fensterSek = Math.round(rateLimitOpts.fensterMs / 1000);
+    const windowSec = Math.round(rateLimitOpts.windowMs / 1000);
     app.use("*", async (c, next) => {
-      const pfad = c.req.path;
-      if (!OFFENE_PFADE.some((p) => pfad.startsWith(p))) return next();
-      const { erlaubt, retryAfterSec } = limiter.pruefe(clientSchluessel(c.req.raw.headers));
-      if (!erlaubt) {
+      const reqPath = c.req.path;
+      if (!OPEN_PATHS.some((p) => reqPath.startsWith(p))) return next();
+      const { allowed, retryAfterSec } = limiter.check(clientKey(c.req.raw.headers));
+      if (!allowed) {
         c.header("Retry-After", String(retryAfterSec));
         return c.json(
           {
             error: "rate_limited",
             retry_after_seconds: retryAfterSec,
             message:
-              `More than ${rateLimitOpts.limit} requests in ${fensterSek} seconds from your address to the ` +
+              `More than ${rateLimitOpts.limit} requests in ${windowSec} seconds from your address to the ` +
               "endpoints that work without an API key (/v1/auth/*, /pay/*). Those write to the database " +
               "and /pay also calls a payment facilitator that costs money per call, so they are capped " +
               `to keep the service up for everyone. Wait ${retryAfterSec} seconds and retry; calls to ` +
