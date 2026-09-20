@@ -308,7 +308,7 @@ export function createApp(opts: AppOptions) {
         note: "Credits pay for usage of this service only. They are not money, not redeemable and not transferable.",
       },
       free_alternative:
-        "https://github.com/matthiashippe/control-plane/blob/main/docs/ohne-control-plane.md",
+        "https://github.com/matthiashippe/control-plane/blob/main/docs/without-control-plane.md",
       source: "https://github.com/matthiashippe/control-plane",
     });
   });
@@ -349,7 +349,7 @@ export function createApp(opts: AppOptions) {
       "ways around that exist and neither is documented upstream: a local Ollama model, or",
       "setting the cached balance in the runtime's own SQLite state and using your own OpenAI key.",
       "Both are written up at",
-      "https://github.com/matthiashippe/control-plane/blob/main/docs/ohne-control-plane.md",
+      "https://github.com/matthiashippe/control-plane/blob/main/docs/without-control-plane.md",
       "",
       "## Source",
       "",

@@ -183,7 +183,7 @@ else
 fi
 
 # ─── 4. Startseite ─────────────────────────────────────────────────────────────
-# Zwei Inhalte sind nicht kosmetisch: Der Link auf ohne-control-plane.md ist das Versprechen,
+# Zwei Inhalte sind nicht kosmetisch: Der Link auf without-control-plane.md ist das Versprechen,
 # den kostenlosen Weg zu zeigen, bevor jemand zahlt, und der Impressum-Anker ist die Pflicht
 # nach § 5 DDG ("leicht erkennbar und unmittelbar erreichbar").
 code=$(hole seite /)
@@ -192,13 +192,13 @@ if [[ "$code" != "200" ]]; then
 else
   mangel=""
   [[ "$(kopf seite content-type)" == *"text/html"* ]] || mangel="$mangel content-type=$(kopf seite content-type);"
-  grep -q "docs/ohne-control-plane.md" "$TMP/seite.body" || mangel="$mangel Link auf ohne-control-plane.md fehlt;"
+  grep -q "docs/without-control-plane.md" "$TMP/seite.body" || mangel="$mangel Link auf without-control-plane.md fehlt;"
   grep -q 'id="impressum"' "$TMP/seite.body" || mangel="$mangel Anker id=impressum fehlt;"
   grep -q 'href="#impressum"' "$TMP/seite.body" || mangel="$mangel Verweis href=#impressum fehlt;"
   if [[ -n "$mangel" ]]; then
     fehler "/: $mangel"
   else
-    ok "/: 200 HTML, Link auf ohne-control-plane.md, Impressum-Anker und -Verweis vorhanden"
+    ok "/: 200 HTML, Link auf without-control-plane.md, Impressum-Anker und -Verweis vorhanden"
   fi
 fi
 

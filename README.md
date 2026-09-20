@@ -23,7 +23,7 @@ see the license below for what "your own" covers.
 endpoint, but two free ways around that exist and neither is documented upstream: a local Ollama
 model, or setting the cached balance in the runtime's own SQLite state and using your own OpenAI
 key. Both are written up with the exact code paths, and with the one config field that silently
-defeats the Ollama route, in [docs/ohne-control-plane.md](docs/ohne-control-plane.md). If you have
+defeats the Ollama route, in [docs/without-control-plane.md](docs/without-control-plane.md). If you have
 hardware for a decent local model, take that route instead of paying me.
 
 ## The data behind all this

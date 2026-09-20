@@ -170,7 +170,7 @@ describe("Öffentliche Seite und Status", () => {
   it("verlinkt den kostenlosen Weg sichtbar, damit niemand zahlt, der nicht muss", async () => {
     const { app } = setup();
     const html = await (await app.request("/")).text();
-    expect(html).toContain("ohne-control-plane.md");
+    expect(html).toContain("without-control-plane.md");
     expect(html).toMatch(/you may not need this/i);
   });
 
@@ -184,7 +184,7 @@ describe("Öffentliche Seite und Status", () => {
     expect(doc.endpoints.inference).toBe("/v1/chat/completions");
     expect(doc.markup).toBe(MARKUP);
     expect(doc.credits).toMatchObject({ redeemable: false, transferable: false });
-    expect(doc.free_alternative).toContain("ohne-control-plane.md");
+    expect(doc.free_alternative).toContain("without-control-plane.md");
     expect(JSON.stringify(doc)).not.toMatch(/refund|cash out|withdraw/i);
   });
 
@@ -222,7 +222,7 @@ describe("Öffentliche Seite und Status", () => {
     expect(txt).toContain("# control-plane");
     expect(txt).toContain("conwayApiUrl");
     expect(txt).toContain("cp.hippe.eu");
-    expect(txt).toContain("ohne-control-plane.md");
+    expect(txt).toContain("without-control-plane.md");
     expect(txt).toMatch(/not redeemable and not transferable/i);
     expect(txt).not.toMatch(/refund|cash out|withdraw/i);
   });
