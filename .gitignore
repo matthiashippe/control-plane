@@ -8,3 +8,6 @@ harness/certs/
 harness/state/
 .scratch/
 !deploy/.env.example
+
+# Python-Bytecode aus den ops-Skripten (ops/pruef-probe.py importiert erfindungspruefung).
+__pycache__/
