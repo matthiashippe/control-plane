@@ -3,7 +3,7 @@
 ## `2026-09-19-conway-payto-transfers.csv`
 
 Alle USDC-Transfers an Conways payTo `0x21DD37E3E4eA6CCC0a5C98A4944702eDE6E7Be10` auf Base,
-lückenlos vom 01.01.2026 bis 19.09.2026 16:14 UTC. 9.026 Zeilen, keine Duplikate.
+lückenlos vom 01.01.2026 bis 20.09.2026 03:55 UTC. 9.027 Zeilen, keine Duplikate.
 
 Nachgezogen am 19.09.2026 um 21:45 (Blöcke 51.518.686 bis 51.528.050): 14 weitere Transfers über
 zusammen **0,04 USDC**, alle von derselben Wallet `0x7f0376c6…d7b82`, die in hoher Frequenz

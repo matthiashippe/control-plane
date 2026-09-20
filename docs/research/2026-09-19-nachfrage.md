@@ -7,8 +7,8 @@ parallel, die tragenden Zahlen habe ich selbst nachgerechnet.
 ## F1: Wie viel Geld fließt noch an Conway?
 
 Vollständiger Scan der USDC-Transfers an Conways payTo `0x21DD37E3E4eA6CCC0a5C98A4944702eDE6E7Be10`
-auf Base, lückenlos vom 01.01.2026 bis 19.09.2026 16:14 UTC (5.652 Chunks à 2.000 Blöcke plus ein
-Nachtrag am selben Abend, zusammen 9.026 Transfer-Events).
+auf Base, lückenlos vom 01.01.2026 bis 20.09.2026 03:55 UTC (5.652 Chunks à 2.000 Blöcke plus zwei
+Nachträge, zusammen 9.027 Transfer-Events).
 
 | Monat | USDC | zahlende Wallets | Transfers |
 |---|---:|---:|---:|
@@ -20,16 +20,16 @@ Nachtrag am selben Abend, zusammen 9.026 Transfer-Events).
 | 2026-06 | 420,00 | 34 | 68 |
 | 2026-07 | 360,00 | 24 | 60 |
 | 2026-08 | 415,00 | 40 | 83 |
-| 2026-09 (bis 19.) | 290,05 | 30 | 76 |
+| 2026-09 (bis 20.) | 295,05 | 31 | 77 |
 
-Letzte 30 Tage: 430,05 USDC, 44 Wallets, 104 Transfers. Letzte 7 Tage: 70,04 USDC, 10 Wallets,
+Letzte 30 Tage: 435,05 USDC, 45 Wallets, 105 Transfers. Letzte 7 Tage: 70,04 USDC, 10 Wallets,
 30 Transfers. Seit Störungsbeginn 17.07.2026: 950,01 USDC von 89 Wallets in 186 Transfers.
 
 Zwei Dinge, die man hier sehen muss. Erstens: **Der Einbruch kam vor der Störung.** Im April lag
 das Volumen schon 93 Prozent unter dem Februar, also drei Monate bevor das Onboarding kaputtging.
 Der Markt ist an Interessenverlust gestorben, nicht am Ausfall. Zweitens: **Der Rest zahlt
 weiter.** Seit Juni liegt das Volumen stabil zwischen 290 und 430 USDC im Monat, und das für eine
-Gegenleistung, die es nicht mehr gibt. 104 Transfers auf 44 Wallets in 30 Tagen heißt: im Schnitt
+Gegenleistung, die es nicht mehr gibt. 105 Transfers auf 45 Wallets in 30 Tagen heißt: im Schnitt
 zwei bis drei Zahlungen je Wallet, was zum Retry-Bug aus Issue #393 passt.
 
 ### Beleg

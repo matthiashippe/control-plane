@@ -45,7 +45,7 @@ means the whole thing is measurable, so I measured it.
 
 I scanned every USDC transfer to the platform's receiving address from January 1 to September 19,
 2026: 5,652 sequential `eth_getLogs` calls against the public Base RPC, 2,000 blocks at a time,
-9,026 transfer events, about 30 minutes of walking the chain. The raw data is a CSV in the repo
+9,027 transfer events, about 30 minutes of walking the chain. The raw data is a CSV in the repo
 linked at the bottom, so you do not have to take my word for any number here.
 
 | Month | USDC | Paying wallets | Transfers |
@@ -57,9 +57,9 @@ linked at the bottom, so you do not have to take my word for any number here.
 | June | 420.00 | 34 | 68 |
 | July | 360.00 | 24 | 60 |
 | August | 415.00 | 40 | 83 |
-| September (to the 19th) | 290.05 | 30 | 76 |
+| September (to the 20th) | 295.05 | 31 | 77 |
 
-Total over nine months: 62,616 USDC from 2,491 distinct wallets. February alone is 61 percent of
+Total over nine months: 62,621 USDC from 2,492 distinct wallets. February alone is 61 percent of
 it. The median payment was exactly 5 USDC, the smallest tier on offer.
 
 Three things in this table surprised me.
@@ -71,12 +71,12 @@ three months earlier, volume was already down 93 percent from February. Whatever
 not break it. People simply stopped caring, and the outage arrived at a corpse.
 
 **Almost nobody came back.** Of the 1,582 wallets that funded an agent in February, three were
-still paying in June or later. Not three percent. Three wallets. 1,035 of the 2,491 wallets in the
+still paying in June or later. Not three percent. Three wallets. 1,036 of the 2,492 wallets in the
 whole dataset paid exactly once and never again. Whatever the product did after the first 5 USDC,
 it did not make people spend a second 5 USDC.
 
 **A small group still pays into a system that cannot deliver.** In the last 30 days of the scan,
-44 wallets sent 430 USDC in 104 transfers. That is well over two payments per wallet, which fits an
+45 wallets sent 435 USDC in 105 transfers. That is well over two payments per wallet, which fits an
 open issue about retry-driven duplicate topups: a failed payment gets retried with a fresh nonce
 and the second one settles too. The onboarding has been broken since July. The last commit to the
 repository was in August and only touched the README. No maintainer has answered an issue since
