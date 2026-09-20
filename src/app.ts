@@ -81,6 +81,25 @@ const INFERENCE_UNAVAILABLE = {
   docs: DOC.inference,
 };
 
+/**
+ * Die oeffentliche Basis-URL dieses Requests. Sie macht die `resource` im Zahlungsangebot absolut,
+ * was ein x402-Facilitator braucht, um den Dienst in sein Verzeichnis aufzunehmen.
+ *
+ * Der Host-Header ist faelschbar, und das ist hier vertretbar: Er faerbt nur die Kennung des
+ * Angebots ein. Wohin das Geld geht, steht in `payTo` aus der Umgebung, und die Signatur des
+ * Zahlers deckt `resource` nicht ab. Ein Betreiber, der das nicht mag, setzt CP_PUBLIC_URL; die
+ * Umgebung schlaegt den Header.
+ */
+function requestOrigin(c: { req: { header: (name: string) => string | undefined; url: string } }): string | undefined {
+  const host = c.req.header("host");
+  if (!host || !/^[a-z0-9.-]+(:\d{1,5})?$/i.test(host)) return undefined;
+  const gemeldet = c.req.header("x-forwarded-proto")?.split(",")[0]?.trim().toLowerCase();
+  const proto = gemeldet === "https" || gemeldet === "http"
+    ? gemeldet
+    : c.req.url.startsWith("https:") ? "https" : "http";
+  return `${proto}://${host}`;
+}
+
 export function createApp(opts: AppOptions) {
   const { db } = opts;
   const siweCfg: SiweConfig = { ...DEFAULT_SIWE_CONFIG, ...opts.siwe };
@@ -316,7 +335,7 @@ export function createApp(opts: AppOptions) {
     const pay = opts.pay ?? null;
     const settler = opts.settler ?? null;
     if (!pay) return c.json(PAYMENTS_UNAVAILABLE, 503);
-    const res = await handlePay(db, settler, pay, {
+    const res = await handlePay(db, settler, { ...pay, publicOrigin: pay.publicOrigin ?? requestOrigin(c) }, {
       usd: c.req.param("usd"),
       recipient: c.req.param("address"),
       paymentHeader: c.req.header("x-payment"),

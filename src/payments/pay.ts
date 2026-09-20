@@ -7,6 +7,7 @@
  */
 
 import { isAddress, verifyTypedData, type Address, type Hex } from "viem";
+import { BAZAAR_EXTENSION } from "./bazaar.js";
 import { MC_PER_CENT, mcToCents, postLedger, type Db } from "../db.js";
 import { DOC } from "../errors.js";
 import type { Authorization, Settler } from "./settler.js";
@@ -23,6 +24,13 @@ export interface PayConfig {
   maxTimeoutSeconds: number;
   /** Angebotene Tiers in USD; Betreiber dürfen ergänzen (z. B. 1 für Abnahmen). */
   tiers: readonly number[];
+  /**
+   * Basis-URL, unter der dieser Dienst oeffentlich erreichbar ist, ohne Schraegstrich am Ende.
+   * Sie macht `resource` absolut. Ohne sie bleibt der Pfad relativ, und kein Facilitator kann
+   * den Dienst katalogisieren: von 6.584 PayAI-Eintraegen trug am 20.09.2026 keiner einen
+   * relativen Pfad.
+   */
+  publicOrigin?: string;
 }
 
 export interface PayResponse {
@@ -42,6 +50,7 @@ export interface PaymentRequired {
     maxTimeoutSeconds: number;
     resource: string;
     description: string;
+    extensions?: typeof BAZAAR_EXTENSION;
   }>;
 }
 
@@ -49,6 +58,15 @@ const USDC_DECIMALS = 6n;
 
 export function tierToAtomic(usd: number): bigint {
   return BigInt(usd) * 10n ** USDC_DECIMALS;
+}
+
+/**
+ * Die Kennung des bezahlten Endpunkts. Absolut, sobald der Betreiber seine Basis-URL kennt,
+ * denn ein Facilitator uebernimmt nur absolute URLs in sein Verzeichnis.
+ */
+export function payResource(cfg: PayConfig, usd: number, recipient: Address): string {
+  const path = `/pay/${usd}/${recipient}`;
+  return cfg.publicOrigin ? `${cfg.publicOrigin}${path}` : path;
 }
 
 export function buildPaymentRequired(cfg: PayConfig, usd: number, recipient: Address): PaymentRequired {
@@ -63,8 +81,9 @@ export function buildPaymentRequired(cfg: PayConfig, usd: number, recipient: Add
         payTo: cfg.payTo,
         asset: cfg.usdcAddress,
         maxTimeoutSeconds: cfg.maxTimeoutSeconds,
-        resource: `/pay/${usd}/${recipient}`,
+        resource: payResource(cfg, usd, recipient),
         description: `${usd} USD credits`,
+        extensions: BAZAAR_EXTENSION,
       },
     ],
   };
@@ -417,7 +436,7 @@ export async function handlePay(
   if (!claim()) return { status: 409, body: SETTLEMENT_IN_PROGRESS };
 
   // Ab hier darf ein Client-Abbruch nichts mehr ändern: Settlement und Buchung laufen zu Ende.
-  const result = await settler.settle(auth, payment.signature, `/pay/${usd}/${recipient}`);
+  const result = await settler.settle(auth, payment.signature, payResource(cfg, usd, recipient));
   if (!result.ok) {
     db.prepare("UPDATE payments SET status = 'failed', error = ?, tx_hash = ? WHERE nonce = ?").run(
       result.error ?? "settlement_failed",
@@ -475,5 +494,6 @@ export function payConfigFromEnv(env: NodeJS.ProcessEnv): PayConfig | null {
     usdcAddress: usdc as Address,
     maxTimeoutSeconds: Number(env.CP_PAY_TIMEOUT_SECONDS || 300),
     tiers,
+    publicOrigin: env.CP_PUBLIC_URL ? env.CP_PUBLIC_URL.replace(/\/+$/, "") : undefined,
   };
 }

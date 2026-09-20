@@ -8,6 +8,7 @@
 
 import type { Address, Hex } from "viem";
 import type { Authorization, Settler, SettleResult } from "./settler.js";
+import { BAZAAR_DESCRIPTION, BAZAAR_EXTENSION } from "./bazaar.js";
 
 export interface FacilitatorConfig {
   url: string;
@@ -29,13 +30,15 @@ export function buildV1Requirements(cfg: FacilitatorConfig, auth: Authorization,
     network: cfg.network,
     maxAmountRequired: auth.value.toString(),
     resource,
-    description: "control-plane credits",
+    description: BAZAAR_DESCRIPTION,
     mimeType: "application/json",
     payTo: cfg.payTo,
     maxTimeoutSeconds: cfg.maxTimeoutSeconds,
     asset: cfg.usdcAddress,
     // EIP-712-Domain des Tokens; der Runtime-Client signiert mit "USD Coin" / "2".
     extra: { name: "USD Coin", version: "2" },
+    // Ohne diesen Block nimmt der Facilitator den Dienst nie in sein Verzeichnis auf.
+    extensions: BAZAAR_EXTENSION,
   };
 }
 
@@ -55,6 +58,7 @@ export function buildV1Payload(cfg: FacilitatorConfig, auth: Authorization, sign
         nonce: auth.nonce,
       },
     },
+    extensions: BAZAAR_EXTENSION,
   };
 }
 
