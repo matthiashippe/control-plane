@@ -6,7 +6,7 @@ Rechnet die Kennzahlen zur x402-Nachfrage aus dem Verzeichnis-Scan.
 
 Jede Zahl, die im Artikel steht, kommt aus diesem Skript. Wer sie anzweifelt, laesst es laufen.
 """
-import csv, collections, datetime, statistics, sys
+import csv, collections, datetime, json, statistics, sys
 
 STICHTAG = datetime.datetime(2026, 9, 20, tzinfo=datetime.timezone.utc)
 
@@ -15,8 +15,37 @@ def zahl(s: str):
     return int(s) if s not in ("", None) else None
 
 
+def kennzahlen(zeilen: list) -> dict:
+    """Die Werte, die eine Zeitreihe braucht: klein, vergleichbar, ohne Text."""
+    cdp = [r for r in zeilen if r["verzeichnis"] == "cdp"]
+    calls = [zahl(r["calls_30d"]) for r in cdp]
+    mit = [c for c in calls if c is not None]
+    p = [x for x in (zahl(r["unique_payers_30d"]) for r in cdp) if x is not None]
+    srt = sorted(mit, reverse=True)
+    return {
+        "stichtag": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "dienste_gesamt": len(zeilen),
+        "dienste_cdp": len(cdp),
+        "dienste_payai": len(zeilen) - len(cdp),
+        "anbieter": len({r["host"] for r in zeilen if r["host"]}),
+        "aufrufe_30d": sum(mit),
+        "aufrufe_median": statistics.median(mit) if mit else 0,
+        "anteil_top10": round(sum(srt[:10]) / sum(mit) * 100, 2) if mit else 0,
+        "anteil_top100": round(sum(srt[:100]) / sum(mit) * 100, 2) if mit else 0,
+        "mit_einem_zahler": sum(1 for x in p if x == 1),
+        "mit_5_zahlern": sum(1 for x in p if x >= 5),
+        "mit_20_zahlern": sum(1 for x in p if x >= 20),
+        "mit_100_zahlern": sum(1 for x in p if x >= 100),
+        "mit_bazaar_block": sum(1 for r in zeilen if r["hat_bazaar_block"] == "1"),
+        "conway_bezug": sum(1 for r in zeilen if "conway" in (r["resource"] or "").lower()),
+    }
+
+
 def main(pfad: str) -> None:
     zeilen = [r for r in csv.DictReader(open(pfad))]
+    if "--json" in sys.argv:
+        print(json.dumps(kennzahlen(zeilen), separators=(",", ":")))
+        return
     cdp = [r for r in zeilen if r["verzeichnis"] == "cdp"]
     payai = [r for r in zeilen if r["verzeichnis"] == "payai"]
     print(f"Dienste gesamt: {len(zeilen)}  (Coinbase {len(cdp)}, PayAI {len(payai)})")
@@ -72,4 +101,4 @@ def main(pfad: str) -> None:
 
 
 if __name__ == "__main__":
-    main(sys.argv[1] if len(sys.argv) > 1 else "2026-09-20-x402-verzeichnis.csv")
+    main(next((a for a in sys.argv[1:] if not a.startswith("--")), "2026-09-20-x402-verzeichnis.csv"))
