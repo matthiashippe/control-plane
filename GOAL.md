@@ -4,7 +4,13 @@
 ACTIVE
 
 ## Active Objective
-**Goal 15 laeuft, weil Goal 10 auf Matthias' Namensentscheidung wartet.** Das Journeybuch
+**Goal 10 bis 15 sind gebaut.** Der Name ist Handsel, der Satz steht ueberall, der Markt ist
+vollstaendig und einmal durchgelaufen, MCP-Server und Runtime-Skill liegen vor, das Journeybuch
+ist die Referenz, und der GTM-Plan mit Kill-Kriterien steht in
+`goals/2026-09-20-goal-13-gtm.md`. Was offen ist, liegt bei Matthias und nicht im Loop: die
+Aussenwirkung selbst, die Domain und die Rechtsfrage.
+
+(Historie:) Das Journeybuch
 steht in `docs/journeys.md`, geprueft von `ops/journeys-pruefen.sh`; die Done-Bedingungen stehen in
 STATE.md unter Goal 15. Danach zurueck zu Goal 10.
 
