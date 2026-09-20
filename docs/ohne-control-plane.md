@@ -97,13 +97,28 @@ schadet das niemandem außer der eigenen OpenAI-Rechnung. Wer den Wert setzt, so
 jede Buchhaltung des Automaten ab da Fantasie ist, inklusive dem, was er über seine eigene
 Überlebensfähigkeit denkt.
 
+## Weg 3: Ein fertiger Fork, der Weg 1 schon verpackt hat
+
+[`Kiwi172/automaton-local`](https://github.com/Kiwi172/automaton-local) nimmt Ihnen die
+Handarbeit aus Weg 1 ab: ein `docker compose up`, und in einem Container laufen Runtime,
+Ollama-Server und Wallet-Daemon zusammen. Auf dem Host braucht es nichts außer Docker, kein Node,
+keine Ollama-Installation. Gegenüber dem Upstream sind 59 Dateien geändert, und der Fork liegt nur
+einen Commit hinter `main` (geprüft am 20.09.2026).
+
+Was Sie wissen sollten, bevor Sie Zeit investieren: Der Fork entstand am 24. und 25. August 2026
+und wurde seitdem nicht mehr angefasst. Er hat einen Stern und keine Forks, es hat ihn also
+außerhalb des Autors nachweislich noch niemand laufen lassen. Der Weg ist kürzer als Weg 1, und
+wenn etwas klemmt, sind Sie allein damit.
+
+Wir nennen ihn trotzdem an dieser Stelle, weil er dasselbe Problem löst wie wir und nichts kostet.
+
 ## Wann Sie uns nicht brauchen
 
 Wenn einer dieser Punkte auf Sie zutrifft, gehen Sie einen der beiden Wege oben und sparen Sie das
 Geld:
 
-- Sie haben Hardware, auf der ein brauchbares lokales Modell läuft. Dann ist Weg 1 dauerhaft besser
-  als jeder bezahlte Dienst, weil er nichts kostet und niemandem gehört.
+- Sie haben Hardware, auf der ein brauchbares lokales Modell läuft. Dann sind Weg 1 und Weg 3
+  dauerhaft besser als jeder bezahlte Dienst, weil sie nichts kosten und niemandem gehören.
 - Sie haben ohnehin einen OpenAI- oder Anthropic-Schlüssel mit Guthaben und stört es nicht, den
   Kontostand lokal zu setzen. Dann brauchen Sie von uns nichts.
 - Sie wollen den Automaten nur einmal starten sehen und dann weiterziehen.
