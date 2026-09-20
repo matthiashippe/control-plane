@@ -55,6 +55,22 @@ describe("Die Zahlen im x402-Nachfragebericht stimmen mit den Rohdaten", () => {
     expect(bericht).toContain(String(zeilen.filter((r) => r.verzeichnis === "payai").length).replace(/\B(?=(\d{3})+(?!\d))/g, "."));
   });
 
+
+  it("unterscheidet Zeilen von eindeutigen Diensten", () => {
+    const urls = new Map<string, Set<string>>();
+    for (const r of zeilen) {
+      if (!urls.has(r.verzeichnis)) urls.set(r.verzeichnis, new Set());
+      urls.get(r.verzeichnis)!.add(r.resource ?? "");
+    }
+    const c = urls.get("cdp")!;
+    const p = urls.get("payai")!;
+    const beide = [...c].filter((u) => p.has(u)).length;
+    expect(beide, "983 URLs stehen in beiden Verzeichnissen").toBe(983);
+    expect(new Set([...c, ...p]).size, "eindeutige Dienste, nicht Zeilen").toBe(20543);
+    expect(bericht).toContain("20.543");
+    expect(bericht, "die Doppelzaehlung muss benannt sein").toMatch(/beiden Verzeichnissen/);
+  });
+
   it("nennt die richtige Zahl der Dienste mit zwanzig Zahlern oder mehr", () => {
     const n = cdp.filter((r) => (zahl(r.unique_payers_30d) ?? 0) >= 20).length;
     expect(n, "die Kernaussage der Ueberschrift").toBe(130);

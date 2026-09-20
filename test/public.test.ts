@@ -457,7 +457,7 @@ describe("Die Marktmessung steht auf der Seite", () => {
   it("nennt Umfang und Kernzahl und verlinkt die Rohdaten", async () => {
     const db = openDb(":memory:");
     const html = await (await createApp({ db }).request("/")).text();
-    expect(html).toMatch(/21,545 listed services/);
+    expect(html).toMatch(/20,543 distinct services/);
     // "130 von 21.545" waere falsch: gemessen sind nur die 14.918 mit Nachfragedaten.
     expect(html).toMatch(/14,918 of them/);
     expect(html).toMatch(/130 of those have twenty or more/);
@@ -552,5 +552,17 @@ describe("GET /v1/credits/history", () => {
     expect(html, "die Seite darf keinen Endpunkt empfehlen, den es als GET nicht gibt").not.toMatch(
       /curl[^\n]*v1\/credits\/transfers/,
     );
+  });
+
+  it("nennt die Guthaben-Endpunkte in beiden Selbstbeschreibungen", async () => {
+    const db = openDb(":memory:");
+    const app = createApp({ db });
+    const doc = (await (await app.request("/.well-known/x402")).json()) as {
+      endpoints: Record<string, string>;
+    };
+    expect(doc.endpoints.history, "eine Maschine findet den Endpunkt sonst nicht").toBe("/v1/credits/history");
+    expect(doc.endpoints.balance).toBe("/v1/credits/balance");
+    const txt = await (await app.request("/llms.txt")).text();
+    expect(txt).toMatch(/v1\/credits\/history/);
   });
 });

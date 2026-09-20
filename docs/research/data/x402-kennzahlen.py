@@ -25,6 +25,8 @@ def kennzahlen(zeilen: list) -> dict:
     return {
         "stichtag": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "dienste_gesamt": len(zeilen),
+        "dienste_eindeutig": len({(r["verzeichnis"], r["resource"]) for r in zeilen}),
+        "urls_eindeutig": len({r["resource"] for r in zeilen}),
         "dienste_cdp": len(cdp),
         "dienste_payai": len(zeilen) - len(cdp),
         "anbieter": len({r["host"] for r in zeilen if r["host"]}),
@@ -48,7 +50,11 @@ def main(pfad: str) -> None:
         return
     cdp = [r for r in zeilen if r["verzeichnis"] == "cdp"]
     payai = [r for r in zeilen if r["verzeichnis"] == "payai"]
-    print(f"Dienste gesamt: {len(zeilen)}  (Coinbase {len(cdp)}, PayAI {len(payai)})")
+    cdp_urls = {r["resource"] for r in cdp}
+    payai_urls = {r["resource"] for r in payai}
+    print(f"Eintraege gesamt: {len(zeilen)}  (Coinbase {len(cdp)}, PayAI {len(payai)})")
+    print(f"Eindeutige Dienst-URLs: {len(cdp_urls | payai_urls)}"
+          f"  (in beiden Verzeichnissen: {len(cdp_urls & payai_urls)})")
     print(f"Verschiedene Anbieter (Host): {len({r['host'] for r in zeilen if r['host']})}")
     print()
 
