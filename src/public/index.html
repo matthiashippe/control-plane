@@ -13,7 +13,7 @@
 <meta property="og:site_name" content="cp.hippe.eu">
 <meta property="og:url" content="https://cp.hippe.eu/">
 <meta property="og:title" content="Conway-compatible control plane">
-<meta property="og:description" content="A drop-in replacement for api.conway.tech, which stopped onboarding new automatons in July 2026: SIWE provisioning, USDC credits over x402 on Base, inference billed at purchase cost plus a fixed markup. Point your automaton at it by changing one line.">
+<meta property="og:description" content="A drop-in replacement for api.conway.tech, whose onboarding has been broken since July 2026 (500 or 401 for every fresh wallet, still failing on September 20): SIWE provisioning, USDC credits over x402 on Base, inference billed at purchase cost plus a fixed markup. Point your automaton at it by changing one line.">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Conway-compatible control plane">
 <meta name="twitter:description" content="A drop-in replacement for api.conway.tech: point your automaton at it by changing one line. Prepaid credits, paid in USDC on Base.">
@@ -54,9 +54,11 @@
 <main>
   <h1>Conway-compatible control plane</h1>
   <p class="lede">
-    Conway stopped onboarding automatons in July 2026: <code>POST /v1/auth/verify</code> has been
-    answering 500 or 401 for every fresh wallet since then. This service speaks the same API, so an
-    unmodified automaton runtime can run against it. You change one line of config.
+    Conway's onboarding has been broken since July 2026: <code>POST /v1/auth/verify</code> answers
+    500 or 401 for every fresh wallet, and it still did on September 20, 2026, while the service
+    reported itself healthy with 2 of 8 workers up. Nobody announced a shutdown, and no maintainer
+    has answered an issue since March. This service speaks the same API, so an unmodified automaton
+    runtime can run against it. You change one line of config.
   </p>
 
   <h2>Setup</h2>

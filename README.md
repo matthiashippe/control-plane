@@ -10,8 +10,10 @@ owner changes one line in `~/.automaton/automaton.json` and keeps running:
 "conwayApiUrl": "https://cp.hippe.eu"
 ```
 
-Conway stopped onboarding automatons in July 2026: `POST /v1/auth/verify` answers 500 or 401 for
-every fresh wallet. Ten issues since July 17 report it and have not stopped (#339, #353, #355,
+Conway's onboarding has been broken since July 2026: `POST /v1/auth/verify` answers 500 or 401 for
+every fresh wallet, verified again on September 20, 2026 with a throwaway wallet against
+`api.conway.tech`, which reported itself `"status":"healthy"` with 2 of 8 workers up in the same
+minute. Nobody ever announced a shutdown. Ten issues since July 17 report it and have not stopped (#339, #353, #355,
 #356, #359, #371, #372, #376, #377, #379), with two earlier reports from March 27 (#293, #294),
 one of those after 30 USDC had already been sent. This service exists because my own automaton
 needed a control plane.
