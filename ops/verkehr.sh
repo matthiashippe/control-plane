@@ -12,8 +12,14 @@ set -euo pipefail
 STUNDEN="${1:-24}"
 KEY="${CP_SSH_KEY:-$HOME/.ssh/id_ed25519_automaton}"
 HOST="${CP_HOST:-root@76.13.144.207}"
-# Der Anschluss des Betreibers und die VM selbst. Ohne diesen Filter besteht das Bild aus uns.
-EIGENE="${CP_EIGENE_IPS:-82.194.125.90 76.13.144.207}"
+# Der Anschluss des Betreibers, die VM selbst und der code-host. Ohne diesen Filter besteht das
+# Bild aus uns.
+#
+# Der code-host (Google Cloud, 35.242.237.124) kam am 20.09.2026 dazu und ist der heimtueckischste
+# der drei: Jeder Job, der dort ops/journeys-pruefen.sh oder harness/e2e/markt.ts gegen die
+# Produktion faehrt, erscheint sonst als fremder Besucher, der genau die neuen Marktpfade abklopft.
+# Das ist exakt das Signal, auf das wir warten, und es waere unser eigenes.
+EIGENE="${CP_EIGENE_IPS:-82.194.125.90 76.13.144.207 35.242.237.124}"
 
 seit=$(( $(date -u +%s) - STUNDEN * 3600 ))
 # Als JSON-Liste an jq, nicht als zusammengebauter Ausdruck: Ein `paste -d' and '` setzt nur das
