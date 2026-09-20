@@ -1,9 +1,10 @@
 /**
- * OpenRouter als Einkaufsquelle: OpenAI-kompatible Chat-Completions, ein Key für alle Anbieter.
+ * OpenRouter as the purchasing source: OpenAI-compatible chat completions, one key for every
+ * provider.
  *
- * Katalog-IDs sind die OpenRouter-IDs (`openai/gpt-5.2`); die IDs, die die Runtime hart anfragt,
- * kommen als Aliase davor (`defaultAliases`). Preise werden beim Start aus `/models` gelesen und
- * stündlich erneuert; `usage.cost` in der Antwort liefert die tatsächlichen Einkaufskosten je Call.
+ * Catalogue IDs are the OpenRouter IDs (`openai/gpt-5.2`); the IDs the runtime hard-codes sit in
+ * front of them as aliases (`defaultAliases`). Prices are read from `/models` on start and renewed
+ * hourly; `usage.cost` in the answer gives the actual purchase cost per call.
  */
 
 import type { ChatProvider, ChatRequest, ChatResponse, ModelSpec, ToolCall } from "./provider.js";
@@ -11,20 +12,20 @@ import { ProviderBadRequestError, ProviderUnavailableError } from "./provider.js
 
 export interface OpenRouterOptions {
   apiKey: string;
-  /** OpenRouter-IDs, die im Katalog landen. */
+  /** OpenRouter IDs that end up in the catalogue. */
   models: string[];
   baseUrl?: string;
   fetch?: typeof fetch;
   referer?: string;
   title?: string;
   timeoutMs?: number;
-  /** Timeout für den Preisabruf. Kurz, weil er den Start blockiert. Default 15 s. */
+  /** Timeout for the price fetch. Short, because it blocks the start. Default 15 s. */
   priceFetchTimeoutMs?: number;
   /**
-   * Wird nach jedem erfolgreichen Preisabruf gerufen, auch beim stündlichen. Der Aufrufer nutzt
-   * das, um den Katalog dauerhaft zu speichern. Ohne diesen Haken veraltet der gespeicherte Stand,
-   * während der Prozess mit frischen Preisen läuft, und nach einem Neustart ohne erreichbaren
-   * Anbieter rechnet der Dienst mit Zahlen von vorgestern.
+   * Called after every successful price fetch, the hourly one included. The caller uses it to
+   * persist the catalogue. Without this hook the stored state goes stale while the process runs on
+   * fresh prices, and after a restart without a reachable provider the service bills with numbers
+   * from the day before yesterday.
    */
   onRefresh?: (specs: ModelSpec[]) => void;
   priceRefreshMs?: number;
@@ -33,7 +34,7 @@ export interface OpenRouterOptions {
 
 export const DEFAULT_OPENROUTER_MODELS = ["openai/gpt-5.2", "openai/gpt-5-mini"];
 
-/** Runtime-Baseline-IDs -> OpenRouter-IDs. `gpt-5.3` fehlt bewusst: OpenRouter hat nur die Codex-Variante. */
+/** Runtime baseline IDs -> OpenRouter IDs. `gpt-5.3` is missing on purpose: OpenRouter only has the Codex variant. */
 export const DEFAULT_OPENROUTER_ALIASES: Record<string, string> = {
   "gpt-5.2": "openai/gpt-5.2",
   "gpt-5-mini": "openai/gpt-5-mini",
@@ -60,7 +61,7 @@ export class OpenRouterProvider implements ChatProvider {
   private refreshTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(private readonly opts: OpenRouterOptions) {
-    if (!opts.apiKey) throw new Error("OpenRouter: apiKey fehlt");
+    if (!opts.apiKey) throw new Error("OpenRouter: apiKey is missing");
     this.baseUrl = (opts.baseUrl ?? "https://openrouter.ai/api/v1").replace(/\/$/, "");
     this.fetchImpl = opts.fetch ?? fetch;
     this.timeoutMs = opts.timeoutMs ?? 120_000;
@@ -70,12 +71,12 @@ export class OpenRouterProvider implements ChatProvider {
     this.now = opts.now ?? Date.now;
   }
 
-  /** Lädt die Preise. Ohne Preise startet das Control Plane nicht (Vorprüfung wäre blind). */
+  /** Loads the prices. Without prices the control plane does not start (the estimate would be blind). */
   async init(): Promise<void> {
     await this.refreshPrices();
     if (this.priceRefreshMs > 0) {
       this.refreshTimer = setInterval(() => {
-        this.refreshPrices().catch((err) => console.error(`[openrouter] Preis-Refresh fehlgeschlagen: ${err.message}`));
+        this.refreshPrices().catch((err) => console.error(`[openrouter] price refresh failed: ${err.message}`));
       }, this.priceRefreshMs);
       this.refreshTimer.unref?.();
     }
@@ -86,12 +87,11 @@ export class OpenRouterProvider implements ChatProvider {
   }
 
   async refreshPrices(): Promise<void> {
-    // Mit Timeout, weil dieser Aufruf den Start blockiert: ohne ihn hängt der Prozess still,
-    // der Healthcheck schlägt fehl und der Dienst antwortet nicht, ohne dass eine Zeile im Log
-    // steht. Der Timer deckt ausdrücklich AUCH das Lesen des Bodys: Die Modellliste von
-    // OpenRouter ist über ein Megabyte groß, und ein hängender Download hängt genauso wie ein
-    // hängender Verbindungsaufbau. Die erste Fassung löschte den Timer direkt nach dem `fetch`
-    // und ließ damit genau die Hälfte ungeschützt.
+    // With a timeout, because this call blocks the start: without one the process hangs silently,
+    // the health check fails and the service does not answer, without a single line in the log. The
+    // timer explicitly ALSO covers reading the body: OpenRouter's model list is more than a
+    // megabyte, and a stalled download stalls just like a stalled connection setup. The first
+    // version cleared the timer right after the `fetch` and left exactly half of it unprotected.
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.priceFetchTimeoutMs);
     let body: { data?: OpenRouterModelRow[] };
@@ -116,7 +116,7 @@ export class OpenRouterProvider implements ChatProvider {
         missing.push(id);
         continue;
       }
-      // OpenRouter nennt USD je Token; wir führen USD je Million.
+      // OpenRouter quotes USD per token; we keep USD per million.
       const inputPerMillion = Number(row.pricing?.prompt ?? 0) * 1_000_000;
       const outputPerMillion = Number(row.pricing?.completion ?? 0) * 1_000_000;
       const existing = this.specs.get(id);
@@ -134,11 +134,11 @@ export class OpenRouterProvider implements ChatProvider {
         });
       }
     }
-    if (missing.length) throw new Error(`OpenRouter kennt diese Modelle nicht: ${missing.join(", ")}`);
+    if (missing.length) throw new Error(`OpenRouter does not know these models: ${missing.join(", ")}`);
     this.lastRefresh = this.now();
-    // Auch der stündliche Abruf meldet sich hier, nicht nur der beim Start. Sonst läuft der Prozess
-    // mit frischen Preisen, während der gespeicherte Stand veraltet, und nach einem Neustart ohne
-    // erreichbaren Anbieter rechnet der Dienst mit Zahlen von vorgestern.
+    // The hourly fetch reports here too, not just the one on start. Otherwise the process runs on
+    // fresh prices while the stored state goes stale, and after a restart without a reachable
+    // provider the service bills with numbers from the day before yesterday.
     this.onRefresh?.(this.snapshot());
   }
 
@@ -146,27 +146,27 @@ export class OpenRouterProvider implements ChatProvider {
     return [...this.specs.values()];
   }
 
-  /** Aliase, deren Ziel im Katalog liegt. */
-  /**
-   * Die geladenen Preise, damit der Aufrufer sie zwischenspeichern kann. Ein Startpfad, der
-   * zwingend einen Drittanbieter erreichen muss, ist ein Ausfallgrund: Am 19.09.2026 hing der
-   * Start zweimal an genau diesem Aufruf und der Dienst war weg.
-   */
-  /** Nachträglich setzen, damit auch der Abruf beim Start schon gespeichert wird. */
+  /** Set after construction, so the fetch on start is persisted as well. */
   setOnRefresh(cb: (specs: ModelSpec[]) => void): void {
     this.onRefresh = cb;
   }
 
+  /**
+   * The loaded prices, so the caller can cache them. A start path that has to reach a third party
+   * is a reason for an outage: on 19.09.2026 the start hung twice on exactly this call and the
+   * service was gone.
+   */
   snapshot(): ModelSpec[] {
     return [...this.specs.values()];
   }
 
-  /** Lädt Preise aus einem Snapshot, wenn der Abruf beim Start nicht durchkam. */
+  /** Loads prices from a snapshot when the fetch on start did not get through. */
   loadSnapshot(specs: ModelSpec[]): void {
     this.specs.clear();
     for (const spec of specs) this.specs.set(spec.id, spec);
   }
 
+  /** Aliases whose target is in the catalogue. */
   defaultAliases(): Record<string, string> {
     const out: Record<string, string> = {};
     for (const [alias, target] of Object.entries(DEFAULT_OPENROUTER_ALIASES)) {
@@ -235,7 +235,7 @@ export class OpenRouterProvider implements ChatProvider {
       usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number; cost?: number };
       error?: { message?: string; code?: number };
     };
-    // OpenRouter kann 200 mit einem Fehlerobjekt antworten (Upstream-Provider-Fehler).
+    // OpenRouter can answer 200 with an error object (upstream provider error).
     if (data.error) {
       throw new ProviderUnavailableError(this.id, data.error.code ?? 200, data.error.message ?? "upstream error");
     }
@@ -278,7 +278,7 @@ export class OpenRouterProvider implements ChatProvider {
 
 export function openRouterFromEnv(env: NodeJS.ProcessEnv): OpenRouterProvider {
   const apiKey = env.OPENROUTER_API_KEY;
-  if (!apiKey) throw new Error("CP_PROVIDER=openrouter braucht OPENROUTER_API_KEY");
+  if (!apiKey) throw new Error("CP_PROVIDER=openrouter needs OPENROUTER_API_KEY");
   const models = (env.CP_OPENROUTER_MODELS || DEFAULT_OPENROUTER_MODELS.join(","))
     .split(",")
     .map((s) => s.trim())

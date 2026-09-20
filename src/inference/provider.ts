@@ -1,20 +1,20 @@
 /**
- * Provider-Naht für Inferenz. Das Control Plane spricht nach außen OpenAI-Chat-Completions
- * (so ruft die Runtime `/v1/chat/completions` auf) und kauft nach innen bei einem Provider ein.
- * Preise sind Listenpreise in USD je Million Tokens; der Verkaufsaufschlag liegt im Katalog.
+ * Provider seam for inference. Outwards the control plane speaks OpenAI chat completions (that is
+ * how the runtime calls `/v1/chat/completions`) and inwards it buys from a provider. Prices are
+ * list prices in USD per million tokens; the sales markup lives in the catalogue.
  */
 
 export interface ModelSpec {
-  /** ID, wie sie die Runtime in `model` schickt. */
+  /** ID exactly as the runtime sends it in `model`. */
   id: string;
   provider: string;
-  /** Listenpreis USD / 1M Tokens. */
+  /** List price in USD per 1M tokens. */
   inputPerMillion: number;
   outputPerMillion: number;
   contextWindow: number;
 }
 
-/** Untermenge des OpenAI-Chat-Formats, die die Runtime sendet (docs/protocol.md, Inferenz). */
+/** The subset of the OpenAI chat format the runtime sends (docs/protocol.md, section Inferenz). */
 export interface ChatMessage {
   role: "system" | "user" | "assistant" | "tool";
   content: string | null | Array<{ type: string; text?: string }>;
@@ -49,7 +49,7 @@ export interface Usage {
   prompt_tokens: number;
   completion_tokens: number;
   total_tokens: number;
-  /** Tatsächliche Einkaufskosten in USD, wenn der Provider sie meldet (OpenRouter `usage.cost`). */
+  /** Actual purchase cost in USD, when the provider reports it (OpenRouter `usage.cost`). */
   cost_usd?: number;
 }
 
@@ -66,7 +66,7 @@ export interface ChatResponse {
   usage: Usage;
 }
 
-/** Provider-Ausfall (kein Guthaben, Rate-Limit, 5xx, Timeout): nicht dem Automaton anlasten. */
+/** Provider outage (no credit, rate limit, 5xx, timeout): do not blame the automaton for it. */
 export class ProviderUnavailableError extends Error {
   constructor(
     public readonly provider: string,
@@ -78,7 +78,7 @@ export class ProviderUnavailableError extends Error {
   }
 }
 
-/** Unser Request war fehlerhaft (Provider antwortet 400): durchreichen. */
+/** Our request was malformed (the provider answers 400): pass it through. */
 export class ProviderBadRequestError extends Error {
   constructor(
     public readonly provider: string,
@@ -92,11 +92,11 @@ export class ProviderBadRequestError extends Error {
 export interface ChatProvider {
   readonly id: string;
   models(): ModelSpec[];
-  /** Der Aufrufer schickt nur Modelle, die models() kennt. Max-Tokens sind bereits normalisiert. */
+  /** The caller only sends models that models() knows. Max tokens are already normalised. */
   chat(req: ChatRequest & { maxTokens: number; apiKeyId: string }): Promise<ChatResponse>;
 }
 
-/** Grobe Token-Schätzung ohne Tokenizer: vier Zeichen je Token, plus ein Token je Nachricht. */
+/** Rough token estimate without a tokenizer: four characters per token, plus one token per message. */
 export function estimateTokens(messages: ChatMessage[], tools?: ToolDef[]): number {
   let chars = 0;
   for (const m of messages) {

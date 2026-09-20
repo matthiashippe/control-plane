@@ -22,7 +22,7 @@ interface Recorded {
   body: Record<string, unknown> | null;
 }
 
-/** fetch-Stub: nimmt Antworten je Pfad entgegen und zeichnet Requests auf. */
+/** fetch stub: takes answers per path and records the requests. */
 function stubFetch(handlers: Record<string, (rec: Recorded) => Response | Promise<Response>>) {
   const calls: Recorded[] = [];
   const impl = (async (input: string | URL | Request, init?: RequestInit) => {
@@ -59,11 +59,11 @@ function appWith(provider: OpenRouterProvider, balanceMc = 500_000) {
     app.request("/v1/chat/completions", { method: "POST", headers: { "content-type": "application/json", authorization: key }, body: JSON.stringify(body) });
   const balance = () => (db.prepare("SELECT balance_mc FROM wallets WHERE address = ?").get(address) as { balance_mc: number }).balance_mc;
   const rows = () => db.prepare("SELECT delta_mc, meta FROM ledger WHERE kind = 'inference'").all() as { delta_mc: number; meta: string }[];
-  // Der Saldo allein genuegt nicht: Eine nicht freigegebene Reservierung laesst ihn unveraendert
-  // und sperrt das Guthaben trotzdem dauerhaft.
-  const reserviert = () =>
+  // The balance alone is not enough: a reservation that is never released leaves it unchanged and
+  // still blocks the credit for good.
+  const reserved = () =>
     (db.prepare("SELECT reserved_mc FROM wallets WHERE address = ?").get(address) as { reserved_mc: number }).reserved_mc;
-  return { db, app, key, chat, balance, rows, reserviert };
+  return { db, app, key, chat, balance, rows, reserved };
 }
 
 const OK_RESPONSE = {
@@ -75,7 +75,7 @@ const OK_RESPONSE = {
 };
 
 describe("OpenRouterProvider", () => {
-  it("lädt Katalog und Preise aus /models (USD je Token -> je Million) und liefert Default-Aliase", async () => {
+  it("loads catalogue and prices from /models (USD per token -> per million) and serves default aliases", async () => {
     const { provider, calls } = await makeProvider(() => json(OK_RESPONSE));
     expect(calls[0].url).toBe("https://openrouter.ai/api/v1/models");
     expect((calls[0].init.headers as Record<string, string>).Authorization).toBe(`Bearer ${KEY}`);
@@ -88,11 +88,11 @@ describe("OpenRouterProvider", () => {
     expect(provider.defaultAliases()).toEqual(DEFAULT_OPENROUTER_ALIASES);
   });
 
-  it("bricht beim Start ab, wenn ein konfiguriertes Modell bei OpenRouter fehlt", async () => {
+  it("aborts the start when a configured model is missing at OpenRouter", async () => {
     await expect(makeProvider(() => json(OK_RESPONSE), ["openai/gpt-5.2", "openai/does-not-exist"])).rejects.toThrow(/does-not-exist/);
   });
 
-  it("schickt den Request 1:1 mit usage.include und Bearer-Header; Alias gpt-5-mini wird zur OpenRouter-ID", async () => {
+  it("sends the request as is with usage.include and a Bearer header; alias gpt-5-mini becomes the OpenRouter ID", async () => {
     const { provider, calls } = await makeProvider(() => json(OK_RESPONSE));
     const { chat } = appWith(provider);
     const tools = [{ type: "function", function: { name: "check_credits", parameters: { type: "object", properties: {} } } }];
@@ -112,7 +112,7 @@ describe("OpenRouterProvider", () => {
     expect(body.usage.cost_usd).toBe(0.00029);
   });
 
-  it("bucht nach usage.cost x 1,3 ab und schreibt cost_usd, purchase_mc und margin_mc ins Ledger", async () => {
+  it("charges usage.cost x 1.3 and writes cost_usd, purchase_mc and margin_mc into the ledger", async () => {
     const { provider } = await makeProvider(() => json(OK_RESPONSE));
     const { chat, balance, rows } = appWith(provider);
     const before = balance();
@@ -129,7 +129,7 @@ describe("OpenRouterProvider", () => {
     expect(meta.cost_mc).toBe(expected);
   });
 
-  it("fällt ohne usage.cost auf die Listenpreis-Formel zurück", async () => {
+  it("falls back to the list price formula without usage.cost", async () => {
     const noCost = { ...OK_RESPONSE, usage: { prompt_tokens: 1000, completion_tokens: 20, total_tokens: 1020 } };
     const { provider } = await makeProvider(() => json(noCost));
     const { chat, balance, rows } = appWith(provider);
@@ -142,33 +142,33 @@ describe("OpenRouterProvider", () => {
     expect(JSON.parse(rows()[0].meta).cost_usd).toBeNull();
   });
 
-  it("meldet OpenRouter 402/429/5xx als 503 provider_unavailable ohne Ledger-Zeile", async () => {
+  it("reports OpenRouter 402/429/5xx as 503 provider_unavailable without a ledger row", async () => {
     for (const status of [402, 429, 502]) {
       const { provider } = await makeProvider(() => json({ error: { message: "nope", code: status } }, status));
-      const { chat, balance, rows, reserviert } = appWith(provider);
+      const { chat, balance, rows, reserved } = appWith(provider);
       const before = balance();
       const res = await chat({ model: "gpt-5.2", messages: [{ role: "user", content: "hi" }] });
       expect(res.status).toBe(503);
       const text = await res.text();
       const body = JSON.parse(text) as { error: string; provider: string; message: string; docs: string };
       expect(body.error).toBe("provider_unavailable");
-      expect(body.provider, "das Feld provider bleibt").toBe("openrouter");
-      // Der Upstream-Text gehört ins Log, nicht in die Antwort: er sagt dem Leser nichts und
-      // verrät den Zustand unseres Einkaufs.
+      expect(body.provider, "the provider field stays").toBe("openrouter");
+      // The upstream text belongs in the log, not in the answer: it tells the reader nothing and
+      // leaks the state of our purchasing.
       expect(text).not.toContain("nope");
       expect(text).not.toContain(String(status));
-      expect(body.message, "der Leser muss wissen, dass es nicht an seinem Guthaben liegt").toMatch(
+      expect(body.message, "the reader needs to know it is not their credit").toMatch(
         /not a credit problem/,
       );
       expect(body.message).toMatch(/retryable/);
       expect(body.docs).toContain("docs/errors.md#inference");
       expect(balance()).toBe(before);
       expect(rows()).toHaveLength(0);
-      expect(reserviert(), "sonst kommt der Kunde nach einem fremden Ausfall nicht mehr an sein Geld").toBe(0);
+      expect(reserved(), "otherwise the customer cannot reach their money after somebody else's outage").toBe(0);
     }
   });
 
-  it("meldet ein 200 mit Fehlerobjekt (Upstream-Fehler) ebenfalls als 503", async () => {
+  it("reports a 200 carrying an error object (upstream error) as 503 as well", async () => {
     const { provider } = await makeProvider(() => json({ error: { message: "provider overloaded", code: 502 } }));
     const { chat, rows } = appWith(provider);
     const res = await chat({ model: "gpt-5.2", messages: [{ role: "user", content: "hi" }] });
@@ -176,22 +176,22 @@ describe("OpenRouterProvider", () => {
     expect(rows()).toHaveLength(0);
   });
 
-  it("reicht OpenRouter 400 als 400 provider_rejected_request durch", async () => {
+  it("passes an OpenRouter 400 through as 400 provider_rejected_request", async () => {
     const { provider } = await makeProvider(() => json({ error: { message: "bad tools schema" } }, 400));
     const { chat } = appWith(provider);
     const res = await chat({ model: "gpt-5.2", messages: [{ role: "user", content: "hi" }] });
     expect(res.status).toBe(400);
     const body = (await res.json()) as { error: string; details: { error: { message: string } }; message: string };
     expect(body.error).toBe("provider_rejected_request");
-    expect(body.details.error.message, "die Antwort des Providers auf den eigenen Body bleibt erhalten").toBe(
+    expect(body.details.error.message, "the provider answer about our own body is kept").toBe(
       "bad tools schema",
     );
-    expect(body.message, "und daneben steht, was das heißt und dass nichts abgebucht wurde").toMatch(
+    expect(body.message, "and next to it stands what that means and that nothing was charged").toMatch(
       /Nothing was charged/,
     );
   });
 
-  it("bricht bei Timeout mit ProviderUnavailableError ab", async () => {
+  it("aborts on timeout with a ProviderUnavailableError", async () => {
     const { impl } = stubFetch({
       "/models": () => json(MODELS_BODY),
       "/chat/completions": (rec) =>
@@ -204,9 +204,9 @@ describe("OpenRouterProvider", () => {
     await expect(provider.chat({ model: "openai/gpt-5.2", messages: [{ role: "user", content: "hi" }], maxTokens: 10, apiKeyId: "x" })).rejects.toBeInstanceOf(ProviderUnavailableError);
   });
 
-  it("bricht den Preisabruf beim Start nach dem Timeout ab, statt still zu hängen", async () => {
-    // Regression: am 19.09.2026 blieb der Start unbegrenzt in GET /models stehen. Der Prozess gab
-    // keine Zeile aus, der Healthcheck schlug an, Compose brach ab und der Dienst war 502.
+  it("aborts the price fetch on start after the timeout instead of hanging silently", async () => {
+    // Regression: on 19.09.2026 the start sat in GET /models without a bound. The process printed
+    // no line, the health check fired, compose gave up and the service was a 502.
     const { impl } = stubFetch({
       "/models": (rec) =>
         new Promise((_, reject) => {
@@ -225,46 +225,46 @@ describe("OpenRouterProvider", () => {
     expect(Date.now() - started).toBeLessThan(2000);
   });
 
-  it("nennt den Grund, wenn der Preisabruf beim Start aus einem anderen Grund scheitert", async () => {
+  it("names the reason when the price fetch on start fails for another reason", async () => {
     const { impl } = stubFetch({ "/models": () => Promise.reject(new Error("ECONNREFUSED")) });
     const provider = new OpenRouterProvider({ apiKey: KEY, models: ["openai/gpt-5.2"], fetch: impl, priceRefreshMs: 0 });
     await expect(provider.init()).rejects.toThrow(/GET \/models: ECONNREFUSED/);
   });
 });
 
-describe("Start ohne erreichbaren OpenRouter", () => {
-  it("liefert einen Snapshot der Preise und lädt ihn zurück", async () => {
-    // Das ist die Grundlage dafür, dass der Start nicht an einem Drittanbieter hängt.
+describe("start without a reachable OpenRouter", () => {
+  it("delivers a snapshot of the prices and loads it back", async () => {
+    // This is what keeps the start from depending on a third party.
     const { impl } = stubFetch({ "/models": () => json(MODELS_BODY) });
     const a = new OpenRouterProvider({ apiKey: KEY, models: ["openai/gpt-5.2", "openai/gpt-5-mini"], fetch: impl, priceRefreshMs: 0 });
     await a.init();
     const snapshot = a.snapshot();
     expect(snapshot.length).toBe(2);
 
-    // Ein zweiter Provider, dessen Abruf scheitert, kommt über den Snapshot trotzdem hoch.
-    const { impl: kaputt } = stubFetch({ "/models": () => Promise.reject(new Error("ECONNREFUSED")) });
-    const b = new OpenRouterProvider({ apiKey: KEY, models: ["openai/gpt-5.2"], fetch: kaputt, priceRefreshMs: 0 });
+    // A second provider whose fetch fails still comes up through the snapshot.
+    const { impl: broken } = stubFetch({ "/models": () => Promise.reject(new Error("ECONNREFUSED")) });
+    const b = new OpenRouterProvider({ apiKey: KEY, models: ["openai/gpt-5.2"], fetch: broken, priceRefreshMs: 0 });
     await expect(b.init()).rejects.toThrow();
     b.loadSnapshot(JSON.parse(JSON.stringify(snapshot)));
 
     expect(b.models().map((m) => m.id).sort()).toEqual(snapshot.map((m) => m.id).sort());
-    const preis = b.models().find((m) => m.id === "openai/gpt-5.2");
-    expect(preis?.inputPerMillion, "die Preise müssen den Neustart überleben").toBe(
+    const price = b.models().find((m) => m.id === "openai/gpt-5.2");
+    expect(price?.inputPerMillion, "the prices have to survive the restart").toBe(
       snapshot.find((m) => m.id === "openai/gpt-5.2")?.inputPerMillion,
     );
   });
 
-  it("deckt den Timeout auch das Lesen der Antwort ab, nicht nur den Verbindungsaufbau", async () => {
-    // Die erste Fassung löschte den Timer direkt nach dem `fetch`. Die Modellliste von OpenRouter
-    // ist über ein Megabyte groß; ein hängender Download hängt genauso wie ein hängender
-    // Verbindungsaufbau, und genau das kostete den Dienst am 19.09.2026 zweimal die Erreichbarkeit.
+  it("covers reading the answer with the timeout, not only the connection setup", async () => {
+    // The first version cleared the timer right after the `fetch`. OpenRouter's model list is more
+    // than a megabyte; a stalled download stalls just like a stalled connection setup, and that is
+    // exactly what cost the service its availability twice on 19.09.2026.
     const { impl } = stubFetch({
       "/models": (rec) => {
         const signal = rec.init.signal as AbortSignal;
         return Promise.resolve({
           ok: true,
           status: 200,
-          // Antwort kommt sofort, aber der Body niemals.
+          // The answer comes at once, the body never.
           json: () =>
             new Promise((_, reject) => {
               signal.addEventListener("abort", () => reject(new Error("aborted")));
@@ -275,60 +275,60 @@ describe("Start ohne erreichbaren OpenRouter", () => {
     const p = new OpenRouterProvider({ apiKey: KEY, models: ["openai/gpt-5.2"], fetch: impl, priceRefreshMs: 0, priceFetchTimeoutMs: 30 });
     const start = Date.now();
     await expect(p.init()).rejects.toThrow(/timeout after 30 ms/);
-    expect(Date.now() - start, "der Start darf nicht hängen bleiben").toBeLessThan(2000);
+    expect(Date.now() - start, "the start must not hang").toBeLessThan(2000);
   });
 });
 
-describe("Katalog speichern", () => {
-  it("meldet auch den stündlichen Abruf, nicht nur den beim Start", async () => {
-    // Vorher wurde der Katalog nur beim Start gespeichert. Der Prozess lief dann mit frischen
-    // Preisen weiter, während der gespeicherte Stand veraltete, und nach einem Neustart ohne
-    // erreichbaren Anbieter hätte der Dienst mit Zahlen von vorgestern gerechnet. Gefunden am
-    // 20.09.2026: Der Cache war elf Stunden alt, obwohl der Prozess seit zwei Stunden lief.
-    const gespeichert: number[] = [];
-    let jetzt = 0;
+describe("persisting the catalogue", () => {
+  it("reports the hourly fetch too, not only the one on start", async () => {
+    // Before, the catalogue was only saved on start. The process then kept running on fresh prices
+    // while the stored state went stale, and after a restart without a reachable provider the
+    // service would have billed with numbers from the day before yesterday. Found on 20.09.2026:
+    // the cache was eleven hours old although the process had been running for two hours.
+    const saved: number[] = [];
+    let now = 0;
     const { impl } = stubFetch({ "/models": () => json(MODELS_BODY) });
     const p = new OpenRouterProvider({
       apiKey: KEY,
       models: ["openai/gpt-5.2"],
       fetch: impl,
       priceRefreshMs: 0,
-      now: () => jetzt,
-      onRefresh: (specs) => gespeichert.push(specs.length),
+      now: () => now,
+      onRefresh: (specs) => saved.push(specs.length),
     });
 
     await p.init();
-    expect(gespeichert, "der Abruf beim Start meldet sich").toEqual([1]);
+    expect(saved, "the fetch on start reports itself").toEqual([1]);
 
-    jetzt += 3_600_000;
+    now += 3_600_000;
     await p.refreshPrices();
-    expect(gespeichert, "der stündliche Abruf ebenfalls").toEqual([1, 1]);
+    expect(saved, "the hourly fetch does too").toEqual([1, 1]);
   });
 
-  it("meldet einen fehlgeschlagenen Abruf nicht als Erfolg", async () => {
-    const gespeichert: number[] = [];
+  it("does not report a failed fetch as a success", async () => {
+    const saved: number[] = [];
     const { impl } = stubFetch({ "/models": () => Promise.reject(new Error("ECONNREFUSED")) });
     const p = new OpenRouterProvider({
       apiKey: KEY,
       models: ["openai/gpt-5.2"],
       fetch: impl,
       priceRefreshMs: 0,
-      onRefresh: (specs) => gespeichert.push(specs.length),
+      onRefresh: (specs) => saved.push(specs.length),
     });
     await expect(p.init()).rejects.toThrow();
-    expect(gespeichert, "ein gescheiterter Abruf darf nichts speichern").toEqual([]);
+    expect(saved, "a failed fetch must not persist anything").toEqual([]);
   });
 
-  it("gibt die Reservierung auch frei, wenn die Antwort unbrauchbar ist", async () => {
-    // Teurer als ein Ausfall: Der Einkauf hat stattgefunden, aber es gibt nichts zu buchen. Ohne
-    // Freigabe bleibt das Guthaben blockiert, und der Kunde sieht nur, dass nichts mehr geht.
+  it("releases the reservation even when the answer is unusable", async () => {
+    // More expensive than an outage: the purchase happened but there is nothing to book. Without
+    // the release the credit stays blocked and the customer only sees that nothing works any more.
     const { provider } = await makeProvider(() => json({ id: "x", choices: [] }));
-    const { chat, balance, rows, reserviert } = appWith(provider);
+    const { chat, balance, rows, reserved } = appWith(provider);
     const before = balance();
     const res = await chat({ model: "gpt-5.2", messages: [{ role: "user", content: "hi" }] });
     expect(res.status).toBeGreaterThanOrEqual(400);
-    expect(reserviert(), "nach jedem Ausgang ohne Buchung muss die Reservierung zurueck sein").toBe(0);
-    expect(balance(), "und abgebucht werden darf nichts").toBe(before);
+    expect(reserved(), "after every exit without a booking the reservation has to be back").toBe(0);
+    expect(balance(), "and nothing may be charged").toBe(before);
     expect(rows()).toHaveLength(0);
   });
 });
