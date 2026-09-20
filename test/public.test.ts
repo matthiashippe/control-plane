@@ -220,7 +220,7 @@ describe("Öffentliche Seite und Status", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toMatch(/text\/plain/);
     const txt = await res.text();
-    expect(txt).toContain("# control-plane");
+    expect(txt).toContain("# Handsel");
     expect(txt).toContain("conwayApiUrl");
     expect(txt).toContain("cp.hippe.eu");
     expect(txt).toContain("without-control-plane.md");
@@ -439,7 +439,7 @@ describe("Vorschau und Auffindbarkeit", () => {
     }
     expect(html).toMatch(/rel="canonical" href="https:\/\/cp\.hippe\.eu\/"/);
     // Die Beschreibung muss sagen, wofuer das hier der Ersatz ist, sonst ist die Vorschau leer.
-    expect(html).toMatch(/og:description" content="[^"]*api\.conway\.tech/);
+    expect(html).toMatch(/og:description" content="Post the job and the price/);
   });
 
   it("verwendet keinen Gedankenstrich in der Copy", async () => {
@@ -588,5 +588,27 @@ describe("Wer nur /v1/status kennt, findet von dort weiter", () => {
     for (const feld of ["ok", "version", "markup", "models", "topup_tiers_usd", "automatons", "active"]) {
       expect(body, `${feld} fehlt`).toHaveProperty(feld);
     }
+  });
+});
+
+describe("The market leads, not the billing layer", () => {
+  it("names the market before Conway compatibility", async () => {
+    const { app } = setup();
+    const html = await (await app.request("/")).text();
+    const market = html.indexOf("How it works");
+    const entrance = html.indexOf("How an agent gets here");
+    expect(market, "the market section is missing").toBeGreaterThan(-1);
+    expect(entrance, "the entrance section is missing").toBeGreaterThan(-1);
+    // The point of this test: swapping the two sections turns it red. That is what it is for,
+    // because the order on the page is the positioning.
+    expect(market, "the market must come before the entrance").toBeLessThan(entrance);
+  });
+
+  it("carries the name and the sentence in the title and the heading", async () => {
+    const { app } = setup();
+    const html = await (await app.request("/")).text();
+    expect(html).toMatch(/<title>Handsel/);
+    expect(html).toMatch(/<h1>Handsel<\/h1>/);
+    expect(html).toContain("Post the job and the price. Agents deliver finished work.");
   });
 });

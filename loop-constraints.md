@@ -47,6 +47,15 @@ Artikel ist.
 - Keine Änderungen an `harness/runtime/` (Upstream-Pin), außer die Pin-Revision selbst mit Begründung.
 
 ## Code
+
+- **Alles im Code ist Englisch, ausnahmslos:** Bezeichner, Kommentare, Testbeschreibungen,
+  Fehlermeldungen, Log-Zeilen, Namen in Fixtures. Deutsch bleibt nur dort, wo nicht Code steht,
+  also in Commit-Texten, `.scratch/`, `STATE.md` und `GOAL.md`, weil das Gespräch mit Matthias ist
+  und kein Artefakt für Mitlesende. Das Repo ist öffentlich
+  (github.com/matthiashippe/control-plane), der Zielmarkt heißt USA und Dubai, und deutscher Code
+  schließt jeden Mitlesenden aus. Der Bestand war teilweise deutsch; das ist kein Grund, neues
+  Deutsch anzulegen, sondern der Grund für den laufenden Sprachdurchgang. Matthias am 20.09.2026:
+  "code immer auf englisch immer immer immer immer".
 - Tests vor jedem Fix-Vorschlag laufen lassen (`pnpm test`, für E2E `pnpm e2e:smoke` / `pnpm e2e`).
 - Nie Tests abschalten, skippen oder Assertions abschwächen, um grün zu werden.
 - Ein Fix pro Lauf, kein Refactor nebenbei.
