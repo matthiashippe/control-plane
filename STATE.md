@@ -193,13 +193,28 @@ Social-Relay) erst, wenn Nachfrage messbar ist, also frühestens nach dem 19.10.
     benannt und nicht entschieden sind: ob eine Einreichung ihre Herkunft ausweisen muss (B3), und
     was passiert, wenn ein Kaeufer nach der Vergabe widerspricht.
 
-**Die zwei offenen Fragen aus dem Journeybuch gehoeren Matthias:**
-- **Duerfen Menschen einreichen?** Heute kann jeder mit einem Schluessel selbst arbeiten und
-  abgeben, und nichts an einer Einreichung sagt, woher sie kommt. Ein Agentenmarkt, der still auf
-  Menschen laeuft, waere genau die Sorte Luege, die dieses Projekt sonst vermeidet.
-- **Was passiert bei Widerspruch nach der Vergabe?** Heute nichts: keine Rueckabwicklung, keine
-  Schlichtung. Solange die Betraege klein sind, ist das vertretbar; es muss entschieden sein,
-  bevor jemand 50 USD ausschreibt.
+**Drei Entscheidungen vom 20.09.2026, getroffen im Loop.** Matthias hat die Entscheidungsgewalt
+ausdruecklich abgegeben ("du entscheidest weiterhin alles aber deterministisch und aus den personas
+raus"). Jede folgt aus dem Journeybuch, nicht aus Geschmack:
+
+- **Der Name ist Handsel.** Abgeleitet aus dem Kaltstart: Die Nachfrage kommt ueber einen Kanal und
+  nicht ueber die Suche, also ist die Verwechslungsgefahr mit Handshake heute klein und waechst
+  erst spaeter. Der Beiklang von Piecework (Akkordarbeit) trifft dagegen sofort und dauerhaft genau
+  den Nerv, um den es bei Maschinen, die um Geld arbeiten, ohnehin geht. Bidwork ist irrefuehrend,
+  weil hier nicht mit einem Preis geboten wird. Handsel benennt als einziger die Mechanik, die
+  sonst niemand hat.
+- **Eine Einreichung traegt eine gemessene Tatsache ueber ihre Herkunft, keine Behauptung.** Wir
+  rechnen die Inferenz ab, also wissen wir, ohne jemanden zu fragen, wie viel eine Adresse zwischen
+  dem Ausschreiben und dem Einreichen fuers Denken ausgegeben hat. Diese Zahl steht an der
+  Einreichung. Sie beweist nichts, und genau das steht daneben; sie macht den ehrlichen Fall
+  sichtbar und den unehrlichen teuer. Die Zuschauer-Persona braucht das, der Kaeufer bekommt ein
+  zweites Signal umsonst.
+- **Die Vergabe ist endgueltig.** Eine Rueckabwicklung hiesse, einem Agenten Credits wieder
+  wegzunehmen, und jemand muesste beurteilen, ob das richtig ist. Dieser Jemand ist eine einzelne
+  Person, und sobald sie es versucht, wird jeder Streit zu einer Verhandlung mit dem Betreiber und
+  der Ledger hoert auf, die Wahrheit zu sein. Der Aufwand liegt deshalb vor der Vergabe: alle
+  Einreichungen sehen, pruefen lassen, bewusst vergeben, oder nichts vergeben und das Geld
+  zurueckbekommen.
 
 ## Entscheidungen bei Matthias
 
