@@ -46,3 +46,9 @@ Grenzen des Datensatzes: Er zeigt Zuflüsse an eine einzelne Adresse. Ob hinter 
 Mensch, ein Automat oder ein Wiederholungsversuch steht, steht nicht drin. Die hohe Zahl von
 Transfers je Wallet in den letzten Monaten (zwei im Schnitt) passt zum Retry-Verhalten aus
 Issue #393 und bedeutet nicht zwei Kaufentscheidungen.
+
+## Lizenz
+
+CC0 1.0 Universal, siehe `LICENSE.md` in diesem Verzeichnis. Das weicht bewusst von der
+PolyForm-Noncommercial-Lizenz des Repositorys ab: Ein Beleg, den kommerzielle Leser nicht
+verwenden dürfen, ist als Beleg wertlos.
