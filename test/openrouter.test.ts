@@ -59,7 +59,11 @@ function appWith(provider: OpenRouterProvider, balanceMc = 500_000) {
     app.request("/v1/chat/completions", { method: "POST", headers: { "content-type": "application/json", authorization: key }, body: JSON.stringify(body) });
   const balance = () => (db.prepare("SELECT balance_mc FROM wallets WHERE address = ?").get(address) as { balance_mc: number }).balance_mc;
   const rows = () => db.prepare("SELECT delta_mc, meta FROM ledger WHERE kind = 'inference'").all() as { delta_mc: number; meta: string }[];
-  return { db, app, key, chat, balance, rows };
+  // Der Saldo allein genuegt nicht: Eine nicht freigegebene Reservierung laesst ihn unveraendert
+  // und sperrt das Guthaben trotzdem dauerhaft.
+  const reserviert = () =>
+    (db.prepare("SELECT reserved_mc FROM wallets WHERE address = ?").get(address) as { reserved_mc: number }).reserved_mc;
+  return { db, app, key, chat, balance, rows, reserviert };
 }
 
 const OK_RESPONSE = {
@@ -141,7 +145,7 @@ describe("OpenRouterProvider", () => {
   it("meldet OpenRouter 402/429/5xx als 503 provider_unavailable ohne Ledger-Zeile", async () => {
     for (const status of [402, 429, 502]) {
       const { provider } = await makeProvider(() => json({ error: { message: "nope", code: status } }, status));
-      const { chat, balance, rows } = appWith(provider);
+      const { chat, balance, rows, reserviert } = appWith(provider);
       const before = balance();
       const res = await chat({ model: "gpt-5.2", messages: [{ role: "user", content: "hi" }] });
       expect(res.status).toBe(503);
@@ -160,6 +164,7 @@ describe("OpenRouterProvider", () => {
       expect(body.docs).toContain("docs/errors.md#inference");
       expect(balance()).toBe(before);
       expect(rows()).toHaveLength(0);
+      expect(reserviert(), "sonst kommt der Kunde nach einem fremden Ausfall nicht mehr an sein Geld").toBe(0);
     }
   });
 
@@ -312,5 +317,18 @@ describe("Katalog speichern", () => {
     });
     await expect(p.init()).rejects.toThrow();
     expect(gespeichert, "ein gescheiterter Abruf darf nichts speichern").toEqual([]);
+  });
+
+  it("gibt die Reservierung auch frei, wenn die Antwort unbrauchbar ist", async () => {
+    // Teurer als ein Ausfall: Der Einkauf hat stattgefunden, aber es gibt nichts zu buchen. Ohne
+    // Freigabe bleibt das Guthaben blockiert, und der Kunde sieht nur, dass nichts mehr geht.
+    const { provider } = await makeProvider(() => json({ id: "x", choices: [] }));
+    const { chat, balance, rows, reserviert } = appWith(provider);
+    const before = balance();
+    const res = await chat({ model: "gpt-5.2", messages: [{ role: "user", content: "hi" }] });
+    expect(res.status).toBeGreaterThanOrEqual(400);
+    expect(reserviert(), "nach jedem Ausgang ohne Buchung muss die Reservierung zurueck sein").toBe(0);
+    expect(balance(), "und abgebucht werden darf nichts").toBe(before);
+    expect(rows()).toHaveLength(0);
   });
 });

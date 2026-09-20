@@ -334,3 +334,36 @@ describe("Zusammenlegung gleichzeitiger identischer Anfragen", () => {
     expect(inferenceRows()).toHaveLength(2);
   });
 });
+
+/**
+ * Der letzte Ausgang ohne Buchung: Der Einkauf beim Anbieter hat stattgefunden, die Antwort ist
+ * da, und erst danach geht etwas schief. Der Code hält dafür eine Freigabe im `finally` bereit,
+ * seit ein solcher Fall am 19.09.2026 auffiel. Eine Gegenprobe am 20.09. zeigte, dass diese
+ * Freigabe entfernt werden kann, ohne dass ein einziger Test rot wird: Der Pfad war ungeschützt.
+ *
+ * Er kostet den Kunden mehr als ein Anbieterausfall. Bei einem Ausfall ist nichts eingekauft und
+ * nichts reserviert. Hier ist eingekauft, und ohne Freigabe bleibt sein Guthaben blockiert, bis
+ * der Prozess neu startet.
+ */
+describe("Fehler nach der Antwort des Anbieters", () => {
+  it("gibt die Reservierung frei, wenn die Abrechnung an kaputten Zahlen scheitert", async () => {
+    const { db, provider, chat, request, address, balance, inferenceRows } = setup(500_000);
+    const reserviert = () =>
+      (db.prepare("SELECT reserved_mc FROM wallets WHERE address = ?").get(address) as { reserved_mc: number }).reserved_mc;
+    const vorher = balance();
+
+    // Ein Anbieter, der antwortet, aber unbrauchbare Verbrauchszahlen liefert. NaN kommt bis in
+    // die Buchung durch und SQLite lehnt es ab, also wirft postLedger nach dem Einkauf.
+    const echt = provider.chat.bind(provider);
+    provider.chat = async (req: Parameters<typeof echt>[0]) => {
+      const antwort = await echt(req);
+      return { ...antwort, usage: { ...antwort.usage, prompt_tokens: NaN, completion_tokens: NaN, cost_usd: NaN } };
+    };
+
+    const res = await chat(request(1));
+    expect(res.status, "ein Fehler nach dem Einkauf darf kein 200 sein").toBeGreaterThanOrEqual(400);
+    expect(reserviert(), "sonst bleibt das Guthaben blockiert, bis der Prozess neu startet").toBe(0);
+    expect(balance(), "abgebucht werden kann nichts, wenn die Zahlen kaputt sind").toBe(vorher);
+    expect(inferenceRows()).toHaveLength(0);
+  });
+});
