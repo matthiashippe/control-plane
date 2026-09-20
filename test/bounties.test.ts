@@ -394,3 +394,47 @@ describe("Migration auf einen Bestand, der die Auftragstabelle schon hat", () =>
     }
   });
 });
+
+describe("Die oeffentliche Auftragsliste", () => {
+  it("zeigt offene Aufträge ohne Schlüssel, denn ein Markt, den nur Mitglieder sehen, ist keiner", async () => {
+    const { app, a } = setup();
+    await a.einstellen(auftrag());
+    const res = await app.request("/bounties.json", { method: "GET" });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { open: { brief: string; price_cents: number }[]; note: string };
+    expect(body.open).toHaveLength(1);
+    expect(body.open[0].price_cents).toBe(200);
+    expect(body.note, "wer hier liest, soll wissen, dass Briefings öffentlich sind").toMatch(/public/i);
+  });
+
+  it("nennt keine Adressen, denn öffentlich ist der Auftrag und nicht der Auftraggeber", async () => {
+    const { app, a } = setup();
+    await a.einstellen(auftrag());
+    const text = await (await app.request("/bounties.json", { method: "GET" })).text();
+    expect(text).not.toContain(a.address);
+  });
+
+  it("zeigt zurückgezogene und abgelaufene Aufträge nicht", async () => {
+    const { app, a, db } = setup();
+    const { id } = (await (await a.einstellen(auftrag())).json()) as { id: string };
+    const { id: id2 } = (await (await a.einstellen(auftrag({ price_cents: 100 }))).json()) as { id: string };
+    await a.zurueckziehen({ id });
+    db.prepare("UPDATE bounties SET deadline = ? WHERE id = ?").run(new Date(Date.now() - 1000).toISOString(), id2);
+    const body = (await (await app.request("/bounties.json", { method: "GET" })).json()) as { open: unknown[] };
+    expect(body.open).toHaveLength(0);
+  });
+
+  it("gibt beim Abruf abgelaufenes Geld zurück, auch ohne dass jemand angemeldet ist", async () => {
+    const { app, a, db } = setup();
+    const { id } = (await (await a.einstellen(auftrag())).json()) as { id: string };
+    db.prepare("UPDATE bounties SET deadline = ? WHERE id = ?").run(new Date(Date.now() - 1000).toISOString(), id);
+    await app.request("/bounties.json", { method: "GET" });
+    expect(a.saldo()).toBe(500_000);
+  });
+
+  it("deckelt die Zahl der Einträge", async () => {
+    const { app } = setup();
+    const res = await app.request("/bounties.json?limit=99999", { method: "GET" });
+    expect(res.status).toBe(200);
+  });
+});

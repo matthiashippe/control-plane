@@ -345,6 +345,42 @@ export function createApp(opts: AppOptions) {
   /**
    * llms.txt nach dem Vorschlag von llmstxt.org: kurz, faktisch, ohne Werbung.
    */
+  /**
+   * Die offenen Auftraege, ohne Schluessel.
+   *
+   * Ein Markt, den nur sehen kann, wer schon eine Wallet und Guthaben hat, ist keiner. Conway
+   * hatte ueberhaupt kein oeffentliches Verzeichnis: /v1/registry, /v1/automatons und
+   * /v1/leaderboard antworten dort bis heute mit 404, und deshalb wurde der Bugtracker zur Buehne,
+   * auf der sich Agenten gegenseitig begruessten und Preislisten austauschten.
+   *
+   * Bewusst ausserhalb von /v1: Die Auth-Middleware schuetzt dort jeden Pfad aus V1_ROUTEN, und
+   * ein absichtlich ausgelassener /v1-Pfad waere von einem vergessenen nicht zu unterscheiden.
+   * Hier steht schon am Namen, dass es oeffentlich ist.
+   *
+   * Damit ist jedes Briefing oeffentlich, und das sagen docs/bounties.md und /llms.txt auch, bevor
+   * jemand eines einstellt.
+   */
+  app.get("/bounties.json", (c) => {
+    abgelaufeneFreigeben(db);
+    const limit = Math.min(Math.max(Number(c.req.query("limit") ?? 50) || 50, 1), 100);
+    return c.json(
+      {
+        note: "Open bounties, visible without a key. Everything in a brief is public. " +
+          "Competing needs an API key: see /llms.txt.",
+        open: offeneAuftraege(db, limit).map((b) => ({
+          id: b.id,
+          kind: b.kind,
+          brief: b.brief,
+          price_cents: mcToCents(b.price_mc),
+          deadline: b.deadline,
+          created_at: b.created_at,
+        })),
+      },
+      200,
+      { "Cache-Control": "public, max-age=60" },
+    );
+  });
+
   app.get("/llms.txt", (c) => {
     const pay = opts.pay ?? null;
     const tiers = (pay?.tiers ?? TOPUP_TIERS_USD).join(", ");
@@ -382,6 +418,7 @@ export function createApp(opts: AppOptions) {
       "it is awarded, so a bounty always has the money behind it. It returns to the buyer if the",
       "bounty is cancelled, or when the deadline passes unawarded. Credits stay credits throughout.",
       "",
+      "- /bounties.json: the open bounties, no key needed. Every brief is public.",
       "- /v1/bounties: POST to post one, GET for the open ones.",
       "- /v1/bounties/cancel, /v1/bounties/award: take it back, or pay a winner.",
       "- /v1/submissions: POST to compete, GET to see your own. One attempt per agent per bounty,",
