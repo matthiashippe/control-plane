@@ -22,7 +22,7 @@ import type { Db } from "../db.js";
 import { postLedger } from "../db.js";
 
 export type Auftragsart = "factual" | "creative";
-export type Status = "open" | "cancelled";
+export type Status = "open" | "cancelled" | "expired";
 
 export interface Bounty {
   id: string;
@@ -157,4 +157,47 @@ export function auftragZurueckziehen(db: Db, id: string, wer: string): Bounty {
   });
   run();
   return auftragLesen(db, id)!;
+}
+
+/**
+ * Abgelaufene Auftraege schliessen und das hinterlegte Geld zurueckgeben.
+ *
+ * Ohne diesen Durchlauf liegt das Geld eines Auftrags, dessen Frist verstreicht, ohne dass jemand
+ * vergibt, fuer immer fest. Der Auftraggeber sieht es nicht mehr im Guthaben, bekommt aber auch
+ * nichts dafuer, und keine Zeile im Ledger erklaert, wo es geblieben ist.
+ *
+ * `expired` und nicht `cancelled`: Dieselbe Geldbewegung, aber eine andere Geschichte, und wer
+ * spaeter wissen will, warum ein Markt nicht funktioniert, muss die beiden unterscheiden koennen.
+ * Ein zurueckgezogener Auftrag ist ein Auftraggeber, der es sich anders ueberlegt hat; ein
+ * abgelaufener ist einer, fuer den niemand gearbeitet hat.
+ *
+ * Laeuft beim Start und zu Beginn jeder Auftragsanfrage. Das deckt jeden Fall ab, in dem jemand
+ * den Markt anfasst; was es nicht deckt, ist ein Dienst, den monatelang niemand aufruft. Dann
+ * liegt das Geld bis zum naechsten Start, und der kommt bei jedem Deploy.
+ */
+export function abgelaufeneFreigeben(db: Db, jetzt = new Date()): number {
+  const faellig = db
+    .prepare("SELECT id, creator, price_mc FROM bounties WHERE status = 'open' AND deadline <= ?")
+    .all(jetzt.toISOString()) as { id: string; creator: string; price_mc: number }[];
+  let freigegeben = 0;
+  for (const b of faellig) {
+    const run = db.transaction(() => {
+      // Die Bedingung steht im UPDATE, nicht nur in der Abfrage davor: Zwei gleichzeitige
+      // Durchlaeufe wuerden sonst beide zurueckzahlen, und Geld entstuende aus dem Nichts.
+      const res = db
+        .prepare("UPDATE bounties SET status = 'expired', closed_at = ? WHERE id = ? AND status = 'open'")
+        .run(jetzt.toISOString(), b.id);
+      if (res.changes !== 1) return false;
+      postLedger(db, {
+        address: b.creator,
+        kind: "bounty_release",
+        deltaMc: b.price_mc,
+        ref: `bounty-expired:${b.id}`,
+        meta: { bounty_id: b.id, grund: "deadline" },
+      });
+      return true;
+    });
+    if (run()) freigegeben++;
+  }
+  return freigegeben;
 }

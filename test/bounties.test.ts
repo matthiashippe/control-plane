@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { privateKeyToAccount, generatePrivateKey } from "viem/accounts";
 import { createApp } from "../src/app.js";
 import { openDb, postLedger, MC_PER_CENT } from "../src/db.js";
+import { abgelaufeneFreigeben } from "../src/bounties/store.js";
 import { hashApiKey } from "../src/auth/siwe.js";
 
 const IN_EINER_STUNDE = () => new Date(Date.now() + 3_600_000).toISOString();
@@ -165,5 +166,80 @@ describe("Buchhaltung", () => {
     expect(zeilen.map((z) => z.kind)).toEqual(["bounty_hold", "bounty_release"]);
     expect(zeilen[0].delta_mc).toBe(-200 * MC_PER_CENT);
     expect(zeilen[1].delta_mc).toBe(200 * MC_PER_CENT);
+  });
+});
+
+describe("Verfall bei abgelaufener Frist", () => {
+  /** Setzt die Frist in die Vergangenheit, ohne die Pruefung beim Einstellen zu umgehen. */
+  async function abgelaufenerAuftrag() {
+    const s = setup();
+    const { id } = (await (await s.a.einstellen(auftrag())).json()) as { id: string };
+    s.db.prepare("UPDATE bounties SET deadline = ? WHERE id = ?").run(new Date(Date.now() - 1000).toISOString(), id);
+    return { ...s, id };
+  }
+
+  it("gibt das hinterlegte Geld zurueck, sonst liegt es für immer", async () => {
+    const { a, db, id } = await abgelaufenerAuftrag();
+    expect(a.saldo(), "vorher liegt das Geld fest").toBe(500_000 - 200 * MC_PER_CENT);
+    expect(abgelaufeneFreigeben(db)).toBe(1);
+    expect(a.saldo()).toBe(500_000);
+    expect((db.prepare("SELECT status FROM bounties WHERE id = ?").get(id) as { status: string }).status).toBe("expired");
+  });
+
+  it("unterscheidet abgelaufen von zurückgezogen, weil es zwei verschiedene Geschichten sind", async () => {
+    const { db, id } = await abgelaufenerAuftrag();
+    abgelaufeneFreigeben(db);
+    const zeile = db.prepare("SELECT kind, ref FROM ledger WHERE ref = ?").get(`bounty-expired:${id}`) as { kind: string };
+    expect(zeile.kind).toBe("bounty_release");
+  });
+
+  it("zahlt beim zweiten Durchlauf nicht noch einmal aus", async () => {
+    const { a, db } = await abgelaufenerAuftrag();
+    abgelaufeneFreigeben(db);
+    const nachErstem = a.saldo();
+    expect(abgelaufeneFreigeben(db)).toBe(0);
+    expect(a.saldo()).toBe(nachErstem);
+  });
+
+  it("lässt laufende Aufträge unberührt", async () => {
+    const { a, db } = setup();
+    await a.einstellen(auftrag());
+    expect(abgelaufeneFreigeben(db)).toBe(0);
+    expect(a.saldo()).toBe(500_000 - 200 * MC_PER_CENT);
+  });
+
+  it("läuft von selbst, sobald jemand den Markt anfasst", async () => {
+    const { a, db, id } = await abgelaufenerAuftrag();
+    await a.liste();
+    expect((db.prepare("SELECT status FROM bounties WHERE id = ?").get(id) as { status: string }).status).toBe("expired");
+    expect(a.saldo()).toBe(500_000);
+  });
+
+  it("hält Ledger und Salden auch nach dem Verfall deckungsgleich", async () => {
+    const { db, ledgerSumme, saldenSumme } = await abgelaufenerAuftrag();
+    abgelaufeneFreigeben(db);
+    expect(ledgerSumme()).toBe(saldenSumme());
+    expect(saldenSumme()).toBe(1_000_000);
+  });
+
+  it("gibt das Geld auch dann zurück, wenn der Dienst zwischendurch neu startet", async () => {
+    const { db, a, id } = await abgelaufenerAuftrag();
+    // Ein Neustart baut die App neu auf; genau dort laeuft der Durchlauf.
+    createApp({ db });
+    expect((db.prepare("SELECT status FROM bounties WHERE id = ?").get(id) as { status: string }).status).toBe("expired");
+    expect(a.saldo()).toBe(500_000);
+  });
+});
+
+describe("Der Verfall darf den Start nicht verhindern", () => {
+  it("laesst die App auch mit gestoerter Datenbank entstehen, statt eine Neustartschleife zu bauen", () => {
+    const kaputt = {
+      prepare() {
+        throw new Error("SQLITE_CORRUPT: database disk image is malformed");
+      },
+    } as unknown as ReturnType<typeof openDb>;
+    // Ohne die Absicherung wirft schon createApp, und zusammen mit autoheal waere das eine
+    // Neustartschleife statt eines Dienstes, der laut warnt und weiterlaeuft.
+    expect(() => createApp({ db: kaputt })).not.toThrow();
   });
 });

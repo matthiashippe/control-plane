@@ -14,6 +14,7 @@ import {
   auftragEinstellen,
   auftragZurueckziehen,
   offeneAuftraege,
+  abgelaufeneFreigeben,
   BountyError,
   type Bounty,
 } from "./bounties/store.js";
@@ -641,6 +642,21 @@ export function createApp(opts: AppOptions) {
    * oben vergleicht gegen V1_ROUTEN mit `has()`, und ein Pfad mit variablem Segment stuende
    * dadurch voellig ohne Schluessel offen. Die zurueckzuziehende ID steht deshalb im Rumpf.
    */
+  // Einmal beim Aufbau der App, also bei jedem Start und jedem Deploy: Ein Auftrag, dessen Frist
+  // waehrend eines Stillstands verstrichen ist, gibt sein Geld zurueck, ohne dass jemand ihn
+  // anfassen muss.
+  //
+  // Und er darf den Start nicht verhindern: Waere er ungeschuetzt, liesse eine gestoerte Datenbank
+  // die App gar nicht erst entstehen, und zusammen mit autoheal wuerde daraus eine
+  // Neustartschleife. Dieselbe Abwaegung wie beim ledger_topup_ref-Index in src/db.ts: laut warnen
+  // und weiterlaufen. Der naechste Aufruf einer Auftragsroute holt den Durchlauf ohnehin nach.
+  try {
+    const n = abgelaufeneFreigeben(db);
+    if (n > 0) console.log(`[bounties] ${n} abgelaufene Auftraege freigegeben`);
+  } catch (e) {
+    console.error("[bounties] Freigabe abgelaufener Auftraege beim Start fehlgeschlagen:", (e as Error).message);
+  }
+
   const bountyAntwort = (b: Bounty) => ({
     id: b.id,
     kind: b.kind,
@@ -652,6 +668,7 @@ export function createApp(opts: AppOptions) {
   });
 
   app.post("/v1/bounties", async (c) => {
+    abgelaufeneFreigeben(db);
     const roh = await c.req.json().catch(() => null);
     const b = (typeof roh === "object" && roh !== null ? roh : {}) as Record<string, unknown>;
     const preisCents = typeof b.price_cents === "number" ? b.price_cents : NaN;
@@ -673,11 +690,13 @@ export function createApp(opts: AppOptions) {
   });
 
   app.get("/v1/bounties", (c) => {
+    abgelaufeneFreigeben(db);
     const limit = Number(c.req.query("limit") ?? 50) || 50;
     return c.json({ bounties: offeneAuftraege(db, limit).map(bountyAntwort) });
   });
 
   app.post("/v1/bounties/withdraw", async (c) => {
+    abgelaufeneFreigeben(db);
     const roh = await c.req.json().catch(() => null);
     const id = (roh as { id?: unknown } | null)?.id;
     if (typeof id !== "string" || !id) {
