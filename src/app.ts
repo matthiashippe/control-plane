@@ -269,6 +269,9 @@ export function createApp(opts: AppOptions) {
       description:
         "Prepaid credits for the unmodified Conway automaton runtime: SIWE provisioning, " +
         "USDC topups over x402 on Base, inference billed at purchase cost plus a fixed markup.",
+      // Die Basis, an die die Pfade darunter gehoeren. Ohne sie raet ein Skript, und am
+      // 20.09.2026 riet eines falsch: es verkettete zwei Endpunkte zu /v1/status/v1/models.
+      base_url: requestOrigin(c) ?? null,
       endpoints: {
         status: "/v1/status",
         models: "/v1/models",

@@ -672,3 +672,16 @@ describe("Ein Pfad, den es nicht gibt, ist kein Schluesselproblem", () => {
     expect(res.status, "sonst waere die Auth-Pruefung loechrig").toBe(401);
   });
 });
+
+describe("Die Selbstbeschreibung nennt ihre eigene Basis", () => {
+  it("liefert base_url, damit ein Skript die Pfade nicht raten muss", async () => {
+    const db = openDb(":memory:");
+    const app = createApp({ db });
+    const body = (await (
+      await app.request("/.well-known/x402", { headers: { host: "cp.hippe.eu", "x-forwarded-proto": "https" } })
+    ).json()) as { base_url: string; endpoints: Record<string, string> };
+    expect(body.base_url).toBe("https://cp.hippe.eu");
+    // Die Pfade bleiben relativ: base_url davor gesetzt ergibt genau eine gueltige URL.
+    expect(body.base_url + body.endpoints.models).toBe("https://cp.hippe.eu/v1/models");
+  });
+});
