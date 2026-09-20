@@ -1,5 +1,8 @@
 // Runs inside the cp container (node - < ops/db-report.cjs), reads the SQLite read-only.
-const db = require("better-sqlite3")("/data/cp.db", { readonly: true });
+// The path is overridable so the script can be run against a database built by a test. Production
+// is unchanged: inside the container CP_DB_PATH is not set and /data/cp.db is where it lives.
+// Without this the report was the one piece of the daily observation that nothing could check.
+const db = require("better-sqlite3")(process.env.CP_DB_PATH || "/data/cp.db", { readonly: true });
 const day = new Date(Date.now() - 86400e3).toISOString();
 const one = (sql, ...a) => db.prepare(sql).get(...a);
 const all = (sql, ...a) => db.prepare(sql).all(...a);
@@ -43,5 +46,41 @@ report.paying_without_thinking = all(
   hours_since_topup: Number(((Date.now() - Date.parse(r.last_topup)) / 3600e3).toFixed(1)),
   ever_thought: r.last_inference !== null,
 }));
+
+// The market, and the one number the whole plan hangs on.
+//
+// goals/2026-09-20-goal-13-gtm.md ends with it: a bounty_hold in the ledger from an address that
+// is not ours, by 2026-10-19. Declaring a number decisive and then not reading it anywhere is the
+// most comfortable way to miss it, so it is computed here and printed on every run.
+//
+// "Ours" is spelled out rather than inferred. The operator wallet posted the first cycle and the
+// seed jobs, and the first-cycle agent was created by us; counting either as a stranger would be
+// the same self-deception as the code-host showing up as a visitor in the traffic log.
+const OURS = [
+  "0xd24f37d0838e62621ed24111164485ded0f0924f", // operator wallet, posts the seed jobs
+  "0xf6204b0662082d65d78eab79936a4d91744dee6b", // the agent from the first cycle on 2026-09-20
+];
+const notOurs = `address not in (${OURS.map(() => "?").join(",")})`;
+
+report.market = {
+  open_bounties: one("select count(*) n from bounties where status='open' and deadline > ?", new Date().toISOString()).n,
+  held_mc: one("select coalesce(sum(price_mc),0) s from bounties where status='open'").s,
+  awarded: one("select count(*) n from bounties where status='awarded'").n,
+  expired: one("select count(*) n from bounties where status='expired'").n,
+  cancelled: one("select count(*) n from bounties where status='cancelled'").n,
+  submissions: one("select count(*) n from submissions").n,
+  fee_earned_mc: one("select coalesce(sum(delta_mc),0) s from ledger where kind='bounty_fee'").s,
+  starter_granted: one("select count(*) n from ledger where kind='grant'").n,
+  starter_pool_left_mc: 500000 - one("select coalesce(sum(delta_mc),0) s from ledger where kind='grant'").s,
+  // THE number. Anything above zero means this stopped being our own demonstration.
+  foreign_buyers: one(
+    `select count(distinct address) n from ledger where kind='bounty_hold' and ${notOurs}`,
+    ...OURS,
+  ).n,
+  foreign_agents: one(
+    `select count(distinct agent) n from submissions where agent not in (${OURS.map(() => "?").join(",")})`,
+    ...OURS,
+  ).n,
+};
 
 console.log(JSON.stringify(report));
