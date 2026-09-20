@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createApp } from "../src/app.js";
 import { openDb, postLedger } from "../src/db.js";
+import { hashApiKey } from "../src/auth/siwe.js";
 import { MockProvider } from "../src/inference/mock.js";
 import { Catalog, MARKUP } from "../src/inference/proxy.js";
 
@@ -462,6 +463,94 @@ describe("Die Marktmessung steht auf der Seite", () => {
     expect(html).toMatch(/130 of those have twenty or more/);
     expect(html, "ohne Link auf die Rohdaten ist es eine Behauptung").toMatch(
       /docs\/research\/data/,
+    );
+  });
+});
+
+/**
+ * Die eigenen Buchungen. Die Seite verspricht, dass jeder Aufruf eine Ledger-Zeile mit
+ * Einkaufspreis und Marge ist; ohne diesen Endpunkt war das Versprechen unbelegbar. Und ein Kunde,
+ * bei dem nach der Zahlung nichts passiert, kann hier unterscheiden, ob sein Geld nicht ankam oder
+ * seine Runtime nicht denkt. Genau diesen Fall hatten wir am 19.09.2026.
+ */
+describe("GET /v1/credits/history", () => {
+  function mitSchluessel() {
+    const db = openDb(":memory:");
+    const address = "0x0629a6851234567890123456789012345678488e".toLowerCase();
+    const key = "cnwy_k_test_history";
+    // Die Wallet muss es geben, bevor ein Schluessel auf sie zeigt. Direkt anlegen statt ueber
+    // postLedger, sonst steht eine Nullbuchung in jeder Historie, die dieser Test prueft.
+    db.prepare("INSERT INTO wallets (address, balance_mc, created_at) VALUES (?, 0, ?)").run(
+      address,
+      new Date().toISOString(),
+    );
+    db.prepare(
+      "INSERT INTO api_keys (address, key_hash, key_prefix, name, created_at) VALUES (?, ?, ?, ?, ?)",
+    ).run(address, hashApiKey(key), key.slice(0, 12), "test", new Date().toISOString());
+    return { db, address, key, app: createApp({ db }) };
+  }
+
+  it("verlangt einen Schluessel", async () => {
+    const { app } = mitSchluessel();
+    expect((await app.request("/v1/credits/history")).status).toBe(401);
+  });
+
+  it("zeigt Topup und Inferenz mit Einkaufspreis und Marge", async () => {
+    const { db, address, key, app } = mitSchluessel();
+    postLedger(db, { address, kind: "topup", deltaMc: 501_000, ref: "0xabc", meta: { tx_hash: "0xdeadbeef" } });
+    postLedger(db, {
+      address,
+      kind: "inference",
+      deltaMc: -1557,
+      ref: "call-1",
+      meta: { model: "openai/gpt-5.2", cost_usd: 0.0119735, margin_mc: 359, usage: { total_tokens: 12591 } },
+    });
+    const res = await app.request("/v1/credits/history", { headers: { Authorization: key } });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      balance_cents: number;
+      entries: { kind: string; cents: number; model?: string; purchase_usd?: number; margin_cents?: number; tx_hash?: string }[];
+    };
+    expect(body.balance_cents).toBe(499);
+    expect(body.entries).toHaveLength(2);
+    // Neueste zuerst: die Inferenz, dann der Topup.
+    expect(body.entries[0].kind).toBe("inference");
+    expect(body.entries[0].model).toBe("openai/gpt-5.2");
+    expect(body.entries[0].purchase_usd).toBe(0.0119735);
+    expect(body.entries[1].kind).toBe("topup");
+    expect(body.entries[1].tx_hash).toBe("0xdeadbeef");
+  });
+
+  it("zeigt nur die eigene Adresse, auch wenn eine fremde bezahlt hat", async () => {
+    const { db, address, key, app } = mitSchluessel();
+    const fremd = "0x1111111111111111111111111111111111111111";
+    postLedger(db, { address, kind: "topup", deltaMc: 1000, ref: "eigen", meta: {} });
+    postLedger(db, { address: fremd, kind: "topup", deltaMc: 999_000, ref: "fremd", meta: {} });
+    const body = (await (await app.request("/v1/credits/history", { headers: { Authorization: key } })).json()) as {
+      entries: { cents: number }[];
+    };
+    expect(body.entries, "eine fremde Buchung darf hier nicht auftauchen").toHaveLength(1);
+    expect(body.entries[0].cents).toBe(1);
+  });
+
+  it("beantwortet die Frage des stillen Kunden: Guthaben da, Liste leer", async () => {
+    const { db, address, key, app } = mitSchluessel();
+    postLedger(db, { address, kind: "topup", deltaMc: 501_000, ref: "0xabc", meta: {} });
+    const body = (await (await app.request("/v1/credits/history", { headers: { Authorization: key } })).json()) as {
+      balance_cents: number;
+      entries: { kind: string }[];
+    };
+    expect(body.balance_cents).toBe(501);
+    expect(body.entries.filter((e) => e.kind === "inference"), "kein einziger Inferenzaufruf").toHaveLength(0);
+  });
+
+  it("nennt im Setup den Endpunkt, den es wirklich gibt", async () => {
+    const db = openDb(":memory:");
+    const html = await (await createApp({ db }).request("/")).text();
+    expect(html).toMatch(/v1\/credits\/history/);
+    // /v1/credits/transfers ist ein POST und antwortet 501. Eine Anleitung darauf liefe ins Leere.
+    expect(html, "die Seite darf keinen Endpunkt empfehlen, den es als GET nicht gibt").not.toMatch(
+      /curl[^\n]*v1\/credits\/transfers/,
     );
   });
 });

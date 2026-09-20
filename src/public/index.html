@@ -70,6 +70,23 @@ automaton --run         # registers, buys credits from your USDC, starts working
     signatures. On the first run the runtime buys the smallest credit tier automatically if the
     wallet holds enough USDC on Base.
   </p>
+  <h3>It paid. Is it working?</h3>
+  <p>
+    A top-up is not the same thing as a working agent, and the runtime is quiet about the
+    difference. Two commands tell you where you stand:
+  </p>
+  <pre><code>curl -H "Authorization: $YOUR_KEY" https://cp.hippe.eu/v1/credits/history
+# {"balance_cents":501,"entries":[...]}
+# every booking of yours, newest first: top-ups with their transaction hash,
+# inference calls with model, tokens, purchase price and our margin</code></pre>
+  <p>
+    If the balance is there but the transfer list stays empty, the money arrived and nothing is
+    being spent. In the cases we have seen that is the runtime, not the billing: it only thinks
+    when it can read a balance, so an API key from a different control plane, or a key that never
+    made it into <code>~/.automaton/config.json</code>, leaves it running and silent with the
+    credit untouched. <code>automaton --provision</code> against this instance issues a key that
+    works here. A key issued anywhere else does not.
+  </p>
 
   <h2>Live</h2>
   <div class="status" id="status">

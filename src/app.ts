@@ -9,7 +9,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Hono } from "hono";
 import type { Db } from "./db.js";
-import { getBalanceCents } from "./db.js";
+import { mcToCents,getBalanceCents } from "./db.js";
 import { DOC } from "./errors.js";
 import { Catalog, handleChat, MARKUP } from "./inference/proxy.js";
 import { clientSchluessel, RateLimiter, type RateLimitOptions } from "./ratelimit.js";
@@ -101,6 +101,7 @@ const V1_ROUTEN = new Set([
   "/v1/automatons/register",
   "/v1/chat/completions",
   "/v1/credits/balance",
+  "/v1/credits/history",
   "/v1/credits/pricing",
   "/v1/credits/transfer",
   "/v1/credits/transfers",
@@ -459,6 +460,55 @@ export function createApp(opts: AppOptions) {
   app.get("/v1/credits/balance", (c) =>
     c.json({ balance_cents: getBalanceCents(db, c.get("address")) }),
   );
+
+  /**
+   * Die eigenen Buchungen, neueste zuerst.
+   *
+   * Die Startseite verspricht, dass jeder Aufruf eine Ledger-Zeile mit Einkaufspreis und Marge
+   * ist. Einsehen konnte ein Kunde diese Zeilen bisher nicht, und damit war das Versprechen
+   * unbelegbar. Wichtiger noch ist der Fall, der uns am 19.09. begegnet ist: Ein Kunde zahlt,
+   * danach passiert nichts, und er hat keine Moeglichkeit zu unterscheiden, ob sein Geld nicht
+   * ankam oder seine Runtime nicht denkt. Eine leere Liste bei vorhandenem Guthaben beantwortet
+   * genau das.
+   *
+   * Nur die eigene Adresse, die aus dem API-Key kommt. Kein Parameter waehlt eine fremde.
+   */
+  app.get("/v1/credits/history", (c) => {
+    const limit = Math.min(Math.max(Number(c.req.query("limit") ?? 50) || 50, 1), 200);
+    const zeilen = db
+      .prepare(
+        "SELECT kind, delta_mc, created_at, meta FROM ledger WHERE address = ? ORDER BY id DESC LIMIT ?",
+      )
+      .all(c.get("address"), limit) as { kind: string; delta_mc: number; created_at: string; meta: string | null }[];
+    return c.json({
+      balance_cents: getBalanceCents(db, c.get("address")),
+      entries: zeilen.map((z) => {
+        const meta = (() => {
+          try {
+            return z.meta ? (JSON.parse(z.meta) as Record<string, unknown>) : {};
+          } catch {
+            return {};
+          }
+        })();
+        const eintrag: Record<string, unknown> = {
+          kind: z.kind,
+          cents: mcToCents(z.delta_mc),
+          at: z.created_at,
+        };
+        if (z.kind === "inference") {
+          eintrag.model = meta.model;
+          // Was der Aufruf im Einkauf gekostet hat und was davon unsere Marge war, in derselben
+          // Einheit wie die Abbuchung. Wer nachrechnen will, kann es.
+          eintrag.purchase_usd = meta.cost_usd;
+          eintrag.margin_cents = typeof meta.margin_mc === "number" ? mcToCents(meta.margin_mc) : undefined;
+          const usage = meta.usage as { total_tokens?: number } | undefined;
+          eintrag.total_tokens = usage?.total_tokens;
+        }
+        if (z.kind === "topup") eintrag.tx_hash = meta.tx_hash;
+        return eintrag;
+      }),
+    });
+  });
 
   // ─── Inferenz ─────────────────────────────────────────────────
 
