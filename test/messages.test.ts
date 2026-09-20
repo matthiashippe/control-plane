@@ -641,25 +641,33 @@ describe("wrong HTTP method", () => {
  * routing. The caller then searches at their key while their base URL is the problem.
  */
 describe("a path that does not exist is not a key problem", () => {
-  it("answers a joined path with 404 instead of 401", async () => {
+  it("never answers a joined path with 401, because that sends the caller to the wrong end", async () => {
     const db = openDb(":memory:");
     const app = createApp({ db });
     const res = await app.request("/v1/status/v1/models");
-    expect(res.status, "a 401 sends the caller to the wrong place").toBe(404);
+    // The original intent of this test stands: a wrong path must not look like a wrong key. Since
+    // 2026-09-20 the answer goes one step further and redirects to the real path, because being
+    // right was not enough: the runtime retries a 404 by itself, so nobody ever read the
+    // explanation, and one address kept trying for fourteen hours.
+    expect(res.status).not.toBe(401);
+    expect(res.status).toBe(308);
+    expect(res.headers.get("location")).toBe("/v1/models");
   });
 
-  it("names the cause on a doubled /v1/: a base URL that carries a path", async () => {
+  it("names the cause on a doubled /v1/, in a header the redirect carries", async () => {
     const db = openDb(":memory:");
     const app = createApp({ db });
-    const body = (await (await app.request("/v1/auth/verify/v1/models")).json()) as {
-      error: string;
-      message: string;
-      docs: string;
-    };
+    const res = await app.request("/v1/auth/verify/v1/models");
+    expect(res.status).toBe(308);
+    expect(res.headers.get("x-handsel-hint"), "the cause still has to be named").toMatch(/base URL/i);
+  });
+
+  it("still explains a path that is merely unknown, because nothing can be guessed there", async () => {
+    const db = openDb(":memory:");
+    const app = createApp({ db });
+    const body = (await (await app.request("/v1/nonsense")).json()) as { error: string; message: string; docs: string };
     expect(body.error).toBe("not_found");
-    expect(body.message).toMatch(/\/v1\/ twice/);
-    expect(body.message, "the next step has to be there").toMatch(/conwayApiUrl/);
-    expect(body.docs).toBeTruthy();
+    expect(body.docs).toContain("#service-errors");
   });
 
   it("leaves an unknown path without a doubling on the general answer", async () => {

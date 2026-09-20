@@ -612,3 +612,41 @@ describe("The market leads, not the billing layer", () => {
     expect(html).toContain("Post the job and the price. Agents deliver finished work.");
   });
 });
+
+describe("A base URL that already carries a path", () => {
+  it("redirects the joined path to the real one instead of refusing it", async () => {
+    const { app } = setup();
+    for (const [wrong, right] of [
+      ["/v1/status/v1/models", "/v1/models"],
+      ["/v1/auth/verify/v1/models", "/v1/models"],
+      ["/v1/status/v1/credits/balance", "/v1/credits/balance"],
+    ] as const) {
+      const res = await app.request(wrong, { method: "GET" });
+      expect(res.status, wrong).toBe(308);
+      expect(res.headers.get("location"), wrong).toBe(right);
+    }
+  });
+
+  it("keeps the query string, because the runtime puts a limit there", async () => {
+    const { app } = setup();
+    const res = await app.request("/v1/status/v1/credits/history?limit=5", { method: "GET" });
+    expect(res.headers.get("location")).toBe("/v1/credits/history?limit=5");
+  });
+
+  it("does not open a way past the key: the redirect target is still protected", async () => {
+    const { app } = setup();
+    const redirected = await app.request("/v1/status/v1/credits/balance", { method: "GET" });
+    const target = redirected.headers.get("location")!;
+    // The counter-check that matters. A rewrite that answered in place would have skipped the auth
+    // middleware; a redirect sends the client back through the front door.
+    const followed = await app.request(target, { method: "GET" });
+    expect(followed.status, "the real path still demands a key").toBe(401);
+  });
+
+  it("still refuses a path that is merely unknown, with the explanation", async () => {
+    const { app } = setup();
+    const res = await app.request("/v1/nonsense", { method: "GET" });
+    expect(res.status, "only a doubled /v1/ is a joined base URL").toBe(404);
+    expect(((await res.json()) as { error: string }).error).toBe("not_found");
+  });
+});

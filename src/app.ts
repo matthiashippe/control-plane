@@ -983,7 +983,24 @@ export function createApp(opts: AppOptions) {
 
   app.notFound((c) => {
     // A doubled /v1 step almost always means somebody joined a base URL that already contains a
-    // path with an endpoint. The hint saves them from searching at the wrong end.
+    // path with an endpoint. Since 2026-09-20 the answer said so, precisely, naming the value to
+    // set. It was not enough, and the reason is in docs/protocol.md: the runtime retries a 404 up
+    // to three times by itself, so the message never reaches the person who could act on it.
+    //
+    // The evidence is one address in Helsinki that tried at 09:26, again at 22:37 and again at
+    // 23:23 on the same day, each time with the same joined path. Somebody wanted in for fourteen
+    // hours and could not get in, while this service answered correctly.
+    //
+    // So the malformed path is now redirected to the real one instead of refused. 308 keeps method
+    // and body, every normal client follows it, and nothing is hidden: the Location header names
+    // the right path and the redirect stands in the log. It is no security hole either, because
+    // the client then makes a fresh request that goes through the auth middleware like any other.
+    const joined = c.req.path.match(/^\/v1\/.+?(\/v1\/.+)$/);
+    if (joined) {
+      const target = joined[1] + (new URL(c.req.url).search || "");
+      c.header("X-Handsel-Hint", "your base URL contains a path; use the bare origin");
+      return c.redirect(target, 308);
+    }
     const doubled = (c.req.path.match(/\/v1\//g) ?? []).length > 1;
     return c.json(
       {
