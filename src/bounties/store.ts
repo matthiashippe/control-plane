@@ -22,7 +22,7 @@ import type { Db } from "../db.js";
 import { postLedger } from "../db.js";
 
 export type Auftragsart = "factual" | "creative";
-export type Status = "open" | "cancelled" | "expired";
+export type Status = "open" | "cancelled" | "expired" | "awarded";
 
 export interface Bounty {
   id: string;
@@ -34,6 +34,7 @@ export interface Bounty {
   status: Status;
   created_at: string;
   closed_at: string | null;
+  winner_submission: string | null;
 }
 
 export const BRIEF_MAX = 20_000;
@@ -200,4 +201,126 @@ export function abgelaufeneFreigeben(db: Db, jetzt = new Date()): number {
     if (run()) freigegeben++;
   }
   return freigegeben;
+}
+
+export interface Submission {
+  id: string;
+  bounty_id: string;
+  agent: string;
+  body: string;
+  created_at: string;
+}
+
+export const EINREICHUNG_MAX = 50_000;
+
+/**
+ * Sich auf einen Auftrag bewerben.
+ *
+ * Ein Versuch je Agent und Auftrag, erzwungen vom eindeutigen Index in der Tabelle und nicht nur
+ * von der Pruefung hier: Zwei gleichzeitige Anfragen kaemen sonst beide durch, und der
+ * Auftraggeber saehe denselben Bewerber zweimal.
+ *
+ * Der Auftraggeber selbst darf nicht mitbieten. Geld an sich selbst zu vergeben waere zwar
+ * folgenlos, aber es macht aus einer Bestenauswahl eine Buehne fuer einen einzigen Darsteller,
+ * und in einer oeffentlichen Liste ist das ein Vertrauensschaden.
+ */
+export function einreichen(db: Db, a: { bountyId: string; agent: string; body: string }): Submission {
+  const agent = a.agent.toLowerCase();
+  const body = a.body.trim();
+  if (!body) throw new BountyError("body_required", 400, "A submission cannot be empty.");
+  if (body.length > EINREICHUNG_MAX) {
+    throw new BountyError("body_too_long", 400, `A submission is limited to ${EINREICHUNG_MAX} characters; yours is ${body.length}.`);
+  }
+  const auftrag = auftragLesen(db, a.bountyId);
+  if (!auftrag) throw new BountyError("not_found", 404, "No bounty with that id.");
+  if (auftrag.status !== "open") throw new BountyError("not_open", 409, `This bounty is ${auftrag.status}; it takes no more submissions.`);
+  if (Date.parse(auftrag.deadline) <= Date.now()) {
+    throw new BountyError("deadline_passed", 409, "The deadline has passed. The bounty pays nothing out after it.");
+  }
+  if (auftrag.creator === agent) {
+    throw new BountyError("own_bounty", 403, "You cannot submit to a bounty you posted yourself.");
+  }
+  const s: Submission = {
+    id: randomUUID(),
+    bounty_id: a.bountyId,
+    agent,
+    body,
+    created_at: new Date().toISOString(),
+  };
+  try {
+    db.prepare("INSERT INTO submissions (id, bounty_id, agent, body, created_at) VALUES (?, ?, ?, ?, ?)")
+      .run(s.id, s.bounty_id, s.agent, s.body, s.created_at);
+  } catch (e) {
+    if (String((e as Error).message).includes("UNIQUE")) {
+      throw new BountyError("already_submitted", 409, "You already submitted to this bounty. One attempt per agent.");
+    }
+    throw e;
+  }
+  return s;
+}
+
+/**
+ * Wer welche Einreichungen sieht.
+ *
+ * Der Auftraggeber sieht alle, denn er muss auswaehlen. Ein Agent sieht nur seine eigene: Die
+ * Arbeit der Mitbewerber vor der Entscheidung zu lesen hiesse abschreiben, und der Auftraggeber
+ * bezahlte dann dreimal dieselbe Idee.
+ */
+export function einreichungen(db: Db, bountyId: string, wer: string): Submission[] {
+  const adresse = wer.toLowerCase();
+  const auftrag = auftragLesen(db, bountyId);
+  if (!auftrag) throw new BountyError("not_found", 404, "No bounty with that id.");
+  if (auftrag.creator === adresse) {
+    return db.prepare("SELECT * FROM submissions WHERE bounty_id = ? ORDER BY created_at").all(bountyId) as Submission[];
+  }
+  return db
+    .prepare("SELECT * FROM submissions WHERE bounty_id = ? AND agent = ?")
+    .all(bountyId, adresse) as Submission[];
+}
+
+/**
+ * Vergeben: das hinterlegte Geld geht an den Gewinner.
+ *
+ * Der eine Zug, auf den der ganze Markt hinauslaeuft, und die Stelle, an der Geld entstehen
+ * koennte, wenn man sie falsch baut. Die Bedingung `status = 'open'` steht deshalb im UPDATE und
+ * nicht nur in der Pruefung davor: Zwei gleichzeitige Vergaben wuerden sonst beide auszahlen.
+ *
+ * Das Geld verlaesst den Ledger nicht. Es wurde beim Einstellen als `bounty_hold` abgebucht und
+ * kommt jetzt als `bounty_award` beim Gewinner an; die Summe ueber alle Zeilen bleibt gleich, und
+ * Credits bleiben nicht auszahlbar (loop-constraints.md).
+ *
+ * Eine Vermittlungsgebuehr gibt es noch nicht. Sie gehoert laut Vision hierher, aber ihre Hoehe
+ * ist eine Entscheidung von Matthias und keine des Loops; wenn sie kommt, ist sie eine eigene
+ * Ledger-Zeile neben dieser.
+ */
+export function vergeben(db: Db, a: { bountyId: string; submissionId: string; wer: string }): Bounty {
+  const adresse = a.wer.toLowerCase();
+  const auftrag = auftragLesen(db, a.bountyId);
+  if (!auftrag) throw new BountyError("not_found", 404, "No bounty with that id.");
+  if (auftrag.creator !== adresse) throw new BountyError("not_yours", 403, "Only the address that posted a bounty can award it.");
+  if (auftrag.status !== "open") throw new BountyError("not_open", 409, `This bounty is already ${auftrag.status}.`);
+
+  const einreichung = db
+    .prepare("SELECT * FROM submissions WHERE id = ?")
+    .get(a.submissionId) as Submission | undefined;
+  if (!einreichung) throw new BountyError("submission_not_found", 404, "No submission with that id.");
+  if (einreichung.bounty_id !== a.bountyId) {
+    throw new BountyError("submission_other_bounty", 400, "That submission belongs to a different bounty.");
+  }
+
+  const run = db.transaction(() => {
+    const res = db
+      .prepare("UPDATE bounties SET status = 'awarded', closed_at = ?, winner_submission = ? WHERE id = ? AND status = 'open'")
+      .run(new Date().toISOString(), einreichung.id, a.bountyId);
+    if (res.changes !== 1) throw new BountyError("not_open", 409, "This bounty is no longer open.");
+    postLedger(db, {
+      address: einreichung.agent,
+      kind: "bounty_award",
+      deltaMc: auftrag.price_mc,
+      ref: `bounty-award:${a.bountyId}`,
+      meta: { bounty_id: a.bountyId, submission_id: einreichung.id, from: auftrag.creator },
+    });
+  });
+  run();
+  return auftragLesen(db, a.bountyId)!;
 }

@@ -1,4 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import Database from "better-sqlite3";
 import { privateKeyToAccount, generatePrivateKey } from "viem/accounts";
 import { createApp } from "../src/app.js";
 import { openDb, postLedger, MC_PER_CENT } from "../src/db.js";
@@ -26,6 +30,9 @@ function konto(db: ReturnType<typeof openDb>, app: ReturnType<typeof createApp>,
     einstellen: (b: unknown) => ruf("/v1/bounties", "POST", b),
     zurueckziehen: (b: unknown) => ruf("/v1/bounties/withdraw", "POST", b),
     liste: () => ruf("/v1/bounties", "GET"),
+    einreichen2: (b: unknown) => ruf("/v1/submissions", "POST", b),
+    vergeben: (b: unknown) => ruf("/v1/bounties/award", "POST", b),
+    einreichungen: (id: string) => ruf(`/v1/submissions?bounty_id=${id}`, "GET"),
     ohneKey: () => app.request("/v1/bounties", { method: "GET" }),
     saldo: () => (db.prepare("SELECT balance_mc FROM wallets WHERE address = ?").get(address) as { balance_mc: number }).balance_mc,
   };
@@ -241,5 +248,149 @@ describe("Der Verfall darf den Start nicht verhindern", () => {
     // Ohne die Absicherung wirft schon createApp, und zusammen mit autoheal waere das eine
     // Neustartschleife statt eines Dienstes, der laut warnt und weiterlaeuft.
     expect(() => createApp({ db: kaputt })).not.toThrow();
+  });
+});
+
+describe("Einreichen und vergeben: der Weg des Geldes zum Gewinner", () => {
+  /** Auftraggeber a, Bewerber b. */
+  async function markt() {
+    const s = setup();
+    const { id } = (await (await s.a.einstellen(auftrag())).json()) as { id: string };
+    return { ...s, id };
+  }
+
+  it("nimmt eine Einreichung an und zahlt bei der Vergabe genau den hinterlegten Betrag aus", async () => {
+    const { a, b, id, ledgerSumme, saldenSumme } = await markt();
+    const res = await b.einreichen2({ bounty_id: id, body: "Here is the listing." });
+    expect(res.status).toBe(201);
+    const { id: sid } = (await res.json()) as { id: string };
+
+    const vergabe = await a.vergeben({ bounty_id: id, submission_id: sid });
+    expect(vergabe.status).toBe(200);
+    expect(((await vergabe.json()) as { status: string }).status).toBe("awarded");
+    expect(b.saldo(), "der Gewinner bekommt den Preis").toBe(500_000 + 200 * MC_PER_CENT);
+    expect(a.saldo(), "der Auftraggeber hat ihn beim Einstellen bezahlt").toBe(500_000 - 200 * MC_PER_CENT);
+    expect(ledgerSumme(), "das Geld hat den Ledger nie verlassen").toBe(saldenSumme());
+    expect(saldenSumme()).toBe(1_000_000);
+  });
+
+  it("vergibt kein zweites Mal, sonst entstünde Geld aus dem Nichts", async () => {
+    const { a, b, id } = await markt();
+    const { id: sid } = (await (await b.einreichen2({ bounty_id: id, body: "x" })).json()) as { id: string };
+    await a.vergeben({ bounty_id: id, submission_id: sid });
+    const nachErster = b.saldo();
+    const zweite = await a.vergeben({ bounty_id: id, submission_id: sid });
+    expect(zweite.status).toBe(409);
+    expect(b.saldo()).toBe(nachErster);
+  });
+
+  it("lässt nur den Auftraggeber vergeben", async () => {
+    const { a, b, id } = await markt();
+    const { id: sid } = (await (await b.einreichen2({ bounty_id: id, body: "x" })).json()) as { id: string };
+    const res = await b.vergeben({ bounty_id: id, submission_id: sid });
+    expect(res.status).toBe(403);
+    expect(b.saldo(), "niemand vergibt sich selbst fremdes Geld").toBe(500_000);
+    void a;
+  });
+
+  it("nimmt je Agent nur eine Einreichung an", async () => {
+    const { b, id } = await markt();
+    expect((await b.einreichen2({ bounty_id: id, body: "erster Versuch" })).status).toBe(201);
+    const zweiter = await b.einreichen2({ bounty_id: id, body: "zweiter Versuch" });
+    expect(zweiter.status).toBe(409);
+    expect(((await zweiter.json()) as { error: string }).error).toBe("already_submitted");
+  });
+
+  it("lässt den Auftraggeber nicht auf den eigenen Auftrag bieten", async () => {
+    const { a, id } = await markt();
+    const res = await a.einreichen2({ bounty_id: id, body: "meine eigene Arbeit" });
+    expect(res.status).toBe(403);
+  });
+
+  it("nimmt nach Ablauf der Frist nichts mehr an", async () => {
+    const { b, db, id } = await markt();
+    db.prepare("UPDATE bounties SET deadline = ? WHERE id = ?").run(new Date(Date.now() - 1000).toISOString(), id);
+    const res = await b.einreichen2({ bounty_id: id, body: "zu spät" });
+    // Der Durchlauf zu Beginn der Route hat den Auftrag bereits verfallen lassen.
+    expect(res.status).toBe(409);
+    expect((db.prepare("SELECT status FROM bounties WHERE id = ?").get(id) as { status: string }).status).toBe("expired");
+  });
+
+  it("weist eine Einreichung ab, die zu einem anderen Auftrag gehört", async () => {
+    const { a, b, id } = await markt();
+    const { id: id2 } = (await (await a.einstellen(auftrag({ price_cents: 100 }))).json()) as { id: string };
+    const { id: sid } = (await (await b.einreichen2({ bounty_id: id2, body: "gehört zu 2" })).json()) as { id: string };
+    const res = await a.vergeben({ bounty_id: id, submission_id: sid });
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { error: string }).error).toBe("submission_other_bounty");
+  });
+
+  it("zeigt dem Auftraggeber alle Einreichungen und einem Bewerber nur die eigene", async () => {
+    const { db, app, a, b, id } = await markt();
+    const c = konto(db, app, 500_000, 3);
+    await b.einreichen2({ bounty_id: id, body: "von b" });
+    await c.einreichen2({ bounty_id: id, body: "von c" });
+    const alsAuftraggeber = (await (await a.einreichungen(id)).json()) as { submissions: unknown[] };
+    expect(alsAuftraggeber.submissions, "er muss auswählen können").toHaveLength(2);
+    const alsBewerber = (await (await b.einreichungen(id)).json()) as { submissions: { body: string }[] };
+    expect(alsBewerber.submissions, "sonst schreibt einer vom anderen ab").toHaveLength(1);
+    expect(alsBewerber.submissions[0].body).toBe("von b");
+  });
+
+  it("schreibt für die Vergabe eine Ledger-Zeile mit Bezug auf Auftrag und Einreichung", async () => {
+    const { a, b, db, id } = await markt();
+    const { id: sid } = (await (await b.einreichen2({ bounty_id: id, body: "x" })).json()) as { id: string };
+    await a.vergeben({ bounty_id: id, submission_id: sid });
+    const zeile = db.prepare("SELECT kind, delta_mc, address, meta FROM ledger WHERE ref = ?").get(`bounty-award:${id}`) as
+      { kind: string; delta_mc: number; address: string; meta: string };
+    expect(zeile.kind).toBe("bounty_award");
+    expect(zeile.delta_mc).toBe(200 * MC_PER_CENT);
+    expect(zeile.address).toBe(b.address);
+    expect(JSON.parse(zeile.meta).submission_id).toBe(sid);
+  });
+
+  it("verlangt für beide Wege einen API-Key", async () => {
+    const { app, id } = await markt();
+    for (const [pfad, init] of [
+      ["/v1/submissions", { method: "POST", body: JSON.stringify({ bounty_id: id, body: "x" }) }],
+      ["/v1/bounties/award", { method: "POST", body: JSON.stringify({ bounty_id: id, submission_id: "x" }) }],
+      [`/v1/submissions?bounty_id=${id}`, { method: "GET" }],
+    ] as const) {
+      expect((await app.request(pfad, { ...init, headers: { "content-type": "application/json" } })).status, pfad).toBe(401);
+    }
+  });
+});
+
+describe("Migration auf einen Bestand, der die Auftragstabelle schon hat", () => {
+  it("zieht winner_submission nach, denn CREATE TABLE IF NOT EXISTS legt keine Spalte nach", () => {
+    // Genau die Lage der Produktionsdatenbank nach dem Deploy vom 20.09.2026: bounties existiert,
+    // die Spalte noch nicht. Wer das nicht prueft, merkt es erst, wenn die erste Vergabe wirft.
+    const ordner = mkdtempSync(join(tmpdir(), "cp-migration-"));
+    const pfad = join(ordner, "alt.db");
+    try {
+      const alt = new Database(pfad);
+      alt.exec(`
+        CREATE TABLE wallets (address TEXT PRIMARY KEY, balance_mc INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL);
+        CREATE TABLE bounties (
+          id TEXT PRIMARY KEY, creator TEXT NOT NULL, kind TEXT NOT NULL, brief TEXT NOT NULL,
+          price_mc INTEGER NOT NULL, deadline TEXT NOT NULL, status TEXT NOT NULL,
+          created_at TEXT NOT NULL, closed_at TEXT
+        );
+      `);
+      alt.prepare("INSERT INTO bounties VALUES (?, ?, 'factual', 'b', 1000, ?, 'open', ?, NULL)")
+        .run("alt-1", "0xabc", new Date(Date.now() + 3_600_000).toISOString(), new Date().toISOString());
+      alt.close();
+
+      const db = openDb(pfad);
+      const spalten = (db.prepare("PRAGMA table_info(bounties)").all() as { name: string }[]).map((s) => s.name);
+      expect(spalten).toContain("winner_submission");
+      expect(
+        (db.prepare("SELECT winner_submission FROM bounties WHERE id = ?").get("alt-1") as { winner_submission: null }).winner_submission,
+        "der Bestand bleibt erhalten und die neue Spalte ist leer",
+      ).toBeNull();
+      db.close();
+    } finally {
+      rmSync(ordner, { recursive: true, force: true });
+    }
   });
 });

@@ -15,6 +15,9 @@ import {
   auftragZurueckziehen,
   offeneAuftraege,
   abgelaufeneFreigeben,
+  einreichen,
+  einreichungen,
+  vergeben,
   BountyError,
   type Bounty,
 } from "./bounties/store.js";
@@ -110,6 +113,8 @@ const V1_ROUTEN = new Set([
   "/v1/automatons/register",
   "/v1/bounties",
   "/v1/bounties/withdraw",
+  "/v1/bounties/award",
+  "/v1/submissions",
   "/v1/chat/completions",
   "/v1/check",
   "/v1/credits/balance",
@@ -708,6 +713,61 @@ export function createApp(opts: AppOptions) {
       if (e instanceof BountyError) {
         return c.json({ error: e.code, message: e.hint, docs: DOC.payments }, e.status as 400);
       }
+      throw e;
+    }
+  });
+
+  app.post("/v1/submissions", async (c) => {
+    abgelaufeneFreigeben(db);
+    const roh = await c.req.json().catch(() => null);
+    const b = (typeof roh === "object" && roh !== null ? roh : {}) as Record<string, unknown>;
+    if (typeof b.bounty_id !== "string" || !b.bounty_id) {
+      return c.json({ error: "bounty_id_required", message: 'Send {"bounty_id": "...", "body": "..."}.', docs: DOC.payments }, 400);
+    }
+    try {
+      const s = einreichen(db, {
+        bountyId: b.bounty_id,
+        agent: c.get("address"),
+        body: typeof b.body === "string" ? b.body : "",
+      });
+      return c.json({ id: s.id, bounty_id: s.bounty_id, created_at: s.created_at }, 201);
+    } catch (e) {
+      if (e instanceof BountyError) return c.json({ error: e.code, message: e.hint, docs: DOC.payments }, e.status as 400);
+      throw e;
+    }
+  });
+
+  app.get("/v1/submissions", (c) => {
+    abgelaufeneFreigeben(db);
+    const id = c.req.query("bounty_id");
+    if (!id) return c.json({ error: "bounty_id_required", message: "Pass ?bounty_id=...", docs: DOC.payments }, 400);
+    try {
+      const liste = einreichungen(db, id, c.get("address"));
+      return c.json({
+        bounty_id: id,
+        submissions: liste.map((s) => ({ id: s.id, agent: s.agent, body: s.body, created_at: s.created_at })),
+      });
+    } catch (e) {
+      if (e instanceof BountyError) return c.json({ error: e.code, message: e.hint, docs: DOC.payments }, e.status as 400);
+      throw e;
+    }
+  });
+
+  app.post("/v1/bounties/award", async (c) => {
+    abgelaufeneFreigeben(db);
+    const roh = await c.req.json().catch(() => null);
+    const b = (typeof roh === "object" && roh !== null ? roh : {}) as Record<string, unknown>;
+    if (typeof b.bounty_id !== "string" || typeof b.submission_id !== "string" || !b.bounty_id || !b.submission_id) {
+      return c.json(
+        { error: "ids_required", message: 'Send {"bounty_id": "...", "submission_id": "..."}.', docs: DOC.payments },
+        400,
+      );
+    }
+    try {
+      const auftrag = vergeben(db, { bountyId: b.bounty_id, submissionId: b.submission_id, wer: c.get("address") });
+      return c.json({ ...bountyAntwort(auftrag), winner_submission: auftrag.winner_submission });
+    } catch (e) {
+      if (e instanceof BountyError) return c.json({ error: e.code, message: e.hint, docs: DOC.payments }, e.status as 400);
       throw e;
     }
   });

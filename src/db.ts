@@ -114,10 +114,24 @@ function migrate(db: Db): void {
       deadline    TEXT NOT NULL,                -- ISO 8601
       status      TEXT NOT NULL,                -- open | cancelled
       created_at  TEXT NOT NULL,
-      closed_at   TEXT
+      closed_at   TEXT,
+      winner_submission TEXT
     );
     CREATE INDEX IF NOT EXISTS bounties_status ON bounties(status, deadline);
     CREATE INDEX IF NOT EXISTS bounties_creator ON bounties(creator, id);
+
+    -- Eine Bewerbung auf einen Auftrag. Der eindeutige Index ueber (bounty_id, agent) ist die
+    -- Regel: ein Versuch je Agent und Auftrag. Ohne ihn koennte ein Agent denselben Auftrag
+    -- hundertmal bewerben und damit die Auswahl des Auftraggebers zuschuetten.
+    CREATE TABLE IF NOT EXISTS submissions (
+      id          TEXT PRIMARY KEY,
+      bounty_id   TEXT NOT NULL REFERENCES bounties(id),
+      agent       TEXT NOT NULL REFERENCES wallets(address),
+      body        TEXT NOT NULL,
+      created_at  TEXT NOT NULL
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS submissions_einmal ON submissions(bounty_id, agent);
+    CREATE INDEX IF NOT EXISTS submissions_bounty ON submissions(bounty_id, id);
   `);
 
   // Bestehende Datenbanken kennen reserved_mc noch nicht. SQLite hat kein "ADD COLUMN IF NOT
@@ -125,6 +139,14 @@ function migrate(db: Db): void {
   const spalten = db.prepare("PRAGMA table_info(wallets)").all() as { name: string }[];
   if (!spalten.some((c) => c.name === "reserved_mc")) {
     db.exec("ALTER TABLE wallets ADD COLUMN reserved_mc INTEGER NOT NULL DEFAULT 0");
+  }
+
+  // Dieselbe Sache fuer die Auftragstabelle: `CREATE TABLE IF NOT EXISTS` legt keine Spalte in
+  // einer Tabelle nach, die es schon gibt, und die Produktionsdatenbank hat `bounties` seit dem
+  // Deploy vom 20.09.2026 ohne diese Spalte.
+  const bountySpalten = db.prepare("PRAGMA table_info(bounties)").all() as { name: string }[];
+  if (bountySpalten.length > 0 && !bountySpalten.some((c) => c.name === "winner_submission")) {
+    db.exec("ALTER TABLE bounties ADD COLUMN winner_submission TEXT");
   }
 
   // Zweite Verteidigungslinie gegen doppelte Gutschriften: Eine x402-Nonce darf höchstens eine
@@ -192,7 +214,9 @@ export interface LedgerEntry {
   // bounty_hold bucht den Preis beim Einstellen ab, bounty_release gibt ihn beim
   // Zurueckziehen wieder frei. Beides sind echte Saldo-Aenderungen und keine Reservierung,
   // damit sie einen Neustart ueberleben (src/bounties/store.ts sagt, warum).
-  kind: "topup" | "inference" | "transfer_in" | "transfer_out" | "bounty_hold" | "bounty_release";
+  kind:
+    | "topup" | "inference" | "transfer_in" | "transfer_out"
+    | "bounty_hold" | "bounty_release" | "bounty_award";
   deltaMc: number;
   ref?: string;
   meta?: Record<string, unknown>;
