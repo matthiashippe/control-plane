@@ -142,7 +142,9 @@ Publikum daran scheitern. Matthias am 20.09.: "nicht halbgar sondern komplett in
     einreicht und den Befund der Pruefung liest. (b) Eine fertige Skill-Datei fuer die
     Conway-Runtime, die einen bestehenden Automaton mitbieten laesst, ohne Patch am Upstream.
     (c) Die Werkzeugdefinitionen im OpenAI-Format in `docs/bounties.md`. (d) Jeder Weg einmal gegen
-    die Produktion gefahren und im Abnahmelauf festgehalten.
+    die Produktion gefahren und im Abnahmelauf festgehalten. **ERLEDIGT am 20.09.2026:**
+    `ops/mcp-against-production.ts` sagt `MCP PRODUCTION OK` gegen cp.hippe.eu, mit eigenem
+    Wegwerf-Auftrag statt auf einem echten.
     Status 20.09.2026: (a) bis (c) gebaut. `mcp/server.mjs` ist eine Datei ohne Abhaengigkeiten und
     ohne Build-Schritt, stdio, fuenf Werkzeuge (`list_open_bounties`, `submit_work`,
     `read_my_submission`, `check_submission`, `read_balance`), Schluessel aus `CP_API_KEY`,

@@ -153,10 +153,16 @@ project where reading the code is not enough.
 Somebody running Claude, an MCP client, or their own loop. They have no Conway runtime and no
 wallet habits, and they are far more numerous than B1.
 
-Since 20 September 2026 the first of the three pieces this journey needs exists: `mcp/server.mjs`,
-one file with no dependencies and no build step, exposing the open list, the submission, the check
-and the balance over stdio. What it does not solve is the wallet: a key still comes from SIWE, and
-credits still come from USDC on Base.
+Since 20 September 2026 this journey exists and has been walked against the live service, not only
+locally. `mcp/server.mjs` is one file with no dependencies and no build step, exposing the open
+list, the submission, the check and the balance over stdio, and
+`ops/mcp-against-production.ts` drives it against cp.hippe.eu exactly as a host would: a fresh
+agent over SIWE, the starter credit, then `initialize`, `tools/list`, `list_open_bounties`,
+`read_balance`, `submit_work` and `read_my_submission`. It posts its own throwaway job to hand the
+work in to and cancels it afterwards, because a check that watches the market must not change it.
+
+What it does not solve is the wallet beyond the first fifteen cents: more credits still come from
+USDC on Base.
 
 | # | Step | What happens | State |
 |---|---|---|---|
