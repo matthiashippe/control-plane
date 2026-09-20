@@ -8,6 +8,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Hono } from "hono";
 import type { Db } from "./db.js";
+import { claimStarter, poolLeftMc, GRANT_MC, StarterError } from "./credits/starter.js";
 import { verifyFindings, messages, type CheckMode } from "./check/fabrication.js";
 import {
   createBounty,
@@ -112,6 +113,7 @@ const V1_ROUTES = new Set([
   "/v1/credits/balance",
   "/v1/credits/history",
   "/v1/credits/pricing",
+  "/v1/credits/starter",
   "/v1/credits/transfer",
   "/v1/credits/transfers",
   "/v1/models",
@@ -287,6 +289,10 @@ export function createApp(opts: AppOptions) {
       topup_tiers_usd: opts.pay?.tiers ?? TOPUP_TIERS_USD,
       automatons,
       active,
+      // The free tier, in the open. An agent that reads only this endpoint has to be able to see
+      // that it can start without owning USDC, and how much is left before it cannot.
+      starter_credit_cents: mcToCents(GRANT_MC),
+      starter_pool_left_cents: mcToCents(poolLeftMc(db)),
       // On 20.09.2026 somebody on a private line in Madrid called exactly this endpoint with curl,
       // without loading the landing page first, and was gone afterwards. Whoever knows only this
       // path should be able to get on from here without guessing.
@@ -294,6 +300,7 @@ export function createApp(opts: AppOptions) {
         service: requestOrigin(c) ?? "https://cp.hippe.eu",
         endpoints: "/.well-known/x402",
         setup: "Set conwayApiUrl in ~/.automaton/automaton.json to this origin, then run automaton --provision",
+        starter: "POST /v1/credits/starter with your API key: one free starter credit per address, no USDC needed",
         free_alternative: "https://github.com/matthiashippe/control-plane/blob/main/docs/without-control-plane.md",
       },
     });
@@ -431,6 +438,9 @@ export function createApp(opts: AppOptions) {
       "it is awarded, so a bounty always has the money behind it. It returns to the buyer if the",
       "bounty is cancelled, or when the deadline passes unawarded. Credits stay credits throughout.",
       "",
+      "- /v1/credits/starter: one free starter credit per address, " + mcToCents(GRANT_MC) + " cents, about ten",
+      "  attempts at a bounty. No USDC needed to begin. The pool is fixed and does not refill;",
+      "  /v1/status says how much is left.",
       "- /bounties.json: the open bounties, no key needed. Every brief is public. price_cents is",
       "  what the buyer pays, award_cents is what the winner receives after the " + FEE_PERCENT + "% fee.",
       "- /v1/bounties: POST to post one, GET for the open ones.",
@@ -853,6 +863,28 @@ export function createApp(opts: AppOptions) {
       return c.json({ ...bountyView(bounty), winner_submission: bounty.winner_submission });
     } catch (e) {
       if (e instanceof BountyError) return c.json({ error: e.code, message: e.hint, docs: DOC.payments }, e.status as 400);
+      throw e;
+    }
+  });
+
+  /**
+   * The one credit an agent gets for free, so that it can compete at all.
+   *
+   * Until this existed, a fresh agent could not get its first cent: buying credits takes USDC on
+   * Base, and being handed them is blocked on purpose. That closed the market to anyone who did
+   * not already live in the crypto world, on the supply side as much as on the demand side.
+   *
+   * Nothing here moves between users. The operator gives away usage of its own service, once per
+   * address, out of a pool that does not refill, and the pool is in /v1/status so the promise can
+   * be checked rather than believed.
+   */
+  app.post("/v1/credits/starter", (c) => {
+    try {
+      return c.json(claimStarter(db, c.get("address")), 201);
+    } catch (e) {
+      if (e instanceof StarterError) {
+        return c.json({ error: e.code, message: e.hint, docs: DOC.transfers }, e.status as 409);
+      }
       throw e;
     }
   });

@@ -12,15 +12,10 @@
  *
  * The private key is read, used to sign, and never printed, logged or written anywhere.
  *
- * BLOCKED as of 2026-09-20, and finding out why was the point of writing it. A fresh agent cannot
- * be given its first credit: POST /v1/credits/transfer answers 501 on purpose, because a free
- * transfer between users would make credits behave like a currency. So an agent has to arrive
- * already holding USDC on Base and buy its own credits, exactly like the buyer has to. That is the
- * supply side's version of the buyer's wallet problem, it is written up in docs/journeys.md under
- * Side B, and it blocks the cold start on both sides at once.
- *
- * The script is kept because everything up to that point works and because it is the shortest
- * description of what a full cycle is. Run it again when either side can be funded.
+ * Writing this is what found the hole it now runs through. The first attempt on 2026-09-20 stopped
+ * dead: a fresh agent could not be given its first credit, because a transfer between users is
+ * refused on purpose. POST /v1/credits/starter came out of that, and the agent below stakes itself
+ * with it instead of being funded by the buyer.
  *
  *   OPERATOR_WALLET=harness/state/mainnet-wallet.json \
  *   CP_URL=https://cp.hippe.eu pnpm tsx ops/first-cycle.ts --brief <file> --price-cents 200
@@ -96,14 +91,13 @@ async function main(): Promise<void> {
   const brief = fs.readFileSync(arg("brief"), "utf-8").trim();
   const priceCents = Number(arg("price-cents", "200"));
   const kind = arg("kind", "factual");
-  const agentCents = Number(arg("agent-cents", "50"));
   const model = arg("model", "gpt-5.2");
 
   const buyerKeyFile = JSON.parse(fs.readFileSync(path.resolve(WALLET), "utf-8")) as { privateKey: Hex };
   const buyer = await provision(buyerKeyFile.privateKey, "handsel-first-cycle-buyer");
   const balance = (await call("/v1/credits/balance", buyer.key)) as { balance_cents: number };
   console.log(`buyer   ${buyer.address}  balance ${balance.balance_cents} c`);
-  if (balance.balance_cents < priceCents + agentCents) throw new Error("buyer balance too small");
+  if (balance.balance_cents < priceCents) throw new Error("buyer balance too small");
 
   // A fresh agent. Its key is written next to the operator wallet so the credits it earns are not
   // lost; harness/state/ is gitignored, so nothing secret reaches the public repo.
@@ -118,12 +112,10 @@ async function main(): Promise<void> {
   const agent = await provision(agentPk, "handsel-first-cycle-agent");
   console.log(`agent   ${agent.address}`);
 
-  await call("/v1/credits/transfer", buyer.key, {
-    method: "POST",
-    headers: { "Idempotency-Key": `first-cycle-fund-${agent.address}` },
-    body: JSON.stringify({ to_address: agent.address, amount_cents: agentCents, note: "stake for the first cycle" }),
-  });
-  console.log(`funded  agent with ${agentCents} c so it pays for its own thinking`);
+  // The agent pays for its own thinking out of the starter credit, not out of the buyer's pocket.
+  // A transfer between the two would make credits behave like a currency and is refused on purpose.
+  const stake = (await call("/v1/credits/starter", agent.key, { method: "POST" })) as { granted_cents: number };
+  console.log(`staked  agent claimed its starter credit, ${stake.granted_cents} c`);
 
   const deadline = new Date(Date.now() + 6 * 3_600_000).toISOString();
   const bounty = (await call("/v1/bounties", buyer.key, {

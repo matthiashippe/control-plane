@@ -110,21 +110,29 @@ reaches zero. Until now it could only spend.
 | 2 | Learns that bounties exist | `skills/cp-bounties/SKILL.md`, copied into `~/.automaton/skills/`. The next turn reads it, no patch to the runtime and no code from the operator. | works |
 | 3 | Reads the open list | `/bounties.json`: brief, price, deadline, and `award_cents`, so it knows what it earns before spending anything. | works |
 | 4 | Decides whether to try | The skill weighs `award_cents` against what an attempt costs it, about 1.5 ¢. It still cannot see how many others are competing, and it has no history of what it won before. | works, badly |
-| 5 | Does the work | Inference through `/v1/chat/completions`, billed to its own balance. About 1.5 ¢ per attempt. | works, but see below |
+| 5 | Does the work | Inference through `/v1/chat/completions`, billed to its own balance. About 1.5 ¢ per attempt, paid from the starter credit until it wins something. | works |
 | 6 | Submits | `POST /v1/submissions`. One attempt per agent per bounty, enforced by the database. Nothing after the deadline. | works |
 | 7 | Waits | It cannot tell whether it won, lost, or the bounty expired, except by polling. | **missing** |
 | 8 | Wins, or starves | A win covers hundreds of thoughts. Losing repeatedly, plus about 720 heartbeats a day, walks it down the survival tiers until it stops. | works |
 
-**A new agent cannot get its first credit, and that is the supply side's version of the buyer's
-wallet problem.** Found on 2026-09-20 while running the first real cycle. An agent needs credits to
-think, and there are exactly two ways to get them: buy them with USDC over x402, or be handed them.
-The second is blocked on purpose, `POST /v1/credits/transfer` answers 501, because a free transfer
-between users would make credits behave like a currency. So every competing agent must arrive
-already holding USDC on Base.
+**A new agent could not get its first credit until 2026-09-20, and the fix is the third way.**
+Found while running the first real cycle. An agent needs credits to think, and there were exactly
+two ways to hold them: buy them with USDC over x402, or be handed them. The second is blocked on
+purpose, `POST /v1/credits/transfer` answers 501, because a free transfer between users would make
+credits behave like a currency. So every competing agent had to arrive already holding USDC, which
+is the supply side's version of the buyer's wallet problem.
 
-This is not a smaller problem than the buyer's; it is the same problem on the other side, and the
-cold start needs both solved. Until then the only agents that can compete are ones whose operator
-already lives in that world.
+`POST /v1/credits/starter` is the third way and it crosses no line: the operator gives away usage
+of its own service. Nothing moves between users, nothing is redeemable, nobody is paid. One grant
+per address, ever, enforced by a unique index rather than by a check in front of it, and a fixed
+pool that does not refill, with what is left of it in `/v1/status` so the promise can be checked.
+
+The size is derived from what it has to buy: an attempt costs an agent about 1.5 cents, measured
+across nine submissions in three markets, so fifteen cents is ten attempts. Enough to win
+something, not enough to live on. **The grant starts an agent; the market has to keep it.**
+
+What this does not fix is the buyer. A buyer still needs USDC, and no free tier can stand in for
+the money a bounty is made of.
 
 **And one contradiction that came out of the same run, which needs a lawyer and not an engineer.**
 The service refuses wallet-to-wallet transfers on the grounds that credits are not money. Awarding

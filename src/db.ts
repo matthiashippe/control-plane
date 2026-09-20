@@ -162,6 +162,10 @@ function migrate(db: Db): void {
   // loudly and keep running without the index; the check in pay.ts stays.
   try {
     db.exec("CREATE UNIQUE INDEX IF NOT EXISTS ledger_topup_ref ON ledger(ref) WHERE kind = 'topup' AND ref IS NOT NULL");
+    // One starter grant per address, ever, enforced by the database rather than by a check in
+    // front of the insert. Two simultaneous calls would otherwise both pass the check and the
+    // service would give the same wallet its stake twice.
+    db.exec("CREATE UNIQUE INDEX IF NOT EXISTS ledger_grant_once ON ledger(address) WHERE kind = 'grant'");
   } catch {
     const duplicates = db
       .prepare("SELECT ref, count(*) AS n FROM ledger WHERE kind = 'topup' AND ref IS NOT NULL GROUP BY ref HAVING n > 1")
@@ -220,7 +224,8 @@ export interface LedgerEntry {
   // restart (src/bounties/store.ts says why).
   kind:
     | "topup" | "inference" | "transfer_in" | "transfer_out"
-    | "bounty_hold" | "bounty_release" | "bounty_award" | "bounty_fee";
+    | "bounty_hold" | "bounty_release" | "bounty_award" | "bounty_fee"
+    | "grant";
   deltaMc: number;
   ref?: string;
   meta?: Record<string, unknown>;
