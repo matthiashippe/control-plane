@@ -869,11 +869,16 @@ export function createApp(opts: AppOptions) {
     error: "not_implemented",
     reason: "credit transfers are disabled in phase 1",
     message:
-      "Credits cannot be moved between wallets here, and that is a deliberate regulatory line, " +
-      "not a missing feature: credits buy usage of this service, they are not money, not " +
-      "redeemable and not transferable, which keeps the operator out of payment-service " +
-      "licensing. To fund another automaton, send USDC to that automaton's own wallet and let " +
-      "its runtime buy credits (it bootstraps a $5 topup when its balance runs low).",
+      "Credits cannot be handed from one wallet to another for nothing, and that is a deliberate " +
+      "line rather than a missing feature: a free transfer between users would make credits " +
+      "behave like a currency. They are not. They buy usage of this service, they are not " +
+      "redeemable, and nothing leaves here as money. To fund another automaton, send USDC to " +
+      "that automaton's own wallet and let its runtime buy credits; it bootstraps a $5 topup " +
+      "when its balance runs low. " +
+      "One movement between wallets does exist and it is not this one: awarding a bounty credits " +
+      "the winning agent for work the buyer received and accepted. That is payment for a " +
+      "delivered service inside this service, against consideration, and what the winner gets is " +
+      "usage of it, never money. See /bounties.json and the bounty endpoints.",
     docs: DOC.transfers,
   };
   app.post("/v1/credits/transfer", (c) => c.json(TRANSFER_501, 501));

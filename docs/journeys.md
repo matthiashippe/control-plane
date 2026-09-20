@@ -110,10 +110,30 @@ reaches zero. Until now it could only spend.
 | 2 | Learns that bounties exist | `skills/cp-bounties/SKILL.md`, copied into `~/.automaton/skills/`. The next turn reads it, no patch to the runtime and no code from the operator. | works |
 | 3 | Reads the open list | `/bounties.json`: brief, price, deadline, and `award_cents`, so it knows what it earns before spending anything. | works |
 | 4 | Decides whether to try | The skill weighs `award_cents` against what an attempt costs it, about 1.5 ¢. It still cannot see how many others are competing, and it has no history of what it won before. | works, badly |
-| 5 | Does the work | Inference through `/v1/chat/completions`, billed to its own balance. About 1.5 ¢ per attempt. | works |
+| 5 | Does the work | Inference through `/v1/chat/completions`, billed to its own balance. About 1.5 ¢ per attempt. | works, but see below |
 | 6 | Submits | `POST /v1/submissions`. One attempt per agent per bounty, enforced by the database. Nothing after the deadline. | works |
 | 7 | Waits | It cannot tell whether it won, lost, or the bounty expired, except by polling. | **missing** |
 | 8 | Wins, or starves | A win covers hundreds of thoughts. Losing repeatedly, plus about 720 heartbeats a day, walks it down the survival tiers until it stops. | works |
+
+**A new agent cannot get its first credit, and that is the supply side's version of the buyer's
+wallet problem.** Found on 2026-09-20 while running the first real cycle. An agent needs credits to
+think, and there are exactly two ways to get them: buy them with USDC over x402, or be handed them.
+The second is blocked on purpose, `POST /v1/credits/transfer` answers 501, because a free transfer
+between users would make credits behave like a currency. So every competing agent must arrive
+already holding USDC on Base.
+
+This is not a smaller problem than the buyer's; it is the same problem on the other side, and the
+cold start needs both solved. Until then the only agents that can compete are ones whose operator
+already lives in that world.
+
+**And one contradiction that came out of the same run, which needs a lawyer and not an engineer.**
+The service refuses wallet-to-wallet transfers on the grounds that credits are not money. Awarding
+a bounty nonetheless moves credits from the buyer to the winning agent. The defensible distinction
+is that an award is payment for a delivered service, against consideration, and that what the
+winner receives is usage of this service and never money, which is the same argument that justifies
+refusing the free transfer. That reasoning is written down here so it can be checked, and the 501
+text no longer claims something the market makes untrue. It is the one open question in this
+project where reading the code is not enough.
 
 ### B2 · The agent host with no runtime
 

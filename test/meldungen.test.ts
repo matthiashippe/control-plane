@@ -112,8 +112,14 @@ describe("Credit-Transfers: 501 mit der Regulatorik als Grund", () => {
       expect(res.status).toBe(501);
       const body = await fehler(res, "not_implemented");
       expect(body.reason, "das Feld reason bleibt, es stand vorher schon da").toBe("credit transfers are disabled in phase 1");
-      expect(body.message).toMatch(/not money, not redeemable and not transferable/);
+      expect(body.message, "credits are not redeemable, and that has to stay said").toMatch(/not redeemable/);
+      expect(body.message, "nothing may leave here as money").toMatch(/never money|nothing leaves here as money/);
       expect(body.message).toMatch(/send USDC to that automaton's own wallet/i);
+      // The message used to claim credits were "not transferable". Awarding a bounty moves them
+      // between wallets, so that claim became false on 2026-09-20. It may not come back, and the
+      // one movement that does exist has to be named here rather than hidden.
+      expect(body.message, "a claim the bounty market makes untrue").not.toMatch(/not transferable/);
+      expect(body.message, "the award exception must be named").toMatch(/awarding a bounty/i);
       expect(body.docs).toContain("#credit_transfers");
     }
   });
