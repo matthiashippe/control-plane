@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 /**
- * Chain-Werkzeuge für den Harness.
+ * Chain tools for the harness.
  *
- *   node chain.mjs setup                  MockUSDC kompilieren und per anvil_setCode an USDC_ADDRESS legen
- *   node chain.mjs fund <address> <usd>   Test-USDC prägen
- *   node chain.mjs balance <address>      USDC-Saldo (in USD) ausgeben
+ *   node chain.mjs setup                  compile MockUSDC and place it at USDC_ADDRESS via anvil_setCode
+ *   node chain.mjs fund <address> <usd>   mint test USDC
+ *   node chain.mjs balance <address>      print the USDC balance (in USD)
  *
- * Env: RPC_URL (Default http://chain:8545), USDC_ADDRESS (Default Base-Mainnet-USDC)
+ * Env: RPC_URL (default http://chain:8545), USDC_ADDRESS (default Base mainnet USDC)
  */
 
 import fs from "node:fs";
@@ -16,7 +16,7 @@ import { privateKeyToAccount } from "viem/accounts";
 
 const RPC_URL = process.env.RPC_URL || "http://chain:8545";
 const USDC = (process.env.USDC_ADDRESS || "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913");
-// Anvil-Account 0: zahlt Gas für mint().
+// Anvil account 0: pays the gas for mint().
 const FUNDER_KEY = process.env.FUNDER_KEY || "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
 
 const chain = {
@@ -64,13 +64,13 @@ async function setup() {
   const code = await pub.getCode({ address: USDC });
   if (code && code !== "0x") {
     const name = await pub.readContract({ address: USDC, abi: ABI, functionName: "name" });
-    console.log(`USDC-Mock liegt schon an ${USDC} (${name})`);
+    console.log(`USDC mock already in place at ${USDC} (${name})`);
     return;
   }
   const bytecode = compile();
   await rpc("anvil_setCode", [USDC, bytecode]);
   const name = await pub.readContract({ address: USDC, abi: ABI, functionName: "name" });
-  console.log(`USDC-Mock gesetzt an ${USDC} (${name}), chainId ${await pub.getChainId()}`);
+  console.log(`USDC mock placed at ${USDC} (${name}), chainId ${await pub.getChainId()}`);
 }
 
 async function fund(address, usd) {

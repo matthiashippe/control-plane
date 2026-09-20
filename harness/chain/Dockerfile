@@ -1,5 +1,5 @@
-# Werkzeuge für die lokale Chain: kompiliert den USDC-Mock, legt ihn per anvil_setCode an die
-# Mainnet-Adresse und stattet Wallets mit Test-USDC aus.
+# Tools for the local chain: compiles the USDC mock, places it at the mainnet address via
+# anvil_setCode and funds wallets with test USDC.
 FROM node:22-bookworm-slim
 WORKDIR /chain
 COPY package.json ./

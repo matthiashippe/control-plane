@@ -1,14 +1,13 @@
 /**
- * Der Anmeldeweg gegen eine laufende Instanz, ohne Geld.
+ * The sign-up path against a running instance, without money.
  *
- * `mainnet.ts` daneben prueft den ganzen Weg inklusive echter Zahlung und braucht dafuer USDC.
- * Dieser Lauf hoert davor auf: Wallet, SIWE, Schluessel, Guthaben, Historie. Genau das, was ein
- * Interessent als Erstes tut, und genau das, was am 19.09. bei einem fremden Kunden funktioniert
- * hat, bevor er stehenblieb.
+ * `mainnet.ts` next door checks the whole way including a real payment and needs USDC for it.
+ * This run stops short of that: wallet, SIWE, key, balance, history. Exactly what a prospect does
+ * first, and exactly what worked on 19.09. for an outside customer before he came to a halt.
  *
  *   CP_URL=https://cp.hippe.eu pnpm tsx harness/e2e/provisionierung.ts
  *
- * Legt einen API-Key in der Zieldatenbank an. Das kostet nichts und ist beabsichtigt.
+ * Creates one API key in the target database. That costs nothing and is intended.
  */
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { createSiweMessage } from "viem/siwe";
@@ -18,7 +17,7 @@ const DOMAIN = process.env.CP_SIWE_DOMAIN || "conway.tech";
 
 async function main(): Promise<void> {
   const account = privateKeyToAccount(generatePrivateKey());
-  console.log(`Wegwerf-Wallet: ${account.address}`);
+  console.log(`throwaway wallet: ${account.address}`);
 
   const nonceRes = await fetch(`${BASE}/v1/auth/nonce`, { method: "POST" });
   if (!nonceRes.ok) throw new Error(`nonce: ${nonceRes.status} ${await nonceRes.text()}`);
@@ -42,11 +41,11 @@ async function main(): Promise<void> {
   });
   const verify = (await verifyRes.json()) as Record<string, unknown>;
   if (!verifyRes.ok) throw new Error(`verify: ${verifyRes.status} ${JSON.stringify(verify)}`);
-  // Schritt drei, und der wird leicht uebersehen: `verify` liefert nur einen kurzlebigen
-  // access_token. Der API-Schluessel kommt aus /v1/auth/api-keys, mit dem Token als Bearer, und
-  // wird danach ohne Bearer-Prefix gesendet.
+  // Step three, and it is easily missed: `verify` only hands out a short-lived access_token. The
+  // API key comes from /v1/auth/api-keys, with that token as the bearer, and is sent without a
+  // bearer prefix afterwards.
   const token = (verify.access_token ?? verify.accessToken) as string | undefined;
-  if (!token) throw new Error(`kein access_token in der Antwort: ${JSON.stringify(verify).slice(0, 200)}`);
+  if (!token) throw new Error(`no access_token in the response: ${JSON.stringify(verify).slice(0, 200)}`);
 
   const keyRes = await fetch(`${BASE}/v1/auth/api-keys`, {
     method: "POST",
@@ -56,26 +55,26 @@ async function main(): Promise<void> {
   const keyBody = (await keyRes.json()) as Record<string, unknown>;
   if (!keyRes.ok) throw new Error(`api-keys: ${keyRes.status} ${JSON.stringify(keyBody).slice(0, 200)}`);
   const key = (keyBody.apiKey ?? keyBody.api_key ?? keyBody.key) as string | undefined;
-  if (!key) throw new Error(`kein Schluessel in der Antwort: ${JSON.stringify(keyBody).slice(0, 200)}`);
-  console.log(`provisioniert: ${key.slice(0, 14)}…`);
+  if (!key) throw new Error(`no key in the response: ${JSON.stringify(keyBody).slice(0, 200)}`);
+  console.log(`provisioned: ${key.slice(0, 14)}…`);
 
   const balRes = await fetch(`${BASE}/v1/credits/balance`, { headers: { Authorization: key } });
   const bal = (await balRes.json()) as { balance_cents?: number };
   if (!balRes.ok) throw new Error(`balance: ${balRes.status} ${JSON.stringify(bal)}`);
-  if (bal.balance_cents !== 0) throw new Error(`frische Wallet sollte 0 Cent haben, hat ${bal.balance_cents}`);
+  if (bal.balance_cents !== 0) throw new Error(`a fresh wallet should hold 0 cents, holds ${bal.balance_cents}`);
 
   const histRes = await fetch(`${BASE}/v1/credits/history?limit=5`, { headers: { Authorization: key } });
   const hist = (await histRes.json()) as { balance_cents?: number; entries?: unknown[] };
   if (!histRes.ok) throw new Error(`history: ${histRes.status} ${JSON.stringify(hist)}`);
-  if (!Array.isArray(hist.entries)) throw new Error(`history ohne entries: ${JSON.stringify(hist).slice(0, 200)}`);
-  if (hist.entries.length !== 0) throw new Error(`frische Wallet sollte keine Buchungen haben, hat ${hist.entries.length}`);
+  if (!Array.isArray(hist.entries)) throw new Error(`history without entries: ${JSON.stringify(hist).slice(0, 200)}`);
+  if (hist.entries.length !== 0) throw new Error(`a fresh wallet should have no entries, has ${hist.entries.length}`);
 
-  // Genau die Antwort, die ein Kunde sieht, bei dem nichts passiert: Guthaben da, Liste leer.
-  // Hier ist auch das Guthaben null, aber die Form stimmt und das ist der Punkt.
-  const fremd = await fetch(`${BASE}/v1/credits/history`);
-  if (fremd.status !== 401) throw new Error(`history ohne Schluessel muss 401 sein, war ${fremd.status}`);
+  // Exactly the answer a customer sees when nothing is happening: balance there, list empty. Here
+  // the balance is zero as well, but the shape is right and that is the point.
+  const anonymous = await fetch(`${BASE}/v1/credits/history`);
+  if (anonymous.status !== 401) throw new Error(`history without a key has to be 401, was ${anonymous.status}`);
 
-  console.log(`PROVISIONIERUNG OK  balance=${bal.balance_cents} ct  entries=${hist.entries.length}  ohne Schluessel=401`);
+  console.log(`PROVISIONIERUNG OK  balance=${bal.balance_cents} ct  entries=${hist.entries.length}  without a key=401`);
 }
 
 main().catch((e: unknown) => {
