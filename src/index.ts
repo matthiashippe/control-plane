@@ -48,11 +48,19 @@ const providers = providersFromEnv(process.env, {
 // und der Dienst war von außen weg. Deshalb wird der letzte erfolgreiche Katalog gespeichert und
 // als Rückfalloption benutzt. Nur wenn es auch den nicht gibt, ist der Start zu Recht ein Fehler.
 const PREIS_CACHE_KEY = "openrouter_price_snapshot";
+/** Speichert den Katalog nach jedem erfolgreichen Abruf, auch dem stündlichen. */
+const katalogSpeichern = (specs: Parameters<NonNullable<ConstructorParameters<typeof OpenRouterProvider>[0]["onRefresh"]>>[0]) => {
+  try {
+    setKV(db, PREIS_CACHE_KEY, JSON.stringify(specs));
+  } catch (err) {
+    console.error(`[openrouter] Katalog konnte nicht gespeichert werden: ${err instanceof Error ? err.message : String(err)}`);
+  }
+};
 for (const p of providers) {
   if (!(p instanceof OpenRouterProvider)) continue;
+  p.setOnRefresh(katalogSpeichern);
   try {
     await p.init();
-    setKV(db, PREIS_CACHE_KEY, JSON.stringify(p.snapshot()));
   } catch (err) {
     const grund = err instanceof Error ? err.message : String(err);
     const zwischengespeichert = getKV(db, PREIS_CACHE_KEY);
@@ -63,7 +71,7 @@ for (const p of providers) {
     p.loadSnapshot(JSON.parse(zwischengespeichert));
     console.error(
       `[openrouter] Preisabruf fehlgeschlagen (${grund}). Weiter mit dem gespeicherten Katalog; ` +
-        `der stündliche Refresh zieht ihn nach. Preise können veraltet sein.`,
+        `der stündliche Abruf ersetzt ihn, sobald er durchkommt, und speichert ihn dann auch.`,
     );
   }
 }

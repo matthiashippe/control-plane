@@ -273,3 +273,44 @@ describe("Start ohne erreichbaren OpenRouter", () => {
     expect(Date.now() - start, "der Start darf nicht hängen bleiben").toBeLessThan(2000);
   });
 });
+
+describe("Katalog speichern", () => {
+  it("meldet auch den stündlichen Abruf, nicht nur den beim Start", async () => {
+    // Vorher wurde der Katalog nur beim Start gespeichert. Der Prozess lief dann mit frischen
+    // Preisen weiter, während der gespeicherte Stand veraltete, und nach einem Neustart ohne
+    // erreichbaren Anbieter hätte der Dienst mit Zahlen von vorgestern gerechnet. Gefunden am
+    // 20.09.2026: Der Cache war elf Stunden alt, obwohl der Prozess seit zwei Stunden lief.
+    const gespeichert: number[] = [];
+    let jetzt = 0;
+    const { impl } = stubFetch({ "/models": () => json(MODELS_BODY) });
+    const p = new OpenRouterProvider({
+      apiKey: KEY,
+      models: ["openai/gpt-5.2"],
+      fetch: impl,
+      priceRefreshMs: 0,
+      now: () => jetzt,
+      onRefresh: (specs) => gespeichert.push(specs.length),
+    });
+
+    await p.init();
+    expect(gespeichert, "der Abruf beim Start meldet sich").toEqual([1]);
+
+    jetzt += 3_600_000;
+    await p.refreshPrices();
+    expect(gespeichert, "der stündliche Abruf ebenfalls").toEqual([1, 1]);
+  });
+
+  it("meldet einen fehlgeschlagenen Abruf nicht als Erfolg", async () => {
+    const gespeichert: number[] = [];
+    const { impl } = stubFetch({ "/models": () => Promise.reject(new Error("ECONNREFUSED")) });
+    const p = new OpenRouterProvider({
+      apiKey: KEY,
+      models: ["openai/gpt-5.2"],
+      fetch: impl,
+      priceRefreshMs: 0,
+      onRefresh: (specs) => gespeichert.push(specs.length),
+    });
+    await expect(p.init()).rejects.toThrow();
+    expect(gespeichert, "ein gescheiterter Abruf darf nichts speichern").toEqual([]);
+  });
+});

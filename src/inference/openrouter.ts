@@ -20,6 +20,13 @@ export interface OpenRouterOptions {
   timeoutMs?: number;
   /** Timeout für den Preisabruf. Kurz, weil er den Start blockiert. Default 15 s. */
   priceFetchTimeoutMs?: number;
+  /**
+   * Wird nach jedem erfolgreichen Preisabruf gerufen, auch beim stündlichen. Der Aufrufer nutzt
+   * das, um den Katalog dauerhaft zu speichern. Ohne diesen Haken veraltet der gespeicherte Stand,
+   * während der Prozess mit frischen Preisen läuft, und nach einem Neustart ohne erreichbaren
+   * Anbieter rechnet der Dienst mit Zahlen von vorgestern.
+   */
+  onRefresh?: (specs: ModelSpec[]) => void;
   priceRefreshMs?: number;
   now?: () => number;
 }
@@ -46,6 +53,7 @@ export class OpenRouterProvider implements ChatProvider {
   private readonly fetchImpl: typeof fetch;
   private readonly timeoutMs: number;
   private readonly priceFetchTimeoutMs: number;
+  private onRefresh?: (specs: ModelSpec[]) => void;
   private readonly priceRefreshMs: number;
   private readonly now: () => number;
   private lastRefresh = 0;
@@ -57,6 +65,7 @@ export class OpenRouterProvider implements ChatProvider {
     this.fetchImpl = opts.fetch ?? fetch;
     this.timeoutMs = opts.timeoutMs ?? 120_000;
     this.priceFetchTimeoutMs = opts.priceFetchTimeoutMs ?? 15_000;
+    this.onRefresh = opts.onRefresh;
     this.priceRefreshMs = opts.priceRefreshMs ?? 60 * 60 * 1000;
     this.now = opts.now ?? Date.now;
   }
@@ -127,6 +136,10 @@ export class OpenRouterProvider implements ChatProvider {
     }
     if (missing.length) throw new Error(`OpenRouter kennt diese Modelle nicht: ${missing.join(", ")}`);
     this.lastRefresh = this.now();
+    // Auch der stündliche Abruf meldet sich hier, nicht nur der beim Start. Sonst läuft der Prozess
+    // mit frischen Preisen, während der gespeicherte Stand veraltet, und nach einem Neustart ohne
+    // erreichbaren Anbieter rechnet der Dienst mit Zahlen von vorgestern.
+    this.onRefresh?.(this.snapshot());
   }
 
   models(): ModelSpec[] {
@@ -139,6 +152,11 @@ export class OpenRouterProvider implements ChatProvider {
    * zwingend einen Drittanbieter erreichen muss, ist ein Ausfallgrund: Am 19.09.2026 hing der
    * Start zweimal an genau diesem Aufruf und der Dienst war weg.
    */
+  /** Nachträglich setzen, damit auch der Abruf beim Start schon gespeichert wird. */
+  setOnRefresh(cb: (specs: ModelSpec[]) => void): void {
+    this.onRefresh = cb;
+  }
+
   snapshot(): ModelSpec[] {
     return [...this.specs.values()];
   }
