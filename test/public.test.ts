@@ -384,3 +384,33 @@ describe("Favicon", () => {
     expect(html, "ohne den data-URI fragt jeder Browser die Route an").toMatch(/rel="icon"/);
   });
 });
+
+describe("Nichts ausliefern, was nicht ausgeliefert werden soll", () => {
+  it("antwortet auf typische Scan-Pfade mit 404 und ohne Inhalt", async () => {
+    // Am 20.09.2026 fuhr ein Scanner 261 bekannte Pfade gegen den Dienst (.env, .git/config,
+    // Varianten davon), alle 404. Das war zu erwarten, weil die App genau eine Datei liest, die
+    // Startseite, und zwar einmal beim Start (src/app.ts, loadIndexHtml). Dieser Test hält das
+    // fest: Sollte jemals ein statischer Dateiserver dazukommen, fällt er hier auf.
+    const { app } = setup();
+    const pfade = [
+      "/.env",
+      "/.env.production",
+      "/.git/config",
+      "/config.json",
+      "/package.json",
+      "/deploy/.env",
+      "/src/app.ts",
+      "/data/cp.db",
+      "/admin",
+      "/../package.json",
+      "/public/../../package.json",
+    ];
+    for (const pfad of pfade) {
+      const res = await app.request(pfad);
+      expect(res.status, `${pfad} darf nichts liefern`).toBe(404);
+      const text = await res.text();
+      expect(text, `${pfad} verrät Inhalt`).not.toMatch(/(dependencies|BEGIN |cnwy_k_|sk-|PRIVATE KEY|CP_)/);
+      expect(text.length, `${pfad} antwortet zu ausführlich`).toBeLessThan(600);
+    }
+  });
+});
