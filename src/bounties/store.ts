@@ -1,20 +1,20 @@
 /**
- * Ausgeschriebene Auftraege, und das Geld dahinter.
+ * Posted bounties, and the money behind them.
  *
- * Ein Auftrag ohne hinterlegtes Geld ist ein Versprechen, das der Auftraggeber nicht halten muss.
- * Deshalb wird der Preis beim Einstellen sofort abgebucht: eine Ledger-Zeile `bounty_hold` mit
- * negativem Betrag. Das Guthaben des Auftraggebers sinkt, und der Auftrag traegt das Geld, bis er
- * zurueckgezogen oder awardBounty wird.
+ * A bounty without money behind it is a promise the buyer does not have to keep. That is why the
+ * price is charged the moment the bounty goes up: a `bounty_hold` ledger row with a negative
+ * amount. The buyer's balance drops, and the bounty carries the money until it is cancelled or
+ * awarded.
  *
- * **Warum nicht ueber `wallets.reserved_mc`:** Diese Spalte wird bei jedem Start auf null gesetzt
- * (`migrate()` in src/db.ts), weil sie abgebrochene Inferenz-Reservierungen aufraeumt, und das ist
- * dort richtig. Fuer eine Hinterlegung waere es toedlich: Ein Deploy gaebe jedem Auftraggeber sein
- * Geld zurueck, waehrend sein Auftrag weiter ausgeschrieben ist, und niemand merkte es. Der Ledger
- * ist die dauerhafte Wahrheit, also liegt die Hinterlegung dort.
+ * **Why not via `wallets.reserved_mc`:** that column is set to zero on every start (`migrate()` in
+ * src/db.ts) because it cleans up aborted inference reservations, and that is right where it sits.
+ * For a hold it would be fatal: a deploy would hand every buyer their money back while their bounty
+ * is still posted, and nobody would notice. The ledger is the durable truth, so the hold lives
+ * there.
  *
- * Credits bleiben dabei, was sie sind: nicht auszahlbar und nur innerhalb dieses Control Plane
- * beweglich (loop-constraints.md). Ein Auftrag verschiebt sie zwischen zwei Konten desselben
- * Systems, mehr nicht.
+ * Credits stay what they are throughout: not redeemable and movable only inside this control plane
+ * (loop-constraints.md). A bounty shifts them between two accounts of the same system, nothing
+ * more.
  */
 
 import { randomUUID } from "node:crypto";
@@ -38,31 +38,30 @@ export interface Bounty {
 }
 
 export const BRIEF_MAX = 20_000;
-/** Ein Cent ist der kleinste sinnvolle Auftrag, 1.000 USD die Grenze gegen den Zahlendreher. */
+/** One cent is the smallest bounty that makes sense, 1,000 USD the guard against a typo in the digits. */
 export const PRICE_MIN_MC = 1_000;
 export const PRICE_MAX_MC = 100_000_000;
-/** Laenger als 30 Tage bindet Geld ohne Gegenwert; kuerzer als eine Minute schafft niemand. */
 /**
- * Die Vermittlungsgebuehr, in Prozent des Auftragspreises.
+ * The brokerage fee, in percent of the bounty price.
  *
- * Zehn Prozent, getragen vom Gewinner und vom Auszahlbetrag abgezogen. Upwork nimmt zehn, Fiverr
- * zwanzig; in einem Markt ohne Liquiditaet ist die niedrigere Zahl richtig, und sie ist spaeter
- * leichter zu erhoehen als zu senken.
+ * Ten percent, carried by the winner and deducted from the payout. Upwork takes ten, Fiverr twenty;
+ * in a market without liquidity the lower number is the right one, and it is easier to raise later
+ * than to lower.
  *
- * Der Kaeufer zahlt genau den Preis, den er ausschreibt: Er soll nicht rechnen muessen, was ein
- * Auftrag "wirklich" kostet. Der Agent sieht dafuer schon in der oeffentlichen Liste, was bei ihm
- * ankommt, und nicht erst nach der Vergabe.
+ * The buyer pays exactly the price they post: they should not have to work out what a bounty
+ * "really" costs. The agent in turn sees in the public list what arrives at their end, and not only
+ * after the award.
  *
- * Gerundet wird zugunsten des Gewinners: Die Gebuehr wird abgerundet, damit sie nie ueber zehn
- * Prozent liegt. Beide Zeilen zusammen ergeben exakt den hinterlegten Betrag, es entsteht und
- * verschwindet kein Millicent.
+ * Rounding goes in favour of the winner: the fee is rounded down so it never exceeds ten percent.
+ * Both rows together add up to exactly the amount held, no millicent appears or disappears.
  */
 export const FEE_PERCENT = 10;
 
-export function feeMc(preisMc: number): number {
-  return Math.floor((preisMc * FEE_PERCENT) / 100);
+export function feeMc(priceMc: number): number {
+  return Math.floor((priceMc * FEE_PERCENT) / 100);
 }
 
+/** Longer than 30 days ties up money for nothing; shorter than a minute is beyond anyone. */
 export const DEADLINE_MIN_MS = 60_000;
 export const DEADLINE_MAX_MS = 30 * 24 * 3_600_000;
 
@@ -81,12 +80,11 @@ export interface NewBounty {
 }
 
 /**
- * Einstellen und im selben Zug bezahlen.
+ * Post and pay in the same move.
  *
- * Beides in einer Transaktion: Ein Auftrag ohne Abbuchung waere Geld, das es nicht gibt, eine
- * Abbuchung ohne Auftrag waere Geld, das niemandem gehoert. `postLedger` oeffnet selbst eine
- * Transaktion; better-sqlite3 schachtelt das ueber Savepoints, die aeussere bleibt also die, die
- * zaehlt.
+ * Both in one transaction: a bounty without a charge would be money that does not exist, a charge
+ * without a bounty would be money that belongs to nobody. `postLedger` opens a transaction itself;
+ * better-sqlite3 nests that through savepoints, so the outer one remains the one that counts.
  */
 export function createBounty(db: Db, a: NewBounty): Bounty {
   const brief = a.brief.trim();
@@ -118,8 +116,8 @@ export function createBounty(db: Db, a: NewBounty): Bounty {
     db.prepare(
       "INSERT INTO bounties (id, creator, kind, brief, price_mc, deadline, status, created_at) VALUES (?, ?, ?, ?, ?, ?, 'open', ?)",
     ).run(id, creator, a.kind, brief, a.priceMc, new Date(deadlineMs).toISOString(), now);
-    // Wirft "insufficient_balance", wenn das Guthaben nicht reicht; die Transaktion faellt
-    // zurueck und der Auftrag existiert nie.
+    // Throws "insufficient_balance" when the credit is not enough; the transaction rolls back and
+    // the bounty never exists.
     postLedger(db, {
       address: creator,
       kind: "bounty_hold",
@@ -143,7 +141,7 @@ export function getBounty(db: Db, id: string): Bounty | null {
   return (db.prepare("SELECT * FROM bounties WHERE id = ?").get(id) as Bounty | undefined) ?? null;
 }
 
-/** Offene Auftraege, deren Frist noch laeuft, aelteste zuerst: who laenger wartet, kommt zuerst. */
+/** Open bounties whose deadline is still running, oldest first: whoever waits longer comes first. */
 export function openBounties(db: Db, limit = 50): Bounty[] {
   return db
     .prepare("SELECT * FROM bounties WHERE status = 'open' AND deadline > ? ORDER BY created_at LIMIT ?")
@@ -151,11 +149,11 @@ export function openBounties(db: Db, limit = 50): Bounty[] {
 }
 
 /**
- * Zurueckziehen und das Geld zurueckgeben.
+ * Cancel and give the money back.
  *
- * Nur der Auftraggeber, und nur einmal: Die Bedingung `status = 'open'` im UPDATE ist das, was
- * einen doppelten Aufruf unschaedlich macht. Ohne sie zahlte der zweite Aufruf ein zweites Mal
- * zurueck, und das Geld waere aus dem Nichts entstanden.
+ * Only the buyer, and only once: the condition `status = 'open'` in the UPDATE is what makes a
+ * duplicate call harmless. Without it the second call would refund a second time, and the money
+ * would have appeared out of nothing.
  */
 export function cancelBounty(db: Db, id: string, who: string): Bounty {
   const address = who.toLowerCase();
@@ -182,20 +180,19 @@ export function cancelBounty(db: Db, id: string, who: string): Bounty {
 }
 
 /**
- * Abgelaufene Auftraege schliessen und das hinterlegte Geld zurueckgeben.
+ * Close expired bounties and give the held money back.
  *
- * Ohne diesen Durchlauf liegt das Geld eines Auftrags, dessen Frist verstreicht, ohne dass jemand
- * vergibt, fuer immer fest. Der Auftraggeber sieht es nicht mehr im Guthaben, bekommt aber auch
- * nichts dafuer, und keine Zeile im Ledger erklaert, wo es geblieben ist.
+ * Without this pass the money of a bounty whose deadline goes by without anybody awarding it stays
+ * locked forever. The buyer no longer sees it in their balance but gets nothing for it either, and
+ * no ledger row explains where it went.
  *
- * `expired` und nicht `cancelled`: Dieselbe Geldbewegung, aber eine andere Geschichte, und who
- * spaeter wissen will, warum ein Markt nicht funktioniert, muss die beiden unterscheiden koennen.
- * Ein zurueckgezogener Auftrag ist ein Auftraggeber, der es sich anders ueberlegt hat; ein
- * abgelaufener ist einer, fuer den niemand gearbeitet hat.
+ * `expired` and not `cancelled`: the same movement of money but a different story, and whoever
+ * wants to know later why a market does not work has to be able to tell the two apart. A cancelled
+ * bounty is a buyer who changed their mind; an expired one is a bounty nobody worked on.
  *
- * Laeuft beim Start und zu Beginn jeder Auftragsanfrage. Das deckt jeden Fall ab, in dem jemand
- * den Markt anfasst; was es nicht deckt, ist ein Dienst, den monatelang niemand aufruft. Dann
- * liegt das Geld bis zum naechsten Start, und der kommt bei jedem Deploy.
+ * Runs on start and at the beginning of every bounty request. That covers every case in which
+ * somebody touches the market; what it does not cover is a service nobody calls for months. Then
+ * the money sits until the next start, and that comes with every deploy.
  */
 export function releaseExpired(db: Db, now = new Date()): number {
   const due = db
@@ -204,8 +201,8 @@ export function releaseExpired(db: Db, now = new Date()): number {
   let released = 0;
   for (const b of due) {
     const run = db.transaction(() => {
-      // Die Bedingung steht im UPDATE, nicht nur in der Abfrage davor: Zwei gleichzeitige
-      // Durchlaeufe wuerden sonst beide zurueckzahlen, und Geld entstuende aus dem Nichts.
+      // The condition sits in the UPDATE, not only in the query before it: two concurrent passes
+      // would otherwise both refund, and money would appear out of nothing.
       const res = db
         .prepare("UPDATE bounties SET status = 'expired', closed_at = ? WHERE id = ? AND status = 'open'")
         .run(now.toISOString(), b.id);
@@ -215,7 +212,7 @@ export function releaseExpired(db: Db, now = new Date()): number {
         kind: "bounty_release",
         deltaMc: b.price_mc,
         ref: `bounty-expired:${b.id}`,
-        meta: { bounty_id: b.id, grund: "deadline" },
+        meta: { bounty_id: b.id, reason: "deadline" },
       });
       return true;
     });
@@ -235,15 +232,15 @@ export interface Submission {
 export const SUBMISSION_MAX = 50_000;
 
 /**
- * Sich auf einen Auftrag bewerben.
+ * Enter a bounty.
  *
- * Ein Versuch je Agent und Auftrag, erzwungen vom eindeutigen Index in der Tabelle und nicht nur
- * von der Pruefung hier: Zwei gleichzeitige Anfragen kaemen sonst beide durch, und der
- * Auftraggeber saehe denselben Bewerber zweimal.
+ * One attempt per agent and bounty, enforced by the unique index on the table and not only by the
+ * check here: two concurrent requests would otherwise both get through, and the buyer would see the
+ * same entrant twice.
  *
- * Der Auftraggeber selbst darf nicht mitbieten. Geld an sich selbst zu awardBounty waere zwar
- * folgenlos, aber es macht aus einer Bestenauswahl eine Buehne fuer einen einzigen Darsteller,
- * und in einer oeffentlichen Liste ist das ein Vertrauensschaden.
+ * The buyer themselves must not compete. Awarding money to yourself would have no financial effect,
+ * but it turns a selection of the best into a stage for a single performer, and in a public list
+ * that costs trust.
  */
 export function submitWork(db: Db, a: { bountyId: string; agent: string; body: string }): Submission {
   const agent = a.agent.toLowerCase();
@@ -281,11 +278,11 @@ export function submitWork(db: Db, a: { bountyId: string; agent: string; body: s
 }
 
 /**
- * Wer welche Einreichungen sieht.
+ * Who sees which submissions.
  *
- * Der Auftraggeber sieht alle, denn er muss auswaehlen. Ein Agent sieht nur seine eigene: Die
- * Arbeit der Mitbewerber vor der Entscheidung zu lesen hiesse abschreiben, und der Auftraggeber
- * bezahlte dann dreimal dieselbe Idee.
+ * The buyer sees all of them, because they have to choose. An agent sees only their own: reading
+ * the competitors' work before the decision would mean copying it, and the buyer would then pay
+ * three times for the same idea.
  */
 export function submissionsFor(db: Db, bountyId: string, who: string): Submission[] {
   const address = who.toLowerCase();
@@ -300,19 +297,18 @@ export function submissionsFor(db: Db, bountyId: string, who: string): Submissio
 }
 
 /**
- * Vergeben: das hinterlegte Geld geht an den Gewinner.
+ * Award: the held money goes to the winner.
  *
- * Der eine Zug, auf den der ganze Markt hinauslaeuft, und die Stelle, an der Geld entstehen
- * koennte, wenn man sie falsch baut. Die Bedingung `status = 'open'` steht deshalb im UPDATE und
- * nicht nur in der Pruefung davor: Zwei gleichzeitige Vergaben wuerden sonst beide auszahlen.
+ * The one move the whole market runs towards, and the place where money could come into existence
+ * if it were built wrong. That is why the condition `status = 'open'` sits in the UPDATE and not
+ * only in the check before it: two concurrent awards would otherwise both pay out.
  *
- * Das Geld verlaesst den Ledger nicht. Es wurde beim Einstellen als `bounty_hold` abgebucht und
- * kommt now als `bounty_award` beim Gewinner an; die Summe ueber alle Zeilen bleibt gleich, und
- * Credits bleiben nicht auszahlbar (loop-constraints.md).
+ * The money does not leave the ledger. It was charged as `bounty_hold` when the bounty went up and
+ * arrives at the winner as `bounty_award`; the sum over all rows stays the same, and credits stay
+ * non-redeemable (loop-constraints.md).
  *
- * Eine Vermittlungsgebuehr gibt es noch nicht. Sie gehoert laut Vision hierher, aber ihre Hoehe
- * ist eine Entscheidung von Matthias und keine des Loops; wenn sie kommt, ist sie eine eigene
- * Ledger-Zeile neben dieser.
+ * The brokerage fee is a second row next to this one and only exists when the instance has an
+ * operator address configured (`feeTo`).
  */
 export function awardBounty(
   db: Db,
@@ -337,8 +333,8 @@ export function awardBounty(
       .prepare("UPDATE bounties SET status = 'awarded', closed_at = ?, winner_submission = ? WHERE id = ? AND status = 'open'")
       .run(new Date().toISOString(), submission.id, a.bountyId);
     if (res.changes !== 1) throw new BountyError("not_open", 409, "This bounty is no longer open.");
-    // Ohne Empfaenger keine Gebuehr: Eine Instanz ohne konfigurierte Betreiberadresse soll nicht
-    // still Geld einbehalten, das dann niemandem gehoert und die Buchhaltung sprengt.
+    // No recipient, no fee: an instance without a configured operator address must not silently
+    // keep money that then belongs to nobody and breaks the books.
     const fee = a.feeTo ? feeMc(bounty.price_mc) : 0;
     postLedger(db, {
       address: submission.agent,

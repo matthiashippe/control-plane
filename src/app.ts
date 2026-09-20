@@ -8,7 +8,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Hono } from "hono";
 import type { Db } from "./db.js";
-import { verifyFindings, messages, type CheckMode } from "./check/erfindung.js";
+import { verifyFindings, messages, type CheckMode } from "./check/fabrication.js";
 import {
   createBounty,
   cancelBounty,

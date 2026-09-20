@@ -6,7 +6,7 @@ import { Catalog } from "../src/inference/proxy.js";
 import { MOCK_MODEL } from "../src/inference/mock.js";
 import type { ChatProvider } from "../src/inference/provider.js";
 import { hashApiKey } from "../src/auth/siwe.js";
-import { verifyFindings, messages, normalise } from "../src/check/erfindung.js";
+import { verifyFindings, messages, normalise } from "../src/check/fabrication.js";
 
 const EINREICHUNG =
   "Marina Promenade, Dubai Marina. Two bedrooms, 1,240 sqft on the 11th floor. " +
