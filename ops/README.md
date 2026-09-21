@@ -278,6 +278,28 @@ twenty-five. Whoever wants to move the number has to pay, and that is the whole 
 measurement. Our own automaton is included in the number, so subtract one for the actual figure.
 `db.keys` counts issued API keys, `db.day.topups` the payments of the last day.
 
+## When a key name nobody knows shows up
+
+`ops/db-report.cjs` keeps two lists, and `ops/check-all.sh` prints every key name that is on
+neither, with the question that goes with it.
+
+Three times on 2026-09-21 a tool of ours arrived without its name on the list of ours, and each
+time a number about the market quietly became a number about us: four check agents counted as
+foreign agents, a check's submission sat on a live job, and the cold-start probe read as a
+stranger for an hour. Fixing the instance three times fixes nothing.
+
+An unknown name is one of exactly two things, and both deserve a look:
+
+- a tool of ours that did not register its name, which is a bug, or
+- somebody who is not us, which is the news this whole project is waiting for.
+
+`conway-automaton` is the reason there is a second list. That is what the upstream runtime calls
+the key it provisions, so the name belongs to anybody who points a runtime here; on this database
+two addresses carry it, our own operator wallet from the acceptance run and the paying stranger.
+It must never be treated as ours, and our own use of it is excluded one level up, by address.
+
+**Anything under `ops/` that provisions a key adds its name in the same commit that creates it.**
+
 ## The whole cold start, once, before an article goes out
 
 `CP_URL=https://cp.hippe.eu pnpm tsx ops/neuling-probe.ts`, by hand, never by cron.
