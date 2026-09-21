@@ -1,0 +1,30 @@
+{
+  "measured_on": "2026-09-21T04:45:00Z",
+  "source": "GitHub REST API, unauthenticated, repo Conway-Research/automaton",
+  "last_push": "2026-08-26T16:28:14Z",
+  "last_commit_files": [
+    "README.md"
+  ],
+  "forks": 1444,
+  "stars": 6492,
+  "open_issues": 233,
+  "has_discussions": false,
+  "archived": false,
+  "issues_mentioning_auth_verify_or_nonce": 17,
+  "issues_mentioning_auth_verify_or_nonce_on_2026_09_20": 14,
+  "recent_issue_comments_checked": 100,
+  "recent_issue_comments_span": "2026-03-11T20:13:32Z .. 2026-09-20T09:22:39Z",
+  "recent_issue_comments_from_write_access": 0,
+  "fork_automaton_local": {
+    "repo": "Kiwi172/automaton-local",
+    "stars": 1,
+    "last_push": "2026-08-25T03:31:37Z"
+  },
+  "note": "Checked before posting, as the article's checklist requires. The only figure that moved since 2026-09-20 is the issue count, from 14 to 17. The last comment from anybody with write access is dated exactly, so the claim about the maintainers is one API call to check.",
+  "last_write_access_issue_comment": {
+    "at": "2026-03-06T04:43:25Z",
+    "login": "unifiedh",
+    "association": "COLLABORATOR"
+  },
+  "issue_comments_since_then": 103
+}
