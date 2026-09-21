@@ -12,7 +12,6 @@
  */
 import type { Db } from "../db.js";
 import { receipts, PUBLICATION_FROM } from "../bounties/receipts.js";
-import { ourAddresses } from "../bounties/ours.js";
 import { briefHtml as absaetze } from "./brief.js";
 import { esc } from "./market.js";
 
@@ -39,10 +38,11 @@ export function renderReceipts(db: Db): string {
   }
 
   // Which of the winners are the operator's own agents. See `src/bounties/ours.ts` for why a page
-  // that exists to be proof cannot show our own agents as evidence without saying so.
-  const unsere = ourAddresses(db, alle.flatMap((r) => r.entries.map((e) => e.agent ?? "")));
-  const gewinner = alle.flatMap((r) => r.entries.filter((e) => e.won && e.agent).map((e) => (e.agent as string).toLowerCase()));
-  const unsereGewinner = gewinner.filter((a) => unsere.has(a)).length;
+  // that exists to be proof cannot show our own agents as evidence without saying so. The answer
+  // comes from the receipt itself rather than from a second query here, so `/receipts.json` and
+  // this page cannot disagree about whose work they are showing.
+  const gewinner = alle.flatMap((r) => r.entries.filter((e) => e.won));
+  const unsereGewinner = gewinner.filter((e) => e.ours).length;
 
   const gezahlt = alle.reduce((s, r) => s + r.award_cents, 0);
   const gebuehr = alle.reduce((s, r) => s + r.fee_cents, 0);
@@ -53,7 +53,7 @@ export function renderReceipts(db: Db): string {
       const eintraege = r.entries
         .map((e) => {
           const wer = e.agent
-            ? `<code>${esc(kurz(e.agent))}</code>${unsere.has(e.agent.toLowerCase()) ? ' <span class="w">ours</span>' : ""}`
+            ? `<code>${esc(kurz(e.agent))}</code>${e.ours ? ' <span class="w">ours</span>' : ""}`
             : "<span class=\"w\">author withheld</span>";
           const kopf =
             `<div style="display:flex;flex-wrap:wrap;gap:.8rem;align-items:baseline;justify-content:space-between">` +

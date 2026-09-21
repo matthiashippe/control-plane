@@ -18,11 +18,18 @@
  * `docs/bounties.md`, in `/llms.txt` and in the MCP tool it submits through. Older ones are
  * counted and dated in the receipt, with their text withheld and the reason named, because hiding
  * the fact that they exist would falsify the one number a reader wants: how many agents competed.
+ *
+ * The operator's own agents are the one exception, added on 2026-09-21. The withholding is a
+ * promise kept to a stranger, and we have nothing to promise ourselves. Leaving it on our own rows
+ * was worse than pointless: the only paid receipt on this market was won by our own first-cycle
+ * agent on 20.09., and the page presented it as an author whose rights were being respected, which
+ * reads as a stranger and is the opposite of what the row is.
  */
 
 import type { Db } from "../db.js";
 import { mcToCents } from "../db.js";
 import { feeMc } from "./store.js";
+import { ourAddresses } from "./ours.js";
 
 /**
  * From this moment a submission is published when its bounty is awarded.
@@ -55,6 +62,8 @@ export interface ReceiptEntry {
   body: string | null;
   /** Why it is not here, when it is not. */
   withheld: string | null;
+  /** The operator's own agent. Published whatever the date, and marked as ours wherever it shows. */
+  ours: boolean;
 }
 
 export interface Receipt {
@@ -112,6 +121,14 @@ export function receipts(db: Db, limit = 50): Receipt[] {
     award_mc: number | null;
   }[];
 
+  // Every agent on every receipt, asked once. See `src/bounties/ours.ts`.
+  const alleAgenten = db
+    .prepare(
+      `SELECT DISTINCT agent FROM submissions WHERE bounty_id IN (${rows.map(() => "?").join(",") || "''"})`,
+    )
+    .all(...rows.map((b) => b.id)) as { agent: string }[];
+  const unsere = ourAddresses(db, alleAgenten.map((a) => a.agent));
+
   return rows.map((b) => {
     const subs = db
       .prepare("SELECT id, agent, body, created_at FROM submissions WHERE bounty_id = ? ORDER BY created_at")
@@ -133,7 +150,13 @@ export function receipts(db: Db, limit = 50): Receipt[] {
       competitors: subs.length,
       entries: subs.map((s) => {
         const submittedMs = Date.parse(s.created_at);
-        const published = submittedMs >= PUBLICATION_FROM_MS;
+        // The withholding protects a stranger who was never told their work would be read. It has
+        // nothing to protect us from, and leaving it on our own rows was actively misleading: the
+        // only paid receipt on this market was won by our own first-cycle agent on 20.09., and the
+        // page presented it as an author whose rights were being respected. So our own agents are
+        // published whatever the date, and marked wherever they show.
+        const meins = unsere.has(s.agent.toLowerCase());
+        const published = meins || submittedMs >= PUBLICATION_FROM_MS;
         return {
           // Named only where the rule covered them. An address is what earns a reputation here,
           // and a reputation needs consent: an agent that submitted under the silence was never
@@ -145,6 +168,7 @@ export function receipts(db: Db, limit = 50): Receipt[] {
           won: s.id === b.winner_submission,
           body: published ? s.body : null,
           withheld: published ? null : Number.isNaN(submittedMs) ? WITHHELD_UNDATED : WITHHELD,
+          ours: meins,
         };
       }),
     };

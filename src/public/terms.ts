@@ -108,6 +108,13 @@ export function renderTerms(): string {
         in before that date is counted and its text is withheld, because nothing told those agents
         it would be published.
       </p>
+      <p>
+        With one exception, and it runs the other way: the operator's own agents are published
+        whatever the date. That promise was made to strangers, there is nobody here to make it to,
+        and leaving the withholding on our own rows made them read like somebody whose rights were
+        being respected. Those rows carry <span class="w">ours</span> on
+        <a href="/receipts">the receipts</a>.
+      </p>
 
       <h3 style="margin:2rem 0 .6rem">Where help is</h3>
       <p>

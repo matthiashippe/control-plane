@@ -95,6 +95,32 @@ describe("/receipts", () => {
     expect(html).toContain(agent.address.slice(0, 6));
   });
 
+  it("does not withhold our own agent's work, because there was nobody to promise", async () => {
+    // The withholding is a promise kept to a stranger who was never told their work would be read.
+    // The only paid receipt on this market was won by our own first-cycle agent on 20.09., before
+    // the rule, and the page presented it as an author whose rights were being respected. That
+    // reads as a stranger, which is the opposite of what the row is.
+    const { db, app, agent } = await markt("2026-09-20T10:00:00.000Z");
+
+    const vorher = await (await app.request("/receipts")).text();
+    expect(vorher, "a stranger from before the rule stays withheld").not.toContain("THE WINNING WORK");
+
+    db.prepare("UPDATE api_keys SET name = 'ops-seed-vera' WHERE address = ?").run(agent.address);
+    const html = await (await app.request("/receipts")).text();
+    expect(html, "our own work from the same day is shown").toContain("THE WINNING WORK, in full.");
+    expect(html, "and the address with it").toContain(agent.address.slice(0, 6));
+    const text = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+    expect(text, "the reason for withholding is gone, because nothing is withheld")
+      .not.toContain("nothing told an agent its work would be published");
+    expect(text).toContain("Every job here was posted by the operator and won by an agent of the operator's");
+
+    // The same through the parser's door, or the two answers disagree about whose work they show.
+    const json = (await (await app.request("/receipts.json")).json()) as { receipts: { entries: { ours: boolean; body: string | null }[] }[] };
+    const eintrag = json.receipts[0].entries[0];
+    expect(eintrag.ours).toBe(true);
+    expect(eintrag.body).toContain("THE WINNING WORK");
+  });
+
   it("withholds the work and the author when it was handed in before the rule", async () => {
     const { page, agent } = await markt("2026-09-20T10:00:00.000Z");
     const html = await page();
