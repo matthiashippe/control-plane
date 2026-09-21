@@ -48,6 +48,10 @@ run "conway still broken" ./ops/conway-zustand.sh
 run "market guards" env CP_URL="$BASE" pnpm -s tsx harness/e2e/markt.ts
 run "journeys match the service" ./ops/journeys-pruefen.sh
 run "pages say nothing obviously wrong" ./ops/seiten-pruefen.sh
+# Added 2026-09-21. The three series below were printed by this script and never checked, so a cron
+# entry that stops firing would leave the same last point in every cycle's output and this script
+# would keep saying ALL CHECKS OK next to it.
+run "the daily jobs still ran" ./ops/freshness.sh
 
 if (( DEEP )); then
   run "MCP route end to end" env CP_URL="$BASE" OPERATOR_WALLET="${OPERATOR_WALLET:-harness/state/mainnet-wallet.json}" pnpm -s tsx ops/mcp-against-production.ts
@@ -103,7 +107,8 @@ fi
 reihen=$(timeout 25 ssh -i "${CP_SSH_KEY:-$HOME/.ssh/id_ed25519_automaton}" -o BatchMode=yes -o ConnectTimeout=8 \
   "${CP_HOST:-root@76.13.144.207}" \
   'echo "x402 $(wc -l < /opt/control-plane/x402/kennzahlen.ndjson 2>/dev/null || echo 0) $(tail -1 /opt/control-plane/x402/kennzahlen.ndjson 2>/dev/null)";
-   echo "conway $(wc -l < /opt/control-plane/conway/repo.ndjson 2>/dev/null || echo 0) $(tail -1 /opt/control-plane/conway/repo.ndjson 2>/dev/null)"' 2>/dev/null)
+   echo "conway $(wc -l < /opt/control-plane/conway/repo.ndjson 2>/dev/null || echo 0) $(tail -1 /opt/control-plane/conway/repo.ndjson 2>/dev/null)";
+   echo "money $(wc -l < /opt/control-plane/conway-money/metrics.ndjson 2>/dev/null || echo 0) $(tail -1 /opt/control-plane/conway-money/metrics.ndjson 2>/dev/null)"' 2>/dev/null)
 
 if [[ -n "$reihen" ]]; then
   printf '%s\n' "$reihen" | python3 -c "
@@ -119,7 +124,12 @@ for zeile in sys.stdin:
     except json.JSONDecodeError:
         print(f'{name} series: the last line is not readable')
         continue
-    if name == 'x402':
+    if name == 'money':
+        print(f\"money  {d['measured_at'][:10]}, {n} point(s): \"
+              f\"{d['topup_usdc_30d']:,.0f} USDC in 30 days from {d['topup_wallets_30d']} wallets, \"
+              f\"{d['topups_30d']} purchases, pay endpoint {d.get('pay_endpoint_status', '?')}, \"
+              f\"data through {d['data_through'][:10]}\")
+    elif name == 'x402':
         print(f\"x402   {d['stichtag'][:10]}, {n} point(s): {d['urls_eindeutig']:,} services, \"
               f\"{d['aufrufe_30d']:,} calls, top10 {d['anteil_top10']}%, \"
               f\"{d['ohne_nachfragedaten']} without demand data\")

@@ -104,7 +104,12 @@ for ref, ips in sorted(vonher.items(), key=lambda kv: -len(kv[1])):
         marke = "  <-- went further" if weiter else ""
         pfadkette = " -> ".join(reihe[:6])
         print("    %-16s %s%s" % (ip, pfadkette, marke))
-' || echo "  none"
+' || true
+# `|| true`, not `|| echo "  none"`, and not nothing at all. The python above already prints "none"
+# when there is nothing to show, and with `pipefail` the greps that filter every line out exit 1,
+# so the old fallback fired on top of it and the section said "none" twice. Dropping the fallback
+# entirely was worse: `set -e` then killed the script right here, and the report lost the two
+# sections below it, which is most of what a cycle looks at.
 if [[ "${ours:-0}" -gt 0 ]]; then
   echo "  ($ours row(s) with a foreign referrer came from our own addresses and are not counted)"
 fi
