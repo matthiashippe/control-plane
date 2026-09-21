@@ -534,6 +534,31 @@ Verified end to end on 2026-09-21 rather than assumed: a request carrying
 intact and, after two more requests, with the path it took. The instrument the whole GTM
 measurement hangs on had never been tested with a real referrer.
 
+## Did the deploy cost a stranger an answer
+
+`ops/deploy-window.sh [tail seconds]`, after every rollout. `loop-constraints.md` has required this
+since 19.09.; what it did not require was that the window be found rather than typed.
+
+On 2026-09-21 a cycle typed 20:25 for a deploy that happened at 18:25 UTC. The VM runs on UTC, the
+operator's machine on CEST, and the two are two hours apart. The query looked at a window that had
+not happened yet, found nothing in it, and the cycle wrote "nobody noticed" into the log. The
+conclusion was right and the check was worthless, which is the worse of the two failures because it
+reads exactly like the good case.
+
+So the window now comes from `docker inspect deploy-cp-1 --format {{.State.StartedAt}}`, which is
+the deploy to the second, and the output separates the two things the old query ran together:
+
+- `CLEAN` means strangers were served in that window and none of them got an error.
+- `MEASURED NOTHING` means there were no strangers. On a service this size that is the normal
+  result, and it is not evidence about the deploy at all.
+- `PARTIAL` means the log ends before the window does, which happens when it runs immediately
+  after the rollout. Then the answer is an interim one and says so.
+
+Exit 0, 1 for somebody affected, 2 when it could not run. Counter-proved in all four states: with
+our own addresses removed from the filter it reports the smoke test's 23 deliberate 4xx as
+`AFFECTED` and exits 1, with an unreachable host it exits 2, and with a tail long enough to run
+past the end of the log it prints `PARTIAL`.
+
 ## Does a backup come back up
 
 `ops/sicherung-probe.sh`, by hand, not by cron. `--oldest` takes the oldest backup still kept

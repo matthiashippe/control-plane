@@ -19,7 +19,11 @@ unserer Deploys bereits zwölf 502er gesehen.
 
 **Nach jedem Deploy, ohne Ausnahme:**
 - Von außen prüfen: `/health`, `/v1/status`, und dass der Container `healthy` ist.
-- In die Caddy-Logs sehen, ob der Kunde in diesem Fenster einen Fehler bekommen hat.
+- `ops/deploy-window.sh` laufen lassen, nicht das Fenster von Hand in eine Abfrage tippen. Es
+  nimmt den Startzeitpunkt des Containers als Deploy-Zeitpunkt und sagt getrennt, ob niemand
+  betroffen war oder ob es niemanden gab. Am 21.09.2026 hat ein Zyklus 20:25 getippt für einen
+  Deploy um 18:25 UTC (die VM läuft auf UTC, der Rechner auf MESZ), fand nichts und schrieb
+  "niemand hat etwas gemerkt" ins Protokoll. Das Ergebnis stimmte zufällig, die Prüfung nicht.
 - Das Ergebnis in `.scratch/gtm/nachtlauf.md` protokollieren, auch wenn alles gut ging.
 
 **Was trotzdem nicht passiert:**
