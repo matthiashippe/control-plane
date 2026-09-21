@@ -92,6 +92,13 @@ code, pre, .mono, .brief, .who { overflow-wrap: anywhere; }
 .wrap { width: 100%; max-width: 68rem; margin-inline: auto; padding-inline: var(--s-4); }
 @media (min-width: 34rem) { .wrap { padding-inline: var(--s-6); } }
 .prose { max-width: 34rem; }          /* 60 to 70 characters */
+/* A brief is quoted verbatim, so it gets a panel that says so. The panel spans its card and
+   the text inside it keeps the reading width: painting the background on the constrained
+   element itself left a block that stopped halfway across the card and read as unfinished. */
+.brief-panel { background: var(--panel-2); border-radius: var(--r-pan); padding: 1rem 1.15rem;
+               margin-top: 1rem; }
+.brief-panel > .prose > p:first-child { margin-top: 0; }
+.brief-panel > .prose > p:last-child { margin-bottom: 0; }
 .sub { color: var(--muted); font-size: var(--t-lead); line-height: 1.5; }
 .eyebrow { font: 500 var(--t-label)/1 var(--mono); letter-spacing: .08em;
            text-transform: uppercase; color: var(--dim); }

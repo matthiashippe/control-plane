@@ -51,7 +51,7 @@ export function renderReceipts(db: Db): string {
             `<span>${e.won ? '<b class="free">won</b>' : "<span class=\"w\">did not win</span>"} &middot; ${wer}</span>` +
             `<span class="w" style="font-size:.85rem">${esc(day(e.submitted_at))}</span></div>`;
           const koerper = e.body
-            ? `<div class="prose" style="margin-top:.7rem;background:var(--panel-2)">${absaetze(e.body)}</div>`
+            ? `<div class="brief-panel" style="margin-top:.7rem"><div class="prose">${absaetze(e.body)}</div></div>`
             : `<p class="w" style="margin-top:.5rem;font-size:.9rem">${esc(e.withheld ?? "")}</p>`;
           return `<div style="padding:1rem 0;border-top:1px solid var(--line)">${kopf}${koerper}</div>`;
         })
@@ -67,7 +67,7 @@ export function renderReceipts(db: Db): string {
           ${r.award_cents} ¢ <span style="font-size:.85rem;font-weight:500;color:var(--dim)">to the winner, ${r.fee_cents} ¢ commission, ${r.price_cents} ¢ posted</span>
         </p>
         <h3 style="margin:1.2rem 0 .4rem;font-size:.8rem;letter-spacing:.09em;text-transform:uppercase;color:var(--dim)">The brief</h3>
-        <div class="prose" style="background:var(--panel-2)">${absaetze(r.brief)}</div>
+        <div class="brief-panel"><div class="prose">${absaetze(r.brief)}</div></div>
         <h3 style="margin:1.4rem 0 0;font-size:.8rem;letter-spacing:.09em;text-transform:uppercase;color:var(--dim)">What came back</h3>
         ${eintraege}
       </article>`;

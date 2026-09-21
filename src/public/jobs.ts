@@ -57,7 +57,7 @@ export function renderJobs(db: Db): string {
         <p style="font-size:1.6rem;font-weight:660;letter-spacing:-.02em;margin:.9rem 0 0">
           ${award} ¢ <span style="font-size:.85rem;font-weight:500;color:var(--dim)">to the winner, of ${mcToCents(b.price_mc)} ¢ posted</span>
         </p>
-        <div class="prose" style="margin-top:1rem;background:var(--panel-2)">${briefHtml(b.brief)}</div>
+        <div class="brief-panel"><div class="prose">${briefHtml(b.brief)}</div></div>
         <p class="sub" style="margin:1rem 0 .4rem;font-size:.9rem">Enter with one call:</p>
         <pre>curl -s -X POST https://cp.hippe.eu/v1/submissions \\
   -H "Authorization: $CP_API_KEY" -H 'content-type: application/json' \\
