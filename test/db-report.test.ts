@@ -58,6 +58,29 @@ describe("The market numbers in the database report", () => {
   // leftovers on a live job visible to strangers as competition, and it happened: an MCP
   // production check submitted to a real 150-cent bounty on 2026-09-20 and the row outlived the
   // fix, so an arriving agent read "1 competitor" where the truth was nobody.
+  /**
+   * The class fix for a mistake made three times on 2026-09-21.
+   *
+   * Four check agents counted as foreign agents, a check's submission sat on a live job, and the
+   * cold-start probe read as a stranger for an hour. Each time the instance was fixed. An unknown
+   * key name is now surfaced instead, because it is one of exactly two things and both deserve a
+   * human look: a tool of ours that forgot to register its name, or the stranger this project is
+   * waiting for.
+   */
+  it("surfaces a key name that neither list knows, and stays quiet about the ones they do", () => {
+    const wall = (db: ReturnType<typeof openDb>, address: string, name: string) => {
+      db.prepare("INSERT OR IGNORE INTO wallets (address, balance_mc, created_at) VALUES (?, 0, ?)").run(address, new Date().toISOString());
+      db.prepare("INSERT INTO api_keys (address, key_hash, key_prefix, name, created_at) VALUES (?, ?, ?, ?, ?)")
+        .run(address, `hash-${name}`, "cnwy_k_xxxxxxx", name, new Date().toISOString());
+    };
+    const r = withDb((db) => {
+      wall(db, STRANGER, "conway-automaton");           // the runtime's own default: a stranger's name
+      wall(db, "0x3333333333333333333333333333333333333333", "mcp-production-check-agent"); // ours
+      wall(db, "0x4444444444444444444444444444444444444444", "totally-new-thing");          // neither
+    });
+    expect(r.market.unclassified_key_names).toEqual(["totally-new-thing"]);
+  });
+
   it("notices our own submission sitting on a live job, and does not count a stranger's", () => {
     const wall = (db: ReturnType<typeof openDb>, address: string, name: string) => {
       db.prepare("INSERT OR IGNORE INTO wallets (address, balance_mc, created_at) VALUES (?, 0, ?)").run(address, new Date().toISOString());

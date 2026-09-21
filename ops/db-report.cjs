@@ -93,7 +93,20 @@ const OUR_KEY_NAMES = [
   // whole plan hangs on, and it lied because a new tool of ours arrived without its name.
   // Anything that provisions a key from ops/ belongs here in the same commit that creates it.
   "cold-start-probe",
+  "doc-check", "my-agent", // the two runs that proved docs/api-key.md works, one of them verbatim
 ];
+
+// Names that are not ours to claim.
+//
+// `conway-automaton` is what the upstream runtime calls the key it provisions, so it belongs to
+// anybody who points a runtime here. On this database two addresses carry it: our own operator
+// wallet from the acceptance run on 19.09., and the paying stranger 0x0629a685. That is exactly
+// why it must never land on the list above. Our own use of it is already excluded one level up,
+// by address, in `OURS`.
+//
+// Anything else that appears here is a decision a human makes, and the day this list grows for a
+// reason other than the runtime's default is the day this project stops being a demonstration.
+const STRANGER_KEY_NAMES = ["conway-automaton"];
 const oursClause = `(
   address in (${OURS.map(() => "?").join(",")})
   or exists (select 1 from api_keys k where k.address = ledger.address
@@ -124,6 +137,24 @@ report.market = {
     `select count(distinct address) n from ledger where kind='bounty_hold' and ${notOurs}`,
     ...OURS_ARGS,
   ).n,
+  // A key name this report has never been told about.
+  //
+  // Three times on 2026-09-21 a tool of ours arrived without its name on the list above, and each
+  // time a number about the market quietly became a number about us: four check agents counted as
+  // foreign agents, a check's submission sat on a live job, and the cold-start probe read as a
+  // stranger for an hour. Fixing the instance three times is not fixing anything.
+  //
+  // So an unknown name is surfaced instead of silently bucketed. It is one of exactly two things,
+  // and both are worth a human look: a tool of ours that forgot to register, which is a bug, or a
+  // real stranger, which is the news this whole project is waiting for.
+  unclassified_key_names: all(
+    `select distinct name from api_keys
+      where not (${OUR_KEY_NAMES.map(() => "name like ?").join(" or ")})
+        ${STRANGER_KEY_NAMES.length ? `and name not in (${STRANGER_KEY_NAMES.map(() => "?").join(",")})` : ""}`,
+    ...OUR_KEY_NAMES,
+    ...STRANGER_KEY_NAMES,
+  ).map((r) => r.name),
+
   // Our own litter on a live job.
   //
   // On 2026-09-20 at 23:01 the MCP production check submitted to a real 150-cent bounty instead of

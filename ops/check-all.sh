@@ -72,6 +72,9 @@ print(f\"foreign buyers: {m['foreign_buyers']}   foreign agents: {m['foreign_age
       f\"starter pool left: {m['starter_pool_left_mc']/1000:.0f} c \"
       f\"(of {m['starter_granted']} grants, {m['starter_granted_ours']} to us)\")
 print(f\"written off by the token estimate: {u/1000:.2f} c\")
+for name in m.get('unclassified_key_names', []):
+    print(f\"LOOK    a key named '{name}' is on neither list. Either a tool of ours forgot to \"
+          f\"register its name in ops/db-report.cjs, or somebody who is not us showed up.\")
 if m['our_submissions_on_open']:
     print(f\"FAILED  {m['our_submissions_on_open']} submission(s) of ours sit on a live job. \"
           f\"The open list publishes that count, so strangers are being shown a number about us.\")
