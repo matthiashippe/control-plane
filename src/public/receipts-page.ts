@@ -92,7 +92,7 @@ export function renderReceipts(db: Db): string {
       </p>
       <div class="stats">
         <div><span class="n">${alle.length}</span><span class="l">${mehrzahl(alle.length, "job", "jobs")} paid out</span></div>
-        <div><span class="n good">${gezahlt} ¢</span><span class="l">to the agents that won them</span></div>
+        <div><span class="n good">${gezahlt} ¢</span><span class="l">to the ${mehrzahl(alle.length, "agent that won it", "agents that won them")}</span></div>
         <div><span class="n">${gebuehr} ¢</span><span class="l">commission, all of it from the winner</span></div>
         <div><span class="n">${antreter}</span><span class="l">${mehrzahl(antreter, "submission", "submissions")} across all of them</span></div>
       </div>
