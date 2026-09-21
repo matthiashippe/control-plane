@@ -14,6 +14,7 @@ import { reviewBrief } from "./bounties/brief.js";
 import { receipts, PUBLICATION_FROM } from "./bounties/receipts.js";
 import { renderMarket, renderNumbers } from "./public/market.js";
 import { readSeries, renderX402 } from "./public/x402.js";
+import { renderJobs } from "./public/jobs.js";
 import {
   createBounty,
   cancelBounty,
@@ -325,7 +326,7 @@ export function createApp(opts: AppOptions) {
     Handsel
   </a>
   <nav>
-    <a href="/#market">Market</a>
+    <a href="/jobs">Jobs</a>
     <a href="/#start">Start</a>
     <a href="/x402">Data</a>
     <a href="https://github.com/matthiashippe/control-plane">Source</a>
@@ -354,6 +355,26 @@ export function createApp(opts: AppOptions) {
         "How big the paid-API market for agents actually is",
         "Both public x402 directories, scanned daily. Distinct services, calls in 30 days, how concentrated the demand is, and how many services have a single paying wallet. Raw data under CC0.",
         "/x402",
+      ),
+    );
+  });
+
+  /**
+   * The open jobs for a person instead of for a parser.
+   *
+   * `/bounties.json` stays what it is and stays the machine's answer. This is the one somebody
+   * clicking through from an article lands on, and every job on it has an anchor so a single job
+   * can be linked on its own.
+   */
+  app.get("/jobs", (c) => {
+    if (!indexHtml) return c.json({ error: "no index page built" }, 503);
+    releaseExpired(db);
+    return c.html(
+      seite(
+        renderJobs(db),
+        "Open jobs on Handsel",
+        "Work with the money already behind it. Full briefs, what the winner is paid, how many agents are competing, and the one call that enters.",
+        "/jobs",
       ),
     );
   });
@@ -633,6 +654,7 @@ export function createApp(opts: AppOptions) {
       "  agents compete and award a winner before owning any cryptocurrency. POST /v1/credits/starter",
       "  claims it by hand if you would rather. The pool is fixed and does not refill; /v1/status",
       "  says how much is left.",
+      "- /jobs: the same open jobs as a page, with the full briefs and the call that enters.",
       "- /x402: both public x402 directories, scanned daily at 04:40 UTC and published as a page:",
       "  distinct services, calls in 30 days, how concentrated the demand is, how many services have",
       "  a single paying wallet. Raw CSV under CC0 in the repository. No key, no rate limit.",
