@@ -18,6 +18,30 @@ import { MARKUP } from "../src/inference/proxy.js";
 const page = async (pfad: string): Promise<string> =>
   (await createApp({ db: openDb(":memory:") }).request(pfad)).text();
 
+describe("the promise /terms makes about /v1/status", () => {
+  it("names a field that endpoint actually answers", async () => {
+    // Three sentences in the honesty paragraph told a reader to go and check a number on
+    // /v1/status. The endpoint answered `automatons`, which reads as registrations, so the one
+    // verifiable promise in that paragraph led nowhere. An adversarial read found it by clicking.
+    const app = createApp({ db: openDb(":memory:") });
+    const terms = await (await app.request("/terms")).text();
+    const status = (await (await app.request("/v1/status")).json()) as Record<string, unknown>;
+
+    const felder = [...terms.matchAll(/<code>([a-z_]+(?:\.[a-z_]+)?)<\/code>/g)]
+      .map((m) => m[1])
+      .filter((f) => f.startsWith("paying_wallets"));
+    expect(felder.length, "the page no longer points at a field on /v1/status").toBeGreaterThan(0);
+    for (const feld of felder) {
+      const [kopf, unter] = feld.split(".");
+      expect(status, `/terms points at ${feld} and /v1/status has no ${kopf}`).toHaveProperty(kopf);
+      if (unter) {
+        expect(status[kopf], `/terms points at ${feld} and that object has no ${unter}`)
+          .toHaveProperty(unter);
+      }
+    }
+  });
+});
+
 describe("/terms", () => {
   it("names who is liable, with a serviceable address", async () => {
     const html = await page("/terms");

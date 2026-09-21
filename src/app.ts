@@ -17,6 +17,7 @@ import { readSeries, renderX402 } from "./public/x402.js";
 import { readMoneySeries, readReceipts, renderConway } from "./public/conway.js";
 import { renderPost } from "./public/post.js";
 import { renderFix } from "./public/fix.js";
+import { ourAddresses } from "./bounties/ours.js";
 import { renderTerms } from "./public/terms.js";
 import { renderJobs } from "./public/jobs.js";
 import { renderReceipts } from "./public/receipts-page.js";
@@ -572,6 +573,26 @@ export function createApp(opts: AppOptions) {
     const active = (
       db.prepare("SELECT count(DISTINCT address) AS n FROM ledger WHERE kind = 'inference'").get() as { n: number }
     ).n;
+    // The same count, under the name three sentences on /terms promise a reader will find here.
+    //
+    // /terms says "/v1/status publishes the number of wallets that have actually paid, which is
+    // the one figure that separates a market from a demonstration", and twice more in that
+    // paragraph it calls it the number of paying wallets. This endpoint answered `automatons`,
+    // which reads as registrations, and an adversarial read of the site on 2026-09-21 went looking
+    // for the promised figure and found nothing. A verifiable promise that cannot be verified is
+    // worse than no promise, and it sits in the honesty paragraph.
+    //
+    // `not_ours` is the number the whole plan is measured against and the reason this is two
+    // fields rather than one. Every wallet that has paid so far except one is the operator's own
+    // tooling, and a reader who is told this separates a market from a demonstration has to be
+    // able to see which side of that line the service is on. Same treatment as /conway gives our
+    // own transfer into Conway: counted like anybody else's and marked, never hidden.
+    const unsereZahler = ourAddresses(
+      db,
+      (db.prepare("SELECT DISTINCT address FROM ledger WHERE kind = 'topup'").all() as { address: string }[])
+        .map((r) => r.address),
+    );
+
     return c.json({
       ok: true,
       version: VERSION,
@@ -581,6 +602,7 @@ export function createApp(opts: AppOptions) {
       topup_tiers_usd: opts.pay?.tiers ?? TOPUP_TIERS_USD,
       automatons,
       active,
+      paying_wallets: { total: automatons, not_ours: automatons - unsereZahler.size },
       // The free tier, in the open. An agent that reads only this endpoint has to be able to see
       // that it can start without owning USDC, and how much is left before it cannot.
       starter_credit_cents: mcToCents(GRANT_MC),
