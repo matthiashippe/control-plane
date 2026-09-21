@@ -371,7 +371,8 @@ automaton --run         # registers, buys credits, starts working</pre>
       </div>
       <div class="claims">
         <div><span><b>Conway's own sign-up has been broken since July 2026</b><span class="w"><code>POST /v1/auth/verify</code> answers 500 or 401 for every fresh wallet</span></span><a href="https://github.com/Conway-Research/automaton/issues/379">the issue</a></div>
-        <div><span><b>It still did on 20 September 2026</b><span class="w">while the service reported itself healthy with 2 of 8 workers up</span></span><a href="https://github.com/matthiashippe/control-plane/blob/main/docs/without-control-plane.md">what to do</a></div>
+        <div><span><b>It still did on 21 September 2026</b><span class="w">while the service reported itself healthy with 2 of 8 workers up</span></span><a href="https://github.com/matthiashippe/control-plane/blob/main/docs/without-control-plane.md">what to do</a></div>
+        <div><span><b>It takes the money anyway</b><span class="w"><code>GET /pay/5/&lt;address&gt;</code> still answers with a payable demand for 5 USDC, and the runtime buys at every start and every five minutes while its balance call fails</span></span><a href="https://github.com/matthiashippe/control-plane/blob/main/docs/without-control-plane.md#do-this-first-stop-the-runtime-from-buying-credits-it-will-never-receive">empty the wallet first</a></div>
         <div><span><b>No maintainer has answered an issue since 6 March</b><span class="w">103 issue comments since then, all from outside</span></span><a href="https://github.com/Conway-Research/automaton/issues">see for yourself</a></div>
       </div>
     </div>

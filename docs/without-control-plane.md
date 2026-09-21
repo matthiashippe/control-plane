@@ -7,6 +7,53 @@ longer provisions anyone. It costs nothing but effort. Both routes below were ru
 Every code reference points at the pinned upstream revision
 [`Conway-Research/automaton@d8f8168`](https://github.com/Conway-Research/automaton/tree/d8f8168).
 
+## Do this first: stop the runtime from buying credits it will never receive
+
+This section was added on 21 September 2026, and everything below it was written without it, which
+was a mistake. If you follow either route with USDC in the wallet and `conwayApiUrl` still pointing
+at `https://api.conway.tech`, the runtime keeps paying for credits that nobody will ever deliver.
+
+The payment path is independent of the provisioning path, and only one of the two is broken.
+Measured on 21 September 2026 at 11:08 UTC:
+
+```
+POST https://api.conway.tech/v1/auth/verify   -> 500 {"error":"Database error"}
+GET  https://api.conway.tech/pay/5/<address>  -> 402, a valid x402 demand for 5.000000 USDC
+                                                 payTo 0x21DD37E3E4eA6CCC0a5C98A4944702eDE6E7Be10
+```
+
+One failed balance call is handled three different ways in the runtime, and two of them spend
+money:
+
+| Where | On a failed balance call | What follows |
+| --- | --- | --- |
+| Agent loop (`src/agent/loop.ts:961-984`) | `creditsCents: -1` | tier `dead`, no inference, no spending |
+| Startup (`src/index.ts:349-350`) | `.catch(() => 0)` | below the 500 cent threshold, buys 5 USDC of credits, no cooldown |
+| Heartbeat (`src/heartbeat/tick-context.ts:51-56`) | leaves the value at `0` | `getSurvivalTier(0)` is `critical`, so the topup task fires every five minutes (`src/heartbeat/tasks.ts:160-176`) |
+
+Both spending paths require only that the wallet holds at least 5 USDC and that the `/pay` endpoint
+answers with a payable 402 (`src/conway/topup.ts:148-191`). Neither checks whether the credits ever
+arrived.
+
+Issue [#293](https://github.com/Conway-Research/automaton/issues/293) is what that looks like from
+the outside: 30 USDC in six payments of 5 within 75 minutes on 27 March 2026, no API key, no
+credits, no reply. The on-chain data shows the same pattern continuing after the sign-up broke: in
+the 30 days to 20 September 2026, 44 wallets sent 430.05 USDC in 104 transfers, about 2.4 payments
+per wallet.
+
+Two ways to stop it. Do one of them before the first start:
+
+- **Move the USDC out of the automaton's wallet.** With less than 5 USDC there is nothing to spend
+  (`src/conway/topup.ts:179-184`).
+- **Point `conwayApiUrl` at something that cannot answer**, for example `https://127.0.0.1:9`. Then
+  the `/pay` call fails to connect and nothing is signed. This is also what our own reproduction
+  below used.
+
+Route 2 does not protect you here. Neither spending path reads the cache: startup and heartbeat
+both call the live endpoint and fall back to `0` regardless of what `last_known_balance` holds. The
+cache is read on the thinking path (`src/agent/loop.ts:962`) and by the planner context
+(`src/orchestration/planner-context.ts:141-145`), and nowhere near the decision to buy.
+
 ## Why the agent does not think at all when it cannot reach a balance
 
 The API key itself is never checked. `loadApiKeyFromConfig` (`src/identity/provision.ts:25`) reads
