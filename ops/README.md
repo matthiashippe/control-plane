@@ -297,6 +297,20 @@ ran at 03:30 and the cron at 04:40.
 
 What it cannot check, and says so: whether today is a good day to post.
 
+## Naming the key a check provisions
+
+Anything of ours that provisions an API key names it **`ops-<what it checks>`**. That prefix is on
+`OUR_KEY_NAMES` in `ops/db-report.cjs`, so a new probe is classified by construction instead of by
+somebody remembering to edit a list in the same commit.
+
+This is the answer to doing the same thing wrong four times on 2026-09-21: four tools of ours
+arrived with a name nobody had registered, and each time a number about the market quietly became a
+number about us. The last one was a throwaway script that verified the example on `/post`, named
+`first-buyer-check` after what it did rather than after who ran it, and it put `foreign_buyers` on
+1. That is the number the whole plan hangs on.
+
+The names already in the database keep their old spellings, so the list keeps them too.
+
 ## When a key name nobody knows shows up
 
 `ops/db-report.cjs` keeps two lists, and `ops/check-all.sh` prints every key name that is on

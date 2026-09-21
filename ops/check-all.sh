@@ -62,7 +62,11 @@ echo
 # The one number the plan hangs on, printed last so it is the thing left on the screen.
 open=$(curl -s -m 10 "$BASE/bounties.json" | grep -o '"id"' | wc -l | tr -d ' ')
 echo "open jobs: ${open:-?}"
-if [[ -n "${OPENROUTER_API_KEY:-}" ]]; then
+# Not gated on OPENROUTER_API_KEY any more. That key buys the provider numbers and nothing else,
+# but it stood in front of the whole block, so on every cycle that did not export it the market
+# hygiene below was skipped in silence. On 2026-09-21 that was every cycle of the day, including
+# the one where a key of ours went unclassified and `foreign buyers` read 1.
+if true; then
   ./ops/status.sh 2>/dev/null | python3 -c "
 import json, sys
 try:
@@ -76,9 +80,18 @@ print(f\"foreign buyers: {m['foreign_buyers']}   foreign agents: {m['foreign_age
       f\"starter pool left: {m['starter_pool_left_mc']/1000:.0f} c \"
       f\"(of {m['starter_granted']} grants, {m['starter_granted_ours']} to us)\")
 print(f\"written off by the token estimate: {u/1000:.2f} c\")
-for name in m.get('unclassified_key_names', []):
-    print(f\"LOOK    a key named '{name}' is on neither list. Either a tool of ours forgot to \"
+unbekannt = m.get('unclassified_key_names', [])
+for name in unbekannt:
+    print(f\"FAILED  a key named '{name}' is on neither list. Either a tool of ours forgot to \"
           f\"register its name in ops/db-report.cjs, or somebody who is not us showed up.\")
+if unbekannt:
+    # Not a LOOK any more. While a name is unclassified, every number that splits us from the
+    # market is wrong by an unknown amount, and foreign_buyers is the number the whole plan hangs
+    # on. Four times in one day a tool of ours arrived without its name and a number about the
+    # market quietly became a number about us; each time the report said LOOK and the cycle
+    # carried on. Either it is ours and belongs on the list, or it is a stranger and is the best
+    # news this project has had, and both deserve more than a line somebody skims.
+    sys.exit(3)
 if m['our_submissions_on_open']:
     print(f\"FAILED  {m['our_submissions_on_open']} submission(s) of ours sit on a live job. \"
           f\"The open list publishes that count, so strangers are being shown a number about us.\")

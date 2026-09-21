@@ -87,13 +87,27 @@ const OUR_KEY_NAMES = [
   "mcp-production-check%", // mcp-against-production.ts
   "skill-production-check", "skill-check-buyer",
   "harness-%",            // provisionierung.ts, markt.ts
-  "mainnet-abnahme", "provisioned-key", "cleanup",
+  "provisioned-key", "cleanup",
   // ops/neuling-probe.ts. Added on 2026-09-21, an hour too late: the probe ran, its wallet was not
   // on this list, and `foreign agents` read 1 when the truth was 0. That is the one number the
   // whole plan hangs on, and it lied because a new tool of ours arrived without its name.
   // Anything that provisions a key from ops/ belongs here in the same commit that creates it.
   "cold-start-probe",
   "doc-check", "my-agent", // the two runs that proved docs/api-key.md works, one of them verbatim
+  // 2026-09-21, the fourth time in one day. A throwaway script verified that the example on /post
+  // works for a first-time buyer, and its key was named after what it did rather than after who
+  // ran it. `foreign_buyers` went from 0 to 1, which is THE number, and it was me.
+  "first-buyer-check",
+  // `harness/e2e/mainnet.ts` provisions "mainnet-acceptance". This list said "mainnet-abnahme",
+  // the German name the script carried before the language pass. Nobody had run the acceptance
+  // since, so the mismatch was still theoretical; the next run would have counted itself as a
+  // stranger. Both spellings stay, because an old key in the database keeps its old name forever.
+  "mainnet-abnahme", "mainnet-acceptance",
+  // The reserved prefix, and the answer to doing this a fifth time. Anything ours provisions from
+  // now on names its key `ops-<what it checks>`, and is classified by construction rather than by
+  // somebody remembering to edit this list. The names above stay because keys already exist under
+  // them.
+  "ops-%",
 ];
 
 // Names that are not ours to claim.
