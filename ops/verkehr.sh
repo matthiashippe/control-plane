@@ -74,7 +74,7 @@ echo "-- Foreign referrers, and what the visit became --"
 # clicking through from GitHub. That is the worst shape a measurement error can take, because the
 # section exists to answer exactly one question and the wrong answer was the one we were hoping
 # for. The number of dropped rows is printed, so the filter can never silently swallow everything.
-eigene=$(jq -r --argjson since "$since" --argjson own "$own_json" \
+ours=$(jq -r --argjson since "$since" --argjson own "$own_json" \
   "select(.ts > \$since) | select(.request.remote_ip as \$ip | (\$own | index(\$ip)) != null) | ((.request.headers.Referer // [\"-\"])[0])" "$log" \
   | grep -v '^-$' | grep -vc 'cp\.hippe\.eu' || true)
 jq -r --argjson since "$since" --argjson own "$own_json" \
@@ -105,8 +105,8 @@ for ref, ips in sorted(vonher.items(), key=lambda kv: -len(kv[1])):
         pfadkette = " -> ".join(reihe[:6])
         print("    %-16s %s%s" % (ip, pfadkette, marke))
 ' || echo "  none"
-if [[ "${eigene:-0}" -gt 0 ]]; then
-  echo "  ($eigene row(s) with a foreign referrer came from our own addresses and are not counted)"
+if [[ "${ours:-0}" -gt 0 ]]; then
+  echo "  ($ours row(s) with a foreign referrer came from our own addresses and are not counted)"
 fi
 
 echo
