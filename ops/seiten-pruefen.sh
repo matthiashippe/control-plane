@@ -17,7 +17,7 @@ fehler=0
 ok()   { echo "ok      $1"; }
 bad()  { fehler=$((fehler+1)); echo "FAILED  $1"; [[ -n "${2:-}" ]] && echo "        $2"; }
 
-for pfad in / /jobs /receipts /x402 /conway; do
+for pfad in / /post /jobs /receipts /x402 /conway; do
   antwort=$(curl -s -m 15 -w '\n%{http_code}\n%{content_type}' "$BASE$pfad" 2>/dev/null)
   code=$(printf '%s' "$antwort" | tail -2 | head -1)
   typ=$(printf '%s' "$antwort" | tail -1)

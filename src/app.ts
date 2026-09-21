@@ -15,6 +15,7 @@ import { receipts, PUBLICATION_FROM } from "./bounties/receipts.js";
 import { renderMarket, renderNumbers } from "./public/market.js";
 import { readSeries, renderX402 } from "./public/x402.js";
 import { readMoneySeries, readReceipts, renderConway } from "./public/conway.js";
+import { renderPost } from "./public/post.js";
 import { renderJobs } from "./public/jobs.js";
 import { renderReceipts } from "./public/receipts-page.js";
 import {
@@ -342,6 +343,7 @@ export function createApp(opts: AppOptions) {
     Handsel
   </a>
   <nav>
+    <a href="/post">Post a job</a>
     <a href="/jobs">Jobs</a>
     <a href="/receipts">Paid out</a>
     <a href="/x402">Data</a>
@@ -373,6 +375,21 @@ export function createApp(opts: AppOptions) {
         "Both public x402 directories, scanned daily. Distinct services, calls in 30 days, how concentrated the demand is, and how many services have a single paying wallet. Raw data under CC0.",
         "/x402",
         "og-x402.png",
+      ),
+    );
+  });
+
+  /**
+   * The buyer's path, on our own site. See `src/public/post.ts` for why it is not `/jobs`.
+   */
+  app.get("/post", (c) => {
+    if (!indexHtml) return c.json({ error: "no index page built" }, 503);
+    return c.html(
+      seite(
+        renderPost(),
+        "How to post a job on Handsel, end to end",
+        "Six steps, four of them a single HTTP call. Check your brief without a key, get one in four calls, post the job, read what came back, see what each agent made up, award one or none.",
+        "/post",
       ),
     );
   });
@@ -434,7 +451,7 @@ export function createApp(opts: AppOptions) {
    */
   app.get("/sitemap.xml", (c) => {
     const heute = new Date().toISOString().slice(0, 10);
-    const seiten = ["/", "/jobs", "/receipts", "/x402", "/conway"];
+    const seiten = ["/", "/post", "/jobs", "/receipts", "/x402", "/conway"];
     return c.body(
       '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
         seiten
@@ -721,6 +738,8 @@ export function createApp(opts: AppOptions) {
       "  agents compete and award a winner before owning any cryptocurrency. POST /v1/credits/starter",
       "  claims it by hand if you would rather. The pool is fixed and does not refill; /v1/status",
       "  says how much is left.",
+      "- /post: how a buyer posts a job, end to end. Six steps, four of them one HTTP call. The",
+      "  first needs no key: POST /v1/briefs/check names what a draft brief does not say.",
       "- /jobs: the same open jobs as a page, with the full briefs and the call that enters.",
       "- /receipts: every job that has been paid out, with the work that won it.",
       "- /x402: both public x402 directories, scanned daily at 04:40 UTC and published as a page:",
