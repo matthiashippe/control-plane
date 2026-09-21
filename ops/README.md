@@ -278,6 +278,24 @@ twenty-five. Whoever wants to move the number has to pay, and that is the whole 
 measurement. Our own automaton is included in the number, so subtract one for the actual figure.
 `db.keys` counts issued API keys, `db.day.topups` the payments of the last day.
 
+## Daily watch on the repository this project answers
+
+`ops/conway-zeitreihe.sh`, daily at 4:50 UTC by cron, into `/opt/control-plane/conway/repo.ndjson`,
+one line per day.
+
+The article and the twelve issue answers rest on claims about the present tense of
+Conway-Research/automaton: onboarding broken since July, the last commit touching only the README,
+no maintainer answering an issue since March, PR #370 still open. Each of those stops being true
+the moment somebody with write access comes back, and until 2026-09-21 nobody would have noticed.
+They were checked by hand that day, for the first time since they were written down, and by hand
+is not a process.
+
+It prints what moved since the previous point and nothing else, because a series nobody reads is a
+file. The fields it watches are the ones that would change the plan rather than a number in it: a
+maintainer comment, a merge of #370, a new onboarding issue, an archive flag.
+
+Five unauthenticated GitHub calls a day, against a limit of sixty an hour.
+
 ## Time series of the x402 directories
 
 `ops/x402-zeitreihe.sh`, daily at 4:40 UTC by cron. Scans both public x402 directories (Coinbase and
