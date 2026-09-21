@@ -297,6 +297,21 @@ ran at 03:30 and the cron at 04:40.
 
 What it cannot check, and says so: whether today is a good day to post.
 
+## The two production probes run themselves once a day
+
+`ops/mcp-against-production.ts` and `ops/skill-against-production.sh` walk the whole supply side
+against the live service: an MCP host taking the six tools, and a Conway runtime taking the skill
+file. Until 2026-09-21 they ran only behind `ops/check-all.sh --deep`, and no cycle ever passed the
+flag, so the entire supply side went unverified for days at a time.
+
+They now run from `check-all.sh` whenever their last clean run is more than a day old. The stamps
+are in `.scratch/probes/`, written only on success, so a failed probe stays due. `--deep` forces a
+run, `CP_PROBE_MAX_AGE` moves the window, and `CP_PROBE_STAMPS` moves the directory, which is also
+how both directions were checked.
+
+Neither probe claims a starter grant any more, so a daily run costs nothing but the minute it
+takes. They stay local: both need the operator wallet, and that key does not go on the VM.
+
 ## Naming the key a check provisions
 
 Anything of ours that provisions an API key names it **`ops-<what it checks>`**. That prefix is on

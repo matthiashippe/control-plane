@@ -18,6 +18,28 @@ cd "$(dirname "$0")/.."
 BASE="${CP_URL:-https://cp.hippe.eu}"
 DEEP=0
 [[ "${1:-}" == "--deep" ]] && DEEP=1
+
+# The two production probes below walk the whole supply side: an MCP host takes the six tools and
+# a Conway runtime takes the skill file, both against the live service, both end to end. Until
+# 2026-09-21 they ran only when somebody passed --deep, and no cycle ever did. A check that needs
+# to be remembered is a check that does not run: exactly what had just been fixed one level up,
+# where the market hygiene block sat behind an environment variable nobody exported.
+#
+# They cost nothing any more (neither claims a starter grant), so the only reason left to skip them
+# is the minute they take. That is worth paying once a day, not once per cycle, so they run
+# whenever the last successful run is more than a day old. `--deep` still forces one.
+STAMPS="${CP_PROBE_STAMPS:-.scratch/probes}"
+mkdir -p "$STAMPS"
+faellig() {
+  local stamp="$STAMPS/$1"
+  [[ ! -f "$stamp" ]] && return 0
+  local alter=$(( $(date -u +%s) - $(date -u -r "$stamp" +%s 2>/dev/null || echo 0) ))
+  (( alter > ${CP_PROBE_MAX_AGE:-86400} ))
+}
+if faellig mcp-production || faellig skill-production; then
+  DEEP=1
+  echo "(the production probes are due: their last clean run is more than a day old)"
+fi
 declare -a PASSED=() FAILED=()
 
 run() {
@@ -33,6 +55,11 @@ run() {
     printf '  FAIL  %-34s exit %s\n' "$name" "$code"
     printf '%s\n' "$out" | tail -4 | sed 's/^/        /'
   fi
+  # The caller's exit code, not the printf's. Without this line `run ... && touch stamp` stamps a
+  # failed probe as a clean run, because an if/else ends with whatever its last branch returned and
+  # that is always a successful printf. The script sets no -e, so returning non-zero here aborts
+  # nothing; it only makes the status readable.
+  return $code
 }
 
 echo "Handsel, all checks against $BASE"
@@ -54,8 +81,10 @@ run "pages say nothing obviously wrong" ./ops/seiten-pruefen.sh
 run "the daily jobs still ran" ./ops/freshness.sh
 
 if (( DEEP )); then
-  run "MCP route end to end" env CP_URL="$BASE" OPERATOR_WALLET="${OPERATOR_WALLET:-harness/state/mainnet-wallet.json}" pnpm -s tsx ops/mcp-against-production.ts
-  run "skill route end to end" env CP_URL="$BASE" OPERATOR_WALLET="${OPERATOR_WALLET:-harness/state/mainnet-wallet.json}" ./ops/skill-against-production.sh
+  run "MCP route end to end" env CP_URL="$BASE" OPERATOR_WALLET="${OPERATOR_WALLET:-harness/state/mainnet-wallet.json}" pnpm -s tsx ops/mcp-against-production.ts \
+    && touch "$STAMPS/mcp-production"
+  run "skill route end to end" env CP_URL="$BASE" OPERATOR_WALLET="${OPERATOR_WALLET:-harness/state/mainnet-wallet.json}" ./ops/skill-against-production.sh \
+    && touch "$STAMPS/skill-production"
 fi
 
 echo
