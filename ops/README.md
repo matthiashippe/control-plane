@@ -534,6 +534,24 @@ Verified end to end on 2026-09-21 rather than assumed: a request carrying
 intact and, after two more requests, with the path it took. The instrument the whole GTM
 measurement hangs on had never been tested with a real referrer.
 
+## How many newcomers can still start
+
+`ops/check-all.sh` fails when the starter pool carries fewer than three.
+
+`/fix`, the landing page and `/post` all tell a fresh wallet it gets 15 cents of starter credit.
+That is not a statement about the code, it is a statement about a fixed pot of 500 cents that does
+not refill. On 2026-09-21 the pot was 45 per cent gone and every single grant had been taken by us:
+three seed agents and a cold-start probe in one day. The report printed `starter_pool_left_mc` and
+nothing noticed, because a sum of millicents does not read as "four more people can start".
+
+So the number is now in the unit the promise is made in, and three is where it fails rather than
+zero: at three, one probe run can empty it before a stranger arrives, and from that moment every
+page saying "15 cents" is lying to the next newcomer. The two ways out are in the failure message,
+and one of them is Matthias' money, so this is a decision and not a repair.
+
+Deliberately not a rate. Consumption comes in bursts, a probe run or a wave of seed agents, and a
+per-day figure derived from that would be a trend nobody measured.
+
 ## Did the deploy cost a stranger an answer
 
 `ops/deploy-window.sh [tail seconds]`, after every rollout. `loop-constraints.md` has required this

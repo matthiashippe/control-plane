@@ -10,6 +10,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { openDb, postLedger, MC_PER_CENT } from "../src/db.js";
+import { claimStarter, GRANT_MC, POOL_MC } from "../src/credits/starter.js";
 
 const OPERATOR = "0xd24f37d0838e62621ed24111164485ded0f0924f";
 const FIRST_AGENT = "0xf6204b0662082d65d78eab79936a4d91744dee6b";
@@ -126,6 +127,28 @@ describe("The market numbers in the database report", () => {
       submit(db, "s-1", "ours-1", "0x2222222222222222222222222222222222222222");
     });
     expect(closed.market.stray_submissions_on_open, "only a live job shows the number to anybody").toBe(0);
+  });
+
+  it("says how many newcomers the starter pool still carries, in the unit the promise uses", () => {
+    // `/fix`, the landing page and `/post` all tell a fresh wallet it gets 15 cents. That is not a
+    // statement about the code, it is a statement about a fixed pot, and on 2026-09-21 the pot was
+    // 45 per cent gone with every grant taken by us. The report printed a sum of millicents, and a
+    // sum does not read as "four more people can start".
+    const leer = withDb(() => {});
+    expect(leer.market.starter_grants_left, "an untouched pool carries POOL_MC / GRANT_MC").toBe(
+      Math.floor(POOL_MC / GRANT_MC),
+    );
+
+    const nach = withDb((db) => {
+      claimStarter(db, "0x4444444444444444444444444444444444444444");
+      claimStarter(db, "0x5555555555555555555555555555555555555555");
+    });
+    expect(nach.market.starter_grants_left, "two grants are two newcomers fewer").toBe(
+      Math.floor(POOL_MC / GRANT_MC) - 2,
+    );
+    // The counter-check: a number derived from the wrong side would move the other way, or not at
+    // all, and this is the number a check fails on.
+    expect(nach.market.starter_grants_left).toBeLessThan(leer.market.starter_grants_left);
   });
 
   it("counts a stranger the moment one posts, which is the whole point", () => {

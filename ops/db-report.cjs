@@ -156,6 +156,19 @@ report.market = {
   // the numbers below, because the useful reading is not "the pool is shrinking" but "who by".
   starter_granted_ours: one(`select count(*) n from ledger where kind='grant' and ${oursClause}`, ...OURS_ARGS).n,
   starter_pool_left_mc: 500000 - one("select coalesce(sum(delta_mc),0) s from ledger where kind='grant'").s,
+
+  // How many newcomers the giveaway still carries.
+  //
+  // `/fix`, the landing page and `/post` all promise a fresh wallet 15 cents of starter credit.
+  // That promise is not a statement about the code, it is a statement about a fixed pot, and on
+  // 2026-09-21 the pot was 45 per cent gone with every single grant having been taken by us: four
+  // in one day, three seed agents and one cold-start probe. Nothing warned, because the report
+  // printed a sum of millicents and a sum does not read as "four more people can start".
+  //
+  // So the number is the one the pages depend on, in the unit the promise is made in. It is not a
+  // rate and not a forecast: consumption here comes in bursts, a probe run or a wave of seed
+  // agents, and a per-day figure derived from that would be a made-up trend.
+  starter_grants_left: Math.floor((500000 - one("select coalesce(sum(delta_mc),0) s from ledger where kind='grant'").s) / 15000),
   // THE number. Anything above zero means this stopped being our own demonstration.
   foreign_buyers: one(
     `select count(distinct address) n from ledger where kind='bounty_hold' and ${notOurs}`,

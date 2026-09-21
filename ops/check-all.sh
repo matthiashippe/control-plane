@@ -122,6 +122,15 @@ if unbekannt:
     # carried on. Either it is ours and belongs on the list, or it is a stranger and is the best
     # news this project has had, and both deserve more than a line somebody skims.
     sys.exit(3)
+uebrig = m.get('starter_grants_left', 0)
+print(f\"newcomers the starter pool still carries: {uebrig}\")
+if uebrig < 3:
+    print(f\"FAILED  the starter pool carries {uebrig} more newcomer(s). /fix, the landing page \"
+          f\"and /post all promise a fresh wallet 15 cents, and that promise is about this pot. \"
+          f\"Three is the last point at which one probe run cannot empty it before a stranger \"
+          f\"arrives. Raise POOL_MC in src/credits/starter.ts, which is Matthias' money, or stop \"
+          f\"spending it on ourselves.\")
+    sys.exit(3)
 seed = m.get('seed_submissions_on_open', 0)
 if seed:
     print(f\"seeded: {seed} submission(s) on live jobs come from our own agents (ops/compete.ts). \"
