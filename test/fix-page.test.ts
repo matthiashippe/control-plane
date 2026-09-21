@@ -50,6 +50,18 @@ describe("/fix", () => {
     expect(html).toContain(`${mcToCents(GRANT_MC)} cents of starter credit`);
   });
 
+  it("is reachable from the landing page, or nobody without the URL can get to it", async () => {
+    // Until Matthias releases the issue answers, the only other way in is a link on the page the
+    // traffic already lands on. Two rebuilds of that page in one day have already left /llms.txt
+    // and og.png behind, so the link is pinned by the rule and not by its wording: somewhere in
+    // the section written for a stranded automaton, something points here.
+    const html = await page("/");
+    const abschnitt = html.indexOf('id="agents"');
+    expect(abschnitt, "the section for a stranded automaton is gone").toBeGreaterThan(-1);
+    expect(html.slice(abschnitt, abschnitt + 1200), "nothing in that section links to /fix")
+      .toContain('href="/fix"');
+  });
+
   it("is in the sitemap and in llms.txt, because neither is maintained by hand", async () => {
     expect(await page("/sitemap.xml")).toContain("https://cp.hippe.eu/fix");
     expect(await page("/llms.txt")).toContain("/fix:");
