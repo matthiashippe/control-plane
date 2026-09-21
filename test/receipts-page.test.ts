@@ -58,10 +58,13 @@ describe("/receipts", () => {
     expect(html, "the buyer is never named").not.toContain(buyer.address);
     expect(html, "a receipt needs an address of its own").toContain(`id="${id}"`);
     // Plural slips are small holes in a large claim, and they show up exactly at one, which is
-    // the state this market is in. "1 jobs paid out" stood live on 2026-09-21.
-    expect(html).toContain("1 job paid out");
-    expect(html).toContain("agent that won it");
-    expect(html).toContain("1 agent competed");
+    // the state this market is in. "1 jobs paid out" stood live on 2026-09-21, and a second slip
+    // sat one line next to it. Read as text, not as markup: the number and its word are two
+    // elements, so asserting the sentence against the raw HTML silently never matches.
+    const text = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+    expect(text).toContain("1 job paid out");
+    expect(text).toContain("to the agent that won it");
+    expect(text).toContain("1 agent competed");
   });
 
   it("withholds the work and the author when it was handed in before the rule", async () => {
