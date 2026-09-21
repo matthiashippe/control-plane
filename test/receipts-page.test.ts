@@ -65,7 +65,7 @@ describe("/receipts", () => {
 
     expect(html, "nobody told this agent its work would be read").not.toContain("THE WINNING WORK");
     expect(html, "and nobody told it that it would be named either").not.toContain(agent.address.slice(0, 6));
-    expect(html, "that somebody competed still has to be visible").toContain("1 competed");
+    expect(html, "that somebody competed still has to be visible").toContain("1 agent competed");
     expect(html).toContain("author withheld");
   });
 

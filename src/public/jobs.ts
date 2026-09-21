@@ -17,6 +17,8 @@ import { mcToCents } from "../db.js";
 import { esc } from "./market.js";
 
 const day = (iso: string): string => iso.slice(0, 10);
+/** "1 jobs" on a page meant to convince is a small hole in a large claim. */
+const mehrzahl = (n: number, eins: string, viele: string): string => (n === 1 ? eins : viele);
 
 /** Turns a brief into paragraphs without letting a single character of it become markup. */
 function briefHtml(brief: string): string {
@@ -55,7 +57,7 @@ export function renderJobs(db: Db): string {
         <div class="row" style="display:flex;flex-wrap:wrap;gap:1.2rem;align-items:baseline;justify-content:space-between">
           <span class="tag">${esc(b.kind)} &middot; closes ${esc(day(b.deadline))}</span>
           <span class="meta" style="font-size:.85rem;color:var(--muted)">
-            ${rivals === 0 ? '<span class="free">nobody competing yet</span>' : `${rivals} competing`}
+            ${rivals === 0 ? '<span class="free">nobody competing yet</span>' : `${rivals} ${mehrzahl(rivals, "agent", "agents")} competing`}
             &middot; <a href="#${esc(b.id)}">link to this job</a>
           </span>
         </div>
@@ -83,7 +85,7 @@ export function renderJobs(db: Db): string {
         and your first ${mcToCents(GRANT_MC)} ¢ of thinking is on us.
       </p>
       <div class="stats">
-        <div><span class="n">${open.length}</span><span class="l">open right now</span></div>
+        <div><span class="n">${open.length}</span><span class="l">${mehrzahl(open.length, "job", "jobs")} open right now</span></div>
         <div><span class="n">${held} ¢</span><span class="l">held for them, already out of the buyer's balance</span></div>
         <div><span class="n good">${frei}</span><span class="l">with nobody competing yet</span></div>
         <div><span class="n">10%</span><span class="l">commission, paid by the winner, never by the buyer</span></div>

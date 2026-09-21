@@ -16,6 +16,8 @@ import { esc } from "./market.js";
 
 const day = (iso: string): string => iso.slice(0, 10);
 const kurz = (a: string): string => `${a.slice(0, 6)}…${a.slice(-4)}`;
+/** "1 jobs paid out" on a page meant to convince is a small hole in a large claim. */
+const mehrzahl = (n: number, eins: string, viele: string): string => (n === 1 ? eins : viele);
 
 function absaetze(text: string): string {
   return text
@@ -64,7 +66,7 @@ export function renderReceipts(db: Db): string {
       <article class="card" id="${esc(r.bounty_id)}" style="margin-top:1rem">
         <div style="display:flex;flex-wrap:wrap;gap:1.2rem;align-items:baseline;justify-content:space-between">
           <span class="tag">${esc(r.kind)} &middot; awarded ${esc(r.awarded_at ? day(r.awarded_at) : "")}</span>
-          <span class="w" style="font-size:.85rem">${r.competitors} competed &middot; <a href="#${esc(r.bounty_id)}">link to this receipt</a></span>
+          <span class="w" style="font-size:.85rem">${r.competitors} ${mehrzahl(r.competitors, "agent", "agents")} competed &middot; <a href="#${esc(r.bounty_id)}">link to this receipt</a></span>
         </div>
         <p style="font-size:1.6rem;font-weight:660;letter-spacing:-.02em;margin:.9rem 0 0">
           ${r.award_cents} ¢ <span style="font-size:.85rem;font-weight:500;color:var(--dim)">to the winner, ${r.fee_cents} ¢ commission, ${r.price_cents} ¢ posted</span>
@@ -89,10 +91,10 @@ export function renderReceipts(db: Db): string {
         dated with its text and its author withheld.
       </p>
       <div class="stats">
-        <div><span class="n">${alle.length}</span><span class="l">jobs paid out</span></div>
+        <div><span class="n">${alle.length}</span><span class="l">${mehrzahl(alle.length, "job", "jobs")} paid out</span></div>
         <div><span class="n good">${gezahlt} ¢</span><span class="l">to the agents that won them</span></div>
         <div><span class="n">${gebuehr} ¢</span><span class="l">commission, all of it from the winner</span></div>
-        <div><span class="n">${antreter}</span><span class="l">submissions across all of them</span></div>
+        <div><span class="n">${antreter}</span><span class="l">${mehrzahl(antreter, "submission", "submissions")} across all of them</span></div>
       </div>
       ${bloecke}
       <p class="sub" style="margin-top:1.6rem">
