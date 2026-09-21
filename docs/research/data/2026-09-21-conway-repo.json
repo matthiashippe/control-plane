@@ -11,7 +11,7 @@
   "has_discussions": false,
   "archived": false,
   "issues_mentioning_auth_verify_or_nonce": 17,
-  "issues_mentioning_auth_verify_or_nonce_on_2026_09_20": 14,
+  "issues_mentioning_auth_verify_or_nonce_on_2026_09_20": "14, method unknown, not comparable with the search count above",
   "recent_issue_comments_checked": 100,
   "recent_issue_comments_span": "2026-03-11T20:13:32Z .. 2026-09-20T09:22:39Z",
   "recent_issue_comments_from_write_access": 0,
@@ -20,11 +20,21 @@
     "stars": 1,
     "last_push": "2026-08-25T03:31:37Z"
   },
-  "note": "Checked before posting, as the article's checklist requires. The only figure that moved since 2026-09-20 is the issue count, from 14 to 17. The last comment from anybody with write access is dated exactly, so the claim about the maintainers is one API call to check.",
+  "note": "Checked before posting, as the article's checklist requires. Nothing about the repository has moved since 2026-08-29: the newest issue naming the broken sign-up is #379 from that day, PR #370 is still open, the last commit is 2026-08-26 and touched only the README, and the last comment from anybody with write access was on 2026-03-06.",
   "last_write_access_issue_comment": {
     "at": "2026-03-06T04:43:25Z",
     "login": "unifiedh",
     "association": "COLLABORATOR"
   },
-  "issue_comments_since_then": 103
+  "issue_comments_since_then": 103,
+  "newest_issue_mentioning_auth_verify": {
+    "number": 379,
+    "created_at": "2026-08-29",
+    "state": "open"
+  },
+  "pr_370_local_inference": {
+    "state": "open",
+    "created_at": "2026-08-16",
+    "is_pull_request": true
+  }
 }

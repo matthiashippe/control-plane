@@ -57,8 +57,11 @@ The environment variable `OLLAMA_BASE_URL` works too and takes precedence over t
 
 **The trap everyone falls into:** there are two fields named `inferenceModel`. The top-level one is
 not the one the router reads. The router takes `modelStrategy` (`src/inference/router.ts:211-216`),
-and the setup wizard keeps writing `gpt-5.2` and `gpt-5-mini` in there even when the top-level
-field already names your local model. We measured exactly this case: Ollama was reachable, the
+and those keep their defaults `gpt-5.2` and `gpt-5-mini` unless you change them, so naming your
+local model in the top-level field alone does nothing. Checked against the source at the pinned
+revision on 2026-09-21: the wizard's own Model Strategy step does copy the top-level value down
+(`src/setup/configure.ts:239`), so the trap is not the wizard rewriting your work, it is that a
+hand-edited `automaton.json` leaves the nested block untouched. We measured exactly this case: Ollama was reachable, the
 model was registered (`Ollama: registered 1 model(s)`), and the runtime still went through every
 turn at `tier: dead, model: gpt-5-mini` with 0 tokens. Only after `modelStrategy.inferenceModel`
 pointed at the local model did the log read `Routing inference (tier: dead, model: <local model>)`
