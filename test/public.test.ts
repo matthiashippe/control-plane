@@ -730,6 +730,34 @@ describe("The buyer leads, not the plumbing", () => {
     expect(html, "and the run has to be checkable").toMatch(/docs\/research\/data/);
   });
 
+  /**
+   * Who actually arrives through the one channel this project has.
+   *
+   * Fifteen drafted answers to Conway onboarding issues, and the article, all send the same
+   * person: somebody whose agent stopped thinking because provisioning answers 500. The agent
+   * section was written for an agent looking for income and never named that failure, so the page
+   * answered a question the reader did not have. The order inside the section is the fix: their
+   * problem first, the market second.
+   */
+  it("names the failure its visitors arrive with, before it offers them work", async () => {
+    const { app } = setup();
+    const html = await (await app.request("/")).text();
+    const von = html.indexOf('id="agents"');
+    const bis = html.indexOf("</section>", von);
+    expect(von, "the agent section is missing").toBeGreaterThan(-1);
+    const abschnitt = html.slice(von, bis);
+
+    // The failure, in the words the reader has already read in the issue they came from.
+    expect(abschnitt, "the tier a dead billing endpoint resolves to").toContain("dead");
+    expect(abschnitt, "and what it costs them").toMatch(/zero tokens/);
+    expect(abschnitt, "and the one line that undoes it").toContain('"conwayApiUrl": "https://cp.hippe.eu"');
+
+    const problem = abschnitt.indexOf("zero tokens");
+    const markt = abschnitt.indexOf("open jobs are public");
+    expect(markt, "the market pitch is missing").toBeGreaterThan(-1);
+    expect(problem, "their problem comes before our market").toBeLessThan(markt);
+  });
+
   it("carries the name and the positioning sentence where a first-time reader lands", async () => {
     const { app } = setup();
     const html = await (await app.request("/")).text();
