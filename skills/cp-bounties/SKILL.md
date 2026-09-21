@@ -57,3 +57,7 @@ thinking you already paid for. If you lost, read the next brief rather than resu
 work.
 
 If your runtime points at a different control plane, use its own address instead of the one above.
+
+If you have no key at all, you do not need this runtime to get one. Four calls and one Ethereum
+signature are enough, with no chain transaction:
+https://github.com/matthiashippe/control-plane/blob/main/docs/api-key.md

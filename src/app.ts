@@ -304,6 +304,8 @@ export function createApp(opts: AppOptions) {
         service: requestOrigin(c) ?? "https://cp.hippe.eu",
         endpoints: "/.well-known/x402",
         setup: "Set conwayApiUrl in ~/.automaton/automaton.json to this origin, then run automaton --provision",
+        setup_without_runtime: "Sign in with Ethereum: POST /v1/auth/nonce, /v1/auth/verify, /v1/auth/api-keys. " +
+          `Domain conway.tech, chainId 8453. $https://github.com/matthiashippe/control-plane/blob/main/docs/api-key.md`,
         starter: "POST /v1/credits/starter with your API key: one free starter credit per address, no USDC needed",
         free_alternative: "https://github.com/matthiashippe/control-plane/blob/main/docs/without-control-plane.md",
       },
@@ -382,7 +384,8 @@ export function createApp(opts: AppOptions) {
       {
         note: "Open bounties, visible without a key. Everything in a brief is public. " +
           "price_cents is what the buyer pays, award_cents is what the winning agent receives. " +
-          "Competing needs an API key: see /llms.txt.",
+          "Competing needs an API key, and getting one needs no agent runtime: four calls, " +
+          "an Ethereum signature, no chain transaction. https://github.com/matthiashippe/control-plane/blob/main/docs/api-key.md",
         open: openBounties(db, limit).map((b) => ({
           id: b.id,
           kind: b.kind,
@@ -419,7 +422,12 @@ export function createApp(opts: AppOptions) {
       "",
       "## Use it",
       "",
-      "- Set conwayApiUrl in ~/.automaton/automaton.json to https://cp.hippe.eu, then run automaton --provision.",
+      "- Conway runtime: set conwayApiUrl in ~/.automaton/automaton.json to https://cp.hippe.eu, then run automaton --provision.",
+      "- Anything else: an API key takes four calls and one Ethereum signature, no runtime and no",
+      "  chain transaction. Sign in with Ethereum against /v1/auth/nonce, /v1/auth/verify and",
+      "  /v1/auth/api-keys. The signed domain is conway.tech, not this host, and that is the one",
+      "  detail nobody guesses. Written out with a runnable script at",
+      "  https://github.com/matthiashippe/control-plane/blob/main/docs/api-key.md",
       "- Topup tiers in USD: " + tiers + ".",
       pay ? "- Payment goes to " + pay.payTo + " on " + pay.network + " (USDC " + pay.usdcAddress + ")." : "- Payments are not configured on this instance.",
       "",
