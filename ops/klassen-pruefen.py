@@ -24,6 +24,14 @@ Rules whose selector carries an `#id` are therefore not counted: an id belongs t
 page and cannot be what makes a class work wherever it is used. That much is exact. The rest is not
 checkable without a CSS engine, so nothing here replaces looking at the page.
 
+The same day, `pre` and inline `code` lost their panel and their chip on the sub-pages for the same
+reason, and an element check was written here to catch it. It was removed again within the hour:
+`code, pre, .mono { font-family: var(--mono) }` survived the rewrite, so the elements were still
+mentioned in a rule and the check passed against the broken page. Telling "mentioned" from "styled"
+means knowing which properties matter for which element, which is taste, and a check that cannot
+fail is worse than no check because it reads as coverage. What is left is the class check, which
+does fail when it should, and the habit of opening the page.
+
     ops/klassen-pruefen.py [base-url]
 
 Exit 0 all classes defined, 1 something renders unstyled, 2 a page could not be fetched.
@@ -34,6 +42,7 @@ import urllib.error
 import urllib.request
 
 SEITEN = ["/", "/post", "/terms", "/jobs", "/receipts", "/x402", "/conway"]
+
 
 
 def hole(url: str) -> str:
@@ -71,6 +80,7 @@ def main() -> int:
         for attr in re.findall(r'class="([^"]*)"', ohne_svg):
             benutzt.update(k for k in attr.split() if k)
         offen = sorted(benutzt - definiert)
+
         if offen:
             print(f"FAILED  {pfad}: {len(offen)} class(es) with no rule: {', '.join(offen[:8])}")
             fehler += 1

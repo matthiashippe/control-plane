@@ -321,6 +321,13 @@ as ordinary body text. Rules whose selector carries an `#id` no longer count as 
 closes the second case exactly; the first is not checkable without a CSS engine. Nothing here
 replaces looking at the page.
 
+The same day, `pre` and inline `code` lost their panel and their chip on the sub-pages for the same
+reason, and an element check was added here to catch it. It was removed again within the hour:
+`code, pre, .mono { font-family: var(--mono) }` survived the rewrite, so those elements were still
+mentioned in a rule and the check passed against the broken page. Telling "mentioned" from "styled"
+means knowing which properties matter for which element, which is taste, and a check that cannot
+fail is worse than no check because it reads as coverage.
+
 **Classes inside an `<svg>` are cut out before the comparison.** In there a class is as often a
 name as a hook: `n0`, `a1`, `wires` and `marks` say which box is which and are never meant to be
 styled, while the rules that do style the diagram reach in from outside (`.flow .w1`). Counting
