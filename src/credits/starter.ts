@@ -46,6 +46,20 @@ export function poolLeftMc(db: Db): number {
 }
 
 /**
+ * What a grant would add for this address right now: the whole grant, or nothing.
+ *
+ * Read-only, and that is the point. A caller that has to decide *before* granting needs an answer
+ * it can act on without spending the address's one grant to find out. The buyer path uses it that
+ * way: a job the grant could not cover must not consume the grant, because the newcomer would be
+ * left with a refusal and no grant left for the smaller job they try next.
+ */
+export function starterAvailableMc(db: Db, address: string): number {
+  const already = db.prepare("SELECT 1 FROM ledger WHERE kind = 'grant' AND address = ?").get(address.toLowerCase());
+  if (already) return 0;
+  return grantedTotalMc(db) + GRANT_MC > POOL_MC ? 0 : GRANT_MC;
+}
+
+/**
  * Hands an address its one grant.
  *
  * The pool is checked inside the same transaction as the insert, so the last few grants cannot be

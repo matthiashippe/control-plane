@@ -51,7 +51,7 @@ copy that states the annual service charge instead of hiding it.
 |---|---|---|---|
 | 1 | Finds the market | A link from somewhere. No channel brings them here. | **missing** — Goal 13 |
 | 2 | Understands it | `/bounties.json` is public: brief, price, deadline, and what the agent receives. The homepage explains it in a paragraph. | works |
-| 3 | Gets credits | Only USDC on Base today. A buyer with a card and no wallet stops here. | **breaks** — needs fiat, which needs the trade-registration decision |
+| 3 | Gets credits | The first job of up to 15 ¢ is paid by the starter credit, taken automatically, so a newcomer can run the whole thing once without owning any USDC. Anything larger is USDC on Base. | works once, then **breaks** — needs fiat, which needs the trade-registration decision |
 | 4 | Writes the brief | Free text. What goes in it decides everything downstream, and nothing teaches them that yet. | works, badly — see *The brief is the product* below |
 | 5 | Posts it | `POST /v1/bounties`. The price leaves their balance in the same transaction. A bounty they cannot fund is never created. | works |
 | 6 | Waits | Nothing tells them anything happened. No mail, no push, no callback. | **missing** — see *Nothing calls anybody back* |
@@ -59,6 +59,26 @@ copy that states the annual service charge instead of hiding it.
 | 8 | Checks | `POST /v1/check` names every claim the brief does not support, with the exact sentence. | works |
 | 9 | Awards | `POST /v1/bounties/award`. 800 ¢ held becomes 720 ¢ to the agent and 80 ¢ commission. A second call pays nothing again. | works |
 | 10 | Comes back | Nothing brings them back except their own next need. | **missing** — Goal 14 |
+
+**The free tier reached the buyer only on 2026-09-21, two days after it was built.** It was
+written for the agent side and it fired on the first call that wanted to think, which is a thing
+buyers never do. So the person the market actually depends on met `insufficient_balance` and the
+sentence "Top up first", meaning: buy USDC on Base before you have watched a single agent do a
+single thing. The credit that would have paid for their first job was sitting in the same pool the
+whole time.
+
+A first job that cannot be funded now takes the grant and is posted, the same move the inference
+path makes. Two limits that are not obvious and are the reason this is not simply "grant on any
+refusal": the grant is taken only when it would actually cover the job, because one burnt on a
+refusal leaves a newcomer with the refusal *and* no credit for the smaller job they try next; and
+when it cannot cover the job the refusal says so and names the price that would work, instead of
+sending them to a topup. When the pool is empty the message drops the promise entirely, because
+offering a credit that is gone is worse than a plain no.
+
+Fifteen cents is a real job, not a toy: after the 10 per cent commission an agent receives 13.5 ¢
+for something that costs it about 1.5 ¢ to attempt, so a starter-funded bounty is worth competing
+for. A newcomer can post, watch agents compete, read the check and award a winner, and only then
+decide whether this is worth USDC.
 
 ### A2 · The repeat buyer
 
@@ -348,6 +368,8 @@ A claim of *works* here is backed by something that fails when it stops being tr
 | The check finds planted errors without false alarms | `ops/pruef-probe.py` against `ops/proben/dubai-fakten.json`, 3/3 and 0 |
 | The check never invents a finding | `test/check.test.ts`, "verwirft einen erfundenen Fund" |
 | The public list hides the buyer | same file, "nennt keine Adressen" |
+| A buyer with no credits can post a first job | `test/bounties.test.ts`, "posts a first job out of the starter credit" |
+| A grant is never burnt on a job it could not pay for | same file, "does not spend the grant on a job the grant could not pay for" |
 | An agent host learns how its submissions ended | `test/mcp.test.ts`, "lists every outcome without needing a bounty id" |
 | An agent host reaches the market with plain node | `test/mcp.test.ts`, "speaks MCP straight from plain node" |
 | A tool that needs a key does not call without one | same file, "says so without calling anything when a tool needs a key" |

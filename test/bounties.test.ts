@@ -6,6 +6,7 @@ import Database from "better-sqlite3";
 import { privateKeyToAccount, generatePrivateKey } from "viem/accounts";
 import { createApp } from "../src/app.js";
 import { openDb, postLedger, MC_PER_CENT } from "../src/db.js";
+import { claimStarter, poolLeftMc, GRANT_MC } from "../src/credits/starter.js";
 import { releaseExpired, FEE_PERCENT, feeMc } from "../src/bounties/store.js";
 import { hashApiKey } from "../src/auth/siwe.js";
 
@@ -73,6 +74,68 @@ describe("posting a bounty", () => {
     expect(res.status).toBe(402);
     expect(a.balance()).toBe(before);
     expect((db.prepare("SELECT count(*) AS n FROM bounties").get() as { n: number }).n).toBe(0);
+  });
+
+  // The buyer side of the free tier. A newcomer with no credits could post nothing at all, and the
+  // only answer was "top up first", which means buying USDC on Base before having watched a single
+  // agent do a single thing. The grant existed and only ever fired on a call that wanted to think.
+  describe("a buyer who arrives with nothing", () => {
+    it("posts a first job out of the starter credit, without owning any USDC", async () => {
+      const { a, db } = setup(0);
+      expect(a.balance()).toBe(0);
+
+      const res = await a.postBounty(bounty({ price_cents: 10 }));
+
+      expect(res.status, "a newcomer must be able to see the market work before paying for it").toBe(201);
+      const grants = db.prepare("SELECT delta_mc FROM ledger WHERE kind = 'grant' AND address = ?").all(a.address) as { delta_mc: number }[];
+      expect(grants).toHaveLength(1);
+      expect(grants[0].delta_mc).toBe(GRANT_MC);
+      expect(a.balance(), "fifteen cents granted, ten held for the job").toBe(GRANT_MC - 10 * MC_PER_CENT);
+      const held = db.prepare("SELECT count(*) AS n FROM ledger WHERE kind = 'bounty_hold' AND address = ?").get(a.address) as { n: number };
+      expect(held.n, "the money really left the balance, as it does for every other buyer").toBe(1);
+    });
+
+    it("does not spend the grant on a job the grant could not pay for", async () => {
+      const { a, db } = setup(0);
+
+      const refused = await a.postBounty(bounty({ price_cents: 200 }));
+
+      expect(refused.status).toBe(402);
+      const body = (await refused.json()) as { message: string };
+      expect(body.message, "the refusal has to name the way forward that exists").toContain("starter credit");
+      expect(body.message).toContain("Post a smaller one");
+      expect(
+        (db.prepare("SELECT count(*) AS n FROM ledger WHERE kind = 'grant'").get() as { n: number }).n,
+        "a grant burnt on a refusal leaves a newcomer with nothing and no second chance",
+      ).toBe(0);
+
+      // And the proof that it was kept for them: the smaller job now goes through.
+      const smaller = await a.postBounty(bounty({ price_cents: 12 }));
+      expect(smaller.status).toBe(201);
+      expect(a.balance()).toBe(GRANT_MC - 12 * MC_PER_CENT);
+    });
+
+    it("says plainly that there is nothing free left once the pool is empty", async () => {
+      const { a, db } = setup(0);
+      while (poolLeftMc(db) >= GRANT_MC) claimStarter(db, privateKeyToAccount(generatePrivateKey()).address.toLowerCase());
+
+      const res = await a.postBounty(bounty({ price_cents: 10 }));
+
+      expect(res.status).toBe(402);
+      const body = (await res.json()) as { message: string };
+      expect(body.message).toContain("Top up first");
+      expect(body.message, "promising a credit that is gone is worse than refusing").not.toContain("starter credit");
+    });
+
+    it("takes the grant once, whether it is spent on thinking or on posting", async () => {
+      const { a, db } = setup(0);
+      await a.postBounty(bounty({ price_cents: 5 }));
+      await a.postBounty(bounty({ price_cents: 5 }));
+
+      const grants = db.prepare("SELECT count(*) AS n FROM ledger WHERE kind = 'grant' AND address = ?").get(a.address) as { n: number };
+      expect(grants.n).toBe(1);
+      expect(a.balance()).toBe(GRANT_MC - 10 * MC_PER_CENT);
+    });
   });
 
   it("rejects empty briefs, impossible prices and impossible deadlines", async () => {

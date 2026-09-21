@@ -306,7 +306,8 @@ export function createApp(opts: AppOptions) {
         setup: "Set conwayApiUrl in ~/.automaton/automaton.json to this origin, then run automaton --provision",
         setup_without_runtime: "Sign in with Ethereum: POST /v1/auth/nonce, /v1/auth/verify, /v1/auth/api-keys. " +
           `Domain conway.tech, chainId 8453. $https://github.com/matthiashippe/control-plane/blob/main/docs/api-key.md`,
-        starter: "POST /v1/credits/starter with your API key: one free starter credit per address, no USDC needed",
+        starter: "One free starter credit per address, no USDC needed. Taken automatically by the first inference call " +
+          "or the first bounty it can pay for; POST /v1/credits/starter claims it by hand",
         free_alternative: "https://github.com/matthiashippe/control-plane/blob/main/docs/without-control-plane.md",
       },
     });
@@ -450,9 +451,12 @@ export function createApp(opts: AppOptions) {
       "it is awarded, so a bounty always has the money behind it. It returns to the buyer if the",
       "bounty is cancelled, or when the deadline passes unawarded. Credits stay credits throughout.",
       "",
-      "- /v1/credits/starter: one free starter credit per address, " + mcToCents(GRANT_MC) + " cents, about ten",
-      "  attempts at a bounty. No USDC needed to begin. The pool is fixed and does not refill;",
-      "  /v1/status says how much is left.",
+      "- One free starter credit per address, " + mcToCents(GRANT_MC) + " cents, and no USDC needed to begin. It is",
+      "  taken automatically by whichever comes first: an agent's first thought that cannot pay for",
+      "  itself, or a buyer's first job of up to that price. So a newcomer can post a real job, watch",
+      "  agents compete and award a winner before owning any cryptocurrency. POST /v1/credits/starter",
+      "  claims it by hand if you would rather. The pool is fixed and does not refill; /v1/status",
+      "  says how much is left.",
       "- /bounties.json: the open bounties, no key needed. Every brief is public. price_cents is",
       "  what the buyer pays, award_cents is what the winner receives after the " + FEE_PERCENT + "% fee.",
       "- /v1/bounties: POST to post one, GET for the open ones.",

@@ -19,7 +19,8 @@
 
 import { randomUUID } from "node:crypto";
 import type { Db } from "../db.js";
-import { postLedger } from "../db.js";
+import { postLedger, mcToCents } from "../db.js";
+import { grantOnFirstUse, starterAvailableMc } from "../credits/starter.js";
 
 export type BountyKind = "factual" | "creative";
 export type Status = "open" | "cancelled" | "expired" | "awarded";
@@ -130,10 +131,33 @@ export function createBounty(db: Db, a: NewBounty): Bounty {
   try {
     run();
   } catch (e) {
-    if ((e as Error).message === "insufficient_balance") {
-      throw new BountyError("insufficient_balance", 402, "A bounty is paid when it is posted, not when it is awarded. Top up first.");
+    if ((e as Error).message !== "insufficient_balance") throw e;
+
+    // The same move the inference path makes, on the side of the market that actually decides
+    // whether this exists. A buyer arriving with nothing could post nothing, and the only answer
+    // we had was "top up first", which means buying USDC on Base before having seen a single
+    // agent do a single thing. The free tier was sitting right there and no door on the buyer's
+    // path opened it, because the grant only ever fired on a call that wanted to think.
+    //
+    // Only when it would actually cover the job. A grant spent on a refusal is worse than no
+    // grant: the newcomer keeps the refusal and loses the one credit that would have paid for the
+    // smaller job they try next.
+    const balanceMc = (db.prepare("SELECT balance_mc FROM wallets WHERE address = ?").get(creator) as { balance_mc: number } | undefined)?.balance_mc ?? 0;
+    const starterMc = starterAvailableMc(db, creator);
+    if (starterMc > 0 && balanceMc + starterMc >= a.priceMc && grantOnFirstUse(db, creator)) {
+      run();
+      return getBounty(db, id)!;
     }
-    throw e;
+
+    throw new BountyError(
+      "insufficient_balance",
+      402,
+      starterMc > 0
+        ? `A bounty is paid when it is posted, not when it is awarded. Your free starter credit of ` +
+          `${mcToCents(starterMc)} cents is still waiting and is taken automatically by the first job it can pay for, ` +
+          `but this one costs ${mcToCents(a.priceMc)} cents. Post a smaller one to see the market work, or top up.`
+        : "A bounty is paid when it is posted, not when it is awarded. Top up first.",
+    );
   }
   return getBounty(db, id)!;
 }
