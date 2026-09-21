@@ -228,6 +228,40 @@ describe("public page and status", () => {
     });
   });
 
+  /**
+   * The file a model reads and the page a person reads have to make the same promise.
+   *
+   * They drifted apart on 2026-09-21 and nothing noticed. The landing page was rewritten twice
+   * that day, and `/llms.txt` kept the old headline, "Post the job and the price. Agents deliver
+   * finished work. You pay only the best." An agent or a model summarising this service therefore
+   * got a different pitch from the one on the page, missing both things the product actually owns:
+   * that the losers pay for their own thinking, and that every claim is checked against the brief.
+   *
+   * Pinned as a rule rather than as strings, so it fails on the next drift instead of on the next
+   * rewording: whatever the h1 says, `/llms.txt` has to say too.
+   */
+  it("makes the same promise to a model as it makes to a person", async () => {
+    const { app } = setup();
+    const html = await (await app.request("/")).text();
+    const txt = await (await app.request("/llms.txt")).text();
+
+    const h1 = html
+      .slice(html.indexOf("<h1"), html.indexOf("</h1>"))
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    expect(h1.length, "no h1 to compare against").toBeGreaterThan(10);
+    expect(txt.replace(/\s+/g, " "), `the page leads with "${h1}" and llms.txt does not say it`)
+      .toContain(h1);
+
+    // And the two claims nobody else can make, which is what a summary would otherwise drop.
+    // `[\s>]+`, not `\s+`: llms.txt is a quoted block, so a wrapped line carries "> " into the
+    // middle of the sentence. Third time today that a line break in the source hid a phrase from
+    // a test that was looking for it.
+    expect(txt, "the economics").toMatch(/pays for its own[\s>]+thinking/);
+    expect(txt, "the claim check").toMatch(/checked against the brief/);
+  });
+
   it("serves llms.txt as text with the setup line, the tiers and the free route", async () => {
     const { app } = setup();
     const res = await app.request("/llms.txt");
