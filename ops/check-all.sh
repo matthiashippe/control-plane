@@ -136,6 +136,11 @@ else
   echo "(no OPENROUTER_API_KEY, so the market numbers are skipped)"
 fi
 
+# Whether the directory a stranger's automaton searches in knows this service exists.
+# Printed and not failed: absence is today's expected state, and the line is the finding.
+./ops/own-x402-listing.sh 2>/dev/null || true
+
+echo
 # The two daily series, read into the cycle instead of sitting in a log file.
 #
 # `ops/x402-zeitreihe.sh` and `ops/conway-zeitreihe.sh` both run by cron on the VM and both print

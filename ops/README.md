@@ -297,6 +297,39 @@ ran at 03:30 and the cron at 04:40.
 
 What it cannot check, and says so: whether today is a good day to post.
 
+## Are we in the directory an automaton searches in
+
+`ops/own-x402-listing.sh`, part of `ops/check-all.sh`, printed rather than failed: absence is
+today's expected state and the line itself is the finding.
+
+An agent does not browse, it reads a facilitator's catalogue, and that catalogue is the only place
+a stranger's automaton finds this service without a human recommending it. We scan both public ones
+every morning for the article, 20,789 paid services on 2026-09-21, and not one row of them is ours.
+
+**There is no registration to forget.** A facilitator catalogues a seller as a side effect of a
+payment, keyed on the `resource` the seller declares, and `src/payments/bazaar.ts` already declares
+the block a listing needs. What it is attached to is the problem: `payResource`
+(`src/payments/pay.ts:82-85`) builds `/pay/{usd}/{recipient}` with the recipient substituted, so
+every payment hands the catalogue a different URL with a wallet address inside it.
+
+Evidence, not inference:
+
+- PayAI reports settlements for `https://cp.hippe.eu/pay/5/0xd24f37d0…`, so our payments do reach
+  its records.
+- No cp.hippe.eu row appears anywhere in the 20,789 catalogued resources.
+- Of those 20,789, **none** has a wallet address in its path. Not one of the 49 with `/pay/` in it,
+  and none of the five with the most payers, one of which writes its variable segment as a
+  parameter (`/api/chain/ens/:input`).
+- Our own `/.well-known/x402` already describes the endpoint correctly as `/pay/{usd}/{address}`.
+  Only the 402 answer does not.
+
+The fix lives in `src/payments/**`, which `loop-constraints.md` keeps locked without a human. This
+script is the other half: the answer is in front of the cycle every run, so the day it flips is a
+day somebody notices.
+
+Checked both ways: with `CP_OWN_HOST=aidress.ai`, a host that really is catalogued, it reports the
+16 rows.
+
 ## The two production probes run themselves once a day
 
 `ops/mcp-against-production.ts` and `ops/skill-against-production.sh` walk the whole supply side
