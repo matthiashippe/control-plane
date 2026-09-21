@@ -486,3 +486,24 @@ Fetching it for an analysis:
 ```
 scp -i ~/.ssh/id_ed25519_automaton root@76.13.144.207:/opt/control-plane/conway-money/metrics.ndjson .
 ```
+
+## Do the daily jobs still run
+
+`ops/freshness.sh`, part of `ops/check-all.sh`. Asks the VM for the age of four things and fails
+when any is older than 26 hours (the daily window plus two hours of grace, so a late run is quiet
+and a skipped one is not):
+
+- `/opt/control-plane/x402/kennzahlen.ndjson`
+- `/opt/control-plane/conway/repo.ndjson`
+- `/opt/control-plane/conway-money/metrics.ndjson`
+- the newest file in `/opt/control-plane/backups`
+
+**Why the age and not the content.** A failing run is already loud: every scheduled script reports
+over `CP_ALERT_WEBHOOK` and leaves a `.err` file behind. A run that never starts is silent, and
+before this existed nothing would have said so. The series would stop, `check-all.sh` would print
+the same last point in every cycle, and it would say ALL CHECKS OK next to it.
+
+Exit codes: 0 fresh, 1 something is stale and is named with its age, 2 the VM did not answer, which
+is explicitly not a statement about the service.
+
+`CP_MAX_AGE_HOURS` moves the limit, which is also how the failing path was checked.
