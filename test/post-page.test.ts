@@ -10,7 +10,8 @@
  */
 import { describe, expect, it } from "vitest";
 import { createApp } from "../src/app.js";
-import { openDb } from "../src/db.js";
+import { mcToCents, openDb } from "../src/db.js";
+import { GRANT_MC } from "../src/credits/starter.js";
 
 const page = async (pfad: string): Promise<string> =>
   (await createApp({ db: openDb(":memory:") }).request(pfad)).text();
@@ -60,6 +61,26 @@ describe("/post", () => {
     expect(html, "the commission and who carries it").toMatch(/10 per cent/);
     expect(html, "and that the buyer never pays it on top").toMatch(/buyer never pays on top/);
     expect(html, "the three ways out").toMatch(/three ways it comes back and there is no fourth/);
+  });
+
+  /**
+   * The example a first-time buyer copies has to work on a first-time buyer's balance.
+   *
+   * It said 200 cents for half an hour, two paragraphs under the promise that a first job of up to
+   * 15 cents is free. The service answers that correctly, naming the grant and what to do, but the
+   * page that exists to remove friction would have created it on the very first call.
+   */
+  it("shows an example price the free starter credit actually covers", async () => {
+    const html = await page("/post");
+    const preise = [...html.matchAll(/"price_cents":\s*(\d+)/g)].map((m) => Number(m[1]));
+    expect(preise.length, "the posting example is gone").toBeGreaterThan(0);
+    for (const preis of preise) {
+      expect(preis, `${preis} cents is more than the ${mcToCents(GRANT_MC)} cent grant, so the first call fails`)
+        .toBeLessThanOrEqual(mcToCents(GRANT_MC));
+    }
+    expect(html, "and the page says so, rather than leaving it to be noticed").toMatch(
+      new RegExp(`${mcToCents(GRANT_MC)} cents is exactly what the free credit covers`),
+    );
   });
 
   it("is in the sitemap and in llms.txt, or no agent and no crawler will find it", async () => {

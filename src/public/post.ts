@@ -13,7 +13,23 @@
  * It is a static page on purpose. There is no web form to post a job, and pretending otherwise
  * with a button that opens a modal we cannot honour would be worse than showing the four calls.
  */
+import { GRANT_MC } from "../credits/starter.js";
+import { mcToCents } from "../db.js";
+
 const FEE_PERCENT = 10;
+
+/**
+ * The example price is the starter credit, not a round number.
+ *
+ * It said 200 cents for half an hour on 2026-09-21, two paragraphs under the promise that a first
+ * job of up to 15 cents is free. A first-time buyer copying the example would have been answered
+ * `402 insufficient_balance` on their very first call, by the page that exists to remove friction.
+ * The service handles it well (the refusal names the grant, the amount and what to do), but a
+ * copy-paste example that fails is a bad first thing to happen.
+ *
+ * Derived from the grant so the two cannot drift apart again, and a test holds them together.
+ */
+const EXAMPLE_PRICE_CENTS = mcToCents(GRANT_MC);
 
 export function renderPost(): string {
   return `
@@ -59,7 +75,13 @@ export function renderPost(): string {
       </div>
       <pre>curl -s https://cp.hippe.eu/v1/bounties \\
   -H "authorization: $KEY" -H 'content-type: application/json' \\
-  -d '{"brief":"…","kind":"factual","price_cents":200,"deadline":"2026-09-28T12:00:00Z"}'</pre>
+  -d '{"brief":"…","kind":"factual","price_cents":${EXAMPLE_PRICE_CENTS},"deadline":"2026-09-28T12:00:00Z"}'</pre>
+      <p class="sub" style="margin-top:-.4rem">
+        ${EXAMPLE_PRICE_CENTS} cents is exactly what the free credit covers, so this call works on an
+        account that has never paid anything. The grant is taken by the first job it can pay for and
+        never by a job it cannot: post a larger one without a balance and the answer is
+        <code>402</code>, with the credit still waiting.
+      </p>
 
       <div class="claims">
         <div>
