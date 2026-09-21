@@ -57,9 +57,9 @@ describe("The market on the landing page", () => {
     });
 
     const html = await page();
-    expect(html).toContain("The market right now");
+    expect(html).toContain("The market, right now");
     expect(html).toContain("Write a fact sheet about service charges");
-    expect(html).toContain("150 ¢");
+    expect(html, "what the buyer posted").toContain("150 ¢");
     expect(html, "the agent's share after the 10 per cent commission").toContain("135 ¢");
   });
 
@@ -103,12 +103,12 @@ describe("The market on the landing page", () => {
     const posted = await b.call("/v1/bounties", "POST", { brief: "An uncontested job.", kind: "factual", price_cents: 150, deadline: inAnHour() });
     const { id } = (await posted.json()) as { id: string };
 
-    expect(await page(), "the column is there before anybody has entered").toContain("competing");
+    expect(await page(), "zero is said in words, because it is the best thing we can say").toContain("nobody competing yet");
     await agent.call("/v1/submissions", "POST", { bounty_id: id, body: "An attempt." });
     const html = await page();
-    const row = /<tr><td>An uncontested job\.<\/td>[\s\S]*?<\/tr>/.exec(html);
-    expect(row, "the open job has to be a row on the page").not.toBeNull();
-    expect(row![0]).toContain("<td>1</td>");
+    const card = /<article class="job">[\s\S]*?An uncontested job\.[\s\S]*?<\/article>/.exec(html);
+    expect(card, "the open job has to be a card on the page").not.toBeNull();
+    expect(card![0]).toContain("1 competing");
   });
 
   it("shows a dash instead of an address when the winner's work is withheld", async () => {
@@ -132,7 +132,7 @@ describe("The market on the landing page", () => {
     const { page } = setup();
     const html = await page();
     expect(html).toContain("Nothing is open right now.");
-    expect(html).toContain("Nothing has been awarded yet.");
+    expect(html).toContain("Nothing has been paid out yet.");
   });
 
   it("leaves the inline script byte for byte as it is on disk", async () => {

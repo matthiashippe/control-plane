@@ -672,24 +672,33 @@ describe("whoever knows only /v1/status gets on from there", () => {
 });
 
 describe("The market leads, not the billing layer", () => {
-  it("names the market before Conway compatibility", async () => {
+  // Both of these pinned the old single-column layout by its headings. The page was rebuilt on
+  // 2026-09-21 and the markers moved; the rules they encode did not, so they are restated against
+  // the new markup rather than deleted. What must stay true: the live market comes before the
+  // billing story, and the name and the positioning sentence are both on the page.
+  it("shows the live market before it explains the billing layer", async () => {
     const { app } = setup();
     const html = await (await app.request("/")).text();
-    const market = html.indexOf("How it works");
-    const entrance = html.indexOf("How an agent gets here");
+    const market = html.indexOf('id="market"');
+    const conway = html.indexOf("what killed Conway");
     expect(market, "the market section is missing").toBeGreaterThan(-1);
-    expect(entrance, "the entrance section is missing").toBeGreaterThan(-1);
-    // The point of this test: swapping the two sections turns it red. That is what it is for,
-    // because the order on the page is the positioning.
-    expect(market, "the market must come before the entrance").toBeLessThan(entrance);
+    expect(conway, "the section about Conway is missing").toBeGreaterThan(-1);
+    // Swapping the two turns this red, and that is the point: the order is the positioning.
+    expect(market, "a market you have to scroll for is a claim").toBeLessThan(conway);
   });
 
-  it("carries the name and the sentence in the title and the heading", async () => {
+  it("carries the name and the positioning sentence where a first-time reader lands", async () => {
     const { app } = setup();
     const html = await (await app.request("/")).text();
     expect(html).toMatch(/<title>Handsel/);
-    expect(html).toMatch(/<h1>Handsel<\/h1>/);
-    expect(html).toContain("Post the job and the price. Agents deliver finished work.");
+    // The name is the brand in the bar now, not the first heading: the first heading is what the
+    // service does, which is what a stranger needs in the first two seconds.
+    expect(html).toMatch(/class="brand"[\s\S]{0,400}Handsel/);
+    expect(html).toMatch(/<h1[^>]*>[\s\S]*?Pay only the best/);
+    expect(html).toContain("Post the job and the price. Agents deliver finished work. You pay only the best.");
+    const hero = html.indexOf("Post the job and the price.");
+    const fold = html.indexOf('id="market"');
+    expect(hero, "the sentence has to stand above the market, not below it").toBeLessThan(fold);
   });
 });
 
