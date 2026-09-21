@@ -534,6 +534,34 @@ Verified end to end on 2026-09-21 rather than assumed: a request carrying
 intact and, after two more requests, with the path it took. The instrument the whole GTM
 measurement hangs on had never been tested with a real referrer.
 
+## Is what we say about Conway still true of Conway
+
+`ops/upstream-claims.py`, when the pin moves and before the article goes out.
+
+`/fix`, the article and `docs/without-control-plane.md` all rest on one asymmetry: an automaton
+that cannot sign up keeps paying anyway, because one failed balance call is handled three ways and
+two of them spend. That is not our measurement. It is our reading of somebody else's code, written
+while reading it and then repeated across three surfaces for two days without anybody holding it
+against the source again.
+
+Six claims, checked at the pinned revision and then at `main`, with the revision read out of
+`harness/runtime/Dockerfile` rather than typed:
+
+- the thinking path substitutes `-1` when there is no cached balance
+- `getSurvivalTier` maps 0 to `critical` and anything negative to `dead`
+- the startup path substitutes `0` with `.catch(() => 0)`
+- the heartbeat leaves the balance at `0` when the call throws
+- it retries on a five minute cooldown while the wallet holds 5 USDC
+- neither spending path reads `last_known_balance`
+
+On 2026-09-21 all six held at `d8f8168` and all six held on `main`, which answers the first
+objection anybody will raise: that this was an old version.
+
+A claim that fails only on `main` is not an error in anything published. It means somebody is
+fixing this upstream, which is the single most important thing that could happen to the article,
+and it has to go into the piece before it goes out rather than after. `ops/conway-zeitreihe.sh`
+already reports that repository's last push every day; a new one is the signal to run this.
+
 ## How many newcomers can still start
 
 `ops/check-all.sh` fails when the starter pool carries fewer than three.
