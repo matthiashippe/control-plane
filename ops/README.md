@@ -278,6 +278,25 @@ twenty-five. Whoever wants to move the number has to pay, and that is the whole 
 measurement. Our own automaton is included in the number, so subtract one for the actual figure.
 `db.keys` counts issued API keys, `db.day.topups` the payments of the last day.
 
+## Do the pages say anything obviously wrong
+
+`ops/seiten-pruefen.sh [base]`, part of `ops/check-all.sh` since 2026-09-21.
+
+`ops/smoke.sh` proves the API and the security headers. What the pages actually *say* had nothing
+looking at it, and twice in a row something visibly wrong went live: "1 jobs paid out", and one
+line next to it "to the agents that won them". Both were caught by reading the live page, which is
+not a process.
+
+It checks what is cheap to check and embarrassing to ship: status and content type, exactly one
+`h1`, a title, no unreplaced placeholder, no template that leaked as text, no `undefined`, no
+`NaN`, no "1 jobs" against a named list of nouns so prose raises no false alarms. Then both
+preview cards and every internal link the landing page offers.
+
+It is not a design review and cannot be one.
+
+On its first run it found something nobody was looking for: the three sub-pages had no `h1` at
+all, their main heading was an `h2`.
+
 ## Who arrived, and what the visit became
 
 `ops/verkehr.sh [hours]`. The section **Foreign referrers, and what the visit became** is the one
