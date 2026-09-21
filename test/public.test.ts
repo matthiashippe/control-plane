@@ -150,16 +150,29 @@ describe("public page and status", () => {
     expect(html).toContain("github.com/matthiashippe/control-plane");
   });
 
+  /**
+   * The imprint moved to `/terms` on 2026-09-21, where the rest of the fine print lives. DDG 5
+   * asks for easily recognisable, directly reachable and permanently available, which a footer
+   * link on every page satisfies; it does not ask for it on the page somebody lands on.
+   *
+   * What this checks is the path a person or an authority actually takes: the guessed URL, the
+   * footer link, and the address itself. `test/terms-page.test.ts` holds the contents.
+   */
   it("carries an imprint with a serviceable address (DDG § 5), reachable at /impressum", async () => {
     const { app } = setup();
-    const html = await (await app.request("/")).text();
-    expect(html).toMatch(/id="impressum"/);
-    expect(html).toMatch(/Matthias Hippe/);
-    expect(html).toMatch(/San-Francisco-Straße 1/);
-    expect(html).toMatch(/20457 Hamburg/);
     const redirect = await app.request("/impressum");
     expect(redirect.status).toBe(302);
-    expect(redirect.headers.get("location")).toBe("/#impressum");
+    expect(redirect.headers.get("location")).toBe("/terms#impressum");
+
+    const ziel = await (await app.request("/terms")).text();
+    expect(ziel).toMatch(/id="impressum"/);
+    expect(ziel).toMatch(/Matthias Hippe/);
+    expect(ziel).toMatch(/San-Francisco-Straße 1/);
+    expect(ziel).toMatch(/20457 Hamburg/);
+
+    const start = await (await app.request("/")).text();
+    expect(start, "every page has to carry the link, that is the reachable part")
+      .toContain('href="/terms#impressum"');
   });
 
   it("promises no cashing of credits (regulation: no claim to repayment)", async () => {

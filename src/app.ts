@@ -491,7 +491,7 @@ export function createApp(opts: AppOptions) {
 
   // German law (DDG § 5) requires an imprint that is "easy to recognise and directly reachable".
   // The details are on the landing page; this path is the one people and auditors guess first.
-  app.get("/impressum", (c) => c.redirect("/#impressum", 302));
+  app.get("/impressum", (c) => c.redirect("/terms#impressum", 302));
 
   // The page carries its icon as a data URI in the head, yet some clients stubbornly ask for
   // /favicon.ico and used to get a 404. This costs nothing and looks unfinished otherwise.

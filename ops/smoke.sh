@@ -244,10 +244,10 @@ fi
 # not into nothing; a 404 here is grounds for a warning letter, not a blemish.
 code=$(fetch impressum /impressum)
 target=$(header impressum location)
-if [[ "$code" == "302" && "$target" == "/#impressum" ]]; then
-  ok "/impressum: 302 to /#impressum"
+if [[ "$code" == "302" && "$target" == "/terms#impressum" ]]; then
+  ok "/impressum: 302 to /terms#impressum"
 else
-  fail "/impressum: $code to '$target', expected 302 to /#impressum"
+  fail "/impressum: $code to '$target', expected 302 to /terms#impressum"
 fi
 
 # --- 6. /.well-known/x402 -----------------------------------------------------
