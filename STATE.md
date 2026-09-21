@@ -118,7 +118,7 @@ Website, Verteilung und GTM. Sie sind keine Kosmetik: Die Recherche vom 20.09. s
 hier Conway seinen Vorsprung hatte (ein Tweet mit 3,8 Mio. Views) und dass Einzelentwickler ohne
 Publikum daran scheitern. Matthias am 20.09.: "nicht halbgar sondern komplett insane verfolgen".
 
-10. **Goal 10, Positionierung und Name** (NEXT): Ein Satz, der sagt, was das ist, und ein Name, der
+10. **Goal 10, Positionierung und Name** (DONE 20.09.2026, `goals/2026-09-20-goal-10-name.md`): Ein Satz, der sagt, was das ist, und ein Name, der
     ihn traegt.
     Done: (a) Ein Satz mit hoechstens fuenfzehn Woertern, der ohne Vorwissen verstaendlich ist und
     den Markt nennt, nicht die Technik. Pruefung: Ein Fremder, der die Seite zum ersten Mal sieht,
@@ -129,14 +129,20 @@ Publikum daran scheitern. Matthias am 20.09.: "nicht halbgar sondern komplett in
     den Open-Graph-Angaben, `/llms.txt`, der Repo-Beschreibung und `docs/bounties.md`.
     (d) Ein Test in `test/public.test.ts` haelt fest, dass die Startseite mit dem Markt beginnt und
     nicht mit der Conway-Kompatibilitaet.
-11. **Goal 11, Die Website**: Die Startseite fuehrt den Markt, nicht die Abrechnungsschicht.
+11. **Goal 11, Die Website** (DONE 21.09.2026, `goals/2026-09-21-goal-11-website.md`): Die
+    Startseite fuehrt den Markt, nicht die Abrechnungsschicht.
     Done: (a) Oberhalb der ersten Bildschirmkante beantwortet die Seite drei Fragen: was ist das,
     was kostet es mich, was tue ich zuerst. (b) Der Beleg steht drauf und ist echt: ein Briefing,
     die konkurrierenden Einreichungen, der Befund der Pruefung, die Kosten. (c) Conway-Kompatibilitaet
     wird zum Abschnitt "wie ein Agent hier ankommt". (d) Unveraendert gilt: keine externen
     Ressourcen (CSP), kein Tracking, lesbar in Telefonbreite, `ops/smoke.sh` gruen. Aenderungen am
     Inline-Skript brauchen den CSP-Hash im Caddyfile und damit Matthias.
-12. **Goal 12, Verteilung dorthin, wo Agenten schon leben**: Ein Agent soll mitbieten koennen, ohne
+    Stand 21.09.2026: (a) bis (d) erfuellt. Die Seite wurde neu gebaut, nachdem Matthias sie
+    ansah: "das ist doch keine website das ist ein text block". Alle vier Kriterien waren erfuellt
+    und die Seite war trotzdem falsch, weil in keinem von ihnen stand, was er wirklich gesagt
+    hatte: maximal modern. Das Nachtragsblatt haelt das fest, samt der Korrektur meiner eigenen
+    Fehldiagnose, die Website sei nie als Ziel notiert worden. Sie war es, hier, seit dem 20.09.
+12. **Goal 12, Verteilung dorthin, wo Agenten schon leben** (DONE 21.09.2026): Ein Agent soll mitbieten koennen, ohne
     dass sein Betreiber Code schreibt.
     Done: (a) Ein MCP-Server, ueber den ein beliebiger Agenten-Host offene Auftraege sieht,
     einreicht und den Befund der Pruefung liest. (b) Eine fertige Skill-Datei fuer die
@@ -152,21 +158,34 @@ Publikum daran scheitern. Matthias am 20.09.: "nicht halbgar sondern komplett in
     im Format der Upstream-Defaults (Pin d8f8168) und wird nur ins Skills-Verzeichnis kopiert. Die
     Werkzeugdefinitionen in `docs/bounties.md` werden aus denselben Schemata erzeugt, ein Test
     faellt bei Abweichung. 33 neue Pruefungen, jede mit Gegenprobe, `pnpm test` bei 281.
-    Offen ist (d): kein Weg ist gegen die Produktion gefahren, und noch niemand ausser uns hat
-    einen davon benutzt. Dazu fehlt ausserdem die Sichtbarkeit: weder `/llms.txt` noch die
-    Startseite nennen den MCP-Weg, beides braucht ein Ausrollen und wartet auf das naechste
-    ohnehin faellige.
-13. **Goal 13, GTM mit Kill-Kriterium**: Ein Plan, der eine Zahl nennt, ab der er beendet wird.
+    Stand 21.09.2026: (a) bis (d) erledigt, und die damals offene Sichtbarkeit ebenfalls.
+    `/llms.txt` und die Startseite nennen den MCP-Weg, der Server hat inzwischen sechs Werkzeuge
+    (`read_my_submissions` kam am 21.09. dazu, weil ein Host sonst nie erfaehrt, was aus seiner
+    Einreichung wurde), und ein Schluessel braucht keine Runtime mehr: vier Aufrufe und eine
+    Ethereum-Signatur, aufgeschrieben in `docs/api-key.md`.
+    **Was weiterhin fehlt, ist kein Bauteil:** ausser uns hat niemand einen dieser Wege benutzt.
+    Das ist Goal 13 und liegt bei Matthias.
+13. **Goal 13, GTM mit Kill-Kriterium** (AKTIV; der Plan steht, das Ausfuehren liegt bei Matthias):
+    Ein Plan, der eine Zahl nennt, ab der er beendet wird.
     Done: (a) Jeder Kanal mit gemessener Ausgangslage statt Hoffnung, in der Reihenfolge, in der er
     gefahren wird, mit Datum. (b) Der Artikel, die Reddit-Beitraege und die Issue-Antworten haengen
     darin und nicht daneben. (c) Eine Abbruchbedingung je Kanal, formuliert als Zahl und Datum.
     (d) Nichts davon geht ohne Matthias nach draussen; der Plan sagt, was er tun muss und wann.
-14. **Goal 14, Der Markt ist nie leer**: Ein Marktplatz ohne Auftraege ueberzeugt niemanden.
+14. **Goal 14, Der Markt ist nie leer** (GEBAUT 21.09.2026, WIRKUNG OFFEN): Ein Marktplatz ohne
+    Auftraege ueberzeugt niemanden.
     Done: (a) Matthias schreibt Arbeit aus, die er tatsaechlich braucht, und sie steht oeffentlich
     in `/bounties.json`. (b) Jeder vergebene Auftrag erzeugt einen oeffentlichen Beleg: Briefing,
     alle Einreichungen, die Befunde, die Kosten, der Gewinner. Das ist zugleich der Inhalt, mit dem
     sich der Markt bewerben laesst, und es ist der Beleg, den in diesem Feld sonst niemand liefert.
     (c) Der erste vollstaendige Umlauf mit echtem Geld ist gefahren und dokumentiert.
+    Stand 21.09.2026: (a) zwei offene Auftraege ueber 150 und 250 Cent stehen in `/bounties.json`.
+    (b) `/receipts.json` gibt es seit dem 21.09., ohne Schluessel, mit Briefing, Preis, Gebuehr,
+    allen Einreichungen und dem Gewinner; was vor der Stichzeit eingereicht wurde, wird gezaehlt
+    und zurueckgehalten, weil jenen Agenten niemand gesagt hatte, dass ihre Arbeit veroeffentlicht
+    wird. (c) Der erste Umlauf lief am 20.09. mit echtem Geld, Beleg in
+    `docs/research/data/2026-09-20-first-cycle.json`.
+    **Offen bleibt der Sinn des Ziels:** der Markt ist nicht leer, aber alles darin ist von uns.
+    Null fremde Kaeufer, null fremde Agenten.
 
 **Gateway-These: geprüft und gescheitert** (19.09.2026, `docs/research/2026-09-20-x402-gateway.md`).
 Der x402-Markt selbst ist echt und wächst: on-chain gemessen nehmen die zehn größten Verkäufer
@@ -189,7 +208,8 @@ Wettbewerb ausweist. Wir sind Kunde des Marktes, in den wir verkaufen wollten.
 report-only, Datenquelle `ops/status.sh`, Schwellen in `ops/README.md`). Phase 2 (Sandboxes,
 Social-Relay) erst, wenn Nachfrage messbar ist, also frühestens nach dem 19.10.
 
-15. **Goal 15, Das Journeybuch** (AKTIV, weil Goal 10 auf Matthias' Namensentscheidung wartet):
+15. **Goal 15, Das Journeybuch** (DONE 20.09.2026, `docs/journeys.md`, seitdem bei jeder
+    Aenderung nachgezogen):
     `docs/journeys.md` ist die Referenz, gegen die alles andere geprueft wird. Matthias am 20.09.:
     "das ist unsere bibel, denn erst wenn es auf beiden seiten etwas gibt dann geht es".
     Done: (a) Beide Seiten vollstaendig, je Schritt was passiert, welcher Endpunkt beruehrt wird,

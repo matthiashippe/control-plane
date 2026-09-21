@@ -1,20 +1,24 @@
-# Goal 15: Eine Website, keine Textdatei
+# Goal 11: Eine Website, keine Textdatei
 
-## Warum es dieses Goal erst heute gibt, und das ist der Befund
+## Warum dieses Blatt erst heute entstand, und was daran der Befund ist
 
 Matthias am 20.09.2026: "wir brauchen einen fancy name einen fancy website maximal modern wir
 bruachen maximal insane GTM und integrationsstrategie und eine super krasse positionierung / dsa
 alles bitte mit in die goals aufnehmen und nict halbgar sondern komplett insane verfolgen".
 
-Drei der vier wurden Goals. Der Name wurde Goal 10 und heisst Handsel. GTM wurde Goal 13 mit
-Kill-Kriterium. Die Positionierung steht als Satz an jeder Stelle, an der jemand von uns erfaehrt.
-**Die Website wurde nie aufgeschrieben.** Ein `grep` ueber `goals/*.md` nach website, fancy oder
-modern findet am 21.09. null Treffer.
+**Am 21.09. habe ich dazu zuerst etwas Falsches behauptet und korrigiere es hier.** Ich schrieb,
+die Website sei nie aufgeschrieben worden, weil ein `grep` ueber `goals/*.md` nach website, fancy
+oder modern null Treffer findet. Das Register der Ziele ist aber nicht dieses Verzeichnis, sondern
+`STATE.md`, und dort steht Goal 11, Die Website, seit dem 20.09. mit vier Abnahmekriterien.
 
-Die Folge ist keine Geschmacksfrage. Der Loop entscheidet jeden Zyklus, was am meisten bringt, und
-er entscheidet aus dem, was aufgeschrieben ist. Zwanzig Zyklen lang sind Korrektheit, Messung und
-Pruefung gewonnen, weil sie im Journey-Buch und im Backlog standen. Die Website stand nirgends,
-also hat sie nie gewonnen. Ein Ziel, das nicht notiert ist, existiert fuer diesen Loop nicht.
+Falsch war die Diagnose, richtig bleibt der Befund dahinter. Goal 11 verlangt, dass die Startseite
+den Markt fuehrt und nicht die Abrechnungsschicht, und genau das hat sie getan. Was in keinem
+Kriterium stand, war Matthias' eigentliches Wort: **maximal modern**. Eine Seite kann jedes
+einzelne Kriterium erfuellen und trotzdem ein Textblock sein, und genau das ist passiert. Der Loop
+prueft gegen das, was notiert ist, also erfuellte er die Liste und verfehlte den Auftrag.
+
+Dieses Blatt ergaenzt Goal 11 um das, was gefehlt hat: nicht die Reihenfolge der Abschnitte,
+sondern die Gestalt.
 
 Matthias am 21.09., nach einem Blick auf die ausgelieferte Seite: "das ist doch keine website das
 ist ein text block. schau dir AI startups bei y cominator an."
@@ -55,17 +59,17 @@ ihre Modernitaet aus Skripten bezieht.
 
 ## Fertig heisst
 
-- [ ] Ein erster Bildschirm, der in zehn Sekunden sagt, was das ist, was es kostet und was man
+- [x] Ein erster Bildschirm, der in zehn Sekunden sagt, was das ist, was es kostet und was man
       zuerst tut, ohne zu scrollen.
-- [ ] Der lebende Markt sichtbar im oberen Drittel, nicht auf halber Hoehe: offene Auftraege mit
+- [x] Der lebende Markt sichtbar im oberen Drittel, nicht auf halber Hoehe: offene Auftraege mit
       Preis und Zahl der Mitbewerber, ausgezahlte mit Gewinner.
-- [ ] Drei getrennte Wege statt einer Spalte, je einer fuer Kaeufer, Agent-Betreiber und
+- [x] Drei getrennte Wege statt einer Spalte, je einer fuer Kaeufer, Agent-Betreiber und
       Zuschauer, jeder mit genau einem naechsten Schritt.
-- [ ] Auf einem Telefon lesbar und benutzbar.
-- [ ] Die Beweise bleiben, aber unter den Wegen: On-Chain-Beleg, Verzeichniszahlen, ehrliche
+- [x] Auf einem Telefon lesbar und benutzbar.
+- [x] Die Beweise bleiben, aber unter den Wegen: On-Chain-Beleg, Verzeichniszahlen, ehrliche
       Grenzen, Impressum.
-- [ ] CSP-Hash unveraendert, Rauchtest gruen, kein neues Skript.
-- [ ] Alles, was heute an Substanz auf der Seite steht, steht danach immer noch irgendwo. Kuerzen
+- [x] CSP-Hash unveraendert, Rauchtest gruen, kein neues Skript.
+- [x] Alles, was heute an Substanz auf der Seite steht, steht danach immer noch irgendwo. Kuerzen
       ja, weglassen nein: die Ehrlichkeit ist die Positionierung.
 
 ## Was ausdruecklich nicht dazugehoert
@@ -73,3 +77,19 @@ ihre Modernitaet aus Skripten bezieht.
 Keine erfundenen Logos von Kunden, die es nicht gibt, keine Zahlen ohne Beleg, keine
 Testimonials. Der Markt hat null fremde Kaeufer, und die Seite darf das nicht verstecken; sie
 muss nur aufhoeren, es in einem Textblock zu vergraben.
+
+## Abgenommen am 21.09.2026
+
+Alle sieben Punkte erfuellt, jeder einzeln nachgesehen statt abgehakt. Auf 1492 und auf 414 Pixel
+angesehen, im dunklen und im hellen Modus, das Inline-Skript byteweise identisch, Rauchtest
+inklusive CSP-Hash gruen, 393 Tests.
+
+Der siebte Punkt, "kuerzen ja, weglassen nein", hat sich selbst durchgesetzt: sieben Tests wurden
+beim Umbau rot, und jeder zeigte auf Substanz, die ich verloren hatte. Preisabschnitt,
+Abschaltklausel, der Schwellenbonus von 501 Cent, der 501 fuer Sandboxes, der Verweis auf den
+freien Weg ohne uns, die Abnahmezeile des Produktionslaufs, die Verzeichniszahlen. Ohne diese
+Tests waere die Seite huebscher und aermer geworden.
+
+Dazu ein Vorschaubild, damit ein Link auf uns irgendwo etwas zeigt, und ein Lasttest, der zuerst
+meinen eigenen Laptop gemessen hat: richtig gemessen traegt die Seite 458 Anfragen je Sekunde
+ueber TLS ohne einen Fehler.
