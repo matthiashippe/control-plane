@@ -262,6 +262,27 @@ export function createApp(opts: AppOptions) {
 
   const indexHtml = loadIndexHtml();
 
+  /**
+   * The picture a link unfurls into.
+   *
+   * Without it Slack, Discord, Reddit and X show the bare address, and the twelve issue answers
+   * and the article all carry this address. It is a still image on purpose: generating one per
+   * request would put an image encoder in the serving path for a thumbnail nobody reloads, and
+   * the numbers that change are on the page itself. The source of the card is next to it in
+   * `src/public/og-card.html`, so the next version is a screenshot away and not a mystery.
+   */
+  const ogImage = (() => {
+    for (const candidate of [path.join(PUBLIC_DIR, "og.png"), path.resolve("src/public/og.png")]) {
+      if (fs.existsSync(candidate)) return fs.readFileSync(candidate);
+    }
+    return null;
+  })();
+  if (ogImage) {
+    app.get("/og.png", (c) =>
+      c.body(ogImage, 200, { "Content-Type": "image/png", "Cache-Control": "public, max-age=86400" }),
+    );
+  }
+
   app.get("/", (c) => {
     if (!indexHtml) return c.json({ ok: true, version: VERSION, note: "no index page built" });
     // Rendered per request, into the body and never into the script: the inline script is covered

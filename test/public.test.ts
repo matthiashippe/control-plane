@@ -454,6 +454,37 @@ describe("preview and findability", () => {
   });
 });
 
+/**
+ * The picture a link unfurls into.
+ *
+ * Twelve issue answers and an article all carry this address, and without this the unfurl in
+ * Slack, Discord, Reddit or X is the bare URL. It is a file in `src/public`, which the image
+ * build copies wholesale (`harness/cp/Dockerfile`: `cp -r src/public dist/public`), so the way
+ * this breaks is silently: the route simply stops existing and nobody notices until a link looks
+ * bare somewhere nobody is watching.
+ */
+describe("the link preview", () => {
+  it("serves the card and names it with an absolute URL", async () => {
+    const db = openDb(":memory:");
+    const app = createApp({ db });
+
+    const res = await app.request("/og.png");
+    expect(res.status, "the card is missing from src/public or was not copied into the image").toBe(200);
+    expect(res.headers.get("content-type")).toBe("image/png");
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    expect(bytes.length, "an empty file unfurls as nothing at all").toBeGreaterThan(10_000);
+    // A PNG and not something renamed: the eight-byte signature.
+    expect([...bytes.slice(0, 8)]).toEqual([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
+    const html = await (await app.request("/")).text();
+    // Relative URLs are ignored by most unfurlers, so the absolute one is the whole point.
+    expect(html).toContain('property="og:image" content="https://cp.hippe.eu/og.png"');
+    expect(html).toContain('name="twitter:image" content="https://cp.hippe.eu/og.png"');
+    expect(html, "summary shows a thumbnail, summary_large_image shows the card").toContain("summary_large_image");
+    expect(html, "an alt text is what a screen reader and a bad connection get").toMatch(/og:image:alt/);
+  });
+});
+
 describe("the market measurement is on the page", () => {
   /**
    * Read from the dataset, not written down here a second time.
