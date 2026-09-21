@@ -81,10 +81,48 @@ def main() -> int:
         aendern("ops/check-all.sh is not green",
                 "the article sends people to a service that is not answering for itself")
 
-    # 2. The directory figures in the text against the scan of today.
-    punkt = letzte_zeile("/opt/control-plane/x402/kennzahlen.ndjson")
-    if not punkt:
-        aendern("the x402 series could not be read", "run ops/x402-zeitreihe.sh on the VM first")
+    # 2. The directory figures in the text against the file a reader can re-run.
+    #
+    # This compared the article against `/opt/control-plane/x402/kennzahlen.ndjson` until
+    # 2026-09-22, which is the same series `/x402` renders, so it was green by construction: two
+    # readings of one source agreeing with each other. The file the article actually sends people
+    # to, the CC0 CSV in `docs/research/data/`, appeared in no comparison at all.
+    #
+    # It mattered. The CSV in the repository came from a local run at 03:22 UTC and the article's
+    # figures from the VM scan at 04:40, 78 minutes apart. Seven of the headline numbers differed,
+    # and "every number here can be re-run" was an invitation to find that out. The adversarial
+    # read on 2026-09-21 found it in one command.
+    #
+    # So the numbers are now checked against the CSV, by running the published script on the
+    # published data, which is exactly what a hostile reader does first.
+    csv = sorted(Path("docs/research/data").glob("*-x402-verzeichnis.csv"))
+    if not csv:
+        aendern("no x402 CSV in docs/research/data", "the article links to it as the way to re-run")
+        punkt = {}
+    else:
+        lauf = subprocess.run(
+            ["python3", "docs/research/data/x402-kennzahlen.py", str(csv[-1])],
+            capture_output=True, text=True, timeout=180,
+        ).stdout
+        zahl_aus = lambda muster: (
+            int(m.group(1).replace(",", "").replace(".", "")) if (m := re.search(muster, lauf)) else None
+        )
+        punkt = {
+            "dienste_cdp": zahl_aus(r"Coinbase ([\d.,]+)"),
+            "dienste_payai": zahl_aus(r"PayAI ([\d.,]+)"),
+            "urls_eindeutig": zahl_aus(r"Eindeutige Dienst-URLs: ([\d.,]+)"),
+            "anbieter": zahl_aus(r"Verschiedene Anbieter \(Host\): ([\d.,]+)"),
+            "aufrufe_30d": zahl_aus(r"Aufrufe in 30 Tagen, Summe:\s+([\d.,]+)"),
+            "mit_20_zahlern": zahl_aus(r"mindestens  20 Zahlern:\s+([\d.,]+)"),
+            "mit_nachfrage": zahl_aus(r"Nachfragedaten: ([\d.,]+) von"),
+        }
+        punkt["ohne_nachfragedaten"] = (
+            punkt["dienste_cdp"] - punkt["mit_nachfrage"]
+            if punkt["dienste_cdp"] and punkt["mit_nachfrage"] else None
+        )
+        print(f"  (the figures below come from {csv[-1].name}, re-run with the published script)")
+    if not punkt or punkt.get("dienste_cdp") is None:
+        aendern("the CSV could not be re-run", "without it the article's figures are unchecked")
     else:
         paare = [
             ("distinct services", r"so ([\d,]+) distinct services", "urls_eindeutig"),

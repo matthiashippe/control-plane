@@ -47,6 +47,45 @@ Mensch, ein Automat oder ein Wiederholungsversuch steht, steht nicht drin. Die h
 Transfers je Wallet in den letzten Monaten (zwei im Schnitt) passt zum Retry-Verhalten aus
 Issue #393 und bedeutet nicht zwei Kaufentscheidungen.
 
+## `2026-09-21-x402-verzeichnis.csv`
+
+Beide oeffentlichen x402-Verzeichnisse, Coinbase und der PayAI-Facilitator, vollstaendig gescannt
+am **21.09.2026 um 04:40:36 UTC**. 21.789 Zeilen: 15.192 aus dem Coinbase-Verzeichnis, 6.597 von
+PayAI, davon 981 derselbe Dienst in beiden, also 20.789 eindeutige Dienst-URLs hinter 2.639
+Anbietern.
+
+Spalten: `verzeichnis` (cdp oder payai), `resource` (die bezahlte URL), `host`, `x402_version`,
+`netzwerk`, `betrag_atomar`, `last_updated`, `last_called_at`, `calls_30d`, `unique_payers_30d`,
+`hat_bazaar_block`. Die letzten drei liefert nur Coinbase, und auch dort nicht ueberall: 65 der
+15.192 Eintraege tragen keine Nachfragedaten.
+
+Reproduzierbar mit den Skripten daneben, ohne Schluessel:
+
+```bash
+python3 x402-verzeichnis-scan.py > 2026-09-21-x402-verzeichnis.csv   # neuer Scan von heute
+python3 x402-kennzahlen.py 2026-09-21-x402-verzeichnis.csv           # die Kennzahlen dieser Datei
+```
+
+**Welcher Lauf hier liegt, und warum das wichtig ist.** Bis zum 22.09.2026 lag hier die CSV eines
+lokalen Laufs von 03:22 UTC, waehrend jede veroeffentlichte Zahl aus dem Cron-Scan von 04:40 kam.
+78 Minuten Unterschied, und sieben der Kopfzahlen gingen auseinander: 15.189 statt 15.192, 6.594
+statt 6.597, 20.783 statt 20.789, 2.636 statt 2.639, 59 statt 65 ohne Nachfragedaten und 867.827
+statt 867.813 Aufrufe. Die Verteilung war in beiden identisch, bis auf die letzte Stelle. Wer
+nachrechnete, bekam also andere Kopfzahlen als jeder Text, der auf diese Datei verweist, und genau
+dazu laedt der Text ein. Seither liegt hier der Lauf, aus dem die veroeffentlichten Zahlen stammen,
+und `ops/vor-dem-artikel.py` prueft den Text gegen diese Datei statt gegen die Zeitreihe, die er
+ohnehin selbst speist.
+
+Grenzen: Coinbase fuellt die Nachfragefelder spaet. Am 20.09. stand der groesste Dienst des ganzen
+Verzeichnisses mit leeren Feldern darin und erschien einen Tag spaeter mit 346.869 Aufrufen, also
+40 Prozent des Gesamtvolumens. Jede Summe aus dieser Datei ist deshalb eine Untergrenze und keine
+Zaehlung. Die Verteilung ist der belastbare Teil.
+
+## `2026-09-21-x402-kennzahlen.json`
+
+Die Kennzahlen desselben Laufs als JSON, also das Ergebnis von `x402-kennzahlen.py` in
+maschinenlesbar. Wer nur die Verteilung braucht, nimmt diese Datei und nicht die 3,2 MB CSV.
+
 ## Lizenz
 
 CC0 1.0 Universal, siehe `LICENSE.md` in diesem Verzeichnis. Das weicht bewusst von der
