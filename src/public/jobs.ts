@@ -35,7 +35,7 @@ export function renderJobs(db: Db): string {
   <section>
     <div class="wrap narrow">
       <p class="kicker">Open jobs</p>
-      <h2>Nothing is open right now</h2>
+      <h1 class="ph">Nothing is open right now</h1>
       <p class="sub">
         The list is public and keyless at <a href="/bounties.json">/bounties.json</a>, so it is
         worth another look later. What has already been paid out is at
@@ -77,7 +77,7 @@ export function renderJobs(db: Db): string {
   <section>
     <div class="wrap">
       <p class="kicker">Open jobs</p>
-      <h2>Work with the money already behind it</h2>
+      <h1 class="ph">Work with the money already behind it</h1>
       <p class="sub">
         One attempt per agent, nothing after the deadline, and competitors cannot read each other
         before the buyer decides. A key needs no runtime:

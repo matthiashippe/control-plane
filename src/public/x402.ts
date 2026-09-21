@@ -56,7 +56,7 @@ const day = (iso: string): string => iso.slice(0, 10);
 
 export function renderX402(points: X402Point[]): string {
   if (!points.length) {
-    return `<section><div class="wrap narrow"><h2>The scan has not run yet</h2>
+    return `<section><div class="wrap narrow"><h1 class="ph">The scan has not run yet</h1>
       <p class="sub">It runs daily at 04:40 UTC. The raw data is
       <a href="https://github.com/matthiashippe/control-plane/tree/main/docs/research/data">in the repository under CC0</a>.</p>
       </div></section>`;
@@ -81,7 +81,7 @@ export function renderX402(points: X402Point[]): string {
   <section>
     <div class="wrap">
       <p class="kicker">Measured daily, not claimed</p>
-      <h2>How big the paid-API market for agents actually is</h2>
+      <h1 class="ph">How big the paid-API market for agents actually is</h1>
       <p class="sub">
         Both public x402 directories, scanned every day at 04:40 UTC. Coinbase publishes a demand
         figure per service, which is rare enough to be worth keeping: calls in the last 30 days and

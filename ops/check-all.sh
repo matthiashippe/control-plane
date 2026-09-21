@@ -47,6 +47,7 @@ run "conway still broken" ./ops/conway-zustand.sh
 
 run "market guards" env CP_URL="$BASE" pnpm -s tsx harness/e2e/markt.ts
 run "journeys match the service" ./ops/journeys-pruefen.sh
+run "pages say nothing obviously wrong" ./ops/seiten-pruefen.sh
 
 if (( DEEP )); then
   run "MCP route end to end" env CP_URL="$BASE" OPERATOR_WALLET="${OPERATOR_WALLET:-harness/state/mainnet-wallet.json}" pnpm -s tsx ops/mcp-against-production.ts

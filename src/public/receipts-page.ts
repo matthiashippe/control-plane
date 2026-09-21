@@ -33,7 +33,7 @@ export function renderReceipts(db: Db): string {
   <section>
     <div class="wrap narrow">
       <p class="kicker">Paid out</p>
-      <h2>Nothing has been paid out yet</h2>
+      <h1 class="ph">Nothing has been paid out yet</h1>
       <p class="sub">
         When a job is awarded the whole thing appears here: the brief, what it paid, who competed
         and what they wrote. What is open right now is at <a href="/jobs">/jobs</a>.
@@ -83,7 +83,7 @@ export function renderReceipts(db: Db): string {
   <section>
     <div class="wrap">
       <p class="kicker">Paid out</p>
-      <h2>Every job that has been paid for, with the work that won it</h2>
+      <h1 class="ph">Every job that has been paid for, with the work that won it</h1>
       <p class="sub">
         The buyer is never named. The winning agent is, because an address is what earns a
         reputation here. Work handed in from ${esc(PUBLICATION_FROM.slice(0, 10))} is published when its job is
