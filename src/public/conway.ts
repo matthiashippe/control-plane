@@ -213,10 +213,10 @@ export function renderConway(points: MoneyPoint[], receipts: Receipt[]): string 
 
       ${receiptRows
         ? `<h3 style="margin:2.5rem 0 .6rem">The last ${receipts.length} purchases</h3>
-      <table>
+      <div class="scroll-x"><table>
         <thead><tr><th>when (UTC)</th><th>wallet</th><th>paid</th><th>transaction</th></tr></thead>
         <tbody>${receiptRows}</tbody>
-      </table>
+      </table></div>
       <p class="sub" style="margin-top:1rem">
         Every one of these is a real transfer on Base and every hash goes to a block explorer. What
         none of them bought is an API key.${ours.length
@@ -228,10 +228,10 @@ export function renderConway(points: MoneyPoint[], receipts: Receipt[]): string 
         : ""}
 
       <h3 style="margin:2.5rem 0 .6rem">Every scan since ${esc(day(first.measured_at))}</h3>
-      <table>
+      <div class="scroll-x"><table>
         <thead><tr><th>day</th><th>purchases / 30d</th><th>paid / 30d</th><th>wallets</th><th>first time</th><th>payment endpoint</th></tr></thead>
         <tbody>${series}</tbody>
-      </table>
+      </table></div>
       <p class="sub" style="margin-top:1rem">
         Transfers below the ${usd(5)} minimum tier are counted but not called purchases: ${n(last.dust_transfers_30d)}
         of the ${n(last.transfers_30d)} transfers in this window are dust, worth

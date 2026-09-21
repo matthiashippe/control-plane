@@ -116,10 +116,10 @@ export function renderX402(points: X402Point[]): string {
       </div>
 
       <h3 style="margin:2.5rem 0 .6rem">Every scan since ${esc(day(first.stichtag))}</h3>
-      <table>
+      <div class="scroll-x"><table>
         <thead><tr><th>day</th><th>services</th><th>calls / 30d</th><th>top ten</th><th>no demand data</th><th>largest service</th></tr></thead>
         <tbody>${reihe}</tbody>
-      </table>
+      </table></div>
       <p class="sub" style="margin-top:1rem">
         The series is kept for good and the raw CSV of each day for sixty. If you want the whole
         thing, take it: CC0, no attribution required, no key, no rate limit worth mentioning.

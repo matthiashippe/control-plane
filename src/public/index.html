@@ -111,6 +111,13 @@ code, pre, .mono, .brief, .who { overflow-wrap: anywhere; }
    the money section together into one wall, and /terms is the page somebody reads before they pay.
    Scoped to paragraphs and lists that sit directly in a column or in a .prose block, so nothing
    the landing page composes by hand is touched. */
+/* A wide data table scrolls inside itself, not with the page.
+   /x402 puts six columns of figures in a row. At 390px that table is 574 wide, and without this
+   the whole document scrolled sideways: every line of prose on the page moved when the reader
+   dragged the table. Measured on 2026-09-21 in a real 390px viewport. */
+.scroll-x { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.scroll-x > table { min-width: 34rem; }
+
 main .wrap > p, main .wrap > ul, main .wrap > ol,
 .prose > p, .prose > ul, .prose > ol, .prose li { margin: .65rem 0; }
 main .wrap > p.kicker, main .wrap > p.sub, main .wrap > p.fine { margin-top: 0; }
@@ -213,7 +220,8 @@ section { padding-block: var(--s-16); }
   /* `:not(.hide-s)`, because this rule sits after the one that hides those links at narrow
      widths and a bare `display: inline-flex` brought them back. Found by measuring again
      after the fix rather than by assuming the fix was the end of it. */
-  .bar nav a:not(.hide-s) { display: inline-flex; align-items: center; min-height: 44px; }
+  .bar nav a:not(.hide-s) { display: inline-flex; align-items: center; justify-content: center;
+                            min-height: 44px; min-width: 44px; padding-inline: .35rem; }
   .bar .brand { display: inline-flex; align-items: center; min-height: 44px; }
 }
 @media (max-width: 30rem) { .bar .wrap { gap: var(--s-4); } .bar nav { gap: var(--s-4); } .hide-s { display: none; } }

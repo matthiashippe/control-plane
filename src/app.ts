@@ -346,10 +346,10 @@ export function createApp(opts: AppOptions) {
   <nav>
     <a href="/post">Post a job</a>
     <a href="/jobs">Jobs</a>
-    <a href="/receipts">Paid out</a>
-    <a href="/x402">Data</a>
+    <a href="/receipts" class="hide-s">Paid out</a>
+    <a href="/x402" class="hide-s">Data</a>
     <a href="/conway" class="hide-s">Conway</a>
-    <a href="https://github.com/matthiashippe/control-plane">Source</a>
+    <a href="https://github.com/matthiashippe/control-plane" class="hide-s">Source</a>
   </nav>
 </div></header>
 <main>${bodyHtml}</main>
