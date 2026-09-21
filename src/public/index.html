@@ -105,6 +105,18 @@ code, pre, .mono, .brief, .who { overflow-wrap: anywhere; }
    and /post lost its chip. `ops/klassen-pruefen.py` cannot see this: both are element selectors,
    and it only knows about classes. Scoped with :not() so the landing page's own `.code pre` keeps
    its narrower styling. */
+/* Running prose, which only the sub-pages have.
+   The rewrite set `p { margin: 0 }`, which is right for the landing page: every block there sets
+   its own spacing and a stray margin would break the rhythm. On /terms it ran four paragraphs of
+   the money section together into one wall, and /terms is the page somebody reads before they pay.
+   Scoped to paragraphs and lists that sit directly in a column or in a .prose block, so nothing
+   the landing page composes by hand is touched. */
+main .wrap > p, main .wrap > ul, main .wrap > ol,
+.prose > p, .prose > ul, .prose > ol, .prose li { margin: .65rem 0; }
+main .wrap > p.kicker, main .wrap > p.sub, main .wrap > p.fine { margin-top: 0; }
+.prose > p:first-child { margin-top: 0; }
+.prose > p:last-child { margin-bottom: 0; }
+
 :not(.code) > pre { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px;
                     padding: .9rem 1rem; overflow-x: auto; font-size: .85rem; margin: .8rem 0; }
 code:not(pre code) { background: var(--panel-2); border: 1px solid var(--line);
