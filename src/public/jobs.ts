@@ -14,19 +14,12 @@ import type { Db } from "../db.js";
 import { openBounties, feeMc } from "../bounties/store.js";
 import { GRANT_MC } from "../credits/starter.js";
 import { mcToCents } from "../db.js";
+import { briefHtml } from "./brief.js";
 import { esc } from "./market.js";
 
 const day = (iso: string): string => iso.slice(0, 10);
 /** "1 jobs" on a page meant to convince is a small hole in a large claim. */
 const mehrzahl = (n: number, eins: string, viele: string): string => (n === 1 ? eins : viele);
-
-/** Turns a brief into paragraphs without letting a single character of it become markup. */
-function briefHtml(brief: string): string {
-  return brief
-    .split(/\n{2,}/)
-    .map((absatz) => `<p>${esc(absatz.trim()).replace(/\n/g, "<br>")}</p>`)
-    .join("");
-}
 
 export function renderJobs(db: Db): string {
   const open = openBounties(db, 50);

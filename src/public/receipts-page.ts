@@ -12,6 +12,7 @@
  */
 import type { Db } from "../db.js";
 import { receipts, PUBLICATION_FROM } from "../bounties/receipts.js";
+import { briefHtml as absaetze } from "./brief.js";
 import { esc } from "./market.js";
 
 const day = (iso: string): string => iso.slice(0, 10);
@@ -19,12 +20,6 @@ const kurz = (a: string): string => `${a.slice(0, 6)}…${a.slice(-4)}`;
 /** "1 jobs paid out" on a page meant to convince is a small hole in a large claim. */
 const mehrzahl = (n: number, eins: string, viele: string): string => (n === 1 ? eins : viele);
 
-function absaetze(text: string): string {
-  return text
-    .split(/\n{2,}/)
-    .map((a) => `<p>${esc(a.trim()).replace(/\n/g, "<br>")}</p>`)
-    .join("");
-}
 
 export function renderReceipts(db: Db): string {
   const alle = receipts(db, 50);
