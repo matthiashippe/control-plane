@@ -78,6 +78,7 @@ run "pages say nothing obviously wrong" ./ops/seiten-pruefen.sh
 # Added 2026-09-21. The three series below were printed by this script and never checked, so a cron
 # entry that stops firing would leave the same last point in every cycle's output and this script
 # would keep saying ALL CHECKS OK next to it.
+run "every class on every page has a rule" ./ops/klassen-pruefen.py
 run "the daily jobs still ran" ./ops/freshness.sh
 
 if (( DEEP )); then

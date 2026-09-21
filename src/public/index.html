@@ -443,6 +443,68 @@ footer a { color: var(--muted); }
 .receipt .amt { font-variant-numeric: tabular-nums; font-family: var(--mono); text-align: right; }
 .receipt .who { font-family: var(--mono); color: var(--dim); }
 .empty { color: var(--muted); font-size: var(--t-ui); margin-top: var(--s-6); }
+
+/* ============================================================================
+   The sub-pages, on the stylesheet they are served with.
+
+   `seite()` in src/app.ts builds every sub-page from this file's <head>, so /post, /terms,
+   /conway, /x402, /jobs and /receipts all carry whatever stylesheet the landing page carries.
+   The landing page was rewritten on 2026-09-21 and its CSS replaced wholesale, which silently
+   took ten classes with it that only the sub-pages use: .ph is the heading on every one of them,
+   .narrow is their column width, and .stats, .claims, .card, .n, .l, .good, .bad and .t carry
+   everything else. They went out rendering against rules that no longer existed, and
+   ops/seiten-pruefen.sh said PAGES OK, because it checks a status code, one h1 and no unrendered
+   placeholder, and layout is none of those.
+
+   Lifted from the previous stylesheet unchanged except for var(--radius), which is var(--r-pan)
+   now. `h2, h1.ph` became `h1.ph`: taking the old h2 with it would have overridden the new type
+   scale on the landing page as well.
+   ========================================================================= */
+.narrow { max-width: 46rem; }
+h1.ph { font-size: clamp(1.5rem, 3.2vw, 2.1rem); line-height: 1.15; letter-spacing: -.025em; margin: 0 0 .6rem; font-weight: 660; max-width: none; }
+.cards.four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.cards.four { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.cards.four { grid-template-columns: 1fr; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-pan); padding: 1.25rem; }
+.card.step { background: linear-gradient(180deg, var(--panel-2), var(--panel)); }
+.card p { color: var(--muted); font-size: .93rem; margin: .4rem 0 0; }
+.card .go { display: inline-block; margin-top: .9rem; font-size: .9rem; font-weight: 600; text-decoration: none; }
+.card .go::after { content: " \2192"; }
+.job { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-pan); padding: 1.15rem 1.25rem; display: flex; flex-direction: column; gap: .8rem; }
+.job .tag { font-size: .7rem; letter-spacing: .08em; text-transform: uppercase; color: var(--dim); border: 1px solid var(--line); border-radius: 999px; padding: .2rem .55rem; }
+.job .brief { font-size: .95rem; line-height: 1.45; }
+.job .row { display: flex; align-items: flex-end; justify-content: space-between; gap: 1rem; margin-top: auto; padding-top: .8rem; border-top: 1px solid var(--line); }
+.job .pay { font-size: 1.5rem; font-weight: 660; letter-spacing: -.02em; white-space: nowrap; }
+.job .pay span { display: block; font-size: .78rem; font-weight: 500; color: var(--dim); letter-spacing: 0; white-space: normal; margin-top: .15rem; }
+.job .meta { font-size: .82rem; color: var(--muted); text-align: right; white-space: nowrap; }
+.empty { background: var(--panel); border: 1px dashed var(--line); border-radius: var(--r-pan); padding: 1.5rem; color: var(--muted); }
+.receipt + .receipt { margin-top: .6rem; }
+.receipt .t { color: var(--muted); }
+.receipt .amt { font-weight: 640; white-space: nowrap; }
+.receipt .who { font-family: ui-monospace, monospace; font-size: .82rem; color: var(--dim); white-space: nowrap; }
+.receipt { grid-template-columns: 1fr 1fr; }
+.stats div { background: var(--panel); padding: 1.4rem 1.3rem; }
+.stats .n { display: block; font-size: clamp(1.9rem, 3.6vw, 2.7rem); font-weight: 680; letter-spacing: -.035em; line-height: 1; }
+.stats .n.good { color: var(--accent); }
+.stats .n.bad { color: var(--warm); }
+.stats .l { display: block; margin-top: .55rem; font-size: .88rem; color: var(--muted); line-height: 1.35; }
+.stats a { color: inherit; }
+.claims > div { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1rem; align-items: center; padding: 1rem 1.3rem; background: var(--panel); }
+.claims > div + div { border-top: 1px solid var(--line); }
+.claims b { font-weight: 600; }
+.claims .w { color: var(--muted); font-size: .9rem; display: block; margin-top: .15rem; }
+.claims a { font-size: .88rem; font-weight: 600; text-decoration: none; white-space: nowrap; }
+.claims a::after { content: " \2192"; }
+.claims > div { grid-template-columns: 1fr; gap: .5rem; }
+.two ul { list-style: none; margin: .6rem 0 0; padding: 0; }
+.two li { position: relative; padding-left: 1.5rem; font-size: .93rem; color: var(--muted); margin: .45rem 0; }
+.two li::before { position: absolute; left: 0; font-weight: 700; }
+.two .yes li::before { content: "\2713"; color: var(--accent); }
+.two .no li::before { content: "\2715"; color: var(--warm); }
+@media(max-width: 66rem) { .cards.four { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media(max-width: 36rem) { .cards.four { grid-template-columns: 1fr; } }
+@media(max-width: 46rem) { .receipt { grid-template-columns: 1fr 1fr; } }
+@media(max-width: 40rem) { .claims > div { grid-template-columns: 1fr; gap: .5rem; } }
 </style>
 </head>
 <body>

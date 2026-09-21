@@ -297,6 +297,27 @@ ran at 03:30 and the cron at 04:40.
 
 What it cannot check, and says so: whether today is a good day to post.
 
+## Does every class on every page have a rule
+
+`ops/klassen-pruefen.py`, part of `ops/check-all.sh`. Reads the served HTML of all seven pages and
+holds every class in it against the stylesheet that came with it.
+
+`seite()` in `src/app.ts` builds every sub-page from the landing page's `<head>`, so /post, /terms,
+/conway, /x402, /jobs and /receipts carry whatever stylesheet the landing page carries. When the
+landing page was rewritten on 2026-09-21 its CSS was replaced wholesale, and that took ten classes
+with it that only the sub-pages use: `.ph` is the heading on every one of them, `.narrow` their
+column width, and `.stats`, `.claims`, `.card`, `.n`, `.l`, `.good`, `.bad` and `.t` carry the rest.
+Six pages went out rendering against rules that no longer existed, and `ops/seiten-pruefen.sh` said
+PAGES OK the whole time, because it checks a status code, one h1 and no unrendered placeholder, and
+a class that resolves to nothing is none of those.
+
+It reads the served bytes rather than the source, so a class lost in a build step counts too.
+
+**Classes inside an `<svg>` are cut out before the comparison.** In there a class is as often a
+name as a hook: `n0`, `a1`, `wires` and `marks` say which box is which and are never meant to be
+styled, while the rules that do style the diagram reach in from outside (`.flow .w1`). Counting
+them would have meant keeping an allow-list, and an allow-list is a hole in a check.
+
 ## Measuring the page at phone width
 
 `ops/seiten-pruefen.sh` checks that every page answers 200 with one h1 and nothing unrendered. It
