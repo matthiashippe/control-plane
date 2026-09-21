@@ -1,0 +1,44 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><style>
+  * { box-sizing: border-box; margin: 0; }
+  html, body { width: 1200px; height: 630px; overflow: hidden; }
+  body {
+    background: #0c0e0c; color: #f0efe6; position: relative;
+    font: 16px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    -webkit-font-smoothing: antialiased; padding: 68px 72px;
+    display: flex; flex-direction: column; justify-content: space-between;
+  }
+  body::before {
+    content: ""; position: absolute; inset: -30% -10% auto -10%; height: 520px;
+    background: radial-gradient(42% 52% at 26% 38%, rgba(126,224,176,.20), transparent 70%),
+                radial-gradient(38% 46% at 78% 26%, rgba(232,176,75,.13), transparent 70%);
+  }
+  .top, .mid, .bot { position: relative; }
+  .brand { display: flex; align-items: center; gap: 12px; font-size: 26px; font-weight: 660; letter-spacing: -.01em; }
+  h1 { font-size: 78px; line-height: .98; letter-spacing: -.035em; font-weight: 680; max-width: 15ch; }
+  .glow { background: linear-gradient(95deg, #7ee0b0, #d9f27a); -webkit-background-clip: text; color: transparent; }
+  .sub { font-size: 25px; color: #9b9c8e; max-width: 46ch; margin-top: 22px; line-height: 1.4; }
+  .bot { display: flex; align-items: flex-end; justify-content: space-between; gap: 40px; }
+  .facts { display: flex; gap: 46px; }
+  .facts b { display: block; font-size: 15px; letter-spacing: .1em; text-transform: uppercase; color: #6f7166; font-weight: 600; }
+  .facts span { display: block; font-size: 30px; font-weight: 640; letter-spacing: -.02em; margin-top: 6px; }
+  .url { font: 500 21px ui-monospace, SFMono-Regular, Menlo, monospace; color: #7ee0b0; }
+</style></head><body>
+  <div class="top">
+    <div class="brand">
+      <svg width="34" height="34" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#7ee0b0" opacity=".14"/><circle cx="16" cy="12" r="5.5" fill="none" stroke="#7ee0b0" stroke-width="2.5"/><rect x="7" y="21" width="18" height="3.5" rx="1.75" fill="#7ee0b0"/></svg>
+      Handsel
+    </div>
+  </div>
+  <div class="mid">
+    <h1>How big the paid-API market for agents <span class="glow">actually is</span></h1>
+    <p class="sub">Both public x402 directories, scanned every day at 04:40 UTC. Raw data under CC0, no key, including the numbers that do not flatter anybody selling in this space.</p>
+  </div>
+  <div class="bot">
+    <div class="facts">
+      <div><b>median service</b><span>2 calls a month</span></div>
+      <div><b>most services</b><span>one paying wallet</span></div>
+      <div><b>raw data</b><span>CC0, re-runnable</span></div>
+    </div>
+    <div class="url">cp.hippe.eu/x402</div>
+  </div>
+</body></html>

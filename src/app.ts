@@ -274,16 +274,24 @@ export function createApp(opts: AppOptions) {
    * the numbers that change are on the page itself. The source of the card is next to it in
    * `src/public/og-card.html`, so the next version is a screenshot away and not a mystery.
    */
-  const ogImage = (() => {
-    for (const candidate of [path.join(PUBLIC_DIR, "og.png"), path.resolve("src/public/og.png")]) {
-      if (fs.existsSync(candidate)) return fs.readFileSync(candidate);
+  const ogBild = (name: string): ArrayBuffer | null => {
+    for (const candidate of [path.join(PUBLIC_DIR, name), path.resolve(`src/public/${name}`)]) {
+      if (fs.existsSync(candidate)) {
+        const b = fs.readFileSync(candidate);
+        // A copy into a plain ArrayBuffer: a Buffer is a view into a shared pool, and handing that
+        // straight out would serve whatever else happens to sit next to it in the pool.
+        return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer;
+      }
     }
     return null;
-  })();
-  if (ogImage) {
-    app.get("/og.png", (c) =>
-      c.body(ogImage, 200, { "Content-Type": "image/png", "Cache-Control": "public, max-age=86400" }),
-    );
+  };
+  for (const name of ["og.png", "og-x402.png"]) {
+    const bild = ogBild(name);
+    if (bild) {
+      app.get(`/${name}`, (c) =>
+        c.body(bild, 200, { "Content-Type": "image/png", "Cache-Control": "public, max-age=86400" }),
+      );
+    }
   }
 
   /**
@@ -312,13 +320,19 @@ export function createApp(opts: AppOptions) {
    * script is deliberately not carried over; it only fills the status figures on the landing page,
    * and a page that does not need it should not ship a hash-pinned script for nothing.
    */
-  const seite = (bodyHtml: string, titel: string, beschreibung: string, pfad: string): string => {
+  const seite = (bodyHtml: string, titel: string, beschreibung: string, pfad: string, karte = "og.png"): string => {
     const kopf = (indexHtml ?? "").slice(0, (indexHtml ?? "").indexOf("</head>"));
     return (
       kopf
         .replace(/<title>[^<]*<\/title>/, `<title>${titel}</title>`)
         .replace(/(<meta name="description" content=")[^"]*/, `$1${beschreibung}`)
-        .replace(/(<link rel="canonical" href="https:\/\/cp\.hippe\.eu)\/"/, `$1${pfad}"`) +
+        .replace(/(<link rel="canonical" href="https:\/\/cp\.hippe\.eu)\/"/, `$1${pfad}"`)
+        .replace(/(<meta property="og:title" content=")[^"]*/, `$1${titel}`)
+        .replace(/(<meta property="og:description" content=")[^"]*/, `$1${beschreibung}`)
+        .replace(/(<meta name="twitter:title" content=")[^"]*/, `$1${titel}`)
+        .replace(/(<meta name="twitter:description" content=")[^"]*/, `$1${beschreibung}`)
+        .replace(/(<meta property="og:url" content="https:\/\/cp\.hippe\.eu)\/"/, `$1${pfad}"`)
+        .replace(/og\.png/g, karte) +
       `</head>
 <body>
 <header class="bar"><div class="wrap">
@@ -356,6 +370,7 @@ export function createApp(opts: AppOptions) {
         "How big the paid-API market for agents actually is",
         "Both public x402 directories, scanned daily. Distinct services, calls in 30 days, how concentrated the demand is, and how many services have a single paying wallet. Raw data under CC0.",
         "/x402",
+        "og-x402.png",
       ),
     );
   });

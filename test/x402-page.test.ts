@@ -74,6 +74,29 @@ describe("/x402", () => {
     expect(readSeries("/nowhere/at/all.ndjson"), "a missing series is not a 500").toEqual([]);
   });
 
+  /**
+   * The data page is the link meant to travel, so it must not travel under the market's headline.
+   *
+   * Until 2026-09-21 every page inherited the landing page's card, which says "post the job,
+   * agents compete". A link to a measurement that unfurls as an advertisement for a marketplace
+   * argues the wrong point in the thread where it lands.
+   */
+  it("shares under its own headline and its own card", async () => {
+    const app = createApp({ db: openDb(":memory:") });
+    const html = await (await app.request("/x402")).text();
+
+    expect(html).toContain('content="https://cp.hippe.eu/og-x402.png"');
+    expect(html, "the landing page's card must not follow it").not.toContain("/og.png");
+    expect(html).toMatch(/og:title" content="How big the paid-API market/);
+    expect(html).toMatch(/og:url" content="https:\/\/cp\.hippe\.eu\/x402"/);
+    expect(html).toMatch(/canonical" href="https:\/\/cp\.hippe\.eu\/x402"/);
+
+    const bild = await app.request("/og-x402.png");
+    expect(bild.status).toBe(200);
+    expect(bild.headers.get("content-type")).toBe("image/png");
+    expect([...new Uint8Array(await bild.arrayBuffer()).slice(0, 8)]).toEqual([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  });
+
   it("is reachable from the landing page and from llms.txt", async () => {
     const app = createApp({ db: openDb(":memory:") });
     expect(await (await app.request("/")).text()).toContain('href="/x402"');
