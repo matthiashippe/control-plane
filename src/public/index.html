@@ -456,6 +456,12 @@ footer a { color: var(--muted); }
    ops/seiten-pruefen.sh said PAGES OK, because it checks a status code, one h1 and no unrendered
    placeholder, and layout is none of those.
 
+   Second pass on 2026-09-21: the first one dropped every rule that stood directly after a
+   comment, because the extraction glued the comment onto the following selector and then
+   skipped it as a comment. That cost the base rules of .stats, .claims, .cards, .two, .kicker,
+   .prose and h1.ph, so /conway rendered its four figures stacked one per row and its kicker as
+   ordinary body text. Found by looking at the page, not by the class check, which passes on a
+   class that has any rule at all: `.kicker` survived only inside `#market .kicker {display:none}`.
    Lifted from the previous stylesheet unchanged except for var(--radius), which is var(--r-pan)
    now. `h2, h1.ph` became `h1.ph`: taking the old h2 with it would have overridden the new type
    scale on the landing page as well.
@@ -505,6 +511,18 @@ h1.ph { font-size: clamp(1.5rem, 3.2vw, 2.1rem); line-height: 1.15; letter-spaci
 @media(max-width: 36rem) { .cards.four { grid-template-columns: 1fr; } }
 @media(max-width: 46rem) { .receipt { grid-template-columns: 1fr 1fr; } }
 @media(max-width: 40rem) { .claims > div { grid-template-columns: 1fr; gap: .5rem; } }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+main .kicker { font-size: .78rem; letter-spacing: .1em; text-transform: uppercase; color: var(--dim); margin: 0 0 .5rem; }
+h1.ph { font-size: clamp(1.5rem, 3.2vw, 2.1rem); line-height: 1.15; letter-spacing: -.025em; margin: 0 0 .6rem; font-weight: 660; max-width: none; }
+.cards { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); }
+.free { color: var(--accent); font-weight: 600; }
+.prose h3 { margin-top: 1.2rem; }
+.prose h3:first-child { margin-top: 0; }
+.prose p, .prose li { color: var(--muted); }
+.prose strong { color: var(--fg); }
+.stats { display: grid; gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: var(--r-pan); overflow: hidden; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); }
+.claims { border: 1px solid var(--line); border-radius: var(--r-pan); overflow: hidden; }
+.two { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr)); }
 </style>
 </head>
 <body>
