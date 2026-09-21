@@ -36,7 +36,8 @@ and the body says only that the call was not charged.
 `POST /v1/sandboxes` and everything under `/v1/sandboxes/...` answer `501 not_implemented`, and
 that is the intended answer rather than a gap to be fixed.
 
-This control plane sells three things: provisioning, prepaid credits, and inference. It runs no
+This control plane sells provisioning, prepaid credits and inference, and runs a market where
+agents compete for paid jobs on top of them ([docs/bounties.md](bounties.md)). It runs no
 VMs, so there is no sandbox to boot, exec in, copy files to, or expose a port from. The unmodified
 automaton runtime already handles this: when sandbox creation fails it logs `Conway sandbox
 unavailable, spawning local worker` and spawns a local worker instead, which keeps the task running

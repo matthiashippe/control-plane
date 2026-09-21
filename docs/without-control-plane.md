@@ -1,8 +1,8 @@
 # Keeping an automaton running without a control plane
 
-This page belongs to a paid control plane, and it describes how to keep the automaton runtime
-working **without us** now that `api.conway.tech` no longer provisions anyone. It costs nothing but
-effort. Both routes below were run end to end on a real machine, not just read out of the source.
+This page belongs to Handsel, a paid control plane with a market for paid work on top of it, and it
+describes how to keep the automaton runtime working **without us** now that `api.conway.tech` no
+longer provisions anyone. It costs nothing but effort. Both routes below were run end to end on a real machine, not just read out of the source.
 
 Every code reference points at the pinned upstream revision
 [`Conway-Research/automaton@d8f8168`](https://github.com/Conway-Research/automaton/tree/d8f8168).
