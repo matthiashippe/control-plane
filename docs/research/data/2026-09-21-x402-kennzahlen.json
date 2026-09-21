@@ -1,0 +1,22 @@
+{
+  "measured_on": "2026-09-21",
+  "source": "docs/research/data/2026-09-21-x402-verzeichnis.csv",
+  "coinbase_entries": 15189,
+  "payai_entries": 6594,
+  "in_both": 981,
+  "distinct_services": 20783,
+  "providers": 2636,
+  "with_demand_data": 15130,
+  "without_demand_data": 59,
+  "calls_30d_total": 867827,
+  "top10_share_percent": 76.3,
+  "top100_share_percent": 88.8,
+  "largest_service": {
+    "url": "https://blockrun.ai/api/v1/chat/completions",
+    "calls_30d": 346869,
+    "payers_30d": 182,
+    "share_percent": 40.0
+  },
+  "services_with_20_or_more_payers": 133,
+  "note": "Coinbase fills the demand fields late. The largest service was listed with empty fields on 2026-09-20, so totals are a floor and not a count."
+}

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createApp } from "../src/app.js";
+import { readFileSync } from "node:fs";
 import { openDb, postLedger } from "../src/db.js";
 import { hashApiKey } from "../src/auth/siwe.js";
 import { MockProvider } from "../src/inference/mock.js";
@@ -454,16 +455,41 @@ describe("preview and findability", () => {
 });
 
 describe("the market measurement is on the page", () => {
-  it("names the scope and the core number and links the raw data", async () => {
+  /**
+   * Read from the dataset, not written down here a second time.
+   *
+   * These four numbers were hardcoded in this test until 2026-09-21, which meant the page and the
+   * data it cites could drift apart and the test would keep passing as long as the page did not
+   * change. It nearly happened the same day: a fresh scan moved the totals, and the only thing
+   * that caught the stale page was a string comparison against numbers that were themselves
+   * stale. Now the summary beside the raw CSV is the single source, so a new scan either updates
+   * both or fails here.
+   */
+  const measured = JSON.parse(
+    readFileSync(new URL("../docs/research/data/2026-09-21-x402-kennzahlen.json", import.meta.url), "utf-8"),
+  ) as {
+    distinct_services: number;
+    providers: number;
+    with_demand_data: number;
+    services_with_20_or_more_payers: number;
+    largest_service: { share_percent: number };
+  };
+  const grouped = (n: number) => n.toLocaleString("en-US");
+
+  it("names the scope and the core numbers the dataset actually holds", async () => {
     const db = openDb(":memory:");
     const html = await (await createApp({ db }).request("/")).text();
-    expect(html).toMatch(/20,543 distinct services/);
-    // "130 of 21,545" would be wrong: only the 14,918 with demand data were measured.
-    expect(html).toMatch(/14,918 of them/);
-    expect(html).toMatch(/130 of those have twenty or more/);
-    expect(html, "without a link to the raw data it is a claim").toMatch(
-      /docs\/research\/data/,
-    );
+
+    expect(html).toContain(`${grouped(measured.distinct_services)} distinct services`);
+    expect(html).toContain(`${grouped(measured.providers)} providers`);
+    // "133 of 20,783" would be wrong: only the entries carrying demand data were measured.
+    expect(html).toContain(`${grouped(measured.with_demand_data)} of them`);
+    expect(html).toContain(`${grouped(measured.services_with_20_or_more_payers)} of those have twenty or more`);
+    // The concentration, and the warning that goes with it. A number this large from one endpoint
+    // is worthless without the sentence saying the directory published it a day late.
+    expect(html).toContain(`${measured.largest_service.share_percent} percent of all calls`);
+    expect(html, "a floor is not a count and the page has to say which it is").toMatch(/floor and not a count/);
+    expect(html, "without a link to the raw data it is a claim").toMatch(/docs\/research\/data/);
   });
 });
 
