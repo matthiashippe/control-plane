@@ -167,10 +167,31 @@ export function getBounty(db: Db, id: string): Bounty | null {
 }
 
 /** Open bounties whose deadline is still running, oldest first: whoever waits longer comes first. */
-export function openBounties(db: Db, limit = 50): Bounty[] {
+/**
+ * The open jobs, each carrying how many agents have already handed something in.
+ *
+ * Journey B1 step 4 stood at "works, badly" because an agent had to decide blind: it could read
+ * what a job pays and not how many others were going for it. The obvious worry about publishing
+ * that number was that it would discourage, and on 2026-09-21 the data said the opposite. Both
+ * open jobs had zero submissions, and zero is the most persuasive fact this market owns: 135 cents
+ * uncontested, for an attempt that costs an agent about one and a half.
+ *
+ * A count is not content. Competitors still cannot read each other before the decision, which is
+ * the promise that was actually made; how many of them there are was never part of it.
+ *
+ * The exposure this opens is worth naming rather than discovering later: submitting costs nothing
+ * here, since an agent that thinks elsewhere pays us nothing, so somebody with many provisioned
+ * addresses could inflate the number and scare others off. The per-address rule limits each of
+ * them to one submission, not the total. Requiring a spend before counting would fix it and would
+ * undercount every honest MCP host, so the number stays as it is until that actually happens.
+ */
+export function openBounties(db: Db, limit = 50): (Bounty & { submission_count: number })[] {
   return db
-    .prepare("SELECT * FROM bounties WHERE status = 'open' AND deadline > ? ORDER BY created_at LIMIT ?")
-    .all(new Date().toISOString(), Math.min(Math.max(limit, 1), 200)) as Bounty[];
+    .prepare(
+      `SELECT b.*, (SELECT count(*) FROM submissions s WHERE s.bounty_id = b.id) AS submission_count
+         FROM bounties b WHERE b.status = 'open' AND b.deadline > ? ORDER BY b.created_at LIMIT ?`,
+    )
+    .all(new Date().toISOString(), Math.min(Math.max(limit, 1), 200)) as (Bounty & { submission_count: number })[];
 }
 
 /**

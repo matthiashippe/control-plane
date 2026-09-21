@@ -96,6 +96,21 @@ describe("The market on the landing page", () => {
     expect(html, "the open list hides the buyer and so does the page").not.toContain(b.address);
   });
 
+  it("shows how many agents are already in, because zero is the best thing we can say", async () => {
+    const { app, db, page } = setup();
+    const b = buyer(db, app, 1);
+    const agent = buyer(db, app, 2);
+    const posted = await b.call("/v1/bounties", "POST", { brief: "An uncontested job.", kind: "factual", price_cents: 150, deadline: inAnHour() });
+    const { id } = (await posted.json()) as { id: string };
+
+    expect(await page(), "the column is there before anybody has entered").toContain("competing");
+    await agent.call("/v1/submissions", "POST", { bounty_id: id, body: "An attempt." });
+    const html = await page();
+    const row = /<tr><td>An uncontested job\.<\/td>[\s\S]*?<\/tr>/.exec(html);
+    expect(row, "the open job has to be a row on the page").not.toBeNull();
+    expect(row![0]).toContain("<td>1</td>");
+  });
+
   it("says plainly that nothing is there instead of showing an empty table", async () => {
     const { page } = setup();
     const html = await page();

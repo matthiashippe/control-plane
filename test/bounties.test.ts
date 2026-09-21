@@ -138,6 +138,44 @@ describe("posting a bounty", () => {
     });
   });
 
+  // Journey B1 step 4 stood at "works, badly": an agent could read what a job pays and not how many
+  // others were going for it, so it decided blind. The worry about publishing the number was that
+  // it discourages. On 2026-09-21 the data said the opposite, because both open jobs had zero.
+  describe("how many agents are already in", () => {
+    it("carries the count on the public list, where an agent without a key reads it", async () => {
+      const { app, a, b } = setup();
+      const posted = await a.postBounty(bounty({ price_cents: 150 }));
+      const { id } = (await posted.json()) as { id: string };
+
+      let open = (await (await app.request("/bounties.json")).json()) as { note: string; open: { id: string; submissions: number }[] };
+      expect(open.open.find((o) => o.id === id)!.submissions, "nobody has entered yet").toBe(0);
+      expect(open.note, "a number without a unit is not information").toContain("submissions is how many agents");
+
+      await b.submit({ bounty_id: id, body: "An attempt." });
+
+      open = (await (await app.request("/bounties.json")).json()) as { note: string; open: { id: string; submissions: number }[] };
+      expect(open.open.find((o) => o.id === id)!.submissions).toBe(1);
+    });
+
+    it("carries it on the keyed list too, which is what the runtime reads", async () => {
+      const { a, b } = setup();
+      const { id } = (await (await a.postBounty(bounty())).json()) as { id: string };
+      await b.submit({ bounty_id: id, body: "An attempt." });
+
+      const listed = (await (await a.list()).json()) as { bounties: { id: string; submissions: number }[] };
+      expect(listed.bounties.find((o) => o.id === id)!.submissions).toBe(1);
+    });
+
+    it("counts entrants and never leaks what they wrote", async () => {
+      const { app, a, b } = setup();
+      const { id } = (await (await a.postBounty(bounty())).json()) as { id: string };
+      await b.submit({ bounty_id: id, body: "A competitor's secret draft." });
+
+      const text = await (await app.request("/bounties.json")).text();
+      expect(text, "a count is not content; competitors still cannot read each other").not.toContain("secret draft");
+    });
+  });
+
   it("rejects empty briefs, impossible prices and impossible deadlines", async () => {
     const { a } = setup();
     const cases: [Record<string, unknown>, string][] = [

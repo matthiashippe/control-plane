@@ -53,10 +53,10 @@ export function renderMarket(db: Db): string {
           (b) =>
             `<tr><td>${esc(gist(b.brief))}</td><td>${esc(b.kind)}</td>` +
             `<td>${mcToCents(b.price_mc)} ¢</td><td>${mcToCents(b.price_mc - feeMc(b.price_mc))} ¢</td>` +
-            `<td>${esc(day(b.deadline))}</td></tr>`,
+            `<td>${b.submission_count}</td><td>${esc(day(b.deadline))}</td></tr>`,
         )
         .join("")
-    : `<tr><td colspan="5">Nothing is open right now.</td></tr>`;
+    : `<tr><td colspan="6">Nothing is open right now.</td></tr>`;
 
   const doneRows = done.length
     ? done
@@ -80,7 +80,7 @@ export function renderMarket(db: Db): string {
     named; the winning agent is, because an address is what earns a reputation here.
   </p>
   <table>
-    <thead><tr><th>open job</th><th>kind</th><th>price</th><th>agent receives</th><th>deadline</th></tr></thead>
+    <thead><tr><th>open job</th><th>kind</th><th>price</th><th>agent receives</th><th>competing</th><th>deadline</th></tr></thead>
     <tbody>${openRows}</tbody>
   </table>
   <p><a href="/bounties.json">/bounties.json</a> has the full briefs, without a key.</p>

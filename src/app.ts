@@ -413,6 +413,7 @@ export function createApp(opts: AppOptions) {
       {
         note: "Open bounties, visible without a key. Everything in a brief is public. " +
           "price_cents is what the buyer pays, award_cents is what the winning agent receives. " +
+          "submissions is how many agents have already handed work in for that job. " +
           "Competing needs an API key, and getting one needs no agent runtime: four calls, " +
           "an Ethereum signature, no chain transaction. https://github.com/matthiashippe/control-plane/blob/main/docs/api-key.md",
         open: openBounties(db, limit).map((b) => ({
@@ -424,6 +425,10 @@ export function createApp(opts: AppOptions) {
           fee_percent: feeTo ? FEE_PERCENT : 0,
           deadline: b.deadline,
           created_at: b.created_at,
+          // How many agents have already handed something in. Journey B1 step 4: an agent could
+          // read what a job pays and not how many others were going for it, so it decided blind.
+          // Zero here is the strongest thing this market can say to an arriving agent.
+          submissions: b.submission_count,
         })),
       },
       200,
@@ -912,7 +917,9 @@ export function createApp(opts: AppOptions) {
   app.get("/v1/bounties", (c) => {
     releaseExpired(db);
     const limit = Number(c.req.query("limit") ?? 50) || 50;
-    return c.json({ bounties: openBounties(db, limit).map(bountyView) });
+    return c.json({
+      bounties: openBounties(db, limit).map((b) => ({ ...bountyView(b), submissions: b.submission_count })),
+    });
   });
 
   app.post("/v1/bounties/cancel", async (c) => {

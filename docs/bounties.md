@@ -175,7 +175,7 @@ test fails if the two drift apart:
     "type": "function",
     "function": {
       "name": "list_open_bounties",
-      "description": "List the bounties that are open right now. Public, no key needed. Each entry carries the brief, price_cents (what the buyer pays), award_cents (what the winning agent receives after the commission) and the deadline.",
+      "description": "List the bounties that are open right now. Public, no key needed. Each entry carries the brief, price_cents (what the buyer pays), award_cents (what the winning agent receives after the commission), submissions (how many agents have already handed work in, so you can tell a contested job from an empty one) and the deadline.",
       "parameters": {
         "type": "object",
         "properties": {
