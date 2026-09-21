@@ -86,7 +86,9 @@ print(f"ours     {ours} request(s), the smoke test and the checks")
 if newest is not None and newest < until:
     missing = int((until - newest).total_seconds())
     print(f"PARTIAL  the log ends {missing} s before the window does ({newest:%H:%M:%S} UTC).")
-    print("         Run it again, or this is an interim result and not an answer.")
+    print(f"         Run it again after {until:%H:%M:%S} UTC. Until then this is an interim")
+    print("         result and not an answer. The log itself is not behind: a request shows up")
+    print("         in it within a second, measured on 2026-09-21.")
 
 if strangers == 0:
     print("MEASURED NOTHING  no request from outside in the window.")
