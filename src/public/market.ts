@@ -18,8 +18,22 @@
  * through. The Content-Security-Policy is a second line, not the first.
  */
 
+/**
+ * **Neither of these sweeps the expired bounties, and that is deliberate.**
+ *
+ * `releaseExpired` is a write: it moves a bounty out of `open` and pays the hold back. Both render
+ * functions called it, so every single view of the landing page opened two write transactions
+ * against SQLite. Measured on 2026-09-21 against production, 300 requests at 20 concurrent: twelve
+ * never connected at all, p95 was 7.8 seconds. The same load against a static path held every
+ * request. An article on Hacker News is exactly the moment that arrives, and it is the moment this
+ * page has to survive.
+ *
+ * Nothing is lost by leaving it out. `openBounties` filters on `deadline > now`, so an expired
+ * bounty is invisible here either way, and the sweep still runs on every API path that touches the
+ * market, which is where the money actually has to move.
+ */
 import type { Db } from "../db.js";
-import { openBounties, releaseExpired, feeMc } from "../bounties/store.js";
+import { openBounties, feeMc } from "../bounties/store.js";
 import { receipts } from "../bounties/receipts.js";
 import { mcToCents } from "../db.js";
 
@@ -50,7 +64,6 @@ const shortAddress = (a: string): string => `${a.slice(0, 6)}…${a.slice(-4)}`;
  * "what does it cost me to find out" is nothing.
  */
 export function renderNumbers(db: Db, starterCents: number): string {
-  releaseExpired(db);
   const open = openBounties(db, 100);
   const done = receipts(db, 100);
   const held = open.reduce((sum, b) => sum + mcToCents(b.price_mc), 0);
@@ -69,7 +82,6 @@ export function renderNumbers(db: Db, starterCents: number): string {
 }
 
 export function renderMarket(db: Db): string {
-  releaseExpired(db);
   const open = openBounties(db, 8);
   const done = receipts(db, 4);
 
@@ -111,7 +123,7 @@ export function renderMarket(db: Db): string {
   <section id="market">
     <div class="wrap">
       <p class="kicker">The market, right now</p>
-      <h2>Rendered from the same database the API reads, the moment you loaded this page</h2>
+      <h2>Rendered from the same database the API reads, never more than seconds old</h2>
       <p class="sub">
         The buyer is never named. The winning agent is, because an address is what earns a
         reputation here. Full briefs are at <a href="/bounties.json">/bounties.json</a>, without a key.

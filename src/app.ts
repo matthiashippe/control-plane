@@ -283,16 +283,37 @@ export function createApp(opts: AppOptions) {
     );
   }
 
+  /**
+   * The landing page, rendered at most once every few seconds.
+   *
+   * It is rendered into the body and never into the script, because the inline script is covered
+   * by a CSP hash that lives in the Caddyfile and deploy/** is not touched without a human.
+   *
+   * The cache is not an optimisation, it is the difference between surviving an article and not.
+   * Measured against production on 2026-09-21, 300 requests at 20 concurrent: twelve never
+   * connected, p95 7.8 seconds, while the same load against a static path lost nothing. One vCPU
+   * serves this, and a front page sends more than twenty at once. With a short window a spike
+   * collapses into one render and the rest is a string already in memory.
+   *
+   * Five seconds, not five minutes: the page states that its numbers come from the same database
+   * the API reads, and it has to stay true enough that nobody can catch it lying. What a reader
+   * loses is that a job posted this second may appear on the next reload instead of this one.
+   */
+  const PAGE_TTL_MS = 5_000;
+  let cached: { at: number; html: string } | null = null;
+
   app.get("/", (c) => {
     if (!indexHtml) return c.json({ ok: true, version: VERSION, note: "no index page built" });
-    // Rendered per request, into the body and never into the script: the inline script is covered
-    // by a CSP hash that lives in the Caddyfile, and deploy/** is not touched without a human.
-    // Two indexed reads, so this costs less than the round trip a fetch would have cost anyway.
-    return c.html(
-      indexHtml
-        .replace("<!--NUMBERS-->", renderNumbers(db, mcToCents(GRANT_MC)))
-        .replace("<!--MARKET-->", renderMarket(db)),
-    );
+    const now = Date.now();
+    if (!cached || now - cached.at > PAGE_TTL_MS) {
+      cached = {
+        at: now,
+        html: indexHtml
+          .replace("<!--NUMBERS-->", renderNumbers(db, mcToCents(GRANT_MC)))
+          .replace("<!--MARKET-->", renderMarket(db)),
+      };
+    }
+    return c.html(cached.html, 200, { "Cache-Control": "public, max-age=5" });
   });
 
   // German law (DDG § 5) requires an imprint that is "easy to recognise and directly reachable".

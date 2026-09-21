@@ -41,7 +41,17 @@ function buyer(db: ReturnType<typeof openDb>, app: ReturnType<typeof createApp>,
 function setup() {
   const db = openDb(":memory:");
   const app = createApp({ db, pay: { payTo: "0x" + "1".repeat(40) } as never });
-  return { db, app, page: async () => (await app.request("/")).text() };
+  return {
+    db,
+    app,
+    page: async () => (await app.request("/")).text(),
+    // The landing page is rendered at most once every five seconds, so a second load inside that
+    // window returns the string from the first one. A fresh app starts with an empty cache, which
+    // is how a test asks for the state as it is now rather than as it was a moment ago. It also
+    // sweeps the expired bounties once on the way up, so it is the wrong tool for asking whether
+    // a page view writes.
+    fresh: async () => (await createApp({ db, pay: { payTo: "0x" + "1".repeat(40) } as never }).request("/")).text(),
+  };
 }
 
 const inAnHour = () => new Date(Date.now() + 3600e3).toISOString();
@@ -97,7 +107,7 @@ describe("The market on the landing page", () => {
   });
 
   it("shows how many agents are already in, because zero is the best thing we can say", async () => {
-    const { app, db, page } = setup();
+    const { app, db, page, fresh } = setup();
     const b = buyer(db, app, 1);
     const agent = buyer(db, app, 2);
     const posted = await b.call("/v1/bounties", "POST", { brief: "An uncontested job.", kind: "factual", price_cents: 150, deadline: inAnHour() });
@@ -105,7 +115,7 @@ describe("The market on the landing page", () => {
 
     expect(await page(), "zero is said in words, because it is the best thing we can say").toContain("nobody competing yet");
     await agent.call("/v1/submissions", "POST", { bounty_id: id, body: "An attempt." });
-    const html = await page();
+    const html = await fresh();
     const card = /<article class="job">[\s\S]*?An uncontested job\.[\s\S]*?<\/article>/.exec(html);
     expect(card, "the open job has to be a card on the page").not.toBeNull();
     expect(card![0]).toContain("1 competing");
@@ -133,6 +143,44 @@ describe("The market on the landing page", () => {
     const html = await page();
     expect(html).toContain("Nothing is open right now.");
     expect(html).toContain("Nothing has been paid out yet.");
+  });
+
+  /**
+   * The cost of surviving an article, stated rather than discovered.
+   *
+   * Measured against production on 2026-09-21: 300 requests at 20 concurrent, twelve of which
+   * never connected and a p95 of 7.8 seconds, because every view opened two write transactions
+   * and rendered 34 KB. One vCPU serves this and a front page sends more than twenty at once. The
+   * page is therefore rendered at most once every five seconds, and what a reader pays for that is
+   * exactly this: a job posted a second ago may appear on the next reload instead of this one.
+   */
+  it("renders at most once every few seconds, and says so by being identical", async () => {
+    const { app, db, page, fresh } = setup();
+    const b = buyer(db, app, 1);
+
+    const before = await page();
+    await b.call("/v1/bounties", "POST", { brief: "Posted a moment later.", kind: "factual", price_cents: 30, deadline: inAnHour() });
+
+    expect(await page(), "a second load inside the window is the first one").toBe(before);
+    expect(await fresh(), "and the next render has it").toContain("Posted a moment later.");
+  });
+
+  it("does not write to the database while rendering a page view", async () => {
+    // Deliberately the same app, not `fresh()`: `createApp` sweeps the expired bounties once when
+    // it comes up, which is right and is once per process. Building a new app here would measure
+    // that sweep and report it as a page view writing, which is how the first version of this test
+    // failed and very nearly sent me looking for a bug that was not there.
+    const { app, db, page } = setup();
+    const b = buyer(db, app, 1);
+    const posted = await b.call("/v1/bounties", "POST", { brief: "A job whose deadline has passed.", kind: "factual", price_cents: 30, deadline: inAnHour() });
+    const { id } = (await posted.json()) as { id: string };
+    // Backdated by hand: only a sweep would move it out of `open`, and the sweep is a write.
+    db.prepare("UPDATE bounties SET deadline = ? WHERE id = ?").run("2020-01-01T00:00:00.000Z", id);
+
+    await page();
+
+    const row = db.prepare("SELECT status FROM bounties WHERE id = ?").get(id) as { status: string };
+    expect(row.status, "a page view must not open a write transaction; that is what an article breaks").toBe("open");
   });
 
   it("leaves the inline script byte for byte as it is on disk", async () => {
