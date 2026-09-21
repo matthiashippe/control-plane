@@ -133,6 +133,25 @@ def pruefe(rev: str) -> int:
                "both /fix and the article say 'again every five minutes for as long as the wallet "
                "holds 5 USDC'")
 
+    # 7. The wizard copies the top-level model down, so the trap is hand-editing and not the wizard.
+    #
+    # Added on 2026-09-22 after an adversarial read found this one wrong on two of the three
+    # surfaces it appears on. The article and /fix both said the router reads the nested field
+    # "not the top-level one the setup wizard writes", which reads as the wizard writing a field
+    # the router ignores. It does not: `configure.ts` assigns the chosen model to both. The trap is
+    # a hand-edited automaton.json, where the nested block keeps its defaults.
+    #
+    # docs/without-control-plane.md had it right since 2026-09-21 and nothing held the short
+    # versions against the long one. That is the seventh claim, and it is the one nobody checked.
+    cfg = datei("src/setup/configure.ts", rev)
+    if re.search(r"config\.inferenceModel = await pickFromList\([^)]*\);\s*\n\s*s\.inferenceModel = config\.inferenceModel;", cfg):
+        ok("the setup wizard copies the top-level model into modelStrategy",
+           "src/setup/configure.ts assigns s.inferenceModel = config.inferenceModel")
+    else:
+        falsch("the wizard no longer copies the top-level model down",
+               "/fix and docs/without-control-plane.md both say the trap is hand-editing the file, "
+               "not the wizard; if the wizard stopped copying, the trap is the wizard again")
+
     # 6. Neither spending path reads the cache, which is why route 2 does not protect anybody.
     #    Checked as an absence, so it is stated narrowly: the two files that spend never mention it.
     if "last_known_balance" not in q["src/index.ts"] and "last_known_balance" not in tick:
@@ -146,7 +165,7 @@ def pruefe(rev: str) -> int:
     if befunde:
         print(f"  {len(befunde)} claim(s) do not hold at {rev}.")
         return 1
-    print(f"  All 6 claims hold at {rev}.")
+    print(f"  All 7 claims hold at {rev}.")
     return 0
 
 

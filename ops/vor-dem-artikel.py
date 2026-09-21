@@ -105,7 +105,7 @@ def main() -> int:
             capture_output=True, text=True, timeout=180,
         ).stdout
         zahl_aus = lambda muster: (
-            int(m.group(1).replace(",", "").replace(".", "")) if (m := re.search(muster, lauf)) else None
+            int(m.group(1).replace(",", "").replace(".", "")) if (m := re.search(muster, lauf, re.MULTILINE)) else None
         )
         punkt = {
             "dienste_cdp": zahl_aus(r"Coinbase ([\d.,]+)"),
@@ -115,6 +115,19 @@ def main() -> int:
             "aufrufe_30d": zahl_aus(r"Aufrufe in 30 Tagen, Summe:\s+([\d.,]+)"),
             "mit_20_zahlern": zahl_aus(r"mindestens  20 Zahlern:\s+([\d.,]+)"),
             "mit_nachfrage": zahl_aus(r"Nachfragedaten: ([\d.,]+) von"),
+            "mit_einem_zahler": zahl_aus(r"genau EINER zahlenden Wallet: ([\d.,]+)"),
+            "mit_5_zahlern": zahl_aus(r"mindestens   5 Zahlern:\s+([\d.,]+)"),
+            "mit_100_zahlern": zahl_aus(r"mindestens 100 Zahlern:\s+([\d.,]+)"),
+            "eimer": {
+                name: zahl_aus(muster)
+                for name, muster in [
+                    ("none", r"^\s+0:\s+([\d.,]+)"),
+                    ("1 to 9", r"1-9:\s+([\d.,]+)"),
+                    ("10 to 99", r"10-99:\s+([\d.,]+)"),
+                    ("100 to 999", r"100-999:\s+([\d.,]+)"),
+                    ("1,000 or more", r"1000\+:\s+([\d.,]+)"),
+                ]
+            },
         }
         punkt["ohne_nachfragedaten"] = (
             punkt["dienste_cdp"] - punkt["mit_nachfrage"]
@@ -211,6 +224,116 @@ def main() -> int:
         except Exception as fehler:
             aendern(f"api.conway.tech/pay could not be reached ({fehler})",
                     "without it the sentence about the live payment endpoint is unchecked")
+
+    # 4c. The one claim about upstream code that two of three surfaces got wrong.
+    #
+    # The article and /fix both said the router reads the nested inferenceModel "not the top-level
+    # one the setup wizard writes", which reads as the wizard writing a field the router ignores.
+    # It does not: src/setup/configure.ts assigns the chosen model to both. The trap is a
+    # hand-edited automaton.json. docs/without-control-plane.md had it right since 21.09. and
+    # nothing held the short version against the long one until an adversarial read did.
+    if "inferenceModel" in text:
+        if re.search(r"wizard copies the top-level value down", text):
+            ok("the inferenceModel trap is described the way the code behaves",
+               "the wizard copies it down; a hand-edited file does not")
+        else:
+            aendern("the article describes the inferenceModel trap without saying the wizard copies",
+                    "ops/upstream-claims.py checks that it does, and blaming the wizard is a wrong "
+                    "claim about somebody else's code inside a piece about somebody else's code")
+
+    # 4c-bis. The distribution table, line by line.
+    #
+    # The head figures and the table came from two different scans 78 minutes apart, and nobody
+    # noticed because only the head figures were ever compared. The table said 13,618 and 1,207
+    # where the published CSV says 13,616 and 1,206, so it summed to 15,130 while the sentence
+    # above it said 15,127. An adversarial read found that subtraction in one pass. The
+    # distribution is the part the whole argument rests on, so it is checked line by line and then
+    # added up.
+    if punkt and punkt.get("eimer") and all(v is not None for v in punkt["eimer"].values()):
+        schief = []
+        # The sum is taken from the rows AS PRINTED, not from the CSV. Summing the CSV and
+        # comparing that to the sentence compares two things that are both right by construction,
+        # which is the mistake this whole cycle was about. The original finding was that the
+        # table in the text added up to 15,130 while the sentence above it said 15,127.
+        aus_tabelle = 0
+        vollstaendig = True
+        for name, soll in punkt["eimer"].items():
+            m = re.search(rf"^  {re.escape(name)}\s+([\d,]+)\s", text, re.MULTILINE)
+            if not m:
+                schief.append(f"the row '{name}' is not in the table")
+                vollstaendig = False
+                continue
+            aus_tabelle += zahl(m.group(1))
+            if zahl(m.group(1)) != soll:
+                schief.append(f"'{name}': the table says {zahl(m.group(1)):,}, the CSV says {soll:,}")
+        m = re.search(r"the remaining ([\d,]+) were paid for", text)
+        if vollstaendig and m and zahl(m.group(1)) != aus_tabelle:
+            schief.append(
+                f"the rows in the table add up to {aus_tabelle:,} and the sentence above them says "
+                f"{zahl(m.group(1)):,}")
+        summe = aus_tabelle
+        if schief:
+            for zeile in schief:
+                aendern(zeile, "the distribution is the part the argument rests on, and a reader "
+                               "adds up five numbers before they trust any of it")
+        else:
+            ok("the distribution table matches the published CSV and adds up", f"{summe:,} services")
+
+    # The number words are here because the text uses them: "Forty have a hundred or more". A
+    # pattern that only matches digits skips that line in silence, which is a check that cannot
+    # fail dressed as a check that passed.
+    WORT = {"ten": 10, "twenty": 20, "thirty": 30, "forty": 40, "fifty": 50, "sixty": 60,
+            "seventy": 70, "eighty": 80, "ninety": 90, "one hundred": 100}
+
+    def als_zahl(roh: str) -> int:
+        return WORT[roh.lower()] if roh.lower() in WORT else zahl(roh)
+
+    for name, muster, feld in [
+        ("services with 5+ payers", r"([\d,]+|[A-Za-z]+) services have five or more", "mit_5_zahlern"),
+        ("services with 100+ payers", r"([\d,]+|[A-Za-z]+) have a hundred or more", "mit_100_zahlern"),
+    ]:
+        m = re.search(muster, text)
+        if not m:
+            aendern(f"the sentence about {name} is not in the text any more",
+                    f"the check looked for /{muster}/")
+            continue
+        if punkt.get(feld) is None:
+            continue
+        try:
+            im_text = als_zahl(m.group(1))
+        except (KeyError, ValueError):
+            aendern(f"{name}: cannot read '{m.group(1)}' as a number",
+                    "the check has to be taught the word before it can compare it, and until then "
+                    "it is not checking this line at all")
+            continue
+        if im_text != punkt[feld]:
+            aendern(f"{name}: the text says {im_text:,}, the CSV says {punkt[feld]:,}",
+                    "same file, same script")
+        else:
+            ok(name, f"{im_text:,}")
+
+    # 4d. Where the piece puts itself, against the same data it puts everybody else against.
+    #
+    # It used to say Handsel "sits in the same bucket as most of the 15,192 entries", while four
+    # paragraphs earlier it sorts 10,564 services with exactly one paying wallet into "somebody
+    # testing their own deployment". Handsel has exactly one paying wallet. The sentence was
+    # flattering by being vague, in the one place where the piece has to apply its own measure to
+    # itself, and an adversarial read found it in a minute.
+    #
+    # So the group it names is checked against the CSV like every other figure, and the number of
+    # paying wallets against the live service.
+    m = re.search(r"it is one of the ([\d,]+):", text)
+    if not m:
+        aendern("the article no longer says which group it puts itself in",
+                "four paragraphs earlier it sorts that group into people testing their own "
+                "deployment, and leaving itself out of it is the objection a reader reaches for")
+    elif punkt and punkt.get("mit_einem_zahler") is not None and zahl(m.group(1)) != punkt["mit_einem_zahler"]:
+        aendern(f"the article puts itself among {zahl(m.group(1)):,} services, the CSV says "
+                f"{punkt['mit_einem_zahler']:,}",
+                "same file, same script, and this is the number a reader checks first because the "
+                "sentence is about the author")
+    else:
+        ok("the article applies its own measure to itself", f"one of {m.group(1)}")
 
     # 5. Nobody should arrive at an empty market.
     try:

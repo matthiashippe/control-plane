@@ -65,8 +65,11 @@ GET  https://api.conway.tech/pay/5/&lt;address&gt;  -&gt; 402, a payable demand 
           <span class="w">Two routes, neither documented upstream: point the runtime at a local
           Ollama model, or write a balance into its own SQLite state and use your own OpenAI key.
           One trap costs an hour if you miss it. There are two config fields named
-          <code>inferenceModel</code>, and the router reads the nested one, not the top-level one
-          the setup wizard writes.</span></span>
+          <code>inferenceModel</code> and the router reads the nested one, under
+          <code>modelStrategy</code>. The wizard copies the top-level value down, so it is fine.
+          Editing <code>automaton.json</code> by hand is what leaves the nested block on its
+          defaults, and then the runtime keeps routing to <code>gpt-5-mini</code> while telling you
+          it registered your local model.</span></span>
           <a href="https://github.com/matthiashippe/control-plane/blob/main/docs/without-control-plane.md">both routes, with the code paths</a>
         </div>
         <div>

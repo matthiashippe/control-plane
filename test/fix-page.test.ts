@@ -67,6 +67,21 @@ describe("/fix", () => {
     expect(await page("/llms.txt")).toContain("/fix:");
   });
 
+  it("names the inferenceModel trap the way the long version does", async () => {
+    const html = await page("/fix");
+    // Two of the three surfaces this trap appears on said the router reads the nested field "not
+    // the top-level one the setup wizard writes", which reads as the wizard writing a field the
+    // router ignores. src/setup/configure.ts at the pinned revision assigns the chosen model to
+    // both, so the trap is a hand-edited automaton.json and not the wizard.
+    // docs/without-control-plane.md had it right and nothing held the short version against it.
+    // Checked as the presence of the correct half rather than the absence of the wrong wording,
+    // so a rewrite has to keep the fact rather than avoid a phrase.
+    expect(html, "the page no longer says which field the router reads").toContain("modelStrategy");
+    const text = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+    expect(text, "the page has to say the wizard copies the value down, or it blames the wizard")
+      .toMatch(/wizard copies the top-level value down/i);
+  });
+
   it("does not claim the payment endpoint is broken, because it is not", async () => {
     const html = await page("/fix");
     // The whole argument of the page rests on exactly one asymmetry: sign-up fails, paying works.
