@@ -335,6 +335,76 @@ def main() -> int:
     else:
         ok("the article applies its own measure to itself", f"one of {m.group(1)}")
 
+    # 4e. The Conway transfer window, against the CSV the article publishes.
+    #
+    # Four sentences in this piece were wrong against our own data on 2026-09-21, and all four in
+    # the same direction: the text claimed more than the file behind it. The transfer window said
+    # "2.4 payments per wallet" and then explained that number with a runtime path that only ever
+    # buys the $5 minimum, while 18 of the 104 transfers are dust worth five cents together. And
+    # the September first-time buyers included our own automaton without saying so, in the
+    # paragraph that exists to show demand from strangers.
+    #
+    # Both are arithmetic on a committed CSV, so both are checked here rather than remembered.
+    kurve = Path("docs/research/data/2026-09-19-conway-payto-transfers.csv")
+    if "in 104 transfers" in text and kurve.exists():
+        import csv as _csv
+
+        zeilen = list(_csv.DictReader(kurve.open()))
+        fenster = [r for r in zeilen if r["timestamp_utc"] >= "2026-08-21"]
+        kaeufe = [r for r in fenster if abs(float(r["usdc"]) - 5.0) < 1e-9]
+        staub = [r for r in fenster if float(r["usdc"]) < 5.0]
+        soll = {
+            "transfers": len(fenster),
+            "wallets": len({r["from"].lower() for r in fenster}),
+            "kaeufe": len(kaeufe),
+            "kaufwallets": len({r["from"].lower() for r in kaeufe}),
+            "staub": len(staub),
+        }
+        paare = [
+            (r"([\d,]+) wallets sent", "wallets"),
+            (r"in ([\d,]+) transfers", "transfers"),
+            (r"([\d,]+) of those are exactly the \$5 minimum", "kaeufe"),
+            (r"from ([\d,]+) wallets, so two purchases", "kaufwallets"),
+            (r"the other ([\d,]+) are dust", "staub"),
+        ]
+        schief = []
+        for muster, feld in paare:
+            m = re.search(muster, text)
+            if not m:
+                schief.append(f"the transfer window no longer says {feld}")
+            elif zahl(m.group(1)) != soll[feld]:
+                schief.append(f"{feld}: the text says {zahl(m.group(1)):,}, the CSV says {soll[feld]:,}")
+        if schief:
+            for zeile in schief:
+                aendern(zeile, "the sentence carries a causal claim about a runtime that only buys "
+                               "the 5 USDC tier, so the dust has to be outside the number it explains")
+        else:
+            ok("the transfer window separates purchases from dust",
+               f"{soll['kaeufe']} purchases, {soll['staub']} dust")
+
+        # And whether our own first start is named among the September first-time buyers.
+        erst = {}
+        for r in sorted(zeilen, key=lambda r: r["timestamp_utc"]):
+            erst.setdefault(r["from"].lower(), r["timestamp_utc"])
+        unsere = "0x56de77800de59baf92ccb2ccc32c4cf11f58e93b"
+        if erst.get(unsere, "") >= "2026-09-01":
+            if re.search(r"my own automaton on its first start", text):
+                ok("our own wallet is named among the September first-time buyers")
+            else:
+                aendern("our own automaton is one of the September first-time buyers and the "
+                        "article does not say so",
+                        "that paragraph exists to show demand from strangers, and /conway already "
+                        "marks the same transfer as ours")
+
+    # 4f. Discussions and issue trackers are two different figures.
+    if re.search(r"Discussions are off on the main repository", text):
+        ok("Discussions and the issue tracker are told apart",
+           "0 of 1,438 forks have Discussions; 1,435 have the tracker off")
+    elif "Discussions" in text:
+        aendern("the sentence about Discussions changed",
+                "docs/research/2026-09-20-wo-die-betroffenen-sind.md says no fork has Discussions "
+                "at all, and the three exceptions belong to the issue tracker figure")
+
     # 5. Nobody should arrive at an empty market.
     try:
         offen = hole("/bounties.json")["open"]

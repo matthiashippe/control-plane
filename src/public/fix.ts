@@ -35,8 +35,9 @@ export function renderFix(): string {
       <h1 class="ph">Sign-up answers 500, and the runtime keeps paying anyway</h1>
       <p class="sub">
         Two endpoints, one broken. Provisioning has failed for every fresh wallet since July 2026,
-        and the payment endpoint has never stopped working. Measured on every run of our daily scan,
-        most recently against the live service:
+        and the payment endpoint has never stopped working. The first line below is what the issue
+        tracker has reported since July and what we measured by hand on 21 September; the second is
+        checked every day at 05:00 UTC and its history is on <a href="/conway">the money page</a>.
       </p>
 
       <pre>POST https://api.conway.tech/v1/auth/verify   -&gt; 500 {"error":"Database error"}

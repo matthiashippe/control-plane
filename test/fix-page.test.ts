@@ -82,6 +82,20 @@ describe("/fix", () => {
       .toMatch(/wizard copies the top-level value down/i);
   });
 
+  it("claims a daily measurement only for the half that is measured daily", async () => {
+    const html = await page("/fix");
+    // The page showed both lines under "measured on every run of our daily scan". The daily scan
+    // (ops/conway-money-series.sh) only calls GET /pay/5/<address>; nothing anywhere signs a SIWE
+    // message against api.conway.tech, and the repo series carries no field for it. So half of
+    // that sentence was a measurement nobody takes, on the page that exists to be trusted by
+    // somebody whose wallet is draining.
+    const text = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+    expect(text, "the daily claim has to name what is actually daily")
+      .toMatch(/second is\s+checked every day/i);
+    expect(text, "and the other half has to carry its own source")
+      .toMatch(/measured by hand on 21 September/i);
+  });
+
   it("does not claim the payment endpoint is broken, because it is not", async () => {
     const html = await page("/fix");
     // The whole argument of the page rests on exactly one asymmetry: sign-up fails, paying works.
