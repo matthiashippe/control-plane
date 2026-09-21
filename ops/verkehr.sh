@@ -66,8 +66,19 @@ echo "-- Foreign referrers, and what the visit became --"
 #
 # `/` alone means they looked and left. `/bounties.json` means they went for the market.
 # `/v1/auth/nonce` means somebody started provisioning, and that is the line worth waking up for.
-jq -r --argjson since "$since" \
-  'select(.ts > $since) | [((.request.headers.Referer // ["-"])[0]), .request.remote_ip, .request.uri] | @tsv' "$log" \
+#
+# Our own addresses are filtered out here, same as everywhere else. They were not, until
+# 2026-09-21: the section showed two referrers from Conway issues #353 and #371 with one address
+# behind them that walked on to /bounties.json and /receipts.json, and that address was our own.
+# Two of the three issues have no answer posted at all, so the only possible source was one of us
+# clicking through from GitHub. That is the worst shape a measurement error can take, because the
+# section exists to answer exactly one question and the wrong answer was the one we were hoping
+# for. The number of dropped rows is printed, so the filter can never silently swallow everything.
+eigene=$(jq -r --argjson since "$since" --argjson own "$own_json" \
+  "select(.ts > \$since) | select(.request.remote_ip as \$ip | (\$own | index(\$ip)) != null) | ((.request.headers.Referer // [\"-\"])[0])" "$log" \
+  | grep -v '^-$' | grep -vc 'cp\.hippe\.eu' || true)
+jq -r --argjson since "$since" --argjson own "$own_json" \
+  "select(.ts > \$since) | $FOREIGN | [((.request.headers.Referer // [\"-\"])[0]), .request.remote_ip, .request.uri] | @tsv" "$log" \
   | grep -v $'^-\t' | grep -v 'cp\.hippe\.eu' \
   | python3 -c '
 import sys, collections
@@ -94,6 +105,9 @@ for ref, ips in sorted(vonher.items(), key=lambda kv: -len(kv[1])):
         pfadkette = " -> ".join(reihe[:6])
         print("    %-16s %s%s" % (ip, pfadkette, marke))
 ' || echo "  none"
+if [[ "${eigene:-0}" -gt 0 ]]; then
+  echo "  ($eigene row(s) with a foreign referrer came from our own addresses and are not counted)"
+fi
 
 echo
 # The landing page pulls its numbers with `fetch("/v1/status")` (src/public/index.html). A real
