@@ -15,6 +15,12 @@
  * strangers.
  *
  *   CP_URL=https://cp.hippe.eu pnpm tsx ops/neuling-probe.ts
+ *
+ * **Its key name is on the list in `ops/db-report.cjs`, and that is not optional.** The first run
+ * on 2026-09-21 was not, and `foreign agents` read 1 for an hour when the truth was 0. That is the
+ * number the entire plan is measured against. Anything under ops/ that provisions a key adds its
+ * name to `OUR_KEY_NAMES` in the same commit that creates it, or it turns the scoreboard into a
+ * mirror.
  */
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { createSiweMessage } from "viem/siwe";

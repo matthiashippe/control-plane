@@ -88,6 +88,11 @@ const OUR_KEY_NAMES = [
   "skill-production-check", "skill-check-buyer",
   "harness-%",            // provisionierung.ts, markt.ts
   "mainnet-abnahme", "provisioned-key", "cleanup",
+  // ops/neuling-probe.ts. Added on 2026-09-21, an hour too late: the probe ran, its wallet was not
+  // on this list, and `foreign agents` read 1 when the truth was 0. That is the one number the
+  // whole plan hangs on, and it lied because a new tool of ours arrived without its name.
+  // Anything that provisions a key from ops/ belongs here in the same commit that creates it.
+  "cold-start-probe",
 ];
 const oursClause = `(
   address in (${OURS.map(() => "?").join(",")})
