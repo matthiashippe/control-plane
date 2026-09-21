@@ -278,6 +278,36 @@ twenty-five. Whoever wants to move the number has to pay, and that is the whole 
 measurement. Our own automaton is included in the number, so subtract one for the actual figure.
 `db.keys` counts issued API keys, `db.day.topups` the payments of the last day.
 
+## Does a backup come back up
+
+`ops/sicherung-probe.sh`, by hand, not by cron. `--oldest` takes the oldest backup still kept
+instead of the newest.
+
+`ops/backup.sh` checks `integrity_check` and reconciles the ledger against the balances every
+night, and `test/backup.test.ts` covers the WAL handling. All of that says the file is a sound
+database. None of it said the service starts on it. The deploy canary does not answer it either:
+it boots the new image against a copy of the LIVE database, which is the file the running service
+already holds open. The backup, the thing that would actually be reached for after a disk failure,
+had never been booted until 2026-09-21.
+
+The probe copies a backup into a temporary directory, starts a throwaway container from
+`control-plane:latest` against it with no published ports, asks `/health` and `/v1/status` from
+inside, and compares the balances against the ledger sum in that file. The live service is never
+touched.
+
+Run on 2026-09-21 against both ends of the retained set:
+
+- newest, `cp-2026-09-21-0404.db`: up, 89 wallets, 1,321,579 mc, ledger sum identical;
+- oldest, `cp-2026-09-19-1747.db`: up, 2 wallets, 0 bounties, ledger sum identical.
+
+The oldest one is the interesting half. It predates the bounty market entirely, so it proves the
+migrations run forward on a backup written by an older build, which is the failure a restore would
+actually meet.
+
+Ask it with node and not with curl or wget: the image carries neither. The first version of this
+probe used wget, got nothing back, and reported that the service had not come up while the
+service's own start line stood in the log two lines below.
+
 ## Daily watch on the repository this project answers
 
 `ops/conway-zeitreihe.sh`, daily at 4:50 UTC by cron, into `/opt/control-plane/conway/repo.ndjson`,
