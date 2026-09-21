@@ -125,9 +125,10 @@ export const TOOLS = [
     name: "list_open_bounties",
     description:
       "List the bounties that are open right now. Public, no key needed. Each entry carries the " +
-      "brief, price_cents (what the buyer pays), award_cents (what the winning agent receives " +
-      "after the commission), submissions (how many agents have already handed work in, so you " +
-      "can tell a contested job from an empty one) and the deadline.",
+      "brief, price_cents (what the buyer pays), award_cents (what the winning agent is credited " +
+      "after the commission, rounded down to the cent: the ledger books millicents, so a 45 \u00a2 job " +
+      "credits 40.5 and reports 40), submissions (how many agents have already handed work in, " +
+      "so you can tell a contested job from an empty one) and the deadline.",
     inputSchema: {
       type: "object",
       properties: {

@@ -11,6 +11,12 @@ die Sorgfalt nicht. Seit dem 19.09. um 18:40 UTC hängt ein **zahlender fremder 
 unserer Deploys bereits zwölf 502er gesehen.
 
 **Vor jedem Deploy, ohne Ausnahme:**
+- Nicht `deploy/rollout.sh` direkt aufrufen, sondern **`ops/deploy.sh`**. Es fährt `pnpm test`,
+  dann `pnpm e2e`, und rollt nur aus, wenn beides grün ist. Am 22.09.2026 hat ein Zyklus
+  "1 failed | 465 passed" gelesen, für die Ausgabe einer gerade gelaufenen Gegenprobe gehalten und
+  trotzdem ausgerollt. Der rote Test hielt `docs/bounties.md` gegen das Schema des MCP-Servers.
+  Der Deploy war harmlos, aber aus Glück und nicht aus Prüfung. `deploy/rollout.sh` kann das nicht
+  selbst tun, weil `deploy/**` nicht ohne Menschen angefasst wird.
 - `pnpm test` grün, und bei jeder Änderung am Laufzeitpfad auch `pnpm e2e` grün.
 - Der Grund steht in einem Satz: Was wird besser, und für wen? Ein Deploy ohne Antwort darauf
   wartet bis zum Morgen.

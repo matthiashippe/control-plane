@@ -602,6 +602,21 @@ and one of them is Matthias' money, so this is a decision and not a repair.
 Deliberately not a rate. Consumption comes in bursts, a probe run or a wave of seed agents, and a
 per-day figure derived from that would be a trend nobody measured.
 
+## Deploying
+
+`ops/deploy.sh`, not `deploy/rollout.sh`. It runs `pnpm test`, then `pnpm e2e`, and rolls out only
+if both are green. `--no-e2e "<reason>"` skips the harness and refuses to do it silently.
+
+loop-constraints.md has made both unconditional since 19.09., and `deploy/rollout.sh` never
+checked either, because `deploy/**` is not touched without a human. So the rule lived entirely in
+whoever was typing. On 2026-09-22 that failed: a cycle read "1 failed | 465 passed", took it for
+the output of a counter-proof it had just run, and rolled out. The failing test was the one holding
+docs/bounties.md against the MCP server's own schema, and the deploy was harmless by luck rather
+than by check.
+
+A condition that is written down and enforced by nobody is a request. This is the same finding as
+the checks that could not fail, one level up, at the process instead of at a number.
+
 ## Did the deploy cost a stranger an answer
 
 `ops/deploy-window.sh [tail seconds]`, after every rollout. `loop-constraints.md` has required this
