@@ -61,13 +61,16 @@ if [[ -n "${OPENROUTER_API_KEY:-}" ]]; then
   ./ops/status.sh 2>/dev/null | python3 -c "
 import json, sys
 try:
-    m = json.load(sys.stdin)['db']['market']
+    db = json.load(sys.stdin)['db']
+    m = db['market']
+    u = db.get('uncollected_mc', 0)
 except Exception:
     sys.exit(0)
 print(f\"foreign buyers: {m['foreign_buyers']}   foreign agents: {m['foreign_agents']}   \"
       f\"awarded: {m['awarded']}   fee earned: {m['fee_earned_mc']/1000:.2f} c   \"
       f\"starter pool left: {m['starter_pool_left_mc']/1000:.0f} c \"
       f\"(of {m['starter_granted']} grants, {m['starter_granted_ours']} to us)\")
+print(f\"written off by the token estimate: {u/1000:.2f} c\")
 if m['our_submissions_on_open']:
     print(f\"FAILED  {m['our_submissions_on_open']} submission(s) of ours sit on a live job. \"
           f\"The open list publishes that count, so strangers are being shown a number about us.\")

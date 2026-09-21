@@ -21,6 +21,18 @@ const i = one(
   "select count(*) n, coalesce(sum(delta_mc),0) s, coalesce(sum(json_extract(meta,'$.margin_mc')),0) m, coalesce(sum(json_extract(meta,'$.cost_usd')),0) c from ledger where kind='inference' and created_at > ?",
   day,
 );
+// What the token estimate failed to collect, over the whole life of the service.
+//
+// `src/inference/proxy.ts` charges min(actual, balance) and records the remainder as
+// `uncollected_mc`. Until 2026-09-21 that number was written and never read, so it could have run
+// to any size unseen. Measured the same day against the provider's tokenizer, the estimate is
+// short by up to 64 percent on JSON-heavy prompts and over-reserves the dominant runtime shape by
+// 40 percent, which is why the estimate was left alone; see .scratch/gtm/nacht-backlog.md B1. The
+// decision only holds while this number stays small, so here it is.
+report.uncollected_mc = one(
+  "select coalesce(sum(json_extract(meta,'$.uncollected_mc')),0) s from ledger where kind='inference'",
+).s;
+
 report.day = { topups: t.n, topup_mc: t.s, calls: i.n, spend_mc: -i.s, margin_mc: i.m, purchase_usd: Number((i.c || 0).toFixed(4)) };
 
 // Customers who paid and still do not think. That is the quietest way to lose a customer: the

@@ -1,0 +1,39 @@
+{
+  "measured_on": "2026-09-21T06:05:00Z",
+  "service": "https://cp.hippe.eu",
+  "model": "gpt-5-mini",
+  "method": "one real call per shape, estimate from src/inference/provider.ts estimateTokens, actual from the provider's usage.prompt_tokens",
+  "shapes": [
+    {
+      "shape": "plain English prose",
+      "estimated": 25,
+      "actual": 25,
+      "ratio": 1.0
+    },
+    {
+      "shape": "German prose",
+      "estimated": 32,
+      "actual": 38,
+      "ratio": 1.19
+    },
+    {
+      "shape": "a real brief from this market",
+      "estimated": 122,
+      "actual": 100,
+      "ratio": 0.82
+    },
+    {
+      "shape": "JSON and code",
+      "estimated": 81,
+      "actual": 133,
+      "ratio": 1.64
+    },
+    {
+      "shape": "a runtime turn, system prompt plus six tools",
+      "estimated": 289,
+      "actual": 173,
+      "ratio": 0.6
+    }
+  ],
+  "conclusion": "The error runs both ways and depends on the shape. A flat increase of the factor would fix the 64 percent shortfall on JSON and would over-reserve the runtime turn, which is the dominant shape here, by a further 40 percent. That harms exactly the agents starting on fifteen cents. The estimate stays as it is; the write-off it causes is now reported instead."
+}
