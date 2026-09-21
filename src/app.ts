@@ -12,6 +12,7 @@ import { claimStarter, poolLeftMc, GRANT_MC, StarterError } from "./credits/star
 import { verifyFindings, messages, type CheckMode } from "./check/fabrication.js";
 import { reviewBrief } from "./bounties/brief.js";
 import { receipts, PUBLICATION_FROM } from "./bounties/receipts.js";
+import { renderMarket } from "./public/market.js";
 import {
   createBounty,
   cancelBounty,
@@ -217,7 +218,10 @@ export function createApp(opts: AppOptions) {
 
   app.get("/", (c) => {
     if (!indexHtml) return c.json({ ok: true, version: VERSION, note: "no index page built" });
-    return c.html(indexHtml);
+    // Rendered per request, into the body and never into the script: the inline script is covered
+    // by a CSP hash that lives in the Caddyfile, and deploy/** is not touched without a human.
+    // Two indexed reads, so this costs less than the round trip a fetch would have cost anyway.
+    return c.html(indexHtml.replace("<!--MARKET-->", renderMarket(db)));
   });
 
   // German law (DDG § 5) requires an imprint that is "easy to recognise and directly reachable".
