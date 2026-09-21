@@ -47,7 +47,31 @@ if ! printf '%s' "$line" | python3 -c 'import json,sys; d=json.load(sys.stdin); 
   echo "[x402] metrics implausible, nothing appended to the series" >&2
   exit 1
 fi
-printf '%s\n' "$line" >> "$TARGET/kennzahlen.ndjson"
+# One line per day, not one per run. The cron entry fires at 04:40, and a run by hand to check
+# that the thing still works used to leave a second point for the same date; two points for one day
+# quietly double-count in anything that reads the series as a daily sequence. So a line whose
+# stichtag falls on today is replaced rather than joined.
+series="$TARGET/kennzahlen.ndjson"
+touch "$series"
+python3 - "$series" "$TODAY" "$line" <<'PY'
+import json, sys
+path, today, line = sys.argv[1], sys.argv[2], sys.argv[3]
+kept = []
+with open(path) as f:
+    for raw in f:
+        raw = raw.strip()
+        if not raw:
+            continue
+        try:
+            if json.loads(raw).get("stichtag", "").startswith(today):
+                continue
+        except json.JSONDecodeError:
+            pass  # keep anything unparseable rather than silently dropping a data point
+        kept.append(raw)
+kept.append(line.strip())
+with open(path, "w") as f:
+    f.write("\n".join(kept) + "\n")
+PY
 gzip -c "$tmp" > "$TARGET/roh/$TODAY.csv.gz"
 find "$TARGET/roh" -name '*.csv.gz' -mtime +60 -delete
 

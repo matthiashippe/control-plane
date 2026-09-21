@@ -22,6 +22,8 @@ def kennzahlen(zeilen: list) -> dict:
     mit = [c for c in calls if c is not None]
     p = [x for x in (zahl(r["unique_payers_30d"]) for r in cdp) if x is not None]
     srt = sorted(mit, reverse=True)
+    mit_daten = [r for r in cdp if zahl(r["calls_30d"]) is not None]
+    groesster = max(mit_daten, key=lambda r: zahl(r["calls_30d"])) if mit_daten else None
     return {
         "stichtag": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "dienste_gesamt": len(zeilen),
@@ -38,6 +40,19 @@ def kennzahlen(zeilen: list) -> dict:
         "mit_5_zahlern": sum(1 for x in p if x >= 5),
         "mit_20_zahlern": sum(1 for x in p if x >= 20),
         "mit_100_zahlern": sum(1 for x in p if x >= 100),
+        # Der Fruehindikator. Coinbase fuellt die Qualitaetsfelder nachtraeglich: am 20.09.2026
+        # stand blockrun.ai/api/v1/chat/completions mit leeren Feldern im Verzeichnis und meldete
+        # einen Tag spaeter 346.869 Aufrufe fuer denselben rueckwaertigen Zeitraum, vierzig Prozent
+        # des gesamten Verzeichnisses. Jede Summe hier ist damit eine Untergrenze, und diese Zahl
+        # sagt, wie gross die Untergrenze hoechstens danebenliegen kann.
+        "ohne_nachfragedaten": len(cdp) - len(mit),
+        # Ohne den groessten Dienst laesst sich ein Sprung in der Reihe nicht zuordnen. Am
+        # 21.09.2026 sprang aufrufe_30d um 77 Prozent, und die Zuordnung auf einen einzigen
+        # Endpunkt hat eine Stunde gekostet, weil die Reihe sie nicht mitfuehrte.
+        "groesster_dienst": groesster["resource"] if groesster else None,
+        "groesster_aufrufe": zahl(groesster["calls_30d"]) if groesster else 0,
+        "groesster_zahler": zahl(groesster["unique_payers_30d"]) if groesster else 0,
+        "groesster_anteil": round(zahl(groesster["calls_30d"]) / sum(mit) * 100, 2) if groesster and mit else 0,
         "mit_bazaar_block": sum(1 for r in zeilen if r["hat_bazaar_block"] == "1"),
         "conway_bezug": sum(1 for r in zeilen if "conway" in (r["resource"] or "").lower()),
     }
