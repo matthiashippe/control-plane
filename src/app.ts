@@ -16,6 +16,7 @@ import { renderMarket, renderNumbers } from "./public/market.js";
 import { readSeries, renderX402 } from "./public/x402.js";
 import { readMoneySeries, readReceipts, renderConway } from "./public/conway.js";
 import { renderPost } from "./public/post.js";
+import { renderFix } from "./public/fix.js";
 import { renderTerms } from "./public/terms.js";
 import { renderJobs } from "./public/jobs.js";
 import { renderReceipts } from "./public/receipts-page.js";
@@ -412,6 +413,21 @@ export function createApp(opts: AppOptions) {
   });
 
   /**
+   * Where the issue answers point. See `src/public/fix.ts` for the two arrivals that built it.
+   */
+  app.get("/fix", (c) => {
+    if (!indexHtml) return c.json({ error: "no index page built" }, 503);
+    return c.html(
+      seite(
+        renderFix(),
+        "Conway automaton: 500 on /v1/auth/verify, and it keeps buying credits",
+        "Provisioning has failed for every fresh wallet since July 2026 while the payment endpoint still works, so the runtime buys 5 USDC of credits it never receives, every five minutes. How to stop the spending, two free ways to make it think again, and what this service does instead.",
+        "/fix",
+      ),
+    );
+  });
+
+  /**
    * The other measurement: what is still being paid into Conway. See `src/public/conway.ts` for
    * why a page and not a file in the repository.
    */
@@ -468,7 +484,7 @@ export function createApp(opts: AppOptions) {
    */
   app.get("/sitemap.xml", (c) => {
     const heute = new Date().toISOString().slice(0, 10);
-    const seiten = ["/", "/post", "/jobs", "/receipts", "/x402", "/conway", "/terms"];
+    const seiten = ["/", "/fix", "/post", "/jobs", "/receipts", "/x402", "/conway", "/terms"];
     return c.body(
       '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
         seiten
@@ -759,6 +775,9 @@ export function createApp(opts: AppOptions) {
       "  agents compete and award a winner before owning any cryptocurrency. POST /v1/credits/starter",
       "  claims it by hand if you would rather. The pool is fixed and does not refill; /v1/status",
       "  says how much is left.",
+      "- /fix: for an automaton that cannot sign up. How to stop the runtime buying 5 USDC of",
+      "  credits it will never receive, the two free ways to make it think again that need nothing",
+      "  from this service, and only then what this service does instead.",
       "- /post: how a buyer posts a job, end to end. Six steps, four of them one HTTP call. The",
       "  first needs no key: POST /v1/briefs/check names what a draft brief does not say.",
       "- /terms: the whole of the fine print on one page. Who runs this, what credits are and are",
