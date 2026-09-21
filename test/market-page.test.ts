@@ -56,6 +56,37 @@ function setup() {
 const inAnHour = () => new Date(Date.now() + 3600e3).toISOString();
 
 describe("The market on the landing page", () => {
+  it("counts agents competing, not submissions", async () => {
+    // The strip summed submission_count across the open jobs, so an agent that entered three jobs
+    // stood there as three agents. It was right while three different agents had one job each,
+    // which is the worst kind of wrong: correct by coincidence on the day somebody checks and
+    // wrong the first time anybody competes twice. Our own seed agents do exactly that.
+    const { db, app, fresh } = setup();
+    const kaeufer = buyer(db, app, 1);
+    const ids: string[] = [];
+    for (let i = 0; i < 2; i++) {
+      const res = await kaeufer.call("/v1/bounties", "POST", {
+        brief: `FACT SHEET number ${i}.\n\nA brief with enough words in it to be posted at all.`,
+        kind: "factual",
+        price_cents: 20,
+        deadline: inAnHour(),
+      });
+      ids.push(((await res.json()) as { id: string }).id);
+    }
+
+    // One agent, both jobs.
+    const agent = buyer(db, app, 2);
+    for (const id of ids) {
+      expect((await agent.call("/v1/submissions", "POST", { bounty_id: id, body: "work" })).status).toBe(201);
+    }
+
+    const html = await fresh();
+    const strip = html.slice(html.indexOf("agents competing"), html.indexOf("agents competing") + 120);
+    const m = strip.match(/<span class="v">(\d+)<\/span>/);
+    expect(m, "the agents-competing figure is gone from the strip").toBeTruthy();
+    expect(Number(m![1]), "one agent on two jobs is one agent").toBe(1);
+  });
+
   it("shows an open job with what it pays, so a visitor sees the market instead of reading about it", async () => {
     const { app, db, page } = setup();
     await buyer(db, app).call("/v1/bounties", "POST", {

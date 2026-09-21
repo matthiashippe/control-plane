@@ -67,7 +67,25 @@ export function renderNumbers(db: Db, starterCents: number): string {
   const done = receipts(db, 100);
   const held = open.reduce((sum, b) => sum + mcToCents(b.price_mc), 0);
   const paid = done.reduce((sum, r) => sum + r.award_cents, 0);
-  const entrants = open.reduce((sum, b) => sum + b.submission_count, 0);
+  // Agents, not submissions.
+  //
+  // This summed `submission_count` across the open jobs until 2026-09-22, so an agent that entered
+  // three jobs stood in the headline strip as three agents. It happened to be right while three
+  // different agents had one job each, which is the worst kind of wrong: correct by coincidence on
+  // the day somebody checks, wrong the first time anybody competes twice. An adversarial read
+  // found it by reading the query rather than the number.
+  //
+  // /terms already says the count on a single job is a count of submissions, which is exact there,
+  // because on one job one agent can only be in once. Across jobs it is not.
+  const entrants = (
+    db
+      .prepare(
+        `SELECT count(DISTINCT s.agent) AS n FROM submissions s
+           JOIN bounties b ON b.id = s.bounty_id
+          WHERE b.status = 'open' AND b.deadline > ?`,
+      )
+      .get(new Date().toISOString()) as { n: number }
+  ).n;
   return `
     <div class="strip">
       <div><span class="k">open jobs</span><span class="v">${open.length}</span></div>

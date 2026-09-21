@@ -231,6 +231,36 @@ describe("cancelling a bounty", () => {
     expect((await a.cancel({})).status).toBe(400);
   });
 
+  it("credits the winner the millicents the ledger holds, not the rounded-down cents it reports", async () => {
+    // /bounties.json reports award_cents, and docs describe it as what the winner receives. On a
+    // 45 cent job the fee is 4.5 cents and the winner is credited 40.5, while the field says 40:
+    // mcToCents floors. An adversarial read found three surfaces quoting three different numbers
+    // with no explanation. Nobody is short-changed, the description was.
+    // A fee only exists when the instance has an operator address, so this setup needs one; the
+    // default `setup()` has none and awards the whole price, which is a different case.
+    const db = openDb(":memory:");
+    const app = createApp({ db, pay: { payTo: "0x" + "9".repeat(40) } as never });
+    const a = account(db, app, 500_000, 1);
+    const b = account(db, app, 500_000, 2);
+    const { id } = (await (await a.postBounty(bounty({ price_cents: 45 }))).json()) as { id: string };
+    const sub = (await (await b.submit({ bounty_id: id, body: "the work" })).json()) as { id: string };
+
+    // What the public list promises, read before the award while the job is still open.
+    const gemeldet = (
+      (await (await app.request("/bounties.json")).json()) as { open: { id: string; award_cents: number }[] }
+    ).open.find((x) => x.id === id);
+    expect(gemeldet, "the job is not in the public list").toBeTruthy();
+    expect(gemeldet!.award_cents, "45 less a 10 per cent fee, floored to the cent").toBe(40);
+
+    const vorher = b.balance();
+    await a.awardBounty({ bounty_id: id, submission_id: sub.id });
+    const bewegt = b.balance() - vorher;
+
+    expect(bewegt, "the ledger moves 40.5 cents, in millicents").toBe(40_500);
+    expect(bewegt, "so the winner gets more than the field reports, never less")
+      .toBeGreaterThan(gemeldet!.award_cents * 1000);
+  });
+
   it("takes bounty_id as well, because the rest of this resource does", async () => {
     // POST /v1/submissions and POST /v1/bounties/award both name the field `bounty_id`, and only
     // cancel called it `id`. A buyer walking the path in docs/bounties.md gets a 400 at exactly
