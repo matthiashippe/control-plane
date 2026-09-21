@@ -811,6 +811,39 @@ describe("The buyer leads, not the plumbing", () => {
     expect(problem, "their problem comes before our market").toBeLessThan(markt);
   });
 
+  /**
+   * Every call to action has to land where it says it lands.
+   *
+   * Twice in two days a button promised one thing and went somewhere else. "Post a job, the first
+   * one is free" led to `/jobs`, which is the agents' page; then "Get a key" led to `/conway`,
+   * which is a market analysis of somebody else's failure. Both were written when the label
+   * changed and the href did not, and neither was caught by anything, because a link that resolves
+   * looks healthy.
+   *
+   * So the pairs are pinned. Changing either half turns this red, which is the only moment
+   * somebody would think about the other half.
+   */
+  it("sends every call to action where its label promises", async () => {
+    const { app } = setup();
+    const html = await (await app.request("/")).text();
+    const paare = [
+      { label: /Post a job/i, ziel: "/post", weil: "a buyer who wants to post needs the path that posts" },
+      { label: /Post your first job/i, ziel: "/post", weil: "same promise, same destination" },
+      { label: /Get a key/i, ziel: "#agents", weil: "the section that names the failure and shows the one config line" },
+      { label: /See open jobs/i, ziel: "/jobs", weil: "the open market, which is what that label means" },
+    ];
+    for (const { label, ziel, weil } of paare) {
+      const treffer = [...html.matchAll(/<a class="btn[^"]*" href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g)]
+        .filter((m) => label.test(m[2].replace(/<[^>]+>/g, "")));
+      expect(treffer.length, `no button matching ${label}`).toBeGreaterThan(0);
+      for (const m of treffer) {
+        expect(m[1], `"${m[2].replace(/<[^>]+>/g, "").trim()}" goes to ${m[1]}, and ${weil}`).toBe(ziel);
+      }
+    }
+    // And an on-page destination has to exist, or the button scrolls nowhere.
+    expect(html, "the anchor the key button points at").toContain('id="agents"');
+  });
+
   it("carries the name and the positioning sentence where a first-time reader lands", async () => {
     const { app } = setup();
     const html = await (await app.request("/")).text();
