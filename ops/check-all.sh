@@ -122,6 +122,11 @@ if unbekannt:
     # carried on. Either it is ours and belongs on the list, or it is a stranger and is the best
     # news this project has had, and both deserve more than a line somebody skims.
     sys.exit(3)
+fremd = db.get('wallets_foreign')
+if fremd is not None:
+    liste = db.get('wallets_foreign_list', [])
+    kurz = ', '.join(a[:10] + '…' for a in liste[:5]) + ('' if len(liste) <= 5 else ', …')
+    print(f\"wallets: {db['wallets']} in total, {fremd} of them not ours{': ' + kurz if kurz.strip(', …') else ''}\")
 uebrig = m.get('starter_grants_left', 0)
 print(f\"newcomers the starter pool still carries: {uebrig}\")
 if uebrig < 3:

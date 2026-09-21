@@ -71,6 +71,12 @@ report.paying_without_thinking = all(
 const OURS = [
   "0xd24f37d0838e62621ed24111164485ded0f0924f", // operator wallet, posts the seed jobs
   "0xf6204b0662082d65d78eab79936a4d91744dee6b", // the agent from the first cycle on 2026-09-20
+  // The operator's own fee address, added on 2026-09-21. It is where `bounty_fee` is booked, so it
+  // appears in the ledger and in `wallets` like any other address, and it read as a stranger until
+  // somebody counted the strangers and found three where there should have been one. It is also
+  // the address printed in `/.well-known/x402` as the payment recipient, so it is ours by
+  // construction and never anybody else's.
+  "0x914102284463f4f58b1d2f6db9ac80bfcaa7d614",
 ];
 
 // The hardcoded pair is not enough. Every production check provisions a throwaway wallet, and on
@@ -138,6 +144,33 @@ const oursClause = `(
 )`;
 const OURS_ARGS = [...OURS, ...OUR_KEY_NAMES];
 const notOurs = `not ${oursClause}`;
+
+// How many wallets are not ours.
+//
+// `wallets` is printed as a headline figure and reads as usage. On 2026-09-21 it said 280, and 248
+// of those carried a key named `harness-markt-poster` or `harness-markt-applicant`: two per run of
+// `ops/check-all.sh`, 110 runs in one day. The market check was 89 per cent of the number meant to
+// show how many people are here. `harness/e2e/markt.ts` keeps its two accounts from that day on,
+// so it stops growing, but the 248 already in the database stay, because deleting rows from a
+// production ledger to make a number look better is the opposite of the point.
+const fremdeWallets = `select w.address from wallets w where not (
+     w.address in (${OURS.map(() => "?").join(",")})
+     or exists (select 1 from api_keys k where k.address = w.address
+                and (${OUR_KEY_NAMES.map(() => "k.name like ?").join(" or ")})))`;
+// The addresses themselves while there are few enough to read. A bare count says "3" and every
+// cycle has to go and find out what they are; on 2026-09-21 two of the three turned out to be our
+// own fee address and an abandoned sign-in from our own machine. The one that matters is a real
+// arrival, and it should be readable in the line that reports it.
+report.wallets_foreign_list = all(fremdeWallets + " order by w.created_at limit 6", ...OURS, ...OUR_KEY_NAMES)
+  .map((r) => r.address);
+report.wallets_foreign = one(
+  `select count(*) n from wallets w where not (
+     w.address in (${OURS.map(() => "?").join(",")})
+     or exists (select 1 from api_keys k where k.address = w.address
+                and (${OUR_KEY_NAMES.map(() => "k.name like ?").join(" or ")})))`,
+  ...OURS,
+  ...OUR_KEY_NAMES,
+).n;
 
 report.market = {
   open_bounties: one("select count(*) n from bounties where status='open' and deadline > ?", new Date().toISOString()).n,

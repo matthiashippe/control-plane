@@ -12,11 +12,32 @@
  * anyway, namely that nothing comes into being without cover.
  *
  *   CP_URL=https://cp.hippe.eu pnpm tsx harness/e2e/markt.ts
+ *   CP_URL=https://cp.hippe.eu pnpm tsx harness/e2e/markt.ts --fresh
  *
- * Creates two throwaway keys in the target database. That costs nothing and is intended.
+ * It used to say: "Creates two throwaway keys in the target database. That costs nothing and is
+ * intended." That was true of a run somebody did by hand before a release. It stopped being true
+ * when `ops/check-all.sh` started running it every cycle: on 2026-09-21 the production database
+ * held 110 `harness-markt-poster` wallets and 110 `harness-markt-applicant` wallets, created
+ * between 00:01 and 20:23 that day, against 28 wallets belonging to everything else put together.
+ * `status.sh` prints a wallet count, that count reads as usage, and 89 per cent of it was this
+ * script.
+ *
+ * So the two accounts persist, in `harness/state/` like every other key this repo keeps, and each
+ * run signs in with them again. Everything the check actually checks is unchanged: the four calls,
+ * the signature, the key, and every rule at the till. What is no longer re-checked on every run is
+ * the very first sign-in of an address nobody has seen, and that has its own tool in
+ * `ops/neuling-probe.ts`, which starts from nothing on purpose and is run deliberately because it
+ * costs a starter grant. `--fresh` is here for the case where this one should do it too.
+ *
+ * Each run still mints a new API key for those two accounts, and that is deliberate. Minting one
+ * is part of what this checks, and keeping a key on disk to reuse would skip the call. Rows in
+ * `api_keys` are not a number anybody reads as usage; rows in `wallets` were.
  */
+import fs from "node:fs";
+import path from "node:path";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { createSiweMessage } from "viem/siwe";
+import type { Hex } from "viem";
 
 const BASE = (process.env.CP_URL || "https://cp.hippe.eu").replace(/\/$/, "");
 const DOMAIN = process.env.CP_SIWE_DOMAIN || "conway.tech";
@@ -30,21 +51,41 @@ function failed(what: string, seen: unknown) {
   console.log(`FAILED  ${what}\n        seen: ${JSON.stringify(seen).slice(0, 300)}`);
 }
 
+/**
+ * The account for a role, kept between runs unless `--fresh` says otherwise.
+ *
+ * `harness/state/` is gitignored, so nothing secret reaches the public repo. A missing or broken
+ * file is not an error: it writes a new one, which is also what the first run after this change
+ * does.
+ */
+function account(role: string) {
+  if (process.argv.includes("--fresh")) return privateKeyToAccount(generatePrivateKey());
+  const file = path.resolve(`harness/state/markt-${role}.json`);
+  try {
+    return privateKeyToAccount((JSON.parse(fs.readFileSync(file, "utf-8")) as { privateKey: Hex }).privateKey);
+  } catch {
+    const pk = generatePrivateKey();
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, JSON.stringify({ privateKey: pk, createdAt: new Date().toISOString() }, null, 2), { mode: 0o600 });
+    return privateKeyToAccount(pk);
+  }
+}
+
 async function provision(name: string): Promise<{ key: string; address: string }> {
-  const account = privateKeyToAccount(generatePrivateKey());
+  const account_ = account(name);
   const nonceRes = await fetch(`${BASE}/v1/auth/nonce`, { method: "POST" });
   if (!nonceRes.ok) throw new Error(`nonce: ${nonceRes.status}`);
   const { nonce } = (await nonceRes.json()) as { nonce: string };
   const message = createSiweMessage({
     domain: DOMAIN,
-    address: account.address,
+    address: account_.address,
     statement: "Sign in to Conway",
     uri: `https://${DOMAIN}`,
     version: "1",
     chainId: 8453,
     nonce,
   });
-  const signature = await account.signMessage({ message });
+  const signature = await account_.signMessage({ message });
   const verifyRes = await fetch(`${BASE}/v1/auth/verify`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -61,7 +102,7 @@ async function provision(name: string): Promise<{ key: string; address: string }
   const keyBody = (await keyRes.json()) as Record<string, unknown>;
   if (!keyRes.ok) throw new Error(`api-keys: ${keyRes.status} ${JSON.stringify(keyBody)}`);
   const key = (keyBody.apiKey ?? keyBody.api_key ?? keyBody.key) as string;
-  return { key, address: account.address.toLowerCase() };
+  return { key, address: account_.address.toLowerCase() };
 }
 
 async function call(path: string, key: string | null, init: RequestInit = {}) {

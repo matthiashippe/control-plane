@@ -28,6 +28,12 @@ import type { Db } from "../db.js";
 export const OUR_ADDRESSES = [
   "0xd24f37d0838e62621ed24111164485ded0f0924f", // operator wallet, posts the seed jobs
   "0xf6204b0662082d65d78eab79936a4d91744dee6b", // the agent from the first cycle on 2026-09-20
+  // The operator's own fee address, added on 2026-09-21. It is where `bounty_fee` is booked, so it
+  // appears in the ledger and in `wallets` like any other address, and it read as a stranger until
+  // somebody counted the strangers and found three where there should have been one. It is also
+  // the address printed in `/.well-known/x402` as the payment recipient, so it is ours by
+  // construction and never anybody else's.
+  "0x914102284463f4f58b1d2f6db9ac80bfcaa7d614",
 ];
 
 /** SQL LIKE patterns. A key carrying one of these names was provisioned by a tool of ours. */

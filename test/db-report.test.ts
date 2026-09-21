@@ -151,6 +151,32 @@ describe("The market numbers in the database report", () => {
     expect(nach.market.starter_grants_left).toBeLessThan(leer.market.starter_grants_left);
   });
 
+  it("separates the wallets that are ours from the ones that are not", () => {
+    // `wallets` is printed as a headline figure and reads as usage. On 2026-09-21 it said 280, and
+    // 248 of those carried a key named `harness-markt-poster` or `harness-markt-applicant`: two
+    // per run of ops/check-all.sh, 110 runs in one day. The market check was 89 per cent of the
+    // number meant to show how many people are here.
+    const r = withDb((db) => {
+      const wall = (address: string, name: string | null) => {
+        db.prepare("INSERT OR IGNORE INTO wallets (address, balance_mc, created_at) VALUES (?, 0, ?)")
+          .run(address, new Date().toISOString());
+        if (name) {
+          db.prepare("INSERT INTO api_keys (address, key_hash, key_prefix, name, created_at) VALUES (?, ?, ?, ?, ?)")
+            .run(address, `hash-${address}`, "cnwy_k_xxxxxxx", name, new Date().toISOString());
+        }
+      };
+      wall(OPERATOR, null);                                                    // ours by address
+      wall("0xaaaa000000000000000000000000000000000001", "harness-markt-poster"); // ours by key name
+      wall("0xaaaa000000000000000000000000000000000002", "harness-markt-applicant");
+      wall(STRANGER, "conway-automaton");                                      // a real arrival
+      wall("0xbbbb000000000000000000000000000000000001", null);                // signed in, gave up
+    });
+    expect(r.wallets, "every row is still counted").toBe(5);
+    expect(r.wallets_foreign, "the market check is not two more people").toBe(2);
+    expect(r.wallets_foreign_list, "and the line names them, while there are few enough to read")
+      .toEqual([STRANGER, "0xbbbb000000000000000000000000000000000001"]);
+  });
+
   it("counts a stranger the moment one posts, which is the whole point", () => {
     const r = withDb((db) => {
       postBounty(db, OPERATOR, "ours-1", 200 * MC_PER_CENT);
