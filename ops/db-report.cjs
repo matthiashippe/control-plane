@@ -110,6 +110,16 @@ const OUR_KEY_NAMES = [
   "ops-%",
 ];
 
+// The one name among ours that is allowed on a live job, and the rest, which are not.
+//
+// `ops/compete.ts` names its key `ops-seed-<agent>`. Everything else of ours that ends up holding
+// a submission on an open bounty is a tool that escaped its throwaway, which is the bug this pair
+// was built to catch.
+// Subtracting `ops-seed-%` from the list is not enough: `ops-%` is on it and matches the seed keys
+// too, so a plain filter would have counted every seed agent as a stray. The exclusion has to be a
+// second condition in the SQL, not an absence from the list.
+const SEED_KEY_NAME = "ops-seed-%";
+
 // Names that are not ours to claim.
 //
 // `conway-automaton` is what the upstream runtime calls the key it provisions, so it belongs to
@@ -176,14 +186,35 @@ report.market = {
   // until 2026-09-21, when the open list started publishing how many agents are already in. From
   // that moment a visiting agent read "1 competitor" on a job whose only competitor was us, which
   // discourages exactly the behaviour the number was published to encourage. Anything above zero
-  // here means the market is showing strangers a number about ourselves.
-  our_submissions_on_open: one(
+  // here means a tool of ours wandered onto a live job by accident.
+  //
+  // `ops/compete.ts` is the exception and is split out below rather than excused here, because the
+  // two are different events. A production check on a live job is a bug in the check. A seed agent
+  // on a live job is the operator supplying the side that does not exist yet, decided on
+  // 2026-09-21 and written down on /terms. Both are ours, only one is a mistake.
+  stray_submissions_on_open: one(
     `select count(*) n from submissions s
        join bounties b on b.id = s.bounty_id
       where b.status = 'open'
         and exists (select 1 from api_keys k where k.address = s.agent
-                    and (${OUR_KEY_NAMES.map(() => "k.name like ?").join(" or ")}))`,
+                    and (${OUR_KEY_NAMES.map(() => "k.name like ?").join(" or ")})
+                    and k.name not like ?)`,
     ...OUR_KEY_NAMES,
+    SEED_KEY_NAME,
+  ).n,
+
+  // The operator's own supply side, counted and never netted away.
+  //
+  // This number exists so that nobody, including whoever writes the next cycle, can read the
+  // submission counts on the landing page as evidence of strangers. `foreign_agents` below is the
+  // number that means something; this one is what has to be subtracted from the public count to
+  // get there.
+  seed_submissions_on_open: one(
+    `select count(*) n from submissions s
+       join bounties b on b.id = s.bounty_id
+      where b.status = 'open'
+        and exists (select 1 from api_keys k where k.address = s.agent and k.name like ?)`,
+    SEED_KEY_NAME,
   ).n,
   foreign_agents: one(
     `select count(distinct s.agent) n from submissions s

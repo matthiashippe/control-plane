@@ -81,7 +81,7 @@ describe("The market numbers in the database report", () => {
     expect(r.market.unclassified_key_names).toEqual(["totally-new-thing"]);
   });
 
-  it("notices our own submission sitting on a live job, and does not count a stranger's", () => {
+  it("tells a check that escaped its throwaway apart from a seed agent, and both from a stranger", () => {
     const wall = (db: ReturnType<typeof openDb>, address: string, name: string) => {
       db.prepare("INSERT OR IGNORE INTO wallets (address, balance_mc, created_at) VALUES (?, 0, ?)").run(address, new Date().toISOString());
       db.prepare("INSERT INTO api_keys (address, key_hash, key_prefix, name, created_at) VALUES (?, ?, ?, ?, ?)")
@@ -96,21 +96,36 @@ describe("The market numbers in the database report", () => {
       wall(db, STRANGER, "conway-automaton");
       submit(db, "s-1", "ours-1", STRANGER);
     });
-    expect(clean.market.our_submissions_on_open, "a real agent named conway-automaton is not us").toBe(0);
+    expect(clean.market.stray_submissions_on_open, "a real agent named conway-automaton is not us").toBe(0);
+    expect(clean.market.seed_submissions_on_open, "and it is not a seed agent either").toBe(0);
 
     const dirty = withDb((db) => {
       postBounty(db, OPERATOR, "ours-1", 200 * MC_PER_CENT);
       wall(db, "0x2222222222222222222222222222222222222222", "mcp-production-check-agent");
       submit(db, "s-1", "ours-1", "0x2222222222222222222222222222222222222222");
     });
-    expect(dirty.market.our_submissions_on_open).toBe(1);
+    expect(dirty.market.stray_submissions_on_open).toBe(1);
+    expect(dirty.market.seed_submissions_on_open, "a production check is not seeding").toBe(0);
+
+    // The seed agent of ops/compete.ts. `ops-seed-vera` also matches `ops-%`, which is on the list
+    // of our own names, so the only thing keeping it out of the stray count is the explicit
+    // exclusion in the query. Without that exclusion this case reads 1 and 1, and the number that
+    // is supposed to mean "a tool of ours went wrong" would fire on every seeded job.
+    const seeded = withDb((db) => {
+      postBounty(db, OPERATOR, "ours-1", 200 * MC_PER_CENT);
+      wall(db, "0x3333333333333333333333333333333333333333", "ops-seed-vera");
+      submit(db, "s-1", "ours-1", "0x3333333333333333333333333333333333333333");
+    });
+    expect(seeded.market.seed_submissions_on_open).toBe(1);
+    expect(seeded.market.stray_submissions_on_open, "seeding on purpose is not a tool going wrong").toBe(0);
+    expect(seeded.market.foreign_agents, "and a seed agent is never a stranger").toBe(0);
 
     const closed = withDb((db) => {
       postBounty(db, OPERATOR, "ours-1", 200 * MC_PER_CENT, "cancelled");
       wall(db, "0x2222222222222222222222222222222222222222", "mcp-production-check-agent");
       submit(db, "s-1", "ours-1", "0x2222222222222222222222222222222222222222");
     });
-    expect(closed.market.our_submissions_on_open, "only a live job shows the number to anybody").toBe(0);
+    expect(closed.market.stray_submissions_on_open, "only a live job shows the number to anybody").toBe(0);
   });
 
   it("counts a stranger the moment one posts, which is the whole point", () => {

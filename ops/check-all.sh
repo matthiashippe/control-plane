@@ -122,9 +122,14 @@ if unbekannt:
     # carried on. Either it is ours and belongs on the list, or it is a stranger and is the best
     # news this project has had, and both deserve more than a line somebody skims.
     sys.exit(3)
-if m['our_submissions_on_open']:
-    print(f\"FAILED  {m['our_submissions_on_open']} submission(s) of ours sit on a live job. \"
-          f\"The open list publishes that count, so strangers are being shown a number about us.\")
+seed = m.get('seed_submissions_on_open', 0)
+if seed:
+    print(f\"seeded: {seed} submission(s) on live jobs come from our own agents (ops/compete.ts). \"
+          f\"Subtract that from the counts the landing page publishes.\")
+if m.get('stray_submissions_on_open', 0):
+    print(f\"FAILED  {m['stray_submissions_on_open']} submission(s) from a tool of ours sit on a \"
+          f\"live job. That is a check that escaped its throwaway, not the seeding, and the open \"
+          f\"list publishes the count.\")
     sys.exit(3)
 " || markt_hygiene=$?
   # `|| true` used to swallow everything here, which was right for "no JSON to read" and wrong for
