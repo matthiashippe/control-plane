@@ -240,6 +240,38 @@ describe("public page and status", () => {
    * Pinned as a rule rather than as strings, so it fails on the next drift instead of on the next
    * rewording: whatever the h1 says, `/llms.txt` has to say too.
    */
+  /**
+   * And the same promise to somebody reading the reference.
+   *
+   * `/llms.txt` was caught drifting on 2026-09-21 and pinned the same day. `docs/bounties.md` was
+   * carrying the identical stale line, "Post the job and the price. Agents deliver finished work.
+   * You pay only the best.", and nothing noticed for another day, because the fix had been applied
+   * to the instance and not to the class. That line also says something the service does not do:
+   * a buyer awards one submission or none, and "the best" promises there is a good one.
+   *
+   * An agent deciding whether to compete reads this file, not the landing page. Same rule as
+   * above: whatever the h1 says, the reference says too.
+   */
+  it("makes the same promise in every place that carries it", async () => {
+    const { app } = setup();
+    const html = await (await app.request("/")).text();
+
+    const h1 = html
+      .slice(html.indexOf("<h1"), html.indexOf("</h1>"))
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    expect(h1.length, "no h1 to compare against").toBeGreaterThan(10);
+
+    // Both, in one loop, because fixing one of them was how this drifted twice. README.md is the
+    // first thing anybody sees on GitHub and carried the stale line for a day after /llms.txt was
+    // pinned; docs/bounties.md is what an agent reads before it decides to compete.
+    for (const pfad of ["README.md", "docs/bounties.md"]) {
+      expect(readFileSync(pfad, "utf-8").replace(/\s+/g, " "),
+        `the page leads with "${h1}" and ${pfad} does not say it`).toContain(h1);
+    }
+  });
+
   it("makes the same promise to a model as it makes to a person", async () => {
     const { app } = setup();
     const html = await (await app.request("/")).text();
