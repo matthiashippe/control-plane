@@ -98,6 +98,19 @@ describe("POST /v1/briefs/check", () => {
     }
   });
 
+  it("tells a browser that opened the documented path which method it wants", async () => {
+    const { app } = setup();
+    // llms.txt and docs/bounties.md name this path, so somebody will open it in a browser. Without
+    // the guard that GET is a bare 404 and the path we advertised looks like it does not exist.
+    // Found on 2026-09-21 by ops/journeys-pruefen.sh, which reads a 404 as the document lying.
+    const res = await app.request("/v1/briefs/check");
+    expect(res.status).toBe(405);
+    expect(res.headers.get("allow")).toBe("POST");
+    const body = (await res.json()) as { error: string; message: string };
+    expect(body.error).toBe("method_not_allowed");
+    expect(body.message, "the answer has to carry the next step, not just the refusal").toContain("no API key is needed");
+  });
+
   it("refuses a draft longer than a brief may be, so a keyless path cannot be fed a megabyte", async () => {
     const { check } = setup();
     const res = await check({ brief: "x ".repeat(BRIEF_MAX) });

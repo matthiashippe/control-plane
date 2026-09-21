@@ -560,6 +560,10 @@ export function createApp(opts: AppOptions) {
     "/v1/auth/nonce": ["POST"],
     "/v1/auth/verify": ["POST"],
     "/v1/auth/api-keys": ["POST"],
+    // Keyless like the three above, and documented in llms.txt and docs/bounties.md, so somebody
+    // will open it in a browser. Without this that GET is a bare 404 and the path we told them
+    // about looks like it does not exist.
+    "/v1/briefs/check": ["POST"],
   };
   app.use("/v1/auth/*", async (c, next) => {
     const allowed = ALLOWED_METHODS[c.req.path];
@@ -571,6 +575,24 @@ export function createApp(opts: AppOptions) {
           message: `${c.req.path} accepts ${allowed.join(" and ")}, not ${c.req.method}. This endpoint needs no API key.`,
           allow: allowed,
           docs: DOC.authentication,
+        },
+        405,
+      );
+    }
+    return next();
+  });
+
+  // The same guard for the keyless paths outside /v1/auth/*.
+  app.use("/v1/briefs/*", async (c, next) => {
+    const allowed = ALLOWED_METHODS[c.req.path];
+    if (allowed && !allowed.includes(c.req.method)) {
+      c.header("Allow", allowed.join(", "));
+      return c.json(
+        {
+          error: "method_not_allowed",
+          message: `${c.req.path} accepts ${allowed.join(" and ")}, not ${c.req.method}. Send the draft as {"brief": "…"}; no API key is needed.`,
+          allow: allowed,
+          docs: DOC.payments,
         },
         405,
       );
