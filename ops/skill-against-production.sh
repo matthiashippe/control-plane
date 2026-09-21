@@ -48,8 +48,14 @@ CP_URL="$BASE" pnpm -s tsx ops/provision-key.ts --out "$keyfile" --name skill-pr
 agent=$(cat "$keyfile" 2>/dev/null)
 [[ -n "$agent" ]] && ok "provisioned a fresh agent" || { bad "could not provision an agent"; echo "SKILL PRODUCTION FAILED: $failures"; exit 1; }
 
-granted=$(curl -s -m 15 -X POST "$BASE/v1/credits/starter" -H "Authorization: $agent" | grep -o '"granted_cents":[0-9]*' | cut -d: -f2)
-[[ "${granted:-0}" -gt 0 ]] && ok "claimed the starter credit, $granted c" || bad "starter credit" "$granted"
+# No starter credit is claimed. This check walks the skill's curl calls and not one of them is
+# billed, so every run took 15 cents out of a pool of 500 and spent none of it. The pool is the
+# cold-start budget for agents that are not us, and on 2026-09-21 every single grant in it was
+# ours. Since the same day the grant arrives by itself on the first call that cannot pay for
+# itself, so a future step that does think will still get it, exactly when it needs it.
+balance=$(curl -s -m 15 "$BASE/v1/credits/balance" -H "Authorization: $agent" | grep -o '"balance_cents":[0-9]*' | cut -d: -f2)
+[[ "${balance:-x}" == "0" ]] && ok "starts at zero credits, and takes none it would not spend" \
+  || bad "a fresh wallet should start empty" "$balance"
 
 # Step 1 of the skill, verbatim.
 open=$(curl -s -m 15 "$BASE/bounties.json")

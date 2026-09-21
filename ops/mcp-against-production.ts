@@ -119,8 +119,19 @@ async function main(): Promise<number> {
   })) as { id: string };
   ok(`posted its own throwaway job ${own.id}, 1 c`);
 
-  const stake = (await http("/v1/credits/starter", key, { method: "POST" })) as { granted_cents: number };
-  stake.granted_cents > 0 ? ok(`claimed the starter credit, ${stake.granted_cents} c`) : bad("starter credit", stake);
+  // No starter credit is claimed here, on purpose. This check provisions a fresh wallet on every
+  // run and none of the tools it exercises is billed, so every claim took 15 cents out of a pool
+  // of 500 and spent none of it. Measured on 2026-09-21: two runs in one cycle moved the pool from
+  // 410 to 380 cents, and at that rate our own observation would have eaten the entire cold-start
+  // budget in twenty-five cycles, leaving nothing for the agents it was built for.
+  //
+  // Nothing is lost by dropping it. Since the same day the grant is taken automatically by the
+  // first call that cannot pay for itself (src/credits/starter.ts), so if this check ever does
+  // exercise check_submission, the credit arrives exactly then and is actually used.
+  const balanceBefore = (await http("/v1/credits/balance", key)) as { balance_cents: number };
+  balanceBefore.balance_cents === 0
+    ? ok("starts at zero credits, and takes none it would not spend")
+    : bad("a fresh wallet should start empty", balanceBefore);
 
   const mcp = client(key);
   try {
