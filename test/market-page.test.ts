@@ -111,6 +111,23 @@ describe("The market on the landing page", () => {
     expect(row![0]).toContain("<td>1</td>");
   });
 
+  it("shows a dash instead of an address when the winner's work is withheld", async () => {
+    const { app, db, page } = setup();
+    const b = buyer(db, app, 1);
+    const agent = buyer(db, app, 2);
+    const posted = await b.call("/v1/bounties", "POST", { brief: "An older job.", kind: "factual", price_cents: 200, deadline: inAnHour() });
+    const { id } = (await posted.json()) as { id: string };
+    const sub = await agent.call("/v1/submissions", "POST", { bounty_id: id, body: "Work from before the rule." });
+    const s = (await sub.json()) as { id: string };
+    // Handed in before the publication rule existed, so neither the work nor the author is public.
+    db.prepare("UPDATE submissions SET created_at = ? WHERE id = ?").run("2026-09-20T10:00:00.000Z", s.id);
+    await b.call("/v1/bounties/award", "POST", { bounty_id: id, submission_id: s.id });
+
+    const html = await page();
+    expect(html).toContain("An older job.");
+    expect(html, "the page must not name what the receipt withholds").not.toContain(agent.address.slice(0, 6));
+  });
+
   it("says plainly that nothing is there instead of showing an empty table", async () => {
     const { page } = setup();
     const html = await page();

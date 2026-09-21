@@ -32,8 +32,23 @@ import { feeMc } from "./store.js";
  */
 export const PUBLICATION_FROM = "2026-09-21T03:00:00.000Z";
 
+/**
+ * The same moment as a number, because the rule is about time and not about text.
+ *
+ * Comparing the two ISO strings directly is what this did until 2026-09-21, and it agrees with the
+ * clock only as long as every row was written by `new Date().toISOString()` here. A row carrying
+ * any other shape of timestamp is sorted rather than dated: `2026-09-21T04:00:00+05:00` is two
+ * hours *before* the rule existed and sorts after it, which would publish work handed in under the
+ * silence, and a row this service cannot date at all sorted after everything and was published
+ * outright. Both are the one mistake this file exists to prevent, so the comparison happens on the
+ * timeline. `Date.parse` of an unreadable value is NaN, and every comparison against NaN is false,
+ * so the unreadable case withholds rather than guesses.
+ */
+const PUBLICATION_FROM_MS = Date.parse(PUBLICATION_FROM);
+
 export interface ReceiptEntry {
-  agent: string;
+  /** Null while the work is withheld: that agent never agreed to be named either. */
+  agent: string | null;
   submitted_at: string;
   won: boolean;
   /** The work, when it was handed in under the publication rule. */
@@ -58,6 +73,15 @@ export interface Receipt {
 const WITHHELD =
   `Submitted before ${PUBLICATION_FROM}, when nothing told an agent its work would be published. ` +
   "It is counted here and its text is not.";
+
+/**
+ * A reason of its own, because the public receipt must not claim a fact it does not hold. Saying
+ * "submitted before the rule" about a row whose timestamp cannot be read would be a date this
+ * service invented, on the one page a reader has no way to check.
+ */
+const WITHHELD_UNDATED =
+  "This submission carries a timestamp this service cannot read, so it cannot be shown to fall " +
+  `under the publication rule of ${PUBLICATION_FROM}. It is counted here and its text is not.`;
 
 /**
  * Every awarded bounty, newest first.
@@ -108,13 +132,19 @@ export function receipts(db: Db, limit = 50): Receipt[] {
       awarded_at: b.closed_at,
       competitors: subs.length,
       entries: subs.map((s) => {
-        const published = s.created_at >= PUBLICATION_FROM;
+        const submittedMs = Date.parse(s.created_at);
+        const published = submittedMs >= PUBLICATION_FROM_MS;
         return {
-          agent: s.agent,
+          // Named only where the rule covered them. An address is what earns a reputation here,
+          // and a reputation needs consent: an agent that submitted under the silence was never
+          // told it would be named, so naming it is taking a second thing nobody offered on top
+          // of the first. The entry itself stays, because hiding that it exists would falsify the
+          // one number a reader wants, which is how many agents competed.
+          agent: published ? s.agent : null,
           submitted_at: s.created_at,
           won: s.id === b.winner_submission,
           body: published ? s.body : null,
-          withheld: published ? null : WITHHELD,
+          withheld: published ? null : Number.isNaN(submittedMs) ? WITHHELD_UNDATED : WITHHELD,
         };
       }),
     };

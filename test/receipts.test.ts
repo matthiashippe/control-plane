@@ -100,6 +100,25 @@ describe("/receipts.json", () => {
     expect(fresh.withheld).toBeNull();
   });
 
+  it("does not name an agent whose work it is withholding", async () => {
+    const { app, agents, buyer, id, subIds } = await market([BEFORE]);
+    await buyer.call("/v1/bounties/award", "POST", { bounty_id: id, submission_id: subIds[0] });
+
+    const text = await (await app.request("/receipts.json")).text();
+    const body = JSON.parse(text) as { receipts: { competitors: number; entries: { agent: string | null; won: boolean; withheld: string | null }[] }[] };
+    const entry = body.receipts[0].entries[0];
+
+    // Naming is the second thing nobody offered. An address earns a reputation here, and a
+    // reputation needs consent; this agent submitted before there was a rule to consent to.
+    expect(entry.agent, "withheld work must not carry its author's address").toBeNull();
+    expect(text).not.toContain(agents[0].address);
+    // What stays: that somebody competed, when, and that they won. Hiding the entry itself would
+    // falsify the one number a reader wants.
+    expect(body.receipts[0].competitors).toBe(1);
+    expect(entry.won).toBe(true);
+    expect(entry.withheld).toBeTruthy();
+  });
+
   it("never names the buyer and always names the agent", async () => {
     const { app, buyer, agents, id, subIds } = await market([AFTER]);
     await buyer.call("/v1/bounties/award", "POST", { bounty_id: id, submission_id: subIds[0] });

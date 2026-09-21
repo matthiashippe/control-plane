@@ -65,7 +65,7 @@ export function renderMarket(db: Db): string {
           return (
             `<tr><td>${esc(gist(r.brief, 80))}</td><td>${r.price_cents} ¢</td>` +
             `<td>${r.fee_cents} ¢</td><td>${r.competitors}</td>` +
-            `<td><code>${winner ? esc(shortAddress(winner.agent)) : "—"}</code></td>` +
+            `<td><code>${winner?.agent ? esc(shortAddress(winner.agent)) : "—"}</code></td>` +
             `<td>${esc(r.awarded_at ? day(r.awarded_at) : "—")}</td></tr>`
           );
         })
