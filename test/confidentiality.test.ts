@@ -432,7 +432,10 @@ describe("the rule an agent reads is the rule the receipt applies", () => {
   const CHANNELS = [
     "skills/cp-bounties/SKILL.md",
     "docs/bounties.md",
-    "src/public/index.html",
+    // `src/public/terms.ts` since 2026-09-21. The landing page was cut to 300 words and a diagram
+    // and no longer carries the publication rule; the page that carries the rest of what an agent
+    // agrees to by competing carries this too, and it is linked from the footer of every page.
+    "src/public/terms.ts",
   ];
 
   /**

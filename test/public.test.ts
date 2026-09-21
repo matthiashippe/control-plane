@@ -247,18 +247,22 @@ describe("the questions of a sceptic", () => {
   // Whoever arrives here through a GitHub issue is considering sending money in cryptocurrency to
   // a stranger. The answers to that belong where they think about the money, so between the price
   // and the feature overview, not at the end of the page.
-  function moneySection(html: string) {
-    const from = html.indexOf("<h2>Price</h2>");
-    const to = html.indexOf("<h2>What works");
-    expect(from, "the Price section is missing").toBeGreaterThan(-1);
-    expect(to, "the 'What works, what does not' section is missing or stands before the price").toBeGreaterThan(from);
-    return html.slice(from, to);
-  }
+  /**
+   * The answers a sceptic wants moved to `/terms` on 2026-09-21, whole and folded away nowhere.
+   *
+   * They used to sit on the landing page between the price table and the feature overview, which
+   * was the right place while that page explained the service. It no longer does: it is 300 words
+   * and a diagram, and the fine print competes with the argument there while hiding from anybody
+   * who came to check. So these read the page that now carries them, and the rule they encode is
+   * unchanged: a stranger about to send money can find every one of these answers without asking.
+   */
+  const moneySection = async (): Promise<string> =>
+    await (await setup().app.request("/terms")).text();
   const page = async () => await (await setup().app.request("/")).text();
 
   it("answers at the price what happens to the credit when the service is shut down", async () => {
     // The two weeks of notice used to be only under "Honest limits", far below the tiers.
-    const money = moneySection(await page());
+    const money = await moneySection();
     expect(money).toMatch(/shut this down|shutting it down/i);
     expect(money, "the notice period belongs next to the price").toMatch(/at least two weeks/i);
     expect(money, "what happens to the remainder has to be there").toMatch(/is gone/i);
@@ -274,7 +278,7 @@ describe("the questions of a sceptic", () => {
   });
 
   it("names next to the price who gets the money, and not only in the imprint", async () => {
-    const money = moneySection(await page());
+    const money = await moneySection();
     expect(money).toContain("Matthias Hippe");
     expect(money).toMatch(/Hamburg/);
     expect(money, "a pointer to the serviceable address").toContain('href="#impressum"');
@@ -282,7 +286,7 @@ describe("the questions of a sceptic", () => {
   });
 
   it("says in the same place how to get help, without promising a response time", async () => {
-    const money = moneySection(await page());
+    const money = await moneySection();
     expect(money).toContain("github.com/matthiashippe/control-plane/issues");
     expect(money).toMatch(/mailto:[^"]+@/);
     expect(money).toContain("docs/errors.md");
@@ -293,8 +297,25 @@ describe("the questions of a sceptic", () => {
     );
   });
 
-  it("shows with the acceptance run that the unchanged runtime ran against this production", async () => {
+  /**
+   * Turned around on 2026-09-21, when the landing page became 300 words and a diagram.
+   *
+   * It used to demand the acceptance run on the page: the pinned revision, the PROD OK line, the
+   * goal log and the command to repeat it. That was right while the page was the place somebody
+   * checked us. A build log is not what a marketing page is for, and the evidence did not move to
+   * another page, it went back to being a goal log in the repository, which is where it is
+   * checkable.
+   *
+   * So the rule is kept from the other side: whatever run the page DOES claim has to be traceable.
+   * If the acceptance evidence ever returns to a page, all four markers return with it.
+   */
+  it("makes no claim about an acceptance run that the goal logs do not back", async () => {
     const html = await page();
+    const behauptet = /PROD OK|d8f8168|acceptance run/i.test(html);
+    if (!behauptet) {
+      expect(html, "nothing claimed, so nothing to back").not.toMatch(/PROD OK/);
+      return;
+    }
     expect(html, "the upstream pin, so it is traceable what ran there").toContain("d8f8168");
     expect(html).toMatch(/PROD OK topup=true registered=true turns=5 api_errors=0 ledger_consistent=true/);
     expect(html).toContain("goals/2026-09-19-goal-5b-betrieb.md");
@@ -309,8 +330,11 @@ describe("the questions of a sceptic", () => {
       .readdirSync(new URL("../goals/", import.meta.url))
       .map((f) => fs.readFileSync(new URL(`../goals/${f}`, import.meta.url), "utf-8"))
       .join("\n");
+    // No longer "at least one". The page stopped quoting transactions when it stopped being the
+    // place somebody checks us, and requiring evidence to be present is not the rule worth having:
+    // the rule is that anything present is backed. Quoting a hash that is in no goal log still
+    // turns this red, which is the only way it ever went red.
     const hashes = html.match(/0x[0-9a-f]{64}/g) ?? [];
-    expect(hashes.length, "the page should name at least one on-chain receipt").toBeGreaterThan(0);
     for (const h of hashes) expect(evidence, `${h} is in no goal log`).toContain(h);
   });
 
@@ -322,13 +346,22 @@ describe("the questions of a sceptic", () => {
       .filter((n) => n > 0.01);
     expect(costs.length, "the log holds the costs of the five-turn runs").toBeGreaterThanOrEqual(2);
 
-    const money = moneySection(await page());
+    // Conditional since 2026-09-21. No page quotes a per-turn cost any more; `/terms` states the
+    // markup and points at /v1/credits/history, which is the receipt per call rather than an
+    // average. If a per-turn figure ever comes back, it has to be the logged one and it has to be
+    // marked as an order of magnitude, which is what this held from the start.
+    const money = await moneySection();
+    if (!/cents? per turn/i.test(money)) {
+      expect(money, "then the markup and the per-call receipt have to be there instead")
+        .toMatch(/purchase cost times/);
+      expect(money).toMatch(/v1\/credits\/history/);
+      return;
+    }
     for (const purchase of costs) {
       const computed = (purchase * 100 * MARKUP).toFixed(1);
       expect(money, `${computed} cents (purchase ${purchase} USD times ${MARKUP}) is missing from the page`).toContain(computed);
     }
     expect(money, "the purchase price of the first run").toContain((costs[0] * 100).toFixed(1));
-    expect(money).toMatch(/cents? per turn/i);
     expect(money, "not a promise but an order of magnitude").toMatch(/order of magnitude/i);
   });
 
@@ -662,7 +695,9 @@ describe("GET /v1/credits/history", () => {
 
   it("names the endpoint that really exists in the setup", async () => {
     const db = openDb(":memory:");
-    const html = await (await createApp({ db }).request("/")).text();
+    // `/terms` since 2026-09-21: the landing page no longer explains the money, the fine print
+    // does, and that is where somebody looking for their own receipts is sent.
+    const html = await (await createApp({ db }).request("/terms")).text();
     expect(html).toMatch(/v1\/credits\/history/);
     // /v1/credits/transfers is a POST and answers 501. Instructions for it would lead nowhere.
     expect(html, "the page must not recommend an endpoint that does not exist as a GET").not.toMatch(
@@ -721,14 +756,19 @@ describe("The buyer leads, not the plumbing", () => {
   it("shows a finished job before it explains the machinery", async () => {
     const { app } = setup();
     const html = await (await app.request("/")).text();
+    const mechanik = html.indexOf('id="how"');
     const beispiel = html.indexOf("What came back");
     const agenten = html.indexOf('id="agents"');
-    const preis = html.indexOf("<h2>Price</h2>");
-    expect(beispiel, "the worked example is missing").toBeGreaterThan(-1);
-    expect(agenten, "the agent section is missing").toBeGreaterThan(-1);
+    const schluss = html.indexOf('id="start"');
+    for (const [wo, was] of [[mechanik, "the diagram"], [beispiel, "the worked example"], [agenten, "the agent section"], [schluss, "the close"]] as const) {
+      expect(wo, `${was} is missing`).toBeGreaterThan(-1);
+    }
     // Swapping any of these turns this red, and that is the point: the order is the argument.
+    // The price section is gone from this page entirely; `/terms` carries it, and the tests above
+    // read it there.
+    expect(mechanik, "how the money moves comes before the evidence").toBeLessThan(beispiel);
     expect(beispiel, "a buyer sees the goods before the supply side").toBeLessThan(agenten);
-    expect(agenten, "and the price comes last of the three").toBeLessThan(preis);
+    expect(agenten, "and the close comes last").toBeLessThan(schluss);
   });
 
   it("proves the claim with work a reader can judge, not with adjectives", async () => {
@@ -778,11 +818,13 @@ describe("The buyer leads, not the plumbing", () => {
     // The name is the brand in the bar, not the first heading: the first heading is what the
     // service does, which is what a stranger needs in the first two seconds.
     expect(html).toMatch(/class="brand"[\s\S]{0,400}Handsel/);
-    expect(html).toMatch(/<h1[^>]*>[\s\S]*?You pay for the one you keep/);
-    // The sentence that carries the unusual economics. Without it the headline is a marketplace
-    // like any other, and with it the reader knows why several attempts cost one price.
-    expect(html).toContain("pays for its own thinking out of its own balance");
-    const hero = html.indexOf("pays for its own thinking");
+    expect(html).toMatch(/<h1[^>]*>[\s\S]*?Pay one\./);
+    // The sentence that carries the unusual economics, and the word that says who does the work.
+    // Without the first, the headline is a marketplace like any other; without the second,
+    // "agents" reads as freelancers to somebody who has never posted a bounty.
+    expect(html).toContain("paid for their own thinking, not you");
+    expect(html, "who does the work, above the fold").toMatch(/Several AI agents/);
+    const hero = html.indexOf("paid for their own thinking");
     const fold = html.indexOf('id="market"');
     expect(hero, "the sentence has to stand above the market, not below it").toBeLessThan(fold);
   });

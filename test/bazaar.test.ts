@@ -132,10 +132,16 @@ describe("threshold bonus", () => {
     expect(credited - 5 * 100, "more than one cent would be a gift without a purpose").toBe(1);
   });
 
+  /**
+   * On `/terms` since 2026-09-21, with the rest of the money detail. The landing page was cut to
+   * 300 words and a diagram, and an explanation of one cent is exactly the kind of thing that
+   * belongs where somebody checks rather than where somebody decides. It is served, not read off
+   * disk, so the test fails if the page stops rendering it as well as if the sentence goes.
+   */
   it("is stated openly on the page, because it benefits us too", async () => {
-    const html = await import("node:fs/promises").then((fs) =>
-      fs.readFile(new URL("../src/public/index.html", import.meta.url), "utf8"),
-    );
+    const { createApp } = await import("../src/app.js");
+    const { openDb } = await import("../src/db.js");
+    const html = await (await createApp({ db: openDb(":memory:") }).request("/terms")).text();
     expect(html).toMatch(/501 cents/);
     expect(html, "the reason has to stand next to it, otherwise it is a sales trick").toMatch(/above<\/em> 500 cents/);
   });

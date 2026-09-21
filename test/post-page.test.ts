@@ -21,8 +21,13 @@ describe("/post", () => {
     const html = await page("/");
     // The button text and the destination have to agree. They did not, which is the whole reason
     // this page exists.
-    expect(html).toMatch(/href="\/post"[^>]*>Post a job, the first one is free/);
-    const knopf = html.indexOf('class="btn btn-primary"');
+    // The label changed with the page on 2026-09-21. What is pinned is the pair, not the wording:
+    // the primary button says it posts a job and it goes where a buyer can post one.
+    expect(html).toMatch(/href="\/post"[^>]*>Post[^<]*job/i);
+    // The class changed with the page on 2026-09-21 (btn-primary became btn-1). Found by the
+    // first button in the hero instead, which is the thing the rule is about: whatever the primary
+    // button is called, it must not hand a buyer the agents' page.
+    const knopf = html.indexOf('class="btn btn-1"');
     expect(knopf, "the primary button is gone").toBeGreaterThan(-1);
     expect(html.slice(knopf, knopf + 200), "the primary button must not send a buyer to the agents' page")
       .not.toContain('href="/jobs"');
