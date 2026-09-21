@@ -359,6 +359,21 @@ const d = f.contentDocument, w = f.contentWindow;
 })
 ```
 
+**Measure with real data, or you measure the empty state.** /jobs, /receipts, /x402 and /conway
+render a short "nothing here yet" block against an empty database, and that block has no layout to
+get wrong. Pull the night's backup and the two series off the VM and point the local instance at
+them:
+
+```
+scp -i ~/.ssh/id_ed25519_automaton root@76.13.144.207:/opt/control-plane/backups/cp-*.db /tmp/mess.db
+ssh -i ~/.ssh/id_ed25519_automaton root@76.13.144.207 'cat /opt/control-plane/x402/kennzahlen.ndjson' > /tmp/x402.ndjson
+CP_PORT=8499 CP_DB_PATH=/tmp/mess.db CP_X402_SERIES=/tmp/x402.ndjson pnpm tsx src/index.ts
+```
+
+Doing that on 2026-09-21 found both defects of the day: /x402 scrolling the whole document
+sideways because six columns of figures are 574 pixels wide, and the sub-page bar breaking its five
+labels across three lines each in the 246 pixels it has.
+
 Resizing the browser window does not work for this: the window resizes and the content viewport
 stays at its old width, so the measurement reads the desktop layout while looking like a phone.
 The iframe is the honest way, and it is same-origin, so everything inside it is readable.
