@@ -450,3 +450,39 @@ Fetching it for an analysis:
 ```
 scp -i ~/.ssh/id_ed25519_automaton root@76.13.144.207:/opt/control-plane/x402/kennzahlen.ndjson .
 ```
+
+## Time series of the money going into Conway
+
+`ops/conway-money-series.sh`, daily at 5:00 UTC by cron. Scans forward for USDC transfers into
+Conway's payTo address `0x21DD37E3E4eA6CCC0a5C98A4944702eDE6E7Be10` on Base and writes to
+`/opt/control-plane/conway-money`:
+
+- `metrics.ndjson`: one line per run. That is the series, it stays for good. Handed into the
+  container as `/data/conway-money.ndjson` after every run.
+- `delta.csv`: every transfer found since the base file, same five columns.
+
+The base file `docs/research/data/2026-09-19-conway-payto-transfers.csv` holds the history up to
+20 September and cost half an hour of `eth_getLogs`. The daily run never repeats it: the resume
+point is the newest block in the data itself, which is about 22 chunks a day. A state file was the
+obvious alternative and was rejected, because it can drift away from the rows it claims to describe
+and the resulting hole is invisible.
+
+**Why it exists.** The landing page and the article both claim that money still flows into a system
+that cannot issue an API key. That claim is measurable and it will age. `ops/vor-dem-artikel.py`
+now refuses to say READY when the newest transfer is more than seven days old, or when
+`GET /pay/5/<address>` stops answering 402.
+
+**The guard that matters compares against the last line of the series**, not against this run's own
+starting figures. Both of those come from the same files, so a base file that had lost half its rows
+would pass any before/after check and still write a line claiming the money had vanished. Verified
+by halving the base file: `usdc_total fell from 62626.135927 to 29058.449455`, exit 1, series
+untouched.
+
+The scanner was checked against the existing dataset before it was trusted: blocks 43,890,000 to
+43,896,000 rescanned, 28 transfers, identical line for line, including the six from issue #293.
+
+Fetching it for an analysis:
+
+```
+scp -i ~/.ssh/id_ed25519_automaton root@76.13.144.207:/opt/control-plane/conway-money/metrics.ndjson .
+```
