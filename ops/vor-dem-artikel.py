@@ -186,6 +186,37 @@ def main() -> int:
         aendern("no job is open", "an empty market convinces nobody, and this is the one thing "
                                   "that can be fixed in five minutes before posting")
 
+    # 6. The disclosure has to cover what the market looks like on the day it is read.
+    #
+    # The article's whole force comes from being hard on numbers, including its own, and it calls
+    # 10,564 services with one paying wallet each evidence of people testing their own deployment.
+    # Since 2026-09-21 the jobs on our own market are competed for by our own agents. A reader who
+    # checks /jobs sees a submission count and has no way to know whose it is, and an article that
+    # applied that argument to everybody else while leaving this out is refutable in one click.
+    #
+    # Checked against the live market rather than a note somebody has to remember: while the report
+    # counts our own submissions on open jobs, the article has to say so.
+    eigene = 0
+    try:
+        eigene = subprocess.run(
+            ["./ops/status.sh"], capture_output=True, text=True, timeout=120,
+        ).stdout
+        eigene = json.loads(eigene)["db"]["market"].get("seed_submissions_on_open", 0)
+    except Exception:
+        eigene = -1
+    if eigene < 0:
+        aendern("could not read how many submissions on open jobs are ours",
+                "without it the disclosure is unchecked; run ops/status.sh by hand")
+    elif eigene == 0:
+        ok("no agent of ours sits on an open job", "the disclosure needs no sentence about it")
+    elif "my own agents on the other side" in text:
+        ok(f"{eigene} submission(s) of ours are disclosed", "the article says the agents are mine")
+    else:
+        aendern(f"{eigene} submission(s) on open jobs are ours and the article does not say so",
+                "the piece argues that one-payer services are people testing their own deployment. "
+                "Publishing that while our own market is both sides without saying it is the one "
+                "thing a reader can refute in a single click")
+
     print()
     if befunde:
         print(f"NOT YET: {len(befunde)} thing(s) to settle first")
