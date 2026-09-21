@@ -193,8 +193,13 @@ else
   problems=""
   [[ "$(header page content-type)" == *"text/html"* ]] || problems="$problems content-type=$(header page content-type);"
   grep -q "docs/without-control-plane.md" "$TMP/page.body" || problems="$problems link to without-control-plane.md missing;"
-  grep -q 'id="impressum"' "$TMP/page.body" || problems="$problems anchor id=impressum missing;"
-  grep -q 'href="#impressum"' "$TMP/page.body" || problems="$problems reference href=#impressum missing;"
+  # The imprint moved to /terms on 2026-09-21 with the rest of the fine print, so the landing page
+  # carries the link and not the anchor. What the duty asks for is that it is easily recognisable,
+  # directly reachable and permanently available, which a footer link on every page satisfies; it
+  # does not ask for the address on the page somebody lands on. The anchor itself is checked on the
+  # page that now holds it, a few lines below.
+  grep -q 'href="/terms#impressum"' "$TMP/page.body" || problems="$problems link to /terms#impressum missing;"
+  grep -q 'href="/terms"' "$TMP/page.body" || problems="$problems link to the fine print missing;"
   if [[ -n "$problems" ]]; then
     fail "/: $problems"
   else
@@ -245,7 +250,15 @@ fi
 code=$(fetch impressum /impressum)
 target=$(header impressum location)
 if [[ "$code" == "302" && "$target" == "/terms#impressum" ]]; then
-  ok "/impressum: 302 to /terms#impressum"
+  # And the target has to hold what the redirect promises. A 302 into a page without the anchor is
+  # a 302 into the top of a page, which is not "directly reachable" in any sense a court would use.
+  code_t=$(fetch terms /terms)
+  if [[ "$code_t" == "200" ]] && grep -q 'id="impressum"' "$TMP/terms.body" \
+     && grep -q "20457 Hamburg" "$TMP/terms.body"; then
+    ok "/impressum: 302 to /terms#impressum, and the address is there"
+  else
+    fail "/impressum leads to /terms, but that page answered $code_t without the imprint anchor or the address"
+  fi
 else
   fail "/impressum: $code to '$target', expected 302 to /terms#impressum"
 fi
