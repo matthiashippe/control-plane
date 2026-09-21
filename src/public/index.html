@@ -175,6 +175,18 @@ section { padding-block: var(--s-16); }
          font-weight: 600; font-size: 1.125rem; letter-spacing: -.02em; color: var(--accent); }
 .brand { color: var(--fg); } .brand svg { color: var(--accent); }
 .btn-sm { height: 34px; font-size: var(--t-ui); padding-inline: .8rem; }
+/* A thumb is not a mouse pointer. Measured in a real 390px viewport on 2026-09-21, the bar's
+   primary button came out 93 by 34 and the nav links 45 by 22, and the one visitor this site has
+   had from GitHub arrived on an Android phone. Below the breakpoint the bar's targets grow to 44,
+   which is the smallest size Apple's guidance accepts; the bar itself grows with them. */
+@media (max-width: 48rem) {
+  .btn-sm { height: 44px; padding-inline: 1rem; }
+  /* `:not(.hide-s)`, because this rule sits after the one that hides those links at narrow
+     widths and a bare `display: inline-flex` brought them back. Found by measuring again
+     after the fix rather than by assuming the fix was the end of it. */
+  .bar nav a:not(.hide-s) { display: inline-flex; align-items: center; min-height: 44px; }
+  .bar .brand { display: inline-flex; align-items: center; min-height: 44px; }
+}
 @media (max-width: 30rem) { .bar .wrap { gap: var(--s-4); } .bar nav { gap: var(--s-4); } .hide-s { display: none; } }
 @supports (animation-timeline: scroll()) {
   @media (prefers-reduced-motion: no-preference) {

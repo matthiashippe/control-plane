@@ -297,6 +297,45 @@ ran at 03:30 and the cron at 04:40.
 
 What it cannot check, and says so: whether today is a good day to post.
 
+## Measuring the page at phone width
+
+`ops/seiten-pruefen.sh` checks that every page answers 200 with one h1 and nothing unrendered. It
+says nothing about layout, and layout is where a phone visitor is lost. The one visitor this site
+has had from GitHub, on 2026-09-21 at 14:08 UTC, arrived on an Android phone.
+
+There is no headless browser in this repo and adding one for a single check is not worth 180 MB of
+Chromium, so this is a paste rather than a script. Run the service locally, open any page in
+Chrome, and measure a real viewport from inside the page by loading it into an iframe of exactly
+the width you want:
+
+```js
+const f = document.createElement('iframe');
+f.style.cssText = 'position:fixed;left:0;top:0;width:390px;height:844px;border:0;z-index:99999';
+f.src = 'http://127.0.0.1:8499/?v=' + Date.now();
+document.body.appendChild(f);
+await new Promise(r => f.addEventListener('load', r, { once: true }));
+const d = f.contentDocument, w = f.contentWindow;
+({
+  ueberlauf: d.documentElement.scrollWidth > w.innerWidth,
+  kleineZiele: [...d.querySelectorAll('header a, main .btn')]
+    .filter(el => { const r = el.getBoundingClientRect(); return r.width && (r.height < 40 || r.width < 40); })
+    .map(el => el.textContent.trim()),
+})
+```
+
+Resizing the browser window does not work for this: the window resizes and the content viewport
+stays at its old width, so the measurement reads the desktop layout while looking like a phone.
+The iframe is the honest way, and it is same-origin, so everything inside it is readable.
+
+What that found on 2026-09-21, none of which a screenshot would have shown: the bar's primary
+button was a 93 by 34 tap target and the nav links 45 by 22, against the 44 pixels Apple's guidance
+treats as the minimum. Both now grow below 48rem. The fix then broke something itself, and the
+second measurement caught it: `.bar nav a { display: inline-flex }` sits after the rule that hides
+two links at narrow widths, so it brought them back. It reads `:not(.hide-s)` now.
+
+Measured clean afterwards at 360, 390 and 768: no horizontal overflow, no target under 44, the
+narrow diagram below the breakpoint and the wide one above it.
+
 ## Are we in the directory an automaton searches in
 
 `ops/own-x402-listing.sh`, part of `ops/check-all.sh`, printed rather than failed: absence is
