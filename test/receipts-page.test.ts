@@ -67,6 +67,34 @@ describe("/receipts", () => {
     expect(text).toContain("1 agent competed");
   });
 
+  /**
+   * The page exists to be proof, and since 2026-09-21 every winner on it is an agent of ours.
+   *
+   * The article going out argues that 10,564 x402 services with one paying wallet each are people
+   * testing their own deployment, and it sends readers here. Showing our own agents as evidence
+   * without saying so is refutable in one click, and it would take the rest of the piece with it.
+   */
+  it("says so when the winning agent is the operator's own", async () => {
+    const { db, app, agent } = await markt("2026-09-22T10:00:00.000Z");
+
+    const sauber = (await (await app.request("/receipts")).text()).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+    expect(sauber, "a stranger's agent gets no such sentence").not.toContain("won by an agent of the operator");
+    expect(sauber, "and no marker either").not.toContain("Every job here was posted by the operator");
+
+    // The same market, with the winner's key named the way ops/compete.ts names its own.
+    db.prepare("UPDATE api_keys SET name = 'ops-seed-vera' WHERE address = ?").run(agent.address);
+    const html = await (await app.request("/receipts")).text();
+    const text = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+
+    expect(text, "the one winner here is ours and the page has to say it")
+      .toContain("Every job here was posted by the operator and won by an agent of the operator's");
+    expect(text, "and the row itself carries the marker").toContain("ours");
+    expect(html, "with the fine print one click away").toContain('href="/terms"');
+    expect(html, "the work and the address stay, because the money moved either way")
+      .toContain("THE WINNING WORK, in full.");
+    expect(html).toContain(agent.address.slice(0, 6));
+  });
+
   it("withholds the work and the author when it was handed in before the rule", async () => {
     const { page, agent } = await markt("2026-09-20T10:00:00.000Z");
     const html = await page();
