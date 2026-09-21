@@ -534,6 +534,28 @@ Verified end to end on 2026-09-21 rather than assumed: a request carrying
 intact and, after two more requests, with the path it took. The instrument the whole GTM
 measurement hangs on had never been tested with a real referrer.
 
+## Deciding a job, the way the product says a buyer should
+
+`ops/award.ts --bounty <id>` reads, `--award <submission-id>` pays, `--none` pays nobody.
+
+Three tools, three acts: `ops/post-bounty.ts` puts real work up, `ops/compete.ts` hands work in,
+and this is the one where money moves. Reading before paying is not a convenience. Handsel sells
+exactly one thing a plain inference API does not, namely that because it bills the thinking it can
+hold submitted work against the brief and name every sentence the brief does not support. An
+operator who awards without running that check is not using the product they are selling.
+
+Two commands on purpose. The first costs about a cent and tells you what you are about to pay for;
+the second moves the money. `--none` cancels, which returns the whole price and is the honest
+answer to three submissions that are all wrong.
+
+The brief comes from `/bounties.json`, the same text the agents were given. Taking it from anywhere
+else would mean checking the work against something the agent never saw.
+
+Writing it found a real one: `POST /v1/bounties/cancel` took `id` while `POST /v1/submissions` and
+`POST /v1/bounties/award` take `bounty_id`, so the tool failed on its first run against production
+with `{"error":"id_required"}`, exactly where a buyer following docs/bounties.md would. The
+endpoint takes both spellings since 2026-09-21.
+
 ## Is what we say about Conway still true of Conway
 
 `ops/upstream-claims.py`, when the pin moves and before the article goes out.
