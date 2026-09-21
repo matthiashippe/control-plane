@@ -1,0 +1,129 @@
+/**
+ * The measurement of the x402 market, as a page that updates itself.
+ *
+ * This is the one thing here that nobody else has: both public directories scanned every day at
+ * 04:40 UTC, with the raw CSV kept for sixty days, under CC0. Until 2026-09-21 it lived as files
+ * in `docs/research/data/`, which means it was invisible: a link that earns a link has to be a
+ * page, not a repository directory.
+ *
+ * It is also the most honest kind of marketing this project can do. The numbers are unflattering
+ * to everybody selling in this space, us included, and the page says so. What it buys is a reason
+ * for somebody to point at us that is not "look at my startup".
+ *
+ * The series is handed into the container by `ops/x402-zeitreihe.sh` after each scan, because it
+ * lives outside the repo directory that `deploy/rollout.sh` mirrors with --delete, and adding a
+ * bind mount would mean touching `deploy/**`, which is not done without a human.
+ */
+import fs from "node:fs";
+import { esc } from "./market.js";
+
+export interface X402Point {
+  stichtag: string;
+  urls_eindeutig: number;
+  dienste_cdp: number;
+  dienste_payai: number;
+  anbieter: number;
+  aufrufe_30d: number;
+  aufrufe_median: number;
+  anteil_top10: number;
+  anteil_top100: number;
+  mit_einem_zahler: number;
+  mit_5_zahlern: number;
+  mit_20_zahlern: number;
+  mit_100_zahlern: number;
+  ohne_nachfragedaten?: number;
+  groesster_dienst?: string | null;
+  groesster_aufrufe?: number;
+  groesster_zahler?: number;
+  groesster_anteil?: number;
+}
+
+/** Reads the series the scan hands over. Missing or broken is not an error worth a 500. */
+export function readSeries(path = process.env.CP_X402_SERIES || "/data/x402.ndjson"): X402Point[] {
+  try {
+    return fs
+      .readFileSync(path, "utf-8")
+      .split("\n")
+      .filter((l) => l.trim())
+      .map((l) => JSON.parse(l) as X402Point);
+  } catch {
+    return [];
+  }
+}
+
+const n = (x: number): string => x.toLocaleString("en-US");
+const day = (iso: string): string => iso.slice(0, 10);
+
+export function renderX402(points: X402Point[]): string {
+  if (!points.length) {
+    return `<section><div class="wrap narrow"><h2>The scan has not run yet</h2>
+      <p class="sub">It runs daily at 04:40 UTC. The raw data is
+      <a href="https://github.com/matthiashippe/control-plane/tree/main/docs/research/data">in the repository under CC0</a>.</p>
+      </div></section>`;
+  }
+  const last = points[points.length - 1];
+  const first = points[0];
+  const mit = last.dienste_cdp - (last.ohne_nachfragedaten ?? 0);
+  const anteilEiner = ((last.mit_einem_zahler / mit) * 100).toFixed(1);
+
+  const reihe = points
+    .slice()
+    .reverse()
+    .map(
+      (p) =>
+        `<tr><td>${esc(day(p.stichtag))}</td><td>${n(p.urls_eindeutig)}</td><td>${n(p.aufrufe_30d)}</td>` +
+        `<td>${p.anteil_top10}%</td><td>${n(p.ohne_nachfragedaten ?? 0)}</td>` +
+        `<td>${p.groesster_dienst ? esc(p.groesster_dienst.replace(/^https?:\/\//, "").slice(0, 44)) : "—"}</td></tr>`,
+    )
+    .join("");
+
+  return `
+  <section>
+    <div class="wrap">
+      <p class="kicker">Measured daily, not claimed</p>
+      <h2>How big the paid-API market for agents actually is</h2>
+      <p class="sub">
+        Both public x402 directories, scanned every day at 04:40 UTC. Coinbase publishes a demand
+        figure per service, which is rare enough to be worth keeping: calls in the last 30 days and
+        distinct paying wallets. Everything below re-runs from
+        <a href="https://github.com/matthiashippe/control-plane/tree/main/docs/research/data">scripts in the repository</a>,
+        under CC0, without a key. Last scan ${esc(day(last.stichtag))}.
+      </p>
+
+      <div class="stats">
+        <div><span class="n">${n(last.urls_eindeutig)}</span><span class="l">distinct paid services, behind ${n(last.anbieter)} providers</span></div>
+        <div><span class="n">${n(last.aufrufe_30d)}</span><span class="l">calls paid for across all of them in 30 days</span></div>
+        <div><span class="n bad">${last.anteil_top10}%</span><span class="l">of those calls go to the ten largest services</span></div>
+        <div><span class="n bad">${n(last.mit_20_zahlern)}</span><span class="l">services have twenty or more paying wallets a month</span></div>
+      </div>
+
+      <div class="claims" style="margin-top:1rem">
+        <div>
+          <span><b>${anteilEiner}% of services with published demand had exactly one paying wallet</b>
+          <span class="w">${n(last.mit_einem_zahler)} of ${n(mit)}. A market does not consist of that many services with one payer each. What it looks like instead is a lot of people testing their own deployment.</span></span>
+          <a href="https://github.com/matthiashippe/control-plane/tree/main/docs/research/data">the raw scan</a>
+        </div>
+        <div>
+          <span><b>The median paid service is called ${last.aufrufe_median} times a month</b>
+          <span class="w">Supply is essentially free and demand is the entire problem. Any number in this space that counts services, listings or integrations is counting the cheap half.</span></span>
+          <a href="/">what we built instead</a>
+        </div>
+        <div>
+          <span><b>${n(last.ohne_nachfragedaten ?? 0)} entries carry no demand data at all, and that number climbs</b>
+          <span class="w">Coinbase fills those fields in late. On 20 September the largest service in the whole directory sat there with empty fields and appeared the next day with ${n(last.groesster_aufrufe ?? 0)} calls, ${last.groesster_anteil}% of everything. So every total here is a floor, not a count.</span></span>
+          <a href="https://github.com/matthiashippe/control-plane/tree/main/docs/research/data">check it</a>
+        </div>
+      </div>
+
+      <h3 style="margin:2.5rem 0 .6rem">Every scan since ${esc(day(first.stichtag))}</h3>
+      <table>
+        <thead><tr><th>day</th><th>services</th><th>calls / 30d</th><th>top ten</th><th>no demand data</th><th>largest service</th></tr></thead>
+        <tbody>${reihe}</tbody>
+      </table>
+      <p class="sub" style="margin-top:1rem">
+        The series is kept for good and the raw CSV of each day for sixty. If you want the whole
+        thing, take it: CC0, no attribution required, no key, no rate limit worth mentioning.
+      </p>
+    </div>
+  </section>`;
+}

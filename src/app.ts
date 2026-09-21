@@ -13,6 +13,7 @@ import { verifyFindings, messages, type CheckMode } from "./check/fabrication.js
 import { reviewBrief } from "./bounties/brief.js";
 import { receipts, PUBLICATION_FROM } from "./bounties/receipts.js";
 import { renderMarket, renderNumbers } from "./public/market.js";
+import { readSeries, renderX402 } from "./public/x402.js";
 import {
   createBounty,
   cancelBounty,
@@ -301,6 +302,62 @@ export function createApp(opts: AppOptions) {
    * What did survive the correction is below it: a page view opens no write transaction. That was
    * right on its own merits and not because of a number.
    */
+  /**
+   * A second page in the same skin, without copying the skin.
+   *
+   * Everything down to `</head>` is the landing page's: the same tokens, the same type, the same
+   * dark and light palettes. What follows is this page's own bar, body and footer. The inline
+   * script is deliberately not carried over; it only fills the status figures on the landing page,
+   * and a page that does not need it should not ship a hash-pinned script for nothing.
+   */
+  const seite = (bodyHtml: string, titel: string, beschreibung: string, pfad: string): string => {
+    const kopf = (indexHtml ?? "").slice(0, (indexHtml ?? "").indexOf("</head>"));
+    return (
+      kopf
+        .replace(/<title>[^<]*<\/title>/, `<title>${titel}</title>`)
+        .replace(/(<meta name="description" content=")[^"]*/, `$1${beschreibung}`)
+        .replace(/(<link rel="canonical" href="https:\/\/cp\.hippe\.eu)\/"/, `$1${pfad}"`) +
+      `</head>
+<body>
+<header class="bar"><div class="wrap">
+  <a class="brand" href="/">
+    <svg width="22" height="22" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="currentColor" opacity=".12"/><circle cx="16" cy="12" r="5.5" fill="none" stroke="currentColor" stroke-width="2.5"/><rect x="7" y="21" width="18" height="3.5" rx="1.75" fill="currentColor"/></svg>
+    Handsel
+  </a>
+  <nav>
+    <a href="/#market">Market</a>
+    <a href="/#start">Start</a>
+    <a href="/x402">Data</a>
+    <a href="https://github.com/matthiashippe/control-plane">Source</a>
+  </nav>
+</div></header>
+<main>${bodyHtml}</main>
+<footer><div class="wrap">
+  Measured and published by Matthias Hippe, San-Francisco-Stra\u00dfe 1, 20457 Hamburg, Germany.
+  Data under CC0, code at
+  <a href="https://github.com/matthiashippe/control-plane">github.com/matthiashippe/control-plane</a>.
+  <a href="/#impressum">Impressum</a>.
+</div></footer>
+</body>
+</html>`
+    );
+  };
+
+  /**
+   * The measurement, as a page. See `src/public/x402.ts` for why it exists at all.
+   */
+  app.get("/x402", (c) => {
+    if (!indexHtml) return c.json({ error: "no index page built" }, 503);
+    return c.html(
+      seite(
+        renderX402(readSeries()),
+        "How big the paid-API market for agents actually is",
+        "Both public x402 directories, scanned daily. Distinct services, calls in 30 days, how concentrated the demand is, and how many services have a single paying wallet. Raw data under CC0.",
+        "/x402",
+      ),
+    );
+  });
+
   app.get("/", (c) => {
     if (!indexHtml) return c.json({ ok: true, version: VERSION, note: "no index page built" });
     return c.html(
@@ -576,6 +633,9 @@ export function createApp(opts: AppOptions) {
       "  agents compete and award a winner before owning any cryptocurrency. POST /v1/credits/starter",
       "  claims it by hand if you would rather. The pool is fixed and does not refill; /v1/status",
       "  says how much is left.",
+      "- /x402: both public x402 directories, scanned daily at 04:40 UTC and published as a page:",
+      "  distinct services, calls in 30 days, how concentrated the demand is, how many services have",
+      "  a single paying wallet. Raw CSV under CC0 in the repository. No key, no rate limit.",
       "- /receipts.json: every awarded job, no key needed. Brief, price, fee, who competed and who",
       "  won. Submissions made from " + PUBLICATION_FROM + " are published in full when their job is",
       "  awarded; that is the rule an agent agrees to by submitting, and older ones stay withheld.",

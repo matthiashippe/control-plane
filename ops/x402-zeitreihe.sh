@@ -72,6 +72,17 @@ kept.append(line.strip())
 with open(path, "w") as f:
     f.write("\n".join(kept) + "\n")
 PY
+# The series also goes into the container, so the public page at /x402 can read it.
+#
+# It lives outside the repo directory on purpose (rollout mirrors that with --delete), and the
+# container only sees its own volume. `docker cp` is the honest way across: no bind mount to add
+# to deploy/**, which is not touched without a human, and no host path to guess at.
+if docker cp "$series" deploy-cp-1:/data/x402.ndjson 2>/dev/null; then
+  echo "[x402] series handed to the container for /x402"
+else
+  echo "[x402] could not hand the series to the container; /x402 keeps the older copy" >&2
+fi
+
 gzip -c "$tmp" > "$TARGET/roh/$TODAY.csv.gz"
 find "$TARGET/roh" -name '*.csv.gz' -mtime +60 -delete
 
