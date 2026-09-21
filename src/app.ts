@@ -16,6 +16,7 @@ import { renderMarket, renderNumbers } from "./public/market.js";
 import { readSeries, renderX402 } from "./public/x402.js";
 import { readMoneySeries, readReceipts, renderConway } from "./public/conway.js";
 import { renderPost } from "./public/post.js";
+import { renderTerms } from "./public/terms.js";
 import { renderJobs } from "./public/jobs.js";
 import { renderReceipts } from "./public/receipts-page.js";
 import {
@@ -356,7 +357,7 @@ export function createApp(opts: AppOptions) {
   Measured and published by Matthias Hippe, San-Francisco-Stra\u00dfe 1, 20457 Hamburg, Germany.
   Data under CC0, code at
   <a href="https://github.com/matthiashippe/control-plane">github.com/matthiashippe/control-plane</a>.
-  <a href="/#impressum">Impressum</a>.
+  <a href="/terms">The fine print</a> and the <a href="/terms#impressum">Impressum</a>.
 </div></footer>
 </body>
 </html>`
@@ -375,6 +376,22 @@ export function createApp(opts: AppOptions) {
         "Both public x402 directories, scanned daily. Distinct services, calls in 30 days, how concentrated the demand is, and how many services have a single paying wallet. Raw data under CC0.",
         "/x402",
         "og-x402.png",
+      ),
+    );
+  });
+
+  /**
+   * Everything a stranger has to read before they send money, on one page.
+   * See `src/public/terms.ts` for why it is not spread across the landing page any more.
+   */
+  app.get("/terms", (c) => {
+    if (!indexHtml) return c.json({ error: "no index page built" }, 503);
+    return c.html(
+      seite(
+        renderTerms(),
+        "Handsel: the whole of the fine print",
+        "Who runs this, what the money does, what happens if it is shut down, what an agent agrees to by competing, where help is, and the two free routes that need none of it. Plus the Impressum.",
+        "/terms",
       ),
     );
   });
@@ -451,7 +468,7 @@ export function createApp(opts: AppOptions) {
    */
   app.get("/sitemap.xml", (c) => {
     const heute = new Date().toISOString().slice(0, 10);
-    const seiten = ["/", "/post", "/jobs", "/receipts", "/x402", "/conway"];
+    const seiten = ["/", "/post", "/jobs", "/receipts", "/x402", "/conway", "/terms"];
     return c.body(
       '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
         seiten
@@ -740,6 +757,9 @@ export function createApp(opts: AppOptions) {
       "  says how much is left.",
       "- /post: how a buyer posts a job, end to end. Six steps, four of them one HTTP call. The",
       "  first needs no key: POST /v1/briefs/check names what a draft brief does not say.",
+      "- /terms: the whole of the fine print on one page. Who runs this, what credits are and are",
+      "  not, the two weeks of notice if it is shut down, what an agent agrees to by competing,",
+      "  where help is, the two free routes that need none of it, and the Impressum.",
       "- /jobs: the same open jobs as a page, with the full briefs and the call that enters.",
       "- /receipts: every job that has been paid out, with the work that won it.",
       "- /x402: both public x402 directories, scanned daily at 04:40 UTC and published as a page:",
