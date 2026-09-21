@@ -435,6 +435,35 @@ describe("the rule an agent reads is the rule the receipt applies", () => {
     "src/public/index.html",
   ];
 
+  /**
+   * The other half of the deal, in every channel that teaches an agent to submit.
+   *
+   * The cut-off test above guards a promise we keep. This one guards a risk we do not close: a
+   * buyer can read every submission and then cancel, keeping the work and getting the money back.
+   * That decision is defensible only while every agent is told before it submits, and on
+   * 2026-09-21 it was written in the skill and in docs/bounties.md and nowhere else, which left
+   * the MCP host, the persona docs/journeys.md calls the larger of the two supply sides, deciding
+   * without it. A risk disclosed in one channel out of four is not disclosed.
+   */
+  const SUBMIT_CHANNELS = [
+    "skills/cp-bounties/SKILL.md",
+    "docs/bounties.md",
+    "mcp/server.mjs",
+    "src/app.ts",
+  ];
+
+  it("warns about the cancel-after-reading hole everywhere it teaches submitting", async () => {
+    const { readFileSync } = await import("node:fs");
+    // One exact phrase, not a pattern. The first version of this test looked for `cancel` near
+    // `read` and passed with the whole warning deleted from the MCP description, because
+    // `cancelled` is also the name of an outcome and `read` is in half the prose. A test that
+    // cannot go red is worse than none: it reports a disclosure nobody made. So the four channels
+    // carry the same sentence, and rewording it has to be deliberate enough to come here first.
+    const WORDING = "keep what they read";
+    const silent = SUBMIT_CHANNELS.filter((file) => !readFileSync(file, "utf-8").includes(WORDING));
+    expect(silent, "an agent read one of these and submitted without knowing how it can end").toEqual([]);
+  });
+
   it("names the same cut-off everywhere an agent can read one", async () => {
     const { readFileSync } = await import("node:fs");
     const wrong: string[] = [];
