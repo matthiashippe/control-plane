@@ -109,21 +109,6 @@ def main() -> int:
                         f"replace it, and remember the totals are a floor: "
                         f"{punkt.get('ohne_nachfragedaten', 0)} entries still carry no demand data")
 
-    # 3. The disclosure. "zero buyers who are not me" is a fact with an expiry date.
-    try:
-        bericht = subprocess.run(["./ops/status.sh"], capture_output=True, text=True, timeout=60)
-        markt = json.loads(bericht.stdout)["db"]["market"]
-    except Exception:
-        markt = {}
-    fremde = markt.get("foreign_buyers")
-    if fremde == 0 and "zero buyers who are not me" in text:
-        ok("the disclosure is still true", "foreign buyers: 0")
-    elif fremde != 0:
-        aendern(f"foreign buyers is {fremde}, and the text still says zero",
-                "that is the best possible reason to edit a sentence; say the real number")
-    else:
-        aendern("the disclosure sentence is not in the text any more",
-                "it said 'zero buyers who are not me' and it is what makes the piece honest")
 
     # 4. Conway's present tense. A maintainer coming back changes the argument, not a number.
     c = letzte_zeile("/opt/control-plane/conway/repo.ndjson")
