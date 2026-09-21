@@ -202,6 +202,43 @@ else
   fi
 fi
 
+# --- 4b. Every page the sitemap names ------------------------------------------
+# Added on 2026-09-21, right after /conway went out returning a 500 to everybody who clicked it.
+# The smoke test had eleven green checks and none of them touched the new page, because every
+# check here names a path by hand and nobody adds one for the page they just built.
+#
+# The sitemap is the list of pages the service itself publishes, so driving the check from it
+# covers the next page without anybody remembering to. What is asserted is deliberately shallow:
+# a 200, an HTML content type, and a heading. A page that renders its error block still passes,
+# and that is correct, because an empty series is not a broken deploy.
+code=$(fetch sitemap /sitemap.xml)
+if [[ "$code" != "200" ]]; then
+  fail "/sitemap.xml: $code instead of 200"
+else
+  pages=$(grep -o '<loc>[^<]*</loc>' "$TMP/sitemap.body" | sed 's|<loc>https://[^/]*||; s|</loc>||')
+  broken=""
+  count=0
+  for page in $pages; do
+    count=$((count + 1))
+    name="page$count"
+    pcode=$(fetch "$name" "$page")
+    ctype=$(header "$name" content-type)
+    if [[ "$pcode" != "200" ]]; then
+      broken="$broken $page=$pcode;"
+    elif [[ "$ctype" != *"text/html"* ]]; then
+      broken="$broken $page=$ctype;"
+    elif ! grep -q '<h1' "$TMP/$name.body"; then
+      broken="$broken $page=no-h1;"
+    fi
+  done
+  CAPPED_REQUESTS=$((CAPPED_REQUESTS + count))
+  if [[ -n "$broken" ]]; then
+    fail "pages from the sitemap:$broken"
+  else
+    ok "all $count page(s) in the sitemap: 200 HTML with a heading"
+  fi
+fi
+
 # --- 5. /impressum ------------------------------------------------------------
 # The path people and auditors guess first. It has to lead to the anchor on the landing page and
 # not into nothing; a 404 here is grounds for a warning letter, not a blemish.

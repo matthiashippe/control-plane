@@ -157,6 +157,39 @@ describe("/conway", () => {
     expect(series.indexOf("2026-09-22")).toBeLessThan(series.indexOf("2026-09-21"));
   });
 
+  /**
+   * The bug that took the page down within a minute of its first deploy. The series is
+   * append-only, so a line written before a field existed keeps missing it for good, and the file
+   * in production held exactly one such line from the day before.
+   */
+  it("survives a scan from before the fields it prints existed", async () => {
+    const alt = {
+      measured_at: "2026-09-20T05:00:00Z",
+      data_through: "2026-09-19T14:05:17Z",
+      window_from: "2026-08-20T14:05:17Z",
+      transfers_30d: 104,
+      usdc_30d: 430.048895,
+      wallets_30d: 44,
+      transfers_total: 9027,
+      usdc_total: 62621.135927,
+      wallets_total: 2492,
+      last_block: 51543584,
+    };
+    const html = await page([alt, POINT]);
+
+    expect(html, "the newest complete scan still fills the headline").toMatch(
+      /\$435<\/span><span class="l">paid in over the last 30 days/,
+    );
+    expect(html, "the older scan is shown as a row, with a dash where it measured nothing")
+      .toMatch(/<td>2026-09-20<\/td><td>—<\/td>/);
+
+    // And with nothing but old-format scans, a sentence instead of a 500.
+    const nurAlt = await page([alt]);
+    // Matched inside one source line: the sentence wraps in the template, so the full phrase
+    // never appears with single spaces in the HTML.
+    expect(nurAlt).toContain("1 older scan(s) on file, none of them in a shape");
+  });
+
   it("says the scan has not run rather than showing an empty frame", () => {
     expect(renderConway([], [])).toContain("has not run yet");
     expect(readMoneySeries("/nowhere/at/all.ndjson"), "a missing series is not a 500").toEqual([]);

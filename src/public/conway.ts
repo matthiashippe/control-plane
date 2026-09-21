@@ -79,11 +79,24 @@ export function readReceipts(path = process.env.CP_CONWAY_RECEIPTS || "/data/con
   }
 }
 
-const n = (x: number): string => x.toLocaleString("en-US");
+/**
+ * A series is append-only, so every line written before a field existed will be missing it for
+ * good. The first deploy of this page crashed on exactly that: the line from 2026-09-21 predates
+ * `topups_30d` and `n(undefined)` threw, which turned the whole page into a 500. Missing is
+ * printed as a dash rather than coerced to zero, because zero purchases is a claim and "we did not
+ * measure that yet" is not.
+ */
+const n = (x: number | undefined): string => (typeof x === "number" ? x.toLocaleString("en-US") : "—");
+const money = (x: number | undefined): string => (typeof x === "number" ? `$${n(Math.round(x))}` : "—");
 const day = (iso: string): string => iso.slice(0, 10);
 const minute = (iso: string): string => iso.slice(0, 16).replace("T", " ");
 const short = (address: string): string => `${address.slice(0, 8)}…${address.slice(-4)}`;
 const usd = (x: number): string => `$${x.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
+
+/** Whether a scan carries the fields the headline figures are made of. */
+const complete = (p: MoneyPoint): boolean =>
+  typeof p.topup_usdc_30d === "number" && typeof p.topups_30d === "number" &&
+  typeof p.topup_wallets_30d === "number";
 
 /** "5,837 × $5, 700 × $25, 63 × $100" and so on, largest tier last. */
 function tierMix(tiers: Record<string, number> | undefined, minimumCount = 10): string {
@@ -102,7 +115,17 @@ export function renderConway(points: MoneyPoint[], receipts: Receipt[]): string 
       <a href="https://github.com/matthiashippe/control-plane/tree/main/docs/research/data">in the repository under CC0</a>.</p>
       </div></section>`;
   }
-  const last = points[points.length - 1];
+  // The newest scan that can actually fill the headline, not simply the newest line. An older
+  // format in the file must cost the page its top row, never its whole rendering.
+  const usable = points.filter(complete);
+  if (!usable.length) {
+    return `<section><div class="wrap narrow"><h1 class="ph">The scan has not run yet</h1>
+      <p class="sub">There are ${points.length} older scan(s) on file, none of them in a shape this
+      page can read. It runs daily at 05:00 UTC; the transfers it builds on are
+      <a href="https://github.com/matthiashippe/control-plane/tree/main/docs/research/data">in the repository under CC0</a>.</p>
+      </div></section>`;
+  }
+  const last = usable[usable.length - 1];
   const first = points[0];
   const onlyMinimum = Object.keys(last.topup_tiers_30d ?? {}).length === 1
     && Object.keys(last.topup_tiers_30d)[0] === "5";
@@ -122,7 +145,7 @@ export function renderConway(points: MoneyPoint[], receipts: Receipt[]): string 
     .map(
       (p) =>
         `<tr><td>${esc(day(p.measured_at))}</td><td>${n(p.topups_30d)}</td>` +
-        `<td>$${n(Math.round(p.topup_usdc_30d))}</td><td>${n(p.topup_wallets_30d)}</td>` +
+        `<td>${money(p.topup_usdc_30d)}</td><td>${n(p.topup_wallets_30d)}</td>` +
         `<td>${n(p.first_time_topup_wallets_30d)}</td>` +
         `<td>${p.pay_endpoint_status === 402 ? "402, still asking" : esc(String(p.pay_endpoint_status ?? "—"))}</td></tr>`,
     )
@@ -142,10 +165,10 @@ export function renderConway(points: MoneyPoint[], receipts: Receipt[]): string 
       </p>
 
       <div class="stats">
-        <div><span class="n bad">$${n(Math.round(last.topup_usdc_30d))}</span><span class="l">paid in over the last 30 days</span></div>
+        <div><span class="n bad">${money(last.topup_usdc_30d)}</span><span class="l">paid in over the last 30 days</span></div>
         <div><span class="n">${n(last.topup_wallets_30d)}</span><span class="l">wallets paid it, ${n(last.first_time_topup_wallets_30d)} of them for the first time</span></div>
         <div><span class="n">${n(last.topups_30d)}</span><span class="l">separate purchases, ${last.topups_per_wallet_30d} per wallet</span></div>
-        <div><span class="n">$${n(Math.round(last.usdc_total))}</span><span class="l">since 1 February 2026, from ${n(last.wallets_total)} wallets</span></div>
+        <div><span class="n">${money(last.usdc_total)}</span><span class="l">since 1 February 2026, from ${n(last.wallets_total)} wallets</span></div>
       </div>
 
       <div class="claims" style="margin-top:1rem">
@@ -190,7 +213,7 @@ export function renderConway(points: MoneyPoint[], receipts: Receipt[]): string 
       <p class="sub" style="margin-top:1rem">
         Transfers below the ${usd(5)} minimum tier are counted but not called purchases: ${n(last.dust_transfers_30d)}
         of the ${n(last.transfers_30d)} transfers in this window are dust, worth
-        $${(last.usdc_30d - last.topup_usdc_30d).toFixed(2)} together. The history before
+        $${Math.max(0, last.usdc_30d - last.topup_usdc_30d).toFixed(2)} together. The history before
         20 September 2026 comes from one full scan of ${n(last.transfers_total)} transfers; every day
         since is scanned forward from the newest block already held.
       </p>
