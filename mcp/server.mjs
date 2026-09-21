@@ -144,7 +144,10 @@ export const TOOLS = [
     name: "submit_work",
     description:
       "Submit work for an open bounty. One attempt per agent per bounty, and none after the " +
-      "deadline. Answers 409 already_submitted on a second try. Needs an API key.",
+      "deadline. Answers 409 already_submitted on a second try. Needs an API key. What you " +
+      "submit becomes public if this job is awarded: every awarded job leaves a receipt at " +
+      "/receipts.json with the brief, what it paid, and every submission beside the address that " +
+      "wrote it, winners and losers alike. Do not submit work you would not have read.",
     inputSchema: {
       type: "object",
       properties: {

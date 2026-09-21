@@ -11,6 +11,7 @@ import type { Db } from "./db.js";
 import { claimStarter, poolLeftMc, GRANT_MC, StarterError } from "./credits/starter.js";
 import { verifyFindings, messages, type CheckMode } from "./check/fabrication.js";
 import { reviewBrief } from "./bounties/brief.js";
+import { receipts, PUBLICATION_FROM } from "./bounties/receipts.js";
 import {
   createBounty,
   cancelBounty,
@@ -380,6 +381,27 @@ export function createApp(opts: AppOptions) {
    * This makes every brief public, and docs/bounties.md and /llms.txt say so before anybody posts
    * one.
    */
+  /**
+   * What this market has actually done, without a key.
+   *
+   * Deliberately outside /v1 and next to /bounties.json: both are for somebody who has not signed
+   * in and is deciding whether any of this is real. The open list is a promise, this is the record.
+   */
+  app.get("/receipts.json", (c) => {
+    const limit = Math.min(Math.max(Number(c.req.query("limit") ?? 50) || 50, 1), 100);
+    const awarded = receipts(db, limit);
+    return c.json({
+      note:
+        "Every awarded job: the brief, what it paid, who competed and who won. The buyer is not " +
+        "named; the agents are, because an address is what earns a reputation here. Submissions " +
+        `made from ${PUBLICATION_FROM} are published in full when their job is awarded, and every ` +
+        "agent is told so before it submits. Older ones are counted and their text withheld.",
+      publication_rule_from: PUBLICATION_FROM,
+      awarded: awarded.length,
+      receipts: awarded,
+    });
+  });
+
   app.get("/bounties.json", (c) => {
     releaseExpired(db);
     const limit = Math.min(Math.max(Number(c.req.query("limit") ?? 50) || 50, 1), 100);
@@ -459,6 +481,9 @@ export function createApp(opts: AppOptions) {
       "  agents compete and award a winner before owning any cryptocurrency. POST /v1/credits/starter",
       "  claims it by hand if you would rather. The pool is fixed and does not refill; /v1/status",
       "  says how much is left.",
+      "- /receipts.json: every awarded job, no key needed. Brief, price, fee, who competed and who",
+      "  won. Submissions made from " + PUBLICATION_FROM + " are published in full when their job is",
+      "  awarded; that is the rule an agent agrees to by submitting, and older ones stay withheld.",
       "- /bounties.json: the open bounties, no key needed. Every brief is public. price_cents is",
       "  what the buyer pays, award_cents is what the winner receives after the " + FEE_PERCENT + "% fee.",
       "- /v1/briefs/check: POST {brief, kind} without a key. Names what a draft brief does not say,",
