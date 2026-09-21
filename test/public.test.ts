@@ -485,42 +485,34 @@ describe("the link preview", () => {
   });
 });
 
-describe("the market measurement is on the page", () => {
+describe("the market measurement stays off the landing page", () => {
   /**
-   * Read from the dataset, not written down here a second time.
+   * This used to assert the opposite: four figures from the x402 dataset had to appear on the
+   * landing page, read from the summary beside the raw CSV so that page and data could not drift.
    *
-   * These four numbers were hardcoded in this test until 2026-09-21, which meant the page and the
-   * data it cites could drift apart and the test would keep passing as long as the page did not
-   * change. It nearly happened the same day: a fresh scan moved the totals, and the only thing
-   * that caught the stale page was a string comparison against numbers that were themselves
-   * stale. Now the summary beside the raw CSV is the single source, so a new scan either updates
-   * both or fails here.
+   * On 2026-09-21 the page was rebuilt around what a buyer gets, and the directory measurement
+   * moved to `/x402`, which renders every figure from the daily series and therefore cannot drift
+   * from it at all. The drift this test was built to catch is gone with the hardcoding.
+   *
+   * What is left to protect is the other direction, and it is the one that will actually be
+   * tempted: numbers typed back into the landing page because they look impressive there. A
+   * figure typed into HTML is stale the day after the next scan, and nothing else would notice.
    */
   const measured = JSON.parse(
     readFileSync(new URL("../docs/research/data/2026-09-21-x402-kennzahlen.json", import.meta.url), "utf-8"),
-  ) as {
-    distinct_services: number;
-    providers: number;
-    with_demand_data: number;
-    services_with_20_or_more_payers: number;
-    largest_service: { share_percent: number };
-  };
-  const grouped = (n: number) => n.toLocaleString("en-US");
+  ) as { distinct_services: number; providers: number; with_demand_data: number };
 
-  it("names the scope and the core numbers the dataset actually holds", async () => {
+  it("carries no figure from the dataset in its own HTML, and links the page that does", async () => {
     const db = openDb(":memory:");
     const html = await (await createApp({ db }).request("/")).text();
 
-    expect(html).toContain(`${grouped(measured.distinct_services)} distinct services`);
-    expect(html).toContain(`${grouped(measured.providers)} providers`);
-    // "133 of 20,783" would be wrong: only the entries carrying demand data were measured.
-    expect(html).toContain(`${grouped(measured.with_demand_data)} of them`);
-    expect(html).toContain(`${grouped(measured.services_with_20_or_more_payers)} of those have twenty or more`);
-    // The concentration, and the warning that goes with it. A number this large from one endpoint
-    // is worthless without the sentence saying the directory published it a day late.
-    expect(html).toContain(`${measured.largest_service.share_percent} percent of all calls`);
-    expect(html, "a floor is not a count and the page has to say which it is").toMatch(/floor and not a count/);
-    expect(html, "without a link to the raw data it is a claim").toMatch(/docs\/research\/data/);
+    for (const zahl of [measured.distinct_services, measured.providers, measured.with_demand_data]) {
+      for (const schreibweise of [zahl.toLocaleString("en-US"), String(zahl)]) {
+        expect(html, `${schreibweise} is typed into the landing page and will be stale tomorrow`)
+          .not.toContain(schreibweise);
+      }
+    }
+    expect(html, "the measurement has to be one click away").toContain('href="/x402"');
   });
 });
 
@@ -702,32 +694,54 @@ describe("whoever knows only /v1/status gets on from there", () => {
   });
 });
 
-describe("The market leads, not the billing layer", () => {
-  // Both of these pinned the old single-column layout by its headings. The page was rebuilt on
-  // 2026-09-21 and the markers moved; the rules they encode did not, so they are restated against
-  // the new markup rather than deleted. What must stay true: the live market comes before the
-  // billing story, and the name and the positioning sentence are both on the page.
-  it("shows the live market before it explains the billing layer", async () => {
+describe("The buyer leads, not the plumbing", () => {
+  /**
+   * Rewritten on 2026-09-21, second time in one day. The first rebuild fixed the layout and left
+   * the argument alone, and the verdict on it was that the value proposition is not legible: the
+   * page explained mechanics (tiers, cents, SIWE, Conway) to somebody who had not yet been given
+   * a reason to care. What the rules below encode is the order of an argument, not a layout.
+   *
+   * A buyer has to meet, in this order: what they get, one job that actually ran, and only then
+   * the machinery. The agent side comes after that, because agents are abundant here and buyers
+   * are not.
+   */
+  it("shows a finished job before it explains the machinery", async () => {
     const { app } = setup();
     const html = await (await app.request("/")).text();
-    const market = html.indexOf('id="market"');
-    const conway = html.indexOf("what killed Conway");
-    expect(market, "the market section is missing").toBeGreaterThan(-1);
-    expect(conway, "the section about Conway is missing").toBeGreaterThan(-1);
-    // Swapping the two turns this red, and that is the point: the order is the positioning.
-    expect(market, "a market you have to scroll for is a claim").toBeLessThan(conway);
+    const beispiel = html.indexOf("What came back");
+    const agenten = html.indexOf('id="agents"');
+    const preis = html.indexOf("<h2>Price</h2>");
+    expect(beispiel, "the worked example is missing").toBeGreaterThan(-1);
+    expect(agenten, "the agent section is missing").toBeGreaterThan(-1);
+    // Swapping any of these turns this red, and that is the point: the order is the argument.
+    expect(beispiel, "a buyer sees the goods before the supply side").toBeLessThan(agenten);
+    expect(agenten, "and the price comes last of the three").toBeLessThan(preis);
+  });
+
+  it("proves the claim with work a reader can judge, not with adjectives", async () => {
+    const { app } = setup();
+    const html = await (await app.request("/")).text();
+    // Three submissions, each with what it invented. Without the second half the example is an
+    // advertisement for language models rather than for what this service adds to them.
+    for (const agent of ["klaus", "vera", "opti-7734"]) {
+      expect(html, `${agent} is missing from the worked example`).toContain(agent);
+    }
+    expect(html, "what the agents made up is the point of showing three").toMatch(/Made up:/);
+    expect(html, "and the run has to be checkable").toMatch(/docs\/research\/data/);
   });
 
   it("carries the name and the positioning sentence where a first-time reader lands", async () => {
     const { app } = setup();
     const html = await (await app.request("/")).text();
     expect(html).toMatch(/<title>Handsel/);
-    // The name is the brand in the bar now, not the first heading: the first heading is what the
+    // The name is the brand in the bar, not the first heading: the first heading is what the
     // service does, which is what a stranger needs in the first two seconds.
     expect(html).toMatch(/class="brand"[\s\S]{0,400}Handsel/);
-    expect(html).toMatch(/<h1[^>]*>[\s\S]*?Pay only the best/);
-    expect(html).toContain("Post the job and the price. Agents deliver finished work. You pay only the best.");
-    const hero = html.indexOf("Post the job and the price.");
+    expect(html).toMatch(/<h1[^>]*>[\s\S]*?You pay for the one you keep/);
+    // The sentence that carries the unusual economics. Without it the headline is a marketplace
+    // like any other, and with it the reader knows why several attempts cost one price.
+    expect(html).toContain("pays for its own thinking out of its own balance");
+    const hero = html.indexOf("pays for its own thinking");
     const fold = html.indexOf('id="market"');
     expect(hero, "the sentence has to stand above the market, not below it").toBeLessThan(fold);
   });
