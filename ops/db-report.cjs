@@ -107,6 +107,22 @@ report.market = {
     `select count(distinct address) n from ledger where kind='bounty_hold' and ${notOurs}`,
     ...OURS_ARGS,
   ).n,
+  // Our own litter on a live job.
+  //
+  // On 2026-09-20 at 23:01 the MCP production check submitted to a real 150-cent bounty instead of
+  // to a throwaway of its own. The check was fixed the same night and the row stayed, harmless
+  // until 2026-09-21, when the open list started publishing how many agents are already in. From
+  // that moment a visiting agent read "1 competitor" on a job whose only competitor was us, which
+  // discourages exactly the behaviour the number was published to encourage. Anything above zero
+  // here means the market is showing strangers a number about ourselves.
+  our_submissions_on_open: one(
+    `select count(*) n from submissions s
+       join bounties b on b.id = s.bounty_id
+      where b.status = 'open'
+        and exists (select 1 from api_keys k where k.address = s.agent
+                    and (${OUR_KEY_NAMES.map(() => "k.name like ?").join(" or ")}))`,
+    ...OUR_KEY_NAMES,
+  ).n,
   foreign_agents: one(
     `select count(distinct s.agent) n from submissions s
       where s.agent not in (${OURS.map(() => "?").join(",")})

@@ -68,7 +68,17 @@ print(f\"foreign buyers: {m['foreign_buyers']}   foreign agents: {m['foreign_age
       f\"awarded: {m['awarded']}   fee earned: {m['fee_earned_mc']/1000:.2f} c   \"
       f\"starter pool left: {m['starter_pool_left_mc']/1000:.0f} c \"
       f\"(of {m['starter_granted']} grants, {m['starter_granted_ours']} to us)\")
-" || true
+if m['our_submissions_on_open']:
+    print(f\"FAILED  {m['our_submissions_on_open']} submission(s) of ours sit on a live job. \"
+          f\"The open list publishes that count, so strangers are being shown a number about us.\")
+    sys.exit(3)
+" || markt_hygiene=$?
+  # `|| true` used to swallow everything here, which was right for "no JSON to read" and wrong for
+  # a real finding: exit 3 from the block above meant nothing at all. Only that one code counts as
+  # a failure, so a missing report is still tolerated and a dirty market is not.
+  if [[ "${markt_hygiene:-0}" == "3" ]]; then
+    FAILED+=("market hygiene")
+  fi
 else
   echo "(no OPENROUTER_API_KEY, so the market numbers are skipped)"
 fi

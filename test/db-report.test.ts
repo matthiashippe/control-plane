@@ -54,6 +54,42 @@ describe("The market numbers in the database report", () => {
     expect(r.market.foreign_buyers, "our own job must not read as a stranger").toBe(0);
   });
 
+  // Since 2026-09-21 the open list publishes how many agents are already in. That makes our own
+  // leftovers on a live job visible to strangers as competition, and it happened: an MCP
+  // production check submitted to a real 150-cent bounty on 2026-09-20 and the row outlived the
+  // fix, so an arriving agent read "1 competitor" where the truth was nobody.
+  it("notices our own submission sitting on a live job, and does not count a stranger's", () => {
+    const wall = (db: ReturnType<typeof openDb>, address: string, name: string) => {
+      db.prepare("INSERT OR IGNORE INTO wallets (address, balance_mc, created_at) VALUES (?, 0, ?)").run(address, new Date().toISOString());
+      db.prepare("INSERT INTO api_keys (address, key_hash, key_prefix, name, created_at) VALUES (?, ?, ?, ?, ?)")
+        .run(address, `hash-${name}`, "cnwy_k_xxxxxxx", name, new Date().toISOString());
+    };
+    const submit = (db: ReturnType<typeof openDb>, id: string, bounty: string, agent: string) =>
+      db.prepare("INSERT INTO submissions (id, bounty_id, agent, body, created_at) VALUES (?, ?, ?, 'w', ?)")
+        .run(id, bounty, agent, new Date().toISOString());
+
+    const clean = withDb((db) => {
+      postBounty(db, OPERATOR, "ours-1", 200 * MC_PER_CENT);
+      wall(db, STRANGER, "conway-automaton");
+      submit(db, "s-1", "ours-1", STRANGER);
+    });
+    expect(clean.market.our_submissions_on_open, "a real agent named conway-automaton is not us").toBe(0);
+
+    const dirty = withDb((db) => {
+      postBounty(db, OPERATOR, "ours-1", 200 * MC_PER_CENT);
+      wall(db, "0x2222222222222222222222222222222222222222", "mcp-production-check-agent");
+      submit(db, "s-1", "ours-1", "0x2222222222222222222222222222222222222222");
+    });
+    expect(dirty.market.our_submissions_on_open).toBe(1);
+
+    const closed = withDb((db) => {
+      postBounty(db, OPERATOR, "ours-1", 200 * MC_PER_CENT, "cancelled");
+      wall(db, "0x2222222222222222222222222222222222222222", "mcp-production-check-agent");
+      submit(db, "s-1", "ours-1", "0x2222222222222222222222222222222222222222");
+    });
+    expect(closed.market.our_submissions_on_open, "only a live job shows the number to anybody").toBe(0);
+  });
+
   it("counts a stranger the moment one posts, which is the whole point", () => {
     const r = withDb((db) => {
       postBounty(db, OPERATOR, "ours-1", 200 * MC_PER_CENT);
