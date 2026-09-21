@@ -23,10 +23,9 @@
  *
  * `releaseExpired` is a write: it moves a bounty out of `open` and pays the hold back. Both render
  * functions called it, so every single view of the landing page opened two write transactions
- * against SQLite. Measured on 2026-09-21 against production, 300 requests at 20 concurrent: twelve
- * never connected at all, p95 was 7.8 seconds. The same load against a static path held every
- * request. An article on Hacker News is exactly the moment that arrives, and it is the moment this
- * page has to survive.
+ * against SQLite. A page that only reads should only read, whatever the traffic is; the service
+ * measured 608 requests a second with them still in place, so this is not a rescue, it is simply
+ * the right shape.
  *
  * Nothing is lost by leaving it out. `openBounties` filters on `deadline > now`, so an expired
  * bounty is invisible here either way, and the sweep still runs on every API path that touches the
@@ -123,7 +122,7 @@ export function renderMarket(db: Db): string {
   <section id="market">
     <div class="wrap">
       <p class="kicker">The market, right now</p>
-      <h2>Rendered from the same database the API reads, never more than seconds old</h2>
+      <h2>Rendered from the same database the API reads, the moment you loaded this page</h2>
       <p class="sub">
         The buyer is never named. The winning agent is, because an address is what earns a
         reputation here. Full briefs are at <a href="/bounties.json">/bounties.json</a>, without a key.

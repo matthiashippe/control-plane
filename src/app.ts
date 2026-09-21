@@ -284,36 +284,30 @@ export function createApp(opts: AppOptions) {
   }
 
   /**
-   * The landing page, rendered at most once every few seconds.
+   * The landing page, rendered per request.
    *
-   * It is rendered into the body and never into the script, because the inline script is covered
-   * by a CSP hash that lives in the Caddyfile and deploy/** is not touched without a human.
+   * Into the body and never into the script: the inline script is covered by a CSP hash that lives
+   * in the Caddyfile, and deploy/** is not touched without a human.
    *
-   * The cache is not an optimisation, it is the difference between surviving an article and not.
-   * Measured against production on 2026-09-21, 300 requests at 20 concurrent: twelve never
-   * connected, p95 7.8 seconds, while the same load against a static path lost nothing. One vCPU
-   * serves this, and a front page sends more than twenty at once. With a short window a spike
-   * collapses into one render and the rest is a string already in memory.
+   * **It is not cached, and the story of why is worth keeping.** On 2026-09-21 a load test said
+   * this page collapsed under an article: 300 requests at 20 concurrent, twelve never connected,
+   * p95 7.8 seconds. A cache went in on the strength of that. The measurement was wrong. It ran
+   * 300 separate `curl` processes from a laptop over the Atlantic, so it timed process spawning
+   * and 300 cold TLS handshakes on the client. Measured properly, one process with twenty
+   * connections: 608 requests a second inside the container, 458 a second over TLS from the same
+   * laptop, zero failures, p50 29 ms. So the cache bought nothing and cost the one sentence that
+   * makes this section worth reading, that the numbers are from the moment the page was loaded.
    *
-   * Five seconds, not five minutes: the page states that its numbers come from the same database
-   * the API reads, and it has to stay true enough that nobody can catch it lying. What a reader
-   * loses is that a job posted this second may appear on the next reload instead of this one.
+   * What did survive the correction is below it: a page view opens no write transaction. That was
+   * right on its own merits and not because of a number.
    */
-  const PAGE_TTL_MS = 5_000;
-  let cached: { at: number; html: string } | null = null;
-
   app.get("/", (c) => {
     if (!indexHtml) return c.json({ ok: true, version: VERSION, note: "no index page built" });
-    const now = Date.now();
-    if (!cached || now - cached.at > PAGE_TTL_MS) {
-      cached = {
-        at: now,
-        html: indexHtml
-          .replace("<!--NUMBERS-->", renderNumbers(db, mcToCents(GRANT_MC)))
-          .replace("<!--MARKET-->", renderMarket(db)),
-      };
-    }
-    return c.html(cached.html, 200, { "Cache-Control": "public, max-age=5" });
+    return c.html(
+      indexHtml
+        .replace("<!--NUMBERS-->", renderNumbers(db, mcToCents(GRANT_MC)))
+        .replace("<!--MARKET-->", renderMarket(db)),
+    );
   });
 
   // German law (DDG § 5) requires an imprint that is "easy to recognise and directly reachable".
