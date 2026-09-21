@@ -58,9 +58,42 @@ jq -r --argjson since "$since" --argjson own "$own_json" \
     done
 
 echo
-echo "-- Foreign referrers (everything that is not us) --"
-jq -r --argjson since "$since" "select(.ts > \$since) | (.request.headers.Referer // [\"-\"])[0]" "$log" \
-  | grep -v '^-$' | grep -v 'cp\.hippe\.eu' | sort | uniq -c | sort -rn || echo "  none"
+echo "-- Foreign referrers, and what the visit became --"
+# A count of clicks answers the wrong question. The one the standing order asks every cycle is
+# whether the issue answers are a channel, and a channel is not a click: it is somebody who
+# arrived and then did something. So each referrer is shown with the distinct addresses it
+# brought and every path those addresses touched afterwards, in order.
+#
+# `/` alone means they looked and left. `/bounties.json` means they went for the market.
+# `/v1/auth/nonce` means somebody started provisioning, and that is the line worth waking up for.
+jq -r --argjson since "$since" \
+  'select(.ts > $since) | [((.request.headers.Referer // ["-"])[0]), .request.remote_ip, .request.uri] | @tsv' "$log" \
+  | grep -v $'^-\t' | grep -v 'cp\.hippe\.eu' \
+  | python3 -c '
+import sys, collections
+vonher = collections.defaultdict(lambda: collections.defaultdict(list))
+for zeile in sys.stdin:
+    teile = zeile.rstrip("\n").split("\t")
+    if len(teile) != 3:
+        continue
+    ref, ip, pfad = teile
+    vonher[ref][ip].append(pfad)
+if not vonher:
+    print("  none")
+for ref, ips in sorted(vonher.items(), key=lambda kv: -len(kv[1])):
+    print(f"  {ref}")
+    print(f"    {len(ips)} address(es)")
+    for ip, pfade in ips.items():
+        gesehen, reihe = set(), []
+        for pfad in pfade:
+            if pfad not in gesehen:
+                gesehen.add(pfad)
+                reihe.append(pfad)
+        weiter = [p for p in reihe if p != "/"]
+        marke = "  <-- went further" if weiter else ""
+        pfadkette = " -> ".join(reihe[:6])
+        print("    %-16s %s%s" % (ip, pfadkette, marke))
+' || echo "  none"
 
 echo
 # The landing page pulls its numbers with `fetch("/v1/status")` (src/public/index.html). A real

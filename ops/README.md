@@ -278,6 +278,24 @@ twenty-five. Whoever wants to move the number has to pay, and that is the whole 
 measurement. Our own automaton is included in the number, so subtract one for the actual figure.
 `db.keys` counts issued API keys, `db.day.topups` the payments of the last day.
 
+## Who arrived, and what the visit became
+
+`ops/verkehr.sh [hours]`. The section **Foreign referrers, and what the visit became** is the one
+the standing order asks for every cycle: whether the issue answers are a channel.
+
+A count of clicks answers the wrong question, and until 2026-09-21 a count was all it printed. A
+channel is not a click, it is somebody who arrived and then did something. Each referrer is now
+shown with the distinct addresses it brought and the paths each of them touched afterwards, in
+order, with `<-- went further` on any address that did more than look at the front page.
+
+`/` alone means they looked and left. `/bounties.json` means they went for the market.
+`/v1/auth/nonce` means somebody started provisioning, and that is the line worth waking up for.
+
+Verified end to end on 2026-09-21 rather than assumed: a request carrying
+`Referer: https://github.com/Conway-Research/automaton/issues/371` shows up with the issue number
+intact and, after two more requests, with the path it took. The instrument the whole GTM
+measurement hangs on had never been tested with a real referrer.
+
 ## Does a backup come back up
 
 `ops/sicherung-probe.sh`, by hand, not by cron. `--oldest` takes the oldest backup still kept
