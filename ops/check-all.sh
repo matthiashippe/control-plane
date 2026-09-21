@@ -86,6 +86,49 @@ else
   echo "(no OPENROUTER_API_KEY, so the market numbers are skipped)"
 fi
 
+# The two daily series, read into the cycle instead of sitting in a log file.
+#
+# `ops/x402-zeitreihe.sh` and `ops/conway-zeitreihe.sh` both run by cron on the VM and both print
+# what moved since the previous point. Until 2026-09-21 that printing went to
+# /var/log/cp-x402.log and /var/log/cp-conway.log, which no cycle opened. Each script carries the
+# sentence that a series nobody reads is a file, and then wrote into one. So the last point of each
+# comes here, where the cycle already looks.
+#
+# The VM only hands over two lines; the reading happens locally, because a nested heredoc over ssh
+# is a quoting puzzle and this is a diagnostic, not a place to be clever.
+reihen=$(timeout 25 ssh -i "${CP_SSH_KEY:-$HOME/.ssh/id_ed25519_automaton}" -o BatchMode=yes -o ConnectTimeout=8 \
+  "${CP_HOST:-root@76.13.144.207}" \
+  'echo "x402 $(wc -l < /opt/control-plane/x402/kennzahlen.ndjson 2>/dev/null || echo 0) $(tail -1 /opt/control-plane/x402/kennzahlen.ndjson 2>/dev/null)";
+   echo "conway $(wc -l < /opt/control-plane/conway/repo.ndjson 2>/dev/null || echo 0) $(tail -1 /opt/control-plane/conway/repo.ndjson 2>/dev/null)"' 2>/dev/null)
+
+if [[ -n "$reihen" ]]; then
+  printf '%s\n' "$reihen" | python3 -c "
+import json, sys
+for zeile in sys.stdin:
+    teile = zeile.strip().split(' ', 2)
+    if len(teile) < 3 or not teile[2].startswith('{'):
+        print(f'{teile[0] if teile else \"?\"} series: no point yet')
+        continue
+    name, n, roh = teile[0], teile[1], teile[2]
+    try:
+        d = json.loads(roh)
+    except json.JSONDecodeError:
+        print(f'{name} series: the last line is not readable')
+        continue
+    if name == 'x402':
+        print(f\"x402   {d['stichtag'][:10]}, {n} point(s): {d['urls_eindeutig']:,} services, \"
+              f\"{d['aufrufe_30d']:,} calls, top10 {d['anteil_top10']}%, \"
+              f\"{d['ohne_nachfragedaten']} without demand data\")
+    else:
+        print(f\"conway {d['stichtag'][:10]}, {n} point(s): last push {d['last_push'][:10]}, \"
+              f\"{d['onboarding_issues']} onboarding issues, newest #{d['newest_onboarding_issue']}, \"
+              f\"last maintainer comment {(d['last_write_access_comment'] or 'never')[:10]}, \"
+              f\"PR370 {d['pr370_state']}\")
+"
+else
+  echo "(the daily series could not be read; that says nothing about the service)"
+fi
+
 echo
 if (( ${#FAILED[@]} == 0 )); then
   echo "ALL CHECKS OK (${#PASSED[@]} of ${#PASSED[@]})"
