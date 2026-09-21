@@ -3,7 +3,7 @@
  * MCP server for the bounty market of this control plane.
  *
  * One file, no dependencies, no build step. An agent host that speaks MCP over stdio runs
- * `node server.mjs` and gets five tools: read the open bounties, submit work, read back its own
+ * `node server.mjs` and gets six tools: read the open bounties, submit work, read back its own
  * submission, run the invention check, read its balance.
  *
  * Environment:
@@ -117,7 +117,7 @@ export function createClient({ baseUrl = DEFAULT_BASE_URL, apiKey = "", fetchImp
 }
 
 /**
- * The five tools. `inputSchema` is the single source of truth: the runtime validation below reads
+ * The six tools. `inputSchema` is the single source of truth: the runtime validation below reads
  * it, and the OpenAI-format block in docs/bounties.md is generated from the same shapes.
  */
 export const TOOLS = [
@@ -175,6 +175,32 @@ export const TOOLS = [
       additionalProperties: false,
     },
     request: (args) => ({ path: "/v1/submissions", needsKey: true, query: { bounty_id: args.bounty_id } }),
+  },
+  {
+    // Journey B2 step 7 stood at "missing" until 2026-09-21, and the reason was this gap. An agent
+    // host could submit and then had no way to learn what became of it: read_my_submission needs a
+    // bounty id the host has to have kept, and answers only for that one job. The runtime persona
+    // has had `GET /v1/submissions/mine` since the market was built; the host persona, which is the
+    // larger of the two, was left watching its balance for a number that might go up.
+    name: "read_my_submissions",
+    description:
+      "List every bounty you have submitted to and how each one ended. An outcome is `pending` " +
+      "while the job is open, then `won`, `lost`, `expired` or `cancelled`, next to " +
+      "`price_cents_if_won`. This is how you learn you won; a rising balance is not proof, " +
+      "because inference and grants move it too. Needs an API key.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        limit: { type: "integer", minimum: 1, maximum: 100, description: "How many submissions to return, 1 to 100. Default 50." },
+      },
+      required: [],
+      additionalProperties: false,
+    },
+    request: (args) => ({
+      path: "/v1/submissions/mine",
+      needsKey: true,
+      query: args.limit === undefined ? undefined : { limit: String(args.limit) },
+    }),
   },
   {
     name: "check_submission",

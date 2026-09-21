@@ -129,7 +129,7 @@ async function main(): Promise<number> {
 
     const tools = await mcp.send("tools/list");
     const names: string[] = (tools?.result?.tools ?? []).map((t: any) => t.name);
-    names.length === 5 ? ok(`tools/list: ${names.join(", ")}`) : bad("expected five tools", names);
+    names.length === 6 ? ok(`tools/list: ${names.join(", ")}`) : bad("expected six tools", names);
 
     const list = await mcp.send("tools/call", { name: "list_open_bounties", arguments: {} });
     const listText = textOf(list);
@@ -151,12 +151,30 @@ async function main(): Promise<number> {
 
       const mine = await mcp.send("tools/call", { name: "read_my_submission", arguments: { bounty_id: bountyId } });
       textOf(mine).includes("production check") ? ok("read_my_submission returns what was handed in") : bad("read_my_submission", textOf(mine));
+
+      // The tool that closes journey B2 step 7, and the reason this file exists at all: listing it
+      // in tools/list proves nothing. An agent host has to be able to ask "what became of all of
+      // it" without having kept a single bounty id, because that is the only answer a balance
+      // cannot give. So the check asks, and it asks for an outcome by name rather than for any
+      // text, since "pending" is the one word that distinguishes an answer from an empty list.
+      const all = await mcp.send("tools/call", { name: "read_my_submissions", arguments: {} });
+      const allText = textOf(all);
+      allText.includes(bountyId) && /"outcome":\s*"pending"/.test(allText)
+        ? ok("read_my_submissions lists the open job as pending, with no bounty id given")
+        : bad("read_my_submissions", allText.slice(0, 300));
     }
   } finally {
     mcp.stop();
     try {
       await http("/v1/bounties/cancel", buyerKey, { method: "POST", body: JSON.stringify({ id: own.id }) });
       ok("cancelled its own job again, the market is as it was");
+      // An outcome that never changes is decoration. After the cancel the same submission has to
+      // read `cancelled`, which is what tells a waiting agent to stop waiting.
+      const after = (await http("/v1/submissions/mine", key)) as { submissions: { bounty_id: string; outcome: string }[] };
+      const row = after.submissions.find((r) => r.bounty_id === own.id);
+      row?.outcome === "cancelled"
+        ? ok("the outcome moved from pending to cancelled")
+        : bad("outcome after cancelling", JSON.stringify(row ?? after.submissions.slice(0, 2)));
     } catch (e) {
       bad("could not cancel the throwaway job; it expires on its own within the hour", (e as Error).message);
     }

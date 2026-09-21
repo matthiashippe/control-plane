@@ -74,12 +74,13 @@ describe("MCP protocol", () => {
     expect(await handleMessage({ jsonrpc: "2.0", method: "notifications/cancelled", params: {} }, ctx)).toBeNull();
   });
 
-  it("lists five tools with their schemas and nothing internal", async () => {
+  it("lists six tools with their schemas and nothing internal", async () => {
     const listed = (await handleMessage({ jsonrpc: "2.0", id: 1, method: "tools/list" }, ctx)).result.tools;
     expect(listed.map((t: any) => t.name)).toEqual([
       "list_open_bounties",
       "submit_work",
       "read_my_submission",
+      "read_my_submissions",
       "check_submission",
       "read_balance",
     ]);
@@ -166,7 +167,7 @@ describe("Starting it without a build step", () => {
     expect(code).toBe(0);
     const lines = out.split("\n").filter(Boolean).map((l) => JSON.parse(l));
     expect(lines.map((l) => l.id)).toEqual([1, 2]);
-    expect(lines[1].result.tools).toHaveLength(5);
+    expect(lines[1].result.tools).toHaveLength(6);
     // Counter-check: the startup note goes to stderr. On stdout it would corrupt the protocol,
     // so every single line out there has to be a JSON-RPC message.
     expect(err).toContain("control-plane-bounties");
@@ -216,6 +217,21 @@ describe("What each tool asks the control plane", () => {
     await callTool(c.client, "read_my_submission", { bounty_id: "b 1" });
     expect(c.calls[0].url).toBe("https://cp.test/v1/submissions?bounty_id=b+1");
     expect(c.calls[0].method).toBe("GET");
+  });
+
+  it("lists every outcome without needing a bounty id, and passes limit only when it was given", async () => {
+    // The tool that closes journey B2 step 7. read_my_submission answers for one job whose id the
+    // host must have kept; this one answers for all of them, which is what an agent needs to learn
+    // it won without reading a balance that inference and grants also move.
+    const bare = client([{ status: 200, body: { submissions: [] } }]);
+    await callTool(bare.client, "read_my_submissions", {});
+    expect(bare.calls[0].url).toBe("https://cp.test/v1/submissions/mine");
+    expect(bare.calls[0].method).toBe("GET");
+    expect(bare.calls[0].headers?.authorization, "an outcome belongs to one agent").toBeTruthy();
+
+    const limited = client([{ status: 200, body: { submissions: [] } }]);
+    await callTool(limited.client, "read_my_submissions", { limit: 5 });
+    expect(limited.calls[0].url).toBe("https://cp.test/v1/submissions/mine?limit=5");
   });
 
   it("checks work as factual unless creative was asked for", async () => {

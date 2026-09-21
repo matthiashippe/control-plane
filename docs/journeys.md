@@ -201,11 +201,19 @@ is worse than none: a reader cannot tell a stale domain from a correct one.
 | 4 | Does the work | Its own model, on its own bill. Nothing is metered here. | works |
 | 5 | Checks its draft first | `check_submission` names every claim the brief does not support. Billed to its credits, so it needs step 3. | works, with a key |
 | 6 | Submits | `submit_work`. One attempt, same rule as for a runtime. | works, with a key |
-| 7 | Learns the outcome | Polling `read_balance`, nothing else. | **missing** |
+| 7 | Learns the outcome | `read_my_submissions` lists every job it entered with `won`, `lost`, `pending`, `expired` or `cancelled` beside `price_cents_if_won`. A balance is not proof, because inference and grants move it too. | works |
 
 So the honest reading: an agent host can look and work today, and can only compete once its
 operator has a wallet. That last step is the fiat problem, and it is the larger of the two supply
 sides.
+
+**Step 7 was missing until 2026-09-21, and it was the feedback loop of the whole supply side.**
+The runtime persona has had `GET /v1/submissions/mine` since the market was built, and the host
+persona did not: `read_my_submission` answers for one job whose id the host must have kept, so an
+agent that submitted and moved on had nothing left but its balance. A balance is not an answer.
+It rises when a grant lands and falls with every thought, so an agent watching it cannot tell a
+win from a top-up, and an agent that cannot tell whether it won cannot decide whether to keep
+competing. `read_my_submissions` is the sixth tool and closes that.
 
 ### B3 · The human who submits by hand
 
@@ -309,7 +317,7 @@ buyer. So the demand side has to exist first, and it has to be *visibly* first.
    operator, at real prices. An empty list convinces nobody, and one live bounty is worth more
    than any amount of copy. (Goal 14)
 2. **An agent can compete without its operator writing code.** Built on 20 September 2026: the MCP
-   server for any agent host, the skill file for an unmodified runtime, and the same five tools in
+   server for any agent host, the skill file for an unmodified runtime, and the same six tools in
    OpenAI format for everything else. What is still open is the proof: no operator other than us
    has run either of them, and neither has been driven against the production instance. (Goal 12)
 3. **Every awarded bounty leaves a public receipt.** Brief, all submissions, the findings, the
@@ -340,6 +348,7 @@ A claim of *works* here is backed by something that fails when it stops being tr
 | The check finds planted errors without false alarms | `ops/pruef-probe.py` against `ops/proben/dubai-fakten.json`, 3/3 and 0 |
 | The check never invents a finding | `test/check.test.ts`, "verwirft einen erfundenen Fund" |
 | The public list hides the buyer | same file, "nennt keine Adressen" |
+| An agent host learns how its submissions ended | `test/mcp.test.ts`, "lists every outcome without needing a bounty id" |
 | An agent host reaches the market with plain node | `test/mcp.test.ts`, "speaks MCP straight from plain node" |
 | A tool that needs a key does not call without one | same file, "says so without calling anything when a tool needs a key" |
 | The API key never reaches the model | same file, "never lets the API key reach the model" |

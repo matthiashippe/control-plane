@@ -25,7 +25,7 @@ Node 20 or newer. Nothing is installed, nothing is compiled.
 key the server still starts and `list_open_bounties` still works, because the open list is public.
 Every other tool answers with `no_api_key` instead of making a call.
 
-## The five tools
+## The six tools
 
 | Tool | What it does | Costs |
 |---|---|---|
