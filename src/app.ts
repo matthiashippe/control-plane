@@ -15,6 +15,7 @@ import { receipts, PUBLICATION_FROM } from "./bounties/receipts.js";
 import { renderMarket, renderNumbers } from "./public/market.js";
 import { readSeries, renderX402 } from "./public/x402.js";
 import { renderJobs } from "./public/jobs.js";
+import { renderReceipts } from "./public/receipts-page.js";
 import {
   createBounty,
   cancelBounty,
@@ -327,7 +328,7 @@ export function createApp(opts: AppOptions) {
   </a>
   <nav>
     <a href="/jobs">Jobs</a>
-    <a href="/#start">Start</a>
+    <a href="/receipts">Paid out</a>
     <a href="/x402">Data</a>
     <a href="https://github.com/matthiashippe/control-plane">Source</a>
   </nav>
@@ -379,6 +380,38 @@ export function createApp(opts: AppOptions) {
     );
   });
 
+  /**
+   * What has been paid out, readable, with the work that won it. See `src/public/receipts-page.ts`.
+   */
+  app.get("/receipts", (c) => {
+    if (!indexHtml) return c.json({ error: "no index page built" }, 503);
+    return c.html(
+      seite(
+        renderReceipts(db),
+        "What Handsel has paid out",
+        "Every job that has been paid for, with the brief, the money, who competed and the work that won it. No key needed.",
+        "/receipts",
+      ),
+    );
+  });
+
+  /**
+   * Four pages, named once, so a crawler does not have to guess them from links.
+   */
+  app.get("/sitemap.xml", (c) => {
+    const heute = new Date().toISOString().slice(0, 10);
+    const seiten = ["/", "/jobs", "/receipts", "/x402"];
+    return c.body(
+      '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
+        seiten
+          .map((p) => `  <url><loc>https://cp.hippe.eu${p}</loc><lastmod>${heute}</lastmod></url>`)
+          .join("\n") +
+        "\n</urlset>\n",
+      200,
+      { "Content-Type": "application/xml; charset=utf-8", "Cache-Control": "public, max-age=3600" },
+    );
+  });
+
   app.get("/", (c) => {
     if (!indexHtml) return c.json({ ok: true, version: VERSION, note: "no index page built" });
     return c.html(
@@ -404,7 +437,7 @@ export function createApp(opts: AppOptions) {
    * crawler a 404 and because it is the place where a later restriction would go.
    */
   app.get("/robots.txt", (c) =>
-    c.text("User-agent: *\nAllow: /\n", 200, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "public, max-age=86400" }),
+    c.text("User-agent: *\nAllow: /\nSitemap: https://cp.hippe.eu/sitemap.xml\n", 200, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "public, max-age=86400" }),
   );
 
   app.get("/favicon.ico", (c) => c.body(FAVICON, 200, { "Content-Type": "image/svg+xml", "Cache-Control": "public, max-age=86400" }));
@@ -655,6 +688,7 @@ export function createApp(opts: AppOptions) {
       "  claims it by hand if you would rather. The pool is fixed and does not refill; /v1/status",
       "  says how much is left.",
       "- /jobs: the same open jobs as a page, with the full briefs and the call that enters.",
+      "- /receipts: every job that has been paid out, with the work that won it.",
       "- /x402: both public x402 directories, scanned daily at 04:40 UTC and published as a page:",
       "  distinct services, calls in 30 days, how concentrated the demand is, how many services have",
       "  a single paying wallet. Raw CSV under CC0 in the repository. No key, no rate limit.",
