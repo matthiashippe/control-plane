@@ -138,6 +138,51 @@ jq -r --argjson since "$since" --argjson own "$own_json" \
     }' | sort -k1,1 -k2,2
 
 echo
+# Did the page lead anywhere?
+#
+# Added on 2026-09-21, after the first cycle that asked the question and had to answer it by hand.
+# Over the 48 hours to that evening, 36 foreign addresses fetched the landing page and not one of
+# them then fetched a second page. That is the only behavioural measurement these logs can yield,
+# and until now no cycle looked at it.
+#
+# "Onward" is a 200 that is HTML and is not the landing page, or one of the three files an agent
+# fetches instead of a page. Defining it by the answer and not by a list of known paths means it
+# does not rot: a scanner probing /wp-login.php gets a 404 in JSON and never counts, and a page
+# added next month counts from its first visit without anybody editing this.
+#
+# What this does NOT see, and the reason a zero here is not yet a verdict on the page: the landing
+# page is a single page with anchor links (#how, #agents, #start). Following one of those leaves no
+# line in any log. So this measures leaving the page, not interest in it.
+echo "-- Did the page lead anywhere? (a second page, not an anchor) --"
+jq -r --argjson since "$since" --argjson own "$own_json" \
+  "select(.ts > \$since) | $FOREIGN | select(.status == 200) | [.request.remote_ip, .request.uri, (.resp_headers.\"Content-Type\"[0] // \"\")] | @tsv" "$log" \
+  | awk -F'\t' '
+      { ip = $1; uri = $2; ct = $3
+        if (uri == "/") { landed[ip] = 1; next }
+        onward = (ct ~ /text\/html/) || uri == "/bounties.json" || uri == "/llms.txt" || uri == "/.well-known/x402"
+        # Distinct paths, not every request. The counter-proof on 2026-09-21 ran against our own
+        # address, which has fetched every page hundreds of times, and printed a single line of
+        # roughly nine thousand characters. A report is unreadable exactly on the day it finally
+        # has something to say, which is the day it matters.
+        if (onward && !((ip, uri) in seen_page)) {
+          seen_page[ip, uri] = 1
+          if (count[ip] < 6) { next_page[ip] = next_page[ip] uri " " }
+          else if (count[ip] == 6) { next_page[ip] = next_page[ip] "..." }
+          count[ip]++
+        }
+      }
+      END {
+        n = 0; moved = 0
+        for (ip in landed) {
+          n++
+          if (ip in next_page) { moved++; printf "   %-16s %d page(s): %s\n", ip, count[ip], next_page[ip] }
+        }
+        if (n == 0) { print "   nobody fetched the landing page"; exit }
+        printf "   %d of %d who opened the page went on to a second one.\n", moved, n
+        if (moved == 0) print "   (anchor links leave no log line, so this is a floor, not a verdict)"
+      }'
+
+echo
 echo "-- Error answers to strangers (what a visitor got to see) --"
 jq -r --argjson since "$since" --argjson own "$own_json" \
   "select(.ts > \$since) | $FOREIGN | select(.status >= 400) | select(.request.uri | test(\"wp-|php|\\\\.env|\\\\.git|admin|xmlrpc\") | not) | [(.status|tostring), .request.uri] | @tsv" "$log" \
