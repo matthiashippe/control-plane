@@ -86,6 +86,22 @@ export function readReceipts(path = process.env.CP_CONWAY_RECEIPTS || "/data/con
  * printed as a dash rather than coerced to zero, because zero purchases is a claim and "we did not
  * measure that yet" is not.
  */
+/**
+ * Our own automaton's wallet. It paid Conway 5 USDC on 18 September 2026, once, before the runtime
+ * was pointed here instead, and that row sits in the published receipts like anybody else's.
+ *
+ * A page that argues "strangers are still paying" while quietly showing our own transfer as
+ * evidence is the same failure the landing page avoids by saying "zero buyers who are not me" out
+ * loud. So the row is marked and counted rather than hidden: removing it would be worse, because
+ * the transfer is real and the totals include it either way.
+ */
+const OUR_WALLETS = new Set(
+  (process.env.CP_OWN_WALLETS || "0x56de77800de59baf92ccb2ccc32c4cf11f58e93b")
+    .split(",")
+    .map((address) => address.trim().toLowerCase())
+    .filter(Boolean),
+);
+
 const n = (x: number | undefined): string => (typeof x === "number" ? x.toLocaleString("en-US") : "—");
 const money = (x: number | undefined): string => (typeof x === "number" ? `$${n(Math.round(x))}` : "—");
 const day = (iso: string): string => iso.slice(0, 10);
@@ -130,10 +146,12 @@ export function renderConway(points: MoneyPoint[], receipts: Receipt[]): string 
   const onlyMinimum = Object.keys(last.topup_tiers_30d ?? {}).length === 1
     && Object.keys(last.topup_tiers_30d)[0] === "5";
 
+  const ours = receipts.filter((r) => OUR_WALLETS.has(r.from.toLowerCase()));
   const receiptRows = receipts
     .map(
       (r) =>
-        `<tr><td>${esc(minute(r.timestamp_utc))}</td><td><code>${esc(short(r.from))}</code></td>` +
+        `<tr><td>${esc(minute(r.timestamp_utc))}</td><td><code>${esc(short(r.from))}</code>` +
+        `${OUR_WALLETS.has(r.from.toLowerCase()) ? ' <span class="w">ours</span>' : ""}</td>` +
         `<td>$${esc(String(Math.round(Number(r.usdc))))}</td>` +
         `<td><a href="https://basescan.org/tx/${esc(r.tx_hash)}">${esc(r.tx_hash.slice(0, 10))}…</a></td></tr>`,
     )
@@ -201,7 +219,11 @@ export function renderConway(points: MoneyPoint[], receipts: Receipt[]): string 
       </table>
       <p class="sub" style="margin-top:1rem">
         Every one of these is a real transfer on Base and every hash goes to a block explorer. What
-        none of them bought is an API key.
+        none of them bought is an API key.${ours.length
+          ? ` ${ours.length === 1 ? "One of them is ours" : `${n(ours.length)} of them are ours`}, marked
+        above: our own automaton paid the same 5 USDC before it was pointed somewhere else. It is
+        counted in every figure on this page like anybody else's.`
+          : ""}
       </p>`
         : ""}
 

@@ -119,6 +119,28 @@ describe("/conway", () => {
     expect(gemischt).toContain("80 at $5, 7 at $25");
   });
 
+  /**
+   * Found by looking at the live page: row seven of the published receipts was our own automaton,
+   * which paid Conway 5 USDC on 18 September before it was pointed here instead. A page arguing
+   * that strangers keep paying, using our own transfer as evidence and not saying so, is the exact
+   * thing the landing page avoids by printing "zero buyers who are not me".
+   */
+  it("marks our own wallet in the receipts instead of passing it off as somebody else", async () => {
+    const mitUns =
+      RECEIPTS +
+      "51482543,2026-09-18T18:00:33Z,0x56de77800de59baf92ccb2ccc32c4cf11f58e93b,5.000000,0x2ac8b33a506314e82af6bc029634e27b7796faccc1635c6b9371528bcc448b84\n";
+    const html = await page([POINT], mitUns);
+
+    expect(html, "the row itself says whose it is").toMatch(/0x56de77…e93b<\/code> <span class="w">ours<\/span>/);
+    expect(html, "and the caption says how many, so nobody has to count").toContain("One of them is ours");
+    expect(html, "the figures are not quietly adjusted either").toContain("counted in every figure on this page");
+
+    // Without our wallet in the file the sentence must not appear at all.
+    const ohneUns = await page([POINT]);
+    expect(ohneUns).not.toContain("is ours");
+    expect(ohneUns).not.toContain(">ours<");
+  });
+
   /** A receipt nobody can look up is a claim. Every row carries the full hash to an explorer. */
   it("gives every purchase a transaction a reader can open", async () => {
     const html = await page([POINT]);
