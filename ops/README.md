@@ -278,6 +278,25 @@ twenty-five. Whoever wants to move the number has to pay, and that is the whole 
 measurement. Our own automaton is included in the number, so subtract one for the actual figure.
 `db.keys` counts issued API keys, `db.day.topups` the payments of the last day.
 
+## Before the article goes out
+
+`ops/vor-dem-artikel.py`. Reads the article, pulls its figures out and holds each one against what
+the service and the daily series say today. Changes nothing, sends nothing. Exit 0 means the text
+matches the world; anything else names the sentences to fix and why.
+
+The checklist it replaces was a list of commands somebody had to remember to run and numbers
+somebody had to remember to compare. On a posting morning that is exactly the kind of list that
+gets skipped, and those numbers are the first thing a reader checks.
+
+It holds eight directory figures, the disclosure "zero buyers who are not me" against the real
+counter, the three claims about Conway's present tense against the daily watch, whether
+`check-all.sh` is green, and whether any job is open at all when readers arrive.
+
+On its first run it caught three numbers that had drifted the same morning, because the hand scan
+ran at 03:30 and the cron at 04:40.
+
+What it cannot check, and says so: whether today is a good day to post.
+
 ## When a key name nobody knows shows up
 
 `ops/db-report.cjs` keeps two lists, and `ops/check-all.sh` prints every key name that is on
