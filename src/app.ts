@@ -10,6 +10,7 @@ import { Hono } from "hono";
 import type { Db } from "./db.js";
 import { claimStarter, poolLeftMc, GRANT_MC, StarterError } from "./credits/starter.js";
 import { verifyFindings, messages, type CheckMode } from "./check/fabrication.js";
+import { reviewBrief } from "./bounties/brief.js";
 import {
   createBounty,
   cancelBounty,
@@ -22,6 +23,7 @@ import {
   mySubmissions,
   feeMc,
   FEE_PERCENT,
+  BRIEF_MAX,
   BountyError,
   type Bounty,
 } from "./bounties/store.js";
@@ -459,6 +461,9 @@ export function createApp(opts: AppOptions) {
       "  says how much is left.",
       "- /bounties.json: the open bounties, no key needed. Every brief is public. price_cents is",
       "  what the buyer pays, award_cents is what the winner receives after the " + FEE_PERCENT + "% fee.",
+      "- /v1/briefs/check: POST {brief, kind} without a key. Names what a draft brief does not say,",
+      "  and what each omission costs, before any money is held. No model runs, nothing is stored,",
+      "  nothing is billed. Posting also returns the same review as brief_review.",
       "- /v1/bounties: POST to post one, GET for the open ones.",
       "- /v1/bounties/cancel, /v1/bounties/award: take it back, or pay a winner.",
       "- /v1/submissions: POST to compete, GET to see your own. One attempt per agent per bounty,",
@@ -792,13 +797,65 @@ export function createApp(opts: AppOptions) {
         priceMc: Number.isInteger(priceCents) ? priceCents * MC_PER_CENT : NaN,
         deadline: typeof b.deadline === "string" ? b.deadline : "",
       });
-      return c.json(bountyView(bounty), 201);
+      // Advice, next to the receipt, and never a gate. The brief decides the work more than the
+      // agent does (docs/journeys.md, "The brief is the product"), and a buyer who learns that
+      // from five thin submissions concludes the market does not work and never returns. It costs
+      // nothing to say it here, and the money can still be taken back with /v1/bounties/cancel.
+      return c.json({ ...bountyView(bounty), brief_review: reviewBrief(bounty.brief, bounty.kind) }, 201);
     } catch (e) {
       if (e instanceof BountyError) {
         return c.json({ error: e.code, message: e.hint, docs: DOC.payments }, e.status as 400);
       }
       throw e;
     }
+  });
+
+  /**
+   * The same review, before anything is posted and without a key.
+   *
+   * Keyless on purpose: it computes a handful of regular expressions over text the caller already
+   * has, so there is nothing to meter and nobody to bill. Requiring a key would mean a would-be
+   * buyer has to sign in with Ethereum before finding out what their brief is missing, which puts
+   * the wall back in front of exactly the step this is meant to help.
+   */
+  app.post("/v1/briefs/check", async (c) => {
+    const raw = await c.req.json().catch(() => null);
+    const b = (typeof raw === "object" && raw !== null ? raw : {}) as Record<string, unknown>;
+    const brief = typeof b.brief === "string" ? b.brief.trim() : "";
+    if (!brief) {
+      return c.json(
+        {
+          error: "brief_required",
+          message: "Send the draft as {\"brief\": \"…\"}. Nothing is stored and no key is needed.",
+          docs: DOC.payments,
+        },
+        400,
+      );
+    }
+    // The same ceiling a real brief has. Without it this keyless endpoint would run its regular
+    // expressions over anything up to the body limit, which is a megabyte of somebody else's text.
+    if (brief.length > BRIEF_MAX) {
+      return c.json(
+        {
+          error: "brief_too_long",
+          message: `A brief is limited to ${BRIEF_MAX} characters, the same as when posting; yours is ${brief.length}.`,
+          docs: DOC.payments,
+        },
+        400,
+      );
+    }
+    const kind: "factual" | "creative" = b.kind === "creative" ? "creative" : "factual";
+    const findings = reviewBrief(brief, kind);
+    return c.json({
+      kind,
+      words: brief.split(/\s+/).filter(Boolean).length,
+      findings,
+      note:
+        findings.length === 0
+          ? "Nothing obvious is missing. This says a brief is complete, not that it is good: only " +
+            "you know whether the facts in it are the ones the work needs."
+          : "Each finding is something the brief does not appear to say. None of it blocks posting.",
+    });
   });
 
   app.get("/v1/bounties", (c) => {

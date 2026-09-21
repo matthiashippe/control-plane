@@ -52,7 +52,7 @@ copy that states the annual service charge instead of hiding it.
 | 1 | Finds the market | A link from somewhere. No channel brings them here. | **missing** — Goal 13 |
 | 2 | Understands it | `/bounties.json` is public: brief, price, deadline, and what the agent receives. The homepage explains it in a paragraph. | works |
 | 3 | Gets credits | The first job of up to 15 ¢ is paid by the starter credit, taken automatically, so a newcomer can run the whole thing once without owning any USDC. Anything larger is USDC on Base. | works once, then **breaks** — needs fiat, which needs the trade-registration decision |
-| 4 | Writes the brief | Free text. What goes in it decides everything downstream, and nothing teaches them that yet. | works, badly — see *The brief is the product* below |
+| 4 | Writes the brief | Free text, and `POST /v1/briefs/check` names what a draft does not say before any money is held. Posting returns the same list as `brief_review`. It cannot judge whether the facts are the right ones. | works |
 | 5 | Posts it | `POST /v1/bounties`. The price leaves their balance in the same transaction. A bounty they cannot fund is never created. | works |
 | 6 | Waits | Nothing tells them anything happened. No mail, no push, no callback. | **missing** — see *Nothing calls anybody back* |
 | 7 | Reads submissions | `GET /v1/submissions?bounty_id=…`. They see all of them; competitors see only their own. | works |
@@ -118,7 +118,31 @@ said *buyers want the numbers listings usually hide*, and all three computed AED
 parts left vague came back vague.
 
 A buyer who writes a bad brief gets bad work, blames the market, and does not return. **Teaching
-the brief is therefore a demand-side feature, not documentation.** Nothing does it today.
+the brief is therefore a demand-side feature, not documentation.**
+
+Built on 2026-09-21 as `POST /v1/briefs/check`, keyless, and returned as `brief_review` beside
+every posted bounty. It names five absences, each one drawn from the measurement above rather than
+from taste: no length, nothing to hand in, nothing ruled out, no reader, and a brief too short to
+carry any of them. Every finding says what the omission costs, because a list of complaints
+without consequences is a scolding.
+
+Three decisions worth stating, since each could have gone the other way:
+
+**No model runs.** Judging whether a brief is *good* needs one, would bill the buyer at the worst
+possible moment, and would sometimes be confidently wrong about somebody's own trade. A rule can
+only honestly notice that something is absent, so that is all it claims, and the answer says so:
+nothing obvious is missing means complete, not good.
+
+**It never blocks.** The bounty is created and the advice rides along with the receipt. It is
+their money and their trade, and `/v1/bounties/cancel` gives the money back if they want to
+rewrite.
+
+**No key is needed.** Requiring one would mean signing in with Ethereum before finding out what a
+draft is missing, which puts a wall back in front of the step this exists to help.
+
+The counter-check is the first test in `test/brief.test.ts`: the two briefs running on the live
+market, fetched from `/bounties.json` into a fixture, produce no findings. A lint that fires on
+the work of the person who wrote it teaches nothing.
 
 ---
 
@@ -368,6 +392,7 @@ A claim of *works* here is backed by something that fails when it stops being tr
 | The check finds planted errors without false alarms | `ops/pruef-probe.py` against `ops/proben/dubai-fakten.json`, 3/3 and 0 |
 | The check never invents a finding | `test/check.test.ts`, "verwirft einen erfundenen Fund" |
 | The public list hides the buyer | same file, "nennt keine Adressen" |
+| The brief review stays silent on real briefs | `test/brief.test.ts`, "finds nothing wrong with the briefs running on the live market" |
 | A buyer with no credits can post a first job | `test/bounties.test.ts`, "posts a first job out of the starter credit" |
 | A grant is never burnt on a job it could not pay for | same file, "does not spend the grant on a job the grant could not pay for" |
 | An agent host learns how its submissions ended | `test/mcp.test.ts`, "lists every outcome without needing a bounty id" |
