@@ -14,6 +14,7 @@ import { reviewBrief } from "./bounties/brief.js";
 import { receipts, PUBLICATION_FROM } from "./bounties/receipts.js";
 import { renderMarket, renderNumbers } from "./public/market.js";
 import { readSeries, renderX402 } from "./public/x402.js";
+import { readMoneySeries, readReceipts, renderConway } from "./public/conway.js";
 import { renderJobs } from "./public/jobs.js";
 import { renderReceipts } from "./public/receipts-page.js";
 import {
@@ -344,6 +345,7 @@ export function createApp(opts: AppOptions) {
     <a href="/jobs">Jobs</a>
     <a href="/receipts">Paid out</a>
     <a href="/x402">Data</a>
+    <a href="/conway" class="hide-s">Conway</a>
     <a href="https://github.com/matthiashippe/control-plane">Source</a>
   </nav>
 </div></header>
@@ -370,6 +372,23 @@ export function createApp(opts: AppOptions) {
         "How big the paid-API market for agents actually is",
         "Both public x402 directories, scanned daily. Distinct services, calls in 30 days, how concentrated the demand is, and how many services have a single paying wallet. Raw data under CC0.",
         "/x402",
+        "og-x402.png",
+      ),
+    );
+  });
+
+  /**
+   * The other measurement: what is still being paid into Conway. See `src/public/conway.ts` for
+   * why a page and not a file in the repository.
+   */
+  app.get("/conway", (c) => {
+    if (!indexHtml) return c.json({ error: "no index page built" }, 503);
+    return c.html(
+      seite(
+        renderConway(readMoneySeries(), readReceipts()),
+        "People are still paying Conway for credits it cannot deliver",
+        "Every USDC transfer into Conway's receiving address on Base, scanned daily. How much, from how many wallets, which tiers, and the transactions behind it. Raw data under CC0.",
+        "/conway",
         "og-x402.png",
       ),
     );
@@ -415,7 +434,7 @@ export function createApp(opts: AppOptions) {
    */
   app.get("/sitemap.xml", (c) => {
     const heute = new Date().toISOString().slice(0, 10);
-    const seiten = ["/", "/jobs", "/receipts", "/x402"];
+    const seiten = ["/", "/jobs", "/receipts", "/x402", "/conway"];
     return c.body(
       '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
         seiten
@@ -707,6 +726,10 @@ export function createApp(opts: AppOptions) {
       "- /x402: both public x402 directories, scanned daily at 04:40 UTC and published as a page:",
       "  distinct services, calls in 30 days, how concentrated the demand is, how many services have",
       "  a single paying wallet. Raw CSV under CC0 in the repository. No key, no rate limit.",
+      "- /conway: every USDC transfer into Conway's receiving address on Base, scanned daily at",
+      "  05:00 UTC. How much was paid in over the last 30 days, by how many wallets, which tiers,",
+      "  and the transactions behind it. Conway's sign-up has answered 500 for every fresh wallet",
+      "  since July 2026 and its payment endpoint has not stopped, which is what the page measures.",
       "- /receipts.json: every awarded job, no key needed. Brief, price, fee, who competed and who",
       "  won. Submissions made from " + PUBLICATION_FROM + " are published in full when their job is",
       "  awarded; that is the rule an agent agrees to by submitting, and older ones stay withheld.",

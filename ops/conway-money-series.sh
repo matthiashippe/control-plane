@@ -95,6 +95,20 @@ then
   exit 1
 fi
 
+# Whether the payment endpoint still takes money is the other half of the claim this series
+# exists for, and it is one plain GET. Nothing is signed here: an x402 demand is just a 402 with a
+# description of what it wants, and answering it would take a signature this script never makes.
+pay_status=$(curl -s -o /dev/null -m 15 -w '%{http_code}' \
+  -A 'control-plane-check/1.0 (+https://cp.hippe.eu)' \
+  'https://api.conway.tech/pay/5/0x0000000000000000000000000000000000000001' || echo 000)
+after=$(python3 - "$after" "$pay_status" <<'PY'
+import json, sys
+values = json.loads(sys.argv[1])
+values["pay_endpoint_status"] = int(sys.argv[2])
+print(json.dumps(values, separators=(",", ":")))
+PY
+)
+
 # One line per day, not one per run, same as the x402 series: a run by hand to check that the thing
 # still works used to leave a second point for the same date, and two points for one day quietly
 # double-count in anything that reads the series as a daily sequence.
@@ -118,12 +132,18 @@ with open(path, "w") as f:
     f.write("\n".join(kept) + "\n")
 PY
 
-# The series also goes into the container, the same way the x402 one does: no bind mount to add to
+# The receipts behind the claim, so the page can name transfers a reader can look up. A separate
+# file rather than a field in the series: the series is a record of what was true on each day and
+# has to stay small, the receipts are current state and only the newest ones are ever shown.
+python3 "$REPO/docs/research/data/conway-money-metrics.py" "$BASE" "$delta" --recent 25 > "$TARGET/recent.csv"
+
+# Both files go into the container, the same way the x402 series does: no bind mount to add to
 # deploy/**, which is not touched without a human, and no host path to guess at.
-if docker cp "$series" deploy-cp-1:/data/conway-money.ndjson 2>/dev/null; then
-  echo "[conway-money] series handed to the container"
+if docker cp "$series" deploy-cp-1:/data/conway-money.ndjson 2>/dev/null \
+  && docker cp "$TARGET/recent.csv" deploy-cp-1:/data/conway-recent.csv 2>/dev/null; then
+  echo "[conway-money] series and receipts handed to the container"
 else
-  echo "[conway-money] could not hand the series to the container; it keeps the older copy" >&2
+  echo "[conway-money] could not hand the files to the container; it keeps the older copies" >&2
 fi
 
 cp "$errors" "$TARGET/last-run.log"
