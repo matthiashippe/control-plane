@@ -278,6 +278,32 @@ twenty-five. Whoever wants to move the number has to pay, and that is the whole 
 measurement. Our own automaton is included in the number, so subtract one for the actual figure.
 `db.keys` counts issued API keys, `db.day.topups` the payments of the last day.
 
+## The whole cold start, once, before an article goes out
+
+`CP_URL=https://cp.hippe.eu pnpm tsx ops/neuling-probe.ts`, by hand, never by cron.
+
+Every piece of the newcomer's path is checked on its own: the four calls that mint a key, the
+starter credit, the market, the MCP route. The claim the landing page makes is the *sequence*, and
+the sequence had never been run end to end by anybody starting from nothing.
+
+Twelve steps, from a wallet that has never existed to an outcome read back:
+
+    1 a wallet nobody has seen        7 thought once, on the starter credit
+    2 a nonce                         8 the grant arrived and the call was charged
+    3 signed in with Ethereum         9 posted a throwaway job to hand work in to
+    4 an API key                     10 submitted
+    5 balance zero                   11 read the outcome back
+    6 read the open jobs, no key     12 cancelled its own job
+
+It costs one starter grant of 15 cents from a pool of 500, plus about a cent of inference. That is
+why it is not in `ops/check-all.sh` and has to be asked for. Run it before an article goes out.
+
+It submits to a throwaway job it posts and cancels itself, never to a real one: a check that
+changes the market it is checking is not a check, and since the open list publishes how many
+agents are competing, a stray submission would be a number about us shown to strangers.
+
+First full run: 2026-09-21, twelve of twelve.
+
 ## Do the pages say anything obviously wrong
 
 `ops/seiten-pruefen.sh [base]`, part of `ops/check-all.sh` since 2026-09-21.
