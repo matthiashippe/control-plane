@@ -313,6 +313,14 @@ a class that resolves to nothing is none of those.
 
 It reads the served bytes rather than the source, so a class lost in a build step counts too.
 
+**A class having a rule is not a class being styled right.** On 2026-09-21 the restored stylesheet
+kept `.stats .n` and lost `.stats`, so `/conway` showed its four figures one per row, correctly
+formatted and in the wrong place, and this script said CLASSES OK. `.kicker` survived only inside
+`#market .kicker { display: none }`, which is a rule, so that passed too while the kicker rendered
+as ordinary body text. Rules whose selector carries an `#id` no longer count as a definition, which
+closes the second case exactly; the first is not checkable without a CSS engine. Nothing here
+replaces looking at the page.
+
 **Classes inside an `<svg>` are cut out before the comparison.** In there a class is as often a
 name as a hook: `n0`, `a1`, `wires` and `marks` say which box is which and are never meant to be
 styled, while the rules that do style the diagram reach in from outside (`.flow .w1`). Counting

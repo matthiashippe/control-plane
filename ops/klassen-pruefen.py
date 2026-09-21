@@ -14,6 +14,16 @@ no unrendered placeholder, and a class that resolves to nothing is none of those
 This reads the served HTML, not the source: a class can also go missing because a build step drops
 it, and the reader gets the served bytes either way.
 
+What this does not see, and it cost a cycle to learn: a class having a rule is not the same as a
+class being styled right. On 2026-09-21 the restored stylesheet kept `.stats .n` and lost `.stats`,
+so /conway showed its four figures one per row, correctly formatted and in the wrong place, and
+this script said CLASSES OK. `.kicker` survived only inside `#market .kicker { display: none }`,
+which is a rule, so that passed too while the kicker rendered as ordinary body text.
+
+Rules whose selector carries an `#id` are therefore not counted: an id belongs to one place on one
+page and cannot be what makes a class work wherever it is used. That much is exact. The rest is not
+checkable without a CSS engine, so nothing here replaces looking at the page.
+
     ops/klassen-pruefen.py [base-url]
 
 Exit 0 all classes defined, 1 something renders unstyled, 2 a page could not be fetched.
@@ -46,7 +56,12 @@ def main() -> int:
             print(f"FAILED  {pfad}: no stylesheet in the served page at all")
             fehler += 1
             continue
-        definiert = set(re.findall(r"\.([A-Za-z][\w-]*)", stil))
+        # An id-scoped rule styles one place on one page and cannot be what makes a class work
+        # wherever it is used, so those selectors do not count as a definition.
+        ohne_id = "\n".join(
+            regel for regel in re.findall(r"[^{}]+\{[^{}]*\}", stil) if "#" not in regel.split("{")[0]
+        )
+        definiert = set(re.findall(r"\.([A-Za-z][\w-]*)", ohne_id))
         # Inside an <svg> a class is as often a name as a hook: `n0`, `a1`, `wires`, `marks` say
         # which box is which and are never meant to be styled, while the rules that do style the
         # diagram reach in from outside (`.flow .w1`). Counting those would mean keeping an
