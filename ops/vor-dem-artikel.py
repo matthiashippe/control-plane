@@ -14,10 +14,12 @@ human act.
 
 Exit code 0 means the text matches the world. Anything else names the sentences to fix.
 """
+import datetime
 import json
 import re
 import subprocess
 import sys
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -143,6 +145,49 @@ def main() -> int:
         else:
             aendern(f"the repository was pushed on {c.get('last_push')}",
                     "the article and five issue answers say the last commit is 26 August")
+
+    # 4b. The two present-tense claims about Conway's money, which are new in the text since
+    # 21.09. and are the only ones that can go stale between writing and posting. The window
+    # figures in the article ("From August 21 to the end of the scan") are a closed period and are
+    # deliberately not compared against anything; only the claims about now are.
+    if "Money still moves into it every week" in text:
+        geld = letzte_zeile("/opt/control-plane/conway-money/metrics.ndjson")
+        if not geld:
+            aendern("the conway money series could not be read",
+                    "run ops/conway-money-series.sh on the VM first")
+        else:
+            zuletzt = geld.get("data_through", "")
+            try:
+                alter = (datetime.datetime.now(datetime.timezone.utc)
+                         - datetime.datetime.strptime(zuletzt, "%Y-%m-%dT%H:%M:%SZ")
+                         .replace(tzinfo=datetime.timezone.utc)).days
+            except Exception:
+                alter = 999
+            if alter <= 7:
+                ok("money still moves into Conway", f"last transfer {zuletzt}, {alter} day(s) ago")
+            else:
+                aendern(f"the last transfer into Conway was {zuletzt}, {alter} days ago",
+                        "the article says money still moves in every week; either the flow stopped "
+                        "or the series has not run")
+
+    if "still returned a valid x402 demand" in text:
+        try:
+            urllib.request.urlopen(
+                urllib.request.Request(
+                    "https://api.conway.tech/pay/5/0x0000000000000000000000000000000000000001",
+                    headers={"User-Agent": "control-plane-check/1.0 (+https://cp.hippe.eu)"}),
+                timeout=15)
+            aendern("api.conway.tech/pay no longer answers 402", "it answered 200; nothing is signed "
+                    "by this check, but the sentence about the payment endpoint has to change")
+        except urllib.error.HTTPError as fehler:
+            if fehler.code == 402:
+                ok("Conway still asks for money", "GET /pay/5/<address> answers 402")
+            else:
+                aendern(f"api.conway.tech/pay answers {fehler.code}, not 402",
+                        "the article says the payment endpoint still demands 5 USDC")
+        except Exception as fehler:
+            aendern(f"api.conway.tech/pay could not be reached ({fehler})",
+                    "without it the sentence about the live payment endpoint is unchecked")
 
     # 5. Nobody should arrive at an empty market.
     try:
