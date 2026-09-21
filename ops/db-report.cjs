@@ -60,7 +60,30 @@ const OURS = [
   "0xd24f37d0838e62621ed24111164485ded0f0924f", // operator wallet, posts the seed jobs
   "0xf6204b0662082d65d78eab79936a4d91744dee6b", // the agent from the first cycle on 2026-09-20
 ];
-const notOurs = `address not in (${OURS.map(() => "?").join(",")})`;
+
+// The hardcoded pair is not enough. Every production check provisions a throwaway wallet, and on
+// 2026-09-21 the first full run of ops/check-all.sh proudly reported "foreign agents: 4", all four
+// of them ours. That is the same self-deception as the code-host appearing as a visitor in the
+// traffic log, one layer down, and it would have been read as the supply side waking up.
+//
+// So an address also counts as ours when the key it was given carries a name only our own tools
+// use. The list is spelled out rather than pattern-matched on purpose: `conway-automaton` is the
+// name a real runtime gives its key, and excluding that would hide exactly the people we are
+// waiting for.
+const OUR_KEY_NAMES = [
+  "handsel-%",            // post-bounty.ts, first-cycle.ts
+  "mcp-production-check%", // mcp-against-production.ts
+  "skill-production-check", "skill-check-buyer",
+  "harness-%",            // provisionierung.ts, markt.ts
+  "mainnet-abnahme", "provisioned-key", "cleanup",
+];
+const oursClause = `(
+  address in (${OURS.map(() => "?").join(",")})
+  or exists (select 1 from api_keys k where k.address = ledger.address
+             and (${OUR_KEY_NAMES.map(() => "k.name like ?").join(" or ")}))
+)`;
+const OURS_ARGS = [...OURS, ...OUR_KEY_NAMES];
+const notOurs = `not ${oursClause}`;
 
 report.market = {
   open_bounties: one("select count(*) n from bounties where status='open' and deadline > ?", new Date().toISOString()).n,
@@ -75,11 +98,14 @@ report.market = {
   // THE number. Anything above zero means this stopped being our own demonstration.
   foreign_buyers: one(
     `select count(distinct address) n from ledger where kind='bounty_hold' and ${notOurs}`,
-    ...OURS,
+    ...OURS_ARGS,
   ).n,
   foreign_agents: one(
-    `select count(distinct agent) n from submissions where agent not in (${OURS.map(() => "?").join(",")})`,
-    ...OURS,
+    `select count(distinct s.agent) n from submissions s
+      where s.agent not in (${OURS.map(() => "?").join(",")})
+        and not exists (select 1 from api_keys k where k.address = s.agent
+                        and (${OUR_KEY_NAMES.map(() => "k.name like ?").join(" or ")}))`,
+    ...OURS_ARGS,
   ).n,
 };
 

@@ -98,6 +98,38 @@ describe("The market numbers in the database report", () => {
     expect(r.market.fee_earned_mc).toBe(80 * MC_PER_CENT);
   });
 
+  it("does not count an agent our own checks provisioned", () => {
+    const CHECKER = "0x2222222222222222222222222222222222222222";
+    const r = withDb((db) => {
+      postBounty(db, OPERATOR, "ours-1", 200 * MC_PER_CENT);
+      db.prepare("INSERT INTO wallets (address, balance_mc, created_at) VALUES (?, 0, ?)").run(CHECKER, new Date().toISOString());
+      db.prepare("INSERT INTO api_keys (address, key_hash, key_prefix, name, created_at) VALUES (?, 'h', 'p', 'mcp-production-check-agent', ?)")
+        .run(CHECKER, new Date().toISOString());
+      db.prepare("INSERT INTO submissions (id, bounty_id, agent, body, created_at) VALUES ('s1', 'ours-1', ?, 'work', ?)")
+        .run(CHECKER, new Date().toISOString());
+    });
+    expect(r.market.submissions).toBe(1);
+    // On 2026-09-21 the first full run of ops/check-all.sh reported four foreign agents, all four
+    // of them provisioned by our own production checks minutes earlier.
+    expect(r.market.foreign_agents, "our own checks are not the supply side waking up").toBe(0);
+  });
+
+  it("still counts an agent whose key is named the way a real runtime names it", () => {
+    const REAL = "0x3333333333333333333333333333333333333333";
+    const r = withDb((db) => {
+      postBounty(db, OPERATOR, "ours-1", 200 * MC_PER_CENT);
+      db.prepare("INSERT INTO wallets (address, balance_mc, created_at) VALUES (?, 0, ?)").run(REAL, new Date().toISOString());
+      // This is the name the unmodified Conway runtime gives its key. Excluding it would hide
+      // exactly the people this number exists to find, so the exclusion list is spelled out
+      // instead of matching a pattern.
+      db.prepare("INSERT INTO api_keys (address, key_hash, key_prefix, name, created_at) VALUES (?, 'h', 'p', 'conway-automaton', ?)")
+        .run(REAL, new Date().toISOString());
+      db.prepare("INSERT INTO submissions (id, bounty_id, agent, body, created_at) VALUES ('s1', 'ours-1', ?, 'work', ?)")
+        .run(REAL, new Date().toISOString());
+    });
+    expect(r.market.foreign_agents).toBe(1);
+  });
+
   it("shows what is left of the starter pool", () => {
     const r = withDb((db) => {
       postLedger(db, { address: STRANGER, kind: "grant", deltaMc: 15 * MC_PER_CENT, ref: `starter:${STRANGER}` });
