@@ -13,6 +13,7 @@ import { RequestCoalescer, requestKey } from "./dedupe.js";
 import { DOC } from "../errors.js";
 import type { ChatProvider, ChatRequest, ChatResponse, ModelSpec, Usage } from "./provider.js";
 import { estimateTokens, ProviderBadRequestError, ProviderUnavailableError } from "./provider.js";
+import { grantOnFirstUse } from "../credits/starter.js";
 
 export const MARKUP = 1.3;
 const DEFAULT_MAX_TOKENS = 4096;
@@ -236,7 +237,16 @@ async function handleChatUncoalesced(
   // the same funds. With 1 USD of credit and 200 parallel requests roughly 65 USD of real purchase
   // cost was reachable that way (security review 19.09.2026). `reserveMc` decides atomically in the
   // database and is therefore closed against that race.
-  if (!reserveMc(db, address, requiredMc)) {
+  // A call that cannot pay for itself takes the starter credit first, and only bounces if that
+  // does not exist or does not cover it. `grantOnFirstUse` says why the grant is taken here and
+  // not at the endpoint built for it: a Conway runtime speaks the upstream API and never calls it,
+  // so for the agents this service is trying to attract the free tier was invisible.
+  let reserved = reserveMc(db, address, requiredMc);
+  if (!reserved && grantOnFirstUse(db, address)) {
+    reserved = reserveMc(db, address, requiredMc);
+  }
+
+  if (!reserved) {
     const availableMc = getAvailableMc(db, address);
     return {
       status: 402,

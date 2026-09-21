@@ -66,7 +66,8 @@ except Exception:
     sys.exit(0)
 print(f\"foreign buyers: {m['foreign_buyers']}   foreign agents: {m['foreign_agents']}   \"
       f\"awarded: {m['awarded']}   fee earned: {m['fee_earned_mc']/1000:.2f} c   \"
-      f\"starter pool left: {m['starter_pool_left_mc']/1000:.0f} c\")
+      f\"starter pool left: {m['starter_pool_left_mc']/1000:.0f} c \"
+      f\"(of {m['starter_granted']} grants, {m['starter_granted_ours']} to us)\")
 " || true
 else
   echo "(no OPENROUTER_API_KEY, so the market numbers are skipped)"

@@ -6,6 +6,21 @@ import { MockProvider, MOCK_MODEL } from "../src/inference/mock.js";
 import { Catalog, costMc, MARKUP, sellPrice } from "../src/inference/proxy.js";
 import type { ChatProvider } from "../src/inference/provider.js";
 import { hashApiKey } from "../src/auth/siwe.js";
+import { claimStarter, poolLeftMc, GRANT_MC, POOL_MC } from "../src/credits/starter.js";
+
+/**
+ * Uses the starter pool up, with real grants to real addresses.
+ *
+ * Needed wherever a test states a balance and means it. Since 2026-09-21 a call that cannot pay
+ * for itself takes the starter credit before it bounces, so an account seeded with 500 mc is in
+ * truth an account with 15,500 mc, and a test that does not say otherwise is measuring the free
+ * tier instead of the thing it was written for. Emptying the pool is the honest way to say "not
+ * this account, not today": nothing is faked, the ledger stays true, and the premise is visible.
+ */
+function emptyStarterPool(db: ReturnType<typeof openDb>) {
+  while (poolLeftMc(db) >= GRANT_MC) claimStarter(db, privateKeyToAccount(generatePrivateKey()).address.toLowerCase());
+  expect(poolLeftMc(db), "the pool has to be too small for one more grant").toBeLessThan(GRANT_MC);
+}
 
 const TOOLS = ["check_credits", "system_synopsis", "list_models", "view_soul", "sleep", "exec"].map((name) => ({
   type: "function" as const,
@@ -110,7 +125,11 @@ describe("inference proxy", () => {
   });
 
   it("answers an empty account with the 402 shape the runtime parses, and charges nothing", async () => {
-    const { chat, request, inferenceRows } = setup(0);
+    const { db, chat, request, inferenceRows } = setup(0);
+    // Without this the first call would be paid for by the starter credit and never reach the 402.
+    // That is the intended behaviour for a fresh agent and is covered below; this test is about
+    // what an agent sees once the free tier is behind it, which is the state it spends its life in.
+    emptyStarterPool(db);
     const res = await chat(request());
     expect(res.status).toBe(402);
     const body = (await res.json()) as { error: string; details: { required_cents: number; current_balance_cents: number } };
@@ -118,6 +137,50 @@ describe("inference proxy", () => {
     expect(body.details.current_balance_cents).toBe(0);
     expect(body.details.required_cents).toBeGreaterThan(0);
     expect(inferenceRows()).toHaveLength(0);
+  });
+
+  // The moment this service is judged on: an operator points a fresh runtime at us and it either
+  // thinks or it does not. Until 2026-09-21 it did not. The free tier existed, but the only way to
+  // it was POST /v1/credits/starter, a call a Conway runtime has no reason to know about, so every
+  // new agent met a 402 and a request to buy USDC on Base before it had said a word.
+  it("pays a fresh agent's first thought out of the starter credit instead of bouncing it", async () => {
+    const { db, chat, request, balance, inferenceRows, address } = setup(0);
+
+    const res = await chat(request());
+
+    expect(res.status, "a fresh agent must be able to think without owning any USDC").toBe(200);
+    const grants = db.prepare("SELECT delta_mc FROM ledger WHERE kind = 'grant' AND address = ?").all(address) as { delta_mc: number }[];
+    expect(grants).toHaveLength(1);
+    expect(grants[0].delta_mc).toBe(GRANT_MC);
+    expect(inferenceRows(), "the call was really served and really charged").toHaveLength(1);
+    const charged = Math.abs(inferenceRows()[0].delta_mc);
+    expect(balance()).toBe(GRANT_MC - charged);
+    expect(charged, "one thought must not eat the whole grant").toBeLessThan(GRANT_MC);
+  });
+
+  it("hands out the grant once, however many calls run into the empty balance", async () => {
+    const { db, chat, request, address } = setup(0);
+
+    await chat(request(1));
+    await chat(request(2));
+    await chat(request(3));
+
+    const grants = db.prepare("SELECT count(*) AS n FROM ledger WHERE kind = 'grant' AND address = ?").get(address) as { n: number };
+    expect(grants.n, "the second call must not be allowed to refill the account").toBe(1);
+    expect(POOL_MC - GRANT_MC).toBe(poolLeftMc(db));
+  });
+
+  it("still bounces an agent that has had its grant and spent it", async () => {
+    const { db, chat, request, address } = setup(0);
+    claimStarter(db, address);
+    // Stands for a grant that has been thought away. What matters is that the grant row exists, so
+    // the reach for the starter credit finds nothing and the 402 the runtime parses comes back.
+    db.prepare("UPDATE wallets SET balance_mc = 0 WHERE address = ?").run(address);
+
+    const res = await chat(request());
+
+    expect(res.status).toBe(402);
+    expect((await res.json() as { error: string }).error).toBe("INSUFFICIENT_CREDITS");
   });
 
   it("never charges more than the balance and records the rest as uncollected_mc", async () => {
@@ -239,7 +302,11 @@ describe("credit coverage under concurrency", () => {
     // runs one after the other in the event loop and the bug stays invisible.
     // 500 mc cover exactly three calls at 160 mc. With 40 concurrent requests the overdraft is
     // thirteen times the credit if coverage is not checked atomically.
-    const { chat, request, balance, inferenceRows, provider } = setupSlow(500);
+    const { db, chat, request, balance, inferenceRows, provider } = setupSlow(500);
+    // 500 mc has to mean 500 mc. A failed reservation now reaches for the starter credit, and with
+    // 15,000 mc behind it all forty calls would pass and the overdraft this test exists to catch
+    // would be invisible.
+    emptyStarterPool(db);
 
     const answers = await Promise.all(Array.from({ length: 40 }, (_, i) => chat(request(i))));
     const codes = answers.map((r) => r.status);

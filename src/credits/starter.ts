@@ -94,3 +94,33 @@ export function claimStarter(db: Db, address: string): { granted_cents: number; 
 
   return { granted_cents: mcToCents(GRANT_MC), pool_left_cents: mcToCents(poolLeftMc(db)) };
 }
+
+/**
+ * The same grant, taken at the moment the agent actually needs it.
+ *
+ * `claimStarter` is reachable only through `POST /v1/credits/starter`, and that is a call a
+ * Conway runtime never makes. It speaks the upstream API and nothing else, so everything this
+ * service invented is invisible to it. The consequence, measured on 2026-09-21: an operator
+ * points a fresh runtime at us, the first thought hits `reserveMc` with a balance of zero and
+ * comes back 402, and the only documented way on is to buy USDC on Base. The free tier existed
+ * and sat behind a door nobody could see.
+ *
+ * So the grant is taken here instead, on the first call that cannot pay for itself. Tying it to
+ * use rather than to provisioning is deliberate: a scanner that signs in and leaves costs the
+ * pool nothing, and only an address that is genuinely trying to think draws from it.
+ *
+ * Silent by design. This runs inside the billing path of a request that asked for inference, not
+ * for credit, so a refusal here is not an error the caller did anything about: it means the
+ * address has had its grant or the pool is empty, and in both cases the 402 that follows is the
+ * right answer. The grant itself is not silent, it is a ledger row of kind `grant` like any
+ * other, and `ops/db-report.cjs` prints what is left of the pool on every run.
+ */
+export function grantOnFirstUse(db: Db, address: string): boolean {
+  try {
+    claimStarter(db, address);
+    return true;
+  } catch (e) {
+    if (e instanceof StarterError) return false;
+    throw e;
+  }
+}

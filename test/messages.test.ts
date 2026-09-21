@@ -12,6 +12,7 @@ import type { Address, Hex } from "viem";
 import { createApp } from "../src/app.js";
 import { openDb, postLedger, type Db } from "../src/db.js";
 import { hashApiKey } from "../src/auth/siwe.js";
+import { claimStarter, poolLeftMc, GRANT_MC } from "../src/credits/starter.js";
 import { MockProvider } from "../src/inference/mock.js";
 import { Catalog } from "../src/inference/proxy.js";
 import type { PayConfig } from "../src/payments/pay.js";
@@ -512,7 +513,11 @@ describe("inference: models, credit, provider", () => {
   });
 
   it("INSUFFICIENT_CREDITS keeps the wording and details and adds the way to more credit", async () => {
-    const { withKey } = setup();
+    const { db, withKey } = setup();
+    // Since 2026-09-21 a first call that cannot pay for itself is covered by the starter credit,
+    // so this answer only exists once the free tier is behind the agent. That is the state it
+    // spends its life in, and the wording is a contract the runtime parses, so it stays pinned.
+    while (poolLeftMc(db) >= GRANT_MC) claimStarter(db, privateKeyToAccount(generatePrivateKey()).address.toLowerCase());
     const res = await withKey("/v1/chat/completions", {
       method: "POST",
       body: JSON.stringify({ model: "gpt-5.2", messages: [{ role: "user", content: "hi" }] }),

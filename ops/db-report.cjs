@@ -94,6 +94,13 @@ report.market = {
   submissions: one("select count(*) n from submissions").n,
   fee_earned_mc: one("select coalesce(sum(delta_mc),0) s from ledger where kind='bounty_fee'").s,
   starter_granted: one("select count(*) n from ledger where kind='grant'").n,
+  // How much of the giveaway went to us. Since 2026-09-21 the grant is taken automatically by the
+  // first call that cannot pay for itself, which is right for a stranger's runtime and quietly
+  // expensive for ours: every throwaway wallet a production check provisions and then makes think
+  // draws 15 cents. The pool is 33 grants wide, so our own tooling can empty the cold-start budget
+  // in an afternoon. Split out rather than filtered away, using the same definition of "ours" as
+  // the numbers below, because the useful reading is not "the pool is shrinking" but "who by".
+  starter_granted_ours: one(`select count(*) n from ledger where kind='grant' and ${oursClause}`, ...OURS_ARGS).n,
   starter_pool_left_mc: 500000 - one("select coalesce(sum(delta_mc),0) s from ledger where kind='grant'").s,
   // THE number. Anything above zero means this stopped being our own demonstration.
   foreign_buyers: one(
