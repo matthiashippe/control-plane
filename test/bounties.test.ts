@@ -230,6 +230,28 @@ describe("cancelling a bounty", () => {
     expect((await a.cancel({ id: "does-not-exist" })).status).toBe(404);
     expect((await a.cancel({})).status).toBe(400);
   });
+
+  it("takes bounty_id as well, because the rest of this resource does", async () => {
+    // POST /v1/submissions and POST /v1/bounties/award both name the field `bounty_id`, and only
+    // cancel called it `id`. A buyer walking the path in docs/bounties.md gets a 400 at exactly
+    // one step while using the name the previous step required. On 2026-09-21 our own
+    // ops/award.ts did precisely that on its first run: a tool written from the same
+    // documentation a buyer reads, failing the same way a buyer would.
+    const { a } = setup();
+    const { id } = (await (await a.postBounty(bounty())).json()) as { id: string };
+    const vorher = a.balance();
+    expect((await a.cancel({ bounty_id: id })).status).toBe(200);
+    expect(a.balance(), "the price comes back exactly as it does through the old spelling")
+      .toBe(vorher + 200 * MC_PER_CENT);
+
+    // And the old spelling still works, because somebody is already calling it that way.
+    const zweite = (await (await a.postBounty(bounty())).json()) as { id: string };
+    expect((await a.cancel({ id: zweite.id })).status).toBe(200);
+
+    // The counter-check: an empty body is still a 400, so this did not turn into "cancel anything".
+    expect((await a.cancel({})).status).toBe(400);
+    expect((await a.cancel({ bounty_id: "" })).status).toBe(400);
+  });
 });
 
 describe("the bounty list", () => {

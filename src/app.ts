@@ -1230,9 +1230,23 @@ export function createApp(opts: AppOptions) {
   app.post("/v1/bounties/cancel", async (c) => {
     releaseExpired(db);
     const raw = await c.req.json().catch(() => null);
-    const id = (raw as { id?: unknown } | null)?.id;
+    // Both spellings, because the other two endpoints on this resource take `bounty_id`.
+    //
+    // `POST /v1/submissions` and `POST /v1/bounties/award` both name the field `bounty_id`, and
+    // only this one called it `id`. A buyer walking the path in docs/bounties.md hits a 400 at
+    // exactly one step while using the name the previous step required. On 2026-09-21 our own
+    // `ops/award.ts` did precisely that on its first run, which is how this was found: a tool
+    // written from the same documentation a buyer reads, failing the same way.
+    //
+    // `id` stays accepted. It is what anybody already calling this sends, and breaking them to
+    // tidy a name would cost more than the inconsistency does.
+    const b = (typeof raw === "object" && raw !== null ? raw : {}) as Record<string, unknown>;
+    const id = typeof b.bounty_id === "string" && b.bounty_id ? b.bounty_id : b.id;
     if (typeof id !== "string" || !id) {
-      return c.json({ error: "id_required", message: 'Send {"id": "<bounty id>"}.', docs: DOC.payments }, 400);
+      return c.json(
+        { error: "id_required", message: 'Send {"bounty_id": "<bounty id>"}. `id` is accepted too.', docs: DOC.payments },
+        400,
+      );
     }
     try {
       return c.json(bountyView(cancelBounty(db, id, c.get("address"))));
