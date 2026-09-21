@@ -160,12 +160,18 @@ function migrate(db: Db): void {
   // protects against. A hard abort would be the worse option here: together with the autoheal
   // service it would turn into a restart loop and the service would be gone for good. So warn
   // loudly and keep running without the index; the check in pay.ts stays.
+  // One starter grant per address, ever, enforced by the database rather than by a check in front
+  // of the insert. Two simultaneous calls would otherwise both pass the check and the service would
+  // give the same wallet its stake twice.
+  //
+  // In its own statement, deliberately: it used to sit in the same try block as the topup index
+  // below, and that index cannot be created on a database that already carries duplicate credits.
+  // A database in exactly the state one bug produces therefore silently lost the defence against
+  // an unrelated one.
+  db.exec("CREATE UNIQUE INDEX IF NOT EXISTS ledger_grant_once ON ledger(address) WHERE kind = 'grant'");
+
   try {
     db.exec("CREATE UNIQUE INDEX IF NOT EXISTS ledger_topup_ref ON ledger(ref) WHERE kind = 'topup' AND ref IS NOT NULL");
-    // One starter grant per address, ever, enforced by the database rather than by a check in
-    // front of the insert. Two simultaneous calls would otherwise both pass the check and the
-    // service would give the same wallet its stake twice.
-    db.exec("CREATE UNIQUE INDEX IF NOT EXISTS ledger_grant_once ON ledger(address) WHERE kind = 'grant'");
   } catch {
     const duplicates = db
       .prepare("SELECT ref, count(*) AS n FROM ledger WHERE kind = 'topup' AND ref IS NOT NULL GROUP BY ref HAVING n > 1")
@@ -244,11 +250,25 @@ export interface LedgerEntry {
 export function postLedger(db: Db, entry: LedgerEntry): { balanceMc: number } {
   const address = entry.address.toLowerCase();
   if (!Number.isInteger(entry.deltaMc)) throw new Error("delta_mc must be an integer");
+  // A charge that does not settle a reservation must not reach into what a call in flight has
+  // already reserved. Without this the buyer path could spend the credit an inference was holding
+  // (`bounty_hold` charges against `balance_mc` alone): the provider call then booked
+  // `min(cost, balance) = 0`, the bounty was cancelled straight afterwards, and the wallet came
+  // out of it whole with an answer the operator had paid a provider for. Repeatable as often as
+  // you like, and the books stayed consistent throughout, which is why no sum caught it.
+  //
+  // The inference booking itself is the opposite case: the money is already spent upstream, so it
+  // settles against its own reservation and against everything else the wallet still holds.
+  // `releaseReservedMc` is what tells the two apart.
+  const againstReserved = entry.deltaMc < 0 && !entry.releaseReservedMc ? 1 : 0;
   const run = db.transaction(() => {
     ensureWallet(db, address);
     const res = db
-      .prepare("UPDATE wallets SET balance_mc = balance_mc + ? WHERE address = ? AND balance_mc + ? >= 0")
-      .run(entry.deltaMc, address, entry.deltaMc);
+      .prepare(
+        "UPDATE wallets SET balance_mc = balance_mc + ? " +
+          "WHERE address = ? AND balance_mc + ? - (CASE WHEN ? = 1 THEN reserved_mc ELSE 0 END) >= 0",
+      )
+      .run(entry.deltaMc, address, entry.deltaMc, againstReserved);
     if (res.changes !== 1) throw new Error("insufficient_balance");
     if (entry.releaseReservedMc) {
       db.prepare("UPDATE wallets SET reserved_mc = max(0, reserved_mc - ?) WHERE address = ?").run(entry.releaseReservedMc, address);

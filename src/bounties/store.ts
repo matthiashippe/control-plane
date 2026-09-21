@@ -19,7 +19,7 @@
 
 import { randomUUID } from "node:crypto";
 import type { Db } from "../db.js";
-import { postLedger, mcToCents } from "../db.js";
+import { postLedger, mcToCents, getAvailableMc } from "../db.js";
 import { grantOnFirstUse, starterAvailableMc } from "../credits/starter.js";
 
 export type BountyKind = "factual" | "creative";
@@ -142,7 +142,10 @@ export function createBounty(db: Db, a: NewBounty): Bounty {
     // Only when it would actually cover the job. A grant spent on a refusal is worse than no
     // grant: the newcomer keeps the refusal and loses the one credit that would have paid for the
     // smaller job they try next.
-    const balanceMc = (db.prepare("SELECT balance_mc FROM wallets WHERE address = ?").get(creator) as { balance_mc: number } | undefined)?.balance_mc ?? 0;
+    // Available, not the raw balance: credit an inference in flight has reserved is not the
+    // buyer's to spend, and `postLedger` refuses a hold that would reach into it. Asking the wrong
+    // number here would hand out the address's one grant and then fail on the retry anyway.
+    const balanceMc = getAvailableMc(db, creator);
     const starterMc = starterAvailableMc(db, creator);
     if (starterMc > 0 && balanceMc + starterMc >= a.priceMc && grantOnFirstUse(db, creator)) {
       run();

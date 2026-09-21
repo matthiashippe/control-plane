@@ -66,10 +66,16 @@ const WITHHELD =
  * what earns a reputation here, and a receipt that hides who did the work proves nothing.
  */
 export function receipts(db: Db, limit = 50): Receipt[] {
+  // `award_mc` comes from the booking, not from the price: the fee only exists when the instance
+  // has an operator address configured, and it did not exist at all before 2026-09-20. Recomputing
+  // it from `price_mc` made the receipt claim a deduction that never happened, on exactly the
+  // public page a reader has no way to check against a balance of their own.
   const rows = db
     .prepare(
-      `SELECT id, kind, brief, price_mc, created_at, closed_at, winner_submission
-         FROM bounties WHERE status = 'awarded' ORDER BY closed_at DESC LIMIT ?`,
+      `SELECT b.id, b.kind, b.brief, b.price_mc, b.created_at, b.closed_at, b.winner_submission,
+              (SELECT sum(l.delta_mc) FROM ledger l
+                WHERE l.kind = 'bounty_award' AND l.ref = 'bounty-award:' || b.id) AS award_mc
+         FROM bounties b WHERE b.status = 'awarded' ORDER BY b.closed_at DESC LIMIT ?`,
     )
     .all(Math.min(Math.max(limit, 1), 100)) as {
     id: string;
@@ -79,20 +85,25 @@ export function receipts(db: Db, limit = 50): Receipt[] {
     created_at: string;
     closed_at: string | null;
     winner_submission: string | null;
+    award_mc: number | null;
   }[];
 
   return rows.map((b) => {
     const subs = db
       .prepare("SELECT id, agent, body, created_at FROM submissions WHERE bounty_id = ? ORDER BY created_at")
       .all(b.id) as { id: string; agent: string; body: string; created_at: string }[];
-    const fee = feeMc(b.price_mc);
+    // No booking to read means a row older than the ledger it should have written, which cannot
+    // happen through any path here; the computed fee is the honest fallback rather than a zero
+    // that would read as "the winner got everything".
+    const award = b.award_mc ?? b.price_mc - feeMc(b.price_mc);
+    const fee = b.price_mc - award;
     return {
       bounty_id: b.id,
       kind: b.kind,
       brief: b.brief,
       price_cents: mcToCents(b.price_mc),
       fee_cents: mcToCents(fee),
-      award_cents: mcToCents(b.price_mc - fee),
+      award_cents: mcToCents(award),
       posted_at: b.created_at,
       awarded_at: b.closed_at,
       competitors: subs.length,
