@@ -130,6 +130,52 @@ const V1_ROUTES = new Set([
 ]);
 
 /**
+ * The answer for somebody who paid and for whom nothing happened since.
+ *
+ * This endpoint exists for that case, and until 2026-09-21 it answered it with a list of one
+ * booking and no words. Meanwhile the only paying stranger this service has had, wallet
+ * `0x0629a685…488e`, has sat at exactly that state for 33 hours: a key named `conway-automaton`
+ * provisioned on 19 September at 17:36, five dollars paid at 18:40, no automaton registered, not a
+ * single inference call ever, and since access logging began at 19:35 that day not one successful
+ * authenticated request from any address that is not ours. Their money is here and their agent is
+ * not.
+ *
+ * What we can honestly say is bounded by what we hold, so this says exactly that and no more: the
+ * balance never moved, whether a registration exists, and the two causes that fit. The second one
+ * is the one nobody writes down: the runtime picks its inference backend from its own config, and
+ * `openai`, `anthropic` and `ollama` all bypass this control plane entirely
+ * (`src/conway/inference.ts` at the pinned revision). An operator who set one of those will watch
+ * this balance sit still forever while their agent thinks perfectly well somewhere else.
+ *
+ * Only for a wallet that has paid and never spent. Everybody else gets their bookings and nothing
+ * added, because an explanation nobody needs is noise in a machine-read answer.
+ */
+function diagnoseIdleCredit(db: Db, address: string): { idle_credit?: Record<string, unknown> } {
+  const topups = (db.prepare("SELECT count(*) AS n FROM ledger WHERE address = ? AND kind = 'topup'").get(address) as { n: number }).n;
+  if (topups === 0) return {};
+  const spent = (db.prepare("SELECT count(*) AS n FROM ledger WHERE address = ? AND kind = 'inference'").get(address) as { n: number }).n;
+  if (spent > 0) return {};
+  const registered = (db.prepare("SELECT count(*) AS n FROM automatons WHERE address = ?").get(address) as { n: number }).n > 0;
+  return {
+    idle_credit: {
+      inference_calls: 0,
+      automaton_registered: registered,
+      message:
+        "You have paid and nothing has been billed against it yet. Two things cause that, and this " +
+        "service can only see the first. " +
+        (registered
+          ? "Your automaton is registered here, so provisioning worked and the runtime reached us at least once. "
+          : "No automaton of yours is registered here, so the runtime never got past POST /v1/automatons/register. ") +
+        "The second cause is invisible from this side: an automaton picks its inference backend " +
+        "from its own configuration, and openai, anthropic and ollama all bypass this control " +
+        "plane, so the balance here will never move however well the agent is thinking. Check " +
+        "which backend your runtime is set to before assuming the credit is stuck.",
+      docs: DOC.inference,
+    },
+  };
+}
+
+/**
  * The public base URL of this request. It makes the `resource` in the payment offer absolute, which
  * an x402 facilitator needs to take the service into its directory.
  *
@@ -703,6 +749,7 @@ export function createApp(opts: AppOptions) {
         if (row.kind === "topup") entry.tx_hash = meta.tx_hash;
         return entry;
       }),
+      ...diagnoseIdleCredit(db, c.get("address")),
     });
   });
 

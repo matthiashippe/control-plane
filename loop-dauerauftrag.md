@@ -97,8 +97,20 @@ ruhiges Fenster (keine `pending`-Zahlung, keine laufende Reservierung) und schal
 
 ## Offene Fäden, die der Loop weiterverfolgt
 
-- Der zahlende Kunde `0x0629a685…488e` hat am 19.09. um 19:07 UTC `POST /v1/sandboxes` versucht und
-  501 bekommen. Solange er nicht denkt, ist das die wichtigste Baustelle.
+- Der zahlende Kunde `0x0629a685…488e`. **Am 21.09. nachgeprüft, der Stand war teilweise falsch.**
+  Aus der Datenbank belegt: Schlüssel `cnwy_k_d716dcbc` mit dem Namen `conway-automaton` am 19.09.
+  um 17:36:17 provisioniert, 5 USD am 18:40:42 aufgeladen, **kein Automaton registriert, nie eine
+  einzige Inferenz**, und seit Beginn des Zugriffslogs am 19.09. um 19:35 kein einziger
+  erfolgreicher Zugriff einer fremden IP auf einen geschützten Pfad. Seine Runtime spricht nicht
+  mit uns.
+  Der bisher hier notierte `POST /v1/sandboxes` um 19:07 lässt sich nicht belegen: das Log beginnt
+  erst um 19:35, und der einzige Sandbox-Aufruf darin kommt von unserer eigenen Leitung per curl.
+  Nicht widerlegt, nur unbelegbar, und darum keine Grundlage mehr für eine Diagnose.
+  Zwei Ursachen passen zum Befund, und nur die erste sehen wir: die Runtime läuft nicht mehr, oder
+  sie denkt über ein anderes Backend. `src/conway/inference.ts` am Pin `d8f8168` wählt zwischen
+  `openai`, `anthropic`, `ollama` und der eigenen `conwayApiUrl`; die ersten drei gehen komplett an
+  uns vorbei, das Guthaben bleibt dann für immer liegen. Seit dem 21.09. sagt
+  `GET /v1/credits/history` genau das, wenn eine Wallet bezahlt und nie etwas verbraucht hat.
 - Die Messgröße des 30-Tage-Tests: fünf zahlende fremde Betreiber bis zum 19.10.2026, ablesbar in
   `/v1/status` (dort zählen nur Wallets mit echter Zahlung). Stand: 1.
 - Der HN-Artikel liegt postfertig in `.scratch/gtm/hn-post.txt`, der Titel ist entschieden, das

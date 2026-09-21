@@ -521,6 +521,60 @@ describe("GET /v1/credits/history", () => {
     expect((await app.request("/v1/credits/history")).status).toBe(401);
   });
 
+  // The case this endpoint was built for, answered in words since 2026-09-21. The only paying
+  // stranger this service has had sat at exactly this state for 33 hours: five dollars in, no
+  // automaton registered, not one inference call, and no request from their runtime since access
+  // logging began. A list of one booking told them nothing about any of it.
+  describe("paid, and nothing has happened since", () => {
+    const history = async (app: ReturnType<typeof createApp>, key: string) =>
+      (await (await app.request("/v1/credits/history", { headers: { authorization: key } })).json()) as {
+        idle_credit?: { inference_calls: number; automaton_registered: boolean; message: string };
+      };
+
+    it("names the missing registration when there is none", async () => {
+      const { db, app, address, key } = withKey();
+      postLedger(db, { address, kind: "topup", deltaMc: 500_000, ref: "tx" });
+
+      const body = await history(app, key);
+
+      expect(body.idle_credit, "the one place a stuck customer looks has to answer them").toBeTruthy();
+      expect(body.idle_credit!.inference_calls).toBe(0);
+      expect(body.idle_credit!.automaton_registered).toBe(false);
+      expect(body.idle_credit!.message).toContain("never got past POST /v1/automatons/register");
+      // The cause this service cannot see, and the one nobody writes down.
+      expect(body.idle_credit!.message).toContain("bypass this control plane");
+    });
+
+    it("says so differently when the runtime did reach us and register", async () => {
+      const { db, app, address, key } = withKey();
+      postLedger(db, { address, kind: "topup", deltaMc: 500_000, ref: "tx" });
+      db.prepare(
+        "INSERT INTO automatons (automaton_id, address, creator_address, name, registered_at) VALUES (?, ?, ?, ?, ?)",
+      ).run("a-1", address, address, "Theirs", new Date().toISOString());
+
+      const body = await history(app, key);
+
+      expect(body.idle_credit!.automaton_registered).toBe(true);
+      expect(body.idle_credit!.message).toContain("provisioning worked");
+      expect(body.idle_credit!.message, "a registration does not explain the silence on its own").toContain("bypass this control plane");
+    });
+
+    it("says nothing at all to somebody whose credit is being spent", async () => {
+      const { db, app, address, key } = withKey();
+      postLedger(db, { address, kind: "topup", deltaMc: 500_000, ref: "tx" });
+      postLedger(db, { address, kind: "inference", deltaMc: -500, ref: "call-1", meta: { model: "m" } });
+
+      const body = await history(app, key);
+
+      expect(body.idle_credit, "an explanation nobody needs is noise in a machine-read answer").toBeUndefined();
+    });
+
+    it("says nothing to somebody who never paid", async () => {
+      const { app, key } = withKey();
+      expect((await history(app, key)).idle_credit).toBeUndefined();
+    });
+  });
+
   it("shows topup and inference with the purchase price and the margin", async () => {
     const { db, address, key, app } = withKey();
     postLedger(db, { address, kind: "topup", deltaMc: 501_000, ref: "0xabc", meta: { tx_hash: "0xdeadbeef" } });
