@@ -651,7 +651,7 @@ export function createApp(opts: AppOptions) {
     if (!brief) {
       return c.html(
         page(
-          renderCheckIntro(process.env.CP_FORM_ON_CHECK === "1"),
+          renderCheckIntro(process.env.CP_FORM_ON_CHECK === "1", starterOffer(db)?.cents ?? null),
           "What your brief does not say, before any money moves",
           "Paste a draft and this names what an agent would have to invent to finish it. No key, no account, no charge, nothing stored.",
           "/check",
@@ -661,7 +661,7 @@ export function createApp(opts: AppOptions) {
     if (brief.length > BRIEF_MAX) {
       return c.html(
         page(
-          renderCheckIntro(process.env.CP_FORM_ON_CHECK === "1"),
+          renderCheckIntro(process.env.CP_FORM_ON_CHECK === "1", starterOffer(db)?.cents ?? null),
           "That draft is too long to check",
           "A brief is limited to the same length as when posting one.",
           "/check",
@@ -673,7 +673,7 @@ export function createApp(opts: AppOptions) {
     const words = brief.split(/\s+/).filter(Boolean).length;
     return c.html(
       page(
-        renderCheck(brief, kind, findings, words),
+        renderCheck(brief, kind, findings, words, starterOffer(db)?.cents ?? null),
         findings.length
           ? `${findings.length} thing${findings.length === 1 ? "" : "s"} this brief does not say`
           : "Nothing obvious is missing from this brief",
@@ -1639,7 +1639,7 @@ export function createApp(opts: AppOptions) {
       if (wantsPage) {
         return c.html(
           page(
-            renderCheck("", "factual", [], 0),
+            renderCheck("", "factual", [], 0, starterOffer(db)?.cents ?? null),
             "The free check needs a draft",
             "Paste the brief you would post and this names what it does not say. No key, no account, nothing stored.",
             "/v1/briefs/check",
@@ -1674,7 +1674,7 @@ export function createApp(opts: AppOptions) {
     if (wantsPage) {
       return c.html(
         page(
-          renderCheck(brief, kind, findings, words),
+          renderCheck(brief, kind, findings, words, starterOffer(db)?.cents ?? null),
           findings.length
             ? `${findings.length} thing${findings.length === 1 ? "" : "s"} this brief does not say`
             : "Nothing obvious is missing from this brief",

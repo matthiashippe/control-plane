@@ -17,6 +17,38 @@
 import { esc } from "./market.js";
 import { reviewBrief } from "../bounties/brief.js";
 
+/**
+ * What comes after the check, said once and said accurately.
+ *
+ * The first version of both pages here ended with "posting it is six steps and the first three
+ * need no money", which is true and leaves out the part that decides it for most readers: step two
+ * wants an Ethereum signature, so a key pair has to exist even though nothing has to be in it.
+ * Somebody who reads "no money", follows the link and finds a signature on the second step was
+ * told the truth and still misled.
+ *
+ * `test/checkpage.test.ts` holds this against the wording on /post, because two pages describing
+ * the same six steps is exactly the shape that drifts.
+ *
+ * It asks `starterOffer` rather than asserting the free first job, like the three surfaces before
+ * it. The pool is thirty-three grants and does not refill; an article that brings a hundred
+ * readers empties it inside an hour, and from that hour on any page that promises it
+ * unconditionally is contradicted by the server in the same second.
+ */
+function nextStep(freeFirstJobCents: number | null): string {
+  const cost =
+    freeFirstJobCents === null
+      ? `The first three take no payment beyond the price you set, and that price has to be on ` +
+        `your balance before the job goes up.`
+      : `The first three cost nothing: the operator's pool pays for a first job of up to ` +
+        `${freeFirstJobCents} cents.`;
+  return (
+    `When a brief says enough, <a href="/post">posting it</a> is six steps. ${cost} They do need a ` +
+    `wallet, in the sense of a key pair on your own machine that signs one message; nothing has to ` +
+    `be in it and this service never sees it. What other people have posted is at ` +
+    `<a href="/jobs">/jobs</a>, no key needed to read them.`
+  );
+}
+
 export interface Finding {
   missing: string;
 }
@@ -26,7 +58,13 @@ export interface Finding {
  * @param kind factual or creative, because the check is stricter on the first
  * @param findings the same objects the JSON answer carries
  */
-export function renderCheck(brief: string, kind: string, findings: Finding[], words: number): string {
+export function renderCheck(
+  brief: string,
+  kind: string,
+  findings: Finding[],
+  words: number,
+  freeFirstJobCents: number | null,
+): string {
   const list = findings.length
     ? `<ul class="found">${findings.map((f) => `<li>${esc(f.missing)}</li>`).join("")}</ul>`
     : "";
@@ -58,8 +96,7 @@ export function renderCheck(brief: string, kind: string, findings: Finding[], wo
   -H 'content-type: application/json' \\
   -d '{"brief":"…","kind":"${esc(kind)}"}'</code></pre>
       <p class="sub">
-        When the brief says enough, <a href="/post">posting it</a> is six steps, and the first
-        three need no money. What other people have posted is at <a href="/jobs">/jobs</a>.
+        ${nextStep(freeFirstJobCents)}
       </p>
     </div>
   </section>`;
@@ -105,7 +142,7 @@ export const EXAMPLES: { label: string; brief: string; kind: "factual" | "creati
  * the check finds three. A number on a page that asks for trust has to come from the thing it
  * describes, which is the same rule the hero panel on the landing page already follows.
  */
-export function renderCheckIntro(formAllowed: boolean): string {
+export function renderCheckIntro(formAllowed: boolean, freeFirstJobCents: number | null): string {
   // Counted now, from the same function the endpoint runs, so the sentence cannot drift from what
   // the links actually answer.
   const found = EXAMPLES.map((e) => reviewBrief(e.brief, e.kind).length);
@@ -146,8 +183,7 @@ export function renderCheckIntro(formAllowed: boolean): string {
   -H 'content-type: application/json' \
   -d '{"brief":"…","kind":"factual"}'</code></pre>
       <p class="sub">
-        When a brief says enough, <a href="/post">posting it</a> is six steps and the first three
-        need no money. What other people have posted is at <a href="/jobs">/jobs</a>.
+        ${nextStep(freeFirstJobCents)}
       </p>
     </div>
   </section>`;

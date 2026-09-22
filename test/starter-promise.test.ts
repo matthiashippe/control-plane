@@ -20,7 +20,10 @@ import { openDb, postLedger } from "../src/db.js";
 import { hashApiKey } from "../src/auth/siwe.js";
 import { claimStarter, poolLeftMc, starterOffer, GRANT_MC, POOL_MC } from "../src/credits/starter.js";
 
-const PAGES = ["/", "/post", "/jobs"];
+// /check joined on 2026-09-22 and is the fourth surface to carry the promise, which is exactly the
+// case the comment above predicts: a new page that does not know about starterOffer. It is listed
+// twice because its intro and its result page are rendered separately and either could drift.
+const PAGES = ["/", "/post", "/jobs", "/check", "/check?brief=FACT%20SHEET%20on%20a%20roof"];
 
 /**
  * A database with one open job, because `/jobs` has two halves.

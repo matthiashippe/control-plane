@@ -222,3 +222,46 @@ describe("The way to the free check from the landing page", () => {
     expect(after, "the curl block needs a door next to it").toContain('href="/check"');
   });
 });
+
+/**
+ * What comes after the check, and the one sentence that says it.
+ *
+ * Both pages here used to end with "the first three need no money", which is true and leaves out
+ * what decides it for most readers: step two on /post wants an Ethereum signature, so a key pair
+ * has to exist even though nothing has to be in it. A reader told "no money" who then finds a
+ * signature on the second step was told the truth and still misled.
+ */
+describe("What the check says comes next", () => {
+  it("names the signature, because /post asks for one on its second step", async () => {
+    const a = app();
+    const post = await (await a.request("/post")).text();
+    expect(post, "step 2 no longer asks for a signature, so this test is measuring the wrong thing")
+      .toMatch(/Ethereum signature/i);
+
+    for (const path of ["/check", `/check?brief=${encodeURIComponent("FACT SHEET on a roof")}`]) {
+      const html = await (await a.request(path)).text();
+      expect(html, `${path} should say what step two wants`).toMatch(/key pair/i);
+      expect(html, `${path} should not promise money is the only cost`).not.toMatch(
+        /first three need no money/i,
+      );
+    }
+  });
+
+  it("says the same thing on the intro and on a result, not two versions of it", async () => {
+    const a = app();
+    const intro = await (await a.request("/check")).text();
+    const result = await (await a.request(`/check?brief=${encodeURIComponent("FACT SHEET on a roof")}`)).text();
+    const sentence = /When a brief says enough[\s\S]{0,400}?no key needed to\s+read them\./;
+    expect(intro.match(sentence), "the intro lost the sentence").toBeTruthy();
+    expect(result.match(sentence), "the result page lost the sentence").toBeTruthy();
+  });
+
+  it("keeps the claim that the first job is paid from the pool true", async () => {
+    // The sentence says the operator's pool pays for the first job. If the pool is dry that is a
+    // promise the server refuses in the same second, which is the one kind of untruth this project
+    // cannot afford. starterOffer() is the single place allowed to make it.
+    const { starterOffer } = await import("../src/credits/starter.js");
+    const db = openDb(":memory:");
+    expect(starterOffer(db), "the pool is empty in a fresh database, which it should not be").not.toBeNull();
+  });
+});
