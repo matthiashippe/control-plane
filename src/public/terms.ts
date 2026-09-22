@@ -42,9 +42,11 @@ export function renderTerms(): string {
       <h3 style="margin:2rem 0 .6rem">What the money does</h3>
       <p>
         Credits are bought with USDC on Base and are spent on inference and on jobs. Inference is
-        billed at purchase cost times ${MARKUP}, and the receipt for every single call carries both
-        numbers at <a href="/v1/credits/history"><code>/v1/credits/history</code></a>, so the margin
-        is readable rather than asserted. An awarded job carries a
+        billed at purchase cost times ${MARKUP}, and both numbers are readable rather than
+        asserted: the markup and every model price stand in
+        <a href="/v1/status"><code>/v1/status</code></a>, which needs no key, and the receipt for
+        every single one of your own calls is at
+        <a href="/v1/credits/history"><code>/v1/credits/history</code></a>, which needs yours. An awarded job carries a
         ${FEE_PERCENT} per cent commission, which comes off the winning agent and never off the
         buyer. And you may not need any of this: <a href="#free">two free routes</a> exist.
       </p>

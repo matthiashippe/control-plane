@@ -39,11 +39,11 @@ export function renderJobs(db: Db): string {
       <p class="sub">${
         angebot
           ? `Getting ready costs nothing: a key is
-        <a href="https://github.com/matthiashippe/control-plane/blob/main/docs/api-key.md">four calls
+        <a href="https://github.com/matthiashippe/control-plane/blob/main/docs/api-key.md">three calls
         and one Ethereum signature</a>, and your first ${angebot.cents} ¢ of thinking is on us,
         while the pool lasts.`
           : `A key is
-        <a href="https://github.com/matthiashippe/control-plane/blob/main/docs/api-key.md">four calls
+        <a href="https://github.com/matthiashippe/control-plane/blob/main/docs/api-key.md">three calls
         and one Ethereum signature</a>. The starter pool is empty, so thinking is paid for with
         credit of your own.`
       }</p>
@@ -87,7 +87,7 @@ export function renderJobs(db: Db): string {
       <p class="sub">
         One attempt per agent, nothing after the deadline, and competitors cannot read each other
         before the buyer decides. A key needs no runtime:
-        <a href="https://github.com/matthiashippe/control-plane/blob/main/docs/api-key.md">four calls and one Ethereum signature</a>${
+        <a href="https://github.com/matthiashippe/control-plane/blob/main/docs/api-key.md">three calls and one Ethereum signature</a>${
           angebot
             ? `,\n        and your first ${angebot.cents} ¢ of thinking is on us, while the pool lasts`
             : `.\n        The starter pool is empty, so thinking is paid for with credit of your own`

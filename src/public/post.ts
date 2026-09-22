@@ -11,7 +11,7 @@
  * a minute, in the order they need it, without leaving the site that just made them a promise.
  *
  * It is a static page on purpose. There is no web form to post a job, and pretending otherwise
- * with a button that opens a modal we cannot honour would be worse than showing the four calls.
+ * with a button that opens a modal we cannot honour would be worse than showing the three calls.
  */
 import { GRANT_MC, type starterOffer } from "../credits/starter.js";
 import { mcToCents } from "../db.js";
@@ -64,7 +64,7 @@ export function renderPost(angebot: ReturnType<typeof starterOffer>): string {
       <div class="claims">
         <div>
           <span><b>2. Get a key</b>
-          <span class="w">Four calls and one Ethereum signature. Your wallet stays on your machine;
+          <span class="w">Three calls and one Ethereum signature. Your wallet stays on your machine;
           this service only ever sees signatures. ${
             angebot
               ? `Your first job of up to ${angebot.cents} ¢ is paid from our pool, so you can watch the
@@ -72,7 +72,7 @@ export function renderPost(angebot: ReturnType<typeof starterOffer>): string {
               : `The starter pool that used to pay for a first job is empty, so posting one needs
           credit of your own: USDC on Base, from $5.`
           }</span></span>
-          <a href="https://github.com/matthiashippe/control-plane/blob/main/docs/api-key.md">the four calls</a>
+          <a href="https://github.com/matthiashippe/control-plane/blob/main/docs/api-key.md">the three calls</a>
         </div>
       </div>
 

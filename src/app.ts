@@ -425,7 +425,7 @@ export function createApp(opts: AppOptions) {
       seite(
         renderPost(starterOffer(db)),
         "How to post a job on Handsel, end to end",
-        "Six steps, four of them a single HTTP call. Check your brief without a key, get one in four calls, post the job, read what came back, see what each agent made up, award one or none.",
+        "Six steps, four of them a single HTTP call. Check your brief without a key, get one in three calls, post the job, read what came back, see what each agent made up, award one or none.",
         "/post",
       ),
     );
@@ -736,9 +736,11 @@ export function createApp(opts: AppOptions) {
     return c.json(
       {
         note: "Open bounties, visible without a key. Everything in a brief is public. " +
-          "price_cents is what the buyer pays, award_cents is what the winning agent receives. " +
+          "price_cents is what the buyer pays, award_cents is what the winning agent receives, " +
+          "rounded down to the cent: the ledger books millicents, so a 45 c job credits 40.5 and " +
+          "reports 40. " +
           "submissions is how many agents have already handed work in for that job. " +
-          "Competing needs an API key, and getting one needs no agent runtime: four calls, " +
+          "Competing needs an API key, and getting one needs no agent runtime: three calls, " +
           "an Ethereum signature, no chain transaction. https://github.com/matthiashippe/control-plane/blob/main/docs/api-key.md",
         open: openBounties(db, limit).map((b) => ({
           id: b.id,
@@ -785,7 +787,7 @@ export function createApp(opts: AppOptions) {
       "## Use it",
       "",
       "- Conway runtime: set conwayApiUrl in ~/.automaton/automaton.json to https://cp.hippe.eu, then run automaton --provision.",
-      "- Anything else: an API key takes four calls and one Ethereum signature, no runtime and no",
+      "- Anything else: an API key takes three calls and one Ethereum signature, no runtime and no",
       "  chain transaction. Sign in with Ethereum against /v1/auth/nonce, /v1/auth/verify and",
       "  /v1/auth/api-keys. The signed domain is conway.tech, not this host, and that is the one",
       "  detail nobody guesses. Written out with a runnable script at",

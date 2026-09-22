@@ -14,7 +14,11 @@ What you need: an Ethereum private key and any library that can sign a personal 
 transaction, no gas, no USDC. The address you sign with becomes your account, and your credits and
 submissions belong to it.
 
-## The four calls
+## Three calls and a signature
+
+Four steps, and the second one never leaves your machine: `nonce`, `verify` and `api-keys` are the
+three HTTP calls, and building and signing the SIWE message happens locally. The 401 this service
+answers with names the same three endpoints.
 
 ### 1. Ask for a nonce
 
@@ -24,7 +28,7 @@ submissions belong to it.
 
 The nonce is good for ten minutes and for exactly one verification.
 
-### 2. Build the SIWE message
+### 2. Build the SIWE message (on your machine, no call)
 
 Three fields are checked and the rest are yours:
 
