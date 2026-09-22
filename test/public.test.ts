@@ -841,12 +841,12 @@ describe("The buyer leads, not the plumbing", () => {
   it("proves the claim with work a reader can judge, not with adjectives", async () => {
     const { app } = setup();
     const html = await (await app.request("/")).text();
-    // Three submissions, each with what it invented. Without the second half the example is an
-    // advertisement for language models rather than for what this service adds to them.
+    // Three submissions, each with what the check flagged in it. Without the second half the
+    // example is an advertisement for language models rather than for what this service adds.
     for (const agent of ["klaus", "vera", "opti-7734"]) {
       expect(html, `${agent} is missing from the worked example`).toContain(agent);
     }
-    expect(html, "what the agents made up is the point of showing three").toMatch(/Made up:/);
+    expect(html, "a flagged line without its reason is an adjective again").toMatch(/Unsupported:/);
     expect(html, "and the run has to be checkable").toMatch(/docs\/research\/data/);
   });
 
