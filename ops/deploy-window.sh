@@ -60,7 +60,7 @@ if ! timeout 45 "${SSH[@]}" -o ServerAliveInterval=5 "$HOST" \
 fi
 
 python3 - "$started" "$LEAD_SECONDS" "$TAIL_SECONDS" "$OWN" "$log" <<'PY'
-import datetime, json, sys
+import datetime, json, os, sys
 
 started_iso, lead, tail, own_raw, path = sys.argv[1:6]
 # Docker prints nanoseconds; fromisoformat takes at most microseconds.
@@ -98,14 +98,35 @@ print(f"deploy   {started:%Y-%m-%d %H:%M:%S} UTC, taken from the container start
 print(f"window   {since:%H:%M:%S} to {until:%H:%M:%S} UTC, {lead} s before and {tail} s after")
 print(f"ours     {ours} request(s), the smoke test and the checks")
 
-# The log ends before the window does when this runs right after the rollout. Saying "nobody was
-# affected" then is a statement about a window that is still filling.
-if newest is not None and newest < until:
-    missing = int((until - newest).total_seconds())
-    print(f"PARTIAL  the log ends {missing} s before the window does ({newest:%H:%M:%S} UTC).")
-    print(f"         Run it again after {until:%H:%M:%S} UTC. Until then this is an interim")
-    print("         result and not an answer. The log itself is not behind: a request shows up")
-    print("         in it within a second, measured on 2026-09-21.")
+# A window that has not finished yet is an interim result, and saying "nobody was affected" about
+# it is a statement about time that has not passed.
+#
+# What decides that is the clock, not the last line in the log. The first version asked whether the
+# newest log entry was older than the end of the window, and on a service where nobody comes that
+# is true forever: at 18:48 UTC on 2026-09-22, three minutes after a window that ended at 18:47:55,
+# it still printed PARTIAL and told the reader to run it again later. There was nothing to wait
+# for. The last request had been at 18:46:24 because that was the last request, not because the
+# log was behind, and the script says so itself two lines further down.
+#
+# So the test is now `now < until`, and the newest entry is only reported as context. Set
+# CP_FENSTER_JETZT to an ISO timestamp to move the clock and check both directions.
+now_raw = os.environ.get("CP_FENSTER_JETZT", "")
+now = (
+    datetime.datetime.fromisoformat(now_raw).replace(tzinfo=datetime.timezone.utc)
+    if now_raw
+    else datetime.datetime.now(datetime.timezone.utc)
+)
+if now < until:
+    missing = int((until - now).total_seconds())
+    print(f"PARTIAL  the window has {missing} s left to run, it ends at {until:%H:%M:%S} UTC.")
+    if newest is not None:
+        print(f"         The log currently reaches to {newest:%H:%M:%S} UTC.")
+    print("         This is an interim result and not an answer. The log itself is not behind:")
+    print("         a request shows up in it within a second, measured on 2026-09-21.")
+elif newest is not None and newest < until:
+    quiet = int((until - newest).total_seconds())
+    print(f"COMPLETE the window is over. Nothing was logged in its last {quiet} s, which on this")
+    print(f"         service means nobody came, not that the log lags behind ({newest:%H:%M:%S} UTC).")
 
 if strangers == 0:
     print("MEASURED NOTHING  no request from outside in the window.")
