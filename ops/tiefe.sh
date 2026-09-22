@@ -17,6 +17,14 @@
 #   ops/tiefe.sh          last 24 hours
 #   ops/tiefe.sh 72       last 72 hours
 #
+# Both directions, against two planted logs that ship with this script:
+#
+#   CP_TIEFE_LOG=ops/fixtures/tiefe-reader-and-renderer.log ops/tiefe.sh 24
+#       one reader whose four pixels are spread over forty seconds and one renderer whose four
+#       arrive inside a fifth of a second. Must count the reader and print "not a reader: 1".
+#   CP_TIEFE_LOG=ops/fixtures/tiefe-renderers-only.log ops/tiefe.sh 24
+#       two renderers, one of which stops after three pixels. Must print WORTHLESS and no table.
+#
 # `/px/top.png` is the control. It sits in the first screen and is lazy like the rest, so a browser
 # that just fetches every lazy image at once fires it together with the others. When top and close
 # arrive within a second of each other for everybody, this says the signal is worthless rather than
@@ -173,11 +181,34 @@ if not seiten:
     raise SystemExit(0)
 
 # The control first: without it none of the rest means anything.
-zusammen = 0
-for ip, laden in seiten.items():
-    oben, unten = pixel[ip].get("top"), pixel[ip].get("close")
-    if oben and unten and abs((min(unten) - min(oben)).total_seconds()) < 1.0:
-        zusammen += 1
+#
+# An address whose top and bottom pixel arrive within a second of each other did not scroll. That
+# is a renderer with a viewport tall enough to hold the whole page, so every lazy image fires at
+# load. It is not a reader and it must not sit in the numerator of "reached the last screen".
+#
+# The threshold is measured, not chosen. The Swiss visitor on 2026-09-22 fetched top at 18:03:49
+# and proof at 18:04:11, twenty-two seconds apart, which is what scrolling a long page looks like.
+# Three addresses out of Google Cloud that afternoon (34.116.225.162, .146.142, .210.128, all with
+# an iPhone user agent) fetched all four inside a single second.
+#
+# Until this run the check existed but only fired when EVERY address did it, so a window with two
+# renderers and one human printed "the last screen 2 of 3, 67%" and read like two thirds of
+# visitors finishing the page. Off by the entire finding.
+SOFORT_SEKUNDEN = 1.0
+SOFORT_MARKEN = 3
+def holte_alles_auf_einmal(ip):
+    # Across every mark, not only top and close. A renderer that stops before the last pixel would
+    # otherwise pass as a reader who got three quarters of the way down, which is the same error
+    # one notch quieter. Three marks inside a second is the test: two can be a fast scroll over
+    # marks that sit close together, three cannot.
+    zeiten = [min(v) for v in pixel[ip].values() if v]
+    if len(zeiten) < SOFORT_MARKEN:
+        return False
+    return (max(zeiten) - min(zeiten)).total_seconds() < SOFORT_SEKUNDEN
+
+renderer = {ip for ip in seiten if holte_alles_auf_einmal(ip)}
+zusammen = len(renderer)
+leser = {ip: laden for ip, laden in seiten.items() if ip not in renderer}
 mit_top = sum(1 for ip in seiten if pixel[ip].get("top"))
 
 ladungen = sum(len(v) for v in seiten.values())
@@ -198,18 +229,21 @@ if mit_top == 0:
     print("                 nobody was here rather than that lazy loading is off. A browser that")
     print("                 already has the icon cached would show up in neither, so check with")
     print("                 a fresh one before reading anything below.")
-elif zusammen and zusammen == mit_top:
-    print()
-    print(f"  WORTHLESS: for all {zusammen} of them the top and bottom pixels arrived within a")
-    print("             second of each other, which is a browser fetching every lazy image at once")
-    print("             and not a reader scrolling. The numbers below mean nothing today.")
+elif zusammen:
+    print(f"  not a reader, fetched every pixel at once: {zusammen}")
 if mit_top == 0:
+    raise SystemExit(0)
+if zusammen and not leser:
+    print()
+    print(f"  WORTHLESS: all {zusammen} of them fetched three or more pixels inside one second,")
+    print("             which is a renderer taking every lazy image at load and not a reader")
+    print("             scrolling. Nothing here is a scroll, so there is no table.")
     raise SystemExit(0)
 print()
 for marke in MARKEN:
-    wer = [ip for ip in seiten if pixel[ip].get(marke)]
-    anteil = f"{len(wer) / len(seiten) * 100:.0f}%" if seiten else "-"
-    print(f"  {WAS[marke]:<28} {len(wer):>3} of {len(seiten)}  {anteil}")
+    wer = [ip for ip in leser if pixel[ip].get(marke)]
+    anteil = f"{len(wer) / len(leser) * 100:.0f}%" if leser else "-"
+    print(f"  {WAS[marke]:<28} {len(wer):>3} of {len(leser)}  {anteil}")
 print()
 print("  A lazy image is fetched when it comes near the viewport, which is close to being read and")
 print("  is not the same thing. This is a floor for attention, never a proof of it.")
