@@ -25,15 +25,14 @@ TAIL_SECONDS="${1:-180}"
 LEAD_SECONDS=60
 KEY="${CP_SSH_KEY:-$HOME/.ssh/id_ed25519_automaton}"
 HOST="${CP_HOST:-root@76.13.144.207}"
-OWN="${CP_OWN_IPS:-82.194.125.90 76.13.144.207 35.242.237.124}"
+source "$(dirname "$0")/eigene-ips.sh"
+OWN=$(eigene_ips)
 SSH=(ssh -i "$KEY" -o BatchMode=yes -o ConnectTimeout=10)
 
-# Plus the address this machine goes out through right now, asked of the VM rather than assumed.
-# The constant above went stale on 2026-09-22 when the line reconnected, and in this script that
-# would have counted our own post-deploy checks as strangers inside the window: the one number the
+# `eigene_ips` asks the VM which address this machine goes out through right now and keeps every
+# one it has ever seen. A constant alone went stale on 2026-09-22 when the line reconnected, and
+# here that counts our own post-deploy checks as strangers inside the window: the one number this
 # script exists to produce, wrong in the direction that looks like traffic.
-lebend=$(timeout 15 "${SSH[@]}" "$HOST" 'echo "$SSH_CLIENT"' 2>/dev/null | awk '{print $1}' || true)
-[[ -n "$lebend" ]] && OWN="$OWN $lebend"
 
 started=$("${SSH[@]}" "$HOST" 'docker inspect deploy-cp-1 --format "{{.State.StartedAt}}"' 2>/dev/null || true)
 if [[ -z "$started" ]]; then

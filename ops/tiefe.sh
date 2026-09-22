@@ -35,17 +35,27 @@ SEIT_UTC="${CP_PIXEL_SEIT:-2026-09-22T10:07:23Z}"
 HOURS="${1:-24}"
 KEY="${CP_SSH_KEY:-$HOME/.ssh/id_ed25519_automaton}"
 HOST="${CP_HOST:-root@76.13.144.207}"
-OWN="${CP_OWN_IPS:-82.194.125.90 76.13.144.207 35.242.237.124}"
-lebend=$(timeout 15 ssh -i "$KEY" -o BatchMode=yes -o ConnectTimeout=8 "$HOST" 'echo "$SSH_CLIENT"' 2>/dev/null | awk '{print $1}' || true)
-[[ -n "$lebend" ]] && OWN="$OWN $lebend"
+# Not built here: this line and the two traffic scripts got it wrong the same way, so it lives in
+# one place now and keeps a written history of every address this machine has had.
+source "$(dirname "$0")/eigene-ips.sh"
+OWN=$(eigene_ips)
 
+# A log from a file instead of from the VM, so the counting can be shown to work rather than
+# assumed to. A filter that throws everything away prints exactly what an empty log prints, and on
+# 2026-09-22 this script had to be proved in both directions: the real log says nobody, and a
+# planted browser reader in a file has to come out the other end as one.
 log=$(mktemp); trap 'rm -f "$log"' EXIT
+if [[ -n "${CP_TIEFE_LOG:-}" ]]; then
+  cp "${CP_TIEFE_LOG}" "$log"
+  echo "(log from ${CP_TIEFE_LOG}, not from the VM)" >&2
+else
 # gzip on the far side: the log is 20 MB and plain cat runs into the timeout. See ops/verkehr.sh.
 if ! timeout 45 ssh -i "$KEY" -o BatchMode=yes -o ConnectTimeout=10 -o ServerAliveInterval=5 "$HOST" \
   'docker exec deploy-caddy-1 cat /var/log/caddy/access.log | gzip -c' 2>/dev/null | gunzip > "$log"; then
   echo "COULD NOT TELL: the access log was not readable in 45 seconds." >&2
   echo "        A hiccup on the ssh connection, not a finding about the page. Run it again." >&2
   exit 2
+fi
 fi
 
 python3 - "$HOURS" "$OWN" "$log" "$SEIT_UTC" <<'PY'
@@ -76,6 +86,7 @@ WAS = {
 # Per address: when the page was loaded, and when each pixel came back.
 seiten = collections.defaultdict(list)
 pixel = collections.defaultdict(lambda: collections.defaultdict(list))
+nicht_browser = collections.Counter()
 frueheste_px = None
 for roh in open(path):
     roh = roh.strip()
@@ -90,7 +101,19 @@ for roh in open(path):
     ip = r.get("remote_ip")
     if ip in own or z.get("status") != 200:
         continue
+    # A depth measurement needs a browser: lazy loading is what makes a pixel mean anything, and
+    # curl, wget and our own checker fetch what they are told to and nothing else. On 2026-09-22
+    # this script counted a `curl -o /dev/null` verification of the pixel route, run by me one
+    # second after the deploy, as a reader who had seen the first screen. Anything that does not
+    # claim to be a browser cannot produce a scroll event, so it is not in the numerator and not
+    # in the denominator either.
     uri = (r.get("uri") or "").split("?")[0]
+    if uri != "/" and not (uri.startswith("/px/") and uri.endswith(".png")):
+        continue
+    ua = (r.get("headers", {}).get("User-Agent") or [""])[0]
+    if "Mozilla/" not in ua:
+        nicht_browser[ua.split()[0] if ua else "(none)"] += 1
+        continue
     if uri.startswith("/px/") and uri.endswith(".png"):
         if frueheste_px is None or at < frueheste_px:
             frueheste_px = at
@@ -113,7 +136,11 @@ if frueheste is not None and frueheste < live:
 print(f"How far down the landing page people got, last {hours} hours")
 print(f"  counting page loads from {seit:%Y-%m-%d %H:%M} UTC, when the pixels went live")
 print()
+if nicht_browser:
+    wer = ", ".join(f"{k} {n}x" for k, n in nicht_browser.most_common(4))
+    print(f"  not counted, no browser: {wer}")
 if not seiten:
+    print()
     print("  Nobody from outside loaded the page in this window. Nothing to say about depth.")
     raise SystemExit(0)
 
@@ -125,7 +152,8 @@ for ip, laden in seiten.items():
         zusammen += 1
 mit_top = sum(1 for ip in seiten if pixel[ip].get("top"))
 
-print(f"  page loads from outside: {len(seiten)} by {len(seiten)} address(es)")
+ladungen = sum(len(v) for v in seiten.values())
+print(f"  page loads from outside: {ladungen} by {len(seiten)} address(es)")
 print(f"  fetched the control pixel: {mit_top}")
 if mit_top == 0:
     print()
