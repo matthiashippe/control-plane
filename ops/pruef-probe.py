@@ -4,7 +4,7 @@
 In cycle 48 the finding kind `rechenfehler` was added without a single piece of evidence that it
 ever fires. A checker nobody checks is the same thing as a test that stays green without its fix.
 
-This sample runs ops/erfindungspruefung.py against submissions with known ground truth: one clean
+This sample runs ops/invention-check.py against submissions with known ground truth: one clean
 one that must produce no finding, and one with a planted error of each kind. The clean one is the
 more important half, because a checker that reports everything is worthless as a quality gate, and
 that is exactly where the check on marketing copy failed.

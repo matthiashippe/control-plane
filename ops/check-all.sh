@@ -112,12 +112,12 @@ run "health from outside" bash -c "code=\$(curl -s -o /dev/null -m 10 -w '%{http
 run --undetermined-on 2 "conway still broken" ./ops/conway-zustand.sh
 
 run "market guards" env CP_URL="$BASE" pnpm -s tsx harness/e2e/markt.ts
-run "journeys match the service" ./ops/journeys-pruefen.sh
-run "pages say nothing obviously wrong" ./ops/seiten-pruefen.sh
+run "journeys match the service" ./ops/check-journeys.sh
+run "pages say nothing obviously wrong" ./ops/check-pages.sh
 # Added 2026-09-21. The three series below were printed by this script and never checked, so a cron
 # entry that stops firing would leave the same last point in every cycle's output and this script
 # would keep saying ALL CHECKS OK next to it.
-run "every class on every page has a rule" ./ops/klassen-pruefen.py
+run "every class on every page has a rule" ./ops/check-classes.py
 run "the daily jobs still ran" ./ops/freshness.sh
 
 # What we say about somebody else's code, held against their code.
@@ -132,25 +132,25 @@ run "the daily jobs still ran" ./ops/freshness.sh
 # sign-up, for the same reason.
 run --undetermined-on 2 "our claims about the runtime hold" python3 ./ops/upstream-claims.py
 
-# Every published dataset against the CSV beside it. See ops/daten-pruefen.py: the file that
+# Every published dataset against the CSV beside it. See ops/check-data.py: the file that
 # carried the article's numbers was built by hand, survived the correction of its own source, and
 # the README two sections down described the discrepancy while recommending the file.
-run --undetermined-on 2 "the published data reproduces" ./ops/daten-pruefen.py
+run --undetermined-on 2 "the published data reproduces" ./ops/check-data.py
 
 # Whether anything that indexes the web has ever looked at this service, and whether our side of
 # that is in order. The first crawler is news; until then the line is the finding. See
-# ops/sichtbarkeit.sh: in the first 2.6 days there was not one, and nothing on our side is wrong.
-run --undetermined-on 2 "search engines can find us" ./ops/sichtbarkeit.sh
+# ops/visibility.sh: in the first 2.6 days there was not one, and nothing on our side is wrong.
+run --undetermined-on 2 "search engines can find us" ./ops/visibility.sh
 
 # Every command a page shows, run against the live service. The unit tests prove a page agrees
 # with the code in this checkout; this asks whether it agrees with what is deployed, and whether
 # the answer the hero prints beside its call is the answer the service gives. See
-# ops/befehle-pruefen.sh.
-run --undetermined-on 2 "the commands the pages show work" ./ops/befehle-pruefen.sh
+# ops/check-commands.sh.
+run --undetermined-on 2 "the commands the pages show work" ./ops/check-commands.sh
 
 # Can somebody who has not read the source get in? Three faults on 2026-09-22 said no, and all
 # three were invisible from in here: every answer involved was correct and none was any use.
-run "the way in is walkable" ./ops/fremder-client.sh
+run "the way in is walkable" ./ops/stranger-client.sh
 
 if (( DEEP )); then
   run "MCP route end to end" env CP_URL="$BASE" OPERATOR_WALLET="${OPERATOR_WALLET:-harness/state/mainnet-wallet.json}" pnpm -s tsx ops/mcp-against-production.ts \
@@ -161,7 +161,7 @@ fi
 
 # How old the proof of the cold start is, and how much has changed since.
 #
-# `ops/neuling-probe.ts` is the only thing that walks the whole promise on the landing page, from a
+# `ops/newcomer-probe.ts` is the only thing that walks the whole promise on the landing page, from a
 # wallet that did not exist to a thought paid for by the grant. It costs a grant, so it is not run
 # every cycle, which means its result quietly ages. On 2026-09-22 its last run was fifteen hours,
 # 96 commits and twelve deploys behind, and the deploys in between had changed exactly the
@@ -178,8 +178,8 @@ age_of_the_proof() {
   commits_since=$(git log --oneline "$commit..HEAD" 2>/dev/null | wc -l | tr -d ' ')
   echo "$label last proven ${age}h ago at ${commit}, ${commits_since:-?} commit(s) ago ($how)"
 }
-age_of_the_proof kaltstart "cold start" "ops/neuling-probe.ts, costs a grant"
-age_of_the_proof sicherung "backup restore" "ops/sicherung-probe.sh, costs nothing"
+age_of_the_proof kaltstart "cold start" "ops/newcomer-probe.ts, costs a grant"
+age_of_the_proof sicherung "backup restore" "ops/backup-probe.sh, costs nothing"
 
 echo
 # The one number the plan hangs on, printed last so it is the thing left on the screen.
@@ -267,7 +267,7 @@ fi
 echo
 # The two daily series, read into the cycle instead of sitting in a log file.
 #
-# `ops/x402-zeitreihe.sh` and `ops/conway-zeitreihe.sh` both run by cron on the VM and both print
+# `ops/x402-series.sh` and `ops/conway-series.sh` both run by cron on the VM and both print
 # what moved since the previous point. Until 2026-09-21 that printing went to
 # /var/log/cp-x402.log and /var/log/cp-conway.log, which no cycle opened. Each script carries the
 # sentence that a series nobody reads is a file, and then wrote into one. So the last point of each

@@ -10,7 +10,7 @@
 # catch and embarrassing to ship: a placeholder that never got replaced, a template that leaked as
 # text, a number rendered as `undefined`, a plural that does not agree with the one in front of it.
 #
-#   ops/seiten-pruefen.sh [base]
+#   ops/check-pages.sh [base]
 set -uo pipefail
 BASE="${1:-${CP_URL:-https://cp.hippe.eu}}"
 failures=0

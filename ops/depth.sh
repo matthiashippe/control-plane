@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # How far down the landing page do people actually get?
 #
-# `ops/verkehr.sh` has reported "0 of N who opened the page went on to a second one" for days, with
+# `ops/traffic.sh` has reported "0 of N who opened the page went on to a second one" for days, with
 # the honest footnote that anchor links leave no log line. Since the rebuild the only in-page
 # navigation is anchors, so that number cannot tell a reader who went through the whole page and
 # left from somebody who bounced at the fold, and those two call for opposite work.
@@ -14,15 +14,15 @@
 # Exit 1: browsers were here and the mechanism did not fire. That is a finding about this repo.
 # Exit 2: could not tell (log unreadable, or a constant that contradicts itself).
 #
-#   ops/tiefe.sh          last 24 hours
-#   ops/tiefe.sh 72       last 72 hours
+#   ops/depth.sh          last 24 hours
+#   ops/depth.sh 72       last 72 hours
 #
 # Both directions, against two planted logs that ship with this script:
 #
-#   CP_TIEFE_LOG=ops/fixtures/tiefe-reader-and-renderer.log ops/tiefe.sh 24
+#   CP_DEPTH_LOG=ops/fixtures/depth-reader-and-renderer.log ops/depth.sh 24
 #       one reader whose four pixels are spread over forty seconds and one renderer whose four
 #       arrive inside a fifth of a second. Must count the reader and print "not a reader: 1".
-#   CP_TIEFE_LOG=ops/fixtures/tiefe-renderers-only.log ops/tiefe.sh 24
+#   CP_DEPTH_LOG=ops/fixtures/depth-renderers-only.log ops/depth.sh 24
 #       two renderers, one of which stops after three pixels. Must print WORTHLESS and no table.
 #
 # `/px/top.png` is the control. It sits in the first screen and is lazy like the rest, so a browser
@@ -42,14 +42,14 @@ set -euo pipefail
 # hours and forty minutes ahead, so the script would have discarded every real reader in silence
 # until the clock caught up. `ops/deploy-window.sh` exists because of the same trap; the lesson
 # there was to take the time from the machine, and this took it from my head.
-SINCE_UTC="${CP_PIXEL_SEIT:-2026-09-22T10:07:23Z}"
+SINCE_UTC="${CP_PIXELS_SINCE:-2026-09-22T10:07:23Z}"
 
 HOURS="${1:-24}"
 KEY="${CP_SSH_KEY:-$HOME/.ssh/id_ed25519_automaton}"
 HOST="${CP_HOST:-root@76.13.144.207}"
 # Not built here: this line and the two traffic scripts got it wrong the same way, so it lives in
 # one place now and keeps a written history of every address this machine has had.
-source "$(dirname "$0")/eigene-ips.sh"
+source "$(dirname "$0")/own-ips.sh"
 OWN=$(eigene_ips)
 
 # A log from a file instead of from the VM, so the counting can be shown to work rather than
@@ -57,11 +57,11 @@ OWN=$(eigene_ips)
 # 2026-09-22 this script had to be proved in both directions: the real log says nobody, and a
 # planted browser reader in a file has to come out the other end as one.
 log=$(mktemp); trap 'rm -f "$log"' EXIT
-if [[ -n "${CP_TIEFE_LOG:-}" ]]; then
-  cp "${CP_TIEFE_LOG}" "$log"
-  echo "(log from ${CP_TIEFE_LOG}, not from the VM)" >&2
+if [[ -n "${CP_DEPTH_LOG:-}" ]]; then
+  cp "${CP_DEPTH_LOG}" "$log"
+  echo "(log from ${CP_DEPTH_LOG}, not from the VM)" >&2
 else
-# gzip on the far side: the log is 20 MB and plain cat runs into the timeout. See ops/verkehr.sh.
+# gzip on the far side: the log is 20 MB and plain cat runs into the timeout. See ops/traffic.sh.
 if ! timeout 45 ssh -i "$KEY" -o BatchMode=yes -o ConnectTimeout=10 -o ServerAliveInterval=5 "$HOST" \
   'docker exec deploy-caddy-1 cat /var/log/caddy/access.log | gzip -c' 2>/dev/null | gunzip > "$log"; then
   echo "COULD NOT TELL: the access log was not readable in 45 seconds." >&2

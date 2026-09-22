@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Check every issue answer against what we measure, before any of it goes out.
 
-`ops/vor-dem-artikel.py` does this for the article. The issue answers had nothing, and they carry
+`ops/before-the-article.py` does this for the article. The issue answers had nothing, and they carry
 the same kind of claim about somebody else's repository: when the last maintainer comment was, when
 the last commit was, how long PR #370 has been open. Every one of those ages, and two of them were
 already wrong on 2026-09-22: four drafts said "no maintainer reply since March 7" while the last
@@ -12,8 +12,8 @@ It also enforces the lesson from 20.09., paid for with a real visitor count: an 
 not spell out https://cp.hippe.eu leads nowhere. The repo link alone brought one visitor in
 fourteen days, and that one came from our own site.
 
-    ops/vor-den-antworten.py            all drafts
-    ops/vor-den-antworten.py 372 376    only these
+    ops/before-the-answers.py            all drafts
+    ops/before-the-answers.py 372 376    only these
 
 Exit 0: everything checks out. Exit 1: something in a draft is not true any more.
 """

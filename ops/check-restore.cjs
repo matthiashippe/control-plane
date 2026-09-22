@@ -1,7 +1,7 @@
 // Checks a restored SQLite before the service starts on it again.
 //
-// Locally:          node ops/restore-pruefen.cjs /path/to/cp.db
-// In the container: docker compose -f docker-compose.prod.yml exec -T cp node - < ops/restore-pruefen.cjs
+// Locally:          node ops/check-restore.cjs /path/to/cp.db
+// In the container: docker compose -f docker-compose.prod.yml exec -T cp node - < ops/check-restore.cjs
 //
 // Output: one line per check, a JSON summary at the end. Exit 1 as soon as one check fails. The
 // file is only read (readonly); the schema comparison writes nothing either.

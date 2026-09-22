@@ -21,7 +21,7 @@ anything published: it means the wall is being taken down, which is the single m
 that could happen to the article, and it has to be said before the piece goes out rather than after.
 
 It is not in `ops/check-all.sh` on purpose: six API calls per revision, and neither the pin nor
-that repository moves often. `ops/conway-zeitreihe.sh` already watches the repository daily and
+that repository moves often. `ops/conway-series.sh` already watches the repository daily and
 reports its last push. A new push there is the signal to run this.
 
 The patterns are strict about whitespace in two places. A formatting-only change upstream would

@@ -18,7 +18,7 @@ import { openDb } from "../src/db.js";
 function patternFromStatusSh(): RegExp {
   const line = readFileSync("ops/status.sh", "utf8")
     .split("\n")
-    .find((l) => l.startsWith("CP_FEHLERMUSTER="));
+    .find((l) => l.startsWith("CP_ERROR_PATTERN="));
   expect(line, "ops/status.sh has to carry the pattern on one line of its own").toBeTruthy();
   const pattern = line!.match(/:-(.*)\}"/)?.[1];
   expect(pattern, "and it has to be readable out of that line").toBeTruthy();

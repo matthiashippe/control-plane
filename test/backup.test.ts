@@ -15,7 +15,7 @@ import { openDb, postLedger } from "../src/db.js";
 
 const REPO = process.cwd();
 const VACUUM = path.join(REPO, "ops", "backup-vacuum.cjs");
-const CHECK_SCRIPT = path.join(REPO, "ops", "restore-pruefen.cjs");
+const CHECK_SCRIPT = path.join(REPO, "ops", "check-restore.cjs");
 
 const directories: string[] = [];
 const openConnections: Database.Database[] = [];
@@ -251,7 +251,7 @@ describe("restoring a backup (ops/README.md)", () => {
   });
 });
 
-describe("checking a restored file (ops/restore-pruefen.cjs)", () => {
+describe("checking a restored file (ops/check-restore.cjs)", () => {
   function check(file: string): { code: number; output: string } {
     try {
       return { code: 0, output: execFileSync(process.execPath, [CHECK_SCRIPT, file], { encoding: "utf8" }) };

@@ -21,7 +21,7 @@ SSH=(ssh -i "$KEY" -o BatchMode=yes -o ConnectTimeout=10 "$HOST")
 # An extended regular expression: grep gets -E below, because without it the pipe is a literal
 # character and the whole pattern matches nothing at all. That is the same blindness in a
 # different disguise, and it is why the pattern and the -E live next to each other.
-CP_FEHLERMUSTER="${CP_FEHLERMUSTER:-\[app\] |provider_unavailable|settlement_failed}"
+CP_ERROR_PATTERN="${CP_ERROR_PATTERN:-\[app\] |provider_unavailable|settlement_failed}"
 
 health_code=$(curl -s -m 10 -o /tmp/cp-health.$$ -w '%{http_code}' "$CP_URL/health" 2>/dev/null || echo 000)
 health_body=$(cat /tmp/cp-health.$$ 2>/dev/null); rm -f /tmp/cp-health.$$
@@ -31,7 +31,7 @@ vm_stats=$("${SSH[@]}" 'cd /opt/control-plane/repo/deploy && printf "%s|%s|%s|%s
   "$(df -h / | awk "NR==2{print \$5}")" \
   "$(free -m | awk "NR==2{printf \"%d/%d\", \$3, \$2}")" \
   "$(docker inspect deploy-cp-1 --format "{{.RestartCount}}" 2>/dev/null || echo -1)" \
-  "$(docker compose -f docker-compose.prod.yml logs --since 24h cp 2>/dev/null | grep -ciE "'"$CP_FEHLERMUSTER"'" | head -1)"' 2>/dev/null)
+  "$(docker compose -f docker-compose.prod.yml logs --since 24h cp 2>/dev/null | grep -ciE "'"$CP_ERROR_PATTERN"'" | head -1)"' 2>/dev/null)
 db_json=$("${SSH[@]}" 'cd /opt/control-plane/repo/deploy && docker compose -f docker-compose.prod.yml exec -T cp node -' < "$DIR/db-report.cjs" 2>/dev/null)
 or_json=$(curl -s -m 10 https://openrouter.ai/api/v1/credits -H "Authorization: Bearer ${OPENROUTER_API_KEY:-none}" 2>/dev/null)
 payto_hex=$(curl -s -m 10 -X POST https://mainnet.base.org -H 'content-type: application/json' \

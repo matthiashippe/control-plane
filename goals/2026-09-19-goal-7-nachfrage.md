@@ -75,12 +75,12 @@ blockierter Nutzer die Alternative "ohne Control Plane weiterlaufen".
   Wiederholung bei Fehlschlag, 30 Minuten Laufzeit, was der Datensatz nicht zeigt), F3 auf "Null"
   und F4 auf "null Inferenz-Requests" plus ausdrücklich nicht ermittelbarem Arbeitsaufwand
   zugespitzt. Zusätzlich den unter UNSICHER gemeldeten Schwachpunkt geschlossen: die F2-Zahlen
-  waren aus den gezeigten Befehlen nicht ableitbar, es gibt jetzt `docs/research/data/f2-betroffene.sh`
+  waren aus den gezeigten Befehlen nicht ableitbar, es gibt jetzt `docs/research/data/f2-affected.sh`
   mit Issue-Liste und Zähldefinition. Dabei fiel auf, dass Issue #371 (SIWE 500, 20.08.2026) in
   keiner Liste stand; es ist in F2, in der Antwortliste und in STATE.md ergänzt.
 - Verifier-Lauf 2 (19.09.2026, 18:35): PASS, keine Gaps. Er hat die CSV selbst nachgerechnet
   (alle acht Monatswerte, 30-Tage-Fenster 430,01 / 44 / 90, 7-Tage-Fenster 70,00 / 10 / 16, keine
   Duplikate, keine Monatslücken), zwei Zeilen per `eth_getTransactionReceipt` gegen die Kette
-  gestichprobt, `f2-betroffene.sh` ausgeführt (Juli 6, August 12, September 3, gesamt 20) und den
+  gestichprobt, `f2-affected.sh` ausgeführt (Juli 6, August 12, September 3, gesamt 20) und den
   Diff auf Abschwächungen geprüft. Offen geblieben ist nur, was nicht prüfbar ist: ob hinter den
   GitHub-Konten in F2 dieselbe Person mehrfach steckt.

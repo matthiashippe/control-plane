@@ -22,7 +22,7 @@
 # that hit us in the same second put the URL in front of it, this log cannot say. What it can say
 # is that the door was never shut, and three comments opened it in under twenty seconds.
 #
-#   ops/sichtbarkeit.sh
+#   ops/visibility.sh
 #
 # Exit 0 when the answer is "nothing has come yet and our side is in order", 1 when our side is
 # not in order, 2 when it could not look. The first crawler is news; it is printed loudly.
@@ -34,11 +34,11 @@ KEY="${CP_SSH_KEY:-$HOME/.ssh/id_ed25519_automaton}"
 HOST="${CP_HOST:-root@76.13.144.207}"
 
 # A log from a file, so a finding of "nothing" can be shown to be a finding rather than
-# blindness. See the same switch in ops/tiefe.sh and the reason it had to be added there.
-if [[ -n "${CP_SICHT_LOG:-}" ]]; then
+# blindness. See the same switch in ops/depth.sh and the reason it had to be added there.
+if [[ -n "${CP_VISIBILITY_LOG:-}" ]]; then
   log=$(mktemp); trap 'rm -f "$log"' EXIT
-  cp "${CP_SICHT_LOG}" "$log"
-  echo "(log from ${CP_SICHT_LOG}, not from the VM)" >&2
+  cp "${CP_VISIBILITY_LOG}" "$log"
+  echo "(log from ${CP_VISIBILITY_LOG}, not from the VM)" >&2
 else
   log=$(mktemp); trap 'rm -f "$log"' EXIT
   if ! timeout 45 ssh -i "$KEY" -o BatchMode=yes -o ConnectTimeout=10 -o ServerAliveInterval=5 "$HOST" \

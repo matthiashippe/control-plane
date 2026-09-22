@@ -172,7 +172,7 @@ describe("Everything we ship points at endpoints this service has", () => {
     });
   }
 
-  /** Exists means anything but 404, the same rule ops/journeys-pruefen.sh uses. */
+  /** Exists means anything but 404, the same rule ops/check-journeys.sh uses. */
   async function exists(instance: ReturnType<typeof createApp>, path: string) {
     const get = await instance.request(path);
     if (get.status !== 404) return true;

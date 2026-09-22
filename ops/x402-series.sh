@@ -25,7 +25,7 @@ tmp="$(mktemp)"
 stderr_tmp="$(mktemp)"
 trap 'rm -f "$tmp" "$stderr_tmp"' EXIT
 
-if ! python3 "$REPO/docs/research/data/x402-verzeichnis-scan.py" > "$tmp" 2>"$stderr_tmp"; then
+if ! python3 "$REPO/docs/research/data/x402-directory-scan.py" > "$tmp" 2>"$stderr_tmp"; then
   cp "$stderr_tmp" "$TARGET/letzter-lauf.err"
   echo "[x402] scan failed, see $TARGET/letzter-lauf.err" >&2
   [[ -n "${CP_ALERT_WEBHOOK:-}" ]] && curl -fsS -m 10 -d "x402 scan failed on $(hostname)" "$CP_ALERT_WEBHOOK" >/dev/null || true
@@ -41,7 +41,7 @@ if [[ "$lines" -lt 1000 ]]; then
   exit 1
 fi
 
-line="$(python3 "$REPO/docs/research/data/x402-kennzahlen.py" "$tmp" --json)"
+line="$(python3 "$REPO/docs/research/data/x402-metrics.py" "$tmp" --json)"
 # A broken line in the series only shows up when somebody evaluates it, so check it here.
 if ! printf '%s' "$line" | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d["dienste_gesamt"] > 1000, d'; then
   echo "[x402] metrics implausible, nothing appended to the series" >&2

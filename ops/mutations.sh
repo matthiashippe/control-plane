@@ -10,8 +10,8 @@
 # So the load-bearing lines get broken on purpose, one at a time, and the suite is asked how many
 # tests notice.
 #
-#   ops/mutationen.sh            every mutation below
-#   ops/mutationen.sh fee        only those whose name contains "fee"
+#   ops/mutations.sh            every mutation below
+#   ops/mutations.sh fee        only those whose name contains "fee"
 #
 # Exit 0 when every mutation is caught, 1 when one survives, 2 when it could not tell.
 #

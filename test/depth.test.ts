@@ -1,7 +1,7 @@
 /**
  * The depth pixels, and the control that decides whether they mean anything.
  *
- * `ops/verkehr.sh` reported "0 of N who opened the page went on to a second one" for days with the
+ * `ops/traffic.sh` reported "0 of N who opened the page went on to a second one" for days with the
  * footnote that anchor links leave no log line. Since the rebuild the only in-page navigation is
  * anchors, so that number cannot separate a reader who went through the page and left from
  * somebody who bounced at the fold, and those two findings call for opposite work.
@@ -44,7 +44,7 @@ describe("how far down the page a reader got", () => {
 
   it("keeps the control in the first screen and the others below it", async () => {
     // The control is what makes this a measurement: a browser that fetches every lazy image at
-    // once fires it together with the rest, and ops/tiefe.sh then reports the signal as worthless
+    // once fires it together with the rest, and ops/depth.sh then reports the signal as worthless
     // instead of reporting a scroll that never happened. That only works if it really is at the
     // top, so the order is pinned here.
     const html = await (await createApp({ db: openDb(":memory:") }).request("/")).text();

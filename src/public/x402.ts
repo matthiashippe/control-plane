@@ -10,7 +10,7 @@
  * to everybody selling in this space, us included, and the page says so. What it buys is a reason
  * for somebody to point at us that is not "look at my startup".
  *
- * The series is handed into the container by `ops/x402-zeitreihe.sh` after each scan, because it
+ * The series is handed into the container by `ops/x402-series.sh` after each scan, because it
  * lives outside the repo directory that `deploy/rollout.sh` mirrors with --delete, and adding a
  * bind mount would mean touching `deploy/**`, which is not done without a human.
  */

@@ -1,5 +1,5 @@
 # Addresses that are us, not visitors. One per line: address, date first seen, why.
-# ops/eigene-ips.sh appends to this and every traffic script reads it. See that file for the why.
+# ops/own-ips.sh appends to this and every traffic script reads it. See that file for the why.
 82.194.125.90 2026-09-19  this machine, seen live
 76.13.144.207 2026-09-19  the VM itself, its own health checks
 35.242.237.124 2026-09-19  the uptime monitor

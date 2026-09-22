@@ -10,7 +10,7 @@
 # The adversarial read of 2026-09-22 checked it once by hand and found it sound. That was one day
 # and one state. This asks the same question every cycle:
 #
-#   ops/befehle-pruefen.sh
+#   ops/check-commands.sh
 #
 # What it asks per command:
 #   - a call the page shows with `authorization: $KEY` must answer 401 without one, with a JSON

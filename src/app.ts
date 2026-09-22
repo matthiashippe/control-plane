@@ -341,7 +341,7 @@ export function createApp(opts: AppOptions) {
   /**
    * Four one-pixel images that say how far down the page a reader got.
    *
-   * `ops/verkehr.sh` has said "0 of 11 who opened the page went on to a second one" for days, and
+   * `ops/traffic.sh` has said "0 of 11 who opened the page went on to a second one" for days, and
    * under it, honestly, "anchor links leave no log line, so this is a floor, not a verdict". That
    * is the whole problem: since the rebuild the only in-page navigation is anchors, so the
    * measurement cannot tell somebody who read the page and left from somebody who bounced at the
@@ -354,7 +354,7 @@ export function createApp(opts: AppOptions) {
    *
    * `/px/top.png` is the control and the reason this is a measurement rather than a hope. It sits
    * in the first screen and is lazy too, so a browser that simply fetches every lazy image at once
-   * fires it together with the others, and `ops/tiefe.sh` then says the signal is worthless
+   * fires it together with the others, and `ops/depth.sh` then says the signal is worthless
    * instead of reporting a scroll that never happened.
    *
    * Nothing new is stored. The request lands in the same access log every page view already lands
@@ -369,7 +369,7 @@ export function createApp(opts: AppOptions) {
    * anything else in this repo is allowed to work.
    *
    * What makes shipping it defensible is the control: if lazy never fires in the wild either,
-   * `ops/tiefe.sh` prints NOT MEASURING and nobody is misled by a zero. So the deal is dated. If
+   * `ops/depth.sh` prints NOT MEASURING and nobody is misled by a zero. So the deal is dated. If
    * by 2026-09-24 browsers have loaded the page and no control pixel has arrived, the mechanism
    * does not work and these four lines come out again.
    */

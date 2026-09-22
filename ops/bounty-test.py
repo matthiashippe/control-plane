@@ -17,11 +17,11 @@ would need a plaintext key that we do not have locally, and obtaining one would 
 an on-chain operation that loop-constraints.md forbids. The markup is therefore calculated rather
 than measured; the margin itself is covered by tests in src/inference/.
 
-The JSON keys of ergebnisse.json stay German: ops/auftragstest-export.py reads them and writes the
+The JSON keys of ergebnisse.json stay German: ops/bounty-test-export.py reads them and writes the
 published data set docs/research/data/2026-09-20-auftragstest.json from them, which is linked from
 the landing page under CC0.
 
-  OPENROUTER_API_KEY=... ops/auftragstest.py --auftrag <file.md> --agenten <file.json>
+  OPENROUTER_API_KEY=... ops/bounty-test.py --auftrag <file.md> --agenten <file.json>
 """
 import argparse, json, os, pathlib, sys, time, urllib.error, urllib.request
 

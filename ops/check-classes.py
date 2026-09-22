@@ -8,7 +8,7 @@ with it that only the sub-pages use: `.ph` is the heading on every one of them, 
 column width, and `.stats`, `.claims`, `.card`, `.n`, `.l`, `.good`, `.bad` and `.t` carry the
 rest. Five pages went out styled against rules that no longer existed.
 
-`ops/seiten-pruefen.sh` said PAGES OK the whole time, because it checks a status code, one h1 and
+`ops/check-pages.sh` said PAGES OK the whole time, because it checks a status code, one h1 and
 no unrendered placeholder, and a class that resolves to nothing is none of those.
 
 This reads the served HTML, not the source: a class can also go missing because a build step drops
@@ -32,7 +32,7 @@ means knowing which properties matter for which element, which is taste, and a c
 fail is worse than no check because it reads as coverage. What is left is the class check, which
 does fail when it should, and the habit of opening the page.
 
-    ops/klassen-pruefen.py [base-url]
+    ops/check-classes.py [base-url]
 
 Exit 0 all classes defined, 1 something renders unstyled, 2 a page could not be fetched.
 """

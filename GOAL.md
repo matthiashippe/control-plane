@@ -11,7 +11,7 @@ ist die Referenz, und der GTM-Plan mit Kill-Kriterien steht in
 Aussenwirkung selbst, die Domain und die Rechtsfrage.
 
 (Historie:) Das Journeybuch
-steht in `docs/journeys.md`, geprueft von `ops/journeys-pruefen.sh`; die Done-Bedingungen stehen in
+steht in `docs/journeys.md`, geprueft von `ops/check-journeys.sh`; die Done-Bedingungen stehen in
 STATE.md unter Goal 15. Danach zurueck zu Goal 10.
 
 Goal 10: Positionierung und Name. Der Markt ist seit dem 20.09.2026 fertig, beschrieben und

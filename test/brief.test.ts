@@ -102,7 +102,7 @@ describe("POST /v1/briefs/check", () => {
     const { app } = setup();
     // llms.txt and docs/bounties.md name this path, so somebody will open it in a browser. Without
     // the guard that GET is a bare 404 and the path we advertised looks like it does not exist.
-    // Found on 2026-09-21 by ops/journeys-pruefen.sh, which reads a 404 as the document lying.
+    // Found on 2026-09-21 by ops/check-journeys.sh, which reads a 404 as the document lying.
     const res = await app.request("/v1/briefs/check");
     expect(res.status).toBe(405);
     expect(res.headers.get("allow")).toBe("POST");

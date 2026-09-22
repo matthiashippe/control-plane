@@ -12,7 +12,7 @@ adversarial read found it (B2).
 
 So the file is generated now, and this checks that it still matches its own CSV:
 
-    ops/daten-pruefen.py
+    ops/check-data.py
 
 Exit 0 when every published dataset reproduces, 1 when one of them does not, 2 when the check
 could not look (a missing file, an unreadable CSV). The third case is not a finding about the
@@ -29,7 +29,7 @@ DATA = Path(__file__).resolve().parent.parent / "docs/research/data"
 
 # Each published dataset, and the command that has to reproduce it byte for byte.
 PAIRS = [
-    ("2026-09-21-x402-kennzahlen.json", ["x402-kennzahlen.py", "2026-09-21-x402-verzeichnis.csv", "--dataset"]),
+    ("2026-09-21-x402-kennzahlen.json", ["x402-metrics.py", "2026-09-21-x402-verzeichnis.csv", "--dataset"]),
 ]
 
 
@@ -41,7 +41,7 @@ def transfers_readme() -> tuple[int, list[str]]:
     290.01 / 30 / 62 against an actual 295.05 / 31 / 77, and the two window figures were the state
     before the backfill of 19 September 21:45 that the same README describes three paragraphs
     higher. The stated scan end was thirteen hours early as well, which is where
-    artikel-zahlen.py got its hardcoded cut from. An adversarial read found it (B5, B4).
+    article-numbers.py got its hardcoded cut from. An adversarial read found it (B5, B4).
 
     Recomputed and then searched for as text: a number that moves on either side turns this red,
     which is the only arrangement in which the README and its data cannot drift apart again.
@@ -134,11 +134,11 @@ def series_against_csv() -> tuple[int, list[str]]:
         if point is None:
             continue  # A published scan from before the series existed is not a mismatch.
         proc = subprocess.run(
-            [sys.executable, "x402-kennzahlen.py", csv_file.name, "--json"],
+            [sys.executable, "x402-metrics.py", csv_file.name, "--json"],
             cwd=DATA, capture_output=True, text=True, timeout=300,
         )
         if proc.returncode != 0:
-            return 2, [f"COULD NOT TELL: x402-kennzahlen.py on {csv_file.name} exited {proc.returncode}."]
+            return 2, [f"COULD NOT TELL: x402-metrics.py on {csv_file.name} exited {proc.returncode}."]
         from_csv = json.loads(proc.stdout)
         # `stichtag` is when the script ran, not what it measured, so it is the one field that
         # differs by design.
@@ -195,31 +195,31 @@ def main() -> int:
             checked += 1
     # And the script the article invites a reader to run, against the same figures.
     #
-    # artikel-zahlen.py carried a hardcoded `cut = "2026-08-20T14:59:00Z"`, annotated as 30 days
+    # article-numbers.py carried a hardcoded `cut = "2026-08-20T14:59:00Z"`, annotated as 30 days
     # before the scan end, and that constant was thirteen hours early, from an older scan end.
     # It pulled one transfer of 5 USDC from 20 August into the window and printed
     # 435.05 / 45 / 105 where the article says
     # 430.05 / 44 / 104. The article was right and its own evidence script was not, on a command
     # the article names in its last paragraph (B4). It computes the cut from the data now, and
     # this holds its output against what the README states.
-    proc = subprocess.run([sys.executable, "artikel-zahlen.py"], cwd=DATA, capture_output=True, text=True, timeout=300)
+    proc = subprocess.run([sys.executable, "article-numbers.py"], cwd=DATA, capture_output=True, text=True, timeout=300)
     if proc.returncode != 0:
-        print(f"COULD NOT TELL: artikel-zahlen.py exited {proc.returncode}: {proc.stderr.strip()[:160]}")
+        print(f"COULD NOT TELL: article-numbers.py exited {proc.returncode}: {proc.stderr.strip()[:160]}")
         return 2
     line = next((z for z in proc.stdout.splitlines() if z.startswith("Letzte 30 Tage")), "")
     readme_text = " ".join((DATA / "README.md").read_text().split())
     numbers = line.replace("Letzte 30 Tage:", "").strip().split(" USDC, ")
     if len(numbers) != 2:
-        print(f"COULD NOT TELL: artikel-zahlen.py printed no 30-day line: {line[:80]!r}")
+        print(f"COULD NOT TELL: article-numbers.py printed no 30-day line: {line[:80]!r}")
         return 2
     expected = f"{numbers[0].replace('.', ',')} USDC von {numbers[1].split(' Wallets')[0]} Wallets"
     if expected not in readme_text:
         bad += 1
-        print("WRONG   artikel-zahlen.py and README.md disagree about the 30-day window.")
+        print("WRONG   article-numbers.py and README.md disagree about the 30-day window.")
         print(f"        the script prints {line.strip()}")
         print(f"        the README should therefore contain {expected}")
     else:
-        print(f"ok      artikel-zahlen.py agrees with README.md ({expected})")
+        print(f"ok      article-numbers.py agrees with README.md ({expected})")
         checked += 1
 
     code, missing = series_against_csv()

@@ -17,7 +17,7 @@
 # step. It is not a smoke test: ops/smoke.sh proves the service runs. This proves it can be
 # entered without reading the source.
 #
-#   ops/fremder-client.sh [base]
+#   ops/stranger-client.sh [base]
 set -uo pipefail
 BASE="${1:-${CP_URL:-https://cp.hippe.eu}}"
 failures=0

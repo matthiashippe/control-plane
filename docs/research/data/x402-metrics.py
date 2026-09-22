@@ -2,7 +2,7 @@
 """
 Computes the x402 demand metrics from the directory scan.
 
-    python3 x402-kennzahlen.py 2026-09-20-x402-verzeichnis.csv
+    python3 x402-metrics.py 2026-09-20-x402-verzeichnis.csv
 
 Every number in the article comes from this script. Whoever doubts one runs it.
 """
@@ -20,7 +20,7 @@ def metrics(rows: list) -> dict:
 
     The keys stay German because they are the published contract of
     /opt/control-plane/x402/kennzahlen.ndjson: src/public/x402.ts, ops/freshness.sh and
-    ops/daten-pruefen.py read them by these names, and the series is append-only, so a renamed
+    ops/check-data.py read them by these names, and the series is append-only, so a renamed
     key would split every line written before the rename from every line written after.
     """
     cdp = [r for r in rows if r["verzeichnis"] == "cdp"]
@@ -75,7 +75,7 @@ def dataset(rows: list, path: str) -> dict:
 
     Now it comes from the same CSV that lies beside it:
 
-        python3 x402-kennzahlen.py 2026-09-21-x402-verzeichnis.csv --dataset > 2026-09-21-x402-kennzahlen.json
+        python3 x402-metrics.py 2026-09-21-x402-verzeichnis.csv --dataset > 2026-09-21-x402-kennzahlen.json
 
     Whoever doubts the file runs the command and compares.
     """
@@ -116,7 +116,7 @@ def dataset(rows: list, path: str) -> dict:
 
 
 def main(path: str) -> None:
-    # The German wording of the lines below is load-bearing, not leftover: ops/vor-dem-artikel.py
+    # The German wording of the lines below is load-bearing, not leftover: ops/before-the-article.py
     # parses this output with fixed patterns ("Eindeutige Dienst-URLs: ", "Verschiedene Anbieter
     # (Host): ", "Nachfragedaten: N von", "Aufrufe in 30 Tagen, Summe:", "genau EINER zahlenden
     # Wallet: ", "mindestens  20 Zahlern:", including the column padding). Rewording one of them

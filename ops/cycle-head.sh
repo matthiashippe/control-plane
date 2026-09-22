@@ -4,13 +4,13 @@
 # Three times in two days the same trap: the VM and the log run on UTC, this machine runs on CEST,
 # and a time written from memory is two hours out. It cost a deploy window that measured a window
 # that had not happened, a block of protocol entries dated a day ahead, and a constant in
-# ops/tiefe.sh that sat two hours and forty minutes in the future and would have discarded every
+# ops/depth.sh that sat two hours and forty minutes in the future and would have discarded every
 # reader in silence. Each time the fix was the same: take the time from the machine.
 #
 # So the header is printed, not written:
 #
-#   ops/zyklus-kopf.sh 187          the header for cycle 187, starting at the last one's end
-#   ops/zyklus-kopf.sh 187 10:20    the header for cycle 187, starting at a given UTC time
+#   ops/cycle-head.sh 187          the header for cycle 187, starting at the last one's end
+#   ops/cycle-head.sh 187 10:20    the header for cycle 187, starting at a given UTC time
 #
 # It also prints the last deploy, from the container start, because that is the other number a
 # protocol entry gets wrong.
@@ -20,7 +20,7 @@ cd "$(dirname "$0")/.."
 NUM="${1:-}"
 FROM="${2:-}"
 if [[ -z "$NUM" ]]; then
-  echo "usage: ops/zyklus-kopf.sh <cycle number> [HH:MM start, UTC]" >&2
+  echo "usage: ops/cycle-head.sh <cycle number> [HH:MM start, UTC]" >&2
   exit 64
 fi
 

@@ -46,7 +46,7 @@ Two datasets, both raw, both under CC0, both re-runnable without any API key:
 | What | Data | How it was collected |
 |---|---|---|
 | Every USDC transfer to Conway's receiving address, Jan 1 to Sep 20 2026 (9,027 transfers, 2,492 wallets) | [`2026-09-19-conway-payto-transfers.csv`](docs/research/data/2026-09-19-conway-payto-transfers.csv) | 5,652 sequential `eth_getLogs` calls against the public Base RPC |
-| Every service in both public x402 directories, with Coinbase's per-service demand figures (21,545 entries, 2,627 providers) | [`2026-09-20-x402-verzeichnis.csv`](docs/research/data/2026-09-20-x402-verzeichnis.csv) | [`x402-verzeichnis-scan.py`](docs/research/data/x402-verzeichnis-scan.py), two unauthenticated endpoints |
+| Every service in both public x402 directories, with Coinbase's per-service demand figures (21,545 entries, 2,627 providers) | [`2026-09-20-x402-verzeichnis.csv`](docs/research/data/2026-09-20-x402-verzeichnis.csv) | [`x402-directory-scan.py`](docs/research/data/x402-directory-scan.py), two unauthenticated endpoints |
 
 The write-ups: [what the directory data shows](docs/research/2026-09-20-x402-nachfrage.md) (14,960
 paid APIs, 130 with twenty or more customers a month) and [where the Conway money

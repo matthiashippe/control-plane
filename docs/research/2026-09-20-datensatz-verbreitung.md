@@ -6,7 +6,7 @@ zu den Leuten, die ihn brauchen, und was kostet das an Zeit und Geld.
 
 ## 1. Was tatsächlich drinsteht, selbst nachgerechnet
 
-Gelesen: `docs/research/data/README.md`, `artikel-zahlen.py`, `f2-betroffene.sh`,
+Gelesen: `docs/research/data/README.md`, `article-numbers.py`, `f2-affected.sh`,
 `x402-sellers-scan.py`. Nachgerechnet mit einem eigenen Skript gegen die CSV, nicht mit dem
 mitgelieferten:
 
@@ -23,7 +23,7 @@ mitgelieferten:
 
 9.027 Zeilen, keine doppelten `tx_hash`, Zeitraum 01.02.2026 13:33:45 UTC bis 20.09.2026 03:55:15
 UTC, 2.492 verschiedene Wallets, 62.621,14 USDC gesamt. Das deckt sich mit dem README und mit
-`artikel-zahlen.py`.
+`article-numbers.py`.
 
 **Die Kernaussage hält, aber sie meint etwas anderes, als der Satz nahelegt.** "Im Juni waren noch
 drei übrig" ist die Kohortenzahl: Von den 1.582 Wallets, die im Februar gezahlt haben, haben genau
@@ -47,7 +47,7 @@ Alles darunter gemessen, nicht geschätzt.
 **Leute, die einen Automaton betreiben.** Das Repo `Conway-Research/automaton` hat 6.479 Stars,
 1.442 Forks, 108 Watcher und 233 offene Issues, letzter Push am 26.08.2026. Die Zahl der Personen,
 die sich mit dem Provisionierungsproblem tatsächlich gemeldet haben, liegt bei 20 über die zwölf
-Kern-Issues, 26 mit den drei Grenzfällen (`f2-betroffene.sh`, Lauf vom 20.09.2026). In den letzten
+Kern-Issues, 26 mit den drei Grenzfällen (`f2-affected.sh`, Lauf vom 20.09.2026). In den letzten
 30 Tagen waren davon 11 aktiv, in den letzten 14 Tagen 3. Wer heute noch zahlt, sind 45 Wallets in
 30 Tagen. Die aktive Zielgruppe hat also die Größenordnung von zwei bis drei Dutzend Personen, und
 sie sind namentlich und an einem einzigen Ort auffindbar.

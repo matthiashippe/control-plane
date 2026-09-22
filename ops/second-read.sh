@@ -7,8 +7,8 @@
 # the page tells you to click, add up the five numbers in the table. What was missing was not
 # effort, it was the angle. That is not a state that fixes itself, so it belongs in the rhythm.
 #
-#   ops/gegenlese.sh            starts the job and prints its id
-#   ops/gegenlese.sh --dry      prints the brief and starts nothing
+#   ops/second-read.sh            starts the job and prints its id
+#   ops/second-read.sh --dry      prints the brief and starts nothing
 #
 # Weekly is about right. Daily would mostly re-find what the checks from the last one already
 # cover, and every finding it did produce was worth a cycle.
@@ -19,7 +19,7 @@ cd "$(dirname "$0")/.."
 
 ARTICLE=".scratch/gtm/hn-post.txt"
 REPORTS=".scratch/gtm/gegenlese"
-TEMPLATE="ops/gegenlese-auftrag.md"
+TEMPLATE="ops/second-read-brief.md"
 
 [[ -f "$TEMPLATE" ]] || { echo "FAILED: $TEMPLATE is missing." >&2; exit 2; }
 

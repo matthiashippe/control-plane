@@ -6,8 +6,8 @@
 # through which channel somebody arrived. Every follow-up request carries cp.hippe.eu and is
 # worthless.
 #
-#   ops/verkehr.sh          last 24 hours
-#   ops/verkehr.sh 72       last 72 hours
+#   ops/traffic.sh          last 24 hours
+#   ops/traffic.sh 72       last 72 hours
 set -euo pipefail
 
 HOURS="${1:-24}"
@@ -17,10 +17,10 @@ HOST="${CP_HOST:-root@76.13.144.207}"
 # consists of us.
 #
 # The code-host (Google Cloud, 35.242.237.124) joined on 2026-09-20 and is the most treacherous of
-# the three: any job that runs ops/journeys-pruefen.sh or harness/e2e/markt.ts against production
+# the three: any job that runs ops/check-journeys.sh or harness/e2e/markt.ts against production
 # otherwise shows up as a stranger probing exactly the new market paths. That is precisely the
 # signal we are waiting for, and it would be our own.
-source "$(dirname "$0")/eigene-ips.sh"
+source "$(dirname "$0")/own-ips.sh"
 OWN=$(eigene_ips)
 # That list is a starting point, not the answer. Our own address is not a constant: on 2026-09-22
 # between 06:41 and 07:02 UTC this machine's line reconnected and got 62.224.55.59 instead of
@@ -53,12 +53,12 @@ log=$(mktemp); trap 'rm -f "$log"' EXIT
 #
 # The real answer is log rotation, and that lives in deploy/, which is not touched without a human.
 # A planted log, so the evidence lines below can be proved in both directions. Every other
-# measuring tool here has one (CP_TIEFE_LOG, CP_SICHT_LOG, CP_FEHLERMUSTER, CP_WINDOW_NOW) and
+# measuring tool here has one (CP_DEPTH_LOG, CP_VISIBILITY_LOG, CP_ERROR_PATTERN, CP_WINDOW_NOW) and
 # loop-constraints.md requires it of anything that can report "none": without a counter-proof a
 # zero is indistinguishable from blindness. Fixtures under ops/fixtures/.
-if [[ -n "${CP_VERKEHR_LOG:-}" ]]; then
-  cp "${CP_VERKEHR_LOG}" "$log"
-  echo "(log from ${CP_VERKEHR_LOG}, not from the VM)" >&2
+if [[ -n "${CP_TRAFFIC_LOG:-}" ]]; then
+  cp "${CP_TRAFFIC_LOG}" "$log"
+  echo "(log from ${CP_TRAFFIC_LOG}, not from the VM)" >&2
 elif ! timeout 45 ssh -i "$KEY" -o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=3 "$HOST" \
   'docker exec deploy-caddy-1 cat /var/log/caddy/access.log | gzip -c' 2>/dev/null | gunzip > "$log"; then
   echo "ERROR: the access log could not be fetched within 45 seconds." >&2
@@ -93,11 +93,11 @@ own_json=$(printf '%s' "$OWN" | tr ' ' '\n' | grep -v '^$' | jq -R . | jq -sc .)
 echo "Requests to cp.hippe.eu in the last $HOURS hours"
 if [[ -n "$added" ]]; then
   echo "(counted as ours beyond the configured list: $(printf '%s' "$added" | tr '\n' ' '))"
-  echo "(these sent our own checker UA; addresses of this machine live in ops/eigene-ips.txt)"
+  echo "(these sent our own checker UA; addresses of this machine live in ops/own-ips.txt)"
 fi
 echo
 
-ROWS="${CP_VERKEHR_ZEILEN:-25}"
+ROWS="${CP_TRAFFIC_LINES:-25}"
 echo "-- First request per foreign IP (this is where the referrer is) --"
 # The first request of an address, not the first one inside the window. Until 2026-09-22 the
 # window filter ran first, so an address whose real first visit was three days ago and which came
@@ -367,7 +367,7 @@ jq -r --argjson own "$own_json" \
         count[$1]++ }
       END {
         total = 0; returning = 0; printed = 0
-        limit = (ENVIRON["CP_VERKEHR_ZEILEN"] == "" ? 25 : ENVIRON["CP_VERKEHR_ZEILEN"]) + 0
+        limit = (ENVIRON["CP_TRAFFIC_LINES"] == "" ? 25 : ENVIRON["CP_TRAFFIC_LINES"]) + 0
         for (ip in n) {
           total++
           if (n[ip] > 1) {

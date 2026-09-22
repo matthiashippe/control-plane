@@ -13,8 +13,8 @@
 # So: newest backup, throwaway container, no published ports, answer from inside, then gone. The
 # live service is not touched at any point and the copy is read from a temporary directory.
 #
-#   ops/sicherung-probe.sh            newest backup
-#   ops/sicherung-probe.sh --oldest   the oldest one still kept, which is the older format risk
+#   ops/backup-probe.sh            newest backup
+#   ops/backup-probe.sh --oldest   the oldest one still kept, which is the older format risk
 set -euo pipefail
 
 KEY="${CP_SSH_KEY:-$HOME/.ssh/id_ed25519_automaton}"
@@ -81,7 +81,7 @@ console.log("ok      balances and ledger agree");
 echo "RESTORE PROBE OK"
 REMOTE
 
-# A stamp, for the same reason ops/neuling-probe.ts writes one: a probe that does not run every
+# A stamp, for the same reason ops/newcomer-probe.ts writes one: a probe that does not run every
 # cycle ages in silence, and on 2026-09-22 its last result had to be dug out of the protocol
 # rather than read off. ops/check-all.sh prints how old this is and how many commits have landed.
 mkdir -p "${CP_PROBE_STAMPS:-.scratch/probes}"

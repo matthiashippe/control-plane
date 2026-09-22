@@ -10,8 +10,8 @@
 # and present, 404 means the document describes something that does not exist. The answer itself
 # does not matter, existence is the point.
 #
-#   ops/journeys-pruefen.sh                 against https://cp.hippe.eu
-#   CP_URL=http://localhost:8402 ops/journeys-pruefen.sh
+#   ops/check-journeys.sh                 against https://cp.hippe.eu
+#   CP_URL=http://localhost:8402 ops/check-journeys.sh
 set -uo pipefail
 cd "$(dirname "$0")/.."
 

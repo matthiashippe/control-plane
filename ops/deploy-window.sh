@@ -25,7 +25,7 @@ TAIL_SECONDS="${1:-180}"
 LEAD_SECONDS=60
 KEY="${CP_SSH_KEY:-$HOME/.ssh/id_ed25519_automaton}"
 HOST="${CP_HOST:-root@76.13.144.207}"
-source "$(dirname "$0")/eigene-ips.sh"
+source "$(dirname "$0")/own-ips.sh"
 OWN=$(eigene_ips)
 SSH=(ssh -i "$KEY" -o BatchMode=yes -o ConnectTimeout=10)
 

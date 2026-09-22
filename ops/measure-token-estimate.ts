@@ -12,7 +12,7 @@
  * what every new agent here starts with. So this measures first, against real prompts and the real
  * tokenizer, and prints the shape of the error rather than a single number.
  *
- *   CP_URL=https://cp.hippe.eu pnpm tsx ops/token-schaetzung-messen.ts --key /path/to/keyfile
+ *   CP_URL=https://cp.hippe.eu pnpm tsx ops/measure-token-estimate.ts --key /path/to/keyfile
  *
  * Costs a few cents of the caller's own credit: every shape is one real call with max_tokens 16.
  */

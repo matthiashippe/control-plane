@@ -46,7 +46,7 @@ Transfers.
 Diese drei Zeilen standen bis zum 22.09.2026 auf dem Stand **vor** dem Nachziehen von 21:45, das
 drei Absätze weiter oben beschrieben ist, und das Scan-Ende war mit 19.09. 14:59 UTC um dreizehn
 Stunden zu früh angesetzt. Wer den Block darüber laufen ließ, bekam andere Zahlen als die Datei,
-die ihn anbietet. `ops/daten-pruefen.py` rechnet sie seither aus der CSV nach und läuft in
+die ihn anbietet. `ops/check-data.py` rechnet sie seither aus der CSV nach und läuft in
 `ops/check-all.sh` mit.
 
 Grenzen des Datensatzes: Er zeigt Zuflüsse an eine einzelne Adresse. Ob hinter einer Wallet ein
@@ -69,8 +69,8 @@ Spalten: `verzeichnis` (cdp oder payai), `resource` (die bezahlte URL), `host`, 
 Reproduzierbar mit den Skripten daneben, ohne Schluessel:
 
 ```bash
-python3 x402-verzeichnis-scan.py > 2026-09-21-x402-verzeichnis.csv   # neuer Scan von heute
-python3 x402-kennzahlen.py 2026-09-21-x402-verzeichnis.csv           # die Kennzahlen dieser Datei
+python3 x402-directory-scan.py > 2026-09-21-x402-verzeichnis.csv   # neuer Scan von heute
+python3 x402-metrics.py 2026-09-21-x402-verzeichnis.csv           # die Kennzahlen dieser Datei
 ```
 
 **Welcher Lauf hier liegt, und warum das wichtig ist.** Bis zum 22.09.2026 lag hier die CSV eines
@@ -80,7 +80,7 @@ statt 6.597, 20.783 statt 20.789, 2.636 statt 2.639, 59 statt 65 ohne Nachfraged
 statt 867.813 Aufrufe. Die Verteilung war in beiden identisch, bis auf die letzte Stelle. Wer
 nachrechnete, bekam also andere Kopfzahlen als jeder Text, der auf diese Datei verweist, und genau
 dazu laedt der Text ein. Seither liegt hier der Lauf, aus dem die veroeffentlichten Zahlen stammen,
-und `ops/vor-dem-artikel.py` prueft den Text gegen diese Datei statt gegen die Zeitreihe, die er
+und `ops/before-the-article.py` prueft den Text gegen diese Datei statt gegen die Zeitreihe, die er
 ohnehin selbst speist.
 
 Grenzen: Coinbase fuellt die Nachfragefelder spaet. Am 20.09. stand der groesste Dienst des ganzen
@@ -90,19 +90,19 @@ Zaehlung. Die Verteilung ist der belastbare Teil.
 
 ## `2026-09-21-x402-kennzahlen.json`
 
-Die Kennzahlen desselben Laufs als JSON, also das Ergebnis von `x402-kennzahlen.py` in
+Die Kennzahlen desselben Laufs als JSON, also das Ergebnis von `x402-metrics.py` in
 maschinenlesbar. Wer nur die Verteilung braucht, nimmt diese Datei und nicht die 3,2 MB CSV.
 
 Sie wird erzeugt, nicht getippt:
 
 ```
 cd docs/research/data
-python3 x402-kennzahlen.py 2026-09-21-x402-verzeichnis.csv --dataset > 2026-09-21-x402-kennzahlen.json
+python3 x402-metrics.py 2026-09-21-x402-verzeichnis.csv --dataset > 2026-09-21-x402-kennzahlen.json
 ```
 
 Bis zum 22.09.2026 war sie von Hand gebaut, und genau deshalb hat sie die Korrektur der CSV nicht
 ueberlebt: sie trug weiter die sieben Kopfzahlen des lokalen Laufs von 03:22 UTC, die der Abschnitt
-oben als den Fehler beschreibt, waehrend dieser Abschnitt sie empfahl. `ops/daten-pruefen.py` haelt
+oben als den Fehler beschreibt, waehrend dieser Abschnitt sie empfahl. `ops/check-data.py` haelt
 sie seither gegen ihre eigene CSV und laeuft in `ops/check-all.sh` mit.
 
 ## Lizenz

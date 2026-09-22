@@ -10,7 +10,7 @@ So this reads the article, pulls the figures out of it, and holds each one again
 service and the daily series say today. It changes nothing and sends nothing; posting stays a
 human act.
 
-    ops/vor-dem-artikel.py
+    ops/before-the-article.py
 
 Exit code 0 means the text matches the world. Anything else names the sentences to fix.
 """
@@ -133,7 +133,7 @@ def main() -> int:
         figures = {}
     else:
         metrics = subprocess.run(
-            ["python3", "docs/research/data/x402-kennzahlen.py", str(csv[-1])],
+            ["python3", "docs/research/data/x402-metrics.py", str(csv[-1])],
             capture_output=True, text=True, timeout=180,
         ).stdout
         number_from = lambda pattern: (
@@ -198,7 +198,7 @@ def main() -> int:
     # 4. Conway's present tense. A maintainer coming back changes the argument, not a number.
     c = last_line("/opt/control-plane/conway/repo.ndjson")
     if not c:
-        change("the conway series could not be read", "run ops/conway-zeitreihe.sh on the VM first")
+        change("the conway series could not be read", "run ops/conway-series.sh on the VM first")
     else:
         if c.get("last_write_access_comment", "").startswith("2026-03-06"):
             ok("no maintainer has come back", "last write-access comment 2026-03-06")
@@ -323,7 +323,7 @@ def main() -> int:
     # 4c-ter. The thirty-day window, per version.
     #
     # This is the sentence B4 was about, and on 2026-09-22 fixing it caught only half the house:
-    # the post-ready copy got the right figures, artikel-zahlen.py stopped using a stale cut, the
+    # the post-ready copy got the right figures, article-numbers.py stopped using a stale cut, the
     # data README was corrected, and docs/artikel-agentenoekonomie.md kept saying "45 wallets sent
     # 435 USDC in 105 transfers" for another four hours. Every check here searched the joined text,
     # and one correct copy is enough to satisfy a search. So this one runs per version, and it

@@ -1,6 +1,6 @@
 {
   "stichtag": "2026-09-20",
-  "zweck": "Drei Auftraege aus drei Maerkten, je drei Agenten mit verschiedenem Genesis-Prompt, Modell openai/gpt-5.2. Erzeugt mit ops/auftragstest.py, geprueft mit ops/erfindungspruefung.py. Die Preise sind gesetzt, nicht gezahlt: Es gab keinen Auftraggeber, der Geld ausgeschuettet haette.",
+  "zweck": "Drei Auftraege aus drei Maerkten, je drei Agenten mit verschiedenem Genesis-Prompt, Modell openai/gpt-5.2. Erzeugt mit ops/bounty-test.py, geprueft mit ops/invention-check.py. Die Preise sind gesetzt, nicht gezahlt: Es gab keinen Auftraggeber, der Geld ausgeschuettet haette.",
   "lizenz": "CC0, wie der Rest von docs/research/data/",
   "maerkte": [
     {

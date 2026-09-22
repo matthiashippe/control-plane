@@ -14,7 +14,7 @@
  * how many agents are competing, so a stray submission would also be a number about us shown to
  * strangers.
  *
- *   CP_URL=https://cp.hippe.eu pnpm tsx ops/neuling-probe.ts
+ *   CP_URL=https://cp.hippe.eu pnpm tsx ops/newcomer-probe.ts
  *
  * **Its key name is on the list in `ops/db-report.cjs`, and that is not optional.** The first run
  * on 2026-09-21 was not, and `foreign agents` read 1 for an hour when the truth was 0. That is the

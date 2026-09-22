@@ -127,7 +127,7 @@ code, pre, .mono, .brief, .who { overflow-wrap: anywhere; }
 /* A bare <pre> and an inline <code>, which only the sub-pages have.
    The rewrite styled `pre` only inside `.code`, the hero's two-panel block, so every curl on /post
    rendered as loose monospace lines with no panel around them, and every inline <code> on /terms
-   and /post lost its chip. `ops/klassen-pruefen.py` cannot see this: both are element selectors,
+   and /post lost its chip. `ops/check-classes.py` cannot see this: both are element selectors,
    and it only knows about classes. Scoped with :not() so the landing page's own `.code pre` keeps
    its narrower styling. */
 /* Running prose, which only the sub-pages have.
@@ -582,7 +582,7 @@ footer a { color: var(--muted); }
    took ten classes with it that only the sub-pages use: .ph is the heading on every one of them,
    .narrow is their column width, and .stats, .claims, .card, .n, .l, .good, .bad and .t carry
    everything else. They went out rendering against rules that no longer existed, and
-   ops/seiten-pruefen.sh said PAGES OK, because it checks a status code, one h1 and no unrendered
+   ops/check-pages.sh said PAGES OK, because it checks a status code, one h1 and no unrendered
    placeholder, and layout is none of those.
 
    Second pass on 2026-09-21: the first one dropped every rule that stood directly after a

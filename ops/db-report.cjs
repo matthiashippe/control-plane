@@ -94,7 +94,7 @@ const OUR_KEY_NAMES = [
   "skill-production-check", "skill-check-buyer",
   "harness-%",            // provisionierung.ts, markt.ts
   "provisioned-key", "cleanup",
-  // ops/neuling-probe.ts. Added on 2026-09-21, an hour too late: the probe ran, its wallet was not
+  // ops/newcomer-probe.ts. Added on 2026-09-21, an hour too late: the probe ran, its wallet was not
   // on this list, and `foreign agents` read 1 when the truth was 0. That is the one number the
   // whole plan hangs on, and it lied because a new tool of ours arrived without its name.
   // Anything that provisions a key from ops/ belongs here in the same commit that creates it.
@@ -172,7 +172,7 @@ report.wallets_foreign_list = all(
 //
 // On 2026-09-22 at 02:05 UTC one did: three calls in one second from a Korean address, key named
 // `conway-automaton`, which is what the unmodified upstream runtime calls its own. The cycle only
-// noticed because `ops/verkehr.sh` printed a new IP. The report had the fact all along, as a count
+// noticed because `ops/traffic.sh` printed a new IP. The report had the fact all along, as a count
 // that went from 2 to 3, and nothing said so.
 report.wallets_foreign_new_24h = all(
   fremdeWallets.replace("select w.address from", "select w.address, w.created_at from") +

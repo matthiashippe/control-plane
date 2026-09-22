@@ -2,7 +2,7 @@
 """
 Compares two directory scans and shows what has moved.
 
-    python3 x402-vergleich.py old.csv new.csv
+    python3 x402-comparison.py old.csv new.csv
 
 A snapshot says what the market looks like. Only the comparison says whether it is growing, and on
 the way it answers a question that a single scan could not settle: a fresh `last_updated` only

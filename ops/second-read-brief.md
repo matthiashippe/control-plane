@@ -36,7 +36,7 @@ Was du pruefst, in dieser Reihenfolge:
    docs/without-control-plane.md, README.md, ops/README.md. Stimmt, was dort steht, mit dem Dienst
    ueberein? Ein Leser, der dem Artikel folgt, landet in diesen Dateien.
 
-4. DIE PRUEFUNGEN SELBST. `ops/check-all.sh`, `ops/vor-dem-artikel.py`, `ops/upstream-claims.py`,
+4. DIE PRUEFUNGEN SELBST. `ops/check-all.sh`, `ops/before-the-article.py`, `ops/upstream-claims.py`,
    die Tests unter `test/`. **Welche davon kann nicht fallen?** Eine Pruefung, die zwei Lesarten
    derselben Quelle vergleicht, ist Dekoration. Genau so eine hat am 21.09. sieben falsche Zahlen
    im Artikel durchgelassen. Nimm dir die Zeit, fuer jede wichtige Pruefung zu sagen, wodurch sie

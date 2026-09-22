@@ -134,10 +134,10 @@ service keeps running while it does:
 ls -la /opt/control-plane/backups/
 docker run --rm -v /opt/control-plane/backups:/bak:ro -v /opt/control-plane/repo/ops:/ops:ro \
   -e NODE_PATH=/app/node_modules --entrypoint node control-plane:latest \
-  /ops/restore-pruefen.cjs /bak/<file>.db
+  /ops/check-restore.cjs /bak/<file>.db
 ```
 
-`ops/restore-pruefen.cjs` checks `integrity_check`, `foreign_key_check`, whether every wallet matches
+`ops/check-restore.cjs` checks `integrity_check`, `foreign_key_check`, whether every wallet matches
 the sum of its ledger rows, whether every `settled` payment has its `topup` row and whether an x402
 nonce carries more than one credit. It ends with `exit 1` as soon as one of those checks fails. Only
 once it runs through is the outage justified.
@@ -172,7 +172,7 @@ is still there, do not start, catch up on step 3 instead.
 ```
 docker compose -f docker-compose.prod.yml start cp
 docker compose -f docker-compose.prod.yml logs --tail 50 cp
-docker compose -f docker-compose.prod.yml exec -T cp node - < /opt/control-plane/repo/ops/restore-pruefen.cjs
+docker compose -f docker-compose.prod.yml exec -T cp node - < /opt/control-plane/repo/ops/check-restore.cjs
 /opt/control-plane/repo/ops/smoke.sh
 ```
 
@@ -215,16 +215,16 @@ satisfied checks too early. That is why the stop comes before the copy and the c
 backup without `wallets.reserved_mc`, without `payments.balance_after_mc` and without the `kv` table
 was migrated in 0.94 seconds at startup, the columns and the table were added, the index
 `ledger_topup_ref` as well, the balances stayed unchanged, `/health` and `/v1/status` answered
-normally. `ops/restore-pruefen.cjs` reports missing columns as a hint and does not reject the backup.
+normally. `ops/check-restore.cjs` reports missing columns as a hint and does not reject the backup.
 Two after-effects remain: the price catalogue in `kv` is empty (step 6), and if the old backup holds
 an x402 nonce with two credits, `ledger_topup_ref` cannot be created. The start then carries on and
-only writes it to the log, where nobody sees it. That is exactly what `restore-pruefen.cjs` checks
+only writes it to the log, where nobody sees it. That is exactly what `check-restore.cjs` checks
 for with its duplicate-credit check.
 
 **The backup is empty and nobody notices.** A copy of the `.db` without its `-wal` has a complete
 schema, a size of 86 KB and `integrity_check: ok`, but not a single row. No size threshold catches
 that, and on restore every customer would stand at 0 credits. That is why `backup-vacuum.cjs` counts
-the rows in the backup against the source, and why `restore-pruefen.cjs` runs before it is put in.
+the rows in the backup against the source, and why `check-restore.cjs` runs before it is put in.
 
 ### Duration and outage
 
@@ -246,7 +246,7 @@ inside it.
 
 ### What has to hold afterwards
 
-`ops/restore-pruefen.cjs` checks all of this and ends with `exit 1` as soon as one of them does not
+`ops/check-restore.cjs` checks all of this and ends with `exit 1` as soon as one of them does not
 hold:
 
 - `PRAGMA integrity_check` is `ok`, `foreign_key_check` is empty.
@@ -280,7 +280,7 @@ measurement. Our own automaton is included in the number, so subtract one for th
 
 ## Before the article goes out
 
-`ops/vor-dem-artikel.py`. Reads the article, pulls its figures out and holds each one against what
+`ops/before-the-article.py`. Reads the article, pulls its figures out and holds each one against what
 the service and the daily series say today. Changes nothing, sends nothing. Exit 0 means the text
 matches the world; anything else names the sentences to fix and why.
 
@@ -299,7 +299,7 @@ What it cannot check, and says so: whether today is a good day to post.
 
 ## Does every class on every page have a rule
 
-`ops/klassen-pruefen.py`, part of `ops/check-all.sh`. Reads the served HTML of all seven pages and
+`ops/check-classes.py`, part of `ops/check-all.sh`. Reads the served HTML of all seven pages and
 holds every class in it against the stylesheet that came with it.
 
 `seite()` in `src/app.ts` builds every sub-page from the landing page's `<head>`, so /post, /terms,
@@ -307,7 +307,7 @@ holds every class in it against the stylesheet that came with it.
 landing page was rewritten on 2026-09-21 its CSS was replaced wholesale, and that took ten classes
 with it that only the sub-pages use: `.ph` is the heading on every one of them, `.narrow` their
 column width, and `.stats`, `.claims`, `.card`, `.n`, `.l`, `.good`, `.bad` and `.t` carry the rest.
-Six pages went out rendering against rules that no longer existed, and `ops/seiten-pruefen.sh` said
+Six pages went out rendering against rules that no longer existed, and `ops/check-pages.sh` said
 PAGES OK the whole time, because it checks a status code, one h1 and no unrendered placeholder, and
 a class that resolves to nothing is none of those.
 
@@ -335,7 +335,7 @@ them would have meant keeping an allow-list, and an allow-list is a hole in a ch
 
 ## Measuring the page at phone width
 
-`ops/seiten-pruefen.sh` checks that every page answers 200 with one h1 and nothing unrendered. It
+`ops/check-pages.sh` checks that every page answers 200 with one h1 and nothing unrendered. It
 says nothing about layout, and layout is where a phone visitor is lost. The one visitor this site
 has had from GitHub, on 2026-09-21 at 14:08 UTC, arrived on an Android phone.
 
@@ -473,7 +473,7 @@ It must never be treated as ours, and our own use of it is excluded one level up
 
 ## The whole cold start, once, before an article goes out
 
-`CP_URL=https://cp.hippe.eu pnpm tsx ops/neuling-probe.ts`, by hand, never by cron.
+`CP_URL=https://cp.hippe.eu pnpm tsx ops/newcomer-probe.ts`, by hand, never by cron.
 
 Every piece of the newcomer's path is checked on its own: the four calls that mint a key, the
 starter credit, the market, the MCP route. The claim the landing page makes is the *sequence*, and
@@ -499,7 +499,7 @@ First full run: 2026-09-21, twelve of twelve.
 
 ## Do the pages say anything obviously wrong
 
-`ops/seiten-pruefen.sh [base]`, part of `ops/check-all.sh` since 2026-09-21.
+`ops/check-pages.sh [base]`, part of `ops/check-all.sh` since 2026-09-21.
 
 `ops/smoke.sh` proves the API and the security headers. What the pages actually *say* had nothing
 looking at it, and twice in a row something visibly wrong went live: "1 jobs paid out", and one
@@ -518,7 +518,7 @@ all, their main heading was an `h2`.
 
 ## Who arrived, and what the visit became
 
-`ops/verkehr.sh [hours]`. The section **Foreign referrers, and what the visit became** is the one
+`ops/traffic.sh [hours]`. The section **Foreign referrers, and what the visit became** is the one
 the standing order asks for every cycle: whether the issue answers are a channel.
 
 A count of clicks answers the wrong question, and until 2026-09-21 a count was all it printed. A
@@ -581,7 +581,7 @@ objection anybody will raise: that this was an old version.
 
 A claim that fails only on `main` is not an error in anything published. It means somebody is
 fixing this upstream, which is the single most important thing that could happen to the article,
-and it has to go into the piece before it goes out rather than after. `ops/conway-zeitreihe.sh`
+and it has to go into the piece before it goes out rather than after. `ops/conway-series.sh`
 already reports that repository's last push every day; a new one is the signal to run this.
 
 ## How many newcomers can still start
@@ -604,7 +604,7 @@ per-day figure derived from that would be a trend nobody measured.
 
 ## The adversarial read
 
-`ops/gegenlese.sh`, about once a week. `--dry` prints the brief and starts nothing.
+`ops/second-read.sh`, about once a week. `--dry` prints the brief and starts nothing.
 
 On 2026-09-21 a job on the code-host went through the whole site and the article as a hostile
 reader and came back with 26 findings. Twelve loop cycles of checking had found none of them, and
@@ -613,7 +613,7 @@ tells you to click, add up the five numbers in the table. What was missing was n
 the angle. That does not fix itself, so it belongs in the rhythm rather than in whoever thinks of
 it.
 
-The brief lives in `ops/gegenlese-auftrag.md` and is versioned, so two reports are comparable. The
+The brief lives in `ops/second-read-brief.md` and is versioned, so two reports are comparable. The
 script appends the current article and the headings of the last report, so a run spends its time on
 new ground instead of rediscovering what has since been pinned.
 
@@ -666,7 +666,7 @@ past the end of the log it prints `PARTIAL`.
 
 ### Did anybody come back
 
-The last section of `ops/verkehr.sh`, and the only one that ignores the window and reads the whole
+The last section of `ops/traffic.sh`, and the only one that ignores the window and reads the whole
 log. Every other section reads 24 hours, so somebody who visits on Monday and again on Friday looks
 like two strangers.
 
@@ -699,7 +699,7 @@ that means what it looks like.
 
 ## Does a backup come back up
 
-`ops/sicherung-probe.sh`, by hand, not by cron. `--oldest` takes the oldest backup still kept
+`ops/backup-probe.sh`, by hand, not by cron. `--oldest` takes the oldest backup still kept
 instead of the newest.
 
 `ops/backup.sh` checks `integrity_check` and reconciles the ledger against the balances every
@@ -729,7 +729,7 @@ service's own start line stood in the log two lines below.
 
 ## Daily watch on the repository this project answers
 
-`ops/conway-zeitreihe.sh`, daily at 4:50 UTC by cron, into `/opt/control-plane/conway/repo.ndjson`,
+`ops/conway-series.sh`, daily at 4:50 UTC by cron, into `/opt/control-plane/conway/repo.ndjson`,
 one line per day.
 
 The article and the twelve issue answers rest on claims about the present tense of
@@ -747,7 +747,7 @@ Five unauthenticated GitHub calls a day, against a limit of sixty an hour.
 
 ## Time series of the x402 directories
 
-`ops/x402-zeitreihe.sh`, daily at 4:40 UTC by cron. Scans both public x402 directories (Coinbase and
+`ops/x402-series.sh`, daily at 4:40 UTC by cron. Scans both public x402 directories (Coinbase and
 PayAI) and writes to `/opt/control-plane/x402`:
 
 - `kennzahlen.ndjson`: one line per run. That is the series, it stays for good.
@@ -783,7 +783,7 @@ obvious alternative and was rejected, because it can drift away from the rows it
 and the resulting hole is invisible.
 
 **Why it exists.** The landing page and the article both claim that money still flows into a system
-that cannot issue an API key. That claim is measurable and it will age. `ops/vor-dem-artikel.py`
+that cannot issue an API key. That claim is measurable and it will age. `ops/before-the-article.py`
 now refuses to say READY when the newest transfer is more than seven days old, or when
 `GET /pay/5/<address>` stops answering 402.
 

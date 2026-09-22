@@ -11,10 +11,10 @@ mistakes happened while copying numbers by hand, all of them unnoticed when read
 found when recomputed.
 
 The German keys of the export are the schema of the published data set and stay as they are; the
-same holds for the keys read from .scratch/, which ops/auftragstest.py and
-ops/erfindungspruefung.py write.
+same holds for the keys read from .scratch/, which ops/bounty-test.py and
+ops/invention-check.py write.
 
-  ops/auftragstest-export.py
+  ops/bounty-test-export.py
 """
 import json, pathlib, sys, textwrap
 
@@ -44,8 +44,8 @@ def main() -> int:
     export = {
         "stichtag": "2026-09-20",
         "zweck": "Drei Auftraege aus drei Maerkten, je drei Agenten mit verschiedenem "
-                 "Genesis-Prompt, Modell openai/gpt-5.2. Erzeugt mit ops/auftragstest.py, geprueft "
-                 "mit ops/erfindungspruefung.py. Die Preise sind gesetzt, nicht gezahlt: Es gab "
+                 "Genesis-Prompt, Modell openai/gpt-5.2. Erzeugt mit ops/bounty-test.py, geprueft "
+                 "mit ops/invention-check.py. Die Preise sind gesetzt, nicht gezahlt: Es gab "
                  "keinen Auftraggeber, der Geld ausgeschuettet haette.",
         "lizenz": "CC0, wie der Rest von docs/research/data/",
         "maerkte": [],

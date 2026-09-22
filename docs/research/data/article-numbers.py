@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """The numbers from ../../artikel-agentenoekonomie.md, computed from the data set.
 
-Call from this directory: python3 artikel-zahlen.py
+Call from this directory: python3 article-numbers.py
 Every number that stands in the article and not in ../2026-09-19-nachfrage.md comes out here.
 """
 import csv, collections, datetime

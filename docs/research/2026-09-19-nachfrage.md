@@ -81,7 +81,7 @@ Social-Relay ist tot, Discussions sind deaktiviert, einen Discord gibt es nicht.
 
 ### Beleg
 
-Die Personenzahlen je Monat liefert `data/f2-betroffene.sh` (Issue-Liste und Zähldefinition stehen
+Die Personenzahlen je Monat liefert `data/f2-affected.sh` (Issue-Liste und Zähldefinition stehen
 im Kopf des Skripts). Ausgabe am 19.09.2026: Juli 6, August 12, September 3, gesamt 20, letzte
 30 Tage 11, letzte 14 Tage 3; mit den drei Grenzfällen gesamt 26.
 

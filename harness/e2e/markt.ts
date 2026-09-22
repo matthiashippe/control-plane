@@ -26,7 +26,7 @@
  * run signs in with them again. Everything the check actually checks is unchanged: the four calls,
  * the signature, the key, and every rule at the till. What is no longer re-checked on every run is
  * the very first sign-in of an address nobody has seen, and that has its own tool in
- * `ops/neuling-probe.ts`, which starts from nothing on purpose and is run deliberately because it
+ * `ops/newcomer-probe.ts`, which starts from nothing on purpose and is run deliberately because it
  * costs a starter grant. `--fresh` is here for the case where this one should do it too.
  *
  * Each run still mints a new API key for those two accounts, and that is deliberate. Minting one

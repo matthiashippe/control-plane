@@ -220,7 +220,7 @@ Social-Relay) erst, wenn Nachfrage messbar ist, also frühestens nach dem 19.10.
     schlecht ist, der Kaeufer verschwindet oder einem Agenten mitten in der Arbeit das Geld
     ausgeht. (d) Ein Kaltstart-Abschnitt sagt die Reihenfolge, in der die beiden Seiten gefuellt
     werden, und nennt die eine Zahl, an der man sieht, dass es funktioniert hat.
-    (e) `ops/journeys-pruefen.sh` haelt jeden im Dokument genannten Pfad gegen die laufende
+    (e) `ops/check-journeys.sh` haelt jeden im Dokument genannten Pfad gegen die laufende
     Instanz, mit Gegenprobe: ein erfundener Pfad muss den Lauf rot machen.
     Status: (a) bis (e) erledigt am 20.09.2026. Offen bleiben zwei Entscheidungen, die im Dokument
     benannt und nicht entschieden sind: ob eine Einreichung ihre Herkunft ausweisen muss (B3), und

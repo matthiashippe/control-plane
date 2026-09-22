@@ -6,7 +6,7 @@ weil er nach Hacker News soll. Das Posten macht Matthias selbst.
 ## Stand der Entscheidungen
 
 **Titel steht** (Matthias, 19.09.2026): "1,582 wallets funded an AI agent in February. By June,
-three were left." Die Zahl ist aus dem Datensatz gerechnet (`docs/research/data/artikel-zahlen.py`)
+three were left." Die Zahl ist aus dem Datensatz gerechnet (`docs/research/data/article-numbers.py`)
 und behauptet nichts, was nicht belegt ist. Die beiden Alternativen ("I scanned every USDC
 payment…" und "An agent economy died in nine months…") sind verworfen: die erste verschenkt die
 Pointe, die zweite überdehnt den Befund von einem Projekt auf eine ganze Ökonomie und wäre auf HN

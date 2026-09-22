@@ -184,7 +184,7 @@ describe("The market numbers in the database report", () => {
   it("names a stranger who provisioned in the last day, with what they have done since", () => {
     // On 2026-09-22 at 02:05 UTC a Korean address ran the three provisioning calls in one second
     // and took a key named `conway-automaton`, which is what the unmodified upstream runtime calls
-    // its own. The cycle only noticed because ops/verkehr.sh printed a new IP. The report had the
+    // its own. The cycle only noticed because ops/traffic.sh printed a new IP. The report had the
     // fact all along, as a count that went from 2 to 3, and nothing said so.
     const r = withDb((db) => {
       const wall = (address: string, name: string, when: string) => {

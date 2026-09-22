@@ -10,8 +10,8 @@
  * holding" is a thing an operator wants on the day something leaks, and that is the day nobody
  * wants to write it.
  *
- *   pnpm tsx ops/keys-zurueckgeben.ts --wallet harness/state/markt-poster.json
- *   pnpm tsx ops/keys-zurueckgeben.ts --wallet … --dry
+ *   pnpm tsx ops/return-keys.ts --wallet harness/state/markt-poster.json
+ *   pnpm tsx ops/return-keys.ts --wallet … --dry
  *
  * It only ever touches wallets whose private key is on this machine, so it cannot reach anybody
  * else's: the service scopes every revoke to the caller's own address, and the caller is whoever

@@ -75,8 +75,8 @@ Artikel ist.
   "code immer auf englisch immer immer immer immer".
 - **Ein Messwerkzeug gilt erst, wenn es in beide Richtungen bewiesen ist.** Jedes Skript in `ops/`,
   das "niemand war da", "kein Crawler", "null Fehler" oder "alles ok" melden kann, braucht einen
-  Schalter, mit dem sich ein gepflanzter Treffer nachweislich durchreichen lässt: `CP_TIEFE_LOG`,
-  `CP_SICHT_LOG`, `CP_FEHLERMUSTER`, `CONWAY_PROBE_TIMEOUT`, `CP_WINDOW_NOW`. Ohne diese
+  Schalter, mit dem sich ein gepflanzter Treffer nachweislich durchreichen lässt: `CP_DEPTH_LOG`,
+  `CP_VISIBILITY_LOG`, `CP_ERROR_PATTERN`, `CONWAY_PROBE_TIMEOUT`, `CP_WINDOW_NOW`. Ohne diese
   Gegenprobe ist die Null nicht von Blindheit zu unterscheiden. Am 22.09.2026 kostete das an
   einem Nachmittag fünf falsche Zahlen: die Tiefenmessung meldete unseren eigenen curl als ersten Leser, die Crawler-Erkennung
   ließ `meta-externalagent` durch, `errors_24h` suchte ein Wort, das nur im Antwort-Body steht, der

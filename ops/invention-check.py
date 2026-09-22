@@ -6,7 +6,7 @@ cannot judge taste, but they can judge invented facts, and in the markets we aim
 real risk: in the test run of 20.09. `opti-7734` wrote "Viewings available on short notice" into a
 Dubai listing, a promise the briefing does not contain and for which somebody is liable in the end.
 
-The script takes the results from ops/auftragstest.py and has every submission checked against its
+The script takes the results from ops/bounty-test.py and has every submission checked against its
 own briefing. Three kinds of finding are told apart because they weigh differently:
 `rechenfehler` derives a number from the briefing and gets it wrong, `widerspruch` says something
 other than the briefing, `unbelegt` says something that is neither in it nor follows from it.
@@ -27,7 +27,7 @@ kinds rechenfehler, widerspruch, unbelegt) stay German on purpose: the same name
 published data set docs/research/data/2026-09-20-auftragstest.json, which is linked from the
 landing page under CC0, and they can only be renamed together with it.
 
-  OPENROUTER_API_KEY=... ops/erfindungspruefung.py --ergebnisse <path/ergebnisse.json>
+  OPENROUTER_API_KEY=... ops/invention-check.py --ergebnisse <path/ergebnisse.json>
 """
 import argparse, json, os, pathlib, re, sys, unicodedata, urllib.error, urllib.request
 
@@ -137,7 +137,7 @@ def ask(model: str, briefing: str, submission: str, key: str, mode: str = "fakti
 
 def main() -> int:
     p = argparse.ArgumentParser()
-    p.add_argument("--ergebnisse", required=True, help="ergebnisse.json from ops/auftragstest.py")
+    p.add_argument("--ergebnisse", required=True, help="ergebnisse.json from ops/bounty-test.py")
     p.add_argument("--modell", default="openai/gpt-5.2")
     p.add_argument("--art", choices=sorted(INSTRUCTIONS), default="faktisch",
                    help="faktisch: every unsupported claim. schoepferisch: only what binds the "

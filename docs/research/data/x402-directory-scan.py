@@ -7,7 +7,7 @@ per-service demand data (calls and paying wallets over the last 30 days), and th
 value: it is the only public source for how much in the agent economy is actually bought instead
 of merely offered.
 
-    python3 x402-verzeichnis-scan.py > 2026-09-20-x402-verzeichnis.csv
+    python3 x402-directory-scan.py > 2026-09-20-x402-verzeichnis.csv
 
 Runtime about two minutes, no keys needed.
 """
@@ -29,7 +29,7 @@ def fetch(url: str, offset: int) -> dict:
 def main() -> None:
     writer = csv.writer(sys.stdout)
     # The column names stay German: they are the header of the CC0 files in this directory, which
-    # are published and documented in README.md, and x402-kennzahlen.py reads them by these names.
+    # are published and documented in README.md, and x402-metrics.py reads them by these names.
     # Renaming one here would make every CSV published so far unreadable for the script beside it.
     writer.writerow([
         "verzeichnis", "resource", "host", "x402_version", "netzwerk", "betrag_atomar",

@@ -88,7 +88,7 @@ export function ourAddresses(db: Db, addresses: string[]): Set<string> {
  * `/terms` says it says. Found by an adversarial read on 2026-09-22 (B8).
  *
  * So the split is computed once, here, and both the endpoint and the page take it from the same
- * call. `test/eigene-zahlen.test.ts` holds them against each other, because two places rendering
+ * call. `test/own-numbers.test.ts` holds them against each other, because two places rendering
  * the same fact from two queries is how the first version drifted.
  */
 export function wallets(db: Db, kind: "topup" | "inference"): { total: number; not_ours: number } {
