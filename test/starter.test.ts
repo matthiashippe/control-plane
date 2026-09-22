@@ -16,6 +16,7 @@ function account(db: ReturnType<typeof openDb>, app: ReturnType<typeof createApp
     address,
     claim: () => app.request("/v1/credits/starter", { method: "POST", headers: { authorization: key } }),
     noKey: () => app.request("/v1/credits/starter", { method: "POST" }),
+    read: () => app.request("/v1/credits/balance", { headers: { authorization: key } }),
     balance: () => (db.prepare("SELECT balance_mc FROM wallets WHERE address = ?").get(address) as { balance_mc: number }).balance_mc,
   };
 }
@@ -95,6 +96,40 @@ describe("The starter credit", () => {
   it("needs an API key, because the key is what proves a wallet", async () => {
     const { a } = setup();
     expect((await a.noKey()).status).toBe(401);
+  });
+
+  /**
+   * The endpoint a newcomer actually polls has to mention the credit waiting for them.
+   *
+   * On 2026-09-22 a stranger who had arrived through our answer in Conway issue #390 provisioned a
+   * runtime and then asked /v1/credits/balance twenty-eight times in thirteen minutes. Every answer
+   * was `{"balance_cents":0}` and nothing more, the grant was one POST away, and they left. So the
+   * three properties that make the answer useful are pinned: the invitation is there while a grant
+   * is available, it names the route, and it is gone once the grant is taken, because inviting
+   * somebody to claim what they already have is its own kind of wrong answer.
+   */
+  it("tells an address with nothing that a starter credit is waiting, and stops once it is taken", async () => {
+    const { a } = setup();
+    type Antwort = { balance_cents: number; starter_available_cents?: number; hint?: string };
+    const leer = (await (await a.read()).json()) as Antwort;
+    expect(leer.balance_cents).toBe(0);
+    expect(leer.starter_available_cents).toBe(GRANT_MC / MC_PER_CENT);
+    expect(leer.hint).toContain("POST /v1/credits/starter");
+
+    await a.claim();
+    const voll = (await (await a.read()).json()) as Antwort;
+    expect(voll.balance_cents).toBe(GRANT_MC / MC_PER_CENT);
+    expect(voll.starter_available_cents, "the grant is taken, so the invitation goes").toBeUndefined();
+    expect(voll.hint).toBeUndefined();
+  });
+
+  it("does not invite anybody to claim from an empty pool", async () => {
+    const { db, a } = setup();
+    const viele = Math.floor(POOL_MC / GRANT_MC);
+    for (let i = 0; i < viele; i++) claimStarter(db, `0x${String(i).padStart(40, "0")}`);
+    const antwort = (await (await a.read()).json()) as { balance_cents: number; hint?: string };
+    expect(antwort.balance_cents).toBe(0);
+    expect(antwort.hint, "a promise the pool cannot keep is worse than silence").toBeUndefined();
   });
 
   it("says in /v1/status how much is left, so the promise can be checked", async () => {

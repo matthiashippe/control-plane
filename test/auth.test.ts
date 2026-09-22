@@ -69,7 +69,17 @@ describe("SIWE provisioning", () => {
 
     const balance = await req("/v1/credits/balance", { headers: { authorization: key } });
     expect(balance.status).toBe(200);
-    expect(await balance.json()).toEqual({ balance_cents: 0 });
+    // This is where the route ends for a newcomer, and on 2026-09-22 a real one stopped here: a
+    // stranger who had come from Conway issue #390 provisioned exactly like this at 02:05 UTC and
+    // then asked this endpoint twenty-eight times. It answered `{"balance_cents":0}` every time.
+    // So the end of the provisioning route is pinned to say what happens next, not just that the
+    // balance is zero.
+    expect(await balance.json()).toEqual({
+      balance_cents: 0,
+      starter_available_cents: 15,
+      hint: expect.stringContaining("POST /v1/credits/starter"),
+      docs: expect.stringContaining("errors.md"),
+    });
   });
 
   it("stores the key only hashed and links it to the wallet", async () => {

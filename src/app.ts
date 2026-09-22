@@ -8,7 +8,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Hono } from "hono";
 import type { Db } from "./db.js";
-import { claimStarter, poolLeftMc, GRANT_MC, StarterError } from "./credits/starter.js";
+import { claimStarter, poolLeftMc, starterAvailableMc, GRANT_MC, StarterError } from "./credits/starter.js";
 import { verifyFindings, messages, type CheckMode } from "./check/fabrication.js";
 import { reviewBrief } from "./bounties/brief.js";
 import { receipts, PUBLICATION_FROM } from "./bounties/receipts.js";
@@ -519,7 +519,7 @@ export function createApp(opts: AppOptions) {
     if (!indexHtml) return c.json({ ok: true, version: VERSION, note: "no index page built" });
     return c.html(
       indexHtml
-        .replace("<!--NUMBERS-->", renderNumbers(db, mcToCents(GRANT_MC)))
+        .replace("<!--NUMBERS-->", renderNumbers(mcToCents(GRANT_MC), mcToCents(poolLeftMc(db))))
         .replace("<!--MARKET-->", renderMarket(db)),
     );
   });
@@ -1003,9 +1003,42 @@ export function createApp(opts: AppOptions) {
     await next();
   });
 
-  app.get("/v1/credits/balance", (c) =>
-    c.json({ balance_cents: getBalanceCents(db, c.get("address")) }),
-  );
+  /**
+   * What this address can spend, and the credit it has not claimed yet.
+   *
+   * The second half was added on 2026-09-22, out of a log rather than out of a backlog. A stranger
+   * arrived through our answer in Conway issue #390, provisioned a runtime at 02:05 UTC, and then
+   * between 04:01 and 04:14 asked this endpoint twenty-eight times. Every answer was
+   * `{"balance_cents":0}` and nothing else. After that a browser opened the same URL by hand, got
+   * the 401 it deserves, opened the landing page from the GitHub issue, and that was the end of it.
+   *
+   * The landing page, /post and /fix all promise that a newcomer's first job is paid out of our
+   * pool. The promise is real and it was sitting one POST away, and the one endpoint they actually
+   * polled never mentioned it. So it says it now, for as long as the pool still holds a grant for
+   * that address.
+   *
+   * Deliberately not granted automatically on provisioning: the pool is 33 grants and our own
+   * checks provision several times an hour, so an automatic grant would be spent on us within a
+   * day. Saying it out loud is the fix; handing it out in silence is a different and worse one.
+   *
+   * `balance_cents` keeps its name, its type and its place, because the runtime reads it.
+   */
+  app.get("/v1/credits/balance", (c) => {
+    const address = c.get("address");
+    const wartet = starterAvailableMc(db, address);
+    return c.json({
+      balance_cents: getBalanceCents(db, address),
+      ...(wartet > 0
+        ? {
+            starter_available_cents: mcToCents(wartet),
+            hint:
+              `POST /v1/credits/starter puts ${mcToCents(wartet)} cents on this address. Once per ` +
+              "address, free, out of the operator's pool, and it is what pays for your first job here.",
+            docs: DOC.transfers,
+          }
+        : {}),
+    });
+  });
 
   /**
    * Your own keys, and the way to turn one off.
