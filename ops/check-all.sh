@@ -40,9 +40,21 @@ if faellig mcp-production || faellig skill-production; then
   DEEP=1
   echo "(the production probes are due: their last clean run is more than a day old)"
 fi
-declare -a PASSED=() FAILED=()
+# A check has three possible answers, not two: yes, no, and "I could not look".
+#
+# Everything here asks our own service, where not being able to look is itself a failure worth a
+# red line. `ops/conway-zustand.sh` is the exception: it asks somebody else's service a question,
+# and a timeout at api.conway.tech (which reported 2 of 8 healthy workers on 22.09.) says nothing
+# about us. Until 2026-09-23 there was no third answer, so one such timeout printed CHECKS FAILED
+# for the loudest alarm this project has, next to a protocol entry claiming all seven were green.
+#
+# The third state is opt-in per check, via `--unklar-bei <code>`, because a check that is allowed
+# to shrug is a check that can stop working in silence.
+declare -a PASSED=() FAILED=() UNKLAR=()
 
 run() {
+  local unklar=""
+  if [[ "$1" == "--unklar-bei" ]]; then unklar="$2"; shift 2; fi
   local name="$1"; shift
   local out
   out=$("$@" 2>&1)
@@ -50,6 +62,9 @@ run() {
   if (( code == 0 )); then
     PASSED+=("$name")
     printf '  ok    %-34s %s\n' "$name" "$(printf '%s' "$out" | tail -1 | cut -c1-60)"
+  elif [[ -n "$unklar" ]] && (( code == unklar )); then
+    UNKLAR+=("$name")
+    printf '  ----  %-34s %s\n' "$name" "$(printf '%s' "$out" | tail -2 | head -1 | cut -c1-60)"
   else
     FAILED+=("$name")
     printf '  FAIL  %-34s exit %s\n' "$name" "$code"
@@ -70,7 +85,7 @@ run "health from outside" bash -c "code=\$(curl -s -o /dev/null -m 10 -w '%{http
 
 # Our own public claim about Conway. Returns 1 when their onboarding works again, which would make
 # the front page untrue.
-run "conway still broken" ./ops/conway-zustand.sh
+run --unklar-bei 2 "conway still broken" ./ops/conway-zustand.sh
 
 run "market guards" env CP_URL="$BASE" pnpm -s tsx harness/e2e/markt.ts
 run "journeys match the service" ./ops/journeys-pruefen.sh
@@ -222,9 +237,17 @@ else
 fi
 
 echo
+gesamt=$(( ${#PASSED[@]} + ${#FAILED[@]} + ${#UNKLAR[@]} ))
 if (( ${#FAILED[@]} == 0 )); then
-  echo "ALL CHECKS OK (${#PASSED[@]} of ${#PASSED[@]})"
+  # An undetermined check is not a pass, and the summary line is what gets copied into the
+  # protocol, so it has to carry the difference or the protocol inherits the lie.
+  if (( ${#UNKLAR[@]} )); then
+    echo "CHECKS OK (${#PASSED[@]} of $gesamt), NOT DETERMINED: ${UNKLAR[*]}"
+  else
+    echo "ALL CHECKS OK (${#PASSED[@]} of $gesamt)"
+  fi
   exit 0
 fi
 echo "CHECKS FAILED: ${FAILED[*]}"
+(( ${#UNKLAR[@]} )) && echo "NOT DETERMINED: ${UNKLAR[*]}"
 exit 1

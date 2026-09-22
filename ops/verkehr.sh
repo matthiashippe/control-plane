@@ -21,6 +21,14 @@ HOST="${CP_HOST:-root@76.13.144.207}"
 # otherwise shows up as a stranger probing exactly the new market paths. That is precisely the
 # signal we are waiting for, and it would be our own.
 OWN="${CP_OWN_IPS:-82.194.125.90 76.13.144.207 35.242.237.124}"
+# That list is a starting point, not the answer. Our own address is not a constant: on 2026-09-22
+# between 06:41 and 07:02 UTC this machine's line reconnected and got 62.224.55.59 instead of
+# 82.194.125.90, and the next run of this script presented our own check-all.sh as the best news
+# the service had ever had: a stranger who opened the page, walked on to nine more, and provisioned
+# two wallets. Every error a measurement makes about itself points the flattering way.
+#
+# So the list is now assembled from evidence, in `eigene_adressen` below, and what it adds is
+# printed. A filter that grows in silence can hide a real visitor just as easily.
 
 since=$(( $(date -u +%s) - HOURS * 3600 ))
 # Handed to jq as a JSON list, not as an expression assembled by hand: a `paste -d' and '` only
@@ -46,7 +54,32 @@ if [[ ! -s "$log" ]]; then
   exit 2
 fi
 
+# Who is us, according to this run rather than according to a constant typed in earlier.
+#
+# Two sources, both from the machine and log in front of us:
+#   1. the address the VM sees on our own ssh connection ($SSH_CLIENT), which is by definition the
+#      line every ops/ script here goes out through;
+#   2. every address that sent `control-plane-check/1.0`, the user agent only our own checks use.
+#
+# The second rule can be spoofed, and a stranger who sets that header would disappear from this
+# report. That trade is worth taking: a visitor hiding themselves is a far-fetched attack, the
+# addresses folded in are printed below, and the failure it prevents happened today.
+eigene_adressen() {
+  local lebend
+  lebend=$(timeout 15 ssh -i "$KEY" -o BatchMode=yes -o ConnectTimeout=8 "$HOST" 'echo "$SSH_CLIENT"' 2>/dev/null | awk '{print $1}')
+  local pruefer
+  pruefer=$(jq -r 'select(((.request.headers["User-Agent"] // [""])[0]) | startswith("control-plane-check")) | .request.remote_ip' "$log" 2>/dev/null | sort -u)
+  printf '%s\n' $OWN $lebend $pruefer | grep -v '^$' | sort -u
+}
+dazu=$(comm -13 <(printf '%s\n' $OWN | sort -u) <(eigene_adressen))
+OWN=$(eigene_adressen | tr '\n' ' ')
+own_json=$(printf '%s' "$OWN" | tr ' ' '\n' | grep -v '^$' | jq -R . | jq -sc .)
+
 echo "Requests to cp.hippe.eu in the last $HOURS hours"
+if [[ -n "$dazu" ]]; then
+  echo "(counted as ours beyond the configured list: $(printf '%s' "$dazu" | tr '\n' ' '))"
+  echo "(if one of these is here to stay, put it in CP_OWN_IPS so the reason is written down)"
+fi
 echo
 
 echo "-- First request per foreign IP (this is where the referrer is) --"

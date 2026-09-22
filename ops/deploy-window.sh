@@ -28,6 +28,13 @@ HOST="${CP_HOST:-root@76.13.144.207}"
 OWN="${CP_OWN_IPS:-82.194.125.90 76.13.144.207 35.242.237.124}"
 SSH=(ssh -i "$KEY" -o BatchMode=yes -o ConnectTimeout=10)
 
+# Plus the address this machine goes out through right now, asked of the VM rather than assumed.
+# The constant above went stale on 2026-09-22 when the line reconnected, and in this script that
+# would have counted our own post-deploy checks as strangers inside the window: the one number the
+# script exists to produce, wrong in the direction that looks like traffic.
+lebend=$(timeout 15 "${SSH[@]}" "$HOST" 'echo "$SSH_CLIENT"' 2>/dev/null | awk '{print $1}')
+[[ -n "$lebend" ]] && OWN="$OWN $lebend"
+
 started=$("${SSH[@]}" "$HOST" 'docker inspect deploy-cp-1 --format "{{.State.StartedAt}}"' 2>/dev/null || true)
 if [[ -z "$started" ]]; then
   echo "FAILED: could not read the container start time." >&2
