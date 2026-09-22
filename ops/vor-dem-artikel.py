@@ -138,7 +138,9 @@ def main() -> int:
         aendern("the CSV could not be re-run", "without it the article's figures are unchecked")
     else:
         paare = [
-            ("distinct services", r"so ([\d,]+) distinct services", "urls_eindeutig"),
+            # Reworded on 2026-09-22 when the first paragraph started showing its subtraction.
+            # The check noticed, which is what it is for.
+            ("distinct services", r"leaves ([\d,]+) distinct service URLs", "urls_eindeutig"),
             ("providers", r"behind ([\d,]+) providers", "anbieter"),
             ("calls in 30 days", r"were paid for ([\d,]+) calls", "aufrufe_30d"),
             ("services with 20+ payers", r"([\d,]+) have twenty or more", "mit_20_zahlern"),
@@ -395,6 +397,58 @@ def main() -> int:
                         "article does not say so",
                         "that paragraph exists to show demand from strangers, and /conway already "
                         "marks the same transfer as ours")
+
+    # 4e-bis. The scan totals and the one arithmetic a reader does in the first paragraph.
+    #
+    # Six sentences were checked by nobody until an adversarial read did them by hand: the reader's
+    # own sum in paragraph one came out 19 too high because duplicates inside PayAI were never
+    # mentioned, "over nine months" covered eight months with money in them, and the transfer
+    # totals belong to a scan that ends at 03:55 while /conway keeps counting.
+    if kurve.exists():
+        import csv as _csv2
+
+        alle = list(_csv2.DictReader(kurve.open()))
+        conway = {
+            "transfers": len(alle),
+            "wallets": len({r["from"].lower() for r in alle}),
+            "usdc": round(sum(float(r["usdc"]) for r in alle)),
+            "monate": len({r["timestamp_utc"][:7] for r in alle}),
+        }
+        for name, muster, soll in [
+            ("transfer events", r"([\d,]+) transfer events", conway["transfers"]),
+            ("distinct wallets", r"from ([\d,]+) distinct wallets", conway["wallets"]),
+            ("USDC in total", r"([\d,]+) USDC from", conway["usdc"]),
+        ]:
+            m = re.search(muster, text)
+            if not m:
+                aendern(f"the sentence about {name} is gone", f"the check looked for /{muster}/")
+            elif zahl(m.group(1)) != soll:
+                aendern(f"{name}: the text says {zahl(m.group(1)):,}, the CSV says {soll:,}",
+                        "the article invites the reader to re-run this against that file")
+            else:
+                ok(name, f"{soll:,}")
+        m = re.search(r"over the ([a-z]+) months that carry any", text)
+        wortzahl = {"seven": 7, "eight": 8, "nine": 9, "ten": 10}
+        if m and wortzahl.get(m.group(1)) != conway["monate"]:
+            aendern(f"the text says {m.group(1)} months with money, the CSV has {conway['monate']}",
+                    "January is in the scan and empty, which is why this is not the span of the scan")
+        elif m:
+            ok("months that carry money", str(conway["monate"]))
+
+    # The reader's own subtraction in the first paragraph.
+    m = re.search(r"([\d,]+) services from Coinbase and ([\d,]+) entries from the PayAI", text)
+    m2 = re.search(r"([\d,]+) of those are\s+the same service listed in both directories and another ([\d,]+) are listed twice", text)
+    m3 = re.search(r"leaves ([\d,]+) distinct service URLs", text)
+    if m and m2 and m3:
+        gerechnet = zahl(m.group(1)) + zahl(m.group(2)) - zahl(m2.group(1)) - zahl(m2.group(2))
+        if gerechnet != zahl(m3.group(1)):
+            aendern(f"the first paragraph adds up to {gerechnet:,} and then says {zahl(m3.group(1)):,}",
+                    "it is the only sum a reader can do in their head, and it sits in the opening")
+        else:
+            ok("the first paragraph adds up", f"{gerechnet:,}")
+    else:
+        aendern("the first paragraph no longer shows its subtraction",
+                "without the duplicates named, a reader's sum comes out 19 too high")
 
     # 4f. Discussions and issue trackers are two different figures.
     if re.search(r"Discussions are off on the main repository", text):
