@@ -1056,7 +1056,7 @@ export function createApp(opts: AppOptions) {
         "the Bearer prefix; both work, so the prefix is not what is wrong here. Either this " +
         "request carries no key, or it is not a key of this control plane: one from another " +
         "instance does not work. Get one with `automaton --provision` against this instance, " +
-        "or walk the three auth endpoints yourself (nonce, verify, api-keys).",
+        "or walk the three auth endpoints yourself, starting at /v1/auth/nonce.",
     );
 
   app.use("/v1/*", async (c, next) => {

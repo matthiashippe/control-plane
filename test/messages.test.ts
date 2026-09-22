@@ -159,6 +159,9 @@ describe("authentication: the Conway wording stays, the way stands next to it", 
     // prefix that was never the problem.
     expect(body.message).toMatch(/raw or with the Bearer prefix/);
     expect(body.message).toMatch(/automaton --provision/);
+    // A path they can call, not three words they have to look up. ops/fremder-client.sh walks in
+    // from outside and stopped here: "(nonce, verify, api-keys)" names the steps and no URL.
+    expect(body.message, "somebody with no runtime needs a path to start at").toMatch(/\/v1\/auth\/nonce/);
     expect(body.message).toContain("automaton --provision");
     expect(body.docs).toContain("#authentication");
   });
