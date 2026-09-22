@@ -244,7 +244,7 @@ print()
 for mark in MARKS:
     who = [ip for ip in readers if pixel[ip].get(mark)]
     share = f"{len(who) / len(readers) * 100:.0f}%" if readers else "-"
-    print(f"  {WHAT[mark]:<28} {len(who):>3} of {len(readers)}  {share}")
+    print(f"  {WHAT[mark]:<34} {len(who):>3} of {len(readers)}  {share}")
 print()
 print("  A lazy image is fetched when it comes near the viewport, which is close to being read and")
 print("  is not the same thing. This is a floor for attention, never a proof of it.")
