@@ -269,7 +269,7 @@ echo
 # Did anybody come back?
 #
 # Every other section here reads one window, so somebody who visits on Monday and again on Friday
-# looks like two strangers. Working it out by hand on 2026-09-23 took one query and produced the
+# looks like two strangers. Working it out by hand on 2026-09-22 took one query and produced the
 # first new fact in hours: 2 of 46 foreign addresses had been here on more than one day, and both
 # were tools walking API paths rather than people.
 #
@@ -306,7 +306,7 @@ jq -r --argjson own "$own_json" \
 echo
 # And the same question one level up, because an address is not a visitor.
 #
-# On 2026-09-23 the log held 50 foreign addresses in 41 /24 networks. One of those networks,
+# On 2026-09-22 the log held 50 foreign addresses in 41 /24 networks. One of those networks,
 # 205.169.39.x, had five addresses and thirteen requests spread over three days, all with the same
 # two Windows user agents. Counted by address that is five strangers who each came once; counted by
 # network it is one thing that keeps coming back, which is the more useful reading and the one

@@ -4,7 +4,7 @@
  * `POST /v1/check` finds claims the brief does not support, which is the expensive half and the
  * one worth paying for. The cheap half sits in the brief in plain sight: a word limit, a list of
  * words that must not appear, no exclamation marks, one sentence. A buyer reading three
- * submissions does that by hand and badly, and on 2026-09-23 this operator was about to.
+ * submissions does that by hand and badly, and on 2026-09-22 this operator was about to.
  *
  * It reports and never refuses, so these pin that it reports the right things and stays quiet on
  * work that keeps to the brief. The first version missed "10 words maximum. One sentence." because
@@ -74,6 +74,9 @@ describe("the formal check against a brief", () => {
 describe("hours left on a job", () => {
   const jetzt = Date.parse("2026-09-22T17:20:00Z");
   it("counts the hours while the job is open", () => {
+    // The real deadline of job 0a10d826, not a date in prose: a blanket sed over this file on
+    // 2026-09-22 pulled it back a day along with four comments that genuinely had the wrong date,
+    // and the test caught it. A replacement that cannot tell a fact from a typo is a typo.
     expect(nochOffenStunden("2026-09-23T17:47:50.175Z", jetzt)).toBeCloseTo(24.46, 1);
   });
   it("is zero once the deadline has passed, which is what lets an award through", () => {

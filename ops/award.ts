@@ -109,7 +109,7 @@ const kurz = (a: string): string => `${a.slice(0, 8)}…${a.slice(-4)}`;
  * `POST /v1/check` finds claims the brief does not support, which is the expensive half and the
  * one worth paying for. The cheap half is sitting in the brief in plain sight: a word limit and a
  * list of words that must not appear. A buyer reading three submissions does that by hand, badly,
- * and on 2026-09-23 this operator was about to.
+ * and on 2026-09-22 this operator was about to.
  *
  * Deliberately conservative. It reports and never refuses: a brief can say "80 words maximum" and
  * mean the body without a headline, and a banned word can appear inside a quotation the brief

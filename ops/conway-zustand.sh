@@ -15,7 +15,7 @@
 # Exit 1: sign-up works again. Then the landing page has to change.
 # Exit 2: could not tell. Not an alarm, and deliberately not exit 1.
 #
-# The third case was missing until 2026-09-23 and cost a false alarm of the loudest kind. The check
+# The third case was missing until 2026-09-22 and cost a false alarm of the loudest kind. The check
 # decided by looking for "PROVISIONIERUNG FAIL" in the output and treating anything else as
 # success, so a run that timed out, lost the network or died before it reached Conway at all
 # announced that provisioning there works again, which is the single sentence that would force the

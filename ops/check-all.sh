@@ -45,7 +45,7 @@ fi
 # Everything here asks our own service, where not being able to look is itself a failure worth a
 # red line. `ops/conway-zustand.sh` is the exception: it asks somebody else's service a question,
 # and a timeout at api.conway.tech (which reported 2 of 8 healthy workers on 22.09.) says nothing
-# about us. Until 2026-09-23 there was no third answer, so one such timeout printed CHECKS FAILED
+# about us. Until 2026-09-22 there was no third answer, so one such timeout printed CHECKS FAILED
 # for the loudest alarm this project has, next to a protocol entry claiming all seven were green.
 #
 # The third state is opt-in per check, via `--unklar-bei <code>`, because a check that is allowed

@@ -670,7 +670,7 @@ The last section of `ops/verkehr.sh`, and the only one that ignores the window a
 log. Every other section reads 24 hours, so somebody who visits on Monday and again on Friday looks
 like two strangers.
 
-Worked out by hand on 2026-09-23 and it produced the first new fact in hours: 2 of 46 foreign
+Worked out by hand on 2026-09-22 and it produced the first new fact in hours: 2 of 46 foreign
 addresses had been here on more than one day, and both were tools walking API paths rather than
 people. `23.23.253.54` called `/v1/auth/verify`, `/v1/credits/history` and `/v1/submissions` by GET
 without a key over two days; `31.77.203.199` is the scanner that appends `/v1/models` to every path
@@ -683,7 +683,7 @@ that answer changes without warning.
 
 ### The same, by network
 
-The section under it, and the reason both exist. On 2026-09-23 the log held 50 foreign addresses in
+The section under it, and the reason both exist. On 2026-09-22 the log held 50 foreign addresses in
 41 /24 networks. One of those, `205.169.39.x`, had five addresses and thirteen requests over three
 days, all carrying the same two Windows user agents. Counted by address that is five strangers who
 each came once. Counted by network it is one thing that keeps coming back, and the by-address

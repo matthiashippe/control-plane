@@ -37,7 +37,8 @@ export function renderFix(): string {
       <p class="sub">
         Two endpoints, one broken. Provisioning has failed for every fresh wallet since July 2026,
         and money has reached the payment address in every month since February. The first line below is what the issue
-        tracker has reported since July and what we measured by hand on 21 September; the second is
+        tracker has reported since July and what our own provisioning attempt with a fresh wallet
+        answers on every check we run, most recently with the same 500; the second is
         checked every day at 05:00 UTC and its history is on <a href="/conway">the money page</a>.
       </p>
 

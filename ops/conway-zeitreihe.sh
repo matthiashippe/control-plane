@@ -28,9 +28,13 @@ api() {
   curl -fsS -m 30 -H "Accept: application/vnd.github+json" "https://api.github.com/$1"
 }
 
+# No apostrophe anywhere below, not even inside a Python comment: this heredoc sits inside a
+# $( ) substitution, bash lexes the substitution before the heredoc quoting applies, and a single
+# ' makes it hunt for a closing quote to the end of the file. The error it then prints names the
+# last line of the script, a hundred lines away from the cause. Cost twenty minutes on 2026-09-22.
 line="$(
   python3 - "$REPO" <<'PY'
-import json, sys, urllib.request, datetime
+import json, os, sys, urllib.request, datetime
 
 repo = sys.argv[1]
 
@@ -38,6 +42,29 @@ def api(path):
     req = urllib.request.Request(f"https://api.github.com/{path}", headers={"Accept": "application/vnd.github+json"})
     with urllib.request.urlopen(req, timeout=30) as r:
         return json.load(r)
+
+# What the service says about itself, read-only, no account and no write.
+#
+# Added on 2026-09-22. Everything else in this line is about the repository; this is the only
+# number about the running service that can be had without knocking on the sign-up, which is a
+# write on infrastructure that is not ours and stays a decision for a person. api.conway.tech
+# answers "healthy" while reporting 2 of 8 healthy workers, and that ratio is the one public
+# figure that would move if the thing behind the 500 were repaired.
+def dienst():
+    # The URL is a variable so the failure path can be shown rather than argued: point
+    # CONWAY_SERVICE_URL at something dead and the four fields have to come out null, not zero.
+    url = os.environ.get("CONWAY_SERVICE_URL") or "https://api.conway.tech/"
+    try:
+        req = urllib.request.Request(url, headers={"Accept": "application/json"})
+        with urllib.request.urlopen(req, timeout=20) as r:
+            d = json.load(r)
+        return d.get("status"), d.get("workers"), d.get("healthyWorkers"), d.get("version")
+    except Exception:
+        # None, not zero: a request that did not arrive is not a service with no workers, and a
+        # zero here would read as the loudest possible news on the day the network hiccups.
+        return None, None, None, None
+
+status, workers, healthy, version = dienst()
 
 meta = api(f"repos/{repo}")
 search = api(f'search/issues?q=repo:{repo}+%22auth/verify%22+OR+%22Invalid+or+expired+nonce%22&sort=created&order=desc&per_page=1')
@@ -72,6 +99,10 @@ print(json.dumps({
     "pr370_state": pr370.get("state"),
     "fork_local_last_push": fork.get("pushed_at"),
     "fork_local_stars": fork.get("stargazers_count"),
+    "service_status": status,
+    "service_version": version,
+    "service_workers": workers,
+    "service_healthy_workers": healthy,
 }, separators=(",", ":")))
 PY
 )"

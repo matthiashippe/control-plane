@@ -85,15 +85,23 @@ describe("/fix", () => {
   it("claims a daily measurement only for the half that is measured daily", async () => {
     const html = await page("/fix");
     // The page showed both lines under "measured on every run of our daily scan". The daily scan
-    // (ops/conway-money-series.sh) only calls GET /pay/5/<address>; nothing anywhere signs a SIWE
-    // message against api.conway.tech, and the repo series carries no field for it. So half of
-    // that sentence was a measurement nobody takes, on the page that exists to be trusted by
-    // somebody whose wallet is draining.
+    // (ops/conway-money-series.sh) only calls GET /pay/5/<address>, so half of that sentence was a
+    // measurement nobody takes, on the page that exists to be trusted by somebody whose wallet is
+    // draining.
+    //
+    // The replacement said "measured by hand on 21 September", and this test held it there. By
+    // 2026-09-22 that was false in the other direction: harness/e2e/provisionierung.ts signs a
+    // SIWE message against api.conway.tech, ops/conway-zustand.sh runs it, and check-all.sh runs
+    // that on every cycle. The page was underselling its own evidence with a date that ages by a
+    // day every day. So what is required now is that each half names its own source and that only
+    // the daily one claims to be daily.
     const text = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
     expect(text, "the daily claim has to name what is actually daily")
       .toMatch(/second is\s+checked every day/i);
-    expect(text, "and the other half has to carry its own source")
-      .toMatch(/measured by hand on 21 September/i);
+    expect(text, "and the sign-up half must not borrow that claim")
+      .not.toMatch(/sign-up[^.]*checked every day|every day[^.]*auth\/verify/i);
+    expect(text, "the sign-up half has to name where its answer comes from")
+      .toMatch(/provisioning attempt with a fresh wallet answers on every check we run/i);
   });
 
   it("warns that the same runtime buys here too, before it touches the free credit", async () => {
