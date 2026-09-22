@@ -6,7 +6,7 @@ Rechnet die Kennzahlen zur x402-Nachfrage aus dem Verzeichnis-Scan.
 
 Jede Zahl, die im Artikel steht, kommt aus diesem Skript. Wer sie anzweifelt, laesst es laufen.
 """
-import csv, collections, datetime, json, statistics, sys
+import csv, collections, datetime, json, pathlib, statistics, sys
 
 STICHTAG = datetime.datetime(2026, 9, 20, tzinfo=datetime.timezone.utc)
 
@@ -58,8 +58,62 @@ def kennzahlen(zeilen: list) -> dict:
     }
 
 
+def datensatz(zeilen: list, pfad: str) -> dict:
+    """Die veroeffentlichte Kennzahlen-JSON, aus der CSV daneben.
+
+    Diese Datei lag bis zum 22.09.2026 von Hand gebaut im Verzeichnis, und weil sie von Hand
+    gebaut war, ueberlebte sie die Korrektur der CSV nicht: sie trug weiter die sieben Zahlen
+    eines lokalen Laufs von 03:22 UTC (15.189 statt 15.192, 20.783 statt 20.789, 867.827 statt
+    867.813 und so fort), waehrend die README zwei Abschnitte weiter genau diese Abweichung als
+    den Fehler beschrieb und dieselbe Datei trotzdem empfahl. Eine gegnerische Lesung fand es.
+
+    Jetzt kommt sie aus derselben CSV, die daneben liegt:
+
+        python3 x402-kennzahlen.py 2026-09-21-x402-verzeichnis.csv --dataset > 2026-09-21-x402-kennzahlen.json
+
+    Wer die Datei anzweifelt, laesst den Befehl laufen und vergleicht.
+    """
+    cdp = [r for r in zeilen if r["verzeichnis"] == "cdp"]
+    payai = [r for r in zeilen if r["verzeichnis"] == "payai"]
+    mit = [c for c in (zahl(r["calls_30d"]) for r in cdp) if c is not None]
+    srt = sorted(mit, reverse=True)
+    p_ = [x for x in (zahl(r["unique_payers_30d"]) for r in cdp) if x is not None]
+    mit_daten = [r for r in cdp if zahl(r["calls_30d"]) is not None]
+    groesster = max(mit_daten, key=lambda r: zahl(r["calls_30d"])) if mit_daten else None
+    return {
+        "measured_on": pathlib.Path(pfad).name[:10],
+        "source": f"docs/research/data/{pathlib.Path(pfad).name}",
+        "coinbase_entries": len(cdp),
+        "payai_entries": len(payai),
+        "in_both": len({r["resource"] for r in cdp} & {r["resource"] for r in payai}),
+        "distinct_services": len({r["resource"] for r in zeilen}),
+        "providers": len({r["host"] for r in zeilen if r["host"]}),
+        "with_demand_data": len(mit),
+        "without_demand_data": len(cdp) - len(mit),
+        "calls_30d_total": sum(mit),
+        "top10_share_percent": round(sum(srt[:10]) / sum(mit) * 100, 1) if mit else 0,
+        "top100_share_percent": round(sum(srt[:100]) / sum(mit) * 100, 1) if mit else 0,
+        "largest_service": {
+            "url": groesster["resource"],
+            "calls_30d": zahl(groesster["calls_30d"]),
+            "payers_30d": zahl(groesster["unique_payers_30d"]),
+            "share_percent": round(zahl(groesster["calls_30d"]) / sum(mit) * 100, 1),
+        } if groesster and mit else None,
+        "services_with_20_or_more_payers": sum(1 for x in p_ if x >= 20),
+        "note": (
+            "Coinbase fills the demand fields late, so a scan covers only the services that "
+            "already carry them: see with_demand_data against coinbase_entries. calls_30d_total "
+            "is one day's reading of a trailing 30-day window and not a running count, so it "
+            "moves in both directions."
+        ),
+    }
+
+
 def main(pfad: str) -> None:
     zeilen = [r for r in csv.DictReader(open(pfad))]
+    if "--dataset" in sys.argv:
+        print(json.dumps(datensatz(zeilen, pfad), indent=4))
+        return
     if "--json" in sys.argv:
         print(json.dumps(kennzahlen(zeilen), separators=(",", ":")))
         return

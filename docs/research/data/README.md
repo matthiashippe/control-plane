@@ -86,6 +86,18 @@ Zaehlung. Die Verteilung ist der belastbare Teil.
 Die Kennzahlen desselben Laufs als JSON, also das Ergebnis von `x402-kennzahlen.py` in
 maschinenlesbar. Wer nur die Verteilung braucht, nimmt diese Datei und nicht die 3,2 MB CSV.
 
+Sie wird erzeugt, nicht getippt:
+
+```
+cd docs/research/data
+python3 x402-kennzahlen.py 2026-09-21-x402-verzeichnis.csv --dataset > 2026-09-21-x402-kennzahlen.json
+```
+
+Bis zum 22.09.2026 war sie von Hand gebaut, und genau deshalb hat sie die Korrektur der CSV nicht
+ueberlebt: sie trug weiter die sieben Kopfzahlen des lokalen Laufs von 03:22 UTC, die der Abschnitt
+oben als den Fehler beschreibt, waehrend dieser Abschnitt sie empfahl. `ops/daten-pruefen.py` haelt
+sie seither gegen ihre eigene CSV und laeuft in `ops/check-all.sh` mit.
+
 ## Lizenz
 
 CC0 1.0 Universal, siehe `LICENSE.md` in diesem Verzeichnis. Das weicht bewusst von der

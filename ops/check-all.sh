@@ -108,6 +108,11 @@ run "the daily jobs still ran" ./ops/freshness.sh
 # sign-up, for the same reason.
 run --unklar-bei 2 "our claims about the runtime hold" python3 ./ops/upstream-claims.py
 
+# Every published dataset against the CSV beside it. See ops/daten-pruefen.py: the file that
+# carried the article's numbers was built by hand, survived the correction of its own source, and
+# the README two sections down described the discrepancy while recommending the file.
+run --unklar-bei 2 "the published data reproduces" ./ops/daten-pruefen.py
+
 if (( DEEP )); then
   run "MCP route end to end" env CP_URL="$BASE" OPERATOR_WALLET="${OPERATOR_WALLET:-harness/state/mainnet-wallet.json}" pnpm -s tsx ops/mcp-against-production.ts \
     && touch "$STAMPS/mcp-production"

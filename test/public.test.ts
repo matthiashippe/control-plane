@@ -934,6 +934,32 @@ describe("The buyer leads, not the plumbing", () => {
    * config line to the same reader, and a warning that lives only on the page somebody happens to
    * read second is a warning that arrives after the five dollars are gone.
    */
+  /**
+   * The claim next to the config line names the run, not an endpoint.
+   *
+   * It read "The same call answers 200 here", three lines under a curl that works with nothing, so
+   * a reader tries the bare call. `POST /v1/auth/verify` with an empty body answers
+   * `400 Malformed SIWE message` here, and on 2026-09-22 api.conway.tech answered 400 to the same
+   * request: the naive test shows parity, not an advantage. An adversarial read found it (B16).
+   *
+   * The real difference is the whole provisioning run, which is what `ops/conway-zustand.sh`
+   * measures every day in ops/check-all.sh: their `verify` answers 500 with a database error and
+   * ours completes. So the sentence points at the command the check actually runs, and this test
+   * keeps it pointing there.
+   */
+  it("claims what the daily check measures, which is the provisioning run", async () => {
+    const { app } = setup();
+    const html = await (await app.request("/")).text();
+    const von = html.indexOf('id="agents"');
+    const abschnitt = html.slice(von, html.indexOf("</section>", von));
+    expect(abschnitt, "the claim has to name the run ops/conway-zustand.sh exercises").toMatch(
+      /automaton --provision<\/code> finishes here/,
+    );
+    expect(abschnitt, "and not invite a bare call that answers 400 on both sides").not.toMatch(
+      /The same call answers 200/i,
+    );
+  });
+
   it("warns about the five dollars wherever it shows the config line", async () => {
     const { app } = setup();
     const html = await (await app.request("/")).text();
