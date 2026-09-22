@@ -615,7 +615,7 @@ h1.ph { font-size: clamp(1.5rem, 3.2vw, 2.1rem); line-height: 1.15; letter-spaci
 .receipt .t { color: var(--muted); }
 .receipt .amt { font-weight: 640; white-space: nowrap; }
 .receipt .who { font-family: ui-monospace, monospace; font-size: .82rem; color: var(--dim); white-space: nowrap; }
-.receipt { grid-template-columns: 1fr 1fr; }
+.receipt { grid-template-columns: minmax(0,1fr) minmax(0,1fr); }
 .stats div { background: var(--panel); padding: 1.4rem 1.3rem; }
 .stats .n { display: block; font-size: clamp(1.9rem, 3.6vw, 2.7rem); font-weight: 680; letter-spacing: -.035em; line-height: 1; }
 .stats .n.good { color: var(--accent); }
@@ -650,6 +650,27 @@ h1.ph { font-size: clamp(1.5rem, 3.2vw, 2.1rem); line-height: 1.15; letter-spaci
 .stats { display: grid; gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: var(--r-pan); overflow: hidden; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); }
 .claims { border: 1px solid var(--line); border-radius: var(--r-pan); overflow: hidden; }
 .two { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr)); }
+
+/* Below 24rem two columns cannot hold a receipt. Measured on 2026-09-23 at 320 px, the width of an
+   iPhone SE and the narrowest phone still in use: `.amt` carries "180 ¢ paid, 20 ¢ commission" with
+   white-space: nowrap, which needs 227 px, and half of 320 is 160. The line ran to 346 px,
+   twenty-six past the edge, on the one section of the landing page that shows money actually
+   changing hands.
+   `1fr` without minmax made it worse than it had to be: a grid track refuses to go below its
+   content by default, so the column pushed the page rather than clipping.
+   This sits at the END of the stylesheet, after every rule it has to beat. Nesting one @media inside
+   another is CSS Nesting, which this stylesheet does not otherwise use; the first attempt nested it inside the 48rem block, where it did nothing at all, and the
+   second put it before that block, where the cascade overrode it. Same measurement both times. */
+@media (max-width: 24rem) {
+  .receipt { grid-template-columns: minmax(0,1fr); }
+  .receipt .amt { text-align: left; }
+  /* The same width, the same cause, a different element. `.claims a` is nowrap so the little
+     arrow never ends up alone on a line, and on /post one of those links reads "a worked example,
+     with the twelve findings", which is 308 px of unbreakable text in a 261 px column. Measured at
+     320 px: it ran to 346. Below this width the arrow sharing a line with the last word is the
+     smaller price. */
+  .claims a { white-space: normal; }
+}
 </style>
 </head>
 <body>
