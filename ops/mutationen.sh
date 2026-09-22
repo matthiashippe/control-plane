@@ -15,12 +15,10 @@
 #
 # Exit 0 when every mutation is caught, 1 when one survives, 2 when it could not tell.
 #
-# One mutation is reliably "could not tell" here and is not a gap in the suite: breaking the
-# publication rule in src/bounties/receipts.ts makes a run inside this loop collect 76 of the 514
-# tests, reproducibly, while the identical mutation applied and run by hand collects all 514 and
-# turns 10 of them red. Twice checked that way on 2026-09-22. Why the loop changes what vitest
-# collects is not understood, so the script says so instead of guessing, and prints how to ask by
-# hand. The rule itself is covered: ten tests across four files notice it.
+# The guard below is what makes any of this trustworthy, and it earned its keep on the first run:
+# one mutation collected 76 of 514 tests instead of all of them, and the guard reported that as
+# saying nothing rather than as a pass. It took three wrong hypotheses to find the cause, and it
+# was in this file. See the separator note above the list.
 #
 # The guard that makes this trustworthy: a partial test run looks exactly like "not caught". A
 # hand-rolled loop on 2026-09-22 reported "76 passed (76)" twice and those readings went into a
@@ -31,16 +29,21 @@ cd "$(dirname "$0")/.."
 
 FILTER="${1:-}"
 
-# datei|name|von|nach. `von` has to appear exactly once; the script checks that.
+# datei :: name :: von :: nach. The separator is "::" and not "|", which was the bug that cost a
+# cycle: the publication rule reads `const published = meins || submittedMs >= ...`, the split took
+# everything up to the first "|", the replacement produced `const published = true;|| submittedMs
+# >= ...`, and that file no longer parsed. vitest then collected 76 of 514 tests, which the guard
+# below reported as "says nothing" while I looked for the cause in stdin, in caching and in timing.
+# A separator that can appear in the thing being separated is not a separator.
 MUTATIONEN=(
-  "src/bounties/store.ts|fee rounds up instead of down|  return Math.floor((priceMc * FEE_PERCENT) / 100);|  return Math.ceil((priceMc * FEE_PERCENT) / 100);"
-  "src/bounties/store.ts|fee is never taken|const fee = a.feeTo ? feeMc(bounty.price_mc) : 0;|const fee = 0;"
-  "src/bounties/store.ts|winner is paid the full price|      deltaMc: bounty.price_mc - fee,|      deltaMc: bounty.price_mc,"
-  "src/db.ts|cents round up|  return Math.floor(mc / MC_PER_CENT);|  return Math.ceil(mc / MC_PER_CENT);"
-  "src/db.ts|available ignores the reservation|SELECT balance_mc - reserved_mc AS available FROM wallets WHERE address = ?|SELECT balance_mc AS available FROM wallets WHERE address = ?"
-  "src/bounties/receipts.ts|everything is published|const published = meins || submittedMs >= PUBLICATION_FROM_MS;|const published = true;"
-  "src/bounties/ours.ts|nothing counts as ours|  const found = new Set(OUR_ADDRESSES.filter((a) => wanted.includes(a)));|  const found = new Set<string>();"
-  "src/credits/starter.ts|the pool has no floor|  if (left < GRANT_MC) return null;|  if (false) return null;"
+  "src/bounties/store.ts::fee rounds up instead of down::  return Math.floor((priceMc * FEE_PERCENT) / 100);::  return Math.ceil((priceMc * FEE_PERCENT) / 100);"
+  "src/bounties/store.ts::fee is never taken::const fee = a.feeTo ? feeMc(bounty.price_mc) : 0;::const fee = 0;"
+  "src/bounties/store.ts::winner is paid the full price::      deltaMc: bounty.price_mc - fee,::      deltaMc: bounty.price_mc,"
+  "src/db.ts::cents round up::  return Math.floor(mc / MC_PER_CENT);::  return Math.ceil(mc / MC_PER_CENT);"
+  "src/db.ts::available ignores the reservation::SELECT balance_mc - reserved_mc AS available FROM wallets WHERE address = ?::SELECT balance_mc AS available FROM wallets WHERE address = ?"
+  "src/bounties/receipts.ts::everything is published::const published = meins || submittedMs >= PUBLICATION_FROM_MS;::const published = true;"
+  "src/bounties/ours.ts::nothing counts as ours::  const found = new Set(OUR_ADDRESSES.filter((a) => wanted.includes(a)));::  const found = new Set<string>();"
+  "src/credits/starter.ts::the pool has no floor::  if (left < GRANT_MC) return null;::  if (false) return null;"
 )
 
 # One run, numbers read from the JSON reporter rather than scraped off the summary line. The
@@ -49,7 +52,7 @@ MUTATIONEN=(
 # the error messages beside it carried the true counts.
 lauf() {
   local aus
-  aus=$(pnpm -s vitest run --reporter=json --silent 2>/dev/null | python3 -c '
+  aus=$(pnpm -s vitest run --reporter=json --silent < /dev/null 2>/dev/null | python3 -c '
 import json, sys
 roh = sys.stdin.read()
 i = roh.find("{")
@@ -77,9 +80,9 @@ echo
 ueberlebt=0
 unklar=0
 for eintrag in "${MUTATIONEN[@]}"; do
-  datei="${eintrag%%|*}"; rest="${eintrag#*|}"
-  name="${rest%%|*}"; rest="${rest#*|}"
-  von="${rest%%|*}"; nach="${rest##*|}"
+  datei="${eintrag%%::*}"; rest="${eintrag#*::}"
+  name="${rest%%::*}"; rest="${rest#*::}"
+  von="${rest%%::*}"; nach="${rest#*::}"
   [[ -n "$FILTER" && "$name" != *"$FILTER"* ]] && continue
 
   if ! python3 - "$datei" "$von" "$nach" <<'PY'
