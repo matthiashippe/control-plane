@@ -158,14 +158,40 @@ async function main(): Promise<void> {
 }
 
 async function entscheiden(bountyId: string, key: string): Promise<void> {
+  // Reassigned once the prefix is resolved, see below.
 
   // The brief comes from the public list, the same text the agents were given. Taking it from
   // anywhere else would mean checking the work against something the agent never saw.
   const list = (await call("/bounties.json", null)) as {
     open: { id: string; brief: string; kind: string; award_cents: number; deadline: string }[];
   };
-  const job = list.open.find((b) => b.id === bountyId);
-  if (!job) throw new Error(`${bountyId} is not open. An awarded or cancelled job cannot be decided again.`);
+  let job = list.open.find((b) => b.id === bountyId);
+  if (!job) {
+    // A prefix is what every other surface shows: /bounties.json in the protocol, the receipts,
+    // the log lines. Accepting one is not convenience, it is the difference between a right and a
+    // wrong sentence at the one moment money moves.
+    const treffer = list.open.filter((b) => b.id.startsWith(bountyId));
+    if (treffer.length === 1) {
+      job = treffer[0];
+      console.log(`  (${bountyId} is a prefix of ${job.id})`);
+    } else if (treffer.length > 1) {
+      throw new Error(
+        `${bountyId} matches ${treffer.length} open jobs: ${treffer.map((b) => b.id).join(", ")}. Give more of the id.`,
+      );
+    }
+  }
+  if (!job) {
+    const offen = list.open.map((b) => `${b.id} (${b.award_cents} c)`).join("\n    ") || "nothing is open";
+    throw new Error(
+      `${bountyId} is not on the open list. It was awarded, cancelled, or the id is wrong.\n` +
+        `  Open right now:\n    ${offen}`,
+    );
+  }
+
+  // From here on only the resolved id counts. The first version of the prefix lookup changed the
+  // list search and then kept using the prefix, so the next call answered 404: a resolution that
+  // stops halfway is worse than none, because it works far enough to look right.
+  bountyId = job.id;
 
   const { submissions } = (await call(`/v1/submissions?bounty_id=${encodeURIComponent(bountyId)}`, key)) as {
     submissions: { id: string; agent: string; body: string; created_at: string }[];
