@@ -115,6 +115,20 @@ const kurz = (a: string): string => `${a.slice(0, 8)}…${a.slice(-4)}`;
  * mean the body without a headline, and a banned word can appear inside a quotation the brief
  * asked for. The buyer decides; this only makes sure nobody has to count.
  */
+/**
+ * Hours left on a job, 0 once the deadline has passed, NaN when it cannot be read.
+ *
+ * NaN rather than 0 for an unreadable deadline, and the caller treats anything that is not 0 as
+ * "still open". Written that way on purpose: `(new Date("nonsense").getTime() - now) / h` is NaN,
+ * every comparison against NaN is false, and a guard written as `rest > 0` would wave the award
+ * through at exactly the moment it knows least. A guard has to fail towards refusing.
+ */
+export function nochOffenStunden(deadline: string, jetzt = Date.now()): number {
+  const t = new Date(deadline).getTime();
+  if (Number.isNaN(t)) return NaN;
+  return Math.max(0, (t - jetzt) / 3_600_000);
+}
+
 export function formalpruefung(brief: string, work: string): string[] {
   const befunde: string[] = [];
 
@@ -214,6 +228,27 @@ async function entscheiden(bountyId: string, key: string): Promise<void> {
   }
   if (!submissions.some((s) => s.id === gewinner)) {
     throw new Error(`${gewinner} is not a submission on this job`);
+  }
+
+  // Not before the deadline, unless somebody says so out loud.
+  //
+  // On 2026-09-22 a cycle was carrying "award 0a10d826 at 17:47 UTC" as a standing instruction.
+  // The job closes at 17:47 on the 23rd; the day had been written down from memory, the same trap
+  // that had already dated a block of protocol entries a day ahead that morning. Awarding then
+  // would have taken 24 hours off the one thing this market is waiting for, a submission from
+  // somebody who is not us, to move money from us to us.
+  //
+  // The deadline is read from the service, never from the instruction. A job can still be awarded
+  // early on purpose, which is a real case when every agent has handed in, but it has to be said.
+  const rest = nochOffenStunden(job.deadline);
+  if (rest !== 0 && !process.argv.includes("--vorzeitig")) {
+    const wie = Number.isNaN(rest)
+      ? `has a deadline this script cannot read ("${job.deadline}")`
+      : `is open for another ${rest.toFixed(1)} hour(s), until ${job.deadline.slice(0, 16)} UTC`;
+    console.log(`\nNOT AWARDED. This job ${wie}.`);
+    console.log("             Awarding now ends it early and takes that time away from anybody");
+    console.log("             who has not handed in yet. Pass --vorzeitig if that is what you mean.");
+    return;
   }
 
   const before = ((await call("/v1/credits/balance", key)) as { balance_cents: number }).balance_cents;

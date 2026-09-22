@@ -11,7 +11,7 @@
  * it only looked for that instruction at the start of a line or after a colon.
  */
 import { describe, expect, it } from "vitest";
-import { formalpruefung } from "../ops/award.js";
+import { formalpruefung, nochOffenStunden } from "../ops/award.js";
 
 const BRIEF = `FACT SHEET for a test.
 
@@ -60,5 +60,30 @@ describe("the formal check against a brief", () => {
 
   it("says nothing when the brief sets no measurable rule", () => {
     expect(formalpruefung("Write something nice about us.", "Something! With a dash — and more.")).toEqual([]);
+  });
+});
+
+/**
+ * The deadline guard, and the direction it fails in.
+ *
+ * On 2026-09-22 a standing instruction said to award job 0a10d826 "at 17:47 UTC". The job closes
+ * at 17:47 on the 23rd: the day had been written from memory, the same trap that dated a block of
+ * protocol entries a day ahead that morning. Awarding then would have ended the job 24 hours early
+ * to move money from us to us, in a market whose whole purpose is a submission from somebody else.
+ */
+describe("hours left on a job", () => {
+  const jetzt = Date.parse("2026-09-22T17:20:00Z");
+  it("counts the hours while the job is open", () => {
+    expect(nochOffenStunden("2026-09-23T17:47:50.175Z", jetzt)).toBeCloseTo(24.46, 1);
+  });
+  it("is zero once the deadline has passed, which is what lets an award through", () => {
+    expect(nochOffenStunden("2026-09-22T17:19:00Z", jetzt)).toBe(0);
+    expect(nochOffenStunden("2026-09-01T00:00:00Z", jetzt)).toBe(0);
+  });
+  it("is NaN and not zero when the deadline cannot be read", () => {
+    // The whole point: `rest > 0` would be false for NaN and would wave the award through at the
+    // moment the script knows least about the job. The caller compares against 0, so NaN refuses.
+    expect(nochOffenStunden("tomorrow afternoon", jetzt)).toBeNaN();
+    expect(nochOffenStunden("", jetzt)).toBeNaN();
   });
 });
