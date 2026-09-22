@@ -1651,14 +1651,39 @@ export function createApp(opts: AppOptions) {
     // hours and could not get in, while this service answered correctly.
     //
     // So the malformed path is now redirected to the real one instead of refused. 308 keeps method
-    // and body, every normal client follows it, and nothing is hidden: the Location header names
-    // the right path and the redirect stands in the log. It is no security hole either, because
-    // the client then makes a fresh request that goes through the auth middleware like any other.
+    // and body, the Location header names the right path, and the redirect stands in the log. It
+    // is no security hole either, because the client then makes a fresh request that goes through
+    // the auth middleware like any other.
+    //
+    // The redirect carries a body, which a redirect normally does not. "Every normal client
+    // follows it" is what this comment said until 2026-09-22, and the same address disproved it:
+    // three 308s went out on 21.09. at 17:59 and not one request for the target ever arrived.
+    // httpx, which the OpenAI Python SDK is built on, has follow_redirects off by default, so the
+    // caller got a bare 308 with nothing in it after two days of trying. A client that follows
+    // never sees this body. A client that stops shows it, and it says what to change.
     const joined = c.req.path.match(/^\/v1\/.+?(\/v1\/.+)$/);
     if (joined) {
       const target = joined[1] + (new URL(c.req.url).search || "");
-      c.header("X-Handsel-Hint", "your base URL contains a path; use the bare origin");
-      return c.redirect(target, 308);
+      const origin = requestOrigin(c);
+      return c.json(
+        {
+          error: "base_url_contains_a_path",
+          message:
+            `This path carries /v1/ twice, which means a base URL that already contains a path ` +
+            `was joined with an endpoint. The base URL here is the bare origin: ` +
+            `${origin ?? "https://cp.hippe.eu"}. The endpoint you asked for is ${joined[1]}, ` +
+            `and this response redirects there; if your client does not follow redirects, ` +
+            `request it directly.`,
+          base_url: origin,
+          endpoint: joined[1],
+          docs: DOC.service,
+        },
+        308,
+        {
+          Location: target,
+          "X-Handsel-Hint": "your base URL contains a path; use the bare origin",
+        },
+      );
     }
     const doubled = (c.req.path.match(/\/v1\//g) ?? []).length > 1;
     return c.json(

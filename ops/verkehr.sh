@@ -92,10 +92,45 @@ echo
 
 ZEILEN="${CP_VERKEHR_ZEILEN:-25}"
 echo "-- First request per foreign IP (this is where the referrer is) --"
-erste=$(jq -r --argjson since "$since" --argjson own "$own_json" \
-  "select(.ts > \$since) | $FOREIGN | [(.ts|floor|tostring), .request.remote_ip, .request.uri, (.status|tostring), ((.request.headers.Referer // [\"-\"])[0]), ((.request.headers[\"User-Agent\"] // [\"-\"])[0]|.[0:40])] | @tsv" "$log" \
-  | sort -k2,2 -k1,1n | awk -F'\t' '!seen[$2]++' | sort -k1,1n)
+# The first request of an address, not the first one inside the window. Until 2026-09-22 the
+# window filter ran first, so an address whose real first visit was three days ago and which came
+# back yesterday appeared here as new, carrying the referrer of the LATER request. That is almost
+# always empty or internal, and this line is the one the standing order points at every cycle:
+# the referrer of a first request is the evidence about where people come from. Getting it from
+# the wrong request answers the question with a blank.
+#
+# So: the earliest request of every foreign address over the WHOLE log, and only then the window.
+# Addresses that were already here before it are counted separately, because a returning visitor
+# is a stronger signal than a new one and must not be silently dropped or silently renamed "new".
+alle_ersten=$(jq -r --argjson own "$own_json" \
+  "$FOREIGN | [(.ts|floor|tostring), .request.remote_ip, .request.uri, (.status|tostring), ((.request.headers.Referer // [\"-\"])[0]), ((.request.headers[\"User-Agent\"] // [\"-\"])[0]|.[0:40])] | @tsv" "$log" \
+  | sort -k2,2 -k1,1n | awk -F'\t' '!seen[$2]++')
+erste=$(printf '%s\n' "$alle_ersten" | awk -F'\t' -v s="$since" '$1 > s' | sort -k1,1n)
+frueher=$(printf '%s\n' "$alle_ersten" | awk -F'\t' -v s="$since" '$1 <= s' | grep -c . || true)
+aktiv_frueher=$(jq -r --argjson since "$since" --argjson own "$own_json" \
+  "select(.ts > \$since) | $FOREIGN | .request.remote_ip" "$log" 2>/dev/null | sort -u \
+  | comm -12 - <(printf '%s\n' "$alle_ersten" | awk -F'\t' -v s="$since" '$1 <= s {print $2}' | sort -u) | grep -c . || true)
 gesamt=$(printf '%s\n' "$erste" | grep -c . || true)
+echo "   ($gesamt address(es) here for the first time in this window; $frueher known from before, $aktiv_frueher of them active again)"
+
+# A returning visitor named, not counted. A count of one is the same shape as a count of none to
+# anybody reading the report, and this is the rarer and more interesting of the two kinds of
+# visit: somebody who came back without being reminded.
+if (( aktiv_frueher > 0 )); then
+  jq -r --argjson since "$since" --argjson own "$own_json" \
+    "select(.ts > \$since) | $FOREIGN | .request.remote_ip" "$log" 2>/dev/null | sort -u \
+    | comm -12 - <(printf '%s\n' "$alle_ersten" | awk -F'\t' -v s="$since" '$1 <= s {print $2}' | sort -u) \
+    | while read -r ip; do
+        [[ -z "$ip" ]] && continue
+        zeile=$(printf '%s\n' "$alle_ersten" | awk -F'\t' -v ip="$ip" '$2 == ip')
+        ts=$(printf '%s' "$zeile" | cut -f1); ref=$(printf '%s' "$zeile" | cut -f5)
+        pfade=$(jq -r --argjson since "$since" --arg ip "$ip" \
+          'select(.ts > $since) | select(.request.remote_ip == $ip) | .request.uri' "$log" \
+          | sort -u | head -4 | tr '\n' ' ')
+        printf '   back:  %-16s first seen %s from %s, now %s\n' "$ip" \
+          "$(date -u -r "$ts" +%m-%d\ %H:%M 2>/dev/null || echo "$ts")" "${ref:0:40}" "${pfade:0:60}"
+      done
+fi
 if (( gesamt > ZEILEN )); then
   echo "   ($((gesamt - ZEILEN)) older address(es) not shown; the referrer section below counts all $gesamt)"
 fi

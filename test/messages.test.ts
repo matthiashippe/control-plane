@@ -676,6 +676,24 @@ describe("a path that does not exist is not a key problem", () => {
     expect(res.headers.get("x-handsel-hint"), "the cause still has to be named").toMatch(/base URL/i);
   });
 
+  it("puts the explanation in the redirect body, for the client that does not follow it", async () => {
+    // The header and the Location are only read by a client that follows the redirect, and the
+    // client that needs this one does not: httpx, which the OpenAI Python SDK is built on, has
+    // follow_redirects off by default. On 2026-09-21 three 308s went to one address and no
+    // request for the target ever arrived, so after two days of trying they had seen nothing but
+    // an empty response. A 3xx may carry a body, and this one has to.
+    const db = openDb(":memory:");
+    const app = createApp({ db });
+    const res = await app.request("/v1/auth/api-keys/v1/models");
+    expect(res.status).toBe(308);
+    const body = (await res.json()) as { error: string; message: string; endpoint: string; docs: string };
+    expect(body.error).toBe("base_url_contains_a_path");
+    expect(body.endpoint, "the endpoint they actually wanted").toBe("/v1/models");
+    expect(body.message, "what to change, not what went wrong").toMatch(/bare origin/i);
+    expect(body.message, "and that the redirect may not be followed for them").toMatch(/follow redirects/i);
+    expect(body.docs).toBeTruthy();
+  });
+
   it("still explains a path that is merely unknown, because nothing can be guessed there", async () => {
     const db = openDb(":memory:");
     const app = createApp({ db });
