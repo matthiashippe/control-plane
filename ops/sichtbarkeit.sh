@@ -23,12 +23,20 @@ BASE="${CP_URL:-https://cp.hippe.eu}"
 KEY="${CP_SSH_KEY:-$HOME/.ssh/id_ed25519_automaton}"
 HOST="${CP_HOST:-root@76.13.144.207}"
 
-log=$(mktemp); trap 'rm -f "$log"' EXIT
-if ! timeout 45 ssh -i "$KEY" -o BatchMode=yes -o ConnectTimeout=10 -o ServerAliveInterval=5 "$HOST" \
-  'docker exec deploy-caddy-1 cat /var/log/caddy/access.log | gzip -c' 2>/dev/null | gunzip > "$log"; then
-  echo "COULD NOT TELL: the access log was not readable in 45 seconds." >&2
-  echo "        A hiccup on the ssh connection, not a finding about the service." >&2
-  exit 2
+# A log from a file, so a finding of "nothing" can be shown to be a finding rather than
+# blindness. See the same switch in ops/tiefe.sh and the reason it had to be added there.
+if [[ -n "${CP_SICHT_LOG:-}" ]]; then
+  log=$(mktemp); trap 'rm -f "$log"' EXIT
+  cp "${CP_SICHT_LOG}" "$log"
+  echo "(log from ${CP_SICHT_LOG}, not from the VM)" >&2
+else
+  log=$(mktemp); trap 'rm -f "$log"' EXIT
+  if ! timeout 45 ssh -i "$KEY" -o BatchMode=yes -o ConnectTimeout=10 -o ServerAliveInterval=5 "$HOST" \
+    'docker exec deploy-caddy-1 cat /var/log/caddy/access.log | gzip -c' 2>/dev/null | gunzip > "$log"; then
+    echo "COULD NOT TELL: the access log was not readable in 45 seconds." >&2
+    echo "        A hiccup on the ssh connection, not a finding about the service." >&2
+    exit 2
+  fi
 fi
 
 fehler=0
@@ -41,12 +49,25 @@ import collections, datetime, json, re, sys
 
 # Named rather than pattern-matched on "bot", because half the scanners on this log call themselves
 # a bot and none of them index anything.
+# The AI crawlers of 2025/26 largely dropped "bot" from their names: meta-externalagent,
+# google-extended, applebot-extended, anthropic-ai. A planted meta-externalagent walked straight
+# through both this list and the pattern below on 2026-09-22, which is exactly the miss the
+# unnamed column exists to prevent and did not.
 NAMEN = ("googlebot|bingbot|duckduckbot|yandex|baiduspider|slurp|applebot|ahrefsbot|semrushbot|"
          "mj12bot|dotbot|petalbot|gptbot|oai-searchbot|chatgpt-user|claudebot|claude-web|ccbot|"
          "perplexitybot|amazonbot|bytespider|facebookexternalhit|twitterbot|linkedinbot|"
-         "telegrambot|discordbot|slackbot|whatsapp|redditbot|pinterest")
+         "telegrambot|discordbot|slackbot|whatsapp|redditbot|pinterest|"
+         "meta-externalagent|meta-externalfetcher|google-extended|applebot-extended|"
+         "anthropic-ai|cohere-ai|diffbot|timpibot|omgili|youbot|imagesiftbot|duckassistbot")
+
+# A named list cannot be complete, and on the day a crawler that is not on it arrives, this script
+# would print the same "Nothing" it prints today. So everything that describes itself like a
+# fetching machine and is not named gets counted separately. Not an alarm: a column to look at,
+# which is what makes a new crawler visible before somebody thinks to add it to the list above.
+VERDACHT = re.compile(r"bot|crawl|spider|index|fetch|scrape|archiv|preview|agent|-ai/|search", re.I)
 
 treffer = collections.Counter()
+unbenannt = collections.Counter()
 erste, letzte = {}, {}
 zeilen = 0
 frueheste = None
@@ -65,6 +86,8 @@ for roh in open(sys.argv[1]):
     ua = (z.get("request", {}).get("headers", {}).get("User-Agent") or ["-"])[0]
     m = re.search(NAMEN, ua, re.I)
     if not m:
+        if VERDACHT.search(ua):
+            unbenannt[ua[:70]] += 1
         continue
     name = m.group(0).lower()
     treffer[name] += 1
@@ -85,6 +108,16 @@ else:
     print("  A crawler arrives by following a link, and every public link to this service sits in")
     print("  GitHub user content, which is rel=nofollow and passes no crawl signal. Until something")
     print("  links it from a page that is crawled, this number stays at zero however good the page is.")
+    print()
+    print("  What this cannot see: a crawler that sends a browser user agent. Nothing in a log tells")
+    print("  such a visit apart from a reader, so \"nothing\" here means nothing that says it is one.")
+
+if unbenannt:
+    print()
+    print(f"  Not on the list above, but calls itself a fetching machine ({len(unbenannt)} kind(s)):")
+    for ua, n in unbenannt.most_common(6):
+        print(f"    {n:5d}x  {ua}")
+    print("  Look at these. One of them being a real crawler is how the list above gets its next entry.")
 PY
 
 echo
