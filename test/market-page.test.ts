@@ -153,6 +153,38 @@ describe("The market on the landing page", () => {
     const card = /<article class="job">[\s\S]*?An uncontested job\.[\s\S]*?<\/article>/.exec(html);
     expect(card, "the open job has to be a card on the page").not.toBeNull();
     expect(card![0]).toContain("1 competing");
+    // The entrant here is a stranger to us, so there is nothing to mark and no qualifier.
+    expect(card![0], "an outside agent needs no note").not.toMatch(/ours/);
+  });
+
+  /**
+   * The card says whose agent is competing, like the strip two lines below it and like /jobs.
+   *
+   * /terms promises that nothing on this site counts our own jobs as somebody else's demand. The
+   * strip learned that on 2026-09-22 and /jobs a few cycles later; the cards on the same page kept
+   * saying a bare "1 competing" while every entrant on the live board was ours. Half marked is not
+   * yet honest on the page the promise is about.
+   */
+  it("marks our own agent on the card, the way the strip and /jobs do", async () => {
+    const { app, db, fresh } = setup();
+    const b = buyer(db, app, 1);
+    const posted = await b.call("/v1/bounties", "POST", { brief: "A job our own agent enters.", kind: "factual", price_cents: 150, deadline: inAnHour() });
+    const { id } = (await posted.json()) as { id: string };
+
+    // One of ours, by the name on its key: ops/compete.ts names them ops-seed-<persona>, and
+    // `ops-%` is on OUR_KEY_NAMES in src/bounties/ours.ts.
+    const unser = privateKeyToAccount(generatePrivateKey()).address.toLowerCase();
+    db.prepare("INSERT INTO wallets (address, balance_mc, created_at) VALUES (?, 0, ?)").run(unser, new Date().toISOString());
+    db.prepare("INSERT INTO api_keys (address, key_hash, key_prefix, name, created_at) VALUES (?, ?, ?, ?, ?)").run(
+      unser, hashApiKey("cnwy_k_" + "8e".repeat(16)), "cnwy_k_seed000", "ops-seed-vera", new Date().toISOString(),
+    );
+    db.prepare("INSERT INTO submissions (id, bounty_id, agent, body, created_at) VALUES (?, ?, ?, ?, ?)").run(
+      "s-unser", id, unser, "our work", new Date().toISOString(),
+    );
+
+    const card = /<article class="job">[\s\S]*?A job our own agent enters\.[\s\S]*?<\/article>/.exec(await fresh());
+    expect(card, "the open job has to be a card on the page").not.toBeNull();
+    expect(card![0], "one entrant and it is ours").toContain("1 competing, ours");
   });
 
   it("shows a dash instead of an address when the winner's work is withheld", async () => {

@@ -35,7 +35,7 @@ import type { Db } from "../db.js";
 import { openBounties, feeMc } from "../bounties/store.js";
 import { receipts } from "../bounties/receipts.js";
 import { mcToCents } from "../db.js";
-import { ourAddresses, wallets } from "../bounties/ours.js";
+import { agentsPerBounty, ourAddresses, wallets } from "../bounties/ours.js";
 
 /** The five characters that can end an HTML text node or an attribute. */
 export function esc(s: string): string {
@@ -133,6 +133,9 @@ export function renderMarket(db: Db): string {
   // per-job counts is not the number of distinct agents across all jobs the moment one agent
   // enters twice, and that difference is exactly the finding that moved this cell from counting
   // submissions to counting agents.
+  // Per job, for the cards, from the same function /jobs uses.
+  const jeAuftrag = agentsPerBounty(db, open.map((b) => b.id));
+
   const alleAgenten = (
     db
       .prepare(
@@ -148,7 +151,7 @@ export function renderMarket(db: Db): string {
     ? `<div class="jobs">${open
         .map((b) => {
           const award = mcToCents(b.price_mc - feeMc(b.price_mc));
-          const rivals = b.submission_count;
+          const wettbewerb = jeAuftrag.get(b.id) ?? { total: 0, not_ours: 0 };
           return (
             `<article class="job">` +
             // The whole card is the tap target. It lifted on hover and coloured its border on
@@ -160,7 +163,17 @@ export function renderMarket(db: Db): string {
             `<p class="brief">${esc(gist(b.brief))}</p>` +
             `<div class="row">` +
             `<span class="pay">${award} ¢ <span>of ${mcToCents(b.price_mc)} ¢ posted</span></span>` +
-            `<span class="meta">${rivals === 0 ? '<span class="free">nobody competing yet</span>' : `${rivals} competing`}</span>` +
+            `<span class="meta">${
+              wettbewerb.total === 0
+                ? '<span class="free">nobody competing yet</span>'
+                : `${wettbewerb.total} competing${
+                    wettbewerb.not_ours === wettbewerb.total
+                      ? ""
+                      : wettbewerb.not_ours === 0
+                        ? wettbewerb.total === 1 ? ", ours" : ", all ours"
+                        : `, ${wettbewerb.not_ours} not ours`
+                  }`
+            }</span>` +
             `</div></article>`
           );
         })
