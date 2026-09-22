@@ -714,11 +714,24 @@ describe("a path that does not exist is not a key problem", () => {
     expect(body.message).not.toMatch(/twice/);
   });
 
-  it("still protects the real routes: /v1/models without a key stays 401", async () => {
+  it("still protects the real routes, and /v1/models is the one deliberate exception", async () => {
+    // This test read "/v1/models without a key stays 401" until 2026-09-22, to make sure the
+    // redirect above had not punched a hole in the auth check. The hole it guards against is
+    // real and still guarded: /v1/credits/balance is the same kind of path and stays shut.
+    // /v1/models was opened on purpose, because /v1/status already hands the same catalogue to
+    // anybody, and a wrong key there is still a wrong key.
     const db = openDb(":memory:");
     const app = createApp({ db });
-    const res = await app.request("/v1/models");
-    expect(res.status, "otherwise the auth check would be full of holes").toBe(401);
+    expect((await app.request("/v1/credits/balance")).status, "a protected path is still shut").toBe(401);
+    expect((await app.request("/v1/submissions")).status, "and so is this one").toBe(401);
+    expect(
+      (await app.request("/v1/models", { headers: { authorization: "cnwy_k_nope" } })).status,
+      "a wrong key on the open path is still a wrong key",
+    ).toBe(401);
+    expect(
+      (await app.request("/v1/models")).status,
+      "and no key at all gets the catalogue, or 503 when there is none configured",
+    ).not.toBe(401);
   });
 });
 

@@ -221,6 +221,24 @@ describe("inference proxy", () => {
     expect(((await res.json()) as { error: string }).error).toBe("model_not_found");
   });
 
+  it("serves the same catalogue without a key, because /v1/status already does", async () => {
+    // GET /v1/models is what every OpenAI-compatible SDK calls first to check its base URL, and
+    // answering 401 there talks about a key when the question was about the URL. One address in
+    // Helsinki spent 32 hours on that, joining documentation paths together and never getting a
+    // word back. /v1/status hands out the same ids and the same prices to anybody, so the key
+    // requirement protected nothing at all.
+    const { app, key } = setup();
+    const ohne = await app.request("/v1/models");
+    expect(ohne.status).toBe(200);
+    const offen = (await ohne.json()) as { data: { id: string }[] };
+    const mit = (await (await app.request("/v1/models", { headers: { authorization: key } })).json()) as {
+      data: { id: string }[];
+    };
+    expect(offen, "the same answer, so a key buys nothing here and hides nothing either").toEqual(mit);
+    // And the thing it must not become: a path where any string passes for a key.
+    expect((await app.request("/v1/models", { headers: { authorization: "cnwy_k_nope" } })).status).toBe(401);
+  });
+
   it("serves /v1/models with sale prices = list price x 1.3", async () => {
     const { app, key } = setup();
     const res = await app.request("/v1/models", { headers: { authorization: key } });

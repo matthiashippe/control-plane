@@ -133,7 +133,10 @@ describe("public page and status", () => {
   it("otherwise still lets /v1/* through only with an API key and answers unknown paths with a JSON 404", async () => {
     const { app } = setup();
     expect((await app.request("/v1/credits/balance")).status).toBe(401);
-    expect((await app.request("/v1/models")).status).toBe(401);
+    // /v1/models answered 401 here until 2026-09-22 and now answers without a key on purpose:
+    // the catalogue is already public on /v1/status, and this is the path every OpenAI-compatible
+    // client knocks on first. A wrong key is still refused, which is what this line now checks.
+    expect((await app.request("/v1/models", { headers: { authorization: "cnwy_k_nope" } })).status).toBe(401);
     const missing = await app.request("/does-not-exist");
     expect(missing.status).toBe(404);
     const body = (await missing.json()) as { error: string; message: string; docs: string };

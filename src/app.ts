@@ -136,7 +136,8 @@ const V1_ROUTES = new Set([
   "/v1/credits/starter",
   "/v1/credits/transfer",
   "/v1/credits/transfers",
-  "/v1/models",
+  // /v1/models is deliberately NOT here. See its route for the reason: the same catalogue is
+  // already public on /v1/status, and this is the path every OpenAI-compatible client calls first.
   "/v1/sandboxes",
   "/v1/status",
 ]);
@@ -1036,23 +1037,27 @@ export function createApp(opts: AppOptions) {
     return next();
   });
 
+  // One sentence, two callers: the middleware below and /v1/models, which does its own check so
+  // that a request without a key can still see the catalogue. Two copies would drift, and a
+  // message that drifts is how somebody ends up reading the wrong thing about their key.
+  const keinSchluessel = () =>
+    new AuthError(
+      401,
+      "Invalid API key",
+      "Send the control plane API key (cnwy_k_...) in the Authorization header, raw or with " +
+        "the Bearer prefix; both work, so the prefix is not what is wrong here. Either this " +
+        "request carries no key, or it is not a key of this control plane: one from another " +
+        "instance does not work. Get one with `automaton --provision` against this instance, " +
+        "or walk the three auth endpoints yourself (nonce, verify, api-keys).",
+    );
+
   app.use("/v1/*", async (c, next) => {
     // A path that does not exist is not a key problem. Without this line the middleware answers
     // /v1/status/v1/models with 401 "Invalid API key" too, and the caller spends hours on their key
     // instead of their URL. Observed on 20.09.2026 at 09:26 UTC.
     if (!V1_ROUTES.has(c.req.path)) return next();
     const address = resolveApiKey(db, c.req.header("authorization"));
-    if (!address) {
-      throw new AuthError(
-        401,
-        "Invalid API key",
-        "Send the control plane API key (cnwy_k_...) in the Authorization header, raw or with " +
-          "the Bearer prefix; both work, so the prefix is not what is wrong here. Either this " +
-          "request carries no key, or it is not a key of this control plane: one from another " +
-          "instance does not work. Get one with `automaton --provision` against this instance, " +
-          "or walk the three auth endpoints yourself (nonce, verify, api-keys).",
-      );
-    }
+    if (!address) throw keinSchluessel();
     c.set("address", address);
     await next();
   });
@@ -1226,7 +1231,23 @@ export function createApp(opts: AppOptions) {
 
   // --- Inference ------------------------------------------------
 
+  /**
+   * The catalogue, and the only /v1/ path that answers without a key.
+   *
+   * Every OpenAI-compatible SDK calls GET /v1/models first, to check that the base URL is right
+   * before it sends anything. Until 2026-09-22 that call answered 401 here, which tells a caller
+   * nothing about their URL and everything about a key they do not have yet. Meanwhile /v1/status
+   * hands out the same model ids and the same prices to anybody who asks. The key requirement
+   * protected nothing; it hid, at the first door people knock on, what stands open next to it.
+   *
+   * A wrong key is still a wrong key: only a request with no Authorization header at all gets the
+   * catalogue. A client that sends one gets exactly what it got before, so nothing that works
+   * today changes, and the Conway runtime always sends one.
+   */
   app.get("/v1/models", (c) => {
+    if (c.req.header("authorization") && !resolveApiKey(db, c.req.header("authorization"))) {
+      throw keinSchluessel();
+    }
     if (!opts.catalog) return c.json(INFERENCE_UNAVAILABLE, 503);
     return c.json(opts.catalog.listModels());
   });
