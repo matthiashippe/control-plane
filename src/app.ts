@@ -1045,6 +1045,17 @@ export function createApp(opts: AppOptions) {
     return next();
   });
 
+  // Which methods this app registered for a path, exact match only. Used twice below, and the
+  // second use is the reason it exists rather than being inlined: the auth middleware has to ask
+  // the same question the notFound handler asks, or it answers a method mistake with a key error.
+  const methodenFuer = (pfad: string): string[] => [
+    ...new Set(
+      (app as unknown as { routes: { path: string; method: string }[] }).routes
+        .filter((r) => r.method !== "ALL" && r.path === pfad)
+        .map((r) => r.method),
+    ),
+  ];
+
   // One sentence, two callers: the middleware below and /v1/models, which does its own check so
   // that a request without a key can still see the catalogue. Two copies would drift, and a
   // message that drifts is how somebody ends up reading the wrong thing about their key.
@@ -1064,6 +1075,12 @@ export function createApp(opts: AppOptions) {
     // /v1/status/v1/models with 401 "Invalid API key" too, and the caller spends hours on their key
     // instead of their URL. Observed on 20.09.2026 at 09:26 UTC.
     if (!V1_ROUTES.has(c.req.path)) return next();
+    // Deliberately no method check here, although `POST /v1/status` answering "Invalid API key"
+    // about a path that needs no key is wrong. Handing a mismatched method on to the router turns
+    // HEAD on a protected path into a 500: Hono serves HEAD from the GET route, the handler then
+    // runs without the address this middleware sets, and a stranger gets a stack trace instead of
+    // a 401. Tried on 2026-09-22 and reverted the same minute. The real case that was measured is
+    // POST on a page, which is not on this list and is answered by the notFound handler.
     const address = resolveApiKey(db, c.req.header("authorization"));
     if (!address) throw keinSchluessel();
     c.set("address", address);
@@ -1715,6 +1732,34 @@ export function createApp(opts: AppOptions) {
         },
       );
     }
+    // The path exists, just not for this method.
+    //
+    // Two hand-written lists above answer 405 for /v1/auth/* and /v1/briefs/*, because those are
+    // the paths documentation sends people to and somebody opens them in a browser. Everything
+    // else answered "No such endpoint here", including the landing page: on 2026-09-20 at 08:56
+    // one address sent four POSTs to `/` and was told four times that there is no such thing,
+    // about the one URL this whole service is reachable at. A scanner in that case, but the
+    // answer is wrong for whoever mixes up the method, and that is the same shape of mistake that
+    // cost a real caller 32 hours today: a correct answer about something they had not asked.
+    //
+    // Hono knows which methods it registered, so this needs no list and cannot fall behind one.
+    // Exact path match only: a pattern route like /px/:name would not compare, and a 405 for a
+    // path that truly does not exist would be worse than the 404 it replaces.
+    const erlaubt = methodenFuer(c.req.path);
+    if (erlaubt.length > 0) {
+      const liste = [...erlaubt].sort();
+      c.header("Allow", liste.join(", "));
+      return c.json(
+        {
+          error: "method_not_allowed",
+          message: `${c.req.path} accepts ${liste.join(" and ")}, not ${c.req.method}.`,
+          allow: liste,
+          docs: DOC.service,
+        },
+        405,
+      );
+    }
+
     const doubled = (c.req.path.match(/\/v1\//g) ?? []).length > 1;
     return c.json(
       {

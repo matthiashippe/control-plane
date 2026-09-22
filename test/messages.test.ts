@@ -797,3 +797,59 @@ describe("the key formats the message names are the key formats that work", () =
     expect(body.message, "and it has to say what is actually wrong").toMatch(/no key|not a key/i);
   });
 });
+
+/**
+ * A path that exists but not for this method says so, everywhere and not on a list.
+ *
+ * Two hand-written lists in src/app.ts answer 405 for /v1/auth/* and /v1/briefs/*. Everything else
+ * answered "No such endpoint here", including `/`: on 2026-09-20 at 08:56 one address sent four
+ * POSTs to the landing page and was told four times that there is no such thing, about the one URL
+ * this service is reachable at. A scanner that time. The answer is still wrong for anybody who
+ * mixes up the method, and it is the same shape as the joined base URL that cost a real caller 32
+ * hours: a correct sentence about something they did not ask.
+ */
+describe("wrong method, existing path", () => {
+  it("answers 405 with Allow on the pages, not 404", async () => {
+    const db = openDb(":memory:");
+    const app = createApp({ db });
+    for (const pfad of ["/", "/jobs", "/post", "/receipts", "/x402"]) {
+      const res = await app.request(pfad, { method: "POST" });
+      expect(res.status, `POST ${pfad}`).toBe(405);
+      expect(res.headers.get("allow"), `Allow on ${pfad}`).toBe("GET");
+      const body = (await res.json()) as { error: string; message: string; allow: string[] };
+      expect(body.error).toBe("method_not_allowed");
+      expect(body.message, "it has to name the method that works").toContain("accepts GET");
+      expect(body.allow).toEqual(["GET"]);
+    }
+  });
+
+  it("still answers 404 for a path that really is not there", async () => {
+    // The guard must not turn every 404 into a 405. A pattern route cannot be compared by string,
+    // so those stay 404 too, which is the safe direction.
+    const db = openDb(":memory:");
+    const app = createApp({ db });
+    for (const pfad of ["/gibtsnicht", "/v1/nonsense"]) {
+      const res = await app.request(pfad, { method: "POST" });
+      expect(res.status, `POST ${pfad}`).toBe(404);
+    }
+  });
+
+  it("leaves the protected /v1 paths alone, where a 401 is the right answer", async () => {
+    // A path behind the auth middleware answers 401 whatever the method, and that stays: without
+    // a key there is no access, and a 405 there would tell a stranger which paths exist. It is
+    // also what keeps HEAD working, which Hono serves from the GET route and which would reach
+    // the handler without an address if the middleware handed it on.
+    const db = openDb(":memory:");
+    const app = createApp({ db });
+    expect((await app.request("/v1/credits/balance", { method: "DELETE" })).status).toBe(401);
+    expect((await app.request("/v1/submissions", { method: "HEAD" })).status).toBe(401);
+  });
+
+  it("keeps the tailored message where a path has one", async () => {
+    // /v1/auth/verify is on the hand-written list and says more than the generic answer does.
+    const db = openDb(":memory:");
+    const app = createApp({ db });
+    const body = (await (await app.request("/v1/auth/verify", { method: "GET" })).json()) as { message: string };
+    expect(body.message).toMatch(/needs no API key/i);
+  });
+});
