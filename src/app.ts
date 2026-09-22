@@ -47,6 +47,7 @@ import {
 } from "./bounties/store.js";
 import { mcToCents, getBalanceCents, getBalanceMc, MC_PER_CENT } from "./db.js";
 import { block as ldBlock, dataset, howToFrom, organization, webPage, webSite } from "./public/jsonld.js";
+import { prefersHtml, renderApiPage } from "./public/apipage.js";
 import { DOC } from "./errors.js";
 import { Catalog, handleChat, MARKUP } from "./inference/proxy.js";
 import { clientKey, RateLimiter, type RateLimitOptions } from "./ratelimit.js";
@@ -223,6 +224,25 @@ export function createApp(opts: AppOptions) {
 
   app.onError((err, c) => {
     if (err instanceof AuthError) {
+      // A person who opened this path in a browser is not the reader this answer was written for.
+      // They have no key problem: a browser sends no Authorization header at all, so it gets this
+      // status whether or not the key behind it is good. Measured on 2026-09-22, see
+      // src/public/apipage.ts. The status stays 401 for both, only the shape differs, and the
+      // shape only differs for a caller that explicitly asked for HTML.
+      if (indexHtml && c.req.path.startsWith("/v1/") && prefersHtml(c.req.header("accept"))) {
+        const angebot = starterOffer(db);
+        return c.html(
+          seite(
+            renderApiPage(c.req.path, angebot ? angebot.cents : null),
+            "Your browser cannot carry your key",
+            "This path answers to a key in a header, and a browser does not send one. Nothing is " +
+              "wrong with your account. Here is the same question from a terminal, and what " +
+              "happens when an agent sits at zero.",
+            c.req.path,
+          ),
+          err.status as 401,
+        );
+      }
       // `error` stays the Conway wording, `message` says what to do now.
       return c.json(
         { error: err.message, ...(err.hint ? { message: err.hint, docs: DOC.authentication } : {}) },
