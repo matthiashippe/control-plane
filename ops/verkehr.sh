@@ -42,8 +42,17 @@ log=$(mktemp); trap 'rm -f "$log"' EXIT
 # the first reading was that the observation tool was broken. That is the dangerous reading: a tool
 # that hangs looks like a tool problem, and the next real outage gets waved away as one. So it now
 # fails fast and says which half failed, instead of sitting there.
+# gzip on the far side, because the access log is 20 MB and growing.
+#
+# Measured on 2026-09-22: `cat` over ssh took 40 seconds for 20,726,086 bytes and the same file
+# through `gzip -c` took 4.5. The 45 second timeout below started firing intermittently on this
+# very run, and the failure looks exactly like an outage on a tool whose whole job is to tell an
+# outage from a quiet minute. JSON logs compress about tenfold, so this buys back the margin
+# without changing a byte of what is read.
+#
+# The real answer is log rotation, and that lives in deploy/, which is not touched without a human.
 if ! timeout 45 ssh -i "$KEY" -o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=3 "$HOST" \
-  'docker exec deploy-caddy-1 cat /var/log/caddy/access.log' 2>/dev/null > "$log"; then
+  'docker exec deploy-caddy-1 cat /var/log/caddy/access.log | gzip -c' 2>/dev/null | gunzip > "$log"; then
   echo "FEHLER: das Zugriffslog war in 45 Sekunden nicht zu holen." >&2
   echo "        Das ist kein Befund ueber den Dienst. Pruefe ihn getrennt:" >&2
   echo "        curl -s -o /dev/null -m 10 -w '%{http_code}\n' https://cp.hippe.eu/health" >&2

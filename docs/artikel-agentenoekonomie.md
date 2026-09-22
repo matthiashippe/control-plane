@@ -102,8 +102,9 @@ runtime at a local Ollama model, or write a balance into its own SQLite state an
 OpenAI key. The first one has a trap that cost me an hour. There are two config fields named
 `inferenceModel` and the router reads the nested one, under `modelStrategy`. The setup wizard
 copies the top-level value down, so it is fine; editing `automaton.json` by hand is what leaves the
-nested block on its defaults, and then the runtime keeps routing to its default model while telling
-you it registered your local one. I have written both routes up with the exact code paths, because
+nested block on its defaults, and then the runtime keeps routing to those defaults while telling you
+it registered your local one: `gpt-5.2` while the balance carries tier `normal`, `gpt-5-mini` once
+it is `critical` or `dead`. I have written both routes up with the exact code paths, because
 someone paying 5 USDC a week into a dead endpoint deserves to know they do not have to.
 
 Full disclosure, since it would be dishonest to leave it out: after my own agent hit this wall, I

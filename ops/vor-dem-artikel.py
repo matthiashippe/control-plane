@@ -265,6 +265,23 @@ def main() -> int:
     # It does not: src/setup/configure.ts assigns the chosen model to both. The trap is a
     # hand-edited automaton.json. docs/without-control-plane.md had it right since 21.09. and
     # nothing held the short version against the long one until an adversarial read did.
+    # 4c-quater. Which model the sentence names, and whether it says when.
+    #
+    # "then the runtime keeps routing to gpt-5-mini" was right for the Ollama route and wrong for
+    # the other one this piece offers: the nested default is gpt-5.2, and gpt-5-mini is what the
+    # router puts first only at tier critical or dead. Claim 8 in ops/upstream-claims.py checks
+    # both constants and both candidate orders; this checks that the sentence carries them.
+    for quelle, fassung in fassungen_fliess:
+        if "gpt-5-mini" not in fassung:
+            continue
+        if "gpt-5.2" in fassung and re.search(r"critical", fassung):
+            ok(f"{quelle.name} names both default models and the tier that picks each")
+        else:
+            aendern(f"{quelle.name} names gpt-5-mini without gpt-5.2 or without the tier",
+                    "the nested default is gpt-5.2; gpt-5-mini goes first only at tier critical or "
+                    "dead, so naming it alone is right for the Ollama route and wrong for the "
+                    "route that writes a balance into the SQLite file")
+
     for quelle, fassung in fassungen_fliess:
         if "inferenceModel" not in fassung:
             continue

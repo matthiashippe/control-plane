@@ -32,20 +32,31 @@ SSH=(ssh -i "$KEY" -o BatchMode=yes -o ConnectTimeout=10)
 # The constant above went stale on 2026-09-22 when the line reconnected, and in this script that
 # would have counted our own post-deploy checks as strangers inside the window: the one number the
 # script exists to produce, wrong in the direction that looks like traffic.
-lebend=$(timeout 15 "${SSH[@]}" "$HOST" 'echo "$SSH_CLIENT"' 2>/dev/null | awk '{print $1}')
+lebend=$(timeout 15 "${SSH[@]}" "$HOST" 'echo "$SSH_CLIENT"' 2>/dev/null | awk '{print $1}' || true)
 [[ -n "$lebend" ]] && OWN="$OWN $lebend"
 
 started=$("${SSH[@]}" "$HOST" 'docker inspect deploy-cp-1 --format "{{.State.StartedAt}}"' 2>/dev/null || true)
 if [[ -z "$started" ]]; then
-  echo "FAILED: could not read the container start time." >&2
+  echo "COULD NOT TELL: the container start time was not readable." >&2
   echo "        Without it the window would be a guess, and a guessed window measures nothing." >&2
+  echo "        This says nothing about the deploy. Run it again." >&2
   exit 2
 fi
 
 log=$(mktemp); trap 'rm -f "$log"' EXIT
+# gzip on the far side, because the access log is 20 MB and growing.
+#
+# Measured on 2026-09-22: `cat` over ssh took 40 seconds for 20,726,086 bytes and the same file
+# through `gzip -c` took 4.5. The 45 second timeout below started firing intermittently on this
+# very run, and the failure looks exactly like an outage on a tool whose whole job is to tell an
+# outage from a quiet minute. JSON logs compress about tenfold, so this buys back the margin
+# without changing a byte of what is read.
+#
+# The real answer is log rotation, and that lives in deploy/, which is not touched without a human.
 if ! timeout 45 "${SSH[@]}" -o ServerAliveInterval=5 "$HOST" \
-  'docker exec deploy-caddy-1 cat /var/log/caddy/access.log' 2>/dev/null > "$log"; then
-  echo "FAILED: could not read the access log." >&2
+  'docker exec deploy-caddy-1 cat /var/log/caddy/access.log | gzip -c' 2>/dev/null | gunzip > "$log"; then
+  echo "COULD NOT TELL: the access log was not readable in 45 seconds." >&2
+  echo "        A hiccup on the ssh connection, not a finding about the deploy. Run it again." >&2
   exit 2
 fi
 

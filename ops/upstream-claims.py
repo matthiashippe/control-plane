@@ -146,6 +146,34 @@ def pruefe(rev: str) -> int:
                "/fix and /conway both say it buys on critical and on dead alike, again every five "
                "minutes for as long as the wallet holds 5 USDC")
 
+    # 8. Which model the defaults actually route to, and when.
+    #
+    # /fix and the article said "then the runtime keeps routing to gpt-5-mini". The nested default
+    # is gpt-5.2; gpt-5-mini is the low-compute and critical model. The router builds its candidate
+    # list as [inferenceModel, lowComputeModel, criticalModel] and swaps the critical one to the
+    # front only at tier critical or dead, so the small model is what a reader sees exactly when
+    # they have no balance, which is the Ollama case and not the other route this page offers.
+    # Right by accident on one of two routes, and this is the one place the text shows detail
+    # knowledge. An adversarial read found it (B7), and nothing here checked it: claim 7 only
+    # checked that the wizard copies the value.
+    typen = datei("src/inference/types.ts", rev)
+    router = datei("src/inference/router.ts", rev)
+    gross = re.search(r"DEFAULT_MODEL_STRATEGY_CONFIG[^{]*\{\s*inferenceModel:\s*\"([^\"]+)\"", typen)
+    klein = re.search(r"DEFAULT_MODEL_STRATEGY_CONFIG[\s\S]{0,200}?criticalModel:\s*\"([^\"]+)\"", typen)
+    knapp = re.search(
+        r'tier === "critical" \|\| tier === "dead"\s*\?\s*\[strategy\.criticalModel',
+        router,
+    )
+    reich = re.search(r":\s*\[strategy\.inferenceModel, strategy\.lowComputeModel", router)
+    if gross and klein and knapp and reich:
+        ok(f"the defaults route to {gross.group(1)} until the tier is critical, then {klein.group(1)}",
+           "src/inference/types.ts DEFAULT_MODEL_STRATEGY_CONFIG and the two candidate orders in router.ts")
+    else:
+        fehlt = [n for n, t in [("the default inferenceModel", gross), ("the default criticalModel", klein),
+                                ("the critical-first order", knapp), ("the normal-first order", reich)] if not t]
+        falsch(f"the model defaults or the routing order changed: {', '.join(fehlt)} not found",
+               "/fix and the article name both models and say which tier each belongs to")
+
     # 7. The wizard copies the top-level model down, so the trap is hand-editing and not the wizard.
     #
     # Added on 2026-09-22 after an adversarial read found this one wrong on two of the three
@@ -178,7 +206,7 @@ def pruefe(rev: str) -> int:
     if befunde:
         print(f"  {len(befunde)} claim(s) do not hold at {rev}.")
         return 1
-    print(f"  All 7 claims hold at {rev}.")
+    print(f"  All claims hold at {rev}.")
     return 0
 
 

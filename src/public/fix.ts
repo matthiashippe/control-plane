@@ -71,8 +71,11 @@ GET  https://api.conway.tech/pay/5/&lt;address&gt;  -&gt; 402, a payable demand 
           <code>inferenceModel</code> and the router reads the nested one, under
           <code>modelStrategy</code>. The wizard copies the top-level value down, so it is fine.
           Editing <code>automaton.json</code> by hand is what leaves the nested block on its
-          defaults, and then the runtime keeps routing to <code>gpt-5-mini</code> while telling you
-          it registered your local model.</span></span>
+          defaults, and then the runtime keeps routing to those defaults while telling you it
+          registered your local model: <code>gpt-5.2</code> while the balance carries tier
+          <code>normal</code>, <code>gpt-5-mini</code> once it is <code>critical</code> or
+          <code>dead</code>. Naming only the small one is right for the Ollama route, where there
+          is no balance, and wrong for the other one.</span></span>
           <a href="https://github.com/matthiashippe/control-plane/blob/main/docs/without-control-plane.md">both routes, with the code paths</a>
         </div>
         <div>

@@ -112,6 +112,27 @@ describe("/fix", () => {
       .toMatch(/move the USDC out first/i);
   });
 
+  /**
+   * The one place the page shows detail knowledge has to be right on both routes it offers.
+   *
+   * It said "then the runtime keeps routing to `gpt-5-mini`". The nested default is `gpt-5.2`;
+   * `gpt-5-mini` is the low-compute and critical model, and the router puts the critical one first
+   * only at tier `critical` or `dead`. That makes the sentence right for the Ollama route, where
+   * the reader has no balance, and wrong for the other route on the same page, which writes a
+   * balance into the SQLite file. An adversarial read found it on 2026-09-22 (B7).
+   *
+   * `ops/upstream-claims.py` checks both constants and both candidate orders against the pinned
+   * revision. This checks that the page carries what that claim establishes.
+   */
+  it("names both default models, and which tier picks each", async () => {
+    const text = await page("/fix");
+    expect(text).toContain("gpt-5.2");
+    expect(text).toContain("gpt-5-mini");
+    const satz = text.slice(text.indexOf("keeps routing"), text.indexOf("keeps routing") + 400);
+    expect(satz, "naming only the small model is right on one of the two routes this page offers")
+      .toMatch(/critical/);
+  });
+
   it("does not claim the payment endpoint is broken, because it is not", async () => {
     const html = await page("/fix");
     // The whole argument of the page rests on exactly one asymmetry: sign-up fails, paying works.
