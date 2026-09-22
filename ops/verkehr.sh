@@ -91,11 +91,18 @@ if [[ -n "$dazu" ]]; then
 fi
 echo
 
+ZEILEN="${CP_VERKEHR_ZEILEN:-25}"
 echo "-- First request per foreign IP (this is where the referrer is) --"
-jq -r --argjson since "$since" --argjson own "$own_json" \
+erste=$(jq -r --argjson since "$since" --argjson own "$own_json" \
   "select(.ts > \$since) | $FOREIGN | [(.ts|floor|tostring), .request.remote_ip, .request.uri, (.status|tostring), ((.request.headers.Referer // [\"-\"])[0]), ((.request.headers[\"User-Agent\"] // [\"-\"])[0]|.[0:40])] | @tsv" "$log" \
-  | sort -k2,2 -k1,1n | awk -F'\t' '!seen[$2]++' | sort -k1,1n \
+  | sort -k2,2 -k1,1n | awk -F'\t' '!seen[$2]++' | sort -k1,1n)
+gesamt=$(printf '%s\n' "$erste" | grep -c . || true)
+if (( gesamt > ZEILEN )); then
+  echo "   ($((gesamt - ZEILEN)) older address(es) not shown; the referrer section below counts all $gesamt)"
+fi
+printf '%s\n' "$erste" | tail -n "$ZEILEN" \
   | while IFS=$'\t' read -r ts ip uri st ref ua; do
+      [[ -z "$ts" ]] && continue
       printf '%s  %-16s %-28s %3s  %-28s %s\n' "$(date -u -r "$ts" +%m-%d\ %H:%M 2>/dev/null || echo "$ts")" "$ip" "${uri:0:28}" "$st" "${ref:0:28}" "$ua"
     done
 
@@ -248,12 +255,17 @@ jq -r --argjson own "$own_json" \
         if (count[$1] < 3) pfade[$1] = pfade[$1] $3 " "
         count[$1]++ }
       END {
-        gesamt = 0; wieder = 0
+        gesamt = 0; wieder = 0; gedruckt = 0
+        grenze = (ENVIRON["CP_VERKEHR_ZEILEN"] == "" ? 25 : ENVIRON["CP_VERKEHR_ZEILEN"]) + 0
         for (ip in n) {
           gesamt++
-          if (n[ip] > 1) { wieder++; printf "   %-16s %d days: %s\n      %s\n", ip, n[ip], tage[ip], pfade[ip] }
+          if (n[ip] > 1) {
+            wieder++
+            if (gedruckt < grenze) { gedruckt++; printf "   %-16s %d days: %s\n      %s\n", ip, n[ip], tage[ip], pfade[ip] }
+          }
         }
         if (gesamt == 0) { print "   no foreign address in the log at all"; exit }
+        if (wieder > gedruckt) printf "   (%d more returning address(es) not shown)\n", wieder - gedruckt
         printf "   %d of %d foreign address(es) were here on more than one day.\n", wieder, gesamt
       }'
 
