@@ -19,6 +19,8 @@ could not look (a missing file, an unreadable CSV). The third case is not a find
 data, the same distinction ops/conway-zustand.sh makes about somebody else's service.
 """
 import json
+import os
+import pathlib
 import subprocess
 import sys
 from pathlib import Path
@@ -85,11 +87,77 @@ def transfers_readme() -> tuple[int, list[str]]:
     return (1 if fehlend else 0), fehlend
 
 
+def reihe_gegen_csv() -> tuple[int, list[str]]:
+    """The daily series and the published CSV, for the day both describe.
+
+    /x402 renders the time series that a cron on the VM appends to every morning. The repository
+    publishes the raw scan of 21 September as a CSV and invites a reader to re-run the script on
+    it. Two artefacts, one day, and nothing held them against each other: the series could drift
+    from the file that is supposed to prove it, in either direction, in silence.
+
+    This pair has already gone wrong twice. On 2026-09-22 the published CSV came from a different
+    scan than the article's figures, and the kennzahlen JSON beside it kept the numbers of a third.
+    Both times the mismatch was found by a reader doing arithmetic, not by us.
+
+    Needs the VM, so it returns 2 rather than 1 when the series cannot be fetched: not being able
+    to look is not a finding about the data.
+    """
+    import subprocess
+
+    csvs = sorted(DATEN.glob("*-x402-verzeichnis.csv"))
+    if not csvs:
+        return 2, ["COULD NOT TELL: no x402 directory scan is published here."]
+
+    key = os.environ.get("CP_SSH_KEY", str(pathlib.Path.home() / ".ssh/id_ed25519_automaton"))
+    host = os.environ.get("CP_HOST", "root@76.13.144.207")
+    holen = subprocess.run(
+        ["ssh", "-i", key, "-o", "BatchMode=yes", "-o", "ConnectTimeout=8", host,
+         "cat /opt/control-plane/x402/kennzahlen.ndjson"],
+        capture_output=True, text=True, timeout=60,
+    )
+    if holen.returncode != 0 or not holen.stdout.strip():
+        return 2, ["COULD NOT TELL: the daily series was not readable from the VM."]
+    reihe = {}
+    for zeile in holen.stdout.splitlines():
+        try:
+            punkt = json.loads(zeile)
+        except json.JSONDecodeError:
+            continue
+        reihe[punkt["stichtag"][:10]] = punkt
+
+    fehlend = []
+    verglichen = 0
+    for csv_datei in csvs:
+        tag = csv_datei.name[:10]
+        punkt = reihe.get(tag)
+        if punkt is None:
+            continue  # A published scan from before the series existed is not a mismatch.
+        lauf = subprocess.run(
+            [sys.executable, "x402-kennzahlen.py", csv_datei.name, "--json"],
+            cwd=DATEN, capture_output=True, text=True, timeout=300,
+        )
+        if lauf.returncode != 0:
+            return 2, [f"COULD NOT TELL: x402-kennzahlen.py on {csv_datei.name} exited {lauf.returncode}."]
+        aus_csv = json.loads(lauf.stdout)
+        # `stichtag` is when the script ran, not what it measured, so it is the one field that
+        # differs by design.
+        for feld, wert in aus_csv.items():
+            if feld == "stichtag":
+                continue
+            verglichen += 1
+            if punkt.get(feld) != wert:
+                fehlend.append(f"{tag} {feld}: the series says {punkt.get(feld)!r}, the CSV gives {wert!r}")
+    if not verglichen:
+        return 0, []
+    return (1 if fehlend else 0), fehlend
+
+
 def main() -> int:
     if not DATEN.is_dir():
         print(f"COULD NOT TELL: {DATEN} is not there.")
         return 2
     schlecht = 0
+    geprueft = 0
     for name, befehl in PAARE:
         ziel = DATEN / name
         quelle = DATEN / befehl[1]
@@ -123,6 +191,7 @@ def main() -> int:
             print(f"        Reproduce: cd docs/research/data && python3 {' '.join(befehl)}")
         else:
             print(f"ok      {name} reproduces from {befehl[1]} ({len(gerechnet)} fields)")
+            geprueft += 1
     # And the script the article invites a reader to run, against the same figures.
     #
     # artikel-zahlen.py carried `cut = "2026-08-20T14:59:00Z"  # 30 Tage vor dem Scan-Ende` and
@@ -149,6 +218,21 @@ def main() -> int:
         print(f"        the README should therefore contain {erwartet}")
     else:
         print(f"ok      artikel-zahlen.py agrees with README.md ({erwartet})")
+        geprueft += 1
+
+    code, fehlend = reihe_gegen_csv()
+    if code == 2:
+        print(fehlend[0])
+        return 2
+    if fehlend:
+        schlecht += 1
+        print("WRONG   the daily series and the published CSV disagree about the same day.")
+        for f in fehlend:
+            print(f"        {f}")
+        print("        One of them is what /x402 renders and the other is what a reader re-runs.")
+    elif code == 0:
+        print("ok      the daily series matches the published CSV on every day both describe")
+        geprueft += 1
 
     code, fehlend = transfers_readme()
     if code == 2:
@@ -162,11 +246,12 @@ def main() -> int:
         print("        Reproduce: the Python block in that section, on the CSV beside it.")
     else:
         print("ok      README.md reproduces the transfer CSV (months, scan end, both windows)")
+        geprueft += 1
 
     if schlecht:
-        print(f"\nDATA FAILED: {schlecht} published file(s) no longer match their own source.")
+        print(f"\nDATA FAILED: {schlecht} of {geprueft + schlecht} published artefact(s) no longer match their own source.")
         return 1
-    print(f"\nDATA OK ({len(PAARE) + 2} published file(s) reproduced from the data beside them)")
+    print(f"\nDATA OK ({geprueft} published artefact(s) held against the data beside them)")
     return 0
 
 
