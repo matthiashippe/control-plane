@@ -664,6 +664,23 @@ our own addresses removed from the filter it reports the smoke test's 23 deliber
 `AFFECTED` and exits 1, with an unreachable host it exits 2, and with a tail long enough to run
 past the end of the log it prints `PARTIAL`.
 
+### Did anybody come back
+
+The last section of `ops/verkehr.sh`, and the only one that ignores the window and reads the whole
+log. Every other section reads 24 hours, so somebody who visits on Monday and again on Friday looks
+like two strangers.
+
+Worked out by hand on 2026-09-23 and it produced the first new fact in hours: 2 of 46 foreign
+addresses had been here on more than one day, and both were tools walking API paths rather than
+people. `23.23.253.54` called `/v1/auth/verify`, `/v1/credits/history` and `/v1/submissions` by GET
+without a key over two days; `31.77.203.199` is the scanner that appends `/v1/models` to every path
+it finds. Every one of those got a usable 401 or 405 with a way forward, which is what those
+answers are for.
+
+On a service waiting for its first user, a returning visitor is the strongest signal short of a
+payment. The first line of the section says how far the log goes back, because Caddy rotates it and
+that answer changes without warning.
+
 ## Does a backup come back up
 
 `ops/sicherung-probe.sh`, by hand, not by cron. `--oldest` takes the oldest backup still kept

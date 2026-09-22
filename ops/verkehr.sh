@@ -183,6 +183,39 @@ jq -r --argjson since "$since" --argjson own "$own_json" \
       }'
 
 echo
+# Did anybody come back?
+#
+# Every other section here reads one window, so somebody who visits on Monday and again on Friday
+# looks like two strangers. Working it out by hand on 2026-09-23 took one query and produced the
+# first new fact in hours: 2 of 46 foreign addresses had been here on more than one day, and both
+# were tools walking API paths rather than people.
+#
+# On a service waiting for its first user, a returning visitor is the strongest signal short of a
+# payment. It deserves a line rather than an afternoon of curiosity.
+#
+# This one ignores the window on purpose and reads the whole log, so the first line says how far
+# back that goes. Caddy rotates it, so the answer changes without warning.
+echo "-- Did anybody come back? (the whole log, not the window) --"
+jq -r --argjson own "$own_json" \
+  "$FOREIGN | select(.request.uri | test(\"wp-|php|\\\\.env|\\\\.git|admin|xmlrpc|/vendor|/actuator|/cgi\") | not)
+   | [.request.remote_ip, (.ts | strftime(\"%Y-%m-%d\")), .request.uri] | @tsv" "$log" \
+  | sort -u | awk -F'\t' '
+      # The day goes on the list once, not once per distinct path: the rows are unique by
+      # (ip, day, path), so appending outside this guard printed the same date three times.
+      { if (!seen[$1 SUBSEP $2]++) { n[$1]++; tage[$1] = tage[$1] $2 " " }
+        if (count[$1] < 3) pfade[$1] = pfade[$1] $3 " "
+        count[$1]++ }
+      END {
+        gesamt = 0; wieder = 0
+        for (ip in n) {
+          gesamt++
+          if (n[ip] > 1) { wieder++; printf "   %-16s %d days: %s\n      %s\n", ip, n[ip], tage[ip], pfade[ip] }
+        }
+        if (gesamt == 0) { print "   no foreign address in the log at all"; exit }
+        printf "   %d of %d foreign address(es) were here on more than one day.\n", wieder, gesamt
+      }'
+
+echo
 echo "-- Error answers to strangers (what a visitor got to see) --"
 jq -r --argjson since "$since" --argjson own "$own_json" \
   "select(.ts > \$since) | $FOREIGN | select(.status >= 400) | select(.request.uri | test(\"wp-|php|\\\\.env|\\\\.git|admin|xmlrpc\") | not) | [(.status|tostring), .request.uri] | @tsv" "$log" \
