@@ -80,3 +80,10 @@ console.log("ok      balances and ledger agree");
 '
 echo "RESTORE PROBE OK"
 REMOTE
+
+# A stamp, for the same reason ops/neuling-probe.ts writes one: a probe that does not run every
+# cycle ages in silence, and on 2026-09-22 its last result had to be dug out of the protocol
+# rather than read off. ops/check-all.sh prints how old this is and how many commits have landed.
+mkdir -p "${CP_PROBE_STAMPS:-.scratch/probes}"
+printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$(git rev-parse --short HEAD)" \
+  > "${CP_PROBE_STAMPS:-.scratch/probes}/sicherung"
