@@ -197,3 +197,28 @@ describe("The check as a page you can reach by clicking", () => {
     expect(xml).toContain("https://cp.hippe.eu/check");
   });
 });
+
+/**
+ * The link, which is the part that decides whether any of the rest is reachable.
+ *
+ * Over the whole access log to 2026-09-22 nobody has ever followed a link on this site, and the
+ * nav item called "The free check" pointed at an anchor. An anchor leaves no log line, so even a
+ * reader who used it was invisible, and it led to a curl block rather than to something they could
+ * do.
+ */
+describe("The way to the free check from the landing page", () => {
+  it("offers it as a page and not only as an anchor", async () => {
+    const html = await (await app().request("/")).text();
+    const nav = html.slice(html.indexOf("<nav>"), html.indexOf("</nav>"));
+    expect(nav, "the nav item for the check has to be a real link").toContain('href="/check"');
+    expect(nav, "an anchor leaves no log line, so it cannot be measured").not.toContain('href="#how"');
+  });
+
+  it("offers a way out of the curl block for somebody without a terminal", async () => {
+    const html = await (await app().request("/")).text();
+    const panel = html.slice(html.indexOf('id="how"'), html.indexOf("/px/top.png"));
+    const after = html.slice(html.indexOf('id="how"'), html.indexOf('id="proof"'));
+    expect(panel.length + after.length, "the hero panel is gone").toBeGreaterThan(0);
+    expect(after, "the curl block needs a door next to it").toContain('href="/check"');
+  });
+});
