@@ -836,6 +836,14 @@ export function createApp(opts: AppOptions) {
       "## Use it",
       "",
       "- Conway runtime: set conwayApiUrl in ~/.automaton/automaton.json to https://cp.hippe.eu, then run automaton --provision.",
+      // Written down on 2026-09-22 after somebody spent 32 hours looking for it. They joined every
+      // documented path onto their base URL (/v1/status/v1/models, /v1/auth/verify/v1/models, and
+      // four more) and got nothing back that named the mistake. Both halves of this line are the
+      // answer they needed: the base is the bare origin, and the catalogue can be read before you
+      // have a key, so the URL can be checked separately from the key.
+      "- OpenAI-compatible client: the base URL is https://cp.hippe.eu, the bare origin with no path",
+      "  after it. GET /v1/models answers without a key, so the URL can be checked before there is one.",
+      "  The key goes in Authorization, raw or with the Bearer prefix; both are accepted.",
       "- Anything else: an API key takes three calls and one Ethereum signature, no runtime and no",
       "  chain transaction. Sign in with Ethereum against /v1/auth/nonce, /v1/auth/verify and",
       "  /v1/auth/api-keys. The signed domain is conway.tech, not this host, and that is the one",

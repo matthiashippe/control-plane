@@ -1050,3 +1050,26 @@ describe("A base URL that already carries a path", () => {
     expect(((await res.json()) as { error: string }).error).toBe("not_found");
   });
 });
+
+/**
+ * What llms.txt promises about /v1/models is what /v1/models does.
+ *
+ * The line exists because somebody could not find the base URL for 32 hours. A line that says
+ * "answers without a key" and an endpoint that then asks for one would cost the next reader the
+ * same time, with our own text as the source of the error. So the promise is read out of the
+ * served file and checked against the served endpoint, rather than both being written twice.
+ */
+describe("llms.txt and the endpoint it describes", () => {
+  it("promises a keyless catalogue only while there is one", async () => {
+    const { app } = setup();
+    const text = await (await app.request("/llms.txt")).text();
+    // No branch on whether the promise is there. A test that passes both ways is a test that
+    // checks nothing, and the point here is that the sentence and the behaviour move together:
+    // take the line out and this fails, close the endpoint and this fails.
+    expect(text, "the promise").toMatch(/GET \/v1\/models answers without a key/);
+    expect(text, "the base URL is the other half of what they were missing").toMatch(/bare origin with no path/);
+    const ohne = await app.request("/v1/models");
+    expect(ohne.status, "and the endpoint keeps it").toBe(200);
+    expect((await app.request("/v1/models", { headers: { authorization: "cnwy_k_nope" } })).status).toBe(401);
+  });
+});
