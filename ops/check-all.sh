@@ -118,6 +118,12 @@ run --unklar-bei 2 "the published data reproduces" ./ops/daten-pruefen.py
 # ops/sichtbarkeit.sh: in the first 2.6 days there was not one, and nothing on our side is wrong.
 run --unklar-bei 2 "search engines can find us" ./ops/sichtbarkeit.sh
 
+# Every command a page shows, run against the live service. The unit tests prove a page agrees
+# with the code in this checkout; this asks whether it agrees with what is deployed, and whether
+# the answer the hero prints beside its call is the answer the service gives. See
+# ops/befehle-pruefen.sh.
+run --unklar-bei 2 "the commands the pages show work" ./ops/befehle-pruefen.sh
+
 if (( DEEP )); then
   run "MCP route end to end" env CP_URL="$BASE" OPERATOR_WALLET="${OPERATOR_WALLET:-harness/state/mainnet-wallet.json}" pnpm -s tsx ops/mcp-against-production.ts \
     && touch "$STAMPS/mcp-production"
