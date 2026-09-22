@@ -110,26 +110,26 @@ describe("The starter credit", () => {
    */
   it("tells an address with nothing that a starter credit is waiting, and stops once it is taken", async () => {
     const { a } = setup();
-    type Antwort = { balance_cents: number; starter_available_cents?: number; hint?: string };
-    const leer = (await (await a.read()).json()) as Antwort;
-    expect(leer.balance_cents).toBe(0);
-    expect(leer.starter_available_cents).toBe(GRANT_MC / MC_PER_CENT);
-    expect(leer.hint).toContain("POST /v1/credits/starter");
+    type BalanceAnswer = { balance_cents: number; starter_available_cents?: number; hint?: string };
+    const emptyBalance = (await (await a.read()).json()) as BalanceAnswer;
+    expect(emptyBalance.balance_cents).toBe(0);
+    expect(emptyBalance.starter_available_cents).toBe(GRANT_MC / MC_PER_CENT);
+    expect(emptyBalance.hint).toContain("POST /v1/credits/starter");
 
     await a.claim();
-    const voll = (await (await a.read()).json()) as Antwort;
-    expect(voll.balance_cents).toBe(GRANT_MC / MC_PER_CENT);
-    expect(voll.starter_available_cents, "the grant is taken, so the invitation goes").toBeUndefined();
-    expect(voll.hint).toBeUndefined();
+    const fundedBalance = (await (await a.read()).json()) as BalanceAnswer;
+    expect(fundedBalance.balance_cents).toBe(GRANT_MC / MC_PER_CENT);
+    expect(fundedBalance.starter_available_cents, "the grant is taken, so the invitation goes").toBeUndefined();
+    expect(fundedBalance.hint).toBeUndefined();
   });
 
   it("does not invite anybody to claim from an empty pool", async () => {
     const { db, a } = setup();
-    const viele = Math.floor(POOL_MC / GRANT_MC);
-    for (let i = 0; i < viele; i++) claimStarter(db, `0x${String(i).padStart(40, "0")}`);
-    const antwort = (await (await a.read()).json()) as { balance_cents: number; hint?: string };
-    expect(antwort.balance_cents).toBe(0);
-    expect(antwort.hint, "a promise the pool cannot keep is worse than silence").toBeUndefined();
+    const many = Math.floor(POOL_MC / GRANT_MC);
+    for (let i = 0; i < many; i++) claimStarter(db, `0x${String(i).padStart(40, "0")}`);
+    const answer = (await (await a.read()).json()) as { balance_cents: number; hint?: string };
+    expect(answer.balance_cents).toBe(0);
+    expect(answer.hint, "a promise the pool cannot keep is worse than silence").toBeUndefined();
   });
 
   it("says in /v1/status how much is left, so the promise can be checked", async () => {

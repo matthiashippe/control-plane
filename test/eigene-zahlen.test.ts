@@ -27,55 +27,55 @@ import { OUR_ADDRESSES, wallets } from "../src/bounties/ours.js";
 function setup() {
   const db = openDb(":memory:");
   const app = createApp({ db });
-  return { db, app, seite: async () => (await app.request("/")).text() };
+  return { db, app, page: async () => (await app.request("/")).text() };
 }
 
 /** A wallet with a key, so `ourAddresses` can classify it by the name on the key. */
 function wallet(db: ReturnType<typeof openDb>, keyName: string, address?: string): string {
-  const wer = (address ?? privateKeyToAccount(generatePrivateKey()).address).toLowerCase();
-  db.prepare("INSERT OR IGNORE INTO wallets (address, balance_mc, created_at) VALUES (?, 0, ?)").run(wer, new Date().toISOString());
+  const who = (address ?? privateKeyToAccount(generatePrivateKey()).address).toLowerCase();
+  db.prepare("INSERT OR IGNORE INTO wallets (address, balance_mc, created_at) VALUES (?, 0, ?)").run(who, new Date().toISOString());
   const key = `cnwy_k_${Math.random().toString(16).slice(2, 10)}`.padEnd(15, "0");
   db.prepare("INSERT INTO api_keys (address, key_hash, key_prefix, name, created_at) VALUES (?, ?, ?, ?, ?)").run(
-    wer, hashApiKey(key + wer), key.slice(0, 15), keyName, new Date().toISOString(),
+    who, hashApiKey(key + who), key.slice(0, 15), keyName, new Date().toISOString(),
   );
-  return wer;
+  return who;
 }
 
 describe("the numbers that count us", () => {
   it("shows the part that is not ours, next to the total, in the status line", async () => {
-    const { db, seite } = setup();
+    const { db, page } = setup();
     // One wallet of ours and one stranger, both having paid; only ours has thought here.
-    const unser = wallet(db, "harness-markt-poster", OUR_ADDRESSES[0]);
-    const fremd = wallet(db, "conway-automaton");
-    postLedger(db, { address: unser, kind: "topup", deltaMc: 500_000, ref: "t1" });
-    postLedger(db, { address: fremd, kind: "topup", deltaMc: 500_000, ref: "t2" });
-    postLedger(db, { address: unser, kind: "inference", deltaMc: -100, ref: "i1" });
+    const ours = wallet(db, "harness-markt-poster", OUR_ADDRESSES[0]);
+    const stranger = wallet(db, "conway-automaton");
+    postLedger(db, { address: ours, kind: "topup", deltaMc: 500_000, ref: "t1" });
+    postLedger(db, { address: stranger, kind: "topup", deltaMc: 500_000, ref: "t2" });
+    postLedger(db, { address: ours, kind: "inference", deltaMc: -100, ref: "i1" });
 
-    const html = await seite();
+    const html = await page();
     expect(html, "two paid, one of them a stranger").toContain("2 paid, 1 from outside");
     expect(html, "one has thought here, and it is ours").toContain("1 thought here, 0 from outside");
     expect(html, "the placeholder has to be replaced").not.toContain("<!--WALLETS-->");
   });
 
   it("says nobody rather than printing a zero with a label", async () => {
-    const { seite } = setup();
-    const html = await seite();
+    const { page } = setup();
+    const html = await page();
     expect(html).toContain("nobody has paid yet");
     expect(html).toContain("nobody has thought here yet");
   });
 
   it("renders exactly what /v1/status publishes, from the same call", async () => {
-    const { db, app, seite } = setup();
-    const unser = wallet(db, "harness-markt-applicant", OUR_ADDRESSES[1]);
-    const fremd = wallet(db, "conway-automaton");
-    for (const a of [unser, fremd]) postLedger(db, { address: a, kind: "topup", deltaMc: 500_000, ref: `t-${a}` });
-    postLedger(db, { address: fremd, kind: "inference", deltaMc: -100, ref: "i-fremd" });
+    const { db, app, page } = setup();
+    const ours = wallet(db, "harness-markt-applicant", OUR_ADDRESSES[1]);
+    const stranger = wallet(db, "conway-automaton");
+    for (const a of [ours, stranger]) postLedger(db, { address: a, kind: "topup", deltaMc: 500_000, ref: `t-${a}` });
+    postLedger(db, { address: stranger, kind: "inference", deltaMc: -100, ref: "i-stranger" });
 
     const status = (await (await app.request("/v1/status")).json()) as {
       paying_wallets: { total: number; not_ours: number };
       thinking_wallets: { total: number; not_ours: number };
     };
-    const html = await seite();
+    const html = await page();
 
     // The page and the endpoint are two renderings of one fact. They drifted before, in the same
     // direction both times, because two files each ran their own query.
@@ -90,11 +90,11 @@ describe("the numbers that count us", () => {
   it("marks our own agents in the market strip instead of counting them as competition", async () => {
     const { db, app } = setup();
     // A job of ours, entered by an agent of ours: the state the market was actually in.
-    const kaeufer = wallet(db, "harness-markt-poster", OUR_ADDRESSES[0]);
-    postLedger(db, { address: kaeufer, kind: "topup", deltaMc: 500_000, ref: "t" });
+    const buyer = wallet(db, "harness-markt-poster", OUR_ADDRESSES[0]);
+    postLedger(db, { address: buyer, kind: "topup", deltaMc: 500_000, ref: "t" });
     const key = "cnwy_k_" + "3b".repeat(16);
     db.prepare("INSERT INTO api_keys (address, key_hash, key_prefix, name, created_at) VALUES (?, ?, ?, ?, ?)").run(
-      kaeufer, hashApiKey(key), key.slice(0, 15), "harness-markt-poster", new Date().toISOString(),
+      buyer, hashApiKey(key), key.slice(0, 15), "harness-markt-poster", new Date().toISOString(),
     );
     const res = await app.request("/v1/bounties", {
       method: "POST",

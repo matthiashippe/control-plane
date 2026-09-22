@@ -28,7 +28,7 @@ OWN=$(eigene_ips)
 # the service had ever had: a stranger who opened the page, walked on to nine more, and provisioned
 # two wallets. Every error a measurement makes about itself points the flattering way.
 #
-# So the list is now assembled from evidence, in `eigene_adressen` below, and what it adds is
+# So the list is now assembled from evidence, in `own_addresses` below, and what it adds is
 # printed. A filter that grows in silence can hide a real visitor just as easily.
 
 since=$(( $(date -u +%s) - HOURS * 3600 ))
@@ -53,7 +53,7 @@ log=$(mktemp); trap 'rm -f "$log"' EXIT
 #
 # The real answer is log rotation, and that lives in deploy/, which is not touched without a human.
 # A planted log, so the evidence lines below can be proved in both directions. Every other
-# measuring tool here has one (CP_TIEFE_LOG, CP_SICHT_LOG, CP_FEHLERMUSTER, CP_FENSTER_JETZT) and
+# measuring tool here has one (CP_TIEFE_LOG, CP_SICHT_LOG, CP_FEHLERMUSTER, CP_WINDOW_NOW) and
 # loop-constraints.md requires it of anything that can report "none": without a counter-proof a
 # zero is indistinguishable from blindness. Fixtures under ops/fixtures/.
 if [[ -n "${CP_VERKEHR_LOG:-}" ]]; then
@@ -61,13 +61,13 @@ if [[ -n "${CP_VERKEHR_LOG:-}" ]]; then
   echo "(log from ${CP_VERKEHR_LOG}, not from the VM)" >&2
 elif ! timeout 45 ssh -i "$KEY" -o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=3 "$HOST" \
   'docker exec deploy-caddy-1 cat /var/log/caddy/access.log | gzip -c' 2>/dev/null | gunzip > "$log"; then
-  echo "FEHLER: das Zugriffslog war in 45 Sekunden nicht zu holen." >&2
-  echo "        Das ist kein Befund ueber den Dienst. Pruefe ihn getrennt:" >&2
-  echo "        curl -s -o /dev/null -m 10 -w '%{http_code}\n' https://cp.hippe.eu/health" >&2
+  echo "ERROR: the access log could not be fetched within 45 seconds." >&2
+  echo "       That is no finding about the service. Check it separately:" >&2
+  echo "       curl -s -o /dev/null -m 10 -w '%{http_code}\n' https://cp.hippe.eu/health" >&2
   exit 2
 fi
 if [[ ! -s "$log" ]]; then
-  echo "FEHLER: das Zugriffslog kam leer zurueck. Laeuft deploy-caddy-1?" >&2
+  echo "ERROR: the access log came back empty. Is deploy-caddy-1 running?" >&2
   exit 2
 fi
 
@@ -81,23 +81,23 @@ fi
 # That rule can be spoofed, and a stranger who set the header would disappear from this report.
 # The trade is worth taking: a visitor hiding themselves is far-fetched, the addresses folded in
 # are printed below, and the failure it prevents happened twice in one day.
-eigene_adressen() {
-  local pruefer
-  pruefer=$(jq -r 'select(((.request.headers["User-Agent"] // [""])[0]) | startswith("control-plane-check")) | .request.remote_ip' "$log" 2>/dev/null | sort -u)
-  printf '%s\n' $OWN $pruefer | grep -v '^$' | sort -u
+own_addresses() {
+  local checkers
+  checkers=$(jq -r 'select(((.request.headers["User-Agent"] // [""])[0]) | startswith("control-plane-check")) | .request.remote_ip' "$log" 2>/dev/null | sort -u)
+  printf '%s\n' $OWN $checkers | grep -v '^$' | sort -u
 }
-dazu=$(comm -13 <(printf '%s\n' $OWN | sort -u) <(eigene_adressen))
-OWN=$(eigene_adressen | tr '\n' ' ')
+added=$(comm -13 <(printf '%s\n' $OWN | sort -u) <(own_addresses))
+OWN=$(own_addresses | tr '\n' ' ')
 own_json=$(printf '%s' "$OWN" | tr ' ' '\n' | grep -v '^$' | jq -R . | jq -sc .)
 
 echo "Requests to cp.hippe.eu in the last $HOURS hours"
-if [[ -n "$dazu" ]]; then
-  echo "(counted as ours beyond the configured list: $(printf '%s' "$dazu" | tr '\n' ' '))"
+if [[ -n "$added" ]]; then
+  echo "(counted as ours beyond the configured list: $(printf '%s' "$added" | tr '\n' ' '))"
   echo "(these sent our own checker UA; addresses of this machine live in ops/eigene-ips.txt)"
 fi
 echo
 
-ZEILEN="${CP_VERKEHR_ZEILEN:-25}"
+ROWS="${CP_VERKEHR_ZEILEN:-25}"
 echo "-- First request per foreign IP (this is where the referrer is) --"
 # The first request of an address, not the first one inside the window. Until 2026-09-22 the
 # window filter ran first, so an address whose real first visit was three days ago and which came
@@ -109,39 +109,39 @@ echo "-- First request per foreign IP (this is where the referrer is) --"
 # So: the earliest request of every foreign address over the WHOLE log, and only then the window.
 # Addresses that were already here before it are counted separately, because a returning visitor
 # is a stronger signal than a new one and must not be silently dropped or silently renamed "new".
-alle_ersten=$(jq -r --argjson own "$own_json" \
+all_firsts=$(jq -r --argjson own "$own_json" \
   "$FOREIGN | [(.ts|floor|tostring), .request.remote_ip, .request.uri, (.status|tostring), ((.request.headers.Referer // [\"-\"])[0]), ((.request.headers[\"User-Agent\"] // [\"-\"])[0]|.[0:40])] | @tsv" "$log" \
   | sort -k2,2 -k1,1n | awk -F'\t' '!seen[$2]++')
-erste=$(printf '%s\n' "$alle_ersten" | awk -F'\t' -v s="$since" '$1 > s' | sort -k1,1n)
-frueher=$(printf '%s\n' "$alle_ersten" | awk -F'\t' -v s="$since" '$1 <= s' | grep -c . || true)
-aktiv_frueher=$(jq -r --argjson since "$since" --argjson own "$own_json" \
+firsts=$(printf '%s\n' "$all_firsts" | awk -F'\t' -v s="$since" '$1 > s' | sort -k1,1n)
+earlier=$(printf '%s\n' "$all_firsts" | awk -F'\t' -v s="$since" '$1 <= s' | grep -c . || true)
+active_earlier=$(jq -r --argjson since "$since" --argjson own "$own_json" \
   "select(.ts > \$since) | $FOREIGN | .request.remote_ip" "$log" 2>/dev/null | sort -u \
-  | comm -12 - <(printf '%s\n' "$alle_ersten" | awk -F'\t' -v s="$since" '$1 <= s {print $2}' | sort -u) | grep -c . || true)
-gesamt=$(printf '%s\n' "$erste" | grep -c . || true)
-echo "   ($gesamt address(es) here for the first time in this window; $frueher known from before, $aktiv_frueher of them active again)"
+  | comm -12 - <(printf '%s\n' "$all_firsts" | awk -F'\t' -v s="$since" '$1 <= s {print $2}' | sort -u) | grep -c . || true)
+total=$(printf '%s\n' "$firsts" | grep -c . || true)
+echo "   ($total address(es) here for the first time in this window; $earlier known from before, $active_earlier of them active again)"
 
 # A returning visitor named, not counted. A count of one is the same shape as a count of none to
 # anybody reading the report, and this is the rarer and more interesting of the two kinds of
 # visit: somebody who came back without being reminded.
-if (( aktiv_frueher > 0 )); then
+if (( active_earlier > 0 )); then
   jq -r --argjson since "$since" --argjson own "$own_json" \
     "select(.ts > \$since) | $FOREIGN | .request.remote_ip" "$log" 2>/dev/null | sort -u \
-    | comm -12 - <(printf '%s\n' "$alle_ersten" | awk -F'\t' -v s="$since" '$1 <= s {print $2}' | sort -u) \
+    | comm -12 - <(printf '%s\n' "$all_firsts" | awk -F'\t' -v s="$since" '$1 <= s {print $2}' | sort -u) \
     | while read -r ip; do
         [[ -z "$ip" ]] && continue
-        zeile=$(printf '%s\n' "$alle_ersten" | awk -F'\t' -v ip="$ip" '$2 == ip')
-        ts=$(printf '%s' "$zeile" | cut -f1); ref=$(printf '%s' "$zeile" | cut -f5)
-        pfade=$(jq -r --argjson since "$since" --arg ip "$ip" \
+        row=$(printf '%s\n' "$all_firsts" | awk -F'\t' -v ip="$ip" '$2 == ip')
+        ts=$(printf '%s' "$row" | cut -f1); ref=$(printf '%s' "$row" | cut -f5)
+        paths=$(jq -r --argjson since "$since" --arg ip "$ip" \
           'select(.ts > $since) | select(.request.remote_ip == $ip) | .request.uri' "$log" \
           | sort -u | head -4 | tr '\n' ' ')
         printf '   back:  %-16s first seen %s from %s, now %s\n' "$ip" \
-          "$(date -u -r "$ts" +%m-%d\ %H:%M 2>/dev/null || echo "$ts")" "${ref:0:40}" "${pfade:0:60}"
+          "$(date -u -r "$ts" +%m-%d\ %H:%M 2>/dev/null || echo "$ts")" "${ref:0:40}" "${paths:0:60}"
       done
 fi
-if (( gesamt > ZEILEN )); then
-  echo "   ($((gesamt - ZEILEN)) older address(es) not shown; the referrer section below counts all $gesamt)"
+if (( total > ROWS )); then
+  echo "   ($((total - ROWS)) older address(es) not shown; the referrer section below counts all $total)"
 fi
-printf '%s\n' "$erste" | tail -n "$ZEILEN" \
+printf '%s\n' "$firsts" | tail -n "$ROWS" \
   | while IFS=$'\t' read -r ts ip uri st ref ua; do
       [[ -z "$ts" ]] && continue
       printf '%s  %-16s %-28s %3s  %-28s %s\n' "$(date -u -r "$ts" +%m-%d\ %H:%M 2>/dev/null || echo "$ts")" "$ip" "${uri:0:28}" "$st" "${ref:0:28}" "$ua"
@@ -362,22 +362,22 @@ jq -r --argjson own "$own_json" \
   | sort -u | awk -F'\t' '
       # The day goes on the list once, not once per distinct path: the rows are unique by
       # (ip, day, path), so appending outside this guard printed the same date three times.
-      { if (!seen[$1 SUBSEP $2]++) { n[$1]++; tage[$1] = tage[$1] $2 " " }
-        if (count[$1] < 3) pfade[$1] = pfade[$1] $3 " "
+      { if (!seen[$1 SUBSEP $2]++) { n[$1]++; days[$1] = days[$1] $2 " " }
+        if (count[$1] < 3) paths[$1] = paths[$1] $3 " "
         count[$1]++ }
       END {
-        gesamt = 0; wieder = 0; gedruckt = 0
-        grenze = (ENVIRON["CP_VERKEHR_ZEILEN"] == "" ? 25 : ENVIRON["CP_VERKEHR_ZEILEN"]) + 0
+        total = 0; returning = 0; printed = 0
+        limit = (ENVIRON["CP_VERKEHR_ZEILEN"] == "" ? 25 : ENVIRON["CP_VERKEHR_ZEILEN"]) + 0
         for (ip in n) {
-          gesamt++
+          total++
           if (n[ip] > 1) {
-            wieder++
-            if (gedruckt < grenze) { gedruckt++; printf "   %-16s %d days: %s\n      %s\n", ip, n[ip], tage[ip], pfade[ip] }
+            returning++
+            if (printed < limit) { printed++; printf "   %-16s %d days: %s\n      %s\n", ip, n[ip], days[ip], paths[ip] }
           }
         }
-        if (gesamt == 0) { print "   no foreign address in the log at all"; exit }
-        if (wieder > gedruckt) printf "   (%d more returning address(es) not shown)\n", wieder - gedruckt
-        printf "   %d of %d foreign address(es) were here on more than one day.\n", wieder, gesamt
+        if (total == 0) { print "   no foreign address in the log at all"; exit }
+        if (returning > printed) printf "   (%d more returning address(es) not shown)\n", returning - printed
+        printf "   %d of %d foreign address(es) were here on more than one day.\n", returning, total
       }'
 
 echo
@@ -396,17 +396,17 @@ jq -r --argjson own "$own_json" \
   "$FOREIGN | select(.request.uri | test(\"wp-|php|\\\\.env|\\\\.git|admin|xmlrpc|/vendor|/actuator|/cgi\") | not)
    | [(.request.remote_ip | split(\".\")[0:3] | join(\".\")), .request.remote_ip, (.ts | strftime(\"%Y-%m-%d\"))] | @tsv" "$log" \
   | sort -u | sort -k1,1 -k3,3 | awk -F'\t' '
-      { if (!ip_seen[$1 SUBSEP $2]++) adressen[$1]++
-        if (!tag_seen[$1 SUBSEP $3]++) { tage[$1]++; liste[$1] = liste[$1] $3 " " } }
+      { if (!ip_seen[$1 SUBSEP $2]++) addresses[$1]++
+        if (!day_seen[$1 SUBSEP $3]++) { days[$1]++; list[$1] = list[$1] $3 " " } }
       END {
-        netze = 0; summe = 0; wieder = 0
-        for (netz in adressen) { netze++; summe += adressen[netz]; if (tage[netz] > 1) wieder++ }
-        if (netze == 0) { print "   no foreign network in the log"; exit }
-        for (netz in adressen) {
-          if (adressen[netz] > 1 || tage[netz] > 1)
-            printf "   %-16s %d address(es) over %d day(s): %s\n", netz ".x", adressen[netz], tage[netz], liste[netz]
+        networks = 0; sum = 0; returning = 0
+        for (network in addresses) { networks++; sum += addresses[network]; if (days[network] > 1) returning++ }
+        if (networks == 0) { print "   no foreign network in the log"; exit }
+        for (network in addresses) {
+          if (addresses[network] > 1 || days[network] > 1)
+            printf "   %-16s %d address(es) over %d day(s): %s\n", network ".x", addresses[network], days[network], list[network]
         }
-        printf "   %d address(es) in %d network(s); %d network(s) were here on more than one day.\n", summe, netze, wieder
+        printf "   %d address(es) in %d network(s); %d network(s) were here on more than one day.\n", sum, networks, returning
       }'
 
 echo

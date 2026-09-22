@@ -29,16 +29,16 @@ import { execSync } from "node:child_process";
 
 const BASE = (process.env.CP_URL || "https://cp.hippe.eu").replace(/\/$/, "");
 const DOMAIN = process.env.CP_SIWE_DOMAIN || "conway.tech";
-let schritt = 0;
-let fehler = 0;
-const ok = (was: string, wert = "") => console.log(`  ${String(++schritt).padStart(2)}. ok    ${was}${wert ? `  ${wert}` : ""}`);
-const bad = (was: string, wert: unknown) => {
-  fehler++;
-  console.log(`  ${String(++schritt).padStart(2)}. FAIL  ${was}\n        ${JSON.stringify(wert).slice(0, 220)}`);
+let step = 0;
+let failures = 0;
+const ok = (label: string, value = "") => console.log(`  ${String(++step).padStart(2)}. ok    ${label}${value ? `  ${value}` : ""}`);
+const bad = (label: string, value: unknown) => {
+  failures++;
+  console.log(`  ${String(++step).padStart(2)}. FAIL  ${label}\n        ${JSON.stringify(value).slice(0, 220)}`);
 };
 
-async function json(pfad: string, init?: RequestInit): Promise<any> {
-  const res = await fetch(`${BASE}${pfad}`, init);
+async function json(path: string, init?: RequestInit): Promise<any> {
+  const res = await fetch(`${BASE}${path}`, init);
   const body = await res.json().catch(() => ({}));
   return { status: res.status, body };
 }
@@ -71,15 +71,15 @@ async function main(): Promise<number> {
   key?.startsWith("cnwy_k_") ? ok("got an API key", key.slice(0, 14) + "…") : bad("no key", minted);
 
   // 2. Nothing in the balance. This is the state every new agent is in.
-  const { body: leer } = await json("/v1/credits/balance", { headers: { authorization: key } });
-  leer.balance_cents === 0 ? ok("balance is zero, as a newcomer's is") : bad("expected an empty balance", leer);
+  const { body: empty } = await json("/v1/credits/balance", { headers: { authorization: key } });
+  empty.balance_cents === 0 ? ok("balance is zero, as a newcomer's is") : bad("expected an empty balance", empty);
 
   // 3. The market, without a key at all.
-  const { body: offen } = await json("/bounties.json");
-  Array.isArray(offen.open) ? ok("read the open jobs without a key", `${offen.open.length} open`) : bad("no open list", offen);
+  const { body: openJobs } = await json("/bounties.json");
+  Array.isArray(openJobs.open) ? ok("read the open jobs without a key", `${openJobs.open.length} open`) : bad("no open list", openJobs);
 
   // 4. Think, with no money. The starter credit is taken here, by the first call that cannot pay.
-  const { status: denkStatus, body: gedacht } = await json("/v1/chat/completions", {
+  const { status: thinkStatus, body: thought } = await json("/v1/chat/completions", {
     method: "POST",
     headers: { authorization: key, "content-type": "application/json" },
     body: JSON.stringify({
@@ -88,11 +88,11 @@ async function main(): Promise<number> {
       max_tokens: 60,
     }),
   });
-  denkStatus === 200 ? ok("thought once, paid for by the starter credit") : bad("the first thought was refused", gedacht);
-  const { body: danach } = await json("/v1/credits/balance", { headers: { authorization: key } });
-  danach.balance_cents > 0 && danach.balance_cents < 15
-    ? ok("the grant arrived and the call was charged", `${danach.balance_cents} c left`)
-    : bad("balance after thinking looks wrong", danach);
+  thinkStatus === 200 ? ok("thought once, paid for by the starter credit") : bad("the first thought was refused", thought);
+  const { body: after } = await json("/v1/credits/balance", { headers: { authorization: key } });
+  after.balance_cents > 0 && after.balance_cents < 15
+    ? ok("the grant arrived and the call was charged", `${after.balance_cents} c left`)
+    : bad("balance after thinking looks wrong", after);
 
   // 5. Its own job to hand work in to. Never a real one: a check must not change the market.
   const wallet = process.env.OPERATOR_WALLET || "harness/state/mainnet-wallet.json";
@@ -126,19 +126,19 @@ async function main(): Promise<number> {
 
   try {
     // 6. Compete.
-    const { status: einStatus, body: eingereicht } = await json("/v1/submissions", {
+    const { status: submitStatus, body: submitted } = await json("/v1/submissions", {
       method: "POST",
       headers: { authorization: key, "content-type": "application/json" },
       body: JSON.stringify({ bounty_id: job.id, body: "Cold-start probe: work handed in by an agent that started with nothing." }),
     });
-    einStatus === 201 ? ok("submitted") : bad("submission refused", eingereicht);
+    submitStatus === 201 ? ok("submitted") : bad("submission refused", submitted);
 
     // 7. And learn what became of it, which is what keeps an agent competing.
-    const { body: meine } = await json("/v1/submissions/mine", { headers: { authorization: key } });
-    const zeile = (meine.submissions ?? []).find((s: any) => s.bounty_id === job.id);
-    zeile?.outcome === "pending"
-      ? ok("read the outcome back", `pending, ${zeile.price_cents_if_won} c if it wins`)
-      : bad("no outcome for the submission", meine.submissions);
+    const { body: mine } = await json("/v1/submissions/mine", { headers: { authorization: key } });
+    const row = (mine.submissions ?? []).find((s: any) => s.bounty_id === job.id);
+    row?.outcome === "pending"
+      ? ok("read the outcome back", `pending, ${row.price_cents_if_won} c if it wins`)
+      : bad("no outcome for the submission", mine.submissions);
   } finally {
     const { status } = await json("/v1/bounties/cancel", {
       method: "POST",
@@ -148,9 +148,9 @@ async function main(): Promise<number> {
     status === 200 ? ok("cancelled its own job, the market is as it was") : bad("could not cancel the throwaway job", { status });
   }
 
-  console.log(`\n${fehler === 0 ? "COLD START OK" : `COLD START FAILED: ${fehler}`}`);
+  console.log(`\n${failures === 0 ? "COLD START OK" : `COLD START FAILED: ${failures}`}`);
   console.log("Cost: one starter grant of 15 c and about a cent of inference.");
-  if (fehler === 0) {
+  if (failures === 0) {
     // A stamp, because otherwise nobody knows how old the evidence is. On 2026-09-22 the date of
     // the last run had to be dug out of the protocol: it was fifteen hours, 96 commits and twelve
     // deploys old, and in that time exactly the endpoints this walks had changed.
@@ -161,7 +161,7 @@ async function main(): Promise<number> {
       // A stamp that cannot be written is not a reason to call a green run red.
     }
   }
-  return fehler === 0 ? 0 : 1;
+  return failures === 0 ? 0 : 1;
 }
 
 main().then((c) => process.exit(c)).catch((e) => {

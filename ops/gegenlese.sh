@@ -17,43 +17,43 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-ARTIKEL=".scratch/gtm/hn-post.txt"
-BERICHTE=".scratch/gtm/gegenlese"
-VORLAGE="ops/gegenlese-auftrag.md"
+ARTICLE=".scratch/gtm/hn-post.txt"
+REPORTS=".scratch/gtm/gegenlese"
+TEMPLATE="ops/gegenlese-auftrag.md"
 
-[[ -f "$VORLAGE" ]] || { echo "FAILED: $VORLAGE is missing." >&2; exit 2; }
+[[ -f "$TEMPLATE" ]] || { echo "FAILED: $TEMPLATE is missing." >&2; exit 2; }
 
 # What the last run already found, so this one spends its time on new ground rather than
 # rediscovering what has since been fixed and pinned.
-vorige=""
-if compgen -G "$BERICHTE/gegenlese-*.md" > /dev/null; then
-  letzter=$(ls -t "$BERICHTE"/gegenlese-*.md | head -1)
-  vorige=$(printf '\n\nWAS DER LETZTE LAUF SCHON GEFUNDEN HAT (%s)\nDiese Befunde sind abgearbeitet und durch Pruefungen abgedeckt. Melde sie nicht noch einmal,\nausser du findest sie wieder offen. Such neues Gelaende.\n\n%s\n' \
-    "$(basename "$letzter")" "$(grep -E '^### B' "$letzter" || echo '(keine Ueberschriften gefunden)')")
+previous=""
+if compgen -G "$REPORTS/gegenlese-*.md" > /dev/null; then
+  latest=$(ls -t "$REPORTS"/gegenlese-*.md | head -1)
+  previous=$(printf '\n\nWAS DER LETZTE LAUF SCHON GEFUNDEN HAT (%s)\nDiese Befunde sind abgearbeitet und durch Pruefungen abgedeckt. Melde sie nicht noch einmal,\nausser du findest sie wieder offen. Such neues Gelaende.\n\n%s\n' \
+    "$(basename "$latest")" "$(grep -E '^### B' "$latest" || echo '(keine Ueberschriften gefunden)')")
 fi
 
-artikel=""
-if [[ -f "$ARTIKEL" ]]; then
-  artikel=$(printf '\n\nDER ARTIKEL IM WORTLAUT\n=======================\n%s\n' \
-    "$(sed -n '/FELD "text": alles ab hier bis zum Ende kopieren/,$p' "$ARTIKEL" | sed '1,2d')")
+article=""
+if [[ -f "$ARTICLE" ]]; then
+  article=$(printf '\n\nDER ARTIKEL IM WORTLAUT\n=======================\n%s\n' \
+    "$(sed -n '/FELD "text": alles ab hier bis zum Ende kopieren/,$p' "$ARTICLE" | sed '1,2d')")
 else
-  artikel=$'\n\nDer Artikel liegt nicht vor. Pruefe die Seiten und das Repo.'
+  article=$'\n\nDer Artikel liegt nicht vor. Pruefe die Seiten und das Repo.'
 fi
 
-auftrag="$(cat "$VORLAGE")$vorige$artikel"
+brief="$(cat "$TEMPLATE")$previous$article"
 
 if [[ "${1:-}" == "--dry" ]]; then
-  printf '%s\n' "$auftrag"
+  printf '%s\n' "$brief"
   echo
-  echo "--- $(printf '%s' "$auftrag" | wc -c | tr -d ' ') Zeichen, nichts gestartet ---"
+  echo "--- $(printf '%s' "$brief" | wc -c | tr -d ' ') characters, nothing started ---"
   exit 0
 fi
 
 tmp=$(mktemp); trap 'rm -f "$tmp"' EXIT
-printf '%s' "$auftrag" > "$tmp"
+printf '%s' "$brief" > "$tmp"
 scp -q "$tmp" code-host:/tmp/gegenlese-auftrag.txt
 ssh -o BatchMode=yes code-host \
   'job start control-plane --model opus --workspace worktree --base main -- "$(cat /tmp/gegenlese-auftrag.txt)"'
 
 echo
-echo "Collect it with: ssh code-host 'job report <id>', then put the report in $BERICHTE/"
+echo "Collect it with: ssh code-host 'job report <id>', then put the report in $REPORTS/"

@@ -45,10 +45,10 @@ describe("what a stranger checks first", () => {
   it("proves the markup somewhere that answers without a key", async () => {
     const { app } = setup();
     const terms = await (await app.request("/terms")).text();
-    const von = terms.indexOf("What the money does");
-    expect(von, "the money section is gone").toBeGreaterThan(-1);
-    const geld = terms.slice(von, terms.indexOf("</p>", terms.indexOf("</p>", von) + 4));
-    expect(geld, "the margin has to be checkable before the first payment").toContain('href="/v1/status"');
+    const sectionStart = terms.indexOf("What the money does");
+    expect(sectionStart, "the money section is gone").toBeGreaterThan(-1);
+    const moneySection = terms.slice(sectionStart, terms.indexOf("</p>", terms.indexOf("</p>", sectionStart) + 4));
+    expect(moneySection, "the margin has to be checkable before the first payment").toContain('href="/v1/status"');
 
     // And the place it points at has to carry the number.
     const status = (await (await app.request("/v1/status")).json()) as { markup: number; models: unknown[] };
@@ -57,19 +57,19 @@ describe("what a stranger checks first", () => {
 
     // The keyless claim and the key-only receipt must not be confused for each other: the page
     // says which is which, because the old version linked only the one that answers 401.
-    expect(geld).toContain('href="/v1/credits/history"');
+    expect(moneySection).toContain('href="/v1/credits/history"');
     expect((await app.request("/v1/credits/history")).status, "still key-only, and said to be").toBe(401);
   });
 
   it("says the same number of calls everywhere, including in its own 401", async () => {
     const { app } = setup();
-    const fehler = (await (await app.request("/v1/credits/balance")).json()) as { message?: string; hint?: string };
-    const meldung = JSON.stringify(fehler);
-    expect(meldung, "the service names three endpoints when it refuses").toMatch(/three auth endpoints/);
+    const error = (await (await app.request("/v1/credits/balance")).json()) as { message?: string; hint?: string };
+    const refusal = JSON.stringify(error);
+    expect(refusal, "the service names three endpoints when it refuses").toMatch(/three auth endpoints/);
 
-    for (const pfad of ["/", "/post", "/jobs", "/llms.txt", "/bounties.json"]) {
-      const text = await (await app.request(pfad)).text();
-      expect(text, `${pfad} still promises four calls while the 401 names three`).not.toMatch(/four calls/i);
+    for (const path of ["/", "/post", "/jobs", "/llms.txt", "/bounties.json"]) {
+      const text = await (await app.request(path)).text();
+      expect(text, `${path} still promises four calls while the 401 names three`).not.toMatch(/four calls/i);
     }
   });
 
@@ -89,13 +89,13 @@ describe("what a stranger checks first", () => {
     });
     expect(res.status).toBe(201);
 
-    const liste = (await (await app.request("/bounties.json")).json()) as {
+    const list = (await (await app.request("/bounties.json")).json()) as {
       note: string;
       open: { price_cents: number; award_cents: number }[];
     };
-    const job = liste.open.find((b) => b.price_cents === 45)!;
+    const job = list.open.find((b) => b.price_cents === 45)!;
     expect(job.award_cents, "half a cent goes nowhere, and the field shows the floor").toBe(40);
-    expect(liste.note, "so the note has to say it, on the surface that carries the number").toMatch(
+    expect(list.note, "so the note has to say it, on the surface that carries the number").toMatch(
       /rounded down to the cent/i,
     );
   });

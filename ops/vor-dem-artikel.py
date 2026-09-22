@@ -36,54 +36,54 @@ from pathlib import Path
 #
 # So whichever exists is checked, the run says which file it read, and when both exist both are
 # read: a claim that holds in one and not the other is exactly the drift that happened.
-ARTIKEL = Path(".scratch/gtm/hn-post.txt")
-ARTIKEL_REPO = Path("docs/artikel-agentenoekonomie.md")
+ARTICLE = Path(".scratch/gtm/hn-post.txt")
+ARTICLE_REPO = Path("docs/artikel-agentenoekonomie.md")
 BASE = "https://cp.hippe.eu"
-befunde = []
+findings = []
 
 
-def ok(was: str, wert: str = "") -> None:
-    print(f"  ok      {was}{'  ' + wert if wert else ''}")
+def ok(what: str, value: str = "") -> None:
+    print(f"  ok      {what}{'  ' + value if value else ''}")
 
 
-def aendern(was: str, hinweis: str) -> None:
-    befunde.append(was)
-    print(f"  CHANGE  {was}\n          {hinweis}")
+def change(what: str, hint: str) -> None:
+    findings.append(what)
+    print(f"  CHANGE  {what}\n          {hint}")
 
 
-def vm(befehl: str) -> str:
+def vm(command: str) -> str:
     """Reads a file on the VM. The series lives outside the repo and outside the container."""
     try:
         return subprocess.run(
             ["ssh", "-i", str(Path.home() / ".ssh/id_ed25519_automaton"), "-o", "BatchMode=yes",
-             "-o", "ConnectTimeout=8", "root@76.13.144.207", befehl],
+             "-o", "ConnectTimeout=8", "root@76.13.144.207", command],
             capture_output=True, text=True, timeout=25,
         ).stdout.strip()
     except Exception:
         return ""
 
 
-def letzte_zeile(pfad: str) -> dict:
-    roh = vm(f"tail -1 {pfad}")
+def last_line(path: str) -> dict:
+    raw = vm(f"tail -1 {path}")
     try:
-        return json.loads(roh)
+        return json.loads(raw)
     except Exception:
         return {}
 
 
-def hole(pfad: str) -> dict:
-    with urllib.request.urlopen(f"{BASE}{pfad}", timeout=15) as r:
+def fetch(path: str) -> dict:
+    with urllib.request.urlopen(f"{BASE}{path}", timeout=15) as r:
         return json.load(r)
 
 
-def zahl(text: str) -> int:
+def number(text: str) -> int:
     return int(text.replace(",", "").replace(".", ""))
 
 
 def main() -> int:
-    quellen = [p for p in (ARTIKEL, ARTIKEL_REPO) if p.exists()]
-    if not quellen:
-        print(f"Neither {ARTIKEL} nor {ARTIKEL_REPO} is there.")
+    sources = [p for p in (ARTICLE, ARTICLE_REPO) if p.exists()]
+    if not sources:
+        print(f"Neither {ARTICLE} nor {ARTICLE_REPO} is there.")
         return 2
     # Two kinds of check need two kinds of text.
     #
@@ -93,25 +93,25 @@ def main() -> int:
     # the counter-proof put the old wrong inferenceModel sentence back into the repo copy and this
     # stayed green, because the post-ready copy still carried the corrected one. So those run per
     # source, through `je_quelle`.
-    fassungen = [(p, p.read_text()) for p in quellen]
-    text = "\n".join(t for _, t in fassungen)
+    versions = [(p, p.read_text()) for p in sources]
+    text = "\n".join(t for _, t in versions)
     # Flattened copies for the prose searches. The distribution table is checked row by row and
     # needs its line breaks, so `text` stays raw and only the sentence-level checks use these.
-    def glatt(t: str) -> str:
+    def flatten(t: str) -> str:
         return " ".join(t.split())
 
-    fliess = glatt(text)
-    fassungen_fliess = [(p, glatt(t)) for p, t in fassungen]
+    flat = flatten(text)
+    versions_flat = [(p, flatten(t)) for p, t in versions]
     print("Before the article goes out\n")
-    print(f"  Reading: {', '.join(str(p) for p in quellen)}\n")
+    print(f"  Reading: {', '.join(str(p) for p in sources)}\n")
 
     # 1. Is the service the reader will land on actually healthy and complete?
-    lauf = subprocess.run(["./ops/check-all.sh"], capture_output=True, text=True, timeout=400)
-    if "ALL CHECKS OK" in lauf.stdout:
-        ok("the service, the market, the journeys and the pages", lauf.stdout.strip().splitlines()[-1])
+    checks = subprocess.run(["./ops/check-all.sh"], capture_output=True, text=True, timeout=400)
+    if "ALL CHECKS OK" in checks.stdout:
+        ok("the service, the market, the journeys and the pages", checks.stdout.strip().splitlines()[-1])
     else:
-        aendern("ops/check-all.sh is not green",
-                "the article sends people to a service that is not answering for itself")
+        change("ops/check-all.sh is not green",
+               "the article sends people to a service that is not answering for itself")
 
     # 2. The directory figures in the text against the file a reader can re-run.
     #
@@ -129,30 +129,30 @@ def main() -> int:
     # published data, which is exactly what a hostile reader does first.
     csv = sorted(Path("docs/research/data").glob("*-x402-verzeichnis.csv"))
     if not csv:
-        aendern("no x402 CSV in docs/research/data", "the article links to it as the way to re-run")
-        punkt = {}
+        change("no x402 CSV in docs/research/data", "the article links to it as the way to re-run")
+        figures = {}
     else:
-        lauf = subprocess.run(
+        metrics = subprocess.run(
             ["python3", "docs/research/data/x402-kennzahlen.py", str(csv[-1])],
             capture_output=True, text=True, timeout=180,
         ).stdout
-        zahl_aus = lambda muster: (
-            int(m.group(1).replace(",", "").replace(".", "")) if (m := re.search(muster, lauf, re.MULTILINE)) else None
+        number_from = lambda pattern: (
+            int(m.group(1).replace(",", "").replace(".", "")) if (m := re.search(pattern, metrics, re.MULTILINE)) else None
         )
-        punkt = {
-            "dienste_cdp": zahl_aus(r"Coinbase ([\d.,]+)"),
-            "dienste_payai": zahl_aus(r"PayAI ([\d.,]+)"),
-            "urls_eindeutig": zahl_aus(r"Eindeutige Dienst-URLs: ([\d.,]+)"),
-            "anbieter": zahl_aus(r"Verschiedene Anbieter \(Host\): ([\d.,]+)"),
-            "aufrufe_30d": zahl_aus(r"Aufrufe in 30 Tagen, Summe:\s+([\d.,]+)"),
-            "mit_20_zahlern": zahl_aus(r"mindestens  20 Zahlern:\s+([\d.,]+)"),
-            "mit_nachfrage": zahl_aus(r"Nachfragedaten: ([\d.,]+) von"),
-            "mit_einem_zahler": zahl_aus(r"genau EINER zahlenden Wallet: ([\d.,]+)"),
-            "mit_5_zahlern": zahl_aus(r"mindestens   5 Zahlern:\s+([\d.,]+)"),
-            "mit_100_zahlern": zahl_aus(r"mindestens 100 Zahlern:\s+([\d.,]+)"),
-            "eimer": {
-                name: zahl_aus(muster)
-                for name, muster in [
+        figures = {
+            "services_cdp": number_from(r"Coinbase ([\d.,]+)"),
+            "services_payai": number_from(r"PayAI ([\d.,]+)"),
+            "urls_distinct": number_from(r"Eindeutige Dienst-URLs: ([\d.,]+)"),
+            "providers": number_from(r"Verschiedene Anbieter \(Host\): ([\d.,]+)"),
+            "calls_30d": number_from(r"Aufrufe in 30 Tagen, Summe:\s+([\d.,]+)"),
+            "with_20_payers": number_from(r"mindestens  20 Zahlern:\s+([\d.,]+)"),
+            "with_demand": number_from(r"Nachfragedaten: ([\d.,]+) von"),
+            "with_one_payer": number_from(r"genau EINER zahlenden Wallet: ([\d.,]+)"),
+            "with_5_payers": number_from(r"mindestens   5 Zahlern:\s+([\d.,]+)"),
+            "with_100_payers": number_from(r"mindestens 100 Zahlern:\s+([\d.,]+)"),
+            "buckets": {
+                name: number_from(pattern)
+                for name, pattern in [
                     ("none", r"^\s+0:\s+([\d.,]+)"),
                     ("1 to 9", r"1-9:\s+([\d.,]+)"),
                     ("10 to 99", r"10-99:\s+([\d.,]+)"),
@@ -161,84 +161,84 @@ def main() -> int:
                 ]
             },
         }
-        punkt["ohne_nachfragedaten"] = (
-            punkt["dienste_cdp"] - punkt["mit_nachfrage"]
-            if punkt["dienste_cdp"] and punkt["mit_nachfrage"] else None
+        figures["without_demand_data"] = (
+            figures["services_cdp"] - figures["with_demand"]
+            if figures["services_cdp"] and figures["with_demand"] else None
         )
         print(f"  (the figures below come from {csv[-1].name}, re-run with the published script)")
-    if not punkt or punkt.get("dienste_cdp") is None:
-        aendern("the CSV could not be re-run", "without it the article's figures are unchecked")
+    if not figures or figures.get("services_cdp") is None:
+        change("the CSV could not be re-run", "without it the article's figures are unchecked")
     else:
-        paare = [
+        pairs = [
             # Reworded on 2026-09-22 when the first paragraph started showing its subtraction.
             # The check noticed, which is what it is for.
-            ("distinct services", r"leaves ([\d,]+) distinct service URLs", "urls_eindeutig"),
-            ("providers", r"behind ([\d,]+) providers", "anbieter"),
-            ("calls in 30 days", r"were paid for ([\d,]+) calls", "aufrufe_30d"),
-            ("services with 20+ payers", r"([\d,]+) have twenty or more", "mit_20_zahlern"),
-            ("Coinbase entries", r"([\d,]+) services from Coinbase", "dienste_cdp"),
-            ("PayAI entries", r"and ([\d,]+) entries from the PayAI", "dienste_payai"),
-            ("entries without demand data", r"([\d,]+) of the Coinbase entries carry no demand", "ohne_nachfragedaten"),
+            ("distinct services", r"leaves ([\d,]+) distinct service URLs", "urls_distinct"),
+            ("providers", r"behind ([\d,]+) providers", "providers"),
+            ("calls in 30 days", r"were paid for ([\d,]+) calls", "calls_30d"),
+            ("services with 20+ payers", r"([\d,]+) have twenty or more", "with_20_payers"),
+            ("Coinbase entries", r"([\d,]+) services from Coinbase", "services_cdp"),
+            ("PayAI entries", r"and ([\d,]+) entries from the PayAI", "services_payai"),
+            ("entries without demand data", r"([\d,]+) of the Coinbase entries carry no demand", "without_demand_data"),
         ]
-        for name, muster, feld in paare:
-            m = re.search(muster, text)
+        for name, pattern, field in pairs:
+            m = re.search(pattern, text)
             if not m:
-                aendern(f"the sentence about {name} is not in the text any more",
-                        f"the check looked for /{muster}/")
+                change(f"the sentence about {name} is not in the text any more",
+                       f"the check looked for /{pattern}/")
                 continue
-            im_text, heute = zahl(m.group(1)), punkt.get(feld)
-            if im_text == heute:
-                ok(f"{name}", f"{im_text:,}")
+            in_text, today = number(m.group(1)), figures.get(field)
+            if in_text == today:
+                ok(f"{name}", f"{in_text:,}")
             else:
-                aendern(f"{name}: the text says {im_text:,}, today it is {heute:,}",
-                        f"replace it, and remember the totals are a floor: "
-                        f"{punkt.get('ohne_nachfragedaten', 0)} entries still carry no demand data")
+                change(f"{name}: the text says {in_text:,}, today it is {today:,}",
+                       f"replace it, and remember the totals are a floor: "
+                       f"{figures.get('without_demand_data', 0)} entries still carry no demand data")
 
 
     # 4. Conway's present tense. A maintainer coming back changes the argument, not a number.
-    c = letzte_zeile("/opt/control-plane/conway/repo.ndjson")
+    c = last_line("/opt/control-plane/conway/repo.ndjson")
     if not c:
-        aendern("the conway series could not be read", "run ops/conway-zeitreihe.sh on the VM first")
+        change("the conway series could not be read", "run ops/conway-zeitreihe.sh on the VM first")
     else:
         if c.get("last_write_access_comment", "").startswith("2026-03-06"):
             ok("no maintainer has come back", "last write-access comment 2026-03-06")
         else:
-            aendern(f"a maintainer commented on {c.get('last_write_access_comment')}",
-                    "the wall the article describes is being taken down; say so before posting")
+            change(f"a maintainer commented on {c.get('last_write_access_comment')}",
+                   "the wall the article describes is being taken down; say so before posting")
         if c.get("pr370_state") == "open":
             ok("PR #370 is still open")
         else:
-            aendern(f"PR #370 is {c.get('pr370_state')}",
-                    "nine issue answers call it open")
+            change(f"PR #370 is {c.get('pr370_state')}",
+                   "nine issue answers call it open")
         if c.get("last_push") == "2026-08-26T16:28:14Z":
             ok("the last commit is still 26 August")
         else:
-            aendern(f"the repository was pushed on {c.get('last_push')}",
-                    "the article and five issue answers say the last commit is 26 August")
+            change(f"the repository was pushed on {c.get('last_push')}",
+                   "the article and five issue answers say the last commit is 26 August")
 
     # 4b. The two present-tense claims about Conway's money, which are new in the text since
     # 21.09. and are the only ones that can go stale between writing and posting. The window
     # figures in the article ("From August 21 to the end of the scan") are a closed period and are
     # deliberately not compared against anything; only the claims about now are.
     if "Money still moves into it every week" in text:
-        geld = letzte_zeile("/opt/control-plane/conway-money/metrics.ndjson")
-        if not geld:
-            aendern("the conway money series could not be read",
-                    "run ops/conway-money-series.sh on the VM first")
+        money = last_line("/opt/control-plane/conway-money/metrics.ndjson")
+        if not money:
+            change("the conway money series could not be read",
+                   "run ops/conway-money-series.sh on the VM first")
         else:
-            zuletzt = geld.get("data_through", "")
+            last_at = money.get("data_through", "")
             try:
-                alter = (datetime.datetime.now(datetime.timezone.utc)
-                         - datetime.datetime.strptime(zuletzt, "%Y-%m-%dT%H:%M:%SZ")
+                age_days = (datetime.datetime.now(datetime.timezone.utc)
+                         - datetime.datetime.strptime(last_at, "%Y-%m-%dT%H:%M:%SZ")
                          .replace(tzinfo=datetime.timezone.utc)).days
             except Exception:
-                alter = 999
-            if alter <= 7:
-                ok("money still moves into Conway", f"last transfer {zuletzt}, {alter} day(s) ago")
+                age_days = 999
+            if age_days <= 7:
+                ok("money still moves into Conway", f"last transfer {last_at}, {age_days} day(s) ago")
             else:
-                aendern(f"the last transfer into Conway was {zuletzt}, {alter} days ago",
-                        "the article says money still moves in every week; either the flow stopped "
-                        "or the series has not run")
+                change(f"the last transfer into Conway was {last_at}, {age_days} days ago",
+                       "the article says money still moves in every week; either the flow stopped "
+                       "or the series has not run")
 
     if "still returned a valid x402 demand" in text:
         try:
@@ -247,17 +247,17 @@ def main() -> int:
                     "https://api.conway.tech/pay/5/0x0000000000000000000000000000000000000001",
                     headers={"User-Agent": "control-plane-check/1.0 (+https://cp.hippe.eu)"}),
                 timeout=15)
-            aendern("api.conway.tech/pay no longer answers 402", "it answered 200; nothing is signed "
-                    "by this check, but the sentence about the payment endpoint has to change")
-        except urllib.error.HTTPError as fehler:
-            if fehler.code == 402:
+            change("api.conway.tech/pay no longer answers 402", "it answered 200; nothing is signed "
+                   "by this check, but the sentence about the payment endpoint has to change")
+        except urllib.error.HTTPError as err:
+            if err.code == 402:
                 ok("Conway still asks for money", "GET /pay/5/<address> answers 402")
             else:
-                aendern(f"api.conway.tech/pay answers {fehler.code}, not 402",
-                        "the article says the payment endpoint still demands 5 USDC")
-        except Exception as fehler:
-            aendern(f"api.conway.tech/pay could not be reached ({fehler})",
-                    "without it the sentence about the live payment endpoint is unchecked")
+                change(f"api.conway.tech/pay answers {err.code}, not 402",
+                       "the article says the payment endpoint still demands 5 USDC")
+        except Exception as err:
+            change(f"api.conway.tech/pay could not be reached ({err})",
+                   "without it the sentence about the live payment endpoint is unchecked")
 
     # 4c. The one claim about upstream code that two of three surfaces got wrong.
     #
@@ -277,21 +277,21 @@ def main() -> int:
 
     # One read for both blocks below: the monthly table and the thirty-day window are two
     # questions about the same file.
-    zeilen = list(_csv.DictReader(open("docs/research/data/2026-09-19-conway-payto-transfers.csv")))
+    rows = list(_csv.DictReader(open("docs/research/data/2026-09-19-conway-payto-transfers.csv")))
 
-    monate = collections.defaultdict(lambda: [0.0, set(), 0])
-    for z in zeilen:
+    months = collections.defaultdict(lambda: [0.0, set(), 0])
+    for z in rows:
         k = z["timestamp_utc"][:7]
-        monate[k][0] += float(z["usdc"])
-        monate[k][1].add(z["from"])
-        monate[k][2] += 1
+        months[k][0] += float(z["usdc"])
+        months[k][1].add(z["from"])
+        months[k][2] += 1
     NAME = {"01": "January", "02": "February", "03": "March", "04": "April", "05": "May",
             "06": "June", "07": "July", "08": "August", "09": "September"}
-    for quelle, fassung in fassungen:
-        schlechte = []
-        gefunden = 0
-        for schluessel, (usdc, wallets, transfers) in sorted(monate.items()):
-            name = NAME.get(schluessel[5:7])
+    for source, version in versions:
+        bad = []
+        found = 0
+        for key, (usdc, wallets, transfers) in sorted(months.items()):
+            name = NAME.get(key[5:7])
             if not name:
                 continue
             # Both layouts, one pattern: a Markdown row with pipes and the plain columns of the
@@ -299,26 +299,26 @@ def main() -> int:
             # September is "September (to the 20th)" in one copy and "Sep 1-20" in the other. The
             # first pattern forbade digits in the label, found neither, and said nothing: it
             # counted seven of eight rows and called that a pass.
-            kurz = name[:3] if name == "September" else name
+            short = name[:3] if name == "September" else name
             m = re.search(
-                rf"^\s*\|?\s*(?:{name}|{kurz})[^\n]*?([\d,]+\.\d\d)\s*\|?\s+([\d,]+)\s*\|?\s+([\d,]+)",
-                fassung, re.M,
+                rf"^\s*\|?\s*(?:{name}|{short})[^\n]*?([\d,]+\.\d\d)\s*\|?\s+([\d,]+)\s*\|?\s+([\d,]+)",
+                version, re.M,
             )
             if not m:
-                schlechte.append(f"{name}: no row for it in this version, and the CSV has one")
+                bad.append(f"{name}: no row for it in this version, and the CSV has one")
                 continue
-            gefunden += 1
-            gesagt = (m.group(1), zahl(m.group(2)), zahl(m.group(3)))
-            echt = (f"{usdc:,.2f}", len(wallets), transfers)
-            if gesagt != echt:
-                schlechte.append(f"{name}: says {gesagt}, the CSV gives {echt}")
-        if not gefunden:
+            found += 1
+            said = (m.group(1), number(m.group(2)), number(m.group(3)))
+            actual = (f"{usdc:,.2f}", len(wallets), transfers)
+            if said != actual:
+                bad.append(f"{name}: says {said}, the CSV gives {actual}")
+        if not found:
             continue
-        if schlechte:
-            aendern(f"the monthly table in {quelle.name} does not come out of the transfer CSV",
-                    "; ".join(schlechte))
+        if bad:
+            change(f"the monthly table in {source.name} does not come out of the transfer CSV",
+                   "; ".join(bad))
         else:
-            ok(f"the monthly table in {quelle.name} reproduces from the CSV", f"{gefunden} row(s)")
+            ok(f"the monthly table in {source.name} reproduces from the CSV", f"{found} row(s)")
 
     # 4c-ter. The thirty-day window, per version.
     #
@@ -328,27 +328,27 @@ def main() -> int:
     # 435 USDC in 105 transfers" for another four hours. Every check here searched the joined text,
     # and one correct copy is enough to satisfy a search. So this one runs per version, and it
     # recomputes rather than comparing to a number written here.
-    ende = max(z["timestamp_utc"] for z in zeilen)
-    grenze = (
-        datetime.datetime.fromisoformat(ende.replace("Z", "+00:00")) - datetime.timedelta(days=30)
+    end = max(z["timestamp_utc"] for z in rows)
+    cutoff = (
+        datetime.datetime.fromisoformat(end.replace("Z", "+00:00")) - datetime.timedelta(days=30)
     ).strftime("%Y-%m-%dT%H:%M:%SZ")
-    fenster = [z for z in zeilen if z["timestamp_utc"] >= grenze]
-    w_usdc = sum(float(z["usdc"]) for z in fenster)
-    w_wallets = len({z["from"] for z in fenster})
-    for quelle, fassung in fassungen_fliess:
-        m = re.search(r"(\d+) wallets sent ([\d.]+) USDC in (\d+) transfers", fassung)
+    window = [z for z in rows if z["timestamp_utc"] >= cutoff]
+    window_usdc = sum(float(z["usdc"]) for z in window)
+    window_wallets = len({z["from"] for z in window})
+    for source, version in versions_flat:
+        m = re.search(r"(\d+) wallets sent ([\d.]+) USDC in (\d+) transfers", version)
         if not m:
             continue
-        gesagt = (zahl(m.group(1)), float(m.group(2)), zahl(m.group(3)))
-        echt = (w_wallets, round(w_usdc, 2), len(fenster))
-        if gesagt == echt or (gesagt[0], round(gesagt[1]), gesagt[2]) == (echt[0], round(echt[1]), echt[2]):
-            ok(f"the 30-day window in {quelle.name} matches the transfer list",
-               f"{echt[0]} wallets, {echt[1]} USDC, {echt[2]} transfers")
+        said = (number(m.group(1)), float(m.group(2)), number(m.group(3)))
+        actual = (window_wallets, round(window_usdc, 2), len(window))
+        if said == actual or (said[0], round(said[1]), said[2]) == (actual[0], round(actual[1]), actual[2]):
+            ok(f"the 30-day window in {source.name} matches the transfer list",
+               f"{actual[0]} wallets, {actual[1]} USDC, {actual[2]} transfers")
         else:
-            aendern(f"{quelle.name} says {gesagt[0]} wallets, {gesagt[1]} USDC, {gesagt[2]} transfers "
-                    f"in the last 30 days, and the published CSV gives {echt[0]}, {echt[1]}, {echt[2]}",
-                    "the window runs from the last row of the file; a hardcoded cut ages into the "
-                    "wrong day, which is what B4 was")
+            change(f"{source.name} says {said[0]} wallets, {said[1]} USDC, {said[2]} transfers "
+                   f"in the last 30 days, and the published CSV gives {actual[0]}, {actual[1]}, {actual[2]}",
+                   "the window runs from the last row of the file; a hardcoded cut ages into the "
+                   "wrong day, which is what B4 was")
 
     # 4c-quater. Which model the sentence names, and whether it says when.
     #
@@ -356,27 +356,27 @@ def main() -> int:
     # the other one this piece offers: the nested default is gpt-5.2, and gpt-5-mini is what the
     # router puts first only at tier critical or dead. Claim 8 in ops/upstream-claims.py checks
     # both constants and both candidate orders; this checks that the sentence carries them.
-    for quelle, fassung in fassungen_fliess:
-        if "gpt-5-mini" not in fassung:
+    for source, version in versions_flat:
+        if "gpt-5-mini" not in version:
             continue
-        if "gpt-5.2" in fassung and re.search(r"critical", fassung):
-            ok(f"{quelle.name} names both default models and the tier that picks each")
+        if "gpt-5.2" in version and re.search(r"critical", version):
+            ok(f"{source.name} names both default models and the tier that picks each")
         else:
-            aendern(f"{quelle.name} names gpt-5-mini without gpt-5.2 or without the tier",
-                    "the nested default is gpt-5.2; gpt-5-mini goes first only at tier critical or "
-                    "dead, so naming it alone is right for the Ollama route and wrong for the "
-                    "route that writes a balance into the SQLite file")
+            change(f"{source.name} names gpt-5-mini without gpt-5.2 or without the tier",
+                   "the nested default is gpt-5.2; gpt-5-mini goes first only at tier critical or "
+                   "dead, so naming it alone is right for the Ollama route and wrong for the "
+                   "route that writes a balance into the SQLite file")
 
-    for quelle, fassung in fassungen_fliess:
-        if "inferenceModel" not in fassung:
+    for source, version in versions_flat:
+        if "inferenceModel" not in version:
             continue
-        if re.search(r"wizard copies the top-level value down", fassung):
-            ok(f"the inferenceModel trap is described the way the code behaves in {quelle.name}",
+        if re.search(r"wizard copies the top-level value down", version):
+            ok(f"the inferenceModel trap is described the way the code behaves in {source.name}",
                "the wizard copies it down; a hand-edited file does not")
         else:
-            aendern(f"{quelle.name} describes the inferenceModel trap without saying the wizard copies",
-                    "ops/upstream-claims.py checks that it does, and blaming the wizard is a wrong "
-                    "claim about somebody else's code inside a piece about somebody else's code")
+            change(f"{source.name} describes the inferenceModel trap without saying the wizard copies",
+                   "ops/upstream-claims.py checks that it does, and blaming the wizard is a wrong "
+                   "claim about somebody else's code inside a piece about somebody else's code")
 
     # 4c-bis. The distribution table, line by line.
     #
@@ -386,68 +386,68 @@ def main() -> int:
     # above it said 15,127. An adversarial read found that subtraction in one pass. The
     # distribution is the part the whole argument rests on, so it is checked line by line and then
     # added up.
-    if punkt and punkt.get("eimer") and all(v is not None for v in punkt["eimer"].values()):
-        schief = []
+    if figures and figures.get("buckets") and all(v is not None for v in figures["buckets"].values()):
+        off = []
         # The sum is taken from the rows AS PRINTED, not from the CSV. Summing the CSV and
         # comparing that to the sentence compares two things that are both right by construction,
         # which is the mistake this whole cycle was about. The original finding was that the
         # table in the text added up to 15,130 while the sentence above it said 15,127.
-        aus_tabelle = 0
-        vollstaendig = True
-        for name, soll in punkt["eimer"].items():
+        from_table = 0
+        complete = True
+        for name, expected in figures["buckets"].items():
             m = re.search(rf"^  {re.escape(name)}\s+([\d,]+)\s", text, re.MULTILINE)
             if not m:
-                schief.append(f"the row '{name}' is not in the table")
-                vollstaendig = False
+                off.append(f"the row '{name}' is not in the table")
+                complete = False
                 continue
-            aus_tabelle += zahl(m.group(1))
-            if zahl(m.group(1)) != soll:
-                schief.append(f"'{name}': the table says {zahl(m.group(1)):,}, the CSV says {soll:,}")
+            from_table += number(m.group(1))
+            if number(m.group(1)) != expected:
+                off.append(f"'{name}': the table says {number(m.group(1)):,}, the CSV says {expected:,}")
         m = re.search(r"the remaining ([\d,]+) were paid for", text)
-        if vollstaendig and m and zahl(m.group(1)) != aus_tabelle:
-            schief.append(
-                f"the rows in the table add up to {aus_tabelle:,} and the sentence above them says "
-                f"{zahl(m.group(1)):,}")
-        summe = aus_tabelle
-        if schief:
-            for zeile in schief:
-                aendern(zeile, "the distribution is the part the argument rests on, and a reader "
+        if complete and m and number(m.group(1)) != from_table:
+            off.append(
+                f"the rows in the table add up to {from_table:,} and the sentence above them says "
+                f"{number(m.group(1)):,}")
+        total = from_table
+        if off:
+            for line in off:
+                change(line, "the distribution is the part the argument rests on, and a reader "
                                "adds up five numbers before they trust any of it")
         else:
-            ok("the distribution table matches the published CSV and adds up", f"{summe:,} services")
+            ok("the distribution table matches the published CSV and adds up", f"{total:,} services")
 
     # The number words are here because the text uses them: "Forty have a hundred or more". A
     # pattern that only matches digits skips that line in silence, which is a check that cannot
     # fail dressed as a check that passed.
-    WORT = {"ten": 10, "twenty": 20, "thirty": 30, "forty": 40, "fifty": 50, "sixty": 60,
+    WORDS = {"ten": 10, "twenty": 20, "thirty": 30, "forty": 40, "fifty": 50, "sixty": 60,
             "seventy": 70, "eighty": 80, "ninety": 90, "one hundred": 100}
 
-    def als_zahl(roh: str) -> int:
-        return WORT[roh.lower()] if roh.lower() in WORT else zahl(roh)
+    def as_number(raw: str) -> int:
+        return WORDS[raw.lower()] if raw.lower() in WORDS else number(raw)
 
-    for name, muster, feld in [
-        ("services with 5+ payers", r"([\d,]+|[A-Za-z]+) services have five or more", "mit_5_zahlern"),
-        ("services with 100+ payers", r"([\d,]+|[A-Za-z]+) have a hundred or more", "mit_100_zahlern"),
+    for name, pattern, field in [
+        ("services with 5+ payers", r"([\d,]+|[A-Za-z]+) services have five or more", "with_5_payers"),
+        ("services with 100+ payers", r"([\d,]+|[A-Za-z]+) have a hundred or more", "with_100_payers"),
     ]:
-        m = re.search(muster, text)
+        m = re.search(pattern, text)
         if not m:
-            aendern(f"the sentence about {name} is not in the text any more",
-                    f"the check looked for /{muster}/")
+            change(f"the sentence about {name} is not in the text any more",
+                   f"the check looked for /{pattern}/")
             continue
-        if punkt.get(feld) is None:
+        if figures.get(field) is None:
             continue
         try:
-            im_text = als_zahl(m.group(1))
+            in_text = as_number(m.group(1))
         except (KeyError, ValueError):
-            aendern(f"{name}: cannot read '{m.group(1)}' as a number",
-                    "the check has to be taught the word before it can compare it, and until then "
-                    "it is not checking this line at all")
+            change(f"{name}: cannot read '{m.group(1)}' as a number",
+                   "the check has to be taught the word before it can compare it, and until then "
+                   "it is not checking this line at all")
             continue
-        if im_text != punkt[feld]:
-            aendern(f"{name}: the text says {im_text:,}, the CSV says {punkt[feld]:,}",
-                    "same file, same script")
+        if in_text != figures[field]:
+            change(f"{name}: the text says {in_text:,}, the CSV says {figures[field]:,}",
+                   "same file, same script")
         else:
-            ok(name, f"{im_text:,}")
+            ok(name, f"{in_text:,}")
 
     # 4d. Where the piece puts itself, against the same data it puts everybody else against.
     #
@@ -461,14 +461,14 @@ def main() -> int:
     # paying wallets against the live service.
     m = re.search(r"it is one of the ([\d,]+):", text)
     if not m:
-        aendern("the article no longer says which group it puts itself in",
-                "four paragraphs earlier it sorts that group into people testing their own "
-                "deployment, and leaving itself out of it is the objection a reader reaches for")
-    elif punkt and punkt.get("mit_einem_zahler") is not None and zahl(m.group(1)) != punkt["mit_einem_zahler"]:
-        aendern(f"the article puts itself among {zahl(m.group(1)):,} services, the CSV says "
-                f"{punkt['mit_einem_zahler']:,}",
-                "same file, same script, and this is the number a reader checks first because the "
-                "sentence is about the author")
+        change("the article no longer says which group it puts itself in",
+               "four paragraphs earlier it sorts that group into people testing their own "
+               "deployment, and leaving itself out of it is the objection a reader reaches for")
+    elif figures and figures.get("with_one_payer") is not None and number(m.group(1)) != figures["with_one_payer"]:
+        change(f"the article puts itself among {number(m.group(1)):,} services, the CSV says "
+               f"{figures['with_one_payer']:,}",
+               "same file, same script, and this is the number a reader checks first because the "
+               "sentence is about the author")
     else:
         ok("the article applies its own measure to itself", f"one of {m.group(1)}")
 
@@ -482,56 +482,56 @@ def main() -> int:
     # paragraph that exists to show demand from strangers.
     #
     # Both are arithmetic on a committed CSV, so both are checked here rather than remembered.
-    kurve = Path("docs/research/data/2026-09-19-conway-payto-transfers.csv")
-    if "in 104 transfers" in text and kurve.exists():
+    transfer_csv = Path("docs/research/data/2026-09-19-conway-payto-transfers.csv")
+    if "in 104 transfers" in text and transfer_csv.exists():
         import csv as _csv
 
-        zeilen = list(_csv.DictReader(kurve.open()))
-        fenster = [r for r in zeilen if r["timestamp_utc"] >= "2026-08-21"]
-        kaeufe = [r for r in fenster if abs(float(r["usdc"]) - 5.0) < 1e-9]
-        staub = [r for r in fenster if float(r["usdc"]) < 5.0]
-        soll = {
-            "transfers": len(fenster),
-            "wallets": len({r["from"].lower() for r in fenster}),
-            "kaeufe": len(kaeufe),
-            "kaufwallets": len({r["from"].lower() for r in kaeufe}),
-            "staub": len(staub),
+        rows = list(_csv.DictReader(transfer_csv.open()))
+        window = [r for r in rows if r["timestamp_utc"] >= "2026-08-21"]
+        purchases = [r for r in window if abs(float(r["usdc"]) - 5.0) < 1e-9]
+        dust = [r for r in window if float(r["usdc"]) < 5.0]
+        expected = {
+            "transfers": len(window),
+            "wallets": len({r["from"].lower() for r in window}),
+            "purchases": len(purchases),
+            "purchase_wallets": len({r["from"].lower() for r in purchases}),
+            "dust": len(dust),
         }
-        paare = [
+        pairs = [
             (r"([\d,]+) wallets sent", "wallets"),
             (r"in ([\d,]+) transfers", "transfers"),
-            (r"([\d,]+) of those are exactly the \$5 minimum", "kaeufe"),
-            (r"from ([\d,]+) wallets, so two purchases", "kaufwallets"),
-            (r"the other ([\d,]+) are dust", "staub"),
+            (r"([\d,]+) of those are exactly the \$5 minimum", "purchases"),
+            (r"from ([\d,]+) wallets, so two purchases", "purchase_wallets"),
+            (r"the other ([\d,]+) are dust", "dust"),
         ]
-        schief = []
-        for muster, feld in paare:
-            m = re.search(muster, text)
+        off = []
+        for pattern, field in pairs:
+            m = re.search(pattern, text)
             if not m:
-                schief.append(f"the transfer window no longer says {feld}")
-            elif zahl(m.group(1)) != soll[feld]:
-                schief.append(f"{feld}: the text says {zahl(m.group(1)):,}, the CSV says {soll[feld]:,}")
-        if schief:
-            for zeile in schief:
-                aendern(zeile, "the sentence carries a causal claim about a runtime that only buys "
+                off.append(f"the transfer window no longer says {field}")
+            elif number(m.group(1)) != expected[field]:
+                off.append(f"{field}: the text says {number(m.group(1)):,}, the CSV says {expected[field]:,}")
+        if off:
+            for line in off:
+                change(line, "the sentence carries a causal claim about a runtime that only buys "
                                "the 5 USDC tier, so the dust has to be outside the number it explains")
         else:
             ok("the transfer window separates purchases from dust",
-               f"{soll['kaeufe']} purchases, {soll['staub']} dust")
+               f"{expected['purchases']} purchases, {expected['dust']} dust")
 
         # And whether our own first start is named among the September first-time buyers.
-        erst = {}
-        for r in sorted(zeilen, key=lambda r: r["timestamp_utc"]):
-            erst.setdefault(r["from"].lower(), r["timestamp_utc"])
-        unsere = "0x56de77800de59baf92ccb2ccc32c4cf11f58e93b"
-        if erst.get(unsere, "") >= "2026-09-01":
+        first_seen = {}
+        for r in sorted(rows, key=lambda r: r["timestamp_utc"]):
+            first_seen.setdefault(r["from"].lower(), r["timestamp_utc"])
+        ours = "0x56de77800de59baf92ccb2ccc32c4cf11f58e93b"
+        if first_seen.get(ours, "") >= "2026-09-01":
             if re.search(r"my own automaton on its first start", text):
                 ok("our own wallet is named among the September first-time buyers")
             else:
-                aendern("our own automaton is one of the September first-time buyers and the "
-                        "article does not say so",
-                        "that paragraph exists to show demand from strangers, and /conway already "
-                        "marks the same transfer as ours")
+                change("our own automaton is one of the September first-time buyers and the "
+                       "article does not say so",
+                       "that paragraph exists to show demand from strangers, and /conway already "
+                       "marks the same transfer as ours")
 
     # 4e-bis. The scan totals and the one arithmetic a reader does in the first paragraph.
     #
@@ -539,51 +539,51 @@ def main() -> int:
     # own sum in paragraph one came out 19 too high because duplicates inside PayAI were never
     # mentioned, "over nine months" covered eight months with money in them, and the transfer
     # totals belong to a scan that ends at 03:55 while /conway keeps counting.
-    if kurve.exists():
+    if transfer_csv.exists():
         import csv as _csv2
 
-        alle = list(_csv2.DictReader(kurve.open()))
+        all_rows = list(_csv2.DictReader(transfer_csv.open()))
         conway = {
-            "transfers": len(alle),
-            "wallets": len({r["from"].lower() for r in alle}),
-            "usdc": round(sum(float(r["usdc"]) for r in alle)),
-            "monate": len({r["timestamp_utc"][:7] for r in alle}),
+            "transfers": len(all_rows),
+            "wallets": len({r["from"].lower() for r in all_rows}),
+            "usdc": round(sum(float(r["usdc"]) for r in all_rows)),
+            "months": len({r["timestamp_utc"][:7] for r in all_rows}),
         }
-        for name, muster, soll in [
+        for name, pattern, expected in [
             ("transfer events", r"([\d,]+) transfer events", conway["transfers"]),
             ("distinct wallets", r"from ([\d,]+) distinct wallets", conway["wallets"]),
             ("USDC in total", r"([\d,]+) USDC from", conway["usdc"]),
         ]:
-            m = re.search(muster, text)
+            m = re.search(pattern, text)
             if not m:
-                aendern(f"the sentence about {name} is gone", f"the check looked for /{muster}/")
-            elif zahl(m.group(1)) != soll:
-                aendern(f"{name}: the text says {zahl(m.group(1)):,}, the CSV says {soll:,}",
-                        "the article invites the reader to re-run this against that file")
+                change(f"the sentence about {name} is gone", f"the check looked for /{pattern}/")
+            elif number(m.group(1)) != expected:
+                change(f"{name}: the text says {number(m.group(1)):,}, the CSV says {expected:,}",
+                       "the article invites the reader to re-run this against that file")
             else:
-                ok(name, f"{soll:,}")
+                ok(name, f"{expected:,}")
         m = re.search(r"over the ([a-z]+) months that carry any", text)
-        wortzahl = {"seven": 7, "eight": 8, "nine": 9, "ten": 10}
-        if m and wortzahl.get(m.group(1)) != conway["monate"]:
-            aendern(f"the text says {m.group(1)} months with money, the CSV has {conway['monate']}",
-                    "January is in the scan and empty, which is why this is not the span of the scan")
+        word_number = {"seven": 7, "eight": 8, "nine": 9, "ten": 10}
+        if m and word_number.get(m.group(1)) != conway["months"]:
+            change(f"the text says {m.group(1)} months with money, the CSV has {conway['months']}",
+                   "January is in the scan and empty, which is why this is not the span of the scan")
         elif m:
-            ok("months that carry money", str(conway["monate"]))
+            ok("months that carry money", str(conway["months"]))
 
     # The reader's own subtraction in the first paragraph.
     m = re.search(r"([\d,]+) services from Coinbase and ([\d,]+) entries from the PayAI", text)
     m2 = re.search(r"([\d,]+) of those are\s+the same service listed in both directories and another ([\d,]+) are listed twice", text)
     m3 = re.search(r"leaves ([\d,]+) distinct service URLs", text)
     if m and m2 and m3:
-        gerechnet = zahl(m.group(1)) + zahl(m.group(2)) - zahl(m2.group(1)) - zahl(m2.group(2))
-        if gerechnet != zahl(m3.group(1)):
-            aendern(f"the first paragraph adds up to {gerechnet:,} and then says {zahl(m3.group(1)):,}",
-                    "it is the only sum a reader can do in their head, and it sits in the opening")
+        computed = number(m.group(1)) + number(m.group(2)) - number(m2.group(1)) - number(m2.group(2))
+        if computed != number(m3.group(1)):
+            change(f"the first paragraph adds up to {computed:,} and then says {number(m3.group(1)):,}",
+                   "it is the only sum a reader can do in their head, and it sits in the opening")
         else:
-            ok("the first paragraph adds up", f"{gerechnet:,}")
+            ok("the first paragraph adds up", f"{computed:,}")
     else:
-        aendern("the first paragraph no longer shows its subtraction",
-                "without the duplicates named, a reader's sum comes out 19 too high")
+        change("the first paragraph no longer shows its subtraction",
+               "without the duplicates named, a reader's sum comes out 19 too high")
 
     # 4e-ter. The three claims that lean on somebody else's numbers.
     #
@@ -591,7 +591,7 @@ def main() -> int:
     # each is a case of the text sounding firmer than the evidence: a download count attributed to
     # a repository it is not linked to, "all from outside" over a sample of 100 out of 103, and an
     # issue from March used to illustrate a wall that went up in July.
-    for name, muster, hinweis in [
+    for name, pattern, hint in [
         ("the npm package's weak link to the repository",
          r"bugs\.url at a repository that does not exist",
          "docs/research/2026-09-20-wo-die-betroffenen-sind.md checked that repository and got a "
@@ -606,10 +606,10 @@ def main() -> int:
          "the piece puts the wall at 17 July and says people were still getting in before it, so "
          "an issue from March illustrates the spending path and not the wall"),
     ]:
-        if re.search(muster, text):
+        if re.search(pattern, text):
             ok(name)
         else:
-            aendern(f"the hedge on {name} is gone", hinweis)
+            change(f"the hedge on {name} is gone", hint)
 
     # 4f. Discussions and issue trackers are two different figures, and the fork count is a third.
     #
@@ -621,43 +621,43 @@ def main() -> int:
     # file this article publishes as its own evidence, says 1,444, and GitHub says more today.
     # Deleted and private forks are the difference. "Every one of its 1,438 forks" presents the
     # listable subset as the whole.
-    m_forks = re.search(r"([\d,]+) forks[^.]*?and ([\d,]+) of those forks", fliess)
+    m_forks = re.search(r"([\d,]+) forks[^.]*?and ([\d,]+) of those forks", flat)
     if m_forks:
-        behauptet, tracker = zahl(m_forks.group(1)), zahl(m_forks.group(2))
+        behauptet, tracker = number(m_forks.group(1)), number(m_forks.group(2))
         gemessen = json.loads(Path("docs/research/data/2026-09-21-conway-repo.json").read_text()).get("forks")
         if gemessen is None:
-            aendern("the fork count cannot be checked",
-                    "docs/research/data/2026-09-21-conway-repo.json carries no `forks` field any more")
+            change("the fork count cannot be checked",
+                   "docs/research/data/2026-09-21-conway-repo.json carries no `forks` field any more")
         elif behauptet > gemessen:
-            aendern(f"the article claims {behauptet:,} forks and the published measurement says {gemessen:,}",
-                    "a number above the measured one cannot be defended with the file the article ships")
-        elif behauptet < gemessen and "listable" not in fliess and "the fork listing" not in fliess:
-            aendern(f"the article says \"every one of its {behauptet:,} forks\" while the measurement says {gemessen:,}",
-                    "1,438 is what the fork listing returns; deleted and private forks are the "
-                    "difference, and calling the subset the whole is what an adversarial read "
-                    "picked up. Say which of the two numbers it is.")
+            change(f"the article claims {behauptet:,} forks and the published measurement says {gemessen:,}",
+                   "a number above the measured one cannot be defended with the file the article ships")
+        elif behauptet < gemessen and "listable" not in flat and "the fork listing" not in flat:
+            change(f"the article says \"every one of its {behauptet:,} forks\" while the measurement says {gemessen:,}",
+                   "1,438 is what the fork listing returns; deleted and private forks are the "
+                   "difference, and calling the subset the whole is what an adversarial read "
+                   "picked up. Say which of the two numbers it is.")
         else:
             ok("the fork count matches the published measurement", f"{behauptet:,} of {gemessen:,}")
         if tracker > behauptet:
-            aendern(f"{tracker:,} forks have the tracker off out of {behauptet:,}",
-                    "the subset cannot be larger than the set it is drawn from")
+            change(f"{tracker:,} forks have the tracker off out of {behauptet:,}",
+                   "the subset cannot be larger than the set it is drawn from")
     elif "Discussions" in text:
-        aendern("the sentence about Discussions and the forks changed",
-                "docs/research/2026-09-20-wo-die-betroffenen-sind.md says no fork has Discussions "
-                "at all, and the three exceptions belong to the issue tracker figure. The two "
-                "figures and the fork count are checked by their shape, so keep the sentence "
-                "readable as \"every one of its N forks, and M of those forks\".")
+        change("the sentence about Discussions and the forks changed",
+               "docs/research/2026-09-20-wo-die-betroffenen-sind.md says no fork has Discussions "
+               "at all, and the three exceptions belong to the issue tracker figure. The two "
+               "figures and the fork count are checked by their shape, so keep the sentence "
+               "readable as \"every one of its N forks, and M of those forks\".")
 
     # 5. Nobody should arrive at an empty market.
     try:
-        offen = hole("/bounties.json")["open"]
+        open_jobs = fetch("/bounties.json")["open"]
     except Exception:
-        offen = []
-    if offen:
-        ok(f"{len(offen)} job(s) open when readers arrive",
-           ", ".join(f"{b['award_cents']} c" for b in offen))
+        open_jobs = []
+    if open_jobs:
+        ok(f"{len(open_jobs)} job(s) open when readers arrive",
+           ", ".join(f"{b['award_cents']} c" for b in open_jobs))
     else:
-        aendern("no job is open", "an empty market convinces nobody, and this is the one thing "
+        change("no job is open", "an empty market convinces nobody, and this is the one thing "
                                   "that can be fixed in five minutes before posting")
 
     # 6. The disclosure has to cover what the market looks like on the day it is read.
@@ -670,30 +670,30 @@ def main() -> int:
     #
     # Checked against the live market rather than a note somebody has to remember: while the report
     # counts our own submissions on open jobs, the article has to say so.
-    eigene = 0
+    own = 0
     try:
-        eigene = subprocess.run(
+        own = subprocess.run(
             ["./ops/status.sh"], capture_output=True, text=True, timeout=120,
         ).stdout
-        eigene = json.loads(eigene)["db"]["market"].get("seed_submissions_on_open", 0)
+        own = json.loads(own)["db"]["market"].get("seed_submissions_on_open", 0)
     except Exception:
-        eigene = -1
-    if eigene < 0:
-        aendern("could not read how many submissions on open jobs are ours",
-                "without it the disclosure is unchecked; run ops/status.sh by hand")
-    elif eigene == 0:
+        own = -1
+    if own < 0:
+        change("could not read how many submissions on open jobs are ours",
+               "without it the disclosure is unchecked; run ops/status.sh by hand")
+    elif own == 0:
         ok("no agent of ours sits on an open job", "the disclosure needs no sentence about it")
     elif "my own agents on the other side" in text:
-        ok(f"{eigene} submission(s) of ours are disclosed", "the article says the agents are mine")
+        ok(f"{own} submission(s) of ours are disclosed", "the article says the agents are mine")
     else:
-        aendern(f"{eigene} submission(s) on open jobs are ours and the article does not say so",
-                "the piece argues that one-payer services are people testing their own deployment. "
-                "Publishing that while our own market is both sides without saying it is the one "
-                "thing a reader can refute in a single click")
+        change(f"{own} submission(s) on open jobs are ours and the article does not say so",
+               "the piece argues that one-payer services are people testing their own deployment. "
+               "Publishing that while our own market is both sides without saying it is the one "
+               "thing a reader can refute in a single click")
 
     print()
-    if befunde:
-        print(f"NOT YET: {len(befunde)} thing(s) to settle first")
+    if findings:
+        print(f"NOT YET: {len(findings)} thing(s) to settle first")
         return 1
     print("READY. Nothing left that this can check.")
     print("What it cannot check: whether today is a good day to post, and that is yours.")

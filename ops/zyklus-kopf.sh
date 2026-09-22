@@ -17,31 +17,31 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
-NR="${1:-}"
-VON="${2:-}"
-if [[ -z "$NR" ]]; then
+NUM="${1:-}"
+FROM="${2:-}"
+if [[ -z "$NUM" ]]; then
   echo "usage: ops/zyklus-kopf.sh <cycle number> [HH:MM start, UTC]" >&2
   exit 64
 fi
 
-JETZT=$(date -u +%H:%M)
-HEUTE=$(date -u +%d.%m.)
+NOW=$(date -u +%H:%M)
+TODAY=$(date -u +%d.%m.)
 
 # The start: given, or the end of the last entry in the protocol, or simply now.
-if [[ -z "$VON" ]]; then
-  VON=$(grep -Eo '^## Zyklus [0-9]+, [0-9.]+ [0-9]{2}:[0-9]{2} bis [0-9]{2}:[0-9]{2} UTC' \
+if [[ -z "$FROM" ]]; then
+  FROM=$(grep -Eo '^## Zyklus [0-9]+, [0-9.]+ [0-9]{2}:[0-9]{2} bis [0-9]{2}:[0-9]{2} UTC' \
         .scratch/gtm/nachtlauf.md 2>/dev/null | tail -1 | grep -Eo '[0-9]{2}:[0-9]{2} UTC$' | cut -d' ' -f1)
-  [[ -z "$VON" ]] && VON="$JETZT"
+  [[ -z "$FROM" ]] && FROM="$NOW"
 fi
 
-if [[ "$VON" > "$JETZT" ]]; then
-  echo "COULD NOT TELL: the start $VON UTC is after the current time $JETZT UTC." >&2
+if [[ "$FROM" > "$NOW" ]]; then
+  echo "COULD NOT TELL: the start $FROM UTC is after the current time $NOW UTC." >&2
   echo "        That comes from the previous entry, so the previous entry carries a time" >&2
   echo "        somebody typed. Fix it there, or pass a start explicitly." >&2
   exit 2
 fi
 
-echo "## Zyklus $NR, $HEUTE $VON bis $JETZT UTC"
+echo "## Zyklus $NUM, $TODAY $FROM bis $NOW UTC"
 echo
 
 KEY="${CP_SSH_KEY:-$HOME/.ssh/id_ed25519_automaton}"
@@ -49,7 +49,7 @@ HOST="${CP_HOST:-root@76.13.144.207}"
 started=$(timeout 20 ssh -i "$KEY" -o BatchMode=yes -o ConnectTimeout=8 "$HOST" \
   'docker inspect deploy-cp-1 --format "{{.State.StartedAt}}"' 2>/dev/null || true)
 if [[ -n "$started" ]]; then
-  echo "(last deploy: ${started:11:5} UTC, from the container start. Now: $JETZT UTC.)"
+  echo "(last deploy: ${started:11:5} UTC, from the container start. Now: $NOW UTC.)"
 else
   echo "(the container start time was not readable, so no deploy time here. Not a finding.)"
 fi

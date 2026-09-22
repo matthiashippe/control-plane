@@ -1,9 +1,9 @@
 /**
- * Settlement über einen externen x402-Facilitator (Betrieb). Das Control Plane sendet nichts
- * selbst on-chain; es reicht den v1-Payload der Runtime an `/verify` und `/settle` durch.
+ * Settlement through an external x402 facilitator (production). The control plane sends nothing
+ * on-chain itself; it passes the runtime's v1 payload through to `/verify` and `/settle`.
  *
- * PayAI (`https://facilitator.payai.network`) unterstützt `x402Version 1, exact, base`
- * (geprüft 19.09.2026 über `/supported`); CDP braucht zusätzlich einen Auth-Header.
+ * PayAI (`https://facilitator.payai.network`) supports `x402Version 1, exact, base`
+ * (checked 19.09.2026 through `/supported`); CDP additionally needs an auth header.
  */
 
 import type { Address, Hex } from "viem";
@@ -12,9 +12,9 @@ import { BAZAAR_DESCRIPTION, BAZAAR_EXTENSION } from "./bazaar.js";
 
 export interface FacilitatorConfig {
   url: string;
-  /** Vollständiger Authorization-Header-Wert, falls der Facilitator einen verlangt (CDP). */
+  /** The full Authorization header value, in case the facilitator demands one (CDP). */
   authHeader?: string;
-  /** "base" oder "base-sepolia", wie im Angebot. */
+  /** "base" or "base-sepolia", as in the offer. */
   network: "base" | "base-sepolia";
   payTo: Address;
   usdcAddress: Address;
@@ -23,7 +23,7 @@ export interface FacilitatorConfig {
   timeoutMs?: number;
 }
 
-/** x402-v1-Requirements, wie Facilitatoren sie für `exact` auf EVM erwarten. */
+/** x402 v1 requirements, the way facilitators expect them for `exact` on EVM. */
 export function buildV1Requirements(cfg: FacilitatorConfig, auth: Authorization, resource: string) {
   return {
     scheme: "exact",
@@ -35,9 +35,9 @@ export function buildV1Requirements(cfg: FacilitatorConfig, auth: Authorization,
     payTo: cfg.payTo,
     maxTimeoutSeconds: cfg.maxTimeoutSeconds,
     asset: cfg.usdcAddress,
-    // EIP-712-Domain des Tokens; der Runtime-Client signiert mit "USD Coin" / "2".
+    // The token's EIP-712 domain; the runtime client signs with "USD Coin" / "2".
     extra: { name: "USD Coin", version: "2" },
-    // Ohne diesen Block nimmt der Facilitator den Dienst nie in sein Verzeichnis auf.
+    // Without this block the facilitator never takes the service into its directory.
     extensions: BAZAAR_EXTENSION,
   };
 }
@@ -89,10 +89,10 @@ export class FacilitatorSettler implements Settler {
     const settle = await this.post("/settle", body);
     if (!settle.ok) return { ok: false, error: `settle: ${settle.error}` };
     const s = settle.data as { success?: boolean; errorReason?: string; transaction?: string; txHash?: string };
-    // Die Antwort des Facilitators einmal vollstaendig ins Log. Sie enthaelt keine Signatur und
-    // kein Geheimnis, aber sie ist die einzige Stelle, an der steht, ob er den Verkaeufer in sein
-    // Verzeichnis uebernommen hat. Am 20.09. lief ein Settlement sauber durch, und wir standen
-    // danach trotzdem nicht im Verzeichnis, ohne dass irgendwo nachzulesen war warum.
+    // The facilitator's answer in full, once, into the log. It carries no signature and no
+    // secret, but it is the only place that says whether it has taken the seller into its
+    // directory. On 20.09. a settlement ran through cleanly and we were still not in the
+    // directory afterwards, with nowhere to read why.
     console.log(`[facilitator] settle -> ${JSON.stringify(settle.data).slice(0, 600)}`);
     if (!s.success) return { ok: false, error: `settle failed: ${s.errorReason ?? "unknown"}` };
     const txHash = (s.transaction || s.txHash || "") as Hex;

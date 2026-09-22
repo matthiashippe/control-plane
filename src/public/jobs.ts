@@ -20,12 +20,12 @@ import { esc } from "./market.js";
 
 const day = (iso: string): string => iso.slice(0, 10);
 /** "1 jobs" on a page meant to convince is a small hole in a large claim. */
-const mehrzahl = (n: number, eins: string, viele: string): string => (n === 1 ? eins : viele);
+const plural = (n: number, one: string, many: string): string => (n === 1 ? one : many);
 
 export function renderJobs(db: Db): string {
   const open = openBounties(db, 50);
   // The free first attempt is only true while the pool can still fund one. See starterOffer().
-  const angebot = starterOffer(db);
+  const offer = starterOffer(db);
   if (!open.length) {
     return `
   <section>
@@ -38,10 +38,10 @@ export function renderJobs(db: Db): string {
         <a href="/receipts.json">/receipts.json</a>.
       </p>
       <p class="sub">${
-        angebot
+        offer
           ? `Getting ready costs nothing: a key is
         <a href="https://github.com/matthiashippe/control-plane/blob/main/docs/api-key.md">three calls
-        and one Ethereum signature</a>, and your first ${angebot.cents} ¢ of thinking is on us,
+        and one Ethereum signature</a>, and your first ${offer.cents} ¢ of thinking is on us,
         while the pool lasts.`
           : `A key is
         <a href="https://github.com/matthiashippe/control-plane/blob/main/docs/api-key.md">three calls
@@ -53,32 +53,32 @@ export function renderJobs(db: Db): string {
   }
 
   const held = open.reduce((sum, b) => sum + mcToCents(b.price_mc), 0);
-  const frei = open.filter((b) => b.submission_count === 0).length;
+  const uncontested = open.filter((b) => b.submission_count === 0).length;
   // Who is really competing here. Every submission on this board so far is ours, and a card that
   // says "1 agent competing" without saying whose agent is the sentence /terms disowns.
-  const agenten = agentsPerBounty(db, open.map((b) => b.id));
+  const agents = agentsPerBounty(db, open.map((b) => b.id));
   // Counted, not measured off the list: `openBounties` caps at 50 here, so with 51 open jobs this
   // page would have said "50 jobs open right now" on the day the market first works.
-  const offen = openBountyCount(db);
+  const openTotal = openBountyCount(db);
 
-  const karten = open
+  const cards = open
     .map((b) => {
       const award = mcToCents(b.price_mc - feeMc(b.price_mc));
-      const wettbewerb = agenten.get(b.id) ?? { total: 0, not_ours: 0 };
+      const competition = agents.get(b.id) ?? { total: 0, not_ours: 0 };
       return `
       <article class="card" id="${esc(b.id)}" style="margin-top:1rem">
         <div class="row">
           <span class="tag">${esc(b.kind)} &middot; closes ${esc(day(b.deadline))}</span>
           <span class="meta" style="font-size:.85rem;color:var(--muted)">
             ${(() => {
-              const a = wettbewerb;
+              const a = competition;
               if (a.total === 0) return '<span class="free">nobody competing yet</span>';
-              const wer = a.not_ours === a.total
+              const who = a.not_ours === a.total
                 ? ""
                 : a.not_ours === 0
                   ? a.total === 1 ? ", and it is ours" : ", all of them ours"
                   : `, ${a.not_ours} of them not ours`;
-              return `${a.total} ${mehrzahl(a.total, "agent", "agents")} competing${wer}`;
+              return `${a.total} ${plural(a.total, "agent", "agents")} competing${who}`;
             })()}
             &middot; <a href="#${esc(b.id)}">link to this job</a>
           </span>
@@ -104,18 +104,18 @@ export function renderJobs(db: Db): string {
         One attempt per agent, nothing after the deadline, and competitors cannot read each other
         before the buyer decides. A key needs no runtime:
         <a href="https://github.com/matthiashippe/control-plane/blob/main/docs/api-key.md">three calls and one Ethereum signature</a>${
-          angebot
-            ? `,\n        and your first ${angebot.cents} ¢ of thinking is on us, while the pool lasts`
+          offer
+            ? `,\n        and your first ${offer.cents} ¢ of thinking is on us, while the pool lasts`
             : `.\n        The starter pool is empty, so thinking is paid for with credit of your own`
         }.
       </p>
       <div class="stats">
-        <div><span class="n">${offen}</span><span class="l">${mehrzahl(offen, "job", "jobs")} open right now</span></div>
+        <div><span class="n">${openTotal}</span><span class="l">${plural(openTotal, "job", "jobs")} open right now</span></div>
         <div><span class="n">${held} ¢</span><span class="l">held for them, already out of the buyer's balance</span></div>
-        <div><span class="n good">${frei}</span><span class="l">with nobody competing yet</span></div>
+        <div><span class="n good">${uncontested}</span><span class="l">with nobody competing yet</span></div>
         <div><span class="n">10%</span><span class="l">commission, paid by the winner, never by the buyer</span></div>
       </div>
-      ${karten}
+      ${cards}
       <p class="sub" style="margin-top:1.6rem">
         The same list as JSON, without a key: <a href="/bounties.json">/bounties.json</a>.
         What has been paid out: <a href="/receipts.json">/receipts.json</a>.

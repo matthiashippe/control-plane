@@ -11,7 +11,7 @@ import { createApp } from "../src/app.js";
 import { openDb, postLedger } from "../src/db.js";
 import { hashApiKey } from "../src/auth/siwe.js";
 
-function konto(db: ReturnType<typeof openDb>, app: ReturnType<typeof createApp>, n: number, balanceMc: number) {
+function account(db: ReturnType<typeof openDb>, app: ReturnType<typeof createApp>, n: number, balanceMc: number) {
   const address = privateKeyToAccount(generatePrivateKey()).address.toLowerCase();
   const key = `cnwy_k_${String(n).repeat(2)}` + "3d".repeat(15);
   db.prepare("INSERT INTO wallets (address, balance_mc, created_at) VALUES (?, 0, ?)").run(address, new Date().toISOString());
@@ -26,11 +26,11 @@ function konto(db: ReturnType<typeof openDb>, app: ReturnType<typeof createApp>,
   };
 }
 
-async function markt(submittedAt: string) {
+async function market(submittedAt: string) {
   const db = openDb(":memory:");
   const app = createApp({ db, pay: { payTo: "0x" + "1".repeat(40) } as never });
-  const buyer = konto(db, app, 1, 500_000);
-  const agent = konto(db, app, 2, 50_000);
+  const buyer = account(db, app, 1, 500_000);
+  const agent = account(db, app, 2, 50_000);
   const posted = await buyer.call("/v1/bounties", {
     brief: "FACT SHEET for developers.\n\nA second paragraph of the brief.",
     kind: "factual",
@@ -47,7 +47,7 @@ async function markt(submittedAt: string) {
 
 describe("/receipts", () => {
   it("shows the work that won, when the rule covers it", async () => {
-    const { page, agent, buyer, id } = await markt("2026-09-22T10:00:00.000Z");
+    const { page, agent, buyer, id } = await market("2026-09-22T10:00:00.000Z");
     const html = await page();
 
     expect(html).toContain("THE WINNING WORK, in full.");
@@ -75,11 +75,11 @@ describe("/receipts", () => {
    * without saying so is refutable in one click, and it would take the rest of the piece with it.
    */
   it("says so when the winning agent is the operator's own", async () => {
-    const { db, app, agent } = await markt("2026-09-22T10:00:00.000Z");
+    const { db, app, agent } = await market("2026-09-22T10:00:00.000Z");
 
-    const sauber = (await (await app.request("/receipts")).text()).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
-    expect(sauber, "a stranger's agent gets no such sentence").not.toContain("won by an agent of the operator");
-    expect(sauber, "and no marker either").not.toContain("Every job here was posted by the operator");
+    const clean = (await (await app.request("/receipts")).text()).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+    expect(clean, "a stranger's agent gets no such sentence").not.toContain("won by an agent of the operator");
+    expect(clean, "and no marker either").not.toContain("Every job here was posted by the operator");
 
     // The same market, with the winner's key named the way ops/compete.ts names its own.
     db.prepare("UPDATE api_keys SET name = 'ops-seed-vera' WHERE address = ?").run(agent.address);
@@ -100,10 +100,10 @@ describe("/receipts", () => {
     // The only paid receipt on this market was won by our own first-cycle agent on 20.09., before
     // the rule, and the page presented it as an author whose rights were being respected. That
     // reads as a stranger, which is the opposite of what the row is.
-    const { db, app, agent } = await markt("2026-09-20T10:00:00.000Z");
+    const { db, app, agent } = await market("2026-09-20T10:00:00.000Z");
 
-    const vorher = await (await app.request("/receipts")).text();
-    expect(vorher, "a stranger from before the rule stays withheld").not.toContain("THE WINNING WORK");
+    const beforeRename = await (await app.request("/receipts")).text();
+    expect(beforeRename, "a stranger from before the rule stays withheld").not.toContain("THE WINNING WORK");
 
     db.prepare("UPDATE api_keys SET name = 'ops-seed-vera' WHERE address = ?").run(agent.address);
     const html = await (await app.request("/receipts")).text();
@@ -116,9 +116,9 @@ describe("/receipts", () => {
 
     // The same through the parser's door, or the two answers disagree about whose work they show.
     const json = (await (await app.request("/receipts.json")).json()) as { receipts: { entries: { ours: boolean; body: string | null }[] }[] };
-    const eintrag = json.receipts[0].entries[0];
-    expect(eintrag.ours).toBe(true);
-    expect(eintrag.body).toContain("THE WINNING WORK");
+    const entry = json.receipts[0].entries[0];
+    expect(entry.ours).toBe(true);
+    expect(entry.body).toContain("THE WINNING WORK");
   });
 
   it("admits the jobs that ran out with nobody paid", async () => {
@@ -126,21 +126,21 @@ describe("/receipts", () => {
     // A job nobody entered leaves the open list at its deadline and appears nowhere afterwards, so
     // a reader counting evidence sees only successes. That is what this project accuses the x402
     // directory of doing with its own numbers.
-    const { db, app } = await markt("2026-09-22T10:00:00.000Z");
+    const { db, app } = await market("2026-09-22T10:00:00.000Z");
 
-    const ohne = (await (await app.request("/receipts")).text()).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
-    expect(ohne, "nothing has expired yet, so the page says nothing about it")
+    const withoutExpired = (await (await app.request("/receipts")).text()).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+    expect(withoutExpired, "nothing has expired yet, so the page says nothing about it")
       .not.toContain("ran out of time");
 
     // One expired job nobody entered. The creator has to be a real wallet: `bounties.creator`
     // references `wallets(address)`, which is the constraint that keeps a job from belonging to
     // nobody.
-    const wer = "0x" + "5".repeat(40);
+    const creator = "0x" + "5".repeat(40);
     db.prepare("INSERT INTO wallets (address, balance_mc, created_at) VALUES (?, 0, ?)")
-      .run(wer, new Date().toISOString());
+      .run(creator, new Date().toISOString());
     db.prepare("INSERT INTO bounties (id, creator, kind, brief, price_mc, deadline, status, created_at, closed_at) " +
       "VALUES ('exp-1', ?, 'factual', 'A brief.', 30000, ?, 'expired', ?, ?)")
-      .run(wer, new Date(Date.now() - 1000).toISOString(),
+      .run(creator, new Date(Date.now() - 1000).toISOString(),
            new Date(Date.now() - 2000).toISOString(), new Date().toISOString());
     // And a cancelled one, which must not be counted. A cancelled job is a buyer changing their
     // mind, usually within a minute and usually a throwaway from a production check; seventeen of
@@ -148,7 +148,7 @@ describe("/receipts", () => {
     // lives in a comment: widening the query to both statuses leaves the test green.
     db.prepare("INSERT INTO bounties (id, creator, kind, brief, price_mc, deadline, status, created_at, closed_at) " +
       "VALUES ('can-1', ?, 'factual', 'A brief.', 99000, ?, 'cancelled', ?, ?)")
-      .run(wer, new Date(Date.now() - 1000).toISOString(),
+      .run(creator, new Date(Date.now() - 1000).toISOString(),
            new Date(Date.now() - 2000).toISOString(), new Date().toISOString());
 
     const text = (await (await app.request("/receipts")).text()).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
@@ -159,7 +159,7 @@ describe("/receipts", () => {
   });
 
   it("withholds the work and the author when it was handed in before the rule", async () => {
-    const { page, agent } = await markt("2026-09-20T10:00:00.000Z");
+    const { page, agent } = await market("2026-09-20T10:00:00.000Z");
     const html = await page();
 
     expect(html, "nobody told this agent its work would be read").not.toContain("THE WINNING WORK");
@@ -181,8 +181,8 @@ describe("/receipts", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toContain("application/xml");
     const xml = await res.text();
-    for (const pfad of ["/", "/jobs", "/receipts", "/x402"]) {
-      expect(xml).toContain(`https://cp.hippe.eu${pfad}<`);
+    for (const path of ["/", "/jobs", "/receipts", "/x402"]) {
+      expect(xml).toContain(`https://cp.hippe.eu${path}<`);
     }
     expect(await (await app.request("/robots.txt")).text()).toContain("Sitemap: https://cp.hippe.eu/sitemap.xml");
   });

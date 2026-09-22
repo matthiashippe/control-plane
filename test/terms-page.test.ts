@@ -15,8 +15,8 @@ import { openDb } from "../src/db.js";
 import { FEE_PERCENT } from "../src/bounties/store.js";
 import { MARKUP } from "../src/inference/proxy.js";
 
-const page = async (pfad: string): Promise<string> =>
-  (await createApp({ db: openDb(":memory:") }).request(pfad)).text();
+const page = async (path: string): Promise<string> =>
+  (await createApp({ db: openDb(":memory:") }).request(path)).text();
 
 describe("the promise /terms makes about /v1/status", () => {
   it("names a field that endpoint actually answers", async () => {
@@ -27,16 +27,16 @@ describe("the promise /terms makes about /v1/status", () => {
     const terms = await (await app.request("/terms")).text();
     const status = (await (await app.request("/v1/status")).json()) as Record<string, unknown>;
 
-    const felder = [...terms.matchAll(/<code>([a-z_]+(?:\.[a-z_]+)?)<\/code>/g)]
+    const fields = [...terms.matchAll(/<code>([a-z_]+(?:\.[a-z_]+)?)<\/code>/g)]
       .map((m) => m[1])
       .filter((f) => f.startsWith("paying_wallets"));
-    expect(felder.length, "the page no longer points at a field on /v1/status").toBeGreaterThan(0);
-    for (const feld of felder) {
-      const [kopf, unter] = feld.split(".");
-      expect(status, `/terms points at ${feld} and /v1/status has no ${kopf}`).toHaveProperty(kopf);
-      if (unter) {
-        expect(status[kopf], `/terms points at ${feld} and that object has no ${unter}`)
-          .toHaveProperty(unter);
+    expect(fields.length, "the page no longer points at a field on /v1/status").toBeGreaterThan(0);
+    for (const field of fields) {
+      const [head, sub] = field.split(".");
+      expect(status, `/terms points at ${field} and /v1/status has no ${head}`).toHaveProperty(head);
+      if (sub) {
+        expect(status[head], `/terms points at ${field} and that object has no ${sub}`)
+          .toHaveProperty(sub);
       }
     }
   });
@@ -103,14 +103,14 @@ describe("/terms", () => {
    */
   it("takes its numbers from the code and not from a typist", async () => {
     const { readFileSync } = await import("node:fs");
-    const quelle = readFileSync(new URL("../src/public/terms.ts", import.meta.url), "utf-8");
-    const koerper = quelle.slice(quelle.indexOf("export function renderTerms"));
+    const source = readFileSync(new URL("../src/public/terms.ts", import.meta.url), "utf-8");
+    const body = source.slice(source.indexOf("export function renderTerms"));
 
-    expect(koerper, "the commission has to come from the store module").toContain("${FEE_PERCENT} per cent commission");
-    expect(koerper, "and the markup from the inference proxy").toContain("purchase cost times ${MARKUP}");
-    expect(koerper, `${FEE_PERCENT} is typed into the page and will be stale the day the fee moves`)
+    expect(body, "the commission has to come from the store module").toContain("${FEE_PERCENT} per cent commission");
+    expect(body, "and the markup from the inference proxy").toContain("purchase cost times ${MARKUP}");
+    expect(body, `${FEE_PERCENT} is typed into the page and will be stale the day the fee moves`)
       .not.toMatch(new RegExp(`${FEE_PERCENT}\\s*per cent`));
-    expect(koerper, `${MARKUP} is typed into the page and will be stale the day the markup moves`)
+    expect(body, `${MARKUP} is typed into the page and will be stale the day the markup moves`)
       .not.toMatch(new RegExp(`times\\s*${MARKUP}`));
 
     // And the sentences still have to reach the reader.
@@ -128,10 +128,10 @@ describe("/terms", () => {
   });
 
   it("is reachable from every page and is in the sitemap and llms.txt", async () => {
-    for (const pfad of ["/post", "/jobs", "/receipts", "/x402", "/conway", "/terms"]) {
-      const html = await page(pfad);
-      expect(html, `${pfad} has no link to the fine print`).toContain('href="/terms"');
-      expect(html, `${pfad} has no link to the imprint`).toContain('href="/terms#impressum"');
+    for (const path of ["/post", "/jobs", "/receipts", "/x402", "/conway", "/terms"]) {
+      const html = await page(path);
+      expect(html, `${path} has no link to the fine print`).toContain('href="/terms"');
+      expect(html, `${path} has no link to the imprint`).toContain('href="/terms#impressum"');
     }
     expect(await page("/sitemap.xml")).toContain("https://cp.hippe.eu/terms");
     expect(await page("/llms.txt")).toContain("/terms:");
@@ -139,8 +139,8 @@ describe("/terms", () => {
 
   it("folds nothing away: no details element on the page", async () => {
     const html = await page("/terms");
-    const koerper = html.slice(html.indexOf("<main>"), html.indexOf("</main>"));
-    expect(koerper, "a duty behind a disclosure triangle is a duty somebody has to guess at")
+    const body = html.slice(html.indexOf("<main>"), html.indexOf("</main>"));
+    expect(body, "a duty behind a disclosure triangle is a duty somebody has to guess at")
       .not.toContain("<details");
   });
 });

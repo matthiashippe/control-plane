@@ -15,22 +15,22 @@ import { createApp } from "../src/app.js";
 import { mcToCents, openDb } from "../src/db.js";
 import { GRANT_MC } from "../src/credits/starter.js";
 
-const page = async (pfad: string): Promise<string> =>
-  (await createApp({ db: openDb(":memory:") }).request(pfad)).text();
+const page = async (path: string): Promise<string> =>
+  (await createApp({ db: openDb(":memory:") }).request(path)).text();
 
 describe("/fix", () => {
   it("tells them how to stop paying before it mentions what we sell", async () => {
     const html = await page("/fix");
-    const stopp = html.indexOf("Stop it buying");
-    const frei = html.indexOf("without paying anybody");
+    const stopSection = html.indexOf("Stop it buying");
+    const freeRoutes = html.indexOf("without paying anybody");
     // Not the bare host: it is in the canonical link and the og:url in every <head>, so anchoring
     // on it made the test read "we sell before anything else" on a page that does not.
-    const unser = html.indexOf("Or point it at this control plane");
-    expect(stopp, "the section about stopping the spending is gone").toBeGreaterThan(-1);
-    expect(frei, "the two free routes are gone").toBeGreaterThan(-1);
-    expect(unser, "the section about what we sell is gone").toBeGreaterThan(-1);
-    expect(stopp, "what we sell comes before the reader is told how to stop paying").toBeLessThan(unser);
-    expect(frei, "what we sell comes before the free routes").toBeLessThan(unser);
+    const whatWeSell = html.indexOf("Or point it at this control plane");
+    expect(stopSection, "the section about stopping the spending is gone").toBeGreaterThan(-1);
+    expect(freeRoutes, "the two free routes are gone").toBeGreaterThan(-1);
+    expect(whatWeSell, "the section about what we sell is gone").toBeGreaterThan(-1);
+    expect(stopSection, "what we sell comes before the reader is told how to stop paying").toBeLessThan(whatWeSell);
+    expect(freeRoutes, "what we sell comes before the free routes").toBeLessThan(whatWeSell);
   });
 
   it("carries the error the reader just saw, in the words their console used", async () => {
@@ -56,9 +56,9 @@ describe("/fix", () => {
     // and og.png behind, so the link is pinned by the rule and not by its wording: somewhere in
     // the section written for a stranded automaton, something points here.
     const html = await page("/");
-    const abschnitt = html.indexOf('id="agents"');
-    expect(abschnitt, "the section for a stranded automaton is gone").toBeGreaterThan(-1);
-    expect(html.slice(abschnitt, abschnitt + 1200), "nothing in that section links to /fix")
+    const section = html.indexOf('id="agents"');
+    expect(section, "the section for a stranded automaton is gone").toBeGreaterThan(-1);
+    expect(html.slice(section, section + 1200), "nothing in that section links to /fix")
       .toContain('href="/fix"');
   });
 
@@ -136,8 +136,8 @@ describe("/fix", () => {
     const text = await page("/fix");
     expect(text).toContain("gpt-5.2");
     expect(text).toContain("gpt-5-mini");
-    const satz = text.slice(text.indexOf("keeps routing"), text.indexOf("keeps routing") + 400);
-    expect(satz, "naming only the small model is right on one of the two routes this page offers")
+    const sentence = text.slice(text.indexOf("keeps routing"), text.indexOf("keeps routing") + 400);
+    expect(sentence, "naming only the small model is right on one of the two routes this page offers")
       .toMatch(/critical/);
   });
 
@@ -146,8 +146,8 @@ describe("/fix", () => {
     // The whole argument of the page rests on exactly one asymmetry: sign-up fails, paying works.
     // A sentence that blurs the two turns the page into "Conway is down", which is both wrong and
     // useless to somebody whose wallet is still draining.
-    const zahlweg = html.indexOf("402, a payable demand");
-    expect(zahlweg, "the working payment endpoint is no longer shown next to the broken sign-up")
+    const paymentRoute = html.indexOf("402, a payable demand");
+    expect(paymentRoute, "the working payment endpoint is no longer shown next to the broken sign-up")
       .toBeGreaterThan(-1);
   });
 });

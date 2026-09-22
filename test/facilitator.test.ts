@@ -136,8 +136,11 @@ describe("tiers from the environment", () => {
     expect(base?.tiers).toEqual([5, 25, 100, 500, 1000, 2500]);
     const withOne = payConfigFromEnv({ CP_PAY_TO: PAY_TO, CP_TOPUP_TIERS_USD: "1,5,25" });
     expect(withOne?.tiers).toEqual([1, 5, 25]);
-    // The wording comes from src/payments/pay.ts, which this language pass does not touch.
-    expect(() => payConfigFromEnv({ CP_PAY_TO: PAY_TO, CP_TOPUP_TIERS_USD: "abc" })).toThrow(/leer/);
+    // The wording comes from src/payments/pay.ts. A parallel agent in the same language pass
+    // assumed that file would stay German and left this matcher on /leer/; pay.ts was in another
+    // agent's group and went to English in the same minute, so the assertion went red. Matching
+    // the English wording, which is now the only one there is.
+    expect(() => payConfigFromEnv({ CP_PAY_TO: PAY_TO, CP_TOPUP_TIERS_USD: "abc" })).toThrow(/is empty/);
   });
 });
 

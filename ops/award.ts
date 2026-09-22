@@ -101,7 +101,7 @@ async function handBack(who: { key: string; prefix: string }): Promise<void> {
   }
 }
 
-const kurz = (a: string): string => `${a.slice(0, 8)}…${a.slice(-4)}`;
+const short = (a: string): string => `${a.slice(0, 8)}…${a.slice(-4)}`;
 
 /**
  * The parts of a brief a machine can check, checked.
@@ -120,59 +120,59 @@ const kurz = (a: string): string => `${a.slice(0, 8)}…${a.slice(-4)}`;
  *
  * NaN rather than 0 for an unreadable deadline, and the caller treats anything that is not 0 as
  * "still open". Written that way on purpose: `(new Date("nonsense").getTime() - now) / h` is NaN,
- * every comparison against NaN is false, and a guard written as `rest > 0` would wave the award
+ * every comparison against NaN is false, and a guard written as `hoursLeft > 0` would wave the award
  * through at exactly the moment it knows least. A guard has to fail towards refusing.
  */
-export function nochOffenStunden(deadline: string, jetzt = Date.now()): number {
+export function nochOffenStunden(deadline: string, now = Date.now()): number {
   const t = new Date(deadline).getTime();
   if (Number.isNaN(t)) return NaN;
-  return Math.max(0, (t - jetzt) / 3_600_000);
+  return Math.max(0, (t - now) / 3_600_000);
 }
 
 export function formalpruefung(brief: string, work: string): string[] {
-  const befunde: string[] = [];
+  const findings: string[] = [];
 
-  const grenze = /(\d+)\s*words?\s*maximum|maximum\s*(\d+)\s*words?|at most (\d+) words/i.exec(brief);
-  if (grenze) {
-    const max = Number(grenze[1] ?? grenze[2] ?? grenze[3]);
+  const limit = /(\d+)\s*words?\s*maximum|maximum\s*(\d+)\s*words?|at most (\d+) words/i.exec(brief);
+  if (limit) {
+    const max = Number(limit[1] ?? limit[2] ?? limit[3]);
     const n = work.split(/\s+/).filter(Boolean).length;
-    if (n > max) befunde.push(`${n} words against a limit of ${max}`);
+    if (n > max) findings.push(`${n} words against a limit of ${max}`);
   }
 
   // "Do not use: "a", "b", "c"." and the same list without quotes.
-  const liste = /Do not use:?\s*([^.]+)\./i.exec(brief);
-  if (liste) {
-    const woerter = [...liste[1].matchAll(/"([^"]+)"|([A-Za-z][A-Za-z-]{2,})/g)]
+  const banned = /Do not use:?\s*([^.]+)\./i.exec(brief);
+  if (banned) {
+    const words = [...banned[1].matchAll(/"([^"]+)"|([A-Za-z][A-Za-z-]{2,})/g)]
       .map((m) => (m[1] ?? m[2]).toLowerCase())
       .filter((w) => !["and", "or", "the", "no", "not", "use", "do"].includes(w));
-    const drin = woerter.filter((w) => new RegExp(`\\b${w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(work));
-    for (const w of drin) befunde.push(`uses "${w}", which the brief rules out`);
+    const used = words.filter((w) => new RegExp(`\\b${w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(work));
+    for (const w of used) findings.push(`uses "${w}", which the brief rules out`);
   }
 
-  if (/no exclamation marks/i.test(brief) && work.includes("!")) befunde.push("has an exclamation mark");
-  if (/no em dashes/i.test(brief) && /[—–]/.test(work)) befunde.push("has an em or en dash");
+  if (/no exclamation marks/i.test(brief) && work.includes("!")) findings.push("has an exclamation mark");
+  if (/no em dashes/i.test(brief) && /[—–]/.test(work)) findings.push("has an em or en dash");
   // Loose on purpose. "one sentence" appears in a brief as an instruction and almost nowhere else,
   // and the two spellings this first tried (line start, or after a colon) missed "10 words
   // maximum. One sentence." A false alarm here costs one glance; a missed one costs the check.
   if (/\bone sentence\b/i.test(brief)) {
-    const saetze = work.split(/[.!?]+\s/).filter((t) => t.trim().length > 3).length;
-    if (saetze > 1) befunde.push(`${saetze} sentences where the brief asks for one`);
+    const sentences = work.split(/[.!?]+\s/).filter((t) => t.trim().length > 3).length;
+    if (sentences > 1) findings.push(`${sentences} sentences where the brief asks for one`);
   }
-  return befunde;
+  return findings;
 }
 
 async function main(): Promise<void> {
   const bountyId = arg("bounty");
-  const konto = await signIn();
-  const key = konto.key;
+  const session = await signIn();
+  const key = session.key;
   try {
-    await entscheiden(bountyId, key);
+    await decide(bountyId, key);
   } finally {
-    await handBack(konto);
+    await handBack(session);
   }
 }
 
-async function entscheiden(bountyId: string, key: string): Promise<void> {
+async function decide(bountyId: string, key: string): Promise<void> {
   // Reassigned once the prefix is resolved, see below.
 
   // The brief comes from the public list, the same text the agents were given. Taking it from
@@ -205,16 +205,16 @@ async function entscheiden(bountyId: string, key: string): Promise<void> {
     return;
   }
 
-  const gewinner = process.argv.includes("--award") ? arg("award") : null;
+  const winner = process.argv.includes("--award") ? arg("award") : null;
 
   for (const s of submissions) {
     const check = (await call("/v1/check", key, {
       method: "POST",
       body: JSON.stringify({ briefing: job.brief, submission: s.body, kind: job.kind }),
     })) as { findings: { quote: string; kind: string; reason: string }[]; discarded: number };
-    const woerter = s.body.split(/\s+/).filter(Boolean).length;
+    const words = s.body.split(/\s+/).filter(Boolean).length;
     const formal = formalpruefung(job.brief, s.body);
-    console.log(`${s.id === gewinner ? "->" : "  "} ${s.id}  ${kurz(s.agent)}  ${woerter} words  ` +
+    console.log(`${s.id === winner ? "->" : "  "} ${s.id}  ${short(s.agent)}  ${words} words  ` +
       `${check.findings.length} finding(s)${check.discarded ? `, ${check.discarded} discarded` : ""}` +
       `${formal.length ? `, ${formal.length} against the brief` : ""}`);
     for (const f of formal) console.log(`      [brief] ${f}`);
@@ -222,12 +222,12 @@ async function entscheiden(bountyId: string, key: string): Promise<void> {
     console.log(`      ${s.body.replace(/\n+/g, " ").slice(0, 400)}${s.body.length > 400 ? "…" : ""}\n`);
   }
 
-  if (!gewinner) {
+  if (!winner) {
     console.log("Nothing awarded. Re-run with --award <submission-id>, or --none to award nobody.");
     return;
   }
-  if (!submissions.some((s) => s.id === gewinner)) {
-    throw new Error(`${gewinner} is not a submission on this job`);
+  if (!submissions.some((s) => s.id === winner)) {
+    throw new Error(`${winner} is not a submission on this job`);
   }
 
   // Not before the deadline, unless somebody says so out loud.
@@ -240,12 +240,12 @@ async function entscheiden(bountyId: string, key: string): Promise<void> {
   //
   // The deadline is read from the service, never from the instruction. A job can still be awarded
   // early on purpose, which is a real case when every agent has handed in, but it has to be said.
-  const rest = nochOffenStunden(job.deadline);
-  if (rest !== 0 && !process.argv.includes("--vorzeitig")) {
-    const wie = Number.isNaN(rest)
+  const hoursLeft = nochOffenStunden(job.deadline);
+  if (hoursLeft !== 0 && !process.argv.includes("--vorzeitig")) {
+    const how = Number.isNaN(hoursLeft)
       ? `has a deadline this script cannot read ("${job.deadline}")`
-      : `is open for another ${rest.toFixed(1)} hour(s), until ${job.deadline.slice(0, 16)} UTC`;
-    console.log(`\nNOT AWARDED. This job ${wie}.`);
+      : `is open for another ${hoursLeft.toFixed(1)} hour(s), until ${job.deadline.slice(0, 16)} UTC`;
+    console.log(`\nNOT AWARDED. This job ${how}.`);
     console.log("             Awarding now ends it early and takes that time away from anybody");
     console.log("             who has not handed in yet. Pass --vorzeitig if that is what you mean.");
     return;
@@ -256,12 +256,12 @@ async function entscheiden(bountyId: string, key: string): Promise<void> {
   // fee_percent, deadline, status, created_at, plus winner_submission. No fee_cents, so nothing
   // here may print one.
   const awarded = (await call("/v1/bounties/award", key, {
-    method: "POST", body: JSON.stringify({ bounty_id: bountyId, submission_id: gewinner }),
+    method: "POST", body: JSON.stringify({ bounty_id: bountyId, submission_id: winner }),
   })) as { status: string; award_cents: number; winner_submission: string };
   const after = ((await call("/v1/credits/balance", key)) as { balance_cents: number }).balance_cents;
 
-  console.log(`awarded ${gewinner}, status ${awarded.status}, ${awarded.award_cents} c to the winner`);
-  if (awarded.winner_submission !== gewinner) {
+  console.log(`awarded ${winner}, status ${awarded.status}, ${awarded.award_cents} c to the winner`);
+  if (awarded.winner_submission !== winner) {
     console.log(`WARNING the service recorded ${awarded.winner_submission} as the winner, not the one asked for`);
   }
   // The buyer's balance must not move: the price left it when the job was posted. Checked rather
@@ -282,8 +282,8 @@ async function entscheiden(bountyId: string, key: string): Promise<void> {
 // and `pnpm test` still exited 1, with the failure shown as "Errors 1 error" rather than as a
 // failing test. Two cycles read the "475 passed" line and moved on. ops/deploy.sh refused the
 // rollout, which is the first thing it has caught.
-const alsSkript = process.argv[1] && import.meta.url.endsWith(process.argv[1].split("/").pop() ?? "\0");
-if (alsSkript) {
+const runAsScript = process.argv[1] && import.meta.url.endsWith(process.argv[1].split("/").pop() ?? "\0");
+if (runAsScript) {
   main().catch((e) => {
     console.error("AWARD FAILED:", (e as Error).message);
     process.exit(1);

@@ -1,60 +1,63 @@
 #!/usr/bin/env python3
 """
-Erhebt beide oeffentlichen x402-Verzeichnisse und schreibt sie als CSV.
+Collects both public x402 directories and writes them as a CSV.
 
-Beide Facilitatoren veroeffentlichen ihren Katalog ohne Authentifizierung. Coinbase liefert
-zusaetzlich Nachfragedaten je Dienst (Aufrufe und zahlende Wallets der letzten 30 Tage), und das
-ist der eigentliche Wert: Es ist die einzige oeffentliche Quelle dafuer, wie viel in der
-Agenten-Oekonomie tatsaechlich gekauft statt nur angeboten wird.
+Both facilitators publish their catalogue without authentication. Coinbase additionally supplies
+per-service demand data (calls and paying wallets over the last 30 days), and that is the real
+value: it is the only public source for how much in the agent economy is actually bought instead
+of merely offered.
 
     python3 x402-verzeichnis-scan.py > 2026-09-20-x402-verzeichnis.csv
 
-Laufzeit rund zwei Minuten, keine Schluessel noetig.
+Runtime about two minutes, no keys needed.
 """
 import csv, json, sys, time, urllib.request
 
-QUELLEN = {
+SOURCES = {
     "cdp": "https://api.cdp.coinbase.com/platform/v2/x402/discovery/resources",
     "payai": "https://facilitator.payai.network/discovery/resources",
 }
-SEITE = 1000
+PAGE_SIZE = 1000
 
 
-def hole(url: str, offset: int) -> dict:
-    req = urllib.request.Request(f"{url}?limit={SEITE}&offset={offset}", headers={"Accept": "application/json"})
+def fetch(url: str, offset: int) -> dict:
+    req = urllib.request.Request(f"{url}?limit={PAGE_SIZE}&offset={offset}", headers={"Accept": "application/json"})
     with urllib.request.urlopen(req, timeout=60) as r:
         return json.load(r)
 
 
 def main() -> None:
-    schreiber = csv.writer(sys.stdout)
-    schreiber.writerow([
+    writer = csv.writer(sys.stdout)
+    # The column names stay German: they are the header of the CC0 files in this directory, which
+    # are published and documented in README.md, and x402-kennzahlen.py reads them by these names.
+    # Renaming one here would make every CSV published so far unreadable for the script beside it.
+    writer.writerow([
         "verzeichnis", "resource", "host", "x402_version", "netzwerk", "betrag_atomar",
         "last_updated", "last_called_at", "calls_30d", "unique_payers_30d", "hat_bazaar_block",
     ])
-    for name, url in QUELLEN.items():
-        offset, gesamt = 0, None
+    for name, url in SOURCES.items():
+        offset, total = 0, None
         while True:
-            d = hole(url, offset)
-            posten = d.get("items") or []
-            if gesamt is None:
-                gesamt = (d.get("pagination") or {}).get("total")
-                print(f"# {name}: {gesamt} Eintraege", file=sys.stderr)
-            if not posten:
+            d = fetch(url, offset)
+            items = d.get("items") or []
+            if total is None:
+                total = (d.get("pagination") or {}).get("total")
+                print(f"# {name}: {total} entries", file=sys.stderr)
+            if not items:
                 break
-            for p in posten:
+            for p in items:
                 q = p.get("quality") or {}
                 a = (p.get("accepts") or [{}])[0]
                 res = p.get("resource") or ""
                 host = res.split("/")[2] if res.startswith("http") and len(res.split("/")) > 2 else ""
-                schreiber.writerow([
+                writer.writerow([
                     name, res, host, p.get("x402Version"), a.get("network"),
                     a.get("maxAmountRequired") or a.get("amount"), p.get("lastUpdated"),
                     q.get("lastCalledAt"), q.get("l30DaysTotalCalls"), q.get("l30DaysUniquePayers"),
                     1 if (p.get("extensions") or {}).get("bazaar") else 0,
                 ])
-            offset += SEITE
-            if gesamt and offset >= gesamt:
+            offset += PAGE_SIZE
+            if total and offset >= total:
                 break
             time.sleep(0.2)
 

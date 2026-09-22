@@ -42,7 +42,7 @@ set -euo pipefail
 # hours and forty minutes ahead, so the script would have discarded every real reader in silence
 # until the clock caught up. `ops/deploy-window.sh` exists because of the same trap; the lesson
 # there was to take the time from the machine, and this took it from my head.
-SEIT_UTC="${CP_PIXEL_SEIT:-2026-09-22T10:07:23Z}"
+SINCE_UTC="${CP_PIXEL_SEIT:-2026-09-22T10:07:23Z}"
 
 HOURS="${1:-24}"
 KEY="${CP_SSH_KEY:-$HOME/.ssh/id_ed25519_automaton}"
@@ -70,25 +70,25 @@ if ! timeout 45 ssh -i "$KEY" -o BatchMode=yes -o ConnectTimeout=10 -o ServerAli
 fi
 fi
 
-python3 - "$HOURS" "$OWN" "$log" "$SEIT_UTC" <<'PY'
+python3 - "$HOURS" "$OWN" "$log" "$SINCE_UTC" <<'PY'
 import datetime, json, sys, collections
 
-hours, own_raw, path, pixel_seit = int(sys.argv[1]), sys.argv[2], sys.argv[3], sys.argv[4]
+hours, own_raw, path, pixels_since = int(sys.argv[1]), sys.argv[2], sys.argv[3], sys.argv[4]
 own = set(own_raw.split())
-fenster = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=hours)
-live = datetime.datetime.fromisoformat(pixel_seit.replace("Z", "+00:00"))
-jetzt = datetime.datetime.now(datetime.timezone.utc)
-if live > jetzt:
-    print(f"COULD NOT TELL: SEIT_UTC is {live:%Y-%m-%d %H:%M} UTC, which is in the future.")
-    print(f"                It is {jetzt:%Y-%m-%d %H:%M} UTC now. A go-live that has not happened")
+window = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=hours)
+live = datetime.datetime.fromisoformat(pixels_since.replace("Z", "+00:00"))
+now = datetime.datetime.now(datetime.timezone.utc)
+if live > now:
+    print(f"COULD NOT TELL: SINCE_UTC is {live:%Y-%m-%d %H:%M} UTC, which is in the future.")
+    print(f"                It is {now:%Y-%m-%d %H:%M} UTC now. A go-live that has not happened")
     print("                discards every reader, silently. Somebody typed a local clock.")
     raise SystemExit(2)
 # The later of the two: a page load has to be inside the asked-for window AND after the pixels
 # existed, or it is in a denominator it cannot belong to.
-seit = max(fenster, live)
+since = max(window, live)
 
-MARKEN = ["top", "proof", "market", "close"]
-WAS = {
+MARKS = ["top", "proof", "market", "close"]
+WHAT = {
     "top": "the first screen (control)",
     "proof": "past the proof section",
     "market": "past the live market",
@@ -96,23 +96,23 @@ WAS = {
 }
 
 # Per address: when the page was loaded, and when each pixel came back.
-seiten = collections.defaultdict(list)
+page_loads = collections.defaultdict(list)
 pixel = collections.defaultdict(lambda: collections.defaultdict(list))
-nicht_browser = collections.Counter()
+not_a_browser = collections.Counter()
 favicon = {}
-frueheste_px = None
-for roh in open(path):
-    roh = roh.strip()
-    if not roh.startswith("{"):
+earliest_px = None
+for raw in open(path):
+    raw = raw.strip()
+    if not raw.startswith("{"):
         continue
     try:
-        z = json.loads(roh)
+        entry = json.loads(raw)
     except ValueError:
         continue
-    at = datetime.datetime.fromtimestamp(z["ts"], datetime.timezone.utc)
-    r = z.get("request", {})
+    at = datetime.datetime.fromtimestamp(entry["ts"], datetime.timezone.utc)
+    r = entry.get("request", {})
     ip = r.get("remote_ip")
-    if ip in own or z.get("status") != 200:
+    if ip in own or entry.get("status") != 200:
         continue
     # A depth measurement needs a browser: lazy loading is what makes a pixel mean anything, and
     # curl, wget and our own checker fetch what they are told to and nothing else. On 2026-09-22
@@ -131,42 +131,42 @@ for roh in open(path):
     # A floor and not a count: a browser fetches the icon once and caches it, so a returning
     # reader is invisible here.
     if uri == "/favicon.ico":
-        ua_f = (r.get("headers", {}).get("User-Agent") or [""])[0]
-        if "Mozilla/" in ua_f and at >= seit:
+        ua_icon = (r.get("headers", {}).get("User-Agent") or [""])[0]
+        if "Mozilla/" in ua_icon and at >= since:
             favicon[ip] = at
         continue
     if uri != "/" and not (uri.startswith("/px/") and uri.endswith(".png")):
         continue
     ua = (r.get("headers", {}).get("User-Agent") or [""])[0]
     if "Mozilla/" not in ua:
-        nicht_browser[ua.split()[0] if ua else "(none)"] += 1
+        not_a_browser[ua.split()[0] if ua else "(none)"] += 1
         continue
     if uri.startswith("/px/") and uri.endswith(".png"):
-        if frueheste_px is None or at < frueheste_px:
-            frueheste_px = at
-    if at < seit:
+        if earliest_px is None or at < earliest_px:
+            earliest_px = at
+    if at < since:
         continue
     if uri == "/":
-        seiten[ip].append(at)
+        page_loads[ip].append(at)
     elif uri.startswith("/px/") and uri.endswith(".png"):
         pixel[ip][uri[4:-4]].append(at)
 
 # The constant checks itself. A pixel fetched before the moment we say they went live means the
 # moment is wrong, and every count under it would be drawn from the wrong window.
-frueheste = frueheste_px
-if frueheste is not None and frueheste < live:
-    print(f"COULD NOT TELL: a pixel was fetched at {frueheste:%Y-%m-%d %H:%M:%S} UTC, before the")
+earliest = earliest_px
+if earliest is not None and earliest < live:
+    print(f"COULD NOT TELL: a pixel was fetched at {earliest:%Y-%m-%d %H:%M:%S} UTC, before the")
     print(f"                {live:%Y-%m-%d %H:%M} UTC this script calls the go-live. The constant")
-    print("                SEIT_UTC is wrong, so the denominator would be too. Fix it first.")
+    print("                SINCE_UTC is wrong, so the denominator would be too. Fix it first.")
     raise SystemExit(2)
 
 print(f"How far down the landing page people got, last {hours} hours")
-print(f"  counting page loads from {seit:%Y-%m-%d %H:%M} UTC, when the pixels went live")
+print(f"  counting page loads from {since:%Y-%m-%d %H:%M} UTC, when the pixels went live")
 print()
-if nicht_browser:
-    wer = ", ".join(f"{k} {n}x" for k, n in nicht_browser.most_common(4))
-    print(f"  not counted, no browser: {wer}")
-if not seiten:
+if not_a_browser:
+    agents = ", ".join(f"{k} {n}x" for k, n in not_a_browser.most_common(4))
+    print(f"  not counted, no browser: {agents}")
+if not page_loads:
     print()
     if favicon:
         print(f"  BROKEN: {len(favicon)} browser(s) fetched /favicon.ico in this window and not one")
@@ -206,15 +206,15 @@ def took_everything_at_once(ip):
         return False
     return (max(stamps) - min(stamps)).total_seconds() < AT_ONCE_SECONDS
 
-renderers = {ip for ip in seiten if took_everything_at_once(ip)}
+renderers = {ip for ip in page_loads if took_everything_at_once(ip)}
 at_once = len(renderers)
-readers = {ip: loads for ip, loads in seiten.items() if ip not in renderers}
-mit_top = sum(1 for ip in seiten if pixel[ip].get("top"))
+readers = {ip: times for ip, times in page_loads.items() if ip not in renderers}
+with_control = sum(1 for ip in page_loads if pixel[ip].get("top"))
 
-ladungen = sum(len(v) for v in seiten.values())
-print(f"  page loads from outside: {ladungen} by {len(seiten)} address(es)")
-print(f"  fetched the control pixel: {mit_top}")
-if mit_top == 0 and favicon:
+loads = sum(len(v) for v in page_loads.values())
+print(f"  page loads from outside: {loads} by {len(page_loads)} address(es)")
+print(f"  fetched the control pixel: {with_control}")
+if with_control == 0 and favicon:
     print()
     print(f"  BROKEN: {len(favicon)} browser(s) fetched /favicon.ico in this window and not one")
     print("          fetched the control pixel. The icon needs no javascript and no lazy loading,")
@@ -222,7 +222,7 @@ if mit_top == 0 and favicon:
     for ip, at in sorted(favicon.items(), key=lambda x: x[1]):
         print(f"          {at:%m-%d %H:%M} {ip}")
     raise SystemExit(1)
-if mit_top == 0:
+if with_control == 0:
     print()
     print("  NOT MEASURING: no reader fetched the control either, so nothing here is a scroll.")
     print("                 No /favicon.ico from a browser either, so the likely reason is that")
@@ -231,7 +231,7 @@ if mit_top == 0:
     print("                 a fresh one before reading anything below.")
 elif at_once:
     print(f"  not a reader, fetched every pixel at once: {at_once}")
-if mit_top == 0:
+if with_control == 0:
     raise SystemExit(0)
 if at_once and not readers:
     print()
@@ -240,10 +240,10 @@ if at_once and not readers:
     print("             scrolling. Nothing here is a scroll, so there is no table.")
     raise SystemExit(0)
 print()
-for marke in MARKEN:
-    who = [ip for ip in readers if pixel[ip].get(marke)]
+for mark in MARKS:
+    who = [ip for ip in readers if pixel[ip].get(mark)]
     share = f"{len(who) / len(readers) * 100:.0f}%" if readers else "-"
-    print(f"  {WAS[marke]:<28} {len(who):>3} of {len(readers)}  {share}")
+    print(f"  {WHAT[mark]:<28} {len(who):>3} of {len(readers)}  {share}")
 print()
 print("  A lazy image is fetched when it comes near the viewport, which is close to being read and")
 print("  is not the same thing. This is a floor for attention, never a proof of it.")

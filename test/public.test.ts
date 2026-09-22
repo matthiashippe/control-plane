@@ -168,11 +168,11 @@ describe("public page and status", () => {
     expect(redirect.status).toBe(302);
     expect(redirect.headers.get("location")).toBe("/terms#impressum");
 
-    const ziel = await (await app.request("/terms")).text();
-    expect(ziel).toMatch(/id="impressum"/);
-    expect(ziel).toMatch(/Matthias Hippe/);
-    expect(ziel).toMatch(/San-Francisco-Straße 1/);
-    expect(ziel).toMatch(/20457 Hamburg/);
+    const terms = await (await app.request("/terms")).text();
+    expect(terms).toMatch(/id="impressum"/);
+    expect(terms).toMatch(/Matthias Hippe/);
+    expect(terms).toMatch(/San-Francisco-Straße 1/);
+    expect(terms).toMatch(/20457 Hamburg/);
 
     const start = await (await app.request("/")).text();
     expect(start, "every page has to carry the link, that is the reachable part")
@@ -270,9 +270,9 @@ describe("public page and status", () => {
     // Both, in one loop, because fixing one of them was how this drifted twice. README.md is the
     // first thing anybody sees on GitHub and carried the stale line for a day after /llms.txt was
     // pinned; docs/bounties.md is what an agent reads before it decides to compete.
-    for (const pfad of ["README.md", "docs/bounties.md"]) {
-      expect(readFileSync(pfad, "utf-8").replace(/\s+/g, " "),
-        `the page leads with "${h1}" and ${pfad} does not say it`).toContain(h1);
+    for (const path of ["README.md", "docs/bounties.md"]) {
+      expect(readFileSync(path, "utf-8").replace(/\s+/g, " "),
+        `the page leads with "${h1}" and ${path} does not say it`).toContain(h1);
     }
   });
 
@@ -381,8 +381,8 @@ describe("the questions of a sceptic", () => {
    */
   it("makes no claim about an acceptance run that the goal logs do not back", async () => {
     const html = await page();
-    const behauptet = /PROD OK|d8f8168|acceptance run/i.test(html);
-    if (!behauptet) {
+    const claimed = /PROD OK|d8f8168|acceptance run/i.test(html);
+    if (!claimed) {
       expect(html, "nothing claimed, so nothing to back").not.toMatch(/PROD OK/);
       return;
     }
@@ -622,10 +622,10 @@ describe("the market measurement stays off the landing page", () => {
     const db = openDb(":memory:");
     const html = await (await createApp({ db }).request("/")).text();
 
-    for (const zahl of [measured.distinct_services, measured.providers, measured.with_demand_data]) {
-      for (const schreibweise of [zahl.toLocaleString("en-US"), String(zahl)]) {
-        expect(html, `${schreibweise} is typed into the landing page and will be stale tomorrow`)
-          .not.toContain(schreibweise);
+    for (const figure of [measured.distinct_services, measured.providers, measured.with_demand_data]) {
+      for (const spelling of [figure.toLocaleString("en-US"), String(figure)]) {
+        expect(html, `${spelling} is typed into the landing page and will be stale tomorrow`)
+          .not.toContain(spelling);
       }
     }
     expect(html, "the measurement has to be one click away").toContain('href="/x402"');
@@ -826,19 +826,19 @@ describe("The buyer leads, not the plumbing", () => {
   it("shows a finished job before it explains the machinery", async () => {
     const { app } = setup();
     const html = await (await app.request("/")).text();
-    const mechanik = html.indexOf('id="how"');
-    const beispiel = html.indexOf("What came back");
-    const agenten = html.indexOf('id="agents"');
-    const schluss = html.indexOf('id="start"');
-    for (const [wo, was] of [[mechanik, "the diagram"], [beispiel, "the worked example"], [agenten, "the agent section"], [schluss, "the close"]] as const) {
-      expect(wo, `${was} is missing`).toBeGreaterThan(-1);
+    const diagram = html.indexOf('id="how"');
+    const example = html.indexOf("What came back");
+    const agents = html.indexOf('id="agents"');
+    const close = html.indexOf('id="start"');
+    for (const [at, label] of [[diagram, "the diagram"], [example, "the worked example"], [agents, "the agent section"], [close, "the close"]] as const) {
+      expect(at, `${label} is missing`).toBeGreaterThan(-1);
     }
     // Swapping any of these turns this red, and that is the point: the order is the argument.
     // The price section is gone from this page entirely; `/terms` carries it, and the tests above
     // read it there.
-    expect(mechanik, "how the money moves comes before the evidence").toBeLessThan(beispiel);
-    expect(beispiel, "a buyer sees the goods before the supply side").toBeLessThan(agenten);
-    expect(agenten, "and the close comes last").toBeLessThan(schluss);
+    expect(diagram, "how the money moves comes before the evidence").toBeLessThan(example);
+    expect(example, "a buyer sees the goods before the supply side").toBeLessThan(agents);
+    expect(agents, "and the close comes last").toBeLessThan(close);
   });
 
   it("proves the claim with work a reader can judge, not with adjectives", async () => {
@@ -865,20 +865,20 @@ describe("The buyer leads, not the plumbing", () => {
   it("names the failure its visitors arrive with, before it offers them work", async () => {
     const { app } = setup();
     const html = await (await app.request("/")).text();
-    const von = html.indexOf('id="agents"');
-    const bis = html.indexOf("</section>", von);
-    expect(von, "the agent section is missing").toBeGreaterThan(-1);
-    const abschnitt = html.slice(von, bis);
+    const sectionStart = html.indexOf('id="agents"');
+    const sectionEnd = html.indexOf("</section>", sectionStart);
+    expect(sectionStart, "the agent section is missing").toBeGreaterThan(-1);
+    const section = html.slice(sectionStart, sectionEnd);
 
     // The failure, in the words the reader has already read in the issue they came from.
-    expect(abschnitt, "the tier a dead billing endpoint resolves to").toContain("dead");
-    expect(abschnitt, "and what it costs them").toMatch(/zero tokens/);
-    expect(abschnitt, "and the one line that undoes it").toContain('"conwayApiUrl": "https://cp.hippe.eu"');
+    expect(section, "the tier a dead billing endpoint resolves to").toContain("dead");
+    expect(section, "and what it costs them").toMatch(/zero tokens/);
+    expect(section, "and the one line that undoes it").toContain('"conwayApiUrl": "https://cp.hippe.eu"');
 
-    const problem = abschnitt.indexOf("zero tokens");
-    const markt = abschnitt.indexOf("open jobs are public");
-    expect(markt, "the market pitch is missing").toBeGreaterThan(-1);
-    expect(problem, "their problem comes before our market").toBeLessThan(markt);
+    const problem = section.indexOf("zero tokens");
+    const market = section.indexOf("open jobs are public");
+    expect(market, "the market pitch is missing").toBeGreaterThan(-1);
+    expect(problem, "their problem comes before our market").toBeLessThan(market);
   });
 
   /**
@@ -919,15 +919,15 @@ describe("The buyer leads, not the plumbing", () => {
     const brief = html.match(/"brief":"([^"]+)"/)?.[1];
     expect(brief, "the panel no longer shows a brief to check").toBeTruthy();
 
-    const liste = html.match(/<ul class="found">([\s\S]*?)<\/ul>/)?.[1] ?? "";
-    const zeilen = [...liste.matchAll(/<li>([\s\S]*?)<\/li>/g)].map((m) => m[1].trim());
-    const befunde = reviewBrief(brief!, "factual");
+    const listHtml = html.match(/<ul class="found">([\s\S]*?)<\/ul>/)?.[1] ?? "";
+    const lines = [...listHtml.matchAll(/<li>([\s\S]*?)<\/li>/g)].map((m) => m[1].trim());
+    const findings = reviewBrief(brief!, "factual");
 
-    expect(befunde.length, "a brief with nothing to say about it proves nothing").toBeGreaterThan(0);
-    for (const b of befunde) {
-      expect(zeilen, `the check says "${b.missing}" and the page does not`).toContain(b.missing);
+    expect(findings.length, "a brief with nothing to say about it proves nothing").toBeGreaterThan(0);
+    for (const b of findings) {
+      expect(lines, `the check says "${b.missing}" and the page does not`).toContain(b.missing);
     }
-    expect(zeilen.length, "the page shows a line the check does not produce").toBe(befunde.length);
+    expect(lines.length, "the page shows a line the check does not produce").toBe(findings.length);
   });
 
   /**
@@ -953,12 +953,12 @@ describe("The buyer leads, not the plumbing", () => {
   it("claims what the daily check measures, which is the provisioning run", async () => {
     const { app } = setup();
     const html = await (await app.request("/")).text();
-    const von = html.indexOf('id="agents"');
-    const abschnitt = html.slice(von, html.indexOf("</section>", von));
-    expect(abschnitt, "the claim has to name the run ops/conway-zustand.sh exercises").toMatch(
+    const sectionStart = html.indexOf('id="agents"');
+    const section = html.slice(sectionStart, html.indexOf("</section>", sectionStart));
+    expect(section, "the claim has to name the run ops/conway-zustand.sh exercises").toMatch(
       /automaton --provision<\/code> finishes here/,
     );
-    expect(abschnitt, "and not invite a bare call that answers 400 on both sides").not.toMatch(
+    expect(section, "and not invite a bare call that answers 400 on both sides").not.toMatch(
       /The same call answers 200/i,
     );
   });
@@ -966,28 +966,28 @@ describe("The buyer leads, not the plumbing", () => {
   it("warns about the five dollars wherever it shows the config line", async () => {
     const { app } = setup();
     const html = await (await app.request("/")).text();
-    const von = html.indexOf('id="agents"');
-    expect(von, "the section with the config line is gone").toBeGreaterThan(-1);
-    const abschnitt = html.slice(von, html.indexOf("</section>", von));
-    expect(abschnitt, "the same runtime buys the $5 tier here too")
+    const sectionStart = html.indexOf('id="agents"');
+    expect(sectionStart, "the section with the config line is gone").toBeGreaterThan(-1);
+    const section = html.slice(sectionStart, html.indexOf("</section>", sectionStart));
+    expect(section, "the same runtime buys the $5 tier here too")
       .toMatch(/buys the \$5 tier here on its first start/i);
-    expect(abschnitt, "and the way out has to stand next to it").toMatch(/move the USDC out first/i);
+    expect(section, "and the way out has to stand next to it").toMatch(/move the USDC out first/i);
   });
 
   it("sends every call to action where its label promises", async () => {
     const { app } = setup();
     const html = await (await app.request("/")).text();
-    const paare = [
-      { label: /Post a job/i, ziel: "/post", weil: "a buyer who wants to post needs the path that posts" },
-      { label: /Post your first job/i, ziel: "/post", weil: "same promise, same destination" },
-      { label: /See open jobs/i, ziel: "/jobs", weil: "the open market, which is what that label means" },
+    const pairs = [
+      { label: /Post a job/i, target: "/post", why: "a buyer who wants to post needs the path that posts" },
+      { label: /Post your first job/i, target: "/post", why: "same promise, same destination" },
+      { label: /See open jobs/i, target: "/jobs", why: "the open market, which is what that label means" },
     ];
-    for (const { label, ziel, weil } of paare) {
-      const treffer = [...html.matchAll(/<a class="btn[^"]*" href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g)]
+    for (const { label, target, why } of pairs) {
+      const matches = [...html.matchAll(/<a class="btn[^"]*" href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g)]
         .filter((m) => label.test(m[2].replace(/<[^>]+>/g, "")));
-      expect(treffer.length, `no button matching ${label}`).toBeGreaterThan(0);
-      for (const m of treffer) {
-        expect(m[1], `"${m[2].replace(/<[^>]+>/g, "").trim()}" goes to ${m[1]}, and ${weil}`).toBe(ziel);
+      expect(matches.length, `no button matching ${label}`).toBeGreaterThan(0);
+      for (const m of matches) {
+        expect(m[1], `"${m[2].replace(/<[^>]+>/g, "").trim()}" goes to ${m[1]}, and ${why}`).toBe(target);
       }
     }
     // And an on-page destination has to exist, or the button scrolls nowhere.
@@ -1068,8 +1068,8 @@ describe("llms.txt and the endpoint it describes", () => {
     // take the line out and this fails, close the endpoint and this fails.
     expect(text, "the promise").toMatch(/GET \/v1\/models answers without a key/);
     expect(text, "the base URL is the other half of what they were missing").toMatch(/bare origin with no path/);
-    const ohne = await app.request("/v1/models");
-    expect(ohne.status, "and the endpoint keeps it").toBe(200);
+    const withoutKey = await app.request("/v1/models");
+    expect(withoutKey.status, "and the endpoint keeps it").toBe(200);
     expect((await app.request("/v1/models", { headers: { authorization: "cnwy_k_nope" } })).status).toBe(401);
   });
 });

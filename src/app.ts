@@ -232,7 +232,7 @@ export function createApp(opts: AppOptions) {
       if (indexHtml && c.req.path.startsWith("/v1/") && prefersHtml(c.req.header("accept"))) {
         const offer = starterOffer(db);
         return c.html(
-          seite(
+          page(
             renderApiPage(c.req.path, offer ? offer.cents : null),
             "Your browser cannot carry your key",
             "This path answers to a key in a header, and a browser does not send one. Nothing is " +
@@ -327,7 +327,7 @@ export function createApp(opts: AppOptions) {
    * the numbers that change are on the page itself. The source of the card is next to it in
    * `src/public/og-card.html`, so the next version is a screenshot away and not a mystery.
    */
-  const ogBild = (name: string): ArrayBuffer | null => {
+  const ogImage = (name: string): ArrayBuffer | null => {
     for (const candidate of [path.join(PUBLIC_DIR, name), path.resolve(`src/public/${name}`)]) {
       if (fs.existsSync(candidate)) {
         const b = fs.readFileSync(candidate);
@@ -377,8 +377,8 @@ export function createApp(opts: AppOptions) {
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
     "base64",
   );
-  for (const marke of ["top", "proof", "market", "close"]) {
-    app.get(`/px/${marke}.png`, (c) =>
+  for (const mark of ["top", "proof", "market", "close"]) {
+    app.get(`/px/${mark}.png`, (c) =>
       c.body(new Uint8Array(PIXEL), 200, {
         "Content-Type": "image/png",
         "Cache-Control": "no-store",
@@ -387,10 +387,10 @@ export function createApp(opts: AppOptions) {
   }
 
   for (const name of ["og.png", "og-x402.png"]) {
-    const bild = ogBild(name);
-    if (bild) {
+    const image = ogImage(name);
+    if (image) {
       app.get(`/${name}`, (c) =>
-        c.body(bild, 200, { "Content-Type": "image/png", "Cache-Control": "public, max-age=86400" }),
+        c.body(image, 200, { "Content-Type": "image/png", "Cache-Control": "public, max-age=86400" }),
       );
     }
   }
@@ -421,12 +421,12 @@ export function createApp(opts: AppOptions) {
    * script is deliberately not carried over; it only fills the status figures on the landing page,
    * and a page that does not need it should not ship a hash-pinned script for nothing.
    */
-  const seite = (
+  const page = (
     bodyHtml: string,
-    titel: string,
-    beschreibung: string,
-    pfad: string,
-    karte = "og.png",
+    title: string,
+    description: string,
+    pathname: string,
+    card = "og.png",
     /**
      * Extra structured-data nodes for this page, beyond the WebPage every page gets.
      *
@@ -436,19 +436,19 @@ export function createApp(opts: AppOptions) {
      */
     ld: Record<string, unknown>[] = [],
   ): string => {
-    const kopf = (indexHtml ?? "").slice(0, (indexHtml ?? "").indexOf("</head>"));
+    const head = (indexHtml ?? "").slice(0, (indexHtml ?? "").indexOf("</head>"));
     return (
-      kopf
-        .replace(/<title>[^<]*<\/title>/, `<title>${titel}</title>`)
-        .replace(/(<meta name="description" content=")[^"]*/, `$1${beschreibung}`)
-        .replace(/(<link rel="canonical" href="https:\/\/cp\.hippe\.eu)\/"/, `$1${pfad}"`)
-        .replace(/(<meta property="og:title" content=")[^"]*/, `$1${titel}`)
-        .replace(/(<meta property="og:description" content=")[^"]*/, `$1${beschreibung}`)
-        .replace(/(<meta name="twitter:title" content=")[^"]*/, `$1${titel}`)
-        .replace(/(<meta name="twitter:description" content=")[^"]*/, `$1${beschreibung}`)
-        .replace(/(<meta property="og:url" content="https:\/\/cp\.hippe\.eu)\/"/, `$1${pfad}"`)
-        .replace(/og\.png/g, karte) +
-      ldBlock(organization(), webSite(), webPage(titel, beschreibung, pfad), ...ld) +
+      head
+        .replace(/<title>[^<]*<\/title>/, `<title>${title}</title>`)
+        .replace(/(<meta name="description" content=")[^"]*/, `$1${description}`)
+        .replace(/(<link rel="canonical" href="https:\/\/cp\.hippe\.eu)\/"/, `$1${pathname}"`)
+        .replace(/(<meta property="og:title" content=")[^"]*/, `$1${title}`)
+        .replace(/(<meta property="og:description" content=")[^"]*/, `$1${description}`)
+        .replace(/(<meta name="twitter:title" content=")[^"]*/, `$1${title}`)
+        .replace(/(<meta name="twitter:description" content=")[^"]*/, `$1${description}`)
+        .replace(/(<meta property="og:url" content="https:\/\/cp\.hippe\.eu)\/"/, `$1${pathname}"`)
+        .replace(/og\.png/g, card) +
+      ldBlock(organization(), webSite(), webPage(title, description, pathname), ...ld) +
       `</head>
 <body>
 <header class="bar"><div class="wrap">
@@ -483,7 +483,7 @@ export function createApp(opts: AppOptions) {
   app.get("/x402", (c) => {
     if (!indexHtml) return c.json({ error: "no index page built" }, 503);
     return c.html(
-      seite(
+      page(
         renderX402(readSeries()),
         "How big the paid-API market for agents actually is",
         "Both public x402 directories, scanned daily. Distinct services, calls in 30 days, how concentrated the demand is, and how many services have a single paying wallet. Raw data under CC0.",
@@ -508,7 +508,7 @@ export function createApp(opts: AppOptions) {
   app.get("/terms", (c) => {
     if (!indexHtml) return c.json({ error: "no index page built" }, 503);
     return c.html(
-      seite(
+      page(
         renderTerms(),
         "Handsel: the whole of the fine print",
         "Who runs this, what the money does, what happens if it is shut down, what an agent agrees to by competing, where help is, and the two free routes that need none of it. Plus the Impressum.",
@@ -522,14 +522,14 @@ export function createApp(opts: AppOptions) {
    */
   app.get("/post", (c) => {
     if (!indexHtml) return c.json({ error: "no index page built" }, 503);
-    const titel = "How to post a job on Handsel, end to end";
-    const beschreibung =
+    const title = "How to post a job on Handsel, end to end";
+    const description =
       "Six steps, four of them a single HTTP call. Check your brief without a key, get one in three calls, post the job, read what came back, see what each agent made up, award one or none.";
     // The body is rendered once and the HowTo is read back out of it, so the markup carries the
     // steps the reader is looking at and cannot describe a version of the page that is gone.
     const body = renderPost(starterOffer(db));
-    const howto = howToFrom(body, titel, beschreibung, "/post");
-    return c.html(seite(body, titel, beschreibung, "/post", "og.png", howto ? [howto] : []));
+    const howto = howToFrom(body, title, description, "/post");
+    return c.html(page(body, title, description, "/post", "og.png", howto ? [howto] : []));
   });
 
   /**
@@ -538,7 +538,7 @@ export function createApp(opts: AppOptions) {
   app.get("/fix", (c) => {
     if (!indexHtml) return c.json({ error: "no index page built" }, 503);
     return c.html(
-      seite(
+      page(
         renderFix(),
         "Conway automaton: 500 on /v1/auth/verify, and it keeps buying credits",
         "Provisioning has failed for every fresh wallet since July 2026 while the payment endpoint still works, so the runtime buys 5 USDC of credits it never receives, every five minutes. How to stop the spending, two free ways to make it think again, and what this service does instead.",
@@ -554,7 +554,7 @@ export function createApp(opts: AppOptions) {
   app.get("/conway", (c) => {
     if (!indexHtml) return c.json({ error: "no index page built" }, 503);
     return c.html(
-      seite(
+      page(
         renderConway(readMoneySeries(), readReceipts()),
         "People are still paying Conway for credits it cannot deliver",
         "Every USDC transfer into Conway's receiving address on Base, scanned daily. How much, from how many wallets, which tiers, and the transactions behind it. Raw data under CC0.",
@@ -575,7 +575,7 @@ export function createApp(opts: AppOptions) {
     if (!indexHtml) return c.json({ error: "no index page built" }, 503);
     releaseExpired(db);
     return c.html(
-      seite(
+      page(
         renderJobs(db),
         "Open jobs on Handsel",
         "Work with the money already behind it. Full briefs, what the winner is paid, how many agents are competing, and the one call that enters.",
@@ -590,7 +590,7 @@ export function createApp(opts: AppOptions) {
   app.get("/receipts", (c) => {
     if (!indexHtml) return c.json({ error: "no index page built" }, 503);
     return c.html(
-      seite(
+      page(
         renderReceipts(db),
         "What Handsel has paid out",
         "Every job that has been paid for, with the brief, the money, who competed and the work that won it. No key needed.",
@@ -612,12 +612,12 @@ export function createApp(opts: AppOptions) {
    * Four pages, named once, so a crawler does not have to guess them from links.
    */
   app.get("/sitemap.xml", (c) => {
-    const heute = new Date().toISOString().slice(0, 10);
-    const seiten = ["/", "/fix", "/post", "/jobs", "/receipts", "/x402", "/conway", "/terms"];
+    const today = new Date().toISOString().slice(0, 10);
+    const pages = ["/", "/fix", "/post", "/jobs", "/receipts", "/x402", "/conway", "/terms"];
     return c.body(
       '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
-        seiten
-          .map((p) => `  <url><loc>https://cp.hippe.eu${p}</loc><lastmod>${heute}</lastmod></url>`)
+        pages
+          .map((p) => `  <url><loc>https://cp.hippe.eu${p}</loc><lastmod>${today}</lastmod></url>`)
           .join("\n") +
         "\n</urlset>\n",
       200,
@@ -632,7 +632,7 @@ export function createApp(opts: AppOptions) {
         .replace("<!--NUMBERS-->", renderNumbers(mcToCents(GRANT_MC), mcToCents(poolLeftMc(db))))
         .replace("<!--MARKET-->", renderMarket(db))
         .replace("<!--WALLETS-->", renderStatus(db))
-        // The landing page is served from the file and never goes through seite(), so it needs the
+        // The landing page is served from the file and never goes through page(), so it needs the
         // same graph put in by hand. Its title and description are the ones already in the file.
         .replace(
           "</head>",
@@ -731,8 +731,8 @@ export function createApp(opts: AppOptions) {
     // able to see which side of that line the service is on. Same treatment as /conway gives our
     // own transfer into Conway: counted like anybody else's and marked, never hidden.
     // One call, shared with the landing page's status line. See src/bounties/ours.ts.
-    const zahler = wallets(db, "topup");
-    const denker = wallets(db, "inference");
+    const payers = wallets(db, "topup");
+    const thinkers = wallets(db, "inference");
 
     return c.json({
       ok: true,
@@ -743,11 +743,11 @@ export function createApp(opts: AppOptions) {
       topup_tiers_usd: opts.pay?.tiers ?? TOPUP_TIERS_USD,
       automatons,
       active,
-      paying_wallets: zahler,
+      paying_wallets: payers,
       // The same split for the other count. `active` is the larger number and had no breakdown at
       // all: all eight of those addresses are ours, and the figure stood on the landing page as
       // the biggest number on the page. Additive, so nothing that reads the old fields changes.
-      thinking_wallets: denker,
+      thinking_wallets: thinkers,
       // The free tier, in the open. An agent that reads only this endpoint has to be able to see
       // that it can start without owning USDC, and how much is left before it cannot.
       starter_credit_cents: mcToCents(GRANT_MC),
@@ -1123,10 +1123,10 @@ export function createApp(opts: AppOptions) {
   // Which methods this app registered for a path, exact match only. Used twice below, and the
   // second use is the reason it exists rather than being inlined: the auth middleware has to ask
   // the same question the notFound handler asks, or it answers a method mistake with a key error.
-  const methodenFuer = (pfad: string): string[] => [
+  const methodsFor = (pathname: string): string[] => [
     ...new Set(
       (app as unknown as { routes: { path: string; method: string }[] }).routes
-        .filter((r) => r.method !== "ALL" && r.path === pfad)
+        .filter((r) => r.method !== "ALL" && r.path === pathname)
         .map((r) => r.method),
     ),
   ];
@@ -1134,7 +1134,7 @@ export function createApp(opts: AppOptions) {
   // One sentence, two callers: the middleware below and /v1/models, which does its own check so
   // that a request without a key can still see the catalogue. Two copies would drift, and a
   // message that drifts is how somebody ends up reading the wrong thing about their key.
-  const keinSchluessel = () =>
+  const invalidKeyError = () =>
     new AuthError(
       401,
       "Invalid API key",
@@ -1157,7 +1157,7 @@ export function createApp(opts: AppOptions) {
     // a 401. Tried on 2026-09-22 and reverted the same minute. The real case that was measured is
     // POST on a page, which is not on this list and is answered by the notFound handler.
     const address = resolveApiKey(db, c.req.header("authorization"));
-    if (!address) throw keinSchluessel();
+    if (!address) throw invalidKeyError();
     c.set("address", address);
     await next();
   });
@@ -1282,11 +1282,11 @@ export function createApp(opts: AppOptions) {
         404,
       );
     }
-    const selbst = (c.req.header("authorization") ?? "").replace(/^Bearer /, "").startsWith(prefix);
+    const isOwnKey = (c.req.header("authorization") ?? "").replace(/^Bearer /, "").startsWith(prefix);
     return c.json({
       key_prefix: prefix,
       revoked: true,
-      note: selbst
+      note: isOwnKey
         ? "That is the key you just used. The next call with it answers 401."
         : "Calls with that key now answer 401.",
     });
@@ -1358,7 +1358,7 @@ export function createApp(opts: AppOptions) {
    */
   app.get("/v1/models", (c) => {
     if (c.req.header("authorization") && !resolveApiKey(db, c.req.header("authorization"))) {
-      throw keinSchluessel();
+      throw invalidKeyError();
     }
     if (!opts.catalog) return c.json(INFERENCE_UNAVAILABLE, 503);
     return c.json(opts.catalog.listModels());
@@ -1832,15 +1832,15 @@ export function createApp(opts: AppOptions) {
     // Hono knows which methods it registered, so this needs no list and cannot fall behind one.
     // Exact path match only: a pattern route like /px/:name would not compare, and a 405 for a
     // path that truly does not exist would be worse than the 404 it replaces.
-    const erlaubt = methodenFuer(c.req.path);
-    if (erlaubt.length > 0) {
-      const liste = [...erlaubt].sort();
-      c.header("Allow", liste.join(", "));
+    const allowed = methodsFor(c.req.path);
+    if (allowed.length > 0) {
+      const list = [...allowed].sort();
+      c.header("Allow", list.join(", "));
       return c.json(
         {
           error: "method_not_allowed",
-          message: `${c.req.path} accepts ${liste.join(" and ")}, not ${c.req.method}.`,
-          allow: liste,
+          message: `${c.req.path} accepts ${list.join(" and ")}, not ${c.req.method}.`,
+          allow: list,
           docs: DOC.service,
         },
         405,

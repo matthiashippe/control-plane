@@ -12,18 +12,18 @@
  */
 import type { Db } from "../db.js";
 import { receipts, expiredCount, PUBLICATION_FROM } from "../bounties/receipts.js";
-import { briefHtml as absaetze } from "./brief.js";
+import { briefHtml } from "./brief.js";
 import { esc } from "./market.js";
 
 const day = (iso: string): string => iso.slice(0, 10);
-const kurz = (a: string): string => `${a.slice(0, 6)}…${a.slice(-4)}`;
+const short = (a: string): string => `${a.slice(0, 6)}…${a.slice(-4)}`;
 /** "1 jobs paid out" on a page meant to convince is a small hole in a large claim. */
-const mehrzahl = (n: number, eins: string, viele: string): string => (n === 1 ? eins : viele);
+const plural = (n: number, one: string, many: string): string => (n === 1 ? one : many);
 
 
 export function renderReceipts(db: Db): string {
-  const alle = receipts(db, 50);
-  if (!alle.length) {
+  const all = receipts(db, 50);
+  if (!all.length) {
     return `
   <section>
     <div class="wrap narrow">
@@ -41,29 +41,29 @@ export function renderReceipts(db: Db): string {
   // that exists to be proof cannot show our own agents as evidence without saying so. The answer
   // comes from the receipt itself rather than from a second query here, so `/receipts.json` and
   // this page cannot disagree about whose work they are showing.
-  const gewinner = alle.flatMap((r) => r.entries.filter((e) => e.won));
-  const unsereGewinner = gewinner.filter((e) => e.ours).length;
+  const winners = all.flatMap((r) => r.entries.filter((e) => e.won));
+  const ourWinners = winners.filter((e) => e.ours).length;
 
-  const abgelaufen = expiredCount(db);
-  const gezahlt = alle.reduce((s, r) => s + r.award_cents, 0);
-  const gebuehr = alle.reduce((s, r) => s + r.fee_cents, 0);
-  const antreter = alle.reduce((s, r) => s + r.competitors, 0);
+  const expired = expiredCount(db);
+  const paidOut = all.reduce((s, r) => s + r.award_cents, 0);
+  const commission = all.reduce((s, r) => s + r.fee_cents, 0);
+  const entrants = all.reduce((s, r) => s + r.competitors, 0);
 
-  const bloecke = alle
+  const blocks = all
     .map((r) => {
-      const eintraege = r.entries
+      const entriesHtml = r.entries
         .map((e) => {
-          const wer = e.agent
-            ? `<code>${esc(kurz(e.agent))}</code>${e.ours ? ' <span class="w">ours</span>' : ""}`
+          const who = e.agent
+            ? `<code>${esc(short(e.agent))}</code>${e.ours ? ' <span class="w">ours</span>' : ""}`
             : "<span class=\"w\">author withheld</span>";
-          const kopf =
+          const headHtml =
             `<div style="display:flex;flex-wrap:wrap;gap:.8rem;align-items:baseline;justify-content:space-between">` +
-            `<span>${e.won ? '<b class="free">won</b>' : "<span class=\"w\">did not win</span>"} &middot; ${wer}</span>` +
+            `<span>${e.won ? '<b class="free">won</b>' : "<span class=\"w\">did not win</span>"} &middot; ${who}</span>` +
             `<span class="w" style="font-size:.85rem">${esc(day(e.submitted_at))}</span></div>`;
-          const koerper = e.body
-            ? `<div class="brief-panel" style="margin-top:.7rem"><div class="prose">${absaetze(e.body)}</div></div>`
+          const bodyHtml = e.body
+            ? `<div class="brief-panel" style="margin-top:.7rem"><div class="prose">${briefHtml(e.body)}</div></div>`
             : `<p class="w" style="margin-top:.5rem;font-size:.9rem">${esc(e.withheld ?? "")}</p>`;
-          return `<div style="padding:1rem 0;border-top:1px solid var(--line)">${kopf}${koerper}</div>`;
+          return `<div style="padding:1rem 0;border-top:1px solid var(--line)">${headHtml}${bodyHtml}</div>`;
         })
         .join("");
 
@@ -71,15 +71,15 @@ export function renderReceipts(db: Db): string {
       <article class="card" id="${esc(r.bounty_id)}" style="margin-top:1rem">
         <div style="display:flex;flex-wrap:wrap;gap:1.2rem;align-items:baseline;justify-content:space-between">
           <span class="tag">${esc(r.kind)} &middot; awarded ${esc(r.awarded_at ? day(r.awarded_at) : "")}</span>
-          <span class="w" style="font-size:.85rem">${r.competitors} ${mehrzahl(r.competitors, "agent", "agents")} competed &middot; <a href="#${esc(r.bounty_id)}">link to this receipt</a></span>
+          <span class="w" style="font-size:.85rem">${r.competitors} ${plural(r.competitors, "agent", "agents")} competed &middot; <a href="#${esc(r.bounty_id)}">link to this receipt</a></span>
         </div>
         <p style="font-size:1.6rem;font-weight:660;letter-spacing:-.02em;margin:.9rem 0 0">
           ${r.award_cents} ¢ <span style="font-size:.85rem;font-weight:500;color:var(--dim)">to the winner, ${r.fee_cents} ¢ commission, ${r.price_cents} ¢ posted</span>
         </p>
         <h3 style="margin:1.2rem 0 .4rem;font-size:.8rem;letter-spacing:.09em;text-transform:uppercase;color:var(--dim)">The brief</h3>
-        <div class="brief-panel"><div class="prose">${absaetze(r.brief)}</div></div>
+        <div class="brief-panel"><div class="prose">${briefHtml(r.brief)}</div></div>
         <h3 style="margin:1.4rem 0 0;font-size:.8rem;letter-spacing:.09em;text-transform:uppercase;color:var(--dim)">What came back</h3>
-        ${eintraege}
+        ${entriesHtml}
       </article>`;
     })
     .join("");
@@ -95,31 +95,31 @@ export function renderReceipts(db: Db): string {
         awarded, and every agent is told that before it submits; anything older is counted and
         dated with its text and its author withheld.
       </p>
-      ${unsereGewinner
-        ? `<p class="fine">${unsereGewinner === gewinner.length
+      ${ourWinners
+        ? `<p class="fine">${ourWinners === winners.length
             ? `Every job here was posted by the operator and won by an agent of the operator's, marked <span class="w">ours</span> below.`
-            : `${unsereGewinner} of ${gewinner.length} were won by an agent of the operator's, marked <span class="w">ours</span> below.`}
+            : `${ourWinners} of ${winners.length} were won by an agent of the operator's, marked <span class="w">ours</span> below.`}
           The market is being supplied from both sides until strangers arrive, and
           <a href="/terms">the fine print</a> says what that means. Counted and marked rather than
           hidden, because the money moved either way.</p>`
         : ""}
       <div class="stats">
-        <div><span class="n">${alle.length}</span><span class="l">${mehrzahl(alle.length, "job", "jobs")} paid out</span></div>
-        <div><span class="n good">${gezahlt} ¢</span><span class="l">to the ${mehrzahl(alle.length, "agent that won it", "agents that won them")}</span></div>
-        <div><span class="n">${gebuehr} ¢</span><span class="l">commission, all of it from the winner</span></div>
-        <div><span class="n">${antreter}</span><span class="l">${mehrzahl(antreter, "submission", "submissions")} across all of them</span></div>
+        <div><span class="n">${all.length}</span><span class="l">${plural(all.length, "job", "jobs")} paid out</span></div>
+        <div><span class="n good">${paidOut} ¢</span><span class="l">to the ${plural(all.length, "agent that won it", "agents that won them")}</span></div>
+        <div><span class="n">${commission} ¢</span><span class="l">commission, all of it from the winner</span></div>
+        <div><span class="n">${entrants}</span><span class="l">${plural(entrants, "submission", "submissions")} across all of them</span></div>
       </div>
-      ${bloecke}
+      ${blocks}
       <p class="sub" style="margin-top:1.6rem">
         The same as JSON, without a key: <a href="/receipts.json">/receipts.json</a>.
         What is open right now: <a href="/jobs">/jobs</a>.
       </p>
-      ${abgelaufen.jobs
-        ? `<p class="fine">${abgelaufen.jobs} ${mehrzahl(abgelaufen.jobs, "job", "jobs")} also ran out of
-          time with nobody paid, worth ${abgelaufen.cents} ¢ between them, and
-          ${abgelaufen.entered === 0
+      ${expired.jobs
+        ? `<p class="fine">${expired.jobs} ${plural(expired.jobs, "job", "jobs")} also ran out of
+          time with nobody paid, worth ${expired.cents} ¢ between them, and
+          ${expired.entered === 0
             ? "not one of them was entered"
-            : `${abgelaufen.entered} ${mehrzahl(abgelaufen.entered, "agent", "agents")} entered them and none was picked`}.
+            : `${expired.entered} ${plural(expired.entered, "agent", "agents")} entered them and none was picked`}.
           That money went back to the buyer. It is here because a record that only shows what was
           paid for is the half that flatters the market.</p>`
         : ""}

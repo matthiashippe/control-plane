@@ -1,18 +1,18 @@
 /**
- * Was dieser Dienst verkauft, in der Form, die ein x402-Facilitator in sein Verzeichnis übernimmt.
+ * What this service sells, in the shape an x402 facilitator takes into its directory.
  *
- * Ein Facilitator katalogisiert einen Verkäufer als Nebenwirkung einer Zahlung: Der Verkäufer
- * deklariert den Eintrag in `extensions`, der Facilitator übernimmt ihn bei `/verify` oder
- * `/settle`. Einen Anmeldeweg gibt es nicht, also bleibt ein Verkäufer ohne Deklaration für immer
- * unsichtbar, gleichgültig wie viele Zahlungen er abwickelt (PayAI-Doku, geprüft 20.09.2026).
+ * A facilitator catalogues a seller as a side effect of a payment: the seller declares the entry
+ * in `extensions`, and the facilitator takes it over on `/verify` or `/settle`. There is no
+ * sign-up route, so a seller without a declaration stays invisible forever, no matter how many
+ * payments it settles (PayAI docs, checked 20.09.2026).
  *
- * Das Verzeichnis ist die einzige Stelle, an der ein fremder Automat diesen Dienst findet, ohne
- * dass ein Mensch ihn empfiehlt: PayAI führte am 20.09.2026 6.584 Einträge, davon keinen einzigen
- * mit Bezug zur Conway-Runtime.
+ * The directory is the only place where an automaton that is not ours finds this service without
+ * a human recommending it: on 20.09.2026 PayAI carried 6,584 entries, not one of them with any
+ * reference to the Conway runtime.
  *
- * Gegen `POST /verify` von PayAI geprüft: mit und ohne diesen Block antwortet der Facilitator
- * identisch (`invalid_exact_evm_signature` bei erfundener Signatur), das Zusatzfeld stört das
- * Settlement also nicht.
+ * Checked against `POST /verify` at PayAI: with and without this block the facilitator answers
+ * identically (`invalid_exact_evm_signature` for an invented signature), so the extra field does
+ * not disturb settlement.
  */
 export const BAZAAR_DESCRIPTION =
   "Prepaid inference credits for the unmodified Conway automaton runtime: SIWE provisioning, " +

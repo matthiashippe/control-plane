@@ -19,31 +19,31 @@
 import { esc } from "./market.js";
 
 /** How far short of the longest line a line may stop and still count as wrapped, not ended. */
-const TOLERANZ = 12;
+const TOLERANCE = 12;
 /** Below this, a paragraph has no reliable wrap column and every break is taken as intended. */
-const MINDESTBREITE = 40;
+const MIN_WIDTH = 40;
 
 export function briefHtml(brief: string): string {
   return brief
     .split(/\n{2,}/)
-    .map((absatz) => `<p>${absatzHtml(absatz.trim())}</p>`)
+    .map((paragraph) => `<p>${paragraphHtml(paragraph.trim())}</p>`)
     .join("");
 }
 
-function absatzHtml(absatz: string): string {
-  const zeilen = absatz.split("\n");
-  if (zeilen.length === 1) return esc(absatz);
+function paragraphHtml(paragraph: string): string {
+  const lines = paragraph.split("\n");
+  if (lines.length === 1) return esc(paragraph);
 
-  const breite = Math.max(...zeilen.map((z) => z.length));
-  if (breite < MINDESTBREITE) return zeilen.map((z) => esc(z)).join("<br>");
+  const width = Math.max(...lines.map((ln) => ln.length));
+  if (width < MIN_WIDTH) return lines.map((ln) => esc(ln)).join("<br>");
 
   let out = "";
-  zeilen.forEach((zeile, i) => {
-    out += esc(zeile);
-    if (i === zeilen.length - 1) return;
+  lines.forEach((line, i) => {
+    out += esc(line);
+    if (i === lines.length - 1) return;
     // Reached the wrap column, so the break belongs to the wrapper and the next line continues
     // this sentence. A space, not a break.
-    out += zeile.length >= breite - TOLERANZ ? " " : "<br>";
+    out += line.length >= width - TOLERANCE ? " " : "<br>";
   });
   return out;
 }

@@ -13,8 +13,8 @@ import { createApp } from "../src/app.js";
 import { mcToCents, openDb } from "../src/db.js";
 import { GRANT_MC } from "../src/credits/starter.js";
 
-const page = async (pfad: string): Promise<string> =>
-  (await createApp({ db: openDb(":memory:") }).request(pfad)).text();
+const page = async (path: string): Promise<string> =>
+  (await createApp({ db: openDb(":memory:") }).request(path)).text();
 
 describe("/post", () => {
   it("is where the landing page's primary button leads", async () => {
@@ -27,15 +27,15 @@ describe("/post", () => {
     // The class changed with the page on 2026-09-21 (btn-primary became btn-1). Found by the
     // first button in the hero instead, which is the thing the rule is about: whatever the primary
     // button is called, it must not hand a buyer the agents' page.
-    const knopf = html.indexOf('class="btn btn-1"');
-    expect(knopf, "the primary button is gone").toBeGreaterThan(-1);
-    expect(html.slice(knopf, knopf + 200), "the primary button must not send a buyer to the agents' page")
+    const button = html.indexOf('class="btn btn-1"');
+    expect(button, "the primary button is gone").toBeGreaterThan(-1);
+    expect(html.slice(button, button + 200), "the primary button must not send a buyer to the agents' page")
       .not.toContain('href="/jobs"');
   });
 
   it("names every call the buyer's path needs, in order", async () => {
     const html = await page("/post");
-    const schritte = [
+    const steps = [
       "/v1/briefs/check",   // 1. without a key
       "/v1/bounties",       // 3. post
       "/v1/submissions",    // 4. read
@@ -43,12 +43,12 @@ describe("/post", () => {
       "/v1/bounties/award", // 6. award
       "/v1/bounties/cancel",
     ];
-    let zuletzt = -1;
-    for (const schritt of schritte) {
-      const wo = html.indexOf(schritt);
-      expect(wo, `${schritt} is missing from the buyer's path`).toBeGreaterThan(-1);
-      expect(wo, `${schritt} comes before the step it depends on`).toBeGreaterThan(zuletzt);
-      zuletzt = wo;
+    let previous = -1;
+    for (const step of steps) {
+      const pos = html.indexOf(step);
+      expect(pos, `${step} is missing from the buyer's path`).toBeGreaterThan(-1);
+      expect(pos, `${step} comes before the step it depends on`).toBeGreaterThan(previous);
+      previous = pos;
     }
   });
 
@@ -77,10 +77,10 @@ describe("/post", () => {
    */
   it("shows an example price the free starter credit actually covers", async () => {
     const html = await page("/post");
-    const preise = [...html.matchAll(/"price_cents":\s*(\d+)/g)].map((m) => Number(m[1]));
-    expect(preise.length, "the posting example is gone").toBeGreaterThan(0);
-    for (const preis of preise) {
-      expect(preis, `${preis} cents is more than the ${mcToCents(GRANT_MC)} cent grant, so the first call fails`)
+    const prices = [...html.matchAll(/"price_cents":\s*(\d+)/g)].map((m) => Number(m[1]));
+    expect(prices.length, "the posting example is gone").toBeGreaterThan(0);
+    for (const price of prices) {
+      expect(price, `${price} cents is more than the ${mcToCents(GRANT_MC)} cent grant, so the first call fails`)
         .toBeLessThanOrEqual(mcToCents(GRANT_MC));
     }
     expect(html, "and the page says so, rather than leaving it to be noticed").toMatch(

@@ -95,8 +95,8 @@ export function wallets(db: Db, kind: "topup" | "inference"): { total: number; n
   const addresses = (
     db.prepare("SELECT DISTINCT address FROM ledger WHERE kind = ?").all(kind) as { address: string }[]
   ).map((r) => r.address);
-  const unsere = ourAddresses(db, addresses);
-  return { total: addresses.length, not_ours: addresses.length - unsere.size };
+  const ourOwn = ourAddresses(db, addresses);
+  return { total: addresses.length, not_ours: addresses.length - ourOwn.size };
 }
 
 /**
@@ -114,8 +114,8 @@ export function agentsPerBounty(
   db: Db,
   bountyIds: string[],
 ): Map<string, { total: number; not_ours: number }> {
-  const raus = new Map<string, { total: number; not_ours: number }>();
-  if (!bountyIds.length) return raus;
+  const perBounty = new Map<string, { total: number; not_ours: number }>();
+  if (!bountyIds.length) return perBounty;
   const rows = db
     .prepare(
       `SELECT bounty_id, agent FROM submissions
@@ -123,12 +123,12 @@ export function agentsPerBounty(
         GROUP BY bounty_id, agent`,
     )
     .all(...bountyIds) as { bounty_id: string; agent: string }[];
-  const unsere = ourAddresses(db, rows.map((r) => r.agent));
-  for (const id of bountyIds) raus.set(id, { total: 0, not_ours: 0 });
+  const ourOwn = ourAddresses(db, rows.map((r) => r.agent));
+  for (const id of bountyIds) perBounty.set(id, { total: 0, not_ours: 0 });
   for (const r of rows) {
-    const eintrag = raus.get(r.bounty_id)!;
-    eintrag.total += 1;
-    if (!unsere.has(r.agent.toLowerCase())) eintrag.not_ours += 1;
+    const entry = perBounty.get(r.bounty_id)!;
+    entry.total += 1;
+    if (!ourOwn.has(r.agent.toLowerCase())) entry.not_ours += 1;
   }
-  return raus;
+  return perBounty;
 }

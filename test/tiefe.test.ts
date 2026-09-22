@@ -13,14 +13,14 @@ import { describe, expect, it } from "vitest";
 import { createApp } from "../src/app.js";
 import { openDb } from "../src/db.js";
 
-const MARKEN = ["top", "proof", "market", "close"] as const;
+const MARKS = ["top", "proof", "market", "close"] as const;
 
 describe("how far down the page a reader got", () => {
   it("serves a one-pixel PNG at each mark, uncached", async () => {
     const app = createApp({ db: openDb(":memory:") });
-    for (const marke of MARKEN) {
-      const res = await app.request(`/px/${marke}.png`);
-      expect(res.status, `/px/${marke}.png`).toBe(200);
+    for (const mark of MARKS) {
+      const res = await app.request(`/px/${mark}.png`);
+      expect(res.status, `/px/${mark}.png`).toBe(200);
       expect(res.headers.get("content-type")).toBe("image/png");
       // A cached pixel is a reader the count loses, so it must not be cacheable.
       expect(res.headers.get("cache-control"), "no-store or the second visit is invisible").toBe("no-store");
@@ -32,9 +32,9 @@ describe("how far down the page a reader got", () => {
 
   it("puts every mark on the page, lazy and out of the way", async () => {
     const html = await (await createApp({ db: openDb(":memory:") }).request("/")).text();
-    for (const marke of MARKEN) {
-      const tag = html.match(new RegExp(`<img src="/px/${marke}\\.png"[^>]*>`))?.[0];
-      expect(tag, `/px/${marke}.png is not on the page`).toBeTruthy();
+    for (const mark of MARKS) {
+      const tag = html.match(new RegExp(`<img src="/px/${mark}\\.png"[^>]*>`))?.[0];
+      expect(tag, `/px/${mark}.png is not on the page`).toBeTruthy();
       // Without lazy the image is fetched on load and the mark says nothing about depth.
       expect(tag, "lazy is the whole mechanism").toContain('loading="lazy"');
       expect(tag, "a pixel a screen reader announces is a pixel that costs something").toContain('aria-hidden="true"');
@@ -48,12 +48,12 @@ describe("how far down the page a reader got", () => {
     // instead of reporting a scroll that never happened. That only works if it really is at the
     // top, so the order is pinned here.
     const html = await (await createApp({ db: openDb(":memory:") }).request("/")).text();
-    const wo = (m: string) => html.indexOf(`/px/${m}.png`);
-    expect(wo("top"), "the control has to be in the first screen").toBeLessThan(html.indexOf('id="proof"'));
-    expect(wo("top")).toBeLessThan(wo("proof"));
-    expect(wo("proof")).toBeLessThan(wo("market"));
-    expect(wo("market")).toBeLessThan(wo("close"));
-    expect(wo("close"), "the last mark belongs after the market").toBeGreaterThan(html.indexOf('id="agents"'));
+    const posOf = (m: string) => html.indexOf(`/px/${m}.png`);
+    expect(posOf("top"), "the control has to be in the first screen").toBeLessThan(html.indexOf('id="proof"'));
+    expect(posOf("top")).toBeLessThan(posOf("proof"));
+    expect(posOf("proof")).toBeLessThan(posOf("market"));
+    expect(posOf("market")).toBeLessThan(posOf("close"));
+    expect(posOf("close"), "the last mark belongs after the market").toBeGreaterThan(html.indexOf('id="agents"'));
   });
 
   it("asks for nothing a reader did not already send", async () => {
@@ -61,7 +61,7 @@ describe("how far down the page a reader got", () => {
     // every page view already lands in, which is the only reason this is proportionate at all.
     const html = await (await createApp({ db: openDb(":memory:") }).request("/")).text();
     const tags = [...html.matchAll(/<img src="\/px\/[^"]+"[^>]*>/g)].map((m) => m[0]);
-    expect(tags).toHaveLength(MARKEN.length);
+    expect(tags).toHaveLength(MARKS.length);
     for (const tag of tags) {
       expect(tag, "no query string, so nothing can be smuggled into the log").not.toMatch(/\?/);
       expect(tag).not.toMatch(/crossorigin|referrerpolicy=["']unsafe/i);

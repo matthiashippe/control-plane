@@ -20,7 +20,7 @@ mkdir -p "$TARGET/roh"
 tmp="$(mktemp)"
 # The error output of the scan is only named at the end. Before, it was always called
 # `letzter-lauf.err`, even after a clean run, and then sat in the directory carrying nothing but the
-# progress lines ("# cdp: 14960 Eintraege"). Whoever looks reads an error message that is none; on
+# progress lines ("# cdp: 14960 entries"). Whoever looks reads an error message that is none; on
 # 20.09.2026 exactly that cost a loop cycle. Now it is only called `.err` when the run failed.
 stderr_tmp="$(mktemp)"
 trap 'rm -f "$tmp" "$stderr_tmp"' EXIT

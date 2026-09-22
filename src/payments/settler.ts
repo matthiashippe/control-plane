@@ -1,9 +1,9 @@
 /**
- * Settlement einer EIP-3009-Autorisierung (x402 "exact", USDC).
+ * Settlement of an EIP-3009 authorization (x402 "exact", USDC).
  *
- * Im Betrieb übernimmt das ein externer Facilitator (CDP oder PayAI; Goal 5), das Control Plane
- * settlet nie selbst (Regulatorik, docs/research 6.3). Der LocalSettler existiert nur für den
- * Harness: er schickt `transferWithAuthorization` an eine lokale Anvil-Chain.
+ * In production an external facilitator handles this (CDP or PayAI; Goal 5), the control plane
+ * never settles itself (regulation, docs/research 6.3). LocalSettler exists only for the harness:
+ * it sends `transferWithAuthorization` to a local Anvil chain.
  */
 
 import {
@@ -35,7 +35,7 @@ export interface SettleResult {
 
 export interface Settler {
   readonly kind: string;
-  /** `resource` ist der Pfad des bezahlten Requests (Facilitatoren wollen ihn in den Requirements). */
+  /** `resource` is the path of the paid request (facilitators want it in the requirements). */
   settle(auth: Authorization, signature: Hex, resource?: string): Promise<SettleResult>;
 }
 
@@ -63,11 +63,11 @@ export interface LocalSettlerConfig {
   rpcUrl: string;
   chainId: number;
   usdcAddress: Address;
-  /** Relayer, der die Transaktion sendet und Gas zahlt (Anvil-Account). */
+  /** Relayer that sends the transaction and pays the gas (Anvil account). */
   relayerKey: Hex;
 }
 
-/** Nur für den Harness. Sendet die Autorisierung selbst an die Chain. */
+/** Harness only. Sends the authorization to the chain itself. */
 export class LocalSettler implements Settler {
   readonly kind = "local";
   private readonly chain;
@@ -109,12 +109,12 @@ export class LocalSettler implements Settler {
   }
 }
 
-/** Baut den Settler aus der Umgebung. Ohne CP_SETTLER gibt es keinen, /pay antwortet dann 503. */
+/** Builds the settler from the environment. Without CP_SETTLER there is none and /pay answers 503. */
 export function settlerFromEnv(env: NodeJS.ProcessEnv, pay: PayConfig | null): Settler | null {
   const kind = env.CP_SETTLER;
   if (!kind) return null;
   if (kind === "facilitator") {
-    if (!pay) throw new Error("CP_SETTLER=facilitator braucht CP_PAY_TO");
+    if (!pay) throw new Error("CP_SETTLER=facilitator needs CP_PAY_TO");
     return new FacilitatorSettler({
       url: env.CP_FACILITATOR_URL || "https://facilitator.payai.network",
       authHeader: env.CP_FACILITATOR_AUTH || undefined,
@@ -130,9 +130,9 @@ export function settlerFromEnv(env: NodeJS.ProcessEnv, pay: PayConfig | null): S
     const usdcAddress = env.CP_USDC_ADDRESS as Address | undefined;
     const chainId = Number(env.CP_CHAIN_ID || 8453);
     if (!rpcUrl || !relayerKey || !usdcAddress) {
-      throw new Error("CP_SETTLER=local braucht CP_RPC_URL, CP_SETTLER_KEY und CP_USDC_ADDRESS");
+      throw new Error("CP_SETTLER=local needs CP_RPC_URL, CP_SETTLER_KEY and CP_USDC_ADDRESS");
     }
     return new LocalSettler({ rpcUrl, relayerKey, usdcAddress, chainId });
   }
-  throw new Error(`Unbekannter CP_SETTLER: ${kind}`);
+  throw new Error(`Unknown CP_SETTLER: ${kind}`);
 }

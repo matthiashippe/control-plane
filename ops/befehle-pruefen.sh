@@ -32,26 +32,26 @@ import sys
 import urllib.error
 import urllib.request
 
-basis = sys.argv[1].rstrip("/")
-SEITEN = ["/", "/post", "/jobs", "/fix", "/conway", "/x402", "/terms", "/receipts"]
-KOPF = {"User-Agent": "control-plane-check/1.0 (+https://cp.hippe.eu)"}
-fehler = 0
-geprueft = 0
+base = sys.argv[1].rstrip("/")
+PAGES = ["/", "/post", "/jobs", "/fix", "/conway", "/x402", "/terms", "/receipts"]
+HEADERS = {"User-Agent": "control-plane-check/1.0 (+https://cp.hippe.eu)"}
+failures = 0
+checked = 0
 
 
-def hole(pfad: str) -> str:
-    req = urllib.request.Request(basis + pfad, headers=KOPF)
+def fetch(path: str) -> str:
+    req = urllib.request.Request(base + path, headers=HEADERS)
     with urllib.request.urlopen(req, timeout=20) as r:
         return r.read().decode("utf-8", "replace")
 
 
-def ruf(url: str, daten: bytes | None, ist_post: bool) -> tuple[int, str]:
-    kopf = dict(KOPF)
-    if ist_post:
-        kopf["content-type"] = "application/json"
+def call(url: str, data: bytes | None, is_post: bool) -> tuple[int, str]:
+    headers = dict(HEADERS)
+    if is_post:
+        headers["content-type"] = "application/json"
     req = urllib.request.Request(
-        url, data=daten if daten is not None else (b"" if ist_post else None),
-        headers=kopf, method="POST" if ist_post else "GET",
+        url, data=data if data is not None else (b"" if is_post else None),
+        headers=headers, method="POST" if is_post else "GET",
     )
     try:
         with urllib.request.urlopen(req, timeout=25) as r:
@@ -60,95 +60,95 @@ def ruf(url: str, daten: bytes | None, ist_post: bool) -> tuple[int, str]:
         return e.code, e.read().decode("utf-8", "replace")
 
 
-def bloecke(seite: str) -> list[str]:
+def blocks(page: str) -> list[str]:
     # The stylesheet carries a comment containing the literal <pre>, so the style and script
     # blocks come out before anything is extracted. Without that the first "command" found on
     # /post is a sentence about CSS.
-    ohne = re.sub(r"<(style|script)\b[\s\S]*?</\1>", "", seite, flags=re.I)
-    roh = [htmlmod.unescape(re.sub(r"<[^>]+>", "", m)) for m in re.findall(r"<pre>([\s\S]*?)</pre>", ohne)]
+    stripped = re.sub(r"<(style|script)\b[\s\S]*?</\1>", "", page, flags=re.I)
+    raw = [htmlmod.unescape(re.sub(r"<[^>]+>", "", m)) for m in re.findall(r"<pre>([\s\S]*?)</pre>", stripped)]
     # One <pre> can carry several commands: on /post award and cancel share a block, and reading
     # only the first would claim more in the summary than was asked.
-    befehle = []
-    for block in roh:
-        teile = re.split(r"\n(?=\s*curl\b)", block)
-        befehle.extend(t for t in teile if t.strip())
-    return befehle
+    commands = []
+    for block in raw:
+        parts = re.split(r"\n(?=\s*curl\b)", block)
+        commands.extend(t for t in parts if t.strip())
+    return commands
 
 
-print(f"The commands the pages show, run against {basis}")
+print(f"The commands the pages show, run against {base}")
 print()
 
-for pfad in SEITEN:
+for path in PAGES:
     try:
-        seite = hole(pfad)
+        page = fetch(path)
     except Exception as e:  # noqa: BLE001
-        print(f"COULD NOT TELL: {pfad} was not readable ({e}).")
+        print(f"COULD NOT TELL: {path} was not readable ({e}).")
         raise SystemExit(2)
 
-    for block in bloecke(seite):
+    for block in blocks(page):
         if "curl" not in block:
             continue
         m = re.search(r"(https://cp\.hippe\.eu|http://127\.0\.0\.1:\d+)(/[\w/.?=$&-]*)", block)
         if not m:
             continue
-        url = basis + m.group(2)
+        url = base + m.group(2)
         # A placeholder id or query is not a call anybody can make; the endpoint is still the claim.
         url = re.sub(r"\?.*$", "", url)
-        braucht_key = "authorization" in block.lower()
-        rumpf = re.search(r"-d '([\s\S]*?)'", block)
-        daten = rumpf.group(1).encode() if rumpf else None
-        ist_post = daten is not None
-        geprueft += 1
+        needs_key = "authorization" in block.lower()
+        body_match = re.search(r"-d '([\s\S]*?)'", block)
+        data = body_match.group(1).encode() if body_match else None
+        is_post = data is not None
+        checked += 1
 
-        if braucht_key:
-            code, text = ruf(url, daten or b"{}", True)
+        if needs_key:
+            code, text = call(url, data or b"{}", True)
             if code != 401:
-                print(f"  FAILED  {pfad} shows {m.group(2)}, which answers {code} without a key, not 401")
-                fehler += 1
+                print(f"  FAILED  {path} shows {m.group(2)}, which answers {code} without a key, not 401")
+                failures += 1
                 continue
             try:
-                koerper = json.loads(text)
+                body = json.loads(text)
             except ValueError:
-                print(f"  FAILED  {pfad}: {m.group(2)} answers 401 with something that is not JSON")
-                fehler += 1
+                print(f"  FAILED  {path}: {m.group(2)} answers 401 with something that is not JSON")
+                failures += 1
                 continue
-            if "docs" not in koerper or "message" not in koerper:
-                print(f"  FAILED  {pfad}: the 401 on {m.group(2)} carries no message or no docs link")
-                fehler += 1
+            if "docs" not in body or "message" not in body:
+                print(f"  FAILED  {path}: the 401 on {m.group(2)} carries no message or no docs link")
+                failures += 1
                 continue
-            print(f"  ok      {pfad}: {m.group(2)} answers 401 with a message and a docs link")
+            print(f"  ok      {path}: {m.group(2)} answers 401 with a message and a docs link")
         else:
-            code, text = ruf(url, daten, ist_post)
+            code, text = call(url, data, is_post)
             if code != 200:
-                print(f"  FAILED  {pfad} shows {m.group(2)} as a call anybody can make, and it answers {code}")
-                fehler += 1
+                print(f"  FAILED  {path} shows {m.group(2)} as a call anybody can make, and it answers {code}")
+                failures += 1
                 continue
-            print(f"  ok      {pfad}: {m.group(2)} answers 200, exactly as printed")
+            print(f"  ok      {path}: {m.group(2)} answers 200, exactly as printed")
 
             # The hero prints the answer next to the call. That is the one place on this site where
             # a command and its output stand together, so it is the one place where the output can
             # be wrong in front of the reader.
-            if pfad == "/" and m.group(2).startswith("/v1/briefs/check"):
-                gezeigt = [
+            if path == "/" and m.group(2).startswith("/v1/briefs/check"):
+                shown = [
                     htmlmod.unescape(re.sub(r"<[^>]+>", "", li)).strip()
-                    for li in re.findall(r"<li>([\s\S]*?)</li>", re.search(r'<ul class="found">([\s\S]*?)</ul>', seite).group(1))
+                    for li in re.findall(r"<li>([\s\S]*?)</li>", re.search(r'<ul class="found">([\s\S]*?)</ul>', page).group(1))
                 ]
-                echt = [f["missing"] for f in json.loads(text)["findings"]]
-                if gezeigt != echt:
+                returned = [f["missing"] for f in json.loads(text)["findings"]]
+                if shown != returned:
                     print("  FAILED  the hero prints an answer the service does not give:")
-                    for z in gezeigt:
-                        if z not in echt:
-                            print(f"            shown but not returned: {z}")
-                    for z in echt:
-                        if z not in gezeigt:
-                            print(f"            returned but not shown: {z}")
-                    fehler += 1
+                    for entry in shown:
+                        if entry not in returned:
+                            print(f"            shown but not returned: {entry}")
+                    for entry in returned:
+                        if entry not in shown:
+                            print(f"            returned but not shown: {entry}")
+                    failures += 1
                 else:
-                    print(f"  ok      and the {len(echt)} line(s) beside it are what it returned")
+                    print(f"  ok      and the {len(returned)} line(s) beside it are what it returned")
 
 print()
-if fehler:
-    print(f"COMMANDS FAILED: {fehler} of {geprueft} shown command(s) do not behave as the page says.")
+if failures:
+    print(f"COMMANDS FAILED: {failures} of {checked} shown command(s) do not behave as the page says.")
     raise SystemExit(1)
-print(f"COMMANDS OK ({geprueft} shown command(s), each run against the live service)")
+print(f"COMMANDS OK ({checked} shown command(s), each run against the live service)")
 PY

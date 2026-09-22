@@ -84,16 +84,16 @@ describe("what the page claims about Conway's payment path", () => {
     // The transfers do carry the stronger version. Every month from February to September has at
     // least one purchase at the $5 tier, which cannot happen through an endpoint that is down, so
     // the sentence says that instead and this holds it to the file.
-    const zeilen = readFileSync("docs/research/data/2026-09-19-conway-payto-transfers.csv", "utf-8")
+    const rows = readFileSync("docs/research/data/2026-09-19-conway-payto-transfers.csv", "utf-8")
       .split("\n")
       .slice(1)
       .filter(Boolean)
-      .map((z) => z.split(","));
-    const monate = new Set(
-      zeilen.filter((z) => Number(z[3]) >= 5).map((z) => z[1].slice(0, 7)),
+      .map((r) => r.split(","));
+    const months = new Set(
+      rows.filter((r) => Number(r[3]) >= 5).map((r) => r[1].slice(0, 7)),
     );
-    expect(monate.size, "a gap here and the sentence is wrong").toBe(8);
-    expect([...monate].sort()[0]).toBe("2026-02");
+    expect(months.size, "a gap here and the sentence is wrong").toBe(8);
+    expect([...months].sort()[0]).toBe("2026-02");
 
     for (const [name, html] of [
       ["/conway", renderConway([POINT], [])],
@@ -142,15 +142,15 @@ describe("/conway", () => {
    * changes would be worse than one that printed nothing.
    */
   it("says all purchases were the minimum tier only while that is true", async () => {
-    const einheitlich = await page([POINT]);
-    expect(einheitlich).toContain("All 87 purchases in the last 30 days were the $5 minimum tier");
-    expect(einheitlich, "the historical mix is the contrast that makes it mean something")
+    const uniform = await page([POINT]);
+    expect(uniform).toContain("All 87 purchases in the last 30 days were the $5 minimum tier");
+    expect(uniform, "the historical mix is the contrast that makes it mean something")
       .toContain("5,837 at $5, 700 at $25, 63 at $100");
-    expect(einheitlich, "one-off amounts are noise in that sentence").not.toContain("1 at $7");
+    expect(uniform, "one-off amounts are noise in that sentence").not.toContain("1 at $7");
 
-    const gemischt = await page([{ ...POINT, topup_tiers_30d: { "5": 80, "25": 7 } }]);
-    expect(gemischt).not.toContain("were the $5 minimum tier");
-    expect(gemischt).toContain("80 at $5, 7 at $25");
+    const mixed = await page([{ ...POINT, topup_tiers_30d: { "5": 80, "25": 7 } }]);
+    expect(mixed).not.toContain("were the $5 minimum tier");
+    expect(mixed).toContain("80 at $5, 7 at $25");
   });
 
   /**
@@ -160,19 +160,19 @@ describe("/conway", () => {
    * thing the landing page avoids by printing "zero buyers who are not me".
    */
   it("marks our own wallet in the receipts instead of passing it off as somebody else", async () => {
-    const mitUns =
+    const withOurs =
       RECEIPTS +
       "51482543,2026-09-18T18:00:33Z,0x56de77800de59baf92ccb2ccc32c4cf11f58e93b,5.000000,0x2ac8b33a506314e82af6bc029634e27b7796faccc1635c6b9371528bcc448b84\n";
-    const html = await page([POINT], mitUns);
+    const html = await page([POINT], withOurs);
 
     expect(html, "the row itself says whose it is").toMatch(/0x56de77…e93b<\/code> <span class="w">ours<\/span>/);
     expect(html, "and the caption says how many, so nobody has to count").toContain("One of them is ours");
     expect(html, "the figures are not quietly adjusted either").toContain("counted in every figure on this page");
 
     // Without our wallet in the file the sentence must not appear at all.
-    const ohneUns = await page([POINT]);
-    expect(ohneUns).not.toContain("is ours");
-    expect(ohneUns).not.toContain(">ours<");
+    const withoutOurs = await page([POINT]);
+    expect(withoutOurs).not.toContain("is ours");
+    expect(withoutOurs).not.toContain(">ours<");
   });
 
   /** A receipt nobody can look up is a claim. Every row carries the full hash to an explorer. */
@@ -192,9 +192,9 @@ describe("/conway", () => {
   it("reports the payment endpoint as it was last measured", async () => {
     expect(await page([POINT])).toContain("still asking for money at the last scan");
 
-    const tot = await page([{ ...POINT, pay_endpoint_status: 503 }]);
-    expect(tot, "a changed endpoint must change the sentence").not.toContain("still asking for money");
-    expect(tot).toContain("answered 503 at the last scan");
+    const dead = await page([{ ...POINT, pay_endpoint_status: 503 }]);
+    expect(dead, "a changed endpoint must change the sentence").not.toContain("still asking for money");
+    expect(dead).toContain("answered 503 at the last scan");
   });
 
   /**
@@ -219,7 +219,7 @@ describe("/conway", () => {
    * in production held exactly one such line from the day before.
    */
   it("survives a scan from before the fields it prints existed", async () => {
-    const alt = {
+    const old = {
       measured_at: "2026-09-20T05:00:00Z",
       data_through: "2026-09-19T14:05:17Z",
       window_from: "2026-08-20T14:05:17Z",
@@ -231,7 +231,7 @@ describe("/conway", () => {
       wallets_total: 2492,
       last_block: 51543584,
     };
-    const html = await page([alt, POINT]);
+    const html = await page([old, POINT]);
 
     expect(html, "the newest complete scan still fills the headline").toMatch(
       /\$435<\/span><span class="l">paid in over the last 30 days/,
@@ -240,10 +240,10 @@ describe("/conway", () => {
       .toMatch(/<td>2026-09-20<\/td><td>—<\/td>/);
 
     // And with nothing but old-format scans, a sentence instead of a 500.
-    const nurAlt = await page([alt]);
+    const oldOnly = await page([old]);
     // Matched inside one source line: the sentence wraps in the template, so the full phrase
     // never appears with single spaces in the HTML.
-    expect(nurAlt).toContain("1 older scan(s) on file, none of them in a shape");
+    expect(oldOnly).toContain("1 older scan(s) on file, none of them in a shape");
   });
 
   it("says the scan has not run rather than showing an empty frame", () => {

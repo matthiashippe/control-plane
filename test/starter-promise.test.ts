@@ -20,7 +20,7 @@ import { openDb, postLedger } from "../src/db.js";
 import { hashApiKey } from "../src/auth/siwe.js";
 import { claimStarter, poolLeftMc, starterOffer, GRANT_MC, POOL_MC } from "../src/credits/starter.js";
 
-const SEITEN = ["/", "/post", "/jobs"];
+const PAGES = ["/", "/post", "/jobs"];
 
 /**
  * A database with one open job, because `/jobs` has two halves.
@@ -30,7 +30,7 @@ const SEITEN = ["/", "/post", "/jobs"];
  * the counter-proof showed what that is worth: the unconditional sentence was put back by hand and
  * all four assertions stayed green. A test that cannot see the code it is about is not a test.
  */
-async function mitOffenemAuftrag() {
+async function withAnOpenJob() {
   const db = openDb(":memory:");
   const app = createApp({ db });
   const address = privateKeyToAccount(generatePrivateKey()).address.toLowerCase();
@@ -57,64 +57,64 @@ async function mitOffenemAuftrag() {
 }
 
 /** What a reader would take as "you get a first job for free". */
-const VERSPRECHEN = [
+const PROMISES = [
   /first job of up to/i,
   /of thinking is on us/i,
   /is exactly what the free credit covers/i,
   /\bfree\b[\s\S]{0,40}up to \d+ ¢/i,
 ];
 
-function leeren(db: ReturnType<typeof openDb>): void {
-  const viele = Math.floor(POOL_MC / GRANT_MC);
-  for (let i = 0; i < viele; i++) claimStarter(db, `0x${String(i).padStart(40, "0")}`);
+function drainPool(db: ReturnType<typeof openDb>): void {
+  const grants = Math.floor(POOL_MC / GRANT_MC);
+  for (let i = 0; i < grants; i++) claimStarter(db, `0x${String(i).padStart(40, "0")}`);
   expect(poolLeftMc(db), "the pool has to be too small for one more grant").toBeLessThan(GRANT_MC);
   expect(starterOffer(db)).toBeNull();
 }
 
 describe("the promise of a free first job", () => {
   it("is on every page that asks a buyer to start, while the pool can keep it", async () => {
-    const { app } = await mitOffenemAuftrag();
-    for (const pfad of SEITEN) {
-      const html = await (await app.request(pfad)).text();
+    const { app } = await withAnOpenJob();
+    for (const path of PAGES) {
+      const html = await (await app.request(path)).text();
       expect(
-        VERSPRECHEN.some((r) => r.test(html)),
-        `${pfad} does not offer the starter credit at all, so a newcomer has no reason to start`,
+        PROMISES.some((r) => r.test(html)),
+        `${path} does not offer the starter credit at all, so a newcomer has no reason to start`,
       ).toBe(true);
     }
   });
 
   it("is gone from every one of them once the pool is empty", async () => {
-    const { db, app } = await mitOffenemAuftrag();
-    leeren(db);
-    for (const pfad of SEITEN) {
-      const html = await (await app.request(pfad)).text();
-      for (const r of VERSPRECHEN) {
-        expect(html, `${pfad} still promises a free first job, and ${r} is the sentence`).not.toMatch(r);
+    const { db, app } = await withAnOpenJob();
+    drainPool(db);
+    for (const path of PAGES) {
+      const html = await (await app.request(path)).text();
+      for (const r of PROMISES) {
+        expect(html, `${path} still promises a free first job, and ${r} is the sentence`).not.toMatch(r);
       }
     }
   });
 
   it("says what is true instead, rather than falling silent about the money", async () => {
-    const { db, app } = await mitOffenemAuftrag();
-    leeren(db);
+    const { db, app } = await withAnOpenJob();
+    drainPool(db);
     // A page that simply drops the sentence leaves a buyer with no idea what a job costs them.
-    for (const pfad of ["/post", "/jobs"]) {
-      const html = await (await app.request(pfad)).text();
-      expect(html, `${pfad} says nothing about paying for it either`).toMatch(/credit of your own|USDC on Base/i);
+    for (const path of ["/post", "/jobs"]) {
+      const html = await (await app.request(path)).text();
+      expect(html, `${path} says nothing about paying for it either`).toMatch(/credit of your own|USDC on Base/i);
     }
   });
 
   it("holds for the empty board as well, which is the other half of /jobs", async () => {
     // Nothing open is exactly the moment an agent needs a reason to come back, so the short
     // version of the page carries the offer too, and has to drop it for the same reason.
-    const voll = await (await createApp({ db: openDb(":memory:") }).request("/jobs")).text();
-    expect(voll).toMatch(/of thinking is on us/i);
+    const withPool = await (await createApp({ db: openDb(":memory:") }).request("/jobs")).text();
+    expect(withPool).toMatch(/of thinking is on us/i);
 
     const db = openDb(":memory:");
-    const leer = createApp({ db });
-    leeren(db);
-    const html = await (await leer.request("/jobs")).text();
-    for (const r of VERSPRECHEN) expect(html).not.toMatch(r);
+    const drainedApp = createApp({ db });
+    drainPool(db);
+    const html = await (await drainedApp.request("/jobs")).text();
+    for (const r of PROMISES) expect(html).not.toMatch(r);
     expect(html).toMatch(/credit of your own/i);
   });
 
@@ -123,8 +123,8 @@ describe("the promise of a free first job", () => {
     // The page and the server have to change their mind in the same instant, or the gap between
     // them is a promise the next caller gets refused on.
     for (let i = 0; ; i++) {
-      const angebot = starterOffer(db);
-      if (!angebot) {
+      const offer = starterOffer(db);
+      if (!offer) {
         expect(() => claimStarter(db, "0x" + "f".repeat(40))).toThrow();
         expect(i, "the pool has to hand out every grant it holds before it says no").toBe(
           Math.floor(POOL_MC / GRANT_MC),

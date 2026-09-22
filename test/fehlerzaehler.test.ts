@@ -15,34 +15,34 @@ import { readFileSync } from "node:fs";
 import { createApp } from "../src/app.js";
 import { openDb } from "../src/db.js";
 
-function musterAusStatusSh(): RegExp {
-  const zeile = readFileSync("ops/status.sh", "utf8")
+function patternFromStatusSh(): RegExp {
+  const line = readFileSync("ops/status.sh", "utf8")
     .split("\n")
-    .find((z) => z.startsWith("CP_FEHLERMUSTER="));
-  expect(zeile, "ops/status.sh has to carry the pattern on one line of its own").toBeTruthy();
-  const muster = zeile!.match(/:-(.*)\}"/)?.[1];
-  expect(muster, "and it has to be readable out of that line").toBeTruthy();
-  return new RegExp(muster!, "i");
+    .find((l) => l.startsWith("CP_FEHLERMUSTER="));
+  expect(line, "ops/status.sh has to carry the pattern on one line of its own").toBeTruthy();
+  const pattern = line!.match(/:-(.*)\}"/)?.[1];
+  expect(pattern, "and it has to be readable out of that line").toBeTruthy();
+  return new RegExp(pattern!, "i");
 }
 
 describe("the error counter counts what the service writes", () => {
   it("matches the line a failed request actually produces", () => {
     const db = openDb(":memory:");
     const app = createApp({ db });
-    const geschrieben: string[] = [];
+    const written: string[] = [];
     const spy = vi.spyOn(console, "error").mockImplementation((...args) => {
-      geschrieben.push(args.map(String).join(" "));
+      written.push(args.map(String).join(" "));
     });
     try {
       // A failure the service cannot handle, caused where it has to go through app.onError.
       db.prepare("DROP TABLE bounties").run();
       return app.request("/bounties.json").then((res) => {
         expect(res.status, "this has to be a 500, or the test proves nothing").toBe(500);
-        expect(geschrieben.length, "and a 500 has to leave a line in the log").toBeGreaterThan(0);
-        const muster = musterAusStatusSh();
+        expect(written.length, "and a 500 has to leave a line in the log").toBeGreaterThan(0);
+        const pattern = patternFromStatusSh();
         expect(
-          geschrieben.some((z) => muster.test(z)),
-          `ops/status.sh counts /${muster.source}/i and the service wrote: ${geschrieben[0]?.slice(0, 120)}`,
+          written.some((l) => pattern.test(l)),
+          `ops/status.sh counts /${pattern.source}/i and the service wrote: ${written[0]?.slice(0, 120)}`,
         ).toBe(true);
       });
     } finally {
@@ -51,8 +51,8 @@ describe("the error counter counts what the service writes", () => {
   });
 
   it("does not match an ordinary line, or every log line would be an error", () => {
-    const muster = musterAusStatusSh();
-    expect(muster.test("[cleanup] removed 0 nonces, 2 sessions, 0 old failed payments")).toBe(false);
-    expect(muster.test("listening on 0.0.0.0:8402")).toBe(false);
+    const pattern = patternFromStatusSh();
+    expect(pattern.test("[cleanup] removed 0 nonces, 2 sessions, 0 old failed payments")).toBe(false);
+    expect(pattern.test("listening on 0.0.0.0:8402")).toBe(false);
   });
 });

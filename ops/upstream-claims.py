@@ -37,16 +37,16 @@ from pathlib import Path
 
 DOCKERFILE = Path("harness/runtime/Dockerfile")
 REPO = "Conway-Research/automaton"
-befunde = []
+findings = []
 
 
-def ok(was: str, beleg: str = "") -> None:
-    print(f"  ok      {was}" + (f"\n          {beleg}" if beleg else ""))
+def ok(what: str, evidence: str = "") -> None:
+    print(f"  ok      {what}" + (f"\n          {evidence}" if evidence else ""))
 
 
-def falsch(was: str, hinweis: str) -> None:
-    befunde.append(was)
-    print(f"  WRONG   {was}\n          {hinweis}")
+def wrong(what: str, hint: str) -> None:
+    findings.append(what)
+    print(f"  WRONG   {what}\n          {hint}")
 
 
 def pin() -> str:
@@ -57,18 +57,18 @@ def pin() -> str:
     return m.group(1)
 
 
-def datei(pfad: str, rev: str) -> str:
-    roh = subprocess.run(
-        ["gh", "api", f"repos/{REPO}/contents/{pfad}?ref={rev}", "--jq", ".content"],
+def file_at(path: str, rev: str) -> str:
+    raw = subprocess.run(
+        ["gh", "api", f"repos/{REPO}/contents/{path}?ref={rev}", "--jq", ".content"],
         capture_output=True, text=True, timeout=30,
     )
-    if roh.returncode != 0 or not roh.stdout.strip():
-        print(f"  could not fetch {pfad} at {rev}: {roh.stderr.strip()[:120]}")
+    if raw.returncode != 0 or not raw.stdout.strip():
+        print(f"  could not fetch {path} at {rev}: {raw.stderr.strip()[:120]}")
         sys.exit(2)
-    return base64.b64decode(roh.stdout).decode("utf-8", "replace")
+    return base64.b64decode(raw.stdout).decode("utf-8", "replace")
 
 
-DATEIEN = [
+FILES = [
     "src/index.ts",
     "src/heartbeat/tick-context.ts",
     "src/heartbeat/tasks.ts",
@@ -77,50 +77,50 @@ DATEIEN = [
 ]
 
 
-def pruefe(rev: str) -> int:
-    global befunde
-    befunde = []
+def check(rev: str) -> int:
+    global findings
+    findings = []
     print(f"What we say about {REPO} at {rev}\n")
-    q = {p: datei(p, rev) for p in DATEIEN}
+    content = {p: file_at(p, rev) for p in FILES}
 
     # 1. The thinking path refuses to spend. This is the claim that makes the asymmetry a story
     #    rather than a bug report: the one fallback that costs nothing is the one that gives up.
-    if "creditsCents: -1" in q["src/agent/loop.ts"]:
+    if "creditsCents: -1" in content["src/agent/loop.ts"]:
         ok("the thinking path substitutes -1 when the balance call fails and there is no cache",
            "src/agent/loop.ts returns creditsCents: -1")
     else:
-        falsch("the thinking path no longer substitutes -1",
-               "/fix and the article both describe the sentinel by name")
+        wrong("the thinking path no longer substitutes -1",
+              "/fix and the article both describe the sentinel by name")
 
     # 2. And -1 resolves to a tier that buys nothing, while 0 resolves to one that buys.
-    tiers = q["src/conway/credits.ts"]
+    tiers = content["src/conway/credits.ts"]
     if re.search(r"if \(creditsCents >= 0\) return \"critical\";\s*\n\s*return \"dead\";", tiers):
         ok("zero is critical and anything negative is dead",
            "src/conway/credits.ts getSurvivalTier")
     else:
-        falsch("getSurvivalTier no longer maps 0 to critical and negatives to dead",
-               "the whole asymmetry is this mapping; without it the three paths are the same path")
+        wrong("getSurvivalTier no longer maps 0 to critical and negatives to dead",
+              "the whole asymmetry is this mapping; without it the three paths are the same path")
 
     # 3. The startup path substitutes 0, which is 'critical', which buys.
-    if re.search(r"getCreditsBalance\(\)\.catch\(\(\) => 0\)", q["src/index.ts"]):
+    if re.search(r"getCreditsBalance\(\)\.catch\(\(\) => 0\)", content["src/index.ts"]):
         ok("the startup path substitutes 0 and goes on to buy", "src/index.ts .catch(() => 0)")
     else:
-        falsch("the startup path no longer substitutes 0",
-               "the claim that a fresh start buys 5 USDC rests on this line")
+        wrong("the startup path no longer substitutes 0",
+              "the claim that a fresh start buys 5 USDC rests on this line")
 
     # 4. The heartbeat leaves the value at 0 on failure, rather than propagating the error.
-    tick = q["src/heartbeat/tick-context.ts"]
+    tick = content["src/heartbeat/tick-context.ts"]
     if re.search(r"let creditBalance = 0;\s*\n\s*try \{\s*\n\s*creditBalance = await conway\.getCreditsBalance\(\);\s*\n\s*\} catch", tick):
         ok("the heartbeat leaves the balance at 0 when the call throws",
            "src/heartbeat/tick-context.ts logs and carries on")
     else:
-        falsch("the heartbeat no longer falls back to 0",
-               "the claim that it buys again every five minutes starts here")
+        wrong("the heartbeat no longer falls back to 0",
+              "the claim that it buys again every five minutes starts here")
 
     # 5. And buys again on a five minute cooldown for as long as the wallet holds 5 USDC.
-    tasks = q["src/heartbeat/tasks.ts"]
-    hat_schwelle = re.search(r"MIN_TOPUP_USD = 5\b", tasks)
-    hat_cooldown = re.search(r"AUTO_TOPUP_COOLDOWN_MS = 5 \* 60 \* 1000", tasks)
+    tasks = content["src/heartbeat/tasks.ts"]
+    has_threshold = re.search(r"MIN_TOPUP_USD = 5\b", tasks)
+    has_cooldown = re.search(r"AUTO_TOPUP_COOLDOWN_MS = 5 \* 60 \* 1000", tasks)
     # The whole condition, both halves of it.
     #
     # This pattern stopped at `=== "critical"` until 2026-09-22 and therefore could never go red
@@ -130,21 +130,21 @@ def pruefe(rev: str) -> int:
     # "dead"))`. The runtime buys on either tier, so which tier the failure resolves to changes
     # nothing, and the check was cut exactly short of the half that says so. An adversarial read
     # found it (B6): a check that cannot fail for its own claim is decoration.
-    hat_bedingung = re.search(
+    has_condition = re.search(
         r"balance >= MIN_TOPUP_USD && \(ctx\.survivalTier === \"critical\"\s*\|\|\s*"
         r"ctx\.survivalTier === \"dead\"\)",
         tasks,
     )
-    if hat_schwelle and hat_cooldown and hat_bedingung:
+    if has_threshold and has_cooldown and has_condition:
         ok("it buys on critical and on dead alike, every five minutes while the wallet holds 5 USDC",
            "src/heartbeat/tasks.ts: MIN_TOPUP_USD, AUTO_TOPUP_COOLDOWN_MS and both halves of the tier condition")
     else:
-        fehlt = [n for n, t in [("the 5 USDC threshold", hat_schwelle),
-                                ("the five minute cooldown", hat_cooldown),
-                                ("the tier condition", hat_bedingung)] if not t]
-        falsch(f"the heartbeat's topup changed: {', '.join(fehlt)} not found",
-               "/fix and /conway both say it buys on critical and on dead alike, again every five "
-               "minutes for as long as the wallet holds 5 USDC")
+        missing = [n for n, t in [("the 5 USDC threshold", has_threshold),
+                                  ("the five minute cooldown", has_cooldown),
+                                  ("the tier condition", has_condition)] if not t]
+        wrong(f"the heartbeat's topup changed: {', '.join(missing)} not found",
+              "/fix and /conway both say it buys on critical and on dead alike, again every five "
+              "minutes for as long as the wallet holds 5 USDC")
 
     # 8. Which model the defaults actually route to, and when.
     #
@@ -156,23 +156,25 @@ def pruefe(rev: str) -> int:
     # Right by accident on one of two routes, and this is the one place the text shows detail
     # knowledge. An adversarial read found it (B7), and nothing here checked it: claim 7 only
     # checked that the wizard copies the value.
-    typen = datei("src/inference/types.ts", rev)
-    router = datei("src/inference/router.ts", rev)
-    gross = re.search(r"DEFAULT_MODEL_STRATEGY_CONFIG[^{]*\{\s*inferenceModel:\s*\"([^\"]+)\"", typen)
-    klein = re.search(r"DEFAULT_MODEL_STRATEGY_CONFIG[\s\S]{0,200}?criticalModel:\s*\"([^\"]+)\"", typen)
-    knapp = re.search(
+    types_ts = file_at("src/inference/types.ts", rev)
+    router = file_at("src/inference/router.ts", rev)
+    default_model = re.search(r"DEFAULT_MODEL_STRATEGY_CONFIG[^{]*\{\s*inferenceModel:\s*\"([^\"]+)\"", types_ts)
+    critical_model = re.search(r"DEFAULT_MODEL_STRATEGY_CONFIG[\s\S]{0,200}?criticalModel:\s*\"([^\"]+)\"", types_ts)
+    critical_first = re.search(
         r'tier === "critical" \|\| tier === "dead"\s*\?\s*\[strategy\.criticalModel',
         router,
     )
-    reich = re.search(r":\s*\[strategy\.inferenceModel, strategy\.lowComputeModel", router)
-    if gross and klein and knapp and reich:
-        ok(f"the defaults route to {gross.group(1)} until the tier is critical, then {klein.group(1)}",
+    normal_first = re.search(r":\s*\[strategy\.inferenceModel, strategy\.lowComputeModel", router)
+    if default_model and critical_model and critical_first and normal_first:
+        ok(f"the defaults route to {default_model.group(1)} until the tier is critical, then {critical_model.group(1)}",
            "src/inference/types.ts DEFAULT_MODEL_STRATEGY_CONFIG and the two candidate orders in router.ts")
     else:
-        fehlt = [n for n, t in [("the default inferenceModel", gross), ("the default criticalModel", klein),
-                                ("the critical-first order", knapp), ("the normal-first order", reich)] if not t]
-        falsch(f"the model defaults or the routing order changed: {', '.join(fehlt)} not found",
-               "/fix and the article name both models and say which tier each belongs to")
+        missing = [n for n, t in [("the default inferenceModel", default_model),
+                                  ("the default criticalModel", critical_model),
+                                  ("the critical-first order", critical_first),
+                                  ("the normal-first order", normal_first)] if not t]
+        wrong(f"the model defaults or the routing order changed: {', '.join(missing)} not found",
+              "/fix and the article name both models and say which tier each belongs to")
 
     # 7. The wizard copies the top-level model down, so the trap is hand-editing and not the wizard.
     #
@@ -184,44 +186,44 @@ def pruefe(rev: str) -> int:
     #
     # docs/without-control-plane.md had it right since 2026-09-21 and nothing held the short
     # versions against the long one. That is the seventh claim, and it is the one nobody checked.
-    cfg = datei("src/setup/configure.ts", rev)
+    cfg = file_at("src/setup/configure.ts", rev)
     if re.search(r"config\.inferenceModel = await pickFromList\([^)]*\);\s*\n\s*s\.inferenceModel = config\.inferenceModel;", cfg):
         ok("the setup wizard copies the top-level model into modelStrategy",
            "src/setup/configure.ts assigns s.inferenceModel = config.inferenceModel")
     else:
-        falsch("the wizard no longer copies the top-level model down",
-               "/fix and docs/without-control-plane.md both say the trap is hand-editing the file, "
-               "not the wizard; if the wizard stopped copying, the trap is the wizard again")
+        wrong("the wizard no longer copies the top-level model down",
+              "/fix and docs/without-control-plane.md both say the trap is hand-editing the file, "
+              "not the wizard; if the wizard stopped copying, the trap is the wizard again")
 
     # 6. Neither spending path reads the cache, which is why route 2 does not protect anybody.
     #    Checked as an absence, so it is stated narrowly: the two files that spend never mention it.
-    if "last_known_balance" not in q["src/index.ts"] and "last_known_balance" not in tick:
+    if "last_known_balance" not in content["src/index.ts"] and "last_known_balance" not in tick:
         ok("neither spending path reads the cached balance",
            "last_known_balance appears in neither src/index.ts nor tick-context.ts")
     else:
-        falsch("a spending path now reads last_known_balance",
-               "docs/without-control-plane.md says route 2 does not protect you here")
+        wrong("a spending path now reads last_known_balance",
+              "docs/without-control-plane.md says route 2 does not protect you here")
 
     print()
-    if befunde:
-        print(f"  {len(befunde)} claim(s) do not hold at {rev}.")
+    if findings:
+        print(f"  {len(findings)} claim(s) do not hold at {rev}.")
         return 1
     print(f"  All claims hold at {rev}.")
     return 0
 
 
 def main() -> int:
-    angepinnt = pin()
-    schlecht = pruefe(angepinnt)
+    pinned = pin()
+    at_pin = check(pinned)
     print()
-    auf_main = pruefe("main")
+    on_main = check("main")
 
     print()
-    if schlecht:
+    if at_pin:
         print("NOT TRUE ANY MORE at the pinned commit. Rewrite before anything goes out: /fix, the")
         print("article and docs/without-control-plane.md all rest on these.")
         return 1
-    if auf_main:
+    if on_main:
         print("The pinned commit still reads the way we describe it, and the default branch does")
         print("not. Somebody is fixing this upstream. That is the single most important thing that")
         print("could happen to the article, and it belongs in it before it goes out.")

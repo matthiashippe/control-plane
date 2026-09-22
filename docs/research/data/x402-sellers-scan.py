@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
-"""Zuflussmessung fuer x402-Verkaeufer-Wallets auf Base.
+"""Inflow measurement for x402 seller wallets on Base.
 
-Zaehlt alle USDC-Transfers an die unten gelisteten payTo-Adressen in einem Blockfenster
-(Default 302.400 Bloecke = 7 Tage bei 2 s Blockzeit) und gibt Transfers, Summe und Zahl der
-verschiedenen Zahler je Verkaeufer aus. Gleiche Methode wie die Conway-Messung vom 19.09.2026,
-nur mit mehreren Adressen in einem Lauf (topics[2] als OR-Liste), damit ein Durchlauf reicht.
+Counts every USDC transfer to the payTo addresses listed below inside a block window
+(default 302,400 blocks = 7 days at a 2 s block time) and prints transfers, sum and the number of
+distinct payers per seller. The same method as the Conway measurement of 19.09.2026, only with
+several addresses in one run (topics[2] as an OR list), so that a single pass is enough.
 
-    python3 x402-sellers-scan.py [blockfenster]
+    python3 x402-sellers-scan.py [block window]
 
-Erhebung am 19.09.2026 ab 19:15 UTC, Head-Block 51.528.083 bzw. 51.528.206 (zweiter Lauf),
-152 Chunks a 2.000 Bloecke je Lauf, keine fehlgeschlagenen Chunks. Der oeffentliche RPC
-mainnet.base.org begrenzt eth_getLogs auf 2.000 Bloecke und antwortet Python-urllib ohne
-User-Agent nicht, deshalb der curl-UA im Header. Ergebnis: 2026-09-20-x402-sellers-7d.csv.
+Collected on 19.09.2026 from 19:15 UTC, head block 51,528,083 and 51,528,206 (second run),
+152 chunks of 2,000 blocks per run, no failed chunks. The public RPC
+mainnet.base.org limits eth_getLogs to 2,000 blocks and does not answer Python urllib without a
+User-Agent, hence the curl UA in the header. Result: 2026-09-20-x402-sellers-7d.csv.
 """
 import json, time, urllib.request, sys, csv, collections
 
@@ -19,8 +19,8 @@ RPC = "https://mainnet.base.org"
 USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
 TOPIC = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
 
-# Rang 1 bis 10 des agent402-Leaderboards (7-Tage-Fenster, abgerufen 19.09.2026 18:20 UTC),
-# Conway als Referenz, dazu die payTo-Adressen der selbst geprueften Prepaid-Kandidaten.
+# Ranks 1 to 10 of the agent402 leaderboard (7-day window, fetched 19.09.2026 18:20 UTC),
+# Conway as the reference, plus the payTo addresses of the prepaid candidates checked by hand.
 SELLERS = {
     "0x7284d41b5b852f2bd4c99bdf95043d84452d299c": "AX1 Console",
     "0x325bdf6f7efab24a2210c48c1b64cab2eae1d430": "StableEnrich",

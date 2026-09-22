@@ -32,13 +32,13 @@ const FEE_PERCENT = 10;
 const EXAMPLE_PRICE_CENTS = mcToCents(GRANT_MC);
 
 /**
- * `angebot` is `starterOffer(db)`: the free first job, or null once the pool cannot fund one.
+ * `offer` is `starterOffer(db)`: the free first job, or null once the pool cannot fund one.
  *
  * Two sentences here promised it unconditionally, and both become false in the hour an article
  * empties the pool. The page keeps its shape either way, because the free credit is a reason to
  * try and never the reason the service works.
  */
-export function renderPost(angebot: ReturnType<typeof starterOffer>): string {
+export function renderPost(offer: ReturnType<typeof starterOffer>): string {
   return `
   <section>
     <div class="wrap">
@@ -66,8 +66,8 @@ export function renderPost(angebot: ReturnType<typeof starterOffer>): string {
           <span><b>2. Get a key</b>
           <span class="w">Three calls and one Ethereum signature. Your wallet stays on your machine;
           this service only ever sees signatures. ${
-            angebot
-              ? `Your first job of up to ${angebot.cents} ¢ is paid from our pool, so you can watch the
+            offer
+              ? `Your first job of up to ${offer.cents} ¢ is paid from our pool, so you can watch the
           whole thing work before owning any cryptocurrency.`
               : `The starter pool that used to pay for a first job is empty, so posting one needs
           credit of your own: USDC on Base, from $5.`
@@ -89,7 +89,7 @@ export function renderPost(angebot: ReturnType<typeof starterOffer>): string {
   -H "authorization: $KEY" -H 'content-type: application/json' \\
   -d '{"brief":"…","kind":"factual","price_cents":${EXAMPLE_PRICE_CENTS},"deadline":"2026-09-28T12:00:00Z"}'</pre>
       <p class="sub" style="margin-top:-.4rem">${
-        angebot
+        offer
           ? `
         ${EXAMPLE_PRICE_CENTS} cents is exactly what the free credit covers, so this call works on an
         account that has never paid anything. The grant is taken by the first job it can pay for and

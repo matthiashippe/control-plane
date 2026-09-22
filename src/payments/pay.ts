@@ -1,9 +1,9 @@
 /**
- * `/pay/{usd}/{address}`: x402-v1-Seller für Credit-Topups (docs/protocol.md, Abschnitt Topup).
+ * `/pay/{usd}/{address}`: x402 v1 seller for credit topups (docs/protocol.md, section Topup).
  *
- * Ablauf: ohne X-Payment ein 402 mit Angebot; mit X-Payment wird die EIP-3009-Signatur offline
- * geprüft, dann settlet der Settler, dann werden Payment-Status, Ledger-Zeile und Saldo in einer
- * Transaktion geschrieben. Idempotenzschlüssel ist die Authorization-Nonce.
+ * Flow: without X-Payment a 402 carrying the offer; with X-Payment the EIP-3009 signature is
+ * verified offline, then the settler settles, then payment status, ledger row and balance are
+ * written in one transaction. The idempotency key is the authorization nonce.
  */
 
 import { isAddress, verifyTypedData, type Address, type Hex } from "viem";
@@ -12,23 +12,23 @@ import { MC_PER_CENT, mcToCents, postLedger, type Db } from "../db.js";
 import { DOC } from "../errors.js";
 import type { Authorization, Settler } from "./settler.js";
 
-/** Die Tiers, die der Runtime-Client kennt (`TOPUP_TIERS` in topup.ts). */
+/** The tiers the runtime client knows (`TOPUP_TIERS` in topup.ts). */
 export const TOPUP_TIERS_USD = [5, 25, 100, 500, 1000, 2500] as const;
 
 export interface PayConfig {
   payTo: Address;
-  /** "base" oder "base-sepolia"; so steht es im Angebot, der Client normalisiert selbst. */
+  /** "base" or "base-sepolia"; that is how it stands in the offer, the client normalises it itself. */
   network: "base" | "base-sepolia";
   chainId: number;
   usdcAddress: Address;
   maxTimeoutSeconds: number;
-  /** Angebotene Tiers in USD; Betreiber dürfen ergänzen (z. B. 1 für Abnahmen). */
+  /** Offered tiers in USD; operators may add their own (for example 1 for acceptance runs). */
   tiers: readonly number[];
   /**
-   * Basis-URL, unter der dieser Dienst oeffentlich erreichbar ist, ohne Schraegstrich am Ende.
-   * Sie macht `resource` absolut. Ohne sie bleibt der Pfad relativ, und kein Facilitator kann
-   * den Dienst katalogisieren: von 6.584 PayAI-Eintraegen trug am 20.09.2026 keiner einen
-   * relativen Pfad.
+   * Base URL under which this service is publicly reachable, without a trailing slash.
+   * It makes `resource` absolute. Without it the path stays relative, and no facilitator can
+   * catalogue the service: of 6.584 PayAI entries, not one carried a relative path on
+   * 20.09.2026.
    */
   publicOrigin?: string;
 }
@@ -61,23 +61,23 @@ export function tierToAtomic(usd: number): bigint {
 }
 
 /**
- * Ein Cent obendrauf auf jeden Topup.
+ * One cent on top of every topup.
  *
- * Die Runtime staffelt ihre Denkfaehigkeit nach dem Kontostand, und die Schwelle fuer die beste
- * Stufe lautet `> 500` Cent, nicht `>= 500` (Upstream `src/types.ts`, `getSurvivalTier`). Ihr
- * Bootstrap-Topup nimmt automatisch den kleinsten angebotenen Tier. Wer bei uns mit 5 USD startet,
- * laege ohne diesen Cent genau einen Cent unter der Schwelle und bekaeme dauerhaft das kleinere
- * Modell und die Haelfte der Token, obwohl er fuer die Stufe bezahlt hat.
+ * The runtime grades its thinking capacity by the account balance, and the threshold for the best
+ * tier reads `> 500` cents, not `>= 500` (upstream `src/types.ts`, `getSurvivalTier`). Its
+ * bootstrap topup automatically takes the smallest offered tier. Anyone who starts here with
+ * 5 USD would, without this cent, sit exactly one cent below the threshold and permanently get
+ * the smaller model and half the tokens, although they paid for that tier.
  *
- * Der Bonus kostet uns 0,0077 USD je Kunde (ein Cent Verkaufswert bei Markup 1,3). Er steht offen
- * auf der Preisseite, denn ungesagt saehe er wie ein Verkaufstrick aus: Ein Kunde in der besseren
- * Stufe verbraucht auch mehr.
+ * The bonus costs us 0,0077 USD per customer (one cent of sale value at markup 1,3). It is stated
+ * openly on the pricing page, because left unsaid it would look like a sales trick: a customer in
+ * the better tier also consumes more.
  */
 export const SCHWELLEN_BONUS_CENTS = 1;
 
 /**
- * Die Kennung des bezahlten Endpunkts. Absolut, sobald der Betreiber seine Basis-URL kennt,
- * denn ein Facilitator uebernimmt nur absolute URLs in sein Verzeichnis.
+ * The identifier of the paid endpoint. Absolute as soon as the operator knows their base URL,
+ * because a facilitator only takes absolute URLs into its directory.
  */
 export function payResource(cfg: PayConfig, usd: number, recipient: Address): string {
   const path = `/pay/${usd}/${recipient}`;
@@ -91,7 +91,7 @@ export function buildPaymentRequired(cfg: PayConfig, usd: number, recipient: Add
       {
         scheme: "exact",
         network: cfg.network,
-        // 7+ Stellen: der Runtime-Client liest das als atomare Einheit (siehe protocol.md).
+        // 7+ digits: the runtime client reads this as an atomic unit (see protocol.md).
         maxAmountRequired: tierToAtomic(usd).toString(),
         payTo: cfg.payTo,
         asset: cfg.usdcAddress,
@@ -105,12 +105,12 @@ export function buildPaymentRequired(cfg: PayConfig, usd: number, recipient: Add
 }
 
 /**
- * Warum ein bezahlter Versuch abgelehnt wurde, in einem Satz, der sagt, was zu tun ist. Der
- * Runtime-Client liest aus diesem Körper nur `x402Version` und `accepts` (Upstream
- * `src/conway/x402.ts`, `normalizePaymentRequired`), Zusatzfelder ignoriert er. Der Mensch, der
- * den Topup von Hand nachstellt, liest genau sie.
+ * Why a paid attempt was rejected, in one sentence that says what to do. The runtime client reads
+ * only `x402Version` and `accepts` out of this body (upstream `src/conway/x402.ts`,
+ * `normalizePaymentRequired`) and ignores extra fields. The human who reproduces the topup by
+ * hand reads exactly those extra fields.
  */
-function zahlungsHinweis(cfg: PayConfig, usd: number, error: string): string | null {
+function paymentHint(cfg: PayConfig, usd: number, error: string): string | null {
   if (error.startsWith("wrong_amount")) {
     return (
       `The signed authorization does not carry the amount of the ${usd} USD tier. Sign exactly ` +
@@ -180,9 +180,9 @@ function paymentRequiredResponse(cfg: PayConfig, usd: number, recipient: Address
   const body: Record<string, unknown> = { ...required };
   if (error) {
     body.error = error;
-    const hinweis = zahlungsHinweis(cfg, usd, error);
-    if (hinweis) {
-      body.message = hinweis;
+    const hint = paymentHint(cfg, usd, error);
+    if (hint) {
+      body.message = hint;
       body.docs = DOC.payments;
     }
   } else {
@@ -304,10 +304,10 @@ interface PaymentRow {
 }
 
 function settledResponse(db: Db, row: PaymentRow): PayResponse {
-  // Bewusst NICHT den aktuellen Saldo lesen. Diese Antwort gibt es ohne API-Key, sobald jemand
-  // einen bereits verbrauchten Zahlungs-Header wiederholt. Mit dem aktuellen Wert wäre das ein
-  // Kontostandsmelder für fremde Mandanten (Sicherheitsprüfung 19.09.2026). Der Saldo zum
-  // Zeitpunkt der Gutschrift steht in der Zahlung selbst und verrät nichts Neues.
+  // Deliberately do NOT read the current balance. This answer is available without an API key as
+  // soon as somebody repeats an already spent payment header. With the current value it would be
+  // a balance reporter for other tenants (security review 19.09.2026). The balance at the time of
+  // the credit is in the payment itself and gives nothing new away.
   void db;
   return {
     status: 200,
@@ -320,8 +320,8 @@ function settledResponse(db: Db, row: PaymentRow): PayResponse {
 }
 
 /**
- * Dieselbe Autorisierung ist bereits unterwegs. Kein Fehler des Aufrufers, nur ein Rennen: die
- * Nonce ist der Idempotenzschlüssel, eine Wiederholung bucht nie zweimal.
+ * The same authorization is already in flight. Not a caller error, just a race: the nonce is the
+ * idempotency key, a repeat never books twice.
  */
 const SETTLEMENT_IN_PROGRESS = {
   error: "settlement_in_progress",
@@ -400,11 +400,11 @@ export async function handlePay(
   if (auth.to.toLowerCase() !== cfg.payTo.toLowerCase()) {
     return paymentRequiredResponse(cfg, usd, recipient, "wrong_recipient");
   }
-  // Die EIP-3009-Signatur deckt Betrag, Empfänger der USDC und Nonce, aber nicht den Pfad, der
-  // bestimmt, WER die Credits bekommt. Ohne diese Prüfung kann jeder, der einen signierten
-  // Header in die Hände bekommt, die Gutschrift auf eine beliebige Adresse umleiten, während das
-  // Geld weiter vom Signierer abfließt (Sicherheitsprüfung 19.09.2026). Die Runtime lädt immer
-  // ihre eigene Wallet auf, also schränkt das keinen echten Ablauf ein.
+  // The EIP-3009 signature covers amount, USDC recipient and nonce, but not the path, which
+  // decides WHO gets the credits. Without this check anybody who gets hold of a signed header can
+  // redirect the credit to an arbitrary address while the money keeps flowing out of the signer
+  // (security review 19.09.2026). The runtime always tops up its own wallet, so this restricts no
+  // real flow.
   if (auth.from.toLowerCase() !== recipient.toLowerCase()) {
     return paymentRequiredResponse(cfg, usd, recipient, "recipient_must_match_payer");
   }
@@ -415,7 +415,7 @@ export async function handlePay(
   if (auth.validBefore <= nowSec) return paymentRequiredResponse(cfg, usd, recipient, "authorization_expired");
   if (auth.validAfter > nowSec + 60n) return paymentRequiredResponse(cfg, usd, recipient, "authorization_not_yet_valid");
 
-  // Idempotenz: dieselbe Nonce liefert dieselbe Antwort, egal wie oft sie kommt.
+  // Idempotency: the same nonce yields the same answer, however often it arrives.
   const existing = db.prepare("SELECT nonce, status, credits_mc, to_address, tx_hash, balance_after_mc FROM payments WHERE nonce = ?").get(auth.nonce) as
     | PaymentRow
     | undefined;
@@ -431,9 +431,9 @@ export async function handlePay(
   const nowIso = new Date(now).toISOString();
   const claim = db.transaction(() => {
     if (existing?.status === "failed") {
-      // `changes` prüfen, sonst gewinnen zwei parallele Retries beide den Claim, settlen beide
-      // und schreiben zwei Gutschriften für dieselbe Zahlung. Der WHERE-Filter allein reicht
-      // nicht: Er verhindert nur, dass ein Nicht-failed-Zustand überschrieben wird.
+      // Check `changes`, otherwise two parallel retries both win the claim, both settle and write
+      // two credits for the same payment. The WHERE filter alone is not enough: it only prevents
+      // a non-failed state from being overwritten.
       const res = db
         .prepare("UPDATE payments SET status = 'pending', error = NULL, created_at = ? WHERE nonce = ? AND status = 'failed'")
         .run(nowIso, auth.nonce);
@@ -445,12 +445,12 @@ export async function handlePay(
       ).run(auth.nonce, auth.from.toLowerCase(), recipient, auth.value.toString(), creditsMc, nowIso);
       return true;
     } catch {
-      return false; // Rennen: ein anderer Request hat die Nonce gerade angelegt
+      return false; // Race: another request has just created the nonce
     }
   });
   if (!claim()) return { status: 409, body: SETTLEMENT_IN_PROGRESS };
 
-  // Ab hier darf ein Client-Abbruch nichts mehr ändern: Settlement und Buchung laufen zu Ende.
+  // From here on a client abort must change nothing: settlement and booking run to completion.
   const result = await settler.settle(auth, payment.signature, payResource(cfg, usd, recipient));
   if (!result.ok) {
     db.prepare("UPDATE payments SET status = 'failed', error = ?, tx_hash = ? WHERE nonce = ?").run(
@@ -491,9 +491,9 @@ export async function handlePay(
 export function payConfigFromEnv(env: NodeJS.ProcessEnv): PayConfig | null {
   const payTo = env.CP_PAY_TO;
   if (!payTo) return null;
-  if (!isAddress(payTo)) throw new Error("CP_PAY_TO ist keine Adresse");
+  if (!isAddress(payTo)) throw new Error("CP_PAY_TO is not an address");
   const network = (env.CP_NETWORK || "base") as PayConfig["network"];
-  if (network !== "base" && network !== "base-sepolia") throw new Error(`CP_NETWORK unbekannt: ${network}`);
+  if (network !== "base" && network !== "base-sepolia") throw new Error(`CP_NETWORK unknown: ${network}`);
   const usdc = env.CP_USDC_ADDRESS || (network === "base"
     ? "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
     : "0x036CbD53842c5426634e7929541eC2318f3dCF7e");
@@ -501,7 +501,7 @@ export function payConfigFromEnv(env: NodeJS.ProcessEnv): PayConfig | null {
     .split(",")
     .map((s) => Number(s.trim()))
     .filter((n) => Number.isInteger(n) && n > 0);
-  if (!tiers.length) throw new Error("CP_TOPUP_TIERS_USD ist leer");
+  if (!tiers.length) throw new Error("CP_TOPUP_TIERS_USD is empty");
   return {
     payTo: payTo as Address,
     network,

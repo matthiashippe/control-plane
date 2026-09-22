@@ -26,27 +26,27 @@
 CP_EIGENE_IPS_DATEI="${CP_EIGENE_IPS_DATEI:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/eigene-ips.txt}"
 
 eigene_ips() {
-  local datei="$CP_EIGENE_IPS_DATEI"
+  local list_file="$CP_EIGENE_IPS_DATEI"
   local key="${CP_SSH_KEY:-$HOME/.ssh/id_ed25519_automaton}"
   local host="${CP_HOST:-root@76.13.144.207}"
-  local lebend
+  local live
   # Missing means the path is wrong, not that the history is empty. Say so rather than start a
   # fresh one somewhere else.
-  if [[ ! -f "$datei" ]]; then
-    echo "eigene_ips: $datei is not there. The list of our own addresses lives in the" >&2
+  if [[ ! -f "$list_file" ]]; then
+    echo "eigene_ips: $list_file is not there. The list of our own addresses lives in the" >&2
     echo "            repository; without it every traffic count is guesswork." >&2
     return 1
   fi
-  lebend=$(timeout 15 ssh -i "$key" -o BatchMode=yes -o ConnectTimeout=8 "$host" \
+  live=$(timeout 15 ssh -i "$key" -o BatchMode=yes -o ConnectTimeout=8 "$host" \
     'echo "$SSH_CLIENT"' 2>/dev/null | awk '{print $1}' || true)
-  if [[ -n "$lebend" ]] && ! grep -q "^$lebend " "$datei" 2>/dev/null; then
-    printf '%s %s  this machine, seen live\n' "$lebend" "$(date -u +%Y-%m-%d)" >> "$datei"
-    echo "  (new own address $lebend, written to $(basename "$datei"))" >&2
+  if [[ -n "$live" ]] && ! grep -q "^$live " "$list_file" 2>/dev/null; then
+    printf '%s %s  this machine, seen live\n' "$live" "$(date -u +%Y-%m-%d)" >> "$list_file"
+    echo "  (new own address $live, written to $(basename "$list_file"))" >&2
   fi
   {
     # tr, not word splitting: this file gets sourced by scripts, and one shell that does not split
     # an unquoted variable turns the whole list into a single line that matches no address.
     printf '%s' "${CP_OWN_IPS:-}" | tr ' ' '\n'
-    grep -v '^#' "$datei" | awk 'NF {print $1}'
+    grep -v '^#' "$list_file" | awk 'NF {print $1}'
   } | grep -v '^$' | sort -u | tr '\n' ' '
 }

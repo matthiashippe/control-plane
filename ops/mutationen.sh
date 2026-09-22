@@ -29,13 +29,13 @@ cd "$(dirname "$0")/.."
 
 FILTER="${1:-}"
 
-# datei :: name :: von :: nach. The separator is "::" and not "|", which was the bug that cost a
+# file :: name :: from :: to. The separator is "::" and not "|", which was the bug that cost a
 # cycle: the publication rule reads `const published = meins || submittedMs >= ...`, the split took
 # everything up to the first "|", the replacement produced `const published = true;|| submittedMs
 # >= ...`, and that file no longer parsed. vitest then collected 76 of 514 tests, which the guard
 # below reported as "says nothing" while I looked for the cause in stdin, in caching and in timing.
 # A separator that can appear in the thing being separated is not a separator.
-MUTATIONEN=(
+MUTATIONS=(
   "src/bounties/store.ts::fee rounds up instead of down::  return Math.floor((priceMc * FEE_PERCENT) / 100);::  return Math.ceil((priceMc * FEE_PERCENT) / 100);"
   "src/bounties/store.ts::fee is never taken::const fee = a.feeTo ? feeMc(bounty.price_mc) : 0;::const fee = 0;"
   "src/bounties/store.ts::winner is paid the full price::      deltaMc: bounty.price_mc - fee,::      deltaMc: bounty.price_mc,"
@@ -52,45 +52,45 @@ MUTATIONEN=(
 )
 
 # One run, numbers read from the JSON reporter rather than scraped off the summary line. The
-# first version called vitest twice per mutation and parsed the text: with no failures `rot`
+# first version called vitest twice per mutation and parsed the text: with no failures `red`
 # returned two lines and the comparison broke, so every mutation was reported as surviving while
 # the error messages beside it carried the true counts.
-lauf() {
-  local aus
-  aus=$(pnpm -s vitest run --reporter=json --silent < /dev/null 2>/dev/null | python3 -c '
+run_suite() {
+  local out
+  out=$(pnpm -s vitest run --reporter=json --silent < /dev/null 2>/dev/null | python3 -c '
 import json, sys
-roh = sys.stdin.read()
-i = roh.find("{")
+raw = sys.stdin.read()
+i = raw.find("{")
 if i < 0:
     print("none none"); raise SystemExit
 try:
-    d = json.loads(roh[i:])
+    d = json.loads(raw[i:])
 except ValueError:
     print("none none"); raise SystemExit
 print(d.get("numTotalTests", "none"), d.get("numFailedTests", "none"))
 ')
-  echo "$aus"
+  echo "$out"
 }
 
 echo "Breaking the load-bearing lines on purpose, one at a time"
 echo
-read -r basis basis_rot <<< "$(lauf)"
-if [[ "$basis" == "none" || "${basis_rot:-1}" != "0" ]]; then
-  echo "COULD NOT TELL: the baseline is not a clean green run (${basis} tests, ${basis_rot:-?} failing)." >&2
+read -r baseline baseline_red <<< "$(run_suite)"
+if [[ "$baseline" == "none" || "${baseline_red:-1}" != "0" ]]; then
+  echo "COULD NOT TELL: the baseline is not a clean green run (${baseline} tests, ${baseline_red:-?} failing)." >&2
   exit 2
 fi
-echo "  baseline: $basis test(s), all green"
+echo "  baseline: $baseline test(s), all green"
 echo
 
-ueberlebt=0
-unklar=0
-for eintrag in "${MUTATIONEN[@]}"; do
-  datei="${eintrag%%::*}"; rest="${eintrag#*::}"
+survived=0
+undetermined=0
+for entry in "${MUTATIONS[@]}"; do
+  file="${entry%%::*}"; rest="${entry#*::}"
   name="${rest%%::*}"; rest="${rest#*::}"
-  von="${rest%%::*}"; nach="${rest#*::}"
+  from="${rest%%::*}"; to="${rest#*::}"
   [[ -n "$FILTER" && "$name" != *"$FILTER"* ]] && continue
 
-  if ! python3 - "$datei" "$von" "$nach" <<'PY'
+  if ! python3 - "$file" "$from" "$to" <<'PY'
 import sys, pathlib
 p = pathlib.Path(sys.argv[1]); s = p.read_text()
 if s.count(sys.argv[2]) != 1:
@@ -100,43 +100,43 @@ p.write_text(s.replace(sys.argv[2], sys.argv[3], 1))
 PY
   then
     echo "  ----  $name: could not be applied, the code moved"
-    unklar=$((unklar + 1))
-    git checkout -- "$datei" 2>/dev/null
+    undetermined=$((undetermined + 1))
+    git checkout -- "$file" 2>/dev/null
     continue
   fi
 
-  read -r gesamt gefallen <<< "$(lauf)"
-  if [[ "$gesamt" != "$basis" ]]; then
+  read -r total failed <<< "$(run_suite)"
+  if [[ "$total" != "$baseline" ]]; then
     # Vitest caches under node_modules/.vite, and a file written and reverted in quick succession
     # sometimes makes it collect a subset: the receipts mutation reported 76 tests inside this
     # loop and 514 with 10 red when run on its own. One retry clears it; if it does not, the
     # result is still reported as saying nothing rather than as a pass.
-    read -r gesamt gefallen <<< "$(lauf)"
+    read -r total failed <<< "$(run_suite)"
   fi
-  git checkout -- "$datei"
+  git checkout -- "$file"
 
-  if [[ "$gesamt" == "none" || "$gesamt" != "$basis" ]]; then
-    echo "  ----  $name: the run executed ${gesamt:-no} test(s) against a baseline of $basis, so this says nothing"
+  if [[ "$total" == "none" || "$total" != "$baseline" ]]; then
+    echo "  ----  $name: the run executed ${total:-no} test(s) against a baseline of $baseline, so this says nothing"
     echo "        Run it by hand and read the numbers yourself:"
     echo "        python3 - <<'"'"'PY'"'"'"
-    echo "        import pathlib; p = pathlib.Path(\"$datei\"); s = p.read_text()"
+    echo "        import pathlib; p = pathlib.Path(\"$file\"); s = p.read_text()"
     echo "        p.write_text(s.replace(<the line>, <the replacement>, 1))"
     echo "        PY"
-    echo "        pnpm vitest run   # then: git checkout -- $datei"
-    unklar=$((unklar + 1))
-  elif [[ "${gefallen:-0}" -gt 0 ]]; then
-    printf '  ok    %-42s %s test(s) noticed\n' "$name" "$gefallen"
+    echo "        pnpm vitest run   # then: git checkout -- $file"
+    undetermined=$((undetermined + 1))
+  elif [[ "${failed:-0}" -gt 0 ]]; then
+    printf '  ok    %-42s %s test(s) noticed\n' "$name" "$failed"
   else
     printf '  ALIVE %-42s nothing noticed\n' "$name"
-    ueberlebt=$((ueberlebt + 1))
+    survived=$((survived + 1))
   fi
 done
 
 echo
-(( unklar )) && echo "$unklar mutation(s) could not be judged."
-if (( ueberlebt )); then
-  echo "MUTATIONS SURVIVED: $ueberlebt. A line nobody would miss is a line nobody is checking."
+(( undetermined )) && echo "$undetermined mutation(s) could not be judged."
+if (( survived )); then
+  echo "MUTATIONS SURVIVED: $survived. A line nobody would miss is a line nobody is checking."
   exit 1
 fi
-(( unklar )) && exit 2
+(( undetermined )) && exit 2
 echo "MUTATIONS OK: every one of them was noticed."

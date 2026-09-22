@@ -63,8 +63,8 @@ export function renderX402(points: X402Point[]): string {
   }
   const last = points[points.length - 1];
   const first = points[0];
-  const mit = last.dienste_cdp - (last.ohne_nachfragedaten ?? 0);
-  const anteilEiner = ((last.mit_einem_zahler / mit) * 100).toFixed(1);
+  const withDemand = last.dienste_cdp - (last.ohne_nachfragedaten ?? 0);
+  const shareWithOnePayer = ((last.mit_einem_zahler / withDemand) * 100).toFixed(1);
 
   // Which way the count of entries without demand data is going, taken from the data rather than
   // written down once. It said "and that number climbs" from the day the page was built. On
@@ -84,24 +84,24 @@ export function renderX402(points: X402Point[]): string {
   // front; that is the normal behaviour of a window and says nothing about late filling. What late
   // filling really costs is coverage: a service whose fields are still empty is in no demand total
   // at all. So the page now says that, and prints the movement instead of asserting a direction.
-  const vorTotal = points.length > 1 ? points[points.length - 2] : undefined;
-  const bewegung =
-    vorTotal === undefined
+  const previousPoint = points.length > 1 ? points[points.length - 2] : undefined;
+  const movement =
+    previousPoint === undefined
       ? "one scan is a reading, not a series"
-      : vorTotal.aufrufe_30d === last.aufrufe_30d
-        ? `unchanged since ${esc(day(vorTotal.stichtag))}`
-        : `${n(last.aufrufe_30d)} calls today against ${n(vorTotal.aufrufe_30d)} on ${esc(day(vorTotal.stichtag))}`;
+      : previousPoint.aufrufe_30d === last.aufrufe_30d
+        ? `unchanged since ${esc(day(previousPoint.stichtag))}`
+        : `${n(last.aufrufe_30d)} calls today against ${n(previousPoint.aufrufe_30d)} on ${esc(day(previousPoint.stichtag))}`;
 
-  const vorher = points.length > 1 ? points[points.length - 2].ohne_nachfragedaten : undefined;
-  const jetzt = last.ohne_nachfragedaten;
-  const richtung =
-    vorher === undefined || jetzt === undefined || vorher === jetzt
+  const withoutBefore = points.length > 1 ? points[points.length - 2].ohne_nachfragedaten : undefined;
+  const withoutNow = last.ohne_nachfragedaten;
+  const direction =
+    withoutBefore === undefined || withoutNow === undefined || withoutBefore === withoutNow
       ? ""
-      : jetzt > vorher
-        ? `, up from ${n(vorher)} yesterday`
-        : `, down from ${n(vorher)} yesterday`;
+      : withoutNow > withoutBefore
+        ? `, up from ${n(withoutBefore)} yesterday`
+        : `, down from ${n(withoutBefore)} yesterday`;
 
-  const reihe = points
+  const rowsHtml = points
     .slice()
     .reverse()
     .map(
@@ -134,8 +134,8 @@ export function renderX402(points: X402Point[]): string {
 
       <div class="claims" style="margin-top:1rem">
         <div>
-          <span><b>${anteilEiner}% of services with published demand had exactly one paying wallet</b>
-          <span class="w">${n(last.mit_einem_zahler)} of ${n(mit)}. A market does not consist of that many services with one payer each. What it looks like instead is a lot of people testing their own deployment.</span></span>
+          <span><b>${shareWithOnePayer}% of services with published demand had exactly one paying wallet</b>
+          <span class="w">${n(last.mit_einem_zahler)} of ${n(withDemand)}. A market does not consist of that many services with one payer each. What it looks like instead is a lot of people testing their own deployment.</span></span>
           <a href="https://github.com/matthiashippe/control-plane/tree/main/docs/research/data">the raw scan</a>
         </div>
         <div>
@@ -144,13 +144,13 @@ export function renderX402(points: X402Point[]): string {
           <a href="/">what we built instead</a>
         </div>
         <div>
-          <span><b>${n(last.ohne_nachfragedaten ?? 0)} entries carry no demand data at all${richtung}</b>
+          <span><b>${n(last.ohne_nachfragedaten ?? 0)} entries carry no demand data at all${direction}</b>
           <span class="w">Coinbase fills those fields in late, so every demand figure on this page
-          covers only the ${n(mit)} of ${n(last.dienste_cdp)} services in this scan that have them.
+          covers only the ${n(withDemand)} of ${n(last.dienste_cdp)} services in this scan that have them.
           The largest single service is ${n(last.groesster_aufrufe ?? 0)} calls,
           ${last.groesster_anteil}% of everything, and on 20 September that same service sat in the
           directory with its demand fields empty. The totals are one day's reading of a trailing
-          30-day window and not a running count, so they move both ways: ${bewegung}.</span></span>
+          30-day window and not a running count, so they move both ways: ${movement}.</span></span>
           <a href="https://github.com/matthiashippe/control-plane/tree/main/docs/research/data">check it</a>
         </div>
       </div>
@@ -158,7 +158,7 @@ export function renderX402(points: X402Point[]): string {
       <h3 style="margin:2.5rem 0 .6rem">Every scan since ${esc(day(first.stichtag))}</h3>
       <div class="scroll-x"><table>
         <thead><tr><th>day</th><th>services</th><th>calls / 30d</th><th>top ten</th><th>no demand data</th><th>largest service</th></tr></thead>
-        <tbody>${reihe}</tbody>
+        <tbody>${rowsHtml}</tbody>
       </table></div>
       <p class="sub" style="margin-top:1rem">
         The series is kept for good and the raw CSV of each day for sixty. If you want the whole

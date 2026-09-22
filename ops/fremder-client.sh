@@ -20,47 +20,47 @@
 #   ops/fremder-client.sh [base]
 set -uo pipefail
 BASE="${1:-${CP_URL:-https://cp.hippe.eu}}"
-fehler=0
+failures=0
 ok()  { echo "  ok      $1"; }
-bad() { fehler=$((fehler+1)); echo "  FAILED  $1"; [[ -n "${2:-}" ]] && echo "          ${2:0:160}"; }
+bad() { failures=$((failures+1)); echo "  FAILED  $1"; [[ -n "${2:-}" ]] && echo "          ${2:0:160}"; }
 
-hole() { curl -s -m 15 -w '\n%{http_code}' "$@"; }
+fetch() { curl -s -m 15 -w '\n%{http_code}' "$@"; }
 status() { printf '%s' "$1" | tail -1; }
-rumpf()  { printf '%s' "$1" | sed '$d'; }
+body_of()  { printf '%s' "$1" | sed '$d'; }
 
 echo "Can somebody who is not us get in? ($BASE)"
 echo
 echo "-- the base URL they guessed wrong, all six shapes from the log --"
-for pfad in /v1/status/v1/models /v1/auth/verify/v1/models /v1/submissions/v1/models \
+for path in /v1/status/v1/models /v1/auth/verify/v1/models /v1/submissions/v1/models \
             /v1/auth/api-keys/v1/models /v1/auth/nonce/v1/models /v1/credits/balance/v1/models; do
-  a=$(hole "$BASE$pfad"); code=$(status "$a"); body=$(rumpf "$a")
-  ziel=$(curl -s -m 15 -o /dev/null -w '%{redirect_url}' "$BASE$pfad")
+  a=$(fetch "$BASE$path"); code=$(status "$a"); body=$(body_of "$a")
+  target=$(curl -s -m 15 -o /dev/null -w '%{redirect_url}' "$BASE$path")
   if [[ "$code" != "308" ]]; then
-    bad "$pfad answers $code, not a redirect"; continue
+    bad "$path answers $code, not a redirect"; continue
   fi
   # The body is the whole point: a client that does not follow the redirect sees only this.
   if ! printf '%s' "$body" | grep -q "base_url_contains_a_path"; then
-    bad "$pfad redirects with nothing in the body" "$body"
+    bad "$path redirects with nothing in the body" "$body"
   elif ! printf '%s' "$body" | grep -q "bare origin"; then
-    bad "$pfad has a body that does not say what to set" "$body"
-  elif [[ "$ziel" != *"/v1/models" ]]; then
-    bad "$pfad redirects to $ziel"
+    bad "$path has a body that does not say what to set" "$body"
+  elif [[ "$target" != *"/v1/models" ]]; then
+    bad "$path redirects to $target"
   else
-    ok "$pfad: 308 to /v1/models, and the body names the base URL"
+    ok "$path: 308 to /v1/models, and the body names the base URL"
   fi
 done
 
 echo
 echo "-- the first call every OpenAI-compatible client makes --"
-a=$(hole "$BASE/v1/models"); code=$(status "$a"); body=$(rumpf "$a")
+a=$(fetch "$BASE/v1/models"); code=$(status "$a"); body=$(body_of "$a")
 if [[ "$code" == "200" ]] && printf '%s' "$body" | grep -q '"data"'; then
-  anzahl=$(printf '%s' "$body" | python3 -c 'import json,sys; print(len(json.load(sys.stdin)["data"]))' 2>/dev/null || echo "?")
-  ok "/v1/models without a key: 200, $anzahl model(s), so the URL can be checked before the key"
+  count=$(printf '%s' "$body" | python3 -c 'import json,sys; print(len(json.load(sys.stdin)["data"]))' 2>/dev/null || echo "?")
+  ok "/v1/models without a key: 200, $count model(s), so the URL can be checked before the key"
 else
   bad "/v1/models without a key answers $code" "$body"
 fi
-a=$(hole -H "Authorization: Bearer cnwy_k_definitelynotakey" "$BASE/v1/models")
-code=$(status "$a"); body=$(rumpf "$a")
+a=$(fetch -H "Authorization: Bearer cnwy_k_definitelynotakey" "$BASE/v1/models")
+code=$(status "$a"); body=$(body_of "$a")
 if [[ "$code" != "401" ]]; then
   bad "a wrong key on /v1/models answers $code, it has to stay 401" "$body"
 elif printf '%s' "$body" | grep -qi "without the Bearer"; then
@@ -74,13 +74,13 @@ fi
 echo
 echo "-- what the file for machines tells them --"
 llms=$(curl -s -m 15 "$BASE/llms.txt")
-for satz in "bare origin with no path" "GET /v1/models answers without a key" "raw or with the Bearer prefix"; do
-  printf '%s' "$llms" | grep -q "$satz" && ok "llms.txt says: $satz" || bad "llms.txt does not say: $satz"
+for sentence in "bare origin with no path" "GET /v1/models answers without a key" "raw or with the Bearer prefix"; do
+  printf '%s' "$llms" | grep -q "$sentence" && ok "llms.txt says: $sentence" || bad "llms.txt does not say: $sentence"
 done
 
 echo
 echo "-- and the way to a key, for somebody with no runtime --"
-a=$(hole "$BASE/v1/credits/balance"); code=$(status "$a"); body=$(rumpf "$a")
+a=$(fetch "$BASE/v1/credits/balance"); code=$(status "$a"); body=$(body_of "$a")
 if [[ "$code" == "401" ]] && printf '%s' "$body" | grep -q "v1/auth/nonce"; then
   ok "a protected path is shut and names the three auth calls"
 else
@@ -88,5 +88,5 @@ else
 fi
 
 echo
-if (( fehler == 0 )); then echo "THE WAY IN IS WALKABLE"; else echo "THE WAY IN IS BLOCKED: $fehler"; fi
-exit $(( fehler == 0 ? 0 : 1 ))
+if (( failures == 0 )); then echo "THE WAY IN IS WALKABLE"; else echo "THE WAY IN IS BLOCKED: $failures"; fi
+exit $(( failures == 0 ? 0 : 1 ))

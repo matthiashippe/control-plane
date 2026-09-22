@@ -2,7 +2,7 @@
  * Backup and restore, reproduced without Docker.
  *
  * Background: on 19.09.2026 `ops/backup.sh` had been running for days, but nobody had ever restored
- * a backup. The drill for that is in `ops/README.md`, section "Ein Backup zurueckspielen"; these
+ * a backup. The drill for that is in `ops/README.md`, section "Restoring a backup"; these
  * tests pin down the three places where it goes wrong.
  */
 import { execFileSync } from "node:child_process";

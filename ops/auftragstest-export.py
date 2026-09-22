@@ -27,12 +27,12 @@ NUMBER_WORD = {1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 6: "six",
                7: "seven", 8: "eight", 9: "nine"}
 
 MARKETS = [
-    {"markt": "Hamburg", "auftrag_datei": "auftrag-01.md", "unter": "",
-     "preis": "2.00 EUR", "art": "schoepferisch", "pruefung": "erfindungspruefung.json"},
-    {"markt": "Austin", "auftrag_datei": "auftrag-02-us.md", "unter": "us",
-     "preis": "5.00 USD", "art": "schoepferisch", "pruefung": "erfindungspruefung.json"},
-    {"markt": "Dubai", "auftrag_datei": "auftrag-03-dubai.md", "unter": "dubai",
-     "preis": "8.00 USD", "art": "faktisch", "pruefung": "erfindungspruefung.json"},
+    {"city": "Hamburg", "brief_file": "auftrag-01.md", "subdir": "",
+     "price": "2.00 EUR", "kind": "schoepferisch", "check": "erfindungspruefung.json"},
+    {"city": "Austin", "brief_file": "auftrag-02-us.md", "subdir": "us",
+     "price": "5.00 USD", "kind": "schoepferisch", "check": "erfindungspruefung.json"},
+    {"city": "Dubai", "brief_file": "auftrag-03-dubai.md", "subdir": "dubai",
+     "price": "8.00 USD", "kind": "faktisch", "check": "erfindungspruefung.json"},
 ]
 
 
@@ -52,9 +52,9 @@ def main() -> int:
     }
 
     for m in MARKETS:
-        folder = SOURCE / m["unter"] if m["unter"] else SOURCE
+        folder = SOURCE / m["subdir"] if m["subdir"] else SOURCE
         results = json.loads((folder / "ergebnisse.json").read_text(encoding="utf-8"))
-        check_file = folder / m["pruefung"]
+        check_file = folder / m["check"]
         findings = {}
         if check_file.exists():
             p = json.loads(check_file.read_text(encoding="utf-8"))
@@ -76,9 +76,9 @@ def main() -> int:
 
         production = round(sum(x["verkauf_usd"] for x in entries), 6)
         export["maerkte"].append({
-            "markt": m["markt"],
-            "auftragspreis": m["preis"],
-            "auftragsart": m["art"],
+            "markt": m["city"],
+            "auftragspreis": m["price"],
+            "auftragsart": m["kind"],
             "briefing": results["auftrag"],
             "modell": results["modell"],
             "bewerber": len(entries),

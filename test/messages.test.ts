@@ -633,11 +633,11 @@ describe("wrong HTTP method", () => {
     // /v1/auth/api-keys left this list on 2026-09-22, when GET became a real method on it: it
     // lists your own keys and therefore needs one. A GET without a key is a 401 and that is the
     // right answer. What still has to be a 405 is a method the path does not have at all.
-    const mitSchluessel = await app.request("/v1/auth/api-keys", { method: "GET" });
-    expect(mitSchluessel.status, "GET now exists there and needs a key").toBe(401);
-    const falsch = await app.request("/v1/auth/api-keys", { method: "DELETE" });
-    expect(falsch.status, "a method it does not have is still a 405").toBe(405);
-    expect(falsch.headers.get("allow")).toBe("GET, POST");
+    const getNeedsKey = await app.request("/v1/auth/api-keys", { method: "GET" });
+    expect(getNeedsKey.status, "GET now exists there and needs a key").toBe(401);
+    const wrongMethod = await app.request("/v1/auth/api-keys", { method: "DELETE" });
+    expect(wrongMethod.status, "a method it does not have is still a 405").toBe(405);
+    expect(wrongMethod.headers.get("allow")).toBe("GET, POST");
   });
 
   it("lets the right method through unchanged", async () => {
@@ -762,7 +762,7 @@ describe("the self-description names its own base", () => {
  * address spent 32 hours in that loop.
  */
 describe("the key formats the message names are the key formats that work", () => {
-  const schluessel = (db: Db, address: Address): string => {
+  const makeKey = (db: Db, address: Address): string => {
     const key = `cnwy_k_${"ab".repeat(16)}`;
     db.prepare("INSERT INTO wallets (address, balance_mc, created_at) VALUES (?, 0, ?)").run(
       address,
@@ -774,15 +774,15 @@ describe("the key formats the message names are the key formats that work", () =
     return key;
   };
 
-  it.each(["raw", "Bearer"] as const)("accepts a valid key sent %s", async (wie) => {
+  it.each(["raw", "Bearer"] as const)("accepts a valid key sent %s", async (how) => {
     const db = openDb(":memory:");
     const app = createApp({ db });
     const address = "0x1111111111111111111111111111111111111111" as Address;
-    const key = schluessel(db, address);
+    const key = makeKey(db, address);
     const res = await app.request("/v1/credits/balance", {
-      headers: { authorization: wie === "raw" ? key : `Bearer ${key}` },
+      headers: { authorization: how === "raw" ? key : `Bearer ${key}` },
     });
-    expect(res.status, `a valid key sent ${wie} has to be a valid key`).toBe(200);
+    expect(res.status, `a valid key sent ${how} has to be a valid key`).toBe(200);
   });
 
   it("does not blame the Bearer prefix, because the prefix is fine", async () => {
@@ -812,10 +812,10 @@ describe("wrong method, existing path", () => {
   it("answers 405 with Allow on the pages, not 404", async () => {
     const db = openDb(":memory:");
     const app = createApp({ db });
-    for (const pfad of ["/", "/jobs", "/post", "/receipts", "/x402"]) {
-      const res = await app.request(pfad, { method: "POST" });
-      expect(res.status, `POST ${pfad}`).toBe(405);
-      expect(res.headers.get("allow"), `Allow on ${pfad}`).toBe("GET");
+    for (const path of ["/", "/jobs", "/post", "/receipts", "/x402"]) {
+      const res = await app.request(path, { method: "POST" });
+      expect(res.status, `POST ${path}`).toBe(405);
+      expect(res.headers.get("allow"), `Allow on ${path}`).toBe("GET");
       const body = (await res.json()) as { error: string; message: string; allow: string[] };
       expect(body.error).toBe("method_not_allowed");
       expect(body.message, "it has to name the method that works").toContain("accepts GET");
@@ -828,9 +828,9 @@ describe("wrong method, existing path", () => {
     // so those stay 404 too, which is the safe direction.
     const db = openDb(":memory:");
     const app = createApp({ db });
-    for (const pfad of ["/gibtsnicht", "/v1/nonsense"]) {
-      const res = await app.request(pfad, { method: "POST" });
-      expect(res.status, `POST ${pfad}`).toBe(404);
+    for (const path of ["/doesnotexist", "/v1/nonsense"]) {
+      const res = await app.request(path, { method: "POST" });
+      expect(res.status, `POST ${path}`).toBe(404);
     }
   });
 

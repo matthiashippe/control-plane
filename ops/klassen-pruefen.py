@@ -41,54 +41,54 @@ import sys
 import urllib.error
 import urllib.request
 
-SEITEN = ["/", "/post", "/terms", "/jobs", "/receipts", "/x402", "/conway"]
+PAGES = ["/", "/post", "/terms", "/jobs", "/receipts", "/x402", "/conway"]
 
 
 
-def hole(url: str) -> str:
+def fetch(url: str) -> str:
     req = urllib.request.Request(url, headers={"User-Agent": "control-plane-check/1.0 (+https://cp.hippe.eu)"})
     with urllib.request.urlopen(req, timeout=20) as r:
         return r.read().decode("utf-8", "replace")
 
 
 def main() -> int:
-    basis = (sys.argv[1] if len(sys.argv) > 1 else "https://cp.hippe.eu").rstrip("/")
-    fehler = 0
-    for pfad in SEITEN:
+    base = (sys.argv[1] if len(sys.argv) > 1 else "https://cp.hippe.eu").rstrip("/")
+    failures = 0
+    for path in PAGES:
         try:
-            html = hole(basis + pfad)
+            html = fetch(base + path)
         except (urllib.error.URLError, TimeoutError) as e:
-            print(f"FEHLER  {pfad}: {e}")
+            print(f"ERROR   {path}: {e}")
             return 2
-        stil = "".join(re.findall(r"<style>([\s\S]*?)</style>", html))
-        if not stil:
-            print(f"FAILED  {pfad}: no stylesheet in the served page at all")
-            fehler += 1
+        style = "".join(re.findall(r"<style>([\s\S]*?)</style>", html))
+        if not style:
+            print(f"FAILED  {path}: no stylesheet in the served page at all")
+            failures += 1
             continue
         # An id-scoped rule styles one place on one page and cannot be what makes a class work
         # wherever it is used, so those selectors do not count as a definition.
-        ohne_id = "\n".join(
-            regel for regel in re.findall(r"[^{}]+\{[^{}]*\}", stil) if "#" not in regel.split("{")[0]
+        without_id = "\n".join(
+            rule for rule in re.findall(r"[^{}]+\{[^{}]*\}", style) if "#" not in rule.split("{")[0]
         )
-        definiert = set(re.findall(r"\.([A-Za-z][\w-]*)", ohne_id))
+        defined = set(re.findall(r"\.([A-Za-z][\w-]*)", without_id))
         # Inside an <svg> a class is as often a name as a hook: `n0`, `a1`, `wires`, `marks` say
         # which box is which and are never meant to be styled, while the rules that do style the
         # diagram reach in from outside (`.flow .w1`). Counting those would mean keeping an
         # allow-list, and an allow-list is a hole in a check. Cutting the SVGs out is exact.
-        ohne_svg = re.sub(r"<svg[\s\S]*?</svg>", " ", html)
-        benutzt: set[str] = set()
-        for attr in re.findall(r'class="([^"]*)"', ohne_svg):
-            benutzt.update(k for k in attr.split() if k)
-        offen = sorted(benutzt - definiert)
+        without_svg = re.sub(r"<svg[\s\S]*?</svg>", " ", html)
+        used: set[str] = set()
+        for attr in re.findall(r'class="([^"]*)"', without_svg):
+            used.update(k for k in attr.split() if k)
+        unstyled = sorted(used - defined)
 
-        if offen:
-            print(f"FAILED  {pfad}: {len(offen)} class(es) with no rule: {', '.join(offen[:8])}")
-            fehler += 1
+        if unstyled:
+            print(f"FAILED  {path}: {len(unstyled)} class(es) with no rule: {', '.join(unstyled[:8])}")
+            failures += 1
         else:
-            print(f"ok      {pfad}: {len(benutzt)} class(es), every one of them styled")
+            print(f"ok      {path}: {len(used)} class(es), every one of them styled")
     print()
-    if fehler:
-        print(f"CLASSES FAILED: {fehler} page(s) render against rules that do not exist")
+    if failures:
+        print(f"CLASSES FAILED: {failures} page(s) render against rules that do not exist")
         return 1
     print("CLASSES OK")
     return 0

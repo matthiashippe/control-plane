@@ -62,10 +62,10 @@ describe("The market on the landing page", () => {
     // which is the worst kind of wrong: correct by coincidence on the day somebody checks and
     // wrong the first time anybody competes twice. Our own seed agents do exactly that.
     const { db, app, fresh } = setup();
-    const kaeufer = buyer(db, app, 1);
+    const poster = buyer(db, app, 1);
     const ids: string[] = [];
     for (let i = 0; i < 2; i++) {
-      const res = await kaeufer.call("/v1/bounties", "POST", {
+      const res = await poster.call("/v1/bounties", "POST", {
         brief: `FACT SHEET number ${i}.\n\nA brief with enough words in it to be posted at all.`,
         kind: "factual",
         price_cents: 20,
@@ -173,13 +173,13 @@ describe("The market on the landing page", () => {
 
     // One of ours, by the name on its key: ops/compete.ts names them ops-seed-<persona>, and
     // `ops-%` is on OUR_KEY_NAMES in src/bounties/ours.ts.
-    const unser = privateKeyToAccount(generatePrivateKey()).address.toLowerCase();
-    db.prepare("INSERT INTO wallets (address, balance_mc, created_at) VALUES (?, 0, ?)").run(unser, new Date().toISOString());
+    const ours = privateKeyToAccount(generatePrivateKey()).address.toLowerCase();
+    db.prepare("INSERT INTO wallets (address, balance_mc, created_at) VALUES (?, 0, ?)").run(ours, new Date().toISOString());
     db.prepare("INSERT INTO api_keys (address, key_hash, key_prefix, name, created_at) VALUES (?, ?, ?, ?, ?)").run(
-      unser, hashApiKey("cnwy_k_" + "8e".repeat(16)), "cnwy_k_seed000", "ops-seed-vera", new Date().toISOString(),
+      ours, hashApiKey("cnwy_k_" + "8e".repeat(16)), "cnwy_k_seed000", "ops-seed-vera", new Date().toISOString(),
     );
     db.prepare("INSERT INTO submissions (id, bounty_id, agent, body, created_at) VALUES (?, ?, ?, ?, ?)").run(
-      "s-unser", id, unser, "our work", new Date().toISOString(),
+      "s-ours", id, ours, "our work", new Date().toISOString(),
     );
 
     const card = /<article class="job">[\s\S]*?A job our own agent enters\.[\s\S]*?<\/article>/.exec(await fresh());

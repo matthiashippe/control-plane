@@ -68,45 +68,45 @@ async function main(): Promise<void> {
     body: JSON.stringify({ name: "ops-keys-zurueckgeben" }),
   });
   const key = (keyBody.apiKey ?? keyBody.api_key ?? keyBody.key) as string;
-  const eigenes = (keyBody.key_prefix ?? keyBody.keyPrefix ?? "") as string;
+  const ownPrefix = (keyBody.key_prefix ?? keyBody.keyPrefix ?? "") as string;
 
   const { keys } = (await call("/v1/auth/api-keys", key)) as {
     keys: { key_prefix: string; name: string; created_at: string; active: boolean }[];
   };
-  const offen = keys.filter((k) => k.active && k.key_prefix !== eigenes);
+  const outstanding = keys.filter((k) => k.active && k.key_prefix !== ownPrefix);
   console.log(`${account.address}`);
   console.log(`  ${keys.length} key(s) on file, ${keys.filter((k) => k.active).length} active`);
-  console.log(`  ${offen.length} to hand back, plus the one this run is holding`);
+  console.log(`  ${outstanding.length} to hand back, plus the one this run is holding`);
 
-  const namen = new Map<string, number>();
-  for (const k of offen) namen.set(k.name, (namen.get(k.name) ?? 0) + 1);
-  for (const [name, anzahl] of [...namen].sort((a, b) => b[1] - a[1])) console.log(`    ${String(anzahl).padStart(4)}  ${name}`);
+  const byName = new Map<string, number>();
+  for (const k of outstanding) byName.set(k.name, (byName.get(k.name) ?? 0) + 1);
+  for (const [name, count] of [...byName].sort((a, b) => b[1] - a[1])) console.log(`    ${String(count).padStart(4)}  ${name}`);
 
   if (flag("dry")) {
     console.log("\nDRY  nothing revoked.");
     return;
   }
 
-  let weg = 0;
-  let schief = 0;
-  for (const k of offen) {
+  let revoked = 0;
+  let failed = 0;
+  for (const k of outstanding) {
     try {
       await call("/v1/auth/api-keys/revoke", key, { method: "POST", body: JSON.stringify({ key_prefix: k.key_prefix }) });
-      weg++;
+      revoked++;
     } catch (e) {
-      schief++;
-      if (schief <= 3) console.log(`    could not revoke ${k.key_prefix}: ${(e as Error).message}`);
+      failed++;
+      if (failed <= 3) console.log(`    could not revoke ${k.key_prefix}: ${(e as Error).message}`);
     }
   }
-  console.log(`\n${weg} handed back${schief ? `, ${schief} refused` : ""}.`);
+  console.log(`\n${revoked} handed back${failed ? `, ${failed} refused` : ""}.`);
 
   // And this run's own key, last, because everything above needed it.
-  await call("/v1/auth/api-keys/revoke", key, { method: "POST", body: JSON.stringify({ key_prefix: eigenes }) });
+  await call("/v1/auth/api-keys/revoke", key, { method: "POST", body: JSON.stringify({ key_prefix: ownPrefix }) });
   console.log("Including the one this run was holding. That wallet now has no active key.");
 }
 
-const alsSkript = process.argv[1] && import.meta.url.endsWith(process.argv[1].split("/").pop() ?? "\0");
-if (alsSkript) {
+const runAsScript = process.argv[1] && import.meta.url.endsWith(process.argv[1].split("/").pop() ?? "\0");
+if (runAsScript) {
   main().catch((e) => {
     console.error("HANDING BACK FAILED:", (e as Error).message);
     process.exit(1);

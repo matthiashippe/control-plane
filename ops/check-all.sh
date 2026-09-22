@@ -30,13 +30,13 @@ DEEP=0
 # whenever the last successful run is more than a day old. `--deep` still forces one.
 STAMPS="${CP_PROBE_STAMPS:-.scratch/probes}"
 mkdir -p "$STAMPS"
-faellig() {
+due() {
   local stamp="$STAMPS/$1"
   [[ ! -f "$stamp" ]] && return 0
-  local alter=$(( $(date -u +%s) - $(date -u -r "$stamp" +%s 2>/dev/null || echo 0) ))
-  (( alter > ${CP_PROBE_MAX_AGE:-86400} ))
+  local age=$(( $(date -u +%s) - $(date -u -r "$stamp" +%s 2>/dev/null || echo 0) ))
+  (( age > ${CP_PROBE_MAX_AGE:-86400} ))
 }
-if faellig mcp-production || faellig skill-production; then
+if due mcp-production || due skill-production; then
   DEEP=1
   echo "(the production probes are due: their last clean run is more than a day old)"
 fi
@@ -48,13 +48,13 @@ fi
 # about us. Until 2026-09-22 there was no third answer, so one such timeout printed CHECKS FAILED
 # for the loudest alarm this project has, next to a protocol entry claiming all seven were green.
 #
-# The third state is opt-in per check, via `--unklar-bei <code>`, because a check that is allowed
-# to shrug is a check that can stop working in silence.
-declare -a PASSED=() FAILED=() UNKLAR=()
+# The third state is opt-in per check, via `--undetermined-on <code>`, because a check that is
+# allowed to shrug is a check that can stop working in silence.
+declare -a PASSED=() FAILED=() UNDETERMINED=()
 
 run() {
-  local unklar=""
-  if [[ "$1" == "--unklar-bei" ]]; then unklar="$2"; shift 2; fi
+  local undetermined=""
+  if [[ "$1" == "--undetermined-on" ]]; then undetermined="$2"; shift 2; fi
   local name="$1"; shift
   local out
   out=$("$@" 2>&1)
@@ -62,8 +62,8 @@ run() {
   if (( code == 0 )); then
     PASSED+=("$name")
     printf '  ok    %-34s %s\n' "$name" "$(printf '%s' "$out" | tail -1 | cut -c1-60)"
-  elif [[ -n "$unklar" ]] && (( code == unklar )); then
-    UNKLAR+=("$name")
+  elif [[ -n "$undetermined" ]] && (( code == undetermined )); then
+    UNDETERMINED+=("$name")
     printf '  ----  %-34s %s\n' "$name" "$(printf '%s' "$out" | tail -2 | head -1 | cut -c1-60)"
   else
     FAILED+=("$name")
@@ -80,8 +80,8 @@ run() {
 # Which of these checks has ever been shown to fail?
 #
 # A check that has never gone red is a check nobody has verified, and this repo says so about
-# tests in loop-constraints.md ("Ein Test, der ohne den zugehoerigen Fix gruen bleibt, ist kein
-# Test"). On 2026-09-22 the same question was put to the twelve below, one at a time, by breaking
+# tests in loop-constraints.md ("a test that stays green without the fix it belongs to is not
+# a test"). On 2026-09-22 the same question was put to the twelve below, one at a time, by breaking
 # what each one guards:
 #
 #   health              a wrong URL answers 000, the check reports it
@@ -109,7 +109,7 @@ run "health from outside" bash -c "code=\$(curl -s -o /dev/null -m 10 -w '%{http
 
 # Our own public claim about Conway. Returns 1 when their onboarding works again, which would make
 # the front page untrue.
-run --unklar-bei 2 "conway still broken" ./ops/conway-zustand.sh
+run --undetermined-on 2 "conway still broken" ./ops/conway-zustand.sh
 
 run "market guards" env CP_URL="$BASE" pnpm -s tsx harness/e2e/markt.ts
 run "journeys match the service" ./ops/journeys-pruefen.sh
@@ -130,23 +130,23 @@ run "the daily jobs still ran" ./ops/freshness.sh
 # Undetermined rather than red when GitHub cannot be reached: it exits 2 for an unreachable file,
 # and a rate limit at api.github.com is not a finding about our claims. Same rule as Conway's
 # sign-up, for the same reason.
-run --unklar-bei 2 "our claims about the runtime hold" python3 ./ops/upstream-claims.py
+run --undetermined-on 2 "our claims about the runtime hold" python3 ./ops/upstream-claims.py
 
 # Every published dataset against the CSV beside it. See ops/daten-pruefen.py: the file that
 # carried the article's numbers was built by hand, survived the correction of its own source, and
 # the README two sections down described the discrepancy while recommending the file.
-run --unklar-bei 2 "the published data reproduces" ./ops/daten-pruefen.py
+run --undetermined-on 2 "the published data reproduces" ./ops/daten-pruefen.py
 
 # Whether anything that indexes the web has ever looked at this service, and whether our side of
 # that is in order. The first crawler is news; until then the line is the finding. See
 # ops/sichtbarkeit.sh: in the first 2.6 days there was not one, and nothing on our side is wrong.
-run --unklar-bei 2 "search engines can find us" ./ops/sichtbarkeit.sh
+run --undetermined-on 2 "search engines can find us" ./ops/sichtbarkeit.sh
 
 # Every command a page shows, run against the live service. The unit tests prove a page agrees
 # with the code in this checkout; this asks whether it agrees with what is deployed, and whether
 # the answer the hero prints beside its call is the answer the service gives. See
 # ops/befehle-pruefen.sh.
-run --unklar-bei 2 "the commands the pages show work" ./ops/befehle-pruefen.sh
+run --undetermined-on 2 "the commands the pages show work" ./ops/befehle-pruefen.sh
 
 # Can somebody who has not read the source get in? Three faults on 2026-09-22 said no, and all
 # three were invisible from in here: every answer involved was correct and none was any use.
@@ -166,20 +166,20 @@ fi
 # every cycle, which means its result quietly ages. On 2026-09-22 its last run was fifteen hours,
 # 96 commits and twelve deploys behind, and the deploys in between had changed exactly the
 # endpoints it walks. Printed, not failed: it is a reminder and not a finding.
-alter_des_belegs() {
-  local stempel="$1" was="$2" wie="$3"
-  if [[ ! -f "$STAMPS/$stempel" ]]; then
-    echo "$was: never proven on this checkout. $wie"
+age_of_the_proof() {
+  local stamp="$1" label="$2" how="$3"
+  if [[ ! -f "$STAMPS/$stamp" ]]; then
+    echo "$label: never proven on this checkout. $how"
     return
   fi
-  local zeit commit alter neu
-  read -r zeit commit < "$STAMPS/$stempel"
-  alter=$(( ($(date -u +%s) - $(date -u -jf %Y-%m-%dT%H:%M:%SZ "$zeit" +%s 2>/dev/null || date -u -d "$zeit" +%s 2>/dev/null || echo 0)) / 3600 ))
-  neu=$(git log --oneline "$commit..HEAD" 2>/dev/null | wc -l | tr -d ' ')
-  echo "$was last proven ${alter}h ago at ${commit}, ${neu:-?} commit(s) ago ($wie)"
+  local proven_at commit age commits_since
+  read -r proven_at commit < "$STAMPS/$stamp"
+  age=$(( ($(date -u +%s) - $(date -u -jf %Y-%m-%dT%H:%M:%SZ "$proven_at" +%s 2>/dev/null || date -u -d "$proven_at" +%s 2>/dev/null || echo 0)) / 3600 ))
+  commits_since=$(git log --oneline "$commit..HEAD" 2>/dev/null | wc -l | tr -d ' ')
+  echo "$label last proven ${age}h ago at ${commit}, ${commits_since:-?} commit(s) ago ($how)"
 }
-alter_des_belegs kaltstart "cold start" "ops/neuling-probe.ts, costs a grant"
-alter_des_belegs sicherung "backup restore" "ops/sicherung-probe.sh, costs nothing"
+age_of_the_proof kaltstart "cold start" "ops/neuling-probe.ts, costs a grant"
+age_of_the_proof sicherung "backup restore" "ops/sicherung-probe.sh, costs nothing"
 
 echo
 # The one number the plan hangs on, printed last so it is the thing left on the screen.
@@ -203,11 +203,11 @@ print(f\"foreign buyers: {m['foreign_buyers']}   foreign agents: {m['foreign_age
       f\"starter pool left: {m['starter_pool_left_mc']/1000:.0f} c \"
       f\"(of {m['starter_granted']} grants, {m['starter_granted_ours']} to us)\")
 print(f\"written off by the token estimate: {u/1000:.2f} c\")
-unbekannt = m.get('unclassified_key_names', [])
-for name in unbekannt:
+unknown = m.get('unclassified_key_names', [])
+for name in unknown:
     print(f\"FAILED  a key named '{name}' is on neither list. Either a tool of ours forgot to \"
           f\"register its name in ops/db-report.cjs, or somebody who is not us showed up.\")
-if unbekannt:
+if unknown:
     # Not a LOOK any more. While a name is unclassified, every number that splits us from the
     # market is wrong by an unknown amount, and foreign_buyers is the number the whole plan hangs
     # on. Four times in one day a tool of ours arrived without its name and a number about the
@@ -215,15 +215,15 @@ if unbekannt:
     # carried on. Either it is ours and belongs on the list, or it is a stranger and is the best
     # news this project has had, and both deserve more than a line somebody skims.
     sys.exit(3)
-fremd = db.get('wallets_foreign')
-if fremd is not None:
-    liste = [w['address'] if isinstance(w, dict) else w for w in db.get('wallets_foreign_list', [])]
-    kurz = ', '.join(a[:10] + '…' for a in liste[:5]) + ('' if len(liste) <= 5 else ', …')
-    print(f\"wallets: {db['wallets']} in total, {fremd} of them not ours{': ' + kurz if kurz.strip(', …') else ''}\")
-aktiv = db.get('wallets_foreign_active')
-if aktiv is not None:
-    print(f\"strangers who have thought here: {aktiv}\"
-          + ('' if aktiv else '   (the step between provisioning and paying, and nothing counted it until 22.09.)'))
+foreign = db.get('wallets_foreign')
+if foreign is not None:
+    addresses = [w['address'] if isinstance(w, dict) else w for w in db.get('wallets_foreign_list', [])]
+    short = ', '.join(a[:10] + '…' for a in addresses[:5]) + ('' if len(addresses) <= 5 else ', …')
+    print(f\"wallets: {db['wallets']} in total, {foreign} of them not ours{': ' + short if short.strip(', …') else ''}\")
+active = db.get('wallets_foreign_active')
+if active is not None:
+    print(f\"strangers who have thought here: {active}\"
+          + ('' if active else '   (the step between provisioning and paying, and nothing counted it until 22.09.)'))
 # Printed loudly rather than as a count that moved. A stranger provisioning is the second biggest
 # thing that can happen on this service, and on 2026-09-22 one did while the only sign was a total
 # going from 2 to 3.
@@ -231,10 +231,10 @@ for w in db.get('wallets_foreign_new_24h', []):
     print(f\"NEW     {w['address']} provisioned {w['created_at'][11:16]} UTC, \"
           f\"key {', '.join(w['key_names']) or '(none)'}, \"
           f\"{'has used it' if w['used'] else 'has not used it yet'}\")
-uebrig = m.get('starter_grants_left', 0)
-print(f\"newcomers the starter pool still carries: {uebrig}\")
-if uebrig < 3:
-    print(f\"FAILED  the starter pool carries {uebrig} more newcomer(s). /fix, the landing page \"
+left = m.get('starter_grants_left', 0)
+print(f\"newcomers the starter pool still carries: {left}\")
+if left < 3:
+    print(f\"FAILED  the starter pool carries {left} more newcomer(s). /fix, the landing page \"
           f\"and /post all promise a fresh wallet 15 cents, and that promise is about this pot. \"
           f\"Three is the last point at which one probe run cannot empty it before a stranger \"
           f\"arrives. Raise POOL_MC in src/credits/starter.ts, which is Matthias' money, or stop \"
@@ -249,11 +249,11 @@ if m.get('stray_submissions_on_open', 0):
           f\"live job. That is a check that escaped its throwaway, not the seeding, and the open \"
           f\"list publishes the count.\")
     sys.exit(3)
-" || markt_hygiene=$?
+" || market_hygiene=$?
   # `|| true` used to swallow everything here, which was right for "no JSON to read" and wrong for
   # a real finding: exit 3 from the block above meant nothing at all. Only that one code counts as
   # a failure, so a missing report is still tolerated and a dirty market is not.
-  if [[ "${markt_hygiene:-0}" == "3" ]]; then
+  if [[ "${market_hygiene:-0}" == "3" ]]; then
     FAILED+=("market hygiene")
   fi
 else
@@ -275,23 +275,23 @@ echo
 #
 # The VM only hands over two lines; the reading happens locally, because a nested heredoc over ssh
 # is a quoting puzzle and this is a diagnostic, not a place to be clever.
-reihen=$(timeout 25 ssh -i "${CP_SSH_KEY:-$HOME/.ssh/id_ed25519_automaton}" -o BatchMode=yes -o ConnectTimeout=8 \
+series=$(timeout 25 ssh -i "${CP_SSH_KEY:-$HOME/.ssh/id_ed25519_automaton}" -o BatchMode=yes -o ConnectTimeout=8 \
   "${CP_HOST:-root@76.13.144.207}" \
   'echo "x402 $(wc -l < /opt/control-plane/x402/kennzahlen.ndjson 2>/dev/null || echo 0) $(tail -1 /opt/control-plane/x402/kennzahlen.ndjson 2>/dev/null)";
    echo "conway $(wc -l < /opt/control-plane/conway/repo.ndjson 2>/dev/null || echo 0) $(tail -1 /opt/control-plane/conway/repo.ndjson 2>/dev/null)";
    echo "money $(wc -l < /opt/control-plane/conway-money/metrics.ndjson 2>/dev/null || echo 0) $(tail -1 /opt/control-plane/conway-money/metrics.ndjson 2>/dev/null)"' 2>/dev/null)
 
-if [[ -n "$reihen" ]]; then
-  printf '%s\n' "$reihen" | python3 -c "
+if [[ -n "$series" ]]; then
+  printf '%s\n' "$series" | python3 -c "
 import json, sys
-for zeile in sys.stdin:
-    teile = zeile.strip().split(' ', 2)
-    if len(teile) < 3 or not teile[2].startswith('{'):
-        print(f'{teile[0] if teile else \"?\"} series: no point yet')
+for line in sys.stdin:
+    parts = line.strip().split(' ', 2)
+    if len(parts) < 3 or not parts[2].startswith('{'):
+        print(f'{parts[0] if parts else \"?\"} series: no point yet')
         continue
-    name, n, roh = teile[0], teile[1], teile[2]
+    name, n, raw = parts[0], parts[1], parts[2]
     try:
-        d = json.loads(roh)
+        d = json.loads(raw)
     except json.JSONDecodeError:
         print(f'{name} series: the last line is not readable')
         continue
@@ -315,17 +315,17 @@ else
 fi
 
 echo
-gesamt=$(( ${#PASSED[@]} + ${#FAILED[@]} + ${#UNKLAR[@]} ))
+total=$(( ${#PASSED[@]} + ${#FAILED[@]} + ${#UNDETERMINED[@]} ))
 if (( ${#FAILED[@]} == 0 )); then
   # An undetermined check is not a pass, and the summary line is what gets copied into the
   # protocol, so it has to carry the difference or the protocol inherits the lie.
-  if (( ${#UNKLAR[@]} )); then
-    echo "CHECKS OK (${#PASSED[@]} of $gesamt), NOT DETERMINED: ${UNKLAR[*]}"
+  if (( ${#UNDETERMINED[@]} )); then
+    echo "CHECKS OK (${#PASSED[@]} of $total), NOT DETERMINED: ${UNDETERMINED[*]}"
   else
-    echo "ALL CHECKS OK (${#PASSED[@]} of $gesamt)"
+    echo "ALL CHECKS OK (${#PASSED[@]} of $total)"
   fi
   exit 0
 fi
 echo "CHECKS FAILED: ${FAILED[*]}"
-(( ${#UNKLAR[@]} )) && echo "NOT DETERMINED: ${UNKLAR[*]}"
+(( ${#UNDETERMINED[@]} )) && echo "NOT DETERMINED: ${UNDETERMINED[*]}"
 exit 1
