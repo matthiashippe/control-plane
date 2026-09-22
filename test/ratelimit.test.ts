@@ -3,6 +3,35 @@ import { createApp } from "../src/app.js";
 import { cleanupExpired, openDb } from "../src/db.js";
 import { clientKey, RateLimiter } from "../src/ratelimit.js";
 
+describe("what the rate limit is for", () => {
+  it("bounds the keyless paths and leaves the authenticated ones alone", async () => {
+    // The limit exists because /v1/auth/nonce and friends write to the database on the word of a
+    // stranger. Matching them by prefix caught two paths that do need a key: GET
+    // /v1/auth/api-keys lists your own, POST /v1/auth/api-keys/revoke turns one off. Handing back
+    // 64 leftover keys hit a 429 after 52 of them, which is how this was found.
+    const db = openDb(":memory:");
+    const app = createApp({ db, rateLimit: { limit: 3, windowMs: 60_000 } });
+
+    // Three keyless POSTs are the budget; the fourth is refused.
+    for (let i = 0; i < 3; i++) {
+      expect((await app.request("/v1/auth/nonce", { method: "POST" })).status, `nonce ${i}`).toBe(200);
+    }
+    expect((await app.request("/v1/auth/nonce", { method: "POST" })).status).toBe(429);
+
+    // The authenticated paths are not spending that budget: they answer 401 for want of a key,
+    // which is the auth middleware and not the limiter.
+    for (let i = 0; i < 5; i++) {
+      expect((await app.request("/v1/auth/api-keys", { method: "GET" })).status, `list ${i}`).toBe(401);
+      const res = await app.request("/v1/auth/api-keys/revoke", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ key_prefix: "cnwy_k_1111111" }),
+      });
+      expect(res.status, `revoke ${i}`).toBe(401);
+    }
+  });
+});
+
 describe("RateLimiter", () => {
   it("lets the limit through and blocks afterwards until the window expires", () => {
     let now = 1_000_000;

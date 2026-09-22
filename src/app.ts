@@ -244,12 +244,26 @@ export function createApp(opts: AppOptions) {
 
   const rateLimitOpts: RateLimitOptions = opts.rateLimit ?? { limit: 60, windowMs: 60_000 };
   const limiter = opts.rateLimit === null ? null : new RateLimiter(rateLimitOpts);
-  const OPEN_PATHS = ["/v1/auth/nonce", "/v1/auth/verify", "/v1/auth/api-keys", "/pay/"];
+  // The limit is for the paths anybody can reach without a key, because those write to the
+  // database on the word of a stranger. Matching them by prefix caught two that do need one.
+  //
+  // `GET /v1/auth/api-keys` lists your own keys and `POST /v1/auth/api-keys/revoke` turns one off;
+  // both came in on 2026-09-22 and both start with `/v1/auth/api-keys`, so both landed under a
+  // limit meant for the keyless. Handing back 64 leftover keys hit a 429 after 52 of them, which
+  // is how this was found. An authenticated caller is not a stranger and is already bounded by
+  // having signed in at all.
+  //
+  // Exact paths, one prefix. A prefix match is what put a child path under its parent's rule.
+  const OPEN_PATHS = ["/v1/auth/nonce", "/v1/auth/verify", "/v1/auth/api-keys"];
+  const OPEN_PREFIXES = ["/pay/"];
   if (limiter) {
     const windowSec = Math.round(rateLimitOpts.windowMs / 1000);
     app.use("*", async (c, next) => {
       const reqPath = c.req.path;
-      if (!OPEN_PATHS.some((p) => reqPath.startsWith(p))) return next();
+      const keyless =
+        (OPEN_PATHS.includes(reqPath) && c.req.method === "POST") ||
+        OPEN_PREFIXES.some((p) => reqPath.startsWith(p));
+      if (!keyless) return next();
       const { allowed, retryAfterSec } = limiter.check(clientKey(c.req.raw.headers));
       if (!allowed) {
         c.header("Retry-After", String(retryAfterSec));
