@@ -368,17 +368,24 @@ export function createApp(opts: AppOptions) {
    * in, with no cookie, no identifier and no third party. `no-store`, because a cached pixel is a
    * reader the count would lose.
    *
-   * Unverified in a browser, deliberately, and with a date on it. In the Chrome this session
-   * drives, no `loading="lazy"` image loads at all: not these, not a plain 40x40 one in the middle
-   * of the viewport, while the identical image with `loading="eager"` loads instantly. That is
-   * this environment and not a property of the browsers strangers use, but it means the mechanism
-   * here rests on documented behaviour rather than on a measurement of our own, which is not how
-   * anything else in this repo is allowed to work.
+   * Measured on 2026-09-22, and the answer is not the one the first version of this comment gave.
    *
-   * What makes shipping it defensible is the control: if lazy never fires in the wild either,
-   * `ops/depth.sh` prints NOT MEASURING and nobody is misled by a zero. So the deal is dated. If
-   * by 2026-09-24 browsers have loaded the page and no control pixel has arrived, the mechanism
-   * does not work and these four lines come out again.
+   * Headless Chrome does not defer these at all. Both `--headless` and `--headless=new`, at
+   * 1280x900 and at a 390x700 phone viewport, load the page and fetch all five pixels within a
+   * tenth of a second, including `end` which sits 3312 px down, five screens below the fold on the
+   * phone size. So every headless renderer that visits looks exactly like a reader who scrolled to
+   * the bottom, which is what 34.116.225.162 and 34.116.146.142 did on this day.
+   *
+   * A real browser is different, and there is one measurement of that too. 80.218.182.64, a
+   * Firefox on Windows arriving from a GitHub issue, fetched `top` at 18:03:49 and `proof` at
+   * 18:04:11. Twenty-two seconds apart. Lazy loading fired for one and not the other, which is
+   * what scrolling looks like and what no renderer produces.
+   *
+   * That is why the tools do not count marks, they count the GAPS between them: a mark that
+   * arrives more than a second after the previous one is a scroll event, and a fistful arriving
+   * together is a renderer. `ops/depth.sh` and the person section of `ops/traffic.sh` both apply
+   * that rule, and both say so out loud in their output rather than reporting a scroll that never
+   * happened.
    */
   const PIXEL = Buffer.from(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",

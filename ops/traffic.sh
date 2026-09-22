@@ -171,8 +171,13 @@ def swapped(stamped):
 ORDER = ["top", "proof", "market", "close", "end"]
 
 def all_at_once(stamps):
-    # Three or more marks inside a second is a renderer, the same test ops/depth.sh applies.
-    return len(stamps) >= 3 and max(stamps) - min(stamps) < 1.0
+    # Two or more marks inside one second is a renderer, the same test ops/depth.sh applies.
+    # Measured on 2026-09-22: headless Chrome ignores loading="lazy" and fetches every pixel on
+    # load, at a desktop size and at a 390x700 phone viewport alike. A real browser does not:
+    # 80.218.182.64 fetched top at 18:03:49 and proof at 18:04:11. The gap is the evidence, not
+    # the mark. Requiring three marks let 34.31.186.92 through, which took top and proof in the
+    # same second and was reported here as a second reader who got past the proof section.
+    return len(stamps) >= 2 and max(stamps) - min(stamps) < 1.0
 
 scrolled, loaded_only, dropped = [], [], collections.Counter()
 for ip, entry in people.items():

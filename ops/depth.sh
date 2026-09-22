@@ -196,16 +196,21 @@ if not page_loads:
 # renderers and one human printed "the last screen 2 of 3, 67%" and read like two thirds of
 # visitors finishing the page. Off by the entire finding.
 AT_ONCE_SECONDS = 1.0
-AT_ONCE_MARKS = 3
+
 def took_everything_at_once(ip):
-    # Across every mark, not only top and close. A renderer that stops before the last pixel would
-    # otherwise pass as a reader who got three quarters of the way down, which is the same error
-    # one notch quieter. Three marks inside a second is the test: two can be a fast scroll over
-    # marks that sit close together, three cannot.
-    stamps = [min(v) for v in pixel[ip].values() if v]
-    if len(stamps) < AT_ONCE_MARKS:
+    # Count the GAPS, not the marks. Measured on 2026-09-22: headless Chrome ignores
+    # loading="lazy" entirely, in both headless modes and at both a desktop and a 390x700 phone
+    # viewport, and fetches all five pixels within a tenth of a second, including the one 3312 px
+    # down. A real browser does not: 80.218.182.64, a Firefox on Windows, fetched top at 18:03:49
+    # and proof at 18:04:11, twenty-two seconds apart, which is what scrolling looks like.
+    #
+    # So an address whose marks all arrived inside one second of each other did not scroll, however
+    # many of them there are. The earlier rule needed three marks before it would say so, which let
+    # a renderer that fetched exactly two pass as a reader who had made it past the proof section.
+    stamps = sorted(min(v) for v in pixel[ip].values() if v)
+    if len(stamps) < 2:
         return False
-    return (max(stamps) - min(stamps)).total_seconds() < AT_ONCE_SECONDS
+    return (stamps[-1] - stamps[0]).total_seconds() < AT_ONCE_SECONDS
 
 renderers = {ip for ip in page_loads if took_everything_at_once(ip)}
 at_once = len(renderers)
