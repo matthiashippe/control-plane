@@ -43,8 +43,15 @@ set -euo pipefail
 # until the clock caught up. `ops/deploy-window.sh` exists because of the same trap; the lesson
 # there was to take the time from the machine, and this took it from my head.
 SINCE_UTC="${CP_PIXELS_SINCE:-2026-09-22T10:07:23Z}"
+# The same constant for /fix, whose marks went live later. A page load before its own marks existed
+# could never have produced one, and counting it in the denominator is the mistake this repo keeps
+# finding elsewhere. The landing page value has its own history in the comment above.
+SINCE_FIX_UTC="${CP_PIXELS_FIX_SINCE:-2026-09-22T20:31:00Z}"
 
 HOURS="${1:-24}"
+# Which page to measure. "" is the landing page, "fix" is /fix, which is where the issue answers
+# point and which had ten browser visits and no mark at all until 2026-09-22.
+PAGE="${2:-}"
 KEY="${CP_SSH_KEY:-$HOME/.ssh/id_ed25519_automaton}"
 HOST="${CP_HOST:-root@76.13.144.207}"
 # Not built here: this line and the two traffic scripts got it wrong the same way, so it lives in
@@ -70,7 +77,7 @@ if ! timeout 45 ssh -i "$KEY" -o BatchMode=yes -o ConnectTimeout=10 -o ServerAli
 fi
 fi
 
-python3 - "$HOURS" "$OWN" "$log" "$SINCE_UTC" <<'PY'
+python3 - "$HOURS" "$OWN" "$log" "$SINCE_UTC" "$PAGE" "$SINCE_FIX_UTC" <<'PY'
 import datetime, json, sys, collections
 
 hours, own_raw, path, pixels_since = int(sys.argv[1]), sys.argv[2], sys.argv[3], sys.argv[4]
@@ -87,14 +94,35 @@ if live > now:
 # existed, or it is in a denominator it cannot belong to.
 since = max(window, live)
 
-MARKS = ["top", "proof", "market", "close", "end"]
-WHAT = {
-    "top": "the first screen (control)",
-    "proof": "past the proof section",
-    "market": "past the live market",
-    "close": "past the agents section",
-    "end": "the last screen, with the buttons",
-}
+# Two pages, two sets of marks, and deliberately not one shared set. A reader of /fix arrived with
+# a broken runtime and a reader of / arrived with a job to post; counting them together would
+# answer neither question. The prefix keeps the two series apart in one access log.
+PAGE = sys.argv[5] if len(sys.argv) > 5 else ""
+if PAGE == "fix":
+    PATH = "/fix"
+    live = datetime.datetime.fromisoformat(sys.argv[6].replace("Z", "+00:00"))
+    since = max(window, live)
+    MARKS = ["fix-top", "fix-stop", "fix-think", "fix-us"]
+    WHAT = {
+        "fix-top": "the first screen (control)",
+        "fix-stop": "past step 1, stop it spending",
+        "fix-think": "past step 2, the free routes",
+        "fix-us": "past step 3, the one that names us",
+    }
+elif PAGE:
+    print(f"COULD NOT TELL: no marks are defined for page {PAGE!r}. Known: the landing page (no")
+    print("                argument) and fix.")
+    raise SystemExit(2)
+else:
+    PATH = "/"
+    MARKS = ["top", "proof", "market", "close", "end"]
+    WHAT = {
+        "top": "the first screen (control)",
+        "proof": "past the proof section",
+        "market": "past the live market",
+        "close": "past the agents section",
+        "end": "the last screen, with the buttons",
+    }
 
 # Per address: when the page was loaded, and when each pixel came back.
 page_loads = collections.defaultdict(list)
@@ -136,7 +164,7 @@ for raw in open(path):
         if "Mozilla/" in ua_icon and at >= since:
             favicon[ip] = at
         continue
-    if uri != "/" and not (uri.startswith("/px/") and uri.endswith(".png")):
+    if uri != PATH and not (uri.startswith("/px/") and uri.endswith(".png")):
         continue
     ua = (r.get("headers", {}).get("User-Agent") or [""])[0]
     if "Mozilla/" not in ua:
@@ -147,10 +175,14 @@ for raw in open(path):
             earliest_px = at
     if at < since:
         continue
-    if uri == "/":
+    if uri == PATH:
         page_loads[ip].append(at)
     elif uri.startswith("/px/") and uri.endswith(".png"):
-        pixel[ip][uri[4:-4]].append(at)
+        mark = uri[4:-4]
+        # Only this page's marks. Without it a reader of /fix counts as a renderer on the landing
+        # page, because their four pixels arrive within a second of each other and of nothing else.
+        if mark in WHAT:
+            pixel[ip][mark].append(at)
 
 # The constant checks itself. A pixel fetched before the moment we say they went live means the
 # moment is wrong, and every count under it would be drawn from the wrong window.
@@ -161,7 +193,7 @@ if earliest is not None and earliest < live:
     print("                SINCE_UTC is wrong, so the denominator would be too. Fix it first.")
     raise SystemExit(2)
 
-print(f"How far down the landing page people got, last {hours} hours")
+print(f"How far down {PATH} people got, last {hours} hours")
 print(f"  counting page loads from {since:%Y-%m-%d %H:%M} UTC, when the pixels went live")
 print()
 if not_a_browser:

@@ -97,3 +97,60 @@ describe("how far down the page a reader got", () => {
     expect(res.headers.get("set-cookie"), "no cookie").toBeNull();
   });
 });
+
+/**
+ * The second page with marks, and why its marks are its own.
+ *
+ * /fix is where the issue answers point. On 2026-09-22 it had eleven browser visits from ten
+ * addresses and not a single mark, so nothing said whether any of them read past the first screen,
+ * and the one channel that has ever brought a person here was the one page nobody was measuring.
+ *
+ * Separate names rather than a shared set: a reader of /fix arrived with a broken runtime, a
+ * reader of / arrived with a job to post, and one number covering both answers neither.
+ */
+describe("how far down /fix a reader got", () => {
+  const FIX_MARKS = ["fix-top", "fix-stop", "fix-think", "fix-us"] as const;
+
+  it("serves and places every mark of its own", async () => {
+    const app = createApp({ db: openDb(":memory:") });
+    const html = await (await app.request("/fix")).text();
+    for (const mark of FIX_MARKS) {
+      expect((await app.request(`/px/${mark}.png`)).status, `/px/${mark}.png`).toBe(200);
+      const tag = html.match(new RegExp(`<img src="/px/${mark}\\.png"[^>]*>`))?.[0];
+      expect(tag, `/px/${mark}.png is not on /fix`).toBeTruthy();
+      expect(tag, "lazy is the whole mechanism").toContain('loading="lazy"');
+      expect(tag).toContain('aria-hidden="true"');
+    }
+  });
+
+  it("keeps them in reading order, control first", async () => {
+    const html = await (await createApp({ db: openDb(":memory:") }).request("/fix")).text();
+    const at = (m: string) => html.indexOf(`/px/${m}.png`);
+    expect(at("fix-top")).toBeGreaterThan(-1);
+    expect(at("fix-top")).toBeLessThan(at("fix-stop"));
+    expect(at("fix-stop")).toBeLessThan(at("fix-think"));
+    expect(at("fix-think")).toBeLessThan(at("fix-us"));
+  });
+
+  it("puts the last mark after the step that names this service, not before it", async () => {
+    // fix-us is the one mark that says whether the page sells anything, so it has to sit after
+    // step 3 and not merely after step 2.
+    const html = await (await createApp({ db: openDb(":memory:") }).request("/fix")).text();
+    const step3 = html.indexOf("Or point it at this control plane instead");
+    expect(step3, "step 3 is gone from /fix").toBeGreaterThan(-1);
+    expect(html.indexOf("/px/fix-us.png")).toBeGreaterThan(step3);
+    expect(html.indexOf("/px/fix-think.png")).toBeLessThan(step3);
+  });
+
+  it("does not put the landing page's marks on /fix, or the other way round", async () => {
+    const app = createApp({ db: openDb(":memory:") });
+    const fix = await (await app.request("/fix")).text();
+    const landing = await (await app.request("/")).text();
+    for (const mark of ["proof", "market", "close", "end"]) {
+      expect(fix, `/px/${mark}.png belongs to the landing page`).not.toContain(`/px/${mark}.png`);
+    }
+    for (const mark of FIX_MARKS) {
+      expect(landing, `/px/${mark}.png belongs to /fix`).not.toContain(`/px/${mark}.png`);
+    }
+  });
+});

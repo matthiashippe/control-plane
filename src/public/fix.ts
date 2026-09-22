@@ -46,6 +46,9 @@ export function renderFix(): string {
                                              or 401 {"error":"Invalid or expired nonce"}
 GET  https://api.conway.tech/pay/5/&lt;address&gt;  -&gt; 402, a payable demand for 5 USDC</pre>
 
+      <!-- The control: first screen, lazy like the rest, so a client that takes every image at load fires it together with the others. See the /px/ route in src/app.ts. -->
+      <img src="/px/fix-top.png" alt="" width="1" height="1" loading="lazy" decoding="async" aria-hidden="true" class="px">
+
       <div class="claims" style="margin-top:1.6rem">
         <div>
           <span><b>1. Stop it buying, before anything else</b>
@@ -63,6 +66,9 @@ GET  https://api.conway.tech/pay/5/&lt;address&gt;  -&gt; 402, a payable demand 
 
       <pre>{ "conwayApiUrl": "https://127.0.0.1:9" }</pre>
 
+      <!-- Read past step 1, the one that stops the runtime spending. See the /px/ route in src/app.ts. -->
+      <img src="/px/fix-stop.png" alt="" width="1" height="1" loading="lazy" decoding="async" aria-hidden="true" class="px">
+
       <div class="claims">
         <div>
           <span><b>2. Make it think again, without paying anybody</b>
@@ -79,6 +85,9 @@ GET  https://api.conway.tech/pay/5/&lt;address&gt;  -&gt; 402, a payable demand 
           is no balance, and wrong for the other one.</span></span>
           <a href="https://github.com/matthiashippe/control-plane/blob/main/docs/without-control-plane.md">both routes, with the code paths</a>
         </div>
+
+      <!-- Read past step 2, the route that needs nothing from us. See the /px/ route in src/app.ts. -->
+      <img src="/px/fix-think.png" alt="" width="1" height="1" loading="lazy" decoding="async" aria-hidden="true" class="px">
         <div>
           <span><b>3. Or point it at this control plane instead</b>
           <span class="w">One line of configuration and the provisioning call your runtime already
@@ -95,6 +104,9 @@ GET  https://api.conway.tech/pay/5/&lt;address&gt;  -&gt; 402, a payable demand 
 
       <pre>{ "conwayApiUrl": "https://cp.hippe.eu" }
 $ automaton --provision</pre>
+
+      <!-- Read past step 3, the only one that names this service. This is the mark that says whether the page sells anything. See the /px/ route in src/app.ts. -->
+      <img src="/px/fix-us.png" alt="" width="1" height="1" loading="lazy" decoding="async" aria-hidden="true" class="px">
 
       <p class="sub" style="margin-top:1.6rem">
         Written by somebody selling the third option, which is why it is third. The first two cost

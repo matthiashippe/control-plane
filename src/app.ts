@@ -391,7 +391,12 @@ export function createApp(opts: AppOptions) {
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
     "base64",
   );
-  for (const mark of ["top", "proof", "market", "close", "end"]) {
+  // The landing page has five marks, /fix has four of its own. Separate names and not a shared
+  // set, because a reader of /fix is a different person with a different question and mixing the
+  // two counts would answer neither. /fix is where the issue answers point, and on 2026-09-22 it
+  // had ten browser visits and no mark at all, so nothing said whether any of them read past the
+  // first screen.
+  for (const mark of ["top", "proof", "market", "close", "end", "fix-top", "fix-stop", "fix-think", "fix-us"]) {
     app.get(`/px/${mark}.png`, (c) =>
       c.body(new Uint8Array(PIXEL), 200, {
         "Content-Type": "image/png",
