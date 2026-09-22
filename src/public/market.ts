@@ -236,3 +236,36 @@ export function renderStatus(db: Db): string {
   const denker = wallets(db, "inference");
   return `${esc(satz(zahler, "paid"))} &middot; ${esc(satz(denker, "thought here"))}`;
 }
+
+/**
+ * The price table and the three figures beside it, rendered by the server.
+ *
+ * Without JavaScript this block showed "…", "…", "…" and an empty table, for good. Measured on
+ * 2026-09-23 against the live page: the inline script fills six ids and a tbody, and a reader with
+ * a script blocker, a text browser or a crawler that does not render sees the placeholders and
+ * nothing else. The prices are the one thing in that panel a buyer opens it for.
+ *
+ * The script is not touched and its CSP hash stays valid: it overwrites all of this on load, which
+ * is right, because its numbers are fresher. This is what stands there until it does, and what
+ * stands there forever when it cannot.
+ */
+export function renderPrices(
+  models: { id: string; aliases: string[]; input_per_million: number; output_per_million: number }[],
+  version: string,
+  tiers: readonly number[],
+): string {
+  const rows = models
+    .map(
+      (m) =>
+        `<tr><td>${esc(m.id)}</td><td>${esc(m.aliases.join(", "))}</td>` +
+        `<td>$${m.input_per_million.toFixed(3)}</td><td>$${m.output_per_million.toFixed(3)}</td></tr>`,
+    )
+    .join("");
+  return (
+    `<p class="fine"><span id="s-models">${models.length}</span> models &middot; ` +
+    `v<span id="s-version">${esc(version)}</span> &middot; ` +
+    `top-up <span id="s-tiers">${esc(tiers.join(", "))}</span></p>` +
+    `<table id="models"><thead><tr><th>model</th><th>alias</th><th>in</th><th>out</th></tr></thead>` +
+    `<tbody>${rows}</tbody></table>`
+  );
+}

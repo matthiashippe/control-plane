@@ -834,15 +834,12 @@ h1.ph { font-size: clamp(1.5rem, 3.2vw, 2.1rem); line-height: 1.15; letter-spaci
          an adversarial read on 2026-09-22 (B8) went and checked. `script-src` is a locked path, so
          the split could not be fetched; it can be rendered. -->
     <p class="status mono">
-      <span id="s-health">checking</span> &middot; <!--WALLETS-->
+      <span id="s-health">checking</span><noscript> (this line needs the page script, which is not
+      running; everything else here is rendered by the server)</noscript> &middot; <!--WALLETS-->
     </p>
     <details class="prices">
       <summary>Prices</summary>
-      <p class="fine"><span id="s-models">&hellip;</span> models &middot;
-        v<span id="s-version">&hellip;</span> &middot;
-        top-up <span id="s-tiers">&hellip;</span></p>
-      <table id="models"><thead><tr><th>model</th><th>alias</th><th>in</th><th>out</th></tr></thead>
-        <tbody></tbody></table>
+      <!--PRICES-->
     </details>
     <p class="legal">
       Operated by Matthias Hippe, Hamburg.

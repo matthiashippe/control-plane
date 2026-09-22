@@ -20,7 +20,7 @@ import {
 import { verifyFindings, messages, type CheckMode } from "./check/fabrication.js";
 import { reviewBrief } from "./bounties/brief.js";
 import { receipts, PUBLICATION_FROM } from "./bounties/receipts.js";
-import { renderMarket, renderNumbers, renderStatus } from "./public/market.js";
+import { renderMarket, renderNumbers, renderPrices, renderStatus } from "./public/market.js";
 import { readSeries, renderX402 } from "./public/x402.js";
 import { readMoneySeries, readReceipts, renderConway } from "./public/conway.js";
 import { renderPost } from "./public/post.js";
@@ -702,6 +702,27 @@ export function createApp(opts: AppOptions) {
     );
   });
 
+  /**
+   * The model list as /v1/status derives it, so the page and the endpoint cannot disagree about
+   * what this service sells. One entry per real model, the runtime's hard-coded ids as aliases.
+   */
+  const modelList = () => {
+    const byUpstream = new Map<string, { id: string; aliases: string[]; input_per_million: number; output_per_million: number }>();
+    for (const m of opts.catalog?.listModels().data ?? []) {
+      const upstream = (m.upstream_model as string) ?? (m.id as string);
+      const pricing = m.pricing as { input_per_million: number; output_per_million: number };
+      const entry = byUpstream.get(upstream) ?? {
+        id: upstream,
+        aliases: [],
+        input_per_million: pricing.input_per_million,
+        output_per_million: pricing.output_per_million,
+      };
+      if (m.id !== upstream) entry.aliases.push(m.id as string);
+      byUpstream.set(upstream, entry);
+    }
+    return [...byUpstream.values()];
+  };
+
   app.get("/", (c) => {
     if (!indexHtml) return c.json({ ok: true, version: VERSION, note: "no index page built" });
     return c.html(
@@ -709,6 +730,7 @@ export function createApp(opts: AppOptions) {
         .replace("<!--NUMBERS-->", renderNumbers(mcToCents(GRANT_MC), mcToCents(poolLeftMc(db))))
         .replace("<!--MARKET-->", renderMarket(db))
         .replace("<!--WALLETS-->", renderStatus(db))
+        .replace("<!--PRICES-->", renderPrices(modelList(), VERSION, opts.pay?.tiers ?? []))
         // The landing page is served from the file and never goes through page(), so it needs the
         // same graph put in by hand. Its title and description are the ones already in the file.
         .replace(
