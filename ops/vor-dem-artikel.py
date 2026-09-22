@@ -23,7 +23,20 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
+# The post-ready text, and the copy a reader of the repository can actually open.
+#
+# Until 2026-09-22 this only knew the first one, and `.scratch/` is in `.gitignore`: in a fresh
+# checkout the whole check printed "The article is not at .scratch/gtm/hn-post.txt" and exited 2.
+# Meanwhile `docs/artikel-agentenoekonomie.md` carried a draft of the same piece that nothing read,
+# and it still said the router "reads the nested one, not the top-level one the setup wizard
+# writes" four days after that claim had been corrected on /fix, on /conway and in the post-ready
+# text. Two versions, one check, and the checked one was the one nobody sees. An adversarial read
+# found it (B17).
+#
+# So whichever exists is checked, the run says which file it read, and when both exist both are
+# read: a claim that holds in one and not the other is exactly the drift that happened.
 ARTIKEL = Path(".scratch/gtm/hn-post.txt")
+ARTIKEL_REPO = Path("docs/artikel-agentenoekonomie.md")
 BASE = "https://cp.hippe.eu"
 befunde = []
 
@@ -67,11 +80,29 @@ def zahl(text: str) -> int:
 
 
 def main() -> int:
-    if not ARTIKEL.exists():
-        print(f"The article is not at {ARTIKEL}.")
+    quellen = [p for p in (ARTIKEL, ARTIKEL_REPO) if p.exists()]
+    if not quellen:
+        print(f"Neither {ARTIKEL} nor {ARTIKEL_REPO} is there.")
         return 2
-    text = ARTIKEL.read_text()
+    # Two kinds of check need two kinds of text.
+    #
+    # A check of the shape "the text must not say Y" is satisfiable only by every copy, so the
+    # joined text is right for it. A check of the shape "if it mentions X it has to say Y" is
+    # satisfied by ANY copy once the texts are joined, which is the opposite of what is wanted:
+    # the counter-proof put the old wrong inferenceModel sentence back into the repo copy and this
+    # stayed green, because the post-ready copy still carried the corrected one. So those run per
+    # source, through `je_quelle`.
+    fassungen = [(p, p.read_text()) for p in quellen]
+    text = "\n".join(t for _, t in fassungen)
+    # Flattened copies for the prose searches. The distribution table is checked row by row and
+    # needs its line breaks, so `text` stays raw and only the sentence-level checks use these.
+    def glatt(t: str) -> str:
+        return " ".join(t.split())
+
+    fliess = glatt(text)
+    fassungen_fliess = [(p, glatt(t)) for p, t in fassungen]
     print("Before the article goes out\n")
+    print(f"  Reading: {', '.join(str(p) for p in quellen)}\n")
 
     # 1. Is the service the reader will land on actually healthy and complete?
     lauf = subprocess.run(["./ops/check-all.sh"], capture_output=True, text=True, timeout=400)
@@ -234,12 +265,14 @@ def main() -> int:
     # It does not: src/setup/configure.ts assigns the chosen model to both. The trap is a
     # hand-edited automaton.json. docs/without-control-plane.md had it right since 21.09. and
     # nothing held the short version against the long one until an adversarial read did.
-    if "inferenceModel" in text:
-        if re.search(r"wizard copies the top-level value down", text):
-            ok("the inferenceModel trap is described the way the code behaves",
+    for quelle, fassung in fassungen_fliess:
+        if "inferenceModel" not in fassung:
+            continue
+        if re.search(r"wizard copies the top-level value down", fassung):
+            ok(f"the inferenceModel trap is described the way the code behaves in {quelle.name}",
                "the wizard copies it down; a hand-edited file does not")
         else:
-            aendern("the article describes the inferenceModel trap without saying the wizard copies",
+            aendern(f"{quelle.name} describes the inferenceModel trap without saying the wizard copies",
                     "ops/upstream-claims.py checks that it does, and blaming the wizard is a wrong "
                     "claim about somebody else's code inside a piece about somebody else's code")
 
@@ -476,14 +509,42 @@ def main() -> int:
         else:
             aendern(f"the hedge on {name} is gone", hinweis)
 
-    # 4f. Discussions and issue trackers are two different figures.
-    if re.search(r"Discussions are off on the main repository", text):
-        ok("Discussions and the issue tracker are told apart",
-           "0 of 1,438 forks have Discussions; 1,435 have the tracker off")
+    # 4f. Discussions and issue trackers are two different figures, and the fork count is a third.
+    #
+    # This checked only that the sentence still began with "Discussions are off on the main
+    # repository" and then printed two numbers that were hardcoded right here, held against
+    # nothing. The text could have claimed nine thousand forks and this stayed green. An
+    # adversarial read found it (B12), and the number really is wrong in a way worth naming: 1,438
+    # is what the fork listing returns, while docs/research/data/2026-09-21-conway-repo.json, the
+    # file this article publishes as its own evidence, says 1,444, and GitHub says more today.
+    # Deleted and private forks are the difference. "Every one of its 1,438 forks" presents the
+    # listable subset as the whole.
+    m_forks = re.search(r"([\d,]+) forks[^.]*?and ([\d,]+) of those forks", fliess)
+    if m_forks:
+        behauptet, tracker = zahl(m_forks.group(1)), zahl(m_forks.group(2))
+        gemessen = json.loads(Path("docs/research/data/2026-09-21-conway-repo.json").read_text()).get("forks")
+        if gemessen is None:
+            aendern("the fork count cannot be checked",
+                    "docs/research/data/2026-09-21-conway-repo.json carries no `forks` field any more")
+        elif behauptet > gemessen:
+            aendern(f"the article claims {behauptet:,} forks and the published measurement says {gemessen:,}",
+                    "a number above the measured one cannot be defended with the file the article ships")
+        elif behauptet < gemessen and "listable" not in fliess and "the fork listing" not in fliess:
+            aendern(f"the article says \"every one of its {behauptet:,} forks\" while the measurement says {gemessen:,}",
+                    "1,438 is what the fork listing returns; deleted and private forks are the "
+                    "difference, and calling the subset the whole is what an adversarial read "
+                    "picked up. Say which of the two numbers it is.")
+        else:
+            ok("the fork count matches the published measurement", f"{behauptet:,} of {gemessen:,}")
+        if tracker > behauptet:
+            aendern(f"{tracker:,} forks have the tracker off out of {behauptet:,}",
+                    "the subset cannot be larger than the set it is drawn from")
     elif "Discussions" in text:
-        aendern("the sentence about Discussions changed",
+        aendern("the sentence about Discussions and the forks changed",
                 "docs/research/2026-09-20-wo-die-betroffenen-sind.md says no fork has Discussions "
-                "at all, and the three exceptions belong to the issue tracker figure")
+                "at all, and the three exceptions belong to the issue tracker figure. The two "
+                "figures and the fork count are checked by their shape, so keep the sentence "
+                "readable as \"every one of its N forks, and M of those forks\".")
 
     # 5. Nobody should arrive at an empty market.
     try:

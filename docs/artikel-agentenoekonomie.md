@@ -100,9 +100,11 @@ its own users could not name, and it is not the model, the wallet, or the chain.
 There are two free ways around it, incidentally, and neither is documented upstream: point the
 runtime at a local Ollama model, or write a balance into its own SQLite state and use your own
 OpenAI key. The first one has a trap that cost me an hour. There are two config fields named
-`inferenceModel`, and the router reads the nested one, not the top-level one the setup wizard
-writes. I have written both routes up with the exact code paths, because someone paying 5 USDC a
-week into a dead endpoint deserves to know they do not have to.
+`inferenceModel` and the router reads the nested one, under `modelStrategy`. The setup wizard
+copies the top-level value down, so it is fine; editing `automaton.json` by hand is what leaves the
+nested block on its defaults, and then the runtime keeps routing to its default model while telling
+you it registered your local one. I have written both routes up with the exact code paths, because
+someone paying 5 USDC a week into a dead endpoint deserves to know they do not have to.
 
 Full disclosure, since it would be dishonest to leave it out: after my own agent hit this wall, I
 built a replacement for the billing layer and run it as a paid service. This post is not an ad for
