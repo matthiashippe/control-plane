@@ -27,6 +27,7 @@
  * and never printed, logged or written anywhere.
  */
 import fs from "node:fs";
+import { auftragFinden } from "./auftrag-finden.js";
 import path from "node:path";
 import { privateKeyToAccount } from "viem/accounts";
 import { createSiweMessage } from "viem/siwe";
@@ -165,28 +166,7 @@ async function entscheiden(bountyId: string, key: string): Promise<void> {
   const list = (await call("/bounties.json", null)) as {
     open: { id: string; brief: string; kind: string; award_cents: number; deadline: string }[];
   };
-  let job = list.open.find((b) => b.id === bountyId);
-  if (!job) {
-    // A prefix is what every other surface shows: /bounties.json in the protocol, the receipts,
-    // the log lines. Accepting one is not convenience, it is the difference between a right and a
-    // wrong sentence at the one moment money moves.
-    const treffer = list.open.filter((b) => b.id.startsWith(bountyId));
-    if (treffer.length === 1) {
-      job = treffer[0];
-      console.log(`  (${bountyId} is a prefix of ${job.id})`);
-    } else if (treffer.length > 1) {
-      throw new Error(
-        `${bountyId} matches ${treffer.length} open jobs: ${treffer.map((b) => b.id).join(", ")}. Give more of the id.`,
-      );
-    }
-  }
-  if (!job) {
-    const offen = list.open.map((b) => `${b.id} (${b.award_cents} c)`).join("\n    ") || "nothing is open";
-    throw new Error(
-      `${bountyId} is not on the open list. It was awarded, cancelled, or the id is wrong.\n` +
-        `  Open right now:\n    ${offen}`,
-    );
-  }
+  const job = auftragFinden(list.open as never, bountyId, (t) => console.log(t));
 
   // From here on only the resolved id counts. The first version of the prefix lookup changed the
   // list search and then kept using the prefix, so the next call answered 404: a resolution that
