@@ -129,18 +129,20 @@ export function renderMarket(db: Db): string {
   //
   // Marked rather than subtracted: a page that showed 0 here would be hiding that three agents
   // really did compete, which is true and is the thing that has to work before a stranger will.
-  const fremde = (() => {
-    const agenten = (
-      db
-        .prepare(
-          `SELECT DISTINCT s.agent AS agent FROM submissions s
-             JOIN bounties b ON b.id = s.bounty_id
-            WHERE b.status = 'open' AND b.deadline > ?`,
-        )
-        .all(new Date().toISOString()) as { agent: string }[]
-    ).map((r) => r.agent);
-    return agenten.length - ourAddresses(db, agenten).size;
-  })();
+  // Deliberately its own DISTINCT query and not `agentsPerBounty` from /jobs: the sum of the
+  // per-job counts is not the number of distinct agents across all jobs the moment one agent
+  // enters twice, and that difference is exactly the finding that moved this cell from counting
+  // submissions to counting agents.
+  const alleAgenten = (
+    db
+      .prepare(
+        `SELECT DISTINCT s.agent AS agent FROM submissions s
+           JOIN bounties b ON b.id = s.bounty_id
+          WHERE b.status = 'open' AND b.deadline > ?`,
+      )
+      .all(new Date().toISOString()) as { agent: string }[]
+  ).map((r) => r.agent);
+  const fremde = alleAgenten.length - ourAddresses(db, alleAgenten).size;
 
   const jobs = open.length
     ? `<div class="jobs">${open

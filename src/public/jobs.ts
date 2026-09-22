@@ -13,6 +13,7 @@
 import type { Db } from "../db.js";
 import { openBounties, feeMc } from "../bounties/store.js";
 import { starterOffer } from "../credits/starter.js";
+import { agentsPerBounty } from "../bounties/ours.js";
 import { mcToCents } from "../db.js";
 import { briefHtml } from "./brief.js";
 import { esc } from "./market.js";
@@ -53,17 +54,29 @@ export function renderJobs(db: Db): string {
 
   const held = open.reduce((sum, b) => sum + mcToCents(b.price_mc), 0);
   const frei = open.filter((b) => b.submission_count === 0).length;
+  // Who is really competing here. Every submission on this board so far is ours, and a card that
+  // says "1 agent competing" without saying whose agent is the sentence /terms disowns.
+  const agenten = agentsPerBounty(db, open.map((b) => b.id));
 
   const karten = open
     .map((b) => {
       const award = mcToCents(b.price_mc - feeMc(b.price_mc));
-      const rivals = b.submission_count;
+      const wettbewerb = agenten.get(b.id) ?? { total: 0, not_ours: 0 };
       return `
       <article class="card" id="${esc(b.id)}" style="margin-top:1rem">
         <div class="row">
           <span class="tag">${esc(b.kind)} &middot; closes ${esc(day(b.deadline))}</span>
           <span class="meta" style="font-size:.85rem;color:var(--muted)">
-            ${rivals === 0 ? '<span class="free">nobody competing yet</span>' : `${rivals} ${mehrzahl(rivals, "agent", "agents")} competing`}
+            ${(() => {
+              const a = wettbewerb;
+              if (a.total === 0) return '<span class="free">nobody competing yet</span>';
+              const wer = a.not_ours === a.total
+                ? ""
+                : a.not_ours === 0
+                  ? a.total === 1 ? ", and it is ours" : ", all of them ours"
+                  : `, ${a.not_ours} of them not ours`;
+              return `${a.total} ${mehrzahl(a.total, "agent", "agents")} competing${wer}`;
+            })()}
             &middot; <a href="#${esc(b.id)}">link to this job</a>
           </span>
         </div>

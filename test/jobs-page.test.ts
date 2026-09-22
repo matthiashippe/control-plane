@@ -32,6 +32,56 @@ function setup() {
 const inAnHour = () => new Date(Date.now() + 3600e3).toISOString();
 
 describe("/jobs", () => {
+  /**
+   * The card says whose agents are competing, because so far they are all ours.
+   *
+   * The landing page learned this on 2026-09-22 after an adversarial read held it against the
+   * honesty paragraph in /terms: "Nothing on this site counts our own jobs as somebody else's
+   * demand." /jobs kept saying "1 agent competing" with no mark, and /jobs is the page an agent
+   * reads before deciding whether this market is worth entering (H3).
+   *
+   * Marked, not subtracted. A card that dropped our own entrant would hide that somebody really
+   * did compete, which is true and is the thing that has to work before a stranger will.
+   */
+  it("says how many of the competing agents are not ours", async () => {
+    const { db, app, post, page } = setup();
+    const res = await post({
+      brief: "FACT SHEET on one page. 90 words maximum. Hand in the sheet and nothing else.",
+      kind: "factual",
+      price_cents: 150,
+      deadline: inAnHour(),
+    });
+    const { id } = (await res.json()) as { id: string };
+
+    expect(await page(), "no entrant yet is said in words").toContain("nobody competing yet");
+
+    // One of ours, by the name on its key: `ops/compete.ts` names them ops-seed-<persona>,
+    // and `ops-%` is on OUR_KEY_NAMES in src/bounties/ours.ts.
+    const unser = privateKeyToAccount(generatePrivateKey()).address.toLowerCase();
+    db.prepare("INSERT INTO wallets (address, balance_mc, created_at) VALUES (?, 0, ?)").run(unser, new Date().toISOString());
+    db.prepare("INSERT INTO api_keys (address, key_hash, key_prefix, name, created_at) VALUES (?, ?, ?, ?, ?)").run(
+      unser, hashApiKey("cnwy_k_" + "1f".repeat(16)), "cnwy_k_ours000", "ops-seed-klaus", new Date().toISOString(),
+    );
+    db.prepare("INSERT INTO submissions (id, bounty_id, agent, body, created_at) VALUES (?, ?, ?, ?, ?)").run(
+      "s-ours", id, unser, "our work", new Date().toISOString(),
+    );
+    expect(await page(), "one entrant and it is ours").toContain("1 agent competing, and it is ours");
+
+    // And a stranger, whose key carries a name none of our tools use.
+    const fremd = privateKeyToAccount(generatePrivateKey()).address.toLowerCase();
+    db.prepare("INSERT INTO wallets (address, balance_mc, created_at) VALUES (?, 0, ?)").run(fremd, new Date().toISOString());
+    db.prepare("INSERT INTO api_keys (address, key_hash, key_prefix, name, created_at) VALUES (?, ?, ?, ?, ?)").run(
+      fremd, hashApiKey("cnwy_k_" + "2f".repeat(16)), "cnwy_k_them000", "conway-automaton", new Date().toISOString(),
+    );
+    db.prepare("INSERT INTO submissions (id, bounty_id, agent, body, created_at) VALUES (?, ?, ?, ?, ?)").run(
+      "s-them", id, fremd, "their work", new Date().toISOString(),
+    );
+    const html = await page();
+    expect(html, "two entrants, one of them a stranger").toContain("2 agents competing, 1 of them not ours");
+    expect(html, "and the day they are all strangers the qualifier goes").not.toMatch(/all of them ours|it is ours/);
+  });
+
+
   it("shows the whole brief, the money and the call that enters", async () => {
     const { post, page } = setup();
     const res = await post({

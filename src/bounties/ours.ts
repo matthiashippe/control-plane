@@ -98,3 +98,37 @@ export function wallets(db: Db, kind: "topup" | "inference"): { total: number; n
   const unsere = ourAddresses(db, addresses);
   return { total: addresses.length, not_ours: addresses.length - unsere.size };
 }
+
+/**
+ * How many distinct agents are on each of these jobs, and how many of them are not ours.
+ *
+ * The landing page learned to say this on 2026-09-22; `/jobs` did not, and `/jobs` is the page an
+ * agent actually reads before deciding whether this market is worth entering. Every submission on
+ * the board so far comes from `ops/compete.ts`, so "1 agent competing" on a card is a count of us,
+ * and `/terms` promises in its honesty paragraph that nothing here counts our own work as somebody
+ * else's demand.
+ *
+ * One query for every job on the page, because the per-card version of this was a query per card.
+ */
+export function agentsPerBounty(
+  db: Db,
+  bountyIds: string[],
+): Map<string, { total: number; not_ours: number }> {
+  const raus = new Map<string, { total: number; not_ours: number }>();
+  if (!bountyIds.length) return raus;
+  const rows = db
+    .prepare(
+      `SELECT bounty_id, agent FROM submissions
+        WHERE bounty_id IN (${bountyIds.map(() => "?").join(",")})
+        GROUP BY bounty_id, agent`,
+    )
+    .all(...bountyIds) as { bounty_id: string; agent: string }[];
+  const unsere = ourAddresses(db, rows.map((r) => r.agent));
+  for (const id of bountyIds) raus.set(id, { total: 0, not_ours: 0 });
+  for (const r of rows) {
+    const eintrag = raus.get(r.bounty_id)!;
+    eintrag.total += 1;
+    if (!unsere.has(r.agent.toLowerCase())) eintrag.not_ours += 1;
+  }
+  return raus;
+}
