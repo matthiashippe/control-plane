@@ -202,7 +202,17 @@ async function main(): Promise<void> {
   console.log(`        the receipt is public at ${BASE}/receipts#${bountyId}`);
 }
 
-main().catch((e) => {
-  console.error("AWARD FAILED:", (e as Error).message);
-  process.exit(1);
-});
+// Only when run as a script.
+//
+// `test/award-formal.test.ts` imports `formalpruefung` from this file, and an unguarded `main()`
+// runs on import: it found no --bounty, threw, and called process.exit(1). Every test still passed
+// and `pnpm test` still exited 1, with the failure shown as "Errors 1 error" rather than as a
+// failing test. Two cycles read the "475 passed" line and moved on. ops/deploy.sh refused the
+// rollout, which is the first thing it has caught.
+const alsSkript = process.argv[1] && import.meta.url.endsWith(process.argv[1].split("/").pop() ?? "\0");
+if (alsSkript) {
+  main().catch((e) => {
+    console.error("AWARD FAILED:", (e as Error).message);
+    process.exit(1);
+  });
+}
