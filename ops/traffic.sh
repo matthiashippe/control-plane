@@ -190,7 +190,10 @@ for ip, entry in people.items():
     if len(networks[".".join(ip.split(".")[:3])]) > 2:
         dropped["one of three or more addresses from its /24"] += 1
         continue
-    below = [m for m in entry["marks"] if m != "top"]
+    # Both pages have a control mark in their first screen, and neither of them proves a scroll.
+    # Hard-coding only "top" would have counted a /fix reader who fetched fix-top and nothing else
+    # as somebody who scrolled.
+    below = [m for m in entry["marks"] if m not in ("top", "fix-top")]
     if below and not all_at_once(list(entry["mark_times"].values())):
         scrolled.append((entry["first"], ip, entry))
     else:

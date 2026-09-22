@@ -46,7 +46,7 @@ SINCE_UTC="${CP_PIXELS_SINCE:-2026-09-22T10:07:23Z}"
 # The same constant for /fix, whose marks went live later. A page load before its own marks existed
 # could never have produced one, and counting it in the denominator is the mistake this repo keeps
 # finding elsewhere. The landing page value has its own history in the comment above.
-SINCE_FIX_UTC="${CP_PIXELS_FIX_SINCE:-2026-09-22T20:31:00Z}"
+SINCE_FIX_UTC="${CP_PIXELS_FIX_SINCE:-2026-09-22T20:24:54Z}"
 
 HOURS="${1:-24}"
 # Which page to measure. "" is the landing page, "fix" is /fix, which is where the issue answers
@@ -170,7 +170,11 @@ for raw in open(path):
     if "Mozilla/" not in ua:
         not_a_browser[ua.split()[0] if ua else "(none)"] += 1
         continue
-    if uri.startswith("/px/") and uri.endswith(".png"):
+    if uri.startswith("/px/") and uri.endswith(".png") and uri[4:-4] in WHAT:
+        # Only this page's marks. The check below compares the earliest pixel against this page's
+        # go-live, and the landing page marks have been live since 10:07 while the /fix marks went
+        # up at 20:24. Without the filter, measuring /fix aborts with COULD NOT TELL on the strength
+        # of a landing page pixel from three hours before its own marks existed.
         if earliest_px is None or at < earliest_px:
             earliest_px = at
     if at < since:
@@ -247,7 +251,11 @@ def took_everything_at_once(ip):
 renderers = {ip for ip in page_loads if took_everything_at_once(ip)}
 at_once = len(renderers)
 readers = {ip: times for ip, times in page_loads.items() if ip not in renderers}
-with_control = sum(1 for ip in page_loads if pixel[ip].get("top"))
+# The control is the FIRST mark of whichever page is being measured, not the literal "top".
+# Hard-coding it made the /fix table report zero controls while a planted reader had fetched
+# fix-top, which reads as "the mechanism is not firing" when the mechanism is fine.
+CONTROL = MARKS[0]
+with_control = sum(1 for ip in page_loads if pixel[ip].get(CONTROL))
 
 loads = sum(len(v) for v in page_loads.values())
 print(f"  page loads from outside: {loads} by {len(page_loads)} address(es)")
