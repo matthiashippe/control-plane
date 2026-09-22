@@ -80,6 +80,32 @@ That key is what goes into `CP_API_KEY` for `mcp/server.mjs`, or into the `Autho
 directly. It does not expire. Name it after the thing that uses it, because that name is what you
 will read when you revoke it.
 
+## Seeing what you have, and turning one off
+
+    GET /v1/auth/api-keys
+    Authorization: cnwy_k_…
+
+    {"keys": [{"key_prefix": "cnwy_k_abc1234", "name": "my-runtime",
+               "created_at": "…", "revoked_at": null, "active": true}]}
+
+Your own keys and nobody else's. The key itself is never returned, only the prefix, which is what
+listings and logs show anyway.
+
+    POST /v1/auth/api-keys/revoke
+    Authorization: cnwy_k_…
+
+    {"key_prefix": "cnwy_k_abc1234"}
+
+That key answers 401 from then on. It stays in the listing with `active: false`, so you can see
+what you turned off and when.
+
+A key that is not yours answers `404 no_such_key` and is not touched. Revoking the key you are
+holding is allowed and is often the point; the answer says so, because the next call with it is a
+401 and that should not be a surprise.
+
+Both were added on 22 September 2026. Until then this page told you to name a key for the day you
+revoke it, and there was no way to revoke it.
+
 ## The whole thing, runnable
 
 Needs `viem`, which is the library the reference implementation uses. Any other EIP-191 signer

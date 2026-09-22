@@ -613,7 +613,7 @@ describe("wrong HTTP method", () => {
     // and was rejected as "no API key". The message asked for a key this path does not need at all.
     // Whoever mixed up the method ended up in a dead end.
     const { app } = setup();
-    for (const path of ["/v1/auth/nonce", "/v1/auth/verify", "/v1/auth/api-keys"]) {
+    for (const path of ["/v1/auth/nonce", "/v1/auth/verify"]) {
       const res = await app.request(path, { method: "GET" });
       expect(res.status, `${path} with GET`).toBe(405);
       expect(res.headers.get("allow")).toBe("POST");
@@ -622,6 +622,15 @@ describe("wrong HTTP method", () => {
       expect(body.message, "the message has to say that no key is needed here").toMatch(/no API key/i);
       expect(body.allow).toEqual(["POST"]);
     }
+
+    // /v1/auth/api-keys left this list on 2026-09-22, when GET became a real method on it: it
+    // lists your own keys and therefore needs one. A GET without a key is a 401 and that is the
+    // right answer. What still has to be a 405 is a method the path does not have at all.
+    const mitSchluessel = await app.request("/v1/auth/api-keys", { method: "GET" });
+    expect(mitSchluessel.status, "GET now exists there and needs a key").toBe(401);
+    const falsch = await app.request("/v1/auth/api-keys", { method: "DELETE" });
+    expect(falsch.status, "a method it does not have is still a 405").toBe(405);
+    expect(falsch.headers.get("allow")).toBe("GET, POST");
   });
 
   it("lets the right method through unchanged", async () => {

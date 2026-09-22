@@ -115,6 +115,10 @@ const INFERENCE_UNAVAILABLE = {
  */
 const V1_ROUTES = new Set([
   "/v1/auth/api-keys",
+  // Without this line the auth middleware waves the revoke through, `c.get("address")` is
+  // undefined and the UPDATE scoped to it silently matches nothing. No key would ever be revoked
+  // and no caller would be told why.
+  "/v1/auth/api-keys/revoke",
   "/v1/auth/nonce",
   "/v1/auth/verify",
   "/v1/automatons/register",
@@ -776,6 +780,9 @@ export function createApp(opts: AppOptions) {
       "",
       "- /v1/status: models, prices, tiers, number of registered automatons (public, no key).",
       "- /v1/models, /v1/credits/pricing: catalog and prices.",
+      "- /v1/auth/api-keys: GET lists your own keys by prefix and name, POST mints one.",
+      "- /v1/auth/api-keys/revoke: POST {key_prefix} turns one of yours off for good. A key that is",
+      "  not yours answers 404 and is not touched.",
       "- /pay/{usd}/{address}: x402 topup.",
       "- /v1/automatons/register: EIP-712 registration.",
       "- /v1/chat/completions: OpenAI-compatible inference, billed against credits.",
@@ -919,7 +926,9 @@ export function createApp(opts: AppOptions) {
   const ALLOWED_METHODS: Record<string, string[]> = {
     "/v1/auth/nonce": ["POST"],
     "/v1/auth/verify": ["POST"],
-    "/v1/auth/api-keys": ["POST"],
+    // GET lists your own keys, POST mints one, and the revoke is its own path below.
+    "/v1/auth/api-keys": ["GET", "POST"],
+    "/v1/auth/api-keys/revoke": ["POST"],
     // Keyless like the three above, and documented in llms.txt and docs/bounties.md, so somebody
     // will open it in a browser. Without this that GET is a bare 404 and the path we told them
     // about looks like it does not exist.
@@ -983,6 +992,87 @@ export function createApp(opts: AppOptions) {
   app.get("/v1/credits/balance", (c) =>
     c.json({ balance_cents: getBalanceCents(db, c.get("address")) }),
   );
+
+  /**
+   * Your own keys, and the way to turn one off.
+   *
+   * `docs/api-key.md` has told people since it was written to "name it after the thing that uses
+   * it, because that name is what you will read when you revoke it". There was no way to revoke
+   * it, and no way to see what you had. The database has carried a `revoked_at` column the whole
+   * time and `resolveApiKey` has always refused a key that has one; nothing could ever set it.
+   *
+   * Found on 2026-09-22 by counting: 447 keys on this instance, every one of them valid, 350 of
+   * them minted by our own market check on two wallets. Ours are noise. The one that matters is
+   * the stranger who provisioned a real runtime at 02:05 that morning: if that key ever leaks, the
+   * page that told them to name it carefully offered them nothing to do about it.
+   *
+   * Never returns a key, only its prefix, which is what `docs/api-key.md` says listings show.
+   */
+  app.get("/v1/auth/api-keys", (c) => {
+    const rows = db
+      .prepare(
+        "SELECT key_prefix, name, created_at, revoked_at FROM api_keys WHERE address = ? ORDER BY created_at DESC",
+      )
+      .all(c.get("address")) as { key_prefix: string; name: string; created_at: string; revoked_at: string | null }[];
+    return c.json({
+      keys: rows.map((r) => ({
+        key_prefix: r.key_prefix,
+        name: r.name,
+        created_at: r.created_at,
+        revoked_at: r.revoked_at,
+        active: r.revoked_at === null,
+      })),
+    });
+  });
+
+  /**
+   * Turn one of your own keys off, for good.
+   *
+   * Scoped to the caller's address in the UPDATE itself, not in a check before it: a revoke that
+   * names somebody else's prefix has to change nothing, and the safest way to say that is to let
+   * the database say it.
+   *
+   * Revoking the key you are holding is allowed and is most of the point. The answer says so,
+   * because the next call with that key is a 401 and that should not come as a surprise.
+   */
+  app.post("/v1/auth/api-keys/revoke", async (c) => {
+    const raw = await c.req.json().catch(() => null);
+    const b = (typeof raw === "object" && raw !== null ? raw : {}) as Record<string, unknown>;
+    const prefix = typeof b.key_prefix === "string" ? b.key_prefix.trim() : "";
+    if (!prefix) {
+      return c.json(
+        {
+          error: "key_prefix_required",
+          message: 'Send {"key_prefix": "cnwy_k_abc1234"}. GET /v1/auth/api-keys lists yours.',
+          docs: DOC.authentication,
+        },
+        400,
+      );
+    }
+    const res = db
+      .prepare("UPDATE api_keys SET revoked_at = ? WHERE address = ? AND key_prefix = ? AND revoked_at IS NULL")
+      .run(new Date().toISOString(), c.get("address"), prefix);
+    if (res.changes === 0) {
+      return c.json(
+        {
+          error: "no_such_key",
+          message:
+            "No active key of yours has that prefix. GET /v1/auth/api-keys lists the ones you " +
+            "have, active or not. A key belonging to somebody else is not yours to revoke.",
+          docs: DOC.authentication,
+        },
+        404,
+      );
+    }
+    const selbst = (c.req.header("authorization") ?? "").replace(/^Bearer /, "").startsWith(prefix);
+    return c.json({
+      key_prefix: prefix,
+      revoked: true,
+      note: selbst
+        ? "That is the key you just used. The next call with it answers 401."
+        : "Calls with that key now answer 401.",
+    });
+  });
 
   /**
    * Your own bookings, newest first.
