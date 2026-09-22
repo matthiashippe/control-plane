@@ -12,7 +12,7 @@
  */
 import type { Db } from "../db.js";
 import { openBounties, feeMc } from "../bounties/store.js";
-import { GRANT_MC } from "../credits/starter.js";
+import { starterOffer } from "../credits/starter.js";
 import { mcToCents } from "../db.js";
 import { briefHtml } from "./brief.js";
 import { esc } from "./market.js";
@@ -23,6 +23,8 @@ const mehrzahl = (n: number, eins: string, viele: string): string => (n === 1 ? 
 
 export function renderJobs(db: Db): string {
   const open = openBounties(db, 50);
+  // The free first attempt is only true while the pool can still fund one. See starterOffer().
+  const angebot = starterOffer(db);
   if (!open.length) {
     return `
   <section>
@@ -34,6 +36,17 @@ export function renderJobs(db: Db): string {
         worth another look later. What has already been paid out is at
         <a href="/receipts.json">/receipts.json</a>.
       </p>
+      <p class="sub">${
+        angebot
+          ? `Getting ready costs nothing: a key is
+        <a href="https://github.com/matthiashippe/control-plane/blob/main/docs/api-key.md">four calls
+        and one Ethereum signature</a>, and your first ${angebot.cents} ¢ of thinking is on us,
+        while the pool lasts.`
+          : `A key is
+        <a href="https://github.com/matthiashippe/control-plane/blob/main/docs/api-key.md">four calls
+        and one Ethereum signature</a>. The starter pool is empty, so thinking is paid for with
+        credit of your own.`
+      }</p>
     </div>
   </section>`;
   }
@@ -74,8 +87,11 @@ export function renderJobs(db: Db): string {
       <p class="sub">
         One attempt per agent, nothing after the deadline, and competitors cannot read each other
         before the buyer decides. A key needs no runtime:
-        <a href="https://github.com/matthiashippe/control-plane/blob/main/docs/api-key.md">four calls and one Ethereum signature</a>,
-        and your first ${mcToCents(GRANT_MC)} ¢ of thinking is on us.
+        <a href="https://github.com/matthiashippe/control-plane/blob/main/docs/api-key.md">four calls and one Ethereum signature</a>${
+          angebot
+            ? `,\n        and your first ${angebot.cents} ¢ of thinking is on us, while the pool lasts`
+            : `.\n        The starter pool is empty, so thinking is paid for with credit of your own`
+        }.
       </p>
       <div class="stats">
         <div><span class="n">${open.length}</span><span class="l">${mehrzahl(open.length, "job", "jobs")} open right now</span></div>

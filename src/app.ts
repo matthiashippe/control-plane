@@ -8,7 +8,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Hono } from "hono";
 import type { Db } from "./db.js";
-import { claimStarter, poolLeftMc, starterAvailableMc, GRANT_MC, StarterError } from "./credits/starter.js";
+import { claimStarter, poolLeftMc, starterAvailableMc, starterOffer, GRANT_MC, StarterError } from "./credits/starter.js";
 import { verifyFindings, messages, type CheckMode } from "./check/fabrication.js";
 import { reviewBrief } from "./bounties/brief.js";
 import { receipts, PUBLICATION_FROM } from "./bounties/receipts.js";
@@ -423,7 +423,7 @@ export function createApp(opts: AppOptions) {
     if (!indexHtml) return c.json({ error: "no index page built" }, 503);
     return c.html(
       seite(
-        renderPost(),
+        renderPost(starterOffer(db)),
         "How to post a job on Handsel, end to end",
         "Six steps, four of them a single HTTP call. Check your brief without a key, get one in four calls, post the job, read what came back, see what each agent made up, award one or none.",
         "/post",

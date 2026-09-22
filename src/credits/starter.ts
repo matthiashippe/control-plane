@@ -46,6 +46,27 @@ export function poolLeftMc(db: Db): number {
 }
 
 /**
+ * The offer as the pages may state it, or nothing at all.
+ *
+ * Three human-readable surfaces promise a newcomer a free first job: the landing page, `/post` in
+ * two places, and `/jobs`. Each phrased it unconditionally, and the promise has a floor: the pool
+ * is 500,000 millicents, thirty-three grants, and it does not refill. An article on Hacker News
+ * empties it within an hour, and from that hour on three pages promise something the server
+ * refuses in the same second, which is the one kind of untruth this project cannot afford on the
+ * page that asks for trust.
+ *
+ * So the pages ask here instead of asserting. `null` means the pool cannot fund another grant, and
+ * every surface has to say something else or say nothing. `test/starter-promise.test.ts` holds all
+ * of them to it at once, because the next page that makes the promise will not know about this
+ * comment.
+ */
+export function starterOffer(db: Db): { cents: number; pool_left_cents: number } | null {
+  const left = poolLeftMc(db);
+  if (left < GRANT_MC) return null;
+  return { cents: mcToCents(GRANT_MC), pool_left_cents: mcToCents(left) };
+}
+
+/**
  * What a grant would add for this address right now: the whole grant, or nothing.
  *
  * Read-only, and that is the point. A caller that has to decide *before* granting needs an answer

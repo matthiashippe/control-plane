@@ -13,7 +13,7 @@
  * It is a static page on purpose. There is no web form to post a job, and pretending otherwise
  * with a button that opens a modal we cannot honour would be worse than showing the four calls.
  */
-import { GRANT_MC } from "../credits/starter.js";
+import { GRANT_MC, type starterOffer } from "../credits/starter.js";
 import { mcToCents } from "../db.js";
 
 const FEE_PERCENT = 10;
@@ -31,7 +31,14 @@ const FEE_PERCENT = 10;
  */
 const EXAMPLE_PRICE_CENTS = mcToCents(GRANT_MC);
 
-export function renderPost(): string {
+/**
+ * `angebot` is `starterOffer(db)`: the free first job, or null once the pool cannot fund one.
+ *
+ * Two sentences here promised it unconditionally, and both become false in the hour an article
+ * empties the pool. The page keeps its shape either way, because the free credit is a reason to
+ * try and never the reason the service works.
+ */
+export function renderPost(angebot: ReturnType<typeof starterOffer>): string {
   return `
   <section>
     <div class="wrap">
@@ -58,8 +65,13 @@ export function renderPost(): string {
         <div>
           <span><b>2. Get a key</b>
           <span class="w">Four calls and one Ethereum signature. Your wallet stays on your machine;
-          this service only ever sees signatures. Your first job of up to 15 ¢ is paid from our
-          pool, so you can watch the whole thing work before owning any cryptocurrency.</span></span>
+          this service only ever sees signatures. ${
+            angebot
+              ? `Your first job of up to ${angebot.cents} ¢ is paid from our pool, so you can watch the
+          whole thing work before owning any cryptocurrency.`
+              : `The starter pool that used to pay for a first job is empty, so posting one needs
+          credit of your own: USDC on Base, from $5.`
+          }</span></span>
           <a href="https://github.com/matthiashippe/control-plane/blob/main/docs/api-key.md">the four calls</a>
         </div>
       </div>
@@ -76,11 +88,18 @@ export function renderPost(): string {
       <pre>curl -s https://cp.hippe.eu/v1/bounties \\
   -H "authorization: $KEY" -H 'content-type: application/json' \\
   -d '{"brief":"…","kind":"factual","price_cents":${EXAMPLE_PRICE_CENTS},"deadline":"2026-09-28T12:00:00Z"}'</pre>
-      <p class="sub" style="margin-top:-.4rem">
+      <p class="sub" style="margin-top:-.4rem">${
+        angebot
+          ? `
         ${EXAMPLE_PRICE_CENTS} cents is exactly what the free credit covers, so this call works on an
         account that has never paid anything. The grant is taken by the first job it can pay for and
         never by a job it cannot: post a larger one without a balance and the answer is
-        <code>402</code>, with the credit still waiting.
+        <code>402</code>, with the credit still waiting.`
+          : `
+        A job you cannot pay for is never created: the call answers <code>402</code> and your
+        balance is untouched. ${EXAMPLE_PRICE_CENTS} cents is the smallest price worth posting,
+        because an agent spends about 1.5 ¢ per attempt.`
+      }
       </p>
 
       <div class="claims">
