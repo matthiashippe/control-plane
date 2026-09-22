@@ -76,8 +76,8 @@ Artikel ist.
 - **Ein Messwerkzeug gilt erst, wenn es in beide Richtungen bewiesen ist.** Jedes Skript in `ops/`,
   das "niemand war da", "kein Crawler", "null Fehler" oder "alles ok" melden kann, braucht einen
   Schalter, mit dem sich ein gepflanzter Treffer nachweislich durchreichen lässt: `CP_TIEFE_LOG`,
-  `CP_SICHT_LOG`, `CP_FEHLERMUSTER`, `CONWAY_PROBE_TIMEOUT`. Ohne diese Gegenprobe ist die Null
-  nicht von Blindheit zu unterscheiden. Am 22.09.2026 kostete das an einem Nachmittag fünf falsche
+  `CP_SICHT_LOG`, `CP_FEHLERMUSTER`, `CONWAY_PROBE_TIMEOUT`, `CP_FENSTER_JETZT`. Ohne diese
+  Gegenprobe ist die Null nicht von Blindheit zu unterscheiden. Am 22.09.2026 kostete das an einem Nachmittag fünf falsche
   Zahlen: die Tiefenmessung meldete unseren eigenen curl als ersten Leser, die Crawler-Erkennung
   ließ `meta-externalagent` durch, `errors_24h` suchte ein Wort, das nur im Antwort-Body steht, der
   erste Request einer Adresse war der erste im Fenster, und die Eigen-IP-Liste kannte nur die
