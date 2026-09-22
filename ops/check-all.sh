@@ -113,6 +113,11 @@ run --unklar-bei 2 "our claims about the runtime hold" python3 ./ops/upstream-cl
 # the README two sections down described the discrepancy while recommending the file.
 run --unklar-bei 2 "the published data reproduces" ./ops/daten-pruefen.py
 
+# Whether anything that indexes the web has ever looked at this service, and whether our side of
+# that is in order. The first crawler is news; until then the line is the finding. See
+# ops/sichtbarkeit.sh: in the first 2.6 days there was not one, and nothing on our side is wrong.
+run --unklar-bei 2 "search engines can find us" ./ops/sichtbarkeit.sh
+
 if (( DEEP )); then
   run "MCP route end to end" env CP_URL="$BASE" OPERATOR_WALLET="${OPERATOR_WALLET:-harness/state/mainnet-wallet.json}" pnpm -s tsx ops/mcp-against-production.ts \
     && touch "$STAMPS/mcp-production"
