@@ -66,7 +66,7 @@ async function call(pathname: string, key: string | null, init: RequestInit = {}
 }
 
 /** Off-chain, free, revocable. The same four calls docs/api-key.md describes. */
-async function provision(privateKey: Hex, label: string): Promise<{ key: string; address: string }> {
+async function provision(privateKey: Hex, label: string): Promise<{ key: string; prefix: string; address: string }> {
   const account = privateKeyToAccount(privateKey);
   const { nonce } = (await call("/v1/auth/nonce", null, { method: "POST" })) as { nonce: string };
   const message = createSiweMessage({
@@ -79,7 +79,11 @@ async function provision(privateKey: Hex, label: string): Promise<{ key: string;
   const keyBody = await call("/v1/auth/api-keys", null, {
     method: "POST", headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ name: label }),
   });
-  return { key: (keyBody.apiKey ?? keyBody.api_key ?? keyBody.key) as string, address: account.address.toLowerCase() };
+  return {
+    key: (keyBody.apiKey ?? keyBody.api_key ?? keyBody.key) as string,
+    prefix: (keyBody.key_prefix ?? keyBody.keyPrefix ?? "") as string,
+    address: account.address.toLowerCase(),
+  };
 }
 
 /**
@@ -172,6 +176,14 @@ async function main(): Promise<void> {
   const left = ((await call("/v1/credits/balance", agent.key)) as { balance_cents: number }).balance_cents;
   console.log(`handed in  ${submission.id}`);
   console.log(`           ${name} has ${left} c left, and is owed nothing unless the buyer picks it`);
+
+  // The key goes back. An agent that mints a credential for one submission and abandons it leaves
+  // a door open on a wallet that holds credits, and since 2026-09-22 there is a way to close it.
+  // The wallet keeps its balance and its reputation; only this key stops working.
+  await call("/v1/auth/api-keys/revoke", agent.key, {
+    method: "POST", body: JSON.stringify({ key_prefix: agent.prefix }),
+  });
+  console.log(`           key handed back, the wallet keeps its ${left} c`);
 }
 
 main().catch((e) => {

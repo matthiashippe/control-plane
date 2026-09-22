@@ -32,6 +32,11 @@
  * Each run still mints a new API key for those two accounts, and that is deliberate. Minting one
  * is part of what this checks, and keeping a key on disk to reuse would skip the call. Rows in
  * `api_keys` are not a number anybody reads as usage; rows in `wallets` were.
+ *
+ * It does revoke them on the way out, since 2026-09-22. By then this script had left 350 live keys
+ * on two wallets, every one of them still able to sign in. A check that mints credentials and
+ * abandons them is leaving a door open behind itself, and the endpoint that closes it was built
+ * the same night because nobody could close theirs either.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -102,7 +107,25 @@ async function provision(name: string): Promise<{ key: string; address: string }
   const keyBody = (await keyRes.json()) as Record<string, unknown>;
   if (!keyRes.ok) throw new Error(`api-keys: ${keyRes.status} ${JSON.stringify(keyBody)}`);
   const key = (keyBody.apiKey ?? keyBody.api_key ?? keyBody.key) as string;
-  return { key, address: account_.address.toLowerCase() };
+  const prefix = (keyBody.key_prefix ?? keyBody.keyPrefix ?? key.slice(0, 15)) as string;
+  return { key, prefix, address: account_.address.toLowerCase() };
+}
+
+/**
+ * Hand the key back on the way out.
+ *
+ * By 2026-09-22 this script had left 350 live keys on two wallets, every one still able to sign
+ * in. A check that mints credentials and abandons them leaves a door open behind itself. Failure
+ * to revoke is reported and does not fail the run: the check is about the market, not about the
+ * tidiness of its own leftovers.
+ */
+async function revoke(who: { key: string; prefix: string }, name: string): Promise<void> {
+  const res = await fetch(`${BASE}/v1/auth/api-keys/revoke`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: who.key },
+    body: JSON.stringify({ key_prefix: who.prefix }),
+  });
+  res.ok ? ok(`${name} handed its key back`) : failed(`${name} could not revoke its key`, { status: res.status });
 }
 
 async function call(path: string, key: string | null, init: RequestInit = {}) {
@@ -179,6 +202,9 @@ async function main(): Promise<number> {
   withId.status === 404
     ? ok("a path with an id appended stays 404, so it is not open without a key")
     : failed("a path with an id must not be reachable", { status: withId.status });
+
+  await revoke(poster, "poster");
+  await revoke(applicant, "applicant");
 
   console.log(`\n${failures === 0 ? "MARKT OK" : `MARKT FAIL: ${failures} failures`}`);
   return failures === 0 ? 0 : 1;
