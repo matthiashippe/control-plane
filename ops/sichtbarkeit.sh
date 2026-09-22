@@ -8,9 +8,19 @@
 # of them answer 200, the repository is public with cp.hippe.eu in its description, its homepage
 # field and four times in the README.
 #
-# The reason is upstream of anything in this repo. A crawler arrives by following a link, and every
-# public link to this service sits inside GitHub user content, which carries rel="nofollow" and
-# passes no crawl signal. Two and a half days is also not long for a domain nobody links.
+# That held for 2.9 days and then stopped holding, on the same day, at 17:56 UTC: **eighteen seconds
+# after three comments were posted to Conway issues #392, #376 and #372, Googlebot arrived for the
+# first time.** robots.txt, then the landing page twice, then /v1/status with the landing page as
+# its referrer, which is our own inline script running, so it rendered the page rather than reading
+# the markup. Six requests from 66.249.70.7 and .8.
+#
+# The explanation that stood here until then is therefore wrong, and it is worth saying plainly
+# rather than replacing it with a better guess: it said a crawler never comes because every public
+# link sits in GitHub user content carrying rel="nofollow", so no crawl signal is passed. One
+# comment on a public issue was enough. Whether Google followed the nofollow link anyway (it has
+# treated it as a hint and not an instruction since 2019), or whether one of the preview fetchers
+# that hit us in the same second put the URL in front of it, this log cannot say. What it can say
+# is that the door was never shut, and three comments opened it in under twenty seconds.
 #
 #   ops/sichtbarkeit.sh
 #
@@ -44,7 +54,7 @@ fehler=0
 echo "Who that indexes the web has been here"
 echo
 
-python3 - "$log" <<'PY'
+crawler_bericht=$(python3 - "$log" <<'PY'
 import collections, datetime, json, re, sys
 
 # Named rather than pattern-matched on "bot", because half the scanners on this log call themselves
@@ -105,9 +115,10 @@ if treffer:
         print(f"    {name:22s} {n:5d} request(s), first {erste[name]:%m-%d %H:%M}, last {letzte[name]:%m-%d %H:%M} UTC")
 else:
     print(f"  Nothing. Not one crawler, preview bot or AI crawler in {tage:.1f} days.")
-    print("  A crawler arrives by following a link, and every public link to this service sits in")
-    print("  GitHub user content, which is rel=nofollow and passes no crawl signal. Until something")
-    print("  links it from a page that is crawled, this number stays at zero however good the page is.")
+    print("  A crawler arrives by following a link. On 2026-09-22 at 17:56 UTC three comments on")
+    print("  public Conway issues brought Googlebot within eighteen seconds, after 2.9 days of")
+    print("  nothing, so posting is what moves this number. If it is back at zero, the last link")
+    print("  is old news rather than the door being shut.")
     print()
     print("  What this cannot see: a crawler that sends a browser user agent. Nothing in a log tells")
     print("  such a visit apart from a reader, so \"nothing\" here means nothing that says it is one.")
@@ -119,6 +130,8 @@ if unbenannt:
         print(f"    {n:5d}x  {ua}")
     print("  Look at these. One of them being a real crawler is how the list above gets its next entry.")
 PY
+)
+printf '%s\n' "$crawler_bericht"
 
 echo
 echo "-- Our side of it --"
@@ -164,5 +177,14 @@ if (( fehler )); then
   echo "VISIBILITY FAILED: something on our side keeps crawlers out."
   exit 1
 fi
-echo "VISIBILITY OK on our side. What is missing is a link from a page that gets crawled,"
-echo "and that is a decision about posting, not a change to this repository."
+# The closing line follows the finding above rather than repeating a fixed sentence. Once a crawler
+# has been here, "what is missing is a link" is no longer true and would read as an instruction to
+# do the thing that already worked; while none has, saying one has would be worse still. So it is
+# read out of the report rather than written twice.
+if printf '%s' "$crawler_bericht" | grep -q "FIRST CRAWLER"; then
+  echo "VISIBILITY OK on our side, and something that indexes the web has been here."
+  echo "Whether it stays is a question about new links, not about this repository."
+else
+  echo "VISIBILITY OK on our side. What is missing is a link from a page that gets crawled,"
+  echo "and that is a decision about posting, not a change to this repository."
+fi
