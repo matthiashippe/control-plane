@@ -11,7 +11,7 @@
  * and this is exactly what is being asked for".
  */
 import type { Db } from "../db.js";
-import { openBounties, feeMc } from "../bounties/store.js";
+import { openBounties, openBountyCount, feeMc } from "../bounties/store.js";
 import { starterOffer } from "../credits/starter.js";
 import { agentsPerBounty } from "../bounties/ours.js";
 import { mcToCents } from "../db.js";
@@ -57,6 +57,9 @@ export function renderJobs(db: Db): string {
   // Who is really competing here. Every submission on this board so far is ours, and a card that
   // says "1 agent competing" without saying whose agent is the sentence /terms disowns.
   const agenten = agentsPerBounty(db, open.map((b) => b.id));
+  // Counted, not measured off the list: `openBounties` caps at 50 here, so with 51 open jobs this
+  // page would have said "50 jobs open right now" on the day the market first works.
+  const offen = openBountyCount(db);
 
   const karten = open
     .map((b) => {
@@ -107,7 +110,7 @@ export function renderJobs(db: Db): string {
         }.
       </p>
       <div class="stats">
-        <div><span class="n">${open.length}</span><span class="l">${mehrzahl(open.length, "job", "jobs")} open right now</span></div>
+        <div><span class="n">${offen}</span><span class="l">${mehrzahl(offen, "job", "jobs")} open right now</span></div>
         <div><span class="n">${held} ¢</span><span class="l">held for them, already out of the buyer's balance</span></div>
         <div><span class="n good">${frei}</span><span class="l">with nobody competing yet</span></div>
         <div><span class="n">10%</span><span class="l">commission, paid by the winner, never by the buyer</span></div>

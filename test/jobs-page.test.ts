@@ -43,6 +43,34 @@ describe("/jobs", () => {
    * Marked, not subtracted. A card that dropped our own entrant would hide that somebody really
    * did compete, which is true and is the thing that has to work before a stranger will.
    */
+  /**
+   * The count of open jobs is counted, not measured off the list the page happens to hold.
+   *
+   * `openBounties` caps: 50 for this page, 100 for the market block on the landing page. Both
+   * printed the length of what they had fetched, so at 51 open jobs /jobs would have said "50 jobs
+   * open right now" and the landing page would have linked "All 100 open jobs" at 101. Wrong
+   * exactly on the day this market first works, and invisible while there are five.
+   */
+  it("counts the open jobs instead of measuring its own page", async () => {
+    const { db, app, post, page } = setup();
+    const inAnHour = () => new Date(Date.now() + 3600e3).toISOString();
+    // 52 open jobs, two past the cap this page fetches with.
+    for (let i = 0; i < 52; i++) {
+      const res = await post({
+        brief: `FACT SHEET number ${i}. Ninety words maximum, hand in the sheet and nothing else.`,
+        kind: "factual",
+        price_cents: 1,
+        deadline: inAnHour(),
+      });
+      expect(res.status, `job ${i} could not be posted`).toBe(201);
+    }
+    const html = await page();
+    expect(html, "the page has to name the number it has, not the number it fetched").toContain(">52<");
+    expect(html).toContain("52</span><span class=\"l\">jobs open right now");
+    const landing = await (await app.request("/")).text();
+    expect(landing, "and the landing page links the same number").toContain("All 52 open jobs");
+  });
+
   it("says how many of the competing agents are not ours", async () => {
     const { db, app, post, page } = setup();
     const res = await post({

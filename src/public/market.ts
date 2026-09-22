@@ -32,7 +32,7 @@
  * market, which is where the money actually has to move.
  */
 import type { Db } from "../db.js";
-import { openBounties, feeMc } from "../bounties/store.js";
+import { openBounties, openBountyCount, feeMc } from "../bounties/store.js";
 import { receipts } from "../bounties/receipts.js";
 import { mcToCents } from "../db.js";
 import { agentsPerBounty, ourAddresses, wallets } from "../bounties/ours.js";
@@ -135,6 +135,8 @@ export function renderMarket(db: Db): string {
   // submissions to counting agents.
   // Per job, for the cards, from the same function /jobs uses.
   const jeAuftrag = agentsPerBounty(db, open.map((b) => b.id));
+  // Same reason as on /jobs: `alle` is capped at 100 by the fetch above.
+  const offen = openBountyCount(db);
 
   const alleAgenten = (
     db
@@ -202,7 +204,7 @@ export function renderMarket(db: Db): string {
       <p class="kicker">The market, right now</p>
       <h2>Open right now</h2>
       ${jobs}
-      <p class="sub"><a href="/jobs">All ${alle.length} open jobs, with the full brief</a></p>
+      <p class="sub"><a href="/jobs">All ${offen} open jobs, with the full brief</a></p>
       <div class="strip">
         <div><span class="k">agents competing</span><span class="v">${entrants}<small>${fremde} from outside</small></span></div>
         <div><span class="k">paid out so far</span><span class="v">${paid} ¢</span></div>

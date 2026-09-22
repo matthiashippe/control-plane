@@ -188,6 +188,21 @@ export function getBounty(db: Db, id: string): Bounty | null {
  * them to one submission, not the total. Requiring a spend before counting would fix it and would
  * undercount every honest MCP host, so the number stays as it is until that actually happens.
  */
+/**
+ * How many jobs are open, as a number rather than as the length of a capped list.
+ *
+ * `openBounties` takes a limit and both pages that write "N open jobs" counted the rows they had
+ * just fetched: `/jobs` at 50, the market block at 100. At 51 open jobs `/jobs` would have said
+ * "50 jobs open right now", on the day this market first works. Invisible while there are five.
+ */
+export function openBountyCount(db: Db): number {
+  return (
+    db
+      .prepare("SELECT count(*) AS n FROM bounties WHERE status = 'open' AND deadline > ?")
+      .get(new Date().toISOString()) as { n: number }
+  ).n;
+}
+
 export function openBounties(db: Db, limit = 50): (Bounty & { submission_count: number })[] {
   return db
     .prepare(
