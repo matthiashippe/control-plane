@@ -81,7 +81,7 @@ run() {
 #
 # A check that has never gone red is a check nobody has verified, and this repo says so about
 # tests in loop-constraints.md ("Ein Test, der ohne den zugehoerigen Fix gruen bleibt, ist kein
-# Test"). On 2026-09-22 the same question was put to the eleven below, one at a time, by breaking
+# Test"). On 2026-09-22 the same question was put to the twelve below, one at a time, by breaking
 # what each one guards:
 #
 #   health              a wrong URL answers 000, the check reports it
@@ -95,6 +95,8 @@ run() {
 #   published data      a deleted CSV row: three figures named with both values
 #   search engines      a noindex meta tag: VISIBILITY FAILED
 #   shown commands      one altered line in the hero: shown-but-not-returned, both directions
+#   the way in          nothing had to be broken: its first run was red, on the 401 that named
+#                       the three auth steps in words and no path anybody could call
 #
 # Every one of them went red for the right reason and green again afterwards. Anything added
 # below is expected to have been through the same before it is trusted.
@@ -145,6 +147,10 @@ run --unklar-bei 2 "search engines can find us" ./ops/sichtbarkeit.sh
 # the answer the hero prints beside its call is the answer the service gives. See
 # ops/befehle-pruefen.sh.
 run --unklar-bei 2 "the commands the pages show work" ./ops/befehle-pruefen.sh
+
+# Can somebody who has not read the source get in? Three faults on 2026-09-22 said no, and all
+# three were invisible from in here: every answer involved was correct and none was any use.
+run "the way in is walkable" ./ops/fremder-client.sh
 
 if (( DEEP )); then
   run "MCP route end to end" env CP_URL="$BASE" OPERATOR_WALLET="${OPERATOR_WALLET:-harness/state/mainnet-wallet.json}" pnpm -s tsx ops/mcp-against-production.ts \
