@@ -87,12 +87,13 @@ if live > now:
 # existed, or it is in a denominator it cannot belong to.
 since = max(window, live)
 
-MARKS = ["top", "proof", "market", "close"]
+MARKS = ["top", "proof", "market", "close", "end"]
 WHAT = {
     "top": "the first screen (control)",
     "proof": "past the proof section",
     "market": "past the live market",
-    "close": "the last screen",
+    "close": "past the agents section",
+    "end": "the last screen, with the buttons",
 }
 
 # Per address: when the page was loaded, and when each pixel came back.

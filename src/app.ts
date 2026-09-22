@@ -350,7 +350,14 @@ export function createApp(opts: AppOptions) {
    *
    * No script is possible here: the CSP pins one inline script by hash and deploy/ is not touched
    * without a human. `loading="lazy"` needs none. A browser defers a lazy image until it comes
-   * near the viewport, so a request for /px/close.png is a reader who got to the last screen.
+   * near the viewport, so a request for /px/end.png is a reader who got to the last screen.
+   *
+   * Five marks and not four, since 2026-09-22. `close.png` was named and reported as "the last
+   * screen" and sits before the closing section, so what it actually measured was the end of the
+   * agents block. The one section with something to click, "Post your first job" and "See open
+   * jobs", had no mark at all: whether anybody has ever seen those two buttons was not a question
+   * this page could answer. `end.png` sits after that section and is the honest last screen;
+   * `close.png` keeps its name so the series stays comparable and is reported for what it is.
    *
    * `/px/top.png` is the control and the reason this is a measurement rather than a hope. It sits
    * in the first screen and is lazy too, so a browser that simply fetches every lazy image at once
@@ -377,7 +384,7 @@ export function createApp(opts: AppOptions) {
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
     "base64",
   );
-  for (const mark of ["top", "proof", "market", "close"]) {
+  for (const mark of ["top", "proof", "market", "close", "end"]) {
     app.get(`/px/${mark}.png`, (c) =>
       c.body(new Uint8Array(PIXEL), 200, {
         "Content-Type": "image/png",

@@ -13,7 +13,7 @@ import { describe, expect, it } from "vitest";
 import { createApp } from "../src/app.js";
 import { openDb } from "../src/db.js";
 
-const MARKS = ["top", "proof", "market", "close"] as const;
+const MARKS = ["top", "proof", "market", "close", "end"] as const;
 
 describe("how far down the page a reader got", () => {
   it("serves a one-pixel PNG at each mark, uncached", async () => {
@@ -53,7 +53,34 @@ describe("how far down the page a reader got", () => {
     expect(posOf("top")).toBeLessThan(posOf("proof"));
     expect(posOf("proof")).toBeLessThan(posOf("market"));
     expect(posOf("market")).toBeLessThan(posOf("close"));
-    expect(posOf("close"), "the last mark belongs after the market").toBeGreaterThan(html.indexOf('id="agents"'));
+    expect(posOf("close"), "the agents mark belongs after the market").toBeGreaterThan(html.indexOf('id="agents"'));
+    expect(posOf("close")).toBeLessThan(posOf("end"));
+  });
+
+  /**
+   * The mark that was missing, and the reason it matters more than the other four.
+   *
+   * close.png was called "the last screen" and sits before the closing section, so what it
+   * measured was the end of the agents block. The one section carrying something to click, "Post
+   * your first job" and "See open jobs", had no mark at all, which means whether a reader has ever
+   * reached those two buttons was not a question this page could answer. It is now.
+   */
+  it("marks the closing section, the only one with something to click", async () => {
+    const html = await (await createApp({ db: openDb(":memory:") }).request("/")).text();
+    const close = html.indexOf('id="start"');
+    expect(close, "the closing section should exist").toBeGreaterThan(-1);
+    expect(html.indexOf("/px/end.png"), "end belongs after the closing section").toBeGreaterThan(close);
+    expect(html.indexOf("/px/close.png"), "close sits before it, which is why it is not the end").toBeLessThan(close);
+    // Both buttons are in that section, so the mark stands for having seen them.
+    const section = html.slice(close, html.indexOf("/px/end.png"));
+    expect(section).toContain('href="/post"');
+    expect(section).toContain('href="/jobs"');
+  });
+
+  it("does not claim the closing mark is anything else in the report", async () => {
+    const script = (await import("node:fs")).readFileSync("ops/depth.sh", "utf8");
+    expect(script).toContain('"close": "past the agents section"');
+    expect(script).toContain('"end": "the last screen, with the buttons"');
   });
 
   it("asks for nothing a reader did not already send", async () => {
