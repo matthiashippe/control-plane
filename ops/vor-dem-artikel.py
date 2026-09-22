@@ -450,6 +450,32 @@ def main() -> int:
         aendern("the first paragraph no longer shows its subtraction",
                 "without the duplicates named, a reader's sum comes out 19 too high")
 
+    # 4e-ter. The three claims that lean on somebody else's numbers.
+    #
+    # Each of these was found by an adversarial read holding the text against our own notes, and
+    # each is a case of the text sounding firmer than the evidence: a download count attributed to
+    # a repository it is not linked to, "all from outside" over a sample of 100 out of 103, and an
+    # issue from March used to illustrate a wall that went up in July.
+    for name, muster, hinweis in [
+        ("the npm package's weak link to the repository",
+         r"bugs\.url at a repository that does not exist",
+         "docs/research/2026-09-20-wo-die-betroffenen-sind.md checked that repository and got a "
+         "404; leaning on the download count without saying so attributes traffic we cannot "
+         "attribute"),
+        ("the comment sample",
+         r"the 100 most recent, which is as many as the API hands over",
+         "2026-09-21-conway-repo.json says recent_issue_comments_checked is 100 while "
+         "issue_comments_since_then is 103, so 'all' was a claim about three comments nobody read"),
+        ("the date on issue 293",
+         r"filed on 27 March, four months before the wall went up",
+         "the piece puts the wall at 17 July and says people were still getting in before it, so "
+         "an issue from March illustrates the spending path and not the wall"),
+    ]:
+        if re.search(muster, text):
+            ok(name)
+        else:
+            aendern(f"the hedge on {name} is gone", hinweis)
+
     # 4f. Discussions and issue trackers are two different figures.
     if re.search(r"Discussions are off on the main repository", text):
         ok("Discussions and the issue tracker are told apart",
