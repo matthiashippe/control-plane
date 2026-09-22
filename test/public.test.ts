@@ -5,6 +5,7 @@ import { openDb, postLedger } from "../src/db.js";
 import { hashApiKey } from "../src/auth/siwe.js";
 import { MockProvider } from "../src/inference/mock.js";
 import { Catalog, MARKUP } from "../src/inference/proxy.js";
+import { reviewBrief } from "../src/bounties/brief.js";
 
 function setup() {
   const db = openDb(":memory:");
@@ -888,14 +889,68 @@ describe("The buyer leads, not the plumbing", () => {
    *
    * So the pairs are pinned. Changing either half turns this red, which is the only moment
    * somebody would think about the other half.
+   *
+   * "Get a key" was the fourth pair and was deleted with the button on 2026-09-22, not rewired.
+   * The label promised a key and delivered a scroll jump to a section that shows a config file for
+   * somebody else's runtime and hands out no key at all; the honest route to one is docs/api-key.md.
+   * A deleted pair is the truthful form of "that button is gone". The section it pointed at stays,
+   * and the last line of this test still requires it.
    */
+  /**
+   * The panel in the hero has to be an output, not a picture of one.
+   *
+   * It shows a call any reader can run and three lines under it. Nothing stops those lines from
+   * drifting away from what the service answers: a word added to `SHORT_WORDS`, a finding renamed,
+   * a fourth check introduced, and the page keeps showing the old answer with a `$ curl` in front
+   * of it, which is a screenshot of a result rather than the result. This project refuses invented
+   * evidence elsewhere and the first screen is the last place to make an exception.
+   *
+   * So the brief is read back out of the page, run through the same function the endpoint runs,
+   * and every finding has to be on the page: no missing line, and no line that the check does not
+   * produce.
+   */
+  it("derives the hero panel from the check, instead of quoting an answer it once got", async () => {
+    const { app } = setup();
+    const html = await (await app.request("/")).text();
+
+    const brief = html.match(/"brief":"([^"]+)"/)?.[1];
+    expect(brief, "the panel no longer shows a brief to check").toBeTruthy();
+
+    const liste = html.match(/<ul class="found">([\s\S]*?)<\/ul>/)?.[1] ?? "";
+    const zeilen = [...liste.matchAll(/<li>([\s\S]*?)<\/li>/g)].map((m) => m[1].trim());
+    const befunde = reviewBrief(brief!, "factual");
+
+    expect(befunde.length, "a brief with nothing to say about it proves nothing").toBeGreaterThan(0);
+    for (const b of befunde) {
+      expect(zeilen, `the check says "${b.missing}" and the page does not`).toContain(b.missing);
+    }
+    expect(zeilen.length, "the page shows a line the check does not produce").toBe(befunde.length);
+  });
+
+  /**
+   * The five-dollar warning belongs on the page that shows the command.
+   *
+   * /fix carries it and is tested for it (test/fix-page.test.ts). The landing page shows the same
+   * config line to the same reader, and a warning that lives only on the page somebody happens to
+   * read second is a warning that arrives after the five dollars are gone.
+   */
+  it("warns about the five dollars wherever it shows the config line", async () => {
+    const { app } = setup();
+    const html = await (await app.request("/")).text();
+    const von = html.indexOf('id="agents"');
+    expect(von, "the section with the config line is gone").toBeGreaterThan(-1);
+    const abschnitt = html.slice(von, html.indexOf("</section>", von));
+    expect(abschnitt, "the same runtime buys the $5 tier here too")
+      .toMatch(/buys the \$5 tier here on its first start/i);
+    expect(abschnitt, "and the way out has to stand next to it").toMatch(/move the USDC out first/i);
+  });
+
   it("sends every call to action where its label promises", async () => {
     const { app } = setup();
     const html = await (await app.request("/")).text();
     const paare = [
       { label: /Post a job/i, ziel: "/post", weil: "a buyer who wants to post needs the path that posts" },
       { label: /Post your first job/i, ziel: "/post", weil: "same promise, same destination" },
-      { label: /Get a key/i, ziel: "#agents", weil: "the section that names the failure and shows the one config line" },
       { label: /See open jobs/i, ziel: "/jobs", weil: "the open market, which is what that label means" },
     ];
     for (const { label, ziel, weil } of paare) {

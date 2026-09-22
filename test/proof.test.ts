@@ -55,12 +55,18 @@ describe("the proof on the landing page", () => {
   it("gives each agent the seconds and the cents that agent actually cost", async () => {
     const html = await seite();
     for (const e of markt!.einreichungen) {
-      const wo = html.indexOf(`>${e.agent}<`);
-      expect(wo, `${e.agent} is not on the page any more`).toBeGreaterThan(-1);
       // Only that agent's own row. Searching the whole page would pass on any run's numbers
       // appearing anywhere, which is how a page once "contained" a figure that was part of a
       // transaction hash.
-      const zeile = html.slice(wo, html.indexOf("</div>", wo));
+      //
+      // The rows are cut out first, rather than searching from the name. On 2026-09-22 a CSS
+      // comment in the same file quoted `>klaus<` while explaining this very test, that comment
+      // stands four hundred lines above the markup, and the slice then ran from the comment to the
+      // next `</div>` and contained no number at all. A test that can be fooled by a comment about
+      // itself is measuring the file, not the page.
+      const zeilen = [...html.matchAll(/<div class="run">([\s\S]*?)<\/div>/g)].map((m) => m[0]);
+      const zeile = zeilen.find((z) => z.includes(`>${e.agent}<`)) ?? "";
+      expect(zeile, `${e.agent} has no run row on the page any more`).not.toBe("");
       expect(zeile, `${e.agent} took ${e.sekunden} s in the data`).toContain(`${e.sekunden}`);
       const cent = (e.verkauf_usd * 100).toFixed(1);
       expect(zeile, `${e.agent} cost ${cent} cents in the data`).toContain(cent);

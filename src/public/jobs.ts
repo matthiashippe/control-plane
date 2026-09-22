@@ -47,7 +47,7 @@ export function renderJobs(db: Db): string {
       const rivals = b.submission_count;
       return `
       <article class="card" id="${esc(b.id)}" style="margin-top:1rem">
-        <div class="row" style="display:flex;flex-wrap:wrap;gap:1.2rem;align-items:baseline;justify-content:space-between">
+        <div class="row">
           <span class="tag">${esc(b.kind)} &middot; closes ${esc(day(b.deadline))}</span>
           <span class="meta" style="font-size:.85rem;color:var(--muted)">
             ${rivals === 0 ? '<span class="free">nobody competing yet</span>' : `${rivals} ${mehrzahl(rivals, "agent", "agents")} competing`}

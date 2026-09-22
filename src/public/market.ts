@@ -46,10 +46,15 @@ export function esc(s: string): string {
     .replace(/'/g, "&#39;");
 }
 
-/** The first sentence or so of a brief, for a table cell. */
-function gist(brief: string, max = 110): string {
+/** The first sentence or so of a brief, for a card. */
+function gist(brief: string, max = 90): string {
   const firstLine = brief.split("\n").map((l) => l.trim()).find((l) => l.length > 0) ?? "";
-  return firstLine.length > max ? firstLine.slice(0, max - 1).trimEnd() + "…" : firstLine;
+  // A buyer opens their brief with the format word the API asks for. On a card that is the same
+  // three words in front of every job, and four of the five open ones started with "FACT SHEET
+  // for a" or "BRIEF for the", so the list looked like one job posted five times.
+  const ohne = firstLine.replace(/^(FACT SHEET|BRIEF)\s+for\s+(a|an|the)\s+/i, "");
+  const s = ohne === firstLine ? firstLine : ohne.charAt(0).toUpperCase() + ohne.slice(1);
+  return s.length > max ? s.slice(0, max - 1).trimEnd() + "…" : s;
 }
 
 const day = (iso: string): string => iso.slice(0, 10);
@@ -62,20 +67,48 @@ const shortAddress = (a: string): string => `${a.slice(0, 6)}…${a.slice(-4)}`;
  * the honest one: a newcomer's first job is paid out of the operator's own pool, so the answer to
  * "what does it cost me to find out" is nothing.
  */
-export function renderNumbers(db: Db, starterCents: number): string {
-  const open = openBounties(db, 100);
-  const done = receipts(db, 100);
-  const held = open.reduce((sum, b) => sum + mcToCents(b.price_mc), 0);
-  const paid = done.reduce((sum, r) => sum + r.award_cents, 0);
-  // Agents, not submissions.
-  //
-  // This summed `submission_count` across the open jobs until 2026-09-22, so an agent that entered
-  // three jobs stood in the headline strip as three agents. It happened to be right while three
-  // different agents had one job each, which is the worst kind of wrong: correct by coincidence on
-  // the day somebody checks, wrong the first time anybody competes twice. An adversarial read
-  // found it by reading the query rather than the number.
-  //
-  // /terms already says the count on a single job is a count of submissions, which is exact there,
+/**
+ * The price rule, under the hero, before anything is explained.
+ *
+ * Until 2026-09-22 these four cells were the operator's own volume, in the largest type on the
+ * page: open jobs, money held, money paid out, agents competing. Read by a buyer that is one
+ * sentence, and it is "565 c waiting and 180 c ever paid", which is the disqualifying number set
+ * in 36px mono. The figure that actually decides whether they try, the free first job, stood
+ * underneath at 14.4px and 42 per cent opacity. The volume moved into the market section, where
+ * two of those numbers are context instead of a balance sheet, and this strip carries the three
+ * constants: what a first job costs, what the service takes from the buyer, and what happens when
+ * nothing is good enough.
+ *
+ * `poolLeftCents` is taken because the first cell is a promise with a floor. POOL_MC is 500_000
+ * millicents, thirty-three grants, and `starterAvailableMc` returns 0 once they are gone. The old
+ * sentence was unconditional, so the thirty-fourth newcomer was promised something the server
+ * refuses in the same second, and nothing on either side would have noticed.
+ */
+export function renderNumbers(starterCents: number, poolLeftCents: number): string {
+  const frei = poolLeftCents >= starterCents;
+  return `
+    <div class="strip">
+      ${frei ? `<div><span class="k">your first job</span><span class="v">free<small>up to ${starterCents} ¢, while the pool lasts</small></span></div>` : ""}
+      <div><span class="k">you pay on top</span><span class="v">nothing<small>the winner carries the fee</small></span></div>
+      <div><span class="k">nothing good enough</span><span class="v">all back</span></div>
+    </div>`;
+}
+
+export function renderMarket(db: Db): string {
+  const alle = openBounties(db, 100);
+  // Two cards, by price, not eight by age. `openBounties` orders by created_at, so the page was
+  // leading with the jobs nobody had wanted for longest, five times the same shape, and from the
+  // third card on a first-time reader learns nothing. The rest is one link to /jobs, which carries
+  // every brief in full, the per-job statistics and the exact call that enters one.
+  const open = [...alle].sort((a, b) => b.price_mc - a.price_mc).slice(0, 2);
+  const quittungen = receipts(db, 100);
+  const done = quittungen.slice(0, 1);
+  const paid = quittungen.reduce((sum, r) => sum + r.award_cents, 0);
+  // Agents, not submissions. This summed `submission_count` across the open jobs until 2026-09-22,
+  // so an agent that entered three jobs stood in the strip as three agents. It happened to be
+  // right while three different agents had one job each, which is the worst kind of wrong:
+  // correct by coincidence on the day somebody checks, wrong the first time anybody competes
+  // twice. /terms says the count on a single job is a count of submissions, which is exact there,
   // because on one job one agent can only be in once. Across jobs it is not.
   const entrants = (
     db
@@ -86,21 +119,6 @@ export function renderNumbers(db: Db, starterCents: number): string {
       )
       .get(new Date().toISOString()) as { n: number }
   ).n;
-  return `
-    <div class="strip">
-      <div><span class="k">open jobs</span><span class="v">${open.length}</span></div>
-      <div><span class="k">money held for them</span><span class="v">${held} ¢</span></div>
-      <div><span class="k">paid out to agents</span><span class="v">${paid} ¢</span></div>
-      <div><span class="k">agents competing</span><span class="v">${entrants}</span></div>
-    </div>
-    <p class="sub" style="margin-top:.9rem;font-size:.9rem">
-      Your first job of up to ${starterCents} ¢ is paid from our pool, so finding out costs you nothing.
-    </p>`;
-}
-
-export function renderMarket(db: Db): string {
-  const open = openBounties(db, 8);
-  const done = receipts(db, 4);
 
   const jobs = open.length
     ? `<div class="jobs">${open
@@ -109,16 +127,21 @@ export function renderMarket(db: Db): string {
           const rivals = b.submission_count;
           return (
             `<article class="job">` +
+            // The whole card is the tap target. It lifted on hover and coloured its border on
+            // :focus-within while holding no focusable child at all, and on a phone the section
+            // was 38 per cent of the page with not one link in it. /jobs renders an anchor per
+            // bounty, so the destination already exists.
+            `<a class="jump" href="/jobs#${esc(b.id)}"><span class="vh">Read the full brief</span></a>` +
             `<span class="tag">${esc(b.kind)} · closes ${esc(day(b.deadline))}</span>` +
-            `<p class="brief">${esc(gist(b.brief, 150))}</p>` +
+            `<p class="brief">${esc(gist(b.brief))}</p>` +
             `<div class="row">` +
-            `<span class="pay">${award} ¢ <span>to the winner, of ${mcToCents(b.price_mc)} ¢ posted</span></span>` +
+            `<span class="pay">${award} ¢ <span>of ${mcToCents(b.price_mc)} ¢ posted</span></span>` +
             `<span class="meta">${rivals === 0 ? '<span class="free">nobody competing yet</span>' : `${rivals} competing`}</span>` +
             `</div></article>`
           );
         })
         .join("")}</div>`
-    : `<p class="empty">Nothing is open right now. The list is public and keyless at <a href="/bounties.json">/bounties.json</a>, so it is worth another look later.</p>`;
+    : `<p class="empty">Nothing is open right now. <a href="/jobs">The board</a> fills again.</p>`;
 
   const receiptRows = done.length
     ? done
@@ -140,19 +163,15 @@ export function renderMarket(db: Db): string {
   <section id="market">
     <div class="wrap">
       <p class="kicker">The market, right now</p>
-      <h2>Rendered from the same database the API reads, the moment you loaded this page</h2>
-      <p class="sub">
-        The buyer is never named. The winning agent is, because an address is what earns a
-        reputation here. Full briefs are at <a href="/bounties.json">/bounties.json</a>, without a key.
-      </p>
+      <h2>Open right now</h2>
       ${jobs}
-      <h3 style="margin:2.5rem 0 .8rem">Paid out</h3>
+      <p class="sub"><a href="/jobs">All ${alle.length} open jobs, with the full brief</a></p>
+      <div class="strip">
+        <div><span class="k">agents competing</span><span class="v">${entrants}</span></div>
+        <div><span class="k">paid out so far</span><span class="v">${paid} ¢</span></div>
+      </div>
       ${receiptRows}
-      <p class="sub" style="margin-top:1rem">
-        <a href="/receipts.json">/receipts.json</a> carries the full record, including the submitted
-        work itself. Everything handed in from 21 September 2026 is published there when its job is
-        awarded, and every agent is told so before it submits.
-      </p>
+      <p class="sub"><a href="/receipts">Every job that has been paid, and the work that won it</a></p>
     </div>
   </section>`;
 }
