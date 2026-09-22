@@ -125,6 +125,22 @@ if (( DEEP )); then
     && touch "$STAMPS/skill-production"
 fi
 
+# How old the proof of the cold start is, and how much has changed since.
+#
+# `ops/neuling-probe.ts` is the only thing that walks the whole promise on the landing page, from a
+# wallet that did not exist to a thought paid for by the grant. It costs a grant, so it is not run
+# every cycle, which means its result quietly ages. On 2026-09-22 its last run was fifteen hours,
+# 96 commits and twelve deploys behind, and the deploys in between had changed exactly the
+# endpoints it walks. Printed, not failed: it is a reminder and not a finding.
+if [[ -f "$STAMPS/kaltstart" ]]; then
+  read -r kalt_zeit kalt_commit < "$STAMPS/kaltstart"
+  kalt_alter=$(( ($(date -u +%s) - $(date -u -jf %Y-%m-%dT%H:%M:%SZ "$kalt_zeit" +%s 2>/dev/null || date -u -d "$kalt_zeit" +%s 2>/dev/null || echo 0)) / 3600 ))
+  kalt_neu=$(git log --oneline "$kalt_commit..HEAD" 2>/dev/null | wc -l | tr -d ' ')
+  echo "cold start last proven ${kalt_alter}h ago at ${kalt_commit}, ${kalt_neu:-?} commit(s) ago (ops/neuling-probe.ts, costs a grant)"
+else
+  echo "cold start: never proven on this checkout. ops/neuling-probe.ts walks it, and costs a grant."
+fi
+
 echo
 # The one number the plan hangs on, printed last so it is the thing left on the screen.
 open=$(curl -s -m 10 "$BASE/bounties.json" | grep -o '"id"' | wc -l | tr -d ' ')

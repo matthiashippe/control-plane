@@ -24,7 +24,8 @@
  */
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { createSiweMessage } from "viem/siwe";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { execSync } from "node:child_process";
 
 const BASE = (process.env.CP_URL || "https://cp.hippe.eu").replace(/\/$/, "");
 const DOMAIN = process.env.CP_SIWE_DOMAIN || "conway.tech";
@@ -149,6 +150,17 @@ async function main(): Promise<number> {
 
   console.log(`\n${fehler === 0 ? "COLD START OK" : `COLD START FAILED: ${fehler}`}`);
   console.log("Cost: one starter grant of 15 c and about a cent of inference.");
+  if (fehler === 0) {
+    // A stamp, because otherwise nobody knows how old the evidence is. On 2026-09-22 the date of
+    // the last run had to be dug out of the protocol: it was fifteen hours, 96 commits and twelve
+    // deploys old, and in that time exactly the endpoints this walks had changed.
+    try {
+      mkdirSync(".scratch/probes", { recursive: true });
+      writeFileSync(".scratch/probes/kaltstart", `${new Date().toISOString()} ${execSync("git rev-parse --short HEAD").toString().trim()}\n`);
+    } catch {
+      // A stamp that cannot be written is not a reason to call a green run red.
+    }
+  }
   return fehler === 0 ? 0 : 1;
 }
 
