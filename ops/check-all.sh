@@ -123,6 +123,11 @@ run --undetermined-on 2 "every class on every page has a rule" ./ops/check-class
 # in the log carry a phone user agent. Exit 2 when there is no Chrome, so a machine without one
 # reports "could not tell" rather than a failure.
 run --undetermined-on 2 "it fits a small phone" ./ops/phone.sh --quick
+# Added the same day, for the same reason one layer over: the light colour scheme had never been
+# seen, because headless Chrome reports dark in a plain run and every screenshot this project ever
+# took was therefore of the dark one. --quick is one scheme and three pages; the full run is six
+# pages in both.
+run --undetermined-on 2 "the text is readable in both schemes" ./ops/contrast.sh --quick
 run "the daily jobs still ran" ./ops/freshness.sh
 
 # What we say about somebody else's code, held against their code.
