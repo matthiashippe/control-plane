@@ -19,6 +19,15 @@
 # reporting a scroll that never happened.
 set -euo pipefail
 
+# When the pixels went live. Page loads before this could never have fetched one, and counting
+# them in the denominator is the mistake this repo keeps finding elsewhere: a population that could
+# not have produced the signal, sitting under the number anyway. The first reading would have said
+# "1 of 11, 9 per cent" for what is really 1 of 1.
+#
+# A constant, and it checks itself: if the log carries a /px/ request from before it, the constant
+# is wrong and the script says so rather than quietly using it.
+SEIT_UTC="${CP_PIXEL_SEIT:-2026-09-22T12:47:00Z}"
+
 HOURS="${1:-24}"
 KEY="${CP_SSH_KEY:-$HOME/.ssh/id_ed25519_automaton}"
 HOST="${CP_HOST:-root@76.13.144.207}"
@@ -35,12 +44,16 @@ if ! timeout 45 ssh -i "$KEY" -o BatchMode=yes -o ConnectTimeout=10 -o ServerAli
   exit 2
 fi
 
-python3 - "$HOURS" "$OWN" "$log" <<'PY'
+python3 - "$HOURS" "$OWN" "$log" "$SEIT_UTC" <<'PY'
 import datetime, json, sys, collections
 
-hours, own_raw, path = int(sys.argv[1]), sys.argv[2], sys.argv[3]
+hours, own_raw, path, pixel_seit = int(sys.argv[1]), sys.argv[2], sys.argv[3], sys.argv[4]
 own = set(own_raw.split())
-seit = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=hours)
+fenster = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=hours)
+live = datetime.datetime.fromisoformat(pixel_seit.replace("Z", "+00:00"))
+# The later of the two: a page load has to be inside the asked-for window AND after the pixels
+# existed, or it is in a denominator it cannot belong to.
+seit = max(fenster, live)
 
 MARKEN = ["top", "proof", "market", "close"]
 WAS = {
@@ -53,6 +66,7 @@ WAS = {
 # Per address: when the page was loaded, and when each pixel came back.
 seiten = collections.defaultdict(list)
 pixel = collections.defaultdict(lambda: collections.defaultdict(list))
+frueheste_px = None
 for roh in open(path):
     roh = roh.strip()
     if not roh.startswith("{"):
@@ -62,19 +76,32 @@ for roh in open(path):
     except ValueError:
         continue
     at = datetime.datetime.fromtimestamp(z["ts"], datetime.timezone.utc)
-    if at < seit:
-        continue
     r = z.get("request", {})
     ip = r.get("remote_ip")
     if ip in own or z.get("status") != 200:
         continue
     uri = (r.get("uri") or "").split("?")[0]
+    if uri.startswith("/px/") and uri.endswith(".png"):
+        if frueheste_px is None or at < frueheste_px:
+            frueheste_px = at
+    if at < seit:
+        continue
     if uri == "/":
         seiten[ip].append(at)
     elif uri.startswith("/px/") and uri.endswith(".png"):
         pixel[ip][uri[4:-4]].append(at)
 
+# The constant checks itself. A pixel fetched before the moment we say they went live means the
+# moment is wrong, and every count under it would be drawn from the wrong window.
+frueheste = frueheste_px
+if frueheste is not None and frueheste < live:
+    print(f"COULD NOT TELL: a pixel was fetched at {frueheste:%Y-%m-%d %H:%M:%S} UTC, before the")
+    print(f"                {live:%Y-%m-%d %H:%M} UTC this script calls the go-live. The constant")
+    print("                SEIT_UTC is wrong, so the denominator would be too. Fix it first.")
+    raise SystemExit(2)
+
 print(f"How far down the landing page people got, last {hours} hours")
+print(f"  counting page loads from {seit:%Y-%m-%d %H:%M} UTC, when the pixels went live")
 print()
 if not seiten:
     print("  Nobody from outside loaded the page in this window. Nothing to say about depth.")
@@ -100,6 +127,8 @@ elif zusammen and zusammen == mit_top:
     print(f"  WORTHLESS: for all {zusammen} of them the top and bottom pixels arrived within a")
     print("             second of each other, which is a browser fetching every lazy image at once")
     print("             and not a reader scrolling. The numbers below mean nothing today.")
+if mit_top == 0:
+    raise SystemExit(0)
 print()
 for marke in MARKEN:
     wer = [ip for ip in seiten if pixel[ip].get(marke)]
