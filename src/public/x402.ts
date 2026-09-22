@@ -66,6 +66,21 @@ export function renderX402(points: X402Point[]): string {
   const mit = last.dienste_cdp - (last.ohne_nachfragedaten ?? 0);
   const anteilEiner = ((last.mit_einem_zahler / mit) * 100).toFixed(1);
 
+  // Which way the count of entries without demand data is going, taken from the data rather than
+  // written down once. It said "and that number climbs" from the day the page was built. On
+  // 2026-09-22 it had gone 42, 65, 46: the sentence was still there and the number was falling.
+  //
+  // A phrase that asserts a direction has to be computed or it is a guess that ages into a lie,
+  // and this one sits next to the argument that every total here is a floor.
+  const vorher = points.length > 1 ? points[points.length - 2].ohne_nachfragedaten : undefined;
+  const jetzt = last.ohne_nachfragedaten;
+  const richtung =
+    vorher === undefined || jetzt === undefined || vorher === jetzt
+      ? ""
+      : jetzt > vorher
+        ? `, up from ${n(vorher)} yesterday`
+        : `, down from ${n(vorher)} yesterday`;
+
   const reihe = points
     .slice()
     .reverse()
@@ -109,8 +124,12 @@ export function renderX402(points: X402Point[]): string {
           <a href="/">what we built instead</a>
         </div>
         <div>
-          <span><b>${n(last.ohne_nachfragedaten ?? 0)} entries carry no demand data at all, and that number climbs</b>
-          <span class="w">Coinbase fills those fields in late. On 20 September the largest service in the whole directory sat there with empty fields and appeared the next day with ${n(last.groesster_aufrufe ?? 0)} calls, ${last.groesster_anteil}% of everything. So every total here is a floor, not a count.</span></span>
+          <span><b>${n(last.ohne_nachfragedaten ?? 0)} entries carry no demand data at all${richtung}</b>
+          <span class="w">Coinbase fills those fields in late, and the size of what it is late about
+          is the reason to distrust every total here. The largest single service in this scan is
+          ${n(last.groesster_aufrufe ?? 0)} calls, ${last.groesster_anteil}% of everything, and on
+          20 September that same service sat in the directory with its demand fields empty. So
+          every total here is a floor, not a count.</span></span>
           <a href="https://github.com/matthiashippe/control-plane/tree/main/docs/research/data">check it</a>
         </div>
       </div>

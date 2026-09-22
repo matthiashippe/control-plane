@@ -46,6 +46,33 @@ function withSeries(punkte: unknown[]): string {
   return path;
 }
 
+describe("the direction of a number that moves", () => {
+  it("says which way the count without demand data went, from the data", async () => {
+    // The page said "and that number climbs" from the day it was built. On 2026-09-22 the series
+    // read 42, 65, 46: the sentence was still there and the number was falling. A phrase that
+    // asserts a direction has to be computed or it ages into a lie, and this one sits next to the
+    // argument that every total on the page is a floor.
+    const punkt = (stichtag: string, ohne: number) => ({
+      ...PUNKT,
+      stichtag,
+      ohne_nachfragedaten: ohne,
+    });
+
+    const faellt = renderX402([punkt("2026-09-21T04:40:00Z", 65), punkt("2026-09-22T04:40:00Z", 46)]);
+    expect(faellt).toContain("down from 65 yesterday");
+    expect(faellt, "the old unconditional claim is gone").not.toContain("that number climbs");
+
+    const steigt = renderX402([punkt("2026-09-21T04:40:00Z", 42), punkt("2026-09-22T04:40:00Z", 65)]);
+    expect(steigt).toContain("up from 42 yesterday");
+
+    const gleich = renderX402([punkt("2026-09-21T04:40:00Z", 50), punkt("2026-09-22T04:40:00Z", 50)]);
+    expect(gleich, "no movement, no claim about movement").not.toMatch(/up from|down from/);
+
+    const allein = renderX402([punkt("2026-09-22T04:40:00Z", 46)]);
+    expect(allein, "one point is no direction").not.toMatch(/up from|down from/);
+  });
+});
+
 describe("/x402", () => {
   it("leads with the numbers a reader came for", async () => {
     const path = withSeries([{ ...PUNKT, stichtag: "2026-09-20T10:24:18Z", aufrufe_30d: 490044, anteil_top10: 58.75 }, PUNKT]);
