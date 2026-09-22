@@ -97,6 +97,126 @@ if [[ -n "$added" ]]; then
 fi
 echo
 
+# The line every cycle reads first, and the one that did not exist until 2026-09-22.
+#
+# Answering "was a person here" took three scripts and a hand check of every address, five times in
+# one evening. The signals were always the same, so they live here now. None of them is proof on
+# its own and the sum of them is not proof either; what they buy is the difference between an
+# address that behaves like a person and one that does not, which is the only distinction this
+# service has ever needed and the one it kept making by hand.
+#
+# A person, as far as a log can tell, is an address that SCROLLED: it fetched a lazy pixel from
+# below the first screen, and not all of them inside one second. Everything else is weaker and the
+# first version of this section proved it by reporting eighteen people where there were two. Its
+# test was "the inline script ran", and every rendering fetcher runs the script; Googlebot was in
+# that list, and so were eight Google Cloud addresses that loaded the page once and left.
+#
+# Three further conditions, each of which caught something real:
+#   - not all marks inside one second, which is a renderer with a viewport tall enough to hold the
+#     whole page (34.116.225.162 and .146.142 on 2026-09-22, four pixels in under a second);
+#   - no second browser identity from the same address within a minute, which caught
+#     35.243.23.139, the only address that ever followed a link here. It carried four identities
+#     (Pixel 4a, Windows Chrome, Android Firefox, Mac Safari) and a referrer of "http://cp.hippe.eu"
+#     with no path. It is a link checker;
+#   - fewer than three addresses out of its /24 across the whole log, which is the shape of a scan.
+#
+# Addresses that loaded the page and produced no mark below the fold are counted and named on one
+# line, because "nobody scrolled" and "nobody came" are different findings and this section must
+# not merge them.
+echo "-- Who of them behaved like a person, over the whole log --"
+jq -r --argjson own "$own_json" \
+  "$FOREIGN | [(.ts|tostring), .request.remote_ip, (.request.uri // \"\"), ((.request.headers.Referer // [\"\"])[0]), ((.request.headers[\"User-Agent\"] // [\"\"])[0])] | @tsv" "$log" \
+  | python3 -c '
+import sys, collections
+
+people = collections.defaultdict(
+    lambda: {"agents": [], "ran_script": False, "marks": set(), "mark_times": {}, "paths": set(), "first": None, "from": ""}
+)
+networks = collections.defaultdict(set)
+
+for line in sys.stdin:
+    parts = line.rstrip("\n").split("\t")
+    if len(parts) != 5:
+        continue
+    stamp, ip, path, referrer, agent = parts
+    try:
+        stamp = float(stamp)
+    except ValueError:
+        continue
+    path = path.split("?")[0]
+    networks[".".join(ip.split(".")[:3])].add(ip)
+    if "Mozilla/" not in agent:
+        continue
+    entry = people[ip]
+    entry["agents"].append((stamp, agent))
+    if entry["first"] is None or stamp < entry["first"]:
+        entry["first"] = stamp
+        entry["from"] = referrer
+    if path.startswith("/v1/status") and "cp.hippe.eu" in referrer:
+        entry["ran_script"] = True
+    if path.startswith("/px/") and path.endswith(".png"):
+        mark = path[4:-4]
+        entry["marks"].add(mark)
+        entry["mark_times"].setdefault(mark, stamp)
+    elif not path.startswith("/px/") and path != "/favicon.ico":
+        entry["paths"].add(path)
+
+def swapped(stamped):
+    browsers = sorted(stamped)
+    for (t1, a1), (t2, a2) in zip(browsers, browsers[1:]):
+        if a1 != a2 and t2 - t1 < 60:
+            return True
+    return False
+
+ORDER = ["top", "proof", "market", "close", "end"]
+
+def all_at_once(stamps):
+    # Three or more marks inside a second is a renderer, the same test ops/depth.sh applies.
+    return len(stamps) >= 3 and max(stamps) - min(stamps) < 1.0
+
+scrolled, loaded_only, dropped = [], [], collections.Counter()
+for ip, entry in people.items():
+    if not entry["ran_script"]:
+        dropped["never ran the page script"] += 1
+        continue
+    if swapped(entry["agents"]):
+        dropped["changed browser identity within a minute"] += 1
+        continue
+    if len(networks[".".join(ip.split(".")[:3])]) > 2:
+        dropped["one of three or more addresses from its /24"] += 1
+        continue
+    below = [m for m in entry["marks"] if m != "top"]
+    if below and not all_at_once(list(entry["mark_times"].values())):
+        scrolled.append((entry["first"], ip, entry))
+    else:
+        loaded_only.append(ip)
+
+if not scrolled:
+    print("   nobody scrolled. Not one address fetched a mark from below the first screen.")
+else:
+    print(f"   {len(scrolled)} address(es) scrolled, oldest first:")
+    for _, ip, entry in sorted(scrolled):
+        reached = [m for m in ORDER if m in entry["marks"]]
+        depth = reached[-1] if reached else "no mark"
+        went = sorted(p for p in entry["paths"] if p != "/")
+        came = entry["from"] if entry["from"] else "typed or unknown"
+        print(f"     {ip:<16} from {came[:46]}")
+        did = ", ".join(went) if went else "nothing, left from the page"
+        print(f"                      read to: {depth:<10} then: {did}")
+if loaded_only:
+    print(f"   {len(loaded_only)} more loaded the page and left no mark below the fold:")
+    print("     " + ", ".join(sorted(loaded_only)[:10]) + ("" if len(loaded_only) <= 10 else ", ..."))
+    print("     That is a fetcher rendering once, or a person who did not scroll. The page cannot")
+    print("     tell those apart, and calling them readers is how this section first said eighteen.")
+# Never drop silently. A filter that removes addresses without saying how many is indistinguishable
+# from a quiet log, and this section exists precisely to tell those two apart.
+if dropped:
+    print("   set aside before any of that:")
+    for reason, n in dropped.most_common():
+        print(f"     {n:>4}  {reason}")
+' || true
+echo
+
 ROWS="${CP_TRAFFIC_LINES:-25}"
 echo "-- First request per foreign IP (this is where the referrer is) --"
 # The first request of an address, not the first one inside the window. Until 2026-09-22 the
