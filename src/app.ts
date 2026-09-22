@@ -48,7 +48,7 @@ import {
 import { mcToCents, getBalanceCents, getBalanceMc, MC_PER_CENT } from "./db.js";
 import { block as ldBlock, dataset, howToFrom, organization, webPage, webSite } from "./public/jsonld.js";
 import { prefersHtml, renderApiPage } from "./public/apipage.js";
-import { renderCheck } from "./public/checkpage.js";
+import { renderCheck, renderCheckIntro } from "./public/checkpage.js";
 import { DOC } from "./errors.js";
 import { Catalog, handleChat, MARKUP } from "./inference/proxy.js";
 import { clientKey, RateLimiter, type RateLimitOptions } from "./ratelimit.js";
@@ -631,9 +631,61 @@ export function createApp(opts: AppOptions) {
   /**
    * Four pages, named once, so a crawler does not have to guess them from links.
    */
+  /**
+   * The free check, as a page somebody can reach by clicking.
+   *
+   * POST /v1/briefs/check answers a browser since 20:56 UTC on 2026-09-22, but a person has to get
+   * there first, and the only way to send a POST from a page is a form, which the policy in
+   * deploy/ refuses with form-action 'none'. A GET needs none of that. So the same check answers
+   * here, reading the draft out of the query string, and the landing page can link two examples
+   * that a reader can open with one click.
+   *
+   * CP_FORM_ON_CHECK is the switch for the day the policy allows a form: set it and the page grows
+   * a textarea posting to the endpoint that has taken form bodies since that deploy. It is off
+   * until then, because a form that silently refuses to submit is worse than no form.
+   */
+  app.get("/check", (c) => {
+    if (!indexHtml) return c.json({ error: "no index page built" }, 503);
+    const brief = (c.req.query("brief") ?? "").trim();
+    const kind: "factual" | "creative" = c.req.query("kind") === "creative" ? "creative" : "factual";
+    if (!brief) {
+      return c.html(
+        page(
+          renderCheckIntro(process.env.CP_FORM_ON_CHECK === "1"),
+          "What your brief does not say, before any money moves",
+          "Paste a draft and this names what an agent would have to invent to finish it. No key, no account, no charge, nothing stored.",
+          "/check",
+        ),
+      );
+    }
+    if (brief.length > BRIEF_MAX) {
+      return c.html(
+        page(
+          renderCheckIntro(process.env.CP_FORM_ON_CHECK === "1"),
+          "That draft is too long to check",
+          "A brief is limited to the same length as when posting one.",
+          "/check",
+        ),
+        400,
+      );
+    }
+    const findings = reviewBrief(brief, kind);
+    const words = brief.split(/\s+/).filter(Boolean).length;
+    return c.html(
+      page(
+        renderCheck(brief, kind, findings, words),
+        findings.length
+          ? `${findings.length} thing${findings.length === 1 ? "" : "s"} this brief does not say`
+          : "Nothing obvious is missing from this brief",
+        "What an agent would have to invent to finish this job, named before any money moves. No key, no account, nothing stored.",
+        "/check",
+      ),
+    );
+  });
+
   app.get("/sitemap.xml", (c) => {
     const today = new Date().toISOString().slice(0, 10);
-    const pages = ["/", "/fix", "/post", "/jobs", "/receipts", "/x402", "/conway", "/terms"];
+    const pages = ["/", "/check", "/fix", "/post", "/jobs", "/receipts", "/x402", "/conway", "/terms"];
     return c.body(
       '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
         pages

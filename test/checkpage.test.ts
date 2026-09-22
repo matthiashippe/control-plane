@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { createApp } from "../src/app.js";
 import { openDb } from "../src/db.js";
+import { EXAMPLES } from "../src/public/checkpage.js";
+import { reviewBrief } from "../src/bounties/brief.js";
 
 const BROWSER = "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8";
 const BRIEF = "FACT SHEET on the energy certificate for a 1974 apartment block with six flats and gas heating.";
@@ -134,5 +136,64 @@ describe("The free check, for somebody without a terminal", () => {
     expect(html).toMatch(/<script type="application\/ld\+json">/);
     expect(html).toContain('href="/terms"');
     expect(html, "the way on has to be on it").toContain('href="/post"');
+  });
+});
+
+/**
+ * The clickable half. POST answers a browser, but a person has to arrive somewhere first, and the
+ * only way to send a POST from a page is a form, which deploy/ refuses with form-action 'none'.
+ * A GET needs none of that.
+ */
+describe("The check as a page you can reach by clicking", () => {
+  it("shows the two examples and no form while the policy forbids one", async () => {
+    const html = await (await app().request("/check")).text();
+    expect(html).toMatch(/What your brief does not say/);
+    expect(html, "a form that cannot submit is worse than no form").not.toMatch(/<form/);
+    for (const e of EXAMPLES) {
+      expect(html, `the ${e.label} link is missing`).toContain(encodeURIComponent(e.brief).slice(0, 40));
+    }
+  });
+
+  it("answers a linked example with the findings for exactly that brief", async () => {
+    const a = app();
+    const first = EXAMPLES[0];
+    const res = await a.request(`/check?kind=${first.kind}&brief=${encodeURIComponent(first.brief)}`);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toMatch(/text\/html/);
+    const html = await res.text();
+    for (const f of reviewBrief(first.brief, first.kind)) {
+      expect(html, `the check says "${f.missing}" and the page does not`).toContain(f.missing);
+    }
+  });
+
+  /**
+   * The sentence on the intro page counts the findings of both examples. Written down by hand it
+   * said four; the check finds three. This holds the page to the function instead of to a memory.
+   */
+  it("counts the examples instead of asserting a number", async () => {
+    const html = await (await app().request("/check")).text();
+    const real = EXAMPLES.map((e) => reviewBrief(e.brief, e.kind).length);
+    expect(html, "the first example's count is wrong on the page").toContain(`${real[0]} things in the first`);
+    if (real[1] === 0) {
+      expect(html).toContain("and nothing in the second");
+    }
+  });
+
+  it("keeps the second example clean, because that is the whole point of showing two", () => {
+    expect(reviewBrief(EXAMPLES[1].brief, EXAMPLES[1].kind).length,
+      "the good draft has to survive the check, or the pair teaches nothing").toBe(0);
+    expect(reviewBrief(EXAMPLES[0].brief, EXAMPLES[0].kind).length,
+      "the bad draft has to fail it").toBeGreaterThan(0);
+  });
+
+  it("refuses a draft longer than a postable brief, as a page", async () => {
+    const res = await app().request(`/check?brief=${encodeURIComponent("word ".repeat(9000))}`);
+    expect(res.status).toBe(400);
+    expect(res.headers.get("content-type")).toMatch(/text\/html/);
+  });
+
+  it("is in the sitemap, because it is the one page a stranger can act on", async () => {
+    const xml = await (await app().request("/sitemap.xml")).text();
+    expect(xml).toContain("https://cp.hippe.eu/check");
   });
 });
