@@ -124,8 +124,12 @@ echo
 # line, because "nobody scrolled" and "nobody came" are different findings and this section must
 # not merge them.
 echo "-- Who of them behaved like a person, over the whole log --"
+# Everything, ours included, with a flag. The funnel needs both: who a stranger is, and when each
+# path first answered at all. A path goes live for the service and not for a visitor, and our own
+# checks are usually the first to touch it, so filtering them out before Python made /check look
+# like a path that has never answered.
 jq -r --argjson own "$own_json" \
-  "$FOREIGN | [(.ts|tostring), .request.remote_ip, (.request.uri // \"\"), ((.request.headers.Referer // [\"\"])[0]), ((.request.headers[\"User-Agent\"] // [\"\"])[0])] | @tsv" "$log" \
+  "[(.ts|tostring), .request.remote_ip, (.request.uri // \"\"), ((.request.headers.Referer // [\"\"])[0]), ((.request.headers[\"User-Agent\"] // [\"\"])[0]), (if (.request.remote_ip as \$ip | (\$own | index(\$ip)) == null) then \"foreign\" else \"ours\" end)] | @tsv" "$log" \
   | python3 -c '
 import sys, collections
 
@@ -138,17 +142,24 @@ people = collections.defaultdict(
 # he asked for came from node.
 all_paths = collections.defaultdict(set)
 networks = collections.defaultdict(set)
+# When each path first answered anything, ours included: that is when the step behind it went live.
+first_answered = {}
 
 for line in sys.stdin:
     parts = line.rstrip("\n").split("\t")
-    if len(parts) != 5:
+    if len(parts) != 6:
         continue
-    stamp, ip, path, referrer, agent = parts
+    stamp, ip, path, referrer, agent, whose = parts
     try:
         stamp = float(stamp)
     except ValueError:
         continue
     path = path.split("?")[0]
+    # When a path first answered anybody, ours included. That is when the step behind it went live.
+    if path not in first_answered or stamp < first_answered[path]:
+        first_answered[path] = stamp
+    if whose != "foreign":
+        continue
     networks[".".join(ip.split(".")[:3])].add(ip)
     all_paths[ip].add(path)
     if "Mozilla/" not in agent:
@@ -227,12 +238,21 @@ def pages_of(entry):
 def touched(entry, *wanted):
     return any(p in all_paths[entry["ip"]] for p in wanted)
 
+# A step that did not exist yet cannot have been taken, and an address that arrived before it
+# existed does not belong in its denominator. The depth pixels went live at 10:07 and /check at
+# 20:58 on 2026-09-22; every one of the eighteen addresses in the log arrived before /check did, so
+# the first version of this column printed "tried the free check 0 of 18" about eighteen people who
+# never had the chance. ops/depth.sh solves the same problem with SINCE_UTC and its comment names
+# it: a population that could not have produced the signal, sitting under the number anyway.
+#
+# The dates are taken from the log rather than typed: the first time the service answered that path
+# at all is when it went live, which cannot drift from a deploy and cannot be mistyped.
 STEPS = [
-    ("opened a page", lambda e: bool(pages_of(e))),
-    ("scrolled", lambda e: e["scrolled"]),
-    ("opened a second page", lambda e: len(pages_of(e)) > 1),
-    ("tried the free check", lambda e: touched(e, "/check", "/v1/briefs/check")),
-    ("asked for a key", lambda e: touched(e, "/v1/auth/api-keys")),
+    ("opened a page", lambda e: bool(pages_of(e)), None),
+    ("scrolled", lambda e: e["scrolled"], "/px/top.png"),
+    ("opened a second page", lambda e: len(pages_of(e)) > 1, None),
+    ("tried the free check", lambda e: touched(e, "/check", "/v1/briefs/check"), "/check"),
+    ("asked for a key", lambda e: touched(e, "/v1/auth/api-keys"), None),
 ]
 arrived = []
 for ip, entry in people.items():
@@ -252,10 +272,22 @@ print("   the way in, over the whole log:")
 if not arrived:
     print("     nobody arrived that did not also look like a checker.")
 else:
-    for label, test in STEPS:
-        n = sum(1 for e in arrived if test(e))
-        share = f"{n / len(arrived) * 100:.0f}%" if arrived else "-"
-        print(f"     {label:<24} {n:>3} of {len(arrived)}  {share}")
+    for label, test, needs in STEPS:
+        live = first_answered.get(needs) if needs else None
+        # Eligible means the step existed while they were here, OR they took it. The second half is
+        # not a nicety: the address that first touched a path is by definition the one that made it
+        # answer, so its own arrival is earlier than the go-live it created, and the first version
+        # of this threw it out of the denominator while counting it in the numerator. A funnel whose
+        # numerator can exceed its denominator is not a funnel.
+        eligible = [e for e in arrived if live is None or e["first"] >= live or test(e)]
+        n = sum(1 for e in eligible if test(e))
+        share = f"{n / len(eligible) * 100:.0f}%" if eligible else "-"
+        note = ""
+        if needs and live is not None and len(eligible) < len(arrived):
+            note = f"   ({len(arrived) - len(eligible)} arrived before {needs} existed)"
+        elif needs and live is None:
+            note = f"   ({needs} has never answered, so this step cannot be measured)"
+        print(f"     {label:<24} {n:>3} of {len(eligible):<3} {share:<5}{note}")
     print("     (thought: in the ledger, not the log. ops/check-all.sh prints it.)")
 print()
 
