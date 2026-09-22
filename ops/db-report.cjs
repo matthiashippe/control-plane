@@ -161,8 +161,31 @@ const fremdeWallets = `select w.address from wallets w where not (
 // cycle has to go and find out what they are; on 2026-09-21 two of the three turned out to be our
 // own fee address and an abandoned sign-in from our own machine. The one that matters is a real
 // arrival, and it should be readable in the line that reports it.
-report.wallets_foreign_list = all(fremdeWallets + " order by w.created_at limit 6", ...OURS, ...OUR_KEY_NAMES)
-  .map((r) => r.address);
+report.wallets_foreign_list = all(
+  fremdeWallets.replace("select w.address from", "select w.address, w.created_at from") +
+    " order by w.created_at limit 6",
+  ...OURS,
+  ...OUR_KEY_NAMES,
+).map((r) => ({ address: r.address, created_at: r.created_at }));
+
+// A stranger provisioning is the second biggest thing that can happen here, after a payment.
+//
+// On 2026-09-22 at 02:05 UTC one did: three calls in one second from a Korean address, key named
+// `conway-automaton`, which is what the unmodified upstream runtime calls its own. The cycle only
+// noticed because `ops/verkehr.sh` printed a new IP. The report had the fact all along, as a count
+// that went from 2 to 3, and nothing said so.
+report.wallets_foreign_new_24h = all(
+  fremdeWallets.replace("select w.address from", "select w.address, w.created_at from") +
+    " and w.created_at > ? order by w.created_at",
+  ...OURS,
+  ...OUR_KEY_NAMES,
+  new Date(Date.now() - 86400e3).toISOString(),
+).map((r) => ({
+  address: r.address,
+  created_at: r.created_at,
+  key_names: all("select distinct name from api_keys where address = ?", r.address).map((k) => k.name),
+  used: one("select count(*) n from ledger where address = ?", r.address).n,
+}));
 report.wallets_foreign = one(
   `select count(*) n from wallets w where not (
      w.address in (${OURS.map(() => "?").join(",")})

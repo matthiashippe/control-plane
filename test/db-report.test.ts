@@ -173,8 +173,37 @@ describe("The market numbers in the database report", () => {
     });
     expect(r.wallets, "every row is still counted").toBe(5);
     expect(r.wallets_foreign, "the market check is not two more people").toBe(2);
-    expect(r.wallets_foreign_list, "and the line names them, while there are few enough to read")
+    // Objects since 2026-09-22, because the report also needs when each one arrived. The older
+    // assertion compared bare strings and caught the change, which is what it is for.
+    expect(r.wallets_foreign_list.map((w: { address: string }) => w.address),
+      "and the line names them, while there are few enough to read")
       .toEqual([STRANGER, "0xbbbb000000000000000000000000000000000001"]);
+    expect(r.wallets_foreign_list[0], "with the day it arrived").toHaveProperty("created_at");
+  });
+
+  it("names a stranger who provisioned in the last day, with what they have done since", () => {
+    // On 2026-09-22 at 02:05 UTC a Korean address ran the three provisioning calls in one second
+    // and took a key named `conway-automaton`, which is what the unmodified upstream runtime calls
+    // its own. The cycle only noticed because ops/verkehr.sh printed a new IP. The report had the
+    // fact all along, as a count that went from 2 to 3, and nothing said so.
+    const r = withDb((db) => {
+      const wall = (address: string, name: string, when: string) => {
+        db.prepare("INSERT OR IGNORE INTO wallets (address, balance_mc, created_at) VALUES (?, 0, ?)").run(address, when);
+        db.prepare("INSERT INTO api_keys (address, key_hash, key_prefix, name, created_at) VALUES (?, ?, ?, ?, ?)")
+          .run(address, `hash-${address}`, "cnwy_k_xxxxxxx", name, when);
+      };
+      const jetzt = new Date().toISOString();
+      const alt = new Date(Date.now() - 3 * 86400e3).toISOString();
+      wall(STRANGER, "conway-automaton", jetzt);
+      wall("0xcccc000000000000000000000000000000000001", "conway-automaton", alt);   // older than a day
+      wall("0xcccc000000000000000000000000000000000002", "ops-seed-vera", jetzt);     // ours
+    });
+    const neu = r.wallets_foreign_new_24h;
+    expect(neu, "only the stranger from the last day").toHaveLength(1);
+    expect(neu[0].address).toBe(STRANGER);
+    expect(neu[0].key_names).toEqual(["conway-automaton"]);
+    expect(neu[0].used, "a key taken and not used yet reads as zero, which is the interesting case")
+      .toBe(0);
   });
 
   it("counts a stranger the moment one posts, which is the whole point", () => {

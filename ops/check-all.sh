@@ -124,9 +124,16 @@ if unbekannt:
     sys.exit(3)
 fremd = db.get('wallets_foreign')
 if fremd is not None:
-    liste = db.get('wallets_foreign_list', [])
+    liste = [w['address'] if isinstance(w, dict) else w for w in db.get('wallets_foreign_list', [])]
     kurz = ', '.join(a[:10] + '…' for a in liste[:5]) + ('' if len(liste) <= 5 else ', …')
     print(f\"wallets: {db['wallets']} in total, {fremd} of them not ours{': ' + kurz if kurz.strip(', …') else ''}\")
+# Printed loudly rather than as a count that moved. A stranger provisioning is the second biggest
+# thing that can happen on this service, and on 2026-09-22 one did while the only sign was a total
+# going from 2 to 3.
+for w in db.get('wallets_foreign_new_24h', []):
+    print(f\"NEW     {w['address']} provisioned {w['created_at'][11:16]} UTC, \"
+          f\"key {', '.join(w['key_names']) or '(none)'}, \"
+          f\"{'has used it' if w['used'] else 'has not used it yet'}\")
 uebrig = m.get('starter_grants_left', 0)
 print(f\"newcomers the starter pool still carries: {uebrig}\")
 if uebrig < 3:
