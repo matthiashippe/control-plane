@@ -14,6 +14,13 @@
  * the same block back out. Both directions, one file, so the conclusion is not a guess about how
  * CSP treats a script type.
  *
+ * The sharper half of that measurement is the console. One file under a policy that allows no
+ * script at all, carrying a data block and an executable one: Chrome reports "Executing inline
+ * script violates the following Content Security Policy directive" for the executable one and says
+ * **nothing** about the data block. The rendered production page reports nothing at all. A
+ * violation is what a renderer would act on, and there is none, which is why a rendering crawler
+ * reads this and does not discard it.
+ *
  * **Every statement here has to stand on the page it describes.** Structured data that claims more
  * than the page shows is what Google calls spammy structured markup, and it is also just untrue,
  * which this project cannot afford on the surface that asks for trust. That is why `howToFrom`
