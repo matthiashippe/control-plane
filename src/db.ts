@@ -96,6 +96,19 @@ function migrate(db: Db): void {
     );
     CREATE INDEX IF NOT EXISTS automatons_address ON automatons(address);
 
+    -- Every read of GET /v1/credits/balance by an address, counted. Not analytics: it is the only
+    -- evidence this service has that a runtime is up, pointed at us, and waiting for money it
+    -- cannot ask for. Measured on 2026-09-22: a Korean operator provisioned at 02:05 UTC, polled
+    -- this one endpoint twenty-six times between 04:01 and 04:07 with a balance of zero, and left.
+    -- The starter grant that would have started them was sitting one call away behind a door only
+    -- a human reading the answer could open. See grantToWaitingRuntime() in credits/starter.ts.
+    CREATE TABLE IF NOT EXISTS balance_polls (
+      address  TEXT PRIMARY KEY,
+      n        INTEGER NOT NULL,
+      first_at TEXT NOT NULL,
+      last_at  TEXT NOT NULL
+    );
+
     -- Posted bounties. The price is already charged against the buyer's balance when the bounty
     -- goes up and is fixed as a bounty_hold ledger row; the price_mc column only says how much
     -- goes back to the buyer or over to the winner.

@@ -159,3 +159,53 @@ export function grantOnFirstUse(db: Db, address: string): boolean {
     throw e;
   }
 }
+
+/** Three reads, because one is a check and two could be a retry. */
+export const WAITING_POLLS = 3;
+/** A minute, because our own end-to-end runs read a balance twice within seconds. */
+export const WAITING_MS = 60_000;
+
+/**
+ * The grant a waiting runtime cannot ask for.
+ *
+ * `grantOnFirstUse` hangs the grant on the first inference that cannot pay for itself, and that is
+ * right for a runtime that tries to think. It is useless for the one we actually measured. On
+ * 2026-09-22 a Conway operator in Korea provisioned a key at 02:05 UTC, and between 04:01 and
+ * 04:07 their runtime read `GET /v1/credits/balance` twenty-six times, got `{"balance_cents": 0}`
+ * every time, and never attempted a single inference. It was waiting for money before working, so
+ * the grant tied to work never fired. At 04:22 the operator looked by hand, at 04:24 they read the
+ * landing page, and at 04:27 they were gone. The hint in the balance answer that would have told
+ * them what to do went live at 09:40 that morning, five hours too late, and a runtime does not
+ * read hints anyway: it reads `balance_cents`.
+ *
+ * So the poll itself is the trigger. A runtime that asks three times over more than a minute with
+ * an empty balance is not browsing, it is stuck, and the next poll after this one returns fifteen
+ * cents and it starts working.
+ *
+ * Both limits earn their place against our own traffic. Over the whole access log exactly three
+ * addresses have ever polled this endpoint: two of ours and that operator. Ours are end-to-end
+ * runs that read a balance twice within seconds around a call (`ops/award.ts`, `ops/first-cycle.ts`),
+ * so a minute of distance rules them out; and the balance-is-zero condition rules out every run
+ * that has already topped up. What remains is what we want to catch.
+ *
+ * Silent, like `grantOnFirstUse`: it sits inside a request that asked for a number, so a refusal
+ * is not an error anybody can act on. The grant is a ledger row either way.
+ *
+ * @param nowMs injectable so a test can prove both directions without waiting a minute.
+ */
+export function grantToWaitingRuntime(db: Db, address: string, balanceMc: number, nowMs: number): boolean {
+  const who = address.toLowerCase();
+  const now = new Date(nowMs).toISOString();
+  db.prepare(
+    `INSERT INTO balance_polls (address, n, first_at, last_at) VALUES (?, 1, ?, ?)
+     ON CONFLICT(address) DO UPDATE SET n = n + 1, last_at = excluded.last_at`,
+  ).run(who, now, now);
+
+  if (balanceMc > 0) return false;
+  const row = db.prepare("SELECT n, first_at, last_at FROM balance_polls WHERE address = ?").get(who) as
+    | { n: number; first_at: string; last_at: string }
+    | undefined;
+  if (!row || row.n < WAITING_POLLS) return false;
+  if (Date.parse(row.last_at) - Date.parse(row.first_at) < WAITING_MS) return false;
+  return grantOnFirstUse(db, who);
+}

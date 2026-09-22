@@ -8,7 +8,15 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Hono } from "hono";
 import type { Db } from "./db.js";
-import { claimStarter, poolLeftMc, starterAvailableMc, starterOffer, GRANT_MC, StarterError } from "./credits/starter.js";
+import {
+  claimStarter,
+  grantToWaitingRuntime,
+  poolLeftMc,
+  starterAvailableMc,
+  starterOffer,
+  GRANT_MC,
+  StarterError,
+} from "./credits/starter.js";
 import { verifyFindings, messages, type CheckMode } from "./check/fabrication.js";
 import { reviewBrief } from "./bounties/brief.js";
 import { receipts, PUBLICATION_FROM } from "./bounties/receipts.js";
@@ -37,7 +45,7 @@ import {
   BountyError,
   type Bounty,
 } from "./bounties/store.js";
-import { mcToCents, getBalanceCents, MC_PER_CENT } from "./db.js";
+import { mcToCents, getBalanceCents, getBalanceMc, MC_PER_CENT } from "./db.js";
 import { DOC } from "./errors.js";
 import { Catalog, handleChat, MARKUP } from "./inference/proxy.js";
 import { clientKey, RateLimiter, type RateLimitOptions } from "./ratelimit.js";
@@ -1109,9 +1117,21 @@ export function createApp(opts: AppOptions) {
    */
   app.get("/v1/credits/balance", (c) => {
     const address = c.get("address");
-    const wartet = starterAvailableMc(db, address);
+    // A runtime that has read an empty balance three times over more than a minute is stuck, not
+    // browsing, and this is the call where it is handed its grant. See grantToWaitingRuntime().
+    const granted = grantToWaitingRuntime(db, address, getBalanceMc(db, address), Date.now());
+    const wartet = granted ? 0 : starterAvailableMc(db, address);
     return c.json({
       balance_cents: getBalanceCents(db, address),
+      ...(granted
+        ? {
+            granted_cents: mcToCents(GRANT_MC),
+            hint:
+              `You had nothing and kept asking, so the operator's pool put ${mcToCents(GRANT_MC)} cents ` +
+              "on this address. One per address, ever, free, and enough for about ten attempts at a job.",
+            docs: DOC.transfers,
+          }
+        : {}),
       ...(wartet > 0
         ? {
             starter_available_cents: mcToCents(wartet),
