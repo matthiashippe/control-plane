@@ -216,6 +216,35 @@ jq -r --argjson own "$own_json" \
       }'
 
 echo
+# And the same question one level up, because an address is not a visitor.
+#
+# On 2026-09-23 the log held 50 foreign addresses in 41 /24 networks. One of those networks,
+# 205.169.39.x, had five addresses and thirteen requests spread over three days, all with the same
+# two Windows user agents. Counted by address that is five strangers who each came once; counted by
+# network it is one thing that keeps coming back, which is the more useful reading and the one
+# nothing was doing.
+#
+# A /24 is an assumption, not a fact: two neighbours in one can be unrelated, and on mobile or in a
+# cloud range they usually are. So both numbers are printed and neither replaces the other.
+echo "-- The same, by network (a /24 is an assumption, not a fact) --"
+jq -r --argjson own "$own_json" \
+  "$FOREIGN | select(.request.uri | test(\"wp-|php|\\\\.env|\\\\.git|admin|xmlrpc|/vendor|/actuator|/cgi\") | not)
+   | [(.request.remote_ip | split(\".\")[0:3] | join(\".\")), .request.remote_ip, (.ts | strftime(\"%Y-%m-%d\"))] | @tsv" "$log" \
+  | sort -u | sort -k1,1 -k3,3 | awk -F'\t' '
+      { if (!ip_seen[$1 SUBSEP $2]++) adressen[$1]++
+        if (!tag_seen[$1 SUBSEP $3]++) { tage[$1]++; liste[$1] = liste[$1] $3 " " } }
+      END {
+        netze = 0; summe = 0; wieder = 0
+        for (netz in adressen) { netze++; summe += adressen[netz]; if (tage[netz] > 1) wieder++ }
+        if (netze == 0) { print "   no foreign network in the log"; exit }
+        for (netz in adressen) {
+          if (adressen[netz] > 1 || tage[netz] > 1)
+            printf "   %-16s %d address(es) over %d day(s): %s\n", netz ".x", adressen[netz], tage[netz], liste[netz]
+        }
+        printf "   %d address(es) in %d network(s); %d network(s) were here on more than one day.\n", summe, netze, wieder
+      }'
+
+echo
 echo "-- Error answers to strangers (what a visitor got to see) --"
 jq -r --argjson since "$since" --argjson own "$own_json" \
   "select(.ts > \$since) | $FOREIGN | select(.status >= 400) | select(.request.uri | test(\"wp-|php|\\\\.env|\\\\.git|admin|xmlrpc\") | not) | [(.status|tostring), .request.uri] | @tsv" "$log" \

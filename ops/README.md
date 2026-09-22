@@ -681,6 +681,22 @@ On a service waiting for its first user, a returning visitor is the strongest si
 payment. The first line of the section says how far the log goes back, because Caddy rotates it and
 that answer changes without warning.
 
+### The same, by network
+
+The section under it, and the reason both exist. On 2026-09-23 the log held 50 foreign addresses in
+41 /24 networks. One of those, `205.169.39.x`, had five addresses and thirteen requests over three
+days, all carrying the same two Windows user agents. Counted by address that is five strangers who
+each came once. Counted by network it is one thing that keeps coming back, and the by-address
+figure of "2 returned" becomes 5.
+
+A /24 is an assumption and not a fact: two neighbours in one can be unrelated, and on mobile or in
+a cloud range they usually are. Both numbers are printed and neither replaces the other.
+
+Building it broke the count once, quietly and in the right direction to be believed: `sort -u` with
+`-k1,1 -k3,3` deduplicates by those keys and not by the whole line, so every row that differed only
+in the address fell away and five addresses became two. `sort -u | sort -k1,1 -k3,3` is the version
+that means what it looks like.
+
 ## Does a backup come back up
 
 `ops/sicherung-probe.sh`, by hand, not by cron. `--oldest` takes the oldest backup still kept
