@@ -77,6 +77,28 @@ run() {
   return $code
 }
 
+# Which of these checks has ever been shown to fail?
+#
+# A check that has never gone red is a check nobody has verified, and this repo says so about
+# tests in loop-constraints.md ("Ein Test, der ohne den zugehoerigen Fix gruen bleibt, ist kein
+# Test"). On 2026-09-22 the same question was put to the eleven below, one at a time, by breaking
+# what each one guards:
+#
+#   health              a wrong URL answers 000, the check reports it
+#   conway still broken CONWAY_PROBE_TIMEOUT=1 gives the third exit, not a false alarm
+#   market guards       DEADLINE_MAX_MS raised to ten years: MARKT FAIL, 1 failure
+#   journeys            an invented /v1 path in docs/journeys.md: JOURNEYS FAIL
+#   pages               a dead internal link and a renamed doc heading, both named
+#   classes             one class with no CSS rule: CLASSES FAILED
+#   daily jobs          CP_MAX_AGE_HOURS=1: all four artefacts named with their ages
+#   runtime claims      a renamed field in the pattern: WRONG, naming the claim
+#   published data      a deleted CSV row: three figures named with both values
+#   search engines      a noindex meta tag: VISIBILITY FAILED
+#   shown commands      one altered line in the hero: shown-but-not-returned, both directions
+#
+# Every one of them went red for the right reason and green again afterwards. Anything added
+# below is expected to have been through the same before it is trusted.
+
 echo "Handsel, all checks against $BASE"
 echo
 
