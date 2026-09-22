@@ -98,6 +98,14 @@ describe("A person who opens an API path in a browser", () => {
     expect(html).toMatch(/Impressum/);
   });
 
+  it("tells a crawler not to index a page that only exists under a 401", async () => {
+    const res = await app().request("/v1/credits/balance", { headers: { accept: BROWSER } });
+    expect(res.headers.get("x-robots-tag"), "a 401 page has no business in a search result").toBe("noindex");
+    // And the JSON answer, which no crawler renders, does not need the header.
+    const json = await app().request("/v1/credits/balance");
+    expect(json.headers.get("x-robots-tag")).toBeNull();
+  });
+
   it("does not turn a page's own error into a page", async () => {
     // Only /v1/ paths. A 404 on a page stays what it was.
     const res = await app().request("/gibtsnicht", { headers: { accept: BROWSER } });

@@ -242,6 +242,11 @@ export function createApp(opts: AppOptions) {
             c.req.path,
           ),
           err.status as 401,
+          // A page served under a 401 is not a page anybody should find in a search result. Google
+          // does not index a 401 anyway, so this is a belt rather than the braces, and it costs a
+          // header. The canonical link in the head points at the /v1/ path this was served from,
+          // which is the part that would be wrong if it ever were indexed.
+          { "X-Robots-Tag": "noindex" },
         );
       }
       // `error` stays the Conway wording, `message` says what to do now.
