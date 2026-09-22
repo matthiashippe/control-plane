@@ -31,6 +31,60 @@ PAARE = [
 ]
 
 
+def transfers_readme() -> tuple[int, list[str]]:
+    """The figures the data README states about the transfer CSV, recomputed from that CSV.
+
+    The README hands a reader a Python block and prints what it "ergibt". Until 2026-09-22 the
+    block on the file beside it produced something else: the monthly line for September read
+    290.01 / 30 / 62 against an actual 295.05 / 31 / 77, and the two window figures were the state
+    before the backfill of 19 September 21:45 that the same README describes three paragraphs
+    higher. The stated scan end was thirteen hours early as well, which is where
+    artikel-zahlen.py got its hardcoded cut from. An adversarial read found it (B5, B4).
+
+    Recomputed and then searched for as text: a number that moves on either side turns this red,
+    which is the only arrangement in which the README and its data cannot drift apart again.
+    """
+    import collections
+    import csv
+    import datetime
+
+    readme = DATEN / "README.md"
+    csv_datei = DATEN / "2026-09-19-conway-payto-transfers.csv"
+    if not readme.exists() or not csv_datei.exists():
+        return 2, [f"COULD NOT TELL: {readme.name} or {csv_datei.name} is missing."]
+    zeilen = list(csv.DictReader(csv_datei.open()))
+    if not zeilen:
+        return 2, [f"COULD NOT TELL: {csv_datei.name} is empty."]
+    text = readme.read_text()
+
+    fehlend = []
+    monate = collections.defaultdict(lambda: [0.0, set(), 0])
+    for r in zeilen:
+        k = r["timestamp_utc"][:7]
+        monate[k][0] += float(r["usdc"])
+        monate[k][1].add(r["from"])
+        monate[k][2] += 1
+    for k in sorted(monate):
+        erwartet = f"{k} {round(monate[k][0], 2)} / {len(monate[k][1])} / {monate[k][2]}"
+        if erwartet not in text:
+            fehlend.append(f"the monthly line for {k} should read {erwartet}")
+
+    ende = max(r["timestamp_utc"] for r in zeilen)
+    if f"{ende[8:10]}.{ende[5:7]}.{ende[0:4]} {ende[11:19]} UTC" not in text:
+        fehlend.append(f"the stated scan end should be the last row of the file, {ende}")
+    for tage in (30, 7):
+        grenze = (
+            datetime.datetime.fromisoformat(ende.replace("Z", "+00:00")) - datetime.timedelta(days=tage)
+        ).strftime("%Y-%m-%dT%H:%M:%SZ")
+        f = [r for r in zeilen if r["timestamp_utc"] >= grenze]
+        betrag = f"{sum(float(r['usdc']) for r in f):.2f}".replace(".", ",")
+        satz = f"letzte {tage} Tage\n{betrag} USDC von {len({r['from'] for r in f})} Wallets in {len(f)} Transfers"
+        # The README wraps its lines, so the claim is checked without the line breaks.
+        if " ".join(satz.split()) not in " ".join(text.split()):
+            fehlend.append(f"the {tage}-day window should read {' '.join(satz.split())}")
+    return (1 if fehlend else 0), fehlend
+
+
 def main() -> int:
     if not DATEN.is_dir():
         print(f"COULD NOT TELL: {DATEN} is not there.")
@@ -69,10 +123,50 @@ def main() -> int:
             print(f"        Reproduce: cd docs/research/data && python3 {' '.join(befehl)}")
         else:
             print(f"ok      {name} reproduces from {befehl[1]} ({len(gerechnet)} fields)")
+    # And the script the article invites a reader to run, against the same figures.
+    #
+    # artikel-zahlen.py carried `cut = "2026-08-20T14:59:00Z"  # 30 Tage vor dem Scan-Ende` and
+    # that constant was thirteen hours early, from an older scan end. It pulled one transfer of
+    # 5 USDC from 20 August into the window and printed 435.05 / 45 / 105 where the article says
+    # 430.05 / 44 / 104. The article was right and its own evidence script was not, on a command
+    # the article names in its last paragraph (B4). It computes the cut from the data now, and
+    # this holds its output against what the README states.
+    lauf = subprocess.run([sys.executable, "artikel-zahlen.py"], cwd=DATEN, capture_output=True, text=True, timeout=300)
+    if lauf.returncode != 0:
+        print(f"COULD NOT TELL: artikel-zahlen.py exited {lauf.returncode}: {lauf.stderr.strip()[:160]}")
+        return 2
+    zeile = next((z for z in lauf.stdout.splitlines() if z.startswith("Letzte 30 Tage")), "")
+    readme_text = " ".join((DATEN / "README.md").read_text().split())
+    zahlen = zeile.replace("Letzte 30 Tage:", "").strip().split(" USDC, ")
+    if len(zahlen) != 2:
+        print(f"COULD NOT TELL: artikel-zahlen.py printed no 30-day line: {zeile[:80]!r}")
+        return 2
+    erwartet = f"{zahlen[0].replace('.', ',')} USDC von {zahlen[1].split(' Wallets')[0]} Wallets"
+    if erwartet not in readme_text:
+        schlecht += 1
+        print("WRONG   artikel-zahlen.py and README.md disagree about the 30-day window.")
+        print(f"        the script prints {zeile.strip()}")
+        print(f"        the README should therefore contain {erwartet}")
+    else:
+        print(f"ok      artikel-zahlen.py agrees with README.md ({erwartet})")
+
+    code, fehlend = transfers_readme()
+    if code == 2:
+        print(fehlend[0])
+        return 2
+    if fehlend:
+        schlecht += 1
+        print("WRONG   README.md states figures its own transfer CSV does not produce.")
+        for f in fehlend:
+            print(f"        {f}")
+        print("        Reproduce: the Python block in that section, on the CSV beside it.")
+    else:
+        print("ok      README.md reproduces the transfer CSV (months, scan end, both windows)")
+
     if schlecht:
-        print(f"\nDATA FAILED: {schlecht} published dataset(s) no longer match their own source.")
+        print(f"\nDATA FAILED: {schlecht} published file(s) no longer match their own source.")
         return 1
-    print(f"\nDATA OK ({len(PAARE)} dataset(s) reproduced from the CSVs beside them)")
+    print(f"\nDATA OK ({len(PAARE) + 2} published file(s) reproduced from the data beside them)")
     return 0
 
 

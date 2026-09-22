@@ -35,12 +35,19 @@ for k in sorted(m):
     print(k, round(m[k][0], 2), len(m[k][1]), m[k][2])
 ```
 
-Ergibt: 2026-02 37958.65 / 1582 / 6119, 2026-03 19112.44 / 581 / 1961, 2026-04 2845.00 / 198 / 461,
-2026-05 1215.00 / 90 / 198, 2026-06 420.00 / 34 / 68, 2026-07 360.00 / 24 / 60,
-2026-08 415.00 / 40 / 83, 2026-09 (bis 19.) 290.01 / 30 / 62.
+Ergibt: 2026-02 37958.65 / 1582 / 6119, 2026-03 19112.44 / 581 / 1961, 2026-04 2845.0 / 198 / 461,
+2026-05 1215.0 / 90 / 198, 2026-06 420.0 / 34 / 68, 2026-07 360.0 / 24 / 60,
+2026-08 415.0 / 40 / 83, 2026-09 295.05 / 31 / 77.
 
-Für die Fenster relativ zum Scan-Ende 19.09.2026 14:59 UTC: letzte 30 Tage 430,01 USDC von
-44 Wallets in 90 Transfers, letzte 7 Tage 70,00 USDC von 10 Wallets in 16 Transfers.
+Für die Fenster relativ zur letzten Zeile der Datei, 20.09.2026 03:55:15 UTC: letzte 30 Tage
+430,05 USDC von 44 Wallets in 104 Transfers, letzte 7 Tage 70,04 USDC von 10 Wallets in 30
+Transfers.
+
+Diese drei Zeilen standen bis zum 22.09.2026 auf dem Stand **vor** dem Nachziehen von 21:45, das
+drei Absätze weiter oben beschrieben ist, und das Scan-Ende war mit 19.09. 14:59 UTC um dreizehn
+Stunden zu früh angesetzt. Wer den Block darüber laufen ließ, bekam andere Zahlen als die Datei,
+die ihn anbietet. `ops/daten-pruefen.py` rechnet sie seither aus der CSV nach und läuft in
+`ops/check-all.sh` mit.
 
 Grenzen des Datensatzes: Er zeigt Zuflüsse an eine einzelne Adresse. Ob hinter einer Wallet ein
 Mensch, ein Automat oder ein Wiederholungsversuch steht, steht nicht drin. Die hohe Zahl von
