@@ -46,6 +46,7 @@ import {
   type Bounty,
 } from "./bounties/store.js";
 import { mcToCents, getBalanceCents, getBalanceMc, MC_PER_CENT } from "./db.js";
+import { block as ldBlock, dataset, howToFrom, organization, webPage, webSite } from "./public/jsonld.js";
 import { DOC } from "./errors.js";
 import { Catalog, handleChat, MARKUP } from "./inference/proxy.js";
 import { clientKey, RateLimiter, type RateLimitOptions } from "./ratelimit.js";
@@ -400,7 +401,21 @@ export function createApp(opts: AppOptions) {
    * script is deliberately not carried over; it only fills the status figures on the landing page,
    * and a page that does not need it should not ship a hash-pinned script for nothing.
    */
-  const seite = (bodyHtml: string, titel: string, beschreibung: string, pfad: string, karte = "og.png"): string => {
+  const seite = (
+    bodyHtml: string,
+    titel: string,
+    beschreibung: string,
+    pfad: string,
+    karte = "og.png",
+    /**
+     * Extra structured-data nodes for this page, beyond the WebPage every page gets.
+     *
+     * Passed in rather than decided in here, because only the caller knows whether the body it
+     * just rendered actually contains the steps or the download links the node would claim. See
+     * src/public/jsonld.ts on why nothing here may say more than the page shows.
+     */
+    ld: Record<string, unknown>[] = [],
+  ): string => {
     const kopf = (indexHtml ?? "").slice(0, (indexHtml ?? "").indexOf("</head>"));
     return (
       kopf
@@ -413,6 +428,7 @@ export function createApp(opts: AppOptions) {
         .replace(/(<meta name="twitter:description" content=")[^"]*/, `$1${beschreibung}`)
         .replace(/(<meta property="og:url" content="https:\/\/cp\.hippe\.eu)\/"/, `$1${pfad}"`)
         .replace(/og\.png/g, karte) +
+      ldBlock(organization(), webSite(), webPage(titel, beschreibung, pfad), ...ld) +
       `</head>
 <body>
 <header class="bar"><div class="wrap">
@@ -453,6 +469,14 @@ export function createApp(opts: AppOptions) {
         "Both public x402 directories, scanned daily. Distinct services, calls in 30 days, how concentrated the demand is, and how many services have a single paying wallet. Raw data under CC0.",
         "/x402",
         "og-x402.png",
+        [
+          dataset(
+            "The paid-API market for agents, measured daily",
+            "Both public x402 directories scanned once a day: distinct services, calls over 30 days, how concentrated the demand is, and how many services have exactly one paying wallet.",
+            "/x402",
+            [{ url: "/bounties.json", format: "application/json" }],
+          ),
+        ],
       ),
     );
   });
@@ -478,14 +502,14 @@ export function createApp(opts: AppOptions) {
    */
   app.get("/post", (c) => {
     if (!indexHtml) return c.json({ error: "no index page built" }, 503);
-    return c.html(
-      seite(
-        renderPost(starterOffer(db)),
-        "How to post a job on Handsel, end to end",
-        "Six steps, four of them a single HTTP call. Check your brief without a key, get one in three calls, post the job, read what came back, see what each agent made up, award one or none.",
-        "/post",
-      ),
-    );
+    const titel = "How to post a job on Handsel, end to end";
+    const beschreibung =
+      "Six steps, four of them a single HTTP call. Check your brief without a key, get one in three calls, post the job, read what came back, see what each agent made up, award one or none.";
+    // The body is rendered once and the HowTo is read back out of it, so the markup carries the
+    // steps the reader is looking at and cannot describe a version of the page that is gone.
+    const body = renderPost(starterOffer(db));
+    const howto = howToFrom(body, titel, beschreibung, "/post");
+    return c.html(seite(body, titel, beschreibung, "/post", "og.png", howto ? [howto] : []));
   });
 
   /**
@@ -551,6 +575,15 @@ export function createApp(opts: AppOptions) {
         "What Handsel has paid out",
         "Every job that has been paid for, with the brief, the money, who competed and the work that won it. No key needed.",
         "/receipts",
+        "og.png",
+        [
+          dataset(
+            "Handsel payouts",
+            "Every job on this service that has been paid for: the brief, the price, how many agents competed and which submission won.",
+            "/receipts",
+            [{ url: "/receipts.json", format: "application/json" }],
+          ),
+        ],
       ),
     );
   });
@@ -578,7 +611,21 @@ export function createApp(opts: AppOptions) {
       indexHtml
         .replace("<!--NUMBERS-->", renderNumbers(mcToCents(GRANT_MC), mcToCents(poolLeftMc(db))))
         .replace("<!--MARKET-->", renderMarket(db))
-        .replace("<!--WALLETS-->", renderStatus(db)),
+        .replace("<!--WALLETS-->", renderStatus(db))
+        // The landing page is served from the file and never goes through seite(), so it needs the
+        // same graph put in by hand. Its title and description are the ones already in the file.
+        .replace(
+          "</head>",
+          ldBlock(
+            organization(),
+            webSite(),
+            webPage(
+              "Handsel: one job, several agents, pay one",
+              "Post a job with a price. Several agents each deliver finished work. You read it and pay one, or pay nobody and get the price back.",
+              "/",
+            ),
+          ) + "</head>",
+        ),
     );
   });
 
