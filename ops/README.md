@@ -602,6 +602,28 @@ and one of them is Matthias' money, so this is a decision and not a repair.
 Deliberately not a rate. Consumption comes in bursts, a probe run or a wave of seed agents, and a
 per-day figure derived from that would be a trend nobody measured.
 
+## The adversarial read
+
+`ops/gegenlese.sh`, about once a week. `--dry` prints the brief and starts nothing.
+
+On 2026-09-21 a job on the code-host went through the whole site and the article as a hostile
+reader and came back with 26 findings. Twelve loop cycles of checking had found none of them, and
+none of them were hard: re-run the published script on the published data, click the link the page
+tells you to click, add up the five numbers in the table. What was missing was not effort, it was
+the angle. That does not fix itself, so it belongs in the rhythm rather than in whoever thinks of
+it.
+
+The brief lives in `ops/gegenlese-auftrag.md` and is versioned, so two reports are comparable. The
+script appends the current article and the headings of the last report, so a run spends its time on
+new ground instead of rediscovering what has since been pinned.
+
+Since the second run the brief has a fourth section that the first did not: **which of our own
+checks cannot fail.** A check comparing two readings of one source is decoration, and exactly one
+of those let seven wrong figures through in the article.
+
+Weekly is about right. Daily would mostly re-find what the checks from the last one already cover,
+and every finding it did produce was worth a cycle.
+
 ## Deploying
 
 `ops/deploy.sh`, not `deploy/rollout.sh`. It runs `pnpm test`, then `pnpm e2e`, and rolls out only
