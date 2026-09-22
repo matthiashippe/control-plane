@@ -783,16 +783,18 @@ h1.ph { font-size: clamp(1.5rem, 3.2vw, 2.1rem); line-height: 1.15; letter-spaci
 <footer>
   <div class="wrap">
     <!-- The script is pinned by a CSP hash in deploy/Caddyfile and is not touched. It sets six
-         ids through `set`, which checks `if (el)` first, so three of them can move into the
-         details block below without a byte of it changing. What is left in the line is the part
-         a reader can act on, with labels that say what the two counts actually count: automatons
-         is DISTINCT address over kind='topup', active is DISTINCT address over kind='inference',
-         so "2 agents, 8 active" was a contradiction in one line on the only live figure the
-         supply side gets. -->
+         ids through `set`, which checks `if (el)` first, so an id that is not in the document any
+         more costs it nothing. `s-health` stays client-side, because it is the one line that
+         proves the page is talking to a live service.
+
+         The two counts are rendered by the server now, and the reason is that they needed a word
+         the script cannot fetch. They came from `automatons` and `active`, both of which count us
+         in, and neither of which said so: one of the two wallets that paid is ours and all eight
+         that ever thought here are. `/terms` promises the opposite in the honesty paragraph, and
+         an adversarial read on 2026-09-22 (B8) went and checked. `script-src` is a locked path, so
+         the split could not be fetched; it can be rendered. -->
     <p class="status mono">
-      <span id="s-health">checking</span> &middot;
-      <span id="s-automatons">&hellip;</span> wallets have paid &middot;
-      <span id="s-active">&hellip;</span> have spent on thinking
+      <span id="s-health">checking</span> &middot; <!--WALLETS-->
     </p>
     <details class="prices">
       <summary>Prices</summary>

@@ -35,6 +35,7 @@ import type { Db } from "../db.js";
 import { openBounties, feeMc } from "../bounties/store.js";
 import { receipts } from "../bounties/receipts.js";
 import { mcToCents } from "../db.js";
+import { ourAddresses, wallets } from "../bounties/ours.js";
 
 /** The five characters that can end an HTML text node or an attribute. */
 export function esc(s: string): string {
@@ -119,6 +120,27 @@ export function renderMarket(db: Db): string {
       )
       .get(new Date().toISOString()) as { n: number }
   ).n;
+  // And how many of them are not ours.
+  //
+  // `/terms` says in the honesty paragraph: "the count of agents competing on a job is a real
+  // count of real submissions, and until a stranger arrives it is a count of us." The strip said
+  // "agents competing 3" and all three were ours, seeded by ops/compete.ts, which is the sentence
+  // from /terms rendered as its own opposite. Found by an adversarial read on 2026-09-22 (B15).
+  //
+  // Marked rather than subtracted: a page that showed 0 here would be hiding that three agents
+  // really did compete, which is true and is the thing that has to work before a stranger will.
+  const fremde = (() => {
+    const agenten = (
+      db
+        .prepare(
+          `SELECT DISTINCT s.agent AS agent FROM submissions s
+             JOIN bounties b ON b.id = s.bounty_id
+            WHERE b.status = 'open' AND b.deadline > ?`,
+        )
+        .all(new Date().toISOString()) as { agent: string }[]
+    ).map((r) => r.agent);
+    return agenten.length - ourAddresses(db, agenten).size;
+  })();
 
   const jobs = open.length
     ? `<div class="jobs">${open
@@ -167,11 +189,33 @@ export function renderMarket(db: Db): string {
       ${jobs}
       <p class="sub"><a href="/jobs">All ${alle.length} open jobs, with the full brief</a></p>
       <div class="strip">
-        <div><span class="k">agents competing</span><span class="v">${entrants}</span></div>
+        <div><span class="k">agents competing</span><span class="v">${entrants}<small>${fremde} from outside</small></span></div>
         <div><span class="k">paid out so far</span><span class="v">${paid} ¢</span></div>
       </div>
       ${receiptRows}
       <p class="sub"><a href="/receipts">Every job that has been paid, and the work that won it</a></p>
     </div>
   </section>`;
+}
+
+/**
+ * The status line in the footer, with the part that is not ours broken out.
+ *
+ * Two numbers, each twice: how many wallets did the thing, and how many of those are not the
+ * operator's. That second figure is what `/terms` calls "the one figure that separates a market
+ * from a demonstration", and until 2026-09-22 the landing page showed only the first, unmarked,
+ * in a line a reader reads as the score.
+ *
+ * Nothing is hidden and nothing is subtracted: ours are counted like anybody else's and marked,
+ * the same treatment `/conway` gives our own transfer into Conway. A page that quietly dropped
+ * its own rows would be a second way of saying something untrue.
+ */
+export function renderStatus(db: Db): string {
+  const satz = (n: { total: number; not_ours: number }, was: string) =>
+    n.total === 0
+      ? `nobody has ${was} yet`
+      : `${n.total} ${was}, ${n.not_ours} from outside`;
+  const zahler = wallets(db, "topup");
+  const denker = wallets(db, "inference");
+  return `${esc(satz(zahler, "paid"))} &middot; ${esc(satz(denker, "thought here"))}`;
 }

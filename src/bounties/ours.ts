@@ -73,3 +73,28 @@ export function ourAddresses(db: Db, addresses: string[]): Set<string> {
   for (const row of rows) found.add(row.address.toLowerCase());
   return found;
 }
+
+/**
+ * How many wallets did a thing, and how many of those were not ours.
+ *
+ * `/terms` promises: "Nothing on this site counts our own jobs as somebody else's demand, and
+ * /v1/status publishes it as paying_wallets, with the part that is not ours broken out, which is
+ * the one figure that separates a market from a demonstration."
+ *
+ * The landing page broke that promise at its most visible point. Its status line read "2 wallets
+ * have paid, 8 have spent on thinking", straight out of `automatons` and `active`, both of which
+ * count us in and neither of which was marked. One of those two paying wallets is ours and all
+ * eight of the thinking ones are, so the line a reader sees said the opposite of the line
+ * `/terms` says it says. Found by an adversarial read on 2026-09-22 (B8).
+ *
+ * So the split is computed once, here, and both the endpoint and the page take it from the same
+ * call. `test/eigene-zahlen.test.ts` holds them against each other, because two places rendering
+ * the same fact from two queries is how the first version drifted.
+ */
+export function wallets(db: Db, kind: "topup" | "inference"): { total: number; not_ours: number } {
+  const addresses = (
+    db.prepare("SELECT DISTINCT address FROM ledger WHERE kind = ?").all(kind) as { address: string }[]
+  ).map((r) => r.address);
+  const unsere = ourAddresses(db, addresses);
+  return { total: addresses.length, not_ours: addresses.length - unsere.size };
+}

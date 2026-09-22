@@ -12,12 +12,12 @@ import { claimStarter, poolLeftMc, starterAvailableMc, starterOffer, GRANT_MC, S
 import { verifyFindings, messages, type CheckMode } from "./check/fabrication.js";
 import { reviewBrief } from "./bounties/brief.js";
 import { receipts, PUBLICATION_FROM } from "./bounties/receipts.js";
-import { renderMarket, renderNumbers } from "./public/market.js";
+import { renderMarket, renderNumbers, renderStatus } from "./public/market.js";
 import { readSeries, renderX402 } from "./public/x402.js";
 import { readMoneySeries, readReceipts, renderConway } from "./public/conway.js";
 import { renderPost } from "./public/post.js";
 import { renderFix } from "./public/fix.js";
-import { ourAddresses } from "./bounties/ours.js";
+import { wallets } from "./bounties/ours.js";
 import { renderTerms } from "./public/terms.js";
 import { renderJobs } from "./public/jobs.js";
 import { renderReceipts } from "./public/receipts-page.js";
@@ -520,7 +520,8 @@ export function createApp(opts: AppOptions) {
     return c.html(
       indexHtml
         .replace("<!--NUMBERS-->", renderNumbers(mcToCents(GRANT_MC), mcToCents(poolLeftMc(db))))
-        .replace("<!--MARKET-->", renderMarket(db)),
+        .replace("<!--MARKET-->", renderMarket(db))
+        .replace("<!--WALLETS-->", renderStatus(db)),
     );
   });
 
@@ -605,11 +606,9 @@ export function createApp(opts: AppOptions) {
     // tooling, and a reader who is told this separates a market from a demonstration has to be
     // able to see which side of that line the service is on. Same treatment as /conway gives our
     // own transfer into Conway: counted like anybody else's and marked, never hidden.
-    const unsereZahler = ourAddresses(
-      db,
-      (db.prepare("SELECT DISTINCT address FROM ledger WHERE kind = 'topup'").all() as { address: string }[])
-        .map((r) => r.address),
-    );
+    // One call, shared with the landing page's status line. See src/bounties/ours.ts.
+    const zahler = wallets(db, "topup");
+    const denker = wallets(db, "inference");
 
     return c.json({
       ok: true,
@@ -620,7 +619,11 @@ export function createApp(opts: AppOptions) {
       topup_tiers_usd: opts.pay?.tiers ?? TOPUP_TIERS_USD,
       automatons,
       active,
-      paying_wallets: { total: automatons, not_ours: automatons - unsereZahler.size },
+      paying_wallets: zahler,
+      // The same split for the other count. `active` is the larger number and had no breakdown at
+      // all: all eight of those addresses are ours, and the figure stood on the landing page as
+      // the biggest number on the page. Additive, so nothing that reads the old fields changes.
+      thinking_wallets: denker,
       // The free tier, in the open. An agent that reads only this endpoint has to be able to see
       // that it can start without owning USDC, and how much is left before it cannot.
       starter_credit_cents: mcToCents(GRANT_MC),

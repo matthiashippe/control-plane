@@ -81,10 +81,14 @@ describe("The market on the landing page", () => {
     }
 
     const html = await fresh();
-    const strip = html.slice(html.indexOf("agents competing"), html.indexOf("agents competing") + 120);
-    const m = strip.match(/<span class="v">(\d+)<\/span>/);
+    const strip = html.slice(html.indexOf("agents competing"), html.indexOf("agents competing") + 140);
+    // The cell carries a `<small>` with the part that is not ours since 2026-09-22, so the number
+    // is read up to the first tag rather than up to `</span>`.
+    const m = strip.match(/<span class="v">(\d+)</);
     expect(m, "the agents-competing figure is gone from the strip").toBeTruthy();
     expect(Number(m![1]), "one agent on two jobs is one agent").toBe(1);
+    // And the same count again, split: this agent is a stranger to us, so both halves are 1.
+    expect(strip, "the cell has to say how many of them are not ours").toContain("1 from outside");
   });
 
   it("shows an open job with what it pays, so a visitor sees the market instead of reading about it", async () => {
