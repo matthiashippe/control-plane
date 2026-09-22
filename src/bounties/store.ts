@@ -215,9 +215,22 @@ export function openBounties(db: Db, limit = 50): (Bounty & { submission_count: 
 /**
  * Cancel and give the money back.
  *
- * Only the buyer, and only once: the condition `status = 'open'` in the UPDATE is what makes a
- * duplicate call harmless. Without it the second call would credit the buyer a second time, and
- * the money would have appeared out of nothing.
+ * Only the buyer, and only once. Two things enforce the "once", and they are not the same thing:
+ *
+ * The status check three lines below is what stops a second call in this runtime. better-sqlite3
+ * is synchronous and this process is single-threaded, so two cancels cannot interleave inside this
+ * function, and the second one reads `cancelled` and throws.
+ *
+ * The `status = 'open'` in the UPDATE, with `res.changes !== 1`, is the guard for a second writer:
+ * another process on the same file, or a threaded runtime later. Without it a race would write two
+ * `bounty_release` rows, and `ledger_topup_ref` does not cover that kind, so the buyer would be
+ * credited twice and the money would have come from nowhere.
+ *
+ * That second guard has no test, and it cannot have one here: producing the race needs a second
+ * writer this runtime does not have, and a test that goes around the status check would be testing
+ * its own setup. Removing the condition leaves all 513 tests green, which is how this was found on
+ * 2026-09-22. It stays because it costs nothing and the day there is a second writer it is the
+ * only thing standing there. The same pair guards `awardBounty`.
  */
 export function cancelBounty(db: Db, id: string, who: string): Bounty {
   const address = who.toLowerCase();
