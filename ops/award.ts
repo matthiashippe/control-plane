@@ -60,7 +60,7 @@ async function call(pathname: string, key: string | null, init: RequestInit = {}
   return body as Record<string, unknown>;
 }
 
-async function signIn(): Promise<string> {
+async function signIn(): Promise<{ key: string; prefix: string }> {
   const { privateKey } = JSON.parse(fs.readFileSync(path.resolve(WALLET), "utf-8")) as { privateKey: Hex };
   const account = privateKeyToAccount(privateKey);
   const { nonce } = (await call("/v1/auth/nonce", null, { method: "POST" })) as { nonce: string };
@@ -74,7 +74,30 @@ async function signIn(): Promise<string> {
   const keyBody = await call("/v1/auth/api-keys", null, {
     method: "POST", headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ name: "handsel-award" }),
   });
-  return (keyBody.apiKey ?? keyBody.api_key ?? keyBody.key) as string;
+  return {
+    key: (keyBody.apiKey ?? keyBody.api_key ?? keyBody.key) as string,
+    prefix: (keyBody.key_prefix ?? keyBody.keyPrefix ?? "") as string,
+  };
+}
+
+/**
+ * Hand the key back, whatever the run decided.
+ *
+ * This tool has four ways out: nothing submitted, read-only, awarded nobody, awarded somebody. A
+ * credential left behind on the operator wallet after any of them is a door held open for
+ * nothing, and the wallet it belongs to is the one that holds the market's money. Reported and
+ * never fatal: the decision has already been made and written down by the time this runs.
+ */
+async function handBack(who: { key: string; prefix: string }): Promise<void> {
+  if (!who.prefix) return;
+  try {
+    await call("/v1/auth/api-keys/revoke", who.key, {
+      method: "POST", body: JSON.stringify({ key_prefix: who.prefix }),
+    });
+    console.log("        key handed back");
+  } catch (e) {
+    console.log(`        NOTE could not revoke the key: ${(e as Error).message}`);
+  }
 }
 
 const kurz = (a: string): string => `${a.slice(0, 8)}…${a.slice(-4)}`;
@@ -125,7 +148,16 @@ export function formalpruefung(brief: string, work: string): string[] {
 
 async function main(): Promise<void> {
   const bountyId = arg("bounty");
-  const key = await signIn();
+  const konto = await signIn();
+  const key = konto.key;
+  try {
+    await entscheiden(bountyId, key);
+  } finally {
+    await handBack(konto);
+  }
+}
+
+async function entscheiden(bountyId: string, key: string): Promise<void> {
 
   // The brief comes from the public list, the same text the agents were given. Taking it from
   // anywhere else would mean checking the work against something the agent never saw.

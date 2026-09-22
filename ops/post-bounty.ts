@@ -68,7 +68,25 @@ async function main(): Promise<void> {
     method: "POST", headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ name: "handsel-post-bounty" }),
   });
   const key = (keyBody.apiKey ?? keyBody.api_key ?? keyBody.key) as string;
+  const keyPrefix = (keyBody.key_prefix ?? keyBody.keyPrefix ?? "") as string;
 
+  try {
+    await stellen(key, brief, kind, priceCents, hours);
+  } finally {
+    // Whatever happened, the key goes back. Without the finally a failed post leaves it behind,
+    // which is the one case where a tool exits in a hurry and is least likely to be looked at.
+    if (keyPrefix) {
+      await call("/v1/auth/api-keys/revoke", key, {
+        method: "POST", body: JSON.stringify({ key_prefix: keyPrefix }),
+      }).then(
+        () => console.log("        key handed back"),
+        (e) => console.log(`        NOTE could not revoke the key: ${(e as Error).message}`),
+      );
+    }
+  }
+}
+
+async function stellen(key: string, brief: string, kind: string, priceCents: number, hours: number): Promise<void> {
   const before = ((await call("/v1/credits/balance", key)) as { balance_cents: number }).balance_cents;
   const bounty = (await call("/v1/bounties", key, {
     method: "POST",
