@@ -120,6 +120,11 @@ export function createClient({ baseUrl = DEFAULT_BASE_URL, apiKey = "", fetchImp
  * The six tools. `inputSchema` is the single source of truth: the runtime validation below reads
  * it, and the OpenAI-format block in docs/bounties.md is generated from the same shapes.
  */
+// Not part of the deployed image. `harness/cp/Dockerfile` copies `src` and nothing else, and the
+// service has no MCP route: this is a stdio server a client starts from a checkout. So a change
+// here reaches people when it reaches `main`, not when the VM is rolled out. Two cycles in
+// September 2026 carried "mcp/server.mjs waits for the next deploy" as an open item, and there was
+// nothing to wait for.
 export const TOOLS = [
   {
     name: "list_open_bounties",
