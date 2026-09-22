@@ -14,6 +14,7 @@ human act.
 
 Exit code 0 means the text matches the world. Anything else names the sentences to fix.
 """
+import collections
 import datetime
 import json
 import re
@@ -265,6 +266,60 @@ def main() -> int:
     # It does not: src/setup/configure.ts assigns the chosen model to both. The trap is a
     # hand-edited automaton.json. docs/without-control-plane.md had it right since 21.09. and
     # nothing held the short version against the long one until an adversarial read did.
+    # 4c-bis-bis. The monthly table, row by row, per version.
+    #
+    # Eight rows with three figures each, in both copies, and the only thing that had ever checked
+    # them was an adversarial reader doing it by hand once. The thirty-day window two paragraphs
+    # below this one was wrong in one copy for four hours on 2026-09-22 for exactly that reason, so
+    # the table gets the same treatment: recomputed from the published CSV, and asked of each
+    # version separately.
+    import csv as _csv
+
+    # One read for both blocks below: the monthly table and the thirty-day window are two
+    # questions about the same file.
+    zeilen = list(_csv.DictReader(open("docs/research/data/2026-09-19-conway-payto-transfers.csv")))
+
+    monate = collections.defaultdict(lambda: [0.0, set(), 0])
+    for z in zeilen:
+        k = z["timestamp_utc"][:7]
+        monate[k][0] += float(z["usdc"])
+        monate[k][1].add(z["from"])
+        monate[k][2] += 1
+    NAME = {"01": "January", "02": "February", "03": "March", "04": "April", "05": "May",
+            "06": "June", "07": "July", "08": "August", "09": "September"}
+    for quelle, fassung in fassungen:
+        schlechte = []
+        gefunden = 0
+        for schluessel, (usdc, wallets, transfers) in sorted(monate.items()):
+            name = NAME.get(schluessel[5:7])
+            if not name:
+                continue
+            # Both layouts, one pattern: a Markdown row with pipes and the plain columns of the
+            # post-ready copy. The label is matched non-greedily and may contain digits, because
+            # September is "September (to the 20th)" in one copy and "Sep 1-20" in the other. The
+            # first pattern forbade digits in the label, found neither, and said nothing: it
+            # counted seven of eight rows and called that a pass.
+            kurz = name[:3] if name == "September" else name
+            m = re.search(
+                rf"^\s*\|?\s*(?:{name}|{kurz})[^\n]*?([\d,]+\.\d\d)\s*\|?\s+([\d,]+)\s*\|?\s+([\d,]+)",
+                fassung, re.M,
+            )
+            if not m:
+                schlechte.append(f"{name}: no row for it in this version, and the CSV has one")
+                continue
+            gefunden += 1
+            gesagt = (m.group(1), zahl(m.group(2)), zahl(m.group(3)))
+            echt = (f"{usdc:,.2f}", len(wallets), transfers)
+            if gesagt != echt:
+                schlechte.append(f"{name}: says {gesagt}, the CSV gives {echt}")
+        if not gefunden:
+            continue
+        if schlechte:
+            aendern(f"the monthly table in {quelle.name} does not come out of the transfer CSV",
+                    "; ".join(schlechte))
+        else:
+            ok(f"the monthly table in {quelle.name} reproduces from the CSV", f"{gefunden} row(s)")
+
     # 4c-ter. The thirty-day window, per version.
     #
     # This is the sentence B4 was about, and on 2026-09-22 fixing it caught only half the house:
@@ -273,9 +328,6 @@ def main() -> int:
     # 435 USDC in 105 transfers" for another four hours. Every check here searched the joined text,
     # and one correct copy is enough to satisfy a search. So this one runs per version, and it
     # recomputes rather than comparing to a number written here.
-    import csv as _csv
-
-    zeilen = list(_csv.DictReader(open("docs/research/data/2026-09-19-conway-payto-transfers.csv")))
     ende = max(z["timestamp_utc"] for z in zeilen)
     grenze = (
         datetime.datetime.fromisoformat(ende.replace("Z", "+00:00")) - datetime.timedelta(days=30)
