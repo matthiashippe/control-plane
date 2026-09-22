@@ -111,8 +111,9 @@ export function renderApiPage(pfad: string, starterCents: number | null): string
       <p>
         <code>$YOUR_KEY</code> is the <code>cnwy_k_…</code> your runtime was provisioned with. If
         you do not have it any more, <code>automaton --provision</code> against this instance
-        issues a new one, and <a href="/v1/auth/api-keys">the list of your keys</a> is itself
-        behind a key, for the same reason as everything else here.
+        issues a new one. <code>GET /v1/auth/api-keys</code> lists the keys you have, and it sits
+        behind a key as well, for the same reason as everything else here: it is a question about
+        your account, and this page cannot prove it is you asking.
       </p>
       ${
         starterCents === null

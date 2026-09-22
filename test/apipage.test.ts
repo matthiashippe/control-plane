@@ -75,6 +75,15 @@ describe("A person who opens an API path in a browser", () => {
     expect(leer).not.toMatch(/is handed 15 cents/);
   });
 
+  it("does not link anywhere that answers with this same page", async () => {
+    const html = await (await app().request("/v1/credits/balance", { headers: { accept: BROWSER } })).text();
+    // Every href in the body must be a page a person can actually read. A link promising "the list
+    // of your keys" that lands on this very explanation is a loop, and it was one until it was seen
+    // in a screenshot rather than in a test.
+    const hrefs = [...html.matchAll(/href="(\/[^"]*)"/g)].map((m) => m[1]);
+    expect(hrefs.filter((h) => h.startsWith("/v1/"))).toEqual([]);
+  });
+
   it("offers no way to read a balance without a key", async () => {
     const html = await (await app().request("/v1/credits/balance", { headers: { accept: BROWSER } })).text();
     expect(html).not.toMatch(/enter your address/i);
