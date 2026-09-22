@@ -72,6 +72,26 @@ export function renderX402(points: X402Point[]): string {
   //
   // A phrase that asserts a direction has to be computed or it is a guess that ages into a lie,
   // and this one sits next to the argument that every total here is a floor.
+  // What the totals did since the scan before, for the same reason.
+  //
+  // The page said "every total here is a floor, not a count", and three lines under that sentence
+  // its own table showed the totals falling: 867,813 calls on 21 September against 802,808 on the
+  // 22nd, and the largest service down from 346,869 to 275,522. A floor does not fall. An
+  // adversarial read on 2026-09-22 found it (B1) by clicking the link the article itself gives.
+  //
+  // The claim was wrong rather than out of date. Coinbase's demand figure is a trailing 30-day
+  // window, so it drops whenever the days falling off the back outweigh the days arriving at the
+  // front; that is the normal behaviour of a window and says nothing about late filling. What late
+  // filling really costs is coverage: a service whose fields are still empty is in no demand total
+  // at all. So the page now says that, and prints the movement instead of asserting a direction.
+  const vorTotal = points.length > 1 ? points[points.length - 2] : undefined;
+  const bewegung =
+    vorTotal === undefined
+      ? "one scan is a reading, not a series"
+      : vorTotal.aufrufe_30d === last.aufrufe_30d
+        ? `unchanged since ${esc(day(vorTotal.stichtag))}`
+        : `${n(last.aufrufe_30d)} calls today against ${n(vorTotal.aufrufe_30d)} on ${esc(day(vorTotal.stichtag))}`;
+
   const vorher = points.length > 1 ? points[points.length - 2].ohne_nachfragedaten : undefined;
   const jetzt = last.ohne_nachfragedaten;
   const richtung =
@@ -125,11 +145,12 @@ export function renderX402(points: X402Point[]): string {
         </div>
         <div>
           <span><b>${n(last.ohne_nachfragedaten ?? 0)} entries carry no demand data at all${richtung}</b>
-          <span class="w">Coinbase fills those fields in late, and the size of what it is late about
-          is the reason to distrust every total here. The largest single service in this scan is
-          ${n(last.groesster_aufrufe ?? 0)} calls, ${last.groesster_anteil}% of everything, and on
-          20 September that same service sat in the directory with its demand fields empty. So
-          every total here is a floor, not a count.</span></span>
+          <span class="w">Coinbase fills those fields in late, so every demand figure on this page
+          covers only the ${n(mit)} of ${n(last.dienste_cdp)} services in this scan that have them.
+          The largest single service is ${n(last.groesster_aufrufe ?? 0)} calls,
+          ${last.groesster_anteil}% of everything, and on 20 September that same service sat in the
+          directory with its demand fields empty. The totals are one day's reading of a trailing
+          30-day window and not a running count, so they move both ways: ${bewegung}.</span></span>
           <a href="https://github.com/matthiashippe/control-plane/tree/main/docs/research/data">check it</a>
         </div>
       </div>

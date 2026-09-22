@@ -73,6 +73,34 @@ describe("the direction of a number that moves", () => {
   });
 });
 
+describe("what the totals did since the scan before", () => {
+  /**
+   * The page called its totals "a floor, not a count" while its own table showed them falling.
+   *
+   * On 2026-09-22 the series read 490,044 / 867,813 / 802,808 calls: a drop of 7.5 per cent in a
+   * day, three lines under a sentence saying the numbers could only be too low. Coinbase's demand
+   * figure is a trailing 30-day window, so it falls whenever the days leaving the back outweigh
+   * the days arriving at the front. The page prints the movement now, and printing it is the only
+   * way it cannot contradict the table.
+   */
+  it("prints the movement instead of asserting a direction", () => {
+    const punkt = (stichtag: string, aufrufe: number) => ({ ...PUNKT, stichtag, aufrufe_30d: aufrufe });
+
+    const gefallen = renderX402([punkt("2026-09-21T04:40:00Z", 867813), punkt("2026-09-22T04:40:00Z", 802808)]);
+    expect(gefallen.replace(/\s+/g, " ")).toContain("802,808 calls today against 867,813 on 2026-09-21");
+    expect(gefallen, "the claim that could only ever be too low is gone").not.toContain("floor, not a count");
+
+    const gestiegen = renderX402([punkt("2026-09-21T04:40:00Z", 490044), punkt("2026-09-22T04:40:00Z", 867813)]);
+    expect(gestiegen.replace(/\s+/g, " ")).toContain("867,813 calls today against 490,044 on 2026-09-21");
+
+    const gleich = renderX402([punkt("2026-09-21T04:40:00Z", 500), punkt("2026-09-22T04:40:00Z", 500)]);
+    expect(gleich.replace(/\s+/g, " "), "no movement is also a reading").toContain("unchanged since 2026-09-21");
+
+    const allein = renderX402([punkt("2026-09-22T04:40:00Z", 802808)]);
+    expect(allein.replace(/\s+/g, " "), "one point is no series").toContain("one scan is a reading, not a series");
+  });
+});
+
 describe("/x402", () => {
   it("leads with the numbers a reader came for", async () => {
     const path = withSeries([{ ...PUNKT, stichtag: "2026-09-20T10:24:18Z", aufrufe_30d: 490044, anteil_top10: 58.75 }, PUNKT]);
@@ -87,8 +115,16 @@ describe("/x402", () => {
       expect(html, "10561 / (15192 - 65)").toContain("69.8%");
       // Both scans are in the table, newest first.
       expect(html.indexOf("2026-09-21")).toBeLessThan(html.indexOf("2026-09-20"));
-      // And the finding that makes every total a floor.
-      expect(html).toContain("floor, not a count");
+      // And what the late filling really costs: coverage, not a floor. The page claimed the
+      // totals were "a floor, not a count" while its own table showed them falling by 7.5 per
+      // cent in a day. A trailing 30-day window drops whenever the days leaving the back outweigh
+      // the days arriving at the front, which is not evidence about late filling at all.
+      expect(html, "what the missing fields actually cost is coverage").toMatch(
+        /covers only the [\d,]+ of [\d,]+ services/,
+      );
+      expect(html.replace(/\s+/g, " "), "and the window is named as a window").toContain(
+        "one day's reading of a trailing 30-day window",
+      );
       expect(html, "the raw data has to be one click away or the page is a claim").toContain("docs/research/data");
     } finally {
       delete process.env.CP_X402_SERIES;
