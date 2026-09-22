@@ -763,8 +763,30 @@ export function createApp(opts: AppOptions) {
    * Search engines may read everything. The file exists anyway, because its absence costs every
    * crawler a 404 and because it is the place where a later restriction would go.
    */
+  /**
+   * Search engines may read the pages and not the API.
+   *
+   * Since 2026-09-22 a /v1/ path answers a browser with a page instead of an object, and Googlebot
+   * sends `Accept: text/html`. Measured the same day: `GET /v1/credits/history` as Googlebot
+   * returns 401 with `content-type: text/html`. The `X-Robots-Tag: noindex` on that answer keeps
+   * it out of the index, but the crawl happens first, and `Allow: /` was an invitation to walk
+   * every documented API path for a page that says the same thing each time.
+   *
+   * `/v1/status` is the exception and has to stay allowed: the inline script fetches it while the
+   * page renders, and Google is explicit that a resource needed for rendering must not be blocked.
+   * Blocking it would cost the crawler the live figures it came for. The depth pixels stay allowed
+   * for the same reason, and a crawler that takes them is filtered out as a renderer anyway.
+   */
   app.get("/robots.txt", (c) =>
-    c.text("User-agent: *\nAllow: /\nSitemap: https://cp.hippe.eu/sitemap.xml\n", 200, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "public, max-age=86400" }),
+    c.text(
+      "User-agent: *\n" +
+        "Allow: /\n" +
+        "Disallow: /v1/\n" +
+        "Allow: /v1/status\n" +
+        "Sitemap: https://cp.hippe.eu/sitemap.xml\n",
+      200,
+      { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "public, max-age=86400" },
+    ),
   );
 
   app.get("/favicon.ico", (c) => c.body(FAVICON, 200, { "Content-Type": "image/svg+xml", "Cache-Control": "public, max-age=86400" }));
