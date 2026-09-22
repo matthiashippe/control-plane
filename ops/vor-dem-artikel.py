@@ -265,6 +265,39 @@ def main() -> int:
     # It does not: src/setup/configure.ts assigns the chosen model to both. The trap is a
     # hand-edited automaton.json. docs/without-control-plane.md had it right since 21.09. and
     # nothing held the short version against the long one until an adversarial read did.
+    # 4c-ter. The thirty-day window, per version.
+    #
+    # This is the sentence B4 was about, and on 2026-09-22 fixing it caught only half the house:
+    # the post-ready copy got the right figures, artikel-zahlen.py stopped using a stale cut, the
+    # data README was corrected, and docs/artikel-agentenoekonomie.md kept saying "45 wallets sent
+    # 435 USDC in 105 transfers" for another four hours. Every check here searched the joined text,
+    # and one correct copy is enough to satisfy a search. So this one runs per version, and it
+    # recomputes rather than comparing to a number written here.
+    import csv as _csv
+
+    zeilen = list(_csv.DictReader(open("docs/research/data/2026-09-19-conway-payto-transfers.csv")))
+    ende = max(z["timestamp_utc"] for z in zeilen)
+    grenze = (
+        datetime.datetime.fromisoformat(ende.replace("Z", "+00:00")) - datetime.timedelta(days=30)
+    ).strftime("%Y-%m-%dT%H:%M:%SZ")
+    fenster = [z for z in zeilen if z["timestamp_utc"] >= grenze]
+    w_usdc = sum(float(z["usdc"]) for z in fenster)
+    w_wallets = len({z["from"] for z in fenster})
+    for quelle, fassung in fassungen_fliess:
+        m = re.search(r"(\d+) wallets sent ([\d.]+) USDC in (\d+) transfers", fassung)
+        if not m:
+            continue
+        gesagt = (zahl(m.group(1)), float(m.group(2)), zahl(m.group(3)))
+        echt = (w_wallets, round(w_usdc, 2), len(fenster))
+        if gesagt == echt or (gesagt[0], round(gesagt[1]), gesagt[2]) == (echt[0], round(echt[1]), echt[2]):
+            ok(f"the 30-day window in {quelle.name} matches the transfer list",
+               f"{echt[0]} wallets, {echt[1]} USDC, {echt[2]} transfers")
+        else:
+            aendern(f"{quelle.name} says {gesagt[0]} wallets, {gesagt[1]} USDC, {gesagt[2]} transfers "
+                    f"in the last 30 days, and the published CSV gives {echt[0]}, {echt[1]}, {echt[2]}",
+                    "the window runs from the last row of the file; a hardcoded cut ages into the "
+                    "wrong day, which is what B4 was")
+
     # 4c-quater. Which model the sentence names, and whether it says when.
     #
     # "then the runtime keeps routing to gpt-5-mini" was right for the Ollama route and wrong for

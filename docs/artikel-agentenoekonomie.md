@@ -76,7 +76,7 @@ whole dataset paid exactly once and never again. Whatever the product did after 
 it did not make people spend a second 5 USDC.
 
 **A small group still pays into a system that cannot deliver.** In the last 30 days of the scan,
-45 wallets sent 435 USDC in 105 transfers. That is well over two payments per wallet, which fits an
+44 wallets sent 430.05 USDC in 104 transfers. That is well over two payments per wallet, which fits an
 open issue about retry-driven duplicate topups: a failed payment gets retried with a fresh nonce
 and the second one settles too. The onboarding has been broken since July. The last commit to the
 repository was in August and only touched the README. No maintainer has answered an issue since
