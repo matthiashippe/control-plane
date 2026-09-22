@@ -113,11 +113,16 @@ run --undetermined-on 2 "conway still broken" ./ops/conway-zustand.sh
 
 run "market guards" env CP_URL="$BASE" pnpm -s tsx harness/e2e/markt.ts
 run "journeys match the service" ./ops/check-journeys.sh
-run "pages say nothing obviously wrong" ./ops/check-pages.sh
+run --undetermined-on 2 "pages say nothing obviously wrong" ./ops/check-pages.sh
 # Added 2026-09-21. The three series below were printed by this script and never checked, so a cron
 # entry that stops firing would leave the same last point in every cycle's output and this script
 # would keep saying ALL CHECKS OK next to it.
-run "every class on every page has a rule" ./ops/check-classes.py
+run --undetermined-on 2 "every class on every page has a rule" ./ops/check-classes.py
+# Added 2026-09-23, the day a measurement first existed. Two pages pushed 26 px past the edge of a
+# 320 px phone and had done so for as long as they existed; twelve of the sixty foreign addresses
+# in the log carry a phone user agent. Exit 2 when there is no Chrome, so a machine without one
+# reports "could not tell" rather than a failure.
+run --undetermined-on 2 "it fits a small phone" ./ops/phone.sh --quick
 run "the daily jobs still ran" ./ops/freshness.sh
 
 # What we say about somebody else's code, held against their code.

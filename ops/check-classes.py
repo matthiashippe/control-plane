@@ -41,7 +41,29 @@ import sys
 import urllib.error
 import urllib.request
 
-PAGES = ["/", "/post", "/terms", "/jobs", "/receipts", "/x402", "/conway"]
+def pages_from_sitemap(base: str) -> list[str]:
+    """Which pages to check, asked of the service instead of kept here.
+
+    This array used to be seven paths and had lost two of them: /fix was never added, and /check
+    shipped on 2026-09-22 while three separate hand-kept lists across this repo stayed at their old
+    length. A class with no rule on the newest page is exactly the thing this script exists to
+    catch, and it could not see the page.
+
+    An empty or improbably short list raises rather than silently checking nothing.
+    """
+    try:
+        xml = fetch(base + "/sitemap.xml")
+    except Exception as e:  # noqa: BLE001 - any failure here means the list is unknown, not empty
+        print(f"COULD NOT TELL: the sitemap at {base} was not readable: {e}", file=sys.stderr)
+        raise SystemExit(2)
+    paths = [m or "/" for m in re.findall(r"<loc>" + re.escape(base) + r"([^<]*)</loc>", xml)]
+    if len(paths) < 5:
+        print(
+            f"COULD NOT TELL: the sitemap named {len(paths)} page(s), too few to be the real list.",
+            file=sys.stderr,
+        )
+        raise SystemExit(2)
+    return paths
 
 
 
@@ -54,7 +76,7 @@ def fetch(url: str) -> str:
 def main() -> int:
     base = (sys.argv[1] if len(sys.argv) > 1 else "https://cp.hippe.eu").rstrip("/")
     failures = 0
-    for path in PAGES:
+    for path in pages_from_sitemap(base):
         try:
             html = fetch(base + path)
         except (urllib.error.URLError, TimeoutError) as e:

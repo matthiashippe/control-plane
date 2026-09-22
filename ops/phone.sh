@@ -14,7 +14,8 @@
 # It also needs --allow-file-access-from-files to read into the frame, and a timer rather than the
 # frame's load event, which does not fire reliably here.
 #
-#   ops/phone.sh                  the landing page, /check and /fix at 320, 390 and 430
+#   ops/phone.sh                  six pages at 320, 390 and 430
+#   ops/phone.sh --quick          four pages at 320 only, for ops/check-all.sh
 #   ops/phone.sh 390 /terms       one width, one path
 #   ops/phone.sh --selftest       proves it catches an overflow that is really there
 #
@@ -102,7 +103,20 @@ HTML
   exit 0
 fi
 
-if [[ -n "${1:-}" ]]; then
+# Chrome is not on every machine this repo runs from, and a check that fails because a browser is
+# missing is noise, not a finding. Exit 2 is "could not tell", which ops/check-all.sh reports
+# separately from a failure.
+if [[ ! -x "$CHROME" ]]; then
+  echo "COULD NOT TELL: no Chrome at $CHROME. Set CHROME_BIN." >&2
+  exit 2
+fi
+
+if [[ "${1:-}" == "--quick" ]]; then
+  # For ops/check-all.sh: the narrowest width, which is where everything has broken so far, and the
+  # pages a stranger actually opens. Eighteen runs take two minutes and that is too long to sit in
+  # a check somebody runs every cycle.
+  WIDTHS=(320); PATHS=(/ /check /fix /post)
+elif [[ -n "${1:-}" ]]; then
   WIDTHS=("$1"); PATHS=("${2:-/}")
 else
   WIDTHS=(320 390 430); PATHS=(/ /check /fix /post /jobs /terms)

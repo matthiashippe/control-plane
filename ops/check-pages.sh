@@ -17,8 +17,24 @@ failures=0
 ok()   { echo "ok      $1"; }
 bad()  { failures=$((failures+1)); echo "FAILED  $1"; [[ -n "${2:-}" ]] && echo "        $2"; }
 
-# One list, used by both loops below. Two literals would drift the day a page is added.
-PAGES=(/ /post /terms /jobs /receipts /x402 /conway /fix)
+# The list comes from the service, not from this file. "Two literals would drift the day a page is
+# added" is what the old comment here said about keeping one array instead of two, and on
+# 2026-09-23 the array itself drifted: /check shipped and three separate hand-kept lists, this one
+# among them, did not grow. The sitemap is the service's own answer to which pages are meant to be
+# found, and test/sitemap-covers-pages.test.ts holds it to the routes from both sides.
+#
+# An empty list is a failure and not an empty run: a check that silently verifies nothing is worse
+# than one that is missing.
+# `while read` and not `mapfile`: this repo runs on the bash macOS ships, which is 3.2 and has no
+# mapfile at all. The first version failed with "command not found" and then "unbound variable".
+PAGES=()
+while IFS= read -r line; do
+  [[ -n "$line" ]] && PAGES+=("$line")
+done < <(curl -s -m 15 "$BASE/sitemap.xml" | grep -oE '<loc>[^<]*' | sed "s|<loc>$BASE||" | sed 's|^$|/|')
+if (( ${#PAGES[@]} < 5 )); then
+  echo "COULD NOT TELL: the sitemap named ${#PAGES[@]} page(s), which is too few to be the real list." >&2
+  exit 2
+fi
 
 for path in "${PAGES[@]}"; do
   response=$(curl -s -m 15 -w '\n%{http_code}\n%{content_type}' "$BASE$path" 2>/dev/null)
