@@ -121,17 +121,30 @@ def pruefe(rev: str) -> int:
     tasks = q["src/heartbeat/tasks.ts"]
     hat_schwelle = re.search(r"MIN_TOPUP_USD = 5\b", tasks)
     hat_cooldown = re.search(r"AUTO_TOPUP_COOLDOWN_MS = 5 \* 60 \* 1000", tasks)
-    hat_bedingung = re.search(r"balance >= MIN_TOPUP_USD && \(ctx\.survivalTier === \"critical\"", tasks)
+    # The whole condition, both halves of it.
+    #
+    # This pattern stopped at `=== "critical"` until 2026-09-22 and therefore could never go red
+    # for the claim it was there to protect. /fix, /conway and the article all said the heartbeat
+    # buys because the failed balance call resolves to `critical`, and the line it was reading is
+    # `if (balance >= MIN_TOPUP_USD && (ctx.survivalTier === "critical" || ctx.survivalTier ===
+    # "dead"))`. The runtime buys on either tier, so which tier the failure resolves to changes
+    # nothing, and the check was cut exactly short of the half that says so. An adversarial read
+    # found it (B6): a check that cannot fail for its own claim is decoration.
+    hat_bedingung = re.search(
+        r"balance >= MIN_TOPUP_USD && \(ctx\.survivalTier === \"critical\"\s*\|\|\s*"
+        r"ctx\.survivalTier === \"dead\"\)",
+        tasks,
+    )
     if hat_schwelle and hat_cooldown and hat_bedingung:
-        ok("it retries every five minutes while the wallet holds 5 USDC",
-           "src/heartbeat/tasks.ts: MIN_TOPUP_USD, AUTO_TOPUP_COOLDOWN_MS and the tier condition")
+        ok("it buys on critical and on dead alike, every five minutes while the wallet holds 5 USDC",
+           "src/heartbeat/tasks.ts: MIN_TOPUP_USD, AUTO_TOPUP_COOLDOWN_MS and both halves of the tier condition")
     else:
         fehlt = [n for n, t in [("the 5 USDC threshold", hat_schwelle),
                                 ("the five minute cooldown", hat_cooldown),
                                 ("the tier condition", hat_bedingung)] if not t]
         falsch(f"the heartbeat's topup changed: {', '.join(fehlt)} not found",
-               "both /fix and the article say 'again every five minutes for as long as the wallet "
-               "holds 5 USDC'")
+               "/fix and /conway both say it buys on critical and on dead alike, again every five "
+               "minutes for as long as the wallet holds 5 USDC")
 
     # 7. The wizard copies the top-level model down, so the trap is hand-editing and not the wizard.
     #

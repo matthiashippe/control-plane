@@ -96,6 +96,18 @@ run "pages say nothing obviously wrong" ./ops/seiten-pruefen.sh
 run "every class on every page has a rule" ./ops/klassen-pruefen.py
 run "the daily jobs still ran" ./ops/freshness.sh
 
+# What we say about somebody else's code, held against their code.
+#
+# Seven claims about the Conway runtime, checked at the pin and on main. It is the check that
+# would have caught B3, B6 and B7 in the adversarial read of 2026-09-22, and it ran only when
+# somebody remembered it: no script called it, and its own docstring named a signal ("a new push
+# there") that nothing was wired to. A check that runs when somebody thinks of it does not run.
+#
+# Undetermined rather than red when GitHub cannot be reached: it exits 2 for an unreachable file,
+# and a rate limit at api.github.com is not a finding about our claims. Same rule as Conway's
+# sign-up, for the same reason.
+run --unklar-bei 2 "our claims about the runtime hold" python3 ./ops/upstream-claims.py
+
 if (( DEEP )); then
   run "MCP route end to end" env CP_URL="$BASE" OPERATOR_WALLET="${OPERATOR_WALLET:-harness/state/mainnet-wallet.json}" pnpm -s tsx ops/mcp-against-production.ts \
     && touch "$STAMPS/mcp-production"

@@ -51,8 +51,9 @@ GET  https://api.conway.tech/pay/5/&lt;address&gt;  -&gt; 402, a payable demand 
           <span class="w">A failed balance call is handled three ways upstream and two of them
           spend. The thinking path substitutes <code>-1</code>, resolves to tier <code>dead</code>
           and refuses to spend a token. The startup path substitutes <code>0</code> and buys. The
-          heartbeat substitutes <code>0</code>, reads that as <code>critical</code>, and buys again
-          every five minutes for as long as the wallet holds 5 USDC. Only the fallback that costs
+          heartbeat substitutes <code>0</code> and buys again every five minutes for as long as the
+          wallet holds 5 USDC, and its condition is <code>critical</code> or <code>dead</code>, so
+          which tier the failure resolves to changes nothing. Only the fallback that costs
           nothing refuses to act. Move the USDC out of the wallet, or point the runtime at an
           address that cannot answer, so the payment call never connects.</span></span>
           <a href="/conway">what is still being paid in</a>

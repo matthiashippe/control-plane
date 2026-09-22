@@ -199,7 +199,7 @@ export function renderConway(points: MoneyPoint[], receipts: Receipt[]): string 
         </div>
         <div>
           <span><b>The runtime pays ${usd(5)} at every start, and again every five minutes</b>
-          <span class="w">A failed balance call is handled three ways upstream. The thinking path substitutes <code>-1</code>, resolves to tier <code>dead</code> and stops. The startup path substitutes <code>0</code> and buys. The heartbeat substitutes <code>0</code>, reads that as <code>critical</code>, and buys again every five minutes for as long as the wallet holds ${usd(5)}. Only the fallback that costs nothing refuses to act.</span></span>
+          <span class="w">A failed balance call is handled three ways upstream. The thinking path substitutes <code>-1</code>, resolves to tier <code>dead</code> and stops. The startup path substitutes <code>0</code> and buys. The heartbeat substitutes <code>0</code> and buys again every five minutes for as long as the wallet holds ${usd(5)}; its condition is <code>critical</code> or <code>dead</code>, so which tier the failure resolves to changes nothing. Only the fallback that costs nothing refuses to act.</span></span>
           <a href="https://github.com/matthiashippe/control-plane/blob/main/docs/without-control-plane.md">what to do instead</a>
         </div>
         <div>
