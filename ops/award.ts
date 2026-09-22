@@ -132,12 +132,26 @@ async function main(): Promise<void> {
   }
 
   const before = ((await call("/v1/credits/balance", key)) as { balance_cents: number }).balance_cents;
+  // `bountyView` in src/app.ts is what comes back: id, kind, brief, price_cents, award_cents,
+  // fee_percent, deadline, status, created_at, plus winner_submission. No fee_cents, so nothing
+  // here may print one.
   const awarded = (await call("/v1/bounties/award", key, {
     method: "POST", body: JSON.stringify({ bounty_id: bountyId, submission_id: gewinner }),
-  })) as { status: string; award_cents: number; fee_cents?: number };
+  })) as { status: string; award_cents: number; winner_submission: string };
   const after = ((await call("/v1/credits/balance", key)) as { balance_cents: number }).balance_cents;
-  console.log(`awarded ${gewinner}, status ${awarded.status}`);
-  console.log(`        buyer ${before} c -> ${after} c, which is 0 because the price was already held`);
+
+  console.log(`awarded ${gewinner}, status ${awarded.status}, ${awarded.award_cents} c to the winner`);
+  if (awarded.winner_submission !== gewinner) {
+    console.log(`WARNING the service recorded ${awarded.winner_submission} as the winner, not the one asked for`);
+  }
+  // The buyer's balance must not move: the price left it when the job was posted. Checked rather
+  // than asserted, because a difference here would mean the money moved twice.
+  if (before === after) {
+    console.log(`        buyer unchanged at ${before} c, because the price was held at posting`);
+  } else {
+    console.log(`WARNING buyer went ${before} c -> ${after} c. The price was already held when the`);
+    console.log(`        job was posted, so an award should move nothing on this side.`);
+  }
   console.log(`        the receipt is public at ${BASE}/receipts#${bountyId}`);
 }
 
