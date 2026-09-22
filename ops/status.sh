@@ -9,6 +9,20 @@ HOSTNAME_ONLY="${CP_URL#https://}"
 DIR="$(cd "$(dirname "$0")" && pwd)"
 SSH=(ssh -i "$KEY" -o BatchMode=yes -o ConnectTimeout=10 "$HOST")
 
+# What counts as an error in the log, in one place, because a test reads this line and checks it
+# against what the service actually writes.
+#
+# It used to be "provider_unavailable|settlement_failed|internal_error", and "internal_error" is
+# the word in the RESPONSE body of a 500, never in the log. app.onError writes
+# `[app] <method> <path>: <stack>`, so a 500 whose stack does not happen to contain that word was
+# not counted, which is every 500. The counter could only ever report zero for the one class of
+# failure it exists to report. It has reported zero for three days, and there really were none:
+# zero `[app]` lines in seven days. A number that is right by luck is not a measurement.
+# An extended regular expression: grep gets -E below, because without it the pipe is a literal
+# character and the whole pattern matches nothing at all. That is the same blindness in a
+# different disguise, and it is why the pattern and the -E live next to each other.
+CP_FEHLERMUSTER="${CP_FEHLERMUSTER:-\[app\] |provider_unavailable|settlement_failed}"
+
 health_code=$(curl -s -m 10 -o /tmp/cp-health.$$ -w '%{http_code}' "$CP_URL/health" 2>/dev/null || echo 000)
 health_body=$(cat /tmp/cp-health.$$ 2>/dev/null); rm -f /tmp/cp-health.$$
 cert_end=$(echo | openssl s_client -servername "$HOSTNAME_ONLY" -connect "$HOSTNAME_ONLY:443" 2>/dev/null | openssl x509 -noout -enddate 2>/dev/null | cut -d= -f2)
@@ -17,7 +31,7 @@ vm_stats=$("${SSH[@]}" 'cd /opt/control-plane/repo/deploy && printf "%s|%s|%s|%s
   "$(df -h / | awk "NR==2{print \$5}")" \
   "$(free -m | awk "NR==2{printf \"%d/%d\", \$3, \$2}")" \
   "$(docker inspect deploy-cp-1 --format "{{.RestartCount}}" 2>/dev/null || echo -1)" \
-  "$(docker compose -f docker-compose.prod.yml logs --since 24h cp 2>/dev/null | grep -ci "provider_unavailable\|settlement_failed\|internal_error" | head -1)"' 2>/dev/null)
+  "$(docker compose -f docker-compose.prod.yml logs --since 24h cp 2>/dev/null | grep -ciE "'"$CP_FEHLERMUSTER"'" | head -1)"' 2>/dev/null)
 db_json=$("${SSH[@]}" 'cd /opt/control-plane/repo/deploy && docker compose -f docker-compose.prod.yml exec -T cp node -' < "$DIR/db-report.cjs" 2>/dev/null)
 or_json=$(curl -s -m 10 https://openrouter.ai/api/v1/credits -H "Authorization: Bearer ${OPENROUTER_API_KEY:-none}" 2>/dev/null)
 payto_hex=$(curl -s -m 10 -X POST https://mainnet.base.org -H 'content-type: application/json' \
