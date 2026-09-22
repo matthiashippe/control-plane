@@ -44,6 +44,11 @@ MUTATIONEN=(
   "src/bounties/receipts.ts::everything is published::const published = meins || submittedMs >= PUBLICATION_FROM_MS;::const published = true;"
   "src/bounties/ours.ts::nothing counts as ours::  const found = new Set(OUR_ADDRESSES.filter((a) => wanted.includes(a)));::  const found = new Set<string>();"
   "src/credits/starter.ts::the pool has no floor::  if (left < GRANT_MC) return null;::  if (false) return null;"
+  "src/check/fabrication.ts::a quote nobody wrote still counts::    if (!quote || !kind || !haystack.includes(normalise(quote))) {::    if (false) {"
+  "src/check/fabrication.ts::the check finds nothing at all::  if (!Array.isArray(list)) return { findings: [], discarded: 0 };::  if (true) return { findings: [], discarded: 0 };"
+  "src/inference/proxy.ts::the markup is dropped::export const MARKUP = 1.3;::export const MARKUP = 1.0;"
+  "src/bounties/brief.ts::the brief check finds nothing::export function reviewBrief(brief: string, kind: \"factual\" | \"creative\"): BriefFinding[] {::export function reviewBrief(brief: string, kind: \"factual\" | \"creative\"): BriefFinding[] { if (brief) return [];"
+  "src/bounties/store.ts::an expired job keeps the money::    .prepare(\"UPDATE bounties SET status = 'expired', closed_at = ? WHERE id = ? AND status = 'open'\")::    .prepare(\"UPDATE bounties SET status = 'expired', closed_at = ? WHERE id = ? AND status = 'awarded'\")"
 )
 
 # One run, numbers read from the JSON reporter rather than scraped off the summary line. The
