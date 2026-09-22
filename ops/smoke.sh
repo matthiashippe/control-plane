@@ -470,6 +470,17 @@ if ((WITH_RATELIMIT)); then
     else
       fail "rate limit: with a forged X-Forwarded-For the same address gets $gefaelscht instead of 429. A caller can pick their own bucket, so one visitor can spend another's limit."
     fi
+
+    # Sit out the lockout instead of handing it on.
+    #
+    # On 2026-09-22 this run killed the next check: ops/check-all.sh reported "market guards exit
+    # 2" because harness/e2e/markt.ts walked /v1/* straight afterwards and got 429. The header of
+    # this script has warned about that from the start, and a warning nobody enforces is a
+    # request. So the run waits out the window it opened.
+    if [[ "$retry" =~ ^[0-9]+$ ]] && ((retry > 0 && retry <= 60)); then
+      echo "$C_GREY        waiting ${retry}s for the window to close, so the next tool is not locked out$C_OFF"
+      sleep "$retry"
+    fi
   fi
 else
   skipped "rate limit: only with --with-ratelimit, because the test locks the caller out for a minute"
