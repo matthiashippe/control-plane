@@ -154,7 +154,11 @@ describe("authentication: the Conway wording stays, the way stands next to it", 
     expect(res.status).toBe(401);
     const body = await expectError(res, "Invalid API key");
     expect(body.message).toContain("cnwy_k_");
-    expect(body.message).toMatch(/without the Bearer prefix/);
+    // Said "without the Bearer prefix" until 2026-09-22, and this test held it there while
+    // resolveApiKey accepted both forms all along. The message has to name the way in, not a
+    // prefix that was never the problem.
+    expect(body.message).toMatch(/raw or with the Bearer prefix/);
+    expect(body.message).toMatch(/automaton --provision/);
     expect(body.message).toContain("automaton --provision");
     expect(body.docs).toContain("#authentication");
   });
@@ -728,5 +732,52 @@ describe("the self-description names its own base", () => {
     expect(body.base_url).toBe("https://cp.hippe.eu");
     // The paths stay relative: base_url put in front gives exactly one valid URL.
     expect(body.base_url + body.endpoints.models).toBe("https://cp.hippe.eu/v1/models");
+  });
+});
+
+/**
+ * What the 401 says about the Bearer prefix has to be what the code does about it.
+ *
+ * `resolveApiKey` has accepted both forms since it was written, and until 2026-09-22 the 401 said
+ * the key goes "raw in the Authorization header, without the Bearer prefix". Every OpenAI-compatible
+ * SDK sends Bearer and cannot be told not to, so a caller who had done nothing wrong read that they
+ * had, and went to rebuild their client instead of looking at their key. Same shape as the joined
+ * base URL above: the answer was about the wrong thing, so the time went into the wrong place. One
+ * address spent 32 hours in that loop.
+ */
+describe("the key formats the message names are the key formats that work", () => {
+  const schluessel = (db: Db, address: Address): string => {
+    const key = `cnwy_k_${"ab".repeat(16)}`;
+    db.prepare("INSERT INTO wallets (address, balance_mc, created_at) VALUES (?, 0, ?)").run(
+      address,
+      new Date().toISOString(),
+    );
+    db.prepare(
+      "INSERT INTO api_keys (address, key_hash, key_prefix, name, created_at) VALUES (?, ?, ?, ?, ?)",
+    ).run(address, hashApiKey(key), key.slice(0, 15), "test", new Date().toISOString());
+    return key;
+  };
+
+  it.each(["raw", "Bearer"] as const)("accepts a valid key sent %s", async (wie) => {
+    const db = openDb(":memory:");
+    const app = createApp({ db });
+    const address = "0x1111111111111111111111111111111111111111" as Address;
+    const key = schluessel(db, address);
+    const res = await app.request("/v1/credits/balance", {
+      headers: { authorization: wie === "raw" ? key : `Bearer ${key}` },
+    });
+    expect(res.status, `a valid key sent ${wie} has to be a valid key`).toBe(200);
+  });
+
+  it("does not blame the Bearer prefix, because the prefix is fine", async () => {
+    const db = openDb(":memory:");
+    const app = createApp({ db });
+    const res = await app.request("/v1/credits/balance", {
+      headers: { authorization: "Bearer cnwy_k_nope" },
+    });
+    expect(res.status).toBe(401);
+    const body = (await res.json()) as { message: string };
+    expect(body.message, "it must not tell them to drop a prefix that works").not.toMatch(/without the Bearer/i);
+    expect(body.message, "and it has to say what is actually wrong").toMatch(/no key|not a key/i);
   });
 });

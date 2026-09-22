@@ -974,9 +974,9 @@ export function createApp(opts: AppOptions) {
       throw new AuthError(
         401,
         "Bearer token required",
-        "This call needs the short-lived access_token from POST /v1/auth/verify, sent as " +
-          "`Authorization: Bearer <access_token>`. The API key it returns is sent raw on /v1/* " +
-          "calls, without the Bearer prefix.",
+          "This call needs the short-lived access_token from POST /v1/auth/verify, sent as " +
+            "`Authorization: Bearer <access_token>`. The API key it returns goes on /v1/* " +
+            "calls, raw or with the Bearer prefix; both are accepted.",
       );
     }
     const body = (await c.req.json().catch(() => ({}))) as { name?: string };
@@ -1046,10 +1046,11 @@ export function createApp(opts: AppOptions) {
       throw new AuthError(
         401,
         "Invalid API key",
-        "Send the control plane API key (cnwy_k_...) raw in the Authorization header, without " +
-          "the Bearer prefix. A key from another control plane does not work here: get one with " +
-          "`automaton --provision` against this instance, or walk the three auth endpoints " +
-          "yourself (nonce, verify, api-keys).",
+        "Send the control plane API key (cnwy_k_...) in the Authorization header, raw or with " +
+          "the Bearer prefix; both work, so the prefix is not what is wrong here. Either this " +
+          "request carries no key, or it is not a key of this control plane: one from another " +
+          "instance does not work. Get one with `automaton --provision` against this instance, " +
+          "or walk the three auth endpoints yourself (nonce, verify, api-keys).",
       );
     }
     c.set("address", address);
