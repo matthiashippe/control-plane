@@ -308,6 +308,54 @@ export function createApp(opts: AppOptions) {
     }
     return null;
   };
+  /**
+   * Four one-pixel images that say how far down the page a reader got.
+   *
+   * `ops/verkehr.sh` has said "0 of 11 who opened the page went on to a second one" for days, and
+   * under it, honestly, "anchor links leave no log line, so this is a floor, not a verdict". That
+   * is the whole problem: since the rebuild the only in-page navigation is anchors, so the
+   * measurement cannot tell somebody who read the page and left from somebody who bounced at the
+   * fold. Those two readings call for opposite work. One says move the argument up or cut it, the
+   * other says the argument is read and the offer is what fails.
+   *
+   * No script is possible here: the CSP pins one inline script by hash and deploy/ is not touched
+   * without a human. `loading="lazy"` needs none. A browser defers a lazy image until it comes
+   * near the viewport, so a request for /px/close.png is a reader who got to the last screen.
+   *
+   * `/px/top.png` is the control and the reason this is a measurement rather than a hope. It sits
+   * in the first screen and is lazy too, so a browser that simply fetches every lazy image at once
+   * fires it together with the others, and `ops/tiefe.sh` then says the signal is worthless
+   * instead of reporting a scroll that never happened.
+   *
+   * Nothing new is stored. The request lands in the same access log every page view already lands
+   * in, with no cookie, no identifier and no third party. `no-store`, because a cached pixel is a
+   * reader the count would lose.
+   *
+   * Unverified in a browser, deliberately, and with a date on it. In the Chrome this session
+   * drives, no `loading="lazy"` image loads at all: not these, not a plain 40x40 one in the middle
+   * of the viewport, while the identical image with `loading="eager"` loads instantly. That is
+   * this environment and not a property of the browsers strangers use, but it means the mechanism
+   * here rests on documented behaviour rather than on a measurement of our own, which is not how
+   * anything else in this repo is allowed to work.
+   *
+   * What makes shipping it defensible is the control: if lazy never fires in the wild either,
+   * `ops/tiefe.sh` prints NOT MEASURING and nobody is misled by a zero. So the deal is dated. If
+   * by 2026-09-24 browsers have loaded the page and no control pixel has arrived, the mechanism
+   * does not work and these four lines come out again.
+   */
+  const PIXEL = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+    "base64",
+  );
+  for (const marke of ["top", "proof", "market", "close"]) {
+    app.get(`/px/${marke}.png`, (c) =>
+      c.body(new Uint8Array(PIXEL), 200, {
+        "Content-Type": "image/png",
+        "Cache-Control": "no-store",
+      }),
+    );
+  }
+
   for (const name of ["og.png", "og-x402.png"]) {
     const bild = ogBild(name);
     if (bild) {

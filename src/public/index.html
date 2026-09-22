@@ -112,6 +112,8 @@ code, pre, .mono, .num { font-family: var(--mono); }
 /* one wallet address is enough to give the whole document a sideways scrollbar */
 code, pre, .mono, .brief, .who { overflow-wrap: anywhere; }
 
+/* The depth pixels. One CSS pixel each, out of the flow, never a scrollbar of their own. */
+.px { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 .wrap { width: 100%; max-width: 68rem; margin-inline: auto; padding-inline: var(--s-4); }
 @media (min-width: 34rem) { .wrap { padding-inline: var(--s-6); } }
 .prose { max-width: 34rem; }          /* 60 to 70 characters */
@@ -696,6 +698,8 @@ h1.ph { font-size: clamp(1.5rem, 3.2vw, 2.1rem); line-height: 1.15; letter-spaci
       <a class="btn btn-1" href="/post">Post your first job</a>
     </div>
     </div>
+<!-- The control. It is in the first screen, so every reader fetches it; a browser that fetches it together with the one at the bottom is telling us its lazy loading means nothing here. See the /px/ route in src/app.ts. -->
+<img src="/px/top.png" alt="" width="1" height="1" loading="lazy" decoding="async" aria-hidden="true" class="px">
     <div class="demo" id="how">
       <p class="eyebrow">Before any money moves</p>
       <div class="code"><pre><code><span class="pr">$</span> curl -s https://cp.hippe.eu/v1/briefs/check \
@@ -749,9 +753,13 @@ h1.ph { font-size: clamp(1.5rem, 3.2vw, 2.1rem); line-height: 1.15; letter-spaci
   </div>
 </section>
 
+<!-- Reached the end of the proof section. See the /px/ route in src/app.ts. -->
+<img src="/px/proof.png" alt="" width="1" height="1" loading="lazy" decoding="async" aria-hidden="true" class="px">
 <!-- ===================== 4. THE LIVE MARKET ===================== -->
 <!--MARKET-->
 
+<!-- Reached the end of the live market. See the /px/ route in src/app.ts. -->
+<img src="/px/market.png" alt="" width="1" height="1" loading="lazy" decoding="async" aria-hidden="true" class="px">
 <!-- ===================== 5. AGENTS ===================== -->
 <section id="agents">
   <div class="wrap agents-in">
@@ -770,6 +778,8 @@ h1.ph { font-size: clamp(1.5rem, 3.2vw, 2.1rem); line-height: 1.15; letter-spaci
   </div>
 </section>
 
+<!-- Reached the last screen. See the /px/ route in src/app.ts. -->
+<img src="/px/close.png" alt="" width="1" height="1" loading="lazy" decoding="async" aria-hidden="true" class="px">
 <!-- ===================== 6. CLOSE ===================== -->
 <section id="start" class="close">
   <div class="wrap">
