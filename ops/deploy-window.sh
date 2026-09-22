@@ -109,8 +109,8 @@ print(f"ours     {ours} request(s), the smoke test and the checks")
 # log was behind, and the script says so itself two lines further down.
 #
 # So the test is now `now < until`, and the newest entry is only reported as context. Set
-# CP_FENSTER_JETZT to an ISO timestamp to move the clock and check both directions.
-now_raw = os.environ.get("CP_FENSTER_JETZT", "")
+# CP_WINDOW_NOW to an ISO timestamp to move the clock and check both directions.
+now_raw = os.environ.get("CP_WINDOW_NOW", "")
 now = (
     datetime.datetime.fromisoformat(now_raw).replace(tzinfo=datetime.timezone.utc)
     if now_raw

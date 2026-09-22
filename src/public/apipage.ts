@@ -56,49 +56,49 @@ export function prefersHtml(accept: string | undefined): boolean {
 }
 
 /** The three sentences that differ per path, so the page answers the question that was asked. */
-function fuerPfad(pfad: string): { frage: string; antwort: string } {
-  if (pfad.startsWith("/v1/credits")) {
+function forPath(path: string): { question: string; answer: string } {
+  if (path.startsWith("/v1/credits")) {
     return {
-      frage: "You wanted to see what your agent has left.",
-      antwort:
+      question: "You wanted to see what your agent has left.",
+      answer:
         "That figure belongs to a key, not to a page, and this is the reason: an address is " +
         "public, it sits on every block explorer, and a balance readable from an address alone " +
         "would be readable by anybody who has ever seen yours.",
     };
   }
-  if (pfad.startsWith("/v1/bounties") || pfad.startsWith("/v1/submissions")) {
+  if (path.startsWith("/v1/bounties") || path.startsWith("/v1/submissions")) {
     return {
-      frage: "You wanted to see the jobs.",
-      antwort:
+      question: "You wanted to see the jobs.",
+      answer:
         "The open ones are on <a href=\"/jobs\">/jobs</a> and the finished ones on " +
         "<a href=\"/receipts\">/receipts</a>, both without a key. This path is the same thing " +
         "for a program, and it answers about your own jobs, which is why it wants one.",
     };
   }
   return {
-    frage: "You opened a path meant for a program.",
-    antwort:
+    question: "You opened a path meant for a program.",
+    answer:
       "It answers to a key in a header, and a browser does not send one, so it cannot reach you " +
       "here no matter how often you reload.",
   };
 }
 
 /**
- * @param pfad the path that was asked for, already known to be a `/v1/` route
+ * @param path the path that was asked for, already known to be a `/v1/` route
  * @param starterCents the standing offer, or null when the pool cannot fund another grant. Passed
  *        in rather than read here, because `starterOffer()` is the one place allowed to promise it
  *        and three pages already went out of date by promising it on their own.
  */
-export function renderApiPage(pfad: string, starterCents: number | null): string {
-  const { frage, antwort } = fuerPfad(pfad);
-  const p = esc(pfad);
+export function renderApiPage(path: string, starterCents: number | null): string {
+  const { question, answer } = forPath(path);
+  const p = esc(path);
   return `
   <section>
     <div class="wrap narrow">
       <p class="kicker">${p}</p>
       <h1 class="ph">Your browser cannot carry your key</h1>
       <p class="sub">
-        ${frage} ${antwort}
+        ${question} ${answer}
       </p>
       <p>
         Nothing is wrong with your account and nothing is wrong with your key. A browser sends no

@@ -52,7 +52,14 @@ log=$(mktemp); trap 'rm -f "$log"' EXIT
 # without changing a byte of what is read.
 #
 # The real answer is log rotation, and that lives in deploy/, which is not touched without a human.
-if ! timeout 45 ssh -i "$KEY" -o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=3 "$HOST" \
+# A planted log, so the evidence lines below can be proved in both directions. Every other
+# measuring tool here has one (CP_TIEFE_LOG, CP_SICHT_LOG, CP_FEHLERMUSTER, CP_FENSTER_JETZT) and
+# loop-constraints.md requires it of anything that can report "none": without a counter-proof a
+# zero is indistinguishable from blindness. Fixtures under ops/fixtures/.
+if [[ -n "${CP_VERKEHR_LOG:-}" ]]; then
+  cp "${CP_VERKEHR_LOG}" "$log"
+  echo "(log from ${CP_VERKEHR_LOG}, not from the VM)" >&2
+elif ! timeout 45 ssh -i "$KEY" -o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=3 "$HOST" \
   'docker exec deploy-caddy-1 cat /var/log/caddy/access.log | gzip -c' 2>/dev/null | gunzip > "$log"; then
   echo "FEHLER: das Zugriffslog war in 45 Sekunden nicht zu holen." >&2
   echo "        Das ist kein Befund ueber den Dienst. Pruefe ihn getrennt:" >&2
@@ -160,34 +167,104 @@ echo "-- Foreign referrers, and what the visit became --"
 ours=$(jq -r --argjson since "$since" --argjson own "$own_json" \
   "select(.ts > \$since) | select(.request.remote_ip as \$ip | (\$own | index(\$ip)) != null) | ((.request.headers.Referer // [\"-\"])[0])" "$log" \
   | grep -v '^-$' | grep -vc 'cp\.hippe\.eu' || true)
-jq -r --argjson since "$since" --argjson own "$own_json" \
-  "select(.ts > \$since) | $FOREIGN | [((.request.headers.Referer // [\"-\"])[0]), .request.remote_ip, .request.uri] | @tsv" "$log" \
-  | grep -v $'^-\t' | grep -v 'cp\.hippe\.eu' \
+# Every foreign request of the WHOLE log, not only the ones carrying a referrer and not only the
+# ones inside the window. The window decides which referrers are reported; the rest is the evidence
+# about the addresses behind them, and that evidence is worthless if it stops at the window edge.
+jq -r --argjson own "$own_json" \
+  "$FOREIGN | [(.ts|tostring), ((.request.headers.Referer // [\"-\"])[0]), .request.remote_ip, .request.uri, ((.request.headers[\"User-Agent\"] // [\"-\"])[0])] | @tsv" "$log" \
   | python3 -c '
 import sys, collections
-vonher = collections.defaultdict(lambda: collections.defaultdict(list))
-for zeile in sys.stdin:
-    teile = zeile.rstrip("\n").split("\t")
-    if len(teile) != 3:
+
+# A referrer is a string somebody put in a header, and a scanner can put anything there. On
+# 2026-09-22 at 18:57:39 an address arrived on /fix with `Referer: https://bing.com/`, which would
+# have been the first search referrer this project has seen. It was not one: the /24 behind it had sent six
+# addresses since 20.09., one to five requests each, always / then /v1/status, and 205.169.39.191
+# changed its Windows version between 02:17:36 and 02:17:39 from the same address. No browser does
+# that. Printed beside the github referrers with nothing to tell them apart, that line reads like a
+# channel, and a channel is what this section exists to find.
+#
+# So every address now carries what it did afterwards. None of these signals is proof on its own;
+# together they are the difference between somebody who arrived and somebody who scanned.
+window_start = float(sys.argv[1])
+seen = collections.defaultdict(
+    lambda: {"paths": [], "agents": set(), "agent_times": [], "pixel": False, "ran_script": False}
+)
+by_referrer = collections.defaultdict(lambda: collections.defaultdict(list))
+networks = collections.defaultdict(set)
+
+# A person uses more than one tool, and that is not a tell. The Korean operator on 2026-09-22 shows
+# up with three user agents from one address (node, curl, Safari) and went from curl to Safari
+# inside twenty-three seconds, which is what trying a thing in the terminal and then looking at it
+# in the browser looks like. Speed alone therefore marked the most valuable visitor this service
+# has had as a scanner, which is the wrong answer in the worst possible place.
+#
+# What no person does is arrive as one browser and come back as a different browser seconds later.
+# 205.169.39.191 did exactly that at 02:17:36 and 02:17:39, Windows NT 6.1 then NT 10.0, both
+# claiming to be Chrome. So the tell is two BROWSER identities in quick succession, not two tools.
+AGENT_SWAP_SECONDS = 60
+
+def swapped_browsers(stamped_agents):
+    browsers = sorted((t, a) for t, a in stamped_agents if "Mozilla/" in a)
+    for (t1, a1), (t2, a2) in zip(browsers, browsers[1:]):
+        if a1 != a2 and t2 - t1 < AGENT_SWAP_SECONDS:
+            return True
+    return False
+
+for line in sys.stdin:
+    parts = line.rstrip("\n").split("\t")
+    if len(parts) != 5:
         continue
-    ref, ip, pfad = teile
-    vonher[ref][ip].append(pfad)
-if not vonher:
+    stamp, referrer, ip, path, agent = parts
+    try:
+        stamp = float(stamp)
+    except ValueError:
+        continue
+    entry = seen[ip]
+    entry["paths"].append(path)
+    if agent and agent != "-":
+        entry["agents"].add(agent)
+        entry["agent_times"].append((stamp, agent))
+    if path.startswith("/px/"):
+        entry["pixel"] = True
+    # The inline script fetches /v1/status with the page as its referrer. Nothing else does, so
+    # this is the one line in the log that says a real engine ran the page rather than read it.
+    if path.startswith("/v1/status") and "cp.hippe.eu" in referrer:
+        entry["ran_script"] = True
+    networks[".".join(ip.split(".")[:3])].add(ip)
+    if stamp > window_start and referrer not in ("-", "") and "cp.hippe.eu" not in referrer:
+        by_referrer[referrer][ip].append(path)
+
+if not by_referrer:
     print("  none")
-for ref, ips in sorted(vonher.items(), key=lambda kv: -len(kv[1])):
-    print(f"  {ref}")
-    print(f"    {len(ips)} address(es)")
-    for ip, pfade in ips.items():
-        gesehen, reihe = set(), []
-        for pfad in pfade:
-            if pfad not in gesehen:
-                gesehen.add(pfad)
-                reihe.append(pfad)
-        weiter = [p for p in reihe if p != "/"]
-        marke = "  <-- went further" if weiter else ""
-        pfadkette = " -> ".join(reihe[:6])
-        print("    %-16s %s%s" % (ip, pfadkette, marke))
-' || true
+for referrer, addresses in sorted(by_referrer.items(), key=lambda kv: -len(kv[1])):
+    print(f"  {referrer}")
+    print(f"    {len(addresses)} address(es)")
+    for ip, paths in addresses.items():
+        known, ordered = set(), []
+        for path in paths:
+            if path not in known:
+                known.add(path)
+                ordered.append(path)
+        # More than one distinct path, not "a path other than /". An address whose single request
+        # lands on /fix has not gone anywhere, and on 2026-09-22 the scanner carrying a bing.com
+        # referrer was marked "went further" for exactly one request.
+        mark = "  <-- went further" if len(ordered) > 1 else ""
+        print("    %-16s %s%s" % (ip, " -> ".join(ordered[:6]), mark))
+        entry = seen[ip]
+        evidence = [str(len(entry["paths"])) + " request(s) all told"]
+        if entry["ran_script"]:
+            evidence.append("ran the page script")
+        if entry["pixel"]:
+            evidence.append("fetched a depth pixel")
+        if swapped_browsers(entry["agent_times"]):
+            evidence.append("changed browser identity within a minute, which no person does")
+        elif len(entry["agents"]) > 1:
+            evidence.append(str(len(entry["agents"])) + " tools from this one address over time")
+        siblings = networks[".".join(ip.split(".")[:3])]
+        if len(siblings) > 2:
+            evidence.append(str(len(siblings)) + " addresses from this /24 in the whole log")
+        print("                     " + ", ".join(evidence))
+' "$since" || true
 # `|| true`, not `|| echo "  none"`, and not nothing at all. The python above already prints "none"
 # when there is nothing to show, and with `pipefail` the greps that filter every line out exit 1,
 # so the old fallback fired on top of it and the section said "none" twice. Dropping the fallback

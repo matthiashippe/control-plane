@@ -194,21 +194,21 @@ if not seiten:
 # Until this run the check existed but only fired when EVERY address did it, so a window with two
 # renderers and one human printed "the last screen 2 of 3, 67%" and read like two thirds of
 # visitors finishing the page. Off by the entire finding.
-SOFORT_SEKUNDEN = 1.0
-SOFORT_MARKEN = 3
-def holte_alles_auf_einmal(ip):
+AT_ONCE_SECONDS = 1.0
+AT_ONCE_MARKS = 3
+def took_everything_at_once(ip):
     # Across every mark, not only top and close. A renderer that stops before the last pixel would
     # otherwise pass as a reader who got three quarters of the way down, which is the same error
     # one notch quieter. Three marks inside a second is the test: two can be a fast scroll over
     # marks that sit close together, three cannot.
-    zeiten = [min(v) for v in pixel[ip].values() if v]
-    if len(zeiten) < SOFORT_MARKEN:
+    stamps = [min(v) for v in pixel[ip].values() if v]
+    if len(stamps) < AT_ONCE_MARKS:
         return False
-    return (max(zeiten) - min(zeiten)).total_seconds() < SOFORT_SEKUNDEN
+    return (max(stamps) - min(stamps)).total_seconds() < AT_ONCE_SECONDS
 
-renderer = {ip for ip in seiten if holte_alles_auf_einmal(ip)}
-zusammen = len(renderer)
-leser = {ip: laden for ip, laden in seiten.items() if ip not in renderer}
+renderers = {ip for ip in seiten if took_everything_at_once(ip)}
+at_once = len(renderers)
+readers = {ip: loads for ip, loads in seiten.items() if ip not in renderers}
 mit_top = sum(1 for ip in seiten if pixel[ip].get("top"))
 
 ladungen = sum(len(v) for v in seiten.values())
@@ -229,21 +229,21 @@ if mit_top == 0:
     print("                 nobody was here rather than that lazy loading is off. A browser that")
     print("                 already has the icon cached would show up in neither, so check with")
     print("                 a fresh one before reading anything below.")
-elif zusammen:
-    print(f"  not a reader, fetched every pixel at once: {zusammen}")
+elif at_once:
+    print(f"  not a reader, fetched every pixel at once: {at_once}")
 if mit_top == 0:
     raise SystemExit(0)
-if zusammen and not leser:
+if at_once and not readers:
     print()
-    print(f"  WORTHLESS: all {zusammen} of them fetched three or more pixels inside one second,")
+    print(f"  WORTHLESS: all {at_once} of them fetched three or more pixels inside one second,")
     print("             which is a renderer taking every lazy image at load and not a reader")
     print("             scrolling. Nothing here is a scroll, so there is no table.")
     raise SystemExit(0)
 print()
 for marke in MARKEN:
-    wer = [ip for ip in leser if pixel[ip].get(marke)]
-    anteil = f"{len(wer) / len(leser) * 100:.0f}%" if leser else "-"
-    print(f"  {WAS[marke]:<28} {len(wer):>3} of {len(leser)}  {anteil}")
+    who = [ip for ip in readers if pixel[ip].get(marke)]
+    share = f"{len(who) / len(readers) * 100:.0f}%" if readers else "-"
+    print(f"  {WAS[marke]:<28} {len(who):>3} of {len(readers)}  {share}")
 print()
 print("  A lazy image is fetched when it comes near the viewport, which is close to being read and")
 print("  is not the same thing. This is a floor for attention, never a proof of it.")

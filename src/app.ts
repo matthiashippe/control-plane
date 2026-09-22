@@ -230,10 +230,10 @@ export function createApp(opts: AppOptions) {
       // src/public/apipage.ts. The status stays 401 for both, only the shape differs, and the
       // shape only differs for a caller that explicitly asked for HTML.
       if (indexHtml && c.req.path.startsWith("/v1/") && prefersHtml(c.req.header("accept"))) {
-        const angebot = starterOffer(db);
+        const offer = starterOffer(db);
         return c.html(
           seite(
-            renderApiPage(c.req.path, angebot ? angebot.cents : null),
+            renderApiPage(c.req.path, offer ? offer.cents : null),
             "Your browser cannot carry your key",
             "This path answers to a key in a header, and a browser does not send one. Nothing is " +
               "wrong with your account. Here is the same question from a terminal, and what " +
@@ -1187,7 +1187,7 @@ export function createApp(opts: AppOptions) {
     // A runtime that has read an empty balance three times over more than a minute is stuck, not
     // browsing, and this is the call where it is handed its grant. See grantToWaitingRuntime().
     const granted = grantToWaitingRuntime(db, address, getBalanceMc(db, address), Date.now());
-    const wartet = granted ? 0 : starterAvailableMc(db, address);
+    const waiting = granted ? 0 : starterAvailableMc(db, address);
     return c.json({
       balance_cents: getBalanceCents(db, address),
       ...(granted
@@ -1199,11 +1199,11 @@ export function createApp(opts: AppOptions) {
             docs: DOC.transfers,
           }
         : {}),
-      ...(wartet > 0
+      ...(waiting > 0
         ? {
-            starter_available_cents: mcToCents(wartet),
+            starter_available_cents: mcToCents(waiting),
             hint:
-              `POST /v1/credits/starter puts ${mcToCents(wartet)} cents on this address. Once per ` +
+              `POST /v1/credits/starter puts ${mcToCents(waiting)} cents on this address. Once per ` +
               "address, free, out of the operator's pool, and it is what pays for your first job here.",
             docs: DOC.transfers,
           }
