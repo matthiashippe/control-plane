@@ -79,6 +79,50 @@ async function signIn(): Promise<string> {
 
 const kurz = (a: string): string => `${a.slice(0, 8)}…${a.slice(-4)}`;
 
+/**
+ * The parts of a brief a machine can check, checked.
+ *
+ * `POST /v1/check` finds claims the brief does not support, which is the expensive half and the
+ * one worth paying for. The cheap half is sitting in the brief in plain sight: a word limit and a
+ * list of words that must not appear. A buyer reading three submissions does that by hand, badly,
+ * and on 2026-09-23 this operator was about to.
+ *
+ * Deliberately conservative. It reports and never refuses: a brief can say "80 words maximum" and
+ * mean the body without a headline, and a banned word can appear inside a quotation the brief
+ * asked for. The buyer decides; this only makes sure nobody has to count.
+ */
+export function formalpruefung(brief: string, work: string): string[] {
+  const befunde: string[] = [];
+
+  const grenze = /(\d+)\s*words?\s*maximum|maximum\s*(\d+)\s*words?|at most (\d+) words/i.exec(brief);
+  if (grenze) {
+    const max = Number(grenze[1] ?? grenze[2] ?? grenze[3]);
+    const n = work.split(/\s+/).filter(Boolean).length;
+    if (n > max) befunde.push(`${n} words against a limit of ${max}`);
+  }
+
+  // "Do not use: "a", "b", "c"." and the same list without quotes.
+  const liste = /Do not use:?\s*([^.]+)\./i.exec(brief);
+  if (liste) {
+    const woerter = [...liste[1].matchAll(/"([^"]+)"|([A-Za-z][A-Za-z-]{2,})/g)]
+      .map((m) => (m[1] ?? m[2]).toLowerCase())
+      .filter((w) => !["and", "or", "the", "no", "not", "use", "do"].includes(w));
+    const drin = woerter.filter((w) => new RegExp(`\\b${w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(work));
+    for (const w of drin) befunde.push(`uses "${w}", which the brief rules out`);
+  }
+
+  if (/no exclamation marks/i.test(brief) && work.includes("!")) befunde.push("has an exclamation mark");
+  if (/no em dashes/i.test(brief) && /[—–]/.test(work)) befunde.push("has an em or en dash");
+  // Loose on purpose. "one sentence" appears in a brief as an instruction and almost nowhere else,
+  // and the two spellings this first tried (line start, or after a colon) missed "10 words
+  // maximum. One sentence." A false alarm here costs one glance; a missed one costs the check.
+  if (/\bone sentence\b/i.test(brief)) {
+    const saetze = work.split(/[.!?]+\s/).filter((t) => t.trim().length > 3).length;
+    if (saetze > 1) befunde.push(`${saetze} sentences where the brief asks for one`);
+  }
+  return befunde;
+}
+
 async function main(): Promise<void> {
   const bountyId = arg("bounty");
   const key = await signIn();
@@ -117,8 +161,11 @@ async function main(): Promise<void> {
       body: JSON.stringify({ briefing: job.brief, submission: s.body, kind: job.kind }),
     })) as { findings: { quote: string; kind: string; reason: string }[]; discarded: number };
     const woerter = s.body.split(/\s+/).filter(Boolean).length;
+    const formal = formalpruefung(job.brief, s.body);
     console.log(`${s.id === gewinner ? "->" : "  "} ${s.id}  ${kurz(s.agent)}  ${woerter} words  ` +
-      `${check.findings.length} finding(s)${check.discarded ? `, ${check.discarded} discarded` : ""}`);
+      `${check.findings.length} finding(s)${check.discarded ? `, ${check.discarded} discarded` : ""}` +
+      `${formal.length ? `, ${formal.length} against the brief` : ""}`);
+    for (const f of formal) console.log(`      [brief] ${f}`);
     for (const f of check.findings) console.log(`      [${f.kind}] ${f.quote}\n        ${f.reason}`);
     console.log(`      ${s.body.replace(/\n+/g, " ").slice(0, 400)}${s.body.length > 400 ? "…" : ""}\n`);
   }
