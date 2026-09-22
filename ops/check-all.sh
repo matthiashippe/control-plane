@@ -127,6 +127,10 @@ if fremd is not None:
     liste = [w['address'] if isinstance(w, dict) else w for w in db.get('wallets_foreign_list', [])]
     kurz = ', '.join(a[:10] + '…' for a in liste[:5]) + ('' if len(liste) <= 5 else ', …')
     print(f\"wallets: {db['wallets']} in total, {fremd} of them not ours{': ' + kurz if kurz.strip(', …') else ''}\")
+aktiv = db.get('wallets_foreign_active')
+if aktiv is not None:
+    print(f\"strangers who have thought here: {aktiv}\"
+          + ('' if aktiv else '   (the step between provisioning and paying, and nothing counted it until 22.09.)'))
 # Printed loudly rather than as a count that moved. A stranger provisioning is the second biggest
 # thing that can happen on this service, and on 2026-09-22 one did while the only sign was a total
 # going from 2 to 3.

@@ -195,6 +195,25 @@ report.wallets_foreign = one(
   ...OUR_KEY_NAMES,
 ).n;
 
+// Has anybody from outside ever thought here?
+//
+// Between "provisioned" and "paid" there is a step nothing counted. On 2026-09-22 at 02:05 a
+// stranger took a key and then did nothing with it for an hour, and the only numbers that could
+// have said so were a wallet count and a payment count, one of which moved and one of which did
+// not. Inference is the step in between: it is what the service is for, it costs the operator
+// real money the moment it happens, and it is the first thing a working runtime does.
+//
+// Zero today. The day this reads 1, somebody outside this house has had a thought on our bill.
+report.wallets_foreign_active = one(
+  `select count(distinct l.address) n from ledger l
+    where l.kind = 'inference' and not (
+      l.address in (${OURS.map(() => "?").join(",")})
+      or exists (select 1 from api_keys k where k.address = l.address
+                 and (${OUR_KEY_NAMES.map(() => "k.name like ?").join(" or ")})))`,
+  ...OURS,
+  ...OUR_KEY_NAMES,
+).n;
+
 report.market = {
   open_bounties: one("select count(*) n from bounties where status='open' and deadline > ?", new Date().toISOString()).n,
   held_mc: one("select coalesce(sum(price_mc),0) s from bounties where status='open'").s,

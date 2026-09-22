@@ -206,6 +206,35 @@ describe("The market numbers in the database report", () => {
       .toBe(0);
   });
 
+  it("counts a stranger who has thought here, which is neither provisioning nor paying", () => {
+    // On 2026-09-22 a stranger took a key at 02:05 and did nothing with it for an hour. The only
+    // numbers that could have said so were a wallet count and a payment count, one of which moved
+    // and one of which did not. Inference is the step in between: what the service is for, what
+    // costs the operator real money the moment it happens, and the first thing a working runtime
+    // does.
+    const r = withDb((db) => {
+      const wall = (address: string, name: string) => {
+        db.prepare("INSERT OR IGNORE INTO wallets (address, balance_mc, created_at) VALUES (?, 0, ?)")
+          .run(address, new Date().toISOString());
+        db.prepare("INSERT INTO api_keys (address, key_hash, key_prefix, name, created_at) VALUES (?, ?, ?, ?, ?)")
+          .run(address, `hash-${address}`, "cnwy_k_xxxxxxx", name, new Date().toISOString());
+      };
+      // A thought has to be paid for, so the grant comes first; postLedger refuses to book a
+      // balance below zero, which is the rule this whole ledger rests on.
+      wall(STRANGER, "conway-automaton");
+      postLedger(db, { address: STRANGER, kind: "grant", deltaMc: 15_000, ref: "g-1" });
+      postLedger(db, { address: STRANGER, kind: "inference", deltaMc: -400, ref: "t-1" });
+      // A second stranger with a key and no thought yet: the case that was invisible.
+      wall("0xdddd000000000000000000000000000000000001", "conway-automaton");
+      // And one of ours thinking, which must not count.
+      wall("0xdddd000000000000000000000000000000000002", "ops-seed-vera");
+      postLedger(db, { address: "0xdddd000000000000000000000000000000000002", kind: "grant", deltaMc: 15_000, ref: "g-2" });
+      postLedger(db, { address: "0xdddd000000000000000000000000000000000002", kind: "inference", deltaMc: -400, ref: "t-2" });
+    });
+    expect(r.wallets_foreign_active, "one stranger has thought, the other only holds a key").toBe(1);
+    expect(r.wallets_foreign, "both strangers still count as foreign wallets").toBe(2);
+  });
+
   it("counts a stranger the moment one posts, which is the whole point", () => {
     const r = withDb((db) => {
       postBounty(db, OPERATOR, "ours-1", 200 * MC_PER_CENT);
