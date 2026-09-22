@@ -93,6 +93,33 @@ const WITHHELD_UNDATED =
   `under the publication rule of ${PUBLICATION_FROM}. It is counted here and its text is not.`;
 
 /**
+ * Jobs that ran out of time with nobody paid.
+ *
+ * `/receipts` shows what was paid for, which is the half of the record that flatters the market.
+ * A job nobody entered, or one whose work was not worth paying for, leaves the open list at its
+ * deadline and appears nowhere afterwards. A reader counting evidence sees only the successes,
+ * which is precisely what this project accuses the x402 directory of doing with its own numbers.
+ *
+ * Added on 2026-09-22, before the first one could expire: five jobs are open, the earliest closes
+ * on 23.09., and building the honest version after the first disappearance would have meant
+ * building it because it looked bad.
+ *
+ * `cancelled` is not counted here. A cancelled job is a buyer changing their mind, usually within
+ * a minute and usually a throwaway from a production check, and the seventeen on this database are
+ * all ours. An expired one is a job the market did not answer, which is the thing worth admitting.
+ */
+export function expiredCount(db: Db): { jobs: number; cents: number; entered: number } {
+  const row = db
+    .prepare(
+      `SELECT count(*) AS jobs, coalesce(sum(b.price_mc), 0) AS mc,
+              coalesce(sum((SELECT count(*) FROM submissions s WHERE s.bounty_id = b.id)), 0) AS entered
+         FROM bounties b WHERE b.status = 'expired'`,
+    )
+    .get() as { jobs: number; mc: number; entered: number };
+  return { jobs: row.jobs, cents: mcToCents(row.mc), entered: row.entered };
+}
+
+/**
  * Every awarded bounty, newest first.
  *
  * The buyer is not named, the same rule `/bounties.json` follows. The agents are: an address is

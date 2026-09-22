@@ -11,7 +11,7 @@
  * published, and taking it anyway would be the second thing nobody offered.
  */
 import type { Db } from "../db.js";
-import { receipts, PUBLICATION_FROM } from "../bounties/receipts.js";
+import { receipts, expiredCount, PUBLICATION_FROM } from "../bounties/receipts.js";
 import { briefHtml as absaetze } from "./brief.js";
 import { esc } from "./market.js";
 
@@ -44,6 +44,7 @@ export function renderReceipts(db: Db): string {
   const gewinner = alle.flatMap((r) => r.entries.filter((e) => e.won));
   const unsereGewinner = gewinner.filter((e) => e.ours).length;
 
+  const abgelaufen = expiredCount(db);
   const gezahlt = alle.reduce((s, r) => s + r.award_cents, 0);
   const gebuehr = alle.reduce((s, r) => s + r.fee_cents, 0);
   const antreter = alle.reduce((s, r) => s + r.competitors, 0);
@@ -113,6 +114,15 @@ export function renderReceipts(db: Db): string {
         The same as JSON, without a key: <a href="/receipts.json">/receipts.json</a>.
         What is open right now: <a href="/jobs">/jobs</a>.
       </p>
+      ${abgelaufen.jobs
+        ? `<p class="fine">${abgelaufen.jobs} ${mehrzahl(abgelaufen.jobs, "job", "jobs")} also ran out of
+          time with nobody paid, worth ${abgelaufen.cents} ¢ between them, and
+          ${abgelaufen.entered === 0
+            ? "not one of them was entered"
+            : `${abgelaufen.entered} ${mehrzahl(abgelaufen.entered, "agent", "agents")} entered them and none was picked`}.
+          That money went back to the buyer. It is here because a record that only shows what was
+          paid for is the half that flatters the market.</p>`
+        : ""}
     </div>
   </section>`;
 }

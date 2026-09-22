@@ -121,6 +121,43 @@ describe("/receipts", () => {
     expect(eintrag.body).toContain("THE WINNING WORK");
   });
 
+  it("admits the jobs that ran out with nobody paid", async () => {
+    // /receipts shows what was paid for, which is the half of the record that flatters the market.
+    // A job nobody entered leaves the open list at its deadline and appears nowhere afterwards, so
+    // a reader counting evidence sees only successes. That is what this project accuses the x402
+    // directory of doing with its own numbers.
+    const { db, app } = await markt("2026-09-22T10:00:00.000Z");
+
+    const ohne = (await (await app.request("/receipts")).text()).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+    expect(ohne, "nothing has expired yet, so the page says nothing about it")
+      .not.toContain("ran out of time");
+
+    // One expired job nobody entered. The creator has to be a real wallet: `bounties.creator`
+    // references `wallets(address)`, which is the constraint that keeps a job from belonging to
+    // nobody.
+    const wer = "0x" + "5".repeat(40);
+    db.prepare("INSERT INTO wallets (address, balance_mc, created_at) VALUES (?, 0, ?)")
+      .run(wer, new Date().toISOString());
+    db.prepare("INSERT INTO bounties (id, creator, kind, brief, price_mc, deadline, status, created_at, closed_at) " +
+      "VALUES ('exp-1', ?, 'factual', 'A brief.', 30000, ?, 'expired', ?, ?)")
+      .run(wer, new Date(Date.now() - 1000).toISOString(),
+           new Date(Date.now() - 2000).toISOString(), new Date().toISOString());
+    // And a cancelled one, which must not be counted. A cancelled job is a buyer changing their
+    // mind, usually within a minute and usually a throwaway from a production check; seventeen of
+    // them sit on the live database and all seventeen are ours. Without this case the choice only
+    // lives in a comment: widening the query to both statuses leaves the test green.
+    db.prepare("INSERT INTO bounties (id, creator, kind, brief, price_mc, deadline, status, created_at, closed_at) " +
+      "VALUES ('can-1', ?, 'factual', 'A brief.', 99000, ?, 'cancelled', ?, ?)")
+      .run(wer, new Date(Date.now() - 1000).toISOString(),
+           new Date(Date.now() - 2000).toISOString(), new Date().toISOString());
+
+    const text = (await (await app.request("/receipts")).text()).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+    expect(text).toContain("1 job also ran out of time with nobody paid");
+    expect(text, "the cancelled job's 99 cents must not be in that figure").not.toContain("129 ¢");
+    expect(text, "with the money it carried").toContain("30 ¢");
+    expect(text, "and the fact that nobody even tried").toContain("not one of them was entered");
+  });
+
   it("withholds the work and the author when it was handed in before the rule", async () => {
     const { page, agent } = await markt("2026-09-20T10:00:00.000Z");
     const html = await page();
