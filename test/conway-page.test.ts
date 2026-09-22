@@ -13,10 +13,12 @@
  * first thing we published about this.
  */
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createApp } from "../src/app.js";
+import { renderFix } from "../src/public/fix.js";
 import { openDb } from "../src/db.js";
 import { readMoneySeries, readReceipts, renderConway } from "../src/public/conway.js";
 
@@ -72,6 +74,38 @@ async function page(points: unknown[], receipts = RECEIPTS): Promise<string> {
     rmSync(recent, { force: true });
   }
 }
+
+describe("what the page claims about Conway's payment path", () => {
+  it("claims only what the published transfers show", async () => {
+    // Both /conway and /fix said the payment endpoint "has never stopped working". Nothing here
+    // measured that: the daily scan has checked it since 20 September and the series has three
+    // points. It is a claim about February to September made from four days of looking.
+    //
+    // The transfers do carry the stronger version. Every month from February to September has at
+    // least one purchase at the $5 tier, which cannot happen through an endpoint that is down, so
+    // the sentence says that instead and this holds it to the file.
+    const zeilen = readFileSync("docs/research/data/2026-09-19-conway-payto-transfers.csv", "utf-8")
+      .split("\n")
+      .slice(1)
+      .filter(Boolean)
+      .map((z) => z.split(","));
+    const monate = new Set(
+      zeilen.filter((z) => Number(z[3]) >= 5).map((z) => z[1].slice(0, 7)),
+    );
+    expect(monate.size, "a gap here and the sentence is wrong").toBe(8);
+    expect([...monate].sort()[0]).toBe("2026-02");
+
+    for (const [name, html] of [
+      ["/conway", renderConway([POINT], [])],
+      ["/fix", renderFix()],
+    ] as const) {
+      const text = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+      expect(text, `${name} still makes a claim it cannot show`).not.toMatch(/never stopped working/i);
+      expect(text, `${name} has to say what the transfers show`)
+        .toMatch(/money has reached (its|the) payment address in every month since February/i);
+    }
+  });
+});
 
 describe("/conway", () => {
   /**

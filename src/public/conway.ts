@@ -177,8 +177,8 @@ export function renderConway(points: MoneyPoint[], receipts: Receipt[]): string 
       <p class="sub">
         Every USDC transfer into Conway's receiving address on Base, scanned daily at 05:00 UTC.
         Conway's sign-up has returned <code>500 Database error</code> for every fresh wallet since
-        July 2026, and its payment endpoint has never stopped working. The transfers below are what
-        that combination looks like. Data through ${esc(minute(last.data_through))} UTC, under CC0,
+        July 2026, and money has reached its payment address in every month since February, this
+        one included. The transfers below are what that combination looks like. Data through ${esc(minute(last.data_through))} UTC, under CC0,
         <a href="https://github.com/matthiashippe/control-plane/tree/main/docs/research/data">scripts in the repository</a>.
       </p>
 
