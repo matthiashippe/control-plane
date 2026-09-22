@@ -96,6 +96,22 @@ describe("/fix", () => {
       .toMatch(/measured by hand on 21 September/i);
   });
 
+  it("warns that the same runtime buys here too, before it touches the free credit", async () => {
+    const html = await page("/fix");
+    // Step 1 tells the reader their runtime keeps buying $5 tiers at Conway. The same
+    // bootstrapTopup runs against this service: credits under $5 and 5 USDC in the wallet is all
+    // it asks, so a fresh wallet with USDC buys on its first start, before the 15 cent grant is
+    // ever drawn. Promising they can see whether it thinks before deciding anything was true of
+    // the API path and not of the runtime path, on the page a stranded operator arrives at.
+    //
+    // Found on 2026-09-22, hours after the first stranger provisioned a real runtime here.
+    const text = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+    expect(text, "the page has to say the runtime buys here on its first start")
+      .toMatch(/buys the \$5 tier here on its first start/i);
+    expect(text, "and name the way out, which is the same one as in step 1")
+      .toMatch(/move the USDC out first/i);
+  });
+
   it("does not claim the payment endpoint is broken, because it is not", async () => {
     const html = await page("/fix");
     // The whole argument of the page rests on exactly one asymmetry: sign-up fails, paying works.

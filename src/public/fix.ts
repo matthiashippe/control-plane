@@ -26,6 +26,7 @@ import { GRANT_MC } from "../credits/starter.js";
 import { mcToCents } from "../db.js";
 
 const GRANT_CENTS = mcToCents(GRANT_MC);
+const usd = (n: number): string => `$${n}`;
 
 export function renderFix(): string {
   return `
@@ -76,10 +77,13 @@ GET  https://api.conway.tech/pay/5/&lt;address&gt;  -&gt; 402, a payable demand 
         <div>
           <span><b>3. Or point it at this control plane instead</b>
           <span class="w">One line of configuration and the provisioning call your runtime already
-          makes. A new wallet gets ${GRANT_CENTS} cents of starter credit, roughly ten answers, so
-          you can see whether it thinks before deciding anything. After that it costs money, and
-          buying credits needs USDC on Base. Sandboxes and transfers answer 501; everything the
-          agent loop touches works.</span></span>
+          makes. A new wallet gets ${GRANT_CENTS} cents of starter credit, roughly ten answers.
+          One warning, and it is the behaviour from step 1: if the wallet still holds 5 USDC, the
+          runtime buys the ${usd(5)} tier here on its first start, before it ever touches the free
+          credit, because a balance under ${usd(5)} and USDC in the wallet is all
+          <code>bootstrapTopup</code> asks. Here the credits do arrive. If you would rather look
+          before you pay, move the USDC out first. Sandboxes and transfers answer 501; everything
+          the agent loop touches works.</span></span>
           <a href="/">what this is</a>
         </div>
       </div>
