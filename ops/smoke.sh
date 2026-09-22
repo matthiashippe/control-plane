@@ -422,7 +422,7 @@ fi
 # own service. Runs last, so the lockout does not hit another check.
 if ((WITH_RATELIMIT)); then
   echo
-  echo "$C_GREY--with-ratelimit: 65 requests to /v1/auth/nonce. This IP will get 429 until the end of the minute window.$C_OFF"
+  echo "$C_GREY--with-ratelimit: 65 requests to /v1/auth/nonce, then one with a forged X-Forwarded-For. This IP will get 429 until the end of the minute window.$C_OFF"
   blocked_at=0
   for i in $(seq 1 65); do
     CAPPED_REQUESTS=$((CAPPED_REQUESTS + 1))
@@ -447,6 +447,29 @@ if ((WITH_RATELIMIT)); then
     fail "rate limit: 429 at request $blocked_at, but Retry-After is '$retry' instead of a number of seconds up to 60."
   else
     ok "rate limit: request $blocked_at gives a 429 with Retry-After ${retry}s$note"
+  fi
+
+  # Can a caller pick their own bucket?
+  #
+  # The limiter keys on the LAST entry of X-Forwarded-For (src/ratelimit.ts), because Caddy appends
+  # the real peer address to whatever the client sent, so the last one is the only entry a client
+  # cannot forge. test/ratelimit.test.ts pins that parsing, and nothing checked the chain through
+  # Caddy in production: if Caddy passed a client-supplied header through instead of appending, the
+  # last entry would be attacker-controlled and one visitor could exhaust another visitor's budget,
+  # or step around their own.
+  #
+  # Free to ask here and only here: the lockout above has already happened, so one more request
+  # costs nothing. With a forged header in front, a correct chain still answers 429 for this
+  # address. A 200 would mean the caller chose their own bucket.
+  if ((blocked_at > 0)); then
+    gefaelscht=$(curl -sS --max-time 10 -o /dev/null -w '%{http_code}' \
+      -H 'X-Forwarded-For: 203.0.113.250' -X POST "$BASE/v1/auth/nonce" 2>/dev/null)
+    CAPPED_REQUESTS=$((CAPPED_REQUESTS + 1))
+    if [[ "$gefaelscht" == "429" ]]; then
+      ok "rate limit: a forged X-Forwarded-For does not buy a fresh bucket"
+    else
+      fail "rate limit: with a forged X-Forwarded-For the same address gets $gefaelscht instead of 429. A caller can pick their own bucket, so one visitor can spend another's limit."
+    fi
   fi
 else
   skipped "rate limit: only with --with-ratelimit, because the test locks the caller out for a minute"
