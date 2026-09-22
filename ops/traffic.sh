@@ -130,8 +130,13 @@ jq -r --argjson own "$own_json" \
 import sys, collections
 
 people = collections.defaultdict(
-    lambda: {"agents": [], "ran_script": False, "marks": set(), "mark_times": {}, "paths": set(), "first": None, "from": ""}
+    lambda: {"agents": [], "ran_script": False, "marks": set(), "mark_times": {}, "paths": set(), "first": None, "from": "", "ip": ""}
 )
+# Every path an address touched, whatever tool did it. The browser-only view is right for deciding
+# who read a page; it is wrong for the funnel, because the step after reading is done in a terminal.
+# The Korean operator on 2026-09-22 is the case: node, curl and Safari from one address, and the key
+# he asked for came from node.
+all_paths = collections.defaultdict(set)
 networks = collections.defaultdict(set)
 
 for line in sys.stdin:
@@ -145,9 +150,11 @@ for line in sys.stdin:
         continue
     path = path.split("?")[0]
     networks[".".join(ip.split(".")[:3])].add(ip)
+    all_paths[ip].add(path)
     if "Mozilla/" not in agent:
         continue
     entry = people[ip]
+    entry["ip"] = ip
     entry["agents"].append((stamp, agent))
     if entry["first"] is None or stamp < entry["first"]:
         entry["first"] = stamp
@@ -198,6 +205,59 @@ for ip, entry in people.items():
         scrolled.append((entry["first"], ip, entry))
     else:
         loaded_only.append(ip)
+
+# The whole way in, as one column.
+#
+# Every number in it existed before, in three scripts and a hand check, and nobody could read the
+# shape. The point of the column is the shape: which step loses people. Written on 2026-09-22,
+# when the honest answer to every step below the first was zero and the page had just grown a free
+# thing a person could click.
+#
+# The steps are what a stranger actually does, in order, and each one is visible in the access log
+# alone. "Thought" is deliberately not here: it lives in the ledger and ops/check-all.sh prints it,
+# and a funnel that mixes two sources drifts at the seam.
+# Pages a person reads, as opposed to everything else that lands in this log. Without this list
+# the second step read 19 of 19: the inline script fetches /v1/status on every page view, and
+# counting it as a second page turns every single visitor into somebody who clicked through.
+PAGES = ("/", "/check", "/fix", "/post", "/jobs", "/receipts", "/x402", "/conway", "/terms")
+
+def pages_of(entry):
+    return {p for p in entry["paths"] if p in PAGES}
+
+def touched(entry, *wanted):
+    return any(p in all_paths[entry["ip"]] for p in wanted)
+
+STEPS = [
+    ("opened a page", lambda e: bool(pages_of(e))),
+    ("scrolled", lambda e: e["scrolled"]),
+    ("opened a second page", lambda e: len(pages_of(e)) > 1),
+    ("tried the free check", lambda e: touched(e, "/check", "/v1/briefs/check")),
+    ("asked for a key", lambda e: touched(e, "/v1/auth/api-keys")),
+]
+arrived = []
+for ip, entry in people.items():
+    if not entry["ran_script"] or swapped(entry["agents"]):
+        continue
+    if len(networks[".".join(ip.split(".")[:3])]) > 2:
+        continue
+    below = [m for m in entry["marks"] if m not in ("top", "fix-top")]
+    entry["scrolled"] = bool(below) and not all_at_once(list(entry["mark_times"].values()))
+    # Arrived means read a page. An address that only ever touched /v1/ is a runtime, and putting
+    # it in the denominator of a funnel about reading makes every step below look worse than it is.
+    if pages_of(entry):
+        arrived.append(entry)
+
+print()
+print("   the way in, over the whole log:")
+if not arrived:
+    print("     nobody arrived that did not also look like a checker.")
+else:
+    for label, test in STEPS:
+        n = sum(1 for e in arrived if test(e))
+        share = f"{n / len(arrived) * 100:.0f}%" if arrived else "-"
+        print(f"     {label:<24} {n:>3} of {len(arrived)}  {share}")
+    print("     (thought: in the ledger, not the log. ops/check-all.sh prints it.)")
+print()
 
 if not scrolled:
     print("   nobody scrolled. Not one address fetched a mark from below the first screen.")
