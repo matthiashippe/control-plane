@@ -10,6 +10,10 @@
 # one inline script by hash. A browser defers a lazy image until it comes near the viewport, so a
 # request for /px/close.png is somebody who reached the last screen.
 #
+# Exit 0: a reading, or an empty window that two measures agree on.
+# Exit 1: browsers were here and the mechanism did not fire. That is a finding about this repo.
+# Exit 2: could not tell (log unreadable, or a constant that contradicts itself).
+#
 #   ops/tiefe.sh          last 24 hours
 #   ops/tiefe.sh 72       last 72 hours
 #
@@ -87,6 +91,7 @@ WAS = {
 seiten = collections.defaultdict(list)
 pixel = collections.defaultdict(lambda: collections.defaultdict(list))
 nicht_browser = collections.Counter()
+favicon = {}
 frueheste_px = None
 for roh in open(path):
     roh = roh.strip()
@@ -108,6 +113,20 @@ for roh in open(path):
     # claim to be a browser cannot produce a scroll event, so it is not in the numerator and not
     # in the denominator either.
     uri = (r.get("uri") or "").split("?")[0]
+    # A second witness, and the only one that can tell the two failures apart.
+    #
+    # Zero control pixels means either nobody came or lazy loading never fires, and this script
+    # cannot tell which: both print the same line. /favicon.ico is fetched by the browser itself,
+    # with no javascript, no lazy loading and nothing of ours involved. If it arrives while the
+    # control pixel does not, the mechanism is broken. If neither arrives, nobody was here.
+    #
+    # A floor and not a count: a browser fetches the icon once and caches it, so a returning
+    # reader is invisible here.
+    if uri == "/favicon.ico":
+        ua_f = (r.get("headers", {}).get("User-Agent") or [""])[0]
+        if "Mozilla/" in ua_f and at >= seit:
+            favicon[ip] = at
+        continue
     if uri != "/" and not (uri.startswith("/px/") and uri.endswith(".png")):
         continue
     ua = (r.get("headers", {}).get("User-Agent") or [""])[0]
@@ -141,7 +160,16 @@ if nicht_browser:
     print(f"  not counted, no browser: {wer}")
 if not seiten:
     print()
-    print("  Nobody from outside loaded the page in this window. Nothing to say about depth.")
+    if favicon:
+        print(f"  BROKEN: {len(favicon)} browser(s) fetched /favicon.ico in this window and not one")
+        print("          fetched the control pixel. The icon needs no javascript and no lazy")
+        print("          loading, so somebody was here and the depth mechanism did not fire.")
+        for ip, at in sorted(favicon.items(), key=lambda x: x[1]):
+            print(f"          {at:%m-%d %H:%M} {ip}")
+        raise SystemExit(1)
+    print("  Nobody from outside loaded the page in this window, by two independent measures:")
+    print("  no control pixel and no /favicon.ico from a browser. Nothing to say about depth,")
+    print("  and nothing that says the mechanism is broken either.")
     raise SystemExit(0)
 
 # The control first: without it none of the rest means anything.
@@ -155,11 +183,21 @@ mit_top = sum(1 for ip in seiten if pixel[ip].get("top"))
 ladungen = sum(len(v) for v in seiten.values())
 print(f"  page loads from outside: {ladungen} by {len(seiten)} address(es)")
 print(f"  fetched the control pixel: {mit_top}")
+if mit_top == 0 and favicon:
+    print()
+    print(f"  BROKEN: {len(favicon)} browser(s) fetched /favicon.ico in this window and not one")
+    print("          fetched the control pixel. The icon needs no javascript and no lazy loading,")
+    print("          so this is not an empty window: the depth mechanism did not fire.")
+    for ip, at in sorted(favicon.items(), key=lambda x: x[1]):
+        print(f"          {at:%m-%d %H:%M} {ip}")
+    raise SystemExit(1)
 if mit_top == 0:
     print()
     print("  NOT MEASURING: no reader fetched the control either, so nothing here is a scroll.")
-    print("                 Either no browser has seen the page since the pixels went in, or lazy")
-    print("                 loading is off. Check with a browser before reading anything below.")
+    print("                 No /favicon.ico from a browser either, so the likely reason is that")
+    print("                 nobody was here rather than that lazy loading is off. A browser that")
+    print("                 already has the icon cached would show up in neither, so check with")
+    print("                 a fresh one before reading anything below.")
 elif zusammen and zusammen == mit_top:
     print()
     print(f"  WORTHLESS: for all {zusammen} of them the top and bottom pixels arrived within a")
