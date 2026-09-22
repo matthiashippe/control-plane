@@ -5,7 +5,7 @@ import { join } from "node:path";
 import Database from "better-sqlite3";
 import { privateKeyToAccount, generatePrivateKey } from "viem/accounts";
 import { createApp } from "../src/app.js";
-import { openDb, postLedger, MC_PER_CENT } from "../src/db.js";
+import { openDb, postLedger, reserveMc, MC_PER_CENT } from "../src/db.js";
 import { claimStarter, poolLeftMc, GRANT_MC } from "../src/credits/starter.js";
 import { releaseExpired, FEE_PERCENT, feeMc } from "../src/bounties/store.js";
 import { hashApiKey } from "../src/auth/siwe.js";
@@ -113,6 +113,42 @@ describe("posting a bounty", () => {
       const smaller = await a.postBounty(bounty({ price_cents: 12 }));
       expect(smaller.status).toBe(201);
       expect(a.balance()).toBe(GRANT_MC - 12 * MC_PER_CENT);
+    });
+
+    /**
+     * Credit an inference in flight has reserved is not the buyer's to spend.
+     *
+     * `createBounty` asks `getAvailableMc` and not the raw balance before it decides whether the
+     * grant would cover the job, and the comment there says why: reserved credit is spoken for,
+     * `postLedger` refuses a hold that reaches into it, and asking the wrong number would hand out
+     * the address's one grant and then fail on the retry anyway. A newcomer would be left with the
+     * refusal and no grant for the smaller job they try next.
+     *
+     * Nothing held that. A mutation sweep on 2026-09-22 changed `getAvailableMc` to return the
+     * raw balance and all 513 tests stayed green. The safety half is covered: ignoring the
+     * reservation inside `postLedger` turns two tests red. This is the other half, and it is about
+     * the scarcest thing here, which is the thirty-three grants.
+     */
+    it("does not spend the grant on a job that reserved credit cannot cover", async () => {
+      const { a, db } = setup(0);
+      // Twenty cents of balance, eighteen of them reserved by an inference in flight.
+      postLedger(db, { address: a.address, kind: "topup", deltaMc: 20 * MC_PER_CENT, ref: "t" });
+      expect(reserveMc(db, a.address, 18 * MC_PER_CENT)).toBe(true);
+
+      // 15 cents of grant plus 2 available is 17, which does not reach 25.
+      const refused = await a.postBounty(bounty({ price_cents: 25 }));
+      // A 500 here is the shape of the bug, not a variant of it: with the raw balance the code
+      // decides the grant covers the job, takes it, and the retry inside the catch throws
+      // `insufficient_balance` out of postLedger with nobody left to catch it.
+      expect(refused.status, "the held credit is not the buyer's to spend, and a refusal is a 402").toBe(402);
+      expect(
+        (db.prepare("SELECT count(*) AS n FROM ledger WHERE kind = 'grant'").get() as { n: number }).n,
+        "and the grant is still there for the job they try next",
+      ).toBe(0);
+
+      // Counting the reserved credit as spendable would have made 35 look like enough for 25.
+      const passt = await a.postBounty(bounty({ price_cents: 16 }));
+      expect(passt.status, "15 of grant plus 2 available covers 16").toBe(201);
     });
 
     it("says plainly that there is nothing free left once the pool is empty", async () => {
