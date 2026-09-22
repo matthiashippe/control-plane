@@ -24,9 +24,13 @@ set -euo pipefail
 # not have produced the signal, sitting under the number anyway. The first reading would have said
 # "1 of 11, 9 per cent" for what is really 1 of 1.
 #
-# A constant, and it checks itself: if the log carries a /px/ request from before it, the constant
-# is wrong and the script says so rather than quietly using it.
-SEIT_UTC="${CP_PIXEL_SEIT:-2026-09-22T12:47:00Z}"
+# A constant, and it checks itself in both directions: a /px/ request from before it means it is
+# set too late, and a value in the future means somebody typed the local clock. The second half was
+# missing on the first day and the first value was exactly that mistake, CEST written as UTC, two
+# hours and forty minutes ahead, so the script would have discarded every real reader in silence
+# until the clock caught up. `ops/deploy-window.sh` exists because of the same trap; the lesson
+# there was to take the time from the machine, and this took it from my head.
+SEIT_UTC="${CP_PIXEL_SEIT:-2026-09-22T10:07:23Z}"
 
 HOURS="${1:-24}"
 KEY="${CP_SSH_KEY:-$HOME/.ssh/id_ed25519_automaton}"
@@ -51,6 +55,12 @@ hours, own_raw, path, pixel_seit = int(sys.argv[1]), sys.argv[2], sys.argv[3], s
 own = set(own_raw.split())
 fenster = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=hours)
 live = datetime.datetime.fromisoformat(pixel_seit.replace("Z", "+00:00"))
+jetzt = datetime.datetime.now(datetime.timezone.utc)
+if live > jetzt:
+    print(f"COULD NOT TELL: SEIT_UTC is {live:%Y-%m-%d %H:%M} UTC, which is in the future.")
+    print(f"                It is {jetzt:%Y-%m-%d %H:%M} UTC now. A go-live that has not happened")
+    print("                discards every reader, silently. Somebody typed a local clock.")
+    raise SystemExit(2)
 # The later of the two: a page load has to be inside the asked-for window AND after the pixels
 # existed, or it is in a denominator it cannot belong to.
 seit = max(fenster, live)
