@@ -19,11 +19,27 @@ import { createApp } from "../src/app.js";
 import { openDb, postLedger } from "../src/db.js";
 import { hashApiKey } from "../src/auth/siwe.js";
 import { claimStarter, poolLeftMc, starterOffer, GRANT_MC, POOL_MC } from "../src/credits/starter.js";
+import { sitemapPages } from "./site-pages.js";
 
-// /check joined on 2026-09-22 and is the fourth surface to carry the promise, which is exactly the
-// case the comment above predicts: a new page that does not know about starterOffer. It is listed
-// twice because its intro and its result page are rendered separately and either could drift.
-const PAGES = ["/", "/post", "/jobs", "/check", "/check?brief=FACT%20SHEET%20on%20a%20roof"];
+/**
+ * Two lists, because this file asks two different questions and they have different answers.
+ *
+ * OFFERS is the deliberate one: the pages that invite a buyer to start and must therefore say the
+ * first job is free while it is. /fix speaks to an operator with a broken runtime and /terms to
+ * somebody reading the fine print; neither is inviting anybody to post a job, and demanding the
+ * sentence there would put it where it does not belong.
+ *
+ * EVERY_SURFACE is the guard, and it is not hand-kept: every page in the sitemap, plus the one
+ * rendering with no path of its own, since a /check result is built by a different function than
+ * the /check intro. No page anywhere may carry the promise once the pool cannot keep it, and the
+ * hand-kept version of this array is exactly what let /check ship with an unconditional promise
+ * three commits after it was written. See test/site-pages.ts.
+ */
+const OFFERS = ["/", "/post", "/jobs", "/check"];
+const EVERY_SURFACE = [
+  ...(await sitemapPages(createApp({ db: openDb(":memory:") }))),
+  "/check?brief=FACT%20SHEET%20on%20a%20roof",
+];
 
 /**
  * A database with one open job, because `/jobs` has two halves.
@@ -77,7 +93,7 @@ function drainPool(db: ReturnType<typeof openDb>): void {
 describe("the promise of a free first job", () => {
   it("is on every page that asks a buyer to start, while the pool can keep it", async () => {
     const { app } = await withAnOpenJob();
-    for (const path of PAGES) {
+    for (const path of OFFERS) {
       const html = await (await app.request(path)).text();
       expect(
         PROMISES.some((r) => r.test(html)),
@@ -89,7 +105,7 @@ describe("the promise of a free first job", () => {
   it("is gone from every one of them once the pool is empty", async () => {
     const { db, app } = await withAnOpenJob();
     drainPool(db);
-    for (const path of PAGES) {
+    for (const path of EVERY_SURFACE) {
       const html = await (await app.request(path)).text();
       for (const r of PROMISES) {
         expect(html, `${path} still promises a free first job, and ${r} is the sentence`).not.toMatch(r);

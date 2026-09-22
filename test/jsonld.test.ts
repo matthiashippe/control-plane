@@ -2,8 +2,11 @@ import { describe, expect, it } from "vitest";
 import { createApp } from "../src/app.js";
 import { openDb } from "../src/db.js";
 import { block, dataset, howToFrom, organization, webPage, webSite } from "../src/public/jsonld.js";
+import { sitemapPages } from "./site-pages.js";
 
-const PAGES = ["/", "/post", "/jobs", "/receipts", "/x402", "/conway", "/fix", "/terms"];
+// Not a hand-kept list. On 2026-09-22 /check was added and this array did not grow, so the newest
+// page was the one page nobody checked for structured data. See test/site-pages.ts.
+const PAGES = await sitemapPages(createApp({ db: openDb(":memory:") }));
 
 function app() {
   return createApp({ db: openDb(":memory:") });
