@@ -48,6 +48,7 @@ import {
 import { mcToCents, getBalanceCents, getBalanceMc, MC_PER_CENT } from "./db.js";
 import { block as ldBlock, dataset, howToFrom, organization, webPage, webSite } from "./public/jsonld.js";
 import { prefersHtml, renderApiPage } from "./public/apipage.js";
+import { renderCheck } from "./public/checkpage.js";
 import { DOC } from "./errors.js";
 import { Catalog, handleChat, MARKUP } from "./inference/proxy.js";
 import { clientKey, RateLimiter, type RateLimitOptions } from "./ratelimit.js";
@@ -1544,11 +1545,56 @@ export function createApp(opts: AppOptions) {
    * buyer has to sign in with Ethereum before finding out what their brief is missing, which puts
    * the wall back in front of exactly the step this is meant to help.
    */
+  /**
+   * The one thing on this service that costs nothing and needs no account, reachable by somebody
+   * who does not have a terminal open.
+   *
+   * The landing page offers this check as a `curl` line, which is the right shape for the reader
+   * it was written for and unusable for anybody else. Measured on 2026-09-22 over the whole access
+   * log: one address has ever scrolled this site and nobody has ever followed a link on it.
+   *
+   * So the endpoint now also takes a form post, and answers a browser with a page instead of an
+   * object. Same function, same findings, same limits. A caller that did not ask for HTML gets the
+   * byte-identical JSON it got before, which `test/checkpage.test.ts` holds it to, because every
+   * runtime reads this answer and a page where an object was expected breaks all of them at once.
+   *
+   * The form itself is not on the page yet: the policy in deploy/ carries `form-action 'none'`,
+   * and deploy/** is not touched without a human. One word there, 'self' instead of 'none', and
+   * the form can go up.
+   *
+   * That `'none'` refuses a same-origin submission is what the CSP specification says and NOT
+   * something measured here. Two attempts on 2026-09-22 hung headless Chrome at the submit and
+   * were killed; the endpoint does not depend on the answer, and the claim is left standing as a
+   * reading of the spec rather than dressed up as an observation. Whoever changes that line should
+   * check it in a real browser first, which takes one page and one click.
+   */
   app.post("/v1/briefs/check", async (c) => {
-    const raw = await c.req.json().catch(() => null);
-    const b = (typeof raw === "object" && raw !== null ? raw : {}) as Record<string, unknown>;
+    const contentType = c.req.header("content-type") ?? "";
+    let b: Record<string, unknown> = {};
+    if (contentType.includes("form")) {
+      // A browser form sends urlencoded, never JSON. Reading it as JSON would answer a person who
+      // filled in a field with "send the draft as {brief: …}", which is advice about a shape they
+      // never chose.
+      const form = await c.req.parseBody().catch(() => ({}) as Record<string, unknown>);
+      b = form as Record<string, unknown>;
+    } else {
+      const raw = await c.req.json().catch(() => null);
+      b = (typeof raw === "object" && raw !== null ? raw : {}) as Record<string, unknown>;
+    }
+    const wantsPage = indexHtml !== null && prefersHtml(c.req.header("accept"));
     const brief = typeof b.brief === "string" ? b.brief.trim() : "";
     if (!brief) {
+      if (wantsPage) {
+        return c.html(
+          page(
+            renderCheck("", "factual", [], 0),
+            "The free check needs a draft",
+            "Paste the brief you would post and this names what it does not say. No key, no account, nothing stored.",
+            "/v1/briefs/check",
+          ),
+          400,
+        );
+      }
       return c.json(
         {
           error: "brief_required",
@@ -1572,9 +1618,22 @@ export function createApp(opts: AppOptions) {
     }
     const kind: "factual" | "creative" = b.kind === "creative" ? "creative" : "factual";
     const findings = reviewBrief(brief, kind);
+    const words = brief.split(/\s+/).filter(Boolean).length;
+    if (wantsPage) {
+      return c.html(
+        page(
+          renderCheck(brief, kind, findings, words),
+          findings.length
+            ? `${findings.length} thing${findings.length === 1 ? "" : "s"} this brief does not say`
+            : "Nothing obvious is missing from this brief",
+          "What an agent would have to invent to finish this job, named before any money moves. No key, no account, nothing stored.",
+          "/v1/briefs/check",
+        ),
+      );
+    }
     return c.json({
       kind,
-      words: brief.split(/\s+/).filter(Boolean).length,
+      words,
       findings,
       note:
         findings.length === 0
