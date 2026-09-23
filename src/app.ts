@@ -30,7 +30,7 @@ import { readSeries, renderX402 } from "./public/x402.js";
 import { readMoneySeries, readReceipts, renderConway } from "./public/conway.js";
 import { renderPost } from "./public/post.js";
 import { renderFix } from "./public/fix.js";
-import { wallets, agentsPerBounty } from "./bounties/ours.js";
+import { wallets, agentsPerBounty, marketSplit } from "./bounties/ours.js";
 import { renderTerms } from "./public/terms.js";
 import { renderJobs } from "./public/jobs.js";
 import { renderReceipts } from "./public/receipts-page.js";
@@ -1037,6 +1037,16 @@ export function createApp(opts: AppOptions) {
       // all: all eight of those addresses are ours, and the figure stood on the landing page as
       // the biggest number on the page. Additive, so nothing that reads the old fields changes.
       thinking_wallets: thinkers,
+      // The market's own books, ours and everybody else's side by side.
+      //
+      // Added on 2026-09-23. `paying_wallets` and `thinking_wallets` already carried the split,
+      // and the thing this service actually is, a market where jobs are posted and awarded, had no
+      // public figure at all. The awkward moment was drafting an answer to Conway issue #335,
+      // which asks for publicly verifiable evidence that any of this pays for itself: the answer
+      // quoted volume, commission and buyer counts out of a report only the operator runs. Asking
+      // somebody for an auditable wallet address while handing them numbers nobody can check is
+      // the thing that issue is complaining about.
+      market: marketSplit(db),
       // The free tier, in the open. An agent that reads only this endpoint has to be able to see
       // that it can start without owning USDC, and how much is left before it cannot.
       starter_credit_cents: mcToCents(GRANT_MC),

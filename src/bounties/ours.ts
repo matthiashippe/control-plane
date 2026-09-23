@@ -138,3 +138,71 @@ export function agentsPerBounty(
   }
   return perBounty;
 }
+
+/**
+ * The market's own numbers, split into ours and everybody else's, for anybody to read.
+ *
+ * Written on 2026-09-23 while drafting an answer to Conway issue #335, which asks for publicly
+ * verifiable evidence that any of this pays for itself and rightly complains that nobody shows
+ * their books. The draft answered with figures out of this database: foreign volume 0, foreign
+ * buyers 0, one award and both sides of it ours. Then the obvious objection landed on the draft
+ * itself. **None of those numbers were on any page.** Asking somebody for an auditable wallet
+ * address while handing them figures only I can see is the thing the issue is complaining about.
+ *
+ * So they are published. `/terms` already promises that nothing here counts our own jobs as
+ * somebody else's demand, and until now that promise was kept in a report only the operator runs.
+ *
+ * Two things this deliberately does not do. It does not count a job whose buyer never put money in
+ * (the same `topup` condition ops/db-report.cjs uses): a job the starter pool paid for is real
+ * activity and is not somebody choosing to spend. And it is a rolling 30 days rather than a total,
+ * because a total can only grow and therefore can never report a decline.
+ */
+export interface MarketSplit {
+  awarded_30d: { total: number; not_ours: number };
+  volume_30d_cents: { total: number; not_ours: number };
+  commission_30d_cents: { total: number; not_ours: number };
+  buyers: { total: number; not_ours: number };
+  agents: { total: number; not_ours: number };
+}
+
+export function marketSplit(db: Db): MarketSplit {
+  const awarded = db
+    .prepare(
+      `SELECT b.id, b.creator, b.price_mc,
+              (SELECT coalesce(sum(l.delta_mc), 0) FROM ledger l
+                WHERE l.kind = 'bounty_fee' AND l.ref = 'bounty-fee:' || b.id) AS fee_mc,
+              EXISTS (SELECT 1 FROM ledger t WHERE t.address = b.creator AND t.kind = 'topup') AS funded
+         FROM bounties b
+        WHERE b.status = 'awarded' AND b.closed_at > datetime('now', '-30 day')`,
+    )
+    .all() as { id: string; creator: string; price_mc: number; fee_mc: number; funded: number }[];
+
+  const buyers = (db.prepare("SELECT DISTINCT address FROM ledger WHERE kind = 'bounty_hold'").all() as {
+    address: string;
+  }[]).map((r) => r.address);
+  const agents = (db.prepare("SELECT DISTINCT agent FROM submissions").all() as {
+    agent: string;
+  }[]).map((r) => r.agent);
+
+  const known = ourAddresses(db, [...awarded.map((a) => a.creator), ...buyers, ...agents]);
+  const foreign = (a: (typeof awarded)[number]) => !known.has(a.creator.toLowerCase()) && a.funded === 1;
+  const cents = (mc: number) => Math.floor(mc / 1000);
+  const split = <T>(all: T[], isOurs: (x: T) => boolean) => ({
+    total: all.length,
+    not_ours: all.filter((x) => !isOurs(x)).length,
+  });
+
+  return {
+    awarded_30d: { total: awarded.length, not_ours: awarded.filter(foreign).length },
+    volume_30d_cents: {
+      total: cents(awarded.reduce((n, a) => n + a.price_mc, 0)),
+      not_ours: cents(awarded.filter(foreign).reduce((n, a) => n + a.price_mc, 0)),
+    },
+    commission_30d_cents: {
+      total: cents(awarded.reduce((n, a) => n + a.fee_mc, 0)),
+      not_ours: cents(awarded.filter(foreign).reduce((n, a) => n + a.fee_mc, 0)),
+    },
+    buyers: split(buyers, (a) => known.has(a.toLowerCase())),
+    agents: split(agents, (a) => known.has(a.toLowerCase())),
+  };
+}
