@@ -252,6 +252,39 @@ const DE: Copy = {
   things: (n) => (n === 1 ? "eine Sache" : `${n} Dinge`),
 };
 
+/**
+ * The same box, on the pages people actually land on.
+ *
+ * Measured over 96 hours of access log: 171 foreign addresses reached `/`, five reached `/check`.
+ * The check is the one thing here a stranger can use without an account, and it lived one click
+ * away behind three plain links, while `/fix` did not link to it at all. The leak is at the
+ * handoff, not inside the check, so the box moves to where the readers are rather than `/check`
+ * being made nicer for the five.
+ *
+ * Every field it carries is a mark the access log can count without anything being stored:
+ * `via=form` separates a typed draft from a click on one of our examples, and `src` names which
+ * page it came from. See ops/first-typing.sh, which needs no change for this.
+ *
+ * Renders nothing when the form is off, and "nothing" means nothing: a box that cannot submit is
+ * worse than a link.
+ */
+export function renderPasteBox(formAllowed: boolean, src: string, lang: "de" | "en" = "en"): string {
+  if (!formAllowed) return "";
+  const t = lang === "de" ? DE : EN;
+  return `<form method="GET" action="/check" class="pastebox">
+        <textarea name="brief" rows="4" placeholder="${esc(t.introPlaceholder)}" required></textarea>
+        <input type="hidden" name="via" value="form"><input type="hidden" name="src" value="${esc(src)}">
+        <div class="cta" style="align-items:center;gap:1rem">
+          <button class="btn btn-1" type="submit">${t.checkIt}</button>
+          <label class="fine" style="margin:0">
+            <input type="radio" name="kind" value="factual" checked> ${t.factual}
+            <input type="radio" name="kind" value="creative" style="margin-left:.6rem"> ${t.creative}
+          </label>
+        </div>
+      </form>
+      <p class="fine">${t.introKept}</p>`;
+}
+
 export interface Finding {
   missing: string;
 }

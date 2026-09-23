@@ -55,7 +55,7 @@ import { mcToCents, getBalanceCents, getBalanceMc, MC_PER_CENT } from "./db.js";
 import { block as ldBlock, dataset, howToFrom, organization, webPage, webSite } from "./public/jsonld.js";
 import { prefersHtml, renderApiPage } from "./public/apipage.js";
 import { siteOrigin, withOrigin } from "./public/site.js";
-import { renderCheck, renderCheckIntro } from "./public/checkpage.js";
+import { renderCheck, renderCheckIntro, renderPasteBox } from "./public/checkpage.js";
 import { detectBriefLanguage } from "./bounties/brief.de.js";
 import { DOC } from "./errors.js";
 import { Catalog, handleChat, MARKUP } from "./inference/proxy.js";
@@ -818,7 +818,8 @@ export function createApp(opts: AppOptions) {
    *
    * POST /v1/briefs/check answers a browser since 20:56 UTC on 2026-09-22, but a person has to get
    * there first, and the only way to send a POST from a page is a form, which the policy in
-   * deploy/ refuses with form-action 'none'. A GET needs none of that. So the same check answers
+   * deploy/ carried form-action 'none' until 2026-09-23 and carries 'self' since. A GET needed
+   * none of it either way. So the same check answers
    * here, reading the draft out of the query string, and the landing page can link two examples
    * that a reader can open with one click.
    *
@@ -922,6 +923,17 @@ export function createApp(opts: AppOptions) {
     // walks all seven pages for exactly this reason; checking one of them would have passed.
     return c.html(
       withOrigin(indexHtml
+        // The box, where the readers are. 171 foreign addresses reached this page over 96 hours
+        // and five reached /check, so the one thing a stranger can use without an account was one
+        // click away and nobody took it. `src=home` is what tells the log which page it came from.
+        .replace(
+          "<!--PASTEBOX-->",
+          renderPasteBox(
+            process.env.CP_FORM_ON_CHECK === "1",
+            "home",
+            langOf("", c.req.header("accept-language")),
+          ),
+        )
         .replace("<!--NUMBERS-->", renderNumbers(mcToCents(GRANT_MC), mcToCents(poolLeftMc(db))))
         .replace("<!--MARKET-->", renderMarket(db))
         .replace("<!--WALLETS-->", renderStatus(db))
@@ -2126,7 +2138,10 @@ export function createApp(opts: AppOptions) {
    * byte-identical JSON it got before, which `test/checkpage.test.ts` holds it to, because every
    * runtime reads this answer and a page where an object was expected breaks all of them at once.
    *
-   * The form itself is not on the page yet: the policy in deploy/ carries `form-action 'none'`,
+   * (Until 2026-09-23 the form was not on the page at all, because the policy in deploy/ carried
+   * `form-action 'none'`. It carries 'self' now and the box is rendered; the reasoning below is
+   * why the address-bar route was built first and why it still answers.)
+   * The older note: the policy in deploy/ carries `form-action 'none'`,
    * and deploy/** is not touched without a human. One word there, 'self' instead of 'none', and
    * the form can go up.
    *

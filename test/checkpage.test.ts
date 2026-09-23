@@ -210,16 +210,39 @@ describe("The way to the free check from the landing page", () => {
   it("offers it as a page and not only as an anchor", async () => {
     const html = await (await app().request("/")).text();
     const nav = html.slice(html.indexOf("<nav>"), html.indexOf("</nav>"));
-    expect(nav, "the nav item for the check has to be a real link").toContain('href="/check"');
+    // The query is the point, not decoration: `src=home` is what tells the access log which page
+    // a run came from, and it costs nothing because the log records the URI anyway.
+    expect(nav, "the nav item for the check has to be a real link").toMatch(/href="\/check(\?|")/);
+    expect(nav, "and it has to say where it came from").toContain("src=home");
     expect(nav, "an anchor leaves no log line, so it cannot be measured").not.toContain('href="#how"');
   });
 
-  it("offers a way out of the curl block for somebody without a terminal", async () => {
+  // Rewritten on 2026-09-23. The requirement was "a door next to the curl block", and it was met
+  // by a link nobody took: 171 foreign addresses reached this page in 96 hours and five reached
+  // /check. A door is now too little. What has to be here is the thing itself.
+  it("puts the box itself next to the curl block, not a door to it", async () => {
+    process.env.CP_FORM_ON_CHECK = "1";
+    try {
+      const html = await (await app().request("/")).text();
+      const after = html.slice(html.indexOf('id="how"'), html.indexOf('id="proof"'));
+      expect(after, "the hero panel is gone").not.toHaveLength(0);
+      expect(after, "a textarea, on the page people actually land on").toContain("<textarea");
+      expect(after, "posting to the check").toContain('action="/check"');
+      expect(after, "marked as typed, or the log cannot tell it from an example click").toContain(
+        'name="via" value="form"',
+      );
+      expect(after, "and marked with the page it came from").toContain('name="src" value="home"');
+    } finally {
+      delete process.env.CP_FORM_ON_CHECK;
+    }
+  });
+
+  it("renders no box at all while the form is switched off, rather than a dead one", async () => {
+    delete process.env.CP_FORM_ON_CHECK;
     const html = await (await app().request("/")).text();
-    const panel = html.slice(html.indexOf('id="how"'), html.indexOf("/px/top.png"));
     const after = html.slice(html.indexOf('id="how"'), html.indexOf('id="proof"'));
-    expect(panel.length + after.length, "the hero panel is gone").toBeGreaterThan(0);
-    expect(after, "the curl block needs a door next to it").toContain('href="/check"');
+    expect(after).not.toContain("<textarea");
+    expect(after, "and no leftover placeholder either").not.toContain("PASTEBOX");
   });
 });
 

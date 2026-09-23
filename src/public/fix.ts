@@ -133,7 +133,15 @@ GET  https://api.conway.tech/pay/5/&lt;address&gt;  -&gt; 402, a payable demand 
           <code>bootstrapTopup</code> asks. Here the credits do arrive. If you would rather look
           before you pay, move the USDC out first. Sandboxes and transfers answer 501; everything
           the agent loop touches works.${boardLine(db)}</span></span>
-          <a href="/">what this is</a>
+          <!--
+            src=fix, so the log can say this page sent somebody on. The derivation round of
+            2026-09-23 proposed putting the brief-check box on this page, because 34 foreign
+            addresses reach it and only five reach /check. It is not built, and the reason is who
+            reads this page: somebody whose agent has stopped. The check is the buyer's tool, and
+            offering it here would be selling the other side of the market to a person holding a
+            broken runtime. What belongs here is the board, and boardLine above names it.
+          -->
+          <a href="/?src=fix">what this is</a>
         </div>
       </div>
 
