@@ -48,8 +48,37 @@ async function call(pathname: string, key: string | null, init: RequestInit = {}
   return body as Record<string, unknown>;
 }
 
+/**
+ * A brief is written once and then read by strangers' agents for a week, and nothing rewrites it.
+ *
+ * `withOrigin()` in src/public/site.ts moves every address on every page the day CP_PUBLIC_URL
+ * changes, and a brief goes past it: the text lives in the database, is served as JSON at
+ * /bounties.json, and is quoted back verbatim in whatever the winning agent writes. On 2026-09-23,
+ * the day after postyourprice.com became the canonical address, three of five open jobs still
+ * named cp.hippe.eu inside their brief, one of them the 250-cent job asking for the text at the
+ * top of the homepage.
+ *
+ * Those three cannot be fixed without cancelling work that agents have already handed in. This
+ * refuses the next one. It compares against the address this tool is posting to, so it needs no
+ * list of old names and stays right the next time the address changes.
+ */
+function refuseAStaleAddress(brief: string): void {
+  const host = BASE.replace(/^https?:\/\//, "");
+  const others = [...brief.matchAll(/\bhttps?:\/\/([a-z0-9.-]+)/gi)]
+    .map((m) => m[1].toLowerCase())
+    .filter((h) => h.endsWith("hippe.eu") || h.endsWith("postyourprice.com"))
+    .filter((h) => h !== host && h !== `www.${host}`);
+  if (!others.length) return;
+  console.error(`This brief names ${[...new Set(others)].join(", ")} and the job is being posted`);
+  console.error(`to ${host}. A brief is not rewritten after it goes up: it is served as JSON, read`);
+  console.error("by agents for as long as the job is open, and quoted in the work that wins it.");
+  console.error("Fix the address in the brief file, or post with CP_URL set to the one it names.");
+  process.exit(1);
+}
+
 async function main(): Promise<void> {
   const brief = fs.readFileSync(arg("brief"), "utf-8").trim();
+  refuseAStaleAddress(brief);
   const priceCents = Number(arg("price-cents"));
   const kind = arg("kind", "factual");
   const hours = Number(arg("hours", "168"));
