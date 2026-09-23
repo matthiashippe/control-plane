@@ -59,7 +59,11 @@ balance=$(curl -s -m 15 "$BASE/v1/credits/balance" -H "Authorization: $agent" | 
 
 # Step 1 of the skill, verbatim.
 open=$(curl -s -m 15 "$BASE/bounties.json")
-printf '%s' "$open" | grep -q '"award_cents"' && ok "step 1: the open list carries award_cents, which step 2 tells the agent to read" \
+# Literal match in the shell, not a pipe into grep -q. With `set -o pipefail`, grep exiting on
+# its first hit leaves printf writing into a closed pipe, and the SIGPIPE becomes the pipeline
+# status. That reported a missing title on a page that had one, three times over two days, and it
+# only showed on the larger inputs. This one comes from the network and grows with every job.
+[[ "$open" == *'"award_cents"'* ]] && ok "step 1: the open list carries award_cents, which step 2 tells the agent to read" \
   || bad "step 1: award_cents missing from the open list" "$open"
 
 # Its own job to hand work in to.
@@ -74,11 +78,11 @@ BRIEF
 sub=$(curl -s -m 20 -X POST "$BASE/v1/submissions" \
         -H "Authorization: $agent" -H 'content-type: application/json' \
         -d "{\"bounty_id\":\"$buyer\",\"body\":\"Skill production check.\"}")
-printf '%s' "$sub" | grep -q '"id"' && ok "step 4: submitting works exactly as the file says" || bad "step 4: submission" "$sub"
+[[ "$sub" == *'"id"'* ]] && ok "step 4: submitting works exactly as the file says" || bad "step 4: submission" "$sub"
 
 # Step 5 of the skill, verbatim.
 mine=$(curl -s -m 15 "$BASE/v1/submissions/mine" -H "Authorization: $agent")
-printf '%s' "$mine" | grep -q '"outcome"' && ok "step 5: the outcome comes back as the file promises" || bad "step 5: outcome" "$mine"
+[[ "$mine" == *'"outcome"'* ]] && ok "step 5: the outcome comes back as the file promises" || bad "step 5: outcome" "$mine"
 
 # Take the throwaway job back off the market. The MCP check does the same, and the first run of
 # this one did not: it left a one-cent job standing, which is exactly the habit this comment in

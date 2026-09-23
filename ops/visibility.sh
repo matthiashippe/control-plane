@@ -181,7 +181,8 @@ fi
 # has been here, "what is missing is a link" is no longer true and would read as an instruction to
 # do the thing that already worked; while none has, saying one has would be worse still. So it is
 # read out of the report rather than written twice.
-if printf '%s' "$crawler_report" | grep -q "FIRST CRAWLER"; then
+# No pipe: see the note in ops/check-pages.sh about grep -q, SIGPIPE and pipefail.
+if [[ "$crawler_report" == *"FIRST CRAWLER"* ]]; then
   echo "VISIBILITY OK on our side, and something that indexes the web has been here."
   echo "Whether it stays is a question about new links, not about this repository."
 else
