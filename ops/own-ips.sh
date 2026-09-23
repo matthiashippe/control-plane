@@ -23,7 +23,24 @@
 # THIS moment, and by the time the function runs it can be empty. It was, and the function
 # quietly created a second list in whatever directory the caller happened to stand in, where
 # nobody commits it. A history that writes to the wrong place is not a history.
-CP_OWN_IPS_FILE="${CP_OWN_IPS_FILE:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/own-ips.txt}"
+#
+# And BASH_SOURCE does not exist in zsh, which is the shell an operator stands in. Sourcing this
+# from a zsh prompt made `dirname ""` resolve to `.`, so the path became <repo>/own-ips.txt and the
+# guard below refused. That guard is what saved it: on 2026-09-23 a hand-written traffic query ran
+# with an empty own-list and was one step from reporting our own address, with 11,772 requests in
+# the log, as a stranger who got errors. The fallbacks below cover the shell; the guard stays
+# because a list that is merely absent must never read as a list that is empty.
+if [[ -z "${CP_OWN_IPS_FILE:-}" ]]; then
+  if [[ -n "${BASH_SOURCE[0]:-}" ]]; then
+    CP_OWN_IPS_FILE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/own-ips.txt"
+  elif [[ -f "$PWD/ops/own-ips.txt" ]]; then
+    CP_OWN_IPS_FILE="$PWD/ops/own-ips.txt"
+  elif [[ -f "$PWD/own-ips.txt" ]]; then
+    CP_OWN_IPS_FILE="$PWD/own-ips.txt"
+  else
+    CP_OWN_IPS_FILE="$PWD/own-ips.txt"
+  fi
+fi
 
 own_ips() {
   local list_file="$CP_OWN_IPS_FILE"
@@ -35,6 +52,8 @@ own_ips() {
   if [[ ! -f "$list_file" ]]; then
     echo "own_ips: $list_file is not there. The list of our own addresses lives in the" >&2
     echo "            repository; without it every traffic count is guesswork." >&2
+    echo "            If you are in zsh, source this from the repository root or set" >&2
+    echo "            CP_OWN_IPS_FILE=<repo>/ops/own-ips.txt; zsh has no BASH_SOURCE." >&2
     return 1
   fi
   live=$(timeout 15 ssh -i "$key" -o BatchMode=yes -o ConnectTimeout=8 "$host" \
