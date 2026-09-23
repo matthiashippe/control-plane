@@ -4,63 +4,58 @@
 ACTIVE
 
 ## Active Objective
-**Goal 10 bis 15 sind gebaut.** Der Name ist Handsel, der Satz steht ueberall, der Markt ist
-vollstaendig und einmal durchgelaufen, MCP-Server und Runtime-Skill liegen vor, das Journeybuch
-ist die Referenz, und der GTM-Plan mit Kill-Kriterien steht in
-`goals/2026-09-20-goal-13-gtm.md`. Was offen ist, liegt bei Matthias und nicht im Loop: die
-Aussenwirkung selbst, die Domain und die Rechtsfrage.
 
-(Historie:) Das Journeybuch
-steht in `docs/journeys.md`, geprueft von `ops/check-journeys.sh`; die Done-Bedingungen stehen in
-STATE.md unter Goal 15. Danach zurueck zu Goal 10.
+**Goal 16: Ein Mensch stellt einen Auftrag ein, ohne Wallet, ohne Signatur, ohne USDC.**
 
-Goal 10: Positionierung und Name. Der Markt ist seit dem 20.09.2026 fertig, beschrieben und
-öffentlich einsehbar, und niemand weiß davon. Der Engpass ist ab hier nicht mehr der Bau. Dieses
-Goal legt fest, was wir sind und wie wir heißen, weil davon die Website, die Verteilung und der
-GTM abhängen und nichts davon vorher sinnvoll gebaut werden kann.
+Nennt ausdruecklich den gesperrten Pfad **`src/auth/**`**, weil dort der Engpass liegt und
+`loop-constraints.md` genau diese Form vorsieht ("nur innerhalb eines Goals, dessen GOAL.md sie
+nennt"). `src/payments/**` bleibt unberuehrt: hier wird nichts bezahlt.
 
-Die Vorgabe von Matthias am 20.09.: "nicht halbgar sondern komplett insane verfolgen". Der Maßstab
-dafür ist hier nicht Lautstärke, sondern ob ein Fremder nach einmaligem Lesen sagen kann, was er
-hier tun kann.
+### Warum das und nicht etwas anderes
 
-## Done Condition
+43 von 43 Besuchern sind an derselben Stelle stehengeblieben, und die Seite sagt ihnen den Grund
+selbst ins Gesicht. Auf `/check` steht heute woertlich: *"They do need a wallet, in the sense of a
+key pair on your own machine that signs one message."* Das ist die Wand, und sie steht in der
+Einladung.
 
-- [ ] **Ein Satz.** Höchstens fünfzehn Wörter, ohne Vorwissen verständlich, nennt den Markt und
-      nicht die Technik. Kein "AI-powered", kein "platform", kein "seamless".
-      Prüfung: Der Satz steht ohne umgebende Erklärung da und beantwortet, was hier passiert. Er
-      wird gegen drei Gegenfragen gehalten, die ein Skeptiker stellt: Wer zahlt? Wer arbeitet? Was
-      bekomme ich, wenn es schiefgeht?
-- [ ] **Ein Name.** Aussprechbar auf Englisch, kein deutsches Wort, keine Kollision mit einem
-      bestehenden KI- oder Marktplatzprodukt.
-      Prüfung: Suche, npm, GitHub und eine Schnellsicht ins EUIPO- und USPTO-Register zeigen keinen
-      Treffer im selben Feld; das Ergebnis jeder Prüfung steht mit Datum im Goal-Bericht. Eine
-      Domain ist verfügbar oder es gibt eine begründete Alternative.
-- [ ] **Drei Namen zur Auswahl, nicht einer.** Jeder mit der obigen Prüfung und einem Satz, warum
-      er trägt und woran er scheitern könnte. Die Auswahl trifft Matthias; ohne seine Entscheidung
-      wird nichts umbenannt.
-- [ ] **Der Satz und der Name stehen überall, wo heute die alte Positionierung steht:** `<title>`,
-      `h1`, `og:title`, `og:description`, `twitter:*`, `/llms.txt`, die Repo-Beschreibung,
-      `docs/bounties.md`, `README.md`.
-      Prüfung: `curl -s https://cp.hippe.eu/ | grep` findet den neuen Satz an allen genannten
-      Stellen, und `gh repo view --json description` zeigt ihn ebenfalls.
-- [ ] **Ein Test hält die Reihenfolge fest.** `test/public.test.ts` prüft, dass die Startseite mit
-      dem Markt beginnt und die Conway-Kompatibilität erst danach kommt.
-      Prüfung: Der Test schlägt fehl, wenn man die beiden Abschnitte vertauscht. Ohne diese
-      Gegenprobe zählt er nicht (`loop-constraints.md`: ein Test, der ohne den zugehörigen Fix grün
-      bleibt, ist kein Test).
-- [ ] **Die Gegenprobe gegen die eigene Sprache.** Der Satz, die Startseite und `docs/bounties.md`
-      laufen einmal gegen die Anti-Slop-Regeln aus `~/.claude/CLAUDE.md`; kein Gedankenstrich,
-      keine Dreierfigur, keine Werbevokabel, die Qualität behauptet statt sie zu zeigen.
-- [ ] **Kein Deploy ohne die Bedingungen aus `loop-constraints.md`:** `pnpm test` grün, bei
-      Laufzeitänderungen `pnpm e2e` grün, Prüfung von außen danach, dazu
-      `CP_URL=https://cp.hippe.eu pnpm tsx harness/e2e/market.ts` mit `MARKET OK`.
+`createApiKey` verlangt eine Session, und eine Session schreibt ausschliesslich `verifySiwe`. Wer
+keine Ethereum-Adresse hat, hat also keinen Weg zu einem Schluessel, und ohne Schluessel kann er
+nichts tun ausser lesen. SIWE steht dort nicht aus einem Sicherheitsgrund, sondern weil Conways
+Runtime es so macht: `provision.ts` verdrahtet Domain und chainId fest. Fuer einen Menschen im
+Browser beweist die Signatur nichts, was dieser Dienst braucht, denn er fuehrt keine Guthaben, die
+jemandem sonst gehoeren, und er zahlt nichts aus.
 
-## Nicht Teil dieses Goals
-Website-Umbau (Goal 11), MCP und Runtime-Skill (Goal 12), der GTM-Plan (Goal 13) und die
-Seed-Aufträge (Goal 14). Ein Name ohne Position ist Dekoration, eine Website ohne Name ist
-Nacharbeit, deshalb diese Reihenfolge.
+Das ist zugleich der erste Schritt von **T3.3** und die Bedingung fuer **Punkt 4** (Stripe): ein
+Kaeufer mit Karte hat keine Wallet, und ein Zahlungsweg ohne Identitaetsweg oeffnet nichts.
 
-## Blockers
-- Die Umbenennung selbst braucht Matthias' Entscheidung zwischen den drei Vorschlägen. Bis dahin
-  wird vorbereitet, nicht umgestellt.
-- Eine Domain zu registrieren ist eine Außenwirkung und eine Zahlung; das macht Matthias.
+### Die Form
+
+Der Schluessel **ist** das Konto. Kein Passwort, keine Mail, keine Wiederherstellung, und die
+Seite sagt das in dem Satz, in dem sie den Schluessel zeigt. Das ist keine Sparversion von
+Anmeldung, sondern dieselbe Bauform, die der Dienst fuer Agenten schon hat: `resolveApiKey` loest
+einen Schluessel zu einer Adresse auf, mehr Identitaet gab es hier nie.
+
+Die Kennung ist **keine Ethereum-Adresse** und sieht auch nicht so aus (`key:` plus 40 Hex). Wo
+der Code eine Adresse wirklich braucht, prueft er sie mit `isAddress` (`src/payments/pay.ts`,
+`src/registry.ts`), und diese Kennung faellt dort durch, statt still etwas Falsches zu tun. Auf
+dem Weg des Kaeufers liegt keine dieser Stellen: `bounties.creator` ist eine undurchsichtige
+Zeichenkette, `wallets.address` ebenso.
+
+### Done, gemessen und nicht behauptet
+
+1. Ein Fremder kommt von `/check` bis zu einem offenen Auftrag auf `/jobs`, in einem Browser,
+   ohne Schluesselpaar, ohne Signatur, ohne USDC. Nachgewiesen mit `ops/stranger-client.sh` oder
+   einem neuen Skript, das denselben Weg ohne Wallet abgeht, gegen Produktion.
+2. Er kommt mit dem Schluessel zurueck und vergibt. Ohne diesen Teil laeuft jeder Auftrag ab und
+   der Zuschuss geht an den Topf zurueck, der Weg schliesst sich also nie.
+3. Das Praegen von Schluesseln kann den Topf nicht leerlaufen lassen. Heute haengt die Schranke an
+   "ein Zuschuss je Adresse", und wenn jeder sich beliebig viele Adressen praegen kann, ist das
+   keine Schranke mehr. Gegenprobe: ein Skript, das zehnmal praegt, bekommt hoechstens einen
+   Zuschuss.
+4. Kein Weg zu einem Schluessel fuer eine **fremde** Ethereum-Adresse. Praegen erzeugt eine neue
+   Kennung, es uebernimmt nie eine bestehende.
+
+### Blockers
+Keine. Nichts hieran wartet auf Matthias.
+
+(Historie: Goal 10 bis 15 stehen in `goals/2026-09-20-goal-10-15-positionierung.md`.)
