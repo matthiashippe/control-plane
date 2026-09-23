@@ -429,8 +429,9 @@ for w in db.get('wallets_foreign_new_24h', []):
     print(f\"NEW     {w['address']} provisioned {w['created_at'][11:16]} UTC, \"
           f\"key {', '.join(w['key_names']) or '(none)'}, \"
           f\"{'has used it' if w['used'] else 'has not used it yet'}\")
+buyers_left = m.get('starter_buyer_grants_left', 0)
 left = m.get('starter_grants_left', 0)
-print(f\"newcomers the starter pool still carries: {left}\")
+print(f\"newcomers the starter pool still carries: {left} agent(s) at 15 c, or {buyers_left} buyer(s) at 50 c. Not both.\")
 if left < 3:
     print(f\"FAILED  the starter pool carries {left} more newcomer(s). /fix, the landing page \"
           f\"and /post all promise a fresh wallet 15 cents, and that promise is about this pot. \"

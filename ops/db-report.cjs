@@ -271,7 +271,17 @@ report.market = {
   // So the number is the one the pages depend on, in the unit the promise is made in. It is not a
   // rate and not a forecast: consumption here comes in bursts, a probe run or a wave of seed
   // agents, and a per-day figure derived from that would be a made-up trend.
-  starter_grants_left: Math.floor((500000 - one("select coalesce(sum(delta_mc),0) s from ledger where kind='grant'").s) / 15000),
+  // Two sides, two capacities, because since 2026-09-23 a grant is not one size any more. An agent
+  // gets 15 c and a buyer's first job gets up to 50, so one figure of "newcomers left" hid a
+  // threefold difference: at 150 c the pool carries ten agents or three buyers, and three buyers
+  // is the number that decides whether the answers going out tomorrow meet an offer or a refusal.
+  //
+  // And it nets grant_returned, the way the service's own poolLeftMc does. A job posted and
+  // cancelled gave nobody anything and its credit is back in the pool; counting it as spent made
+  // this figure pessimistic after every cancellation, which is the direction that quietly shrinks
+  // a promise the pages are still making.
+  starter_grants_left: Math.floor((500000 - one("select coalesce(sum(delta_mc),0) s from ledger where kind in ('grant','grant_returned')").s) / 15000),
+  starter_buyer_grants_left: Math.floor((500000 - one("select coalesce(sum(delta_mc),0) s from ledger where kind in ('grant','grant_returned')").s) / 50000),
   // Money the buyer brought, against money we handed them.
   //
   // `foreign_gmv_30d_mc` below is the number the whole plan is measured by, and it was about to
