@@ -51,7 +51,16 @@ gebaut und nicht aus den Vorlagen: in jeder Begruendung stand der bessere Zug.
       Vergabe keine `topup`-Zeile im Ledger hat, zaehlt dort statt in der Zielzahl. Erster Schritt:
       die Query in `ops/db-report.cjs:269` um `not exists (select 1 from ledger where address =
       b.creator and kind = 'topup')` ergaenzen, Fall in `test/db-report.test.ts`. 1 h.
-- [ ] **T1.2 Der erste Auftrag einer fremden Adresse laeuft aus dem Topf.** Zahl: `foreign_buyers`
+- [x] **T1.2 Der erste Auftrag einer fremden Adresse laeuft aus dem Topf.** Erledigt 23.09.,
+      Commit `b3df7f2`, ausgerollt 12:11 UTC. Der Zuschuss deckt genau die Luecke des Auftrags, bis
+      50 Cent, und gehoert dem **Auftrag**: endet er ohne Vergabe, geht das Guthaben an den Topf
+      zurueck statt auf die Wallet. Ohne diese zweite Haelfte waere es ein Weg gewesen, den Topf in
+      Inferenz zu verwandeln, zum dreifachen Agentensatz, und die Adresse haette trotzdem in
+      `foreign_buyers` gestanden. Vier neue Faelle, Gegenprobe in beide Richtungen.
+      **Offene Kante, bewusst:** wer zurueckzieht, hat seinen einen Zuschuss verbraucht. Das zu
+      heilen verlangt, den Unique-Index zu verschieben, also eine Migration auf einem laufenden
+      Ledger, und das gehoert nicht in denselben Commit wie eine Geldfluss-Aenderung.
+      (alter Text) Zahl: `foreign_buyers`
       0 auf bis zu 4, `grant_funded_gmv_30d` 0 auf bis zu 2 USD, `foreign_gmv_30d` bewusst
       unberuehrt. 15 Cent tragen keinen Auftrag, den ein Agent ernst nimmt; der Erstauftrag einer
       Adresse ohne eigenes USDC bekommt 50. Der Preis steht dazu: 215 Cent im Topf sind entweder
@@ -137,7 +146,11 @@ Frage, ob wir halten oder vermitteln. **Das ist die Entscheidung, und sie gehoer
 
 ### Ziel 29.10. -- 5.000 USDC fremdes Volumen
 
-- [ ] **T3.1 `1c89045` ausrollen.** Die einzige Zeile auf der Angebotsseite, die nichts kostet.
+- [x] **T3.1 `1c89045` ausrollen.** Erledigt 23.09. um 12:11 UTC, zusammen mit T1.2. Nach vier
+      Fehlschlaegen (dreimal Registry, einmal die Vorpruefung aus M10) lief der fuenfte durch.
+      Live auf `/jobs`: *"Credits here, not cash: they buy about 177 more answers at the 0.76 ¢ an
+      answer this service has averaged so far."*
+      (alter Text) Die einzige Zeile auf der Angebotsseite, die nichts kostet.
       Am 23.09. dreimal abgelehnt (Registry), danach einmal an einer falschen Vorpruefung. 0,5 h.
 - [ ] **T3.2 Aus Punkt 4 eine Entscheidung machen statt einer Besorgung.** Eine halbe Seite mit
       den drei Fragen, die das Stripe-Konto wirklich blockieren: Rechtsform, weil der Dienst privat
