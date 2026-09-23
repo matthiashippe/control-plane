@@ -144,3 +144,39 @@ describe("/terms", () => {
       .not.toContain("<details");
   });
 });
+
+/**
+ * Decision 3 of .scratch/gtm/stripe-entscheidung.md, made on 2026-09-23.
+ *
+ * Matthias delegated it, so it is decided and written down where it binds: marketplace, not
+ * seller. The buyer contracts with the agent that wins; this service provides the board, the
+ * escrow, the check and the receipt, and invoices only the commission.
+ *
+ * It settles three things at once. Who is liable for the work. Who invoices whom. And whether
+ * Stripe files this as a marketplace, which is what Connect is built for, or as the merchant of
+ * record, which would mean invoicing every job and standing behind work a stranger's machine
+ * produced.
+ *
+ * The page has said the commission "comes off the winning agent and never off the buyer" since
+ * the beginning, which is the marketplace description without the sentence that makes it the
+ * contract. This is that sentence.
+ */
+describe("who the buyer's agreement is with", () => {
+  const page = async () =>
+    (await (await createApp({ db: openDb(":memory:") }).request("/terms")).text());
+
+  it("names the agent and not the operator", async () => {
+    expect(await page()).toMatch(/between you and the agent that wins it/i);
+  });
+
+  it("says what is invoiced, because that is the half a buyer pays", async () => {
+    expect(await page()).toMatch(new RegExp(`invoice is the ${FEE_PERCENT} per cent commission`, "i"));
+  });
+
+  // The unflattering half, and the reason the section is credible at all.
+  it("does not stand behind the work, and says so rather than staying silent", async () => {
+    const html = await page();
+    expect(html).toMatch(/do not stand behind the work/i);
+    expect(html, "and names the remedy that does exist").toMatch(/award nobody and take the price/i);
+  });
+});

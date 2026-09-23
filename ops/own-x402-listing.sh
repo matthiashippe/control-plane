@@ -149,6 +149,48 @@ fi
 # Not in the catalogue. Then the interesting number is whether the facilitator has recorded any
 # settlement for us at all, because that separates "nobody paid" from "paid and not catalogued",
 # and it is the whole reason the cause is an open question rather than a missing payment.
+# The cron scan is from 04:40 and the question is now.
+#
+# Until 2026-09-23 this read only the file the nightly scan left, which is right for the series and
+# wrong on the one day it matters: Matthias registered a merchant account that afternoon, and the
+# answer to "did it work" would have been a day old. So before concluding absence, the live
+# listing is asked as well. Both directories are paged; this walks PayAI, which is where the
+# account is, and stops at the first page that does not answer.
+live=$(python3 - "$CP_OWN_HOSTS" <<'PY2'
+import json, sys, urllib.request
+hosts = [h for h in sys.argv[1].split() if h]
+found, seen = [], 0
+try:
+    for offset in range(0, 8000, 1000):
+        url = f"https://facilitator.payai.network/discovery/resources?limit=1000&offset={offset}"
+        req = urllib.request.Request(url, headers={"Accept": "application/json", "User-Agent": "control-plane-check/1.0"})
+        with urllib.request.urlopen(req, timeout=30) as r:
+            items = json.load(r).get("items") or []
+        if not items:
+            break
+        seen += len(items)
+        for it in items:
+            res = str(it.get("resource") or "")
+            if any(h in res for h in hosts):
+                found.append(res)
+except Exception as e:
+    print(f"? could not ask the live listing: {e}")
+    raise SystemExit(0)
+print(("LISTED " + "; ".join(found[:3])) if found else f"none {seen}")
+PY2
+)
+case "$live" in
+  LISTED*)
+    echo "LISTED  the LIVE listing carries one of our hosts, ahead of today's scan file:"
+    printf '        %s\n' "${live#LISTED }"
+    echo "        This is the flip. Re-run ops/own-x402-listing.sh tomorrow to see it in the series."
+    exit 0 ;;
+  "?"*) echo "        (live listing not reachable, falling back to today's scan)" >&2 ;;
+  none*)
+    # Said out loud, because an absence nobody can see the freshness of is the same as no check.
+    echo "live    asked the PayAI listing just now, ${live#none } entries, none of them ours." ;;
+esac
+
 settlements=$(python3 - "$FACILITATOR" "$OWN_RESOURCE" <<'PY'
 import json, sys, urllib.parse, urllib.request
 
