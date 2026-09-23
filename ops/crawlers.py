@@ -41,11 +41,12 @@ def sitemap_pages():
     quietly checking a shorter list, because "nothing missing" from a truncated list is a lie.
     """
     try:
-        req = urllib.request.Request("https://cp.hippe.eu/sitemap.xml",
+        base = os.environ.get("CP_URL", "https://cp.hippe.eu").rstrip("/")
+        req = urllib.request.Request(base + "/sitemap.xml",
                                      headers={"User-Agent": "control-plane-check/1.0 (+https://cp.hippe.eu)"})
         with urllib.request.urlopen(req, timeout=15) as r:
             xml = r.read().decode("utf-8", "replace")
-        return [u.replace("https://cp.hippe.eu", "") or "/" for u in re.findall(r"<loc>([^<]+)</loc>", xml)], None
+        return [re.sub(r"^https?://[^/]*", "", u) or "/" for u in re.findall(r"<loc>([^<]+)</loc>", xml)], None
     except Exception as exc:
         return [], str(exc)
 

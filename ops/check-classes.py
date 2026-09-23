@@ -56,7 +56,11 @@ def pages_from_sitemap(base: str) -> list[str]:
     except Exception as e:  # noqa: BLE001 - any failure here means the list is unknown, not empty
         print(f"COULD NOT TELL: the sitemap at {base} was not readable: {e}", file=sys.stderr)
         raise SystemExit(2)
-    paths = [m or "/" for m in re.findall(r"<loc>" + re.escape(base) + r"([^<]*)</loc>", xml)]
+    # Match any host, not the one this script was told to use. Those were the same thing until
+    # 2026-09-23, when the sitemap moved to postyourprice.com while base still said cp.hippe.eu:
+    # the pattern matched nothing, paths came back empty, and this printed "the sitemap named 0
+    # page(s)" about a sitemap with nine of them.
+    paths = [m or "/" for m in re.findall(r"<loc>https?://[^/]*([^<]*)</loc>", xml)]
     if len(paths) < 5:
         print(
             f"COULD NOT TELL: the sitemap named {len(paths)} page(s), too few to be the real list.",

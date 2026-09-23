@@ -30,7 +30,11 @@ bad()  { failures=$((failures+1)); echo "FAILED  $1"; [[ -n "${2:-}" ]] && echo 
 PAGES=()
 while IFS= read -r line; do
   [[ -n "$line" ]] && PAGES+=("$line")
-done < <(curl -s -m 15 "$BASE/sitemap.xml" | grep -oE '<loc>[^<]*' | sed "s|<loc>$BASE||" | sed 's|^$|/|')
+  # The host is stripped by pattern, not by comparing against BASE. Those two were the same thing
+  # until 2026-09-23, when the sitemap moved to postyourprice.com while BASE still said
+  # cp.hippe.eu: the substitution matched nothing and the page list filled with strings that equal
+  # no path. Four tools then reported, quietly, that they could not judge anything.
+done < <(curl -s -m 15 "$BASE/sitemap.xml" | grep -oE '<loc>[^<]*' | sed -E 's|^<loc>https?://[^/]*||' | sed 's|^$|/|')
 if (( ${#PAGES[@]} < 5 )); then
   echo "COULD NOT TELL: the sitemap named ${#PAGES[@]} page(s), which is too few to be the real list." >&2
   exit 2
