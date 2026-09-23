@@ -37,17 +37,59 @@ export interface BriefFinding {
 /** Under this many words a brief cannot carry a task, a reader and a limit at once. */
 const SHORT_WORDS = 25;
 
-/** "90 words", "one paragraph", "3 sentences", "80 words maximum". */
-const LENGTH = /\b(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+(word|words|character|characters|sentence|sentences|paragraph|paragraphs|line|lines|bullet|bullets)\b/i;
+/**
+ * German alongside English, because the check was telling German briefs they were bad.
+ *
+ * Measured against production on 2026-09-23 with one brief in two languages, the same brief: the
+ * English version came back with zero findings and the German with four, and every one of the
+ * four was wrong. "400 bis 500 Woerter" is a length. "Nur den Text abgeben, kein Anschreiben" is
+ * a deliverable. "Keinen Preis nennen und kein Gesetz ohne Paragraphennummer zitieren" rules
+ * things out. "fuer einen Vermieter, der zum ersten Mal einen bestellt" is a reader.
+ *
+ * That is worse than a gap. A check whose whole promise is "this names what your brief does not
+ * say" told a careful writer four times over that they had left out things they had written down,
+ * and it did it on the one page a stranger can use without an account, in the language of the
+ * market this is run from.
+ *
+ * The patterns stay patterns and do not become a model. They are cheap, they are readable, and
+ * what they cost when they are wrong is exactly what was just measured, which is the argument for
+ * keeping them small rather than clever. Umlauts are matched both ways: somebody typing into a
+ * web form writes "Wörter", somebody pasting out of a terminal often writes "Woerter".
+ */
 
-/** "Deliver the finished paragraph only", "return just the JSON", "hand in the text". */
-const DELIVERABLE = /\b(deliver|return|reply with|respond with|hand in|output|submit)\b[^.]{0,80}\b(only|nothing else|just)\b|\bnothing else\b/i;
+/** "90 words", "one paragraph", "3 sentences", "400 bis 500 Woerter", "zwei Absaetze". */
+const LENGTH =
+  /\b(\d+|one|two|three|four|five|six|seven|eight|nine|ten|ein|eine|zwei|drei|vier|fuenf|f\u00fcnf|sechs|sieben|acht|neun|zehn)\s+(?:bis\s+\d+\s+)?(word|words|character|characters|sentence|sentences|paragraph|paragraphs|line|lines|bullet|bullets|W\u00f6rter|Woerter|Wort|Zeichen|Satz|S\u00e4tze|Saetze|Absatz|Abs\u00e4tze|Absaetze|Zeile|Zeilen|Stichpunkte?|Aufz\u00e4hlungspunkte?)\b/i;
 
-/** "Do not use", "no lists of three", "avoid", "must not". */
-const RULED_OUT = /\b(do not|don't|never|avoid|without|no more than|must not|do no)\b/i;
+/** "Deliver the paragraph only", "Nur den Text abgeben", "sonst nichts", "ohne Anschreiben". */
+const DELIVERABLE =
+  /\b(deliver|return|reply with|respond with|hand in|output|submit)\b[^.]{0,80}\b(only|nothing else|just)\b|\bnothing else\b|\bnur\s+(den|die|das)\b[^.]{0,60}\b(abgeben|liefern|ausgeben|zur\u00fcckgeben|zurueckgeben|schreiben)\b|\bsonst nichts\b|\bnichts (?:weiter|anderes)\b|\bkein(?:e|en)?\s+(?:Anschreiben|Vorwort|Einleitung|Kommentar|Erkl\u00e4rung|Erklaerung)\b/i;
 
-/** "for a developer", "aimed at", "the reader is", "who has never". */
-const READER = /\b(reader|audience|aimed at|for (a|an|somebody|someone|people|developers?|buyers?|customers?|managers?)|who has never|deciding whether)\b/i;
+/**
+ * "Do not use", "avoid", "Keinen Preis nennen", "nicht erfinden", "vermeide".
+ *
+ * Die deutsche Halfte haengt an einer Verbliste und nicht an "kein" allein. Gemessen am
+ * 2026-09-23: ein Brief mit "das keinen Keller und keine Garage hat" liess den Check
+ * verstummen, obwohl der Brief nichts ausschliesst. Das ist derselbe Fehler wie der, den
+ * diese Aenderung behebt, nur in die andere Richtung, und er ist der teurere: ein falscher
+ * Befund aergert, ein ausgelassener Befund macht den Check wertlos.
+ */
+// eslint-disable-next-line no-useless-escape
+const VERBOT_VERB =
+  "nennen|zitieren|verwenden|benutzen|erw\u00e4hnen|erwaehnen|schreiben|behaupten|versprechen|" +
+  "empfehlen|bewerten|vergleichen|aufz\u00e4hlen|aufzaehlen|erfinden|spekulieren|werben|angeben|" +
+  "einbauen|ausgeben|liefern|anpreisen|beziffern|sch\u00e4tzen|schaetzen";
+const RULED_OUT = new RegExp(
+  "\\b(do not|don't|never|avoid|without|no more than|must not|do no)\\b" +
+    `|\\bkein(?:e|en|em|er)?\\b[^.]{0,60}?\\b(?:${VERBOT_VERB})\\b` +
+    `|\\b(?:nicht|niemals|keinesfalls)\\s+(?:\\w+\\s+){0,3}?(?:${VERBOT_VERB})\\b` +
+    "|\\bvermeide\\b|\\bverzichte auf\\b|\\bunzul\u00e4ssig\\b|\\bverboten\\b|\\btabu\\b",
+  "i",
+);
+
+/** "for a developer", "aimed at", "fuer einen Vermieter", "die Leserin ist", "richtet sich an". */
+const READER =
+  /\b(reader|audience|aimed at|for (a|an|somebody|someone|people|developers?|buyers?|customers?|managers?)|who has never|deciding whether)\b|\bf\u00fcr\s+(?:eine[nm]?|die|den|das)\b|\bfuer\s+(?:eine[nm]?|die|den|das)\b|\b(?:Leser|Leserin|Zielgruppe|Publikum)\b|\brichtet sich an\b|\bder\s+(?:noch\s+)?nie\b/i;
 
 /**
  * Reads a brief and names what is absent. Never judges what is there.
