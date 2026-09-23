@@ -58,10 +58,17 @@ else.
 | A0.1 | Arrives on the landing page | The nav says **The free check**, and the hero panel says *Try it without a terminal* | works |
 | A0.2 | Opens `/check` | Two drafts of the same job to click: one nobody could work from, and the same job said properly | works |
 | A0.3 | Clicks one | `GET /check?brief=…` names every thing an agent would have to invent, for that draft | works |
-| A0.4 | Pastes their own draft | Needs a form, and `form-action 'none'` in `deploy/Caddyfile` refuses every submission | **blocked, one word in a locked path** |
+| A0.4 | Pastes their own draft | A textarea on `/check`, submitting GET to the same page the two examples link to | works, since 2026-09-23 |
 | A0.5 | Reads what comes next | The page says posting is six steps, that the first three cost nothing, and that a key pair is needed even though nothing has to be in it | works |
 
-**What A0.4 costs while it is blocked.** The endpoint has taken form bodies since 2026-09-22 and
+**A0.4 opened on 2026-09-23.** `form-action 'self'` replaced `'none'` in `deploy/Caddyfile` and
+the same change dropped the `brief` parameter from the logged URI, which is what made a GET form
+the right shape rather than a compromise: the result has an address a reader can send on, a reload
+does not re-submit, a crawler can read it, and the form produces exactly the URLs the two examples
+already link to. The draft no longer reaches the access log. `POST /v1/briefs/check` is unchanged
+and stays what a terminal uses.
+
+**What A0.4 cost while it was blocked.** The endpoint has taken form bodies since 2026-09-22 and
 answers a browser with a page; `CP_FORM_ON_CHECK=1` puts the textarea on the page the day the
 policy allows it. Until then a reader can see the check work on two examples and cannot run it on
 their own draft, which is the one thing they came for.

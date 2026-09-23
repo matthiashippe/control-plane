@@ -17,6 +17,10 @@ services:
       # ein Besucher kopiert, lesen sie aus src/public/site.ts. cp.hippe.eu antwortet weiter und
       # zeigt per canonical hierher, damit nichts bricht, was schon darauf verweist.
       CP_PUBLIC_URL: https://postyourprice.com
+      # Das Textfeld auf /check. Es haengt an form-action 'self' im Caddyfile, das seit dem
+      # 23.09. gesetzt ist; ohne das verweigert der Browser die Uebermittlung stumm, und ein
+      # Formular, das stumm nichts tut, ist schlechter als keines.
+      CP_FORM_ON_CHECK: "1"
     volumes:
       - cp-data:/data
     expose:

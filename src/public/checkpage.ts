@@ -206,10 +206,29 @@ export function renderCheckIntro(formAllowed: boolean, freeFirstJobCents: number
       </p>
       ${
         formAllowed
-          ? `<form method="POST" action="/v1/briefs/check">
-        <textarea name="brief" rows="6" placeholder="FACT SHEET on ..." required></textarea>
-        <div class="cta"><button class="btn btn-1" type="submit">Check it</button></div>
-      </form>`
+          ? // GET and not POST, now that the log filter drops `brief` from the recorded URI.
+            //
+            // The objection to GET was that the draft ends up in the address and Caddy keeps
+            // addresses for 720 hours. deploy/Caddyfile gained `query { delete brief }` in the
+            // same change that allowed forms at all, so the draft no longer reaches the log, and
+            // GET is the better shape for everything else: the result has an address somebody can
+            // send to a colleague, reloading does not re-submit, a crawler can read it, and it
+            // lands on this page rather than on an API endpoint. The two examples below are
+            // already exactly these URLs, so the form and the examples produce the same thing.
+            //
+            // POST /v1/briefs/check keeps working and stays what a terminal uses.
+            `<form method="GET" action="/check">
+        <textarea name="brief" rows="6" placeholder="FACT SHEET on the energy certificate for a 1974 apartment block with six flats and gas heating, for a landlord ordering one for the first time." required></textarea>
+        <div class="cta" style="align-items:center;gap:1rem">
+          <button class="btn btn-1" type="submit">Check it</button>
+          <label class="fine" style="margin:0">
+            <input type="radio" name="kind" value="factual" checked> factual
+            <input type="radio" name="kind" value="creative" style="margin-left:.6rem"> creative
+          </label>
+        </div>
+      </form>
+      <p class="fine">Nothing is stored: the draft goes in the address and the web server is told
+        to drop it before it writes the line. No key, no account, no charge.</p>`
           : // No box to paste into, so the page says where the draft goes instead of promising a
             // field that is not there. "Paste a draft" stood here whether or not the form was
             // rendered, and with it switched off a reader looked for a box, found none, and had

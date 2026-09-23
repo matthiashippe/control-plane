@@ -22,7 +22,7 @@ cp.hippe.eu, postyourprice.com {
 		Referrer-Policy "strict-origin-when-cross-origin"
 		# Die Seite laedt nichts von aussen. Das Inline-Script ist per Hash erlaubt, damit
 		# 'unsafe-inline' nicht noetig ist. Aendert sich das Skript, muss der Hash mit.
-		Content-Security-Policy "default-src 'none'; script-src 'sha256-4SRH5WazXeAcUMwLFvCY4lXOlcCFv/p0qFFiElgkhKE='; style-src 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+		Content-Security-Policy "default-src 'none'; script-src 'sha256-4SRH5WazXeAcUMwLFvCY4lXOlcCFv/p0qFFiElgkhKE='; style-src 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
 		-Server
 	}
 
@@ -50,6 +50,9 @@ cp.hippe.eu, postyourprice.com {
 				request>headers>X-Payment delete
 				request>headers>Authorization delete
 				request>headers>Cookie delete
+				request>uri query {
+					delete brief
+				}
 			}
 		}
 	}

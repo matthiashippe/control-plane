@@ -32,10 +32,18 @@ describe("docs/journeys.md", () => {
    * 2026-09-22. If that word changes, this test should start failing and the document should say
    * "works" instead.
    */
-  it("still records the form as blocked, and by what", () => {
+  it("says the same thing about the form as the policy does", () => {
     const doc = readFileSync("docs/journeys.md", "utf8");
     const caddy = readFileSync("deploy/Caddyfile", "utf8");
-    const blockedInDoc = /A0\.4[\s\S]{0,200}?blocked/.test(doc);
+    // The TABLE ROW, not the first 200 characters after any mention of A0.4.
+    //
+    // The row is the claim; the prose around it describes how the step got there and is allowed to
+    // say "blocked" about the past. On 2026-09-23 the policy opened, the row was changed to
+    // "works", and this test stayed red because the paragraph below it begins "What A0.4 cost
+    // while it was blocked", which is true and which the old pattern read as the state.
+    const row = doc.split("\n").find((l) => l.startsWith("| A0.4 |")) ?? "";
+    expect(row, "no A0.4 row in docs/journeys.md at all").not.toBe("");
+    const blockedInDoc = /blocked/i.test(row);
     const blockedInPolicy = /form-action 'none'/.test(caddy);
     expect(
       blockedInDoc,
