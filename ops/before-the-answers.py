@@ -86,6 +86,25 @@ posted: list[str] = []
 pending: list[str] = []
 no_occasion: list[str] = []
 wanted = sys.argv[1:]
+# The newest line of the on-chain scan, read off the VM. Absent is not a failure: this file has to
+# work on a machine with no key to the server, and the checks that need it are skipped by name
+# rather than passing quietly.
+CHAIN = None
+try:
+    _raw = subprocess.run(
+        ["ssh", "-i", os.environ.get("CP_SSH_KEY", os.path.expanduser("~/.ssh/id_ed25519_automaton")),
+         "-o", "BatchMode=yes", "-o", "ConnectTimeout=10",
+         os.environ.get("CP_HOST", "root@76.13.144.207"),
+         "tail -1 /opt/control-plane/conway-money/metrics.ndjson"],
+        capture_output=True, text=True, timeout=30,
+    ).stdout.strip()
+    CHAIN = json.loads(_raw) if _raw.startswith("{") else None
+except Exception:
+    CHAIN = None
+if CHAIN is None:
+    print("note: the on-chain scan was not readable, so the figures in #335 are NOT checked.")
+    print()
+
 drafts = sorted(FOLDER.glob("*.md"))
 drafts = [d for d in drafts if d.stem != "README" and (not wanted or d.stem in wanted)]
 if not drafts:
@@ -178,6 +197,34 @@ for draft in drafts:
         report(disclosure, "carries a disclosure line, because it names the service")
     else:
         print("  ok      names no service and carries no disclosure, deliberately")
+
+    # 6. On-chain figures, against the newest scan rather than against the scan that was open when
+    # the draft was written.
+    #
+    # #335 is the evidence question, and the answer to it is nothing but numbers: transfers, USDC,
+    # wallets, and the tier distribution that carries the whole argument. Everything above checks
+    # what GitHub says. Nothing checked what the chain says, and a figure in a GitHub comment is
+    # permanent, which is the exact shape of failure this file exists to prevent one category over.
+    #
+    # The numbers come from ops/conway-money-series.sh, which runs daily on the VM and only ever
+    # scans forward. A draft written on Tuesday and posted on Thursday carries Tuesday's window.
+    if CHAIN and re.search(r"\d[\d,]* transfers", text):
+        for label, value, pattern in (
+            ("transfers, all time", f"{CHAIN['transfers_total']:,}", r"([\d,]+) transfers"),
+            ("wallets, all time", f"{CHAIN['wallets_total']:,}", r"([\d,]+) distinct wallets"),
+            ("top-ups, 30 days", str(CHAIN["topups_30d"]), r"(\d+) top-ups"),
+            ("wallets, 30 days", str(CHAIN["topup_wallets_30d"]), r"(\d+) wallets, "),
+        ):
+            found = re.search(pattern, text)
+            report(bool(found) and found.group(1) == value,
+                   f"{label} matches today's scan ({value})",
+                   f"the draft says {found.group(1) if found else 'nothing'}, the scan of "
+                   f"{CHAIN['measured_at'][:10]} says {value}")
+        tiers = "{" + ", ".join(f'"{k}": {v}' for k, v in sorted(CHAIN["topup_tiers_30d"].items(), key=lambda kv: int(kv[0]))) + "}"
+        report(tiers in text,
+               f"the 30-day tier distribution matches today's scan ({tiers})",
+               "that distribution is the argument of the whole comment; a stale one is a wrong "
+               "claim in a permanent place")
 
     pending.append(number)
     print()
