@@ -76,6 +76,14 @@ function nextStep(freeFirstJobCents: number | null): string {
  * is not touched without a human, and the day it is edited out this function is where the
  * difference goes back in. The measurement is what decides, and it runs every cycle.
  */
+/**
+ * How long the access log keeps a line, from `roll_keep_for` in deploy/Caddyfile.
+ *
+ * Nothing on the page names it any more: since the log filter drops the `brief` parameter, the
+ * retention of a line that does not contain the draft is not the reader's business. It stays here
+ * because the number is the reason the filter matters, and because the day the filter is edited
+ * out this is what the warning would be built from again.
+ */
 export const LOG_KEEPS_DAYS = 30;
 
 export function whatIsKept(_viaQuery: boolean): string {
@@ -237,16 +245,18 @@ export function renderCheckIntro(formAllowed: boolean, freeFirstJobCents: number
             // The address bar is the way in that needs nothing: a browser encodes the spaces on
             // its own, which is why this reads as plain words rather than %20. Measured against
             // production on 2026-09-23.
+            // The branch for a deployment whose policy still refuses forms. It kept a warning
+            // about the access log until 2026-09-23, when deploy/Caddyfile started dropping the
+            // `brief` parameter before the line is written. The warning went with it: a page that
+            // warns about something that no longer happens is wrong in the harmless direction,
+            // and ops/what-the-log-keeps.sh fails on that direction too.
             `<p class="fine">
-        There is no box here yet. The policy this site runs under refuses form submissions, and a
+        There is no box here. The policy this deployment runs under refuses form submissions, and a
         form that silently does nothing is worse than none. Two ways in meanwhile: the examples
-        below are one click each, and for your own draft the terminal call further down sends it
-        in the request body, where nothing logs it.
-      </p>
-      <p class="fine">
-        <code>${esc(siteHost())}/check?brief=...</code> answers any draft as well, but it puts the
-        draft in the address, and the web server writes every address it is called with into a log
-        kept for ${LOG_KEEPS_DAYS} days. Worth knowing before pasting a client's brief into it.
+        below are one click each, and
+        <code>${esc(siteHost())}/check?brief=...</code> answers any draft you put after it. The
+        web server is told to drop that parameter before it writes its log, so nothing keeps the
+        draft either way.
       </p>`
       }
       <h2>Two drafts of the same job</h2>
