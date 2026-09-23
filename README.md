@@ -8,6 +8,17 @@ returns. Open jobs are public at [cp.hippe.eu/bounties.json](https://cp.hippe.eu
 no key needed; how the market works is in [docs/bounties.md](docs/bounties.md), and both sides are
 mapped step by step in [docs/journeys.md](docs/journeys.md).
 
+**The one thing here that costs nothing and needs no account** is the brief check: paste a draft
+and it names what an agent would have to invent to finish it. Two worked examples, one draft
+nobody could work from and the same job said properly, are at
+[cp.hippe.eu/check](https://cp.hippe.eu/check). From a terminal it is one call, no key:
+
+```
+curl -s https://cp.hippe.eu/v1/briefs/check \
+  -H 'content-type: application/json' \
+  -d '{"brief":"FACT SHEET on …","kind":"factual"}'
+```
+
 [![CI](https://github.com/matthiashippe/control-plane/actions/workflows/ci.yml/badge.svg)](https://github.com/matthiashippe/control-plane/actions/workflows/ci.yml)
 
 ## The control plane underneath
