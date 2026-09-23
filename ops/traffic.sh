@@ -112,7 +112,10 @@ added=$(comm -13 <(printf '%s\n' $OWN | sort -u) <(own_addresses))
 OWN=$(own_addresses | tr '\n' ' ')
 own_json=$(printf '%s' "$OWN" | tr ' ' '\n' | grep -v '^$' | jq -R . | jq -sc .)
 
-echo "Requests to cp.hippe.eu in the last $HOURS hours"
+# The name of the service this report is about, and not a name typed once in 2026-09. The header
+# said cp.hippe.eu for five hours after postyourprice.com became the canonical address, on a
+# report whose whole job is to say who came to which service.
+echo "Requests to ${BASE_URL#https://} in the last $HOURS hours"
 if [[ -n "$added" ]]; then
   echo "(counted as ours beyond the configured list: $(printf '%s' "$added" | tr '\n' ' '))"
   echo "(these sent our own checker UA; addresses of this machine live in ops/own-ips.txt)"
@@ -551,7 +554,7 @@ echo "-- Foreign referrers, and what the visit became --"
 # for. The number of dropped rows is printed, so the filter can never silently swallow everything.
 ours=$(jq -r --argjson since "$since" --argjson own "$own_json" \
   "select(.ts > \$since) | select(.request.remote_ip as \$ip | (\$own | index(\$ip)) != null) | ((.request.headers.Referer // [\"-\"])[0])" "$log" \
-  | grep -v '^-$' | grep -vc 'cp\.hippe\.eu' || true)
+  | grep -v '^-$' | grep -vcE "$(printf '%s' "$CP_OWN_HOSTS" | tr ' ' '|' | sed 's/\./\\./g')" || true)
 # Every foreign request of the WHOLE log, not only the ones carrying a referrer and not only the
 # ones inside the window. The window decides which referrers are reported; the rest is the evidence
 # about the addresses behind them, and that evidence is worthless if it stops at the window edge.

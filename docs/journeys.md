@@ -66,6 +66,21 @@ answers a browser with a page; `CP_FORM_ON_CHECK=1` puts the textarea on the pag
 policy allows it. Until then a reader can see the check work on two examples and cannot run it on
 their own draft, which is the one thing they came for.
 
+**The workaround cost more than the missing box.** With no form, the page told a reader to put
+their draft after `brief=` in the address bar, in the same paragraph that promised nothing would
+be stored. Caddy logs `request>uri` in full and `deploy/Caddyfile` keeps that file for 720 hours,
+so the draft was kept for thirty days by the route the page recommended. Measured against
+production on 2026-09-23 at 07:34 UTC: a probe sent that way came back out of
+`/var/log/caddy/access.log` three seconds later, word for word.
+
+Since then the page says what is kept where it is kept, and it no longer sends a reader's own
+draft through the address bar: the two example links carry our own text and stay, and the route
+still answers for anybody holding such a link. `ops/what-the-log-keeps.sh` measures both routes
+against the running service and fails in both directions, so the warning cannot outlive the thing
+it warns about. `ops/caddyfile-pending.patch` holds the two lines that end it: `form-action 'self'`
+for the box, and a `query { delete brief }` filter so the address route stops keeping drafts.
+Caddy v2.11.4 on the VM validated that file on 2026-09-23.
+
 **What is measured, and it is not flattering.** Over the whole access log to 2026-09-23: eighteen
 addresses opened a page, one of them scrolled, none opened a second page, and the free check had
 not existed long enough for any of them to try it. The step exists now and nobody has walked it
