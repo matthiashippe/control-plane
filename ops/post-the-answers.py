@@ -9,8 +9,9 @@ scrolled this site, and Googlebot eighteen seconds later.
 
 Nothing here posts by itself. A dry run is the default and prints exactly what would go where.
 
-    ops/post-the-answers.py              a dry run, always
-    ops/post-the-answers.py --send 3     posts at most three, and only with all of the below true
+    ops/post-the-answers.py                          a dry run, always
+    ops/post-the-answers.py --send 3                 posts at most three, in folder order
+    ops/post-the-answers.py --send 3 --only 335,373,385   posts those three, in that order
 
 Every one of these has to hold before a single comment goes out:
 
@@ -137,6 +138,32 @@ for line in gate.stdout.splitlines():
 if not pending:
     print("\nNothing pending. Every draft is posted or has lost its occasion.")
     raise SystemExit(0)
+
+# The order, which is a decision and not the sort order of a folder.
+#
+# Written down in the folder README on 2026-09-23 with two measured reasons. First, #353, #356 and
+# #359 are the same bug, rank for the same search and read as a pattern if they go out together,
+# and the account belongs to a person. Second, Googlebot arrives WITH the comment: it fetched four
+# URLs here in the whole log, seven seconds after the answer under #392 went up, so a day with a
+# comment is a day with a crawler and spreading beats batching.
+#
+# Without this the tool took the drafts in numeric order and would have sent #335, #353, #356 on
+# day one, which is the block the order exists to avoid. A decision that lives only in a README is
+# a decision that does not run.
+#
+#   ops/post-the-answers.py --send 3 --only 335,373,385
+only = []
+if "--only" in argv:
+    i = argv.index("--only")
+    if i + 1 >= len(argv):
+        die("--only needs a comma-separated list of issue numbers, e.g. --only 335,373,385")
+    only = [n.strip().lstrip("#") for n in argv[i + 1].split(",") if n.strip()]
+    unknown = [n for n in only if n not in pending]
+    if unknown:
+        die(f"--only names {', '.join('#' + n for n in unknown)}, which is not pending. "
+            f"Pending right now: {', '.join('#' + n for n in pending)}.")
+    pending = only
+    print(f"\norder given on the command line: {', '.join('#' + n for n in pending)}")
 
 # What our account has already said in this repository today, asked of GitHub. A local stamp file
 # would be the obvious way and the wrong one: it can be deleted, and the thing it protects is an
