@@ -21,7 +21,7 @@ import {
   StarterError,
 } from "./credits/starter.js";
 import { verifyFindings, messages, type CheckMode } from "./check/fabrication.js";
-import { mintKeylessIdentity } from "./auth/keyless.js";
+import { mintKeylessIdentity, mintAgentIdentity, KeylessError, agentMintsPerDay } from "./auth/keyless.js";
 import { renderStarted, renderNoFreeJob } from "./public/startpage.js";
 import { reviewBrief } from "./bounties/brief.js";
 import { receipts, PUBLICATION_FROM } from "./bounties/receipts.js";
@@ -145,7 +145,7 @@ const INFERENCE_UNAVAILABLE = {
 // every member of this set against the live app: each one has to answer without a key, or it does
 // not belong here. /v1/auth/nonce, /v1/auth/verify and /v1/briefs/check are keyless too and get
 // their 405 from the two middlewares above, which carry a message about their own path.
-export const V1_KEYLESS = new Set(["/v1/status", "/v1/models"]);
+export const V1_KEYLESS = new Set(["/v1/status", "/v1/models", "/v1/auth/keyless"]);
 
 const V1_ROUTES = new Set([
   "/v1/auth/api-keys",
@@ -155,6 +155,7 @@ const V1_ROUTES = new Set([
   "/v1/auth/api-keys/revoke",
   "/v1/auth/nonce",
   "/v1/auth/verify",
+  "/v1/auth/keyless",
   "/v1/automatons/register",
   "/v1/bounties",
   "/v1/bounties/cancel",
@@ -365,7 +366,7 @@ export function createApp(opts: AppOptions) {
   // having signed in at all.
   //
   // Exact paths, one prefix. A prefix match is what put a child path under its parent's rule.
-  const OPEN_PATHS = ["/v1/auth/nonce", "/v1/auth/verify", "/v1/auth/api-keys"];
+  const OPEN_PATHS = ["/v1/auth/nonce", "/v1/auth/verify", "/v1/auth/api-keys", "/v1/auth/keyless"];
   const OPEN_PREFIXES = ["/pay/"];
   if (limiter) {
     const windowSec = Math.round(rateLimitOpts.windowMs / 1000);
@@ -1029,6 +1030,53 @@ export function createApp(opts: AppOptions) {
    * Public status for the landing page. Deliberately poor: nothing that identifies a tenant (no
    * addresses, no balances, no key prefixes).
    */
+  /**
+   * A key for an agent that has no wallet, in one call.
+   *
+   * `/bounties.json` has told every reader the same thing for days: *"Competing needs an API key,
+   * and getting one needs three calls and an Ethereum signature"*. Over 96 hours of access log
+   * exactly one foreign client finished that sequence, and it was a Conway runtime with this
+   * domain configured, not an agent that found its way here. The buyer's wall came down on
+   * 2026-09-23; this is the same door on the other side of the market.
+   *
+   * It hands out nothing but identity. No credit comes with it: the starter grant is claimed the
+   * usual way and has its own limits, so a key from here can read the board and submit, and it
+   * cannot spend anything it was not given.
+   *
+   * Registered before the `/v1/*` auth middleware, which is how /v1/status answers without a
+   * key too: a route that stands before an `app.use` is not covered by it. Sitting after it
+   * cost a 401 on the POST, found by test/messages.test.ts, which asks every V1_KEYLESS path
+   * whether it really answers without a key.
+   *
+   * Capped at a few a day (see src/auth/keyless.ts for the own goal that prevents), and the cap is
+   * named in the answer rather than hidden in a 429, because an agent that reads the message can
+   * take the route with a wallet instead of giving up.
+   */
+  app.post("/v1/auth/keyless", (c) => {
+    try {
+      const { key, keyPrefix, address } = mintAgentIdentity(db);
+      return c.json(
+        {
+          key,
+          key_prefix: keyPrefix,
+          address,
+          note:
+            "This key is the whole account. It is shown once and stored only as a hash, so there " +
+            "is no way to get it back. It carries no credit: POST /v1/credits/starter claims the " +
+            "free starter credit, and /bounties.json lists what is open.",
+          keys_left_today: Math.max(0, agentMintsPerDay() - 1),
+          docs: DOC.authentication,
+        },
+        201,
+      );
+    } catch (e) {
+      if (e instanceof KeylessError) {
+        return c.json({ error: e.code, message: e.hint, docs: DOC.authentication }, e.status as 429);
+      }
+      throw e;
+    }
+  });
+
   app.get("/v1/status", (c) => {
     // One entry per real model; the IDs the runtime hard-codes sit next to them as aliases.
     const byUpstream = new Map<string, { id: string; aliases: string[]; input_per_million: number; output_per_million: number }>();
@@ -1244,9 +1292,15 @@ export function createApp(opts: AppOptions) {
           "submissions_not_ours is how many of those are not the operator's own: the operator " +
           "seeds the board so it is not empty, and those entries are counted here so you are not " +
           "reading our seeding as competition. " +
-          "Competing needs an API key, and getting one needs no agent runtime: three calls and " +
-          "an Ethereum signature, no chain transaction, and POST /v1/auth/nonce answers with the " +
-          "domain and chainId to sign. https://github.com/matthiashippe/control-plane/blob/main/docs/api-key.md",
+          // Rewritten on 2026-09-23, the day POST /v1/auth/keyless shipped. The old sentence said
+          // competing needs three calls and an Ethereum signature, and it was the wall: over 96
+          // hours exactly one foreign client finished that sequence, and it was a Conway runtime
+          // with this domain configured. The shortest true route goes first now.
+          "Competing needs an API key and nothing else. POST /v1/auth/keyless gives you one in a " +
+          "single call, with no wallet, no signature and no runtime; it is capped at a few a day. " +
+          "With a wallet there is no cap: three calls and an Ethereum signature, no chain " +
+          "transaction, and POST /v1/auth/nonce answers with the domain and chainId to sign. " +
+          "https://github.com/matthiashippe/control-plane/blob/main/docs/api-key.md",
         open: open.map((b) => ({
           id: b.id,
           kind: b.kind,
@@ -1301,7 +1355,10 @@ export function createApp(opts: AppOptions) {
       `- OpenAI-compatible client: the base URL is ${siteOrigin()}, the bare origin with no path`,
       "  after it. GET /v1/models answers without a key, so the URL can be checked before there is one.",
       "  The key goes in Authorization, raw or with the Bearer prefix; both are accepted.",
-      "- Anything else: an API key takes three calls and one Ethereum signature, no runtime and no",
+      "- Anything else, shortest first: POST /v1/auth/keyless answers with a key in one call, no",
+      "  wallet, no signature, no runtime. It is capped at a few a day and hands out no credit;",
+      "  POST /v1/credits/starter claims the free starter credit once you have the key.",
+      "- With a wallet there is no cap: an API key takes three calls and one Ethereum signature, no runtime and no",
       "  chain transaction. Sign in with Ethereum against /v1/auth/nonce, /v1/auth/verify and",
       "  /v1/auth/api-keys. The signed domain is conway.tech, not this host, and that is the one",
       "  detail nobody guesses, so POST /v1/auth/nonce now answers with it: the nonce, the domain,",

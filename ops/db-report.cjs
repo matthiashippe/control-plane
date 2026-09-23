@@ -146,7 +146,10 @@ const SEED_KEY_NAME = "ops-seed-%";
 // up, by address, because its handle is in OURS. Putting it on the list above instead would claim
 // every stranger who ever uses the front door as one of ours, which is the one error this report
 // exists to prevent.
-const STRANGER_KEY_NAMES = ["conway-automaton", "browser"];
+// `agent` joins them on 2026-09-23 with POST /v1/auth/keyless: it is the name every keyless key
+// for the supply side carries, for anybody. Same safeguard as the other two, our own use is
+// excluded one level up by address.
+const STRANGER_KEY_NAMES = ["conway-automaton", "browser", "agent"];
 const oursClause = `(
   address in (${OURS.map(() => "?").join(",")})
   or exists (select 1 from api_keys k where k.address = ledger.address

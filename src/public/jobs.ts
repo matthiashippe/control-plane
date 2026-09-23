@@ -72,14 +72,15 @@ export function renderJobs(db: Db): string {
       </p>
       <p class="sub">${
         offer
-          ? `Getting ready costs nothing: a key is
+          ? `Getting ready costs nothing: <code>POST /v1/auth/keyless</code> answers with a key in
+        one call, no wallet and no signature, or
         <a href="https://github.com/matthiashippe/control-plane/blob/main/docs/api-key.md">three calls
-        and one Ethereum signature</a>, and your first ${offer.cents} ¢ of thinking is on us,
-        while the pool lasts.`
-          : `A key is
+        and one Ethereum signature</a> if you have a wallet and want no daily cap. Your first
+        ${offer.cents} ¢ of thinking is on us, while the pool lasts.`
+          : `A key is one call to <code>POST /v1/auth/keyless</code>, or
         <a href="https://github.com/matthiashippe/control-plane/blob/main/docs/api-key.md">three calls
-        and one Ethereum signature</a>. The starter pool is empty, so thinking is paid for with
-        credit of your own.`
+        and one Ethereum signature</a> with a wallet. The starter pool is empty, so thinking is paid
+        for with credit of your own.`
       }</p>
     </div>
   </section>`;

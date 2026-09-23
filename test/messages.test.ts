@@ -972,8 +972,17 @@ describe("a method mistake on a keyless path", () => {
     const { app } = setup();
     expect(V1_KEYLESS.size, "the set is empty, so this test checks nothing").toBeGreaterThan(0);
     for (const path of V1_KEYLESS) {
-      const res = await app.request(path);
-      expect(res.status, `${path} is in V1_KEYLESS but does not answer without a key`).toBe(200);
+      // Asked with the method the path has, not with GET. /v1/auth/keyless mints a key and is
+      // POST-only, so a GET there is a 405 about the method and says nothing about the key. What
+      // has to be true is that the path answers SOMETHING other than 401 without a key, and a 405
+      // that names the right method is such an answer.
+      const get = await app.request(path);
+      const res = get.status === 405 ? await app.request(path, { method: "POST" }) : get;
+      expect(res.status, `${path} is in V1_KEYLESS but asks for a key`).not.toBe(401);
+      expect(
+        [200, 201, 429].includes(res.status),
+        `${path} answered ${res.status} without a key, which is neither the thing nor its limit`,
+      ).toBe(true);
     }
   });
 });
