@@ -265,6 +265,10 @@ Was sich bewegt hat, ist die Voraussetzung, und das ist kein Ersatz fuer eine Za
   zeigen und Googlebot hier vier Dinge geholt hat, sieben Sekunden nach einem davon.
 - **Die Verkehrswerkzeuge sehen wieder ihre Geschichte.** Sie waren nach einer Log-Rotation
   vierzig Minuten blind und haben in dieser Zeit "nobody has ever" gemeldet.
+- **Der Check bemaengelt nicht mehr, was dasteht.** An 50 echten bezahlten deutschen
+  Textauftraegen gemessen (Job `f582a0a8` auf dem code-host): 12 bekamen einen Befund, den der
+  Auftraggeber am eigenen Text widerlegen kann, nach der Korrektur ist es einer. Die 147 richtigen
+  Befunde sind unveraendert 147 geblieben, keiner ist verstummt.
 
 **Der Engpass ist unveraendert und heisst Zulauf.** Der einzige Kanal mit Beleg sind die
 Issue-Antworten: drei Adressen sind je von github.com gekommen, alle drei haben gelesen, zwei aus
@@ -377,7 +381,7 @@ QR-Code. Die Karte sagt auf sich selbst, dass sie vor dem Drucken einmal gescann
 |---|---|---|---|
 | Do 24.09. | ~~NIT~~ von Matthias am 23.09. abgelehnt: Messeticket plus acht Stunden fuer eine Handvoll Gespraeche, waehrend der belegte Kanal kostenlos offen liegt | | |
 | Fr 25.09. | Antworten, die Betrag und Menge nennen | 0 | 3 |
-| Sa 26.09. | 50 bezahlte deutsche Textauftraege durch `reviewBrief`: wie viele falschen Befunde | unbekannt | hoechstens 2 |
+| Sa 26.09. | 50 bezahlte deutsche Textauftraege durch `reviewBrief`: wie viele falschen Befunde | **12, jetzt 1** (vorgezogen erledigt) | hoechstens 2 |
 | So 27.09. | Abbruchstellen `/check` bis offener Auftrag ohne Wallet | **0, vorgezogen erledigt** | 0 |
 | Mo 28.09. | eigene Laeufe aus 10 persoenlichen Nachrichten | 0 | 4 |
 | Di 29.09. | Antworten von IVD Nord und VDIV Nord | 0 | 1 |
