@@ -27,6 +27,26 @@ import { postLedger, mcToCents } from "../db.js";
 
 /** Ten attempts at about 1.5 cents each. */
 export const GRANT_MC = 15_000;
+
+/**
+ * What a newcomer gets when their first use is POSTING a job rather than thinking.
+ *
+ * Fifteen cents is ten attempts, which is the right size for an agent and the wrong size for a
+ * buyer: a fifteen-cent job leaves the winner thirteen and a half, and nothing about it says to a
+ * stranger's agent that it is worth an attempt. The five jobs open on 2026-09-23 are 45 to 250
+ * cents, so a newcomer's first job would be the smallest thing on the board by a factor of three.
+ *
+ * Fifty cents leaves the winner forty-five, which at the 0.81 cents an answer has cost here is
+ * about fifty-five attempts' worth. That is a prize. The pool pays for it: 215 cents left is four
+ * of these or fourteen agent grants, and not both, which is a real choice and is why the figure is
+ * named here and printed by ops/db-report.cjs rather than buried in a branch.
+ *
+ * It is a grant FOR A JOB and not for a wallet. See returnGrantToPool: if the job ends without an
+ * award the credit goes back to the pool, not to the buyer. Without that, posting a job and
+ * cancelling it would be a way to turn the pool into inference at three times the agent rate, and
+ * the address would still be counted in foreign_buyers.
+ */
+export const BUYER_GRANT_MC = 50_000;
 /** The whole giveaway, across every address. At 15 cents each this is 33 agents. */
 export const POOL_MC = 500_000;
 
@@ -36,8 +56,18 @@ export class StarterError extends Error {
   }
 }
 
+/**
+ * What the pool has actually given away, which is what went out minus what came back.
+ *
+ * `grant_returned` rows are negative and belong in this sum: a job-scoped grant whose job was
+ * cancelled never reached anybody, and counting it as spent would shrink the pool for a giveaway
+ * that did not happen. The unique index on the ledger is scoped to kind = 'grant', so the return
+ * cannot be booked as another grant row even if somebody wanted to.
+ */
 export function grantedTotalMc(db: Db): number {
-  const row = db.prepare("SELECT coalesce(sum(delta_mc), 0) AS total FROM ledger WHERE kind = 'grant'").get() as { total: number };
+  const row = db
+    .prepare("SELECT coalesce(sum(delta_mc), 0) AS total FROM ledger WHERE kind IN ('grant', 'grant_returned')")
+    .get() as { total: number };
   return row.total;
 }
 
@@ -62,6 +92,31 @@ export function poolLeftMc(db: Db): number {
  */
 export function starterOffer(db: Db): { cents: number; pool_left_cents: number } | null {
   const left = poolLeftMc(db);
+  // The BUYER ceiling, because every caller of this is a buyer surface: the landing page, /post,
+  // /jobs and /check all use it to say what a first job costs a newcomer. Since 2026-09-23 the
+  // grant for a first job covers what that job is short of, up to BUYER_GRANT_MC, so "up to fifty
+  // cents" is what these pages may promise. The agent figure stays GRANT_MC and is published
+  // separately as starter_credit_cents on /v1/status, where a runtime reads it.
+  if (left < BUYER_GRANT_MC) return null;
+  return { cents: mcToCents(BUYER_GRANT_MC), pool_left_cents: mcToCents(left) };
+}
+
+/**
+ * The same question for the other side, and the reason it is a second function.
+ *
+ * `starterOffer` is what the BUYER surfaces say, and since 2026-09-23 that is the buyer ceiling.
+ * The browser answer on a `/v1/` path is not a buyer surface: it is what an operator sees when
+ * they open their runtime's balance URL by hand, and the sentence it carries is about the fifteen
+ * cents a runtime is handed when it polls an empty balance. Feeding it the buyer figure made the
+ * page promise fifty cents for something that hands out fifteen, which test/apipage.test.ts
+ * caught in the same run the split was written.
+ *
+ * Gated on GRANT_MC and not on the buyer ceiling, because a pool too thin for a fifty-cent job can
+ * still carry a fifteen-cent agent, and closing the supply side for a promise made to buyers would
+ * be the wrong half to give up.
+ */
+export function agentOffer(db: Db): { cents: number; pool_left_cents: number } | null {
+  const left = poolLeftMc(db);
   if (left < GRANT_MC) return null;
   return { cents: mcToCents(GRANT_MC), pool_left_cents: mcToCents(left) };
 }
@@ -74,10 +129,10 @@ export function starterOffer(db: Db): { cents: number; pool_left_cents: number }
  * way: a job the grant could not cover must not consume the grant, because the newcomer would be
  * left with a refusal and no grant left for the smaller job they try next.
  */
-export function starterAvailableMc(db: Db, address: string): number {
+export function starterAvailableMc(db: Db, address: string, amountMc: number = GRANT_MC): number {
   const already = db.prepare("SELECT 1 FROM ledger WHERE kind = 'grant' AND address = ?").get(address.toLowerCase());
   if (already) return 0;
-  return grantedTotalMc(db) + GRANT_MC > POOL_MC ? 0 : GRANT_MC;
+  return grantedTotalMc(db) + amountMc > POOL_MC ? 0 : amountMc;
 }
 
 /**
@@ -87,7 +142,12 @@ export function starterAvailableMc(db: Db, address: string): number {
  * handed out twice over. The unique index is what makes the per-address rule true even under a
  * race; the check before it exists only to give a useful answer instead of a constraint error.
  */
-export function claimStarter(db: Db, address: string): { granted_cents: number; pool_left_cents: number } {
+export function claimStarter(
+  db: Db,
+  address: string,
+  amountMc: number = GRANT_MC,
+  meta: Record<string, unknown> = {},
+): { granted_cents: number; pool_left_cents: number } {
   const who = address.toLowerCase();
   const already = db.prepare("SELECT 1 FROM ledger WHERE kind = 'grant' AND address = ?").get(who);
   if (already) {
@@ -100,7 +160,7 @@ export function claimStarter(db: Db, address: string): { granted_cents: number; 
   }
 
   const run = db.transaction(() => {
-    if (grantedTotalMc(db) + GRANT_MC > POOL_MC) {
+    if (grantedTotalMc(db) + amountMc > POOL_MC) {
       throw new StarterError(
         "pool_empty",
         409,
@@ -111,9 +171,9 @@ export function claimStarter(db: Db, address: string): { granted_cents: number; 
     postLedger(db, {
       address: who,
       kind: "grant",
-      deltaMc: GRANT_MC,
+      deltaMc: amountMc,
       ref: `starter:${who}`,
-      meta: { reason: "starter credit", attempts: Math.floor(GRANT_MC / 1_500) },
+      meta: { reason: "starter credit", attempts: Math.floor(amountMc / 1_500), ...meta },
     });
   });
 
@@ -127,7 +187,48 @@ export function claimStarter(db: Db, address: string): { granted_cents: number; 
     throw e;
   }
 
-  return { granted_cents: mcToCents(GRANT_MC), pool_left_cents: mcToCents(poolLeftMc(db)) };
+  return { granted_cents: mcToCents(amountMc), pool_left_cents: mcToCents(poolLeftMc(db)) };
+}
+
+/**
+ * Gives a job-scoped grant back, because the job it was for never reached anybody.
+ *
+ * A grant handed out for a specific bounty is the pool paying for that piece of work to exist. If
+ * the bounty is cancelled or runs out its deadline unawarded, the work did not happen and the
+ * credit has no business sitting on the buyer's balance: it would be usage of this service that
+ * nobody gave away on purpose, and the address would keep it at three times what an agent gets.
+ *
+ * Booked as `grant_returned` and never as a second `grant` row, because the unique index that
+ * makes "one grant per address, ever" true is scoped to kind = 'grant' and would refuse it.
+ * grantedTotalMc() sums both, so the pool is whole again for the next newcomer.
+ *
+ * Called inside the same transaction that credits the buyer back, so the balance it debits is
+ * always there: the release puts the whole price back first, and the grant can never exceed it.
+ */
+export function returnGrantToPool(db: Db, address: string, amountMc: number, bountyId: string): void {
+  postLedger(db, {
+    address: address.toLowerCase(),
+    kind: "grant_returned",
+    deltaMc: -amountMc,
+    ref: `grant-returned:${bountyId}`,
+    meta: { reason: "the job this grant paid for ended without an award", bounty_id: bountyId },
+  });
+}
+
+/**
+ * How much of a bounty was paid for out of the pool, or zero.
+ *
+ * Read from the grant's own meta rather than from a column on `bounties`: the fact belongs to the
+ * giveaway and not to the market, and a migration on a live ledger to store what one JSON field
+ * already says would be the more expensive of the two mistakes.
+ */
+export function grantBehindBounty(db: Db, bountyId: string): number {
+  const row = db
+    .prepare(
+      "SELECT delta_mc AS mc FROM ledger WHERE kind = 'grant' AND json_extract(meta, '$.for_bounty') = ?",
+    )
+    .get(bountyId) as { mc: number } | undefined;
+  return row ? row.mc : 0;
 }
 
 /**
@@ -150,9 +251,14 @@ export function claimStarter(db: Db, address: string): { granted_cents: number; 
  * right answer. The grant itself is not silent, it is a ledger row of kind `grant` like any
  * other, and `ops/db-report.cjs` prints what is left of the pool on every run.
  */
-export function grantOnFirstUse(db: Db, address: string): boolean {
+export function grantOnFirstUse(
+  db: Db,
+  address: string,
+  amountMc: number = GRANT_MC,
+  meta: Record<string, unknown> = {},
+): boolean {
   try {
-    claimStarter(db, address);
+    claimStarter(db, address, amountMc, meta);
     return true;
   } catch (e) {
     if (e instanceof StarterError) return false;

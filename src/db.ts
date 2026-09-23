@@ -244,7 +244,10 @@ export interface LedgerEntry {
   kind:
     | "topup" | "inference" | "transfer_in" | "transfer_out"
     | "bounty_hold" | "bounty_release" | "bounty_award" | "bounty_fee"
-    | "grant";
+    // grant_returned is negative and only ever cancels a job-scoped grant whose job ended without
+    // an award. It is a separate kind because the unique index that makes "one grant per address,
+    // ever" true is scoped to kind = 'grant' and would refuse a second row there.
+    | "grant" | "grant_returned";
   deltaMc: number;
   ref?: string;
   meta?: Record<string, unknown>;

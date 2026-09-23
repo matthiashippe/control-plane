@@ -18,7 +18,7 @@ import { privateKeyToAccount, generatePrivateKey } from "viem/accounts";
 import { createApp } from "../src/app.js";
 import { openDb, postLedger } from "../src/db.js";
 import { hashApiKey } from "../src/auth/siwe.js";
-import { claimStarter, poolLeftMc, starterOffer, GRANT_MC, POOL_MC } from "../src/credits/starter.js";
+import { BUYER_GRANT_MC, claimStarter, poolLeftMc, starterOffer, GRANT_MC, POOL_MC } from "../src/credits/starter.js";
 import { sitemapPages } from "./site-pages.js";
 
 /**
@@ -137,20 +137,52 @@ describe("the promise of a free first job", () => {
     expect(html).toMatch(/credit of your own/i);
   });
 
-  it("refuses the grant at exactly the point the pages stop offering it", () => {
+  /**
+   * There are two promises now, and they have two sizes.
+   *
+   * Since 2026-09-23 a buyer's first job draws what that job is short of, up to BUYER_GRANT_MC,
+   * because fifteen cents is ten attempts for an agent and a job nobody competes for. An agent
+   * still draws GRANT_MC on its first thought. starterOffer() is what the buyer surfaces say, so
+   * it is gated on the buyer size; /v1/status keeps publishing starter_credit_cents for a runtime.
+   *
+   * The invariant is unchanged and now has to hold twice: the page and the server change their
+   * mind in the same instant, or the gap between them is a promise the next caller is refused on.
+   */
+  it("refuses a buyer's grant at exactly the point the pages stop offering it", () => {
     const db = openDb(":memory:");
-    // The page and the server have to change their mind in the same instant, or the gap between
-    // them is a promise the next caller gets refused on.
     for (let i = 0; ; i++) {
       const offer = starterOffer(db);
       if (!offer) {
-        expect(() => claimStarter(db, "0x" + "f".repeat(40))).toThrow();
-        expect(i, "the pool has to hand out every grant it holds before it says no").toBe(
-          Math.floor(POOL_MC / GRANT_MC),
+        expect(
+          () => claimStarter(db, "0x" + "f".repeat(40), BUYER_GRANT_MC),
+          "the buyer surfaces went quiet, so a buyer's grant has to be refused too",
+        ).toThrow();
+        expect(i, "the pool has to hand out every buyer grant it holds before it says no").toBe(
+          Math.floor(POOL_MC / BUYER_GRANT_MC),
         );
         break;
       }
-      claimStarter(db, `0x${String(i).padStart(40, "0")}`);
+      claimStarter(db, `0x${String(i).padStart(40, "0")}`, BUYER_GRANT_MC);
     }
+  });
+
+  // The other half, and the reason the two are tested apart: a pool that can no longer carry a
+  // fifty-cent job can still carry a fifteen-cent agent, and saying no to that agent would close
+  // the supply side for a promise made to buyers.
+  it("still grants an agent while the pool is too thin for a buyer", () => {
+    const db = openDb(":memory:");
+    // One agent first, so the pool is no longer an exact multiple of the buyer size and the state
+    // this test is about can exist at all: 500,000 is exactly ten buyer grants, and without the
+    // remainder the pool goes from "a buyer fits" straight to "nothing fits".
+    claimStarter(db, "0x" + "b".repeat(40), GRANT_MC);
+    while (starterOffer(db)) {
+      claimStarter(db, `0x${String(poolLeftMc(db)).padStart(40, "0")}`, BUYER_GRANT_MC);
+    }
+    expect(starterOffer(db), "no room for another buyer").toBeNull();
+    expect(poolLeftMc(db), "and still room for an agent").toBeGreaterThanOrEqual(GRANT_MC);
+    expect(
+      () => claimStarter(db, "0x" + "a".repeat(40), GRANT_MC),
+      "an agent still fits and must still be served",
+    ).not.toThrow();
   });
 });

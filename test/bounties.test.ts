@@ -6,7 +6,7 @@ import Database from "better-sqlite3";
 import { privateKeyToAccount, generatePrivateKey } from "viem/accounts";
 import { createApp } from "../src/app.js";
 import { openDb, postLedger, reserveMc, MC_PER_CENT } from "../src/db.js";
-import { claimStarter, poolLeftMc, GRANT_MC } from "../src/credits/starter.js";
+import { claimStarter, poolLeftMc, GRANT_MC, BUYER_GRANT_MC } from "../src/credits/starter.js";
 import { releaseExpired, FEE_PERCENT, feeMc } from "../src/bounties/store.js";
 import { hashApiKey } from "../src/auth/siwe.js";
 
@@ -89,8 +89,12 @@ describe("posting a bounty", () => {
       expect(res.status, "a newcomer must be able to see the market work before paying for it").toBe(201);
       const grants = db.prepare("SELECT delta_mc FROM ledger WHERE kind = 'grant' AND address = ?").all(a.address) as { delta_mc: number }[];
       expect(grants).toHaveLength(1);
-      expect(grants[0].delta_mc).toBe(GRANT_MC);
-      expect(a.balance(), "fifteen cents granted, ten held for the job").toBe(GRANT_MC - 10 * MC_PER_CENT);
+      // Exactly the job and not a cent more, up to the buyer ceiling of BUYER_GRANT_MC. A grant
+      // larger than the hold would leave spare credit on the balance, and spare credit granted for
+      // a job is the hole: post it, cancel it, keep the difference, spend it on thinking. The
+      // whole grant sits inside the hold, so there is nothing loose to keep.
+      expect(grants[0].delta_mc, "the shortfall, not the ceiling").toBe(10 * MC_PER_CENT);
+      expect(a.balance(), "everything granted went straight into the hold").toBe(0);
       const held = db.prepare("SELECT count(*) AS n FROM ledger WHERE kind = 'bounty_hold' AND address = ?").get(a.address) as { n: number };
       expect(held.n, "the money really left the balance, as it does for every other buyer").toBe(1);
     });
@@ -98,7 +102,7 @@ describe("posting a bounty", () => {
     it("does not spend the grant on a job the grant could not pay for", async () => {
       const { a, db } = setup(0);
 
-      const refused = await a.postBounty(bounty({ price_cents: 200 }));
+      const refused = await a.postBounty(bounty({ price_cents: 200 }));  // over the 50 a buyer grant carries
 
       expect(refused.status).toBe(402);
       const body = (await refused.json()) as { message: string };
@@ -112,7 +116,7 @@ describe("posting a bounty", () => {
       // And the proof that it was kept for them: the smaller job now goes through.
       const smaller = await a.postBounty(bounty({ price_cents: 12 }));
       expect(smaller.status).toBe(201);
-      expect(a.balance()).toBe(GRANT_MC - 12 * MC_PER_CENT);
+      expect(a.balance(), "twelve granted, twelve held").toBe(0);
     });
 
     /**
@@ -135,8 +139,8 @@ describe("posting a bounty", () => {
       postLedger(db, { address: a.address, kind: "topup", deltaMc: 20 * MC_PER_CENT, ref: "t" });
       expect(reserveMc(db, a.address, 18 * MC_PER_CENT)).toBe(true);
 
-      // 15 cents of grant plus 2 available is 17, which does not reach 25.
-      const refused = await a.postBounty(bounty({ price_cents: 25 }));
+      // 50 cents of grant plus 2 available is 52, which does not reach 60.
+      const refused = await a.postBounty(bounty({ price_cents: 60 }));
       // A 500 here is the shape of the bug, not a variant of it: with the raw balance the code
       // decides the grant covers the job, takes it, and the retry inside the catch throws
       // `insufficient_balance` out of postLedger with nobody left to catch it.
@@ -165,12 +169,16 @@ describe("posting a bounty", () => {
 
     it("takes the grant once, whether it is spent on thinking or on posting", async () => {
       const { a, db } = setup(0);
-      await a.postBounty(bounty({ price_cents: 5 }));
-      await a.postBounty(bounty({ price_cents: 5 }));
+      const first = await a.postBounty(bounty({ price_cents: 5 }));
+      const second = await a.postBounty(bounty({ price_cents: 5 }));
 
+      expect(first.status, "the first job is the one the pool pays for").toBe(201);
+      // And the second is not. The offer is a first job, not a balance to spend across jobs: the
+      // grant covers exactly what that one job was short of and nothing is left over.
+      expect(second.status, "one job, not a running balance").toBe(402);
       const grants = db.prepare("SELECT count(*) AS n FROM ledger WHERE kind = 'grant' AND address = ?").get(a.address) as { n: number };
       expect(grants.n).toBe(1);
-      expect(a.balance()).toBe(GRANT_MC - 10 * MC_PER_CENT);
+      expect(a.balance()).toBe(0);
     });
   });
 
@@ -786,5 +794,73 @@ describe("Seeing your own side of the market", () => {
     for (const path of ["/v1/bounties/mine", "/v1/submissions/mine"]) {
       expect((await app.request(path, { method: "GET" })).status, path).toBe(401);
     }
+  });
+});
+
+/**
+ * The grant is for a job, not for a wallet, and this is the half that makes that true.
+ *
+ * T1.2 in ZIELE.md raises a buyer's first job from fifteen cents to what the job needs, up to
+ * fifty, because a fifteen-cent job leaves the winner thirteen and a half and says nothing to a
+ * stranger's agent about being worth an attempt. Built without this, it would have been a way to
+ * turn the operator's pool into inference at three times the agent rate: post a job on the grant,
+ * cancel it, keep the credit, spend it on thinking. The address would also have stayed in
+ * foreign_buyers, which is the number T1.1 had just finished protecting.
+ *
+ * Two things hold it shut. The grant covers exactly what the job is short of, so nothing is loose
+ * on the balance to begin with; and if the job ends without an award the credit goes back to the
+ * pool rather than to the buyer.
+ */
+describe("a grant that paid for a job the job never used", () => {
+  const grantsOut = (db: ReturnType<typeof openDb>) =>
+    (db.prepare("SELECT coalesce(sum(delta_mc),0) s FROM ledger WHERE kind IN ('grant','grant_returned')").get() as { s: number }).s;
+
+  it("goes back to the pool when the buyer cancels, not onto their balance", async () => {
+    const { a, db } = setup(0);
+    const posted = await a.postBounty(bounty({ price_cents: 40 }));
+    expect(posted.status).toBe(201);
+    const { id } = (await posted.json()) as { id: string };
+    expect(grantsOut(db), "the pool paid for the job").toBe(40 * MC_PER_CENT);
+
+    expect((await a.cancel({ id })).status).toBe(200);
+    expect(a.balance(), "cancelling must not hand a newcomer free credit to think with").toBe(0);
+    expect(grantsOut(db), "the pool is whole again for the next newcomer").toBe(0);
+  });
+
+  it("goes back when the deadline passes without an award", async () => {
+    const { a, db } = setup(0);
+    const posted = await a.postBounty(bounty({ price_cents: 30 }));
+    const { id } = (await posted.json()) as { id: string };
+    db.prepare("UPDATE bounties SET deadline = ? WHERE id = ?").run(
+      new Date(Date.now() - 1000).toISOString(), id,
+    );
+    expect(releaseExpired(db)).toBe(1);
+    expect(a.balance()).toBe(0);
+    expect(grantsOut(db)).toBe(0);
+  });
+
+  // The other direction: an award is the job happening, which is what the pool paid for. Nothing
+  // comes back, and it should not.
+  it("stays spent when the job was awarded, because the work happened", async () => {
+    const { a, b, db } = setup(0);
+    const posted = await a.postBounty(bounty({ price_cents: 45 }));
+    const { id } = (await posted.json()) as { id: string };
+    const sub = await b.submit({ bounty_id: id, body: "work" });
+    const { id: submissionId } = (await sub.json()) as { id: string };
+    expect((await a.awardBounty({ bounty_id: id, submission_id: submissionId })).status).toBe(200);
+    expect(grantsOut(db), "the pool bought a job and got one").toBe(45 * MC_PER_CENT);
+  });
+
+  // And money the buyer brought themselves is theirs. The clawback is scoped to the grant row that
+  // names this bounty, so a buyer who topped up and cancelled gets everything back as before.
+  it("leaves a buyer who paid with their own credit untouched", async () => {
+    const { a, db } = setup(0);
+    postLedger(db, { address: a.address, kind: "topup", deltaMc: 80 * MC_PER_CENT, ref: "own" });
+    const posted = await a.postBounty(bounty({ price_cents: 80 }));
+    const { id } = (await posted.json()) as { id: string };
+    expect(grantsOut(db), "their own money, no grant taken").toBe(0);
+
+    expect((await a.cancel({ id })).status).toBe(200);
+    expect(a.balance(), "their money comes back in full").toBe(80 * MC_PER_CENT);
   });
 });

@@ -20,7 +20,13 @@
 import { randomUUID } from "node:crypto";
 import type { Db } from "../db.js";
 import { postLedger, mcToCents, getAvailableMc } from "../db.js";
-import { grantOnFirstUse, starterAvailableMc } from "../credits/starter.js";
+import {
+  grantOnFirstUse,
+  starterAvailableMc,
+  returnGrantToPool,
+  grantBehindBounty,
+  BUYER_GRANT_MC,
+} from "../credits/starter.js";
 
 export type BountyKind = "factual" | "creative";
 export type Status = "open" | "cancelled" | "expired" | "awarded";
@@ -146,8 +152,25 @@ export function createBounty(db: Db, a: NewBounty): Bounty {
     // buyer's to spend, and `postLedger` refuses a hold that would reach into it. Asking the wrong
     // number here would hand out the address's one grant and then fail on the retry anyway.
     const balanceMc = getAvailableMc(db, creator);
-    const starterMc = starterAvailableMc(db, creator);
-    if (starterMc > 0 && balanceMc + starterMc >= a.priceMc && grantOnFirstUse(db, creator)) {
+    // A buyer's first use gets the buyer's size, not the agent's.
+    //
+    // Fifteen cents is ten attempts, which is right for an agent and wrong for a buyer: a
+    // fifteen-cent job leaves the winner thirteen and a half and says nothing to a stranger's
+    // agent about being worth an attempt. The five jobs open on 2026-09-23 are 45 to 250 cents, so
+    // a newcomer's first job would have been the smallest thing on the board by a factor of three.
+    //
+    // The grant is tied to THIS bounty by id, and returnGrantToPool gives it back if the job ends
+    // without an award. Without that tie, posting a job and cancelling it would turn the pool into
+    // inference at three times the agent rate, and the address would still be counted in
+    // foreign_buyers.
+    // Exactly what this job is short of, never more, and never above the buyer ceiling. A grant
+    // that exceeds the hold leaves spare credit on the balance, and spare credit granted for a job
+    // is the hole: post a job, cancel it, keep the difference and spend it on thinking. Granting
+    // the shortfall means the whole grant is inside the hold, so there is nothing loose to keep.
+    const shortfallMc = Math.max(0, a.priceMc - balanceMc);
+    const ceilingMc = starterAvailableMc(db, creator, BUYER_GRANT_MC);
+    const starterMc = ceilingMc > 0 ? Math.min(shortfallMc, ceilingMc) : 0;
+    if (starterMc > 0 && balanceMc + starterMc >= a.priceMc && grantOnFirstUse(db, creator, starterMc, { for_bounty: id })) {
       run();
       return getBounty(db, id)!;
     }
@@ -251,6 +274,11 @@ export function cancelBounty(db: Db, id: string, who: string): Bounty {
       ref: `bounty-release:${id}`,
       meta: { bounty_id: id },
     });
+    // The release first, the return after it, in this order and in one transaction. The buyer is
+    // whole for an instant and the pool takes back only what it put in, so the debit can never
+    // reach into money that was theirs.
+    const fromPool = grantBehindBounty(db, id);
+    if (fromPool > 0) returnGrantToPool(db, address, fromPool, id);
   });
   run();
   return getBounty(db, id)!;
@@ -291,6 +319,8 @@ export function releaseExpired(db: Db, now = new Date()): number {
         ref: `bounty-expired:${b.id}`,
         meta: { bounty_id: b.id, reason: "deadline" },
       });
+      const fromPool = grantBehindBounty(db, b.id);
+      if (fromPool > 0) returnGrantToPool(db, b.creator, fromPool, b.id);
       return true;
     });
     if (run()) released++;

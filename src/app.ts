@@ -14,6 +14,7 @@ import {
   poolLeftMc,
   starterAvailableMc,
   starterOffer,
+  agentOffer,
   GRANT_MC,
   StarterError,
 } from "./credits/starter.js";
@@ -247,7 +248,10 @@ export function createApp(opts: AppOptions) {
       // src/public/apipage.ts. The status stays 401 for both, only the shape differs, and the
       // shape only differs for a caller that explicitly asked for HTML.
       if (indexHtml && c.req.path.startsWith("/v1/") && prefersHtml(c.req.header("accept"))) {
-        const offer = starterOffer(db);
+        // The agent figure, not the buyer one: this page is what an operator sees when they open
+        // their runtime's balance URL by hand, and its sentence is about the fifteen cents a
+        // polling runtime is handed. See agentOffer().
+        const offer = agentOffer(db);
         return c.html(
           page(
             renderApiPage(c.req.path, offer ? offer.cents : null),
