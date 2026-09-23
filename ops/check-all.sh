@@ -180,6 +180,18 @@ fi
 echo
 ./ops/traffic.sh --funnel 2>/dev/null || echo "  (the funnel could not be read; ops/traffic.sh says why)"
 
+# The rule that outranks the backlog, in one line.
+#
+# "An error a real user saw beats any task in the backlog" has been the standing order for days,
+# and there was no way to ask it, so the answer arrived by accident: one caller in Helsinki spent
+# three days failing to find the API entry point and surfaced only because a path in an unrelated
+# report looked like a formatting bug. ops/failures.sh asks it on purpose; this line says whether
+# it is worth opening. Printed, not failed: a 401 to a browser is the correct answer and not a
+# fault, and what this cannot judge is which of them was a person.
+echo
+printf "  "
+./ops/failures.sh --summary 2>/dev/null || echo "(the failure list could not be read; ops/failures.sh says why)"
+
 # How old the proof of the cold start is, and how much has changed since.
 #
 # `ops/newcomer-probe.ts` is the only thing that walks the whole promise on the landing page, from a
