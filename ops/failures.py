@@ -26,8 +26,9 @@ SCAN = re.compile(
 )
 
 # 404 on these is noise every site gets and nobody is failing at anything.
-BORING = {"/favicon.ico", "/apple-touch-icon.png", "/apple-touch-icon-precomposed.png",
-          "/robots.txt", "/sitemap.xml", "/ads.txt", "/.well-known/security.txt"}
+BORING = {"/favicon.ico", "/favicon.png", "/favicon.svg", "/apple-touch-icon.png",
+          "/apple-touch-icon-precomposed.png", "/robots.txt", "/sitemap.xml", "/ads.txt",
+          "/.well-known/security.txt"}
 
 errors = collections.defaultdict(list)
 worked = collections.Counter()

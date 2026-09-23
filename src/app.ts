@@ -803,7 +803,15 @@ export function createApp(opts: AppOptions) {
     ),
   );
 
-  app.get("/favicon.ico", (c) => c.body(FAVICON, 200, { "Content-Type": "image/svg+xml", "Cache-Control": "public, max-age=86400" }));
+  // Both names, and both answer with the SVG. A client that asks for .png and gets an SVG renders
+  // it; a client that asks and gets a 404 shows the generic page icon. Two addresses asked for
+  // /favicon.png on 2026-09-23 within twenty minutes of the new domain going live, which is what
+  // okhttp does, and every one of those was a 404.
+  const favicon = (c: { body: (b: string, s: 200, h: Record<string, string>) => Response }) =>
+    c.body(FAVICON, 200, { "Content-Type": "image/svg+xml", "Cache-Control": "public, max-age=86400" });
+  app.get("/favicon.ico", favicon);
+  app.get("/favicon.png", favicon);
+  app.get("/favicon.svg", favicon);
 
   app.get("/health", (c) => c.json({ ok: true, version: VERSION }));
 
