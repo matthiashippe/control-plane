@@ -9,7 +9,7 @@ one is from 6 March 04:43 UTC. A day out, under Matthias' name, in a tracker whe
 check it in two clicks.
 
 It also enforces the lesson from 20.09., paid for with a real visitor count: an answer that does
-not spell out https://cp.hippe.eu leads nowhere. The repo link alone brought one visitor in
+not spell out the canonical address leads nowhere. The repo link alone brought one visitor in
 fourteen days, and that one came from our own site.
 
     ops/before-the-answers.py            all drafts
@@ -18,6 +18,7 @@ fourteen days, and that one came from our own site.
 Exit 0: everything checks out. Exit 1: something in a draft is not true any more.
 """
 import json
+import os
 import pathlib
 import re
 import subprocess
@@ -25,6 +26,12 @@ import sys
 
 REPO = "Conway-Research/automaton"
 FOLDER = pathlib.Path(".scratch/gtm/issue-antworten")
+
+# The address a new answer has to carry, and every address this service has ever answered to.
+# Not a literal typed once: this file enforced "cp.hippe.eu" for two days after the move, which
+# turned the guard into the thing that would have sent nine permanent links to the wrong host.
+CANONICAL_HOST = os.environ.get("CP_PUBLIC_HOST") or "postyourprice.com"
+KNOWN_HOSTS = ("cp.hippe.eu", "postyourprice.com")
 
 failures = 0
 
@@ -90,6 +97,30 @@ for draft in drafts:
     text = draft.read_text()
     print(f"#{number}")
 
+    # Status first, checks after, and the order is the point.
+    #
+    # It used to run every check and ask about the issue last. Checks 1 to 5 all judge what is
+    # about to go OUT: whether a date is still right, whether the address is the canonical one.
+    # For an answer that is already posted, that file is not a draft any more, it is the record
+    # of what was actually said, and the README says so in as many words. Judged as a draft it is
+    # permanently red, and on 2026-09-23 that was exactly the result: the six posted answers name
+    # cp.hippe.eu because that is the address that is out there, so the gate reported 14 problems
+    # that no edit may fix and could never say READY again. A gate that cannot go green is not a
+    # gate.
+    state = gh(f"repos/{REPO}/issues/{number}", ".state")
+    if state != "open":
+        print(f"  --      issue #{number} is {state}, so this draft has no occasion left")
+        no_occasion.append(number)
+        print()
+        continue
+    authors = gh(f"repos/{REPO}/issues/{number}/comments", "[.[].user.login] | join(\",\")")
+    if "matthiashippe" in authors:
+        print("  ok      already posted; this file records what was said and is not judged as a draft")
+        posted.append(number)
+        print()
+        continue
+    print(f"  ok      issue #{number} is open, and we have not answered yet")
+
     # 1. The claim that ages fastest: when a maintainer last said anything.
     mentions_march = re.findall(r"since (\w+ \d{1,2}|\w+)(?=[,.\s])", text)
     if last_maintainer_comment and any("March" in m for m in mentions_march):
@@ -125,35 +156,30 @@ for draft in drafts:
     # in the set. What must never happen is one without the other: a link with no disclosure, or
     # a disclosure with no way to get here. So they are checked against each other, not against a
     # rule that every answer has to sell something.
-    names_service = "cp.hippe.eu" in text
+    names_service = any(h in text for h in KNOWN_HOSTS)
     disclosure = bool(re.search(r"^Disclosure:", text, re.M))
     if names_service or disclosure:
-        report("https://cp.hippe.eu" in text,
-               "spells out https://cp.hippe.eu, not just the repo",
+        report(f"https://{CANONICAL_HOST}" in text,
+               f"spells out https://{CANONICAL_HOST}, not just the repo",
                "the drafts of 20.09. named only the repo and brought nobody: the repo had one "
                "visitor in fourteen days, and that one came from our own site")
+        # A comment on a public issue is permanent. The address in it is the only backlink this
+        # project will ever have from that thread, and on 2026-09-22 the canonical address moved to
+        # postyourprice.com. Nine unsent drafts still named cp.hippe.eu, and this check REQUIRED
+        # them to: it compared against a literal host typed on 20.09. So the one channel that has
+        # ever delivered a reader would have anchored nine permanent links on the address we had
+        # just moved away from, and the gate built to protect that channel would have passed every
+        # one of them.
+        stale = sorted({h for h in KNOWN_HOSTS if h != CANONICAL_HOST and h in text})
+        report(not stale,
+               f"names no address other than {CANONICAL_HOST}",
+               f"this draft still names {', '.join(stale)}; a comment is permanent and the link "
+               f"in it is the backlink" if stale else "")
         report(disclosure, "carries a disclosure line, because it names the service")
     else:
         print("  ok      names no service and carries no disclosure, deliberately")
 
-    # 6. A closed issue is not a fault in the draft, it is a draft that has lost its occasion.
-    #    Commenting there reaches nobody, so it drops out of the list rather than going red.
-    state = gh(f"repos/{REPO}/issues/{number}", ".state")
-    if state != "open":
-        print(f"  --      issue #{number} is {state}, so this draft has no occasion left")
-        no_occasion.append(number)
-        print()
-        continue
-    print(f"  ok      issue #{number} is open")
-
-    # 7. Already answered there is not a fault, it is the draft having done its job. Only a
-    #    second comment from us would be one, and that is what this would catch.
-    authors = gh(f"repos/{REPO}/issues/{number}/comments", "[.[].user.login] | join(\",\")")
-    if "matthiashippe" in authors:
-        print("  ok      already posted (our comment is there), nothing left to send")
-        posted.append(number)
-    else:
-        pending.append(number)
+    pending.append(number)
     print()
 
 print(f"{len(posted)} answer(s) already posted: {', '.join('#' + n for n in posted) or 'none'}")
