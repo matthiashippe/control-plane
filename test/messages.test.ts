@@ -701,6 +701,47 @@ describe("a path that does not exist is not a key problem", () => {
     expect(body.docs).toBeTruthy();
   });
 
+  it("names the /v1 step when the base URL is missing it, which our own advice can cause", async () => {
+    // Which base URL is right depends on what the client appends, and the answer to the doubled
+    // path tells a caller to use the bare origin. That is correct for a client that appends
+    // /v1/models and wrong for the OpenAI SDK, which appends `models` and then lands on /models.
+    // Measured on 2026-09-23 with openai 3.19.0: base_url=https://cp.hippe.eu is a 404 there.
+    const db = openDb(":memory:");
+    const app = createApp({ db });
+    const res = await app.request("/models");
+    expect(res.status).toBe(308);
+    const body = (await res.json()) as { error: string; message: string; base_url: string; endpoint: string };
+    expect(body.error).toBe("base_url_is_missing_the_v1_path");
+    expect(body.endpoint).toBe("/v1/models");
+    expect(body.base_url, "the value to set, not the origin").toMatch(/\/v1$/);
+    expect(body.message, "and that the redirect may not be followed for them").toMatch(/follow\s+redirects/i);
+  });
+
+  it("catches the same mistake when the base URL also carries a path", async () => {
+    // base_url=https://cp.hippe.eu/v1/status with the OpenAI SDK produces exactly this.
+    const db = openDb(":memory:");
+    const app = createApp({ db });
+    const res = await app.request("/v1/status/models");
+    expect(res.status).toBe(308);
+    expect(res.headers.get("location")).toBe("/v1/models");
+  });
+
+  it("covers chat/completions too, because that is the call that matters", async () => {
+    const db = openDb(":memory:");
+    const app = createApp({ db });
+    const res = await app.request("/chat/completions", { method: "POST" });
+    expect(res.status).toBe(308);
+    expect(res.headers.get("location")).toBe("/v1/chat/completions");
+  });
+
+  it("leaves /v1/models itself alone", async () => {
+    // The guard must not fire on the path that exists, or the endpoint redirects to itself.
+    const db = openDb(":memory:");
+    const app = createApp({ db });
+    const res = await app.request("/v1/models");
+    expect(res.status, "an existing route never reaches notFound").not.toBe(308);
+  });
+
   it("still explains a path that is merely unknown, because nothing can be guessed there", async () => {
     const db = openDb(":memory:");
     const app = createApp({ db });

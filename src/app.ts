@@ -2002,6 +2002,52 @@ export function createApp(opts: AppOptions) {
         },
       );
     }
+    // The other half of the same mistake, and the answer above can lead straight into it.
+    //
+    // Which base URL is correct depends on what the client appends. A client that appends
+    // /v1/models needs the bare origin, which is what the block above tells it. The OpenAI SDK
+    // appends `models` with no version step, so it needs <origin>/v1 instead. Somebody using that
+    // SDK who follows the advice above lands here, on GET /models, and until 2026-09-23 got the
+    // general "No such endpoint here", which lists every endpoint and names the one thing to
+    // change nowhere.
+    //
+    // Measured on 2026-09-23 with openai 3.19.0 against production: base_url=https://cp.hippe.eu
+    // answers 404 on /models, base_url=https://cp.hippe.eu/v1 answers 401 on /v1/models, which is
+    // the right answer to a request carrying no key.
+    //
+    // No stranger has ever asked for a prefix-less path; the log says so over its whole length.
+    // This is not a measured visitor failure like the doubled path above, and it should not be
+    // read as one. It closes a hole our own first contact fell into on 2026-09-20 and that our
+    // own advice can lead a reader to, which is reason enough for a redirect that costs nothing.
+    const bare = c.req.path.match(
+      /^(?:\/v1\/.+?)?\/(models|chat\/completions|completions|embeddings)$/,
+    );
+    if (bare) {
+      const endpoint = `/v1/${bare[1]}`;
+      const target = endpoint + (new URL(c.req.url).search || "");
+      const origin = requestOrigin(c);
+      const base = `${origin ?? "https://cp.hippe.eu"}/v1`;
+      return c.json(
+        {
+          error: "base_url_is_missing_the_v1_path",
+          message:
+            `This API is served under /v1, and the path asked for does not carry it. A client ` +
+            `that appends \`${bare[1]}\` on its own, which the OpenAI SDK does, needs the ` +
+            `version step in the base URL: set it to ${base}. The endpoint you asked for is ` +
+            `${endpoint}, and this response redirects there; if your client does not follow ` +
+            `redirects, request it directly.`,
+          base_url: base,
+          endpoint,
+          docs: DOC.service,
+        },
+        308,
+        {
+          Location: target,
+          "X-Handsel-Hint": "your base URL is missing the /v1 path",
+        },
+      );
+    }
+
     // The path exists, just not for this method.
     //
     // Two hand-written lists above answer 405 for /v1/auth/* and /v1/briefs/*, because those are
