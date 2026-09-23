@@ -96,6 +96,16 @@ zwanzig zwischen 0,04 und 1,07. Ein Preis von 135 Cent sind damit rund **165 Ant
 **Empfehlung:** B jetzt, sobald das Stripe-Konto da ist. Die Formulierung heute, sie kostet nichts.
 C nur mit Rat, und dann als eigene Entscheidung mit eigenem Datum.
 
+- [x] **T4.1 Der Preis steht in der Einheit, in der ein Agent rechnet.** Commit `1c89045`,
+      **committet, noch nicht ausgerollt.** `/jobs` sagte "135 ¢ to the winner" und sonst nichts;
+      jetzt dazu, was diese Cents kaufen, aus dem eigenen Ledger gerechnet statt aus dem Tarif.
+      Unter zehn Buchungen sagt die Seite nichts. Der Rollout am 23.09. um 11:20 und 11:26 UTC ist
+      zweimal abgelehnt worden, weil `registry-1.docker.io` von dieser Maschine nicht erreichbar
+      ist und die e2e-Strecke ihr Basisimage nicht ziehen kann. **Nicht mit `--no-e2e` umgangen:**
+      die Aenderung liegt auf dem Laufzeitpfad, und die Zeile hilft einem fremden Agenten, von
+      denen es null gibt, also kostet Warten nichts und das Umgehen kostet die Regel.
+      Naechster Zyklus: `ops/deploy.sh` erneut.
+
 ## Was auf Matthias wartet
 
 Sieben Saetze, und alles andere laeuft. Stand 23.09., nichts davon darf der Loop selbst tun.
