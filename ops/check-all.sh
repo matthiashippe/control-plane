@@ -245,6 +245,20 @@ run "the directory search would see a listing" ./ops/own-x402-listing.sh --selft
 # Whether anything that indexes the web has ever looked at this service, and whether our side of
 # that is in order. The first crawler is news; until then the line is the finding. See
 # ops/visibility.sh: in the first 2.6 days there was not one, and nothing on our side is wrong.
+# Can the traffic tools still see their own history?
+#
+# On 2026-09-23 at 17:28 Caddy rotated the access log by size, and every script in ops/ that reads
+# traffic silently lost four days in that second. One cycle reported "3 address(es) came from a
+# github.com page, 3 of which ran the page script"; the next, forty minutes later, reported
+# "Nobody has ever arrived here from a github.com page." Nothing had changed outside. 45,067 lines
+# had become 273.
+#
+# The readers now take the rotated files too (ops/access-log.sh). This is the check that says so:
+# a service running since 19 September whose log reaches back an hour is a tool that has gone
+# blind, and blindness that reports a confident zero is the one failure mode this whole directory
+# is built against. Undetermined on 2, because an unreachable VM is not a finding.
+run --undetermined-on 2 "the traffic tools can still see their history" ./ops/access-log.sh --span
+
 run --undetermined-on 2 "search engines can find us" ./ops/visibility.sh
 
 # Every command a page shows, run against the live service. The unit tests prove a page agrees

@@ -63,8 +63,11 @@ OWN="${CP_TYPING_OWN-$(own_ips)}"
 log="${CP_TYPING_LOG:-}"
 if [[ -z "$log" ]]; then
   log=$(mktemp); trap 'rm -f "$log"' EXIT
-  if ! timeout 60 ssh -i "$KEY" -o BatchMode=yes -o ConnectTimeout=10 -o ServerAliveInterval=5 "$HOST" \
-    'docker exec deploy-caddy-1 cat /var/log/caddy/access.log | gzip -c' 2>/dev/null | gunzip > "$log"; then
+  # Reads the WHOLE log, rotated files included (ops/access-log.sh). Caddy rotated by size on
+  # 2026-09-23 at 17:28 and every script here silently lost its history: one cycle counted three
+  # arrivals from github.com, the next said nobody had ever come from there. 45,067 lines against
+  # the 273 that were left in the current file.
+  if ! "$(dirname "$0")/access-log.sh" > "$log"; then
     echo "COULD NOT TELL: the access log was not readable. Not a finding about the week." >&2
     exit 2
   fi

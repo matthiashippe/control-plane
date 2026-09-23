@@ -57,6 +57,5 @@ if [ -n "${CP_CRAWLER_LOG:-}" ]; then
 else
   # gzip on the far side: the access log passed 30 MB on 2026-09-23 and compresses to about 1.3 MB,
   # which is the difference between one second and forty on this link. Measured, not assumed.
-  ssh -i "$KEY" -o BatchMode=yes -o ConnectTimeout=10 "$HOST" \
-    'docker exec deploy-caddy-1 cat /var/log/caddy/access.log 2>/dev/null | gzip -c' | gunzip -c
+  "$(dirname "$0")/access-log.sh"
 fi | python3 "$DIR/crawlers.py"

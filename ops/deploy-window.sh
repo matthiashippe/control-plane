@@ -57,8 +57,11 @@ log=$(mktemp); trap 'rm -f "$log"' EXIT
 # the file.
 #
 # The real answer is log rotation, and that lives in deploy/, which is not touched without a human.
-if ! timeout 45 "${SSH[@]}" -o ServerAliveInterval=5 "$HOST" \
-  'docker exec deploy-caddy-1 cat /var/log/caddy/access.log | gzip -c' 2>/dev/null | gunzip > "$log"; then
+# Reads the WHOLE log, rotated files included (ops/access-log.sh). Caddy rotated by size on
+# 2026-09-23 at 17:28 and every script here silently lost its history: one cycle counted three
+# arrivals from github.com, the next said nobody had ever come from there. 45,067 lines against
+# the 273 that were left in the current file.
+if ! "$(dirname "$0")/access-log.sh" > "$log"; then
   echo "COULD NOT TELL: the access log was not readable in 45 seconds." >&2
   echo "        A hiccup on the ssh connection, not a finding about the deploy. Run it again." >&2
   exit 2

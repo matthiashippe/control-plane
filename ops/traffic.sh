@@ -156,8 +156,11 @@ log=$(mktemp); trap 'rm -f "$log"' EXIT
 if [[ -n "${CP_TRAFFIC_LOG:-}" ]]; then
   cp "${CP_TRAFFIC_LOG}" "$log"
   echo "(log from ${CP_TRAFFIC_LOG}, not from the VM)" >&2
-elif ! timeout 45 ssh -i "$KEY" -o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=3 "$HOST" \
-  'docker exec deploy-caddy-1 cat /var/log/caddy/access.log | gzip -c' 2>/dev/null | gunzip > "$log"; then
+# Reads the WHOLE log, rotated files included (ops/access-log.sh). Caddy rotated by size on
+# 2026-09-23 at 17:28 and every script here silently lost its history: one cycle counted three
+# arrivals from github.com, the next said nobody had ever come from there. 45,067 lines against
+# the 273 that were left in the current file.
+elif ! "$(dirname "$0")/access-log.sh" > "$log"; then
   echo "ERROR: the access log could not be fetched within 45 seconds." >&2
   echo "       That is no finding about the service. Check it separately:" >&2
   echo "       curl -s -o /dev/null -m 10 -w '%{http_code}\n' https://cp.hippe.eu/health" >&2

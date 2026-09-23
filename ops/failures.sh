@@ -68,6 +68,5 @@ if [ -n "${CP_FAILURE_LOG:-}" ]; then
   cat "$CP_FAILURE_LOG"
 else
   # gzip on the far side: 30 MB of log becomes about 1.3 MB on the wire.
-  ssh -i "$KEY" -o BatchMode=yes -o ConnectTimeout=10 "$HOST" \
-    'docker exec deploy-caddy-1 cat /var/log/caddy/access.log 2>/dev/null | gzip -c' | gunzip -c
+  "$(dirname "$0")/access-log.sh"
 fi | python3 "$DIR/failures.py" "${1:-}"
