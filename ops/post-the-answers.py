@@ -196,7 +196,13 @@ for number in pending[:send]:
         print(f"  #{number} FAILED: {r.stderr.strip()[:200]}")
         continue
     sent += 1
-    print(f"  #{number} posted: {r.stdout.strip()}")
+    url = r.stdout.strip()
+    print(f"  #{number} posted: {url}")
+    # The record of the outward action, and the input ops/traffic.sh needs. A public link triggers
+    # a fetch fleet within seconds, and without the timestamp a cycle reading the log a day later
+    # counts that fleet as arrivals. Appended after the post succeeded, never before.
+    with open("ops/posted-answers.log", "a", encoding="utf-8") as fh:
+        fh.write(f"{datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')} {number} {url}\n")
     if sent < send:
         time.sleep(GAP_SECONDS)
 

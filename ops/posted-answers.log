@@ -1,0 +1,15 @@
+# What went out, when, under Matthias' name. Append-only, written by ops/post-the-answers.py.
+#
+# It is here and not in .scratch/ because it is the record of an outward action and belongs in the
+# history, and because ops/traffic.sh reads it: posting a URL into a public GitHub comment
+# triggers a fetch fleet within seconds, and a cycle reading the traffic a day later would
+# otherwise count that fleet as arrivals.
+#
+# Measured on 2026-09-23: five seconds after the first comment, six new addresses hit /fix; sixteen
+# within three minutes; not one of them ran the page script and fetched a depth pixel more than a
+# hundredth of a second apart. Sixteen arrivals, no readers.
+#
+# <iso8601-utc> <issue> <url>
+2026-09-23T13:58:48Z 293 https://github.com/Conway-Research/automaton/issues/293#issuecomment-5796193319
+2026-09-23T14:00:20Z 294 https://github.com/Conway-Research/automaton/issues/294#issuecomment-5796218247
+2026-09-23T14:01:53Z 333 https://github.com/Conway-Research/automaton/pull/333#issuecomment-5796242563

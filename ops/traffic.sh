@@ -84,6 +84,25 @@ BASE_URL="${CP_URL:-https://postyourprice.com}"
 # the settled x402 payments point at.
 CP_OWN_HOSTS="${CP_OWN_HOSTS:-cp.hippe.eu postyourprice.com}"
 export CP_OWN_HOSTS
+# When we posted a public link, and why this report has to know.
+#
+# Measured on 2026-09-23: the first issue answer went out at 13:58:48 UTC and FIVE SECONDS later
+# six new addresses were on /fix. Sixteen inside three minutes. Not one of them ran the page
+# script, and the two that did never fetched two depth pixels more than a hundredth of a second
+# apart, so not one was a reader. That is the fetch fleet a public GitHub comment triggers.
+#
+# A cycle reading this report tomorrow would see sixteen arrivals and no way to know they were
+# ours. The naive reading is the flattering one, which is the failure every counter in this file
+# exists to prevent, so the posting times are read from ops/posted-answers.log and the burst is
+# counted separately from the rest.
+CP_POSTED_LOG="${CP_POSTED_LOG:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/posted-answers.log}"
+export CP_POSTED_LOG
+# How long after a post an arrival is attributed to the fleet rather than to a reader. Five
+# minutes: on 2026-09-23 the last of the sixteen came at 14:02:00, three minutes and twelve
+# seconds after the first comment, and a reader who clicks a link in an issue thread arrives
+# later than a machine that is handed the URL by the platform.
+CP_BURST_SECONDS="${CP_BURST_SECONDS:-300}"
+export CP_BURST_SECONDS
 KEY="${CP_SSH_KEY:-$HOME/.ssh/id_ed25519_automaton}"
 HOST="${CP_HOST:-root@76.13.144.207}"
 # The operator's own line, the VM itself and the code-host. Without this filter the picture
@@ -167,6 +186,10 @@ own_addresses() {
 added=$(comm -13 <(printf '%s\n' $OWN | sort -u) <(own_addresses))
 OWN=$(own_addresses | tr '\n' ' ')
 own_json=$(printf '%s' "$OWN" | tr ' ' '\n' | grep -v '^$' | jq -R . | jq -sc .)
+# The burst block below runs as its own process and needs the same list. Without it our own smoke
+# test after a deploy lands inside the five minutes after a post and is counted as an arrival,
+# which is the exact flattering error this section was built to prevent.
+export CP_OWN_IPS_RESOLVED="$OWN"
 
 # The name of the service this report is about, and not a name typed once in 2026-09. The header
 # said cp.hippe.eu for five hours after postyourprice.com became the canonical address, on a
@@ -541,6 +564,73 @@ echo
 
 ROWS="${CP_TRAFFIC_LINES:-25}"
 if (( ONLY_FUNNEL )); then exit 0; fi
+
+# What our own posting pulled in, told apart from what came on its own.
+python3 - "$log" <<'BURST'
+import collections, datetime, json, os, sys
+
+posted = []
+path = os.environ.get("CP_POSTED_LOG", "")
+if path and os.path.exists(path):
+    for line in open(path, encoding="utf-8"):
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        parts = line.split()
+        if len(parts) < 2:
+            continue
+        try:
+            posted.append((datetime.datetime.fromisoformat(parts[0].replace("Z", "+00:00")).timestamp(), parts[1]))
+        except ValueError:
+            continue
+if not posted:
+    raise SystemExit(0)
+
+window = float(os.environ.get("CP_BURST_SECONDS", "300"))
+own = set(os.environ.get("CP_OWN_IPS_RESOLVED", "").split())
+hosts = (os.environ.get("CP_OWN_HOSTS") or "").split()
+first, acted = {}, set()
+for raw in open(sys.argv[1], encoding="utf-8", errors="replace"):
+    raw = raw.strip()
+    if not raw.startswith("{"):
+        continue
+    try:
+        r = json.loads(raw)
+    except ValueError:
+        continue
+    q = r.get("request", {})
+    ip = q.get("remote_ip")
+    if not ip or ip in own:
+        continue
+    ts = r["ts"]
+    if ip not in first or ts < first[ip]:
+        first[ip] = ts
+    # The one thing a fetch fleet does not do: run the page script. /v1/status carrying one of our
+    # own pages as its referrer is the inline script and nothing else.
+    if str(q.get("uri", "")).startswith("/v1/status"):
+        ref = (q.get("headers", {}).get("Referer") or [""])[0]
+        if any(h in ref for h in hosts):
+            acted.add(ip)
+
+burst, per_post = set(), collections.Counter()
+for ip, ts in first.items():
+    for at, issue in posted:
+        if at <= ts <= at + window:
+            burst.add(ip)
+            per_post[issue] += 1
+            break
+
+print()
+print("-- What our own posting pulled in --")
+newest = max(at for at, _ in posted)
+print(f"   {len(posted)} link(s) posted, newest {datetime.datetime.fromtimestamp(newest, datetime.timezone.utc):%m-%d %H:%M} UTC.")
+print(f"   {len(burst)} address(es) first arrived within {int(window)} s of one of them, {len(burst & acted)} of which ran the page script.")
+for issue, n in per_post.most_common():
+    print(f"     #{issue}: {n}")
+print("   A public link reaches a fetch fleet before it reaches a person. Measured on 2026-09-23:")
+print("   six addresses were on /fix five seconds after the first comment and not one of them read")
+print("   anything. Counted here so the next cycle does not read them as arrivals.")
+BURST
 
 echo "-- First request per foreign IP (this is where the referrer is) --"
 # The first request of an address, not the first one inside the window. Until 2026-09-22 the
