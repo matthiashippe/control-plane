@@ -10,6 +10,12 @@
 #   ops/traffic.sh 72       last 72 hours
 set -euo pipefail
 
+# Only the funnel, for ops/check-all.sh. The column is the one number the standing order is about,
+# and a report nobody reads it in is a number nobody sees. Parsed before HOURS, because the first
+# argument is the window and a flag read as a window is an unbound variable three lines down.
+ONLY_FUNNEL=0
+[[ "${1:-}" == "--funnel" ]] && { ONLY_FUNNEL=1; shift; }
+
 HOURS="${1:-24}"
 KEY="${CP_SSH_KEY:-$HOME/.ssh/id_ed25519_automaton}"
 HOST="${CP_HOST:-root@76.13.144.207}"
@@ -318,6 +324,8 @@ if dropped:
 echo
 
 ROWS="${CP_TRAFFIC_LINES:-25}"
+if (( ONLY_FUNNEL )); then exit 0; fi
+
 echo "-- First request per foreign IP (this is where the referrer is) --"
 # The first request of an address, not the first one inside the window. Until 2026-09-22 the
 # window filter ran first, so an address whose real first visit was three days ago and which came

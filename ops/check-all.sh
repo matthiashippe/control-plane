@@ -169,6 +169,17 @@ if (( DEEP )); then
     && touch "$STAMPS/skill-production"
 fi
 
+# The one number the standing order is actually about, printed where a cycle already looks.
+#
+# ops/traffic.sh has carried it since 2026-09-22 and ops/check-all.sh did not, so reading the
+# report told you the way in is walkable and not whether anybody walks it. Those are different
+# questions and the second one is the point: on the night it was written, eighteen addresses had
+# opened a page, one had scrolled, and none had opened a second one.
+#
+# Printed, not failed. Nobody arriving is not a fault in this repository.
+echo
+./ops/traffic.sh --funnel 2>/dev/null || echo "  (the funnel could not be read; ops/traffic.sh says why)"
+
 # How old the proof of the cold start is, and how much has changed since.
 #
 # `ops/newcomer-probe.ts` is the only thing that walks the whole promise on the landing page, from a
@@ -182,9 +193,21 @@ age_of_the_proof() {
     echo "$label: never proven on this checkout. $how"
     return
   fi
-  local proven_at commit age commits_since
+  local proven_at commit age commits_since seconds
   read -r proven_at commit < "$STAMPS/$stamp"
-  age=$(( ($(date -u +%s) - $(date -u -jf %Y-%m-%dT%H:%M:%SZ "$proven_at" +%s 2>/dev/null || date -u -d "$proven_at" +%s 2>/dev/null || echo 0)) / 3600 ))
+  # Milliseconds are stripped before parsing. ops/newcomer-probe.ts writes its stamp with
+  # `new Date().toISOString()`, which ends in `.536Z`, and the format below does not take that. The
+  # parse fell through to `echo 0` and the line read "cold start last proven 497256h ago", an age
+  # counted from 1970. It was only noticed because 56 years is absurd; a stamp written a few hours
+  # wrong would have passed for real.
+  proven_at="${proven_at/.[0-9][0-9][0-9]Z/Z}"
+  seconds=$(date -u -jf %Y-%m-%dT%H:%M:%SZ "$proven_at" +%s 2>/dev/null || date -u -d "$proven_at" +%s 2>/dev/null || echo "")
+  if [[ -z "$seconds" ]]; then
+    # Say it is unreadable rather than print an age derived from nothing.
+    echo "$label: stamp at $STAMPS/$stamp is not a date I can read ($proven_at). $how"
+    return
+  fi
+  age=$(( ($(date -u +%s) - seconds) / 3600 ))
   commits_since=$(git log --oneline "$commit..HEAD" 2>/dev/null | wc -l | tr -d ' ')
   echo "$label last proven ${age}h ago at ${commit}, ${commits_since:-?} commit(s) ago ($how)"
 }
