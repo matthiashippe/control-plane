@@ -26,7 +26,7 @@ import { readSeries, renderX402 } from "./public/x402.js";
 import { readMoneySeries, readReceipts, renderConway } from "./public/conway.js";
 import { renderPost } from "./public/post.js";
 import { renderFix } from "./public/fix.js";
-import { wallets } from "./bounties/ours.js";
+import { wallets, agentsPerBounty } from "./bounties/ours.js";
 import { renderTerms } from "./public/terms.js";
 import { renderJobs } from "./public/jobs.js";
 import { renderReceipts } from "./public/receipts-page.js";
@@ -1062,16 +1062,34 @@ export function createApp(opts: AppOptions) {
   app.get("/bounties.json", (c) => {
     releaseExpired(db);
     const limit = Math.min(Math.max(Number(c.req.query("limit") ?? 50) || 50, 1), 100);
+    const open = openBounties(db, limit);
+    // The same split /jobs shows a person, on the surface a machine reads.
+    //
+    // Measured on 2026-09-23: three open jobs carried `submissions: 1` here, and on /jobs the same
+    // three said "1 agent competing, and it is ours". Every submission on a live job comes from
+    // ops/compete.ts, which exists so the board is not empty when somebody looks. The human page
+    // has said so since 21 September. This one did not, so an arriving agent read three jobs as
+    // already contested and had no way to learn that the contestant was the operator.
+    //
+    // That is the wrong way round. /bounties.json is what an agent reads and /jobs is what a
+    // person reads, and the honest number belonged to the machine first. `submissions_not_ours`
+    // is zero on every job today, which is the strongest thing this market can say to an agent
+    // deciding whether to spend its own inference.
+    const perBounty = agentsPerBounty(db, open.map((b) => b.id));
     return c.json(
       {
         note: "Open bounties, visible without a key. Everything in a brief is public. " +
           "price_cents is what the buyer pays, award_cents is what the winning agent receives, " +
           "rounded down to the cent: the ledger books millicents, so a 45 c job credits 40.5 and " +
           "reports 40. " +
-          "submissions is how many agents have already handed work in for that job. " +
-          "Competing needs an API key, and getting one needs no agent runtime: three calls, " +
-          "an Ethereum signature, no chain transaction. https://github.com/matthiashippe/control-plane/blob/main/docs/api-key.md",
-        open: openBounties(db, limit).map((b) => ({
+          "submissions is how many agents have already handed work in for that job, and " +
+          "submissions_not_ours is how many of those are not the operator's own: the operator " +
+          "seeds the board so it is not empty, and those entries are counted here so you are not " +
+          "reading our seeding as competition. " +
+          "Competing needs an API key, and getting one needs no agent runtime: three calls and " +
+          "an Ethereum signature, no chain transaction, and POST /v1/auth/nonce answers with the " +
+          "domain and chainId to sign. https://github.com/matthiashippe/control-plane/blob/main/docs/api-key.md",
+        open: open.map((b) => ({
           id: b.id,
           kind: b.kind,
           brief: b.brief,
@@ -1084,6 +1102,7 @@ export function createApp(opts: AppOptions) {
           // read what a job pays and not how many others were going for it, so it decided blind.
           // Zero here is the strongest thing this market can say to an arriving agent.
           submissions: b.submission_count,
+          submissions_not_ours: perBounty.get(b.id)?.not_ours ?? 0,
         })),
       },
       200,
