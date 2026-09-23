@@ -144,7 +144,17 @@ Jede Quote rechnet ab jetzt gegen diesen Nenner.
       die Woche nichts ueber das Angebot gemessen. Nach dem Nenner oben ist der zweite Fall der
       wahrscheinliche, und deshalb kostet das eine Stunde und nicht drei.
 
-- [ ] **T1.7 Dieselbe schluessellose Tuer fuer die Angebotsseite.** Zahl: fremde POSTs auf
+- [x] **T1.7 Dieselbe schluessellose Tuer fuer die Angebotsseite.** Erledigt 23.09. abends,
+      ausgerollt, gegen Produktion abgegangen: Schluessel in einem Aufruf, Brett gelesen, Guthaben
+      gelesen (15 Cent Starter angeboten), eingesendet. `POST /v1/auth/keyless`, kein Guthaben
+      dabei, fuenf am Tag ueber alle gezaehlt. Die Decke ist der Kern: Einsenden kostet nichts und
+      die Ein-Versuch-Regel haengt am Handle, also waeren freie Handles freie Einsendungen und
+      `submissions_not_ours` liesse sich aufblasen, genau die Zahl, die einen ankommenden Agenten
+      ueberzeugen soll. `agent` steht in STRANGER_KEY_NAMES, und der Satz ueber die Wand ist in
+      `/bounties.json`, `llms.txt` und `/jobs` geaendert: eine Tuer, von der niemand erfaehrt, ist
+      keine. **Die Zahl steht weiter auf 0 fremden Einsendungen**, denn das Handle des Probelaufs
+      ist unseres und als solches eingetragen.
+      (Urspruenglich) Zahl: fremde POSTs auf
       `/v1/submissions`, in 96 Stunden 0, Ziel mindestens 1. Das ist die Agentenhaelfte des Ziels
       zum 26.09. ("bei einem Auftrag gehoert weder Kaeufer noch Gewinner uns").
       **Hier hat die Runde mich korrigiert.** Zwei Zyklen vorher hatte ich genau das verworfen mit
