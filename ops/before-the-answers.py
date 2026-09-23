@@ -113,6 +113,19 @@ if WALLET_TS is None:
     print("note: Conway's wallet.ts was not readable, so the line #373 and #380 quote is NOT checked.")
     print()
 
+# The other file of Conway's that the drafts quote, for the same reason.
+ROUTER_TS = None
+try:
+    _r = subprocess.run(
+        ["gh", "api", "repos/Conway-Research/automaton/contents/src/inference/router.ts",
+         "--jq", ".content"], capture_output=True, text=True, timeout=30).stdout
+    ROUTER_TS = base64.b64decode(_r).decode("utf-8", "replace") if _r.strip() else None
+except Exception:
+    ROUTER_TS = None
+if ROUTER_TS is None:
+    print("note: Conway's router.ts was not readable, so the free-model route is NOT checked.")
+    print()
+
 # What Conway's sign-up does right now, from ops/conway-zustand.sh, which provisions a throwaway
 # wallet and costs nothing. None is not a pass: the checks that need it are skipped out loud.
 CONWAY_FAIL = None
@@ -325,6 +338,18 @@ for draft in drafts:
         report('process.env.HOME || "/root"' in WALLET_TS,
                "the /root fall-through is still in Conway's src/identity/wallet.ts",
                "that expression is gone from the file; the fix in this draft may be stale")
+
+    # 10. The other line of Conway's, and the one nearly every draft rests on.
+    #
+    # Ten of the twelve drafts tell somebody a local model still runs when the survival tier is
+    # `dead`, because `isFree || tierOk` in src/inference/router.ts exempts free models from the
+    # tier check. That is the whole free route, the thing offered before anything we sell, and if
+    # it stops being true then ten permanent comments are sending people down a path that does not
+    # work. It is at line 224 today.
+    if ROUTER_TS is not None and "isFree || tierOk" in text:
+        report("isFree || tierOk" in ROUTER_TS,
+               "the free-model exemption is still in Conway's src/inference/router.ts",
+               "that condition is gone; the free route these drafts offer may no longer work")
 
     pending.append(number)
     print()
