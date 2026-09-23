@@ -630,6 +630,45 @@ for issue, n in per_post.most_common():
 print("   A public link reaches a fetch fleet before it reaches a person. Measured on 2026-09-23:")
 print("   six addresses were on /fix five seconds after the first comment and not one of them read")
 print("   anything. Counted here so the next cycle does not read them as arrivals.")
+
+# The second window, and it is the one that carries the answer.
+#
+# The 300 seconds above catch the fetch fleet and nothing else, and on 2026-09-23 a cycle read
+# "16 arrivals, 0 readers" off it and wrote the channel off. That was the wrong window, not the
+# wrong channel. Measured over the whole log on the same day: THREE addresses ever arrived from a
+# github.com page and ALL THREE ran the page script, which no fetcher in the fleet did. Two of them
+# carry a Conway issue we had answered -- #390 (answered 09-20 09:22) and #392 (answered 09-22
+# 17:56, first visit 18:03, seven minutes later and seven minutes outside the window above).
+#
+# Seven minutes is a person opening a thread, not a scanner. The burst window is tuned to catch
+# machines, so reading the channel off it measures machines. Both windows are printed and neither
+# is called "what the posting did".
+gh = {}
+for raw in open(sys.argv[1]):
+    raw = raw.strip()
+    if not raw.startswith("{"):
+        continue
+    try:
+        r = json.loads(raw)
+    except ValueError:
+        continue
+    q = r.get("request", {})
+    ip = q.get("remote_ip")
+    if not ip or ip in own:
+        continue
+    ref = (q.get("headers", {}).get("Referer") or [""])[0]
+    if "github.com" in ref and ip not in gh:
+        gh[ip] = (r["ts"], ref)
+print()
+if gh:
+    print(f"   Over the WHOLE log, {len(gh)} address(es) came from a github.com page, "
+          f"{len(set(gh) & acted)} of which ran the page script:")
+    for ip, (ts, ref) in sorted(gh.items(), key=lambda kv: kv[1][0]):
+        mark = "READ " if ip in acted else "     "
+        at = datetime.datetime.fromtimestamp(ts, datetime.timezone.utc)
+        print(f"     {mark}{ip:<16} {at:%m-%d %H:%M} UTC  {ref[:72]}")
+else:
+    print("   Nobody has ever arrived here from a github.com page.")
 BURST
 
 echo "-- First request per foreign IP (this is where the referrer is) --"
