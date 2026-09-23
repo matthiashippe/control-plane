@@ -690,8 +690,16 @@ export function createApp(opts: AppOptions) {
     return c.html(
       page(
         renderFix(db),
-        "Conway automaton: 500 on /v1/auth/verify, and it keeps buying credits",
-        "Provisioning has failed for every fresh wallet since July 2026 while the payment endpoint still works, so the runtime buys 5 USDC of credits it never receives, every five minutes. How to stop the spending, two free ways to make it think again, and what this service does instead.",
+        // The title carries the wording people actually type into a search box.
+        //
+        // It said "500 on /v1/auth/verify", which is what our own probe gets and not what the
+        // people looking for help have in front of them: three issue titles on the Conway tracker
+        // say "Invalid or expired nonce", and the folder README for the issue answers says that is
+        // the search that brings readers. The body of this page has carried both wordings for
+        // days; the title and the description, which are the two lines a search result shows, had
+        // neither. Both are in the title now, shortest first.
+        'Conway automaton: "Invalid or expired nonce", 500 on /v1/auth/verify',
+        'The 401 says your nonce expired and it did not: sign-up does not complete for a fresh wallet, while the payment endpoint still works, so the runtime buys 5 USDC of credits it never receives, every five minutes. How to stop the spending, two free ways to make it think again, and what this service does instead.',
         "/fix",
       ),
     );

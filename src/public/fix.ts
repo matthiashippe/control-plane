@@ -68,10 +68,12 @@ export function renderFix(db: Db): string {
       <p class="kicker">If your automaton stopped</p>
       <h1 class="ph">Sign-up answers 500, and the runtime keeps paying anyway</h1>
       <p class="sub">
-        Two endpoints, one broken. Provisioning has failed for every fresh wallet since July 2026,
-        and money has reached the payment address in every month since February. The first line below is what the issue
-        tracker has reported since July and what our own provisioning attempt with a fresh wallet
-        answers on every check we run, most recently with the same 500; the second is
+        Two endpoints, one broken. Sign-up does not complete for a fresh wallet, and money has
+        reached the payment address in every month since February. The two wordings below are not
+        two problems: <code>401 Invalid or expired nonce</code> is what the issue tracker has
+        reported since July, and <code>500 Database error</code> is what our own attempt with a
+        freshly generated wallet gets on every check we run. Same endpoint, same outcome, and the
+        401 is the misleading one, because the nonce is not what expired. The payment line is
         checked every day at 05:00 UTC and its history is on <a href="/conway">the money page</a>.
       </p>
 

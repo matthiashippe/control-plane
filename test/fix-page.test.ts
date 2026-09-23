@@ -95,13 +95,35 @@ describe("/fix", () => {
     // that on every cycle. The page was underselling its own evidence with a date that ages by a
     // day every day. So what is required now is that each half names its own source and that only
     // the daily one claims to be daily.
+    //
+    // Reworded on 2026-09-23 so the two error strings sit next to each other, and the requirement
+    // stayed: name the source per half, and let only the daily half say daily. It is asserted on
+    // what the sentence means rather than on the phrase "second is", which is what broke when the
+    // sentence changed while remaining correct.
     const text = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
     expect(text, "the daily claim has to name what is actually daily")
-      .toMatch(/second is\s+checked every day/i);
+      .toMatch(/payment line is checked every day/i);
     expect(text, "and the sign-up half must not borrow that claim")
       .not.toMatch(/sign-up[^.]*checked every day|every day[^.]*auth\/verify/i);
     expect(text, "the sign-up half has to name where its answer comes from")
-      .toMatch(/provisioning attempt with a fresh wallet answers on every check we run/i);
+      .toMatch(/our own attempt with a\s+freshly generated wallet gets on every check we run/i);
+    // Both wordings, said to be one problem. A reader who searched for the 401 and finds a page
+    // about a 500 concludes it is a different bug and leaves.
+    expect(text).toMatch(/401 Invalid or expired nonce/i);
+    expect(text).toMatch(/500 Database error/i);
+    expect(text, "and the page has to say they are the same endpoint")
+      .toMatch(/Same endpoint, same outcome/i);
+  });
+
+  // The two lines a search result shows. The body carried both error strings for days while the
+  // title and description carried neither, and the wording people type is the 401.
+  it("puts the searched wording where a search result can show it", async () => {
+    const html = await page("/fix");
+    const title = html.match(/<title>([^<]*)<\/title>/)?.[1] ?? "";
+    const description = html.match(/<meta name="description" content="([^"]*)/)?.[1] ?? "";
+    expect(title).toMatch(/Invalid or expired nonce/i);
+    expect(title.length, "a title much over 70 characters is cut off in a result").toBeLessThan(75);
+    expect(description).toMatch(/nonce/i);
   });
 
   it("warns that the same runtime buys here too, before it touches the free credit", async () => {
