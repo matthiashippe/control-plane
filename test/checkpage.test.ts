@@ -294,3 +294,65 @@ describe("the page says where the draft goes", () => {
     expect(withForm).not.toContain("in the address bar");
   });
 });
+
+/**
+ * What the page says is kept, against what is kept.
+ *
+ * `POST /v1/briefs/check` carries the draft in the request body and Caddy logs no bodies.
+ * `GET /check?brief=...` carries it in the address and Caddy logs `request>uri` in full, into a
+ * file `deploy/Caddyfile` keeps for 720 hours. Until 2026-09-23 three surfaces said "nothing
+ * stored" without distinguishing the two, and the page recommended the address bar to anybody
+ * without a terminal. A probe sent that way came back out of the access log three seconds later.
+ *
+ * `ops/what-the-log-keeps.sh` measures it against the running service, from both ends. These
+ * tests hold the wording, which is the half that can drift without anybody deploying anything.
+ */
+describe("what the check says is kept", () => {
+  it("tells a reader their draft is in the log when it arrived in the address", async () => {
+    const res = await app().request(`/check?brief=${encodeURIComponent(BRIEF)}`, {
+      headers: { accept: BROWSER },
+    });
+    const html = await res.text();
+    expect(res.status).toBe(200);
+    expect(html).toContain("access log");
+    expect(html).toContain("30 days");
+  });
+
+  it("says nothing was stored when it arrived in the body, because nothing was", async () => {
+    const res = await app().request("/v1/briefs/check", {
+      method: "POST",
+      headers: { accept: BROWSER, "content-type": "application/json" },
+      body: JSON.stringify({ brief: BRIEF }),
+    });
+    const html = await res.text();
+    expect(res.status).toBe(200);
+    expect(html).toContain("Nothing was stored");
+    expect(html).not.toContain("access log");
+  });
+
+  // The claim and the meta description both, because the description is what a search result
+  // shows and a reader decides on it before the page has rendered.
+  it("never claims nothing is stored on a route that puts the draft in the address", async () => {
+    for (const path of ["/check", `/check?brief=${encodeURIComponent(BRIEF)}`]) {
+      const html = await (await app().request(path, { headers: { accept: BROWSER } })).text();
+      expect(html.toLowerCase(), `${path} still promises that nothing is stored`).not.toContain(
+        "nothing stored",
+      );
+    }
+  });
+
+  // The address-bar route still answers, because links people already hold must not break and the
+  // two examples are exactly that shape. What it must not do is stand there as the recommended
+  // way in with no word about where the draft goes.
+  it("does not offer the address bar for a reader's own draft without saying what it costs", () => {
+    const intro = renderCheckIntro(false, 15);
+    expect(intro).toContain("/check?brief=");
+    expect(intro).toContain("30 days");
+    expect(intro).not.toContain("Put your own draft");
+  });
+
+  it("drops the warning when the box is there, because a form body is not logged", () => {
+    const intro = renderCheckIntro(true, 15);
+    expect(intro).not.toContain("30 days");
+  });
+});

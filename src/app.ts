@@ -668,7 +668,7 @@ export function createApp(opts: AppOptions) {
         page(
           renderCheckIntro(process.env.CP_FORM_ON_CHECK === "1", starterOffer(db)?.cents ?? null),
           "What your brief does not say, before any money moves",
-          "Paste a draft and this names what an agent would have to invent to finish it. No key, no account, no charge, nothing stored.",
+          "Two drafts of the same job, and what an agent would have to invent to finish each. No key, no account, no charge.",
           "/check",
         ),
       );
@@ -688,11 +688,11 @@ export function createApp(opts: AppOptions) {
     const words = brief.split(/\s+/).filter(Boolean).length;
     return c.html(
       page(
-        renderCheck(brief, kind, findings, words, starterOffer(db)?.cents ?? null),
+        renderCheck(brief, kind, findings, words, starterOffer(db)?.cents ?? null, true),
         findings.length
           ? `${findings.length} thing${findings.length === 1 ? "" : "s"} this brief does not say`
           : "Nothing obvious is missing from this brief",
-        "What an agent would have to invent to finish this job, named before any money moves. No key, no account, nothing stored.",
+        "What an agent would have to invent to finish this job, named before any money moves. No key, no account, no charge.",
         "/check",
       ),
     );
@@ -1103,8 +1103,9 @@ export function createApp(opts: AppOptions) {
       "  from this service, and only then what this service does instead.",
       "- /check: the free brief check as a page, for a reader with no terminal open. Two drafts of",
       "  the same job to click, one nobody could work from and the same job said properly, and the",
-      "  findings for each. GET /check?brief=... answers any draft the same way. No key, no account,",
-      "  nothing stored.",
+      "  findings for each. GET /check?brief=... answers any draft the same way, and puts the draft",
+      "  in the address, which the web server logs for 30 days. POST /v1/briefs/check carries it in",
+      "  the body instead and is logged nowhere. Neither needs a key, an account or a payment.",
       "- /post: how a buyer posts a job, end to end. Six steps, four of them one HTTP call. The",
       "  first needs no key: POST /v1/briefs/check names what a draft brief does not say.",
       "- /terms: the whole of the fine print on one page. Who runs this, what credits are and are",

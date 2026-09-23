@@ -50,6 +50,38 @@ function nextStep(freeFirstJobCents: number | null): string {
   );
 }
 
+/**
+ * What is kept, said where it is true and not where it is not.
+ *
+ * Three surfaces carried "nothing stored" until 2026-09-23: the intro, the result page and the
+ * meta description that goes into a search snippet. For `POST /v1/briefs/check` that is exact --
+ * the draft is in the request body, the service writes nothing and Caddy logs no bodies.
+ *
+ * For `GET /check?brief=...` it was false, and the page recommended that route to anybody without
+ * a terminal. Caddy logs `request>uri` in full, query string included, and `deploy/Caddyfile`
+ * keeps that file for 720 hours. Measured on 2026-09-23: a probe sent through the address bar
+ * came back out of `/var/log/caddy/access.log` three seconds later, word for word.
+ *
+ * So a stranger was told their draft was not stored while it was being written into a log kept
+ * for a month. That is the worst shape a claim on this site can take, because the sentence exists
+ * to make somebody comfortable enough to paste real work.
+ *
+ * The two example links stay as they are: the brief in those URLs is ours, written for this page.
+ * What changed is that the page no longer sends a reader's OWN draft through the address bar, and
+ * says what happens to it if they do anyway. The day `deploy/Caddyfile` drops the `brief`
+ * parameter from the logged URI, `ops/what-the-log-keeps.sh` says so and this text goes back to
+ * one sentence.
+ */
+export const LOG_KEEPS_DAYS = 30;
+
+export function whatIsKept(viaQuery: boolean): string {
+  return viaQuery
+    ? `This service stored nothing, and the draft was in the address, so the web server's ` +
+      `access log has it for ${LOG_KEEPS_DAYS} days. The terminal call below sends it in the ` +
+      `body instead, which is not logged.`
+    : "Nothing was stored, no key was needed and nothing was charged.";
+}
+
 export interface Finding {
   missing: string;
 }
@@ -65,6 +97,7 @@ export function renderCheck(
   findings: Finding[],
   words: number,
   freeFirstJobCents: number | null,
+  viaQuery = false,
 ): string {
   const list = findings.length
     ? `<ul class="found">${findings.map((f) => `<li>${esc(f.missing)}</li>`).join("")}</ul>`
@@ -90,9 +123,8 @@ export function renderCheck(
       ${list}
       <h2>What was checked</h2>
       <pre>${esc(brief)}</pre>
-      <p class="fine">${words} word${words === 1 ? "" : "s"}, read as ${esc(kind)} work. Nothing was
-        stored, no key was needed and nothing was charged. The same call from a terminal answers
-        JSON:</p>
+      <p class="fine">${words} word${words === 1 ? "" : "s"}, read as ${esc(kind)} work.
+        ${whatIsKept(viaQuery)} The same call from a terminal answers JSON:</p>
       <pre><code>curl -s https://cp.hippe.eu/v1/briefs/check \\
   -H 'content-type: application/json' \\
   -d '{"brief":"…","kind":"${esc(kind)}"}'</code></pre>
@@ -169,7 +201,7 @@ export function renderCheckIntro(formAllowed: boolean, freeFirstJobCents: number
             ? "Paste a draft and this names the things an agent would have to invent to finish it."
             : "This names the things an agent would have to invent to finish your brief."
         } No key,
-        no account, no charge, nothing stored. It is the same check that runs on every job posted
+        no account, no charge. It is the same check that runs on every job posted
         here, and it costs nothing because knowing this after paying is worse for both sides.
       </p>
       ${
@@ -186,10 +218,16 @@ export function renderCheckIntro(formAllowed: boolean, freeFirstJobCents: number
             // The address bar is the way in that needs nothing: a browser encodes the spaces on
             // its own, which is why this reads as plain words rather than %20. Measured against
             // production on 2026-09-23.
-            `<div class="code"><pre><code>${esc(siteHost())}/check?brief=FACT SHEET on ...</code></pre></div>
+            `<p class="fine">
+        There is no box here yet. The policy this site runs under refuses form submissions, and a
+        form that silently does nothing is worse than none. Two ways in meanwhile: the examples
+        below are one click each, and for your own draft the terminal call further down sends it
+        in the request body, where nothing logs it.
+      </p>
       <p class="fine">
-        Put your own draft after <code>brief=</code> in the address bar. The two examples below are
-        the same thing with the text already filled in.
+        <code>${esc(siteHost())}/check?brief=...</code> answers any draft as well, but it puts the
+        draft in the address, and the web server writes every address it is called with into a log
+        kept for ${LOG_KEEPS_DAYS} days. Worth knowing before pasting a client's brief into it.
       </p>`
       }
       <h2>Two drafts of the same job</h2>
