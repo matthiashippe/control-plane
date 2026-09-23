@@ -108,29 +108,30 @@ describe("free identities do not make a free pool", () => {
     const { db, app } = fresh();
     const codes: number[] = [];
     for (let i = 0; i < 10; i++) codes.push((await post(app, { brief: `${BRIEF} Run ${i}.` })).status);
-    expect(codes.filter((s) => s === 201), "two fifty-cent jobs fit in a day").toHaveLength(2);
-    expect(codes.filter((s) => s === 503), "the rest are refused, not served").toHaveLength(8);
+    expect(codes.filter((s) => s === 201), "three fifty-cent jobs fit in a day").toHaveLength(3);
+    expect(codes.filter((s) => s === 503), "the rest are refused, not served").toHaveLength(7);
 
     const out = db
       .prepare("SELECT coalesce(sum(delta_mc), 0) AS total FROM ledger WHERE kind = 'grant'")
       .get() as { total: number };
-    expect(out.total).toBe(100_000);
+    expect(out.total).toBe(150_000);
   });
 
   it("mints no wallet for a request it is going to refuse", async () => {
     const { db, app } = fresh();
-    for (let i = 0; i < 3; i++) await post(app, { brief: `${BRIEF} Run ${i}.` });
+    for (let i = 0; i < 4; i++) await post(app, { brief: `${BRIEF} Run ${i}.` });
     const wallets = db.prepare("SELECT count(*) AS n FROM wallets").get() as { n: number };
-    // Two jobs, two handles. A third handle would be a row nobody can reach, holding a key nobody
-    // was ever shown.
-    expect(wallets.n).toBe(2);
+    // Three jobs, three handles. A fourth handle would be a row nobody can reach, holding a key
+    // nobody was ever shown.
+    expect(wallets.n).toBe(3);
   });
 
   it("says why, in words, instead of failing like a broken page", async () => {
     const { app } = fresh();
     await post(app, { brief: BRIEF });
     await post(app, { brief: `${BRIEF} Two.` });
-    const res = await post(app, { brief: `${BRIEF} Three.` });
+    await post(app, { brief: `${BRIEF} Three.` });
+    const res = await post(app, { brief: `${BRIEF} Four.` });
     expect(res.status).toBe(503);
     const html = await res.text();
     expect(html).toMatch(/midnight UTC/i);

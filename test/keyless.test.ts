@@ -3,6 +3,7 @@ import { isAddress } from "viem";
 import { openDb } from "../src/db.js";
 import { resolveApiKey, hashApiKey } from "../src/auth/siwe.js";
 import { mintKeylessIdentity, isKeylessAddress, KEYLESS_PREFIX } from "../src/auth/keyless.js";
+import { OUR_ADDRESSES } from "../src/bounties/ours.js";
 import {
   claimStarter,
   grantedTodayMc,
@@ -64,18 +65,19 @@ describe("an account for somebody without a wallet", () => {
 });
 
 describe("the pool survives identities being free", () => {
-  // Two buyer grants fit in a day at 50,000 each; the third is what this exists to refuse.
+  // Three buyer grants fit in a day at 50,000 each; the fourth is what this exists to refuse.
   it("gives the day's budget away and then stops", () => {
     const d = db();
-    const minted = [0, 1, 2].map(() => mintKeylessIdentity(d).address);
+    const minted = [0, 1, 2, 3].map(() => mintKeylessIdentity(d).address);
     claimStarter(d, minted[0], BUYER_GRANT_MC);
     claimStarter(d, minted[1], BUYER_GRANT_MC);
-    expect(grantedTodayMc(d)).toBe(2 * BUYER_GRANT_MC);
+    claimStarter(d, minted[2], BUYER_GRANT_MC);
+    expect(grantedTodayMc(d)).toBe(3 * BUYER_GRANT_MC);
     expect(poolLeftTodayMc(d)).toBe(0);
-    expect(starterAvailableMc(d, minted[2], BUYER_GRANT_MC)).toBe(0);
+    expect(starterAvailableMc(d, minted[3], BUYER_GRANT_MC)).toBe(0);
     try {
-      claimStarter(d, minted[2], BUYER_GRANT_MC);
-      throw new Error("the third grant went through");
+      claimStarter(d, minted[3], BUYER_GRANT_MC);
+      throw new Error("the fourth grant went through");
     } catch (e) {
       expect(e).toBeInstanceOf(StarterError);
       expect((e as StarterError).code).toBe("pool_daily_limit");
@@ -117,17 +119,45 @@ describe("the pool survives identities being free", () => {
   // what they say they test, with everything still green.
   it("lifts the day's ceiling only when the knob is set, and puts it back", () => {
     const d = db();
-    const a = [0, 1, 2].map(() => mintKeylessIdentity(d).address);
+    const a = [0, 1, 2, 3].map(() => mintKeylessIdentity(d).address);
     claimStarter(d, a[0], BUYER_GRANT_MC);
     claimStarter(d, a[1], BUYER_GRANT_MC);
-    expect(starterAvailableMc(d, a[2], BUYER_GRANT_MC)).toBe(0);
+    claimStarter(d, a[2], BUYER_GRANT_MC);
+    expect(starterAvailableMc(d, a[3], BUYER_GRANT_MC)).toBe(0);
     process.env.CP_POOL_DAILY_MC = "500000";
     try {
-      expect(starterAvailableMc(d, a[2], BUYER_GRANT_MC)).toBe(BUYER_GRANT_MC);
-      expect(claimStarter(d, a[2], BUYER_GRANT_MC).granted_cents).toBe(50);
+      expect(starterAvailableMc(d, a[3], BUYER_GRANT_MC)).toBe(BUYER_GRANT_MC);
+      expect(claimStarter(d, a[3], BUYER_GRANT_MC).granted_cents).toBe(50);
     } finally {
       delete process.env.CP_POOL_DAILY_MC;
     }
     expect(starterAvailableMc(d, mintKeylessIdentity(d).address, BUYER_GRANT_MC)).toBe(0);
+  });
+
+  // Our own money, spent on our own checks, does not close the door on a stranger. And the list
+  // that decides it is the hardcoded one, because a key name is chosen by whoever creates the key.
+  it("does not count the operator's own grants against the day", () => {
+    const d = db();
+    const ours = OUR_ADDRESSES[0];
+    d.prepare("INSERT INTO wallets (address, balance_mc, created_at) VALUES (?, 0, ?)").run(
+      ours,
+      new Date().toISOString(),
+    );
+    d.prepare(
+      "INSERT INTO ledger (address, kind, delta_mc, ref, created_at) VALUES (?, 'grant', ?, 'ours', ?)",
+    ).run(ours, POOL_DAILY_MC_DEFAULT, new Date().toISOString());
+    expect(grantedTodayMc(d), "the whole day, spent by us").toBe(0);
+    expect(starterAvailableMc(d, mintKeylessIdentity(d).address, BUYER_GRANT_MC)).toBe(
+      BUYER_GRANT_MC,
+    );
+  });
+
+  it("is not fooled by a key that calls itself one of ours", () => {
+    const d = db();
+    // `ops-` is on OUR_KEY_NAMES, and POST /v1/api-keys takes the name from the request body, so
+    // this is a name a stranger can ask for. It must not buy them a way past the day's limit.
+    const a = mintKeylessIdentity(d, "ops-drain").address;
+    claimStarter(d, a, BUYER_GRANT_MC);
+    expect(grantedTodayMc(d)).toBe(BUYER_GRANT_MC);
   });
 });

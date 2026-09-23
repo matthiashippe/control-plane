@@ -151,7 +151,8 @@ describe("the last screen of the walk, in the same language as the first", () =>
       });
     await send(1);
     await send(2);
-    const res = await send(3);
+    await send(3);
+    const res = await send(4);
     expect(res.status).toBe(503);
     const html = await res.text();
     expect(html).toContain("Mitternacht UTC");

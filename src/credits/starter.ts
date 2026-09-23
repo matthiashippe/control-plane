@@ -23,6 +23,7 @@
  */
 
 import type { Db } from "../db.js";
+import { OUR_ADDRESSES } from "../bounties/ours.js";
 import { postLedger, mcToCents } from "../db.js";
 
 /** Ten attempts at about 1.5 cents each. */
@@ -69,18 +70,25 @@ export const POOL_MC = 500_000;
  * anybody who meant it; it stopped accidents. Minting in the browser only makes that visible, and
  * the cap below is the first thing here that actually limits a determined caller.
  *
- * 100,000 millicents is two buyer grants or six agent grants a day. With 230 cents left on
- * 2026-09-23 a determined drainer needs two and a half days and gets a euro a day; a genuine
- * newcomer, on a service that sees one stranger a day, never meets this limit. The total was
- * always the real exposure and this only spreads it out, which is the honest way to put it: it
- * does not make the giveaway safe, it makes it slow enough to notice.
+ * 150,000 millicents is three buyer grants or ten agent grants a day. With 230 cents left on
+ * 2026-09-23 a determined drainer needs a day and a half and gets 1.50 a day; a genuine newcomer,
+ * on a service that sees one stranger a day, never meets this limit. The total was always the real
+ * exposure and this only spreads it out, which is the honest way to put it: it does not make the
+ * giveaway safe, it makes it slow enough to notice.
+ *
+ * It was 100,000 for four hours. Our own cold-start probe takes a 15,000 grant on every deploy it
+ * runs with, two deploys took 30,000 on 2026-09-23, and those are NOT excluded below because the
+ * probe mints a fresh address each run and only the hardcoded address list is trusted here. At
+ * 100,000 a heavy deploy day left 70,000, enough for exactly one buyer and nothing spare. 150,000
+ * leaves room for our own checks and two strangers on the same day, which is the case this has to
+ * survive without anybody noticing it exists.
  *
  * `CP_POOL_DAILY_MC` raises it, and it is read on every call rather than at import. Tests about
  * what happens when the WHOLE pool is gone need to spend it in one run, and without a way to lift
  * the day's ceiling the only alternatives are to weaken those tests or to leave the cap out of
  * their reach, both of which trade a real check for a green run.
  */
-export const POOL_DAILY_MC_DEFAULT = 100_000;
+export const POOL_DAILY_MC_DEFAULT = 150_000;
 
 export function poolDailyMc(): number {
   const raw = Number(process.env.CP_POOL_DAILY_MC);
@@ -122,13 +130,38 @@ export function poolLeftMc(db: Db): number {
  */
 export function grantedTodayMc(db: Db, now: Date = new Date()): number {
   const day = now.toISOString().slice(0, 10);
-  const row = db
+  const rows = db
     .prepare(
-      "SELECT coalesce(sum(delta_mc), 0) AS total FROM ledger " +
-        "WHERE kind IN ('grant', 'grant_returned') AND substr(created_at, 1, 10) = ?",
+      "SELECT address, coalesce(sum(delta_mc), 0) AS total FROM ledger " +
+        "WHERE kind IN ('grant', 'grant_returned') AND substr(created_at, 1, 10) = ? GROUP BY address",
     )
-    .get(day) as { total: number };
-  return row.total;
+    .all(day) as { address: string; total: number }[];
+  if (!rows.length) return 0;
+  // Our own grants do not count against the day, and the reason is what this limit is for.
+  //
+  // The total pool is the operator's exposure and counts everything, ours included. The DAY exists
+  // for one thing: a caller who mints identities cannot take the whole pool in a minute. A grant
+  // to our own walk of that path is not that caller, it is us spending our own money on a check.
+  //
+  // Not a nicety. Measured on 2026-09-23, hours after this limit shipped: 80,000 of the day's
+  // 100,000 were gone and 50,000 of that was our own keyless walk. `starterOffer` reads the day's
+  // budget, so the offer on /check went silent -- and the free-first-job button with it -- for
+  // every real visitor, because our own measuring had eaten the day. A limit that our own checks
+  // switch the product off is the same shape of error as a measurement that counts its own curl
+  // as a visitor.
+  //
+  // **Only the hardcoded address list, never the key names.** `ourAddresses` also recognises us by
+  // the NAME on an API key, and a caller picks that name themselves: `POST /v1/api-keys` takes it
+  // from the request body, so anybody could call their key `ops-anything` and walk straight past
+  // this limit. That is tolerable in a report an operator reads and is not tolerable in the one
+  // check standing between a script and the pool. OUR_ADDRESSES cannot be self-assigned, which is
+  // the whole reason it is the list used here.
+  //
+  // The same hole is in the reporting, where it costs a wrong number instead of money: a stranger
+  // who names their key `ops-x` disappears from foreign_buyers. Written down here because that is
+  // where it was noticed; fixing it belongs in ops/db-report.cjs and ours.ts, not in this function.
+  const ours = new Set(OUR_ADDRESSES);
+  return rows.filter((r) => !ours.has(r.address.toLowerCase())).reduce((n, r) => n + r.total, 0);
 }
 
 /** What the pool can still fund today: the smaller of what is left and what the day allows. */
