@@ -363,3 +363,39 @@ describe("what the check says is kept", () => {
     expect(intro, "and lets a reader say which kind of work it is").toContain('name="kind"');
   });
 });
+
+/**
+ * The form made the address space infinite, and one line keeps it from costing anything.
+ *
+ * Since 2026-09-23 /check carries a textarea that submits GET to itself, so every draft anybody
+ * ever pastes is its own URL. That is the right shape for a reader, who gets an address to send
+ * on, and it is the wrong shape for a search engine unless every one of those URLs says which
+ * page it really is.
+ *
+ * It already did, because page() is called with "/check" for both the intro and the result. This
+ * holds it there. Nothing else in the suite would notice if the pathname were passed through from
+ * the request instead, and the damage would be silent: a thousand thin pages competing with the
+ * one that matters.
+ */
+describe("the result of a check is the same page as the check", () => {
+  const canonicalOf = async (path: string) => {
+    const html = await (await app().request(path, { headers: { accept: BROWSER } })).text();
+    return (html.match(/<link rel="canonical" href="([^"]*)"/) ?? [])[1];
+  };
+
+  it("points a result at /check and not at the draft that produced it", async () => {
+    const withDraft = await canonicalOf(`/check?brief=${encodeURIComponent(BRIEF)}&kind=creative`);
+    expect(withDraft, "the canonical must not carry the query").not.toContain("brief=");
+    expect(withDraft).toMatch(/\/check$/);
+  });
+
+  it("gives the empty page the same canonical, so the two do not compete", async () => {
+    expect(await canonicalOf("/check")).toBe(await canonicalOf(`/check?brief=${encodeURIComponent(BRIEF)}`));
+  });
+
+  it("does the same for a draft too long to check, which is also a page somebody can link", async () => {
+    const tooLong = "x".repeat(20_000);
+    const html = await (await app().request(`/check?brief=${tooLong}`, { headers: { accept: BROWSER } })).text();
+    expect((html.match(/<link rel="canonical" href="([^"]*)"/) ?? [])[1]).toMatch(/\/check$/);
+  });
+});
