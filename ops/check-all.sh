@@ -180,6 +180,15 @@ run --undetermined-on 2 "it fits a small phone" ./ops/phone.sh --quick
 # took was therefore of the dark one. --quick is one scheme and three pages; the full run is six
 # pages in both.
 run --undetermined-on 2 "the text is readable in both schemes" ./ops/contrast.sh --quick
+# Does every scheduled job still point at a file that exists?
+#
+# The freshness check below notices a dead job 26 hours after it dies, which for something that
+# runs once a day is one hour of warning. This notices the cause: a crontab entry naming a file
+# that was renamed in the repository, which no compiler, test or grep here can catch, because the
+# reference lives on another machine. Two jobs died that way on 2026-09-22 and it took until the
+# next morning to see it.
+run --undetermined-on 2 "the scheduled jobs point somewhere" ./ops/cron-points-somewhere.sh
+
 run "the daily jobs still ran" ./ops/freshness.sh
 
 # What we say about somebody else's code, held against their code.
