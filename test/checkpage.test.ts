@@ -308,17 +308,21 @@ describe("the page says where the draft goes", () => {
  * tests hold the wording, which is the half that can drift without anybody deploying anything.
  */
 describe("what the check says is kept", () => {
-  it("tells a reader their draft is in the log when it arrived in the address", async () => {
-    const res = await app().request(`/check?brief=${encodeURIComponent(BRIEF)}`, {
-      headers: { accept: BROWSER },
-    });
-    const html = await res.text();
-    expect(res.status).toBe(200);
-    expect(html).toContain("access log");
-    expect(html).toContain("30 days");
+  // Reversed on 2026-09-23, hours after it was written, because the thing it asserted stopped
+  // being true: deploy/Caddyfile gained `query { delete brief }` in its log filter, so the address
+  // route keeps nothing either. ops/what-the-log-keeps.sh measured it against production, not
+  // kept through the address and not kept through the body, and it is what decides. A page that
+  // warns about a log which no longer keeps the draft is wrong in the harmless direction, and the
+  // tool was written to fail on that direction too.
+  it("no longer warns about a log that keeps nothing, whichever route the draft came by", async () => {
+    for (const path of ["/check", `/check?brief=${encodeURIComponent(BRIEF)}`]) {
+      const html = await (await app().request(path, { headers: { accept: BROWSER } })).text();
+      expect(html, `${path} still warns about the access log`).not.toContain("access log");
+      expect(html, `${path} still names a retention period`).not.toContain("30 days");
+    }
   });
 
-  it("says nothing was stored when it arrived in the body, because nothing was", async () => {
+  it("says nothing was stored, because since the log filter nothing is", async () => {
     const res = await app().request("/v1/briefs/check", {
       method: "POST",
       headers: { accept: BROWSER, "content-type": "application/json" },
@@ -344,15 +348,18 @@ describe("what the check says is kept", () => {
   // The address-bar route still answers, because links people already hold must not break and the
   // two examples are exactly that shape. What it must not do is stand there as the recommended
   // way in with no word about where the draft goes.
-  it("does not offer the address bar for a reader's own draft without saying what it costs", () => {
+  // With the box switched off the page still explains the address route; it just no longer has a
+  // cost to name, because the log filter took the cost away.
+  it("still explains the address route when there is no box", () => {
     const intro = renderCheckIntro(false, 15);
     expect(intro).toContain("/check?brief=");
-    expect(intro).toContain("30 days");
     expect(intro).not.toContain("Put your own draft");
   });
 
-  it("drops the warning when the box is there, because a form body is not logged", () => {
+  it("offers the box when it is switched on, and submits to the page and not to the API", () => {
     const intro = renderCheckIntro(true, 15);
-    expect(intro).not.toContain("30 days");
+    expect(intro).toContain('method="GET" action="/check"');
+    expect(intro).toContain('name="brief"');
+    expect(intro, "and lets a reader say which kind of work it is").toContain('name="kind"');
   });
 });

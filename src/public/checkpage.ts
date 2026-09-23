@@ -66,20 +66,20 @@ function nextStep(freeFirstJobCents: number | null): string {
  * for a month. That is the worst shape a claim on this site can take, because the sentence exists
  * to make somebody comfortable enough to paste real work.
  *
- * The two example links stay as they are: the brief in those URLs is ours, written for this page.
- * What changed is that the page no longer sends a reader's OWN draft through the address bar, and
- * says what happens to it if they do anyway. The day `deploy/Caddyfile` drops the `brief`
- * parameter from the logged URI, `ops/what-the-log-keeps.sh` says so and this text goes back to
- * one sentence.
+ * **That day came on 2026-09-23, hours later.** `deploy/Caddyfile` now carries
+ * `query { delete brief }` in its log filter, so the parameter is dropped before the line is
+ * written and the address route keeps nothing either. `ops/what-the-log-keeps.sh` measured it
+ * against production: not kept through the address, not kept through the body.
+ *
+ * So the sentence is one sentence again, and the parameter stays in the signature rather than
+ * being deleted with it: the two routes are still two routes, the filter is a line in a file that
+ * is not touched without a human, and the day it is edited out this function is where the
+ * difference goes back in. The measurement is what decides, and it runs every cycle.
  */
 export const LOG_KEEPS_DAYS = 30;
 
-export function whatIsKept(viaQuery: boolean): string {
-  return viaQuery
-    ? `This service stored nothing, and the draft was in the address, so the web server's ` +
-      `access log has it for ${LOG_KEEPS_DAYS} days. The terminal call below sends it in the ` +
-      `body instead, which is not logged.`
-    : "Nothing was stored, no key was needed and nothing was charged.";
+export function whatIsKept(_viaQuery: boolean): string {
+  return "Nothing was stored, no key was needed and nothing was charged.";
 }
 
 export interface Finding {
