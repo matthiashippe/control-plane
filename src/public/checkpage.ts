@@ -106,6 +106,7 @@ export function renderCheck(
   words: number,
   freeFirstJobCents: number | null,
   viaQuery = false,
+  formAllowed = false,
 ): string {
   const list = findings.length
     ? `<ul class="found">${findings.map((f) => `<li>${esc(f.missing)}</li>`).join("")}</ul>`
@@ -129,10 +130,37 @@ export function renderCheck(
         }
       </p>
       ${list}
-      <h2>What was checked</h2>
+      ${
+        formAllowed
+          ? // The draft comes back, in a box, so the next move is the one the findings ask for.
+            //
+            // The page used to end on "posting it is six steps, and they do need a wallet",
+            // directly after the one moment a stranger is convinced. That is the wall, offered at
+            // the worst possible instant, and it is locked until a buyer can pay with a card.
+            //
+            // The move the findings actually ask for is smaller and needs nothing: fix the brief
+            // and check it again. That is also the outcome somebody came for. A brief that comes
+            // back clean is the product, and the job offer makes sense after it rather than
+            // instead of it.
+            `<h2>${findings.length ? "Fix it here and check again" : "Change anything and check again"}</h2>
+      <form method="GET" action="/check">
+        <textarea name="brief" rows="8" required>${esc(brief)}</textarea>
+        <div class="cta" style="align-items:center;gap:1rem">
+          <button class="btn btn-1" type="submit">Check it again</button>
+          <label class="fine" style="margin:0">
+            <input type="radio" name="kind" value="factual"${kind === "creative" ? "" : " checked"}> factual
+            <input type="radio" name="kind" value="creative"${kind === "creative" ? " checked" : ""}> creative
+          </label>
+        </div>
+      </form>
+      <p class="fine">${words} word${words === 1 ? "" : "s"}, read as ${esc(kind)} work.
+        ${whatIsKept(viaQuery)}</p>`
+          : `<h2>What was checked</h2>
       <pre>${esc(brief)}</pre>
       <p class="fine">${words} word${words === 1 ? "" : "s"}, read as ${esc(kind)} work.
-        ${whatIsKept(viaQuery)} The same call from a terminal answers JSON:</p>
+        ${whatIsKept(viaQuery)}</p>`
+      }
+      <h2>From a terminal</h2>
       <pre><code>curl -s https://cp.hippe.eu/v1/briefs/check \\
   -H 'content-type: application/json' \\
   -d '{"brief":"…","kind":"${esc(kind)}"}'</code></pre>

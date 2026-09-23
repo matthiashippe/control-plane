@@ -399,3 +399,50 @@ describe("the result of a check is the same page as the check", () => {
     expect((html.match(/<link rel="canonical" href="([^"]*)"/) ?? [])[1]).toMatch(/\/check$/);
   });
 });
+
+/**
+ * What happens after the findings, which is where the page used to put the wall.
+ *
+ * It ended on "posting it is six steps, and they do need a wallet", directly after the one moment
+ * a stranger is convinced, and that step is locked until a buyer can pay with a card. The move the
+ * findings actually ask for is smaller and needs nothing: fix the brief and check it again. That
+ * is also the outcome somebody came for, because a brief that comes back clean is the product.
+ */
+describe("what the page offers after it has found something", () => {
+  const resultHtml = async (brief: string, kind = "factual") =>
+    (await (await app().request(`/check?brief=${encodeURIComponent(brief)}&kind=${kind}`, {
+      headers: { accept: BROWSER },
+    })).text());
+
+  it("hands the draft back in a box, so the next move is the one the findings ask for", async () => {
+    process.env.CP_FORM_ON_CHECK = "1";
+    const html = await resultHtml(BRIEF);
+    expect(html).toContain("Check it again");
+    expect(html, "the draft comes back so it can be edited rather than retyped").toContain(
+      BRIEF.replace(/&/g, "&amp;"),
+    );
+    delete process.env.CP_FORM_ON_CHECK;
+  });
+
+  it("keeps the kind the reader chose, because re-checking as the other one is a different answer", async () => {
+    process.env.CP_FORM_ON_CHECK = "1";
+    const html = await resultHtml("Write something lovely about a dog.", "creative");
+    expect(html).toMatch(/value="creative" checked|value="creative"\s+checked/);
+    delete process.env.CP_FORM_ON_CHECK;
+  });
+
+  it("escapes the draft it hands back, because it came from a stranger", async () => {
+    process.env.CP_FORM_ON_CHECK = "1";
+    const html = await resultHtml('FACT SHEET </textarea><script>alert(1)</script> about a thing.');
+    expect(html, "a draft must not be able to close its own box").not.toContain("</textarea><script>");
+    expect(html).toContain("&lt;script&gt;");
+    delete process.env.CP_FORM_ON_CHECK;
+  });
+
+  // Without the policy that allows forms there is no box, and the page must not pretend otherwise.
+  it("falls back to showing the draft when the policy refuses forms", async () => {
+    const html = await resultHtml(BRIEF);
+    expect(html).toContain("What was checked");
+    expect(html).not.toContain("Check it again");
+  });
+});

@@ -734,7 +734,7 @@ export function createApp(opts: AppOptions) {
     const words = brief.split(/\s+/).filter(Boolean).length;
     return c.html(
       page(
-        renderCheck(brief, kind, findings, words, starterOffer(db)?.cents ?? null, true),
+        renderCheck(brief, kind, findings, words, starterOffer(db)?.cents ?? null, true, process.env.CP_FORM_ON_CHECK === "1"),
         findings.length
           ? `${findings.length} thing${findings.length === 1 ? "" : "s"} this brief does not say`
           : "Nothing obvious is missing from this brief",
@@ -1864,7 +1864,7 @@ export function createApp(opts: AppOptions) {
       if (wantsPage) {
         return c.html(
           page(
-            renderCheck("", "factual", [], 0, starterOffer(db)?.cents ?? null),
+            renderCheck("", "factual", [], 0, starterOffer(db)?.cents ?? null, false, process.env.CP_FORM_ON_CHECK === "1"),
             "The free check needs a draft",
             "Paste the brief you would post and this names what it does not say. No key, no account, nothing stored.",
             "/v1/briefs/check",
@@ -1899,7 +1899,7 @@ export function createApp(opts: AppOptions) {
     if (wantsPage) {
       return c.html(
         page(
-          renderCheck(brief, kind, findings, words, starterOffer(db)?.cents ?? null),
+          renderCheck(brief, kind, findings, words, starterOffer(db)?.cents ?? null, false, process.env.CP_FORM_ON_CHECK === "1"),
           findings.length
             ? `${findings.length} thing${findings.length === 1 ? "" : "s"} this brief does not say`
             : "Nothing obvious is missing from this brief",
