@@ -92,9 +92,20 @@ for path in "${PAGES[@]}"; do
   # /jobs because at 60 and 65 KB printf is still writing when grep is already done, which is why
   # it looked random and why it survived three cycles.
   if [[ ! "$html" =~ \<title\>[^\<] ]]; then
-    keep="${CP_EVIDENCE_DIR:-/tmp}/cp-notitle-$(date -u +%Y%m%dT%H%M%S)-$(printf '%s' "$path" | tr -c 'a-zA-Z0-9' '_').html"
-    printf '%s' "$html" > "$keep"
-    bad "$path has no title" "body kept at $keep, $(printf '%s' "$html" | wc -c | tr -d ' ') bytes, http $code, type $ctype"
+    # .scratch and not /tmp. The first version of this trap wrote to /tmp, the file was gone
+    # within the hour, and the re-measurement it existed for only worked because the page is live
+    # and could be fetched again. A failure that happens once would have left nothing. .scratch is
+    # in the repository directory, is gitignored, and survives a restart.
+    evidence="${CP_EVIDENCE_DIR:-$(cd "$(dirname "$0")/.." && pwd)/.scratch/evidence}"
+    mkdir -p "$evidence" 2>/dev/null
+    keep="$evidence/cp-notitle-$(date -u +%Y%m%dT%H%M%S)-$(printf '%s' "$path" | tr -c 'a-zA-Z0-9' '_').html"
+    if printf '%s' "$html" > "$keep" 2>/dev/null; then
+      bad "$path has no title" "body kept at $keep, $(printf '%s' "$html" | wc -c | tr -d ' ') bytes, http $code, type $ctype"
+    else
+      # The body is the whole point of this branch, so failing to keep it is worth saying out
+      # loud rather than reporting the finding as if the evidence were safe.
+      bad "$path has no title" "COULD NOT KEEP THE BODY at $keep. $(printf '%s' "$html" | wc -c | tr -d ' ') bytes, http $code, type $ctype"
+    fi
   fi
   [[ "$(printf '%s' "$html" | grep -c '<h1')" == "1" ]] || bad "$path does not have exactly one h1"
 
