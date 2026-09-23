@@ -351,6 +351,30 @@ for draft in drafts:
                "the free-model exemption is still in Conway's src/inference/router.ts",
                "that condition is gone; the free route these drafts offer may no longer work")
 
+    # 11. Words that are true when written and false when read.
+    #
+    # A GitHub comment is permanent and nobody edits it again. On 2026-09-23 the draft for #335
+    # said a wallet "had not spent a cent 92 hours later", measured that morning and due to post
+    # after midnight UTC, and "that block went up today". Both would have been wrong on arrival,
+    # and neither is a fact the checks above can reach: they compare numbers against live sources,
+    # and these are sentences about when the reader is standing.
+    #
+    # Nothing here is forbidden in the internal German header, which body_to_send() strips; this
+    # looks only at what actually goes out.
+    outgoing = re.sub(r"^<!--.*?-->\s*", "", text, flags=re.S)
+    relative = sorted({
+        w for w in re.findall(
+            r"\b(?:today|yesterday|tomorrow|this (?:morning|afternoon|evening|week)|"
+            r"\d+\s+(?:hours?|days?|weeks?)\s+(?:later|ago)|just now|right now|currently)\b",
+            outgoing, re.I,
+        )
+    })
+    report(not relative,
+           "says when, not how long ago",
+           f"this draft carries {', '.join(repr(r) for r in relative)}; a comment is read on a day "
+           f"nobody picks, so a relative time in it is a sentence that goes false by itself"
+           if relative else "")
+
     pending.append(number)
     print()
 
