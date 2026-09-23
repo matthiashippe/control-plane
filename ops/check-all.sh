@@ -216,6 +216,12 @@ run --undetermined-on 2 "the published data reproduces" ./ops/check-data.py
 # proved on the day it was written. See ops/traffic.sh --selftest. Reads nothing from production.
 run "the traffic report tells an arrival from a claim" ./ops/traffic.sh --selftest
 
+# Whether a copy of the database exists anywhere but on the disk that holds it. Measured on
+# 2026-09-23: seven backups, all on /dev/sda1, the same single disk as the live database, and
+# nothing in the crontab copies any of them off the machine. Behind that file are 286 wallets and
+# a ledger of 1,258,736 mc. This reports only; the pull is ops/backup-offsite.sh with no argument.
+run --undetermined-on 2 "the database exists somewhere other than the VM" ./ops/backup-offsite.sh --check
+
 # What a stranger would actually read if the answers went out. Every draft opens with an internal
 # note in German about the recipient, GitHub renders an HTML comment as nothing, and the six
 # answers already out do not carry it because somebody stripped it by hand. This proves the
