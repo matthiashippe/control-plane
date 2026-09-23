@@ -56,10 +56,40 @@ declare -a PASSED=() FAILED=() UNDETERMINED=()
 FAILDIR="$(mktemp -d)"
 trap 'rm -rf "$FAILDIR"' EXIT
 
+# Has this name already been used in this run?
+#
+# On 2026-09-23 a run of this script reported "CHECKS OK (13 of 14)" while one check had not run
+# at all and another had run twice. The cause was editing this file while it was executing: bash
+# reads a script from disk as it goes, and shifting the bytes under it made it resume mid-line,
+# which also produced two "command not found" lines nobody would connect to a missing check. The
+# count was right because the duplicate filled the gap.
+#
+# The lesson about editing a running script is a lesson for whoever edits it. What belongs here is
+# the part the report can know by itself: a name it has already seen means the list of checks is
+# not what it looks like, whatever the reason, and a report that cannot notice that is worth less
+# than its own summary line.
+# One string rather than a walk over the three arrays: this script runs under `set -u`, and an
+# empty array is an unbound variable in the bash that ships with macOS, so the guard would abort
+# the run it exists to protect.
+SEEN_NAMES=""
+seen_name() {
+  case "$SEEN_NAMES" in
+    *"|$1|"*) return 0 ;;
+  esac
+  return 1
+}
+
 run() {
   local undetermined=""
   if [[ "$1" == "--undetermined-on" ]]; then undetermined="$2"; shift 2; fi
   local name="$1"; shift
+  if seen_name "$name"; then
+    echo "  BROKEN  \"$name\" ran twice. The list of checks is not what it looks like: this script"
+    echo "          was probably edited while it was running. Re-run it without touching it."
+    FAILED+=("$name ran twice")
+    return 1
+  fi
+  SEEN_NAMES="$SEEN_NAMES|$name|"
   local out
   out=$("$@" 2>&1)
   local code=$?
