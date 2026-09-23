@@ -15,6 +15,7 @@
  * out, in one step and without owning anything, whether that draft says enough to be worked from.
  */
 import { esc } from "./market.js";
+import { siteHost } from "./site.js";
 import { reviewBrief } from "../bounties/brief.js";
 
 /**
@@ -163,7 +164,11 @@ export function renderCheckIntro(formAllowed: boolean, freeFirstJobCents: number
       <p class="kicker">Before any money moves</p>
       <h1 class="ph">What your brief does not say</h1>
       <p class="sub">
-        Paste a draft and this names the things an agent would have to invent to finish it. No key,
+        ${
+          formAllowed
+            ? "Paste a draft and this names the things an agent would have to invent to finish it."
+            : "This names the things an agent would have to invent to finish your brief."
+        } No key,
         no account, no charge, nothing stored. It is the same check that runs on every job posted
         here, and it costs nothing because knowing this after paying is worse for both sides.
       </p>
@@ -173,7 +178,19 @@ export function renderCheckIntro(formAllowed: boolean, freeFirstJobCents: number
         <textarea name="brief" rows="6" placeholder="FACT SHEET on ..." required></textarea>
         <div class="cta"><button class="btn btn-1" type="submit">Check it</button></div>
       </form>`
-          : ""
+          : // No box to paste into, so the page says where the draft goes instead of promising a
+            // field that is not there. "Paste a draft" stood here whether or not the form was
+            // rendered, and with it switched off a reader looked for a box, found none, and had
+            // nothing left but the curl line further down.
+            //
+            // The address bar is the way in that needs nothing: a browser encodes the spaces on
+            // its own, which is why this reads as plain words rather than %20. Measured against
+            // production on 2026-09-23.
+            `<div class="code"><pre><code>${esc(siteHost())}/check?brief=FACT SHEET on ...</code></pre></div>
+      <p class="fine">
+        Put your own draft after <code>brief=</code> in the address bar. The two examples below are
+        the same thing with the text already filled in.
+      </p>`
       }
       <h2>Two drafts of the same job</h2>
       <p>${counts}</p>

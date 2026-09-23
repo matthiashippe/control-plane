@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createApp } from "../src/app.js";
 import { openDb } from "../src/db.js";
-import { EXAMPLES } from "../src/public/checkpage.js";
+import { EXAMPLES, renderCheckIntro } from "../src/public/checkpage.js";
 import { reviewBrief } from "../src/bounties/brief.js";
 
 const BROWSER = "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8";
@@ -263,5 +263,34 @@ describe("What the check says comes next", () => {
     const { starterOffer } = await import("../src/credits/starter.js");
     const db = openDb(":memory:");
     expect(starterOffer(db), "the pool is empty in a fresh database, which it should not be").not.toBeNull();
+  });
+});
+
+describe("the page says where the draft goes", () => {
+  /**
+   * "Paste a draft" stood in the opening sentence whether or not the form was rendered, and the
+   * form is off: deploy/Caddyfile carries form-action 'none', which blocks a submission from this
+   * origin to this origin. A reader looked for a box, found none, and had nothing left but the
+   * curl line further down.
+   *
+   * The address bar needs nothing switched on. A browser encodes the spaces itself, and
+   * GET /check?brief=... has answered since the page shipped.
+   */
+  it("does not promise a box when there is no box", () => {
+    const html = renderCheckIntro(false, 15);
+    expect(html, "no box, so no invitation to paste into one").not.toContain("Paste a draft");
+    expect(html, "the way in that works has to be on the page").toContain("/check?brief=");
+  });
+
+  it("does promise one when the form is switched on", () => {
+    const html = renderCheckIntro(true, 15);
+    expect(html).toContain("Paste a draft");
+    expect(html).toContain("<textarea");
+  });
+
+  it("never shows both the box and the address-bar instruction", () => {
+    // Two ways to do the same thing, on the same screen, is a page that cannot decide.
+    const withForm = renderCheckIntro(true, 15);
+    expect(withForm).not.toContain("in the address bar");
   });
 });
