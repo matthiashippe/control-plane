@@ -3,6 +3,7 @@ import { createApp } from "../src/app.js";
 import { openDb } from "../src/db.js";
 import { detectBriefLanguage, MISSING_DE, COSTS_DE } from "../src/bounties/brief.de.js";
 import { reviewBrief } from "../src/bounties/brief.js";
+import { EXAMPLES_DE, EXAMPLES_EN } from "../src/public/checkpage.js";
 
 // The box and its two buttons are behind CP_FORM_ON_CHECK, which docker-compose.prod.yml sets and
 // a test process does not. This file is about what a person reads on that box, so it switches the
@@ -157,5 +158,47 @@ describe("the last screen of the walk, in the same language as the first", () =>
     const html = await res.text();
     expect(html).toContain("Mitternacht UTC");
     expect(html).not.toContain("midnight UTC");
+  });
+});
+
+describe("the two example drafts, in the language of the page they hang on", () => {
+  it("links a German reader to German drafts", async () => {
+    const html = await (
+      await app().request("/check", { headers: { accept: BROWSER, "accept-language": "de-DE,de;q=0.9" } })
+    ).text();
+    expect(html).toContain("derselbe Auftrag, richtig gesagt");
+    expect(html, "an English draft under a German heading is the half-translated page").not.toContain(
+      "a fact sheet nobody could finish",
+    );
+    expect(html, "the link has to carry the German text, not just a German label").toContain(
+      encodeURIComponent("Mehrfamilienhaus"),
+    );
+  });
+
+  it("leaves an English reader with the English pair", async () => {
+    const html = await (
+      await app().request("/check", { headers: { accept: BROWSER, "accept-language": "en-US,en;q=0.9" } })
+    ).text();
+    expect(html).toContain("the same job, said properly");
+    expect(html).not.toContain("derselbe Auftrag");
+  });
+
+  // The pair only makes its point if the first draft fails the check and the second passes it.
+  // Both are run through the same function the page runs, so a pattern change that quietly makes
+  // the good draft look bad shows up here and not on the page.
+  it("keeps the difference the page promises, in both languages", () => {
+    for (const [name, pair] of [["de", EXAMPLES_DE], ["en", EXAMPLES_EN]] as const) {
+      const bad = reviewBrief(pair[0].brief, pair[0].kind).length;
+      const good = reviewBrief(pair[1].brief, pair[1].kind).length;
+      expect(bad, `${name}: the first draft should be missing things`).toBeGreaterThanOrEqual(3);
+      expect(good, `${name}: the second draft should be clean`).toBe(0);
+    }
+  });
+
+  it("writes the German drafts in German, or the findings come back English", () => {
+    for (const e of EXAMPLES_DE) {
+      expect(e.brief).toMatch(/\b(der|die|das|für|und|einen)\b/i);
+      expect(e.label).not.toMatch(/^(a |the )/i);
+    }
   });
 });

@@ -342,7 +342,21 @@ export function renderCheck(
 
 
 /** The two briefs the landing page links to, and the reason there are exactly two. */
-export const EXAMPLES: { label: string; brief: string; kind: "factual" | "creative" }[] = [
+/**
+ * The two drafts the intro page links to, in both languages.
+ *
+ * They were English only until 2026-09-23, and by then everything around them was German for a
+ * German reader: the heading said "Zwei Entwürfe desselben Auftrags" and the two links under it
+ * said "a fact sheet nobody could finish". Clicking one landed on an English brief with English
+ * findings. That is the half-translated page this file has a test against, in the one spot the
+ * test did not reach.
+ *
+ * The German pair is not a translation of the English pair. The subject is the same, because a
+ * German landlord ordering an Energieausweis is the case this service is closest to reaching, but
+ * the sentences are written the way somebody would actually type them, including "Woerter"
+ * without an umlaut, which is how half of them arrive.
+ */
+export const EXAMPLES_EN: { label: string; brief: string; kind: "factual" | "creative" }[] = [
   {
     label: "a fact sheet nobody could finish",
     brief:
@@ -362,6 +376,30 @@ export const EXAMPLES: { label: string; brief: string; kind: "factual" | "creati
     kind: "factual",
   },
 ];
+
+export const EXAMPLES_DE: { label: string; brief: string; kind: "factual" | "creative" }[] = [
+  {
+    label: "ein Auftrag, den niemand fertig machen kann",
+    brief:
+      "Infoblatt zum Energieausweis für ein Mehrfamilienhaus von 1974 mit sechs Wohnungen und " +
+      "Gasheizung, für einen Vermieter, der zum ersten Mal einen bestellt.",
+    kind: "factual",
+  },
+  {
+    label: "derselbe Auftrag, richtig gesagt",
+    brief:
+      "Infoblatt zum Energieausweis für ein Mehrfamilienhaus von 1974 mit sechs Wohnungen und " +
+      "Gasheizung, für einen Vermieter, der zum ersten Mal einen bestellt. 400 bis 500 Wörter in " +
+      "fünf Abschnitten: was der Ausweis ist, welcher der beiden Typen hier gilt und warum, was " +
+      "der Vermieter beibringen muss, was es kostet und wie lange es dauert, und was passiert, " +
+      "wenn er bei einer Besichtigung fehlt. Nur den Text abgeben, kein Anschreiben. Keinen Preis " +
+      "eines einzelnen Anbieters nennen und kein Gesetz ohne Paragraphennummer zitieren.",
+    kind: "factual",
+  },
+];
+
+/** The English pair stays the default export name, because the rest of the site is English. */
+export const EXAMPLES = EXAMPLES_EN;
 
 /**
  * The page a reader lands on before they have typed anything.
@@ -407,11 +445,12 @@ export function renderCheckIntro(
   const t = lang === "de" ? DE : EN;
   // Counted now, from the same function the endpoint runs, so the sentence cannot drift from what
   // the links actually answer.
-  const found = EXAMPLES.map((e) => reviewBrief(e.brief, e.kind).length);
+  const examples = lang === "de" ? EXAMPLES_DE : EXAMPLES_EN;
+  const found = examples.map((e) => reviewBrief(e.brief, e.kind).length);
   const counts = t.difference(t.things(found[0]), found[1] === 0 ? null : t.things(found[1]));
   const srcField = src ? `<input type="hidden" name="src" value="${esc(src)}">` : "";
   const srcQuery = src ? `&amp;src=${encodeURIComponent(src)}` : "";
-  const links = EXAMPLES.map(
+  const links = examples.map(
     (e, i) =>
       `<li><a href="/check?kind=${e.kind}&amp;src=ex${i + 1}${srcQuery}&amp;brief=${encodeURIComponent(e.brief)}">${esc(e.label)}</a></li>`,
   ).join("");
