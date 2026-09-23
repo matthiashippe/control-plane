@@ -59,11 +59,20 @@ echo "walking $CP_URL as somebody with no wallet, no key and no USDC"
 echo
 
 step "1. /check answers a browser"
-check=$(curl -s -m 20 -A "$UA" -H "accept: $BROWSER" "$CP_URL/check")
-[[ -n "$check" ]] && ok "$(wc -c <<<"$check" | tr -d ' ') bytes" || { bad "no answer"; exit 2; }
+check=$(curl -sL -m 20 -A "$UA" -H "accept: $BROWSER" "$CP_URL/check")
+# -L, because a browser follows a redirect and this walk claims to be one. Without it the run
+# against the old host printed "no answer" at step 1 while the service was answering 301, which is
+# a tool calling a working service broken.
+if [[ -n "$check" ]]; then
+  ok "$(wc -c <<<"$check" | tr -d ' ') bytes"
+else
+  code=$(curl -s -m 20 -o /dev/null -w '%{http_code}' -A "$UA" -H "accept: $BROWSER" "$CP_URL/check")
+  bad "empty body, the service answered $code"
+  exit 2
+fi
 
 step "2. a result page offers the job button"
-result=$(curl -s -m 20 -A "$UA" -H "accept: $BROWSER" --data-urlencode "brief=$BRIEF" --data "kind=factual" \
+result=$(curl -sL -m 20 -A "$UA" -H "accept: $BROWSER" --data-urlencode "brief=$BRIEF" --data "kind=factual" \
   -G "$CP_URL/check")
 if grep -q 'formaction="/start"' <<<"$result"; then ok "the button posts to /start"
 else bad "no button on the result page"; echo "$result" | grep -o '<form[^>]*>' | head -3; exit 1; fi
@@ -107,7 +116,7 @@ sub=$(curl -s -m 20 -H "authorization: Bearer $key" "$CP_URL/v1/submissions?boun
 grep -q '"submissions"' <<<"$sub" && ok || bad "the key does not read its own job: $(head -c 120 <<<"$sub")"
 
 step "7. the job is on the public board"
-board=$(curl -s -m 20 -A "$UA" -H "accept: $BROWSER" "$CP_URL/jobs")
+board=$(curl -sL -m 20 -A "$UA" -H "accept: $BROWSER" "$CP_URL/jobs")
 grep -q "1974 apartment building" <<<"$board" && ok || bad "the job is not on /jobs"
 
 echo
