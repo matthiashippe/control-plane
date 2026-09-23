@@ -216,6 +216,13 @@ run --undetermined-on 2 "the published data reproduces" ./ops/check-data.py
 # proved on the day it was written. See ops/traffic.sh --selftest. Reads nothing from production.
 run "the traffic report tells an arrival from a claim" ./ops/traffic.sh --selftest
 
+# What a stranger would actually read if the answers went out. Every draft opens with an internal
+# note in German about the recipient, GitHub renders an HTML comment as nothing, and the six
+# answers already out do not carry it because somebody stripped it by hand. This proves the
+# stripping on cases, and that anything else that looks like a note stops the send instead of
+# going out invisible. Sends nothing and reads nothing from production.
+run "the issue answers would go out without our notes in them" ./ops/post-the-answers.py --selftest
+
 # The preview card against the pool it promises from. Four surfaces ask starterOffer() and go
 # quiet on their own when the pool runs dry; /og.png cannot, because it is a picture with
 # "first job / free, 15 c" burned in. The handoff has said since 2026-09-22 that no test can
