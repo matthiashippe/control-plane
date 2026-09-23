@@ -12,6 +12,11 @@ services:
       CP_HOST: 0.0.0.0
       CP_PORT: "8402"
       CP_DB_PATH: /data/cp.db
+      # Die Adresse, unter der dieser Dienst nach aussen heisst. Sie steht hier und nicht mehr an
+      # 229 Stellen im Code: canonical, Sitemap, die Vorschaukarte und jedes curl-Beispiel, das
+      # ein Besucher kopiert, lesen sie aus src/public/site.ts. cp.hippe.eu antwortet weiter und
+      # zeigt per canonical hierher, damit nichts bricht, was schon darauf verweist.
+      CP_PUBLIC_URL: https://postyourprice.com
     volumes:
       - cp-data:/data
     expose:

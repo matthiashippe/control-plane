@@ -2,7 +2,10 @@
 	email matthias@hanseatictech.de
 }
 
-cp.hippe.eu {
+# cp.hippe.eu bleibt, damit nichts bricht, was heute darauf zeigt: die Issue-Kommentare, das
+# x402-Manifest der bisherigen Zahlungen, die veroeffentlichten CC0-Daten. Welche der beiden
+# Adressen die kanonische ist, entscheidet CP_PUBLIC_URL im Dienst, nicht diese Zeile.
+cp.hippe.eu, postyourprice.com {
 	encode zstd gzip
 
 	# Ohne Limit nimmt der Dienst beliebig grosse Bodies an; /v1/auth/nonce antwortete auf 3 MB
@@ -50,4 +53,12 @@ cp.hippe.eu {
 			}
 		}
 	}
+}
+
+# www gehoert nicht neben die nackte Domain, sondern darauf. Zwei Adressen mit identischem Inhalt
+# teilen jedes Suchmaschinen-Signal auf, und der Umweg kostet einen Redirect, den kein Mensch
+# bemerkt. 308 und nicht 301: die Methode bleibt erhalten, was fuer die POST-Endpunkte unter /v1
+# der Unterschied zwischen einer Weiterleitung und einem verlorenen Request ist.
+www.postyourprice.com {
+	redir https://postyourprice.com{uri} 308
 }
