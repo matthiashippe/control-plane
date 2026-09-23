@@ -1,8 +1,15 @@
 # Dauerauftrag für den Loop
 
-> Jeder Loop-Lauf beginnt hier und in `loop-constraints.md`. Der Auftrag von Matthias, 19.09.2026:
-> "die ganze zeit verbessern entwickeln deployn, prüfen verbessern deployn, etc! schauen was macht
-> der traffic verbessern deployn".
+> Jeder Loop-Lauf beginnt in **`ZIELE.md`**, dann hier, dann in `loop-constraints.md`.
+> Der Auftrag von Matthias, 19.09.2026: "die ganze zeit verbessern entwickeln deployn, prüfen
+> verbessern deployn, etc! schauen was macht der traffic verbessern deployn".
+>
+> **Ergänzt am 23.09.2026, weil der Loop an vierzehn Zyklen hintereinander nur repariert hat.**
+> Matthias: "du arbeitest die ganze Zeit nur an Bugs und nicht an der Vision, habe ich das Gefühl."
+> Er hatte recht, und die Ursache stand in dieser Datei: Schritt 2 unten schickte jeden Zyklus, der
+> nichts Kaputtes fand, in `nacht-backlog.md`, und keine Zeile dort zeigt auf ein Ziel. Die vier
+> datierten Ziele stehen seither in `ZIELE.md` samt Teilzielen, und Schritt 2 geht zuerst dorthin.
+> Ein Fehler, den ein echter Nutzer gesehen hat, geht weiterhin vor. Alles andere nicht mehr.
 
 Der Dienst läuft öffentlich unter https://cp.hippe.eu und hat seit dem 19.09.2026, 18:40 UTC einen
 zahlenden Kunden. Ab hier gibt es keinen Projektabschluss mehr, nur noch Zyklen.
@@ -31,10 +38,22 @@ Vermutung.
 
 **2. Entscheiden, was am meisten bringt.** In dieser Reihenfolge:
 - Etwas ist kaputt oder ein Nutzer läuft gegen eine Wand: sofort, und zwar vor allem anderen.
-- Der Verkehr zeigt etwas Unerwartetes: nachgehen, verstehen, dann erst handeln.
-- Nichts davon: die oberste offene Zeile aus `.scratch/gtm/nacht-backlog.md`.
-- Auch die ist leer: eine neue Aufgabe aus dem ableiten, was du beim Hinsehen gelernt hast, und
-  sie unten im Backlog ergänzen, damit der nächste Lauf sie findet.
+  Das bleibt die erste Regel, sie hat sich jeden Tag bezahlt gemacht.
+- **Sonst: das oberste offene Teilziel aus `ZIELE.md`**, von oben, ohne Auswahl nach Geschmack.
+  Wenn es auf Matthias wartet, nimm das nächste, das ohne ihn geht, und schreib in den Bericht,
+  worauf das übersprungene wartet.
+- Der Verkehr zeigt etwas Unerwartetes: nachgehen, aber nur so weit, dass klar wird, ob es ein
+  Fehler ist oder ein Kanal. Ist es keins von beidem, notieren und zurück zum Teilziel.
+- Kein Teilziel offen: neue mit dem Workflow `ziele-zu-teilzielen` ableiten, nicht aus dem Bauch.
+- Erst danach `.scratch/gtm/nacht-backlog.md`. Diese Liste ist Reparatur und Hygiene. Sie ist
+  wichtig und sie ist nie dringend, und sie hat am 23.09. vierzehn Zyklen lang die Arbeit an den
+  Zielen verdrängt, weil sie in dieser Aufzählung an zweiter Stelle stand.
+
+**Woran du erkennst, dass du wieder abgedriftet bist.** Schreib vor dem Bauen einen Satz: welche
+Zahl aus der Tabelle in `ZIELE.md` bewegt sich dadurch, und um wieviel. Geht der Satz nicht, ohne
+über den Dienst statt über den Markt zu reden, dann ist es Reparatur. Reparatur ist erlaubt, wenn
+sie aus der ersten Regel kommt, also aus einem Fehler, den jemand gesehen hat. Sonst wandert sie
+in den Backlog und der Zyklus nimmt das Teilziel.
 
 **3. Bauen.** Klein genug, dass es in einen Zyklus passt. Lieber eine Sache fertig als drei halb.
 Eigenständiges und Rechenintensives geht an den code-host (`job start control-plane --model opus
@@ -52,6 +71,10 @@ das niemand abholt, war verschwendete Rechenzeit.
 **6. Protokollieren.** Eine Zeile in `.scratch/gtm/nachtlauf.md`: was beobachtet, was gebaut, was
 ausgerollt, was dabei auffiel. Wer nichts gefunden hat, schreibt das auch, mit den Zahlen, die er
 gesehen hat. Ein stiller Zyklus ist ein Befund, kein Nichts.
+
+Dazu **eine Zeile in `ZIELE.md`**: welches Teilziel bearbeitet wurde, und was die Zahl daneben
+danach sagt. Ein Teilziel gilt als erledigt, wenn die Zahl sich bewegt hat, nicht wenn der Code
+fertig ist. Bewegt sie sich nicht, bleibt es offen und bekommt eine Zeile, warum.
 
 ## Handwerk
 
