@@ -246,6 +246,50 @@ export function createApp(opts: AppOptions) {
   const siweCfg: SiweConfig = { ...DEFAULT_SIWE_CONFIG, ...opts.siwe };
   const app = new Hono<Env>();
 
+  /**
+   * One host for the pages, because nine permanent comments point at the other one.
+   *
+   * The service answered on both `cp.hippe.eu` and `postyourprice.com` with a 200, the same page
+   * twice. The canonical link already named the second, which is the correct hint and only a hint.
+   *
+   * What made it worth more than tidiness: measured on 2026-09-23, Googlebot has fetched exactly
+   * four things here, `/` twice, `/robots.txt`, `/v1/status` and `/favicon.ico`, and it arrived
+   * seven seconds after a comment of ours went up on somebody else's tracker. That is the whole
+   * crawl budget this domain has, it is bought with those comments, and nine of them carry
+   * `cp.hippe.eu` because they were posted before the move. Spending it on two copies of one site
+   * is spending half of it twice.
+   *
+   * **Pages only.** `/v1/`, `/health`, `/.well-known/` and `/px/` stay on both hosts and answer
+   * where they are asked. A runtime configured with `conwayApiUrl: https://cp.hippe.eu` is a real
+   * client, and a 301 would break it in the worst way available: curl and most HTTP clients drop
+   * the Authorization header when a redirect crosses hosts, so the call would not fail, it would
+   * arrive unauthenticated. `robots.txt` is excluded for the ordinary reason that it has to be
+   * answerable per host.
+   *
+   * 301 and not 302, because this is permanent and a permanent redirect is what passes the value
+   * of a link. The day it has to point elsewhere, the comments would have to change anyway.
+   */
+  const PAGES_STAY = ["/v1/", "/.well-known/", "/px/", "/health", "/robots.txt"];
+  app.use("*", async (c, next) => {
+    const canonical = siteOrigin();
+    const host = c.req.header("host")?.toLowerCase();
+    const method = c.req.method;
+    if (
+      !host ||
+      (method !== "GET" && method !== "HEAD") ||
+      PAGES_STAY.some((p) => c.req.path === p || c.req.path.startsWith(p)) ||
+      host === canonical.replace(/^https?:\/\//, "")
+    ) {
+      return next();
+    }
+    // Only hosts this service is actually known by. Anything else is somebody pointing their own
+    // name at this address, and bouncing it would be this service deciding where their traffic
+    // goes.
+    if (host !== "cp.hippe.eu") return next();
+    const url = new URL(c.req.url);
+    return c.redirect(`${canonical}${url.pathname}${url.search}`, 301);
+  });
+
   app.onError((err, c) => {
     if (err instanceof AuthError) {
       // A person who opened this path in a browser is not the reader this answer was written for.
