@@ -78,7 +78,15 @@ for path in "${PAGES[@]}"; do
   # Text without markup: a sentence split across two elements is still a sentence to a reader.
   text=$(printf '%s' "$html" | sed -e 's/<[^>]*>/ /g' -e 's/  */ /g')
 
-  printf '%s' "$html" | grep -q '<title>[^<]' || bad "$path has no title"
+  # A body that arrived but has no title is the failure this script has reported three times, at
+  # 22:25 on 22.09. and at 01:26 and 05:40 on 23.09., each time naming a title that is at byte 132
+  # of the page and has never been missing: ten fetches in a row a minute later all carried it.
+  # Guessing has now cost three cycles, so the evidence gets kept instead.
+  if ! printf '%s' "$html" | grep -q '<title>[^<]'; then
+    keep="${CP_EVIDENCE_DIR:-/tmp}/cp-notitle-$(date -u +%Y%m%dT%H%M%S)-$(printf '%s' "$path" | tr -c 'a-zA-Z0-9' '_').html"
+    printf '%s' "$html" > "$keep"
+    bad "$path has no title" "body kept at $keep, $(printf '%s' "$html" | wc -c | tr -d ' ') bytes, http $code, type $ctype"
+  fi
   [[ "$(printf '%s' "$html" | grep -c '<h1')" == "1" ]] || bad "$path does not have exactly one h1"
 
   for leftover in '<!--MARKET-->' '<!--NUMBERS-->' '${' 'undefined' 'NaN' '[object Object]'; do
