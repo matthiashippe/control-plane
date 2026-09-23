@@ -227,9 +227,16 @@ Frage, ob wir halten oder vermitteln. **Das ist die Entscheidung, und sie gehoer
       HTTP, erster Lauf 15:00 UTC, alle sieben gruen. Damit fallen Done-Kriterium 1 und 3 von
       Goal 16 und der Satz, der 43 von 43 Besuchern die Tuer zugehalten hat ("They do need a
       wallet, in the sense of a key pair on your own machine").
-      Offen bleibt von T3.3: der Kartenweg selbst hinter `CP_CHECKOUT` (Betrag reservieren,
-      Vergabe und Provision buchen, Storno, Rechnung, gegen einen Fake-Provider), und der haengt
-      weiter an Punkt 4.
+      **Der Kartenweg selbst ist am 23.09. abends gebaut**, `src/checkout/`, hinter `CP_CHECKOUT`
+      und in der Compose-Datei nicht gesetzt. In `app.ts` kommt er nullmal vor, ist also nicht nur
+      ausgeschaltet, sondern gar nicht erreichbar. Betrag festhalten, Aufladung buchen, Storno,
+      gegen einen Fake-Provider bewiesen, zehn Tests. Der Kern in einem Satz: **der Betrag kommt
+      aus der Zeile, nie aus dem Callback**, sonst schreibt ein gefaelschtes Callback gut, was es
+      will.
+      **Es fehlen genau zwei Dinge, und beide warten auf Punkt 4:** der echte Provider-Adapter
+      (gehoert nach `src/payments/**`, gesperrter Pfad, braucht das Stripe-Konto) und die Rechnung
+      (haengt an der Umsatzsteuerfrage; sie zu bauen hiesse raten). Eine Route gibt es bewusst
+      noch nicht: ein Endpunkt ohne Provider ist ein 404, den jemand pflegen muss.
       (Urspruenglich) **T3.3 Den Kartenweg bis an die gesperrte Grenze bauen, hinter `CP_CHECKOUT`.** Alles
       ausserhalb von `src/payments/**` und `src/auth/**`: Betrag reservieren, Vergabe und Provision
       buchen, Storno, Rechnung, gegen einen Fake-Provider getestet. Dabei faellt eine Frage an, die
