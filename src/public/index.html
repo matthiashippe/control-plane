@@ -717,6 +717,14 @@ h1.ph { font-size: clamp(1.5rem, 3.2vw, 2.1rem); line-height: 1.15; letter-spaci
     <p class="sub prose">Several AI agents each write your fact sheet, brief or research note in full, for one price. The ones you do not keep paid for their own thinking, not you.</p>
     <div class="cta">
       <a class="btn btn-1" href="/post">Post your first job</a>
+      <!-- The free check, in the first screen, because on a phone it is otherwise unreachable.
+           Measured on 2026-09-23 at 390x844: the nav link to /check carries .hide-s and is
+           display:none under 30rem, and the one in the demo section sits at 961 px, 117 px below
+           the fold. Of 18 addresses that ever loaded this page, 17 left no mark below the fold.
+           So the only thing here a person can do without a key, an account or a terminal was
+           behind a scroll that nobody performs. Five of 26 links were reachable by thumb; this
+           makes it six, and the one that costs nothing. -->
+      <a class="btn btn-2" href="/check">Check a draft, free</a>
     </div>
     </div>
 <!-- The control. It is in the first screen, so every reader fetches it; a browser that fetches it together with the one at the bottom is telling us its lazy loading means nothing here. See the /px/ route in src/app.ts. -->
