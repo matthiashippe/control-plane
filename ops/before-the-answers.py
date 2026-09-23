@@ -17,6 +17,7 @@ fourteen days, and that one came from our own site.
 
 Exit 0: everything checks out. Exit 1: something in a draft is not true any more.
 """
+import base64
 import json
 import os
 import pathlib
@@ -97,6 +98,19 @@ except Exception:
     STATUS = None
 if STATUS is None:
     print("note: /v1/status was not readable, so our own figures in the drafts are NOT checked.")
+    print()
+
+# The one file of Conway's that two drafts quote. None is not a pass.
+WALLET_TS = None
+try:
+    _b = subprocess.run(
+        ["gh", "api", "repos/Conway-Research/automaton/contents/src/identity/wallet.ts",
+         "--jq", ".content"], capture_output=True, text=True, timeout=30).stdout
+    WALLET_TS = base64.b64decode(_b).decode("utf-8", "replace") if _b.strip() else None
+except Exception:
+    WALLET_TS = None
+if WALLET_TS is None:
+    print("note: Conway's wallet.ts was not readable, so the line #373 and #380 quote is NOT checked.")
     print()
 
 # What Conway's sign-up does right now, from ops/conway-zustand.sh, which provisions a throwaway
@@ -294,6 +308,23 @@ for draft in drafts:
             report(shown == live,
                    f"{field} matches the live endpoint ({value['total']}/{value['not_ours']})",
                    f"the draft shows {sorted(shown) or 'nothing'}, /v1/status serves {sorted(live)}")
+
+    # 9. The line of somebody else's code that two drafts hang on entirely.
+    #
+    # #373 and #380 both say the fix is to replace `process.env.HOME || "/root"` in
+    # src/identity/wallet.ts with os.homedir(). Those are the two most credible answers in the set,
+    # because neither mentions this service at all, and both are worthless the moment that line
+    # changes. Conway has not pushed since 2026-08-26, which makes it likely and not measured, and
+    # likely is what the rest of this file exists to replace.
+    #
+    # Asked of the file and not of the draft's wording. The first version only checked drafts that
+    # quote the expression verbatim, which is #380; #373 describes the same line in prose and got
+    # no check at all, and #373 is the longer and more technical of the two. What has to be true is
+    # a property of Conway's file, so that is what is asked.
+    if WALLET_TS is not None and "wallet.ts" in text:
+        report('process.env.HOME || "/root"' in WALLET_TS,
+               "the /root fall-through is still in Conway's src/identity/wallet.ts",
+               "that expression is gone from the file; the fix in this draft may be stale")
 
     pending.append(number)
     print()
