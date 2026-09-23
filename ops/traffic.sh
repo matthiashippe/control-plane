@@ -197,6 +197,22 @@ import sys, os, collections
 # string and takes the rest of the script with it. That has now happened three times in two days.
 PAGES = tuple(p for p in (os.environ.get("CP_PAGES") or "").split() if p.startswith("/"))
 
+# A user agent that names the hardware model is not a browser.
+#
+# Safari on iOS reports "iPhone; CPU iPhone OS 17_4 like Mac OS X" and never the model code, so
+# "iPhone13,2" is something a tool wrote. Seven addresses carry it here, every one of them in
+# 34.116, 34.118 or 34.158, which is Google Cloud: one rendering fleet wearing a phone name.
+#
+# It cost the number this whole script exists for. On 2026-09-23 at 06:35 one of them fetched top
+# and proof three seconds apart, which no bundle rule can separate from a person who scrolled
+# once, and the column went from one reader to two. The timing was honest; the phone was not.
+#
+# Narrow on purpose: only the model-code form, and only for the scroll step. An Android agent that
+# names a device ("Nexus 5X Build/MMB29P") is left alone, because real Android browsers do that.
+import re as _re
+MODEL_CODED = _re.compile(r"iPhone\d+,\d+|iPad\d+,\d+|Watch\d+,\d+")
+
+
 # The hosts this service answers to, so "came from one of our own pages" is not one hard-coded
 # name. See the comment on CP_OWN_HOSTS at the top of this file for what that cost.
 OWN_HOSTS = tuple(h for h in (os.environ.get("CP_OWN_HOSTS") or "cp.hippe.eu").split() if h)
@@ -205,7 +221,7 @@ def from_us(ref):
     return any(h in ref for h in OWN_HOSTS)
 
 people = collections.defaultdict(
-    lambda: {"agents": [], "ran_script": False, "loaded_page": False, "marks": set(), "mark_times": {}, "paths": set(), "first": None, "from": "", "ip": "", "lang": False}
+    lambda: {"agents": [], "ran_script": False, "loaded_page": False, "marks": set(), "mark_times": {}, "paths": set(), "first": None, "from": "", "ip": "", "lang": False, "model_coded": False}
 )
 # Every path an address touched, whatever tool did it. The browser-only view is right for deciding
 # who read a page; it is wrong for the funnel, because the step after reading is done in a terminal.
@@ -252,6 +268,8 @@ for line in sys.stdin:
         entry["loaded_page"] = True
         if lang:
             entry["lang"] = True
+        if MODEL_CODED.search(agent):
+            entry["model_coded"] = True
     if path.startswith("/px/") and path.endswith(".png"):
         mark = path[4:-4]
         entry["marks"].add(mark)
@@ -330,7 +348,7 @@ for ip, entry in people.items():
     # Only the scroll step, never the denominator. A person with strict privacy settings still
     # counts as having opened the page, because this counter has to err towards keeping a real
     # reader, and the whole point of the column below is what happens after the page loads.
-    if below and entry["lang"] and not all_at_once(list(entry["mark_times"].values())):
+    if below and entry["lang"] and not entry["model_coded"] and not all_at_once(list(entry["mark_times"].values())):
         scrolled.append((entry["first"], ip, entry))
     else:
         loaded_only.append(ip)
@@ -388,7 +406,10 @@ for ip, entry in people.items():
     # while the list under it named one address. Two numbers from one file that contradict each
     # other are worse than either being wrong, because one of them is always believable.
     entry["scrolled"] = (
-        bool(below) and entry["lang"] and not all_at_once(list(entry["mark_times"].values()))
+        bool(below)
+        and entry["lang"]
+        and not entry["model_coded"]
+        and not all_at_once(list(entry["mark_times"].values()))
     )
     # Arrived means read a page. An address that only ever touched /v1/ is a runtime, and putting
     # it in the denominator of a funnel about reading makes every step below look worse than it is.
