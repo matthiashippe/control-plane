@@ -34,6 +34,8 @@ export interface BriefFinding {
   costs: string;
 }
 
+import { MISSING_DE, COSTS_DE, tooShortDe, detectBriefLanguage } from "./brief.de.js";
+
 /** Under this many words a brief cannot carry a task, a reader and a limit at once. */
 const SHORT_WORDS = 25;
 
@@ -98,48 +100,64 @@ const READER =
  * fabrication check is a gate, so a brief that carries no facts sets its own submissions up to
  * fail against it.
  */
-export function reviewBrief(brief: string, kind: "factual" | "creative"): BriefFinding[] {
+/**
+ * The findings, in the language the brief was written in.
+ *
+ * `lang` is normally left out and detected from the text. It is a parameter so a caller that
+ * already knows (a page that was asked for German, a test standing on one side of the detector)
+ * does not have to write German and hope.
+ */
+export function reviewBrief(
+  brief: string,
+  kind: "factual" | "creative",
+  lang: "de" | "en" = detectBriefLanguage(brief),
+): BriefFinding[] {
   const text = brief.trim();
   const words = text.split(/\s+/).filter(Boolean).length;
   const findings: BriefFinding[] = [];
+  const de = lang === "de";
 
   if (words < SHORT_WORDS) {
     findings.push({
       id: "too_short",
-      missing: `The whole brief is ${words} words.`,
-      costs:
-        "Everything an agent is not told, it decides for itself, and five agents decide five " +
-        "different ways. The submissions then differ in what they attempted, which leaves nothing " +
-        "to compare and no reason to prefer one.",
+      missing: de ? tooShortDe(words) : `The whole brief is ${words} words.`,
+      costs: de
+        ? COSTS_DE.too_short
+        : "Everything an agent is not told, it decides for itself, and five agents decide five " +
+          "different ways. The submissions then differ in what they attempted, which leaves nothing " +
+          "to compare and no reason to prefer one.",
     });
   }
 
   if (!LENGTH.test(text)) {
     findings.push({
       id: "no_length",
-      missing: "No length: how many words, sentences or paragraphs.",
-      costs:
-        "Without a limit each agent writes to its own default, and submissions arrive at wildly " +
-        "different lengths. Comparing them then means comparing a paragraph against a page.",
+      missing: de ? MISSING_DE.no_length : "No length: how many words, sentences or paragraphs.",
+      costs: de
+        ? COSTS_DE.no_length
+        : "Without a limit each agent writes to its own default, and submissions arrive at wildly " +
+          "different lengths. Comparing them then means comparing a paragraph against a page.",
     });
   }
 
   if (!DELIVERABLE.test(text)) {
     findings.push({
       id: "no_deliverable",
-      missing: "No statement of what to hand in and nothing else.",
-      costs:
-        "Submissions come back wrapped in an explanation of how the agent approached it. You pay " +
-        "for the work, then do the unwrapping by hand for every submission.",
+      missing: de ? MISSING_DE.no_deliverable : "No statement of what to hand in and nothing else.",
+      costs: de
+        ? COSTS_DE.no_deliverable
+        : "Submissions come back wrapped in an explanation of how the agent approached it. You pay " +
+          "for the work, then do the unwrapping by hand for every submission.",
     });
   }
 
   if (!RULED_OUT.test(text)) {
     findings.push({
       id: "nothing_ruled_out",
-      missing: "Nothing is ruled out: no banned words, forms or claims.",
-      costs:
-        kind === "creative"
+      missing: de ? MISSING_DE.nothing_ruled_out : "Nothing is ruled out: no banned words, forms or claims.",
+      costs: de
+        ? COSTS_DE.nothing_ruled_out
+        : kind === "creative"
           ? "Measured on 2026-09-20: the briefs that banned specific words came back clean, and " +
             "the ones that did not came back full of the words every model reaches for first."
           : "On factual work every claim is checked against this brief. Saying what must not be " +
@@ -150,10 +168,11 @@ export function reviewBrief(brief: string, kind: "factual" | "creative"): BriefF
   if (!READER.test(text)) {
     findings.push({
       id: "no_reader",
-      missing: "No reader: who this is written for and what they are deciding.",
-      costs:
-        "The same facts written for a developer and for a buyer are two different texts. Without " +
-        "a reader an agent writes for nobody, which reads as writing for everybody.",
+      missing: de ? MISSING_DE.no_reader : "No reader: who this is written for and what they are deciding.",
+      costs: de
+        ? COSTS_DE.no_reader
+        : "The same facts written for a developer and for a buyer are two different texts. Without " +
+          "a reader an agent writes for nobody, which reads as writing for everybody.",
     });
   }
 

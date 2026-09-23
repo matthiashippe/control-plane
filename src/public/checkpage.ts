@@ -46,7 +46,21 @@ import { reviewBrief } from "../bounties/brief.js";
  * When the pool cannot fund a first job the offer is absent rather than softened, and the six-step
  * route with a wallet is what remains, because that route is still real.
  */
-function nextStep(freeFirstJobCents: number | null): string {
+function nextStep(freeFirstJobCents: number | null, lang: "de" | "en" = "en"): string {
+  if (lang === "de") {
+    return freeFirstJobCents === null
+      ? `Wenn ein Auftrag genug sagt, sind es <a href="/post">sechs Schritte</a>, ihn ` +
+        `einzustellen. Der Preis muss vorher auf dem Guthaben liegen, und dafür brauchen Sie ein ` +
+        `Schlüsselpaar auf dem eigenen Rechner und USDC auf Base; der kostenlose Erstauftrag aus ` +
+        `dem Topf ist gerade nicht verfügbar. Was andere eingestellt haben, steht unter ` +
+        `<a href="/jobs">/jobs</a> und ist ohne Schlüssel lesbar.`
+      : `Zum Einstellen brauchen Sie nichts, was Sie nicht schon haben: kein Konto, keine Wallet, ` +
+        `keine Karte. Der Topf zahlt einen ersten Auftrag bis ${freeFirstJobCents} Cent, den ` +
+        `Schlüssel bekommen Sie auf der nächsten Seite, und dieser Schlüssel ist das ganze Konto. ` +
+        `Der Weg über sechs Schritte mit eigener Wallet und eigenem Geld steht unverändert unter ` +
+        `<a href="/post">/post</a>. Was andere eingestellt haben, steht unter ` +
+        `<a href="/jobs">/jobs</a> und ist ohne Schlüssel lesbar.`;
+  }
   if (freeFirstJobCents === null) {
     return (
       `When a brief says enough, <a href="/post">posting it</a> is six steps. The price has to be ` +
@@ -104,6 +118,83 @@ export function whatIsKept(_viaQuery: boolean): string {
   return "Nothing was stored, no key was needed and nothing was charged.";
 }
 
+/**
+ * The result page in two languages, because the findings are in two languages.
+ *
+ * Findings in German under an English heading, with an English button under them, is a page that
+ * cannot decide, and it is worse than either language alone: the reader has to work out which half
+ * is meant for them. The language is the brief's, decided once in reviewBrief's detector and
+ * passed in here, so the page and the findings can never disagree.
+ *
+ * Only the content is German; every identifier and comment stays English, the same split as
+ * src/bounties/brief.de.ts. The table is flat and keyed by a short name rather than nested by
+ * language, because that way a missing sentence is a TypeScript error and not a blank on a page.
+ */
+interface Copy {
+  kicker: (kind: string) => string;
+  headingFound: (n: number) => string;
+  headingClean: string;
+  subFound: string;
+  subClean: string;
+  fixHeading: (n: number) => string;
+  again: string;
+  post: string;
+  factual: string;
+  creative: string;
+  wordsRead: (n: number, kind: string) => string;
+  kept: string;
+  terminal: string;
+  postsFree: (cents: number) => string;
+}
+
+const EN: Copy = {
+  kicker: (k) => `The free check, ${esc(k)}`,
+  headingFound: (n) => `${n} thing${n === 1 ? "" : "s"} your brief does not say`,
+  headingClean: "Nothing obvious is missing",
+  subFound:
+    "Each line below is something an agent would have to invent to finish the job. None of it " +
+    "stops you posting; it is what you would otherwise find out after paying.",
+  subClean:
+    "This says the brief is complete, not that it is good. Only you know whether the facts in it " +
+    "are the ones the work needs.",
+  fixHeading: (n) => (n ? "Fix it here and check again" : "Change anything and check again"),
+  again: "Check it again",
+  post: "Post it as a job",
+  factual: "factual",
+  creative: "creative",
+  wordsRead: (n, k) => `${n} word${n === 1 ? "" : "s"}, read as ${esc(k)} work.`,
+  kept: "Nothing was stored, no key was needed and nothing was charged.",
+  terminal: "From a terminal",
+  postsFree: (c) =>
+    `Posting costs you nothing and asks for nothing: the pool pays up to ${c} cents for a first ` +
+    `job, and the key you get back is the only way into it, so copy it when it appears.`,
+};
+
+const DE: Copy = {
+  kicker: (k) => `Die kostenlose Prüfung, ${k === "creative" ? "frei" : "sachlich"}`,
+  headingFound: (n) => (n === 1 ? "Eine Sache, die Ihr Auftrag nicht sagt" : `${n} Dinge, die Ihr Auftrag nicht sagt`),
+  headingClean: "Nichts Offensichtliches fehlt",
+  subFound:
+    "Jede Zeile unten ist etwas, das ein Agent sich ausdenken müsste, um fertig zu werden. " +
+    "Nichts davon hindert Sie am Einstellen; es ist das, was Sie sonst nach dem Bezahlen erfahren.",
+  subClean:
+    "Das heißt, der Auftrag ist vollständig, nicht dass er gut ist. Ob die Fakten darin die " +
+    "richtigen sind, wissen nur Sie.",
+  fixHeading: (n) => (n ? "Hier nachbessern und noch einmal prüfen" : "Etwas ändern und noch einmal prüfen"),
+  again: "Noch einmal prüfen",
+  post: "Als Auftrag einstellen",
+  factual: "sachlich",
+  creative: "frei",
+  wordsRead: (n, k) =>
+    `${n} ${n === 1 ? "Wort" : "Wörter"}, gelesen als ${k === "creative" ? "freie" : "sachliche"} Arbeit.`,
+  kept: "Nichts wurde gespeichert, kein Schlüssel gebraucht und nichts berechnet.",
+  terminal: "Vom Terminal aus",
+  postsFree: (c) =>
+    `Das Einstellen kostet Sie nichts und verlangt nichts: der Topf zahlt bis zu ${c} Cent für ` +
+    `einen ersten Auftrag, und der Schlüssel, den Sie zurückbekommen, ist der einzige Weg dorthin. ` +
+    `Kopieren Sie ihn, wenn er erscheint.`,
+};
+
 export interface Finding {
   missing: string;
 }
@@ -121,27 +212,19 @@ export function renderCheck(
   freeFirstJobCents: number | null,
   viaQuery = false,
   formAllowed = false,
+  lang: "de" | "en" = "en",
 ): string {
+  const t = lang === "de" ? DE : EN;
   const list = findings.length
     ? `<ul class="found">${findings.map((f) => `<li>${esc(f.missing)}</li>`).join("")}</ul>`
     : "";
   return `
   <section>
     <div class="wrap narrow">
-      <p class="kicker">The free check, ${esc(kind)}</p>
-      <h1 class="ph">${
-        findings.length
-          ? `${findings.length} thing${findings.length === 1 ? "" : "s"} your brief does not say`
-          : "Nothing obvious is missing"
-      }</h1>
+      <p class="kicker">${t.kicker(kind)}</p>
+      <h1 class="ph">${findings.length ? t.headingFound(findings.length) : t.headingClean}</h1>
       <p class="sub">
-        ${
-          findings.length
-            ? "Each line below is something an agent would have to invent to finish the job. None " +
-              "of it stops you posting; it is what you would otherwise find out after paying."
-            : "This says the brief is complete, not that it is good. Only you know whether the " +
-              "facts in it are the ones the work needs."
-        }
+        ${findings.length ? t.subFound : t.subClean}
       </p>
       ${list}
       ${
@@ -156,11 +239,11 @@ export function renderCheck(
             // and check it again. That is also the outcome somebody came for. A brief that comes
             // back clean is the product, and the job offer makes sense after it rather than
             // instead of it.
-            `<h2>${findings.length ? "Fix it here and check again" : "Change anything and check again"}</h2>
+            `<h2>${t.fixHeading(findings.length)}</h2>
       <form method="GET" action="/check">
         <textarea name="brief" rows="8" required>${esc(brief)}</textarea>
         <div class="cta" style="align-items:center;gap:1rem">
-          <button class="btn btn-1" type="submit">Check it again</button>
+          <button class="btn btn-1" type="submit">${t.again}</button>
           ${
             // The same textarea, a second button, and the draft goes straight to the board. Two
             // forms would mean two copies of the text and one of them going stale the moment
@@ -168,34 +251,30 @@ export function renderCheck(
             // exactly this, and CSP form-action 'self' covers both targets.
             freeFirstJobCents === null
               ? ""
-              : `<button class="btn btn-2" type="submit" formmethod="post" formaction="/start">Post it as a job</button>`
+              : `<button class="btn btn-2" type="submit" formmethod="post" formaction="/start">${t.post}</button>`
           }
           <label class="fine" style="margin:0">
-            <input type="radio" name="kind" value="factual"${kind === "creative" ? "" : " checked"}> factual
-            <input type="radio" name="kind" value="creative"${kind === "creative" ? " checked" : ""}> creative
+            <input type="radio" name="kind" value="factual"${kind === "creative" ? "" : " checked"}> ${t.factual}
+            <input type="radio" name="kind" value="creative"${kind === "creative" ? " checked" : ""}> ${t.creative}
           </label>
         </div>
       </form>
       ${
         freeFirstJobCents === null
           ? ""
-          : `<p class="fine">Posting costs you nothing and asks for nothing: the pool pays up to
-             ${freeFirstJobCents} cents for a first job, and the key you get back is the only way
-             into it, so copy it when it appears.</p>`
+          : `<p class="fine">${t.postsFree(freeFirstJobCents)}</p>`
       }
-      <p class="fine">${words} word${words === 1 ? "" : "s"}, read as ${esc(kind)} work.
-        ${whatIsKept(viaQuery)}</p>`
-          : `<h2>What was checked</h2>
+      <p class="fine">${t.wordsRead(words, kind)} ${t.kept}</p>`
+          : `<h2>${lang === "de" ? "Was geprüft wurde" : "What was checked"}</h2>
       <pre>${esc(brief)}</pre>
-      <p class="fine">${words} word${words === 1 ? "" : "s"}, read as ${esc(kind)} work.
-        ${whatIsKept(viaQuery)}</p>`
+      <p class="fine">${t.wordsRead(words, kind)} ${t.kept}</p>`
       }
-      <h2>From a terminal</h2>
+      <h2>${t.terminal}</h2>
       <pre><code>curl -s https://cp.hippe.eu/v1/briefs/check \\
   -H 'content-type: application/json' \\
   -d '{"brief":"…","kind":"${esc(kind)}"}'</code></pre>
       <p class="sub">
-        ${nextStep(freeFirstJobCents)}
+        ${nextStep(freeFirstJobCents, lang)}
       </p>
     </div>
   </section>`;
@@ -241,7 +320,20 @@ export const EXAMPLES: { label: string; brief: string; kind: "factual" | "creati
  * the check finds three. A number on a page that asks for trust has to come from the thing it
  * describes, which is the same rule the hero panel on the landing page already follows.
  */
-export function renderCheckIntro(formAllowed: boolean, freeFirstJobCents: number | null): string {
+/**
+ * The intro page, and the one place the language cannot be read off a brief.
+ *
+ * There is no text yet, so the only signal is the browser's Accept-Language. That is a weak
+ * signal in general and a good one here: this page is what a QR code on a card at a German trade
+ * fair opens, and the reader is holding a phone that has said "de" in every request it has ever
+ * made. Wrong guesses cost a page in the wrong language, which the reader fixes by leaving, so it
+ * is worth getting right and not worth building a language switch for yet.
+ */
+export function renderCheckIntro(
+  formAllowed: boolean,
+  freeFirstJobCents: number | null,
+  lang: "de" | "en" = "en",
+): string {
   // Counted now, from the same function the endpoint runs, so the sentence cannot drift from what
   // the links actually answer.
   const found = EXAMPLES.map((e) => reviewBrief(e.brief, e.kind).length);
@@ -325,7 +417,7 @@ export function renderCheckIntro(formAllowed: boolean, freeFirstJobCents: number
   -H 'content-type: application/json' \
   -d '{"brief":"…","kind":"factual"}'</code></pre>
       <p class="sub">
-        ${nextStep(freeFirstJobCents)}
+        ${nextStep(freeFirstJobCents, lang)}
       </p>
     </div>
   </section>`;

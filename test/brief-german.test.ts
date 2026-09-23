@@ -19,26 +19,28 @@ const schlecht_de =
 
 describe("the check reads German as well as English", () => {
   it("finds nothing wrong with a German brief that says everything", () => {
-    expect(reviewBrief(gut_de, "factual").map((f) => f.missing)).toEqual([]);
+    expect(reviewBrief(gut_de, "factual").map((f) => f.id)).toEqual([]);
   });
 
   it("does the same with real umlauts, because a web form produces those", () => {
-    expect(reviewBrief(gut_de_umlaute, "factual").map((f) => f.missing)).toEqual([]);
+    expect(reviewBrief(gut_de_umlaute, "factual").map((f) => f.id)).toEqual([]);
   });
 
   // The other direction, and the one that matters more: teaching it German must not make it blind.
+  // Asserted on ids and not on wording, since a German brief now answers in German and the point
+  // here is which checks fired, not what they said.
   it("still names what a short German brief leaves out", () => {
-    const f = reviewBrief(schlecht_de, "factual").map((x) => x.missing);
-    expect(f.length, "a fifteen-word brief is missing several things").toBeGreaterThanOrEqual(3);
-    expect(f.join(" ")).toMatch(/length/i);
-    expect(f.join(" ")).toMatch(/hand in/i);
+    const ids = reviewBrief(schlecht_de, "factual").map((x) => x.id);
+    expect(ids.length, "a fifteen-word brief is missing several things").toBeGreaterThanOrEqual(3);
+    expect(ids).toContain("no_length");
+    expect(ids).toContain("no_deliverable");
   });
 
   it("names each thing only when it is really absent, one at a time", () => {
     const ohneLaenge = gut_de.replace("400 bis 500 Woerter in fuenf Abschnitten", "in Abschnitten");
-    expect(reviewBrief(ohneLaenge, "factual").map((f) => f.missing).join(" ")).toMatch(/length/i);
+    expect(reviewBrief(ohneLaenge, "factual").map((f) => f.id)).toEqual(["no_length"]);
     const ohneAbgabe = gut_de.replace("Nur den Text abgeben, kein Anschreiben.", "");
-    expect(reviewBrief(ohneAbgabe, "factual").map((f) => f.missing).join(" ")).toMatch(/hand in/i);
+    expect(reviewBrief(ohneAbgabe, "factual").map((f) => f.id)).toEqual(["no_deliverable"]);
   });
 
   // Die andere Richtung der deutschen Muster, und die teurere: "kein" kommt im Deutschen
@@ -48,9 +50,7 @@ describe("the check reads German as well as English", () => {
     const beschreibend =
       "FACT SHEET ueber ein Reihenhaus von 1998 in Kiel, das keinen Keller und keine Garage hat, " +
       "fuer einen Kaeufer, der zum ersten Mal kauft. 300 Woerter. Nur den Text abgeben.";
-    expect(reviewBrief(beschreibend, "factual").map((f) => f.missing).join(" ")).toMatch(
-      /ruled out/i,
-    );
+    expect(reviewBrief(beschreibend, "factual").map((f) => f.id)).toContain("nothing_ruled_out");
   });
 
   it("stays quiet about it when the brief really forbids something", () => {
@@ -58,8 +58,6 @@ describe("the check reads German as well as English", () => {
       "FACT SHEET ueber ein Reihenhaus von 1998 in Kiel fuer einen Kaeufer, der zum ersten Mal " +
       "kauft. 300 Woerter. Nur den Text abgeben. Keinen Preis eines einzelnen Anbieters nennen " +
       "und kein Gesetz ohne Paragraphennummer zitieren.";
-    expect(reviewBrief(verbietend, "factual").map((f) => f.missing).join(" ")).not.toMatch(
-      /ruled out/i,
-    );
+    expect(reviewBrief(verbietend, "factual").map((f) => f.id)).not.toContain("nothing_ruled_out");
   });
 });

@@ -56,6 +56,7 @@ import { block as ldBlock, dataset, howToFrom, organization, webPage, webSite } 
 import { prefersHtml, renderApiPage } from "./public/apipage.js";
 import { siteOrigin, withOrigin } from "./public/site.js";
 import { renderCheck, renderCheckIntro } from "./public/checkpage.js";
+import { detectBriefLanguage } from "./bounties/brief.de.js";
 import { DOC } from "./errors.js";
 import { Catalog, handleChat, MARKUP } from "./inference/proxy.js";
 import { clientKey, RateLimiter, type RateLimitOptions } from "./ratelimit.js";
@@ -476,6 +477,58 @@ export function createApp(opts: AppOptions) {
    * script is deliberately not carried over; it only fills the status figures on the landing page,
    * and a page that does not need it should not ship a hash-pinned script for nothing.
    */
+  /**
+   * Which language to answer a browser in.
+   *
+   * The brief decides when there is one, because that is what the reader typed and the findings
+   * are already in that language (src/bounties/brief.de.ts). Accept-Language decides when there is
+   * not, which is only the empty intro page.
+   *
+   * Deliberately not a cookie, not a path prefix and not a switch in the corner: none of those
+   * exist yet, and inventing an incomplete one would leave the site half translated in a way a
+   * reader has to navigate. One signal, one decision, and it is right for the case this was built
+   * for -- a phone at a German trade fair, which has said "de" in every request it ever made.
+   */
+  /**
+   * Title and description for the check page, in the page's language.
+   *
+   * These are not decoration: they are the browser tab and the line under the link in a search
+   * result. A German page with an English title is an English page to everybody who has not opened
+   * it yet, which is everybody the copy was written for.
+   */
+  const checkIntroMeta = (lang: "de" | "en"): readonly [string, string] =>
+    lang === "de"
+      ? [
+          "Was Ihr Auftrag nicht sagt, bevor Geld fließt",
+          "Zwei Entwürfe desselben Auftrags, und was ein Agent sich für jeden ausdenken müsste. Kein Schlüssel, kein Konto, keine Kosten.",
+        ]
+      : [
+          "What your brief does not say, before any money moves",
+          "Two drafts of the same job, and what an agent would have to invent to finish each. No key, no account, no charge.",
+        ];
+
+  const checkResultMeta = (n: number, lang: "de" | "en"): readonly [string, string] =>
+    lang === "de"
+      ? [
+          n
+            ? n === 1
+              ? "Eine Sache, die dieser Auftrag nicht sagt"
+              : `${n} Dinge, die dieser Auftrag nicht sagt`
+            : "Diesem Auftrag fehlt nichts Offensichtliches",
+          "Was ein Agent sich ausdenken müsste, um diesen Auftrag fertig zu machen, benannt bevor Geld fließt. Kein Schlüssel, kein Konto, keine Kosten.",
+        ]
+      : [
+          n
+            ? `${n} thing${n === 1 ? "" : "s"} this brief does not say`
+            : "Nothing obvious is missing from this brief",
+          "What an agent would have to invent to finish this job, named before any money moves. No key, no account, no charge.",
+        ];
+
+  const langOf = (brief: string, accept: string | undefined): "de" | "en" => {
+    if (brief.trim()) return detectBriefLanguage(brief);
+    return /(^|,)\s*de\b/i.test(accept ?? "") ? "de" : "en";
+  };
+
   const page = (
     bodyHtml: string,
     title: string,
@@ -508,8 +561,19 @@ export function createApp(opts: AppOptions) {
      * the ones a crawler acts on.
      */
     notAPage = false,
+    /**
+     * The language the body is written in, which has to reach the `<html>` element.
+     *
+     * A page of German prose under `lang="en"` is not cosmetic: a screen reader pronounces it as
+     * English, and a search engine files it under the wrong language, which is the opposite of
+     * what German copy is for. The attribute comes from index.html, so it is rewritten here rather
+     * than having a second template.
+     */
+    lang: "de" | "en" = "en",
   ): string => {
-    const head = (indexHtml ?? "").slice(0, (indexHtml ?? "").indexOf("</head>"));
+    const head = (indexHtml ?? "")
+      .slice(0, (indexHtml ?? "").indexOf("</head>"))
+      .replace(/<html lang="en">/, lang === "de" ? '<html lang="de">' : "$&");
     // withOrigin at the door, once, rather than per template string. The curl examples on these
     // pages are the thing a visitor copies, they live in prose across a dozen files, and after a
     // domain move they would be the last place anybody looked. See src/public/site.ts.
@@ -714,37 +778,50 @@ export function createApp(opts: AppOptions) {
     if (!indexHtml) return c.json({ error: "no index page built" }, 503);
     const brief = (c.req.query("brief") ?? "").trim();
     const kind: "factual" | "creative" = c.req.query("kind") === "creative" ? "creative" : "factual";
+    const lang = langOf(brief, c.req.header("accept-language"));
     if (!brief) {
       return c.html(
         page(
-          renderCheckIntro(process.env.CP_FORM_ON_CHECK === "1", starterOffer(db)?.cents ?? null),
-          "What your brief does not say, before any money moves",
-          "Two drafts of the same job, and what an agent would have to invent to finish each. No key, no account, no charge.",
+          renderCheckIntro(process.env.CP_FORM_ON_CHECK === "1", starterOffer(db)?.cents ?? null, lang),
+          checkIntroMeta(lang)[0],
+          checkIntroMeta(lang)[1],
           "/check",
+          "og.png",
+          [],
+          false,
+          lang,
         ),
       );
     }
     if (brief.length > BRIEF_MAX) {
       return c.html(
         page(
-          renderCheckIntro(process.env.CP_FORM_ON_CHECK === "1", starterOffer(db)?.cents ?? null),
-          "That draft is too long to check",
-          "A brief is limited to the same length as when posting one.",
+          renderCheckIntro(process.env.CP_FORM_ON_CHECK === "1", starterOffer(db)?.cents ?? null, lang),
+          lang === "de" ? "Dieser Entwurf ist zu lang zum Prüfen" : "That draft is too long to check",
+          lang === "de"
+            ? "Ein Auftrag ist auf dieselbe Länge begrenzt wie beim Einstellen."
+            : "A brief is limited to the same length as when posting one.",
           "/check",
+          "og.png",
+          [],
+          false,
+          lang,
         ),
         400,
       );
     }
-    const findings = reviewBrief(brief, kind);
+    const findings = reviewBrief(brief, kind, lang);
     const words = brief.split(/\s+/).filter(Boolean).length;
     return c.html(
       page(
-        renderCheck(brief, kind, findings, words, starterOffer(db)?.cents ?? null, true, process.env.CP_FORM_ON_CHECK === "1"),
-        findings.length
-          ? `${findings.length} thing${findings.length === 1 ? "" : "s"} this brief does not say`
-          : "Nothing obvious is missing from this brief",
-        "What an agent would have to invent to finish this job, named before any money moves. No key, no account, no charge.",
+        renderCheck(brief, kind, findings, words, starterOffer(db)?.cents ?? null, true, process.env.CP_FORM_ON_CHECK === "1", lang),
+        checkResultMeta(findings.length, lang)[0],
+        checkResultMeta(findings.length, lang)[1],
         "/check",
+        "og.png",
+        [],
+        false,
+        lang,
       ),
     );
   });
@@ -1827,6 +1904,7 @@ export function createApp(opts: AppOptions) {
     const brief = typeof form.brief === "string" ? form.brief.trim() : "";
     const kind: "factual" | "creative" = form.kind === "creative" ? "creative" : "factual";
     const host = c.req.header("host") ?? "cp.hippe.eu";
+    const lang = langOf(brief, c.req.header("accept-language"));
     if (!brief || brief.length > BRIEF_MAX) {
       return c.redirect("/check", 303);
     }
@@ -1839,14 +1917,19 @@ export function createApp(opts: AppOptions) {
     if (priceMc < PRICE_MIN_MC) {
       return c.html(
         page(
-          renderNoFreeJob(host, mcToCents(poolLeftMc(db)), poolLeftMc(db) >= BUYER_GRANT_MC),
-          "The free first job is not available right now",
-          "The starter pool gives away a fixed amount a day and a fixed amount in total. The brief check stays free either way.",
+          renderNoFreeJob(host, mcToCents(poolLeftMc(db)), poolLeftMc(db) >= BUYER_GRANT_MC, lang),
+          lang === "de"
+            ? "Der kostenlose Erstauftrag ist gerade nicht zu haben"
+            : "The free first job is not available right now",
+          lang === "de"
+            ? "Der Starttopf gibt einen festen Betrag am Tag und einen festen Betrag insgesamt aus. Die Auftragsprüfung bleibt so oder so kostenlos."
+            : "The starter pool gives away a fixed amount a day and a fixed amount in total. The brief check stays free either way.",
           "/start",
           "og.png",
           [],
           // Noindex: a POST result, and the one below carries a key in plain sight.
           true,
+          lang,
         ),
         503,
       );
@@ -1871,16 +1954,20 @@ export function createApp(opts: AppOptions) {
               key,
               brief,
               kind,
-              findings: reviewBrief(brief, kind).length,
+              findings: reviewBrief(brief, kind, lang).length,
             },
             host,
+            lang,
           ),
-          "Your job is on the board",
-          "A first job paid by the operator's pool, and the one key that opens it.",
+          lang === "de" ? "Ihr Auftrag steht auf dem Brett" : "Your job is on the board",
+          lang === "de"
+            ? "Ein erster Auftrag, bezahlt aus dem Topf des Betreibers, und der eine Schlüssel, der ihn öffnet."
+            : "A first job paid by the operator's pool, and the one key that opens it.",
           "/start",
           "og.png",
           [],
           true,
+          lang,
         ),
         201,
       );
@@ -1891,13 +1978,18 @@ export function createApp(opts: AppOptions) {
       if (e instanceof BountyError || e instanceof StarterError) {
         return c.html(
           page(
-            renderNoFreeJob(host, mcToCents(poolLeftMc(db)), true),
-            "The free first job is not available right now",
-            "The starter pool gives away a fixed amount a day and a fixed amount in total. The brief check stays free either way.",
+            renderNoFreeJob(host, mcToCents(poolLeftMc(db)), true, lang),
+            lang === "de"
+              ? "Der kostenlose Erstauftrag ist gerade nicht zu haben"
+              : "The free first job is not available right now",
+            lang === "de"
+              ? "Der Starttopf gibt einen festen Betrag am Tag und einen festen Betrag insgesamt aus. Die Auftragsprüfung bleibt so oder so kostenlos."
+              : "The starter pool gives away a fixed amount a day and a fixed amount in total. The brief check stays free either way.",
             "/start",
             "og.png",
             [],
             true,
+            lang,
           ),
           503,
         );
@@ -1978,14 +2070,21 @@ export function createApp(opts: AppOptions) {
     }
     const wantsPage = indexHtml !== null && prefersHtml(c.req.header("accept"));
     const brief = typeof b.brief === "string" ? b.brief.trim() : "";
+    const emptyLang = langOf("", c.req.header("accept-language"));
     if (!brief) {
       if (wantsPage) {
         return c.html(
           page(
-            renderCheck("", "factual", [], 0, starterOffer(db)?.cents ?? null, false, process.env.CP_FORM_ON_CHECK === "1"),
-            "The free check needs a draft",
-            "Paste the brief you would post and this names what it does not say. No key, no account, nothing stored.",
+            renderCheck("", "factual", [], 0, starterOffer(db)?.cents ?? null, false, process.env.CP_FORM_ON_CHECK === "1", emptyLang),
+            emptyLang === "de" ? "Die kostenlose Prüfung braucht einen Entwurf" : "The free check needs a draft",
+            emptyLang === "de"
+              ? "Fügen Sie den Auftrag ein, den Sie einstellen würden, und hier steht, was er nicht sagt. Kein Schlüssel, kein Konto, nichts gespeichert."
+              : "Paste the brief you would post and this names what it does not say. No key, no account, nothing stored.",
             "/v1/briefs/check",
+            "og.png",
+            [],
+            false,
+            emptyLang,
           ),
           400,
         );
@@ -2012,17 +2111,20 @@ export function createApp(opts: AppOptions) {
       );
     }
     const kind: "factual" | "creative" = b.kind === "creative" ? "creative" : "factual";
-    const findings = reviewBrief(brief, kind);
+    const lang = langOf(brief, c.req.header("accept-language"));
+    const findings = reviewBrief(brief, kind, lang);
     const words = brief.split(/\s+/).filter(Boolean).length;
     if (wantsPage) {
       return c.html(
         page(
-          renderCheck(brief, kind, findings, words, starterOffer(db)?.cents ?? null, false, process.env.CP_FORM_ON_CHECK === "1"),
-          findings.length
-            ? `${findings.length} thing${findings.length === 1 ? "" : "s"} this brief does not say`
-            : "Nothing obvious is missing from this brief",
-          "What an agent would have to invent to finish this job, named before any money moves. No key, no account, nothing stored.",
+          renderCheck(brief, kind, findings, words, starterOffer(db)?.cents ?? null, false, process.env.CP_FORM_ON_CHECK === "1", lang),
+          checkResultMeta(findings.length, lang)[0],
+          checkResultMeta(findings.length, lang)[1],
           "/v1/briefs/check",
+          "og.png",
+          [],
+          false,
+          lang,
         ),
       );
     }

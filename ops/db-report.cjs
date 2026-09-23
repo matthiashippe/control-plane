@@ -140,7 +140,13 @@ const SEED_KEY_NAME = "ops-seed-%";
 //
 // Anything else that appears here is a decision a human makes, and the day this list grows for a
 // reason other than the runtime's default is the day this project stops being a demonstration.
-const STRANGER_KEY_NAMES = ["conway-automaton"];
+// `browser` is what the keyless door names every key it mints (src/auth/keyless.ts), for anybody
+// who posts a job without a wallet since 2026-09-23. It is on this list for the same reason as
+// `conway-automaton` and with the same safeguard: our own walk of that path is excluded one level
+// up, by address, because its handle is in OURS. Putting it on the list above instead would claim
+// every stranger who ever uses the front door as one of ours, which is the one error this report
+// exists to prevent.
+const STRANGER_KEY_NAMES = ["conway-automaton", "browser"];
 const oursClause = `(
   address in (${OURS.map(() => "?").join(",")})
   or exists (select 1 from api_keys k where k.address = ledger.address
