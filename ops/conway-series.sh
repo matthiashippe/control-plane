@@ -83,11 +83,27 @@ for page in (1, 2):
         elif last_write is None:
             comments_since += 1
 
+npm_downloads = None
+try:
+    with urllib.request.urlopen(
+        "https://api.npmjs.org/downloads/point/last-month/automaton", timeout=20
+    ) as r:
+        npm_downloads = json.load(r).get("downloads")
+except Exception:
+    pass
+
 print(json.dumps({
     "stichtag": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
     "last_push": meta["pushed_at"],
     "forks": meta["forks_count"],
     "stars": meta["stargazers_count"],
+    # How many people actually run this thing, as opposed to how many starred it. Stars and forks
+    # are a reputation; a download is somebody installing the runtime this month. Measured on
+    # 2026-09-23: 180 in the last month against 6,520 stars and 1,452 forks, which is the ratio
+    # that decides whether the audience for a replacement control plane is hundreds or dozens.
+    # None: the field is null rather than 0, because "the registry did not answer" and "nobody
+    # installed it" are different findings and a 0 here would read as the second.
+    "npm_downloads_last_month": npm_downloads,
     "open_issues": meta["open_issues_count"],
     "archived": meta["archived"],
     "has_discussions": meta.get("has_discussions", False),
