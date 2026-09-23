@@ -206,13 +206,26 @@ def main() -> int:
     if proc.returncode != 0:
         print(f"COULD NOT TELL: article-numbers.py exited {proc.returncode}: {proc.stderr.strip()[:160]}")
         return 2
-    line = next((z for z in proc.stdout.splitlines() if z.startswith("Letzte 30 Tage")), "")
+    # "Last 30 days", not "Letzte 30 Tage". The language pass renamed the script output on
+    # 2026-09-22 and this line was not carried along, so from then until 2026-09-23 the check
+    # found no line, returned 2, and ops/check-all.sh printed NOT DETERMINED. That reads as "could
+    # not tell" and it meant "is not looking", which is the more dangerous of the two: a check
+    # that fails loudly gets fixed, and one that shrugs gets read past every cycle.
+    #
+    # The translation between the two halves lives here on purpose. The script is code and is
+    # English; README.md is a published CC0 document in German, linked from the landing page, and
+    # its wording and its decimal comma are what a reader downloaded. Only one of the two can be
+    # renamed freely, and it is not the one that is already out in the world.
+    line = next((z for z in proc.stdout.splitlines() if z.startswith("Last 30 days")), "")
     readme_text = " ".join((DATA / "README.md").read_text().split())
-    numbers = line.replace("Letzte 30 Tage:", "").strip().split(" USDC, ")
+    numbers = line.replace("Last 30 days:", "").strip().split(" USDC, ")
     if len(numbers) != 2:
         print(f"COULD NOT TELL: article-numbers.py printed no 30-day line: {line[:80]!r}")
         return 2
-    expected = f"{numbers[0].replace('.', ',')} USDC von {numbers[1].split(' Wallets')[0]} Wallets"
+    # The script says "44 wallets", the README says "44 Wallets": split on the number, not on the
+    # word, so this does not break again the next time one side is translated.
+    count = numbers[1].strip().split(" ")[0]
+    expected = f"{numbers[0].replace('.', ',')} USDC von {count} Wallets"
     if expected not in readme_text:
         bad += 1
         print("WRONG   article-numbers.py and README.md disagree about the 30-day window.")
