@@ -57,6 +57,23 @@ function migrate(db: Db): void {
     );
     CREATE INDEX IF NOT EXISTS api_keys_address ON api_keys(address);
 
+    -- A card payment on its way, behind CP_CHECKOUT and unreachable while that is off.
+    --
+    -- The amount lives HERE and never in the callback. A provider's callback says which payment it
+    -- is talking about; what that payment was for is what we wrote down when we started it. Taking
+    -- the amount from the callback is how a forged one credits any balance it likes, and it is the
+    -- single most expensive mistake available on this path.
+    CREATE TABLE IF NOT EXISTS checkouts (
+      reference  TEXT PRIMARY KEY,               -- what the provider echoes back
+      address    TEXT NOT NULL REFERENCES wallets(address),
+      cents      INTEGER NOT NULL,
+      provider   TEXT NOT NULL,
+      status     TEXT NOT NULL,                  -- pending | paid | abandoned
+      created_at TEXT NOT NULL,
+      settled_at TEXT
+    );
+    CREATE INDEX IF NOT EXISTS checkouts_address ON checkouts(address, created_at);
+
     -- Every balance change is exactly one ledger row, written in the same transaction.
     CREATE TABLE IF NOT EXISTS ledger (
       id          INTEGER PRIMARY KEY AUTOINCREMENT,
