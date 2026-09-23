@@ -54,7 +54,12 @@ failures=0
 echo "Who that indexes the web has been here"
 echo
 
-crawler_report=$(python3 - "$log" <<'PY'
+# Our own addresses, because the three files below are fetched by our own checks hundreds of
+# times a day and a raw count of them reads as interest. Same source as every other traffic tool.
+source "$(dirname "$0")/own-ips.sh"
+VIS_OWN=$(own_ips 2>/dev/null || true)
+
+crawler_report=$(CP_VIS_OWN="$VIS_OWN" python3 - "$log" <<'PY'
 import collections, datetime, json, re, sys
 
 # Named rather than pattern-matched on "bot", because half the scanners on this log call themselves
@@ -81,6 +86,22 @@ unnamed = collections.Counter()
 first_seen, last_seen = {}, {}
 lines = 0
 earliest = None
+
+# The three files this service maintains for machines rather than for people, and who outside has
+# ever asked for one.
+#
+# Measured on 2026-09-23: /llms.txt had 531 fetches and every single one came from our own
+# addresses. Not one foreign address has ever asked for it, while four crawlers (claudebot,
+# googlebot, oai-searchbot, gptbot) were here that same morning. Four of the five fetched
+# robots.txt and gptbot went straight to the sitemap, which robots.txt names. Nothing named
+# llms.txt, so the file written for exactly those readers was the one file they could not find.
+#
+# A raw fetch count would have said 531 and read as heavy interest, which is why our own addresses
+# come out first and the number of them is printed beside the result.
+import os
+MACHINE_FILES = ("/robots.txt", "/sitemap.xml", "/llms.txt")
+OWN = set((os.environ.get("CP_VIS_OWN") or "").split())
+machine = {f: {"ours": 0, "foreign": collections.Counter()} for f in MACHINE_FILES}
 for raw in open(sys.argv[1]):
     raw = raw.strip()
     if not raw.startswith("{"):
@@ -94,6 +115,13 @@ for raw in open(sys.argv[1]):
     if earliest is None or at < earliest:
         earliest = at
     ua = (z.get("request", {}).get("headers", {}).get("User-Agent") or ["-"])[0]
+    path = z.get("request", {}).get("uri", "").split("?")[0]
+    if path in machine:
+        if z.get("request", {}).get("remote_ip") in OWN:
+            machine[path]["ours"] += 1
+        else:
+            named = re.search(NAMES, ua, re.I)
+            machine[path]["foreign"][named.group(0).lower() if named else "not a named crawler"] += 1
     m = re.search(NAMES, ua, re.I)
     if not m:
         if SUSPECT.search(ua):
@@ -129,6 +157,18 @@ if unnamed:
     for ua, n in unnamed.most_common(6):
         print(f"    {n:5d}x  {ua}")
     print("  Look at these. One of them being a real crawler is how the list above gets its next entry.")
+
+print()
+print("  The files written for machines, and who outside has fetched them:")
+for f in MACHINE_FILES:
+    foreign = machine[f]["foreign"]
+    total = sum(foreign.values())
+    who = ", ".join(name for name, _ in foreign.most_common(4)) if foreign else "nobody"
+    print(f"    {f:14s} {total:4d} from outside, {machine[f]['ours']:5d} of our own   {who}")
+if sum(machine["/llms.txt"]["foreign"].values()) == 0:
+    print("  NOT ONE outside fetch of /llms.txt. It is the file this service writes for exactly the")
+    print("  readers in the list above, and until 2026-09-23 nothing pointed at it. robots.txt names")
+    print("  it now; whether that changes this line is what the line is for.")
 PY
 )
 printf '%s\n' "$crawler_report"

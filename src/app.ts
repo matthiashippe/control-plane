@@ -791,13 +791,29 @@ export function createApp(opts: AppOptions) {
    * Blocking it would cost the crawler the live figures it came for. The depth pixels stay allowed
    * for the same reason, and a crawler that takes them is filtered out as a renderer anyway.
    */
+  // The line naming llms.txt, and why it is a comment.
+  //
+  // Measured on 2026-09-23: /llms.txt had 531 fetches and every one came from our own addresses.
+  // Not one foreign address has ever asked for it. That same morning four crawlers were here --
+  // claudebot, googlebot, oai-searchbot, gptbot -- and four of the five fetched robots.txt first,
+  // while gptbot went straight to the sitemap, which robots.txt names. So the file written for
+  // exactly those readers was the one file nothing pointed at.
+  //
+  // There is no registered directive for it the way `Sitemap:` is registered, and inventing one
+  // would be a line every parser ignores while looking like a standard. A comment is legal in
+  // robots.txt, every parser keeps reading past it, and the address is there in plain text for
+  // anything that reads the file rather than only the directives it knows.
+  //
+  // Whether any of them follows it is unknown and not claimed here. ops/visibility.sh prints the
+  // outside fetch count of all three files, so the answer arrives as a measurement.
   app.get("/robots.txt", (c) =>
     c.text(
       "User-agent: *\n" +
         "Allow: /\n" +
         "Disallow: /v1/\n" +
         "Allow: /v1/status\n" +
-        `Sitemap: ${siteOrigin()}/sitemap.xml\n`,
+        `Sitemap: ${siteOrigin()}/sitemap.xml\n` +
+        `# A plain-text summary of this service, written for language models: ${siteOrigin()}/llms.txt\n`,
       200,
       { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "public, max-age=86400" },
     ),

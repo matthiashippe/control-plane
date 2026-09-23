@@ -59,3 +59,37 @@ describe("robots.txt", () => {
     }
   });
 });
+
+/**
+ * The one file every crawler reads, and the one file nothing pointed at.
+ *
+ * Measured against production on 2026-09-23: /llms.txt had 531 fetches and every one came from our
+ * own addresses, while four crawlers were here that morning (claudebot, googlebot, oai-searchbot,
+ * gptbot). Four of the five fetched robots.txt; gptbot went straight to the sitemap, which
+ * robots.txt names. So robots.txt names llms.txt too now, as a comment, because there is no
+ * registered directive for it and inventing one looks like a standard while being ignored.
+ *
+ * ops/visibility.sh prints the outside fetch count of all three files, so whether this works
+ * arrives as a measurement rather than as a hope.
+ */
+describe("robots.txt points at the file written for language models", () => {
+  it("names llms.txt with its full address", async () => {
+    const text = await robots();
+    expect(text).toContain("/llms.txt");
+    expect(text).toMatch(/https?:\/\/[^\s]+\/llms\.txt/);
+  });
+
+  it("names it on a line a parser skips, so no directive is invented", async () => {
+    const text = await robots();
+    const line = text.split("\n").find((l) => l.includes("/llms.txt"));
+    expect(line, "no line names llms.txt").toBeDefined();
+    expect(line!.trimStart().startsWith("#"), `"${line}" is not a comment`).toBe(true);
+  });
+
+  it("keeps the directives that were already there", async () => {
+    const text = await robots();
+    for (const directive of ["User-agent: *", "Allow: /", "Disallow: /v1/", "Allow: /v1/status", "Sitemap: "]) {
+      expect(text, `robots.txt lost ${directive}`).toContain(directive);
+    }
+  });
+});
