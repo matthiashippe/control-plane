@@ -330,10 +330,23 @@ noch Karte noch Stripe voraussetzt.
 **Das Gate vom 23.09. steht**, und zwar vollstaendig: der Check liest Deutsch (`3973d92` und
 `f8f7a77`), antwortet auf Deutsch, die Seite traegt `lang="de"`, der Wallet-Satz ist weg, der
 Knopf "Als Auftrag einstellen" steht darunter und der Weg dahinter ist gegen Produktion
-abgegangen. Offen aus dem Gate: der inhaltsfreie Zaehler (`via`, `src`, Sprache, Wortzahl,
-Befundzahl, gesalzener Adress-Hash, **kein Zeichen des Entwurfs und auch kein Hash davon**), das
-versteckte `via=form` in beiden Formularen, die Kurzadresse `/b?src=nit` und der A6-Zettel mit
-QR-Code.
+abgegangen. Das Gate ist **vollstaendig abgearbeitet**, und an einer Stelle anders als vorgeschlagen.
+
+Der Plan wollte einen inhaltsfreien Zaehler in der Datenbank. Der ist nicht gebaut, weil er nicht
+noetig ist: Caddy schreibt die URI ohnehin ins Zugriffslog und `deploy/Caddyfile` loescht daraus
+genau `brief`. Also faehrt alles, was die Zaehlung braucht, in der Adresse mit. Das Textfeld traegt
+ein verstecktes `via=form`, die Beispiel-Links `src=ex1`/`ex2`, ein Kanal seinen eigenen `src`.
+`ops/first-typing.sh` zaehlt daraus getippte Laeufe, Personen, Wiederkommer, Beispiel-Klicks und
+Karten-Scans, mit `--selftest` als Gegenprobe. **Damit bleibt der Satz "nichts gespeichert"
+wortgleich wahr,** und dieser Satz ist mehr wert als die Zahl: er ist der Grund, warum jemand
+echte Arbeit einfuegt.
+
+`/b?src=nit` ist gebaut und gegen Produktion geprueft (302 auf `/check?src=nit`, deutsche Seite
+mit Textfeld, `via` und `src` stehen drin). Die A6-Karte liegt in `ops/nit-card.html`; sie erzeugt
+den QR-Code im Browser mit einer bekannten Bibliothek, **nicht mit einem selbstgeschriebenen
+Encoder**, weil ein QR-Code das eine Stueck auf der Karte ist, das sich nicht durch Hinsehen
+pruefen laesst, und ein Encoder, den hier niemand nachrechnen kann, schlechter ist als kein
+QR-Code. Die Karte sagt auf sich selbst, dass sie vor dem Drucken einmal gescannt werden muss.
 
 | Tag | Was gemessen wird | Heute | Ziel |
 |---|---|---|---|

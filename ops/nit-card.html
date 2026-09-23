@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Karte fuer den Norddeutschen Immobilientag</title>
+<!--
+  A6 card to print for 24.09.2026, Empire Riverside.
+
+  Why this file is in ops/ and not in src/public/: it is not served. It is opened locally, printed,
+  and carried. Nothing here reaches the production image.
+
+  The QR is drawn in the browser by a library from a CDN rather than by an encoder written here.
+  A QR code is the one artifact on this card that cannot be proofread by looking at it, and an
+  encoder nobody can verify is worse than no QR. **Scan it with a phone before printing.** The
+  page says so on itself, in the part that does not print.
+
+  The address is postyourprice.com/b?src=nit. `/b` redirects to the check and `src=nit` is what
+  ops/first-typing.sh counts, so the card is measurable without anything being stored: the mark
+  travels in the URL and Caddy's log already records URIs with the draft filtered out.
+-->
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<style>
+  :root { --ink: #101418; --dim: #5a6472; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, "Segoe UI", Inter, system-ui, sans-serif; color: var(--ink); background: #eef1f4; }
+  .note { max-width: 105mm; margin: 2rem auto 1rem; font-size: .85rem; line-height: 1.5; color: var(--dim); }
+  .note b { color: var(--ink); }
+  .card {
+    width: 105mm; height: 148mm; margin: 0 auto 2rem; background: #fff; padding: 12mm 11mm;
+    display: flex; flex-direction: column; justify-content: space-between;
+    box-shadow: 0 1px 12px rgba(16,20,24,.14);
+  }
+  h1 { font-size: 20pt; line-height: 1.18; margin: 0 0 4mm; letter-spacing: -.01em; }
+  p { margin: 0 0 3mm; font-size: 10.5pt; line-height: 1.45; }
+  .dim { color: var(--dim); font-size: 9pt; line-height: 1.4; }
+  .row { display: flex; gap: 6mm; align-items: center; }
+  canvas { width: 30mm; height: 30mm; display: block; }
+  .url { font: 600 13pt/1.2 ui-monospace, "SF Mono", Menlo, monospace; letter-spacing: -.01em; }
+  .rule { height: 1px; background: #dfe4ea; margin: 4mm 0; }
+  @media print {
+    @page { size: A6; margin: 0; }
+    body { background: #fff; }
+    .note { display: none; }
+    .card { box-shadow: none; margin: 0; }
+  }
+</style>
+</head>
+<body>
+<div class="note">
+  <b>Vor dem Drucken mit dem Handy scannen.</b> Der QR-Code wird hier im Browser erzeugt; wenn die
+  Seite ohne Netz geoeffnet wird, fehlt er, und das sieht man erst auf dem Papier. Drucken mit
+  Strg+P, Papierformat A6, Raender auf null, Hintergrundgrafiken an.
+</div>
+
+<div class="card">
+  <div>
+    <h1>Was Ihr Briefing nicht sagt, bevor Sie dafuer bezahlen.</h1>
+    <p>
+      Fuegen Sie den Satz ein, mit dem Sie den letzten Text bestellt haben. Sie bekommen in zwei
+      Sekunden aufgelistet, was ein Texter oder eine KI sich dabei ausdenken muesste.
+    </p>
+    <p class="dim">
+      Kostenlos, ohne Konto, ohne Anmeldung. Ihr Text wird nicht gespeichert.
+    </p>
+  </div>
+
+  <div>
+    <div class="rule"></div>
+    <div class="row">
+      <canvas id="qr"></canvas>
+      <div>
+        <div class="url">postyourprice.com/b</div>
+        <p class="dim" style="margin-top:2mm">
+          Scannen oder eintippen. Danach koennen Sie den Auftrag direkt dort ausschreiben, ohne
+          Konto und ohne Karte: den ersten zahlt der Betreiber.
+        </p>
+      </div>
+    </div>
+    <div class="rule"></div>
+    <p class="dim">
+      Handsel &middot; Matthias Hippe, Hamburg &middot; Impressum auf der Seite
+    </p>
+  </div>
+</div>
+
+<script>
+  QRCode.toCanvas(
+    document.getElementById("qr"),
+    "https://postyourprice.com/b?src=nit",
+    { width: 360, margin: 1, errorCorrectionLevel: "M", color: { dark: "#101418", light: "#ffffff" } },
+    function (err) { if (err) document.getElementById("qr").outerHTML =
+      '<div style="width:30mm;height:30mm;border:1px solid #c33;display:flex;align-items:center;justify-content:center;font-size:8pt;color:#c33;text-align:center">QR fehlt:<br>ohne Netz geoeffnet</div>'; }
+  );
+</script>
+</body>
+</html>
