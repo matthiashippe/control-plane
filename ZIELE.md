@@ -39,7 +39,13 @@ gebaut und nicht aus den Vorlagen: in jeder Begruendung stand der bessere Zug.
 
 ### Ziel 26.09. -- der erste fremde Kaeufer
 
-- [ ] **T1.1 "Fremd" an die Geldherkunft binden, bevor der Einstieg billiger wird.** Zahl: keine,
+- [x] **T1.1 "Fremd" an die Geldherkunft binden, bevor der Einstieg billiger wird.** Erledigt
+      23.09., Commit `00998a9`. `grant_funded_gmv_30d_mc` steht neben `foreign_gmv_30d_mc`, und die
+      Zielzahl verlangt jetzt eine `topup`-Zeile beim Kaeufer; die Provision ebenso, denn eine
+      Provision aus dem eigenen Topf ist kein Umsatz. Drei Faelle, Gegenprobe gelaufen. Die Zahl
+      steht heute bei 0 und 0, was richtig ist: es hat noch keinen fremden Auftrag gegeben.
+      **Damit kann T1.2 gebaut werden, ohne die Zahl zu faelschen.**
+      (alter Text) **T1.1** Zahl: keine,
       und genau deshalb zuerst, denn es verhindert, dass T1.2 die Zielzahl faelscht. Neben
       `foreign_gmv_30d_mc` kommt `grant_funded_gmv_30d_mc`, und ein Auftrag, dessen Kaeufer bei der
       Vergabe keine `topup`-Zeile im Ledger hat, zaehlt dort statt in der Zielzahl. Erster Schritt:
