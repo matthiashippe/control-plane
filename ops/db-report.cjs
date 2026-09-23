@@ -256,6 +256,30 @@ report.market = {
   // rate and not a forecast: consumption here comes in bursts, a probe run or a wave of seed
   // agents, and a per-day figure derived from that would be a made-up trend.
   starter_grants_left: Math.floor((500000 - one("select coalesce(sum(delta_mc),0) s from ledger where kind='grant'").s) / 15000),
+  // Money the buyer brought, against money we handed them.
+  //
+  // `foreign_gmv_30d_mc` below is the number the whole plan is measured by, and it was about to
+  // become unreadable. The next sub-goal in ZIELE.md (T1.2) pays a stranger's FIRST job out of the
+  // starter pool, so that the entry stops costing 15 cents of somebody else's USDC. That is the
+  // right move and it would have made our own pool show up as foreign market volume: a job funded
+  // by us, awarded by them, counted as proof that strangers are trading here.
+  //
+  // So the split is drawn where the money comes from, not where the wallet does. A buyer who has
+  // never had a `topup` row in the ledger is spending what we gave them, and their volume is
+  // counted separately and named separately. It is still worth watching -- a stranger who posts a
+  // real job on a free credit is a real event -- it is simply not the number that says the market
+  // pays for itself.
+  //
+  // Written as a clause next to notOursOn() rather than inside it: "is this address ours" and
+  // "did this address bring its own money" are two questions, and one filter answering both is how
+  // a figure quietly changes meaning.
+  grant_funded_gmv_30d_mc: one(
+    `select coalesce(sum(b.price_mc),0) s from bounties b
+       where b.status='awarded' and b.closed_at > datetime('now','-30 day')
+         and ${notOursOn("b.creator")}
+         and not exists (select 1 from ledger l where l.address = b.creator and l.kind = 'topup')`,
+    ...OURS_ARGS,
+  ).s,
   // THE number, in money rather than in people.
   //
   // foreign_buyers counts somebody putting money down; this counts the whole round trip, because
@@ -269,7 +293,8 @@ report.market = {
   foreign_gmv_30d_mc: one(
     `select coalesce(sum(b.price_mc),0) s from bounties b
        where b.status='awarded' and b.closed_at > datetime('now','-30 day')
-         and ${notOursOn("b.creator")}`,
+         and ${notOursOn("b.creator")}
+         and exists (select 1 from ledger l where l.address = b.creator and l.kind = 'topup')`,
     ...OURS_ARGS,
   ).s,
   // The commission actually earned from those, which is what would pay for anything.
@@ -281,7 +306,8 @@ report.market = {
     `select coalesce(sum(l.delta_mc),0) s from ledger l
        join bounties b on l.ref = 'bounty-fee:' || b.id
        where l.kind='bounty_fee' and b.closed_at > datetime('now','-30 day')
-         and ${notOursOn("b.creator")}`,
+         and ${notOursOn("b.creator")}
+         and exists (select 1 from ledger t where t.address = b.creator and t.kind = 'topup')`,
     ...OURS_ARGS,
   ).s,
   // THE number. Anything above zero means this stopped being our own demonstration.

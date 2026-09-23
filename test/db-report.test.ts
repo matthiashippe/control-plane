@@ -331,6 +331,16 @@ describe("the money a stranger actually moved", () => {
    * stays at 0 until the award, which is the difference between somebody trying and a market
    * working.
    */
+  /**
+   * `fundedBy` is the dimension the number turned out to need, and it is not the same question as
+   * "is this address ours".
+   *
+   * Since 2026-09-23 a job counts in foreign_gmv_30d_mc only when its buyer has ever had a `topup`
+   * row, which is the only way a stranger gets credits other than the starter pool. The next
+   * sub-goal pays a stranger's first job out of that pool so the entry stops costing somebody
+   * else's USDC, and without this split our own pool would have shown up as foreign market volume:
+   * a job we funded, awarded by them, counted as proof that strangers trade here.
+   */
   function bounty(
     db: ReturnType<typeof openDb>,
     id: string,
@@ -338,11 +348,15 @@ describe("the money a stranger actually moved", () => {
     priceMc: number,
     status: string,
     closedAt: string | null,
+    fundedBy: "their own money" | "our starter pool" = "their own money",
   ) {
     db.prepare(
       `insert into wallets (address, created_at) values (?, datetime('now'))
          on conflict(address) do nothing`,
     ).run(creator);
+    if (fundedBy === "their own money") {
+      postLedger(db, { address: creator, kind: "topup", deltaMc: priceMc, ref: `topup-${id}` });
+    }
     db.prepare(
       `insert into bounties (id, creator, kind, brief, price_mc, deadline, status, created_at, closed_at)
        values (?, ?, 'factual', 'a brief', ?, datetime('now','+1 day'), ?, datetime('now'), ?)`,
@@ -375,6 +389,56 @@ describe("the money a stranger actually moved", () => {
     });
     expect(r.market.foreign_gmv_30d_mc).toBe(250 * MC_PER_CENT);
     expect(r.market.foreign_fee_30d_mc).toBe(25 * MC_PER_CENT);
+  });
+
+  /**
+   * The split that exists so the next sub-goal cannot fake the number it is measured by.
+   *
+   * T1.2 in ZIELE.md pays a stranger's FIRST job out of the starter pool, because 15 cents of
+   * somebody else's USDC is a wall and 50 cents of ours is not. That is the right move, and
+   * without this split it would have shown up as foreign market volume: a job funded by us,
+   * awarded by them, counted as proof that strangers pay each other here.
+   *
+   * A stranger posting a real job on a free credit is still a real event and still worth watching,
+   * which is why it is counted and named rather than dropped.
+   */
+  it("counts a job a stranger paid for out of our pool separately, not as market volume", () => {
+    const r = withDb((db) => {
+      bounty(db, "granted-1", STRANGER, 50 * MC_PER_CENT, "awarded", new Date().toISOString(), "our starter pool");
+      postLedger(db, { address: STRANGER, kind: "grant", deltaMc: 50 * MC_PER_CENT, ref: "g-1" });
+      postLedger(db, {
+        address: OPERATOR,
+        kind: "bounty_fee",
+        deltaMc: 5 * MC_PER_CENT,
+        ref: "bounty-fee:granted-1",
+      });
+    });
+    expect(r.market.grant_funded_gmv_30d_mc, "it happened and it is counted").toBe(50 * MC_PER_CENT);
+    expect(r.market.foreign_gmv_30d_mc, "our own money is not the market paying for itself").toBe(0);
+    expect(r.market.foreign_fee_30d_mc, "a commission out of our own pool is not revenue").toBe(0);
+  });
+
+  it("keeps the two apart when both happened in the same thirty days", () => {
+    const OTHER = "0x2222222222222222222222222222222222222222";
+    const r = withDb((db) => {
+      bounty(db, "paid-1", STRANGER, 250 * MC_PER_CENT, "awarded", new Date().toISOString());
+      bounty(db, "granted-2", OTHER, 50 * MC_PER_CENT, "awarded", new Date().toISOString(), "our starter pool");
+      postLedger(db, { address: OTHER, kind: "grant", deltaMc: 50 * MC_PER_CENT, ref: "g-2" });
+    });
+    expect(r.market.foreign_gmv_30d_mc).toBe(250 * MC_PER_CENT);
+    expect(r.market.grant_funded_gmv_30d_mc).toBe(50 * MC_PER_CENT);
+  });
+
+  // The other direction, and the one a careless filter gets wrong: a buyer who topped up at some
+  // point has brought their own money, and a later job of theirs is market volume whether or not
+  // they also ever took a grant.
+  it("counts a buyer who once topped up, even if they also hold a grant", () => {
+    const r = withDb((db) => {
+      bounty(db, "mixed-1", STRANGER, 120 * MC_PER_CENT, "awarded", new Date().toISOString());
+      postLedger(db, { address: STRANGER, kind: "grant", deltaMc: 15_000, ref: "g-3" });
+    });
+    expect(r.market.foreign_gmv_30d_mc).toBe(120 * MC_PER_CENT);
+    expect(r.market.grant_funded_gmv_30d_mc).toBe(0);
   });
 
   it("does not count a stranger who funded a job and then got the money back", () => {

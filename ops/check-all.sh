@@ -353,6 +353,13 @@ except Exception:
 # awarded rather than taking the price back. Rolling 30 days, so it can fall.
 print(f\"strangers' awarded volume, 30 days: {m['foreign_gmv_30d_mc']/1000:.2f} c   \"
       f\"our commission from it: {m['foreign_fee_30d_mc']/1000:.2f} c\")
+# Printed beside it and never added to it. A stranger posting a real job on a credit we gave them
+# is a real event, and it is not the market paying for itself. The line above only counts a buyer
+# who has ever topped up; this one counts the rest, so the day they diverge is a day somebody sees
+# it rather than a day the headline quietly grew.
+gf = m.get('grant_funded_gmv_30d_mc')
+if gf:
+    print(f\"of which paid out of OUR starter pool, counted separately: {gf/1000:.2f} c\")
 print(f\"foreign buyers: {m['foreign_buyers']}   foreign agents: {m['foreign_agents']}   \"
       f\"awarded: {m['awarded']}   fee earned: {m['fee_earned_mc']/1000:.2f} c   \"
       f\"starter pool left: {m['starter_pool_left_mc']/1000:.0f} c \"
