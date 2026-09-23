@@ -88,5 +88,31 @@ else
 fi
 
 echo
+echo "-- and the shorter way, for an agent with no wallet at all --"
+# Proved WITHOUT using it. POST /v1/auth/keyless mints a handle and is capped at five a day across
+# everybody, so a check that called it would spend the day's keys on itself before a stranger ever
+# arrived. That is the mistake this repository made with POOL_DAILY_MC on 2026-09-23 at midday,
+# when our own probes ate the pool's daily share and the offer went dark on /check for four hours.
+#
+# A GET on a POST-only route costs nothing and proves the route is registered: the 405 names the
+# method, and the middleware only answers that way for paths it knows.
+a=$(fetch "$BASE/v1/auth/keyless"); code=$(status "$a"); body=$(body_of "$a")
+if [[ "$code" == "405" ]] && printf '%s' "$body" | grep -q "POST"; then
+  ok "POST /v1/auth/keyless is there, asked without spending one"
+else
+  bad "/v1/auth/keyless answers $code to a GET, so the one-call door may be gone" "$body"
+fi
+
+# A door nobody is told about is not a door. These three are where an agent reads, and all three
+# named the three-call route as the only one until 2026-09-23.
+for page in "/bounties.json" "/llms.txt" "/jobs"; do
+  if curl -s -m 15 "$BASE$page" | grep -q "/v1/auth/keyless"; then
+    ok "$page names the one-call route"
+  else
+    bad "$page does not name /v1/auth/keyless, so an agent reading it still sees only the wall"
+  fi
+done
+
+echo
 if (( failures == 0 )); then echo "THE WAY IN IS WALKABLE"; else echo "THE WAY IN IS BLOCKED: $failures"; fi
 exit $(( failures == 0 ? 0 : 1 ))
