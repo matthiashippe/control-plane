@@ -82,7 +82,16 @@ for path in "${PAGES[@]}"; do
   # 22:25 on 22.09. and at 01:26 and 05:40 on 23.09., each time naming a title that is at byte 132
   # of the page and has never been missing: ten fetches in a row a minute later all carried it.
   # Guessing has now cost three cycles, so the evidence gets kept instead.
-  if ! printf '%s' "$html" | grep -q '<title>[^<]'; then
+  # Bash pattern matching, not a pipe into grep -q. That pipe is what produced the failure this
+  # block used to report: grep -q exits the moment it matches, printf keeps writing into a closed
+  # pipe and takes SIGPIPE, and `set -o pipefail` at the top of this file turns the pipeline status
+  # into 141. The condition then reads as "no title" on a page whose title grep had just found.
+  #
+  # Measured on 2026-09-23 against the kept body of a run that failed: 7 of 60 runs reported no
+  # title, 0 of 60 without pipefail, 0 of 60 with the pattern match below. It only ever hit / and
+  # /jobs because at 60 and 65 KB printf is still writing when grep is already done, which is why
+  # it looked random and why it survived three cycles.
+  if [[ ! "$html" =~ \<title\>[^\<] ]]; then
     keep="${CP_EVIDENCE_DIR:-/tmp}/cp-notitle-$(date -u +%Y%m%dT%H%M%S)-$(printf '%s' "$path" | tr -c 'a-zA-Z0-9' '_').html"
     printf '%s' "$html" > "$keep"
     bad "$path has no title" "body kept at $keep, $(printf '%s' "$html" | wc -c | tr -d ' ') bytes, http $code, type $ctype"
@@ -90,7 +99,9 @@ for path in "${PAGES[@]}"; do
   [[ "$(printf '%s' "$html" | grep -c '<h1')" == "1" ]] || bad "$path does not have exactly one h1"
 
   for leftover in '<!--MARKET-->' '<!--NUMBERS-->' '${' 'undefined' 'NaN' '[object Object]'; do
-    if printf '%s' "$html" | grep -qF "$leftover"; then
+    # Same reason as the title check above: no pipe, no SIGPIPE, no false alarm. A literal
+    # comparison here, because these are fixed strings and not patterns.
+    if [[ "$html" == *"$leftover"* ]]; then
       bad "$path still contains $leftover" "$(printf '%s' "$text" | grep -oF -m1 -A0 "$leftover" | head -1)"
     fi
   done

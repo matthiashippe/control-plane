@@ -30,7 +30,9 @@ done < <(printf '%s' "$page" | grep -oE 'href="https?://[^"]+"' | sed 's/href="/
 # Anchors inside the page: an href="#impressum" without id="impressum" would go unnoticed otherwise.
 while read -r anchor; do
   [[ -z "$anchor" ]] && continue
-  if printf '%s' "$page" | grep -q "id=\"$anchor\""; then
+  # No pipe into grep -q: with pipefail a large page makes printf take SIGPIPE after grep has
+  # already matched, and the pipeline reports failure on a page that was fine. See ops/check-pages.sh.
+  if [[ "$page" == *"id=\"$anchor\""* ]]; then
     printf '  OK   #%s\n' "$anchor"
   else
     printf '  FAIL #%s  -> no element with that id\n' "$anchor"
