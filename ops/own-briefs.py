@@ -76,8 +76,11 @@ if bad:
     print("OWN BRIEFS FAILED: %d of %d open job(s) would be flagged by the check on our own" % (bad, len(jobs)))
     print("                   landing page. A stranger pasting them into /check sees this too.")
     raise SystemExit(1)
+# The summary line of ops/check-all.sh shows the first 60 characters of the last line, so the
+# part that changed goes first. Written the other way round it read "OWN BRIEFS OK: all 5 open
+# job(s) pass the check this service" and the finding was past the cut.
 if stale_briefs:
-    print("OWN BRIEFS OK: all %d open job(s) pass the check this service sells, but %d name the "
-          "old address." % (len(jobs), len(stale_briefs)))
+    print("%d of %d brief(s) name the old address; all %d pass the check this service sells."
+          % (len(stale_briefs), len(jobs), len(jobs)))
 else:
     print("OWN BRIEFS OK: all %d open job(s) pass the check this service sells." % len(jobs))
