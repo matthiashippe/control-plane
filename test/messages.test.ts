@@ -685,10 +685,13 @@ describe("a path that does not exist is not a key problem", () => {
 
   it("puts the explanation in the redirect body, for the client that does not follow it", async () => {
     // The header and the Location are only read by a client that follows the redirect, and the
-    // client that needs this one does not: httpx, which the OpenAI Python SDK is built on, has
-    // follow_redirects off by default. On 2026-09-21 three 308s went to one address and no
-    // request for the target ever arrived, so after two days of trying they had seen nothing but
-    // an empty response. A 3xx may carry a body, and this one has to.
+    // client that needs this one does not. Measured on 2026-09-23: a bare httpx client has
+    // follow_redirects off and sends `python-httpx/0.28.1`, which is what the log recorded for the
+    // address that kept trying. The OpenAI SDK is built on httpx but turns follow_redirects on for
+    // its own client, so it follows and never reads this body; the claim that it does not was
+    // wrong and stood here until it was measured. On 2026-09-21 three 308s went to that one
+    // address and no request for the target ever arrived, so after two days of trying they had
+    // seen nothing but an empty response. A 3xx may carry a body, and this one has to.
     const db = openDb(":memory:");
     const app = createApp({ db });
     const res = await app.request("/v1/auth/api-keys/v1/models");

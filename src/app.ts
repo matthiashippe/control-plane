@@ -1975,9 +1975,17 @@ export function createApp(opts: AppOptions) {
     // The redirect carries a body, which a redirect normally does not. "Every normal client
     // follows it" is what this comment said until 2026-09-22, and the same address disproved it:
     // three 308s went out on 21.09. at 17:59 and not one request for the target ever arrived.
-    // httpx, which the OpenAI Python SDK is built on, has follow_redirects off by default, so the
-    // caller got a bare 308 with nothing in it after two days of trying. A client that follows
-    // never sees this body. A client that stops shows it, and it says what to change.
+    //
+    // Which client that is, measured on 2026-09-23 rather than inferred: a bare httpx client has
+    // follow_redirects off and sends `python-httpx/0.28.1`, which is exactly what the log recorded
+    // for that address. The OpenAI Python SDK is built on httpx but sets follow_redirects to True
+    // on its own client, so it follows this redirect and never sees this body at all. The sentence
+    // that used to stand here got that backwards and would have sent the next reader to improve a
+    // body for a client that never reads it.
+    //
+    // So the body is for the caller who wired up httpx themselves, which is the caller who
+    // actually turned up. A client that follows never sees it; a client that stops shows it, and
+    // it says what to change.
     const joined = c.req.path.match(/^\/v1\/.+?(\/v1\/.+)$/);
     if (joined) {
       const target = joined[1] + (new URL(c.req.url).search || "");
@@ -2011,9 +2019,11 @@ export function createApp(opts: AppOptions) {
     // general "No such endpoint here", which lists every endpoint and names the one thing to
     // change nowhere.
     //
-    // Measured on 2026-09-23 with openai 3.19.0 against production: base_url=https://cp.hippe.eu
-    // answers 404 on /models, base_url=https://cp.hippe.eu/v1 answers 401 on /v1/models, which is
-    // the right answer to a request carrying no key.
+    // Measured on 2026-09-23 with openai 3.19.0 against production, before this block existed:
+    // base_url=https://cp.hippe.eu answered 404 on /models, base_url=https://cp.hippe.eu/v1
+    // answered 401 on /v1/models, which is the right answer to a request carrying no key. After
+    // it, all three shapes reach the 401, because that SDK follows the redirect. The body below
+    // is therefore not for the SDK but for a hand-wired httpx client, which does not follow.
     //
     // No stranger has ever asked for a prefix-less path; the log says so over its whole length.
     // This is not a measured visitor failure like the doubled path above, and it should not be
