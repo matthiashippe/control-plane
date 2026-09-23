@@ -9,7 +9,7 @@
 import { describe, expect, it } from "vitest";
 import { privateKeyToAccount, generatePrivateKey } from "viem/accounts";
 import type { Address, Hex } from "viem";
-import { createApp } from "../src/app.js";
+import { createApp, V1_KEYLESS } from "../src/app.js";
 import { openDb, postLedger, type Db } from "../src/db.js";
 import { hashApiKey } from "../src/auth/siwe.js";
 import { claimStarter, poolLeftMc, GRANT_MC } from "../src/credits/starter.js";
@@ -895,5 +895,80 @@ describe("wrong method, existing path", () => {
     const app = createApp({ db });
     const body = (await (await app.request("/v1/auth/verify", { method: "GET" })).json()) as { message: string };
     expect(body.message).toMatch(/needs no API key/i);
+  });
+});
+
+/**
+ * A method a path does not have is not a key problem, and on a keyless path it never was one.
+ *
+ * Measured against production on 2026-09-23: `POST https://postyourprice.com/v1/status` answered
+ * 401 "Invalid API key" about a path that needs no key at all, and told the caller to go and check
+ * their Authorization header. V1_ROUTES answers "does this path exist" and was read as "does this
+ * path need a key".
+ *
+ * The obvious fix was built on 2026-09-22 and reverted in the same minute, because handing a
+ * mismatched method on to the router turns HEAD on a protected path into a 500. The case below
+ * holds that shut.
+ */
+describe("a method mistake on a keyless path", () => {
+  it("answers 405 and says it is the method, not the key", async () => {
+    const { app } = setup();
+    const res = await app.request("/v1/status", { method: "POST" });
+    expect(res.status).toBe(405);
+    expect(res.headers.get("allow")).toBe("GET, HEAD");
+    const body = (await res.json()) as { error: string; message: string; allow: string[] };
+    expect(body.error).toBe("method_not_allowed");
+    expect(body.message, "it has to name the method as the cause").toMatch(/about the method, not the key/i);
+    expect(body.allow).toEqual(["GET"]);
+  });
+
+  it("leaves the right method alone", async () => {
+    const { app } = setup();
+    expect((await app.request("/v1/status")).status).toBe(200);
+  });
+
+  // HEAD must not become a 405, and this test cannot prove the line that makes sure of it.
+  //
+  // The middleware maps HEAD onto GET before it compares. Removing that mapping leaves every test
+  // here green, measured on 2026-09-23, because `app.request` resolves HEAD through the GET route
+  // before `c.req.method` is read in this harness. Over a real socket the method arrives as HEAD,
+  // `methodsFor("/v1/status")` returns ["GET"] alone, and without the mapping the answer would be
+  // a 405 on a path that has to serve HEAD wherever it serves GET.
+  //
+  // So this asserts the outcome and says openly that it does not distinguish the cause. The proof
+  // is `curl -I https://postyourprice.com/v1/status` after a deploy, and it is in the cycle log.
+  it("does not answer HEAD with a 405, whatever the harness does with it", async () => {
+    const { app } = setup();
+    const res = await app.request("/v1/status", { method: "HEAD" });
+    expect(res.status, "HEAD is served out of the GET route and must not be a 405").not.toBe(405);
+    expect(res.status).toBe(200);
+  });
+
+  // The trap that reverted the first attempt. Hono serves HEAD out of the GET route, and a handler
+  // that runs without the address the middleware sets throws. Mapping HEAD onto GET inside the
+  // middleware keeps it out of the router entirely.
+  it("does not turn HEAD on a protected path into a 500", async () => {
+    const { app } = setup();
+    const res = await app.request("/v1/credits/balance", { method: "HEAD" });
+    expect(res.status, "HEAD without a key is still a 401").toBe(401);
+  });
+
+  it("keeps a protected path at 401 whatever the method, so no method set leaks", async () => {
+    const { app } = setup();
+    for (const method of ["DELETE", "PUT", "PATCH"]) {
+      expect((await app.request("/v1/credits/balance", { method })).status, method).toBe(401);
+    }
+  });
+
+  // The set is hand-kept, so it is held against the app rather than trusted. A path that needs a
+  // key has no business here: listing it would answer 405 to somebody without one and hand them
+  // the method set of a protected path.
+  it("lists only paths that really answer without a key", async () => {
+    const { app } = setup();
+    expect(V1_KEYLESS.size, "the set is empty, so this test checks nothing").toBeGreaterThan(0);
+    for (const path of V1_KEYLESS) {
+      const res = await app.request(path);
+      expect(res.status, `${path} is in V1_KEYLESS but does not answer without a key`).toBe(200);
+    }
   });
 });

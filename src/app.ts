@@ -125,6 +125,21 @@ const INFERENCE_UNAVAILABLE = {
  * The paths under /v1 that really exist. The auth middleware lets everything else through, so that
  * a typo or a badly joined base URL comes back as a 404 instead of a 401.
  */
+// The /v1 paths that answer without a key at all.
+//
+// V1_ROUTES answers "does this path exist" and was being read as "does this path need a key".
+// They are not the same question, and the difference was visible in production on 2026-09-23:
+// `POST /v1/status` answered 401 "Invalid API key" about a path that needs none, and sent the
+// caller to look at their Authorization header instead of at their verb.
+//
+// Kept small and explicit rather than derived, because there is nothing in the router that says
+// "this one is public": the public handlers are registered before the auth middleware, so for the
+// RIGHT method the middleware never runs and there is nothing to read. test/messages.test.ts holds
+// every member of this set against the live app: each one has to answer without a key, or it does
+// not belong here. /v1/auth/nonce, /v1/auth/verify and /v1/briefs/check are keyless too and get
+// their 405 from the two middlewares above, which carry a message about their own path.
+export const V1_KEYLESS = new Set(["/v1/status", "/v1/models"]);
+
 const V1_ROUTES = new Set([
   "/v1/auth/api-keys",
   // Without this line the auth middleware waves the revoke through, `c.get("address")` is
@@ -1314,12 +1329,45 @@ export function createApp(opts: AppOptions) {
     // /v1/status/v1/models with 401 "Invalid API key" too, and the caller spends hours on their key
     // instead of their URL. Observed on 20.09.2026 at 09:26 UTC.
     if (!V1_ROUTES.has(c.req.path)) return next();
-    // Deliberately no method check here, although `POST /v1/status` answering "Invalid API key"
-    // about a path that needs no key is wrong. Handing a mismatched method on to the router turns
-    // HEAD on a protected path into a 500: Hono serves HEAD from the GET route, the handler then
-    // runs without the address this middleware sets, and a stranger gets a stack trace instead of
-    // a 401. Tried on 2026-09-22 and reverted the same minute. The real case that was measured is
-    // POST on a page, which is not on this list and is answered by the notFound handler.
+
+    // A method this path does not have is not a key problem either, and until 2026-09-23 it was
+    // answered as one. Measured against production that day: `POST /v1/status` returns 401
+    // "Invalid API key" about a path that needs no key at all, and tells the caller to go and
+    // check their Authorization header. V1_ROUTES answers "does this path exist" and was being
+    // read as "does this path need a key", which are not the same question.
+    //
+    // The obvious fix was built on 2026-09-22 and reverted in the same minute: handing a
+    // mismatched method on to the router turns HEAD on a protected path into a 500, because Hono
+    // serves HEAD from the GET route and the handler then runs without the address this middleware
+    // sets. test/confidentiality.test.ts caught it.
+    //
+    // So this does not hand anything on. It answers 405 here, and it maps HEAD onto GET first,
+    // which is what Hono does anyway: a HEAD on a path that has a GET stays in this middleware and
+    // gets the same 401 it always got. The allowed set comes from methodsFor, which reads the
+    // routes the app actually registered, so it cannot drift from them the way a second hand-kept
+    // list would. That function has carried the sentence "the auth middleware has to ask the same
+    // question the notFound handler asks" since it was written, with one caller.
+    // Only where no key is needed. On a protected path a 401 is right whatever the method, and
+    // test/messages.test.ts has held that since 20.09.: answering 405 there would tell a caller
+    // without a key which methods a path has. V1_ROUTES says a path exists; V1_KEYLESS says it
+    // needs nothing to use, and separating those two meanings is the whole of this change.
+    const asked = c.req.method === "HEAD" ? "GET" : c.req.method;
+    const allowed = V1_KEYLESS.has(c.req.path) ? methodsFor(c.req.path) : [];
+    if (allowed.length && !allowed.includes(asked)) {
+      c.header("Allow", [...allowed, ...(allowed.includes("GET") ? ["HEAD"] : [])].join(", "));
+      return c.json(
+        {
+          error: "method_not_allowed",
+          message:
+            `${c.req.path} accepts ${allowed.join(" and ")}, not ${c.req.method}. ` +
+            `This is about the method, not the key.`,
+          allow: allowed,
+          docs: DOC.authentication,
+        },
+        405,
+      );
+    }
+
     const address = resolveApiKey(db, c.req.header("authorization"));
     if (!address) throw invalidKeyError();
     c.set("address", address);
