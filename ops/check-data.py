@@ -220,8 +220,21 @@ def main() -> int:
     readme_text = " ".join((DATA / "README.md").read_text().split())
     numbers = line.replace("Last 30 days:", "").strip().split(" USDC, ")
     if len(numbers) != 2:
-        print(f"COULD NOT TELL: article-numbers.py printed no 30-day line: {line[:80]!r}")
-        return 2
+        # A failure, not a shrug, and this is the one distinction that matters in this file.
+        #
+        # The script ran, exited 0 and printed something. That it did not print the line this
+        # check reads is a fact about the script, not about whether anything could be measured,
+        # and the ten other COULD NOT TELL branches here are the other case: a file that is
+        # missing, a VM that did not answer, a script that exited non-zero.
+        #
+        # It was exit 2 until 2026-09-23, and that cost a day. The language pass renamed the line
+        # from "Letzte 30 Tage" to "Last 30 days", this check stopped matching, and ops/check-all.sh
+        # printed NOT DETERMINED for a day of cycles that were looking for exactly this. A check
+        # that fails loudly gets fixed; one that shrugs gets read past.
+        print("WRONG   article-numbers.py ran and printed no line starting with 'Last 30 days'.")
+        print(f"        Its first line was {proc.stdout.splitlines()[0][:70]!r} and this check")
+        print("        reads that line by name, so one of the two has been renamed.")
+        return 1
     # The script says "44 wallets", the README says "44 Wallets": split on the number, not on the
     # word, so this does not break again the next time one side is translated.
     count = numbers[1].strip().split(" ")[0]
