@@ -6,6 +6,7 @@
 # a key. Everything here goes over HTTP against the running service; nothing imports the code.
 #
 #   ops/keyless-walk.sh                 against https://postyourprice.com
+#   ops/keyless-walk.sh --dry           the four steps that cost nothing, for every cycle
 #   CP_URL=http://127.0.0.1:8402 ops/keyless-walk.sh
 #   ops/keyless-walk.sh --selftest      plant a failure at each step and check it is caught
 #
@@ -16,6 +17,17 @@
 # it mints counts as a foreign buyer until somebody says otherwise. The last thing it prints is
 # what to do about both, because a measurement that quietly falsifies the number it is next to is
 # worse than no measurement.
+# --dry stops before the step that spends.
+#
+# The full walk takes a first job out of the starter pool and leaves a handle that has to be
+# claimed in OUR_ADDRESSES, so it cannot run every cycle. Steps 1 to 4 cost nothing and cover
+# everything except the posting itself: the page answers, the button is there, the sentence about
+# what it costs is there, and a form post from a foreign origin is refused. That is the plumbing
+# of the newest path on this service, and it is worth checking on a service that deploys six
+# times a day.
+DRY=0
+[[ "${1:-}" == "--dry" ]] && { DRY=1; shift; }
+
 set -uo pipefail
 
 CP_URL="${CP_URL:-https://postyourprice.com}"
@@ -63,6 +75,17 @@ step "4. a foreign origin is refused"
 code=$(curl -s -m 20 -o /dev/null -w '%{http_code}' -X POST -A "$UA" -H "accept: $BROWSER" \
   -H "origin: https://example.invalid" --data-urlencode "brief=$BRIEF" --data "kind=factual" "$CP_URL/start")
 [[ "$code" == "403" ]] && ok "403" || bad "expected 403, got $code"
+
+if (( DRY )); then
+  echo
+  if [[ $fail -eq 0 ]]; then
+    echo "DRY OK  the page, the button, the sentence and the origin check are in place."
+    echo "        The posting itself is not checked here; it spends. Run without --dry for that."
+  else
+    echo "STOPPED $fail of the four free step(s) failed."
+  fi
+  exit $fail
+fi
 
 step "5. the button posts and a job comes back"
 started=$(curl -s -m 30 -X POST -A "$UA" -H "accept: $BROWSER" -H "origin: $CP_URL" \

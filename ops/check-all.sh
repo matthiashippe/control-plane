@@ -269,6 +269,15 @@ run --undetermined-on 2 "the commands the pages show work" ./ops/check-commands.
 
 # Can somebody who has not read the source get in? Three faults on 2026-09-22 said no, and all
 # three were invisible from in here: every answer involved was correct and none was any use.
+# The other way in, the one for somebody with no wallet at all, in its free half.
+#
+# Built on 2026-09-23 and walked against production once that day. Six deploys followed. The full
+# walk spends a first job out of the pool and leaves a handle to claim, so it cannot run every
+# cycle; the four steps before the posting cost nothing and cover the plumbing: the page answers,
+# the button is there, the sentence about what it costs is there, and a form post from a foreign
+# origin is refused.
+run "the door without a wallet is still open" ./ops/keyless-walk.sh --dry
+
 run "the way in is walkable" ./ops/stranger-client.sh
 
 if (( DEEP )); then
