@@ -86,6 +86,19 @@ posted: list[str] = []
 pending: list[str] = []
 no_occasion: list[str] = []
 wanted = sys.argv[1:]
+# Our own published figures, from the endpoint the drafts point a reader at. Unreachable is not a
+# pass; the checks that need it are skipped by name.
+STATUS = None
+try:
+    _s = subprocess.run(["curl", "-s", "-m", "15", f"https://{CANONICAL_HOST}/v1/status"],
+                        capture_output=True, text=True, timeout=25).stdout
+    STATUS = json.loads(_s) if _s.strip().startswith("{") else None
+except Exception:
+    STATUS = None
+if STATUS is None:
+    print("note: /v1/status was not readable, so our own figures in the drafts are NOT checked.")
+    print()
+
 # What Conway's sign-up does right now, from ops/conway-zustand.sh, which provisions a throwaway
 # wallet and costs nothing. None is not a pass: the checks that need it are skipped out loud.
 CONWAY_FAIL = None
@@ -256,6 +269,31 @@ for draft in drafts:
         report(CONWAY_FAIL in text,
                f"quotes what Conway answers right now ({CONWAY_FAIL})",
                f"the draft does not carry today's failure; ops/conway-zustand.sh got {CONWAY_FAIL}")
+
+    # 8. Our own figures, against the endpoint that serves them.
+    #
+    # #335 quotes a block of /v1/status verbatim, which is the whole point of quoting it: a reader
+    # can call the same path and compare. That only holds while the two agree, and the numbers move
+    # the moment anybody awards anything. A comment is permanent and the endpoint is not.
+    if STATUS and '"market"' in text:
+        for field, value in (
+            ("awarded_30d", STATUS["market"]["awarded_30d"]),
+            ("volume_30d_cents", STATUS["market"]["volume_30d_cents"]),
+            ("commission_30d_cents", STATUS["market"]["commission_30d_cents"]),
+            ("buyers", STATUS["market"]["buyers"]),
+            ("agents", STATUS["market"]["agents"]),
+            ("paying_wallets", STATUS["paying_wallets"]),
+            ("thinking_wallets", STATUS["thinking_wallets"]),
+        ):
+            # The braces only. The first version matched the whole `"awarded_30d": {...}` and then
+            # read every number out of it, so the 30 in the field name counted as a figure and
+            # three checks failed against numbers that were in fact identical.
+            quoted = re.search(rf'"{field}":\s*(\{{[^}}]*\}})', text)
+            live = {int(n) for n in re.findall(r"-?\d+", json.dumps(value))}
+            shown = {int(n) for n in re.findall(r"-?\d+", quoted.group(1))} if quoted else set()
+            report(shown == live,
+                   f"{field} matches the live endpoint ({value['total']}/{value['not_ours']})",
+                   f"the draft shows {sorted(shown) or 'nothing'}, /v1/status serves {sorted(live)}")
 
     pending.append(number)
     print()
