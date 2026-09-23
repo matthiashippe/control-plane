@@ -105,8 +105,15 @@ fi
 
 # A door nobody is told about is not a door. These three are where an agent reads, and all three
 # named the three-call route as the only one until 2026-09-23.
+#
+# The body is captured first and grepped afterwards, which looks like a detour and is not:
+# `curl | grep -q` on a large page makes grep exit at the first match, curl takes SIGPIPE, and
+# `set -o pipefail` turns that into a failed pipeline. The two small files passed and /jobs, the
+# biggest page on the site, reported that it does not name a route it names. Half an hour went
+# into looking for the missing sentence on a page that had it.
 for page in "/bounties.json" "/llms.txt" "/jobs"; do
-  if curl -s -m 15 "$BASE$page" | grep -q "/v1/auth/keyless"; then
+  page_body=$(curl -s -m 15 "$BASE$page")
+  if printf '%s' "$page_body" | grep -q "/v1/auth/keyless"; then
     ok "$page names the one-call route"
   else
     bad "$page does not name /v1/auth/keyless, so an agent reading it still sees only the wall"
