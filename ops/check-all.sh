@@ -52,6 +52,10 @@ fi
 # allowed to shrug is a check that can stop working in silence.
 declare -a PASSED=() FAILED=() UNDETERMINED=()
 
+# Where a failing check's whole output goes, so the summary can repeat it.
+FAILDIR="$(mktemp -d)"
+trap 'rm -rf "$FAILDIR"' EXIT
+
 run() {
   local undetermined=""
   if [[ "$1" == "--undetermined-on" ]]; then undetermined="$2"; shift 2; fi
@@ -69,6 +73,14 @@ run() {
     FAILED+=("$name")
     printf '  FAIL  %-34s exit %s\n' "$name" "$code"
     printf '%s\n' "$out" | tail -4 | sed 's/^/        /'
+    # And the whole of it, kept, because four lines is the wrong four often enough to matter.
+    #
+    # This check failed twice, on 2026-09-22 at 22:25 and on 2026-09-23 at 01:26, and both times
+    # the reason was lost the same way: the four lines here were the summary rather than the
+    # failing line, and whoever read the run piped it through tail and cut off even those. Twice
+    # is a property of the report, not of the reader. The summary at the end repeats what is in
+    # this file, so the reason survives being read from the bottom.
+    printf '%s\n' "$out" > "$FAILDIR/$(printf '%s' "$name" | tr -c 'a-zA-Z0-9' '-').txt"
   fi
   # The caller's exit code, not the printf's. Without this line `run ... && touch stamp` stamps a
   # failed probe as a clean run, because an if/else ends with whatever its last branch returned and
@@ -373,4 +385,18 @@ if (( ${#FAILED[@]} == 0 )); then
 fi
 echo "CHECKS FAILED: ${FAILED[*]}"
 (( ${#UNDETERMINED[@]} )) && echo "NOT DETERMINED: ${UNDETERMINED[*]}"
+# What actually went wrong, at the bottom where a summary is read. A check that prints a line per
+# item says everything in the lines that are not "ok", so those are repeated in full; if there are
+# none, the tail of the output is all there is and it goes instead.
+for f in "$FAILDIR"/*.txt; do
+  [ -e "$f" ] || continue
+  echo
+  echo "  why it failed:"
+  bad=$(grep -vE '^\s*ok\b' "$f" | grep -vE '^\s*$' || true)
+  if [ -n "$bad" ]; then
+    printf '%s\n' "$bad" | sed 's/^/    /'
+  else
+    tail -8 "$f" | sed 's/^/    /'
+  fi
+done
 exit 1
