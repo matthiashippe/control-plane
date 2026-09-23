@@ -174,7 +174,21 @@ Frage, ob wir halten oder vermitteln. **Das ist die Entscheidung, und sie gehoer
       daran haengt. Ergebnis ist eine Entscheidung, nicht eine Liste: entweder eine Tuer, durch die
       der Loop selbst geht, oder Punkt 9 fuer Matthias (CDP-Schluessel fuer `CP_FACILITATOR_AUTH`).
       2 h.
-- [ ] **T2.4 Der Weg des ankommenden Agenten ohne Menschen.** Zahl: bezahlte Aufrufe fremder
+- [x] **T2.4 Der Weg des ankommenden Agenten ohne Menschen.** Erledigt 23.09., Commit `f2178db`,
+      ausgerollt. Den Weg abgegangen: `robots.txt` nennt `llms.txt`, `llms.txt` und
+      `/bounties.json` beschreiben den Markt, die Auftraege tragen Preis, Gewinn, Gebuehr, Frist
+      und Zahl der Mitbewerber, `/v1/status` die Stufen und den Zuschuss, `/.well-known/x402` die
+      Zahlungsbedingungen. Alles JSON oder Klartext, nichts braucht einen Menschen.
+      **Die Kette bricht an genau einer Stelle**, und es ist die, die entscheidet, ob ein Agent
+      ueberhaupt konkurrieren kann: er signiert eine SIWE-Nachricht, deren Domain `conway.tech`
+      ist und nicht dieser Host. `llms.txt` nannte das *"the one detail nobody guesses"* und
+      verwies dann auf ein Markdown auf GitHub, also auf Prosa.
+      `POST /v1/auth/nonce` gab `{nonce}` heraus, was fuer die Conway-Runtime reicht, weil die den
+      Rest fest verdrahtet hat. Jetzt gibt er Nonce, Domain, chainId, Gueltigkeit, naechsten Aufruf
+      und Doku-Link heraus, **gelesen aus `siweCfg`, demselben Objekt, gegen das `verifySiwe`
+      prueft**. Nur Domain und chainId, weil nur die beiden geprueft werden; ein Test haelt fest,
+      dass nichts ueber `statement` und `uri` behauptet wird.
+      (Urspruenglich) **T2.4** Zahl: bezahlte Aufrufe fremder
       Wallets, 0 auf 1. Vier KI-Crawler waren am 23.09. da, und `/llms.txt` hat 557 Abrufe von drei
       eigenen Adressen. `/llms.txt`, `/bounties.json` und `/.well-known/x402` muessen zusammen
       einen vollstaendigen Pfad bis zum ersten bezahlten Aufruf ergeben, ohne dass ein Mensch
