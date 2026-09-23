@@ -48,6 +48,7 @@ import {
 import { mcToCents, getBalanceCents, getBalanceMc, MC_PER_CENT } from "./db.js";
 import { block as ldBlock, dataset, howToFrom, organization, webPage, webSite } from "./public/jsonld.js";
 import { prefersHtml, renderApiPage } from "./public/apipage.js";
+import { siteOrigin, withOrigin } from "./public/site.js";
 import { renderCheck, renderCheckIntro } from "./public/checkpage.js";
 import { DOC } from "./errors.js";
 import { Catalog, handleChat, MARKUP } from "./inference/proxy.js";
@@ -462,16 +463,25 @@ export function createApp(opts: AppOptions) {
     ld: Record<string, unknown>[] = [],
   ): string => {
     const head = (indexHtml ?? "").slice(0, (indexHtml ?? "").indexOf("</head>"));
-    return (
+    // withOrigin at the door, once, rather than per template string. The curl examples on these
+    // pages are the thing a visitor copies, they live in prose across a dozen files, and after a
+    // domain move they would be the last place anybody looked. See src/public/site.ts.
+    return withOrigin(
       head
         .replace(/<title>[^<]*<\/title>/, `<title>${title}</title>`)
         .replace(/(<meta name="description" content=")[^"]*/, `$1${description}`)
-        .replace(/(<link rel="canonical" href="https:\/\/cp\.hippe\.eu)\/"/, `$1${pathname}"`)
+        .replace(/<link rel="canonical" href="https:\/\/[a-z0-9.-]+\//, `<link rel="canonical" href="${siteOrigin()}/`)
+        .replace(/(<link rel="canonical" href="[^"]*?)\/"/, `$1${pathname}"`)
         .replace(/(<meta property="og:title" content=")[^"]*/, `$1${title}`)
         .replace(/(<meta property="og:description" content=")[^"]*/, `$1${description}`)
         .replace(/(<meta name="twitter:title" content=")[^"]*/, `$1${title}`)
         .replace(/(<meta name="twitter:description" content=")[^"]*/, `$1${description}`)
-        .replace(/(<meta property="og:url" content="https:\/\/cp\.hippe\.eu)\/"/, `$1${pathname}"`)
+        .replace(/<meta property="og:url" content="https:\/\/[a-z0-9.-]+\//, `<meta property="og:url" content="${siteOrigin()}/`)
+        .replace(/(<meta property="og:url" content="[^"]*?)\/"/, `$1${pathname}"`)
+        // og:image is an absolute URL too, and a card that points at the old host after a move
+        // is the one broken thing nobody sees, because it only shows when somebody shares a link.
+        .replace(/(<meta property="og:image" content=")https:\/\/[a-z0-9.-]+/, `$1${siteOrigin()}`)
+        .replace(/(<meta name="twitter:image" content=")https:\/\/[a-z0-9.-]+/, `$1${siteOrigin()}`)
         .replace(/og\.png/g, card) +
       ldBlock(organization(), webSite(), webPage(title, description, pathname), ...ld) +
       `</head>
@@ -694,7 +704,7 @@ export function createApp(opts: AppOptions) {
     return c.body(
       '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
         pages
-          .map((p) => `  <url><loc>https://cp.hippe.eu${p}</loc><lastmod>${today}</lastmod></url>`)
+          .map((p) => `  <url><loc>${siteOrigin()}${p}</loc><lastmod>${today}</lastmod></url>`)
           .join("\n") +
         "\n</urlset>\n",
       200,
@@ -725,8 +735,11 @@ export function createApp(opts: AppOptions) {
 
   app.get("/", (c) => {
     if (!indexHtml) return c.json({ ok: true, version: VERSION, note: "no index page built" });
+    // withOrigin here as well: this page is served straight from the file and never goes through
+    // page(), so the rewrite that every other page gets has to be repeated. test/domain-move.test.ts
+    // walks all seven pages for exactly this reason; checking one of them would have passed.
     return c.html(
-      indexHtml
+      withOrigin(indexHtml
         .replace("<!--NUMBERS-->", renderNumbers(mcToCents(GRANT_MC), mcToCents(poolLeftMc(db))))
         .replace("<!--MARKET-->", renderMarket(db))
         .replace("<!--WALLETS-->", renderStatus(db))
@@ -745,6 +758,7 @@ export function createApp(opts: AppOptions) {
             ),
           ) + "</head>",
         ),
+    ),
     );
   });
 

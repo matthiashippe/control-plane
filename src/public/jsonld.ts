@@ -28,15 +28,18 @@
  * renamed on the page renames itself here, and a step deleted disappears here.
  */
 
-const SITE = "https://cp.hippe.eu";
+import { siteOrigin } from "./site.js";
+
+// Read per call, so an operator who sets CP_PUBLIC_URL gets it in the structured data too.
+const SITE = () => siteOrigin();
 
 /** The operator, exactly as the footer and /terms#impressum name them. */
 export function organization(): Record<string, unknown> {
   return {
     "@type": "Organization",
-    "@id": `${SITE}/#operator`,
+    "@id": `${SITE()}/#operator`,
     name: "Handsel",
-    url: SITE,
+    url: SITE(),
     description:
       "A market where a buyer posts a job with a price, several agents each deliver finished work, " +
       "and the buyer pays one of them or none.",
@@ -55,12 +58,12 @@ export function organization(): Record<string, unknown> {
 export function webPage(title: string, description: string, path: string): Record<string, unknown> {
   return {
     "@type": "WebPage",
-    "@id": `${SITE}${path}`,
-    url: `${SITE}${path}`,
+    "@id": `${SITE()}${path}`,
+    url: `${SITE()}${path}`,
     name: title,
     description,
-    isPartOf: { "@id": `${SITE}/#website` },
-    publisher: { "@id": `${SITE}/#operator` },
+    isPartOf: { "@id": `${SITE()}/#website` },
+    publisher: { "@id": `${SITE()}/#operator` },
     inLanguage: "en",
   };
 }
@@ -68,10 +71,10 @@ export function webPage(title: string, description: string, path: string): Recor
 export function webSite(): Record<string, unknown> {
   return {
     "@type": "WebSite",
-    "@id": `${SITE}/#website`,
-    url: SITE,
+    "@id": `${SITE()}/#website`,
+    url: SITE(),
     name: "Handsel",
-    publisher: { "@id": `${SITE}/#operator` },
+    publisher: { "@id": `${SITE()}/#operator` },
     inLanguage: "en",
   };
 }
@@ -101,14 +104,14 @@ export function howToFrom(
   steps.sort((a, b) => a.n - b.n);
   return {
     "@type": "HowTo",
-    "@id": `${SITE}${path}#howto`,
+    "@id": `${SITE()}${path}#howto`,
     name,
     description,
     step: steps.map((s) => ({
       "@type": "HowToStep",
       position: s.n,
       name: s.text,
-      url: `${SITE}${path}`,
+      url: `${SITE()}${path}`,
     })),
   };
 }
@@ -131,16 +134,16 @@ export function dataset(
 ): Record<string, unknown> {
   return {
     "@type": "Dataset",
-    "@id": `${SITE}${path}#dataset`,
+    "@id": `${SITE()}${path}#dataset`,
     name,
     description,
-    url: `${SITE}${path}`,
+    url: `${SITE()}${path}`,
     license: "https://creativecommons.org/publicdomain/zero/1.0/",
-    creator: { "@id": `${SITE}/#operator` },
+    creator: { "@id": `${SITE()}/#operator` },
     isAccessibleForFree: true,
     distribution: distributions.map((d) => ({
       "@type": "DataDownload",
-      contentUrl: `${SITE}${d.url}`,
+      contentUrl: `${SITE()}${d.url}`,
       encodingFormat: d.format,
     })),
   };
