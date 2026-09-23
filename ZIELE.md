@@ -32,8 +32,35 @@ ein Schluesselpaar, eine Ethereum-Signatur und USDC, um einen Auftrag zu stellen
 
 ## Teilziele
 
-<!-- Wird vom Workflow `ziele-zu-teilzielen` gefuellt und von jedem Zyklus fortgeschrieben.
-     Abgearbeitete Zeilen bleiben stehen und werden abgehakt, mit dem, was die Zahl danach sagte. -->
+Abgeleitet am 23.09. vom Workflow `ziele-zu-teilzielen`: 40 Agenten, sechs Winkel, ein Skeptiker
+auf jeden einzelnen Vorschlag. **Von 30 abgeleiteten Teilzielen hat keines den Skeptiker
+ueberstanden, null von dreissig.** Der Plan unten ist deshalb aus den Ablehnungsbegruendungen
+gebaut und nicht aus den Vorlagen: in jeder Begruendung stand der bessere Zug.
+
+### Ziel 26.09. -- der erste fremde Kaeufer
+
+- [ ] **T1.1 "Fremd" an die Geldherkunft binden, bevor der Einstieg billiger wird.** Zahl: keine,
+      und genau deshalb zuerst, denn es verhindert, dass T1.2 die Zielzahl faelscht. Neben
+      `foreign_gmv_30d_mc` kommt `grant_funded_gmv_30d_mc`, und ein Auftrag, dessen Kaeufer bei der
+      Vergabe keine `topup`-Zeile im Ledger hat, zaehlt dort statt in der Zielzahl. Erster Schritt:
+      die Query in `ops/db-report.cjs:269` um `not exists (select 1 from ledger where address =
+      b.creator and kind = 'topup')` ergaenzen, Fall in `test/db-report.test.ts`. 1 h.
+- [ ] **T1.2 Der erste Auftrag einer fremden Adresse laeuft aus dem Topf.** Zahl: `foreign_buyers`
+      0 auf bis zu 4, `grant_funded_gmv_30d` 0 auf bis zu 2 USD, `foreign_gmv_30d` bewusst
+      unberuehrt. 15 Cent tragen keinen Auftrag, den ein Agent ernst nimmt; der Erstauftrag einer
+      Adresse ohne eigenes USDC bekommt 50. Der Preis steht dazu: 215 Cent im Topf sind entweder
+      14 Agenten-Grants oder vier Kaeufer-Erstauftraege, nicht beides. 2 h.
+- [ ] **T1.3 Die neun Antworten rufen zum Auftrag, nicht zum Guthaben.** Die Entwuerfe schicken den
+      Leser heute zu Credits; die Handlung, die die Zielzahl zaehlt, ist der Auftrag. Erster
+      Schritt: `ops/stranger-client.sh` vom Issue-Link bis zum offenen Auftrag durchlaufen und jede
+      Abbruchstelle protokollieren. 1 h, reiner Text.
+- [ ] **T1.4 `/fix` schaerfen**, die einzige Seite ausser der Startseite mit echten Lesern (11
+      Besuche von 10 Adressen). Host auf `postyourprice.com`, heutiger Brettwert aus
+      `openBounties` hineingerendert, Marke `fix-us` auswerten. 0,5 h.
+
+**Wartet auf Matthias:** Punkt 1 (Antworten raus), ohne den T1.1 bis T1.4 bei null bleiben, weil
+sie einen Weg fertig machen und keinen Zulauf erzeugen. Danach Punkt 2 (Caddyfile), danach 20
+Minuten Loop-Arbeit.
 
 ### Ziel 02.10. -- im x402-Verzeichnis stehen
 
@@ -58,6 +85,93 @@ ein Schluesselpaar, eine Ethereum-Signatur und USDC, um einen Auftrag zu stellen
       die Aenderung an `src/payments/**`, auf die dieses Ziel vorher zeigte.
       Erster Schritt danach: Konto anlegen, Schluessel in `.env` auf der VM, und der naechste
       Tagesscan sagt, ob es gewirkt hat.
+
+## Die Position, in einem Satz
+
+Matthias am 23.09.: **"Das Ziel ist ja, dass im Marketplace Waehrung keine Rolle spielt, sondern
+dass man einfach handeln kann."**
+
+Daran gemessen ist die Haelfte schon gebaut und die andere fehlt ganz.
+
+**Gebaut: die Rechnungseinheit ist bereits waehrungsfrei.** Preise stehen in Cent, Salden in
+Millicent, und ein Cent ist hier eine Recheneinheit und keine Waehrung. Ein Auftrag kostet 150,
+der Gewinner bekommt 135, die Provision sind 15. Nichts davon sagt, in was jemand bezahlt hat oder
+bezahlt bekommt. Das ist die richtige Grundlage und sie muss nicht angefasst werden.
+
+**Es fehlen die Schienen.** Herein gibt es heute genau eine: USDC ueber x402 auf Base. Hinaus gibt
+es keine, Credits sind nicht auszahlbar. "Waehrung spielt keine Rolle" heisst: viele Schienen
+herein, und mindestens eine hinaus.
+
+**Und genau dort liegt die Grenze.** Wer viele Schienen herein und eine hinaus hat und dazwischen
+das Geld haelt, ist eine Wechselstube. Heute halten wir: der Preis verlaesst das Guthaben des
+Kaeufers beim Ausschreiben und liegt bei uns, bis vergeben wird. Solange nichts hinausgeht, ist
+das unproblematisch; mit einer Schiene hinaus ist es der Kern des Problems.
+
+**Die Form, die den Satz einloest, ohne Wechselstube zu werden:** wir halten nicht, wir vermitteln.
+Der Kaeufer zahlt, davon geht unsere Provision an uns und der Rest an den Gewinner, auf der
+Schiene, die der Gewinner gewaehlt hat. Das ist die uebliche Marktplatz-Bauform, und es gibt sie
+fertig: Stripe Connect nimmt beim Bezahlen eine Anwendungsgebuehr fuer die Plattform und schreibt
+den Rest dem Verkaeufer gut, samt Identitaetspruefung und Auszahlungswegen. Wer Krypto will, nimmt
+dieselbe Bauform mit einem Krypto-Auszahler, und wer gar nichts will, behaelt Credits und kauft
+davon Inferenz.
+
+Damit ist der Unterschied zwischen den drei Fiat-Formen unten kein Geschmack mehr, sondern die
+Frage, ob wir halten oder vermitteln. **Das ist die Entscheidung, und sie gehoert Matthias.**
+- [ ] **T2.3 Welche Tuer fuehrt in den CDP-Katalog?** Zahl: Zeilen mit unserem Host im Tagesscan,
+      0 auf mindestens 1. Die 94 Dienste mit mindestens 25 Zahlern sind ausnahmslos CDP-Zeilen auf
+      38 Hosts. Fuer diese 38 pruefen, ueber welchen Facilitator sie abrechnen und ob der Eintrag
+      daran haengt. Ergebnis ist eine Entscheidung, nicht eine Liste: entweder eine Tuer, durch die
+      der Loop selbst geht, oder Punkt 9 fuer Matthias (CDP-Schluessel fuer `CP_FACILITATOR_AUTH`).
+      2 h.
+- [ ] **T2.4 Der Weg des ankommenden Agenten ohne Menschen.** Zahl: bezahlte Aufrufe fremder
+      Wallets, 0 auf 1. Vier KI-Crawler waren am 23.09. da, und `/llms.txt` hat 557 Abrufe von drei
+      eigenen Adressen. `/llms.txt`, `/bounties.json` und `/.well-known/x402` muessen zusammen
+      einen vollstaendigen Pfad bis zum ersten bezahlten Aufruf ergeben, ohne dass ein Mensch
+      dazwischentritt. 1,5 h.
+
+### Ziel 29.10. -- 5.000 USDC fremdes Volumen
+
+- [ ] **T3.1 `1c89045` ausrollen.** Die einzige Zeile auf der Angebotsseite, die nichts kostet.
+      Am 23.09. dreimal abgelehnt (Registry), danach einmal an einer falschen Vorpruefung. 0,5 h.
+- [ ] **T3.2 Aus Punkt 4 eine Entscheidung machen statt einer Besorgung.** Eine halbe Seite mit
+      den drei Fragen, die das Stripe-Konto wirklich blockieren: Rechtsform, weil der Dienst privat
+      ohne Gewerbe laeuft und 10 Prozent Provision auf fremdes Volumen gewerblich sind;
+      Steuerstatus samt Kleinunternehmerregelung; und wer Vertragspartner des Kaeufers ist, wenn
+      ein Agent liefert. Je Frage **eine** Antwortoption, nicht drei. 1 h.
+- [ ] **T3.3 Den Kartenweg bis an die gesperrte Grenze bauen, hinter `CP_CHECKOUT`.** Alles
+      ausserhalb von `src/payments/**` und `src/auth/**`: Betrag reservieren, Vergabe und Provision
+      buchen, Storno, Rechnung, gegen einen Fake-Provider getestet. Dabei faellt eine Frage an, die
+      heute in keiner Liste steht: `createApiKey` verlangt eine Session, die nur `verifySiwe`
+      schreibt, ein Kaeufer ohne Wallet braucht also eine Identitaet ohne SIWE, und die liegt im
+      gesperrten Pfad. Erster Schritt ist genau diese Ergaenzung zu Punkt 4. 4 h, erst nach T3.2.
+
+### Ziel 31.12. -- 250.000 USDC im Monat
+
+- [ ] **T4.2 Den Tagesscan als Ware behandeln, nicht als Seite.** Wir haben genau ein Gut, das
+      sonst niemand hat: den taeglichen Abzug beider x402-Verzeichnisse mit Nachfragezahlen. Als
+      Zeile in einer Issue-Antwort ("dein Dienst, eine zahlende Wallet, zwei Aufrufe in 30 Tagen")
+      trifft er einen Leser; als neue Seite haette er keinen, weil ausser der Startseite und
+      `/fix` jede Seite dieses Dienstes null Browser-Besuche hat. 2 h, ausdruecklich nicht vor dem
+      02.10.
+
+## Geht das aus? Vier ehrliche Zeilen
+
+**26.09.: nein, nicht durch den Loop.** Fuenf fremde Einzahler in 72 Stunden sind elf Prozent aller
+44 Wallets, die der gemessene Conway-Markt insgesamt hat. T1.1 bis T1.4 machen den Weg fertig und
+senken den Einstieg, sie erzeugen keinen Zulauf. Es haengt an Punkt 1.
+
+**02.10.: zur Haelfte.** Eine Zeile im Tagesscan ist erreichbar und haengt an Punkt 8 oder an dem,
+was T2.3 findet. Die zweite Haelfte faellt: 1.000 bezahlte Aufrufe von 25 fremden Wallets schaffen
+13 bis 14 von rund 15.700 gelisteten Diensten in dreissig Tagen, und wir haetten neun.
+**Der Termin gehoert gestrichen, die Richtung bleibt.**
+
+**29.10.: nein, solange Punkt 4 offen ist.** 5.000 USDC sind bei 120 USDC je Auftrag rund 42 fremde
+Kaeufer in 36 Tagen, ausgehend von null, und die Identitaetsfrage aus T3.3 liegt im gesperrten
+Pfad. Jede Hochrechnung darueber ist Arithmetik ueber der leeren Menge, solange `foreign_gmv_30d`
+nicht ein einziges Mal groesser als null war.
+
+**31.12.: nein, und nicht knapp.** Erreichbar bleibt der zweite Teil, Platz zehn bei x402 bei grob
+51.000 Aufrufen im Monat, und der haengt vollstaendig am Katalogeintrag vom 02.10.
 
 ## Fiat, und wo die Grenze liegt
 

@@ -49,11 +49,21 @@ Vermutung.
   wichtig und sie ist nie dringend, und sie hat am 23.09. vierzehn Zyklen lang die Arbeit an den
   Zielen verdrängt, weil sie in dieser Aufzählung an zweiter Stelle stand.
 
+**Was "ein Fehler, den ein echter Nutzer gesehen hat" heißt, und zwar prüfbar.** Am 23.09. hat
+jeder der vierzehn Zyklen seine Reparatur mit dieser Regel gerechtfertigt, und keine davon war
+einer: gemeint ist **ein 4xx oder 5xx im Zugriffslog, zu dem eine Adresse steht, die nicht in
+`ops/own-ips.txt` steht.** Nur das geht vor. Alles andere, was beim Hinsehen auffällt, bekommt eine
+Zeile im Backlog und wird in diesem Zyklus nicht angefasst, auch wenn es in zehn Minuten zu
+beheben wäre.
+
 **Woran du erkennst, dass du wieder abgedriftet bist.** Schreib vor dem Bauen einen Satz: welche
 Zahl aus der Tabelle in `ZIELE.md` bewegt sich dadurch, und um wieviel. Geht der Satz nicht, ohne
-über den Dienst statt über den Markt zu reden, dann ist es Reparatur. Reparatur ist erlaubt, wenn
-sie aus der ersten Regel kommt, also aus einem Fehler, den jemand gesehen hat. Sonst wandert sie
-in den Backlog und der Zyklus nimmt das Teilziel.
+über den Dienst statt über den Markt zu reden, dann ist es Reparatur.
+
+**Wenn kein Teilziel offen ist, das ohne Matthias geht**, endet der Zyklus mit dem Satz, welches
+Teilziel auf welche Sperre wartet, und leitet mit `ziele-zu-teilzielen` neue ab. Der Backlog ist
+erst dann die Arbeit eines Zyklus, wenn `ZIELE.md` keine offene Zeile mehr hat **und** der
+Ableitungs-Workflow gelaufen ist.
 
 **3. Bauen.** Klein genug, dass es in einen Zyklus passt. Lieber eine Sache fertig als drei halb.
 Eigenständiges und Rechenintensives geht an den code-host (`job start control-plane --model opus
