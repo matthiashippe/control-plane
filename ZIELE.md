@@ -202,7 +202,18 @@ Frage, ob wir halten oder vermitteln. **Das ist die Entscheidung, und sie gehoer
       answer this service has averaged so far."*
       (alter Text) Die einzige Zeile auf der Angebotsseite, die nichts kostet.
       Am 23.09. dreimal abgelehnt (Registry), danach einmal an einer falschen Vorpruefung. 0,5 h.
-- [ ] **T3.2 Aus Punkt 4 eine Entscheidung machen statt einer Besorgung.** Eine halbe Seite mit
+- [x] **T3.2 Aus Punkt 4 eine Entscheidung machen statt einer Besorgung.** Erledigt 23.09.
+      Steht in `.scratch/gtm/stripe-entscheidung.md` und nicht hier, weil es Matthias'
+      Geschaeftsangelegenheiten sind und dieses Repo oeffentlich ist. Drei Fragen, je **eine**
+      Antwort, plus die vierte, die in keiner Liste stand. Kurzform: Rechtsform, weil zehn Prozent
+      Provision auf fremdes Volumen eine gewerbliche Taetigkeit sind, sobald der erste fremde
+      Kaeufer vergibt; Umsatzsteuer, wo die Grenzbetraege ausdruecklich als **zu pruefen** und
+      nicht als Tatsache stehen; und wer Vertragspartner des Kaeufers ist, wenn ein Agent liefert,
+      was zugleich entscheidet, ob Stripe uns als Marktplatz oder als Verkaeufer fuehrt. Die
+      vierte: **ein Kaeufer mit Karte hat keine Wallet und kann keine SIWE-Nachricht signieren,
+      hat also heute keinen Weg zu einem Schluessel.** Ein Konto ohne Identitaetsweg oeffnet
+      nichts. Am Ende eine Tabelle, was ein Ja je Frage binnen eines Zyklus ausloest.
+      (Urspruenglich) **T3.2** Eine halbe Seite mit
       den drei Fragen, die das Stripe-Konto wirklich blockieren: Rechtsform, weil der Dienst privat
       ohne Gewerbe laeuft und 10 Prozent Provision auf fremdes Volumen gewerblich sind;
       Steuerstatus samt Kleinunternehmerregelung; und wer Vertragspartner des Kaeufers ist, wenn
@@ -299,6 +310,9 @@ Sieben Saetze, und alles andere laeuft. Stand 23.09., nichts davon darf der Loop
    `/check` ein Textfeld, und die Adresszeile speichert keine Entwuerfe mehr.
 3. **"Name weg"** -- `handsel.dev` ist ein laufender Wettbewerber mit fast gleicher Beschreibung.
 4. **Stripe-Konto** -- damit ein Kaeufer ohne Wallet zahlen kann. Bedingung fuer jedes Umsatzziel.
+   **Es ist keine Besorgung, sondern drei Entscheidungen plus eine Sperre**, aufgeschrieben in
+   `.scratch/gtm/stripe-entscheidung.md`: Rechtsform, Umsatzsteuer, Vertragspartner, und der
+   gesperrte Pfad fuer eine Identitaet ohne Ethereum-Signatur.
 5. **Search Console und Bing** -- sein Login, den DNS-Eintrag setzt der Loop selbst.
 6. **Eine Zahl fuer Anzeigen** -- Empfehlung: 20 Euro am Tag fuer zwei Wochen.
 7. **Tailscale neu anmelden** -- der code-host nimmt sonst keine Auftraege.
