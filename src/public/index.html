@@ -671,6 +671,21 @@ h1.ph { font-size: clamp(1.5rem, 3.2vw, 2.1rem); line-height: 1.15; letter-spaci
      smaller price. */
   .claims a { white-space: normal; }
 }
+
+/* The four figures on /jobs, two across instead of four down.
+   Measured at 390x844 on 2026-09-23: repeat(auto-fit, minmax(13rem, 1fr)) is 208 px per column
+   and leaves about 342 px of usable width, so it gives one column and four rows. Those rows ran
+   from 414 to 844 and filled half the first screen, and the first actual job started at 883 px,
+   39 px below the fold. The page that exists to show the work showed only figures about the work.
+
+   At the end of the sheet on purpose. The phone block at the top of this file is overridden by
+   the .stats rule 400 lines below it, which is the same cascade mistake that cost two attempts
+   on 2026-09-22. */
+@media (max-width: 30rem) {
+  .stats { grid-template-columns: repeat(2, 1fr); }
+  .stats div { padding: 1.1rem .9rem; }
+  .stats .l { font-size: .8rem; }
+}
 </style>
 </head>
 <body>
