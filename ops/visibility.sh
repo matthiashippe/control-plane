@@ -29,7 +29,7 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
-BASE="${CP_URL:-https://cp.hippe.eu}"
+BASE="${CP_URL:-https://postyourprice.com}"
 KEY="${CP_SSH_KEY:-$HOME/.ssh/id_ed25519_automaton}"
 HOST="${CP_HOST:-root@76.13.144.207}"
 

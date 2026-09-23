@@ -15,7 +15,7 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
-BASE="${CP_URL:-https://cp.hippe.eu}"
+BASE="${CP_URL:-https://postyourprice.com}"
 DEEP=0
 [[ "${1:-}" == "--deep" ]] && DEEP=1
 
@@ -267,7 +267,10 @@ age_of_the_proof() {
     return
   fi
   local proven_at commit age commits_since seconds
-  read -r proven_at commit < "$STAMPS/$stamp"
+  # Third field optional: stamps written before 2026-09-23 have no address, and a run that cannot
+  # say which host it walked is worth saying so about rather than silently reading as the current
+  # one.
+  read -r proven_at commit against < "$STAMPS/$stamp"
   # Milliseconds are stripped before parsing. ops/newcomer-probe.ts writes its stamp with
   # `new Date().toISOString()`, which ends in `.536Z`, and the format below does not take that. The
   # parse fell through to `echo 0` and the line read "cold start last proven 497256h ago", an age
@@ -282,10 +285,17 @@ age_of_the_proof() {
   fi
   age=$(( ($(date -u +%s) - seconds) / 3600 ))
   commits_since=$(git log --oneline "$commit..HEAD" 2>/dev/null | wc -l | tr -d ' ')
-  echo "$label last proven ${age}h ago at ${commit}, ${commits_since:-?} commit(s) ago ($how)"
+  # Which host it was proven against, when the stamp says. A cold start walks ONE service, and
+  # since 2026-09-23 there are two names; "proven 0h ago" about the other one is worse than no
+  # line at all.
+  where=""
+  if [[ -n "${against:-}" ]]; then
+    [[ "$against" == "$BASE" ]] && where=" against $against" || where=" against $against, NOT $BASE"
+  fi
+  echo "$label last proven ${age}h ago at ${commit}, ${commits_since:-?} commit(s) ago${where} ($how)"
 }
-age_of_the_proof kaltstart "cold start" "ops/newcomer-probe.ts, costs a grant"
-age_of_the_proof sicherung "backup restore" "ops/backup-probe.sh, costs nothing"
+age_of_the_proof cold-start "cold start" "ops/newcomer-probe.ts, costs a grant"
+age_of_the_proof backup-restore "backup restore" "ops/backup-probe.sh, costs nothing"
 
 echo
 # The one number the plan hangs on, printed last so it is the thing left on the screen.

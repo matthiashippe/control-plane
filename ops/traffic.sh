@@ -19,7 +19,7 @@ ONLY_FUNNEL=0
 [[ "${1:-}" == "--funnel" ]] && { ONLY_FUNNEL=1; shift; }
 
 HOURS="${1:-24}"
-BASE_URL="${CP_URL:-https://cp.hippe.eu}"
+BASE_URL="${CP_URL:-https://postyourprice.com}"
 # Every name this service answers to. The referrer tests below decide whether a request came from
 # one of our own pages, and until 2026-09-23 they compared against the literal string cp.hippe.eu.
 # The day postyourprice.com went live, every visitor arriving through it was filed as "never ran

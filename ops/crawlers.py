@@ -41,7 +41,7 @@ def sitemap_pages():
     quietly checking a shorter list, because "nothing missing" from a truncated list is a lie.
     """
     try:
-        base = os.environ.get("CP_URL", "https://cp.hippe.eu").rstrip("/")
+        base = os.environ.get("CP_URL", "https://postyourprice.com").rstrip("/")
         req = urllib.request.Request(base + "/sitemap.xml",
                                      headers={"User-Agent": "control-plane-check/1.0 (+https://cp.hippe.eu)"})
         with urllib.request.urlopen(req, timeout=15) as r:

@@ -25,7 +25,7 @@ import type { Hex } from "viem";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { createSiweMessage } from "viem/siwe";
 
-const BASE = (process.env.CP_URL || "https://cp.hippe.eu").replace(/\/$/, "");
+const BASE = (process.env.CP_URL || "https://postyourprice.com").replace(/\/$/, "");
 const DOMAIN = process.env.CP_SIWE_DOMAIN || "conway.tech";
 let failures = 0;
 

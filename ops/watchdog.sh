@@ -10,7 +10,7 @@
 # Otherwise the message goes blunt and gets ignored when it counts.
 set -uo pipefail
 
-URL="${CP_URL:-https://cp.hippe.eu}"
+URL="${CP_URL:-https://postyourprice.com}"
 STATE_FILE="${CP_WATCHDOG_STATE:-/var/lib/cp-watchdog.state}"
 WEBHOOK="${CP_ALERT_WEBHOOK:-}"
 CERT_WARN_DAYS="${CP_CERT_WARN_DAYS:-20}"

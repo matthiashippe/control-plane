@@ -22,7 +22,7 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
-BASE="${CP_URL:-https://cp.hippe.eu}"
+BASE="${CP_URL:-https://postyourprice.com}"
 
 python3 - "$BASE" <<'PY'
 import html as htmlmod

@@ -27,7 +27,7 @@ import { createSiweMessage } from "viem/siwe";
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { execSync } from "node:child_process";
 
-const BASE = (process.env.CP_URL || "https://cp.hippe.eu").replace(/\/$/, "");
+const BASE = (process.env.CP_URL || "https://postyourprice.com").replace(/\/$/, "");
 const DOMAIN = process.env.CP_SIWE_DOMAIN || "conway.tech";
 let step = 0;
 let failures = 0;
@@ -156,7 +156,14 @@ async function main(): Promise<number> {
     // deploys old, and in that time exactly the endpoints this walks had changed.
     try {
       mkdirSync(".scratch/probes", { recursive: true });
-      writeFileSync(".scratch/probes/kaltstart", `${new Date().toISOString()} ${execSync("git rev-parse --short HEAD").toString().trim()}\n`);
+      // The address goes in the stamp. A cold start proves the sequence against ONE host, and on
+      // 2026-09-23 there are two: a run against cp.hippe.eu says nothing about whether the same
+      // twelve steps work under postyourprice.com, and the stamp used to record only when and at
+      // which commit, so the report could say "proven 0h ago" about the wrong service.
+      writeFileSync(
+        ".scratch/probes/cold-start",
+        `${new Date().toISOString()} ${execSync("git rev-parse --short HEAD").toString().trim()} ${BASE}\n`,
+      );
     } catch {
       // A stamp that cannot be written is not a reason to call a green run red.
     }

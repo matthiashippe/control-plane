@@ -15,7 +15,7 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
-BASE="${CP_URL:-https://cp.hippe.eu}"
+BASE="${CP_URL:-https://postyourprice.com}"
 DOC="docs/journeys.md"
 failures=0
 

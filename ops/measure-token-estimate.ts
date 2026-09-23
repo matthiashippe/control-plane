@@ -20,7 +20,7 @@ import { readFileSync } from "node:fs";
 import { estimateTokens } from "../src/inference/provider.js";
 import type { ChatMessage, ToolDef } from "../src/inference/provider.js";
 
-const BASE = (process.env.CP_URL || "https://cp.hippe.eu").replace(/\/$/, "");
+const BASE = (process.env.CP_URL || "https://postyourprice.com").replace(/\/$/, "");
 const MODEL = process.env.CP_MODEL || "gpt-5-mini";
 
 function arg(name: string): string {

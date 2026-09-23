@@ -17,7 +17,7 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
-BASE="${CP_URL:-https://cp.hippe.eu}"
+BASE="${CP_URL:-https://postyourprice.com}"
 SKILL="skills/cp-bounties/SKILL.md"
 failures=0
 ok()  { echo "OK      $1"; }

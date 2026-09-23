@@ -86,4 +86,4 @@ REMOTE
 # rather than read off. ops/check-all.sh prints how old this is and how many commits have landed.
 mkdir -p "${CP_PROBE_STAMPS:-.scratch/probes}"
 printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$(git rev-parse --short HEAD)" \
-  > "${CP_PROBE_STAMPS:-.scratch/probes}/sicherung"
+  > "${CP_PROBE_STAMPS:-.scratch/probes}/backup-restore"

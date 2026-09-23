@@ -19,7 +19,7 @@
 #
 #   ops/stranger-client.sh [base]
 set -uo pipefail
-BASE="${1:-${CP_URL:-https://cp.hippe.eu}}"
+BASE="${1:-${CP_URL:-https://postyourprice.com}}"
 failures=0
 ok()  { echo "  ok      $1"; }
 bad() { failures=$((failures+1)); echo "  FAILED  $1"; [[ -n "${2:-}" ]] && echo "          ${2:0:160}"; }

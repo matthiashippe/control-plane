@@ -23,7 +23,7 @@ import { privateKeyToAccount } from "viem/accounts";
 import { createSiweMessage } from "viem/siwe";
 import type { Hex } from "viem";
 
-const BASE = (process.env.CP_URL || "https://cp.hippe.eu").replace(/\/$/, "");
+const BASE = (process.env.CP_URL || "https://postyourprice.com").replace(/\/$/, "");
 const DOMAIN = process.env.CP_SIWE_DOMAIN || "conway.tech";
 
 function arg(name: string, fallback?: string): string {

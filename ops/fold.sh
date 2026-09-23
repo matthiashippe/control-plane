@@ -28,7 +28,7 @@
 # The iframe is not decoration. headless Chrome reports innerWidth 500 for any --window-size below
 # 500, so a phone width can only be had inside a frame. See ops/phone.sh, which found that.
 set -uo pipefail
-BASE="${CP_URL:-https://cp.hippe.eu}"
+BASE="${CP_URL:-https://postyourprice.com}"
 CHROME="${CHROME_BIN:-/Applications/Google Chrome.app/Contents/MacOS/Google Chrome}"
 W="${1:-390}"
 H="${2:-844}"

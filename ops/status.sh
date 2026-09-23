@@ -4,7 +4,7 @@
 set -uo pipefail
 HOST="${CP_DEPLOY_HOST:-root@76.13.144.207}"
 KEY="${CP_DEPLOY_KEY:-$HOME/.ssh/id_ed25519_automaton}"
-CP_URL="${CP_URL:-https://cp.hippe.eu}"
+CP_URL="${CP_URL:-https://postyourprice.com}"
 HOSTNAME_ONLY="${CP_URL#https://}"
 DIR="$(cd "$(dirname "$0")" && pwd)"
 SSH=(ssh -i "$KEY" -o BatchMode=yes -o ConnectTimeout=10 "$HOST")

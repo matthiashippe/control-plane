@@ -14,7 +14,7 @@
 # and it answers in 64 ms. There is no key, no account and no charge, which is the same thing a
 # visitor gets.
 set -uo pipefail
-BASE="${CP_URL:-https://cp.hippe.eu}"
+BASE="${CP_URL:-https://postyourprice.com}"
 DIR="$(cd "$(dirname "$0")" && pwd)"
 
 if [ "${1:-}" = "--selftest" ]; then
