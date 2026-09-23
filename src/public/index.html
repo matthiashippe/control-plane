@@ -376,6 +376,11 @@ h1 { font-size: var(--t-h1); margin-block: var(--s-6) 0; max-width: 20ch; }
    the delivery wires were still drawing. The section that replaces it costs nothing to render and
    shows the one call this service answers without a key, with the three findings it really
    returned on 2026-09-22 for the brief in the panel. */
+/* The box that moved here from /check on 2026-09-23. It sits inside .demo, under the findings the
+   curl example produces, so it needs a top margin and a textarea that is not full height: the
+   point is that it looks like something to type in, not like a form to fill out. */
+.pastebox { margin-top: 1rem; }
+.pastebox textarea { width: 100%; min-height: 5.5rem; }
 .demo { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-pan);
         padding: var(--s-6); margin-top: var(--s-8); display: grid; gap: var(--s-4);
         align-content: start; }
