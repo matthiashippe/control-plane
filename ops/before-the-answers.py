@@ -86,6 +86,22 @@ posted: list[str] = []
 pending: list[str] = []
 no_occasion: list[str] = []
 wanted = sys.argv[1:]
+# What Conway's sign-up does right now, from ops/conway-zustand.sh, which provisions a throwaway
+# wallet and costs nothing. None is not a pass: the checks that need it are skipped out loud.
+CONWAY_FAIL = None
+try:
+    _z = subprocess.run([str(pathlib.Path(__file__).parent / "conway-zustand.sh")],
+                        capture_output=True, text=True, timeout=120)
+    _m = re.search(r"verify: (\d{3} \{[^}]*\})", _z.stdout)
+    CONWAY_FAIL = _m.group(1) if _m else None
+except Exception:
+    CONWAY_FAIL = None
+if CONWAY_FAIL is None:
+    print("note: Conway's sign-up was not measurable, so what the drafts say about it is NOT checked.")
+    print()
+else:
+    print(f"  Conway verify right now:  {CONWAY_FAIL}")
+
 # The newest line of the on-chain scan, read off the VM. Absent is not a failure: this file has to
 # work on a machine with no key to the server, and the checks that need it are skipped by name
 # rather than passing quietly.
@@ -225,6 +241,21 @@ for draft in drafts:
                f"the 30-day tier distribution matches today's scan ({tiers})",
                "that distribution is the argument of the whole comment; a stale one is a wrong "
                "claim in a permanent place")
+
+    # 7. What we say Conway's sign-up does, against what it does right now.
+    #
+    # Three drafts tell people their client is fine because the server does not complete. That is a
+    # statement about somebody else's service in a permanent comment, and on 2026-09-23 it was
+    # already drifting: the drafts described the 401 `Invalid or expired nonce` the reporters saw,
+    # and a fresh provisioning attempt that day got `500 {"error":"Database error"}`. Same endpoint,
+    # same outcome for the user, different surface, and we would have posted the old one to three
+    # threads that people reach by searching for the exact wording.
+    #
+    # If Conway ever starts working, this is the check that stops all three.
+    if CONWAY_FAIL is not None and re.search(r"Database error|Invalid or expired nonce", text):
+        report(CONWAY_FAIL in text,
+               f"quotes what Conway answers right now ({CONWAY_FAIL})",
+               f"the draft does not carry today's failure; ops/conway-zustand.sh got {CONWAY_FAIL}")
 
     pending.append(number)
     print()
