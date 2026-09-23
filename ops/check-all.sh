@@ -259,6 +259,19 @@ run "the directory search would see a listing" ./ops/own-x402-listing.sh --selft
 # is built against. Undetermined on 2, because an unreachable VM is not a finding.
 run --undetermined-on 2 "the traffic tools can still see their history" ./ops/access-log.sh --span
 
+# The denominator every other traffic number is read against.
+#
+# The derivation round of 2026-09-23 measured it and it is far smaller than anybody had assumed:
+# of 229 foreign addresses over four days, 75 are provably machines in a data centre, and of the
+# seven that spent more than five seconds on a page, five are ClaudeBot and cloud addresses. One
+# human reader is proven in 96 hours. Four of eleven proposals that round miscounted against this,
+# two of them all the way to "the offer is wrong".
+#
+# Printed every cycle rather than measured when somebody remembers, because a cycle that reads a
+# depth figure without this number next to it will draw the same conclusion again.
+printf '\n-- who is even out there --\n'
+CP_OWN_IPS_RESOLVED="$(own_ips 2>/dev/null)" ./ops/access-log.sh 2>/dev/null | python3 ./ops/fetchers.py --summary || true
+
 run --undetermined-on 2 "search engines can find us" ./ops/visibility.sh
 
 # Every command a page shows, run against the live service. The unit tests prove a page agrees

@@ -95,6 +95,74 @@ gebaut und nicht aus den Vorlagen: in jeder Begruendung stand der bessere Zug.
 sie einen Weg fertig machen und keinen Zulauf erzeugen. Danach Punkt 2 (Caddyfile), danach 20
 Minuten Loop-Arbeit.
 
+### Ableitungsrunde 23.09. abends: null von elf
+
+Elf Vorschlaege, elf Ablehnungen, keiner hat den Skeptiker ueberstanden, wie mittags. Der bessere
+Zug steht wieder in den Begruendungen.
+
+**Die Zahl, die die Runde nebenbei gemessen hat, setzt die Groessenordnung von allem anderen.**
+Ueber 96 Stunden Log: 229 fremde Adressen, 51 haben das Seitenskript ausgefuehrt, 30 die letzte
+Tiefenmarke geholt. Von 45 Adressen mit mindestens zwei Marken haben sieben eine Spanne ueber
+fuenf Sekunden, und fuenf davon sind ClaudeBot und Cloud-Adressen. Zwei weitere schicken einen
+`Referer` auf unsere eigene Domain zusammen mit `Sec-Fetch-Site: none` und widersprechen sich
+damit selbst. **Uebrig bleibt ein einziger belegter menschlicher Leser in vier Tagen**, der aus
+Issue #392. Auf `/check` ist es keiner: die fuenf Adressen dort sind vier Abrufer und ClaudeBot.
+Jede Quote rechnet ab jetzt gegen diesen Nenner.
+
+- [x] **T1.5 Den Nenner lesbar machen.** Erledigt 23.09. abends. `ops/fetchers.py` entscheidet
+      ueber Reverse DNS, welche Adresse eine Maschine im Rechenzentrum ist, und nicht ueber eine
+      gepflegte Liste von Adressbereichen: jeder der sechs Anbieter schreibt seinen Namen in den
+      PTR-Eintrag, das ist dieselbe Runde, mit der `ops/crawlers.py` einen echten Googlebot von
+      einem behaupteten trennt, und es ist an dem Tag richtig, an dem ein Anbieter einen Bereich
+      dazunimmt. **Gemessen: von 234 fremden Adressen sind 76 nachweislich Maschinen** (AWS 38,
+      GCP 28, Hetzner 7, OVH 2, Linode 1), 158 sind so nicht entscheidbar.
+      `check-all.sh` druckt den Block jetzt jeden Zyklus, weil ein Zyklus, der eine Tiefenzahl
+      ohne diesen Nenner liest, denselben Schluss noch einmal zieht. Was es ausdruecklich nicht
+      tut: sagen, wer ein Mensch ist. Es raeumt die Haelfte weg, die sicher ist.
+      Gegenprobe in beide Richtungen: zwei bekannte Maschinen aus dem eigenen Log und die
+      Schweizer Leitung aus Issue #392, die nicht als Maschine gelten darf.
+      `google.com` steht bewusst nicht auf der Liste, das haette Googlebot verschluckt.
+
+- [ ] **T1.6 Das Formular dorthin, wo die Leser sind.** Zahl: getippte fremde Laeufe, 0 auf 1.
+      Das Leck liegt bei 171 zu 5, nicht bei 5 zu 0: `/` verlinkt `/check` dreimal ohne
+      `src`-Marke, `/fix` kein einziges Mal. Erster Schritt: dieselbe GET-Form aus
+      `src/public/checkpage.ts` auch auf `/` und in Schritt 3 von `/fix`, Ziel unveraendert
+      `GET /check`, hidden `via=form`, dazu `src=home` beziehungsweise `src=fix`.
+      `ops/first-typing.sh` braucht dafuer keine Zeile. Die CSP traegt es, gegen Produktion
+      geprueft. Zwei Kommentare in `src/app.ts` behaupten noch `form-action 'none'` und gehoeren
+      in denselben Commit, sonst haelt der naechste Zyklus den Weg wieder fuer gesperrt. 1 h.
+      **Widerlegung, und die zwei Faelle nicht verwechseln:** erreichen mindestens zehn bereinigte
+      Adressen den ersten Bildschirm und feuert `src=home` trotzdem nie mit `via=form`, ist das
+      Angebot das Hindernis und nicht der Weg. Bleiben die bereinigten Adressen unter zehn, hat
+      die Woche nichts ueber das Angebot gemessen. Nach dem Nenner oben ist der zweite Fall der
+      wahrscheinliche, und deshalb kostet das eine Stunde und nicht drei.
+
+- [ ] **T1.7 Dieselbe schluessellose Tuer fuer die Angebotsseite.** Zahl: fremde POSTs auf
+      `/v1/submissions`, in 96 Stunden 0, Ziel mindestens 1. Das ist die Agentenhaelfte des Ziels
+      zum 26.09. ("bei einem Auftrag gehoert weder Kaeufer noch Gewinner uns").
+      **Hier hat die Runde mich korrigiert.** Zwei Zyklen vorher hatte ich genau das verworfen mit
+      dem Argument, wer von einem Conway-Issue komme, habe eine Runtime, und die mache SIWE
+      selbst. Der Text von `/bounties.json` sagt es dem Leser anders: *"Competing needs an API
+      key, and getting one needs three calls and an Ethereum signature"*. In 96 Stunden hat genau
+      ein fremder Client diese Strecke geschafft, und das war eine hartcodierte Conway-Runtime,
+      kein zugelaufener Agent. Fuer alles andere, das `/bounties.json` liest, steht die Wand noch.
+      Erster Schritt: `POST /v1/auth/keyless` ruft `mintKeylessIdentity(db, "agent")`, Pfad in
+      `OPEN_PATHS` und `V1_ROUTES`. Kein gesperrter Pfad. Zwei Dinge muessen in denselben Commit,
+      sonst ist es ein Eigentor: eine Obergrenze je Quelle analog `POOL_DAILY_MC`, weil die
+      Ein-Versuch-Regel am Handle haengt und N freie Handles N Einsendungen auf einem Auftrag
+      waeren, und ein so gepraegtes Handle darf nie automatisch in `OUR_ADDRESSES` landen, sonst
+      zaehlt `marketSplit` den ersten echten Fremden als uns. 3 h.
+      **Widerlegung:** scheitert eine Kaltstart-Probe, die von einer Adresse ohne Wallet und ohne
+      Schluessel in einem Aufruf zu einem Schluessel und in einem zweiten zu einer liegenden
+      Einsendung kommt, ist es sofort widerlegt und nicht erst in 48 Stunden.
+
+Ein viertes Teilziel stand im Plan und ist bei der Uebergabe abgeschnitten worden. Es wird nicht
+aus dem Gedaechtnis rekonstruiert; wenn es traegt, kommt es in der naechsten Runde wieder.
+
+**Was die drei ausdruecklich nicht liefern:** keines bewegt `foreign_gmv_30d` bis zum 26.09., und
+alle haengen am selben Nenner von ein bis drei menschlichen Lesern in 96 Stunden. Der Engpass ist
+unveraendert Zulauf, Zulauf laeuft ueber Punkt 1, und Punkt 1 gehoert Matthias.
+
 ### Ziel 02.10. -- im x402-Verzeichnis stehen
 
 - [x] **T2.1 Herausfinden, was einen Verkaeufer ueberhaupt in den Katalog bringt.** Zahl: keine
