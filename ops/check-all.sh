@@ -98,7 +98,10 @@ run() {
     printf '  ok    %-34s %s\n' "$name" "$(printf '%s' "$out" | tail -1 | cut -c1-60)"
   elif [[ -n "$undetermined" ]] && (( code == undetermined )); then
     UNDETERMINED+=("$name")
-    printf '  ----  %-34s %s\n' "$name" "$(printf '%s' "$out" | tail -2 | head -1 | cut -c1-60)"
+    # The last line that says something, not the second to last. A check whose verdict is its
+    # final line then gets captioned with a blank, which is what happened to check-pages.sh the
+    # moment it learned to print one.
+    printf '  ----  %-34s %s\n' "$name" "$(printf '%s' "$out" | grep -v '^[[:space:]]*$' | tail -1 | cut -c1-60)"
   else
     FAILED+=("$name")
     printf '  FAIL  %-34s exit %s\n' "$name" "$code"

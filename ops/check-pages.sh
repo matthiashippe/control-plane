@@ -36,14 +36,43 @@ if (( ${#PAGES[@]} < 5 )); then
   exit 2
 fi
 
+# How long a page has to answer in. A switch, so the failure below can be produced on purpose
+# rather than waited for: CP_PAGE_TIMEOUT=0.05 makes every fetch break off mid-transfer.
+PAGE_TIMEOUT="${CP_PAGE_TIMEOUT:-15}"
+fetch_failed=0
+
 for path in "${PAGES[@]}"; do
-  response=$(curl -s -m 15 -w '\n%{http_code}\n%{content_type}' "$BASE$path" 2>/dev/null)
+  response=$(curl -s -m "$PAGE_TIMEOUT" -w '\n%{http_code}\n%{content_type}' "$BASE$path" 2>/dev/null)
+  # curl's own verdict, which this script ignored until 2026-09-23.
+  #
+  # "pages say nothing obviously wrong" failed twice, at 22:25 on 22.09. and 01:26 on 23.09., both
+  # times reporting "/ has no title" on a page whose title is at byte 132 of 59,621 and has never
+  # been missing. A transfer that breaks off after the response header still reports 200 in -w,
+  # and an empty body then leaves `html` empty, so every content check fails at once and the first
+  # one to speak is the title. The page was fine; the fetch was not, and the report said the
+  # opposite of what happened.
+  #
+  # A fetch that did not complete is not evidence about the page, so it ends the run as
+  # undetermined instead of accusing it. ops/check-all.sh already treats exit 2 that way.
+  rc=$?
+  if (( rc != 0 )); then
+    echo "COULD NOT TELL: $path did not transfer (curl exit $rc). That says nothing about the page." >&2
+    fetch_failed=1
+    continue
+  fi
   code=$(printf '%s' "$response" | tail -2 | head -1)
   ctype=$(printf '%s' "$response" | tail -1)
   html=$(printf '%s' "$response" | sed '$d' | sed '$d')
 
   before=$failures
   [[ "$code" == "200" ]] || { bad "$path answers $code"; continue; }
+  # A 200 with nothing behind it is the same thing wearing a success code, and it produced that
+  # same "has no title" without curl ever reporting an error.
+  if [[ -z "$html" ]]; then
+    echo "COULD NOT TELL: $path answered 200 with an empty body. That is a transfer, not a page." >&2
+    fetch_failed=1
+    continue
+  fi
   [[ "$ctype" == text/html* ]] || bad "$path is $ctype, not HTML"
 
   # Text without markup: a sentence split across two elements is still a sentence to a reader.
@@ -145,5 +174,13 @@ print(f"  ok      all {len(found)} documentation anchor(s) resolve, on main and 
 PY_ANCHORS
 
 echo
+# A run that could not fetch something has not checked it, and "PAGES OK" would be a claim about
+# a page nobody looked at. It is decided before the verdict is printed, not after, because the
+# first version printed both and the summary line of ops/check-all.sh shows the last line of the
+# output: it marked the check undetermined and captioned it "PAGES OK".
+if (( fetch_failed == 1 )); then
+  echo "PAGES UNDETERMINED: at least one page did not transfer, so this run judges nothing."
+  exit 2
+fi
 if (( failures == 0 )); then echo "PAGES OK"; else echo "PAGES FAILED: $failures"; fi
 exit $(( failures == 0 ? 0 : 1 ))
