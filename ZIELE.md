@@ -218,7 +218,19 @@ Frage, ob wir halten oder vermitteln. **Das ist die Entscheidung, und sie gehoer
       ohne Gewerbe laeuft und 10 Prozent Provision auf fremdes Volumen gewerblich sind;
       Steuerstatus samt Kleinunternehmerregelung; und wer Vertragspartner des Kaeufers ist, wenn
       ein Agent liefert. Je Frage **eine** Antwortoption, nicht drei. 1 h.
-- [ ] **T3.3 Den Kartenweg bis an die gesperrte Grenze bauen, hinter `CP_CHECKOUT`.** Alles
+- [x] **T3.3 erster Schritt erledigt, und er war das ganze Nadeloehr.** Am 23.09. als **Goal 16**
+      gebaut (GOAL.md nennt `src/auth/**`, wie `loop-constraints.md` es verlangt). Ein Mensch
+      stellt einen Auftrag ein, ohne Wallet, ohne Signatur, ohne USDC: `mintKeylessIdentity` macht
+      eine Kennung (`key:` plus 40 Hex, ausdruecklich keine Ethereum-Adresse), `POST /start` legt
+      den Auftrag an, der Topf zahlt ihn, und der Schluessel ist das ganze Konto.
+      **Gegen Produktion abgegangen, nicht behauptet:** `ops/keyless-walk.sh`, sieben Schritte ueber
+      HTTP, erster Lauf 15:00 UTC, alle sieben gruen. Damit fallen Done-Kriterium 1 und 3 von
+      Goal 16 und der Satz, der 43 von 43 Besuchern die Tuer zugehalten hat ("They do need a
+      wallet, in the sense of a key pair on your own machine").
+      Offen bleibt von T3.3: der Kartenweg selbst hinter `CP_CHECKOUT` (Betrag reservieren,
+      Vergabe und Provision buchen, Storno, Rechnung, gegen einen Fake-Provider), und der haengt
+      weiter an Punkt 4.
+      (Urspruenglich) **T3.3 Den Kartenweg bis an die gesperrte Grenze bauen, hinter `CP_CHECKOUT`.** Alles
       ausserhalb von `src/payments/**` und `src/auth/**`: Betrag reservieren, Vergabe und Provision
       buchen, Storno, Rechnung, gegen einen Fake-Provider getestet. Dabei faellt eine Frage an, die
       heute in keiner Liste steht: `createApiKey` verlangt eine Session, die nur `verifySiwe`
@@ -300,6 +312,49 @@ C nur mit Rat, und dann als eigene Entscheidung mit eigenem Datum.
       denen es null gibt, also kostet Warten nichts und das Umgehen kostet die Regel.
       Naechster Zyklus: `ops/deploy.sh` erneut.
 
+## Wochenplan 24.09. bis 30.09.
+
+Abgeleitet am 23.09. vom Workflow `nachfrage-finden`: 23 Agenten, sechs Winkel auf die Frage, wo
+die Nachfrageseite sich aufhaelt, ein Skeptiker auf jede Population. Er ersetzt keinen der vier
+Termine. Er misst die Vorstufe, die bisher fehlt: **ob ein Mensch, der Texte braucht, freiwillig
+etwas in ein Feld tippt.**
+
+**Die eine Zahl der Woche: fremde Laeufe mit eigenem Text.** Ein Lauf zaehlt, wenn er ueber das
+Formular kommt, seine Wortzahl auf keines unserer Beispiele passt und die Adresse keine von uns
+ist. Heute 0, Ziel bis Mittwochabend 10. Nicht `foreign_gmv_30d`, weil diese Woche strukturell
+kein Umsatz entstehen kann, solange Punkt 4 offen ist. Nicht Besuche, weil 16 der 46 Adressen vom
+22./23.09. eine Abruf-Flotte waren und ein Crawler keine 40 Woerter tippt. Das Einfuegen ist die
+erste Handlung im Trichter, die Aufwand kostet, die keine Maschine faelscht und die weder Wallet
+noch Karte noch Stripe voraussetzt.
+
+**Das Gate vom 23.09. steht**, und zwar vollstaendig: der Check liest Deutsch (`3973d92` und
+`f8f7a77`), antwortet auf Deutsch, die Seite traegt `lang="de"`, der Wallet-Satz ist weg, der
+Knopf "Als Auftrag einstellen" steht darunter und der Weg dahinter ist gegen Produktion
+abgegangen. Offen aus dem Gate: der inhaltsfreie Zaehler (`via`, `src`, Sprache, Wortzahl,
+Befundzahl, gesalzener Adress-Hash, **kein Zeichen des Entwurfs und auch kein Hash davon**), das
+versteckte `via=form` in beiden Formularen, die Kurzadresse `/b?src=nit` und der A6-Zettel mit
+QR-Code.
+
+| Tag | Was gemessen wird | Heute | Ziel |
+|---|---|---|---|
+| Do 24.09. | eigene Laeufe aus 20 Gespraechen am NIT, dazu Aufrufe von `/b?src=nit` | 0 | 3 |
+| Fr 25.09. | Antworten, die Betrag und Menge nennen | 0 | 3 |
+| Sa 26.09. | 50 bezahlte deutsche Textauftraege durch `reviewBrief`: wie viele falschen Befunde | unbekannt | hoechstens 2 |
+| So 27.09. | Abbruchstellen `/check` bis offener Auftrag ohne Wallet | **0, vorgezogen erledigt** | 0 |
+| Mo 28.09. | eigene Laeufe aus 10 persoenlichen Nachrichten | 0 | 4 |
+| Di 29.09. | Antworten von IVD Nord und VDIV Nord | 0 | 1 |
+| Mi 30.09. | Menschen, die binnen 72 Stunden **ungebeten** einen zweiten Lauf starten | 0 | 2 |
+
+**Der ehrliche Fruehindikator liegt am Samstagmittag, nicht am Mittwoch,** und er hat zwei
+Auspraegungen, die man nicht verwechseln darf. Steht in der Strichliste "20 Gespraeche, 0
+Einfuegungen", traegt der Haken nicht. Steht dort "4 Gespraeche", hat der Kanal nie stattgefunden
+und die Woche hat gar nichts gemessen. Sichtbar ist das schon am Donnerstag um 12:30.
+
+**Wenn am Mittwoch 0 von 20 herauskommt, ist es nicht der Ort.** Naeher als acht Stunden im selben
+Saal kommt kein Kanal an diese Leute heran. Dann ist der Haken falsch und nicht die Bevoelkerung,
+und der naechste Zug ist der Haken: weg vom Auftrag, der schon abgeschickt ist, hin zum Text, der
+gerade rausgeht, mit `src/check/fabrication.ts` als Mechanismus.
+
 ## Was auf Matthias wartet
 
 Sieben Saetze, und alles andere laeuft. Stand 23.09., nichts davon darf der Loop selbst tun.
@@ -316,6 +371,13 @@ Sieben Saetze, und alles andere laeuft. Stand 23.09., nichts davon darf der Loop
 5. **Search Console und Bing** -- sein Login, den DNS-Eintrag setzt der Loop selbst.
 6. **Eine Zahl fuer Anzeigen** -- Empfehlung: 20 Euro am Tag fuer zwei Wochen.
 7. **Tailscale neu anmelden** -- der code-host nimmt sonst keine Auftraege.
+9. **Norddeutscher Immobilientag, Donnerstag 24.09., Empire Riverside: Karte ja oder nein.**
+   Zwei Minuten, und es ist heute faellig. 300 Hausverwalter, acht Stunden, "KI-Use-Cases in der
+   Hausverwaltung" im Programm, in seiner Stadt. Der Preis steht auf der Anmeldeseite und der Loop
+   kennt ihn nicht, deshalb ist es seine Frage. **Ohne diesen Tag haengen 10 von 10 Laeufen am
+   Adressbuch**, und ein Adressbuch ist nach einmal Fragen verbraucht. Ersatz am selben Tag, falls
+   nein: eine Mail an den VDIV Nord zum Prompting-Seminar (Do 14 bis 16 Uhr, online), Zahl dann
+   Antworten statt Laeufe.
 8. **Ein Konto bei `merchant.payai.network`** -- nach der Untersuchung vom 23.09. die einzige noch
    offene Tuer in den x402-Katalog, und damit die Bedingung fuer das Ziel am 02.10. Siehe T2.2.
 
