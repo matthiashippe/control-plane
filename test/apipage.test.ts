@@ -91,11 +91,42 @@ describe("A person who opens an API path in a browser", () => {
     expect(html).toMatch(/sits on every block explorer/);
   });
 
-  it("carries the same skin and structured data as every other page", async () => {
+  it("carries the same skin as every other page", async () => {
     const html = await (await app().request("/v1/credits/balance", { headers: { accept: BROWSER } })).text();
-    expect(html).toMatch(/<script type="application\/ld\+json">/);
     expect(html).toMatch(/href="\/terms"/);
     expect(html).toMatch(/Impressum/);
+  });
+
+  /**
+   * The skin, yes. The claim to be a document, no.
+   *
+   * Until 2026-09-23 this file asserted structured data here too, under the heading "the same
+   * skin and structured data as every other page", with no reason given for the second half. The
+   * page() shell emits a canonical link pointing at the /v1/ path and a JSON-LD block declaring
+   * WebPage, WebSite, Organization and PostalAddress, and a 401 inherited all of it. Every one of
+   * those says "this is a document at this address" about something that is a refusal.
+   *
+   * It is not hypothetical. On 2026-09-22 at 23:20 UTC Googlebot fetched /v1/credits/history and
+   * got exactly this HTML. The X-Robots-Tag kept it out of the index and still does, so nothing
+   * was published; what was wrong is the claim itself, in the half no human reviews.
+   *
+   * The assertion is therefore reversed rather than dropped, and the reason is here so the next
+   * person who finds a 401 without structured data knows it is deliberate.
+   */
+  it("does not describe itself as a document, because it is a refusal", async () => {
+    const html = await (await app().request("/v1/credits/balance", { headers: { accept: BROWSER } })).text();
+    expect(html, "a refusal must not carry a WebPage node").not.toMatch(/<script type="application\/ld\+json">/);
+    expect(html, "nor a canonical URL for a path that serves no document").not.toMatch(/<link rel="canonical"/);
+    expect(html, "and it says so in the markup, not only in the header").toMatch(
+      /<meta name="robots" content="noindex">/,
+    );
+  });
+
+  it("leaves a real page with both, which is the other half of the same rule", async () => {
+    const html = await (await app().request("/check", { headers: { accept: BROWSER } })).text();
+    expect(html, "a real page still carries its structured data").toMatch(/<script type="application\/ld\+json">/);
+    expect(html, "and its canonical URL").toMatch(/<link rel="canonical"/);
+    expect(html, "and is not told to stay out of the index").not.toMatch(/name="robots" content="noindex"/);
   });
 
   it("tells a crawler not to index a page that only exists under a 401", async () => {

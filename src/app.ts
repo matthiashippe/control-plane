@@ -256,6 +256,11 @@ export function createApp(opts: AppOptions) {
               "wrong with your account. Here is the same question from a terminal, and what " +
               "happens when an agent sits at zero.",
             c.req.path,
+            "og.png",
+            [],
+            // Not a page: no canonical, no structured data, and a robots meta instead. See the
+            // parameter in page() and the Googlebot fetch of 2026-09-22 that made it real.
+            true,
           ),
           err.status as 401,
           // A page served under a 401 is not a page anybody should find in a search result. Google
@@ -476,6 +481,24 @@ export function createApp(opts: AppOptions) {
      * src/public/jsonld.ts on why nothing here may say more than the page shows.
      */
     ld: Record<string, unknown>[] = [],
+    /**
+     * This answer is not a page, and must not describe itself as one.
+     *
+     * The 401 in app.onError renders through here, so it inherited a canonical link pointing at
+     * the /v1/ path it was served from and a JSON-LD block declaring WebPage, WebSite,
+     * Organization and PostalAddress. All of that says "this is a document at this address" about
+     * something that is a refusal.
+     *
+     * Not hypothetical: on 2026-09-22 at 23:20 UTC Googlebot fetched /v1/credits/history and got
+     * exactly this HTML. The X-Robots-Tag on the response keeps it out of the index and stays, so
+     * nothing was published. What was wrong is the claim itself, in the machine-readable part,
+     * which is the half no human reviews.
+     *
+     * og:url and og:title still name the path. They are for a preview of a shared link, nobody
+     * shares a 401, and leaving them costs nothing; the canonical and the structured data were
+     * the ones a crawler acts on.
+     */
+    notAPage = false,
   ): string => {
     const head = (indexHtml ?? "").slice(0, (indexHtml ?? "").indexOf("</head>"));
     // withOrigin at the door, once, rather than per template string. The curl examples on these
@@ -497,8 +520,12 @@ export function createApp(opts: AppOptions) {
         // is the one broken thing nobody sees, because it only shows when somebody shares a link.
         .replace(/(<meta property="og:image" content=")https:\/\/[a-z0-9.-]+/, `$1${siteOrigin()}`)
         .replace(/(<meta name="twitter:image" content=")https:\/\/[a-z0-9.-]+/, `$1${siteOrigin()}`)
-        .replace(/og\.png/g, card) +
-      ldBlock(organization(), webSite(), webPage(title, description, pathname), ...ld) +
+        .replace(/og\.png/g, card)
+        .replace(
+          /<link rel="canonical"[^>]*>/,
+          notAPage ? '<meta name="robots" content="noindex">' : "$&",
+        ) +
+      (notAPage ? "" : ldBlock(organization(), webSite(), webPage(title, description, pathname), ...ld)) +
       `</head>
 <body>
 <header class="bar"><div class="wrap">
