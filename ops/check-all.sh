@@ -216,6 +216,13 @@ run --undetermined-on 2 "the published data reproduces" ./ops/check-data.py
 # proved on the day it was written. See ops/traffic.sh --selftest. Reads nothing from production.
 run "the traffic report tells an arrival from a claim" ./ops/traffic.sh --selftest
 
+# The preview card against the pool it promises from. Four surfaces ask starterOffer() and go
+# quiet on their own when the pool runs dry; /og.png cannot, because it is a picture with
+# "first job / free, 15 c" burned in. The handoff has said since 2026-09-22 that no test can
+# notice the pool running out. This one can: /v1/status publishes both numbers. It matters on the
+# day the nine issue answers go out, which is the day the pool can empty within the hour.
+run "the preview card still promises what the pool can pay" ./ops/og-card-says-the-truth.sh
+
 # The directory search, against a planted scan that does and does not contain us. Its single
 # hard-coded host was cp.hippe.eu, so from the move on 2026-09-22 a listing under the new name
 # would have been reported as absence by the one tool that exists to notice it. Reads nothing
