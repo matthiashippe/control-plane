@@ -18,6 +18,14 @@ ONLY_FUNNEL=0
 
 HOURS="${1:-24}"
 BASE_URL="${CP_URL:-https://cp.hippe.eu}"
+# Every name this service answers to. The referrer tests below decide whether a request came from
+# one of our own pages, and until 2026-09-23 they compared against the literal string cp.hippe.eu.
+# The day postyourprice.com went live, every visitor arriving through it was filed as "never ran
+# the page script" and vanished from the column, which is the one number this whole script exists
+# to print. Both names stay, because the old one still answers and is what the issue comments and
+# the settled x402 payments point at.
+CP_OWN_HOSTS="${CP_OWN_HOSTS:-cp.hippe.eu postyourprice.com}"
+export CP_OWN_HOSTS
 KEY="${CP_SSH_KEY:-$HOME/.ssh/id_ed25519_automaton}"
 HOST="${CP_HOST:-root@76.13.144.207}"
 # The operator's own line, the VM itself and the code-host. Without this filter the picture
@@ -147,9 +155,25 @@ echo
 # cannot be read. With :- the empty value would be replaced by the fetch and the counter-proof
 # would quietly measure the normal case, which is the failure mode this repo keeps meeting.
 if [[ -z "${CP_PAGES+x}" ]]; then
-  CP_PAGES="$(curl -s -m 15 "$BASE_URL/sitemap.xml" | grep -oE '<loc>[^<]*' | sed "s|<loc>$BASE_URL||" | sed 's|^$|/|' | tr '\n' ' ')"
+  # The host is stripped by pattern, not by comparing against the address this script was told to
+  # use. Those two stopped being the same on 2026-09-23: the sitemap moved to postyourprice.com
+  # while BASE_URL still said cp.hippe.eu, the substitution matched nothing, and the list filled
+  # with nine strings like "<loc>https://postyourprice.com/" that equal no path a visitor can
+  # request. Every address then failed the page test and the funnel printed "nobody arrived that
+  # did not also look like a checker", which is a sentence about the log and was a bug in the sed.
+  CP_PAGES="$(curl -s -m 15 "$BASE_URL/sitemap.xml" | grep -oE '<loc>[^<]*' | sed -E 's|^<loc>https?://[^/]*||' | sed 's|^$|/|' | tr '\n' ' ')"
 fi
-if [[ "$(printf '%s' "$CP_PAGES" | wc -w)" -lt 5 ]]; then
+# A path starts with a slash. Anything else in this list means the parse above went wrong, and the
+# damage is silent: the filter keeps running and rejects everybody.
+for _p in $CP_PAGES; do
+  case "$_p" in
+    /*) ;;
+    *) echo "   (the sitemap did not parse into paths: got \"$_p\". Page loads are not checked.)" >&2
+       CP_PAGES=""
+       break ;;
+  esac
+done
+if [[ -n "$CP_PAGES" && "$(printf '%s' "$CP_PAGES" | wc -w)" -lt 5 ]]; then
   echo "   (the sitemap named fewer than five pages, so a page load is not checked against it)" >&2
 fi
 export CP_PAGES
@@ -160,7 +184,7 @@ echo "-- Who of them behaved like a person, over the whole log --"
 # checks are usually the first to touch it, so filtering them out before Python made /check look
 # like a path that has never answered.
 jq -r --argjson own "$own_json" \
-  "[(.ts|tostring), .request.remote_ip, (.request.uri // \"\"), ((.request.headers.Referer // [\"\"])[0]), ((.request.headers[\"User-Agent\"] // [\"\"])[0]), (if (.request.remote_ip as \$ip | (\$own | index(\$ip)) == null) then \"foreign\" else \"ours\" end)] | @tsv" "$log" \
+  "[(.ts|tostring), .request.remote_ip, (.request.uri // \"\"), ((.request.headers.Referer // [\"\"])[0]), ((.request.headers[\"User-Agent\"] // [\"\"])[0]), (if (.request.remote_ip as \$ip | (\$own | index(\$ip)) == null) then \"foreign\" else \"ours\" end), ((.request.headers[\"Accept-Language\"] // [\"\"])[0])] | @tsv" "$log" \
   | python3 -c '
 import sys, os, collections
 
@@ -173,8 +197,15 @@ import sys, os, collections
 # string and takes the rest of the script with it. That has now happened three times in two days.
 PAGES = tuple(p for p in (os.environ.get("CP_PAGES") or "").split() if p.startswith("/"))
 
+# The hosts this service answers to, so "came from one of our own pages" is not one hard-coded
+# name. See the comment on CP_OWN_HOSTS at the top of this file for what that cost.
+OWN_HOSTS = tuple(h for h in (os.environ.get("CP_OWN_HOSTS") or "cp.hippe.eu").split() if h)
+
+def from_us(ref):
+    return any(h in ref for h in OWN_HOSTS)
+
 people = collections.defaultdict(
-    lambda: {"agents": [], "ran_script": False, "loaded_page": False, "marks": set(), "mark_times": {}, "paths": set(), "first": None, "from": "", "ip": ""}
+    lambda: {"agents": [], "ran_script": False, "loaded_page": False, "marks": set(), "mark_times": {}, "paths": set(), "first": None, "from": "", "ip": "", "lang": False}
 )
 # Every path an address touched, whatever tool did it. The browser-only view is right for deciding
 # who read a page; it is wrong for the funnel, because the step after reading is done in a terminal.
@@ -187,9 +218,14 @@ first_answered = {}
 
 for line in sys.stdin:
     parts = line.rstrip("\n").split("\t")
-    if len(parts) != 6:
+    # >= and not ==: this row grew a seventh field on 2026-09-23, and a check that fails closed
+    # against its own extension throws away every line and reports an empty log. That has already
+    # happened once in ops/status.sh, where it read as "the VM did not answer" while the VM was
+    # answering perfectly.
+    if len(parts) < 6:
         continue
-    stamp, ip, path, referrer, agent, whose = parts
+    stamp, ip, path, referrer, agent, whose = parts[:6]
+    lang = parts[6] if len(parts) > 6 else ""
     try:
         stamp = float(stamp)
     except ValueError:
@@ -210,10 +246,12 @@ for line in sys.stdin:
     if entry["first"] is None or stamp < entry["first"]:
         entry["first"] = stamp
         entry["from"] = referrer
-    if path.startswith("/v1/status") and "cp.hippe.eu" in referrer:
+    if path.startswith("/v1/status") and from_us(referrer):
         entry["ran_script"] = True
     if path.split("?")[0] in PAGES:
         entry["loaded_page"] = True
+        if lang:
+            entry["lang"] = True
     if path.startswith("/px/") and path.endswith(".png"):
         mark = path[4:-4]
         entry["marks"].add(mark)
@@ -231,13 +269,35 @@ def swapped(stamped):
 ORDER = ["top", "proof", "market", "close", "end"]
 
 def all_at_once(stamps):
-    # Two or more marks inside one second is a renderer, the same test ops/depth.sh applies.
+    # A renderer fetches marks in BUNDLES, and the test has to look at the bundles rather than at
+    # the span from the first mark to the last.
+    #
     # Measured on 2026-09-22: headless Chrome ignores loading="lazy" and fetches every pixel on
     # load, at a desktop size and at a 390x700 phone viewport alike. A real browser does not:
-    # 80.218.182.64 fetched top at 18:03:49 and proof at 18:04:11. The gap is the evidence, not
-    # the mark. Requiring three marks let 34.31.186.92 through, which took top and proof in the
-    # same second and was reported here as a second reader who got past the proof section.
-    return len(stamps) >= 2 and max(stamps) - min(stamps) < 1.0
+    # 80.218.182.64 fetched top at 18:03:49 and proof at 18:04:11. The gap is the evidence.
+    #
+    # The span test that stood here was one hundredth of a second away from being useless. On
+    # 2026-09-23 two scanners arrived through the new domain and both got past it:
+    #
+    #   35.165.215.140  top at +0.00, then proof, market, end and close ALL at +1.03
+    #   93.180.238.143  top at +0.00, four marks between +3.30 and +3.68, three more at +4.30
+    #
+    # Span 1.03 and 4.31, so both read as readers, and the column jumped from one to three. Four
+    # marks in the same millisecond is a page being rendered, however long after the first one it
+    # happens. A person fetches one mark per scroll position, so no bundle of theirs holds more
+    # than two.
+    if len(stamps) < 2:
+        return False
+    ordered = sorted(stamps)
+    bundle = 1
+    for a, b in zip(ordered, ordered[1:]):
+        if b - a < 0.25:
+            bundle += 1
+            if bundle > 2:
+                return True
+        else:
+            bundle = 1
+    return max(ordered) - min(ordered) < 1.0
 
 scrolled, loaded_only, dropped = [], [], collections.Counter()
 for ip, entry in people.items():
@@ -261,7 +321,16 @@ for ip, entry in people.items():
     # Hard-coding only "top" would have counted a /fix reader who fetched fix-top and nothing else
     # as somebody who scrolled.
     below = [m for m in entry["marks"] if m not in ("top", "fix-top")]
-    if below and not all_at_once(list(entry["mark_times"].values())):
+    # A browser sends Accept-Language on a navigation; every one of them does. The scroll test is
+    # a timing test, and timing has a threshold: on 2026-09-23 a scanner fetched all five marks in
+    # exactly 1.00 s and landed one hundredth of a second on the reader side of it. It sent no
+    # Accept-Language, no text/html and no Sec-Fetch-Dest, so it was not a browser and cannot have
+    # scrolled.
+    #
+    # Only the scroll step, never the denominator. A person with strict privacy settings still
+    # counts as having opened the page, because this counter has to err towards keeping a real
+    # reader, and the whole point of the column below is what happens after the page loads.
+    if below and entry["lang"] and not all_at_once(list(entry["mark_times"].values())):
         scrolled.append((entry["first"], ip, entry))
     else:
         loaded_only.append(ip)
@@ -298,6 +367,11 @@ def touched(entry, *wanted):
 STEPS = [
     ("opened a page", lambda e: bool(pages_of(e)), None),
     ("scrolled", lambda e: e["scrolled"], "/px/top.png"),
+    # Two pages loaded, which is not the same as two pages read: a renderer that follows one link
+    # lands here exactly like a person who clicked it, and unlike the scroll step there is no
+    # timing signal to tell them apart. On 2026-09-23 both addresses behind this number turned out
+    # to fetch every depth pixel of both pages in bundles, so the honest reading of a 2 here is
+    # "two clients requested a second page", and the line says so rather than implying a reader.
     ("opened a second page", lambda e: len(pages_of(e)) > 1, None),
     ("tried the free check", lambda e: touched(e, "/check", "/v1/briefs/check"), "/check"),
     ("asked for a key", lambda e: touched(e, "/v1/auth/api-keys"), None),
@@ -309,7 +383,13 @@ for ip, entry in people.items():
     if len(networks[".".join(ip.split(".")[:3])]) > 2:
         continue
     below = [m for m in entry["marks"] if m not in ("top", "fix-top")]
-    entry["scrolled"] = bool(below) and not all_at_once(list(entry["mark_times"].values()))
+    # The same three conditions as the list above, not two of them. They were written twice and
+    # drifted the moment one side gained the Accept-Language test: the column said 2 of 2 scrolled
+    # while the list under it named one address. Two numbers from one file that contradict each
+    # other are worse than either being wrong, because one of them is always believable.
+    entry["scrolled"] = (
+        bool(below) and entry["lang"] and not all_at_once(list(entry["mark_times"].values()))
+    )
     # Arrived means read a page. An address that only ever touched /v1/ is a runtime, and putting
     # it in the denominator of a funnel about reading makes every step below look worse than it is.
     if pages_of(entry):
@@ -445,7 +525,15 @@ ours=$(jq -r --argjson since "$since" --argjson own "$own_json" \
 jq -r --argjson own "$own_json" \
   "$FOREIGN | [(.ts|tostring), ((.request.headers.Referer // [\"-\"])[0]), .request.remote_ip, .request.uri, ((.request.headers[\"User-Agent\"] // [\"-\"])[0])] | @tsv" "$log" \
   | python3 -c '
-import sys, collections
+import sys, os, collections
+
+# The hosts this service answers to. Hard-coding one name here filed every visitor arriving
+# through the new domain as a stranger with a foreign referrer, and every one arriving through
+# the old one as our own. See CP_OWN_HOSTS at the top of this file.
+OWN_HOSTS = tuple(h for h in (os.environ.get("CP_OWN_HOSTS") or "cp.hippe.eu").split() if h)
+
+def from_us(ref):
+    return any(h in ref for h in OWN_HOSTS)
 
 # A referrer is a string somebody put in a header, and a scanner can put anything there. On
 # 2026-09-22 at 18:57:39 an address arrived on /fix with `Referer: https://bing.com/`, which would
@@ -500,10 +588,10 @@ for line in sys.stdin:
         entry["pixel"] = True
     # The inline script fetches /v1/status with the page as its referrer. Nothing else does, so
     # this is the one line in the log that says a real engine ran the page rather than read it.
-    if path.startswith("/v1/status") and "cp.hippe.eu" in referrer:
+    if path.startswith("/v1/status") and from_us(referrer):
         entry["ran_script"] = True
     networks[".".join(ip.split(".")[:3])].add(ip)
-    if stamp > window_start and referrer not in ("-", "") and "cp.hippe.eu" not in referrer:
+    if stamp > window_start and referrer not in ("-", "") and not from_us(referrer):
         by_referrer[referrer][ip].append(path)
 
 if not by_referrer:
