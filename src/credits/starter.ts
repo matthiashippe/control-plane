@@ -50,6 +50,43 @@ export const BUYER_GRANT_MC = 50_000;
 /** The whole giveaway, across every address. At 15 cents each this is 33 agents. */
 export const POOL_MC = 500_000;
 
+/**
+ * What the pool may give away in one UTC day, across every address.
+ *
+ * Until 2026-09-23 the only limit besides the total was "one grant per address, ever", and it was
+ * enforced by a unique index rather than a check, which made it strong. Goal 16 mints an identity
+ * on request for anybody without a wallet, and the moment identities are free that rule stops
+ * limiting anything: mint ten, claim ten.
+ *
+ * The attack is not theoretical and it is worth naming, because it decides the size. Mint a buyer
+ * and an agent, post a fifty-cent job the pool funds, submit to it, award it: the grant has become
+ * forty-five cents of inference at the agent's own hand. Cancelling does not work, the grant goes
+ * back (returnGrantToPool), so it takes a real award, which is exactly the move this cap sizes.
+ *
+ * **The hole is older than Goal 16.** An Ethereum address is free to mint too: thirty-three
+ * keypairs, thirty-three signatures, thirty-three grants, and the unique index waves all of it
+ * through because every one of them is a different address. The per-address rule never stopped
+ * anybody who meant it; it stopped accidents. Minting in the browser only makes that visible, and
+ * the cap below is the first thing here that actually limits a determined caller.
+ *
+ * 100,000 millicents is two buyer grants or six agent grants a day. With 230 cents left on
+ * 2026-09-23 a determined drainer needs two and a half days and gets a euro a day; a genuine
+ * newcomer, on a service that sees one stranger a day, never meets this limit. The total was
+ * always the real exposure and this only spreads it out, which is the honest way to put it: it
+ * does not make the giveaway safe, it makes it slow enough to notice.
+ *
+ * `CP_POOL_DAILY_MC` raises it, and it is read on every call rather than at import. Tests about
+ * what happens when the WHOLE pool is gone need to spend it in one run, and without a way to lift
+ * the day's ceiling the only alternatives are to weaken those tests or to leave the cap out of
+ * their reach, both of which trade a real check for a green run.
+ */
+export const POOL_DAILY_MC_DEFAULT = 100_000;
+
+export function poolDailyMc(): number {
+  const raw = Number(process.env.CP_POOL_DAILY_MC);
+  return Number.isInteger(raw) && raw > 0 ? raw : POOL_DAILY_MC_DEFAULT;
+}
+
 export class StarterError extends Error {
   constructor(readonly code: string, readonly status: number, readonly hint: string) {
     super(code);
@@ -73,6 +110,30 @@ export function grantedTotalMc(db: Db): number {
 
 export function poolLeftMc(db: Db): number {
   return Math.max(0, POOL_MC - grantedTotalMc(db));
+}
+
+/**
+ * What the pool has given away on one UTC day, netted the same way as grantedTotalMc.
+ *
+ * `created_at` is an ISO string, so the day is its first ten characters. The netting matters for
+ * the same reason as in the total: a job posted and cancelled inside one day gave nobody anything,
+ * and holding the day's budget against it would refuse the next newcomer for a grant that was
+ * handed back. `now` is a parameter so a test can stand on either side of midnight.
+ */
+export function grantedTodayMc(db: Db, now: Date = new Date()): number {
+  const day = now.toISOString().slice(0, 10);
+  const row = db
+    .prepare(
+      "SELECT coalesce(sum(delta_mc), 0) AS total FROM ledger " +
+        "WHERE kind IN ('grant', 'grant_returned') AND substr(created_at, 1, 10) = ?",
+    )
+    .get(day) as { total: number };
+  return row.total;
+}
+
+/** What the pool can still fund today: the smaller of what is left and what the day allows. */
+export function poolLeftTodayMc(db: Db, now: Date = new Date()): number {
+  return Math.max(0, Math.min(poolLeftMc(db), poolDailyMc() - grantedTodayMc(db, now)));
 }
 
 /**
@@ -132,7 +193,13 @@ export function agentOffer(db: Db): { cents: number; pool_left_cents: number } |
 export function starterAvailableMc(db: Db, address: string, amountMc: number = GRANT_MC): number {
   const already = db.prepare("SELECT 1 FROM ledger WHERE kind = 'grant' AND address = ?").get(address.toLowerCase());
   if (already) return 0;
-  return grantedTotalMc(db) + amountMc > POOL_MC ? 0 : amountMc;
+  if (grantedTotalMc(db) + amountMc > POOL_MC) return 0;
+  // The day's budget, asked here as well as in claimStarter, because a caller that decides on this
+  // answer and then gets refused by the write path would consume nothing and explain nothing. The
+  // buyer path relies on the two agreeing: it asks first so that a job the pool cannot cover does
+  // not burn the address's one grant.
+  if (grantedTodayMc(db) + amountMc > poolDailyMc()) return 0;
+  return amountMc;
 }
 
 /**
@@ -166,6 +233,16 @@ export function claimStarter(
         409,
         "The starter pool is used up. It is a fixed amount the operator gives away, not a budget " +
           "that refills. Buy credits with USDC on Base, or ask the operator to top the pool up.",
+      );
+    }
+    if (grantedTodayMc(db) + amountMc > poolDailyMc()) {
+      throw new StarterError(
+        "pool_daily_limit",
+        429,
+        "The starter pool has given away what it gives away in a day. It refills at midnight UTC " +
+          "and the limit exists because anybody can mint an identity here, so without it one " +
+          "script could take the whole pool in a minute. Come back tomorrow, or buy credits with " +
+          "USDC on Base.",
       );
     }
     postLedger(db, {

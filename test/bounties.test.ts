@@ -10,6 +10,11 @@ import { claimStarter, poolLeftMc, GRANT_MC, BUYER_GRANT_MC } from "../src/credi
 import { releaseExpired, FEE_PERCENT, feeMc } from "../src/bounties/store.js";
 import { hashApiKey } from "../src/auth/siwe.js";
 
+// This file spends the whole pool to test what the pages say when it is empty, which is more
+// than one day allows since 2026-09-23. The day's ceiling is lifted here on purpose and named,
+// rather than the cap being left out of reach of the tests that would notice it.
+process.env.CP_POOL_DAILY_MC = "500000";
+
 const IN_ONE_HOUR = () => new Date(Date.now() + 3_600_000).toISOString();
 
 function account(db: ReturnType<typeof openDb>, app: ReturnType<typeof createApp>, balanceMc: number, n: number) {

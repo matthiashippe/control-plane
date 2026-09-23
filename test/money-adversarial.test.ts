@@ -33,6 +33,11 @@ import { hashApiKey } from "../src/auth/siwe.js";
 import { claimStarter, poolLeftMc, GRANT_MC } from "../src/credits/starter.js";
 import { releaseExpired } from "../src/bounties/store.js";
 
+// This file spends the whole pool to test what the pages say when it is empty, which is more
+// than one day allows since 2026-09-23. The day's ceiling is lifted here on purpose and named,
+// rather than the cap being left out of reach of the tests that would notice it.
+process.env.CP_POOL_DAILY_MC = "500000";
+
 const SPEC: ModelSpec = { id: "gated-1", provider: "gated", inputPerMillion: 1, outputPerMillion: 2, contextWindow: 128_000 };
 const MAX_TOKENS = 32_768;
 const MESSAGES: ChatMessage[] = [{ role: "user", content: "Say something long." }];
