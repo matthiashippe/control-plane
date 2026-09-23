@@ -150,7 +150,25 @@ davon Inferenz.
 
 Damit ist der Unterschied zwischen den drei Fiat-Formen unten kein Geschmack mehr, sondern die
 Frage, ob wir halten oder vermitteln. **Das ist die Entscheidung, und sie gehoert Matthias.**
-- [ ] **T2.3 Welche Tuer fuehrt in den CDP-Katalog?** Zahl: Zeilen mit unserem Host im Tagesscan,
+- [x] **T2.3 Welche Tuer fuehrt in den CDP-Katalog?** Erledigt 23.09. **Antwort: keine, die der
+      Loop gehen kann.** Vier Messungen, und die erste korrigiert die Frage.
+      **Die Praemisse war ein Artefakt.** Dass alle 107 Zeilen mit mindestens 25 Zahlern
+      CDP-Zeilen sind, sieht nach Nachfrage in einem Katalog aus und ist keine:
+      **PayAI veroeffentlicht ueberhaupt keine Zahlerzahlen**, 0 von 6.792 Zeilen tragen eine.
+      Der Vergleich laesst sich nicht anstellen. Veroeffentlicht ist dazu nichts Falsches,
+      `x402-metrics.py` rechnet absichtlich nur ueber CDP und `/x402` sagt
+      *"services with published demand"*.
+      **133 Hosts stehen in beiden Katalogen**, Zugehoerigkeit haengt also nicht daran, ueber
+      welchen Facilitator jemand abrechnet. **CDP nimmt Version 1 weiter auf**, 202 seiner 204
+      v1-Zeilen wurden in den letzten 30 Tagen aktualisiert, die neueste heute. Und **CDPs
+      Discovery liest ohne Schluessel, jeder andere Pfad dort antwortet 401**, es gibt also nicht
+      einmal eine oeffentliche Registrierungsflaeche zum Nachlesen.
+      **Damit gilt fuer beide dasselbe:** wir haben abgerechnet, wir stehen in keinem, und keiner
+      veroeffentlicht einen Weg hinein. Die Entscheidung ist **Punkt 8** als billigster Test, ein
+      Konto. Bringt er eine Zeile im Tagesscan, heisst der Mechanismus "als Haendler registrieren"
+      und **Punkt 9** ist derselbe Zug fuer den groesseren Katalog. Bringt er keine, hat das Ziel
+      am 02.10. keinen Weg und der Termin faellt.
+      (Urspruenglich) **T2.3** Zahl: Zeilen mit unserem Host im Tagesscan,
       0 auf mindestens 1. Die 94 Dienste mit mindestens 25 Zahlern sind ausnahmslos CDP-Zeilen auf
       38 Hosts. Fuer diese 38 pruefen, ueber welchen Facilitator sie abrechnen und ob der Eintrag
       daran haengt. Ergebnis ist eine Entscheidung, nicht eine Liste: entweder eine Tuer, durch die

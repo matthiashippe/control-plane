@@ -51,6 +51,23 @@
 # not admit a seller and not settling does not keep one out. We have the settlement and not the
 # entry; they have the entry and not the settlement.
 #
+# THE SAME QUESTION ASKED OF THE OTHER CATALOGUE, 2026-09-23:
+#
+#   - 133 hosts appear in BOTH directories. Membership is not exclusive to the facilitator a
+#     seller settles through, so "we settle through PayAI" does not explain being absent from CDP.
+#   - CDP still admits x402 version 1, which is what we speak: 202 of its 204 v1 rows were updated
+#     in the last 30 days and the newest is today. Version is not the blocker on either side.
+#   - CDP's discovery listing reads without a key; every other path on that host answers 401, so
+#     there is no public registration surface even to read.
+#   - And a correction to the premise this was started from. All 107 rows with 25 or more payers
+#     are CDP rows, which looks like demand living in one catalogue and is an artefact: PayAI
+#     publishes no payer counts at all, 0 of 6,792 rows carry a number. Nothing published is wrong
+#     about this -- docs/research/data/x402-metrics.py restricts its payer statistics to CDP on
+#     purpose and /x402 says "services with published demand" -- but the comparison cannot be made.
+#
+# So the same thing is true of both: we have settled, we are in neither, and neither publishes a
+# way in. The loop has no door it can walk through.
+#
 # WHAT IS LEFT, and it is not a code change in a locked path: the OpenAPI names a merchant portal
 # at https://merchant.payai.network for creating an API key, and it answers 200. That is the only
 # door in the public surface that is not /verify or /settle. It needs an account, so it is
