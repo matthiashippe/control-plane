@@ -27,7 +27,7 @@ kinds rechenfehler, widerspruch, unbelegt) stay German on purpose: the same name
 published data set docs/research/data/2026-09-20-auftragstest.json, which is linked from the
 landing page under CC0, and they can only be renamed together with it.
 
-  OPENROUTER_API_KEY=... ops/invention-check.py --ergebnisse <path/ergebnisse.json>
+  OPENROUTER_API_KEY=... ops/invention-check.py --results <path/ergebnisse.json>
 """
 import argparse, json, os, pathlib, re, sys, unicodedata, urllib.error, urllib.request
 
@@ -137,9 +137,9 @@ def ask(model: str, briefing: str, submission: str, key: str, mode: str = "fakti
 
 def main() -> int:
     p = argparse.ArgumentParser()
-    p.add_argument("--ergebnisse", required=True, help="ergebnisse.json from ops/bounty-test.py")
-    p.add_argument("--modell", default="openai/gpt-5.2")
-    p.add_argument("--art", choices=sorted(INSTRUCTIONS), default="faktisch",
+    p.add_argument("--results", required=True, help="ergebnisse.json from ops/bounty-test.py")
+    p.add_argument("--model", default="openai/gpt-5.2")
+    p.add_argument("--kind", choices=sorted(INSTRUCTIONS), default="faktisch",
                    help="faktisch: every unsupported claim. schoepferisch: only what binds the "
                         "buyer.")
     a = p.parse_args()
@@ -149,7 +149,7 @@ def main() -> int:
         print("OPENROUTER_API_KEY is missing", file=sys.stderr)
         return 2
 
-    path = pathlib.Path(a.ergebnisse)
+    path = pathlib.Path(a.results)
     data = json.loads(path.read_text(encoding="utf-8"))
     briefing = data["auftrag"]
 
@@ -159,7 +159,7 @@ def main() -> int:
         text = e["text"]
         text_norm = normalise(text)
         try:
-            raw = ask(a.modell, briefing, text, key, a.art)
+            raw = ask(a.model, briefing, text, key, a.kind)
         except urllib.error.HTTPError as ex:
             print(f"-- {e['name']}: ERROR {ex.code}", file=sys.stderr)
             continue
@@ -187,8 +187,8 @@ def main() -> int:
     if total:
         print(f"Checker quality: {total - discarded} of {total} findings backed by a quote "
               f"({100*(total-discarded)//total} %), {discarded} discarded.")
-    target = path.parent / f"erfindungspruefung-{a.art}.json"
-    target.write_text(json.dumps({"modell": a.modell, "art": a.art, "bericht": report},
+    target = path.parent / f"erfindungspruefung-{a.kind}.json"
+    target.write_text(json.dumps({"modell": a.model, "art": a.kind, "bericht": report},
                                  ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"Written to {target}")
     return 0

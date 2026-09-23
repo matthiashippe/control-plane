@@ -29,7 +29,7 @@ export interface OffenerAuftrag {
  * `hinweis` is printed when a prefix was resolved, so the caller sees which job it is about to
  * act on rather than trusting that eight characters meant what they thought.
  */
-export function auftragFinden(
+export function findJob(
   offen: OffenerAuftrag[],
   gesucht: string,
   hinweis: (text: string) => void = () => {},

@@ -29,7 +29,7 @@
  * --force hands in even when the self-check found a contradiction.
  */
 import fs from "node:fs";
-import { auftragFinden } from "./auftrag-finden.js";
+import { findJob } from "./find-job.js";
 import path from "node:path";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { createSiweMessage } from "viem/siwe";
@@ -111,8 +111,8 @@ async function main(): Promise<void> {
   const list = (await call("/bounties.json", null)) as {
     open: { id: string; brief: string; kind: string; price_cents: number; award_cents: number; deadline: string; submissions: number }[];
   };
-  // Prefixes too: every surface shows eight characters. See ops/auftrag-finden.ts.
-  const job = auftragFinden(list.open as never, bountyId, (t) => console.log(t));
+  // Prefixes too: every surface shows eight characters. See ops/find-job.ts.
+  const job = findJob(list.open as never, bountyId, (t) => console.log(t));
   console.log(`job     ${job.kind}, ${job.award_cents} c to the winner, closes ${job.deadline.slice(0, 16)}, ${job.submissions} already in`);
 
   const agent = await provision(wallet(name), `ops-seed-${name}`);

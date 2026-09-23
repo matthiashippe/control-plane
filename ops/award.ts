@@ -27,7 +27,7 @@
  * and never printed, logged or written anywhere.
  */
 import fs from "node:fs";
-import { auftragFinden } from "./auftrag-finden.js";
+import { findJob } from "./find-job.js";
 import path from "node:path";
 import { privateKeyToAccount } from "viem/accounts";
 import { createSiweMessage } from "viem/siwe";
@@ -123,13 +123,13 @@ const short = (a: string): string => `${a.slice(0, 8)}…${a.slice(-4)}`;
  * every comparison against NaN is false, and a guard written as `hoursLeft > 0` would wave the award
  * through at exactly the moment it knows least. A guard has to fail towards refusing.
  */
-export function nochOffenStunden(deadline: string, now = Date.now()): number {
+export function hoursStillOpen(deadline: string, now = Date.now()): number {
   const t = new Date(deadline).getTime();
   if (Number.isNaN(t)) return NaN;
   return Math.max(0, (t - now) / 3_600_000);
 }
 
-export function formalpruefung(brief: string, work: string): string[] {
+export function formalCheck(brief: string, work: string): string[] {
   const findings: string[] = [];
 
   const limit = /(\d+)\s*words?\s*maximum|maximum\s*(\d+)\s*words?|at most (\d+) words/i.exec(brief);
@@ -180,7 +180,7 @@ async function decide(bountyId: string, key: string): Promise<void> {
   const list = (await call("/bounties.json", null)) as {
     open: { id: string; brief: string; kind: string; award_cents: number; deadline: string }[];
   };
-  const job = auftragFinden(list.open as never, bountyId, (t) => console.log(t));
+  const job = findJob(list.open as never, bountyId, (t) => console.log(t));
 
   // From here on only the resolved id counts. The first version of the prefix lookup changed the
   // list search and then kept using the prefix, so the next call answered 404: a resolution that
@@ -213,7 +213,7 @@ async function decide(bountyId: string, key: string): Promise<void> {
       body: JSON.stringify({ briefing: job.brief, submission: s.body, kind: job.kind }),
     })) as { findings: { quote: string; kind: string; reason: string }[]; discarded: number };
     const words = s.body.split(/\s+/).filter(Boolean).length;
-    const formal = formalpruefung(job.brief, s.body);
+    const formal = formalCheck(job.brief, s.body);
     console.log(`${s.id === winner ? "->" : "  "} ${s.id}  ${short(s.agent)}  ${words} words  ` +
       `${check.findings.length} finding(s)${check.discarded ? `, ${check.discarded} discarded` : ""}` +
       `${formal.length ? `, ${formal.length} against the brief` : ""}`);
@@ -240,14 +240,14 @@ async function decide(bountyId: string, key: string): Promise<void> {
   //
   // The deadline is read from the service, never from the instruction. A job can still be awarded
   // early on purpose, which is a real case when every agent has handed in, but it has to be said.
-  const hoursLeft = nochOffenStunden(job.deadline);
-  if (hoursLeft !== 0 && !process.argv.includes("--vorzeitig")) {
+  const hoursLeft = hoursStillOpen(job.deadline);
+  if (hoursLeft !== 0 && !process.argv.includes("--early")) {
     const how = Number.isNaN(hoursLeft)
       ? `has a deadline this script cannot read ("${job.deadline}")`
       : `is open for another ${hoursLeft.toFixed(1)} hour(s), until ${job.deadline.slice(0, 16)} UTC`;
     console.log(`\nNOT AWARDED. This job ${how}.`);
     console.log("             Awarding now ends it early and takes that time away from anybody");
-    console.log("             who has not handed in yet. Pass --vorzeitig if that is what you mean.");
+    console.log("             who has not handed in yet. Pass --early if that is what you mean.");
     return;
   }
 
@@ -277,7 +277,7 @@ async function decide(bountyId: string, key: string): Promise<void> {
 
 // Only when run as a script.
 //
-// `test/award-formal.test.ts` imports `formalpruefung` from this file, and an unguarded `main()`
+// `test/award-formal.test.ts` imports `formalCheck` from this file, and an unguarded `main()`
 // runs on import: it found no --bounty, threw, and called process.exit(1). Every test still passed
 // and `pnpm test` still exited 1, with the failure shown as "Errors 1 error" rather than as a
 // failing test. Two cycles read the "475 passed" line and moved on. ops/deploy.sh refused the

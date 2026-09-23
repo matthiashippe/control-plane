@@ -21,7 +21,7 @@ The JSON keys of ergebnisse.json stay German: ops/bounty-test-export.py reads th
 published data set docs/research/data/2026-09-20-auftragstest.json from them, which is linked from
 the landing page under CC0.
 
-  OPENROUTER_API_KEY=... ops/bounty-test.py --auftrag <file.md> --agenten <file.json>
+  OPENROUTER_API_KEY=... ops/bounty-test.py --job <file.md> --agents <file.json>
 """
 import argparse, json, os, pathlib, sys, time, urllib.error, urllib.request
 
@@ -46,9 +46,9 @@ def ask(model: str, system: str, brief: str, key: str, timeout: int = 180) -> di
 
 def main() -> int:
     p = argparse.ArgumentParser()
-    p.add_argument("--auftrag", required=True, help="file holding the bounty brief")
-    p.add_argument("--agenten", required=True, help="JSON list of {name, genesis}")
-    p.add_argument("--modell", default="openai/gpt-5.2")
+    p.add_argument("--job", required=True, help="file holding the bounty brief")
+    p.add_argument("--agents", required=True, help="JSON list of {name, genesis}")
+    p.add_argument("--model", default="openai/gpt-5.2")
     p.add_argument("--out", default=".scratch/gtm/auftragstest")
     a = p.parse_args()
 
@@ -57,12 +57,12 @@ def main() -> int:
         print("OPENROUTER_API_KEY is missing", file=sys.stderr)
         return 2
 
-    brief = pathlib.Path(a.auftrag).read_text(encoding="utf-8").strip()
-    agents = json.loads(pathlib.Path(a.agenten).read_text(encoding="utf-8"))
+    brief = pathlib.Path(a.job).read_text(encoding="utf-8").strip()
+    agents = json.loads(pathlib.Path(a.agents).read_text(encoding="utf-8"))
     out = pathlib.Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
 
-    print(f"Brief ({len(brief.split())} words), model {a.modell}, {len(agents)} agents\n")
+    print(f"Brief ({len(brief.split())} words), model {a.model}, {len(agents)} agents\n")
     print("=" * 78)
     print(brief)
     print("=" * 78 + "\n")
@@ -71,7 +71,7 @@ def main() -> int:
     for ag in agents:
         t0 = time.time()
         try:
-            answer = ask(a.modell, ag["genesis"], brief, key)
+            answer = ask(a.model, ag["genesis"], brief, key)
         except urllib.error.HTTPError as e:
             print(f"-- {ag['name']}: ERROR {e.code} {e.read()[:200]!r}\n")
             continue
@@ -114,7 +114,7 @@ def main() -> int:
     print(f"Break-even of the bounty price at {n} entrants: ${break_even:.4f}. "
           f"Below that the population loses money on average.")
     (out / "ergebnisse.json").write_text(
-        json.dumps({"auftrag": brief, "modell": a.modell, "ergebnisse": results},
+        json.dumps({"auftrag": brief, "modell": a.model, "ergebnisse": results},
                    ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"\nWritten to {out}/")
     return 0
