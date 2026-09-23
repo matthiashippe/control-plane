@@ -123,6 +123,27 @@ else:
 PY
 }
 
+# Follow the service to wherever its pages actually live, once, and say so.
+#
+# deploy/rollout.sh calls this with https://cp.hippe.eu, and deploy/ is not touched without a
+# human. Since 2026-09-23 the pages on that host answer 301 to the canonical one, so five checks
+# failed with "301 instead of 200" against a deploy that was in fact correct: a smoke test that
+# goes red on a working service is worse than none, because the next real failure reads as noise.
+#
+# Testing the old host instead of following it would also be wrong. What has to work is what a
+# visitor gets, and a visitor gets the canonical host. So the redirect is followed once, from the
+# root, and the run continues there. Only a cross-host redirect counts; a path redirect on the
+# same host (/impressum -> /terms#impressum) is a check of its own further down and stays one.
+moved=$(curl -s -m 15 -o /dev/null -w '%{redirect_url}' "$BASE/" 2>/dev/null || true)
+if [[ -n "$moved" ]]; then
+  moved_origin="${moved%%/}"
+  moved_origin="$(printf '%s' "$moved" | sed -E 's#^(https?://[^/]+).*#\1#')"
+  if [[ "$moved_origin" != "$BASE" && "$moved_origin" =~ ^https?://[a-z0-9.-]+$ ]]; then
+    echo "note: $BASE sends its pages to $moved_origin, following once and testing there."
+    BASE="$moved_origin"
+  fi
+fi
+
 echo "Smoke test against $BASE"
 echo
 
