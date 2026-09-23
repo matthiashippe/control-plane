@@ -123,7 +123,14 @@ Jede Quote rechnet ab jetzt gegen diesen Nenner.
       Schweizer Leitung aus Issue #392, die nicht als Maschine gelten darf.
       `google.com` steht bewusst nicht auf der Liste, das haette Googlebot verschluckt.
 
-- [ ] **T1.6 Das Formular dorthin, wo die Leser sind.** Zahl: getippte fremde Laeufe, 0 auf 1.
+- [x] **T1.6 Das Formular dorthin, wo die Leser sind.** Erledigt 23.09. abends, ausgerollt.
+      Der Kasten steht auf `/` im `#how`-Block, direkt unter den Befunden aus dem curl-Beispiel,
+      mit verstecktem `via=form` und `src=home`. **Auf `/fix` bewusst nicht**, gegen den
+      Vorschlag der Runde: dort liest jemand mit kaputter Runtime, und der Check ist das Werkzeug
+      der Kaeuferseite. Der Ausgang dort traegt `src=fix`. Zwei Tests sind dabei verschaerft
+      worden, weil die alte Anforderung ("eine Tuer neben dem curl-Block") von einem Link
+      erfuellt war, den in 96 Stunden niemand genommen hat.
+      (Urspruenglich) Zahl: getippte fremde Laeufe, 0 auf 1.
       Das Leck liegt bei 171 zu 5, nicht bei 5 zu 0: `/` verlinkt `/check` dreimal ohne
       `src`-Marke, `/fix` kein einziges Mal. Erster Schritt: dieselbe GET-Form aus
       `src/public/checkpage.ts` auch auf `/` und in Schritt 3 von `/fix`, Ziel unveraendert
