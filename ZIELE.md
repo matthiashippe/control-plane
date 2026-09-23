@@ -59,6 +59,43 @@ ein Schluesselpaar, eine Ethereum-Signatur und USDC, um einen Auftrag zu stellen
       Erster Schritt danach: Konto anlegen, Schluessel in `.env` auf der VM, und der naechste
       Tagesscan sagt, ob es gewirkt hat.
 
+## Fiat, und wo die Grenze liegt
+
+Matthias am 23.09.: "auch Fiat-Waehrung im Kopf behalten. Fiat fuer Agents, Fiat fuer Customer,
+oder Customer zahlt in Fiat und Agent bekommt Crypto."
+
+Das ist die Entscheidung, an der die Ziele am 29.10. und 31.12. haengen, denn aus dem x402-Markt
+koennen 5.000 oder 250.000 USDC im Monat nicht kommen. Drei Formen, und sie kosten sehr
+unterschiedlich viel.
+
+**A. Fiat fuer Agenten.** Wir zahlen dem Gewinner Euro aus. Das verlangt eine Identitaetspruefung
+je Agent, Bankwege und ist ohne Umweg ein Auszahlungsgeschaeft. Dazu der praktische Einwand: die
+Gewinner sind Software, und die wenigsten haben ein Konto. Schwerste Form, geringster Nutzen.
+
+**B. Fiat fuer Kaeufer.** Der Kaeufer zahlt mit Karte und bekommt Credits, alles danach bleibt wie
+es ist. Credits bleiben nicht auszahlbar, `/terms` bleibt unveraendert, und es entsteht keine neue
+regulatorische Flaeche ueber den normalen Verkauf von Dienstguthaben hinaus. **Das trifft den
+gemessenen Engpass:** 43 von 43 Besuchern brauchten ein Schluesselpaar, eine Ethereum-Signatur und
+USDC, und null sind durchgekommen. Braucht: Matthias' Stripe-Konto, Punkt 4 unten.
+
+**C. Kaeufer zahlt Fiat, Agent bekommt Krypto.** Die Bruecke, und die groesste Reichweite auf
+beiden Seiten. Sie stoesst frontal gegen vier Stellen, die heute das Gegenteil sagen: `/terms`
+("Credits are not redeemable for money"), `/v1/credits/pricing` (`redeemable: false`), `llms.txt`,
+und `loop-constraints.md` ("Credits sind nie auszahlbar... Jede Auszahlbarkeit ist ein
+REJECT-Grund"). Geld von A nehmen und an B auszahlen ist der Punkt, an dem Finanzaufsicht
+anfaengt. **Das entscheidet kein Loop.** Es braucht Rat, und zwar bevor eine Zeile dafuer entsteht.
+
+**Und die vierte Sache, die nichts kostet und vielleicht den groessten Teil der Wirkung hat.**
+Ein Agent, der heute gewinnt, bekommt Guthaben, das er nur hier ausgeben kann, und die Seiten
+beschreiben es ausschliesslich ueber das, was es **nicht** ist. Fuer einen Agenten, dessen einzige
+Kosten Inferenz sind, kauft dieses Guthaben genau das, was er braucht. Aus unserem eigenen Ledger
+gemessen am 23.09.: vierzig Inferenz-Buchungen, im Schnitt **0,81 Cent je Antwort**, die letzten
+zwanzig zwischen 0,04 und 1,07. Ein Preis von 135 Cent sind damit rund **165 Antworten**. Auf
+`/jobs` steht "135 ¢ to the winner" und kein Wort davon.
+
+**Empfehlung:** B jetzt, sobald das Stripe-Konto da ist. Die Formulierung heute, sie kostet nichts.
+C nur mit Rat, und dann als eigene Entscheidung mit eigenem Datum.
+
 ## Was auf Matthias wartet
 
 Sieben Saetze, und alles andere laeuft. Stand 23.09., nichts davon darf der Loop selbst tun.

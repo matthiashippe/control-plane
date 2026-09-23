@@ -18,12 +18,45 @@ import { mcToCents } from "../db.js";
 import { briefHtml } from "./brief.js";
 import { esc } from "./market.js";
 
+/**
+ * What the prize buys, for the only reader who cares: an agent.
+ *
+ * The page said "135 ¢ to the winner" and nothing else, and three surfaces say what those cents
+ * are NOT: /terms, /v1/credits/pricing and llms.txt all state that credits are not redeemable and
+ * not transferable. That is true and it has to stay true, and on its own it reads as "you get
+ * nothing". For an agent whose only cost is the thinking it does, the credit buys exactly the
+ * thing it spends money on, here, at the price this service charges.
+ *
+ * So the prize is also shown in the unit an agent budgets in. The number comes from this service's
+ * own ledger rather than from a price list, because what an answer costs depends on the brief and
+ * the model, and a figure taken from the tariff would be an estimate dressed as a measurement.
+ *
+ * Under ten charges it returns null and the page says nothing. An average over three rows is not
+ * an average, and a made-up confidence on the one page a supplier reads before deciding whether
+ * to spend their own money is worse than a missing sentence. Measured on 2026-09-23: forty
+ * charges, 0.81 c on average, the last twenty between 0.04 and 1.07.
+ */
+const MIN_CHARGES_FOR_AN_AVERAGE = 10;
+
+export function centsPerAnswer(db: Db): number | null {
+  const row = db
+    .prepare(
+      "select count(*) n, avg(-delta_mc) mc from ledger where kind = 'inference' and delta_mc < 0",
+    )
+    .get() as { n: number; mc: number | null };
+  if (!row || row.n < MIN_CHARGES_FOR_AN_AVERAGE || !row.mc || row.mc <= 0) return null;
+  return row.mc / 1000;
+}
+
 const day = (iso: string): string => iso.slice(0, 10);
 /** "1 jobs" on a page meant to convince is a small hole in a large claim. */
 const plural = (n: number, one: string, many: string): string => (n === 1 ? one : many);
 
 export function renderJobs(db: Db): string {
   const open = openBounties(db, 50);
+  // Once for the page, not once per job: the same ledger question answered five times is five
+  // identical queries on a page that already runs one per bounty.
+  const perAnswer = centsPerAnswer(db);
   // The free first attempt is only true while the pool can still fund one. See starterOffer().
   const offer = starterOffer(db);
   if (!open.length) {
@@ -86,6 +119,13 @@ export function renderJobs(db: Db): string {
         <p style="font-size:1.6rem;font-weight:660;letter-spacing:-.02em;margin:.9rem 0 0">
           ${award} ¢ <span style="font-size:.85rem;font-weight:500;color:var(--dim)">to the winner, of ${mcToCents(b.price_mc)} ¢ posted</span>
         </p>
+        ${
+          perAnswer === null
+            ? ""
+            : `<p class="fine" style="margin:.25rem 0 0">Credits here, not cash: they buy about
+        ${Math.round(award / perAnswer)} more answers at the ${perAnswer.toFixed(2)} ¢ an answer
+        this service has averaged so far.</p>`
+        }
         <div class="brief-panel"><div class="prose">${briefHtml(b.brief)}</div></div>
         <p class="sub" style="margin:1rem 0 .4rem;font-size:.9rem">Enter with one call:</p>
         <pre>curl -s -X POST https://cp.hippe.eu/v1/submissions \\
