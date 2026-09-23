@@ -145,6 +145,18 @@ const oursClause = `(
 const OURS_ARGS = [...OURS, ...OUR_KEY_NAMES];
 const notOurs = `not ${oursClause}`;
 
+// The same test against a column that is not ledger.address.
+//
+// oursClause names ledger.address, so it only works inside a query on the ledger. The one number
+// the plan hangs on lives on bounties.creator, and writing the filter a second time by hand is
+// how the two drift: this report has already had three occasions where a figure about the market
+// quietly became a figure about us, each one a filter that did not cover a tool of ours.
+const notOursOn = (column) => `not (
+  ${column} in (${OURS.map(() => "?").join(",")})
+  or exists (select 1 from api_keys k where k.address = ${column}
+             and (${OUR_KEY_NAMES.map(() => "k.name like ?").join(" or ")}))
+)`;
+
 // How many wallets are not ours.
 //
 // `wallets` is printed as a headline figure and reads as usage. On 2026-09-21 it said 280, and 248
@@ -244,6 +256,34 @@ report.market = {
   // rate and not a forecast: consumption here comes in bursts, a probe run or a wave of seed
   // agents, and a per-day figure derived from that would be a made-up trend.
   starter_grants_left: Math.floor((500000 - one("select coalesce(sum(delta_mc),0) s from ledger where kind='grant'").s) / 15000),
+  // THE number, in money rather than in people.
+  //
+  // foreign_buyers counts somebody putting money down; this counts the whole round trip, because
+  // it only moves when all three things have happened: a stranger funded a job, an agent handed
+  // work in, and the buyer awarded it rather than taking the price back. A buyer who posts and
+  // then cancels leaves foreign_buyers at 1 and this at 0, which is the honest difference.
+  //
+  // Rolling 30 days and not since-the-beginning: one award in September says nothing about
+  // whether the market works in December, and a total that can only grow is a number that never
+  // reports a decline.
+  foreign_gmv_30d_mc: one(
+    `select coalesce(sum(b.price_mc),0) s from bounties b
+       where b.status='awarded' and b.closed_at > datetime('now','-30 day')
+         and ${notOursOn("b.creator")}`,
+    ...OURS_ARGS,
+  ).s,
+  // The commission actually earned from those, which is what would pay for anything.
+  // Joined on `ref` and not on a column: the ledger has no bounty_id. src/bounties/store.ts writes
+  // `bounty-fee:<id>` into ref when it books the commission, which is the only link between the
+  // two tables, and a query written against the column that ought to exist fails loudly rather
+  // than returning a plausible zero.
+  foreign_fee_30d_mc: one(
+    `select coalesce(sum(l.delta_mc),0) s from ledger l
+       join bounties b on l.ref = 'bounty-fee:' || b.id
+       where l.kind='bounty_fee' and b.closed_at > datetime('now','-30 day')
+         and ${notOursOn("b.creator")}`,
+    ...OURS_ARGS,
+  ).s,
   // THE number. Anything above zero means this stopped being our own demonstration.
   foreign_buyers: one(
     `select count(distinct address) n from ledger where kind='bounty_hold' and ${notOurs}`,

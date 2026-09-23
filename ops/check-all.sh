@@ -304,6 +304,11 @@ try:
     u = db.get('uncollected_mc', 0)
 except Exception:
     sys.exit(0)
+# The number the plan hangs on, first, and in money. foreign_buyers counts somebody putting
+# money down; this only moves once a stranger funded a job, an agent delivered, and the buyer
+# awarded rather than taking the price back. Rolling 30 days, so it can fall.
+print(f\"strangers' awarded volume, 30 days: {m['foreign_gmv_30d_mc']/1000:.2f} c   \"
+      f\"our commission from it: {m['foreign_fee_30d_mc']/1000:.2f} c\")
 print(f\"foreign buyers: {m['foreign_buyers']}   foreign agents: {m['foreign_agents']}   \"
       f\"awarded: {m['awarded']}   fee earned: {m['fee_earned_mc']/1000:.2f} c   \"
       f\"starter pool left: {m['starter_pool_left_mc']/1000:.0f} c \"

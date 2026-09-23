@@ -27,6 +27,10 @@ CHUNK = 2000
 USER_AGENT = "control-plane-research/1.0 (+https://cp.hippe.eu)"
 
 
+class TooMuchAtOnce(RuntimeError):
+    """The node refused because the answer would be too large. Ask for a smaller range."""
+
+
 def rpc(method: str, params: list, attempts: int = 6):
     """One JSON-RPC call, with the rate limit treated as a wait rather than an error."""
     body = json.dumps({"jsonrpc": "2.0", "id": 1, "method": method, "params": params}).encode()
@@ -45,6 +49,16 @@ def rpc(method: str, params: list, attempts: int = 6):
                     continue
                 raise RuntimeError(f"{method}: {message}")
             return answer["result"]
+        except urllib.error.HTTPError as failure:
+            # 413 is the answer being too big, not the request, and no number of retries makes a
+            # block range hold fewer transfers. Raised as its own type so the caller can halve the
+            # range instead of trying the same thing six times, which is what happened on
+            # 2026-09-23: the daily scan failed, retried for a minute and gave up.
+            if failure.code == 413:
+                raise TooMuchAtOnce(f"{method}: {failure}") from failure
+            if attempt == attempts - 1:
+                raise RuntimeError(f"{method}: {failure}") from failure
+            time.sleep(pause); pause *= 2
         except (urllib.error.URLError, TimeoutError) as failure:
             if attempt == attempts - 1:
                 raise RuntimeError(f"{method}: {failure}") from failure
@@ -64,18 +78,41 @@ def block_time(block: int, cache: dict) -> str:
     return cache[block]
 
 
+# The smallest range worth asking for. Below this a 413 is not about the range any more, and
+# halving forever would turn one bad answer into thousands of calls.
+MIN_CHUNK = 25
+
+
+def get_logs(start: int, end: int, payto_topic: str, depth: int = 0):
+    """The logs in one range, halving the range whenever the node says the answer is too large.
+
+    Base produces a block every two seconds, so CHUNK of 2000 is about 67 minutes of chain, and it
+    held for months. It stops holding the day a busy stretch puts more transfers in that window
+    than the node will serialise, and that day was 2026-09-23. Nothing about the range is wrong;
+    it is simply too wide now, and it will be too wide again.
+    """
+    try:
+        return rpc("eth_getLogs", [{
+            "address": USDC,
+            "fromBlock": hex(start),
+            "toBlock": hex(end),
+            "topics": [TRANSFER, None, payto_topic],
+        }])
+    except TooMuchAtOnce:
+        if end - start + 1 <= MIN_CHUNK:
+            raise
+        middle = start + (end - start) // 2
+        print(f"# {start}-{end} too large, splitting at {middle}", file=sys.stderr)
+        return get_logs(start, middle, payto_topic, depth + 1) + get_logs(middle + 1, end, payto_topic, depth + 1)
+
+
 def scan(first: int, last: int):
     cache: dict[int, str] = {}
     found = 0
     payto_topic = "0x" + PAYTO[2:].lower().rjust(64, "0")
     for start in range(first, last + 1, CHUNK):
         end = min(start + CHUNK - 1, last)
-        logs = rpc("eth_getLogs", [{
-            "address": USDC,
-            "fromBlock": hex(start),
-            "toBlock": hex(end),
-            "topics": [TRANSFER, None, payto_topic],
-        }])
+        logs = get_logs(start, end, payto_topic)
         for entry in logs:
             block = int(entry["blockNumber"], 16)
             sender = "0x" + entry["topics"][1][-40:]

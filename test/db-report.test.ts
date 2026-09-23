@@ -319,3 +319,79 @@ describe("The market numbers in the database report", () => {
     expect(r.market.starter_pool_left_mc).toBe(500_000 - 15 * MC_PER_CENT);
   });
 });
+
+describe("the money a stranger actually moved", () => {
+  /**
+   * foreign_gmv_30d_mc is the one number the plan hangs on, and it was zero on the day it was
+   * written, as it should have been. A figure that has only ever been zero is not a measurement
+   * until something makes it move, so these two cases move it.
+   *
+   * It counts the whole round trip and not an intention: a stranger funded a job, an agent handed
+   * work in, and the buyer awarded it. foreign_buyers goes to 1 the moment money is held; this
+   * stays at 0 until the award, which is the difference between somebody trying and a market
+   * working.
+   */
+  function bounty(
+    db: ReturnType<typeof openDb>,
+    id: string,
+    creator: string,
+    priceMc: number,
+    status: string,
+    closedAt: string | null,
+  ) {
+    db.prepare(
+      `insert into wallets (address, created_at) values (?, datetime('now'))
+         on conflict(address) do nothing`,
+    ).run(creator);
+    db.prepare(
+      `insert into bounties (id, creator, kind, brief, price_mc, deadline, status, created_at, closed_at)
+       values (?, ?, 'factual', 'a brief', ?, datetime('now','+1 day'), ?, datetime('now'), ?)`,
+    ).run(id, creator, priceMc, status, closedAt);
+  }
+
+  it("stays at zero while the buyer is us, however much we award ourselves", () => {
+    const r = withDb((db) => {
+      bounty(db, "ours-1", OPERATOR, 250 * MC_PER_CENT, "awarded", new Date().toISOString());
+      postLedger(db, {
+        address: OPERATOR,
+        kind: "bounty_fee",
+        deltaMc: 25 * MC_PER_CENT,
+        ref: "bounty-fee:ours-1",
+      });
+    });
+    expect(r.market.foreign_gmv_30d_mc, "our own award is not the market working").toBe(0);
+    expect(r.market.foreign_fee_30d_mc).toBe(0);
+  });
+
+  it("counts an awarded job whose buyer is a stranger, and the fee with it", () => {
+    const r = withDb((db) => {
+      bounty(db, "theirs-1", STRANGER, 250 * MC_PER_CENT, "awarded", new Date().toISOString());
+      postLedger(db, {
+        address: OPERATOR,
+        kind: "bounty_fee",
+        deltaMc: 25 * MC_PER_CENT,
+        ref: "bounty-fee:theirs-1",
+      });
+    });
+    expect(r.market.foreign_gmv_30d_mc).toBe(250 * MC_PER_CENT);
+    expect(r.market.foreign_fee_30d_mc).toBe(25 * MC_PER_CENT);
+  });
+
+  it("does not count a stranger who funded a job and then got the money back", () => {
+    // The honest difference between foreign_buyers and this: one counts the attempt.
+    const r = withDb((db) => {
+      bounty(db, "theirs-2", STRANGER, 250 * MC_PER_CENT, "cancelled", new Date().toISOString());
+    });
+    expect(r.market.foreign_gmv_30d_mc).toBe(0);
+  });
+
+  it("forgets an award older than thirty days, so the number can fall", () => {
+    // A total that can only grow never reports a decline, and a market that stopped working in
+    // December would still read as one that worked in September.
+    const old = new Date(Date.now() - 40 * 86400_000).toISOString();
+    const r = withDb((db) => {
+      bounty(db, "theirs-3", STRANGER, 250 * MC_PER_CENT, "awarded", old);
+    });
+    expect(r.market.foreign_gmv_30d_mc).toBe(0);
+  });
+});
