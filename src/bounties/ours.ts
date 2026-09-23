@@ -40,6 +40,13 @@ export const OUR_ADDRESSES = [
   // reason the fee address does, and more urgently, because a handle minted by our own probe would
   // otherwise appear as the first foreign buyer this project has ever had.
   "key:99e4d0eec698925fed5ac8099adf2f2263f1fe51",
+  // The keyless AGENT handle the supply-side cold start used on 2026-09-23 at 20:5x UTC, walking
+  // POST /v1/auth/keyless against production for the first time: key, board, balance, submission.
+  // The submission is on a live job, so without this line it would read as the first foreign agent
+  // this market has ever had, in the one number the whole plan is measured by. Claimed for the
+  // same reason as the buyer handle above, and the lesson is the same one twice in a day: a walk
+  // against production leaves a mark, and the mark has to be owned in the same minute.
+  "key:c6989cf4fc8217434c2c422ea6bc857f98291f2e",
 ];
 
 /** SQL LIKE patterns. A key carrying one of these names was provisioned by a tool of ours. */

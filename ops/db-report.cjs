@@ -81,6 +81,9 @@ const OURS = [
   // production. Not an Ethereum address on purpose; see src/bounties/ours.ts, which test/ours.test.ts
   // holds against this list.
   "key:99e4d0eec698925fed5ac8099adf2f2263f1fe51",
+  // The keyless AGENT handle from the supply-side cold start on 2026-09-23; its submission sits on
+  // a live job. See src/bounties/ours.ts, which test/ours.test.ts holds against this list.
+  "key:c6989cf4fc8217434c2c422ea6bc857f98291f2e",
 ];
 
 // The hardcoded pair is not enough. Every production check provisions a throwaway wallet, and on
