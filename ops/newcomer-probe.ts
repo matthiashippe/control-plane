@@ -5,9 +5,15 @@
  * the starter credit, the market, the MCP route. The claim the landing page actually makes is the
  * sequence, and the sequence had never been run end to end by anybody who started with nothing.
  *
- * What it costs: one starter grant, 15 cents from a pool of 500, plus about a cent of real
- * inference. That is why it is not in `ops/check-all.sh` and has to be asked for by hand. Run it
- * before an article goes out, not every cycle.
+ * What it costs: one starter grant plus about a cent of real inference. That is why it is not in
+ * `ops/check-all.sh` and has to be asked for by hand. The run reads the pool first, prints what
+ * fraction of it this takes, and refuses when too few grants would be left: on 2026-09-23 the pool
+ * was at 215 c of the original 500 and every one of the 19 grants ever issued had gone to us.
+ *
+ * When to spend one: after a change to the way in, which means the auth path, the starter credit
+ * or the market calls. Not on a schedule, and not as a ritual at the end of a cycle. The pool
+ * exists to greet the first strangers, and the day the issue answers go out is the day it is
+ * needed.
  *
  * It submits to a throwaway job it posts and cancels itself, never to a real one. A check that
  * changes the market it is checking is not a check, and since 2026-09-21 the open list publishes
@@ -45,6 +51,37 @@ async function json(path: string, init?: RequestInit): Promise<any> {
 
 async function main(): Promise<number> {
   console.log(`The whole cold start against ${BASE}, starting from nothing.\n`);
+
+  // What this run takes, asked of the service rather than written in the header.
+  //
+  // The header said "15 cents from a pool of 500" and that number was right when it was written.
+  // Measured on 2026-09-23: the pool is at 215 c, and all 19 grants ever issued went to us. So the
+  // cost of one run is no longer 3 per cent of the pool, it is 7, and the sentence that justifies
+  // spending it was the last place anybody would have looked.
+  //
+  // The pool exists to greet the first strangers. The day the issue answers go out is the day it
+  // is needed, and a probe that keeps proving a newcomer can get in would spend it on proving it.
+  // So the number is read before it is taken, the fraction is printed, and the run refuses when
+  // too few grants would be left. CP_PROBE_MIN_GRANTS moves the floor, which is also how the
+  // refusal gets proved without emptying a real pool.
+  const before = (await json("/v1/status")).body as {
+    starter_pool_left_cents: number;
+    starter_credit_cents: number;
+  };
+  const grantsLeft = Math.floor(before.starter_pool_left_cents / before.starter_credit_cents);
+  const floor = Number(process.env.CP_PROBE_MIN_GRANTS ?? 5);
+  console.log(
+    `   pool   ${before.starter_pool_left_cents} c left, ${grantsLeft} newcomer(s) at ` +
+      `${before.starter_credit_cents} c each. This run takes one of them.\n`,
+  );
+  if (grantsLeft - 1 < floor) {
+    console.log(
+      `REFUSED  ${grantsLeft} grant(s) left and the floor is ${floor}. The pool is there to greet\n` +
+        `         strangers, not to keep proving that it can. Run it after a change to the way in,\n` +
+        `         not on a schedule, or set CP_PROBE_MIN_GRANTS lower if you mean it.`,
+    );
+    return 1;
+  }
 
   // 1. A wallet nobody has ever seen, and a key in four calls. No runtime, no chain transaction.
   const account = privateKeyToAccount(generatePrivateKey());
