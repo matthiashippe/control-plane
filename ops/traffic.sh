@@ -9,6 +9,8 @@
 #   ops/traffic.sh          last 24 hours
 #   ops/traffic.sh 72       last 72 hours
 set -euo pipefail
+# Set when a python block dies, so a dead analysis cannot leave through a zero exit code.
+FUNNEL_BROKE=0
 
 # Only the funnel, for ops/check-all.sh. The column is the one number the standing order is about,
 # and a report nobody reads it in is a number nobody sees. Parsed before HOURS, because the first
@@ -465,7 +467,17 @@ if dropped:
     print("   set aside before any of that:")
     for reason, n in dropped.most_common():
         print(f"     {n:>4}  {reason}")
-' || true
+' || {
+  # `|| true` stood here, and it turned a dead block into a clean run. On 2026-09-23 a NameError
+  # in this python killed the funnel column, the traceback went to stderr, the script exited 0,
+  # and everything after it printed as if nothing had happened. ops/check-all.sh reads the exit
+  # code; it would have called that check passed.
+  #
+  # Still not an abort: the sections after this one read the same log independently and are worth
+  # having even when the column is gone. But the run says so and carries it to the exit code.
+  echo "   (the funnel could not be computed. The traceback is above; the sections below still ran.)" >&2
+  FUNNEL_BROKE=1
+}
 echo
 
 ROWS="${CP_TRAFFIC_LINES:-25}"
@@ -795,3 +807,8 @@ echo "-- Error answers to strangers (what a visitor got to see) --"
 jq -r --argjson since "$since" --argjson own "$own_json" \
   "select(.ts > \$since) | $FOREIGN | select(.status >= 400) | select(.request.uri | test(\"wp-|php|\\\\.env|\\\\.git|admin|xmlrpc\") | not) | [(.status|tostring), .request.uri] | @tsv" "$log" \
   | sort | uniq -c | sort -rn | head -10 || echo "  none"
+
+# A report whose main column died is not a report that ran.
+if [[ "$FUNNEL_BROKE" != "0" ]]; then
+  exit 1
+fi
