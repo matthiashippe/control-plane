@@ -53,7 +53,7 @@ hier tun kann.
       keine Dreierfigur, keine Werbevokabel, die Qualität behauptet statt sie zu zeigen.
 - [ ] **Kein Deploy ohne die Bedingungen aus `loop-constraints.md`:** `pnpm test` grün, bei
       Laufzeitänderungen `pnpm e2e` grün, Prüfung von außen danach, dazu
-      `CP_URL=https://cp.hippe.eu pnpm tsx harness/e2e/markt.ts` mit `MARKT OK`.
+      `CP_URL=https://cp.hippe.eu pnpm tsx harness/e2e/market.ts` mit `MARKET OK`.
 
 ## Nicht Teil dieses Goals
 Website-Umbau (Goal 11), MCP und Runtime-Skill (Goal 12), der GTM-Plan (Goal 13) und die

@@ -111,7 +111,7 @@ run "health from outside" bash -c "code=\$(curl -s -o /dev/null -m 10 -w '%{http
 # the front page untrue.
 run --undetermined-on 2 "conway still broken" ./ops/conway-zustand.sh
 
-run "market guards" env CP_URL="$BASE" pnpm -s tsx harness/e2e/markt.ts
+run "market guards" env CP_URL="$BASE" pnpm -s tsx harness/e2e/market.ts
 run "journeys match the service" ./ops/check-journeys.sh
 run --undetermined-on 2 "pages say nothing obviously wrong" ./ops/check-pages.sh
 # Added 2026-09-21. The three series below were printed by this script and never checked, so a cron

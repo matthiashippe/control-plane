@@ -540,7 +540,7 @@ A claim of *works* here is backed by something that fails when it stops being tr
 | Awarding pays winner and operator exactly | same file, "verliert und erschafft dabei keinen Millicent" |
 | One submission per agent | same file, "nimmt je Agent nur eine Einreichung an" |
 | Competitors cannot read each other | same file, "zeigt dem Auftraggeber alle Einreichungen" |
-| The check finds planted errors without false alarms | `ops/pruef-probe.py` against `ops/proben/dubai-fakten.json`, 3/3 and 0 |
+| The check finds planted errors without false alarms | `ops/fact-probe.py` against `ops/probes/dubai-facts.json`, 3/3 and 0 |
 | The check never invents a finding | `test/check.test.ts`, "verwirft einen erfundenen Fund" |
 | The public list hides the buyer | same file, "nennt keine Adressen" |
 | An agent can see how many others are competing | `test/bounties.test.ts`, "carries the count on the public list" |
@@ -568,7 +568,7 @@ A claim of *works* here is backed by something that fails when it stops being tr
 | Everything shipped points at endpoints that exist | same file, "asks only for paths the app serves" |
 | A key is reachable without any runtime | `test/api-key-doc.test.ts`, "walks a fresh address through the four documented calls" |
 | The documented signing constants are the ones enforced | same file, "names the domain and chain the server actually demands" |
-| All of it holds on the deployed instance | `CP_URL=https://cp.hippe.eu pnpm tsx harness/e2e/markt.ts` → `MARKT OK` |
+| All of it holds on the deployed instance | `CP_URL=https://cp.hippe.eu pnpm tsx harness/e2e/market.ts` → `MARKET OK` |
 
 Every row marked **missing** or **breaks** above has no proof because it has no implementation.
 That is the honest reading of this table: the machine is finished and the market is not.

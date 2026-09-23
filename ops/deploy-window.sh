@@ -26,10 +26,10 @@ LEAD_SECONDS=60
 KEY="${CP_SSH_KEY:-$HOME/.ssh/id_ed25519_automaton}"
 HOST="${CP_HOST:-root@76.13.144.207}"
 source "$(dirname "$0")/own-ips.sh"
-OWN=$(eigene_ips)
+OWN=$(own_ips)
 SSH=(ssh -i "$KEY" -o BatchMode=yes -o ConnectTimeout=10)
 
-# `eigene_ips` asks the VM which address this machine goes out through right now and keeps every
+# `own_ips` asks the VM which address this machine goes out through right now and keeps every
 # one it has ever seen. A constant alone went stale on 2026-09-22 when the line reconnected, and
 # here that counts our own post-deploy checks as strangers inside the window: the one number this
 # script exists to produce, wrong in the direction that looks like traffic.

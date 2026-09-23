@@ -23,11 +23,11 @@ HOST="${CP_HOST:-root@76.13.144.207}"
 # consists of us.
 #
 # The code-host (Google Cloud, 35.242.237.124) joined on 2026-09-20 and is the most treacherous of
-# the three: any job that runs ops/check-journeys.sh or harness/e2e/markt.ts against production
+# the three: any job that runs ops/check-journeys.sh or harness/e2e/market.ts against production
 # otherwise shows up as a stranger probing exactly the new market paths. That is precisely the
 # signal we are waiting for, and it would be our own.
 source "$(dirname "$0")/own-ips.sh"
-OWN=$(eigene_ips)
+OWN=$(own_ips)
 # That list is a starting point, not the answer. Our own address is not a constant: on 2026-09-22
 # between 06:41 and 07:02 UTC this machine's line reconnected and got 62.224.55.59 instead of
 # 82.194.125.90, and the next run of this script presented our own check-all.sh as the best news
@@ -84,7 +84,7 @@ fi
 
 # Who is us, according to this run rather than according to a constant typed in earlier.
 #
-# `eigene_ips` above brings the written history of every address this machine has had, including
+# `own_ips` above brings the written history of every address this machine has had, including
 # the one the ssh connection comes from right now. On top of that, this log has a second source
 # only it can see: every address that sent `control-plane-check/1.0`, the user agent our own checks
 # use and nobody else does.

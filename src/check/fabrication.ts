@@ -7,7 +7,7 @@
  * into a Dubai listing, a promise the briefing does not contain and for which the seller is liable.
  *
  * The command line version including the measurement series is in `ops/invention-check.py`, the
- * sample with known ground truth in `ops/proben/dubai-fakten.json`. Measured on 20.09.2026: on a
+ * sample with known ground truth in `ops/probes/dubai-facts.json`. Measured on 20.09.2026: on a
  * factual briefing three out of three planted errors found, no false alarm; on marketing copy 23
  * findings across nine submissions, which is why the second mode exists for that case.
  *

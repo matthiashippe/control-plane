@@ -11,8 +11,8 @@
  * chain; loop-constraints.md forbids that. The market's most important property can be shown
  * anyway, namely that nothing comes into being without cover.
  *
- *   CP_URL=https://cp.hippe.eu pnpm tsx harness/e2e/markt.ts
- *   CP_URL=https://cp.hippe.eu pnpm tsx harness/e2e/markt.ts --fresh
+ *   CP_URL=https://cp.hippe.eu pnpm tsx harness/e2e/market.ts
+ *   CP_URL=https://cp.hippe.eu pnpm tsx harness/e2e/market.ts --fresh
  *
  * It used to say: "Creates two throwaway keys in the target database. That costs nothing and is
  * intended." That was true of a run somebody did by hand before a release. It stopped being true
@@ -206,11 +206,11 @@ async function main(): Promise<number> {
   await revoke(poster, "poster");
   await revoke(applicant, "applicant");
 
-  console.log(`\n${failures === 0 ? "MARKT OK" : `MARKT FAIL: ${failures} failures`}`);
+  console.log(`\n${failures === 0 ? "MARKET OK" : `MARKET FAIL: ${failures} failures`}`);
   return failures === 0 ? 0 : 1;
 }
 
 main().then((c) => process.exit(c), (e) => {
-  console.error("MARKT FAIL:", (e as Error).message);
+  console.error("MARKET FAIL:", (e as Error).message);
   process.exit(2);
 });

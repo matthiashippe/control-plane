@@ -109,7 +109,7 @@ herein; das ist der Eingang, nicht die Ueberschrift. Der genaue Wortlaut ist Goa
    `POST /v1/check` mit beiden Auftragsarten, Auftraege mit Hinterlegung im Ledger
    (`/v1/bounties`, `cancel`, `award`), Einreichungen (`/v1/submissions`), Verfall bei abgelaufener
    Frist, oeffentliche Liste unter `/bounties.json`, zehn Prozent Vermittlungsgebuehr,
-   `docs/bounties.md`. 248 Tests, `pnpm e2e` gruen, `harness/e2e/markt.ts` sagt `MARKT OK` gegen
+   `docs/bounties.md`. 248 Tests, `pnpm e2e` gruen, `harness/e2e/market.ts` sagt `MARKET OK` gegen
    die Produktion.
 
 **Ab hier ist der Engpass nicht mehr der Bau.** Der Markt ist fertig, beschrieben und oeffentlich

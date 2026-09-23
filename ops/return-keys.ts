@@ -1,7 +1,7 @@
 /**
  * Hand back every key a wallet of ours is still holding, except the one in use.
  *
- * `harness/e2e/markt.ts` minted a fresh key on every run for two years' worth of runs in two days
+ * `harness/e2e/market.ts` minted a fresh key on every run for two years' worth of runs in two days
  * and never gave one back. By 2026-09-22 this instance held 453 API keys, every one able to sign
  * in, 350 of them on those two wallets. The tools return theirs now; this is for the pile that was
  * already there.

@@ -9,5 +9,5 @@ harness/state/
 .scratch/
 !deploy/.env.example
 
-# Python-Bytecode aus den ops-Skripten (ops/pruef-probe.py importiert erfindungspruefung).
+# Python-Bytecode aus den ops-Skripten (ops/fact-probe.py importiert invention-check.py).
 __pycache__/

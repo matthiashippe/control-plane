@@ -12,18 +12,29 @@ that is exactly where the check on marketing copy failed.
 Both are measured separately: hits (was the planted error found, with the right kind) and false
 alarms (how many findings came on top that nobody planted).
 
-  OPENROUTER_API_KEY=... ops/pruef-probe.py --probe ops/proben/dubai-fakten.json
+  OPENROUTER_API_KEY=... ops/fact-probe.py --probe ops/probes/dubai-facts.json
 """
-import argparse, json, os, pathlib, sys
+import argparse, importlib.util, json, os, pathlib, sys
 
-sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-from erfindungspruefung import ask, normalise  # noqa: E402
+# The checker this probe exercises lives in ops/invention-check.py, and a hyphen cannot appear in
+# an import statement. It used to be importable under a one-word German name; the language pass on
+# 2026-09-22 renamed the file and left this import pointing at a module that no longer existed, so
+# the probe raised ModuleNotFoundError on every run from then until 2026-09-23. Nothing noticed,
+# because docs/journeys.md cites its result as evidence and nobody re-ran it. Loading it by path
+# keeps the hyphenated filename and makes the dependency explicit enough to fail loudly.
+_checker = pathlib.Path(__file__).resolve().parent / "invention-check.py"
+if not _checker.is_file():
+    sys.exit(f"{_checker} is not there; this probe has nothing to exercise.")
+_spec = importlib.util.spec_from_file_location("invention_check", _checker)
+_mod = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_mod)
+ask, normalise = _mod.ask, _mod.normalise
 
 
 def main() -> int:
     p = argparse.ArgumentParser()
     p.add_argument("--probe", required=True)
-    p.add_argument("--modell", default="openai/gpt-5.2")
+    p.add_argument("--model", default="openai/gpt-5.2")
     a = p.parse_args()
 
     key = os.environ.get("OPENROUTER_API_KEY")
@@ -38,7 +49,7 @@ def main() -> int:
     for sample in d["samples"]:
         text = sample["text"]
         text_norm = normalise(text)
-        raw = ask(a.modell, briefing, text, key)
+        raw = ask(a.model, briefing, text, key)
         # Only findings with a findable quote count, the same as in the tool itself.
         findings = [b for b in (raw.get("befunde") or [])
                     if (b.get("zitat") or "").strip()

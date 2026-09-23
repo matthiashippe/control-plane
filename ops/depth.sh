@@ -57,7 +57,7 @@ HOST="${CP_HOST:-root@76.13.144.207}"
 # Not built here: this line and the two traffic scripts got it wrong the same way, so it lives in
 # one place now and keeps a written history of every address this machine has had.
 source "$(dirname "$0")/own-ips.sh"
-OWN=$(eigene_ips)
+OWN=$(own_ips)
 
 # A log from a file instead of from the VM, so the counting can be shown to work rather than
 # assumed to. A filter that throws everything away prints exactly what an empty log prints, and on

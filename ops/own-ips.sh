@@ -17,23 +17,23 @@
 # it is evidence, not a scratch file. Filtering an address that later belongs to somebody else
 # loses a real reader, which is the direction this counter must err in.
 #
-#   source ops/own-ips.sh; OWN=$(eigene_ips)
+#   source ops/own-ips.sh; OWN=$(own_ips)
 
 # Resolved here and not inside the function: ${BASH_SOURCE[0]} names the file being sourced at
 # THIS moment, and by the time the function runs it can be empty. It was, and the function
 # quietly created a second list in whatever directory the caller happened to stand in, where
 # nobody commits it. A history that writes to the wrong place is not a history.
-CP_EIGENE_IPS_DATEI="${CP_EIGENE_IPS_DATEI:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/own-ips.txt}"
+CP_OWN_IPS_FILE="${CP_OWN_IPS_FILE:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/own-ips.txt}"
 
-eigene_ips() {
-  local list_file="$CP_EIGENE_IPS_DATEI"
+own_ips() {
+  local list_file="$CP_OWN_IPS_FILE"
   local key="${CP_SSH_KEY:-$HOME/.ssh/id_ed25519_automaton}"
   local host="${CP_HOST:-root@76.13.144.207}"
   local live
   # Missing means the path is wrong, not that the history is empty. Say so rather than start a
   # fresh one somewhere else.
   if [[ ! -f "$list_file" ]]; then
-    echo "eigene_ips: $list_file is not there. The list of our own addresses lives in the" >&2
+    echo "own_ips: $list_file is not there. The list of our own addresses lives in the" >&2
     echo "            repository; without it every traffic count is guesswork." >&2
     return 1
   fi

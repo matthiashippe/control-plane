@@ -150,7 +150,7 @@ const notOurs = `not ${oursClause}`;
 // `wallets` is printed as a headline figure and reads as usage. On 2026-09-21 it said 280, and 248
 // of those carried a key named `harness-markt-poster` or `harness-markt-applicant`: two per run of
 // `ops/check-all.sh`, 110 runs in one day. The market check was 89 per cent of the number meant to
-// show how many people are here. `harness/e2e/markt.ts` keeps its two accounts from that day on,
+// show how many people are here. `harness/e2e/market.ts` keeps its two accounts from that day on,
 // so it stops growing, but the 248 already in the database stay, because deleting rows from a
 // production ledger to make a number look better is the opposite of the point.
 const fremdeWallets = `select w.address from wallets w where not (
