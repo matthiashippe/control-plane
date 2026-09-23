@@ -26,12 +26,20 @@ CP_ERROR_PATTERN="${CP_ERROR_PATTERN:-\[app\] |provider_unavailable|settlement_f
 health_code=$(curl -s -m 10 -o /tmp/cp-health.$$ -w '%{http_code}' "$CP_URL/health" 2>/dev/null || echo 000)
 health_body=$(cat /tmp/cp-health.$$ 2>/dev/null); rm -f /tmp/cp-health.$$
 cert_end=$(echo | openssl s_client -servername "$HOSTNAME_ONLY" -connect "$HOSTNAME_ONLY:443" 2>/dev/null | openssl x509 -noout -enddate 2>/dev/null | cut -d= -f2)
-vm_stats=$("${SSH[@]}" 'cd /opt/control-plane/repo/deploy && printf "%s|%s|%s|%s|%s" \
+# Eight placeholders for eight values. printf repeats its format when it is handed more arguments
+# than it has slots, so the five-slot version silently joined field five and six without a
+# separator and the parser then tried to read the Docker summary as an integer. The count of %s
+# has to match the count of arguments below, and that is the only reason this line is worth a
+# comment.
+vm_stats=$("${SSH[@]}" 'cd /opt/control-plane/repo/deploy && printf "%s|%s|%s|%s|%s|%s|%s|%s" \
   "$(docker compose -f docker-compose.prod.yml ps --format "{{.Service}}:{{.State}}" | paste -sd, -)" \
   "$(df -h / | awk "NR==2{print \$5}")" \
   "$(free -m | awk "NR==2{printf \"%d/%d\", \$3, \$2}")" \
   "$(docker inspect deploy-cp-1 --format "{{.RestartCount}}" 2>/dev/null || echo -1)" \
-  "$(docker compose -f docker-compose.prod.yml logs --since 24h cp 2>/dev/null | grep -ciE "'"$CP_ERROR_PATTERN"'" | head -1)"' 2>/dev/null)
+  "$(docker compose -f docker-compose.prod.yml logs --since 24h cp 2>/dev/null | grep -ciE "'"$CP_ERROR_PATTERN"'" | head -1)" \
+  "$(df -BM / | awk "NR==2{print \$4}" | tr -d M)" \
+  "$(docker system df --format "{{.Type}}={{.Size}}" 2>/dev/null | paste -sd, -)" \
+  "$(docker exec deploy-caddy-1 stat -c %s /var/log/caddy/access.log 2>/dev/null || echo 0)"' 2>/dev/null)
 db_json=$("${SSH[@]}" 'cd /opt/control-plane/repo/deploy && docker compose -f docker-compose.prod.yml exec -T cp node -' < "$DIR/db-report.cjs" 2>/dev/null)
 or_json=$(curl -s -m 10 https://openrouter.ai/api/v1/credits -H "Authorization: Bearer ${OPENROUTER_API_KEY:-none}" 2>/dev/null)
 payto_hex=$(curl -s -m 10 -X POST https://mainnet.base.org -H 'content-type: application/json' \
@@ -51,9 +59,26 @@ if os.environ.get("CERT_END"):
     except Exception: pass
 vm = {}
 parts = os.environ.get("VM_STATS", "").split("|")
-if len(parts) == 5:
+# Five fields until 2026-09-23, eight after. `== 5` silently produced an empty vm block against
+# the longer line, which reads as "the VM did not answer" when the VM answered perfectly. A length
+# check that fails closed on its own extension is worse than no check.
+if len(parts) >= 5:
     num = lambda x, d=0: int((x or "").strip().splitlines()[0]) if (x or "").strip() else d
-    vm = {"compose": parts[0], "disk_used": parts[1], "mem_mb": parts[2], "restarts": num(parts[3], -1), "errors_24h": num(parts[4])}
+    # A percentage on its own warns of nothing: 15 % today and 15 % tomorrow, until it is 90 %.
+    # What grows here is the Docker build cache, one layer set per deploy, and the access log,
+    # about 10 MB a day with nothing rotating it. Measured on 2026-09-23: 41 GB free, 3.9 GB of
+    # build cache with 3.3 GB reclaimable, and a 30 MB log. Nothing to do yet, and the numbers are
+    # printed so the day there is something to do arrives as a reading and not as an outage.
+    vm = {
+        "compose": parts[0],
+        "disk_used": parts[1],
+        "mem_mb": parts[2],
+        "restarts": num(parts[3], -1),
+        "errors_24h": num(parts[4]),
+        "disk_free_mb": num(parts[5]) if len(parts) > 5 else None,
+        "docker": parts[6] if len(parts) > 6 else "",
+        "access_log_mb": round(num(parts[7]) / 1048576, 1) if len(parts) > 7 else None,
+    }
 orc = j(os.environ.get("OR_JSON", ""), {}) or {}
 ord_ = orc.get("data", {})
 payto = None

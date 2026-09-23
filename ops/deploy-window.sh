@@ -48,8 +48,13 @@ log=$(mktemp); trap 'rm -f "$log"' EXIT
 # Measured on 2026-09-22: `cat` over ssh took 40 seconds for 20,726,086 bytes and the same file
 # through `gzip -c` took 4.5. The 45 second timeout below started firing intermittently on this
 # very run, and the failure looks exactly like an outage on a tool whose whole job is to tell an
-# outage from a quiet minute. JSON logs compress about tenfold, so this buys back the margin
-# without changing a byte of what is read.
+# outage from a quiet minute.
+#
+# Re-measured on 2026-09-23 at 30,657,499 bytes: 1.1 seconds end to end, and gzip turns the file
+# into 1.3 MB on the wire. So the compression buys more than tenfold and the timeout is nowhere
+# near. The margin is worth knowing because the log grows about 10 MB a day and nothing rotates it;
+# at this rate the 45 seconds hold for a long time, and the number to watch is the transfer, not
+# the file.
 #
 # The real answer is log rotation, and that lives in deploy/, which is not touched without a human.
 if ! timeout 45 "${SSH[@]}" -o ServerAliveInterval=5 "$HOST" \
