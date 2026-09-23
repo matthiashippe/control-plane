@@ -77,6 +77,10 @@ const OURS = [
   // the address printed in `/.well-known/x402` as the payment recipient, so it is ours by
   // construction and never anybody else's.
   "0x914102284463f4f58b1d2f6db9ac80bfcaa7d614",
+  // The handle ops/keyless-walk.sh minted on 2026-09-23 walking the keyless path against
+  // production. Not an Ethereum address on purpose; see src/bounties/ours.ts, which test/ours.test.ts
+  // holds against this list.
+  "key:99e4d0eec698925fed5ac8099adf2f2263f1fe51",
 ];
 
 // The hardcoded pair is not enough. Every production check provisions a throwaway wallet, and on

@@ -34,6 +34,12 @@ export const OUR_ADDRESSES = [
   // the address printed in `/.well-known/x402` as the payment recipient, so it is ours by
   // construction and never anybody else's.
   "0x914102284463f4f58b1d2f6db9ac80bfcaa7d614",
+  // The keyless handle `ops/keyless-walk.sh` minted on 2026-09-23 at 15:00 UTC, walking Goal 16's
+  // path against production for the first time. It is not an Ethereum address and never was: the
+  // keyless door mints `key:` plus forty hex (src/auth/keyless.ts). It belongs here for the same
+  // reason the fee address does, and more urgently, because a handle minted by our own probe would
+  // otherwise appear as the first foreign buyer this project has ever had.
+  "key:99e4d0eec698925fed5ac8099adf2f2263f1fe51",
 ];
 
 /** SQL LIKE patterns. A key carrying one of these names was provisioned by a tool of ours. */
