@@ -30,10 +30,36 @@
 #   - So the stats store and the listing are not the same store, and being settled does not put a
 #     seller in the catalogue.
 #
+# WHAT WAS RULED OUT ON 2026-09-23, each one measured rather than reasoned:
+#
+#   - A wallet-shaped segment in the path. 75 catalogued resources carry one.
+#   - x402 version 1, which is what we send. 1,408 catalogued entries are v1, 126 of them added in
+#     the last 30 days and the newest on the day this was written.
+#   - A templated path being the entry requirement. Only 190 of 6,792 PayAI rows have one.
+#   - Our combination not being live. GET /supported lists {v1, exact, base} and names `bazaar`
+#     among the extensions it supports.
+#   - A registration step we forgot. The facilitator's own OpenAPI (GET /openapi.json) has eleven
+#     endpoints and exactly two of them write: POST /verify and POST /settle. There is nothing to
+#     register with.
+#   - Our scan missing us. The catalogue reports total 6,799 and the scan reads 6,792.
+#   - The stats endpoint flattering us. Asked about invented resources of the same shape it
+#     answers `settlements: "0"`; asked about ours it answers "1-9", last7d 1. It distinguishes.
+#
+# AND THE ONE THAT TURNS THE QUESTION AROUND: the catalogue is not built from settlements. A
+# sample of ten catalogued entries on 2026-09-23 found three with zero settlements, and
+# api.paysponge.com is catalogued with a templated path and no settlement at all. So settling does
+# not admit a seller and not settling does not keep one out. We have the settlement and not the
+# entry; they have the entry and not the settlement.
+#
+# WHAT IS LEFT, and it is not a code change in a locked path: the OpenAPI names a merchant portal
+# at https://merchant.payai.network for creating an API key, and it answers 200. That is the only
+# door in the public surface that is not /verify or /settle. It needs an account, so it is
+# Matthias' call and not the loop's, and it is a far smaller ask than the change to
+# src/payments/** that this header used to point at.
+#
 # One confident wrong answer is worse than an open question, because the next cycle spends its
-# effort on the change it names. The question is open. What this script does is make the answer
-# visible every cycle, so the day it flips is a day somebody notices rather than a day nobody
-# looked.
+# effort on the change it names. What this script does is make the answer visible every cycle, so
+# the day it flips is a day somebody notices rather than a day nobody looked.
 #
 #   ops/own-x402-listing.sh
 #   ops/own-x402-listing.sh --selftest   prove the search finds and misses, on a planted scan

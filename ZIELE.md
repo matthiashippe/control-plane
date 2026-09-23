@@ -35,6 +35,30 @@ ein Schluesselpaar, eine Ethereum-Signatur und USDC, um einen Auftrag zu stellen
 <!-- Wird vom Workflow `ziele-zu-teilzielen` gefuellt und von jedem Zyklus fortgeschrieben.
      Abgearbeitete Zeilen bleiben stehen und werden abgehakt, mit dem, was die Zahl danach sagte. -->
 
+### Ziel 02.10. -- im x402-Verzeichnis stehen
+
+- [x] **T2.1 Herausfinden, was einen Verkaeufer ueberhaupt in den Katalog bringt.** Zahl: keine
+      direkt, aber jede weitere Stunde an diesem Ziel haengt daran. Erledigt am 23.09.
+      **Ergebnis: sieben Ursachen ausgeschlossen, und die Frage hat sich umgedreht.** Der Katalog
+      wird **nicht** aus Abrechnungen gebaut: drei von zehn gelisteten Eintraegen haben null
+      Abrechnungen, `api.paysponge.com` steht mit templatiertem Pfad und ohne eine einzige drin.
+      Wir haben die Abrechnung und keinen Eintrag, die haben den Eintrag und keine Abrechnung.
+      Ausgeschlossen: Wallet im Pfad (75 Gegenbeispiele), Version 1 (1.408 Eintraege, 126 davon in
+      30 Tagen), templatierter Pfad (nur 190 von 6.792), unsere Kombination nicht unterstuetzt
+      (`/supported` fuehrt `{v1, exact, base}` und die `bazaar`-Erweiterung), vergessene
+      Registrierung (die OpenAPI hat elf Endpunkte, zwei davon schreiben: `/verify` und
+      `/settle`), unvollstaendiger Scan (6.799 im Katalog, 6.792 gelesen), und ein
+      Statistik-Endpunkt, der alles bejaht (erfundene Ressourcen bekommen `0`, unsere `1-9`).
+      Die Ausschlussliste steht im Kopf von `ops/own-x402-listing.sh`.
+- [ ] **T2.2 Ein Merchant-Konto bei PayAI.** Zahl: Zeilen mit unserem Host im Tagesscan, 0 -> mind. 1.
+      **Wartet auf Matthias, neuer Punkt 8.** Die OpenAPI des Facilitators nennt
+      `https://merchant.payai.network` als den Ort, an dem ein Haendler einen API-Schluessel
+      anlegt; die Seite antwortet mit 200. Das ist die einzige Tuer in der oeffentlichen
+      Oberflaeche, die nicht `/verify` oder `/settle` ist, und sie ist eine weit kleinere Bitte als
+      die Aenderung an `src/payments/**`, auf die dieses Ziel vorher zeigte.
+      Erster Schritt danach: Konto anlegen, Schluessel in `.env` auf der VM, und der naechste
+      Tagesscan sagt, ob es gewirkt hat.
+
 ## Was auf Matthias wartet
 
 Sieben Saetze, und alles andere laeuft. Stand 23.09., nichts davon darf der Loop selbst tun.
@@ -48,6 +72,8 @@ Sieben Saetze, und alles andere laeuft. Stand 23.09., nichts davon darf der Loop
 5. **Search Console und Bing** -- sein Login, den DNS-Eintrag setzt der Loop selbst.
 6. **Eine Zahl fuer Anzeigen** -- Empfehlung: 20 Euro am Tag fuer zwei Wochen.
 7. **Tailscale neu anmelden** -- der code-host nimmt sonst keine Auftraege.
+8. **Ein Konto bei `merchant.payai.network`** -- nach der Untersuchung vom 23.09. die einzige noch
+   offene Tuer in den x402-Katalog, und damit die Bedingung fuer das Ziel am 02.10. Siehe T2.2.
 
 ## Wie Teilziele entstehen
 
