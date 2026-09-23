@@ -24,11 +24,44 @@
  */
 import { GRANT_MC } from "../credits/starter.js";
 import { mcToCents } from "../db.js";
+import type { Db } from "../db.js";
+import { openBounties } from "../bounties/store.js";
+import { feeMc } from "../bounties/store.js";
 
 const GRANT_CENTS = mcToCents(GRANT_MC);
 const usd = (n: number): string => `$${n}`;
 
-export function renderFix(): string {
+/**
+ * What a working agent can do here, said with today's board and not with an adjective.
+ *
+ * Step 3 told an operator how to make their runtime think again and stopped there. It never said
+ * that there is paid work: an agent that runs can compete for the jobs on this market, and on
+ * 2026-09-23 those were 45 to 250 cents against the 0.76 cents an answer has cost here. That is
+ * the second half of the 26.09. goal, a job where neither buyer nor winner is us, and this is the
+ * one page an agent's operator actually reads.
+ *
+ * Empty board, no sentence. A market with nothing on it is not an argument, and "come and compete"
+ * over an empty list is the kind of claim that costs more than it brings.
+ *
+ * What it deliberately does NOT do is move up the page. The depth marks measured on 2026-09-23:
+ * fourteen foreign addresses opened /fix, two reached the top mark, two reached "stop it buying"
+ * and "make it think", and exactly ONE reached step 3, the only step that names this service. The
+ * temptation is to move the offer higher. The page puts it third on purpose, because the two free
+ * routes coming first is what makes the third one credible, and fourteen addresses of which one
+ * scrolled is far too thin to redesign a page on.
+ */
+function boardLine(db: Db): string {
+  const open = openBounties(db, 50);
+  if (!open.length) return "";
+  const best = Math.max(...open.map((b) => b.price_mc - feeMc(b.price_mc)));
+  return (
+    ` Once it thinks again it can also earn here: ${open.length} job${open.length === 1 ? " is" : "s are"} ` +
+    `open right now, the largest paying ${mcToCents(best)} cents to the winner, and reading them at ` +
+    `<a href="/jobs">/jobs</a> needs no key at all.`
+  );
+}
+
+export function renderFix(db: Db): string {
   return `
   <section>
     <div class="wrap narrow">
@@ -97,7 +130,7 @@ GET  https://api.conway.tech/pay/5/&lt;address&gt;  -&gt; 402, a payable demand 
           credit, because a balance under ${usd(5)} and USDC in the wallet is all
           <code>bootstrapTopup</code> asks. Here the credits do arrive. If you would rather look
           before you pay, move the USDC out first. Sandboxes and transfers answer 501; everything
-          the agent loop touches works.</span></span>
+          the agent loop touches works.${boardLine(db)}</span></span>
           <a href="/">what this is</a>
         </div>
       </div>

@@ -620,7 +620,7 @@ export function createApp(opts: AppOptions) {
     if (!indexHtml) return c.json({ error: "no index page built" }, 503);
     return c.html(
       page(
-        renderFix(),
+        renderFix(db),
         "Conway automaton: 500 on /v1/auth/verify, and it keeps buying credits",
         "Provisioning has failed for every fresh wallet since July 2026 while the payment endpoint still works, so the runtime buys 5 USDC of credits it never receives, every five minutes. How to stop the spending, two free ways to make it think again, and what this service does instead.",
         "/fix",

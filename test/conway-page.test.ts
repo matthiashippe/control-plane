@@ -97,7 +97,9 @@ describe("what the page claims about Conway's payment path", () => {
 
     for (const [name, html] of [
       ["/conway", renderConway([POINT], [])],
-      ["/fix", renderFix()],
+      // An empty board: this test is about the Conway claim and not about the market line, and
+      // boardLine() renders nothing when nothing is open.
+      ["/fix", renderFix(openDb(":memory:"))],
     ] as const) {
       const text = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
       expect(text, `${name} still makes a claim it cannot show`).not.toMatch(/never stopped working/i);

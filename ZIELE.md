@@ -65,11 +65,29 @@ gebaut und nicht aus den Vorlagen: in jeder Begruendung stand der bessere Zug.
       unberuehrt. 15 Cent tragen keinen Auftrag, den ein Agent ernst nimmt; der Erstauftrag einer
       Adresse ohne eigenes USDC bekommt 50. Der Preis steht dazu: 215 Cent im Topf sind entweder
       14 Agenten-Grants oder vier Kaeufer-Erstauftraege, nicht beides. 2 h.
-- [ ] **T1.3 Die neun Antworten rufen zum Auftrag, nicht zum Guthaben.** Die Entwuerfe schicken den
+- [~] **T1.3 gestrichen, mit Begruendung.** Der Workflow hat vorgeschlagen, die neun Antworten zum
+      **Auftrag** aufzurufen statt zum Guthaben. Beim Lesen der Entwuerfe faellt es durch: wer ein
+      Conway-Issue liest, hat keinen Auftrag, er hat einen kaputten Agenten. Und die Entwuerfe sind
+      bewusst zurueckhaltend, erst die zwei kostenlosen Wege, unser Angebot als drittes, und genau
+      das hat den einen Menschen gebracht, der je gescrollt hat. Eine Offenlegung, die zum Aufruf
+      wird, liest sich als Anzeige. **Der richtige Ort dafuer ist die Seite, auf der er landet,
+      nicht der Kommentar**, also T1.4.
+      (Urspruenglich) **T1.3 Die neun Antworten rufen zum Auftrag, nicht zum Guthaben.** Die Entwuerfe schicken den
       Leser heute zu Credits; die Handlung, die die Zielzahl zaehlt, ist der Auftrag. Erster
       Schritt: `ops/stranger-client.sh` vom Issue-Link bis zum offenen Auftrag durchlaufen und jede
       Abbruchstelle protokollieren. 1 h, reiner Text.
-- [ ] **T1.4 `/fix` schaerfen**, die einzige Seite ausser der Startseite mit echten Lesern (11
+- [x] **T1.4 `/fix` schaerfen**, erledigt 23.09., Commit folgt. **Die Marke ausgewertet, und sie
+      sagt etwas Hartes:** vierzehn fremde Adressen haben `/fix` geoeffnet, zwei haben die obere
+      Marke erreicht, zwei die Marken bei "stop it buying" und "make it think", und **genau eine**
+      hat `fix-us` erreicht, den einzigen Schritt, der diesen Dienst nennt. Die Versuchung waere,
+      das Angebot nach oben zu ziehen. Die Seite stellt es mit Absicht an dritte Stelle, weil die
+      zwei kostenlosen Wege davor es glaubwuerdig machen, und vierzehn Adressen, von denen eine
+      gescrollt ist, sind viel zu duenn, um eine Seite danach umzubauen.
+      Gebaut ist stattdessen das, was fehlte: **Schritt 3 sagte, wie der Agent wieder denkt, und
+      kein Wort davon, dass es hier bezahlte Arbeit gibt.** Jetzt nennt er das Brett mit den Zahlen
+      von heute, und bei leerem Brett sagt er nichts, weil "komm und konkurriere" ueber einer
+      leeren Liste mehr kostet als es bringt.
+      (Urspruenglich) **T1.4 `/fix` schaerfen**, die einzige Seite ausser der Startseite mit echten Lesern (11
       Besuche von 10 Adressen). Host auf `postyourprice.com`, heutiger Brettwert aus
       `openBounties` hineingerendert, Marke `fix-us` auswerten. 0,5 h.
 
