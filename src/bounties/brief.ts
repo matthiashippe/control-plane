@@ -59,13 +59,43 @@ const SHORT_WORDS = 25;
  * web form writes "Wörter", somebody pasting out of a terminal often writes "Woerter".
  */
 
-/** "90 words", "one paragraph", "3 sentences", "400 bis 500 Woerter", "zwei Absaetze". */
+/**
+ * "90 words", "one paragraph", "3 sentences", "400 bis 500 Woerter", "zwei Absaetze".
+ *
+ * The German units a buyer actually writes are wider than the English ones. Measured on
+ * 2026-09-23 over 50 real German commissions: "ca. 5-8 Dokumente a max. 12 Seiten" and
+ * "508.727 Normzeilen" were both told they carried no length. A page and a Normzeile are
+ * lengths, and the Normzeile is what every German translation contract is priced in. The
+ * number has to sit directly in front of the unit, which is what keeps "auf Seite 3" out.
+ */
 const LENGTH =
-  /\b(\d+|one|two|three|four|five|six|seven|eight|nine|ten|ein|eine|zwei|drei|vier|fuenf|f\u00fcnf|sechs|sieben|acht|neun|zehn)\s+(?:bis\s+\d+\s+)?(word|words|character|characters|sentence|sentences|paragraph|paragraphs|line|lines|bullet|bullets|W\u00f6rter|Woerter|Wort|Zeichen|Satz|S\u00e4tze|Saetze|Absatz|Abs\u00e4tze|Absaetze|Zeile|Zeilen|Stichpunkte?|Aufz\u00e4hlungspunkte?)\b/i;
+  /\b(\d+|one|two|three|four|five|six|seven|eight|nine|ten|ein|eine|zwei|drei|vier|fuenf|f\u00fcnf|sechs|sieben|acht|neun|zehn)\s+(?:bis\s+\d+\s+)?(word|words|character|characters|sentence|sentences|paragraph|paragraphs|line|lines|page|pages|bullet|bullets|W\u00f6rter|Woerter|Wort|Zeichen|Satz|S\u00e4tze|Saetze|Absatz|Abs\u00e4tze|Absaetze|Zeile|Zeilen|Seiten?|Normzeilen?|Anschl\u00e4ge|Anschlaege|B\u00e4nde|Baende|Stichpunkte?|Aufz\u00e4hlungspunkte?)\b/i;
+
+/**
+ * "Was nicht dazugehoert", the German way: a scope drawn by naming what is outside it.
+ *
+ * "Die technische Betreuung des Internetauftritts ist nicht Bestandteil der Ausschreibung" and
+ * "Die Leistung umfasst keine fachtechnische Planung" answer two of the four questions at once,
+ * which is why the same expression is read by both the deliverable and the ruled-out check. It
+ * says what is handed over (everything else) and it forbids something (that). Both checks were
+ * silent on it, and both were wrong, on four of the 50 briefs measured.
+ */
+const SCOPE_EXCLUSION =
+  "\\b(?:ist|sind|war|waren)\\s+nicht\\s+(?:Bestandteil|Gegenstand|Teil)\\b" +
+  "|\\b(?:umfasst|umfassen|beinhaltet|beinhalten|enth\u00e4lt|enthaelt|enthalten)\\s+" +
+  "(?:ausdr\u00fccklich\\s+|ausdruecklich\\s+)?kein(?:e|en)?\\b";
 
 /** "Deliver the paragraph only", "Nur den Text abgeben", "sonst nichts", "ohne Anschreiben". */
-const DELIVERABLE =
-  /\b(deliver|return|reply with|respond with|hand in|output|submit)\b[^.]{0,80}\b(only|nothing else|just)\b|\bnothing else\b|\bnur\s+(den|die|das)\b[^.]{0,60}\b(abgeben|liefern|ausgeben|zur\u00fcckgeben|zurueckgeben|schreiben)\b|\bsonst nichts\b|\bnichts (?:weiter|anderes)\b|\bkein(?:e|en)?\s+(?:Anschreiben|Vorwort|Einleitung|Kommentar|Erkl\u00e4rung|Erklaerung)\b/i;
+const DELIVERABLE = new RegExp(
+  "\\b(deliver|return|reply with|respond with|hand in|output|submit)\\b[^.]{0,80}\\b(only|nothing else|just)\\b" +
+    "|\\bnothing else\\b" +
+    "|\\bnur\\s+(den|die|das)\\b[^.]{0,60}\\b(abgeben|liefern|ausgeben|zur\u00fcckgeben|zurueckgeben|schreiben)\\b" +
+    "|\\bsonst nichts\\b|\\bnichts (?:weiter|anderes)\\b" +
+    "|\\bkein(?:e|en)?\\s+(?:Anschreiben|Vorwort|Einleitung|Kommentar|Erkl\u00e4rung|Erklaerung)\\b" +
+    "|\\berwartete[sr]?\\s+Ergebnis(?:se)?\\b" +
+    `|${SCOPE_EXCLUSION}`,
+  "i",
+);
 
 /**
  * "Do not use", "avoid", "Keinen Preis nennen", "nicht erfinden", "vermeide".
@@ -81,17 +111,59 @@ const VERBOT_VERB =
   "nennen|zitieren|verwenden|benutzen|erw\u00e4hnen|erwaehnen|schreiben|behaupten|versprechen|" +
   "empfehlen|bewerten|vergleichen|aufz\u00e4hlen|aufzaehlen|erfinden|spekulieren|werben|angeben|" +
   "einbauen|ausgeben|liefern|anpreisen|beziffern|sch\u00e4tzen|schaetzen";
+/**
+ * The four other shapes a German ban takes, each one measured rather than guessed.
+ *
+ * Over 50 real German commissions on 2026-09-23 the verb list above missed every ban that was
+ * not built on a verb: "Allgemeine oder austauschbare Texte sind nicht gewuenscht", a section
+ * headed "Was ich nicht suche", "Reine Produktpflege der Artikel, keine Produkttexte", and
+ * "Inhalte, die nicht primaer auf SEO ausgerichtet sind, sondern auf fachliche Fundierung".
+ *
+ * The last one is the dangerous one, because "nicht X, sondern Y" and "nicht nur X, sondern
+ * auch Y" look alike and mean the opposite: the first forbids X, the second adds Y. So the
+ * contrast only counts when "nur", "ausschliesslich" or "allein" does not follow the "nicht".
+ * The noun ban stays tied to a text ("keine Produkttexte", "keinen Werbetext") and does not
+ * accept any noun, because "das keinen Keller hat" must still leave the check talking.
+ */
 const RULED_OUT = new RegExp(
   "\\b(do not|don't|never|avoid|without|no more than|must not|do no)\\b" +
     `|\\bkein(?:e|en|em|er)?\\b[^.]{0,60}?\\b(?:${VERBOT_VERB})\\b` +
     `|\\b(?:nicht|niemals|keinesfalls)\\s+(?:\\w+\\s+){0,3}?(?:${VERBOT_VERB})\\b` +
-    "|\\bvermeide\\b|\\bverzichte auf\\b|\\bunzul\u00e4ssig\\b|\\bverboten\\b|\\btabu\\b",
+    "|\\bvermeide\\b|\\bverzichte auf\\b|\\bunzul\u00e4ssig\\b|\\bverboten\\b|\\btabu\\b" +
+    `|${SCOPE_EXCLUSION}` +
+    "|\\bnicht\\s+(?:gew\u00fcnscht|gewuenscht|erw\u00fcnscht|erwuenscht|zul\u00e4ssig|zulaessig|gestattet|erlaubt|vorgesehen|akzeptiert)\\b" +
+    "|\\bwas\\s+(?:ich|wir)\\s+nicht\\s+(?:suche|suchen|will|wollen|m\u00f6chte|moechte|m\u00f6chten|moechten|brauche|brauchen)\\b" +
+    "|\\bkein(?:e|en)?\\s+\\w*texte?\\b" +
+    "|\\bnicht\\s+(?!nur\\b|ausschlie\u00dflich\\b|ausschliesslich\\b|allein\\b)[^.]{0,60}?\\bsondern\\b",
   "i",
 );
 
-/** "for a developer", "aimed at", "fuer einen Vermieter", "die Leserin ist", "richtet sich an". */
-const READER =
-  /\b(reader|audience|aimed at|for (a|an|somebody|someone|people|developers?|buyers?|customers?|managers?)|who has never|deciding whether)\b|\bf\u00fcr\s+(?:eine[nm]?|die|den|das)\b|\bfuer\s+(?:eine[nm]?|die|den|das)\b|\b(?:Leser|Leserin|Zielgruppe|Publikum)\b|\brichtet sich an\b|\bder\s+(?:noch\s+)?nie\b/i;
+/**
+ * "for a developer", "aimed at", "fuer einen Vermieter", "die Leserin ist", "richtet sich an".
+ *
+ * German names its audience without an article far more often than with one: "fuer Lehrkraefte,
+ * Fachkraefte und Eltern", "fuer Finanzberater, professionelle Fonds-Investoren und private
+ * Anleger", "fuer Schwangere und Eltern mit Kindern bis drei Jahre". All three were told they
+ * named no reader, and all three name one in the first sentence.
+ *
+ * The group has to be a word for people, not any capitalised noun. "Fuer unseren Kunden suchen
+ * wir" is the agency talking about its client and says nothing about who reads the text, and
+ * "fuer verschiedene Zielgruppen" concedes there is an audience without naming it: both were
+ * checked against the 50 briefs and both must keep the finding, so neither is in the list.
+ */
+const READER_GROUP =
+  "leser|h\u00f6rer|hoerer|anleger|berater|investor|nutzer|anwender|verbraucher|b\u00fcrger|buerger|" +
+  "eltern|kr\u00e4fte|kraefte|mitarbeitende|besch\u00e4ftigte|beschaeftigte|jugendliche|erwachsene|" +
+  "schwangere|patient|angeh\u00f6rige|angehoerige|betroffene|einsteiger|laien|fachleute|experten|" +
+  "unternehmer|entscheider|sch\u00fcler|schueler|studierende|senioren|familien|vermieter|mieter|" +
+  "k\u00e4ufer|kaeufer|\u00e4rzte|aerzte|makler|interessierte|teilnehmende|g\u00e4ste|gaeste|besucher";
+const READER = new RegExp(
+  "\\b(reader|audience|aimed at|for (a|an|somebody|someone|people|developers?|buyers?|customers?|managers?)|who has never|deciding whether)\\b" +
+    "|\\bf\u00fcr\\s+(?:eine[nm]?|die|den|das)\\b|\\bfuer\\s+(?:eine[nm]?|die|den|das)\\b" +
+    `|\\bf(?:\u00fc|ue)r\\s+(?:\\w+[\\s,]+){0,2}\\w*(?:${READER_GROUP})\\w*\\b` +
+    "|\\b(?:Leser|Leserin|Zielgruppe|Publikum)\\b|\\brichtet sich an\\b|\\bder\\s+(?:noch\\s+)?nie\\b",
+  "i",
+);
 
 /**
  * Reads a brief and names what is absent. Never judges what is there.
