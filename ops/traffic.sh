@@ -18,6 +18,62 @@ FUNNEL_BROKE=0
 ONLY_FUNNEL=0
 [[ "${1:-}" == "--funnel" ]] && { ONLY_FUNNEL=1; shift; }
 
+# The counter-proof, as a command instead of as a paragraph.
+#
+# CP_TRAFFIC_LOG has existed since 2026-09-22 so the evidence lines can be proved in both
+# directions, and nothing ever re-ran it. A switch nobody pulls proves what it proved on the day
+# it was written. This pulls it: one planted log holding a real search arrival, two addresses that
+# only claim one, and a GitHub referrer as the control, and it fails loudly if the report stops
+# telling them apart.
+#
+# The window is computed from the fixture and not typed. Every other fixture in ops/fixtures/
+# carries fixed timestamps from 2026-09-22, so each of them silently falls out of a 24 hour window
+# a day after it was written, and a counter-proof that measures an empty window measures nothing.
+#
+#   ops/traffic.sh --selftest
+if [[ "${1:-}" == "--selftest" ]]; then
+  fixture="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/fixtures/traffic-search-referrer-claimed.log"
+  [[ -f "$fixture" ]] || { echo "SELFTEST FAILED: $fixture is not there"; exit 1; }
+  hours=$(python3 -c "
+import json, math, sys, time
+stamps = [json.loads(l)[chr(116)+chr(115)] for l in open(sys.argv[1]) if l.strip()]
+print(max(1, math.ceil((time.time() - min(stamps)) / 3600) + 1))
+" "$fixture")
+  out=$(CP_TRAFFIC_LOG="$fixture" "${BASH_SOURCE[0]}" "$hours" 2>/dev/null)
+  fail=0
+  want() { # a line that must be there, and the reason it must
+    local hits
+    hits=$(printf '%s' "$out" | /usr/bin/grep -c -- "$1" || true)
+    if [[ "${hits:-0}" -eq 0 ]]; then
+      echo "SELFTEST FAILED: the report no longer says: $1"
+      echo "                 ($2)"
+      fail=1
+    fi
+  }
+  # Each pattern names the evidence line and not just the words in it. The first version of this
+  # block asked for "never ran the page script" on its own, and the funnel above prints
+  # "2  never ran the page script" as a dropped-address count twelve lines earlier. So the test
+  # passed with the evidence line deleted, which is the one failure a counter-proof exists to
+  # prevent, made by the counter-proof itself.
+  want "request(s) all told, never ran the page script" \
+       "the absence of a browser engine belongs on the evidence line; saying nothing reads as no information"
+  want "3 address(es), 1 of them behaved like a search visitor" \
+       "a visitor who ran the page script and left the sitemap alone has to be counted as one"
+  want "asked for /sitemap.xml, which a reader does not" \
+       "somebody who clicked a search result does not ask for the sitemap"
+  want "issues/392" \
+       "a referrer that is not a search engine still has to appear, unjudged"
+  # The control heading, exactly as it must read: a count and nothing after it. A search verdict
+  # under a GitHub referrer would append ", N of them ..." and this line would no longer exist.
+  hits=$(printf '%s' "$out" | /usr/bin/grep -cE "^    1 address\(es\)$" || true)
+  if [[ "${hits:-0}" -eq 0 ]]; then
+    echo "SELFTEST FAILED: the GitHub referrer heading no longer stands unjudged"
+    fail=1
+  fi
+  [[ "$fail" -eq 0 ]] && echo "SELFTEST OK: a real search arrival, two that only claim one, and a control, told apart over a ${hours} hour window."
+  exit "$fail"
+fi
+
 HOURS="${1:-24}"
 BASE_URL="${CP_URL:-https://postyourprice.com}"
 # Every name this service answers to. The referrer tests below decide whether a request came from
@@ -599,6 +655,32 @@ networks = collections.defaultdict(set)
 # claiming to be Chrome. So the tell is two BROWSER identities in quick succession, not two tools.
 AGENT_SWAP_SECONDS = 60
 
+# A referrer is a header, and a scanner writes whatever it likes into it. The comment above says so
+# for bing.com. On 2026-09-23 between 05:37 and 05:39 three addresses from three different networks
+# arrived claiming https://www.google.com/: a Hetzner address running Trident (Internet Explorer,
+# which no person has used to reach a one-day-old domain), a Cloudflare address that fetched / and
+# then /sitemap.xml, and a third with a single request. Printed under a google.com heading beside
+# the one real GitHub referrer, that reads like the first organic search traffic this project has
+# ever had.
+#
+# The standing order names this section as THE evidence for whether the issue answers are the
+# channel, so it has to be able to tell an arrival from a claim. Two tells, both decisive and
+# neither a guess about user agents:
+#
+#   - The page script did not run. The evidence line said "ran the page script" when it did and
+#     nothing when it did not, and a missing note reads as no information rather than as a finding.
+#     It is a finding: nothing rendered the page.
+#   - The visit fetched /sitemap.xml or /robots.txt. Those exist for crawlers. Somebody who clicked
+#     a search result does not ask for the sitemap, and no browser asks on its own.
+SEARCH_REFERRERS = ("google.", "bing.", "duckduckgo.", "yandex.", "baidu.", "ecosia.", "search.brave.")
+CRAWLER_PATHS = ("/sitemap.xml", "/robots.txt")
+
+def claims_search(referrer):
+    return any(name in referrer for name in SEARCH_REFERRERS)
+
+def crawler_paths_of(entry):
+    return sorted({p for p in entry["paths"] if p.startswith(CRAWLER_PATHS)})
+
 def swapped_browsers(stamped_agents):
     browsers = sorted((t, a) for t, a in stamped_agents if "Mozilla/" in a)
     for (t1, a1), (t2, a2) in zip(browsers, browsers[1:]):
@@ -634,7 +716,19 @@ if not by_referrer:
     print("  none")
 for referrer, addresses in sorted(by_referrer.items(), key=lambda kv: -len(kv[1])):
     print(f"  {referrer}")
-    print(f"    {len(addresses)} address(es)")
+    if claims_search(referrer):
+        # A search engine sends one visitor at a time, with a browser. Counted here so the heading
+        # itself carries the answer and a reader does not have to add up the lines below it.
+        like_a_reader = [
+            ip for ip in addresses
+            if seen[ip]["ran_script"] and not crawler_paths_of(seen[ip])
+        ]
+        if like_a_reader:
+            print(f"    {len(addresses)} address(es), {len(like_a_reader)} of them behaved like a search visitor")
+        else:
+            print(f"    {len(addresses)} address(es), none of them behaved like a search visitor")
+    else:
+        print(f"    {len(addresses)} address(es)")
     for ip, paths in addresses.items():
         known, ordered = set(), []
         for path in paths:
@@ -650,8 +744,13 @@ for referrer, addresses in sorted(by_referrer.items(), key=lambda kv: -len(kv[1]
         evidence = [str(len(entry["paths"])) + " request(s) all told"]
         if entry["ran_script"]:
             evidence.append("ran the page script")
+        else:
+            evidence.append("never ran the page script")
         if entry["pixel"]:
             evidence.append("fetched a depth pixel")
+        asked_for = crawler_paths_of(entry)
+        if asked_for:
+            evidence.append("asked for " + " and ".join(asked_for) + ", which a reader does not")
         if swapped_browsers(entry["agent_times"]):
             evidence.append("changed browser identity within a minute, which no person does")
         elif len(entry["agents"]) > 1:

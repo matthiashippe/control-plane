@@ -208,6 +208,14 @@ run --undetermined-on 2 "our claims about the runtime hold" python3 ./ops/upstre
 # the README two sections down described the discrepancy while recommending the file.
 run --undetermined-on 2 "the published data reproduces" ./ops/check-data.py
 
+# The traffic report, against a planted log holding a real search arrival, two addresses that only
+# claim one, and a control. The standing order names the referrer on the first request of a new
+# address as THE evidence for whether the issue answers are the channel, and on 2026-09-23 three
+# datacentre addresses arrived inside two minutes all claiming https://www.google.com/. The report
+# has to keep telling those apart, and a counter-proof switch nobody pulls proves only what it
+# proved on the day it was written. See ops/traffic.sh --selftest. Reads nothing from production.
+run "the traffic report tells an arrival from a claim" ./ops/traffic.sh --selftest
+
 # Whether anything that indexes the web has ever looked at this service, and whether our side of
 # that is in order. The first crawler is news; until then the line is the finding. See
 # ops/visibility.sh: in the first 2.6 days there was not one, and nothing on our side is wrong.

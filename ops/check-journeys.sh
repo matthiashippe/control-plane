@@ -24,16 +24,36 @@ failures=0
 # sed -E, not sed: BSD sed does not know \| in BRE, and then GET and POST stay behind as paths of
 # their own and are reported OK with status code 000. A checking tool that reports nonsense as green
 # is worse than none; that is exactly what happened on the first run on 20.09.2026.
-paths=$(grep -oE '`(GET |POST |DELETE )?/[a-zA-Z0-9/._-]+' "$DOC" \
+all_paths=$(grep -oE '`(GET |POST |DELETE )?/[a-zA-Z0-9/._-]+' "$DOC" \
   | sed -E 's/^`//; s/^(GET|POST|DELETE) //' \
   | grep -E '^/' \
   | grep -vE '^/v1/chat/completions$' \
   | sort -u)
 
+# A document about how somebody gets in also names files on the machine, and on 2026-09-23 it
+# gained `/var/log/caddy/access.log` in the paragraph explaining what the address-bar route costs.
+# Everything in backticks starting with a slash was a route to this checker, so it asked the
+# service for the Caddy log, got a 404 and reported that the document or the service was lying.
+# Neither was.
+#
+# These six are the absolute roots of a Unix filesystem. None of them can be a route here: every
+# route this service serves is /, /v1/..., a page name or a .json or .txt file at the top level,
+# and adding /var or /etc as a route is not a thing that will happen. The list is deliberately
+# short and the skipped lines are PRINTED, because a filter that quietly drops paths is how a
+# checking tool stops checking without anybody noticing.
+FILESYSTEM_ROOTS='^/(var|etc|opt|usr|tmp|root|home)/'
+skipped=$(printf '%s\n' "$all_paths" | grep -E "$FILESYSTEM_ROOTS" || true)
+paths=$(printf '%s\n' "$all_paths" | grep -vE "$FILESYSTEM_ROOTS" || true)
+
 [[ -n "$paths" ]] || { echo "ERROR: not a single path read from $DOC"; exit 2; }
 
 echo "Journey book against $BASE"
 echo
+if [[ -n "$skipped" ]]; then
+  while read -r f; do
+    [[ -n "$f" ]] && printf "    %-7s %-34s %s\n" "skipped" "$f" "a file on the machine, not a route"
+  done <<< "$skipped"
+fi
 
 for p in $paths; do
   code=$(curl -s -o /dev/null -m 15 -w "%{http_code}" "$BASE$p")
