@@ -350,7 +350,7 @@ QR-Code. Die Karte sagt auf sich selbst, dass sie vor dem Drucken einmal gescann
 
 | Tag | Was gemessen wird | Heute | Ziel |
 |---|---|---|---|
-| Do 24.09. | eigene Laeufe aus 20 Gespraechen am NIT, dazu Aufrufe von `/b?src=nit` | 0 | 3 |
+| Do 24.09. | ~~NIT~~ von Matthias am 23.09. abgelehnt: Messeticket plus acht Stunden fuer eine Handvoll Gespraeche, waehrend der belegte Kanal kostenlos offen liegt | | |
 | Fr 25.09. | Antworten, die Betrag und Menge nennen | 0 | 3 |
 | Sa 26.09. | 50 bezahlte deutsche Textauftraege durch `reviewBrief`: wie viele falschen Befunde | unbekannt | hoechstens 2 |
 | So 27.09. | Abbruchstellen `/check` bis offener Auftrag ohne Wallet | **0, vorgezogen erledigt** | 0 |
@@ -363,9 +363,13 @@ Auspraegungen, die man nicht verwechseln darf. Steht in der Strichliste "20 Gesp
 Einfuegungen", traegt der Haken nicht. Steht dort "4 Gespraeche", hat der Kanal nie stattgefunden
 und die Woche hat gar nichts gemessen. Sichtbar ist das schon am Donnerstag um 12:30.
 
-**Wenn am Mittwoch 0 von 20 herauskommt, ist es nicht der Ort.** Naeher als acht Stunden im selben
-Saal kommt kein Kanal an diese Leute heran. Dann ist der Haken falsch und nicht die Bevoelkerung,
-und der naechste Zug ist der Haken: weg vom Auftrag, der schon abgeschickt ist, hin zum Text, der
+**Die Messe ist gestrichen, und damit faellt die Praemisse des Plans.** Er baute darauf, dass acht
+Stunden im selben Saal der teuerste, aber sicherste Zugang zu dieser Bevoelkerung sind. Gemessen
+ist etwas anderes: **drei Adressen sind je von einer github.com-Seite gekommen, alle drei haben
+gelesen**, zwei davon aus Issues, die wir beantwortet haben. Das ist der einzige Kanal mit einem
+Beleg, er kostet nichts, und sechs Issues sind noch offen. Der Rest der Woche laeuft darauf.
+
+Der Haken bleibt die offene Frage. Wenn getippte Laeufe bei null bleiben: weg vom Auftrag, der schon abgeschickt ist, hin zum Text, der
 gerade rausgeht, mit `src/check/fabrication.ts` als Mechanismus.
 
 ## Was auf Matthias wartet
@@ -384,13 +388,6 @@ Sieben Saetze, und alles andere laeuft. Stand 23.09., nichts davon darf der Loop
 5. **Search Console und Bing** -- sein Login, den DNS-Eintrag setzt der Loop selbst.
 6. **Eine Zahl fuer Anzeigen** -- Empfehlung: 20 Euro am Tag fuer zwei Wochen.
 7. **Tailscale neu anmelden** -- der code-host nimmt sonst keine Auftraege.
-9. **Norddeutscher Immobilientag, Donnerstag 24.09., Empire Riverside: Karte ja oder nein.**
-   Zwei Minuten, und es ist heute faellig. 300 Hausverwalter, acht Stunden, "KI-Use-Cases in der
-   Hausverwaltung" im Programm, in seiner Stadt. Der Preis steht auf der Anmeldeseite und der Loop
-   kennt ihn nicht, deshalb ist es seine Frage. **Ohne diesen Tag haengen 10 von 10 Laeufen am
-   Adressbuch**, und ein Adressbuch ist nach einmal Fragen verbraucht. Ersatz am selben Tag, falls
-   nein: eine Mail an den VDIV Nord zum Prompting-Seminar (Do 14 bis 16 Uhr, online), Zahl dann
-   Antworten statt Laeufe.
 8. **Ein Konto bei `merchant.payai.network`** -- nach der Untersuchung vom 23.09. die einzige noch
    offene Tuer in den x402-Katalog, und damit die Bedingung fuer das Ziel am 02.10. Siehe T2.2.
 
