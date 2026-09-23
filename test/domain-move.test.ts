@@ -63,6 +63,21 @@ describe("moving to another domain", () => {
     expect(html).toContain("cp.hippe.eu");
   });
 
+  it("rewrites the files a crawler reads, which are not pages", async () => {
+    // robots.txt and llms.txt are plain text, so they never pass through the HTML rewrite. On
+    // 2026-09-23 both still named the old host after the move: robots.txt on the new domain sent
+    // every crawler to the old sitemap, and llms.txt told a runtime to point its config at the
+    // address we had just moved away from. Neither is visible on a page.
+    process.env.CP_PUBLIC_URL = NEW;
+    const db = openDb(":memory:");
+    const app = createApp({ db });
+    for (const path of ["/robots.txt", "/llms.txt", "/sitemap.xml"]) {
+      const text = await (await app.request(path)).text();
+      expect(text, `${path} still names the built-in host`).not.toContain("cp.hippe.eu");
+      expect(text, `${path} does not name the new host at all`).toContain("postyourprice.com");
+    }
+  });
+
   it("leaves no mention of the old host anywhere in a served page", async () => {
     process.env.CP_PUBLIC_URL = NEW;
     for (const path of ["/", "/post", "/jobs", "/check", "/fix", "/receipts", "/terms"]) {

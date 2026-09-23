@@ -797,7 +797,7 @@ export function createApp(opts: AppOptions) {
         "Allow: /\n" +
         "Disallow: /v1/\n" +
         "Allow: /v1/status\n" +
-        "Sitemap: https://cp.hippe.eu/sitemap.xml\n",
+        `Sitemap: ${siteOrigin()}/sitemap.xml\n`,
       200,
       { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "public, max-age=86400" },
     ),
@@ -899,7 +899,7 @@ export function createApp(opts: AppOptions) {
       // without loading the landing page first, and was gone afterwards. Whoever knows only this
       // path should be able to get on from here without guessing.
       docs: {
-        service: requestOrigin(c) ?? "https://cp.hippe.eu",
+        service: requestOrigin(c) ?? siteOrigin(),
         endpoints: "/.well-known/x402",
         setup: "Set conwayApiUrl in ~/.automaton/automaton.json to this origin, then run automaton --provision",
         setup_without_runtime: "Sign in with Ethereum: POST /v1/auth/nonce, /v1/auth/verify, /v1/auth/api-keys. " +
@@ -1053,13 +1053,13 @@ export function createApp(opts: AppOptions) {
       "",
       "## Use it",
       "",
-      "- Conway runtime: set conwayApiUrl in ~/.automaton/automaton.json to https://cp.hippe.eu, then run automaton --provision.",
+      `- Conway runtime: set conwayApiUrl in ~/.automaton/automaton.json to ${siteOrigin()}, then run automaton --provision.`,
       // Written down on 2026-09-22 after somebody spent 32 hours looking for it. They joined every
       // documented path onto their base URL (/v1/status/v1/models, /v1/auth/verify/v1/models, and
       // four more) and got nothing back that named the mistake. Both halves of this line are the
       // answer they needed: the base is the bare origin, and the catalogue can be read before you
       // have a key, so the URL can be checked separately from the key.
-      "- OpenAI-compatible client: the base URL is https://cp.hippe.eu, the bare origin with no path",
+      `- OpenAI-compatible client: the base URL is ${siteOrigin()}, the bare origin with no path`,
       "  after it. GET /v1/models answers without a key, so the URL can be checked before there is one.",
       "  The key goes in Authorization, raw or with the Bearer prefix; both are accepted.",
       "- Anything else: an API key takes three calls and one Ethereum signature, no runtime and no",
@@ -2018,7 +2018,7 @@ export function createApp(opts: AppOptions) {
           message:
             `This path carries /v1/ twice, which means a base URL that already contains a path ` +
             `was joined with an endpoint. The base URL here is the bare origin: ` +
-            `${origin ?? "https://cp.hippe.eu"}. The endpoint you asked for is ${joined[1]}, ` +
+            `${origin ?? siteOrigin()}. The endpoint you asked for is ${joined[1]}, ` +
             `and this response redirects there; if your client does not follow redirects, ` +
             `request it directly.`,
           base_url: origin,
@@ -2058,7 +2058,7 @@ export function createApp(opts: AppOptions) {
       const endpoint = `/v1/${bare[1]}`;
       const target = endpoint + (new URL(c.req.url).search || "");
       const origin = requestOrigin(c);
-      const base = `${origin ?? "https://cp.hippe.eu"}/v1`;
+      const base = `${origin ?? siteOrigin()}/v1`;
       return c.json(
         {
           error: "base_url_is_missing_the_v1_path",
@@ -2116,7 +2116,7 @@ export function createApp(opts: AppOptions) {
           ? "No such endpoint, and this path carries /v1/ twice, which usually means a base URL " +
             "that already contains a path was joined with an endpoint. The base URL of this " +
             "control plane is the bare origin, with no path: set conwayApiUrl to " +
-            "https://cp.hippe.eu and let the runtime append /v1/... itself."
+            `${siteOrigin()} and let the runtime append /v1/... itself.`
           : "No such endpoint here. This control plane implements the part of the Conway API that " +
             "the automaton runtime actually calls: auth, credits, topup, registration, models and " +
             "chat completions. The full list is at GET /.well-known/x402.",
