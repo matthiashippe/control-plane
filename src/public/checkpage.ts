@@ -145,6 +145,17 @@ interface Copy {
   kept: string;
   terminal: string;
   postsFree: (cents: number) => string;
+  introKicker: string;
+  introHeading: string;
+  introSubForm: string;
+  introSubNoForm: string;
+  introSubTail: string;
+  introPlaceholder: string;
+  checkIt: string;
+  introKept: string;
+  twoDrafts: string;
+  difference: (a: string, b: string | null) => string;
+  things: (n: number) => string;
 }
 
 const EN: Copy = {
@@ -168,6 +179,27 @@ const EN: Copy = {
   postsFree: (c) =>
     `Posting costs you nothing and asks for nothing: the pool pays up to ${c} cents for a first ` +
     `job, and the key you get back is the only way into it, so copy it when it appears.`,
+  introKicker: "Before any money moves",
+  introHeading: "What your brief does not say",
+  introSubForm: "Paste a draft and this names the things an agent would have to invent to finish it.",
+  introSubNoForm: "This names the things an agent would have to invent to finish your brief.",
+  introSubTail:
+    "No key, no account, no charge. It is the same check that runs on every job posted here, and " +
+    "it costs nothing because knowing this after paying is worse for both sides.",
+  introPlaceholder:
+    "FACT SHEET on the energy certificate for a 1974 apartment block with six flats and gas " +
+    "heating, for a landlord ordering one for the first time.",
+  checkIt: "Check it",
+  introKept:
+    "Nothing is stored: the draft goes in the address and the web server is told to drop it " +
+    "before it writes the line. No key, no account, no charge.",
+  twoDrafts: "Two drafts of the same job",
+  difference: (a, b) =>
+    b === null
+      ? `The interesting part is the difference. The check finds ${a} in the first and nothing in ` +
+        "the second, and the second is what an agent can actually work from."
+      : `The interesting part is the difference. The check finds ${a} in the first and ${b} in the second.`,
+  things: (n) => `${n} thing${n === 1 ? "" : "s"}`,
 };
 
 const DE: Copy = {
@@ -193,6 +225,31 @@ const DE: Copy = {
     `Das Einstellen kostet Sie nichts und verlangt nichts: der Topf zahlt bis zu ${c} Cent für ` +
     `einen ersten Auftrag, und der Schlüssel, den Sie zurückbekommen, ist der einzige Weg dorthin. ` +
     `Kopieren Sie ihn, wenn er erscheint.`,
+  introKicker: "Bevor Geld fließt",
+  introHeading: "Was Ihr Auftrag nicht sagt",
+  introSubForm:
+    "Fügen Sie einen Entwurf ein, und hier steht, was ein Agent sich ausdenken müsste, um ihn " +
+    "fertig zu machen.",
+  introSubNoForm:
+    "Hier steht, was ein Agent sich ausdenken müsste, um Ihren Auftrag fertig zu machen.",
+  introSubTail:
+    "Kein Schlüssel, kein Konto, keine Kosten. Es ist dieselbe Prüfung, die bei jedem Auftrag " +
+    "hier läuft, und sie kostet nichts, weil es für beide Seiten schlechter ist, das nach dem " +
+    "Bezahlen zu erfahren.",
+  introPlaceholder:
+    "FACT SHEET über den Energieausweis für ein Mehrfamilienhaus von 1974 mit sechs Wohnungen und " +
+    "Gasheizung, für einen Vermieter, der zum ersten Mal einen bestellt.",
+  checkIt: "Prüfen",
+  introKept:
+    "Nichts wird gespeichert: der Entwurf steht in der Adresse, und der Webserver ist angewiesen, " +
+    "ihn zu löschen, bevor er die Zeile schreibt. Kein Schlüssel, kein Konto, keine Kosten.",
+  twoDrafts: "Zwei Entwürfe desselben Auftrags",
+  difference: (a, b) =>
+    b === null
+      ? `Interessant ist der Unterschied. Die Prüfung findet ${a} im ersten und nichts im zweiten, ` +
+        "und mit dem zweiten kann ein Agent wirklich arbeiten."
+      : `Interessant ist der Unterschied. Die Prüfung findet ${a} im ersten und ${b} im zweiten.`,
+  things: (n) => (n === 1 ? "eine Sache" : `${n} Dinge`),
 };
 
 export interface Finding {
@@ -213,6 +270,8 @@ export function renderCheck(
   viaQuery = false,
   formAllowed = false,
   lang: "de" | "en" = "en",
+  /** Carried through so a second run from the same visit still names the channel. See above. */
+  src = "",
 ): string {
   const t = lang === "de" ? DE : EN;
   const list = findings.length
@@ -242,6 +301,7 @@ export function renderCheck(
             `<h2>${t.fixHeading(findings.length)}</h2>
       <form method="GET" action="/check">
         <textarea name="brief" rows="8" required>${esc(brief)}</textarea>
+        <input type="hidden" name="via" value="form">${src ? `<input type="hidden" name="src" value="${esc(src)}">` : ""}
         <div class="cta" style="align-items:center;gap:1rem">
           <button class="btn btn-1" type="submit">${t.again}</button>
           ${
@@ -333,34 +393,35 @@ export function renderCheckIntro(
   formAllowed: boolean,
   freeFirstJobCents: number | null,
   lang: "de" | "en" = "en",
+  /**
+   * Where the visitor came from, carried through so the log can tell the channels apart.
+   *
+   * The whole measurement of the week 24.09. is "did a stranger type their own text", and the only
+   * two things that distinguish that from a click on an example are `src` and `via`. They travel
+   * in the URL and in a hidden field, never in a database: the access log already records the URI
+   * with `brief` filtered out (deploy/Caddyfile), so counting this needs no new storage and the
+   * page keeps its promise word for word.
+   */
+  src = "",
 ): string {
+  const t = lang === "de" ? DE : EN;
   // Counted now, from the same function the endpoint runs, so the sentence cannot drift from what
   // the links actually answer.
   const found = EXAMPLES.map((e) => reviewBrief(e.brief, e.kind).length);
-  const plural = (n: number) => `${n} thing${n === 1 ? "" : "s"}`;
-  const counts =
-    found[1] === 0
-      ? `The interesting part is the difference. The check finds ${plural(found[0])} in the first ` +
-        "and nothing in the second, and the second is what an agent can actually work from."
-      : `The interesting part is the difference. The check finds ${plural(found[0])} in the first ` +
-        `and ${plural(found[1])} in the second.`;
+  const counts = t.difference(t.things(found[0]), found[1] === 0 ? null : t.things(found[1]));
+  const srcField = src ? `<input type="hidden" name="src" value="${esc(src)}">` : "";
+  const srcQuery = src ? `&amp;src=${encodeURIComponent(src)}` : "";
   const links = EXAMPLES.map(
-    (e) =>
-      `<li><a href="/check?kind=${e.kind}&amp;brief=${encodeURIComponent(e.brief)}">${esc(e.label)}</a></li>`,
+    (e, i) =>
+      `<li><a href="/check?kind=${e.kind}&amp;src=ex${i + 1}${srcQuery}&amp;brief=${encodeURIComponent(e.brief)}">${esc(e.label)}</a></li>`,
   ).join("");
   return `
   <section>
     <div class="wrap narrow">
-      <p class="kicker">Before any money moves</p>
-      <h1 class="ph">What your brief does not say</h1>
+      <p class="kicker">${t.introKicker}</p>
+      <h1 class="ph">${t.introHeading}</h1>
       <p class="sub">
-        ${
-          formAllowed
-            ? "Paste a draft and this names the things an agent would have to invent to finish it."
-            : "This names the things an agent would have to invent to finish your brief."
-        } No key,
-        no account, no charge. It is the same check that runs on every job posted
-        here, and it costs nothing because knowing this after paying is worse for both sides.
+        ${formAllowed ? t.introSubForm : t.introSubNoForm} ${t.introSubTail}
       </p>
       ${
         formAllowed
@@ -376,17 +437,17 @@ export function renderCheckIntro(
             //
             // POST /v1/briefs/check keeps working and stays what a terminal uses.
             `<form method="GET" action="/check">
-        <textarea name="brief" rows="6" placeholder="FACT SHEET on the energy certificate for a 1974 apartment block with six flats and gas heating, for a landlord ordering one for the first time." required></textarea>
+        <textarea name="brief" rows="6" placeholder="${esc(t.introPlaceholder)}" required></textarea>
+        <input type="hidden" name="via" value="form">${srcField}
         <div class="cta" style="align-items:center;gap:1rem">
-          <button class="btn btn-1" type="submit">Check it</button>
+          <button class="btn btn-1" type="submit">${t.checkIt}</button>
           <label class="fine" style="margin:0">
-            <input type="radio" name="kind" value="factual" checked> factual
-            <input type="radio" name="kind" value="creative" style="margin-left:.6rem"> creative
+            <input type="radio" name="kind" value="factual" checked> ${t.factual}
+            <input type="radio" name="kind" value="creative" style="margin-left:.6rem"> ${t.creative}
           </label>
         </div>
       </form>
-      <p class="fine">Nothing is stored: the draft goes in the address and the web server is told
-        to drop it before it writes the line. No key, no account, no charge.</p>`
+      <p class="fine">${t.introKept}</p>`
           : // No box to paste into, so the page says where the draft goes instead of promising a
             // field that is not there. "Paste a draft" stood here whether or not the form was
             // rendered, and with it switched off a reader looked for a box, found none, and had
@@ -409,10 +470,10 @@ export function renderCheckIntro(
         draft either way.
       </p>`
       }
-      <h2>Two drafts of the same job</h2>
+      <h2>${t.twoDrafts}</h2>
       <p>${counts}</p>
       <ul class="found">${links}</ul>
-      <h2>From a terminal</h2>
+      <h2>${t.terminal}</h2>
       <pre><code>curl -s https://cp.hippe.eu/v1/briefs/check \
   -H 'content-type: application/json' \
   -d '{"brief":"…","kind":"factual"}'</code></pre>

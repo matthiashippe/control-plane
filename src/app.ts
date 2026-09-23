@@ -779,10 +779,12 @@ export function createApp(opts: AppOptions) {
     const brief = (c.req.query("brief") ?? "").trim();
     const kind: "factual" | "creative" = c.req.query("kind") === "creative" ? "creative" : "factual";
     const lang = langOf(brief, c.req.header("accept-language"));
+    // A short, boring value, because it ends up in a URL on a printed card and in a log line.
+    const src = (c.req.query("src") ?? "").replace(/[^a-z0-9_-]/gi, "").slice(0, 16);
     if (!brief) {
       return c.html(
         page(
-          renderCheckIntro(process.env.CP_FORM_ON_CHECK === "1", starterOffer(db)?.cents ?? null, lang),
+          renderCheckIntro(process.env.CP_FORM_ON_CHECK === "1", starterOffer(db)?.cents ?? null, lang, src),
           checkIntroMeta(lang)[0],
           checkIntroMeta(lang)[1],
           "/check",
@@ -796,7 +798,7 @@ export function createApp(opts: AppOptions) {
     if (brief.length > BRIEF_MAX) {
       return c.html(
         page(
-          renderCheckIntro(process.env.CP_FORM_ON_CHECK === "1", starterOffer(db)?.cents ?? null, lang),
+          renderCheckIntro(process.env.CP_FORM_ON_CHECK === "1", starterOffer(db)?.cents ?? null, lang, src),
           lang === "de" ? "Dieser Entwurf ist zu lang zum Prüfen" : "That draft is too long to check",
           lang === "de"
             ? "Ein Auftrag ist auf dieselbe Länge begrenzt wie beim Einstellen."
@@ -814,7 +816,7 @@ export function createApp(opts: AppOptions) {
     const words = brief.split(/\s+/).filter(Boolean).length;
     return c.html(
       page(
-        renderCheck(brief, kind, findings, words, starterOffer(db)?.cents ?? null, true, process.env.CP_FORM_ON_CHECK === "1", lang),
+        renderCheck(brief, kind, findings, words, starterOffer(db)?.cents ?? null, true, process.env.CP_FORM_ON_CHECK === "1", lang, src),
         checkResultMeta(findings.length, lang)[0],
         checkResultMeta(findings.length, lang)[1],
         "/check",
@@ -1893,6 +1895,23 @@ export function createApp(opts: AppOptions) {
    * The price is not a field. A newcomer with no money cannot answer "what is this worth", and the
    * only honest answer is what the pool will cover, so the job is posted at exactly that.
    */
+  /**
+   * The short address that fits on a printed card, under a QR code somebody scans in a foyer.
+   *
+   * `postyourprice.com/b?src=nit` is nineteen characters of QR and reads out loud in one breath;
+   * /check?src=nit does not. It is a redirect and not a second page, because two pages that say
+   * the same thing drift, and because the redirect shows up in the access log as its own line,
+   * which is how the card is counted without anything being stored.
+   *
+   * 302 and not 301: a permanent redirect is cached by the browser and by everything in between,
+   * and the day this points somewhere else the cards already printed would still go to the old
+   * place.
+   */
+  app.get("/b", (c) => {
+    const src = (c.req.query("src") ?? "").replace(/[^a-z0-9_-]/gi, "").slice(0, 16);
+    return c.redirect(src ? `/check?src=${encodeURIComponent(src)}` : "/check", 302);
+  });
+
   app.post("/start", async (c) => {
     const origin = c.req.header("origin");
     if (origin && origin !== siteOrigin()) {
@@ -2071,11 +2090,12 @@ export function createApp(opts: AppOptions) {
     const wantsPage = indexHtml !== null && prefersHtml(c.req.header("accept"));
     const brief = typeof b.brief === "string" ? b.brief.trim() : "";
     const emptyLang = langOf("", c.req.header("accept-language"));
+    const postSrc = (typeof b.src === "string" ? b.src : "").replace(/[^a-z0-9_-]/gi, "").slice(0, 16);
     if (!brief) {
       if (wantsPage) {
         return c.html(
           page(
-            renderCheck("", "factual", [], 0, starterOffer(db)?.cents ?? null, false, process.env.CP_FORM_ON_CHECK === "1", emptyLang),
+            renderCheck("", "factual", [], 0, starterOffer(db)?.cents ?? null, false, process.env.CP_FORM_ON_CHECK === "1", emptyLang, postSrc),
             emptyLang === "de" ? "Die kostenlose Prüfung braucht einen Entwurf" : "The free check needs a draft",
             emptyLang === "de"
               ? "Fügen Sie den Auftrag ein, den Sie einstellen würden, und hier steht, was er nicht sagt. Kein Schlüssel, kein Konto, nichts gespeichert."
@@ -2117,7 +2137,7 @@ export function createApp(opts: AppOptions) {
     if (wantsPage) {
       return c.html(
         page(
-          renderCheck(brief, kind, findings, words, starterOffer(db)?.cents ?? null, false, process.env.CP_FORM_ON_CHECK === "1", lang),
+          renderCheck(brief, kind, findings, words, starterOffer(db)?.cents ?? null, false, process.env.CP_FORM_ON_CHECK === "1", lang, postSrc),
           checkResultMeta(findings.length, lang)[0],
           checkResultMeta(findings.length, lang)[1],
           "/v1/briefs/check",
