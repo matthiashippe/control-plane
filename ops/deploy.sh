@@ -50,7 +50,27 @@ if [[ "$E2E" == "1" ]]; then
     echo
     tail -20 /tmp/cp-deploy-e2e.log
     echo
-    echo "NOT DEPLOYING: the harness did not come up green." >&2
+    # Name the cause that is in the log, not the one that is usually true.
+    #
+    # On 2026-09-23 at 11:20 and again at 11:26 UTC this refused twice with "the harness did not
+    # come up green". The harness was fine. Two lines above sat `failed to do request: Head
+    # "https://registry-1.docker.io/...": net/http: TLS handshake timeout`, and the e2e run cannot
+    # start a container whose base image it cannot pull. Measured right afterwards: auth.docker.io
+    # answered in 4.1 s with 200, registry-1.docker.io/v2/ ran into a 20 s timeout, and the image
+    # was not in the local cache.
+    #
+    # The sentence sent the reader to look at the harness, where nothing was wrong, and it did it
+    # on a day when the change waiting to go out was on the runtime path. A refusal that names the
+    # wrong cause costs more than no refusal, because it is acted on.
+    if grep -qE 'registry-1\.docker\.io|TLS handshake|failed to do request' /tmp/cp-deploy-e2e.log; then
+      echo "NOT DEPLOYING: the e2e run could not fetch its base image from the Docker registry." >&2
+      echo "               That is the network between this machine and registry-1.docker.io, and" >&2
+      echo "               it says nothing about the change you are trying to deploy. Try" >&2
+      echo "               'docker pull node:22-bookworm-slim' once and run this again; with the" >&2
+      echo "               image in the local cache the e2e run does not touch the registry." >&2
+    else
+      echo "NOT DEPLOYING: the harness did not come up green." >&2
+    fi
     exit 1
   fi
   echo "     $(grep -E '^E2E ' /tmp/cp-deploy-e2e.log | tail -1)"
