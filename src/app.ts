@@ -15,10 +15,14 @@ import {
   starterAvailableMc,
   starterOffer,
   agentOffer,
+  poolLeftTodayMc,
+  BUYER_GRANT_MC,
   GRANT_MC,
   StarterError,
 } from "./credits/starter.js";
 import { verifyFindings, messages, type CheckMode } from "./check/fabrication.js";
+import { mintKeylessIdentity } from "./auth/keyless.js";
+import { renderStarted, renderNoFreeJob } from "./public/startpage.js";
 import { reviewBrief } from "./bounties/brief.js";
 import { receipts, PUBLICATION_FROM } from "./bounties/receipts.js";
 import { renderMarket, renderNumbers, renderPrices, renderStatus } from "./public/market.js";
@@ -43,6 +47,7 @@ import {
   feeMc,
   FEE_PERCENT,
   BRIEF_MAX,
+  PRICE_MIN_MC,
   BountyError,
   type Bounty,
 } from "./bounties/store.js";
@@ -1786,6 +1791,119 @@ export function createApp(opts: AppOptions) {
     deadline: b.deadline,
     status: b.status,
     created_at: b.created_at,
+  });
+
+  /**
+   * The other door: a brief becomes a job, and the person gets a key instead of an account.
+   *
+   * Keyless on purpose, and it is the one route on this service that hands out money, so the
+   * reasoning belongs here rather than in a commit message.
+   *
+   * Until 2026-09-23 every way in ran through SIWE, and 43 of 43 visitors stopped there. The
+   * signature proved control of an Ethereum address this service does not use for a buyer: it
+   * holds no balance belonging to anybody else and pays nothing out. What it needs is a handle to
+   * hang a balance on, and an API key has always been exactly that.
+   *
+   * **What stops this being a tap.** Not the per-address rule, which never stopped anybody who
+   * meant it: 33 keypairs are 33 addresses and cost nothing. The day's ceiling does
+   * (POOL_DAILY_MC), and it is asked BEFORE anything is minted, so a refusal leaves no wallet and
+   * no half-made job behind.
+   *
+   * **Same-origin only.** A form post from somebody else's page would spend the pool on jobs
+   * nobody asked for, so a cross-site Origin is refused. An absent Origin is allowed, because that
+   * is what a plain `curl` sends and this route is meant to work from a terminal too.
+   *
+   * The price is not a field. A newcomer with no money cannot answer "what is this worth", and the
+   * only honest answer is what the pool will cover, so the job is posted at exactly that.
+   */
+  app.post("/start", async (c) => {
+    const origin = c.req.header("origin");
+    if (origin && origin !== siteOrigin()) {
+      return c.text("This form only accepts posts from this site.", 403);
+    }
+    releaseExpired(db);
+
+    const form = (await c.req.parseBody().catch(() => ({}))) as Record<string, unknown>;
+    const brief = typeof form.brief === "string" ? form.brief.trim() : "";
+    const kind: "factual" | "creative" = form.kind === "creative" ? "creative" : "factual";
+    const host = c.req.header("host") ?? "cp.hippe.eu";
+    if (!brief || brief.length > BRIEF_MAX) {
+      return c.redirect("/check", 303);
+    }
+
+    // Asked before minting, and asked of the day's budget rather than the pool's total, because
+    // the total can be healthy while today's is gone. A wallet created here and then refused would
+    // be a row nobody can reach and a key nobody was given.
+    const affordableMc = Math.min(BUYER_GRANT_MC, poolLeftTodayMc(db));
+    const priceMc = Math.floor(affordableMc / MC_PER_CENT) * MC_PER_CENT;
+    if (priceMc < PRICE_MIN_MC) {
+      return c.html(
+        page(
+          renderNoFreeJob(host, mcToCents(poolLeftMc(db)), poolLeftMc(db) >= BUYER_GRANT_MC),
+          "The free first job is not available right now",
+          "The starter pool gives away a fixed amount a day and a fixed amount in total. The brief check stays free either way.",
+          "/start",
+          "og.png",
+          [],
+          // Noindex: a POST result, and the one below carries a key in plain sight.
+          true,
+        ),
+        503,
+      );
+    }
+
+    const { address, key } = mintKeylessIdentity(db, "browser");
+    try {
+      const bounty = createBounty(db, {
+        creator: address,
+        kind,
+        brief,
+        priceMc,
+        deadline: new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
+      });
+      return c.html(
+        page(
+          renderStarted(
+            {
+              id: bounty.id,
+              priceCents: mcToCents(bounty.price_mc),
+              deadline: bounty.deadline,
+              key,
+              brief,
+              kind,
+              findings: reviewBrief(brief, kind).length,
+            },
+            host,
+          ),
+          "Your job is on the board",
+          "A first job paid by the operator's pool, and the one key that opens it.",
+          "/start",
+          "og.png",
+          [],
+          true,
+        ),
+        201,
+      );
+    } catch (e) {
+      // The grant is claimed inside createBounty, so a refusal here means the pool moved between
+      // the check above and the insert. Nothing was charged and nothing is half-done; the wallet
+      // that was minted holds zero and is unreachable, which is the harmless end of this.
+      if (e instanceof BountyError || e instanceof StarterError) {
+        return c.html(
+          page(
+            renderNoFreeJob(host, mcToCents(poolLeftMc(db)), true),
+            "The free first job is not available right now",
+            "The starter pool gives away a fixed amount a day and a fixed amount in total. The brief check stays free either way.",
+            "/start",
+            "og.png",
+            [],
+            true,
+          ),
+          503,
+        );
+      }
+      throw e;
+    }
   });
 
   app.post("/v1/bounties", async (c) => {

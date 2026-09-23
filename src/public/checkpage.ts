@@ -35,18 +35,32 @@ import { reviewBrief } from "../bounties/brief.js";
  * readers empties it inside an hour, and from that hour on any page that promises it
  * unconditionally is contradicted by the server in the same second.
  */
+/**
+ * What comes after a brief that says enough, and the sentence this used to end on.
+ *
+ * It read: "posting it is six steps ... They do need a wallet, in the sense of a key pair on your
+ * own machine that signs one message." That was true and it was the wall, placed at the one moment
+ * somebody is convinced. Forty-three visitors reached this point and none went further.
+ *
+ * Since Goal 16 there is a door that needs none of it, so this says what is now actually true.
+ * When the pool cannot fund a first job the offer is absent rather than softened, and the six-step
+ * route with a wallet is what remains, because that route is still real.
+ */
 function nextStep(freeFirstJobCents: number | null): string {
-  const cost =
-    freeFirstJobCents === null
-      ? `The first three take no payment beyond the price you set, and that price has to be on ` +
-        `your balance before the job goes up.`
-      : `The first three cost nothing: the operator's pool pays for a first job of up to ` +
-        `${freeFirstJobCents} cents.`;
+  if (freeFirstJobCents === null) {
+    return (
+      `When a brief says enough, <a href="/post">posting it</a> is six steps. The price has to be ` +
+      `on your balance before the job goes up, which takes a key pair on your own machine and USDC ` +
+      `on Base; the free first job the operator's pool pays for is not available at the moment. ` +
+      `What other people have posted is at <a href="/jobs">/jobs</a>, no key needed to read them.`
+    );
+  }
   return (
-    `When a brief says enough, <a href="/post">posting it</a> is six steps. ${cost} They do need a ` +
-    `wallet, in the sense of a key pair on your own machine that signs one message; nothing has to ` +
-    `be in it and this service never sees it. What other people have posted is at ` +
-    `<a href="/jobs">/jobs</a>, no key needed to read them.`
+    `Posting it needs nothing you do not already have: no account, no wallet, no card. The ` +
+    `operator's pool pays for a first job of up to ${freeFirstJobCents} cents, you get a key on ` +
+    `the next page, and that key is the whole account. The six-step route with your own wallet and ` +
+    `your own money is at <a href="/post">/post</a> and is unchanged. What other people have ` +
+    `posted is at <a href="/jobs">/jobs</a>, no key needed to read them.`
   );
 }
 
@@ -147,12 +161,28 @@ export function renderCheck(
         <textarea name="brief" rows="8" required>${esc(brief)}</textarea>
         <div class="cta" style="align-items:center;gap:1rem">
           <button class="btn btn-1" type="submit">Check it again</button>
+          ${
+            // The same textarea, a second button, and the draft goes straight to the board. Two
+            // forms would mean two copies of the text and one of them going stale the moment
+            // somebody edits the other. `formmethod` and `formaction` are what HTML has for
+            // exactly this, and CSP form-action 'self' covers both targets.
+            freeFirstJobCents === null
+              ? ""
+              : `<button class="btn btn-2" type="submit" formmethod="post" formaction="/start">Post it as a job</button>`
+          }
           <label class="fine" style="margin:0">
             <input type="radio" name="kind" value="factual"${kind === "creative" ? "" : " checked"}> factual
             <input type="radio" name="kind" value="creative"${kind === "creative" ? " checked" : ""}> creative
           </label>
         </div>
       </form>
+      ${
+        freeFirstJobCents === null
+          ? ""
+          : `<p class="fine">Posting costs you nothing and asks for nothing: the pool pays up to
+             ${freeFirstJobCents} cents for a first job, and the key you get back is the only way
+             into it, so copy it when it appears.</p>`
+      }
       <p class="fine">${words} word${words === 1 ? "" : "s"}, read as ${esc(kind)} work.
         ${whatIsKept(viaQuery)}</p>`
           : `<h2>What was checked</h2>

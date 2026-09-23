@@ -226,23 +226,54 @@ describe("The way to the free check from the landing page", () => {
 /**
  * What comes after the check, and the one sentence that says it.
  *
- * Both pages here used to end with "the first three need no money", which is true and leaves out
- * what decides it for most readers: step two on /post wants an Ethereum signature, so a key pair
- * has to exist even though nothing has to be in it. A reader told "no money" who then finds a
- * signature on the second step was told the truth and still misled.
+ * Two rewrites, and the second undoes the first for a good reason. The page once ended with "the
+ * first three need no money", which is true and leaves out that step two on /post wants an
+ * Ethereum signature; so the sentence was made to name the key pair, and this test held it there.
+ *
+ * Since Goal 16 the key pair is no longer what the reader needs. A job funded by the pool is
+ * posted with one button and the key comes back on the next page, so naming a signature as the
+ * price of posting would now be the misleading half. The requirement flipped with the fact, and
+ * what has not changed is the rule underneath: **the sentence has to describe the route the reader
+ * can actually take right now.** That is why it is tested in both states of the pool and not in
+ * one, because the wallet route is still the only one when the pool cannot pay.
  */
 describe("What the check says comes next", () => {
-  it("names the signature, because /post asks for one on its second step", async () => {
+  it("offers the door that needs nothing while the pool can pay for it", async () => {
     const a = app();
+    for (const path of ["/check", `/check?brief=${encodeURIComponent("FACT SHEET on a roof")}`]) {
+      const html = await (await a.request(path)).text();
+      expect(html, `${path} should not promise money is the only cost`).not.toMatch(
+        /first three need no money/i,
+      );
+      expect(html, `${path} must not demand a key pair for a route that needs none`).not.toMatch(
+        /needs? a\s+wallet|key pair on your own machine/i,
+      );
+      expect(html, `${path} should name what posting actually costs`).toMatch(
+        /no account, no wallet, no card/i,
+      );
+    }
+  });
+
+  it("names the wallet again once the pool cannot pay, because then it is the only route", async () => {
+    const db = openDb(":memory:");
+    // Spend the pool the way it is really spent, through the ledger, so the page is reading the
+    // same number the server would refuse on.
+    db.prepare("INSERT INTO wallets (address, balance_mc, created_at) VALUES (?, 0, ?)").run(
+      "key:" + "a".repeat(40),
+      new Date().toISOString(),
+    );
+    db.prepare(
+      "INSERT INTO ledger (address, kind, delta_mc, ref, created_at) VALUES (?, 'grant', ?, 'drain', ?)",
+    ).run("key:" + "a".repeat(40), 500_000, new Date().toISOString());
+    const a = createApp({ db });
     const post = await (await a.request("/post")).text();
     expect(post, "step 2 no longer asks for a signature, so this test is measuring the wrong thing")
       .toMatch(/Ethereum signature/i);
-
     for (const path of ["/check", `/check?brief=${encodeURIComponent("FACT SHEET on a roof")}`]) {
       const html = await (await a.request(path)).text();
-      expect(html, `${path} should say what step two wants`).toMatch(/key pair/i);
-      expect(html, `${path} should not promise money is the only cost`).not.toMatch(
-        /first three need no money/i,
+      expect(html, `${path} should say what the remaining route wants`).toMatch(/key pair/i);
+      expect(html, `${path} must not still offer the free job`).not.toMatch(
+        /no account, no wallet, no card/i,
       );
     }
   });
@@ -251,7 +282,7 @@ describe("What the check says comes next", () => {
     const a = app();
     const intro = await (await a.request("/check")).text();
     const result = await (await a.request(`/check?brief=${encodeURIComponent("FACT SHEET on a roof")}`)).text();
-    const sentence = /When a brief says enough[\s\S]{0,400}?no key needed to\s+read them\./;
+    const sentence = /Posting it needs nothing you do not already have[\s\S]{0,600}?no key needed to\s+read them\./;
     expect(intro.match(sentence), "the intro lost the sentence").toBeTruthy();
     expect(result.match(sentence), "the result page lost the sentence").toBeTruthy();
   });

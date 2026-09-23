@@ -152,7 +152,10 @@ export function poolLeftTodayMc(db: Db, now: Date = new Date()): number {
  * comment.
  */
 export function starterOffer(db: Db): { cents: number; pool_left_cents: number } | null {
-  const left = poolLeftMc(db);
+  // Today's budget and not the total, since 2026-09-23. The total can be healthy while the day's
+  // is spent, and a page that promises a free first job in that hour is making a promise the very
+  // next request refuses, which is the exact failure this function was written to prevent.
+  const left = poolLeftTodayMc(db);
   // The BUYER ceiling, because every caller of this is a buyer surface: the landing page, /post,
   // /jobs and /check all use it to say what a first job costs a newcomer. Since 2026-09-23 the
   // grant for a first job covers what that job is short of, up to BUYER_GRANT_MC, so "up to fifty
@@ -177,7 +180,7 @@ export function starterOffer(db: Db): { cents: number; pool_left_cents: number }
  * be the wrong half to give up.
  */
 export function agentOffer(db: Db): { cents: number; pool_left_cents: number } | null {
-  const left = poolLeftMc(db);
+  const left = poolLeftTodayMc(db);
   if (left < GRANT_MC) return null;
   return { cents: mcToCents(GRANT_MC), pool_left_cents: mcToCents(left) };
 }
