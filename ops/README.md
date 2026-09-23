@@ -396,22 +396,36 @@ An agent does not browse, it reads a facilitator's catalogue, and that catalogue
 a stranger's automaton finds this service without a human recommending it. We scan both public ones
 every morning for the article, 20,789 paid services on 2026-09-21, and not one row of them is ours.
 
-**There is no registration to forget.** A facilitator catalogues a seller as a side effect of a
-payment, keyed on the `resource` the seller declares, and `src/payments/bazaar.ts` already declares
-the block a listing needs. What it is attached to is the problem: `payResource`
-(`src/payments/pay.ts:82-85`) builds `/pay/{usd}/{recipient}` with the recipient substituted, so
-every payment hands the catalogue a different URL with a wallet address inside it.
+**The cause is not known, and this section used to say it was.**
 
-Evidence, not inference:
+What it said until 2026-09-23: a facilitator catalogues a seller as a side effect of a payment,
+keyed on the `resource` the seller declares; `payResource` (`src/payments/pay.ts:82-85`) builds
+`/pay/{usd}/{recipient}` with the payer's wallet substituted, so every payment hands the catalogue
+a different URL with a wallet address inside it, and **none** of the catalogued resources has one.
+It was headed "Evidence, not inference" and it pointed at a locked path.
 
-- PayAI reports settlements for `https://cp.hippe.eu/pay/5/0xd24f37d0…`, so our payments do reach
-  its records.
-- No cp.hippe.eu row appears anywhere in the 20,789 catalogued resources.
-- Of those 20,789, **none** has a wallet address in its path. Not one of the 49 with `/pay/` in it,
-  and none of the five with the most payers, one of which writes its variable segment as a
-  parameter (`/api/chain/ens/:input`).
-- Our own `/.well-known/x402` already describes the endpoint correctly as `/pay/{usd}/{address}`.
-  Only the 402 answer does not.
+That last claim was false on the day it was written. The file it cites,
+`docs/research/data/2026-09-21-x402-verzeichnis.csv`, contains **63** resources with a
+0x-address in the path, all of them `pro-api.coingecko.com`, one row per token contract. Re-measured
+against the scan of 2026-09-23, 22,493 rows: **75** such resources, 58 of them in the PayAI
+directory. A wallet-shaped segment in the path does not keep a seller out of the catalogue.
+
+Nor does the protocol version: 1,612 catalogued resources declare x402Version 1, as we do. Nor is
+a templated path the entry requirement: only 190 of 6,792 PayAI rows have one.
+
+What is measured, all of it at once:
+
+- PayAI reports settlements for `https://cp.hippe.eu/pay/5/0xd24f37d0…` -- 1-9 total, reliability
+  100, network base -- so our payments do reach its records.
+- No row for either of our hosts appears anywhere in the 22,493 catalogued resources, across both
+  directories.
+- Therefore the stats store and the listing are not the same store, and being settled does not put
+  a seller in the catalogue.
+- Our own `/.well-known/x402` already describes the endpoint as `/pay/{usd}/{address}`.
+
+Why we are absent is an open question. One confident wrong answer costs more than an open one,
+because the next cycle spends its effort on the change it names, and this one named a file that is
+locked without a human.
 
 The fix lives in `src/payments/**`, which `loop-constraints.md` keeps locked without a human. This
 script is the other half: the answer is in front of the cycle every run, so the day it flips is a

@@ -216,6 +216,12 @@ run --undetermined-on 2 "the published data reproduces" ./ops/check-data.py
 # proved on the day it was written. See ops/traffic.sh --selftest. Reads nothing from production.
 run "the traffic report tells an arrival from a claim" ./ops/traffic.sh --selftest
 
+# The directory search, against a planted scan that does and does not contain us. Its single
+# hard-coded host was cp.hippe.eu, so from the move on 2026-09-22 a listing under the new name
+# would have been reported as absence by the one tool that exists to notice it. Reads nothing
+# from production.
+run "the directory search would see a listing" ./ops/own-x402-listing.sh --selftest
+
 # Whether anything that indexes the web has ever looked at this service, and whether our side of
 # that is in order. The first crawler is news; until then the line is the finding. See
 # ops/visibility.sh: in the first 2.6 days there was not one, and nothing on our side is wrong.
