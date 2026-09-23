@@ -1127,7 +1127,9 @@ export function createApp(opts: AppOptions) {
       "- Anything else: an API key takes three calls and one Ethereum signature, no runtime and no",
       "  chain transaction. Sign in with Ethereum against /v1/auth/nonce, /v1/auth/verify and",
       "  /v1/auth/api-keys. The signed domain is conway.tech, not this host, and that is the one",
-      "  detail nobody guesses. Written out with a runnable script at",
+      "  detail nobody guesses, so POST /v1/auth/nonce now answers with it: the nonce, the domain,",
+      "  the chainId, how long it is good for and the next call. Nothing on this path needs a page",
+      "  read to it. The same thing written out with a runnable script, for a person, is at",
       "  https://github.com/matthiashippe/control-plane/blob/main/docs/api-key.md",
       "- Topup tiers in USD: " + tiers + ".",
       pay ? "- Payment goes to " + pay.payTo + " on " + pay.network + " (USDC " + pay.usdcAddress + ")." : "- Payments are not configured on this instance.",
@@ -1246,7 +1248,40 @@ export function createApp(opts: AppOptions) {
 
   // --- Provisioning ---------------------------------------------
 
-  app.post("/v1/auth/nonce", (c) => c.json({ nonce: issueNonce(db) }));
+  /**
+   * The nonce, and what has to be signed with it.
+   *
+   * It answered `{nonce}` and nothing else, which is enough for the Conway runtime because the
+   * runtime hard-codes the rest. It is not enough for anything else, and everything else is what
+   * this market needs: an agent that arrives through /bounties.json or /llms.txt has to sign a
+   * SIWE message whose domain is `conway.tech` and not this host, and llms.txt calls that "the one
+   * detail nobody guesses" and then sends the reader to a markdown file on GitHub to find it.
+   *
+   * That is where the machine-readable chain broke. Everything else an arriving agent needs is
+   * already in a JSON answer: the open jobs with their prices, the fee, the deadline, the starter
+   * credit, the topup tiers. The single step that decided whether it could compete at all was
+   * delivered as prose for a human.
+   *
+   * So the two values the verifier actually enforces are published here, read from `siweCfg`,
+   * which is the same object `verifySiwe` compares against. Not typed a second time: a constant
+   * repeated in two files is how a published value and an enforced value drift apart, and
+   * test/nonce-says-what-to-sign.test.ts holds them together.
+   *
+   * Only domain and chainId, because only those two are checked. Statement and uri are free, and
+   * saying otherwise would invent a requirement. Adding fields is backwards compatible: the
+   * runtime reads `.nonce` and ignores the rest.
+   */
+  app.post("/v1/auth/nonce", (c) =>
+    c.json({
+      nonce: issueNonce(db),
+      domain: siweCfg.domain,
+      chain_id: siweCfg.chainId,
+      expires_in_seconds: Math.round(siweCfg.nonceTtlMs / 1000),
+      sign: `A SIWE message carrying your address, this nonce, domain ${siweCfg.domain} and chainId ${siweCfg.chainId}. The domain is not this host, and that is the part nobody guesses.`,
+      next: "POST /v1/auth/verify with {message, signature}, then POST /v1/auth/api-keys with the access token.",
+      docs: DOC.authentication,
+    }),
+  );
 
   app.post("/v1/auth/verify", async (c) => {
     const body = (await c.req.json().catch(() => ({}))) as {
