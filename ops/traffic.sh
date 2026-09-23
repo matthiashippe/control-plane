@@ -17,6 +17,7 @@ ONLY_FUNNEL=0
 [[ "${1:-}" == "--funnel" ]] && { ONLY_FUNNEL=1; shift; }
 
 HOURS="${1:-24}"
+BASE_URL="${CP_URL:-https://cp.hippe.eu}"
 KEY="${CP_SSH_KEY:-$HOME/.ssh/id_ed25519_automaton}"
 HOST="${CP_HOST:-root@76.13.144.207}"
 # The operator's own line, the VM itself and the code-host. Without this filter the picture
@@ -134,6 +135,25 @@ echo
 # Addresses that loaded the page and produced no mark below the fold are counted and named on one
 # line, because "nobody scrolled" and "nobody came" are different findings and this section must
 # not merge them.
+# Which paths are pages, from the service rather than from a list in here.
+#
+# The funnel needs this because its test for "opened a page" is that the inline script ran, and
+# the script announces itself by fetching /v1/status with one of our pages as its referrer. That
+# is one address doing two things, usually. On 2026-09-22 it was two addresses doing one each:
+# Googlebot fetched the landing page from 66.249.70.7 and /v1/status from .8, and .8 was counted
+# as a page load although it never asked for a page in its life.
+# ${CP_PAGES+x} and not ${CP_PAGES:-}: the test is whether the variable is SET, not whether it
+# holds anything, so that CP_PAGES="" can be used to check what this filter does when the sitemap
+# cannot be read. With :- the empty value would be replaced by the fetch and the counter-proof
+# would quietly measure the normal case, which is the failure mode this repo keeps meeting.
+if [[ -z "${CP_PAGES+x}" ]]; then
+  CP_PAGES="$(curl -s -m 15 "$BASE_URL/sitemap.xml" | grep -oE '<loc>[^<]*' | sed "s|<loc>$BASE_URL||" | sed 's|^$|/|' | tr '\n' ' ')"
+fi
+if [[ "$(printf '%s' "$CP_PAGES" | wc -w)" -lt 5 ]]; then
+  echo "   (the sitemap named fewer than five pages, so a page load is not checked against it)" >&2
+fi
+export CP_PAGES
+
 echo "-- Who of them behaved like a person, over the whole log --"
 # Everything, ours included, with a flag. The funnel needs both: who a stranger is, and when each
 # path first answered at all. A path goes live for the service and not for a visitor, and our own
@@ -142,10 +162,19 @@ echo "-- Who of them behaved like a person, over the whole log --"
 jq -r --argjson own "$own_json" \
   "[(.ts|tostring), .request.remote_ip, (.request.uri // \"\"), ((.request.headers.Referer // [\"\"])[0]), ((.request.headers[\"User-Agent\"] // [\"\"])[0]), (if (.request.remote_ip as \$ip | (\$own | index(\$ip)) == null) then \"foreign\" else \"ours\" end)] | @tsv" "$log" \
   | python3 -c '
-import sys, collections
+import sys, os, collections
+
+# Pages a person reads, as opposed to everything else that lands in this log. Read from the
+# sitemap this service publishes, rather than kept here: a hand-kept list of pages drifted four
+# times in this repo in one night, and every one of those times it was missing the page that had
+# just shipped. Empty when the sitemap could not be read, and every use of it says what it does.
+#
+# No apostrophe anywhere in this block. It sits inside python3 -c '...', so one ends the shell
+# string and takes the rest of the script with it. That has now happened three times in two days.
+PAGES = tuple(p for p in (os.environ.get("CP_PAGES") or "").split() if p.startswith("/"))
 
 people = collections.defaultdict(
-    lambda: {"agents": [], "ran_script": False, "marks": set(), "mark_times": {}, "paths": set(), "first": None, "from": "", "ip": ""}
+    lambda: {"agents": [], "ran_script": False, "loaded_page": False, "marks": set(), "mark_times": {}, "paths": set(), "first": None, "from": "", "ip": ""}
 )
 # Every path an address touched, whatever tool did it. The browser-only view is right for deciding
 # who read a page; it is wrong for the funnel, because the step after reading is done in a terminal.
@@ -183,6 +212,8 @@ for line in sys.stdin:
         entry["from"] = referrer
     if path.startswith("/v1/status") and "cp.hippe.eu" in referrer:
         entry["ran_script"] = True
+    if path.split("?")[0] in PAGES:
+        entry["loaded_page"] = True
     if path.startswith("/px/") and path.endswith(".png"):
         mark = path[4:-4]
         entry["marks"].add(mark)
@@ -213,6 +244,13 @@ for ip, entry in people.items():
     if not entry["ran_script"]:
         dropped["never ran the page script"] += 1
         continue
+    # An address that ran the script but never asked for a page did not open one. Googlebot split
+    # the two across 66.249.70.7 and .8 on 2026-09-22, and .8 sat in this column as a page load
+    # with no page behind it. Skipped when the sitemap could not be read, because judging against
+    # an empty list would drop everybody.
+    if PAGES and not entry["loaded_page"]:
+        dropped["fetched /v1/status without ever asking for a page"] += 1
+        continue
     if swapped(entry["agents"]):
         dropped["changed browser identity within a minute"] += 1
         continue
@@ -238,10 +276,9 @@ for ip, entry in people.items():
 # The steps are what a stranger actually does, in order, and each one is visible in the access log
 # alone. "Thought" is deliberately not here: it lives in the ledger and ops/check-all.sh prints it,
 # and a funnel that mixes two sources drifts at the seam.
-# Pages a person reads, as opposed to everything else that lands in this log. Without this list
-# the second step read 19 of 19: the inline script fetches /v1/status on every page view, and
-# counting it as a second page turns every single visitor into somebody who clicked through.
-PAGES = ("/", "/check", "/fix", "/post", "/jobs", "/receipts", "/x402", "/conway", "/terms")
+# PAGES is read from the sitemap at the top of this block. Without a list of pages at all the
+# second step read 19 of 19: the inline script fetches /v1/status on every page view, and counting
+# that as a second page turns every single visitor into somebody who clicked through.
 
 def pages_of(entry):
     return {p for p in entry["paths"] if p in PAGES}
@@ -317,6 +354,8 @@ else:
 if loaded_only:
     print(f"   {len(loaded_only)} more loaded the page and left no mark below the fold:")
     print("     " + ", ".join(sorted(loaded_only)[:10]) + ("" if len(loaded_only) <= 10 else ", ..."))
+    if len(loaded_only) > 10:
+        print("     " + ", ".join(sorted(loaded_only)[10:]))
     print("     That is a fetcher rendering once, or a person who did not scroll. The page cannot")
     print("     tell those apart, and calling them readers is how this section first said eighteen.")
 # Never drop silently. A filter that removes addresses without saying how many is indistinguishable
