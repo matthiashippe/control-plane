@@ -246,6 +246,31 @@ Frage, ob wir halten oder vermitteln. **Das ist die Entscheidung, und sie gehoer
       `/fix` jede Seite dieses Dienstes null Browser-Besuche hat. 2 h, ausdruecklich nicht vor dem
       02.10.
 
+## Stand am Abend des 23.09., in Zahlen statt in Arbeit
+
+Der Dauerauftrag verlangt nach jedem Zyklus eine Zeile dazu, was die Zahl daneben sagt. Heute ist
+die ehrliche Antwort: **keine der vier Zielzahlen hat sich bewegt.** `foreign_gmv_30d` 0,
+`foreign_buyers` 0, Zeilen im x402-Verzeichnis 0, getippte fremde Laeufe 0.
+
+Was sich bewegt hat, ist die Voraussetzung, und das ist kein Ersatz fuer eine Zahl:
+
+- **Die Wand ist weg.** 43 von 43 Besuchern sind an "you need a wallet" stehengeblieben; seit
+  15:00 UTC kommt ein Fremder ohne Wallet, ohne Signatur und ohne USDC vom Entwurf bis zu einem
+  offenen Auftrag, abgegangen mit `ops/keyless-walk.sh`.
+- **Der Check spricht Deutsch**, von der Erkennung ueber die Befunde bis zu `<html lang>` und den
+  zwei Beispielen. Vorher hat er einem deutschen Auftrag viermal etwas vorgeworfen, das dastand.
+- **Die Buecher sind oeffentlich** (`/v1/status`, `market`), weil eine Antwort, die fremde Belege
+  verlangt und eigene Zahlen nur behauptet, nichts wert ist.
+- **Die Seiten wohnen an einer Adresse**, weil neun dauerhafte Kommentare auf den alten Namen
+  zeigen und Googlebot hier vier Dinge geholt hat, sieben Sekunden nach einem davon.
+- **Die Verkehrswerkzeuge sehen wieder ihre Geschichte.** Sie waren nach einer Log-Rotation
+  vierzig Minuten blind und haben in dieser Zeit "nobody has ever" gemeldet.
+
+**Der Engpass ist unveraendert und heisst Zulauf.** Der einzige Kanal mit Beleg sind die
+Issue-Antworten: drei Adressen sind je von github.com gekommen, alle drei haben gelesen, zwei aus
+Threads, die wir beantwortet haben. Sieben geprueste Entwuerfe liegen bereit, drei am Tag duerfen
+raus, und jede Tatsachenbehauptung darin wird vor dem Absenden gegen ihre lebende Quelle geprueft.
+
 ## Geht das aus? Vier ehrliche Zeilen
 
 **26.09.: nein, nicht durch den Loop.** Fuenf fremde Einzahler in 72 Stunden sind elf Prozent aller
@@ -387,7 +412,6 @@ Sieben Saetze, und alles andere laeuft. Stand 23.09., nichts davon darf der Loop
    gesperrte Pfad fuer eine Identitaet ohne Ethereum-Signatur.
 5. **Search Console und Bing** -- sein Login, den DNS-Eintrag setzt der Loop selbst.
 6. **Eine Zahl fuer Anzeigen** -- Empfehlung: 20 Euro am Tag fuer zwei Wochen.
-7. **Tailscale neu anmelden** -- der code-host nimmt sonst keine Auftraege.
 8. **Ein Konto bei `merchant.payai.network`** -- nach der Untersuchung vom 23.09. die einzige noch
    offene Tuer in den x402-Katalog, und damit die Bedingung fuer das Ziel am 02.10. Siehe T2.2.
 
