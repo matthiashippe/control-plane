@@ -159,6 +159,13 @@ run --undetermined-on 2 "conway still broken" ./ops/conway-zustand.sh
 run "market guards" env CP_URL="$BASE" pnpm -s tsx harness/e2e/market.ts
 run "journeys match the service" ./ops/check-journeys.sh
 run --undetermined-on 2 "pages say nothing obviously wrong" ./ops/check-pages.sh
+# Do we walk through the gate we sell?
+#
+# The landing page offers a stranger one thing before any money moves: paste a draft brief and be
+# told what an agent would have to invent to finish it. Every brief on /jobs was written by the
+# operator, and until 2026-09-23 not one had been put through that check. It costs nothing to ask:
+# POST /v1/briefs/check is five rules in 119 lines, not a model, and answers in 64 ms.
+run --undetermined-on 2 "our own briefs pass our own check" ./ops/own-briefs.sh
 # Added 2026-09-21. The three series below were printed by this script and never checked, so a cron
 # entry that stops firing would leave the same last point in every cycle's output and this script
 # would keep saying ALL CHECKS OK next to it.
