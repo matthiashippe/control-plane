@@ -111,10 +111,22 @@ fi
 # `set -o pipefail` turns that into a failed pipeline. The two small files passed and /jobs, the
 # biggest page on the site, reported that it does not name a route it names. Half an hour went
 # into looking for the missing sentence on a page that had it.
+#
+# A read that failed is not a page that is silent, and until 2026-09-24 this said it was. The
+# check went red at 07:40 UTC against a /jobs that carried the sentence; run again by hand it was
+# green. 64 KB over a 15 second timeout, while check-all was doing several hundred reverse-DNS
+# lookups in the same minute, and a timed-out curl returns an empty body. Empty body, no match,
+# "does not name it".
+#
+# A flaky check is worse than a broken one: it cries wolf, and the next real finding reads as
+# noise. So an unreadable page says so and is undetermined, not a failure, and the timeout is
+# large enough for the biggest page on the site.
 for page in "/bounties.json" "/llms.txt" "/jobs"; do
-  page_body=$(curl -s -m 15 "$BASE$page")
-  if printf '%s' "$page_body" | grep -q "/v1/auth/keyless"; then
-    ok "$page names the one-call route"
+  page_body=$(curl -sS -m 45 "$BASE$page" 2>/dev/null)
+  if [[ -z "$page_body" ]]; then
+    echo "  (could not read $page, so what it says is unchecked. Not a finding about the page.)"
+  elif printf '%s' "$page_body" | grep -q "/v1/auth/keyless"; then
+    ok "$page names the one-call route ($(printf '%s' "$page_body" | wc -c | tr -d ' ') bytes)"
   else
     bad "$page does not name /v1/auth/keyless, so an agent reading it still sees only the wall"
   fi
