@@ -8,7 +8,7 @@
 
 import type { Address, Hex } from "viem";
 import type { Authorization, Settler, SettleResult } from "./settler.js";
-import { BAZAAR_DESCRIPTION, BAZAAR_EXTENSION } from "./bazaar.js";
+import { BAZAAR_DESCRIPTION, BAZAAR_EXTENSION, BAZAAR_OUTPUT_SCHEMA } from "./bazaar.js";
 
 export interface FacilitatorConfig {
   url: string;
@@ -37,7 +37,12 @@ export function buildV1Requirements(cfg: FacilitatorConfig, auth: Authorization,
     asset: cfg.usdcAddress,
     // The token's EIP-712 domain; the runtime client signs with "USD Coin" / "2".
     extra: { name: "USD Coin", version: "2" },
-    // Without this block the facilitator never takes the service into its directory.
+    // The form every catalogued entry carries. Measured 2026-09-24: a listed accepts[] has an
+    // `outputSchema` and no `extensions` at all, and `input.discoverable` is what says "list me".
+    outputSchema: BAZAAR_OUTPUT_SCHEMA,
+    // And the route-configuration form the specification documents, which a middleware would have
+    // translated into the line above. Both go out until the EXTENSION-RESPONSES header says which
+    // one was read; asking costs one settlement, and guessing would cost two.
     extensions: BAZAAR_EXTENSION,
   };
 }

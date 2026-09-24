@@ -7,7 +7,7 @@
  */
 
 import { isAddress, verifyTypedData, type Address, type Hex } from "viem";
-import { BAZAAR_EXTENSION } from "./bazaar.js";
+import { BAZAAR_EXTENSION, BAZAAR_OUTPUT_SCHEMA } from "./bazaar.js";
 import { MC_PER_CENT, mcToCents, postLedger, type Db } from "../db.js";
 import { DOC } from "../errors.js";
 import type { Authorization, Settler } from "./settler.js";
@@ -50,6 +50,9 @@ export interface PaymentRequired {
     maxTimeoutSeconds: number;
     resource: string;
     description: string;
+    mimeType?: string;
+    extra?: { name: string; version: string };
+    outputSchema?: typeof BAZAAR_OUTPUT_SCHEMA;
     extensions?: typeof BAZAAR_EXTENSION;
   }>;
 }
@@ -98,6 +101,12 @@ export function buildPaymentRequired(cfg: PayConfig, usd: number, recipient: Add
         maxTimeoutSeconds: cfg.maxTimeoutSeconds,
         resource: payResource(cfg, usd, recipient),
         description: `${usd} USD credits`,
+        // The same three fields every catalogued entry carries, measured against PayAI's v1 rows
+        // on 2026-09-24. The 402 a buyer sees and the requirements the facilitator sees are the
+        // same document in this service, so they say the same thing.
+        mimeType: "application/json",
+        extra: { name: "USD Coin", version: "2" },
+        outputSchema: BAZAAR_OUTPUT_SCHEMA,
         extensions: BAZAAR_EXTENSION,
       },
     ],

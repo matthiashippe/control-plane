@@ -166,3 +166,66 @@ describe("threshold bonus", () => {
     expect(html, "the reason has to stand next to it, otherwise it is a sales trick").toMatch(/above<\/em> 500 cents/);
   });
 });
+
+/**
+ * The shape on the wire, which is not the shape in a route configuration.
+ *
+ * Measured on 2026-09-24 against every v1 row PayAI serves: a catalogued `accepts[]` carries
+ * `asset, description, extra, maxAmountRequired, maxTimeoutSeconds, mimeType, network,
+ * outputSchema, payTo, resource, scheme` and no `extensions` at all. The declaration arrives as
+ * `outputSchema` with `input.discoverable = true`; `extensions.bazaar` is what a seller writes in
+ * the middleware, which translates it. This service builds the payload by hand and so has to do
+ * that translation itself, and for four days it did not.
+ */
+describe("the declaration in the form a catalogued entry actually carries", () => {
+  const FIELDS = [
+    "asset",
+    "description",
+    "extra",
+    "maxAmountRequired",
+    "maxTimeoutSeconds",
+    "mimeType",
+    "network",
+    "outputSchema",
+    "payTo",
+    "resource",
+    "scheme",
+  ];
+
+  it("carries every field a listed v1 entry carries, in the 402 a buyer sees", () => {
+    const offer = buildPaymentRequired(cfg, 5, WALLET);
+    for (const f of FIELDS) {
+      expect(offer.accepts[0], `accepts[0].${f} is missing`).toHaveProperty(f);
+    }
+  });
+
+  it("says discoverable where the facilitator looks for it", () => {
+    const offer = buildPaymentRequired(cfg, 5, WALLET);
+    const schema = offer.accepts[0].outputSchema as { input?: { discoverable?: boolean; method?: string } };
+    expect(schema?.input?.discoverable, "input.discoverable is what says 'list me'").toBe(true);
+    expect(schema?.input?.method).toBe("GET");
+  });
+
+  it("sends the same thing to the facilitator that it shows the buyer", () => {
+    const auth: Authorization = {
+      from: WALLET,
+      to: PAY_TO,
+      value: 5_000_000n,
+      validAfter: 0n,
+      validBefore: 9_999_999_999n,
+      nonce: ("0x" + "11".repeat(32)) as Hex,
+    };
+    const req = buildV1Requirements(
+      { url: "x", network: "base", payTo: PAY_TO, usdcAddress: USDC, maxTimeoutSeconds: 300 },
+      auth,
+      `https://cp.hippe.eu/pay/5/${WALLET}`,
+    ) as Record<string, unknown>;
+    for (const f of FIELDS) {
+      expect(req, `paymentRequirements.${f} is missing`).toHaveProperty(f);
+    }
+    const offer = buildPaymentRequired(cfg, 5, WALLET);
+    expect(req.outputSchema, "the two documents must not drift apart").toEqual(
+      offer.accepts[0].outputSchema,
+    );
+  });
+});

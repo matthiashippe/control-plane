@@ -71,3 +71,52 @@ export const BAZAAR_EXTENSION = {
     },
   },
 } as const;
+
+/**
+ * The same declaration in the shape that is actually on the wire.
+ *
+ * Measured on 2026-09-24 against every v1 entry PayAI serves: a catalogued `accepts[]` carries
+ * `asset, description, extra, maxAmountRequired, maxTimeoutSeconds, mimeType, network,
+ * outputSchema, payTo, resource, scheme`. There is no `extensions` key in it at all. The bazaar
+ * declaration arrives as `outputSchema`, with `input.discoverable = true`.
+ *
+ * `extensions.bazaar.{discoverable, inputSchema, outputSchema}` is what a seller writes in the
+ * middleware's route configuration; the middleware translates it into `accepts[].outputSchema`
+ * before it reaches the facilitator. This service builds its payment requirements by hand and so
+ * has to do that translation itself, and it did not.
+ *
+ * Both forms go out now, and that is not hedging. The facilitator answers a settled payment with
+ * `EXTENSION-RESPONSES` (see src/payments/facilitator.ts), so the first real settlement says which
+ * of the two it read and, if it read neither, why. Sending one form and guessing would cost
+ * another five dollars to find out.
+ */
+export const BAZAAR_OUTPUT_SCHEMA = {
+  input: {
+    type: "http",
+    method: "GET",
+    discoverable: true,
+    routeTemplate: "/pay/:usd/:address",
+    pathParams: {
+      usd: {
+        type: "string",
+        required: true,
+        description: "One of the topup tiers in whole dollars, for example 5.",
+      },
+      address: {
+        type: "string",
+        required: true,
+        description:
+          "The automaton wallet that signs the payment. The credits go to the signer, so this is " +
+          "the address that will be able to spend them.",
+      },
+    },
+  },
+  output: {
+    type: "object",
+    properties: {
+      credits_cents: { type: "number", description: "What this payment added, in cents." },
+      balance_cents: { type: "number", description: "The balance after it, in cents." },
+      tx_hash: { type: "string", description: "The settlement transaction on Base." },
+    },
+  },
+} as const;
