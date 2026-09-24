@@ -126,6 +126,18 @@ if ROUTER_TS is None:
     print("note: Conway's router.ts was not readable, so the free-model route is NOT checked.")
     print()
 
+# What the root of Conway's API says about itself. The worker counts are here and not on /health.
+CONWAY_ROOT = None
+try:
+    _c = subprocess.run(["curl", "-s", "-m", "10", "https://api.conway.tech/"],
+                        capture_output=True, text=True, timeout=20).stdout
+    CONWAY_ROOT = json.loads(_c) if _c.strip().startswith("{") else None
+except Exception:
+    CONWAY_ROOT = None
+if CONWAY_ROOT is None:
+    print("note: Conway's root was not readable, so the worker counts in the drafts are NOT checked.")
+    print()
+
 # What Conway's sign-up does right now, from ops/conway-zustand.sh, which provisions a throwaway
 # wallet and costs nothing. None is not a pass: the checks that need it are skipped out loud.
 CONWAY_FAIL = None
@@ -374,6 +386,23 @@ for draft in drafts:
            f"this draft carries {', '.join(repr(r) for r in relative)}; a comment is read on a day "
            f"nobody picks, so a relative time in it is a sentence that goes false by itself"
            if relative else "")
+
+    # 12. Which of Conway's endpoints says what, because a draft named the wrong one.
+    #
+    # Three drafts said "`/health` on the same host says healthy with 2 of 8 workers up". `/health`
+    # answers `{"status":"healthy"}` and nothing else; the worker counts are on the ROOT. A reader
+    # who checks the path we named sees no such numbers and concludes we invented them, which on a
+    # comment whose whole argument is "here is how to check it yourself" is the worst outcome
+    # available. Found on 2026-09-24 by reading a draft end to end instead of patching it again.
+    if CONWAY_ROOT is not None and "healthyWorkers" in text:
+        report('"healthyWorkers"' in text and "api.conway.tech/`" in text.replace("`https://", "`"),
+               "attributes the worker counts to the root and not to /health",
+               "the counts live on https://api.conway.tech/ and this draft names another path")
+        for field in ("workers", "healthyWorkers"):
+            live = str(CONWAY_ROOT.get(field))
+            report(f'"{field}":{live}' in text.replace(" ", "") or f"{live}" in text,
+                   f"{field} matches what Conway serves right now ({live})",
+                   f"Conway says {field}={live}")
 
     pending.append(number)
     print()
