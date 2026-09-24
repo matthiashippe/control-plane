@@ -291,6 +291,10 @@ export function createApp(opts: AppOptions) {
     "/robots.txt",
     "/bounties.json",
     "/llms.txt",
+    // Named twice in llms.txt as the proof an agent can read. Found on 2026-09-24 by asking the
+    // old host about every path llms.txt promises: ten answered 301, nine of them pages for
+    // people, and this one.
+    "/receipts.json",
   ];
   app.use("*", async (c, next) => {
     const canonical = siteOrigin();

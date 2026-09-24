@@ -133,5 +133,25 @@ for page in "/bounties.json" "/llms.txt" "/jobs"; do
 done
 
 echo
+echo "-- what a machine calls answers on the old host too --"
+# Pages moved to one host on 2026-09-23; endpoints did not, or should not have.
+#
+# `/pay/` was left off that list and answered 301 for fifteen hours: an x402 client asks the
+# resource URL for its 402 and got an empty redirect. The nine comments already standing on
+# somebody else's tracker name the old host, and the facilitator records every settlement we have
+# ever made under it. `/receipts.json` was the same mistake one path over, found by asking the old
+# host about every path llms.txt promises.
+#
+# So it is asked of the old host directly, every cycle, instead of being remembered.
+for path in "/pay/5/0x1111111111111111111111111111111111111111" "/v1/status" "/v1/models" "/health" "/.well-known/x402" "/bounties.json" "/llms.txt" "/receipts.json"; do
+  code=$(curl -s -m 20 -o /dev/null -w '%{http_code}' "https://cp.hippe.eu$path" 2>/dev/null)
+  case "$code" in
+    000) echo "  (could not reach the old host for $path, unchecked)" ;;
+    301|302|308) bad "cp.hippe.eu$path answers $code; a client that does not follow sees nothing" ;;
+    *) ok "cp.hippe.eu$path answers $code, not a redirect" ;;
+  esac
+done
+
+echo
 if (( failures == 0 )); then echo "THE WAY IN IS WALKABLE"; else echo "THE WAY IN IS BLOCKED: $failures"; fi
 exit $(( failures == 0 ? 0 : 1 ))

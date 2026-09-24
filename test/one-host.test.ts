@@ -63,6 +63,7 @@ describe("what a machine calls answers where it was called", () => {
       "/pay/5/0x1111111111111111111111111111111111111111",
       "/bounties.json",
       "/llms.txt",
+      "/receipts.json",
     ]) {
       const res = await at("cp.hippe.eu", path);
       expect(res.status, `${path} must answer where it was asked`).not.toBe(301);
