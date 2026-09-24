@@ -25,6 +25,7 @@
  * written on a settled payment, and then the five USDC are the only way to ask.
  */
 import { buildV1Requirements, buildV1Payload } from "../src/payments/facilitator.js";
+import { BAZAAR_EXTENSION } from "../src/payments/bazaar.js";
 import type { Hex } from "viem";
 
 const URL_ = process.env.CP_FACILITATOR_URL ?? "https://facilitator.payai.network";
@@ -44,10 +45,13 @@ const auth = {
   nonce: ("0x" + "22".repeat(32)) as Hex,
 };
 const resource = "https://postyourprice.com/pay/5/0x1111111111111111111111111111111111111111";
+// The same body the service sends, `serverExtensions` included. A probe that differs from
+// production measures the probe.
 const body = JSON.stringify({
   x402Version: 1,
   paymentPayload: buildV1Payload(cfg, auth, ("0x" + "33".repeat(65)) as Hex),
   paymentRequirements: buildV1Requirements(cfg, auth, resource),
+  serverExtensions: BAZAAR_EXTENSION,
 });
 
 const req = buildV1Requirements(cfg, auth, resource) as Record<string, unknown>;
@@ -118,6 +122,7 @@ if (!fs.existsSync(walletFile)) {
       x402Version: 1,
       paymentPayload: buildV1Payload(cfg, realAuth, sig),
       paymentRequirements: buildV1Requirements(cfg, realAuth, realResource),
+      serverExtensions: BAZAAR_EXTENSION,
     }),
   );
 }
