@@ -195,6 +195,24 @@ unveraendert Zulauf, Zulauf laeuft ueber Punkt 1, und Punkt 1 gehoert Matthias.
       `/settle`), unvollstaendiger Scan (6.799 im Katalog, 6.792 gelesen), und ein
       Statistik-Endpunkt, der alles bejaht (erfundene Ressourcen bekommen `0`, unsere `1-9`).
       Die Ausschlussliste steht im Kopf von `ops/own-x402-listing.sh`.
+- [ ] **T2.5 Fuenf USDC in die Betreiber-Wallet, damit eine Abrechnung laeuft.** Zahl: Zeilen mit
+      unserem Host im Tagesscan, 0 von 23.512 auf mindestens 1. **Neu am 24.09., und es kippt den
+      Satz vom Vortag.** Gestern stand hier, es gebe keine Tuer. Gemessen: zwischen dem 21.09. und
+      heute sind **141 Hosts neu in die Kataloge gekommen**, rund 47 am Tag, zehn davon mit
+      Version 1 wie wir, darunter zwei ephemere Cloudflare-Tunnel, die niemand crawlt.
+      Die Spezifikation beschreibt die Tuer (`coinbase/x402`, `docs/extensions/bazaar.mdx`):
+      aufgenommen wird, wer die Bazaar-Erweiterung mitschickt, und die Form ist
+      `bazaar.{discoverable, inputSchema, outputSchema}`. **Unsere war `bazaar.info.{input,
+      output}` und enthielt `discoverable` nirgends.** Seit heute ausgerollt und live geprueft.
+      Dazu liest der Dienst jetzt den `EXTENSION-RESPONSES`-Header, in dem der Facilitator
+      `success`, `processing` oder `rejected` samt Grund mitteilt; `post()` hat die Header vier
+      Tage lang weggeworfen, waehrend wir ein bis neun Mal abgerechnet haben.
+      **Was jetzt fehlt, ist eine Abrechnung**, denn auf eine abgelehnte Verify antwortet der
+      Facilitator ohne den Header (`ops/bazaar-answer.ts`, gemessen). Die Betreiber-Wallet haelt
+      0,00 USDC, also kann der Loop keine ausloesen. Fuenf USDC dorthin, ein Topup, und der Header
+      sagt beim naechsten Lauf, ob die Form jetzt stimmt. Billiger ist diese Antwort nicht zu
+      haben, und das Geld bleibt im Haus: es geht an unsere eigene payTo-Adresse.
+
 - [ ] **T2.2 Ein Merchant-Konto bei PayAI.** Zahl: Zeilen mit unserem Host im Tagesscan, 0 -> mind. 1.
       **Wartet auf Matthias, neuer Punkt 8.** Die OpenAPI des Facilitators nennt
       `https://merchant.payai.network` als den Ort, an dem ein Haendler einen API-Schluessel
