@@ -240,6 +240,15 @@ run "the preview card still promises what the pool can pay" ./ops/og-card-says-t
 # hard-coded host was cp.hippe.eu, so from the move on 2026-09-22 a listing under the new name
 # would have been reported as absence by the one tool that exists to notice it. Reads nothing
 # from production.
+# Who gets into the x402 catalogues, and how many a day.
+#
+# On 2026-09-23 seven measurements concluded "the loop has no door it can walk through", and every
+# one of them asked the facilitators about their APIs. None asked whether anybody gets in. The
+# answer, from raw scans that had been on disk unread since 20.09.: about 47 hosts a day, ten of
+# them in three days speaking version 1 as we do. That reopened a goal that had been written off.
+printf '\n-- who got into the x402 catalogues --\n'
+./ops/x402-newcomers.sh 1 2>/dev/null || true
+
 run "the directory search would see a listing" ./ops/own-x402-listing.sh --selftest
 
 # Whether anything that indexes the web has ever looked at this service, and whether our side of
