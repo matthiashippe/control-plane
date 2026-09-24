@@ -398,11 +398,19 @@ for draft in drafts:
         report('"healthyWorkers"' in text and "api.conway.tech/`" in text.replace("`https://", "`"),
                "attributes the worker counts to the root and not to /health",
                "the counts live on https://api.conway.tech/ and this draft names another path")
+        # The exact `"field":value` and nothing else.
+        #
+        # The first version fell back to `str(value) in text`, and the value is a single digit: a
+        # "2" appears in every date, every version and every count in these drafts, so the check
+        # passed whatever the draft said. A counter-proof with healthyWorkers turned to 7 went
+        # green, which is the one result a check must never give. That is the same failure this
+        # file exists to prevent, written into the file itself.
+        flat = text.replace(" ", "")
         for field in ("workers", "healthyWorkers"):
             live = str(CONWAY_ROOT.get(field))
-            report(f'"{field}":{live}' in text.replace(" ", "") or f"{live}" in text,
+            report(f'"{field}":{live}' in flat,
                    f"{field} matches what Conway serves right now ({live})",
-                   f"Conway says {field}={live}")
+                   f"Conway says {field}={live}; the draft does not carry that pair")
 
     pending.append(number)
     print()
