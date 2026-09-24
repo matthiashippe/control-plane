@@ -1,5 +1,6 @@
 # ip	owner	kind. Written by ops/fetchers.py; committed because it is evidence
 100.53.7.234	AWS	datacenter
+100.54.194.6	AWS	datacenter
 103.196.9.144	-	unknown
 103.196.9.209	-	unknown
 103.196.9.220	-	unknown
@@ -12,6 +13,7 @@
 104.253.228.170	-	unknown
 104.253.228.38	-	unknown
 108.129.177.191	AWS	datacenter
+109.91.221.13	ip-109-091-221-013.um37.pools.vodafone-ip.de	unknown
 114.248.31.150	-	unknown
 119.12.205.87	-	unknown
 128.199.182.152	cdffb2c5b1.scan.leakix.org	unknown
@@ -20,7 +22,9 @@
 135.136.68.53	-	unknown
 136.118.11.62	GCP	datacenter
 136.124.32.136	-	unknown
+136.124.32.180	-	unknown
 136.124.35.135	-	unknown
+136.22.128.15	-	unknown
 136.65.251.127	GCP	datacenter
 142.147.212.236	-	unknown
 142.147.225.103	-	unknown
@@ -70,6 +74,7 @@
 18.118.48.70	AWS	datacenter
 18.189.182.40	AWS	datacenter
 18.207.184.95	AWS	datacenter
+18.223.203.199	AWS	datacenter
 18.237.204.100	AWS	datacenter
 182.176.130.180	-	unknown
 185.151.8.224	-	unknown
@@ -114,6 +119,7 @@
 213.55.187.134	-	unknown
 216.194.87.47	-	unknown
 216.245.140.84	-	unknown
+216.73.216.124	-	unknown
 216.73.216.202	-	unknown
 216.73.217.178	-	unknown
 222.112.0.200	-	unknown
@@ -126,6 +132,7 @@
 27.44.125.38	-	unknown
 3.136.25.202	AWS	datacenter
 3.141.5.198	AWS	datacenter
+3.144.21.76	AWS	datacenter
 3.145.45.206	AWS	datacenter
 3.147.70.141	AWS	datacenter
 3.224.234.70	AWS	datacenter
@@ -198,6 +205,7 @@
 62.224.55.59	p3ee0373b.dip0.t-ipconnect.de	unknown
 64.227.140.85	-	unknown
 64.40.151.66	-	unknown
+64.64.116.90	ids111.ricnxk.co	unknown
 65.21.227.126	Hetzner	datacenter
 66.249.70.7	crawl-66-249-70-7.googlebot.com	unknown
 66.249.70.8	crawl-66-249-70-8.googlebot.com	unknown
@@ -217,6 +225,7 @@
 79.127.217.45	unn-79-127-217-45.datapacket.com	unknown
 79.135.105.209	-	unknown
 79.177.131.91	bzq-79-177-131-91.red.bezeqint.net	unknown
+8.234.25.120	GCP	datacenter
 8.235.102.225	GCP	datacenter
 80.187.64.95	tmo-064-95.customers.d1-online.com	unknown
 80.218.182.64	80-218-182-64.dclient.hispeed.ch	unknown
