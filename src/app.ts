@@ -271,7 +271,27 @@ export function createApp(opts: AppOptions) {
    * 301 and not 302, because this is permanent and a permanent redirect is what passes the value
    * of a link. The day it has to point elsewhere, the comments would have to change anyway.
    */
-  const PAGES_STAY = ["/v1/", "/.well-known/", "/px/", "/health", "/robots.txt"];
+  // What a machine calls stays answerable on both hosts. Pages move; endpoints do not.
+  //
+  // `/pay/` was missing from this list for fifteen hours and that broke the payment path on the
+  // old host: an x402 client asks the resource URL for its 402 and got a 301 instead, with an
+  // empty body. A client that follows redirects recovers; one that does not sees nothing at all,
+  // and the nine comments already standing on somebody else's tracker name cp.hippe.eu. Found on
+  // 2026-09-24 while reading the facilitator's settlement statistics, which record every one of
+  // our settlements under the old host.
+  //
+  // `/bounties.json` and `/llms.txt` are here for the same reason: they are read by agents, not
+  // by browsers, and a JSON or text client is under no obligation to follow a redirect.
+  const PAGES_STAY = [
+    "/v1/",
+    "/pay/",
+    "/.well-known/",
+    "/px/",
+    "/health",
+    "/robots.txt",
+    "/bounties.json",
+    "/llms.txt",
+  ];
   app.use("*", async (c, next) => {
     const canonical = siteOrigin();
     const host = c.req.header("host")?.toLowerCase();

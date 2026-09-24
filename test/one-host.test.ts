@@ -51,7 +51,19 @@ describe("the pages live at one address", () => {
 describe("what a machine calls answers where it was called", () => {
   it("never redirects the API, because a redirect drops the key", async () => {
     process.env.CP_PUBLIC_URL = "https://postyourprice.com";
-    for (const path of ["/v1/status", "/v1/models", "/health", "/.well-known/x402"]) {
+    // `/pay/` is the one that was forgotten. An x402 client asks the resource URL for its 402;
+    // a 301 with an empty body is not a payment offer, and a client is under no obligation to
+    // follow it. Fifteen hours of the old host answering 301 there, while nine permanent comments
+    // name that host.
+    for (const path of [
+      "/v1/status",
+      "/v1/models",
+      "/health",
+      "/.well-known/x402",
+      "/pay/5/0x1111111111111111111111111111111111111111",
+      "/bounties.json",
+      "/llms.txt",
+    ]) {
       const res = await at("cp.hippe.eu", path);
       expect(res.status, `${path} must answer where it was asked`).not.toBe(301);
     }
