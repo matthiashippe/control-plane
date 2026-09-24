@@ -84,6 +84,19 @@ export class FacilitatorSettler implements Settler {
       x402Version: 1,
       paymentPayload: buildV1Payload(this.cfg, auth, signature),
       paymentRequirements: buildV1Requirements(this.cfg, auth, resource),
+      // Where the declaration actually belongs, and the reason this service has settled through
+      // PayAI without ever being catalogued.
+      //
+      // The facilitator publishes its own schema at GET /openapi.json. `PaymentRequirements` there
+      // has exactly eleven properties -- amount, asset, description, extra, maxAmountRequired,
+      // maxTimeoutSeconds, mimeType, network, payTo, resource, scheme -- and neither `extensions`
+      // nor `outputSchema` is one of them. We put our bazaar block inside paymentRequirements, a
+      // field that does not exist in the document the facilitator validates against.
+      //
+      // `SettleRequest` and `VerifyRequest` both carry `serverExtensions` at the TOP level,
+      // described as "Optional x402 v2 server extensions". That is the slot. Read on 2026-09-24,
+      // after four days of settling into a directory that never saw a declaration at all.
+      serverExtensions: BAZAAR_EXTENSION,
     });
 
     const verify = await this.post("/verify", body);

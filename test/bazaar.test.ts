@@ -20,7 +20,7 @@ import {
   SCHWELLEN_BONUS_CENTS,
   type PayConfig,
 } from "../src/payments/pay.js";
-import { buildV1Requirements } from "../src/payments/facilitator.js";
+import { FacilitatorSettler, buildV1Requirements } from "../src/payments/facilitator.js";
 import type { Authorization, Settler, SettleResult } from "../src/payments/settler.js";
 
 const USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" as Address;
@@ -227,5 +227,47 @@ describe("the declaration in the form a catalogued entry actually carries", () =
     expect(req.outputSchema, "the two documents must not drift apart").toEqual(
       offer.accepts[0].outputSchema,
     );
+  });
+});
+
+/**
+ * Where the declaration travels, which is the question four days of settlements got wrong.
+ *
+ * PayAI publishes its schema at GET /openapi.json. `PaymentRequirements` there has eleven
+ * properties and neither `extensions` nor `outputSchema` is one of them, so a bazaar block sent
+ * inside paymentRequirements is sent into a field the facilitator does not validate and does not
+ * read. `SettleRequest` and `VerifyRequest` both carry `serverExtensions` at the top level,
+ * "Optional x402 v2 server extensions". That is the slot.
+ */
+describe("the declaration goes where the facilitator reads it", () => {
+  it("puts the bazaar block in serverExtensions, at the top of the request", async () => {
+    let sent: Record<string, unknown> = {};
+    const fetchImpl = async (_u: string, init?: { body?: string }) => {
+      sent = JSON.parse(init?.body ?? "{}") as Record<string, unknown>;
+      return new Response(JSON.stringify({ isValid: false, invalidReason: "x" }), { status: 200 });
+    };
+    const settler = new FacilitatorSettler({
+      url: "https://facilitator.invalid",
+      network: "base",
+      payTo: PAY_TO,
+      usdcAddress: USDC,
+      maxTimeoutSeconds: 300,
+      fetch: fetchImpl as never,
+    });
+    await settler.settle(
+      {
+        from: WALLET,
+        to: PAY_TO,
+        value: 5_000_000n,
+        validAfter: 0n,
+        validBefore: 9_999_999_999n,
+        nonce: ("0x" + "11".repeat(32)) as Hex,
+      },
+      ("0x" + "22".repeat(65)) as Hex,
+      "https://cp.hippe.eu/pay/5/x",
+    );
+    const ext = sent.serverExtensions as { bazaar?: { discoverable?: boolean } } | undefined;
+    expect(ext, "serverExtensions is missing from the request").toBeTruthy();
+    expect(ext?.bazaar?.discoverable, "the block has to say discoverable").toBe(true);
   });
 });

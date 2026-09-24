@@ -34,6 +34,12 @@ export const BAZAAR_DESCRIPTION =
  * `trycloudflare.com` tunnels that nothing would ever crawl. The door is used about 47 times a
  * day; we were knocking with the wrong hand.
  *
+ * **Where it goes matters more than what is in it.** Until 2026-09-24 this block travelled inside
+ * `paymentRequirements.extensions`, and the facilitator's own schema (GET /openapi.json) has no
+ * such property: `PaymentRequirements` there is eleven fields and none of them is `extensions`.
+ * The declaration belongs in `serverExtensions`, at the top level of the verify and settle
+ * request. Four days of settlements carried it where nothing reads it.
+ *
  * `routeTemplate` is in the specification for exactly our case: `/pay/{usd}/{address}` is a
  * parameterised route, and without the template the catalogue would key on the concrete URL and
  * take one row per payer. With it, "Facilitators use routeTemplate as the catalog key,
