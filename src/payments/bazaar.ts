@@ -18,20 +18,55 @@ export const BAZAAR_DESCRIPTION =
   "Prepaid inference credits for the unmodified Conway automaton runtime: SIWE provisioning, " +
   "USDC topups on Base, inference billed at purchase cost plus a fixed markup";
 
+/**
+ * The shape the specification asks for, which is not the shape this file had.
+ *
+ * Until 2026-09-24 this declared `bazaar.info.{input, output}`. The specification
+ * (coinbase/x402, docs/extensions/bazaar.mdx, "Quickstart for Sellers") asks for
+ * `bazaar.{discoverable, inputSchema, outputSchema}`, and the word `discoverable` appeared
+ * nowhere in ours. The listed services show the same thing on the wire: their 402 carries
+ * `accepts[].outputSchema.input.discoverable = true`, ours carried no `outputSchema` at all.
+ *
+ * The comment above was right that cataloguing happens as a side effect of a payment and that
+ * there is no sign-up route. What it got wrong was to conclude from "we settle and are not
+ * listed" that no door exists. Measured on 2026-09-24: 141 hosts entered the two catalogues
+ * between 21.09. and that morning, ten of them speaking version 1 as we do, two of them ephemeral
+ * `trycloudflare.com` tunnels that nothing would ever crawl. The door is used about 47 times a
+ * day; we were knocking with the wrong hand.
+ *
+ * `routeTemplate` is in the specification for exactly our case: `/pay/{usd}/{address}` is a
+ * parameterised route, and without the template the catalogue would key on the concrete URL and
+ * take one row per payer. With it, "Facilitators use routeTemplate as the catalog key,
+ * consolidating all requests to the same route pattern into a single discovery entry".
+ */
 export const BAZAAR_EXTENSION = {
   bazaar: {
-    info: {
-      input: {
-        type: "http",
-        method: "GET",
-        pathParams: {
-          usd: "one of the topup tiers, for example 5",
-          address: "the automaton wallet that signs the payment; credits go to the signer",
+    discoverable: true,
+    routeTemplate: "/pay/:usd/:address",
+    inputSchema: {
+      type: "http",
+      method: "GET",
+      pathParams: {
+        usd: {
+          type: "string",
+          description: "One of the topup tiers in whole dollars, for example 5.",
+          required: true,
+        },
+        address: {
+          type: "string",
+          description:
+            "The automaton wallet that signs the payment. The credits go to the signer, so this " +
+            "is the address that will be able to spend them.",
+          required: true,
         },
       },
-      output: {
-        type: "json",
-        example: { credits_cents: 500, balance_cents: 500, tx_hash: "0x" + "00".repeat(32) },
+    },
+    outputSchema: {
+      type: "object",
+      properties: {
+        credits_cents: { type: "number", description: "What this payment added, in cents." },
+        balance_cents: { type: "number", description: "The balance after it, in cents." },
+        tx_hash: { type: "string", description: "The settlement transaction on Base." },
       },
     },
   },

@@ -56,12 +56,32 @@ describe("declaration for the facilitator directory", () => {
     expect(buildPaymentRequired(cfg, 5, WALLET).accepts[0].resource).toBe(`/pay/5/${WALLET}`);
   });
 
-  it("declares the bazaar block in the offer, otherwise no facilitator catalogues it", () => {
+  // Rewritten on 2026-09-24 against the specification instead of against what this repo happened
+  // to send. coinbase/x402, docs/extensions/bazaar.mdx, "Quickstart for Sellers": the route
+  // configuration carries `bazaar.{discoverable, inputSchema, outputSchema}`. This file previously
+  // required `bazaar.info.{input, output}`, a shape that appears nowhere in the specification, and
+  // held it there while the service stayed out of both catalogues for four days.
+  it("declares the bazaar block in the shape the specification asks for", () => {
     const offer = buildPaymentRequired(cfg, 5, WALLET);
-    const info = offer.accepts[0].extensions?.bazaar?.info;
-    expect(info, "accepts[0].extensions.bazaar.info is missing").toBeTruthy();
-    expect(info?.input.method).toBe("GET");
-    expect(info?.output.type).toBe("json");
+    const bazaar = offer.accepts[0].extensions?.bazaar as
+      | { discoverable?: boolean; routeTemplate?: string; inputSchema?: Record<string, unknown>; outputSchema?: Record<string, unknown> }
+      | undefined;
+    expect(bazaar, "accepts[0].extensions.bazaar is missing").toBeTruthy();
+    expect(bazaar?.discoverable, "without discoverable the facilitator has no reason to list it").toBe(true);
+    expect(bazaar?.inputSchema).toBeTruthy();
+    expect(bazaar?.outputSchema).toBeTruthy();
+    expect(bazaar, "the old non-spec shape must be gone, not sitting next to the new one")
+      .not.toHaveProperty("info");
+  });
+
+  // The catalogue keys on routeTemplate for a parameterised route. Without it every payer's
+  // concrete URL would be its own entry, and the directory would fill with one row per topup.
+  it("names the route template, so the catalogue keeps one row and not one per payer", () => {
+    const offer = buildPaymentRequired(cfg, 5, WALLET);
+    const bazaar = offer.accepts[0].extensions?.bazaar as { routeTemplate?: string } | undefined;
+    expect(bazaar?.routeTemplate).toBe("/pay/:usd/:address");
+    expect(offer.accepts[0].resource, "the concrete resource still names the actual call")
+      .toContain(WALLET);
   });
 
   it("sends declaration and description to the facilitator, not only to the client", () => {

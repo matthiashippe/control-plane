@@ -99,6 +99,38 @@ export class FacilitatorSettler implements Settler {
     return { ok: true, txHash: txHash || undefined };
   }
 
+  /**
+   * What the facilitator says about our catalogue entry, in a header nobody read.
+   *
+   * The specification (coinbase/x402, docs/extensions/bazaar.mdx) says a facilitator may answer a
+   * payment carrying the bazaar extension with `EXTENSION-RESPONSES`: base64 JSON whose `bazaar`
+   * key holds a `status` of `success`, `processing` or `rejected`, and on a rejection a
+   * `rejectedReason` in plain words.
+   *
+   * `post` returned the parsed body and dropped every header, so between 20.09. and 24.09.2026
+   * this service settled through PayAI between one and nine times, stayed out of the catalogue,
+   * and the sentence explaining why was thrown away each time. Four cycles went into guessing at
+   * the catalogue from outside instead.
+   *
+   * Never throws and never fails a settlement: a payment that went through went through, whatever
+   * a directory thinks of it.
+   */
+  private bazaarOutcome(headers: Headers, path: string): void {
+    const raw = headers.get("EXTENSION-RESPONSES") ?? headers.get("extension-responses");
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(Buffer.from(raw, "base64").toString("utf8")) as {
+        bazaar?: { status?: string; rejectedReason?: string };
+      };
+      const b = parsed.bazaar;
+      if (!b) return;
+      const why = b.rejectedReason ? `: ${b.rejectedReason}` : "";
+      console.log(`[facilitator] ${path} bazaar -> ${b.status ?? "(no status)"}${why}`);
+    } catch {
+      console.log(`[facilitator] ${path} bazaar header not readable: ${raw.slice(0, 120)}`);
+    }
+  }
+
   private async post(path: string, body: string): Promise<{ ok: true; data: unknown } | { ok: false; error: string }> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
@@ -107,6 +139,7 @@ export class FacilitatorSettler implements Settler {
       if (this.cfg.authHeader) headers.Authorization = this.cfg.authHeader;
       const res = await this.fetchImpl(`${this.url}${path}`, { method: "POST", headers, body, signal: controller.signal });
       const text = await res.text();
+      this.bazaarOutcome(res.headers, path);
       if (!res.ok) return { ok: false, error: `${res.status} ${text.slice(0, 300)}` };
       try {
         return { ok: true, data: JSON.parse(text) };
