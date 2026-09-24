@@ -56,6 +56,7 @@ import { block as ldBlock, dataset, howToFrom, organization, webPage, webSite } 
 import { prefersHtml, renderApiPage } from "./public/apipage.js";
 import { siteOrigin, withOrigin } from "./public/site.js";
 import { renderCheck, renderCheckIntro, renderPasteBox } from "./public/checkpage.js";
+import { germanFirstScreen } from "./public/landing.de.js";
 import { detectBriefLanguage } from "./bounties/brief.de.js";
 import { DOC } from "./errors.js";
 import { Catalog, handleChat, MARKUP } from "./inference/proxy.js";
@@ -922,7 +923,14 @@ export function createApp(opts: AppOptions) {
     // withOrigin here as well: this page is served straight from the file and never goes through
     // page(), so the rewrite that every other page gets has to be repeated. test/domain-move.test.ts
     // walks all seven pages for exactly this reason; checking one of them would have passed.
+    // The first screen in the reader's language, and the markers removed either way.
+    //
+    // Measured on 2026-09-23 at 22:42 UTC: the second human reader this service has ever had
+    // arrived from Conway issue #376 with a German browser, read this page to its last depth
+    // mark, and read it in English while /check had been answering in German since that morning.
+    const landingLang = langOf("", c.req.header("accept-language"));
     return c.html(
+      germanFirstScreen(
       withOrigin(indexHtml
         // The box, where the readers are. 171 foreign addresses reached this page over 96 hours
         // and five reached /check, so the one thing a stranger can use without an account was one
@@ -953,6 +961,8 @@ export function createApp(opts: AppOptions) {
             ),
           ) + "</head>",
         ),
+      ),
+      landingLang,
     ),
     );
   });
