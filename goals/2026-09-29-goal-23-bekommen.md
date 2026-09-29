@@ -1,10 +1,12 @@
 # Goal 23: Eine bezahlte Bestellung wird zu drei Fassungen per E-Mail
 
 ## Status
-VORSCHLAG, Fassung 5 (HAN-39, 29.09.2026). Fassung 5 trägt die Auflagen 15 bis 17 aus dem Urteil zu
-Fassung 4 (HAN-51) und die Bedingungen A und B von `recht` aus HAN-45. Fassung 4 trug die Auflagen
-10 bis 14 aus dem Urteil zu Fassung 3 (HAN-46). HAN-45 ist erledigt: OpenRouters Bedingungen
-(Stand 31.08.2026, 5.1) und OpenAIs (4.1 und 2.2) tragen den Verkauf der Fassungen. Fassung 1 hat der Skeptiker an HAN-42 widerlegt, mit neun
+VORSCHLAG, Fassung 6 (HAN-39, 29.09.2026). Fassung 6 trägt die Auflagen 18 bis 20 aus dem Urteil zu
+Fassung 5 (HAN-54). Fassung 5 trug die Auflagen 15 bis 17 (HAN-51) und die Bedingungen A und B von
+`recht` aus HAN-45, Fassung 4 die Auflagen 10 bis 14 (HAN-46). OpenRouters Bedingungen (Stand
+31.08.2026, 5.1) und OpenAIs (4.1 und 2.2) tragen den Verkauf. **Mit `zdr: true` schreibt aber
+Azure, und Microsofts Bedingungen für Azure sind nicht gelesen**, weder die Output-Klausel noch die
+Gesellschaft; das steht auf der Liste vor dem Live-Schlüssel und blockiert die Vorführung nicht. Fassung 1 hat der Skeptiker an HAN-42 widerlegt, mit neun
 Auflagen; Fassung 3 trägt die Auflagen 5 bis 9, die Auflagen 1 bis 4 galten dem Weg über das Abo und
 den Rechner, den es seit Fassung 2 nicht mehr gibt. Fassung 3 geht noch einmal an den Skeptiker.
 Gebaut wird erst, was danach übrig ist, und erst nachdem Goal 22 ausgerollt ist (WIP = 1).
@@ -99,19 +101,39 @@ VM, derselbe Takt in src/index.ts, danach:
    - keine `deliveries`-Zeile mit `sent` oder `failed`, und keine mit `claimed` jünger als 30
      Minuten. **`failed` ist endgültig** (HAN-51, Auflage 16) und hat genau drei Codes:
      `stale_written`, `cost_cap`, `attempts_exhausted`. Ein vorübergehender Fehler setzt nie
-     `failed`, sondern nur `error` und gibt die Zeile frei;
+     `failed`, sondern nur `error` und gibt die Zeile frei: zurück auf `written`, wenn `written_at`
+     gesetzt ist, sonst auf `claimed` mit abgelaufenem `claimed_at`;
    - `settled_at` nach `DELIVERY_START`, einer Konstante mit dem Zeitpunkt des Commits, der die
      Lieferung baut, nie einem späteren (HAN-46, Auflage 14). Ältere Zeilen (heute die von 21:07 UTC)
      werden nicht nachgeliefert und stehen im Report als `paid_before_delivery`, getrennt nach
      `ours` und `human`. Für `ours` ist das eine Ausnahme, damit Done 4 nicht ab dem 30.09. 21:07
      UTC rot ist (HAN-42, Auflage 9); für `human` ist jede solche Zeile ein Verstoß und rot;
-   - höchstens 5 Versuche, höchstens 10 Zeilen je Lauf, älteste Zahlung zuerst. **Als Versuch zählt
-     eine Fassung, die inhaltlich durchfällt, und jeder 4xx außer 429** (401, 402 Guthaben leer,
-     422). Ein 429, ein Timeout oder ein 5xx zählt nicht, sonst ist eine Zeile nach einer Störung
-     von 25 Minuten für immer tot (HAN-42, Auflage 7);
+   - höchstens 5 Versuche, höchstens 10 Zeilen je Lauf, älteste Zahlung zuerst. Was als Versuch
+     zählt, entscheidet eine Tabelle, im Goal und als eine Funktion `countsAsAttempt(err)` im Code
+     (HAN-54, Auflage 18). Sie hängt am Fehlertyp aus `src/inference/provider.ts` und am Status, den
+     `openrouter.ts` mitgibt:
+
+     | Fall | Quelle in `openrouter.ts` | zählt |
+     |---|---|---|
+     | Fassung besteht die Prüfung nicht | Lieferung | ja |
+     | `ProviderBadRequestError` (HTTP 400) | `:218` | ja |
+     | `ProviderUnavailableError`, 4xx außer 429 (401, 402, 403, 422) | `:223` | ja |
+     | `ProviderUnavailableError`, 429 | `:223` | nein |
+     | `ProviderUnavailableError`, 5xx | `:223` | nein |
+     | Timeout, Netzfehler (Status `null`) | `fetch` | nein |
+     | Fehler im Body einer 200, mit Code | `:240` | wie sein Code nach den Zeilen oben |
+     | Fehler im Body einer 200, ohne Code (Status 200) | `:240` | ja |
+     | Antwort ohne `choices` | `:243` | ja |
+
+     Ein Fall, der in keiner Zeile steht, zählt, damit nichts endlos läuft. Status 200 zählt, weil
+     OpenRouter damit eine Antwort meldet, die trotzdem keine Fassung ist, und eine Wiederholung
+     daran nichts ändert;
    - **Kostengrenze je Zeile**, `DELIVERY_COST_CAP_MC = 50_000`, also 50 US-Cent in Millicent, weil
      OpenRouter in USD abrechnet. Gezählt wird die Summe über alle Läufe in `cost_mc`. Ist sie
-     erreicht, wird die Zeile `failed` mit `cost_cap`, gleich welcher Fehler. Eine Fassung, die die
+     erreicht, wird die Zeile `failed` mit `cost_cap`, gleich welcher Fehler. Kosten entstehen nur
+     aus Antworten, die OpenRouter berechnet (`usage.cost`); ein 5xx trägt keine, weil
+     `openrouter.ts:221-223` vorher wirft. Die Grenze fängt also bezahlte Fassungen, die immer wieder
+     durchfallen, und nicht einen dauerhaft ausgefallenen Anbieter (siehe "nicht weiß"). Eine Fassung, die die
      Prüfung besteht, wird sofort in `body` gespeichert und nie neu geschrieben, auch wenn die
      anderen beiden noch fehlen (HAN-46, Auflage 12). Die Grenze ist eine Setzung, keine Messung:
      sie liegt bei 2,6 Prozent des kleinsten Katalogpreises (17 EUR, umgerechnet mit 1,1355 USD je EUR
@@ -135,9 +157,12 @@ VM, derselbe Takt in src/index.ts, danach:
      Bedingung A): damit gehen die Angaben nur an Endpunkte ohne Speicherung, heute für beide Modelle
      nur Azure (`/api/v1/endpoints/zdr`, öffentlich, 29.09. 21:33 UTC: `Azure | openai/gpt-5.2-20251211`
      und `Azure | openai/gpt-5-mini-2025-08-07`). `src/inference/openrouter.ts` bekommt dafür eine
-     Option nur für die Lieferung; der Proxy unter `/v1/chat/completions` bleibt, wie er ist. Als
-     erster Schritt des Baus eine einzelne echte Anfrage mit `zdr: true` an jedes Modell, weil nur
-     die Liste gelesen ist und keine Anfrage gelaufen. **Die E-Mail-Adresse steht nie im Prompt**
+     Option nur für die Lieferung; der Proxy unter `/v1/chat/completions` bleibt, wie er ist.
+     `openrouter.ts` gibt außerdem das Feld `provider` der Antwort zurück, `deliveries` speichert es
+     je Fassung, und das Log des Laufs zählt Fassungen je Anbieter (`provider Azure 3`), damit eine
+     Anfrage, die trotz `zdr: true` bei OpenAI landet, sichtbar wird (Gegenprobe von `recht`,
+     HAN-54, Auflage 20). Erster Schritt des Baus ist eine echte Anfrage mit `zdr: true` an jedes
+     Modell; Beleg in Done 5. **Die E-Mail-Adresse steht nie im Prompt**
      (Bedingung B), nur die Felder aus `order_briefs.brief`. Die Kosten gehen nicht über das Ledger (es gibt kein Wallet), sondern nach
      `deliveries.cost_mc`;
    - prüft jede Fassung: nicht leer, nicht gleich einer anderen, bei der Rede innerhalb der
@@ -152,7 +177,7 @@ VM, derselbe Takt in src/index.ts, danach:
    - schickt **eine** Mail mit den drei Fassungen, Absender `bestellung@postyourprice.com`,
      `Reply-To` die Adresse aus dem Impressum, Idempotenzschlüssel = Referenz. Innerhalb von 24
      Stunden gibt Resend für denselben Schlüssel mit demselben Inhalt die alte ID zurück, ohne neu zu
-     senden. **Eine Zeile, die länger als 23 Stunden auf `written` steht, wird nicht mehr
+     senden. **Eine Zeile, deren `written_at` mehr als 23 Stunden zurückliegt und die nicht `sent` ist, wird nicht mehr
      versendet**, sondern `failed` mit `stale_written`, und ist nach 24 Stunden rot (HAN-46, Auflage
      11). Resend kann eine Mail nicht nach Schlüssel oder Tag suchen (`GET /emails` kennt nur
      `limit`, `after`, `before`); rot ist dann ehrlich, eine zweite Mail wäre es nicht;
@@ -191,28 +216,35 @@ VM, derselbe Takt in src/index.ts, danach:
    unsere eigene Adresse beliefert.
 
 7. **Tests**, gegen einen gestellten Inferenz-Provider (`src/inference/mock.ts`) und einen
-   gestellten Versanddienst, in beide Richtungen:
+   gestellten Versanddienst, in beide Richtungen. Wo es um den Draht geht (`zdr`, Fehlerklassen),
+   läuft der Test über `OpenRouterProvider` mit gestelltem `fetch` (`opts.fetch`,
+   `openrouter.ts:66`) und liest den JSON-Body bzw. gibt echte HTTP-Antworten zurück:
    - bezahlte Zeile mit Angaben: drei Fassungen, genau eine Mail, `sent`;
    - `pending`, `abandoned`, bezahlt ohne Angaben: keine Mail;
    - `stripe_test` an eine fremde Adresse: keine Mail; an `vorfuehrung@postyourprice.com`: Mail;
-   - ein Modell antwortet leer: einmal neu, danach `failed`, keine Mail mit zwei Fassungen;
+   - ein Modell antwortet leer: einmal neu, danach steigt `attempts`, keine Mail mit zwei Fassungen;
    - Absturz nach dem Versand, vor dem Eintrag, gegen einen gestellten Versanddienst, der Schlüssel
      24 Stunden hält und bei gleichem Schlüssel mit anderem Inhalt 409 gibt: ein Lauf 10 Minuten
-     später bekommt die alte ID und schickt nichts Neues; eine Zeile, die 23 Stunden und eine Minute
-     auf `written` steht, wird `failed` mit `stale_written`, und der Versanddienst sieht keinen
+     später bekommt die alte ID und schickt nichts Neues; eine Zeile, deren `written_at` 23 Stunden und eine
+     Minute zurückliegt, wird `failed` mit `stale_written`, und der Versanddienst sieht keinen
      Aufruf (der gestellte Dienst kann nichts, was Resend nicht kann: kein Suchen);
-   - ein Modell antwortet dauerhaft mit 5xx, die anderen beiden liefern: die zwei Fassungen werden
-     einmal bezahlt und gespeichert, nicht wieder; bei Erreichen von `DELIVERY_COST_CAP_MC` wird die
-     Zeile `failed` mit `cost_cap`;
-   - ein 402 von OpenRouter zählt als Versuch, ein 429 nicht; ebenso zählen ein 400 über
-     `ProviderBadRequestError` (`openrouter.ts:218`) und ein Fehler im Body einer 200 über
-     `error.code` (`openrouter.ts:240`), je mit eigenem Test (HAN-51, Auflage 17);
+   - `cost_cap` über bezahlte Antworten: der gestellte `fetch` liefert Fassungen mit `usage.cost`,
+     die die Prüfung nicht bestehen, bis die Summe `DELIVERY_COST_CAP_MC` erreicht; die Zeile wird
+     `failed` mit `cost_cap` (HAN-54, Auflage 19);
+   - ein Modell antwortet dauerhaft mit 502, die anderen beiden liefern: die zwei Fassungen werden
+     einmal bezahlt und gespeichert, `cost_mc` wächst danach nicht, `attempts` bleibt 0, die Zeile
+     wird nicht `failed`, und nach 24 Stunden steht sie im Report unter
+     `paid_not_delivered_over_24h` (Auflage 19);
+   - je eine Zeile der Tabelle aus Punkt 2 über den gestellten `fetch`: 400, 402, 429, 502,
+     Timeout, Body-Fehler mit 4xx (zählt), Body-Fehler mit 502 (zählt nicht), Body-Fehler ohne Code
+     (zählt), Antwort ohne `choices` (zählt) (Auflage 18);
    - nach `stale_written`, `cost_cap` und `attempts_exhausted` ruft ein weiterer Lauf weder den
      Inferenz-Provider noch den Versanddienst auf. Der Test lässt dafür die echte Kette laufen,
      setzt `written_at` durch den Lauf selbst und stellt nur die Uhr vor, statt eine fertige Zeile
      zu pflanzen (Auflage 16);
-   - jede Lieferanfrage an den gestellten OpenRouter trägt `provider.zdr = true`, eine Anfrage über
-     den Proxy trägt es nicht; kein Prompt enthält die E-Mail-Adresse der Bestellung, geprüft mit
+   - der JSON-Body jeder Lieferanfrage, gelesen im gestellten `fetch`, trägt `provider.zdr = true`,
+     der Body einer Anfrage über den Proxy trägt es nicht; das Feld `provider` der Antwort landet in
+     `deliveries` (Auflage 20); kein Prompt enthält die E-Mail-Adresse der Bestellung, geprüft mit
      einer unverwechselbaren Adresse im Test (Auflage 15);
    - ein 429 oder Timeout von OpenRouter, sechsmal hintereinander: `attempts` bleibt 0, die Zeile
      wird beim siebten Lauf geliefert;
@@ -241,7 +273,9 @@ VM, derselbe Takt in src/index.ts, danach:
 4. Cloudflare Email Routing für `vorfuehrung@postyourprice.com` auf ein Postfach, das er liest.
    Ohne das kommt die Vorführung nirgends an.
 
-5. Vor dem Live-Schlüssel, nicht vor der Vorführung: im OpenRouter-Konto nachsehen, dass "Private
+5. Vor dem Live-Schlüssel, nicht vor der Vorführung, zwei Dinge. Erstens liest `recht` Microsofts
+   Bedingungen für Azure über OpenRouter (Output-Rechte, Vertragsgesellschaft) und trägt die
+   Gesellschaft in `/datenschutz` ein. Zweitens sieht Matthias im OpenRouter-Konto nach, dass "Private
    Input & Output Logging" und "OpenRouter Use of Inputs/Outputs" aus sind (`recht`, HAN-45,
    Bedingung C). Ist der zweite an, stimmt der Satz in `/datenschutz` nicht.
 
@@ -267,6 +301,11 @@ läuft (HAN-46, Auflage 10).
    mindestens 1, für `human` "kein Messweg", solange der Nenner 0 ist, und die Gegenprobe aus
    Punkt 7 grün.
 
+5. **Die erste echte Anfrage mit `zdr: true`**, je Modell eine, nach dem Deploy aus dem Container:
+   Antwort 200 mit `provider = "Azure"`, die Antwort ohne Text abgelegt unter
+   `.scratch/goal-23/zdr-<modell>.json`. Antwortet ein Modell mit 404 oder einem anderen Anbieter,
+   ist Bedingung A nicht erfüllbar, und die Lieferung nimmt dieses Modell nicht (HAN-54, Auflage 20).
+
 **Widerlegt, wenn:** im Report nach `DELIVERY_START` eine bezahlte Zeile mit Angaben älter als 24
 Stunden ohne Lieferung steht, oder `paid_before_delivery.human > 0`, oder eine Zeile beim
 Versanddienst zwei `message_id` hat, oder eine Mail an eine fremde Adresse für eine
@@ -286,6 +325,12 @@ Versanddienst zwei `message_id` hat, oder eine Mail an eine fremde Adresse für 
 - **Live bleibt nach Goal 22 nur im Text zu.** Wird der Live-Schlüssel gesetzt, bevor Goal 23
   läuft, bekommt ein zahlender Mensch nichts. Das verhindert kein Code, aber seit Auflage 14 macht
   es `paid_before_delivery.human` rot. Der Schreiber sagt Matthias, dass HAN-31 auf Goal 23 wartet.
+- **Ein dauerhaft ausgefallener Anbieter** hält eine Zeile offen, ohne Versuch und ohne Kosten, bis
+  sie nach 24 Stunden rot ist. Das ist gewollt: der Report zeigt es, und ein Mensch sieht nach. Eine
+  automatische Ausweichroute auf ein anderes Modell baut dieses Goal nicht.
+- **Welche Codes OpenRouter im Body wirklich schickt**, habe ich nie in einer echten Antwort gesehen.
+  Die Tabelle ordnet jeden Fall zu, auch den unbekannten; ob die Zuordnung im Betrieb passt, zeigt
+  erst das Log.
 - **Nachbessern für Katalogbestellungen ist nicht gebaut.** Der Katalog verspricht "bis zu dreimal
   sagen, was anders werden soll". Bis ein eigenes Goal das baut, liest ein Mensch die Antworten
   und liefert von Hand. Das steht im Report nicht und ist eine Lücke, die ich hier benenne.
