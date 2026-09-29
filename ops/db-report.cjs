@@ -107,6 +107,12 @@ const OURS = [
   // the tests, where the database is in memory, and test/openapi.test.ts does exactly that walk.
   // Against production, a minting endpoint is looked at and not called.
   "key:165d85b0d51c24f46c17c2e6b931d34ab126d70f",
+  // Und das dritte an diesem Tag, 10:52 und dann noch einmal beim Nachpruefen des Fixes, der
+  // genau diese Tuer betrifft. Drei Handles an einem Morgen ist kein Zufall mehr, sondern der
+  // Preis dafuer, dass `POST /v1/auth/keyless` nur durch Benutzen zu pruefen ist: ein GET
+  // antwortet 405. Der Preis ist jetzt bekannt und klein (ein Handle, kein Geld aus dem Topf),
+  // und seit die Kappe eine Notbremse ist statt eines Trichters sperrt er niemanden mehr aus.
+  "key:a0722324659ba4e634e8ee6f084f74139dbd12f9",
 ];
 
 // The hardcoded pair is not enough. Every production check provisions a throwaway wallet, and on

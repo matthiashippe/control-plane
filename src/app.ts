@@ -1547,10 +1547,39 @@ export function createApp(opts: AppOptions) {
    * than the one it leaves out. The addressed route stays untouched: the Conway runtime builds
    * that URL itself and never sees this one.
    */
+  /**
+   * A path parameter that arrived as its own name, in braces.
+   *
+   * On 2026-09-29 `/openapi.json` went live at 10:03 UTC. At 11:10 seven foreign addresses
+   * arrived inside four minutes, all walking the document, and all of them called
+   * `/pay/{usd}/{address}` and `/pay/{usd}` with the braces as literal text: 28 requests, every
+   * one a 400 or a 404. They do not substitute path parameters.
+   *
+   * Formally that is their bug. Practically it is ours, and this repository has known why since
+   * the skill check was written: a machine follows instructions literally and does not improvise,
+   * so it fails and its operator concludes the market is empty. The answer costs nothing and
+   * turns a dead end into the one URL that works.
+   */
+  const literalTemplate = (c: Parameters<typeof requestOrigin>[0], parts: string[]) => {
+    const origin = requestOrigin(c) ?? siteOrigin();
+    return {
+      error: "path_template_not_substituted",
+      message:
+        `The path still carries ${parts.map((p) => `{${p}}`).join(" and ")} from the API ` +
+        `description instead of a value. /pay/{usd}/{address} is a template: {usd} is one of ` +
+        `${TOPUP_TIERS_USD.join(", ")} and {address} is the wallet that signs. Ready to call at ` +
+        `the smallest tier: ${origin}/pay/5, which credits whoever signs and needs no address.`,
+      topup_url: `${origin}/pay/5`,
+      topup_tiers_usd: [...TOPUP_TIERS_USD],
+      docs: DOC.payments,
+    };
+  };
+
   app.get("/pay/:usd", async (c) => {
     const pay = opts.pay ?? null;
     const settler = opts.settler ?? null;
     if (!pay) return c.json(PAYMENTS_UNAVAILABLE, 503);
+    if (/^\{.*\}$/.test(c.req.param("usd"))) return c.json(literalTemplate(c, ["usd"]), 400);
     const res = await handlePay(db, settler, { ...pay, publicOrigin: pay.publicOrigin ?? requestOrigin(c) }, {
       usd: c.req.param("usd"),
       paymentHeader: c.req.header("x-payment"),
@@ -1563,6 +1592,8 @@ export function createApp(opts: AppOptions) {
     const pay = opts.pay ?? null;
     const settler = opts.settler ?? null;
     if (!pay) return c.json(PAYMENTS_UNAVAILABLE, 503);
+    const braced = ["usd", "address"].filter((p) => /^\{.*\}$/.test(c.req.param(p) ?? ""));
+    if (braced.length > 0) return c.json(literalTemplate(c, braced), 400);
     const res = await handlePay(db, settler, { ...pay, publicOrigin: pay.publicOrigin ?? requestOrigin(c) }, {
       usd: c.req.param("usd"),
       recipient: c.req.param("address"),

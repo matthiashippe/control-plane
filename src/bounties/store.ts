@@ -18,6 +18,7 @@
  */
 
 import { randomUUID } from "node:crypto";
+import { isKeylessAddress, KEYLESS_PREFIX } from "../auth/keyless.js";
 import type { Db } from "../db.js";
 import { postLedger, mcToCents, getAvailableMc } from "../db.js";
 import {
@@ -349,6 +350,14 @@ export const SUBMISSION_MAX = 50_000;
  * but it turns a selection of the best into a stage for a single performer, and in a public list
  * that costs trust.
  */
+/** How many keyless submissions one bounty takes in a day. See submitWork(). */
+export const KEYLESS_SUBS_PER_BOUNTY_DAY_DEFAULT = 5;
+
+export function keylessSubsPerBountyDay(): number {
+  const raw = Number(process.env.CP_KEYLESS_SUBS_PER_BOUNTY_DAY);
+  return Number.isInteger(raw) && raw > 0 ? raw : KEYLESS_SUBS_PER_BOUNTY_DAY_DEFAULT;
+}
+
 export function submitWork(db: Db, a: { bountyId: string; agent: string; body: string }): Submission {
   const agent = a.agent.toLowerCase();
   const body = a.body.trim();
@@ -364,6 +373,42 @@ export function submitWork(db: Db, a: { bountyId: string; agent: string; body: s
   }
   if (bounty.creator === agent) {
     throw new BountyError("own_bounty", 403, "You cannot submit to a bounty you posted yourself.");
+  }
+  // How many free agents may pile onto one job in a day.
+  //
+  // This is the limit that used to sit on the keyless door itself, as five keys a day for the
+  // whole instance. src/auth/keyless.ts says why a limit is needed at all: a free key is a free
+  // submission, and an inflated competitor count drives off the agents the count exists to
+  // attract. The exposure it named, word for word, was "one actor can add up to five submissions
+  // to one job per day".
+  //
+  // It sat in the wrong place. On 2026-09-29 one crawler with a rotating egress pool emptied the
+  // day's five places in four minutes, after our own probes had taken three of them, so the door
+  // was shut for everyone else for the rest of that day. The damage a free key can do lands on a
+  // bounty, so the limit belongs on the bounty, and here it is one number rather than a
+  // consequence of how many keys happen to exist.
+  //
+  // Strictly stronger than what it replaces: before, five keys could each submit to a different
+  // job, or all five to the same one, and nothing said which. Here the promise is exact.
+  if (isKeylessAddress(agent)) {
+    const day = new Date().toISOString().slice(0, 10);
+    const { n } = db
+      .prepare(
+        `SELECT count(*) AS n FROM submissions
+          WHERE bounty_id = ? AND agent LIKE ? AND substr(created_at, 1, 10) = ?`,
+      )
+      .get(a.bountyId, `${KEYLESS_PREFIX}%`, day) as { n: number };
+    if (n >= keylessSubsPerBountyDay()) {
+      throw new BountyError(
+        "keyless_crowd_limit",
+        429,
+        `This job already has ${n} submissions from agents working without a wallet today, which ` +
+          "is the daily limit for one job. It exists so a crowd of free keys cannot make a job " +
+          "look busier than it is, which would drive off the agents the count is meant to " +
+          "attract. It refills at midnight UTC, other jobs are unaffected, and with a wallet " +
+          "there is no limit: POST /v1/auth/nonce, /v1/auth/verify, /v1/auth/api-keys.",
+      );
+    }
   }
   const s: Submission = {
     id: randomUUID(),

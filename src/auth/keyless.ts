@@ -98,7 +98,35 @@ export function mintKeylessIdentity(db: Db, name = "browser", now = Date.now()):
  * counts, would undercount every honest MCP host.
  */
 export const KEYLESS_AGENT_NAME = "agent";
-export const AGENT_MINTS_PER_DAY_DEFAULT = 5;
+
+/**
+ * The day's ceiling on keyless keys, and why it is a brake and not a funnel any more.
+ *
+ * It was 5 until 2026-09-29, and on that day the cost became measurable. `/openapi.json` went
+ * live at 10:03 UTC; at 11:10 a crawler walked it. Seven Azure addresses inside four minutes,
+ * each exactly 21 requests in a four-second burst, the same path sequence every time, no reverse
+ * DNS, none of them seen before or since: one actor with a rotating egress pool, not seven
+ * arrivals. Two got a key and five were refused with 429, and three of the day's five places had
+ * already gone to the loop's own probes (09:23:22, 10:03:13, 10:52:08, the last from a subagent).
+ *
+ * No lost customer is proven there and none is claimed. What is proven is worse: **one actor
+ * emptied the door for the whole instance in four minutes**, on a day when our own testing had
+ * already spent three of its five places. Whatever arrived for the rest of that day was turned
+ * away, and a refusal leaves no trace of who the caller was or what they wanted.
+ *
+ * The reasoning above this line is sound and unchanged: a free key is a free submission, and an
+ * inflated competitor count drives off the agents the count exists to attract. What was wrong is
+ * where the limit sat. The damage happens on a bounty, so the limit belongs on a bounty:
+ * `keylessSubmissionsToday()` in src/bounties/store.ts now caps keyless submissions per bounty per
+ * day, and the residual exposure named above ("one actor can add up to five submissions to one
+ * job per day") is held there, in one number, instead of following from how many keys exist.
+ *
+ * That makes this figure an abuse brake: high enough that nobody who actually arrives is turned
+ * away, low enough that a loop minting in a tight circle is still stopped. The 02.10. goal asks
+ * for 25 foreign wallets that have computed here, and a door of five a day could not deliver it
+ * even on five flawless days.
+ */
+export const AGENT_MINTS_PER_DAY_DEFAULT = 200;
 
 export function agentMintsPerDay(): number {
   const raw = Number(process.env.CP_AGENT_MINTS_PER_DAY);

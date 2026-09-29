@@ -5,96 +5,75 @@ ACTIVE
 
 ## Active Objective
 
-**Goal 17: In den x402-Katalog kommen, mit der Form, die die Spezifikation verlangt.**
+**Goal 18: Die Tuer so weit aufmachen, wie das Ziel es verlangt, ohne die Zusage zu brechen.**
 
-Nennt ausdruecklich **`src/payments/**`**, weil dort der Bazaar-Block und der Facilitator-Aufruf
-liegen und `loop-constraints.md` den Pfad nur so oeffnet.
+Nennt ausdruecklich **`src/auth/**`**, weil dort die Tageskappe der schluessellosen Tuer liegt und
+`loop-constraints.md` den Pfad nur so oeffnet. Dazu `src/bounties/store.ts` und `src/app.ts`,
+die nicht gesperrt sind.
 
-### Was gestern falsch war, und wie es auffiel
+### Was heute gemessen wurde, und es ist eine Verwechslung im Entwurf
 
-Am 23.09. stand im Kopf von `ops/own-x402-listing.sh` das Ergebnis von sieben Messungen:
-*"So the same thing is true of both: we have settled, we are in neither, and neither publishes a
-way in. The loop has no door it can walk through."* Das war falsch, und zwar an der Stelle, an der
-nicht gemessen, sondern geschlossen wurde.
+Am 29.09. um 10:03 UTC ging `/openapi.json` live. Um 11:10, also 67 Minuten spaeter, ist ein
+Crawler darueber gelaufen: **sieben Azure-Adressen** in vier Minuten, User-Agent `node`, jede
+**genau 21 Requests** in einem Vier-Sekunden-Schub, jedes Mal dieselbe Reihenfolge
+(`/.well-known/x402`, `/robots.txt`, `/openapi.json`, dann jeder Pfad aus dem Dokument), kein
+Reverse-DNS, keine davon je vorher oder nachher gesehen. Das ist **ein** Akteur mit wechselnden
+Ausgangsadressen, nicht sieben Ankoemmlinge, und das Dokument hat ihn ausgeloest: vor 10:03 ist
+diesen Weg niemand gegangen.
 
-**Gemessen am 24.09.:** zwischen dem 21.09. und heute sind **141 Hosts neu in die beiden Kataloge
-gekommen**, 93 bei CDP, 48 bei PayAI, also rund 47 am Tag. Zehn davon sprechen x402 Version 1 wie
-wir, darunter zwei ephemere `trycloudflare.com`-Tunnel, die niemand crawlen wuerde. Die Tuer ist
-offen und wird taeglich benutzt.
+Was sie bekommen haben:
 
-**Und die Spezifikation beschreibt sie.** `coinbase/x402`, `docs/extensions/bazaar.mdx`:
-*"Services are discoverable when they include the bazaar extension in their route configuration."*
-Die Form dort ist
+- **Fuenf von ihnen ein 429 auf `POST /v1/auth/keyless`.** Die Tageskappe steht auf fuenf, und
+  **drei der fuenf Plaetze hatte der Loop selbst verbraucht**: eigene Produktionsproben um
+  09:23:22, 10:03:13 und 10:52:08, die letzte von einem Subagenten des laufenden Schwarms.
+  Zwei Adressen kamen durch, fuenf wurden abgewiesen (11:10:36, 11:10:36, 11:10:41, 11:11:21,
+  11:14:15). **Kein verlorener Kunde ist damit belegt**, denn es war ein Crawler. Belegt ist
+  etwas Schlimmeres: ein einzelner Akteur hat die Tuer in vier Minuten fuer die ganze Instanz
+  geschlossen, an einem Tag, an dem unsere eigenen Proben den Rest schon verbraucht hatten. Wer
+  danach kam, wurde abgewiesen, und eine Absage hinterlaesst keine Spur davon, wer das war.
+- **28 Requests auf `/pay/{usd}/{address}` und `/pay/{usd}` mit den Klammern als Text**, je 400
+  und 404. Sie setzen die Pfadparameter nicht ein. Das ist formal ihr Fehler und praktisch unserer:
+  dieses Repo weiss seit dem Skill-Check, dass eine Maschine Anweisungen woertlich befolgt und
+  nicht improvisiert.
 
-    extensions: { bazaar: { discoverable: true, inputSchema: {...}, outputSchema: {...} } }
+**Die Kappe begrenzt das Falsche.** Ihre Begruendung in `src/auth/keyless.ts` ist richtig: ein
+freier Schluessel ist eine freie Einsendung, und eine aufgeblaehte Konkurrentenzahl vertreibt
+genau die Agenten, fuer die die Zahl da ist. Der genannte Restschaden lautet woertlich: *"one
+actor can add up to five submissions to one job per day."* Der Index `submissions_once` ueber
+`(bounty_id, agent)` erzwingt eine Einsendung je Agent und Auftrag, also folgt die Fuenf
+ausschliesslich aus der Zahl der Schluessel.
 
-Unsere ist `extensions.bazaar.info.{input,output}` und enthaelt `discoverable` nirgends. Die
-gelisteten Dienste zeigen dieselbe Sache auf der Leitung: ihre 402 traegt
-`accepts[].outputSchema.input.discoverable = true`, unsere traegt kein `outputSchema`.
+Geschuetzt werden muss die **Zahl der Einsendungen auf einem Auftrag**. Begrenzt wird stattdessen
+das **Ankommen**. Das sind zwei verschiedene Dinge, und die Verwechslung kostet seit heute
+messbar Ankoemmlinge.
 
-**Dazu der Beleg, den wir nie gelesen haben.** Dieselbe Seite: nach einer Zahlung mit
-Bazaar-Erweiterung antwortet der Facilitator mit dem Header `EXTENSION-RESPONSES`, base64-JSON mit
-`bazaar.status` aus `success`, `processing` oder `rejected` und im Ablehnungsfall
-`bazaar.rejectedReason`. `FacilitatorClient.post()` in `src/payments/facilitator.ts` gibt nur den
-geparsten Rumpf zurueck und wirft die Header weg. Wir haben ein bis neun Abrechnungen bei PayAI
-und haben nie erfahren, was dieser Header dazu gesagt hat.
+**Und sie macht das Ziel vom 02.10. arithmetisch unmoeglich.** Es verlangt 25 fremde Wallets, die
+hier gerechnet haben. Die Tuer laesst fuenf am Tag herein, insgesamt, fuer alle. Selbst ohne jede
+Verschwendung braeuchte das Ziel fuenf fehlerfreie Tage, und heute gingen drei Plaetze an uns.
 
 ### Die Arbeit
 
-1. `src/payments/bazaar.ts` auf die Form der Spezifikation: `discoverable: true`, `inputSchema`,
-   `outputSchema`. Dazu `routeTemplate`, weil `/pay/{usd}/{address}` eine parametrisierte Route
-   ist und der Katalog sonst je Zahler eine eigene Zeile bekaeme; die Spezifikation nennt
-   `routeTemplate` ausdruecklich als Katalogschluessel.
-2. `post()` gibt die Header mit zurueck, `settle` und `verify` lesen `EXTENSION-RESPONSES`,
-   dekodieren es und schreiben Status und Ablehnungsgrund ins Log. **Das ist der eigentliche
-   Gewinn:** ab da sagt uns der Facilitator selbst, ob es gewirkt hat, statt dass wir den Katalog
-   raten.
-3. Der Tagesscan bekommt die Differenz: welche Hosts sind seit gestern neu. Ohne die Zahl waere
-   heute nicht aufgefallen, dass die Tuer benutzt wird.
+1. Die Kappe wandert dorthin, wo der Schaden entsteht: hoechstens `CP_KEYLESS_SUBS_PER_BOUNTY_DAY`
+   (Vorgabe 5) schluessellose Einsendungen **je Auftrag und Tag**, ueber alle schluessellosen
+   Schluessel hinweg. Damit bleibt der genannte Restschaden wortgleich erhalten, und er wird
+   sogar strenger: heute haengt er an der Zahl der Schluessel, danach steht er direkt im Code.
+2. `AGENT_MINTS_PER_DAY_DEFAULT` steigt auf eine Zahl, die eine Notbremse ist und kein Trichter.
+   Die Tuer soll niemanden abweisen, der wirklich ankommt.
+3. Ein Pfadparameter, der woertlich als `{usd}` oder `{address}` ankommt, bekommt eine Antwort,
+   die die Schablone erklaert und eine aufrufbare URL nennt, statt 400 und 404. Dieselbe
+   Behandlung wie die drei Schablonen von heute frueh.
 
 ### Done, gemessen und nicht behauptet
 
-1. Eine Abrechnung laeuft und der `EXTENSION-RESPONSES`-Header wird gelesen und protokolliert.
-   Steht dort `rejected`, ist der Grund die naechste Arbeit und das Ziel ist trotzdem erreicht:
-   wir wissen zum ersten Mal, warum.
-2. `ops/own-x402-listing.sh` findet unseren Host im Tagesscan. Das ist die Zielzahl fuer den
-   02.10. und sie steht heute auf 0 von 23.512 Zeilen.
-3. Der Katalog fuehrt uns mit **einer** Zeile und nicht mit einer je Zahler.
-
-### Ergebnis, 29.09.2026
-
-**Zwei von drei Abnahmekriterien erfuellt, das dritte gemessen und nicht erreicht.**
-
-Zu 2: `ops/own-x402-listing.sh` meldet **LISTED**. Eine Zeile im PayAI-Verzeichnis von 27.783,
-`hat_bazaar_block = 1`, Zeitstempel `2026-09-27T22:21:02.158Z`. Die Zielzahl fuer den 02.10.
-steht damit vier Tage frueh. Der Eintrag entstand von selbst: er traegt die Sekunde des ersten
-fremden Settle, also hat `serverExtensions` gewirkt, sobald zum ersten Mal echtes Geld durchlief.
-Bezahlt hat das ein fremder Kunde, `0x3749efe7…`, mit zweimal fuenf USDC, nicht wir.
-
-Seitdem indexieren uns sieben verschiedene x402-Crawler (PayAI-Bazaar, QuietforgeIndex,
-x402lens-indexer, csoai-x402-bazaar-conformance, x402-collector, x402-radar-prober, siteradar),
-alle erstmals am 27. oder 28.09. Der Satz vom 23.09., der Loop habe keine Tuer, ist damit in
-beide Richtungen widerlegt: die Tuer war da und sie hat sich geoeffnet.
-
-Zu 3: **nicht erreicht.** Der Katalog fuehrt die konkrete URL `/pay/5/0x3749efe7…`, nicht das
-Muster. `routeTemplate: "/pay/:usd/:address"` ist deklariert und wurde nicht als Schluessel
-benutzt. Folge: wer der Listung folgt, signiert mit der eigenen Wallet auf eine fremde Adresse
-und wird mit `recipient_must_match_payer` abgewiesen. Kein Geld geht fehl, der Pfad entscheidet
-ueber die Credits und die Signatur deckt ihn nicht, aber die Listung ist so unbrauchbar. Behoben,
-soweit es von hier geht: die Absage nennt jetzt die aufrufbare URL fuer die Wallet, die signiert
-hat, statt `/pay/{usd}/{the signing wallet}`. Ob PayAI `routeTemplate` ueberhaupt liest, laesst
-sich ohne einen zweiten Settle nicht sagen.
-
-Zu 1: **verloren, und das ist der lehrreiche Teil.** Der `EXTENSION-RESPONSES`-Header kam am
-27.09. um 22:21 an, `bazaarOutcome()` hat ihn wie gebaut ins Log geschrieben, und der Deploy vom
-29.09. um 09:23 hat den Container ersetzt. Docker loescht das Log mit dem Container, nichts auf
-der VM schrieb es auf Platte. Der Beleg, auf den dieses Ziel tagelang gewartet hat, war 36 Stunden
-lesbar und wurde von einer Routinehandlung vernichtet.
-
-`ops/deploy.sh` sichert das Containerlog jetzt vor jedem Rollout nach `/var/log/cp-history/`,
-gzip, 30 Tage. Gegen die VM geprueft. Das naechste Settle liefert den Header nach.
+1. Ein Lauf mit sechs schluessellosen Schluesseln hintereinander bekommt sechs Schluessel, und der
+   sechste Versuch, auf **denselben** Auftrag einzusenden, wird abgewiesen. Gegenprobe in beide
+   Richtungen.
+2. `/pay/{usd}` mit Klammern antwortet mit einer aufrufbaren URL, und ein Test ruft die genannte
+   URL auf und prueft, dass sie 402 gibt.
+3. Kein 429 mehr im Zugriffslog fuer eine fremde Adresse an dieser Tuer, und ein Crawler, der
+   die Tuer abklopft, kann sie fuer andere nicht mehr schliessen.
 
 ### Blockers
-Keine. Alles daran ist Code und Messung.
+Keine.
 
-(Historie: Goal 16 in `goals/2026-09-23-goal-16-schluessellos.md`.)
+(Historie: Goal 17 in `goals/2026-09-24-goal-17-x402-katalog.md`.)
