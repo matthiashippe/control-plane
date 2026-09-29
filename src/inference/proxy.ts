@@ -14,6 +14,8 @@ import { DOC } from "../errors.js";
 import type { ChatProvider, ChatRequest, ChatResponse, ModelSpec, Usage } from "./provider.js";
 import { estimateTokens, ProviderBadRequestError, ProviderUnavailableError } from "./provider.js";
 import { grantOnFirstUse } from "../credits/starter.js";
+import { siteOrigin } from "../public/site.js";
+import { TOPUP_TIERS_USD } from "../payments/pay.js";
 
 export const MARKUP = 1.3;
 const DEFAULT_MAX_TOKENS = 4096;
@@ -255,15 +257,31 @@ async function handleChatUncoalesced(
         // Wording and `details` stay as they are: the runtime looks for the marker anywhere in the
         // body and reads `details.required_cents`/`details.current_balance_cents` to pick the topup
         // tier (upstream `src/conway/topup.ts:103`). Only the way to buy more is appended.
+        //
+        // That way used to be `/pay/{usd}/{this wallet}`, a template, and on 2026-09-28 a Conway
+        // runtime took this exact 402 fifteen times in three bursts five minutes apart and then
+        // stopped, without ever calling the pay route once. The night before, the automaton that
+        // did get through spent thirty-six minutes and seven guessed URLs on it. A template asks
+        // the caller to substitute two things; the URL below asks it to follow a link. It carries
+        // the wallet the call was billed against, so an operator reading a log line can open it,
+        // and `topup_url` is beside the prose because a machine reads fields, not sentences.
         message:
           `Insufficient credits: need ${mcToCents(requiredMc) + 1} cents, have ${mcToCents(availableMc)} cents. ` +
-          "Buy credits with GET /pay/{usd}/{this wallet} and sign the x402 offer, or send USDC to " +
-          "the wallet and let the runtime's bootstrap topup do it. Nothing was charged for this call.",
+          `Buy credits at ${siteOrigin()}/pay/5/${address}: call it, take the 402, sign the x402 ` +
+          `offer it carries and send it back in X-Payment. Tiers are ${TOPUP_TIERS_USD.join(", ")} USD; ` +
+          `put another one in the path for a larger one. Sending USDC to ${address} on Base works ` +
+          "too, and the runtime's bootstrap topup picks it up. Nothing was charged for this call.",
         docs: DOC.inference,
         details: {
           required_cents: Math.ceil(requiredMc / 1000),
           current_balance_cents: mcToCents(availableMc),
           model: req.model,
+          // Added 2026-09-29, after two foreign automatons in a row failed to find the pay route
+          // from the sentence above. Additive only: nothing upstream reads these, and the two
+          // fields upstream does read are untouched.
+          topup_url: `${siteOrigin()}/pay/5/${address}`,
+          topup_tiers_usd: [...TOPUP_TIERS_USD],
+          wallet: address,
         },
       },
     };

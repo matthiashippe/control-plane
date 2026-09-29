@@ -189,6 +189,17 @@ run --undetermined-on 2 "the text is readable in both schemes" ./ops/contrast.sh
 # next morning to see it.
 run --undetermined-on 2 "the scheduled jobs point somewhere" ./ops/cron-points-somewhere.sh
 
+# Is there anything on the board at all?
+#
+# Added 2026-09-29, the day it was measured: the board had been completely empty since 24.09., the
+# last real job having expired unawarded, and not one of the checks in this file could say so.
+# Nothing refills the board on its own; the operator seeds it from a loop cycle, and the loop did
+# not run for five days. The skill probe's step 1 went red in that window and blamed a missing
+# field, because a substring match cannot tell an empty list from a broken one.
+#
+# Undetermined on 2 when /bounties.json cannot be read, which is a statement about the network.
+run --undetermined-on 2 "the board has work on it" ./ops/board-not-empty.sh
+
 run "the daily jobs still ran" ./ops/freshness.sh
 
 # What we say about somebody else's code, held against their code.
@@ -215,6 +226,11 @@ run --undetermined-on 2 "the published data reproduces" ./ops/check-data.py
 # has to keep telling those apart, and a counter-proof switch nobody pulls proves only what it
 # proved on the day it was written. See ops/traffic.sh --selftest. Reads nothing from production.
 run "the traffic report tells an arrival from a claim" ./ops/traffic.sh --selftest
+
+# The board check against a planted board that is empty, full, unreadable, and one that carries
+# only the note in which the word `award_cents` appears in prose. That last one is the case that
+# broke its predecessor. Reads nothing from production.
+run "the board check tells an empty board from a broken one" ./ops/board-not-empty.sh --selftest
 
 # Whether a copy of the database exists anywhere but on the disk that holds it. Measured on
 # 2026-09-23: seven backups, all on /dev/sda1, the same single disk as the live database, and

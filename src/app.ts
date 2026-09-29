@@ -2666,6 +2666,48 @@ export function createApp(opts: AppOptions) {
       );
     }
 
+    // A guessed path that is obviously looking for the way to pay gets told the way to pay.
+    //
+    // Two real foreign automatons reached this service while nobody was watching, and both ran out
+    // of free credit and had to find out how to buy more. The log of 2026-09-27 holds what that
+    // cost the one that got through: at 21:44:29 it guessed /v1/credits/topup, /v1/credits/buy and
+    // /v1/x402/credits, three 404s in the same second, and stopped. Thirty-six minutes later it
+    // tried again with /v1/credits, /v1/account, /v1/me and /v1/credits/me, four more 404s, and
+    // only then found /pay/5/<its address>, signed the offer and paid 10 USDC. The second one, a
+    // Conway runtime on 2026-09-28, never found it at all: it took the 402 on /v1/chat/completions
+    // fifteen times in three bursts five minutes apart and went away.
+    //
+    // The answer they got was not wrong. It says this service implements "credits, topup" and
+    // sends the reader to /.well-known/x402 for the list, which is one more hop and reads as an
+    // invitation to guess the obvious name for a thing it just said exists. Seven guesses from one
+    // caller is the measurement: the list is in the wrong place, so the path goes in the answer.
+    //
+    // The URL is printed ready to call, with the caller's own wallet in it when the request
+    // carries a key that resolves to one, because `/pay/{usd}/{address}` as a template is what the
+    // 402 has always said and is what neither of them followed.
+    const payish = /^\/v1\/(?:.*\b)?(credits?|topup|top-up|buy|purchase|billing|payments?|account|wallet|me)\b/i;
+    if (payish.test(c.req.path)) {
+      const origin = requestOrigin(c) ?? siteOrigin();
+      const who = resolveApiKey(db, c.req.header("Authorization"));
+      const example = `${origin}/pay/5/${who ?? "{your wallet address}"}`;
+      return c.json(
+        {
+          error: "not_found",
+          message:
+            `No endpoint at ${c.req.path}. Credits are bought at /pay/{usd}/{address}, which is an ` +
+            `x402 seller: call it, take the 402, sign the offer it carries and send it back in ` +
+            `X-Payment. For this wallet at the smallest tier that is ${example}. The tiers are ` +
+            `${TOPUP_TIERS_USD.join(", ")} USD. Your balance is at GET /v1/credits/balance, and ` +
+            `GET /.well-known/x402 lists every endpoint this service has.`,
+          topup_url: example,
+          topup_tiers_usd: [...TOPUP_TIERS_USD],
+          balance_url: `${origin}/v1/credits/balance`,
+          docs: DOC.service,
+        },
+        404,
+      );
+    }
+
     const doubled = (c.req.path.match(/\/v1\//g) ?? []).length > 1;
     return c.json(
       {

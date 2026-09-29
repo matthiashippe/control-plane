@@ -61,6 +61,39 @@ und haben nie erfahren, was dieser Header dazu gesagt hat.
    02.10. und sie steht heute auf 0 von 23.512 Zeilen.
 3. Der Katalog fuehrt uns mit **einer** Zeile und nicht mit einer je Zahler.
 
+### Ergebnis, 29.09.2026
+
+**Zwei von drei Abnahmekriterien erfuellt, das dritte gemessen und nicht erreicht.**
+
+Zu 2: `ops/own-x402-listing.sh` meldet **LISTED**. Eine Zeile im PayAI-Verzeichnis von 27.783,
+`hat_bazaar_block = 1`, Zeitstempel `2026-09-27T22:21:02.158Z`. Die Zielzahl fuer den 02.10.
+steht damit vier Tage frueh. Der Eintrag entstand von selbst: er traegt die Sekunde des ersten
+fremden Settle, also hat `serverExtensions` gewirkt, sobald zum ersten Mal echtes Geld durchlief.
+Bezahlt hat das ein fremder Kunde, `0x3749efe7…`, mit zweimal fuenf USDC, nicht wir.
+
+Seitdem indexieren uns sieben verschiedene x402-Crawler (PayAI-Bazaar, QuietforgeIndex,
+x402lens-indexer, csoai-x402-bazaar-conformance, x402-collector, x402-radar-prober, siteradar),
+alle erstmals am 27. oder 28.09. Der Satz vom 23.09., der Loop habe keine Tuer, ist damit in
+beide Richtungen widerlegt: die Tuer war da und sie hat sich geoeffnet.
+
+Zu 3: **nicht erreicht.** Der Katalog fuehrt die konkrete URL `/pay/5/0x3749efe7…`, nicht das
+Muster. `routeTemplate: "/pay/:usd/:address"` ist deklariert und wurde nicht als Schluessel
+benutzt. Folge: wer der Listung folgt, signiert mit der eigenen Wallet auf eine fremde Adresse
+und wird mit `recipient_must_match_payer` abgewiesen. Kein Geld geht fehl, der Pfad entscheidet
+ueber die Credits und die Signatur deckt ihn nicht, aber die Listung ist so unbrauchbar. Behoben,
+soweit es von hier geht: die Absage nennt jetzt die aufrufbare URL fuer die Wallet, die signiert
+hat, statt `/pay/{usd}/{the signing wallet}`. Ob PayAI `routeTemplate` ueberhaupt liest, laesst
+sich ohne einen zweiten Settle nicht sagen.
+
+Zu 1: **verloren, und das ist der lehrreiche Teil.** Der `EXTENSION-RESPONSES`-Header kam am
+27.09. um 22:21 an, `bazaarOutcome()` hat ihn wie gebaut ins Log geschrieben, und der Deploy vom
+29.09. um 09:23 hat den Container ersetzt. Docker loescht das Log mit dem Container, nichts auf
+der VM schrieb es auf Platte. Der Beleg, auf den dieses Ziel tagelang gewartet hat, war 36 Stunden
+lesbar und wurde von einer Routinehandlung vernichtet.
+
+`ops/deploy.sh` sichert das Containerlog jetzt vor jedem Rollout nach `/var/log/cp-history/`,
+gzip, 30 Tage. Gegen die VM geprueft. Das naechste Settle liefert den Header nach.
+
 ### Blockers
 Keine. Alles daran ist Code und Messung.
 

@@ -59,12 +59,41 @@ balance=$(curl -s -m 15 "$BASE/v1/credits/balance" -H "Authorization: $agent" | 
 
 # Step 1 of the skill, verbatim.
 open=$(curl -s -m 15 "$BASE/bounties.json")
-# Literal match in the shell, not a pipe into grep -q. With `set -o pipefail`, grep exiting on
-# its first hit leaves printf writing into a closed pipe, and the SIGPIPE becomes the pipeline
-# status. That reported a missing title on a page that had one, three times over two days, and it
-# only showed on the larger inputs. This one comes from the network and grows with every job.
-[[ "$open" == *'"award_cents"'* ]] && ok "step 1: the open list carries award_cents, which step 2 tells the agent to read" \
-  || bad "step 1: award_cents missing from the open list" "$open"
+# Count the entries before looking at their fields. Until 2026-09-29 this was one substring match
+# for '"award_cents"' against the whole body, and on the 29th it went red while the field was
+# perfectly fine: every seeded job had expired over a five-day gap, so the list was [] and there
+# was no row for the field to be on. A check that cannot tell "the field is gone" from "there are
+# no rows" reports the wrong defect, and the wrong one was by far the smaller.
+#
+# The substring match stays wrong for a second reason: the note at the top of bounties.json
+# explains award_cents in prose, so a body with an empty list still contains the word. Only the
+# rows count, and they are counted in python rather than grepped.
+rows=$(printf '%s' "$open" | python3 -c '
+import json, sys
+try:
+    d = json.load(sys.stdin)
+except Exception:
+    print("unreadable"); raise SystemExit
+o = d.get("open")
+if not isinstance(o, list):
+    print("nolist"); raise SystemExit
+print(len(o), sum(1 for e in o if isinstance(e, dict) and "award_cents" in e))
+' 2>/dev/null)
+
+case "$rows" in
+  unreadable|nolist|"")
+    bad "step 1: bounties.json is not readable as a list of jobs" "$open" ;;
+  "0 0")
+    # Not a pass and not a field defect. The board being empty is its own failure and it is a
+    # worse one: an arriving agent reads this list, finds nothing to compete for, and leaves.
+    # ops/board-not-empty.sh is the check that owns it; this one only declines to guess.
+    bad "step 1: the board is empty, so nothing here can carry award_cents (see ops/board-not-empty.sh)" "$open" ;;
+  *)
+    n=${rows% *}; withfield=${rows#* }
+    [[ "$n" == "$withfield" ]] \
+      && ok "step 1: all $n open jobs carry award_cents, which step 2 tells the agent to read" \
+      || bad "step 1: only $withfield of $n open jobs carry award_cents" "$open" ;;
+esac
 
 # Its own job to hand work in to.
 buyer=$(OPERATOR_WALLET="${OPERATOR_WALLET:-harness/state/mainnet-wallet.json}" CP_URL="$BASE" \

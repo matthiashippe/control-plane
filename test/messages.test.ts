@@ -541,7 +541,17 @@ describe("inference: models, credit, provider", () => {
     expect(body.message).toMatch(/^Insufficient credits: need \d+ cents, have 0 cents\./);
     expect(body.details.required_cents).toBeGreaterThan(0);
     expect(body.details.current_balance_cents).toBe(0);
-    expect(body.message).toContain("/pay/{usd}/{this wallet}");
+    // Until 2026-09-29 the line below asserted the message contains "/pay/{usd}/{this wallet}",
+    // and it held for a week while the thing it describes did not work. On 2026-09-28 a Conway
+    // runtime took this exact answer fifteen times and never called the pay route; the night
+    // before, the automaton that did get there spent 36 minutes and seven guessed URLs on it. A
+    // template is two substitutions away from being a request, and what a caller follows is a URL.
+    // So the assertion moved with the answer, and it is the stronger one: the address in the path
+    // has to be the wallet that was billed, and the whole thing has to be free of placeholders.
+    const detail = body.details as unknown as { topup_url: string; wallet: string };
+    expect(detail.topup_url).not.toMatch(/[{}<>]/);
+    expect(detail.topup_url).toContain(`/pay/5/${detail.wallet}`);
+    expect(body.message).toContain(detail.topup_url);
   });
 
   it("inference_unavailable says that this instance sells no inference at all", async () => {

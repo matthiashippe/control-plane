@@ -119,7 +119,7 @@ export function buildPaymentRequired(cfg: PayConfig, usd: number, recipient: Add
  * `normalizePaymentRequired`) and ignores extra fields. The human who reproduces the topup by
  * hand reads exactly those extra fields.
  */
-function paymentHint(cfg: PayConfig, usd: number, error: string): string | null {
+function paymentHint(cfg: PayConfig, usd: number, error: string, signer?: string): string | null {
   if (error.startsWith("wrong_amount")) {
     return (
       `The signed authorization does not carry the amount of the ${usd} USD tier. Sign exactly ` +
@@ -155,11 +155,28 @@ function paymentHint(cfg: PayConfig, usd: number, error: string): string | null 
         "payTo of the offer above, or nothing is credited."
       );
     case "recipient_must_match_payer":
+      // The one wrong URL a stranger is most likely to be holding, so it names the right one.
+      //
+      // This service entered the PayAI x402 catalogue on 2026-09-27 at 22:21:02, as a side effect
+      // of the first foreign payment, and the row the catalogue keeps is that payer's own topup
+      // URL: `/pay/5/0x3749efe7…`. `routeTemplate` is declared and was meant to consolidate the
+      // entry onto `/pay/:usd/:address`, and it did not. So every automaton that finds this
+      // service through the catalogue arrives at a URL carrying somebody else's address, signs
+      // with its own wallet, and lands exactly here.
+      //
+      // The refusal is right and stays: the path decides who gets the credits and the signature
+      // does not cover it. What was wrong is the answer, which named the route as a template with
+      // two holes in it, the same shape that cost two real callers their topup on 27. and 28.09.
+      // The signer is known at this point, so the URL can be printed ready to call.
       return (
         "Credits go to the wallet that signed the payment, and that signer is not the address in " +
         "the URL. This is deliberate: a signed x402 header is worth money, and without this check " +
         "anyone who catches one could redirect the credits while the USDC keeps leaving the " +
-        "signer. Call /pay/{usd}/{the signing wallet}. To fund a different automaton, send USDC " +
+        `signer. ${
+          signer
+            ? `Sign again at ${payResource(cfg, usd, signer as Address)}, which is this same tier for the wallet that signed.`
+            : "Call /pay/{usd}/{the signing wallet}."
+        } To fund a different automaton, send USDC ` +
         "to its wallet and let its own runtime buy credits."
       );
     case "authorization_expired":
@@ -184,12 +201,12 @@ function paymentHint(cfg: PayConfig, usd: number, error: string): string | null 
   }
 }
 
-function paymentRequiredResponse(cfg: PayConfig, usd: number, recipient: Address, error?: string): PayResponse {
+function paymentRequiredResponse(cfg: PayConfig, usd: number, recipient: Address, error?: string, signer?: string): PayResponse {
   const required = buildPaymentRequired(cfg, usd, recipient);
   const body: Record<string, unknown> = { ...required };
   if (error) {
     body.error = error;
-    const hint = paymentHint(cfg, usd, error);
+    const hint = paymentHint(cfg, usd, error, signer);
     if (hint) {
       body.message = hint;
       body.docs = DOC.payments;
@@ -415,7 +432,7 @@ export async function handlePay(
   // (security review 19.09.2026). The runtime always tops up its own wallet, so this restricts no
   // real flow.
   if (auth.from.toLowerCase() !== recipient.toLowerCase()) {
-    return paymentRequiredResponse(cfg, usd, recipient, "recipient_must_match_payer");
+    return paymentRequiredResponse(cfg, usd, recipient, "recipient_must_match_payer", auth.from);
   }
   if (auth.value !== expected) {
     return paymentRequiredResponse(cfg, usd, recipient, `wrong_amount: expected ${expected}`);

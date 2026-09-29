@@ -31,7 +31,7 @@ if [[ "${1:-}" == "--no-e2e" ]]; then
   shift 2
 fi
 
-echo "1/3  pnpm test"
+echo "1/4  pnpm test"
 if ! pnpm -s test > /tmp/cp-deploy-test.log 2>&1; then
   echo
   tail -25 /tmp/cp-deploy-test.log
@@ -45,7 +45,7 @@ fi
 echo "     $(grep -E '^\s+Tests ' /tmp/cp-deploy-test.log | tail -1 | sed 's/^ *//')"
 
 if [[ "$E2E" == "1" ]]; then
-  echo "2/3  pnpm e2e"
+  echo "2/4  pnpm e2e"
   if ! pnpm -s e2e > /tmp/cp-deploy-e2e.log 2>&1; then
     echo
     tail -20 /tmp/cp-deploy-e2e.log
@@ -75,10 +75,42 @@ if [[ "$E2E" == "1" ]]; then
   fi
   echo "     $(grep -E '^E2E ' /tmp/cp-deploy-e2e.log | tail -1)"
 else
-  echo "2/3  e2e skipped: $REASON"
+  echo "2/4  e2e skipped: $REASON"
 fi
 
-echo "3/3  deploy/rollout.sh"
+# Keep the running container's log before the rollout replaces the container.
+#
+# A deploy recreates `deploy-cp-1`, and Docker deletes the old container's json log with it. On
+# 2026-09-29 that destroyed the one piece of evidence this project had spent days trying to get:
+# the `EXTENSION-RESPONSES` header the x402 facilitator returns on a settle, which says whether
+# our catalogue declaration was accepted and why. It arrived with the first foreign payment on
+# 27.09. at 22:21, `bazaarOutcome()` logged it as designed, and the next deploy threw it away
+# before anybody read it. Nothing on the VM writes the application log to disk, and
+# `deploy/**` is not changed without a human, so the saving happens here, where the destruction
+# is caused.
+#
+# Cheap and unconditional: a few hundred kilobytes per deploy, kept on the VM next to the
+# database backups. A failure to save is not a reason not to deploy, so it only warns.
+echo "3/4  keep the current log"
+if VM_LOG=$(ssh -o ConnectTimeout=10 -i "${CP_VM_KEY:-$HOME/.ssh/id_ed25519_automaton}" \
+      "root@${CP_VM:-76.13.144.207}" '
+        set -e
+        mkdir -p /var/log/cp-history
+        out=/var/log/cp-history/cp-$(date -u +%Y%m%dT%H%M%SZ).log
+        cd /opt/control-plane/repo/deploy
+        docker compose -f docker-compose.prod.yml logs --no-color --timestamps cp > "$out" 2>&1 || true
+        gzip -f "$out"
+        # Keep a month; the whole point is that it outlives the container, not that it is forever.
+        find /var/log/cp-history -name "cp-*.log.gz" -mtime +30 -delete
+        echo "$(wc -c < "$out.gz") bytes -> $out.gz"
+      ' 2>&1); then
+  echo "     $VM_LOG"
+else
+  echo "     WARNING: could not keep the log ($VM_LOG). Deploying anyway; the container log of the" >&2
+  echo "              version about to be replaced will be lost." >&2
+fi
+
+echo "4/4  deploy/rollout.sh"
 deploy/rollout.sh "$@"
 
 echo
