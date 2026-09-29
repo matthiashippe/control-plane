@@ -17,6 +17,18 @@
  * answers 404, which is the failure this whole cycle has been about.
  */
 import { TOPUP_TIERS_USD } from "../payments/pay.js";
+
+/**
+ * The tiers this INSTANCE sells, which is not always the list in the source.
+ *
+ * `payConfigFromEnv()` lets `CP_TOPUP_TIERS_USD` override `TOPUP_TIERS_USD`, and on 2026-09-29 the
+ * production environment pinned the old list while the constant had just gained a 1. This file
+ * read the constant, so `/openapi.json` documented `/pay/1` for an instance that answers 400 to
+ * it: a documented path that does not work, which is the exact defect the rest of this cycle was
+ * spent closing, introduced here by the same hand within the hour.
+ *
+ * A description is a statement about the running service, so it comes from the running service.
+ */
 import { FEE_PERCENT } from "../bounties/store.js";
 
 const JSON_CONTENT = (schema: Record<string, unknown>) => ({ "application/json": { schema } });
@@ -36,7 +48,11 @@ const ERROR_SCHEMA = {
   required: ["error"],
 } as const;
 
-export function openApiDocument(origin: string, opts: { pay: boolean; inference: boolean }): Record<string, unknown> {
+export function openApiDocument(
+  origin: string,
+  opts: { pay: boolean; inference: boolean; tiers?: readonly number[] },
+): Record<string, unknown> {
+  const tiers = opts.tiers && opts.tiers.length > 0 ? [...opts.tiers] : [...TOPUP_TIERS_USD];
   const paths: Record<string, unknown> = {};
 
   paths["/v1/status"] = {
@@ -164,8 +180,8 @@ export function openApiDocument(origin: string, opts: { pay: boolean; inference:
               name: "usd",
               in: "path",
               required: true,
-              description: `One of the tiers this instance sells: ${TOPUP_TIERS_USD.join(", ")}.`,
-              schema: { type: "integer", enum: [...TOPUP_TIERS_USD] },
+              description: `One of the tiers this instance sells: ${tiers.join(", ")}.`,
+              schema: { type: "integer", enum: tiers },
             },
           ],
           responses: {
@@ -185,7 +201,7 @@ export function openApiDocument(origin: string, opts: { pay: boolean; inference:
         {
           security: [],
           parameters: [
-            { name: "usd", in: "path", required: true, schema: { type: "integer", enum: [...TOPUP_TIERS_USD] } },
+            { name: "usd", in: "path", required: true, schema: { type: "integer", enum: tiers } },
             { name: "address", in: "path", required: true, description: "The signing wallet.", schema: { type: "string" } },
           ],
           responses: {

@@ -1235,6 +1235,7 @@ export function createApp(opts: AppOptions) {
         openApiDocument(requestOrigin(c) ?? siteOrigin(), {
           pay: Boolean(opts.pay),
           inference: Boolean(opts.catalog),
+          tiers: opts.pay?.tiers,
         }),
       ),
     );
@@ -1567,10 +1568,10 @@ export function createApp(opts: AppOptions) {
       message:
         `The path still carries ${parts.map((p) => `{${p}}`).join(" and ")} from the API ` +
         `description instead of a value. /pay/{usd}/{address} is a template: {usd} is one of ` +
-        `${TOPUP_TIERS_USD.join(", ")} and {address} is the wallet that signs. Ready to call at ` +
+        `${(opts.pay?.tiers ?? TOPUP_TIERS_USD).join(", ")} and {address} is the wallet that signs. Ready to call at ` +
         `the smallest tier: ${origin}/pay/5, which credits whoever signs and needs no address.`,
       topup_url: `${origin}/pay/5`,
-      topup_tiers_usd: [...TOPUP_TIERS_USD],
+      topup_tiers_usd: [...(opts.pay?.tiers ?? TOPUP_TIERS_USD)],
       docs: DOC.payments,
     };
   };
@@ -2847,7 +2848,7 @@ export function createApp(opts: AppOptions) {
             `${TOPUP_TIERS_USD.join(", ")} USD. Your balance is at GET /v1/credits/balance, and ` +
             `GET /.well-known/x402 lists every endpoint this service has.`,
           topup_url: example,
-          topup_tiers_usd: [...TOPUP_TIERS_USD],
+          topup_tiers_usd: [...(opts.pay?.tiers ?? TOPUP_TIERS_USD)],
           balance_url: `${origin}/v1/credits/balance`,
           docs: DOC.service,
         },

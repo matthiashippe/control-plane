@@ -84,3 +84,44 @@ describe("the smallest tier", () => {
     expect(((await res.json()) as { error: string }).error).toBe("invalid_tier");
   });
 });
+
+/**
+ * The description has to describe the instance, not the source.
+ *
+ * `payConfigFromEnv()` lets `CP_TOPUP_TIERS_USD` override `TOPUP_TIERS_USD`, and on 2026-09-29 the
+ * production environment pinned the old list at the moment the constant gained a 1. `/openapi.json`
+ * read the constant, so it documented `/pay/1` on an instance that answers 400 to it. A documented
+ * path that does not work is the exact defect this cycle spent the day closing, and it was
+ * reintroduced within the hour by the change that closed it.
+ *
+ * These hold the document against the config the app was actually built with, so the two cannot
+ * drift again whatever the environment says.
+ */
+describe("what the instance publishes about its tiers", () => {
+  const PINNED: PayConfig = { ...PAY, tiers: [5, 25] };
+  const pinnedApp = () => createApp({ db: openDb(":memory:"), pay: PINNED, settler: SETTLER });
+
+  it("openapi names the running tiers, not the ones in the source", async () => {
+    const doc = (await (await pinnedApp().request("/openapi.json")).json()) as { paths: Record<string, any> };
+    expect(doc.paths["/pay/{usd}"].get.parameters[0].schema.enum).toEqual([5, 25]);
+    expect(doc.paths["/pay/{usd}/{address}"].get.parameters[0].schema.enum).toEqual([5, 25]);
+  });
+
+  it("every tier it names is one the instance answers", async () => {
+    const a = pinnedApp();
+    const doc = (await (await a.request("/openapi.json")).json()) as { paths: Record<string, any> };
+    for (const tier of doc.paths["/pay/{usd}"].get.parameters[0].schema.enum as number[]) {
+      expect((await a.request(`/pay/${tier}`)).status, `/pay/${tier} is documented`).toBe(402);
+    }
+  });
+
+  it("the template answer names the running tiers too", async () => {
+    const body = (await (await pinnedApp().request("/pay/%7Busd%7D")).json()) as { topup_tiers_usd: number[] };
+    expect(body.topup_tiers_usd).toEqual([5, 25]);
+  });
+
+  it("and the well-known file already did", async () => {
+    const wk = (await (await pinnedApp().request("/.well-known/x402")).json()) as { accepts: { amounts_usd: number[] }[] };
+    expect(wk.accepts[0].amounts_usd).toEqual([5, 25]);
+  });
+});
