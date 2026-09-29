@@ -44,13 +44,41 @@ zusammen 430 bezahlte Aufrufe in 30 Tagen; das Band von 0,10 bis 1,00 USD haelt 
 3. Die Stelle, die das begruendet, steht im Code und nicht nur hier, weil die naechste Person
    sonst die Stufe wieder entfernt, um die Liste aufzuraeumen.
 
+### Zwei Bevoelkerungen, zwei Waende, und die Stufe hilft nur einer
+
+Am 29.09. nachmittags am Pin `d8f8168` nachgelesen, weil ein Schwarm etwas anderes behauptet hatte:
+
+- **Generische x402-Clients** (alles auf `@x402/core`) verwerfen unser 5-USD-Angebot vor dem
+  Signieren, weil der voreingestellte Deckel ein Dollar ist. **Diesen hilft die neue Stufe.**
+- **Die Conway-Runtime** sieht den Deckel nie: sie baut ihre Zahlung selbst und traegt
+  `TOPUP_TIERS = [5, 25, 100, 500, 1000, 2500]` fest im Code (`src/conway/topup.ts:24`). Unsere
+  1-USD-Stufe ist fuer sie unsichtbar. **Ihr hilft die neue Stufe nicht.**
+
+Dazu eine zweite Wand, die nur die Runtime betrifft und die wir nicht aufmachen koennen:
+`bootstrapTopup` liest den USDC-Bestand und bricht ab, wenn er unter der kleinsten Stufe liegt
+(`src/conway/topup.ts:178-184`): *"Bootstrap topup skipped: USDC balance $X below minimum tier
+($5)"*. Ein Automaton mit ein bis fuenf Dollar versucht es also gar nicht erst.
+
+**Und eine Korrektur an einer Behauptung, die ich selbst weitergegeben hatte.** Der Schwarm sagte,
+ein 402 werde in `src/agent/loop.ts` als ganzer Turn gefangen und erreiche kein Modell. Das stimmt
+nicht: `loop.ts:246-249` erkennt 402 und `INSUFFICIENT_CREDITS` und versucht darauf eine Aufladung
+mit einem Wiederholungsversuch. Was stimmt, ist die andere Haelfte: `getCreditsBalance()` gibt
+`result.balance_cents ?? result.credits_cents ?? 0` zurueck (`src/conway/client.ts:296-298`), also
+eine Zahl, und verwirft den Rest des Koerpers. Die Brett-Zeile vom Vormittag (`open_bounties`,
+`bounties_url`, `work_hint`) erreicht diese Runtime deshalb nicht; jeden anderen Client schon.
+Aus dem 402 liest sie genau zwei Felder, `details.required_cents` und
+`details.current_balance_cents` (`src/conway/topup.ts:104-105`), und beide sind unveraendert da.
+
 ### Done, gemessen und nicht behauptet
 
 1. `/pay/1` antwortet 402 mit `maxAmountRequired: "1000000"`, live.
 2. `/.well-known/x402` und `/openapi.json` nennen die neue Stufe.
-3. Die Zahl der fremden Adressen auf `/pay/` mit einer Signatur steigt ueber null. **Das ist die
-   Zahl, an der dieses Goal gemessen wird**, und sie kann auch nein sagen: bleibt sie nach sieben
-   Tagen bei null, waren die 220 Adressen doch nur Indexer und der Preis war nie die Wand.
+3. Die Zahl der fremden Adressen auf `/pay/` mit einer Signatur steigt ueber null, **und zwar
+   von einem Client, der nicht die Conway-Runtime ist**. Das ist die Zahl, an der dieses Goal
+   gemessen wird, und sie kann auch nein sagen: bleibt sie nach sieben Tagen bei null, waren die
+   220 Adressen doch nur Indexer und der Preis war nie die Wand. Die Einschraenkung auf
+   Nicht-Conway steht da, weil deren Stufen fest verdrahtet sind und ein Treffer von dort nichts
+   ueber die 1-USD-Stufe beweisen wuerde.
 
 ### Blockers
 Keine.
