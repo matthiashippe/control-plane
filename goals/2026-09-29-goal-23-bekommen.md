@@ -1,9 +1,10 @@
 # Goal 23: Eine bezahlte Bestellung wird zu drei Fassungen per E-Mail
 
 ## Status
-VORSCHLAG, Fassung 4 (HAN-39, 29.09.2026). Fassung 4 trägt die Auflagen 10 bis 14 aus dem Urteil zu
-Fassung 3 (HAN-46); Punkte 1 und 2 hielten dort. Gebaut wird erst mit dem Ergebnis von HAN-45
-(`recht`: OpenRouters Bedingungen), das als Blocker an HAN-39 hängt. Fassung 1 hat der Skeptiker an HAN-42 widerlegt, mit neun
+VORSCHLAG, Fassung 5 (HAN-39, 29.09.2026). Fassung 5 trägt die Auflagen 15 bis 17 aus dem Urteil zu
+Fassung 4 (HAN-51) und die Bedingungen A und B von `recht` aus HAN-45. Fassung 4 trug die Auflagen
+10 bis 14 aus dem Urteil zu Fassung 3 (HAN-46). HAN-45 ist erledigt: OpenRouters Bedingungen
+(Stand 31.08.2026, 5.1) und OpenAIs (4.1 und 2.2) tragen den Verkauf der Fassungen. Fassung 1 hat der Skeptiker an HAN-42 widerlegt, mit neun
 Auflagen; Fassung 3 trägt die Auflagen 5 bis 9, die Auflagen 1 bis 4 galten dem Weg über das Abo und
 den Rechner, den es seit Fassung 2 nicht mehr gibt. Fassung 3 geht noch einmal an den Skeptiker.
 Gebaut wird erst, was danach übrig ist, und erst nachdem Goal 22 ausgerollt ist (WIP = 1).
@@ -86,7 +87,8 @@ VM, derselbe Takt in src/index.ts, danach:
 ## Die Arbeit, in dieser Reihenfolge
 
 1. **Tabelle `deliveries`** in `src/db.ts`: `reference` (Primärschlüssel, verweist auf `checkouts`),
-   `status` (`claimed` | `written` | `sent` | `failed`), `attempts`, `claimed_at`, `sent_at`, `message_id` (vom
+   `status` (`claimed` | `written` | `sent` | `failed`), `attempts`, `claimed_at`, `written_at`
+   (einmal gesetzt, wenn die dritte Fassung gespeichert ist, nie überschrieben), `sent_at`, `message_id` (vom
    Versanddienst), `versions` (Anzahl), `body` (die drei Fassungen, für spätere Runden), `cost_mc`
    (Inferenzkosten in Millicent), `error` (nur ein Code, nie Text aus der Bestellung).
    `cleanupOrderBriefs` löscht `body` mit derselben Frist wie die Angaben (`PAID_BRIEF_DAYS` nach der
@@ -94,7 +96,10 @@ VM, derselbe Takt in src/index.ts, danach:
 
 2. **Wer beliefert wird**, `deliverable(db, now)` in `src/checkout/deliver.ts`:
    - `checkouts.status = 'paid'`, `offer` gesetzt, eine Zeile in `order_briefs`;
-   - keine `deliveries`-Zeile mit `sent`, und keine mit `claimed` jünger als 30 Minuten;
+   - keine `deliveries`-Zeile mit `sent` oder `failed`, und keine mit `claimed` jünger als 30
+     Minuten. **`failed` ist endgültig** (HAN-51, Auflage 16) und hat genau drei Codes:
+     `stale_written`, `cost_cap`, `attempts_exhausted`. Ein vorübergehender Fehler setzt nie
+     `failed`, sondern nur `error` und gibt die Zeile frei;
    - `settled_at` nach `DELIVERY_START`, einer Konstante mit dem Zeitpunkt des Commits, der die
      Lieferung baut, nie einem späteren (HAN-46, Auflage 14). Ältere Zeilen (heute die von 21:07 UTC)
      werden nicht nachgeliefert und stehen im Report als `paid_before_delivery`, getrennt nach
@@ -109,7 +114,8 @@ VM, derselbe Takt in src/index.ts, danach:
      erreicht, wird die Zeile `failed` mit `cost_cap`, gleich welcher Fehler. Eine Fassung, die die
      Prüfung besteht, wird sofort in `body` gespeichert und nie neu geschrieben, auch wenn die
      anderen beiden noch fehlen (HAN-46, Auflage 12). Die Grenze ist eine Setzung, keine Messung:
-     sie liegt bei 2,6 Prozent des kleinsten Katalogpreises (17 EUR), Währungen ungleich, und wird
+     sie liegt bei 2,6 Prozent des kleinsten Katalogpreises (17 EUR, umgerechnet mit 1,1355 USD je EUR
+     aus `ops/anzeigen-rechnung.py:101`), und wird
      nach der Vorführung an `delivery_cost_mc_median` gemessen;
    - **`stripe_test` nur an eine eigene, explizite Zustellliste**, `TEST_DELIVERY_TO`, heute genau
      `vorfuehrung@postyourprice.com`. Nicht `ops/ours.txt`: dort stehen die RFC-2606-Domains für
@@ -125,12 +131,19 @@ VM, derselbe Takt in src/index.ts, danach:
    - drei Anfragen an den Inferenz-Provider, verteilt über `CP_OPENROUTER_MODELS`, mit eigenem
      Systemprompt je Angebot und je einer anderen Vorgabe für Ton oder Aufbau, damit drei
      verschiedene Texte entstehen. Die Angaben gehen als Daten in den Prompt, nie als Anweisung,
-     keine Werkzeuge. Die Kosten gehen nicht über das Ledger (es gibt kein Wallet), sondern nach
+     keine Werkzeuge. **Jede Lieferanfrage trägt `provider: { zdr: true }`** (`recht`, HAN-45,
+     Bedingung A): damit gehen die Angaben nur an Endpunkte ohne Speicherung, heute für beide Modelle
+     nur Azure (`/api/v1/endpoints/zdr`, öffentlich, 29.09. 21:33 UTC: `Azure | openai/gpt-5.2-20251211`
+     und `Azure | openai/gpt-5-mini-2025-08-07`). `src/inference/openrouter.ts` bekommt dafür eine
+     Option nur für die Lieferung; der Proxy unter `/v1/chat/completions` bleibt, wie er ist. Als
+     erster Schritt des Baus eine einzelne echte Anfrage mit `zdr: true` an jedes Modell, weil nur
+     die Liste gelesen ist und keine Anfrage gelaufen. **Die E-Mail-Adresse steht nie im Prompt**
+     (Bedingung B), nur die Felder aus `order_briefs.brief`. Die Kosten gehen nicht über das Ledger (es gibt kein Wallet), sondern nach
      `deliveries.cost_mc`;
    - prüft jede Fassung: nicht leer, nicht gleich einer anderen, bei der Rede innerhalb der
      gewählten Länge (130 Wörter je Minute, plus minus 30 Prozent). Eine Fassung, die durchfällt,
-     wird einmal neu geschrieben. **Weniger als drei gehen nie raus;** dann `failed` mit Code, und
-     der nächste Lauf versucht es wieder;
+     wird einmal neu geschrieben. **Weniger als drei gehen nie raus;** dann steigt `attempts`, die
+     Zeile bleibt offen, und bei 5 Versuchen wird sie `failed` mit `attempts_exhausted`;
    - **speichert die drei Fassungen vor dem Versand** in `deliveries.body`, Status `written`. Ab
      dann wird nie neu geschrieben: jeder weitere Lauf verschickt genau diesen gespeicherten Text
      (HAN-42, Auflage 6). Resend hält einen Idempotenzschlüssel 24 Stunden und antwortet auf
@@ -189,7 +202,16 @@ VM, derselbe Takt in src/index.ts, danach:
    - ein Modell antwortet dauerhaft mit 5xx, die anderen beiden liefern: die zwei Fassungen werden
      einmal bezahlt und gespeichert, nicht wieder; bei Erreichen von `DELIVERY_COST_CAP_MC` wird die
      Zeile `failed` mit `cost_cap`;
-   - ein 402 von OpenRouter zählt als Versuch, ein 429 nicht;
+   - ein 402 von OpenRouter zählt als Versuch, ein 429 nicht; ebenso zählen ein 400 über
+     `ProviderBadRequestError` (`openrouter.ts:218`) und ein Fehler im Body einer 200 über
+     `error.code` (`openrouter.ts:240`), je mit eigenem Test (HAN-51, Auflage 17);
+   - nach `stale_written`, `cost_cap` und `attempts_exhausted` ruft ein weiterer Lauf weder den
+     Inferenz-Provider noch den Versanddienst auf. Der Test lässt dafür die echte Kette laufen,
+     setzt `written_at` durch den Lauf selbst und stellt nur die Uhr vor, statt eine fertige Zeile
+     zu pflanzen (Auflage 16);
+   - jede Lieferanfrage an den gestellten OpenRouter trägt `provider.zdr = true`, eine Anfrage über
+     den Proxy trägt es nicht; kein Prompt enthält die E-Mail-Adresse der Bestellung, geprüft mit
+     einer unverwechselbaren Adresse im Test (Auflage 15);
    - ein 429 oder Timeout von OpenRouter, sechsmal hintereinander: `attempts` bleibt 0, die Zeile
      wird beim siebten Lauf geliefert;
    - `stripe_test` an `x@example.com`, an `andere@postyourprice.com`, an eine fremde Adresse: keine
