@@ -78,6 +78,31 @@ if [[ "${1:-}" == "--selftest" ]]; then
     echo "  FAILED  fehlender Katalog gab Exit $code und $n offene Zahlen, erwartet 1 und 1"; fail=1
   fi
 
+  # Die Katalogpruefung selbst, in beide Richtungen. Sie hat bis zum 29.09.2026 einen Preis von
+  # 11,50 EUR als "kein Katalog" gezaehlt, obwohl er ueber dem Break-even von 11,13 liegt.
+  preis_test() {
+    printf '%s' "$1" | python3 -c '
+import re, sys
+text = sys.stdin.read()
+treffer = re.findall(r"(\d{1,3}(?:\.\d{3})*|\d+)(?:,(\d{1,2}))?\s*(?:EUR|€)", text)
+for ganz, rest in treffer:
+    betrag = float(ganz.replace(".", "")) + (float(rest or 0) / (100 if len(rest or "") == 2 else 10))
+    if betrag > 11.13:
+        print(1); break
+else:
+    print(0)
+'
+  }
+  for fall in "11,50 EUR:1" "149 EUR:1" "1.299,00 EUR:1" "9,99 EUR:0" "11,00 EUR:0" "nichts:0"; do
+    text="${fall%%:*}"; soll="${fall##*:}"
+    ist=$(preis_test "Eine Seite im Internet, $text")
+    if [[ "$ist" == "$soll" ]]; then
+      echo "  ok      Katalogpreis '$text' zaehlt als $soll"
+    else
+      echo "  FAILED  Katalogpreis '$text' gab $ist, erwartet $soll"; fail=1
+    fi
+  done
+
   out=$(printf 'kein json\n' | python3 ./ops/ziele.py); code=$?
   if (( code == 2 )); then
     echo "  ok      unlesbare Eingabe ist unentschieden, nicht erreicht"
@@ -101,20 +126,67 @@ fi
 # Der Katalog zaehlt erst, wenn er auch einen Preis ueber elf Euro nennt: eine Seite mit Ueberschrift
 # und ohne Preis ist kein Katalog, und die Untergrenze ist gemessen (ops/anzeigen-rechnung.py,
 # Break-even 11,13 EUR unter Selbstlieferung).
+# Die Untergrenze ist 11,13 EUR und nicht 12. Die alte Regex verlangte zwei Stellen ab 12 und
+# haette einen Katalog mit 11,50 EUR als "kein Katalog" gezaehlt, obwohl er ueber dem Break-even
+# liegt. Gefunden vom Stabschef der Org am 29.09.2026 beim Lesen des eigenen Messwerkzeugs.
+# Deshalb wird der Betrag jetzt gelesen und verglichen statt gemustert.
 katalog_html=$(curl -s -m 20 "$BASE/katalog")
 katalog=0
-if [[ -n "$katalog_html" ]] && grep -qE '(^|[^0-9])(1[2-9]|[2-9][0-9]|[0-9]{3,})[ ,.]?[0-9]{0,2} ?(EUR|€)' <<< "$katalog_html"; then
-  katalog=1
+if [[ -n "$katalog_html" ]]; then
+  katalog=$(printf '%s' "$katalog_html" | python3 -c '
+import re, sys
+text = sys.stdin.read()
+# Preise wie "149 EUR", "11,50 €", "1.299,00 EUR". Punkt ist Tausender, Komma ist Dezimal.
+treffer = re.findall(r"(\d{1,3}(?:\.\d{3})*|\d+)(?:,(\d{1,2}))?\s*(?:EUR|€)", text)
+for ganz, rest in treffer:
+    betrag = float(ganz.replace(".", "")) + (float(rest or 0) / (100 if len(rest or "") == 2 else 10))
+    if betrag > 11.13:
+        print(1); break
+else:
+    print(0)
+')
 fi
-# Ein Gespraech, das eine Bestellung erzeugt: der Endpunkt muss existieren und ohne Anliegen
-# widersprechen, statt 404 zu sagen.
-chat_code=$(curl -s -m 20 -o /dev/null -w '%{http_code}' -X POST "$BASE/v1/orders/chat" \
-  -H 'content-type: application/json' -d '{}')
-chat=0; [[ "$chat_code" =~ ^(400|401|422)$ ]] && chat=1
-# Bezahlen ohne Wallet.
-karte_code=$(curl -s -m 20 -o /dev/null -w '%{http_code}' -X POST "$BASE/v1/orders/checkout" \
-  -H 'content-type: application/json' -d '{}')
-karte=0; [[ "$karte_code" =~ ^(400|401|422)$ ]] && karte=1
+# Ein Gespraech und ein Bezahlweg, und beide muessen mehr koennen als antworten.
+#
+# Bis zum 29.09.2026 galt das Ziel als erfuellt, sobald der Endpunkt auf ein leeres Objekt mit 400,
+# 401 oder 422 antwortete. Ein leerer Stub haette den 02.10. gruen gemacht, ohne dass ein Mensch
+# irgendetwas kaufen kann. Der Stabschef der Org hat das beim Lesen gefunden: der Probe misst
+# "Route existiert", nicht "Bezahlweg ohne Wallet".
+#
+# Jetzt wird die Sache selbst geprueft. Das Gespraech muss auf ein echtes Anliegen antworten und
+# etwas zurueckgeben, das eine Bestellung werden kann. Der Bezahlweg muss auf eine echte Bestellung
+# eine Zahladresse liefern, und er darf dafuer keine Wallet-Adresse verlangen: genau das ist die
+# Mauer, die ein Mensch heute nicht ueberwindet.
+chat=$(curl -s -m 25 -X POST "$BASE/v1/orders/chat" -H 'content-type: application/json' \
+  -d '{"message":"Ich gebe Klavierunterricht in Hamburg und moechte eine einfache Seite im Internet."}' \
+  | python3 -c '
+import json, sys
+try:
+    d = json.load(sys.stdin)
+except Exception:
+    print(0); raise SystemExit
+# Eine Antwort, die weiterfuehrt: sie sagt etwas und fragt nach oder nennt einen Preis.
+text = json.dumps(d).lower()
+weiter = any(k in d for k in ("reply", "question", "order", "draft", "brief", "price_cents"))
+print(1 if weiter and len(text) > 80 else 0)
+' 2>/dev/null)
+chat=${chat:-0}
+
+karte=$(curl -s -m 25 -X POST "$BASE/v1/orders/checkout" -H 'content-type: application/json' \
+  -d '{"item":"website-eine-seite","email":"pruefung@postyourprice.com"}' \
+  | python3 -c '
+import json, sys
+try:
+    d = json.load(sys.stdin)
+except Exception:
+    print(0); raise SystemExit
+text = json.dumps(d).lower()
+# Ein Weg zur Kasse, und ausdruecklich keiner, der eine Wallet verlangt.
+hat_weg = any(k in d for k in ("redirect", "checkout_url", "url", "client_secret", "reference"))
+braucht_wallet = any(w in text for w in ("wallet", "usdc", "address_required", "x402"))
+print(1 if hat_weg and not braucht_wallet else 0)
+' 2>/dev/null)
+karte=${karte:-0}
 
 printf '%s\n%s\n' "$status" "$report" \
   | CP_ZIELE_KATALOG="$katalog" CP_ZIELE_CHAT="$chat" CP_ZIELE_KARTE="$karte" python3 ./ops/ziele.py
