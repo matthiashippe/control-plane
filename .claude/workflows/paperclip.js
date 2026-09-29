@@ -17,6 +17,15 @@ export const meta = {
 // Gebaut wird hier nichts. Das Skript liefert die Entscheidung samt Begruendung zurueck, und der
 // Bau laeuft danach im Hauptlauf mit WIP = 1.
 
+// Die Rollen stehen in .claude/agents/org-*.md und werden von dort gelesen, nicht hier noch einmal
+// beschrieben. `agentType` waere der kuerzere Weg, funktioniert aber nur in einer Session, die
+// beim Start schon wusste, dass es diese Agenten gibt: der erste Durchlauf am 29.09.2026 ist genau
+// daran gescheitert, eine Minute nachdem die Dateien geschrieben waren. Ein Agent kann seine
+// eigene Rolle lesen, also liest er sie.
+const rolle = (datei) =>
+  `Lies zuerst ORG.md und .claude/agents/${datei}.md in /Users/matthiashippe/GIT/control-plane. ` +
+  `Du bist diese Rolle und haeltst dich an ihre Regeln und ihre Ausgabeform. `
+
 const GLIED_SCHEMA = {
   type: 'object',
   properties: {
@@ -67,11 +76,12 @@ const URTEIL_SCHEMA = {
 
 phase('Messen')
 const lage = await agent(
-  'Du bist org-messer aus ORG.md. Miss die eine Zahl und ihre drei Glieder gegen die Produktion: ' +
+  rolle('org-messer') +
+    'Miss die eine Zahl und ihre drei Glieder gegen die Produktion: ' +
     'ops/ziele.sh, ops/sperren.sh, ops/org.sh, und bei Bedarf ops/db-report.cjs auf der VM. ' +
     'Lies keine Zahl aus ZIELE.md, ROADMAP.md oder STATE.md. Nenne zu jeder Zahl Fenster, Quelle ' +
     'und Einheit. Sag am Ende, welches Glied das schwaechste ist und warum.',
-  { label: 'messen', phase: 'Messen', schema: GLIED_SCHEMA, agentType: 'org-messer' },
+  { label: 'messen', phase: 'Messen', schema: GLIED_SCHEMA },
 )
 
 const ROLLEN = [
@@ -87,24 +97,26 @@ const geprueft = await pipeline(
   ROLLEN,
   (r) =>
     agent(
-      `Du bist ${r.agent} aus ORG.md. Das schwaechste Glied ist gerade ${lage.schwaechstes_glied}: ` +
+      rolle(r.agent) +
+        `Das schwaechste Glied ist gerade ${lage.schwaechstes_glied}: ` +
         `${lage.warum}. Die Zahl steht bei ${lage.zahl}. Gemessene Lage: ${lage.fenster}. ` +
         `Nenne drei ${r.was}. Jeder Vorschlag mit erwarteter Wirkung auf fiverr_orders_30d, Kosten, ` +
         'Frist bis zur ersten Messung und der Messung, die ihn widerlegt. Keine Zahl ohne Quelle.',
-      { label: `vorschlag:${r.key}`, phase: 'Vorschlagen', schema: VORSCHLAG_SCHEMA, agentType: r.agent },
+      { label: `vorschlag:${r.key}`, phase: 'Vorschlagen', schema: VORSCHLAG_SCHEMA },
     ),
   (satz, r) =>
     parallel(
       (satz?.vorschlaege ?? []).map((v) => () =>
         agent(
-          `Du bist org-skeptiker aus ORG.md. Widerlege diesen Vorschlag von ${r.agent}:\n\n` +
+          rolle('org-skeptiker') +
+            `Widerlege diesen Vorschlag von ${r.agent}:\n\n` +
             `Titel: ${v.titel}\nWas: ${v.was}\nWarum jetzt: ${v.warum_jetzt}\n` +
             `Erwartete Wirkung: ${v.erwartete_wirkung}\nKosten: ${v.kosten}\n` +
             `Widerlegt durch: ${v.widerlegt_durch}\n\n` +
             'Rechne jede Zahl selbst nach, gegen die Produktion. Pruefe Einheit, Fenster und ' +
             'Waehrung. Pruefe, ob die Wirkung nur eintritt, wenn eine Definition geweitet wird. ' +
             'Bei Unsicherheit lautet dein Urteil WIDERLEGT.',
-          { label: `skeptiker:${v.titel.slice(0, 28)}`, phase: 'Widerlegen', schema: URTEIL_SCHEMA, agentType: 'org-skeptiker' },
+          { label: `skeptiker:${v.titel.slice(0, 28)}`, phase: 'Widerlegen', schema: URTEIL_SCHEMA },
         ).then((u) => ({ rolle: r.key, vorschlag: v, urteil: u })),
       ),
     ),
@@ -116,14 +128,15 @@ log(`${alle.length} Vorschlaege geprueft, ${haelt.length} halten`)
 
 phase('Entscheiden')
 const entscheidung = await agent(
-  'Du bist org-produkt aus ORG.md und entscheidest, was in diesem Lauf gebaut wird. WIP = 1, also ' +
+  rolle('org-produkt') +
+    'Du entscheidest, was in diesem Lauf gebaut wird. WIP = 1, also ' +
     'genau eine Sache. Grundlage:\n\n' +
     `Schwaechstes Glied: ${lage.schwaechstes_glied} (${lage.warum})\n\n` +
     `Was gehalten hat:\n${JSON.stringify(haelt, null, 1)}\n\n` +
     `Was widerlegt wurde, mit Begruendung:\n${JSON.stringify(alle.filter((x) => x.urteil?.urteil !== 'HAELT'), null, 1)}\n\n` +
     'Waehle eine Sache nach Wirkung je Aufwand. Wenn nichts gehalten hat, sag das und nenne die ' +
     'Messung, die die naechste Runde zuerst braucht. Schreibe keinen Code, entscheide nur.',
-  { label: 'entscheiden', phase: 'Entscheiden', agentType: 'org-produkt' },
+  { label: 'entscheiden', phase: 'Entscheiden' },
 )
 
 return { lage, haelt, widerlegt: alle.filter((x) => x.urteil?.urteil !== 'HAELT'), entscheidung }
