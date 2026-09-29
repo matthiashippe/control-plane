@@ -253,6 +253,14 @@ run "the board check tells an empty board from a broken one" ./ops/board-not-emp
 # is met, and one that can only say "erreicht" is worse. Reads nothing from production.
 run "the goal report can say reached and not reached" ./ops/ziele.sh --selftest
 
+# Das Protokoll der Org gegen die Wirklichkeit, an gepflanzten Zustaenden.
+#
+# ORG.md beschreibt sieben Rollen, die auf eine Zahl hinarbeiten. Eine Org, die ihr eigenes
+# Protokoll fuehrt, schreibt sich mit der Zeit besser, als sie ist, also prueft ops/org.sh jede
+# Zeile gegen zwei Dinge ausserhalb des Protokolls: den behaupteten Commit und die gemessene Zahl.
+# Der Selbsttest stellt ihm vier Zustaende hin und verlangt vier Urteile. Ohne Netz.
+run "the org log is checked against commits and the measured number" ./ops/org.sh --selftest
+
 # Die Sperren, und ob eine davon in Wahrheit schon offen ist.
 #
 # Am 29.09. waren drei Punkte der Liste "Was auf Matthias wartet" gleichzeitig veraltet, und

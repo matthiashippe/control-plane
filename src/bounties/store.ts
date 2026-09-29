@@ -340,6 +340,10 @@ export function releaseExpired(db: Db, now = new Date()): number {
 }
 
 export interface Submission {
+  /** Welche Runde. 1 ist die erste Lieferung, jede Ueberarbeitung zaehlt hoch. */
+  round: number;
+  /** Die Fassung, die diese hier ueberarbeitet, oder null bei der ersten. */
+  revises: string | null;
   id: string;
   bounty_id: string;
   agent: string;
@@ -348,6 +352,21 @@ export interface Submission {
 }
 
 export const SUBMISSION_MAX = 50_000;
+
+/**
+ * Wie oft eine Lieferung ueberarbeitet werden darf.
+ *
+ * Matthias am 29.09. ueber das Produkt, das dieser Markt sein soll: ein Mensch traegt ein
+ * Briefing ein, bekommt fuer 100 oder 300 Euro mehrere fertige Lieferungen zur Auswahl, "und dann
+ * gibts noch agent driven 2 3 4 iterationsrunden, alle via text eingerichtet damit die agents das
+ * direkt umsetzen koennen".
+ *
+ * Vier, weil er vier gesagt hat und weil eine Grenze ueberhaupt noetig ist: ohne sie kann ein
+ * Kaeufer einen Agenten beliebig lange arbeiten lassen, und der Agent zahlt jede Runde seine
+ * eigene Inferenz, ohne dass der Preis steigt. Die Grenze schuetzt also die Seite, die liefert.
+ */
+export const MAX_ROUNDS = 4;
+export const FEEDBACK_MAX = 20_000;
 
 /**
  * Enter a bounty.
@@ -368,7 +387,10 @@ export function keylessSubsPerBountyDay(): number {
   return Number.isInteger(raw) && raw > 0 ? raw : KEYLESS_SUBS_PER_BOUNTY_DAY_DEFAULT;
 }
 
-export function submitWork(db: Db, a: { bountyId: string; agent: string; body: string }): Submission {
+export function submitWork(
+  db: Db,
+  a: { bountyId: string; agent: string; body: string; revises?: string },
+): Submission {
   const agent = a.agent.toLowerCase();
   const body = a.body.trim();
   if (!body) throw new BountyError("body_required", 400, "A submission cannot be empty.");
@@ -420,23 +442,132 @@ export function submitWork(db: Db, a: { bountyId: string; agent: string; body: s
       );
     }
   }
+  // Welche Runde das ist. Ohne `revises` ist es die erste Lieferung; mit `revises` die naechste
+  // Runde der genannten Fassung, und die muss dem Agenten gehoeren und zu diesem Auftrag.
+  let round = 1;
+  if (a.revises) {
+    const vorher = db
+      .prepare("SELECT bounty_id, agent, round FROM submissions WHERE id = ?")
+      .get(a.revises) as { bounty_id: string; agent: string; round: number } | undefined;
+    if (!vorher) throw new BountyError("not_found", 404, "No submission with that id.");
+    if (vorher.bounty_id !== a.bountyId) {
+      throw new BountyError("wrong_bounty", 409, "That submission belongs to a different bounty.");
+    }
+    if (vorher.agent !== agent) {
+      throw new BountyError("not_yours", 403, "You can only revise your own submission.");
+    }
+    // Ohne eine Rueckmeldung gibt es nichts umzusetzen, und eine Runde, die niemand angefordert
+    // hat, ist eine Runde, die der Agent umsonst bezahlt. Das ist die Regel, die ihn schuetzt.
+    const { n } = db
+      .prepare("SELECT count(*) AS n FROM feedback WHERE submission_id = ?")
+      .get(a.revises) as { n: number };
+    if (n === 0) {
+      throw new BountyError(
+        "no_feedback_yet",
+        409,
+        "Nothing to revise: the buyer has not said anything about that submission. A revision " +
+          "costs you another inference and the price does not rise, so it waits for a reason.",
+      );
+    }
+    round = vorher.round + 1;
+    if (round > MAX_ROUNDS) {
+      throw new BountyError(
+        "rounds_exhausted",
+        409,
+        `This submission has been through ${MAX_ROUNDS} rounds, which is the limit. The buyer ` +
+          "awards it or does not.",
+      );
+    }
+  }
   const s: Submission = {
     id: randomUUID(),
     bounty_id: a.bountyId,
     agent,
     body,
+    round,
+    revises: a.revises ?? null,
     created_at: new Date().toISOString(),
   };
   try {
-    db.prepare("INSERT INTO submissions (id, bounty_id, agent, body, created_at) VALUES (?, ?, ?, ?, ?)")
-      .run(s.id, s.bounty_id, s.agent, s.body, s.created_at);
+    db.prepare(
+      "INSERT INTO submissions (id, bounty_id, agent, body, created_at, round, revises) VALUES (?, ?, ?, ?, ?, ?, ?)",
+    ).run(s.id, s.bounty_id, s.agent, s.body, s.created_at, s.round, s.revises);
   } catch (e) {
     if (String((e as Error).message).includes("UNIQUE")) {
-      throw new BountyError("already_submitted", 409, "You already submitted to this bounty. One attempt per agent.");
+      throw new BountyError(
+        "already_submitted",
+        409,
+        "You already submitted to this bounty in this round. To improve it, wait for the buyer's " +
+          "feedback and send it again with `revises` set to your submission id.",
+      );
     }
     throw e;
   }
   return s;
+}
+
+export interface Feedback {
+  id: string;
+  submission_id: string;
+  author: string;
+  body: string;
+  created_at: string;
+}
+
+/**
+ * Was der Kaeufer zu einer Lieferung sagt.
+ *
+ * Nur der Kaeufer des Auftrags, und nur zu einer Lieferung auf seinem eigenen Auftrag. Ein Agent
+ * kann die Arbeit der Konkurrenz weder sehen noch kommentieren, aus demselben Grund, aus dem
+ * `submissionsFor` sie ihm nicht zeigt: wer vor der Entscheidung mitliest, schreibt ab.
+ *
+ * Nur Text, und das ist eine Produktentscheidung und keine Bequemlichkeit. Der Empfaenger ist eine
+ * Maschine, die es direkt umsetzen soll, und Text ist das Einzige, was jede Kette lesen kann.
+ */
+export function giveFeedback(db: Db, a: { submissionId: string; who: string; body: string }): Feedback {
+  const author = a.who.toLowerCase();
+  const body = a.body.trim();
+  if (!body) throw new BountyError("body_required", 400, "Feedback cannot be empty.");
+  if (body.length > FEEDBACK_MAX) {
+    throw new BountyError("body_too_long", 400, `Feedback is limited to ${FEEDBACK_MAX} characters; yours is ${body.length}.`);
+  }
+  const sub = db
+    .prepare("SELECT id, bounty_id FROM submissions WHERE id = ?")
+    .get(a.submissionId) as { id: string; bounty_id: string } | undefined;
+  if (!sub) throw new BountyError("not_found", 404, "No submission with that id.");
+  const bounty = getBounty(db, sub.bounty_id);
+  if (!bounty) throw new BountyError("not_found", 404, "No bounty for that submission.");
+  if (bounty.creator !== author) {
+    throw new BountyError("not_yours", 403, "Only the address that posted the bounty can give feedback on its submissions.");
+  }
+  if (bounty.status !== "open") {
+    throw new BountyError("not_open", 409, `This bounty is ${bounty.status}; feedback changes nothing now.`);
+  }
+  const f: Feedback = {
+    id: randomUUID(),
+    submission_id: a.submissionId,
+    author,
+    body,
+    created_at: new Date().toISOString(),
+  };
+  db.prepare("INSERT INTO feedback (id, submission_id, author, body, created_at) VALUES (?, ?, ?, ?, ?)")
+    .run(f.id, f.submission_id, f.author, f.body, f.created_at);
+  return f;
+}
+
+/** Die Rueckmeldungen zu einer Lieferung, fuer den Kaeufer und fuer den Agenten, dem sie gehoert. */
+export function feedbackFor(db: Db, submissionId: string, who: string): Feedback[] {
+  const address = who.toLowerCase();
+  const sub = db
+    .prepare("SELECT bounty_id, agent FROM submissions WHERE id = ?")
+    .get(submissionId) as { bounty_id: string; agent: string } | undefined;
+  if (!sub) return [];
+  const bounty = getBounty(db, sub.bounty_id);
+  if (!bounty) return [];
+  if (address !== bounty.creator && address !== sub.agent) return [];
+  return db
+    .prepare("SELECT * FROM feedback WHERE submission_id = ? ORDER BY created_at")
+    .all(submissionId) as Feedback[];
 }
 
 /**

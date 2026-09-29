@@ -26,6 +26,10 @@ goals erreichen."*
 ops/ziele.sh
 ```
 
+```
+ops/org.sh
+```
+
 Es misst jede der sechs Zielzahlen und jedes Teilziel gegen die Produktion, nicht gegen `ZIELE.md`.
 Das ist der Unterschied, der zählt: Prosa mit Häkchen kann nicht rot werden, und am 29.09. stand in
 `ZIELE.md` noch, ein Händlerkonto sei "die einzige offene Tür in den x402-Katalog", zwei Tage
@@ -37,6 +41,13 @@ Loop ist fertig, und erst dann darf er aufhören. `--selftest` ist die Gegenprob
 
 Was in diesem Lauf gebaut wird, zeigt danach auf **eine** dieser Zahlen. Zeigt es auf keine, ist es
 Reparatur, und Reparatur geht nur vor, wenn ein echter Nutzer gegen die Wand gelaufen ist.
+
+`ops/org.sh` prüft dazu das Protokoll der Org (`org-log.tsv`) gegen die Commits im Repo und gegen
+die gemessene Zahl. **`ORG.md`** sagt, wer in diesem Loop welche Rolle hat, welche Wege zur Zahl
+gesperrt sind und in welcher Reihenfolge ein Durchlauf abläuft. Die Rollen liegen als Agenten in
+`.claude/agents/org-*.md` und sind einzeln aufrufbar; ein ganzer Durchlauf läuft über
+`.claude/workflows/paperclip.js`. Jeder Lauf, der etwas gebaut oder entschieden hat, schreibt am
+Ende eine Zeile nach `org-log.tsv`: Datum, Glied, Rolle, was, Commit, Zahl danach.
 
 **1. Hinsehen, bevor du etwas baust.** Jeder Lauf beginnt mit Beobachtung, nicht mit dem Backlog:
 

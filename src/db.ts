@@ -161,6 +161,28 @@ function migrate(db: Db): void {
     );
     CREATE UNIQUE INDEX IF NOT EXISTS submissions_once ON submissions(bounty_id, agent);
     CREATE INDEX IF NOT EXISTS submissions_bounty ON submissions(bounty_id, id);
+
+    -- Was der Kaeufer zu einer Lieferung sagt, damit sie ueberarbeitet werden kann.
+    --
+    -- Matthias am 29.09.: "meine mutter moechte eine website haben, wuerde ihr briefing da
+    -- eintragen und bekommt dann eine website geliefert fuer 100 oder 300 euro, kann aus allen
+    -- lieferungen aussuchen, und dann gibts noch agent driven 2 3 4 iterationsrunden, alle via
+    -- text eingerichtet damit die agents das direkt umsetzen koennen."
+    --
+    -- Bis dahin war eine Lieferung endgueltig: submissions_once liess je Agent und Auftrag
+    -- genau eine zu, und es gab keinen Weg, etwas dazu zu sagen. Ein Kaeufer konnte nur annehmen
+    -- oder nichts tun. Fuer einen Text von 45 Cent ging das; fuer eine Website von 300 Euro ist
+    -- eine Runde Rueckmeldung der ganze Unterschied zwischen brauchbar und weggeworfen.
+    --
+    -- Nur Text, ausdruecklich. Der Empfaenger ist eine Maschine, die es direkt umsetzen soll.
+    CREATE TABLE IF NOT EXISTS feedback (
+      id            TEXT PRIMARY KEY,
+      submission_id TEXT NOT NULL REFERENCES submissions(id),
+      author        TEXT NOT NULL REFERENCES wallets(address),
+      body          TEXT NOT NULL,
+      created_at    TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS feedback_submission ON feedback(submission_id, id);
   `);
 
   // Existing databases do not know reserved_mc yet. SQLite has no "ADD COLUMN IF NOT EXISTS", so
@@ -191,6 +213,19 @@ function migrate(db: Db): void {
   // been anything else since the table exists (src/bounties/store.ts, FEE_PERCENT = 10 since
   // 2026-09-20). Backfilling them with today's constant instead would rewrite history the moment
   // the constant moves, which is the same bug one layer down.
+  // Runden. Eine Ueberarbeitung ist eine neue Zeile, die auf die alte zeigt, und nicht ein
+  // Ueberschreiben: der Kaeufer soll sehen koennen, was sich geaendert hat, und die Rueckmeldung
+  // haengt an der Fassung, auf die sie sich bezieht.
+  const subColumns = db.prepare("PRAGMA table_info(submissions)").all() as { name: string }[];
+  if (subColumns.length > 0 && !subColumns.some((c) => c.name === "round")) {
+    db.exec("ALTER TABLE submissions ADD COLUMN round INTEGER NOT NULL DEFAULT 1");
+    db.exec("ALTER TABLE submissions ADD COLUMN revises TEXT");
+    // Der alte Index liess eine Zeile je Agent und Auftrag zu und ist damit genau die Sperre
+    // gegen Runden. Der neue laesst eine je Runde zu, was dieselbe Zusage fuer jede Runde ist.
+    db.exec("DROP INDEX IF EXISTS submissions_once");
+    db.exec("CREATE UNIQUE INDEX IF NOT EXISTS submissions_once_per_round ON submissions(bounty_id, agent, round)");
+  }
+
   if (bountyColumns.length > 0 && !bountyColumns.some((c) => c.name === "fee_percent")) {
     db.exec("ALTER TABLE bounties ADD COLUMN fee_percent INTEGER NOT NULL DEFAULT 10");
   }

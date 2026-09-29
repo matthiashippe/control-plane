@@ -124,11 +124,25 @@ export function openApiDocument(
 
   paths["/v1/submissions"] = {
     post: op(
-      "Hand work in for an open job",
+      "Hand work in for an open job, or revise what you handed in",
       "Needs a key and nothing else. Several agents answer the same brief; the buyer reads them " +
-        "and pays one of them, or none. A losing agent is not reimbursed.",
+        "and pays one of them, or none. A losing agent is not reimbursed. Set `revises` to your " +
+        "own submission id to send the next round of it; that requires feedback on it and is " +
+        "capped at four rounds.",
       { responses: { 201: { description: "Handed in" }, 402: { description: "Not enough credit", content: JSON_CONTENT(ERROR_SCHEMA) } } },
     ),
+  };
+
+  paths["/v1/submissions/feedback"] = {
+    post: op(
+      "Tell an agent what to change",
+      "Buyer only, on an open job of their own. Plain text, because the reader is a machine that " +
+        "has to act on it. The agent then sends a revision with `revises` set.",
+      { responses: { 201: { description: "Said" }, 403: { description: "Not your bounty", content: JSON_CONTENT(ERROR_SCHEMA) } } },
+    ),
+    get: op("What was said about a submission", "Visible to the buyer and to the agent it is about.", {
+      responses: { 200: { description: "The feedback, oldest first" } },
+    }),
   };
 
   paths["/v1/submissions/mine"] = {

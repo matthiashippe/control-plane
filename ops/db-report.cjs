@@ -518,6 +518,17 @@ report.market = {
        where b.status='awarded' and b.closed_at > datetime('now','-30 day')
          and (julianday(b.closed_at) - julianday(b.created_at)) * 24 * 60 <= 60`,
   ).n,
+  // Das Angebots-Glied der Org (ORG.md): hat ueberhaupt je ein fremder Agent geliefert.
+  //
+  // Absichtlich ohne Bedingung an den Auftraggeber: eine Lieferung von aussen auf einen unserer
+  // eigenen Auftraege ist trotzdem eine Lieferung von aussen, und genau die hat es in dreissig
+  // Tagen noch nie gegeben. Die strengere Zahl, die zwei fremde Lieferungen auf einem fremden
+  // Auftrag verlangt, steht drei Zeilen weiter oben.
+  foreign_submissions_30d: one(
+    `select count(*) n from submissions s
+       where s.created_at > datetime('now','-30 day') and ${notOursOn("s.agent")}`,
+    ...OURS_ARGS,
+  ).n,
   foreign_gmv_30d_mc: one(
     `select coalesce(sum(b.price_mc),0) s from bounties b
        where b.status='awarded' and b.closed_at > datetime('now','-30 day')

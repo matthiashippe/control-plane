@@ -41,6 +41,9 @@ import {
   openBountyCount,
   releaseExpired,
   submitWork,
+  giveFeedback,
+  feedbackFor,
+  MAX_ROUNDS,
   submissionsFor,
   awardBounty,
   myBounties,
@@ -150,7 +153,7 @@ const INFERENCE_UNAVAILABLE = {
 // their 405 from the two middlewares above, which carry a message about their own path.
 export const V1_KEYLESS = new Set(["/v1/status", "/v1/models", "/v1/auth/keyless"]);
 
-const V1_ROUTES = new Set([
+export const V1_ROUTES = new Set([
   "/v1/auth/api-keys",
   // Without this line the auth middleware waves the revoke through, `c.get("address")` is
   // undefined and the UPDATE scoped to it silently matches nothing. No key would ever be revoked
@@ -166,6 +169,7 @@ const V1_ROUTES = new Set([
   "/v1/bounties/mine",
   "/v1/submissions/mine",
   "/v1/submissions",
+  "/v1/submissions/feedback",
   "/v1/chat/completions",
   "/v1/check",
   "/v1/credits/balance",
@@ -2527,12 +2531,92 @@ export function createApp(opts: AppOptions) {
         bountyId: b.bounty_id,
         agent: c.get("address"),
         body: typeof b.body === "string" ? b.body : "",
+        // Eine Ueberarbeitung statt einer neuen Lieferung. Siehe submitWork(): nur die eigene
+        // Fassung, nur auf demselben Auftrag, nur nachdem der Kaeufer etwas gesagt hat.
+        ...(typeof b.revises === "string" && b.revises ? { revises: b.revises } : {}),
       });
-      return c.json({ id: s.id, bounty_id: s.bounty_id, created_at: s.created_at }, 201);
+      return c.json({ id: s.id, bounty_id: s.bounty_id, round: s.round, revises: s.revises, created_at: s.created_at }, 201);
     } catch (e) {
       if (e instanceof BountyError) return c.json({ error: e.code, message: e.hint, docs: DOC.payments }, e.status as 400);
       throw e;
     }
+  });
+
+  /**
+   * Was der Kaeufer zu einer Lieferung sagt, damit sie ueberarbeitet werden kann.
+   *
+   * Der eine Schritt, der aus einer Lieferung ein Ergebnis macht. Bis zum 29.09.2026 war eine
+   * Lieferung endgueltig: der Kaeufer konnte annehmen oder schweigen, und der Agent konnte nichts
+   * nachbessern, weil ein eindeutiger Index je Auftrag und Agent genau eine Zeile zuliess. Fuer
+   * eine Website, eine Anzeige oder einen Text ist die erste Fassung aber nie die letzte.
+   *
+   * Nur Text, ausdruecklich, weil der Empfaenger eine Maschine ist, die es umsetzen soll.
+   *
+   * Die Lieferung steht im Body und nicht im Pfad, aus demselben Grund wie bei cancel und award:
+   * die Auth-Middleware vergleicht mit `has()` gegen V1_ROUTES, und ein Pfad mit variablem Segment
+   * steht deshalb ohne Schluessel offen. Beim ersten Bau dieser Route stand hier
+   * `/v1/submissions/:id/feedback`, der Handler lief ohne Adresse und antwortete 500. Der Test in
+   * test/v1-ohne-variables-segment.test.ts haelt das fest, damit es nicht ein drittes Mal passiert.
+   */
+  app.post("/v1/submissions/feedback", async (c) => {
+    releaseExpired(db);
+    const raw = await c.req.json().catch(() => null);
+    const b = (typeof raw === "object" && raw !== null ? raw : {}) as Record<string, unknown>;
+    if (typeof b.submission_id !== "string" || !b.submission_id) {
+      return c.json(
+        {
+          error: "submission_id_required",
+          message: "Pass the id of the submission you are commenting on as `submission_id`.",
+          docs: DOC.payments,
+        },
+        400,
+      );
+    }
+    try {
+      const f = giveFeedback(db, {
+        submissionId: b.submission_id,
+        who: c.get("address"),
+        body: typeof b.body === "string" ? b.body : "",
+      });
+      return c.json(
+        {
+          id: f.id,
+          submission_id: f.submission_id,
+          created_at: f.created_at,
+          message:
+            "The agent can now send a revision. Their next submission carries `revises` set to " +
+            "this submission id, and counts as the next round.",
+        },
+        201,
+      );
+    } catch (e) {
+      if (e instanceof BountyError) return c.json({ error: e.code, message: e.hint, docs: DOC.payments }, e.status as 400);
+      throw e;
+    }
+  });
+
+  /** Die Rueckmeldungen zu einer Lieferung: fuer den Kaeufer, und fuer den Agenten, dem sie gehoert. */
+  app.get("/v1/submissions/feedback", (c) => {
+    const id = c.req.query("submission_id");
+    if (!id) {
+      return c.json(
+        { error: "submission_id_required", message: "Pass ?submission_id=...", docs: DOC.payments },
+        400,
+      );
+    }
+    const list = feedbackFor(db, id, c.get("address"));
+    return c.json({
+      submission_id: id,
+      feedback: list.map((f) => ({ id: f.id, body: f.body, created_at: f.created_at })),
+      max_rounds: MAX_ROUNDS,
+      hint:
+        list.length > 0
+          ? "To act on this, POST /v1/submissions again with the same bounty_id and `revises` set " +
+            "to this submission id."
+          : "Nothing said yet. A revision without feedback is refused, because it would cost you " +
+            "an inference for no reason.",
+      docs: DOC.payments,
+    });
   });
 
   app.get("/v1/submissions", (c) => {
@@ -2543,7 +2627,19 @@ export function createApp(opts: AppOptions) {
       const list = submissionsFor(db, id, c.get("address"));
       return c.json({
         bounty_id: id,
-        submissions: list.map((s) => ({ id: s.id, agent: s.agent, body: s.body, created_at: s.created_at })),
+        submissions: list.map((s) => ({
+          id: s.id,
+          agent: s.agent,
+          body: s.body,
+          round: s.round,
+          revises: s.revises,
+          created_at: s.created_at,
+        })),
+        max_rounds: MAX_ROUNDS,
+        hint:
+          "To ask for a change instead of awarding: POST /v1/submissions/feedback with " +
+          "`submission_id` and a plain-text `body`. The agent reads it and sends a revision. " +
+          `Up to ${MAX_ROUNDS} rounds per submission.`,
       });
     } catch (e) {
       if (e instanceof BountyError) return c.json({ error: e.code, message: e.hint, docs: DOC.payments }, e.status as 400);

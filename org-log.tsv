@@ -1,0 +1,4 @@
+# Das Protokoll der Org. Eine Zeile je Lauf, der etwas gebaut oder entschieden hat.
+# Spalten: datum	glied	rolle	was	commit	zahl_danach
+# Geprueft von ops/org.sh gegen die Commits im Repo und gegen die gemessene Zahl.
+# "-" in commit heisst: dieser Lauf hat nichts committet.
