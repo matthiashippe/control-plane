@@ -183,9 +183,11 @@ VM, derselbe Takt in src/index.ts, danach:
    - `ops/ziele.sh` meldet rot, wenn `paid_not_delivered_over_24h` größer 0 ist, und "kein Messweg"
      statt grün, wenn der Nenner `paid_with_brief` 0 ist. Für `human` ist das heute so.
 
-6. **`/datenschutz`**: nennt OpenRouter und die Modellanbieter, an die die Angaben gehen, und den
-   Versanddienst. Text von `recht` (CFO), neu, weil der Text an HAN-43 für Anthropic direkt
-   geschrieben ist. Pflicht vor dem Live-Schlüssel (HAN-31), nicht vor der Vorführung, weil die nur
+6. **`/datenschutz`**: die zwei Abschnitte "Wer Ihren Text schreibt" (OpenRouter, Microsoft,
+   OpenAI) und "Wie Ihr Text zu Ihnen kommt" (Resend) aus dem Dokument `recht` an HAN-45, wörtlich,
+   dazu der Satz zu den Fassungen unter "Wie lange". Der erste Abschnitt stimmt nur mit `zdr: true`
+   und nur für die heutige Modellliste; ändert sich `CP_OPENROUTER_MODELS`, schreibt `recht` ihn
+   vorher neu. Pflicht vor dem Live-Schlüssel (HAN-31), nicht vor der Vorführung, weil die nur
    unsere eigene Adresse beliefert.
 
 7. **Tests**, gegen einen gestellten Inferenz-Provider (`src/inference/mock.ts`) und einen
@@ -238,6 +240,10 @@ VM, derselbe Takt in src/index.ts, danach:
    Handbewegung wie beim Stripe-Schlüssel.
 4. Cloudflare Email Routing für `vorfuehrung@postyourprice.com` auf ein Postfach, das er liest.
    Ohne das kommt die Vorführung nirgends an.
+
+5. Vor dem Live-Schlüssel, nicht vor der Vorführung: im OpenRouter-Konto nachsehen, dass "Private
+   Input & Output Logging" und "OpenRouter Use of Inputs/Outputs" aus sind (`recht`, HAN-45,
+   Bedingung C). Ist der zweite an, stimmt der Satz in `/datenschutz` nicht.
 
 Keine Frage zum Abo und keine Ausnahme von der Standing Rule. Die Nachricht sagt ihm in einem Satz,
 als Mitteilung und nicht als Frage, dass die Lieferung über den OpenRouter-Schlüssel des Dienstes
