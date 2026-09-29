@@ -1,16 +1,18 @@
 # GOAL.md
 
 ## Status
-VORSCHLAG (HAN-30, 29.09.2026). Wird vor dem Bau vom Skeptiker widerlegt. Gebaut wird erst, was
-danach uebrig ist.
+ZUM BAU FREIGEGEBEN mit den zehn Auflagen des Skeptikers (HAN-38, 29.09.2026), eingearbeitet
+unten. Punkt 4 in der ersten Fassung ("ein Live-Schluessel allein schaltet ein") ist widerlegt und
+ersetzt durch einen eigenen Schalter `CP_CHECKOUT_LIVE=1`.
 
 ## Active Objective
 
 **Goal 22: Jede in Stripe bezahlte Session steht in `checkouts` als bezahlt, auch wenn der Kaeufer
-nicht auf `/katalog/danke` zurueckkommt. Danach nimmt der Code einen Live-Schluessel an.**
+nicht auf `/katalog/danke` zurueckkommt. Live geht der Weg nur mit Live-Schluessel und
+`CP_CHECKOUT_LIVE=1`, beides in `deploy/.env`.**
 
 Nennt ausdruecklich **`src/payments/stripe.ts`**, weil dort `expires_at` in den Body der Session
-kommt. Sonst nichts unter `src/payments/**`, und `src/auth/**` bleibt zu.
+kommt und `call()` ein Timeout bekommt. Sonst nichts unter `src/payments/**`, und `src/auth/**` bleibt zu.
 
 Auftrag: HAN-30 (CEO, Entscheidung aus HAN-22). Glied: **Bezahlen**. Frist: ausgerollt bis
 05.10.2026, 18:00 UTC. Den Live-Schluessel setzt Matthias in `deploy/.env` (gesperrter Pfad), der
@@ -40,50 +42,57 @@ Buchung wartet. Ein Webhook kann spaeter dazukommen; der Abgleich bleibt dann da
 
 ### Die Arbeit, in dieser Reihenfolge
 
-1. **`reconcileCheckouts(db, provider, now)`** in `src/checkout/index.ts`. Liest alle Zeilen mit
-   `status = 'pending'`, `provider = provider.name` und `created_at` aelter als zwei Minuten und
-   juenger als 48 Stunden, hoechstens 100 je Lauf, aelteste zuerst. Fuer jede ruft es
-   `settleCheckout(db, provider, { session_id: reference })` und faengt jeden `CheckoutError` einzeln
-   ab, damit eine kaputte Zeile die anderen nicht aufhaelt. Rueckgabe: je eine Zahl fuer `paid`,
-   `abandoned`, `open`, `error`. Eine Logzeile je Lauf mit genau diesen vier Zahlen, keine Referenz,
-   keine E-Mail. Laeuft nicht, wenn `checkoutEnabled()` falsch ist oder kein Provider da ist.
+1. **`reconcileCheckouts(db, provider, now)`** in `src/checkout/index.ts`. Liest Zeilen mit
+   `status = 'pending'`, `provider = provider.name` und `created_at` aelter als zwei Minuten,
+   **ohne Obergrenze beim Alter** (Auflage 3), hoechstens 100 je Lauf, aelteste zuerst. Fuer jede ruft
+   es `settleCheckout(db, provider, { session_id: reference })` und faengt **jeden** Fehler einzeln
+   ab, nicht nur `CheckoutError` (Auflage 6). Rueckgabe und eine Logzeile je Lauf mit fuenf Zahlen:
+   `paid`, `abandoned`, `open`, `error`, `skipped` (Zeilen, die wegen der Kappe nicht gefragt wurden,
+   Auflage 4). Keine Referenz, keine E-Mail im Log. Laeuft nicht, wenn `checkoutEnabled()` falsch ist
+   oder kein Provider da ist, und startet nicht, solange der vorige Lauf noch laeuft (Auflage 5).
 2. **`src/index.ts`**: einmal beim Start, danach alle fuenf Minuten, neben `cleanup`, mit
    `.unref()`. Ein Fehler im Lauf landet im Log und beendet den Prozess nicht.
-3. **`src/payments/stripe.ts`**: `begin` setzt `expires_at` auf jetzt plus 60 Minuten. Damit ist
-   eine abgebrochene Session nach spaetestens 65 Minuten `abandoned` statt nach 24 Stunden. Test
-   gegen gestelltes `fetch`: `expires_at` steht im Body, liegt zwischen 30 Minuten und 24 Stunden
-   (Stripes Grenzen) und in keiner URL.
-4. **Der Live-Schalter.** `checkoutEnabled()` nimmt zusaetzlich `isStripeLiveKey`. Damit ist ein
-   Live-Schluessel allein genug, und das ist Absicht: den Schluessel setzt Matthias, und genau das
-   ist der Schalter. Die Zeile heisst dann `stripe`, nicht `stripe_test` (`stripeProviderName`, gibt
-   es schon), und die Testmodus-Zeile auf Katalog, Bestellseite und Danke-Seite verschwindet.
-   **Der Test `stays off with a live key alone` wird ersetzt, nicht gelockert:** HAN-17 hat ihn
-   geschrieben mit dem Satz "Live needs a switch of its own, set by a later goal". Dies ist dieses
-   Goal. Der neue Test haelt beide Richtungen: `sk_live_`/`rk_live_` schaltet ein und benennt die
-   Zeile `stripe`; kein Schluessel, `pk_live_`, `sk_liv_x` und ein leerer String schalten nicht
-   ein. Das steht so im Commit.
+3. **`src/payments/stripe.ts`**: `begin` setzt `expires_at` auf jetzt plus 60 Minuten, damit eine
+   abgebrochene Session nach spaetestens 65 Minuten `abandoned` ist. `call()` bricht nach 10 Sekunden
+   mit `provider_unreachable` ab (`AbortSignal.timeout`, Auflage 5). Tests gegen gestelltes `fetch`:
+   `expires_at` steht im Body, liegt zwischen 30 Minuten und 24 Stunden und in keiner URL; ein
+   `fetch`, das nie antwortet, endet nach dem Timeout.
+4. **Der Live-Schalter (Auflage 1 und 2).** `checkoutEnabled()` gibt fuer `sk_live_`/`rk_live_` nur
+   `true`, wenn zusaetzlich `CP_CHECKOUT_LIVE=1` gesetzt ist, **auch wenn `CP_CHECKOUT=1` steht**.
+   Heute oeffnet `CP_CHECKOUT=1` plus Live-Schluessel den Weg ohne Commit; das schliesst dieser Punkt.
+   Testschluessel und `CP_CHECKOUT=1` ohne Live-Schluessel verhalten sich wie bisher.
+   `test/stripe-checkout.test.ts:164` (`stays off with a live key alone`) bleibt **unveraendert**.
+   Neue Tests: `CP_CHECKOUT=1` plus Live-Schluessel bleibt aus; mit `CP_CHECKOUT_LIVE=1` geht es an
+   und die Zeile heisst `stripe`; `CP_CHECKOUT_LIVE=1` mit Testschluessel aendert nichts;
+   `CP_CHECKOUT_LIVE=1` ohne Schluessel bleibt aus.
 5. **Tests fuer den Abgleich, gegen gestelltes `fetch`, Gegenprobe in beide Richtungen:**
    - bezahlte Session, niemand ruft `/katalog/danke`: nach einem Lauf `paid`, `settled_at` gesetzt;
-   - abgelaufene Session: `abandoned`, kein `settled_at`;
+   - abgelaufene Session: `abandoned`, kein `settled_at`; dasselbe fuer eine 72 Stunden alte Zeile;
    - offene Session: bleibt `pending`, und ein zweiter Lauf fragt sie wieder;
-   - eine Zeile mit `provider = 'stripe_test'`, gelesen mit einem Live-Provider: wird nicht gefragt
-     (sonst geht der Test-Bestand nach dem Schluesseltausch mit dem Live-Schluessel an Stripe);
-   - Stripe antwortet 500 fuer eine Zeile: die naechste Zeile wird trotzdem gebucht;
-   - Abgleich und `/katalog/danke` fuer dieselbe Session: genau ein `settled_at`, und fuer einen
-     Topup mit `address` genau eine Zeile in `ledger` (die Gegenprobe gegen doppelte Gutschrift);
-   - Zeile juenger als zwei Minuten oder aelter als 48 Stunden: wird nicht gefragt.
+   - Zeile `stripe_test` unter Live-Provider: wird nicht gefragt;
+   - Stripe antwortet 500 fuer eine Zeile: die naechste wird trotzdem gebucht;
+   - eine Zeile, deren `UPDATE` wirft (kein `CheckoutError`): unter `error`, die naechste wird gebucht;
+   - 101 offene Zeilen ergeben `skipped = 1`, 100 ergeben `skipped = 0`;
+   - ein `fetch`, das nie antwortet: der Lauf endet, ein zweiter Aufruf waehrenddessen fragt Stripe
+     nicht;
+   - Abgleich und `/katalog/danke` fuer dieselbe Session: genau ein `settled_at`, fuer einen Topup
+     mit `address` genau eine Zeile in `ledger`;
+   - Zeile juenger als zwei Minuten: wird nicht gefragt.
 6. **`ops/stripe-sessions.cjs`**, die Messung der Zahl. Laeuft wie `ops/db-report.cjs` per stdin im
-   Container, liest `CP_STRIPE_SECRET_KEY` aus der Umgebung und gibt ihn nie aus. Holt ueber
-   `GET /v1/checkout/sessions` (Seiten zu 100, `created[gte]`) alle Sessions eines Fensters,
-   Voreinstellung 30 Tage, behaelt nur die mit `metadata[offer]` aus `OFFERS` **oder** einer
-   `success_url` auf `/katalog/danke` von `postyourprice.com`, und vergleicht mit `checkouts`.
+   Container, liest `CP_STRIPE_SECRET_KEY` und `CP_PUBLIC_URL` aus der Umgebung und gibt den
+   Schluessel nie aus. Holt ueber `GET /v1/checkout/sessions` (Seiten zu 100, `created[gte]`) alle
+   Sessions eines Fensters, Voreinstellung 30 Tage. **Gezaehlt wird eine Session nur, wenn ihre
+   `success_url` mit `<CP_PUBLIC_URL>/katalog/danke` beginnt und `metadata[offer]` in `OFFERS` steht**;
+   alle uebrigen stehen als eigene Zahl `foreign` (Auflage 7). Verglichen werden nur Zeilen mit
+   `provider = stripeProviderName(key)`; eine gebuchte Zeile, die in der Liste fehlt, wird einzeln
+   per `GET /v1/checkout/sessions/<id>` geprueft, bevor sie als `booked_not_paid` zaehlt (Auflage 8).
    Ausgabe nur Zahlen: `stripe_paid`, `booked_paid`, `paid_not_booked`, `paid_no_row`,
-   `booked_not_paid`, plus Fenster und Modus (`test`/`live`). Keine E-Mail, keine Session-ID.
-   Exit 1, wenn `paid_not_booked`, `paid_no_row` oder `booked_not_paid` groesser 0 ist.
-   `--selftest` mit einer Fixture statt Stripe (`CP_STRIPE_SESSIONS_FIXTURE`), in beide Richtungen:
-   eine gepflanzte bezahlte Session ohne Buchung macht Exit 1, dieselbe gebucht macht Exit 0, eine
-   fremde Session (anderes `metadata`, andere `success_url`) zaehlt nicht mit. Laeuft in
-   `ops/check-all.sh` mit.
+   `booked_not_paid`, `foreign`, plus Fenster und Modus. Keine E-Mail, keine Session-ID. Exit 1, wenn
+   `paid_not_booked`, `paid_no_row` oder `booked_not_paid` groesser 0 ist. `--selftest` mit Fixture
+   (`CP_STRIPE_SESSIONS_FIXTURE`): bezahlte Session ohne Buchung gibt Exit 1, dieselbe gebucht Exit 0,
+   eine fremde bezahlte Session steht in `foreign` und nicht in `paid_no_row`, eine bezahlte
+   `stripe_test`-Zeile unter Live-Modus gibt 0, eine gebuchte Zeile knapp vor dem Fenster gibt 0.
+   Laeuft in `ops/check-all.sh` mit.
 
 ### Done, gemessen und nicht behauptet
 
@@ -93,14 +102,17 @@ Buchung wartet. Ein Webhook kann spaeter dazukommen; der Abgleich bleibt dann da
    im Browser mit `vorfuehrung@postyourprice.com` und Karte 4242, die Weiterleitung auf
    `/katalog/danke` wird im Browser abgefangen und nie geladen (Access-Log: kein
    `GET /katalog/danke` fuer diese Session). Nach hoechstens sieben Minuten steht die Zeile `paid`.
+   **Gegenprobe (Auflage 9):** dasselbe Access-Log zeigt fuer eine der bezahlten Vorfuehrungen vom
+   29.09. die Zeile `GET /katalog/danke?session_id=...`. Fehlt sie dort auch, beweist das Fehlen
+   nichts, und die Vorfuehrung braucht einen anderen Beleg.
 3. **Eine abgebrochene Session wird nicht gebucht.** Zweite Vorfuehrung bis zur Stripe-Seite, dann
    `POST /v1/checkout/sessions/<id>/expire` im Container mit dem Testschluessel. Nach hoechstens
    sieben Minuten steht die Zeile `abandoned`, `settled_at` leer.
 4. `ops/stripe-sessions.cjs` in Produktion: `paid_not_booked = 0`, `paid_no_row = 0`,
    `booked_not_paid = 0`, Exit 0, und `--selftest` gruen.
-5. Die zwoelf und mehr alten `stripe_test`-Zeilen aus Goal 20 und 21, die heute `pending` sind:
-   nach dem ersten Lauf stehen die unter 48 Stunden als `abandoned` oder `paid`, und die Zahlen im
-   Log stimmen mit einer Abfrage auf `checkouts` vorher und nachher ueberein.
+5. Die 17 alten `stripe_test`-Zeilen, die am 29.09. `pending` sind (Skeptiker, HAN-38): nach dem
+   ersten Lauf ist jede davon `abandoned` oder `paid`, egal wann ausgerollt wird (Auflage 10),
+   gezaehlt vorher und nachher auf `checkouts`.
 
 **Widerlegt, wenn:** nach dem Deploy eine bezahlte Session in Stripe steht, die in `checkouts`
 fehlt oder dort nicht `paid` ist, laenger als zehn Minuten nach der Zahlung. Gemessen mit
@@ -109,17 +121,20 @@ fehlt oder dort nicht `paid` ist, laenger als zehn Minuten nach der Zahlung. Gem
 ### Was dieses Goal nicht weiss und nicht tut
 
 - **Geliefert wird nach einer echten Zahlung nichts.** Es gibt keine Lieferung, keine Mail an den
-  Kaeufer, keine Verbindung von `checkouts` zu `bounties` (Goal 21, "nicht Teil"). Der Code nimmt
-  ab diesem Goal Geld an; ob Matthias den Schluessel setzt, bevor Bekommen steht, ist seine
-  Entscheidung, und der Schreiber muss ihm genau das sagen. Mein Rat: den Schluessel erst setzen,
-  wenn eine bezahlte Bestellung zu drei Fassungen fuehrt, oder wenn bis dahin von Hand geliefert
-  wird und jemand die Zeilen liest.
+  Kaeufer, keine Verbindung von `checkouts` zu `bounties`. Goal 20 hat Live an diese Bedingung
+  gebunden ("live darf der Knopf erst gehen, wenn nach der Zahlung jemand liefert"). Deshalb bleibt
+  Live nach diesem Goal zu, bis Bekommen steht, und der Schreiber sagt Matthias genau das (HAN-31):
+  nicht "Schluessel setzen", sondern "Live bleibt zu bis zur Lieferung; dann Schluessel und
+  `CP_CHECKOUT_LIVE=1`".
+- **Ob das HTC-Konto im Live-Modus fremde Sessions fuehrt**, sieht der Testschluessel nicht. Im
+  Testmodus fuehrt es nur unsere: 19 Sessions ab 30.08., alle mit `metadata[offer]` und unserer
+  `success_url`, 2 bezahlt gegen 2 `paid`, 17 offen gegen 17 `pending` (Skeptiker, HAN-38,
+  29.09. 21:13 UTC).
+- **Ob Caddy die Query `session_id` ins Access-Log schreibt**, ist nicht geprueft; davon haengt die
+  Gegenprobe in Done 2 ab.
 - **Wer Verkaeufer ist, wenn Stripe live ueber HTC laeuft**, steht offen bei Matthias (Goal 21,
   Blockers). Impressum und `/datenschutz` nennen ihn privat. Das haengt am Schluessel, nicht am
   Code.
-- **Ob das HTC-Konto noch andere Checkout Sessions fuehrt**, weiss ich nicht. Deshalb filtert die
-  Messung nach `metadata[offer]` und `success_url`. Eine Session, die weder das eine noch das andere
-  traegt, faellt aus beiden Seiten heraus; wir setzen beides immer, also sollte es keine geben.
 - **`paid_no_row` kann der Code nicht heilen**, nur melden: eine Session ohne Zeile hat keine
   Angaben und keine E-Mail bei uns, und die Zeile nachzutragen wuerde Done 4 von Goal 21 brechen.
   Bei einem Treffer hilft nur ein Mensch mit dem Stripe-Dashboard. Wie oft das vorkommt: nie
@@ -129,6 +144,7 @@ fehlt oder dort nicht `paid` ist, laenger als zehn Minuten nach der Zahlung. Gem
 - Nicht Teil: ein Webhook, eine Bestaetigungsmail, Erstattungen (`refunded` bleibt bei uns `paid`).
 
 ### Blockers
-Das Urteil des Skeptikers (Kind von HAN-30).
+Keine. Das Urteil des Skeptikers (HAN-38) ist oben eingearbeitet. `CP_CHECKOUT_LIVE` in
+`deploy/.env` setzt nur Matthias, und erst nach der Lieferung.
 
 (Historie: Goal 21, Angaben und E-Mail vor der Kasse, in `goals/2026-09-29-goal-21-angaben.md`.)
