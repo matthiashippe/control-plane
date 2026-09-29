@@ -746,6 +746,9 @@ h1.ph { font-size: clamp(1.5rem, 3.2vw, 2.1rem); line-height: 1.15; letter-spaci
            makes it six, and the one that costs nothing. -->
       <a class="btn btn-2" href="/check?src=home"><!--T:cta2-->Check a draft, free<!--/T--></a>
     </div>
+    <!-- The catalogue, in the first screen (HAN-14, 2026-09-30): a page nobody links to is a page
+         nobody opens, and on a phone the nav hides most links under 30rem. -->
+    <p class="sub" style="margin-top:1rem"><a href="/katalog"><!--T:katalog-->Texts in German, written for you: the catalogue<!--/T--></a></p>
     </div>
 <!-- The control. It is in the first screen, so every reader fetches it; a browser that fetches it together with the one at the bottom is telling us its lazy loading means nothing here. See the /px/ route in src/app.ts. -->
 <img src="/px/top.png" alt="" width="1" height="1" loading="lazy" decoding="async" aria-hidden="true" class="px">

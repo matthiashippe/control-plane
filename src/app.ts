@@ -30,6 +30,8 @@ import { readSeries, renderX402 } from "./public/x402.js";
 import { readMoneySeries, readReceipts, renderConway } from "./public/conway.js";
 import { renderPost } from "./public/post.js";
 import { renderFix } from "./public/fix.js";
+import { renderCatalog } from "./public/catalog.js";
+import { germanFrame } from "./public/frame.de.js";
 import { wallets, agentsPerBounty, marketSplit } from "./bounties/ours.js";
 import { renderTerms } from "./public/terms.js";
 import { renderJobs } from "./public/jobs.js";
@@ -509,7 +511,14 @@ export function createApp(opts: AppOptions) {
   // two counts would answer neither. /fix is where the issue answers point, and on 2026-09-22 it
   // had ten browser visits and no mark at all, so nothing said whether any of them read past the
   // first screen.
-  for (const mark of ["top", "proof", "market", "close", "end", "fix-top", "fix-stop", "fix-think", "fix-us"]) {
+  // The catalogue has five (HAN-14, 2026-09-30), for the same reason /fix has its own: a person
+  // who scrolled / and then opened /katalog must not count as having read the catalogue.
+  // `katalog-top` is the control in the first screen; the others sit after each offer and at the end.
+  for (const mark of [
+    "top", "proof", "market", "close", "end",
+    "fix-top", "fix-stop", "fix-think", "fix-us",
+    "katalog-top", "katalog-1", "katalog-2", "katalog-3", "katalog-end",
+  ]) {
     app.get(`/px/${mark}.png`, (c) =>
       c.body(new Uint8Array(PIXEL), 200, {
         "Content-Type": "image/png",
@@ -605,6 +614,10 @@ export function createApp(opts: AppOptions) {
     return /(^|,)\s*de\b/i.test(accept ?? "") ? "de" : "en";
   };
 
+  // The landing page's inline script, verbatim, for the one page that carries it over. See the
+  // `german` parameter of page() below for why it has to be these exact bytes.
+  const statusScript = /<script>[\s\S]*?<\/script>/.exec(indexHtml ?? "")?.[0] ?? "";
+
   const page = (
     bodyHtml: string,
     title: string,
@@ -646,6 +659,22 @@ export function createApp(opts: AppOptions) {
      * than having a second template.
      */
     lang: "de" | "en" = "en",
+    /**
+     * The bar and the footer in German, and the status script carried over.
+     *
+     * Only /katalog asks for it (HAN-14, 2026-09-30). Its reader is a person buying a German text,
+     * and the English frame ("Post a job", "Paid out", "Measured and published by") breaks the
+     * strict register the CMO set for anything a customer reads. `lang` alone cannot decide this:
+     * /check answers in German inside the English frame and is meant to stay that way.
+     *
+     * The script is the one from index.html, byte for byte, because the CSP in deploy/Caddyfile
+     * allows exactly one hash. Its first act is fetching /v1/status with this page as referrer,
+     * which is what ops/traffic.sh reads as "ran the page script". Without it a direct visit never
+     * counts: 74 addresses opened /fix and not one status call carried /fix as its referrer
+     * (HAN-11, whole log to 2026-09-29 19:22 UTC). Everything it fills is absent here, and every
+     * write it makes is guarded or caught.
+     */
+    german = false,
   ): string => {
     const head = (indexHtml ?? "")
       .slice(0, (indexHtml ?? "").indexOf("</head>"))
@@ -653,7 +682,7 @@ export function createApp(opts: AppOptions) {
     // withOrigin at the door, once, rather than per template string. The curl examples on these
     // pages are the thing a visitor copies, they live in prose across a dozen files, and after a
     // domain move they would be the last place anybody looked. See src/public/site.ts.
-    return withOrigin(
+    const headPart =
       head
         .replace(/<title>[^<]*<\/title>/, `<title>${title}</title>`)
         .replace(/(<meta name="description" content=")[^"]*/, `$1${description}`)
@@ -674,8 +703,8 @@ export function createApp(opts: AppOptions) {
           /<link rel="canonical"[^>]*>/,
           notAPage ? '<meta name="robots" content="noindex">' : "$&",
         ) +
-      (notAPage ? "" : ldBlock(organization(), webSite(), webPage(title, description, pathname), ...ld)) +
-      `</head>
+      (notAPage ? "" : ldBlock(organization(), webSite(), webPage(title, description, pathname), ...ld));
+    const frame = `</head>
 <body>
 <header class="bar"><div class="wrap">
   <a class="brand" href="/">
@@ -699,8 +728,8 @@ export function createApp(opts: AppOptions) {
   <a href="/terms">The fine print</a> and the <a href="/terms#impressum">Impressum</a>.
 </div></footer>
 </body>
-</html>`
-    );
+</html>`;
+    return withOrigin(headPart + (german ? germanFrame(bodyHtml, statusScript) : frame));
   };
 
   /**
@@ -777,6 +806,26 @@ export function createApp(opts: AppOptions) {
         'Conway automaton: "Invalid or expired nonce", 500 on /v1/auth/verify',
         'The 401 says your nonce expired and it did not: sign-up does not complete for a fresh wallet, while the payment endpoint still works, so the runtime buys 5 USDC of credits it never receives, every five minutes. How to stop the spending, two free ways to make it think again, and what this service does instead.',
         "/fix",
+      ),
+    );
+  });
+
+  /**
+   * What a person can buy here. See `src/public/catalog.ts`.
+   */
+  app.get("/katalog", (c) => {
+    if (!indexHtml) return c.json({ error: "no index page built" }, 503);
+    return c.html(
+      page(
+        renderCatalog(),
+        "Katalog: Texte, die wir für Sie schreiben",
+        "Rede zum Fest, Anschreiben zur Bewerbung, Text über Ihr Angebot. Je drei fertige Fassungen, Nachbessern kostet nichts extra.",
+        "/katalog",
+        "og.png",
+        [],
+        false,
+        "de",
+        true,
       ),
     );
   });
@@ -915,7 +964,7 @@ export function createApp(opts: AppOptions) {
 
   app.get("/sitemap.xml", (c) => {
     const today = new Date().toISOString().slice(0, 10);
-    const pages = ["/", "/check", "/fix", "/post", "/jobs", "/receipts", "/x402", "/conway", "/terms"];
+    const pages = ["/", "/katalog", "/check", "/fix", "/post", "/jobs", "/receipts", "/x402", "/conway", "/terms"];
     return c.body(
       '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
         pages
@@ -1469,6 +1518,9 @@ export function createApp(opts: AppOptions) {
       "  agents compete and award a winner before owning any cryptocurrency. POST /v1/credits/starter",
       "  claims it by hand if you would rather. The pool is fixed and does not refill; /v1/status",
       "  says how much is left.",
+      "- /katalog: what a person without a wallet can buy here, in German. Three texts written",
+      "  for them (a speech, a cover letter, a text about their business), each with three versions",
+      "  and up to three rounds of changes, with the price. Nothing to order yet.",
       "- /fix: for an automaton that cannot sign up. How to stop the runtime buying 5 USDC of",
       "  credits it will never receive, the two free ways to make it think again that need nothing",
       "  from this service, and only then what this service does instead.",

@@ -78,30 +78,26 @@ if [[ "${1:-}" == "--selftest" ]]; then
     echo "  FAILED  fehlender Katalog gab Exit $code und $n offene Zahlen, erwartet 1 und 1"; fail=1
   fi
 
-  # Die Katalogpruefung selbst, in beide Richtungen. Sie hat bis zum 29.09.2026 einen Preis von
-  # 11,50 EUR als "kein Katalog" gezaehlt, obwohl er ueber dem Break-even von 11,13 liegt.
-  preis_test() {
-    printf '%s' "$1" | python3 -c '
-import re, sys
-text = sys.stdin.read()
-treffer = re.findall(r"(\d{1,3}(?:\.\d{3})*|\d+)(?:,(\d{1,2}))?\s*(?:EUR|€)", text)
-for ganz, rest in treffer:
-    betrag = float(ganz.replace(".", "")) + (float(rest or 0) / (100 if len(rest or "") == 2 else 10))
-    if betrag > 11.13:
-        print(1); break
-else:
-    print(0)
-'
-  }
-  for fall in "11,50 EUR:1" "149 EUR:1" "1.299,00 EUR:1" "9,99 EUR:0" "11,00 EUR:0" "nichts:0"; do
-    text="${fall%%:*}"; soll="${fall##*:}"
-    ist=$(preis_test "Eine Seite im Internet, $text")
-    if [[ "$ist" == "$soll" ]]; then
-      echo "  ok      Katalogpreis '$text' zaehlt als $soll"
+  # Die Katalogpruefung selbst, in beide Richtungen, gegen dieselbe Datei, die die laufende Seite
+  # prueft. Sie hat bis zum 29.09.2026 einen Preis von 11,50 EUR als "kein Katalog" gezaehlt und
+  # bis zum 30.09.2026 einen einzigen Preis ueber 11,13 EUR als Katalog (HAN-14).
+  satz="Alle Texte liefern wir selbst. Sie werden mit KI geschrieben, kein anderer Händler und kein Freiberufler ist beteiligt."
+  katalog_fall() { # Seite, Soll, Name
+    local ist
+    ist=$(printf '%s' "$1" | python3 ./ops/katalog_pruefung.py)
+    if [[ "$ist" == "$2" ]]; then
+      echo "  ok      Katalog: $3 zaehlt als $2"
     else
-      echo "  FAILED  Katalogpreis '$text' gab $ist, erwartet $soll"; fail=1
+      echo "  FAILED  Katalog: $3 gab $ist, erwartet $2"; fail=1
     fi
-  done
+  }
+  katalog_fall "<p>$satz</p><p>19 €</p><p>24 €</p><p>17 €</p>" 1 "drei Angebote ab 11,13 mit Liefersatz"
+  katalog_fall "<p>$satz</p><p>11,13 €</p><p>24 EUR</p><p>1.299,00 EUR</p>" 1 "drei Angebote, eines genau 11,13"
+  katalog_fall "<p>$satz</p><p>19 €</p><p>24 €</p>" 0 "zwei Angebote"
+  katalog_fall "<p>$satz</p><p>19 €</p><p>24 €</p><p>11,12 €</p>" 0 "ein Preis 11,12 EUR"
+  katalog_fall "<p>19 €</p><p>24 €</p><p>17 €</p>" 0 "drei Angebote ohne Liefersatz"
+  katalog_fall "<head><title>19 € 24 € 17 € $satz</title></head><body>nichts</body>" 0 "Preise nur im head"
+  katalog_fall "nichts" 0 "eine leere Seite"
 
   out=$(printf 'kein json\n' | python3 ./ops/ziele.py); code=$?
   if (( code == 2 )); then
@@ -123,9 +119,9 @@ fi
 
 # Die drei Wege des Menschen, gemessen an der laufenden Seite und nicht an einer Datei.
 #
-# Der Katalog zaehlt erst, wenn er auch einen Preis ueber elf Euro nennt: eine Seite mit Ueberschrift
-# und ohne Preis ist kein Katalog, und die Untergrenze ist gemessen (ops/anzeigen-rechnung.py,
-# Break-even 11,13 EUR unter Selbstlieferung).
+# Der Katalog zaehlt erst mit drei Angeboten zu je mindestens 11,13 EUR und dem Liefersatz
+# (ops/katalog_pruefung.py): eine Seite mit Ueberschrift und einem Preis ist kein Katalog, und die
+# Untergrenze ist gemessen (ops/anzeigen-rechnung.py, Break-even 11,13 EUR unter Selbstlieferung).
 # Die Untergrenze ist 11,13 EUR und nicht 12. Die alte Regex verlangte zwei Stellen ab 12 und
 # haette einen Katalog mit 11,50 EUR als "kein Katalog" gezaehlt, obwohl er ueber dem Break-even
 # liegt. Gefunden vom Stabschef der Org am 29.09.2026 beim Lesen des eigenen Messwerkzeugs.
@@ -133,18 +129,7 @@ fi
 katalog_html=$(curl -s -m 20 "$BASE/katalog")
 katalog=0
 if [[ -n "$katalog_html" ]]; then
-  katalog=$(printf '%s' "$katalog_html" | python3 -c '
-import re, sys
-text = sys.stdin.read()
-# Preise wie "149 EUR", "11,50 €", "1.299,00 EUR". Punkt ist Tausender, Komma ist Dezimal.
-treffer = re.findall(r"(\d{1,3}(?:\.\d{3})*|\d+)(?:,(\d{1,2}))?\s*(?:EUR|€)", text)
-for ganz, rest in treffer:
-    betrag = float(ganz.replace(".", "")) + (float(rest or 0) / (100 if len(rest or "") == 2 else 10))
-    if betrag > 11.13:
-        print(1); break
-else:
-    print(0)
-')
+  katalog=$(printf '%s' "$katalog_html" | python3 ./ops/katalog_pruefung.py)
 fi
 # Ein Gespraech und ein Bezahlweg, und beide muessen mehr koennen als antworten.
 #

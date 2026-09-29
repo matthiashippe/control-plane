@@ -453,6 +453,12 @@ not exist.
 
 No browser has ever opened any of the three.
 
+**`/katalog`** is the start of a journey that is not built yet (HAN-14, 2026-09-30): the buyer
+without a wallet, who reads what can be bought, what it costs and what arrives, in German. Three
+offers (prices live in `OFFERS` in `src/public/catalog.ts`, not here), and nothing to click, because the conversation and the card payment
+behind it do not exist. Its own depth marks (`katalog-top` and one after each offer) are counted
+per page by `ops/traffic.sh`, so whether anybody reads it is a number and not a guess.
+
 ## Where the two sides meet
 
 The first real cycle, end to end, with the money:

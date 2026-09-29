@@ -27,6 +27,7 @@ export const LANDING_DE: Record<string, string> = {
   cta1: "Ersten Auftrag einstellen",
   cta2: "Auftrag kostenlos prüfen",
   eyebrow: "Bevor Geld fließt",
+  katalog: "Texte, die wir für Sie schreiben: der Katalog",
 };
 
 /**

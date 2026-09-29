@@ -70,7 +70,28 @@ print(max(1, math.ceil((time.time() - min(stamps)) / 3600) + 1))
     echo "SELFTEST FAILED: the GitHub referrer heading no longer stands unjudged"
     fail=1
   fi
-  [[ "$fail" -eq 0 ]] && echo "SELFTEST OK: a real search arrival, two that only claim one, and a control, told apart over a ${hours} hour window."
+  # The catalogue, per page, in both directions (HAN-14, the sceptic's first condition in HAN-11).
+  # Both fixtures open with our own checker scrolling the catalogue, which must count in neither.
+  # CP_PAGES is set so the run does not ask production for a sitemap that may not list /katalog yet.
+  katalog_case() { # fixture, expected scrolled count, reason
+    local out hits
+    out=$(CP_PAGES="/ /katalog /check /fix /post" CP_TRAFFIC_LOG="$(dirname "$fixture")/$1" "${BASH_SOURCE[0]}" 24 2>/dev/null)
+    hits=$(printf '%s' "$out" | /usr/bin/grep -cE "^   1 address\(es\) opened /katalog" || true)
+    if [[ "${hits:-0}" -eq 0 ]]; then
+      echo "SELFTEST FAILED: $1 should have one foreign address opening /katalog"; fail=1
+    fi
+    hits=$(printf '%s' "$out" | /usr/bin/grep -cE "^   $2 address\(es\) scrolled the catalogue" || true)
+    if [[ "${hits:-0}" -eq 0 ]]; then
+      echo "SELFTEST FAILED: $1 should report $2 catalogue scroll(s)"
+      echo "                 ($3)"
+      fail=1
+    fi
+  }
+  katalog_case traffic-katalog-scrolled-home-only.log 0 \
+    "a scroll on / followed by /katalog without a catalogue mark is not a catalogue reader"
+  katalog_case traffic-katalog-direct-scroll.log 1 \
+    "a direct visit to /katalog that scrolls it has to count"
+  [[ "$fail" -eq 0 ]] && echo "SELFTEST OK: a real search arrival, two that only claim one, and a control, told apart over a ${hours} hour window; the catalogue counted per page in both directions."
   exit "$fail"
 fi
 
@@ -425,7 +446,7 @@ for ip, entry in people.items():
     # Both pages have a control mark in their first screen, and neither of them proves a scroll.
     # Hard-coding only "top" would have counted a /fix reader who fetched fix-top and nothing else
     # as somebody who scrolled.
-    below = [m for m in entry["marks"] if m not in ("top", "fix-top")]
+    below = [m for m in entry["marks"] if m not in ("top", "fix-top", "katalog-top")]
     # A browser sends Accept-Language on a navigation; every one of them does. The scroll test is
     # a timing test, and timing has a threshold: on 2026-09-23 a scanner fetched all five marks in
     # exactly 1.00 s and landed one hundredth of a second on the reader side of it. It sent no
@@ -487,7 +508,7 @@ for ip, entry in people.items():
         continue
     if len(networks[".".join(ip.split(".")[:3])]) > 2:
         continue
-    below = [m for m in entry["marks"] if m not in ("top", "fix-top")]
+    below = [m for m in entry["marks"] if m not in ("top", "fix-top", "katalog-top")]
     # The same three conditions as the list above, not two of them. They were written twice and
     # drifted the moment one side gained the Accept-Language test: the column said 2 of 2 scrolled
     # while the list under it named one address. Two numbers from one file that contradict each
@@ -567,6 +588,124 @@ echo
 
 ROWS="${CP_TRAFFIC_LINES:-25}"
 if (( ONLY_FUNNEL )); then exit 0; fi
+
+# The catalogue, counted per page and from the moment it went live (HAN-14, 2026-09-30).
+#
+# The section above counts marks per ADDRESS: somebody who scrolled / and then opened /katalog
+# would read as a catalogue reader, and the sceptic said so in HAN-11. So this block looks only at
+# the catalogue's own marks (katalog-*), only at the script run the catalogue page itself caused
+# (/v1/status with /katalog as referrer), and only from the first time /katalog answered anybody,
+# which is the deploy as far as the log can tell. CP_KATALOG_SINCE (epoch seconds) overrides it
+# when the deploy time is known better.
+#
+# Two numbers, and only the second one is "Sehen":
+#   opened    addresses that fetched /katalog at all, fetchers included;
+#   scrolled  addresses that ran the page script from /katalog, fetched a catalogue mark below
+#             katalog-top, sent Accept-Language, and did not fetch the marks in a bundle.
+# Ours are out on both: ops/own-ips.txt plus every address that sent control-plane-check/1.0.
+# No comparison with /: the base there was five scrolled addresses in 240 hours (HAN-11), which
+# separates nothing.
+python3 - "$log" <<'KATALOG' || { echo "   (the catalogue block died; the traceback is above)" >&2; FUNNEL_BROKE=1; }
+import collections, datetime, json, os, re, sys
+
+own = set(os.environ.get("CP_OWN_IPS_RESOLVED", "").split())
+hosts = (os.environ.get("CP_OWN_HOSTS") or "cp.hippe.eu").split()
+MODEL_CODED = re.compile(r"iPhone\d+,\d+|iPad\d+,\d+|Watch\d+,\d+")
+
+rows = []
+for raw in open(sys.argv[1], encoding="utf-8", errors="replace"):
+    raw = raw.strip()
+    if not raw.startswith("{"):
+        continue
+    try:
+        r = json.loads(raw)
+    except ValueError:
+        continue
+    q = r.get("request", {})
+    h = q.get("headers", {}) or {}
+    first = lambda k: ((h.get(k) or [""])[0] or "")
+    rows.append((float(r.get("ts", 0)), q.get("remote_ip", ""), str(q.get("uri", "")).split("?")[0],
+                 first("Referer"), first("User-Agent"), first("Accept-Language")))
+
+answered = [ts for ts, _, path, _, _, _ in rows if path == "/katalog"]
+print("-- The catalogue, per page, since it went live --")
+if not answered:
+    print("   /katalog has never answered anybody in this log, so nothing here can be measured yet.")
+    raise SystemExit(0)
+since = float(os.environ.get("CP_KATALOG_SINCE") or min(answered))
+at = lambda t: datetime.datetime.fromtimestamp(t, datetime.timezone.utc).strftime("%Y-%m-%d %H:%M")
+latest = max(ts for ts, *_ in rows)
+source = "CP_KATALOG_SINCE" if os.environ.get("CP_KATALOG_SINCE") else "first answer of /katalog in the log"
+print(f"   window: {at(since)} to {at(latest)} UTC, {(latest - since) / 3600:.1f} h ({source}); source: access log")
+
+networks = collections.defaultdict(set)
+for _, ip, *_ in rows:
+    networks[".".join(ip.split(".")[:3])].add(ip)
+
+opened, entry = set(), collections.defaultdict(lambda: {"script": False, "lang": False, "marks": {}, "agents": set(), "coded": False})
+for ts, ip, path, ref, agent, lang in rows:
+    if ts < since or ip in own or agent.startswith("control-plane-check"):
+        continue
+    if path == "/katalog":
+        opened.add(ip)
+    if "Mozilla/" not in agent:
+        continue
+    e = entry[ip]
+    on_catalogue = any(hh in ref for hh in hosts) and re.search(r"/katalog([?#]|$)", ref)
+    if path == "/katalog":
+        e["agents"].add(agent)
+        e["lang"] = e["lang"] or bool(lang)
+        e["coded"] = e["coded"] or bool(MODEL_CODED.search(agent))
+    elif path.startswith("/v1/status") and on_catalogue:
+        e["script"] = True
+    elif path.startswith("/px/katalog-") and path.endswith(".png"):
+        e["marks"].setdefault(path[4:-4], ts)
+
+def bundled(stamps):
+    # The rule of the person section above: more than two marks inside a quarter second, or all of
+    # them inside one second, is a renderer and not a scroll.
+    ordered = sorted(stamps)
+    if len(ordered) < 2:
+        return False
+    run = 1
+    for a, b in zip(ordered, ordered[1:]):
+        run = run + 1 if b - a < 0.25 else 1
+        if run > 2:
+            return True
+    return ordered[-1] - ordered[0] < 1.0
+
+scrolled, why = [], collections.Counter()
+for ip in sorted(opened):
+    e = entry.get(ip)
+    if e is None:
+        why["not a browser"] += 1
+    elif not e["script"]:
+        why["never ran the page script from /katalog"] += 1
+    elif not [m for m in e["marks"] if m != "katalog-top"]:
+        why["no catalogue mark below the first screen"] += 1
+    elif not e["lang"]:
+        why["no Accept-Language, so no browser navigation"] += 1
+    elif e["coded"]:
+        why["hardware model in the user agent"] += 1
+    elif len(e["agents"]) > 1:
+        why["more than one browser identity"] += 1
+    elif len(networks[".".join(ip.split(".")[:3])]) > 2:
+        why["one of three or more addresses from its /24"] += 1
+    elif bundled(list(e["marks"].values())):
+        why["fetched the catalogue marks in a bundle"] += 1
+    else:
+        scrolled.append(ip)
+
+print(f"   {len(opened)} address(es) opened /katalog (fetchers included)")
+print(f"   {len(scrolled)} address(es) scrolled the catalogue (as near to a person as the log gets)")
+for ip in scrolled:
+    reached = sorted(entry[ip]["marks"], key=entry[ip]["marks"].get)
+    print(f"     {ip:<16} marks: {', '.join(reached)}")
+for reason, n in why.most_common():
+    print(f"     {n:>4}  set aside: {reason}")
+print("   Ours are out: ops/own-ips.txt and the control-plane-check/1.0 user agent.")
+KATALOG
+echo
 
 # What our own posting pulled in, told apart from what came on its own.
 python3 - "$log" <<'BURST'
