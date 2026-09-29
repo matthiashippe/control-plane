@@ -114,11 +114,9 @@ export function payResource(cfg: PayConfig, usd: number, recipient?: Address): s
   return cfg.publicOrigin ? `${cfg.publicOrigin}${path}` : path;
 }
 
-export function buildPaymentRequired(cfg: PayConfig, usd: number, recipient?: Address): PaymentRequired {
+/** One entry of the offer, for a single tier. */
+function accepts(cfg: PayConfig, usd: number, recipient?: Address): PaymentRequired["accepts"][number] {
   return {
-    x402Version: 1,
-    accepts: [
-      {
         scheme: "exact",
         network: cfg.network,
         // 7+ digits: the runtime client reads this as an atomic unit (see protocol.md).
@@ -133,11 +131,36 @@ export function buildPaymentRequired(cfg: PayConfig, usd: number, recipient?: Ad
         // same document in this service, so they say the same thing.
         mimeType: "application/json",
         extra: { name: "USD Coin", version: "2" },
-        outputSchema: BAZAAR_OUTPUT_SCHEMA,
-        extensions: BAZAAR_EXTENSION,
-      },
-    ],
+    outputSchema: BAZAAR_OUTPUT_SCHEMA,
+    extensions: BAZAAR_EXTENSION,
   };
+}
+
+/**
+ * The offer, and why it is a list rather than one entry.
+ *
+ * `accepts` is plural in the specification, and the official client treats it as a menu: it
+ * filters the entries it cannot pay and picks from what is left
+ * (`selectPaymentRequirements`, @x402/core 2.27.0). Until 2026-09-29 this returned exactly one
+ * entry, for the tier in the path, and that made the whole menu a single dish.
+ *
+ * What that cost is measurable. Our catalogue row points at `/pay/5/0x3749efe7…`, because a
+ * catalogue entry is written from the resource of a settled payment. Every client that finds this
+ * service through the catalogue therefore lands on the five dollar tier, and every client on the
+ * official SDK with default spend controls drops a five dollar offer before signing, because
+ * `DEFAULT_MAX_AMOUNT_PER_PAYMENT` is one dollar. Adding a one dollar tier on 29.09. did not help
+ * them: in the hours afterwards all eight foreign requests still went to the catalogue URL and
+ * not one of them reached `/pay/1`.
+ *
+ * So the cheapest tier rides along in every offer. A capped client filters the expensive entry
+ * out and signs the cheap one; an uncapped client sees the tier it asked for first and takes it,
+ * because the requested tier stays at the head of the list.
+ */
+export function buildPaymentRequired(cfg: PayConfig, usd: number, recipient?: Address): PaymentRequired {
+  const cheapest = Math.min(...cfg.tiers);
+  const entries = [accepts(cfg, usd, recipient)];
+  if (usd !== cheapest) entries.push(accepts(cfg, cheapest, recipient));
+  return { x402Version: 1, accepts: entries };
 }
 
 /**
@@ -477,6 +500,17 @@ export async function handlePay(
   if (payment.network !== cfg.network) return paymentRequiredResponse(cfg, usd, recipient, "wrong_network");
 
   const auth = payment.authorization;
+  // Which tier of the offer this signature is for.
+  //
+  // The offer is a list since 2026-09-29 (see buildPaymentRequired): the tier in the path, plus
+  // the cheapest one, so that a client with a one dollar spend cap has something it can sign at
+  // all. A signature that matches EITHER entry is a signature against something we offered, and
+  // refusing it because the path says five would be refusing our own menu.
+  //
+  // Only tiers that were in that offer are accepted. An arbitrary amount is still wrong_amount,
+  // because the caller has to sign something the service put its name to.
+  const angeboten = usd === Math.min(...cfg.tiers) ? [usd] : [usd, Math.min(...cfg.tiers)];
+  const bezahlt = angeboten.find((t) => auth.value === tierToAtomic(t));
   const expected = tierToAtomic(usd);
   if (auth.to.toLowerCase() !== cfg.payTo.toLowerCase()) {
     return paymentRequiredResponse(cfg, usd, recipient, "wrong_recipient");
@@ -492,7 +526,7 @@ export async function handlePay(
   // On the address-free route the signer is the recipient. This is the same value the check above
   // enforces on the other route, so everything below it reads one variable either way.
   const credited = (recipient ?? auth.from.toLowerCase()) as Address;
-  if (auth.value !== expected) {
+  if (bezahlt === undefined) {
     return paymentRequiredResponse(cfg, usd, recipient, `wrong_amount: expected ${expected}`);
   }
   const nowSec = BigInt(Math.floor(now / 1000));
@@ -510,7 +544,8 @@ export async function handlePay(
     return paymentRequiredResponse(cfg, usd, recipient, "invalid_signature");
   }
 
-  const creditsCents = usd * 100 + SCHWELLEN_BONUS_CENTS;
+  // Gutgeschrieben wird, was bezahlt wurde, nicht was im Pfad steht.
+  const creditsCents = bezahlt * 100 + SCHWELLEN_BONUS_CENTS;
   const creditsMc = creditsCents * MC_PER_CENT;
   const nowIso = new Date(now).toISOString();
   const claim = db.transaction(() => {
