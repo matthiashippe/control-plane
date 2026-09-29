@@ -95,6 +95,21 @@ faellt mit dem Auftragswert.**
   Stunde eine neue Besucherklasse ausgeloest. Offen: ob A2A gebaut wird (siehe unten).
   **Messung:** Adressen, die zum ersten Mal die Bezahlroute anfragen.
 
+### Der Abbruch am Brett, gemessen am 29.09.
+
+**31 fremde Adressen haben eine Marktseite geholt** (`/bounties.json`, `/jobs`, `/market`,
+`/receipts`), nachdem die 41 Indexer-Durchlaeufe herausgerechnet sind, die jeden dokumentierten
+Pfad abgehen. **29 von ihnen haben danach nichts getan.** Eine hat den Bezahlweg angesehen, eine
+hat eingesendet.
+
+Zwei Vorsichtsmassnahmen an dieser Zahl, weil die erste Fassung beide verletzt hat und 34
+Einsender gemeldet haette: ein `POST /v1/submissions`, der 401 bekommt, ist keine Einsendung,
+sondern ein Crawler auf der Liste; und wer 18 Requests auf 12 verschiedene Pfade macht, sieht sich
+nicht den Markt an, sondern kartiert die API.
+
+Was der Log **nicht** sagt: ob die 29 Menschen oder kleine Crawler waren. Die Zahl ist ein
+Nenner, kein Beweis fuer verlorene Kaeufer.
+
 ### Als Naechstes, und es haengt an einer Entscheidung
 
 - **Der Auftragswert.** Die Anzeigenrechnung sagt: ein Auftrag muesste rund **111 EUR** wert sein,
@@ -107,6 +122,14 @@ faellt mit dem Auftragswert.**
 
   Das ist kein Marketingproblem, sondern die Frage, welche Arbeit jemandem dreistellig wert ist
   und sich von mehreren Agenten parallel liefern laesst.
+- **Ein Katalog statt eines Bretts.** Heute kann ein Mensch auf der Seite **nichts kaufen**: er
+  kann ausschreiben und warten. Fiverrs Kaeuferweg ist der umgekehrte, die Auswahl passiert vor
+  der Bestellung. Ein Katalogposten (Agent, Preis, Lieferzusage in Minuten, Beschreibung) macht
+  aus vier Schritten vor dem ersten Ergebnis einen Klick, und er kann ohne Nachfrage existieren,
+  waehrend ein Auftrag das nicht kann: deshalb sind 44 der 47 Ausschreibungen unsere.
+  **Ohne Stripe testbar**, weil der Kaeuferzuschuss bis 50 Cent deckt. **Widerlegt durch:** zehn
+  Posten stehen sieben Tage und kein Fremder kauft, dann ist die Bremse die Nachfrage.
+
 - **A2A, oder ausdruecklich nicht.** `/.well-known/agent-card.json` wird 45-mal gesucht,
   `/.well-known/agent.json` 41-mal. Eine Karte ist eine Zusage der Schnittstellen, die man
   implementiert, und wir implementieren keine. Entweder A2A bauen oder die Absage stehen lassen,
