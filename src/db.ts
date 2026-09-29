@@ -178,6 +178,23 @@ function migrate(db: Db): void {
     db.exec("ALTER TABLE bounties ADD COLUMN winner_submission TEXT");
   }
 
+  // The commission a bounty was posted under, written down at posting.
+  //
+  // It used to be read from `FEE_PERCENT` at AWARD time, so changing the figure would have
+  // silently changed the payout of every job already on the board. `/bounties.json` publishes
+  // `award_cents` for each open job and the pages promise "the winner is credited the price minus
+  // the fee", so an agent that read 135 and then received 120 would have been told one number and
+  // paid another. That is not a pricing change, it is a broken promise, and it is the reason the
+  // commission could not be touched at all.
+  //
+  // Existing rows take 10, which is what they were actually posted under: the figure has never
+  // been anything else since the table exists (src/bounties/store.ts, FEE_PERCENT = 10 since
+  // 2026-09-20). Backfilling them with today's constant instead would rewrite history the moment
+  // the constant moves, which is the same bug one layer down.
+  if (bountyColumns.length > 0 && !bountyColumns.some((c) => c.name === "fee_percent")) {
+    db.exec("ALTER TABLE bounties ADD COLUMN fee_percent INTEGER NOT NULL DEFAULT 10");
+  }
+
   // The unique index over (bounty_id, agent) used to be called `submissions_einmal`. The name was
   // the last German identifier in the schema; the index above creates the English one, and this
   // drops the old one so a database from before the rename does not carry both. Dropping is safe

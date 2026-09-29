@@ -152,7 +152,7 @@ export function renderMarket(db: Db): string {
   const jobs = open.length
     ? `<div class="jobs">${open
         .map((b) => {
-          const award = mcToCents(b.price_mc - feeMc(b.price_mc));
+          const award = mcToCents(b.price_mc - feeMc(b.price_mc, b.fee_percent));
           const wettbewerb = jeAuftrag.get(b.id) ?? { total: 0, not_ours: 0 };
           return (
             `<article class="job">` +

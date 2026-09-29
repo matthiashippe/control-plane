@@ -43,6 +43,8 @@ export interface Bounty {
   created_at: string;
   closed_at: string | null;
   winner_submission: string | null;
+  /** The commission rate this bounty was posted under. Rows from before 2026-09-29 carry 10. */
+  fee_percent: number;
 }
 
 export const BRIEF_MAX = 20_000;
@@ -66,8 +68,16 @@ export const PRICE_MAX_MC = 100_000_000;
  */
 export const FEE_PERCENT = 10;
 
-export function feeMc(priceMc: number): number {
-  return Math.floor((priceMc * FEE_PERCENT) / 100);
+/**
+ * The commission on a price, at a given rate.
+ *
+ * `percent` is the rate the bounty was POSTED under, stored on the row since 2026-09-29. It
+ * defaults to the current constant only for callers that are quoting a job that does not exist
+ * yet, for example the price preview on /post. Never pass the constant for a bounty that is
+ * already on the board: that is exactly the retroactive change this parameter exists to prevent.
+ */
+export function feeMc(priceMc: number, percent: number = FEE_PERCENT): number {
+  return Math.floor((priceMc * percent) / 100);
 }
 
 /** Longer than 30 days ties up money for nothing; shorter than a minute is beyond anyone. */
@@ -123,8 +133,8 @@ export function createBounty(db: Db, a: NewBounty): Bounty {
 
   const run = db.transaction(() => {
     db.prepare(
-      "INSERT INTO bounties (id, creator, kind, brief, price_mc, deadline, status, created_at) VALUES (?, ?, ?, ?, ?, ?, 'open', ?)",
-    ).run(id, creator, a.kind, brief, a.priceMc, new Date(deadlineMs).toISOString(), now);
+      "INSERT INTO bounties (id, creator, kind, brief, price_mc, deadline, status, created_at, fee_percent) VALUES (?, ?, ?, ?, ?, ?, 'open', ?, ?)",
+    ).run(id, creator, a.kind, brief, a.priceMc, new Date(deadlineMs).toISOString(), now, FEE_PERCENT);
     // Throws "insufficient_balance" when the credit is not enough; the transaction rolls back and
     // the bounty never exists.
     postLedger(db, {
@@ -487,7 +497,8 @@ export function awardBounty(
     if (res.changes !== 1) throw new BountyError("not_open", 409, "This bounty is no longer open.");
     // No recipient, no fee: an instance without a configured operator address must not silently
     // keep money that then belongs to nobody and breaks the books.
-    const fee = a.feeTo ? feeMc(bounty.price_mc) : 0;
+    // The rate this bounty was posted under, not today's. See the migration in src/db.ts.
+    const fee = a.feeTo ? feeMc(bounty.price_mc, bounty.fee_percent ?? FEE_PERCENT) : 0;
     postLedger(db, {
       address: submission.agent,
       kind: "bounty_award",

@@ -1372,8 +1372,11 @@ export function createApp(opts: AppOptions) {
           kind: b.kind,
           brief: b.brief,
           price_cents: mcToCents(b.price_mc),
-          award_cents: mcToCents(b.price_mc - (feeTo ? feeMc(b.price_mc) : 0)),
-          fee_percent: feeTo ? FEE_PERCENT : 0,
+          award_cents: mcToCents(b.price_mc - (feeTo ? feeMc(b.price_mc, b.fee_percent) : 0)),
+          // Die Rate DIESES Auftrags, nicht die von heute. Ein Auftrag, der unter zehn Prozent
+          // ausgeschrieben wurde, wird auch unter zehn vergeben, und das Brett muss dasselbe
+          // sagen wie die Vergabe, sonst ist award_cents oben und fee_percent hier zweierlei.
+          fee_percent: feeTo ? b.fee_percent : 0,
           deadline: b.deadline,
           created_at: b.created_at,
           // How many agents have already handed something in. Journey B1 step 4: an agent could
@@ -2175,7 +2178,7 @@ export function createApp(opts: AppOptions) {
     price_cents: mcToCents(b.price_mc),
     // What arrives at the winner. Stands next to the price so an agent does not have to do the
     // arithmetic.
-    award_cents: mcToCents(b.price_mc - (feeTo ? feeMc(b.price_mc) : 0)),
+    award_cents: mcToCents(b.price_mc - (feeTo ? feeMc(b.price_mc, b.fee_percent) : 0)),
     fee_percent: feeTo ? FEE_PERCENT : 0,
     deadline: b.deadline,
     status: b.status,

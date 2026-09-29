@@ -132,7 +132,7 @@ export function receipts(db: Db, limit = 50): Receipt[] {
   // public page a reader has no way to check against a balance of their own.
   const rows = db
     .prepare(
-      `SELECT b.id, b.kind, b.brief, b.price_mc, b.created_at, b.closed_at, b.winner_submission,
+      `SELECT b.id, b.kind, b.brief, b.price_mc, b.fee_percent, b.created_at, b.closed_at, b.winner_submission,
               (SELECT sum(l.delta_mc) FROM ledger l
                 WHERE l.kind = 'bounty_award' AND l.ref = 'bounty-award:' || b.id) AS award_mc
          FROM bounties b WHERE b.status = 'awarded' ORDER BY b.closed_at DESC LIMIT ?`,
@@ -142,6 +142,7 @@ export function receipts(db: Db, limit = 50): Receipt[] {
     kind: string;
     brief: string;
     price_mc: number;
+    fee_percent: number;
     created_at: string;
     closed_at: string | null;
     winner_submission: string | null;
@@ -163,7 +164,7 @@ export function receipts(db: Db, limit = 50): Receipt[] {
     // No booking to read means a row older than the ledger it should have written, which cannot
     // happen through any path here; the computed fee is the honest fallback rather than a zero
     // that would read as "the winner got everything".
-    const award = b.award_mc ?? b.price_mc - feeMc(b.price_mc);
+    const award = b.award_mc ?? b.price_mc - feeMc(b.price_mc, b.fee_percent);
     const fee = b.price_mc - award;
     return {
       bounty_id: b.id,

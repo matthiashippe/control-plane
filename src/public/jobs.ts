@@ -97,7 +97,7 @@ export function renderJobs(db: Db): string {
 
   const cards = open
     .map((b) => {
-      const award = mcToCents(b.price_mc - feeMc(b.price_mc));
+      const award = mcToCents(b.price_mc - feeMc(b.price_mc, b.fee_percent));
       const competition = agents.get(b.id) ?? { total: 0, not_ours: 0 };
       return `
       <article class="card" id="${esc(b.id)}" style="margin-top:1rem">

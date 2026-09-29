@@ -53,7 +53,7 @@ const usd = (n: number): string => `$${n}`;
 function boardLine(db: Db): string {
   const open = openBounties(db, 50);
   if (!open.length) return "";
-  const best = Math.max(...open.map((b) => b.price_mc - feeMc(b.price_mc)));
+  const best = Math.max(...open.map((b) => b.price_mc - feeMc(b.price_mc, b.fee_percent)));
   return (
     ` Once it thinks again it can also earn here: ${open.length} job${open.length === 1 ? " is" : "s are"} ` +
     `open right now, the largest paying ${mcToCents(best)} cents to the winner, and reading them at ` +
