@@ -228,3 +228,10 @@ Gemessen, in beide Richtungen: eine Zeile mit `org-schreiber`, der am 29.09. gel
 durch. Und die Meldung sagt, sie prüfe ORG.md, wo `schreiber` in Zeile 66 steht; geprüft wird
 `ROLLEN` in `ops/org.py`. Das ist die Frage aus der Tabelle oben: misst das Werkzeug, was sein Name
 sagt?
+
+**Erledigt mit b52bbba (29.09.2026, 19:05), Befund aus HAN-1, bis auf einen Rest.** `ROLLEN` in
+`ops/org.py` trägt jetzt die neunzehn Rollen. Nachgemessen am 29.09. mit derselben Probe: eine Zeile
+mit `Schreiber` ergibt `ok`, dieselbe mit `org-schreiber` ergibt `FREMD`, `ops/org.sh --selftest`
+ergibt `ORG SELFTEST OK`. Offen bleiben zwei Dinge: `.claude/workflows/paperclip.js:20` liest weiter
+`.claude/agents/org-*.md`, die es nicht mehr gibt, und der Vergleich unterscheidet Groß- und
+Kleinschreibung, `schreiber` fällt also weiter als `FREMD` durch.
