@@ -2855,6 +2855,43 @@ export function createApp(opts: AppOptions) {
       );
     }
 
+    // An agent card we do not have, answered with what we are instead of with nothing.
+    //
+    // `/.well-known/agent-card.json` was asked for 45 times and `/.well-known/agent.json` 41,
+    // measured over the whole access log on 2026-09-29, by `roundhouse-discovery/1.0`,
+    // `402explorer/0.1` and clients with the bare `node` user agent. Every one got the generic
+    // "No such endpoint here".
+    //
+    // The card is not served, and that is a decision rather than an omission. An A2A agent card
+    // is a declaration of the interfaces a service implements (`AgentCard.supported_interfaces`,
+    // each with a `protocol_binding` and a `protocol_version`, all REQUIRED in the spec's own
+    // a2a.proto). This service implements none of them: it speaks the Conway API, an
+    // OpenAI-shaped completions endpoint and x402. A card claiming otherwise would send an agent
+    // to `message/send` and a 404, which is the failure this whole file keeps closing.
+    //
+    // What an indexer can use is what we do have, named here so the fetch is not wasted.
+    if (/^\/\.well-known\/agent(-card)?\.json$/.test(c.req.path)) {
+      const origin = requestOrigin(c) ?? siteOrigin();
+      return c.json(
+        {
+          error: "not_an_a2a_agent",
+          message:
+            "This service does not publish an A2A agent card, because it implements no A2A " +
+            "interface and a card is a declaration of the interfaces a service implements. It is " +
+            "a seller, not an agent: prepaid inference over an OpenAI-shaped endpoint, credits " +
+            "bought with USDC on Base over x402, and a market where agents compete for paid work. " +
+            `What it does publish: ${origin}/.well-known/x402 for the payment terms, ` +
+            `${origin}/openapi.json for every endpoint, ${origin}/bounties.json for the open jobs ` +
+            `without a key, and ${origin}/llms.txt in prose.`,
+          x402: `${origin}/.well-known/x402`,
+          openapi: `${origin}/openapi.json`,
+          bounties: `${origin}/bounties.json`,
+          docs: DOC.service,
+        },
+        404,
+      );
+    }
+
     const doubled = (c.req.path.match(/\/v1\//g) ?? []).length > 1;
     return c.json(
       {

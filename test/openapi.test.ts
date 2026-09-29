@@ -91,3 +91,51 @@ describe("/openapi.json", () => {
     expect(Object.keys(doc.paths)).toContain("/bounties.json");
   });
 });
+
+/**
+ * The agent card this service does not have, and why the answer still says something.
+ *
+ * `/.well-known/agent-card.json` was asked for 45 times and `/.well-known/agent.json` 41, measured
+ * over the whole access log on 2026-09-29, by `roundhouse-discovery/1.0`, `402explorer/0.1` and
+ * clients with the bare `node` user agent. Every one got the generic "No such endpoint here".
+ *
+ * The card stays unserved on purpose. An A2A agent card declares the interfaces a service
+ * implements: `supported_interfaces`, each with `protocol_binding` and `protocol_version`, all
+ * REQUIRED in the spec's own a2a.proto. This service implements none of them. A card claiming
+ * otherwise would send an agent to `message/send` and a 404, which is precisely the failure the
+ * rest of this cycle was spent closing.
+ *
+ * So the test is not that the card exists. It is that the refusal is still worth the fetch, and
+ * that nothing here starts claiming to be an agent later without somebody noticing.
+ */
+describe("the A2A agent card", () => {
+  const app = () => createApp({ db: openDb(":memory:"), pay: PAY, settler: SETTLER });
+
+  it.each(["/.well-known/agent-card.json", "/.well-known/agent.json"])("%s says what this is instead", async (path) => {
+    const res = await app().request(path);
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as Record<string, string>;
+    expect(body.error).toBe("not_an_a2a_agent");
+    expect(body.openapi).toContain("/openapi.json");
+    expect(body.x402).toContain("/.well-known/x402");
+  });
+
+  /** The three it points at have to be there, or the answer is the same dead end in a new coat. */
+  it("names only paths this service answers", async () => {
+    const a = app();
+    const body = (await (await a.request("/.well-known/agent.json")).json()) as Record<string, string>;
+    for (const key of ["x402", "openapi", "bounties"]) {
+      const res = await a.request(new URL(body[key]).pathname);
+      expect(res.status, `${key} -> ${body[key]}`).toBe(200);
+    }
+  });
+
+  /**
+   * And the counter-proof that matters for honesty: the day this service does implement A2A, the
+   * card belongs here and this test has to be the thing that fails.
+   */
+  it("claims no A2A interface anywhere, because none is implemented", async () => {
+    const doc = (await (await app().request("/openapi.json")).json()) as { paths: Record<string, unknown> };
+    expect(Object.keys(doc.paths).some((p) => p.includes("message/send") || p.includes("/a2a"))).toBe(false);
+  });
+});
