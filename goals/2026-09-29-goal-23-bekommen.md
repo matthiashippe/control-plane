@@ -1,7 +1,9 @@
 # Goal 23: Eine bezahlte Bestellung wird zu drei Fassungen per E-Mail
 
 ## Status
-VORSCHLAG, Fassung 2 (HAN-39, 29.09.2026). Wird vor dem Bau vom Skeptiker widerlegt (HAN-42).
+VORSCHLAG, Fassung 3 (HAN-39, 29.09.2026). Fassung 1 hat der Skeptiker an HAN-42 widerlegt, mit neun
+Auflagen; Fassung 3 trägt die Auflagen 5 bis 9, die Auflagen 1 bis 4 galten dem Weg über das Abo und
+den Rechner, den es seit Fassung 2 nicht mehr gibt. Fassung 3 geht noch einmal an den Skeptiker.
 Gebaut wird erst, was danach übrig ist, und erst nachdem Goal 22 ausgerollt ist (WIP = 1).
 `GOAL.md` trägt bis dahin Goal 22; dieses Goal zieht dort ein, wenn Goal 22 steht.
 
@@ -49,10 +51,10 @@ beginnt nach dem Urteil des Skeptikers, parallel zum Bau von Goal 22.
 
 ## Was gemessen ist, 29.09.2026
 
-- **`checkouts` in Produktion, ganzer Bestand** (`/data/cp.db`, read-only, 29.09. gegen 21 Uhr UTC):
+- **`checkouts` in Produktion, ganzer Bestand** (`/data/cp.db`, read-only, 29.09. gegen 21:10 UTC):
   2 Zeilen `paid`, beide `stripe_test`. Eine von 19:54 UTC ohne `order_briefs`-Zeile (vor Goal 21,
-  also ohne E-Mail, nicht lieferbar), eine von 21:07 UTC mit Angaben und einer Adresse aus
-  `ops/ours.txt`. Dazu 17 `pending`. Keine Zeile mit `provider = 'stripe'`.
+  also ohne E-Mail, nicht lieferbar), eine von 21:07 UTC mit Angaben und der Adresse
+  `vorfuehrung@postyourprice.com` (geprüft 29.09., ohne die Adresse auszugeben). Dazu 17 `pending`. Keine Zeile mit `provider = 'stripe'`.
 - **Kein Code liest eine bezahlte Zeile und liefert.** Leser von `checkouts`: `src/db.ts`,
   `src/checkout/index.ts`, `ops/db-report.cjs`.
 - **`postyourprice.com` empfängt und sendet keine Mail.** `dig MX postyourprice.com` ist leer,
@@ -87,12 +89,19 @@ VM, derselbe Takt in src/index.ts, danach:
 2. **Wer beliefert wird**, `deliverable(db, now)` in `src/checkout/deliver.ts`:
    - `checkouts.status = 'paid'`, `offer` gesetzt, eine Zeile in `order_briefs`;
    - keine `deliveries`-Zeile mit `sent`, und keine mit `claimed` jünger als 30 Minuten;
-   - höchstens 5 Versuche, höchstens 10 Zeilen je Lauf, älteste Zahlung zuerst;
-   - **`stripe_test` nur an eine Adresse aus `ops/ours.txt`.** Der Testmodus ist öffentlich, jeder
-     kann mit 4242 "bezahlen". Ohne diese Regel schreiben wir Fremden umsonst Texte auf unsere
-     Inferenzkosten und schicken Mail an jede Adresse, die jemand eintippt, auch an eine fremde.
-     `stripe` (live) geht an jede Adresse. Die Liste steht als Konstante im Code, ein Test hält sie
-     gleich mit `ops/ours.txt` und der Kopie in `ops/db-report.cjs`.
+   - `settled_at` nach `DELIVERY_START`, einer Konstante mit dem Zeitpunkt des Deploys. Ältere
+     Zeilen (heute die von 21:07 UTC) werden nicht nachgeliefert und stehen im Report als
+     `paid_before_delivery`, sonst wäre Done 4 ab dem 30.09. 21:07 UTC rot, bevor es den Weg gibt
+     (HAN-42, Auflage 9);
+   - höchstens 5 Versuche, höchstens 10 Zeilen je Lauf, älteste Zahlung zuerst. **Als Versuch zählt
+     nur eine Fassung, die inhaltlich durchfällt.** Ein Limit, ein Timeout oder ein 5xx bei
+     OpenRouter oder beim Versanddienst zählt nicht, sonst ist eine Zeile nach einer Störung von
+     25 Minuten für immer tot (HAN-42, Auflage 7);
+   - **`stripe_test` nur an eine eigene, explizite Zustellliste**, `TEST_DELIVERY_TO`, heute genau
+     `vorfuehrung@postyourprice.com`. Nicht `ops/ours.txt`: dort stehen die RFC-2606-Domains für
+     Agenten, die den Kaufweg prüfen, und jede Adresse unter `postyourprice.com`; an die gäbe es nur
+     Bounces, und Resend pausiert ab 4 Prozent (HAN-42, Auflage 5). Eine RFC-2606-Domain bekommt nie
+     eine Mail, auch nicht live. `stripe` (live) geht an jede andere Adresse.
 
 3. **`deliverPaidOrders`**, der Lauf, in `src/index.ts` alle 5 Minuten nach dem Abgleich aus Goal 22,
    mit `.unref()`, ein Fehler landet im Log und beendet den Prozess nicht. Läuft nur, wenn
@@ -108,10 +117,16 @@ VM, derselbe Takt in src/index.ts, danach:
      gewählten Länge (130 Wörter je Minute, plus minus 30 Prozent). Eine Fassung, die durchfällt,
      wird einmal neu geschrieben. **Weniger als drei gehen nie raus;** dann `failed` mit Code, und
      der nächste Lauf versucht es wieder;
+   - **speichert die drei Fassungen vor dem Versand** in `deliveries.body`, Status `written`. Ab
+     dann wird nie neu geschrieben: jeder weitere Lauf verschickt genau diesen gespeicherten Text
+     (HAN-42, Auflage 6). Resend hält einen Idempotenzschlüssel 24 Stunden und antwortet auf
+     denselben Schlüssel mit anderem Inhalt 409; mit neu geschriebenen Fassungen gäbe ein Absturz
+     zwischen Versand und Eintrag innerhalb von 24 Stunden einen 409 und danach eine zweite Mail;
    - schickt **eine** Mail mit den drei Fassungen, Absender `bestellung@postyourprice.com`,
-     `Reply-To` die Adresse aus dem Impressum, Idempotenzschlüssel = Referenz. Stürzt der Prozess
-     zwischen Versand und Eintrag ab, schickt der nächste Lauf dieselbe Mail nicht ein zweites Mal;
-   - trägt `sent`, `message_id`, `body` und `cost_mc` ein;
+     `Reply-To` die Adresse aus dem Impressum, Idempotenzschlüssel = Referenz. Vor dem Versand
+     einer Zeile, die schon `written` war, fragt der Lauf beim Versanddienst nach einer Mail mit
+     diesem Schlüssel bzw. dieser Referenz im Tag; gibt es sie, wird nur eingetragen;
+   - trägt `sent`, `message_id` und `cost_mc` ein;
    - loggt je Lauf nur Zahlen: gefunden, geschickt, fehlgeschlagen, Sekunden. Keine Adresse, keine
      Angaben, keine Referenz, auch nicht bei einem Fehler.
 
@@ -121,13 +136,19 @@ VM, derselbe Takt in src/index.ts, danach:
 
 5. **Das Feld im Report**, `ops/db-report.cjs`, `report.delivery`, nur Zahlen, getrennt nach
    `ours` und `human`:
-   - `paid_delivered`, `paid_not_delivered`, `paid_not_delivered_over_24h`;
+   - `paid_with_brief` als Nenner je Gruppe, dazu `paid_delivered`, `paid_not_delivered`,
+     `paid_not_delivered_over_24h` (HAN-42, Auflage 9);
+   - `test_not_delivered_by_rule`: `stripe_test`-Zeilen außerhalb von `TEST_DELIVERY_TO`, eigene Zahl,
+     weder unter `human` noch unter `over_24h`, sonst macht jeder Fremde mit der Karte 4242 das Goal
+     rot (Auflage 5);
+   - `paid_before_delivery`: bezahlt vor `DELIVERY_START`, heute 1;
    - `paid_undeliverable`: bezahlt ohne `order_briefs`-Zeile. Heute 1 (die Zeile von 19:54 UTC). Sie
      steht getrennt, damit sie weder als Lieferung noch als Verstoß zählt; ab Goal 21 darf es keine
      neue geben;
    - `minutes_to_delivery_median` über `sent_at - settled_at`, 30 Tage;
    - `delivery_cost_mc_median`, 30 Tage, in Millicent;
-   - `ops/ziele.sh` meldet rot, wenn `paid_not_delivered_over_24h` größer 0 ist.
+   - `ops/ziele.sh` meldet rot, wenn `paid_not_delivered_over_24h` größer 0 ist, und "kein Messweg"
+     statt grün, wenn der Nenner `paid_with_brief` 0 ist. Für `human` ist das heute so.
 
 6. **`/datenschutz`**: nennt OpenRouter und die Modellanbieter, an die die Angaben gehen, und den
    Versanddienst. Text von `recht` (CFO), neu, weil der Text an HAN-43 für Anthropic direkt
@@ -140,8 +161,14 @@ VM, derselbe Takt in src/index.ts, danach:
    - `pending`, `abandoned`, bezahlt ohne Angaben: keine Mail;
    - `stripe_test` an eine fremde Adresse: keine Mail; an `vorfuehrung@postyourprice.com`: Mail;
    - ein Modell antwortet leer: einmal neu, danach `failed`, keine Mail mit zwei Fassungen;
-   - Absturz nach dem Versand, vor dem Eintrag: der zweite Lauf schickt mit demselben
-     Idempotenzschlüssel, eine Mail;
+   - Absturz nach dem Versand, vor dem Eintrag, gegen einen gestellten Versanddienst, der Schlüssel
+     24 Stunden hält und bei gleichem Schlüssel mit anderem Inhalt 409 gibt: ein Lauf 10 Minuten
+     später und einer 25 Stunden später schicken keine zweite Mail und schreiben nicht neu;
+   - ein 429 oder Timeout von OpenRouter, sechsmal hintereinander: `attempts` bleibt 0, die Zeile
+     wird beim siebten Lauf geliefert;
+   - `stripe_test` an `x@example.com`, an `andere@postyourprice.com`, an eine fremde Adresse: keine
+     Mail, gezählt unter `test_not_delivered_by_rule`;
+   - bezahlt vor `DELIVERY_START`: keine Mail, gezählt unter `paid_before_delivery`;
    - zwei Läufe gleichzeitig: nur einer nimmt die Zeile (`claimed`);
    - kein Versandschlüssel: der Lauf startet nicht, und der Report zeigt die Zeile als nicht
      geliefert (die Gegenprobe gegen eine stille Null);
@@ -173,16 +200,22 @@ Keine Frage zum Abo und keine Ausnahme von der Standing Rule (siehe oben).
    `vorfuehrung@postyourprice.com`, Karte 4242, bis zur Mail. Belege: die `checkouts`-Zeile `paid`,
    die `deliveries`-Zeile `sent` mit `message_id`, der Status `delivered` beim Versanddienst für
    diese `message_id`, und die Mail im Postfach von Matthias mit drei Fassungen. Zählt nie als
-   Umsatz (Sperrliste 0), und der Report führt sie unter `ours`.
-4. `ops/db-report.cjs` in Produktion: `paid_not_delivered_over_24h = 0` für `ours` und `human`,
-   und die Gegenprobe aus Punkt 7 grün.
+   Umsatz (Sperrliste 0), und der Report führt sie unter `ours`. **Unbeaufsichtigt** (HAN-42,
+   Auflage 8): zwischen Zahlung und `sent_at` ruft niemand etwas von Hand; Beleg ist die Logzeile
+   des Laufs aus `src/index.ts` im Container-Log mit `sent 1`, `sent_at - settled_at` aus der DB und
+   `versions = 3` in der DB. Das Postfach ist kein Log (Sperrliste 2); als Beleg zählt dort nur der
+   gespeicherte Header mit `dkim=pass`, abgelegt unter `.scratch/`.
+4. `ops/db-report.cjs` in Produktion: `paid_not_delivered_over_24h = 0` für `ours` mit Nenner
+   mindestens 1, für `human` "kein Messweg", solange der Nenner 0 ist, und die Gegenprobe aus
+   Punkt 7 grün.
 
 **Widerlegt, wenn:** eine bezahlte Zeile mit Angaben älter als 24 Stunden ohne Lieferung im Report
 steht, oder eine Mail an eine fremde Adresse für eine `stripe_test`-Zeile im Log des Versanddienstes.
 
 ## Was dieses Goal nicht weiß und nicht tut
 
-- **Ob die Mail ankommt**, weiß ich erst nach Done 2. Eine neue Domain ohne Geschichte landet oft
+- **Ob die Mail beim Kunden ankommt**, zeigt nur Done 2, mit n = 1. `delivered` in Done 3 heißt
+  nur, dass Cloudflares MX die Mail angenommen hat. Ob sie ankommt, weiß ich erst nach Done 2. Eine neue Domain ohne Geschichte landet oft
   im Spam; der Versanddienst meldet dann trotzdem `delivered`, weil er nur den Empfang durch den
   Mailserver sieht. Deshalb braucht Done 3 das Postfach und nicht nur den Status.
 - **Wie lange es dauert.** Gemessen ist die Kette (19,2 s Median für drei Fassungen), nicht eine
