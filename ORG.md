@@ -111,7 +111,7 @@ Nicht in Dateien, sondern in **Paperclip**, dem offenen Kontrollsystem fuer Agen
 | Firma | Handsel, Kuerzel HAN |
 | Datenbank | eingebettetes Postgres unter `~/.paperclip/instances/default` |
 | Adapter | `claude_local`, also das lokale `claude` CLI je Agent |
-| Modell | `claude-opus-5-5` fuer alle neunzehn |
+| Modell | `claude-opus-5-5` fuer alle neunzehn, und das ist der Hauptverdacht fuer den gescheiterten ersten Lauf, siehe unten. Der `schreiber` laeuft mit leerem Feld und damit auf `claude-opus-5` |
 | Abrechnung | **ueber das Abo, nie ueber API-Pricing.** Standing Rule von Matthias. Kein `ANTHROPIC_API_KEY`, nirgends |
 | Heartbeats | aus. Nichts laeuft von selbst, bis es eingeschaltet wird |
 | Budget | 10 bis 20 USD je Agent und Monat, zusammen 235 USD Obergrenze |
@@ -126,10 +126,23 @@ und mit `usage used: 0`, also ohne einen einzigen Token. Quelle: die vier Dateie
 `~/.paperclip/instances/default/data/run-logs/<firma>/a36e5810-*/`. Widerlegt sind Repo, cwd und
 Vertrag (die `AGENTS.md` des `stabschef` ist byteweise identisch mit der des `schreiber`, dessen
 Lauf durchläuft) und die Werkzeuge (`ops/ziele.sh`, `ops/sperren.sh`, `ops/org.sh --selftest` alle
-grün). Auch das Modell ist widerlegt, obwohl die Logs hier auseinandergehen: der `stabschef` läuft
-mit `claude-opus-5-5`, der `schreiber` mit `claude-opus-5`, aber `claude --model claude-opus-5-5 -p`
-antwortet normal. Die acpx-Event-Streams, auf die die Sitzungsdateien zeigen, liegen nicht auf der
-Platte, dort endet der Beleg.
+grün).
+
+**Der Verdacht liegt auf dem Modellnamen, und zwar nur über ACP.** Die Logs gehen dort auseinander:
+`stabschef` und `kosten` laufen mit `claude-opus-5-5`, der `schreiber` mit `claude-opus-5`, weil
+dessen `adapterConfig.model` leer ist und auf den Standard fällt. Gemessen, Stand 29.09. 18:56:
+sechs Läufe mit `claude-opus-5-5` verteilt auf zwei Agenten, alle sechs `acpx_turn_failed`; ein Lauf
+mit `claude-opus-5`, dieser läuft. Kein Gegenbeispiel in beide Richtungen.
+
+Was das **nicht** ist: ein ungültiger Modellname überhaupt, denn `claude --model claude-opus-5-5 -p`
+antwortet normal. Der Unterschied muss im ACP-Pfad liegen, also in `claude-agent-acp`, nicht im CLI.
+Die acpx-Event-Streams, auf die die Sitzungsdateien zeigen, liegen nicht auf der Platte, deshalb ist
+das Korrelation und nicht Beweis.
+
+**Der Test, der es entscheidet, und er ist billig und rücknehmbar:** bei genau einem Agenten
+`adapterConfig.model` auf `claude-opus-5` setzen oder leeren und ihn wecken. Läuft er, ist es der
+Name, und die Zeile in der Tabelle oben ist die Ursache. Läuft er nicht, ist der Verdacht widerlegt
+und der Beleg beginnt neu.
 
 **Was Paperclip macht und was hier steht.** Paperclip ist das Betriebssystem: Organigramm, Tickets,
 Weckzeiten, Budgets, Freigaben, Protokoll. Es weiss nicht, dass `price_mc` Millicents sind oder dass
