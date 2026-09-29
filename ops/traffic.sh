@@ -139,7 +139,21 @@ print(max(1, math.ceil((float(sys.argv[2] or time.time()) - min(stamps)) / 3600)
   if order_run env CP_ORDER_BRIEFS_30D=1 | /usr/bin/grep -q "FINDING"; then
     echo "SELFTEST FAILED: one brief against one foreign 303 must not raise a finding"; fail=1
   fi
-  [[ "$fail" -eq 0 ]] && echo "SELFTEST OK: a real search arrival, two that only claim one, and a control, told apart over a ${hours} hour window; the catalogue counted per page in both directions; the order page and its cross-check in both directions."
+  # Foreign browsers on /katalog, and those from the ad (HAN-35), in both directions. AdsBot-Google-
+  # Mobile asks for /katalog?von=anzeige with Accept-Language and must not count; a stranger's Chrome
+  # with ?von=anzeige must. Agent402, Facebook's preview, a 404 and a fetch without Accept-Language
+  # count nowhere; an iPhone without the parameter counts in the total only. So 2, and 1 from the
+  # ad: a bot let through reads 2 there, a browser lost reads 0.
+  browsers_fixture="$(dirname "$fixture")/traffic-katalog-browsers.log"
+  out_browsers=$(CP_PAGES="/ /katalog /check /fix /post" CP_TRAFFIC_LOG="$browsers_fixture" \
+    "${BASH_SOURCE[0]}" "$(fixture_hours "$browsers_fixture")" 2>/dev/null)
+  order_want "$out_browsers" "^   2 foreign browser address\(es\) got /katalog with 200" \
+    "the Chrome from the ad and the iPhone count, no crawler and no 404 does"
+  order_want "$out_browsers" "^   1 of them came with \?von=anzeige$" \
+    "the Chrome with ?von=anzeige counts, AdsBot-Google-Mobile on the same URL does not"
+  order_want "$out_browsers" "^ +3  request\(s\) set aside: crawler mark in the user agent" \
+    "AdsBot, Agent402 and facebookexternalhit are set aside by name, visibly"
+  [[ "$fail" -eq 0 ]] && echo "SELFTEST OK: a real search arrival, two that only claim one, and a control, told apart over a ${hours} hour window; the catalogue counted per page in both directions; the order page and its cross-check in both directions; foreign browsers on /katalog and those from the ad, AdsBot out and Chrome in."
   exit "$fail"
 fi
 
@@ -654,13 +668,13 @@ if (( ONLY_FUNNEL )); then exit 0; fi
 # No comparison with /: the base there was five scrolled addresses in 240 hours (HAN-11), which
 # separates nothing.
 python3 - "$log" <<'KATALOG' || { echo "   (the catalogue block died; the traceback is above)" >&2; FUNNEL_BROKE=1; }
-import collections, datetime, json, os, re, sys
+import collections, datetime, json, os, re, sys, urllib.parse
 
 own = set(os.environ.get("CP_OWN_IPS_RESOLVED", "").split())
 hosts = (os.environ.get("CP_OWN_HOSTS") or "cp.hippe.eu").split()
 MODEL_CODED = re.compile(r"iPhone\d+,\d+|iPad\d+,\d+|Watch\d+,\d+")
 
-rows, answered = [], []
+rows, answered, pages = [], [], []
 for raw in open(sys.argv[1], encoding="utf-8", errors="replace"):
     raw = raw.strip()
     if not raw.startswith("{"):
@@ -674,6 +688,8 @@ for raw in open(sys.argv[1], encoding="utf-8", errors="replace"):
     first = lambda k: ((h.get(k) or [""])[0] or "")
     rows.append((float(r.get("ts", 0)), q.get("remote_ip", ""), str(q.get("uri", "")).split("?")[0],
                  first("Referer"), first("User-Agent"), first("Accept-Language")))
+    if rows[-1][2] == "/katalog":
+        pages.append(rows[-1] + (str(q.get("uri", "")), r.get("status"), q.get("method") or "GET"))
     # Only a 200 marks the deploy. On 2026-09-29 this took any answer, so a 404 on /katalog at 15:24
     # UTC opened the window four hours before the rollout at 19:41 and every rate per 24 h came out
     # too small (HAN-20).
@@ -748,6 +764,39 @@ for ip in sorted(opened):
         scrolled.append(ip)
 
 print(f"   {len(opened)} address(es) opened /katalog (fetchers included)")
+
+# The number the ad is measured against (HAN-35). "opened" above takes any answer from anything,
+# and AdsBot-Google-Mobile carries a Mozilla/ user agent, so 50 on that line needs no person. This
+# one takes a foreign address, GET /katalog with 200, Mozilla/ in the user agent, Accept-Language
+# sent, and none of the crawler marks below. The first four are the CEO's list; the rest were read
+# off the production log on 2026-09-29, where each of them sent Mozilla/ AND Accept-Language:
+# Agent402 on 882 lines ("compatible; ... +https://"), VirusTotal as AppEngine-Google, and
+# HeadlessChrome on 133. A case-insensitive "bot" would also drop CUBOT phones, so it stays exact.
+CRAWLER = re.compile(r"bot|AdsBot|Google-Ads|facebookexternalhit|compatible|\+https?://|AppEngine-Google|HeadlessChrome")
+browsers, from_ad, aside = set(), set(), collections.Counter()
+for ts, ip, _, _, agent, lang, uri, status, method in pages:
+    if ts < since or ip in own or agent.startswith("control-plane-check"):
+        continue
+    if method != "GET":
+        aside[f"method {method}"] += 1
+    elif status != 200:
+        aside[f"answered {status}"] += 1
+    elif CRAWLER.search(agent):
+        aside["crawler mark in the user agent"] += 1
+    elif "Mozilla/" not in agent:
+        aside["no Mozilla/ in the user agent"] += 1
+    elif not lang:
+        aside["no Accept-Language"] += 1
+    else:
+        browsers.add(ip)
+        query = urllib.parse.parse_qs(urllib.parse.urlsplit(uri).query)
+        if "anzeige" in query.get("von", []):
+            from_ad.add(ip)
+print(f"   {len(browsers)} foreign browser address(es) got /katalog with 200 (no crawler mark, Accept-Language sent)")
+print(f"   {len(from_ad)} of them came with ?von=anzeige")
+for reason, n in aside.most_common():
+    print(f"     {n:>4}  request(s) set aside: {reason}")
+
 print(f"   {len(scrolled)} address(es) scrolled the catalogue (as near to a person as the log gets)")
 for ip in scrolled:
     reached = sorted(entry[ip]["marks"], key=entry[ip]["marks"].get)
