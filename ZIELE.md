@@ -18,6 +18,26 @@ ist deshalb auf den 31.12. gezogen, also Faktor 11.
 | **29.10.** | 5.000 USDC fremdes Auftragsvolumen im Monat, 500 USDC Provision | `foreign_gmv_30d`, `foreign_fee_30d` | 0 und 0 |
 | **31.12.** | 250.000 USDC im Monat, unter den zehn meistgerufenen x402-Diensten | `foreign_gmv_30d`, Rang im Verzeichnis | 0, nicht gelistet |
 
+### Stand am 29.09.2026
+
+| Bis | Die Zahl | Ziel | Heute |
+|---|---|---|---|
+| 26.09. | zahlende fremde Wallets | 5 | **2** (`0x0629a685`, `0x3749efe7`) |
+| 26.09. | ein Auftrag, Kaeufer und Gewinner beide fremd | 1 | **0**, `foreign_gmv_30d` = 0 |
+| 02.10. | Zeilen mit unserem Host im Tagesscan | mind. 1 | **1**, seit 27.09. 22:21:02 |
+| 02.10. | bezahlte Aufrufe fremder Wallets | 1.000 von 25 | **9 von 1** |
+| 29.10. | `foreign_gmv_30d` / `foreign_fee_30d` | 5.000 / 500 USDC | **0 / 0** |
+| 31.12. | `foreign_gmv_30d`, Rang | 250.000 USDC, Top 10 | **0**, gelistet ohne Rang |
+
+**Der 26.09. ist verstrichen und nicht erreicht.** Der 02.10. ist zur Haelfte erfuellt, vier Tage
+frueh, und die erfuellte Haelfte hat ein Kunde bezahlt und nicht wir: siehe T2.5.
+
+**Und eine Beobachtung, die alle vier Termine betrifft.** Die beiden fremden Automatons vom 27.
+und 28.09. haben zusammen 36 Inferenz-Aufrufe gemacht und das Auftragsbrett **kein einziges Mal**
+geoeffnet, null Einsendungen. `market.buyers.not_ours` und `market.agents.not_ours` stehen nach
+zehn Tagen auf 0, waehrend die Inferenzseite zwei zahlende Kunden hat. Alle vier Zielzahlen oben
+messen den Markt; die gemessene Nachfrage liegt bisher vollstaendig auf der anderen Haelfte.
+
 **Die eine Zahl, wenn nur eine bliebe:** `foreign_gmv_30d`. Sie setzt alle drei Ereignisse voraus:
 ein Fremder hat hinterlegt, ein Agent hat geliefert, der Kaeufer hat vergeben.
 
@@ -195,7 +215,8 @@ unveraendert Zulauf, Zulauf laeuft ueber Punkt 1, und Punkt 1 gehoert Matthias.
       `/settle`), unvollstaendiger Scan (6.799 im Katalog, 6.792 gelesen), und ein
       Statistik-Endpunkt, der alles bejaht (erfundene Ressourcen bekommen `0`, unsere `1-9`).
       Die Ausschlussliste steht im Kopf von `ops/own-x402-listing.sh`.
-- [ ] **T2.5 Fuenf USDC in die Betreiber-Wallet, damit eine Abrechnung laeuft.** Zahl: Zeilen mit
+- [x] **T2.5 erledigt am 29.09., und zwar ohne die fuenf USDC.** (Stand unten, Text vom 24.09. darunter.)
+      **T2.5 Fuenf USDC in die Betreiber-Wallet, damit eine Abrechnung laeuft.** Zahl: Zeilen mit
       unserem Host im Tagesscan, 0 von 23.512 auf mindestens 1. **Neu am 24.09., und es kippt den
       Satz vom Vortag.** Gestern stand hier, es gebe keine Tuer. Gemessen: zwischen dem 21.09. und
       heute sind **141 Hosts neu in die Kataloge gekommen**, rund 47 am Tag, zehn davon mit
@@ -213,7 +234,33 @@ unveraendert Zulauf, Zulauf laeuft ueber Punkt 1, und Punkt 1 gehoert Matthias.
       sagt beim naechsten Lauf, ob die Form jetzt stimmt. Billiger ist diese Antwort nicht zu
       haben, und das Geld bleibt im Haus: es geht an unsere eigene payTo-Adresse.
 
-- [ ] **T2.2 Ein Merchant-Konto bei PayAI.** Zahl: Zeilen mit unserem Host im Tagesscan, 0 -> mind. 1.
+      **Was am 29.09. daraus geworden ist.** Die Abrechnung kam, aber nicht von uns: am 27.09. um
+      22:21:02 hat eine fremde Wallet (`0x3749efe7…`) fuenf USDC eingezahlt, on-chain bestaetigt,
+      und 57 Sekunden spaeter noch einmal fuenf. Der Settle trug `serverExtensions` mit, der
+      Facilitator hat den Block uebernommen, und `ops/own-x402-listing.sh` meldet seitdem
+      **LISTED**, eine Zeile im PayAI-Verzeichnis von 27.783, `hat_bazaar_block = 1`, Zeitstempel
+      genau diese Sekunde. Die Zielzahl fuer den 02.10. steht damit vier Tage frueh, und bezahlt
+      hat sie ein Kunde.
+
+      **Der Header bleibt trotzdem aus, und das ist jetzt gemessen statt vermutet.**
+      `ops/bazaar-answer.ts` mit einer **gueltigen** Signatur der Betreiber-Wallet: PayAI antwortet
+      `invalid_exact_evm_insufficient_balance`, die Signatur hat also verifiziert und nur das Geld
+      fehlte, und `EXTENSION-RESPONSES` war trotzdem nicht da. Der Facilitator schickt ihn nur bei
+      einer angenommenen Zahlung. Verify ist damit als Weg zu, und er wird nicht mehr gebraucht:
+      dass die Deklaration gelesen wird, sagt der Katalog selbst.
+
+      **Offen bleibt die Haelfte, die der Katalog falsch macht.** Die gelistete Zeile ist die
+      konkrete URL des Zahlers, nicht das Muster; `routeTemplate` war dagegen deklariert und hat
+      nicht konsolidiert. Wer der Listung folgt, signiert mit der eigenen Wallet auf eine fremde
+      Adresse und wird abgewiesen. Gegenmassnahme am 29.09.: `/pay/{usd}` ohne Adresse, Credits an
+      den Signierer, eine URL fuer alle. Ob der Katalog sie uebernimmt, sagt die naechste
+      Abrechnung, die ueber diese Route laeuft.
+
+- [x] **T2.2 hinfaellig seit dem 29.09.** Wir sind ohne Merchant-Konto im Katalog (siehe T2.5).
+      Der Punkt 8 auf Matthias' Liste faellt damit weg. Der Text von damals steht darunter, weil
+      die Begruendung gestimmt hat und nur die Schlussfolgerung nicht.
+
+      **T2.2 Ein Merchant-Konto bei PayAI.** Zahl: Zeilen mit unserem Host im Tagesscan, 0 -> mind. 1.
       **Wartet auf Matthias, neuer Punkt 8.** Die OpenAPI des Facilitators nennt
       `https://merchant.payai.network` als den Ort, an dem ein Haendler einen API-Schluessel
       anlegt; die Seite antwortet mit 200. Das ist die einzige Tuer in der oeffentlichen
@@ -526,8 +573,14 @@ Sieben Saetze, und alles andere laeuft. Stand 23.09., nichts davon darf der Loop
    gesperrte Pfad fuer eine Identitaet ohne Ethereum-Signatur.
 5. **Search Console und Bing** -- sein Login, den DNS-Eintrag setzt der Loop selbst.
 6. **Eine Zahl fuer Anzeigen** -- Empfehlung: 20 Euro am Tag fuer zwei Wochen.
-8. **Ein Konto bei `merchant.payai.network`** -- nach der Untersuchung vom 23.09. die einzige noch
-   offene Tuer in den x402-Katalog, und damit die Bedingung fuer das Ziel am 02.10. Siehe T2.2.
+8. ~~**Ein Konto bei `merchant.payai.network`**~~ -- **weggefallen am 29.09.** Wir stehen seit dem
+   27.09. um 22:21:02 im PayAI-Katalog, ohne Konto und ohne Schluessel: der Eintrag entstand aus
+   dem Settle einer fremden Zahlung, die unsere `serverExtensions` mittrug. Siehe T2.5.
+
+**Und einer ist dazugekommen.** Die Gebuehrenadresse `0x9141…d614` haelt **21,92 USDC** und
+**0 ETH**, gemessen per `balanceOf` am 29.09. Das ist echtes Geld aus echten Zahlungen, und ohne
+Gas laesst es sich nicht bewegen. Eine Entscheidung, keine Besorgung: wohin es soll und ob der
+Loop Gas nachlegen darf.
 
 ## Wie Teilziele entstehen
 
