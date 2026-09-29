@@ -165,6 +165,14 @@ const OURS = [
   // ops/claim-keyless.sh: no ledger, no submission, no bounty. It had to be called to be
   // proved, because a GET on that door answers 405.
   "key:30fcb94104676b5a0ff6c581e7512b4c4bb765b9",
+  // Minted 2026-09-29 by one of our own probes against production and claimed by
+  // ops/claim-keyless.sh: no ledger, no submission, no bounty. It had to be called to be
+  // proved, because a GET on that door answers 405.
+  "key:a774e555b538603b5b60d9dfd330f9d93f5cdf2f",
+  // Minted 2026-09-29 by one of our own probes against production and claimed by
+  // ops/claim-keyless.sh: no ledger, no submission, no bounty. It had to be called to be
+  // proved, because a GET on that door answers 405.
+  "key:6587e904da177a93d3b4ebcfc854763b6a263bdf",
 ];
 
 // The hardcoded pair is not enough. Every production check provisions a throwaway wallet, and on

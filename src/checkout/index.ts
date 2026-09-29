@@ -25,8 +25,27 @@
 
 import { postLedger, ensureWallet, MC_PER_CENT, type Db } from "../db.js";
 
-/** The smallest and largest a card top-up may be, in cents. */
-export const MIN_CENTS = 100;
+/**
+ * Die kleinste und die groesste Kartenzahlung, in Cent.
+ *
+ * Der Boden lag bis zum 29.09.2026 bei einem Euro, und das war die Zahl, die am freundlichsten
+ * aussah und am teuersten war. Die uebliche europaeische Kartengebuehr ist ein Prozentsatz plus
+ * ein fester Betrag je Zahlung (Stripe Standard: 1,5 Prozent plus 25 Cent fuer Karten aus dem
+ * EWR). Der feste Anteil entscheidet bei kleinen Betraegen alles:
+ *
+ *   1 EUR  ->  0,265 EUR Gebuehr  =  26,5 Prozent
+ *   5 EUR  ->  0,325 EUR          =   6,5 Prozent
+ *  10 EUR  ->  0,400 EUR          =   4,0 Prozent
+ *  50 EUR  ->  1,000 EUR          =   2,0 Prozent
+ *
+ * Zehn Euro ist die Stelle, an der die Gebuehr aufhoert, den Preis zu bestimmen. Darunter
+ * verkaufen wir zu einem Viertel an den Zahlungsanbieter, und der Kaeufer merkt nichts davon,
+ * weil er den Preis zahlt, den er sieht.
+ *
+ * Passt zum Preisboden am Auftrag (PRICE_MIN_MC, zehn Cent): eine Aufladung von zehn Euro traegt
+ * hundert Auftraege zum Boden, und niemand muss fuer jeden Auftrag einzeln zur Karte greifen.
+ */
+export const MIN_CENTS = 1_000;
 export const MAX_CENTS = 50_000;
 
 export class CheckoutError extends Error {
@@ -81,7 +100,10 @@ export async function beginCheckout(
     throw new CheckoutError(
       "amount_out_of_range",
       400,
-      `cents must be a whole number between ${MIN_CENTS} and ${MAX_CENTS}.`,
+      `cents must be a whole number between ${MIN_CENTS} and ${MAX_CENTS}. ` +
+        "The floor is the card fee, not a policy: at one euro the usual European card fee " +
+        "(1.5 per cent plus 25 cents) takes 26.5 per cent of the payment, at ten euros it takes " +
+        "4 per cent.",
     );
   }
   const address = input.address.toLowerCase();

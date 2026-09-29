@@ -35,35 +35,35 @@ describe("a card payment, from start to booked", () => {
   it("credits exactly what was asked for", async () => {
     const d = db();
     const p = fakeProvider();
-    const { checkout, redirect } = await beginCheckout(d, p, { address: ADDR, cents: 500 });
+    const { checkout, redirect } = await beginCheckout(d, p, { address: ADDR, cents: 1_500 });
     expect(checkout.status).toBe("pending");
     expect(redirect).toContain(checkout.reference);
     expect(balance(d), "nothing is credited before the money arrives").toBe(0);
 
     const res = settleCheckout(d, p, { reference: checkout.reference, paid: true });
-    expect(res.credited_cents).toBe(500);
+    expect(res.credited_cents).toBe(1_500);
     expect(res.already).toBe(false);
-    expect(balance(d)).toBe(500 * MC_PER_CENT);
+    expect(balance(d)).toBe(1_500 * MC_PER_CENT);
   });
 
   // The one that matters. A callback that names an amount must not be able to set it.
   it("ignores an amount the callback tries to name", async () => {
     const d = db();
     const p = fakeProvider();
-    const { checkout } = await beginCheckout(d, p, { address: ADDR, cents: 500 });
-    settleCheckout(d, p, { reference: checkout.reference, paid: true, cents: 500_000, amount: 500_000 });
-    expect(balance(d), "the row decides, not the callback").toBe(500 * MC_PER_CENT);
+    const { checkout } = await beginCheckout(d, p, { address: ADDR, cents: 1_500 });
+    settleCheckout(d, p, { reference: checkout.reference, paid: true, cents: 1_500_000, amount: 1_500_000 });
+    expect(balance(d), "the row decides, not the callback").toBe(1_500 * MC_PER_CENT);
   });
 
   it("books a repeated callback once, because the provider is right to retry", async () => {
     const d = db();
     const p = fakeProvider();
-    const { checkout } = await beginCheckout(d, p, { address: ADDR, cents: 300 });
+    const { checkout } = await beginCheckout(d, p, { address: ADDR, cents: 1_200 });
     const first = settleCheckout(d, p, { reference: checkout.reference, paid: true });
     const second = settleCheckout(d, p, { reference: checkout.reference, paid: true });
     expect(first.already).toBe(false);
     expect(second.already, "a retry is not an error").toBe(true);
-    expect(balance(d)).toBe(300 * MC_PER_CENT);
+    expect(balance(d)).toBe(1_200 * MC_PER_CENT);
     expect(
       (d.prepare("SELECT count(*) AS n FROM ledger WHERE kind = 'topup'").get() as { n: number }).n,
     ).toBe(1);
@@ -72,7 +72,7 @@ describe("a card payment, from start to booked", () => {
   it("books nothing for a payment that did not go through, and says so in the row", async () => {
     const d = db();
     const p = fakeProvider();
-    const { checkout } = await beginCheckout(d, p, { address: ADDR, cents: 500 });
+    const { checkout } = await beginCheckout(d, p, { address: ADDR, cents: 1_500 });
     const res = settleCheckout(d, p, { reference: checkout.reference, paid: false });
     expect(res.credited_cents).toBe(0);
     expect(balance(d)).toBe(0);
@@ -92,7 +92,7 @@ describe("a card payment, from start to booked", () => {
   it("refuses a callback from a provider the payment was not started with", async () => {
     const d = db();
     const started = fakeProvider();
-    const { checkout } = await beginCheckout(d, started, { address: ADDR, cents: 500 });
+    const { checkout } = await beginCheckout(d, started, { address: ADDR, cents: 1_500 });
     const other = { ...fakeProvider(), name: "somebody-else" };
     expect(() => settleCheckout(d, other, { reference: checkout.reference, paid: true })).toThrow(
       CheckoutError,
@@ -114,7 +114,7 @@ describe("a card payment, from start to booked", () => {
     // (ops/db-report.cjs). A card buyer has put money in, so the row has to be one.
     const d = db();
     const p = fakeProvider();
-    const { checkout } = await beginCheckout(d, p, { address: ADDR, cents: 500 });
+    const { checkout } = await beginCheckout(d, p, { address: ADDR, cents: 1_500 });
     settleCheckout(d, p, { reference: checkout.reference, paid: true });
     const row = d
       .prepare("SELECT kind, ref FROM ledger WHERE address = ?")
@@ -130,14 +130,14 @@ describe("while it is switched off, it does not exist", () => {
     expect(checkoutEnabled()).toBe(false);
     const d = db();
     const p = fakeProvider();
-    await expect(beginCheckout(d, p, { address: ADDR, cents: 500 })).rejects.toThrow(CheckoutError);
+    await expect(beginCheckout(d, p, { address: ADDR, cents: 1_500 })).rejects.toThrow(CheckoutError);
     expect(() => settleCheckout(d, p, { reference: "x", paid: true })).toThrow(CheckoutError);
   });
 
   it("names the route that does work instead", async () => {
     delete process.env.CP_CHECKOUT;
     try {
-      await beginCheckout(db(), fakeProvider(), { address: ADDR, cents: 500 });
+      await beginCheckout(db(), fakeProvider(), { address: ADDR, cents: 1_500 });
       throw new Error("it went through with the flag off");
     } catch (e) {
       expect((e as CheckoutError).code).toBe("checkout_disabled");
