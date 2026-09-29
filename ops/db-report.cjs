@@ -121,6 +121,12 @@ const OUR_KEY_NAMES = [
   // somebody remembering to edit this list. The names above stay because keys already exist under
   // them.
   "ops-%",
+  // 2026-09-29, and the convention above is four days old. A cycle verified the new 404 against
+  // production with a hand-provisioned key and named it after the cycle instead of the prefix,
+  // which is the fifth time this has happened and the first since the prefix existed. The check
+  // caught it within the hour, which is what it is for. The name stays on the list because the
+  // key exists and keys keep their names; the lesson is that `ops-` is not optional.
+  "loop-payway-check",
 ];
 
 // The one name among ours that is allowed on a live job, and the rest, which are not.

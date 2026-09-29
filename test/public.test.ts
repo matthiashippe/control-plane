@@ -199,7 +199,11 @@ describe("public page and status", () => {
     expect(res.status).toBe(200);
     const doc = (await res.json()) as Record<string, any>;
     expect(doc.x402Version).toBe(1);
-    expect(doc.endpoints.topup).toBe("/pay/{usd}/{address}");
+    // `topup` names the address-free seller since 2026-09-29, because that is the one a caller
+    // who found this file can use with nothing but a wallet. The addressed route is still named,
+    // under its own key, because the Conway runtime builds it.
+    expect(doc.endpoints.topup).toBe("/pay/{usd}");
+    expect(doc.endpoints.topup_for_wallet).toBe("/pay/{usd}/{address}");
     expect(doc.endpoints.inference).toBe("/v1/chat/completions");
     expect(doc.markup).toBe(MARKUP);
     expect(doc.credits).toMatchObject({ redeemable: false, transferable: false });

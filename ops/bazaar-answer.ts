@@ -23,6 +23,22 @@
  *
  * Exit 0 either way: an absent header is a finding too. It would mean the catalogue is only ever
  * written on a settled payment, and then the five USDC are the only way to ask.
+ *
+ * **Answered on 2026-09-29, and it is the absent one.** The second shot got past the hurdle that
+ * stopped the first: PayAI answered `invalid_exact_evm_insufficient_balance`, so the signature
+ * verified and only the money was missing. `EXTENSION-RESPONSES` was absent anyway. The
+ * facilitator emits it on a payment it accepts and on nothing else, so verify cannot be used to
+ * read it, however valid the signature.
+ *
+ * That closes this route and it no longer matters much, because the question it was built to
+ * answer has been answered by the catalogue itself: this service was listed on 2026-09-27 at
+ * 22:21:02, off the back of the first foreign settlement, with `hat_bazaar_block = 1` in the
+ * day's scan. The declaration is read. What the header would still add is the reason behind
+ * `routeTemplate` being ignored, and that costs a settlement.
+ *
+ * What the tool is still good for: it sends exactly what production sends, so a change to the
+ * declaration can be put in front of the facilitator before it goes out, and a rejection at the
+ * schema level would show up here as something other than an invalid signature.
  */
 import { buildV1Requirements, buildV1Payload } from "../src/payments/facilitator.js";
 import { BAZAAR_EXTENSION } from "../src/payments/bazaar.js";
@@ -44,7 +60,9 @@ const auth = {
   validBefore: 9_999_999_999n,
   nonce: ("0x" + "22".repeat(32)) as Hex,
 };
-const resource = "https://postyourprice.com/pay/5/0x1111111111111111111111111111111111111111";
+// Since 2026-09-29 the address-free seller, which is the URL the catalogue can key on: the one
+// listing we got keyed on a payer's concrete URL despite routeTemplate. See src/payments/bazaar.ts.
+const resource = "https://postyourprice.com/pay/5";
 // The same body the service sends, `serverExtensions` included. A probe that differs from
 // production measures the probe.
 const body = JSON.stringify({

@@ -65,6 +65,11 @@ export const OUR_KEY_NAMES = [
   "mainnet-abnahme",
   "mainnet-acceptance",
   "ops-%",
+  // 2026-09-29, and the prefix above is four days old. A cycle verified the new 404 against
+  // production with a hand-provisioned key and named it after the cycle rather than the prefix.
+  // The hygiene check caught it within the hour, which is what it is for. The name stays because
+  // the key exists and keys keep their names.
+  "loop-payway-check",
 ];
 
 /**

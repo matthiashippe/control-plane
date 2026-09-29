@@ -44,11 +44,24 @@ export const BAZAAR_DESCRIPTION =
  * parameterised route, and without the template the catalogue would key on the concrete URL and
  * take one row per payer. With it, "Facilitators use routeTemplate as the catalog key,
  * consolidating all requests to the same route pattern into a single discovery entry".
+ *
+ * **Measured on 2026-09-29: it did not consolidate.** The first foreign settlement went through on
+ * 27.09. at 22:21:02 carrying this block, the facilitator took it (`hat_bazaar_block = 1` in the
+ * day's scan), and the row it keeps is the payer's concrete URL, `/pay/5/0x3749efe7…`, not the
+ * pattern. Whether PayAI reads `routeTemplate` at all cannot be told from one settlement, and a
+ * second one costs five USDC, so it is not worth guessing at.
+ *
+ * What can be removed instead is the parameter that makes the URL differ per payer. Since
+ * 29.09. this service also sells at `/pay/{usd}` with no address, where the credits go to whoever
+ * signed; src/payments/pay.ts holds the argument for why that is the same safety rule and not a
+ * weaker one. That route is one URL for everybody, so it is a catalogue key whether the
+ * facilitator honours `routeTemplate` or keys on what it sees. The template below names it, and
+ * the addressed route keeps working for the Conway runtime, which builds its own URL.
  */
 export const BAZAAR_EXTENSION = {
   bazaar: {
     discoverable: true,
-    routeTemplate: "/pay/:usd/:address",
+    routeTemplate: "/pay/:usd",
     inputSchema: {
       type: "http",
       method: "GET",
@@ -56,13 +69,6 @@ export const BAZAAR_EXTENSION = {
         usd: {
           type: "string",
           description: "One of the topup tiers in whole dollars, for example 5.",
-          required: true,
-        },
-        address: {
-          type: "string",
-          description:
-            "The automaton wallet that signs the payment. The credits go to the signer, so this " +
-            "is the address that will be able to spend them.",
           required: true,
         },
       },
@@ -101,7 +107,7 @@ export const BAZAAR_OUTPUT_SCHEMA = {
     type: "http",
     method: "GET",
     discoverable: true,
-    routeTemplate: "/pay/:usd/:address",
+    routeTemplate: "/pay/:usd",
     pathParams: {
       usd: {
         type: "string",

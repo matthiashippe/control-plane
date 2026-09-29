@@ -1234,7 +1234,12 @@ export function createApp(opts: AppOptions) {
         pricing: "/v1/credits/pricing",
         balance: "/v1/credits/balance",
         history: "/v1/credits/history",
-        topup: "/pay/{usd}/{address}",
+        // Both sellers, the address-free one first, because it is the one a caller that found
+        // this file can use without knowing anything: the credits go to whoever signs. The
+        // addressed one stays named because the Conway runtime builds it and because a human
+        // reading this file wants to see which wallet a topup lands on.
+        topup: "/pay/{usd}",
+        topup_for_wallet: "/pay/{usd}/{address}",
         register: "/v1/automatons/register",
         inference: "/v1/chat/completions",
       },
@@ -1500,6 +1505,33 @@ export function createApp(opts: AppOptions) {
   });
 
   // --- Topup (x402, without an API key: the runtime client sends none here) ---
+
+  /**
+   * The same seller without an address in the path, which is the one a catalogue can key on.
+   *
+   * This service entered the PayAI x402 directory on 2026-09-27 at 22:21:02, as a side effect of
+   * the first foreign settlement, and the row it kept is that payer's own URL,
+   * `/pay/5/0x3749efe7…`. `routeTemplate: "/pay/:usd/:address"` is declared in
+   * src/payments/bazaar.ts to prevent exactly that and did not. So the single public entry this
+   * project has in a machine-readable catalogue points at one stranger's wallet, and the next
+   * automaton to follow it signs with its own and is refused.
+   *
+   * Here the signer is the recipient, so the URL is the same for everybody and there is nothing
+   * in the path to get wrong. src/payments/pay.ts says at length why that is not a weaker rule
+   * than the one it leaves out. The addressed route stays untouched: the Conway runtime builds
+   * that URL itself and never sees this one.
+   */
+  app.get("/pay/:usd", async (c) => {
+    const pay = opts.pay ?? null;
+    const settler = opts.settler ?? null;
+    if (!pay) return c.json(PAYMENTS_UNAVAILABLE, 503);
+    const res = await handlePay(db, settler, { ...pay, publicOrigin: pay.publicOrigin ?? requestOrigin(c) }, {
+      usd: c.req.param("usd"),
+      paymentHeader: c.req.header("x-payment"),
+    });
+    for (const [k, v] of Object.entries(res.headers ?? {})) c.header(k, v);
+    return c.json(res.body, res.status as 200);
+  });
 
   app.get("/pay/:usd/:address", async (c) => {
     const pay = opts.pay ?? null;

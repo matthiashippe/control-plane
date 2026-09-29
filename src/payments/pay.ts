@@ -82,12 +82,12 @@ export const SCHWELLEN_BONUS_CENTS = 1;
  * The identifier of the paid endpoint. Absolute as soon as the operator knows their base URL,
  * because a facilitator only takes absolute URLs into its directory.
  */
-export function payResource(cfg: PayConfig, usd: number, recipient: Address): string {
-  const path = `/pay/${usd}/${recipient}`;
+export function payResource(cfg: PayConfig, usd: number, recipient?: Address): string {
+  const path = recipient ? `/pay/${usd}/${recipient}` : `/pay/${usd}`;
   return cfg.publicOrigin ? `${cfg.publicOrigin}${path}` : path;
 }
 
-export function buildPaymentRequired(cfg: PayConfig, usd: number, recipient: Address): PaymentRequired {
+export function buildPaymentRequired(cfg: PayConfig, usd: number, recipient?: Address): PaymentRequired {
   return {
     x402Version: 1,
     accepts: [
@@ -201,7 +201,7 @@ function paymentHint(cfg: PayConfig, usd: number, error: string, signer?: string
   }
 }
 
-function paymentRequiredResponse(cfg: PayConfig, usd: number, recipient: Address, error?: string, signer?: string): PayResponse {
+function paymentRequiredResponse(cfg: PayConfig, usd: number, recipient: Address | undefined, error?: string, signer?: string): PayResponse {
   const required = buildPaymentRequired(cfg, usd, recipient);
   const body: Record<string, unknown> = { ...required };
   if (error) {
@@ -360,7 +360,11 @@ const SETTLEMENT_IN_PROGRESS = {
 
 export interface PayRequest {
   usd: string;
-  recipient: string;
+  /**
+   * The wallet the credits go to, from the path. Optional, and left out on the address-free
+   * route: there the signer is the recipient by construction. See `payResource()`.
+   */
+  recipient?: string;
   paymentHeader?: string;
 }
 
@@ -386,7 +390,31 @@ export async function handlePay(
       },
     };
   }
-  if (!isAddress(req.recipient)) {
+  // The address in the path is optional, and the route without one is the one the catalogue can
+  // key on.
+  //
+  // This service entered the PayAI directory on 2026-09-27 at 22:21:02, as a side effect of the
+  // first foreign settlement, and the row it kept is that payer's own URL: `/pay/5/0x3749efe7…`.
+  // `routeTemplate` is declared for exactly this and did not consolidate the entry. So the one
+  // public front door this project has points at one stranger's wallet, and the next automaton
+  // that follows it signs with its own and is refused.
+  //
+  // The address was never load-bearing. `buildPaymentRequired()` uses it for one thing, the
+  // `resource` URL; the amount, the asset and the recipient of the USDC are all independent of
+  // it. What it does carry is a safety check, `recipient_must_match_payer`, which exists because
+  // a signed x402 header is worth money and the signature does not cover the path: without the
+  // check, whoever catches one could book the credits to an address of their choosing while the
+  // USDC keeps leaving the signer (security review 19.09.2026).
+  //
+  // A route with no address in it cannot have that problem, because there is nothing to redirect
+  // to: the credits go to `authorization.from`, which is the wallet the signature is verified
+  // against and the wallet the USDC actually leaves. A captured header replayed here credits the
+  // original signer, exactly as if they had used it themselves, and the spent-nonce table refuses
+  // it a second time. So this route is not a relaxation of that rule, it is the same rule with
+  // the parameter it was guarding removed.
+  //
+  // `/pay/{usd}/{address}` stays and is unchanged: the Conway runtime builds that URL itself.
+  if (req.recipient !== undefined && !isAddress(req.recipient)) {
     return {
       status: 400,
       body: {
@@ -398,7 +426,7 @@ export async function handlePay(
       },
     };
   }
-  const recipient = req.recipient.toLowerCase() as Address;
+  const recipient = req.recipient ? (req.recipient.toLowerCase() as Address) : undefined;
   if (!settler) {
     return {
       status: 503,
@@ -431,9 +459,12 @@ export async function handlePay(
   // redirect the credit to an arbitrary address while the money keeps flowing out of the signer
   // (security review 19.09.2026). The runtime always tops up its own wallet, so this restricts no
   // real flow.
-  if (auth.from.toLowerCase() !== recipient.toLowerCase()) {
+  if (recipient !== undefined && auth.from.toLowerCase() !== recipient.toLowerCase()) {
     return paymentRequiredResponse(cfg, usd, recipient, "recipient_must_match_payer", auth.from);
   }
+  // On the address-free route the signer is the recipient. This is the same value the check above
+  // enforces on the other route, so everything below it reads one variable either way.
+  const credited = (recipient ?? auth.from.toLowerCase()) as Address;
   if (auth.value !== expected) {
     return paymentRequiredResponse(cfg, usd, recipient, `wrong_amount: expected ${expected}`);
   }
@@ -468,7 +499,7 @@ export async function handlePay(
     try {
       db.prepare(
         "INSERT INTO payments (nonce, from_address, to_address, value_atomic, credits_mc, status, created_at) VALUES (?, ?, ?, ?, ?, 'pending', ?)",
-      ).run(auth.nonce, auth.from.toLowerCase(), recipient, auth.value.toString(), creditsMc, nowIso);
+      ).run(auth.nonce, auth.from.toLowerCase(), credited, auth.value.toString(), creditsMc, nowIso);
       return true;
     } catch {
       return false; // Race: another request has just created the nonce
@@ -489,7 +520,7 @@ export async function handlePay(
 
   const book = db.transaction(() => {
     const { balanceMc } = postLedger(db, {
-      address: recipient,
+      address: credited,
       kind: "topup",
       deltaMc: creditsMc,
       ref: auth.nonce,

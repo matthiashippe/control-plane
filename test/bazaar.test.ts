@@ -74,14 +74,31 @@ describe("declaration for the facilitator directory", () => {
       .not.toHaveProperty("info");
   });
 
-  // The catalogue keys on routeTemplate for a parameterised route. Without it every payer's
-  // concrete URL would be its own entry, and the directory would fill with one row per topup.
-  it("names the route template, so the catalogue keeps one row and not one per payer", () => {
-    const offer = buildPaymentRequired(cfg, 5, WALLET);
-    const bazaar = offer.accepts[0].extensions?.bazaar as { routeTemplate?: string } | undefined;
-    expect(bazaar?.routeTemplate).toBe("/pay/:usd/:address");
-    expect(offer.accepts[0].resource, "the concrete resource still names the actual call")
-      .toContain(WALLET);
+  // What this test asserted until 2026-09-29 was a hypothesis, and the hypothesis was wrong.
+  //
+  // It pinned `routeTemplate` to `/pay/:usd/:address` on the reasoning that the catalogue keys on
+  // the template for a parameterised route, so one row would cover every payer. The first foreign
+  // settlement went through on 27.09. at 22:21:02 carrying exactly that, the facilitator took the
+  // block (`hat_bazaar_block = 1` in the day's directory scan), and the row it kept is the payer's
+  // concrete URL. One settlement, one row, one wallet in it.
+  //
+  // So the parameter that differs per payer was removed instead of argued with: `/pay/{usd}` sells
+  // the same tier to whoever signs, and the credits go to the signer. That URL is one row whether
+  // the facilitator honours `routeTemplate` or keys on the resource it is handed.
+  it("declares the route that is the same URL for every payer", () => {
+    const bazaar = buildPaymentRequired(cfg, 5).accepts[0].extensions?.bazaar as
+      | { routeTemplate?: string; inputSchema?: { pathParams?: Record<string, unknown> } }
+      | undefined;
+    expect(bazaar?.routeTemplate).toBe("/pay/:usd");
+    expect(Object.keys(bazaar?.inputSchema?.pathParams ?? {}), "an address here would be the per-payer key again")
+      .toEqual(["usd"]);
+  });
+
+  it("offers the address-free resource when no address was asked for, and the concrete one when it was", () => {
+    expect(buildPaymentRequired({ ...cfg, publicOrigin: "https://postyourprice.com" }, 5).accepts[0].resource)
+      .toBe("https://postyourprice.com/pay/5");
+    expect(buildPaymentRequired({ ...cfg, publicOrigin: "https://postyourprice.com" }, 5, WALLET).accepts[0].resource)
+      .toBe(`https://postyourprice.com/pay/5/${WALLET}`);
   });
 
   it("sends declaration and description to the facilitator, not only to the client", () => {
