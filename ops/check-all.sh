@@ -263,6 +263,18 @@ printf -- '\n-- die Sperren, gemessen --\n'
 
 run "the blocker check can tell an applied patch from a pending one" ./ops/sperren.sh --selftest
 
+# Die Anzeigenfrage, jeden Zyklus neu gestellt.
+#
+# Matthias am 29.09., nachdem die erste Antwort Nein war: "jetzt geht es vielleicht noch nicht,
+# aber in der produkt und gtm roadmap koennte es in der naechsten oder uebernaechsten woche eine
+# rolle spielen, daher einfach regelmaessig mal challengen." Eine Rechnung, die man sich vornehmen
+# muss, wird nicht gerechnet, also rechnet sie hier mit. Sie liest Hauptbuch und Zugriffslog und
+# schlaegt um, sobald ein Kunde mehr ausgibt oder ein Auftrag mehr wert ist.
+printf -- '\n-- tragen Anzeigen schon? --\n'
+./ops/status.sh 2>/dev/null | python3 ./ops/anzeigen-rechnung.py 2>/dev/null | grep -E "^  (fremde Zahler|Wert je Kunde|TRAEGT|Der andere Weg|Auftrag rund)" || true
+
+run "the ad case can say yes as well as no" python3 ./ops/anzeigen-rechnung.py --selftest
+
 # Whether a copy of the database exists anywhere but on the disk that holds it. Measured on
 # 2026-09-23: seven backups, all on /dev/sda1, the same single disk as the live database, and
 # nothing in the crontab copies any of them off the machine. Behind that file are 286 wallets and

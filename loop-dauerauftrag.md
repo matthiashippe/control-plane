@@ -1,6 +1,8 @@
 # Dauerauftrag für den Loop
 
 > Jeder Loop-Lauf beginnt in **`ZIELE.md`**, dann hier, dann in `loop-constraints.md`.
+> **`ROADMAP.md`** sagt, was ueber einen Zyklus hinaus in welcher Reihenfolge gebaut wird und
+> warum, samt der Messung, die jede Zeile widerlegen wuerde.
 > Der Auftrag von Matthias, 19.09.2026: "die ganze zeit verbessern entwickeln deployn, prüfen
 > verbessern deployn, etc! schauen was macht der traffic verbessern deployn".
 >

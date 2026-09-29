@@ -357,6 +357,27 @@ report.market = {
   // The same class of error emptied the offer for four hours on 2026-09-23, from the other end.
   // Where the three numbers above came from. "fallback" means this report is guessing at the
   // pool's size, and a guess about the pool is a guess about every offer the pages make.
+  // Was ein fremder Zahler diesem Dienst bisher wirklich eingebracht hat.
+  //
+  // Fuer ops/anzeigen-rechnung.py, und der Grund, warum es hier steht und nicht dort: die erste
+  // Fassung jener Rechnung trug die Zahlen vom 29.09. fest eingebaut. Matthias hat gesagt, die
+  // Anzeigenfrage solle regelmaessig neu gestellt werden, und eine Rechnung mit eingemauerten
+  // Zahlen stellt keine Frage, sie wiederholt eine Antwort. Von hier aus schlaegt sie um, sobald
+  // ein Kunde mehr ausgibt.
+  foreign_payers: one(
+    `select count(distinct address) n from ledger where kind = 'topup' and ${notOurs}`,
+    ...OURS_ARGS,
+  ).n,
+  foreign_topup_mc: one(
+    `select coalesce(sum(delta_mc),0) s from ledger where kind = 'topup' and ${notOurs}`,
+    ...OURS_ARGS,
+  ).s,
+  foreign_margin_mc: all(
+    `select meta from ledger where kind = 'inference' and ${notOurs}`,
+    ...OURS_ARGS,
+  ).reduce((sum, r) => {
+    try { return sum + (JSON.parse(r.meta || "{}").margin_mc || 0); } catch { return sum; }
+  }, 0),
   pool_source: poolSource,
   starter_pool_left_mc:
     POOL_MC - one("select coalesce(sum(delta_mc),0) s from ledger where kind in ('grant','grant_returned')").s,

@@ -1,121 +1,153 @@
 #!/usr/bin/env python3
-"""Do paid ads pay for themselves here? The arithmetic, from the ledger.
+"""Do paid ads pay for themselves here? The arithmetic, recomputed every time.
 
 Matthias on 2026-09-29: "anzeigen sind ja ein klarer business case, da muss ich keine
-entscheidung treffen, du musst das einfach analysieren." So this is the analysis, and it is a
-tool rather than a note because the answer changes the day the numbers do.
+entscheidung treffen, du musst das einfach analysieren." And, after the first answer came back
+no: "jetzt geht es vielleicht noch nicht, aber in der produkt und gtm roadmap koennte es ja in der
+naechsten oder uebernaechsten woche eine rolle spielen, daher einfach regelmaessig mal challengen."
 
-It reads the report on stdin (`ops/status.sh`) plus the per-wallet figures passed in, and prints
-the three numbers that decide it: what an acquired customer is worth, what one costs, and the
-factor between them. Nothing here is estimated except the click price, which is an input.
+That second sentence is why this file was rewritten within the hour. The first version carried the
+figures of 29.09. as constants, and a calculation with its numbers walled in does not ask a
+question, it repeats an answer. Everything now comes from the ledger and the access log, so the
+day a customer spends more or a job is worth more, this says so by itself.
 
-    ops/status.sh | python3 ops/anzeigen-rechnung.py --cpc 0.10
-    ops/status.sh | python3 ops/anzeigen-rechnung.py --cpc 0.10 --selftest
+    ops/status.sh | python3 ops/anzeigen-rechnung.py
+    ops/status.sh | python3 ops/anzeigen-rechnung.py --cpc 0.25
+    python3 ops/anzeigen-rechnung.py --selftest
+
+Exit 0 when the case carries at the given click price, 1 when it does not, 2 when it could not
+look. An open question with a clear no is exit 1, which is the normal state and not a failure.
 """
 import argparse
 import json
+import subprocess
 import sys
 
-# Measured on 2026-09-29 from the live ledger, and the whole case rests on these four.
-#
-# They are written down rather than read live because this file has to say what it concluded and
-# when. A later run with different numbers should DISAGREE with this header, loudly, which is the
-# point of printing both.
-GEMESSEN = {
-    "fremde_zahler": 2,
-    "fremd_eingezahlt_usd": 15.02,
-    "unsere_marge_c": 9.42,
-    # Every foreign address that has ever asked the pay route for its offer, against the two that
-    # ever signed. 344 of 352 requests answered 402 and only two payments ever landed.
-    "adressen_an_der_bezahlroute": 230,
-}
+MC_PER_CENT = 1000
+# What the operator keeps of a job, in percent. src/bounties/store.ts FEE_PERCENT.
+FEE_PERCENT = 10
 
 
-def rechne(cpc_eur: float, marge_je_kunde_eur: float, konversion: float) -> dict:
-    """Cost per acquired paying customer against what that customer is worth."""
+def adressen_an_der_bezahlroute() -> int:
+    """Foreign addresses that have ever been handed the payment offer.
+
+    The denominator of the conversion, and it has to come from the log because a wallet that
+    looked and left never appears in the database at all.
+    """
+    try:
+        log = subprocess.run(["./ops/access-log.sh"], capture_output=True, text=True, timeout=180).stdout
+    except Exception:
+        return 0
+    try:
+        own = set(open("ops/own-ips.txt").read().split())
+    except OSError:
+        own = set()
+    adressen = set()
+    for line in log.splitlines():
+        line = line.strip()
+        if not line.startswith("{"):
+            continue
+        try:
+            d = json.loads(line)
+        except Exception:
+            continue
+        r = d.get("request", {})
+        if not (r.get("uri") or "").startswith("/pay/"):
+            continue
+        ip = r.get("client_ip", "")
+        if ip in own or ip == "76.13.144.207":
+            continue
+        adressen.add(ip)
+    return len(adressen)
+
+
+def rechne(cpc_eur: float, wert_eur: float, konversion: float) -> dict:
     kosten = cpc_eur / konversion if konversion > 0 else float("inf")
     return {
-        "kosten_je_kunde_eur": round(kosten, 2),
-        "wert_je_kunde_eur": round(marge_je_kunde_eur, 2),
-        "faktor": round(kosten / marge_je_kunde_eur, 1) if marge_je_kunde_eur > 0 else float("inf"),
-        "traegt": kosten <= marge_je_kunde_eur,
+        "kosten": kosten,
+        "wert": wert_eur,
+        "faktor": (kosten / wert_eur) if wert_eur > 0 else float("inf"),
+        "traegt": wert_eur > 0 and kosten <= wert_eur,
     }
+
+
+def selftest() -> int:
+    fail = 0
+
+    def pruefe(name, got, want):
+        nonlocal fail
+        if got == want:
+            print(f"  ok      {name}")
+        else:
+            print(f"  FAILED  {name}: {got}, erwartet {want}")
+            fail = 1
+
+    # Ein Rechner, der nur Nein sagen kann, ist kein Rechner.
+    pruefe("die Lage vom 29.09. traegt nicht", rechne(0.10, 0.036, 0.0087)["traegt"], False)
+    pruefe("ein 200-Euro-Auftrag traegt", rechne(0.10, 20.0, 0.01)["traegt"], True)
+    pruefe("genau am Break-even traegt es", rechne(1.0, 1.0, 1.0)["traegt"], True)
+    pruefe("einen Schritt darueber nicht mehr", rechne(1.01, 1.0, 1.0)["traegt"], False)
+    pruefe("ohne Konversion ist nichts zu holen", rechne(0.10, 5.0, 0.0)["traegt"], False)
+    pruefe("ohne Wert auch nicht", rechne(0.10, 0.0, 0.5)["traegt"], False)
+    print("ANZEIGEN SELFTEST OK" if fail == 0 else "ANZEIGEN SELFTEST FAILED")
+    return fail
 
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--cpc", type=float, default=0.10, help="click price in EUR")
+    ap.add_argument("--cpc", type=float, default=0.10, help="Klickpreis in EUR")
     ap.add_argument("--selftest", action="store_true")
     a = ap.parse_args()
-
     if a.selftest:
-        # A calculator that only ever says no is not a calculator.
-        fail = 0
-        nein = rechne(cpc_eur=0.10, marge_je_kunde_eur=2.30, konversion=0.0087)
-        ja = rechne(cpc_eur=0.02, marge_je_kunde_eur=50.0, konversion=0.05)
-        if nein["traegt"] is False and nein["faktor"] > 4:
-            print("  ok      die gemessene Lage traegt nicht, und sagt um welchen Faktor")
-        else:
-            print(f"  FAILED  gemessene Lage: {nein}"); fail = 1
-        if ja["traegt"] is True:
-            print("  ok      eine Lage, die traegt, wird auch als tragend erkannt")
-        else:
-            print(f"  FAILED  tragende Lage: {ja}"); fail = 1
-        grenz = rechne(cpc_eur=1.0, marge_je_kunde_eur=1.0, konversion=1.0)
-        if grenz["traegt"] is True and grenz["faktor"] == 1.0:
-            print("  ok      genau am Break-even ist es noch tragend")
-        else:
-            print(f"  FAILED  Break-even: {grenz}"); fail = 1
-        print("ANZEIGEN SELFTEST OK" if fail == 0 else "ANZEIGEN SELFTEST FAILED")
-        return fail
+        return selftest()
 
     try:
-        db = json.load(sys.stdin)["db"]
-        markt = db["market"]
+        markt = json.load(sys.stdin)["db"]["market"]
     except Exception as exc:
-        print(f"could not read ops/status.sh on stdin: {exc}")
+        print(f"ops/status.sh gehoert auf stdin: {exc}")
         return 2
 
-    # What an acquired customer has actually been worth, from the ledger and not from a plan.
-    marge_c = GEMESSEN["unsere_marge_c"]
-    zahler = GEMESSEN["fremde_zahler"]
-    ist_marge_eur = (marge_c / 100) / zahler if zahler else 0.0
+    zahler = markt.get("foreign_payers", 0)
+    eingezahlt_c = markt.get("foreign_topup_mc", 0) / MC_PER_CENT
+    marge_c = markt.get("foreign_margin_mc", 0) / MC_PER_CENT
+    gesehen = adressen_an_der_bezahlroute()
 
-    # And the generous version: the best customer deposited 10.02 USD and its spending so far
-    # carried a 23 percent margin. If it ever spends the whole balance at that ratio, that is what
-    # it is worth. Nothing observed says it will; it stopped after two days.
-    best_eur = 10.02 * 0.23
+    print("Anzeigen, gerechnet gegen das Hauptbuch und das Zugriffslog")
+    print()
+    print(f"  fremde Zahler                       {zahler}")
+    print(f"  von ihnen eingezahlt                {eingezahlt_c / 100:.2f} USD")
+    print(f"  davon als Marge bei uns geblieben   {marge_c:.2f} c")
+    print(f"  Adressen, die das Angebot ansahen   {gesehen}")
 
-    konversion = zahler / GEMESSEN["adressen_an_der_bezahlroute"]
+    if zahler == 0 or gesehen == 0:
+        print()
+        print("  Ohne Zahler oder ohne Betrachter ist die Konversion nicht definiert.")
+        print("  Das ist kein Nein, sondern ein Noch-nicht-messbar.")
+        return 2
 
-    print("Anzeigen, gerechnet gegen das Hauptbuch")
+    konversion = zahler / gesehen
+    wert_ist = (marge_c / 100) / zahler
+    print(f"  Konversion Betrachter zu Zahler     {konversion * 100:.2f} %")
     print()
-    print(f"  fremde Zahler ueberhaupt            {zahler}")
-    print(f"  von ihnen eingezahlt                {GEMESSEN['fremd_eingezahlt_usd']:.2f} USD")
-    print(f"  davon bei uns als Marge geblieben   {marge_c:.2f} c")
-    print(f"  Adressen, die das Angebot ansahen   {GEMESSEN['adressen_an_der_bezahlroute']}")
-    print(f"  daraus Konversion zum Zahler        {konversion * 100:.2f} %")
+    print(f"  Wert je Kunde, gemessen             {wert_ist:.4f} EUR")
+
+    r = rechne(a.cpc, wert_ist, konversion)
+    print(f"  Kosten je Kunde bei {a.cpc:.2f} EUR/Klick   {r['kosten']:.2f} EUR")
     print()
-    print(f"  Wert je Kunde, gemessen             {ist_marge_eur:.4f} EUR")
-    print(f"  Wert je Kunde, grosszuegig          {best_eur:.2f} EUR  (der beste gibt sein ganzes Guthaben aus)")
+    if r["traegt"]:
+        print(f"  TRAEGT. Ein Klick zu {a.cpc:.2f} EUR ist bezahlt, bevor er gekostet hat.")
+        return 0
+
+    print(f"  TRAEGT NICHT, Faktor {r['faktor']:.0f}.")
+    print(f"  Damit es aufgeht, duerfte ein Klick hoechstens {wert_ist * konversion:.4f} EUR kosten.")
     print()
-    for label, wert in (("gemessen", ist_marge_eur), ("grosszuegig", best_eur)):
-        r = rechne(a.cpc, wert, konversion)
-        urteil = "TRAEGT" if r["traegt"] else f"traegt nicht, Faktor {r['faktor']}"
-        print(f"  bei {a.cpc:.2f} EUR je Klick, {label:12} Kosten {r['kosten_je_kunde_eur']:.2f} EUR je Kunde -> {urteil}")
-    print()
-    # Was sich aendern muesste, in der Einheit, in der man es aendern kann.
-    noetig_cpc = best_eur * konversion
-    print(f"  Damit es bei der grosszuegigen Rechnung traegt, duerfte ein Klick")
-    print(f"  hoechstens {noetig_cpc:.4f} EUR kosten. Das gibt es nicht.")
-    print()
-    print(f"  Der andere Weg: der Auftragswert. Die bisherigen Auftraege lagen bei 45 bis 650")
-    print(f"  Cent, unsere Provision sind zehn Prozent davon. Bei einem Auftrag ueber 200 EUR")
-    print(f"  waeren das 20 EUR, und dann traegt ein Klick von 10 Cent bei jeder Konversion")
-    print(f"  ueber {0.10 / 20 * 100:.2f} Prozent.")
-    print()
-    print(f"  offene Auftraege gerade: {markt.get('open_bounties', '?')}")
-    return 0
+    # Die andere Stellschraube, und die einzige, die dieses Projekt selbst drehen kann.
+    noetig_eur = a.cpc / konversion
+    auftrag_eur = noetig_eur / (FEE_PERCENT / 100)
+    print(f"  Der andere Weg ist der Auftragswert. Bei {FEE_PERCENT} Prozent Provision muesste ein")
+    print(f"  Auftrag rund {auftrag_eur:.0f} EUR wert sein, damit ein Klick zu {a.cpc:.2f} EUR sich")
+    print(f"  bei der heutigen Konversion traegt. Offene Auftraege gerade: {markt.get('open_bounties', '?')}.")
+    return 1
 
 
 if __name__ == "__main__":
