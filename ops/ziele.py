@@ -85,8 +85,9 @@ def main():
     untergrenze = f"{UNTERGRENZE:.2f}".replace(".", ",")
     pruefe(f"Katalog mit {ANGEBOTE} Angeboten ab {untergrenze} EUR", http("CP_ZIELE_KATALOG"), 1,
            f"GET /katalog nennt mindestens {ANGEBOTE} Preise ab {untergrenze} EUR und den Liefersatz")
-    pruefe("Gespraech, das eine Bestellung erzeugt", http("CP_ZIELE_CHAT"), 1,
-           "ein Gespraech nimmt Anforderungen auf und macht daraus eine Bestellung")
+    pruefe("Gespraech, das nachfragt", http("CP_ZIELE_CHAT"), 1,
+           "Matthias am 29.09.: ein Chat, der Rueckfragen stellt. Ein Formular nimmt nur entgegen")
+    neben("  Angaben und E-Mail vor der Kasse (Formular)", http("CP_ZIELE_ANGABEN"))
     pruefe("Bezahlweg ohne Wallet", http("CP_ZIELE_KARTE"), 1,
            "POST /katalog/kaufen antwortet 303 auf Stripes Kasse, ohne Wallet und ohne USDC")
 

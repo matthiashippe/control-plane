@@ -198,20 +198,7 @@ fi
 # etwas zurueckgeben, das eine Bestellung werden kann. Der Bezahlweg muss auf eine echte Bestellung
 # eine Zahladresse liefern, und er darf dafuer keine Wallet-Adresse verlangen: genau das ist die
 # Mauer, die ein Mensch heute nicht ueberwindet.
-chat=$(curl -s -m 25 -X POST "$BASE/v1/orders/chat" -H 'content-type: application/json' \
-  -d '{"message":"Ich gebe Klavierunterricht in Hamburg und moechte eine einfache Seite im Internet."}' \
-  | python3 -c '
-import json, sys
-try:
-    d = json.load(sys.stdin)
-except Exception:
-    print(0); raise SystemExit
-# Eine Antwort, die weiterfuehrt: sie sagt etwas und fragt nach oder nennt einen Preis.
-text = json.dumps(d).lower()
-weiter = any(k in d for k in ("reply", "question", "order", "draft", "brief", "price_cents"))
-print(1 if weiter and len(text) > 80 else 0)
-' 2>/dev/null)
-chat=${chat:-0}
+
 
 # Der Bezahlweg ist seit Goal 20 das Formular unter jedem Angebot: POST /katalog/kaufen mit der
 # Angebots-ID, Antwort 303 auf Stripes Kasse. Bis zum 29.09.2026 fragte diese Probe
@@ -230,6 +217,46 @@ chat=${chat:-0}
 # ignoriert die zusaetzlichen Felder.
 angebot=$(printf '%s' "$katalog_html" | grep -oE '(name="angebot" value="|href="/katalog/bestellen\?angebot=)rede-zum-fest' \
   | head -1 | sed -E 's/.*(value="|angebot=)//')
+# Das Gespraech, und warum hier zwei Zahlen stehen statt einer.
+#
+# Bis zum 29.09.2026 fragte diese Probe POST /v1/orders/chat mit JSON, eine Route, die nie gebaut
+# wurde. Derselbe Fehler wie beim Kartenweg (HAN-17, Befund 4): die Probe zeigt auf einen Namen aus
+# einem Entwurf statt auf das, was steht. Gebaut wurde ein Formular unter
+# /katalog/bestellen?angebot=..., mit Feldern fuer die Angaben und einer E-Mail-Adresse.
+#
+# Ein Formular nimmt Angaben auf, und das ist die Haelfte. Die andere Haelfte ist das, was Matthias
+# am 29.09. ausdruecklich verlangt hat: "einen chat bei dem man chatten kann und anforderungen
+# spezifizieren kann etc nachfragen stellen kann". Ein Formular stellt keine Rueckfrage, es nimmt
+# entgegen, was jemand zu sagen weiss, und merkt nicht, wenn etwas fehlt.
+#
+# Deshalb zwei Zahlen: das Formular als Nebenzahl ohne Urteil, das nachfragende Gespraech als Ziel.
+# Die Latte wird damit nicht verschoben, sie wird sichtbar gemacht.
+angaben=0
+if [[ -n "$angebot" ]]; then
+  angaben=$(curl -s -m 20 "$BASE/katalog/bestellen?angebot=$angebot" 2>/dev/null | python3 -c '
+import re, sys
+t = sys.stdin.read()
+felder = set(re.findall(r"<(?:input|textarea|select)[^>]*name=\"([a-z_]+)\"", t))
+hat_anliegen = len(felder - {"angebot", "email"}) >= 1
+hat_kontakt = "email" in felder or "e_mail" in felder
+print(1 if hat_anliegen and hat_kontakt else 0)
+' 2>/dev/null)
+fi
+angaben=${angaben:-0}
+
+chat=$(curl -s -m 25 -X POST "$BASE/katalog/gespraech" -H 'content-type: application/json' \
+  -d '{"angebot":"rede-zum-fest","nachricht":"Ich brauche eine Rede."}' 2>/dev/null \
+  | python3 -c '
+import json, sys
+try:
+    d = json.load(sys.stdin)
+except Exception:
+    print(0); raise SystemExit
+frage = any(isinstance(v, str) and "?" in v for v in d.values())
+print(1 if frage and len(json.dumps(d, ensure_ascii=False)) > 60 else 0)
+' 2>/dev/null)
+chat=${chat:-0}
+
 karte=0
 if [[ -n "$angebot" ]]; then
   karte=$(karte_urteil "$(curl -s -m 25 -o /dev/null -w '%{http_code} %{redirect_url}' \
@@ -240,4 +267,4 @@ if [[ -n "$angebot" ]]; then
 fi
 
 printf '%s\n%s\n' "$status" "$report" \
-  | CP_ZIELE_KATALOG="$katalog" CP_ZIELE_CHAT="$chat" CP_ZIELE_KARTE="$karte" python3 ./ops/ziele.py
+  | CP_ZIELE_KATALOG="$katalog" CP_ZIELE_CHAT="$chat" CP_ZIELE_KARTE="$karte" CP_ZIELE_ANGABEN="$angaben" python3 ./ops/ziele.py
