@@ -4,4 +4,6 @@
 # "-" in commit heisst: dieser Lauf hat nichts committet.
 2026-09-29	Angebot	Produkt	Iterationsrunden: Feedback und Ueberarbeitung, vier Runden	413580f	0
 2026-09-29	Angebot	Betrieb	ausgerollt, 960 Tests gruen, 401 ohne Schluessel live geprueft	413580f	0
-2026-09-29	Sehen	org-schreiber	erster Durchlauf gescheitert: stabschef bricht 4x ohne Token ab, HAN-2 und HAN-3 angelegt	b0eab09	0
+2026-09-29	Sehen	Schreiber	erster Durchlauf gescheitert: stabschef bricht 4x ohne Token ab, HAN-2 und HAN-3 angelegt	b0eab09	0
+2026-09-29	Sehen	Produkt	Katalog live mit drei Angeboten ab 17 EUR	0ffa107	-
+2026-09-29	Bezahlen	Produkt	Kartenweg im Stripe-Testmodus, 303 auf echte Session	1e491b4	-

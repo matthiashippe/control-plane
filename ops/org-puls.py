@@ -19,6 +19,8 @@ from datetime import datetime, timezone
 HAENGT_MIN = 90
 # Ab wann Stille auffaellt: so lange kein einziger Lauf, obwohl offene Arbeit da ist.
 STILL_MIN = 120
+# Das Fenster, in dem Fehler zaehlen. Aelteres ist Geschichte und darf nicht dauerhaft rot halten.
+FENSTER_MIN = 360
 
 
 def alter_min(ts, jetzt):
@@ -74,20 +76,25 @@ def main():
 
     # 3. Gehen die Laeufe durch? Eine Firma, in der jeder Lauf scheitert, verbraucht Kontingent und
     #    erzeugt nichts.
+    # Die Fehlerquote in einem Zeitfenster, nicht ueber alle Zeit und nicht ueber die letzten N.
+    #
+    # Beide Abkuerzungen liegen daneben: eine Quote ueber alle Laeufe bleibt fuer immer rot, wenn
+    # ein Fehler einmal behoben ist, und "die letzten fuenf" haelt gruen, solange zufaellig fuenf
+    # gute dazwischenliegen. Am 29.09.2026 meldete dieses Werkzeug PULS OK bei 75 Prozent
+    # Fehlerquote, weil die neun kaputten Laeufe vom Morgen aus dem Fenster gerutscht waren und die
+    # Fuenf gerade passten. Gefunden vom Challenge-Schwarm.
     fertig = [l for l in laeufe if l.get("status") in ("succeeded", "failed")]
-    schlecht = [l for l in fertig if l.get("status") == "failed"]
-    if fertig:
-        quote = len(schlecht) / len(fertig)
-        print(f"  Laeufe fertig      {len(fertig)}, davon {len(schlecht)} gescheitert ({quote*100:.0f} Prozent)")
-        # Nur die juengsten fuenf zaehlen: die Fehler von heute Morgen sind behoben und wuerden die
-        # Quote fuer immer rot halten.
-        juengste = sorted(fertig, key=lambda l: l.get("startedAt") or "", reverse=True)[:5]
-        j_schlecht = [l for l in juengste if l.get("status") == "failed"]
-        if len(juengste) >= 3 and len(j_schlecht) == len(juengste):
-            print(f"    ROT     die letzten {len(juengste)} Laeufe sind alle gescheitert")
-            befunde.append(f"die letzten {len(juengste)} Laeufe sind alle gescheitert")
+    frisch = [l for l in fertig if (alter_min(l.get("startedAt"), jetzt) or 1e9) <= FENSTER_MIN]
+    schlecht = [l for l in frisch if l.get("status") == "failed"]
+    if frisch:
+        quote = len(schlecht) / len(frisch)
+        print(f"  Laeufe ({FENSTER_MIN//60} h)      {len(frisch)}, davon {len(schlecht)} gescheitert ({quote*100:.0f} Prozent)")
+        if len(frisch) >= 3 and quote >= 0.5:
+            print(f"    ROT     {quote*100:.0f} Prozent der Laeufe im Fenster sind gescheitert")
+            befunde.append(f"{len(schlecht)} von {len(frisch)} Laeufen der letzten {FENSTER_MIN//60} Stunden sind gescheitert")
     else:
-        print("  Laeufe fertig      keiner")
+        alt_fertig = len(fertig)
+        print(f"  Laeufe ({FENSTER_MIN//60} h)      keine ({alt_fertig} aelter als das Fenster)")
 
     # 4. Haengende Tickets: zugewiesen, in Arbeit, aber niemand laeuft dafuer.
     laufend = {l.get("agentId") for l in laeufe if l.get("status") == "running"}

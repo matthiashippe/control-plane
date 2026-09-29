@@ -38,16 +38,25 @@ JSON
   fi
 
   # Jede Stoerung einzeln, damit ein Pruefer nicht nur auf einen Fall reagiert.
-  for fall in fehler still haengt rot modelle; do
+  for fall in fehler still haengt rot altrot modelle; do
     case $fall in
       fehler)  j=$(printf '%s' "$gesund" | sed 's/"status":"idle"/"status":"error"/'); muster="FEHLER" ;;
       still)   j=$(printf '%s' "$gesund" | sed "s/\"startedAt\":\"$frisch\"/\"startedAt\":\"$alt\"/g"); muster="STILL" ;;
       haengt)  j=$(printf '%s' "$gesund" | sed "s/\"updatedAt\":\"$frisch\"/\"updatedAt\":\"$alt\"/" | sed 's/"status":"running"/"status":"succeeded"/'); muster="HAENGT" ;;
       rot)     j=$(printf '%s' "$gesund" | sed 's/"status":"running"/"status":"failed"/; s/"status":"succeeded"/"status":"failed"/g' | sed 's/{"agentId":"a1","status":"failed","startedAt":"'"$frisch"'"}\]/{"agentId":"a1","status":"failed","startedAt":"'"$frisch"'"},{"agentId":"a1","status":"failed","startedAt":"'"$frisch"'"}]/'); muster="ROT" ;;
+      # Die Gegenprobe zum Fenster: dieselben drei Fehler, nur alt, duerfen nicht mehr rot halten.
+      altrot)  j=$(printf '%s' "$gesund" | sed 's/"status":"running"/"status":"failed"/; s/"status":"succeeded"/"status":"failed"/g' | sed "s/\"startedAt\":\"$frisch\"/\"startedAt\":\"2026-09-28T10:00:00Z\"/g"); muster="" ;;
       modelle) j=$(printf '%s' "$gesund" | sed 's/{"name":"CEO","status":"idle","model":"claude-opus-5-5"}/{"name":"CEO","status":"idle","model":"claude-opus-5-5"},{"name":"CTO","status":"idle","model":"claude-opus-5"}/'); muster="verschiedenen Modellen" ;;
     esac
     out=$(printf '%s' "$j" | python3 ./ops/org-puls.py); code=$?
-    if (( code == 1 )) && grep -q "$muster" <<< "$out"; then
+    if [[ -z "$muster" ]]; then
+      # Kein Muster heisst: dieser Fall darf gerade KEINEN Befund ausloesen.
+      if ! grep -q "ROT" <<< "$out"; then
+        echo "  ok      $fall loest keinen Fehlalarm aus"
+      else
+        echo "  FAILED  $fall hat ROT gemeldet, obwohl die Fehler alt sind"; fail=1
+      fi
+    elif (( code == 1 )) && grep -q "$muster" <<< "$out"; then
       echo "  ok      $fall wird erkannt"
     else
       echo "  FAILED  $fall gab Exit $code ohne '$muster'"; fail=1
