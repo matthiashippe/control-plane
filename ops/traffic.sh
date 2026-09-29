@@ -34,11 +34,16 @@ ONLY_FUNNEL=0
 if [[ "${1:-}" == "--selftest" ]]; then
   fixture="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/fixtures/traffic-search-referrer-claimed.log"
   [[ -f "$fixture" ]] || { echo "SELFTEST FAILED: $fixture is not there"; exit 1; }
-  hours=$(python3 -c "
+  # CP_NOW (epoch seconds) stands in for the clock, so this can be run as of any day without
+  # faketime: CP_NOW=$(date -u -j -f %F 2026-10-03 +%s) ops/traffic.sh --selftest (HAN-33).
+  fixture_hours() { # the hours from the fixture's first line to now, so no fixture ages out
+    python3 -c "
 import json, math, sys, time
 stamps = [json.loads(l)[chr(116)+chr(115)] for l in open(sys.argv[1]) if l.strip()]
-print(max(1, math.ceil((time.time() - min(stamps)) / 3600) + 1))
-" "$fixture")
+print(max(1, math.ceil((float(sys.argv[2] or time.time()) - min(stamps)) / 3600) + 1))
+" "$1" "${CP_NOW:-}"
+  }
+  hours=$(fixture_hours "$fixture")
   out=$(CP_TRAFFIC_LOG="$fixture" "${BASH_SOURCE[0]}" "$hours" 2>/dev/null)
   fail=0
   want() { # a line that must be there, and the reason it must
@@ -75,7 +80,8 @@ print(max(1, math.ceil((time.time() - min(stamps)) / 3600) + 1))
   # CP_PAGES is set so the run does not ask production for a sitemap that may not list /katalog yet.
   katalog_case() { # fixture, expected scrolled count, reason
     local out hits
-    out=$(CP_PAGES="/ /katalog /check /fix /post" CP_TRAFFIC_LOG="$(dirname "$fixture")/$1" "${BASH_SOURCE[0]}" 24 2>/dev/null)
+    out=$(CP_PAGES="/ /katalog /check /fix /post" CP_TRAFFIC_LOG="$(dirname "$fixture")/$1" "${BASH_SOURCE[0]}" \
+      "$(fixture_hours "$(dirname "$fixture")/$1")" 2>/dev/null)
     hits=$(printf '%s' "$out" | /usr/bin/grep -cE "^   1 address\(es\) opened /katalog" || true)
     if [[ "${hits:-0}" -eq 0 ]]; then
       echo "SELFTEST FAILED: $1 should have one foreign address opening /katalog"; fail=1
@@ -96,7 +102,7 @@ print(max(1, math.ceil((time.time() - min(stamps)) / 3600) + 1))
   katalog_case traffic-katalog-404-before-deploy.log 1 \
     "a scroll after the first 200 counts even when a 404 came before it"
   hits=$(CP_PAGES="/ /katalog /check /fix /post" CP_TRAFFIC_LOG="$(dirname "$fixture")/traffic-katalog-404-before-deploy.log" \
-    "${BASH_SOURCE[0]}" 24 2>/dev/null | /usr/bin/grep -cE "^   window: 2026-09-30 12:00 .*first 200 of /katalog" || true)
+    "${BASH_SOURCE[0]}" "$(fixture_hours "$(dirname "$fixture")/traffic-katalog-404-before-deploy.log")" 2>/dev/null | /usr/bin/grep -cE "^   window: 2026-09-30 12:00 .*first 200 of /katalog" || true)
   if [[ "${hits:-0}" -eq 0 ]]; then
     echo "SELFTEST FAILED: the catalogue window has to open at the first 200 (12:00), not at the 404 (08:00)"; fail=1
   fi
@@ -106,11 +112,7 @@ print(max(1, math.ceil((time.time() - min(stamps)) / 3600) + 1))
   # robots.txt; one stranger opens the page and gets a 303; another stranger posts `angebot` alone
   # and gets a 400. The window is computed from the fixture, so it cannot age out.
   order_fixture="$(dirname "$fixture")/traffic-order-page.log"
-  order_hours=$(python3 -c "
-import json, math, sys, time
-stamps = [json.loads(l)[chr(116)+chr(115)] for l in open(sys.argv[1]) if l.strip()]
-print(max(1, math.ceil((time.time() - min(stamps)) / 3600) + 1))
-" "$order_fixture")
+  order_hours=$(fixture_hours "$order_fixture")
   order_run() { CP_PAGES="/ /katalog /check /fix /post" CP_TRAFFIC_LOG="$order_fixture" "$@" "${BASH_SOURCE[0]}" "$order_hours" 2>/dev/null; }
   order_want() { # output, extended regex, reason
     if ! printf '%s' "$1" | /usr/bin/grep -qE -- "$2"; then
@@ -190,7 +192,7 @@ OWN=$(own_ips)
 # So the list is now assembled from evidence, in `own_addresses` below, and what it adds is
 # printed. A filter that grows in silence can hide a real visitor just as easily.
 
-since=$(( $(date -u +%s) - HOURS * 3600 ))
+since=$(( ${CP_NOW:-$(date -u +%s)} - HOURS * 3600 ))
 # Handed to jq as a JSON list, not as an expression assembled by hand: a `paste -d' and '` only
 # takes the first character as the separator, which left the filter silently broken.
 own_json=$(printf '%s' "$OWN" | tr ' ' '\n' | jq -R . | jq -sc .)
