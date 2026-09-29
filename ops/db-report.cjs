@@ -406,6 +406,13 @@ report.market = {
                          and k2.name = 'conway-automaton')`,
     ...OURS, ...OUR_KEY_NAMES,
   ).n,
+  // Was fremde Zahler wirklich verbraucht haben, fuer ops/anzeigen-rechnung.py. Ohne diese Zahl
+  // konnte die Rechnung Einzahlung und Verbrauch nicht trennen und hat nur die verbrauchte Marge
+  // als Wert je Kunde gelesen.
+  foreign_inference_mc: one(
+    `select coalesce(sum(-delta_mc),0) s from ledger where kind = 'inference' and ${notOurs}`,
+    ...OURS_ARGS,
+  ).s,
   pool_source: poolSource,
   starter_pool_left_mc:
     POOL_MC - one("select coalesce(sum(delta_mc),0) s from ledger where kind in ('grant','grant_returned')").s,

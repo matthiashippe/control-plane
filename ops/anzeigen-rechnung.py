@@ -96,6 +96,9 @@ def selftest() -> int:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--cpc", type=float, default=0.10, help="Klickpreis in EUR")
+    # EZB-Referenzkurs vom 29.09.2026. Als Schalter, damit ein anderer Tag nicht still
+    # mit dem Kurs von heute rechnet.
+    ap.add_argument("--fx", type=float, default=1.1355, help="USD je EUR")
     ap.add_argument("--selftest", action="store_true")
     a = ap.parse_args()
     if a.selftest:
@@ -110,6 +113,7 @@ def main() -> int:
     zahler = markt.get("foreign_payers", 0)
     eingezahlt_c = markt.get("foreign_topup_mc", 0) / MC_PER_CENT
     marge_c = markt.get("foreign_margin_mc", 0) / MC_PER_CENT
+    verbraucht_c = markt.get("foreign_inference_mc", 0) / MC_PER_CENT
     gesehen = adressen_an_der_bezahlroute()
 
     print("Anzeigen, gerechnet gegen das Hauptbuch und das Zugriffslog")
@@ -126,24 +130,53 @@ def main() -> int:
         return 2
 
     konversion = zahler / gesehen
-    wert_ist = (marge_c / 100) / zahler
+
+    # Was ein Kunde wert ist, und warum das ein Band ist und keine Zahl.
+    #
+    # Bis zum 29.09. stand hier `marge_c / zahler`, also nur die Marge auf dem, was schon
+    # VERBRAUCHT ist. Das ist die Untergrenze und nicht der Wert: von 15,02 USD Einzahlungen sind
+    # 0,41 USD verbraucht. Die restlichen 14,61 USD liegen als Guthaben bei uns, und Guthaben ist
+    # nach /terms und /v1/credits/pricing nicht auszahlbar. Es ist also nicht null wert.
+    #
+    # Die Spanne ist ehrlich und nicht zu vermeiden: wird das Guthaben ganz verbraucht, bleibt uns
+    # die gemessene Margenquote davon; wird es nie verbraucht, bleibt uns alles. Beide Enden sind
+    # real, und welches gilt, weiss heute niemand. Also stehen beide da.
+    margenquote = (marge_c / verbraucht_c) if verbraucht_c > 0 else 0.0
+    offen_c = max(0.0, eingezahlt_c - verbraucht_c)
+    tief_c = marge_c + margenquote * offen_c
+    hoch_c = marge_c + offen_c
+
+    # Und die Einheit. Das Hauptbuch rechnet in US-Cent, weil Einzahlungen in USDC kommen; der
+    # Klickpreis steht in Euro. Bis zum 29.09. wurden beide direkt verglichen.
+    usd_je_eur = a.fx
+    tief_eur = (tief_c / 100) / usd_je_eur / zahler
+    hoch_eur = (hoch_c / 100) / usd_je_eur / zahler
+
+    print(f"  davon schon verbraucht              {verbraucht_c:.2f} c, Margenquote {margenquote * 100:.1f} %")
     print(f"  Konversion Betrachter zu Zahler     {konversion * 100:.2f} %")
     print()
-    print(f"  Wert je Kunde, gemessen             {wert_ist:.4f} EUR")
+    print(f"  Wert je Kunde                       {tief_eur:.2f} bis {hoch_eur:.2f} EUR")
+    print(f"     untere Grenze: nur das, was vom Guthaben noch Marge wird")
+    print(f"     obere Grenze:  das Guthaben wird nie verbraucht und bleibt ganz bei uns")
+    print(f"     Kurs {usd_je_eur} USD je EUR")
 
-    r = rechne(a.cpc, wert_ist, konversion)
-    print(f"  Kosten je Kunde bei {a.cpc:.2f} EUR/Klick   {r['kosten']:.2f} EUR")
+    r_tief = rechne(a.cpc, tief_eur, konversion)
+    r_hoch = rechne(a.cpc, hoch_eur, konversion)
+    print(f"  Kosten je Kunde bei {a.cpc:.2f} EUR/Klick   {r_tief['kosten']:.2f} EUR")
     print()
-    if r["traegt"]:
-        print(f"  TRAEGT. Ein Klick zu {a.cpc:.2f} EUR ist bezahlt, bevor er gekostet hat.")
+    if r_hoch["traegt"]:
+        print(f"  TRAEGT am oberen Ende des Bands.")
         return 0
-
-    print(f"  TRAEGT NICHT, Faktor {r['faktor']:.0f}.")
-    print(f"  Damit es aufgeht, duerfte ein Klick hoechstens {wert_ist * konversion:.4f} EUR kosten.")
+    print(f"  TRAEGT NICHT, Faktor {r_hoch['faktor']:.1f} bis {r_tief['faktor']:.1f}.")
+    print(f"  Ein Klick duerfte zwischen {tief_eur * konversion:.4f} und {hoch_eur * konversion:.4f} EUR kosten.")
     print()
     # Die andere Stellschraube, und die einzige, die dieses Projekt selbst drehen kann.
     noetig_eur = a.cpc / konversion
     auftrag_eur = noetig_eur / (FEE_PERCENT / 100)
+    # Und die Gegenrechnung seit der Umkehrung vom 29.09.: liefern wir selbst, ist der Wert je
+    # Kunde nicht die Provision, sondern fast der ganze Preis. Siehe ROADMAP.md, "Die Umkehrung".
+    print(f"  Liefern wir selbst, ist der Wert je Kunde fast der ganze Auftragspreis, und ein")
+    print(f"  Auftrag muesste nur rund {noetig_eur:.2f} EUR kosten statt {auftrag_eur:.0f}.")
     print(f"  Der andere Weg ist der Auftragswert. Bei {FEE_PERCENT} Prozent Provision muesste ein")
     print(f"  Auftrag rund {auftrag_eur:.0f} EUR wert sein, damit ein Klick zu {a.cpc:.2f} EUR sich")
     print(f"  bei der heutigen Konversion traegt. Offene Auftraege gerade: {markt.get('open_bounties', '?')}.")
