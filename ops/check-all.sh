@@ -261,6 +261,12 @@ run "the goal report can say reached and not reached" ./ops/ziele.sh --selftest
 # Der Selbsttest stellt ihm vier Zustaende hin und verlangt vier Urteile. Ohne Netz.
 run "the org log is checked against commits and the measured number" ./ops/org.sh --selftest
 
+# Atmet die Firma? Sieben gepflanzte Zustaende: gesund, ein Agent im Fehler, Stille trotz offener
+# Arbeit, ein haengendes Ticket, drei gescheiterte Laeufe in Folge, uneinheitliche Modelle, toter
+# Server. Heartbeats sind aus, also faellt Stillstand sonst niemandem auf: nichts wird rot, es
+# passiert nur nichts. Ohne Netz.
+run "the org pulse can tell a working company from a stalled one" ./ops/org-puls.sh --selftest
+
 # Die Sperren, und ob eine davon in Wahrheit schon offen ist.
 #
 # Am 29.09. waren drei Punkte der Liste "Was auf Matthias wartet" gleichzeitig veraltet, und
