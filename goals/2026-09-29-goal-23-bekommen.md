@@ -1,7 +1,9 @@
 # Goal 23: Eine bezahlte Bestellung wird zu drei Fassungen per E-Mail
 
 ## Status
-VORSCHLAG, Fassung 3 (HAN-39, 29.09.2026). Fassung 1 hat der Skeptiker an HAN-42 widerlegt, mit neun
+VORSCHLAG, Fassung 4 (HAN-39, 29.09.2026). Fassung 4 trägt die Auflagen 10 bis 14 aus dem Urteil zu
+Fassung 3 (HAN-46); Punkte 1 und 2 hielten dort. Gebaut wird erst mit dem Ergebnis von HAN-45
+(`recht`: OpenRouters Bedingungen), das als Blocker an HAN-39 hängt. Fassung 1 hat der Skeptiker an HAN-42 widerlegt, mit neun
 Auflagen; Fassung 3 trägt die Auflagen 5 bis 9, die Auflagen 1 bis 4 galten dem Weg über das Abo und
 den Rechner, den es seit Fassung 2 nicht mehr gibt. Fassung 3 geht noch einmal an den Skeptiker.
 Gebaut wird erst, was danach übrig ist, und erst nachdem Goal 22 ausgerollt ist (WIP = 1).
@@ -28,8 +30,12 @@ Anthropic vor, als Ausnahme von der Standing Rule vom 29.09., und das bräuchte 
 Das braucht es nicht. Der Dienst verkauft schon heute Inferenz über OpenRouter
 (`src/inference/openrouter.ts`, Schlüssel `OPENROUTER_API_KEY` in `deploy/.env`), also über einen
 API-Schlüssel und nicht über ein Verbraucher-Abo. Ob OpenRouters Bedingungen den Weiterverkauf der
-Ausgaben decken, habe ich nicht gelesen; das prüft `recht` vor dem Bau. Die gemessenen 0,075 EUR je drei Fassungen und 19,2 s Median stammen aus
-genau dieser Kette. Die Standing Rule regelt, wie die Agenten der Org abgerechnet werden; die
+Ausgaben decken, habe ich nicht gelesen; das prüft `recht` in HAN-45, und ohne dessen Ergebnis wird
+nicht gebaut (HAN-46, Auflage 10). Seit 5ce852d (19.09.) läuft die Inferenz über OpenRouter, im
+Container stehen `CP_PROVIDER=openrouter` und `CP_OPENROUTER_MODELS=openai/gpt-5.2,openai/gpt-5-mini`
+(gelesen vom Skeptiker, 29.09., 21:27 UTC). Kosten und Dauer je drei Fassungen sind **nicht
+belegt**: für die in Umlauf befindlichen Zahlen 0,075 und 19,2 s gibt es im Repo keine Quelle
+(`git log -S`, 29.09.), und sie stehen deshalb nicht in diesem Goal (Auflage 13). Die Standing Rule regelt, wie die Agenten der Org abgerechnet werden; die
 Inferenz des Produkts lief nie über das Abo und setzt keinen `ANTHROPIC_API_KEY`. Wer die Regel
 anders liest, sagt es dem CEO, und dann geht die Frage aus HAN-43 an Matthias.
 
@@ -80,7 +86,7 @@ VM, derselbe Takt in src/index.ts, danach:
 ## Die Arbeit, in dieser Reihenfolge
 
 1. **Tabelle `deliveries`** in `src/db.ts`: `reference` (Primärschlüssel, verweist auf `checkouts`),
-   `status` (`claimed` | `sent` | `failed`), `attempts`, `claimed_at`, `sent_at`, `message_id` (vom
+   `status` (`claimed` | `written` | `sent` | `failed`), `attempts`, `claimed_at`, `sent_at`, `message_id` (vom
    Versanddienst), `versions` (Anzahl), `body` (die drei Fassungen, für spätere Runden), `cost_mc`
    (Inferenzkosten in Millicent), `error` (nur ein Code, nie Text aus der Bestellung).
    `cleanupOrderBriefs` löscht `body` mit derselben Frist wie die Angaben (`PAID_BRIEF_DAYS` nach der
@@ -89,14 +95,22 @@ VM, derselbe Takt in src/index.ts, danach:
 2. **Wer beliefert wird**, `deliverable(db, now)` in `src/checkout/deliver.ts`:
    - `checkouts.status = 'paid'`, `offer` gesetzt, eine Zeile in `order_briefs`;
    - keine `deliveries`-Zeile mit `sent`, und keine mit `claimed` jünger als 30 Minuten;
-   - `settled_at` nach `DELIVERY_START`, einer Konstante mit dem Zeitpunkt des Deploys. Ältere
-     Zeilen (heute die von 21:07 UTC) werden nicht nachgeliefert und stehen im Report als
-     `paid_before_delivery`, sonst wäre Done 4 ab dem 30.09. 21:07 UTC rot, bevor es den Weg gibt
-     (HAN-42, Auflage 9);
+   - `settled_at` nach `DELIVERY_START`, einer Konstante mit dem Zeitpunkt des Commits, der die
+     Lieferung baut, nie einem späteren (HAN-46, Auflage 14). Ältere Zeilen (heute die von 21:07 UTC)
+     werden nicht nachgeliefert und stehen im Report als `paid_before_delivery`, getrennt nach
+     `ours` und `human`. Für `ours` ist das eine Ausnahme, damit Done 4 nicht ab dem 30.09. 21:07
+     UTC rot ist (HAN-42, Auflage 9); für `human` ist jede solche Zeile ein Verstoß und rot;
    - höchstens 5 Versuche, höchstens 10 Zeilen je Lauf, älteste Zahlung zuerst. **Als Versuch zählt
-     nur eine Fassung, die inhaltlich durchfällt.** Ein Limit, ein Timeout oder ein 5xx bei
-     OpenRouter oder beim Versanddienst zählt nicht, sonst ist eine Zeile nach einer Störung von
-     25 Minuten für immer tot (HAN-42, Auflage 7);
+     eine Fassung, die inhaltlich durchfällt, und jeder 4xx außer 429** (401, 402 Guthaben leer,
+     422). Ein 429, ein Timeout oder ein 5xx zählt nicht, sonst ist eine Zeile nach einer Störung
+     von 25 Minuten für immer tot (HAN-42, Auflage 7);
+   - **Kostengrenze je Zeile**, `DELIVERY_COST_CAP_MC = 50_000`, also 50 US-Cent in Millicent, weil
+     OpenRouter in USD abrechnet. Gezählt wird die Summe über alle Läufe in `cost_mc`. Ist sie
+     erreicht, wird die Zeile `failed` mit `cost_cap`, gleich welcher Fehler. Eine Fassung, die die
+     Prüfung besteht, wird sofort in `body` gespeichert und nie neu geschrieben, auch wenn die
+     anderen beiden noch fehlen (HAN-46, Auflage 12). Die Grenze ist eine Setzung, keine Messung:
+     sie liegt bei 2,6 Prozent des kleinsten Katalogpreises (17 EUR), Währungen ungleich, und wird
+     nach der Vorführung an `delivery_cost_mc_median` gemessen;
    - **`stripe_test` nur an eine eigene, explizite Zustellliste**, `TEST_DELIVERY_TO`, heute genau
      `vorfuehrung@postyourprice.com`. Nicht `ops/ours.txt`: dort stehen die RFC-2606-Domains für
      Agenten, die den Kaufweg prüfen, und jede Adresse unter `postyourprice.com`; an die gäbe es nur
@@ -123,9 +137,12 @@ VM, derselbe Takt in src/index.ts, danach:
      denselben Schlüssel mit anderem Inhalt 409; mit neu geschriebenen Fassungen gäbe ein Absturz
      zwischen Versand und Eintrag innerhalb von 24 Stunden einen 409 und danach eine zweite Mail;
    - schickt **eine** Mail mit den drei Fassungen, Absender `bestellung@postyourprice.com`,
-     `Reply-To` die Adresse aus dem Impressum, Idempotenzschlüssel = Referenz. Vor dem Versand
-     einer Zeile, die schon `written` war, fragt der Lauf beim Versanddienst nach einer Mail mit
-     diesem Schlüssel bzw. dieser Referenz im Tag; gibt es sie, wird nur eingetragen;
+     `Reply-To` die Adresse aus dem Impressum, Idempotenzschlüssel = Referenz. Innerhalb von 24
+     Stunden gibt Resend für denselben Schlüssel mit demselben Inhalt die alte ID zurück, ohne neu zu
+     senden. **Eine Zeile, die länger als 23 Stunden auf `written` steht, wird nicht mehr
+     versendet**, sondern `failed` mit `stale_written`, und ist nach 24 Stunden rot (HAN-46, Auflage
+     11). Resend kann eine Mail nicht nach Schlüssel oder Tag suchen (`GET /emails` kennt nur
+     `limit`, `after`, `before`); rot ist dann ehrlich, eine zweite Mail wäre es nicht;
    - trägt `sent`, `message_id` und `cost_mc` ein;
    - loggt je Lauf nur Zahlen: gefunden, geschickt, fehlgeschlagen, Sekunden. Keine Adresse, keine
      Angaben, keine Referenz, auch nicht bei einem Fehler.
@@ -136,12 +153,15 @@ VM, derselbe Takt in src/index.ts, danach:
 
 5. **Das Feld im Report**, `ops/db-report.cjs`, `report.delivery`, nur Zahlen, getrennt nach
    `ours` und `human`:
+   (`human` heißt `provider = 'stripe'` und eine Adresse außerhalb von `ops/ours.txt`; jede
+   `stripe_test`-Zeile ist `ours` oder `test_not_delivered_by_rule`, nie `human`)
    - `paid_with_brief` als Nenner je Gruppe, dazu `paid_delivered`, `paid_not_delivered`,
      `paid_not_delivered_over_24h` (HAN-42, Auflage 9);
    - `test_not_delivered_by_rule`: `stripe_test`-Zeilen außerhalb von `TEST_DELIVERY_TO`, eigene Zahl,
      weder unter `human` noch unter `over_24h`, sonst macht jeder Fremde mit der Karte 4242 das Goal
      rot (Auflage 5);
-   - `paid_before_delivery`: bezahlt vor `DELIVERY_START`, heute 1;
+   - `paid_before_delivery`, getrennt nach `ours` (heute 1) und `human` (heute 0); `ops/ziele.sh`
+     meldet rot bei `human > 0`;
    - `paid_undeliverable`: bezahlt ohne `order_briefs`-Zeile. Heute 1 (die Zeile von 19:54 UTC). Sie
      steht getrennt, damit sie weder als Lieferung noch als Verstoß zählt; ab Goal 21 darf es keine
      neue geben;
@@ -163,12 +183,20 @@ VM, derselbe Takt in src/index.ts, danach:
    - ein Modell antwortet leer: einmal neu, danach `failed`, keine Mail mit zwei Fassungen;
    - Absturz nach dem Versand, vor dem Eintrag, gegen einen gestellten Versanddienst, der Schlüssel
      24 Stunden hält und bei gleichem Schlüssel mit anderem Inhalt 409 gibt: ein Lauf 10 Minuten
-     später und einer 25 Stunden später schicken keine zweite Mail und schreiben nicht neu;
+     später bekommt die alte ID und schickt nichts Neues; eine Zeile, die 23 Stunden und eine Minute
+     auf `written` steht, wird `failed` mit `stale_written`, und der Versanddienst sieht keinen
+     Aufruf (der gestellte Dienst kann nichts, was Resend nicht kann: kein Suchen);
+   - ein Modell antwortet dauerhaft mit 5xx, die anderen beiden liefern: die zwei Fassungen werden
+     einmal bezahlt und gespeichert, nicht wieder; bei Erreichen von `DELIVERY_COST_CAP_MC` wird die
+     Zeile `failed` mit `cost_cap`;
+   - ein 402 von OpenRouter zählt als Versuch, ein 429 nicht;
    - ein 429 oder Timeout von OpenRouter, sechsmal hintereinander: `attempts` bleibt 0, die Zeile
      wird beim siebten Lauf geliefert;
    - `stripe_test` an `x@example.com`, an `andere@postyourprice.com`, an eine fremde Adresse: keine
      Mail, gezählt unter `test_not_delivered_by_rule`;
-   - bezahlt vor `DELIVERY_START`: keine Mail, gezählt unter `paid_before_delivery`;
+   - bezahlt vor `DELIVERY_START`: keine Mail, gezählt unter `paid_before_delivery`; eine
+     gepflanzte `stripe`-Zeile an eine fremde Adresse, bezahlt vor `DELIVERY_START`, macht
+     `paid_before_delivery.human = 1` und `ops/ziele.sh` rot (Auflage 14);
    - zwei Läufe gleichzeitig: nur einer nimmt die Zeile (`claimed`);
    - kein Versandschlüssel: der Lauf startet nicht, und der Report zeigt die Zeile als nicht
      geliefert (die Gegenprobe gegen eine stille Null);
@@ -189,7 +217,9 @@ VM, derselbe Takt in src/index.ts, danach:
 4. Cloudflare Email Routing für `vorfuehrung@postyourprice.com` auf ein Postfach, das er liest.
    Ohne das kommt die Vorführung nirgends an.
 
-Keine Frage zum Abo und keine Ausnahme von der Standing Rule (siehe oben).
+Keine Frage zum Abo und keine Ausnahme von der Standing Rule. Die Nachricht sagt ihm in einem Satz,
+als Mitteilung und nicht als Frage, dass die Lieferung über den OpenRouter-Schlüssel des Dienstes
+läuft (HAN-46, Auflage 10).
 
 ## Done, gemessen und nicht behauptet
 
@@ -209,20 +239,25 @@ Keine Frage zum Abo und keine Ausnahme von der Standing Rule (siehe oben).
    mindestens 1, für `human` "kein Messweg", solange der Nenner 0 ist, und die Gegenprobe aus
    Punkt 7 grün.
 
-**Widerlegt, wenn:** eine bezahlte Zeile mit Angaben älter als 24 Stunden ohne Lieferung im Report
-steht, oder eine Mail an eine fremde Adresse für eine `stripe_test`-Zeile im Log des Versanddienstes.
+**Widerlegt, wenn:** im Report nach `DELIVERY_START` eine bezahlte Zeile mit Angaben älter als 24
+Stunden ohne Lieferung steht, oder `paid_before_delivery.human > 0`, oder eine Zeile beim
+Versanddienst zwei `message_id` hat, oder eine Mail an eine fremde Adresse für eine
+`stripe_test`-Zeile im Log des Versanddienstes steht.
 
 ## Was dieses Goal nicht weiß und nicht tut
 
 - **Ob die Mail beim Kunden ankommt**, zeigt nur Done 2, mit n = 1. `delivered` in Done 3 heißt
-  nur, dass Cloudflares MX die Mail angenommen hat. Ob sie ankommt, weiß ich erst nach Done 2. Eine neue Domain ohne Geschichte landet oft
+  nur, dass Cloudflares MX die Mail angenommen hat. Eine neue Domain ohne Geschichte landet oft
   im Spam; der Versanddienst meldet dann trotzdem `delivered`, weil er nur den Empfang durch den
   Mailserver sieht. Deshalb braucht Done 3 das Postfach und nicht nur den Status.
-- **Wie lange es dauert.** Gemessen ist die Kette (19,2 s Median für drei Fassungen), nicht eine
-  Bestellung von der Zahlung bis zur Mail. Der Takt von 5 Minuten kommt dazu. Die Seite nennt keine
+- **Wie lange es dauert und was es kostet.** Nicht belegt, weder für die Kette noch für eine
+  Bestellung von der Zahlung bis zur Mail; die erste Zahl mit Quelle liefert die Vorführung. Der Takt von 5 Minuten kommt dazu. Die Seite nennt keine
   Zeit, und das bleibt so, bis ein Median aus echten Lieferungen da ist.
 - **Ob die Fassungen gut genug sind.** Die Prüfung in Punkt 3 fängt Leere, Dopplung und falsche
   Länge, nicht einen schwachen Text. Das zeigt erst die Vorführung und danach die Antworten.
+- **Live bleibt nach Goal 22 nur im Text zu.** Wird der Live-Schlüssel gesetzt, bevor Goal 23
+  läuft, bekommt ein zahlender Mensch nichts. Das verhindert kein Code, aber seit Auflage 14 macht
+  es `paid_before_delivery.human` rot. Der Schreiber sagt Matthias, dass HAN-31 auf Goal 23 wartet.
 - **Nachbessern für Katalogbestellungen ist nicht gebaut.** Der Katalog verspricht "bis zu dreimal
   sagen, was anders werden soll". Bis ein eigenes Goal das baut, liest ein Mensch die Antworten
   und liefert von Hand. Das steht im Report nicht und ist eine Lücke, die ich hier benenne.
