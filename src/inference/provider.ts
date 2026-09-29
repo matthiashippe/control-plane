@@ -91,6 +91,14 @@ export class ProviderBadRequestError extends Error {
 
 export interface ChatProvider {
   readonly id: string;
+  /**
+   * Whether this service may sell this provider's models on to others: /v1/chat/completions,
+   * /v1/check and every page that describes them. `false` keeps the provider callable inside the
+   * service and takes it off the shelf. Only an explicit `false` takes it off (Catalog.forSale):
+   * the providers written before this field, the test stubs among them, stay on the shelf, because
+   * HAN-55 asked for them to keep answering unchanged.
+   */
+  readonly resale?: boolean;
   models(): ModelSpec[];
   /** The caller only sends models that models() knows. Max tokens are already normalised. */
   chat(req: ChatRequest & { maxTokens: number; apiKeyId: string }): Promise<ChatResponse>;

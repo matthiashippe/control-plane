@@ -4,7 +4,7 @@ import { createApp } from "../src/app.js";
 import { openDb, postLedger } from "../src/db.js";
 import { hashApiKey } from "../src/auth/siwe.js";
 import { OpenRouterProvider, DEFAULT_OPENROUTER_ALIASES } from "../src/inference/openrouter.js";
-import { Catalog, costMc, MARKUP } from "../src/inference/proxy.js";
+import { Catalog, costMc, handleChat, MARKUP } from "../src/inference/proxy.js";
 import { ProviderUnavailableError } from "../src/inference/provider.js";
 
 const KEY = "sk-or-v1-test";
@@ -55,8 +55,15 @@ function appWith(provider: OpenRouterProvider, balanceMc = 500_000) {
   db.prepare("INSERT INTO wallets (address, balance_mc, created_at) VALUES (?, 0, ?)").run(address, new Date().toISOString());
   db.prepare("INSERT INTO api_keys (address, key_hash, key_prefix, name, created_at) VALUES (?, ?, ?, ?, ?)").run(address, hashApiKey(key), key.slice(0, 15), "t", new Date().toISOString());
   if (balanceMc > 0) postLedger(db, { address, kind: "topup", deltaMc: balanceMc, ref: "seed" });
-  const chat = (body: unknown) =>
-    app.request("/v1/chat/completions", { method: "POST", headers: { "content-type": "application/json", authorization: key }, body: JSON.stringify(body) });
+  // Straight into handleChat with the whole catalogue, not through /v1/chat/completions: since
+  // 2026-09-29 (HAN-55) that route does not sell OpenRouter, and the refusal is proven in
+  // test/not-for-sale.test.ts. The billing below still runs whenever the service itself calls
+  // OpenRouter, so it stays tested as it was, with the same Response the route would return.
+  const catalog = new Catalog([provider], provider.defaultAliases());
+  const chat = async (body: unknown) => {
+    const res = await handleChat(db, catalog, address, body);
+    return new Response(JSON.stringify(res.body), { status: res.status, headers: { "content-type": "application/json" } });
+  };
   const balance = () => (db.prepare("SELECT balance_mc FROM wallets WHERE address = ?").get(address) as { balance_mc: number }).balance_mc;
   const rows = () => db.prepare("SELECT delta_mc, meta FROM ledger WHERE kind = 'inference'").all() as { delta_mc: number; meta: string }[];
   // The balance alone is not enough: a reservation that is never released leaves it unchanged and

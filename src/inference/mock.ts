@@ -24,6 +24,8 @@ const SLEEP_AT_REQUEST = 5;
 
 export class MockProvider implements ChatProvider {
   readonly id = "mock";
+  /** Buys nothing from anybody, so there is nothing to forbid. */
+  readonly resale = true;
   private readonly counts = new Map<string, number>();
   /**
    * All calls across all keys. With a real provider each of them is a purchase that costs money,

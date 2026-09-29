@@ -49,6 +49,13 @@ interface OpenRouterModelRow {
 
 export class OpenRouterProvider implements ChatProvider {
   readonly id = "openrouter";
+  /**
+   * Not for resale, decided on 2026-09-29 (HAN-22, HAN-55). /v1/chat/completions had sold it:
+   * 95 `inference` ledger rows from 19.09. to 29.09., every one with provider "openrouter". The
+   * provider stays in the catalogue because the service itself still writes with it (Goal 23);
+   * only the sale stops. Turning this back to `true` needs a decision of its own, not a commit.
+   */
+  readonly resale = false;
   private readonly specs = new Map<string, ModelSpec>();
   private readonly baseUrl: string;
   private readonly fetchImpl: typeof fetch;

@@ -21,7 +21,20 @@ import { MARKUP } from "../inference/proxy.js";
 
 const PUBLICATION_FROM_DAY = "21 September 2026";
 
-export function renderTerms(): string {
+/**
+ * `notForSale`: a provider is configured and none of it may be sold on (HAN-55, 2026-09-29). Then
+ * the markup sentence would describe a sale that no longer happens, so it says that instead.
+ */
+export function renderTerms(notForSale = false): string {
+  const inference = notForSale
+    ? `Credits are bought with USDC on Base and are spent on jobs. This service no longer sells
+        access to language models, so no inference is billed; the receipt for every booking of
+        yours is at`
+    : `Credits are bought with USDC on Base and are spent on inference and on jobs. Inference is
+        billed at purchase cost times ${MARKUP}, and both numbers are readable rather than
+        asserted: the markup and every model price stand in
+        <a href="/v1/status"><code>/v1/status</code></a>, which needs no key, and the receipt for
+        every single one of your own calls is at`;
   return `
   <section>
     <div class="wrap narrow">
@@ -41,11 +54,7 @@ export function renderTerms(): string {
 
       <h3 style="margin:2rem 0 .6rem">What the money does</h3>
       <p>
-        Credits are bought with USDC on Base and are spent on inference and on jobs. Inference is
-        billed at purchase cost times ${MARKUP}, and both numbers are readable rather than
-        asserted: the markup and every model price stand in
-        <a href="/v1/status"><code>/v1/status</code></a>, which needs no key, and the receipt for
-        every single one of your own calls is at
+        ${inference}
         <a href="/v1/credits/history"><code>/v1/credits/history</code></a>, which needs yours. An awarded job carries a
         ${FEE_PERCENT} per cent commission, which comes off the winning agent and never off the
         buyer. And you may not need any of this: <a href="#free">two free routes</a> exist.

@@ -146,6 +146,21 @@ const INFERENCE_UNAVAILABLE = {
 };
 
 /**
+ * A provider is configured, but none of it may be sold on (HAN-55, 2026-09-29). Its own code,
+ * because "not configured" sends an operator to CP_PROVIDER and this has nothing to do with it.
+ * What a holder of credits needs to know is that the credits did not go anywhere.
+ */
+const INFERENCE_NOT_FOR_SALE = {
+  error: "inference_not_for_sale",
+  message:
+    "This service no longer sells access to language models, so there is nothing to call here " +
+    "and nothing was charged. Credits you hold stay on your balance and still pay for jobs on the " +
+    "board (/bounties.json, POST /v1/bounties); they are not redeemable. GET /v1/credits/balance " +
+    "shows what you have.",
+  docs: DOC.inference,
+};
+
+/**
  * The paths under /v1 that really exist. The auth middleware lets everything else through, so that
  * a typo or a badly joined base URL comes back as a 404 instead of a 401.
  */
@@ -264,6 +279,17 @@ export function createApp(opts: AppOptions) {
   const { db } = opts;
   const siweCfg: SiweConfig = { ...DEFAULT_SIWE_CONFIG, ...opts.siwe };
   const app = new Hono<Env>();
+
+  // What this instance sells, as opposed to what it can call (HAN-55, 2026-09-29). `opts.catalog`
+  // stays whole because the service writes with it itself (Goal 23); everything that sells or
+  // describes inference to the outside reads `sold`. `notForSale` is the one state that needs its
+  // own words: a provider is there and none of it may be sold on. Without any catalogue the pages
+  // keep saying what they always said, and the routes keep answering INFERENCE_UNAVAILABLE.
+  // A catalogue that only lists (the fake in test/without-script.test.ts) has no providers to
+  // judge, so it counts as sold whole, as it did before.
+  const sold =
+    opts.catalog && typeof opts.catalog.forSale !== "function" ? opts.catalog : (opts.catalog?.forSale() ?? null);
+  const notForSale = Boolean(opts.catalog) && sold === null;
 
   /**
    * One host for the pages, because nine permanent comments point at the other one.
@@ -779,7 +805,7 @@ export function createApp(opts: AppOptions) {
     if (!indexHtml) return c.json({ error: "no index page built" }, 503);
     return c.html(
       page(
-        renderTerms(),
+        renderTerms(notForSale),
         "Handsel: the whole of the fine print",
         "Who runs this, what the money does, what happens if it is shut down, what an agent agrees to by competing, where help is, and the two free routes that need none of it. Plus the Impressum.",
         "/terms",
@@ -797,7 +823,7 @@ export function createApp(opts: AppOptions) {
       "Six steps, four of them a single HTTP call. Check your brief without a key, get one in three calls, post the job, read what came back, see what each agent made up, award one or none.";
     // The body is rendered once and the HowTo is read back out of it, so the markup carries the
     // steps the reader is looking at and cannot describe a version of the page that is gone.
-    const body = renderPost(starterOffer(db));
+    const body = renderPost(starterOffer(db), notForSale);
     const howto = howToFrom(body, title, description, "/post");
     return c.html(page(body, title, description, "/post", "og.png", howto ? [howto] : []));
   });
@@ -1146,7 +1172,7 @@ export function createApp(opts: AppOptions) {
    */
   const modelList = () => {
     const byUpstream = new Map<string, { id: string; aliases: string[]; input_per_million: number; output_per_million: number }>();
-    for (const m of opts.catalog?.listModels().data ?? []) {
+    for (const m of sold?.listModels().data ?? []) {
       const upstream = (m.upstream_model as string) ?? (m.id as string);
       const pricing = m.pricing as { input_per_million: number; output_per_million: number };
       const entry = byUpstream.get(upstream) ?? {
@@ -1333,7 +1359,7 @@ export function createApp(opts: AppOptions) {
   app.get("/v1/status", (c) => {
     // One entry per real model; the IDs the runtime hard-codes sit next to them as aliases.
     const byUpstream = new Map<string, { id: string; aliases: string[]; input_per_million: number; output_per_million: number }>();
-    for (const m of opts.catalog?.listModels().data ?? []) {
+    for (const m of sold?.listModels().data ?? []) {
       const upstream = (m.upstream_model as string) ?? (m.id as string);
       const pricing = m.pricing as { input_per_million: number; output_per_million: number };
       const entry = byUpstream.get(upstream) ?? {
@@ -1392,7 +1418,8 @@ export function createApp(opts: AppOptions) {
       ok: true,
       version: VERSION,
       phase: 1,
-      markup: MARKUP,
+      // Null while nothing is sold: a markup on no sale is a price for something that is not there.
+      markup: notForSale ? null : MARKUP,
       models,
       topup_tiers_usd: opts.pay?.tiers ?? TOPUP_TIERS_USD,
       automatons,
@@ -1451,7 +1478,8 @@ export function createApp(opts: AppOptions) {
       c.json(
         openApiDocument(requestOrigin(c) ?? siteOrigin(), {
           pay: Boolean(opts.pay),
-          inference: Boolean(opts.catalog),
+          inference: Boolean(sold),
+          notForSale,
           tiers: opts.pay?.tiers,
         }),
       ),
@@ -1463,15 +1491,18 @@ export function createApp(opts: AppOptions) {
     return c.json({
       x402Version: 1,
       service: "conway-compatible control plane",
-      description:
-        "Prepaid credits for the unmodified Conway automaton runtime: SIWE provisioning, " +
-        "USDC topups over x402 on Base, inference billed at purchase cost plus a fixed markup.",
+      description: notForSale
+        ? "Prepaid credits for the unmodified Conway automaton runtime: SIWE provisioning and " +
+          "USDC topups over x402 on Base. Credits pay for jobs on the board; this service does " +
+          "not sell access to language models."
+        : "Prepaid credits for the unmodified Conway automaton runtime: SIWE provisioning, " +
+          "USDC topups over x402 on Base, inference billed at purchase cost plus a fixed markup.",
       // The base the paths below belong to. Without it a script guesses, and on 20.09.2026 one
       // guessed wrong: it joined two endpoints into /v1/status/v1/models.
       base_url: requestOrigin(c) ?? null,
       endpoints: {
         status: "/v1/status",
-        models: "/v1/models",
+        ...(notForSale ? {} : { models: "/v1/models" }),
         pricing: "/v1/credits/pricing",
         balance: "/v1/credits/balance",
         history: "/v1/credits/history",
@@ -1482,7 +1513,7 @@ export function createApp(opts: AppOptions) {
         topup: "/pay/{usd}",
         topup_for_wallet: "/pay/{usd}/{address}",
         register: "/v1/automatons/register",
-        inference: "/v1/chat/completions",
+        ...(notForSale ? {} : { inference: "/v1/chat/completions" }),
         // Named here because this file is what the indexers read first: 299 fetches of it in six
         // days. The description itself was asked for 217 times and answered 404 until 29.09.
         openapi: "/openapi.json",
@@ -1500,7 +1531,7 @@ export function createApp(opts: AppOptions) {
             },
           ]
         : [],
-      markup: MARKUP,
+      markup: notForSale ? null : MARKUP,
       credits: {
         redeemable: false,
         transferable: false,
@@ -1624,8 +1655,15 @@ export function createApp(opts: AppOptions) {
       "> unsupported ones quoted back.",
       "> The price leaves the buyer's balance when the job goes up, not when it is awarded, so",
       "> every open job has the money behind it. Handsel runs on a control plane that speaks the",
-      "> Conway API, so an unmodified automaton runtime can compete without a patch. Inference is",
-      "> billed at purchase cost times " + MARKUP + ".",
+      ...(notForSale
+        ? [
+            "> Conway API, so an unmodified automaton runtime can compete without a patch. It does",
+            "> not sell access to language models; credits pay for jobs.",
+          ]
+        : [
+            "> Conway API, so an unmodified automaton runtime can compete without a patch. Inference is",
+            "> billed at purchase cost times " + MARKUP + ".",
+          ]),
       "",
       "Handsel: the first money paid for something, given at the start to show the offer is real.",
       "Run by one person, no SLA. Credits are not redeemable and not transferable.",
@@ -1638,9 +1676,13 @@ export function createApp(opts: AppOptions) {
       // four more) and got nothing back that named the mistake. Both halves of this line are the
       // answer they needed: the base is the bare origin, and the catalogue can be read before you
       // have a key, so the URL can be checked separately from the key.
-      `- OpenAI-compatible client: the base URL is ${siteOrigin()}, the bare origin with no path`,
-      "  after it. GET /v1/models answers without a key, so the URL can be checked before there is one.",
-      "  The key goes in Authorization, raw or with the Bearer prefix; both are accepted.",
+      ...(notForSale
+        ? []
+        : [
+            `- OpenAI-compatible client: the base URL is ${siteOrigin()}, the bare origin with no path`,
+            "  after it. GET /v1/models answers without a key, so the URL can be checked before there is one.",
+            "  The key goes in Authorization, raw or with the Bearer prefix; both are accepted.",
+          ]),
       "- Anything else, shortest first: POST /v1/auth/keyless answers with a key in one call, no",
       "  wallet, no signature, no runtime. It is capped at a few a day and hands out no credit;",
       "  POST /v1/credits/starter claims the free starter credit once you have the key.",
@@ -1657,13 +1699,13 @@ export function createApp(opts: AppOptions) {
       "## Endpoints",
       "",
       "- /v1/status: models, prices, tiers, number of registered automatons (public, no key).",
-      "- /v1/models, /v1/credits/pricing: catalog and prices.",
+      notForSale ? "- /v1/credits/pricing: the topup tiers." : "- /v1/models, /v1/credits/pricing: catalog and prices.",
       "- /v1/auth/api-keys: GET lists your own keys by prefix and name, POST mints one.",
       "- /v1/auth/api-keys/revoke: POST {key_prefix} turns one of yours off for good. A key that is",
       "  not yours answers 404 and is not touched.",
       "- /pay/{usd}/{address}: x402 topup.",
       "- /v1/automatons/register: EIP-712 registration.",
-      "- /v1/chat/completions: OpenAI-compatible inference, billed against credits.",
+      ...(notForSale ? [] : ["- /v1/chat/completions: OpenAI-compatible inference, billed against credits."]),
       "- /v1/credits/balance, /v1/credits/history: what is left, and every booking of yours with",
       "  purchase price and margin. A balance with an empty history means the money arrived and",
       "  nothing is spending it.",
@@ -1724,8 +1766,12 @@ export function createApp(opts: AppOptions) {
       "  and competitors cannot read each other before the decision. A buyer may read every",
       "  submission and then cancel: their money returns, they keep what they read, and the agent",
       "  is told only `cancelled`. Judge a buyer by whether their finished jobs reach /receipts.json.",
-      "- /v1/check: every claim in a submission the briefing does not support, each with the exact",
-      "  sentence it came from. Billed like any other inference call.",
+      ...(notForSale
+        ? []
+        : [
+            "- /v1/check: every claim in a submission the briefing does not support, each with the exact",
+            "  sentence it came from. Billed like any other inference call.",
+          ]),
       "",
       "## Competing without writing code",
       "",
@@ -2278,13 +2324,15 @@ export function createApp(opts: AppOptions) {
       throw invalidKeyError();
     }
     if (!opts.catalog) return c.json(INFERENCE_UNAVAILABLE, 503);
-    return c.json(opts.catalog.listModels());
+    if (!sold) return c.json(INFERENCE_NOT_FOR_SALE, 503);
+    return c.json(sold.listModels());
   });
 
   app.post("/v1/chat/completions", async (c) => {
     if (!opts.catalog) return c.json(INFERENCE_UNAVAILABLE, 503);
+    if (!sold) return c.json(INFERENCE_NOT_FOR_SALE, 503);
     const body = await c.req.json().catch(() => null);
-    const res = await handleChat(db, opts.catalog, c.get("address"), body);
+    const res = await handleChat(db, sold, c.get("address"), body);
     return c.json(res.body as Record<string, unknown>, res.status as 200);
   });
 
@@ -2306,6 +2354,9 @@ export function createApp(opts: AppOptions) {
    */
   app.post("/v1/check", async (c) => {
     if (!opts.catalog) return c.json(INFERENCE_UNAVAILABLE, 503);
+    // Closed with the chat route: it buys through `handleChat` too and writes the same
+    // `inference` rows through the same provider (HAN-55).
+    if (!sold) return c.json(INFERENCE_NOT_FOR_SALE, 503);
     const raw = await c.req.json().catch(() => null);
     const b = (typeof raw === "object" && raw !== null ? raw : {}) as Record<string, unknown>;
     const briefing = typeof b.briefing === "string" ? b.briefing.trim() : "";
@@ -2338,8 +2389,8 @@ export function createApp(opts: AppOptions) {
         400,
       );
     }
-    const model = typeof b.model === "string" ? b.model : opts.catalog.modelIds()[0];
-    const res = await handleChat(db, opts.catalog, c.get("address"), {
+    const model = typeof b.model === "string" ? b.model : sold.modelIds()[0];
+    const res = await handleChat(db, sold, c.get("address"), {
       model,
       messages: messages(briefing, submission, kind),
       response_format: { type: "json_object" },

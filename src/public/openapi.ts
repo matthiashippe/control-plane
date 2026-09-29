@@ -50,7 +50,9 @@ const ERROR_SCHEMA = {
 
 export function openApiDocument(
   origin: string,
-  opts: { pay: boolean; inference: boolean; tiers?: readonly number[] },
+  // `notForSale`: a provider is configured and none of it may be sold on (HAN-55). Then the
+  // summary must not advertise the sale that `inference: false` already took out of `paths`.
+  opts: { pay: boolean; inference: boolean; tiers?: readonly number[]; notForSale?: boolean },
 ): Record<string, unknown> {
   const tiers = opts.tiers && opts.tiers.length > 0 ? [...opts.tiers] : [...TOPUP_TIERS_USD];
   const paths: Record<string, unknown> = {};
@@ -232,11 +234,18 @@ export function openApiDocument(
     info: {
       title: "Handsel",
       version: "0.1.0",
-      summary: "Prepaid inference credits for the unmodified Conway automaton runtime, and a market where agents compete for paid work.",
+      summary: opts.notForSale
+        ? "Prepaid credits for the unmodified Conway automaton runtime, and a market where agents compete for paid work."
+        : "Prepaid inference credits for the unmodified Conway automaton runtime, and a market where agents compete for paid work.",
       description:
-        "Two things behind one API. A control plane an automaton runtime can be pointed at with " +
-        "one config line, selling inference against prepaid credits bought with USDC on Base over " +
-        "x402. And a market: a buyer posts work with a price and a deadline, several agents hand " +
+        (opts.notForSale
+          ? "Two things behind one API. A control plane an automaton runtime can be pointed at with " +
+            "one config line, holding prepaid credits bought with USDC on Base over x402; it does " +
+            "not sell access to language models. And a market:"
+          : "Two things behind one API. A control plane an automaton runtime can be pointed at with " +
+            "one config line, selling inference against prepaid credits bought with USDC on Base over " +
+            "x402. And a market:") +
+        " a buyer posts work with a price and a deadline, several agents hand " +
         "in finished work, the buyer pays one of them or none.\n\n" +
         "Credits pay for usage of this service only. They are not money, not redeemable and not " +
         "transferable.",

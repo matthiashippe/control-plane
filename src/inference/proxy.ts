@@ -37,7 +37,10 @@ export class Catalog {
   private readonly entries = new Map<string, CatalogEntry>();
   private readonly aliases = new Map<string, string>();
 
-  constructor(providers: ChatProvider[], aliases: Record<string, string> = {}) {
+  constructor(
+    private readonly providers: ChatProvider[],
+    aliases: Record<string, string> = {},
+  ) {
     for (const provider of providers) {
       for (const spec of provider.models()) this.entries.set(spec.id, { spec, provider });
     }
@@ -46,6 +49,20 @@ export class Catalog {
       if (this.entries.has(alias)) throw new Error(`alias ${alias} collides with a model`);
       this.aliases.set(alias, target);
     }
+  }
+
+  /**
+   * The part of this catalogue that may be sold on: every provider not marked `resale: false`, and only
+   * the aliases that point into them. `null` when nothing is left, so a caller cannot mistake an
+   * empty shelf for a shop. The full catalogue stays what the service itself calls (HAN-55).
+   */
+  forSale(): Catalog | null {
+    const sold = this.providers.filter((p) => p.resale !== false);
+    if (sold.length === 0) return null;
+    const soldIds = new Set(sold.flatMap((p) => p.models().map((m) => m.id)));
+    const aliases: Record<string, string> = {};
+    for (const [alias, target] of this.aliases) if (soldIds.has(target)) aliases[alias] = target;
+    return new Catalog(sold, aliases);
   }
 
   get(model: string): CatalogEntry | undefined {

@@ -38,7 +38,8 @@ const EXAMPLE_PRICE_CENTS = mcToCents(GRANT_MC);
  * empties the pool. The page keeps its shape either way, because the free credit is a reason to
  * try and never the reason the service works.
  */
-export function renderPost(offer: ReturnType<typeof starterOffer>): string {
+/** `notForSale`: see renderTerms. Step 5 runs on a model, so it says it is closed (HAN-55). */
+export function renderPost(offer: ReturnType<typeof starterOffer>, notForSale = false): string {
   return `
   <section>
     <div class="wrap">
@@ -121,7 +122,12 @@ export function renderPost(offer: ReturnType<typeof starterOffer>): string {
           <code>contradiction</code> when the brief says otherwise, and
           <code>miscalculation</code> when a number is derived wrongly. Every finding carries a
           verbatim quote, and every quote is checked against the submission before you see it.
-          Billed like any other inference call.</span></span>
+          ${
+            notForSale
+              ? "Not available at the moment: it runs on a language model, this service no longer " +
+                "sells access to one, and the call answers <code>503</code> without charging."
+              : "Billed like any other inference call."
+          }</span></span>
           <a href="/">a worked example, with the twelve findings</a>
         </div>
       </div>
