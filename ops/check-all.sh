@@ -146,6 +146,20 @@ run() {
 # Every one of them went red for the right reason and green again afterwards. Anything added
 # below is expected to have been through the same before it is trusted.
 
+# The goals, before anything else, because that is what the work is for.
+#
+# Matthias on 2026-09-29: "ich moechte dass du in jedem loop die goals und die sub goals alle
+# pruefst und erst aufhoerst wenn wir alle goals erreichen." A cycle that opens with the goal
+# state cannot spend itself on repairs without noticing, which is the failure he named on 23.09.
+# ("du arbeitest die ganze Zeit nur an Bugs und nicht an der Vision").
+#
+# Printed, not `run`: an open goal is the normal state of this project and not a failing check.
+# The counter-proof further down IS a check, because a goal report that cannot go red is worse
+# than none.
+printf -- '-- die vier Ziele und die Teilziele --\n'
+./ops/ziele.sh --short 2>/dev/null || true
+echo
+
 echo "Handsel, all checks against $BASE"
 echo
 
@@ -233,6 +247,11 @@ run "the traffic report tells an arrival from a claim" ./ops/traffic.sh --selfte
 # only the note in which the word `award_cents` appears in prose. That last one is the case that
 # broke its predecessor. Reads nothing from production.
 run "the board check tells an empty board from a broken one" ./ops/board-not-empty.sh --selftest
+
+# The goal report against planted numbers: nothing reached, everything reached, one single number
+# moved, and unreadable input. A report that can only ever say "offen" would hide the day a goal
+# is met, and one that can only say "erreicht" is worse. Reads nothing from production.
+run "the goal report can say reached and not reached" ./ops/ziele.sh --selftest
 
 # Whether a copy of the database exists anywhere but on the disk that holds it. Measured on
 # 2026-09-23: seven backups, all on /dev/sda1, the same single disk as the live database, and

@@ -16,6 +16,26 @@ zahlenden Kunden. Ab hier gibt es keinen Projektabschluss mehr, nur noch Zyklen.
 
 ## Der Zyklus
 
+**0. Die Ziele, vor allem anderen.** Ergänzt am 29.09.2026 auf Matthias' Ansage: *"ich möchte
+dass du in jedem loop die goals und die sub goals alle prüfst und erst aufhörst wenn wir alle
+goals erreichen."*
+
+```
+ops/ziele.sh
+```
+
+Es misst jede der sechs Zielzahlen und jedes Teilziel gegen die Produktion, nicht gegen `ZIELE.md`.
+Das ist der Unterschied, der zählt: Prosa mit Häkchen kann nicht rot werden, und am 29.09. stand in
+`ZIELE.md` noch, ein Händlerkonto sei "die einzige offene Tür in den x402-Katalog", zwei Tage
+nachdem wir ohne eines drinstanden. Niemand hat gelogen, niemand hat nachgemessen.
+
+Exit 1 heißt, mindestens eine Zielzahl ist offen, und das ist der Normalzustand. Exit 0 heißt, der
+Loop ist fertig, und erst dann darf er aufhören. `--selftest` ist die Gegenprobe und läuft in
+`ops/check-all.sh` mit.
+
+Was in diesem Lauf gebaut wird, zeigt danach auf **eine** dieser Zahlen. Zeigt es auf keine, ist es
+Reparatur, und Reparatur geht nur vor, wenn ein echter Nutzer gegen die Wand gelaufen ist.
+
 **1. Hinsehen, bevor du etwas baust.** Jeder Lauf beginnt mit Beobachtung, nicht mit dem Backlog:
 
 ```
