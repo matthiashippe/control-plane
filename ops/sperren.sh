@@ -37,6 +37,8 @@ if [[ "${1:-}" == "--selftest" ]]; then
   t "form-action self erkannt"        "x form-action 'self' y" "form-action 'self'" ja
   t "form-action none nicht verwechselt" "x form-action 'none' y" "form-action 'self'" nein
   t "delete brief erkannt"            "request>uri query { delete brief }" "delete brief" ja
+  t "facilitator erkannt"             "facilitator"                        "facilitator"  ja
+  t "ein eigener Settler faellt auf"  "local"                              "facilitator"  nein
   t "fehlendes delete brief gesehen"  "request>uri query { }"              "delete brief" nein
   (( fail == 0 )) && echo "SPERREN SELFTEST OK" || echo "SPERREN SELFTEST FAILED"
   exit $fail
@@ -76,21 +78,29 @@ else
   bad "$rest Antwort(en) liegen noch" "ops/post-the-answers.py --send 3"
 fi
 
-# 4. Das Geld. Seit dem 29.09. darf der Loop es im Dienst arbeiten lassen, also ist Herumliegen
-#    eine Sperre und keine Tatsache mehr.
-bal=$(curl -s -m 20 -X POST https://mainnet.base.org -H 'content-type: application/json' \
-  --data '{"jsonrpc":"2.0","id":1,"method":"eth_call","params":[{"to":"0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913","data":"0x70a08231000000000000000000000000914102284463F4F58B1D2f6DB9aC80BFcaA7d614"},"latest"]}' \
-  | python3 -c 'import json,sys;print(int(json.load(sys.stdin)["result"],16)/1e6)' 2>/dev/null || echo "?")
-gas=$(curl -s -m 20 -X POST https://mainnet.base.org -H 'content-type: application/json' \
-  --data '{"jsonrpc":"2.0","id":1,"method":"eth_getBalance","params":["0x914102284463f4f58b1d2f6db9ac80bfcaa7d614","latest"]}' \
-  | python3 -c 'import json,sys;print(int(json.load(sys.stdin)["result"],16)/1e18)' 2>/dev/null || echo "?")
-if [[ "$bal" == "?" ]]; then
-  grey "Einnahmen: die Kette war nicht lesbar"
-elif python3 -c "import sys;sys.exit(0 if float('$bal')>1 and float('$gas')==0 else 1)"; then
-  bad "$bal USDC liegen fest" "0 ETH auf 0x9141...d614, also kein Gas"
-else
-  ok "die Einnahmen sind nicht blockiert" "$bal USDC, $gas ETH"
-fi
+# 4. Gas. Und die Antwort darauf ist seit dem 29.09. nein, aus einem messbaren Grund.
+#
+# Hier stand vorher "21,92 USDC liegen fest, 0 ETH, also kein Gas", und das war die falsche Frage,
+# dreimal an Matthias gestellt. Nachgemessen: **dieser Dienst sendet nie selbst eine Transaktion.**
+# `CP_SETTLER=facilitator` in der Produktion, und der Facilitator reicht die EIP-3009-Zahlung ein
+# und zahlt ihr Gas. Genau deshalb stand die Wallet des zahlenden Kunden am 27.09. auf Nonce 0,
+# waehrend sein USDC floss. Der selbst-settlende Pfad (`LocalSettler`, `writeContract` in
+# src/payments/settler.ts) existiert nur im Code, und loop-constraints.md verbietet ihn im Betrieb.
+#
+# Also braucht der Dienst kein Gas, und die Einnahmen auf der payTo-Adresse sind Einnahmen in
+# Matthias' Verwahrung und kein blockiertes Kapital. Wir halten fuer diese Adresse ohnehin keinen
+# Schluessel: die VM kennt `CP_PAY_TO`, aber keinen privaten Schluessel dazu.
+#
+# Die Sperre waere zurueck, sobald der Betrieb selbst settlen muesste. Genau das prueft diese
+# Zeile, und nichts anderes.
+settler=$(ssh -o ConnectTimeout=10 -i "${CP_VM_KEY:-$HOME/.ssh/id_ed25519_automaton}" \
+  "root@${CP_VM:-76.13.144.207}" 'grep -oE "^CP_SETTLER=.*" /opt/control-plane/.env | cut -d= -f2' 2>/dev/null | tr -d '\r')
+case "$settler" in
+  facilitator) ok "kein Gas noetig" "CP_SETTLER=facilitator, der Facilitator reicht ein" ;;
+  "")          grey "Gas: die Einstellung war nicht lesbar" ;;
+  *)           bad "der Betrieb settlet selbst ($settler) und braucht damit Gas" \
+                   "loop-constraints.md verbietet das ausserdem" ;;
+esac
 
 # 5. Was sich von hier nicht messen laesst, und das ehrlich gesagt.
 grey "Search Console und Bing" "nur im Browser zu sehen"

@@ -582,15 +582,25 @@ Seine Freigaben stehen woertlich in `loop-constraints.md`:
 
 ### Was wirklich offen ist
 
-1. **Stripe ueber HTC**, seine Antwort auf die Rechtsformfrage. Damit entfallen Gewerbeanmeldung
-   und Kleinunternehmerfrage. Offen bleibt die dritte und teuerste der drei Luecken aus
-   `.scratch/gtm/stripe-entscheidung.md`: **wer schuldet dem Kaeufer die Leistung, wenn ein Agent
-   liefert?** Das ist eine Vertragsfrage und keine Messung, und sie gehoert zu HTC.
-2. **Der Name.** `handsel.dev` ist ein laufender Wettbewerber mit fast gleicher Beschreibung. Die
-   Domain ist keine Frage mehr; ob wir uns im Text abgrenzen oder umbenennen, schon.
-3. **Gas.** Auf `0x9141…d614` liegen 21,92 USDC und 0 ETH. Solange dort kein Gas ist, kann der
-   Dienst nie selbst auszahlen, und das ist die Voraussetzung dafuer, dass ein Agent je Geld statt
-   Credits sieht.
+Genau zwei Dinge, und beide liegen bei Matthias. Alles andere ist entschieden und steht als
+stehende Regel in `loop-constraints.md`, damit es nicht wieder als Frage auftaucht.
+
+1. **Die Stripe-Zugaenge.** Das Konto auf HTC existiert, Matthias schickt sie. Marktplatz oder
+   Verkaeufer ist **die Wahl des Loops** und am 29.09. getroffen: Marktplatz.
+2. **Search Console und Bing**, im Browser, sobald die Erweiterung verbunden ist.
+
+**Erledigt und nicht mehr zu besprechen:** die Domain (`postyourprice.com`, gekauft), die
+Rechtsform (HTC), die Provision (aenderbar, weil sie am Auftrag steht), die Anzeigen (gerechnet,
+traegt nicht, rechnet sich jeden Zyklus neu), das Caddyfile (war laengst drin), die
+Issue-Antworten (der Loop sendet selbst) und **Gas**.
+
+**Zu Gas, damit es nie wieder auftaucht:** dieser Dienst sendet nie selbst eine Transaktion.
+`CP_SETTLER=facilitator`, und der Facilitator reicht die EIP-3009-Zahlung ein und zahlt ihr Gas.
+Deshalb stand die Wallet des zahlenden Kunden am 27.09. auf Nonce 0, waehrend sein USDC floss. Der
+selbst-settlende Pfad existiert nur im Code und ist betrieblich verboten. Die 21,92 USDC auf der
+payTo-Adresse sind Einnahmen in Matthias' Verwahrung, kein blockiertes Kapital; einen Schluessel
+dafuer haelt dieses System ohnehin nicht. `ops/sperren.sh` prueft nur noch, ob der Betrieb je
+selbst settlen muesste, und genau dann waere Gas wieder ein Thema.
 
 ## Wie Teilziele entstehen
 

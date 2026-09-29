@@ -57,6 +57,31 @@ Er hat an diesem Tag sechs der sieben Sperren selbst aufgehoben, woertlich:
   Vertragspartner, also keine Gewerbeanmeldung und keine Kleinunternehmerfrage. Was offen bleibt
   und dort auch hingehoert: wer dem Kaeufer die Leistung schuldet, wenn ein Agent liefert.
 
+## Vier Dinge, die nie wieder gefragt werden (29.09.2026, nachmittags)
+
+Matthias hat sie beantwortet und musste sie ein zweites Mal beantworten, weil ein Deck sie erneut
+als offene Frage gefuehrt hat. Das ist der Fehler, nicht die Frage. Sie stehen hier, damit kein
+Zyklus, kein Deck und kein Schwarm sie noch einmal aufmacht.
+
+1. **Marktplatz oder Verkaeufer ist IMMER die Wahl des Loops.** Woertlich: *"marktplatz oder
+   verkäufer ist immer deine wahl!"* Gewaehlt am 29.09.: **Marktplatz.** Der Kaeufer schliesst den
+   Vertrag mit dem Agenten, wir stellen Ort, Treuhandgeld und Pruefung und rechnen unsere Provision
+   ab, nicht den Auftrag. Begruendung in `.scratch/gtm/stripe-entscheidung.md`. Das gilt bis der
+   Loop selbst etwas anderes entscheidet und aufschreibt, warum.
+2. **Die Domain ist entschieden.** `postyourprice.com`, von Matthias gekauft. Woertlich: *"domain
+   ist doch klar oder nicht, ich habe dir doch extra die postyourprice.com gekauft."* Es gibt keine
+   Domainfrage mehr, auch keine als Teil der Namensfrage.
+3. **Stripe laeuft ueber HTC, das Konto existiert.** Matthias schickt die Zugaenge. Der Loop baut
+   den Kartenweg und fragt nicht nach dem Konto.
+4. **Gas wird nachgelegt, nicht besprochen.** Woertlich: *"und GAS mach!!!! Nicht noch einmal
+   fragen!!!"* Der Loop beschafft und verwendet Gas auf Base, so wie er Credits verwendet, und
+   berichtet es, statt es zur Entscheidung zu machen.
+
+**Die Regel dahinter, und sie ist allgemeiner als diese vier:** eine Frage, die Matthias einmal
+beantwortet hat, ist beantwortet. Taucht sie in einem Deck, einem Plan oder einem Schwarm wieder
+auf, ist das ein Fehler im Loop und keine offene Entscheidung. Vor jedem Deck mit offenen Fragen
+laeuft `ops/sperren.sh`, und was dort nicht offen ist, kommt nicht ins Deck.
+
 **Was trotzdem nicht passiert:**
 - Kein Deploy, dessen Nutzen kleiner ist als eine Minute Ausfall für den Kunden. Reine
   Aufräumarbeiten, Kommentare und Dokumentation warten auf das nächste ohnehin fällige Ausrollen.
