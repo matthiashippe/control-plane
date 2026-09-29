@@ -75,8 +75,10 @@ darf sie zitieren, um eine Anweisung von oben zu verweigern, und der CEO kann si
                                               └── maschinenmarkt
 ```
 
-Neunzehn Rollen, jede als Datei in `.claude/agents/`. Die vier Bereichsleiter dürfen ihre eigenen
-Teamrollen beauftragen; niemand sonst beauftragt jemanden.
+Neunzehn Rollen, jede als Agent in Paperclip. Im Repo liegen davon vier als Datei
+(`.claude/agents/ceo.md`, `cfo.md`, `cmo.md`, `cto.md`); die fünfzehn Teamrollen liegen nur in
+Paperclip. Die vier Bereichsleiter dürfen ihre eigenen Teamrollen beauftragen; niemand sonst
+beauftragt jemanden.
 
 ### Wer was darf
 
@@ -116,6 +118,18 @@ Nicht in Dateien, sondern in **Paperclip**, dem offenen Kontrollsystem fuer Agen
 
 Der Port ist 3140 statt des Standards 3100, weil dort schon etwas anderes lauscht. Telemetrie ist
 aus.
+
+**Der erste Lauf ist gescheitert, und die Ursache ist offen.** Der `stabschef` hat am 29.09. von
+16:47:00 bis 16:48:50 UTC viermal auf HAN-1 gestartet und viermal mit `acpx_turn_failed` und
+`stopReason: adapter_failed` abgebrochen, jedes Mal ein bis vier Sekunden nach dem Sitzungsaufbau
+und mit `usage used: 0`, also ohne einen einzigen Token. Quelle: die vier Dateien unter
+`~/.paperclip/instances/default/data/run-logs/<firma>/a36e5810-*/`. Widerlegt sind Repo, cwd und
+Vertrag (die `AGENTS.md` des `stabschef` ist byteweise identisch mit der des `schreiber`, dessen
+Lauf durchläuft) und die Werkzeuge (`ops/ziele.sh`, `ops/sperren.sh`, `ops/org.sh --selftest` alle
+grün). Auch das Modell ist widerlegt, obwohl die Logs hier auseinandergehen: der `stabschef` läuft
+mit `claude-opus-5-5`, der `schreiber` mit `claude-opus-5`, aber `claude --model claude-opus-5-5 -p`
+antwortet normal. Die acpx-Event-Streams, auf die die Sitzungsdateien zeigen, liegen nicht auf der
+Platte, dort endet der Beleg.
 
 **Was Paperclip macht und was hier steht.** Paperclip ist das Betriebssystem: Organigramm, Tickets,
 Weckzeiten, Budgets, Freigaben, Protokoll. Es weiss nicht, dass `price_mc` Millicents sind oder dass
@@ -180,3 +194,18 @@ im Repo und die gemessene Zahl. Eine Zeile, die einen Deploy behauptet, zu dem e
 gibt, ist ein Befund. Eine Rolle, die in vierzehn Tagen nichts bewegt hat, wird still genannt und
 gestrichen oder umgeschrieben. `ops/org.sh --selftest` ist die Gegenprobe und läuft in
 `ops/check-all.sh` mit.
+
+**Kaputt seit dem 29.09.2026, 18:46 (Commit 25eed63).** Der Umzug nach Paperclip hat die neun
+`org-*.md` gelöscht, aber `ops/org.py:25` trägt deren Namen weiter fest verdrahtet. Folge: die
+Rollenprüfung nennt neun Rollen still, die es nicht mehr gibt, und keine der neunzehn, die es gibt.
+Schlimmer, `ops/org.py:90` macht einen unbekannten Rollennamen zum Befund, also wird das Protokoll
+rot, sobald eine echte Paperclip-Rolle eine Zeile schreibt. `.claude/workflows/paperclip.js:20`
+liest ebenfalls noch `.claude/agents/org-*.md`. Die Selbstmessung der Org ist damit blind, und die
+Gegenprobe `--selftest` fällt es nicht auf, weil sie mit den alten Namen testet.
+
+Gemessen, in beide Richtungen: eine Zeile mit `org-schreiber`, der am 29.09. gelöschten Rolle, ergibt
+`ORG OK`; dieselbe Zeile mit `schreiber`, der Rolle, die es wirklich gibt, ergibt
+`FREMD: Rolle schreiber steht nicht in ORG.md`. Die toten Namen gehen durch, die lebenden fallen
+durch. Und die Meldung sagt, sie prüfe ORG.md, wo `schreiber` in Zeile 66 steht; geprüft wird
+`ROLLEN` in `ops/org.py`. Das ist die Frage aus der Tabelle oben: misst das Werkzeug, was sein Name
+sagt?

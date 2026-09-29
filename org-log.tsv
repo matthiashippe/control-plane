@@ -4,3 +4,4 @@
 # "-" in commit heisst: dieser Lauf hat nichts committet.
 2026-09-29	Angebot	org-produkt	Iterationsrunden: Feedback und Ueberarbeitung, vier Runden	413580f	0
 2026-09-29	Angebot	org-wirt	ausgerollt, 960 Tests gruen, 401 ohne Schluessel live geprueft	413580f	0
+2026-09-29	Sehen	org-schreiber	erster Durchlauf gescheitert: stabschef bricht 4x ohne Token ab, HAN-2 und HAN-3 angelegt	4ed9236	0
