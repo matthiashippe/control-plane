@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { TOPUP_TIERS_USD } from "../src/payments/pay.js";
 import { privateKeyToAccount, generatePrivateKey } from "viem/accounts";
 import { keccak256, toHex } from "viem";
 import { createApp } from "../src/app.js";
@@ -155,7 +156,11 @@ describe("Registry", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { tiers: unknown[]; topup_tiers_usd: number[] };
     expect(Array.isArray(body.tiers)).toBe(true);
-    expect(body.topup_tiers_usd).toEqual([5, 25, 100, 500, 1000, 2500]);
+    // Aus der Quelle und nicht abgeschrieben. Am 29.09. kam die 1 dazu, weil @x402/core
+    // jedes Angebot ueber einem Dollar vor dem Signieren aussortiert, und diese Zeile hat
+    // das gemeldet, was ihre Aufgabe ist. Eine abgeschriebene Liste haette es gemeldet und
+    // waere danach von Hand nachgezogen worden, also steht hier jetzt die Quelle.
+    expect(body.topup_tiers_usd).toEqual([...TOPUP_TIERS_USD]);
   });
 
   it("answers transfers with 501 (the phase 1 decision), on both paths", async () => {

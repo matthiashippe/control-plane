@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { TOPUP_TIERS_USD } from "../src/payments/pay.js";
 import type { Address, Hex } from "viem";
 import { FacilitatorSettler } from "../src/payments/facilitator.js";
 import { payConfigFromEnv } from "../src/payments/pay.js";
@@ -133,7 +134,11 @@ describe("FacilitatorSettler", () => {
 describe("tiers from the environment", () => {
   it("takes the runtime tiers as the default and allows operator tiers", () => {
     const base = payConfigFromEnv({ CP_PAY_TO: PAY_TO });
-    expect(base?.tiers).toEqual([5, 25, 100, 500, 1000, 2500]);
+    // Aus der Quelle und nicht abgeschrieben. Am 29.09. kam die 1 dazu, weil @x402/core
+    // jedes Angebot ueber einem Dollar vor dem Signieren aussortiert, und diese Zeile hat
+    // das gemeldet, was ihre Aufgabe ist. Eine abgeschriebene Liste haette es gemeldet und
+    // waere danach von Hand nachgezogen worden, also steht hier jetzt die Quelle.
+    expect(base?.tiers).toEqual([...TOPUP_TIERS_USD]);
     const withOne = payConfigFromEnv({ CP_PAY_TO: PAY_TO, CP_TOPUP_TIERS_USD: "1,5,25" });
     expect(withOne?.tiers).toEqual([1, 5, 25]);
     // The wording comes from src/payments/pay.ts. A parallel agent in the same language pass

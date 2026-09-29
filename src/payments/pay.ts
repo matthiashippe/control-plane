@@ -12,8 +12,35 @@ import { MC_PER_CENT, mcToCents, postLedger, type Db } from "../db.js";
 import { DOC } from "../errors.js";
 import type { Authorization, Settler } from "./settler.js";
 
-/** The tiers the runtime client knows (`TOPUP_TIERS` in topup.ts). */
-export const TOPUP_TIERS_USD = [5, 25, 100, 500, 1000, 2500] as const;
+/**
+ * The tiers this service sells, smallest first.
+ *
+ * The 1 is not a rounding of the list and must not be tidied away. `@x402/core` 2.27.0 sets
+ * `DEFAULT_MAX_AMOUNT_PER_PAYMENT = "$1"` (`package/dist/esm/client/index.mjs:22`, read from the
+ * npm tarball on 2026-09-29), `resolveAtomicSpendCap()` turns it into the caller's ceiling unless
+ * they pass `spendControls: false` or their own limit, and the client then does this, before any
+ * signature exists:
+ *
+ *     filtered = filtered.filter((requirement) => … BigInt(rawAmount) <= BigInt(cap))
+ *
+ * So a 5 USD offer is dropped by every client on the official SDK running defaults, silently,
+ * without a human or an agent ever deciding anything. Between the catalogue entry on 27.09. and
+ * 29.09., 220 foreign addresses asked this route 465 times and **not one ever signed**; the whole
+ * access log holds three `X-PAYMENT-RESPONSE` answers, two of them from the same Conway runtime,
+ * whose tiers are hard-wired and therefore never saw the cap.
+ *
+ * The comparison is `<=`, so exactly 1.00 USD passes: 1,000,000 atomic units against a ceiling of
+ * 1,000,000. One cent more and it is filtered out again.
+ *
+ * The directory says the same thing from the other side. In the scan of 2026-09-29 the 85 CDP
+ * rows priced at 5 USDC and up hold 430 paid calls between them in 30 days; the band from 0.10 to
+ * 1.00 USD holds 889 rows with 9,309 calls. The two prepaid services anybody can point at sit
+ * exactly at 1.00 USD.
+ *
+ * The runtime client's own `TOPUP_TIERS` in topup.ts starts at 5 and is unaffected: it asks for a
+ * tier by name and never filters.
+ */
+export const TOPUP_TIERS_USD = [1, 5, 25, 100, 500, 1000, 2500] as const;
 
 export interface PayConfig {
   payTo: Address;
