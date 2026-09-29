@@ -91,6 +91,15 @@ print(max(1, math.ceil((time.time() - min(stamps)) / 3600) + 1))
     "a scroll on / followed by /katalog without a catalogue mark is not a catalogue reader"
   katalog_case traffic-katalog-direct-scroll.log 1 \
     "a direct visit to /katalog that scrolls it has to count"
+  # A 404 on /katalog four hours before the first 200, from a browser that is not ours (HAN-20).
+  # It must neither open the window nor count as an opener; the scroll after the 200 still counts.
+  katalog_case traffic-katalog-404-before-deploy.log 1 \
+    "a scroll after the first 200 counts even when a 404 came before it"
+  hits=$(CP_PAGES="/ /katalog /check /fix /post" CP_TRAFFIC_LOG="$(dirname "$fixture")/traffic-katalog-404-before-deploy.log" \
+    "${BASH_SOURCE[0]}" 24 2>/dev/null | /usr/bin/grep -cE "^   window: 2026-09-30 12:00 .*first 200 of /katalog" || true)
+  if [[ "${hits:-0}" -eq 0 ]]; then
+    echo "SELFTEST FAILED: the catalogue window has to open at the first 200 (12:00), not at the 404 (08:00)"; fail=1
+  fi
   [[ "$fail" -eq 0 ]] && echo "SELFTEST OK: a real search arrival, two that only claim one, and a control, told apart over a ${hours} hour window; the catalogue counted per page in both directions."
   exit "$fail"
 fi
@@ -594,7 +603,7 @@ if (( ONLY_FUNNEL )); then exit 0; fi
 # The section above counts marks per ADDRESS: somebody who scrolled / and then opened /katalog
 # would read as a catalogue reader, and the sceptic said so in HAN-11. So this block looks only at
 # the catalogue's own marks (katalog-*), only at the script run the catalogue page itself caused
-# (/v1/status with /katalog as referrer), and only from the first time /katalog answered anybody,
+# (/v1/status with /katalog as referrer), and only from the first time /katalog answered 200,
 # which is the deploy as far as the log can tell. CP_KATALOG_SINCE (epoch seconds) overrides it
 # when the deploy time is known better.
 #
@@ -612,7 +621,7 @@ own = set(os.environ.get("CP_OWN_IPS_RESOLVED", "").split())
 hosts = (os.environ.get("CP_OWN_HOSTS") or "cp.hippe.eu").split()
 MODEL_CODED = re.compile(r"iPhone\d+,\d+|iPad\d+,\d+|Watch\d+,\d+")
 
-rows = []
+rows, answered = [], []
 for raw in open(sys.argv[1], encoding="utf-8", errors="replace"):
     raw = raw.strip()
     if not raw.startswith("{"):
@@ -626,16 +635,19 @@ for raw in open(sys.argv[1], encoding="utf-8", errors="replace"):
     first = lambda k: ((h.get(k) or [""])[0] or "")
     rows.append((float(r.get("ts", 0)), q.get("remote_ip", ""), str(q.get("uri", "")).split("?")[0],
                  first("Referer"), first("User-Agent"), first("Accept-Language")))
-
-answered = [ts for ts, _, path, _, _, _ in rows if path == "/katalog"]
+    # Only a 200 marks the deploy. On 2026-09-29 this took any answer, so a 404 on /katalog at 15:24
+    # UTC opened the window four hours before the rollout at 19:41 and every rate per 24 h came out
+    # too small (HAN-20).
+    if rows[-1][2] == "/katalog" and r.get("status") == 200:
+        answered.append(rows[-1][0])
 print("-- The catalogue, per page, since it went live --")
 if not answered:
-    print("   /katalog has never answered anybody in this log, so nothing here can be measured yet.")
+    print("   /katalog has never answered 200 in this log, so nothing here can be measured yet.")
     raise SystemExit(0)
 since = float(os.environ.get("CP_KATALOG_SINCE") or min(answered))
 at = lambda t: datetime.datetime.fromtimestamp(t, datetime.timezone.utc).strftime("%Y-%m-%d %H:%M")
 latest = max(ts for ts, *_ in rows)
-source = "CP_KATALOG_SINCE" if os.environ.get("CP_KATALOG_SINCE") else "first answer of /katalog in the log"
+source = "CP_KATALOG_SINCE" if os.environ.get("CP_KATALOG_SINCE") else "first 200 of /katalog in the log"
 print(f"   window: {at(since)} to {at(latest)} UTC, {(latest - since) / 3600:.1f} h ({source}); source: access log")
 
 networks = collections.defaultdict(set)

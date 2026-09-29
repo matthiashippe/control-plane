@@ -15,6 +15,7 @@ import re
 import sys
 
 UNTERGRENZE = 11.13
+ANGEBOTE = 3
 LIEFERSATZ = (
     "Alle Texte liefern wir selbst. Sie werden mit KI geschrieben, "
     "kein anderer Händler und kein Freiberufler ist beteiligt."
@@ -41,7 +42,7 @@ def betraege(text: str) -> list[float]:
 def ist_katalog(seite: str) -> bool:
     text = sichtbarer_text(seite)
     tragend = [b for b in betraege(text) if b >= UNTERGRENZE - 1e-9]
-    return len(tragend) >= 3 and LIEFERSATZ in text
+    return len(tragend) >= ANGEBOTE and LIEFERSATZ in text
 
 
 if __name__ == "__main__":

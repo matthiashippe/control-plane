@@ -15,6 +15,8 @@ import json
 import os
 import sys
 
+from katalog_pruefung import ANGEBOTE, UNTERGRENZE
+
 GREEN, RED, GREY, UNK = "OK    ", "OFFEN ", "----  ", "?     "
 
 
@@ -77,8 +79,12 @@ def main():
     print(f"Ziele, gemessen gegen {base}")
 
     ziel("02.10.", "Ein Mensch kann hier kaufen, ohne Wallet")
-    pruefe("Katalog mit Preisen ueber 11 EUR", http("CP_ZIELE_KATALOG"), 1,
-           "GET /katalog antwortet 200 und nennt mindestens einen Preis ueber 11 EUR")
+    # Die Beschriftung liest die Grenzen aus der Pruefung selbst. Bis zum 29.09.2026 stand hier
+    # "mindestens einen Preis ueber 11 EUR", waehrend die Pruefung schon drei ab 11,13 EUR und den
+    # Liefersatz verlangte (HAN-20).
+    untergrenze = f"{UNTERGRENZE:.2f}".replace(".", ",")
+    pruefe(f"Katalog mit {ANGEBOTE} Angeboten ab {untergrenze} EUR", http("CP_ZIELE_KATALOG"), 1,
+           f"GET /katalog nennt mindestens {ANGEBOTE} Preise ab {untergrenze} EUR und den Liefersatz")
     pruefe("Gespraech, das eine Bestellung erzeugt", http("CP_ZIELE_CHAT"), 1,
            "ein Gespraech nimmt Anforderungen auf und macht daraus eine Bestellung")
     pruefe("Bezahlweg ohne Wallet", http("CP_ZIELE_KARTE"), 1,
