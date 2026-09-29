@@ -3,6 +3,39 @@
 // is unchanged: inside the container CP_DB_PATH is not set and /data/cp.db is where it lives.
 // Without this the report was the one piece of the daily observation that nothing could check.
 const db = require("better-sqlite3")(process.env.CP_DB_PATH || "/data/cp.db", { readonly: true });
+
+// The pool's size and the grant sizes, read from the service instead of retyped here.
+//
+// They were three literals in this file: 500000, 15000, 50000. On 2026-09-29 the pool went from
+// 500,000 mc to 1,500,000 because the old figure was the ceiling on the 02.10. goal rather than a
+// budget, and this report kept reporting the old one. The test that holds "an untouched pool
+// carries POOL_MC / GRANT_MC" went red on the spot, which is what it is for, and it found a
+// duplication rather than a typo: a number that decides an offer has one home.
+//
+// Read from the compiled service when it is there, which it is in the container this runs in, and
+// fall back to the values as they stood, so a report on a machine without a build still runs and
+// says something rather than nothing.
+let POOL_MC = 1_500_000;
+let GRANT_MC = 15_000;
+let BUYER_GRANT_MC = 50_000;
+let poolSource = "fallback";
+// ops/status.sh pipes this file into `node -` inside the container, so there is no __dirname to
+// resolve against and `require` starts from the working directory, which is /app. The first
+// attempt at this read used "../dist/..." and would have failed silently on every production run,
+// leaving the fallback in place: the same quiet drift this block exists to end. Measured in the
+// container before shipping, which is the only way that was ever going to be caught.
+for (const candidate of ["./dist/credits/starter.js", "/app/dist/credits/starter.js", "../dist/credits/starter.js"]) {
+  try {
+    const starter = require(candidate);
+    if (Number.isInteger(starter.POOL_MC)) POOL_MC = starter.POOL_MC;
+    if (Number.isInteger(starter.GRANT_MC)) GRANT_MC = starter.GRANT_MC;
+    if (Number.isInteger(starter.BUYER_GRANT_MC)) BUYER_GRANT_MC = starter.BUYER_GRANT_MC;
+    poolSource = candidate;
+    break;
+  } catch {
+    /* try the next one */
+  }
+}
 const day = new Date(Date.now() - 86400e3).toISOString();
 const one = (sql, ...a) => db.prepare(sql).get(...a);
 const all = (sql, ...a) => db.prepare(sql).all(...a);
@@ -311,8 +344,11 @@ report.market = {
   // The direction matters: this number is what a cycle reads to decide whether the free offer can
   // still be made, and understating it takes the offer off the pages while the money is there.
   // The same class of error emptied the offer for four hours on 2026-09-23, from the other end.
+  // Where the three numbers above came from. "fallback" means this report is guessing at the
+  // pool's size, and a guess about the pool is a guess about every offer the pages make.
+  pool_source: poolSource,
   starter_pool_left_mc:
-    500000 - one("select coalesce(sum(delta_mc),0) s from ledger where kind in ('grant','grant_returned')").s,
+    POOL_MC - one("select coalesce(sum(delta_mc),0) s from ledger where kind in ('grant','grant_returned')").s,
 
   // How many newcomers the giveaway still carries.
   //
@@ -334,8 +370,8 @@ report.market = {
   // cancelled gave nobody anything and its credit is back in the pool; counting it as spent made
   // this figure pessimistic after every cancellation, which is the direction that quietly shrinks
   // a promise the pages are still making.
-  starter_grants_left: Math.floor((500000 - one("select coalesce(sum(delta_mc),0) s from ledger where kind in ('grant','grant_returned')").s) / 15000),
-  starter_buyer_grants_left: Math.floor((500000 - one("select coalesce(sum(delta_mc),0) s from ledger where kind in ('grant','grant_returned')").s) / 50000),
+  starter_grants_left: Math.floor((POOL_MC - one("select coalesce(sum(delta_mc),0) s from ledger where kind in ('grant','grant_returned')").s) / GRANT_MC),
+  starter_buyer_grants_left: Math.floor((POOL_MC - one("select coalesce(sum(delta_mc),0) s from ledger where kind in ('grant','grant_returned')").s) / BUYER_GRANT_MC),
   // Money the buyer brought, against money we handed them.
   //
   // `foreign_gmv_30d_mc` below is the number the whole plan is measured by, and it was about to

@@ -8,7 +8,7 @@ import { claimStarter, poolLeftMc, GRANT_MC, POOL_MC, StarterError } from "../sr
 // This file spends the whole pool to test what the pages say when it is empty, which is more
 // than one day allows since 2026-09-23. The day's ceiling is lifted here on purpose and named,
 // rather than the cap being left out of reach of the tests that would notice it.
-process.env.CP_POOL_DAILY_MC = "500000";
+process.env.CP_POOL_DAILY_MC = String(POOL_MC);
 
 function account(db: ReturnType<typeof openDb>, app: ReturnType<typeof createApp>, n: number) {
   const address = privateKeyToAccount(generatePrivateKey()).address.toLowerCase();

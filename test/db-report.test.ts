@@ -5,6 +5,7 @@
  * against a database it built itself.
  */
 import { describe, expect, it } from "vitest";
+import { POOL_MC } from "../src/credits/starter.js";
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -316,7 +317,7 @@ describe("The market numbers in the database report", () => {
       postLedger(db, { address: STRANGER, kind: "grant", deltaMc: 15 * MC_PER_CENT, ref: `starter:${STRANGER}` });
     });
     expect(r.market.starter_granted).toBe(1);
-    expect(r.market.starter_pool_left_mc).toBe(500_000 - 15 * MC_PER_CENT);
+    expect(r.market.starter_pool_left_mc).toBe(POOL_MC - 15 * MC_PER_CENT);
   });
 
   /**
@@ -342,10 +343,10 @@ describe("The market numbers in the database report", () => {
       postLedger(db, { address: STRANGER, kind: "grant_returned", deltaMc: -50 * MC_PER_CENT, ref: `job-back:${STRANGER}` });
     });
     expect(r.market.starter_pool_left_mc, "given and given back is a pool that was never touched")
-      .toBe(500_000);
+      .toBe(POOL_MC);
     // The two that were already right, held against it: a report whose figures disagree is worse
     // than one that is wrong, because it reads as precision.
-    expect(r.market.starter_grants_left).toBe(Math.floor(500_000 / (15 * MC_PER_CENT)));
+    expect(r.market.starter_grants_left).toBe(Math.floor(POOL_MC / (15 * MC_PER_CENT)));
     expect(Math.floor(r.market.starter_pool_left_mc / (15 * MC_PER_CENT)))
       .toBe(r.market.starter_grants_left);
   });

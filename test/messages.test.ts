@@ -12,7 +12,7 @@ import type { Address, Hex } from "viem";
 import { createApp, V1_KEYLESS } from "../src/app.js";
 import { openDb, postLedger, type Db } from "../src/db.js";
 import { hashApiKey } from "../src/auth/siwe.js";
-import { claimStarter, poolLeftMc, GRANT_MC } from "../src/credits/starter.js";
+import { POOL_MC, claimStarter, poolLeftMc, GRANT_MC } from "../src/credits/starter.js";
 import { MockProvider } from "../src/inference/mock.js";
 import { Catalog } from "../src/inference/proxy.js";
 import type { PayConfig } from "../src/payments/pay.js";
@@ -21,7 +21,7 @@ import type { Authorization, Settler, SettleResult } from "../src/payments/settl
 // This file spends the whole pool to test what the pages say when it is empty, which is more
 // than one day allows since 2026-09-23. The day's ceiling is lifted here on purpose and named,
 // rather than the cap being left out of reach of the tests that would notice it.
-process.env.CP_POOL_DAILY_MC = "500000";
+process.env.CP_POOL_DAILY_MC = String(POOL_MC);
 
 const USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" as Address;
 const PAY_TO = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8" as Address;

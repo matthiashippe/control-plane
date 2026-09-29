@@ -459,6 +459,10 @@ if unknown:
     # carried on. Either it is ours and belongs on the list, or it is a stranger and is the best
     # news this project has had, and both deserve more than a line somebody skims.
     sys.exit(3)
+src = db.get('market', {}).get('pool_source')
+if src == 'fallback':
+    print(\"BROKEN  the report could not read the pool's size from the service and is guessing.\")
+    print(\"        Every figure about the starter pool below is that guess. See ops/db-report.cjs.\")
 foreign = db.get('wallets_foreign')
 if foreign is not None:
     addresses = [w['address'] if isinstance(w, dict) else w for w in db.get('wallets_foreign_list', [])]

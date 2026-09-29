@@ -48,8 +48,31 @@ export const GRANT_MC = 15_000;
  * the address would still be counted in foreign_buyers.
  */
 export const BUYER_GRANT_MC = 50_000;
-/** The whole giveaway, across every address. At 15 cents each this is 33 agents. */
-export const POOL_MC = 500_000;
+/**
+ * The whole giveaway, across every address.
+ *
+ * It was 500,000 mc, 33 agent grants at 15 cents, and on 2026-09-29 that number turned out to be
+ * the ceiling on a dated goal rather than a budget. ZIELE.md asks for 25 foreign wallets that
+ * have computed here by 02.10. Two have. A wallet with no USDC can only get there through a
+ * grant, 23 more grants cost 345 cents, and the pool had 170 left: eleven. **So the goal could
+ * not be reached with this figure, by arithmetic, whatever else was built.** That is the same
+ * shape as the keyless door in Goal 18, one layer down, and it was found the same way: by
+ * dividing the target by what the mechanism allows.
+ *
+ * What the raise actually costs. A grant is 15 cents of CREDIT, and credit buys inference at
+ * MARKUP 1.3, so the operator's real exposure per grant is about 11.5 cents of provider spend,
+ * and only for a grant that is spent. Going to 1,500,000 mc puts 78 further grants within reach
+ * for at most about nine dollars of purchase cost, spread over however long they take.
+ *
+ * What bounds it stays where it was: `poolDailyMc()` still lets out 150 cents a day, ten agent
+ * grants, so a bad day costs about 1.15 dollars and the day after is a fresh decision. That
+ * matters more since the keyless door opened: a crawler minted eleven handles in twenty minutes
+ * on the day this changed. Measured that day, it did not spend any of them (one of sixteen
+ * handles had a ledger entry at all), and a handle only draws a grant on a call it cannot pay
+ * for. If that ever changes, the answer is not to shrink the pool again but to hang the grant on
+ * something a crawler does not do.
+ */
+export const POOL_MC = 1_500_000;
 
 /**
  * What the pool may give away in one UTC day, across every address.

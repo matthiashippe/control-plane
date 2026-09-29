@@ -23,12 +23,12 @@ import { describe, expect, it } from "vitest";
 // These cases put the caller in the state the runtime was in, which means emptying the pool, and
 // that is more than one day allows since 2026-09-23. The day's ceiling is lifted here on purpose
 // and named, rather than the cap being left out of reach of the tests that would notice it.
-process.env.CP_POOL_DAILY_MC = "500000";
+process.env.CP_POOL_DAILY_MC = String(POOL_MC);
 
 import { createApp } from "../src/app.js";
 import { openDb, postLedger } from "../src/db.js";
 import { hashApiKey } from "../src/auth/siwe.js";
-import { poolLeftMc, GRANT_MC, claimStarter } from "../src/credits/starter.js";
+import { POOL_MC, poolLeftMc, GRANT_MC, claimStarter } from "../src/credits/starter.js";
 import { privateKeyToAccount, generatePrivateKey } from "viem/accounts";
 
 const ADDRESS = "0x938f5c37ba7d1c20c1a7c4e4446f4d5377f1d10e";
