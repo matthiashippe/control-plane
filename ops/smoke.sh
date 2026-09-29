@@ -177,20 +177,75 @@ else
   markup=$(json_value status markup)
   automatons=$(json_value status automatons)
   tiers=$(json_value status topup_tiers_usd)
+  # Which phase the service says it is in (HAN-62). Three states, read from the service itself so
+  # this script is bound to the running configuration and not to a date typed in here:
+  #   selling  markup is a number, no notice: models are sold as before.
+  #   sunset   markup is a number and `handsel_notice` names the day the sale ends.
+  #   ended    markup is null: nothing is sold, and no model may be listed.
+  # Each state is then held against what the routes really do, further down, so a status that
+  # claims the wrong phase fails instead of steering the checks.
+  SALE_ENDS=$(json_value status handsel_notice.inference_ends_at 2>/dev/null)
+  if [[ "$markup" == "None" ]]; then
+    SALE_PHASE="ended"
+  elif [[ -n "$SALE_ENDS" ]]; then
+    SALE_PHASE="sunset"
+  else
+    SALE_PHASE="selling"
+  fi
+  # Topups closed: the tier list is empty (HAN-62). Held against /pay itself in check 6b.
+  if [[ "$tiers" == "[]" ]]; then INTAKE="closed"; else INTAKE="open"; fi
   problems=""
-  # Without models the runtime cannot think, and the price cache from src/index.ts would be empty.
-  [[ "$model_count" -gt 0 ]] || problems="$problems models empty;"
-  # A markup below 1 would mean we sell below purchase. On 19.09. the catalogue was gone once already.
-  python3 -c 'import sys; sys.exit(0 if float(sys.argv[1]) >= 1 else 1)' "$markup" 2>/dev/null || problems="$problems markup=$markup;"
+  if [[ "$SALE_PHASE" == "ended" ]]; then
+    # Nothing is sold, so a listed model would be a price for something that is not there.
+    [[ "$model_count" -eq 0 ]] || problems="$problems $model_count model(s) listed while markup is null;"
+  else
+    # Without models the runtime cannot think, and the price cache from src/index.ts would be empty.
+    [[ "$model_count" -gt 0 ]] || problems="$problems models empty;"
+    # A markup below 1 would mean we sell below purchase. On 19.09. the catalogue was gone once already.
+    python3 -c 'import sys; sys.exit(0 if float(sys.argv[1]) >= 1 else 1)' "$markup" 2>/dev/null || problems="$problems markup=$markup;"
+  fi
   # The number has to be there and be a number; it counts paying operators, not registrations.
   [[ "$automatons" =~ ^[0-9]+$ ]] || problems="$problems automatons=$automatons;"
   [[ "$tiers" == *"["* ]] || problems="$problems topup_tiers_usd missing;"
   if [[ -n "$problems" ]]; then
     fail "/v1/status: $problems"
   else
-    ok "/v1/status: 200, $model_count model(s), markup $markup, automatons $automatons, tiers $tiers"
+    ok "/v1/status: 200, phase $SALE_PHASE${SALE_ENDS:+ until $SALE_ENDS}, topups $INTAKE, $model_count model(s), markup $markup, automatons $automatons, tiers $tiers"
   fi
 fi
+SALE_PHASE="${SALE_PHASE:-selling}"
+INTAKE="${INTAKE:-open}"
+
+# --- 2b. /v1/models does what /v1/status says ------------------------------------
+# The phase above is the service's own word; this is the route. Before the sunset the catalogue
+# answers 200 with a Sunset header naming the same day (RFC 8594), after it 503
+# inference_not_for_sale, and while selling as before 200 without one. Needs no key.
+code=$(fetch models /v1/models)
+sunset_header=$(header models sunset)
+case "$SALE_PHASE" in
+  ended)
+    if [[ "$code" == "503" && "$(json_value models error)" == "inference_not_for_sale" ]]; then
+      ok "/v1/models: 503 inference_not_for_sale, as /v1/status says"
+    else
+      fail "/v1/models: $code instead of 503 inference_not_for_sale, while /v1/status lists no markup"
+    fi
+    ;;
+  sunset)
+    expected=$(python3 -c 'import sys,datetime,email.utils; print(email.utils.format_datetime(datetime.datetime.fromisoformat(sys.argv[1].replace("Z","+00:00")), usegmt=True))' "$SALE_ENDS" 2>/dev/null)
+    if [[ "$code" == "200" && -n "$expected" && "$sunset_header" == "$expected" && "$(json_value models handsel_notice.inference_ends_at)" == "$SALE_ENDS" ]]; then
+      ok "/v1/models: 200 with Sunset: $sunset_header and the notice, as /v1/status says"
+    else
+      fail "/v1/models: $code, Sunset '$sunset_header', expected 200 with Sunset '$expected' and handsel_notice for $SALE_ENDS"
+    fi
+    ;;
+  *)
+    if [[ "$code" == "200" && -z "$sunset_header" ]]; then
+      ok "/v1/models: 200, no sunset announced"
+    else
+      fail "/v1/models: $code, Sunset '$sunset_header', expected 200 without a Sunset header"
+    fi
+    ;;
+esac
 
 # --- 3. the version from /health and /v1/status match --------------------------
 # A cheap counter-check that a single build is really running: both numbers come from the same
@@ -297,23 +352,53 @@ else
   problems=""
   [[ $valid -eq 2 ]] && problems="$problems not valid JSON;"
   [[ "$x402version" == "1" ]] || problems="$problems x402Version=$x402version;"
-  for field in status models topup register inference; do
+  # Present or absent by phase (HAN-62), both directions: a sale that has ended must not be
+  # advertised, and one that runs must be findable.
+  present="status register"
+  absent=""
+  if [[ "$SALE_PHASE" == "ended" ]]; then absent="$absent models inference"; else present="$present models inference"; fi
+  if [[ "$INTAKE" == "closed" ]]; then absent="$absent topup"; else present="$present topup"; fi
+  for field in $present; do
     json_value x402 "endpoints.$field" >/dev/null 2>&1 || problems="$problems endpoints.$field missing;"
   done
-  # The payment offer: network, asset and recipient. `accepts` is empty when CP_PAY_TO is not set
-  # on the VM; then /pay answers 503 as well and nobody can top up.
-  scheme=$(json_value x402 accepts.0.scheme 2>/dev/null)
-  payto=$(json_value x402 accepts.0.payTo 2>/dev/null)
-  network=$(json_value x402 accepts.0.network 2>/dev/null)
-  asset=$(json_value x402 accepts.0.asset 2>/dev/null)
-  [[ "$scheme" == "exact" ]] || problems="$problems accepts[0].scheme=$scheme;"
-  [[ "$payto" =~ ^0x[0-9a-fA-F]{40}$ ]] || problems="$problems payTo=$payto;"
-  [[ -n "$network" ]] || problems="$problems network missing;"
-  [[ "$asset" =~ ^0x[0-9a-fA-F]{40}$ ]] || problems="$problems asset=$asset;"
+  for field in $absent; do
+    json_value x402 "endpoints.$field" >/dev/null 2>&1 && problems="$problems endpoints.$field present in phase $SALE_PHASE/topups $INTAKE;"
+  done
+  if [[ "$INTAKE" == "closed" ]]; then
+    # No offer to pay while nothing is sold: an `accepts` entry is exactly that offer.
+    [[ "$(json_value x402 accepts)" == "[]" ]] || problems="$problems accepts not empty while topups are closed;"
+    summary="endpoints match phase $SALE_PHASE, no payment offer (topups closed)"
+  else
+    # The payment offer: network, asset and recipient. `accepts` is empty when CP_PAY_TO is not set
+    # on the VM; then /pay answers 503 as well and nobody can top up.
+    scheme=$(json_value x402 accepts.0.scheme 2>/dev/null)
+    payto=$(json_value x402 accepts.0.payTo 2>/dev/null)
+    network=$(json_value x402 accepts.0.network 2>/dev/null)
+    asset=$(json_value x402 accepts.0.asset 2>/dev/null)
+    [[ "$scheme" == "exact" ]] || problems="$problems accepts[0].scheme=$scheme;"
+    [[ "$payto" =~ ^0x[0-9a-fA-F]{40}$ ]] || problems="$problems payTo=$payto;"
+    [[ -n "$network" ]] || problems="$problems network missing;"
+    [[ "$asset" =~ ^0x[0-9a-fA-F]{40}$ ]] || problems="$problems asset=$asset;"
+    summary="endpoints complete, payment exact on $network to $payto"
+  fi
   if [[ -n "$problems" ]]; then
     fail "/.well-known/x402: $problems"
   else
-    ok "/.well-known/x402: 200 JSON, x402Version 1, endpoints complete, payment exact on $network to $payto"
+    ok "/.well-known/x402: 200 JSON, x402Version 1, $summary"
+  fi
+fi
+
+# --- 6b. /pay does what the tier list says ---------------------------------------
+# Only while topups are closed: then /pay/5 must refuse with 410 before any settlement. While they
+# are open a GET without X-Payment answers 402 with an offer, which is what check 6 already covers
+# through `accepts`. One request against a capped path.
+if [[ "$INTAKE" == "closed" ]]; then
+  CAPPED_REQUESTS=$((CAPPED_REQUESTS + 1))
+  code=$(fetch pay /pay/5)
+  if [[ "$code" == "410" && "$(json_value pay error)" == "topups_closed" ]]; then
+    ok "/pay/5: 410 topups_closed, as the empty tier list says"
+  else
+    fail "/pay/5: $code instead of 410 topups_closed, while /v1/status lists no tier"
   fi
 fi
 

@@ -38,8 +38,18 @@ const EXAMPLE_PRICE_CENTS = mcToCents(GRANT_MC);
  * empties the pool. The page keeps its shape either way, because the free credit is a reason to
  * try and never the reason the service works.
  */
-/** `notForSale`: see renderTerms. Step 5 runs on a model, so it says it is closed (HAN-55). */
-export function renderPost(offer: ReturnType<typeof starterOffer>, notForSale = false): string {
+/**
+ * `notForSale`, `endsAt`, `intakeClosed`: see renderTerms. Step 5 runs on a model, so it says it
+ * is closed (HAN-55) or until when it runs (HAN-62); step 2 names no topup while none is sold.
+ */
+export function renderPost(
+  offer: ReturnType<typeof starterOffer>,
+  state: { notForSale?: boolean; endsAt?: Date | null; intakeClosed?: boolean } = {},
+): string {
+  const { notForSale = false, endsAt = null, intakeClosed = false } = state;
+  const day = endsAt
+    ? endsAt.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" })
+    : "";
   return `
   <section>
     <div class="wrap">
@@ -70,7 +80,9 @@ export function renderPost(offer: ReturnType<typeof starterOffer>, notForSale = 
             offer
               ? `Your first job of up to ${offer.cents} ¢ is paid from our pool, so you can watch the
           whole thing work before owning any cryptocurrency.`
-              : `The starter pool that used to pay for a first job is empty, so posting one needs
+              : intakeClosed
+                ? `Posting a job needs credit you already hold: credits are no longer sold here.`
+                : `The starter pool that used to pay for a first job is empty, so posting one needs
           credit of your own: USDC on Base, from $5.`
           }</span></span>
           <a href="https://github.com/matthiashippe/control-plane/blob/main/docs/api-key.md">the three calls</a>
@@ -126,7 +138,10 @@ export function renderPost(offer: ReturnType<typeof starterOffer>, notForSale = 
             notForSale
               ? "Not available at the moment: it runs on a language model, this service no longer " +
                 "sells access to one, and the call answers <code>503</code> without charging."
-              : "Billed like any other inference call."
+              : endsAt
+                ? `Billed like any other inference call until ${day}, when this service stops ` +
+                  "selling access to language models; no more credits are sold."
+                : "Billed like any other inference call."
           }</span></span>
           <a href="/">a worked example, with the twelve findings</a>
         </div>

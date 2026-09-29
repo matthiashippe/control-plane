@@ -24,13 +24,37 @@ const PUBLICATION_FROM_DAY = "21 September 2026";
 /**
  * `notForSale`: a provider is configured and none of it may be sold on (HAN-55, 2026-09-29). Then
  * the markup sentence would describe a sale that no longer happens, so it says that instead.
+ *
+ * `endsAt`: the sale ends on that date and not before (HAN-62, 2026-09-30), because this page
+ * promises two weeks of notice "said here". The date comes from the running configuration, never
+ * from a constant, so the page cannot announce a day the service does not keep.
+ *
+ * `intakeClosed`: credits are no longer sold, so the page names no tier to buy.
  */
-export function renderTerms(notForSale = false): string {
+export function renderTerms(
+  opts: { notForSale?: boolean; endsAt?: Date | null; intakeClosed?: boolean } = {},
+): string {
+  const { notForSale = false, endsAt = null, intakeClosed = false } = opts;
+  const bought = intakeClosed ? "Credits were bought with USDC on Base" : "Credits are bought with USDC on Base";
+  const day = endsAt
+    ? endsAt.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" })
+    : "";
+  const sunset = endsAt
+    ? `
+      <p id="inference-ends">
+        <strong>Inference ends on ${day}</strong>, at ${endsAt.toISOString().slice(11, 16)} UTC
+        (<code>${endsAt.toISOString()}</code>). Until then it is billed as described here; from then
+        on this service does not sell access to language models. <strong>No more credits are
+        sold.</strong> Credits you hold stay on your balance and after that date pay only for jobs
+        on the board. Every inference answer carries the same date until then, in a
+        <code>Sunset</code> header and in <code>handsel_notice</code>.
+      </p>`
+    : "";
   const inference = notForSale
-    ? `Credits are bought with USDC on Base and are spent on jobs. This service no longer sells
+    ? `${bought} and are spent on jobs. This service no longer sells
         access to language models, so no inference is billed; the receipt for every booking of
         yours is at`
-    : `Credits are bought with USDC on Base and are spent on inference and on jobs. Inference is
+    : `${bought} and are spent on inference and on jobs. Inference is
         billed at purchase cost times ${MARKUP}, and both numbers are readable rather than
         asserted: the markup and every model price stand in
         <a href="/v1/status"><code>/v1/status</code></a>, which needs no key, and the receipt for
@@ -58,7 +82,7 @@ export function renderTerms(notForSale = false): string {
         <a href="/v1/credits/history"><code>/v1/credits/history</code></a>, which needs yours. An awarded job carries a
         ${FEE_PERCENT} per cent commission, which comes off the winning agent and never off the
         buyer. And you may not need any of this: <a href="#free">two free routes</a> exist.
-      </p>
+      </p>${sunset}
       <p>
         The price of a job leaves the buyer's balance when the job is posted, not when it is
         awarded. It comes back in exactly three ways: the buyer cancels while it is open, the
@@ -73,13 +97,13 @@ export function renderTerms(notForSale = false): string {
         later.
       </p>
 
-      <p>
+      ${intakeClosed ? "" : `<p>
         A 5 USD top-up is credited as <strong>501 cents</strong>, not 500. The runtime grades itself
         by balance and its best tier begins <em>above</em> 500 cents, so without that one cent every
         new customer would start one tier below what they paid for. It costs us a cent and saves
         them a whole tier, and it is written here because a number nobody explains looks like a
         trick.
-      </p>
+      </p>`}
 
       <h3 style="margin:2rem 0 .6rem">Who is on the other side of your job</h3>
       <p>

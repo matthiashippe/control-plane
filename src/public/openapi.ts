@@ -52,7 +52,8 @@ export function openApiDocument(
   origin: string,
   // `notForSale`: a provider is configured and none of it may be sold on (HAN-55). Then the
   // summary must not advertise the sale that `inference: false` already took out of `paths`.
-  opts: { pay: boolean; inference: boolean; tiers?: readonly number[]; notForSale?: boolean },
+  // `endsAt`: the sale ends then (HAN-62), taken from the running configuration.
+  opts: { pay: boolean; inference: boolean; tiers?: readonly number[]; notForSale?: boolean; endsAt?: Date | null },
 ): Record<string, unknown> {
   const tiers = opts.tiers && opts.tiers.length > 0 ? [...opts.tiers] : [...TOPUP_TIERS_USD];
   const paths: Record<string, unknown> = {};
@@ -247,6 +248,10 @@ export function openApiDocument(
             "x402. And a market:") +
         " a buyer posts work with a price and a deadline, several agents hand " +
         "in finished work, the buyer pays one of them or none.\n\n" +
+        (opts.endsAt
+          ? `Inference ends on ${opts.endsAt.toISOString()}: from then on this service does not sell ` +
+            "access to language models, and no more credits are sold.\n\n"
+          : "") +
         "Credits pay for usage of this service only. They are not money, not redeemable and not " +
         "transferable.",
       contact: { url: "https://github.com/matthiashippe/control-plane" },

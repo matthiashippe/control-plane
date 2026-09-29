@@ -52,13 +52,12 @@ const day = (iso: string): string => iso.slice(0, 10);
 /** "1 jobs" on a page meant to convince is a small hole in a large claim. */
 const plural = (n: number, one: string, many: string): string => (n === 1 ? one : many);
 
-export function renderJobs(db: Db): string {
+/** `offer`: the caller's starterOffer, or null while no free credit is handed out (HAN-62). */
+export function renderJobs(db: Db, offer: ReturnType<typeof starterOffer> = starterOffer(db)): string {
   const open = openBounties(db, 50);
   // Once for the page, not once per job: the same ledger question answered five times is five
   // identical queries on a page that already runs one per bounty.
   const perAnswer = centsPerAnswer(db);
-  // The free first attempt is only true while the pool can still fund one. See starterOffer().
-  const offer = starterOffer(db);
   if (!open.length) {
     return `
   <section>

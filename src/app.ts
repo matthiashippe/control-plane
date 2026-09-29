@@ -121,7 +121,26 @@ export interface AppOptions {
    * or nobody. Tests pass the Stripe adapter with a staged `fetch`, or `null`.
    */
   checkout?: CheckoutProvider | null;
+  /**
+   * The moment inference stops being sold (HAN-62). Until then the whole catalogue is sold and
+   * every inference answer says when it ends; from then on only what `Catalog.forSale()` keeps.
+   * Only matters when the catalogue holds a provider marked `resale: false`. Left out, it is
+   * INFERENCE_SUNSET_AT_DEFAULT.
+   */
+  inferenceSunsetAt?: Date;
+  /** The clock the sunset is judged against. Tests pass a fixed one to stand on either side of it. */
+  now?: () => Date;
 }
+
+/**
+ * The production value of the sunset, because `deploy/.env` is not ours to change (HAN-63).
+ *
+ * /terms promises at least two weeks before anything is shut down, and on 2026-09-30 two paying
+ * strangers still held credit bought for inference: 999,481 mc and 500,000 mc. 1d65aac stopped
+ * the sale the moment it was deployed; this date is the two weeks. CP_INFERENCE_SUNSET_AT
+ * overrides it in src/index.ts.
+ */
+export const INFERENCE_SUNSET_AT_DEFAULT = "2026-10-17T00:00:00Z";
 
 type Env = { Variables: { address: `0x${string}` } };
 
@@ -159,6 +178,55 @@ const INFERENCE_NOT_FOR_SALE = {
     "shows what you have.",
   docs: DOC.inference,
 };
+
+/**
+ * The day inference ends, for a sentence: "17 October 2026, 00:00 UTC". The ISO form goes next to
+ * it wherever a machine reads, so neither has to be parsed out of the other.
+ */
+function sunsetDay(at: Date): string {
+  const day = at.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
+  return `${day}, ${at.toISOString().slice(11, 16)} UTC`;
+}
+
+/**
+ * What every inference answer carries until the sunset (HAN-62), and /v1/status and
+ * /.well-known/x402 with it. /terms promises two weeks of notice "said here"; for a runtime that
+ * never opens a page, here is the inference answer itself.
+ */
+function sunsetNotice(at: Date) {
+  return {
+    handsel_notice: {
+      inference_ends_at: at.toISOString(),
+      message:
+        `This service stops selling access to language models on ${sunsetDay(at)}. No more ` +
+        "credits are sold. Credits you hold stay on your balance; after that date they pay only " +
+        "for jobs on the board (/bounties.json, POST /v1/bounties), and they are not redeemable.",
+      terms: "/terms",
+    },
+  };
+}
+
+/** The answer on /pay while topups are closed (HAN-62). Before any settlement, so nothing is taken. */
+const TOPUPS_CLOSED = {
+  error: "topups_closed",
+  message:
+    "Credits are no longer sold here, so nothing was charged and nothing was settled. Credits " +
+    "you already hold stay on your balance and pay for jobs on the board (/bounties.json, " +
+    "POST /v1/bounties); they are not redeemable. GET /v1/credits/balance shows what you have.",
+  docs: DOC.payments,
+};
+
+/** The same for the free starter credit, which is intake too (HAN-62). */
+const STARTER_CLOSED = {
+  error: "starter_closed",
+  message:
+    "The free starter credit is no longer handed out, so nothing was booked. Credits you already " +
+    "hold stay on your balance. GET /v1/credits/balance shows what you have.",
+  docs: DOC.transfers,
+};
+
+/** The three routes that sell inference and say until when (HAN-62). */
+const SUNSET_PATHS = new Set(["/v1/chat/completions", "/v1/check", "/v1/models"]);
 
 /**
  * The paths under /v1 that really exist. The auth middleware lets everything else through, so that
@@ -282,14 +350,48 @@ export function createApp(opts: AppOptions) {
 
   // What this instance sells, as opposed to what it can call (HAN-55, 2026-09-29). `opts.catalog`
   // stays whole because the service writes with it itself (Goal 23); everything that sells or
-  // describes inference to the outside reads `sold`. `notForSale` is the one state that needs its
-  // own words: a provider is there and none of it may be sold on. Without any catalogue the pages
-  // keep saying what they always said, and the routes keep answering INFERENCE_UNAVAILABLE.
+  // describes inference to the outside reads `shelf()`. `notForSale()` is the one state that needs
+  // its own words: a provider is there and none of it may be sold on. Without any catalogue the
+  // pages keep saying what they always said, and the routes keep answering INFERENCE_UNAVAILABLE.
   // A catalogue that only lists (the fake in test/without-script.test.ts) has no providers to
   // judge, so it counts as sold whole, as it did before.
-  const sold =
+  const afterSunset =
     opts.catalog && typeof opts.catalog.forSale !== "function" ? opts.catalog : (opts.catalog?.forSale() ?? null);
-  const notForSale = Boolean(opts.catalog) && sold === null;
+  // Something on the shelf is going away (HAN-62, 2026-09-30). 1d65aac took it off at once, and
+  // /terms promises two weeks; so it is sold whole until the sunset and every answer says when
+  // that is. The topups close now, whatever the date: whoever buys credit today for inference that
+  // ends on the 17th would be the same broken promise a second time.
+  const sunsetting = Boolean(opts.catalog) && afterSunset !== opts.catalog;
+  const sunsetAt = opts.inferenceSunsetAt ?? new Date(INFERENCE_SUNSET_AT_DEFAULT);
+  const clock = opts.now ?? (() => new Date());
+  /** The sunset date while it is still ahead, null when there is none or it has passed. */
+  const endsAt = (): Date | null => (sunsetting && clock().getTime() < sunsetAt.getTime() ? sunsetAt : null);
+  const shelf = () => (endsAt() ? (opts.catalog ?? null) : afterSunset);
+  const notForSaleNow = () => Boolean(opts.catalog) && shelf() === null;
+  const intakeClosed = sunsetting;
+  /** Free credit is intake too: an offer that /start or /v1/credits/starter would refuse is not made. */
+  const offerStarter = () => (intakeClosed ? null : starterOffer(db));
+
+  // The notice on every answer of the three inference routes until the sunset (HAN-62): the
+  // `Sunset` header of RFC 8594 with the link to /terms, and `handsel_notice` in a JSON body.
+  // Registered first so it wraps everything after it, the 401 of the key check and the 402 and 400
+  // of the routes included. After the sunset the routes answer 503 and there is nothing to announce.
+  app.use("*", async (c, next) => {
+    await next();
+    const ends = endsAt();
+    if (!ends || !SUNSET_PATHS.has(c.req.path)) return;
+    const headers = new Headers(c.res.headers);
+    headers.set("Sunset", ends.toUTCString());
+    headers.set("Link", '</terms>; rel="sunset"');
+    let body: ConstructorParameters<typeof Response>[0] = c.res.body;
+    if (headers.get("content-type")?.includes("application/json")) {
+      const parsed = (await c.res.clone().json().catch(() => null)) as unknown;
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        body = JSON.stringify({ ...parsed, ...sunsetNotice(ends) });
+      }
+    }
+    c.res = new Response(body, { status: c.res.status, headers });
+  });
 
   /**
    * One host for the pages, because nine permanent comments point at the other one.
@@ -370,7 +472,7 @@ export function createApp(opts: AppOptions) {
         // The agent figure, not the buyer one: this page is what an operator sees when they open
         // their runtime's balance URL by hand, and its sentence is about the fifteen cents a
         // polling runtime is handed. See agentOffer().
-        const offer = agentOffer(db);
+        const offer = intakeClosed ? null : agentOffer(db);
         return c.html(
           page(
             renderApiPage(c.req.path, offer ? offer.cents : null),
@@ -805,7 +907,7 @@ export function createApp(opts: AppOptions) {
     if (!indexHtml) return c.json({ error: "no index page built" }, 503);
     return c.html(
       page(
-        renderTerms(notForSale),
+        renderTerms({ notForSale: notForSaleNow(), endsAt: endsAt(), intakeClosed }),
         "Handsel: the whole of the fine print",
         "Who runs this, what the money does, what happens if it is shut down, what an agent agrees to by competing, where help is, and the two free routes that need none of it. Plus the Impressum.",
         "/terms",
@@ -823,7 +925,7 @@ export function createApp(opts: AppOptions) {
       "Six steps, four of them a single HTTP call. Check your brief without a key, get one in three calls, post the job, read what came back, see what each agent made up, award one or none.";
     // The body is rendered once and the HowTo is read back out of it, so the markup carries the
     // steps the reader is looking at and cannot describe a version of the page that is gone.
-    const body = renderPost(starterOffer(db), notForSale);
+    const body = renderPost(offerStarter(), { notForSale: notForSaleNow(), endsAt: endsAt(), intakeClosed });
     const howto = howToFrom(body, title, description, "/post");
     return c.html(page(body, title, description, "/post", "og.png", howto ? [howto] : []));
   });
@@ -1049,7 +1151,7 @@ export function createApp(opts: AppOptions) {
     releaseExpired(db);
     return c.html(
       page(
-        renderJobs(db),
+        renderJobs(db, offerStarter()),
         "Open jobs on Handsel",
         "Work with the money already behind it. Full briefs, what the winner is paid, how many agents are competing, and the one call that enters.",
         "/jobs",
@@ -1108,7 +1210,7 @@ export function createApp(opts: AppOptions) {
     if (!brief) {
       return c.html(
         page(
-          renderCheckIntro(process.env.CP_FORM_ON_CHECK === "1", starterOffer(db)?.cents ?? null, lang, src),
+          renderCheckIntro(process.env.CP_FORM_ON_CHECK === "1", offerStarter()?.cents ?? null, lang, src),
           checkIntroMeta(lang)[0],
           checkIntroMeta(lang)[1],
           "/check",
@@ -1122,7 +1224,7 @@ export function createApp(opts: AppOptions) {
     if (brief.length > BRIEF_MAX) {
       return c.html(
         page(
-          renderCheckIntro(process.env.CP_FORM_ON_CHECK === "1", starterOffer(db)?.cents ?? null, lang, src),
+          renderCheckIntro(process.env.CP_FORM_ON_CHECK === "1", offerStarter()?.cents ?? null, lang, src),
           lang === "de" ? "Dieser Entwurf ist zu lang zum Prüfen" : "That draft is too long to check",
           lang === "de"
             ? "Ein Auftrag ist auf dieselbe Länge begrenzt wie beim Einstellen."
@@ -1140,7 +1242,7 @@ export function createApp(opts: AppOptions) {
     const words = brief.split(/\s+/).filter(Boolean).length;
     return c.html(
       page(
-        renderCheck(brief, kind, findings, words, starterOffer(db)?.cents ?? null, true, process.env.CP_FORM_ON_CHECK === "1", lang, src),
+        renderCheck(brief, kind, findings, words, offerStarter()?.cents ?? null, true, process.env.CP_FORM_ON_CHECK === "1", lang, src),
         checkResultMeta(findings.length, lang)[0],
         checkResultMeta(findings.length, lang)[1],
         "/check",
@@ -1172,7 +1274,7 @@ export function createApp(opts: AppOptions) {
    */
   const modelList = () => {
     const byUpstream = new Map<string, { id: string; aliases: string[]; input_per_million: number; output_per_million: number }>();
-    for (const m of sold?.listModels().data ?? []) {
+    for (const m of shelf()?.listModels().data ?? []) {
       const upstream = (m.upstream_model as string) ?? (m.id as string);
       const pricing = m.pricing as { input_per_million: number; output_per_million: number };
       const entry = byUpstream.get(upstream) ?? {
@@ -1215,7 +1317,7 @@ export function createApp(opts: AppOptions) {
         .replace("<!--NUMBERS-->", renderNumbers(mcToCents(GRANT_MC), mcToCents(poolLeftMc(db))))
         .replace("<!--MARKET-->", renderMarket(db))
         .replace("<!--WALLETS-->", renderStatus(db))
-        .replace("<!--PRICES-->", renderPrices(modelList(), VERSION, opts.pay?.tiers ?? []))
+        .replace("<!--PRICES-->", renderPrices(modelList(), VERSION, intakeClosed ? [] : (opts.pay?.tiers ?? [])))
         // The landing page is served from the file and never goes through page(), so it needs the
         // same graph put in by hand. Its title and description are the ones already in the file.
         .replace(
@@ -1359,7 +1461,7 @@ export function createApp(opts: AppOptions) {
   app.get("/v1/status", (c) => {
     // One entry per real model; the IDs the runtime hard-codes sit next to them as aliases.
     const byUpstream = new Map<string, { id: string; aliases: string[]; input_per_million: number; output_per_million: number }>();
-    for (const m of sold?.listModels().data ?? []) {
+    for (const m of shelf()?.listModels().data ?? []) {
       const upstream = (m.upstream_model as string) ?? (m.id as string);
       const pricing = m.pricing as { input_per_million: number; output_per_million: number };
       const entry = byUpstream.get(upstream) ?? {
@@ -1413,15 +1515,19 @@ export function createApp(opts: AppOptions) {
     // One call, shared with the landing page's status line. See src/bounties/ours.ts.
     const payers = wallets(db, "topup");
     const thinkers = wallets(db, "inference");
+    const ends = endsAt();
 
     return c.json({
       ok: true,
       version: VERSION,
       phase: 1,
       // Null while nothing is sold: a markup on no sale is a price for something that is not there.
-      markup: notForSale ? null : MARKUP,
+      markup: notForSaleNow() ? null : MARKUP,
       models,
-      topup_tiers_usd: opts.pay?.tiers ?? TOPUP_TIERS_USD,
+      // Empty while topups are closed (HAN-62): a tier listed here that /pay refuses is the
+      // /openapi.json mistake of 29.09. once more.
+      topup_tiers_usd: intakeClosed ? [] : (opts.pay?.tiers ?? TOPUP_TIERS_USD),
+      ...(ends ? sunsetNotice(ends) : {}),
       automatons,
       active,
       paying_wallets: payers,
@@ -1452,8 +1558,13 @@ export function createApp(opts: AppOptions) {
         setup: "Set conwayApiUrl in ~/.automaton/automaton.json to this origin, then run automaton --provision",
         setup_without_runtime: "Sign in with Ethereum: POST /v1/auth/nonce, /v1/auth/verify, /v1/auth/api-keys. " +
           `Domain conway.tech, chainId 8453. $https://github.com/matthiashippe/control-plane/blob/main/docs/api-key.md`,
-        starter: "One free starter credit per address, no USDC needed. Taken automatically by the first inference call " +
-          "or the first bounty it can pay for; POST /v1/credits/starter claims it by hand",
+        ...(intakeClosed
+          ? {}
+          : {
+              starter:
+                "One free starter credit per address, no USDC needed. Taken automatically by the first inference call " +
+                "or the first bounty it can pay for; POST /v1/credits/starter claims it by hand",
+            }),
         free_alternative: "https://github.com/matthiashippe/control-plane/blob/main/docs/without-control-plane.md",
       },
     });
@@ -1477,9 +1588,11 @@ export function createApp(opts: AppOptions) {
     app.get(path, (c) =>
       c.json(
         openApiDocument(requestOrigin(c) ?? siteOrigin(), {
-          pay: Boolean(opts.pay),
-          inference: Boolean(sold),
-          notForSale,
+          // No /pay paths while topups are closed (HAN-62), bound to the same flag the routes read.
+          pay: Boolean(opts.pay) && !intakeClosed,
+          inference: Boolean(shelf()),
+          notForSale: notForSaleNow(),
+          endsAt: endsAt(),
           tiers: opts.pay?.tiers,
         }),
       ),
@@ -1487,16 +1600,25 @@ export function createApp(opts: AppOptions) {
   }
 
   app.get("/.well-known/x402", (c) => {
-    const pay = opts.pay ?? null;
+    // Nothing to accept while topups are closed (HAN-62): an `accepts` entry here is an offer.
+    const pay = intakeClosed ? null : (opts.pay ?? null);
+    const notForSale = notForSaleNow();
+    const ends = endsAt();
     return c.json({
       x402Version: 1,
       service: "conway-compatible control plane",
-      description: notForSale
+      description: ends
+        ? "Prepaid credits for the unmodified Conway automaton runtime. Inference is billed at " +
+          `purchase cost plus a fixed markup until ${sunsetDay(ends)}, when this service stops selling ` +
+          "access to language models. No more credits are sold; credits already held pay for jobs " +
+          "on the board after that."
+        : notForSale
         ? "Prepaid credits for the unmodified Conway automaton runtime: SIWE provisioning and " +
           "USDC topups over x402 on Base. Credits pay for jobs on the board; this service does " +
           "not sell access to language models."
         : "Prepaid credits for the unmodified Conway automaton runtime: SIWE provisioning, " +
           "USDC topups over x402 on Base, inference billed at purchase cost plus a fixed markup.",
+      ...(ends ? sunsetNotice(ends) : {}),
       // The base the paths below belong to. Without it a script guesses, and on 20.09.2026 one
       // guessed wrong: it joined two endpoints into /v1/status/v1/models.
       base_url: requestOrigin(c) ?? null,
@@ -1510,8 +1632,7 @@ export function createApp(opts: AppOptions) {
         // this file can use without knowing anything: the credits go to whoever signs. The
         // addressed one stays named because the Conway runtime builds it and because a human
         // reading this file wants to see which wallet a topup lands on.
-        topup: "/pay/{usd}",
-        topup_for_wallet: "/pay/{usd}/{address}",
+        ...(intakeClosed ? {} : { topup: "/pay/{usd}", topup_for_wallet: "/pay/{usd}/{address}" }),
         register: "/v1/automatons/register",
         ...(notForSale ? {} : { inference: "/v1/chat/completions" }),
         // Named here because this file is what the indexers read first: 299 fetches of it in six
@@ -1645,6 +1766,8 @@ export function createApp(opts: AppOptions) {
   app.get("/llms.txt", (c) => {
     const pay = opts.pay ?? null;
     const tiers = (pay?.tiers ?? TOPUP_TIERS_USD).join(", ");
+    const notForSale = notForSaleNow();
+    const ends = endsAt();
     const body = [
       "# Handsel",
       "",
@@ -1664,6 +1787,14 @@ export function createApp(opts: AppOptions) {
             "> Conway API, so an unmodified automaton runtime can compete without a patch. Inference is",
             "> billed at purchase cost times " + MARKUP + ".",
           ]),
+      ...(ends
+        ? [
+            "",
+            `Inference ends on ${sunsetDay(ends)}: from then on this service does not sell access to`,
+            "language models. No more credits are sold. Credits you hold stay on your balance and",
+            "after that date pay only for jobs on the board; they are not redeemable.",
+          ]
+        : []),
       "",
       "Handsel: the first money paid for something, given at the start to show the offer is real.",
       "Run by one person, no SLA. Credits are not redeemable and not transferable.",
@@ -1684,8 +1815,12 @@ export function createApp(opts: AppOptions) {
             "  The key goes in Authorization, raw or with the Bearer prefix; both are accepted.",
           ]),
       "- Anything else, shortest first: POST /v1/auth/keyless answers with a key in one call, no",
-      "  wallet, no signature, no runtime. It is capped at a few a day and hands out no credit;",
-      "  POST /v1/credits/starter claims the free starter credit once you have the key.",
+      ...(intakeClosed
+        ? ["  wallet, no signature, no runtime. It is capped at a few a day and hands out no credit."]
+        : [
+            "  wallet, no signature, no runtime. It is capped at a few a day and hands out no credit;",
+            "  POST /v1/credits/starter claims the free starter credit once you have the key.",
+          ]),
       "- With a wallet there is no cap: an API key takes three calls and one Ethereum signature, no runtime and no",
       "  chain transaction. Sign in with Ethereum against /v1/auth/nonce, /v1/auth/verify and",
       "  /v1/auth/api-keys. The signed domain is conway.tech, not this host, and that is the one",
@@ -1693,17 +1828,26 @@ export function createApp(opts: AppOptions) {
       "  the chainId, how long it is good for and the next call. Nothing on this path needs a page",
       "  read to it. The same thing written out with a runnable script, for a person, is at",
       "  https://github.com/matthiashippe/control-plane/blob/main/docs/api-key.md",
-      "- Topup tiers in USD: " + tiers + ".",
-      pay ? "- Payment goes to " + pay.payTo + " on " + pay.network + " (USDC " + pay.usdcAddress + ")." : "- Payments are not configured on this instance.",
+      // No tiers and no payee while topups are closed (HAN-62).
+      ...(intakeClosed
+        ? ["- Credits are no longer sold here."]
+        : [
+            "- Topup tiers in USD: " + tiers + ".",
+            pay ? "- Payment goes to " + pay.payTo + " on " + pay.network + " (USDC " + pay.usdcAddress + ")." : "- Payments are not configured on this instance.",
+          ]),
       "",
       "## Endpoints",
       "",
       "- /v1/status: models, prices, tiers, number of registered automatons (public, no key).",
-      notForSale ? "- /v1/credits/pricing: the topup tiers." : "- /v1/models, /v1/credits/pricing: catalog and prices.",
+      notForSale
+        ? intakeClosed
+          ? "- /v1/credits/pricing: the topup tiers, empty while no credits are sold."
+          : "- /v1/credits/pricing: the topup tiers."
+        : "- /v1/models, /v1/credits/pricing: catalog and prices.",
       "- /v1/auth/api-keys: GET lists your own keys by prefix and name, POST mints one.",
       "- /v1/auth/api-keys/revoke: POST {key_prefix} turns one of yours off for good. A key that is",
       "  not yours answers 404 and is not touched.",
-      "- /pay/{usd}/{address}: x402 topup.",
+      ...(intakeClosed ? [] : ["- /pay/{usd}/{address}: x402 topup."]),
       "- /v1/automatons/register: EIP-712 registration.",
       ...(notForSale ? [] : ["- /v1/chat/completions: OpenAI-compatible inference, billed against credits."]),
       "- /v1/credits/balance, /v1/credits/history: what is left, and every booking of yours with",
@@ -1718,12 +1862,16 @@ export function createApp(opts: AppOptions) {
       "it is awarded, so a bounty always has the money behind it. It returns to the buyer if the",
       "bounty is cancelled, or when the deadline passes unawarded. Credits stay credits throughout.",
       "",
-      "- One free starter credit per address, " + mcToCents(GRANT_MC) + " cents, and no USDC needed to begin. It is",
-      "  taken automatically by whichever comes first: an agent's first thought that cannot pay for",
-      "  itself, or a buyer's first job of up to that price. So a newcomer can post a real job, watch",
-      "  agents compete and award a winner before owning any cryptocurrency. POST /v1/credits/starter",
-      "  claims it by hand if you would rather. The pool is fixed and does not refill; /v1/status",
-      "  says how much is left.",
+      ...(intakeClosed
+        ? []
+        : [
+            "- One free starter credit per address, " + mcToCents(GRANT_MC) + " cents, and no USDC needed to begin. It is",
+            "  taken automatically by whichever comes first: an agent's first thought that cannot pay for",
+            "  itself, or a buyer's first job of up to that price. So a newcomer can post a real job, watch",
+            "  agents compete and award a winner before owning any cryptocurrency. POST /v1/credits/starter",
+            "  claims it by hand if you would rather. The pool is fixed and does not refill; /v1/status",
+            "  says how much is left.",
+          ]),
       "- /katalog: what a person without a wallet can buy here, in German. Three texts written",
       "  for them (a speech, a cover letter, a text about their business), each with three versions",
       "  and up to three rounds of changes, with the price. Ordering asks one question about the",
@@ -1851,6 +1999,9 @@ export function createApp(opts: AppOptions) {
   app.get("/pay/:usd", async (c) => {
     const pay = opts.pay ?? null;
     const settler = opts.settler ?? null;
+    // First, before the X-Payment header is even looked at: handlePay settles, and a closed shop
+    // must not take the money and then say so (HAN-62).
+    if (intakeClosed) return c.json(TOPUPS_CLOSED, 410);
     if (!pay) return c.json(PAYMENTS_UNAVAILABLE, 503);
     if (/^\{.*\}$/.test(c.req.param("usd"))) return c.json(literalTemplate(c, ["usd"]), 400);
     const res = await handlePay(db, settler, { ...pay, publicOrigin: pay.publicOrigin ?? requestOrigin(c) }, {
@@ -1864,6 +2015,7 @@ export function createApp(opts: AppOptions) {
   app.get("/pay/:usd/:address", async (c) => {
     const pay = opts.pay ?? null;
     const settler = opts.settler ?? null;
+    if (intakeClosed) return c.json(TOPUPS_CLOSED, 410);
     if (!pay) return c.json(PAYMENTS_UNAVAILABLE, 503);
     const braced = ["usd", "address"].filter((p) => /^\{.*\}$/.test(c.req.param(p) ?? ""));
     if (braced.length > 0) return c.json(literalTemplate(c, braced), 400);
@@ -2125,8 +2277,9 @@ export function createApp(opts: AppOptions) {
     const address = c.get("address");
     // A runtime that has read an empty balance three times over more than a minute is stuck, not
     // browsing, and this is the call where it is handed its grant. See grantToWaitingRuntime().
-    const granted = grantToWaitingRuntime(db, address, getBalanceMc(db, address), Date.now());
-    const waiting = granted ? 0 : starterAvailableMc(db, address);
+    // Neither while intake is closed (HAN-62).
+    const granted = !intakeClosed && grantToWaitingRuntime(db, address, getBalanceMc(db, address), Date.now());
+    const waiting = granted || intakeClosed ? 0 : starterAvailableMc(db, address);
     return c.json({
       balance_cents: getBalanceCents(db, address),
       ...(granted
@@ -2324,15 +2477,17 @@ export function createApp(opts: AppOptions) {
       throw invalidKeyError();
     }
     if (!opts.catalog) return c.json(INFERENCE_UNAVAILABLE, 503);
+    const sold = shelf();
     if (!sold) return c.json(INFERENCE_NOT_FOR_SALE, 503);
     return c.json(sold.listModels());
   });
 
   app.post("/v1/chat/completions", async (c) => {
     if (!opts.catalog) return c.json(INFERENCE_UNAVAILABLE, 503);
+    const sold = shelf();
     if (!sold) return c.json(INFERENCE_NOT_FOR_SALE, 503);
     const body = await c.req.json().catch(() => null);
-    const res = await handleChat(db, sold, c.get("address"), body);
+    const res = await handleChat(db, sold, c.get("address"), body, { topupsClosed: intakeClosed });
     return c.json(res.body as Record<string, unknown>, res.status as 200);
   });
 
@@ -2356,6 +2511,7 @@ export function createApp(opts: AppOptions) {
     if (!opts.catalog) return c.json(INFERENCE_UNAVAILABLE, 503);
     // Closed with the chat route: it buys through `handleChat` too and writes the same
     // `inference` rows through the same provider (HAN-55).
+    const sold = shelf();
     if (!sold) return c.json(INFERENCE_NOT_FOR_SALE, 503);
     const raw = await c.req.json().catch(() => null);
     const b = (typeof raw === "object" && raw !== null ? raw : {}) as Record<string, unknown>;
@@ -2390,11 +2546,13 @@ export function createApp(opts: AppOptions) {
       );
     }
     const model = typeof b.model === "string" ? b.model : sold.modelIds()[0];
-    const res = await handleChat(db, sold, c.get("address"), {
-      model,
-      messages: messages(briefing, submission, kind),
-      response_format: { type: "json_object" },
-    });
+    const res = await handleChat(
+      db,
+      sold,
+      c.get("address"),
+      { model, messages: messages(briefing, submission, kind), response_format: { type: "json_object" } },
+      { topupsClosed: intakeClosed },
+    );
     if (res.status !== 200) return c.json(res.body as Record<string, unknown>, res.status as 400);
 
     const answer = res.body as { choices?: { message?: { content?: string } }[]; usage?: unknown; model?: string };
@@ -2518,7 +2676,8 @@ export function createApp(opts: AppOptions) {
     // Asked before minting, and asked of the day's budget rather than the pool's total, because
     // the total can be healthy while today's is gone. A wallet created here and then refused would
     // be a row nobody can reach and a key nobody was given.
-    const affordableMc = Math.min(BUYER_GRANT_MC, poolLeftTodayMc(db));
+    // Nothing while intake is closed (HAN-62): the free first job is credit handed out too.
+    const affordableMc = intakeClosed ? 0 : Math.min(BUYER_GRANT_MC, poolLeftTodayMc(db));
     const priceMc = Math.floor(affordableMc / MC_PER_CENT) * MC_PER_CENT;
     if (priceMc < PRICE_MIN_MC) {
       return c.html(
@@ -2685,7 +2844,7 @@ export function createApp(opts: AppOptions) {
       if (wantsPage) {
         return c.html(
           page(
-            renderCheck("", "factual", [], 0, starterOffer(db)?.cents ?? null, false, process.env.CP_FORM_ON_CHECK === "1", emptyLang, postSrc),
+            renderCheck("", "factual", [], 0, offerStarter()?.cents ?? null, false, process.env.CP_FORM_ON_CHECK === "1", emptyLang, postSrc),
             emptyLang === "de" ? "Die kostenlose Prüfung braucht einen Entwurf" : "The free check needs a draft",
             emptyLang === "de"
               ? "Fügen Sie den Auftrag ein, den Sie einstellen würden, und hier steht, was er nicht sagt. Kein Schlüssel, kein Konto, nichts gespeichert."
@@ -2727,7 +2886,7 @@ export function createApp(opts: AppOptions) {
     if (wantsPage) {
       return c.html(
         page(
-          renderCheck(brief, kind, findings, words, starterOffer(db)?.cents ?? null, false, process.env.CP_FORM_ON_CHECK === "1", lang, postSrc),
+          renderCheck(brief, kind, findings, words, offerStarter()?.cents ?? null, false, process.env.CP_FORM_ON_CHECK === "1", lang, postSrc),
           checkResultMeta(findings.length, lang)[0],
           checkResultMeta(findings.length, lang)[1],
           "/v1/briefs/check",
@@ -2976,6 +3135,7 @@ export function createApp(opts: AppOptions) {
    * be checked rather than believed.
    */
   app.post("/v1/credits/starter", (c) => {
+    if (intakeClosed) return c.json(STARTER_CLOSED, 410);
     try {
       return c.json(claimStarter(db, c.get("address")), 201);
     } catch (e) {
@@ -2986,7 +3146,9 @@ export function createApp(opts: AppOptions) {
     }
   });
 
-  app.get("/v1/credits/pricing", (c) => c.json({ tiers: [], topup_tiers_usd: opts.pay?.tiers ?? TOPUP_TIERS_USD }));
+  app.get("/v1/credits/pricing", (c) =>
+    c.json({ tiers: [], topup_tiers_usd: intakeClosed ? [] : (opts.pay?.tiers ?? TOPUP_TIERS_USD) }),
+  );
 
   // Decision in STATE.md: credits are not transferable in phase 1. That is not a gap in the build
   // but regulation, and that is exactly what the answer says now: credits that can move between
@@ -3203,6 +3365,9 @@ export function createApp(opts: AppOptions) {
     // carries a key that resolves to one, because `/pay/{usd}/{address}` as a template is what the
     // 402 has always said and is what neither of them followed.
     const payish = /^\/v1\/(?:.*\b)?(credits?|topup|top-up|buy|purchase|billing|payments?|account|wallet|me)\b/i;
+    if (payish.test(c.req.path) && intakeClosed) {
+      return c.json({ ...TOPUPS_CLOSED, error: "not_found", message: `No endpoint at ${c.req.path}. ${TOPUPS_CLOSED.message}` }, 404);
+    }
     if (payish.test(c.req.path)) {
       const origin = requestOrigin(c) ?? siteOrigin();
       const who = resolveApiKey(db, c.req.header("Authorization"));

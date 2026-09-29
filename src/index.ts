@@ -17,13 +17,15 @@
  *   CP_MODEL_ALIASES  "gpt-5.2=<model>,gpt-5-mini=<model>": the IDs the runtime hard-codes;
  *                 without it the OpenRouter provider serves its defaults
  *   OPENROUTER_API_KEY, CP_OPENROUTER_MODELS  for CP_PROVIDER=openrouter
+ *   CP_INFERENCE_SUNSET_AT  ISO 8601; from then on a provider marked `resale: false` is no longer
+ *                 sold. Default INFERENCE_SUNSET_AT_DEFAULT in app.ts, which is the production value
  */
 
 import fs from "node:fs";
 import path from "node:path";
 import { createServer as createHttpsServer } from "node:https";
 import { serve } from "@hono/node-server";
-import { createApp, VERSION } from "./app.js";
+import { createApp, INFERENCE_SUNSET_AT_DEFAULT, VERSION } from "./app.js";
 import { cleanupExpired, cleanupOrderBriefs, getKV, openDb, setKV } from "./db.js";
 import { MockProvider } from "./inference/mock.js";
 import { OpenRouterProvider, openRouterFromEnv } from "./inference/openrouter.js";
@@ -86,6 +88,12 @@ const aliases = process.env.CP_MODEL_ALIASES
 const catalog = providers.length ? new Catalog(providers, aliases) : null;
 // One Stripe adapter for the pages and the reconcile run, built exactly as createApp would build it.
 const checkout = stripeFromEnv(siteOrigin);
+// A typo here must stop the start, not quietly move the date every page announces (HAN-62).
+const sunsetRaw = process.env.CP_INFERENCE_SUNSET_AT || INFERENCE_SUNSET_AT_DEFAULT;
+const inferenceSunsetAt = new Date(sunsetRaw);
+if (Number.isNaN(inferenceSunsetAt.getTime())) {
+  throw new Error(`CP_INFERENCE_SUNSET_AT is not an ISO 8601 date: ${sunsetRaw}`);
+}
 const app = createApp({
   db,
   siwe: process.env.CP_SIWE_DOMAIN ? { domain: process.env.CP_SIWE_DOMAIN } : undefined,
@@ -93,6 +101,7 @@ const app = createApp({
   settler,
   catalog,
   checkout,
+  inferenceSunsetAt,
 });
 
 // Cleanup: once on start, hourly after that. Otherwise `siwe_nonces` grows with every call to
@@ -139,7 +148,8 @@ serve(
     console.log(
       `[control-plane] v${VERSION} ${tls ? "https" : "http"}://${info.address}:${info.port} db=${dbPath} ` +
         `pay=${pay ? `${pay.network}->${pay.payTo}` : "off"} settler=${settler?.kind ?? "none"} ` +
-        `providers=${providers.map((p) => p.id).join(",") || "none"} aliases=${Object.keys(aliases).join(",") || "none"}`,
+        `providers=${providers.map((p) => p.id).join(",") || "none"} aliases=${Object.keys(aliases).join(",") || "none"} ` +
+        `inference_sunset=${inferenceSunsetAt.toISOString()}`,
     );
   },
 );

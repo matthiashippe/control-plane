@@ -8,6 +8,9 @@
  * The other direction, a provider that may be sold, is every existing test with the mock: they run
  * unchanged. This file is the direction the mock cannot show: OpenRouter configured, every route
  * that sold it refuses without buying anything, and every page that described it stops.
+ *
+ * Since HAN-62 (2026-09-30) that is the state from the sunset on, so the clock here stands one
+ * second after it. The two weeks before it are test/inference-sunset.test.ts.
  */
 import { describe, expect, it } from "vitest";
 import { privateKeyToAccount, generatePrivateKey } from "viem/accounts";
@@ -17,6 +20,9 @@ import { hashApiKey } from "../src/auth/siwe.js";
 import { OpenRouterProvider } from "../src/inference/openrouter.js";
 import { MockProvider } from "../src/inference/mock.js";
 import { Catalog } from "../src/inference/proxy.js";
+
+const SUNSET = new Date("2026-10-17T00:00:00Z");
+const AFTER = () => new Date(SUNSET.getTime() + 1000);
 
 const MODELS_BODY = {
   data: [
@@ -54,7 +60,13 @@ async function openRouter() {
 
 function setup(catalog: Catalog) {
   const db = openDb(":memory:");
-  const app = createApp({ db, catalog, pay: { payTo: "0x" + "1".repeat(40), tiers: [5, 25, 100] } as never });
+  const app = createApp({
+    db,
+    catalog,
+    pay: { payTo: "0x" + "1".repeat(40), tiers: [5, 25, 100] } as never,
+    inferenceSunsetAt: SUNSET,
+    now: AFTER,
+  });
   const address = privateKeyToAccount(generatePrivateKey()).address.toLowerCase();
   const key = "cnwy_k_" + "34".repeat(16);
   const now = new Date().toISOString();

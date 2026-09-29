@@ -59,6 +59,9 @@ export class Catalog {
   forSale(): Catalog | null {
     const sold = this.providers.filter((p) => p.resale !== false);
     if (sold.length === 0) return null;
+    // The same object when nothing is withheld, so a caller can tell by identity whether anything
+    // leaves the shelf (HAN-62: that is what closes the topups and starts the sunset notice).
+    if (sold.length === this.providers.length) return this;
     const soldIds = new Set(sold.flatMap((p) => p.models().map((m) => m.id)));
     const aliases: Record<string, string> = {};
     for (const [alias, target] of this.aliases) if (soldIds.has(target)) aliases[alias] = target;
@@ -165,12 +168,26 @@ export function inflightRequests(): number {
   return coalescer.inflightCount();
 }
 
-export async function handleChat(db: Db, catalog: Catalog, address: string, body: unknown): Promise<ChatResult> {
+/**
+ * `topupsClosed`: credits are no longer sold (HAN-62). Then a call that cannot pay for itself takes
+ * no starter credit and its 402 names no way to buy more, because every such way answers 410.
+ */
+export interface ChatOptions {
+  topupsClosed?: boolean;
+}
+
+export async function handleChat(
+  db: Db,
+  catalog: Catalog,
+  address: string,
+  body: unknown,
+  chatOpts: ChatOptions = {},
+): Promise<ChatResult> {
   // If an identical request for the same address is already running, wait for its result instead
   // of buying and charging a second time. See `dedupe.ts` for the reason.
   const key = requestKey(address, body);
   const { value, coalesced } = await coalescer.run(key, () =>
-    handleChatUncoalesced(db, catalog, address, body),
+    handleChatUncoalesced(db, catalog, address, body, chatOpts),
   );
   if (coalesced) {
     console.log(`[inference] coalesced an identical request into one already running (${key.slice(0, 12)})`);
@@ -183,6 +200,7 @@ async function handleChatUncoalesced(
   catalog: Catalog,
   address: string,
   body: unknown,
+  chatOpts: ChatOptions,
 ): Promise<ChatResult> {
   if (typeof body !== "object" || body === null) {
     return {
@@ -262,12 +280,35 @@ async function handleChatUncoalesced(
   // not at the endpoint built for it: a Conway runtime speaks the upstream API and never calls it,
   // so for the agents this service is trying to attract the free tier was invisible.
   let reserved = reserveMc(db, address, requiredMc);
-  if (!reserved && grantOnFirstUse(db, address)) {
+  if (!reserved && !chatOpts.topupsClosed && grantOnFirstUse(db, address)) {
     reserved = reserveMc(db, address, requiredMc);
   }
 
   if (!reserved) {
     const availableMc = getAvailableMc(db, address);
+    if (chatOpts.topupsClosed) {
+      return {
+        status: 402,
+        body: {
+          // The marker and the two fields upstream reads stay; the way to buy more goes, because
+          // there is none left (HAN-62).
+          error: "INSUFFICIENT_CREDITS",
+          message:
+            `Insufficient credits: need ${mcToCents(requiredMc) + 1} cents, have ${mcToCents(availableMc)} cents. ` +
+            "Credits are no longer sold here, so there is no topup. Nothing was charged for this call.",
+          docs: DOC.inference,
+          details: {
+            required_cents: Math.ceil(requiredMc / 1000),
+            current_balance_cents: mcToCents(availableMc),
+            model: req.model,
+            wallet: address,
+            ...(openBountyCount(db) > 0
+              ? { open_bounties: openBountyCount(db), bounties_url: `${siteOrigin()}/bounties.json` }
+              : {}),
+          },
+        },
+      };
+    }
     return {
       status: 402,
       body: {
