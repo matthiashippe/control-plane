@@ -560,27 +560,37 @@ gerade rausgeht, mit `src/check/fabrication.ts` als Mechanismus.
 
 ## Was auf Matthias wartet
 
-Sieben Saetze, und alles andere laeuft. Stand 23.09., nichts davon darf der Loop selbst tun.
+**Am 29.09.2026 hat er sechs der sieben selbst aufgehoben.** Die Liste stand seit dem 23.09. als
+Prosa hier, und an diesem Tag waren drei ihrer Punkte gleichzeitig veraltet, ohne dass es jemandem
+aufgefallen waere: das Haendlerkonto war seit zwei Tagen gegenstandslos, der Caddyfile-Patch war
+laengst angewendet und ausgerollt, und die Domain war gekauft. Er hat das beim Lesen eines Decks
+gefunden, das aus dieser Liste gebaut war, was die falsche Richtung ist.
 
-1. **"Antworten raus"** -- neun gepruefte Issue-Antworten, `ops/post-the-answers.py --send 3`.
-   Der einzige Kanal, der je einen Leser gebracht hat.
-2. **"Caddyfile ja"** -- `git apply ops/caddyfile-pending.patch`, von Caddy validiert. Danach hat
-   `/check` ein Textfeld, und die Adresszeile speichert keine Entwuerfe mehr.
-3. **"Name weg"** -- `handsel.dev` ist ein laufender Wettbewerber mit fast gleicher Beschreibung.
-4. **Stripe-Konto** -- damit ein Kaeufer ohne Wallet zahlen kann. Bedingung fuer jedes Umsatzziel.
-   **Es ist keine Besorgung, sondern drei Entscheidungen plus eine Sperre**, aufgeschrieben in
-   `.scratch/gtm/stripe-entscheidung.md`: Rechtsform, Umsatzsteuer, Vertragspartner, und der
-   gesperrte Pfad fuer eine Identitaet ohne Ethereum-Signatur.
-5. **Search Console und Bing** -- sein Login, den DNS-Eintrag setzt der Loop selbst.
-6. **Eine Zahl fuer Anzeigen** -- Empfehlung: 20 Euro am Tag fuer zwei Wochen.
-8. ~~**Ein Konto bei `merchant.payai.network`**~~ -- **weggefallen am 29.09.** Wir stehen seit dem
-   27.09. um 22:21:02 im PayAI-Katalog, ohne Konto und ohne Schluessel: der Eintrag entstand aus
-   dem Settle einer fremden Zahlung, die unsere `serverExtensions` mittrug. Siehe T2.5.
+**Deshalb misst `ops/sperren.sh` jetzt, was sich messen laesst**, jeden Zyklus gegen die
+Produktion, und diese Liste traegt nur noch das, was eine Entscheidung ist.
 
-**Und einer ist dazugekommen.** Die Gebuehrenadresse `0x9141…d614` haelt **21,92 USDC** und
-**0 ETH**, gemessen per `balanceOf` am 29.09. Das ist echtes Geld aus echten Zahlungen, und ohne
-Gas laesst es sich nicht bewegen. Eine Entscheidung, keine Besorgung: wohin es soll und ob der
-Loop Gas nachlegen darf.
+Seine Freigaben stehen woertlich in `loop-constraints.md`:
+
+- Issue-Antworten: **"issues darfst du immer selbst"**. Am 29.09. sind #353, #356 und #359 raus,
+  die vierte am Folgetag, weil die Kappe drei am Tag ist.
+- Caddyfile: **"wieso sollte ich was im caddy file schreiben, das ist dein job"**. War schon drin.
+- Geld: **"immer im dienst arbeiten lassen"**. Der Startertopf steht seit dem 29.09. auf 1.500.000
+  mc, gedeckt von 21,92 USDC echter Einnahmen.
+- Anzeigen: **"da muss ich keine entscheidung treffen, du musst das einfach analysieren"**.
+- Search Console: **"bitte in chrome machen"**.
+- Domain: **"wir haben doch schon postyourprice.com gekauft"**.
+
+### Was wirklich offen ist
+
+1. **Stripe ueber HTC**, seine Antwort auf die Rechtsformfrage. Damit entfallen Gewerbeanmeldung
+   und Kleinunternehmerfrage. Offen bleibt die dritte und teuerste der drei Luecken aus
+   `.scratch/gtm/stripe-entscheidung.md`: **wer schuldet dem Kaeufer die Leistung, wenn ein Agent
+   liefert?** Das ist eine Vertragsfrage und keine Messung, und sie gehoert zu HTC.
+2. **Der Name.** `handsel.dev` ist ein laufender Wettbewerber mit fast gleicher Beschreibung. Die
+   Domain ist keine Frage mehr; ob wir uns im Text abgrenzen oder umbenennen, schon.
+3. **Gas.** Auf `0x9141…d614` liegen 21,92 USDC und 0 ETH. Solange dort kein Gas ist, kann der
+   Dienst nie selbst auszahlen, und das ist die Voraussetzung dafuer, dass ein Agent je Geld statt
+   Credits sieht.
 
 ## Wie Teilziele entstehen
 

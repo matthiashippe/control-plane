@@ -32,13 +32,41 @@ unserer Deploys bereits zwölf 502er gesehen.
   "niemand hat etwas gemerkt" ins Protokoll. Das Ergebnis stimmte zufällig, die Prüfung nicht.
 - Das Ergebnis in `.scratch/gtm/nachtlauf.md` protokollieren, auch wenn alles gut ging.
 
+## Freigaben von Matthias, 29.09.2026
+
+Er hat an diesem Tag sechs der sieben Sperren selbst aufgehoben, woertlich:
+
+- **"issues darfst du immer selbst"** -- Issue-Antworten gehen ohne Rueckfrage raus. Das Gatter
+  (`ops/before-the-answers.py`) und die Tageskappe von drei bleiben, weil sie die Qualitaet und
+  nicht die Erlaubnis sichern. Der Satz "keine Aussenwirkung ohne Matthias" weiter unten gilt
+  damit nicht mehr fuer Issue-Antworten; fuer einen Artikel oder einen HN-Post bleibt er.
+- **"wieso sollte ich was im caddy file schreiben das ist dein job"** -- `deploy/Caddyfile` darf
+  der Loop selbst aendern. `caddy validate` davor und `--force-recreate` danach bleiben Pflicht,
+  weil es ein Bind-Mount ist. Der Rest von `deploy/**` (systemd, Compose) bleibt gesperrt.
+- **"geld immer im dienst arbeiten lassen, klar darf der loop das, immer bitte machen"** -- Geld
+  darf im Dienst arbeiten statt herumzuliegen: Topf, Credits, Aufträge, Preise. Bei etwas, das
+  nicht zurueckholbar ist, sagt der Loop vorher in einem Satz, was er tut, und tut es dann.
+- **"search console bitte in chrome machen"** -- die Anmeldung bei Search Console und Bing macht
+  der Loop im Browser mit seinem Profil.
+- **"anzeigen sind ja ein klarer business case, da muss ich keine entscheidung treffen, du musst
+  das einfach analysieren"** -- keine Zahl von ihm. Der Loop rechnet den Fall und entscheidet
+  danach selbst.
+- **"wir haben doch schon postyourprice.com gekauft"** -- die Domain steht. Die Namensfrage ist
+  damit keine Domainfrage mehr, sondern hoechstens eine Abgrenzung im Text gegen `handsel.dev`.
+- **Stripe ueber HTC** (*"warum stripe nicht über HTC machen"*): die Hanseatic Tech Company ist
+  Vertragspartner, also keine Gewerbeanmeldung und keine Kleinunternehmerfrage. Was offen bleibt
+  und dort auch hingehoert: wer dem Kaeufer die Leistung schuldet, wenn ein Agent liefert.
+
 **Was trotzdem nicht passiert:**
 - Kein Deploy, dessen Nutzen kleiner ist als eine Minute Ausfall für den Kunden. Reine
   Aufräumarbeiten, Kommentare und Dokumentation warten auf das nächste ohnehin fällige Ausrollen.
 - Keine zwei Deploys hintereinander ohne dazwischen liegende Prüfung.
-- Keine Außenwirkung: keine Issue-Kommentare, kein HN-Post, keine Nachricht an Dritte. Die drei
-  Issue-Antworten des Tages gehen morgen raus, von einer wachen Session.
-- Keine Zahlungen und keine On-Chain-Transaktionen. **Geändert am 20.09.2026:** Eine
+- Keine Außenwirkung **außer Issue-Antworten**: kein HN-Post, kein Artikel, keine Nachricht an
+  Dritte ohne Matthias. Issue-Antworten sind seit dem 29.09. freigegeben (siehe oben), drei am Tag,
+  und nur durch das Gatter.
+- Zahlungen und On-Chain-Transaktionen: seit dem 29.09. erlaubt, soweit das Geld im Dienst
+  arbeitet (siehe die Freigaben oben). Vorher in einem Satz sagen, was passiert.
+  (Alter Stand, zur Herkunft:) Keine Zahlungen und keine On-Chain-Transaktionen. **Geändert am 20.09.2026:** Eine
   SIWE-Signatur mit der Betreiber-Wallet ist erlaubt, ebenso das Bewegen vorhandener Credits
   innerhalb des Dienstes. Grund: Matthias hat die Entscheidungsgewalt an den Loop abgegeben
   ("du entscheidest weiterhin alles"), und der Markt lässt sich ohne einen echten Umlauf nicht
