@@ -275,6 +275,12 @@ printf -- '\n-- tragen Anzeigen schon? --\n'
 
 run "the ad case can say yes as well as no" python3 ./ops/anzeigen-rechnung.py --selftest
 
+# Jede Stufe, die eine Seite nennt, muss eine sein, die der Dienst verkauft. Am 29.09. liefen die
+# beiden auseinander, weil die Umgebung die Konstante ueberschreibt und /openapi.json aus der
+# Konstante gebaut wurde. Kein Test im Checkout kann das sehen; dieser Zwilling schon.
+run --undetermined-on 2 "published tiers are tiers the service sells" ./ops/tiers-agree.sh
+run "the tier check notices a list that drifted" ./ops/tiers-agree.sh --selftest
+
 # Whether a copy of the database exists anywhere but on the disk that holds it. Measured on
 # 2026-09-23: seven backups, all on /dev/sda1, the same single disk as the live database, and
 # nothing in the crontab copies any of them off the machine. Behind that file are 286 wallets and
