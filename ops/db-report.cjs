@@ -150,6 +150,14 @@ const OUR_KEY_NAMES = [
   // somebody remembering to edit this list. The names above stay because keys already exist under
   // them.
   "ops-%",
+  // Minted 2026-09-29 by one of our own probes against production and claimed by
+  // ops/claim-keyless.sh: no ledger, no submission, no bounty. It had to be called to be
+  // proved, because a GET on that door answers 405.
+  "key:0dfe81d95c4cdbdb24eeed91b80136baa1071692",
+  // Minted 2026-09-29 by one of our own probes against production and claimed by
+  // ops/claim-keyless.sh: no ledger, no submission, no bounty. It had to be called to be
+  // proved, because a GET on that door answers 405.
+  "key:30fcb94104676b5a0ff6c581e7512b4c4bb765b9",
   // 2026-09-29, and the convention above is four days old. A cycle verified the new 404 against
   // production with a hand-provisioned key and named it after the cycle instead of the prefix,
   // which is the fifth time this has happened and the first since the prefix existed. The check

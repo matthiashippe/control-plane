@@ -94,6 +94,14 @@ export const OUR_KEY_NAMES = [
   "mainnet-abnahme",
   "mainnet-acceptance",
   "ops-%",
+  // Minted 2026-09-29 by one of our own probes against production and claimed by
+  // ops/claim-keyless.sh: no ledger, no submission, no bounty. It had to be called to be
+  // proved, because a GET on that door answers 405.
+  "key:0dfe81d95c4cdbdb24eeed91b80136baa1071692",
+  // Minted 2026-09-29 by one of our own probes against production and claimed by
+  // ops/claim-keyless.sh: no ledger, no submission, no bounty. It had to be called to be
+  // proved, because a GET on that door answers 405.
+  "key:30fcb94104676b5a0ff6c581e7512b4c4bb765b9",
   // 2026-09-29, and the prefix above is four days old. A cycle verified the new 404 against
   // production with a hand-provisioned key and named it after the cycle rather than the prefix.
   // The hygiene check caught it within the hour, which is what it is for. The name stays because

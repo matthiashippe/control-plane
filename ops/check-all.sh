@@ -463,10 +463,23 @@ foreign = db.get('wallets_foreign')
 if foreign is not None:
     addresses = [w['address'] if isinstance(w, dict) else w for w in db.get('wallets_foreign_list', [])]
     short = ', '.join(a[:10] + '…' for a in addresses[:5]) + ('' if len(addresses) <= 5 else ', …')
-    print(f\"wallets: {db['wallets']} in total, {foreign} of them not ours{': ' + short if short.strip(', …') else ''}\")
+    # The count of foreign wallets stopped being a signal on 2026-09-29 at 11:29.
+    #
+    # Until that afternoon the keyless door handed out five keys a day for the whole instance, so
+    # a wallet that existed had roughly cost somebody something. The cap moved that day, from the
+    # door to the bounty, because one crawler could otherwise shut the door for everyone (Goal
+    # 18). Within twenty minutes the same crawler had minted eleven handles from rotating Azure
+    # addresses and this number went from 5 to 18, none of them having done anything at all.
+    #
+    # The number is not wrong and it is not dropped: a handle IS a foreign wallet, and hiding the
+    # ones that did nothing would be the mirror image of the error this report keeps finding. It
+    # just cannot be read alone any more, so the line says what it is next to what it means.
+    active = db.get('wallets_foreign_active')
+    minted = f", of which {foreign - active} have never done anything" if active is not None else ""
+    print(f\"wallets: {db['wallets']} in total, {foreign} of them not ours{minted}{': ' + short if short.strip(', …') else ''}\")
 active = db.get('wallets_foreign_active')
 if active is not None:
-    print(f\"strangers who have thought here: {active}\"
+    print(f\"strangers who have thought here: {active}   <- the one to read\"
           + ('' if active else '   (the step between provisioning and paying, and nothing counted it until 22.09.)'))
 # Printed loudly rather than as a count that moved. A stranger provisioning is the second biggest
 # thing that can happen on this service, and on 2026-09-22 one did while the only sign was a total

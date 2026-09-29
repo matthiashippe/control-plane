@@ -73,6 +73,27 @@ Verschwendung braeuchte das Ziel fuenf fehlerfreie Tage, und heute gingen drei P
 3. Kein 429 mehr im Zugriffslog fuer eine fremde Adresse an dieser Tuer, und ein Crawler, der
    die Tuer abklopft, kann sie fuer andere nicht mehr schliessen.
 
+### Was die offene Tuer kostet, gemessen statt vermutet
+
+Zwanzig Minuten nach dem Ausrollen hat derselbe Crawler **elf Handles** gemintet, im Sekundentakt
+aus wechselnden Azure-Adressen. `wallets_foreign` ist dadurch von 5 auf 18 gesprungen, und keines
+davon hat etwas getan. `wallets_foreign_active` steht unveraendert auf 2, den zwei echten
+Automatons.
+
+Das ist der Preis und er war absehbar. Die Zahl ist nicht falsch, ein Handle **ist** eine fremde
+Wallet, und sie wegzulassen waere das Spiegelbild des Fehlers, den dieser Bericht staendig findet.
+Sie ist nur allein nicht mehr lesbar, also steht jetzt daneben, wieviele davon nie etwas getan
+haben, und `wallets_foreign_active` ist als die Zahl markiert, die man liest. Die sechs Zielzahlen
+in `ops/ziele.sh` sind nicht betroffen: sie haengen alle an Aktivitaet, nicht an Existenz.
+
+**Das verbleibende Risiko, ausdruecklich benannt:** ein Handle bekommt beim ersten Aufruf, den es
+nicht bezahlen kann, 15 Cent aus dem Topf (`grantOnFirstUse`). Ein Crawler, der seine Handles auch
+benutzt, koennte also Zuschuesse abgreifen. Die Tagesgrenze des Topfes (`CP_POOL_DAILY_MC`,
+150 Cent, also zehn Zuschuesse) begrenzt den Schaden auf einen Tag, und der Topf steht ohnehin nur
+noch bei 170 Cent. Gemessen benutzt dieser Crawler seine Handles nicht: von 16 Handles heute hat
+genau eines einen Ledger-Eintrag. Wenn sich das aendert, ist die Antwort nicht die Tuer, sondern
+der Zuschuss: er muesste an etwas haengen, das ein Crawler nicht hat.
+
 ### Blockers
 Keine.
 
