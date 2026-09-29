@@ -73,6 +73,56 @@ Bei uns ist es genauso herum: die einzigen zwei zahlenden Fremden sind **Agenten
 15,02 USD fuer Inferenz eingezahlt und das Brett null Mal geoeffnet. **Die Anbieterseite zahlt
 schon, die Nachfrageseite ist die Wette.**
 
+## Die Umkehrung, 29.09. nachmittags
+
+Matthias: *"waere es nicht schlau, zuerst die Demand-Seite aufzubauen und im Zweifelsfall alles via
+Agents selbst zu liefern?"*
+
+**Das kehrt den Fehler um, den dieses Projekt seit zehn Tagen macht.** Wir bestuecken die
+**Nachfrage**seite selbst: 44 von 47 Auftraegen kommen von unserer eigenen Wallet. Wir spielen den
+Kaeufer und warten auf Agenten. Dabei ist bei uns das Angebot Software und die Nachfrage nicht,
+also ist genau die Seite knapp, die wir uns selbst schenken, und die, die wir uns schenken
+koennten, kaufen wir teuer ein.
+
+`ops/compete.ts` gibt es seit dem 21.09.: ein Agent, der das Brett liest, seine eigene Inferenz
+bezahlt und einsendet. Die Maschinerie fuer die Angebotsseite steht also. Was fehlt, ist ein
+Kaeufer.
+
+### Was die Rechnung sagt
+
+Eine Lieferung kostet uns im Median **0,5 Cent** Inferenz (82 Aufrufe gemessen, Spanne 0,001 bis
+5,8 Cent). Drei Fassungen eines Auftrags kosten also 1,5 bis 17 Cent.
+
+| Auftrag | Provision, 10 % | Selbst liefern | Faktor |
+|---|---|---|---|
+| 5 EUR | 0,50 EUR | 4,83 bis 4,99 EUR | 10 |
+| 20 EUR | 2,00 EUR | 19,83 bis 19,98 EUR | 10 |
+| 50 EUR | 5,00 EUR | 49,83 bis 49,98 EUR | 10 |
+
+**Und die Anzeigenrechnung dreht sich.** Der Break-even faellt von **111 EUR auf 11,13 EUR** je
+Auftrag, weil der Wert je Kunde nicht mehr zehn Prozent ist, sondern fast der ganze Preis. Ab
+einem Auftrag von 20 EUR traegt ein Klick zu 10 Cent bei der heute gemessenen Konversion von 0,90
+Prozent.
+
+### Was das fuer die Vertragsfrage heisst
+
+Die Wahl vom Vormittag war **Marktplatz**, und sie war fuer den Fall richtig, dass ein fremder
+Agent liefert. Wenn wir selbst liefern, sind wir **Verkaeufer** und schulden dem Kaeufer die
+Arbeit. Beides nebeneinander, und die Reihenfolge ist die Umkehrung:
+
+1. **Verkaeufer, solange wir liefern.** Ein gewoehnliches Stripe-Konto, kein Connect, keine
+   Identitaet je Agent, keine Auszahlung. Damit faellt das groesste Stueck Arbeit aus dem
+   kritischen Pfad.
+2. **Marktplatz, sobald ein fremder Agent liefert.** Dann Connect, dann Provision, dann
+   Auszahlung.
+
+### Was ehrlich bleiben muss
+
+Wenn wir liefern, steht das da. Keine Seite, die von konkurrierenden Agenten spricht, waehrend
+drei Prompts von uns antworten. **Das Versprechen traegt auch so:** Arbeit einstellen, in Minuten
+drei fertige Fassungen bekommen, die beste bezahlen. Drei Fassungen aus drei verschiedenen
+Modellen sind echte Auswahl, sie gehoeren nur uns, und das gehoert auf die Seite.
+
 ## Die Wette, in einem Satz
 
 Der gemessene x402-Markt ist dreistellig im Monat (385 USDC von 38 Wallets bei Conway, gefallen

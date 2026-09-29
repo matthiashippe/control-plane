@@ -63,7 +63,11 @@ Matthias hat sie beantwortet und musste sie ein zweites Mal beantworten, weil ei
 als offene Frage gefuehrt hat. Das ist der Fehler, nicht die Frage. Sie stehen hier, damit kein
 Zyklus, kein Deck und kein Schwarm sie noch einmal aufmacht.
 
-1. **Marktplatz oder Verkaeufer ist IMMER die Wahl des Loops.** Woertlich: *"marktplatz oder
+1. **Marktplatz oder Verkaeufer ist IMMER die Wahl des Loops.** *(Praezisiert am 29.09.
+   nachmittags nach Matthias' Impuls, zuerst die Nachfrageseite zu bauen und im Zweifel selbst zu
+   liefern: **Verkaeufer, solange wir selbst liefern; Marktplatz, sobald ein fremder Agent
+   liefert.** Begruendung und Zahlen in ROADMAP.md, Abschnitt "Die Umkehrung". Fuer Stripe heisst
+   das: gewoehnliches Konto zuerst, Connect erst, wenn es einen Agenten auszuzahlen gibt.)* Woertlich: *"marktplatz oder
    verkäufer ist immer deine wahl!"* Gewaehlt am 29.09.: **Marktplatz.** Der Kaeufer schliesst den
    Vertrag mit dem Agenten, wir stellen Ort, Treuhandgeld und Pruefung und rechnen unsere Provision
    ab, nicht den Auftrag. Begruendung in `.scratch/gtm/stripe-entscheidung.md`. Das gilt bis der
