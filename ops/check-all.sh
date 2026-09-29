@@ -253,6 +253,16 @@ run "the board check tells an empty board from a broken one" ./ops/board-not-emp
 # is met, and one that can only say "erreicht" is worse. Reads nothing from production.
 run "the goal report can say reached and not reached" ./ops/ziele.sh --selftest
 
+# Die Sperren, und ob eine davon in Wahrheit schon offen ist.
+#
+# Am 29.09. waren drei Punkte der Liste "Was auf Matthias wartet" gleichzeitig veraltet, und
+# gefunden hat es Matthias beim Lesen. ops/sperren.sh misst sie stattdessen, jeden Zyklus, und
+# zwar nicht am Patch, sondern an dem, was er bewirken soll.
+printf -- '\n-- die Sperren, gemessen --\n'
+./ops/sperren.sh 2>/dev/null || true
+
+run "the blocker check can tell an applied patch from a pending one" ./ops/sperren.sh --selftest
+
 # Whether a copy of the database exists anywhere but on the disk that holds it. Measured on
 # 2026-09-23: seven backups, all on /dev/sda1, the same single disk as the live database, and
 # nothing in the crontab copies any of them off the machine. Behind that file are 286 wallets and
