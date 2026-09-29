@@ -427,7 +427,7 @@ describe("the money a stranger actually moved", () => {
   /**
    * The split that exists so the next sub-goal cannot fake the number it is measured by.
    *
-   * T1.2 in ZIELE.md pays a stranger's FIRST job out of the starter pool, because 15 cents of
+   * T1.2 in ZIELE-alt-bis-29-09.md pays a stranger's FIRST job out of the starter pool, because 15 cents of
    * somebody else's USDC is a wall and 50 cents of ours is not. That is the right move, and
    * without this split it would have shown up as foreign market volume: a job funded by us,
    * awarded by them, counted as proof that strangers pay each other here.

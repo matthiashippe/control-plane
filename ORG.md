@@ -11,31 +11,39 @@ Wege, die verboten sind, und die Rolle, deren Aufgabe das Widerlegen ist.
 ## Die Zahl
 
 ```
-fiverr_orders_30d
+human_revenue_30d_cents
 ```
 
-Bezahlte Lieferungen in dreißig Tagen, bei denen **ein Fremder** den Auftrag gestellt und **ein
-anderer Fremder** ihn geliefert hat, und Geld geflossen ist. Gemessen von `ops/ziele.sh` aus der
+Was Menschen in dreißig Tagen bezahlt haben, in Cent. Gemessen von `ops/ziele.sh` aus der
 Produktionsdatenbank, nie aus einer Datei.
 
-Stand 29.09.2026: **0**. Alles andere in diesem Repo ist Vorarbeit auf diese Zahl.
+Stand 29.09.2026: **kein Messweg**, weil es die Bestellung noch nicht gibt. Das ist nicht null,
+und der Unterschied ist die erste Aufgabe: null wäre ein Ergebnis, kein Messweg ist eine Aussage
+über uns.
 
-Drei Zwischenzahlen, weil eine Null keine Richtung hat. Jede ist selbst gemessen, jede ist ein
-Glied der Kette, und die Kette reißt an ihrem schwächsten:
+Vier Glieder, weil eine Zahl ohne Kette keine Richtung hat. Die Reihenfolge ist die des Käufers,
+nicht die der Technik, und die Kette reißt an ihrem schwächsten Glied:
 
 | Glied | Zahl | Stand 29.09. |
 |---|---|---|
-| Nachfrage | fremde Auftraggeber mit einem bezahlten Auftrag | 0 von 47 Aufträgen |
-| Angebot | fremde Agenten, die geliefert haben | 0 |
-| Abschluss | Provision aus fremden Aufträgen | 0 |
+| Sehen | Besucher, die den Katalog öffnen | kein Katalog |
+| Sagen | Gespräche, aus denen eine Bestellung wird | kein Gespräch |
+| Bezahlen | bezahlte Bestellungen, über 11 EUR | kein Weg ohne Wallet |
+| Bekommen | Fassungen je Bestellung, Minuten bis zur ersten, Runden | Runden gebaut, Rest fehlt |
 
-Der Engpass ist damit benannt und nicht verhandelbar: es gibt keine Nachfrage von außen. Jeder
-Zyklus baut an dem Glied, das gerade am schwächsten ist, und an keinem anderen.
+Elf Euro sind keine runde Zahl, sondern die gemessene Untergrenze: unter Selbstlieferung liegt der
+Break-even einer bezahlten Anzeige bei 11,13 EUR (`ops/anzeigen-rechnung.py`).
+
+Die alte Zahl `fiverr_orders_30d` bleibt gemessen und ist nicht mehr die eine: sie hängt an einem
+Markt, der on-chain 430 USDC bei 44 Wallets in dreißig Tagen groß ist. `ZIELE.md` sagt, warum das
+nicht reicht.
 
 ## Die Sperrliste
 
 Sie steht vor der Zahl. Ein Verstoß ist kein Fehler, sondern das Ende des Laufs.
 
+0. **Keine eigene Bestellung zählt als die eines Menschen.** Eine Bestellung, die wir selbst
+   ausgelöst haben, ist eine Vorführung. Die Zahl misst, was jemand bezahlt hat, der nicht wir ist.
 1. **Kein eigener Auftrag zählt als fremder.** Unsere Adressen und Schlüsselnamen stehen in
    `ops/ours.*`; `ops/claim-keyless.sh` entscheidet über die Minting-IP, nicht über das Verhalten.
    Wer die Zahl erhöhen will, indem er die Definition weitet, hat die Zahl abgeschafft.
@@ -59,7 +67,9 @@ Agenten-Definitionen in `.claude/agents/` und sind einzeln aufrufbar.
 | Rolle | Aufgabe | Darf nicht |
 |---|---|---|
 | `org-messer` | Misst gegen die Produktion und sagt, welches Glied gerade das schwächste ist. | Nichts bauen, nichts deployen, keine Zahl aus einer Datei lesen. |
-| `org-nachfrage` | Bringt Menschen dazu, einen bezahlten Auftrag zu stellen. Kanäle, Landeseiten, SEO, SEA, GEO. | Keine Reichweite behaupten, die nicht gemessen ist. |
+| `org-nachfrage` | Bringt Menschen auf die Seite, die etwas kaufen wollen. Kanäle, Landeseiten, SEO, SEA, GEO. | Keine Reichweite behaupten, die nicht gemessen ist. |
+| `org-gestalt` | Die Erfahrung des Menschen: Katalog, Gespräch, Warten, Auswahl, Nachbessern. | Kein Bildschirm, den ein Mensch nicht in zehn Sekunden versteht. |
+| `org-lieferkette` | Die Agentenketten, die liefern: Modelle, Kosten je Fassung, Zeit bis zur ersten. | Keine Lieferung versprechen, deren Kosten nicht gemessen sind. |
 | `org-angebot` | Bringt fremde Agenten dazu zu liefern. Preis, Verzeichnisse, Maschinendoku, Katalogeinträge. | Keinen Auftrag posten, der weniger zahlt als eine Antwort kostet. |
 | `org-produkt` | Baut das, was die Kette bisher verhindert, und nur das. | Kein Feature ohne die Messung, die es widerlegen würde. |
 | `org-skeptiker` | Versucht jede Behauptung und jede Messung zu widerlegen, bevor sie zu Matthias geht. | Nichts bauen, nichts bestätigen, ohne es selbst nachgerechnet zu haben. |

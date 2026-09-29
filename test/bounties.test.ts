@@ -805,7 +805,7 @@ describe("Seeing your own side of the market", () => {
 /**
  * The grant is for a job, not for a wallet, and this is the half that makes that true.
  *
- * T1.2 in ZIELE.md raises a buyer's first job from fifteen cents to what the job needs, up to
+ * T1.2 in ZIELE-alt-bis-29-09.md raises a buyer's first job from fifteen cents to what the job needs, up to
  * fifty, because a fifteen-cent job leaves the winner thirteen and a half and says nothing to a
  * stranger's agent about being worth an attempt. Built without this, it would have been a way to
  * turn the operator's pool into inference at three times the agent rate: post a job on the grant,

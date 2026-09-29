@@ -1,19 +1,25 @@
 #!/usr/bin/env python3
-"""Every goal and every sub-goal, as a verdict per number.
+"""Jede Zielzahl als Urteil, gemessen und nicht behauptet.
 
-Reads two JSON documents from stdin, one after the other: `/v1/status` and the output of
-`ops/status.sh`. `ops/ziele.sh` fetches them; this file only judges, so the judging can be put in
-front of planted numbers without touching the network. See that file's header for why this exists.
+Liest zwei JSON-Dokumente von stdin, hintereinander: `/v1/status` und die Ausgabe von
+`ops/status.sh`. `ops/ziele.sh` holt sie; diese Datei urteilt nur, damit das Urteilen vor
+gepflanzte Zahlen gestellt werden kann, ohne das Netz zu berühren.
+
+**Drei Zustände, nicht zwei.** Neu am 29.09.2026 mit den neuen Zielen: eine Zahl, für die es noch
+keinen Messweg gibt, ist nicht 0. Sie ist unbekannt, und das steht auch so da. Der Unterschied
+zählt, weil 0 eine Aussage über den Markt ist und "kein Messweg" eine über uns: das erste ist ein
+Ergebnis, das zweite ist die nächste Aufgabe. Die alte Fassung hätte für jede Bestellzahl eine
+saubere 0 gemeldet, obwohl es die Tabelle dafür noch gar nicht gibt.
 """
 import json
 import os
 import sys
 
-GREEN, RED, GREY = "OK    ", "OFFEN ", "----  "
+GREEN, RED, GREY, UNK = "OK    ", "OFFEN ", "----  ", "?     "
 
 
 def read_two(raw):
-    """Two JSON objects concatenated. Returns both, or raises."""
+    """Zwei aneinandergehängte JSON-Objekte. Gibt beide zurück, oder wirft."""
     dec = json.JSONDecoder()
     first, idx = dec.raw_decode(raw.lstrip())
     second, _ = dec.raw_decode(raw.lstrip()[idx:].lstrip())
@@ -30,94 +36,107 @@ def main():
         return 2
 
     short = os.environ.get("CP_ZIELE_SHORT") == "1"
-    listed = int(os.environ.get("CP_ZIELE_LISTED_N", "0"))
     base = os.environ.get("CP_URL", "https://postyourprice.com")
+    # Was ops/ziele.sh per HTTP gemessen hat, weil es nicht in der Datenbank steht.
+    def http(name):
+        v = os.environ.get(name)
+        return None if v in (None, "") else int(v)
+
     offen = 0
+    unbekannt = 0
 
     def pruefe(name, ist, ziel, note=""):
-        nonlocal offen
+        """Ein Urteil. `ist` darf None sein: dann gibt es keinen Messweg, und das ist kein Nullwert."""
+        nonlocal offen, unbekannt
+        if ist is None:
+            unbekannt += 1
+            offen += 1
+            print(f"  {UNK}{name:<48} Ziel {str(ziel):<10} kein Messweg")
+            if note and not short:
+                print(f"          {note}")
+            return
         ok = ist >= ziel
         if not ok:
             offen += 1
-        print(f"  {GREEN if ok else RED}{name:<48} Ziel {str(ziel):<12} ist {ist}")
+        print(f"  {GREEN if ok else RED}{name:<48} Ziel {str(ziel):<10} ist {ist}")
         if note and not short:
             print(f"          {note}")
+
+    def neben(name, wert):
+        """Eine Zahl ohne Urteil: sie sagt, woran es liegt, und ist selbst kein Ziel."""
+        print(f"  {GREY}{name:<48} {'kein Messweg' if wert is None else wert}")
 
     def ziel(datum, titel):
         print()
         print(f"{datum}  {titel}")
 
-    paying = status.get("paying_wallets", {}).get("not_ours", 0)
-    thinking = status.get("thinking_wallets", {}).get("not_ours", 0)
-    gmv_c = market.get("foreign_gmv_30d_mc", 0) // 1000
-    fee_c = market.get("foreign_fee_30d_mc", 0) // 1000
+    def feld(key):
+        """Ein Feld aus dem Report, oder None, wenn es den Messweg noch nicht gibt."""
+        return market.get(key) if key in market else None
 
-    print(f"Ziele und Teilziele, gemessen gegen {base}")
+    print(f"Ziele, gemessen gegen {base}")
 
-    ziel("26.09.", "Der erste fremde Kaeufer")
-    pruefe("zahlende fremde Wallets", paying, 5, "paying_wallets.not_ours")
-    pruefe("Auftrag, Kaeufer und Gewinner beide fremd", market.get("foreign_buyers", 0), 1,
-           "foreign_buyers zaehlt erst, wenn der Kaeufer selbst eingezahlt hat")
+    ziel("02.10.", "Ein Mensch kann hier kaufen, ohne Wallet")
+    pruefe("Katalog mit Preisen ueber 11 EUR", http("CP_ZIELE_KATALOG"), 1,
+           "GET /katalog antwortet 200 und nennt mindestens einen Preis ueber 11 EUR")
+    pruefe("Gespraech, das eine Bestellung erzeugt", http("CP_ZIELE_CHAT"), 1,
+           "ein Gespraech nimmt Anforderungen auf und macht daraus eine Bestellung")
+    pruefe("Bezahlweg ohne Wallet", http("CP_ZIELE_KARTE"), 1,
+           "heute braucht ein Kaeufer Schluesselpaar, Signatur und USDC")
 
-    ziel("02.10.", "Im Verzeichnis stehen und benutzt werden")
-    pruefe("Zeilen mit unserem Host im Tagesscan", listed, 1, "ops/own-x402-listing.sh")
-    pruefe("fremde Wallets, die hier gerechnet haben", thinking, 25, "thinking_wallets.not_ours")
+    ziel("10.10.", "Der erste zahlende Mensch")
+    pruefe("bezahlte Bestellungen von Menschen (30 Tage)", feld("human_orders_paid_30d"), 1,
+           "eine Bestellung, die ein Mensch bezahlt hat, nicht eine Wallet")
+    neben("  davon ueber 11 EUR", feld("human_orders_above_floor_30d"))
 
-    ziel("29.10.", "5.000 USDC fremdes Auftragsvolumen im Monat")
-    pruefe("foreign_gmv_30d in Cent", gmv_c, 500000, "fremd eingezahlt, geliefert, vergeben")
-    pruefe("foreign_fee_30d in Cent", fee_c, 50000)
+    ziel("31.10.", "Zehn Menschen, 500 EUR im Monat")
+    pruefe("zahlende Menschen (30 Tage)", feld("human_buyers_30d"), 10)
+    pruefe("Umsatz in Cent (30 Tage)", feld("human_revenue_30d_cents"), 50000)
 
-    ziel("31.12.", "250.000 USDC im Monat")
-    pruefe("foreign_gmv_30d in Cent", gmv_c, 25000000,
-           "ZIELE.md sagt selbst: das 568-fache des gemessenen Marktes")
+    ziel("31.12.", "5.000 EUR im Monat, und ein fremder Agent liefert")
+    pruefe("Umsatz in Cent (30 Tage)", feld("human_revenue_30d_cents"), 500000)
+    pruefe("fremde Lieferungen (30 Tage)", feld("foreign_submissions_30d"), 1,
+           "bisher 0 von 37 Einsendungen, alle von unseren eigenen Adressen")
 
     print()
-    print("Goal 19: findet ein fremder Client ueberhaupt den Bezahlweg?")
+    print("Die drei Versprechen, je Bestellung gemessen")
+    pruefe("Fassungen je Bestellung (Median)", feld("versions_per_order_median"), 3,
+           "Auswahl ist das halbe Versprechen: eine Fassung ist keine Auswahl")
+    pruefe("Bestellungen mit mindestens einer Runde", feld("orders_with_a_round_30d"), 1,
+           "Rueckmeldung als Text, bis zu vier Runden, der Preis steigt nicht")
+    # Schnell ist die einzige Zahl, bei der klein besser ist, also steht sie ohne Urteil da und
+    # bekommt ihre Schwelle erst, wenn es ueberhaupt eine Bestellung gibt, an der man sie misst.
+    neben("Minuten bis zur ersten Fassung (Median)", feld("minutes_to_first_version_median"))
+
+    print()
+    print("Die Angebotsseite, die schon zahlt")
     pruefe("abgerechnete Zahlungen von Nicht-Conway-Clients",
-           market.get("settled_payments_non_conway", 0), 1,
+           feld("settled_payments_non_conway"), 1,
            "@x402/core verwirft jedes Angebot ueber einem Dollar vor dem Signieren")
-    print(f"  {GREY}{'  abgerechnete fremde Zahlungen insgesamt':<48} "
-          f"{market.get('settled_payments_foreign', 0)}")
-
-    print()
-    print("Die Vision: Fiverr fuer Agenten")
-    pruefe("Auftraege, die alle drei Versprechen einloesen", market.get("fiverr_orders_30d", 0), 1,
-           "fremd finanziert, zwei fremde Lieferungen, Vergabe binnen einer Stunde")
-    for name, key in (
-        ("  davon fremd finanziert", "fiverr_foreign_funded_orders_30d"),
-        ("  davon mit zwei fremden Lieferungen", "fiverr_orders_with_two_foreign_deliveries_30d"),
-        ("  davon binnen einer Stunde vergeben", "fiverr_orders_awarded_within_the_hour_30d"),
-    ):
-        # Einzeln und ohne Urteil: sie sagen, woran es liegt, und sind selbst kein Ziel.
-        print(f"  {GREY}{name:<46} {market.get(key, 0)}")
+    neben("  abgerechnete fremde Zahlungen insgesamt", feld("settled_payments_foreign"))
+    neben("  fremde Wallets, die hier gerechnet haben",
+          status.get("thinking_wallets", {}).get("not_ours"))
 
     print()
     print("Teilziele, die der Loop allein bewegt")
-    pruefe("Arbeit auf dem Brett", market.get("open_bounties", 0), 1,
+    pruefe("Arbeit auf dem Brett", feld("open_bounties"), 1,
            "ein leeres Brett bricht die Zusage auf der Startseite")
-    pruefe("Startertopf traegt Neuankoemmlinge", market.get("starter_grants_left", 0), 1,
-           "leer heisst: der naechste fremde Agent bekommt nichts")
+    pruefe("Startertopf traegt Neuankoemmlinge", feld("starter_grants_left"), 1)
     pruefe("Schluesselnamen alle klassifiziert",
-           0 if market.get("unclassified_key_names") else 1, 1,
+           None if "unclassified_key_names" not in market
+           else (0 if market["unclassified_key_names"] else 1), 1,
            "ein unbekannter Name faelscht jede Zahl ueber den Markt")
     pruefe("keine eigenen Einsendungen auf fremden Auftraegen",
-           0 if market.get("stray_submissions_on_open", 0) else 1, 1)
+           None if "stray_submissions_on_open" not in market
+           else (0 if market["stray_submissions_on_open"] else 1), 1)
 
     print()
-    print("Sperren, die nur Matthias loesen kann (ZIELE.md)")
-    for name in [
-        "Issue-Antworten raus",
-        "Der Name und die Domain",
-        "Stripe: Gewerbe, Steuer, Vertragspartner",
-        "Caddyfile-Patch",
-        "21,92 USDC ohne Gas",
-        "Search Console und Bing",
-        "Eine Zahl fuer Anzeigen",
-    ]:
-        print(f"  {GREY}{name}")
-
-    print()
-    print("ALLE ZIELE ERREICHT" if offen == 0 else f"OFFEN: {offen} Zielzahl(en)")
+    if offen == 0:
+        print("ALLE ZIELE ERREICHT")
+    elif unbekannt:
+        print(f"OFFEN: {offen} Zielzahl(en), davon {unbekannt} ohne Messweg")
+    else:
+        print(f"OFFEN: {offen} Zielzahl(en)")
     return 0 if offen == 0 else 1
 
 

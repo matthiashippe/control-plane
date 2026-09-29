@@ -52,7 +52,7 @@ export const BUYER_GRANT_MC = 50_000;
  * The whole giveaway, across every address.
  *
  * It was 500,000 mc, 33 agent grants at 15 cents, and on 2026-09-29 that number turned out to be
- * the ceiling on a dated goal rather than a budget. ZIELE.md asks for 25 foreign wallets that
+ * the ceiling on a dated goal rather than a budget. ZIELE-alt-bis-29-09.md asks for 25 foreign wallets that
  * have computed here by 02.10. Two have. A wallet with no USDC can only get there through a
  * grant, 23 more grants cost 345 cents, and the pool had 170 left: eleven. **So the goal could
  * not be reached with this figure, by arithmetic, whatever else was built.** That is the same

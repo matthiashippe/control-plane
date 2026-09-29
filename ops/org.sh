@@ -21,7 +21,7 @@ cd "$(dirname "$0")/.."
 # Zusatzschritten, also bekommt er hier vier gepflanzte Zustaende und muss viermal richtig liegen.
 if [[ "${1:-}" == "--selftest" ]]; then
   fail=0
-  report='{"db":{"market":{"fiverr_orders_30d":2,"foreign_buyers":1,"foreign_submissions_30d":3,"foreign_fee_30d_mc":500}}}'
+  report='{"db":{"market":{"human_revenue_30d_cents":2,"human_orders_paid_30d":1,"foreign_submissions_30d":3}}}'
   echt=$'aaa1111\nbbb2222'
 
   gut=$'2026-09-29\tNachfrage\torg-produkt\tIterationsrunden gebaut\taaa1111\t2'

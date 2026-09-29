@@ -4,7 +4,7 @@
  * Why it exists. Measured over the whole access log: 43 visitors reached the point where posting a
  * job needs money and none got past it, because the only rail in is USDC on Base. Goal 16 removed
  * the identity half of that wall (a key is the account now, no wallet, no signature). This is the
- * money half. ZIELE.md calls it form B: the buyer pays with a card and gets credits, everything
+ * money half. ZIELE-alt-bis-29-09.md calls it form B: the buyer pays with a card and gets credits, everything
  * after that is unchanged, credits stay not redeemable, and no new regulatory surface opens beyond
  * the ordinary sale of usage.
  *

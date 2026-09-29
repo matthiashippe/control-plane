@@ -22,7 +22,8 @@ import json, os, sys
 from datetime import date, timedelta
 
 SPALTEN = ["datum", "glied", "rolle", "was", "commit", "zahl_danach"]
-ROLLEN = ["org-messer", "org-nachfrage", "org-angebot", "org-produkt", "org-skeptiker", "org-wirt", "org-schreiber"]
+ROLLEN = ["org-messer", "org-nachfrage", "org-gestalt", "org-lieferkette", "org-angebot",
+          "org-produkt", "org-skeptiker", "org-wirt", "org-schreiber"]
 # Ab wann eine Rolle auffaellt: vierzehn Tage ohne eine einzige Zeile.
 STILL_TAGE = 14
 
@@ -57,13 +58,21 @@ def main():
     heute = date.fromisoformat(os.environ.get("CP_ORG_HEUTE") or date.today().isoformat())
     commits = {c.strip() for c in os.environ.get("CP_ORG_COMMITS", "").splitlines() if c.strip()}
 
-    zahl = markt.get("fiverr_orders_30d")
+    # Die eine Zahl seit dem 29.09.2026: was Menschen bezahlt haben. Fehlt das Feld, gibt es den
+    # Messweg noch nicht, und das ist etwas anderes als eine Null.
+    zahl = markt.get("human_revenue_30d_cents")
+    fehlt = "human_revenue_30d_cents" not in markt
     print("DIE ZAHL")
-    print(f"  fiverr_orders_30d = {zahl}")
+    print(f"  human_revenue_30d_cents = {'kein Messweg' if fehlt else zahl}")
     print("  Glieder:")
-    print(f"    Nachfrage  fremde Auftraggeber:      {markt.get('foreign_buyers')}")
-    print(f"    Angebot    fremde Lieferungen:       {markt.get('foreign_submissions_30d', 0)}")
-    print(f"    Abschluss  Provision aus fremd (mc): {markt.get('foreign_fee_30d_mc')}")
+    for name, key in (
+        ("Sehen      Besucher im Katalog:     ", "catalog_views_30d"),
+        ("Sagen      Gespraeche zur Bestellung:", "order_chats_30d"),
+        ("Bezahlen   bezahlte Bestellungen:   ", "human_orders_paid_30d"),
+        ("Bekommen   Fassungen je Bestellung: ", "versions_per_order_median"),
+    ):
+        print(f"    {name} {markt.get(key, 'kein Messweg')}")
+    print(f"    (alt) fremde Lieferungen:      {markt.get('foreign_submissions_30d', 'kein Messweg')}")
     print()
 
     fehler = 0
@@ -87,7 +96,7 @@ def main():
     # Die zuletzt protokollierte Zahl muss zur gemessenen passen, sonst schreibt das Protokoll
     # eine eigene Wirklichkeit fort.
     letzte = [z for z in zeilen if z["zahl_danach"] not in ("-", "")]
-    if letzte and zahl is not None:
+    if letzte and zahl is not None and not fehlt:
         gemeldet = letzte[-1]["zahl_danach"]
         if str(zahl) != gemeldet:
             print(f"  ABWEICHUNG  zuletzt protokolliert {gemeldet}, gemessen {zahl}")
