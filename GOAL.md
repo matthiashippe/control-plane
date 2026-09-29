@@ -1,196 +1,134 @@
 # GOAL.md
 
 ## Status
-GEBAUT, nicht ausgerollt (HAN-27, 29.09.2026). Eingebaut sind die Aenderungen des Skeptikers aus
-HAN-24 (unten im Text), seine Auflagen 1 bis 9 aus HAN-25 und Satz, Seite und Loeschfristen von
-Recht aus HAN-26 (unter Blockers). Ausrollen macht Betrieb, und `/datenschutz` geht mit dem Feld
-zusammen live, nicht das Feld allein.
+VORSCHLAG (HAN-30, 29.09.2026). Wird vor dem Bau vom Skeptiker widerlegt. Gebaut wird erst, was
+danach uebrig ist.
 
 ## Active Objective
 
-**Goal 21: Wer kaufen will, sagt zuerst, was er braucht, und gibt eine E-Mail an. Erst dann geht
-es zu Stripe.**
+**Goal 22: Jede in Stripe bezahlte Session steht in `checkouts` als bezahlt, auch wenn der Kaeufer
+nicht auf `/katalog/danke` zurueckkommt. Danach nimmt der Code einen Live-Schluessel an.**
 
-Nennt ausdruecklich **`src/payments/stripe.ts`**, weil `customer_email` dort in den Body der
-Checkout Session kommt und `loop-constraints.md` den Pfad nur so oeffnet. Sonst nichts unter
-`src/payments/**`, und `src/auth/**` bleibt zu.
+Nennt ausdruecklich **`src/payments/stripe.ts`**, weil dort `expires_at` in den Body der Session
+kommt. Sonst nichts unter `src/payments/**`, und `src/auth/**` bleibt zu.
 
-Auftrag: HAN-23 (CEO, Entscheidung aus HAN-22). Glied: **Sagen**. Frist: live bis 01.10.2026,
-18:00 UTC.
+Auftrag: HAN-30 (CEO, Entscheidung aus HAN-22). Glied: **Bezahlen**. Frist: ausgerollt bis
+05.10.2026, 18:00 UTC. Den Live-Schluessel setzt Matthias in `deploy/.env` (gesperrter Pfad), der
+Schreiber sagt ihm Bescheid (HAN-31).
 
 ### Was gemessen ist, 29.09.2026
 
-- `checkouts` in Produktion: 12 Zeilen (11 `pending`, 1 `paid`), alle `stripe_test`, alle
-  `rede-zum-fest`, 19:53:51 bis 20:37:08 UTC, alle als `POST /katalog/kaufen 303` von
-  82.194.125.90 aus `ops/own-ips.txt`, 0 davon mit Angaben oder Kontakt, weil es keine Spalte
-  dafuer gibt. Quelle: `checkouts` read-only und Access-Log, nachgezaehlt vom Skeptiker in HAN-25;
-  die erste Fassung hier sagte 10.
-- Der Knopf unter jedem Angebot schickt nur `angebot` und leitet sofort zu Stripe
-  (`src/public/catalog.ts`, `buyForm`).
-- **Den Entwurf der fuenf Bildschirme gibt es nicht.** HAN-10 hat Repo, Git und Paperclip
-  durchsucht, der Workflow `der-mensch` ist nie gelaufen. Deshalb wird die kleinste Fassung
-  gebaut, die der Auftrag zulaesst: eine gezielte Rueckfrage je Angebot als Textfeld plus E-Mail.
-  Kein Chat, keine Nachfragen des Systems. Das fehlt und steht unten.
-- Unsere eigenen Kaeufer lassen sich heute nicht erkennen: `ops/ours.*` gibt es nicht, und
-  `checkouts` kennt keinen Kaeufer.
+- Gebucht wird nur in `GET /katalog/danke` ueber `settleCheckout` (`src/app.ts`, Route
+  `/katalog/danke`). Wer nach der Zahlung den Tab schliesst, bleibt `pending`, fuer immer.
+- `checkoutEnabled()` nimmt nur `sk_test_`/`rk_test_` oder `CP_CHECKOUT=1`
+  (`src/checkout/index.ts:67`). `test/stripe-checkout.test.ts:164` haelt fest, dass ein
+  Live-Schluessel allein den Weg **nicht** oeffnet.
+- `beginOfferCheckout` fragt zuerst Stripe und schreibt erst danach die Zeile. Scheitert die
+  Transaktion dazwischen, gibt es eine Session in Stripe ohne Zeile bei uns, und der Kaeufer kann
+  sie bezahlen. Heute sieht das niemand.
+- Die Session laeuft mit Stripes Voreinstellung nach 24 Stunden ab. Solange weiss niemand, ob eine
+  offene Zeile abgebrochen ist.
+
+### Warum Abgleich und kein Webhook
+
+Ein Webhook braucht ein Signatur-Geheimnis in `deploy/.env` (Matthias), einen Endpunkt, den jemand
+in Stripe eintraegt, und eine neue oeffentliche Route, die Stripe-Signaturen prueft. Der Abgleich
+braucht nichts davon: er fragt dieselbe Session mit demselben `read`, das `/katalog/danke` heute
+schon benutzt, also mit derselben Pruefung (Betrag aus der Zeile, Modus aus Stripe, bedingtes
+`UPDATE`). Er ist langsamer, hoechstens fuenf Minuten, und das reicht, weil heute niemand auf die
+Buchung wartet. Ein Webhook kann spaeter dazukommen; der Abgleich bleibt dann das Netz darunter.
 
 ### Die Arbeit, in dieser Reihenfolge
 
-1. **Tabelle `order_briefs`**, verknuepft ueber die Referenz, in `src/db.ts`:
-   ```sql
-   CREATE TABLE IF NOT EXISTS order_briefs (
-     reference  TEXT PRIMARY KEY REFERENCES checkouts(reference),
-     brief      TEXT NOT NULL CHECK (json_valid(brief)),
-     email      TEXT NOT NULL CHECK (email LIKE '%_@_%._%'),
-     created_at TEXT NOT NULL
-   );
-   ```
-   Eine eigene Tabelle statt zwei Spalten an `checkouts`, weil SQLite an eine bestehende Tabelle
-   keine `NOT NULL`-Spalte ohne Default haengt und die zwoelf alten Zeilen sonst die Regel brechen.
-   Die `CHECK`s halten Zahl 1 auch dann, wenn ein spaeterer Code-Pfad die Pruefung vergisst.
-   **Die E-Mail steht nur hier, nie in `checkouts.address`** (Skeptiker, HAN-24): `address` ist ein
-   Fremdschluessel auf `wallets`, und `finishSettle` bucht fuer jede Zeile mit `address != null`
-   einen Topup. Bei Angeboten bleibt `address` `null`, und `beginOfferCheckout` schreibt es
-   ausdruecklich als `null`. `brief` ist JSON mit den Feldern des Angebots (siehe 4).
-2. **`beginOfferCheckout(db, provider, { offerId, brief, email })`** in `src/checkout/index.ts`.
-   Reihenfolge: eingeschaltet, Angebot bekannt, jedes Pflichtfeld des Angebots (siehe 4) erfuellt
-   seine Mindestregel, `email`
-   nach `trim` und Kleinschreibung hoechstens 254 Zeichen und `^[^\s@]+@[^\s@]+\.[^\s@]+$`. Jeder
-   Fehler davon wirft 400 **bevor** Stripe gefragt und bevor eine Zeile geschrieben wird. Danach
-   `provider.begin` mit der E-Mail, dann `checkouts` und `order_briefs` in **einer** Transaktion.
-   Die alte Signatur mit nur der Angebots-ID verschwindet, damit der alte Weg nicht mehr erreichbar
-   ist, auch nicht aus Code.
-3. **`src/payments/stripe.ts`:** `begin` nimmt `email` und setzt `customer_email` im
-   Form-Body des `POST /v1/checkout/sessions`. Nie in `success_url` oder `cancel_url`. Test gegen
-   gestelltes `fetch`: `customer_email` steht im Body, und keine der beiden URLs enthaelt `@` oder
-   die Adresse.
-4. **Die Bestellseite `GET /katalog/bestellen?angebot=<id>`**, deutsch, im Rahmen von `/katalog`.
-   Oben Name und Preis des Angebots, dann die Pflichtfelder des Angebots, dann ein Feld `email` (`type=email`, `required`, `autocomplete=email`),
-   ein Satz zur Verwendung der Adresse (Wortlaut von Recht, siehe Blockers), der Knopf
-   "Weiter zur Bezahlung". Das Formular geht per POST an `/katalog/kaufen`, die ID als verstecktes
-   Feld. Ohne gueltige ID oder mit ausgeschaltetem Kartenweg: 303 nach `/katalog`, damit die
-   Adresse keine eigene Seite fuer die Sitemap ist (wie `/katalog/danke`).
-   **Pflichtfelder mit Mindestinhalt statt einer freien Frage** (Skeptiker, HAN-24: ein "x" darf
-   nicht reichen). Sie stehen als `fields` an jedem Angebot in `OFFERS`; Zahlen nach `trim`:
-   - Rede zum Fest: `anlass` (3 bis 200), `person` "Für wen ist die Rede?" (2 bis 200),
-     `laenge` Auswahl 3, 5 oder 10 Minuten, `inhalt` "Was soll vorkommen: Namen, eine gemeinsame
-     Geschichte?" (40 bis 4000).
-   - Anschreiben zur Bewerbung: `stellenanzeige` "Fügen Sie die Stellenanzeige ein" (200 bis 8000),
-     `erfahrung` "Was bringen Sie mit?" (40 bis 4000).
-   - Text über Ihr Angebot: `was` (10 bis 2000), `fuer_wen` (5 bis 500), `wo` Auswahl Aushang,
-     Faltblatt oder Internetseite.
-   Zusaetzlich gilt fuer jedes Freitextfeld: mindestens zwei Woerter aus Buchstaben, damit
-   "xxxxxxxxxx" nicht als Anlass durchgeht. Ein fehlendes oder zu kurzes Feld antwortet 400 mit dem
-   deutschen Namen des Felds, die schon getippten Angaben bleiben im Formular stehen.
-   **Gegenprobe in beide Richtungen, je Angebot ein Test:** alle Felder "x" gibt 400 und keine
-   Zeile; die Beispielangabe unten gibt 303 nach Stripe und genau eine Zeile. Den Dialog von Gestalt
-   gibt es nicht, deshalb stehen die Beispiele hier woertlich und sind die positive Probe:
-   - Rede: Anlass "70. Geburtstag", Person "meine Mutter Ingrid", 5 Minuten, Inhalt "Sie war 35
-     Jahre Grundschullehrerin in Kassel, singt im Kirchenchor und hat uns jeden Sommer an die
-     Ostsee gefahren."
-   - Anschreiben: eine Stellenanzeige von 400 Zeichen (Fixture `test/fixtures/stellenanzeige.txt`),
-     Erfahrung "Sechs Jahre Buchhaltung in einem Handwerksbetrieb, DATEV, Jahresabschluss
-     vorbereitet."
-   - Angebot: Was "Fahrradreparatur mit Abholung", Für wen "Familien und Pendler im Viertel",
-     Wo "Aushang"
-5. **Der Knopf auf `/katalog`** wird ein Link auf die Bestellseite ("Bestellen"), kein Formular
-   mehr. `POST /katalog/kaufen` ohne `angaben` oder ohne `email` antwortet 400 mit einem deutschen
-   Satz und legt keine Zeile an.
-6. **`/katalog/bestellen` kommt ins Rate-Limit** neben `/katalog/kaufen` und `/katalog/danke`.
-7. **`ops/ours.txt`**: die Liste eigener Kaeufer, je Zeile `email <adresse>` oder
-   `email-domain <domain>`, mit Datum und Grund. Erste Eintraege: `email-domain postyourprice.com`,
-   `email-domain handsel.dev`. Eine Vorfuehrung benutzt immer eine Adresse unter
-   `@postyourprice.com`. Keine persoenliche Adresse von Matthias in dieser Datei, weil das Repo
-   oeffentlich ist. `ops/db-report.cjs` traegt dieselbe Liste als Kopie (es laeuft per stdin im
-   Container und kann `ops/` nicht lesen), und ein Test haelt beide gleich, wie
-   `test/ours.test.ts` es fuer die Wallets tut.
-8. **`ops/db-report.cjs`, zwei Felder unter `market`:**
-   - `order_briefs_30d` (hiess `order_chats_30d`, umbenannt nach HAN-25, Auflage 1: gezaehlt wird
-     ein Formular, kein Gespraech, und die Zahl gilt nirgends als Erfuellung von Ziel 1 "Gespraech
-     antwortet live"): Zeilen in `order_briefs` der letzten dreissig Tage, deren E-Mail nicht in
-     `ops/ours.txt` steht. Heisst: fremde Angaben, die bis zur Kasse gekommen sind.
-   - `human_orders_paid_30d`: `checkouts` mit `status = 'paid'`, `provider = 'stripe'`,
-     `settled_at` in dreissig Tagen, verknuepft mit `order_briefs`, E-Mail nicht unsere.
-   - `human_orders_pending_30d`: dieselbe Grundgesamtheit mit `status = 'pending'` und aelter als
-     eine Stunde. Ohne Webhook bucht nur die Rueckkehr auf `/katalog/danke` (Skeptiker, HAN-24);
-     wer den Tab schliesst, bleibt `pending`. Diese Zahl macht eine Null in
-     `human_orders_paid_30d` von Blindheit unterscheidbar.
-   Gegenprobe im Test in beide Richtungen: eine gepflanzte fremde bezahlte `stripe`-Zeile zaehlt
-   in beiden Feldern; dieselbe mit `@postyourprice.com` zaehlt in keinem; dieselbe fremde als
-   `stripe_test` zaehlt in `order_briefs_30d`, nicht in `human_orders_paid_30d`.
-9. **`ops/traffic.sh`** zaehlt fremde Adressen mit `GET /katalog/bestellen` (Status 200) als
-   `order_page_opened`, mit je einer Fixture im `--selftest` fuer "fremd zaehlt" und "eigene IP
-   zaehlt nicht". Ohne diese Zahl ist die zweite widerlegende Messung (Gespraech geoeffnet, keiner
-   an der Kasse) nicht lesbar.
-
-10. **Test gegen die Gutschrift:** ein Angebot mit E-Mail, bezahlt und abgerechnet, erzeugt keine
-    Zeile in `ledger` und keine in `wallets`; die Gegenprobe, ein Topup mit `address`, erzeugt
-    genau eine.
+1. **`reconcileCheckouts(db, provider, now)`** in `src/checkout/index.ts`. Liest alle Zeilen mit
+   `status = 'pending'`, `provider = provider.name` und `created_at` aelter als zwei Minuten und
+   juenger als 48 Stunden, hoechstens 100 je Lauf, aelteste zuerst. Fuer jede ruft es
+   `settleCheckout(db, provider, { session_id: reference })` und faengt jeden `CheckoutError` einzeln
+   ab, damit eine kaputte Zeile die anderen nicht aufhaelt. Rueckgabe: je eine Zahl fuer `paid`,
+   `abandoned`, `open`, `error`. Eine Logzeile je Lauf mit genau diesen vier Zahlen, keine Referenz,
+   keine E-Mail. Laeuft nicht, wenn `checkoutEnabled()` falsch ist oder kein Provider da ist.
+2. **`src/index.ts`**: einmal beim Start, danach alle fuenf Minuten, neben `cleanup`, mit
+   `.unref()`. Ein Fehler im Lauf landet im Log und beendet den Prozess nicht.
+3. **`src/payments/stripe.ts`**: `begin` setzt `expires_at` auf jetzt plus 60 Minuten. Damit ist
+   eine abgebrochene Session nach spaetestens 65 Minuten `abandoned` statt nach 24 Stunden. Test
+   gegen gestelltes `fetch`: `expires_at` steht im Body, liegt zwischen 30 Minuten und 24 Stunden
+   (Stripes Grenzen) und in keiner URL.
+4. **Der Live-Schalter.** `checkoutEnabled()` nimmt zusaetzlich `isStripeLiveKey`. Damit ist ein
+   Live-Schluessel allein genug, und das ist Absicht: den Schluessel setzt Matthias, und genau das
+   ist der Schalter. Die Zeile heisst dann `stripe`, nicht `stripe_test` (`stripeProviderName`, gibt
+   es schon), und die Testmodus-Zeile auf Katalog, Bestellseite und Danke-Seite verschwindet.
+   **Der Test `stays off with a live key alone` wird ersetzt, nicht gelockert:** HAN-17 hat ihn
+   geschrieben mit dem Satz "Live needs a switch of its own, set by a later goal". Dies ist dieses
+   Goal. Der neue Test haelt beide Richtungen: `sk_live_`/`rk_live_` schaltet ein und benennt die
+   Zeile `stripe`; kein Schluessel, `pk_live_`, `sk_liv_x` und ein leerer String schalten nicht
+   ein. Das steht so im Commit.
+5. **Tests fuer den Abgleich, gegen gestelltes `fetch`, Gegenprobe in beide Richtungen:**
+   - bezahlte Session, niemand ruft `/katalog/danke`: nach einem Lauf `paid`, `settled_at` gesetzt;
+   - abgelaufene Session: `abandoned`, kein `settled_at`;
+   - offene Session: bleibt `pending`, und ein zweiter Lauf fragt sie wieder;
+   - eine Zeile mit `provider = 'stripe_test'`, gelesen mit einem Live-Provider: wird nicht gefragt
+     (sonst geht der Test-Bestand nach dem Schluesseltausch mit dem Live-Schluessel an Stripe);
+   - Stripe antwortet 500 fuer eine Zeile: die naechste Zeile wird trotzdem gebucht;
+   - Abgleich und `/katalog/danke` fuer dieselbe Session: genau ein `settled_at`, und fuer einen
+     Topup mit `address` genau eine Zeile in `ledger` (die Gegenprobe gegen doppelte Gutschrift);
+   - Zeile juenger als zwei Minuten oder aelter als 48 Stunden: wird nicht gefragt.
+6. **`ops/stripe-sessions.cjs`**, die Messung der Zahl. Laeuft wie `ops/db-report.cjs` per stdin im
+   Container, liest `CP_STRIPE_SECRET_KEY` aus der Umgebung und gibt ihn nie aus. Holt ueber
+   `GET /v1/checkout/sessions` (Seiten zu 100, `created[gte]`) alle Sessions eines Fensters,
+   Voreinstellung 30 Tage, behaelt nur die mit `metadata[offer]` aus `OFFERS` **oder** einer
+   `success_url` auf `/katalog/danke` von `postyourprice.com`, und vergleicht mit `checkouts`.
+   Ausgabe nur Zahlen: `stripe_paid`, `booked_paid`, `paid_not_booked`, `paid_no_row`,
+   `booked_not_paid`, plus Fenster und Modus (`test`/`live`). Keine E-Mail, keine Session-ID.
+   Exit 1, wenn `paid_not_booked`, `paid_no_row` oder `booked_not_paid` groesser 0 ist.
+   `--selftest` mit einer Fixture statt Stripe (`CP_STRIPE_SESSIONS_FIXTURE`), in beide Richtungen:
+   eine gepflanzte bezahlte Session ohne Buchung macht Exit 1, dieselbe gebucht macht Exit 0, eine
+   fremde Session (anderes `metadata`, andere `success_url`) zaehlt nicht mit. Laeuft in
+   `ops/check-all.sh` mit.
 
 ### Done, gemessen und nicht behauptet
 
-1. `pnpm test` und `pnpm e2e` gruen, bestehende Checkout-Tests ohne gelockerte Assertion. Wo ein
-   Test heute `angebot` allein postet und 303 erwartet, ist genau das jetzt der Fehlerfall; der
-   Test wird auf die neue Pflicht umgestellt und ein neuer haelt die 400 fest. Das ist keine
-   Lockerung, sondern der Auftrag, und steht so im Commit.
-2. Von aussen: `curl -d angebot=rede-zum-fest https://postyourprice.com/katalog/kaufen` antwortet
-   400, und die Zahl der Zeilen in `checkouts` aendert sich dabei nicht (vorher und nachher lesen).
-3. Vorfuehrung im Browser: Katalog, Bestellseite, Angaben und `vorfuehrung@postyourprice.com`,
-   Testkarte `4242 4242 4242 4242`, Danke-Seite. Danach genau eine neue Zeile `paid`,
-   `stripe_test`, mit Zeile in `order_briefs`, beide Felder nicht leer. Die Stripe-Kassenseite
-   zeigt die E-Mail vorbelegt.
-4. `SELECT count(*) FROM checkouts c LEFT JOIN order_briefs b USING (reference) WHERE
-   c.created_at > <Deploy> AND c.offer IS NOT NULL AND b.reference IS NULL` ist **0**. Das ist
-   Zahl 1 des Auftrags, aber sie ist per Bau erfuellt (Zahl 2 laesst keine Zeile ohne Angaben
-   zu) und damit ein Test, keine Zahl. Sie bleibt als Wache gegen einen zweiten Code-Pfad.
-   **Die Zahl, die zaehlt, ist eine Anzahl:** `order_briefs_30d`, fremde Zeilen mit Angaben, die
-   die Mindestregeln bestanden haben. Heute 0, und bis ein Kanal zu deutschsprachigen Kaeufern
-   steht, bleibt sie 0 unter jeder Hypothese.
-5. `ops/db-report.cjs` in Produktion: `order_briefs_30d = 0`, `human_orders_paid_30d = 0`, obwohl
-   die Vorfuehrung aus 3 in der Tabelle steht. Das ist die Gegenprobe gegen die eigene Zeile.
+1. `pnpm test` und `pnpm e2e` gruen, kein `expect` entfernt ausser dem in 4 benannten, das durch
+   einen strengeren ersetzt ist.
+2. Nach dem Deploy, Testmodus, von Betrieb: **eine bezahlte Session ohne Rueckkehr.** Vorfuehrung
+   im Browser mit `vorfuehrung@postyourprice.com` und Karte 4242, die Weiterleitung auf
+   `/katalog/danke` wird im Browser abgefangen und nie geladen (Access-Log: kein
+   `GET /katalog/danke` fuer diese Session). Nach hoechstens sieben Minuten steht die Zeile `paid`.
+3. **Eine abgebrochene Session wird nicht gebucht.** Zweite Vorfuehrung bis zur Stripe-Seite, dann
+   `POST /v1/checkout/sessions/<id>/expire` im Container mit dem Testschluessel. Nach hoechstens
+   sieben Minuten steht die Zeile `abandoned`, `settled_at` leer.
+4. `ops/stripe-sessions.cjs` in Produktion: `paid_not_booked = 0`, `paid_no_row = 0`,
+   `booked_not_paid = 0`, Exit 0, und `--selftest` gruen.
+5. Die zwoelf und mehr alten `stripe_test`-Zeilen aus Goal 20 und 21, die heute `pending` sind:
+   nach dem ersten Lauf stehen die unter 48 Stunden als `abandoned` oder `paid`, und die Zahlen im
+   Log stimmen mit einer Abfrage auf `checkouts` vorher und nachher ueberein.
+
+**Widerlegt, wenn:** nach dem Deploy eine bezahlte Session in Stripe steht, die in `checkouts`
+fehlt oder dort nicht `paid` ist, laenger als zehn Minuten nach der Zahlung. Gemessen mit
+`ops/stripe-sessions.cjs`.
 
 ### Was dieses Goal nicht weiss und nicht tut
 
-- **Kein Webhook.** Bezahlt wird nur gebucht, wenn der Kaeufer auf `/katalog/danke` zurueckkommt.
-  Im Testmodus reicht das. Vor dem Live-Schalter braucht es einen Webhook oder das Nachfragen
-  offener Sessions; das ist nicht dieses Goal und liegt beim CEO in HAN-22 (Besitzer und Frist).
-- **Ob die Angaben fuer die Lieferung reichen**, prueft erst der naechste Auftrag (Bekommen):
-  `ops/compete.ts` braucht einen `bounty`, und die Verbindung `checkouts` zu `bounties` ist hier
-  ausdruecklich nicht Teil.
-- **Die widerlegende Messung "fremde oeffnen, keiner kauft" widerlegt vor einem Kanal nichts**,
-  weil bei rund vier fremden Besuchern aus der falschen Zielgruppe bis zum 10.10. beide Ausgaenge
-  gleich wahrscheinlich sind (Skeptiker, HAN-24). Eine Null am 08.10. ist kein Beleg fuer die
-  Huerde.
-
-- **Es ist kein Gespraech.** Eine feste Rueckfrage, keine Nachfrage, die auf die Antwort
-  eingeht. Ob das reicht, damit die Lieferkette drei brauchbare Fassungen schreibt, weiss niemand,
-  weil es die Lieferung noch nicht gibt. Der naechste Auftrag (Bekommen) zeigt es.
-- **Niemand schickt heute etwas an die E-Mail.** Sie wird gespeichert, nicht benutzt. Keine
-  Bestaetigungsmail, kein Versand.
-- Ob Stripe die E-Mail ohne `customer_email` ohnehin einsammelt, ist egal: bei uns kam sie bisher
-  nicht an.
-- Nicht Teil: `versions_per_order_median`, `orders_with_a_round_30d`, die Verbindung von
-  `checkouts` zu `bounties`.
-- `email-domain` als Merkmal ist eindeutig nur fuer Domains, die uns gehoeren. Ein eigener Kauf
-  mit einer privaten Adresse faellt durch. Deshalb ist die Regel fuer Vorfuehrungen Pflicht, und
-  jede Ausnahme kommt als `email`-Zeile in `ops/ours.txt`, bevor die Vorfuehrung laeuft.
+- **Geliefert wird nach einer echten Zahlung nichts.** Es gibt keine Lieferung, keine Mail an den
+  Kaeufer, keine Verbindung von `checkouts` zu `bounties` (Goal 21, "nicht Teil"). Der Code nimmt
+  ab diesem Goal Geld an; ob Matthias den Schluessel setzt, bevor Bekommen steht, ist seine
+  Entscheidung, und der Schreiber muss ihm genau das sagen. Mein Rat: den Schluessel erst setzen,
+  wenn eine bezahlte Bestellung zu drei Fassungen fuehrt, oder wenn bis dahin von Hand geliefert
+  wird und jemand die Zeilen liest.
+- **Wer Verkaeufer ist, wenn Stripe live ueber HTC laeuft**, steht offen bei Matthias (Goal 21,
+  Blockers). Impressum und `/datenschutz` nennen ihn privat. Das haengt am Schluessel, nicht am
+  Code.
+- **Ob das HTC-Konto noch andere Checkout Sessions fuehrt**, weiss ich nicht. Deshalb filtert die
+  Messung nach `metadata[offer]` und `success_url`. Eine Session, die weder das eine noch das andere
+  traegt, faellt aus beiden Seiten heraus; wir setzen beides immer, also sollte es keine geben.
+- **`paid_no_row` kann der Code nicht heilen**, nur melden: eine Session ohne Zeile hat keine
+  Angaben und keine E-Mail bei uns, und die Zeile nachzutragen wuerde Done 4 von Goal 21 brechen.
+  Bei einem Treffer hilft nur ein Mensch mit dem Stripe-Dashboard. Wie oft das vorkommt: nie
+  gemessen, heute gibt es kein Werkzeug dafuer.
+- **Asynchrone Zahlarten** bleiben aus (`payment_method_types[0]=card`, HAN-17). Der Abgleich
+  koennte sie buchen, aber das ist nicht getestet.
+- Nicht Teil: ein Webhook, eine Bestaetigungsmail, Erstattungen (`refunded` bleibt bei uns `paid`).
 
 ### Blockers
-Keine mehr. Was die Antworten verlangt haben und wie es gebaut ist:
-- **Skeptiker, HAN-25:** die Kreuzprobe E-Mail gegen IP steht in `ops/traffic.sh`
-  (`CP_ORDER_BRIEFS_30D`, FINDING, wenn `order_briefs_30d` die fremden 303 uebersteigt);
-  `order_page_opened` zaehlt nur mit Seitenskript, Accept-Language und ohne Crawler-Pfade; die
-  Bestellseite ist `noindex`, der Link `rel="nofollow"`; `ops/ours.txt` fuehrt die RFC-2606-Domains;
-  der Diff an `test/stripe-checkout.test.ts` entfernt kein `expect`; alle Felder `required`;
-  Done 4 mit `c.offer IS NOT NULL`; keine Adresse und kein Text in Report oder Log.
-- **Recht, HAN-26:** der Satz unter dem E-Mail-Feld wortgleich, `/datenschutz` im deutschen
-  Rahmen, verlinkt im Fuss beider Rahmen; Loeschung stuendlich, unbezahlt 30 Tage ab
-  `created_at`, bezahlt 120 Tage ab `settled_at`; die Seite liest beide Fristen aus dem Code.
-- **Zwei-Woerter-Regel:** woertlich "zwei Woerter aus Buchstaben" lehnt das eigene Beispiel
-  "70. Geburtstag" ab. Gebaut ist: zwei Folgen aus mindestens zwei Buchstaben oder Ziffern,
-  mindestens ein Buchstabe. "x x" und "xxxxxxxxxx" fallen weiter durch.
-- **Offen fuer Matthias, nicht fuer den 01.10.:** wer Verantwortlicher und Verkaeufer ist, wenn
-  Stripe live ueber HTC laeuft. Impressum und `/datenschutz` nennen bis dahin Matthias privat.
+Das Urteil des Skeptikers (Kind von HAN-30).
 
-(Historie: Goal 20, der Kartenweg im Stripe-Testmodus, in
-`goals/2026-09-29-goal-20-kartenweg.md`.)
+(Historie: Goal 21, Angaben und E-Mail vor der Kasse, in `goals/2026-09-29-goal-21-angaben.md`.)
