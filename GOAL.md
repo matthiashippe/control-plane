@@ -1,137 +1,131 @@
 # GOAL.md
 
 ## Status
-ACTIVE. Punkte 1 bis 7 und 9 gebaut (HAN-18), mit den Auflagen des Skeptikers aus HAN-17, siehe
-"Nachtrag" unten. Punkt 8 und der Deploy liegen bei Betrieb.
+VORSCHLAG, beim Skeptiker. Gebaut wird erst nach seinem Urteil (HAN-23).
 
 ## Active Objective
 
-**Goal 20: Ein Mensch kann ein Angebot aus dem Katalog mit Karte bezahlen, im Stripe-Testmodus.**
+**Goal 21: Wer kaufen will, sagt zuerst, was er braucht, und gibt eine E-Mail an. Erst dann geht
+es zu Stripe.**
 
-Nennt ausdruecklich **`src/payments/**`**, weil dort der Stripe-Adapter liegt und
-`loop-constraints.md` den Pfad nur so oeffnet. `src/auth/**` bleibt zu.
+Nennt ausdruecklich **`src/payments/stripe.ts`**, weil `customer_email` dort in den Body der
+Checkout Session kommt und `loop-constraints.md` den Pfad nur so oeffnet. Sonst nichts unter
+`src/payments/**`, und `src/auth/**` bleibt zu.
 
-Auftrag: HAN-16. Glied: **Bezahlen**. Frist: gebaut und getestet bis 01.10. 18:00 UTC, live bis
-02.10. 12:00 UTC (Ziel aus `ZIELE.md`: Kartenweg antwortet live bis 02.10.).
+Auftrag: HAN-23 (CEO, Entscheidung aus HAN-22). Glied: **Sagen**. Frist: live bis 01.10.2026,
+18:00 UTC.
 
 ### Was gemessen ist, 29.09.2026
 
-- Beide Schluessel liegen auf der VM, in `/opt/control-plane/.env` und in
-  `/opt/control-plane/repo/deploy/.env`, je zwei Zeilen `CP_STRIPE_*`, Praefix `sk_test` und
-  `pk_test`. Gelesen wurden nur Name und Praefix, nie der Wert.
-- **Der laufende Container kennt sie nicht.** `docker inspect` zeigt keine Variable mit `STRIPE`
-  im Namen (Container erstellt 29.09. 15:37:53 UTC). Erst der naechste Deploy, der den Container
-  neu erstellt, bringt sie hinein. Ohne diese Pruefung haette der erste Kaufversuch live mit
-  "nicht eingeschaltet" geantwortet, und die Suche waere im Code gelandet.
-- `checkouts` hat in Produktion **null Zeilen**. Der Umbau der Tabelle verschiebt also nichts.
-- Die CSP in `deploy/Caddyfile` traegt `form-action 'self'`. Chrome wendet `form-action` auch auf
-  die Weiterleitung nach dem Absenden an, ein Formular auf `/katalog/kaufen` mit 303 zu
-  `checkout.stripe.com` wird also blockiert, bis die Quelle dort steht.
-- Es gibt kein Webhook-Geheimnis (`whsec_`) auf der VM, nur die zwei Schluessel.
+- `checkouts` in Produktion: 10 Zeilen, alle `stripe_test`, alle von uns, 0 davon mit Angaben
+  oder Kontakt, weil es keine Spalte dafuer gibt (HAN-21).
+- Der Knopf unter jedem Angebot schickt nur `angebot` und leitet sofort zu Stripe
+  (`src/public/catalog.ts`, `buyForm`).
+- **Den Entwurf der fuenf Bildschirme gibt es nicht.** HAN-10 hat Repo, Git und Paperclip
+  durchsucht, der Workflow `der-mensch` ist nie gelaufen. Deshalb wird die kleinste Fassung
+  gebaut, die der Auftrag zulaesst: eine gezielte Rueckfrage je Angebot als Textfeld plus E-Mail.
+  Kein Chat, keine Nachfragen des Systems. Das fehlt und steht unten.
+- Unsere eigenen Kaeufer lassen sich heute nicht erkennen: `ops/ours.*` gibt es nicht, und
+  `checkouts` kennt keinen Kaeufer.
 
 ### Die Arbeit, in dieser Reihenfolge
 
-1. **Schema.** `checkouts.address` wird nullable, dazu die Spalte `offer TEXT` und
-   `CHECK (address IS NOT NULL OR offer IS NOT NULL)`. SQLite kann `NOT NULL` nicht per
-   `ALTER` entfernen: Tabelle neu anlegen, kopieren, umbenennen, in einer Transaktion, nur wenn
-   `PRAGMA table_info(checkouts)` fuer `address` noch `notnull = 1` zeigt. Test: eine Datenbank mit
-   dem alten Schema und einer Zeile wird migriert, die Zeile ist danach unveraendert da, und ein
-   zweiter Start migriert nicht noch einmal.
-2. **Settle ohne Wallet.** `settleCheckout` bucht wie bisher Credits, wenn die Zeile eine Adresse
-   hat. Hat sie nur ein Angebot, setzt es `status = 'paid'` und bucht nichts ins Ledger, weil es
-   kein Konto gibt, dem etwas gutgeschrieben wird. Credits bleiben nicht auszahlbar.
-3. **`read` wird asynchron.** Der Stripe-Adapter kann nicht aus dem Rueckweg allein wissen, ob
-   bezahlt wurde; er fragt Stripe. Der Fake folgt. Die zehn Tests in `test/checkout.test.ts`
-   behalten ihre Assertions wortgleich, es kommt nur `await` dazu. Insbesondere
-   "ignores an amount the callback tries to name" bleibt unveraendert.
-4. **Der Adapter, `src/payments/stripe.ts`.** Kein SDK, `fetch` gegen `api.stripe.com/v1`.
-   - `begin`: `POST /v1/checkout/sessions`, `mode=payment`, `currency=eur`, ein Posten mit Name
-     und Preis aus `OFFERS`, `success_url` = `${CP_PUBLIC_URL}/katalog/danke?session_id={CHECKOUT_SESSION_ID}`,
-     `cancel_url` = `${CP_PUBLIC_URL}/katalog`. Referenz ist die Session-ID, Ziel ist `session.url`.
-   - `read`: `GET /v1/checkout/sessions/{id}` mit dem Geheimschluessel, `paid` genau dann, wenn
-     `payment_status === "paid"`.
-   - **Der Betrag kommt weiter aus der Zeile.** Zusaetzlich verweigert das Settle mit 409, wenn
-     Stripe fuer die Session einen anderen Betrag oder eine andere Waehrung meldet als die Zeile.
-     Diese Pruefung kann nur ablehnen, nie gutschreiben.
-   - **Der Providername kommt aus dem Schluessel:** `stripe_test` bei `sk_test_`, `stripe` bei
-     `sk_live_`. Damit traegt jede Zeile selbst, ob echtes Geld geflossen ist.
-   - Tests gegen ein gestelltes `fetch`, nie gegen Stripe: Session angelegt mit dem Preis aus der
-     Konstante, `unpaid` bucht nichts, ein Betrag, der von der Zeile abweicht, ergibt 409, ein
-     Schluessel `sk_live_` ergibt den Namen `stripe`.
-5. **Der Schalter.** `checkoutEnabled()` ist an, wenn `CP_CHECKOUT=1` oder
-   `CP_STRIPE_SECRET_KEY` gesetzt ist. Der Schluessel ist Matthias' Schalter, und
-   `CP_CHECKOUT` steht in `deploy/**`, das wir nicht anfassen. Die zwei Tests unter "while it is
-   switched off" bleiben unveraendert und laufen mit beiden Variablen leer; neu kommt einer dazu,
-   der nur mit dem Schluessel an ist.
-6. **Zwei Routen, beide ausserhalb von `/v1`,** damit die `has()`-Regel der Auth-Middleware nicht
-   beruehrt wird:
-   - `POST /katalog/kaufen`, Formularfeld `angebot` mit der ID aus `OFFERS` (neu: je Angebot ein
-     festes `id`). Der Preis kommt aus der Konstante, nie aus dem Formular. Antwort 303 zu Stripe.
-     Unbekanntes Angebot: 400. Rate-Limit wie bei den anderen oeffentlichen POSTs.
-   - `GET /katalog/danke?session_id=...` ruft das Settle auf und zeigt eine deutsche Seite in drei
-     Zustaenden: bezahlt, nicht bezahlt (mit Link zurueck zum Katalog), unbekannt. Neu laden bucht
-     nichts doppelt.
-7. **Der Knopf.** Unter jedem Angebot auf `/katalog` ein Formular mit einem Knopf "Kaufen". Solange
-   der Schluessel mit `sk_test_` beginnt, steht darueber: "Testbetrieb: Es wird kein Geld
-   abgebucht." Ist der Kartenweg aus, gibt es den Knopf nicht.
-8. **`deploy/Caddyfile`:** `form-action 'self' https://checkout.stripe.com`. Davor
-   `caddy validate`, danach `--force-recreate` (Bind-Mount). Das macht Betrieb.
-9. **Der Messweg fuer die Zahl.** `ops/ziele.sh` bekommt `human_revenue_30d_cents` aus
-   `checkouts`: Summe `cents`, `status = 'paid'`, `provider = 'stripe'`, `offer IS NOT NULL`,
-   `settled_at` in den letzten dreissig Tagen. Gegenprobe im Selbsttest in beide Richtungen: eine
-   gepflanzte Zeile `stripe` zaehlt, dieselbe mit `stripe_test` zaehlt nicht. Damit ist eine
-   Vorfuehrung mit Testkarte strukturell keine Bestellung eines Menschen (Sperrliste 0 und 2).
-
-### Nachtrag: gebaut mit den Auflagen aus HAN-17 (29.09.2026)
-
-Der Skeptiker hat Punkt 4 und 5 in dieser Fassung widerlegt; gebaut ist die strengere Form:
-
-- Der Name ist `stripe` nur bei `sk_live_` oder `rk_live_`, jedes andere Praefix ergibt
-  `stripe_test` (auch `rk_test_`). Beim Settle muss `livemode` aus Stripes Antwort zum Namen der
-  Zeile passen, sonst 409.
-- Der Schalter geht nur mit einem Testschluessel (`sk_test_`, `rk_test_`) oder `CP_CHECKOUT=1` an.
-  Ein Live-Schluessel allein schaltet nichts ein; Live braucht einen eigenen Schalter.
-- Settle liest zuerst die Zeile und fragt Stripe nur fuer eine Session, die in `checkouts` steht.
-  `session_id` muss `^cs_(test|live)_[A-Za-z0-9]+$` sein. `/katalog/kaufen` und `/katalog/danke`
-  stehen im Rate-Limit.
-- `payment_method_types[0]=card`. `abandoned` nur bei `status = expired`, sonst bleibt `pending`.
-- Eine Angebotszeile wird mit `UPDATE ... WHERE status != 'paid'` bezahlt gesetzt, zwei
-  gleichzeitige Reloads zaehlen einmal.
-- Punkt 9 steht in `ops/db-report.cjs` (dort liest `ops/ziele.py` die Zahl), die Gegenprobe im Test
-  und in `ops/ziele.sh --selftest`. Die Kartenprobe in `ops/ziele.sh` fragt jetzt
-  `POST /katalog/kaufen` und nicht mehr die nie gebaute Route `/v1/orders/checkout`.
-
-"Strukturell keine Bestellung eines Menschen" gilt nur fuer die Testkarte. Mit einem
-Live-Schluessel zaehlt jeder eigene Kauf mit echter Karte als `stripe`. Vor Live braucht es ein
-Ausschlussmerkmal fuer eigene Kaeufe in `ops/`, mit Gegenprobe in beide Richtungen.
+1. **Tabelle `order_briefs`**, verknuepft ueber die Referenz, in `src/db.ts`:
+   ```sql
+   CREATE TABLE IF NOT EXISTS order_briefs (
+     reference  TEXT PRIMARY KEY REFERENCES checkouts(reference),
+     brief      TEXT NOT NULL CHECK (length(trim(brief)) > 0),
+     email      TEXT NOT NULL CHECK (email LIKE '%_@_%._%'),
+     created_at TEXT NOT NULL
+   );
+   ```
+   Eine eigene Tabelle statt zwei Spalten an `checkouts`, weil SQLite an eine bestehende Tabelle
+   keine `NOT NULL`-Spalte ohne Default haengt und die zehn alten Zeilen sonst die Regel brechen.
+   Die `CHECK`s halten Zahl 1 auch dann, wenn ein spaeterer Code-Pfad die Pruefung vergisst.
+2. **`beginOfferCheckout(db, provider, { offerId, brief, email })`** in `src/checkout/index.ts`.
+   Reihenfolge: eingeschaltet, Angebot bekannt, `brief` nach `trim` 1 bis 4000 Zeichen, `email`
+   nach `trim` und Kleinschreibung hoechstens 254 Zeichen und `^[^\s@]+@[^\s@]+\.[^\s@]+$`. Jeder
+   Fehler davon wirft 400 **bevor** Stripe gefragt und bevor eine Zeile geschrieben wird. Danach
+   `provider.begin` mit der E-Mail, dann `checkouts` und `order_briefs` in **einer** Transaktion.
+   Die alte Signatur mit nur der Angebots-ID verschwindet, damit der alte Weg nicht mehr erreichbar
+   ist, auch nicht aus Code.
+3. **`src/payments/stripe.ts`:** `begin` nimmt `email` und setzt `customer_email` im
+   Form-Body des `POST /v1/checkout/sessions`. Nie in `success_url` oder `cancel_url`. Test gegen
+   gestelltes `fetch`: `customer_email` steht im Body, und keine der beiden URLs enthaelt `@` oder
+   die Adresse.
+4. **Die Bestellseite `GET /katalog/bestellen?angebot=<id>`**, deutsch, im Rahmen von `/katalog`.
+   Oben Name und Preis des Angebots, dann die Rueckfrage des Angebots als Beschriftung eines
+   Textfelds `angaben`, dann ein Feld `email` (`type=email`, `required`, `autocomplete=email`),
+   ein Satz zur Verwendung der Adresse (Wortlaut von Recht, siehe Blockers), der Knopf
+   "Weiter zur Bezahlung". Das Formular geht per POST an `/katalog/kaufen`, die ID als verstecktes
+   Feld. Ohne gueltige ID oder mit ausgeschaltetem Kartenweg: 303 nach `/katalog`, damit die
+   Adresse keine eigene Seite fuer die Sitemap ist (wie `/katalog/danke`).
+   Die drei Rueckfragen stehen als Feld `ask` an jedem Angebot in `OFFERS`, eine Zeile je Angebot,
+   Entwurf:
+   - Rede zum Fest: "Für wen ist die Rede, zu welchem Anlass, und was soll darin vorkommen? Namen, eine gemeinsame Geschichte, wie lang sie sein darf."
+   - Anschreiben zur Bewerbung: "Um welche Stelle bei welcher Firma geht es, und was bringen Sie mit? Fügen Sie die Stellenanzeige gern hier ein."
+   - Text über Ihr Angebot: "Was bieten Sie an, für wen, und wo soll der Text stehen: Aushang, Faltblatt oder Internetseite?"
+5. **Der Knopf auf `/katalog`** wird ein Link auf die Bestellseite ("Bestellen"), kein Formular
+   mehr. `POST /katalog/kaufen` ohne `angaben` oder ohne `email` antwortet 400 mit einem deutschen
+   Satz und legt keine Zeile an.
+6. **`/katalog/bestellen` kommt ins Rate-Limit** neben `/katalog/kaufen` und `/katalog/danke`.
+7. **`ops/ours.txt`**: die Liste eigener Kaeufer, je Zeile `email <adresse>` oder
+   `email-domain <domain>`, mit Datum und Grund. Erste Eintraege: `email-domain postyourprice.com`,
+   `email-domain handsel.dev`. Eine Vorfuehrung benutzt immer eine Adresse unter
+   `@postyourprice.com`. Keine persoenliche Adresse von Matthias in dieser Datei, weil das Repo
+   oeffentlich ist. `ops/db-report.cjs` traegt dieselbe Liste als Kopie (es laeuft per stdin im
+   Container und kann `ops/` nicht lesen), und ein Test haelt beide gleich, wie
+   `test/ours.test.ts` es fuer die Wallets tut.
+8. **`ops/db-report.cjs`, zwei Felder unter `market`:**
+   - `order_chats_30d`: Zeilen in `order_briefs` der letzten dreissig Tage, deren E-Mail nicht in
+     `ops/ours.txt` steht. Heisst: fremde Angaben, die bis zur Kasse gekommen sind.
+   - `human_orders_paid_30d`: `checkouts` mit `status = 'paid'`, `provider = 'stripe'`,
+     `settled_at` in dreissig Tagen, verknuepft mit `order_briefs`, E-Mail nicht unsere.
+   Gegenprobe im Test in beide Richtungen: eine gepflanzte fremde bezahlte `stripe`-Zeile zaehlt
+   in beiden Feldern; dieselbe mit `@postyourprice.com` zaehlt in keinem; dieselbe fremde als
+   `stripe_test` zaehlt in `order_chats_30d`, nicht in `human_orders_paid_30d`.
+9. **`ops/traffic.sh`** zaehlt fremde Adressen mit `GET /katalog/bestellen` (Status 200) als
+   `order_page_opened`, mit je einer Fixture im `--selftest` fuer "fremd zaehlt" und "eigene IP
+   zaehlt nicht". Ohne diese Zahl ist die zweite widerlegende Messung (Gespraech geoeffnet, keiner
+   an der Kasse) nicht lesbar.
 
 ### Done, gemessen und nicht behauptet
 
-1. `pnpm test` gruen, `ops/ziele.sh --selftest` gruen, die zehn bestehenden Checkout-Tests mit
-   unveraenderten Assertions.
-2. Nach dem Deploy zeigt `docker inspect` im Container zwei Variablen `CP_STRIPE_*` (nur Namen).
-3. `curl -s -o /dev/null -w '%{http_code} %{redirect_url}' -d angebot=<id> https://postyourprice.com/katalog/kaufen`
-   liefert 303 auf `https://checkout.stripe.com/...`.
-4. Ein Kauf im Browser mit Stripes Testkarte `4242 4242 4242 4242` endet auf `/katalog/danke` mit
-   "bezahlt", und in `checkouts` steht genau eine Zeile `paid`, `provider = 'stripe_test'`,
-   `address IS NULL`, `cents` gleich dem Katalogpreis. Das ist eine Vorfuehrung und zaehlt nicht.
-5. `ops/ziele.sh` meldet danach `human_revenue_30d_cents` als Zahl, und zwar **0**. Das ist die
-   Gegenprobe zu 4: der Messweg existiert, und der eigene Testkauf taucht darin nicht auf.
+1. `pnpm test` und `pnpm e2e` gruen, bestehende Checkout-Tests ohne gelockerte Assertion. Wo ein
+   Test heute `angebot` allein postet und 303 erwartet, ist genau das jetzt der Fehlerfall; der
+   Test wird auf die neue Pflicht umgestellt und ein neuer haelt die 400 fest. Das ist keine
+   Lockerung, sondern der Auftrag, und steht so im Commit.
+2. Von aussen: `curl -d angebot=rede-zum-fest https://postyourprice.com/katalog/kaufen` antwortet
+   400, und die Zahl der Zeilen in `checkouts` aendert sich dabei nicht (vorher und nachher lesen).
+3. Vorfuehrung im Browser: Katalog, Bestellseite, Angaben und `vorfuehrung@postyourprice.com`,
+   Testkarte `4242 4242 4242 4242`, Danke-Seite. Danach genau eine neue Zeile `paid`,
+   `stripe_test`, mit Zeile in `order_briefs`, beide Felder nicht leer. Die Stripe-Kassenseite
+   zeigt die E-Mail vorbelegt.
+4. `SELECT count(*) FROM checkouts c LEFT JOIN order_briefs b USING (reference) WHERE
+   c.created_at > <Deploy> AND b.reference IS NULL` ist **0**. Das ist Zahl 1 des Auftrags und
+   zugleich die Messung, die ihn widerlegt, sobald sie nicht 0 ist.
+5. `ops/db-report.cjs` in Produktion: `order_chats_30d = 0`, `human_orders_paid_30d = 0`, obwohl
+   die Vorfuehrung aus 3 in der Tabelle steht. Das ist die Gegenprobe gegen die eigene Zeile.
 
 ### Was dieses Goal nicht weiss und nicht tut
 
-- **Kein Webhook.** Gebucht wird auf dem Rueckweg. Wer bezahlt und den Tab schliesst, bevor
-  `/katalog/danke` laedt, steht als `pending`, obwohl Stripe `paid` fuehrt. Im Testmodus kostet das
-  nichts. Vor Live braucht es einen Webhook mit `whsec_`, und der liegt in `.env*`, also bei
-  Matthias.
-- **Keine Bestellung dahinter.** Ein bezahltes Angebot ist heute eine Zeile, kein Auftrag, weil es
-  das Gespraech (Glied Sagen) noch nicht gibt. Deshalb ist Testmodus hier keine Schwaeche, sondern
-  die Grenze: live darf der Knopf erst gehen, wenn nach der Zahlung jemand liefert.
-- `payment_method_types[0]=card` wird ausdruecklich gesetzt (HAN-17). Ob Stripe das Konto damit
-  annimmt, zeigt erst der Testkauf bei Betrieb.
+- **Es ist kein Gespraech.** Eine feste Rueckfrage, keine Nachfrage, die auf die Antwort
+  eingeht. Ob das reicht, damit die Lieferkette drei brauchbare Fassungen schreibt, weiss niemand,
+  weil es die Lieferung noch nicht gibt. Der naechste Auftrag (Bekommen) zeigt es.
+- **Niemand schickt heute etwas an die E-Mail.** Sie wird gespeichert, nicht benutzt. Keine
+  Bestaetigungsmail, kein Versand.
+- Ob Stripe die E-Mail ohne `customer_email` ohnehin einsammelt, ist egal: bei uns kam sie bisher
+  nicht an.
+- Nicht Teil: `versions_per_order_median`, `orders_with_a_round_30d`, die Verbindung von
+  `checkouts` zu `bounties`.
+- `email-domain` als Merkmal ist eindeutig nur fuer Domains, die uns gehoeren. Ein eigener Kauf
+  mit einer privaten Adresse faellt durch. Deshalb ist die Regel fuer Vorfuehrungen Pflicht, und
+  jede Ausnahme kommt als `email`-Zeile in `ops/ours.txt`, bevor die Vorfuehrung laeuft.
 
 ### Blockers
-Keine fuer den Bau. Punkt 8 (`deploy/Caddyfile`) und der Deploy liegen bei Betrieb.
+- **Recht (CFO):** braucht die gespeicherte E-Mail einen Hinweis auf der Seite, und welchen
+  Wortlaut? Vor dem Ausrollen, nicht danach.
+- **Skeptiker:** Urteil ueber diesen Vorschlag, vor dem Bau.
 
-(Historie: Goal 19 in `goals/2026-09-29-goal-19-ein-dollar.md`. Dessen Messung, Punkt 3, laeuft
-bis 06.10. weiter und wird dort nachgetragen.)
+(Historie: Goal 20, der Kartenweg im Stripe-Testmodus, in
+`goals/2026-09-29-goal-20-kartenweg.md`.)
