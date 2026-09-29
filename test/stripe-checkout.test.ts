@@ -171,6 +171,61 @@ describe("the switch", () => {
   });
 });
 
+// Goal 22, HAN-38 conditions 1 and 2: live has a switch of its own, and CP_CHECKOUT=1 is not it.
+describe("the live switch", () => {
+  afterEach(() => {
+    delete process.env.CP_CHECKOUT_LIVE;
+  });
+
+  it("stays off with CP_CHECKOUT=1 next to a live key", () => {
+    process.env.CP_CHECKOUT = "1";
+    for (const k of [LIVE_KEY, "rk_live_placeholder"]) {
+      process.env.CP_STRIPE_SECRET_KEY = k;
+      expect(checkoutEnabled(), k).toBe(false);
+    }
+  });
+
+  it("goes on with a live key and CP_CHECKOUT_LIVE=1, and the row says stripe", async () => {
+    process.env.CP_STRIPE_SECRET_KEY = LIVE_KEY;
+    process.env.CP_CHECKOUT_LIVE = "1";
+    expect(checkoutEnabled()).toBe(true);
+    process.env.CP_STRIPE_SECRET_KEY = "rk_live_placeholder";
+    expect(checkoutEnabled()).toBe(true);
+    const d = openDb(":memory:");
+    const { checkout } = await beginOfferCheckout(d, stripe(stagedStripe(), LIVE_KEY), ORDER);
+    expect(row(d, checkout.reference).provider).toBe("stripe");
+  });
+
+  it("goes off again when CP_CHECKOUT_LIVE is anything but 1", () => {
+    process.env.CP_STRIPE_SECRET_KEY = LIVE_KEY;
+    for (const v of ["0", "true", "yes", ""]) {
+      process.env.CP_CHECKOUT_LIVE = v;
+      expect(checkoutEnabled(), v).toBe(false);
+    }
+  });
+
+  it("changes nothing next to a test key: on, and the row says stripe_test", async () => {
+    process.env.CP_STRIPE_SECRET_KEY = TEST_KEY;
+    process.env.CP_CHECKOUT_LIVE = "1";
+    expect(checkoutEnabled()).toBe(true);
+    const d = openDb(":memory:");
+    const { checkout } = await beginOfferCheckout(d, stripe(stagedStripe()), ORDER);
+    expect(row(d, checkout.reference).provider).toBe("stripe_test");
+  });
+
+  it("stays off without any key", () => {
+    delete process.env.CP_STRIPE_SECRET_KEY;
+    process.env.CP_CHECKOUT_LIVE = "1";
+    expect(checkoutEnabled()).toBe(false);
+  });
+
+  it("leaves CP_CHECKOUT=1 without a live key working as before", () => {
+    delete process.env.CP_STRIPE_SECRET_KEY;
+    process.env.CP_CHECKOUT = "1";
+    expect(checkoutEnabled()).toBe(true);
+  });
+});
+
 describe("the provider name, from the key", () => {
   it("says stripe only for a live key", () => {
     expect(stripeProviderName(LIVE_KEY)).toBe("stripe");
@@ -303,6 +358,44 @@ describe("the Stripe adapter against a staged fetch", () => {
       expect(() => settleCheckout(d, stripe(s), { session_id: id })).toThrow(CheckoutError);
     }
     expect(s.calls).toHaveLength(0);
+  });
+
+  it("lets a session expire after 60 minutes, set in the body and in no URL", async () => {
+    const s = stagedStripe();
+    const t0 = Math.floor(Date.now() / 1000);
+    await beginOfferCheckout(openDb(":memory:"), stripe(s), ORDER);
+    const expires = Number(s.calls[0].body!.get("expires_at"));
+    // Stripe refuses anything outside 30 minutes to 24 hours.
+    expect(expires - t0).toBeGreaterThanOrEqual(30 * 60);
+    expect(expires - t0).toBeLessThanOrEqual(24 * 60 * 60);
+    expect(expires - t0).toBeGreaterThanOrEqual(60 * 60 - 5);
+    expect(expires - t0).toBeLessThanOrEqual(60 * 60 + 5);
+    for (const c of s.calls) expect(c.url).not.toContain("expires_at");
+  });
+
+  it("gives up on a Stripe that never answers, as unreachable, after the timeout", async () => {
+    let seen: AbortSignal | undefined;
+    const silent = ((_: string, init?: RequestInit) =>
+      new Promise((_resolve, reject) => {
+        seen = init?.signal ?? undefined;
+        init?.signal?.addEventListener("abort", () => reject(init.signal!.reason));
+      })) as typeof fetch;
+    const p = stripeProvider({ secretKey: TEST_KEY, origin, fetch: silent, timeoutMs: 50 });
+    const started = Date.now();
+    await expect(beginOfferCheckout(openDb(":memory:"), p, ORDER)).rejects.toMatchObject({ code: "provider_unreachable", status: 502 });
+    expect(Date.now() - started).toBeLessThan(2_000);
+    expect(seen?.aborted).toBe(true);
+  });
+
+  it("does not time out a Stripe that answers in time", async () => {
+    const slow = stagedStripe();
+    const late = (async (input: string | URL, init?: RequestInit) => {
+      await new Promise((r) => setTimeout(r, 20));
+      return slow.fetchImpl(input, init);
+    }) as typeof fetch;
+    const p = stripeProvider({ secretKey: TEST_KEY, origin, fetch: late, timeoutMs: 1_000 });
+    const { redirect } = await beginOfferCheckout(openDb(":memory:"), p, ORDER);
+    expect(redirect).toMatch(/^https:\/\/checkout\.stripe\.com\//);
   });
 
   it("names no key in an error", async () => {

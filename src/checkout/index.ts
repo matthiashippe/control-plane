@@ -21,7 +21,7 @@
 
 import { postLedger, ensureWallet, MC_PER_CENT, type Db } from "../db.js";
 import { OFFERS, type Offer } from "../public/catalog.js";
-import { isStripeTestKey } from "../payments/stripe-key.js";
+import { isStripeLiveKey, isStripeTestKey } from "../payments/stripe-key.js";
 
 /** Every card payment here is in euro. The catalogue prices are euro cents. */
 export const CURRENCY = "eur";
@@ -57,15 +57,22 @@ export class CheckoutError extends Error {
 }
 
 /**
- * On with `CP_CHECKOUT=1`, or with a Stripe TEST key in `CP_STRIPE_SECRET_KEY`.
+ * On with `CP_CHECKOUT=1`, or with a Stripe TEST key in `CP_STRIPE_SECRET_KEY`. A LIVE key opens it
+ * only together with `CP_CHECKOUT_LIVE=1`, and nothing else does.
  *
  * The key is Matthias' switch, because `CP_CHECKOUT` sits in `deploy/**`, which the loop does not
  * touch. Only a test key counts (HAN-17, 2026-09-29): swapping `sk_test_` for `sk_live_` must not
- * open the card path for real money on the next restart without a commit and a test. Live needs a
- * switch of its own, set by a later goal, once somebody delivers after the payment.
+ * open the card path for real money on the next restart without a commit and a test.
+ *
+ * Live has its own switch since Goal 22 (HAN-38, condition 1 and 2, 2026-09-29). Before it,
+ * `CP_CHECKOUT=1` next to a live key opened the path for real money, because that flag was checked
+ * first and never looked at the key. So a live key now decides alone, and `CP_CHECKOUT=1` cannot
+ * stand in for `CP_CHECKOUT_LIVE=1`. Matthias sets that one after somebody delivers (GOAL.md).
  */
 export function checkoutEnabled(): boolean {
-  return process.env.CP_CHECKOUT === "1" || isStripeTestKey(process.env.CP_STRIPE_SECRET_KEY ?? "");
+  const key = process.env.CP_STRIPE_SECRET_KEY ?? "";
+  if (isStripeLiveKey(key)) return process.env.CP_CHECKOUT_LIVE === "1";
+  return process.env.CP_CHECKOUT === "1" || isStripeTestKey(key);
 }
 
 /**
@@ -344,6 +351,80 @@ async function finishSettle(db: Db, provider: CheckoutProvider, payload: unknown
     throw e;
   }
   return result(row.cents, false, "paid");
+}
+
+/** A pending row younger than this is left alone: the buyer is most likely still on Stripe's page. */
+export const RECONCILE_MIN_AGE_MS = 2 * 60 * 1000;
+/** At most this many rows are asked about per run, oldest first. */
+export const RECONCILE_BATCH = 100;
+
+/** One run of `reconcileCheckouts`, in rows. `skipped` are the ones the cap left for the next run. */
+export interface ReconcileResult {
+  paid: number;
+  abandoned: number;
+  open: number;
+  error: number;
+  skipped: number;
+}
+
+// Per database, so a run that hangs on the provider cannot be joined by the next tick (HAN-38,
+// condition 5). A WeakSet and not a flag, so two databases in one test file do not block each other.
+const reconciling = new WeakSet<Db>();
+
+/**
+ * Asks the provider about every pending row, so a payment is booked even when the buyer never
+ * comes back to /katalog/danke (Goal 22, 2026-09-29).
+ *
+ * Until then the only booking path was that page. A buyer who closed the tab after paying left the
+ * row `pending` for good, and a session nobody finished stayed `pending` too, so the table could not
+ * tell the two apart. This runs the same `settleCheckout` the page runs, with the same checks
+ * (amount from the row, mode from the provider, conditional UPDATE), so it can book nothing the
+ * page could not.
+ *
+ * No upper bound on age (HAN-38, condition 3): the 17 `stripe_test` rows pending since 30.08. have
+ * to resolve on the first run whenever it happens. Every error is caught per row, not only
+ * `CheckoutError` (condition 6): a thrown UPDATE on one row must not keep the next one from being
+ * booked. The log line carries counts only, never a reference or an address.
+ *
+ * Returns null when it did not run: switched off, or the previous run on this database is still
+ * going.
+ */
+export async function reconcileCheckouts(
+  db: Db,
+  provider: CheckoutProvider | null,
+  now: Date = new Date(),
+): Promise<ReconcileResult | null> {
+  if (!provider || !checkoutEnabled()) return null;
+  if (reconciling.has(db)) {
+    console.log("[reconcile] previous run still going, not starting another");
+    return null;
+  }
+  reconciling.add(db);
+  try {
+    const before = new Date(now.getTime() - RECONCILE_MIN_AGE_MS).toISOString();
+    const where = "status = 'pending' AND provider = ? AND created_at < ?";
+    const total = (db.prepare(`SELECT count(*) AS n FROM checkouts WHERE ${where}`).get(provider.name, before) as { n: number }).n;
+    const refs = db
+      .prepare(`SELECT reference FROM checkouts WHERE ${where} ORDER BY created_at ASC LIMIT ?`)
+      .all(provider.name, before, RECONCILE_BATCH) as { reference: string }[];
+    const r: ReconcileResult = { paid: 0, abandoned: 0, open: 0, error: 0, skipped: total - refs.length };
+    for (const { reference } of refs) {
+      try {
+        const s = await settleCheckout(db, provider, { session_id: reference });
+        if (s.status === "paid") r.paid += 1;
+        else if (s.status === "abandoned") r.abandoned += 1;
+        else r.open += 1;
+      } catch {
+        r.error += 1;
+      }
+    }
+    console.log(
+      `[reconcile] provider=${provider.name} paid=${r.paid} abandoned=${r.abandoned} open=${r.open} error=${r.error} skipped=${r.skipped}`,
+    );
+    return r;
+  } finally {
+    reconciling.delete(db);
+  }
 }
 
 /**

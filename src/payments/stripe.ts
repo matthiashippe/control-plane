@@ -27,7 +27,18 @@ export interface StripeOptions {
   /** Where Stripe sends the buyer back to, e.g. https://postyourprice.com. Read per call. */
   origin: () => string;
   fetch?: typeof fetch;
+  /** How long one call to Stripe may take before it counts as unreachable. Default 10 seconds. */
+  timeoutMs?: number;
 }
+
+/**
+ * How long a session stays payable (Goal 22, 2026-09-29).
+ *
+ * Stripe's default is 24 hours, and for that long nobody can tell a buyer who is still deciding from
+ * one who left. At 60 minutes, and a reconcile run every five, an abandoned session is `abandoned` in
+ * our table after at most 65. Stripe accepts 30 minutes to 24 hours.
+ */
+export const SESSION_TTL_MS = 60 * 60 * 1000;
 
 interface Session {
   id?: string;
@@ -42,21 +53,30 @@ interface Session {
 export function stripeProvider(opts: StripeOptions): CheckoutProvider {
   const name = stripeProviderName(opts.secretKey);
   const doFetch = opts.fetch ?? fetch;
+  const timeoutMs = opts.timeoutMs ?? 10_000;
 
   async function call(method: "GET" | "POST", path: string, body?: URLSearchParams): Promise<Session> {
-    let res: Response;
     try {
-      res = await doFetch(`${API}${path}`, {
+      const res = await doFetch(`${API}${path}`, {
         method,
         headers: {
           authorization: `Bearer ${opts.secretKey}`,
           ...(body ? { "content-type": "application/x-www-form-urlencoded" } : {}),
         },
         body,
+        // A Stripe that never answers would hold the reconcile run forever, and with it every run
+        // after it (HAN-38, condition 5). Aborting ends up in the catch below like any lost connection.
+        signal: AbortSignal.timeout(timeoutMs),
       });
-    } catch {
+      return await readJson(res);
+    } catch (e) {
+      if (e instanceof CheckoutError) throw e;
       throw new CheckoutError("provider_unreachable", 502, "The payment provider could not be reached.");
     }
+  }
+
+  // Inside the try above, so a body that stalls after the headers is cut by the same timeout.
+  async function readJson(res: Response): Promise<Session> {
     if (!res.ok) {
       // The status only. Stripe's error body can echo request details, and none of it helps a buyer.
       throw new CheckoutError("provider_error", 502, `The payment provider answered ${res.status}.`);
@@ -86,6 +106,8 @@ export function stripeProvider(opts: StripeOptions): CheckoutProvider {
         // Stripe replaces the literal {CHECKOUT_SESSION_ID} itself.
         success_url: `${origin}/katalog/danke?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${origin}/katalog`,
+        // Unix seconds, in the body like everything else here.
+        expires_at: String(Math.floor((Date.now() + SESSION_TTL_MS) / 1000)),
       });
       if (offer) form.set("metadata[offer]", offer.id);
       // Goal 21: the address the buyer gave on /katalog/bestellen, so Stripe's page shows it filled

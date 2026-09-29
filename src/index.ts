@@ -30,6 +30,9 @@ import { OpenRouterProvider, openRouterFromEnv } from "./inference/openrouter.js
 import { aliasesFromEnv, Catalog, providersFromEnv } from "./inference/proxy.js";
 import { payConfigFromEnv } from "./payments/pay.js";
 import { settlerFromEnv } from "./payments/settler.js";
+import { stripeFromEnv } from "./payments/stripe.js";
+import { reconcileCheckouts } from "./checkout/index.js";
+import { siteOrigin } from "./public/site.js";
 
 const port = Number(process.env.CP_PORT || 8402);
 const host = process.env.CP_HOST || "127.0.0.1";
@@ -81,12 +84,15 @@ const aliases = process.env.CP_MODEL_ALIASES
   ? aliasesFromEnv(process.env)
   : Object.assign({}, ...providers.map((p) => (p instanceof OpenRouterProvider ? p.defaultAliases() : {})));
 const catalog = providers.length ? new Catalog(providers, aliases) : null;
+// One Stripe adapter for the pages and the reconcile run, built exactly as createApp would build it.
+const checkout = stripeFromEnv(siteOrigin);
 const app = createApp({
   db,
   siwe: process.env.CP_SIWE_DOMAIN ? { domain: process.env.CP_SIWE_DOMAIN } : undefined,
   pay,
   settler,
   catalog,
+  checkout,
 });
 
 // Cleanup: once on start, hourly after that. Otherwise `siwe_nonces` grows with every call to
@@ -106,6 +112,17 @@ const cleanup = () => {
 };
 cleanup();
 setInterval(cleanup, 60 * 60 * 1000).unref();
+
+// Card payments: once on start, every five minutes after that (Goal 22). Books what was paid even
+// when the buyer never came back to /katalog/danke. Does nothing while the card path is off, and a
+// failed run is logged, never fatal.
+const reconcile = () => {
+  reconcileCheckouts(db, checkout).catch((err) => {
+    console.error(`[reconcile] failed: ${err instanceof Error ? err.message : String(err)}`);
+  });
+};
+reconcile();
+setInterval(reconcile, 5 * 60 * 1000).unref();
 
 const tlsCert = process.env.CP_TLS_CERT;
 const tlsKey = process.env.CP_TLS_KEY;

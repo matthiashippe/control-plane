@@ -253,6 +253,12 @@ run "the board check tells an empty board from a broken one" ./ops/board-not-emp
 # is met, and one that can only say "erreicht" is worse. Reads nothing from production.
 run "the goal report can say reached and not reached" ./ops/ziele.sh --selftest
 
+# Goal 22: every session paid in Stripe against `checkouts`. The selftest plants a paid session
+# without a booking, the same one booked, a stranger's session, a test row under a live key, a row
+# whose session is just before the window and a third page, and wants exit 1 or 0 for each. Reads
+# nothing from production and never talks to Stripe.
+run "the Stripe check can tell a booked payment from a missing one" node ./ops/stripe-sessions.cjs --selftest
+
 # Das Protokoll der Org gegen die Wirklichkeit, an gepflanzten Zustaenden.
 #
 # ORG.md beschreibt sieben Rollen, die auf eine Zahl hinarbeiten. Eine Org, die ihr eigenes
