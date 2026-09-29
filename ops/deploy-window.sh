@@ -80,6 +80,8 @@ until = started + datetime.timedelta(seconds=int(tail))
 own = set(own_raw.split())
 
 strangers = failures = ours = 0
+unauth = 0
+unauth_lines = []
 lines = []
 newest = None
 for raw in open(path):
@@ -116,9 +118,24 @@ for raw in open(path):
     # Any other 4xx or 5xx on those paths is still a failure: a 400, a 409 or a 503 there means a
     # caller that wanted to pay could not.
     selling = re.match(r"^/pay/\d+(/|$)", req.get("uri", "") or "")
-    if row.get("status", 200) >= 400 and not (selling and row.get("status") == 402):
+    status = row.get("status", 200)
+    if status < 400 or (selling and status == 402):
+        pass
+    elif status == 401:
+        # The third answer, because this report cannot honestly give one of the other two.
+        #
+        # A 401 is the right answer to a caller with no key and the wrong one to a caller whose key
+        # broke, and `deploy/Caddyfile` logs only Accept and User-Agent, never Authorization, which
+        # is correct and leaves no way to tell them apart. Counting them as failures buried the one
+        # that mattered: on 2026-09-29 at 09:56 a discovery crawler got three 502s during a deploy,
+        # in a list where fifteen crawler 401s sat beside them looking identical.
+        #
+        # So they are counted and shown apart, and the caption says what the report does not know.
+        unauth += 1
+        unauth_lines.append(f"   {at:%H:%M:%S}  {req.get('remote_ip')}  {req.get('method')} {req.get('uri')}")
+    else:
         failures += 1
-        lines.append(f"   {at:%H:%M:%S}  {req.get('remote_ip')}  {req.get('method')} {req.get('uri')}  {row['status']}")
+        lines.append(f"   {at:%H:%M:%S}  {req.get('remote_ip')}  {req.get('method')} {req.get('uri')}  {status}")
 
 print(f"deploy   {started:%Y-%m-%d %H:%M:%S} UTC, taken from the container start")
 print(f"window   {since:%H:%M:%S} to {until:%H:%M:%S} UTC, {lead} s before and {tail} s after")
@@ -160,10 +177,20 @@ if strangers == 0:
     print("                  there, which on a service this size is the normal case.")
     sys.exit(0)
 
+if unauth:
+    print(f"NO KEY   {unauth} of {strangers} request(s) from outside answered 401:")
+    print("\n".join(unauth_lines[:8]))
+    if len(unauth_lines) > 8:
+        print(f"   and {len(unauth_lines) - 8} more")
+    print("         Not counted as affected and not cleared either. The access log carries only")
+    print("         Accept and User-Agent, never Authorization, so a 401 here is a caller with no")
+    print("         key, which is the right answer, or one whose key broke, which is not, and this")
+    print("         report cannot tell them apart.")
+
 if failures:
     print(f"AFFECTED  {failures} of {strangers} request(s) from outside got an error:")
     print("\n".join(lines))
     sys.exit(1)
 
-print(f"CLEAN    {strangers} request(s) from outside in the window, all answered.")
+print(f"CLEAN    {strangers} request(s) from outside in the window, none of them an error.")
 PY

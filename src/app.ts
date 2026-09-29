@@ -1733,6 +1733,37 @@ export function createApp(opts: AppOptions) {
     ),
   ];
 
+  /**
+   * The same question for a route whose path carries parameters.
+   *
+   * `methodsFor` compares literally, on purpose: a 405 for a path that truly does not exist would
+   * be worse than the 404 it replaces. The cost of that decision showed up on 2026-09-29, once
+   * there was something out there mapping this API. A crawler walking /openapi.json tries every
+   * path with GET and then with POST, and `POST /pay/5` answered "No such endpoint here" because
+   * the registered path is `/pay/:usd` and the two strings differ. An indexer writes that down,
+   * and what it writes down is wrong: the endpoint exists.
+   *
+   * So the pattern is compared segment by segment, and a `:name` segment matches any one segment
+   * that is not empty. Nothing is guessed: the answer still comes from the routes Hono actually
+   * registered, which is why this cannot fall behind the routing table.
+   */
+  const patternMethodsFor = (pathname: string): string[] => {
+    const parts = pathname.split("/");
+    const routes = (app as unknown as { routes: { path: string; method: string }[] }).routes;
+    return [
+      ...new Set(
+        routes
+          .filter((r) => {
+            if (r.method === "ALL" || !r.path.includes(":")) return false;
+            const want = r.path.split("/");
+            if (want.length !== parts.length) return false;
+            return want.every((seg, i) => (seg.startsWith(":") ? parts[i] !== "" : seg === parts[i]));
+          })
+          .map((r) => r.method),
+      ),
+    ];
+  };
+
   // One sentence, two callers: the middleware below and /v1/models, which does its own check so
   // that a request without a key can still see the catalogue. Two copies would drift, and a
   // message that drifts is how somebody ends up reading the wrong thing about their key.
@@ -2764,7 +2795,9 @@ export function createApp(opts: AppOptions) {
     // Hono knows which methods it registered, so this needs no list and cannot fall behind one.
     // Exact path match only: a pattern route like /px/:name would not compare, and a 405 for a
     // path that truly does not exist would be worse than the 404 it replaces.
-    const allowed = methodsFor(c.req.path);
+    const allowed = methodsFor(c.req.path).length > 0
+      ? methodsFor(c.req.path)
+      : patternMethodsFor(c.req.path);
     if (allowed.length > 0) {
       const list = [...allowed].sort();
       c.header("Allow", list.join(", "));

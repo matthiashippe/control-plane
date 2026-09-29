@@ -134,3 +134,39 @@ describe("a path template called with its braces still in it", () => {
     expect((await setup().request("/pay/5")).status).toBe(402);
   });
 });
+
+/**
+ * A route that exists says so, even when its path carries parameters.
+ *
+ * The crawler of 2026-09-29 tries every path from /openapi.json with GET and then with POST. On a
+ * literal path that produced the right answer, a 405 naming the methods. On `/pay/5` it produced
+ * "No such endpoint here", because the registered path is `/pay/:usd` and the strings differ. An
+ * indexer writes that down, and what it writes down is that the endpoint does not exist.
+ *
+ * The 404 for a path that truly does not exist has to survive this, or the fix is a worse lie
+ * than the bug, so both directions are here.
+ */
+describe("the wrong method on a route that takes parameters", () => {
+  const app = () => createApp({ db: openDb(":memory:"), pay: PAY, settler: SETTLER });
+
+  it.each([
+    ["/pay/5", "GET"],
+    ["/pay/5/0x1111111111111111111111111111111111111111", "GET"],
+  ])("%s answers 405 and names %s", async (path, method) => {
+    const res = await app().request(path, { method: "POST" });
+    expect(res.status).toBe(405);
+    expect(res.headers.get("Allow")).toContain(method);
+    expect(((await res.json()) as { error: string }).error).toBe("method_not_allowed");
+  });
+
+  it("still answers 404 for a path that does not exist at all", async () => {
+    for (const path of ["/pay", "/pay/5/0xabc/extra", "/nothing/here"]) {
+      const res = await app().request(path, { method: "POST" });
+      expect(res.status, path).toBe(404);
+    }
+  });
+
+  it("leaves the method that does exist working", async () => {
+    expect((await app().request("/pay/5")).status).toBe(402);
+  });
+});
