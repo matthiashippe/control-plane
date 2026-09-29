@@ -72,6 +72,14 @@ def main():
            "ZIELE.md sagt selbst: das 568-fache des gemessenen Marktes")
 
     print()
+    print("Goal 19: findet ein fremder Client ueberhaupt den Bezahlweg?")
+    pruefe("abgerechnete Zahlungen von Nicht-Conway-Clients",
+           market.get("settled_payments_non_conway", 0), 1,
+           "@x402/core verwirft jedes Angebot ueber einem Dollar vor dem Signieren")
+    print(f"  {GREY}{'  abgerechnete fremde Zahlungen insgesamt':<48} "
+          f"{market.get('settled_payments_foreign', 0)}")
+
+    print()
     print("Die Vision: Fiverr fuer Agenten")
     pruefe("Auftraege, die alle drei Versprechen einloesen", market.get("fiverr_orders_30d", 0), 1,
            "fremd finanziert, zwei fremde Lieferungen, Vergabe binnen einer Stunde")

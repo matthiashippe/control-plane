@@ -378,6 +378,34 @@ report.market = {
   ).reduce((sum, r) => {
     try { return sum + (JSON.parse(r.meta || "{}").margin_mc || 0); } catch { return sum; }
   }, 0),
+  // Die Abnahme von Goal 19, als Zahl statt als Vorsatz.
+  //
+  // Goal 19 fragt, ob ein fremder Client ueberhaupt je signiert, nachdem sich herausgestellt hat,
+  // dass @x402/core jedes Angebot ueber einem Dollar vor dem Signieren verwirft. Die Einschraenkung
+  // auf Nicht-Conway steht im Goal, weil deren Stufen fest verdrahtet sind und ein Treffer von
+  // dort nichts ueber die neue Stufe beweisen wuerde: sie haben den Deckel nie gesehen.
+  //
+  // Gezaehlt werden abgerechnete Zahlungen, nicht Anfragen. Eine Anfrage sagt nur, dass jemand das
+  // Angebot gelesen hat, und davon gab es 465 ohne eine einzige Signatur.
+  settled_payments_foreign: one(
+    `select count(*) n from payments p
+       where p.status = 'settled'
+         and not (p.from_address in (${OURS.map(() => "?").join(",")})
+                  or exists (select 1 from api_keys k where k.address = p.from_address
+                             and (${OUR_KEY_NAMES.map(() => "k.name like ?").join(" or ")})))`,
+    ...OURS, ...OUR_KEY_NAMES,
+  ).n,
+  // Und davon die, deren Schluessel NICHT conway-automaton heisst, also andere Clients.
+  settled_payments_non_conway: one(
+    `select count(*) n from payments p
+       where p.status = 'settled'
+         and not (p.from_address in (${OURS.map(() => "?").join(",")})
+                  or exists (select 1 from api_keys k where k.address = p.from_address
+                             and (${OUR_KEY_NAMES.map(() => "k.name like ?").join(" or ")})))
+         and not exists (select 1 from api_keys k2 where k2.address = p.from_address
+                         and k2.name = 'conway-automaton')`,
+    ...OURS, ...OUR_KEY_NAMES,
+  ).n,
   pool_source: poolSource,
   starter_pool_left_mc:
     POOL_MC - one("select coalesce(sum(delta_mc),0) s from ledger where kind in ('grant','grant_returned')").s,
