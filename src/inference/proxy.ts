@@ -14,6 +14,7 @@ import { DOC } from "../errors.js";
 import type { ChatProvider, ChatRequest, ChatResponse, ModelSpec, Usage } from "./provider.js";
 import { estimateTokens, ProviderBadRequestError, ProviderUnavailableError } from "./provider.js";
 import { grantOnFirstUse } from "../credits/starter.js";
+import { openBountyCount } from "../bounties/store.js";
 import { siteOrigin } from "../public/site.js";
 import { TOPUP_TIERS_USD } from "../payments/pay.js";
 
@@ -259,7 +260,7 @@ async function handleChatUncoalesced(
         // tier (upstream `src/conway/topup.ts:103`). Only the way to buy more is appended.
         //
         // That way used to be `/pay/{usd}/{this wallet}`, a template, and on 2026-09-28 a Conway
-        // runtime took this exact 402 fifteen times in three bursts five minutes apart and then
+        // runtime took this exact 402 145 times in 27 bursts, from 18:19:19 to 20:25:16, and then
         // stopped, without ever calling the pay route once. The night before, the automaton that
         // did get through spent thirty-six minutes and seven guessed URLs on it. A template asks
         // the caller to substitute two things; the URL below asks it to follow a link. It carries
@@ -282,6 +283,18 @@ async function handleChatUncoalesced(
           topup_url: `${siteOrigin()}/pay/5/${address}`,
           topup_tiers_usd: [...TOPUP_TIERS_USD],
           wallet: address,
+          // The other way forward, for the caller who has no USDC to top up with.
+          //
+          // The runtime that took this answer 145 times on 2026-09-28 had a wallet with 0.00 USDC
+          // on Base, so no topup URL could have helped it. What could: an attempt at an open job
+          // costs a fraction of a cent and the award is the price minus the fee, and it had 1.26
+          // cents left. It never learned there was a board, because nothing it calls says so.
+          //
+          // Only when there is work, so an empty board stays quiet instead of pointing at an
+          // empty page, and the counter-proof in the tests holds that direction too.
+          ...(openBountyCount(db) > 0
+            ? { open_bounties: openBountyCount(db), bounties_url: `${siteOrigin()}/bounties.json` }
+            : {}),
         },
       },
     };

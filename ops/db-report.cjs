@@ -84,6 +84,19 @@ const OURS = [
   // The keyless AGENT handle from the supply-side cold start on 2026-09-23; its submission sits on
   // a live job. See src/bounties/ours.ts, which test/ours.test.ts holds against this list.
   "key:c6989cf4fc8217434c2c422ea6bc857f98291f2e",
+  // The keyless AGENT handle minted on 2026-09-29 at 09:23:22, and the way it got here is the
+  // point. No script in ops/ mints one: `ops/keyless-walk.sh --dry` stops before the step that
+  // spends and `ops/stranger-client.sh` proves the door exists with a GET that answers 405. Both
+  // were re-run that morning against production and the handle count did not move. It came from a
+  // subagent of the loop's own derivation round, which had been told to check whether
+  // `/v1/auth/keyless` still worked and checked it by using it.
+  //
+  // So the rule this list carries ("anything that provisions a key from ops/ belongs here in the
+  // same commit that creates it") has a hole that no commit can close: an agent reading the repo
+  // can call production without being a tool in it. The handle has a zero balance and an empty
+  // ledger, so it changes no money, but `wallets_foreign` counted it and that is the number the
+  // plan is read against.
+  "key:1001d3d458a61eaeae0bc6a2ade41f8d424a31e8",
 ];
 
 // The hardcoded pair is not enough. Every production check provisions a throwaway wallet, and on
@@ -264,7 +277,18 @@ report.market = {
   // in an afternoon. Split out rather than filtered away, using the same definition of "ours" as
   // the numbers below, because the useful reading is not "the pool is shrinking" but "who by".
   starter_granted_ours: one(`select count(*) n from ledger where kind='grant' and ${oursClause}`, ...OURS_ARGS).n,
-  starter_pool_left_mc: 500000 - one("select coalesce(sum(delta_mc),0) s from ledger where kind='grant'").s,
+  // Nets `grant_returned`, like `poolLeftMc()` in src/credits/starter.ts and like the two
+  // capacities below. It did not, and the report contradicted itself in two adjacent lines:
+  // on 2026-09-29 it printed 120000 mc left next to `starter_grants_left: 11`, and eleven grants
+  // of 15000 mc do not fit in 120000. The figure the service itself publishes was 170000. The
+  // difference is the one cancelled job-scoped grant, 50000 mc, which went back to the pool and
+  // was still being counted as spent here.
+  //
+  // The direction matters: this number is what a cycle reads to decide whether the free offer can
+  // still be made, and understating it takes the offer off the pages while the money is there.
+  // The same class of error emptied the offer for four hours on 2026-09-23, from the other end.
+  starter_pool_left_mc:
+    500000 - one("select coalesce(sum(delta_mc),0) s from ledger where kind in ('grant','grant_returned')").s,
 
   // How many newcomers the giveaway still carries.
   //

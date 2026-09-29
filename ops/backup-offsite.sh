@@ -18,6 +18,14 @@
 #   ops/backup-offsite.sh --check    report only, no transfer; this is what check-all runs
 #   ops/backup-offsite.sh --selftest prove the verification rejects a file it should reject
 #
+# **It only runs when somebody runs it, and that is the weak part.** Between 2026-09-24 and
+# 2026-09-29 no loop cycle happened, so no pull happened, and `--check` reported the copy 144
+# hours stale while the live database grew to 295 wallets and 2,868,249 mc. A backup whose
+# schedule is "whenever the loop is awake" has the same shape as the problem it is solving.
+# `ops/launchd/eu.hippe.control-plane.backup-offsite.plist` is the daily job, with the one command
+# to install it in its own header. It is not installed automatically: it is a standing job on
+# Matthias' machine and that is his to start.
+#
 # A copy on the operator's laptop is not an off-site backup. It is the difference between one copy
 # and two, which is the difference that matters here, and it is what can be built without asking
 # anybody for an account. The real answer is a bucket the VM writes to with append-only

@@ -47,6 +47,19 @@ export const OUR_ADDRESSES = [
   // same reason as the buyer handle above, and the lesson is the same one twice in a day: a walk
   // against production leaves a mark, and the mark has to be owned in the same minute.
   "key:c6989cf4fc8217434c2c422ea6bc857f98291f2e",
+  // The keyless AGENT handle minted on 2026-09-29 at 09:23:22, and the way it got here is the
+  // point. No script in ops/ mints one: `ops/keyless-walk.sh --dry` stops before the step that
+  // spends and `ops/stranger-client.sh` proves the door exists with a GET that answers 405. Both
+  // were re-run that morning against production and the handle count did not move. It came from a
+  // subagent of the loop's own derivation round, which had been told to check whether
+  // `/v1/auth/keyless` still worked and checked it by using it.
+  //
+  // So the rule this list carries ("anything that provisions a key from ops/ belongs here in the
+  // same commit that creates it") has a hole that no commit can close: an agent reading the repo
+  // can call production without being a tool in it. The handle has a zero balance and an empty
+  // ledger, so it changes no money, but `wallets_foreign` counted it and that is the number the
+  // plan is read against.
+  "key:1001d3d458a61eaeae0bc6a2ade41f8d424a31e8",
 ];
 
 /** SQL LIKE patterns. A key carrying one of these names was provisioned by a tool of ours. */

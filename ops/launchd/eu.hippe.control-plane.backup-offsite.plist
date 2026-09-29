@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Pulls the newest database backup off the VM once a day.
+
+  Why this exists: the second copy of the database is created only when a loop cycle happens to
+  run ops/backup-offsite.sh. Between 2026-09-24 and 2026-09-29 no cycle ran, and the copy on this
+  machine went 144 hours stale while the live database grew to 295 wallets, 6 payments and
+  2,868,249 mc, all of it on one disk in one Hostinger VM. The nightly ops/backup.sh on the VM
+  covers a bad migration or a corrupted page. It does not cover the disk, the machine or the
+  account going away, and that is the only failure a second copy is for.
+
+  Runs at 05:30 local, after the VM's own backup at 03:17 UTC. RunAtLoad catches a laptop that was
+  asleep at 05:30, which is most days, and the script is idempotent: a backup already here is
+  verified and not fetched again.
+
+  Install:   launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/eu.hippe.control-plane.backup-offsite.plist
+  Check:     ops/backup-offsite.sh --check
+  Remove:    launchctl bootout gui/$(id -u)/eu.hippe.control-plane.backup-offsite
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>eu.hippe.control-plane.backup-offsite</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>-lc</string>
+    <string>cd "$HOME/GIT/control-plane" &amp;&amp; ops/backup-offsite.sh</string>
+  </array>
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key><integer>5</integer>
+    <key>Minute</key><integer>30</integer>
+  </dict>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>/tmp/cp-backup-offsite.log</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/cp-backup-offsite.log</string>
+</dict>
+</plist>

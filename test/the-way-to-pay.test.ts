@@ -13,8 +13,8 @@
  * moves money.
  *
  * The one that did not, 2026-09-28, wallet 0x938f5c37, key named `conway-automaton`: 27 billed
- * calls in 23 minutes, then 402 INSUFFICIENT_CREDITS fifteen times in three bursts five minutes
- * apart, then nothing. It never called the pay route once.
+ * calls in 23 minutes, then 402 INSUFFICIENT_CREDITS 145 times in 27 bursts, from 18:19:19 to
+ * 20:25:16, then nothing. It never called the pay route once, in 552 requests.
  *
  * Both answers they got were correct and neither was any use. The 404 said this service implements
  * "credits, topup" and sent the reader one hop further for the list; the 402 named the route as

@@ -318,6 +318,37 @@ describe("The market numbers in the database report", () => {
     expect(r.market.starter_granted).toBe(1);
     expect(r.market.starter_pool_left_mc).toBe(500_000 - 15 * MC_PER_CENT);
   });
+
+  /**
+   * A grant that came back is not spent, and this figure said it was.
+   *
+   * A job-scoped grant belongs to the job: if the job ends without an award the credit goes back
+   * to the pool as a negative `grant_returned` row (src/credits/starter.ts). `poolLeftMc()` in the
+   * service nets it and so do `starter_grants_left` and `starter_buyer_grants_left` two lines
+   * below in the report, with a comment saying why. `starter_pool_left_mc` did not.
+   *
+   * Measured against production on 2026-09-29: the report printed 120000 mc left and
+   * `starter_grants_left: 11` in the same breath, and eleven grants of 15000 mc do not fit in
+   * 120000. The service itself published 170000. One cancelled 50000 mc grant, counted as spent
+   * in one figure and returned in the other.
+   *
+   * The direction is the harmful one. This number is what a cycle reads to decide whether the
+   * free offer can still be made, and understating it takes the offer off the pages while the
+   * money is there.
+   */
+  it("counts a returned grant back into the pool, like every other figure about the pool", () => {
+    const r = withDb((db) => {
+      postLedger(db, { address: STRANGER, kind: "grant", deltaMc: 50 * MC_PER_CENT, ref: `job:${STRANGER}` });
+      postLedger(db, { address: STRANGER, kind: "grant_returned", deltaMc: -50 * MC_PER_CENT, ref: `job-back:${STRANGER}` });
+    });
+    expect(r.market.starter_pool_left_mc, "given and given back is a pool that was never touched")
+      .toBe(500_000);
+    // The two that were already right, held against it: a report whose figures disagree is worse
+    // than one that is wrong, because it reads as precision.
+    expect(r.market.starter_grants_left).toBe(Math.floor(500_000 / (15 * MC_PER_CENT)));
+    expect(Math.floor(r.market.starter_pool_left_mc / (15 * MC_PER_CENT)))
+      .toBe(r.market.starter_grants_left);
+  });
 });
 
 describe("the money a stranger actually moved", () => {

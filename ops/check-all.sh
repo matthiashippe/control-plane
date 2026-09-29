@@ -191,11 +191,13 @@ run --undetermined-on 2 "the scheduled jobs point somewhere" ./ops/cron-points-s
 
 # Is there anything on the board at all?
 #
-# Added 2026-09-29, the day it was measured: the board had been completely empty since 24.09., the
-# last real job having expired unawarded, and not one of the checks in this file could say so.
-# Nothing refills the board on its own; the operator seeds it from a loop cycle, and the loop did
-# not run for five days. The skill probe's step 1 went red in that window and blamed a missing
-# field, because a substring match cannot tell an empty list from a broken one.
+# Added 2026-09-29, the day it was measured: the board had been empty since 27.09. at 21:02:18,
+# when the last two real jobs reached their deadline unawarded, and not one of the checks in this
+# file could say so. Forty-one minutes into that gap the first foreign automaton arrived, and the
+# next day somebody behind the second one fetched /bounties.json by hand and got `{"open":[]}`
+# fourteen minutes before that host went quiet. The skill probe's step 1 went red in the same
+# window and blamed a missing field, because a substring match cannot tell an empty list from a
+# broken one.
 #
 # Undetermined on 2 when /bounties.json cannot be read, which is a statement about the network.
 run --undetermined-on 2 "the board has work on it" ./ops/board-not-empty.sh

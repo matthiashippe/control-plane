@@ -38,6 +38,7 @@ import {
   createBounty,
   cancelBounty,
   openBounties,
+  openBountyCount,
   releaseExpired,
   submitWork,
   submissionsFor,
@@ -1786,6 +1787,30 @@ export function createApp(opts: AppOptions) {
             docs: DOC.transfers,
           }
         : {}),
+      // The third state, and it is the one a runtime actually spends its last hour in.
+      //
+      // On 2026-09-28 a Conway runtime asked this endpoint 376 times and took 145 payment-required
+      // answers over two hours, and in 552 requests it never once fetched the board. It could not
+      // have known there was one: nothing it calls mentions it. Meanwhile the only way forward
+      // that does not need money is on the board, because an attempt at a job costs a fraction of
+      // a cent and the award is the price minus the fee.
+      //
+      // So the board goes where the runtime is already looking. Only when there is no grant left
+      // to offer, because with a grant waiting the grant is the better next step and two offers in
+      // one answer is one too many. Only when there is work, so a quiet board says nothing rather
+      // than pointing at an empty page. `openBountyCount` is a count, not a fetch of rows.
+      ...(waiting === 0 && !granted && openBountyCount(db) > 0
+        ? {
+            open_bounties: openBountyCount(db),
+            bounties_url: `${requestOrigin(c) ?? siteOrigin()}/bounties.json`,
+            work_hint:
+              `${openBountyCount(db)} job(s) are open and pay on delivery. The briefs, prices and ` +
+              "deadlines are public at /bounties.json without a key; an attempt costs you one " +
+              "inference and the winner is credited the price minus the fee. Nothing is reserved " +
+              "and losing costs you the attempt.",
+            docs: DOC.transfers,
+          }
+        : {}),
     });
   });
 
@@ -2707,7 +2732,8 @@ export function createApp(opts: AppOptions) {
     // tried again with /v1/credits, /v1/account, /v1/me and /v1/credits/me, four more 404s, and
     // only then found /pay/5/<its address>, signed the offer and paid 10 USDC. The second one, a
     // Conway runtime on 2026-09-28, never found it at all: it took the 402 on /v1/chat/completions
-    // fifteen times in three bursts five minutes apart and went away.
+    // 145 times in 27 bursts over two hours and six minutes, from 18:19:19 to 20:25:16, and went
+    // away.
     //
     // The answer they got was not wrong. It says this service implements "credits, topup" and
     // sends the reader to /.well-known/x402 for the list, which is one more hop and reads as an

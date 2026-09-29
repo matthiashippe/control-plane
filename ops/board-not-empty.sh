@@ -1,17 +1,28 @@
 #!/usr/bin/env bash
 # Is there anything on the board for an arriving agent to compete for?
 #
-# The board ran completely dry between 2026-09-24 and 2026-09-29. The last real job, 500 cents for
-# a fact sheet on energy certificates, expired unawarded on 24.09. at 15:00 UTC, and nothing
-# replaced it because nothing does: the operator seeds the board by hand from a loop cycle, and the
-# loop did not run for five days. `/bounties.json` answered `{"open":[]}` that whole time.
+# The board ran dry on 2026-09-27 at 21:02:18 UTC, when the last two real jobs, 150 and 250 cents,
+# reached their deadline unawarded within a second of each other. Nothing replaced them because
+# nothing does: the operator seeds the board by hand from a loop cycle, and the loop did not run
+# between 24.09. and 29.09. `/bounties.json` answered `{"open":[]}` for the 36.5 hours that
+# followed, and no check in this repository could say so.
 #
-# In exactly that window the first two foreign automatons this service has ever had showed up, one
-# of which paid 10 USDC. Neither ever read the board, so the empty shop window cost nothing that
-# can be measured. That is the honest version and it is why this check says what it says rather
-# than crying about lost revenue: what it guards is the claim, not a number. docs/journeys.md opens
-# the cold start with "a marketplace with no jobs convinces nobody", /bounties.json explains in its
-# own note that the operator seeds the board so it is not empty, and for five days both were false.
+# What that window cost is measured and it is not nothing.
+#
+# Forty-one minutes after the board emptied, at 21:43:52, the first foreign automaton this service
+# ever had arrived and paid 10 USDC. The second came the next day at 17:47, spent its 15-cent
+# starter grant in 27 calls, and then took 402 INSUFFICIENT_CREDITS 145 times in 27 bursts over
+# two hours. At 20:13:42, in the middle of that, somebody at the same host ran `curl` by hand
+# against `/bounties.json` and got 962 bytes of `{"open":[]}`. The last request from that host is
+# at 20:27:25, fourteen minutes later.
+#
+# That is one arrival, one look, one empty answer and one departure, in that order, and it is as
+# close to a measured cost as this service has ever got. It is not proof: the runtime itself never
+# read the board in 552 requests, so what looked was a person or a shell, and a person who leaves
+# may leave for any reason. But "the empty board cost nothing" is no longer available either, and
+# the claim it breaks is on the front page. docs/journeys.md opens the cold start with "a
+# marketplace with no jobs convinces nobody", and /bounties.json explains in its own note that the
+# operator seeds the board so it is not empty.
 #
 # It also notices the state before the empty one. A board whose last job expires in six hours is a
 # board that is empty tomorrow, and the point of this file is to be louder than a calendar.
