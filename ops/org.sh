@@ -24,7 +24,7 @@ if [[ "${1:-}" == "--selftest" ]]; then
   report='{"db":{"market":{"human_revenue_30d_cents":2,"human_orders_paid_30d":1,"foreign_submissions_30d":3}}}'
   echt=$'aaa1111\nbbb2222'
 
-  gut=$'2026-09-29\tNachfrage\torg-produkt\tIterationsrunden gebaut\taaa1111\t2'
+  gut=$'2026-09-29\tNachfrage\tProdukt\tIterationsrunden gebaut\taaa1111\t2'
   out=$(printf '%s\n---\n%s\n' "$report" "$gut" | CP_ORG_COMMITS="$echt" CP_ORG_HEUTE=2026-09-29 python3 ./ops/org.py); code=$?
   if (( code == 0 )) && grep -q "ORG OK" <<< "$out"; then
     echo "  ok      ein Protokoll mit echtem Commit und passender Zahl haelt"
@@ -32,7 +32,7 @@ if [[ "${1:-}" == "--selftest" ]]; then
     echo "  FAILED  ein gueltiges Protokoll gab Exit $code"; fail=1
   fi
 
-  erfunden=$'2026-09-29\tNachfrage\torg-produkt\tangeblich gebaut\tzzz9999\t2'
+  erfunden=$'2026-09-29\tNachfrage\tProdukt\tangeblich gebaut\tzzz9999\t2'
   out=$(printf '%s\n---\n%s\n' "$report" "$erfunden" | CP_ORG_COMMITS="$echt" CP_ORG_HEUTE=2026-09-29 python3 ./ops/org.py); code=$?
   if (( code == 1 )) && grep -q "FEHLT" <<< "$out"; then
     echo "  ok      ein erfundener Commit ist ein Befund"
@@ -40,7 +40,7 @@ if [[ "${1:-}" == "--selftest" ]]; then
     echo "  FAILED  erfundener Commit gab Exit $code"; fail=1
   fi
 
-  falsche_zahl=$'2026-09-29\tNachfrage\torg-produkt\tgebaut\taaa1111\t9'
+  falsche_zahl=$'2026-09-29\tNachfrage\tProdukt\tgebaut\taaa1111\t9'
   out=$(printf '%s\n---\n%s\n' "$report" "$falsche_zahl" | CP_ORG_COMMITS="$echt" CP_ORG_HEUTE=2026-09-29 python3 ./ops/org.py); code=$?
   if (( code == 1 )) && grep -q "ABWEICHUNG" <<< "$out"; then
     echo "  ok      eine protokollierte Zahl, die nicht der gemessenen entspricht, faellt auf"
@@ -48,9 +48,9 @@ if [[ "${1:-}" == "--selftest" ]]; then
     echo "  FAILED  falsche Zahl gab Exit $code"; fail=1
   fi
 
-  alt=$'2026-09-01\tNachfrage\torg-produkt\tlange her\taaa1111\t2'
+  alt=$'2026-09-01\tNachfrage\tProdukt\tlange her\taaa1111\t2'
   out=$(printf '%s\n---\n%s\n' "$report" "$alt" | CP_ORG_COMMITS="$echt" CP_ORG_HEUTE=2026-09-29 python3 ./ops/org.py)
-  if grep -q "STILL   org-produkt" <<< "$out"; then
+  if grep -q "STILL   Produkt" <<< "$out"; then
     echo "  ok      eine Rolle, die vierzehn Tage nichts bewegt hat, wird still genannt"
   else
     echo "  FAILED  eine stille Rolle wurde nicht genannt"; fail=1

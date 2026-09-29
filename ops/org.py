@@ -22,8 +22,17 @@ import json, os, sys
 from datetime import date, timedelta
 
 SPALTEN = ["datum", "glied", "rolle", "was", "commit", "zahl_danach"]
-ROLLEN = ["org-messer", "org-nachfrage", "org-gestalt", "org-lieferkette", "org-angebot",
-          "org-produkt", "org-skeptiker", "org-wirt", "org-schreiber"]
+# Die neunzehn Rollen der Firma, wie sie in Paperclip stehen (ORG.md).
+#
+# Die Liste hiess bis zum 29.09.2026 org-messer, org-nachfrage und so weiter, also nach einer
+# flachen Org, die es seit dem Umbau auf CEO, CFO, CMO und CTO nicht mehr gibt. Gefunden hat das
+# der Schreiber-Agent im ersten Lauf der Firma: ein Werkzeug, das gegen eine Liste prueft, prueft
+# gegen nichts, sobald die Liste veraltet ist, und meldet trotzdem OK.
+ROLLEN = ["CEO", "CFO", "CMO", "CTO",
+          "Stabschef", "Skeptiker", "Schreiber",
+          "Preise", "Kosten", "Recht",
+          "Kanal", "Katalog", "Copy", "Kunde",
+          "Gestalt", "Produkt", "Lieferkette", "Betrieb", "Maschinenmarkt"]
 # Ab wann eine Rolle auffaellt: vierzehn Tage ohne eine einzige Zeile.
 STILL_TAGE = 14
 
