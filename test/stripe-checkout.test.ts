@@ -28,6 +28,20 @@ import { OFFERS, TEST_MODE_LINE } from "../src/public/catalog.js";
 const TEST_KEY = "sk_test_placeholder";
 const LIVE_KEY = "sk_live_placeholder";
 const OFFER = OFFERS[0];
+// Since Goal 21 an order carries the offer's fields and an address, and without them it is
+// refused (test/order-brief.test.ts). The brief is GOAL.md's own example for the speech; the
+// address is under @postyourprice.com, like every demonstration (ops/ours.txt).
+const ORDER = {
+  offerId: OFFER.id,
+  brief: {
+    anlass: "70. Geburtstag",
+    person: "meine Mutter Ingrid",
+    laenge: "5 Minuten",
+    inhalt: "Sie war 35 Jahre Grundschullehrerin in Kassel, singt im Kirchenchor und hat uns jeden Sommer an die Ostsee gefahren.",
+  },
+  email: "vorfuehrung@postyourprice.com",
+};
+const ORDER_FORM = new URLSearchParams({ ...ORDER.brief, email: ORDER.email }).toString();
 
 interface Call {
   method: string;
@@ -176,7 +190,7 @@ describe("the Stripe adapter against a staged fetch", () => {
   it("creates the session with the price from OFFERS, in euro, card only", async () => {
     const s = stagedStripe();
     const d = openDb(":memory:");
-    const { checkout, redirect } = await beginOfferCheckout(d, stripe(s), OFFER.id);
+    const { checkout, redirect } = await beginOfferCheckout(d, stripe(s), ORDER);
     expect(redirect).toMatch(/^https:\/\/checkout\.stripe\.com\//);
     expect(s.calls).toHaveLength(1);
     const body = s.calls[0].body!;
@@ -200,7 +214,7 @@ describe("the Stripe adapter against a staged fetch", () => {
   it("marks a paid offer as paid and books nothing into the ledger", async () => {
     const s = stagedStripe();
     const d = openDb(":memory:");
-    const { checkout } = await beginOfferCheckout(d, stripe(s), OFFER.id);
+    const { checkout } = await beginOfferCheckout(d, stripe(s), ORDER);
     const r = await settleCheckout(d, stripe(s), { session_id: checkout.reference });
     expect(r).toMatchObject({ status: "paid", cents: OFFER.priceCents, credited_cents: 0, already: false, address: null });
     expect(row(d, checkout.reference).status).toBe("paid");
@@ -211,7 +225,7 @@ describe("the Stripe adapter against a staged fetch", () => {
     const s = stagedStripe();
     const d = openDb(":memory:");
     const p = stripe(s);
-    const { checkout } = await beginOfferCheckout(d, p, OFFER.id);
+    const { checkout } = await beginOfferCheckout(d, p, ORDER);
     const [a, b] = await Promise.all([
       settleCheckout(d, p, { session_id: checkout.reference }),
       settleCheckout(d, p, { session_id: checkout.reference }),
@@ -226,7 +240,7 @@ describe("the Stripe adapter against a staged fetch", () => {
   it("books nothing while Stripe says unpaid, and keeps the row pending rather than abandoned", async () => {
     const s = stagedStripe({ payment_status: "unpaid", status: "open" });
     const d = openDb(":memory:");
-    const { checkout } = await beginOfferCheckout(d, stripe(s), OFFER.id);
+    const { checkout } = await beginOfferCheckout(d, stripe(s), ORDER);
     const r = await settleCheckout(d, stripe(s), { session_id: checkout.reference });
     expect(r.status).toBe("pending");
     expect(row(d, checkout.reference).status).toBe("pending");
@@ -236,7 +250,7 @@ describe("the Stripe adapter against a staged fetch", () => {
   it("calls a session abandoned only when Stripe says it expired", async () => {
     const s = stagedStripe({ payment_status: "unpaid", status: "expired" });
     const d = openDb(":memory:");
-    const { checkout } = await beginOfferCheckout(d, stripe(s), OFFER.id);
+    const { checkout } = await beginOfferCheckout(d, stripe(s), ORDER);
     const r = await settleCheckout(d, stripe(s), { session_id: checkout.reference });
     expect(r.status).toBe("abandoned");
     expect(row(d, checkout.reference).status).toBe("abandoned");
@@ -245,7 +259,7 @@ describe("the Stripe adapter against a staged fetch", () => {
   it("refuses with 409 when Stripe reports another amount, and books nothing", async () => {
     const s = stagedStripe({ amount_total: 1 });
     const d = openDb(":memory:");
-    const { checkout } = await beginOfferCheckout(d, stripe(s), OFFER.id);
+    const { checkout } = await beginOfferCheckout(d, stripe(s), ORDER);
     await expect(settleCheckout(d, stripe(s), { session_id: checkout.reference })).rejects.toMatchObject({
       code: "amount_mismatch",
       status: 409,
@@ -256,7 +270,7 @@ describe("the Stripe adapter against a staged fetch", () => {
   it("refuses with 409 when Stripe reports another currency", async () => {
     const s = stagedStripe({ currency: "usd" });
     const d = openDb(":memory:");
-    const { checkout } = await beginOfferCheckout(d, stripe(s), OFFER.id);
+    const { checkout } = await beginOfferCheckout(d, stripe(s), ORDER);
     await expect(settleCheckout(d, stripe(s), { session_id: checkout.reference })).rejects.toMatchObject({
       code: "currency_mismatch",
       status: 409,
@@ -267,7 +281,7 @@ describe("the Stripe adapter against a staged fetch", () => {
   it("refuses with 409 when Stripe's mode disagrees with the row", async () => {
     const s = stagedStripe({ livemode: true });
     const d = openDb(":memory:");
-    const { checkout } = await beginOfferCheckout(d, stripe(s), OFFER.id);
+    const { checkout } = await beginOfferCheckout(d, stripe(s), ORDER);
     await expect(settleCheckout(d, stripe(s), { session_id: checkout.reference })).rejects.toMatchObject({
       code: "livemode_mismatch",
       status: 409,
@@ -294,7 +308,7 @@ describe("the Stripe adapter against a staged fetch", () => {
   it("names no key in an error", async () => {
     const failing = (async () => new Response("{}", { status: 401 })) as typeof fetch;
     const p = stripeProvider({ secretKey: TEST_KEY, origin, fetch: failing });
-    const e = await beginOfferCheckout(openDb(":memory:"), p, OFFER.id).catch((x) => x as CheckoutError);
+    const e = await beginOfferCheckout(openDb(":memory:"), p, ORDER).catch((x) => x as CheckoutError);
     expect(e).toBeInstanceOf(CheckoutError);
     expect(`${e.message} ${e.hint}`).not.toContain(TEST_KEY);
   });
@@ -313,7 +327,7 @@ describe("/katalog/kaufen and /katalog/danke", () => {
   it("sends the buyer to Stripe with the catalogue price, whatever else the form says", async () => {
     const s = stagedStripe();
     const { d, app: a } = app(s);
-    const res = await buy(a, `angebot=${OFFER.id}&cents=1&price=1&priceCents=1&amount=1`);
+    const res = await buy(a, `angebot=${OFFER.id}&${ORDER_FORM}&cents=1&price=1&priceCents=1&amount=1`);
     expect(res.status).toBe(303);
     expect(res.headers.get("location")).toMatch(/^https:\/\/checkout\.stripe\.com\//);
     expect(s.calls[0].body!.get("line_items[0][price_data][unit_amount]")).toBe(String(OFFER.priceCents));
@@ -330,8 +344,10 @@ describe("/katalog/kaufen and /katalog/danke", () => {
     expect((d.prepare("SELECT count(*) AS n FROM checkouts").get() as { n: number }).n).toBe(0);
   });
 
+  // Since Goal 21 the form behind the button lives on the order page; /katalog links to it
+  // (test/order-brief.test.ts holds the link).
   it("shows the button and the test-mode line while the key is a test key", async () => {
-    const html = await (await app(stagedStripe()).app.request("/katalog")).text();
+    const html = await (await app(stagedStripe()).app.request(`/katalog/bestellen?angebot=${OFFER.id}`)).text();
     expect(html).toContain('action="/katalog/kaufen"');
     expect(html).toContain(`value="${OFFER.id}"`);
     expect(html).toContain(TEST_MODE_LINE);
@@ -344,6 +360,7 @@ describe("/katalog/kaufen and /katalog/danke", () => {
     const html = await (await a.request("/katalog")).text();
     expect(html).not.toContain('action="/katalog/kaufen"');
     expect(html).not.toContain(TEST_MODE_LINE);
+    expect(html, "no link to an order page that would only send the visitor back").not.toContain("/katalog/bestellen");
     expect((await buy(a, `angebot=${OFFER.id}`)).status).toBe(404);
     expect(s.calls).toHaveLength(0);
   });
@@ -351,7 +368,7 @@ describe("/katalog/kaufen and /katalog/danke", () => {
   it("says paid on the way back, and a reload books nothing twice", async () => {
     const s = stagedStripe();
     const { d, app: a } = app(s);
-    const res = await buy(a, `angebot=${OFFER.id}`);
+    const res = await buy(a, `angebot=${OFFER.id}&${ORDER_FORM}`);
     const id = res.headers.get("location")!.split("/").pop()!;
     const page = await a.request(`/katalog/danke?session_id=${id}`);
     expect(page.status).toBe(200);
@@ -368,7 +385,7 @@ describe("/katalog/kaufen and /katalog/danke", () => {
   it("says not paid, with a way back, while Stripe says unpaid", async () => {
     const s = stagedStripe({ payment_status: "unpaid", status: "open" });
     const { app: a } = app(s);
-    const id = (await buy(a, `angebot=${OFFER.id}`)).headers.get("location")!.split("/").pop()!;
+    const id = (await buy(a, `angebot=${OFFER.id}&${ORDER_FORM}`)).headers.get("location")!.split("/").pop()!;
     const html = await (await a.request(`/katalog/danke?session_id=${id}`)).text();
     expect(html).toContain("Die Zahlung ist nicht abgeschlossen");
     expect(html).toContain('href="/katalog"');

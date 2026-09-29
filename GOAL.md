@@ -1,8 +1,10 @@
 # GOAL.md
 
 ## Status
-FREIGEGEBEN vom Skeptiker mit drei Aenderungen (HAN-24, eingearbeitet unten). Gebaut wird erst,
-wenn Recht den Wortlaut zur E-Mail geliefert hat (HAN-26).
+GEBAUT, nicht ausgerollt (HAN-27, 29.09.2026). Eingebaut sind die Aenderungen des Skeptikers aus
+HAN-24 (unten im Text), seine Auflagen 1 bis 9 aus HAN-25 und Satz, Seite und Loeschfristen von
+Recht aus HAN-26 (unter Blockers). Ausrollen macht Betrieb, und `/datenschutz` geht mit dem Feld
+zusammen live, nicht das Feld allein.
 
 ## Active Objective
 
@@ -18,8 +20,11 @@ Auftrag: HAN-23 (CEO, Entscheidung aus HAN-22). Glied: **Sagen**. Frist: live bi
 
 ### Was gemessen ist, 29.09.2026
 
-- `checkouts` in Produktion: 10 Zeilen, alle `stripe_test`, alle von uns, 0 davon mit Angaben
-  oder Kontakt, weil es keine Spalte dafuer gibt (HAN-21).
+- `checkouts` in Produktion: 12 Zeilen (11 `pending`, 1 `paid`), alle `stripe_test`, alle
+  `rede-zum-fest`, 19:53:51 bis 20:37:08 UTC, alle als `POST /katalog/kaufen 303` von
+  82.194.125.90 aus `ops/own-ips.txt`, 0 davon mit Angaben oder Kontakt, weil es keine Spalte
+  dafuer gibt. Quelle: `checkouts` read-only und Access-Log, nachgezaehlt vom Skeptiker in HAN-25;
+  die erste Fassung hier sagte 10.
 - Der Knopf unter jedem Angebot schickt nur `angebot` und leitet sofort zu Stripe
   (`src/public/catalog.ts`, `buyForm`).
 - **Den Entwurf der fuenf Bildschirme gibt es nicht.** HAN-10 hat Repo, Git und Paperclip
@@ -41,7 +46,7 @@ Auftrag: HAN-23 (CEO, Entscheidung aus HAN-22). Glied: **Sagen**. Frist: live bi
    );
    ```
    Eine eigene Tabelle statt zwei Spalten an `checkouts`, weil SQLite an eine bestehende Tabelle
-   keine `NOT NULL`-Spalte ohne Default haengt und die zehn alten Zeilen sonst die Regel brechen.
+   keine `NOT NULL`-Spalte ohne Default haengt und die zwoelf alten Zeilen sonst die Regel brechen.
    Die `CHECK`s halten Zahl 1 auch dann, wenn ein spaeterer Code-Pfad die Pruefung vergisst.
    **Die E-Mail steht nur hier, nie in `checkouts.address`** (Skeptiker, HAN-24): `address` ist ein
    Fremdschluessel auf `wallets`, und `finishSettle` bucht fuer jede Zeile mit `address != null`
@@ -100,7 +105,9 @@ Auftrag: HAN-23 (CEO, Entscheidung aus HAN-22). Glied: **Sagen**. Frist: live bi
    Container und kann `ops/` nicht lesen), und ein Test haelt beide gleich, wie
    `test/ours.test.ts` es fuer die Wallets tut.
 8. **`ops/db-report.cjs`, zwei Felder unter `market`:**
-   - `order_chats_30d`: Zeilen in `order_briefs` der letzten dreissig Tage, deren E-Mail nicht in
+   - `order_briefs_30d` (hiess `order_chats_30d`, umbenannt nach HAN-25, Auflage 1: gezaehlt wird
+     ein Formular, kein Gespraech, und die Zahl gilt nirgends als Erfuellung von Ziel 1 "Gespraech
+     antwortet live"): Zeilen in `order_briefs` der letzten dreissig Tage, deren E-Mail nicht in
      `ops/ours.txt` steht. Heisst: fremde Angaben, die bis zur Kasse gekommen sind.
    - `human_orders_paid_30d`: `checkouts` mit `status = 'paid'`, `provider = 'stripe'`,
      `settled_at` in dreissig Tagen, verknuepft mit `order_briefs`, E-Mail nicht unsere.
@@ -110,7 +117,7 @@ Auftrag: HAN-23 (CEO, Entscheidung aus HAN-22). Glied: **Sagen**. Frist: live bi
      `human_orders_paid_30d` von Blindheit unterscheidbar.
    Gegenprobe im Test in beide Richtungen: eine gepflanzte fremde bezahlte `stripe`-Zeile zaehlt
    in beiden Feldern; dieselbe mit `@postyourprice.com` zaehlt in keinem; dieselbe fremde als
-   `stripe_test` zaehlt in `order_chats_30d`, nicht in `human_orders_paid_30d`.
+   `stripe_test` zaehlt in `order_briefs_30d`, nicht in `human_orders_paid_30d`.
 9. **`ops/traffic.sh`** zaehlt fremde Adressen mit `GET /katalog/bestellen` (Status 200) als
    `order_page_opened`, mit je einer Fixture im `--selftest` fuer "fremd zaehlt" und "eigene IP
    zaehlt nicht". Ohne diese Zahl ist die zweite widerlegende Messung (Gespraech geoeffnet, keiner
@@ -136,10 +143,10 @@ Auftrag: HAN-23 (CEO, Entscheidung aus HAN-22). Glied: **Sagen**. Frist: live bi
    c.created_at > <Deploy> AND c.offer IS NOT NULL AND b.reference IS NULL` ist **0**. Das ist
    Zahl 1 des Auftrags, aber sie ist per Bau erfuellt (Zahl 2 laesst keine Zeile ohne Angaben
    zu) und damit ein Test, keine Zahl. Sie bleibt als Wache gegen einen zweiten Code-Pfad.
-   **Die Zahl, die zaehlt, ist eine Anzahl:** `order_chats_30d`, fremde Zeilen mit Angaben, die
+   **Die Zahl, die zaehlt, ist eine Anzahl:** `order_briefs_30d`, fremde Zeilen mit Angaben, die
    die Mindestregeln bestanden haben. Heute 0, und bis ein Kanal zu deutschsprachigen Kaeufern
    steht, bleibt sie 0 unter jeder Hypothese.
-5. `ops/db-report.cjs` in Produktion: `order_chats_30d = 0`, `human_orders_paid_30d = 0`, obwohl
+5. `ops/db-report.cjs` in Produktion: `order_briefs_30d = 0`, `human_orders_paid_30d = 0`, obwohl
    die Vorfuehrung aus 3 in der Tabelle steht. Das ist die Gegenprobe gegen die eigene Zeile.
 
 ### Was dieses Goal nicht weiss und nicht tut
@@ -169,9 +176,21 @@ Auftrag: HAN-23 (CEO, Entscheidung aus HAN-22). Glied: **Sagen**. Frist: live bi
   jede Ausnahme kommt als `email`-Zeile in `ops/ours.txt`, bevor die Vorfuehrung laeuft.
 
 ### Blockers
-- **Recht (CFO):** braucht die gespeicherte E-Mail einen Hinweis auf der Seite, und welchen
-  Wortlaut? Vor dem Ausrollen, nicht danach.
-- ~~Skeptiker~~: Urteil in HAN-24, freigegeben mit den Aenderungen oben.
+Keine mehr. Was die Antworten verlangt haben und wie es gebaut ist:
+- **Skeptiker, HAN-25:** die Kreuzprobe E-Mail gegen IP steht in `ops/traffic.sh`
+  (`CP_ORDER_BRIEFS_30D`, FINDING, wenn `order_briefs_30d` die fremden 303 uebersteigt);
+  `order_page_opened` zaehlt nur mit Seitenskript, Accept-Language und ohne Crawler-Pfade; die
+  Bestellseite ist `noindex`, der Link `rel="nofollow"`; `ops/ours.txt` fuehrt die RFC-2606-Domains;
+  der Diff an `test/stripe-checkout.test.ts` entfernt kein `expect`; alle Felder `required`;
+  Done 4 mit `c.offer IS NOT NULL`; keine Adresse und kein Text in Report oder Log.
+- **Recht, HAN-26:** der Satz unter dem E-Mail-Feld wortgleich, `/datenschutz` im deutschen
+  Rahmen, verlinkt im Fuss beider Rahmen; Loeschung stuendlich, unbezahlt 30 Tage ab
+  `created_at`, bezahlt 120 Tage ab `settled_at`; die Seite liest beide Fristen aus dem Code.
+- **Zwei-Woerter-Regel:** woertlich "zwei Woerter aus Buchstaben" lehnt das eigene Beispiel
+  "70. Geburtstag" ab. Gebaut ist: zwei Folgen aus mindestens zwei Buchstaben oder Ziffern,
+  mindestens ein Buchstabe. "x x" und "xxxxxxxxxx" fallen weiter durch.
+- **Offen fuer Matthias, nicht fuer den 01.10.:** wer Verantwortlicher und Verkaeufer ist, wenn
+  Stripe live ueber HTC laeuft. Impressum und `/datenschutz` nennen bis dahin Matthias privat.
 
 (Historie: Goal 20, der Kartenweg im Stripe-Testmodus, in
 `goals/2026-09-29-goal-20-kartenweg.md`.)

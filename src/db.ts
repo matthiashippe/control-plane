@@ -280,6 +280,21 @@ function migrate(db: Db): void {
 
   migrateCheckoutsV2(db);
 
+  // What a buyer said they need and where to reach them (Goal 21, 2026-09-29). A table of its own
+  // rather than two columns on `checkouts`: SQLite cannot add a NOT NULL column without a default
+  // to a table that has rows, and the twelve test rows in production on 2026-09-29 have neither.
+  // The CHECKs hold the rule even for a later code path that forgets to validate. `brief` is JSON
+  // with the offer's fields (HAN-24), so the minimums per field live in OFFERS, not here.
+  // The rows are deleted on a schedule set by Recht (HAN-26), see `cleanupOrderBriefs`.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS order_briefs (
+      reference  TEXT PRIMARY KEY REFERENCES checkouts(reference),
+      brief      TEXT NOT NULL CHECK (json_valid(brief) AND json_type(brief) = 'object'),  -- the offer's fields
+      email      TEXT NOT NULL CHECK (email LIKE '%_@_%._%'),
+      created_at TEXT NOT NULL
+    );
+  `);
+
   // Reservations belong to requests in flight. A freshly started process has none, so leftover
   // values are the remains of a crash in the middle of a provider call. Resetting them here is only
   // correct as long as exactly one process works on this file, and that is exactly how the service
@@ -476,6 +491,35 @@ export function cleanupExpired(db: Db, now = Date.now()): { nonces: number; sess
     return { nonces, sessions, payments };
   });
   return run();
+}
+
+/** Days an unpaid order's brief and email are kept, counted from `order_briefs.created_at`. */
+export const UNPAID_BRIEF_DAYS = 30;
+/** Days a paid order's brief and email are kept, counted from `checkouts.settled_at`. */
+export const PAID_BRIEF_DAYS = 120;
+
+/**
+ * Deletes what a buyer typed once there is no reason left to keep it (HAN-26, 2026-09-29).
+ *
+ * The periods are Recht's and are published on /datenschutz, so the page and this function have to
+ * agree (test/order-brief.test.ts). Unpaid: 30 days, which is also the window of
+ * `order_briefs_30d`, so the number stays readable. Paid: 120 days after the payment, which covers
+ * withdrawal, the rounds of changes and a chargeback, where the brief is the proof of what was
+ * ordered. The same for `stripe` and `stripe_test`, because a test payment still carries a real
+ * person's address. `checkouts` stays: it names no person.
+ */
+export function cleanupOrderBriefs(db: Db, now = Date.now()): number {
+  const day = 24 * 60 * 60 * 1000;
+  return db
+    .prepare(
+      `DELETE FROM order_briefs WHERE reference IN (
+         SELECT b.reference FROM order_briefs b JOIN checkouts c USING (reference)
+          WHERE (c.status != 'paid' AND b.created_at < ?)
+             OR (c.status = 'paid' AND c.settled_at < ?)
+       )`,
+    )
+    .run(new Date(now - UNPAID_BRIEF_DAYS * day).toISOString(), new Date(now - PAID_BRIEF_DAYS * day).toISOString())
+    .changes;
 }
 
 /** Key-value store for small things that have to survive a restart. */

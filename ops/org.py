@@ -76,7 +76,8 @@ def main():
     print("  Glieder:")
     for name, key in (
         ("Sehen      Besucher im Katalog:     ", "catalog_views_30d"),
-        ("Sagen      Gespraeche zur Bestellung:", "order_chats_30d"),
+        # Ein Formular mit einer festen Rueckfrage, kein Gespraech (HAN-25, Auflage 1, 29.09.2026).
+        ("Sagen      Angaben vor der Kasse:   ", "order_briefs_30d"),
         ("Bezahlen   bezahlte Bestellungen:   ", "human_orders_paid_30d"),
         ("Bekommen   Fassungen je Bestellung: ", "versions_per_order_median"),
     ):

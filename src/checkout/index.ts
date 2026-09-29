@@ -20,7 +20,7 @@
  */
 
 import { postLedger, ensureWallet, MC_PER_CENT, type Db } from "../db.js";
-import { OFFERS } from "../public/catalog.js";
+import { OFFERS, type Offer } from "../public/catalog.js";
 import { isStripeTestKey } from "../payments/stripe-key.js";
 
 /** Every card payment here is in euro. The catalogue prices are euro cents. */
@@ -50,7 +50,8 @@ export const MIN_CENTS = 1_000;
 export const MAX_CENTS = 50_000;
 
 export class CheckoutError extends Error {
-  constructor(readonly code: string, readonly status: number, readonly hint: string) {
+  /** `field` names the order-page field a refusal is about, so the page can say which one. */
+  constructor(readonly code: string, readonly status: number, readonly hint: string, readonly field?: string) {
     super(code);
   }
 }
@@ -88,6 +89,8 @@ export interface CheckoutProvider {
     cents: number;
     address?: string;
     offer?: { id: string; name: string };
+    /** The buyer's address, already validated. Only an offer carries one (Goal 21). */
+    email?: string;
   }): Promise<{ reference: string; redirect: string }>;
   /** Which payment a callback names, without asking anybody. Empty when it names none. */
   reference(payload: unknown): string;
@@ -162,26 +165,84 @@ export async function beginCheckout(
   return { checkout: { reference, address, offer: null, cents, provider: provider.name, status: "pending" }, redirect };
 }
 
+/** RFC 5321 caps a path at 256 octets including the brackets, which leaves 254 for the address. */
+export const EMAIL_MAX = 254;
+/** Something, an at sign, something with a dot. Deliberately loose: a real address is never refused. */
+export const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 /**
- * Starts a payment for a catalogue offer, by a person who has no wallet (Goal 20).
+ * Two words, so "xxxxxxxxxx" is not an occasion (HAN-24).
  *
- * Takes an offer id and nothing else. The price is looked up in OFFERS, so a form that sends a
- * price of its own has nowhere to put it.
+ * A word is two or more letters or digits in a row, and at least one letter has to be there.
+ * GOAL.md says "two words of letters", read literally that refuses its own positive example
+ * "70. Geburtstag", which has one; so digits count as a word, and "x x" still does not.
+ */
+export function hasTwoWords(text: string): boolean {
+  return (text.match(/[\p{L}\p{N}]{2,}/gu) ?? []).length >= 2 && /\p{L}/u.test(text);
+}
+
+/**
+ * The offer's fields out of a form, checked, trimmed and in the offer's order. Anything the offer
+ * does not ask for is dropped, so a form cannot store more than the page showed.
+ */
+export function checkBrief(offer: Offer, input: Readonly<Record<string, string>>): Record<string, string> {
+  const brief: Record<string, string> = {};
+  for (const f of offer.fields) {
+    const value = (input[f.name] ?? "").trim();
+    const ok =
+      f.kind === "choice"
+        ? f.options.includes(value)
+        : value.length >= f.min && value.length <= f.max && hasTwoWords(value);
+    if (!ok) {
+      const rule = f.kind === "choice" ? `one of ${f.options.join(", ")}` : `${f.min} to ${f.max} characters and two words`;
+      throw new CheckoutError("brief_invalid", 400, `${f.name} must be ${rule}.`, f.name);
+    }
+    brief[f.name] = value;
+  }
+  return brief;
+}
+
+/**
+ * Starts a payment for a catalogue offer, by a person who has no wallet (Goal 20, Goal 21).
+ *
+ * The price is looked up in OFFERS, so a form that sends a price of its own has nowhere to put it.
+ *
+ * Since Goal 21 (2026-09-29) nobody reaches Stripe without filling the offer's fields and leaving
+ * an address. Every check runs before the provider is asked and before a row is written, so a
+ * refusal costs no Stripe call and leaves no row. The address goes into `order_briefs` only, never
+ * into `checkouts.address`: that column is a wallet, and `finishSettle` credits every row that has
+ * one (HAN-24). It is written as an explicit null here for that reason. The old signature with the offer id alone is gone on
+ * purpose, so the old way cannot be reached from code either. Both rows go in one transaction:
+ * Done 4 of Goal 21 counts checkouts without a brief, and that number has to be able to stay 0.
  */
 export async function beginOfferCheckout(
   db: Db,
   provider: CheckoutProvider,
-  offerId: string,
+  input: { offerId: string; brief: Readonly<Record<string, string>>; email: string },
 ): Promise<{ checkout: Checkout; redirect: string }> {
   requireEnabled();
-  const offer = OFFERS.find((o) => o.id === offerId);
+  const offer = OFFERS.find((o) => o.id === input.offerId);
   if (!offer) throw new CheckoutError("unknown_offer", 400, "There is no offer with that id.");
+  const brief = JSON.stringify(checkBrief(offer, input.brief));
+  const email = input.email.trim().toLowerCase();
+  if (email.length > EMAIL_MAX || !EMAIL_PATTERN.test(email)) {
+    throw new CheckoutError("email_invalid", 400, "That is not an email address.");
+  }
   const cents = offer.priceCents;
-  const { reference, redirect } = await provider.begin({ cents, offer: { id: offer.id, name: offer.name } });
+  const { reference, redirect } = await provider.begin({ cents, offer: { id: offer.id, name: offer.name }, email });
   if (!reference) throw new CheckoutError("provider_no_reference", 502, "The payment provider did not name the payment.");
-  db.prepare(
-    "INSERT INTO checkouts (reference, offer, cents, provider, status, created_at) VALUES (?, ?, ?, ?, 'pending', ?)",
-  ).run(reference, offer.id, cents, provider.name, new Date().toISOString());
+  const now = new Date().toISOString();
+  db.transaction(() => {
+    db.prepare(
+      "INSERT INTO checkouts (reference, address, offer, cents, provider, status, created_at) VALUES (?, NULL, ?, ?, ?, 'pending', ?)",
+    ).run(reference, offer.id, cents, provider.name, now);
+    db.prepare("INSERT INTO order_briefs (reference, brief, email, created_at) VALUES (?, ?, ?, ?)").run(
+      reference,
+      brief,
+      email,
+      now,
+    );
+  })();
   return {
     checkout: { reference, address: null, offer: offer.id, cents, provider: provider.name, status: "pending" },
     redirect,

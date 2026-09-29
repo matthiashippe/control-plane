@@ -6,7 +6,7 @@
  * thing a buyer reads, and it names things a buyer has nothing to do with. So this frame links
  * only what such a reader needs, and says the same facts as the English footer, no more.
  *
- * Only /katalog uses it. The other pages keep their frame, because their readers are operators
+ * The catalogue, its order and thanks pages and /datenschutz use it. The other pages keep their frame, because their readers are operators
  * and agents, and changing them was not asked for.
  */
 export function germanFrame(bodyHtml: string, statusScript: string): string {
@@ -24,7 +24,7 @@ export function germanFrame(bodyHtml: string, statusScript: string): string {
 <main>${bodyHtml}</main>
 <footer><div class="wrap">
   Betrieben von Matthias Hippe, San-Francisco-Straße 1, 20457 Hamburg.
-  <a href="/terms#impressum">Impressum</a>.
+  <a href="/terms#impressum">Impressum</a>, <a href="/datenschutz">Datenschutz</a>.
 </div></footer>
 ${statusScript}
 </body>

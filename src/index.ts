@@ -24,7 +24,7 @@ import path from "node:path";
 import { createServer as createHttpsServer } from "node:https";
 import { serve } from "@hono/node-server";
 import { createApp, VERSION } from "./app.js";
-import { cleanupExpired, getKV, openDb, setKV } from "./db.js";
+import { cleanupExpired, cleanupOrderBriefs, getKV, openDb, setKV } from "./db.js";
 import { MockProvider } from "./inference/mock.js";
 import { OpenRouterProvider, openRouterFromEnv } from "./inference/openrouter.js";
 import { aliasesFromEnv, Catalog, providersFromEnv } from "./inference/proxy.js";
@@ -97,6 +97,9 @@ const cleanup = () => {
     if (removed.nonces || removed.sessions || removed.payments) {
       console.log(`[cleanup] removed ${removed.nonces} nonces, ${removed.sessions} sessions, ${removed.payments} old failed payments`);
     }
+    // A count only: the rows hold a person's email and what they wrote (HAN-25, condition 8).
+    const briefs = cleanupOrderBriefs(db);
+    if (briefs) console.log(`[cleanup] removed ${briefs} order briefs past their retention period`);
   } catch (err) {
     console.error(`[cleanup] failed: ${err instanceof Error ? err.message : String(err)}`);
   }

@@ -648,4 +648,58 @@ if (db.prepare("PRAGMA table_info(checkouts)").all().some((c) => c.name === "off
   ).s;
 }
 
+// Buyers who are us, or no person at all: a copy of ops/ours.txt (Goal 21, 2026-09-29), because
+// this script runs on stdin inside the container and cannot read ops/. test/order-brief.test.ts
+// holds the two equal. A domain matches the address's domain and every subdomain of it.
+const OUR_EMAILS = [
+];
+const OUR_EMAIL_DOMAINS = [
+  "postyourprice.com",
+  "handsel.dev",
+  // RFC 2606. An agent checking the path types these (HAN-25, condition 4).
+  "example.com",
+  "example.org",
+  "example.net",
+  "test",
+  "invalid",
+  "example",
+];
+const ourEmail = (email) => {
+  const e = String(email).trim().toLowerCase();
+  const domain = e.slice(e.lastIndexOf("@") + 1);
+  return OUR_EMAILS.includes(e) || OUR_EMAIL_DOMAINS.some((d) => domain === d || domain.endsWith(`.${d}`));
+};
+
+// Two numbers from what a buyer typed before paying (Goal 21). Counts only: no address and no
+// brief leaves this script, not even in a debug line (HAN-25, condition 8).
+//
+//   order_briefs_30d       briefs of the last thirty days whose email is not ours: strangers who
+//                          said what they need and were sent on to Stripe. Not a conversation and
+//                          not goal 1's "Gespräch antwortet live": it is one fixed question in a
+//                          form (HAN-25, condition 1).
+//   human_orders_paid_30d  of those, paid with a live key in the last thirty days. `stripe_test`
+//                          never counts: a test card is a demonstration (Sperrliste 0).
+//   human_orders_pending_30d  the same buyers and the same live key, still `pending` more than an
+//                          hour after they started. There is no webhook: a payment is booked only
+//                          when the buyer comes back to /katalog/danke, and whoever closes the tab
+//                          stays pending (HAN-24). This tells a 0 above from blindness.
+//
+// The email is one mark of "ours" only. ops/traffic.sh counts foreign 303s on POST /katalog/kaufen
+// by IP, and order_briefs_30d above that count means one of ours slipped past this list.
+if (db.prepare("select name from sqlite_master where type = 'table' and name = 'order_briefs'").get()) {
+  const since30 = new Date(Date.now() - 30 * 86400e3).toISOString();
+  const briefs = all(
+    `select b.email, b.created_at, c.status, c.provider, c.settled_at
+       from order_briefs b join checkouts c using (reference)`,
+  ).filter((r) => !ourEmail(r.email));
+  report.market.order_briefs_30d = briefs.filter((r) => r.created_at > since30).length;
+  report.market.human_orders_paid_30d = briefs.filter(
+    (r) => r.status === "paid" && r.provider === "stripe" && r.settled_at && r.settled_at > since30,
+  ).length;
+  const hourAgo = new Date(Date.now() - 3600e3).toISOString();
+  report.market.human_orders_pending_30d = briefs.filter(
+    (r) => r.status === "pending" && r.provider === "stripe" && r.created_at > since30 && r.created_at < hourAgo,
+  ).length;
+}
+
 console.log(JSON.stringify(report));

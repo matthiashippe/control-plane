@@ -453,11 +453,17 @@ not exist.
 
 No browser has ever opened any of the three.
 
-**`/katalog`** is the start of a journey that is not built yet (HAN-14, 2026-09-30): the buyer
-without a wallet, who reads what can be bought, what it costs and what arrives, in German. Three
-offers (prices live in `OFFERS` in `src/public/catalog.ts`, not here), and nothing to click, because the conversation and the card payment
-behind it do not exist. Its own depth marks (`katalog-top` and one after each offer) are counted
-per page by `ops/traffic.sh`, so whether anybody reads it is a number and not a guess.
+**`/katalog`** is the start of the journey for a buyer without a wallet (HAN-14, 2026-09-30), who
+reads what can be bought, what it costs and what arrives, in German. Three offers (prices live in
+`OFFERS` in `src/public/catalog.ts`, not here). Since Goal 21 (2026-09-29) each links to
+`/katalog/bestellen`, which asks one fixed question about the text and an email address, and only
+then posts to `/katalog/kaufen` and on to Stripe. That is a form, not the conversation ZIELE.md
+asks for. Its own depth marks (`katalog-top` and one after each offer) are counted per page by
+`ops/traffic.sh`, and so is the order page, so whether anybody reads it is a number and not a
+guess.
+
+**`/datenschutz`** is the privacy notice the order page links under its email field (HAN-26). It
+carries no journey: it is read before a step, not walked as one.
 
 ## Where the two sides meet
 

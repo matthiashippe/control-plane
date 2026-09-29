@@ -221,11 +221,22 @@ chat=${chat:-0}
 # Die ID kommt aus der laufenden Seite, damit die Probe auch prueft, dass der Knopf dort steht.
 # Der Weiterleitung wird nicht gefolgt. Jeder Lauf legt eine Stripe-Session und eine Zeile
 # `pending` an; die zaehlt nirgends, weil jede Zahl in ops/db-report.cjs `status = 'paid'` verlangt.
-angebot=$(printf '%s' "$katalog_html" | grep -o 'name="angebot" value="[a-z0-9-]*"' | head -1 | sed 's/.*value="//; s/"$//')
+#
+# Seit Goal 21 (29.09.2026) ist der Knopf ein Link auf /katalog/bestellen, und POST /katalog/kaufen
+# ohne die Felder des Angebots antwortet 400. Die Probe nimmt deshalb immer die Rede und schickt das
+# Beispiel aus GOAL.md mit (Punkt 4), dazu eine Adresse unter @postyourprice.com, damit ihre Zeile
+# in `order_briefs` als unsere zaehlt (ops/ours.txt) und nicht in `order_briefs_30d` landet.
+# Bis zum Deploy steht noch das alte Formular live; beide Formen werden gelesen, und der alte Weg
+# ignoriert die zusaetzlichen Felder.
+angebot=$(printf '%s' "$katalog_html" | grep -oE '(name="angebot" value="|href="/katalog/bestellen\?angebot=)rede-zum-fest' \
+  | head -1 | sed -E 's/.*(value="|angebot=)//')
 karte=0
 if [[ -n "$angebot" ]]; then
   karte=$(karte_urteil "$(curl -s -m 25 -o /dev/null -w '%{http_code} %{redirect_url}' \
-    -d "angebot=$angebot" "$BASE/katalog/kaufen")")
+    -d "angebot=$angebot" --data-urlencode "anlass=70. Geburtstag" \
+    --data-urlencode "person=meine Mutter Ingrid" --data-urlencode "laenge=5 Minuten" \
+    --data-urlencode "inhalt=Probe von ops/ziele.sh, keine Bestellung. Sie war 35 Jahre Grundschullehrerin in Kassel." \
+    -d "email=ziele-probe@postyourprice.com" "$BASE/katalog/kaufen")")
 fi
 
 printf '%s\n%s\n' "$status" "$report" \

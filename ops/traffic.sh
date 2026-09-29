@@ -100,7 +100,44 @@ print(max(1, math.ceil((time.time() - min(stamps)) / 3600) + 1))
   if [[ "${hits:-0}" -eq 0 ]]; then
     echo "SELFTEST FAILED: the catalogue window has to open at the first 200 (12:00), not at the 404 (08:00)"; fail=1
   fi
-  [[ "$fail" -eq 0 ]] && echo "SELFTEST OK: a real search arrival, two that only claim one, and a control, told apart over a ${hours} hour window; the catalogue counted per page in both directions."
+  # The order page (Goal 21, HAN-25 conditions 2 and 3), in both directions. One fixture: our
+  # checker and our own IP do everything a buyer does and count nowhere; Googlebot follows the link,
+  # runs the script, sends Accept-Language and still does not count, because it asked for
+  # robots.txt; one stranger opens the page and gets a 303; another stranger posts `angebot` alone
+  # and gets a 400. The window is computed from the fixture, so it cannot age out.
+  order_fixture="$(dirname "$fixture")/traffic-order-page.log"
+  order_hours=$(python3 -c "
+import json, math, sys, time
+stamps = [json.loads(l)[chr(116)+chr(115)] for l in open(sys.argv[1]) if l.strip()]
+print(max(1, math.ceil((time.time() - min(stamps)) / 3600) + 1))
+" "$order_fixture")
+  order_run() { CP_PAGES="/ /katalog /check /fix /post" CP_TRAFFIC_LOG="$order_fixture" "$@" "${BASH_SOURCE[0]}" "$order_hours" 2>/dev/null; }
+  order_want() { # output, extended regex, reason
+    if ! printf '%s' "$1" | /usr/bin/grep -qE -- "$2"; then
+      echo "SELFTEST FAILED: the order block no longer says: $2"
+      echo "                 ($3)"
+      fail=1
+    fi
+  }
+  out_order=$(order_run env)
+  order_want "$out_order" "^   2 address\(es\) fetched /katalog/bestellen" \
+    "the stranger and Googlebot fetched it; our checker and our own IP did not count"
+  order_want "$out_order" "^   1 address\(es\) opened the order page" \
+    "the stranger counts, Googlebot following the link does not"
+  order_want "$out_order" "asked for /sitemap.xml or /robots.txt" \
+    "Googlebot has to be set aside for its crawler path, visibly"
+  order_want "$out_order" "foreign: 1 x 303 from 1 address\(es\), 1 x 400 from 1 address\(es\)" \
+    "our own 303 must not count, the stranger's 303 and 400 must"
+  order_want "$out_order" "not compared with order_briefs_30d" \
+    "without the report's number the block says it compared nothing"
+  order_want "$(order_run env CP_ORDER_BRIEFS_30D=2)" "FINDING: order_briefs_30d = 2 is larger than the 1 foreign" \
+    "two briefs by email against one foreign 303 by IP means one of ours slipped through"
+  order_want "$(order_run env CP_ORDER_BRIEFS_30D=1)" "order_briefs_30d = 1, not more than the 1 foreign 303\(s\) here: consistent" \
+    "one against one is no finding"
+  if order_run env CP_ORDER_BRIEFS_30D=1 | /usr/bin/grep -q "FINDING"; then
+    echo "SELFTEST FAILED: one brief against one foreign 303 must not raise a finding"; fail=1
+  fi
+  [[ "$fail" -eq 0 ]] && echo "SELFTEST OK: a real search arrival, two that only claim one, and a control, told apart over a ${hours} hour window; the catalogue counted per page in both directions; the order page and its cross-check in both directions."
   exit "$fail"
 fi
 
@@ -717,6 +754,109 @@ for reason, n in why.most_common():
     print(f"     {n:>4}  set aside: {reason}")
 print("   Ours are out: ops/own-ips.txt and the control-plane-check/1.0 user agent.")
 KATALOG
+echo
+
+# The order page and the POST behind it (Goal 21, 2026-09-29), with the sceptic's conditions 2 and 3
+# from HAN-25.
+#
+#   order_page_opened   foreign addresses that opened /katalog/bestellen (200), ran the page script
+#                       from it (/v1/status with the order page as referrer), sent Accept-Language
+#                       there, and never asked for /sitemap.xml or /robots.txt. The catalogue link
+#                       is a plain link, and every crawler that follows it gets a 200; without these
+#                       rules Googlebot reads as a person who opened the order and did not pay.
+#   POST /katalog/kaufen, foreign, split into 303 (sent on to Stripe) and 400 (refused, no row).
+#
+# The cross-check: `order_briefs_30d` in ops/db-report.cjs decides "not ours" by email, this block
+# by IP. Two independent marks. Pass the report's number in CP_ORDER_BRIEFS_30D and a FINDING is
+# printed when it is larger than the foreign 303s here, because then one of our own purchases got
+# past the email list (an agent typing a private address). Without the variable nothing is
+# compared, and the output says so rather than staying silent.
+#
+# Window: from the first 200 of /katalog/bestellen in the log, or CP_ORDER_SINCE (epoch seconds).
+# The access log keeps 30 days (roll_keep_for 720h), the same as the report's window.
+python3 - "$log" <<'ORDER' || { echo "   (the order block died; the traceback is above)" >&2; FUNNEL_BROKE=1; }
+import collections, datetime, json, os, re, sys
+
+own = set(os.environ.get("CP_OWN_IPS_RESOLVED", "").split())
+hosts = (os.environ.get("CP_OWN_HOSTS") or "cp.hippe.eu").split()
+CRAWLER_PATHS = ("/sitemap.xml", "/robots.txt")
+
+rows, answered = [], []
+for raw in open(sys.argv[1], encoding="utf-8", errors="replace"):
+    raw = raw.strip()
+    if not raw.startswith("{"):
+        continue
+    try:
+        r = json.loads(raw)
+    except ValueError:
+        continue
+    q = r.get("request", {})
+    h = q.get("headers", {}) or {}
+    first = lambda k: ((h.get(k) or [""])[0] or "")
+    row = (float(r.get("ts", 0)), q.get("remote_ip", ""), q.get("method", "GET"), str(q.get("uri", "")).split("?")[0],
+           int(r.get("status") or 0), first("Referer"), first("User-Agent"), first("Accept-Language"))
+    rows.append(row)
+    if row[3] == "/katalog/bestellen" and row[4] == 200:
+        answered.append(row[0])
+print("-- The order page, since it went live --")
+if not answered:
+    print("   /katalog/bestellen has never answered 200 in this log, so nothing here can be measured yet.")
+    raise SystemExit(0)
+since = float(os.environ.get("CP_ORDER_SINCE") or min(answered))
+at = lambda t: datetime.datetime.fromtimestamp(t, datetime.timezone.utc).strftime("%Y-%m-%d %H:%M")
+latest = max(r[0] for r in rows)
+source = "CP_ORDER_SINCE" if os.environ.get("CP_ORDER_SINCE") else "first 200 of /katalog/bestellen in the log"
+print(f"   window: {at(since)} to {at(latest)} UTC, {(latest - since) / 3600:.1f} h ({source}); source: access log")
+
+fetched = set()
+e = collections.defaultdict(lambda: {"script": False, "lang": False, "browser": False, "crawler": False})
+posts = collections.Counter()
+posters = collections.defaultdict(set)
+for ts, ip, method, path, status, ref, agent, lang in rows:
+    if ts < since or ip in own or agent.startswith("control-plane-check"):
+        continue
+    if path.startswith(CRAWLER_PATHS):
+        e[ip]["crawler"] = True
+    if path == "/katalog/bestellen" and status == 200:
+        fetched.add(ip)
+        e[ip]["lang"] = e[ip]["lang"] or bool(lang)
+        e[ip]["browser"] = e[ip]["browser"] or "Mozilla/" in agent
+    elif path.startswith("/v1/status") and any(hh in ref for hh in hosts) and re.search(r"/katalog/bestellen([?#]|$)", ref):
+        e[ip]["script"] = True
+    elif path == "/katalog/kaufen" and method == "POST" and status in (303, 400):
+        posts[status] += 1
+        posters[status].add(ip)
+
+opened, why = [], collections.Counter()
+for ip in sorted(fetched):
+    x = e[ip]
+    if not x["browser"]:
+        why["not a browser"] += 1
+    elif x["crawler"]:
+        why["asked for /sitemap.xml or /robots.txt, which a reader does not"] += 1
+    elif not x["script"]:
+        why["never ran the page script from /katalog/bestellen"] += 1
+    elif not x["lang"]:
+        why["no Accept-Language, so no browser navigation"] += 1
+    else:
+        opened.append(ip)
+
+print(f"   {len(fetched)} address(es) fetched /katalog/bestellen (fetchers included)")
+print(f"   {len(opened)} address(es) opened the order page (order_page_opened)")
+for reason, n in why.most_common():
+    print(f"     {n:>4}  set aside: {reason}")
+print(f"   POST /katalog/kaufen, foreign: {posts[303]} x 303 from {len(posters[303])} address(es), "
+      f"{posts[400]} x 400 from {len(posters[400])} address(es)")
+reported = os.environ.get("CP_ORDER_BRIEFS_30D", "").strip()
+if not reported:
+    print("   not compared with order_briefs_30d: set CP_ORDER_BRIEFS_30D from ops/db-report.cjs")
+elif int(reported) > posts[303]:
+    print(f"   FINDING: order_briefs_30d = {reported} is larger than the {posts[303]} foreign 303(s) here, "
+          "so a purchase of ours got past ops/ours.txt. Find it by IP, add its address as an `email` line.")
+else:
+    print(f"   order_briefs_30d = {reported}, not more than the {posts[303]} foreign 303(s) here: consistent")
+print("   Ours are out: ops/own-ips.txt and the control-plane-check/1.0 user agent.")
+ORDER
 echo
 
 # What our own posting pulled in, told apart from what came on its own.

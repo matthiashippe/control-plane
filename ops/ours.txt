@@ -1,0 +1,20 @@
+# Buyers who are us, or no person at all (Goal 21, 2026-09-29). One per line:
+#   email <address>          <date>  <why>
+#   email-domain <domain>    <date>  <why>
+# `email-domain d` matches an address at d and at every subdomain of d, so `email-domain test`
+# covers the whole .test top-level domain.
+#
+# ops/db-report.cjs carries a copy (it runs on stdin inside the container and cannot read ops/);
+# test/order-brief.test.ts holds both equal. No personal address of Matthias here: the repo is
+# public. A demonstration always uses an address under @postyourprice.com, and every exception
+# goes in here as an `email` line before the demonstration runs.
+email-domain postyourprice.com  2026-09-29  our domain; every demonstration buys under it
+email-domain handsel.dev        2026-09-29  our other domain
+# Addresses no person has (RFC 2606). An agent checking whether the path still works types these,
+# and without them its purchase would count as a stranger's (HAN-25, condition 4).
+email-domain example.com        2026-09-29  RFC 2606, reserved for examples
+email-domain example.org        2026-09-29  RFC 2606, reserved for examples
+email-domain example.net        2026-09-29  RFC 2606, reserved for examples
+email-domain test               2026-09-29  RFC 2606 top-level domain, reserved for testing
+email-domain invalid            2026-09-29  RFC 2606 top-level domain, never valid
+email-domain example            2026-09-29  RFC 2606 top-level domain, reserved for examples

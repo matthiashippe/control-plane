@@ -30,7 +30,8 @@ import { readSeries, renderX402 } from "./public/x402.js";
 import { readMoneySeries, readReceipts, renderConway } from "./public/conway.js";
 import { renderPost } from "./public/post.js";
 import { renderFix } from "./public/fix.js";
-import { OFFERS, TEST_MODE_LINE, euro, renderCatalog } from "./public/catalog.js";
+import { OFFERS, TEST_MODE_LINE, euro, renderCatalog, renderOrderPage, type Offer } from "./public/catalog.js";
+import { renderPrivacy } from "./public/datenschutz.js";
 import { beginOfferCheckout, checkoutEnabled, CheckoutError, settleCheckout, type CheckoutProvider } from "./checkout/index.js";
 import { stripeFromEnv } from "./payments/stripe.js";
 import { isStripeTestKey } from "./payments/stripe-key.js";
@@ -411,8 +412,9 @@ export function createApp(opts: AppOptions) {
   const OPEN_PREFIXES = ["/pay/"];
   // The card path (Goal 20). Both call Stripe with our secret key on a stranger's word: the POST
   // creates a session, the GET asks whether one is paid. HAN-17: without the GET in here, anybody
-  // could spend our Stripe rate limit and block `begin` for real buyers.
-  const OPEN_PAGES = ["/katalog/kaufen", "/katalog/danke"];
+  // could spend our Stripe rate limit and block `begin` for real buyers. The order page (Goal 21)
+  // asks Stripe nothing, but it is the one step before the POST and belongs to the same path.
+  const OPEN_PAGES = ["/katalog/bestellen", "/katalog/kaufen", "/katalog/danke"];
   if (limiter) {
     const windowSec = Math.round(rateLimitOpts.windowMs / 1000);
     app.use("*", async (c, next) => {
@@ -431,7 +433,7 @@ export function createApp(opts: AppOptions) {
             retry_after_seconds: retryAfterSec,
             message:
               `More than ${rateLimitOpts.limit} requests in ${windowSec} seconds from your address to the ` +
-              "endpoints that work without an API key (/v1/auth/*, /pay/*, /katalog/kaufen, /katalog/danke). Those write to the database " +
+              "endpoints that work without an API key (/v1/auth/*, /pay/*, /katalog/bestellen, /katalog/kaufen, /katalog/danke). Those write to the database " +
               "and /pay also calls a payment facilitator that costs money per call, so they are capped " +
               `to keep the service up for everyone. Wait ${retryAfterSec} seconds and retry; calls to ` +
               "/v1/* with an API key are not capped.",
@@ -738,7 +740,7 @@ export function createApp(opts: AppOptions) {
   Measured and published by Matthias Hippe, San-Francisco-Stra\u00dfe 1, 20457 Hamburg, Germany.
   Data under CC0, code at
   <a href="https://github.com/matthiashippe/control-plane">github.com/matthiashippe/control-plane</a>.
-  <a href="/terms">The fine print</a> and the <a href="/terms#impressum">Impressum</a>.
+  <a href="/terms">The fine print</a>, the <a href="/terms#impressum">Impressum</a> and <a href="/datenschutz">Datenschutz</a>.
 </div></footer>
 </body>
 </html>`;
@@ -851,28 +853,89 @@ export function createApp(opts: AppOptions) {
     );
   });
 
+  /** The order page in the catalogue's frame, with `noindex` (HAN-25, condition 3). */
+  const orderPage = (o: Offer, form: { error?: string; values?: Record<string, string>; email?: string }): string =>
+    page(
+      renderOrderPage(o, { testMode: buying()!.testMode, ...form }),
+      `${o.name} bestellen | Katalog`,
+      `${o.name}, ${euro(o.priceCents)}. Sagen Sie uns, was Sie brauchen, dann geht es zur Bezahlung.`,
+      "/katalog/bestellen",
+      "og.png",
+      [],
+      true,
+      "de",
+      true,
+    );
+
+  /**
+   * Where a buyer says what they need before paying (Goal 21, 2026-09-29).
+   *
+   * Without a known offer, or with the card path off, it sends the visitor to /katalog, like
+   * /katalog/danke without a session id: it is a step of one purchase, not a page for the sitemap.
+   */
+  app.get("/katalog/bestellen", (c) => {
+    if (!indexHtml) return c.json({ error: "no index page built" }, 503);
+    const offer = OFFERS.find((o) => o.id === c.req.query("angebot"));
+    if (!buying() || !offer) return c.redirect("/katalog", 303);
+    return c.html(orderPage(offer, {}));
+  });
+
   /**
    * Buying an offer by card (Goal 20). Outside /v1 on purpose: the auth middleware there decides
    * with `has()` against exact paths (test/v1-ohne-variables-segment.test.ts).
    *
-   * The form carries `angebot` and nothing else that is read. The price comes from OFFERS.
+   * The form carries `angebot`, the offer's fields (OFFERS) and `email`. The price comes from
+   * OFFERS. Since Goal 21 a POST with a field missing or too short, or without an email, answers
+   * 400 and starts nothing; for a known offer the 400 is the order page again, with what was typed
+   * and one sentence naming the field.
    */
   app.post("/katalog/kaufen", async (c) => {
     if (!buying()) return c.text("Kaufen ist hier gerade nicht eingeschaltet.", 404);
     const form = (await c.req.parseBody().catch(() => ({}))) as Record<string, unknown>;
-    const id = typeof form.angebot === "string" ? form.angebot : "";
+    const field = (k: string) => (typeof form[k] === "string" ? (form[k] as string) : "");
+    const id = field("angebot");
+    const offer = OFFERS.find((o) => o.id === id);
+    const values = Object.fromEntries((offer?.fields ?? []).map((f) => [f.name, field(f.name)]));
+    const email = field("email");
     try {
-      const { redirect } = await beginOfferCheckout(opts.db, checkoutProvider!, id);
+      const { redirect } = await beginOfferCheckout(opts.db, checkoutProvider!, { offerId: id, brief: values, email });
       return c.redirect(redirect, 303);
     } catch (e) {
       if (e instanceof CheckoutError && e.code === "unknown_offer") {
         return c.text("Dieses Angebot gibt es nicht.", 400);
+      }
+      if (offer && e instanceof CheckoutError && (e.code === "brief_invalid" || e.code === "email_invalid")) {
+        const f = offer.fields.find((x) => x.name === e.field);
+        const error = !f
+          ? "Bitte geben Sie eine gültige E-Mail-Adresse an, damit wir Sie zu Ihrer Bestellung erreichen."
+          : f.kind === "choice"
+            ? `Bitte wählen Sie bei „${f.label}“ eine Möglichkeit aus.`
+            : `Bitte schreiben Sie bei „${f.label}“ mindestens ${f.min} Zeichen und zwei Wörter.`;
+        return c.html(orderPage(offer, { error, values, email }), 400);
       }
       if (e instanceof CheckoutError) {
         return c.text("Die Bezahlseite ist gerade nicht erreichbar. Bitte versuchen Sie es in ein paar Minuten noch einmal.", 502);
       }
       throw e;
     }
+  });
+
+  /** The privacy notice (HAN-26). German, in the catalogue's frame, and in the sitemap. */
+  app.get("/datenschutz", (c) => {
+    if (!indexHtml) return c.json({ error: "no index page built" }, 503);
+    return c.html(
+      page(
+        renderPrivacy(),
+        "Datenschutz",
+        "Was wir speichern, wenn Sie die Seite aufrufen oder bestellen, wie lange, und welche Rechte Sie haben.",
+        "/datenschutz",
+        "og.png",
+        [],
+        false,
+        "de",
+        true,
+      ),
+    );
   });
 
   /**
@@ -1065,7 +1128,7 @@ export function createApp(opts: AppOptions) {
 
   app.get("/sitemap.xml", (c) => {
     const today = new Date().toISOString().slice(0, 10);
-    const pages = ["/", "/katalog", "/check", "/fix", "/post", "/jobs", "/receipts", "/x402", "/conway", "/terms"];
+    const pages = ["/", "/katalog", "/check", "/fix", "/post", "/jobs", "/receipts", "/x402", "/conway", "/terms", "/datenschutz"];
     return c.body(
       '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
         pages
@@ -1621,7 +1684,8 @@ export function createApp(opts: AppOptions) {
       "  says how much is left.",
       "- /katalog: what a person without a wallet can buy here, in German. Three texts written",
       "  for them (a speech, a cover letter, a text about their business), each with three versions",
-      "  and up to three rounds of changes, with the price. Nothing to order yet.",
+      "  and up to three rounds of changes, with the price. Ordering asks one question about the",
+      "  text and an email address, then goes to a card payment.",
       "- /fix: for an automaton that cannot sign up. How to stop the runtime buying 5 USDC of",
       "  credits it will never receive, the two free ways to make it think again that need nothing",
       "  from this service, and only then what this service does instead.",
@@ -1635,6 +1699,8 @@ export function createApp(opts: AppOptions) {
       "- /terms: the whole of the fine print on one page. Who runs this, what credits are and are",
       "  not, the two weeks of notice if it is shut down, what an agent agrees to by competing,",
       "  where help is, the two free routes that need none of it, and the Impressum.",
+      "- /datenschutz: the privacy notice, in German. What the server logs and what an order",
+      "  stores, who receives it (Stripe), how long each is kept, and the reader's rights.",
       "- /jobs: the same open jobs as a page, with the full briefs and the call that enters.",
       "- /receipts: every job that has been paid out, with the work that won it.",
       "- /x402: both public x402 directories, scanned daily at 04:40 UTC and published as a page:",

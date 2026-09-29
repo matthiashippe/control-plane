@@ -72,7 +72,7 @@ export function stripeProvider(opts: StripeOptions): CheckoutProvider {
 
   return {
     name,
-    async begin({ cents, offer }) {
+    async begin({ cents, offer, email }) {
       const origin = opts.origin().replace(/\/+$/, "");
       const form = new URLSearchParams({
         mode: "payment",
@@ -88,6 +88,9 @@ export function stripeProvider(opts: StripeOptions): CheckoutProvider {
         cancel_url: `${origin}/katalog`,
       });
       if (offer) form.set("metadata[offer]", offer.id);
+      // Goal 21: the address the buyer gave on /katalog/bestellen, so Stripe's page shows it filled
+      // in. In the form body and nowhere else: a URL ends up in logs and in browser histories.
+      if (email) form.set("customer_email", email);
       const s = await call("POST", "/checkout/sessions", form);
       if (!s.id || !s.url) {
         throw new CheckoutError("provider_no_reference", 502, "The payment provider did not name the payment.");
