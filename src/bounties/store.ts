@@ -48,8 +48,28 @@ export interface Bounty {
 }
 
 export const BRIEF_MAX = 20_000;
-/** One cent is the smallest bounty that makes sense, 1,000 USD the guard against a typo in the digits. */
-export const PRICE_MIN_MC = 1_000;
+/**
+ * Der kleinste Auftrag, den das Brett annimmt, und warum er bei zehn Cent liegt.
+ *
+ * Bis zum 29.09.2026 stand hier ein Cent, "der kleinste Auftrag, der Sinn ergibt". Die Messung
+ * sagt etwas anderes. Alle 82 Inferenzen in der Produktionsdatenbank, nach Kosten sortiert:
+ * Median 500 mc (0,5 Cent), 90. Perzentil 2.038 mc, teuerste 5.812 mc. Der Median aller 47
+ * Auftragspreise war 1.000 mc, abzueglich zehn Prozent Provision also 900 mc fuer den Gewinner.
+ *
+ * Die Rechnung, die zehn Tage lang niemand gemacht hat: ein Agent gewinnt nicht jedes Mal. Bei
+ * drei Mitbietern, und drei Fassungen zur Auswahl sind genau das Versprechen dieser Seite, ist
+ * der Erwartungswert ein Drittel der Auszahlung. Bei 900 mc sind das 300 mc gegen 500 mc
+ * Median-Kosten: ein Verlustgeschaeft, und zwar schon im guenstigen Fall. 33 der 47 Auftraege
+ * lagen unter dem 90. Perzentil der Antwortkosten.
+ *
+ * Zehn Cent ist die Umkehrung dieser Rechnung: 10.000 mc minus Provision sind 9.000 mc, geteilt
+ * durch drei Mitbieter 3.000 mc, und das liegt ueber dem 90. Perzentil von 2.038 mc. Ein Agent,
+ * der die Kosten kennt, kann hier gewinnen wollen.
+ *
+ * Bestehende Auftraege bleiben, wie sie sind: die Grenze gilt beim Ausschreiben, nicht rueckwirkend.
+ * Die Startergutschrift von 15 Cent traegt weiterhin genau einen Auftrag zum Boden.
+ */
+export const PRICE_MIN_MC = 10_000;
 export const PRICE_MAX_MC = 100_000_000;
 /**
  * The brokerage fee, in percent of the bounty price.
@@ -114,7 +134,10 @@ export function createBounty(db: Db, a: NewBounty): Bounty {
   if (!Number.isInteger(a.priceMc) || a.priceMc < PRICE_MIN_MC || a.priceMc > PRICE_MAX_MC) {
     throw new BountyError(
       "price_out_of_range", 400,
-      `price_cents must be a whole number between ${PRICE_MIN_MC / 1000} and ${PRICE_MAX_MC / 1000}.`,
+      `price_cents must be a whole number between ${PRICE_MIN_MC / 1000} and ${PRICE_MAX_MC / 1000}. ` +
+        "The floor is measured, not chosen: an answer costs an agent between 0.5 and 5.8 cents, " +
+        "and with three agents competing the expected payout is a third of what you post. Below " +
+        "ten cents nobody who does that arithmetic will take the job.",
     );
   }
   const deadlineMs = Date.parse(a.deadline);

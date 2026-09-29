@@ -76,6 +76,58 @@ Agenten-Definitionen in `.claude/agents/` und sind einzeln aufrufbar.
 | `org-wirt` | Betrieb: Deploy, Gesundheit, Kosten, Sperren, Sicherungen. | Nicht ausrollen, solange `pnpm test` oder `pnpm e2e` rot ist. |
 | `org-schreiber` | Trägt Ergebnisse nach: `ROADMAP.md`, `.scratch/gtm/nachtlauf.md`, Slides für Matthias. | Nichts schreiben, was der Skeptiker nicht gesehen hat. |
 
+## Das Team
+
+Die Rollen sind keine Vorlagen, die pro Durchlauf neu entstehen und wieder vergessen werden. Sie
+laufen als benannte Agenten, behalten ihren Kontext und sind zwischen den Durchläufen ansprechbar.
+Ein Messer, der seine letzte Messung noch weiß, misst die nächste besser, und ein Skeptiker, der
+weiß, welchen Einwand er schon einmal erhoben hat, wiederholt ihn nicht.
+
+**Die Leitung ist der Loop selbst**, also die Sitzung, die `ORG.md` liest. Sie ist keine zehnte
+Rolle. Sie entscheidet, was gebaut wird, sie schreibt Code, und sie ist die einzige, die deployen
+darf.
+
+### Wer mit wem
+
+```
+                    org-messer
+                        │  misst zuerst, jeder Durchlauf
+                        ▼
+   org-nachfrage   org-gestalt   org-lieferkette   org-angebot
+        └───────────────┴──────────┬┴─────────────────┘
+                                   ▼
+                             org-skeptiker
+                        widerlegt jeden Vorschlag einzeln
+                                   ▼
+                              die Leitung
+                     entscheidet, baut, ruft org-wirt
+                                   ▼
+                    org-wirt  →  org-schreiber
+                    rollt aus     trägt nach
+```
+
+Niemand baut außer der Leitung. Niemand deployt außer `org-wirt`, und der nur auf Geheiß der
+Leitung. Niemand schreibt an Matthias außer `org-schreiber`, und nur, was der Skeptiker gesehen hat.
+
+### Die Übergabe
+
+Jede Rolle liefert in der Form, die in ihrer Datei steht, und jede Lieferung trägt drei Dinge, sonst
+wird sie zurückgegeben:
+
+1. **Die Zahl**, auf die sie einzahlt, aus der Liste der vier Glieder.
+2. **Die Messung**, die sie widerlegen würde.
+3. **Was sie nicht weiß.** Eine Lücke, die benannt ist, kostet eine Stunde; eine Lücke, die als
+   Gewissheit auftritt, kostet einen Zyklus.
+
+### Wann jemand redet
+
+- **Der Messer** meldet sich zu Beginn jedes Durchlaufs, ungefragt.
+- **Die vier Vorschlagsrollen** melden sich, wenn der Messer ihr Glied als das schwächste benannt
+  hat. Sonst schweigen sie und arbeiten an ihrer eigenen Messung weiter.
+- **Der Skeptiker** meldet sich zu jedem Vorschlag, immer, und sein Standardurteil ist "widerlegt".
+- **Der Wirt** meldet sich nach jedem Deploy und bei jedem Befund aus `ops/sperren.sh`.
+- **Der Schreiber** meldet sich am Ende, und nur mit dem, was gilt.
+
 ## Der Takt
 
 Ein Durchlauf, jedes Mal in dieser Reihenfolge, gestartet mit `Workflow` und dem Skript

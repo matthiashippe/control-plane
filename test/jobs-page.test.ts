@@ -23,7 +23,9 @@ function setup() {
   db.prepare("INSERT INTO api_keys (address, key_hash, key_prefix, name, created_at) VALUES (?, ?, ?, ?, ?)").run(
     address, hashApiKey(key), key.slice(0, 15), "test", new Date().toISOString(),
   );
-  postLedger(db, { address, kind: "topup", deltaMc: 500_000, ref: "seed" });
+  // 52 Auftraege zum Preisboden von zehn Cent sind 520 Cent, also reicht das alte Guthaben
+  // von 500 Cent hier nicht mehr. Der Test misst die Zaehlung auf der Seite, nicht das Geld.
+  postLedger(db, { address, kind: "topup", deltaMc: 1_000_000, ref: "seed" });
   const post = (body: unknown) =>
     app.request("/v1/bounties", { method: "POST", headers: { "content-type": "application/json", authorization: key }, body: JSON.stringify(body) });
   return { db, app, post, page: async () => (await app.request("/jobs")).text() };
@@ -59,7 +61,7 @@ describe("/jobs", () => {
       const res = await post({
         brief: `FACT SHEET number ${i}. Ninety words maximum, hand in the sheet and nothing else.`,
         kind: "factual",
-        price_cents: 1,
+        price_cents: 10,
         deadline: inAnHour(),
       });
       expect(res.status, `job ${i} could not be posted`).toBe(201);

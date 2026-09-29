@@ -113,7 +113,7 @@ async function main(): Promise<number> {
     body: JSON.stringify({
       brief: "Throwaway job for the MCP production check. It is cancelled as soon as the check is done.",
       kind: "factual",
-      price_cents: 1,
+      price_cents: 10, // Preisboden seit 29.09.2026, siehe PRICE_MIN_MC
       deadline: new Date(Date.now() + 3_600_000).toISOString(),
     }),
   })) as { id: string };

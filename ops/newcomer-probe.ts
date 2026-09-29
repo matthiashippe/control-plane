@@ -155,7 +155,7 @@ async function main(): Promise<number> {
     headers: { authorization: buyerKey, "content-type": "application/json" },
     body: JSON.stringify({
       brief: "Throwaway job for the cold-start probe. Cancelled as soon as the probe is done.",
-      kind: "factual", price_cents: 1,
+      kind: "factual", price_cents: 10, // Preisboden seit 29.09.2026
       deadline: new Date(Date.now() + 3600e3).toISOString(),
     }),
   });

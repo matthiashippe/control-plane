@@ -174,8 +174,10 @@ describe("posting a bounty", () => {
 
     it("takes the grant once, whether it is spent on thinking or on posting", async () => {
       const { a, db } = setup(0);
-      const first = await a.postBounty(bounty({ price_cents: 5 }));
-      const second = await a.postBounty(bounty({ price_cents: 5 }));
+      // Zehn Cent ist der Preisboden seit dem 29.09.2026, und die Kaeufer-Gutschrift von 50 Cent
+      // traegt ihn. Der Test misst, dass die Gutschrift einmal greift, nicht wie teuer ein Auftrag ist.
+      const first = await a.postBounty(bounty({ price_cents: 10 }));
+      const second = await a.postBounty(bounty({ price_cents: 10 }));
 
       expect(first.status, "the first job is the one the pool pays for").toBe(201);
       // And the second is not. The offer is a first job, not a balance to spend across jobs: the
