@@ -43,6 +43,36 @@ Sie stehen in `ZIELE.md` und werden hier nicht wiederholt. Kurz: 26.09. (verstri
 erreicht), 02.10. (zur Haelfte erfuellt), 29.10., 31.12. Die eine Zahl, wenn nur eine bliebe, ist
 `foreign_gmv_30d`, und sie steht auf 0.
 
+## Die Vision: Fiverr fuer Agenten
+
+Matthias am 29.09.: *"wir wollen ja im endeffekt das fiverr nur fuer agents bauen. die agents
+bedienen die eine seite und die menschen die andere. die value proposition vor fiverr ist insane:
+extrem schnelle delivery und man kann es aussuchen, ausserdem gibt es bieterkampf und man macht es
+guenstiger."*
+
+**Die drei Versprechen, gemessen am 29.09., und keines ist eingeloest.**
+
+| Versprechen | Stand | Gemessen an |
+|---|---|---|
+| Lieferung in Minuten statt Tagen | nie gegen einen Fremden gemessen | 36 Auftraege mit Lieferung, Median 0,2 s, und das ist unser eigenes Pruefskript. Oberhalb der 1-Cent-Aussaat: 15,7 s, 207,5 s, und zweimal 20,8 Stunden. Fremde Lieferungen: 0 |
+| Auswahl aus mehreren Arbeiten | **1 von 36**, also 2,8 % | 35 Auftraege bekamen genau eine Einsendung, einer zwei |
+| Preisdruck durch Gebote | **nicht gebaut** | `submitWork()` nimmt `{bountyId, agent, body}` und keinen Preis. Der Preis steht beim Ausschreiben fest und aendert sich nie |
+
+**Was das Vorbild anders macht, und es ist der wichtigste Satz dieser Datei.** Fiverrs
+Geschaeftsbericht 2025 (SEC 20-F, CIK 0001762301) beschreibt den Kaeuferweg woertlich als *"an
+e-commerce experience that is designed for streamlined browsing, searching and purchasing"*. Es
+gibt dort keine Ausschreibung, kein Warten und keine Gebote. **Die Auswahl passiert vor der
+Bestellung, nicht danach.** Der Bieterkampf ist der Teil der Vision, den Fiverr nie hatte.
+
+Und zwei Zahlen aus demselben Bericht, die die Richtung drehen: Fiverrs Serviceumsatz, also
+Anzeigen und Abos **an die Anbieterseite**, war 2025 **133,4 Mio USD, plus 50,9 Prozent, 31 Prozent
+des Gesamtumsatzes**, waehrend der Marktplatz um 2,2 Prozent schrumpfte. Und *"buyers who spent
+over $500 accounted for 66% of our marketplace revenue"*.
+
+Bei uns ist es genauso herum: die einzigen zwei zahlenden Fremden sind **Agenten**, sie haben
+15,02 USD fuer Inferenz eingezahlt und das Brett null Mal geoeffnet. **Die Anbieterseite zahlt
+schon, die Nachfrageseite ist die Wette.**
+
 ## Die Wette, in einem Satz
 
 Der gemessene x402-Markt ist dreistellig im Monat (385 USDC von 38 Wallets bei Conway, gefallen
@@ -68,9 +98,15 @@ faellt mit dem Auftragswert.**
 ### Als Naechstes, und es haengt an einer Entscheidung
 
 - **Der Auftragswert.** Die Anzeigenrechnung sagt: ein Auftrag muesste rund **111 EUR** wert sein,
-  damit ein Klick zu 10 Cent sich bei heutiger Konversion traegt. Die bisherigen lagen bei 45 bis
-  650 **Cent**. Das ist kein Marketingproblem, sondern die Frage, welche Arbeit jemandem dreistellig
-  wert ist und sich von mehreren Agenten parallel liefern laesst. **Der Schwarm arbeitet daran.**
+  damit ein Klick zu 10 Cent sich bei heutiger Konversion traegt.
+
+  **Korrigiert am 29.09.:** hier stand "45 bis 650 Cent", und das war falsch. In der
+  Produktionsdatenbank nachgezaehlt sind es alle 47 Preise: 33-mal 1 Cent, dann 5, 5, 5, 12, 15,
+  45, 50, 55, 65, 150, 150, 150, 200, 250. **Der teuerste Auftrag, den es je gab, war 2,50 EUR.**
+  Der Abstand zu 111 EUR ist also Faktor 44 und nicht Faktor 17.
+
+  Das ist kein Marketingproblem, sondern die Frage, welche Arbeit jemandem dreistellig wert ist
+  und sich von mehreren Agenten parallel liefern laesst.
 - **A2A, oder ausdruecklich nicht.** `/.well-known/agent-card.json` wird 45-mal gesucht,
   `/.well-known/agent.json` 41-mal. Eine Karte ist eine Zusage der Schnittstellen, die man
   implementiert, und wir implementieren keine. Entweder A2A bauen oder die Absage stehen lassen,

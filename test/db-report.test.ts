@@ -6,6 +6,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { POOL_MC } from "../src/credits/starter.js";
+import { OUR_ADDRESSES } from "../src/bounties/ours.js";
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -489,5 +490,91 @@ describe("the money a stranger actually moved", () => {
       bounty(db, "theirs-3", STRANGER, 250 * MC_PER_CENT, "awarded", old);
     });
     expect(r.market.foreign_gmv_30d_mc).toBe(0);
+  });
+});
+
+/**
+ * The vision, as a number that can say no.
+ *
+ * Matthias on 2026-09-29: "wir wollen ja im endeffekt das fiverr nur fuer agents bauen, die agents
+ * bedienen die eine seite und die menschen die andere", with three promises: delivery in minutes,
+ * a choice between several finished pieces of work, and price pressure. A vision without a number
+ * is a wish two weeks later, so `fiverr_orders_30d` is the number.
+ *
+ * An order counts when all three hold: the buyer is foreign and funded themselves, at least two
+ * foreign agents delivered, and the award came within an hour of posting. The loose version would
+ * already read 1 and mean nothing: 44 of the 47 orders were posted by our own operator wallet and
+ * all 37 submissions come from addresses the classifier calls ours.
+ *
+ * These cases build an order that qualifies and then break one condition at a time, because a
+ * number that has only ever been zero is not a measurement.
+ */
+describe("fiverr_orders_30d, the vision as a number", () => {
+  const BUYER = "0x2222222222222222222222222222222222222222";
+  const A1 = "0x3333333333333333333333333333333333333333";
+  const A2 = "0x4444444444444444444444444444444444444444";
+  const now = () => new Date().toISOString();
+
+  /** A complete, qualifying order. `opts` breaks exactly one thing. */
+  function auftrag(opts: { gefoerdert?: boolean; lieferungen?: number; minuten?: number } = {}) {
+    const { gefoerdert = true, lieferungen = 2, minuten = 5 } = opts;
+    return withDb((db) => {
+      for (const a of [BUYER, A1, A2]) {
+        db.prepare("INSERT OR IGNORE INTO wallets (address, balance_mc, created_at) VALUES (?, 0, ?)").run(a, now());
+      }
+      // "Foreign and funded themselves" is a topup row, not a grant.
+      if (gefoerdert) postLedger(db, { address: BUYER, kind: "topup", deltaMc: 500_000, ref: "paid" });
+      const created = new Date(Date.now() - minuten * 60_000).toISOString();
+      db.prepare(
+        "INSERT INTO bounties (id, creator, kind, brief, price_mc, deadline, status, created_at, closed_at) VALUES (?, ?, 'factual', ?, ?, ?, 'awarded', ?, ?)",
+      ).run("job", BUYER, "A brief with a deliverable in it.", 150_000,
+            new Date(Date.now() + 86_400_000).toISOString(), created, now());
+      [A1, A2].slice(0, lieferungen).forEach((a, i) => {
+        db.prepare("INSERT INTO submissions (id, bounty_id, agent, body, created_at) VALUES (?, 'job', ?, 'work', ?)")
+          .run(`s${i}`, a, now());
+      });
+    }).market;
+  }
+
+  it("counts an order where all three promises held", () => {
+    expect(auftrag().fiverr_orders_30d).toBe(1);
+  });
+
+  it("does not count it when the buyer never put money down", () => {
+    const m = auftrag({ gefoerdert: false });
+    expect(m.fiverr_orders_30d).toBe(0);
+    expect(m.fiverr_foreign_funded_orders_30d, "and says which condition failed").toBe(0);
+  });
+
+  it("does not count it when only one agent delivered, because that is not a choice", () => {
+    const m = auftrag({ lieferungen: 1 });
+    expect(m.fiverr_orders_30d).toBe(0);
+    expect(m.fiverr_orders_with_two_foreign_deliveries_30d).toBe(0);
+  });
+
+  it("does not count it when the award took longer than an hour", () => {
+    const m = auftrag({ minuten: 90 });
+    expect(m.fiverr_orders_30d).toBe(0);
+    expect(m.fiverr_orders_awarded_within_the_hour_30d).toBe(0);
+  });
+
+  /** The one that matters most: our own seeding must never read as the market working. */
+  it("does not count an order of ours, however complete it looks", () => {
+    const m = withDb((db) => {
+      const ours = OUR_ADDRESSES[0];
+      for (const a of [ours, A1, A2]) {
+        db.prepare("INSERT OR IGNORE INTO wallets (address, balance_mc, created_at) VALUES (?, 0, ?)").run(a, now());
+      }
+      postLedger(db, { address: ours, kind: "topup", deltaMc: 500_000, ref: "paid" });
+      db.prepare(
+        "INSERT INTO bounties (id, creator, kind, brief, price_mc, deadline, status, created_at, closed_at) VALUES (?, ?, 'factual', ?, ?, ?, 'awarded', ?, ?)",
+      ).run("job", ours, "A brief with a deliverable in it.", 150_000,
+            new Date(Date.now() + 86_400_000).toISOString(), new Date(Date.now() - 300_000).toISOString(), now());
+      [A1, A2].forEach((a, i) => {
+        db.prepare("INSERT INTO submissions (id, bounty_id, agent, body, created_at) VALUES (?, 'job', ?, 'work', ?)")
+          .run(`s${i}`, a, now());
+      });
+    }).market;
+    expect(m.fiverr_orders_30d).toBe(0);
   });
 });

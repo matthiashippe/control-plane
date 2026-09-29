@@ -35,16 +35,16 @@ BASE="${CP_URL:-https://postyourprice.com}"
 if [[ "${1:-}" == "--selftest" ]]; then
   fail=0
   leer='{"paying_wallets":{"total":0,"not_ours":0},"thinking_wallets":{"total":0,"not_ours":0}}'
-  leer_r='{"db":{"market":{"foreign_gmv_30d_mc":0,"foreign_fee_30d_mc":0,"foreign_buyers":0,"open_bounties":0,"starter_grants_left":0,"unclassified_key_names":["fremd"],"stray_submissions_on_open":2}}}'
+  leer_r='{"db":{"market":{"foreign_gmv_30d_mc":0,"foreign_fee_30d_mc":0,"foreign_buyers":0,"open_bounties":0,"starter_grants_left":0,"unclassified_key_names":["fremd"],"stray_submissions_on_open":2,"fiverr_orders_30d":0}}}'
   voll='{"paying_wallets":{"total":9,"not_ours":9},"thinking_wallets":{"total":40,"not_ours":40}}'
-  voll_r='{"db":{"market":{"foreign_gmv_30d_mc":30000000000,"foreign_fee_30d_mc":3000000000,"foreign_buyers":4,"open_bounties":5,"starter_grants_left":9,"unclassified_key_names":[],"stray_submissions_on_open":0}}}'
+  voll_r='{"db":{"market":{"foreign_gmv_30d_mc":30000000000,"foreign_fee_30d_mc":3000000000,"foreign_buyers":4,"open_bounties":5,"starter_grants_left":9,"unclassified_key_names":[],"stray_submissions_on_open":0,"fiverr_orders_30d":3}}}'
 
   out=$(printf '%s\n%s\n' "$leer" "$leer_r" | CP_ZIELE_LISTED_N=0 python3 ./ops/ziele.py); code=$?
   n=$(printf '%s' "$out" | grep -c '^  OFFEN')
-  if (( code == 1 )) && (( n == 11 )); then
-    echo "  ok      nichts erreicht: 11 von 11 Zahlen offen, Exit 1"
+  if (( code == 1 )) && (( n == 12 )); then
+    echo "  ok      nichts erreicht: 12 von 12 Zahlen offen, Exit 1"
   else
-    echo "  FAILED  nichts erreicht gab Exit $code und $n offene Zahlen, erwartet 1 und 11"; fail=1
+    echo "  FAILED  nichts erreicht gab Exit $code und $n offene Zahlen, erwartet 1 und 12"; fail=1
   fi
 
   out=$(printf '%s\n%s\n' "$voll" "$voll_r" | CP_ZIELE_LISTED_N=3 python3 ./ops/ziele.py); code=$?

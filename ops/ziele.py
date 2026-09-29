@@ -72,6 +72,18 @@ def main():
            "ZIELE.md sagt selbst: das 568-fache des gemessenen Marktes")
 
     print()
+    print("Die Vision: Fiverr fuer Agenten")
+    pruefe("Auftraege, die alle drei Versprechen einloesen", market.get("fiverr_orders_30d", 0), 1,
+           "fremd finanziert, zwei fremde Lieferungen, Vergabe binnen einer Stunde")
+    for name, key in (
+        ("  davon fremd finanziert", "fiverr_foreign_funded_orders_30d"),
+        ("  davon mit zwei fremden Lieferungen", "fiverr_orders_with_two_foreign_deliveries_30d"),
+        ("  davon binnen einer Stunde vergeben", "fiverr_orders_awarded_within_the_hour_30d"),
+    ):
+        # Einzeln und ohne Urteil: sie sagen, woran es liegt, und sind selbst kein Ziel.
+        print(f"  {GREY}{name:<46} {market.get(key, 0)}")
+
+    print()
     print("Teilziele, die der Loop allein bewegt")
     pruefe("Arbeit auf dem Brett", market.get("open_bounties", 0), 1,
            "ein leeres Brett bricht die Zusage auf der Startseite")

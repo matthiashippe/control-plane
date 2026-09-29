@@ -438,6 +438,51 @@ report.market = {
   // Rolling 30 days and not since-the-beginning: one award in September says nothing about
   // whether the market works in December, and a total that can only grow is a number that never
   // reports a decline.
+  // Die Vision, als eine Zahl, die nein sagen kann.
+  //
+  // Matthias am 29.09.: "wir wollen ja im endeffekt das fiverr nur fuer agents bauen, die agents
+  // bedienen die eine seite und die menschen die andere", mit drei Versprechen: Lieferung in
+  // Minuten, Auswahl aus mehreren fertigen Arbeiten, Preisdruck. Eine Vision ohne Zahl ist in
+  // zwei Wochen ein Wunsch, also ist das hier die Zahl.
+  //
+  // Ein Auftrag zaehlt, wenn ALLE DREI zutreffen: der Kaeufer ist fremd und hat selbst eingezahlt,
+  // mindestens zwei fremde Agenten haben geliefert, und die Vergabe kam binnen einer Stunde nach
+  // dem Ausschreiben. Die lockere Fassung waere heute erfuellt und wertlos: 44 der 47 Auftraege
+  // hat unsere eigene Betreiber-Wallet ausgeschrieben, und alle 37 Einsendungen kommen von
+  // Adressen, die der Klassifizierer als unsere fuehrt.
+  //
+  // Die drei Bedingungen stehen zusaetzlich einzeln da, weil die Gesamtzahl sonst nur sagt "nein"
+  // und nicht "woran". Am 29.09. ist jede einzelne 0, und das ist die ehrliche Auskunft.
+  fiverr_orders_30d: one(
+    `select count(*) n from bounties b
+       where b.status='awarded' and b.closed_at > datetime('now','-30 day')
+         and ${notOursOn("b.creator")}
+         and exists (select 1 from ledger l where l.address = b.creator and l.kind = 'topup')
+         and (select count(*) from submissions s
+               where s.bounty_id = b.id and ${notOursOn("s.agent")}) >= 2
+         and (julianday(b.closed_at) - julianday(b.created_at)) * 24 * 60 <= 60`,
+    ...OURS_ARGS, ...OURS_ARGS,
+  ).n,
+  // Woran es liegt, je Bedingung einzeln.
+  fiverr_foreign_funded_orders_30d: one(
+    `select count(*) n from bounties b
+       where b.created_at > datetime('now','-30 day')
+         and ${notOursOn("b.creator")}
+         and exists (select 1 from ledger l where l.address = b.creator and l.kind = 'topup')`,
+    ...OURS_ARGS,
+  ).n,
+  fiverr_orders_with_two_foreign_deliveries_30d: one(
+    `select count(*) n from bounties b
+       where b.created_at > datetime('now','-30 day')
+         and (select count(*) from submissions s
+               where s.bounty_id = b.id and ${notOursOn("s.agent")}) >= 2`,
+    ...OURS_ARGS,
+  ).n,
+  fiverr_orders_awarded_within_the_hour_30d: one(
+    `select count(*) n from bounties b
+       where b.status='awarded' and b.closed_at > datetime('now','-30 day')
+         and (julianday(b.closed_at) - julianday(b.created_at)) * 24 * 60 <= 60`,
+  ).n,
   foreign_gmv_30d_mc: one(
     `select coalesce(sum(b.price_mc),0) s from bounties b
        where b.status='awarded' and b.closed_at > datetime('now','-30 day')
