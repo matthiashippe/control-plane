@@ -8,6 +8,25 @@
 #
 # WHY NOT IS NOT KNOWN, and saying so is the point of this header.
 #
+# **That stopped being true on 2026-09-27, and the answer was a payment.** This service entered the
+# PayAI catalogue at 22:21:02 that evening, the second a foreign wallet settled five USDC, with the
+# `serverExtensions` declaration attached (`hat_bazaar_block = 1`). Nothing else had changed. The
+# long exclusion list below was right about every cause it ruled out and wrong in its conclusion:
+# the door was the settlement all along, and we had never settled with a declaration the
+# facilitator would read.
+#
+# Two things were measured on 29.09. that the list could not have known:
+#
+#   - A VERIFY DOES NOT CATALOGUE. The live listing (`GET /discovery/resources`, 9,023 rows) was
+#     read before and after a verify carrying our declaration and a valid signature. One row
+#     before, the same one row after, same `lastUpdated`. So the catalogue is written on a settled
+#     payment and on nothing else, and no amount of probing substitutes for one.
+#   - THE ROW IS KEYED ON THE PAYER'S URL, `/pay/5/0x3749efe7…`, not on `routeTemplate`, which was
+#     declared for exactly that purpose. Anyone following that row signs with their own wallet
+#     against a stranger's address and is refused. Hence `/pay/{usd}` with no address, which is
+#     one URL for everybody and gets its own row the first time somebody pays through it.
+
+#
 # Until 2026-09-23 it said the cause was the shape of our resource URL: `payResource` in
 # src/payments/pay.ts builds `/pay/{usd}/{recipient}` with the payer's wallet substituted, so every
 # payment hands the catalogue a different URL, and "none of the 20,789 catalogued resources

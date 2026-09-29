@@ -39,6 +39,19 @@
  * What the tool is still good for: it sends exactly what production sends, so a change to the
  * declaration can be put in front of the facilitator before it goes out, and a rejection at the
  * schema level would show up here as something other than an invalid signature.
+ *
+ * **And the question behind the header, answered on the catalogue itself, 2026-09-29 11:55 UTC.**
+ * The absent header said nothing about whether a verify CATALOGUES; those are two different
+ * things, and concluding one from the other was a jump. So it was measured instead: the
+ * facilitator's live listing (`GET /discovery/resources`, 9,023 rows, paged) was read before and
+ * after a verify carrying `resource: https://postyourprice.com/pay/5` and the current
+ * declaration. Before: one row, `.../pay/5/0x3749efe7…`, `lastUpdated 2026-09-27T22:21:02.158Z`.
+ * After: the same one row, same timestamp, no new entry.
+ *
+ * So the catalogue is written on a settled payment and on nothing else, and the address-free
+ * route gets its own row the first time somebody pays through it. That is not something the loop
+ * can cause; what it can do is make `/pay/{usd}` the route an arriving agent finds first, which
+ * `/.well-known/x402`, `/openapi.json` and every template answer now do.
  */
 import { buildV1Requirements, buildV1Payload } from "../src/payments/facilitator.js";
 import { BAZAAR_EXTENSION } from "../src/payments/bazaar.js";

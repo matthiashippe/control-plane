@@ -76,6 +76,25 @@ export const OUR_ADDRESSES = [
   // antwortet 405. Der Preis ist jetzt bekannt und klein (ein Handle, kein Geld aus dem Topf),
   // und seit die Kappe eine Notbremse ist statt eines Trichters sperrt er niemanden mehr aus.
   "key:a0722324659ba4e634e8ee6f084f74139dbd12f9",
+  // The handle our own walk of the stranger's path used, 2026-09-29 at 11:46 UTC, and it is the
+  // one keyless handle on this list that DID something: it took a key without a wallet, read its
+  // balance, called /v1/chat/completions, drew the 15-cent starter grant on that call and spent
+  // about a cent of it. That was the point, the whole funnel proved end to end against production
+  // for the first time, and the receipt is that `thinking_wallets.not_ours` went from 2 to 3
+  // within the minute.
+  //
+  // Three is a goal number. ops/claim-keyless.sh refuses to offer a handle that did anything,
+  // exactly so this cannot be swept in with the quiet ones, and it is written here by hand with
+  // what it did, which is the rule that refusal exists to enforce.
+  "key:47a47c509827ede2fbc7294baf889d17e8e30a3b",
+  // Minted 2026-09-29 by one of our own probes against production and claimed by
+  // ops/claim-keyless.sh: no ledger, no submission, no bounty. It had to be called to be
+  // proved, because a GET on that door answers 405.
+  "key:0dfe81d95c4cdbdb24eeed91b80136baa1071692",
+  // Minted 2026-09-29 by one of our own probes against production and claimed by
+  // ops/claim-keyless.sh: no ledger, no submission, no bounty. It had to be called to be
+  // proved, because a GET on that door answers 405.
+  "key:30fcb94104676b5a0ff6c581e7512b4c4bb765b9",
 ];
 
 /** SQL LIKE patterns. A key carrying one of these names was provisioned by a tool of ours. */
@@ -94,14 +113,6 @@ export const OUR_KEY_NAMES = [
   "mainnet-abnahme",
   "mainnet-acceptance",
   "ops-%",
-  // Minted 2026-09-29 by one of our own probes against production and claimed by
-  // ops/claim-keyless.sh: no ledger, no submission, no bounty. It had to be called to be
-  // proved, because a GET on that door answers 405.
-  "key:0dfe81d95c4cdbdb24eeed91b80136baa1071692",
-  // Minted 2026-09-29 by one of our own probes against production and claimed by
-  // ops/claim-keyless.sh: no ledger, no submission, no bounty. It had to be called to be
-  // proved, because a GET on that door answers 405.
-  "key:30fcb94104676b5a0ff6c581e7512b4c4bb765b9",
   // 2026-09-29, and the prefix above is four days old. A cycle verified the new 404 against
   // production with a hand-provisioned key and named it after the cycle rather than the prefix.
   // The hygiene check caught it within the hour, which is what it is for. The name stays because

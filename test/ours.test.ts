@@ -70,3 +70,39 @@ describe('"ours" means the same in the service as in the report', () => {
     expect(ourAddresses(openDb(":memory:"), []).size).toBe(0);
   });
 });
+
+/**
+ * A handle is an address and never a key name.
+ *
+ * Both files carry two lists: addresses, compared with `IN`, and key names, compared with
+ * `LIKE`. On 2026-09-29 a tool written to end a recurring bookkeeping error wrote three keyless
+ * handles into the name list, because it anchored on `"ops-%"` and that entry lives there. A
+ * `key:…` used as a name pattern matches nothing, so those three excluded nothing, and the goal
+ * number they were meant to correct sat at 3 instead of 2 while the lists looked full.
+ *
+ * The existing test here holds the two name lists against each other, and both were wrong in the
+ * same way, so it stayed green. This one asks the question that catches it: an entry shaped like
+ * an address has no business in a list of names, whichever file it is in.
+ */
+describe("the two lists are not interchangeable", () => {
+  const listOf = (source: string, name: string): string[] => {
+    const m = new RegExp(`(?:export )?const ${name} = \\[([\\s\\S]*?)\\n\\];`).exec(source);
+    return [...(m?.[1] ?? "").matchAll(/"([^"]+)"/g)].map((x) => x[1]);
+  };
+
+  it.each([
+    ["src/bounties/ours.ts", "OUR_KEY_NAMES"],
+    ["ops/db-report.cjs", "OUR_KEY_NAMES"],
+  ])("%s: %s holds no addresses", (file, name) => {
+    const bad = listOf(readFileSync(file, "utf8"), name).filter((e) => e.startsWith("key:") || e.startsWith("0x"));
+    expect(bad, `${bad.join(", ")} look like addresses and would be matched with LIKE`).toEqual([]);
+  });
+
+  it.each([
+    ["src/bounties/ours.ts", "OUR_ADDRESSES"],
+    ["ops/db-report.cjs", "OURS"],
+  ])("%s: %s holds no name patterns", (file, name) => {
+    const bad = listOf(readFileSync(file, "utf8"), name).filter((e) => e.includes("%"));
+    expect(bad, `${bad.join(", ")} look like name patterns and would be compared with IN`).toEqual([]);
+  });
+});

@@ -125,17 +125,23 @@ fi
 today=$(date -u +%Y-%m-%d)
 for addr in "${unclaimed[@]}"; do
   python3 - "$addr" "$today" <<'PY'
-import pathlib, sys
+import pathlib, re, sys
 addr, today = sys.argv[1], sys.argv[2]
 note = (f'  // Minted {today} by one of our own probes against production and claimed by\n'
         f'  // ops/claim-keyless.sh: no ledger, no submission, no bounty. It had to be called to be\n'
         f'  // proved, because a GET on that door answers 405.\n'
         f'  "{addr}",\n')
-for path in ["src/bounties/ours.ts", "ops/db-report.cjs"]:
+# The address lists, NOT the key-name lists. Both files carry two lists and the first version of
+# this script wrote into the wrong one: it anchored on `"ops-%"`, which lives in OUR_KEY_NAMES,
+# where an entry is used as `name LIKE ?`. A handle is an address and never a key name, so those
+# entries matched nothing and excluded nothing, and the number they were meant to correct did not
+# move. A tool written to end a recurring bookkeeping error had introduced a quieter version of
+# it. test/ours.test.ts now refuses a `key:` entry in a name list, so this cannot come back.
+for path, addr_list in [("src/bounties/ours.ts", "OUR_ADDRESSES"), ("ops/db-report.cjs", "OURS")]:
     p = pathlib.Path(path); s = p.read_text()
-    anchor = '  "ops-%",\n'
-    assert s.count(anchor) == 1, f"{path}: anchor {s.count(anchor)}x"
-    p.write_text(s.replace(anchor, anchor + note))
+    m = re.search(rf'((?:export )?const {addr_list} = \[.*?)(\n\];)', s, re.S)
+    assert m, f"{path}: list {addr_list} not found"
+    p.write_text(s[:m.end(1)] + "\n" + note.rstrip("\n") + s[m.end(1):])
 print(f"  written   {addr}")
 PY
 done
