@@ -25,6 +25,20 @@ SCAN = re.compile(
     re.I,
 )
 
+# The 402 on a selling route is the sale, not a failure.
+#
+# `/pay/{usd}` and `/pay/{usd}/{address}` are x402 sellers: the 402 carries the offer and a caller
+# that receives one has been served exactly right. Counting it as an error was harmless while
+# nobody called the route. It stopped being harmless on 2026-09-27, when this service entered the
+# PayAI catalogue: since then 183 addresses have asked the pay route for the first time and 344 of
+# 352 requests answered 402, so this report counted the entire discovery traffic as strangers
+# failing. On 2026-09-29 it said "244 stranger(s) got an error", and the great majority of them
+# had been handed the thing they came for.
+#
+# Only 402, and only there. A 400, a 409 or a 503 on the same path is a caller who wanted to pay
+# and could not, which is the most expensive failure this service has.
+SELLING = re.compile(r"^/pay/\d+(/|$)")
+
 # 404 on these is noise every site gets and nobody is failing at anything.
 BORING = {"/favicon.ico", "/favicon.png", "/favicon.svg", "/apple-touch-icon.png",
           "/apple-touch-icon-precomposed.png", "/robots.txt", "/sitemap.xml", "/ads.txt",
@@ -62,6 +76,10 @@ for line in sys.stdin:
         redirected[ip] += 1
         continue
     if status < 400:
+        worked[ip] += 1
+        continue
+    if status == 402 and SELLING.match(path):
+        # Served, not failed. Counted as work that worked, because that is what it is.
         worked[ip] += 1
         continue
     if SCAN.search(uri):

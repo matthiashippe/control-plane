@@ -60,6 +60,16 @@ export const OUR_ADDRESSES = [
   // ledger, so it changes no money, but `wallets_foreign` counted it and that is the number the
   // plan is read against.
   "key:1001d3d458a61eaeae0bc6a2ade41f8d424a31e8",
+  // And the same thing again ninety minutes later, 2026-09-29 at 10:03:13, this time by the
+  // cycle's own hand: a loop walking every path in the new /openapi.json against production, to
+  // prove the document names nothing that answers 404. `POST /v1/auth/keyless` answers 201 by
+  // minting, so proving it is there costs one.
+  //
+  // Twice in one morning is not two accidents, it is a shape: any liveness probe that walks a
+  // list of endpoints will eventually POST to one that creates something. The check belongs in
+  // the tests, where the database is in memory, and test/openapi.test.ts does exactly that walk.
+  // Against production, a minting endpoint is looked at and not called.
+  "key:165d85b0d51c24f46c17c2e6b931d34ab126d70f",
 ];
 
 /** SQL LIKE patterns. A key carrying one of these names was provisioned by a tool of ours. */

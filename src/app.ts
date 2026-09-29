@@ -56,6 +56,7 @@ import { mcToCents, getBalanceCents, getBalanceMc, MC_PER_CENT } from "./db.js";
 import { block as ldBlock, dataset, howToFrom, organization, webPage, webSite } from "./public/jsonld.js";
 import { prefersHtml, renderApiPage } from "./public/apipage.js";
 import { siteOrigin, withOrigin } from "./public/site.js";
+import { openApiDocument } from "./public/openapi.js";
 import { renderCheck, renderCheckIntro, renderPasteBox } from "./public/checkpage.js";
 import { germanFirstScreen } from "./public/landing.de.js";
 import { detectBriefLanguage } from "./bounties/brief.de.js";
@@ -1218,6 +1219,27 @@ export function createApp(opts: AppOptions) {
    * Machine-readable description for other agents and crawlers. Deliberately without numbers that
    * change daily; the prices are in /v1/status and /v1/models.
    */
+  /**
+   * The OpenAPI description, because the indexers that found us keep asking for it.
+   *
+   * Requested 217 times and answered 404 every time, measured over the whole access log on
+   * 2026-09-29, plus seven for /swagger.json. `Agent402/1.0` alone asked 201 times. The first of
+   * those requests is at 27.09. 23:36, an hour after this service entered the PayAI catalogue: the
+   * asking started because the listing exists, and every one of them was turned away.
+   *
+   * Served at both the plain path and under /.well-known, because the log carries both.
+   */
+  for (const path of ["/openapi.json", "/.well-known/openapi.json"]) {
+    app.get(path, (c) =>
+      c.json(
+        openApiDocument(requestOrigin(c) ?? siteOrigin(), {
+          pay: Boolean(opts.pay),
+          inference: Boolean(opts.catalog),
+        }),
+      ),
+    );
+  }
+
   app.get("/.well-known/x402", (c) => {
     const pay = opts.pay ?? null;
     return c.json({
@@ -1243,6 +1265,9 @@ export function createApp(opts: AppOptions) {
         topup_for_wallet: "/pay/{usd}/{address}",
         register: "/v1/automatons/register",
         inference: "/v1/chat/completions",
+        // Named here because this file is what the indexers read first: 299 fetches of it in six
+        // days. The description itself was asked for 217 times and answered 404 until 29.09.
+        openapi: "/openapi.json",
       },
       accepts: pay
         ? [

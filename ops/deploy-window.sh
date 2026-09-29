@@ -68,7 +68,8 @@ if ! "$(dirname "$0")/access-log.sh" > "$log"; then
 fi
 
 python3 - "$started" "$LEAD_SECONDS" "$TAIL_SECONDS" "$OWN" "$log" <<'PY'
-import datetime, json, os, sys
+import datetime
+import re, json, os, sys
 
 started_iso, lead, tail, own_raw, path = sys.argv[1:6]
 # Docker prints nanoseconds; fromisoformat takes at most microseconds.
@@ -98,7 +99,24 @@ for raw in open(path):
         ours += 1
         continue
     strangers += 1
-    if row.get("status", 200) >= 400:
+    # A 402 on the selling route is the sale, not a fault.
+    #
+    # `/pay/{usd}` and `/pay/{usd}/{address}` are x402 sellers: the 402 carries the offer, and a
+    # caller that gets one has been served correctly. Everything else about the shape of this
+    # check is right, and this one line was wrong from the moment the route existed. It stopped
+    # being harmless on 2026-09-27, when this service entered the PayAI catalogue: since then 183
+    # addresses have asked the pay route for the first time, 344 of 352 requests answered 402, and
+    # every deploy window from now on would have reported crawlers as affected customers.
+    #
+    # The first one already did, at 09:23 on 2026-09-29: "AFFECTED 1 of 1 request(s) from outside
+    # got an error", and the request was PayAI's own crawler being handed the offer it came for.
+    # A check that cries wolf on every run is a check that gets skimmed, and this one exists to be
+    # read on the one day it is not crying wolf.
+    #
+    # Any other 4xx or 5xx on those paths is still a failure: a 400, a 409 or a 503 there means a
+    # caller that wanted to pay could not.
+    selling = re.match(r"^/pay/\d+(/|$)", req.get("uri", "") or "")
+    if row.get("status", 200) >= 400 and not (selling and row.get("status") == 402):
         failures += 1
         lines.append(f"   {at:%H:%M:%S}  {req.get('remote_ip')}  {req.get('method')} {req.get('uri')}  {row['status']}")
 
