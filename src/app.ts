@@ -30,7 +30,10 @@ import { readSeries, renderX402 } from "./public/x402.js";
 import { readMoneySeries, readReceipts, renderConway } from "./public/conway.js";
 import { renderPost } from "./public/post.js";
 import { renderFix } from "./public/fix.js";
-import { renderCatalog } from "./public/catalog.js";
+import { OFFERS, TEST_MODE_LINE, euro, renderCatalog } from "./public/catalog.js";
+import { beginOfferCheckout, checkoutEnabled, CheckoutError, settleCheckout, type CheckoutProvider } from "./checkout/index.js";
+import { stripeFromEnv } from "./payments/stripe.js";
+import { isStripeTestKey } from "./payments/stripe-key.js";
 import { germanFrame } from "./public/frame.de.js";
 import { wallets, agentsPerBounty, marketSplit } from "./bounties/ours.js";
 import { renderTerms } from "./public/terms.js";
@@ -112,6 +115,11 @@ export interface AppOptions {
    * deliberately run many requests should do.
    */
   rateLimit?: RateLimitOptions | null;
+  /**
+   * Who takes card payments for /katalog/kaufen. Left out, it is Stripe from CP_STRIPE_SECRET_KEY,
+   * or nobody. Tests pass the Stripe adapter with a staged `fetch`, or `null`.
+   */
+  checkout?: CheckoutProvider | null;
 }
 
 type Env = { Variables: { address: `0x${string}` } };
@@ -401,12 +409,17 @@ export function createApp(opts: AppOptions) {
   // Exact paths, one prefix. A prefix match is what put a child path under its parent's rule.
   const OPEN_PATHS = ["/v1/auth/nonce", "/v1/auth/verify", "/v1/auth/api-keys", "/v1/auth/keyless"];
   const OPEN_PREFIXES = ["/pay/"];
+  // The card path (Goal 20). Both call Stripe with our secret key on a stranger's word: the POST
+  // creates a session, the GET asks whether one is paid. HAN-17: without the GET in here, anybody
+  // could spend our Stripe rate limit and block `begin` for real buyers.
+  const OPEN_PAGES = ["/katalog/kaufen", "/katalog/danke"];
   if (limiter) {
     const windowSec = Math.round(rateLimitOpts.windowMs / 1000);
     app.use("*", async (c, next) => {
       const reqPath = c.req.path;
       const keyless =
         (OPEN_PATHS.includes(reqPath) && c.req.method === "POST") ||
+        OPEN_PAGES.includes(reqPath) ||
         OPEN_PREFIXES.some((p) => reqPath.startsWith(p));
       if (!keyless) return next();
       const { allowed, retryAfterSec } = limiter.check(clientKey(c.req.raw.headers));
@@ -418,7 +431,7 @@ export function createApp(opts: AppOptions) {
             retry_after_seconds: retryAfterSec,
             message:
               `More than ${rateLimitOpts.limit} requests in ${windowSec} seconds from your address to the ` +
-              "endpoints that work without an API key (/v1/auth/*, /pay/*). Those write to the database " +
+              "endpoints that work without an API key (/v1/auth/*, /pay/*, /katalog/kaufen, /katalog/danke). Those write to the database " +
               "and /pay also calls a payment facilitator that costs money per call, so they are capped " +
               `to keep the service up for everyone. Wait ${retryAfterSec} seconds and retry; calls to ` +
               "/v1/* with an API key are not capped.",
@@ -813,11 +826,19 @@ export function createApp(opts: AppOptions) {
   /**
    * What a person can buy here. See `src/public/catalog.ts`.
    */
+  const checkoutProvider: CheckoutProvider | null =
+    opts.checkout !== undefined ? opts.checkout : stripeFromEnv(siteOrigin);
+  /** The buy button shows only when a payment would actually start. */
+  const buying = (): { testMode: boolean } | undefined =>
+    checkoutEnabled() && checkoutProvider
+      ? { testMode: isStripeTestKey(process.env.CP_STRIPE_SECRET_KEY ?? "") }
+      : undefined;
+
   app.get("/katalog", (c) => {
     if (!indexHtml) return c.json({ error: "no index page built" }, 503);
     return c.html(
       page(
-        renderCatalog(),
+        renderCatalog(OFFERS, buying()),
         "Katalog: Texte, die wir für Sie schreiben",
         "Rede zum Fest, Anschreiben zur Bewerbung, Text über Ihr Angebot. Je drei fertige Fassungen, Nachbessern kostet nichts extra.",
         "/katalog",
@@ -828,6 +849,86 @@ export function createApp(opts: AppOptions) {
         true,
       ),
     );
+  });
+
+  /**
+   * Buying an offer by card (Goal 20). Outside /v1 on purpose: the auth middleware there decides
+   * with `has()` against exact paths (test/v1-ohne-variables-segment.test.ts).
+   *
+   * The form carries `angebot` and nothing else that is read. The price comes from OFFERS.
+   */
+  app.post("/katalog/kaufen", async (c) => {
+    if (!buying()) return c.text("Kaufen ist hier gerade nicht eingeschaltet.", 404);
+    const form = (await c.req.parseBody().catch(() => ({}))) as Record<string, unknown>;
+    const id = typeof form.angebot === "string" ? form.angebot : "";
+    try {
+      const { redirect } = await beginOfferCheckout(opts.db, checkoutProvider!, id);
+      return c.redirect(redirect, 303);
+    } catch (e) {
+      if (e instanceof CheckoutError && e.code === "unknown_offer") {
+        return c.text("Dieses Angebot gibt es nicht.", 400);
+      }
+      if (e instanceof CheckoutError) {
+        return c.text("Die Bezahlseite ist gerade nicht erreichbar. Bitte versuchen Sie es in ein paar Minuten noch einmal.", 502);
+      }
+      throw e;
+    }
+  });
+
+  /**
+   * Where Stripe sends the buyer back. It settles, and reloading books nothing twice.
+   *
+   * Three states for a person: paid, not paid, unknown. The session id is checked against the
+   * pattern Stripe issues and looked up in `checkouts` before Stripe is asked (src/checkout).
+   */
+  app.get("/katalog/danke", async (c) => {
+    if (!indexHtml) return c.json({ error: "no index page built" }, 503);
+    // Stripe always sends the id. Without one nobody is coming back from a payment, and the
+    // catalogue is where they meant to be. It also keeps this address out of the sitemap's set of
+    // pages (test/sitemap-covers-pages.test.ts): it is an answer about one payment, not a page.
+    const sessionId = c.req.query("session_id");
+    if (!sessionId) return c.redirect("/katalog", 303);
+    const back = '<p><a href="/katalog">Zurück zum Katalog</a></p>';
+    const answer = (heading: string, lines: string[], status: 200 | 404 | 502) =>
+      c.html(
+        page(
+          `
+  <section>
+    <div class="wrap narrow">
+      <p class="kicker">Katalog</p>
+      <h1 class="ph">${heading}</h1>
+      ${lines.map((l) => `<p>${l}</p>`).join("\n      ")}
+    </div>
+  </section>`,
+          `${heading} | Katalog`,
+          heading,
+          "/katalog/danke",
+          "og.png",
+          [],
+          true,
+          "de",
+          true,
+        ),
+        status,
+      );
+    const unknown = () => answer("Zu diesem Link finden wir keine Zahlung.", [back], 404);
+    if (!buying()) return unknown();
+    const test = buying()!.testMode ? [TEST_MODE_LINE] : [];
+    try {
+      const r = await settleCheckout(opts.db, checkoutProvider!, { session_id: sessionId });
+      const offer = OFFERS.find((o) => o.id === r.offer);
+      if (r.status === "paid" && offer) {
+        return answer("Danke, Ihre Zahlung ist angekommen.", [`Sie haben „${offer.name}“ für ${euro(r.cents)} bezahlt.`, ...test], 200);
+      }
+      if (r.status === "paid") return unknown();
+      return answer("Die Zahlung ist nicht abgeschlossen.", ["Es wurde nichts abgebucht.", back], 200);
+    } catch (e) {
+      if (!(e instanceof CheckoutError)) throw e;
+      if (e.status === 502) {
+        return answer("Wir können den Stand Ihrer Zahlung gerade nicht prüfen.", ["Bitte laden Sie die Seite in ein paar Minuten neu.", back], 502);
+      }
+      return unknown();
+    }
   });
 
   /**

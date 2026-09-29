@@ -22,6 +22,9 @@ const ADDR = "key:" + "c".repeat(40);
 
 beforeEach(() => {
   process.env.CP_CHECKOUT = "1";
+  // Since Goal 20 a Stripe test key switches the card path on as well. A shell with one exported
+  // would otherwise make "switched off" green for the wrong reason (HAN-17).
+  delete process.env.CP_STRIPE_SECRET_KEY;
 });
 afterEach(() => {
   delete process.env.CP_CHECKOUT;
@@ -40,7 +43,7 @@ describe("a card payment, from start to booked", () => {
     expect(redirect).toContain(checkout.reference);
     expect(balance(d), "nothing is credited before the money arrives").toBe(0);
 
-    const res = settleCheckout(d, p, { reference: checkout.reference, paid: true });
+    const res = await settleCheckout(d, p, { reference: checkout.reference, paid: true });
     expect(res.credited_cents).toBe(1_500);
     expect(res.already).toBe(false);
     expect(balance(d)).toBe(1_500 * MC_PER_CENT);
@@ -51,7 +54,7 @@ describe("a card payment, from start to booked", () => {
     const d = db();
     const p = fakeProvider();
     const { checkout } = await beginCheckout(d, p, { address: ADDR, cents: 1_500 });
-    settleCheckout(d, p, { reference: checkout.reference, paid: true, cents: 1_500_000, amount: 1_500_000 });
+    await settleCheckout(d, p, { reference: checkout.reference, paid: true, cents: 1_500_000, amount: 1_500_000 });
     expect(balance(d), "the row decides, not the callback").toBe(1_500 * MC_PER_CENT);
   });
 
@@ -59,8 +62,8 @@ describe("a card payment, from start to booked", () => {
     const d = db();
     const p = fakeProvider();
     const { checkout } = await beginCheckout(d, p, { address: ADDR, cents: 1_200 });
-    const first = settleCheckout(d, p, { reference: checkout.reference, paid: true });
-    const second = settleCheckout(d, p, { reference: checkout.reference, paid: true });
+    const first = await settleCheckout(d, p, { reference: checkout.reference, paid: true });
+    const second = await settleCheckout(d, p, { reference: checkout.reference, paid: true });
     expect(first.already).toBe(false);
     expect(second.already, "a retry is not an error").toBe(true);
     expect(balance(d)).toBe(1_200 * MC_PER_CENT);
@@ -73,7 +76,7 @@ describe("a card payment, from start to booked", () => {
     const d = db();
     const p = fakeProvider();
     const { checkout } = await beginCheckout(d, p, { address: ADDR, cents: 1_500 });
-    const res = settleCheckout(d, p, { reference: checkout.reference, paid: false });
+    const res = await settleCheckout(d, p, { reference: checkout.reference, paid: false });
     expect(res.credited_cents).toBe(0);
     expect(balance(d)).toBe(0);
     const row = d.prepare("SELECT status FROM checkouts WHERE reference = ?").get(checkout.reference) as {
@@ -115,7 +118,7 @@ describe("a card payment, from start to booked", () => {
     const d = db();
     const p = fakeProvider();
     const { checkout } = await beginCheckout(d, p, { address: ADDR, cents: 1_500 });
-    settleCheckout(d, p, { reference: checkout.reference, paid: true });
+    await settleCheckout(d, p, { reference: checkout.reference, paid: true });
     const row = d
       .prepare("SELECT kind, ref FROM ledger WHERE address = ?")
       .get(ADDR) as { kind: string; ref: string };

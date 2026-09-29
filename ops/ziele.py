@@ -82,7 +82,7 @@ def main():
     pruefe("Gespraech, das eine Bestellung erzeugt", http("CP_ZIELE_CHAT"), 1,
            "ein Gespraech nimmt Anforderungen auf und macht daraus eine Bestellung")
     pruefe("Bezahlweg ohne Wallet", http("CP_ZIELE_KARTE"), 1,
-           "heute braucht ein Kaeufer Schluesselpaar, Signatur und USDC")
+           "POST /katalog/kaufen antwortet 303 auf Stripes Kasse, ohne Wallet und ohne USDC")
 
     ziel("10.10.", "Der erste zahlende Mensch")
     pruefe("bezahlte Bestellungen von Menschen (30 Tage)", feld("human_orders_paid_30d"), 1,

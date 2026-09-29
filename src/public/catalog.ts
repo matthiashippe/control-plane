@@ -16,6 +16,8 @@
  */
 
 export interface Offer {
+  /** Fixed, because a form posts it and a Stripe session carries it (Goal 20). Never rename. */
+  readonly id: string;
   readonly name: string;
   readonly delivers: string;
   /** Gross, in euro cents. Not millicents and not dollars: this is what a person pays. */
@@ -32,6 +34,7 @@ export interface Offer {
  */
 export const OFFERS: readonly Offer[] = [
   {
+    id: "rede-zum-fest",
     name: "Rede zum Fest",
     delivers:
       "Sie bekommen drei fertige Fassungen einer Rede für Geburtstag, Hochzeit oder Jubiläum, " +
@@ -39,6 +42,7 @@ export const OFFERS: readonly Offer[] = [
     priceCents: 1900,
   },
   {
+    id: "anschreiben-bewerbung",
     name: "Anschreiben zur Bewerbung",
     delivers:
       "Sie bekommen drei fertige Fassungen eines Anschreibens für eine bestimmte Stelle, geschrieben " +
@@ -46,6 +50,7 @@ export const OFFERS: readonly Offer[] = [
     priceCents: 2400,
   },
   {
+    id: "text-ueber-ihr-angebot",
     name: "Text über Ihr Angebot",
     delivers:
       "Sie bekommen drei fertige Fassungen eines Textes, der Ihr Angebot vorstellt (etwa Ihren " +
@@ -77,7 +82,27 @@ export function euro(cents: number): string {
 const mark = (name: string): string =>
   `<img src="/px/${name}.png" alt="" width="1" height="1" loading="lazy" decoding="async" aria-hidden="true" class="px">`;
 
-export function renderCatalog(offers: readonly Offer[] = OFFERS): string {
+/** Shown above every buy button while the Stripe key is a test key. */
+export const TEST_MODE_LINE = "Testbetrieb: Es wird kein Geld abgebucht.";
+
+/**
+ * The buy button under an offer (Goal 20). It posts the offer id and nothing else: the price is
+ * looked up server-side in OFFERS, so there is no field a visitor could change it in.
+ */
+function buyForm(o: Offer, testMode: boolean): string {
+  return `
+        ${testMode ? `<p class="fine">${TEST_MODE_LINE}</p>` : ""}
+        <form method="post" action="/katalog/kaufen">
+          <input type="hidden" name="angebot" value="${o.id}">
+          <button type="submit" class="btn btn-1">Kaufen</button>
+        </form>`;
+}
+
+/**
+ * `buy` is absent while the card path is off, and then there is no button: a button that answers
+ * "not switched on" is worse than none.
+ */
+export function renderCatalog(offers: readonly Offer[] = OFFERS, buy?: { testMode: boolean }): string {
   const cards = offers
     .map(
       (o, i) => `
@@ -85,7 +110,7 @@ export function renderCatalog(offers: readonly Offer[] = OFFERS): string {
         <h2 class="offer-name">${o.name}</h2>
         <p class="offer-price">${euro(o.priceCents)}</p>
         <p>${o.delivers}</p>
-        <p class="fine">${REWORK_LINE}</p>
+        <p class="fine">${REWORK_LINE}</p>${buy ? buyForm(o, buy.testMode) : ""}
       </div>${
         // One mark after each offer. On a 390 px phone the first card already reaches past the
         // first screen, so every one of these is below the fold there; see test/catalog-page.test.ts.

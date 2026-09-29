@@ -626,4 +626,26 @@ report.market = {
   ).n,
 };
 
+// What people paid in thirty days, in euro cents (Goal 20, 2026-09-29). ORG.md calls it the number.
+//
+// Only `provider = 'stripe'`, which src/payments/stripe-key.ts writes for a live key alone: a
+// purchase with Stripe's test card is a demonstration and carries `stripe_test` (Sperrliste 0, 2).
+// Only rows with an offer, because a row with an address is credits for a wallet, not a person
+// buying from the catalogue. The window is computed here in ISO, the format `settled_at` is written
+// in; `datetime('now')` has a space where ISO has a T, and the two do not compare on the same day.
+//
+// Before the migration in src/db.ts has run there is no `offer` column, and then the field is left
+// out rather than reported as 0: ops/ziele.py prints "kein Messweg" for a missing field, which is
+// the truth, while a 0 would be a measurement that did not happen.
+//
+// Not yet excluded: our own purchases with a real card once a live key is set. That needs a list of
+// our own buyers in ops/ with its counter-proof, before any live key (HAN-17).
+if (db.prepare("PRAGMA table_info(checkouts)").all().some((c) => c.name === "offer")) {
+  report.market.human_revenue_30d_cents = one(
+    `select coalesce(sum(cents),0) s from checkouts
+      where status = 'paid' and provider = 'stripe' and offer is not null and settled_at > ?`,
+    new Date(Date.now() - 30 * 86400e3).toISOString(),
+  ).s;
+}
+
 console.log(JSON.stringify(report));

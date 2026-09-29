@@ -27,6 +27,13 @@ cd "$(dirname "$0")/.."
 BASE="${CP_URL:-https://postyourprice.com}"
 [[ "${1:-}" == "--short" ]] && export CP_ZIELE_SHORT=1
 
+# Ein Weg zur Kasse heisst: 303 auf https://checkout.stripe.com/. Eingabe ist die Ausgabe von
+# curl -w '%{http_code} %{redirect_url}'. Eine Funktion, damit der Selbsttest dasselbe Urteil prueft
+# wie der Lauf gegen die Produktion.
+karte_urteil() {
+  [[ "$1" =~ ^303\ https://checkout\.stripe\.com/ ]] && echo 1 || echo 0
+}
+
 # The counter-proof, and it is the whole reason this file may be trusted to say "erreicht".
 #
 # A verdict function that has only ever seen one state is a constant with extra steps. These two
@@ -99,6 +106,55 @@ if [[ "${1:-}" == "--selftest" ]]; then
   katalog_fall "<head><title>19 € 24 € 17 € $satz</title></head><body>nichts</body>" 0 "Preise nur im head"
   katalog_fall "nichts" 0 "eine leere Seite"
 
+  # Der Bezahlweg, gemessen an der Antwort von POST /katalog/kaufen (Goal 20): 303, und das Ziel
+  # ist Stripes Kasse. Die Pruefung in beide Richtungen, weil ein Urteil, das nur "ja" gesehen hat,
+  # auch eine Weiterleitung auf eine fremde Seite oder eine Fehlerseite als Kasse zaehlen koennte.
+  karte_fall() { # curl-Ausgabe "code url", Soll, Name
+    local ist
+    ist=$(karte_urteil "$1")
+    if [[ "$ist" == "$2" ]]; then
+      echo "  ok      Karte: $3 zaehlt als $2"
+    else
+      echo "  FAILED  Karte: $3 gab $ist, erwartet $2"; fail=1
+    fi
+  }
+  karte_fall "303 https://checkout.stripe.com/c/pay/cs_test_a1" 1 "303 auf Stripes Kasse"
+  karte_fall "302 https://checkout.stripe.com/c/pay/cs_test_a1" 0 "302 statt 303"
+  karte_fall "303 https://example.com/checkout.stripe.com/" 0 "303 auf eine fremde Seite"
+  karte_fall "303 http://checkout.stripe.com/c/pay/cs_test_a1" 0 "303 ohne https"
+  karte_fall "404 " 0 "Kaufen ausgeschaltet"
+  karte_fall "400 " 0 "unbekanntes Angebot"
+  karte_fall "" 0 "keine Antwort"
+
+  # human_revenue_30d_cents aus ops/db-report.cjs, gegen eine Datenbank mit dem echten Schema
+  # (src/db.ts), in beide Richtungen: eine bezahlte Zeile `stripe` zaehlt, dieselbe mit
+  # `stripe_test` zaehlt nicht. Ohne die zweite Haelfte waere eine Vorfuehrung mit Stripes
+  # Testkarte von einem zahlenden Menschen nicht zu unterscheiden (Sperrliste 0 und 2).
+  umsatz_fall() { # Provider, Soll
+    local dir ist
+    dir=$(mktemp -d)
+    if ! npx --no-install tsx -e '
+      import { openDb } from "./src/db.ts";
+      const d = openDb(process.argv[1]);
+      const now = new Date().toISOString();
+      d.prepare("INSERT INTO checkouts (reference, offer, cents, provider, status, created_at, settled_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
+        .run("cs_selftest", "rede-zum-fest", 1900, process.argv[2], "paid", now, now);
+      d.close();' "$dir/cp.db" "$1" 2>/dev/null; then
+      echo "  FAILED  Umsatz: keine Testdatenbank anlegbar (laedt node $(node -v) better-sqlite3?)"; fail=1
+      rm -rf "$dir"; return
+    fi
+    ist=$(CP_DB_PATH="$dir/cp.db" node ops/db-report.cjs 2>/dev/null \
+      | python3 -c 'import json,sys; print(json.load(sys.stdin)["market"].get("human_revenue_30d_cents"))' 2>/dev/null)
+    rm -rf "$dir"
+    if [[ "$ist" == "$2" ]]; then
+      echo "  ok      Umsatz: eine bezahlte Zeile $1 ergibt $2 Cent"
+    else
+      echo "  FAILED  Umsatz: eine bezahlte Zeile $1 ergab '$ist', erwartet $2"; fail=1
+    fi
+  }
+  umsatz_fall stripe 1900
+  umsatz_fall stripe_test 0
+
   out=$(printf 'kein json\n' | python3 ./ops/ziele.py); code=$?
   if (( code == 2 )); then
     echo "  ok      unlesbare Eingabe ist unentschieden, nicht erreicht"
@@ -157,21 +213,20 @@ print(1 if weiter and len(text) > 80 else 0)
 ' 2>/dev/null)
 chat=${chat:-0}
 
-karte=$(curl -s -m 25 -X POST "$BASE/v1/orders/checkout" -H 'content-type: application/json' \
-  -d '{"item":"website-eine-seite","email":"pruefung@postyourprice.com"}' \
-  | python3 -c '
-import json, sys
-try:
-    d = json.load(sys.stdin)
-except Exception:
-    print(0); raise SystemExit
-text = json.dumps(d).lower()
-# Ein Weg zur Kasse, und ausdruecklich keiner, der eine Wallet verlangt.
-hat_weg = any(k in d for k in ("redirect", "checkout_url", "url", "client_secret", "reference"))
-braucht_wallet = any(w in text for w in ("wallet", "usdc", "address_required", "x402"))
-print(1 if hat_weg and not braucht_wallet else 0)
-' 2>/dev/null)
-karte=${karte:-0}
+# Der Bezahlweg ist seit Goal 20 das Formular unter jedem Angebot: POST /katalog/kaufen mit der
+# Angebots-ID, Antwort 303 auf Stripes Kasse. Bis zum 29.09.2026 fragte diese Probe
+# POST /v1/orders/checkout mit JSON, eine Route, die nie gebaut wurde; der Kartenweg waere am 02.10.
+# trotz fertigem Bau als tot gemeldet worden (HAN-17, Befund 4).
+#
+# Die ID kommt aus der laufenden Seite, damit die Probe auch prueft, dass der Knopf dort steht.
+# Der Weiterleitung wird nicht gefolgt. Jeder Lauf legt eine Stripe-Session und eine Zeile
+# `pending` an; die zaehlt nirgends, weil jede Zahl in ops/db-report.cjs `status = 'paid'` verlangt.
+angebot=$(printf '%s' "$katalog_html" | grep -o 'name="angebot" value="[a-z0-9-]*"' | head -1 | sed 's/.*value="//; s/"$//')
+karte=0
+if [[ -n "$angebot" ]]; then
+  karte=$(karte_urteil "$(curl -s -m 25 -o /dev/null -w '%{http_code} %{redirect_url}' \
+    -d "angebot=$angebot" "$BASE/katalog/kaufen")")
+fi
 
 printf '%s\n%s\n' "$status" "$report" \
   | CP_ZIELE_KATALOG="$katalog" CP_ZIELE_CHAT="$chat" CP_ZIELE_KARTE="$karte" python3 ./ops/ziele.py

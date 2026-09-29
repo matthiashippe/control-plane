@@ -1,7 +1,8 @@
 # GOAL.md
 
 ## Status
-ACTIVE, Bau beginnt erst, wenn HAN-14 (Katalog) abgeschlossen ist. WIP gleich eins.
+ACTIVE. Punkte 1 bis 7 und 9 gebaut (HAN-18), mit den Auflagen des Skeptikers aus HAN-17, siehe
+"Nachtrag" unten. Punkt 8 und der Deploy liegen bei Betrieb.
 
 ## Active Objective
 
@@ -81,6 +82,29 @@ Auftrag: HAN-16. Glied: **Bezahlen**. Frist: gebaut und getestet bis 01.10. 18:0
    gepflanzte Zeile `stripe` zaehlt, dieselbe mit `stripe_test` zaehlt nicht. Damit ist eine
    Vorfuehrung mit Testkarte strukturell keine Bestellung eines Menschen (Sperrliste 0 und 2).
 
+### Nachtrag: gebaut mit den Auflagen aus HAN-17 (29.09.2026)
+
+Der Skeptiker hat Punkt 4 und 5 in dieser Fassung widerlegt; gebaut ist die strengere Form:
+
+- Der Name ist `stripe` nur bei `sk_live_` oder `rk_live_`, jedes andere Praefix ergibt
+  `stripe_test` (auch `rk_test_`). Beim Settle muss `livemode` aus Stripes Antwort zum Namen der
+  Zeile passen, sonst 409.
+- Der Schalter geht nur mit einem Testschluessel (`sk_test_`, `rk_test_`) oder `CP_CHECKOUT=1` an.
+  Ein Live-Schluessel allein schaltet nichts ein; Live braucht einen eigenen Schalter.
+- Settle liest zuerst die Zeile und fragt Stripe nur fuer eine Session, die in `checkouts` steht.
+  `session_id` muss `^cs_(test|live)_[A-Za-z0-9]+$` sein. `/katalog/kaufen` und `/katalog/danke`
+  stehen im Rate-Limit.
+- `payment_method_types[0]=card`. `abandoned` nur bei `status = expired`, sonst bleibt `pending`.
+- Eine Angebotszeile wird mit `UPDATE ... WHERE status != 'paid'` bezahlt gesetzt, zwei
+  gleichzeitige Reloads zaehlen einmal.
+- Punkt 9 steht in `ops/db-report.cjs` (dort liest `ops/ziele.py` die Zahl), die Gegenprobe im Test
+  und in `ops/ziele.sh --selftest`. Die Kartenprobe in `ops/ziele.sh` fragt jetzt
+  `POST /katalog/kaufen` und nicht mehr die nie gebaute Route `/v1/orders/checkout`.
+
+"Strukturell keine Bestellung eines Menschen" gilt nur fuer die Testkarte. Mit einem
+Live-Schluessel zaehlt jeder eigene Kauf mit echter Karte als `stripe`. Vor Live braucht es ein
+Ausschlussmerkmal fuer eigene Kaeufe in `ops/`, mit Gegenprobe in beide Richtungen.
+
 ### Done, gemessen und nicht behauptet
 
 1. `pnpm test` gruen, `ops/ziele.sh --selftest` gruen, die zehn bestehenden Checkout-Tests mit
@@ -103,11 +127,11 @@ Auftrag: HAN-16. Glied: **Bezahlen**. Frist: gebaut und getestet bis 01.10. 18:0
 - **Keine Bestellung dahinter.** Ein bezahltes Angebot ist heute eine Zeile, kein Auftrag, weil es
   das Gespraech (Glied Sagen) noch nicht gibt. Deshalb ist Testmodus hier keine Schwaeche, sondern
   die Grenze: live darf der Knopf erst gehen, wenn nach der Zahlung jemand liefert.
-- Ob Stripe fuer diesen Kontotyp `payment_method_types` ausdruecklich braucht oder die
-  Voreinstellung reicht, ist nicht geprueft.
+- `payment_method_types[0]=card` wird ausdruecklich gesetzt (HAN-17). Ob Stripe das Konto damit
+  annimmt, zeigt erst der Testkauf bei Betrieb.
 
 ### Blockers
-HAN-14 (WIP gleich eins). Sonst keine.
+Keine fuer den Bau. Punkt 8 (`deploy/Caddyfile`) und der Deploy liegen bei Betrieb.
 
 (Historie: Goal 19 in `goals/2026-09-29-goal-19-ein-dollar.md`. Dessen Messung, Punkt 3, laeuft
 bis 06.10. weiter und wird dort nachgetragen.)

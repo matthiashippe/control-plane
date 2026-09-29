@@ -63,14 +63,19 @@ function migrate(db: Db): void {
     -- is talking about; what that payment was for is what we wrote down when we started it. Taking
     -- the amount from the callback is how a forged one credits any balance it likes, and it is the
     -- single most expensive mistake available on this path.
+    --
+    -- A row is either credits for a wallet (address) or a catalogue offer bought by a person who has
+    -- no wallet (offer, Goal 20). Keep this definition and CHECKOUTS_V2 below identical.
     CREATE TABLE IF NOT EXISTS checkouts (
       reference  TEXT PRIMARY KEY,               -- what the provider echoes back
-      address    TEXT NOT NULL REFERENCES wallets(address),
+      address    TEXT REFERENCES wallets(address),
       cents      INTEGER NOT NULL,
-      provider   TEXT NOT NULL,
+      provider   TEXT NOT NULL,                  -- fake | stripe_test | stripe
       status     TEXT NOT NULL,                  -- pending | paid | abandoned
       created_at TEXT NOT NULL,
-      settled_at TEXT
+      settled_at TEXT,
+      offer      TEXT,                           -- id from OFFERS in src/public/catalog.ts
+      CHECK (address IS NOT NULL OR offer IS NOT NULL)
     );
     CREATE INDEX IF NOT EXISTS checkouts_address ON checkouts(address, created_at);
 
@@ -273,6 +278,8 @@ function migrate(db: Db): void {
     db.exec("ALTER TABLE payments ADD COLUMN balance_after_mc INTEGER");
   }
 
+  migrateCheckoutsV2(db);
+
   // Reservations belong to requests in flight. A freshly started process has none, so leftover
   // values are the remains of a crash in the middle of a provider call. Resetting them here is only
   // correct as long as exactly one process works on this file, and that is exactly how the service
@@ -297,6 +304,44 @@ function migrate(db: Db): void {
       );
     }
   }
+}
+
+const CHECKOUTS_V2 = `
+    CREATE TABLE checkouts_v2 (
+      reference  TEXT PRIMARY KEY,
+      address    TEXT REFERENCES wallets(address),
+      cents      INTEGER NOT NULL,
+      provider   TEXT NOT NULL,
+      status     TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      settled_at TEXT,
+      offer      TEXT,
+      CHECK (address IS NOT NULL OR offer IS NOT NULL)
+    )`;
+
+/**
+ * Makes `checkouts.address` nullable and adds `offer` (Goal 20, 2026-09-29).
+ *
+ * A person paying for a catalogue offer has no wallet, so the row has no address. SQLite cannot
+ * drop NOT NULL with ALTER, so the table is rebuilt, copied and renamed in one transaction. It runs
+ * only while `address` is still NOT NULL, which makes a second start a no-op. Production had zero
+ * rows in `checkouts` on 2026-09-29, so the copy moves nothing there; the test moves one anyway.
+ */
+export function migrateCheckoutsV2(db: Db): boolean {
+  const cols = db.prepare("PRAGMA table_info(checkouts)").all() as { name: string; notnull: number }[];
+  const address = cols.find((c) => c.name === "address");
+  if (!address || address.notnull !== 1) return false;
+  db.transaction(() => {
+    db.exec(CHECKOUTS_V2);
+    db.exec(
+      `INSERT INTO checkouts_v2 (reference, address, cents, provider, status, created_at, settled_at)
+         SELECT reference, address, cents, provider, status, created_at, settled_at FROM checkouts`,
+    );
+    db.exec("DROP TABLE checkouts");
+    db.exec("ALTER TABLE checkouts_v2 RENAME TO checkouts");
+    db.exec("CREATE INDEX IF NOT EXISTS checkouts_address ON checkouts(address, created_at)");
+  })();
+  return true;
 }
 
 export const MC_PER_CENT = 1000;

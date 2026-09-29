@@ -578,3 +578,48 @@ describe("fiverr_orders_30d, the vision as a number", () => {
     expect(m.fiverr_orders_30d).toBe(0);
   });
 });
+
+/**
+ * human_revenue_30d_cents, Goal 20. The counter-proof in both directions: a planted `stripe` row
+ * counts, the same row as `stripe_test` does not. Without the second half a demonstration with
+ * Stripe's test card would read as a person paying.
+ */
+describe("human_revenue_30d_cents", () => {
+  const plant = (db: ReturnType<typeof openDb>, reference: string, over: Record<string, unknown> = {}) => {
+    const r = {
+      reference,
+      address: null,
+      offer: "rede-zum-fest",
+      cents: 1900,
+      provider: "stripe",
+      status: "paid",
+      created_at: new Date().toISOString(),
+      settled_at: new Date().toISOString(),
+      ...over,
+    };
+    db.prepare(
+      "INSERT INTO checkouts (reference, address, offer, cents, provider, status, created_at, settled_at) VALUES (@reference, @address, @offer, @cents, @provider, @status, @created_at, @settled_at)",
+    ).run(r);
+  };
+
+  it("counts a paid live row for an offer", () => {
+    const r = withDb((db) => plant(db, "cs_live_1"));
+    expect(r.market.human_revenue_30d_cents).toBe(1900);
+  });
+
+  it("does not count the same row paid with a test key", () => {
+    const r = withDb((db) => plant(db, "cs_test_1", { provider: "stripe_test" }));
+    expect(r.market.human_revenue_30d_cents).toBe(0);
+  });
+
+  it("counts neither a pending row, nor credits for a wallet, nor a row older than thirty days", () => {
+    const r = withDb((db) => {
+      plant(db, "pending", { status: "pending", settled_at: null });
+      db.prepare("INSERT INTO wallets (address, balance_mc, created_at) VALUES ('key:w', 0, 'x')").run();
+      plant(db, "credits", { address: "key:w", offer: null });
+      plant(db, "old", { settled_at: new Date(Date.now() - 31 * 86400e3).toISOString() });
+      plant(db, "counted", { cents: 2400 });
+    });
+    expect(r.market.human_revenue_30d_cents).toBe(2400);
+  });
+});

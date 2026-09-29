@@ -8,22 +8,23 @@
  * after that is unchanged, credits stay not redeemable, and no new regulatory surface opens beyond
  * the ordinary sale of usage.
  *
- * **What is deliberately not here.** No Stripe, no provider SDK, no key. `CheckoutProvider` is an
- * interface with one implementation, a fake one, used by the tests. The real adapter belongs in
- * `src/payments/**`, which this loop does not touch, and it waits on a business decision that is
- * not a loop's to make (`.scratch/gtm/stripe-entscheidung.md`: legal form, VAT, who is the
- * counterparty). Everything on this side of that line can be built and proved now, so that the day
- * the decision lands the work is an adapter and not a system.
+ * **Where the provider lives.** `CheckoutProvider` is the interface; `fakeProvider` below is what
+ * the tests run against, and the Stripe adapter is `src/payments/stripe.ts` (Goal 20, 2026-09-29).
  *
  * **The whole safety argument in one sentence: the amount comes from the row, never from the
  * callback.** A callback says which payment it concerns. What that payment was for is what we
  * wrote down when the buyer started it. Reading the amount out of the callback is how a forged one
  * credits whatever it likes, and every check below exists to keep that from being possible.
  *
- * Off by default. With CP_CHECKOUT unset nothing here runs and the routes do not exist.
+ * Off by default. See `checkoutEnabled()` for what switches it on.
  */
 
 import { postLedger, ensureWallet, MC_PER_CENT, type Db } from "../db.js";
+import { OFFERS } from "../public/catalog.js";
+import { isStripeTestKey } from "../payments/stripe-key.js";
+
+/** Every card payment here is in euro. The catalogue prices are euro cents. */
+export const CURRENCY = "eur";
 
 /**
  * Die kleinste und die groesste Kartenzahlung, in Cent.
@@ -54,27 +55,68 @@ export class CheckoutError extends Error {
   }
 }
 
+/**
+ * On with `CP_CHECKOUT=1`, or with a Stripe TEST key in `CP_STRIPE_SECRET_KEY`.
+ *
+ * The key is Matthias' switch, because `CP_CHECKOUT` sits in `deploy/**`, which the loop does not
+ * touch. Only a test key counts (HAN-17, 2026-09-29): swapping `sk_test_` for `sk_live_` must not
+ * open the card path for real money on the next restart without a commit and a test. Live needs a
+ * switch of its own, set by a later goal, once somebody delivers after the payment.
+ */
 export function checkoutEnabled(): boolean {
-  return process.env.CP_CHECKOUT === "1";
+  return process.env.CP_CHECKOUT === "1" || isStripeTestKey(process.env.CP_STRIPE_SECRET_KEY ?? "");
+}
+
+/**
+ * What a provider reads back about a payment.
+ *
+ * `cents` and `currency` are what the provider says it charged. They are never booked: the amount
+ * comes from the row. They exist so a disagreement can refuse the settle (409), which can only turn
+ * a payment down, never credit one.
+ */
+export interface ProviderReading {
+  /** paid: money arrived. open: not yet, keep waiting. failed: it will not arrive. */
+  outcome: "paid" | "open" | "failed";
+  cents?: number;
+  currency?: string;
 }
 
 export interface CheckoutProvider {
   readonly name: string;
   /** Starts a payment and returns the reference the provider will echo back, plus where to send the buyer. */
-  begin(input: { cents: number; address: string }): Promise<{ reference: string; redirect: string }>;
+  begin(input: {
+    cents: number;
+    address?: string;
+    offer?: { id: string; name: string };
+  }): Promise<{ reference: string; redirect: string }>;
+  /** Which payment a callback names, without asking anybody. Empty when it names none. */
+  reference(payload: unknown): string;
   /**
-   * Reads a callback and says what it is about. It returns a reference and whether the payment
-   * went through, and deliberately NOT an amount: see the note at the top of this file.
+   * Whether that payment went through. Asynchronous because a real provider cannot tell from the
+   * callback alone and has to be asked. It deliberately returns no amount to book: see the note at
+   * the top of this file.
    */
-  read(payload: unknown): { reference: string; paid: boolean };
+  read(payload: unknown): Promise<ProviderReading>;
 }
 
 export interface Checkout {
   reference: string;
-  address: string;
+  address: string | null;
+  offer: string | null;
   cents: number;
   provider: string;
   status: "pending" | "paid" | "abandoned";
+}
+
+export interface Settled {
+  /** Credits booked to a wallet, in cents. Always 0 for an offer, which has no wallet. */
+  credited_cents: number;
+  already: boolean;
+  address: string | null;
+  offer: string | null;
+  /** The amount of the row, which is what was paid when status is 'paid'. */
+  cents: number;
+  status: Checkout["status"];
 }
 
 function requireEnabled(): void {
@@ -117,44 +159,108 @@ export async function beginCheckout(
     ).run(reference, address, cents, provider.name, new Date().toISOString());
   });
   run();
-  return { checkout: { reference, address, cents, provider: provider.name, status: "pending" }, redirect };
+  return { checkout: { reference, address, offer: null, cents, provider: provider.name, status: "pending" }, redirect };
+}
+
+/**
+ * Starts a payment for a catalogue offer, by a person who has no wallet (Goal 20).
+ *
+ * Takes an offer id and nothing else. The price is looked up in OFFERS, so a form that sends a
+ * price of its own has nowhere to put it.
+ */
+export async function beginOfferCheckout(
+  db: Db,
+  provider: CheckoutProvider,
+  offerId: string,
+): Promise<{ checkout: Checkout; redirect: string }> {
+  requireEnabled();
+  const offer = OFFERS.find((o) => o.id === offerId);
+  if (!offer) throw new CheckoutError("unknown_offer", 400, "There is no offer with that id.");
+  const cents = offer.priceCents;
+  const { reference, redirect } = await provider.begin({ cents, offer: { id: offer.id, name: offer.name } });
+  if (!reference) throw new CheckoutError("provider_no_reference", 502, "The payment provider did not name the payment.");
+  db.prepare(
+    "INSERT INTO checkouts (reference, offer, cents, provider, status, created_at) VALUES (?, ?, ?, ?, 'pending', ?)",
+  ).run(reference, offer.id, cents, provider.name, new Date().toISOString());
+  return {
+    checkout: { reference, address: null, offer: offer.id, cents, provider: provider.name, status: "pending" },
+    redirect,
+  };
 }
 
 /**
  * Books a payment that went through, once.
  *
- * Idempotent through the ledger and not through a flag: `ledger_topup_ref` is a unique index on
- * `ref` for kind 'topup' (src/db.ts), so a second callback for the same payment hits the database
- * constraint rather than a check that could be raced. The status column is bookkeeping for the
- * page; the index is what makes the money right.
+ * Everything that needs no provider is checked first and throws synchronously: switched off, no
+ * reference, a reference we never started, a different provider. Only a row that exists here is
+ * worth asking the provider about. HAN-17 found the other order: with the provider asked first,
+ * every anonymous `GET /katalog/danke?session_id=anything` spent a Stripe call with our secret key.
+ *
+ * Credits are idempotent through the ledger: `ledger_topup_ref` is a unique index on `ref` for kind
+ * 'topup' (src/db.ts), so a second callback hits the database constraint rather than a check that
+ * could be raced. An offer books nothing into the ledger, so there it is the conditional UPDATE
+ * (`status != 'paid'`, one changed row) that decides who was first.
  */
-export function settleCheckout(
-  db: Db,
-  provider: CheckoutProvider,
-  payload: unknown,
-): { credited_cents: number; already: boolean; address: string } {
+export function settleCheckout(db: Db, provider: CheckoutProvider, payload: unknown): Promise<Settled> {
   requireEnabled();
-  const { reference, paid } = provider.read(payload);
+  const reference = provider.reference(payload);
   if (!reference) throw new CheckoutError("reference_missing", 400, "The callback does not name a payment.");
 
   const row = db
-    .prepare("SELECT reference, address, cents, provider, status FROM checkouts WHERE reference = ?")
+    .prepare("SELECT reference, address, offer, cents, provider, status FROM checkouts WHERE reference = ?")
     .get(reference) as Checkout | undefined;
   // A callback for a payment we never started is not ours to book, whatever it claims.
   if (!row) throw new CheckoutError("unknown_payment", 404, "No payment here carries that reference.");
   if (row.provider !== provider.name) {
     throw new CheckoutError("wrong_provider", 409, "That payment was started with a different provider.");
   }
-  if (!paid) {
-    db.prepare("UPDATE checkouts SET status = 'abandoned' WHERE reference = ? AND status = 'pending'").run(reference);
-    return { credited_cents: 0, already: false, address: row.address };
-  }
-  if (row.status === "paid") return { credited_cents: row.cents, already: true, address: row.address };
+  return finishSettle(db, provider, payload, row);
+}
 
+async function finishSettle(db: Db, provider: CheckoutProvider, payload: unknown, row: Checkout): Promise<Settled> {
+  const { reference } = row;
+  const reading = await provider.read(payload);
+  const result = (credited_cents: number, already: boolean, status: Checkout["status"]): Settled => ({
+    credited_cents,
+    already,
+    address: row.address,
+    offer: row.offer,
+    cents: row.cents,
+    status,
+  });
+
+  // The provider may name what it charged. Disagreeing with the row refuses; agreeing books the row.
+  if (reading.cents !== undefined && reading.cents !== row.cents) {
+    throw new CheckoutError("amount_mismatch", 409, "The provider reports a different amount than this payment was started for.");
+  }
+  if (reading.currency !== undefined && reading.currency.toLowerCase() !== CURRENCY) {
+    throw new CheckoutError("currency_mismatch", 409, "The provider reports a different currency than this payment was started in.");
+  }
+
+  if (reading.outcome === "open") {
+    const now = db.prepare("SELECT status FROM checkouts WHERE reference = ?").get(reference) as { status: Checkout["status"] };
+    return result(0, false, now.status);
+  }
+  if (reading.outcome === "failed") {
+    db.prepare("UPDATE checkouts SET status = 'abandoned' WHERE reference = ? AND status = 'pending'").run(reference);
+    const now = db.prepare("SELECT status FROM checkouts WHERE reference = ?").get(reference) as { status: Checkout["status"] };
+    return result(0, false, now.status);
+  }
+
+  if (row.address === null) {
+    // No wallet, so nothing to credit. Credits stay not redeemable, and an offer never becomes any.
+    const changed = db
+      .prepare("UPDATE checkouts SET status = 'paid', settled_at = ? WHERE reference = ? AND status != 'paid'")
+      .run(new Date().toISOString(), reference).changes;
+    return result(0, changed !== 1, "paid");
+  }
+
+  const address = row.address;
+  if (row.status === "paid") return result(row.cents, true, "paid");
   try {
     const run = db.transaction(() => {
       postLedger(db, {
-        address: row.address,
+        address,
         kind: "topup",
         // The row, never the callback.
         deltaMc: row.cents * MC_PER_CENT,
@@ -172,11 +278,11 @@ export function settleCheckout(
     // a provider that retries a callback is behaving correctly and must not be told it went wrong.
     if (String((e as Error).message).includes("UNIQUE")) {
       db.prepare("UPDATE checkouts SET status = 'paid' WHERE reference = ?").run(reference);
-      return { credited_cents: row.cents, already: true, address: row.address };
+      return result(row.cents, true, "paid");
     }
     throw e;
   }
-  return { credited_cents: row.cents, already: false, address: row.address };
+  return result(row.cents, false, "paid");
 }
 
 /**
@@ -194,12 +300,15 @@ export function fakeProvider(prefix = "fake"): CheckoutProvider {
       const reference = `${prefix}_${n}_${cents}`;
       return { reference, redirect: `https://provider.invalid/pay/${reference}` };
     },
-    read(payload) {
+    reference(payload) {
       const p = (typeof payload === "object" && payload !== null ? payload : {}) as Record<string, unknown>;
-      return {
-        reference: typeof p.reference === "string" ? p.reference : "",
-        paid: p.paid === true,
-      };
+      return typeof p.reference === "string" ? p.reference : "";
+    },
+    // A fake callback is final: it either says the money arrived or that it will not. It names no
+    // amount, so the amount check above never fires for it and the row decides alone.
+    async read(payload) {
+      const p = (typeof payload === "object" && payload !== null ? payload : {}) as Record<string, unknown>;
+      return { outcome: p.paid === true ? "paid" : "failed" };
     },
   };
 }
