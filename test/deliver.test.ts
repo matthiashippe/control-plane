@@ -15,8 +15,10 @@ import {
   deliverPaidOrders,
   DELIVERY_COST_CAP_MC,
   DELIVERY_START,
+  deliveryWriter,
   MAX_ATTEMPTS,
   STALE_WRITTEN_MS,
+  TEST_DELIVERIES_PER_DAY,
   type Mailer,
   type VersionWriter,
 } from "../src/checkout/deliver.js";
@@ -27,7 +29,8 @@ import { OFFERS } from "../src/public/catalog.js";
 type Db = ReturnType<typeof openDb>;
 const TEXT_OFFER = OFFERS.find((o) => o.id === "text-ueber-ihr-angebot")!;
 const SPEECH = OFFERS.find((o) => o.id === "rede-zum-fest")!;
-const OURS = "vorfuehrung@postyourprice.com";
+/** Stands for the secret in `CP_TEST_DELIVERY_TO`; the real one is never in the repo. */
+const OURS = "demo-7f3a@example.invalid";
 const MARKER_EMAIL = "zz-unmistakable-7f3a@postyourprice.com";
 const T0 = new Date("2026-10-01T10:00:00.000Z");
 const at = (min: number) => () => new Date(T0.getTime() + min * 60_000);
@@ -86,10 +89,12 @@ beforeEach(() => {
   delete process.env.CP_CHECKOUT_LIVE;
   process.env.CP_CHECKOUT = "1";
   delete process.env.CP_STRIPE_SECRET_KEY;
+  process.env.CP_TEST_DELIVERY_TO = OURS;
   log = vi.spyOn(console, "log").mockImplementation(() => {});
 });
 afterEach(() => {
   delete process.env.CP_CHECKOUT;
+  delete process.env.CP_TEST_DELIVERY_TO;
   log.mockRestore();
 });
 
@@ -140,13 +145,69 @@ describe("deliverPaidOrders", () => {
     const d = openDb(":memory:");
     const w = stubWriter();
     const strangers = ["x@example.com", "andere@postyourprice.com", "someone@gmail.com"].map((email) => paidOrder(d, { email }));
-    const ours = paidOrder(d, { email: "Vorfuehrung@PostYourPrice.com" });
+    const ours = paidOrder(d, { email: OURS.toUpperCase() });
     const live = paidOrder(d, { provider: "stripe", email: "someone@gmail.com" });
     const r = await deliverPaidOrders(d, w, null, at(5));
     expect(r).toMatchObject({ found: 2, written: 2 });
     for (const s of strangers) expect(delivery(d, s.reference)).toBeUndefined();
     expect(delivery(d, ours.reference)!.status).toBe("written");
     expect(delivery(d, live.reference)!.status).toBe("written");
+  });
+
+  it("has no test path without CP_TEST_DELIVERY_TO, and the old demo address is no key any more", async () => {
+    const d = openDb(":memory:");
+    const w = stubWriter();
+    const old = paidOrder(d, { email: "vorfuehrung@postyourprice.com" });
+    const ours = paidOrder(d);
+    for (const unset of [undefined, "", " , "]) {
+      if (unset === undefined) delete process.env.CP_TEST_DELIVERY_TO;
+      else process.env.CP_TEST_DELIVERY_TO = unset;
+      expect(await deliverPaidOrders(d, w, null, at(5)), String(unset)).toMatchObject({ found: 0 });
+    }
+    expect(w.calls).toHaveLength(0);
+    // Counter-check: with the variable set, our order is written and the old address still is not.
+    process.env.CP_TEST_DELIVERY_TO = ` other@example.invalid, ${OURS} `;
+    expect(await deliverPaidOrders(d, w, null, at(5))).toMatchObject({ found: 1, written: 1 });
+    expect(delivery(d, ours.reference)!.status).toBe("written");
+    expect(delivery(d, old.reference)).toBeUndefined();
+  });
+
+  it("writes three test-mode orders a day over all addresses, not the fourth, and one again the next day", async () => {
+    expect(TEST_DELIVERIES_PER_DAY).toBe(3);
+    process.env.CP_TEST_DELIVERY_TO = `${OURS},second@example.invalid`;
+    const d = openDb(":memory:");
+    const w = stubWriter();
+    const minute = (m: number) => new Date(T0.getTime() + m * 60_000).toISOString();
+    // A stranger's order that day uses no slot; ours are spread over two addresses.
+    const stranger = paidOrder(d, { email: "x@example.com", settledAt: minute(0) });
+    const day1 = [OURS, "second@example.invalid", OURS, "second@example.invalid"].map((email, i) => paidOrder(d, { email, settledAt: minute(i + 1) }));
+    const live = [1, 2, 3, 4].map((i) => paidOrder(d, { provider: "stripe", email: "someone@gmail.com", settledAt: minute(i) }));
+    expect(await deliverPaidOrders(d, w, null, at(10))).toMatchObject({ found: 7, written: 7 });
+    for (const o of day1.slice(0, 3)) expect(delivery(d, o.reference)!.status, "first three").toBe("written");
+    expect(delivery(d, day1[3].reference), "the fourth").toBeUndefined();
+    expect(delivery(d, stranger.reference)).toBeUndefined();
+    for (const o of live) expect(delivery(d, o.reference)!.status, "live orders have no daily limit").toBe("written");
+    // Later runs the same day do not take the fourth either.
+    expect(await deliverPaidOrders(d, w, null, at(60))).toMatchObject({ found: 0 });
+    expect(delivery(d, day1[3].reference)).toBeUndefined();
+    // The next UTC day, one goes again.
+    const nextDay = paidOrder(d, { settledAt: new Date(Date.parse(`${T0.toISOString().slice(0, 10)}T00:00:00.000Z`) + 86_400_000).toISOString() });
+    expect(await deliverPaidOrders(d, w, null, at(24 * 60))).toMatchObject({ found: 1, written: 1 });
+    expect(delivery(d, nextDay.reference)!.status).toBe("written");
+    expect(delivery(d, day1[3].reference), "the fourth stays unwritten").toBeUndefined();
+    // At most three test-mode rows per day of payment in deliveries.
+    const perDay = d
+      .prepare("SELECT substr(c.settled_at, 1, 10) AS day, count(*) AS n FROM deliveries JOIN checkouts c USING (reference) WHERE c.provider = 'stripe_test' GROUP BY day")
+      .all() as { day: string; n: number }[];
+    expect(perDay.map((r) => r.n)).toEqual([3, 1]);
+  });
+
+  it("never writes with the mock, not even as the only provider", () => {
+    const provider = (id: string) => ({ id, models: () => [{ id: `${id}-model`, inputPerMillion: 1, outputPerMillion: 1 }] }) as never;
+    expect(deliveryWriter([provider("mock")])).toBeNull();
+    expect(deliveryWriter([])).toBeNull();
+    // Counter-check: any other provider writes, also behind the mock.
+    expect(deliveryWriter([provider("mock"), provider("openrouter")])!.models).toEqual(["openrouter-model"]);
   });
 
   it("does not run with the card path off or without a writer", async () => {
@@ -427,6 +488,19 @@ describe("the pages", () => {
     const html = await (await appWith(d).request(`/katalog/fassungen?t=${token}`)).text();
     expect(html).toContain("schreiben wir keine Fassungen");
     expect(html).not.toContain("Wir schreiben Ihre drei Fassungen");
+  });
+
+  it("tells the fourth test-mode order of the day that it is taken and not written", async () => {
+    const d = openDb(":memory:");
+    const orders = [0, 1, 2, 3].map((i) => paidOrder(d, { settledAt: new Date(T0.getTime() + i * 60_000).toISOString() }));
+    const app = appWith(d);
+    const fourth = await (await app.request(`/katalog/fassungen?t=${orders[3].token}`)).text();
+    expect(fourth).toContain("Ihre Bestellung ist angenommen");
+    expect(fourth).toContain("höchstens 3 Bestellungen am Tag");
+    expect(fourth).not.toContain("Wir schreiben Ihre drei Fassungen");
+    // Counter-check: the third still hears that it is being written.
+    const third = await (await app.request(`/katalog/fassungen?t=${orders[2].token}`)).text();
+    expect(third).toContain("Wir schreiben Ihre drei Fassungen");
   });
 
   it("shows nothing for an unpaid order, and nothing after the texts went with the brief", async () => {

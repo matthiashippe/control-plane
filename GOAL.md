@@ -99,7 +99,7 @@ Buchung wartet. Ein Webhook kann spaeter dazukommen; der Abgleich bleibt dann da
 1. `pnpm test` und `pnpm e2e` gruen, kein `expect` entfernt ausser dem in 4 benannten, das durch
    einen strengeren ersetzt ist.
 2. Nach dem Deploy, Testmodus, von Betrieb: **eine bezahlte Session ohne Rueckkehr.** Vorfuehrung
-   im Browser mit `vorfuehrung@postyourprice.com` und Karte 4242, die Weiterleitung auf
+   im Browser mit einer Adresse aus `CP_TEST_DELIVERY_TO` und Karte 4242, die Weiterleitung auf
    `/katalog/danke` wird im Browser abgefangen und nie geladen (Access-Log: kein
    `GET /katalog/danke` fuer diese Session). Nach hoechstens sieben Minuten steht die Zeile `paid`.
    **Gegenprobe (Auflage 9):** dasselbe Access-Log zeigt fuer eine der bezahlten Vorfuehrungen vom

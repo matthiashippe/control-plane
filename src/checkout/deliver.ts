@@ -14,8 +14,11 @@
  * - Fewer than three are never shown or sent. `attempts` rises only for failures a retry cannot
  *   fix (`countsAsAttempt`, condition 18); five of those make the row `failed`.
  * - Spending per row is capped at `DELIVERY_COST_CAP_MC`, summed over all runs.
- * - `stripe_test` rows are written only for `TEST_DELIVERY_TO`, so a stranger with card 4242 costs
- *   us nothing and gets no model output (condition 5).
+ * - `stripe_test` rows are written only for the addresses in `CP_TEST_DELIVERY_TO`, so a stranger
+ *   with card 4242 costs us nothing and gets no model output (condition 5). The list lives in the
+ *   environment, never in the repo, which is public: without it there is no test path (HAN-72).
+ * - At most `TEST_DELIVERIES_PER_DAY` test-mode orders are written per UTC day of payment, counted
+ *   over all orders, so a leaked address costs at most three rows a day (HAN-72).
  * - The email address never goes into a prompt (condition B); the brief goes in as data.
  * - The log line carries counts only: no address, no reference, no text.
  */
@@ -40,8 +43,19 @@ export const DELIVERY_BATCH = 10;
 export const CLAIM_TTL_MS = 30 * 60 * 1000;
 /** A written row older than this is not mailed any more (condition 11): the provider's key expires at 24 h. */
 export const STALE_WRITTEN_MS = 23 * 60 * 60 * 1000;
-/** The only addresses a test-mode order is written for. */
-export const TEST_DELIVERY_TO: readonly string[] = ["vorfuehrung@postyourprice.com"];
+/** Test-mode orders written per UTC day of payment, over all orders and addresses. */
+export const TEST_DELIVERIES_PER_DAY = 3;
+
+/**
+ * The only addresses a test-mode order is written for: `CP_TEST_DELIVERY_TO`, comma-separated.
+ * Unset or empty means no test path. Read on every call, so the running environment decides.
+ */
+export function testDeliveryTo(): string[] {
+  return (process.env.CP_TEST_DELIVERY_TO ?? "")
+    .split(",")
+    .map((a) => a.trim().toLowerCase())
+    .filter(Boolean);
+}
 export const VERSIONS = 3;
 /** Speaking pace for the length check of a speech, words per minute, give or take 30 per cent. */
 export const WORDS_PER_MINUTE = 130;
@@ -103,6 +117,16 @@ export function chatWriter(provider: ChatProvider, models?: readonly string[]): 
       };
     },
   };
+}
+
+/**
+ * The writer for paid orders: the first provider that is not the harness mock. A mock never writes
+ * a delivery, not even as the only provider, so a misconfiguration cannot answer a customer with
+ * "Mock turn N" (HAN-72). No such provider, no writer, and the delivery run does not start.
+ */
+export function deliveryWriter(providers: readonly ChatProvider[]): VersionWriter | null {
+  const p = providers.find((x) => x.id !== "mock");
+  return p ? chatWriter(p) : null;
 }
 
 /**
@@ -197,7 +221,30 @@ interface Row {
 export function deliverableByRule(provider: string, email: string, settledAt: string | null): boolean {
   if (!settledAt || settledAt < DELIVERY_START) return false;
   if (provider === "stripe") return true;
-  return provider === "stripe_test" && TEST_DELIVERY_TO.includes(email.toLowerCase());
+  return provider === "stripe_test" && testDeliveryTo().includes(email.toLowerCase());
+}
+
+/**
+ * Whether a test-mode order is beyond the day's limit: it is not among the first
+ * `TEST_DELIVERIES_PER_DAY` test-mode orders for our addresses paid on the same UTC day. The order
+ * is kept, only not written. Live orders never are.
+ */
+export function overTestLimit(db: Db, reference: string, provider: string, settledAt: string | null): boolean {
+  if (provider !== "stripe_test" || !settledAt) return false;
+  const day = settledAt.slice(0, 10);
+  const next = new Date(Date.parse(`${day}T00:00:00.000Z`) + 86_400_000).toISOString();
+  const ours = new Set(testDeliveryTo());
+  const rows = db
+    .prepare(
+      `SELECT c.reference, b.email
+         FROM checkouts c JOIN order_briefs b USING (reference)
+        WHERE c.provider = 'stripe_test' AND c.status = 'paid'
+          AND c.settled_at >= ? AND c.settled_at < ?
+        ORDER BY c.settled_at ASC, c.reference ASC`,
+    )
+    .all(`${day}T00:00:00.000Z`, next) as { reference: string; email: string }[];
+  const rank = rows.filter((r) => ours.has(r.email.toLowerCase())).findIndex((r) => r.reference === reference);
+  return rank < 0 || rank >= TEST_DELIVERIES_PER_DAY;
 }
 
 /** The rows a run takes, oldest payment first. `written` rows only when there is a mailer to send them. */
@@ -216,7 +263,9 @@ export function deliverable(db: Db, now: Date, withMailer: boolean): Row[] {
         ORDER BY c.settled_at ASC`,
     )
     .all(DELIVERY_START, cutoff, withMailer ? 1 : 0) as (Row & { settled_at: string })[];
-  return rows.filter((r) => deliverableByRule(r.provider, r.email, r.settled_at)).slice(0, DELIVERY_BATCH);
+  return rows
+    .filter((r) => deliverableByRule(r.provider, r.email, r.settled_at) && !overTestLimit(db, r.reference, r.provider, r.settled_at))
+    .slice(0, DELIVERY_BATCH);
 }
 
 /** One run, in rows. `upstreams` counts texts per answering provider, e.g. { Azure: 3 }. */
@@ -413,14 +462,14 @@ export async function deliverPaidOrders(
 export type DeliveryView =
   | { state: "none" }
   | { state: "writing"; offer: Offer }
-  | { state: "not_written"; offer: Offer; reason: "test_mode" | "before_start" }
+  | { state: "not_written"; offer: Offer; reason: "test_mode" | "test_limit" | "before_start" }
   | { state: "failed"; offer: Offer }
   | { state: "ready"; offer: Offer; versions: Version[] };
 
 export function deliveryView(db: Db, token: string): DeliveryView {
   const row = db
     .prepare(
-      `SELECT c.offer, c.status AS paid, c.provider, c.settled_at, b.email, d.status, d.body, d.versions
+      `SELECT c.reference, c.offer, c.status AS paid, c.provider, c.settled_at, b.email, d.status, d.body, d.versions
          FROM order_briefs b
          JOIN checkouts c USING (reference)
          LEFT JOIN deliveries d USING (reference)
@@ -428,6 +477,7 @@ export function deliveryView(db: Db, token: string): DeliveryView {
     )
     .get(token) as
     | {
+        reference: string;
         offer: string | null;
         paid: string;
         provider: string;
@@ -445,6 +495,9 @@ export function deliveryView(db: Db, token: string): DeliveryView {
     return row.body && row.versions === VERSIONS ? { state: "ready", offer, versions: JSON.parse(row.body) as Version[] } : { state: "none" };
   }
   if (row.status === "failed") return { state: "failed", offer };
+  if (deliverableByRule(row.provider, row.email, row.settled_at) && overTestLimit(db, row.reference, row.provider, row.settled_at)) {
+    return { state: "not_written", offer, reason: "test_limit" };
+  }
   if (!deliverableByRule(row.provider, row.email, row.settled_at)) {
     return { state: "not_written", offer, reason: row.provider === "stripe_test" && row.settled_at && row.settled_at >= DELIVERY_START ? "test_mode" : "before_start" };
   }

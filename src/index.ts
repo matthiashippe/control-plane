@@ -34,7 +34,7 @@ import { payConfigFromEnv } from "./payments/pay.js";
 import { settlerFromEnv } from "./payments/settler.js";
 import { stripeFromEnv } from "./payments/stripe.js";
 import { reconcileCheckouts } from "./checkout/index.js";
-import { chatWriter, deliverPaidOrders, type Mailer } from "./checkout/deliver.js";
+import { deliverPaidOrders, deliveryWriter, type Mailer } from "./checkout/deliver.js";
 import { siteOrigin } from "./public/site.js";
 
 const port = Number(process.env.CP_PORT || 8402);
@@ -124,10 +124,9 @@ cleanup();
 setInterval(cleanup, 60 * 60 * 1000).unref();
 
 // Who writes the texts of a paid order (HAN-67): the first provider that is not the harness mock,
-// else the mock, with every model it serves. No provider, no writer, and the delivery run does not
-// start. No mailer until HAN-44: rows stay `written` and the buyer reads them on the page.
-const writerProvider = providers.find((p) => p.id !== "mock") ?? providers[0];
-const writer = writerProvider ? chatWriter(writerProvider) : null;
+// never the mock (HAN-72). No mailer until HAN-44: rows stay `written` and the buyer reads them on
+// the page.
+const writer = deliveryWriter(providers);
 const mailer: Mailer | null = null;
 
 // Card payments: once on start, every five minutes after that (Goal 22). Books what was paid even

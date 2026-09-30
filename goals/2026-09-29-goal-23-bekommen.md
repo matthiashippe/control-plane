@@ -139,8 +139,10 @@ VM, derselbe Takt in src/index.ts, danach:
      sie liegt bei 2,6 Prozent des kleinsten Katalogpreises (17 EUR, umgerechnet mit 1,1355 USD je EUR
      aus `ops/anzeigen-rechnung.py:101`), und wird
      nach der Vorführung an `delivery_cost_mc_median` gemessen;
-   - **`stripe_test` nur an eine eigene, explizite Zustellliste**, `TEST_DELIVERY_TO`, heute genau
-     `vorfuehrung@postyourprice.com`. Nicht `ops/ours.txt`: dort stehen die RFC-2606-Domains für
+   - **`stripe_test` nur an eine eigene, explizite Zustellliste**, seit HAN-72 in der
+     Umgebungsvariablen `CP_TEST_DELIVERY_TO` statt als Konstante im öffentlichen Repo, und
+     höchstens drei je UTC-Tag der Zahlung über alle Bestellungen. Die alte Adresse aus Goal 22
+     ist öffentlich und darf dort nicht wieder stehen. Nicht `ops/ours.txt`: dort stehen die RFC-2606-Domains für
      Agenten, die den Kaufweg prüfen, und jede Adresse unter `postyourprice.com`; an die gäbe es nur
      Bounces, und Resend pausiert ab 4 Prozent (HAN-42, Auflage 5). Eine RFC-2606-Domain bekommt nie
      eine Mail, auch nicht live. `stripe` (live) geht an jede andere Adresse.

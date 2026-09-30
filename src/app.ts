@@ -40,7 +40,7 @@ import {
   settleCheckout,
   type CheckoutProvider,
 } from "./checkout/index.js";
-import { deliveryView } from "./checkout/deliver.js";
+import { deliveryView, TEST_DELIVERIES_PER_DAY } from "./checkout/deliver.js";
 import { stripeFromEnv } from "./payments/stripe.js";
 import { isStripeTestKey } from "./payments/stripe-key.js";
 import { germanFrame } from "./public/frame.de.js";
@@ -1210,7 +1210,9 @@ export function createApp(opts: AppOptions) {
           "Zu dieser Bestellung schreiben wir keine Fassungen.",
           view.reason === "test_mode"
             ? `<p>${TEST_MODE_LINE} Im Testbetrieb schreiben wir nur für unsere eigene Vorführung.</p>${back}`
-            : `<p>Die Bestellung ist älter als unsere Lieferung. Schreiben Sie uns an <a href="mailto:matthias@hanseatictech.de">matthias@hanseatictech.de</a>.</p>`,
+            : view.reason === "test_limit"
+              ? `<p>${TEST_MODE_LINE} Ihre Bestellung ist angenommen. Im Testbetrieb schreiben wir höchstens ${TEST_DELIVERIES_PER_DAY} Bestellungen am Tag, und diese kam danach.</p>${back}`
+              : `<p>Die Bestellung ist älter als unsere Lieferung. Schreiben Sie uns an <a href="mailto:matthias@hanseatictech.de">matthias@hanseatictech.de</a>.</p>`,
           200,
         );
       case "failed":
