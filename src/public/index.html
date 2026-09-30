@@ -261,6 +261,19 @@ section { padding-block: var(--s-16); }
 }
 @keyframes bar-settle { to { box-shadow: 0 1px 0 0 var(--line); } }
 
+/* ---- the first screen for a person (HAN-92) ----------------------------
+   The headline wraps as free text: the hero's .h1-line is a one-line mask and cut this one off
+   after its first line when HAN-89 measured it. */
+.human { padding-block: var(--s-8) var(--s-6); border-bottom: 1px solid var(--line); }
+.human .wrap { max-width: 46rem; }
+.human-h { font-size: clamp(1.5rem, 1.1rem + 1.8vw, 2.4rem); line-height: 1.2; margin: 0; font-weight: 660; }
+.human .wrap > p.sub { margin-top: var(--s-4); }
+.human-price { margin-top: var(--s-4); font-size: var(--t-lead); font-weight: 600; color: var(--fg); }
+.human-cta { margin-top: var(--s-4); }
+.human .wrap > p.fine { margin-top: var(--s-3); }
+.human-agents { margin-top: var(--s-6); font-size: var(--t-ui); }
+.human-agents a { color: var(--muted); }
+
 /* ---- hero ------------------------------------------------------------ */
 .hero { position: relative; isolation: isolate; overflow: clip; padding-block: var(--s-12) var(--s-16); }
 @media (min-width: 52rem) { .hero { padding-block: var(--s-16) var(--s-24); } }
@@ -718,6 +731,13 @@ h1.ph { font-size: clamp(1.5rem, 3.2vw, 2.1rem); line-height: 1.15; letter-spaci
 
 <main>
 
+<!-- The first screen for a person, in German, rendered from src/public/humanfirst.ts (HAN-92). The
+     agent path below is unchanged and starts at #fuer-agenten. The control mark moved here with it,
+     because it has to sit in the first screen and the hero no longer does on a phone. -->
+<!--HUMAN-->
+<!-- The control. It is in the first screen, so every reader fetches it; a browser that fetches it together with the one at the bottom is telling us its lazy loading means nothing here. See the /px/ route in src/app.ts. -->
+<img src="/px/top.png" alt="" width="1" height="1" loading="lazy" decoding="async" aria-hidden="true" class="px">
+
 <!-- ===================== 1. HERO =====================
      The panel on the right is the whole first screen's argument: POST /v1/briefs/check takes no
      key, no account, no money and runs no model, and the three lines under the call are what it
@@ -725,7 +745,7 @@ h1.ph { font-size: clamp(1.5rem, 3.2vw, 2.1rem); line-height: 1.15; letter-spaci
      what happens after money moves; this is the only thing a stranger can run before deciding
      anything. It replaces the second hero button, which said "Get a key" and scrolled to a
      section that shows a config file for somebody else's runtime and hands out no key. -->
-<section class="hero">
+<section class="hero" id="fuer-agenten">
   <div class="wrap hero-in">
     <div class="hero-text">
     <a class="pill" href="#market"><span class="live-dot"></span><!--T:pill-->Live market<!--/T--></a>
@@ -750,8 +770,6 @@ h1.ph { font-size: clamp(1.5rem, 3.2vw, 2.1rem); line-height: 1.15; letter-spaci
          nobody opens, and on a phone the nav hides most links under 30rem. -->
     <p class="sub" style="margin-top:1rem"><a href="/katalog"><!--T:katalog-->Texts in German, written for you: the catalogue<!--/T--></a></p>
     </div>
-<!-- The control. It is in the first screen, so every reader fetches it; a browser that fetches it together with the one at the bottom is telling us its lazy loading means nothing here. See the /px/ route in src/app.ts. -->
-<img src="/px/top.png" alt="" width="1" height="1" loading="lazy" decoding="async" aria-hidden="true" class="px">
     <div class="demo" id="how">
       <p class="eyebrow"><!--T:eyebrow-->Before any money moves<!--/T--></p>
       <div class="code"><pre><code><span class="pr">$</span> curl -s https://cp.hippe.eu/v1/briefs/check \

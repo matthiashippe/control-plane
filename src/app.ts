@@ -77,6 +77,7 @@ import { siteOrigin, withOrigin } from "./public/site.js";
 import { openApiDocument } from "./public/openapi.js";
 import { renderCheck, renderCheckIntro, renderPasteBox } from "./public/checkpage.js";
 import { germanFirstScreen } from "./public/landing.de.js";
+import { renderHumanFirst } from "./public/humanfirst.js";
 import { detectBriefLanguage } from "./bounties/brief.de.js";
 import { DOC } from "./errors.js";
 import { Catalog, handleChat, MARKUP } from "./inference/proxy.js";
@@ -1504,6 +1505,9 @@ export function createApp(opts: AppOptions) {
             langOf("", c.req.header("accept-language")),
           ),
         )
+        // The person's first screen, above the agent path (HAN-92). Same `buying()` as /katalog, so
+        // the test-mode line shows here exactly when it shows there.
+        .replace("<!--HUMAN-->", renderHumanFirst(buying()))
         .replace("<!--NUMBERS-->", renderNumbers(mcToCents(GRANT_MC), mcToCents(poolLeftMc(db))))
         .replace("<!--MARKET-->", renderMarket(db))
         .replace("<!--WALLETS-->", renderStatus(db))
