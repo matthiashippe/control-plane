@@ -323,6 +323,29 @@ function migrate(db: Db): void {
     );
   `);
 
+  // The conversation that asks back (HAN-77). `fields` is what was understood so far, `turns` the
+  // transcript; both are a person's words and are deleted after a day (`cleanupConversations` in
+  // src/checkout/conversation.ts). `conversation_days` counts model calls and their cost per UTC
+  // day, which is what the daily cap reads; it names nobody.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS conversations (
+      id         TEXT PRIMARY KEY,
+      offer      TEXT NOT NULL,
+      fields     TEXT NOT NULL CHECK (json_valid(fields) AND json_type(fields) = 'object'),
+      turns      TEXT NOT NULL CHECK (json_valid(turns) AND json_type(turns) = 'array'),
+      asked      TEXT,
+      questions  INTEGER NOT NULL DEFAULT 0,
+      calls      INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS conversation_days (
+      day     TEXT PRIMARY KEY,
+      calls   INTEGER NOT NULL DEFAULT 0,
+      cost_mc INTEGER NOT NULL DEFAULT 0
+    );
+  `);
+
   // Reservations belong to requests in flight. A freshly started process has none, so leftover
   // values are the remains of a crash in the middle of a provider call. Resetting them here is only
   // correct as long as exactly one process works on this file, and that is exactly how the service

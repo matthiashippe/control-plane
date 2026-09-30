@@ -35,6 +35,7 @@ import { settlerFromEnv } from "./payments/settler.js";
 import { stripeFromEnv } from "./payments/stripe.js";
 import { reconcileCheckouts } from "./checkout/index.js";
 import { deliverPaidOrders, deliveryWriter, type Mailer } from "./checkout/deliver.js";
+import { cleanupConversations } from "./checkout/conversation.js";
 import { siteOrigin } from "./public/site.js";
 
 const port = Number(process.env.CP_PORT || 8402);
@@ -103,6 +104,8 @@ const app = createApp({
   catalog,
   checkout,
   inferenceSunsetAt,
+  // The conversation reads answers with the same provider that writes the texts, never the mock.
+  conversation: deliveryWriter(providers),
 });
 
 // Cleanup: once on start, hourly after that. Otherwise `siwe_nonces` grows with every call to
@@ -116,6 +119,8 @@ const cleanup = () => {
     // A count only: the rows hold a person's email and what they wrote (HAN-25, condition 8).
     const briefs = cleanupOrderBriefs(db);
     if (briefs) console.log(`[cleanup] removed ${briefs} order briefs past their retention period`);
+    const talks = cleanupConversations(db);
+    if (talks) console.log(`[cleanup] removed ${talks} conversations older than a day`);
   } catch (err) {
     console.error(`[cleanup] failed: ${err instanceof Error ? err.message : String(err)}`);
   }

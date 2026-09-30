@@ -21,7 +21,7 @@
 
 import { randomBytes } from "node:crypto";
 import { postLedger, ensureWallet, MC_PER_CENT, type Db } from "../db.js";
-import { OFFERS, type Offer } from "../public/catalog.js";
+import { OFFERS, type Offer, type OfferField } from "../public/catalog.js";
 import { isStripeLiveKey, isStripeTestKey } from "../payments/stripe-key.js";
 
 /** Every card payment here is in euro. The catalogue prices are euro cents. */
@@ -190,6 +190,16 @@ export function hasTwoWords(text: string): boolean {
 }
 
 /**
+ * Whether one trimmed value would pass the order page. The conversation (HAN-77) asks with the same
+ * rule, so it never hands over something the form would send back.
+ */
+export function fieldValid(f: OfferField, value: string): boolean {
+  return f.kind === "choice"
+    ? f.options.includes(value)
+    : value.length >= f.min && value.length <= f.max && hasTwoWords(value);
+}
+
+/**
  * The offer's fields out of a form, checked, trimmed and in the offer's order. Anything the offer
  * does not ask for is dropped, so a form cannot store more than the page showed.
  */
@@ -197,11 +207,7 @@ export function checkBrief(offer: Offer, input: Readonly<Record<string, string>>
   const brief: Record<string, string> = {};
   for (const f of offer.fields) {
     const value = (input[f.name] ?? "").trim();
-    const ok =
-      f.kind === "choice"
-        ? f.options.includes(value)
-        : value.length >= f.min && value.length <= f.max && hasTwoWords(value);
-    if (!ok) {
+    if (!fieldValid(f, value)) {
       const rule = f.kind === "choice" ? `one of ${f.options.join(", ")}` : `${f.min} to ${f.max} characters and two words`;
       throw new CheckoutError("brief_invalid", 400, `${f.name} must be ${rule}.`, f.name);
     }

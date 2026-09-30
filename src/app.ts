@@ -30,7 +30,7 @@ import { readSeries, renderX402 } from "./public/x402.js";
 import { readMoneySeries, readReceipts, renderConway } from "./public/conway.js";
 import { renderPost } from "./public/post.js";
 import { renderFix } from "./public/fix.js";
-import { OFFERS, TEST_MODE_LINE, euro, renderCatalog, renderOrderPage, type Offer } from "./public/catalog.js";
+import { OFFERS, TEST_MODE_LINE, euro, renderCatalog, renderConversation, renderOrderPage, type ConversationTurn, type Offer } from "./public/catalog.js";
 import { renderPrivacy } from "./public/datenschutz.js";
 import {
   beginOfferCheckout,
@@ -40,7 +40,8 @@ import {
   settleCheckout,
   type CheckoutProvider,
 } from "./checkout/index.js";
-import { deliveryView, TEST_DELIVERIES_PER_DAY } from "./checkout/deliver.js";
+import { deliveryView, TEST_DELIVERIES_PER_DAY, type VersionWriter } from "./checkout/deliver.js";
+import { converse, ConversationError, findOffer, MAX_QUESTIONS } from "./checkout/conversation.js";
 import { stripeFromEnv } from "./payments/stripe.js";
 import { isStripeTestKey } from "./payments/stripe-key.js";
 import { germanFrame } from "./public/frame.de.js";
@@ -129,6 +130,11 @@ export interface AppOptions {
    * or nobody. Tests pass the Stripe adapter with a staged `fetch`, or `null`.
    */
   checkout?: CheckoutProvider | null;
+  /**
+   * Who reads the answers in /katalog/gespraech (HAN-77). Left out or null, the conversation still
+   * runs and takes each answer as the answer to the question it asked, without a model.
+   */
+  conversation?: VersionWriter | null;
   /**
    * The moment inference stops being sold (HAN-62). Until then the whole catalogue is sold and
    * every inference answer says when it ends; from then on only what `Catalog.forSale()` keeps.
@@ -550,7 +556,8 @@ export function createApp(opts: AppOptions) {
   // creates a session, the GET asks whether one is paid. HAN-17: without the GET in here, anybody
   // could spend our Stripe rate limit and block `begin` for real buyers. The order page (Goal 21)
   // asks Stripe nothing, but it is the one step before the POST and belongs to the same path.
-  const OPEN_PAGES = ["/katalog/bestellen", "/katalog/kaufen", "/katalog/danke"];
+  // The conversation (HAN-77) spends a model call per answer on a stranger's word, the same reason.
+  const OPEN_PAGES = ["/katalog/bestellen", "/katalog/kaufen", "/katalog/danke", "/katalog/gespraech"];
   if (limiter) {
     const windowSec = Math.round(rateLimitOpts.windowMs / 1000);
     app.use("*", async (c, next) => {
@@ -569,7 +576,7 @@ export function createApp(opts: AppOptions) {
             retry_after_seconds: retryAfterSec,
             message:
               `More than ${rateLimitOpts.limit} requests in ${windowSec} seconds from your address to the ` +
-              "endpoints that work without an API key (/v1/auth/*, /pay/*, /katalog/bestellen, /katalog/kaufen, /katalog/danke). Those write to the database " +
+              "endpoints that work without an API key (/v1/auth/*, /pay/*, /katalog/bestellen, /katalog/kaufen, /katalog/danke, /katalog/gespraech). Those write to the database " +
               "and /pay also calls a payment facilitator that costs money per call, so they are capped " +
               `to keep the service up for everyone. Wait ${retryAfterSec} seconds and retry; calls to ` +
               "/v1/* with an API key are not capped.",
@@ -990,7 +997,10 @@ export function createApp(opts: AppOptions) {
   });
 
   /** The order page in the catalogue's frame, with `noindex` (HAN-25, condition 3). */
-  const orderPage = (o: Offer, form: { error?: string; values?: Record<string, string>; email?: string }): string =>
+  const orderPage = (
+    o: Offer,
+    form: { error?: string; values?: Record<string, string>; email?: string; transcript?: readonly ConversationTurn[]; note?: string | null },
+  ): string =>
     page(
       renderOrderPage(o, { testMode: buying()!.testMode, ...form }),
       `${o.name} bestellen | Katalog`,
@@ -1053,6 +1063,69 @@ export function createApp(opts: AppOptions) {
         return c.text("Die Bezahlseite ist gerade nicht erreichbar. Bitte versuchen Sie es in ein paar Minuten noch einmal.", 502);
       }
       throw e;
+    }
+  });
+
+  /**
+   * The conversation that asks back (HAN-77). Takes `{angebot, nachricht, gespraech?}` as JSON or as
+   * a form. JSON answers JSON: the next question, or the finished fields. A form answers the page:
+   * the transcript and the next question, or at the end the order page with the fields filled in,
+   * where the person leaves an address and pays through /katalog/kaufen like everybody else.
+   *
+   * Outside /v1 for the same reason as /katalog/kaufen, and behind the same per-address cap
+   * (OPEN_PAGES); the model calls have their own caps in src/checkout/conversation.ts.
+   */
+  app.post("/katalog/gespraech", async (c) => {
+    const json = (c.req.header("content-type") ?? "").includes("application/json");
+    if (!buying()) {
+      return json
+        ? c.json({ error: "not_switched_on", message: "Ordering is not switched on here." }, 404)
+        : c.text("Bestellen ist hier gerade nicht eingeschaltet.", 404);
+    }
+    const body = (json ? await c.req.json().catch(() => ({})) : await c.req.parseBody().catch(() => ({}))) as Record<string, unknown>;
+    const str = (k: string) => (typeof body[k] === "string" ? (body[k] as string) : "");
+    const offer = findOffer(str("angebot"));
+    try {
+      const r = await converse(db, opts.conversation ?? null, {
+        offer: str("angebot"),
+        message: str("nachricht"),
+        id: str("gespraech") || undefined,
+      });
+      if (json) {
+        return c.json({
+          gespraech: r.id,
+          angebot: r.offer,
+          frage: r.question,
+          hinweis: r.note,
+          fertig: r.done,
+          angaben: r.values,
+          fragen: r.questions,
+          fragen_hoechstens: MAX_QUESTIONS,
+          ...(r.done ? { auftrag: { angebot: r.offer, angaben: r.values, weiter: "POST /katalog/kaufen mit diesen Angaben und email" } } : {}),
+        });
+      }
+      if (!indexHtml) return c.json({ error: "no index page built" }, 503);
+      if (r.question) {
+        return c.html(
+          page(
+            renderConversation(offer!, { id: r.id, turns: r.turns, question: r.question, note: r.note }),
+            `${offer!.name} bestellen | Katalog`,
+            `${offer!.name}, ${euro(offer!.priceCents)}. Sagen Sie uns, was Sie brauchen, dann geht es zur Bezahlung.`,
+            "/katalog/bestellen",
+            "og.png",
+            [],
+            true,
+            "de",
+            true,
+          ),
+        );
+      }
+      return c.html(orderPage(offer!, { values: r.values, transcript: r.turns, note: null }));
+    } catch (e) {
+      if (!(e instanceof ConversationError)) throw e;
+      if (json) return c.json({ error: e.code }, e.status as 400);
+      if (!offer) return c.text("Dieses Angebot gibt es nicht.", 400);
+      return c.html(orderPage(offer, { error: "Bitte schreiben Sie uns etwas, höchstens 8000 Zeichen." }), 400);
     }
   });
 

@@ -207,17 +207,29 @@ function renderField(f: OfferField, value: string, style: string): string {
  */
 export function renderOrderPage(
   o: Offer,
-  opts: { testMode: boolean; error?: string; values?: Readonly<Record<string, string>>; email?: string },
+  opts: {
+    testMode: boolean;
+    error?: string;
+    values?: Readonly<Record<string, string>>;
+    email?: string;
+    /** The transcript of a finished conversation (HAN-77), shown above the filled form. */
+    transcript?: readonly ConversationTurn[];
+    note?: string | null;
+  },
 ): string {
   const style = "display:block;width:100%;margin-top:.4rem;font:inherit;padding:.6rem;box-sizing:border-box";
   const fields = o.fields.map((f) => renderField(f, opts.values?.[f.name] ?? "", style)).join("\n        ");
+  const top = opts.transcript
+    ? `${renderTranscript(opts.transcript)}${opts.note ? `\n      <p role="status"><strong>${esc(opts.note)}</strong></p>` : ""}`
+    : conversationStart(o, style);
   return `
   <section>
     <div class="wrap narrow">
       <p class="kicker">Bestellen</p>
       <h1 class="ph">${o.name}</h1>
       <p class="offer-price">${euro(o.priceCents)}</p>
-      <p>${o.delivers}</p>${opts.error ? `\n      <p role="alert"><strong>${esc(opts.error)}</strong></p>` : ""}
+      <p>${o.delivers}</p>
+      ${top}${opts.error ? `\n      <p role="alert"><strong>${esc(opts.error)}</strong></p>` : ""}
       <form method="post" action="/katalog/kaufen" style="margin-top:1.6rem;display:grid;gap:1.2rem">
         <input type="hidden" name="angebot" value="${o.id}">
         ${fields}
@@ -230,6 +242,72 @@ export function renderOrderPage(
         <p><button type="submit" class="btn btn-1">Weiter zur Bezahlung</button></p>
       </form>
       <p class="fine"><a href="/katalog">Zurück zum Katalog</a></p>
+    </div>
+  </section>`;
+}
+
+/** One line of a conversation, as src/checkout/conversation.ts stores it. */
+export interface ConversationTurn {
+  who: "we" | "they";
+  text: string;
+}
+
+/** Provisional wording until Gestalt delivers (HAN-78). */
+export const CONVERSATION_INVITE =
+  "Lieber in eigenen Worten? Schreiben Sie, was Sie brauchen. Wir fragen nach, wenn etwas fehlt, höchstens sechsmal.";
+
+/**
+ * The way into the conversation, above the form on the order page (HAN-77). The form stays below
+ * it: whoever wants to type, types; whoever wants to talk, talks. A plain POST and no script,
+ * because the CSP in deploy/Caddyfile allows exactly one inline script by hash.
+ */
+function conversationStart(o: Offer, style: string): string {
+  return `<form method="post" action="/katalog/gespraech" style="margin-top:1.6rem;display:grid;gap:.8rem">
+        <input type="hidden" name="angebot" value="${o.id}">
+        <label for="nachricht">${CONVERSATION_INVITE}
+          <textarea id="nachricht" name="nachricht" rows="4" required maxlength="8000" style="${style}"></textarea>
+        </label>
+        <p><button type="submit" class="btn btn-2">Losschicken</button></p>
+      </form>
+      <p class="fine" style="margin-top:1.6rem">Oder Sie füllen gleich das Formular aus:</p>`;
+}
+
+function renderTranscript(turns: readonly ConversationTurn[]): string {
+  const lines = turns
+    .map((t) => `<p class="turn"><strong>${t.who === "we" ? "Wir" : "Sie"}:</strong> ${esc(t.text).replace(/\n/g, "<br>")}</p>`)
+    .join("\n        ");
+  return `<div class="conversation" style="margin-top:1.6rem;display:grid;gap:.6rem">
+        ${lines}
+      </div>`;
+}
+
+/**
+ * The conversation while it still has a question (HAN-77): the transcript and a field for the
+ * answer. The conversation id goes in the body, never in the address (blocklist 7).
+ */
+export function renderConversation(
+  o: Offer,
+  c: { id: string; turns: readonly ConversationTurn[]; question: string; note: string | null },
+): string {
+  const style = "display:block;width:100%;margin-top:.4rem;font:inherit;padding:.6rem;box-sizing:border-box";
+  // The question stands above the answer field, so it is not repeated as the last line.
+  const shown = c.turns.at(-1)?.text === c.question ? c.turns.slice(0, -1) : c.turns;
+  return `
+  <section>
+    <div class="wrap narrow">
+      <p class="kicker">Bestellen</p>
+      <h1 class="ph">${o.name}</h1>
+      <p class="offer-price">${euro(o.priceCents)}</p>
+      ${renderTranscript(shown)}
+      <form method="post" action="/katalog/gespraech" style="margin-top:1.2rem;display:grid;gap:.8rem">
+        <input type="hidden" name="angebot" value="${o.id}">
+        <input type="hidden" name="gespraech" value="${esc(c.id)}">
+        <label for="nachricht">${esc(c.question)}
+          <textarea id="nachricht" name="nachricht" rows="4" required maxlength="8000" autofocus style="${style}"></textarea>
+        </label>
+        <p><button type="submit" class="btn btn-1">Antworten</button></p>
+      </form>
+      <p class="fine"><a href="/katalog/bestellen?angebot=${o.id}" rel="nofollow">Lieber das Formular</a></p>
     </div>
   </section>`;
 }

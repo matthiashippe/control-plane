@@ -244,7 +244,12 @@ print(1 if hat_anliegen and hat_kontakt else 0)
 fi
 angaben=${angaben:-0}
 
-chat=$(curl -s -m 25 -X POST "$BASE/katalog/gespraech" -H 'content-type: application/json' \
+# In beide Richtungen, seit HAN-77 (30.09.2026): die alte Probe zaehlte jede Antwort mit einem
+# Fragezeichen, also haette eine feste Zeile "Worum geht es?" gereicht, auch fuer ein Anliegen, das
+# schon vollstaendig ist. Jetzt: das unvollstaendige Anliegen bekommt eine Frage, das vollstaendige
+# bekommt den Auftrag und keine Frage. Nur beides zusammen ist ein Gespraech, das nachfragt.
+# Kostet zwei Modellaufrufe je Lauf, gedeckelt durch die Tageskappe des Dienstes.
+chat_frage=$(curl -s -m 25 -X POST "$BASE/katalog/gespraech" -H 'content-type: application/json' \
   -d '{"angebot":"rede-zum-fest","nachricht":"Ich brauche eine Rede."}' 2>/dev/null \
   | python3 -c '
 import json, sys
@@ -252,9 +257,20 @@ try:
     d = json.load(sys.stdin)
 except Exception:
     print(0); raise SystemExit
-frage = any(isinstance(v, str) and "?" in v for v in d.values())
-print(1 if frage and len(json.dumps(d, ensure_ascii=False)) > 60 else 0)
+print(1 if isinstance(d.get("frage"), str) and "?" in d["frage"] and d.get("fertig") is False else 0)
 ' 2>/dev/null)
+chat_auftrag=$(curl -s -m 25 -X POST "$BASE/katalog/gespraech" -H 'content-type: application/json' \
+  -d '{"angebot":"rede-zum-fest","nachricht":"Probe von ops/ziele.sh, keine Bestellung. Eine Rede zum 70. Geburtstag meiner Mutter Ingrid, 5 Minuten lang. Sie war 35 Jahre Grundschullehrerin in Kassel, singt im Kirchenchor und fuhr uns jeden Sommer an die Ostsee."}' 2>/dev/null \
+  | python3 -c '
+import json, sys
+try:
+    d = json.load(sys.stdin)
+except Exception:
+    print(0); raise SystemExit
+print(1 if d.get("fertig") is True and d.get("frage") is None and isinstance(d.get("auftrag"), dict) else 0)
+' 2>/dev/null)
+chat=0
+if [[ "$chat_frage" == 1 && "$chat_auftrag" == 1 ]]; then chat=1; fi
 chat=${chat:-0}
 
 karte=0
