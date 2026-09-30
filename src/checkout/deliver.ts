@@ -295,7 +295,12 @@ function claim(db: Db, reference: string, now: Date): boolean {
   })();
 }
 
-async function write(db: Db, writer: VersionWriter, row: Row, now: Date, r: DeliverResult): Promise<void> {
+/**
+ * `now` is the clock, not a time: `written_at` is read when the third text is stored. The first
+ * build passed the time the run began, and the demo on 2026-09-30 got a `written_at` 28 s before
+ * the log line that reported it (HAN-70).
+ */
+async function write(db: Db, writer: VersionWriter, row: Row, now: () => Date, r: DeliverResult): Promise<void> {
   const offer = OFFERS.find((o) => o.id === row.offer);
   const d = db.prepare("SELECT attempts, body, cost_mc FROM deliveries WHERE reference = ?").get(row.reference) as {
     attempts: number;
@@ -359,7 +364,7 @@ async function write(db: Db, writer: VersionWriter, row: Row, now: Date, r: Deli
   if (body.every(Boolean)) {
     db.prepare(
       "UPDATE deliveries SET status = 'written', written_at = COALESCE(written_at, ?), error = NULL WHERE reference = ?",
-    ).run(now.toISOString(), row.reference);
+    ).run(now().toISOString(), row.reference);
     r.written += 1;
     for (const v of body) {
       const k = v!.upstream ?? "unknown";
@@ -432,7 +437,7 @@ export async function deliverPaidOrders(
       try {
         if (row.status !== "written") {
           if (!claim(db, row.reference, now())) continue;
-          await write(db, writer, row, now(), r);
+          await write(db, writer, row, now, r);
           const after = db.prepare("SELECT status, written_at FROM deliveries WHERE reference = ?").get(row.reference) as {
             status: string;
             written_at: string | null;

@@ -118,6 +118,17 @@ describe("deliverPaidOrders", () => {
     expect(delivery(d, reference)!.written_at, "written_at is set once").toBe(at(5)().toISOString());
   });
 
+  it("sets written_at when the third text is stored, not when the run began (HAN-70)", async () => {
+    const d = openDb(":memory:");
+    const { reference } = paidOrder(d);
+    // Every write takes ten seconds on this clock.
+    let t = at(5)().getTime();
+    const base = stubWriter();
+    const slow: VersionWriter = { models: base.models, write: async (req) => ((t += 10_000), base.write(req)) };
+    await deliverPaidOrders(d, slow, null, () => new Date(t));
+    expect(delivery(d, reference)!.written_at).toBe(new Date(at(5)().getTime() + 30_000).toISOString());
+  });
+
   it("writes nothing for pending, abandoned, paid without brief, or paid before DELIVERY_START", async () => {
     const d = openDb(":memory:");
     const w = stubWriter();
