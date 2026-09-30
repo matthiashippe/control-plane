@@ -63,16 +63,26 @@ def main():
     # 2. Laeuft ueberhaupt etwas, und wann zuletzt?
     letzter = max((alter_min(l.get("startedAt") or l.get("createdAt"), jetzt) or 1e9) for l in laeufe) if laeufe else None
     juengster = min((alter_min(l.get("startedAt") or l.get("createdAt"), jetzt) or 1e9) for l in laeufe) if laeufe else None
-    offen = [t for t in tickets if t.get("status") in ("todo", "in_progress", "backlog")]
+    # Was "offen" heisst, und warum die Liste laenger ist, als sie aussieht.
+    #
+    # Bis zum 30.09.2026 zaehlte dieses Werkzeug nur todo, in_progress und backlog. Es meldete
+    # "3 offen", waehrend 22 Tickets nicht erledigt waren: acht standen auf in_review und warteten
+    # auf Matthias, elf auf blocked, und bei mehreren davon war der Blocker laengst weg. Ein
+    # Ticket, das auf jemanden wartet, ist nicht erledigt, es wartet, und genau das soll man sehen.
+    OFFEN = ("todo", "in_progress", "backlog", "blocked", "in_review")
+    offen = [t for t in tickets if t.get("status") in OFFEN]
+    arbeit = [t for t in tickets if t.get("status") in ("todo", "in_progress", "backlog")]
+    wartet_auf_menschen = [t for t in tickets if t.get("status") == "in_review"]
+    blockiert = [t for t in tickets if t.get("status") == "blocked"]
     if juengster is None:
         print("  Laeufe             keiner, nie")
-        if offen:
+        if arbeit:
             befunde.append("kein einziger Lauf, obwohl Arbeit offen ist")
     else:
         print(f"  Letzter Lauf       vor {juengster:.0f} Minuten")
-        if offen and juengster > STILL_MIN:
-            print(f"    STILL   {len(offen)} offene Tickets und seit {juengster:.0f} Minuten kein Lauf")
-            befunde.append(f"seit {juengster:.0f} Minuten kein Lauf bei {len(offen)} offenen Tickets")
+        if arbeit and juengster > STILL_MIN:
+            print(f"    STILL   {len(arbeit)} Tickets in Arbeit und seit {juengster:.0f} Minuten kein Lauf")
+            befunde.append(f"seit {juengster:.0f} Minuten kein Lauf bei {len(arbeit)} Tickets in Arbeit")
 
     # 3. Gehen die Laeufe durch? Eine Firma, in der jeder Lauf scheitert, verbraucht Kontingent und
     #    erzeugt nichts.
@@ -106,6 +116,13 @@ def main():
         if a is not None and a > HAENGT_MIN and t.get("assigneeAgentId") not in laufend:
             haengt.append((t.get("identifier"), a))
     print(f"  Tickets            {len(tickets)} gesamt, {len(offen)} offen, {len(haengt)} haengen")
+    print(f"    davon            {len(arbeit)} in Arbeit, {len(blockiert)} blockiert, "
+          f"{len(wartet_auf_menschen)} warten auf einen Menschen")
+    # Nachrichten, die sich stapeln, sind ein Befund: niemand liest sie, und die Firma plant weiter
+    # ohne die Antwort. Ab fuenf faellt es auf.
+    if len(wartet_auf_menschen) >= 5:
+        print(f"    STAPEL  {len(wartet_auf_menschen)} Tickets warten auf eine Antwort von Matthias")
+        befunde.append(f"{len(wartet_auf_menschen)} Tickets warten auf eine Antwort von Matthias")
     for ident, a in haengt:
         print(f"    HAENGT  {ident} seit {a:.0f} Minuten in Arbeit, niemand laeuft dafuer")
         befunde.append(f"{ident} haengt seit {a:.0f} Minuten")
