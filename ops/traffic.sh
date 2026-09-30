@@ -139,21 +139,27 @@ print(max(1, math.ceil((float(sys.argv[2] or time.time()) - min(stamps)) / 3600)
   if order_run env CP_ORDER_BRIEFS_30D=1 | /usr/bin/grep -q "FINDING"; then
     echo "SELFTEST FAILED: one brief against one foreign 303 must not raise a finding"; fail=1
   fi
-  # Foreign browsers on /katalog, and those from the ad (HAN-35), in both directions. AdsBot-Google-
-  # Mobile asks for /katalog?von=anzeige with Accept-Language and must not count; a stranger's Chrome
-  # with ?von=anzeige must. Agent402, Facebook's preview, a 404 and a fetch without Accept-Language
-  # count nowhere; an iPhone without the parameter counts in the total only. So 2, and 1 from the
-  # ad: a bot let through reads 2 there, a browser lost reads 0.
+  # Foreign browsers on /katalog, and those from the ad (HAN-35, marker src=ads since HAN-91), in
+  # both directions. AdsBot-Google-Mobile asks for /katalog?src=ads with Accept-Language and must not
+  # count; a stranger's Chrome with ?src=ads must. Agent402, Facebook's preview, a 404 and a fetch
+  # without Accept-Language count nowhere; an iPhone without the parameter counts in the total only.
+  # So 2, and 1 from the ad: a bot let through reads 2 there, a browser lost reads 0. A Chrome with
+  # the retired ?von=anzeige counts in the total, not as an ad.
+  # The pixel probe (HAN-90): katalog-top with src=ads in the Referer counts for the Chrome; the
+  # iPhone's katalog-top without src=ads, AdsBot's with it, and a Chrome whose Referer is a foreign
+  # host carrying /katalog?src=ads do not. So 1.
   browsers_fixture="$(dirname "$fixture")/traffic-katalog-browsers.log"
   out_browsers=$(CP_PAGES="/ /katalog /check /fix /post" CP_TRAFFIC_LOG="$browsers_fixture" \
     "${BASH_SOURCE[0]}" "$(fixture_hours "$browsers_fixture")" 2>/dev/null)
-  order_want "$out_browsers" "^   2 foreign browser address\(es\) got /katalog with 200" \
-    "the Chrome from the ad and the iPhone count, no crawler and no 404 does"
-  order_want "$out_browsers" "^   1 of them came with \?von=anzeige$" \
-    "the Chrome with ?von=anzeige counts, AdsBot-Google-Mobile on the same URL does not"
+  order_want "$out_browsers" "^   3 foreign browser address\(es\) got /katalog with 200" \
+    "the Chrome from the ad, the Chrome with the retired marker and the iPhone count, no crawler and no 404 does"
+  order_want "$out_browsers" "^   1 of them came with \?src=ads$" \
+    "the Chrome with ?src=ads counts, AdsBot-Google-Mobile on the same URL and ?von=anzeige do not"
+  order_want "$out_browsers" "^   1 foreign browser address\(es\) fetched katalog-top from /katalog\?src=ads" \
+    "the Chrome's pixel counts; the iPhone without src=ads, AdsBot and a foreign Referer do not"
   order_want "$out_browsers" "^ +3  request\(s\) set aside: crawler mark in the user agent" \
     "AdsBot, Agent402 and facebookexternalhit are set aside by name, visibly"
-  [[ "$fail" -eq 0 ]] && echo "SELFTEST OK: a real search arrival, two that only claim one, and a control, told apart over a ${hours} hour window; the catalogue counted per page in both directions; the order page and its cross-check in both directions; foreign browsers on /katalog and those from the ad, AdsBot out and Chrome in."
+  [[ "$fail" -eq 0 ]] && echo "SELFTEST OK: a real search arrival, two that only claim one, and a control, told apart over a ${hours} hour window; the catalogue counted per page in both directions; the order page and its cross-check in both directions; foreign browsers on /katalog and those from the ad by src=ads, page and pixel, AdsBot out and Chrome in."
   exit "$fail"
 fi
 
@@ -789,13 +795,32 @@ for ts, ip, _, _, agent, lang, uri, status, method in pages:
         aside["no Accept-Language"] += 1
     else:
         browsers.add(ip)
-        query = urllib.parse.parse_qs(urllib.parse.urlsplit(uri).query)
-        if "anzeige" in query.get("von", []):
+        # The ads point at /katalog?src=ads since HAN-90. Until HAN-91 this read ?von=anzeige, which
+        # no ad carries any more, so the line would have said 0 whoever came.
+        if "ads" in urllib.parse.parse_qs(urllib.parse.urlsplit(uri).query).get("src", []):
             from_ad.add(ip)
 print(f"   {len(browsers)} foreign browser address(es) got /katalog with 200 (no crawler mark, Accept-Language sent)")
-print(f"   {len(from_ad)} of them came with ?von=anzeige")
+print(f"   {len(from_ad)} of them came with ?src=ads")
 for reason, n in aside.most_common():
     print(f"     {n:>4}  request(s) set aside: {reason}")
+
+# The CEO's probe from HAN-90: the first-screen mark fetched from a page whose address carried
+# src=ads. /katalog sends Referrer-Policy strict-origin-when-cross-origin and the pixel is same
+# origin, so the full address arrives in the Referer. A page view proves the HTML went out; this
+# proves a renderer ran it. Same crawler test as above, and the Referer has to name one of our
+# hosts, so a copied link on a foreign page does not count. Not required: Accept-Language, which
+# the pixel lines in older fixtures do not carry. A browser that trims the Referer (strict tracking
+# protection) is missing here and still counted in the page line above.
+pixel_ad = set()
+for ts, ip, path, ref, agent, _ in rows:
+    if ts < since or ip in own or agent.startswith("control-plane-check") or path != "/px/katalog-top.png":
+        continue
+    if "Mozilla/" not in agent or CRAWLER.search(agent):
+        continue
+    r = urllib.parse.urlsplit(ref)
+    if r.hostname in hosts and r.path == "/katalog" and "ads" in urllib.parse.parse_qs(r.query).get("src", []):
+        pixel_ad.add(ip)
+print(f"   {len(pixel_ad)} foreign browser address(es) fetched katalog-top from /katalog?src=ads (Referer)")
 
 print(f"   {len(scrolled)} address(es) scrolled the catalogue (as near to a person as the log gets)")
 for ip in scrolled:
