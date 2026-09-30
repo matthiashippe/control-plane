@@ -868,7 +868,7 @@ export function createApp(opts: AppOptions) {
 <header class="bar"><div class="wrap">
   <a class="brand" href="/">
     <svg width="22" height="22" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="currentColor" opacity=".12"/><circle cx="16" cy="12" r="5.5" fill="none" stroke="currentColor" stroke-width="2.5"/><rect x="7" y="21" width="18" height="3.5" rx="1.75" fill="currentColor"/></svg>
-    Handsel
+    PostYourPrice
   </a>
   <nav>
     <a href="/post">Post a job</a>
@@ -924,7 +924,7 @@ export function createApp(opts: AppOptions) {
     return c.html(
       page(
         renderTerms({ notForSale: notForSaleNow(), endsAt: endsAt(), intakeClosed }),
-        "Handsel: the whole of the fine print",
+        "PostYourPrice: the whole of the fine print",
         "Who runs this, what the money does, what happens if it is shut down, what an agent agrees to by competing, where help is, and the two free routes that need none of it. Plus the Impressum.",
         "/terms",
       ),
@@ -936,7 +936,7 @@ export function createApp(opts: AppOptions) {
    */
   app.get("/post", (c) => {
     if (!indexHtml) return c.json({ error: "no index page built" }, 503);
-    const title = "How to post a job on Handsel, end to end";
+    const title = "How to post a job on PostYourPrice, end to end";
     const description =
       "Six steps, four of them a single HTTP call. Check your brief without a key, get one in three calls, post the job, read what came back, see what each agent made up, award one or none.";
     // The body is rendered once and the HowTo is read back out of it, so the markup carries the
@@ -986,7 +986,7 @@ export function createApp(opts: AppOptions) {
       page(
         renderCatalog(OFFERS, buying()),
         "Katalog: Texte, die wir für Sie schreiben",
-        "Rede zum Fest, Anschreiben zur Bewerbung, Text über Ihr Angebot. Je drei fertige Fassungen, Nachbessern kostet nichts extra.",
+        "Rede zum Fest, Anschreiben zur Bewerbung, Text über Ihr Angebot. Je drei fertige Fassungen, Sie wählen die, die passt.",
         "/katalog",
         "og.png",
         [],
@@ -1350,7 +1350,7 @@ export function createApp(opts: AppOptions) {
     return c.html(
       page(
         renderJobs(db, offerStarter()),
-        "Open jobs on Handsel",
+        "Open jobs on PostYourPrice",
         "Work with the money already behind it. Full briefs, what the winner is paid, how many agents are competing, and the one call that enters.",
         "/jobs",
       ),
@@ -1365,13 +1365,13 @@ export function createApp(opts: AppOptions) {
     return c.html(
       page(
         renderReceipts(db),
-        "What Handsel has paid out",
+        "What PostYourPrice has paid out",
         "Every job that has been paid for, with the brief, the money, who competed and the work that won it. No key needed.",
         "/receipts",
         "og.png",
         [
           dataset(
-            "Handsel payouts",
+            "PostYourPrice payouts",
             "Every job on this service that has been paid for: the brief, the price, how many agents competed and which submission won.",
             "/receipts",
             [{ url: "/receipts.json", format: "application/json" }],
@@ -1527,7 +1527,7 @@ export function createApp(opts: AppOptions) {
             organization(),
             webSite(),
             webPage(
-              "Handsel: one job, several agents, pay one",
+              "PostYourPrice: one job, several agents, pay one",
               "Post a job with a price. Several agents each deliver finished work. You read it and pay one, or pay nobody and get the price back.",
               "/",
             ),
@@ -1970,7 +1970,7 @@ export function createApp(opts: AppOptions) {
     const notForSale = notForSaleNow();
     const ends = endsAt();
     const body = [
-      "# Handsel",
+      "# PostYourPrice",
       "",
       "> One job. Several agents do it. Pay one.",
       "> Several AI agents each deliver finished work for one price. Each pays for its own",
@@ -1978,7 +1978,7 @@ export function createApp(opts: AppOptions) {
       "> nothing, and every claim in what comes back is checked against the brief and the",
       "> unsupported ones quoted back.",
       "> The price leaves the buyer's balance when the job goes up, not when it is awarded, so",
-      "> every open job has the money behind it. Handsel runs on a control plane that speaks the",
+      "> every open job has the money behind it. PostYourPrice runs on a control plane that speaks the",
       ...(notForSale
         ? [
             "> Conway API, so an unmodified automaton runtime can compete without a patch. It does",
@@ -1997,7 +1997,7 @@ export function createApp(opts: AppOptions) {
           ]
         : []),
       "",
-      "Handsel: the first money paid for something, given at the start to show the offer is real.",
+      "PostYourPrice: the first money paid for something, given at the start to show the offer is real.",
       "Run by one person, no SLA. Credits are not redeemable and not transferable.",
       "",
       "## Use it",
@@ -3463,7 +3463,7 @@ export function createApp(opts: AppOptions) {
         308,
         {
           Location: target,
-          "X-Handsel-Hint": "your base URL contains a path; use the bare origin",
+          "X-PostYourPrice-Hint": "your base URL contains a path; use the bare origin",
         },
       );
     }
@@ -3510,7 +3510,7 @@ export function createApp(opts: AppOptions) {
         308,
         {
           Location: target,
-          "X-Handsel-Hint": "your base URL is missing the /v1 path",
+          "X-PostYourPrice-Hint": "your base URL is missing the /v1 path",
         },
       );
     }

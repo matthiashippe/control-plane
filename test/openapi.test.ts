@@ -47,7 +47,7 @@ describe("/openapi.json", () => {
     const { app } = setup();
     const doc = (await (await app.request("/openapi.json")).json()) as Record<string, any>;
     expect(doc.openapi).toMatch(/^3\./);
-    expect(doc.info.title).toBe("Handsel");
+    expect(doc.info.title).toBe("PostYourPrice");
     expect(doc.servers[0].url).toBeTruthy();
   });
 

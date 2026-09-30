@@ -308,7 +308,7 @@ describe("public page and status", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toMatch(/text\/plain/);
     const txt = await res.text();
-    expect(txt).toContain("# Handsel");
+    expect(txt).toContain("# PostYourPrice");
     expect(txt).toContain("conwayApiUrl");
     expect(txt).toContain("cp.hippe.eu");
     expect(txt).toContain("without-control-plane.md");
@@ -1001,10 +1001,10 @@ describe("The buyer leads, not the plumbing", () => {
   it("carries the name and the positioning sentence where a first-time reader lands", async () => {
     const { app } = setup();
     const html = await (await app.request("/")).text();
-    expect(html).toMatch(/<title>Handsel/);
+    expect(html).toMatch(/<title>PostYourPrice/);
     // The name is the brand in the bar, not the first heading: the first heading is what the
     // service does, which is what a stranger needs in the first two seconds.
-    expect(html).toMatch(/class="brand"[\s\S]{0,400}Handsel/);
+    expect(html).toMatch(/class="brand"[\s\S]{0,400}PostYourPrice/);
     expect(html).toMatch(/<h1[^>]*>[\s\S]*?Pay one\./);
     // The sentence that carries the unusual economics, and the word that says who does the work.
     // Without the first, the headline is a marketplace like any other; without the second,

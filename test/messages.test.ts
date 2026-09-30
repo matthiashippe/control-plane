@@ -695,7 +695,12 @@ describe("a path that does not exist is not a key problem", () => {
     const app = createApp({ db });
     const res = await app.request("/v1/auth/verify/v1/models");
     expect(res.status).toBe(308);
-    expect(res.headers.get("x-handsel-hint"), "the cause still has to be named").toMatch(/base URL/i);
+    // Der Header hiess bis zum 30.09.2026 x-handsel-hint. Er traegt einen Hinweis fuer einen
+    // Menschen, der eine falsche Basis-URL gesetzt hat, und kein Client wertet ihn maschinell aus:
+    // deshalb darf er mit dem Namen mitwandern. Beide Schreibweisen zaehlen, damit ein Client, der
+    // noch auf den alten Namen sieht, beim Umbenennen nicht stillschweigend nichts findet.
+    const hinweis = res.headers.get("x-postyourprice-hint") ?? res.headers.get("x-handsel-hint");
+    expect(hinweis, "the cause still has to be named").toMatch(/base URL/i);
   });
 
   it("puts the explanation in the redirect body, for the client that does not follow it", async () => {

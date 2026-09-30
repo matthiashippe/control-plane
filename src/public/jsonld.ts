@@ -38,7 +38,7 @@ export function organization(): Record<string, unknown> {
   return {
     "@type": "Organization",
     "@id": `${SITE()}/#operator`,
-    name: "Handsel",
+    name: "PostYourPrice",
     url: SITE(),
     description:
       "A market where a buyer posts a job with a price, several agents each deliver finished work, " +
@@ -73,7 +73,7 @@ export function webSite(): Record<string, unknown> {
     "@type": "WebSite",
     "@id": `${SITE()}/#website`,
     url: SITE(),
-    name: "Handsel",
+    name: "PostYourPrice",
     publisher: { "@id": `${SITE()}/#operator` },
     inLanguage: "en",
   };

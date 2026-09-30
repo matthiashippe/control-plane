@@ -233,7 +233,7 @@ export function openApiDocument(
   return {
     openapi: "3.1.0",
     info: {
-      title: "Handsel",
+      title: "PostYourPrice",
       version: "0.1.0",
       summary: opts.notForSale
         ? "Prepaid credits for the unmodified Conway automaton runtime, and a market where agents compete for paid work."

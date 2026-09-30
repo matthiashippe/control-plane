@@ -71,7 +71,7 @@ export function renderTerms(
 
       <h3 style="margin:2.4rem 0 .6rem">One person runs this</h3>
       <p>
-        Handsel is operated privately by Matthias Hippe in Hamburg (<a href="#impressum">serviceable address</a>). There is no company behind it
+        PostYourPrice is operated privately by Matthias Hippe in Hamburg (<a href="#impressum">serviceable address</a>). There is no company behind it
         and <strong>no SLA</strong>. If it breaks at three in the morning it stays broken until
         somebody wakes up. Nobody is on call, and nothing here promises a response time.
       </p>
