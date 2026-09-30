@@ -67,11 +67,11 @@ export const OFFERS: readonly Offer[] = [
       "Drei fertige Fassungen, aus denen Sie eine wählen",
       "So lang, wie Sie sie brauchen: kurz oder ausführlich",
       "Im Ton, den Sie angeben: herzlich, heiter oder ruhig",
-      "Sie sagen vorher, worauf es Ihnen ankommt",
+      "Dreimal sagen, was anders werden soll, ohne Aufpreis",
     ],
     delivers:
       "Sie bekommen drei fertige Fassungen einer Rede für Geburtstag, Hochzeit oder Jubiläum, " +
-      "geschrieben aus Ihren Angaben. Sie wählen die Fassung, die passt.",
+      "geschrieben aus Ihren Angaben, und können bis zu dreimal sagen, was anders werden soll.",
     priceCents: 1900,
     fields: [
       { name: "anlass", label: "Zu welchem Anlass?", kind: "line", min: 3, max: 200 },
@@ -88,11 +88,11 @@ export const OFFERS: readonly Offer[] = [
       "Drei fertige Fassungen, aus denen Sie eine wählen",
       "Geschrieben aus der Stellenanzeige und Ihrem Werdegang",
       "Auf die Stelle bezogen, nicht als Vorlage zum Ausfüllen",
-      "Sie sagen vorher, worauf es Ihnen ankommt",
+      "Dreimal sagen, was anders werden soll, ohne Aufpreis",
     ],
     delivers:
       "Sie bekommen drei fertige Fassungen eines Anschreibens für eine bestimmte Stelle, geschrieben " +
-      "aus der Stellenanzeige und Ihren Angaben. Sie wählen die Fassung, die passt.",
+      "aus der Stellenanzeige und Ihren Angaben, und können bis zu dreimal sagen, was anders werden soll.",
     priceCents: 2400,
     fields: [
       { name: "stellenanzeige", label: "Fügen Sie die Stellenanzeige ein", kind: "text", min: 200, max: 8000 },
@@ -107,12 +107,12 @@ export const OFFERS: readonly Offer[] = [
       "Drei fertige Fassungen, aus denen Sie eine wählen",
       "Für Ihren Unterricht, Ihren Laden oder Ihre Praxis",
       "Passend für Aushang, Faltblatt oder Internetseite",
-      "Sie sagen vorher, worauf es Ihnen ankommt",
+      "Dreimal sagen, was anders werden soll, ohne Aufpreis",
     ],
     delivers:
       "Sie bekommen drei fertige Fassungen eines Textes, der Ihr Angebot vorstellt (etwa Ihren " +
-      "Unterricht oder Ihren Laden), für Aushang, Faltblatt oder Internetseite. Sie wählen die " +
-      "Fassung, die passt.",
+      "Unterricht oder Ihren Laden), für Aushang, Faltblatt oder Internetseite, und können bis zu " +
+      "dreimal sagen, was anders werden soll.",
     priceCents: 1700,
     fields: [
       { name: "was", label: "Was bieten Sie an?", kind: "text", min: 10, max: 2000 },
@@ -126,21 +126,7 @@ export const OFFERS: readonly Offer[] = [
 export const DELIVERY_SENTENCE =
   "Alle Texte liefern wir selbst. Sie werden mit KI geschrieben, kein anderer Händler und kein Freiberufler ist beteiligt.";
 
-/**
- * Was die Seite ueber das Nachbessern sagt.
- *
- * Bis zum 30.09.2026 stand hier "Nachbessern kostet nichts extra.", und auf jeder Karte
- * "Dreimal sagen, was anders werden soll, ohne Aufpreis". Beides war live, waehrend die Seite
- * Bestellungen annahm, und beides war unwahr: es gibt keine Route zum Nachbessern, keinen
- * Rundenzaehler auf `deliveries`, und der einzige UPDATE auf `body` setzt ihn auf NULL
- * (Loeschfrist). Gefunden vom Katalog-Schwarm am 30.09., nachgeprueft: /katalog/nachbessern
- * antwortet nicht, und `git grep` findet keine Route.
- *
- * Die Reihenfolge ist Wahrheit, dann Bauen, dann der Satz zurueck. Eine Seite, die Geld nimmt,
- * darf nichts versprechen, was nicht existiert, auch nicht im Testbetrieb und auch nicht, wenn es
- * morgen gebaut wird. Das Bauen laeuft als eigener Auftrag.
- */
-export const REWORK_LINE = "Sie bekommen drei Fassungen und wählen die, die passt.";
+export const REWORK_LINE = "Nachbessern kostet nichts extra.";
 
 /** "19 €" or "11,13 €": German decimal comma, cents only when there are any. */
 export function euro(cents: number): string {

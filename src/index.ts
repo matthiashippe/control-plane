@@ -106,6 +106,8 @@ const app = createApp({
   inferenceSunsetAt,
   // The conversation reads answers with the same provider that writes the texts, never the mock.
   conversation: deliveryWriter(providers),
+  // A round of changes writes on the same provider as the paid texts (HAN-95).
+  rework: deliveryWriter(providers),
 });
 
 // Cleanup: once on start, hourly after that. Otherwise `siwe_nonces` grows with every call to
