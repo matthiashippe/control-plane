@@ -35,30 +35,31 @@ describe("/katalog", () => {
   });
 
   /**
-   * Die Zusage steht auf jeder Karte, die Bedingung einmal ueber allen.
+   * Die Seite verspricht nur, was es gibt.
    *
-   * Bis zum 30.09.2026 pruefte dieser Test, dass REWORK_LINE genau dreimal im Dokument steht, also
-   * einmal unter jedem Angebot. Das war der Wortlaut einer Gestaltung, die Matthias an diesem
-   * Morgen so beschrieben hat: "das ist kein produkt das ist eine beschissene shitshow". Sechsmal
-   * dasselbe Kleingedruckte auf einer Seite liest niemand als Zusage.
+   * Dieser Test hiess bis zum 30.09.2026 "sagt auf jeder Karte, dass Nachbessern nichts kostet"
+   * und hielt damit eine Unwahrheit fest: es gibt keine Route zum Nachbessern, keinen
+   * Rundenzaehler auf `deliveries`, und der einzige UPDATE auf `body` setzt ihn auf NULL. Der
+   * Katalog-Schwarm hat es gefunden, die Leitung nachgeprueft. Ein Test, der ein Versprechen
+   * absichert, ohne dass jemand geprueft hat, ob es gehalten wird, ist schlimmer als kein Test:
+   * er macht die Unwahrheit pruefbar und damit dauerhaft.
    *
-   * Geprueft wird deshalb die Sache statt des Satzes: jede Karte sagt, dass Nachbessern nichts
-   * kostet, und der Testbetrieb steht genau einmal. Die Gegenprobe darunter faellt, wenn eine
-   * Karte die Zusage verliert.
+   * Solange das Nachbessern nicht gebaut ist (HAN-95), steht keines dieser Woerter auf der Seite.
+   * Danach kehrt der Test sich um, und zwar erst, wenn die Route antwortet.
    */
-  it("sagt auf jeder Karte, dass Nachbessern nichts kostet", async () => {
+  it("verspricht kein Nachbessern, solange es das nicht gibt", async () => {
     const body = text(renderCatalog(OFFERS, { testMode: true }));
-    const karten = (body.match(/ohne Aufpreis/g) ?? []).length;
-    expect(karten, "jede Karte traegt die Zusage").toBe(OFFERS.length);
-    // Und die Bedingung des Testbetriebs genau einmal, nicht unter jeder Karte.
+    for (const wort of ["ohne Aufpreis", "Nachbessern", "dreimal", "was anders werden soll"]) {
+      expect(body, `"${wort}" steht auf der Seite, obwohl es die Route nicht gibt`).not.toContain(wort);
+    }
+    // Was stattdessen dort steht, und es ist wahr: drei Fassungen, aus denen man waehlt.
+    // Die Zusagenzeile ueber dem Raster sagt dasselbe einmal, deshalb OFFERS.length + 1.
+    expect((body.match(/Drei fertige Fassungen/g) ?? []).length).toBe(OFFERS.length + 1);
     expect((body.match(/Es wird kein Geld abgebucht/g) ?? []).length).toBe(1);
   });
 
-  it("promises three rounds of changes, not four, and names no time", async () => {
-    // MAX_ROUNDS = 4 in src/bounties/store.ts counts the first version as a round.
+  it("nennt keine Zeit", async () => {
     const body = text(renderCatalog());
-    expect(body).toMatch(/[Dd]reimal/);
-    expect(body).not.toMatch(/viermal/);
     expect(body).not.toMatch(/Sekunde|Minute|Stunde|sofort|Tag(e|en)?\b/);
   });
 

@@ -26,7 +26,7 @@ export const HUMAN_HEADLINE =
   "Wir schreiben für Sie eine Rede zum Fest, ein Anschreiben zur Bewerbung oder einen Text über Ihr Angebot.";
 
 export const HUMAN_SUB =
-  "Sie bekommen drei fertige Fassungen, mit KI geschrieben, und können bis zu dreimal sagen, was anders werden soll.";
+  "Sie bekommen drei fertige Fassungen, mit KI geschrieben, und wählen die, die passt.";
 
 export const AGENT_LINE = "Sie betreiben einen Agenten? Hier entlang.";
 
