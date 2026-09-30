@@ -5,7 +5,7 @@
  * the order and no question. The caps hold at the call that is still allowed and at the one that
  * is not. Unwanted data is thrown away, and ordinary words that look like it are not.
  */
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { openDb } from "../src/db.js";
 import { createApp } from "../src/app.js";
 import {
@@ -17,10 +17,12 @@ import {
   MAX_QUESTIONS,
   cleanupConversations,
   converse,
+  doneLine,
   unwanted,
 } from "../src/checkout/conversation.js";
 import type { VersionWriter } from "../src/checkout/deliver.js";
 import { fakeProvider } from "../src/checkout/index.js";
+import { CONVERSATION_INVITES, OFFERS } from "../src/public/catalog.js";
 
 const REDE = "rede-zum-fest";
 const COMPLETE = {
@@ -67,7 +69,8 @@ describe("an incomplete message gets a question, a complete one gets the order",
     expect(r.done).toBe(true);
     expect(r.question).toBeNull();
     expect(r.values).toEqual(COMPLETE);
-    expect(r.note).toBe(LINES.done);
+    expect(r.note).toBe(doneLine(OFFERS[0]));
+    expect(r.note).toContain("Der Preis bleibt 19 €.");
   });
 
   it("the second answer knows the first: the model is sent what is known, and the next gap is asked", async () => {
@@ -176,8 +179,8 @@ describe("the caps, from both sides", () => {
     const a = await converse(db, model, { offer: REDE, message: "Rede" });
     expect(a.readBy).toBe("model");
     const b = await converse(db, model, { offer: REDE, message: "Rede" });
-    expect(b.readBy).toBe("fallback");
-    expect(b.question).toBe("Zu welchem Anlass?");
+    expect(b.question).toBeNull();
+    expect(b.note).toBe(LINES.dayLimit);
     expect(calls).toHaveLength(1);
   });
 
@@ -186,7 +189,7 @@ describe("the caps, from both sides", () => {
     db.prepare("INSERT INTO conversation_days (day, calls, cost_mc) VALUES (?, 0, ?)").run(day, COST_PER_DAY_MC - 1);
     const { model, calls } = scripted([nothing()]);
     expect((await converse(db, model, { offer: REDE, message: "Rede" })).readBy).toBe("model");
-    expect((await converse(db, model, { offer: REDE, message: "Rede" })).readBy).toBe("fallback");
+    expect((await converse(db, model, { offer: REDE, message: "Rede" })).note).toBe(LINES.dayLimit);
     expect(calls).toHaveLength(1);
     const row = db.prepare("SELECT calls, cost_mc FROM conversation_days WHERE day = ?").get(day) as { calls: number; cost_mc: number };
     expect(row).toEqual({ calls: 1, cost_mc: COST_PER_DAY_MC - 1 + 50 });
@@ -196,8 +199,17 @@ describe("the caps, from both sides", () => {
     const day = new Date().toISOString().slice(0, 10);
     db.prepare("INSERT INTO conversation_days (day, calls, cost_mc) VALUES (?, 0, ?)").run(day, COST_PER_DAY_MC);
     const { model, calls } = scripted([nothing()]);
-    expect((await converse(db, model, { offer: REDE, message: "Rede" })).readBy).toBe("fallback");
+    expect((await converse(db, model, { offer: REDE, message: "Rede" })).note).toBe(LINES.dayLimit);
     expect(calls).toHaveLength(0);
+  });
+
+  it("at the day's cap the answer to the question asked still reaches the form", async () => {
+    const { model } = scripted([nothing()]);
+    const r = await converse(db, model, { offer: REDE, message: "Rede" });
+    db.prepare("UPDATE conversation_days SET calls = ?").run(CALLS_PER_DAY);
+    const b = await converse(db, model, { offer: REDE, message: "70. Geburtstag", id: r.id });
+    expect(b.note).toBe(LINES.dayLimit);
+    expect(b.values).toEqual({ anlass: "70. Geburtstag" });
   });
 
   it("a new UTC day starts from zero", async () => {
@@ -248,6 +260,26 @@ describe("data we do not need is thrown away, and said so", () => {
     const row = db.prepare("SELECT fields, turns FROM conversations WHERE id = ?").get(r.id) as { fields: string; turns: string };
     expect(row.fields + row.turns).not.toContain("3704");
     expect(again.turns.map((t) => t.text)).toContain(LINES.discarded);
+  });
+
+  it("only the line goes: the rest of the message is read, and the line appears nowhere", async () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    const { model, calls } = scripted([{ ...nothing(), anlass: "70. Geburtstag" }]);
+    const r = await converse(db, model, { offer: REDE, message: "Eine Rede zum 70. Geburtstag.\nIBAN DE89 3704 0044 0532 0130 00" });
+    expect(r.discarded).toBe(true);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].user).not.toContain("3704");
+    expect(calls[0].user).toContain("70. Geburtstag");
+    expect(r.question).toBe("Für wen ist die Rede?");
+    expect(r.note).toBe(LINES.discarded);
+    const row = db.prepare("SELECT fields, turns FROM conversations WHERE id = ?").get(r.id) as { fields: string; turns: string };
+    expect(row.fields + row.turns).not.toContain("3704");
+    expect(log.mock.calls.flat().join(" ")).not.toContain("3704");
+    log.mockRestore();
+  });
+
+  it("the gap Gestalt named: a speech that mentions an illness loses that line (HAN-77, condition 3)", () => {
+    expect(unwanted("Nach ihrer schweren Krankheit hat sie wieder angefangen zu unterrichten")).toBe(true);
   });
 
   it("a first message thrown away still gets the first question", async () => {
@@ -331,7 +363,14 @@ describe("POST /katalog/gespraech", () => {
     expect(html).toContain('value="meine Mutter Ingrid"');
     expect(html).toContain("<option selected>5 Minuten</option>");
     expect(html).toContain('name="email"');
-    expect(html).toContain(LINES.done);
+    expect(html).toContain("Der Preis bleibt 19 €.");
+  });
+
+  it("has Gestalt's first sentence for every offer, and it is on the order page", async () => {
+    expect(Object.keys(CONVERSATION_INVITES).sort()).toEqual(OFFERS.map((o) => o.id).sort());
+    const html = await (await app(null).request("/katalog/bestellen?angebot=anschreiben-bewerbung")).text();
+    expect(html).toContain(CONVERSATION_INVITES["anschreiben-bewerbung"]);
+    expect(html).toContain("Die Fragen stellt eine KI.");
   });
 
   it("the form stays: the order page has both the way into the conversation and every field", async () => {

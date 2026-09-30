@@ -13,18 +13,20 @@
  * fields are complete.
  *
  * Money. Every answer is one model call, and anybody can send answers for free, so both are capped:
- * `CALLS_PER_CONVERSATION` per conversation, `CALLS_PER_DAY` and `COST_PER_DAY_MC` over all of them
- * per UTC day. Over a cap it does not stop talking: it takes the answer as the answer to the
- * question it asked, without a model. That is dumber, and it still gets the person through.
+ * `CALLS_PER_DAY` and `COST_PER_DAY_MC` over all conversations per UTC day, and
+ * `CALLS_PER_CONVERSATION` each. At the day's cap the conversation hands over to the form, which asks
+ * the same questions. A model that fails or answers nonsense is not a reason to stop: then the
+ * answer is taken as the answer to the question asked, without a model.
  *
- * Data we do not want. A message with an account or card number or a health word is thrown away
- * before it is stored or sent anywhere, and the reply says so. The rows are deleted after
- * `CONVERSATION_HOURS`; by then the fields are on the order page or nobody wanted them.
+ * Data we do not want. A line with an account or card number or a health word is dropped before
+ * anything is stored, logged or sent to the model, and the reply says so; the rest of the message
+ * goes on. The rows are deleted after `CONVERSATION_HOURS`; by then the fields are on the order page
+ * or nobody wanted them.
  */
 
 import { randomBytes } from "node:crypto";
 import type { Db } from "../db.js";
-import { OFFERS, type Offer, type OfferField } from "../public/catalog.js";
+import { OFFERS, euro, type Offer, type OfferField } from "../public/catalog.js";
 import type { VersionWriter } from "./deliver.js";
 import { fieldValid } from "./index.js";
 
@@ -43,14 +45,25 @@ export const CONVERSATION_HOURS = 24;
 export const MODEL_TIMEOUT_MS = 20_000;
 const MAX_TOKENS = 600;
 
-/** Provisional wording until Gestalt delivers (HAN-78). */
+/**
+ * Word for word from Gestalt (HAN-78, document `gespraech`), except `shorter`, which is ours. Each
+ * one is only true while the code does what it says: `discarded` says "nicht gespeichert", so the
+ * line never reaches the database, the log or the model; `done` says "ändern Sie", so the fields
+ * come back in the order page's form, where they can be changed.
+ */
 export const LINES = {
   discarded:
-    "Diese Nachricht haben wir gelöscht, ohne sie zu speichern: Kontonummern, Kartennummern und Angaben zur Gesundheit brauchen wir für Ihren Text nicht.",
+    "Kontonummern, Kartennummern und Angaben zur Gesundheit brauchen wir für Ihren Text nicht. Diese Zeile haben wir deshalb weggelassen und nicht gespeichert. Schreiben Sie gern ohne sie weiter.",
   shorter: "Das war noch etwas knapp. ",
-  handover: "Den Rest tragen Sie bitte unten ins Formular ein, Ihre Angaben stehen schon darin.",
-  done: "Danke, das reicht uns. Prüfen Sie Ihre Angaben unten, dann fehlt nur noch Ihre E-Mail-Adresse.",
+  handover: "Mehr fragen wir hier nicht. Bitte ergänzen Sie den Rest im Formular darunter, Ihre bisherigen Antworten stehen schon darin.",
+  dayLimit:
+    "Das Gespräch nimmt heute keine neuen Anfragen mehr an. Das Formular darunter stellt dieselben Fragen, und Ihre Bestellung geht damit genauso.",
 } as const;
+
+/** The last sentence once everything is there. The price comes from OFFERS, never from the model. */
+export function doneLine(offer: Offer): string {
+  return `Mehr brauchen wir nicht. Darunter stehen Ihre Angaben so, wie wir sie verstanden haben. Bitte prüfen Sie sie und ändern Sie, was nicht stimmt, bevor Sie Ihre E-Mail-Adresse eintragen. Der Preis bleibt ${euro(offer.priceCents)}.`;
+}
 
 export interface Turn {
   who: "we" | "they";
@@ -62,7 +75,7 @@ export interface ConversationReply {
   offer: string;
   /** The next question, or null when there is none. */
   question: string | null;
-  /** A sentence about the last message (thrown away, handed over), or null. */
+  /** What we say besides a question (line dropped, done, handed over), or null. */
   note: string | null;
   /** All fields pass the order page's check. */
   done: boolean;
@@ -72,6 +85,8 @@ export interface ConversationReply {
   turns: Turn[];
   /** Whether the model read this message, or the fallback took it. For the tests and the log. */
   readBy: "model" | "fallback" | "none";
+  /** Whether a line of this message was dropped as data we do not want. */
+  discarded: boolean;
 }
 
 export class ConversationError extends Error {
@@ -283,75 +298,75 @@ export async function converse(
   const turns = JSON.parse(row.turns) as Turn[];
   let questions = row.questions;
   let asked = row.asked;
-  let note: string | null = null;
   let readBy: ConversationReply["readBy"] = "none";
+  const notes: string[] = [];
 
-  if (unwanted(message)) {
-    // Neither stored nor sent: the turn in the transcript is our sentence, not their words.
-    note = LINES.discarded;
-  } else {
-    turns.push({ who: "they", text: message });
+  // Line by line: a card number in one line does not cost the person the other three.
+  const lines = message.split("\n");
+  const clean = lines.filter((l) => !unwanted(l)).join("\n").trim();
+  const discarded = lines.some((l) => unwanted(l));
+  let dayLimit = false;
+  if (clean) {
+    turns.push({ who: "they", text: clean });
     let got: Record<string, string> | null = null;
-    const mayCall =
-      model &&
-      model.models.length > 0 &&
-      row.calls < CALLS_PER_CONVERSATION &&
-      takeDayCall(db, now());
-    if (mayCall) {
-      db.prepare("UPDATE conversations SET calls = calls + 1 WHERE id = ?").run(row.id);
-      const known = valid(offer, fields);
-      const last = offer.fields.find((f) => f.name === asked);
-      try {
-        const out = await withTimeout(
-          model.write({
-            model: model.models[0],
-            system: systemPrompt(offer),
-            user: JSON.stringify({ known, last_question: last?.label ?? null, message }),
-            maxTokens: MAX_TOKENS,
-          }),
-          MODEL_TIMEOUT_MS,
-        );
-        db.prepare("UPDATE conversation_days SET cost_mc = cost_mc + ? WHERE day = ?").run(Math.max(0, out.costMc), today(now()));
-        const parsed = parseObject(out.text);
-        if (parsed) {
-          got = readModel(offer, parsed);
-          readBy = "model";
+    if (model && model.models.length > 0 && row.calls < CALLS_PER_CONVERSATION) {
+      if (!takeDayCall(db, now())) {
+        dayLimit = true;
+      } else {
+        db.prepare("UPDATE conversations SET calls = calls + 1 WHERE id = ?").run(row.id);
+        const last = offer.fields.find((f) => f.name === asked);
+        try {
+          const out = await withTimeout(
+            model.write({
+              model: model.models[0],
+              system: systemPrompt(offer),
+              user: JSON.stringify({ known: valid(offer, fields), last_question: last?.label ?? null, message: clean }),
+              maxTokens: MAX_TOKENS,
+            }),
+            MODEL_TIMEOUT_MS,
+          );
+          db.prepare("UPDATE conversation_days SET cost_mc = cost_mc + ? WHERE day = ?").run(Math.max(0, out.costMc), today(now()));
+          const parsed = parseObject(out.text);
+          if (parsed) {
+            got = readModel(offer, parsed);
+            readBy = "model";
+          }
+        } catch {
+          got = null;
         }
-      } catch {
-        got = null;
       }
     }
     if (got === null) {
-      got = readFallback(offer, fields, asked, message);
+      // Also at the day's cap: the answer to the question asked is kept for the form.
+      got = readFallback(offer, fields, asked, clean);
       readBy = "fallback";
     }
     Object.assign(fields, got);
   }
+  if (discarded) notes.push(LINES.discarded);
 
   const values = valid(offer, fields);
   const missing = offer.fields.find((f) => !(f.name in values));
   let question: string | null = null;
   if (!missing) {
-    note = note ?? LINES.done;
+    notes.push(doneLine(offer));
+    asked = null;
+  } else if (dayLimit) {
+    notes.push(LINES.dayLimit);
+    asked = null;
+  } else if (!clean && missing.name === asked) {
+    // Nothing left of the message: the same question again, not counted, since nothing was answered.
+    question = questionFor(missing, false);
+  } else if (questions >= MAX_QUESTIONS) {
+    notes.push(LINES.handover);
     asked = null;
   } else {
-    const discarded = note === LINES.discarded;
-    const repeat = missing.name === asked;
-    if (discarded && repeat) {
-      // The same question again, not counted: the answer was thrown away, not given.
-      question = questionFor(missing, false);
-    } else if (questions >= MAX_QUESTIONS) {
-      if (!discarded) note = LINES.handover;
-      asked = null;
-    } else {
-      question = questionFor(missing, !discarded && repeat && Boolean(fields[missing.name]?.trim()));
-      questions += 1;
-      asked = missing.name;
-    }
+    question = questionFor(missing, Boolean(clean) && missing.name === asked && Boolean(fields[missing.name]?.trim()));
+    questions += 1;
+    asked = missing.name;
   }
-  if (note === LINES.discarded) turns.push({ who: "we", text: note });
+  for (const n of notes) turns.push({ who: "we", text: n });
   if (question) turns.push({ who: "we", text: question });
-  else if (note && note !== LINES.discarded) turns.push({ who: "we", text: note });
 
   db.prepare("UPDATE conversations SET fields = ?, turns = ?, asked = ?, questions = ?, updated_at = ? WHERE id = ?").run(
     JSON.stringify(fields),
@@ -362,7 +377,8 @@ export async function converse(
     row.id,
   );
   console.log(
-    `[conversation] offer=${offer.id} read_by=${readBy} questions=${questions} done=${!missing} discarded=${note === LINES.discarded}`,
+    `[conversation] offer=${offer.id} read_by=${readBy} questions=${questions} done=${!missing} discarded=${discarded} day_limit=${dayLimit}`,
   );
-  return { id: row.id, offer: offer.id, question, note, done: !missing, values, questions, turns, readBy };
+  const note = notes.length ? notes.join(" ") : null;
+  return { id: row.id, offer: offer.id, question, note, done: !missing, values, questions, turns, readBy, discarded };
 }

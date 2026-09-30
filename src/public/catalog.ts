@@ -252,9 +252,21 @@ export interface ConversationTurn {
   text: string;
 }
 
-/** Provisional wording until Gestalt delivers (HAN-78). */
-export const CONVERSATION_INVITE =
-  "Lieber in eigenen Worten? Schreiben Sie, was Sie brauchen. Wir fragen nach, wenn etwas fehlt, höchstens sechsmal.";
+/**
+ * The first sentence of the conversation per offer, word for word from Gestalt (HAN-78). "Eine Frage
+ * auf einmal" holds because every reply carries at most one question (src/checkout/conversation.ts).
+ */
+export const CONVERSATION_INVITES: Readonly<Record<string, string>> = {
+  "rede-zum-fest":
+    "Schreiben Sie einfach, wofür Sie die Rede brauchen, so wie Sie es einem Bekannten erzählen würden. Wenn uns etwas fehlt, fragen wir nach, immer nur eine Frage auf einmal.",
+  "anschreiben-bewerbung":
+    "Fügen Sie die Stellenanzeige ein, auf die Sie sich bewerben, und schreiben Sie dazu, was Sie mitbringen. Wenn uns etwas fehlt, fragen wir nach, immer nur eine Frage auf einmal.",
+  "text-ueber-ihr-angebot":
+    "Schreiben Sie in Ihren Worten, was Sie anbieten und für wen, etwa Ihren Unterricht oder Ihren Laden. Wenn uns etwas fehlt, fragen wir nach, immer nur eine Frage auf einmal.",
+};
+
+/** Under the invitation, small. True while the form stands below the conversation on the same page. */
+export const CONVERSATION_FINE = "Die Fragen stellt eine KI. Wer lieber selbst ausfüllt, nimmt das Formular darunter.";
 
 /**
  * The way into the conversation, above the form on the order page (HAN-77). The form stays below
@@ -264,12 +276,12 @@ export const CONVERSATION_INVITE =
 function conversationStart(o: Offer, style: string): string {
   return `<form method="post" action="/katalog/gespraech" style="margin-top:1.6rem;display:grid;gap:.8rem">
         <input type="hidden" name="angebot" value="${o.id}">
-        <label for="nachricht">${CONVERSATION_INVITE}
+        <label for="nachricht">${CONVERSATION_INVITES[o.id] ?? ""}
           <textarea id="nachricht" name="nachricht" rows="4" required maxlength="8000" style="${style}"></textarea>
         </label>
+        <p class="fine">${CONVERSATION_FINE}</p>
         <p><button type="submit" class="btn btn-2">Losschicken</button></p>
-      </form>
-      <p class="fine" style="margin-top:1.6rem">Oder Sie füllen gleich das Formular aus:</p>`;
+      </form>`;
 }
 
 function renderTranscript(turns: readonly ConversationTurn[]): string {
