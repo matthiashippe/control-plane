@@ -38,6 +38,15 @@ export const CALLS_PER_CONVERSATION = MAX_QUESTIONS + 1;
 export const CALLS_PER_DAY = 300;
 /** One US dollar per UTC day, in millicents (OpenRouter bills in dollars). */
 export const COST_PER_DAY_MC = 100_000;
+/**
+ * What one call is assumed to cost until its answer says otherwise: 5 US cents. Reserved when the
+ * call is taken, so parallel calls cannot all pass a cap that is only booked after they answer
+ * (HAN-79, 30.09.2026: 60 parallel calls at 2,000 mc booked 120,000 mc against the 100,000 cap).
+ * The worst case it covers: models[0] is openai/gpt-5.2 at 1.75 USD/M in and 14 USD/M out, a
+ * message of 8,000 characters plus known fields of up to 12,000, and 600 tokens out, about 3 to 5
+ * cents. A call that times out or fails keeps the whole reservation, since it may still be billed.
+ */
+export const MAX_CALL_MC = 5_000;
 /** Longest message taken, in characters: a pasted job advert is up to 8000 (OFFERS). */
 export const MESSAGE_MAX = 8000;
 export const CONVERSATION_HOURS = 24;
@@ -167,15 +176,17 @@ export function matchOption(f: Extract<OfferField, { kind: "choice" }>, text: st
 
 const today = (now: Date) => now.toISOString().slice(0, 10);
 
-/** Takes one call from the day's budget, or says there is none left. Atomic in SQLite. */
-function takeDayCall(db: Db, now: Date): boolean {
+/**
+ * Takes one call and reserves MAX_CALL_MC from the day's budget, or says there is none left. Atomic
+ * in SQLite. Returns the day it was taken on, so the answer is booked there even after midnight UTC.
+ */
+function takeDayCall(db: Db, now: Date): string | null {
   const day = today(now);
   db.prepare("INSERT OR IGNORE INTO conversation_days (day) VALUES (?)").run(day);
-  return (
-    db
-      .prepare("UPDATE conversation_days SET calls = calls + 1 WHERE day = ? AND calls < ? AND cost_mc < ?")
-      .run(day, CALLS_PER_DAY, COST_PER_DAY_MC).changes === 1
-  );
+  const taken = db
+    .prepare("UPDATE conversation_days SET calls = calls + 1, cost_mc = cost_mc + ? WHERE day = ? AND calls < ? AND cost_mc + ? <= ?")
+    .run(MAX_CALL_MC, day, CALLS_PER_DAY, MAX_CALL_MC, COST_PER_DAY_MC).changes;
+  return taken === 1 ? day : null;
 }
 
 function systemPrompt(offer: Offer): string {
@@ -310,7 +321,8 @@ export async function converse(
     turns.push({ who: "they", text: clean });
     let got: Record<string, string> | null = null;
     if (model && model.models.length > 0 && row.calls < CALLS_PER_CONVERSATION) {
-      if (!takeDayCall(db, now())) {
+      const day = takeDayCall(db, now());
+      if (!day) {
         dayLimit = true;
       } else {
         db.prepare("UPDATE conversations SET calls = calls + 1 WHERE id = ?").run(row.id);
@@ -325,7 +337,11 @@ export async function converse(
             }),
             MODEL_TIMEOUT_MS,
           );
-          db.prepare("UPDATE conversation_days SET cost_mc = cost_mc + ? WHERE day = ?").run(Math.max(0, out.costMc), today(now()));
+          // The reservation becomes the real cost. Above MAX_CALL_MC the real cost is booked too, and
+          // logged, because then the reservation is too small and the cap can be passed.
+          const cost = Math.max(0, out.costMc);
+          db.prepare("UPDATE conversation_days SET cost_mc = cost_mc - ? + ? WHERE day = ?").run(MAX_CALL_MC, cost, day);
+          if (cost > MAX_CALL_MC) console.log(`[conversation] call_over_reservation cost_mc=${cost} max_call_mc=${MAX_CALL_MC}`);
           const parsed = parseObject(out.text);
           if (parsed) {
             got = readModel(offer, parsed);

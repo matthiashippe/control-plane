@@ -14,7 +14,9 @@ import {
   COST_PER_DAY_MC,
   CONVERSATION_HOURS,
   LINES,
+  MAX_CALL_MC,
   MAX_QUESTIONS,
+  MODEL_TIMEOUT_MS,
   cleanupConversations,
   converse,
   doneLine,
@@ -184,15 +186,18 @@ describe("the caps, from both sides", () => {
     expect(calls).toHaveLength(1);
   });
 
-  it("per day by cost: below the cap it is read, at the cap it is not", async () => {
+  const dayRow = (day: string) => db.prepare("SELECT calls, cost_mc FROM conversation_days WHERE day = ?").get(day) as { calls: number; cost_mc: number };
+
+  it("per day by cost: with room for one reservation it is read, one millicent less and it is not", async () => {
     const day = new Date().toISOString().slice(0, 10);
-    db.prepare("INSERT INTO conversation_days (day, calls, cost_mc) VALUES (?, 0, ?)").run(day, COST_PER_DAY_MC - 1);
+    db.prepare("INSERT INTO conversation_days (day, calls, cost_mc) VALUES (?, 0, ?)").run(day, COST_PER_DAY_MC - MAX_CALL_MC);
     const { model, calls } = scripted([nothing()]);
     expect((await converse(db, model, { offer: REDE, message: "Rede" })).readBy).toBe("model");
+    // The reservation became the real 50 mc, so there is room for exactly one more reservation minus 50.
+    expect(dayRow(day)).toEqual({ calls: 1, cost_mc: COST_PER_DAY_MC - MAX_CALL_MC + 50 });
     expect((await converse(db, model, { offer: REDE, message: "Rede" })).note).toBe(LINES.dayLimit);
     expect(calls).toHaveLength(1);
-    const row = db.prepare("SELECT calls, cost_mc FROM conversation_days WHERE day = ?").get(day) as { calls: number; cost_mc: number };
-    expect(row).toEqual({ calls: 1, cost_mc: COST_PER_DAY_MC - 1 + 50 });
+    expect(dayRow(day)).toEqual({ calls: 1, cost_mc: COST_PER_DAY_MC - MAX_CALL_MC + 50 });
   });
 
   it("per day by cost: exactly at the cap nothing is read", async () => {
@@ -201,6 +206,73 @@ describe("the caps, from both sides", () => {
     const { model, calls } = scripted([nothing()]);
     expect((await converse(db, model, { offer: REDE, message: "Rede" })).note).toBe(LINES.dayLimit);
     expect(calls).toHaveLength(0);
+  });
+
+  it("300 calls at once, each at MAX_CALL_MC, book no more than the cap (HAN-81)", async () => {
+    const day = new Date().toISOString().slice(0, 10);
+    let started = 0;
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const slow: VersionWriter = {
+      models: ["stub/model"],
+      async write() {
+        started += 1;
+        await gate;
+        return { text: JSON.stringify(nothing()), costMc: MAX_CALL_MC, upstream: null };
+      },
+    };
+    const all = Promise.all(Array.from({ length: CALLS_PER_DAY }, () => converse(db, slow, { offer: REDE, message: "Rede" })));
+    await new Promise((r) => setImmediate(r));
+    release();
+    const replies = await all;
+    expect(started).toBe(COST_PER_DAY_MC / MAX_CALL_MC);
+    expect(replies.filter((r) => r.readBy === "model")).toHaveLength(COST_PER_DAY_MC / MAX_CALL_MC);
+    expect(replies.filter((r) => r.note === LINES.dayLimit)).toHaveLength(CALLS_PER_DAY - COST_PER_DAY_MC / MAX_CALL_MC);
+    expect(dayRow(day).cost_mc).toBe(COST_PER_DAY_MC);
+  });
+
+  it("the same 300 at a real 50 mc each: the reservations are given back and all are read", async () => {
+    const day = new Date().toISOString().slice(0, 10);
+    const { model } = scripted([nothing()]);
+    for (let i = 0; i < CALLS_PER_DAY; i++) expect((await converse(db, model, { offer: REDE, message: "Rede" })).readBy).toBe("model");
+    expect(dayRow(day)).toEqual({ calls: CALLS_PER_DAY, cost_mc: CALLS_PER_DAY * 50 });
+  });
+
+  it("a call that times out keeps its reservation, one that answers does not", async () => {
+    vi.useFakeTimers();
+    try {
+      const day = new Date().toISOString().slice(0, 10);
+      const hanging: VersionWriter = { models: ["x"], write: () => new Promise(() => {}) };
+      const pending = converse(db, hanging, { offer: REDE, message: "Rede" });
+      await vi.advanceTimersByTimeAsync(MODEL_TIMEOUT_MS);
+      expect((await pending).readBy).toBe("fallback");
+      expect(dayRow(day)).toEqual({ calls: 1, cost_mc: MAX_CALL_MC });
+      await converse(db, scripted([nothing()]).model, { offer: REDE, message: "Rede" });
+      expect(dayRow(day)).toEqual({ calls: 2, cost_mc: MAX_CALL_MC + 50 });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("a call that throws keeps its reservation too", async () => {
+    const day = new Date().toISOString().slice(0, 10);
+    const throwing: VersionWriter = { models: ["x"], write: async () => { throw new Error("upstream 500"); } };
+    expect((await converse(db, throwing, { offer: REDE, message: "Rede" })).readBy).toBe("fallback");
+    expect(dayRow(day)).toEqual({ calls: 1, cost_mc: MAX_CALL_MC });
+  });
+
+  it("a call across midnight UTC is booked on the day it was taken", async () => {
+    let clock = new Date("2026-09-30T23:59:59.500Z");
+    const late: VersionWriter = {
+      models: ["stub/model"],
+      async write() {
+        clock = new Date("2026-10-01T00:00:00.500Z");
+        return { text: JSON.stringify(nothing()), costMc: 50, upstream: null };
+      },
+    };
+    expect((await converse(db, late, { offer: REDE, message: "Rede" }, () => clock)).readBy).toBe("model");
+    expect(dayRow("2026-09-30")).toEqual({ calls: 1, cost_mc: 50 });
+    expect(dayRow("2026-10-01")).toBeUndefined();
   });
 
   it("at the day's cap the answer to the question asked still reaches the form", async () => {
