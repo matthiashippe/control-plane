@@ -19,6 +19,7 @@
  * Off by default. See `checkoutEnabled()` for what switches it on.
  */
 
+import { randomBytes } from "node:crypto";
 import { postLedger, ensureWallet, MC_PER_CENT, type Db } from "../db.js";
 import { OFFERS, type Offer } from "../public/catalog.js";
 import { isStripeLiveKey, isStripeTestKey } from "../payments/stripe-key.js";
@@ -243,11 +244,12 @@ export async function beginOfferCheckout(
     db.prepare(
       "INSERT INTO checkouts (reference, address, offer, cents, provider, status, created_at) VALUES (?, NULL, ?, ?, ?, 'pending', ?)",
     ).run(reference, offer.id, cents, provider.name, now);
-    db.prepare("INSERT INTO order_briefs (reference, brief, email, created_at) VALUES (?, ?, ?, ?)").run(
+    db.prepare("INSERT INTO order_briefs (reference, brief, email, created_at, token) VALUES (?, ?, ?, ?, ?)").run(
       reference,
       brief,
       email,
       now,
+      newDeliveryToken(),
     );
   })();
   return {
@@ -255,6 +257,14 @@ export async function beginOfferCheckout(
     redirect,
   };
 }
+
+/** 32 random bytes, base64url: the 43 characters that open the page with the texts (HAN-67). */
+export function newDeliveryToken(): string {
+  return randomBytes(32).toString("base64url");
+}
+
+/** What `newDeliveryToken` produces and nothing else, checked before the database is asked. */
+export const DELIVERY_TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 
 /**
  * Books a payment that went through, once.

@@ -64,6 +64,12 @@ export interface ChatResponse {
     finish_reason: "stop" | "tool_calls" | "length";
   }>;
   usage: Usage;
+  /**
+   * Who actually answered behind the provider, when it says (OpenRouter's `provider`, e.g. "Azure").
+   * The delivery stores it per text, so a request that asked for zero data retention and still
+   * landed elsewhere shows up (Goal 23, condition 20).
+   */
+  upstream?: string;
 }
 
 /** Provider outage (no credit, rate limit, 5xx, timeout): do not blame the automaton for it. */
@@ -101,7 +107,11 @@ export interface ChatProvider {
   readonly resale?: boolean;
   models(): ModelSpec[];
   /** The caller only sends models that models() knows. Max tokens are already normalised. */
-  chat(req: ChatRequest & { maxTokens: number; apiKeyId: string }): Promise<ChatResponse>;
+  /**
+   * `zdr` asks for endpoints that keep neither input nor output (Goal 23, condition A). Only the
+   * delivery sets it; the proxy never does. A provider without such a switch may ignore it.
+   */
+  chat(req: ChatRequest & { maxTokens: number; apiKeyId: string; zdr?: boolean }): Promise<ChatResponse>;
 }
 
 /** Rough token estimate without a tokenizer: four characters per token, plus one token per message. */

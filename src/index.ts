@@ -34,6 +34,7 @@ import { payConfigFromEnv } from "./payments/pay.js";
 import { settlerFromEnv } from "./payments/settler.js";
 import { stripeFromEnv } from "./payments/stripe.js";
 import { reconcileCheckouts } from "./checkout/index.js";
+import { chatWriter, deliverPaidOrders, type Mailer } from "./checkout/deliver.js";
 import { siteOrigin } from "./public/site.js";
 
 const port = Number(process.env.CP_PORT || 8402);
@@ -122,16 +123,31 @@ const cleanup = () => {
 cleanup();
 setInterval(cleanup, 60 * 60 * 1000).unref();
 
+// Who writes the texts of a paid order (HAN-67): the first provider that is not the harness mock,
+// else the mock, with every model it serves. No provider, no writer, and the delivery run does not
+// start. No mailer until HAN-44: rows stay `written` and the buyer reads them on the page.
+const writerProvider = providers.find((p) => p.id !== "mock") ?? providers[0];
+const writer = writerProvider ? chatWriter(writerProvider) : null;
+const mailer: Mailer | null = null;
+
 // Card payments: once on start, every five minutes after that (Goal 22). Books what was paid even
-// when the buyer never came back to /katalog/danke. Does nothing while the card path is off, and a
+// when the buyer never came back to /katalog/danke, then writes what was paid for (Goal 23): first
+// book, then deliver, in that order, in one tick. Does nothing while the card path is off, and a
 // failed run is logged, never fatal.
-const reconcile = () => {
-  reconcileCheckouts(db, checkout).catch((err) => {
+const reconcile = async () => {
+  try {
+    await reconcileCheckouts(db, checkout);
+  } catch (err) {
     console.error(`[reconcile] failed: ${err instanceof Error ? err.message : String(err)}`);
-  });
+  }
+  try {
+    await deliverPaidOrders(db, writer, mailer);
+  } catch (err) {
+    console.error(`[deliver] failed: ${err instanceof Error ? err.message : String(err)}`);
+  }
 };
-reconcile();
-setInterval(reconcile, 5 * 60 * 1000).unref();
+void reconcile();
+setInterval(() => void reconcile(), 5 * 60 * 1000).unref();
 
 const tlsCert = process.env.CP_TLS_CERT;
 const tlsKey = process.env.CP_TLS_KEY;

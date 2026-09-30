@@ -295,6 +295,34 @@ function migrate(db: Db): void {
     );
   `);
 
+  // The key to the page that shows the texts (HAN-67). Random, 256 bits, set when the order starts,
+  // so the page Stripe sends the buyer back to can link to it before anything is written. It is the
+  // only thing in that URL: no email, no name (blocklist 7). Rows from before this column have none
+  // and get no page.
+  const briefCols = db.prepare("PRAGMA table_info(order_briefs)").all() as { name: string }[];
+  if (!briefCols.some((c) => c.name === "token")) db.exec("ALTER TABLE order_briefs ADD COLUMN token TEXT");
+  db.exec("CREATE UNIQUE INDEX IF NOT EXISTS order_briefs_token ON order_briefs(token) WHERE token IS NOT NULL");
+
+  // One row per paid order that is being or has been written (Goal 23, point 1; HAN-67). `body` is
+  // the texts as JSON and is emptied with the brief (`cleanupOrderBriefs`); the rest names no person
+  // and stays for the report. `error` is a code, never text from the order. `written_at` is set once.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS deliveries (
+      reference  TEXT PRIMARY KEY REFERENCES checkouts(reference),
+      status     TEXT NOT NULL CHECK (status IN ('claimed', 'written', 'sent', 'failed')),
+      attempts   INTEGER NOT NULL DEFAULT 0,
+      claimed_at TEXT NOT NULL,
+      written_at TEXT,
+      sent_at    TEXT,
+      message_id TEXT,
+      versions   INTEGER NOT NULL DEFAULT 0,
+      body       TEXT,
+      upstreams  TEXT,
+      cost_mc    INTEGER NOT NULL DEFAULT 0,
+      error      TEXT
+    );
+  `);
+
   // Reservations belong to requests in flight. A freshly started process has none, so leftover
   // values are the remains of a crash in the middle of a provider call. Resetting them here is only
   // correct as long as exactly one process works on this file, and that is exactly how the service
@@ -510,6 +538,13 @@ export const PAID_BRIEF_DAYS = 120;
  */
 export function cleanupOrderBriefs(db: Db, now = Date.now()): number {
   const day = 24 * 60 * 60 * 1000;
+  // The texts were written from the brief and go with it (Goal 23, point 1). Same period, counted
+  // from the payment; the delivery row itself stays, it names nobody.
+  db.prepare(
+    `UPDATE deliveries SET body = NULL WHERE body IS NOT NULL AND reference IN (
+       SELECT reference FROM checkouts WHERE status = 'paid' AND settled_at < ?
+     )`,
+  ).run(new Date(now - PAID_BRIEF_DAYS * day).toISOString());
   return db
     .prepare(
       `DELETE FROM order_briefs WHERE reference IN (

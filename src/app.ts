@@ -32,7 +32,15 @@ import { renderPost } from "./public/post.js";
 import { renderFix } from "./public/fix.js";
 import { OFFERS, TEST_MODE_LINE, euro, renderCatalog, renderOrderPage, type Offer } from "./public/catalog.js";
 import { renderPrivacy } from "./public/datenschutz.js";
-import { beginOfferCheckout, checkoutEnabled, CheckoutError, settleCheckout, type CheckoutProvider } from "./checkout/index.js";
+import {
+  beginOfferCheckout,
+  checkoutEnabled,
+  CheckoutError,
+  DELIVERY_TOKEN_PATTERN,
+  settleCheckout,
+  type CheckoutProvider,
+} from "./checkout/index.js";
+import { deliveryView } from "./checkout/deliver.js";
 import { stripeFromEnv } from "./payments/stripe.js";
 import { isStripeTestKey } from "./payments/stripe-key.js";
 import { germanFrame } from "./public/frame.de.js";
@@ -1109,7 +1117,28 @@ export function createApp(opts: AppOptions) {
       const r = await settleCheckout(opts.db, checkoutProvider!, { session_id: sessionId });
       const offer = OFFERS.find((o) => o.id === r.offer);
       if (r.status === "paid" && offer) {
-        return answer("Danke, Ihre Zahlung ist angekommen.", [`Sie haben „${offer.name}“ für ${euro(r.cents)} bezahlt.`, ...test], 200);
+        const token = (
+          opts.db.prepare("SELECT token FROM order_briefs WHERE reference = ?").get(checkoutProvider!.reference({ session_id: sessionId })) as
+            | { token: string | null }
+            | undefined
+        )?.token;
+        // The texts live behind the token, not behind the session id (HAN-67): this page only
+        // points there, and moves on by itself after a few seconds.
+        const onward = token ? `/katalog/fassungen?t=${token}` : null;
+        const res = answer(
+          "Danke, Ihre Zahlung ist angekommen.",
+          [
+            `Sie haben „${offer.name}“ für ${euro(r.cents)} bezahlt.`,
+            ...(onward ? [`Ihre drei Fassungen stehen gleich hier: <a href="${onward}">zu Ihren Fassungen</a>. Heben Sie diesen Link auf, er ist nur für Sie.`] : []),
+            ...test,
+          ],
+          200,
+        );
+        if (!onward) return res;
+        c.header("Referrer-Policy", "no-referrer");
+        c.header("Cache-Control", "no-store");
+        const html = (await res.text()).replace("</head>", `<meta http-equiv="refresh" content="4;url=${onward}">\n</head>`);
+        return c.html(html, 200);
       }
       if (r.status === "paid") return unknown();
       return answer("Die Zahlung ist nicht abgeschlossen.", ["Es wurde nichts abgebucht.", back], 200);
@@ -1119,6 +1148,92 @@ export function createApp(opts: AppOptions) {
         return answer("Wir können den Stand Ihrer Zahlung gerade nicht prüfen.", ["Bitte laden Sie die Seite in ein paar Minuten neu.", back], 502);
       }
       return unknown();
+    }
+  });
+
+  /**
+   * The three texts of one order, behind the token from `order_briefs.token` (HAN-67).
+   *
+   * The token is the only key: no session id, no email, no name in the URL (blocklist 7). Anything
+   * that is not exactly a token's shape is answered without asking the database. While the texts
+   * are being written the page says so and reloads itself. `no-store` and `no-referrer`, so the
+   * token stays out of caches and out of the next site's log.
+   */
+  app.get("/katalog/fassungen", (c) => {
+    if (!indexHtml) return c.json({ error: "no index page built" }, 503);
+    // Without a token nobody is coming to read an order: back to the catalogue, like /katalog/danke
+    // without a session id. It also keeps this address out of the sitemap's set of pages.
+    const token = c.req.query("t");
+    if (!token) return c.redirect("/katalog", 303);
+    c.header("Referrer-Policy", "no-referrer");
+    c.header("Cache-Control", "no-store");
+    const view = DELIVERY_TOKEN_PATTERN.test(token) ? deliveryView(opts.db, token) : ({ state: "none" } as const);
+    const esc = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    const render = (heading: string, inner: string, status: 200 | 404, refreshSeconds = 0) => {
+      const html = page(
+        `
+  <section>
+    <div class="wrap narrow">
+      <p class="kicker">Katalog</p>
+      <h1 class="ph">${heading}</h1>
+      ${inner}
+    </div>
+  </section>`,
+        `${heading} | Katalog`,
+        heading,
+        "/katalog/fassungen",
+        "og.png",
+        [],
+        true,
+        "de",
+        true,
+      );
+      return c.html(
+        refreshSeconds ? html.replace("</head>", `<meta http-equiv="refresh" content="${refreshSeconds}">\n</head>`) : html,
+        status,
+      );
+    };
+    const back = '<p><a href="/katalog">Zurück zum Katalog</a></p>';
+    switch (view.state) {
+      case "none":
+        return render("Zu diesem Link finden wir keine Bestellung.", back, 404);
+      case "writing":
+        return render(
+          "Wir schreiben Ihre drei Fassungen.",
+          `<p>Sie haben „${view.offer.name}“ bestellt. Diese Seite lädt sich alle 30 Sekunden neu und zeigt die Fassungen, sobald sie fertig sind.</p>
+      <p>Heben Sie diesen Link auf, er ist nur für Sie.</p>`,
+          200,
+          30,
+        );
+      case "not_written":
+        return render(
+          "Zu dieser Bestellung schreiben wir keine Fassungen.",
+          view.reason === "test_mode"
+            ? `<p>${TEST_MODE_LINE} Im Testbetrieb schreiben wir nur für unsere eigene Vorführung.</p>${back}`
+            : `<p>Die Bestellung ist älter als unsere Lieferung. Schreiben Sie uns an <a href="mailto:matthias@hanseatictech.de">matthias@hanseatictech.de</a>.</p>`,
+          200,
+        );
+      case "failed":
+        return render(
+          "Ihre Fassungen konnten wir nicht fertig schreiben.",
+          `<p>Das tut uns leid. Schreiben Sie uns an <a href="mailto:matthias@hanseatictech.de">matthias@hanseatictech.de</a>, dann kümmern wir uns darum.</p>`,
+          200,
+        );
+      case "ready":
+        return render(
+          "Ihre drei Fassungen",
+          `<p>Für „${view.offer.name}“. Die Texte sind mit KI geschrieben. Heben Sie diesen Link auf, er ist nur für Sie.</p>
+      ${view.versions
+        .map(
+          (v, i) =>
+            `<h2>Fassung ${i + 1}</h2>\n      ${v.text
+              .split(/\n\s*\n/)
+              .map((para) => `<p>${esc(para.trim()).replace(/\n/g, "<br>")}</p>`)
+              .join("\n      ")}`,
+        )
+        .join("\n      ")}`,
+          200,
+        );
     }
   });
 

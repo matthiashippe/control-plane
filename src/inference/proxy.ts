@@ -360,7 +360,8 @@ async function handleChatUncoalesced(
 
   let response: ChatResponse;
   try {
-    response = await entry.provider.chat({ ...(req as ChatRequest), model: entry.spec.id, maxTokens, apiKeyId: address });
+    // `zdr` is the delivery's switch, not the caller's: a body field of that name must not reach it.
+    response = await entry.provider.chat({ ...(req as ChatRequest), model: entry.spec.id, maxTokens, apiKeyId: address, zdr: false });
   } catch (err) {
     // Every exit without a booking has to give the reservation back, otherwise the tenant's credit
     // stays blocked for good.

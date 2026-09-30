@@ -191,7 +191,7 @@ export class OpenRouterProvider implements ChatProvider {
     };
   }
 
-  async chat(req: ChatRequest & { maxTokens: number; apiKeyId: string }): Promise<ChatResponse> {
+  async chat(req: ChatRequest & { maxTokens: number; apiKeyId: string; zdr?: boolean }): Promise<ChatResponse> {
     const body: Record<string, unknown> = {
       model: req.model,
       messages: req.messages,
@@ -204,6 +204,8 @@ export class OpenRouterProvider implements ChatProvider {
       body.tool_choice = req.tool_choice ?? "auto";
     }
     if (req.temperature !== undefined) body.temperature = req.temperature;
+    // Zero data retention: OpenRouter routes only to endpoints that store nothing (Goal 23, A).
+    if (req.zdr) body.provider = { zdr: true };
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
@@ -233,6 +235,7 @@ export class OpenRouterProvider implements ChatProvider {
     const data = (await res.json()) as {
       id?: string;
       model?: string;
+      provider?: string;
       created?: number;
       choices?: Array<{
         index?: number;
@@ -279,6 +282,7 @@ export class OpenRouterProvider implements ChatProvider {
         total_tokens: data.usage?.total_tokens ?? promptTokens + completionTokens,
         ...(typeof data.usage?.cost === "number" ? { cost_usd: data.usage.cost } : {}),
       },
+      ...(typeof data.provider === "string" ? { upstream: data.provider } : {}),
     };
   }
 }
