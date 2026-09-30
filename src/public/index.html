@@ -177,6 +177,12 @@ section { padding-block: var(--s-16); }
    HoneyBooks Auswahl. Was sie gemeinsam haben und was hier uebernommen ist: eine Karte je Angebot,
    der Preis als eigene Groesse statt als Textzeile, ein Knopf je Karte, und die Bedingungen einmal
    ueber allem statt dreimal darunter. */
+/* Die erste Sektion einer Unterseite beginnt hoeher als die der Startseite. Dort traegt der
+   Abstand einen Wechsel zwischen Abschnitten; hier steht darueber nur die Leiste, und 96 Pixel
+   Nichts sind das Erste, was ein Kaeufer sieht. */
+main > section:first-child { padding-block: var(--s-8) var(--s-16); }
+@media (min-width: 52rem) { main > section:first-child { padding-block: var(--s-12) var(--s-24); } }
+
 .grid-cards { display: grid; gap: var(--s-4); grid-template-columns: 1fr; margin-top: var(--s-8); }
 @media (min-width: 46rem) { .grid-cards { grid-template-columns: 1fr 1fr; gap: var(--s-6); } }
 @media (min-width: 70rem) { .grid-cards.three { grid-template-columns: repeat(3, 1fr); } }
@@ -188,7 +194,11 @@ section { padding-block: var(--s-16); }
 }
 @media (min-width: 46rem) { .card { padding: var(--s-8); } }
 .card:hover { border-color: var(--line-2); }
-.card > .card-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-4); }
+/* Der Kopf hat eine Mindesthoehe, damit die Haken aller Karten auf einer Linie beginnen, auch
+   wenn ein Titel umbricht und der naechste nicht. Ohne sie starteten die drei Karten am 30.09. auf
+   drei verschiedenen Hoehen und das Raster las sich als Zufall. */
+.card > .card-head { display: flex; align-items: baseline; justify-content: space-between;
+                     gap: var(--s-4); min-height: 4.4rem; }
 .card h3 { font-size: 1.375rem; letter-spacing: -.02em; }
 @media (min-width: 46rem) { .card h3 { font-size: var(--t-h3); } }
 /* Der Preis ist eine Zahl, keine Zeile Text. Er steht auf einer Hoehe mit dem Titel und in
@@ -209,8 +219,22 @@ section { padding-block: var(--s-16); }
    wenn ein Text laenger ist. */
 .card > .card-foot { margin-top: auto; padding-top: var(--s-4); display: flex; flex-direction: column;
                      gap: var(--s-2); align-items: flex-start; }
+/* Der Knopf ist auf jeder Karte gleich breit und gleich hoch. Vorher trug er den Namen des
+   Angebots, und "Anschreiben zur Bewerbung bestellen" brach auf zwei Zeilen, waehrend die
+   Nachbarn einzeilig blieben. Der Name steht ueber dem Knopf, der Knopf sagt, was passiert. */
 .card .btn { width: 100%; justify-content: center; }
-@media (min-width: 46rem) { .card .btn { width: auto; } }
+
+/* Ein Ausschnitt aus einer echten Lieferung, damit niemand Text kauft, ohne Text gesehen zu haben.
+   Kein Bild und kein Beispiel war der zweite Grund, warum der Katalog am 30.09. wie eine Liste
+   aussah: es gab nichts anzusehen. */
+.sample { display: grid; gap: var(--s-4); grid-template-columns: 1fr; margin-top: var(--s-6); }
+@media (min-width: 46rem) { .sample { grid-template-columns: 1fr 1fr; gap: var(--s-6); } }
+.sample figure { margin: 0; background: var(--panel-2); border: 1px solid var(--line);
+                 border-radius: var(--r-pan); padding: var(--s-6); display: flex;
+                 flex-direction: column; gap: var(--s-3); }
+.sample figcaption { font: 500 var(--t-label)/1 var(--mono); letter-spacing: .08em;
+                     text-transform: uppercase; color: var(--dim); }
+.sample p { font-size: var(--t-ui); line-height: 1.6; color: var(--muted); }
 
 /* Eine Zeile mit drei Zusagen ueber dem Raster: was fuer jedes Angebot gilt, einmal gesagt. */
 .promises { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-6); margin-top: var(--s-6);

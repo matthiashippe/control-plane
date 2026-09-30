@@ -64,7 +64,9 @@ export const OFFERS: readonly Offer[] = [
     name: "Rede zum Fest",
     fuer: "Für Geburtstag, Hochzeit oder Jubiläum",
     punkte: [
+      "Drei fertige Fassungen, aus denen Sie eine wählen",
       "So lang, wie Sie sie brauchen: kurz oder ausführlich",
+      "Im Ton, den Sie angeben: herzlich, heiter oder ruhig",
       "Dreimal sagen, was anders werden soll, ohne Aufpreis",
     ],
     delivers:
@@ -83,7 +85,9 @@ export const OFFERS: readonly Offer[] = [
     name: "Anschreiben zur Bewerbung",
     fuer: "Für eine bestimmte Stelle, aus der Anzeige geschrieben",
     punkte: [
+      "Drei fertige Fassungen, aus denen Sie eine wählen",
       "Geschrieben aus der Stellenanzeige und Ihrem Werdegang",
+      "Auf die Stelle bezogen, nicht als Vorlage zum Ausfüllen",
       "Dreimal sagen, was anders werden soll, ohne Aufpreis",
     ],
     delivers:
@@ -100,7 +104,9 @@ export const OFFERS: readonly Offer[] = [
     name: "Text über Ihr Angebot",
     fuer: "Für Aushang, Faltblatt oder Internetseite",
     punkte: [
+      "Drei fertige Fassungen, aus denen Sie eine wählen",
       "Für Ihren Unterricht, Ihren Laden oder Ihre Praxis",
+      "Passend für Aushang, Faltblatt oder Internetseite",
       "Dreimal sagen, was anders werden soll, ohne Aufpreis",
     ],
     delivers:
@@ -149,7 +155,7 @@ export const TEST_MODE_LINE = "Testbetrieb: Es wird kein Geld abgebucht.";
  * would otherwise land in `order_page_opened`; the order page is `noindex` for the same reason.
  */
 function buyLink(o: Offer): string {
-  return `<a class="btn btn-1" href="/katalog/bestellen?angebot=${o.id}" rel="nofollow">${o.name} bestellen</a>`;
+  return `<a class="btn btn-1" href="/katalog/bestellen?angebot=${o.id}" rel="nofollow">Bestellen<span class="vh"> ${o.name}</span></a>`;
 }
 
 /**
@@ -159,7 +165,28 @@ function buyLink(o: Offer): string {
  * sechsmal dasselbe auf einer Seite. Wiederholung liest sich nicht als Zusage, sondern als
  * Kleingedrucktes, und drei Karten mit identischem Fuss sehen aus wie ein Formularausdruck.
  */
-export const PROMISES: readonly string[] = [
+export /**
+ * Zwei Faenge aus der ersten echten Lieferung dieses Dienstes, Zeile 1 in `deliveries`,
+ * geschrieben am 30.09.2026 um 00:34 UTC fuer die Bestellung "Text ueber Ihr Angebot".
+ *
+ * Sie stehen hier, weil niemand Text kauft, ohne Text gesehen zu haben. Der Katalog hatte bis
+ * heute Morgen nichts anzusehen: drei Ueberschriften und drei Preise.
+ *
+ * Woertlich uebernommen und nur am Satzende gekuerzt. Die dritte Fassung fehlt, weil sie den
+ * Namen eines internen Tickets im Text traegt ("Café HAN-70"), was ein Fehler der Kette ist und
+ * als eigener Befund an den CTO ging. Ein Beispiel, das einen Fehler zeigt, waere ehrlich und
+ * trotzdem falsch: es zeigt nicht, was ein Kaeufer bekommt, sondern was schiefging.
+ */
+const SAMPLE: readonly string[] = [
+  "Morgens, wenn die ersten Pendler aus der Bahn kommen, liegt schon der Duft frisch gerösteter " +
+    "Bohnen in der Luft: In unserem kleinen Café in Hamburg rösten wir direkt vor Ort in der " +
+    "eigenen Rösterei. Wer es eilig hat, bekommt seinen Kaffee schnell auf die Hand.",
+  "Guten Morgen, liebe Nachbarn und Pendler! Brauchen Sie einen freundlichen Ort für den ersten " +
+    "Kaffee des Tages oder ein kleines Stück Glück zum Wochenende? Bei uns im kleinen Café mit " +
+    "eigener Rösterei in Hamburg duftet es morgens frisch geröstet.",
+];
+
+const PROMISES: readonly string[] = [
   "Drei fertige Fassungen zur Auswahl",
   "Kein Konto, kein Passwort",
   "Bezahlen mit Karte",
@@ -211,6 +238,16 @@ export function renderCatalog(offers: readonly Offer[] = OFFERS, buy?: { testMod
       }
       ${mark("katalog-top")}
       <div class="grid-cards three">${cards}
+      </div>
+      <h2 style="margin-top:var(--s-16)">So sieht eine Lieferung aus</h2>
+      <p class="sub prose" style="margin-top:var(--s-3)">Zwei von drei Fassungen für dieselbe
+        Bestellung: ein Text über ein Café mit eigener Rösterei. Beide sind wirklich so
+        ausgeliefert worden, gekürzt auf den Anfang.</p>
+      <div class="sample">${SAMPLE.map((t, i) => `
+        <figure>
+          <figcaption>Fassung ${i + 1}</figcaption>
+          <p>${t}</p>
+        </figure>`).join("")}
       </div>
       <p class="fine prose" style="margin-top:var(--s-8);color:var(--dim)">${DELIVERY_SENTENCE}</p>
       ${mark("katalog-end")}
