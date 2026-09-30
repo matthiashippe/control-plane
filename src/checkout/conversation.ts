@@ -125,7 +125,12 @@ export function cleanupConversations(db: Db, now = Date.now()): number {
 const HEALTH =
   /\b(krankheit\w*|erkrank\w*|diagnos\w*|krebs\w*|tumor\w*|depressi\w*|demenz\w*|alzheimer\w*|schlaganfall\w*|herzinfarkt\w*|chemotherapie\w*|hiv|aids|psychiatri\w*|ist krank|war krank)\b/i;
 const MONEY_WORDS = /\b(iban|bic|kontonummer|kartennummer|kreditkartennummer|prüfnummer|cvc|pin)\b/i;
-const IBAN = /\b[a-z]{2}\d{2}(?:[ ]?[a-z0-9]{4}){3,7}(?:[ ]?[a-z0-9]{1,3})?\b/gi;
+// Between the groups of a number: space, dot, hyphen, slash, or a line break. Until 30.09.2026 only
+// space and hyphen, and the check ran per line, so "4111.1111.1111.1111" and a card over two lines
+// went through to the model and into `conversations.turns` (HAN-82, found in HAN-79).
+const SEP = String.raw`(?:[ .\/-]|[ \t]*\r?\n[ \t]*)`;
+const IBAN = new RegExp(String.raw`\b[a-z]{2}\d{2}(?:${SEP}?[a-z0-9]{4}){3,7}(?:${SEP}?[a-z0-9]{1,3})?\b`, "gi");
+const DIGITS = new RegExp(String.raw`\d+(?:${SEP}\d+)*`, "g");
 
 /** Luhn over the digits, the check every card number passes. */
 function luhn(digits: string): boolean {
@@ -141,16 +146,61 @@ function luhn(digits: string): boolean {
   return sum % 10 === 0;
 }
 
-/** Whether a message carries data we never want: an account or card number, or a health word. */
-export function unwanted(message: string): boolean {
-  if (HEALTH.test(message) || MONEY_WORDS.test(message)) return true;
-  for (const m of message.match(IBAN) ?? []) {
-    if ((m.match(/\d/g) ?? []).length >= 10) return true;
-  }
-  for (const m of message.match(/\d(?:[ -]?\d){12,18}/g) ?? []) {
-    if (luhn(m.replace(/\D/g, ""))) return true;
+/**
+ * Whether a run of digit groups holds a card number: some consecutive groups with 13 to 19 digits
+ * that pass Luhn. Whole groups only, so a card followed by a date on the next line is still found,
+ * and a long run of digits is not searched for any 16 of them that happen to pass.
+ */
+function holdsCard(run: string): boolean {
+  const groups = run.split(/\D+/);
+  for (let i = 0; i < groups.length; i++) {
+    let digits = "";
+    for (let j = i; j < groups.length && digits.length < 19; j++) {
+      digits += groups[j];
+      if (digits.length >= 13 && digits.length <= 19 && luhn(digits)) return true;
+    }
   }
   return false;
+}
+
+/** Where in the message an account or card number stands, as [start, end) offsets. */
+function numberSpans(message: string): [number, number][] {
+  const spans: [number, number][] = [];
+  for (const m of message.matchAll(IBAN)) {
+    if ((m[0].match(/\d/g) ?? []).length >= 10) spans.push([m.index, m.index + m[0].length]);
+  }
+  for (const m of message.matchAll(DIGITS)) {
+    if (holdsCard(m[0])) spans.push([m.index, m.index + m[0].length]);
+  }
+  return spans;
+}
+
+/**
+ * The line numbers of a message that carry data we never want: a health word, a money word, or any
+ * part of an account or card number. A number is looked for across the whole message, so a card
+ * split over two lines costs both lines.
+ */
+export function unwantedLines(message: string): Set<number> {
+  const lines = message.split("\n");
+  const out = new Set<number>();
+  let start = 0;
+  const bounds = lines.map((l, i) => {
+    if (HEALTH.test(l) || MONEY_WORDS.test(l)) out.add(i);
+    const b: [number, number] = [start, start + l.length];
+    start += l.length + 1;
+    return b;
+  });
+  for (const [a, b] of numberSpans(message)) {
+    bounds.forEach(([s, e], i) => {
+      if (s < b && e > a) out.add(i);
+    });
+  }
+  return out;
+}
+
+/** Whether a message carries data we never want: an account or card number, or a health word. */
+export function unwanted(message: string): boolean {
+  return unwantedLines(message).size > 0;
 }
 
 /** The question for a field: its label, and for a choice the options. */
@@ -313,9 +363,9 @@ export async function converse(
   const notes: string[] = [];
 
   // Line by line: a card number in one line does not cost the person the other three.
-  const lines = message.split("\n");
-  const clean = lines.filter((l) => !unwanted(l)).join("\n").trim();
-  const discarded = lines.some((l) => unwanted(l));
+  const drop = unwantedLines(message);
+  const clean = message.split("\n").filter((_, i) => !drop.has(i)).join("\n").trim();
+  const discarded = drop.size > 0;
   let dayLimit = false;
   if (clean) {
     turns.push({ who: "they", text: clean });

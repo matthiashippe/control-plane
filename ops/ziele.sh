@@ -269,8 +269,15 @@ except Exception:
     print(0); raise SystemExit
 print(1 if d.get("fertig") is True and d.get("frage") is None and isinstance(d.get("auftrag"), dict) else 0)
 ' 2>/dev/null)
+# Der Weg eines Menschen: die Bestellseite muss ins Gespraech fuehren. Ohne diesen Einstieg bliebe
+# `chat` gruen, auch wenn niemand mehr ueber das Formular hinkommt (HAN-82, Befund aus HAN-79).
+chat_einstieg=0
+if [[ -n "$angebot" ]]; then
+  chat_einstieg=$(curl -s -m 20 "$BASE/katalog/bestellen?angebot=$angebot" 2>/dev/null \
+    | python3 ./ops/gespraech_einstieg.py 2>/dev/null)
+fi
 chat=0
-if [[ "$chat_frage" == 1 && "$chat_auftrag" == 1 ]]; then chat=1; fi
+if [[ "$chat_frage" == 1 && "$chat_auftrag" == 1 && "$chat_einstieg" == 1 ]]; then chat=1; fi
 chat=${chat:-0}
 
 karte=0

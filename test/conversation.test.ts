@@ -6,6 +6,7 @@
  * is not. Unwanted data is thrown away, and ordinary words that look like it are not.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { execFileSync } from "node:child_process";
 import { openDb } from "../src/db.js";
 import { createApp } from "../src/app.js";
 import {
@@ -354,6 +355,50 @@ describe("data we do not need is thrown away, and said so", () => {
     expect(unwanted("Nach ihrer schweren Krankheit hat sie wieder angefangen zu unterrichten")).toBe(true);
   });
 
+  describe("numbers over lines and with dots or slashes (HAN-82, found in HAN-79)", () => {
+    const badNow = [
+      "4111 1111\n1111 1111",
+      "4111.1111.1111.1111",
+      "4111/1111/1111/1111",
+      "Karte:\n4111 1111 1111\n1111",
+      "4111 1111 1111 1111\n12.10.2026",
+      "DE89.3704.0044.0532.0130.00",
+      "DE89 3704 0044\n0532 0130 00",
+    ];
+    const fineNow = [
+      "70. Geburtstag am 12.10.2026, 18.30 Uhr",
+      "Am 12.10.2026\num 18 Uhr",
+      "Termin 2026/10/12, Raum 3.14",
+      "Rufen Sie mich an: 0171 1234567\noder 040 1234567",
+      "Postleitzahl 22765\nHausnummer 12",
+      "DE-22765 Hamburg",
+    ];
+    it.each(badNow)("thrown away: %j", (m) => expect(unwanted(m)).toBe(true));
+    it.each(fineNow)("kept: %j", (m) => expect(unwanted(m)).toBe(false));
+
+    it("a card over two lines costs both lines and only those, and reaches neither model nor database", async () => {
+      const { model, calls } = scripted([{ ...nothing(), anlass: "70. Geburtstag" }]);
+      const r = await converse(db, model, { offer: REDE, message: "Eine Rede zum 70. Geburtstag.\nKarte 4111 1111\n1111 1111\nDanke" });
+      expect(r.discarded).toBe(true);
+      expect(calls[0].user).toContain("70. Geburtstag");
+      expect(calls[0].user).toContain("Danke");
+      expect(calls[0].user).not.toContain("4111");
+      expect(calls[0].user).not.toContain("1111");
+      const row = db.prepare("SELECT fields, turns FROM conversations WHERE id = ?").get(r.id) as { fields: string; turns: string };
+      expect(row.fields + row.turns).not.toContain("1111");
+    });
+
+    it.each(["4111.1111.1111.1111", "DE89.3704.0044.0532.0130.00", "4111 1111\n1111 1111"])(
+      "%j appears nowhere in conversations",
+      async (m) => {
+        const r = await converse(db, null, { offer: REDE, message: m });
+        expect(r.note).toBe(LINES.discarded);
+        const row = db.prepare("SELECT fields, turns FROM conversations WHERE id = ?").get(r.id) as { fields: string; turns: string };
+        expect(row.fields + row.turns).not.toMatch(/1111|3704/);
+      },
+    );
+  });
+
   it("a first message thrown away still gets the first question", async () => {
     const r = await converse(db, null, { offer: REDE, message: "Sie hatte einen Schlaganfall" });
     expect(r.note).toBe(LINES.discarded);
@@ -450,5 +495,15 @@ describe("POST /katalog/gespraech", () => {
     expect(html).toContain('action="/katalog/gespraech"');
     expect(html).toContain('action="/katalog/kaufen"');
     for (const f of ["anlass", "person", "laenge", "inhalt", "email"]) expect(html).toContain(`name="${f}"`);
+  });
+
+  it("ops/ziele.sh finds the way in on the order page, and not once it is taken out (HAN-82)", async () => {
+    const judge = (page: string) => execFileSync("python3", ["ops/gespraech_einstieg.py"], { input: page }).toString().trim();
+    const html = await (await app(null).request("/katalog/bestellen?angebot=rede-zum-fest")).text();
+    expect(judge(html)).toBe("1");
+    const without = html.replace(/<form\b[^>]*action="\/katalog\/gespraech"[\s\S]*?<\/form>/g, "");
+    expect(without).toContain('action="/katalog/kaufen"');
+    expect(judge(without)).toBe("0");
+    expect(judge(html.replace('name="nachricht"', 'name="notiz"'))).toBe("0");
   });
 });
