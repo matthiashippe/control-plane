@@ -63,12 +63,11 @@ describe("the first screen of / for a person", () => {
     // Every promise in the line under it is a promise every offer makes on /katalog.
     for (const o of OFFERS) {
       expect(o.delivers).toContain("drei fertige Fassungen");
-      // "bis zu dreimal" ist am 30.09.2026 von beiden Seiten verschwunden, weil es das
-      // Nachbessern nicht gibt (HAN-95). Was bleibt, muss auf beiden Seiten gleich stehen.
-      expect(o.delivers).toContain("Sie wählen die Fassung, die passt");
+      // Zurueck seit HAN-95, weil es das Nachbessern jetzt gibt (/katalog/nachbessern).
+      expect(o.delivers).toContain("bis zu dreimal sagen, was anders werden soll");
     }
     expect(HUMAN_SUB).toContain("drei fertige Fassungen");
-    expect(HUMAN_SUB).toContain("wählen die, die passt");
+    expect(HUMAN_SUB).toContain("bis zu dreimal sagen, was anders werden soll");
     expect(DELIVERY_SENTENCE).toContain("mit KI geschrieben");
     expect(renderHumanFirst()).toContain(REWORK_LINE);
   });

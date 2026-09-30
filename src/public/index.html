@@ -857,6 +857,10 @@ main .shop .wrap > p.fine:last-child { margin-top: var(--s-8); }
               font-weight: 500; }
 .version .text { display: grid; gap: var(--s-3); color: var(--fg); }
 .card.version p { color: var(--fg); font-size: var(--t-body); margin: 0; }
+/* A round of changes (HAN-95): the field under each text, and the earlier texts folded away. */
+.version .rework { gap: var(--s-3); margin-top: var(--s-6); }
+.version .rework textarea { min-height: 5rem; }
+.version h3 { font-size: var(--t-ui); color: var(--dim); font-weight: 500; margin: var(--s-4) 0 var(--s-2); }
 
 /* German text pages (Datenschutz, Impressum): the sections are smaller than the page title. */
 .doc h2 { font-size: 1.25rem; letter-spacing: -.015em; line-height: 1.25; margin: var(--s-8) 0 var(--s-2); }

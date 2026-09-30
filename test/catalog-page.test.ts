@@ -12,6 +12,7 @@ import { execFileSync } from "node:child_process";
 import { createApp } from "../src/app.js";
 import { openDb } from "../src/db.js";
 import { DELIVERY_SENTENCE, OFFERS, euro, renderCatalog } from "../src/public/catalog.js";
+import { MAX_REWORK_ROUNDS } from "../src/checkout/deliver.js";
 
 const app = () => createApp({ db: openDb(":memory:") });
 const get = async (path: string, headers: Record<string, string> = {}) => app().request(path, { headers });
@@ -35,31 +36,37 @@ describe("/katalog", () => {
   });
 
   /**
-   * Die Seite verspricht nur, was es gibt.
+   * Die Zusage steht auf jeder Karte, und es gibt die Sache, die sie verspricht.
    *
-   * Dieser Test hiess bis zum 30.09.2026 "sagt auf jeder Karte, dass Nachbessern nichts kostet"
-   * und hielt damit eine Unwahrheit fest: es gibt keine Route zum Nachbessern, keinen
-   * Rundenzaehler auf `deliveries`, und der einzige UPDATE auf `body` setzt ihn auf NULL. Der
-   * Katalog-Schwarm hat es gefunden, die Leitung nachgeprueft. Ein Test, der ein Versprechen
-   * absichert, ohne dass jemand geprueft hat, ob es gehalten wird, ist schlimmer als kein Test:
-   * er macht die Unwahrheit pruefbar und damit dauerhaft.
-   *
-   * Solange das Nachbessern nicht gebaut ist (HAN-95), steht keines dieser Woerter auf der Seite.
-   * Danach kehrt der Test sich um, und zwar erst, wenn die Route antwortet.
+   * Vom 30.09.2026 frueh bis HAN-95 pruefte dieser Test das Gegenteil: die Seite verkaufte
+   * Nachbessern, das es nicht gab, keine Route, kein Rundenzaehler. Die Leitung hat die Saetze
+   * herausgenommen (cadbb45), HAN-95 hat die Sache gebaut, und erst seitdem stehen sie wieder da.
+   * Deshalb prueft der Test beides zugleich: jede Karte traegt den Satz, die Zahl im Satz ist die
+   * Obergrenze im Code, und die Route antwortet. Faellt eines davon, faellt der Test, und die
+   * Zusage darf nicht allein zurueckbleiben.
    */
-  it("verspricht kein Nachbessern, solange es das nicht gibt", async () => {
+  it("sagt auf jeder Karte, dass Nachbessern nichts kostet, und die Route dafuer antwortet", async () => {
     const body = text(renderCatalog(OFFERS, { testMode: true }));
-    for (const wort of ["ohne Aufpreis", "Nachbessern", "dreimal", "was anders werden soll"]) {
-      expect(body, `"${wort}" steht auf der Seite, obwohl es die Route nicht gibt`).not.toContain(wort);
-    }
-    // Was stattdessen dort steht, und es ist wahr: drei Fassungen, aus denen man waehlt.
-    // Die Zusagenzeile ueber dem Raster sagt dasselbe einmal, deshalb OFFERS.length + 1.
-    expect((body.match(/Drei fertige Fassungen/g) ?? []).length).toBe(OFFERS.length + 1);
+    const karten = (body.match(/Dreimal sagen, was anders werden soll, ohne Aufpreis/g) ?? []).length;
+    expect(karten, "jede Karte traegt die Zusage").toBe(OFFERS.length);
+    expect(MAX_REWORK_ROUNDS, "\"Dreimal\" auf der Seite ist die Obergrenze im Code").toBe(3);
+    // Die Bedingung des Testbetriebs genau einmal, nicht unter jeder Karte.
     expect((body.match(/Es wird kein Geld abgebucht/g) ?? []).length).toBe(1);
+    // Die Route gibt es: ein unbekannter Token bekommt ihre eigene Absage, nicht das 404 des Routers.
+    const res = await app().request("/katalog/nachbessern", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ t: "x".repeat(43), fassung: 1, wunsch: "kuerzer" }),
+    });
+    expect(res.status).toBe(404);
+    expect(((await res.json()) as { error: string }).error).toBe("no_order");
   });
 
-  it("nennt keine Zeit", async () => {
+  it("promises three rounds of changes, not four, and names no time", async () => {
+    // MAX_ROUNDS = 4 in src/bounties/store.ts counts the first version as a round.
     const body = text(renderCatalog());
+    expect(body).toMatch(/[Dd]reimal/);
+    expect(body).not.toMatch(/viermal/);
     expect(body).not.toMatch(/Sekunde|Minute|Stunde|sofort|Tag(e|en)?\b/);
   });
 

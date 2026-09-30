@@ -6,7 +6,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import type { Db } from "./db.js";
 import {
   claimStarter,
@@ -40,7 +40,16 @@ import {
   settleCheckout,
   type CheckoutProvider,
 } from "./checkout/index.js";
-import { deliveryView, TEST_DELIVERIES_PER_DAY, type VersionWriter } from "./checkout/deliver.js";
+import {
+  deliveryView,
+  FEEDBACK_MAX,
+  MAX_REWORK_ROUNDS,
+  ReworkError,
+  reworkVersion,
+  TEST_DELIVERIES_PER_DAY,
+  type Version,
+  type VersionWriter,
+} from "./checkout/deliver.js";
 import { converse, ConversationError, findOffer, MAX_QUESTIONS } from "./checkout/conversation.js";
 import { stripeFromEnv } from "./payments/stripe.js";
 import { isStripeTestKey } from "./payments/stripe-key.js";
@@ -136,6 +145,11 @@ export interface AppOptions {
    * runs and takes each answer as the answer to the question it asked, without a model.
    */
   conversation?: VersionWriter | null;
+  /**
+   * Who writes a text again in /katalog/nachbessern (HAN-95): the writer of the paid texts. Left
+   * out or null, a round is refused with 503 and not counted.
+   */
+  rework?: VersionWriter | null;
   /**
    * The moment inference stops being sold (HAN-62). Until then the whole catalogue is sold and
    * every inference answer says when it ends; from then on only what `Catalog.forSale()` keeps.
@@ -558,7 +572,8 @@ export function createApp(opts: AppOptions) {
   // could spend our Stripe rate limit and block `begin` for real buyers. The order page (Goal 21)
   // asks Stripe nothing, but it is the one step before the POST and belongs to the same path.
   // The conversation (HAN-77) spends a model call per answer on a stranger's word, the same reason.
-  const OPEN_PAGES = ["/katalog/bestellen", "/katalog/kaufen", "/katalog/danke", "/katalog/gespraech"];
+  // A round of changes (HAN-95) spends one as well, on the word of whoever holds the token.
+  const OPEN_PAGES = ["/katalog/bestellen", "/katalog/kaufen", "/katalog/danke", "/katalog/gespraech", "/katalog/nachbessern"];
   if (limiter) {
     const windowSec = Math.round(rateLimitOpts.windowMs / 1000);
     app.use("*", async (c, next) => {
@@ -577,7 +592,7 @@ export function createApp(opts: AppOptions) {
             retry_after_seconds: retryAfterSec,
             message:
               `More than ${rateLimitOpts.limit} requests in ${windowSec} seconds from your address to the ` +
-              "endpoints that work without an API key (/v1/auth/*, /pay/*, /katalog/bestellen, /katalog/kaufen, /katalog/danke, /katalog/gespraech). Those write to the database " +
+              "endpoints that work without an API key (/v1/auth/*, /pay/*, /katalog/bestellen, /katalog/kaufen, /katalog/danke, /katalog/gespraech, /katalog/nachbessern). Those write to the database " +
               "and /pay also calls a payment facilitator that costs money per call, so they are capped " +
               `to keep the service up for everyone. Wait ${retryAfterSec} seconds and retry; calls to ` +
               "/v1/* with an API key are not capped.",
@@ -1232,19 +1247,23 @@ export function createApp(opts: AppOptions) {
    * that is not exactly a token's shape is answered without asking the database. While the texts
    * are being written the page says so and reloads itself. `no-store` and `no-referrer`, so the
    * token stays out of caches and out of the next site's log.
+   *
+   * One function for GET /katalog/fassungen and for a round of changes that did not go through
+   * (HAN-95). `notice` is one line above the texts: what just happened, or why not.
    */
-  app.get("/katalog/fassungen", (c) => {
+  const versionsPage = (
+    c: Context,
+    token: string,
+    notice: { text: string; alert: boolean } | null,
+    pageStatus: 200 | 400 | 404 | 409 | 502 | 503,
+  ) => {
     if (!indexHtml) return c.json({ error: "no index page built" }, 503);
-    // Without a token nobody is coming to read an order: back to the catalogue, like /katalog/danke
-    // without a session id. It also keeps this address out of the sitemap's set of pages.
-    const token = c.req.query("t");
-    if (!token) return c.redirect("/katalog", 303);
     c.header("Referrer-Policy", "no-referrer");
     c.header("Cache-Control", "no-store");
     const view = DELIVERY_TOKEN_PATTERN.test(token) ? deliveryView(opts.db, token) : ({ state: "none" } as const);
     const esc = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
     // `wide` for the three texts: they stand next to each other once there is room (HAN-93).
-    const render = (heading: string, inner: string, status: 200 | 404, refreshSeconds = 0, wide = false) => {
+    const render = (heading: string, inner: string, status: typeof pageStatus, refreshSeconds = 0, wide = false) => {
       const html = page(
         `
   <section class="shop">
@@ -1296,27 +1315,118 @@ export function createApp(opts: AppOptions) {
           `<p>Das tut uns leid. Schreiben Sie uns an <a href="mailto:matthias@hanseatictech.de">matthias@hanseatictech.de</a>, dann kümmern wir uns darum.</p>`,
           200,
         );
-      case "ready":
+      case "ready": {
+        const left = MAX_REWORK_ROUNDS - view.rounds;
+        const paras = (t: string) =>
+          t
+            .split(/\n\s*\n/)
+            .map((para) => `<p>${esc(para.trim()).replace(/\n/g, "<br>")}</p>`)
+            .join("\n        ");
+        // Every text a version had, first to last. The last is shown, the others stay one click away.
+        const card = (v: Version, i: number) => {
+          const states = [{ text: v.text, feedback: null as string | null }, ...(v.revisions ?? []).map((r) => ({ text: r.text, feedback: r.feedback }))];
+          const now = states[states.length - 1];
+          const earlier = states
+            .slice(0, -1)
+            .reverse()
+            .map(
+              (st, k) =>
+                `<h3>${k === states.length - 2 ? "Zuerst geschrieben" : "Nach Ihrem Wunsch: „" + esc(st.feedback ?? "") + "“"}</h3>\n        <div class="text">${paras(st.text)}</div>`,
+            )
+            .join("\n        ");
+          const form = left
+            ? `<form class="rework" method="post" action="/katalog/nachbessern">
+          <input type="hidden" name="t" value="${esc(token)}">
+          <input type="hidden" name="fassung" value="${i + 1}">
+          <label for="wunsch-${i + 1}">Was soll an Fassung ${i + 1} anders werden?
+            <textarea id="wunsch-${i + 1}" name="wunsch" rows="3" required maxlength="${FEEDBACK_MAX}"></textarea>
+          </label>
+          <p><button type="submit" class="btn btn-2">Fassung ${i + 1} neu schreiben</button></p>
+        </form>`
+            : "";
+          return `<article class="card version">
+        <h2>Fassung ${i + 1}</h2>${now.feedback ? `\n        <p class="fine">Neu geschrieben nach Ihrem Wunsch: „${esc(now.feedback)}“</p>` : ""}
+        <div class="text">${paras(now.text)}</div>${earlier ? `\n        <details class="self"><summary>Frühere Fassung ansehen (${states.length - 1})</summary>\n        ${earlier}\n        </details>` : ""}
+        ${form}
+      </article>`;
+        };
+        const banner = left
+          ? `<b>Soll etwas anders werden?</b> Schreiben Sie unter die Fassung, was sich ändern soll, in Ihren Worten. Wir schreiben sie dann ganz neu. Das geht noch ${left === 1 ? "einmal" : left === 2 ? "zweimal" : "dreimal"}, ohne Aufpreis, und die frühere Fassung bleibt erhalten.`
+          : `<b>Sie haben alle ${MAX_REWORK_ROUNDS} Runden genutzt.</b> Die früheren Fassungen stehen unter jeder Fassung.`;
         return render(
           "Ihre drei Fassungen",
-          `<p class="sub">Für „${view.offer.name}“, mit KI geschrieben. Lesen Sie alle drei und nehmen Sie die, die am besten passt.</p>
+          `<p class="sub">Für „${view.offer.name}“, mit KI geschrieben. Lesen Sie alle drei und nehmen Sie die, die am besten passt.</p>${
+            notice ? `\n      <p class="banner"${notice.alert ? ' role="alert"' : ""}><b>${esc(notice.text)}</b></p>` : ""
+          }
       <div class="grid-cards three">
-      ${view.versions
-        .map(
-          (v, i) =>
-            `<article class="card version">\n        <h2>Fassung ${i + 1}</h2>\n        <div class="text">${v.text
-              .split(/\n\s*\n/)
-              .map((para) => `<p>${esc(para.trim()).replace(/\n/g, "<br>")}</p>`)
-              .join("\n        ")}</div>\n      </article>`,
-        )
-        .join("\n      ")}
+      ${view.versions.map(card).join("\n      ")}
       </div>
-      <p class="banner"><span><b>Soll etwas anders werden?</b> Schreiben Sie uns an <a href="mailto:matthias@hanseatictech.de">matthias@hanseatictech.de</a>, welche Fassung Sie nehmen und was sich ändern soll. Bis zu dreimal, ohne Aufpreis.</span></p>
+      <p class="banner"><span>${banner}</span></p>
       <p class="fine">Heben Sie diesen Link auf, er ist nur für Sie.</p>`,
-          200,
+          pageStatus,
           0,
           true,
         );
+      }
+    }
+  };
+
+  app.get("/katalog/fassungen", (c) => {
+    if (!indexHtml) return c.json({ error: "no index page built" }, 503);
+    // Without a token nobody is coming to read an order: back to the catalogue, like /katalog/danke
+    // without a session id. It also keeps this address out of the sitemap's set of pages.
+    const token = c.req.query("t");
+    if (!token) return c.redirect("/katalog", 303);
+    const runde = Number(c.req.query("runde"));
+    const fassung = Number(c.req.query("fassung"));
+    const done =
+      Number.isInteger(runde) && runde >= 1 && runde <= MAX_REWORK_ROUNDS && Number.isInteger(fassung) && fassung >= 1 && fassung <= 3
+        ? `Fassung ${fassung} ist neu geschrieben. Das war Runde ${runde} von ${MAX_REWORK_ROUNDS}.`
+        : null;
+    return versionsPage(c, token, done ? { text: done, alert: false } : null, 200);
+  });
+
+  /** What the buyer reads when a round of changes did not go through, by `ReworkError.code`. */
+  const REWORK_REFUSED: Record<ReworkError["code"], string> = {
+    no_order: "Zu diesem Link finden wir keine Bestellung.",
+    empty_feedback: "Bitte schreiben Sie in das Feld, was anders werden soll.",
+    feedback_too_long: `Bitte fassen Sie sich kürzer, höchstens ${FEEDBACK_MAX} Zeichen.`,
+    bad_version: "Diese Fassung gibt es nicht.",
+    no_rounds_left: `Sie haben alle ${MAX_REWORK_ROUNDS} Runden genutzt. Mehr Runden gibt es je Bestellung nicht, weil jede für Sie ohne Aufpreis ist.`,
+    busy: "Wir schreiben gerade schon eine Fassung neu. Laden Sie die Seite gleich neu.",
+    no_writer: "Das Neuschreiben ist gerade nicht erreichbar. Die Runde zählt nicht, bitte versuchen Sie es später noch einmal.",
+    unchanged: "Die neue Fassung kam gleich zurück wie die alte. Die Runde zählt nicht, bitte versuchen Sie es noch einmal, gern mit anderen Worten.",
+    writer_failed: "Das Neuschreiben hat nicht geklappt. Die Runde zählt nicht, bitte versuchen Sie es noch einmal.",
+  };
+
+  /**
+   * One round of changes on one of the three texts (HAN-95). Takes `{t, fassung, wunsch}` as a form
+   * or as JSON: the token, which of the three (1 to 3) and in the buyer's own words what should
+   * change. Writes the whole text again on the model that wrote it; the earlier text stays. At most
+   * MAX_REWORK_ROUNDS per order, and the price does not change. A form answers with the page, JSON with
+   * the new text, so an agent acting for the buyer can use it as well.
+   *
+   * Outside /v1, because the token is the only key and it is in the body, not the path. Behind the
+   * per-address cap (OPEN_PAGES), because it spends a model call.
+   */
+  app.post("/katalog/nachbessern", async (c) => {
+    const json = (c.req.header("content-type") ?? "").includes("application/json");
+    const body = (json ? await c.req.json().catch(() => ({})) : await c.req.parseBody().catch(() => ({}))) as Record<string, unknown>;
+    const str = (k: string) => (typeof body[k] === "string" ? (body[k] as string) : typeof body[k] === "number" ? String(body[k]) : "");
+    const token = str("t");
+    c.header("Referrer-Policy", "no-referrer");
+    c.header("Cache-Control", "no-store");
+    try {
+      if (!DELIVERY_TOKEN_PATTERN.test(token)) throw new ReworkError("no_order", 404);
+      const slot = /^[1-3]$/.test(str("fassung").trim()) ? Number(str("fassung").trim()) - 1 : -1;
+      const r = await reworkVersion(opts.db, opts.rework ?? null, { token, slot, feedback: str("wunsch") });
+      if (json) return c.json({ fassung: r.slot + 1, runde: r.round, runden_hoechstens: MAX_REWORK_ROUNDS, text: r.text });
+      return c.redirect(`/katalog/fassungen?t=${token}&fassung=${r.slot + 1}&runde=${r.round}`, 303);
+    } catch (e) {
+      if (!(e instanceof ReworkError)) throw e;
+      if (json) return c.json({ error: e.code, message: REWORK_REFUSED[e.code] }, e.status);
+      if (e.code === "no_order" || !indexHtml) return versionsPage(c, token, null, 404);
+      return versionsPage(c, token, { text: REWORK_REFUSED[e.code], alert: true }, e.status);
     }
   });
 

@@ -323,6 +323,13 @@ function migrate(db: Db): void {
     );
   `);
 
+  // Rounds of changes (HAN-95): `rounds` counts the stored ones, at most MAX_ROUNDS per order;
+  // `rework_at` reserves the one being written, so two clicks cannot both pass the limit. The
+  // texts of every round live in `body` next to the first ones and go with it.
+  const deliveryCols = db.prepare("PRAGMA table_info(deliveries)").all() as { name: string }[];
+  if (!deliveryCols.some((c) => c.name === "rounds")) db.exec("ALTER TABLE deliveries ADD COLUMN rounds INTEGER NOT NULL DEFAULT 0");
+  if (!deliveryCols.some((c) => c.name === "rework_at")) db.exec("ALTER TABLE deliveries ADD COLUMN rework_at TEXT");
+
   // The conversation that asks back (HAN-77). `fields` is what was understood so far, `turns` the
   // transcript; both are a person's words and are deleted after a day (`cleanupConversations` in
   // src/checkout/conversation.ts). `conversation_days` counts model calls and their cost per UTC
