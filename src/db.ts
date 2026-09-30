@@ -323,7 +323,7 @@ function migrate(db: Db): void {
     );
   `);
 
-  // Rounds of changes (HAN-95): `rounds` counts the stored ones, at most MAX_ROUNDS per order;
+  // Rounds of changes (HAN-95): `rounds` counts the stored ones, at most MAX_REWORK_ROUNDS per order;
   // `rework_at` reserves the one being written, so two clicks cannot both pass the limit. The
   // texts of every round live in `body` next to the first ones and go with it.
   const deliveryCols = db.prepare("PRAGMA table_info(deliveries)").all() as { name: string }[];

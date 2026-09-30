@@ -566,12 +566,14 @@ export async function reworkVersion(
   if (row.rounds >= MAX_REWORK_ROUNDS) throw new ReworkError("no_rounds_left", 409);
   if (!writer) throw new ReworkError("no_writer", 503);
 
+  // The reservation is this request's own timestamp, so storing and releasing touch only its own.
+  const mine = now().toISOString();
   const reserved = db
     .prepare(
       `UPDATE deliveries SET rework_at = ?
         WHERE reference = ? AND rounds < ? AND body IS NOT NULL AND (rework_at IS NULL OR rework_at < ?)`,
     )
-    .run(now().toISOString(), row.reference, MAX_REWORK_ROUNDS, new Date(now().getTime() - REWORK_TTL_MS).toISOString()).changes;
+    .run(mine, row.reference, MAX_REWORK_ROUNDS, new Date(now().getTime() - REWORK_TTL_MS).toISOString()).changes;
   if (reserved !== 1) {
     const r = db.prepare("SELECT rounds FROM deliveries WHERE reference = ?").get(row.reference) as { rounds: number };
     throw r.rounds >= MAX_REWORK_ROUNDS ? new ReworkError("no_rounds_left", 409) : new ReworkError("busy", 409);
@@ -600,9 +602,9 @@ export async function reworkVersion(
       const stored = db
         .prepare(
           `UPDATE deliveries SET body = ?, rounds = rounds + 1, rework_at = NULL, cost_mc = cost_mc + ?
-            WHERE reference = ? AND rounds < ? AND body IS NOT NULL`,
+            WHERE reference = ? AND rounds < ? AND body IS NOT NULL AND rework_at = ?`,
         )
-        .run(JSON.stringify(body), cost, row.reference, MAX_REWORK_ROUNDS).changes;
+        .run(JSON.stringify(body), cost, row.reference, MAX_REWORK_ROUNDS, mine).changes;
       if (stored !== 1) throw new ReworkError("no_rounds_left", 409);
       return { round: row.rounds + 1, slot: req.slot, text };
     }
@@ -611,9 +613,10 @@ export async function reworkVersion(
     code = "writer_failed";
   } finally {
     // Not stored: the round is released and not counted, but what it cost is booked.
-    db.prepare("UPDATE deliveries SET rework_at = NULL, cost_mc = cost_mc + ? WHERE reference = ? AND rework_at IS NOT NULL").run(
+    db.prepare("UPDATE deliveries SET rework_at = NULL, cost_mc = cost_mc + ? WHERE reference = ? AND rework_at = ?").run(
       cost,
       row.reference,
+      mine,
     );
   }
   throw new ReworkError(code, 502);
