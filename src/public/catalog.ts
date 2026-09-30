@@ -26,9 +26,10 @@ export interface Offer {
    */
   readonly fuer: string;
   /**
-   * Was man bekommt, in drei Zeilen. Am 30.09.2026 stand das als ein Absatz von 240 Zeichen unter
-   * jedem Angebot; ein Mensch ueberspringt einen Absatz und liest drei Haken. Jede Zeile ist eine
-   * Zusage, die der Code haelt: die Zahl der Fassungen, die Zahl der Runden, das Format.
+   * Was man bekommt, in Haken statt als Absatz. Am 30.09.2026 stand das als ein Absatz von 240
+   * Zeichen unter jedem Angebot; ein Mensch ueberspringt einen Absatz und liest Haken. Jede Zeile
+   * ist eine Zusage, die der Code haelt. "Drei fertige Fassungen" stand bis HAN-93 als erste Zeile
+   * auf jeder Karte und steht jetzt einmal ueber dem Raster (PROMISES), weil es fuer alle gilt.
    */
   readonly punkte: readonly string[];
   /** Gross, in euro cents. Not millicents and not dollars: this is what a person pays. */
@@ -63,7 +64,6 @@ export const OFFERS: readonly Offer[] = [
     name: "Rede zum Fest",
     fuer: "Für Geburtstag, Hochzeit oder Jubiläum",
     punkte: [
-      "Drei fertige Fassungen, aus denen Sie eine wählen",
       "So lang, wie Sie sie brauchen: kurz oder ausführlich",
       "Dreimal sagen, was anders werden soll, ohne Aufpreis",
     ],
@@ -83,7 +83,6 @@ export const OFFERS: readonly Offer[] = [
     name: "Anschreiben zur Bewerbung",
     fuer: "Für eine bestimmte Stelle, aus der Anzeige geschrieben",
     punkte: [
-      "Drei fertige Fassungen, aus denen Sie eine wählen",
       "Geschrieben aus der Stellenanzeige und Ihrem Werdegang",
       "Dreimal sagen, was anders werden soll, ohne Aufpreis",
     ],
@@ -101,7 +100,6 @@ export const OFFERS: readonly Offer[] = [
     name: "Text über Ihr Angebot",
     fuer: "Für Aushang, Faltblatt oder Internetseite",
     punkte: [
-      "Drei fertige Fassungen, aus denen Sie eine wählen",
       "Für Ihren Unterricht, Ihren Laden oder Ihre Praxis",
       "Dreimal sagen, was anders werden soll, ohne Aufpreis",
     ],
@@ -161,10 +159,10 @@ function buyLink(o: Offer): string {
  * sechsmal dasselbe auf einer Seite. Wiederholung liest sich nicht als Zusage, sondern als
  * Kleingedrucktes, und drei Karten mit identischem Fuss sehen aus wie ein Formularausdruck.
  */
-const PROMISES: readonly string[] = [
-  "Drei Fassungen zur Auswahl",
-  "Nachbessern kostet nichts extra",
+export const PROMISES: readonly string[] = [
+  "Drei fertige Fassungen zur Auswahl",
   "Kein Konto, kein Passwort",
+  "Bezahlen mit Karte",
 ];
 
 /**
@@ -179,7 +177,7 @@ export function renderCatalog(offers: readonly Offer[] = OFFERS, buy?: { testMod
           <div class="card-head">
             <div>
               <h3>${o.name}</h3>
-              <p class="price-note" style="margin-top:.3rem">${o.fuer}</p>
+              <p class="price-note">${o.fuer}</p>
             </div>
             <p class="price">${euro(o.priceCents)}</p>
           </div>
@@ -202,8 +200,7 @@ export function renderCatalog(offers: readonly Offer[] = OFFERS, buy?: { testMod
     <div class="wrap">
       <p class="kicker">Katalog</p>
       <h1 class="ph">Texte, die wir für Sie schreiben</h1>
-      <p class="sub prose">Sie sagen uns, worum es geht, und bekommen drei fertige Fassungen zur Auswahl.
-        Ab ${ab}.</p>
+      <p class="sub prose">Sie sagen uns, worum es geht, und wir schreiben den Text. Ab ${ab}.</p>
       <ul class="promises">${PROMISES.map((t) => `
         <li><span class="dot"></span>${t}</li>`).join("")}
       </ul>${
@@ -235,23 +232,44 @@ const esc = (s: string): string =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 
 /** One field of the order page, with what was typed if the server sent the page back. */
-function renderField(f: OfferField, value: string, style: string): string {
+function renderField(f: OfferField, value: string): string {
   if (f.kind === "choice") {
     const options = f.options
       .map((o) => `<option${o === value ? " selected" : ""}>${esc(o)}</option>`)
       .join("");
     return `<label for="${f.name}">${f.label}
-          <select id="${f.name}" name="${f.name}" required style="${style}"><option value="">Bitte wählen</option>${options}</select>
+          <select id="${f.name}" name="${f.name}" required><option value="">Bitte wählen</option>${options}</select>
         </label>`;
   }
   const limits = `minlength="${f.min}" maxlength="${f.max}" required`;
   return f.kind === "text"
     ? `<label for="${f.name}">${f.label}
-          <textarea id="${f.name}" name="${f.name}" rows="6" ${limits} style="${style}">${esc(value)}</textarea>
+          <textarea id="${f.name}" name="${f.name}" rows="6" ${limits}>${esc(value)}</textarea>
         </label>`
     : `<label for="${f.name}">${f.label}
-          <input id="${f.name}" name="${f.name}" type="text" ${limits} value="${esc(value)}" style="${style}">
+          <input id="${f.name}" name="${f.name}" type="text" ${limits} value="${esc(value)}">
         </label>`;
+}
+
+/** A banner that stands once over everything on the page, while payments are in test mode. */
+const testBanner = (testMode: boolean): string =>
+  testMode ? `\n      <p class="banner"><b>${TEST_MODE_LINE}</b> Sie können alles ausprobieren, ohne dass etwas berechnet wird.</p>` : "";
+
+/**
+ * The top of every step of one order: the name and the price on one line, what it is for, what
+ * holds for every offer, and the test-mode banner. The same on the order page and in the
+ * conversation, so a person sees at each step what they are buying and for how much.
+ */
+function orderHead(o: Offer, testMode: boolean): string {
+  return `<p class="kicker">Bestellen</p>
+      <div class="order-head">
+        <h1 class="ph">${o.name}</h1>
+        <p class="price">${euro(o.priceCents)}</p>
+      </div>
+      <p class="price-note">${o.fuer}</p>
+      <ul class="promises">${PROMISES.map((t) => `
+        <li><span class="dot"></span>${t}</li>`).join("")}
+      </ul>${testBanner(testMode)}`;
 }
 
 /**
@@ -264,6 +282,12 @@ function renderField(f: OfferField, value: string, style: string): string {
  * comes back with `error` and with what was typed, rather than a bare 400 that loses the text.
  * The email pattern repeats EMAIL_PATTERN from src/checkout, because a browser accepts `a@b`
  * without a dot and the server does not.
+ *
+ * One first action (HAN-93). Until 2026-09-30 the conversation and the whole form stood one under
+ * the other, each with its own button, and the first field a person saw was the fifth thing on the
+ * page. Now the conversation is the first field and the form is folded under it. After a finished
+ * conversation, or when the server sent the form back with an error, the form is the next step and
+ * stands open.
  */
 export function renderOrderPage(
   o: Offer,
@@ -277,30 +301,34 @@ export function renderOrderPage(
     note?: string | null;
   },
 ): string {
-  const style = "display:block;width:100%;margin-top:.4rem;font:inherit;padding:.6rem;box-sizing:border-box";
-  const fields = o.fields.map((f) => renderField(f, opts.values?.[f.name] ?? "", style)).join("\n        ");
-  const top = opts.transcript
-    ? `${renderTranscript(opts.transcript)}${opts.note ? `\n      <p role="status"><strong>${esc(opts.note)}</strong></p>` : ""}`
-    : conversationStart(o, style);
-  return `
-  <section>
-    <div class="wrap narrow">
-      <p class="kicker">Bestellen</p>
-      <h1 class="ph">${o.name}</h1>
-      <p class="offer-price">${euro(o.priceCents)}</p>
-      <p>${o.delivers}</p>
-      ${top}${opts.error ? `\n      <p role="alert"><strong>${esc(opts.error)}</strong></p>` : ""}
-      <form method="post" action="/katalog/kaufen" style="margin-top:1.6rem;display:grid;gap:1.2rem">
-        <input type="hidden" name="angebot" value="${o.id}">
+  const fields = o.fields.map((f) => renderField(f, opts.values?.[f.name] ?? "")).join("\n        ");
+  const error = opts.error ? `\n        <p class="banner" role="alert"><b>${esc(opts.error)}</b></p>` : "";
+  const form = `<form method="post" action="/katalog/kaufen">
+        <input type="hidden" name="angebot" value="${o.id}">${error}
         ${fields}
         <label for="email">Ihre E-Mail-Adresse
           <input id="email" name="email" type="email" required autocomplete="email" maxlength="254"
-            pattern="[^@\\s]+@[^@\\s]+\\.[^@\\s]+" value="${esc(opts.email ?? "")}" style="${style}">
+            pattern="[^@\\s]+@[^@\\s]+\\.[^@\\s]+" value="${esc(opts.email ?? "")}">
         </label>
         <p class="fine">${PRIVACY_SENTENCE}</p>
-        ${opts.testMode ? `<p class="fine">${TEST_MODE_LINE}</p>` : ""}
         <p><button type="submit" class="btn btn-1">Weiter zur Bezahlung</button></p>
-      </form>
+      </form>`;
+  const open = Boolean(opts.transcript || opts.error);
+  const body = opts.transcript
+    ? `${renderTranscript(opts.transcript)}${opts.note ? `\n      <p class="banner" role="status"><b>${esc(opts.note)}</b></p>` : ""}
+      <div class="ask">
+      ${form}
+      </div>`
+    : `${conversationStart(o)}
+      <details class="self"${open ? " open" : ""}>
+        <summary>${SELF_FILL}</summary>
+      ${form}
+      </details>`;
+  return `
+  <section class="shop">
+    <div class="wrap narrow">
+      ${orderHead(o, opts.testMode)}
+      ${body}
       <p class="fine"><a href="/katalog">Zurück zum Katalog</a></p>
     </div>
   </section>`;
@@ -325,30 +353,36 @@ export const CONVERSATION_INVITES: Readonly<Record<string, string>> = {
     "Schreiben Sie in Ihren Worten, was Sie anbieten und für wen, etwa Ihren Unterricht oder Ihren Laden. Wenn uns etwas fehlt, fragen wir nach, immer nur eine Frage auf einmal.",
 };
 
-/** Under the invitation, small. True while the form stands below the conversation on the same page. */
-export const CONVERSATION_FINE = "Die Fragen stellt eine KI. Wer lieber selbst ausfüllt, nimmt das Formular darunter.";
+/** Under the invitation, small. The way to the form is the fold below it (SELF_FILL), so it is not said twice. */
+export const CONVERSATION_FINE = "Die Fragen stellt eine KI.";
+
+
+/** The fold that holds the form under the conversation. */
+export const SELF_FILL = "Lieber alles selbst in ein Formular eintragen";
 
 /**
- * The way into the conversation, above the form on the order page (HAN-77). The form stays below
- * it: whoever wants to type, types; whoever wants to talk, talks. A plain POST and no script,
- * because the CSP in deploy/Caddyfile allows exactly one inline script by hash.
+ * The way into the conversation, the first field on the order page (HAN-77, HAN-93). A plain POST
+ * and no script, because the CSP in deploy/Caddyfile allows exactly one inline script by hash.
  */
-function conversationStart(o: Offer, style: string): string {
-  return `<form method="post" action="/katalog/gespraech" style="margin-top:1.6rem;display:grid;gap:.8rem">
+function conversationStart(o: Offer): string {
+  return `<form class="ask" method="post" action="/katalog/gespraech">
         <input type="hidden" name="angebot" value="${o.id}">
         <label for="nachricht">${CONVERSATION_INVITES[o.id] ?? ""}
-          <textarea id="nachricht" name="nachricht" rows="4" required maxlength="8000" style="${style}"></textarea>
+          <textarea id="nachricht" name="nachricht" rows="5" required maxlength="8000"></textarea>
         </label>
+        <p><button type="submit" class="btn btn-1">Losschicken</button></p>
         <p class="fine">${CONVERSATION_FINE}</p>
-        <p><button type="submit" class="btn btn-2">Losschicken</button></p>
       </form>`;
 }
 
 function renderTranscript(turns: readonly ConversationTurn[]): string {
   const lines = turns
-    .map((t) => `<p class="turn"><strong>${t.who === "we" ? "Wir" : "Sie"}:</strong> ${esc(t.text).replace(/\n/g, "<br>")}</p>`)
+    .map(
+      (t) =>
+        `<p class="turn ${t.who}"><span class="by">${t.who === "we" ? "Wir" : "Sie"}</span>${esc(t.text).replace(/\n/g, "<br>")}</p>`,
+    )
     .join("\n        ");
-  return `<div class="conversation" style="margin-top:1.6rem;display:grid;gap:.6rem">
+  return `<div class="conversation">
         ${lines}
       </div>`;
 }
@@ -360,26 +394,24 @@ function renderTranscript(turns: readonly ConversationTurn[]): string {
 export function renderConversation(
   o: Offer,
   c: { id: string; turns: readonly ConversationTurn[]; question: string; note: string | null },
+  testMode = false,
 ): string {
-  const style = "display:block;width:100%;margin-top:.4rem;font:inherit;padding:.6rem;box-sizing:border-box";
   // The question stands above the answer field, so it is not repeated as the last line.
   const shown = c.turns.at(-1)?.text === c.question ? c.turns.slice(0, -1) : c.turns;
   return `
-  <section>
+  <section class="shop">
     <div class="wrap narrow">
-      <p class="kicker">Bestellen</p>
-      <h1 class="ph">${o.name}</h1>
-      <p class="offer-price">${euro(o.priceCents)}</p>
+      ${orderHead(o, testMode)}
       ${renderTranscript(shown)}
-      <form method="post" action="/katalog/gespraech" style="margin-top:1.2rem;display:grid;gap:.8rem">
+      <form class="ask" method="post" action="/katalog/gespraech">
         <input type="hidden" name="angebot" value="${o.id}">
         <input type="hidden" name="gespraech" value="${esc(c.id)}">
         <label for="nachricht">${esc(c.question)}
-          <textarea id="nachricht" name="nachricht" rows="4" required maxlength="8000" autofocus style="${style}"></textarea>
+          <textarea id="nachricht" name="nachricht" rows="4" required maxlength="8000" autofocus></textarea>
         </label>
         <p><button type="submit" class="btn btn-1">Antworten</button></p>
       </form>
-      <p class="fine"><a href="/katalog/bestellen?angebot=${o.id}" rel="nofollow">Lieber das Formular</a></p>
+      <p class="fine"><a href="/katalog/bestellen?angebot=${o.id}" rel="nofollow">${SELF_FILL}</a></p>
     </div>
   </section>`;
 }

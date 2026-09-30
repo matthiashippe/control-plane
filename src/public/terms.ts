@@ -71,7 +71,7 @@ export function renderTerms(
 
       <h3 style="margin:2.4rem 0 .6rem">One person runs this</h3>
       <p>
-        Handsel is operated privately by Matthias Hippe in Hamburg. There is no company behind it
+        Handsel is operated privately by Matthias Hippe in Hamburg (<a href="#impressum">serviceable address</a>). There is no company behind it
         and <strong>no SLA</strong>. If it breaks at three in the morning it stays broken until
         somebody wakes up. Nobody is on call, and nothing here promises a response time.
       </p>
@@ -194,12 +194,10 @@ export function renderTerms(
         If Ollama works for you, use Ollama.
       </p>
 
-      <h3 style="margin:2.4rem 0 .6rem">Impressum, Angaben gemäß § 5 DDG</h3>
-      <p class="sub" style="margin-top:-.4rem">
-        The serviceable address, on this page and reachable at
-        <a href="#impressum">/impressum</a> from anywhere on the site.
-      </p>
-      <p id="impressum">
+      <div class="card doc" id="impressum" lang="de" style="margin-top:2.4rem">
+      <h2 style="margin-top:0">Impressum</h2>
+      <p class="price-note">Angaben gemäß § 5 DDG</p>
+      <p>
         Matthias Hippe<br>
         San-Francisco-Straße 1<br>
         20457 Hamburg<br>
@@ -215,6 +213,7 @@ export function renderTerms(
         Wir sind weder verpflichtet noch bereit, an einem Streitbeilegungsverfahren vor einer
         Verbraucherschlichtungsstelle teilzunehmen.
       </p>
+      </div>
     </div>
   </section>`;
 }

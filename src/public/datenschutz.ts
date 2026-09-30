@@ -21,9 +21,9 @@ export const ACCESS_LOG_DAYS = 30;
 export function renderPrivacy(): string {
   return `
   <section>
-    <div class="wrap narrow">
-      <p class="kicker">Datenschutz</p>
+    <div class="wrap narrow doc">
       <h1 class="ph">Datenschutz</h1>
+      <p class="sub">Was wir speichern, wenn Sie die Seite aufrufen oder bestellen, wie lange, und welche Rechte Sie haben.</p>
 
       <h2>Wer verantwortlich ist</h2>
       <p>Matthias Hippe, San-Francisco-Straße 1, 20457 Hamburg,

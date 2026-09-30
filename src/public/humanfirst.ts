@@ -30,17 +30,37 @@ export const HUMAN_SUB =
 
 export const AGENT_LINE = "Sie betreiben einen Agenten? Hier entlang.";
 
-/** `buy` as in renderCatalog: absent while the card path is off, and then no test-mode line either. */
+/**
+ * `buy` as in renderCatalog: absent while the card path is off, and then no test-mode line either,
+ * and the three choices lead to the catalogue instead of to an order page that would send the
+ * visitor back.
+ *
+ * HAN-93: until 2026-09-30 this was a text block (headline, a paragraph, "Ab 17 €" as a line, one
+ * button) sitting above an English hero whose headline was larger than it. The first screen now
+ * shows what can be bought and what each costs, as the catalogue's cards, so the thing a person
+ * came for is the largest thing on it and the choice is the one action.
+ */
 export function renderHumanFirst(buy?: { testMode: boolean }, offers: readonly Offer[] = OFFERS): string {
   const from = euro(Math.min(...offers.map((o) => o.priceCents)));
+  const choices = offers
+    .map(
+      (o) => `
+      <a class="card pick" href="${buy ? `/katalog/bestellen?angebot=${o.id}" rel="nofollow` : "/katalog"}">
+        <span class="card-head"><span class="pick-name">${o.name}</span><span class="price">${euro(o.priceCents)}</span></span>
+        <span class="price-note">${o.fuer}</span>
+        <span class="go">${buy ? "Bestellen" : "Im Katalog ansehen"}</span>
+      </a>`,
+    )
+    .join("");
   return `
 <section class="human" lang="de">
   <div class="wrap">
     <h2 class="human-h">${HUMAN_HEADLINE}</h2>
-    <p class="sub">${HUMAN_SUB} ${REWORK_LINE}</p>
-    <p class="human-price">Ab ${from}</p>
-    <p class="human-cta"><a class="btn btn-1" href="/katalog">Zum Katalog</a></p>
-    ${buy?.testMode ? `<p class="fine">${TEST_MODE_LINE}</p>` : ""}
+    <p class="sub">${HUMAN_SUB} ${REWORK_LINE} <span class="nowrap">Ab ${from}.</span></p>
+    <div class="grid-cards three">${choices}
+    </div>${buy?.testMode ? `
+    <p class="banner"><b>${TEST_MODE_LINE}</b> Sie können alles ausprobieren.</p>` : ""}
+    <p class="human-cta"><a href="/katalog">Zum Katalog</a>, dort steht, was Sie genau bekommen.</p>
     <p class="human-agents"><a href="#${AGENT_ANCHOR}">${AGENT_LINE}</a></p>
   </div>
 </section>`;

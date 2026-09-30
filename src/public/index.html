@@ -219,7 +219,9 @@ section { padding-block: var(--s-16); }
 .promises .dot { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
 
 /* Ein Hinweis, der gilt, solange der Testbetrieb laeuft. Einmal, ganz oben, nicht unter jeder Karte. */
-.banner { display: flex; gap: .65rem; align-items: flex-start; background: var(--panel-2);
+/* A block, not a flex row: as flex items the bold part and the rest became two columns at 390 px
+   and the sentence read as a table (HAN-93). */
+.banner { display: block; background: var(--panel-2);
           border: 1px solid var(--line); border-radius: var(--r-ctl); padding: .8rem 1rem;
           font-size: var(--t-ui); color: var(--muted); margin-top: var(--s-6); }
 .banner b { color: var(--fg); font-weight: 600; }
@@ -321,14 +323,22 @@ section { padding-block: var(--s-16); }
 /* ---- the first screen for a person (HAN-92) ----------------------------
    The headline wraps as free text: the hero's .h1-line is a one-line mask and cut this one off
    after its first line when HAN-89 measured it. */
-.human { padding-block: var(--s-8) var(--s-6); border-bottom: 1px solid var(--line); }
-.human .wrap { max-width: 46rem; }
-.human-h { font-size: clamp(1.5rem, 1.1rem + 1.8vw, 2.4rem); line-height: 1.2; margin: 0; font-weight: 660; }
-.human .wrap > p.sub { margin-top: var(--s-4); }
-.human-price { margin-top: var(--s-4); font-size: var(--t-lead); font-weight: 600; color: var(--fg); }
-.human-cta { margin-top: var(--s-4); }
-.human .wrap > p.fine { margin-top: var(--s-3); }
-.human-agents { margin-top: var(--s-6); font-size: var(--t-ui); }
+.human { padding-block: var(--s-8) var(--s-12); border-bottom: 1px solid var(--line); }
+.human-h { font-size: clamp(1.625rem, 1.1rem + 2.2vw, 2.75rem); line-height: 1.15; margin: 0;
+           font-weight: 660; max-width: 24ch; }
+.human .wrap > p.sub { margin-top: var(--s-4); max-width: 40rem; }
+.human .grid-cards { margin-top: var(--s-6); }
+/* A choice is the whole card, one tap target, not a card with a button in it. */
+.pick { display: flex; flex-direction: column; gap: var(--s-1); text-decoration: none; color: var(--fg); }
+.pick:hover { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
+.pick .card-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-4); }
+.pick-name { font-size: 1.25rem; font-weight: 600; letter-spacing: -.02em; line-height: 1.2; }
+.pick .go { margin-top: var(--s-2); color: var(--accent); font-weight: 600; font-size: var(--t-ui); }
+.pick .go::after { content: " \2192"; }
+.nowrap { white-space: nowrap; }
+.human-cta { margin-top: var(--s-6); color: var(--muted); }
+.human-cta a { color: var(--fg); font-weight: 500; text-decoration-color: var(--accent); }
+.human-agents { margin-top: var(--s-4); font-size: var(--t-ui); }
 .human-agents a { color: var(--muted); }
 
 /* ---- hero ------------------------------------------------------------ */
@@ -761,6 +771,73 @@ h1.ph { font-size: clamp(1.5rem, 3.2vw, 2.1rem); line-height: 1.15; letter-spaci
   .stats div { padding: 1.1rem .9rem; }
   .stats .l { font-size: .8rem; }
 }
+
+/* ---- the shop, on every page a buyer sees (HAN-93) ----------------------
+   At the end of the sheet on purpose. The sub-page block above sets `.card { padding: 1.25rem }`
+   and `.card p { font-size: .93rem; color: var(--muted) }`, and `.card p` beats `.price` on
+   specificity, so on 2026-09-30 the catalogue price rendered 15 px high in the muted grey: the
+   one thing the redesign was for. Measured in a 390 px viewport, not seen in the diff. */
+.grid-cards > .card { padding: var(--s-6); }
+@media (min-width: 46rem) { .grid-cards > .card { padding: var(--s-8); } }
+.grid-cards > .card.pick { padding: var(--s-4) var(--s-6); }
+@media (min-width: 46rem) { .grid-cards > .card.pick { padding: var(--s-6); } }
+.card .price, .price { font: 600 1.75rem/1 var(--font); color: var(--fg); margin: 0; }
+.card .price-note { margin: .3rem 0 0; font-size: var(--t-ui); color: var(--dim); }
+/* One button per card, full width, and a long offer name wraps inside the button instead of
+   overflowing a fixed 44 px height ("Anschreiben zur Bewerbung bestellen" at 1440). */
+.card .btn, .shop .btn-1 { height: auto; min-height: 48px; padding-block: .7rem; line-height: 1.25;
+                           text-align: center; justify-content: center; }
+.card .btn { width: 100%; }
+
+/* The head of an order: name and price on one line, like a card head. */
+.order-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-4); }
+.order-head h1.ph { margin: 0; }
+.shop .price-note { margin-top: var(--s-2); font-size: var(--t-ui); color: var(--dim); }
+
+/* Form fields in the palette instead of the browser's grey boxes. 17 px, so a phone does not zoom. */
+.shop label { display: grid; gap: var(--s-2); font-weight: 500; }
+.shop input[type=text], .shop input[type=email], .shop textarea, .shop select {
+  display: block; width: 100%; margin: 0; font: 400 1.0625rem/1.45 var(--font); color: var(--fg);
+  background: var(--panel); border: 1px solid var(--line-2); border-radius: var(--r-ctl);
+  padding: .75rem .85rem; }
+.shop textarea { resize: vertical; min-height: 8rem; }
+.shop input:focus, .shop textarea:focus, .shop select:focus { outline: none; border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent); }
+.shop form { display: grid; gap: var(--s-6); }
+.shop form .fine { margin: 0; }
+main .shop .wrap > p.fine:last-child { margin-top: var(--s-8); }
+
+/* The first field is the biggest thing on the order page: its question in the lead size. */
+.ask { margin-top: var(--s-8); }
+.ask > label { font-size: var(--t-lead); line-height: 1.45; font-weight: 500; }
+
+/* The other way, folded, so the page has one first action and not two. */
+.self { margin-top: var(--s-8); border-top: 1px solid var(--line); padding-top: var(--s-6); }
+.self > summary { cursor: pointer; color: var(--muted); font-size: var(--t-ui); min-height: 44px;
+                  display: inline-flex; align-items: center; text-decoration: underline;
+                  text-decoration-color: var(--line-2); text-underline-offset: .22em; }
+.self[open] > summary { margin-bottom: var(--s-6); }
+
+/* A conversation reads as one: what the person said on the right, what we asked on the left. */
+.conversation { display: grid; gap: var(--s-3); margin-top: var(--s-8); }
+.turn { max-width: 88%; padding: .7rem .95rem; border-radius: var(--r-pan); line-height: 1.5;
+        background: var(--panel); border: 1px solid var(--line); }
+.turn.they { justify-self: end; background: color-mix(in srgb, var(--accent) 14%, var(--panel));
+             border-color: color-mix(in srgb, var(--accent) 30%, var(--line)); }
+.turn .by { display: block; font: 500 var(--t-label)/1.2 var(--font); letter-spacing: .06em;
+             text-transform: uppercase; color: var(--dim); margin-bottom: .25rem; }
+
+/* The three texts: one card each, next to each other once there is room, so the difference is
+   the thing you see. */
+.version h2 { font-size: var(--t-label); letter-spacing: .1em; text-transform: uppercase; color: var(--dim);
+              font-weight: 500; }
+.version .text { display: grid; gap: var(--s-3); color: var(--fg); }
+.card.version p { color: var(--fg); font-size: var(--t-body); margin: 0; }
+
+/* German text pages (Datenschutz, Impressum): the sections are smaller than the page title. */
+.doc h2 { font-size: 1.25rem; letter-spacing: -.015em; line-height: 1.25; margin: var(--s-8) 0 var(--s-2); }
+.doc > p { color: var(--muted); }
+.doc > p.sub { margin-top: var(--s-2); }
 </style>
 </head>
 <body>
@@ -782,7 +859,7 @@ h1.ph { font-size: clamp(1.5rem, 3.2vw, 2.1rem); line-height: 1.15; letter-spaci
       <a href="/fix">Agent stuck?</a>
       <a href="https://github.com/matthiashippe/control-plane" class="hide-s">Source</a>
     </nav>
-    <a class="btn btn-1 btn-sm" href="/post">Post a job</a>
+    <a class="btn btn-2 btn-sm" href="/post">Post a job</a>
   </div>
 </header>
 

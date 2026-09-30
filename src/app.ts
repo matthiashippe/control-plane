@@ -1109,7 +1109,7 @@ export function createApp(opts: AppOptions) {
       if (r.question) {
         return c.html(
           page(
-            renderConversation(offer!, { id: r.id, turns: r.turns, question: r.question, note: r.note }),
+            renderConversation(offer!, { id: r.id, turns: r.turns, question: r.question, note: r.note }, buying()!.testMode),
             `${offer!.name} bestellen | Katalog`,
             `${offer!.name}, ${euro(offer!.priceCents)}. Sagen Sie uns, was Sie brauchen, dann geht es zur Bezahlung.`,
             "/katalog/bestellen",
@@ -1166,9 +1166,9 @@ export function createApp(opts: AppOptions) {
       c.html(
         page(
           `
-  <section>
+  <section class="shop">
     <div class="wrap narrow">
-      <p class="kicker">Katalog</p>
+      <p class="kicker">Ihre Bestellung</p>
       <h1 class="ph">${heading}</h1>
       ${lines.map((l) => `<p>${l}</p>`).join("\n      ")}
     </div>
@@ -1243,12 +1243,13 @@ export function createApp(opts: AppOptions) {
     c.header("Cache-Control", "no-store");
     const view = DELIVERY_TOKEN_PATTERN.test(token) ? deliveryView(opts.db, token) : ({ state: "none" } as const);
     const esc = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-    const render = (heading: string, inner: string, status: 200 | 404, refreshSeconds = 0) => {
+    // `wide` for the three texts: they stand next to each other once there is room (HAN-93).
+    const render = (heading: string, inner: string, status: 200 | 404, refreshSeconds = 0, wide = false) => {
       const html = page(
         `
-  <section>
-    <div class="wrap narrow">
-      <p class="kicker">Katalog</p>
+  <section class="shop">
+    <div class="wrap${wide ? "" : " narrow"}">
+      <p class="kicker">Ihre Bestellung</p>
       <h1 class="ph">${heading}</h1>
       ${inner}
     </div>
@@ -1274,8 +1275,8 @@ export function createApp(opts: AppOptions) {
       case "writing":
         return render(
           "Wir schreiben Ihre drei Fassungen.",
-          `<p>Sie haben „${view.offer.name}“ bestellt. Diese Seite lädt sich alle 30 Sekunden neu und zeigt die Fassungen, sobald sie fertig sind.</p>
-      <p>Heben Sie diesen Link auf, er ist nur für Sie.</p>`,
+          `<p class="sub">Sie haben „${view.offer.name}“ bestellt. Diese Seite lädt sich alle 30 Sekunden neu und zeigt die Fassungen, sobald sie fertig sind.</p>
+      <p class="banner"><b>Heben Sie diesen Link auf, er ist nur für Sie.</b></p>`,
           200,
           30,
         );
@@ -1298,17 +1299,23 @@ export function createApp(opts: AppOptions) {
       case "ready":
         return render(
           "Ihre drei Fassungen",
-          `<p>Für „${view.offer.name}“. Die Texte sind mit KI geschrieben. Heben Sie diesen Link auf, er ist nur für Sie.</p>
+          `<p class="sub">Für „${view.offer.name}“, mit KI geschrieben. Lesen Sie alle drei und nehmen Sie die, die am besten passt.</p>
+      <div class="grid-cards three">
       ${view.versions
         .map(
           (v, i) =>
-            `<h2>Fassung ${i + 1}</h2>\n      ${v.text
+            `<article class="card version">\n        <h2>Fassung ${i + 1}</h2>\n        <div class="text">${v.text
               .split(/\n\s*\n/)
               .map((para) => `<p>${esc(para.trim()).replace(/\n/g, "<br>")}</p>`)
-              .join("\n      ")}`,
+              .join("\n        ")}</div>\n      </article>`,
         )
-        .join("\n      ")}`,
+        .join("\n      ")}
+      </div>
+      <p class="banner"><span><b>Soll etwas anders werden?</b> Schreiben Sie uns an <a href="mailto:matthias@hanseatictech.de">matthias@hanseatictech.de</a>, welche Fassung Sie nehmen und was sich ändern soll. Bis zu dreimal, ohne Aufpreis.</span></p>
+      <p class="fine">Heben Sie diesen Link auf, er ist nur für Sie.</p>`,
           200,
+          0,
+          true,
         );
     }
   });
