@@ -20,6 +20,17 @@ export interface Offer {
   readonly id: string;
   readonly name: string;
   readonly delivers: string;
+  /**
+   * Wofuer man es braucht, in einer halben Zeile. Steht als Zeile unter dem Titel, damit jemand,
+   * der den Titel nicht versteht, nach vier Woertern weiss, ob er richtig ist.
+   */
+  readonly fuer: string;
+  /**
+   * Was man bekommt, in drei Zeilen. Am 30.09.2026 stand das als ein Absatz von 240 Zeichen unter
+   * jedem Angebot; ein Mensch ueberspringt einen Absatz und liest drei Haken. Jede Zeile ist eine
+   * Zusage, die der Code haelt: die Zahl der Fassungen, die Zahl der Runden, das Format.
+   */
+  readonly punkte: readonly string[];
   /** Gross, in euro cents. Not millicents and not dollars: this is what a person pays. */
   readonly priceCents: number;
   /**
@@ -50,6 +61,12 @@ export const OFFERS: readonly Offer[] = [
   {
     id: "rede-zum-fest",
     name: "Rede zum Fest",
+    fuer: "Für Geburtstag, Hochzeit oder Jubiläum",
+    punkte: [
+      "Drei fertige Fassungen, aus denen Sie eine wählen",
+      "So lang, wie Sie sie brauchen: kurz oder ausführlich",
+      "Dreimal sagen, was anders werden soll, ohne Aufpreis",
+    ],
     delivers:
       "Sie bekommen drei fertige Fassungen einer Rede für Geburtstag, Hochzeit oder Jubiläum, " +
       "geschrieben aus Ihren Angaben, und können bis zu dreimal sagen, was anders werden soll.",
@@ -64,6 +81,12 @@ export const OFFERS: readonly Offer[] = [
   {
     id: "anschreiben-bewerbung",
     name: "Anschreiben zur Bewerbung",
+    fuer: "Für eine bestimmte Stelle, aus der Anzeige geschrieben",
+    punkte: [
+      "Drei fertige Fassungen, aus denen Sie eine wählen",
+      "Geschrieben aus der Stellenanzeige und Ihrem Werdegang",
+      "Dreimal sagen, was anders werden soll, ohne Aufpreis",
+    ],
     delivers:
       "Sie bekommen drei fertige Fassungen eines Anschreibens für eine bestimmte Stelle, geschrieben " +
       "aus der Stellenanzeige und Ihren Angaben, und können bis zu dreimal sagen, was anders werden soll.",
@@ -76,6 +99,12 @@ export const OFFERS: readonly Offer[] = [
   {
     id: "text-ueber-ihr-angebot",
     name: "Text über Ihr Angebot",
+    fuer: "Für Aushang, Faltblatt oder Internetseite",
+    punkte: [
+      "Drei fertige Fassungen, aus denen Sie eine wählen",
+      "Für Ihren Unterricht, Ihren Laden oder Ihre Praxis",
+      "Dreimal sagen, was anders werden soll, ohne Aufpreis",
+    ],
     delivers:
       "Sie bekommen drei fertige Fassungen eines Textes, der Ihr Angebot vorstellt (etwa Ihren " +
       "Unterricht oder Ihren Laden), für Aushang, Faltblatt oder Internetseite, und können bis zu " +
@@ -121,11 +150,22 @@ export const TEST_MODE_LINE = "Testbetrieb: Es wird kein Geld abgebucht.";
  * `rel="nofollow"` because the sceptic found in HAN-25 that every crawler follows a plain link and
  * would otherwise land in `order_page_opened`; the order page is `noindex` for the same reason.
  */
-function buyLink(o: Offer, testMode: boolean): string {
-  return `
-        ${testMode ? `<p class="fine">${TEST_MODE_LINE}</p>` : ""}
-        <p><a class="btn btn-1" href="/katalog/bestellen?angebot=${o.id}" rel="nofollow">Bestellen</a></p>`;
+function buyLink(o: Offer): string {
+  return `<a class="btn btn-1" href="/katalog/bestellen?angebot=${o.id}" rel="nofollow">${o.name} bestellen</a>`;
 }
+
+/**
+ * Was fuer jedes Angebot gilt, einmal ueber dem Raster statt unter jeder Karte.
+ *
+ * Am 30.09.2026 stand `TEST_MODE_LINE` und `REWORK_LINE` unter jedem der drei Angebote, also
+ * sechsmal dasselbe auf einer Seite. Wiederholung liest sich nicht als Zusage, sondern als
+ * Kleingedrucktes, und drei Karten mit identischem Fuss sehen aus wie ein Formularausdruck.
+ */
+const PROMISES: readonly string[] = [
+  "Drei Fassungen zur Auswahl",
+  "Nachbessern kostet nichts extra",
+  "Kein Konto, kein Passwort",
+];
 
 /**
  * `buy` is absent while the card path is off, and then there is no button: a button that answers
@@ -135,27 +175,47 @@ export function renderCatalog(offers: readonly Offer[] = OFFERS, buy?: { testMod
   const cards = offers
     .map(
       (o, i) => `
-      <div class="offer" data-offer>
-        <h2 class="offer-name">${o.name}</h2>
-        <p class="offer-price">${euro(o.priceCents)}</p>
-        <p>${o.delivers}</p>
-        <p class="fine">${REWORK_LINE}</p>${buy ? buyLink(o, buy.testMode) : ""}
-      </div>${
+        <article class="card">
+          <div class="card-head">
+            <div>
+              <h3>${o.name}</h3>
+              <p class="price-note" style="margin-top:.3rem">${o.fuer}</p>
+            </div>
+            <p class="price">${euro(o.priceCents)}</p>
+          </div>
+          <ul class="feats">${o.punkte.map((t) => `
+            <li>${t}</li>`).join("")}
+          </ul>
+          <div class="card-foot">${buy ? `
+            ${buyLink(o)}` : ""}
+          </div>
+        </article>${
         // One mark after each offer. On a 390 px phone the first card already reaches past the
         // first screen, so every one of these is below the fold there; see test/catalog-page.test.ts.
         mark(`katalog-${i + 1}`)
       }`,
     )
     .join("");
+  const ab = offers.length ? euro(Math.min(...offers.map((o) => o.priceCents))) : "";
   return `
   <section>
-    <div class="wrap narrow">
+    <div class="wrap">
       <p class="kicker">Katalog</p>
       <h1 class="ph">Texte, die wir für Sie schreiben</h1>
-      <p class="sub">${DELIVERY_SENTENCE}</p>
+      <p class="sub prose">Sie sagen uns, worum es geht, und bekommen drei fertige Fassungen zur Auswahl.
+        Ab ${ab}.</p>
+      <ul class="promises">${PROMISES.map((t) => `
+        <li><span class="dot"></span>${t}</li>`).join("")}
+      </ul>${
+        buy?.testMode
+          ? `
+      <p class="banner"><b>${TEST_MODE_LINE}</b> Sie können alles ausprobieren, ohne dass etwas berechnet wird.</p>`
+          : ""
+      }
       ${mark("katalog-top")}
-      <div class="offers" style="margin-top:1.6rem;display:grid;gap:1.4rem">${cards}
+      <div class="grid-cards three">${cards}
       </div>
+      <p class="fine prose" style="margin-top:var(--s-8);color:var(--dim)">${DELIVERY_SENTENCE}</p>
       ${mark("katalog-end")}
     </div>
   </section>`;

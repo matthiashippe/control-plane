@@ -167,6 +167,63 @@ section { padding-block: var(--s-16); }
   #proof { padding-block: calc(var(--s-24) + var(--s-8)); }
 }
 
+/* ---- der Laden: Karten, Raster, Preise ---------------------------------
+   Gebaut am 30.09.2026, nachdem Matthias den Katalog aufgemacht hat: "das ist kein produkt das
+   ist eine beschissene shitshow". Er hatte recht. Was dort stand, waren drei Ueberschriften
+   untereinander, jede mit derselben Kleingedruckten-Zeile, ohne Raster, ohne Karte, ohne
+   erkennbaren Preis. Eine Liste, kein Laden.
+
+   Die Vorbilder sind echte Laeden, nicht Geschmack: Fiverrs Paketraster, Deels Servicekatalog,
+   HoneyBooks Auswahl. Was sie gemeinsam haben und was hier uebernommen ist: eine Karte je Angebot,
+   der Preis als eigene Groesse statt als Textzeile, ein Knopf je Karte, und die Bedingungen einmal
+   ueber allem statt dreimal darunter. */
+.grid-cards { display: grid; gap: var(--s-4); grid-template-columns: 1fr; margin-top: var(--s-8); }
+@media (min-width: 46rem) { .grid-cards { grid-template-columns: 1fr 1fr; gap: var(--s-6); } }
+@media (min-width: 70rem) { .grid-cards.three { grid-template-columns: repeat(3, 1fr); } }
+
+.card {
+  display: flex; flex-direction: column; gap: var(--s-3);
+  background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-pan);
+  padding: var(--s-6); transition: border-color .14s, transform .08s;
+}
+@media (min-width: 46rem) { .card { padding: var(--s-8); } }
+.card:hover { border-color: var(--line-2); }
+.card > .card-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-4); }
+.card h3 { font-size: 1.375rem; letter-spacing: -.02em; }
+@media (min-width: 46rem) { .card h3 { font-size: var(--t-h3); } }
+/* Der Preis ist eine Zahl, keine Zeile Text. Er steht auf einer Hoehe mit dem Titel und in
+   Tabellenziffern, damit 19 und 149 untereinander gleich breit sind. */
+.price { font: 600 1.75rem/1 var(--font); letter-spacing: -.02em; font-variant-numeric: tabular-nums;
+         white-space: nowrap; color: var(--fg); }
+.price-note { font-size: var(--t-ui); color: var(--dim); }
+/* Was man bekommt, als Liste mit Haken statt als Absatz. Drei Zeilen liest ein Mensch, einen
+   Absatz ueberspringt er. */
+.feats { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: .4rem; }
+.feats li { display: flex; gap: .55rem; align-items: flex-start; font-size: var(--t-ui);
+            color: var(--muted); line-height: 1.45; }
+.feats li::before { content: ""; flex: none; width: 1rem; height: 1rem; margin-top: .15rem;
+  background: var(--accent); opacity: .9;
+  -webkit-mask: no-repeat center/contain url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M13.5 4.5 6.5 11.5 2.5 7.5' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+          mask: no-repeat center/contain url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M13.5 4.5 6.5 11.5 2.5 7.5' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); }
+/* Der Knopf sitzt am Fuss der Karte, auf einer Linie mit den Knoepfen der Nachbarkarten, auch
+   wenn ein Text laenger ist. */
+.card > .card-foot { margin-top: auto; padding-top: var(--s-4); display: flex; flex-direction: column;
+                     gap: var(--s-2); align-items: flex-start; }
+.card .btn { width: 100%; justify-content: center; }
+@media (min-width: 46rem) { .card .btn { width: auto; } }
+
+/* Eine Zeile mit drei Zusagen ueber dem Raster: was fuer jedes Angebot gilt, einmal gesagt. */
+.promises { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-6); margin-top: var(--s-6);
+            padding: 0; list-style: none; }
+.promises li { display: flex; gap: .5rem; align-items: center; font-size: var(--t-ui); color: var(--muted); }
+.promises .dot { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+
+/* Ein Hinweis, der gilt, solange der Testbetrieb laeuft. Einmal, ganz oben, nicht unter jeder Karte. */
+.banner { display: flex; gap: .65rem; align-items: flex-start; background: var(--panel-2);
+          border: 1px solid var(--line); border-radius: var(--r-ctl); padding: .8rem 1rem;
+          font-size: var(--t-ui); color: var(--muted); margin-top: var(--s-6); }
+.banner b { color: var(--fg); font-weight: 600; }
+
 /* ---- controls -------------------------------------------------------- */
 .btn {
   display: inline-flex; align-items: center; gap: .5rem; height: 44px;

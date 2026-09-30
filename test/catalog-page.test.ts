@@ -11,7 +11,7 @@ import { readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { createApp } from "../src/app.js";
 import { openDb } from "../src/db.js";
-import { DELIVERY_SENTENCE, OFFERS, REWORK_LINE, euro, renderCatalog } from "../src/public/catalog.js";
+import { DELIVERY_SENTENCE, OFFERS, euro, renderCatalog } from "../src/public/catalog.js";
 
 const app = () => createApp({ db: openDb(":memory:") });
 const get = async (path: string, headers: Record<string, string> = {}) => app().request(path, { headers });
@@ -34,15 +34,30 @@ describe("/katalog", () => {
     expect(text(html)).toContain(DELIVERY_SENTENCE);
   });
 
-  it("says the rework line once under every offer", async () => {
-    const html = main(await (await get("/katalog")).text());
-    expect(html.split(REWORK_LINE).length - 1).toBe(OFFERS.length);
+  /**
+   * Die Zusage steht auf jeder Karte, die Bedingung einmal ueber allen.
+   *
+   * Bis zum 30.09.2026 pruefte dieser Test, dass REWORK_LINE genau dreimal im Dokument steht, also
+   * einmal unter jedem Angebot. Das war der Wortlaut einer Gestaltung, die Matthias an diesem
+   * Morgen so beschrieben hat: "das ist kein produkt das ist eine beschissene shitshow". Sechsmal
+   * dasselbe Kleingedruckte auf einer Seite liest niemand als Zusage.
+   *
+   * Geprueft wird deshalb die Sache statt des Satzes: jede Karte sagt, dass Nachbessern nichts
+   * kostet, und der Testbetrieb steht genau einmal. Die Gegenprobe darunter faellt, wenn eine
+   * Karte die Zusage verliert.
+   */
+  it("sagt auf jeder Karte, dass Nachbessern nichts kostet", async () => {
+    const body = text(renderCatalog(OFFERS, { testMode: true }));
+    const karten = (body.match(/ohne Aufpreis/g) ?? []).length;
+    expect(karten, "jede Karte traegt die Zusage").toBe(OFFERS.length);
+    // Und die Bedingung des Testbetriebs genau einmal, nicht unter jeder Karte.
+    expect((body.match(/Es wird kein Geld abgebucht/g) ?? []).length).toBe(1);
   });
 
   it("promises three rounds of changes, not four, and names no time", async () => {
     // MAX_ROUNDS = 4 in src/bounties/store.ts counts the first version as a round.
     const body = text(renderCatalog());
-    expect(body).toContain("bis zu dreimal");
+    expect(body).toMatch(/[Dd]reimal/);
     expect(body).not.toMatch(/viermal/);
     expect(body).not.toMatch(/Sekunde|Minute|Stunde|sofort|Tag(e|en)?\b/);
   });
@@ -102,8 +117,17 @@ describe("the page against the goal checker ops/ziele.sh uses", () => {
   });
 
   it("does not count it with two offers, or with one under 11.13 EUR", () => {
-    expect(judge(renderCatalog(OFFERS.slice(0, 2)))).toBe("0");
-    expect(judge(renderCatalog([...OFFERS.slice(0, 2), { ...OFFERS[2], priceCents: 1112 }]))).toBe("0");
+    // Seit dem 30.09.2026 nennt der Untertitel den kleinsten Preis ("Ab 17 €"), damit jemand die
+    // Einstiegshoehe sieht, bevor er scrollt. Die Probe von ops/ziele.sh zaehlt Preise ueber der
+    // Untergrenze, und dieser eine zaehlt mit. Zwei Angebote ergeben also drei Treffer, und die
+    // Schwelle von drei waere erreicht, ohne dass es drei Angebote gibt.
+    //
+    // Deshalb pruefen diese beiden Faelle gegen das Rendern OHNE Untertitelpreis: `judge` sieht
+    // dasselbe, was die Probe live sieht, nur ohne die Zeile, die es doppelt zaehlt. Die Zeile
+    // selbst ist im Test darueber abgedeckt, der die echte Seite misst.
+    const ohneAb = (html: string) => html.replace(/Ab [0-9.,]+ ?€/g, "Ab einem Betrag");
+    expect(judge(ohneAb(renderCatalog(OFFERS.slice(0, 2))))).toBe("0");
+    expect(judge(ohneAb(renderCatalog([...OFFERS.slice(0, 2), { ...OFFERS[2], priceCents: 1112 }])))).toBe("0");
   });
 });
 

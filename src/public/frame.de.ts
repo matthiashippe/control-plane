@@ -15,7 +15,7 @@ export function germanFrame(bodyHtml: string, statusScript: string): string {
 <header class="bar"><div class="wrap">
   <a class="brand" href="/">
     <svg width="22" height="22" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="currentColor" opacity=".12"/><circle cx="16" cy="12" r="5.5" fill="none" stroke="currentColor" stroke-width="2.5"/><rect x="7" y="21" width="18" height="3.5" rx="1.75" fill="currentColor"/></svg>
-    Handsel
+    PostYourPrice
   </a>
   <nav>
     <a href="/katalog">Katalog</a>
