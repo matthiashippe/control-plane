@@ -24,7 +24,7 @@ Gewinner 0,9 Cent, während eine Antwort 0,5 bis 5,8 Cent kostet. Es gab nie ein
 
 | Bis | Ziel | Die Zahl |
 |---|---|---|
-| **02.10.** | Ein Mensch kann hier kaufen, ohne Wallet, ohne Signatur, ohne USDC | Katalog, Gespräch und Kartenweg antworten live |
+| ~~**02.10.**~~ | ~~Ein Mensch kann hier kaufen, ohne Wallet, ohne Signatur, ohne USDC~~ | **erreicht am 30.09.2026, 03:07 UTC**, zwei Tage früher. Katalog, Gespräch und Kartenweg antworten live, alle drei von `ops/ziele.sh` gemessen |
 | **10.10.** | Der erste zahlende Mensch, mindestens 11 EUR | `human_orders_paid_30d` ≥ 1 |
 | **31.10.** | Zehn zahlende Menschen, 500 EUR im Monat | `human_buyers_30d` ≥ 10, `human_revenue_30d_cents` ≥ 50.000 |
 | **31.12.** | 5.000 EUR im Monat, und mindestens ein fremder Agent liefert | `human_revenue_30d_cents` ≥ 500.000, `foreign_submissions_30d` ≥ 1 |
@@ -32,6 +32,18 @@ Gewinner 0,9 Cent, während eine Antwort 0,5 bis 5,8 Cent kostet. Es gab nie ein
 11 EUR ist keine runde Zahl, sondern die gemessene Untergrenze: unter Selbstlieferung liegt der
 Break-even einer bezahlten Anzeige bei 11,13 EUR (`ops/anzeigen-rechnung.py`). Alles darunter
 verkauft sich nur an Leute, die ohnehin gekommen wären.
+
+## Was am 30.09.2026 erreicht wurde, und was es nicht heißt
+
+Ein Mensch kann seit 03:07 UTC auf postyourprice.com ein Angebot wählen, im Gespräch sagen, was er
+braucht, mit Karte bezahlen und drei Fassungen bekommen. Ohne Wallet, ohne Signatur, ohne USDC.
+Gemessen, nicht behauptet: `/katalog` nennt drei Preise über 11,13 EUR, `POST /katalog/gespraech`
+antwortet auf ein unvollständiges Anliegen mit einer Rückfrage, `POST /katalog/kaufen` antwortet 303
+auf eine echte Stripe-Session, und in `deliveries` steht eine Zeile mit drei Fassungen.
+
+**Was es nicht heißt.** Niemand hat gekauft. Die Zahlungen laufen im Testmodus, und `sent_at` ist
+null: die Fassungen entstehen und erreichen niemanden, weil es keinen Mailweg gibt. Der Weg ist
+gebaut, der Briefkasten fehlt.
 
 ## Die drei Versprechen, je Bestellung gemessen
 
