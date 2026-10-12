@@ -65,3 +65,14 @@ cp.hippe.eu, postyourprice.com {
 www.postyourprice.com {
 	redir https://postyourprice.com{uri} 308
 }
+
+vysyon.hippe.eu {
+	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+	reverse_proxy vysyon-edge:8080
+}
