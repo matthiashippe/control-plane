@@ -21,6 +21,8 @@ export interface OpenRouterOptions {
   timeoutMs?: number;
   /** Timeout for the price fetch. Short, because it blocks the start. Default 15 s. */
   priceFetchTimeoutMs?: number;
+  /** Whether this provider may be sold on. Default true since 2026-10-30, see `resale` below. */
+  resale?: boolean;
   /**
    * Called after every successful price fetch, the hourly one included. The caller uses it to
    * persist the catalogue. Without this hook the stored state goes stale while the process runs on
@@ -50,12 +52,12 @@ interface OpenRouterModelRow {
 export class OpenRouterProvider implements ChatProvider {
   readonly id = "openrouter";
   /**
-   * Not for resale, decided on 2026-09-29 (HAN-22, HAN-55). /v1/chat/completions had sold it:
-   * 95 `inference` ledger rows from 19.09. to 29.09., every one with provider "openrouter". The
-   * provider stays in the catalogue because the service itself still writes with it (Goal 23);
-   * only the sale stops. Turning this back to `true` needs a decision of its own, not a commit.
+   * For resale again since 2026-10-30, Matthias' decision. From 2026-09-29 (HAN-22, HAN-55) the
+   * org had stopped the sale, which ended on 2026-10-17 and with it the only way an automaton could
+   * pay this service. Not a decision for the org to revisit. CP_OPENROUTER_RESALE=0 stops the sale
+   * again and restores the state of 2026-10-17 without a code change.
    */
-  readonly resale = false;
+  readonly resale: boolean;
   private readonly specs = new Map<string, ModelSpec>();
   private readonly baseUrl: string;
   private readonly fetchImpl: typeof fetch;
@@ -76,6 +78,7 @@ export class OpenRouterProvider implements ChatProvider {
     this.onRefresh = opts.onRefresh;
     this.priceRefreshMs = opts.priceRefreshMs ?? 60 * 60 * 1000;
     this.now = opts.now ?? Date.now;
+    this.resale = opts.resale ?? true;
   }
 
   /** Loads the prices. Without prices the control plane does not start (the estimate would be blind). */
@@ -294,5 +297,10 @@ export function openRouterFromEnv(env: NodeJS.ProcessEnv): OpenRouterProvider {
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
-  return new OpenRouterProvider({ apiKey, models, baseUrl: env.CP_OPENROUTER_BASE_URL });
+  return new OpenRouterProvider({
+    apiKey,
+    models,
+    baseUrl: env.CP_OPENROUTER_BASE_URL,
+    resale: env.CP_OPENROUTER_RESALE !== "0",
+  });
 }

@@ -53,6 +53,9 @@ async function openRouter() {
     fetch: impl,
     priceRefreshMs: 0,
     baseUrl: "https://openrouter.ai/api/v1",
+    // The mechanism under test is a provider that may not be sold; OpenRouter is one again
+    // only when CP_OPENROUTER_RESALE=0.
+    resale: false,
   });
   await provider.init();
   return { provider, chatCalls };

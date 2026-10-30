@@ -17,6 +17,8 @@
  *   CP_MODEL_ALIASES  "gpt-5.2=<model>,gpt-5-mini=<model>": the IDs the runtime hard-codes;
  *                 without it the OpenRouter provider serves its defaults
  *   OPENROUTER_API_KEY, CP_OPENROUTER_MODELS  for CP_PROVIDER=openrouter
+ *   CP_OPENROUTER_RESALE  "0" stops selling OpenRouter models (the switch for a blocked key);
+ *                 anything else, or unset, sells them
  *   CP_INFERENCE_SUNSET_AT  ISO 8601; from then on a provider marked `resale: false` is no longer
  *                 sold. Default INFERENCE_SUNSET_AT_DEFAULT in app.ts, which is the production value
  */
