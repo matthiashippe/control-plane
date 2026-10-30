@@ -65,3 +65,17 @@ cp.hippe.eu, postyourprice.com {
 www.postyourprice.com {
 	redir https://postyourprice.com{uri} 308
 }
+
+# Vysyon (15.10.2026, Matthias' Go): vhost auf den Edge-Container von /opt/vysyon; Auth liegt dort, nicht hier.
+
+# Vysyon (15.10.2026, Matthias' Go): vhost auf den Edge-Container von /opt/vysyon; Auth liegt dort, nicht hier.
+vysyon.hippe.eu {
+	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+	reverse_proxy vysyon-edge:8080
+}
