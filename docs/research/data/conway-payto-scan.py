@@ -16,14 +16,21 @@ Two traps, both paid for on 2026-09-19:
   * The public RPC answers Python's default User-Agent with 403. A real one fixes it.
   * It throws "over rate limit" on fast loops, so a refused chunk is retried after a pause rather
     than dropped. A dropped chunk is a silent hole in a series nobody can spot afterwards.
-"""
-import argparse, json, sys, time, urllib.error, urllib.request
 
-RPC = "https://mainnet.base.org"
+And a third, from 2026-10-09 on: mainnet.base.org started answering this loop with HTTP 429 on
+every run, the daily scan gave up each morning, and /fix kept saying the payment line is checked
+daily while the series stood still at 2026-10-08. publicnode takes a range of 30,000 blocks in one
+call (measured 2026-10-30, the same query that 429s on mainnet.base.org), so a daily delta is two
+calls instead of twenty-two. CP_BASE_RPC overrides it, together with CP_SCAN_CHUNK for a node with
+a smaller range limit.
+"""
+import argparse, json, os, sys, time, urllib.error, urllib.request
+
+RPC = os.environ.get("CP_BASE_RPC", "https://base-rpc.publicnode.com")
 USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
 PAYTO = "0x21DD37E3E4eA6CCC0a5C98A4944702eDE6E7Be10"
 TRANSFER = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
-CHUNK = 2000
+CHUNK = int(os.environ.get("CP_SCAN_CHUNK", "30000"))
 USER_AGENT = "control-plane-research/1.0 (+https://cp.hippe.eu)"
 
 
@@ -86,8 +93,8 @@ MIN_CHUNK = 25
 def get_logs(start: int, end: int, payto_topic: str, depth: int = 0):
     """The logs in one range, halving the range whenever the node says the answer is too large.
 
-    Base produces a block every two seconds, so CHUNK of 2000 is about 67 minutes of chain, and it
-    held for months. It stops holding the day a busy stretch puts more transfers in that window
+    Base produces a block every two seconds, so the original CHUNK of 2000 was about 67 minutes of
+    chain, and it held for months. It stops holding the day a busy stretch puts more transfers in that window
     than the node will serialise, and that day was 2026-09-23. Nothing about the range is wrong;
     it is simply too wide now, and it will be too wide again.
     """
