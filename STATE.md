@@ -2,6 +2,17 @@
 
 Last run: 2026-09-20 18:50 UTC (Auftragsmarkt vollstaendig live, Richtungswechsel am Nachmittag)
 
+## Entscheidung 30.10.2026: Inferenz wird wieder über OpenRouter verkauft
+
+**Matthias hat den Stopp vom 30.09. (HAN-60) aufgehoben.** Das ist keine Frage, die die Org neu
+aufmacht. Seit dem Rollout am 30.10. 12:01 UTC verkauft der Dienst wieder, Aufladungen und
+Startguthaben sind offen. Notschalter: `CP_OPENROUTER_RESALE=0` in `/opt/control-plane/.env`,
+danach Neustart des Containers.
+
+**Kanal dazu:** ein gepflegter Fork der Runtime (https://github.com/matthiashippe/automaton), dessen
+Setup PostYourPrice als ersten Control Plane anbietet, offengelegt. Er kauft nur Guthaben, das
+ankommt, und zeigt den echten Anmeldefehler. Verbreitet über die Issue-Antworten.
+
 ## Lage (Stand 20.09.2026)
 
 **Die Richtung hat sich heute gedreht, und die alte Lage unten stimmt weiter, taugt aber nicht
