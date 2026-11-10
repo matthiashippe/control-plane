@@ -79,9 +79,9 @@ zählen muss, um schnellere Anbieter zu belegen.
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
-- [ ] Jede neue Testdatei war vor dem Fix rot; die Zeile im Progress Log nennt, womit (`loop-constraints.md`, Budget und Qualität).
-- [ ] Der Job `e2e` am Kopf des PR ist grün (`gh pr checks`).
-- [ ] Code, Kommentare und Testnamen Englisch, Goal-Datei und Doku Deutsch, kein Gedankenstrich.
+- [x] Jede neue Testdatei war vor dem Fix rot; die Zeile im Progress Log nennt, womit (`loop-constraints.md`, Budget und Qualität).
+- [x] Der Job `e2e` am Kopf des PR ist grün (`gh pr checks`).
+- [x] Code, Kommentare und Testnamen Englisch, Goal-Datei und Doku Deutsch, kein Gedankenstrich.
 
 ## Deny List
 - `loop.yaml`, `gate.yaml`, `loop-constraints.md`, `LOOP.md`, `ops/prompts/**`, `.github/**`, `scripts/check.mjs`, `deploy/**` außer
@@ -94,5 +94,6 @@ zählen muss, um schnellere Anbieter zu belegen.
 
 ## Progress Log
 - 2026-11-10 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6, 7 gebaut: Abbruch-Signal des Clients von der Route über den Coalescer bis zum Anbieter, keine Buchung nach dem Abbruch, Tabelle inference_aborts, Gutschrift der drei Fälle beim Start (61644 mc, gemessen, siehe ANNAHMEN.md), ops/live.sh mit Selbsttest. Rot vorher: beide neuen Testdateien gegen src von origin/dev 8 von 9 und Importfehler rot, dazu Mutationen (Buchung trotz Abbruch, Coalescer bricht beim ersten Abgang ab, ohne Idempotenz, OpenRouter ohne Signal, Route ohne Signal, live.sh-Richter immer OK, Abfrage immer n=1) je rot; Gegenprobe Punkt 6 mit gepflanzter Adresse 1. Prüfbefehle (Node 22, PATH=/usr/bin:$PATH): P1 vitest inference-abort Exit 0, grep it 9; P2 grep coalesc 5, vitest drei Dateien 38 passed Exit 0; P3 -t records 2 passed Exit 0, grep records 2; P4 vitest credit-aborted 6 passed Exit 0, grep it 6; P5 live.sh --selftest LIVE SELFTEST OK Exit 0, grep readonly 2; P6 0; P7 check grün (1251 Tests, Exit 0; ein Lauf davor Exit 1 nur durch zwei Vitest-RPC-Timeouts bei Load 150, alle Tests grün).
+- 2026-11-10 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, 7. `origin/dev` gemergt (schon enthalten), Kopf 960a98f. Prüfbefehle (Node 22.23.4, PATH=/usr/bin:$PATH): P1 vitest inference-abort 9 passed Exit 0, grep it 9; P2 grep coalesc 5, vitest drei Dateien 38 passed Exit 0; P3 -t records 2 passed Exit 0, grep records 2; P4 vitest credit-aborted 6 passed Exit 0, grep it 6; P5 live.sh --selftest LIVE SELFTEST OK Exit 0, grep readonly 2; P6 0; P7 check grün (1251 Tests, 71 s, Exit 0, Load 112). `gh pr checks 2`: check pass, e2e pass (1m45s) am Kopf 960a98f. Kein Gedankenstrich in hinzugefügten Zeilen (grep U+2013/U+2014 leer).
 
 ## Blockers
