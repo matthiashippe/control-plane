@@ -17,6 +17,8 @@
 #   status   GET /v1/status answers 200 with a JSON object
 #   refund   the credit for the five calls of 2026-11-10 whose answers never arrived
 #            (src/credits/aborted.ts) is in the ledger exactly once, over exactly 79229 mc
+#   timeout-quote  the timeout quote per model since the rollout of abrechnung 02, from the durations in the ledger and in
+#            inference_aborts (ops/timeout-quote.sh --since-rollout); shown, and FAIL only when it cannot be read
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -65,6 +67,31 @@ judge_refund() { # $1 = "<rows> <sum mc>" from QUERY_JS
   fi
 }
 
+# $1 = output of ops/timeout-quote.sh --since-rollout (or --rows). One line per model over all days, aborted and answered
+# calls together: `<model> <timeouts>/<calls> (<quote> %)`.
+judge_timeout_quote() {
+  local head summary
+  head="$(head -n 1 <<<"${1:-}")"
+  if [[ "$head" != since\ * ]]; then
+    echo "FAIL timeout-quote: no answer from ops/timeout-quote.sh"
+    return
+  fi
+  summary="$(awk -F'|' '
+    NR > 1 && $3 ~ /^ *all *$/ {
+      m = $2; gsub(/ /, "", m); n[m] += $5; t[m] += $6
+    }
+    END {
+      out = ""
+      for (m in n) out = out (out == "" ? "" : ", ") sprintf("%s %d/%d (%.1f %%)", m, t[m], n[m], 100 * t[m] / n[m])
+      print out
+    }' <<<"$1")"
+  if [ -z "$summary" ]; then
+    echo "OK timeout-quote: no call since the rollout yet"
+  else
+    echo "OK timeout-quote: ${head%%,*}: $summary"
+  fi
+}
+
 selftest() {
   # No network in here, by construction: any attempt is an error.
   curl() { echo "selftest must not reach the network (curl)" >&2; return 99; }
@@ -105,6 +132,28 @@ selftest() {
     [ "${got%% *}" = "$expect" ] || all_ok=0
   done
 
+  # The timeout quote since the rollout, through the real ops/timeout-quote.sh: a long abort shows a quote above 0, calls
+  # without one show exactly 0, a row from before the rollout stays out, and no answer is a FAIL.
+  printf '%s\n' '{"src":"ledger","at":"2026-11-11T09:00:00.000Z","ref":"gen-1","model":"openai/gpt-5.2","duration_ms":null}' \
+    '{"src":"ledger","at":"2026-11-12T09:00:00.000Z","ref":"gen-2","model":"openai/gpt-5.2","duration_ms":12000}' \
+    '{"src":"abort","at":"2026-11-12T10:00:00.000Z","ref":null,"model":"openai/gpt-5.2","duration_ms":59950}' \
+    '{"src":"ledger","at":"2026-11-12T11:00:00.000Z","ref":"gen-3","model":"openai/gpt-5-mini","duration_ms":4000}' >"$dir/tq-long.jsonl"
+  printf '%s\n' '{"src":"ledger","at":"2026-11-12T09:00:00.000Z","ref":"gen-2","model":"openai/gpt-5.2","duration_ms":12000}' >"$dir/tq-short.jsonl"
+  : >"$dir/tq-none.jsonl"
+  local tq_case tq_file tq_expect
+  for tq_case in "long|openai/gpt-5.2 1/2 (50.0 %)" "long|openai/gpt-5-mini 0/1 (0.0 %)" "short|openai/gpt-5.2 0/1 (0.0 %)" "none|no call since the rollout yet"; do
+    tq_file="${tq_case%%|*}"
+    tq_expect="${tq_case#*|}"
+    got="$(judge_timeout_quote "$(TQ_SINCE='' bash "$ROOT/ops/timeout-quote.sh" --rows "$dir/tq-$tq_file.jsonl" 2>/dev/null)")"
+    echo "planted timeout-quote $tq_file: $got"
+    case "$got" in "OK timeout-quote: "*"$tq_expect"*) ;; *) all_ok=0 ;; esac
+  done
+  for tq_case in "" "garbage" "TIMEOUT QUOTE FAIL: ledger not readable"; do
+    got="$(judge_timeout_quote "$tq_case")"
+    echo "planted timeout-quote answer '${tq_case}': $got"
+    [ "${got%% *}" = "FAIL" ] || all_ok=0
+  done
+
   if [ "$all_ok" = 1 ]; then
     echo "LIVE SELFTEST OK"
     return 0
@@ -141,6 +190,8 @@ live() {
   answer="$(ssh -i "$key" -o BatchMode=yes -o ConnectTimeout=10 "$CP_HOST" "$remote" 2>/dev/null)"
   say "$(judge_refund "$answer")"
 
+  say "$(judge_timeout_quote "$(CP_HOST="$CP_HOST" CP_SSH_KEY="$key" bash "$ROOT/ops/timeout-quote.sh" --since-rollout 2>/dev/null)")"
+
   if [ "$FAILED" = 0 ]; then
     echo "LIVE OK"
     return 0
@@ -152,7 +203,7 @@ live() {
 case "${1:-}" in
   --selftest) selftest ;;
   "") live ;;
-  -h | --help) sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//' ;;
+  -h | --help) sed -n '2,21p' "$0" | sed 's/^# \{0,1\}//' ;;
   *)
     echo "unknown switch: $1" >&2
     exit 2

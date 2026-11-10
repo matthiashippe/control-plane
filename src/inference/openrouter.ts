@@ -36,6 +36,19 @@ export interface OpenRouterOptions {
 
 export const DEFAULT_OPENROUTER_MODELS = ["openai/gpt-5.2", "openai/gpt-5-mini"];
 
+/**
+ * Provider routing on every call (abrechnung 02): the endpoints of a model sorted by throughput
+ * (end-to-end output tokens per second), falling back to the next endpoint when one is down. A
+ * non-streaming answer arrives when its last token does, so throughput decides whether a long turn
+ * makes it inside the runtime's 60 second timeout; time to first token does not. The service sets
+ * this field, never the client: a `provider` in the customer's body is not passed on. Price is not
+ * part of the choice any more, and the charge stays the actual purchase times the markup.
+ */
+export const PROVIDER_ROUTING: Readonly<{ sort: "throughput"; allow_fallbacks: true }> = Object.freeze({
+  sort: "throughput",
+  allow_fallbacks: true,
+});
+
 /** Runtime baseline IDs -> OpenRouter IDs. `gpt-5.3` is missing on purpose: OpenRouter only has the Codex variant. */
 export const DEFAULT_OPENROUTER_ALIASES: Record<string, string> = {
   "gpt-5.2": "openai/gpt-5.2",
@@ -224,8 +237,9 @@ export class OpenRouterProvider implements ChatProvider {
       body.tool_choice = req.tool_choice ?? "auto";
     }
     if (req.temperature !== undefined) body.temperature = req.temperature;
-    // Zero data retention: OpenRouter routes only to endpoints that store nothing (Goal 23, A).
-    if (req.zdr) body.provider = { zdr: true };
+    // Our routing, never the client's (abrechnung 02). Zero data retention on top: OpenRouter then
+    // routes only to endpoints that store nothing (Goal 23, A).
+    body.provider = req.zdr ? { ...PROVIDER_ROUTING, zdr: true } : { ...PROVIDER_ROUTING };
 
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
     let res: Response;

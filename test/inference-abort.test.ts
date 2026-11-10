@@ -288,8 +288,9 @@ describe("the abort is written down", () => {
     expect(flat).not.toContain("harbour");
     expect(flat).not.toContain(t.address.slice(2));
     const columns = (t.db.prepare("PRAGMA table_info(inference_aborts)").all() as { name: string }[]).map((c) => c.name);
-    // Exactly these columns: none of them can carry an address, a prompt or an answer.
-    expect(columns).toEqual(["id", "model", "requested_model", "provider", "duration_ms", "purchase_mc", "answered", "ref", "created_at"]);
+    // Exactly these columns: none of them can carry an address, a prompt or an answer. `upstream`
+    // (abrechnung 02) names the provider that answered, e.g. "Azure", never a customer.
+    expect(columns).toEqual(["id", "model", "requested_model", "provider", "duration_ms", "purchase_mc", "answered", "ref", "created_at", "upstream"]);
   });
 
   it("records nothing when the client does not abort", async () => {
