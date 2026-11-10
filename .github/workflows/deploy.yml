@@ -78,10 +78,7 @@ jobs:
         env:
           HTTP_PROXY: http://127.0.0.1:9
           HTTPS_PROXY: http://127.0.0.1:9
-          http_proxy: http://127.0.0.1:9
-          https_proxy: http://127.0.0.1:9
           NO_PROXY: 127.0.0.1,localhost,::1
-          no_proxy: 127.0.0.1,localhost,::1
   e2e:
     needs: plan
     if: needs.plan.outputs.ship == 'true'

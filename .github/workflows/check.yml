@@ -28,15 +28,13 @@ jobs:
           package-manager-cache: false
       - run: corepack enable && corepack prepare --activate && pnpm --version
       - run: pnpm install --frozen-lockfile
-      # Toter Proxy: ein Schritt, der ins Netz greift, scheitert. scripts/check.mjs setzt ihn für jeden Kindprozess noch einmal.
+      # Toter Proxy: ein Schritt, der ins Netz greift, scheitert. Die Namen in Kleinbuchstaben setzt scripts/check.mjs für jeden Kindprozess
+      # selbst (Actions behandelt Namen in env ohne Rücksicht auf Groß- und Kleinschreibung).
       - run: node scripts/check.mjs
         env:
           HTTP_PROXY: http://127.0.0.1:9
           HTTPS_PROXY: http://127.0.0.1:9
-          http_proxy: http://127.0.0.1:9
-          https_proxy: http://127.0.0.1:9
           NO_PROXY: 127.0.0.1,localhost,::1
-          no_proxy: 127.0.0.1,localhost,::1
   e2e:
     runs-on: ubuntu-latest
     timeout-minutes: 30
