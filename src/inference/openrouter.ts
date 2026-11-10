@@ -41,13 +41,31 @@ export const DEFAULT_OPENROUTER_MODELS = ["openai/gpt-5.2", "openai/gpt-5-mini"]
  * (end-to-end output tokens per second), falling back to the next endpoint when one is down. A
  * non-streaming answer arrives when its last token does, so throughput decides whether a long turn
  * makes it inside the runtime's 60 second timeout; time to first token does not. The service sets
- * this field, never the client: a `provider` in the customer's body is not passed on. Price is not
- * part of the choice any more, and the charge stays the actual purchase times the markup.
+ * this field, never the client: a `provider` in the customer's body is not passed on. Price is no
+ * longer the sort key, `maxPriceFor` caps it at the catalogue price, and the charge stays the actual
+ * purchase times the markup.
  */
 export const PROVIDER_ROUTING: Readonly<{ sort: "throughput"; allow_fallbacks: true }> = Object.freeze({
   sort: "throughput",
   allow_fallbacks: true,
 });
+
+/**
+ * Price cap of a call (abrechnung 02): `sort` takes price out of the choice of endpoint, so a fast
+ * but dearer endpoint could charge the customer above the price `/v1/models` names and above the
+ * reservation, which is based on that list price. OpenRouter's `max_price` takes USD per million
+ * tokens, the unit of the catalogue. Rounded to 12 significant digits, because the catalogue
+ * multiplies OpenRouter's per-token strings by a million ("0.0000002" becomes 0.19999999999999998),
+ * and a cap a hair below the real price would shut out every endpoint. Without a price there is no
+ * cap: a zero would refuse every paid endpoint.
+ */
+export function maxPriceFor(spec: ModelSpec | undefined): { prompt: number; completion: number } | null {
+  if (!spec) return null;
+  const clean = (usd: number) => Number(usd.toPrecision(12));
+  const ok = (usd: number) => Number.isFinite(usd) && usd > 0;
+  if (!ok(spec.inputPerMillion) || !ok(spec.outputPerMillion)) return null;
+  return { prompt: clean(spec.inputPerMillion), completion: clean(spec.outputPerMillion) };
+}
 
 /** Runtime baseline IDs -> OpenRouter IDs. `gpt-5.3` is missing on purpose: OpenRouter only has the Codex variant. */
 export const DEFAULT_OPENROUTER_ALIASES: Record<string, string> = {
@@ -237,9 +255,14 @@ export class OpenRouterProvider implements ChatProvider {
       body.tool_choice = req.tool_choice ?? "auto";
     }
     if (req.temperature !== undefined) body.temperature = req.temperature;
-    // Our routing, never the client's (abrechnung 02). Zero data retention on top: OpenRouter then
-    // routes only to endpoints that store nothing (Goal 23, A).
-    body.provider = req.zdr ? { ...PROVIDER_ROUTING, zdr: true } : { ...PROVIDER_ROUTING };
+    // Our routing, never the client's (abrechnung 02), capped at the current catalogue price of the
+    // model. Zero data retention on top: OpenRouter then routes only to endpoints that store nothing
+    // (Goal 23, A).
+    const routing: Record<string, unknown> = { ...PROVIDER_ROUTING };
+    const maxPrice = maxPriceFor(this.specs.get(req.model));
+    if (maxPrice) routing.max_price = maxPrice;
+    if (req.zdr) routing.zdr = true;
+    body.provider = routing;
 
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
     let res: Response;

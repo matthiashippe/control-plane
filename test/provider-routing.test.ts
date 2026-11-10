@@ -99,7 +99,8 @@ describe("provider routing on every OpenRouter call", () => {
     expect((await t.chat(ask("openai/gpt-5.2"))).status).toBe(200);
     expect((await t.chat(ask("gpt-5-mini"))).status).toBe(200);
     expect(bodies).toHaveLength(2);
-    for (const body of bodies) expect(body.provider).toEqual({ sort: "throughput", allow_fallbacks: true });
+    expect(bodies[0].provider).toEqual({ sort: "throughput", allow_fallbacks: true, max_price: { prompt: 1.75, completion: 14 } });
+    expect(bodies[1].provider).toEqual({ sort: "throughput", allow_fallbacks: true, max_price: { prompt: 0.25, completion: 2 } });
     expect(PROVIDER_ROUTING).toEqual({ sort: "throughput", allow_fallbacks: true });
   });
 
@@ -111,14 +112,19 @@ describe("provider routing on every OpenRouter call", () => {
     };
     expect((await t.chat(ask("openai/gpt-5-mini", smuggled))).status).toBe(200);
     expect(bodies).toHaveLength(1);
-    expect(bodies[0].provider).toEqual({ sort: "throughput", allow_fallbacks: true });
+    expect(bodies[0].provider).toEqual({ sort: "throughput", allow_fallbacks: true, max_price: { prompt: 0.25, completion: 2 } });
     expect(JSON.stringify(bodies[0]).toLowerCase()).not.toContain("anthropic");
   });
 
   it("keeps zero data retention next to the routing when the delivery asks for it", async () => {
     const { provider, bodies } = fakeOpenRouter(() => ({ provider: "Azure", costUsd: 0.001 }));
     await provider.chat({ model: "openai/gpt-5.2", messages: [{ role: "user", content: "hi" }], maxTokens: 16, apiKeyId: "x", zdr: true });
-    expect(bodies[0].provider).toEqual({ sort: "throughput", allow_fallbacks: true, zdr: true });
+    expect(bodies[0].provider).toEqual({
+      sort: "throughput",
+      allow_fallbacks: true,
+      max_price: { prompt: 1.75, completion: 14 },
+      zdr: true,
+    });
   });
 
   it("charges the actual purchase times 1.3 when two upstream providers answer at different prices", async () => {
@@ -139,6 +145,53 @@ describe("provider routing on every OpenRouter call", () => {
     expect(slow.meta.purchase_mc).toBe(Math.ceil(0.00119 * 100_000));
     expect(fast.meta.cost_usd).toBe(0.00731);
     expect(slow.meta.cost_usd).toBe(0.00119);
+  });
+});
+
+describe("max_price: no purchase above the catalogue price", () => {
+  const priceOf = (body: Record<string, unknown>) => (body.provider as { max_price?: unknown }).max_price;
+
+  it("max_price: every call is capped at the catalogue price of its own model, alias or real model ID", async () => {
+    const { provider, bodies } = fakeOpenRouter(() => ({ provider: "OpenAI", costUsd: 0.001 }));
+    const t = tenant([provider], provider.defaultAliases());
+    expect((await t.chat(ask("openai/gpt-5.2"))).status).toBe(200);
+    expect((await t.chat(ask("gpt-5-mini"))).status).toBe(200);
+    expect(bodies.map((b) => b.model)).toEqual(["openai/gpt-5.2", "openai/gpt-5-mini"]);
+    expect(priceOf(bodies[0])).toEqual({ prompt: 1.75, completion: 14 });
+    expect(priceOf(bodies[1])).toEqual({ prompt: 0.25, completion: 2 });
+  });
+
+  it("max_price: a max_price from the client's body does not reach OpenRouter", async () => {
+    const { provider, bodies } = fakeOpenRouter(() => ({ provider: "OpenAI", costUsd: 0.001 }));
+    const t = tenant([provider]);
+    const smuggled = {
+      max_price: { prompt: 999, completion: 999 },
+      provider: { max_price: { prompt: 999, completion: 999, request: 5 } },
+    };
+    expect((await t.chat(ask("openai/gpt-5.2", smuggled))).status).toBe(200);
+    expect(bodies).toHaveLength(1);
+    expect(bodies[0].max_price).toBeUndefined();
+    expect(priceOf(bodies[0])).toEqual({ prompt: 1.75, completion: 14 });
+    expect(JSON.stringify(bodies[0])).not.toContain("999");
+  });
+
+  it("max_price: follows the current catalogue price after a price refresh, without float noise", async () => {
+    const { provider, bodies } = fakeOpenRouter(() => ({ provider: "OpenAI", costUsd: 0.001 }));
+    // What refreshPrices computes from OpenRouter's per-token strings "0.0000002" and "0.0000034":
+    // the first lands at 0.19999999999999998, a hair below the real price.
+    const prompt = Number("0.0000002") * 1_000_000;
+    const completion = Number("0.0000034") * 1_000_000;
+    expect(prompt).toBeLessThan(0.2);
+    provider.loadSnapshot([{ ...SPECS[0], inputPerMillion: prompt, outputPerMillion: completion }, SPECS[1]]);
+    await provider.chat({ model: "openai/gpt-5.2", messages: [{ role: "user", content: "hi" }], maxTokens: 16, apiKeyId: "x" });
+    expect(priceOf(bodies[0])).toEqual({ prompt: 0.2, completion: 3.4 });
+  });
+
+  it("max_price: without a catalogue price the routing carries no max_price", async () => {
+    const { provider, bodies } = fakeOpenRouter(() => ({ provider: "OpenAI", costUsd: 0.001 }));
+    provider.loadSnapshot([{ ...SPECS[0], inputPerMillion: 0, outputPerMillion: 0 }, SPECS[1]]);
+    await provider.chat({ model: "openai/gpt-5.2", messages: [{ role: "user", content: "hi" }], maxTokens: 16, apiKeyId: "x" });
+    expect(bodies[0].provider).toEqual({ sort: "throughput", allow_fallbacks: true });
   });
 });
 

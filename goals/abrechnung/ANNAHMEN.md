@@ -43,6 +43,18 @@
   des Kunden geht nie durch: Der Body an OpenRouter wird Feld für Feld gebaut, und `provider` setzt nur der Dienst.
 - **Preis:** Mit `sort` entscheidet nicht mehr der Preis über den Anbieter. Abgerechnet wird weiter `usage.cost` mal 1,3 (`costMc`), also
   der Einkauf des Anbieters, der geantwortet hat; der Test prüft das mit zwei Anbietern verschiedener Preise.
+- **Preisdeckel `max_price` (Kritik, Punkt 7):** Das Routing trägt `max_price: { prompt, completion }` in USD je Million Token aus dem
+  aktuellen Katalogpreis des Modells (`maxPriceFor` in `src/inference/openrouter.ts`, dieselben Zahlen wie `inputPerMillion` und
+  `outputPerMillion` hinter `/v1/models`, nach jedem stündlichen Preisabruf neu). Quelle: OpenRouter-Doku „Provider Selection“
+  (`https://openrouter.ai/docs/guides/routing/provider-selection`, gelesen am 10.11.2026): `max_price` ist ein Objekt mit `prompt`,
+  `completion`, `request` und `image`, Beispiel `{"prompt": 1, "completion": 2}` für höchstens 1 USD und 2 USD je Million Token, oft
+  zusammen mit `sort`; passt kein Anbieter, läuft die Anfrage nicht. `request` und `image` setzen wir nicht, weil der Katalog sie nicht
+  kennt. Gerundet auf 12 signifikante Stellen, weil der Katalog OpenRouters Preis je Token mal eine Million rechnet und etwa jeder vierte
+  Preis dabei knapp unter dem echten landet (`"0.0000002"` wird 0,19999999999999998); ein Deckel knapp unter dem Preis schlösse jeden
+  Anbieter aus. Ohne Preis im Katalog (0 oder unbekannt) kein Deckel, denn 0 schlösse jeden bezahlten Anbieter aus. Ein `max_price` des
+  Kunden, oben im Body oder in seinem `provider`, kommt nicht durch, weil der Body an OpenRouter Feld für Feld gebaut wird. Folge: Ist
+  zeitweise nur ein teurerer Endpunkt erreichbar, antwortet OpenRouter mit einem Fehler statt teurer einzukaufen; das ist gewollt, denn
+  die Reservierung beruht auf dem Listenpreis.
 - **Dauer** ist die Zeit vom Aufruf beim Anbieter bis zu seiner Antwort (Buchung, `meta.duration_ms`) oder bis zum Aufgeben (Abbruch,
   `inference_aborts.duration_ms`, unverändert aus Goal 01). **Anbieter** ist OpenRouters Feld `provider` der Antwort (`meta.upstream`,
   neue Spalte `inference_aborts.upstream`, `null` ohne Antwort). Der Spaltentest aus Goal 01 kennt die neue Spalte; sie trägt einen
