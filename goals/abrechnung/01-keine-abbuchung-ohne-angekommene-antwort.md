@@ -1,7 +1,7 @@
 # Abrechnung Goal 01: Keine Abbuchung ohne angekommene Antwort
 
 ## Status
-PLANNED
+ACTIVE
 
 ## Active Objective
 Bricht ein Client vor der fertigen Antwort ab, bucht `/v1/chat/completions` nichts ab: keine Ledger-Zeile `inference`, die
@@ -47,34 +47,34 @@ zählen muss, um schnellere Anbieter zu belegen.
   Den Rollout selbst machst du nicht.
 
 ## Done Condition
-- [ ] Ein Abbruch des Clients vor der fertigen Antwort bucht nichts: Der Test stellt einen Anbieter, der erst nach dem Abbruch
+- [x] Ein Abbruch des Clients vor der fertigen Antwort bucht nichts: Der Test stellt einen Anbieter, der erst nach dem Abbruch
       antwortet, und verlangt keine Ledger-Zeile `inference`, ein freies Guthaben gleich dem Saldo (Reservierung zurück) und ein
       ausgelöstes Abbruch-Signal beim Anbieter. Ein zweiter Test zeigt, dass eine Anfrage ohne Abbruch genau wie vorher genau einmal
       gebucht wird.
       Prüfung: `pnpm -s vitest run test/inference-abort.test.ts` muss Exit-Code 0 haben.
       Prüfung: `grep -cE "^\s*(it|test)\(" test/inference-abort.test.ts` muss mindestens 4 ausgeben.
-- [ ] Zusammengeführte Anfragen bleiben richtig: Bricht einer von zwei identischen gleichzeitigen Aufrufern ab, bekommt der andere die
+- [x] Zusammengeführte Anfragen bleiben richtig: Bricht einer von zwei identischen gleichzeitigen Aufrufern ab, bekommt der andere die
       Antwort und es gibt genau eine Ledger-Zeile `inference`; brechen beide ab, gibt es keine.
       Prüfung: `grep -ciE "coalesc" test/inference-abort.test.ts` muss mindestens 2 ausgeben.
       Prüfung: `pnpm -s vitest run test/inference-abort.test.ts test/inference.test.ts test/money-adversarial.test.ts` muss Exit-Code 0 haben.
-- [ ] Jeder Abbruch steht in der Datenbank mit Modell, Dauer in ms, Einkaufspreis in mc und Zeitpunkt, ohne Prompt, Antwort und Adresse
+- [x] Jeder Abbruch steht in der Datenbank mit Modell, Dauer in ms, Einkaufspreis in mc und Zeitpunkt, ohne Prompt, Antwort und Adresse
       im Klartext; der Test liest den Eintrag nach einem Abbruch und findet keinen ohne Abbruch.
       Prüfung: `pnpm -s vitest run test/inference-abort.test.ts -t "records"` muss Exit-Code 0 haben.
       Prüfung: `grep -c "records" test/inference-abort.test.ts` muss mindestens 1 ausgeben.
-- [ ] Die Gutschrift der drei Fälle vom 10.11.2026: eine Ledger-Zeile auf die Adresse der drei Abbuchungen über genau ihre Summe, mit
+- [x] Die Gutschrift der drei Fälle vom 10.11.2026: eine Ledger-Zeile auf die Adresse der drei Abbuchungen über genau ihre Summe, mit
       Verweis auf die drei `ref`, idempotent; der Test baut eine Datenbank mit drei solchen Abbuchungen und einer fremden, startet den
       Schritt zweimal und verlangt genau eine Gutschrift über die Summe der drei, Saldo gleich Summe des Ledgers, keine Gutschrift, wenn
       die drei Abbuchungen fehlen, und `GET /v1/credits/history` antwortet mit der neuen Zeile ohne Fehler.
       Prüfung: `pnpm -s vitest run test/credit-aborted.test.ts` muss Exit-Code 0 haben.
       Prüfung: `grep -cE "^\s*(it|test)\(" test/credit-aborted.test.ts` muss mindestens 4 ausgeben.
-- [ ] `ops/live.sh` steht und ist in beide Richtungen bewiesen: Der Selbsttest zeigt an gepflanzten Daten `FAIL` ohne Gutschrift, `FAIL`
+- [x] `ops/live.sh` steht und ist in beide Richtungen bewiesen: Der Selbsttest zeigt an gepflanzten Daten `FAIL` ohne Gutschrift, `FAIL`
       bei doppelter Gutschrift und `OK` bei genau einer, ohne Netz.
       Prüfung: `bash ops/live.sh --selftest` muss Exit-Code 0 haben und `LIVE SELFTEST OK` ausgeben.
       Prüfung: `grep -cE "readonly: *true" ops/live.sh` muss mindestens 1 ausgeben.
-- [ ] Kein Name, keine Adresse und kein Guthaben eines Kunden im Diff: Jede Ethereum-Adresse, die das Goal neu ins Repo bringt, steht in
+- [x] Kein Name, keine Adresse und kein Guthaben eines Kunden im Diff: Jede Ethereum-Adresse, die das Goal neu ins Repo bringt, steht in
       einer Fixture unter `test/` und ist erkennbar erfunden, oder sie gehört uns und steht in `src/bounties/ours.ts`.
       Prüfung: `git diff $(git merge-base origin/dev HEAD) -- src ops | grep -E "^\+" | grep -oiE "0x[0-9a-f]{40}" | tr A-F a-f | sort -u | grep -vxFf <(grep -oiE "0x[0-9a-f]{40}" src/bounties/ours.ts | tr A-F a-f) | wc -l` muss 0 ausgeben.
-- [ ] `check` ist grün.
+- [x] `check` ist grün.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
 - [ ] goal-verifier PASS (K und B)
 
@@ -93,5 +93,6 @@ zählen muss, um schnellere Anbieter zu belegen.
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-10 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6, 7 gebaut: Abbruch-Signal des Clients von der Route über den Coalescer bis zum Anbieter, keine Buchung nach dem Abbruch, Tabelle inference_aborts, Gutschrift der drei Fälle beim Start (61644 mc, gemessen, siehe ANNAHMEN.md), ops/live.sh mit Selbsttest. Rot vorher: beide neuen Testdateien gegen src von origin/dev 8 von 9 und Importfehler rot, dazu Mutationen (Buchung trotz Abbruch, Coalescer bricht beim ersten Abgang ab, ohne Idempotenz, OpenRouter ohne Signal, Route ohne Signal, live.sh-Richter immer OK, Abfrage immer n=1) je rot; Gegenprobe Punkt 6 mit gepflanzter Adresse 1. Prüfbefehle (Node 22, PATH=/usr/bin:$PATH): P1 vitest inference-abort Exit 0, grep it 9; P2 grep coalesc 5, vitest drei Dateien 38 passed Exit 0; P3 -t records 2 passed Exit 0, grep records 2; P4 vitest credit-aborted 6 passed Exit 0, grep it 6; P5 live.sh --selftest LIVE SELFTEST OK Exit 0, grep readonly 2; P6 0; P7 check grün (1251 Tests, Exit 0; ein Lauf davor Exit 1 nur durch zwei Vitest-RPC-Timeouts bei Load 150, alle Tests grün).
 
 ## Blockers
