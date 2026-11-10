@@ -111,7 +111,12 @@ export interface ChatProvider {
    * `zdr` asks for endpoints that keep neither input nor output (Goal 23, condition A). Only the
    * delivery sets it; the proxy never does. A provider without such a switch may ignore it.
    */
-  chat(req: ChatRequest & { maxTokens: number; apiKeyId: string; zdr?: boolean }): Promise<ChatResponse>;
+  /**
+   * `signal` is aborted when nobody waits for the answer any more (the client closed the
+   * connection). A provider should cancel its purchase then; one that ignores it still gets its
+   * answer discarded and not charged by the proxy.
+   */
+  chat(req: ChatRequest & { maxTokens: number; apiKeyId: string; zdr?: boolean; signal?: AbortSignal }): Promise<ChatResponse>;
 }
 
 /** Rough token estimate without a tokenizer: four characters per token, plus one token per message. */

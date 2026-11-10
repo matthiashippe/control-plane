@@ -7,6 +7,7 @@
  */
 
 import Database from "better-sqlite3";
+import { creditAbortedOnStart } from "./credits/aborted.js";
 
 export type Db = Database.Database;
 
@@ -15,6 +16,9 @@ export function openDb(path: string): Db {
   db.pragma("journal_mode = WAL");
   db.pragma("foreign_keys = ON");
   migrate(db);
+  // Gives back what was charged for answers that never arrived (abrechnung 01). Idempotent, so it
+  // runs on every start and lands with the rollout instead of as SQL by hand on the server.
+  creditAbortedOnStart(db);
   return db;
 }
 
@@ -90,6 +94,21 @@ function migrate(db: Db): void {
       created_at  TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS ledger_address ON ledger(address, id);
+
+    -- Inference calls whose client went away before the answer (abrechnung 01, 2026-11-10). Never
+    -- charged; what the provider charged us anyway is our purchase without a sale. Deliberately
+    -- without address, prompt and answer: this table measures timeouts per model, not customers.
+    CREATE TABLE IF NOT EXISTS inference_aborts (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      model       TEXT NOT NULL,                -- model bought upstream
+      requested_model TEXT NOT NULL,            -- ID the client asked for (alias or real)
+      provider    TEXT NOT NULL,
+      duration_ms INTEGER NOT NULL,             -- from the provider call to the moment we gave up
+      purchase_mc INTEGER NOT NULL,             -- what the answer cost us, 0 when none arrived
+      answered    INTEGER NOT NULL,             -- 1: the provider answered after the client had gone
+      ref         TEXT,                         -- generation id at the provider, when it answered
+      created_at  TEXT NOT NULL
+    );
 
     -- x402 payments, keyed by the authorization nonce of the EIP-3009 signature.
     CREATE TABLE IF NOT EXISTS payments (
@@ -256,6 +275,10 @@ function migrate(db: Db): void {
   // A database in exactly the state one bug produces therefore silently lost the defence against
   // an unrelated one.
   db.exec("CREATE UNIQUE INDEX IF NOT EXISTS ledger_grant_once ON ledger(address) WHERE kind = 'grant'");
+
+  // One refund per batch key, ever: the second line of defence behind the check in
+  // src/credits/aborted.ts, for the same reason as the grant index above.
+  db.exec("CREATE UNIQUE INDEX IF NOT EXISTS ledger_refund_once ON ledger(ref) WHERE kind = 'refund'");
 
   try {
     db.exec("CREATE UNIQUE INDEX IF NOT EXISTS ledger_topup_ref ON ledger(ref) WHERE kind = 'topup' AND ref IS NOT NULL");
@@ -434,7 +457,10 @@ export interface LedgerEntry {
     // grant_returned is negative and only ever cancels a job-scoped grant whose job ended without
     // an award. It is a separate kind because the unique index that makes "one grant per address,
     // ever" true is scoped to kind = 'grant' and would refuse a second row there.
-    | "grant" | "grant_returned";
+    | "grant" | "grant_returned"
+    // refund gives back what was charged for answers that never reached the client (abrechnung 01,
+    // src/credits/aborted.ts). Internal credit only, never a payout.
+    | "refund";
   deltaMc: number;
   ref?: string;
   meta?: Record<string, unknown>;
@@ -489,6 +515,34 @@ export function postLedger(db: Db, entry: LedgerEntry): { balanceMc: number } {
     return { balanceMc: getBalanceMc(db, address) };
   });
   return run();
+}
+
+export interface InferenceAbort {
+  model: string;
+  requestedModel: string;
+  provider: string;
+  durationMs: number;
+  purchaseMc: number;
+  answered: boolean;
+  ref?: string | null;
+}
+
+/** One row per aborted inference call; see the table `inference_aborts` for what it leaves out. */
+export function recordInferenceAbort(db: Db, a: InferenceAbort): void {
+  if (!Number.isInteger(a.purchaseMc) || a.purchaseMc < 0) throw new Error("purchase_mc must be a non-negative integer");
+  db.prepare(
+    "INSERT INTO inference_aborts (model, requested_model, provider, duration_ms, purchase_mc, answered, ref, created_at) " +
+      "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+  ).run(
+    a.model,
+    a.requestedModel,
+    a.provider,
+    Math.max(0, Math.round(a.durationMs)),
+    a.purchaseMc,
+    a.answered ? 1 : 0,
+    a.ref ?? null,
+    new Date().toISOString(),
+  );
 }
 
 export function ensureWallet(db: Db, address: string): void {

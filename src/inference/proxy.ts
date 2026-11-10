@@ -8,8 +8,8 @@
  * negative (dead).
  */
 
-import { getAvailableMc, getBalanceMc, mcToCents, postLedger, releaseMc, reserveMc, type Db } from "../db.js";
-import { RequestCoalescer, requestKey } from "./dedupe.js";
+import { getAvailableMc, getBalanceMc, mcToCents, postLedger, recordInferenceAbort, releaseMc, reserveMc, type Db } from "../db.js";
+import { ClientAbortedError, RequestCoalescer, requestKey } from "./dedupe.js";
 import { DOC } from "../errors.js";
 import type { ChatProvider, ChatRequest, ChatResponse, ModelSpec, Usage } from "./provider.js";
 import { estimateTokens, ProviderBadRequestError, ProviderUnavailableError } from "./provider.js";
@@ -174,7 +174,25 @@ export function inflightRequests(): number {
  */
 export interface ChatOptions {
   topupsClosed?: boolean;
+  /**
+   * The client's connection (`c.req.raw.signal`). Aborted means the answer cannot reach it any
+   * more, and an answer that does not arrive is not charged (Matthias, 2026-11-10).
+   */
+  signal?: AbortSignal;
 }
+
+/**
+ * Answer for a caller who went away. Nobody reads it over a closed connection; it exists so the
+ * route returns something well-formed and a log line shows the status nginx and Caddy use for it.
+ */
+const CLIENT_CLOSED: ChatResult = {
+  status: 499,
+  body: {
+    error: "client_closed_request",
+    message: "The client closed the connection before the answer was complete. Nothing was charged.",
+    docs: DOC.inference,
+  },
+};
 
 export async function handleChat(
   db: Db,
@@ -186,9 +204,20 @@ export async function handleChat(
   // If an identical request for the same address is already running, wait for its result instead
   // of buying and charging a second time. See `dedupe.ts` for the reason.
   const key = requestKey(address, body);
-  const { value, coalesced } = await coalescer.run(key, () =>
-    handleChatUncoalesced(db, catalog, address, body, chatOpts),
-  );
+  let outcome: { value: ChatResult; coalesced: boolean };
+  try {
+    outcome = await coalescer.run(
+      key,
+      (signal) => handleChatUncoalesced(db, catalog, address, body, chatOpts, signal),
+      chatOpts.signal,
+    );
+  } catch (err) {
+    // This caller left. Whether the shared work goes on (another caller still waits) or was
+    // cancelled (nobody does) is the coalescer's business; this caller is charged nothing.
+    if (err instanceof ClientAbortedError) return CLIENT_CLOSED;
+    throw err;
+  }
+  const { value, coalesced } = outcome;
   if (coalesced) {
     console.log(`[inference] coalesced an identical request into one already running (${key.slice(0, 12)})`);
   }
@@ -201,6 +230,7 @@ async function handleChatUncoalesced(
   address: string,
   body: unknown,
   chatOpts: ChatOptions,
+  signal: AbortSignal,
 ): Promise<ChatResult> {
   if (typeof body !== "object" || body === null) {
     return {
@@ -358,11 +388,56 @@ async function handleChatUncoalesced(
     };
   }
 
+  // Whoever has gone before we even ask the provider costs nothing at all.
+  if (signal.aborted) {
+    releaseMc(db, address, requiredMc);
+    return CLIENT_CLOSED;
+  }
+
+  // Everything an abort leaves behind: the reservation goes back, nothing is charged, and the
+  // abort is written down with what it cost us (abrechnung 01). Without address, prompt or answer.
+  const startedAt = Date.now();
+  const abandon = (answer: ChatResponse | null): ChatResult => {
+    releaseMc(db, address, requiredMc);
+    let bought = 0;
+    if (answer) {
+      try {
+        bought = purchaseMc(entry.spec, answer.usage);
+      } catch {
+        bought = 0;
+      }
+    }
+    try {
+      recordInferenceAbort(db, {
+        model: entry.spec.id,
+        requestedModel: req.model as string,
+        provider: entry.provider.id,
+        durationMs: Date.now() - startedAt,
+        purchaseMc: Number.isInteger(bought) && bought >= 0 ? bought : 0,
+        answered: answer !== null,
+        ref: answer?.id ?? null,
+      });
+    } catch (err) {
+      console.error(`[inference] could not record an aborted call: ${err instanceof Error ? err.message : String(err)}`);
+    }
+    console.log(`[inference] client aborted before the answer, nothing charged (${entry.spec.id}, ${Date.now() - startedAt} ms)`);
+    return CLIENT_CLOSED;
+  };
+
   let response: ChatResponse;
   try {
     // `zdr` is the delivery's switch, not the caller's: a body field of that name must not reach it.
-    response = await entry.provider.chat({ ...(req as ChatRequest), model: entry.spec.id, maxTokens, apiKeyId: address, zdr: false });
+    response = await entry.provider.chat({
+      ...(req as ChatRequest),
+      model: entry.spec.id,
+      maxTokens,
+      apiKeyId: address,
+      zdr: false,
+      signal,
+    });
   } catch (err) {
+    // The provider gave up because nobody waits any more: an abort, not an outage.
+    if (signal.aborted) return abandon(null);
     // Every exit without a booking has to give the reservation back, otherwise the tenant's credit
     // stays blocked for good.
     releaseMc(db, address, requiredMc);
@@ -402,6 +477,11 @@ async function handleChatUncoalesced(
     }
     throw err;
   }
+  // The answer is here, but the client is not: on 2026-11-10 three calls of a foreign automaton
+  // ran into its 60 second timeout and were charged anyway, for answers that never arrived. An
+  // answer that does not reach the client is not charged (Matthias, 2026-11-10).
+  if (signal.aborted) return abandon(response);
+
   // From here on nothing may end without releasing the reservation. The counter-check of
   // 19.09.2026 showed that an error after the provider answer (incomplete `usage`, a database write
   // failing on a full disk) otherwise blocks the tenant's credit until the process restarts.

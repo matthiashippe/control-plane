@@ -29,27 +29,104 @@ export function requestKey(address: string, body: unknown): string {
     .digest("hex");
 }
 
+/** The caller went away before the answer was there. Nothing may be charged to it. */
+export class ClientAbortedError extends Error {
+  constructor() {
+    super("client aborted the request");
+    this.name = "ClientAbortedError";
+  }
+}
+
+interface Inflight<T> {
+  promise: Promise<T>;
+  /** Aborted once the last caller waiting for this work has gone. */
+  controller: AbortController;
+  waiters: number;
+}
+
 export class RequestCoalescer<T> {
-  private readonly inflight = new Map<string, Promise<T>>();
+  private readonly inflight = new Map<string, Inflight<T>>();
 
   /**
    * Runs `work`, or attaches to a call with the same key that is already running. Also returns
    * whether this call was the first one; that belongs in the ledger meta, so it stays visible
    * afterwards how often retries were coalesced.
+   *
+   * `signal` is the caller's own abort (the client closed the connection). A caller that aborts
+   * leaves at once with `ClientAbortedError`. The shared work keeps running as long as any other
+   * caller still waits for it, because that caller still gets the answer and pays for it once.
+   * Only when the last caller has gone is the signal handed to `work` aborted, so the purchase is
+   * cancelled upstream and nobody is charged (abrechnung 01, 2026-11-10).
    */
-  async run(key: string, work: () => Promise<T>): Promise<{ value: T; coalesced: boolean }> {
-    const existing = this.inflight.get(key);
-    if (existing) return { value: await existing, coalesced: true };
+  async run(
+    key: string,
+    work: (signal: AbortSignal) => Promise<T>,
+    signal?: AbortSignal,
+  ): Promise<{ value: T; coalesced: boolean }> {
+    if (signal?.aborted) throw new ClientAbortedError();
 
-    const p = work();
-    this.inflight.set(key, p);
-    try {
-      return { value: await p, coalesced: false };
-    } finally {
+    let entry = this.inflight.get(key);
+    const coalesced = entry !== undefined;
+    if (!entry) {
+      const controller = new AbortController();
+      const created: Inflight<T> = { promise: work(controller.signal), controller, waiters: 0 };
+      entry = created;
+      this.inflight.set(key, created);
       // Remove it only after completion, not before: otherwise a retry arriving a millisecond too
-      // late would still start a second purchase.
-      this.inflight.delete(key);
+      // late would still start a second purchase. Attached to the work itself and not to the first
+      // caller, because the first caller may leave long before the work ends.
+      created.promise
+        .catch(() => undefined)
+        .finally(() => {
+          if (this.inflight.get(key) === created) this.inflight.delete(key);
+        });
     }
+    const current = entry;
+    current.waiters += 1;
+
+    let left = false;
+    const leave = () => {
+      if (left) return;
+      left = true;
+      current.waiters -= 1;
+    };
+
+    if (!signal) {
+      try {
+        return { value: await current.promise, coalesced };
+      } finally {
+        leave();
+      }
+    }
+
+    return new Promise<{ value: T; coalesced: boolean }>((resolve, reject) => {
+      const onAbort = () => {
+        if (left) return;
+        leave();
+        if (current.waiters === 0) {
+          // Nobody waits any more: cancel upstream, and let a new identical request start fresh
+          // instead of attaching to work whose answer will not be delivered or charged.
+          current.controller.abort();
+          if (this.inflight.get(key) === current) this.inflight.delete(key);
+        }
+        reject(new ClientAbortedError());
+      };
+      signal.addEventListener("abort", onAbort, { once: true });
+      current.promise.then(
+        (value) => {
+          signal.removeEventListener("abort", onAbort);
+          if (left) return;
+          leave();
+          resolve({ value, coalesced });
+        },
+        (err) => {
+          signal.removeEventListener("abort", onAbort);
+          if (left) return;
+          leave();
+          reject(err);
+        },
+      );
+    });
   }
 
   /** For tests and diagnostics only. */

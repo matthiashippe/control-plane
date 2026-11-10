@@ -1,7 +1,7 @@
 # Abrechnung Goal 01: Keine Abbuchung ohne angekommene Antwort
 
 ## Status
-PLANNED
+DONE
 
 ## Active Objective
 Bricht ein Client vor der fertigen Antwort ab, bucht `/v1/chat/completions` nichts ab: keine Ledger-Zeile `inference`, die
@@ -47,36 +47,55 @@ zählen muss, um schnellere Anbieter zu belegen.
   Den Rollout selbst machst du nicht.
 
 ## Done Condition
-- [ ] Ein Abbruch des Clients vor der fertigen Antwort bucht nichts: Der Test stellt einen Anbieter, der erst nach dem Abbruch
+- [x] Ein Abbruch des Clients vor der fertigen Antwort bucht nichts: Der Test stellt einen Anbieter, der erst nach dem Abbruch
       antwortet, und verlangt keine Ledger-Zeile `inference`, ein freies Guthaben gleich dem Saldo (Reservierung zurück) und ein
       ausgelöstes Abbruch-Signal beim Anbieter. Ein zweiter Test zeigt, dass eine Anfrage ohne Abbruch genau wie vorher genau einmal
       gebucht wird.
       Prüfung: `pnpm -s vitest run test/inference-abort.test.ts` muss Exit-Code 0 haben.
       Prüfung: `grep -cE "^\s*(it|test)\(" test/inference-abort.test.ts` muss mindestens 4 ausgeben.
-- [ ] Zusammengeführte Anfragen bleiben richtig: Bricht einer von zwei identischen gleichzeitigen Aufrufern ab, bekommt der andere die
+- [x] Zusammengeführte Anfragen bleiben richtig: Bricht einer von zwei identischen gleichzeitigen Aufrufern ab, bekommt der andere die
       Antwort und es gibt genau eine Ledger-Zeile `inference`; brechen beide ab, gibt es keine.
       Prüfung: `grep -ciE "coalesc" test/inference-abort.test.ts` muss mindestens 2 ausgeben.
       Prüfung: `pnpm -s vitest run test/inference-abort.test.ts test/inference.test.ts test/money-adversarial.test.ts` muss Exit-Code 0 haben.
-- [ ] Jeder Abbruch steht in der Datenbank mit Modell, Dauer in ms, Einkaufspreis in mc und Zeitpunkt, ohne Prompt, Antwort und Adresse
+- [x] Jeder Abbruch steht in der Datenbank mit Modell, Dauer in ms, Einkaufspreis in mc und Zeitpunkt, ohne Prompt, Antwort und Adresse
       im Klartext; der Test liest den Eintrag nach einem Abbruch und findet keinen ohne Abbruch.
       Prüfung: `pnpm -s vitest run test/inference-abort.test.ts -t "records"` muss Exit-Code 0 haben.
       Prüfung: `grep -c "records" test/inference-abort.test.ts` muss mindestens 1 ausgeben.
-- [ ] Die Gutschrift der drei Fälle vom 10.11.2026: eine Ledger-Zeile auf die Adresse der drei Abbuchungen über genau ihre Summe, mit
+- [x] Die Gutschrift der drei Fälle vom 10.11.2026: eine Ledger-Zeile auf die Adresse der drei Abbuchungen über genau ihre Summe, mit
       Verweis auf die drei `ref`, idempotent; der Test baut eine Datenbank mit drei solchen Abbuchungen und einer fremden, startet den
       Schritt zweimal und verlangt genau eine Gutschrift über die Summe der drei, Saldo gleich Summe des Ledgers, keine Gutschrift, wenn
       die drei Abbuchungen fehlen, und `GET /v1/credits/history` antwortet mit der neuen Zeile ohne Fehler.
       Prüfung: `pnpm -s vitest run test/credit-aborted.test.ts` muss Exit-Code 0 haben.
       Prüfung: `grep -cE "^\s*(it|test)\(" test/credit-aborted.test.ts` muss mindestens 4 ausgeben.
-- [ ] `ops/live.sh` steht und ist in beide Richtungen bewiesen: Der Selbsttest zeigt an gepflanzten Daten `FAIL` ohne Gutschrift, `FAIL`
+- [x] `ops/live.sh` steht und ist in beide Richtungen bewiesen: Der Selbsttest zeigt an gepflanzten Daten `FAIL` ohne Gutschrift, `FAIL`
       bei doppelter Gutschrift und `OK` bei genau einer, ohne Netz.
       Prüfung: `bash ops/live.sh --selftest` muss Exit-Code 0 haben und `LIVE SELFTEST OK` ausgeben.
       Prüfung: `grep -cE "readonly: *true" ops/live.sh` muss mindestens 1 ausgeben.
-- [ ] Kein Name, keine Adresse und kein Guthaben eines Kunden im Diff: Jede Ethereum-Adresse, die das Goal neu ins Repo bringt, steht in
+- [x] Kein Name, keine Adresse und kein Guthaben eines Kunden im Diff: Jede Ethereum-Adresse, die das Goal neu ins Repo bringt, steht in
       einer Fixture unter `test/` und ist erkennbar erfunden, oder sie gehört uns und steht in `src/bounties/ours.ts`.
       Prüfung: `git diff $(git merge-base origin/dev HEAD) -- src ops | grep -E "^\+" | grep -oiE "0x[0-9a-f]{40}" | tr A-F a-f | sort -u | grep -vxFf <(grep -oiE "0x[0-9a-f]{40}" src/bounties/ours.ts | tr A-F a-f) | wc -l` muss 0 ausgeben.
-- [ ] `check` ist grün.
+- [x] `check` ist grün.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] Kritik: Die Gutschrift umfasst alle fünf Anfragen dieses Kunden vom 10.11.2026, die nach dem Abbruch trotzdem berechnet
+      wurden, nicht nur die drei nach 59,9 s: Das Caddy-Zugriffslog zeigt Status 0 auch um 05:16:27 UTC nach 22,8 s und um 05:18:17 UTC
+      nach 18,5 s, vom selben Client, und das Ledger bucht dazu `gen-1794287765-SupdXvMT0JLDL224yBtY` (8883 mc) und
+      `gen-1794287878-doiF42ITx3lfTwxRWfqU` (8702 mc), je rund 6 s nach dem Abbruch. Die Summe der fünf ist 79229 mc; der Batch nennt
+      alle fünf `ref`, `ops/live.sh` erwartet genau diese Summe, und der Test baut eine Datenbank mit allen fünf Abbuchungen.
+      MVP: Funktion, weil Grundregel 6 jede berechnete, nicht angekommene Antwort zurückgibt und eine halbe Gutschrift den Kunden
+      genauso verliert wie keine.
+      Prüfung: `grep -cE "gen-1794287765-SupdXvMT0JLDL224yBtY|gen-1794287878-doiF42ITx3lfTwxRWfqU" src/credits/aborted.ts` muss 2 ausgeben.
+      Prüfung: `grep -cE "totalMc: 79_?229" src/credits/aborted.ts` muss 1 ausgeben.
+      Prüfung: `grep -c "^REFUND_MC=79229$" ops/live.sh` muss 1 ausgeben.
+      Prüfung: `pnpm -s vitest run test/credit-aborted.test.ts` muss Exit-Code 0 haben.
+      Prüfung: `bash ops/live.sh --selftest` muss Exit-Code 0 haben und `LIVE SELFTEST OK` ausgeben.
+- [x] Kritik: `## Acceptance Criteria` steht wieder wie auf dem Integrationszweig, alle drei Kästchen leer. Die Goal-Datei darf sich
+      auf dem Goal-Branch nur in Status, Progress Log, Blockers, Ehrlichen Lücken, den Kästchen der Done-Punkte und den Kritik-Punkten
+      ändern; die angehakten Acceptance-Kästchen meldet `goalDrift` des Gates als Vertragsänderung, und der PR ginge in die Human Inbox.
+      Ob die drei Kriterien erfüllt sind, belegt die Zeile im Progress Log.
+      MVP: Funktion, weil sonst das Gate den Merge verweigert und weder die Gutschrift noch der Abbruchschutz ausrollt.
+      Prüfung: `sed -n '/^## Acceptance Criteria/,/^## Deny List/p' goals/abrechnung/01-keine-abbuchung-ohne-angekommene-antwort.md | grep -c '^- \[ \]'` muss 3 ausgeben.
+      Prüfung: `sed -n '/^## Acceptance Criteria/,/^## Deny List/p' goals/abrechnung/01-keine-abbuchung-ohne-angekommene-antwort.md | grep -c '^- \[x\]'` muss 0 ausgeben.
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Jede neue Testdatei war vor dem Fix rot; die Zeile im Progress Log nennt, womit (`loop-constraints.md`, Budget und Qualität).
@@ -93,5 +112,11 @@ zählen muss, um schnellere Anbieter zu belegen.
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-10 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6, 7 gebaut: Abbruch-Signal des Clients von der Route über den Coalescer bis zum Anbieter, keine Buchung nach dem Abbruch, Tabelle inference_aborts, Gutschrift der drei Fälle beim Start (61644 mc, gemessen, siehe ANNAHMEN.md), ops/live.sh mit Selbsttest. Rot vorher: beide neuen Testdateien gegen src von origin/dev 8 von 9 und Importfehler rot, dazu Mutationen (Buchung trotz Abbruch, Coalescer bricht beim ersten Abgang ab, ohne Idempotenz, OpenRouter ohne Signal, Route ohne Signal, live.sh-Richter immer OK, Abfrage immer n=1) je rot; Gegenprobe Punkt 6 mit gepflanzter Adresse 1. Prüfbefehle (Node 22, PATH=/usr/bin:$PATH): P1 vitest inference-abort Exit 0, grep it 9; P2 grep coalesc 5, vitest drei Dateien 38 passed Exit 0; P3 -t records 2 passed Exit 0, grep records 2; P4 vitest credit-aborted 6 passed Exit 0, grep it 6; P5 live.sh --selftest LIVE SELFTEST OK Exit 0, grep readonly 2; P6 0; P7 check grün (1251 Tests, Exit 0; ein Lauf davor Exit 1 nur durch zwei Vitest-RPC-Timeouts bei Load 150, alle Tests grün).
+- 2026-11-10 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, 7. `origin/dev` gemergt (schon enthalten), Kopf 960a98f. Prüfbefehle (Node 22.23.4, PATH=/usr/bin:$PATH): P1 vitest inference-abort 9 passed Exit 0, grep it 9; P2 grep coalesc 5, vitest drei Dateien 38 passed Exit 0; P3 -t records 2 passed Exit 0, grep records 2; P4 vitest credit-aborted 6 passed Exit 0, grep it 6; P5 live.sh --selftest LIVE SELFTEST OK Exit 0, grep readonly 2; P6 0; P7 check grün (1251 Tests, 71 s, Exit 0, Load 112). `gh pr checks 2`: check pass, e2e pass (1m45s) am Kopf 960a98f. Kein Gedankenstrich in hinzugefügten Zeilen (grep U+2013/U+2014 leer).
+- 2026-11-10 Zyklus 3: Punkt 9 gebaut: die drei Acceptance-Kästchen wieder leer wie auf `dev`; Erfüllung belegt dieses Log. Rot vorher: am Kopf 8a78501 gab die erste Prüfung 0 und die zweite 3. Prüfbefehle: P9 `grep -c '^- \[ \]'` 3, `grep -c '^- \[x\]'` 0; `git diff origin/dev` zeigt unter `## Acceptance Criteria` keine Änderung.
+- 2026-11-10 Zyklus 4: Punkt 8 gebaut: Batch auf fünf `ref` und 79229 mc, `ops/live.sh` erwartet 79229 mc (der Fall `short` pflanzt die alte Gutschrift über 61644 mc und muss `FAIL` zeigen), Test mit fünf Abbuchungen und einem Fall „nur die drei langen“ ohne Gutschrift, `ANNAHMEN.md` nachgezogen. Zahl selbst lesend gemessen: Caddy-Log 5 Zeilen Status 0 vom selben Client (gepflanzte Zeile Status 0 Treffer, Status 200 kein Treffer), Ledger `{"n":5,"a":1,"s":-79229}` (erfundene `ref`: n 0). Rot vorher: `test/credit-aborted.test.ts` gegen den alten Batch 7 von 7 rot. Prüfbefehle (Node 22, PATH=/usr/bin:$PATH): P8 grep refs 2, grep totalMc 1, grep REFUND_MC 1, vitest credit-aborted 7 passed Exit 0 (ein Lauf davor Exit 1 bei Load 175 mit 15 s Testzeit statt 2 s, danach drei Läufe grün), live.sh --selftest LIVE SELFTEST OK Exit 0; P6 0; P7 check grün (1252 Tests, 91 s).
+- 2026-11-10 Zyklus 4: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, 7, 8, 9. `origin/dev` ohne neue Commits, Kopf f95b931. Prüfbefehle (Node 22, PATH=/usr/bin:$PATH): P1 9 passed Exit 0, grep it 9; P2 grep coalesc 5, drei Dateien 38 passed Exit 0 (ein Lauf davor 1 Test über 5000 ms bei Load 151; der Gutschrift-Schritt kostet 0,11 ms je Start, gemessen); P3 2 passed Exit 0, grep records 2; P4 7 passed Exit 0, grep it 7; P5 LIVE SELFTEST OK Exit 0, grep readonly 2; P6 0; P7 check grün (1252 Tests); P8 2, 1, 1, 7 passed, LIVE SELFTEST OK; P9 3 und 0. `gh pr checks 2` am Kopf f95b931: check pass, e2e pass (1m49s). Kein Gedankenstrich in hinzugefügten Zeilen.
+- 2026-11-10 Release: PASS K, B (Zyklus 4), DONE.
 
 ## Blockers
