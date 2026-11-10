@@ -76,6 +76,25 @@ zählen muss, um schnellere Anbieter zu belegen.
       Prüfung: `git diff $(git merge-base origin/dev HEAD) -- src ops | grep -E "^\+" | grep -oiE "0x[0-9a-f]{40}" | tr A-F a-f | sort -u | grep -vxFf <(grep -oiE "0x[0-9a-f]{40}" src/bounties/ours.ts | tr A-F a-f) | wc -l` muss 0 ausgeben.
 - [x] `check` ist grün.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
+- [ ] Kritik: Die Gutschrift umfasst alle fünf Anfragen dieses Kunden vom 10.11.2026, die nach dem Abbruch trotzdem berechnet
+      wurden, nicht nur die drei nach 59,9 s: Das Caddy-Zugriffslog zeigt Status 0 auch um 05:16:27 UTC nach 22,8 s und um 05:18:17 UTC
+      nach 18,5 s, vom selben Client, und das Ledger bucht dazu `gen-1794287765-SupdXvMT0JLDL224yBtY` (8883 mc) und
+      `gen-1794287878-doiF42ITx3lfTwxRWfqU` (8702 mc), je rund 6 s nach dem Abbruch. Die Summe der fünf ist 79229 mc; der Batch nennt
+      alle fünf `ref`, `ops/live.sh` erwartet genau diese Summe, und der Test baut eine Datenbank mit allen fünf Abbuchungen.
+      MVP: Funktion, weil Grundregel 6 jede berechnete, nicht angekommene Antwort zurückgibt und eine halbe Gutschrift den Kunden
+      genauso verliert wie keine.
+      Prüfung: `grep -cE "gen-1794287765-SupdXvMT0JLDL224yBtY|gen-1794287878-doiF42ITx3lfTwxRWfqU" src/credits/aborted.ts` muss 2 ausgeben.
+      Prüfung: `grep -cE "totalMc: 79_?229" src/credits/aborted.ts` muss 1 ausgeben.
+      Prüfung: `grep -c "^REFUND_MC=79229$" ops/live.sh` muss 1 ausgeben.
+      Prüfung: `pnpm -s vitest run test/credit-aborted.test.ts` muss Exit-Code 0 haben.
+      Prüfung: `bash ops/live.sh --selftest` muss Exit-Code 0 haben und `LIVE SELFTEST OK` ausgeben.
+- [ ] Kritik: `## Acceptance Criteria` steht wieder wie auf dem Integrationszweig, alle drei Kästchen leer. Die Goal-Datei darf sich
+      auf dem Goal-Branch nur in Status, Progress Log, Blockers, Ehrlichen Lücken, den Kästchen der Done-Punkte und den Kritik-Punkten
+      ändern; die angehakten Acceptance-Kästchen meldet `goalDrift` des Gates als Vertragsänderung, und der PR ginge in die Human Inbox.
+      Ob die drei Kriterien erfüllt sind, belegt die Zeile im Progress Log.
+      MVP: Funktion, weil sonst das Gate den Merge verweigert und weder die Gutschrift noch der Abbruchschutz ausrollt.
+      Prüfung: `sed -n '/^## Acceptance Criteria/,/^## Deny List/p' goals/abrechnung/01-keine-abbuchung-ohne-angekommene-antwort.md | grep -c '^- \[ \]'` muss 3 ausgeben.
+      Prüfung: `sed -n '/^## Acceptance Criteria/,/^## Deny List/p' goals/abrechnung/01-keine-abbuchung-ohne-angekommene-antwort.md | grep -c '^- \[x\]'` muss 0 ausgeben.
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
