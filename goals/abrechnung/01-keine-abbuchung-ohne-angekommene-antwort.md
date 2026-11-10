@@ -1,7 +1,7 @@
 # Abrechnung Goal 01: Keine Abbuchung ohne angekommene Antwort
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Bricht ein Client vor der fertigen Antwort ab, bucht `/v1/chat/completions` nichts ab: keine Ledger-Zeile `inference`, die
@@ -95,7 +95,7 @@ zählen muss, um schnellere Anbieter zu belegen.
       MVP: Funktion, weil sonst das Gate den Merge verweigert und weder die Gutschrift noch der Abbruchschutz ausrollt.
       Prüfung: `sed -n '/^## Acceptance Criteria/,/^## Deny List/p' goals/abrechnung/01-keine-abbuchung-ohne-angekommene-antwort.md | grep -c '^- \[ \]'` muss 3 ausgeben.
       Prüfung: `sed -n '/^## Acceptance Criteria/,/^## Deny List/p' goals/abrechnung/01-keine-abbuchung-ohne-angekommene-antwort.md | grep -c '^- \[x\]'` muss 0 ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Jede neue Testdatei war vor dem Fix rot; die Zeile im Progress Log nennt, womit (`loop-constraints.md`, Budget und Qualität).
@@ -117,5 +117,6 @@ zählen muss, um schnellere Anbieter zu belegen.
 - 2026-11-10 Zyklus 3: Punkt 9 gebaut: die drei Acceptance-Kästchen wieder leer wie auf `dev`; Erfüllung belegt dieses Log. Rot vorher: am Kopf 8a78501 gab die erste Prüfung 0 und die zweite 3. Prüfbefehle: P9 `grep -c '^- \[ \]'` 3, `grep -c '^- \[x\]'` 0; `git diff origin/dev` zeigt unter `## Acceptance Criteria` keine Änderung.
 - 2026-11-10 Zyklus 4: Punkt 8 gebaut: Batch auf fünf `ref` und 79229 mc, `ops/live.sh` erwartet 79229 mc (der Fall `short` pflanzt die alte Gutschrift über 61644 mc und muss `FAIL` zeigen), Test mit fünf Abbuchungen und einem Fall „nur die drei langen“ ohne Gutschrift, `ANNAHMEN.md` nachgezogen. Zahl selbst lesend gemessen: Caddy-Log 5 Zeilen Status 0 vom selben Client (gepflanzte Zeile Status 0 Treffer, Status 200 kein Treffer), Ledger `{"n":5,"a":1,"s":-79229}` (erfundene `ref`: n 0). Rot vorher: `test/credit-aborted.test.ts` gegen den alten Batch 7 von 7 rot. Prüfbefehle (Node 22, PATH=/usr/bin:$PATH): P8 grep refs 2, grep totalMc 1, grep REFUND_MC 1, vitest credit-aborted 7 passed Exit 0 (ein Lauf davor Exit 1 bei Load 175 mit 15 s Testzeit statt 2 s, danach drei Läufe grün), live.sh --selftest LIVE SELFTEST OK Exit 0; P6 0; P7 check grün (1252 Tests, 91 s).
 - 2026-11-10 Zyklus 4: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, 7, 8, 9. `origin/dev` ohne neue Commits, Kopf f95b931. Prüfbefehle (Node 22, PATH=/usr/bin:$PATH): P1 9 passed Exit 0, grep it 9; P2 grep coalesc 5, drei Dateien 38 passed Exit 0 (ein Lauf davor 1 Test über 5000 ms bei Load 151; der Gutschrift-Schritt kostet 0,11 ms je Start, gemessen); P3 2 passed Exit 0, grep records 2; P4 7 passed Exit 0, grep it 7; P5 LIVE SELFTEST OK Exit 0, grep readonly 2; P6 0; P7 check grün (1252 Tests); P8 2, 1, 1, 7 passed, LIVE SELFTEST OK; P9 3 und 0. `gh pr checks 2` am Kopf f95b931: check pass, e2e pass (1m49s). Kein Gedankenstrich in hinzugefügten Zeilen.
+- 2026-11-10 Release: PASS K, B (Zyklus 4), DONE.
 
 ## Blockers
