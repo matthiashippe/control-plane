@@ -59,6 +59,31 @@ function balance(out: string) {
   return { requests: dev("requests"), timeouts: dev("timeouts"), causes };
 }
 
+/** `--rows ROWS` with TQ_SINCE: the database measurement alone, summed per model over days and origins. */
+function rowsPerModel(rowLines: string[], since: string) {
+  n += 1;
+  const r = join(dir, `rows-only-${n}.jsonl`);
+  writeFileSync(r, rowLines.join("\n") + "\n");
+  const run = spawnSync("bash", [SCRIPT, "--rows", r], { encoding: "utf8", timeout: 60_000, env: { ...process.env, TQ_SINCE: since } });
+  expect(run.status, run.stderr).toBe(0);
+  const per = new Map<string, { requests: number; timeouts: number }>();
+  for (const m of run.stdout.matchAll(/^\| (\S+) \| all \| (answered|aborted) \| (\d+) \| (\d+) \|/gm)) {
+    const e = per.get(m[1]) ?? { requests: 0, timeouts: 0 };
+    e.requests += Number(m[3]);
+    e.timeouts += Number(m[4]);
+    per.set(m[1], e);
+  }
+  return per;
+}
+
+/** The `service` lines of a --compare output, per model, without models the database never saw. */
+function servicePerModel(out: string) {
+  const per = new Map<string, { requests: number; timeouts: number }>();
+  for (const m of out.matchAll(/^\| (\S+) \| service \| (\d+) \| (\d+) \|/gm)) {
+    if (Number(m[2]) > 0) per.set(m[1], { requests: Number(m[2]), timeouts: Number(m[3]) });
+  }
+  return per;
+}
 
 const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
 
@@ -177,4 +202,29 @@ describe("ops/timeout-quote.sh --compare-files", () => {
     expect(sum(b.causes.map((c) => c.timeouts))).toBe(b.timeouts);
   });
 
+  it("service matches --rows with the same TQ_SINCE for every model", () => {
+    const rows = [
+      // Before the rollout: no duration, left out by both.
+      ledger(T0 - 593, T0 - 660, "openai/gpt-5.2", null),
+      // The first row with a duration, paired with a request.
+      ledger(T0 + 11, T0 + 1, "openai/gpt-5.2", 8900),
+      // An abort after 59.8 s, paired with a status 0 request.
+      abort(T0 + 135, "openai/gpt-5.2", 59800),
+      // A row with a duration but no request in the log.
+      ledger(T0 + 400, T0 + 340, "openai/gpt-5-mini", 59700),
+      // A row without a duration after the rollout and without a request: neither measurement may count it.
+      ledger(T0 + 500, T0 + 470, "openai/gpt-5-mini", null),
+      ledger(T0 + 600, T0 + 598, "openai/gpt-5-mini", 1900),
+    ];
+    const run = compare(
+      [caddy(T0 - 600, 59.9, 0), caddy(T0 + 10, 9.0), caddy(T0 + 11, 4.0), caddy(T0 + 130, 59.9, 0), caddy(T0 + 600, 2.0), caddy(T0 + 900, 3.0)],
+      rows,
+      { TQ_SINCE: iso(T0 + 11) },
+    );
+    expect(run.status, run.stderr).toBe(0);
+    const service = servicePerModel(run.out);
+    const direct = rowsPerModel(rows, iso(T0 + 11));
+    expect(direct.size).toBe(2);
+    expect(Object.fromEntries(service)).toEqual(Object.fromEntries(direct));
+  });
 });
