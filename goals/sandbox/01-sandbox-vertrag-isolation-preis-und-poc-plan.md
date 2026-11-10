@@ -1,7 +1,7 @@
 # Sandbox Goal 01: Sandbox-Vertrag, Isolation, Preis und PoC-Plan
 
 ## Status
-PLANNED
+BLOCKED matthias
 
 ## Active Objective
 Der Loop weiß, was die unveränderte Runtime bei Conway für Sandboxes und Domains aufruft, und hat entschieden, wie wir Sandboxes
@@ -38,19 +38,19 @@ Vertrag bauen statt gegen eine Vermutung über die Runtime.
   frei und rechnet ab, domains 01 gibt dem Dienst des Kunden einen Namen.
 
 ## Done Condition
-- [ ] `docs/sandbox/vertrag.md` hat einen Abschnitt `## Endpunkte` mit einer Tabelle
+- [x] `docs/sandbox/vertrag.md` hat einen Abschnitt `## Endpunkte` mit einer Tabelle
       `| Methode | Pfad | Anfrage | Antwort, die die Runtime liest | Fundstelle | Bei Fehler |` und mindestens einer Zeile je Endpunkt, den
       die Runtime am Pin für Sandboxes und Domains aufruft; jede Fundstelle hat die Form `src/<pfad>.ts:<zeile>`.
       Prüfung: `awk '/^## Endpunkte/{f=1;next} /^## /{f=0} f && /^[|] (GET|POST|PUT|PATCH|DELETE) /' docs/sandbox/vertrag.md | wc -l` muss mindestens 4 ausgeben.
       Prüfung: `awk '/^## Endpunkte/{f=1;next} /^## /{f=0} f && /^[|] (GET|POST|PUT|PATCH|DELETE) /' docs/sandbox/vertrag.md | grep -vcE "src/[A-Za-z0-9_/.-]+\.ts:[0-9]+"` muss 0 ausgeben.
       Prüfung: `awk '/^## Endpunkte/{f=1;next} /^## /{f=0} f' docs/sandbox/vertrag.md | grep -cE "/v1/(sandboxes|domains)"` muss mindestens 4 ausgeben.
-- [ ] Jede Fundstelle stimmt am Pin: Die Zeile im Quelltext der Runtime nennt den Pfad oder den Aufruf der Tabellenzeile.
+- [x] Jede Fundstelle stimmt am Pin: Die Zeile im Quelltext der Runtime nennt den Pfad oder den Aufruf der Tabellenzeile.
       Prüfung (Netz): `d=$(mktemp -d) && git clone -q https://github.com/Conway-Research/automaton "$d" && git -C "$d" checkout -q d8f8168 && awk '/^## Endpunkte/{f=1;next} /^## /{f=0} f && /^[|] (GET|POST|PUT|PATCH|DELETE) /' docs/sandbox/vertrag.md | grep -oE "src/[A-Za-z0-9_/.-]+\.ts:[0-9]+" | while IFS=: read -r p n; do sed -n "${n}p" "$d/$p" | grep -qiE "sandbox|domain|fetch|request|/v1/" || echo "falsch $p:$n"; done` muss nichts ausgeben.
-- [ ] `docs/sandbox/vertrag.md` hat einen Abschnitt `## Aufrufe in der Produktion` mit Pfad, Status und Zahl aus dem Caddy-Zugriffslog
+- [x] `docs/sandbox/vertrag.md` hat einen Abschnitt `## Aufrufe in der Produktion` mit Pfad, Status und Zahl aus dem Caddy-Zugriffslog
       und dem Befehl, aus dem sie stammen, ohne Adresse.
       Prüfung: `awk '/^## Aufrufe in der Produktion/{f=1;next} /^## /{f=0} f' docs/sandbox/vertrag.md | grep -cE "(501|404)"` muss mindestens 1 ausgeben.
       Prüfung: `grep -cE "([0-9]{1,3}\.){3}[0-9]{1,3}|0x[0-9a-fA-F]{40}" docs/sandbox/vertrag.md | xargs test 0 -eq && echo sauber` muss `sauber` ausgeben.
-- [ ] `docs/sandbox/plan.md` entscheidet in je einem Abschnitt `## Isolation`, `## Netz`, `## Grenzen`, `## Preis`, `## Verbindung` und
+- [x] `docs/sandbox/plan.md` entscheidet in je einem Abschnitt `## Isolation`, `## Netz`, `## Grenzen`, `## Preis`, `## Verbindung` und
       `## Schritte`, mit Begründung; `## Netz` schließt den Zahlungsserver `76.13.144.207` aus, `## Preis` nennt Credits je Stunde in mc
       mit Einkauf und Marge, `## Schritte` nennt sandbox 02, 03 und 04.
       Prüfung: `for s in Isolation Netz Grenzen Preis Verbindung Schritte; do grep -q "^## $s" docs/sandbox/plan.md || echo "fehlt $s"; done` muss nichts ausgeben.
@@ -62,7 +62,7 @@ Vertrag bauen statt gegen eine Vermutung über die Runtime.
       Prüfung: `grep -cE "^Adresse: *([0-9]{1,3}\.){3}[0-9]{1,3}$" docs/sandbox/server.md` muss 1 ausgeben.
       Prüfung: `grep -c "76.13.144.207" docs/sandbox/server.md` muss 0 ausgeben.
       Prüfung (Netz): `ssh -i ~/.ssh/id_ed25519_cp_sandbox -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=15 root@$(sed -nE 's/^Adresse: *//p' docs/sandbox/server.md) 'uname -sr'` muss Exit-Code 0 haben.
-- [ ] `check` ist grün.
+- [x] `check` ist grün.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
 - [ ] goal-verifier PASS (K und B)
 
@@ -80,5 +80,11 @@ Vertrag bauen statt gegen eine Vermutung über die Runtime.
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-10 Zyklus 1: Punkte 1, 2, 3, 4 und 6 gebaut (`docs/sandbox/vertrag.md` mit 12 Endpunkten am Pin und den Aufrufen aus dem Caddy-Log samt Gegenprobe, `docs/sandbox/plan.md` mit gVisor ohne `/dev/kvm`, Netz, Grenzen, 1000 mc je Stunde, signierter Verbindung und Schritten, Schlüsselpaar `~/.ssh/id_ed25519_cp_sandbox` angelegt), Punkt 5 wartet auf das Human Gate `server_kauf`. Prüfbefehle: P1 `wc -l` 12, `grep -vc` 0, `grep -c` 14; P2 (Netz) keine Ausgabe, vorher einmal rot mit `falsch src/registry/agent-card.ts:136`, die Fundstelle ist aus der Tabelle; P3 `grep -c` 9, `sauber`; P4 keine Ausgabe, 2, 6, keine Ausgabe; P5 rot, `docs/sandbox/server.md` fehlt bis zum Kauf; P6 `node scripts/check.mjs` Exit 0 (1266 Tests, grün in 107 s).
 
 ## Blockers
+Art: matthias
+Gate: server_kauf
+Aufgabe: Bei Hostinger einen VPS KVM 1 bestellen (5,49 Euro im Monat bei 24 Monaten, 131,76 Euro im Voraus) und den Schlüssel unten als SSH-Schlüssel eintragen, dann die IP des neuen Servers als Antwort auf die Karte schreiben.
+Worum: Sandboxes laufen auf einem eigenen kleinen Server, nie auf dem Zahlungsserver; ohne ihn können sandbox 02 bis 04 nicht bauen.
+Empfehlung: https://www.hostinger.com/de/vps-hosting öffnen, bei KVM 1 (1 vCPU, 4 GB RAM, 50 GB NVMe) auf „Auswählen“, Laufzeit 24 Monate, bezahlen. Im Einrichtungsassistenten: Standort Deutschland (wie der Zahlungsserver), Betriebssystem „Ubuntu 24.04“ ohne Panel, Hostname `cp-sandbox`, Root-Passwort frei wählen und nicht weitergeben, unter „SSH-Schlüssel hinzufügen“ genau diese Zeile einfügen: `ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPlVgXGcr+yATY/uyjqcQ+V8tFzj0KouiNvRcVPvNGnI code-host cp-sandbox`. Am Ende steht der Server in hPanel unter VPS als „Läuft“; seine IPv4-Adresse als Antwort auf die Karte, den gezahlten Monatspreis dazu, falls er von 5,49 Euro abweicht. Dauer etwa 5 Minuten. Danach schreibt der Loop `docs/sandbox/server.md` und prüft den Zugang selbst.
