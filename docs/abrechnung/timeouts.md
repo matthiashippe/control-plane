@@ -46,3 +46,48 @@ an Kopien von Log und Ledger angehängt, hebt deren Zeile von 0 von 2 auf 1 von 
 Seit abrechnung 02 trägt jede Buchung `duration_ms` und `upstream` in den Meta-Daten der Ledger-Zeile, jeder Abbruch beides in
 `inference_aborts`. Die Quote ab dem Rollout zeigt `bash ops/timeout-quote.sh --since-rollout` aus der Datenbank allein und `ops/live.sh`
 in der Live-Prüfung des Release Managers.
+
+## Vorher und nachher auf derselben Grundlage
+
+Gemessen am 10.11.2026 um 23:26 UTC, nur lesend, vom code-host aus mit
+
+```
+bash ops/timeout-quote.sh --compare
+```
+
+Das Werkzeug zählt beide Messungen über denselben Zeitraum: `caddy` ist der Join aus Caddy-Zugriffslog und Ledger (Dauer auf Caddys
+Uhr, jede Anfrage, auch Wiederholungen), `service` ist die Datenbank allein wie `--since-rollout` (Dauer `duration_ms` des Dienstes ab
+dem Aufruf beim Anbieter, eine Zeile je Buchung oder Abbruch). Den Zeitraum setzen `TQ_SINCE` und `TQ_UNTIL` (ISO-Zeit in UTC); ohne sie
+beginnt er bei der ersten Buchung mit `duration_ms` und endet mit der letzten Zeile. Timeout ab 59,5 Sekunden auf beiden Uhren.
+
+**Zeitraum:** 10.11.2026 20:27:18 UTC (erste Buchung mit `duration_ms`, Rollout von abrechnung 02) bis 10.11.2026 23:01:33 UTC (letzte
+Zeile). Alle 46 Anfragen kamen von fremden Adressen (`--join` auf denselben Zeitraum beschnitten).
+
+| Modell | Messung | Anfragen | Timeouts | Quote |
+|---|---|---:|---:|---:|
+| openai/gpt-5-mini | caddy | 24 | 0 | 0,0 % |
+| openai/gpt-5-mini | service | 24 | 0 | 0,0 % |
+| openai/gpt-5.2 | caddy | 22 | 0 | 0,0 % |
+| openai/gpt-5.2 | service | 22 | 0 | 0,0 % |
+
+**Abweichung** (caddy minus service): Anfragen 0 (46 gegen 46), Timeouts 0 (0 gegen 0). Je Ursache die Zahl der Anfragen, die sie trifft:
+
+- coalesced: 0, Anfragen im Caddy-Log ohne eigene Zeile, die der Coalescer mit der laufenden Antwort einer gleichen Anfrage bediente; der Join zählt sie, die Datenbank nicht.
+- clock: 0, Anfragen mit eigener Zeile, die auf Caddys Uhr Timeout sind und nach `duration_ms` nicht oder umgekehrt, weil die Uhr des Dienstes erst beim Aufruf des Anbieters startet.
+- unmatched: 0, Anfragen im Caddy-Log ohne jede Zeile und Zeilen ohne Anfrage im Zeitraum; sie zählen mit Vorzeichen, damit die Ursachen zusammen genau die Abweichung ergeben.
+
+Ergeben die Ursachen nicht genau die Abweichung, bricht das Werkzeug mit Exit 3 ab und nennt keine Ursache.
+
+Widerlegt: ja, beide Messungen zählen im Zeitraum dieselben 46 Anfragen und dieselben 0 Timeouts, Abweichung 0 bei Anfragen und Timeouts.
+
+Quote nach außen: noch keine. Nennen dürfen kanal und Seite später die Messung `service` (`bash ops/timeout-quote.sh --since-rollout`),
+weil sie im Vergleich dasselbe zählt wie der Join und ohne Caddy-Log auskommt, und immer mit Zeitraum und Zahl der Anfragen. Heute sind es
+46 Anfragen in gut zweieinhalb Stunden (10.11.2026 20:27 bis 23:01 UTC) ohne einen Timeout; vorher waren es 3 Timeouts in 224 Anfragen an
+einem Tag. Aus 0 von 46 folgt keine Besserung, darum frühestens nach sieben Tagen ab dem Rollout (17.11.2026, `docs/kette.md`,
+abrechnung 02) und erst nach einem neuen `--compare` über denselben Zeitraum.
+
+**Gegenprobe:** `bash ops/timeout-quote.sh --selftest` pflanzt Zeilen ohne Netz und verlangt bei gleich zählenden Zeilen Abweichung 0 und
+jede Ursache 0, bei einer bedienten Wiederholung und einem Paar mit 59,7 s im Log und 58,9 s `duration_ms` genau `cause coalesced: 1` und
+`cause clock: 1`, und eine Zeile außerhalb von `TQ_SINCE` und `TQ_UNTIL` zählt in keiner Messung. Gegen die echten Daten: An Kopien von Log
+und Ledger angehängt, eine Wiederholung während der letzten Buchung und ein Paar mit 59,7 s im Log und 58,9 s `duration_ms` heben die
+Abweichung auf 1 bei Anfragen und 1 bei Timeouts, mit `cause coalesced: 1` und `cause clock: 1`.

@@ -13,16 +13,16 @@ Rollout zeigt, dass derselbe Weg für eine eigene Adresse nicht mehr scheitert.
 
 ## abrechnung 01: Keine Abbuchung ohne angekommene Antwort
 
-Beleg vom 10.11.2026: Ein fremder Automaton hatte 3 Anfragen an `/v1/chat/completions` in seinem Timeout von 60 Sekunden, der
-Client brach ab, berechnet wurden sie trotzdem, zusammen 0,37 USD. Die drei Fälle stehen im Ledger (`kind = 'inference'`) und im
-Caddy-Zugriffslog. Ursache im Code: `handleChatUncoalesced` in `src/inference/proxy.ts` bucht, sobald der Anbieter antwortet, ohne zu
+Beleg vom 10.11.2026: Ein fremder Automaton brach 5 Anfragen an `/v1/chat/completions` vor der fertigen Antwort ab, 3 davon in
+seinem Timeout von 60 Sekunden, berechnet wurden sie trotzdem, zusammen 79229 mc (0,79 USD, gemessen mit Befehl in
+`docs/abrechnung/abbrueche-2026-11-10.md`). Die fünf Fälle stehen im Ledger (`kind = 'inference'`) und im Caddy-Zugriffslog. Ursache im Code: `handleChatUncoalesced` in `src/inference/proxy.ts` bucht, sobald der Anbieter antwortet, ohne zu
 wissen, ob der Client noch wartet.
 
 Ziel: Bricht der Client vor der fertigen Antwort ab, gibt es keine Ledger-Zeile `inference` und die Reservierung ist frei; der Abbruch
 reicht bis zum Anbieter durch (kein Einkauf ins Leere, wo es geht), und er steht im Log mit Modell, Dauer und Einkaufspreis, damit
 abrechnung 02 ihn zählen kann. Zusammengeführte Anfragen (`dedupe.ts`) bleiben richtig: Bricht einer von zwei identischen Aufrufern ab,
-zahlt der andere genau einmal. Die drei Fälle vom 10.11.2026 bekommen eine interne Gutschrift auf das Guthaben dieses Kunden, eine
-Ledger-Zeile mit Verweis auf die drei Abbuchungen (ihre `ref`), idempotent, über Code, der mit dem Rollout läuft, nie per Hand auf dem
+zahlt der andere genau einmal. Die fünf Fälle vom 10.11.2026 bekommen eine interne Gutschrift auf das Guthaben dieses Kunden, eine
+Ledger-Zeile mit Verweis auf die fünf Abbuchungen (ihre `ref`), idempotent, über Code, der mit dem Rollout läuft, nie per Hand auf dem
 Server; keine Überweisung, kein On-Chain-Senden. `ops/live.sh` entsteht hier: die Live-Prüfung des Release Managers, nur lesend gegen
 die Produktion, und sie zeigt die Gutschrift.
 

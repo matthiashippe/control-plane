@@ -1,7 +1,7 @@
 # Abrechnung Goal 03: Timeout-Quote vorher und nachher auf derselben Grundlage
 
 ## Status
-PLANNED
+ACTIVE
 
 ## Active Objective
 Die Timeout-Quote vorher (Caddy-Log mit Join aufs Ledger) und die Quote nachher (`--since-rollout`, Datenbank allein) zählen über
@@ -40,7 +40,7 @@ eine Besserung verspricht, die niemand gemessen hat (`loop-constraints.md`, Grun
   vitest im Vordergrund mit eigenem Timeout.
 
 ## Done Condition
-- [ ] `ops/timeout-quote.sh --compare` (Produktion, nur lesend) und `--compare-files CADDY ROWS` fahren Join und Datenbank-Messung über
+- [x] `ops/timeout-quote.sh --compare` (Produktion, nur lesend) und `--compare-files CADDY ROWS` fahren Join und Datenbank-Messung über
       denselben Zeitraum (`TQ_SINCE` und `TQ_UNTIL`, ISO-Zeit UTC; ohne `TQ_SINCE` ab der ersten Buchung mit `duration_ms`, ohne
       `TQ_UNTIL` bis zur letzten Zeile) und geben je Modell eine Zeile `| <Modell> | caddy | <Anfragen> | <Timeouts> | <Quote> |` und eine
       Zeile `| <Modell> | service | … |` aus, darunter die Abweichung bei Anfragen und Timeouts und je Ursache eine Zeile
@@ -54,7 +54,7 @@ eine Besserung verspricht, die niemand gemessen hat (`loop-constraints.md`, Grun
       Prüfung: `pnpm -s vitest run test/timeout-quote-compare.test.ts` muss Exit-Code 0 haben; der Test fährt `--compare-files` gegen
       gepflanzte Dateien und verlangt, dass die Summe der Ursachen gleich der Abweichung ist.
       Prüfung: `grep -cE "^\s*(it|test)\(" test/timeout-quote-compare.test.ts` muss mindestens 3 ausgeben.
-- [ ] `docs/abrechnung/timeouts.md` hat den Abschnitt `## Vorher und nachher auf derselben Grundlage`: Zeitraum in UTC, je Modell die
+- [x] `docs/abrechnung/timeouts.md` hat den Abschnitt `## Vorher und nachher auf derselben Grundlage`: Zeitraum in UTC, je Modell die
       Zeilen `caddy` und `service` aus `--compare`, die Abweichung, je Ursache eine Zeile `- coalesced: <n>`, `- clock: <n>`,
       `- unmatched: <n>` mit einem Satz, was sie bedeutet, der Befehl, aus dem die Zahlen stammen, eine Zeile `Widerlegt:` (ja, wenn beide
       gleich zählen, sonst nein mit der Abweichung) und eine Zeile `Quote nach außen:` (welche Messung kanal und Seite nennen dürfen, mit
@@ -65,7 +65,7 @@ eine Besserung verspricht, die niemand gemessen hat (`loop-constraints.md`, Grun
       Prüfung: `grep -cE "^- (coalesced|clock|unmatched): [0-9]+" docs/abrechnung/timeouts.md` muss 3 ausgeben.
       Prüfung: `grep -cE "^(Widerlegt|Quote nach außen): " docs/abrechnung/timeouts.md` muss 2 ausgeben.
       Prüfung: `grep -cE "0x[0-9a-fA-F]{40}|\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" docs/abrechnung/timeouts.md` muss 0 ausgeben.
-- [ ] `docs/abrechnung/abbrueche-2026-11-10.md` nennt die berechneten Abbrüche vom 10.11.2026 je Fall in einer Tabellenzeile (Ende in
+- [x] `docs/abrechnung/abbrueche-2026-11-10.md` nennt die berechneten Abbrüche vom 10.11.2026 je Fall in einer Tabellenzeile (Ende in
       UTC, Dauer im Caddy-Log, Betrag in mc), die Summe in mc und USD und den lesenden Befehl, aus dem sie stammt, ohne Adresse, Wallet
       oder Guthaben. Die Summe ist dieselbe, die `ops/live.sh` als Gutschrift erwartet, und `docs/kette.md` nennt sie mit Verweis auf
       diese Datei statt der 0,37 USD.
@@ -75,7 +75,7 @@ eine Besserung verspricht, die niemand gemessen hat (`loop-constraints.md`, Grun
       Prüfung: `grep -cE "0x[0-9a-fA-F]{40}|\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" docs/abrechnung/abbrueche-2026-11-10.md` muss 0 ausgeben.
       Prüfung: `grep -c "0,37" docs/kette.md` muss 0 ausgeben.
       Prüfung: `grep -c "abbrueche-2026-11-10.md" docs/kette.md` muss mindestens 1 ausgeben.
-- [ ] Der Laufzeitpfad bleibt unverändert, und `check` ist grün.
+- [x] Der Laufzeitpfad bleibt unverändert, und `check` ist grün.
       Prüfung: `git diff --name-only origin/dev...HEAD -- src deploy | wc -l` muss 0 ausgeben.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
 - [ ] goal-verifier PASS (K und B)
@@ -95,5 +95,6 @@ eine Besserung verspricht, die niemand gemessen hat (`loop-constraints.md`, Grun
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-10 Zyklus 1: Punkte 1, 2, 3, 4 gebaut: `ops/timeout-quote.sh --compare` und `--compare-files` zählen Join und Datenbank über denselben Zeitraum mit Ursachen coalesced, clock und unmatched, gemessen 46 gegen 46 Anfragen und 0 gegen 0 Timeouts (10.11.2026 20:27 bis 23:01 UTC, Abweichung 0), Abbrüche vom 10.11. neu gemessen (fünf, 79229 mc) in `docs/abrechnung/abbrueche-2026-11-10.md`, `docs/kette.md` ohne 0,37. Rot vorher: `test/timeout-quote-compare.test.ts` 6 von 6 rot gegen den alten Stand von `ops/timeout-quote.sh` (unbekannter Schalter), die neuen Selftest-Zeilen `compare` rot mit ausgeschaltetem Zeitraum (5 FAIL), ausgeschaltetem Coalescer-Abgleich (3 FAIL) und `TQ_LIMIT_S=58` (3 FAIL); Gegenprobe an Kopien der Produktionsdaten mit gepflanzter Wiederholung und Uhren-Paar ergibt `cause coalesced: 1` und `cause clock: 1`. Prüfbefehle: `bash ops/timeout-quote.sh --selftest` Exit 0, letzte Zeile `TIMEOUT QUOTE SELFTEST OK`; `grep -c "^ok   compare"` 15; `pnpm -s vitest run test/timeout-quote-compare.test.ts` 6 passed; `grep -cE "^\s*(it|test)\("` 6; Punkt 2: 1, 1, 4, 3, 2, 0; Punkt 3: 1, 5, 3, 0, 0, 1; `git diff --name-only origin/dev...HEAD -- src deploy | wc -l` 0; `node scripts/check.mjs` Exit 0 (100 Dateien, 1272 Tests).
 
 ## Blockers
