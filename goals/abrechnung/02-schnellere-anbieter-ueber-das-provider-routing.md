@@ -52,6 +52,11 @@ zwar nicht mehr zahlt, aber auch nicht weiterarbeitet.
       Prüfung: `grep -c "timeout-quote" ops/live.sh` muss mindestens 1 ausgeben.
 - [x] Kein Claude- oder Anthropic-Modell in Auswahl oder Routing, und `check` ist grün.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
+- [ ] Kein Aufruf kauft teurer ein als der Katalogpreis, den `/v1/models` verkauft: Seit `sort` den Preis aus der Anbieterwahl nimmt,
+      kann ein schneller, teurerer Endpunkt den Kunden über dem genannten Preis belasten und die Reservierung übersteigen. Das Routing
+      trägt deshalb `max_price` mit `prompt` und `completion` in USD je Million Token aus dem aktuellen Katalogpreis des jeweiligen Modells
+      (fehlt der Preis, ohne `max_price`); ein `max_price` aus dem Body des Kunden kommt nicht durch. Wahl und Quelle in `ANNAHMEN.md`.
+      Prüfung: `pnpm -s vitest run test/provider-routing.test.ts -t "max_price"` muss Exit-Code 0 haben und liest den Body je Modell.
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
