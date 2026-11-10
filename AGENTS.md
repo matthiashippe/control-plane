@@ -2,7 +2,8 @@
 
 Conway-kompatibles Control Plane: Server, der die Teilmenge der Conway-API nachbaut, die die
 unveränderte Automaton-Runtime aufruft, damit Nutzer nur `conwayApiUrl` umstellen. Protokoll in
-`docs/protocol.md`, Bauplan in `STATE.md`, aktives Ziel in `GOAL.md`, Regeln in `loop-constraints.md`.
+`docs/protocol.md`. Seit dem 10.11.2026 läuft die Arbeit als Paperclip-Loop: zuerst `LOOP.md`, dann `loop-constraints.md`
+(bindend), `ROADMAP.md`, `docs/kette.md`, `STATE.md` und die Goal-Datei unter `goals/<topic>/`. `GOAL.md` ist Geschichte.
 
 ## Befehle
 

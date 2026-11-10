@@ -29,9 +29,11 @@ if [[ "$vorher" != "200" ]]; then
   exit 1
 fi
 
+# .scratch/, __pycache__ und die lokalen Claude-Einstellungen stehen nicht im Repo, liegen aber vom Rollout aus dem Mac auf dem Server.
+# Ein Rollout aus einem frischen Checkout (deploy.yml, seit 10.11.2026) hätte sie mit --delete gelöscht; so bleiben sie unberührt.
 rsync -az --delete -e "ssh -i $KEY -o StrictHostKeyChecking=accept-new" \
   --exclude node_modules --exclude dist --exclude .git --exclude harness/certs --exclude harness/state \
-  --exclude '*.db' --exclude '.env' \
+  --exclude '*.db' --exclude '.env' --exclude /.scratch --exclude __pycache__ --exclude /.claude/settings.local.json \
   "$REPO/" "$HOST:/opt/control-plane/repo/"
 
 "${SSH[@]}" bash -s <<REMOTE

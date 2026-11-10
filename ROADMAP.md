@@ -1,4 +1,63 @@
-# Roadmap: Produkt und Go-to-Market
+# ROADMAP.md: Topics, Priorität, Goal-Ketten
+
+Quelle: `docs/kette.md` (ausführliche Fassung jedes Glieds), Reihenfolge nach Wirkung beim zahlenden Kunden, ein Goal zur Zeit
+(`parallel_goals: 1`). Der Loop Master startet Topics in der Reihenfolge der Spalte Prio (bei gleicher Prio in der Reihenfolge der
+Tabelle), sobald ihre Voraussetzung abgeschlossen ist. Innerhalb eines Topics laufen die Goals seriell (`goals/<topic>/01-…`,
+`02-…`). Maßgeblich sind die Zeilen `- <topic> Goal NN DONE` unter `## Voraussetzungen` der Goal-Datei; die Spalte Voraussetzung
+gilt für ein erstes Goal, dessen Datei noch fehlt. Fehlt die Datei eines Glieds der Spalte Kette, bekommt der Writer den Auftrag
+„control-plane: <topic> NN schreiben“ mit dieser Zeile und dem Abschnitt aus `docs/kette.md`. Bei der Budget-Stufe core starten nur
+Topics mit Prio 1 bis 3, deshalb steht die ganze Kette in diesen drei Stufen.
+
+| Prio | Topic | Zweck | Voraussetzung | Kette (Dateien liegen bei für abrechnung 01 und 02, sandbox 01, domains 01, kanal 01) |
+|---|---|---|---|---|
+| 1 | **fehler** | Ein Fehler, den ein echter Nutzer gesehen hat, vor allem anderen (`loop-constraints.md`, Grundregel 4; `LOOP.md`, Fehler echter Nutzer). Glieder hängt der Writer an | keine | |
+| 1 | **abrechnung** | Jede Antwort genau einmal und nur, wenn sie beim Kunden ankommt, und weniger Antworten, die gar nicht erst ankommen | keine | 01 Keine Abbuchung ohne angekommene Antwort · 02 Schnellere Anbieter über das Provider-Routing |
+| 2 | **sandbox** | Das nächste Produkt: der Dienst eines Kunden läuft in einer Sandbox auf einem eigenen Server, abgerechnet in Credits, fremder Code nie auf dem Zahlungsserver | abrechnung 01 | 01 Sandbox-Vertrag, Isolation, Preis und PoC-Plan · 02 Der Sandbox-Server steht · 03 Die Sandbox-API ist frei und abgerechnet · 04 Ende zu Ende mit der unveränderten Upstream-Runtime |
+| 3 | **domains** | Die Domain-Endpunkte, die ein fremder Automaton beim Start seines Dienstes mit 404 traf | sandbox 01 | 01 Die Domain-Endpunkte der Runtime |
+| 3 | **kanal** | Automatons mit Anmelde- oder Zahlungsfehlern bei Conway finden uns: Antworten in den Issues des Upstream-Repos, vorbereitet vom Loop, gepostet erst nach Matthias' Freigabe | abrechnung 01 | 01 Antworten auf neue Conway-Issues vorbereiten |
+
+## Abschlusskriterium
+
+Ein fremder Automaton betreibt seinen Dienst bei uns: Eine Sandbox einer Adresse, die nicht uns gehört (`src/bounties/ours.ts`), ist über die
+unveränderte Runtime angelegt, läuft auf dem Sandbox-Server und ist aus Credits bezahlt (eine Ledger-Zeile der Sandbox-Abrechnung
+dieser Adresse in der Produktion; der Prüfbefehl entsteht mit sandbox 03). Gegen diese Zeile urteilt der Kurs-Check.
+
+## Meilensteine
+
+Jeder Meilenstein ist ein Prüfbefehl, kein Satz; die Befehle entstehen mit den Goals.
+
+- Keine Abbuchung ohne angekommene Antwort: ein Test, der einen Abbruch vor der fertigen Antwort ohne Ledger-Zeile `inference`
+  verlangt, und die Gutschrift der drei Fälle vom 10.11.2026 in der Produktion (`ops/live.sh`, abrechnung 01).
+- Timeout-Quote: Anteil der Inferenz-Anfragen, die länger laufen als der Timeout der Runtime, vorher und nachher aus den eigenen Daten
+  (abrechnung 02).
+- Sandbox-Vertrag: jeder Endpunkt und jedes Feld, das die Runtime am Pin `d8f8168` bei Conway für Sandboxes und Domains aufruft, mit
+  Fundstelle (sandbox 01).
+- Erste Sandbox: Die unveränderte Runtime legt im Harness eine Sandbox an, führt darin aus und wird abgerechnet (sandbox 04).
+- Erste fremde Sandbox: Abschlusskriterium oben.
+
+## Zielzahlen
+
+Die Zahlen aus `ZIELE.md` (neu geschrieben am 29.09.2026, gemessen von `ops/ziele.sh` gegen die Produktion, nie aus einer Datei)
+bleiben stehen; `ZIELE.md` ist mit dem Verkehr der Produktion die Quelle für das Nachfüllen der Kette (`LOOP.md`).
+
+| Bis | Ziel | Die Zahl |
+|---|---|---|
+| 02.10. | Ein Mensch kann ohne Wallet kaufen | erreicht am 30.09.2026, 03:07 UTC |
+| 10.10. | Der erste zahlende Mensch, mindestens 11 EUR | `human_orders_paid_30d` ≥ 1 |
+| 31.10. | Zehn zahlende Menschen, 500 EUR im Monat | `human_buyers_30d` ≥ 10, `human_revenue_30d_cents` ≥ 50.000 |
+| 31.12. | 5.000 EUR im Monat, und mindestens ein fremder Agent liefert | `human_revenue_30d_cents` ≥ 500.000, `foreign_submissions_30d` ≥ 1 |
+
+Was am 10.11.2026 tatsächlich zahlt, sind Automatons, nicht Menschen: 6 registrierte Automatons, davon 4 fremde, 8 Zahlungen über
+zusammen 36 USDC. Deshalb führt diese Kette die Seite, die zahlt (Abrechnung, Sandboxes, Domains, Kanal), und die Ziele für Menschen
+aus `ZIELE.md` bleiben die Messlatte, an der der Kurs-Check und das Nachfüllen sie messen. Die Begründung dafür steht unten in der
+Roadmap vom 29.09.2026, Abschnitt „Die Wette, in einem Satz“: Die Inferenzseite finanziert, und genau dort kommen die fremden
+Kunden heute an.
+
+## Begründung: die Roadmap vom 29.09.2026
+
+Unverändert übernommen, nur die Überschriften eine Stufe tiefer. Sie ist die Herleitung der Richtung, kein Plan, dem gefolgt wird.
+
+### Roadmap: Produkt und Go-to-Market
 
 > Angelegt am 29.09.2026, weil Matthias gefragt hat, wo sie liegt, und die ehrliche Antwort
 > "nirgends" war. Es gab Ziele (`ZIELE.md`), ein aktives Goal (`GOAL.md`), dreizehn abgeschlossene
@@ -8,7 +67,7 @@
 > Diese Datei ist kein Plan, dem gefolgt wird, bis er stimmt. Sie ist eine Wette mit einem
 > Ablaufdatum je Zeile, und jede Zeile nennt die Messung, die sie widerlegt.
 
-## Wie hier gearbeitet wird
+### Wie hier gearbeitet wird
 
 **Keine Sprints, kein Backlog, kein Schaetzen.** Ein Ziel gleichzeitig, fortlaufend. Das ist naeher
 an Kanban mit WIP 1 als an Scrum, und es ist so gewachsen, nicht so entworfen.
@@ -37,13 +96,13 @@ Vorlagen. Das ist der Normalfall, nicht der Ausrutscher.
 **Was nie passiert:** ein Deploy ohne gruene Tests, eine Messung ohne Gegenprobe in beide
 Richtungen, eine Zahl in einem Bericht, die nicht rot werden kann.
 
-## Die vier Termine, an denen gemessen wird
+### Die vier Termine, an denen gemessen wird
 
 Sie stehen in `ZIELE.md` und werden hier nicht wiederholt. Kurz: 26.09. (verstrichen, nicht
 erreicht), 02.10. (zur Haelfte erfuellt), 29.10., 31.12. Die eine Zahl, wenn nur eine bliebe, ist
 `foreign_gmv_30d`, und sie steht auf 0.
 
-## Die Vision: Fiverr fuer Agenten
+### Die Vision: Fiverr fuer Agenten
 
 Matthias am 29.09.: *"wir wollen ja im endeffekt das fiverr nur fuer agents bauen. die agents
 bedienen die eine seite und die menschen die andere. die value proposition vor fiverr ist insane:
@@ -73,7 +132,7 @@ Bei uns ist es genauso herum: die einzigen zwei zahlenden Fremden sind **Agenten
 15,02 USD fuer Inferenz eingezahlt und das Brett null Mal geoeffnet. **Die Anbieterseite zahlt
 schon, die Nachfrageseite ist die Wette.**
 
-## Die Umkehrung, 29.09. nachmittags
+### Die Umkehrung, 29.09. nachmittags
 
 Matthias: *"waere es nicht schlau, zuerst die Demand-Seite aufzubauen und im Zweifelsfall alles via
 Agents selbst zu liefern?"*
@@ -88,7 +147,7 @@ koennten, kaufen wir teuer ein.
 bezahlt und einsendet. Die Maschinerie fuer die Angebotsseite steht also. Was fehlt, ist ein
 Kaeufer.
 
-### Was die Rechnung sagt
+#### Was die Rechnung sagt
 
 Eine Lieferung kostet uns im Median **0,5 Cent** Inferenz (82 Aufrufe gemessen, Spanne 0,001 bis
 5,8 Cent). Drei Fassungen eines Auftrags kosten also 1,5 bis 17 Cent.
@@ -104,7 +163,7 @@ Auftrag, weil der Wert je Kunde nicht mehr zehn Prozent ist, sondern fast der ga
 einem Auftrag von 20 EUR traegt ein Klick zu 10 Cent bei der heute gemessenen Konversion von 0,90
 Prozent.
 
-### Was das fuer die Vertragsfrage heisst
+#### Was das fuer die Vertragsfrage heisst
 
 Die Wahl vom Vormittag war **Marktplatz**, und sie war fuer den Fall richtig, dass ein fremder
 Agent liefert. Wenn wir selbst liefern, sind wir **Verkaeufer** und schulden dem Kaeufer die
@@ -116,14 +175,14 @@ Arbeit. Beides nebeneinander, und die Reihenfolge ist die Umkehrung:
 2. **Marktplatz, sobald ein fremder Agent liefert.** Dann Connect, dann Provision, dann
    Auszahlung.
 
-### Was ehrlich bleiben muss
+#### Was ehrlich bleiben muss
 
 Wenn wir liefern, steht das da. Keine Seite, die von konkurrierenden Agenten spricht, waehrend
 drei Prompts von uns antworten. **Das Versprechen traegt auch so:** Arbeit einstellen, in Minuten
 drei fertige Fassungen bekommen, die beste bezahlen. Drei Fassungen aus drei verschiedenen
 Modellen sind echte Auswahl, sie gehoeren nur uns, und das gehoert auf die Seite.
 
-## Die Wette, in einem Satz
+### Die Wette, in einem Satz
 
 Der gemessene x402-Markt ist dreistellig im Monat (385 USDC von 38 Wallets bei Conway, gefallen
 von 440 und 44). Die gemessene Nachfrage bei uns liegt vollstaendig auf der Inferenzseite: zwei
@@ -133,9 +192,9 @@ faellt mit dem Auftragswert.**
 
 ---
 
-## Produkt
+### Produkt
 
-### Jetzt (diese Woche)
+#### Jetzt (diese Woche)
 
 - **Der Weg eines Ankoemmlings, ohne Reibung.** Am 29.09. end to end bewiesen: Schluessel ohne
   Wallet, Zuschuss feuert auf dem ersten Aufruf, der sich nicht bezahlen kann, und die Antwort
@@ -145,7 +204,7 @@ faellt mit dem Auftragswert.**
   Stunde eine neue Besucherklasse ausgeloest. Offen: ob A2A gebaut wird (siehe unten).
   **Messung:** Adressen, die zum ersten Mal die Bezahlroute anfragen.
 
-### Der Abbruch am Brett, gemessen am 29.09.
+#### Der Abbruch am Brett, gemessen am 29.09.
 
 **31 fremde Adressen haben eine Marktseite geholt** (`/bounties.json`, `/jobs`, `/market`,
 `/receipts`), nachdem die 41 Indexer-Durchlaeufe herausgerechnet sind, die jeden dokumentierten
@@ -160,7 +219,7 @@ nicht den Markt an, sondern kartiert die API.
 Was der Log **nicht** sagt: ob die 29 Menschen oder kleine Crawler waren. Die Zahl ist ein
 Nenner, kein Beweis fuer verlorene Kaeufer.
 
-### Als Naechstes, und es haengt an einer Entscheidung
+#### Als Naechstes, und es haengt an einer Entscheidung
 
 - **Der Auftragswert.** Die Anzeigenrechnung sagt: ein Auftrag muesste rund **111 EUR** wert sein,
   damit ein Klick zu 10 Cent sich bei heutiger Konversion traegt.
@@ -188,7 +247,7 @@ Nenner, kein Beweis fuer verlorene Kaeufer.
   gebaut; die Zeile aendert sich erst, wenn jemand darueber bezahlt. Gemessen am 29.09.: ein
   Verify katalogisiert nicht, nur eine angenommene Zahlung. **Nichts zu bauen, nur zu warten.**
 
-### Spaeter, und nur wenn die Marktseite lebt
+#### Spaeter, und nur wenn die Marktseite lebt
 
 Bewertungen der Lieferungen, Wiederholauftraege, Bestenliste der Agenten, Benachrichtigung bei
 passenden Auftraegen, Webhooks. Alles davon setzt voraus, dass es ueberhaupt fremde Agenten und
@@ -196,9 +255,9 @@ fremde Kaeufer gibt, und beide Zahlen stehen auf 0. Vorher gebaut waere es Dekor
 
 ---
 
-## Go-to-Market
+### Go-to-Market
 
-### Was belegt ist
+#### Was belegt ist
 
 **Ein Kanal hat je einen Leser gebracht: GitHub.** Drei Adressen kamen von einer github.com-Seite,
 alle drei haben gelesen, zwei aus Issues, die wir beantwortet haben. Und eine Suche nach dem
@@ -209,7 +268,7 @@ sind drei weitere Antworten raus (#353, #356, #359), die vierte folgt.
 Applebot, OpenAI SearchBot, DuckDuckBot. Gecrawlt ist nicht indexiert, und das sehen wir erst in
 der Search Console.
 
-### Was gerechnet und verworfen ist
+#### Was gerechnet und verworfen ist
 
 **Anzeigen, Stand 29.09.: Faktor 308 daneben.** Wert je Kunde 0,036 EUR gemessen, Kosten 11,10 EUR
 bei 10 Cent je Klick und 0,90 Prozent Konversion. `ops/anzeigen-rechnung.py` rechnet das aus
@@ -220,7 +279,7 @@ als Code statt als Vorsatz.
 **Die Messe.** Am 23.09. abgelehnt: Ticket plus acht Stunden fuer eine Handvoll Gespraeche,
 waehrend der belegte Kanal kostenlos offen liegt.
 
-### Was als Naechstes gemessen wird
+#### Was als Naechstes gemessen wird
 
 | Woche | Frage | Messung | Heute |
 |---|---|---|---|
@@ -231,7 +290,7 @@ waehrend der belegte Kanal kostenlos offen liegt.
 
 ---
 
-## Was diese Roadmap widerlegen wuerde
+### Was diese Roadmap widerlegen wuerde
 
 - `foreign_gmv_30d` bewegt sich ohne einen einzigen hoeherwertigen Auftrag: dann ist der
   Auftragswert nicht das Nadeloehr und die Produktzeile oben ist falsch.

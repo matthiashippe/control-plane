@@ -1,5 +1,8 @@
 # Die Org
 
+> **Abgelöst am 10.11.2026** durch den Paperclip-Loop (`LOOP.md`, `loop-constraints.md`). Diese Datei beschreibt den alten lokalen
+> Loop und bleibt als Geschichte stehen; was von ihren Regeln weiter gilt, steht in `loop-constraints.md`.
+
 Eine Firma aus Agenten, die auf **eine Zahl** hin arbeitet, mit vier Bereichen, festen
 Berichtswegen und einer Sperrliste, die schwerer wiegt als die Zahl.
 

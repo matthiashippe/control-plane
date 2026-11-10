@@ -400,9 +400,11 @@ describe("the questions of a sceptic", () => {
     // A number on the page that cannot be checked in the repo is a claim.
     const fs = await import("node:fs");
     const html = await page();
+    // Files only: since 2026-11-10 goals/ also holds one folder per topic of the Paperclip loop (goals/<topic>/NN-*.md).
     const evidence = fs
-      .readdirSync(new URL("../goals/", import.meta.url))
-      .map((f) => fs.readFileSync(new URL(`../goals/${f}`, import.meta.url), "utf-8"))
+      .readdirSync(new URL("../goals/", import.meta.url), { withFileTypes: true })
+      .filter((e) => e.isFile())
+      .map((e) => fs.readFileSync(new URL(`../goals/${e.name}`, import.meta.url), "utf-8"))
       .join("\n");
     // No longer "at least one". The page stopped quoting transactions when it stopped being the
     // place somebody checks us, and requiring evidence to be present is not the rule worth having:

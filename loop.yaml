@@ -1,0 +1,50 @@
+# Manifest des Loops control-plane (Format: code-host docs/paperclip/loops.md Abschnitt 4, Prüfregeln paperclip/loops/README.md).
+# Seed 10.11.2026 (Auftrag Matthias: „super ja bitte auch als loop“). Die Registrierung paperclip/loops/control-plane.yaml im code-host
+# nennt dieselben Werte für name, repo, checkout, worktrees, paperclip_project, integration_branch und roles.maker.
+name: control-plane
+title: Control Plane
+repo: matthiashippe/control-plane
+# Eigener Primär-Checkout des Loops über den Deploy-Key; ~/work/control-plane auf dem code-host ist ein fremder Checkout.
+checkout: ~/work/control-plane-loop
+worktrees: ~/work/pc-wt/control-plane
+integration_branch: dev          # Merge-Ziel des Loops; jeder Push auf dev, der den Laufzeitpfad ändert, rollt aus (LOOP.md, Release)
+install: pnpm install --frozen-lockfile
+# Merge-Gate und einziger Required Check auf dev (.github/workflows/check.yml, Job check, GitHub-Rechner): zuerst die Regeln (keine
+# Anthropic-API, kein Claude-Modell, keine Secrets im öffentlichen Repo, nichts zu den Bedingungen von OpenRouter, Pakete nur aus der
+# Registry), dann tsc und jeder Unit-Test von selbst, ohne Netz, harter Abbruch nach 600 s. Wächst mit jedem Goal.
+check: node scripts/check.mjs
+paperclip_project: Control Plane
+# Matthias 10.11.2026: L3, der Loop fragt nicht.
+level: L3
+roles:
+  maker: engineer-cp             # eigener Maker: TypeScript, Hono, better-sqlite3, viem, x402 auf Base, SIWE, OpenRouter, Compose
+  writer: tech-lead              # schreibt Folge-Goals aus der Spalte Kette und docs/kette.md
+  critic: tech-lead              # Kritik einmal je Goal
+  release: release-manager       # Merge nach dev, danach Live-Prüfung des Deploys (LOOP.md, Release)
+  course: growth-lead            # Kurs-Check gegen das Abschlusskriterium in ROADMAP.md
+verifiers:
+  K: qa-skeptic                  # Korrektheit: Prüfbefehle mit gesperrtem Netz, check, e2e des PR, Mutation bei Abrechnung und Sandbox
+  B: qa-scope                    # Betrug, Scope, Regeln aus loop-constraints.md; liest den Diff
+  Q: nightly                     # Qualität, nachts in der Routine Loop-Nacharbeit, blockiert nicht
+pass: [K, B]
+verify: goal                     # alle Done-Punkte eines Goals in einem Maker-Lauf, K und B einmal im Abschluss
+breaker:
+  cycles_per_goal: 4             # danach BLOCKED fachlich; ohne PASS landen nur Goal-Datei und Verdicts
+  same_gap: 3
+  no_progress_runs: 2            # zwei Maker-Runs ohne Progress-Log-Zeile: BLOCKED umgebung
+  retry_after_hours: 4
+parallel_goals: 1                # ein Goal zur Zeit: jeder Merge am Laufzeitpfad ist ein Rollout auf dem Server des Kunden
+share: 2
+nightly: [audit, nacharbeit, redteam, triage, critic]
+# Karten an Matthias nur, wenn wirklich nur er es kann (loop-constraints.md, Grundregel 9). public_post: jeder Kommentar in einem
+# fremden Repo unter seinem GitHub-Konto erst nach seinem „ok“ oder seinem eigenen Haken auf der Karte. server_kauf: jeder Kauf und
+# jede Aufladung (Server, OpenRouter-Guthaben).
+human_gates: [main_merge, delete_data, server_kauf, public_post, third_party_mail, paid, password, tax_account_identity, security_settings, sms_code]
+course:
+  detail_share: 0.4
+  cycles_factor: 2
+  stale_hours: 12
+# Die Kette läuft nie leer (code-host docs/paperclip/loops.md Abschnitt 19); Quellen in LOOP.md, Abschnitt Kette nachfüllen.
+refill:
+  min_open: 1
+  every_h: 6

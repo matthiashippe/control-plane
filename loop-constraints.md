@@ -1,157 +1,121 @@
-# Loop Constraints
+# Loop-Regeln für control-plane
 
-> Bindend für jeden Loop- und Goal-Lauf in diesem Repo. Der `loop-constraints`-Skill und der
-> `/goal`-Skill lesen diese Datei zu Beginn jedes Laufs.
+Bindend für jede Rolle, jeden Run und jeden Subagent in diesem Repo. Jeder Run liest diese Datei zuerst. Regel 0: Der Loop fragt
+nicht, er entscheidet nach `LOOP.md` und arbeitet weiter. Dieselben Verbote stehen als Daten in `gate.yaml`, die Routine
+„Loop-Triage“ gleicht beide täglich ab. Ändern darf beide Dateien nur ein Mensch. Seit dem 10.11.2026 löst der Paperclip-Loop den
+lokalen Loop ab (`loop-dauerauftrag.md`, `ORG.md`, `GOAL.md`); was von dessen Regeln weiter gilt, steht hier, alles andere dort ist
+Geschichte.
 
-## Deploy (Stand 19.09.2026, 21:30, ersetzt die Nacht-Sperre)
+## Grundregeln in einem Blick (Matthias, 19.09. bis 10.11.2026)
 
-Matthias hat ausdrücklich alle Rechte zum Ausrollen gegeben. Die Sperre ist damit aufgehoben,
-die Sorgfalt nicht. Seit dem 19.09. um 18:40 UTC hängt ein **zahlender fremder Kunde** am Dienst
-(Wallet `0x0629a685…488e`, 5 USDC on-chain). Jeder Deploy trifft ihn, und heute hat er wegen
-unserer Deploys bereits zwölf 502er gesehen.
+1. **Kein Deploy ohne grüne Tests** (seit 19.09.2026). Ausgeliefert wird nur über `.github/workflows/deploy.yml` nach einem Merge auf
+   `dev`: `check` (Regeln, Build, alle Unit-Tests) und `pnpm e2e` (die unveränderte Upstream-Runtime gegen diesen Stand) grün, dann
+   die Drift-Prüfung, dann `deploy/rollout.sh` mit Kanarienvogel, ruhigem Fenster und Rauchtest, danach `ops/deploy-window.sh`. Kein
+   Goal und keine Rolle rollt von Hand aus: kein `ops/deploy.sh`, kein `deploy/rollout.sh`, kein `deploy/up.sh`, kein
+   `docker compose` auf dem Server. Am 22.09.2026 las ein Zyklus „1 failed | 465 passed“ als Ausgabe einer Gegenprobe und rollte
+   trotzdem aus; deshalb steht die Regel im Ablauf und nicht im Kopf.
+2. **Der Stand auf dem Server liegt im Repo.** Vor jedem Rollout prüft `deploy.yml`, dass jede Datei, die der Rollout ersetzen oder
+   löschen würde, mit genau diesem Inhalt in einem Commit steht. Am 12.10.2026 lag auf dem Server ein Stripe-Stand, der im Repo
+   fehlte, und ein Rollout hätte ihn überschrieben. Abweichung heißt: erst ins Repo holen, dann ausrollen (`LOOP.md`, Release).
+   Ausnahmen stehen nur in `deploy/drift-ok.txt`, die nur ein Mensch ändert.
+3. **Jede Zahl gegen die Produktion gemessen.** Keine Zahl in Goal-Datei, Kommentar, Report oder auf der Seite ohne den Befehl, aus
+   dem sie stammt (`ops/status.sh`, `ops/ziele.sh`, Ledger, Caddy-Zugriffslog), nie aus einer Datei oder aus der Erinnerung. Ein
+   Messwerkzeug gilt erst, wenn es in beide Richtungen bewiesen ist: Ein Schalter reicht einen gepflanzten Treffer nachweislich durch
+   (`CP_DEPTH_LOG`, `CP_VISIBILITY_LOG`, `CP_ERROR_PATTERN`, `CONWAY_PROBE_TIMEOUT`, `CP_WINDOW_NOW`), denn ohne Gegenprobe ist die
+   Null nicht von Blindheit zu unterscheiden (22.09.2026: fünf falsche Zahlen an einem Nachmittag).
+4. **Ein Fehler eines echten Nutzers geht vor.** Gemeint ist ein 4xx oder 5xx im Caddy-Zugriffslog zu einer Adresse, die nicht in
+   `ops/own-ips.txt` steht, und jede Abbuchung, deren Antwort den Kunden nicht erreicht hat. Er wird ein Glied des Topics `fehler`
+   (Prio 1, `LOOP.md`, Fehler echter Nutzer). Alles andere, was beim Hinsehen auffällt, wird ein Vorschlag mit seiner Schwere und
+   wartet, auch wenn es in zehn Minuten behoben wäre (23.09.2026: vierzehn Zyklen Reparatur ohne einen echten Nutzer).
+5. **Der Kunde geht vor.** Seit dem 19.09.2026 zahlen fremde Kunden, und jeder Rollout kostet sie rund 16 Sekunden ohne Antwort.
+   Deshalb rollt `deploy.yml` nur aus, wenn sich der Laufzeitpfad geändert hat, und es läuft ein Goal zur Zeit. Antwortet der Dienst
+   nach einem Rollout nicht, greift autoheal nach 90 Sekunden; danach hilft nur ein Revert-PR über `deploy.yml`.
+6. **Antworten, die beim Kunden nicht ankommen, berechnen wir nicht** (Matthias, 10.11.2026). Bricht der Client vor der fertigen
+   Antwort ab, gibt es keine Abbuchung. Was schon so berechnet wurde, kommt als interne Gutschrift auf das Guthaben zurück, eine
+   Ledger-Zeile, nie eine Überweisung.
+7. **Sandboxes sind das nächste Produkt** (Matthias, 10.11.2026), als PoC auf einem eigenen kleinen Server, getrennt vom
+   Zahlungsdienst. Fremder Code der Kunden läuft nie auf dem Zahlungsserver (`76.13.144.207`), auch nicht zum Testen. Den Server
+   bestellt Matthias (Human Gate `server_kauf`).
+8. **Öffentliches Repo.** Das Repo ist öffentlich. Nie hinein, auch nicht in Commits, PRs, Issues oder Verdicts: Secrets und
+   Schlüssel, Namen oder Wallet-Adressen einzelner Kunden, Umsatz je Kunde. Summen (Zahl der Automatons, Zahl und Summe der Zahlungen)
+   sind in Ordnung. Zum Verkauf der Inferenz über OpenRouter steht im Repo genau ein Satz: Matthias' Entscheidung vom 30.10.2026,
+   Notschalter `CP_OPENROUTER_RESALE=0` in `/opt/control-plane/.env`. Mehr schreibt keine Rolle dazu, und keine Rolle macht die
+   Entscheidung wieder auf. `check` meldet Secrets und Texte über die Bedingungen des Anbieters.
+9. **Selbst erledigen** (Matthias, 02.11.2026: „immer überlegen kannst du die tasks selbst erledigen“). Eine Karte an Matthias
+   entsteht nur, wenn wirklich nur er es kann; sie dauert höchstens ein paar Minuten und nennt Zweck, genaue Klicks oder fertigen Text
+   und Empfehlung. Die Gates stehen in `LOOP.md` (Human Gates): `server_kauf` für jeden Kauf und jede Aufladung, `public_post` für
+   jeden Kommentar in einem fremden Repo unter Matthias' GitHub-Konto (nur nach seinem „ok“ oder seinem eigenen Haken, Kairos Haken
+   zählt nie; die Freigabe „issues darfst du immer selbst“ vom 29.09.2026 gilt seit dem 10.11.2026 nicht mehr), dazu Passwort,
+   Steuer-, Konto- und Ausweisdaten, Sicherheitseinstellung, SMS-Code, bezahlte Werbung und jede Mail an Dritte. Alles andere erledigt
+   die Rolle selbst und meldet es höchstens danach im Progress Log.
+10. **Geld bewegt sich nicht** (Matthias, 10.11.2026). Keine Wallet-Bewegung, keine Überweisung, kein Trade, kein On-Chain-Senden,
+    nie, auch kein Gas und kein Topup über x402; die Freigaben vom 29.09.2026 zu Gas und zu „Geld im Dienst arbeiten lassen“ gelten
+    im Paperclip-Loop nicht. Credits sind nie auszahlbar und nie an Dritte übertragbar außer per `/v1/credits/transfer` innerhalb des
+    Control Plane; jede Auszahlbarkeit ist ein REJECT-Grund. Kein Facilitator-Code, der selbst settlet, außerhalb von `harness/`.
+    Der private Schlüssel der Betreiber-Wallet wird nie gelesen, ausgegeben, geloggt oder committet.
+11. **Kein Claude und kein Anthropic im Produkt.** In der Inferenz-Auswahl, in den Aliasen, in Vorschlägen und auf der Seite nie ein
+    Claude- oder Anthropic-Modell; im Produkt nie ein `ANTHROPIC_API_KEY` und keine Anthropic-API (Standing Rule 29.09.2026). `check`
+    prüft es.
+12. **Code Englisch, ausnahmslos** (Matthias, 20.09.2026: „code immer auf englisch immer immer immer immer“): Bezeichner, Kommentare,
+    Testnamen, Fehlermeldungen, Log-Zeilen, Namen in Fixtures. Deutsch in Goal-Dateien, Doku für Matthias, `STATE.md` und
+    Commit-Texten. Kein Gedankenstrich (U+2013, U+2014) in keinem Text.
+13. **Conway-kompatibel bleiben.** Der Upstream-Pin `d8f8168` von `Conway-Research/automaton` ist die Referenz, `harness/runtime/`
+    ändert kein Goal. Ein Endpunkt gilt erst als gebaut, wenn die unveränderte Runtime ihn im Harness aufruft und bekommt, was sie
+    erwartet.
 
-**Vor jedem Deploy, ohne Ausnahme:**
-- Nicht `deploy/rollout.sh` direkt aufrufen, sondern **`ops/deploy.sh`**. Es fährt `pnpm test`,
-  dann `pnpm e2e`, und rollt nur aus, wenn beides grün ist. Am 22.09.2026 hat ein Zyklus
-  "1 failed | 465 passed" gelesen, für die Ausgabe einer gerade gelaufenen Gegenprobe gehalten und
-  trotzdem ausgerollt. Der rote Test hielt `docs/bounties.md` gegen das Schema des MCP-Servers.
-  Der Deploy war harmlos, aber aus Glück und nicht aus Prüfung. `deploy/rollout.sh` kann das nicht
-  selbst tun, weil `deploy/**` nicht ohne Menschen angefasst wird.
-- `pnpm test` grün, und bei jeder Änderung am Laufzeitpfad auch `pnpm e2e` grün.
-- Der Grund steht in einem Satz: Was wird besser, und für wen? Ein Deploy ohne Antwort darauf
-  wartet bis zum Morgen.
-- Bei einer Änderung an `deploy/**`: vorher `caddy validate`, und daran denken, dass ein
-  Caddyfile-Bind-Mount ein `--force-recreate` braucht (siehe `deploy/README.md`).
+## Produktion: nur lesen
 
-**Nach jedem Deploy, ohne Ausnahme:**
-- Von außen prüfen: `/health`, `/v1/status`, und dass der Container `healthy` ist.
-- `ops/deploy-window.sh` laufen lassen, nicht das Fenster von Hand in eine Abfrage tippen. Es
-  nimmt den Startzeitpunkt des Containers als Deploy-Zeitpunkt und sagt getrennt, ob niemand
-  betroffen war oder ob es niemanden gab. Am 21.09.2026 hat ein Zyklus 20:25 getippt für einen
-  Deploy um 18:25 UTC (die VM läuft auf UTC, der Rechner auf MESZ), fand nichts und schrieb
-  "niemand hat etwas gemerkt" ins Protokoll. Das Ergebnis stimmte zufällig, die Prüfung nicht.
-- Das Ergebnis in `.scratch/gtm/nachtlauf.md` protokollieren, auch wenn alles gut ging.
+- Zugang nur vom code-host: `set -a; . ~/.config/control-plane/loop.env; set +a`, dann `ssh -i "$CP_SSH_KEY" "$CP_HOST"`. Erlaubt ist
+  Lesen: Logs (`docker logs deploy-cp-1`, das Caddy-Zugriffslog in `deploy-caddy-1`), `docker ps`, `docker inspect`, Abfragen der
+  Datenbank mit `readonly: true` über `docker exec deploy-cp-1 node -e …`, `ops/status.sh`, `crontab -l`.
+- Nie von Hand: Rollout, Neustart, `docker compose`, Änderung an Compose, Cron, `/opt/control-plane/.env`, an Dateien unter
+  `/opt/control-plane/repo` oder an der Datenbank. Jede Änderung der Produktion, auch eine Gutschrift, ist Code im Repo, der über
+  `deploy.yml` ausrollt.
+- Die Cron-Läufe auf dem Server ändert kein Goal; `ops/conway-series.sh` und `ops/conway-money-series.sh` (04:50 und 05:00) stehen
+  auf der Deny List.
+- Der Server hat einen Kern und 4 GB: kein Build, kein Test, kein Harness und kein Lastversuch auf ihm.
 
-## Freigaben von Matthias, 29.09.2026
+## Ablauf im Loop
 
-Er hat an diesem Tag sechs der sieben Sperren selbst aufgehoben, woertlich:
+- Die bauende Rolle sagt nie selbst fertig. Ein Goal ist erledigt, wenn die Linsen K (QA Skeptiker) und B (QA Scope) mit frischem
+  Kontext PASS schreiben (`ops/prompts/verifier.md`, Vorgabe REJECT). Der Maker setzt nie PASS oder DONE.
+- Ein erreichtes Goal zieht sofort das nächste: Die Kette steht in `ROADMAP.md`, die ausführliche Fassung jedes Glieds in
+  `docs/kette.md`, der Loop Master startet ohne Rückfrage, fehlende Goal-Dateien schreibt der Tech Lead. Die Kette läuft nie leer
+  (Nachfüllregel in `loop.yaml`).
+- Ausgeliefert wird nur über den Merge: `deploy.yml` bei jedem Push auf `dev`, danach prüft der Release Manager live.
+- Eine Frage, die Matthias einmal beantwortet hat, ist beantwortet (29.09.2026). Taucht sie wieder auf, ist das ein Fehler im Loop und
+  keine offene Entscheidung. Beantwortet sind unter anderem: Verkäufer oder Marktplatz entscheidet der Loop; die Domain ist
+  `postyourprice.com`; Inferenz wird über OpenRouter verkauft (30.10.2026); Sandboxes sind das nächste Produkt auf eigenem Server
+  (10.11.2026); nicht angekommene Antworten berechnen wir nicht (10.11.2026).
 
-- **"issues darfst du immer selbst"** -- Issue-Antworten gehen ohne Rueckfrage raus. Das Gatter
-  (`ops/before-the-answers.py`) und die Tageskappe von drei bleiben, weil sie die Qualitaet und
-  nicht die Erlaubnis sichern. Der Satz "keine Aussenwirkung ohne Matthias" weiter unten gilt
-  damit nicht mehr fuer Issue-Antworten; fuer einen Artikel oder einen HN-Post bleibt er.
-- **"wieso sollte ich was im caddy file schreiben das ist dein job"** -- `deploy/Caddyfile` darf
-  der Loop selbst aendern. `caddy validate` davor und `--force-recreate` danach bleiben Pflicht,
-  weil es ein Bind-Mount ist. Der Rest von `deploy/**` (systemd, Compose) bleibt gesperrt.
-- **"geld immer im dienst arbeiten lassen, klar darf der loop das, immer bitte machen"** -- Geld
-  darf im Dienst arbeiten statt herumzuliegen: Topf, Credits, Aufträge, Preise. Bei etwas, das
-  nicht zurueckholbar ist, sagt der Loop vorher in einem Satz, was er tut, und tut es dann.
-- **"search console bitte in chrome machen"** -- die Anmeldung bei Search Console und Bing macht
-  der Loop im Browser mit seinem Profil.
-- **"anzeigen sind ja ein klarer business case, da muss ich keine entscheidung treffen, du musst
-  das einfach analysieren"** -- keine Zahl von ihm. Der Loop rechnet den Fall und entscheidet
-  danach selbst.
-- **"wir haben doch schon postyourprice.com gekauft"** -- die Domain steht. Die Namensfrage ist
-  damit keine Domainfrage mehr, sondern hoechstens eine Abgrenzung im Text gegen `handsel.dev`.
-- **Stripe ueber HTC** (*"warum stripe nicht über HTC machen"*): die Hanseatic Tech Company ist
-  Vertragspartner, also keine Gewerbeanmeldung und keine Kleinunternehmerfrage. Was offen bleibt
-  und dort auch hingehoert: wer dem Kaeufer die Leistung schuldet, wenn ein Agent liefert.
+## Deny List (nie anfassen, nie committen)
 
-## Vier Dinge, die nie wieder gefragt werden (29.09.2026, nachmittags)
+- `.env*`, `*.pem`, `*.key`, `*.db`, `secrets/`, `.scratch/`; Schlüssel nie ins Repo, in Logs, Issues oder Kommentare
+- der Loop-Vertrag: `loop.yaml`, `gate.yaml`, `loop-constraints.md`, `LOOP.md`, `ops/prompts/**`, `.github/**`, die Prüfmaschine
+  `scripts/check.mjs`
+- der Betrieb: `deploy/docker-compose.prod.yml`, `deploy/rollout.sh`, `deploy/rollout-remote.sh`, `deploy/up.sh`,
+  `deploy/setup-vm.sh`, `deploy/drift-ok.txt`. `deploy/Caddyfile` ändert der Loop selbst (Matthias, 29.09.2026: „wieso sollte ich was
+  im caddy file schreiben das ist dein job“), mit `caddy validate` als Prüfbefehl und dem Bind-Mount aus `deploy/README.md` im Blick
+- `ops/conway-series.sh`, `ops/conway-money-series.sh` und der Upstream-Pin `harness/runtime/**`
+- `src/payments/**` und `src/auth/**` nur in einem Goal, dessen Goal-Datei sie nennt
+- Ports `3100`, `8081`, `8180`, `8190`, `3200` auf jedem Host: nie binden, nie beenden; kein Test bindet einen festen Port
+- `~/work/control-plane` auf dem code-host (ein fremder Checkout) und die Repos, Runner und Schlüssel anderer Loops: nur lesen
+- `~/brain` wird nie geschrieben
 
-Matthias hat sie beantwortet und musste sie ein zweites Mal beantworten, weil ein Deck sie erneut
-als offene Frage gefuehrt hat. Das ist der Fehler, nicht die Frage. Sie stehen hier, damit kein
-Zyklus, kein Deck und kein Schwarm sie noch einmal aufmacht.
+## Verboten
 
-1. **Marktplatz oder Verkaeufer ist IMMER die Wahl des Loops.** *(Praezisiert am 29.09.
-   nachmittags nach Matthias' Impuls, zuerst die Nachfrageseite zu bauen und im Zweifel selbst zu
-   liefern: **Verkaeufer, solange wir selbst liefern; Marktplatz, sobald ein fremder Agent
-   liefert.** Begruendung und Zahlen in ROADMAP.md, Abschnitt "Die Umkehrung". Fuer Stripe heisst
-   das: gewoehnliches Konto zuerst, Connect erst, wenn es einen Agenten auszuzahlen gibt.)* Woertlich: *"marktplatz oder
-   verkäufer ist immer deine wahl!"* Gewaehlt am 29.09.: **Marktplatz.** Der Kaeufer schliesst den
-   Vertrag mit dem Agenten, wir stellen Ort, Treuhandgeld und Pruefung und rechnen unsere Provision
-   ab, nicht den Auftrag. Begruendung in `.scratch/gtm/stripe-entscheidung.md`. Das gilt bis der
-   Loop selbst etwas anderes entscheidet und aufschreibt, warum.
-2. **Die Domain ist entschieden.** `postyourprice.com`, von Matthias gekauft. Woertlich: *"domain
-   ist doch klar oder nicht, ich habe dir doch extra die postyourprice.com gekauft."* Es gibt keine
-   Domainfrage mehr, auch keine als Teil der Namensfrage.
-3. **Stripe laeuft ueber HTC, das Konto existiert.** Matthias schickt die Zugaenge. Der Loop baut
-   den Kartenweg und fragt nicht nach dem Konto.
-4. **Gas wird nachgelegt, nicht besprochen.** Woertlich: *"und GAS mach!!!! Nicht noch einmal
-   fragen!!!"* Der Loop beschafft und verwendet Gas auf Base, so wie er Credits verwendet, und
-   berichtet es, statt es zur Entscheidung zu machen.
+- `git push --force` auf `dev` oder `main`, ein Push direkt auf `dev`, ein Merge nach `main` außer durch den Tech Lead
+- Tests abschalten, `skip`, `only`, auskommentierte Assertions, gesenkte Schwellen, Mocks an der Stelle, die ein Done-Punkt prüft
+- Käufe, Aufladungen, Wallet-Bewegungen; die Sichtbarkeit des Repos ändern; ein Issue oder PR in einem fremden Repo kommentieren oder
+  schließen ohne freigegebenes `public_post`
+- Daten löschen außerhalb von Fixtures und temporären Ordnern
+- `git add -A` (19.09.2026: fremde, halbfertige Dateien unter falscher Commit-Message); Dateien beim Namen nennen. Commit-Texte über
+  ein Heredoc mit `<<'EOF'` (20.09.2026: die Shell verschluckte Code mitten in der Message)
 
-**Die Regel dahinter, und sie ist allgemeiner als diese vier:** eine Frage, die Matthias einmal
-beantwortet hat, ist beantwortet. Taucht sie in einem Deck, einem Plan oder einem Schwarm wieder
-auf, ist das ein Fehler im Loop und keine offene Entscheidung. Vor jedem Deck mit offenen Fragen
-laeuft `ops/sperren.sh`, und was dort nicht offen ist, kommt nicht ins Deck.
+## Budget und Qualität
 
-**Was trotzdem nicht passiert:**
-- Kein Deploy, dessen Nutzen kleiner ist als eine Minute Ausfall für den Kunden. Reine
-  Aufräumarbeiten, Kommentare und Dokumentation warten auf das nächste ohnehin fällige Ausrollen.
-- Keine zwei Deploys hintereinander ohne dazwischen liegende Prüfung.
-- Keine Außenwirkung **außer Issue-Antworten**: kein HN-Post, kein Artikel, keine Nachricht an
-  Dritte ohne Matthias. Issue-Antworten sind seit dem 29.09. freigegeben (siehe oben), drei am Tag,
-  und nur durch das Gatter.
-- Zahlungen und On-Chain-Transaktionen: seit dem 29.09. erlaubt, soweit das Geld im Dienst
-  arbeitet (siehe die Freigaben oben). Vorher in einem Satz sagen, was passiert.
-  (Alter Stand, zur Herkunft:) Keine Zahlungen und keine On-Chain-Transaktionen. **Geändert am 20.09.2026:** Eine
-  SIWE-Signatur mit der Betreiber-Wallet ist erlaubt, ebenso das Bewegen vorhandener Credits
-  innerhalb des Dienstes. Grund: Matthias hat die Entscheidungsgewalt an den Loop abgegeben
-  ("du entscheidest weiterhin alles"), und der Markt lässt sich ohne einen echten Umlauf nicht
-  beweisen. Die Schranke bleibt dort, wo sie etwas schützt: Eine Signatur kostet nichts, läuft
-  nicht über die Chain und erzeugt einen Schlüssel, der jederzeit widerrufbar ist. Eine Zahlung
-  oder ein Topup über x402 ist weiterhin tabu, weil sie echtes Geld bewegt und nicht rückholbar
-  ist. Der private Schlüssel wird nie ausgegeben, nie geloggt und nie committet.
-
-**Wenn der Dienst nach einem Deploy nicht zurückkommt:** autoheal greift nach 90 Sekunden. Erst
-wenn er nach fünf Minuten immer noch nicht antwortet, selbst eingreifen, und dann mit dem
-kleinstmöglichen Schritt (`docker compose -f docker-compose.prod.yml up -d --force-recreate cp`).
-Jeder autoheal-Eingriff kommt ins Protokoll, weil er morgen früh Teil der Entscheidung über den
-Artikel ist.
-
-## Push und Merge
-- Kein Push auf `main` ohne Ankündigung im Chat. Fertige, geprüfte Goals werden committet
-  (Matthias' Commit-Freigabe gilt), Loop-Fixes gehen als Draft-PR.
-- Nie Auto-Merge. Nie ein Issue oder einen PR schließen.
-
-## Pfade
-- Nie anfassen ohne Menschen: `.env*`, `secrets/**`, `deploy/**` (systemd, Caddy, Compose für die
-  VM), `src/payments/**` und `src/auth/**` (nur innerhalb eines Goals, dessen GOAL.md sie nennt).
-- Keine Änderungen an `harness/runtime/` (Upstream-Pin), außer die Pin-Revision selbst mit Begründung.
-
-## Code
-
-- **Alles im Code ist Englisch, ausnahmslos:** Bezeichner, Kommentare, Testbeschreibungen,
-  Fehlermeldungen, Log-Zeilen, Namen in Fixtures. Deutsch bleibt nur dort, wo nicht Code steht,
-  also in Commit-Texten, `.scratch/`, `STATE.md` und `GOAL.md`, weil das Gespräch mit Matthias ist
-  und kein Artefakt für Mitlesende. Das Repo ist öffentlich
-  (github.com/matthiashippe/control-plane), der Zielmarkt heißt USA und Dubai, und deutscher Code
-  schließt jeden Mitlesenden aus. Der Bestand war teilweise deutsch; das ist kein Grund, neues
-  Deutsch anzulegen, sondern der Grund für den laufenden Sprachdurchgang. Matthias am 20.09.2026:
-  "code immer auf englisch immer immer immer immer".
-- **Ein Messwerkzeug gilt erst, wenn es in beide Richtungen bewiesen ist.** Jedes Skript in `ops/`,
-  das "niemand war da", "kein Crawler", "null Fehler" oder "alles ok" melden kann, braucht einen
-  Schalter, mit dem sich ein gepflanzter Treffer nachweislich durchreichen lässt: `CP_DEPTH_LOG`,
-  `CP_VISIBILITY_LOG`, `CP_ERROR_PATTERN`, `CONWAY_PROBE_TIMEOUT`, `CP_WINDOW_NOW`. Ohne diese
-  Gegenprobe ist die Null nicht von Blindheit zu unterscheiden. Am 22.09.2026 kostete das an
-  einem Nachmittag fünf falsche Zahlen: die Tiefenmessung meldete unseren eigenen curl als ersten Leser, die Crawler-Erkennung
-  ließ `meta-externalagent` durch, `errors_24h` suchte ein Wort, das nur im Antwort-Body steht, der
-  erste Request einer Adresse war der erste im Fenster, und die Eigen-IP-Liste kannte nur die
-  Adresse von jetzt, während das Log Tage umfasst.
-- Tests vor jedem Fix-Vorschlag laufen lassen (`pnpm test`, für E2E `pnpm e2e:smoke` / `pnpm e2e`).
-- Nie Tests abschalten, skippen oder Assertions abschwächen, um grün zu werden.
-- Ein Fix pro Lauf, kein Refactor nebenbei.
-- Max 3 Versuche pro Item, dann eskalieren mit Kontext in STATE.md bzw. GOAL.md Blockers.
-- Kein Facilitator-Code, der selbst settlet, außerhalb von `harness/` (Regulatorik: kein eigener
-  x402-Facilitator im Betrieb).
-- Credits sind nie auszahlbar, nie an Dritte übertragbar außer per `/v1/credits/transfer`
-  innerhalb des Control Plane. Jede Auszahlbarkeit ist ein REJECT-Grund.
-
-## Kommunikation
-- Deutsch, Anti-Slop-Regeln aus `~/.claude/CLAUDE.md` (kein Gedankenstrich, echte Umlaute).
-- Nur melden, wenn eine Entscheidung oder Aktion von Matthias gebraucht wird.
-
-## Budget
-- 80 % des Tagesbudgets erreicht: report-only.
-- `loop-pause-all` in STATE.md: sofort beenden.
+- Pro Goal höchstens `cycles_per_goal` Zyklen ohne PASS, dann `BLOCKED fachlich` mit „Ehrliche Lücken“
+- Modell Opus für Maker, Linsen und Kritik; Subagents Opus 5.5, nie Fable
+- Jeder Done-Punkt hat einen Prüfbefehl, der ohne Netz läuft oder `(Netz)` trägt; Temp-Dateien nur per `mktemp`
+- Ein Test, der ohne den zugehörigen Fix grün bleibt, ist kein Test: Jeder neue Test eines Goals war einmal rot, und die Zeile im
+  Progress Log sagt, womit

@@ -1,4 +1,7 @@
-# Loop Run Log — YOUR_PROJECT
+# Loop Run Log: control-plane
+
+> **Abgelöst am 10.11.2026** durch den Paperclip-Loop (`LOOP.md`, `loop-constraints.md`). Diese Datei beschreibt den alten lokalen
+> Loop und bleibt als Geschichte stehen; was von ihren Regeln weiter gilt, steht in `loop-constraints.md`.
 
 Append one entry per run. Prune entries older than 30 days.
 

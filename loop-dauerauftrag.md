@@ -1,5 +1,8 @@
 # Dauerauftrag für den Loop
 
+> **Abgelöst am 10.11.2026** durch den Paperclip-Loop (`LOOP.md`, `loop-constraints.md`). Diese Datei beschreibt den alten lokalen
+> Loop und bleibt als Geschichte stehen; was von ihren Regeln weiter gilt, steht in `loop-constraints.md`.
+
 > Jeder Loop-Lauf beginnt in **`ZIELE.md`**, dann hier, dann in `loop-constraints.md`.
 > **`ROADMAP.md`** sagt, was ueber einen Zyklus hinaus in welcher Reihenfolge gebaut wird und
 > warum, samt der Messung, die jede Zeile widerlegen wuerde.

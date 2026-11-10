@@ -1,0 +1,171 @@
+name: deploy
+on:
+  push:
+    branches: [dev]
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Ausrollen, auch wenn sich am Laufzeitpfad seit dem letzten Deploy nichts geändert hat"
+        type: boolean
+        default: false
+permissions:
+  contents: read
+  deployments: read
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+# Jeder Push auf dev liefert aus, wenn er den Laufzeitpfad seit dem letzten erfolgreichen Deploy ändert (LOOP.md, Release). Die Regel
+# aus loop-constraints.md, Grundregel 1, als Ablauf statt als Vorsatz: kein Rollout ohne grünes check und grünes pnpm e2e.
+#   plan    GitHub-Rechner: Commit des letzten erfolgreichen Deploys in der Umgebung production, Diff auf den Laufzeitpfad. Ohne
+#           Änderung dort endet der Lauf grün ohne Rollout, denn ein Rollout kostet den Kunden rund 16 Sekunden ohne Antwort (Doku,
+#           Goal-Dateien, Verdicts und ops/ warten auf den nächsten ohnehin fälligen Deploy).
+#   test    GitHub-Rechner: scripts/check.mjs (Regeln, Build, alle Unit-Tests), ohne Netz und ohne Secret.
+#   e2e     GitHub-Rechner mit Docker: pnpm e2e, die unveränderte Upstream-Runtime gegen diesen Stand (lokale Chain, Mock-Provider),
+#           ohne Secret. Die Produktion sieht davon nichts; der Server hat einen Kern und trägt den zahlenden Kunden.
+#   deploy  Runner des code-host (Label control-plane-deploy, eigener Benutzer gh-cp-deploy), Umgebung production, die nur dev
+#           bekommt. Nur von dort lässt der Server den Schlüssel zu. Der Schlüssel liegt als Secret der Umgebung vor und nur für die
+#           Dauer des Jobs als Datei auf dem Runner. Erst die Drift-Prüfung, dann das Log sichern, dann deploy/rollout.sh
+#           (Kanarienvogel, ruhiges Fenster, Rauchtest), dann das Deploy-Fenster.
+env:
+  COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      ship: ${{ steps.plan.outputs.ship }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FORCE: ${{ inputs.force }}
+        run: |
+          set -euo pipefail
+          since=""
+          for id in $(gh api "repos/$GITHUB_REPOSITORY/deployments?environment=production&per_page=50" --jq '.[].id'); do
+            state=$(gh api "repos/$GITHUB_REPOSITORY/deployments/$id/statuses?per_page=1" --jq '.[0].state // ""')
+            if [ "$state" = success ]; then since=$(gh api "repos/$GITHUB_REPOSITORY/deployments/$id" --jq .sha); break; fi
+          done
+          # Laufzeitpfad: was den Container oder Caddy auf dem Server ändert. Der Rest des Repos kommt mit dem nächsten Rollout mit.
+          paths=(src package.json pnpm-lock.yaml tsconfig.json harness/cp deploy/docker-compose.prod.yml deploy/Caddyfile deploy/rollout-remote.sh)
+          if [ "$FORCE" = "true" ]; then ship=true; why="von Hand ausgelöst"
+          elif [ -z "$since" ] || ! git cat-file -e "$since^{commit}" 2>/dev/null; then ship=true; why="kein früherer erfolgreicher Deploy bekannt"
+          elif changed=$(git diff --name-only "$since" HEAD -- "${paths[@]}") && [ -n "$changed" ]; then ship=true; why="Laufzeitpfad geändert seit ${since:0:7}: $(echo "$changed" | head -20 | tr '\n' ' ')"
+          else ship=false; why="seit ${since:0:7} nichts am Laufzeitpfad, kein Rollout"
+          fi
+          echo "ship=$ship" >> "$GITHUB_OUTPUT"
+          echo "Ausrollen: $ship ($why)" | tee -a "$GITHUB_STEP_SUMMARY"
+  test:
+    needs: plan
+    if: needs.plan.outputs.ship == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - run: corepack enable && corepack prepare --activate && pnpm --version
+      - run: pnpm install --frozen-lockfile
+      - run: node scripts/check.mjs
+        env:
+          HTTP_PROXY: http://127.0.0.1:9
+          HTTPS_PROXY: http://127.0.0.1:9
+          http_proxy: http://127.0.0.1:9
+          https_proxy: http://127.0.0.1:9
+          NO_PROXY: 127.0.0.1,localhost,::1
+          no_proxy: 127.0.0.1,localhost,::1
+  e2e:
+    needs: plan
+    if: needs.plan.outputs.ship == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - run: corepack enable && corepack prepare --activate && pnpm --version
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm e2e
+  deploy:
+    needs: [plan, test, e2e]
+    if: needs.plan.outputs.ship == 'true'
+    runs-on: [self-hosted, control-plane-deploy]
+    timeout-minutes: 30
+    environment: production
+    env:
+      CP_DEPLOY_HOST: root@76.13.144.207
+      CP_HOST: root@76.13.144.207
+      CP_VM: 76.13.144.207
+      CP_URL: https://postyourprice.com
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Schlüssel für die Dauer des Jobs
+        env:
+          KEY: ${{ secrets.CP_DEPLOY_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          umask 077
+          f="$RUNNER_TEMP/cp_deploy_key"
+          printf '%s\n' "$KEY" > "$f"
+          { echo "CP_DEPLOY_KEY=$f"; echo "CP_VM_KEY=$f"; echo "CP_SSH_KEY=$f"; } >> "$GITHUB_ENV"
+          ssh -i "$f" -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=15 "$CP_DEPLOY_HOST" true
+      # loop-constraints.md, Grundregel 2: Am 12.10.2026 lag auf dem Server ein Stripe-Stand, der im Repo fehlte, und rsync --delete
+      # hätte ihn überschrieben. Jede Datei, die der Rollout ersetzen oder löschen würde, muss mit genau diesem Inhalt in einem Commit
+      # des Repos stehen (git blob id); sonst endet der Job hier, und der Stand kommt zuerst ins Repo. Ausnahmen nur in
+      # deploy/drift-ok.txt, die nur ein Mensch ändert.
+      - name: Der Stand auf dem Server liegt im Repo
+        run: |
+          set -euo pipefail
+          ssh -i "$CP_DEPLOY_KEY" -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=15 "$CP_DEPLOY_HOST" bash -s > "$RUNNER_TEMP/server-blobs.txt" <<'REMOTE'
+          set -euo pipefail
+          cd /opt/control-plane/repo
+          find . \( -path ./node_modules -o -path ./dist -o -path ./.git -o -path ./harness/certs -o -path ./harness/state -o -path ./.scratch -o -name __pycache__ \) -prune \
+            -o -type f ! -name '*.db' ! -name '.env' ! -path ./.claude/settings.local.json -print0 |
+            while IFS= read -r -d '' f; do
+              printf '%s %s\n' "$({ printf 'blob %s\0' "$(stat -c %s "$f")"; cat "$f"; } | sha1sum | cut -d' ' -f1)" "${f#./}"
+            done
+          REMOTE
+          git rev-list --objects --all | cut -d' ' -f1 > "$RUNNER_TEMP/known.txt"
+          grep -vE '^[[:space:]]*(#|$)' deploy/drift-ok.txt | awk '{print $1}' >> "$RUNNER_TEMP/known.txt"
+          awk 'NR == FNR { k[$1] = 1; next } !($1 in k) { print $2 }' "$RUNNER_TEMP/known.txt" "$RUNNER_TEMP/server-blobs.txt" > "$RUNNER_TEMP/unknown.txt"
+          echo "$(wc -l < "$RUNNER_TEMP/server-blobs.txt") Dateien auf dem Server geprüft"
+          if [ -s "$RUNNER_TEMP/unknown.txt" ]; then
+            echo "::error::Auf dem Server liegt ein Stand, den kein Commit hat. Erst ins Repo holen, dann ausrollen (loop-constraints.md, Grundregel 2):"
+            cat "$RUNNER_TEMP/unknown.txt"
+            exit 1
+          fi
+      # Wie ops/deploy.sh Schritt 3: Der Rollout ersetzt den Container, und Docker löscht dessen Log mit (29.09.2026).
+      - name: Log des laufenden Containers sichern
+        run: |
+          ssh -i "$CP_DEPLOY_KEY" -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=15 "$CP_DEPLOY_HOST" '
+            set -e
+            mkdir -p /var/log/cp-history
+            out=/var/log/cp-history/cp-$(date -u +%Y%m%dT%H%M%SZ).log
+            cd /opt/control-plane/repo/deploy
+            docker compose -f docker-compose.prod.yml logs --no-color --timestamps cp > "$out" 2>&1 || true
+            gzip -f "$out"
+            find /var/log/cp-history -name "cp-*.log.gz" -mtime +30 -delete
+            echo "$(wc -c < "$out.gz") bytes -> $out.gz"
+          ' || echo "::warning::Log nicht gesichert, das Log des ersetzten Containers geht verloren"
+      - name: Ausrollen
+        run: deploy/rollout.sh
+      - name: Deploy-Fenster
+        run: ops/deploy-window.sh || echo "::warning::ops/deploy-window.sh meldet Exit $?, Release Manager liest das Fenster"
+      - name: Schlüssel löschen
+        if: always()
+        run: rm -f "$RUNNER_TEMP/cp_deploy_key"

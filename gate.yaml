@@ -1,0 +1,58 @@
+# Gate des Loops control-plane (Format: code-host docs/paperclip/loops.md Abschnitt 3, Glob-Regeln paperclip/loops/README.md):
+# dieselben Regeln wie loop-constraints.md, als Daten für den Loop Master. Ändert nur ein Mensch; jede Änderung gilt erst mit einem
+# neuen Drill.
+deny_paths:
+  # Schlüssel und lokaler Zustand
+  - ".env*"
+  - "*.pem"
+  - "*.key"
+  - "*.db"
+  - "secrets/**"
+  - ".scratch/**"
+  # der Loop-Vertrag und die CI mit dem Deploy
+  - "loop.yaml"
+  - "gate.yaml"
+  - "loop-constraints.md"
+  - "LOOP.md"
+  - "ops/prompts/**"
+  - ".github/**"
+  # die Prüfmaschine selbst: Sie findet jeden Test von selbst, ein Goal ändert sie nie
+  - "scripts/check.mjs"
+  # der Betrieb auf dem Server: Compose, Rollout, Kaltstart, Einrichtung und die Ausnahmen der Drift-Prüfung. deploy/Caddyfile ändert
+  # der Loop selbst (Matthias 29.09.2026: „wieso sollte ich was im caddy file schreiben das ist dein job“).
+  - "deploy/docker-compose.prod.yml"
+  - "deploy/rollout.sh"
+  - "deploy/rollout-remote.sh"
+  - "deploy/up.sh"
+  - "deploy/setup-vm.sh"
+  - "deploy/drift-ok.txt"
+  # die beiden Cron-Läufe auf dem Server (04:50 und 05:00), die nicht verändert werden
+  - "ops/conway-series.sh"
+  - "ops/conway-money-series.sh"
+  # der Upstream-Pin d8f8168: die Referenz, gegen die der Dienst kompatibel ist
+  - "harness/runtime/**"
+# Ein Goal baut Endpunkte, Tests, Messwerkzeuge und Doku; die Sandbox-API (sandbox 03) ist das größte.
+max_files_per_goal_pr: 80
+# Layout aus LOOP.md: Dienst unter src/, Tests unter test/, Messwerkzeuge unter ops/, Harness unter harness/, Doku unter docs/.
+merge_allowlist:
+  - "src/**"
+  - "test/**"
+  - "ops/**"
+  - "harness/**"
+  - "docs/**"
+  - "goals/**"
+  - "mcp/**"
+  - "skills/**"
+  - "scripts/**"
+  - "deploy/Caddyfile"
+  - "deploy/README.md"
+  - "package.json"
+  - "pnpm-lock.yaml"
+  - "tsconfig.json"
+  - "vitest.config.ts"
+  - ".gitignore"
+  - "README.md"
+  - "AGENTS.md"
+  - "ROADMAP.md"
+  - "STATE.md"
+  - "ZIELE.md"

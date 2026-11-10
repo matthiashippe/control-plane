@@ -1,0 +1,8 @@
+# Dateien, deren Fassung auf dem Server in keinem Commit steht und die der nächste Rollout trotzdem ersetzen darf (git blob id, Pfad).
+# Gelesen von .github/workflows/deploy.yml, Schritt „Der Stand auf dem Server liegt im Repo“. Ändert nur ein Mensch (gate.yaml).
+#
+# 10.11.2026, Einrichtung des Loops: Die drei Dateien unten unterscheiden sich von der Fassung im Repo nur in Kommentaren. Die Fassung
+# im Repo ist die neuere und gilt; der erste Rollout ersetzt sie.
+a241aa6840938d1d2b53fc831152ff80b0a99500 src/inference/openrouter.ts
+2601fec0c32392b9e53380028860596851b3a1f9 src/inference/provider.ts
+2fff9b6a93ace5188452295edbf6ac8a8b48f85a test/not-for-sale.test.ts

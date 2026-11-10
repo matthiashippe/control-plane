@@ -1,0 +1,52 @@
+name: check
+on:
+  pull_request:
+    branches: [dev]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
+# Das Repo ist öffentlich, deshalb laufen beide Jobs auf GitHub-Rechnern (für öffentliche Repos kostenlos) und nie auf dem code-host;
+# ein PR aus einem Fork läuft erst nach Freigabe (fork-pr-contributor-approval: all_external_contributors). Kein Job sieht ein Secret.
+#   check  der einzige Required Check auf dev (loop.yaml check): Regeln, Build, alle Unit-Tests, ohne Netz.
+#   e2e    der Harness mit der unveränderten Upstream-Runtime (Docker, Netz für Images und den Klon am Pin), nicht Pflicht; Linse K
+#          liest sein Ergebnis für jede Änderung am Laufzeitpfad, deploy.yml fährt ihn vor jedem Rollout noch einmal.
+env:
+  COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      # Ohne Paketmanager-Cache: setup-node sucht pnpm sonst, bevor corepack es aktiviert hat (10.11.2026).
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - run: corepack enable && corepack prepare --activate && pnpm --version
+      - run: pnpm install --frozen-lockfile
+      # Toter Proxy: ein Schritt, der ins Netz greift, scheitert. scripts/check.mjs setzt ihn für jeden Kindprozess noch einmal.
+      - run: node scripts/check.mjs
+        env:
+          HTTP_PROXY: http://127.0.0.1:9
+          HTTPS_PROXY: http://127.0.0.1:9
+          http_proxy: http://127.0.0.1:9
+          https_proxy: http://127.0.0.1:9
+          NO_PROXY: 127.0.0.1,localhost,::1
+          no_proxy: 127.0.0.1,localhost,::1
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - run: corepack enable && corepack prepare --activate && pnpm --version
+      - run: pnpm install --frozen-lockfile
+      # Erster Lauf 10.11.2026 auf ubuntu-latest: E2E OK turns=5 registered=true api_errors=0 ledger_consistent=true, 72 s.
+      - run: pnpm e2e
