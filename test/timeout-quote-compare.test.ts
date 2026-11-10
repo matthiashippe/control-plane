@@ -59,6 +59,7 @@ function balance(out: string) {
   return { requests: dev("requests"), timeouts: dev("timeouts"), causes };
 }
 
+
 const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
 
 describe("ops/timeout-quote.sh --compare-files", () => {
@@ -151,4 +152,29 @@ describe("ops/timeout-quote.sh --compare-files", () => {
     expect(run.stderr).toContain("TQ_SINCE is no ISO time in UTC");
     expect(run.out).not.toMatch(/^cause /m);
   });
+
+  it("overlap: calls a lost call unmatched when its end is far from every pair, even if a row was written while it ran", () => {
+    const run = compare(
+      [
+        // Leader with its own row, answered after 20 s.
+        caddy(T0 + 60, 20.0),
+        // Retry the coalescer answered: same answer, so it ends within 2 s of the leader.
+        caddy(T0 + 61, 5.0),
+        // A lost call: 59.9 s, status 0, no row of its own. The leader's row was written while it ran,
+        // but it ended 20 s after the leader, so the coalescer did not answer it.
+        caddy(T0 + 80, 59.9, 0),
+      ],
+      [ledger(T0 + 60, T0 + 40, "openai/gpt-5.2", 19900)],
+    );
+    expect(run.status, run.stderr).toBe(0);
+    const b = balance(run.out);
+    expect(b.causes.find((c) => c.name === "coalesced")).toMatchObject({ n: 1, requests: 1, timeouts: 0 });
+    expect(b.causes.find((c) => c.name === "unmatched")).toMatchObject({ n: 1, requests: 1, timeouts: 1 });
+    expect(b.causes.find((c) => c.name === "clock")).toMatchObject({ n: 0 });
+    expect(b.requests).toBe(2);
+    expect(b.timeouts).toBe(1);
+    expect(sum(b.causes.map((c) => c.requests))).toBe(b.requests);
+    expect(sum(b.causes.map((c) => c.timeouts))).toBe(b.timeouts);
+  });
+
 });

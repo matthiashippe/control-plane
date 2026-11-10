@@ -49,7 +49,7 @@ in der Live-Prüfung des Release Managers.
 
 ## Vorher und nachher auf derselben Grundlage
 
-Gemessen am 10.11.2026 um 23:26 UTC, nur lesend, vom code-host aus mit
+Gemessen am 10.11.2026 um 23:26 UTC und mit der 2-s-Regel für `coalesced` um 23:46 UTC erneut, nur lesend, vom code-host aus mit
 
 ```
 bash ops/timeout-quote.sh --compare
@@ -72,7 +72,7 @@ Zeile). Alle 46 Anfragen kamen von fremden Adressen (`--join` auf denselben Zeit
 
 **Abweichung** (caddy minus service): Anfragen 0 (46 gegen 46), Timeouts 0 (0 gegen 0). Je Ursache die Zahl der Anfragen, die sie trifft:
 
-- coalesced: 0, Anfragen im Caddy-Log ohne eigene Zeile, die der Coalescer mit der laufenden Antwort einer gleichen Anfrage bediente; der Join zählt sie, die Datenbank nicht.
+- coalesced: 0, Anfragen im Caddy-Log ohne eigene Zeile, deren Ende höchstens 2 s neben dem Ende einer Anfrage mit eigener Zeile liegt, weil der Coalescer beiden dieselbe Antwort im selben Moment gibt; der Join zählt sie, die Datenbank nicht. Eine Anfrage ohne Zeile, die nur eine fremde Buchung überdeckt, ist `unmatched`, damit ein Timeout ohne Abbruchzeile nicht verschwindet.
 - clock: 0, Anfragen mit eigener Zeile, die auf Caddys Uhr Timeout sind und nach `duration_ms` nicht oder umgekehrt, weil die Uhr des Dienstes erst beim Aufruf des Anbieters startet.
 - unmatched: 0, Anfragen im Caddy-Log ohne jede Zeile und Zeilen ohne Anfrage im Zeitraum; sie zählen mit Vorzeichen, damit die Ursachen zusammen genau die Abweichung ergeben.
 
@@ -88,6 +88,9 @@ abrechnung 02) und erst nach einem neuen `--compare` über denselben Zeitraum.
 
 **Gegenprobe:** `bash ops/timeout-quote.sh --selftest` pflanzt Zeilen ohne Netz und verlangt bei gleich zählenden Zeilen Abweichung 0 und
 jede Ursache 0, bei einer bedienten Wiederholung und einem Paar mit 59,7 s im Log und 58,9 s `duration_ms` genau `cause coalesced: 1` und
-`cause clock: 1`, und eine Zeile außerhalb von `TQ_SINCE` und `TQ_UNTIL` zählt in keiner Messung. Gegen die echten Daten: An Kopien von Log
+`cause clock: 1`, und eine Zeile außerhalb von `TQ_SINCE` und `TQ_UNTIL` zählt in keiner Messung. Eine Anfrage ohne Zeile mit 59,9 s und
+Status 0, die eine fremde Buchung überdeckt und 20 s nach jeder Anfrage mit Zeile endet, ergibt `cause unmatched: 1` (Zeilen
+`compare overlap`). `test/timeout-quote-compare.test.ts` verlangt dazu, dass `service` je Modell dieselben Anfragen und Timeouts zählt
+wie `--rows` mit demselben `TQ_SINCE`. Gegen die echten Daten: An Kopien von Log
 und Ledger angehängt, eine Wiederholung während der letzten Buchung und ein Paar mit 59,7 s im Log und 58,9 s `duration_ms` heben die
 Abweichung auf 1 bei Anfragen und 1 bei Timeouts, mit `cause coalesced: 1` und `cause clock: 1`.

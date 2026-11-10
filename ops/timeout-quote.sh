@@ -34,10 +34,11 @@
 # period: TQ_SINCE and TQ_UNTIL as ISO time in UTC, by default from the first ledger row with
 # `duration_ms` to the last line. Per model one line `| model | caddy | requests | timeouts | quote |`
 # and one line `| model | service | ... |`, then the deviation (caddy minus service) and one line per
-# cause with the number of calls and its signed share: `coalesced` (a request the coalescer answered,
-# no row of its own), `clock` (a timeout on Caddy's clock and not on the service's `duration_ms`, or
-# the other way round), `unmatched` (a request without a row, or a row without a request). The shares
-# add up to the deviation; if they do not, the tool exits 3 without printing a cause.
+# cause with the number of calls and its signed share: `coalesced` (a request without a row of its
+# own that ended within 2 s of a request with one: the coalescer answered both at the same moment),
+# `clock` (a timeout on Caddy's clock and not on the service's `duration_ms`, or the other way round),
+# `unmatched` (a request without a row, or a row without a request). The shares add up to the
+# deviation; if they do not, the tool exits 3 without printing a cause.
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -143,6 +144,8 @@ if (mode === "join") {
   const since = sinceSet ?? firstTimed ?? null;
   if (since === null) { console.error("no row with a duration yet, nothing to compare; set TQ_SINCE"); process.exit(2); }
   const items = [];
+  // First pass: every request that finds its own row. Their end times are what a coalesced retry is matched against.
+  const paired = [], lone = [];
   for (const r of reqs) {
     let best = null, bd = Infinity;
     for (const x of rs) {
@@ -151,14 +154,26 @@ if (mode === "join") {
       if (x.start !== null && dist > 2) continue;
       if (dist < bd) { bd = dist; best = x; }
     }
-    if (best) {
-      best.used = true;
-      if (hasDuration(best)) items.push({ kind: "pair", at: best.t, model: best.model, caddyTo: r.d >= limit, serviceTo: Number(best.duration_ms) >= limit * 1000 });
-      else items.push({ kind: "caddy-only", at: r.end, model: best.model, caddyTo: r.d >= limit });
-      continue;
+    if (!best) { lone.push(r); continue; }
+    best.used = true;
+    const item = hasDuration(best)
+      ? { kind: "pair", at: best.t, model: best.model, caddyTo: r.d >= limit, serviceTo: Number(best.duration_ms) >= limit * 1000 }
+      : { kind: "caddy-only", at: r.end, model: best.model, caddyTo: r.d >= limit };
+    items.push(item);
+    paired.push({ end: r.end, item });
+  }
+  // Second pass: a request without a row of its own is coalesced only when it ended within COALESCE_S of a request that
+  // has one, because the coalescer hands leader and retry the same answer at the same moment. A row merely written while
+  // it ran is not enough: nearly every 60 s call overlaps a row of another request, and a timeout without an abort row (the lost
+  // booking this comparison exists to find) would hide under coalesced.
+  const COALESCE_S = 2;
+  for (const r of lone) {
+    let leader = null, ld = Infinity;
+    for (const p of paired) {
+      const dist = Math.abs(p.end - r.end);
+      if (dist <= COALESCE_S && dist < ld) { ld = dist; leader = p.item; }
     }
-    const leader = rs.find((x) => x.t >= r.start - 1 && x.t <= r.end + 1) || null;
-    if (leader) items.push({ kind: "coalesced", at: leader.t, model: leader.model, caddyTo: r.d >= limit });
+    if (leader) items.push({ kind: "coalesced", at: leader.at, model: leader.model, caddyTo: r.d >= limit });
     else items.push({ kind: "caddy-only", at: r.end, model: "unattributed", caddyTo: r.d >= limit });
   }
   for (const x of rs) if (!x.used && hasDuration(x)) items.push({ kind: "service-only", at: x.t, model: x.model, serviceTo: Number(x.duration_ms) >= limit * 1000 });
@@ -424,6 +439,21 @@ selftest() {
   expect "compare period, lines outside counted in neither" "$out" "cause unmatched: 0 (requests 0, timeouts 0)"
   expect "compare period, the period as set" "$out" "period $(iso "$c") to $(iso $((c + 3600))) UTC, timeout from $LIMIT_S s"
 
+  # Overlap: a lost call (59.9 s, status 0, no row of its own) runs while the leader's row is written, but ends 20 s after
+  # every request that has a row. It is unmatched, not coalesced; the retry that ends next to the leader stays coalesced.
+  {
+    line $((c + 60)) 20.0 200 "$stranger"
+    line $((c + 61)) 5.0 200 "$stranger"
+    line $((c + 80)) 59.9 0 "$stranger"
+  } >"$dir/cmp-overlap.jsonl"
+  trow $((c + 60)) $((c + 40)) openai/gpt-5.2 19900 >"$dir/cmp-overlap-rows.jsonl"
+  out="$(count compare "$dir/cmp-overlap.jsonl" "$dir/cmp-overlap-rows.jsonl" "$dir/own.txt" "$LIMIT_S" "" "")" || all_ok=0
+  echo "$out" | sed 's/^/  planted overlap: /'
+  expect "compare overlap, the lost call is unmatched" "$out" "cause unmatched: 1 (requests 1, timeouts 1)"
+  expect "compare overlap, only the retry next to the leader is coalesced" "$out" "cause coalesced: 1 (requests 1, timeouts 0)"
+  expect "compare overlap, the lost call keeps no model" "$out" "| unattributed | caddy | 1 | 1 | 100.0 % |"
+  expect "compare overlap, causes add up to the deviation" "$out" "deviation timeouts: 1 (caddy 1, service 0)"
+
   if [ "$all_ok" = 1 ]; then
     echo "TIMEOUT QUOTE SELFTEST OK"
     return 0
@@ -440,7 +470,7 @@ case "${1:-}" in
   --compare) compare ;;
   --compare-files) count compare "${2:?CADDY file or -}" "${3:?ROWS file}" "$OWN_FILE" "$LIMIT_S" "${TQ_SINCE:-}" "${TQ_UNTIL:-}" ;;
   "") production ;;
-  -h | --help) sed -n '2,44p' "$0" | sed 's/^# \{0,1\}//' ;;
+  -h | --help) sed -n '2,41p' "$0" | sed 's/^# \{0,1\}//' ;;
   *)
     echo "unknown switch: $1" >&2
     exit 2
