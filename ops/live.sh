@@ -15,14 +15,14 @@
 # Checks:
 #   health   GET /health answers 200
 #   status   GET /v1/status answers 200 with a JSON object
-#   refund   the credit for the three calls of 2026-11-10 whose answers never arrived
-#            (src/credits/aborted.ts) is in the ledger exactly once, over exactly 61644 mc
+#   refund   the credit for the five calls of 2026-11-10 whose answers never arrived
+#            (src/credits/aborted.ts) is in the ledger exactly once, over exactly 79229 mc
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BASE="${LIVE_URL:-https://postyourprice.com}"
 REFUND_KEY="refund:client-aborted-2026-11-10"
-REFUND_MC=61644
+REFUND_MC=79229
 
 # The ledger query, the same text in production and in the selftest. It counts refund rows of the
 # batch key and sums them; nothing else leaves the database. better-sqlite3 is what the container
@@ -74,11 +74,11 @@ selftest() {
   dir="$(mktemp -d)"
   trap 'rm -rf "$dir"' RETURN
 
-  # Planted ledgers: none, two, one, one too small and two that add up to the right sum, each next to decoys the query must not count (an
+  # Planted ledgers: none, two, one, one too small and two halves of the right sum, each next to decoys the query must not count (an
   # inference row and a refund under another key).
-  local plant='const [file, credits, mc] = process.argv.slice(1); let db; try { db = require("better-sqlite3")(file); db.exec("SELECT 1"); } catch (e) { const { DatabaseSync } = require("node:sqlite"); db = new DatabaseSync(file); } db.exec("CREATE TABLE ledger (id INTEGER PRIMARY KEY, address TEXT, kind TEXT, delta_mc INTEGER, ref TEXT)"); const ins = db.prepare("INSERT INTO ledger (address, kind, delta_mc, ref) VALUES (?, ?, ?, ?)"); ins.run("planted-wallet", "inference", -61644, "gen-planted"); ins.run("planted-wallet", "refund", 500, "refund:another-batch"); for (let i = 0; i < Number(credits); i++) ins.run("planted-wallet", "refund", Number(mc), "refund:client-aborted-2026-11-10");'
+  local plant='const [file, credits, mc] = process.argv.slice(1); let db; try { db = require("better-sqlite3")(file); db.exec("SELECT 1"); } catch (e) { const { DatabaseSync } = require("node:sqlite"); db = new DatabaseSync(file); } db.exec("CREATE TABLE ledger (id INTEGER PRIMARY KEY, address TEXT, kind TEXT, delta_mc INTEGER, ref TEXT)"); const ins = db.prepare("INSERT INTO ledger (address, kind, delta_mc, ref) VALUES (?, ?, ?, ?)"); ins.run("planted-wallet", "inference", -79229, "gen-planted"); ins.run("planted-wallet", "refund", 500, "refund:another-batch"); for (let i = 0; i < Number(credits); i++) ins.run("planted-wallet", "refund", Number(mc), "refund:client-aborted-2026-11-10");'
   local case_ name credits mc expect got code first all_ok=1
-  for case_ in "none 0 $REFUND_MC FAIL" "double 2 $REFUND_MC FAIL" "single 1 $REFUND_MC OK" "short 1 61000 FAIL" "split 2 30822 FAIL"; do
+  for case_ in "none 0 $REFUND_MC FAIL" "double 2 $REFUND_MC FAIL" "single 1 $REFUND_MC OK" "short 1 61644 FAIL" "split 2 39614 FAIL"; do
     read -r name credits mc expect <<<"$case_"
     (cd "$ROOT" && NODE_NO_WARNINGS=1 node -e "$plant" "$dir/$name.db" "$credits" "$mc") || {
       echo "FAIL selftest: could not plant $name"

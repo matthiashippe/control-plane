@@ -1,9 +1,9 @@
 /**
  * Credit for inference calls that were charged although their answer never reached the client.
  *
- * On 2026-11-10 a foreign automaton ran three calls to /v1/chat/completions into its own 60 second
- * timeout (Caddy logged status 0 after 59.9 s each), and the proxy charged all three anyway,
- * because it booked as soon as the provider answered. Matthias decided the same day: answers that
+ * On 2026-11-10 a foreign automaton gave up on five calls to /v1/chat/completions before the answer
+ * came (Caddy logged status 0: two after 22.8 s and 18.5 s, three after 59.9 s at its own 60 second
+ * timeout), and the proxy charged all five anyway, because it booked as soon as the provider answered. Matthias decided the same day: answers that
  * do not arrive are not charged, and what was charged that way goes back as an internal credit.
  * One ledger row, never a payout, never on chain (loop-constraints.md, rules 6 and 10).
  *
@@ -29,11 +29,13 @@ export interface AbortedBatch {
 export const ABORTED_2026_11_10: AbortedBatch = {
   key: "refund:client-aborted-2026-11-10",
   refs: [
+    "gen-1794287765-SupdXvMT0JLDL224yBtY",
+    "gen-1794287878-doiF42ITx3lfTwxRWfqU",
     "gen-1794288298-yWUHf9MpFBbR93vpJ7ET",
     "gen-1794288946-oKnNy3iW6PaglDoYV2tH",
     "gen-1794289014-dNsPPbkW0sMRJPZnCbiA",
   ],
-  totalMc: 61_644,
+  totalMc: 79_229,
   reason: "client_aborted_before_answer",
 };
 

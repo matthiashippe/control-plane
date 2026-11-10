@@ -1,7 +1,7 @@
 /**
- * The credit for the three calls of 2026-11-10 that were charged although the client had already
- * given up (abrechnung 01). One ledger row on the wallet of the three charges, over exactly their
- * sum, pointing at the three refs, and never twice: it runs on every start of the service.
+ * The credit for the five calls of 2026-11-10 that were charged although the client had already
+ * given up (abrechnung 01). One ledger row on the wallet of the five charges, over exactly their
+ * sum, pointing at the five refs, and never twice: it runs on every start of the service.
  *
  * The wallets here are made up (repeated digits); the refs and the sum are the measured ones,
  * because the batch only books when it finds exactly those.
@@ -19,7 +19,9 @@ import { hashApiKey } from "../src/auth/siwe.js";
 const CUSTOMER = "0x1111111111111111111111111111111111111111";
 const STRANGER = "0x2222222222222222222222222222222222222222";
 // A made-up split of the measured total; only the sum is real.
-const SPLIT = [20_000, 20_000, ABORTED_2026_11_10.totalMc - 40_000];
+const SPLIT = [10_000, 10_000, 10_000, 10_000, ABORTED_2026_11_10.totalMc - 40_000];
+// The two shorter aborts (22.8 s and 18.5 s) that the first version of the batch left out.
+const SHORT_ABORTS = ["gen-1794287765-SupdXvMT0JLDL224yBtY", "gen-1794287878-doiF42ITx3lfTwxRWfqU"];
 
 let dirs: string[] = [];
 afterEach(() => {
@@ -33,7 +35,7 @@ function freshFile(): string {
   return path.join(dir, "cp.db");
 }
 
-/** The state of production on 2026-11-10 in miniature: three charged aborts and a stranger's call. */
+/** The state of production on 2026-11-10 in miniature: five charged aborts and a stranger's call. */
 function seed(db: Db, opts: { refs?: readonly string[]; addresses?: string[] } = {}) {
   const refs = opts.refs ?? ABORTED_2026_11_10.refs;
   postLedger(db, { address: CUSTOMER, kind: "topup", deltaMc: 500_000, ref: "nonce-customer" });
@@ -64,7 +66,14 @@ function booksAgree(db: Db) {
 }
 
 describe("credit for the charges of 2026-11-10 whose answers never arrived", () => {
-  it("credits exactly once over the sum of the three, even when the step runs twice", () => {
+  it("names all five charged aborts of 2026-11-10, the two short ones included", () => {
+    expect(ABORTED_2026_11_10.refs).toHaveLength(5);
+    expect(new Set(ABORTED_2026_11_10.refs).size).toBe(5);
+    for (const ref of SHORT_ABORTS) expect(ABORTED_2026_11_10.refs).toContain(ref);
+    expect(ABORTED_2026_11_10.totalMc).toBe(79_229);
+  });
+
+  it("credits exactly once over the sum of the five, even when the step runs twice", () => {
     const file = freshFile();
     const db = openDb(file);
     seed(db);
@@ -81,13 +90,13 @@ describe("credit for the charges of 2026-11-10 whose answers never arrived", () 
     expect(rows).toHaveLength(1);
     expect(rows[0].address).toBe(CUSTOMER);
     expect(rows[0].delta_mc).toBe(SPLIT.reduce((a, b) => a + b, 0));
-    expect(rows[0].delta_mc).toBe(61_644);
+    expect(rows[0].delta_mc).toBe(79_229);
     expect(rows[0].ref).toBe(ABORTED_2026_11_10.key);
     expect(JSON.parse(rows[0].meta).refs).toEqual([...ABORTED_2026_11_10.refs]);
     again.close();
   });
 
-  it("runs on start: a database with the three charges gets the credit when the service opens it", () => {
+  it("runs on start: a database with the five charges gets the credit when the service opens it", () => {
     const file = freshFile();
     const db = openDb(file);
     seed(db);
@@ -113,19 +122,20 @@ describe("credit for the charges of 2026-11-10 whose answers never arrived", () 
     expect(strangerBalance).toBe(500_000 - 7_000);
   });
 
-  it("credits nothing when the three charges are missing or are not the measured ones", () => {
+  it("credits nothing when the five charges are missing or are not the measured ones", () => {
     const none = openDb(":memory:");
     postLedger(none, { address: STRANGER, kind: "topup", deltaMc: 500_000, ref: "nonce-stranger" });
     expect(creditAbortedCharges(none)).toEqual({ credited: false, reason: "charges_missing" });
     expect(refunds(none)).toHaveLength(0);
 
-    const two = openDb(":memory:");
-    seed(two, { refs: ABORTED_2026_11_10.refs.slice(0, 2) });
-    expect(creditAbortedCharges(two)).toEqual({ credited: false, reason: "charges_missing" });
-    expect(refunds(two)).toHaveLength(0);
+    // Only the three long ones, as the first version of the batch assumed: not the measured state.
+    const three = openDb(":memory:");
+    seed(three, { refs: ABORTED_2026_11_10.refs.filter((r) => !SHORT_ABORTS.includes(r)) });
+    expect(creditAbortedCharges(three)).toEqual({ credited: false, reason: "charges_missing" });
+    expect(refunds(three)).toHaveLength(0);
 
     const split = openDb(":memory:");
-    seed(split, { addresses: [CUSTOMER, CUSTOMER, STRANGER] });
+    seed(split, { addresses: [CUSTOMER, CUSTOMER, CUSTOMER, CUSTOMER, STRANGER] });
     expect(creditAbortedCharges(split)).toEqual({ credited: false, reason: "several_addresses" });
     expect(refunds(split)).toHaveLength(0);
 
