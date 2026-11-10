@@ -78,6 +78,25 @@ eine Besserung verspricht, die niemand gemessen hat (`loop-constraints.md`, Grun
 - [x] Der Laufzeitpfad bleibt unverändert, und `check` ist grün.
       Prüfung: `git diff --name-only origin/dev...HEAD -- src deploy | wc -l` muss 0 ausgeben.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
+- [ ] `--compare` ordnet eine Anfrage ohne eigene Zeile nur dann `coalesced` zu, wenn ihr Ende im Caddy-Log höchstens 2 s vom Ende
+      der Anfrage eines Paars entfernt liegt (der Coalescer gibt Leader und Wiederholung dieselbe Antwort im selben Moment), sonst ist
+      sie `unmatched`. Heute reicht, dass irgendeine Zeile während ihrer Laufzeit geschrieben wurde (`ops/timeout-quote.sh:160`); bei
+      echtem Verkehr überdeckt fast jede Anfrage von 60 s eine fremde Zeile, und ein Timeout ohne Abbruchzeile, also genau die verlorene
+      Buchung, die der Vergleich finden soll, verschwände unter `coalesced`. Der Selftest pflanzt eine Anfrage ohne Zeile mit 59,9 s und
+      Status 0, deren Laufzeit eine fremde Zeile überdeckt und deren Ende 20 s neben dem Ende jeder Paar-Anfrage liegt: `cause unmatched: 1`
+      und `cause coalesced: 0`; die Wiederholung aus dem bestehenden Selftest bleibt `cause coalesced: 1`. Diese Selftest-Zeilen beginnen
+      mit `ok   compare overlap` oder `FAIL compare overlap`. Die Zeile `- coalesced:` in `docs/abrechnung/timeouts.md` nennt die 2 s.
+      Prüfung: `bash ops/timeout-quote.sh --selftest` muss Exit-Code 0 haben und als letzte Zeile `TIMEOUT QUOTE SELFTEST OK` ausgeben.
+      Prüfung: `bash ops/timeout-quote.sh --selftest | grep -c "^ok   compare overlap"` muss mindestens 2 ausgeben.
+      Prüfung: `grep -cE "^\s*(it|test)\(.*overlap" test/timeout-quote-compare.test.ts` muss mindestens 1 ausgeben.
+      Prüfung: `pnpm -s vitest run test/timeout-quote-compare.test.ts` muss Exit-Code 0 haben.
+      Prüfung: `grep -cE "^- coalesced: [0-9]+.*2 s" docs/abrechnung/timeouts.md` muss 1 ausgeben.
+- [ ] Die Messung `service` aus `--compare` ist dieselbe Zahl, die `timeouts.md` unter `Quote nach außen:` meint: Über dieselben
+      gepflanzten Zeilen, darunter ein Abbruch und eine Zeile ohne `duration_ms`, geben `--compare-files` ohne `TQ_UNTIL` und `--rows` mit
+      demselben `TQ_SINCE` je Modell dieselben Anfragen und Timeouts. Ein Vitest-Test vergleicht beide Ausgaben je Modell; rot gemacht
+      wird er mit einer Mutation (etwa `service` zählt Zeilen ohne `duration_ms`), die die Progress-Log-Zeile nennt.
+      Prüfung: `grep -cE "^\s*(it|test)\(.*matches --rows" test/timeout-quote-compare.test.ts` muss mindestens 1 ausgeben.
+      Prüfung: `pnpm -s vitest run test/timeout-quote-compare.test.ts` muss Exit-Code 0 haben.
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
