@@ -2762,6 +2762,11 @@ export function createApp(opts: AppOptions) {
           entry.total_tokens = usage?.total_tokens;
         }
         if (row.kind === "topup") entry.tx_hash = meta.tx_hash;
+        // A credit for answers that never reached the client: which charges it gives back.
+        if (row.kind === "refund") {
+          entry.reason = meta.reason;
+          entry.refs = Array.isArray(meta.refs) ? meta.refs : undefined;
+        }
         return entry;
       }),
       ...diagnoseIdleCredit(db, c.get("address")),
@@ -2794,11 +2799,15 @@ export function createApp(opts: AppOptions) {
   });
 
   app.post("/v1/chat/completions", async (c) => {
+    // Read first: @hono/node-server creates the signal lazily and only aborts one that exists when
+    // the connection closes. Aborted means the answer cannot arrive, so it is not charged
+    // (abrechnung 01, 2026-11-10).
+    const signal = c.req.raw.signal;
     if (!opts.catalog) return c.json(INFERENCE_UNAVAILABLE, 503);
     const sold = shelf();
     if (!sold) return c.json(INFERENCE_NOT_FOR_SALE, 503);
     const body = await c.req.json().catch(() => null);
-    const res = await handleChat(db, sold, c.get("address"), body, { topupsClosed: intakeClosed });
+    const res = await handleChat(db, sold, c.get("address"), body, { topupsClosed: intakeClosed, signal });
     return c.json(res.body as Record<string, unknown>, res.status as 200);
   });
 
@@ -2819,6 +2828,8 @@ export function createApp(opts: AppOptions) {
    * finding accuses an honest text. `discarded` says how many fell out that way.
    */
   app.post("/v1/check", async (c) => {
+    // Same as the chat route: a check whose caller has gone is not charged.
+    const signal = c.req.raw.signal;
     if (!opts.catalog) return c.json(INFERENCE_UNAVAILABLE, 503);
     // Closed with the chat route: it buys through `handleChat` too and writes the same
     // `inference` rows through the same provider (HAN-55).
@@ -2862,7 +2873,7 @@ export function createApp(opts: AppOptions) {
       sold,
       c.get("address"),
       { model, messages: messages(briefing, submission, kind), response_format: { type: "json_object" } },
-      { topupsClosed: intakeClosed },
+      { topupsClosed: intakeClosed, signal },
     );
     if (res.status !== 200) return c.json(res.body as Record<string, unknown>, res.status as 400);
 

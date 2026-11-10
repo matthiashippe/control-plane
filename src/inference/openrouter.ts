@@ -194,7 +194,24 @@ export class OpenRouterProvider implements ChatProvider {
     };
   }
 
-  async chat(req: ChatRequest & { maxTokens: number; apiKeyId: string; zdr?: boolean }): Promise<ChatResponse> {
+  async chat(req: ChatRequest & { maxTokens: number; apiKeyId: string; zdr?: boolean; signal?: AbortSignal }): Promise<ChatResponse> {
+    // The client's abort joins our own timeout: a caller who has gone does not need the answer,
+    // and every further second at the provider is a purchase nobody will pay for.
+    const controller = new AbortController();
+    const onClientAbort = () => controller.abort();
+    if (req.signal?.aborted) controller.abort();
+    else req.signal?.addEventListener("abort", onClientAbort, { once: true });
+    try {
+      return await this.chatWith(req, controller);
+    } finally {
+      req.signal?.removeEventListener("abort", onClientAbort);
+    }
+  }
+
+  private async chatWith(
+    req: ChatRequest & { maxTokens: number; apiKeyId: string; zdr?: boolean; signal?: AbortSignal },
+    controller: AbortController,
+  ): Promise<ChatResponse> {
     const body: Record<string, unknown> = {
       model: req.model,
       messages: req.messages,
@@ -210,7 +227,6 @@ export class OpenRouterProvider implements ChatProvider {
     // Zero data retention: OpenRouter routes only to endpoints that store nothing (Goal 23, A).
     if (req.zdr) body.provider = { zdr: true };
 
-    const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
     let res: Response;
     try {
@@ -222,7 +238,12 @@ export class OpenRouterProvider implements ChatProvider {
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      throw new ProviderUnavailableError(this.id, null, controller.signal.aborted ? `timeout after ${this.timeoutMs} ms` : msg);
+      const reason = req.signal?.aborted
+        ? "aborted by the client"
+        : controller.signal.aborted
+          ? `timeout after ${this.timeoutMs} ms`
+          : msg;
+      throw new ProviderUnavailableError(this.id, null, reason);
     } finally {
       clearTimeout(timer);
     }
