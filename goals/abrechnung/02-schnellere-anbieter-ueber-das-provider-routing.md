@@ -1,7 +1,7 @@
 # Abrechnung Goal 02: Schnellere Anbieter über das Provider-Routing
 
 ## Status
-PLANNED
+DONE
 
 ## Active Objective
 Weniger Antworten laufen in den Timeout der Runtime: Die Inferenz bittet OpenRouter über das Provider-Routing um schnelle Anbieter,
@@ -32,27 +32,32 @@ zwar nicht mehr zahlt, aber auch nicht weiterarbeitet.
 - Der Laufzeitpfad ändert sich, der Merge rollt über `deploy.yml` aus. Den Rollout selbst machst du nicht.
 
 ## Done Condition
-- [ ] `ops/timeout-quote.sh` zählt die Timeout-Quote je Modell und Tag und ist in beide Richtungen bewiesen: Der Selbsttest zeigt an
+- [x] `ops/timeout-quote.sh` zählt die Timeout-Quote je Modell und Tag und ist in beide Richtungen bewiesen: Der Selbsttest zeigt an
       gepflanzten Zeilen eine Quote über 0 und bei Zeilen ohne lange Anfrage genau 0, ohne Netz.
       Prüfung: `bash ops/timeout-quote.sh --selftest` muss Exit-Code 0 haben und `TIMEOUT QUOTE SELFTEST OK` ausgeben.
-- [ ] Die Quote vorher steht in `docs/abrechnung/timeouts.md`: Zeitraum, je Modell Zahl der Anfragen, Zahl über 60 Sekunden und Quote,
+- [x] Die Quote vorher steht in `docs/abrechnung/timeouts.md`: Zeitraum, je Modell Zahl der Anfragen, Zahl über 60 Sekunden und Quote,
       fremde Adressen getrennt gezählt, mit dem Befehl, aus dem sie stammt, ohne eine Adresse.
       Prüfung: `grep -c "ops/timeout-quote.sh" docs/abrechnung/timeouts.md` muss mindestens 1 ausgeben.
       Prüfung: `grep -cE "^[|] *openai/" docs/abrechnung/timeouts.md` muss mindestens 2 ausgeben.
       Prüfung: `grep -cE "0x[0-9a-fA-F]{40}" docs/abrechnung/timeouts.md` muss 0 ausgeben.
-- [ ] Jeder Aufruf an OpenRouter trägt das gewählte Provider-Routing, ein `provider` aus dem Body des Kunden kommt nicht durch, und der
+- [x] Jeder Aufruf an OpenRouter trägt das gewählte Provider-Routing, ein `provider` aus dem Body des Kunden kommt nicht durch, und der
       Preis bleibt der tatsächliche Einkauf mal 1,3; der Test liest den Request, den der Anbieter bekommt.
       Prüfung: `pnpm -s vitest run test/provider-routing.test.ts` muss Exit-Code 0 haben.
       Prüfung: `grep -cE "^\s*(it|test)\(" test/provider-routing.test.ts` muss mindestens 3 ausgeben.
-- [ ] Je Aufruf stehen Dauer in ms und der Anbieter, der tatsächlich geantwortet hat, in der Datenbank (bei einer Buchung in den Meta-Daten
+- [x] Je Aufruf stehen Dauer in ms und der Anbieter, der tatsächlich geantwortet hat, in der Datenbank (bei einer Buchung in den Meta-Daten
       der Ledger-Zeile, bei einem Abbruch im Eintrag aus abrechnung 01).
       Prüfung: `pnpm -s vitest run test/provider-routing.test.ts -t "duration"` muss Exit-Code 0 haben.
-- [ ] `ops/live.sh` zeigt die Quote seit dem Rollout dieses Goals je Modell, und sein Selbsttest deckt die neue Prüfung mit ab.
+- [x] `ops/live.sh` zeigt die Quote seit dem Rollout dieses Goals je Modell, und sein Selbsttest deckt die neue Prüfung mit ab.
       Prüfung: `bash ops/live.sh --selftest` muss Exit-Code 0 haben und `LIVE SELFTEST OK` ausgeben.
       Prüfung: `grep -c "timeout-quote" ops/live.sh` muss mindestens 1 ausgeben.
-- [ ] Kein Claude- oder Anthropic-Modell in Auswahl oder Routing, und `check` ist grün.
+- [x] Kein Claude- oder Anthropic-Modell in Auswahl oder Routing, und `check` ist grün.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] Kein Aufruf kauft teurer ein als der Katalogpreis, den `/v1/models` verkauft: Seit `sort` den Preis aus der Anbieterwahl nimmt,
+      kann ein schneller, teurerer Endpunkt den Kunden über dem genannten Preis belasten und die Reservierung übersteigen. Das Routing
+      trägt deshalb `max_price` mit `prompt` und `completion` in USD je Million Token aus dem aktuellen Katalogpreis des jeweiligen Modells
+      (fehlt der Preis, ohne `max_price`); ein `max_price` aus dem Body des Kunden kommt nicht durch. Wahl und Quelle in `ANNAHMEN.md`.
+      Prüfung: `pnpm -s vitest run test/provider-routing.test.ts -t "max_price"` muss Exit-Code 0 haben und liest den Body je Modell.
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Jede neue Testdatei war vor dem Fix rot; die Zeile im Progress Log nennt, womit.
@@ -69,5 +74,9 @@ zwar nicht mehr zahlt, aber auch nicht weiterarbeitet.
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-10 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6 gebaut: Provider-Routing `{ sort: "throughput", allow_fallbacks: true }` auf jedem OpenRouter-Aufruf (Kunden-`provider` kommt nicht durch, Preis bleibt Einkauf mal 1,3), Dauer und antwortender Anbieter in `meta` der Ledger-Zeile und in der neuen Spalte `inference_aborts.upstream`, `ops/timeout-quote.sh` mit Selbsttest, Quote vorher gemessen (gpt-5.2 fremd 3 von 224, 1,3 %; gpt-5-mini 0 von 2 fremd, 0 von 5 eigen; Grenze 59,5 s, siehe ANNAHMEN.md), `ops/live.sh` zeigt die Quote seit dem Rollout. Rot vorher: `test/provider-routing.test.ts` gegen den alten src 6 von 7 rot (der Preistest kippt per Mutation Aufschlag 1,25, der Durchreich-Test per Mutation Kunden-`provider` gemergt), `test/timeout-quote-selftest.test.ts` und `test/live-selftest.test.ts` gegen `ops/` von `origin/dev` 3 von 3 rot, Selbsttests mit `TQ_LIMIT_S=1000` und `TQ_LIMIT_S=1` je FAIL; Gegenprobe gegen echte Daten: gepflanzte 70-s-Anfrage hebt gpt-5-mini fremd auf 1 von 3. Prüfbefehle (Node 22.23.4, PATH=/usr/bin:$PATH): P1 TIMEOUT QUOTE SELFTEST OK Exit 0; P2 grep timeout-quote 5, grep openai 7, grep 0x 0; P3 vitest 7 passed Exit 0, grep it 7; P4 -t duration 3 passed Exit 0; P5 LIVE SELFTEST OK Exit 0, grep timeout-quote 12; P6 check grün (1262 Tests, 48 s, Exit 0).
+- 2026-11-10 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6; `origin/dev` war schon im Branch (nichts zu mergen), alle Prüfbefehle am Kopf `5549d7f` neu gefahren. Prüfbefehle (Node 22.23.4): P1 TIMEOUT QUOTE SELFTEST OK Exit 0; P2 grep timeout-quote 5, grep openai 7, grep 0x 0; P3 vitest 7 passed Exit 0, grep it 7; P4 -t duration 3 passed Exit 0; P5 LIVE SELFTEST OK Exit 0, grep timeout-quote 12; P6 check grün (1262 Tests, Exit 0; ein erster Lauf bei Load 128 brach mit einem Fehler ohne roten Test ab, der zweite grün); `gh pr checks 3`: check pass, e2e pass.
+- 2026-11-10 Zyklus 3: Punkt 7 aus der Kritik gebaut, Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, 7: Das Routing trägt `max_price` (`prompt`, `completion` in USD je Million Token) aus dem aktuellen Katalogpreis des Modells, auf 12 Stellen gerundet, ohne Preis kein Deckel, ein `max_price` des Kunden (oben im Body oder in `provider`) kommt nicht durch; Wahl und Quelle in ANNAHMEN.md. Rot vorher: die vier neuen `max_price`-Tests gegen den Stand von Zyklus 2 drei von vier rot, der vierte (ohne Preis kein Deckel) per Mutation „Deckel immer setzen“ rot, der Rundungstest per Mutation „ohne Rundung“ rot; die drei alten Routing-Tests erwarten den Body weiter exakt, jetzt mit Deckel. Prüfbefehle (Node 22.23.4): P1 TIMEOUT QUOTE SELFTEST OK Exit 0; P2 grep timeout-quote 5, grep openai 7, grep 0x 0; P3 vitest 11 passed Exit 0, grep it 11; P4 -t duration 3 passed Exit 0; P5 LIVE SELFTEST OK Exit 0, grep timeout-quote 12; P6 check grün (1266 Tests, Exit 0); P7 -t max_price 4 passed Exit 0.
+- 2026-11-10 Release: PASS K, B (Zyklus 3), DONE.
 
 ## Blockers

@@ -416,6 +416,7 @@ async function handleChatUncoalesced(
         purchaseMc: Number.isInteger(bought) && bought >= 0 ? bought : 0,
         answered: answer !== null,
         ref: answer?.id ?? null,
+        upstream: answer?.upstream ?? null,
       });
     } catch (err) {
       console.error(`[inference] could not record an aborted call: ${err instanceof Error ? err.message : String(err)}`);
@@ -481,6 +482,9 @@ async function handleChatUncoalesced(
   // ran into its 60 second timeout and were charged anyway, for answers that never arrived. An
   // answer that does not reach the client is not charged (Matthias, 2026-11-10).
   if (signal.aborted) return abandon(response);
+  // How long the purchase took, kept with the booking so the timeout quote per model can be read
+  // from the ledger (abrechnung 02).
+  const durationMs = Date.now() - startedAt;
 
   // From here on nothing may end without releasing the reservation. The counter-check of
   // 19.09.2026 showed that an error after the provider answer (incomplete `usage`, a database write
@@ -506,6 +510,8 @@ async function handleChatUncoalesced(
         model: entry.spec.id,
         requested_model: req.model,
         provider: entry.provider.id,
+        upstream: response.upstream ?? null,
+        duration_ms: durationMs,
         usage: response.usage,
         cost_mc: actualMc,
         cost_usd: response.usage.cost_usd ?? null,

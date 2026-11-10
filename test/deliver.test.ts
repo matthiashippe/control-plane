@@ -393,7 +393,8 @@ describe("on the wire, through OpenRouterProvider", () => {
     await deliverPaidOrders(d, chatWriter(p, ["openai/gpt-5.2", "openai/gpt-5-mini"]), null, at(5));
     expect(bodies).toHaveLength(3);
     for (const b of bodies) {
-      expect(b.provider).toEqual({ zdr: true });
+      // zdr on top of the routing every OpenRouter call carries since abrechnung 02.
+      expect(b.provider).toEqual({ sort: "throughput", allow_fallbacks: true, zdr: true });
       expect(JSON.stringify(b)).not.toContain(MARKER_EMAIL);
       expect(JSON.stringify(b)).toContain("Klavierunterricht");
     }
@@ -406,7 +407,9 @@ describe("on the wire, through OpenRouterProvider", () => {
   it("does not ask for zdr through the proxy path, even when a caller sends the field", async () => {
     const { p, bodies } = staged(() => ok("x"));
     await p.chat({ model: "openai/gpt-5.2", messages: [{ role: "user", content: "hi" }], maxTokens: 10, apiKeyId: "a", zdr: false });
-    expect(bodies[0].provider).toBeUndefined();
+    // Only the routing of abrechnung 02, no zdr.
+    expect(bodies[0].provider).toEqual({ sort: "throughput", allow_fallbacks: true });
+    expect((bodies[0].provider as Record<string, unknown>).zdr).toBeUndefined();
   });
 
   it("classifies each case of the table in Goal 23, point 2", async () => {

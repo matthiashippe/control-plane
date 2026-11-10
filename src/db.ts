@@ -107,7 +107,8 @@ function migrate(db: Db): void {
       purchase_mc INTEGER NOT NULL,             -- what the answer cost us, 0 when none arrived
       answered    INTEGER NOT NULL,             -- 1: the provider answered after the client had gone
       ref         TEXT,                         -- generation id at the provider, when it answered
-      created_at  TEXT NOT NULL
+      created_at  TEXT NOT NULL,
+      upstream    TEXT                          -- who answered behind the provider (abrechnung 02), null without an answer
     );
 
     -- x402 payments, keyed by the authorization nonce of the EIP-3009 signature.
@@ -296,6 +297,10 @@ function migrate(db: Db): void {
 
   // Balance right after the credit. Needed so the answer to a repeated payment header does not
   // leak the current balance: that answer is served without an API key.
+  // abrechnung 02: the provider that actually answered an aborted call, next to its duration.
+  const abortColumns = db.prepare("PRAGMA table_info(inference_aborts)").all() as { name: string }[];
+  if (!abortColumns.some((c) => c.name === "upstream")) db.exec("ALTER TABLE inference_aborts ADD COLUMN upstream TEXT");
+
   const paymentColumns = db.prepare("PRAGMA table_info(payments)").all() as { name: string }[];
   if (!paymentColumns.some((c) => c.name === "balance_after_mc")) {
     db.exec("ALTER TABLE payments ADD COLUMN balance_after_mc INTEGER");
@@ -525,14 +530,16 @@ export interface InferenceAbort {
   purchaseMc: number;
   answered: boolean;
   ref?: string | null;
+  /** Who answered behind the provider (OpenRouter's `provider`), when an answer arrived. */
+  upstream?: string | null;
 }
 
 /** One row per aborted inference call; see the table `inference_aborts` for what it leaves out. */
 export function recordInferenceAbort(db: Db, a: InferenceAbort): void {
   if (!Number.isInteger(a.purchaseMc) || a.purchaseMc < 0) throw new Error("purchase_mc must be a non-negative integer");
   db.prepare(
-    "INSERT INTO inference_aborts (model, requested_model, provider, duration_ms, purchase_mc, answered, ref, created_at) " +
-      "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+    "INSERT INTO inference_aborts (model, requested_model, provider, duration_ms, purchase_mc, answered, ref, created_at, upstream) " +
+      "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
   ).run(
     a.model,
     a.requestedModel,
@@ -542,6 +549,7 @@ export function recordInferenceAbort(db: Db, a: InferenceAbort): void {
     a.answered ? 1 : 0,
     a.ref ?? null,
     new Date().toISOString(),
+    a.upstream ?? null,
   );
 }
 
