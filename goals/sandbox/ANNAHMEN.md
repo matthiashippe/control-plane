@@ -47,3 +47,12 @@
      Voraussetzung sandbox 01 DONE.
   3. domains 01: Die Voraussetzung `sandbox Goal 01 DONE` ist Vertrag einer bestehenden Goal-Datei; sie zu lösen geht über die Human
      Inbox. Inhaltlich braucht domains 01 nur die Zone `sbx.postyourprice.com` und die Adresse 72.62.51.224, keinen laufenden Server.
+
+## Goal 01, Abschluss (11.11.2026, Engineer CP)
+
+- **Überholt:** Der parallele Schnitt und „Erst Neuinstallation, dann Zugang“ sind durch Matthias' Entscheidung von 08:44 überholt:
+  Die Sandbox kommt sofort auf `srv1327036`, neben wa-staging, ohne Neuinstallation; die Kette behält die Nummern der ROADMAP.
+  `/dev/kvm` fehlt auf `srv1327036` (gemessen 11.11.2026, `ls -l /dev/kvm` gab `No such file or directory`, `grep -cE "vmx|svm"
+  /proc/cpuinfo` gab `0`), gVisor mit `systrap` bleibt richtig.
+- **Steuer-API über 443 statt 8443.** Regel 5 (ufw bleibt bei 22, 80 und 443) schließt den eigenen Port aus, darum läuft `sandboxd`
+  hinter Caddy unter `ctl.sbx.postyourprice.com`, nur für `76.13.144.207`, mit derselben Ed25519-Signatur wie geplant.

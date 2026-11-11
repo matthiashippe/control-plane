@@ -32,13 +32,16 @@ Entscheidung: Eine Sandbox darf ins Internet (Paketquellen, Git, APIs ihrer Kund
   über `https://postyourprice.com` und Cloudflare, nie direkt über die Adresse des Servers mit Datenbank und Wallet-Schlüssel;
 - Metadaten- und Link-Local-Adressen `169.254.0.0/16` und `fe80::/10`;
 - private Netze `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `100.64.0.0/10`, `fc00::/7`, damit auch das Docker-Netz des Hosts;
-- der Host selbst und jede andere Sandbox: je Sandbox ein eigenes Bridge-Netz ohne Verkehr zwischen Containern;
+- der Host selbst und jede andere Sandbox: je Sandbox ein eigenes Bridge-Netz ohne Verkehr zwischen Containern; auf dem Host
+  heißt das auch 127.0.0.1, die Bridge-Adresse und Postgres von wa-staging (`docs/sandbox/server.md`, Nebeneinander mit wa-staging);
 - ausgehend Port 25, weil ein Server, der Spam versendet, bei Hostinger gesperrt wird und dann jede Sandbox trifft.
 
 Umgesetzt mit nftables in der Kette `DOCKER-USER` (gilt für jeden weitergeleiteten Paketfluss der Container), mit Logzeile je
 Verwurf. Eingehend erreicht eine Sandbox nur, was sie über `ports/expose` freigibt, und zwar über Caddy auf dem Sandbox-Server unter
 `https://<id>-<port>.sbx.postyourprice.com` (Wildcard-Eintrag in der Cloudflare-Zone von `postyourprice.com`, gesetzt von sandbox 02
-über die API). Offen auf dem Host sind nur 22 (nur Schlüssel), 80 und 443 (Caddy) und 8443 (Steuer-API, nur von `76.13.144.207`).
+über die API). Offen auf dem Host sind nur 22 (nur Schlüssel), 80 und 443 (Caddy); ufw bleibt dabei (Matthias, 11.11.2026). Der
+Eingang der Sandboxes ist eine eigene Caddy-Datei, die die Caddyfile mit einer `import`-Zeile lädt. Kein Container veröffentlicht einen
+Port auf dem Host, weil Docker dabei an ufw vorbei öffnet; Caddy leitet auf die Adresse des Containers im Bridge-Netz.
 Die Gegenrichtung gibt es nicht: Der Sandbox-Server baut nie eine Verbindung zum Zahlungsserver auf, auch nicht der Dienst selbst.
 
 ## Grenzen
@@ -54,9 +57,12 @@ Anfragen über 1024 MB beantwortet sandbox 03 mit 400 und dem Hinweis auf die St
 der Server nicht hat. Platte als eigene ext4-Datei je Sandbox (sparse, als Datenträger unter `/root`), damit volle Platte nur die
 eigene Sandbox trifft. Laufzeit: Eine Sandbox läuft, solange Guthaben da ist, höchstens 30 Tage am Stück. Ohne API-Aufruf und ohne
 freigegebenen Port für 24 Stunden wird sie gestoppt und nicht mehr berechnet; gestoppt bleibt sie 7 Tage, dann wird sie gelöscht.
-Ein `exec` dauert höchstens 10 Minuten. Höchstens zwei Sandboxes je Konto, auf dem Server höchstens zwölf Plätze zugleich, eine
-mittlere zählt als zwei (KVM 2: 8 GB, davon 2 GB für Host, Docker, Caddy und `sandboxd`, Rest 12 mal 512 MB; die 2 vCPU teilen sie
-sich; 100 GB Platte tragen 12 mal 5 GB mit Platz für Images).
+Ein `exec` dauert höchstens 10 Minuten. Höchstens zwei Sandboxes je Konto, eine mittlere zählt als zwei Plätze.
+
+Solange wa-staging auf dem Server läuft, laufen alle Sandboxes in einer eigenen systemd-Slice `sandbox.slice` mit `CPUQuota=100%`
+und `MemoryMax=5G`, also höchstens zehn Plätze zu 512 MB; Host und wa-staging bleiben
+damit immer 1 vCPU und rund 3 GB, mehr als die 1 vCPU und 2 GB für wa-staging (Regel 4 in `docs/sandbox/server.md`, Entscheidung Tech Lead 11.11.2026). Nach dem Auszug von wa-staging werden es zwölf Plätze (8 GB, davon
+2 GB für Host, Docker, Caddy und `sandboxd`). 100 GB Platte tragen 12 mal 5 GB mit Platz für Images.
 
 Begründung: Die Runtime hat kein Löschen (`deleteSandbox` ist am Pin leer), also muss der Server selbst aufräumen, sonst läuft eine
 vergessene Sandbox bis zum leeren Guthaben. Swap aus, damit ein Prozess über der Grenze stirbt, statt den Host in den Swap zu ziehen.
@@ -74,8 +80,9 @@ jede verkaufte Stunde Marge. Danach kostet KVM 2 in der Verlängerung 14,99 Euro
 `https://www.hostinger.com/de/vps-hosting`. Mit 1 Euro = 1,17 USD (Annahme, `goals/sandbox/ANNAHMEN.md`) sind das rund 1753830 mc
 im Monat oder 2403 mc je Stunde für den ganzen Server (730 Stunden im Monat).
 
-Marge ab 03.02.2027: Bei zwölf Plätzen und im Mittel der Hälfte belegt kostet eine belegte Platzstunde 2403 / 6 = 401 mc, verkauft
-für 1000 mc, also Faktor 2,5 und über dem Faktor 1,3 der Inferenz. Der Server ist bezahlt, sobald 1754 Platzstunden im Monat verkauft
+Marge ab 03.02.2027: Bei zehn Plätzen (neben wa-staging) und im Mittel der Hälfte belegt kostet eine belegte Platzstunde
+2403 / 5 = 481 mc, verkauft für 1000 mc, also Faktor 2,1 und über dem Faktor 1,3 der Inferenz; mit zwölf Plätzen nach dem Auszug
+2403 / 6 = 401 mc und Faktor 2,5. Der Server ist bezahlt, sobald 1754 Platzstunden im Monat verkauft
 sind, also rund 2,4 Sandboxes rund um die Uhr.
 
 Begründung: Ein fester kleiner Server ist ein Fixkosten-Einkauf, kein Einkauf je Stunde wie bei OpenRouter; der Preis muss den
@@ -86,7 +93,9 @@ Schritt eine ganze Zahl mc ist.
 
 ## Verbindung
 
-Entscheidung: Das Control Plane spricht die Steuer-API des Sandbox-Servers (`sandboxd`, Port 8443, HTTPS) an. Jede Anfrage ist mit
+Entscheidung: Das Control Plane spricht die Steuer-API des Sandbox-Servers (`sandboxd`) über HTTPS auf Port 443 an, unter einem
+eigenen Namen `ctl.sbx.postyourprice.com` ohne Cloudflare-Proxy. `sandboxd` hört nur auf 127.0.0.1, davor steht Caddy aus der
+eigenen Datei und lässt den Namen nur von `76.13.144.207` durch, jede andere Adresse bekommt 403. Jede Anfrage ist mit
 Ed25519 signiert: über Methode, Pfad, Zeitstempel und SHA-256 des Inhalts, in den Headern `X-CP-Timestamp` und `X-CP-Signature`.
 `sandboxd` lehnt Zeitstempel ab, die mehr als 60 Sekunden abweichen, und jede Signatur, die es in den letzten 5 Minuten schon gesehen
 hat.
@@ -94,9 +103,8 @@ hat.
 Das Schlüsselpaar erzeugt der Dienst `cp` beim ersten Start selbst in seinem Volume (`/data/sandbox-client.key`, 0600), die
 öffentliche Hälfte liegt daneben (`/data/sandbox-client.pub`). Der Maker liest sie lesend mit
 `docker exec deploy-cp-1 cat /data/sandbox-client.pub` und trägt sie mit dem Einrichtungsskript in `sandboxd` ein. Die Gegenrichtung
-sichert ein selbst signiertes Zertifikat von `sandboxd`, dessen Fingerabdruck im Repo steht (öffentlich unbedenklich) und den das
-Control Plane prüft. Die Adresse des Sandbox-Servers steht im Repo (`docs/sandbox/server.md`); die Firewall lässt Port 8443 nur
-vom Zahlungsserver zu.
+sichert das Zertifikat, das Caddy für `ctl.sbx.postyourprice.com` holt. Die Adresse des Sandbox-Servers steht im Repo
+(`docs/sandbox/server.md`); ein eigener Port 8443 entfällt, weil ufw bei 22, 80 und 443 bleibt.
 
 Begründung: Kein Secret wandert durch das Repo, durch ein Issue oder in `/opt/control-plane/.env`, die kein Goal von Hand ändert.
 Der private Schlüssel verlässt das Volume nie, und ein Rollout über `deploy.yml` reicht, um den Weg einzuschalten. Ohne die Datei
