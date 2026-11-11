@@ -94,3 +94,22 @@ Status 0, die eine fremde Buchung überdeckt und 20 s nach jeder Anfrage mit Zei
 wie `--rows` mit demselben `TQ_SINCE`. Gegen die echten Daten: An Kopien von Log
 und Ledger angehängt, eine Wiederholung während der letzten Buchung und ein Paar mit 59,7 s im Log und 58,9 s `duration_ms` heben die
 Abweichung auf 1 bei Anfragen und 1 bei Timeouts, mit `cause coalesced: 1` und `cause clock: 1`.
+
+## Einkauf ohne Verkauf
+
+Bisher rechnete die Quote jeden Abbruch ohne Antwort mit Einkauf 0, weil `inference_aborts` dort `purchase_mc = 0` schreibt. Die
+Kostenzahl kommt jetzt aus der Aktivität des Anbieters (`docs/abrechnung/einkauf-abbrueche.md`, `bash ops/abort-purchase.sh`, gemessen
+am 11.11.2026 um 09:32 UTC) für denselben Zeitraum, den abgeschlossenen UTC-Tag 10.11.2026. Timeouts sind die Anfragen ab 59,5 Sekunden
+an diesem Tag (Abschnitt „Quote vorher je Modell“; nach dem Rollout um 20:27 UTC 0 bei beiden Modellen,
+`TQ_UNTIL=2026-11-11T00:00:00Z bash ops/timeout-quote.sh --since-rollout`).
+
+| Modell | Timeouts | Abbrüche ohne Antwort | Einkauf ohne Verkauf mc |
+|---|---:|---:|---:|
+| openai/gpt-5-mini | 0 | 0 | 0 |
+| openai/gpt-5.2 | 3 | 0 | 0 |
+
+Die drei Timeouts bei `openai/gpt-5.2` liegen vor dem Rollout von `inference_aborts`, wurden gebucht und stehen mit ihrem Einkauf im
+Ledger, darum keine Zeile ohne Antwort. Die Lücke zwischen Anbieter und Ledger liegt bei beiden Modellen innerhalb der Toleranz (783 mc
+und -160 mc), also kauft keine Anfrage unbemerkt ein.
+
+Anbieterwahl: Das Routing `{ sort: "throughput", allow_fallbacks: true }` aus abrechnung 02 bleibt, weil der Einkauf ohne Verkauf im Zeitraum bei beiden Modellen 0 mc ist und seit dem Rollout kein Timeout auftrat; eine Zahl, die für ein anderes Routing spräche, gibt es nicht.

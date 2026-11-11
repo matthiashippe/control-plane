@@ -94,8 +94,9 @@
 
 - **Quelle:** OpenRouter-Doku „Get user activity“ (`https://openrouter.ai/docs/api/api-reference/analytics/get-user-activity`, gelesen
   am 11.11.2026): `GET /api/v1/activity` liefert die letzten 30 abgeschlossenen UTC-Tage, nur mit Management-Key (sonst 403, am
-  11.11.2026 mit `OPENROUTER_API_KEY` vom code-host gemessen). Die echte Antwort ist noch nicht gesehen, weil `OPENROUTER_MANAGEMENT_KEY`
-  in `~/.config/control-plane/loop.env` fehlt; weicht sie ab, kommt die Abweichung hierher.
+  11.11.2026 mit `OPENROUTER_API_KEY` vom code-host gemessen). Die echte Antwort ist am 11.11.2026 um 09:32 UTC mit
+  `OPENROUTER_MANAGEMENT_KEY` gesehen: 19 Zeilen vom 25.10. bis 10.11.2026 unter `data`, mit den Feldern der Doku und zusätzlich
+  `byok_requests`, das das Werkzeug wie `byok_usage_inference` nicht liest.
 - **Felder der Aktivität laut Doku:** `date` (`YYYY-MM-DD`), `model` (Slug wie `openai/gpt-5.2`), `model_permaslug`, `endpoint_id`,
   `provider_name`, `usage` (USD, OpenRouter-Guthaben), `byok_usage_inference`, `requests`, `prompt_tokens`, `completion_tokens`,
   `reasoning_tokens`, `cached_tokens`. Das Werkzeug liest nur `date`, `model` und `usage`; je Tag und Modell summiert es `usage` über
@@ -106,7 +107,9 @@
   mc; die Rundung der USD-Summe kostet höchstens 1 mc. Eine Anfrage, die vor Mitternacht beginnt und danach gebucht wird, verschiebt
   ihren Einkauf um einen Tag; bei `openai/gpt-5-mini` sind das wenige hundert mc, bei `openai/gpt-5.2` kann eine lange Antwort darüber
   liegen und erscheint dann als `noise`. 1000 mc liegt deutlich unter der kleinsten Lücke, die der Selftest als `noise` verlangt
-  (5000 mc). Mit der ersten echten Messung wird der Wert gegen die Lücken der Tage ohne Abbruch geprüft.
+  (5000 mc). Geprüft mit der ersten echten Messung (11.11.2026, Tag 10.11.2026, kein Abbruch): Lücke 783 mc bei `openai/gpt-5-mini`
+  und -160 mc bei `openai/gpt-5.2`, beide innerhalb, der Wert bleibt. Liegt eine Lücke an einem Tag ohne Abbruch später darüber, zeigt
+  das Werkzeug `noise` und keine Schätzung.
 - **Modelle, die der Dienst nie gekauft hat,** bleiben aus der Tabelle (das Konto kauft auch für anderes ein) und stehen summiert in der
   Zeile `other models at the provider`. Ein Modell, das wir kaufen, an einem Tag mit Zeile beim Anbieter und ohne eigene Zeile, steht in
   der Tabelle und wird `noise`, wenn die Summe die Toleranz übersteigt.

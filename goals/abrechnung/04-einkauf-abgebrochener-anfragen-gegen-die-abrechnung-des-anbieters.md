@@ -1,7 +1,7 @@
 # Abrechnung Goal 04: Einkauf abgebrochener Anfragen gegen die Abrechnung des Anbieters
 
 ## Status
-BLOCKED matthias
+ACTIVE
 
 ## Active Objective
 Der Einkauf eines Abbruchs ohne Antwort ist gemessen statt 0: `ops/abort-purchase.sh` stellt je abgeschlossenem UTC-Tag und Modell
@@ -82,7 +82,7 @@ und damit sowohl den Verlust je Timeout als auch den Nutzen schnellerer Anbieter
       Prüfung: `grep -c "readonly: true" ops/abort-purchase.sh` muss mindestens 1 ausgeben.
       Prüfung: `env -u OPENROUTER_MANAGEMENT_KEY HOME=$(mktemp -d) HTTPS_PROXY=http://127.0.0.1:9 bash ops/abort-purchase.sh 2>&1 | grep -c "OPENROUTER_MANAGEMENT_KEY missing"` muss 1 ausgeben.
       Prüfung: `env -u OPENROUTER_MANAGEMENT_KEY HOME=$(mktemp -d) HTTPS_PROXY=http://127.0.0.1:9 bash ops/abort-purchase.sh >/dev/null 2>&1; echo $?` muss 2 ausgeben.
-- [ ] `docs/abrechnung/einkauf-abbrueche.md` nennt den Zeitraum (abgeschlossene UTC-Tage ab dem 10.11.2026), je Tag und Modell die Zeile
+- [x] `docs/abrechnung/einkauf-abbrueche.md` nennt den Zeitraum (abgeschlossene UTC-Tage ab dem 10.11.2026), je Tag und Modell die Zeile
       aus `ops/abort-purchase.sh`, die `noise`-Zeilen oder den Satz, dass es keine gibt, je Modell `purchase without sale` in mc und USD,
       den Befehl, aus dem die Zahlen stammen, eine Zeile `Widerlegt:` (ja, wenn jede Lücke innerhalb der Toleranz liegt, sonst nein mit der
       Summe der Lücken) und eine Zeile `Einkauf je Abbruch ohne Antwort:` je Modell mit Zahl oder Grund, warum keine. Keine Adresse.
@@ -91,7 +91,7 @@ und damit sowohl den Verlust je Timeout als auch den Nutzen schnellerer Anbieter
       Prüfung: `grep -cE "^[|] *2026-11-[0-9]{2} *[|] *openai/" docs/abrechnung/einkauf-abbrueche.md` muss mindestens 1 ausgeben.
       Prüfung: `grep -cE "^(Widerlegt|Einkauf je Abbruch ohne Antwort): " docs/abrechnung/einkauf-abbrueche.md` muss mindestens 2 ausgeben.
       Prüfung: `grep -cE "0x[0-9a-fA-F]{40}|\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" docs/abrechnung/einkauf-abbrueche.md` muss 0 ausgeben.
-- [ ] `docs/abrechnung/timeouts.md` hat den Abschnitt `## Einkauf ohne Verkauf`: je Modell eine Tabellenzeile
+- [x] `docs/abrechnung/timeouts.md` hat den Abschnitt `## Einkauf ohne Verkauf`: je Modell eine Tabellenzeile
       `| <Modell> | <Timeouts> | <Abbrüche ohne Antwort> | <Einkauf ohne Verkauf mc> |` mit der Kostenzahl aus
       `einkauf-abbrueche.md` statt 0, den Verweis auf diese Datei und eine Zeile `Anbieterwahl:`, die sagt, ob das Routing aus abrechnung 02
       mit dieser Kostenzahl bleibt, mit der Zahl als Grund. `goals/abrechnung/ANNAHMEN.md` hat den Abschnitt `## Goal 04` mit Toleranz,
@@ -124,10 +124,6 @@ und damit sowohl den Verlust je Timeout als auch den Nutzen schnellerer Anbieter
 
 ## Progress Log
 - 2026-11-11 Zyklus 1: Punkte 1, 2, 5 gebaut (`ops/abort-purchase.sh` mit Selftest, `test/abort-purchase.test.ts`, Abschnitt Goal 04 in `ANNAHMEN.md`); Punkte 3 und 4 offen, weil `OPENROUTER_MANAGEMENT_KEY` in `loop.env` fehlt (`grep -c "^OPENROUTER_MANAGEMENT_KEY=" ~/.config/control-plane/loop.env` -> 0). Rot vorher: der Vitest mit 4 failed von 4 ohne Skript, der Selftest mit `AP_TOLERANCE_MC=1000000` -> `FAIL purchase no abort and 5000 mc more is noise` und Exit 1 (im Vitest belegt). Prüfbefehle: `--selftest` Exit 0, letzte Zeile `ABORT PURCHASE SELFTEST OK`; `grep -c "^ok   purchase"` -> 12; vitest -> 4 passed; `grep -cE "^\s*(it|test)\("` -> 4; Pfade -> nur `openrouter.ai/api/v1/activity`; Schreibmethoden -> 0; `readonly: true` -> 2; ohne Schlüssel -> 1 Zeile `OPENROUTER_MANAGEMENT_KEY missing`, Exit 2; `git diff --name-only origin/dev...HEAD -- src deploy | wc -l` -> 0; `node scripts/check.mjs` -> Exit 0 (1279 passed).
+- 2026-11-11 Zyklus 2: Punkte 3 und 4 gebaut, Abschluss gemeldet, Punkte 1, 2, 3, 4, 5: Human Gate `security_settings` erledigt (`grep -c` -> 1), `origin/dev` gemergt, gemessen 09:32 UTC: Tag 10.11.2026, Lücke 783 mc (`openai/gpt-5-mini`) und -160 mc (`openai/gpt-5.2`) innerhalb der Toleranz, `inference_aborts` leer, Einkauf ohne Verkauf 0 mc, Widerlegt ja, Routing bleibt; Gegenprobe der Abfrage an einer Kopie mit gepflanzter Zeile `answered = 0` -> 1 Zeile, leer -> 0; kein neuer Test in diesem Zyklus (nur Doku). Prüfbefehle: `--selftest` Exit 0, letzte Zeile `ABORT PURCHASE SELFTEST OK`; `grep -c "^ok   purchase"` -> 12; vitest -> 4 passed; `grep -cE "^\s*(it|test)\("` -> 4; Pfade -> nur `openrouter.ai/api/v1/activity`; Schreibmethoden -> 0; `readonly: true` -> 2; ohne Schlüssel -> 1 Zeile, Exit 2; (Netz) `bash ops/abort-purchase.sh` Exit 0, 2 Zeilen `| 2026-11-`; P3 grep -> 2, 2, 3, 0; P4 grep -> 1, 1, 2, 1, 1; `git diff --name-only origin/dev...HEAD -- src deploy | wc -l` -> 0; `node scripts/check.mjs` -> Exit 0 (1286 passed).
 
 ## Blockers
-Art: matthias
-Gate: security_settings
-Aufgabe: Bei OpenRouter einen Management-Key anlegen und auf dem code-host in ~/.config/control-plane/loop.env als OPENROUTER_MANAGEMENT_KEY eintragen
-Worum: Nur dieser Schlüssel darf die Aktivität des Kontos lesen, aus der abrechnung 04 den Einkauf abgebrochener Anfragen misst
-Empfehlung: 1. https://openrouter.ai/settings/management-keys öffnen (im Konto, das die Produktion bezahlt), „Create“, Name `control-plane activity read`, Limit leer lassen, Schlüssel kopieren. 2. Auf dem code-host im Terminal: `read -rs K && printf 'OPENROUTER_MANAGEMENT_KEY=%s\n' "$K" >> ~/.config/control-plane/loop.env && unset K && chmod 600 ~/.config/control-plane/loop.env` (nach `read` den Schlüssel einfügen, Enter; er erscheint nicht am Bildschirm). 3. Prüfen: `grep -c '^OPENROUTER_MANAGEMENT_KEY=' ~/.config/control-plane/loop.env` muss 1 ausgeben. Dauer etwa 3 Minuten. Danach misst der Maker Punkt 3 und 4.
