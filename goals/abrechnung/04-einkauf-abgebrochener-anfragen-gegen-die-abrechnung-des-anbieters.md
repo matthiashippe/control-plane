@@ -104,6 +104,18 @@ und damit sowohl den Verlust je Timeout als auch den Nutzen schnellerer Anbieter
 - [x] Der Laufzeitpfad bleibt unverändert, und `check` ist grün.
       Prüfung: `git diff --name-only origin/dev...HEAD -- src deploy | wc -l` muss 0 ausgeben.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
+- [ ] Die Schätzung je Abbruch ohne Antwort zieht die Grundlinie des Modells ab, sonst bucht das Werkzeug die Drift, die es ohne jeden
+      Abbruch gibt (am 10.11.2026 783 mc bei `openai/gpt-5-mini`), einem einzelnen Abbruch als Einkauf zu. Grundlinie ist der Median der
+      Lücken desselben Modells an den Tagen des Zeitraums ohne Abbruch ohne Antwort und ohne `noise`, ohne solche Tage 0; je Modell steht
+      eine Zeile `baseline <Modell>: <mc>` in der Ausgabe, `je Abbruch mc` und `purchase without sale` rechnen mit Lücke minus Grundlinie
+      (die Spalte `gap mc` bleibt roh). Der Selftest zeigt es ohne Netz: ein Modell mit zwei Tagen ohne Abbruch (Lücken 700 und 900 mc)
+      und einem Tag mit einem Abbruch ohne Antwort und 1100 mc Lücke ergibt `baseline <Modell>: 800` und `300` je Abbruch; die
+      bestehenden Selftest-Zeilen gelten unverändert weiter. `docs/abrechnung/einkauf-abbrueche.md` nennt die Grundlinie je Modell.
+      Prüfung: `bash ops/abort-purchase.sh --selftest` muss Exit-Code 0 haben und als letzte Zeile `ABORT PURCHASE SELFTEST OK` ausgeben.
+      Prüfung: `bash ops/abort-purchase.sh --selftest | grep -cE "^ok   purchase .*baseline"` muss mindestens 2 ausgeben.
+      Prüfung: `bash ops/abort-purchase.sh --selftest | grep -c "^FAIL"` muss 0 ausgeben.
+      Prüfung: `pnpm -s vitest run test/abort-purchase.test.ts` muss Exit-Code 0 haben, und `grep -c "baseline" test/abort-purchase.test.ts` muss mindestens 1 ausgeben.
+      Prüfung: `grep -c "Grundlinie" docs/abrechnung/einkauf-abbrueche.md` muss mindestens 1 ausgeben.
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
