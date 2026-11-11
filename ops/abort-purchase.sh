@@ -15,7 +15,10 @@
 # the same day and model: `meta.purchase_mc` of the ledger rows of kind `inference` plus `purchase_mc`
 # of inference_aborts (an abort that got its answer late carries its real purchase there), only rows of
 # provider `openrouter`, the day taken from `created_at`. Gap = provider mc minus purchase mc. On a day
-# with aborts without an answer, the gap divided by their number is the estimate per abort.
+# with aborts without an answer, the gap minus the baseline of the model, divided by their number, is the
+# estimate per abort. The baseline is the median of the gaps of the same model on the days of the period
+# without an abort without an answer and without noise (0 without such a day): the drift the model shows
+# without any abort (rounding, bookings over midnight), which no abort bought.
 #
 # The activity covers the whole account, not just the key of the service. A day and model without any
 # abort without an answer is therefore a counter-check on real data: its gap must stay within the
@@ -30,7 +33,8 @@
 #
 # Output: a markdown table `| day | model | provider mc | purchase mc | gap mc | no answer | per abort mc |`,
 # one line per day and model; then one line `noise <day> <model>: <gap mc>` per day and model without
-# an abort without an answer whose gap exceeds the tolerance; then one line per model
+# an abort without an answer whose gap exceeds the tolerance; then one line `baseline <model>: <mc>` per
+# model (the gap column stays raw, the estimate uses gap minus baseline); then one line per model
 # `purchase without sale <model>: <mc>`: the purchase of the aborts that got their answer late plus the
 # estimated purchase of those without (no estimate for a model with noise, the line says so).
 #
@@ -115,20 +119,37 @@ console.log("| day | model | provider mc | purchase mc | gap mc | no answer | pe
 console.log("|---|---|---|---|---|---|---|");
 const perModel = new Map();
 const noise = [];
+// First pass: the gap of every day and model, noise, and the gaps of the quiet days (no abort without an
+// answer, no noise) from which each model gets its baseline.
 for (const c of sorted) {
-  const providerMc = Math.round(c.usd * MC_PER_USD);
-  const gap = providerMc - c.purchase;
-  const per = c.noAnswer > 0 ? Math.max(0, Math.round(gap / c.noAnswer)) : null;
-  console.log(`| ${c.day} | ${c.model} | ${providerMc} | ${c.purchase} | ${gap} | ${c.noAnswer} | ${per === null ? "-" : per} |`);
-  const m = perModel.get(c.model) ?? { answeredMc: 0, estimateMc: 0, noAnswer: 0, noise: 0 };
+  c.providerMc = Math.round(c.usd * MC_PER_USD);
+  c.gap = c.providerMc - c.purchase;
+  const m = perModel.get(c.model) ?? { answeredMc: 0, estimateMc: 0, noAnswer: 0, noise: 0, quietGaps: [] };
   m.answeredMc += c.answeredMc;
   m.noAnswer += c.noAnswer;
-  if (per !== null) m.estimateMc += Math.max(0, gap);
-  if (c.noAnswer === 0 && Math.abs(gap) > tolerance) { m.noise += 1; noise.push(`noise ${c.day} ${c.model}: ${gap}`); }
+  if (c.noAnswer === 0 && Math.abs(c.gap) > tolerance) { m.noise += 1; noise.push(`noise ${c.day} ${c.model}: ${c.gap}`); }
+  else if (c.noAnswer === 0) m.quietGaps.push(c.gap);
   perModel.set(c.model, m);
+}
+// Baseline: the median of the quiet gaps of a model, 0 without a quiet day. It is the drift the model shows
+// without any abort, so it is not bought by an abort and comes off before the gap is spread over them.
+const median = (xs) => {
+  if (!xs.length) return 0;
+  const v = [...xs].sort((a, b) => a - b), h = Math.floor(v.length / 2);
+  return v.length % 2 ? v[h] : Math.round((v[h - 1] + v[h]) / 2);
+};
+for (const m of perModel.values()) m.baseline = median(m.quietGaps);
+// Second pass: the table; the gap column stays raw, the estimate uses gap minus baseline.
+for (const c of sorted) {
+  const m = perModel.get(c.model);
+  const net = Math.max(0, c.gap - m.baseline);
+  const per = c.noAnswer > 0 ? Math.round(net / c.noAnswer) : null;
+  console.log(`| ${c.day} | ${c.model} | ${c.providerMc} | ${c.purchase} | ${c.gap} | ${c.noAnswer} | ${per === null ? "-" : per} |`);
+  if (per !== null) m.estimateMc += net;
 }
 for (const n of noise) console.log(n);
 if (!noise.length) console.log("noise: none");
+for (const [model, m] of [...perModel.entries()].sort()) console.log(`baseline ${model}: ${m.baseline}`);
 for (const [model, m] of [...perModel.entries()].sort()) {
   if (m.noise > 0) console.log(`purchase without sale ${model}: ${m.answeredMc} (no estimate for ${m.noAnswer} aborts without answer: noise on ${m.noise} days)`);
   else console.log(`purchase without sale ${model}: ${m.answeredMc + m.estimateMc} (answered late ${m.answeredMc}, estimated ${m.estimateMc} for ${m.noAnswer} aborts without answer)`);
@@ -241,6 +262,7 @@ JSON
   expect "purchase without sale is the estimate" "$out" "purchase without sale openai/gpt-5-mini: 300 (answered late 0, estimated 300 for 2 aborts without answer)"
   expect "noise model keeps only the answered purchase" "$out" "purchase without sale openai/gpt-5.2: 700 (no estimate for 0 aborts without answer: noise on 1 days)"
   expect "other models stay out of the table" "$out" "other models at the provider: 1 (50000 mc)"
+  expect "baseline 0 when the day without abort agrees" "$out" "baseline openai/gpt-5-mini: 0"
 
   # A day later the 16th is completed and counts: the filter follows AP_NOW and is not blind to the day.
   out="$(AP_NOW=2026-11-17T08:00:00Z AP_SINCE=2026-11-10 calc "$dir/activity.json" "$dir/rows.jsonl")" || all_ok=0
@@ -251,6 +273,21 @@ JSON
   { arow ledger 2026-11-12 10:00:00 openai/gpt-5-mini 3000; } >"$dir/quiet.jsonl"
   out="$(AP_NOW=2026-11-16T08:00:00Z AP_SINCE=2026-11-10 calc "$dir/quiet.json" "$dir/quiet.jsonl")" || all_ok=0
   expect "quiet period, no noise" "$out" "noise: none"
+
+  # Drift without any abort: two days without an abort (gaps 700 and 900 mc) give the model a baseline of
+  # 800 mc, so a day with one abort without an answer and a gap of 1100 mc estimates 300, not 1100.
+  printf '%s\n' '{"data":[{"date":"2026-11-12","model":"openai/gpt-5-mini","usage":0.017},{"date":"2026-11-13","model":"openai/gpt-5-mini","usage":0.019},{"date":"2026-11-14","model":"openai/gpt-5-mini","usage":0.021}]}' >"$dir/drift.json"
+  {
+    arow ledger 2026-11-12 10:00:00 openai/gpt-5-mini 1000
+    arow ledger 2026-11-13 10:00:00 openai/gpt-5-mini 1000
+    arow ledger 2026-11-14 10:00:00 openai/gpt-5-mini 1000
+    arow abort 2026-11-14 10:05:00 openai/gpt-5-mini 0 openrouter ',"answered":0'
+  } >"$dir/drift.jsonl"
+  out="$(AP_NOW=2026-11-16T08:00:00Z AP_SINCE=2026-11-10 calc "$dir/drift.json" "$dir/drift.jsonl")" || all_ok=0
+  printf '%s\n' "$out" | sed 's/^/  drift: /'
+  expect "baseline is the median of the days without abort" "$out" "baseline openai/gpt-5-mini: 800"
+  expect "per abort subtracts the baseline, gap stays raw" "$out" "| 2026-11-14 | openai/gpt-5-mini | 2100 | 1000 | 1100 | 1 | 300 |"
+  expect "purchase without sale subtracts the baseline" "$out" "purchase without sale openai/gpt-5-mini: 300 (answered late 0, estimated 300 for 1 aborts without answer)"
 
   if [ "$all_ok" = 1 ]; then
     echo "ABORT PURCHASE SELFTEST OK"

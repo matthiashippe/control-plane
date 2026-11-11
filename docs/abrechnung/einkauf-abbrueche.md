@@ -25,6 +25,20 @@ verteilt die Lücke auf die Abbrüche ohne Antwort desselben Tages und Modells. 
 `noise`-Zeilen: keine. Beide Lücken liegen innerhalb der Toleranz, obwohl der Tag keinen Abbruch ohne Antwort hat; das ist die
 Gegenprobe aus echten Daten, dass Ledger und Anbieter je Modell dasselbe zählen. Andere Modelle beim Anbieter an diesem Tag: 0 mc.
 
+## Grundlinie je Modell
+
+Die Lücke gibt es auch ohne jeden Abbruch (Rundung je Buchung, Buchungen über Mitternacht). Damit sie nicht einem einzelnen Abbruch als
+Einkauf zufällt, zieht das Werkzeug je Modell die Grundlinie ab, den Median der Lücken an den Tagen ohne Abbruch ohne Antwort und ohne
+`noise` (ohne solchen Tag 0); `je Abbruch mc` und `purchase without sale` rechnen mit Lücke minus Grundlinie, die Spalte `Lücke mc` bleibt
+roh. Nachgemessen am 11.11.2026 um 10:31 UTC mit demselben Befehl, gleiche Tabelle:
+
+| Modell | Grundlinie mc | Tage ohne Abbruch |
+|---|---:|---:|
+| openai/gpt-5-mini | 783 | 1 |
+| openai/gpt-5.2 | -160 | 1 |
+
+Beide Grundlinien stehen auf einem einzigen Tag und sind darum noch grob; mit jedem weiteren Tag wird der Median stabiler.
+
 ## Einkauf ohne Verkauf je Modell
 
 | Modell | mc | USD |
@@ -46,6 +60,7 @@ Einkauf je Abbruch ohne Antwort: openai/gpt-5.2 keine Zahl, weil es im Zeitraum 
 
 `bash ops/abort-purchase.sh --selftest` rechnet ohne Netz in beide Richtungen: gleiche Beträge ergeben Lücke 0 und keine `noise`-Zeile,
 zwei Abbrüche ohne Antwort mit 300 mc mehr beim Anbieter ergeben 150 je Abbruch, ein Tag ohne Abbruch mit 5000 mc mehr ergibt `noise`.
-Mit `AP_TOLERANCE_MC=1000000` wird der Selftest rot. Die Abfrage der Produktion (`ROWS_JS` aus dem Werkzeug) liefert an einer Kopie mit
+Zwei Tage ohne Abbruch mit 700 und 900 mc Lücke ergeben die Grundlinie 800 und an einem Tag mit einem Abbruch und 1100 mc Lücke 300 je
+Abbruch statt 1100. Mit `AP_TOLERANCE_MC=1000000` wird der Selftest rot. Die Abfrage der Produktion (`ROWS_JS` aus dem Werkzeug) liefert an einer Kopie mit
 einer gepflanzten Zeile `answered = 0` genau diese Zeile und an der leeren Tabelle keine, die leere Liste der Produktion ist also keine
 falsche Null.

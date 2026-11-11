@@ -113,8 +113,11 @@
 - **Modelle, die der Dienst nie gekauft hat,** bleiben aus der Tabelle (das Konto kauft auch für anderes ein) und stehen summiert in der
   Zeile `other models at the provider`. Ein Modell, das wir kaufen, an einem Tag mit Zeile beim Anbieter und ohne eigene Zeile, steht in
   der Tabelle und wird `noise`, wenn die Summe die Toleranz übersteigt.
-- **Lücke negativ** (wir buchten mehr als der Anbieter): Die Zeile zeigt sie mit Vorzeichen, die Schätzung je Abbruch ist dann 0, und
-  ein Tag ohne Abbruch wird `noise`, wenn der Betrag die Toleranz übersteigt.
+- **Lücke negativ** (wir buchten mehr als der Anbieter): Die Zeile zeigt sie mit Vorzeichen, die Schätzung je Abbruch ist 0, wenn
+  Lücke minus Grundlinie nicht über 0 liegt, und ein Tag ohne Abbruch wird `noise`, wenn der Betrag die Toleranz übersteigt.
+- **Grundlinie** (Kritik 11.11.2026, Punkt 6): Median der Lücken eines Modells an den Tagen ohne Abbruch ohne Antwort und ohne `noise`,
+  bei gerader Zahl der Mittelwert der beiden mittleren, gerundet; ohne solchen Tag 0. Eine negative Grundlinie erhöht die Schätzung, weil
+  wir an ruhigen Tagen mehr buchen als der Anbieter und dieser Überhang an einem Tag mit Abbruch sonst den Einkauf des Abbruchs verdeckt.
 - **Modell mit `noise`:** `purchase without sale` nennt dann nur den Einkauf der Abbrüche mit später Antwort und keine Schätzung für die
   ohne Antwort, weil die Lücke an diesem Modell nicht nur unsere ist.
 - **Filter auf den Schlüssel der Produktion:** Die Doku nennt einen Parameter `api_key_hash`. Er bleibt ungenutzt, weil sein Wert aus der

@@ -58,6 +58,38 @@ describe("ops/abort-purchase.sh", () => {
     expect(run.stdout).toContain("purchase without sale openai/gpt-5-mini: 300");
   }, 120_000);
 
+  it("subtracts the baseline of the days without abort from the estimate", () => {
+    const dir = mkdtempSync(join(tmpdir(), "abort-purchase-baseline-"));
+    const activity = join(dir, "activity.json");
+    const rows = join(dir, "rows.jsonl");
+    // Gaps of 700 and 900 mc on two days without an abort, 1100 mc on a day with one abort without an answer.
+    writeFileSync(
+      activity,
+      JSON.stringify({
+        data: [
+          { date: "2026-11-20", model: "openai/gpt-5-mini", usage: 0.017 },
+          { date: "2026-11-21", model: "openai/gpt-5-mini", usage: 0.019 },
+          { date: "2026-11-22", model: "openai/gpt-5-mini", usage: 0.021 },
+        ],
+      }),
+    );
+    const row = (o: Record<string, unknown>) => JSON.stringify({ provider: "openrouter", model: "openai/gpt-5-mini", ...o });
+    writeFileSync(
+      rows,
+      [
+        row({ src: "ledger", at: "2026-11-20T10:00:00.000Z", purchase_mc: 1000 }),
+        row({ src: "ledger", at: "2026-11-21T10:00:00.000Z", purchase_mc: 1000 }),
+        row({ src: "ledger", at: "2026-11-22T10:00:00.000Z", purchase_mc: 1000 }),
+        row({ src: "abort", at: "2026-11-22T11:00:00.000Z", purchase_mc: 0, answered: 0 }),
+      ].join("\n") + "\n",
+    );
+    const run = spawnSync("bash", [SCRIPT, "--files", activity, rows], { encoding: "utf8", timeout: 60_000, env });
+    expect(run.status).toBe(0);
+    expect(run.stdout).toMatch(/^baseline openai\/gpt-5-mini: 800$/m);
+    expect(run.stdout).toMatch(/^\| 2026-11-22 \| openai\/gpt-5-mini \| 2100 \| 1000 \| 1100 \| 1 \| 300 \|$/m);
+    expect(run.stdout).toContain("purchase without sale openai/gpt-5-mini: 300 (");
+  }, 120_000);
+
   it("passes its own selftest without network", () => {
     const run = spawnSync("bash", [SCRIPT, "--selftest"], { encoding: "utf8", timeout: 60_000 });
     expect(run.stdout).toContain("ok   purchase two aborts without answer, 150 per abort");
