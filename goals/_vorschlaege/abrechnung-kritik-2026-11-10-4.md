@@ -4,3 +4,5 @@ Befund: Die Quote nach außen hängt an einem neuen `--compare` frühestens am 1
 Beleg: `grep -n "17.11\|--compare" docs/kette.md ROADMAP.md` -> keine Zeile; docs/abrechnung/timeouts.md:83
 Empfehlung: Kettenglied abrechnung 04: `--compare` vom Rollout von abrechnung 02 bis mindestens 17.11.2026, danach `Quote nach außen:` mit Zahl, Zeitraum und Anfragen oder mit Grund für weiter keine.
 MVP: Funktion, weil die Zahl für kanal und Seite sonst nie entsteht.
+
+Übernommen: Tech Lead, neues Glied nach abrechnung 04 für den Vergleich ab 17.11.2026 (2026-11-11)

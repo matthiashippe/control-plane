@@ -4,3 +4,5 @@ Befund: Quote vorher und Quote nachher zählen nicht dasselbe. Vorher zählt jed
 Beleg: `ops/timeout-quote.sh` Zeile 97 (Join auf Caddy-Zeilen) gegen Zeile 106 (nur Datenbankzeilen); `src/inference/proxy.ts` Zeile 399 (`startedAt` nach der Reservierung).
 Empfehlung: Beim ersten Vergleich nach dem Rollout beide Messungen nebeneinander fahren (`bash ops/timeout-quote.sh` mit Join und `--since-rollout` über denselben Zeitraum) und die Abweichung in `docs/abrechnung/timeouts.md` nennen, bevor kanal 01 oder die Seite eine Quote nennt.
 MVP: Funktion, weil die Zahl nachher die ist, die nach außen geht.
+
+Übernommen: abrechnung 03 (DONE, docs/abrechnung/timeouts.md) (2026-11-11)
