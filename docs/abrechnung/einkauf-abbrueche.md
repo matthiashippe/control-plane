@@ -6,7 +6,7 @@ Gemessen am 11.11.2026 um 09:32 UTC, nur lesend, vom code-host aus mit
 bash ops/abort-purchase.sh
 ```
 
-Das Werkzeug holt die Aktivität des Kontos bei OpenRouter (`GET /api/v1/activity`, Management-Key aus
+Das Werkzeug holt bei OpenRouter die Aktivität des Kontos (`GET /api/v1/activity`, Management-Key aus
 `~/.config/control-plane/loop.env`, sonst kein Aufruf beim Anbieter) und liest Ledger (`kind = 'inference'`) und `inference_aborts`
 mit `readonly: true` im Container. Je abgeschlossenem UTC-Tag und Modell stellt es den Betrag des Anbieters gegen unseren Einkauf und
 verteilt die Lücke auf die Abbrüche ohne Antwort desselben Tages und Modells. 1 mc sind 0,00001 USD. Toleranz 1000 mc je Tag und Modell
