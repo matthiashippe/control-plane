@@ -64,6 +64,19 @@ Vertrag bauen statt gegen eine Vermutung über die Runtime.
       Prüfung (Netz): `ssh -i ~/.ssh/id_ed25519_cp_sandbox -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=15 root@$(sed -nE 's/^Adresse: *//p' docs/sandbox/server.md) 'uname -sr'` muss Exit-Code 0 haben.
 - [x] `check` ist grün.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
+- [ ] Kritik: `## Netz` in `docs/sandbox/plan.md` entscheidet den Weg von einer Sandbox zum Host selbst. `DOCKER-USER` sieht nur
+      weitergeleitete Pakete; was an eine Adresse des Hosts geht (Bridge-Adresse, `72.62.51.224`, IPv6 des Hosts), läuft durch die
+      Eingangskette, und ufw lässt dort 22, 80 und 443 von überall zu (gemessen 11.11.2026, `ufw status verbose`). Der Abschnitt nennt
+      die Regel in der Eingangskette für die Bridge-Netze der Sandboxes und welche Host-Ports eine Sandbox danach noch erreicht.
+      Prüfung: `awk '/^## Netz/{f=1;next} /^## /{f=0} f' docs/sandbox/plan.md | grep -ciE "input|eingangskette"` muss mindestens 1 ausgeben.
+      Prüfung: `awk '/^## Netz/{f=1;next} /^## /{f=0} f' docs/sandbox/plan.md | grep -c "72.62.51.224"` muss mindestens 1 ausgeben.
+- [ ] Kritik: `docs/sandbox/plan.md` entscheidet, woher das TLS-Zertifikat für `<id>-<port>.sbx.postyourprice.com` kommt. Universal SSL
+      von Cloudflare deckt nur eine Ebene unter der Zone, `*.sbx` ist die zweite; ein Wildcard über DNS-01 braucht ein Caddy mit
+      Cloudflare-Modul (das Caddy auf `srv1327036` hat keins, `caddy list-modules | grep -c dns.providers` gab 0) und damit ein anderes
+      Binary unter dem Caddy von wa-staging (Regel 2 in `docs/sandbox/server.md`); On-Demand-TLS stößt an 50 Zertifikate je Woche und
+      Domain bei Let's Encrypt. Der Plan nennt den Weg, ob der Eintrag über den Cloudflare-Proxy läuft, und was er für wa-staging heißt.
+      Prüfung: `awk '/^## Netz/{f=1;next} /^## /{f=0} f' docs/sandbox/plan.md | grep -ciE "dns-01|on.demand|advanced certificate"` muss mindestens 1 ausgeben.
+      Prüfung: `awk '/^## Netz/{f=1;next} /^## /{f=0} f' docs/sandbox/plan.md | grep -ci "proxy"` muss mindestens 1 ausgeben.
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
