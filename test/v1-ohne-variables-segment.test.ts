@@ -21,6 +21,7 @@ const ERLAUBTE_WILDCARDS = new Map([
   ["/v1/auth/*", "eigene Middleware, die den 405 fuer nonce und verify traegt"],
   ["/v1/briefs/*", "eigene Middleware, /v1/briefs/check braucht keinen Schluessel"],
   ["/v1/sandboxes/*", "antwortet immer 501, ohne jemals eine Adresse zu lesen"],
+  ["/v1/domains/*", "checks the key in its own handler, test/domains.test.ts holds the 401"],
   // Zwei exakte Pfade, die absichtlich ausserhalb der Liste liegen, jeder mit seinem Grund im Code:
   ["/v1/models", "bewusst nicht in V1_ROUTES, weil jeder OpenAI-Client ihn ohne Schluessel ruft"],
   ["/v1/briefs/check", "eigene Middleware darueber, braucht keinen Schluessel"],

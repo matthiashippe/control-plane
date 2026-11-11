@@ -19,7 +19,9 @@ and the body says only that the call was not charged.
 | 401 | `invalid_signature` | `/v1/automatons/register` | the EIP-712 signature does not match |
 | 402 | `INSUFFICIENT_CREDITS` | `/v1/chat/completions` | not enough credits for this call |
 | 402 | offer, or one of the x402 reasons below | `/pay/{usd}/{address}` | payment required, or the payment was rejected |
+| 400 | `invalid_query`, `invalid_tlds`, `invalid_domain` | `/v1/domains/...` | the name to search or the domain in the path is not a domain name |
 | 403 | `address_mismatch` | `/v1/automatons/register` | the key belongs to a different wallet |
+| 403 | `domain_not_held` | `/v1/domains/{domain}/dns...` | this account holds no such domain here, see below |
 | 404 | `model_not_found` | `/v1/chat/completions` | no such model on this instance |
 | 404 | `not_found` | any | no such endpoint |
 | 409 | `automaton_id_conflict` | `/v1/automatons/register` | the id belongs to another wallet |
@@ -27,7 +29,7 @@ and the body says only that the call was not charged.
 | 429 | `rate_limited` | open endpoints | too many requests without an API key |
 | 429 | `too_many_automatons` | `/v1/automatons/register` | this wallet hit the registration cap |
 | 500 | `internal_error` | any | our fault, nothing charged |
-| 501 | `not_implemented` | sandboxes, credit transfers | deliberately not offered, see below |
+| 501 | `not_implemented` | sandboxes, credit transfers, domain registration | deliberately not offered, see below |
 | 503 | `payments_unavailable`, `inference_unavailable` | `/pay`, inference | this instance does not offer it |
 | 503 | `provider_unavailable` | `/v1/chat/completions` | the upstream model provider did not answer |
 
@@ -53,6 +55,25 @@ normal path.
 
 `GET /v1/sandboxes` answers `200 {"sandboxes": []}`, because an empty list is the truthful answer
 to "which sandboxes do I have here".
+
+## domains
+
+`GET /v1/domains/search` answers `200` with one entry per name in `results`, each with
+`available: false`, `purchasable: false` and `currency: "USD"`, and no price. That is not a lookup
+at a registrar: no domain can be bought through this control plane, so every name is not
+purchasable here, whoever holds it elsewhere. The unmodified automaton runtime shows such a name
+as not available, which is the truthful reading for this service.
+
+`POST /v1/domains/register` answers `501 not_implemented` with
+`reason: "domain registration is not offered"`. Registering a domain is a purchase, and this
+service does not buy domains for its callers. Nothing is charged, and the runtime does not retry a
+501 or count it toward its circuit breaker.
+
+`GET` and `POST /v1/domains/{domain}/dns` and `DELETE /v1/domains/{domain}/dns/{record}` answer
+`403 domain_not_held` for a domain this account does not hold here. Since no domain can be
+registered, that is every domain today. No record is invented and nothing is written.
+
+All five want the API key in the `Authorization` header, like every other `/v1` path behind it.
 
 ## credit_transfers
 

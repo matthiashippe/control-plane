@@ -26,6 +26,7 @@ export function docs(anchor: string): string {
 /** Anchors in `docs/errors.md`. As constants, so typos show up at build time. */
 export const DOC = {
   authentication: docs("authentication"),
+  domains: docs("domains"),
   inference: docs("inference"),
   models: docs("model_not_found"),
   payments: docs("payments"),

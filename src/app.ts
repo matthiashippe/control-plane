@@ -89,6 +89,7 @@ import { germanFirstScreen } from "./public/landing.de.js";
 import { renderHumanFirst } from "./public/humanfirst.js";
 import { detectBriefLanguage } from "./bounties/brief.de.js";
 import { DOC } from "./errors.js";
+import { domainNotHeld, invalidDomain, parseDnsPath, registerDomain, searchDomains } from "./domains.js";
 import { Catalog, handleChat, MARKUP } from "./inference/proxy.js";
 import { clientKey, RateLimiter, type RateLimitOptions } from "./ratelimit.js";
 import { handlePay, TOPUP_TIERS_USD, type PayConfig } from "./payments/pay.js";
@@ -301,6 +302,10 @@ export const V1_ROUTES = new Set([
   "/v1/credits/starter",
   "/v1/credits/transfer",
   "/v1/credits/transfers",
+  // The two exact domain paths. The three DNS paths carry the domain as a segment and live behind
+  // the wildcard /v1/domains/*, whose handler checks the key itself (test/domains.test.ts).
+  "/v1/domains/search",
+  "/v1/domains/register",
   // /v1/models is deliberately NOT here. See its route for the reason: the same catalogue is
   // already public on /v1/status, and this is the path every OpenAI-compatible client calls first.
   "/v1/sandboxes",
@@ -3534,6 +3539,42 @@ export function createApp(opts: AppOptions) {
       501,
     ),
   );
+
+  // --- Domains (docs/sandbox/vertrag.md, src/domains.ts) ----------
+
+  // The exact routes stand before the wildcard: `/v1/domains/*` also matches `/v1/domains/search`.
+  app.get("/v1/domains/search", (c) => {
+    const res = searchDomains(c.req.query("query"), c.req.query("tlds"));
+    return c.json(res.body, res.status);
+  });
+  app.post("/v1/domains/register", (c) => {
+    const res = registerDomain();
+    return c.json(res.body, res.status);
+  });
+  // The DNS paths carry the domain as a path segment, which the auth middleware cannot match with
+  // its exact list, so this handler asks for the key itself. A path the contract does not name goes
+  // to the notFound handler before the key is looked at: a wrong URL is not a key problem.
+  app.all("/v1/domains/*", (c) => {
+    const parsed = parseDnsPath(new URL(c.req.url).pathname);
+    if (!parsed) return c.notFound();
+    if (!resolveApiKey(db, c.req.header("authorization"))) throw invalidKeyError();
+    const allowed = parsed.record === null ? ["GET", "POST"] : ["DELETE"];
+    const asked = c.req.method === "HEAD" ? "GET" : c.req.method;
+    if (!allowed.includes(asked)) {
+      c.header("Allow", allowed.join(", "));
+      return c.json(
+        {
+          error: "method_not_allowed",
+          message: `${c.req.path} accepts ${allowed.join(" and ")}, not ${c.req.method}.`,
+          allow: allowed,
+          docs: DOC.domains,
+        },
+        405,
+      );
+    }
+    const res = parsed.domain === null ? invalidDomain() : domainNotHeld(parsed.domain);
+    return c.json(res.body, res.status);
+  });
 
   app.notFound((c) => {
     // A doubled /v1 step almost always means somebody joined a base URL that already contains a

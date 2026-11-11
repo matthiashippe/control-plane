@@ -55,12 +55,37 @@ echo "$ledger"
 consistent=$(printf '%s\n' "$ledger" | grep -o '"consistent":[a-z]*' | grep -o '[a-z]*$')
 db_registered=$(printf '%s\n' "$ledger" | grep -c "\"address\":\"$(printf '%s' "$wallet" | tr 'A-F' 'a-f')\"" || true)
 
+# The five domain calls of docs/sandbox/vertrag.md, made by the runtime's own client
+# (dist/conway/client.js of the unmodified runtime at the pin), with the key it provisioned. Search
+# answers with names it reads as not available, register and the three DNS calls with the error the
+# client hands to its tool; none may be a 404 (retried three times) or open the circuit breaker.
+echo "--- domains through the runtime's own client"
+domains=$("${COMPOSE[@]}" run --rm --no-deps -e KEY="$key" runtime node --input-type=module -e '
+  const { createConwayClient } = await import("/opt/automaton/dist/conway/client.js");
+  const c = createConwayClient({ apiUrl: process.env.CONWAY_API_URL, apiKey: process.env.KEY, sandboxId: "" });
+  const status = async (label, f) => {
+    try { const r = await f(); console.log(`DOMAIN ${label} -> ok ${JSON.stringify(r)}`); return "ok"; }
+    catch (e) { const s = e.status ?? "none"; console.log(`DOMAIN ${label} -> ${s} ${String(e.message).slice(0, 160)}`); return String(s); }
+  };
+  const got = {
+    search: await status("GET /v1/domains/search", () => c.searchDomains("e2eagent", "com,io")),
+    register: await status("POST /v1/domains/register", () => c.registerDomain("e2eagent.com")),
+    list: await status("GET /v1/domains/{domain}/dns", () => c.listDnsRecords("e2eagent.com")),
+    add: await status("POST /v1/domains/{domain}/dns", () => c.addDnsRecord("e2eagent.com", "A", "@", "192.0.2.1")),
+    del: await status("DELETE /v1/domains/{domain}/dns/{record}", () => c.deleteDnsRecord("e2eagent.com", "rec-1")),
+  };
+  console.log("DOMAINS_RESULT " + JSON.stringify(got));' 2>&1) || true
+printf '%s\n' "$domains" | grep -E '^DOMAIN' || true
+domains_ok=false
+printf '%s\n' "$domains" | grep -q '^DOMAINS_RESULT {"search":"ok","register":"501","list":"403","add":"403","del":"403"}$' && domains_ok=true
+printf '%s\n' "$domains" | grep -q '^DOMAIN GET /v1/domains/search -> ok .*"available":false' || domains_ok=false
+
 cleanup
 trap - EXIT
 remaining=$("${COMPOSE[@]}" ps -q | wc -l | tr -d ' ')
 [[ "$remaining" == "0" ]] || { echo "E2E FAIL: containers left behind"; exit 1; }
-if [[ "$turns" -lt 5 || "$registered" != "true" || "$api_errors" != "0" || "$consistent" != "true" || "$db_registered" != "1" || "$balance_cents" -ge 500 ]]; then
-  echo "E2E FAIL turns=$turns registered=$registered api_errors=$api_errors ledger_consistent=$consistent db_registered=$db_registered balance_cents=$balance_cents"
+if [[ "$turns" -lt 5 || "$registered" != "true" || "$api_errors" != "0" || "$consistent" != "true" || "$db_registered" != "1" || "$balance_cents" -ge 500 || "$domains_ok" != "true" ]]; then
+  echo "E2E FAIL turns=$turns registered=$registered api_errors=$api_errors ledger_consistent=$consistent db_registered=$db_registered balance_cents=$balance_cents domains=$domains_ok"
   exit 1
 fi
-echo "E2E OK turns=$turns registered=$registered api_errors=$api_errors ledger_consistent=$consistent balance_cents=$balance_cents"
+echo "E2E OK turns=$turns registered=$registered api_errors=$api_errors ledger_consistent=$consistent balance_cents=$balance_cents domains=$domains_ok"
