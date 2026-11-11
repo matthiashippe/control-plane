@@ -5,9 +5,12 @@
  * attempts per search, because the runtime retries every 404 three times (`src/conway/client.ts:51`
  * at d8f8168). What this control plane can honestly answer without buying anything:
  *
- * - search: every name is reported as not purchasable here. That is true whoever holds the name,
- *   because no registration is offered, and it is the one reading the runtime has for "not
- *   available" (`available ?? purchasable ?? false`). No price is quoted, because nothing is sold.
+ * - search: 501 for a valid query, with the names it covers. A 200 cannot say "not offered here":
+ *   the runtime's tool `search_domains` turns every `available: false` into `<name>: taken`
+ *   (`src/agent/tools.ts` at d8f8168), which would tell a customer's agent that a free name is held
+ *   by someone. On an error status the runtime hands our body to the tool as it is, so the agent
+ *   reads that no domain can be registered here and that availability was not checked. 501 is
+ *   neither retried nor counted toward the breaker. A malformed query stays a 400.
  * - register: 501, the same answer as every other thing this service deliberately does not offer.
  *   Registering a domain is a purchase, and a purchase is a decision of the operator, not of an API
  *   call. 501 is neither retried nor counted toward the runtime's circuit breaker.
@@ -37,9 +40,14 @@ export function normalizeDomain(raw: string): string | null {
 
 export type DomainAnswer = { status: 200 | 400 | 403 | 501; body: Record<string, unknown> };
 
-const NOT_OFFERED =
-  "Domain registration is not offered on this control plane: no name can be bought here, so every " +
-  "name reads as not purchasable, whoever holds it elsewhere. This is not a lookup at a registrar.";
+/** The tool text must not contain "taken" or "AVAILABLE" (test/domains.test.ts, "search_domains tool text"). */
+function searchNotOffered(names: string[]): string {
+  return (
+    `No domain can be registered here, so availability was not checked for ${names.join(", ")}. ` +
+    "This answer says nothing about whether a name is free elsewhere. Nothing was charged, and " +
+    "retrying gives the same answer until this service offers domain registration."
+  );
+}
 
 /** GET /v1/domains/search?query=<q>&tlds=<list> */
 export function searchDomains(query: string | undefined, tlds: string | undefined): DomainAnswer {
@@ -87,16 +95,12 @@ export function searchDomains(query: string | undefined, tlds: string | undefine
   }
 
   return {
-    status: 200,
+    status: 501,
     body: {
-      results: names.map((domain) => ({
-        domain,
-        available: false,
-        purchasable: false,
-        currency: "USD",
-        reason: "registration_not_offered",
-      })),
-      message: NOT_OFFERED,
+      error: "not_implemented",
+      reason: "domain search is not offered",
+      names,
+      message: searchNotOffered(names),
       docs: DOC.domains,
     },
   };

@@ -29,7 +29,7 @@ and the body says only that the call was not charged.
 | 429 | `rate_limited` | open endpoints | too many requests without an API key |
 | 429 | `too_many_automatons` | `/v1/automatons/register` | this wallet hit the registration cap |
 | 500 | `internal_error` | any | our fault, nothing charged |
-| 501 | `not_implemented` | sandboxes, credit transfers, domain registration | deliberately not offered, see below |
+| 501 | `not_implemented` | sandboxes, credit transfers, domain search and registration | deliberately not offered, see below |
 | 503 | `payments_unavailable`, `inference_unavailable` | `/pay`, inference | this instance does not offer it |
 | 503 | `provider_unavailable` | `/v1/chat/completions` | the upstream model provider did not answer |
 
@@ -58,11 +58,13 @@ to "which sandboxes do I have here".
 
 ## domains
 
-`GET /v1/domains/search` answers `200` with one entry per name in `results`, each with
-`available: false`, `purchasable: false` and `currency: "USD"`, and no price. That is not a lookup
-at a registrar: no domain can be bought through this control plane, so every name is not
-purchasable here, whoever holds it elsewhere. The unmodified automaton runtime shows such a name
-as not available, which is the truthful reading for this service.
+`GET /v1/domains/search` answers `501 not_implemented` with `reason: "domain search is not
+offered"` and the names the query covers in `names`. No domain can be registered here, so no
+availability is looked up, and the answer says nothing about whether a name is free elsewhere. It is
+an error on purpose: the unmodified automaton runtime prints every search result without
+`available: true` as `<name>: taken`, which would call a free name held by someone. On a 501 the
+runtime hands this body to its `search_domains` tool instead, does not retry it and does not count it
+toward its circuit breaker. A malformed query answers `400 invalid_query` or `invalid_tlds`.
 
 `POST /v1/domains/register` answers `501 not_implemented` with
 `reason: "domain registration is not offered"`. Registering a domain is a purchase, and this

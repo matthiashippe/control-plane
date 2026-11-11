@@ -12,8 +12,8 @@
  * differently shows up here as the value the runtime would actually see.
  *
  * Nothing here is bought: no domain can be registered through this control plane (a purchase is
- * the human gate `server_kauf`), so search reports every name as not purchasable here, register
- * answers 501, and the DNS endpoints answer 403 for a domain this account does not hold, which
+ * the human gate `server_kauf`), so search and register answer 501 (a search list would make the
+ * runtime's tool call every name "taken"), and the DNS endpoints answer 403 for a domain this account does not hold, which
  * today is every domain.
  */
 import fs from "node:fs";
@@ -88,6 +88,24 @@ const readSearch = (result: any) =>
     currency: d.currency || "USD",
   }));
 
+/**
+ * The text the runtime's tool `search_domains` hands the model for our answer, expression for expression
+ * from d8f8168: on 2xx `src/agent/tools.ts` (`search_domains.execute`) over `searchDomains` of
+ * `src/conway/client.ts`; on any other status `request()` throws `Conway API error: <method> <path> -> <status>: <body>`
+ * and `executeTool` hands `err.message` on as the tool's error.
+ */
+async function searchToolText(res: Response, path: string): Promise<string> {
+  if (!res.ok) return `Conway API error: GET ${path} -> ${res.status}: ${await res.text()}`;
+  const results = readSearch(await res.json());
+  if (results.length === 0) return "No results found.";
+  return results
+    .map(
+      (d: any) =>
+        `${d.domain}: ${d.available ? "AVAILABLE" : "taken"}${d.registrationPrice != null ? ` ($${(d.registrationPrice / 100).toFixed(2)}/yr)` : ""}`,
+    )
+    .join("\n");
+}
+
 /** What `request()` does with a status before any body is read: 404 is retried three times, these five open the breaker. */
 function runtimeFate(status: number): "ok" | "retried-404" | "breaker" | "error-to-tool" {
   if (status >= 200 && status < 300) return "ok";
@@ -120,38 +138,47 @@ describe("domain endpoints from docs/sandbox/vertrag.md", () => {
     }
   });
 
-  it("GET /v1/domains/search: 200 with results[] of domain, available, purchasable, currency; the runtime reads every name as not available", async () => {
-    // vertrag.md row: `results[]` oder `domains[]`, je Eintrag `domain`, `available` oder `purchasable`,
-    // `registration_price` oder `purchase_price`, `renewal_price`, `currency`.
+  it("GET /v1/domains/search: 501 not_implemented with the names it covers, which the runtime hands to search_domains as an error, never as a list of taken names", async () => {
+    // vertrag.md row: `results[]` oder `domains[]`, je Eintrag `domain`, `available` oder `purchasable`, ...;
+    // "Fehler an das Werkzeug `search_domains`". No list: the runtime would print every entry without a
+    // true `available` as taken (src/agent/tools.ts at d8f8168), so the answer is the error the tool shows.
     const { call } = setup();
     const res = await call("GET", "/v1/domains/search?query=myagent&tlds=com,io,ai");
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(501);
+    expect(runtimeFate(res.status)).toBe("error-to-tool");
     expect(res.headers.get("content-type")).toContain("application/json");
     const body = (await res.json()) as any;
-    expect(body.results.map((r: any) => r.domain)).toEqual(["myagent.com", "myagent.io", "myagent.ai"]);
-    for (const r of body.results) {
-      expect(r.available).toBe(false);
-      expect(r.purchasable).toBe(false);
-      expect(r.currency).toBe("USD");
-      // No invented price: nothing is sold, so there is nothing to quote.
-      expect(r.registration_price).toBeUndefined();
-      expect(r.purchase_price).toBeUndefined();
-    }
-    expect(readSearch(body)).toEqual([
-      { domain: "myagent.com", available: false, registrationPrice: undefined, renewalPrice: undefined, currency: "USD" },
-      { domain: "myagent.io", available: false, registrationPrice: undefined, renewalPrice: undefined, currency: "USD" },
-      { domain: "myagent.ai", available: false, registrationPrice: undefined, renewalPrice: undefined, currency: "USD" },
-    ]);
-    expect(body.message).toMatch(/not offered/);
+    expect(body.error).toBe("not_implemented");
+    expect(body.reason).toBe("domain search is not offered");
+    expect(body.names).toEqual(["myagent.com", "myagent.io", "myagent.ai"]);
+    // Neither list field the runtime reads, and no invented price.
+    expect(body.results).toBeUndefined();
+    expect(body.domains).toBeUndefined();
+    expect(JSON.stringify(body)).not.toMatch(/registration_price|purchase_price|renewal_price/);
+    expect(body.message).toMatch(/no domain can be registered here/i);
+    expect(body.message).toMatch(/nothing was charged/i);
     expect(body.docs).toContain("docs/errors.md#domains");
+  });
+
+  it("search_domains tool text: claims no name as taken and says that no domain can be registered here", async () => {
+    // vertrag.md row GET /v1/domains/search: "Fehler an das Werkzeug `search_domains`". Whatever status we pick,
+    // the text the customer's agent reads must not call a name taken that may well be free.
+    const { call } = setup();
+    for (const path of ["/v1/domains/search?query=myagent&tlds=com,io,ai", "/v1/domains/search?query=myagent.dev"]) {
+      const text = await searchToolText(await call("GET", path), path);
+      expect(text, path).not.toMatch(/taken/i);
+      expect(text, path).not.toMatch(/AVAILABLE/);
+      expect(text, path).toMatch(/no domain can be registered here/i);
+      expect(text, path).toMatch(/availability was not checked/i);
+    }
   });
 
   it("GET /v1/domains/search: without tlds the default set, a full name stays one name, a bad query is 400 and not retried", async () => {
     const { call } = setup();
     const plain = (await (await call("GET", "/v1/domains/search?query=MyAgent")).json()) as any;
-    expect(plain.results.map((r: any) => r.domain)).toEqual(["myagent.com", "myagent.io", "myagent.ai"]);
+    expect(plain.names).toEqual(["myagent.com", "myagent.io", "myagent.ai"]);
     const full = (await (await call("GET", "/v1/domains/search?query=myagent.dev&tlds=com")).json()) as any;
-    expect(full.results.map((r: any) => r.domain)).toEqual(["myagent.dev"]);
+    expect(full.names).toEqual(["myagent.dev"]);
     for (const url of ["/v1/domains/search", "/v1/domains/search?query=", "/v1/domains/search?query=a_b", "/v1/domains/search?query=ok&tlds=c%20m"]) {
       const res = await call("GET", url);
       expect(res.status, url).toBe(400);
