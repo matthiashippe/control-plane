@@ -1,7 +1,8 @@
 # Sandbox-Plan: wie wir Sandboxes anbieten
 
-Entschieden am 10.11.2026 in sandbox 01, gegen den Vertrag in `docs/sandbox/vertrag.md`. Sandboxes laufen auf einem eigenen kleinen
-Server (`docs/sandbox/server.md`), nie auf dem Zahlungsserver (`loop-constraints.md`, Grundregel 7). sandbox 02 bis 04 und
+Entschieden am 10.11.2026 in sandbox 01, gegen den Vertrag in `docs/sandbox/vertrag.md`; Server am 11.11.2026 nach Matthias'
+Entscheidung auf den vorhandenen Hostinger-VPS `srv1327036` (KVM 2) umgestellt. Sandboxes laufen auf diesem eigenen Server
+(`docs/sandbox/server.md`), nie auf dem Zahlungsserver (`loop-constraints.md`, Grundregel 7). sandbox 02 bis 04 und
 domains 01 bauen nach diesem Plan; wer davon abweicht, schreibt die Abweichung mit Grund in `goals/sandbox/ANNAHMEN.md`.
 
 ## Isolation
@@ -9,7 +10,8 @@ domains 01 bauen nach diesem Plan; wer davon abweicht, schreibt die Abweichung m
 Entscheidung: jede Sandbox ist ein eigener Container unter gVisor (`runsc`, Plattform `systrap`) mit Docker als Verwalter, kein
 MicroVM.
 
-Begründung: Das Paket, das wir kaufen (Hostinger KVM 1), hat kein `/dev/kvm`. Gemessen am Zahlungsserver, der dasselbe Paket ist:
+Begründung: Hostingers VPS (auch KVM 2, auf dem die Sandboxes laufen) geben kein `/dev/kvm` an den Gast. Gemessen am
+Zahlungsserver, der auf derselben Plattform läuft:
 `ssh -i "$CP_SSH_KEY" "$CP_HOST" 'ls -l /dev/kvm; grep -cE "vmx|svm" /proc/cpuinfo; systemd-detect-virt'` gab
 `No such file or directory`, `0` und `kvm` aus. Firecracker und Kata brauchen `/dev/kvm`, fallen also weg. gVisor fängt jeden
 Systemaufruf in einem eigenen Kernel im Userspace ab und braucht dafür keine Virtualisierung; ein Ausbruch braucht eine Lücke in
@@ -52,8 +54,9 @@ Anfragen über 1024 MB beantwortet sandbox 03 mit 400 und dem Hinweis auf die St
 der Server nicht hat. Platte als eigene ext4-Datei je Sandbox (sparse, als Datenträger unter `/root`), damit volle Platte nur die
 eigene Sandbox trifft. Laufzeit: Eine Sandbox läuft, solange Guthaben da ist, höchstens 30 Tage am Stück. Ohne API-Aufruf und ohne
 freigegebenen Port für 24 Stunden wird sie gestoppt und nicht mehr berechnet; gestoppt bleibt sie 7 Tage, dann wird sie gelöscht.
-Ein `exec` dauert höchstens 10 Minuten. Höchstens zwei Sandboxes je Konto, auf dem Server höchstens sechs zugleich (KVM 1: 4 GB,
-davon 1 GB für Host, Docker und Caddy, Rest 6 mal 512 MB; die CPU teilen sie sich).
+Ein `exec` dauert höchstens 10 Minuten. Höchstens zwei Sandboxes je Konto, auf dem Server höchstens zwölf Plätze zugleich, eine
+mittlere zählt als zwei (KVM 2: 8 GB, davon 2 GB für Host, Docker, Caddy und `sandboxd`, Rest 12 mal 512 MB; die 2 vCPU teilen sie
+sich; 100 GB Platte tragen 12 mal 5 GB mit Platz für Images).
 
 Begründung: Die Runtime hat kein Löschen (`deleteSandbox` ist am Pin leer), also muss der Server selbst aufräumen, sonst läuft eine
 vergessene Sandbox bis zum leeren Guthaben. Swap aus, damit ein Prozess über der Grenze stirbt, statt den Host in den Swap zu ziehen.
@@ -66,14 +69,14 @@ Schritten von 6 Minuten im Nachhinein, also 100 mc je Schritt für klein und 200
 und `details.current_balance_cents`, damit die Runtime ihr Topup selbst auslöst (`src/conway/topup.ts:81` am Pin). Reicht das
 Guthaben für den nächsten Schritt nicht, wird die Sandbox gestoppt, nicht gelöscht.
 
-Einkauf: Hostinger KVM 1 kostet 5,49 Euro im Monat bei 24 Monaten Laufzeit (131,76 Euro im Voraus, danach 11,99 Euro im Monat),
-gelesen am 10.11.2026 auf `https://www.hostinger.com/de/vps-hosting`. Mit 1 Euro = 1,17 USD (Annahme, `goals/sandbox/ANNAHMEN.md`)
-sind das rund 642000 mc im Monat oder 880 mc je Stunde für den ganzen Server.
+Einkauf: 0 Euro zusätzlich. Der Hostinger-VPS `srv1327036` (KVM 2) ist bis 03.02.2027 bezahlt (Matthias, 11.11.2026); bis dahin ist
+jede verkaufte Stunde Marge. Danach kostet KVM 2 in der Verlängerung 14,99 Euro im Monat, gelesen am 11.11.2026 auf
+`https://www.hostinger.com/de/vps-hosting`. Mit 1 Euro = 1,17 USD (Annahme, `goals/sandbox/ANNAHMEN.md`) sind das rund 1753830 mc
+im Monat oder 2403 mc je Stunde für den ganzen Server (730 Stunden im Monat).
 
-Marge: Bei sechs Plätzen und im Mittel der Hälfte belegt kostet eine belegte Platzstunde 880 / 3 = 293 mc, verkauft für 1000 mc,
-also Faktor 3,4. Der Server ist bezahlt, sobald 642 Platzstunden im Monat verkauft sind, also knapp eine Sandbox rund um die Uhr.
-Nach Ablauf der 24 Monate (11,99 Euro) steigt der Einkauf auf 1922 mc je Stunde für den Server, bei halber Belegung 641 mc je
-Platzstunde, die Marge sinkt auf Faktor 1,6 und bleibt über dem Faktor 1,3 der Inferenz.
+Marge ab 03.02.2027: Bei zwölf Plätzen und im Mittel der Hälfte belegt kostet eine belegte Platzstunde 2403 / 6 = 401 mc, verkauft
+für 1000 mc, also Faktor 2,5 und über dem Faktor 1,3 der Inferenz. Der Server ist bezahlt, sobald 1754 Platzstunden im Monat verkauft
+sind, also rund 2,4 Sandboxes rund um die Uhr.
 
 Begründung: Ein fester kleiner Server ist ein Fixkosten-Einkauf, kein Einkauf je Stunde wie bei OpenRouter; der Preis muss den
 Server schon bei wenig Belegung tragen. 1000 mc sind 1 Cent je Stunde, rund 7,30 USD im Monat für eine Sandbox rund um die Uhr, das

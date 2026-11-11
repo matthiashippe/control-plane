@@ -17,3 +17,16 @@
   anderen Preis zeigt, sieht erst Matthias; `docs/sandbox/server.md` nennt den Preis, den er bezahlt hat.
 - **Schlüsselpaar `~/.ssh/id_ed25519_cp_sandbox`** am 10.11.2026 auf dem code-host angelegt (ed25519, ohne Passphrase, Kommentar
   `code-host cp-sandbox`). Die öffentliche Hälfte steht unter `## Blockers` der Goal-Datei, die private verlässt den code-host nie.
+
+## Goal 01, Umstellung (11.11.2026, Engineer CP)
+
+- **Server ist `srv1327036` statt eines neuen KVM 1.** Entscheidung Matthias am Topic vom 11.11.2026, das Gate `server_kauf` entfällt.
+  Die Zeilen oben zu KVM 1 und seinem Preis gelten nur noch als Herleitung von Zyklus 1; `docs/sandbox/plan.md` rechnet mit KVM 2.
+- **Preis KVM 2 nach dem 03.02.2027** gelesen am 11.11.2026 auf `https://www.hostinger.com/de/vps-hosting`: 2 vCPU, 8 GB, 100 GB,
+  7,79 Euro im Monat bei 24 Monaten, Verlängerung 14,99 Euro im Monat. Der Plan rechnet die Marge mit der Verlängerung.
+- **Kein `/dev/kvm` auf `srv1327036`** ist weiter nur am Zahlungsserver gemessen; sandbox 02 misst nach der Neuinstallation.
+- **Erst Neuinstallation, dann Zugang.** Auf `srv1327036` liefen Loop und Deploy-Runner von Wissensanker, darum wird er mit Ubuntu
+  24.04 ohne Panel neu installiert, sobald wa-staging umgezogen ist. Gegenprobe vor der Neuinstallation am 11.11.2026:
+  `ssh -i ~/.ssh/id_ed25519_cp_sandbox -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=15 root@72.62.51.224 'uname -sr'`
+  gab `Permission denied (publickey)` mit Exit 255; der dabei gespeicherte Hostschlüssel ist mit `ssh-keygen -R 72.62.51.224`
+  wieder entfernt, weil die Neuinstallation einen neuen erzeugt.
