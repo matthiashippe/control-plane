@@ -37,9 +37,8 @@ Entscheidung: Eine Sandbox darf ins Internet (Paketquellen, Git, APIs ihrer Kund
 - ausgehend Port 25, weil ein Server, der Spam versendet, bei Hostinger gesperrt wird und dann jede Sandbox trifft.
 
 Umgesetzt mit nftables in der Kette `DOCKER-USER` (gilt für jeden weitergeleiteten Paketfluss der Container), mit Logzeile je
-Verwurf. Eingehend erreicht eine Sandbox nur, was sie über `ports/expose` freigibt, und zwar über Caddy auf dem Sandbox-Server unter
-`https://<id>-<port>.sbx.postyourprice.com` (Wildcard-Eintrag in der Cloudflare-Zone von `postyourprice.com`, gesetzt von sandbox 02
-über die API). Offen auf dem Host sind nur 22 (nur Schlüssel), 80 und 443 (Caddy); ufw bleibt dabei (Matthias, 11.11.2026). Der
+Verwurf. Eingehend erreicht eine Sandbox nur, was sie über `ports/expose` freigibt, und zwar über Cloudflare und Caddy auf dem
+Sandbox-Server unter `https://sbx-<id>-<port>.postyourprice.com` (`public_url` der Antwort, Zertifikat unten). Offen auf dem Host sind nur 22 (nur Schlüssel), 80 und 443 (Caddy); ufw bleibt dabei (Matthias, 11.11.2026). Der
 Eingang der Sandboxes ist eine eigene Caddy-Datei, die die Caddyfile mit einer `import`-Zeile lädt. Kein Container veröffentlicht einen
 Port auf dem Host, weil Docker dabei an ufw vorbei öffnet; Caddy leitet auf die Adresse des Containers im Bridge-Netz.
 Die Gegenrichtung gibt es nicht: Der Sandbox-Server baut nie eine Verbindung zum Zahlungsserver auf, auch nicht der Dienst selbst.
@@ -54,6 +53,22 @@ IPv6 an jeder Zieladresse des Hosts. Danach erreicht eine Sandbox auf dem Host k
 Postgres auf 5432 oder einen anderen Dienst von wa-staging; durch kommen nur Antworten auf Verbindungen, die der Host selbst
 geöffnet hat (Caddy zur Sandbox). DNS fragt die Sandbox direkt bei `1.1.1.1` und `9.9.9.9` (`--dns`), nicht beim Host. Ihren
 eigenen freigegebenen Port erreicht sie wie jeder andere über den öffentlichen Namen und Cloudflare. ufw bleibt dabei unverändert.
+
+Zertifikat für die freigegebenen Ports: Die Namen liegen auf der ersten Ebene unter der Zone, `sbx-<id>-<port>.postyourprice.com`
+statt `<id>-<port>.sbx.postyourprice.com`, und laufen über den Cloudflare-Proxy (orange Wolke). So deckt sie das kostenlose
+Universal SSL von Cloudflare (`postyourprice.com` und `*.postyourprice.com`); `*.sbx` als zweite Ebene deckt es nicht, das bräuchte
+Advanced Certificate Manager, also einen Kauf. Verworfen sind DNS-01 (braucht ein Caddy mit Cloudflare-Modul, also ein anderes
+Binary unter dem Caddy von wa-staging, und einen Zonen-Token auf dem Server mit fremdem Code) und On-Demand-TLS (braucht eine
+globale Option in der Caddyfile und stößt an 50 Zertifikate je Woche für `postyourprice.com` bei Let's Encrypt, geteilt mit der
+Hauptseite). Ein Eintrag `*.postyourprice.com`, proxied, zeigt auf `72.62.51.224`; jeder Name mit eigenem Eintrag (Hauptseite, `www`,
+`ctl.sbx`) geht davor. Zwischen Cloudflare und Caddy gilt ein Cloudflare-Origin-CA-Zertifikat für `*.postyourprice.com` (kostenlos,
+15 Jahre, nur von Cloudflare anerkannt), als Datei unter `/etc/caddy/sbx/` und mit `tls <cert> <key>` in der eigenen Caddy-Datei,
+ohne ACME. Die eigene Datei bedient nur Namen der Form `sbx-<id>-<port>`, die `sandboxd` kennt, alles andere unter
+`*.postyourprice.com` bekommt 404, damit keine Sandbox unter einem beliebigen Namen der Zone auftritt; die Cookies des Control
+Planes bleiben ohne `Domain`-Attribut, also nur für ihren eigenen Namen. Für wa-staging heißt das: kein neues Binary, keine globale
+Option, sein Block bleibt Zeichen für Zeichen, die Caddyfile bekommt nur die eine `import`-Zeile, und sein Name
+`wa-staging.72-62-51-224.sslip.io` kommt mit seinem eigenen Zertifikat von Let's Encrypt weiter direkt an. Steht die Zone auf
+„Flexible“, setzt sandbox 02 für `sbx-*` per Konfigurationsregel „Full (strict)“, weil Caddy sonst auf Port 80 im Kreis umleitet.
 
 ## Grenzen
 
@@ -125,7 +140,8 @@ antwortet das Control Plane wie heute mit 501, es startet also nichts halb.
 
 - **sandbox 02, der Sandbox-Server steht:** Einrichtungsskript im Repo (idempotent, vom code-host per SSH mit
   `~/.ssh/id_ed25519_cp_sandbox`): Ubuntu auf Stand, nftables nach `## Netz`, Docker mit `runsc`, Caddy, `sandboxd` mit Anlegen,
-  `exec`, Dateien, Ports, Stoppen, Löschen und Aufräumen nach `## Grenzen`, Wildcard-Eintrag `*.sbx.postyourprice.com`. Prüfungen
+  `exec`, Dateien, Ports, Stoppen, Löschen und Aufräumen nach `## Grenzen`, Eintrag `*.postyourprice.com` und
+  Origin-CA-Zertifikat nach `## Netz`. Prüfungen
   gegen den Server: keine Host-Datei lesbar, `76.13.144.207` und `169.254.169.254` aus einer Sandbox nicht erreichbar, ein Prozess
   über 512 MB stirbt, der Host bleibt erreichbar.
 - **sandbox 03, die Sandbox-API ist frei und abgerechnet:** Das Control Plane beantwortet jede Zeile aus `docs/sandbox/vertrag.md`,
@@ -136,5 +152,5 @@ antwortet das Control Plane wie heute mit 501, es startet also nichts halb.
 - **sandbox 04, Ende zu Ende mit der unveränderten Runtime:** Der Harness bekommt einen nachgebauten `sandboxd`, und der Job `e2e`
   zeigt, dass die Runtime am Pin eine Sandbox anlegt, darin ausführt, einen Port freigibt und das Ledger stimmt; dazu ein Lauf gegen
   die Produktion mit einem eigenen Automaton aus vorhandenen Credits.
-- **domains 01** baut danach die Domain-Zeilen des Vertrags: Suche und DNS für Namen unter `sbx.postyourprice.com`, eine klare
+- **domains 01** baut danach die Domain-Zeilen des Vertrags: Suche und DNS für Namen `sbx-…` unter `postyourprice.com`, eine klare
   Antwort ohne Kauf für `POST /v1/domains/register`, denn ein Domain-Kauf ist das Human Gate `server_kauf`.
