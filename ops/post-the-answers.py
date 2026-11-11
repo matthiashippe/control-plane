@@ -12,6 +12,8 @@ Nothing here posts by itself. A dry run is the default and prints exactly what w
     ops/post-the-answers.py                          a dry run, always
     ops/post-the-answers.py --send 3                 posts at most three, in folder order
     ops/post-the-answers.py --send 3 --only 335,373,385   posts those three, in that order
+    ops/post-the-answers.py --folder goals/kanal/antworten   a dry run over the drafts in that folder
+                                                          of the repo; the gate checks the same folder
 
 Every one of these has to hold before a single comment goes out:
 
@@ -39,6 +41,7 @@ import time
 import datetime
 
 REPO = "Conway-Research/automaton"
+OPS = pathlib.Path(__file__).resolve().parent
 FOLDER = pathlib.Path(".scratch/gtm/issue-antworten")
 ACCOUNT = "matthiashippe"
 DAILY_CAP = 3
@@ -117,6 +120,16 @@ if "--selftest" in argv:
                   if not fail else "SELFTEST FAILED"))
     raise SystemExit(fail)
 
+# The folder, passed to the gate exactly as given, so the gate judges the drafts this file posts and
+# not some other folder. The gate refuses a missing folder or one outside the repository.
+folder_args: list[str] = []
+if "--folder" in argv:
+    i = argv.index("--folder")
+    if i + 1 >= len(argv) or argv[i + 1].startswith("--"):
+        die("--folder needs a folder in the repository, e.g. --folder goals/kanal/antworten")
+    folder_args = ["--folder", argv[i + 1]]
+    FOLDER = pathlib.Path(argv[i + 1])
+
 send = 0
 if "--send" in argv:
     i = argv.index("--send")
@@ -125,7 +138,8 @@ if "--send" in argv:
     send = int(argv[i + 1])
 
 print("The gate first, because nothing goes out that it has not passed.\n")
-gate = subprocess.run([sys.executable, "ops/before-the-answers.py"], capture_output=True, text=True)
+gate = subprocess.run([sys.executable, str(OPS / "before-the-answers.py"), *folder_args],
+                      capture_output=True, text=True)
 tail = [l for l in gate.stdout.splitlines() if l.strip()][-4:]
 print("\n".join("  " + l for l in tail))
 if gate.returncode != 0:
@@ -134,7 +148,9 @@ if gate.returncode != 0:
 pending = []
 for line in gate.stdout.splitlines():
     if "still to send:" in line:
+        # The gate prints "0 still to send: none" when every draft is answered; "none" is not an issue.
         pending = [n.strip().lstrip("#") for n in line.split(":", 1)[1].split(",")]
+        pending = [n for n in pending if n.isdigit()]
 if not pending:
     print("\nNothing pending. Every draft is posted or has lost its occasion.")
     raise SystemExit(0)
@@ -193,7 +209,7 @@ if send == 0:
     if room < len(pending):
         print(f"  ({len(pending) - room} would wait for tomorrow: the cap is {DAILY_CAP} a day)")
     print("\nTo send, and only after Matthias has said so in the conversation:")
-    print(f"  ops/post-the-answers.py --send {min(room, len(pending))}")
+    print(f"  ops/post-the-answers.py --send {min(room, len(pending))} {' '.join(folder_args)}".rstrip())
     raise SystemExit(0)
 
 if send > room:
@@ -228,7 +244,7 @@ for number in pending[:send]:
     # The record of the outward action, and the input ops/traffic.sh needs. A public link triggers
     # a fetch fleet within seconds, and without the timestamp a cycle reading the log a day later
     # counts that fleet as arrivals. Appended after the post succeeded, never before.
-    with open("ops/posted-answers.log", "a", encoding="utf-8") as fh:
+    with open(OPS / "posted-answers.log", "a", encoding="utf-8") as fh:
         fh.write(f"{datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')} {number} {url}\n")
     if sent < send:
         time.sleep(GAP_SECONDS)

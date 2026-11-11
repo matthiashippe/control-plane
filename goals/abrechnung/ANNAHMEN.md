@@ -69,3 +69,23 @@
 - **Quote nachher** aus der Datenbank allein: ab der ersten Buchung mit `duration_ms` (dem Rollout dieses Goals), `TQ_SINCE` setzt den
   Beginn von Hand. `ops/live.sh` zeigt sie und meldet `FAIL` nur, wenn sie nicht lesbar ist, nicht bei einer hohen Quote: Eine Schwelle
   ohne Messung nachher würde Reverts auslösen, die nichts belegen.
+
+## Goal 03 (10.11.2026, Engineer CP)
+
+- **Ursachen tragen ein Vorzeichen, die Zeile nennt die Zahl der betroffenen Anfragen.** `cause <name>: <n> (requests <r>, timeouts <t>)`:
+  `n` zählt die Anfragen oder Zeilen dieser Ursache, `r` und `t` ihren Anteil an der Abweichung caddy minus service. `unmatched` kann in
+  beide Richtungen wirken (Anfrage ohne Zeile plus, Zeile ohne Anfrage minus), `clock` ebenso (Timeout nur auf Caddys Uhr plus, nur nach
+  `duration_ms` minus). So ergeben die Anteile genau die Abweichung, bei Anfragen wie bei Timeouts; stimmt die Summe nicht, Exit 3 ohne
+  Ursache.
+- **Zeitraum je Paar, nicht je Seite.** Ein Paar aus Anfrage und eigener Zeile und eine vom Coalescer bediente Wiederholung gehören über
+  die Buchungszeit ihrer Zeile in den Zeitraum, alles andere über die eigene Zeit. Sonst trennte eine Grenze eine Anfrage von ihrer Zeile
+  (die Zeile landet bis 15 s nach dem Ende im Log), und am Rand entstünde eine Abweichung, die keine Ursache hat. Ohne `TQ_SINCE` beginnt
+  der Zeitraum bei der ersten Zeile `ledger` mit `duration_ms`, ohne `TQ_UNTIL` endet er mit der spätesten Anfrage oder Zeile.
+- **Zeile ohne `duration_ms` im Zeitraum** zählt `service` nicht; ihre Anfrage zählt `caddy` und landet unter `unmatched`.
+- **Keine Herkunft im Vergleich.** `--compare` trennt nicht nach eigener und fremder Adresse, weil die Datenbank-Seite keine Adresse
+  ausgibt. Die Herkunft im Zeitraum zeigt `--join` auf eine beschnittene Kopie des Logs (am 10.11.2026: 46 von 46 fremd).
+- **Quote nach außen noch keine.** Die Messung `service` darf es später sein, weil sie im Vergleich dasselbe zählt; 0 Timeouts in 46
+  Anfragen über 2,5 Stunden belegen keine Besserung gegenüber 3 in 224 an einem Tag. Frühestens nach sieben Tagen ab dem Rollout von
+  abrechnung 02, wie `docs/kette.md` es für den Vergleich vorsieht.
+- **Summe der Abbrüche neu gemessen:** 79229 mc aus den fünf Abbuchungen (Ledger, `readonly: true`), dieselben fünf Anfragen mit Status 0
+  im Caddy-Log; die `ref` liest die Abfrage aus der Gutschrift selbst. `LOOP.md` nennt weiter 0,37 USD; den Satz ändert nur ein Mensch.
