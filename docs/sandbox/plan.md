@@ -28,8 +28,12 @@ Datenträger der Sandbox.
 
 Entscheidung: Eine Sandbox darf ins Internet (Paketquellen, Git, APIs ihrer Kunden), aber nie dorthin:
 
-- der Zahlungsserver `76.13.144.207`, auf jedem Port: Fremder Code soll das Control Plane nur so erreichen wie jeder andere Kunde,
-  über `https://postyourprice.com` und Cloudflare, nie direkt über die Adresse des Servers mit Datenbank und Wallet-Schlüssel;
+- der Zahlungsserver `76.13.144.207` auf jedem Port außer tcp/443. Eine Runtime in der Sandbox ruft Inferenz und Credits beim Control
+  Plane (`conwayApiUrl`, am Pin `src/agent/loop.ts:156`), und `postyourprice.com`, `www.postyourprice.com` und `cp.hippe.eu` zeigen
+  ohne Cloudflare-Proxy direkt auf `76.13.144.207` (gemessen 11.11.2026, `dig +short postyourprice.com A` gab `76.13.144.207`). Darum
+  erreicht eine Sandbox dort genau tcp/443, also die öffentliche API mit Caddy davor wie jeder andere Kunde; SSH, alle anderen
+  Ports und UDP (auch 443/udp) bleiben gesperrt, damit fremder Code am Server mit Datenbank und Wallet-Schlüssel nichts außer der
+  API sieht;
 - Metadaten- und Link-Local-Adressen `169.254.0.0/16` und `fe80::/10`;
 - private Netze `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `100.64.0.0/10`, `fc00::/7`, damit auch das Docker-Netz des Hosts;
 - der Host selbst und jede andere Sandbox: je Sandbox ein eigenes Bridge-Netz ohne Verkehr zwischen Containern; auf dem Host
@@ -41,14 +45,15 @@ Verwurf. Eingehend erreicht eine Sandbox nur, was sie über `ports/expose` freig
 Sandbox-Server unter `https://sbx-<id>-<port>.postyourprice.com` (`public_url` der Antwort, Zertifikat unten). Offen auf dem Host sind nur 22 (nur Schlüssel), 80 und 443 (Caddy); ufw bleibt dabei (Matthias, 11.11.2026). Der
 Eingang der Sandboxes ist eine eigene Caddy-Datei, die die Caddyfile mit einer `import`-Zeile lädt. Kein Container veröffentlicht einen
 Port auf dem Host, weil Docker dabei an ufw vorbei öffnet; Caddy leitet auf die Adresse des Containers im Bridge-Netz.
-Die Gegenrichtung gibt es nicht: Der Sandbox-Server baut nie eine Verbindung zum Zahlungsserver auf, auch nicht der Dienst selbst.
+Der Host und `sandboxd` selbst bauen nie eine Verbindung zum Zahlungsserver auf; nur Container dürfen dort tcp/443.
 
 Weg zum Host selbst: `DOCKER-USER` sieht nur weitergeleitete Pakete. Was eine Sandbox an eine Adresse des Hosts schickt (die
 Bridge-Adresse ihres Netzes, `72.62.51.224`, die IPv6 des Hosts, 127.0.0.1 ist im Container ohnehin der eigene), läuft durch die
-Eingangskette (`input`), und dort lässt ufw 22, 80 und 443 von überall zu (gemessen 11.11.2026, `ufw status verbose`). Darum bekommt
+Eingangskette (`input`), und dort lässt ufw 22, 80 und 443 von überall zu (gemessen 11.11.2026, `ufw status verbose`, dazu 443/udp). Darum bekommt
 der Host eine eigene Tabelle `inet sandbox` mit der Kette `input` (`type filter hook input priority -10`, also vor ufw) und genau
 zwei Regeln: `iifname "sbx-*" ct state established,related accept` und `iifname "sbx-*" counter log prefix "sbx-host " drop`. Jedes
-Bridge-Netz einer Sandbox heißt `sbx-<id>` (Docker-Option `com.docker.network.bridge.name`), deshalb greift die Regel für IPv4 und
+Bridge-Netz einer Sandbox heißt `sbx-<id>` (Docker-Option `com.docker.network.bridge.name`, höchstens 15 Zeichen, also eine ID von
+`sandboxd` mit höchstens 11 Zeichen), deshalb greift die Regel für IPv4 und
 IPv6 an jeder Zieladresse des Hosts. Danach erreicht eine Sandbox auf dem Host keinen Port mehr, weder 22, 80 und 443 noch
 Postgres auf 5432 oder einen anderen Dienst von wa-staging; durch kommen nur Antworten auf Verbindungen, die der Host selbst
 geöffnet hat (Caddy zur Sandbox). DNS fragt die Sandbox direkt bei `1.1.1.1` und `9.9.9.9` (`--dns`), nicht beim Host. Ihren

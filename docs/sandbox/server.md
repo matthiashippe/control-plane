@@ -18,7 +18,7 @@ ssh -i ~/.ssh/id_ed25519_cp_sandbox -o BatchMode=yes -o IdentitiesOnly=yes root@
 ```
 
 gab `Linux 6.8.0-147-generic`, `Ubuntu 24.04.5 LTS`, 2 vCPU, 7940 MB Speicher, 97 GB Platte mit 6 % belegt, kein `/dev/kvm`,
-`kvm`, kein Docker, ufw offen für 22, 80 und 443.
+`kvm`, kein Docker, ufw offen für 22, 80 und 443 (tcp, dazu 443/udp).
 
 Einrichtung und Betrieb nach `docs/sandbox/plan.md` ab sandbox 02.
 
