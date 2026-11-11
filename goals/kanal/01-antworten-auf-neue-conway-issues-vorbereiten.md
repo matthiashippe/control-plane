@@ -1,7 +1,7 @@
 # Kanal Goal 01: Antworten auf neue Conway-Issues vorbereiten
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Automatons, die bei Conway an Anmeldung oder Zahlung scheitern, finden uns: Neue Issues im Upstream-Repo `Conway-Research/automaton`
@@ -52,7 +52,7 @@ dessen Betreiber dort fragt, ein Kunde ist, der gerade wechseln will.
       Prüfung: `git diff $(git merge-base origin/dev HEAD) -- ops/posted-answers.log | grep -E "^\+[0-9]{4}-" | awk '{print $2}' | while read -r n; do test -f "goals/kanal/antworten/$n.md" || echo "ohne Entwurf $n"; done` muss nichts ausgeben.
 - [x] `check` ist grün.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Englisch in den Antworten, sachlich, kurz, kein Gedankenstrich; Deutsch in Goal-Datei und Liste.
@@ -70,6 +70,7 @@ dessen Betreiber dort fragt, ein Kunde ist, der gerade wechseln will.
 ## Progress Log
 - 2026-11-10 Zyklus 1: Punkte 1, 2, 3, 5 gebaut (Option `--folder` in beiden Skripten, Liste mit 7 Issues, Entwürfe zu #434, #430 und #427), Punkt 4 wartet auf das Human Gate public_post. Prüfbefehle: `pnpm -s vitest run test/answers-folder.test.ts` Exit 0 (7 Tests, vorher 6 rot ohne `--folder` und der Test „Nothing pending“ rot vor dem Fix des Platzhalters `none`); `grep -cE "^\s*(it|test)\(" test/answers-folder.test.ts` 7; `grep -cE "^[|] *#?[0-9]+ " goals/kanal/issues.md` 7; `grep -c "gh issue" goals/kanal/issues.md` 1; `python3 ops/before-the-answers.py --folder goals/kanal/antworten` Exit 0, READY, 3 still to send; Anzahl-Prüfung `passt` (Gegenprobe mit 4 Dateien nicht); Wallet-Grep 0 (Gegenprobe mit gepflanzter Adresse 1); Trockenlauf `python3 ops/post-the-answers.py --folder goals/kanal/antworten` Exit 0, nichts gesendet, `ops/posted-answers.log` unverändert; Punkt 4 Log-Grep 0, offen; `node scripts/check.mjs` Exit 0 (100 Testdateien, 1273 Tests).
 - 2026-11-11 Zyklus 2: Punkt 4 gepostet nach Matthias' Freigabe am Topic (2026-11-11 07:02 UTC), genau die drei freigegebenen Texte über `python3 ops/post-the-answers.py --folder goals/kanal/antworten --send 3 --only 434,430,427`: https://github.com/Conway-Research/automaton/issues/434#issuecomment-6789427945, https://github.com/Conway-Research/automaton/issues/430#issuecomment-6789453609, https://github.com/Conway-Research/automaton/issues/427#issuecomment-6789479781; Entwurf gegen Freigabe und Live-Kommentar gegen Freigabe je identisch (Gegenprobe mit einem geänderten Wort meldet DIFFERENT), `origin/dev` gemergt, Abschluss gemeldet, Punkte 1, 2, 3, 4, 5. Prüfbefehle: `pnpm -s vitest run test/answers-folder.test.ts` Exit 0; `grep -cE "^\s*(it|test)\(" test/answers-folder.test.ts` 7; `grep -cE "^[|] *#?[0-9]+ " goals/kanal/issues.md` 7; `grep -c "gh issue" goals/kanal/issues.md` 1; `python3 ops/before-the-answers.py --folder goals/kanal/antworten` Exit 0, READY, 3 already posted; Anzahl-Prüfung `passt`; Wallet-Grep 0; Punkt 4 Log-Grep 3, Entwurf-Abgleich leer (Gegenprobe mit gepflanzter Zeile 999 meldet `ohne Entwurf 999`); `node scripts/check.mjs` Exit 0 (101 Testdateien, 1281 Tests; der erste Lauf endete bei Load 173 mit Exit 1 nur am vitest-RPC-Timeout, alle Tests grün).
+- 2026-11-11 Release: PASS K, B (Zyklus 2), DONE.
 
 ## Blockers
 Gate public_post erledigt: Freigabe am Topic am 2026-11-11 07:02 UTC, die drei Texte sind Wort für Wort gepostet (Links im Progress Log).
