@@ -7,6 +7,8 @@
 #   ops/timeout-quote.sh --since-rollout      production, database only: calls that carry their own duration (written since
 #                                             the rollout of abrechnung 02), per model
 #   ops/timeout-quote.sh --rows ROWS          the same from a file of rows; `-` for stdin
+#   ops/timeout-quote.sh --compare            production: both measurements over the same period (TQ_SINCE, TQ_UNTIL)
+#   ops/timeout-quote.sh --compare-files CADDY ROWS   the same from files
 #   ops/timeout-quote.sh --selftest           no network: planted lines, a quote above 0 where a long call was planted and
 #                                             exactly 0 where none was
 #
@@ -27,6 +29,16 @@
 #
 # Output: a markdown table `| model | day | origin | requests | timeouts | quote |`, one line per model,
 # day and origin, then one line per model and origin over all days (day `all`).
+#
+# --compare (abrechnung 03) counts the join ("caddy") and the database alone ("service") over one
+# period: TQ_SINCE and TQ_UNTIL as ISO time in UTC, by default from the first ledger row with
+# `duration_ms` to the last line. Per model one line `| model | caddy | requests | timeouts | quote |`
+# and one line `| model | service | ... |`, then the deviation (caddy minus service) and one line per
+# cause with the number of calls and its signed share: `coalesced` (a request without a row of its
+# own that ended within 2 s of a request with one: the coalescer answered both at the same moment),
+# `clock` (a timeout on Caddy's clock and not on the service's `duration_ms`, or the other way round),
+# `unmatched` (a request without a row, or a row without a request). The shares add up to the
+# deviation; if they do not, the tool exits 3 without printing a cause.
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -105,6 +117,114 @@ if (mode === "join") {
   const kept = rs.filter((r) => since && r.at >= since);
   for (const r of kept) add(r.model, r.at.slice(0, 10), r.src === "abort" ? "aborted" : "answered", Number(r.duration_ms) >= limit * 1000);
   print(`since ${since || "the rollout (no call with a duration yet)"}, ${kept.length} calls, timeout from ${limit} s`);
+} else if (mode === "compare") {
+  // Both measurements over the same period (abrechnung 03). Every Caddy request is matched to its own
+  // row first (generation start within 2 s, written before the request ended plus 15 s); then each
+  // request and each row lands in exactly one class:
+  //   pair       a request with its own row that carries a duration: counted by both measurements,
+  //              a timeout on one clock and not on the other is cause "clock"
+  //   coalesced  a request without its own row that was answered by a row written while it ran
+  //   unmatched  a request without any row (or whose row has no duration), or a row without a request
+  // A pair and a coalesced request are in the period by the time their row was written, everything
+  // else by its own time, so a request and the row that answered it are never split by a boundary.
+  const sinceArg = process.argv[6] || "", untilArg = process.argv[7] || "";
+  const parseIso = (name, v) => {
+    if (!v) return null;
+    const t = Date.parse(v);
+    if (!/^\d{4}-\d{2}-\d{2}T/.test(v) || !Number.isFinite(t)) { console.error(`${name} is no ISO time in UTC: ${v}`); process.exit(2); }
+    return t / 1000;
+  };
+  const sinceSet = parseIso("TQ_SINCE", sinceArg), untilSet = parseIso("TQ_UNTIL", untilArg);
+  const reqs = parseLines(read(a)).filter((j) => j.request && j.request.method === "POST" && /^\/v1\/chat\/completions(\?|$)/.test(j.request.uri || "") && (j.status === 200 || j.status === 0) && typeof j.ts === "number" && typeof j.duration === "number")
+    .map((j) => ({ end: j.ts, start: j.ts - j.duration, d: j.duration }))
+    .sort((x, y) => x.end - y.end);
+  const rs = rows(b);
+  const hasDuration = (x) => x.duration_ms !== null && x.duration_ms !== undefined && Number.isFinite(Number(x.duration_ms));
+  const firstTimed = rs.filter((x) => hasDuration(x) && x.src === "ledger").map((x) => x.t).sort((p, q) => p - q)[0];
+  const since = sinceSet ?? firstTimed ?? null;
+  if (since === null) { console.error("no row with a duration yet, nothing to compare; set TQ_SINCE"); process.exit(2); }
+  const items = [];
+  // First pass: every request that finds its own row. Their end times are what a coalesced retry is matched against.
+  const paired = [], lone = [];
+  for (const r of reqs) {
+    let best = null, bd = Infinity;
+    for (const x of rs) {
+      if (x.used || x.t < r.start - 1 || x.t > r.end + 15) continue;
+      const dist = x.start !== null ? Math.abs(x.start - r.start) : Math.abs(x.t - r.end);
+      if (x.start !== null && dist > 2) continue;
+      if (dist < bd) { bd = dist; best = x; }
+    }
+    if (!best) { lone.push(r); continue; }
+    best.used = true;
+    const item = hasDuration(best)
+      ? { kind: "pair", at: best.t, model: best.model, caddyTo: r.d >= limit, serviceTo: Number(best.duration_ms) >= limit * 1000 }
+      : { kind: "caddy-only", at: r.end, model: best.model, caddyTo: r.d >= limit };
+    items.push(item);
+    paired.push({ end: r.end, item });
+  }
+  // Second pass: a request without a row of its own is coalesced only when it ended within COALESCE_S of a request that
+  // has one, because the coalescer hands leader and retry the same answer at the same moment. A row merely written while
+  // it ran is not enough: nearly every 60 s call overlaps a row of another request, and a timeout without an abort row (the lost
+  // booking this comparison exists to find) would hide under coalesced.
+  const COALESCE_S = 2;
+  for (const r of lone) {
+    let leader = null, ld = Infinity;
+    for (const p of paired) {
+      const dist = Math.abs(p.end - r.end);
+      if (dist <= COALESCE_S && dist < ld) { ld = dist; leader = p.item; }
+    }
+    if (leader) items.push({ kind: "coalesced", at: leader.at, model: leader.model, caddyTo: r.d >= limit });
+    else items.push({ kind: "caddy-only", at: r.end, model: "unattributed", caddyTo: r.d >= limit });
+  }
+  for (const x of rs) if (!x.used && hasDuration(x)) items.push({ kind: "service-only", at: x.t, model: x.model, serviceTo: Number(x.duration_ms) >= limit * 1000 });
+  const until = untilSet ?? Math.max(...items.map((i) => i.at), since);
+  const kept = items.filter((i) => i.at >= since && i.at <= until);
+  const per = new Map();
+  const bump = (model, side, to) => {
+    const e = per.get(model) || { caddy: { n: 0, to: 0 }, service: { n: 0, to: 0 } };
+    if (side) { e[side].n += 1; if (to) e[side].to += 1; }
+    per.set(model, e);
+  };
+  const cause = { coalesced: { n: 0, req: 0, to: 0 }, clock: { n: 0, req: 0, to: 0 }, unmatched: { n: 0, req: 0, to: 0 } };
+  for (const i of kept) {
+    if (i.kind === "pair") {
+      bump(i.model, "caddy", i.caddyTo); bump(i.model, "service", i.serviceTo);
+      if (i.caddyTo !== i.serviceTo) { cause.clock.n += 1; cause.clock.to += i.caddyTo ? 1 : -1; }
+    } else if (i.kind === "coalesced") {
+      bump(i.model, "caddy", i.caddyTo); bump(i.model, null);
+      cause.coalesced.n += 1; cause.coalesced.req += 1; if (i.caddyTo) cause.coalesced.to += 1;
+    } else if (i.kind === "caddy-only") {
+      bump(i.model, "caddy", i.caddyTo); bump(i.model, null);
+      cause.unmatched.n += 1; cause.unmatched.req += 1; if (i.caddyTo) cause.unmatched.to += 1;
+    } else {
+      bump(i.model, "service", i.serviceTo); bump(i.model, null);
+      cause.unmatched.n += 1; cause.unmatched.req -= 1; if (i.serviceTo) cause.unmatched.to -= 1;
+    }
+  }
+  const quote = (e) => (e.n ? `${((100 * e.to) / e.n).toFixed(1)} %` : "-");
+  const iso = (s) => new Date(s * 1000).toISOString();
+  console.log(`period ${iso(since)} to ${iso(until)} UTC, timeout from ${limit} s`);
+  console.log("| model | measure | requests | timeouts | quote |");
+  console.log("|---|---|---:|---:|---:|");
+  const tot = { caddy: { n: 0, to: 0 }, service: { n: 0, to: 0 } };
+  for (const model of [...per.keys()].sort((x, y) => (x === "unattributed") - (y === "unattributed") || x.localeCompare(y))) {
+    const e = per.get(model);
+    for (const side of ["caddy", "service"]) {
+      console.log(`| ${model} | ${side} | ${e[side].n} | ${e[side].to} | ${quote(e[side])} |`);
+      tot[side].n += e[side].n; tot[side].to += e[side].to;
+    }
+  }
+  if (!per.size) console.log("no calls");
+  const devReq = tot.caddy.n - tot.service.n, devTo = tot.caddy.to - tot.service.to;
+  console.log(`deviation requests: ${devReq} (caddy ${tot.caddy.n}, service ${tot.service.n})`);
+  console.log(`deviation timeouts: ${devTo} (caddy ${tot.caddy.to}, service ${tot.service.to})`);
+  const sumReq = cause.coalesced.req + cause.clock.req + cause.unmatched.req;
+  const sumTo = cause.coalesced.to + cause.clock.to + cause.unmatched.to;
+  if (sumReq !== devReq || sumTo !== devTo) {
+    console.error(`causes do not add up: requests ${sumReq} vs ${devReq}, timeouts ${sumTo} vs ${devTo}`);
+    process.exit(3);
+  }
+  for (const [name, c] of Object.entries(cause)) console.log(`cause ${name}: ${c.n} (requests ${c.req}, timeouts ${c.to})`);
 } else {
   console.error("unknown mode " + mode);
   process.exit(2);
@@ -144,6 +264,21 @@ production() {
     exit 2
   }
   count join "$TQ_DIR/caddy.jsonl" "$TQ_DIR/rows.jsonl" "$OWN_FILE" "$LIMIT_S"
+}
+
+compare() {
+  load_env
+  TQ_DIR="$(mktemp -d)"
+  trap 'rm -rf "$TQ_DIR"' EXIT
+  CP_SSH_KEY="$KEY" CP_HOST="$CP_HOST" bash "$ROOT/ops/access-log.sh" >"$TQ_DIR/caddy.jsonl" || {
+    echo "TIMEOUT QUOTE FAIL: access log not readable" >&2
+    exit 2
+  }
+  fetch_rows "$TQ_DIR/rows.jsonl" || {
+    echo "TIMEOUT QUOTE FAIL: ledger not readable" >&2
+    exit 2
+  }
+  count compare "$TQ_DIR/caddy.jsonl" "$TQ_DIR/rows.jsonl" "$OWN_FILE" "$LIMIT_S" "${TQ_SINCE:-}" "${TQ_UNTIL:-}"
 }
 
 since_rollout() {
@@ -254,6 +389,71 @@ selftest() {
   out="$(count rows "$dir/since-short.jsonl" "" "$dir/own.txt" "$LIMIT_S")" || all_ok=0
   expect "since rollout, no long call, quote 0" "$out" "| openai/gpt-5.2 | all | answered | 1 | 0 | 0.0 % |"
 
+  # Both measurements over the same period (abrechnung 03). `iso` turns a unix time into the form the rows carry.
+  iso() { date -u -d "@$1" +%Y-%m-%dT%H:%M:%S.000Z; }
+  trow() { printf '{"src":"ledger","at":"%s","ref":"gen-%s-planted","model":"%s","duration_ms":%s}\n' "$(iso "$1")" "$2" "$3" "$4"; }
+  local c=1794330000
+  # Equal: every request has its own row and both clocks agree, one of them a timeout on both.
+  {
+    line $((c + 10)) 9.0 200 "$stranger"
+    line $((c + 130)) 59.9 0 "$stranger"
+    line $((c + 200)) 2.0 200 "$own"
+  } >"$dir/cmp-equal.jsonl"
+  {
+    trow $((c + 11)) $((c + 1)) openai/gpt-5.2 8900
+    printf '{"src":"abort","at":"%s","ref":null,"model":"openai/gpt-5.2","duration_ms":59800}\n' "$(iso $((c + 135)))"
+    trow $((c + 200)) $((c + 198)) openai/gpt-5-mini 1900
+  } >"$dir/cmp-equal-rows.jsonl"
+  out="$(count compare "$dir/cmp-equal.jsonl" "$dir/cmp-equal-rows.jsonl" "$dir/own.txt" "$LIMIT_S" "" "")" || all_ok=0
+  echo "$out" | sed 's/^/  planted equal: /'
+  expect "compare equal, caddy" "$out" "| openai/gpt-5.2 | caddy | 2 | 1 | 50.0 % |"
+  expect "compare equal, service" "$out" "| openai/gpt-5.2 | service | 2 | 1 | 50.0 % |"
+  expect "compare equal, no deviation in requests" "$out" "deviation requests: 0 (caddy 3, service 3)"
+  expect "compare equal, no deviation in timeouts" "$out" "deviation timeouts: 0 (caddy 1, service 1)"
+  expect "compare equal, cause coalesced 0" "$out" "cause coalesced: 0 (requests 0, timeouts 0)"
+  expect "compare equal, cause clock 0" "$out" "cause clock: 0 (requests 0, timeouts 0)"
+  expect "compare equal, cause unmatched 0" "$out" "cause unmatched: 0 (requests 0, timeouts 0)"
+
+  # Causes: a leader of 59.7 s in the log and 58.9 s `duration_ms` (clock), a retry the coalescer answered (coalesced).
+  # A pair and a request without a row outside TQ_SINCE and TQ_UNTIL must count in neither measurement.
+  {
+    line $((c - 3600)) 59.9 0 "$stranger"
+    line $((c + 60)) 59.7 200 "$stranger"
+    line $((c + 60)) 20.0 200 "$stranger"
+    line $((c + 300)) 3.0 200 "$stranger"
+    line $((c + 7200)) 59.9 0 "$stranger"
+  } >"$dir/cmp-causes.jsonl"
+  {
+    printf '{"src":"abort","at":"%s","ref":null,"model":"openai/gpt-5.2","duration_ms":59900}\n' "$(iso $((c - 3595)))"
+    trow $((c + 61)) $((c + 1)) openai/gpt-5.2 58900
+    trow $((c + 300)) $((c + 297)) openai/gpt-5-mini 2800
+  } >"$dir/cmp-causes-rows.jsonl"
+  out="$(count compare "$dir/cmp-causes.jsonl" "$dir/cmp-causes-rows.jsonl" "$dir/own.txt" "$LIMIT_S" "$(iso "$c")" "$(iso $((c + 3600)))")" || all_ok=0
+  echo "$out" | sed 's/^/  planted causes: /'
+  expect "compare causes, caddy counts the retry and the long leader" "$out" "| openai/gpt-5.2 | caddy | 2 | 1 | 50.0 % |"
+  expect "compare causes, service counts the leader only, under the limit" "$out" "| openai/gpt-5.2 | service | 1 | 0 | 0.0 % |"
+  expect "compare causes, cause coalesced 1" "$out" "cause coalesced: 1 (requests 1, timeouts 0)"
+  expect "compare causes, cause clock 1" "$out" "cause clock: 1 (requests 0, timeouts 1)"
+  expect "compare causes, causes add up to the deviation in requests" "$out" "deviation requests: 1 (caddy 3, service 2)"
+  expect "compare causes, causes add up to the deviation in timeouts" "$out" "deviation timeouts: 1 (caddy 1, service 0)"
+  expect "compare period, lines outside counted in neither" "$out" "cause unmatched: 0 (requests 0, timeouts 0)"
+  expect "compare period, the period as set" "$out" "period $(iso "$c") to $(iso $((c + 3600))) UTC, timeout from $LIMIT_S s"
+
+  # Overlap: a lost call (59.9 s, status 0, no row of its own) runs while the leader's row is written, but ends 20 s after
+  # every request that has a row. It is unmatched, not coalesced; the retry that ends next to the leader stays coalesced.
+  {
+    line $((c + 60)) 20.0 200 "$stranger"
+    line $((c + 61)) 5.0 200 "$stranger"
+    line $((c + 80)) 59.9 0 "$stranger"
+  } >"$dir/cmp-overlap.jsonl"
+  trow $((c + 60)) $((c + 40)) openai/gpt-5.2 19900 >"$dir/cmp-overlap-rows.jsonl"
+  out="$(count compare "$dir/cmp-overlap.jsonl" "$dir/cmp-overlap-rows.jsonl" "$dir/own.txt" "$LIMIT_S" "" "")" || all_ok=0
+  echo "$out" | sed 's/^/  planted overlap: /'
+  expect "compare overlap, the lost call is unmatched" "$out" "cause unmatched: 1 (requests 1, timeouts 1)"
+  expect "compare overlap, only the retry next to the leader is coalesced" "$out" "cause coalesced: 1 (requests 1, timeouts 0)"
+  expect "compare overlap, the lost call keeps no model" "$out" "| unattributed | caddy | 1 | 1 | 100.0 % |"
+  expect "compare overlap, causes add up to the deviation" "$out" "deviation timeouts: 1 (caddy 1, service 0)"
+
   if [ "$all_ok" = 1 ]; then
     echo "TIMEOUT QUOTE SELFTEST OK"
     return 0
@@ -267,8 +467,10 @@ case "${1:-}" in
   --join) count join "${2:?CADDY file or -}" "${3:?ROWS file}" "$OWN_FILE" "$LIMIT_S" ;;
   --rows) count rows "${2:?ROWS file or -}" "${TQ_SINCE:-}" "$OWN_FILE" "$LIMIT_S" ;;
   --since-rollout) since_rollout ;;
+  --compare) compare ;;
+  --compare-files) count compare "${2:?CADDY file or -}" "${3:?ROWS file}" "$OWN_FILE" "$LIMIT_S" "${TQ_SINCE:-}" "${TQ_UNTIL:-}" ;;
   "") production ;;
-  -h | --help) sed -n '2,31p' "$0" | sed 's/^# \{0,1\}//' ;;
+  -h | --help) sed -n '2,41p' "$0" | sed 's/^# \{0,1\}//' ;;
   *)
     echo "unknown switch: $1" >&2
     exit 2
