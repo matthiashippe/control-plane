@@ -1,7 +1,7 @@
 # Sandbox Goal 01: Sandbox-Vertrag, Isolation, Preis und PoC-Plan
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Der Loop weiß, was die unveränderte Runtime bei Conway für Sandboxes und Domains aufruft, und hat entschieden, wie wir Sandboxes
@@ -77,7 +77,7 @@ Vertrag bauen statt gegen eine Vermutung über die Runtime.
       Domain bei Let's Encrypt. Der Plan nennt den Weg, ob der Eintrag über den Cloudflare-Proxy läuft, und was er für wa-staging heißt.
       Prüfung: `awk '/^## Netz/{f=1;next} /^## /{f=0} f' docs/sandbox/plan.md | grep -ciE "dns-01|on.demand|advanced certificate"` muss mindestens 1 ausgeben.
       Prüfung: `awk '/^## Netz/{f=1;next} /^## /{f=0} f' docs/sandbox/plan.md | grep -ci "proxy"` muss mindestens 1 ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Jede Zahl mit dem Befehl, aus dem sie stammt; keine Adresse und kein Name eines Kunden.
@@ -100,5 +100,6 @@ Vertrag bauen statt gegen eine Vermutung über die Runtime.
 - 2026-11-11 Zyklus 5: Punkt 8 gebaut und Abschluss gemeldet, Punkte 1 bis 8 (`## Netz`: Namen `sbx-<id>-<port>.postyourprice.com` auf erster Ebene über den Cloudflare-Proxy mit Universal SSL, Origin-CA-Zertifikat als Datei in der eigenen Caddy-Datei, DNS-01 und On-Demand-TLS mit Grund verworfen, wa-staging ohne neues Binary und ohne globale Option). Prüfbefehle: P1 12, 0, 14; P2 (Netz) keine Ausgabe; P3 9, `sauber`; P4 keine Ausgabe, 1, 7, keine Ausgabe; P5 1, 0, `ssh … uname -sr` `Linux 6.8.0-147-generic` Exit 0; P6 `node scripts/check.mjs` Exit 0 (1281 Tests, grün in 50 s); P7 2, 3; P8 vorher 0 und 0, danach 2, 1.
 - 2026-11-11 Zyklus 6: Gap aus Verdict K Zyklus 5 behoben und Abschluss gemeldet, Punkte 1 bis 8 (`## Netz` gibt Sandboxes zum Zahlungsserver genau tcp/443 frei, weil `postyourprice.com` und `cp.hippe.eu` ohne Proxy direkt auf `76.13.144.207` zeigen und die Runtime dort Inferenz ruft, `src/agent/loop.ts:156` am Pin; alles andere dort bleibt gesperrt; dazu Bridge-Namen höchstens 15 Zeichen und 443/udp in `server.md`). Prüfbefehle: P1 12, 0, 14; P2 (Netz) keine Ausgabe; P3 9, `sauber`; P4 keine Ausgabe, 2, 7, keine Ausgabe; P5 1, 0, `ssh … uname -sr` `Linux 6.8.0-147-generic` Exit 0; P6 `node scripts/check.mjs` Exit 0 (1281 Tests, grün in 37 s); P7 2, 3; P8 2, 2.
 - 2026-11-11 Zyklus 7: Gap aus Verdict K Zyklus 6 behoben und Abschluss gemeldet, Punkte 1 bis 8 (`## Schritte` verlangt für sandbox 02 jetzt `76.13.144.207` aus einer Sandbox nur auf tcp/443, 22/tcp und 443/udp gesperrt, passend zu `## Netz`, dazu kein Port des Hosts über Bridge-Adresse, `72.62.51.224` oder IPv6). Prüfbefehle: P1 12, 0, 14; P2 (Netz) keine Ausgabe; P3 9, `sauber`; P4 keine Ausgabe, 2, 7, keine Ausgabe; P5 1, 0, `ssh … uname -sr` `Linux 6.8.0-147-generic` Exit 0; P6 `node scripts/check.mjs` Exit 0 (1281 Tests, grün in 27 s); P7 2, 3; P8 2, 2; `grep -c 'aus einer Sandbox nicht erreichbar' docs/sandbox/plan.md` 0.
+- 2026-11-11 Release: PASS K, B (Zyklus 7), DONE.
 
 ## Blockers
