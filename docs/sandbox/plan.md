@@ -44,6 +44,17 @@ Eingang der Sandboxes ist eine eigene Caddy-Datei, die die Caddyfile mit einer `
 Port auf dem Host, weil Docker dabei an ufw vorbei öffnet; Caddy leitet auf die Adresse des Containers im Bridge-Netz.
 Die Gegenrichtung gibt es nicht: Der Sandbox-Server baut nie eine Verbindung zum Zahlungsserver auf, auch nicht der Dienst selbst.
 
+Weg zum Host selbst: `DOCKER-USER` sieht nur weitergeleitete Pakete. Was eine Sandbox an eine Adresse des Hosts schickt (die
+Bridge-Adresse ihres Netzes, `72.62.51.224`, die IPv6 des Hosts, 127.0.0.1 ist im Container ohnehin der eigene), läuft durch die
+Eingangskette (`input`), und dort lässt ufw 22, 80 und 443 von überall zu (gemessen 11.11.2026, `ufw status verbose`). Darum bekommt
+der Host eine eigene Tabelle `inet sandbox` mit der Kette `input` (`type filter hook input priority -10`, also vor ufw) und genau
+zwei Regeln: `iifname "sbx-*" ct state established,related accept` und `iifname "sbx-*" counter log prefix "sbx-host " drop`. Jedes
+Bridge-Netz einer Sandbox heißt `sbx-<id>` (Docker-Option `com.docker.network.bridge.name`), deshalb greift die Regel für IPv4 und
+IPv6 an jeder Zieladresse des Hosts. Danach erreicht eine Sandbox auf dem Host keinen Port mehr, weder 22, 80 und 443 noch
+Postgres auf 5432 oder einen anderen Dienst von wa-staging; durch kommen nur Antworten auf Verbindungen, die der Host selbst
+geöffnet hat (Caddy zur Sandbox). DNS fragt die Sandbox direkt bei `1.1.1.1` und `9.9.9.9` (`--dns`), nicht beim Host. Ihren
+eigenen freigegebenen Port erreicht sie wie jeder andere über den öffentlichen Namen und Cloudflare. ufw bleibt dabei unverändert.
+
 ## Grenzen
 
 Entscheidung je Sandbox, angelehnt an die kleinsten Stufen der Runtime (`src/replication/spawn.ts:21` am Pin):
