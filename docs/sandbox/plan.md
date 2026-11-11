@@ -147,8 +147,10 @@ antwortet das Control Plane wie heute mit 501, es startet also nichts halb.
   `~/.ssh/id_ed25519_cp_sandbox`): Ubuntu auf Stand, nftables nach `## Netz`, Docker mit `runsc`, Caddy, `sandboxd` mit Anlegen,
   `exec`, Dateien, Ports, Stoppen, Löschen und Aufräumen nach `## Grenzen`, Eintrag `*.postyourprice.com` und
   Origin-CA-Zertifikat nach `## Netz`. Prüfungen
-  gegen den Server: keine Host-Datei lesbar, `76.13.144.207` und `169.254.169.254` aus einer Sandbox nicht erreichbar, ein Prozess
-  über 512 MB stirbt, der Host bleibt erreichbar.
+  gegen den Server: keine Host-Datei lesbar; `76.13.144.207` aus einer Sandbox nur auf tcp/443 erreichbar (443/tcp offen, 22/tcp
+  und 443/udp gesperrt, nach `## Netz`); `169.254.169.254` nicht erreichbar; kein Port des Hosts erreichbar, weder über die
+  Bridge-Adresse noch über `72.62.51.224` oder die IPv6 des Hosts; ein Prozess über 512 MB stirbt, der Host bleibt
+  von außen erreichbar.
 - **sandbox 03, die Sandbox-API ist frei und abgerechnet:** Das Control Plane beantwortet jede Zeile aus `docs/sandbox/vertrag.md`,
   Abschnitt `## Endpunkte`, für Sandboxes mit den Feldern dort und reicht sie signiert an `sandboxd` weiter; Abrechnung nach
   `## Preis` als Ledger-Zeilen in derselben Transaktion wie der Saldo, Reservierung, 402 mit `details`, Halt bei leerem Guthaben,
