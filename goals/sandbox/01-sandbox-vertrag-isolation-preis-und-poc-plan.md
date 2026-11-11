@@ -1,7 +1,7 @@
 # Sandbox Goal 01: Sandbox-Vertrag, Isolation, Preis und PoC-Plan
 
 ## Status
-BLOCKED matthias
+WAITING
 
 ## Active Objective
 Der Loop weiß, was die unveränderte Runtime bei Conway für Sandboxes und Domains aufruft, und hat entschieden, wie wir Sandboxes
@@ -84,8 +84,6 @@ Vertrag bauen statt gegen eine Vermutung über die Runtime.
 - 2026-11-11 Zyklus 2: nach Matthias' Entscheidung vom 11.11.2026 auf den vorhandenen VPS `srv1327036` umgestellt (`docs/sandbox/plan.md` mit KVM 2, zwölf Plätzen und 0 Euro Einkauf bis 03.02.2027, danach 2403 mc je Stunde und Faktor 2,5; `docs/sandbox/server.md` mit Anbieter, Paket, Preis und Adresse; Annahmen ergänzt), Gate `server_kauf` ersetzt durch die Neuinstallation nach dem Auszug von wa-staging. Prüfbefehle: P1 12, 0, 14; P2 (Netz) keine Ausgabe; P3 9, `sauber`; P4 keine Ausgabe, 2, 7, keine Ausgabe; P5 `grep -cE` 1, `grep -c` 0, `ssh` rot (vor der Neuinstallation `Permission denied (publickey)`, ohne bekannten Hostschlüssel `Host key verification failed`, Exit 255); P6 `node scripts/check.mjs` Exit 0 (1266 Tests, grün in 48 s).
 
 ## Blockers
-Art: matthias
-Gate: delete_data
-Aufgabe: Erst wenn wa-staging auf `htc-staging` bei Hetzner läuft: in hPanel den VPS `srv1327036` (72.62.51.224) mit Ubuntu 24.04 ohne Panel neu installieren und dabei den SSH-Schlüssel unten eintragen. Kein Kauf, keine Zahlung.
-Worum: Sandboxes laufen ab sandbox 02 auf diesem schon bezahlten Server statt auf einem neuen (Entscheidung Matthias, 11.11.2026); die Neuinstallation löscht die Reste von Loop und Deploy-Runner von Wissensanker, die dort liefen.
-Empfehlung: https://hpanel.hostinger.com/vps öffnen, `srv1327036` wählen, unter „Betriebssystem & Panel“ auf „Betriebssystem ändern“, „Einfaches Betriebssystem“ und „Ubuntu 24.04“ wählen, Root-Passwort frei setzen und nicht weitergeben, bei „SSH-Schlüssel“ genau diese Zeile einfügen: `ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPlVgXGcr+yATY/uyjqcQ+V8tFzj0KouiNvRcVPvNGnI code-host cp-sandbox`, bestätigen. Am Ende steht der Server in hPanel als „Läuft“; „ok“ als Antwort auf die Karte genügt, die Adresse ist bekannt. Dauer etwa 5 Minuten. Danach trägt der Loop den neuen Hostschlüssel ein und prüft den Zugang selbst.
+Wartet auf: PRO-17959 (Wissensanker-Loop, Deploy-Ziel im Tailnet), danach ist wa-staging von `srv1327036` auf `htc-staging` umgezogen.
+Danach: Wer den Umzug abschließt, räumt `srv1327036` (72.62.51.224) per SSH leer und trägt bei `root` in `~/.ssh/authorized_keys` diese Zeile ein: `ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPlVgXGcr+yATY/uyjqcQ+V8tFzj0KouiNvRcVPvNGnI code-host cp-sandbox`, dann ein Kommentar mit der Adresse am Topic PRO-17522. Kein Handgriff in hPanel, kein Kauf, keine Zahlung (Entscheidung Matthias, 11.11.2026).
+Dann: Der Maker prüft den Zugang, hakt Punkt 5 ab und meldet den Abschluss.

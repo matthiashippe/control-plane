@@ -30,3 +30,20 @@
   `ssh -i ~/.ssh/id_ed25519_cp_sandbox -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=15 root@72.62.51.224 'uname -sr'`
   gab `Permission denied (publickey)` mit Exit 255; der dabei gespeicherte Hostschlüssel ist mit `ssh-keygen -R 72.62.51.224`
   wieder entfernt, weil die Neuinstallation einen neuen erzeugt.
+
+## Goal 01, paralleler Schnitt (11.11.2026, Engineer CP)
+
+- **Kein Human Gate mehr für den Server.** Nachtrag Matthias am Topic vom 11.11.2026: Den Handgriff in hPanel gibt es nicht; wer den
+  Umzug von wa-staging (PRO-17959) abschließt, räumt `srv1327036` per SSH leer und trägt den Schlüssel ein. Status darum `WAITING`
+  statt `BLOCKED matthias`, das Gate `delete_data` entfällt.
+- **Schnitt, damit die Kette ohne Server weiterläuft** (Matthias: Reihenfolge und Schnitt entscheidet der Maker). Was keinen Server
+  braucht, hängt nicht an sandbox 01 DONE, sondern nur an abrechnung 01 DONE und liest Vertrag und Plan von `goal/sandbox-01`
+  (`git show origin/goal/sandbox-01:docs/sandbox/plan.md`), bis PR #4 in `dev` ist:
+  1. sandbox 03 zuerst, weil sie das Geld bringt: API und Abrechnung nach `## Preis` gegen einen nachgebauten `sandboxd` in den
+     Unit-Tests und im Harness; ohne Server und ohne `/data/sandbox-client.key` antwortet die Produktion weiter 501, ein Rollout ist
+     also gefahrlos.
+  2. sandbox 02 ohne Server parallel: `sandboxd`, Einrichtungsskript, nftables nach `## Netz`, gVisor-Profil, Tests gegen einen
+     lokalen Container mit `runsc` im CI. Die Einrichtung auf `srv1327036` und die Prüfungen dort bleiben ein eigenes Glied mit der
+     Voraussetzung sandbox 01 DONE.
+  3. domains 01: Die Voraussetzung `sandbox Goal 01 DONE` ist Vertrag einer bestehenden Goal-Datei; sie zu lösen geht über die Human
+     Inbox. Inhaltlich braucht domains 01 nur die Zone `sbx.postyourprice.com` und die Adresse 72.62.51.224, keinen laufenden Server.
