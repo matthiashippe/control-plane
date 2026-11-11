@@ -41,6 +41,13 @@ den Weg nicht gibt.
       Prüfung: `grep -c "/v1/domains" ops/live.sh` muss mindestens 1 ausgeben.
 - [x] `check` ist grün.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
+- [ ] Kritik: Die Suche behauptet keinen Namen als vergeben. Heute macht das Werkzeug `search_domains` der unveränderten Runtime aus
+      `available: false` die Zeile `<name>: taken` (`src/agent/tools.ts` am Pin `d8f8168`), also liest der Agent eines Kunden jeden
+      freien Namen als vergeben und sucht weiter. Was das Werkzeug aus unserer Antwort macht (Rückgabetext oder Fehlertext mit Body),
+      enthält kein `taken` und sagt, dass hier keine Domain registriert werden kann; ein Test bildet den Text mit demselben Ausdruck wie
+      die Runtime nach. Harness und `docs/errors.md` ziehen mit.
+      Prüfung: `pnpm -s vitest run test/domains.test.ts -t "search_domains tool text"` muss Exit-Code 0 haben.
+      Prüfung: `grep -c "search_domains tool text" test/domains.test.ts` muss mindestens 1 ausgeben.
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
