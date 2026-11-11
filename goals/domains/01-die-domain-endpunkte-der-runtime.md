@@ -1,7 +1,7 @@
 # Domains Goal 01: Die Domain-Endpunkte der Runtime
 
 ## Status
-PLANNED
+ACTIVE
 
 ## Active Objective
 Die Domain-Endpunkte, die die unveränderte Runtime bei Conway aufruft und die ein fremder Automaton am 10.11.2026 bei uns mit 404
@@ -26,20 +26,20 @@ den Weg nicht gibt.
 - Der Laufzeitpfad ändert sich, der Merge rollt über `deploy.yml` aus. Den Rollout selbst machst du nicht.
 
 ## Done Condition
-- [ ] Jeder Domain-Endpunkt aus `docs/sandbox/vertrag.md` hat eine Route; keiner antwortet mehr mit 404 der Rückfallroute.
+- [x] Jeder Domain-Endpunkt aus `docs/sandbox/vertrag.md` hat eine Route; keiner antwortet mehr mit 404 der Rückfallroute.
       Prüfung: `pnpm -s vitest run test/domains.test.ts` muss Exit-Code 0 haben.
       Prüfung: `test "$(awk '/^## Endpunkte/{f=1;next} /^## /{f=0} f && /^[|] (GET|POST|PUT|PATCH|DELETE) /' docs/sandbox/vertrag.md | grep -c '/v1/domains')" -le "$(grep -cE "^\s*(it|test)\(" test/domains.test.ts)" && echo genug` muss `genug` ausgeben.
-- [ ] Die Antworten haben die Felder, die die Runtime laut Vertrag liest; ein Test je Endpunkt prüft Status und Felder gegen die Zeile des
+- [x] Die Antworten haben die Felder, die die Runtime laut Vertrag liest; ein Test je Endpunkt prüft Status und Felder gegen die Zeile des
       Vertrags, und ein Endpunkt, der einen Kauf bräuchte, antwortet mit dem Status, den die Runtime als nicht verfügbar liest.
       Prüfung: `grep -c "vertrag.md" test/domains.test.ts` muss mindestens 1 ausgeben.
-- [ ] Der Harness zeigt, dass die unveränderte Runtime die Domain-Endpunkte ohne Fehler aufruft (Job `e2e` am Kopf des PR grün, mit einer
+- [x] Der Harness zeigt, dass die unveränderte Runtime die Domain-Endpunkte ohne Fehler aufruft (Job `e2e` am Kopf des PR grün, mit einer
       Zeile im Log des Harness, die einen Aufruf von `/v1/domains` zeigt).
       Prüfung: `grep -rc "/v1/domains" harness/e2e | awk -F: '{s += $2} END {print (s > 0) ? "da" : "fehlt"}'` muss `da` ausgeben.
-- [ ] `ops/live.sh` prüft nach dem Rollout einen Domain-Endpunkt mit einer eigenen Adresse, nur lesend oder mit einem Namen, der sofort
+- [x] `ops/live.sh` prüft nach dem Rollout einen Domain-Endpunkt mit einer eigenen Adresse, nur lesend oder mit einem Namen, der sofort
       wieder freigegeben wird, und sein Selbsttest deckt das ab.
       Prüfung: `bash ops/live.sh --selftest` muss Exit-Code 0 haben und `LIVE SELFTEST OK` ausgeben.
       Prüfung: `grep -c "/v1/domains" ops/live.sh` muss mindestens 1 ausgeben.
-- [ ] `check` ist grün.
+- [x] `check` ist grün.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
 - [ ] goal-verifier PASS (K und B)
 
@@ -57,5 +57,6 @@ den Weg nicht gibt.
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-11 Zyklus 1: Punkte 1, 2, 3, 4, 5 gebaut: Routen für die fünf Domain-Zeilen des Vertrags (Suche 200 mit nicht kaufbaren Namen, Registrieren 501, DNS 403 `domain_not_held`, keine Buchung), Harness-Schritt über den Client der unveränderten Runtime, Domain-Prüfung in `ops/live.sh`. Neue Tests vorher rot: `test/domains.test.ts` 9 von 10 rot vor `src/domains.ts`, der 401-Test rot ohne die Schlüsselprüfung der Wildcard, die neuen Zeilen in `test/live-selftest.test.ts` fehlen im alten `ops/live.sh` (0 Treffer `planted domains`). Prüfbefehle: `pnpm -s vitest run test/domains.test.ts` Exit 0; Zählprobe `genug` (5 Zeilen, 10 Tests); `grep -c "vertrag.md"` 11; `grep -rc "/v1/domains" harness/e2e` `da`, Job `e2e` an c369e08 grün mit `DOMAINS_RESULT {"search":"ok","register":"501","list":"403","add":"403","del":"403"}` und `E2E OK ... domains=true`; `bash ops/live.sh --selftest` Exit 0, `LIVE SELFTEST OK`; `grep -c "/v1/domains" ops/live.sh` 3; `node scripts/check.mjs` Exit 0 (1297 Tests).
 
 ## Blockers
