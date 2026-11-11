@@ -1,7 +1,7 @@
 # Abrechnung Goal 04: Einkauf abgebrochener Anfragen gegen die Abrechnung des Anbieters
 
 ## Status
-PLANNED
+DONE
 
 ## Active Objective
 Der Einkauf eines Abbruchs ohne Antwort ist gemessen statt 0: `ops/abort-purchase.sh` stellt je abgeschlossenem UTC-Tag und Modell
@@ -59,7 +59,7 @@ und damit sowohl den Verlust je Timeout als auch den Nutzen schnellerer Anbieter
   (`check` prüft es).
 
 ## Done Condition
-- [ ] `ops/abort-purchase.sh --files ACTIVITY ROWS` (ACTIVITY: Antwort von `/api/v1/activity` als JSON, ROWS: unsere Zeilen als JSON
+- [x] `ops/abort-purchase.sh --files ACTIVITY ROWS` (ACTIVITY: Antwort von `/api/v1/activity` als JSON, ROWS: unsere Zeilen als JSON
       Lines) und `ops/abort-purchase.sh` (Produktion, nur lesend) geben je Tag und Modell eine Zeile
       `| <Tag> | <Modell> | <Anbieter mc> | <Einkauf mc> | <Lücke mc> | <ohne Antwort> | <je Abbruch mc> |` aus, je Modell eine Zeile
       `purchase without sale <Modell>: <mc>` (Einkauf der Abbrüche mit Antwort plus geschätzter Einkauf der ohne Antwort) und je Tag und
@@ -74,7 +74,7 @@ und damit sowohl den Verlust je Timeout als auch den Nutzen schnellerer Anbieter
       Prüfung: `pnpm -s vitest run test/abort-purchase.test.ts` muss Exit-Code 0 haben; der Test fährt `--files` gegen gepflanzte Dateien
       und verlangt `150` je Abbruch und die `noise`-Zeile.
       Prüfung: `grep -cE "^\s*(it|test)\(" test/abort-purchase.test.ts` muss mindestens 3 ausgeben.
-- [ ] Das Werkzeug liest nur: Es ruft bei OpenRouter ausschließlich `GET /api/v1/activity` auf, nur mit `OPENROUTER_MANAGEMENT_KEY`,
+- [x] Das Werkzeug liest nur: Es ruft bei OpenRouter ausschließlich `GET /api/v1/activity` auf, nur mit `OPENROUTER_MANAGEMENT_KEY`,
       gibt den Schlüssel nie aus und bricht ohne ihn mit Exit 2 und der Zeile `OPENROUTER_MANAGEMENT_KEY missing` ab, bevor es irgendwen
       anfragt. Die Datenbank öffnet es mit `readonly: true`.
       Prüfung: `grep -oE "openrouter\.ai/api/v1/[a-z/]+" ops/abort-purchase.sh | sort -u` muss genau `openrouter.ai/api/v1/activity` ausgeben.
@@ -82,7 +82,7 @@ und damit sowohl den Verlust je Timeout als auch den Nutzen schnellerer Anbieter
       Prüfung: `grep -c "readonly: true" ops/abort-purchase.sh` muss mindestens 1 ausgeben.
       Prüfung: `env -u OPENROUTER_MANAGEMENT_KEY HOME=$(mktemp -d) HTTPS_PROXY=http://127.0.0.1:9 bash ops/abort-purchase.sh 2>&1 | grep -c "OPENROUTER_MANAGEMENT_KEY missing"` muss 1 ausgeben.
       Prüfung: `env -u OPENROUTER_MANAGEMENT_KEY HOME=$(mktemp -d) HTTPS_PROXY=http://127.0.0.1:9 bash ops/abort-purchase.sh >/dev/null 2>&1; echo $?` muss 2 ausgeben.
-- [ ] `docs/abrechnung/einkauf-abbrueche.md` nennt den Zeitraum (abgeschlossene UTC-Tage ab dem 10.11.2026), je Tag und Modell die Zeile
+- [x] `docs/abrechnung/einkauf-abbrueche.md` nennt den Zeitraum (abgeschlossene UTC-Tage ab dem 10.11.2026), je Tag und Modell die Zeile
       aus `ops/abort-purchase.sh`, die `noise`-Zeilen oder den Satz, dass es keine gibt, je Modell `purchase without sale` in mc und USD,
       den Befehl, aus dem die Zahlen stammen, eine Zeile `Widerlegt:` (ja, wenn jede Lücke innerhalb der Toleranz liegt, sonst nein mit der
       Summe der Lücken) und eine Zeile `Einkauf je Abbruch ohne Antwort:` je Modell mit Zahl oder Grund, warum keine. Keine Adresse.
@@ -91,7 +91,7 @@ und damit sowohl den Verlust je Timeout als auch den Nutzen schnellerer Anbieter
       Prüfung: `grep -cE "^[|] *2026-11-[0-9]{2} *[|] *openai/" docs/abrechnung/einkauf-abbrueche.md` muss mindestens 1 ausgeben.
       Prüfung: `grep -cE "^(Widerlegt|Einkauf je Abbruch ohne Antwort): " docs/abrechnung/einkauf-abbrueche.md` muss mindestens 2 ausgeben.
       Prüfung: `grep -cE "0x[0-9a-fA-F]{40}|\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" docs/abrechnung/einkauf-abbrueche.md` muss 0 ausgeben.
-- [ ] `docs/abrechnung/timeouts.md` hat den Abschnitt `## Einkauf ohne Verkauf`: je Modell eine Tabellenzeile
+- [x] `docs/abrechnung/timeouts.md` hat den Abschnitt `## Einkauf ohne Verkauf`: je Modell eine Tabellenzeile
       `| <Modell> | <Timeouts> | <Abbrüche ohne Antwort> | <Einkauf ohne Verkauf mc> |` mit der Kostenzahl aus
       `einkauf-abbrueche.md` statt 0, den Verweis auf diese Datei und eine Zeile `Anbieterwahl:`, die sagt, ob das Routing aus abrechnung 02
       mit dieser Kostenzahl bleibt, mit der Zahl als Grund. `goals/abrechnung/ANNAHMEN.md` hat den Abschnitt `## Goal 04` mit Toleranz,
@@ -101,10 +101,22 @@ und damit sowohl den Verlust je Timeout als auch den Nutzen schnellerer Anbieter
       Prüfung: `sed -n '/^## Einkauf ohne Verkauf/,/^## /p' docs/abrechnung/timeouts.md | grep -cE "^[|] *openai/[^|]+[|] *[0-9]+ *[|] *[0-9]+ *[|] *[0-9]+ *[|]"` muss mindestens 1 ausgeben.
       Prüfung: `grep -c "^Anbieterwahl: " docs/abrechnung/timeouts.md` muss 1 ausgeben.
       Prüfung: `grep -c "^## Goal 04" goals/abrechnung/ANNAHMEN.md` muss 1 ausgeben.
-- [ ] Der Laufzeitpfad bleibt unverändert, und `check` ist grün.
+- [x] Der Laufzeitpfad bleibt unverändert, und `check` ist grün.
       Prüfung: `git diff --name-only origin/dev...HEAD -- src deploy | wc -l` muss 0 ausgeben.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] Die Schätzung je Abbruch ohne Antwort zieht die Grundlinie des Modells ab, sonst bucht das Werkzeug die Drift, die es ohne jeden
+      Abbruch gibt (am 10.11.2026 783 mc bei `openai/gpt-5-mini`), einem einzelnen Abbruch als Einkauf zu. Grundlinie ist der Median der
+      Lücken desselben Modells an den Tagen des Zeitraums ohne Abbruch ohne Antwort und ohne `noise`, ohne solche Tage 0; je Modell steht
+      eine Zeile `baseline <Modell>: <mc>` in der Ausgabe, `je Abbruch mc` und `purchase without sale` rechnen mit Lücke minus Grundlinie
+      (die Spalte `gap mc` bleibt roh). Der Selftest zeigt es ohne Netz: ein Modell mit zwei Tagen ohne Abbruch (Lücken 700 und 900 mc)
+      und einem Tag mit einem Abbruch ohne Antwort und 1100 mc Lücke ergibt `baseline <Modell>: 800` und `300` je Abbruch; die
+      bestehenden Selftest-Zeilen gelten unverändert weiter. `docs/abrechnung/einkauf-abbrueche.md` nennt die Grundlinie je Modell.
+      Prüfung: `bash ops/abort-purchase.sh --selftest` muss Exit-Code 0 haben und als letzte Zeile `ABORT PURCHASE SELFTEST OK` ausgeben.
+      Prüfung: `bash ops/abort-purchase.sh --selftest | grep -cE "^ok   purchase .*baseline"` muss mindestens 2 ausgeben.
+      Prüfung: `bash ops/abort-purchase.sh --selftest | grep -c "^FAIL"` muss 0 ausgeben.
+      Prüfung: `pnpm -s vitest run test/abort-purchase.test.ts` muss Exit-Code 0 haben, und `grep -c "baseline" test/abort-purchase.test.ts` muss mindestens 1 ausgeben.
+      Prüfung: `grep -c "Grundlinie" docs/abrechnung/einkauf-abbrueche.md` muss mindestens 1 ausgeben.
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Jede neue Testdatei und jede neue Selftest-Zeile war vor dem Fix rot; die Zeile im Progress Log nennt, womit.
@@ -123,5 +135,9 @@ und damit sowohl den Verlust je Timeout als auch den Nutzen schnellerer Anbieter
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-11 Zyklus 1: Punkte 1, 2, 5 gebaut (`ops/abort-purchase.sh` mit Selftest, `test/abort-purchase.test.ts`, Abschnitt Goal 04 in `ANNAHMEN.md`); Punkte 3 und 4 offen, weil `OPENROUTER_MANAGEMENT_KEY` in `loop.env` fehlt (`grep -c "^OPENROUTER_MANAGEMENT_KEY=" ~/.config/control-plane/loop.env` -> 0). Rot vorher: der Vitest mit 4 failed von 4 ohne Skript, der Selftest mit `AP_TOLERANCE_MC=1000000` -> `FAIL purchase no abort and 5000 mc more is noise` und Exit 1 (im Vitest belegt). Prüfbefehle: `--selftest` Exit 0, letzte Zeile `ABORT PURCHASE SELFTEST OK`; `grep -c "^ok   purchase"` -> 12; vitest -> 4 passed; `grep -cE "^\s*(it|test)\("` -> 4; Pfade -> nur `openrouter.ai/api/v1/activity`; Schreibmethoden -> 0; `readonly: true` -> 2; ohne Schlüssel -> 1 Zeile `OPENROUTER_MANAGEMENT_KEY missing`, Exit 2; `git diff --name-only origin/dev...HEAD -- src deploy | wc -l` -> 0; `node scripts/check.mjs` -> Exit 0 (1279 passed).
+- 2026-11-11 Zyklus 2: Punkte 3 und 4 gebaut, Abschluss gemeldet, Punkte 1, 2, 3, 4, 5: Human Gate `security_settings` erledigt (`grep -c` -> 1), `origin/dev` gemergt, gemessen 09:32 UTC: Tag 10.11.2026, Lücke 783 mc (`openai/gpt-5-mini`) und -160 mc (`openai/gpt-5.2`) innerhalb der Toleranz, `inference_aborts` leer, Einkauf ohne Verkauf 0 mc, Widerlegt ja, Routing bleibt; Gegenprobe der Abfrage an einer Kopie mit gepflanzter Zeile `answered = 0` -> 1 Zeile, leer -> 0; kein neuer Test in diesem Zyklus (nur Doku). Prüfbefehle: `--selftest` Exit 0, letzte Zeile `ABORT PURCHASE SELFTEST OK`; `grep -c "^ok   purchase"` -> 12; vitest -> 4 passed; `grep -cE "^\s*(it|test)\("` -> 4; Pfade -> nur `openrouter.ai/api/v1/activity`; Schreibmethoden -> 0; `readonly: true` -> 2; ohne Schlüssel -> 1 Zeile, Exit 2; (Netz) `bash ops/abort-purchase.sh` Exit 0, 2 Zeilen `| 2026-11-`; P3 grep -> 2, 2, 3, 0; P4 grep -> 1, 1, 2, 1, 1; `git diff --name-only origin/dev...HEAD -- src deploy | wc -l` -> 0; `node scripts/check.mjs` -> Exit 0 (1286 passed). Der Job `check` am PR war zuerst rot (`einkauf-abbrueche.md:9` traf die Regel zu den Bedingungen des Anbieters, die Datei war beim lokalen Lauf noch nicht getrackt); umformuliert, lokal mit getrackter Datei Exit 0, `Regeln grün über 452 Dateien`.
+- 2026-11-11 Zyklus 3: Punkt 6 aus der Kritik gebaut, Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6: Grundlinie je Modell (Median der Lücken an Tagen ohne Abbruch ohne Antwort und ohne `noise`, sonst 0), Zeile `baseline <Modell>: <mc>`, `je Abbruch mc` und `purchase without sale` mit Lücke minus Grundlinie; nachgemessen 10:31 UTC: `baseline openai/gpt-5-mini: 783`, `baseline openai/gpt-5.2: -160`, Tabelle unverändert. Rot vorher: vier neue Selftest-Zeilen `FAIL purchase` (Grundlinie 0, Grundlinie 800, 300 je Abbruch, `purchase without sale` 300) und Exit 1, der neue Vitest-Fall `subtracts the baseline of the days without abort from the estimate` rot (2 failed von 5 mit dem Selftest-Fall). Prüfbefehle: `--selftest` Exit 0, letzte Zeile `ABORT PURCHASE SELFTEST OK`; `grep -c "^ok   purchase"` -> 16; `grep -cE "^ok   purchase .*baseline"` -> 4; `grep -c "^FAIL"` -> 0; vitest -> 5 passed; `grep -cE "^\s*(it|test)\("` -> 5; `grep -c "baseline"` im Test -> 3; P2 unverändert (nur `/api/v1/activity`, 0, 2, 1 Zeile, Exit 2); (Netz) `bash ops/abort-purchase.sh` Exit 0, 2 Zeilen `| 2026-11-`; P3 grep -> 2, 2, 3, 0; P4 grep -> 1, 1, 2, 1, 1; `Grundlinie` -> 6; `git diff --name-only origin/dev...HEAD -- src deploy | wc -l` -> 0; `node scripts/check.mjs` -> Exit 0 (1287 passed; ein Lauf davor rot nur durch den vitest-RPC-Timeout bei Last 118).
+- 2026-11-11 Release: PASS K, B (Zyklus 3), DONE.
 
 ## Blockers
