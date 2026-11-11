@@ -1,7 +1,7 @@
 # Abrechnung Goal 03: Timeout-Quote vorher und nachher auf derselben Grundlage
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Die Timeout-Quote vorher (Caddy-Log mit Join aufs Ledger) und die Quote nachher (`--since-rollout`, Datenbank allein) zählen über
@@ -97,7 +97,7 @@ eine Besserung verspricht, die niemand gemessen hat (`loop-constraints.md`, Grun
       wird er mit einer Mutation (etwa `service` zählt Zeilen ohne `duration_ms`), die die Progress-Log-Zeile nennt.
       Prüfung: `grep -cE "^\s*(it|test)\(.*matches --rows" test/timeout-quote-compare.test.ts` muss mindestens 1 ausgeben.
       Prüfung: `pnpm -s vitest run test/timeout-quote-compare.test.ts` muss Exit-Code 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Jede neue Testdatei und jede neue Selftest-Zeile war vor dem Fix rot; die Zeile im Progress Log nennt, womit.
@@ -118,5 +118,6 @@ eine Besserung verspricht, die niemand gemessen hat (`loop-constraints.md`, Grun
 - 2026-11-10 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4; `origin/dev` war schon im Branch (nichts zu mergen), alle Prüfbefehle am Kopf `b811f44` neu gefahren. Prüfbefehle (Node 22.23.4): `bash ops/timeout-quote.sh --selftest` Exit 0, letzte Zeile `TIMEOUT QUOTE SELFTEST OK`, 0 FAIL; `grep -c "^ok   compare"` 15; `pnpm -s vitest run test/timeout-quote-compare.test.ts` Exit 0, 6 passed; `grep -cE "^\s*(it|test)\("` 6; Punkt 2: 1, 1, 4, 3, 2, 0; Punkt 3: 1, 5, 3, 0, 0, 1; `git diff --name-only origin/dev...HEAD -- src deploy | wc -l` 0; `node scripts/check.mjs` Exit 0 (100 Dateien, 1272 Tests; der erste Lauf endete bei Last 150 mit Exit 1 durch `Timeout calling onTaskUpdate` bei 1272 grünen Tests, der zweite grün); `gh pr checks 8`: check pass, e2e pass am Kopf `b811f44`.
 - 2026-11-10 Zyklus 3: Punkt 5 aus der Kritik gebaut: `--compare` nennt eine Anfrage ohne eigene Zeile nur noch `coalesced`, wenn ihr Ende höchstens 2 s neben dem Ende einer Anfrage mit eigener Zeile liegt (zweiter Durchlauf nach dem Paar-Abgleich), sonst `unmatched`; Produktion lesend neu gemessen, weiter 46 gegen 46 und jede Ursache 0. Rot vorher: Vitest-Fall `overlap` rot gegen den Stand von Zyklus 2 (`coalesced` 2 statt 1), die Selftest-Zeilen `compare overlap` mit der alten Überlappungs-Regel in einer Kopie des Skripts 3 FAIL und der Vitest-Fall rot. Prüfbefehle: `bash ops/timeout-quote.sh --selftest` Exit 0, letzte Zeile `TIMEOUT QUOTE SELFTEST OK`; `grep -c "^ok   compare overlap"` 4; `grep -cE "^\s*(it|test)\(.*overlap"` 1; `pnpm -s vitest run test/timeout-quote-compare.test.ts` Exit 0, 7 passed; `grep -cE "^- coalesced: [0-9]+.*2 s" docs/abrechnung/timeouts.md` 1.
 - 2026-11-10 Zyklus 4: Punkt 6 aus der Kritik gebaut, Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6: Vitest-Fall `service matches --rows with the same TQ_SINCE for every model` vergleicht je Modell `service` aus `--compare-files` ohne `TQ_UNTIL` mit `--rows` (Summe der Zeilen `all`) über dieselben Zeilen, darunter ein Abbruch, eine Zeile vor dem Rollout und eine Zeile ohne `duration_ms` nach dem Rollout ohne Anfrage; Produktion lesend: `--since-rollout` 24 und 22 Anfragen je Modell, gleich `service`. Rot vorher: Mutation in einer Kopie des Skripts, `service` zählt Zeilen ohne `duration_ms` (`if (!x.used && hasDuration(x))` zu `if (!x.used)`), macht den Fall rot, die übrigen 7 bleiben grün. `origin/dev` war schon im Branch (nichts zu mergen). Prüfbefehle am Arbeitsstand über `8ac7d6d` (Node 22.23.4): `bash ops/timeout-quote.sh --selftest` Exit 0, letzte Zeile `TIMEOUT QUOTE SELFTEST OK`, 0 FAIL; `grep -c "^ok   compare"` 19; `grep -c "^ok   compare overlap"` 4; `pnpm -s vitest run test/timeout-quote-compare.test.ts` Exit 0, 8 passed; `grep -cE "^\s*(it|test)\("` 8, `.*overlap` 1, `.*matches --rows` 1; Punkt 2: 1, 1, 4, 3, 2, 0; Punkt 3: 1, 5, 3, 0, 0, 1; Punkt 5 Doku 1; `git diff --name-only origin/dev...HEAD -- src deploy | wc -l` 0; `node scripts/check.mjs` Exit 0 (100 Dateien, 1274 Tests).
+- 2026-11-11 Release: PASS K, B (Zyklus 4), DONE.
 
 ## Blockers
