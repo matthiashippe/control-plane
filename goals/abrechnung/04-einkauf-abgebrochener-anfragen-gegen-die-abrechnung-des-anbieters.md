@@ -1,7 +1,7 @@
 # Abrechnung Goal 04: Einkauf abgebrochener Anfragen gegen die Abrechnung des Anbieters
 
 ## Status
-PLANNED
+BLOCKED matthias
 
 ## Active Objective
 Der Einkauf eines Abbruchs ohne Antwort ist gemessen statt 0: `ops/abort-purchase.sh` stellt je abgeschlossenem UTC-Tag und Modell
@@ -59,7 +59,7 @@ und damit sowohl den Verlust je Timeout als auch den Nutzen schnellerer Anbieter
   (`check` prüft es).
 
 ## Done Condition
-- [ ] `ops/abort-purchase.sh --files ACTIVITY ROWS` (ACTIVITY: Antwort von `/api/v1/activity` als JSON, ROWS: unsere Zeilen als JSON
+- [x] `ops/abort-purchase.sh --files ACTIVITY ROWS` (ACTIVITY: Antwort von `/api/v1/activity` als JSON, ROWS: unsere Zeilen als JSON
       Lines) und `ops/abort-purchase.sh` (Produktion, nur lesend) geben je Tag und Modell eine Zeile
       `| <Tag> | <Modell> | <Anbieter mc> | <Einkauf mc> | <Lücke mc> | <ohne Antwort> | <je Abbruch mc> |` aus, je Modell eine Zeile
       `purchase without sale <Modell>: <mc>` (Einkauf der Abbrüche mit Antwort plus geschätzter Einkauf der ohne Antwort) und je Tag und
@@ -74,7 +74,7 @@ und damit sowohl den Verlust je Timeout als auch den Nutzen schnellerer Anbieter
       Prüfung: `pnpm -s vitest run test/abort-purchase.test.ts` muss Exit-Code 0 haben; der Test fährt `--files` gegen gepflanzte Dateien
       und verlangt `150` je Abbruch und die `noise`-Zeile.
       Prüfung: `grep -cE "^\s*(it|test)\(" test/abort-purchase.test.ts` muss mindestens 3 ausgeben.
-- [ ] Das Werkzeug liest nur: Es ruft bei OpenRouter ausschließlich `GET /api/v1/activity` auf, nur mit `OPENROUTER_MANAGEMENT_KEY`,
+- [x] Das Werkzeug liest nur: Es ruft bei OpenRouter ausschließlich `GET /api/v1/activity` auf, nur mit `OPENROUTER_MANAGEMENT_KEY`,
       gibt den Schlüssel nie aus und bricht ohne ihn mit Exit 2 und der Zeile `OPENROUTER_MANAGEMENT_KEY missing` ab, bevor es irgendwen
       anfragt. Die Datenbank öffnet es mit `readonly: true`.
       Prüfung: `grep -oE "openrouter\.ai/api/v1/[a-z/]+" ops/abort-purchase.sh | sort -u` muss genau `openrouter.ai/api/v1/activity` ausgeben.
@@ -101,7 +101,7 @@ und damit sowohl den Verlust je Timeout als auch den Nutzen schnellerer Anbieter
       Prüfung: `sed -n '/^## Einkauf ohne Verkauf/,/^## /p' docs/abrechnung/timeouts.md | grep -cE "^[|] *openai/[^|]+[|] *[0-9]+ *[|] *[0-9]+ *[|] *[0-9]+ *[|]"` muss mindestens 1 ausgeben.
       Prüfung: `grep -c "^Anbieterwahl: " docs/abrechnung/timeouts.md` muss 1 ausgeben.
       Prüfung: `grep -c "^## Goal 04" goals/abrechnung/ANNAHMEN.md` muss 1 ausgeben.
-- [ ] Der Laufzeitpfad bleibt unverändert, und `check` ist grün.
+- [x] Der Laufzeitpfad bleibt unverändert, und `check` ist grün.
       Prüfung: `git diff --name-only origin/dev...HEAD -- src deploy | wc -l` muss 0 ausgeben.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
 - [ ] goal-verifier PASS (K und B)
@@ -123,5 +123,11 @@ und damit sowohl den Verlust je Timeout als auch den Nutzen schnellerer Anbieter
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-11 Zyklus 1: Punkte 1, 2, 5 gebaut (`ops/abort-purchase.sh` mit Selftest, `test/abort-purchase.test.ts`, Abschnitt Goal 04 in `ANNAHMEN.md`); Punkte 3 und 4 offen, weil `OPENROUTER_MANAGEMENT_KEY` in `loop.env` fehlt (`grep -c "^OPENROUTER_MANAGEMENT_KEY=" ~/.config/control-plane/loop.env` -> 0). Rot vorher: der Vitest mit 4 failed von 4 ohne Skript, der Selftest mit `AP_TOLERANCE_MC=1000000` -> `FAIL purchase no abort and 5000 mc more is noise` und Exit 1 (im Vitest belegt). Prüfbefehle: `--selftest` Exit 0, letzte Zeile `ABORT PURCHASE SELFTEST OK`; `grep -c "^ok   purchase"` -> 12; vitest -> 4 passed; `grep -cE "^\s*(it|test)\("` -> 4; Pfade -> nur `openrouter.ai/api/v1/activity`; Schreibmethoden -> 0; `readonly: true` -> 2; ohne Schlüssel -> 1 Zeile `OPENROUTER_MANAGEMENT_KEY missing`, Exit 2; `git diff --name-only origin/dev...HEAD -- src deploy | wc -l` -> 0; `node scripts/check.mjs` -> Exit 0 (1279 passed).
 
 ## Blockers
+Art: matthias
+Gate: security_settings
+Aufgabe: Bei OpenRouter einen Management-Key anlegen und auf dem code-host in ~/.config/control-plane/loop.env als OPENROUTER_MANAGEMENT_KEY eintragen
+Worum: Nur dieser Schlüssel darf die Aktivität des Kontos lesen, aus der abrechnung 04 den Einkauf abgebrochener Anfragen misst
+Empfehlung: 1. https://openrouter.ai/settings/management-keys öffnen (im Konto, das die Produktion bezahlt), „Create“, Name `control-plane activity read`, Limit leer lassen, Schlüssel kopieren. 2. Auf dem code-host im Terminal: `read -rs K && printf 'OPENROUTER_MANAGEMENT_KEY=%s\n' "$K" >> ~/.config/control-plane/loop.env && unset K && chmod 600 ~/.config/control-plane/loop.env` (nach `read` den Schlüssel einfügen, Enter; er erscheint nicht am Bildschirm). 3. Prüfen: `grep -c '^OPENROUTER_MANAGEMENT_KEY=' ~/.config/control-plane/loop.env` muss 1 ausgeben. Dauer etwa 3 Minuten. Danach misst der Maker Punkt 3 und 4.
