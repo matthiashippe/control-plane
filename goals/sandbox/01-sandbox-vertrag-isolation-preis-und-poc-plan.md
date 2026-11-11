@@ -1,7 +1,7 @@
 # Sandbox Goal 01: Sandbox-Vertrag, Isolation, Preis und PoC-Plan
 
 ## Status
-PLANNED
+DONE
 
 ## Active Objective
 Der Loop weiß, was die unveränderte Runtime bei Conway für Sandboxes und Domains aufruft, und hat entschieden, wie wir Sandboxes
@@ -38,33 +38,46 @@ Vertrag bauen statt gegen eine Vermutung über die Runtime.
   frei und rechnet ab, domains 01 gibt dem Dienst des Kunden einen Namen.
 
 ## Done Condition
-- [ ] `docs/sandbox/vertrag.md` hat einen Abschnitt `## Endpunkte` mit einer Tabelle
+- [x] `docs/sandbox/vertrag.md` hat einen Abschnitt `## Endpunkte` mit einer Tabelle
       `| Methode | Pfad | Anfrage | Antwort, die die Runtime liest | Fundstelle | Bei Fehler |` und mindestens einer Zeile je Endpunkt, den
       die Runtime am Pin für Sandboxes und Domains aufruft; jede Fundstelle hat die Form `src/<pfad>.ts:<zeile>`.
       Prüfung: `awk '/^## Endpunkte/{f=1;next} /^## /{f=0} f && /^[|] (GET|POST|PUT|PATCH|DELETE) /' docs/sandbox/vertrag.md | wc -l` muss mindestens 4 ausgeben.
       Prüfung: `awk '/^## Endpunkte/{f=1;next} /^## /{f=0} f && /^[|] (GET|POST|PUT|PATCH|DELETE) /' docs/sandbox/vertrag.md | grep -vcE "src/[A-Za-z0-9_/.-]+\.ts:[0-9]+"` muss 0 ausgeben.
       Prüfung: `awk '/^## Endpunkte/{f=1;next} /^## /{f=0} f' docs/sandbox/vertrag.md | grep -cE "/v1/(sandboxes|domains)"` muss mindestens 4 ausgeben.
-- [ ] Jede Fundstelle stimmt am Pin: Die Zeile im Quelltext der Runtime nennt den Pfad oder den Aufruf der Tabellenzeile.
+- [x] Jede Fundstelle stimmt am Pin: Die Zeile im Quelltext der Runtime nennt den Pfad oder den Aufruf der Tabellenzeile.
       Prüfung (Netz): `d=$(mktemp -d) && git clone -q https://github.com/Conway-Research/automaton "$d" && git -C "$d" checkout -q d8f8168 && awk '/^## Endpunkte/{f=1;next} /^## /{f=0} f && /^[|] (GET|POST|PUT|PATCH|DELETE) /' docs/sandbox/vertrag.md | grep -oE "src/[A-Za-z0-9_/.-]+\.ts:[0-9]+" | while IFS=: read -r p n; do sed -n "${n}p" "$d/$p" | grep -qiE "sandbox|domain|fetch|request|/v1/" || echo "falsch $p:$n"; done` muss nichts ausgeben.
-- [ ] `docs/sandbox/vertrag.md` hat einen Abschnitt `## Aufrufe in der Produktion` mit Pfad, Status und Zahl aus dem Caddy-Zugriffslog
+- [x] `docs/sandbox/vertrag.md` hat einen Abschnitt `## Aufrufe in der Produktion` mit Pfad, Status und Zahl aus dem Caddy-Zugriffslog
       und dem Befehl, aus dem sie stammen, ohne Adresse.
       Prüfung: `awk '/^## Aufrufe in der Produktion/{f=1;next} /^## /{f=0} f' docs/sandbox/vertrag.md | grep -cE "(501|404)"` muss mindestens 1 ausgeben.
       Prüfung: `grep -cE "([0-9]{1,3}\.){3}[0-9]{1,3}|0x[0-9a-fA-F]{40}" docs/sandbox/vertrag.md | xargs test 0 -eq && echo sauber` muss `sauber` ausgeben.
-- [ ] `docs/sandbox/plan.md` entscheidet in je einem Abschnitt `## Isolation`, `## Netz`, `## Grenzen`, `## Preis`, `## Verbindung` und
+- [x] `docs/sandbox/plan.md` entscheidet in je einem Abschnitt `## Isolation`, `## Netz`, `## Grenzen`, `## Preis`, `## Verbindung` und
       `## Schritte`, mit Begründung; `## Netz` schließt den Zahlungsserver `76.13.144.207` aus, `## Preis` nennt Credits je Stunde in mc
       mit Einkauf und Marge, `## Schritte` nennt sandbox 02, 03 und 04.
       Prüfung: `for s in Isolation Netz Grenzen Preis Verbindung Schritte; do grep -q "^## $s" docs/sandbox/plan.md || echo "fehlt $s"; done` muss nichts ausgeben.
       Prüfung: `awk '/^## Netz/{f=1;next} /^## /{f=0} f' docs/sandbox/plan.md | grep -c "76.13.144.207"` muss mindestens 1 ausgeben.
       Prüfung: `awk '/^## Preis/{f=1;next} /^## /{f=0} f' docs/sandbox/plan.md | grep -cE "[0-9]+ *mc"` muss mindestens 1 ausgeben.
       Prüfung: `for g in "sandbox 02" "sandbox 03" "sandbox 04"; do awk '/^## Schritte/{f=1;next} /^## /{f=0} f' docs/sandbox/plan.md | grep -q "$g" || echo "fehlt $g"; done` muss nichts ausgeben.
-- [ ] Der Server ist über das Human Gate `server_kauf` bestellt und vom code-host mit dem Schlüssel `~/.ssh/id_ed25519_cp_sandbox`
+- [x] Der Server ist über das Human Gate `server_kauf` bestellt und vom code-host mit dem Schlüssel `~/.ssh/id_ed25519_cp_sandbox`
       erreichbar; `docs/sandbox/server.md` nennt Anbieter, Paket, Preis im Monat und Adresse, und der Server ist nicht der Zahlungsserver.
       Prüfung: `grep -cE "^Adresse: *([0-9]{1,3}\.){3}[0-9]{1,3}$" docs/sandbox/server.md` muss 1 ausgeben.
       Prüfung: `grep -c "76.13.144.207" docs/sandbox/server.md` muss 0 ausgeben.
       Prüfung (Netz): `ssh -i ~/.ssh/id_ed25519_cp_sandbox -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=15 root@$(sed -nE 's/^Adresse: *//p' docs/sandbox/server.md) 'uname -sr'` muss Exit-Code 0 haben.
-- [ ] `check` ist grün.
+- [x] `check` ist grün.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] Kritik: `## Netz` in `docs/sandbox/plan.md` entscheidet den Weg von einer Sandbox zum Host selbst. `DOCKER-USER` sieht nur
+      weitergeleitete Pakete; was an eine Adresse des Hosts geht (Bridge-Adresse, `72.62.51.224`, IPv6 des Hosts), läuft durch die
+      Eingangskette, und ufw lässt dort 22, 80 und 443 von überall zu (gemessen 11.11.2026, `ufw status verbose`). Der Abschnitt nennt
+      die Regel in der Eingangskette für die Bridge-Netze der Sandboxes und welche Host-Ports eine Sandbox danach noch erreicht.
+      Prüfung: `awk '/^## Netz/{f=1;next} /^## /{f=0} f' docs/sandbox/plan.md | grep -ciE "input|eingangskette"` muss mindestens 1 ausgeben.
+      Prüfung: `awk '/^## Netz/{f=1;next} /^## /{f=0} f' docs/sandbox/plan.md | grep -c "72.62.51.224"` muss mindestens 1 ausgeben.
+- [x] Kritik: `docs/sandbox/plan.md` entscheidet, woher das TLS-Zertifikat für `<id>-<port>.sbx.postyourprice.com` kommt. Universal SSL
+      von Cloudflare deckt nur eine Ebene unter der Zone, `*.sbx` ist die zweite; ein Wildcard über DNS-01 braucht ein Caddy mit
+      Cloudflare-Modul (das Caddy auf `srv1327036` hat keins, `caddy list-modules | grep -c dns.providers` gab 0) und damit ein anderes
+      Binary unter dem Caddy von wa-staging (Regel 2 in `docs/sandbox/server.md`); On-Demand-TLS stößt an 50 Zertifikate je Woche und
+      Domain bei Let's Encrypt. Der Plan nennt den Weg, ob der Eintrag über den Cloudflare-Proxy läuft, und was er für wa-staging heißt.
+      Prüfung: `awk '/^## Netz/{f=1;next} /^## /{f=0} f' docs/sandbox/plan.md | grep -ciE "dns-01|on.demand|advanced certificate"` muss mindestens 1 ausgeben.
+      Prüfung: `awk '/^## Netz/{f=1;next} /^## /{f=0} f' docs/sandbox/plan.md | grep -ci "proxy"` muss mindestens 1 ausgeben.
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Jede Zahl mit dem Befehl, aus dem sie stammt; keine Adresse und kein Name eines Kunden.
@@ -80,5 +93,13 @@ Vertrag bauen statt gegen eine Vermutung über die Runtime.
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-10 Zyklus 1: Punkte 1, 2, 3, 4 und 6 gebaut (`docs/sandbox/vertrag.md` mit 12 Endpunkten am Pin und den Aufrufen aus dem Caddy-Log samt Gegenprobe, `docs/sandbox/plan.md` mit gVisor ohne `/dev/kvm`, Netz, Grenzen, 1000 mc je Stunde, signierter Verbindung und Schritten, Schlüsselpaar `~/.ssh/id_ed25519_cp_sandbox` angelegt), Punkt 5 wartet auf das Human Gate `server_kauf`. Prüfbefehle: P1 `wc -l` 12, `grep -vc` 0, `grep -c` 14; P2 (Netz) keine Ausgabe, vorher einmal rot mit `falsch src/registry/agent-card.ts:136`, die Fundstelle ist aus der Tabelle; P3 `grep -c` 9, `sauber`; P4 keine Ausgabe, 2, 6, keine Ausgabe; P5 rot, `docs/sandbox/server.md` fehlt bis zum Kauf; P6 `node scripts/check.mjs` Exit 0 (1266 Tests, grün in 107 s).
+- 2026-11-11 Zyklus 2: nach Matthias' Entscheidung vom 11.11.2026 auf den vorhandenen VPS `srv1327036` umgestellt (`docs/sandbox/plan.md` mit KVM 2, zwölf Plätzen und 0 Euro Einkauf bis 03.02.2027, danach 2403 mc je Stunde und Faktor 2,5; `docs/sandbox/server.md` mit Anbieter, Paket, Preis und Adresse; Annahmen ergänzt), Gate `server_kauf` ersetzt durch die Neuinstallation nach dem Auszug von wa-staging. Prüfbefehle: P1 12, 0, 14; P2 (Netz) keine Ausgabe; P3 9, `sauber`; P4 keine Ausgabe, 2, 7, keine Ausgabe; P5 `grep -cE` 1, `grep -c` 0, `ssh` rot (vor der Neuinstallation `Permission denied (publickey)`, ohne bekannten Hostschlüssel `Host key verification failed`, Exit 255); P6 `node scripts/check.mjs` Exit 0 (1266 Tests, grün in 48 s).
+- 2026-11-11 Zyklus 3: Punkt 5 gebaut und Abschluss gemeldet, Punkte 1 bis 6 (nach Matthias' Entscheidung von 08:44 läuft die Sandbox sofort auf `srv1327036` neben wa-staging: `docs/sandbox/server.md` mit gemessenem Stand und den fünf Regeln „Nebeneinander mit wa-staging“, `docs/sandbox/plan.md` mit `sandbox.slice` (`CPUQuota=100%`, `MemoryMax=5G`, zehn Plätze, Faktor 2,1) und Steuer-API über Caddy auf 443 statt 8443, `dev` gemergt). Prüfbefehle: P1 12, 0, 14; P2 (Netz) keine Ausgabe; P3 9, `sauber`; P4 keine Ausgabe, 1, 7, keine Ausgabe; P5 `grep -cE` 1, `grep -c` 0, `ssh … uname -sr` gab `Linux 6.8.0-147-generic` mit Exit 0 (Gegenprobe am 11.11. vor dem Eintrag des Schlüssels: `Permission denied (publickey)`, Exit 255); P6 `node scripts/check.mjs` Exit 0 (1281 Tests, grün in 62 s).
+- 2026-11-11 Zyklus 4: Punkt 7 gebaut (`## Netz` mit eigener Tabelle `inet sandbox`, Kette `input` vor ufw, Drop für alles aus `sbx-*` außer Antworten, damit erreicht eine Sandbox keinen Port des Hosts mehr, auch nicht über `72.62.51.224` oder IPv6). Prüfbefehle: P7 vorher 0 und 0, danach `grep -ciE` 2, `grep -c` 1; P6 `node scripts/check.mjs` Exit 0 (1281 Tests, grün in 117 s).
+- 2026-11-11 Zyklus 5: Punkt 8 gebaut und Abschluss gemeldet, Punkte 1 bis 8 (`## Netz`: Namen `sbx-<id>-<port>.postyourprice.com` auf erster Ebene über den Cloudflare-Proxy mit Universal SSL, Origin-CA-Zertifikat als Datei in der eigenen Caddy-Datei, DNS-01 und On-Demand-TLS mit Grund verworfen, wa-staging ohne neues Binary und ohne globale Option). Prüfbefehle: P1 12, 0, 14; P2 (Netz) keine Ausgabe; P3 9, `sauber`; P4 keine Ausgabe, 1, 7, keine Ausgabe; P5 1, 0, `ssh … uname -sr` `Linux 6.8.0-147-generic` Exit 0; P6 `node scripts/check.mjs` Exit 0 (1281 Tests, grün in 50 s); P7 2, 3; P8 vorher 0 und 0, danach 2, 1.
+- 2026-11-11 Zyklus 6: Gap aus Verdict K Zyklus 5 behoben und Abschluss gemeldet, Punkte 1 bis 8 (`## Netz` gibt Sandboxes zum Zahlungsserver genau tcp/443 frei, weil `postyourprice.com` und `cp.hippe.eu` ohne Proxy direkt auf `76.13.144.207` zeigen und die Runtime dort Inferenz ruft, `src/agent/loop.ts:156` am Pin; alles andere dort bleibt gesperrt; dazu Bridge-Namen höchstens 15 Zeichen und 443/udp in `server.md`). Prüfbefehle: P1 12, 0, 14; P2 (Netz) keine Ausgabe; P3 9, `sauber`; P4 keine Ausgabe, 2, 7, keine Ausgabe; P5 1, 0, `ssh … uname -sr` `Linux 6.8.0-147-generic` Exit 0; P6 `node scripts/check.mjs` Exit 0 (1281 Tests, grün in 37 s); P7 2, 3; P8 2, 2.
+- 2026-11-11 Zyklus 7: Gap aus Verdict K Zyklus 6 behoben und Abschluss gemeldet, Punkte 1 bis 8 (`## Schritte` verlangt für sandbox 02 jetzt `76.13.144.207` aus einer Sandbox nur auf tcp/443, 22/tcp und 443/udp gesperrt, passend zu `## Netz`, dazu kein Port des Hosts über Bridge-Adresse, `72.62.51.224` oder IPv6). Prüfbefehle: P1 12, 0, 14; P2 (Netz) keine Ausgabe; P3 9, `sauber`; P4 keine Ausgabe, 2, 7, keine Ausgabe; P5 1, 0, `ssh … uname -sr` `Linux 6.8.0-147-generic` Exit 0; P6 `node scripts/check.mjs` Exit 0 (1281 Tests, grün in 27 s); P7 2, 3; P8 2, 2; `grep -c 'aus einer Sandbox nicht erreichbar' docs/sandbox/plan.md` 0.
+- 2026-11-11 Release: PASS K, B (Zyklus 7), DONE.
 
 ## Blockers
