@@ -12,8 +12,9 @@ It also enforces the lesson from 20.09., paid for with a real visitor count: an 
 not spell out the canonical address leads nowhere. The repo link alone brought one visitor in
 fourteen days, and that one came from our own site.
 
-    ops/before-the-answers.py            all drafts
-    ops/before-the-answers.py 372 376    only these
+    ops/before-the-answers.py                                   all drafts
+    ops/before-the-answers.py 372 376                           only these
+    ops/before-the-answers.py --folder goals/kanal/antworten    the drafts in that folder of the repo
 
 Exit 0: everything checks out. Exit 1: something in a draft is not true any more.
 """
@@ -26,7 +27,46 @@ import subprocess
 import sys
 
 REPO = "Conway-Research/automaton"
+ROOT = pathlib.Path(__file__).resolve().parent.parent
 FOLDER = pathlib.Path(".scratch/gtm/issue-antworten")
+
+
+def folder_from(argv: list[str]) -> tuple[pathlib.Path, list[str]]:
+    """The drafts folder and the remaining arguments, which are issue numbers.
+
+    The default folder is `.scratch/`, which is not in the repository, so no goal could put a draft
+    where a reviewer sees it. `--folder` names one in the repository instead. A folder that is named
+    and missing, or that lies outside the repository, refuses: a typo would otherwise find no drafts
+    and print the green "No drafts to check.", and a gate that goes green on a typo is not a gate.
+    """
+    rest, folder = [], None
+    i = 0
+    while i < len(argv):
+        a = argv[i]
+        if a == "--folder" or a.startswith("--folder="):
+            value = a.split("=", 1)[1] if "=" in a else (argv[i + 1] if i + 1 < len(argv) else "")
+            i += 1 if "=" in a else 2
+            if not value or value.startswith("--"):
+                print("REFUSED: --folder needs a folder in the repository, e.g. --folder goals/kanal/antworten")
+                raise SystemExit(1)
+            folder = value
+            continue
+        rest.append(a)
+        i += 1
+    if folder is None:
+        return FOLDER, rest
+    path = pathlib.Path(folder).resolve()
+    if not path.is_relative_to(ROOT):
+        print(f"REFUSED: --folder {folder} is outside the repository ({ROOT})")
+        raise SystemExit(1)
+    if not path.is_dir():
+        print(f"REFUSED: --folder {folder} is not a folder")
+        raise SystemExit(1)
+    return path, rest
+
+
+# Before anything goes to the network: a wrong folder refuses in a second, not after two minutes.
+FOLDER, wanted = folder_from(sys.argv[1:])
 
 # The address a new answer has to carry, and every address this service has ever answered to.
 # Not a literal typed once: this file enforced "cp.hippe.eu" for two days after the move, which
@@ -86,7 +126,6 @@ def as_text(iso: str) -> tuple[str, str]:
 posted: list[str] = []
 pending: list[str] = []
 no_occasion: list[str] = []
-wanted = sys.argv[1:]
 # Our own published figures, from the endpoint the drafts point a reader at. Unreachable is not a
 # pass; the checks that need it are skipped by name.
 STATUS = None
