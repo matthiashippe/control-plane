@@ -1,7 +1,7 @@
 # Fehler Goal 04: Keine Besucheradresse kommt ungeprüft nach `dev`
 
 ## Status
-PLANNED
+ACTIVE
 
 ## Active Objective
 Jede öffentliche IPv4-Adresse in einer getrackten Datei ist belegt oder fliegt in `check` auf, auch in CI ohne den Cache von
@@ -63,7 +63,7 @@ Zusage der Datenschutzerklärung bricht, ohne dass `check` es merkt.
   `ops/traffic.sh` endet mit gesperrtem Netz mit Exit 1, deshalb trägt sein Prüfbefehl `(Netz)`.
 
 ## Done Condition
-- [ ] `ops/known-ips.txt` liegt im Repo: je Zeile Adresse, Art aus `datacenter`, `crawler`, `erfunden` oder `eigene` und ein Beleg,
+- [x] `ops/known-ips.txt` liegt im Repo: je Zeile Adresse, Art aus `datacenter`, `crawler`, `erfunden` oder `eigene` und ein Beleg,
       keine Adresse doppelt, keine aus den Dokumentationsbereichen, und jede Adresse der Art `erfunden` steht in einer Datei, die
       dieses Goal nicht ändern darf. `ops/README.md` erklärt die Liste.
       Prüfung: `test -s ops/known-ips.txt && echo da` muss `da` ausgeben.
@@ -72,7 +72,7 @@ Zusage der Datenschutzerklärung bricht, ohne dass `check` es merkt.
       Prüfung: `grep -cE '^(192\.0\.2|198\.51\.100|203\.0\.113)\.' ops/known-ips.txt` muss 0 ausgeben.
       Prüfung: `awk '$2=="erfunden"{print $1}' ops/known-ips.txt | while read -r a; do git ls-files -z -- 'goals/*' 'docs/audit/*' LOOP.md loop-constraints.md loop-dauerauftrag.md '.github/**' 'deploy/**' 'harness/**' | xargs -0 grep -lwF -- "$a" | grep -q . || echo x; done | wc -l` muss 0 ausgeben.
       Prüfung: `grep -c 'known-ips.txt' ops/README.md` muss mindestens 1 ausgeben.
-- [ ] Ein neuer Test `test/known-ips.test.ts` lehnt jede öffentliche IPv4-Adresse außerhalb der Dokumentationsbereiche in
+- [x] Ein neuer Test `test/known-ips.test.ts` lehnt jede öffentliche IPv4-Adresse außerhalb der Dokumentationsbereiche in
       `git ls-files` ab, die weder in `ops/known-ips.txt` noch in `ops/own-ips.txt` oder `ops/crawler-ips.txt` steht, ohne Cache und
       ohne Netz; die Meldung nennt Anzahl und Dateinamen, nie eine Adresse. Ohne die Liste ist er am Kopf rot, mit einer gepflanzten
       öffentlichen Adresse rot, mit Dokumentations- und privaten Adressen grün.
@@ -83,7 +83,7 @@ Zusage der Datenschutzerklärung bricht, ohne dass `check` es merkt.
       Prüfung: `d=$(mktemp -d); git -C "$d" init -q; printf 'seen %d.%d.%d.%d\n' 11 22 33 44 > "$d/a.txt"; git -C "$d" add a.txt; CP_SCAN_ROOT="$d" pnpm -s vitest run test/known-ips.test.ts 2>&1 | grep -cF "$(printf '%d.%d.%d.%d' 11 22 33 44)"` muss 0 ausgeben.
       Prüfung: `d=$(mktemp -d); git -C "$d" init -q; printf 'seen %d.%d.%d.%d\n' 11 22 33 44 > "$d/a.txt"; git -C "$d" add a.txt; CP_SCAN_ROOT="$d" pnpm -s vitest run test/known-ips.test.ts 2>&1 | grep -c 'a\.txt'` muss mindestens 1 ausgeben.
       Prüfung: `grep -cE 'fetcher-cache|CP_FETCHER_CACHE|\.skip|skipIf|\.only|\.todo' test/known-ips.test.ts` muss 0 ausgeben.
-- [ ] Jede Adresse ohne Beleg ist durch eine Dokumentationsadresse ersetzt, und alles verhält sich wie vorher: Tests und Selbsttests
+- [x] Jede Adresse ohne Beleg ist durch eine Dokumentationsadresse ersetzt, und alles verhält sich wie vorher: Tests und Selbsttests
       grün, die Fixtures von `ops/depth.sh` geben bis auf die Adressen dieselbe Ausgabe wie auf `712510f`, unter `src/` ändert sich
       nichts, und der Test aus fehler 02 bleibt grün.
       Prüfung: `git diff --name-only origin/dev...HEAD -- src | wc -l` muss 0 ausgeben.
@@ -93,7 +93,7 @@ Zusage der Datenschutzerklärung bricht, ohne dass `check` es merkt.
       Prüfung: `python3 ops/fetchers.py --selftest` muss Exit-Code 0 haben.
       Prüfung: `bash ops/crawlers.sh --selftest` muss Exit-Code 0 haben.
       Prüfung (Netz): `bash ops/traffic.sh --selftest` muss Exit-Code 0 haben.
-- [ ] `check` ist grün.
+- [x] `check` ist grün.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
 - [ ] goal-verifier PASS (K und B)
 
@@ -118,5 +118,6 @@ Zusage der Datenschutzerklärung bricht, ohne dass `check` es merkt.
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-12 Zyklus 1: Punkte 1, 2, 3, 4 gebaut: `ops/known-ips.txt` mit 13 belegten Adressen (10 datacenter, 1 crawler, 1 eigene, 1 erfunden), neuer Test `test/known-ips.test.ts`, vor der Liste rot (am Kopf von `dev` 60 Adressen in 48 Dateien, nach der Ersetzung 13 in 31), 43 unbelegte Adressen in 22 Dateien unter `ops/` und `test/` durch Dokumentationsadressen ersetzt, `dev` eingemergt. Prüfbefehle: Punkt 1 `da`, 0, 0, 0, 0, 1; Punkt 2 Exit 0, `rot`, `rot`, `gruen`, 0, 2, 0; Punkt 3 0, `pnpm -s vitest run` Exit 0 (120 Dateien, 1472 Tests; zwei Läufe davor rot nur am 5-s-Timeout von `test/stripe-sessions-selftest.test.ts` bei Load 52, einzeln grün), `test/visitor-addresses.test.ts` Exit 0, depth-Fixtures 0, `ops/fetchers.py --selftest` Exit 0, `ops/crawlers.sh --selftest` Exit 0, `ops/traffic.sh --selftest` (Netz) Exit 0; Punkt 4 `node scripts/check.mjs` Exit 0 (grün in 56 s).
 
 ## Blockers

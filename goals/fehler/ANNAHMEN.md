@@ -71,3 +71,8 @@
 - Eine Adresse eines Contabo-Servers steht in den Momentaufnahmen des x402-Verzeichnisses unter `docs/research/data/` als Host eines öffentlichen Dienstes;
   der Betreiber kommt aus RDAP von RIPE, weil der Cache von `ops/fetchers.py` ihn nicht als Rechenzentrum erkennt.
 - Der Absatz in `ops/README.md` ist Englisch wie die ganze Datei.
+- Falle: Eine Abfrage mit `ops/fetchers.py` schreibt jede Adresse in den gemeinsamen Cache, auch eine, die kein Rechenzentrum ist, und
+  `test/visitor-addresses.test.ts` aus fehler 02 hält jede solche Adresse für einen Besucher, ohne `ops/known-ips.txt` zu lesen. Die
+  acht Abfragen dieses Laufs machten den Test auf dem code-host rot; die acht Zeilen, die nur dieser Lauf geschrieben hatte, sind
+  wieder aus dem Cache genommen (Datei bleibt, 960 Zeilen wie vorher, atomar per rename), danach ist der Test grün. Für eine
+  Abfrage ohne Cache-Eintrag `CP_FETCHER_CACHE` auf eine Datei aus `mktemp` setzen.
