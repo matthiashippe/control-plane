@@ -28,7 +28,7 @@ Geschichte.
    (Prio 1, `LOOP.md`, Fehler echter Nutzer). Alles andere, was beim Hinsehen auffällt, wird ein Vorschlag mit seiner Schwere und
    wartet, auch wenn es in zehn Minuten behoben wäre (23.09.2026: vierzehn Zyklen Reparatur ohne einen echten Nutzer).
 5. **Der Kunde geht vor.** Seit dem 19.09.2026 zahlen fremde Kunden, und jeder Rollout kostet sie rund 16 Sekunden ohne Antwort.
-   Deshalb rollt `deploy.yml` nur aus, wenn sich der Laufzeitpfad geändert hat, und es läuft ein Goal zur Zeit. Antwortet der Dienst
+   Deshalb rollt `deploy.yml` nur aus, wenn sich der Laufzeitpfad geändert hat, und Rollouts laufen einzeln nacheinander; bis zu drei Goals bauen parallel (Matthias, 12.11.2026). Antwortet der Dienst
    nach einem Rollout nicht, greift autoheal nach 90 Sekunden; danach hilft nur ein Revert-PR über `deploy.yml`.
 6. **Antworten, die beim Kunden nicht ankommen, berechnen wir nicht** (Matthias, 10.11.2026). Bricht der Client vor der fertigen
    Antwort ab, gibt es keine Abbuchung. Was schon so berechnet wurde, kommt als interne Gutschrift auf das Guthaben zurück, eine

@@ -33,8 +33,11 @@ breaker:
   same_gap: 3
   no_progress_runs: 2            # zwei Maker-Runs ohne Progress-Log-Zeile: BLOCKED umgebung
   retry_after_hours: 4
-parallel_goals: 1                # ein Goal zur Zeit: jeder Merge am Laufzeitpfad ist ein Rollout auf dem Server des Kunden
-share: 2
+# Matthias 12.11.2026 („das Thema maximal pushen“): drei Goals bauen parallel, Merges und Rollouts bleiben einzeln nacheinander
+# (`concurrency: deploy-production` in deploy.yml). share 6 ist das höchste Gewicht im Slot-Budget der VM, weil dieser Loop als
+# einziger zahlende fremde Kunden hat.
+parallel_goals: 3
+share: 6
 nightly: [audit, nacharbeit, redteam, triage, critic]
 # Karten an Matthias nur, wenn wirklich nur er es kann (loop-constraints.md, Grundregel 9). public_post: jeder Kommentar in einem
 # fremden Repo unter seinem GitHub-Konto erst nach seinem „ok“ oder seinem eigenen Haken auf der Karte. server_kauf: jeder Kauf und
@@ -46,5 +49,5 @@ course:
   stale_hours: 12
 # Die Kette läuft nie leer (code-host docs/paperclip/loops.md Abschnitt 19); Quellen in LOOP.md, Abschnitt Kette nachfüllen.
 refill:
-  min_open: 1
+  min_open: 3
   every_h: 6
