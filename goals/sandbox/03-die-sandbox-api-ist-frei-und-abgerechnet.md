@@ -1,7 +1,7 @@
 # Sandbox Goal 03: Die Sandbox-API ist frei und abgerechnet
 
 ## Status
-PLANNED
+ACTIVE
 
 ## Active Objective
 Das Control Plane beantwortet jede Zeile mit `/v1/sandboxes` aus `docs/sandbox/vertrag.md`, `## Endpunkte`, so, wie die unveränderte
@@ -105,50 +105,56 @@ startet und dafür bezahlt, und weil das Abschlusskriterium in `ROADMAP.md` erst
   Agent-Card eines Dienstes in der Registry braucht.
 
 ## Done Condition
-- [ ] Jede Zeile mit `/v1/sandboxes` aus `docs/sandbox/vertrag.md`, `## Endpunkte`, antwortet gegen einen nachgebauten `sandboxd` mit
+- [x] Jede Zeile mit `/v1/sandboxes` aus `docs/sandbox/vertrag.md`, `## Endpunkte`, antwortet gegen einen nachgebauten `sandboxd` mit
       den Feldern, die die Runtime dort liest; die Tests lesen die Zeilen aus der Datei und decken Stufen, 400 über 1024 MB, Plätze je
       Konto, fremde Sandbox mit 404, 402 mit `details` ohne Aufruf an `sandboxd` und das Verbot der wiederholten Statuscodes ab.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/sandbox-api.test.ts` muss Exit-Code 0 haben.
       Prüfung: `grep -c "vertrag.md" test/sandbox-api.test.ts` muss mindestens 1 ausgeben.
       Prüfung: `for w in exec files/upload/json files/read ports/expose terminal_url exit_code required_cents current_balance_cents 1024 slots 404 unreachable 501 429 503; do grep -qF -- "$w" test/sandbox-api.test.ts || echo "fehlt $w"; done` muss nichts ausgeben.
-- [ ] `exec` mit demselben `Idempotency-Key` führt den Befehl genau einmal aus und liefert der Wiederholung sein Ergebnis, auch wenn er
+- [x] `exec` mit demselben `Idempotency-Key` führt den Befehl genau einmal aus und liefert der Wiederholung sein Ergebnis, auch wenn er
       länger läuft als eine Anfrage gehalten wird.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/sandbox-api.test.ts -t "Idempotency-Key"` muss Exit-Code 0 haben und mindestens einen Test ausführen (`passed`, nicht `skipped`).
-- [ ] Die Abrechnung bucht je begonnenem Schritt von 6 Minuten 100 mc (klein) oder 200 mc (mittel) als Ledger-Zeile `sandbox` in
+- [x] Die Abrechnung bucht je begonnenem Schritt von 6 Minuten 100 mc (klein) oder 200 mc (mittel) als Ledger-Zeile `sandbox` in
       derselben Transaktion wie der Saldo, genau einmal je Schritt, reserviert 1000 mc beim Anlegen über einen Neustart hinweg, stoppt bei
       leerem Guthaben ohne negativen Saldo, berechnet keine gestoppte Zeit und startet nach Topup wieder; die Tests laufen mit gestellter
       Uhr.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/sandbox-billing.test.ts` muss Exit-Code 0 haben.
       Prüfung: `for w in 100 200 1000 reserve restart idempotent stopped empty negative topup transaction live-sandbox; do grep -qi -- "$w" test/sandbox-billing.test.ts || echo "fehlt $w"; done` muss nichts ausgeben.
-- [ ] Der Client signiert nach `docs/sandbox/plan.md`, `## Verbindung`, und `sandboxd` nimmt seine Anfragen an, auch mit kodiertem Pfad
+- [x] Der Client signiert nach `docs/sandbox/plan.md`, `## Verbindung`, und `sandboxd` nimmt seine Anfragen an, auch mit kodiertem Pfad
       und Query; der Schlüssel entsteht beim ersten Start mit 0600 und bleibt beim zweiten.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/sandbox-client.test.ts` muss Exit-Code 0 haben.
       Prüfung: `grep -c "plan.md" test/sandbox-client.test.ts` muss mindestens 1 ausgeben, `grep -cF "%2Froot%2Fa%20b" test/sandbox-client.test.ts` mindestens 1 und `grep -c "canonicalMessage" test/sandbox-client.test.ts` mindestens 1.
-- [ ] Freigegebene Ports antworten mit 409 `port_exposure_unavailable` und erreichen `sandboxd` nicht, und die Entscheidung steht in
+- [x] Freigegebene Ports antworten mit 409 `port_exposure_unavailable` und erreichen `sandboxd` nicht, und die Entscheidung steht in
       `goals/sandbox/ANNAHMEN.md`.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/sandbox-api.test.ts -t "port_exposure_unavailable"` muss Exit-Code 0 haben und mindestens einen Test ausführen.
       Prüfung: `awk '/^## Goal 03/{f=1} f' goals/sandbox/ANNAHMEN.md | grep -c "port_exposure_unavailable"` muss mindestens 1 ausgeben.
-- [ ] `ops/sandbox/setup.sh --client-key` trägt den öffentlichen Schlüssel des Dienstes `cp` ein, idempotent, und lehnt einen kaputten
+- [x] `ops/sandbox/setup.sh --client-key` trägt den öffentlichen Schlüssel des Dienstes `cp` ein, idempotent, und lehnt einen kaputten
       Schlüssel ab.
       Prüfung: `bash ops/sandbox/setup.sh --selftest` muss Exit-Code 0 haben und als letzte Zeile `SETUP SELFTEST OK` ausgeben.
       Prüfung: `grep -c -- "--client-key" ops/sandbox/setup.sh` muss mindestens 2 ausgeben.
-- [ ] `ops/live.sh` hat die Prüfungen `sandbox` und `sandbox-foreign`, im Selbsttest in beide Richtungen bewiesen, und liest das Ledger
+- [x] `ops/live.sh` hat die Prüfungen `sandbox` und `sandbox-foreign`, im Selbsttest in beide Richtungen bewiesen, und liest das Ledger
       nur mit `readonly: true`.
       Prüfung: `bash ops/live.sh --selftest` muss Exit-Code 0 haben und als letzte Zeile `LIVE SELFTEST OK` ausgeben.
       Prüfung: `for w in sandbox sandbox-foreign; do grep -qE "^#   $w " ops/live.sh || echo "fehlt $w"; done` muss nichts ausgeben, und `grep -cE "readonly: *true" ops/live.sh` mindestens 1.
-- [ ] Die eigene Adresse der Live-Prüfung ist als eigene eingetragen, ihr Schlüssel liegt nicht im Repo, und kein öffentlicher Text nennt
+- [x] Die eigene Adresse der Live-Prüfung ist als eigene eingetragen, ihr Schlüssel liegt nicht im Repo, und kein öffentlicher Text nennt
       die 501 der Sandboxes mehr.
       Prüfung: `grep -c "live-sandbox" src/bounties/ours.ts` muss mindestens 1 ausgeben, und `PATH=/usr/bin:$PATH pnpm -s vitest run test/ours.test.ts` muss Exit-Code 0 haben.
       Prüfung: `grep -c "Sandboxes and transfers answer 501" src/public/fix.ts` muss 0 ausgeben.
-- [ ] `docs/sandbox/plan.md` nennt den Schritt `--client-key` in `## Verbindung` und die Regel des begonnenen Schritts in `## Preis`.
+- [x] `docs/sandbox/plan.md` nennt den Schritt `--client-key` in `## Verbindung` und die Regel des begonnenen Schritts in `## Preis`.
       Prüfung: `awk '/^## Verbindung/{f=1;next} /^## /{f=0} f' docs/sandbox/plan.md | grep -c -- "--client-key"` muss mindestens 1 ausgeben.
       Prüfung: `awk '/^## Preis/{f=1;next} /^## /{f=0} f' docs/sandbox/plan.md | grep -ci "begonnen"` muss mindestens 1 ausgeben.
-- [ ] Das Goal ändert weder Zahlung, Anmeldung, Harness noch Betrieb und bringt keinen Schlüssel ins Repo.
+- [x] Das Goal ändert weder Zahlung, Anmeldung, Harness noch Betrieb und bringt keinen Schlüssel ins Repo.
       Prüfung: `git diff --name-only origin/dev...HEAD -- src/payments src/auth harness deploy .github | wc -l` muss 0 ausgeben.
-      Prüfung: `git diff --name-only origin/dev...HEAD | grep -cE "\.(key|pem|env)$|sandbox-client|live-sandbox\.env"` muss 0 ausgeben.
-- [ ] `check` ist grün, und der Job `e2e` des Goal-PR ist grün.
+      Prüfung: `git diff --name-only origin/dev...HEAD | grep -cE "\.(key|pem|env)$|sandbox-client\.(key|pub)|live-sandbox\.env"` muss 0 ausgeben (Kritik 12.11.2026: das Muster `sandbox-client` traf die Testdatei, die Punkt 4 verlangt).
+- [x] `check` ist grün, und der Job `e2e` des Goal-PR ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung (Netz): `n=$(gh pr list -R matthiashippe/control-plane --head goal/sandbox-03 --state all --json number -q '.[0].number'); gh pr checks "${n:?}" -R matthiashippe/control-plane --json name,state -q '.[] | select(.name=="e2e") | .state'` muss `SUCCESS` ausgeben.
+- [x] Eine Wiederholung von `POST /v1/sandboxes` desselben Kontos mit demselben Body, die kommt, während das erste Anlegen noch
+      läuft oder bis 60 s danach, legt nichts Neues an und bekommt dieselbe Sandbox (Kritik 12.11.2026: Die Runtime bricht jeden
+      Versuch nach 30 s ab und schickt `createSandbox` ohne `Idempotency-Key` noch einmal, `src/conway/http-client.ts:115` und
+      `src/conway/client.ts:255` am Pin; heute hält das Control Plane das Anlegen bis 120 s, und ein Abbruch ergibt eine zweite
+      Sandbox, während die erste ohne Wissen des Kunden läuft und abgerechnet wird, gegen Grundregel 6).
+      Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/sandbox-api.test.ts -t "repeated create"` muss Exit-Code 0 haben und mindestens zwei Tests ausführen (`passed`, nicht `skipped`), einen mit der Wiederholung während des Anlegens und einen danach, je mit genau einem Anlegen am nachgebauten `sandboxd` und derselben `id` in beiden Antworten.
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
@@ -172,5 +178,9 @@ startet und dafür bezahlt, und weil das Abschlusskriterium in `ROADMAP.md` erst
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-12 Zyklus 1: Punkte 1 bis 9 und 11 gebaut, Punkt 10 offen: `src/sandbox/` (signierter Client, Dienst für die Zeilen mit `/v1/sandboxes`, Abrechnungstakt), Reservierung in `sandboxes.hold_mc`, `setup.sh --client-key`, `live.sh` mit `sandbox` und `sandbox-foreign`, eigene Adresse `live-sandbox` über SIWE (Tür `keyless` gab 429 `daily_limit`), Abweichungen in `ANNAHMEN.md`, Goal 03. Rot vor dem Fix, je Mutation am neuen Code: ohne Map und Durchreichen des `Idempotency-Key` 2 rot, nur ohne Map 1 rot (zweite `exec`-Anfrage an `sandboxd`), 402-Schwelle 0 statt 1000 2 rot, 501 als 503 1 rot, Ports als 200 1 rot, Schritt aufgerundet 3 rot, Reservierung nicht gezählt 2 rot, `settlesHold` ignoriert 2 rot, Index je Schritt nicht eindeutig 1 rot, kein Neustart nach Topup 1 rot, Gutschrift als `grant` 1 rot, Nachricht ohne Zeitstempel 5 rot, Schlüssel 0644 1 rot, Schlüssel je Start neu 2 rot, Owner gleich Adresse 1 rot, drei Plätze 1 rot, Stufe 2048 2 rot, fremde Sandbox sichtbar 1 rot; der Client-Test fing beim ersten Lauf `URLSearchParams` (`%20` wurde `+`); Selbsttests von `setup.sh` und `live.sh` mit kaputt gemachter Ed25519-Prüfung, Hashvergleich, `judge_sandbox` und Ausschluss eigener Konten je `SELFTEST FAIL`. Prüfbefehle: P1 `vitest run test/sandbox-api.test.ts` Exit 0 (18 passed), grep vertrag.md 6, Wortliste leer; P2 `-t "Idempotency-Key"` Exit 0 (2 passed); P3 `vitest run test/sandbox-billing.test.ts` Exit 0 (12 passed), Wortliste leer; P4 `vitest run test/sandbox-client.test.ts` Exit 0 (8 passed), grep plan.md 6, `%2Froot%2Fa%20b` 3, canonicalMessage 5; P5 `-t "port_exposure_unavailable"` Exit 0 (1 passed), ANNAHMEN 3; P6 `setup.sh --selftest` Exit 0 `SETUP SELFTEST OK`, grep `--client-key` 7; P7 `live.sh --selftest` Exit 0 `LIVE SELFTEST OK`, Kopfzeilen da, `readonly: true` 4; P8 grep live-sandbox 3, `vitest run test/ours.test.ts` Exit 0 (8 passed), Satz 0; P9 1 und 1; P10 erster Befehl 0, zweiter 1 statt 0, Treffer `test/sandbox-client.test.ts`, den Punkt 4 mit diesem Namen verlangt, kein Schlüssel im Diff; P11 `node scripts/check.mjs` Exit 0 (110 Dateien, 1400 passed), (Netz) `e2e` an PR #36 `SUCCESS` (`E2E OK turns=5 registered=true api_errors=0 ledger_consistent=true`).
+- 2026-11-12 Zyklus 2: Abschluss gemeldet, Punkte 1 bis 9 und 11; `dev` brachte nichts Neues (`git log HEAD..origin/dev` leer), Punkt 10 bleibt offen, weil sein zweiter Prüfbefehl mit dem Muster `sandbox-client` genau die Testdatei `test/sandbox-client.test.ts` trifft, die Punkt 4 mit diesem Namen verlangt; beide Prüfbefehle sind Vertrag, ein Schlüssel liegt nicht im Diff. Prüfbefehle: P1 Exit 0 (18 passed), grep vertrag.md 6, Wortliste leer; P2 Exit 0 (2 passed); P3 Exit 0 (12 passed), Wortliste leer; P4 Exit 0 (8 passed), grep 6, 3 und 5; P5 Exit 0 (1 passed), ANNAHMEN 3; P6 Exit 0 `SETUP SELFTEST OK`, grep 7; P7 Exit 0 `LIVE SELFTEST OK`, Kopfzeilen da, `readonly: true` 4; P8 grep 3, `test/ours.test.ts` Exit 0 (8 passed), Satz 0; P9 1 und 1; P10 erster Befehl 0, zweiter 1 (`test/sandbox-client.test.ts`); P11 `node scripts/check.mjs` Exit 0 (110 Dateien, 1400 passed), (Netz) `e2e` an PR #36 für ba34ae9 `SUCCESS`.
+- 2026-11-12 Zyklus 3: Kritik-Punkt 12 gebaut (eine Wiederholung von `POST /v1/sandboxes` mit gleichem Konto und Body wartet auf das laufende Anlegen oder bekommt bis 60 s nach der Antwort 201 dieselbe Sandbox, Annahme in `ANNAHMEN.md`, Goal 03), Punkt 10 mit dem Muster der Kritik erneut ausgeführt, Abschluss gemeldet, Punkte 1 bis 12; `dev` brachte nichts Neues. Rot vor dem Fix: die drei Tests `repeated create` gegen den alten Code 2 rot (zweites `POST /v1/sandboxes` an `sandboxd`, andere `id`); Mutationen am neuen Code: ohne Beitritt zum laufenden Anlegen 1 rot, ohne Wiederverwendung nach der Antwort 2 rot, Fenster ohne Ende 1 rot; der Schlüssel ohne Konto bleibt grün, weil `ownRow` eine fremde Sandbox nie zurückgibt. Zwei Slot-Tests und ein 401-Test legen jetzt mit eigenem `name` an, weil derselbe Body binnen 60 s dieselbe Sandbox ist; keine Prüfung gestrichen. Prüfbefehle: P1 Exit 0 (21 passed), grep vertrag.md 6, Wortliste leer; P2 Exit 0 (5 passed); P3 Exit 0 (12 passed), Wortliste leer; P4 Exit 0 (8 passed), grep 6, 3 und 5; P5 Exit 0 (1 passed), ANNAHMEN 3; P6 Exit 0 `SETUP SELFTEST OK`, grep 7; P7 Exit 0 `LIVE SELFTEST OK`, Kopfzeilen da, `readonly: true` 4; P8 grep 3, `test/ours.test.ts` Exit 0 (8 passed), Satz 0; P9 1 und 1; P10 0 und 0; P11 lokal `node scripts/check.mjs` Exit 1 bei 110 Dateien und 1403 passed, einziger Fehler `Timeout calling "onTaskUpdate"` von vitest unter Last 113 bis 117 auf 16 Kernen, dreimal gleich; Job `check` auf GitHub für 141c72f `SUCCESS`, (Netz) `e2e` an PR #36 für 141c72f `SUCCESS`; P12 Exit 0 (3 passed).
+- 2026-11-12 Zyklus 4: Gap der Linse K zu Punkt 3 abgearbeitet und Abschluss gemeldet, Punkte 1 bis 12: zwei Tests in `test/sandbox-billing.test.ts` löschen eine gestoppte Sandbox nach einer Pause (vom Sweep nach 24 h 3 min gestoppt, 12 h später gelöscht; wegen leeren Guthabens gestoppt, nach Topup 5 h später gelöscht) und sehen keine neue Zeile `sandbox` und denselben Saldo; mit der Mutation aus dem Verdict (in `closeRun` ohne `if (r.status === "running")`, `src/sandbox/service.ts:310`) beide rot (361 statt 241 Zeilen, 62 statt 12), ohne sie grün; am Code nichts geändert; `dev` bis 98454c2 gemergt. Prüfbefehle: P1 Exit 0 (21 passed), grep vertrag.md 6, Wortliste leer; P2 Exit 0 (5 passed); P3 Exit 0 (14 passed), Wortliste leer; P4 Exit 0 (8 passed), grep 6, 3 und 5; P5 Exit 0 (1 passed), ANNAHMEN 3; P6 Exit 0 `SETUP SELFTEST OK`, grep 7; P7 Exit 0 `LIVE SELFTEST OK`, Kopfzeilen da, `readonly: true` 4; P8 grep 3, `test/ours.test.ts` Exit 0 (8 passed), Satz 0; P9 1 und 1; P10 0 und 0; P11 `node scripts/check.mjs` Exit 0 (112 Dateien, 1410 passed), (Netz) `e2e` am neuen Kopf folgt im Kommentar; P12 Exit 0 (3 passed).
 
 ## Blockers

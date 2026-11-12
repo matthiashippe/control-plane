@@ -4,7 +4,11 @@
 #   bash ops/sandbox/setup.sh <address>          bring the host to the state below, then check it
 #   bash ops/sandbox/setup.sh --check <address>  change nothing; one CHANGE line per item a run would change,
 #                                                last line SETUP CHECK OK changed=0 or SETUP CHECK DRIFT changed=<n>
-#   bash ops/sandbox/setup.sh --selftest         without network: the comparison reports a planted deviation and a clean state not
+#   bash ops/sandbox/setup.sh --client-key <address>  read the public key of the service cp from the payment server (read only)
+#                                                and install it as /etc/sandboxd/keys/cp.pub after an Ed25519 check, idempotent;
+#                                                last line SETUP CLIENT-KEY OK changed=0 or changed=1, a broken key changes nothing
+#   bash ops/sandbox/setup.sh --selftest         without network: the comparison reports a planted deviation and a clean state not,
+#                                                and --client-key installs a valid key once and rejects broken ones
 #
 # What it manages: Docker with the gVisor runtime runsc (platform systrap), the nftables table inet sandbox (sandbox.nft), the
 # systemd slice sandbox.slice, sandboxd as a unit in that slice on the loopback with its own Node 22, the probe key of the
@@ -226,6 +230,128 @@ apply() {
   check "$host"
 }
 
+# --client-key: the public key of the service cp (SPKI PEM from /data/sandbox-client.pub in deploy-cp-1) as
+# /etc/sandboxd/keys/cp.pub. sandboxd reads its keys on every request, so nothing restarts. $1 of both snippets is a root prefix,
+# empty on the host, a temporary directory in the selftest.
+CP_PUB=/etc/sandboxd/keys/cp.pub
+CP_PUB_READ=$(cat <<'REMOTE'
+f=$1/etc/sandboxd/keys/cp.pub
+if [ -f "$f" ]; then sha256sum "$f" | cut -c1-64; else echo missing; fi
+REMOTE
+)
+CP_PUB_WRITE=$(cat <<'REMOTE'
+set -eu
+d=$1/etc/sandboxd/keys
+install -d -m 0755 "$d"
+t=$(mktemp "$d/.cp-pub.XXXXXX")
+trap 'rm -f "$t"' EXIT
+cat > "$t"
+chmod 0644 "$t"
+mv -f "$t" "$d/cp.pub"
+REMOTE
+)
+
+sbx_read_sha() { ssh_host "$1" "set -- ''
+$CP_PUB_READ"; }
+sbx_write_cp_pub() { ssh_host "$1" "set -- ''
+$CP_PUB_WRITE"; }
+
+# Reads PEM text on stdin; exit 0 only for exactly one Ed25519 public key in SPKI PEM, else one line why.
+check_ed25519_pub() {
+  /usr/bin/node -e '
+    const { createPublicKey } = require("node:crypto");
+    const text = require("node:fs").readFileSync(0, "utf8").replace(/\n+$/, "") + "\n";
+    const fail = (m) => { process.stdout.write(m); process.exit(1); };
+    if (!text.startsWith("-----BEGIN PUBLIC KEY-----\n")) fail("not an SPKI PEM public key");
+    let k;
+    try { k = createPublicKey(text); } catch { fail("not a readable public key"); }
+    if (k.asymmetricKeyType !== "ed25519") fail(`key type ${k.asymmetricKeyType}, want ed25519`);
+    if (k.export({ type: "spki", format: "pem" }) !== text) fail("text around the PEM block");'
+}
+
+# install_client_key <address> <pem text>: checks the key, then writes it only if the hash on the host differs.
+install_client_key() {
+  local host=$1 pub=$2 why want have
+  if ! why=$(check_ed25519_pub <<<"$pub"); then echo "SETUP CLIENT-KEY FAIL: $why"; return 1; fi
+  want=$(printf '%s\n' "$pub" | sha)
+  if ! have=$(sbx_read_sha "$host"); then echo "SETUP CLIENT-KEY FAIL: cannot read $CP_PUB on the sandbox host"; return 1; fi
+  if [ "$have" = "$want" ]; then echo "SETUP CLIENT-KEY OK changed=0"; return 0; fi
+  if ! printf '%s\n' "$pub" | sbx_write_cp_pub "$host"; then echo "SETUP CLIENT-KEY FAIL: cannot write $CP_PUB"; return 1; fi
+  if [ "$(sbx_read_sha "$host")" != "$want" ]; then echo "SETUP CLIENT-KEY FAIL: $CP_PUB differs after the write"; return 1; fi
+  echo "SETUP CLIENT-KEY OK changed=1"
+}
+
+# client_key <address>: the one read on the payment server, then install_client_key. Never prints CP_HOST or the key path.
+client_key() {
+  local key pub
+  if [ -z "${CP_HOST:-}" ] && [ -f "$HOME/.config/control-plane/loop.env" ]; then
+    set -a
+    # shellcheck disable=SC1091
+    . "$HOME/.config/control-plane/loop.env"
+    set +a
+  fi
+  key=${CP_SSH_KEY:-${CP_DEPLOY_KEY:-}}
+  if [ -z "${CP_HOST:-}" ] || [ -z "$key" ]; then
+    echo "SETUP CLIENT-KEY FAIL: CP_HOST and CP_SSH_KEY are not set (~/.config/control-plane/loop.env)"; return 1
+  fi
+  if ! pub=$(ssh -i "$key" -o BatchMode=yes -o ConnectTimeout=10 "$CP_HOST" 'docker exec deploy-cp-1 cat /data/sandbox-client.pub' 2>/dev/null); then
+    echo "SETUP CLIENT-KEY FAIL: cannot read /data/sandbox-client.pub in deploy-cp-1"; return 1
+  fi
+  install_client_key "$1" "$pub"
+}
+
+# selftest of --client-key: a fake sandbox host under $1, the same snippets as on the host, no network.
+selftest_client_key() {
+  local t=$1 root=$1/host fail=0 n
+  ssh() { echo "selftest must not reach the network (ssh)" >&2; return 99; }
+  curl() { echo "selftest must not reach the network (curl)" >&2; return 99; }
+  sbx_read_sha() { bash -c "$CP_PUB_READ" _ "$root"; }
+  sbx_write_cp_pub() { bash -c "$CP_PUB_WRITE" _ "$root"; }
+  /usr/bin/node -e '
+    const { generateKeyPairSync } = require("node:crypto");
+    const fs = require("node:fs"), d = process.argv[1];
+    const spki = (p) => p.publicKey.export({ type: "spki", format: "pem" });
+    const a = generateKeyPairSync("ed25519");
+    fs.writeFileSync(d + "/a.pub", spki(a));
+    fs.writeFileSync(d + "/b.pub", spki(generateKeyPairSync("ed25519")));
+    fs.writeFileSync(d + "/rsa.pub", spki(generateKeyPairSync("rsa", { modulusLength: 2048 })));
+    fs.writeFileSync(d + "/ecdsa.pub", spki(generateKeyPairSync("ec", { namedCurve: "P-256" })));
+    fs.writeFileSync(d + "/private.pem", a.privateKey.export({ type: "pkcs8", format: "pem" }));
+    fs.writeFileSync(d + "/garbage", "-----BEGIN PUBLIC KEY-----\nnot a key\n-----END PUBLIC KEY-----\n");
+    fs.writeFileSync(d + "/empty", "");' "$t"
+  state() { if [ -f "$root$CP_PUB" ]; then echo "$(sha < "$root$CP_PUB") $(stat -c '%i %y %a' "$root$CP_PUB")"; else echo missing; fi; }
+  # ck <label> <key file> <want>: want is changed=0, changed=1 or FAIL
+  ck() {
+    local before after out rc=0 why=
+    before=$(state)
+    out=$(install_client_key selftest-host "$(cat "$t/$2")") || rc=$?
+    after=$(state)
+    case $3 in
+      FAIL)
+        [ $rc -ne 0 ] || why="exit 0"
+        [[ "$(tail -1 <<<"$out")" == "SETUP CLIENT-KEY FAIL: "* ]] || why="$why, last line $(tail -1 <<<"$out")"
+        [ "$before" = "$after" ] || why="$why, file changed" ;;
+      *)
+        [ $rc -eq 0 ] || why="exit $rc"
+        [ "$(tail -1 <<<"$out")" = "SETUP CLIENT-KEY OK $3" ] || why="$why, last line $(tail -1 <<<"$out")"
+        cmp -s "$t/$2" "$root$CP_PUB" || why="$why, content differs"
+        [ "$(stat -c %a "$root$CP_PUB" 2>/dev/null)" = 644 ] || why="$why, mode not 644"
+        if [ "$3" = changed=0 ] && [ "$before" != "$after" ]; then why="$why, file rewritten"; fi ;;
+    esac
+    if [ -z "$why" ]; then echo "selftest client-key: ok ($1)"; else echo "selftest client-key: FAIL $1: ${why#, }"; return 1; fi
+  }
+  ck "valid key on an empty host, changed=1" a.pub changed=1 || fail=1
+  if [ "$(stat -c %a "$root/etc/sandboxd/keys" 2>/dev/null)" != 755 ]; then echo "selftest client-key: FAIL keys dir mode"; fail=1; fi
+  ck "same key again, changed=0" a.pub changed=0 || fail=1
+  ck "another valid key, changed=1" b.pub changed=1 || fail=1
+  for n in empty garbage rsa.pub ecdsa.pub private.pem; do
+    ck "rejects $n" "$n" FAIL || fail=1
+  done
+  n=$(find "$root/etc/sandboxd/keys" -mindepth 1 2>/dev/null | wc -l)
+  if [ "$n" = 1 ]; then echo "selftest client-key: ok (no temp file left)"; else echo "selftest client-key: FAIL $n entries in keys"; fail=1; fi
+  return $fail
+}
+
 selftest() {
   local t d o out fail=0
   t=$(mktemp -d)
@@ -252,6 +378,8 @@ selftest
     grep -q "^file ${f#*:} [0-9a-f]\{64\}$" "$t/desired" || { echo "selftest files: FAIL ${f#*:}"; fail=1; }
   done
   if declare -f check | grep -q 'APPLY\|apply '; then echo "selftest check: FAIL check runs apply"; fail=1; else echo "selftest check: ok (read only)"; fi
+  # 4. --client-key against a fake host in a subshell, so the stubs stay local
+  ( selftest_client_key "$t" ) || fail=1
   rm -rf "$t"
   if [ $fail -eq 0 ]; then echo "SETUP SELFTEST OK"; else echo "SETUP SELFTEST FAIL"; return 1; fi
 }
@@ -259,6 +387,7 @@ selftest
 case "${1:-}" in
   --selftest) selftest ;;
   --check) [ -n "${2:-}" ] || { echo "usage: $0 --check <address>" >&2; exit 2; }; check "$2" ;;
-  -*|"") echo "usage: $0 <address> | --check <address> | --selftest" >&2; exit 2 ;;
+  --client-key) [ -n "${2:-}" ] || { echo "usage: $0 --client-key <address>" >&2; exit 2; }; client_key "$2" ;;
+  -*|"") echo "usage: $0 <address> | --check <address> | --client-key <address> | --selftest" >&2; exit 2 ;;
   *) apply "$1" ;;
 esac
