@@ -1,7 +1,7 @@
 # Seite Goal 02: Die Startseite nennt den Umzug von Conway
 
 ## Status
-PLANNED
+ACTIVE
 
 ## Active Objective
 Wer aus einem Conway-Issue auf `/` landet, sieht im ersten Bildschirm den Umzug: `conwayApiUrl` auf `https://postyourprice.com`,
@@ -87,25 +87,25 @@ hinter „Agent stuck?“ findet und nach diesem Goal ohne Suche im ersten Bilds
   sofort umstellen lässt, und die Zahl vorher und nachher sagt, ob die Seite oder der Kanal das Loch ist.
 
 ## Done Condition
-- [ ] Die Startseite zeigt den Umzug als ersten Block vor dem Katalog für Menschen, mit der richtigen Adresse, auch für einen
+- [x] Die Startseite zeigt den Umzug als ersten Block vor dem Katalog für Menschen, mit der richtigen Adresse, auch für einen
       deutschen Browser, und mit der Zählmarke `top` im ersten Bildschirm.
       Prüfung: `pnpm -s vitest run test/landing-move.test.ts` muss Exit-Code 0 haben.
       Prüfung: `grep -cE "^\s*(it|test)\(" test/landing-move.test.ts` muss mindestens 5 ausgeben (je ein Fall: Reihenfolge Umzug vor `class="human"` vor `id="fuer-agenten"` bei englischem Browser; dieselbe Reihenfolge bei `Accept-Language: de`; der Block enthält `conwayApiUrl`, `https://postyourprice.com` bei `CP_PUBLIC_URL=https://postyourprice.com`, `automaton --provision` und `href="/fix"`; `id="agents"` fehlt auf der Seite; `/px/top.png` steht vor dem `</section>` des Umzugs).
-- [ ] Der echte Render der Startseite ist pixelgleich mit den abgenommenen SOLL-Bildern, und eine geänderte Zeile der Seite fällt
+- [x] Der echte Render der Startseite ist pixelgleich mit den abgenommenen SOLL-Bildern, und eine geänderte Zeile der Seite fällt
       dabei auf.
       Prüfung: `T=$(mktemp -d); node --import tsx ops/soll-live.mjs --out $T/s.html && node ops/soll.mjs --pruefen --source $T/s.html` muss Exit 0 haben und als letzte Zeile `soll: 2 Bilder, umzug oben 390=<y> 1440=<y>, 0 Mängel` ausgeben.
       Prüfung: `T=$(mktemp -d); git archive HEAD | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; sed -i 's/Keep your automaton running\./Keep your agent running./' $T/src/public/index.html; grep -q 'Keep your agent running\.' $T/src/public/index.html || echo sed-miss; (cd $T && node --import tsx ops/soll-live.mjs --out $T/s.html); node ops/soll.mjs --pruefen --source $T/s.html; echo "exit=$?"` muss als letzte Zeile `exit=1` ausgeben und darf `sed-miss` nicht ausgeben.
       Prüfung: `grep -cE 'Conway not answering|Keep your automaton|conwayApiUrl|data-soll|docs/soll|Rede zum Fest' ops/soll-live.mjs` muss `0` ausgeben.
-- [ ] Die Tests, die am alten Block `#agents` hingen, prüfen ihre Regel am Umzug-Block weiter, keiner fehlt.
+- [x] Die Tests, die am alten Block `#agents` hingen, prüfen ihre Regel am Umzug-Block weiter, keiner fehlt.
       Prüfung: `for f in test/public.test.ts test/depth.test.ts test/fix-page.test.ts; do a=$(git show origin/dev:$f | grep -cE "^\s*(it|test)\("); b=$(grep -cE "^\s*(it|test)\(" $f); [ "$b" -ge "$a" ] || echo "weniger $f $a $b"; done; grep -nE 'id="agents"|\.(skip|only|todo)\(' test/public.test.ts test/depth.test.ts test/fix-page.test.ts test/landing-move.test.ts | wc -l` muss als einzige Ausgabe `0` haben.
       Prüfung: `pnpm -s vitest run test/public.test.ts test/depth.test.ts test/fix-page.test.ts` muss Exit-Code 0 haben.
-- [ ] `ops/landing-yield.sh` zählt Ankünfte aus Conway-Issues auf `/` und ihre Anmeldung binnen 24 Stunden, als Summe ohne Adressen,
+- [x] `ops/landing-yield.sh` zählt Ankünfte aus Conway-Issues auf `/` und ihre Anmeldung binnen 24 Stunden, als Summe ohne Adressen,
       in beide Richtungen bewiesen.
       Prüfung: `bash ops/landing-yield.sh --selftest | tail -1` muss `SELFTEST OK` ausgeben.
       Prüfung: `pnpm -s vitest run test/landing-yield.test.ts` muss Exit-Code 0 haben.
       Prüfung: `grep -cE "^\s*(it|test)\(" test/landing-yield.test.ts` muss mindestens 6 ausgeben (Anmeldung nach 23 und nach 25 Stunden, Status 500, Referrer auf `/fix` und auf `Conway-Research-fake`, eigene Adresse, noch offen, Telefon, leeres Fenster mit Exit 2).
       Prüfung: `a=$(grep -oE '"(remote_ip|client_ip)": *"[^"]*"' ops/fixtures/landing-yield.log | wc -l); b=$(grep -oE '"(remote_ip|client_ip)": *"[^"]*"' ops/fixtures/landing-yield.log | grep -vE '"(192\.0\.2|198\.51\.100|203\.0\.113)\.[0-9]{1,3}"$' | wc -l); echo "adressen=$a fremd=$b"` muss `adressen=<n> fremd=0` mit n mindestens 1 ausgeben.
-- [ ] Die Zahl vor dem Rollout steht mit Befehl und Widerlegungsregel fest.
+- [x] Die Zahl vor dem Rollout steht mit Befehl und Widerlegungsregel fest.
       Prüfung: `grep -cE '^Vorher: [0-9]+ kamen auf / von github\.com/Conway-Research, [0-9]+ binnen 24 Stunden angemeldet, [0-9]+ noch in den 24 Stunden, [0-9]+ vom Telefon, 2026-11-02T00:00:00Z bis 20[0-9]{2}-[0-9]{2}-[0-9]{2}T[0-9]{2}:00:00Z$' docs/seite/conway-ankuenfte.md` muss `1` ausgeben.
       Prüfung: `grep -cE '^Befehl: .bash ops/landing-yield\.sh --since 2026-11-02T00:00:00Z --until 20[0-9]{2}-[0-9]{2}-[0-9]{2}T[0-9]{2}:00:00Z.$' docs/seite/conway-ankuenfte.md` muss `1` ausgeben.
       Prüfung: `grep -c 'Widerlegt, wenn' docs/seite/conway-ankuenfte.md` muss mindestens `1` ausgeben.
@@ -140,6 +140,7 @@ hinter „Agent stuck?“ findet und nach diesem Goal ohne Suche im ersten Bilds
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-12 Zyklus 1: Punkte 1, 2, 3, 4, 5 gebaut (Umzug als erster Block in `src/public/index.html`, `ops/soll-live.mjs`, `ops/landing-yield.sh` mit Fixture, Zahl vorher gegen die Produktion), Punkt 6 offen. Jeder neue und geänderte Test war vorher rot: `test/landing-move.test.ts` 5 von 5 und die geänderten Tests 14 von 85 gegen das `index.html` von `origin/dev`, `test/landing-yield.test.ts` 15 von 15 ohne Werkzeug. Prüfbefehle: P1 vitest exit 0, 5 Fälle; P2 `0 Mängel` mit `umzug oben 390=828 1440=656`, Gegenprobe `exit=1` ohne `sed-miss`, grep 0; P3 `0`, vitest exit 0; P4 `SELFTEST OK`, vitest exit 0, 15 Fälle, `adressen=34 fremd=0`; P5 grep 1, 1, 1, Netz exit 0 mit 1, 0, 0, 1 wie `Vorher:`; P6 Pfadliste `6` statt 0 (fünf Tests außerhalb der Liste, dazu `goals/seite/ANNAHMEN.md`, weil `goals/seite/` in der Regex mit `$` verankert ist und auch die Goal-Datei trifft), `src` 0, `check` exit 0 (1439 Tests).
 
 ## Blockers
 keine
