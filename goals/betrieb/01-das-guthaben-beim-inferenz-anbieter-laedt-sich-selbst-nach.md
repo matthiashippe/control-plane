@@ -1,7 +1,7 @@
 # Betrieb Goal 01: Das Guthaben beim Inferenz-Anbieter lädt sich selbst nach
 
 ## Status
-PLANNED
+BLOCKED matthias
 
 ## Active Objective
 Das Guthaben beim Inferenz-Anbieter wird nie leer, weil es sich selbst nachlädt: Die automatische Aufladung beim Anbieter ist mit
@@ -54,13 +54,13 @@ einzige Weg ist, auf dem das nicht mehr von einem Menschen abhängt, der rechtze
   Node 22 vorn im `PATH` (`PATH=/usr/bin:$PATH`), `check` und vitest im Vordergrund mit eigenem Timeout.
 
 ## Done Condition
-- [ ] `ops/credit-runway.sh --topup` rechnet Schwelle und Betrag der automatischen Aufladung aus Warnschwelle und Verbrauch je Tag,
+- [x] `ops/credit-runway.sh --topup` rechnet Schwelle und Betrag der automatischen Aufladung aus Warnschwelle und Verbrauch je Tag,
       und der Selftest zeigt die Regel: 21,84 USD Verbrauch in der Woche ergibt `threshold 16 USD, amount 25 USD`, kein Verbrauch ergibt
       `threshold 7 USD, amount 10 USD`, eine leere Antwort ist `AUTO TOPUP FAIL` mit Exit 2; die bisherigen Fälle bleiben grün.
       Prüfung: `bash ops/credit-runway.sh --selftest` muss Exit-Code 0 haben und als letzte Zeile `CREDIT RUNWAY SELFTEST OK` ausgeben.
       Prüfung: `bash ops/credit-runway.sh --selftest | grep -cE "^ok   topup "` muss mindestens 3 ausgeben.
       Prüfung: `pnpm -s vitest run test/credit-topup.test.ts test/credit-runway.test.ts` muss Exit-Code 0 haben.
-- [ ] Schwelle und Betrag von heute sind gemessen und stehen mit Befehl und Uhrzeit in `docs/betrieb/guthaben.md`, die Schwelle der
+- [x] Schwelle und Betrag von heute sind gemessen und stehen mit Befehl und Uhrzeit in `docs/betrieb/guthaben.md`, die Schwelle der
       Aufladung liegt über der Warnschwelle, und die Zahlen der Doku sind die der gemessenen Zeile.
       Prüfung (Netz): `bash ops/credit-runway.sh --topup` muss eine Zeile ausgeben, die mit `AUTO TOPUP: threshold ` beginnt.
       Prüfung: `awk '/^## Automatische Aufladung/{f=1;next} /^## /{f=0} f' docs/betrieb/guthaben.md | grep -cE "^(Warnschwelle|Schwelle der Aufladung|Betrag der Aufladung): [0-9]+(\.[0-9]+)? USD$"` muss 3 ausgeben.
@@ -71,7 +71,7 @@ einzige Weg ist, auf dem das nicht mehr von einem Menschen abhängt, der rechtze
       Zeitpunkt, und danach meldet die Messung aus dem Container der Produktion OK.
       Prüfung: `awk '/^## Automatische Aufladung/{f=1;next} /^## /{f=0} f' docs/betrieb/guthaben.md | grep -cE "^Eingeschaltet: 20[0-9]{2}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2} UTC$"` muss 1 ausgeben.
       Prüfung (Netz): `set -a; . ~/.config/control-plane/loop.env; set +a; ssh -i "$CP_SSH_KEY" -o BatchMode=yes -o ConnectTimeout=15 "$CP_HOST" 'bash -s -- --container' < ops/credit-runway.sh` muss eine Zeile ausgeben, die mit `CREDIT RUNWAY OK: ` beginnt.
-- [ ] `check` ist grün, und keine Datei des Goals trägt einen Schlüssel.
+- [x] `check` ist grün, und keine Datei des Goals trägt einen Schlüssel.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung: `cat docs/betrieb/guthaben.md ops/credit-runway.sh test/credit-topup.test.ts | grep -cE "sk-or-[A-Za-z0-9-]{8,}"` muss 0 ausgeben.
 - [ ] goal-verifier PASS (K und B)
@@ -94,5 +94,11 @@ einzige Weg ist, auf dem das nicht mehr von einem Menschen abhängt, der rechtze
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-12 Zyklus 1: Punkte 1, 2 und 4 gebaut (`--topup` in `ops/credit-runway.sh` mit fünf Selftest-Fällen, `test/credit-topup.test.ts`, Messung und Abschnitt `## Automatische Aufladung` in `docs/betrieb/guthaben.md`), Punkt 3 wartet am Human Gate `server_kauf`; rot vor dem Fix war `test/credit-topup.test.ts` mit 13 von 13 (das alte Werkzeug lehnt `--topup` mit `unknown argument` ab, die Mutationsmarker fehlten), die Zeilen `ok   topup` gab es nicht, und die Doku-Prüfung von Punkt 2 wird mit verfälschtem Betrag (30 statt 25 USD) rot mit Exit 1. Prüfbefehle: `bash ops/credit-runway.sh --selftest` Exit 0, letzte Zeile `CREDIT RUNWAY SELFTEST OK`; `grep -cE "^ok   topup "` 5; `pnpm -s vitest run test/credit-topup.test.ts test/credit-runway.test.ts` 26 passed; `bash ops/credit-runway.sh --topup` (16:56:57 UTC) `AUTO TOPUP: threshold 16 USD, amount 25 USD, warn threshold 9.49 USD, 3.16 USD per day`; Abschnittszeilen 3; Schwelle über Warnschwelle Exit 0; Doku gleich Messung Exit 0; Befehl in der Doku 1; Zeile `Eingeschaltet:` 0 (Punkt 3 offen); Messung aus dem Container (16:57:03 UTC) `CREDIT RUNWAY OK: 34.62 USD, 10.9 days at 3.16 USD per day, threshold 9.49 USD`; `node scripts/check.mjs` Exit 0 (1380 Tests, 115 s); Schlüssel-Grep 0.
 
 ## Blockers
+Art: matthias
+Gate: server_kauf
+Aufgabe: Beim Inferenz-Anbieter die automatische Aufladung mit Schwelle 16 USD und Betrag 25 USD einschalten und auf der Karte mit Datum und Uhrzeit in UTC antworten.
+Worum: Am 11.11.2026 war das Guthaben leer und ein zahlender Kunde bekam ab 02:01 UTC nur 503; mit der Aufladung hängt das nicht mehr an einer Warnung, die ein Mensch rechtzeitig sehen muss.
+Empfehlung: `https://openrouter.ai/settings/credits` öffnen, falls noch keine Karte hinterlegt ist, eine hinterlegen, dann die automatische Aufladung (Auto Top-Up) einschalten, als Schwelle 16 USD und als Betrag 25 USD eintragen und speichern (Zahlen aus `docs/betrieb/guthaben.md`, gemessen 12.11.2026 16:56:57 UTC). Am Ende steht dort die Aufladung als eingeschaltet mit 16 USD und 25 USD. Antwort auf der Karte: „eingeschaltet JJJJ-MM-TT HH:MM UTC“. Dauert wenige Minuten; der Loop zahlt nichts und stellt beim Anbieter nichts ein.
