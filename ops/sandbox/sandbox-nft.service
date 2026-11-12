@@ -1,0 +1,14 @@
+# Loads only the table inet sandbox; ufw and Docker keep their own tables (docs/sandbox/plan.md, Netz).
+[Unit]
+Description=nftables table inet sandbox
+Before=docker.service sandboxd.service
+After=ufw.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/nft -f /etc/sandbox/sandbox.nft
+ExecStop=/usr/sbin/nft delete table inet sandbox
+
+[Install]
+WantedBy=multi-user.target

@@ -90,10 +90,17 @@ eigene Sandbox trifft. Laufzeit: Eine Sandbox läuft, solange Guthaben da ist, h
 freigegebenen Port für 24 Stunden wird sie gestoppt und nicht mehr berechnet; gestoppt bleibt sie 7 Tage, dann wird sie gelöscht.
 Ein `exec` dauert höchstens 10 Minuten. Höchstens zwei Sandboxes je Konto, eine mittlere zählt als zwei Plätze.
 
-Solange wa-staging auf dem Server läuft, laufen alle Sandboxes in einer eigenen systemd-Slice `sandbox.slice` mit `CPUQuota=100%`
-und `MemoryMax=5G`, also höchstens zehn Plätze zu 512 MB; Host und wa-staging bleiben
-damit immer 1 vCPU und rund 3 GB, mehr als die 1 vCPU und 2 GB für wa-staging (Regel 4 in `docs/sandbox/server.md`, Entscheidung Tech Lead 11.11.2026). Nach dem Auszug von wa-staging werden es zwölf Plätze (8 GB, davon
-2 GB für Host, Docker, Caddy und `sandboxd`). 100 GB Platte tragen 12 mal 5 GB mit Platz für Images.
+Solange wa-staging auf dem Server läuft, laufen alle Sandboxes und `sandboxd` in einer eigenen systemd-Slice `sandbox.slice` mit
+`CPUQuota=100%` und `MemoryMax=5G`; Host und wa-staging bleiben damit immer 1 vCPU und rund 3 GB, mehr als die 1 vCPU und 2 GB für
+wa-staging (Regel 4 in `docs/sandbox/server.md`, Entscheidung Tech Lead 11.11.2026). Unter `runsc` liegt die Sentry im Cgroup des
+Containers, `--memory=512m` schließt sie also ein: Eine Sandbox belegt nie mehr als 512 MB, und der Kunde hat davon 512 minus die
+leere Sandbox.
+
+Leere Sandbox: 9 MB, `sandboxd`: 18 MB (gemessen 12.11.2026 in `docs/sandbox/server.md`). Plätze neben wa-staging:
+(5120 MB minus 18 MB für `sandboxd`) / 512 MB = 9,96, also 9 Plätze (`SANDBOXD_SLOTS=9` in `ops/sandbox/sandboxd.service`), und
+jeder Kunde hat 512 minus 9 = 503 MB für eigene Prozesse. Zehn volle Sandboxes und `sandboxd` passen nicht in die 5 GB der Slice.
+Nach dem Auszug von wa-staging bekommt die Slice 6 GB (8 GB, davon 2 GB für Host, Docker und Caddy): (6144 minus 18) / 512 = 11,96,
+also 11 Plätze. 100 GB Platte tragen 11 mal 5 GB mit Platz für Images.
 
 Begründung: Die Runtime hat kein Löschen (`deleteSandbox` ist am Pin leer), also muss der Server selbst aufräumen, sonst läuft eine
 vergessene Sandbox bis zum leeren Guthaben. Swap aus, damit ein Prozess über der Grenze stirbt, statt den Host in den Swap zu ziehen.
@@ -111,9 +118,9 @@ jede verkaufte Stunde Marge. Danach kostet KVM 2 in der Verlängerung 14,99 Euro
 `https://www.hostinger.com/de/vps-hosting`. Mit 1 Euro = 1,17 USD (Annahme, `goals/sandbox/ANNAHMEN.md`) sind das rund 1753830 mc
 im Monat oder 2403 mc je Stunde für den ganzen Server (730 Stunden im Monat).
 
-Marge ab 03.02.2027: Bei zehn Plätzen (neben wa-staging) und im Mittel der Hälfte belegt kostet eine belegte Platzstunde
-2403 / 5 = 481 mc, verkauft für 1000 mc, also Faktor 2,1 und über dem Faktor 1,3 der Inferenz; mit zwölf Plätzen nach dem Auszug
-2403 / 6 = 401 mc und Faktor 2,5. Der Server ist bezahlt, sobald 1754 Platzstunden im Monat verkauft
+Marge ab 03.02.2027: Bei neun Plätzen (neben wa-staging) und im Mittel der Hälfte belegt kostet eine belegte Platzstunde
+2403 / 4,5 = 534 mc, verkauft für 1000 mc, also Faktor 1,9 und über dem Faktor 1,3 der Inferenz; mit elf Plätzen nach dem Auszug
+2403 / 5,5 = 437 mc und Faktor 2,3. Der Server ist bezahlt, sobald 1754 Platzstunden im Monat verkauft
 sind, also rund 2,4 Sandboxes rund um die Uhr.
 
 Begründung: Ein fester kleiner Server ist ein Fixkosten-Einkauf, kein Einkauf je Stunde wie bei OpenRouter; der Preis muss den
@@ -140,6 +147,47 @@ sichert das Zertifikat, das Caddy für `ctl.sbx.postyourprice.com` holt. Die Adr
 Begründung: Kein Secret wandert durch das Repo, durch ein Issue oder in `/opt/control-plane/.env`, die kein Goal von Hand ändert.
 Der private Schlüssel verlässt das Volume nie, und ein Rollout über `deploy.yml` reicht, um den Weg einzuschalten. Ohne die Datei
 antwortet das Control Plane wie heute mit 501, es startet also nichts halb.
+
+Signaturformat, Byte für Byte (gebaut in `ops/sandbox/sandboxd.mjs`, `canonicalMessage` und `signRequest`, die sandbox 03 und die
+Messung wiederverwenden). Jede Anfrage außer `GET /healthz` trägt zwei Header: `X-CP-Timestamp` ist die Unix-Zeit in ganzen Sekunden
+als Dezimalzahl in ASCII, `X-CP-Signature` ist die 64 Byte lange Ed25519-Signatur in Standard-Base64 mit `=` am Ende (88 Zeichen).
+Signiert werden die UTF-8-Bytes von vier Zeilen, getrennt durch genau ein `\n` (0x0a) und ohne Zeilenumbruch am Ende: Methode in
+Großbuchstaben, Pfad genau so, wie er in der Anfragezeile steht (Pfad samt `?query`, ohne Schema und Host, Caddy reicht ihn
+unverändert durch), der Wert von `X-CP-Timestamp`, und der SHA-256 der rohen Bytes des Inhalts als Hex in Kleinbuchstaben; ohne
+Inhalt ist das der Hash der leeren Zeichenkette, `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`. `sandboxd`
+antwortet mit 401 und JSON `{"error": ...}`, wenn ein Header fehlt, der Zeitstempel mehr als 60 Sekunden von seiner Uhr abweicht,
+die Signatur unter keinem Schlüssel aus `/etc/sandboxd/keys/*.pub` (Ed25519, SPKI-PEM) gilt oder derselbe Signaturwert in den
+letzten 300 Sekunden schon angenommen wurde. Eine Wiederholung von `exec` signiert also neu und trägt denselben `Idempotency-Key`.
+
+Beispiel mit dem Schlüssel aus RFC 8032, Testvektor 1 (öffentlich bekannt, nie für echten Verkehr). Einen Node-`KeyObject` baut man
+aus dem rohen Seed mit `crypto.createPrivateKey({ key: Buffer.from("302e020100300506032b657004220420" + seed, "hex"), format: "der",
+type: "pkcs8" })`, die öffentliche Hälfte mit `crypto.createPublicKey({ key: Buffer.from("302a300506032b6570032100" + public, "hex"),
+format: "der", type: "spki" })`. Die Werte unten hat `signRequest` berechnet, `test/sandboxd.test.ts` liest diesen Block und prüft,
+dass `signRequest` dieselbe Signatur ergibt und `sandboxd` die Anfrage annimmt.
+
+```
+seed: 9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60
+public: d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a
+method: POST
+path: /v1/sandboxes
+timestamp: 1762992000
+body: {"owner":"acct-example","memory_mb":512}
+bodyhash: 5eacf079ae47935f52c349a62eae070fe2afcc3f0e345495cee962e05c19c5da
+signature: gnaFWtEVpi/yvoUzyMdmxwgS/FRmcgopYhhdSqJiYoiAUpwHQoGT2ajKYPtWrivY9y9sbMJ5yZhf5W0KTNFXAg==
+```
+
+Die signierte Nachricht sind diese vier Zeilen:
+
+```
+POST
+/v1/sandboxes
+1762992000
+5eacf079ae47935f52c349a62eae070fe2afcc3f0e345495cee962e05c19c5da
+```
+
+Die Anfrage geht dann mit `X-CP-Timestamp: 1762992000` und
+`X-CP-Signature: gnaFWtEVpi/yvoUzyMdmxwgS/FRmcgopYhhdSqJiYoiAUpwHQoGT2ajKYPtWrivY9y9sbMJ5yZhf5W0KTNFXAg==` hinaus, der Inhalt genau
+in den Bytes, aus denen der Hash stammt.
 
 ## Schritte
 

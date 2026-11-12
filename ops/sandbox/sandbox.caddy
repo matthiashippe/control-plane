@@ -1,0 +1,30 @@
+# Sandbox entrance (docs/sandbox/plan.md, ## Netz and ## Verbindung), imported by exactly one line of /etc/caddy/Caddyfile.
+# The block of wa-staging stays untouched; no global option here.
+
+# Control API for the control plane: only the payment server may pass, everybody else gets 403. Certificate from Let's Encrypt,
+# the name has an A record without proxy and without AAAA.
+ctl.sbx.postyourprice.com {
+	@payment remote_ip 76.13.144.207
+	handle @payment {
+		reverse_proxy 127.0.0.1:8730
+	}
+	handle {
+		respond "forbidden" 403
+	}
+}
+
+# Exposed sandbox ports, through the Cloudflare proxy. The zone runs SSL mode Full, so Cloudflare encrypts to this origin without
+# checking the certificate; Caddy's internal issuer serves it, no ACME and no global option (goals/sandbox/ANNAHMEN.md, Goal 02).
+# sandboxd answers 404 for every name it does not know, so no sandbox shows up under an arbitrary name of the zone.
+*.postyourprice.com {
+	tls internal
+	@sandbox header_regexp Host ^sbx-[a-z0-9]{1,11}-[0-9]{1,5}\.postyourprice\.com(:[0-9]+)?$
+	handle @sandbox {
+		reverse_proxy 127.0.0.1:8731 {
+			header_up Host {host}
+		}
+	}
+	handle {
+		respond "not found" 404
+	}
+}

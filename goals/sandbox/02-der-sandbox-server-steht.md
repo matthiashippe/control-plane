@@ -1,7 +1,7 @@
 # Sandbox Goal 02: Der Sandbox-Server steht
 
 ## Status
-PLANNED
+ACTIVE
 
 ## Active Objective
 `srv1327036` (`72.62.51.224`) ist nach `docs/sandbox/plan.md` eingerichtet, mit einem idempotenten Skript im Repo, das der code-host
@@ -74,42 +74,42 @@ Code erst dann bei uns laufen darf, wenn die Isolation gegen den Zahlungsserver 
   eine Sandbox.
 
 ## Done Condition
-- [ ] `sandboxd` legt an, führt aus, schreibt und liest Dateien, gibt einen Port frei, stoppt, löscht und räumt auf, nach
+- [x] `sandboxd` legt an, führt aus, schreibt und liest Dateien, gibt einen Port frei, stoppt, löscht und räumt auf, nach
       `docs/sandbox/plan.md`; die Unit-Tests laufen gegen einen nachgebauten Docker-Aufruf ohne Netz und decken Signatur, Zeitstempel,
       Wiederholung, die Docker-Argumente der Grenzen und das Aufräumen mit gestellter Uhr ab.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/sandboxd.test.ts` muss Exit-Code 0 haben.
       Prüfung: `for w in signature timestamp replay runsc memory pids no-new-privileges cap-drop dns bridge publish idle expired exec-timeout slots; do grep -qi -- "$w" test/sandboxd.test.ts || echo "fehlt $w"; done` muss nichts ausgeben.
-- [ ] Das Signaturformat steht in `docs/sandbox/plan.md`, `## Verbindung`, so genau, dass sandbox 03 den Client ohne `sandboxd` zu lesen
+- [x] Das Signaturformat steht in `docs/sandbox/plan.md`, `## Verbindung`, so genau, dass sandbox 03 den Client ohne `sandboxd` zu lesen
       bauen kann, und ein Test prüft eine dort abgedruckte Beispielsignatur.
       Prüfung: `awk '/^## Verbindung/{f=1;next} /^## /{f=0} f' docs/sandbox/plan.md | grep -cE "X-CP-Timestamp|X-CP-Signature"` muss mindestens 2 ausgeben.
       Prüfung: `grep -c "plan.md" test/sandboxd.test.ts` muss mindestens 1 ausgeben.
-- [ ] `ops/sandbox/setup.sh` ist idempotent: Der Selbsttest ohne Netz zeigt, dass `--check` eine gepflanzte Abweichung meldet und einen
+- [x] `ops/sandbox/setup.sh` ist idempotent: Der Selbsttest ohne Netz zeigt, dass `--check` eine gepflanzte Abweichung meldet und einen
       sauberen Stand nicht, und am Server meldet `--check` nach der Einrichtung nichts mehr.
       Prüfung: `bash ops/sandbox/setup.sh --selftest` muss Exit-Code 0 haben und als letzte Zeile `SETUP SELFTEST OK` ausgeben.
       Prüfung (Netz): `bash ops/sandbox/setup.sh --check 72.62.51.224 | tail -1` muss `SETUP CHECK OK changed=0` ausgeben.
-- [ ] Die Messung zeigt jede Sperre aus `docs/sandbox/plan.md`, `## Schritte` (sandbox 02), mit Gegenprobe, und lässt keine Sandbox
+- [x] Die Messung zeigt jede Sperre aus `docs/sandbox/plan.md`, `## Schritte` (sandbox 02), mit Gegenprobe, und lässt keine Sandbox
       zurück.
       Prüfung (Netz): `o=$(mktemp) && bash ops/sandbox/probe.sh 72.62.51.224 >"$o"; for p in host_file payment_https payment_ssh payment_udp443 metadata host_bridge host_public host_ipv6 other_sandbox smtp memory expose; do grep -q "^PROBE $p OK" "$o" || echo "fehlt $p"; done; tail -1 "$o"` muss genau `SANDBOX PROBE OK left=0` ausgeben.
       Prüfung: `bash ops/sandbox/probe.sh --selftest` muss Exit-Code 0 haben und als letzte Zeile `PROBE SELFTEST OK` ausgeben (eine Sperre ohne steigende Gegenprobe wird `FAIL`, ein fehlender Probe-Name wird `FAIL`).
-- [ ] DNS und Eingang stehen nach `## Netz` und `## Verbindung`: `ctl.sbx` nur über IPv4 und für den code-host gesperrt, ein unbekannter
+- [x] DNS und Eingang stehen nach `## Netz` und `## Verbindung`: `ctl.sbx` nur über IPv4 und für den code-host gesperrt, ein unbekannter
       Name `sbx-…` über den Cloudflare-Proxy mit 404, und die Hauptseite ist unverändert.
       Prüfung (Netz): `dig +short A ctl.sbx.postyourprice.com` muss genau `72.62.51.224` ausgeben, `dig +short AAAA ctl.sbx.postyourprice.com` nichts.
       Prüfung (Netz): `curl -s -o /dev/null -w '%{http_code}' --max-time 15 https://ctl.sbx.postyourprice.com/` muss `403` ausgeben.
       Prüfung (Netz): `curl -s -o /dev/null -w '%{http_code}' --max-time 15 https://sbx-unknown0-80.postyourprice.com/` muss `404` ausgeben, und `dig +short A sbx-unknown0-80.postyourprice.com | grep -c 72.62.51.224` muss 0 ausgeben (Proxy).
       Prüfung (Netz): `dig +short A postyourprice.com` muss `76.13.144.207` ausgeben, und `bash ops/smoke.sh https://postyourprice.com` muss Exit-Code 0 haben.
-- [ ] Der Server ist nach Plan gehärtet und wa-staging läuft weiter: `sandboxd` nur auf dem Loopback, kein veröffentlichter Port eines
+- [x] Der Server ist nach Plan gehärtet und wa-staging läuft weiter: `sandboxd` nur auf dem Loopback, kein veröffentlichter Port eines
       Containers, SSH nur mit Schlüssel, Updates automatisch, ufw bei 22, 80 und 443, `caddy validate` grün.
       Prüfung (Netz): `ssh -i ~/.ssh/id_ed25519_cp_sandbox -o BatchMode=yes -o IdentitiesOnly=yes root@72.62.51.224 'ss -Hltnp | grep sandboxd | grep -vc "127.0.0.1"; docker ps --format "{{.Ports}}" | grep -c "0.0.0.0\|:::"; sshd -T | grep -c "^passwordauthentication no"; systemctl is-active unattended-upgrades sandboxd; ufw status | grep -cE "^(22|80|443)(/tcp)? +ALLOW"; caddy validate --config /etc/caddy/Caddyfile >/dev/null 2>&1 && echo valid'` muss nacheinander `0`, `0`, `1`, `active`, `active`, eine Zahl von mindestens 3 und `valid` ausgeben.
       Prüfung (Netz): `ssh -i ~/.ssh/id_ed25519_cp_sandbox -o BatchMode=yes -o IdentitiesOnly=yes root@72.62.51.224 'test -d /srv/wissensanker || { echo ausgezogen; exit 0; }; systemctl is-active wa-api wa-worker'` muss `ausgezogen` oder zweimal `active` ausgeben.
-- [ ] `docs/sandbox/server.md` nennt den gemessenen Stand nach der Einrichtung: Speicher einer leeren Sandbox unter `runsc` und die
+- [x] `docs/sandbox/server.md` nennt den gemessenen Stand nach der Einrichtung: Speicher einer leeren Sandbox unter `runsc` und die
       Zahl der Root-Schlüssel, und `docs/sandbox/plan.md`, `## Grenzen`, rechnet die Plätze mit dieser Zahl.
       Prüfung: `grep -cE "^Leere Sandbox: [0-9]+ MB" docs/sandbox/server.md` muss 1 ausgeben.
       Prüfung (Netz): `n=$(ssh -i ~/.ssh/id_ed25519_cp_sandbox -o BatchMode=yes -o IdentitiesOnly=yes root@72.62.51.224 'grep -cvE "^[[:space:]]*(#|$)" /root/.ssh/authorized_keys'); grep -cE "^Zugang: .*\b${n:?} Schlüssel" docs/sandbox/server.md` muss 1 ausgeben.
       Prüfung: `awk '/^## Grenzen/{f=1;next} /^## /{f=0} f' docs/sandbox/plan.md | grep -c "Leere Sandbox"` muss mindestens 1 ausgeben.
-- [ ] Das Goal ändert weder den Zahlungsdienst noch seinen Betrieb und bringt keinen Schlüssel ins Repo.
+- [x] Das Goal ändert weder den Zahlungsdienst noch seinen Betrieb und bringt keinen Schlüssel ins Repo.
       Prüfung: `git diff --name-only origin/dev...HEAD -- src deploy harness | wc -l` muss 0 ausgeben.
       Prüfung: `git diff --name-only origin/dev...HEAD | grep -cE "\.(key|pem)$|sandboxd-probe|origin-ca"` muss 0 ausgeben.
-- [ ] `check` ist grün.
+- [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
 - [ ] goal-verifier PASS (K und B)
 
@@ -132,5 +132,6 @@ Code erst dann bei uns laufen darf, wenn die Isolation gegen den Zahlungsserver 
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-12 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6, 7, 8, 9 gebaut: `sandboxd` mit 34 Unit-Tests gegen nachgebauten Docker-Aufruf, Signaturformat mit Beispiel in `## Verbindung`, `ops/sandbox/setup.sh` und `probe.sh` mit Selbsttest, `srv1327036` eingerichtet (Docker, `runsc`, `inet sandbox`, `sandbox.slice`, `sandboxd`, Caddy-Import), DNS `*.postyourprice.com` proxied und `ctl.sbx` nur A, 9 Plätze nach gemessener leerer Sandbox (9 MB); Abweichungen vom Plan in `ANNAHMEN.md` (Zertifikat `tls internal`, weil der Token keine Origin CA darf, Peer-Sperre in `prerouting`). Rot gesehen: 51 Brüche in `sandboxd.mjs` machten jeden der 34 Tests mindestens einmal rot, `setup.sh --selftest` rot mit abgeschaltetem Vergleich, `probe.sh --selftest` rot ohne Zählerprüfung, ohne Namensprüfung und ohne Beispiel im Plan, `--check` am Server meldete zweimal eine echte Abweichung (`sandbox.nft`, `sandboxd.service`), der erste Messlauf meldete `other_sandbox FAIL counter-proof did not rise (0 -> 0)`. Prüfbefehle: P1 vitest 34 passed Exit 0, Wortliste ohne Ausgabe; P2 6 und 5; P3 `SETUP SELFTEST OK` Exit 0, `SETUP CHECK OK changed=0`; P4 keine fehlende Sperre, `SANDBOX PROBE OK left=0`, `PROBE SELFTEST OK` Exit 0; P5 `72.62.51.224`, AAAA leer, 403, 404, 0, `76.13.144.207`, smoke Exit 0; P6 0, 0, 1, active, active, 3, valid und active, active; P7 1, 1, 1; P8 0 und 0; P9 check grün in 204 s.
 
 ## Blockers
