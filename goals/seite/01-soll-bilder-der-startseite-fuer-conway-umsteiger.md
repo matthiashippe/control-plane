@@ -63,6 +63,11 @@ Betreiber, der aus Conway-Issue #435 kam, den Umzug heute erst hinter „Agent s
       Prüfung: `git diff --name-only origin/dev...HEAD | grep -vE '^(docs/soll/|ops/soll\.mjs$|ops/soll-[a-z]+\.mjs$|test/soll\.test\.ts$|goals/seite/)' | wc -l` muss `0` ausgeben.
       Prüfung: `git diff --quiet origin/dev...HEAD -- src && echo src gleich` muss `src gleich` ausgeben.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
+- [ ] Eine geänderte Zahl oder ein geändertes Wort in der Quelle fällt beim Prüfen auf, damit seite 02 nie nach einem Bild baut, das der Quelle nicht mehr folgt (Kritik 2026-11-12: heute gehen „$9“ statt „$5“ mit 0,003 % und „replies“ statt „answers“ mit 0,133 % Abweichung als 0 Mängel durch).
+      MVP: Funktion, weil seite 02 1:1 nach dem Bild baut und ein veraltetes Bild sonst unbemerkt das SOLL ist.
+      Prüfung: `T=$(mktemp -d); sed 's/tops up \$5 of credit/tops up $9 of credit/' docs/soll/src/startseite.html > $T/s.html; node ops/soll.mjs --pruefen --source $T/s.html; echo "exit=$?"` muss als letzte Zeile `exit=1` ausgeben.
+      Prüfung: `T=$(mktemp -d); sed 's/gets answers again/gets replies again/' docs/soll/src/startseite.html > $T/s.html; node ops/soll.mjs --pruefen --source $T/s.html; echo "exit=$?"` muss als letzte Zeile `exit=1` ausgeben.
+      Prüfung: `node ops/soll.mjs --pruefen` muss weiter Exit 0 haben und als letzte Zeile `soll: 2 Bilder, umzug oben 390=<y> 1440=<y>, 0 Mängel` ausgeben, und `pnpm -s vitest run test/soll.test.ts` muss Exit 0 haben.
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
