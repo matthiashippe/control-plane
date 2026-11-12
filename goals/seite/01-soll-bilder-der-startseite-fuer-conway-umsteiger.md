@@ -1,7 +1,7 @@
 # Seite Goal 01: SOLL-Bilder der Startseite für Conway-Umsteiger
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Wer aus einem Conway-Issue auf `/` landet, sieht im ersten Bildschirm den Umzug in einem Schritt: `conwayApiUrl` auf
@@ -68,7 +68,7 @@ Betreiber, der aus Conway-Issue #435 kam, den Umzug heute erst hinter „Agent s
       Prüfung: `T=$(mktemp -d); sed 's/tops up \$5 of credit/tops up $9 of credit/' docs/soll/src/startseite.html > $T/s.html; node ops/soll.mjs --pruefen --source $T/s.html; echo "exit=$?"` muss als letzte Zeile `exit=1` ausgeben.
       Prüfung: `T=$(mktemp -d); sed 's/gets answers again/gets replies again/' docs/soll/src/startseite.html > $T/s.html; node ops/soll.mjs --pruefen --source $T/s.html; echo "exit=$?"` muss als letzte Zeile `exit=1` ausgeben.
       Prüfung: `node ops/soll.mjs --pruefen` muss weiter Exit 0 haben und als letzte Zeile `soll: 2 Bilder, umzug oben 390=<y> 1440=<y>, 0 Mängel` ausgeben, und `pnpm -s vitest run test/soll.test.ts` muss Exit 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Ein Betreiber, der aus einem Conway-Issue kommt, sieht ohne Scrollen, welche eine Zeile er ändert, und liest dort keine Rede an
@@ -99,6 +99,7 @@ Betreiber, der aus Conway-Issue #435 kam, den Umzug heute erst hinter „Agent s
 - 2026-11-12 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, nach Merge von `origin/dev` (96440e4). Prüfbefehle: `node ops/soll.mjs --pruefen` -> `soll: 2 Bilder, umzug oben 390=828 1440=656, 0 Mängel` (Exit 0); Breiten -> `breiten ok`; `pnpm -s vitest run test/soll.test.ts` -> Exit 0, 8 passed; grep -> 8; Quelle -> `quelle ok`; Bausteine -> `bausteine ok neu=0`; Pfade -> 0; src -> `src gleich`; `node scripts/check.mjs` -> Exit 0 (1418 Tests); Punkt 4 -> `abnahme ok 1`.
 - 2026-11-12 Zyklus 3: Punkt 6 gebaut: `ops/soll-assess.mjs` zählt abweichende Pixel (`pixelDiffCount`), Mangel ab dem ersten Pixel über der Kanaltoleranz (`MAX_DIFF_PIXELS = 0`), `ops/soll.mjs` meldet `diff <n> px`; Annahme in `goals/seite/ANNAHMEN.md`. Vorher beide Gegenproben Exit 0 (0,003 % und 0,133 %). Der geänderte Test war rot mit Grenze 1000 Pixel und mit nicht gezählten Pixeln außerhalb des kleineren Bildes. 12 parallele `--pruefen` bei Load 70: je `diff 0 px`, Exit 0. Prüfbefehle: `$9` -> 54 und 52 px, `exit=1`; `replies` -> 2737 und 1563 px, `exit=1`; `node ops/soll.mjs --pruefen` -> `soll: 2 Bilder, umzug oben 390=828 1440=656, 0 Mängel` (Exit 0); `pnpm -s vitest run test/soll.test.ts` -> Exit 0, 8 passed.
 - 2026-11-12 Zyklus 3: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, `dev` ohne neue Commits. Prüfbefehle: Breiten -> `breiten ok`; grep -> 8; Quelle und Bausteine unverändert seit Zyklus 2 (`quelle ok`, `bausteine ok neu=0`); Punkt 4 -> Bilder unverändert, Abnahme gilt; Pfade -> 0; src -> `src gleich`; `node scripts/check.mjs` -> Exit 0 (1418 Tests, erster Lauf Exit 1 nur durch „Timeout calling onTaskUpdate“ bei Load 104).
+- 2026-11-12 Release: PASS K und B (Zyklus 3), DONE.
 
 ## Blockers
 keine
