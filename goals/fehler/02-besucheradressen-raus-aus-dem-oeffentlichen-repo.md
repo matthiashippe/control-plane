@@ -1,7 +1,7 @@
 # Fehler Goal 02: Besucheradressen raus aus dem öffentlichen Repo
 
 ## Status
-PLANNED
+ACTIVE
 
 ## Active Objective
 Im öffentlichen Repo liegen keine Adressen echter Besucher mehr am Kopf von `dev`, und kein Lauf schreibt neue hinein: Der Cache von
@@ -43,7 +43,7 @@ der Seite das Gegenteil zusagt.
   Commit oder Verdict eine Adresse aus, nur Zahlen.
 
 ## Done Condition
-- [ ] `ops/fetchers.py` liest und schreibt den Cache nur am Ort aus `CP_FETCHER_CACHE` (Standard `~/.cache/control-plane/fetcher-cache.tsv`),
+- [x] `ops/fetchers.py` liest und schreibt den Cache nur am Ort aus `CP_FETCHER_CACHE` (Standard `~/.cache/control-plane/fetcher-cache.tsv`),
       die Datei ist aus dem Repo genommen und steht in `.gitignore`. Der Test fährt `ops/fetchers.py` mit gepflanzten Zeilen und einem
       Cache-Pfad aus `mktemp` und verlangt, dass dort geschrieben wird und neben dem Skript keine Datei entsteht; mit dem Skript von heute
       ist er rot, die Zeile im Progress Log nennt es.
@@ -52,14 +52,14 @@ der Seite das Gegenteil zusagt.
       Prüfung: `grep -c 'with_name("fetcher-cache.tsv")' ops/fetchers.py` muss 0 ausgeben.
       Prüfung: `grep -c "CP_FETCHER_CACHE" ops/fetchers.py` muss mindestens 1 ausgeben.
       Prüfung: `pnpm -s vitest run test/fetcher-cache.test.ts` muss Exit-Code 0 haben.
-- [ ] Keine Datei im Repo trägt eine Adresse aus dem Cache, die nicht als Rechenzentrum erkannt ist, außer den eigenen aus
+- [x] Keine Datei im Repo trägt eine Adresse aus dem Cache, die nicht als Rechenzentrum erkannt ist, außer den eigenen aus
       `ops/own-ips.txt` und höchstens fünf belegten Crawler-Adressen aus `ops/crawler-ips.txt`; unter `src/` ändern sich nur Kommentare.
       Prüfung: `test -s "$HOME/.cache/control-plane/fetcher-cache.tsv" && echo vorhanden` muss `vorhanden` ausgeben.
       Prüfung: `git ls-files -z | xargs -0 grep -ohE '\b([0-9]{1,3}\.){3}[0-9]{1,3}\b' 2>/dev/null | sort -u | grep -cxFf <(awk -F'\t' 'NR>1 && $3!="datacenter"{print $1}' "$HOME/.cache/control-plane/fetcher-cache.tsv" | sort -u | grep -vxFf <(cat ops/own-ips.txt ops/crawler-ips.txt 2>/dev/null | grep -oE '^[0-9.]+'))` muss 0 ausgeben.
       Prüfung: `cat ops/crawler-ips.txt 2>/dev/null | grep -cE '^[0-9.]+ ' | awk '{print ($1 <= 5) ? "passt" : "zu viele"}'` muss `passt` ausgeben, auch wenn die Datei fehlt.
       Prüfung: `git diff origin/dev...HEAD -- src | grep -E '^[+-]' | grep -vE '^(\+\+\+|---)' | grep -vcE '^[+-][[:space:]]*(\*|//|/\*)'` muss 0 ausgeben.
       Prüfung: `pnpm -s vitest run` muss Exit-Code 0 haben.
-- [ ] `check` ist grün.
+- [x] `check` ist grün.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
 - [ ] goal-verifier PASS (K und B)
 
@@ -81,5 +81,6 @@ der Seite das Gegenteil zusagt.
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-12 Zyklus 1: Punkte 1, 2, 3 gebaut: Cache von `ops/fetchers.py` unter `CP_FETCHER_CACHE` (Standard `~/.cache/control-plane/fetcher-cache.tsv`, dorthin kopiert), `ops/fetcher-cache.tsv` aus dem Index und in `.gitignore`, Besucheradressen in 12 Dateien durch Dokumentationsadressen ersetzt, eine Googlebot-Adresse belegt in `ops/crawler-ips.txt`; neuer Test `test/fetcher-cache.test.ts` war mit dem Skript von `origin/dev` rot (3 von 3 failed: Planted-Owner nicht aus `CP_FETCHER_CACHE` gelesen, kein Cache unter `~/.cache`, Datei noch getrackt). Prüfbefehle: `git ls-files ops/fetcher-cache.tsv | wc -l` -> 0; `git check-ignore` -> ignoriert; `grep -c with_name(...)` -> 0; `grep -c CP_FETCHER_CACHE` -> 2; `pnpm -s vitest run test/fetcher-cache.test.ts` -> 3 passed, Exit 0; `test -s` Cache -> vorhanden; Adresszähler -> 0 (Gegenprobe mit einer gepflanzten Cache-Adresse in `ops/who.sh` -> 1); Crawler-Zeilen -> passt (1); Nicht-Kommentarzeilen unter `src/` -> 0; `pnpm -s vitest run` -> 1365 passed, Exit 0 (bei Load über 40 auf 16 Kernen vorher viermal ein 5-s-Timeout in fremden Tests, `stripe-sessions-selftest` ebenso auf frischem `origin/dev`); `node scripts/check.mjs` -> grün in 160 s, Exit 0; Selbsttests `ops/fetchers.py`, `ops/crawlers.sh`, `ops/failures.sh` -> OK.
 
 ## Blockers
