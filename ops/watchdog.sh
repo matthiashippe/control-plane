@@ -7,7 +7,8 @@
 #   */5 * * * * /opt/control-plane/repo/ops/watchdog.sh >> /var/log/cp-watchdog.log 2>&1
 #
 # It reports the change of state, not every run: an outage reports once, the return reports once.
-# Otherwise the message goes blunt and gets ignored when it counts.
+# Otherwise the message goes blunt and gets ignored when it counts. The new state is stored only after the
+# POST went through: when the webhook fails, the next run reports the same change again.
 set -uo pipefail
 
 URL="${CP_URL:-https://postyourprice.com}"
@@ -17,15 +18,20 @@ CERT_WARN_DAYS="${CP_CERT_WARN_DAYS:-20}"
 CREDIT_TIMEOUT="${CP_CREDIT_TIMEOUT:-45}"
 TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
+# Exits non-zero when the POST failed: no answer or an HTTP error of the webhook (`--fail`). The caller then keeps the
+# old state, so the next run sends the message again.
 report() {
   local severity="$1" text="$2"
   echo "$TS [$severity] $text"
   [[ -n "$WEBHOOK" ]] || return 0
-  curl -s -m 15 -X POST "$WEBHOOK" \
+  if ! curl -s --fail -m 15 -X POST "$WEBHOOK" \
     -H "Content-Type: text/plain" \
     -H "Title: control-plane $severity" \
     -H "Priority: $([[ "$severity" == OK ]] && echo default || echo high)" \
-    --data "control-plane $severity: $text ($URL, $TS)" >/dev/null || echo "$TS [WARN] webhook unreachable"
+    --data "control-plane $severity: $text ($URL, $TS)" >/dev/null; then
+    echo "$TS [WARN] webhook unreachable"
+    return 1
+  fi
 }
 
 # Two attempts with a pause, so a single hiccup does not alarm straight away.
@@ -48,7 +54,7 @@ check_health() {
 # and a hanging Docker daemon would otherwise hold every run and with it the outage alarm. `timeout` signals its whole process
 # group, so `docker exec` dies with the script.
 check_credit() {
-  local line code previous today left now
+  local line code previous today left now posted=1
   if command -v timeout >/dev/null 2>&1; then
     line=$(timeout -k 5 "$CREDIT_TIMEOUT" bash "$HERE"/credit-runway.sh --container 2>/dev/null | head -n 1)
     code=${PIPESTATUS[0]}
@@ -61,26 +67,26 @@ check_credit() {
   previous=$(cat "${STATE_FILE}.credit" 2>/dev/null || echo "unknown")
   case "$code" in
     0)
-      [[ "$previous" == "low" || "$previous" == "empty" ]] && report "OK" "credit $line"
-      echo "ok" > "${STATE_FILE}.credit" 2>/dev/null || true
+      if [[ "$previous" == "low" || "$previous" == "empty" ]]; then report "OK" "credit $line" || posted=0; fi
+      [[ $posted == 1 ]] && { echo "ok" > "${STATE_FILE}.credit" 2>/dev/null || true; }
       echo "$TS [INFO] credit $line" ;;
     1)
       # The line starts with "CREDIT RUNWAY LOW: <left> USD"; a balance of 0 or below is empty.
       left=${line#CREDIT RUNWAY LOW: }; left=${left%% USD*}
       if [[ "$left" =~ ^(-[0-9.]+|0(\.0+)?)$ ]]; then now="empty"; else now="low"; fi
       if [[ "$now" == "empty" && "$previous" != "empty" ]]; then
-        report "WARN" "credit empty, $left USD left, every inference request fails until topped up at https://openrouter.ai/settings/credits"
+        report "WARN" "credit empty, $left USD left, every inference request fails until topped up at https://openrouter.ai/settings/credits" || posted=0
       elif [[ "$now" == "low" && "$previous" != "low" && "$previous" != "empty" ]]; then
-        report "WARN" "credit $line, top up at https://openrouter.ai/settings/credits"
+        report "WARN" "credit $line, top up at https://openrouter.ai/settings/credits" || posted=0
       else
         echo "$TS [INFO] credit still $now"
       fi
-      echo "$now" > "${STATE_FILE}.credit" 2>/dev/null || true ;;
+      [[ $posted == 1 ]] && { echo "$now" > "${STATE_FILE}.credit" 2>/dev/null || true; } ;;
     *)
       today=$(date -u +%F)
       if [[ "$(cat "${STATE_FILE}.credit-fail" 2>/dev/null)" != "$today" ]]; then
-        report "WARN" "credit unreadable (${line:-no answer from ops/credit-runway.sh})"
-        echo "$today" > "${STATE_FILE}.credit-fail" 2>/dev/null || true
+        report "WARN" "credit unreadable (${line:-no answer from ops/credit-runway.sh})" &&
+          { echo "$today" > "${STATE_FILE}.credit-fail" 2>/dev/null || true; }
       else
         echo "$TS [WARN] credit unreadable (${line:-no answer from ops/credit-runway.sh})"
       fi ;;
@@ -94,11 +100,13 @@ CODE=$(check_health)
 PREVIOUS=$(cat "$STATE_FILE" 2>/dev/null || echo "unknown")
 
 if [[ "$CODE" == "200" ]]; then
-  [[ "$PREVIOUS" == "down" ]] && report "OK" "reachable again"
-  echo "up" > "$STATE_FILE" 2>/dev/null || true
+  if [[ "$PREVIOUS" != "down" ]] || report "OK" "reachable again"; then
+    echo "up" > "$STATE_FILE" 2>/dev/null || true
+  fi
 else
-  [[ "$PREVIOUS" == "down" ]] || report "OUTAGE" "HTTP $CODE, twice in a row"
-  echo "down" > "$STATE_FILE" 2>/dev/null || true
+  if [[ "$PREVIOUS" == "down" ]] || report "OUTAGE" "HTTP $CODE, twice in a row"; then
+    echo "down" > "$STATE_FILE" 2>/dev/null || true
+  fi
   # On an outage, put the compose state into the log right away so the cause can be read up later.
   docker ps -a --filter "name=deploy-" --format "{{.Names}} {{.Status}}" 2>/dev/null | sed "s/^/$TS [INFO] /"
   exit 1
@@ -114,8 +122,8 @@ if [[ -n "$PEM" ]]; then
     TODAY=$(date -u +%F)
     if [[ "$(cat "${STATE_FILE}.cert" 2>/dev/null)" != "$TODAY" ]]; then
       END=$(echo "$PEM" | openssl x509 -noout -enddate 2>/dev/null | cut -d= -f2)
-      report "WARNING" "certificate expires in less than $CERT_WARN_DAYS days (valid until $END)"
-      echo "$TODAY" > "${STATE_FILE}.cert" 2>/dev/null || true
+      report "WARNING" "certificate expires in less than $CERT_WARN_DAYS days (valid until $END)" &&
+        { echo "$TODAY" > "${STATE_FILE}.cert" 2>/dev/null || true; }
     fi
   fi
   echo "$TS [INFO] ok, certificate valid until $(echo "$PEM" | openssl x509 -noout -enddate 2>/dev/null | cut -d= -f2)"
