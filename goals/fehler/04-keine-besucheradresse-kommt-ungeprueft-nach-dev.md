@@ -95,6 +95,26 @@ Zusage der Datenschutzerklärung bricht, ohne dass `check` es merkt.
       Prüfung (Netz): `bash ops/traffic.sh --selftest` muss Exit-Code 0 haben.
 - [x] `check` ist grün.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
+- [ ] Kritik (Tech Lead, 12.11.2026): Der Test hält die Regeln der Liste selbst in `check`, nicht nur die Prüfbefehle dieses
+      Goals: Jede Zeile von `ops/known-ips.txt` außer Kommentar und Leerzeile hat die Form `<adresse> <art> <beleg>` mit einer der
+      vier Arten und nicht leerem Beleg, und eine Adresse der Art `erfunden` steht in keiner Datei aus `git ls-files` außerhalb der
+      Pfade, die ein Goal nicht ändern darf (`goals/`, `docs/audit/`, `LOOP.md`, `loop-constraints.md`, `loop-dauerauftrag.md`,
+      `.github/`, `deploy/`, `harness/`), die Liste selbst ausgenommen. Heute ist der Test grün, wenn eine Besucheradresse mit
+      `<adresse> datacenter` ohne Beleg, mit einer erfundenen Art oder als `erfunden` in einer Fixture in der Liste steht; nach `DONE`
+      prüft das niemand mehr. Die Meldung nennt Zeilennummer oder Datei, nie eine Adresse.
+      Prüfung: `pnpm -s vitest run test/known-ips.test.ts` muss Exit-Code 0 haben.
+      Prüfung: `d=$(mktemp -d); k=$(mktemp); git -C "$d" init -q; printf 'seen %d.%d.%d.%d\n' 11 22 33 44 > "$d/a.txt"; git -C "$d" add a.txt; printf '%d.%d.%d.%d datacenter\n' 11 22 33 44 > "$k"; CP_SCAN_ROOT="$d" CP_KNOWN_IPS="$k" pnpm -s vitest run test/known-ips.test.ts >/dev/null 2>&1 && echo gruen || echo rot` muss `rot` ausgeben.
+      Prüfung: `d=$(mktemp -d); k=$(mktemp); git -C "$d" init -q; printf 'seen %d.%d.%d.%d\n' 11 22 33 44 > "$d/a.txt"; git -C "$d" add a.txt; printf '%d.%d.%d.%d besucher seen in the log\n' 11 22 33 44 > "$k"; CP_SCAN_ROOT="$d" CP_KNOWN_IPS="$k" pnpm -s vitest run test/known-ips.test.ts >/dev/null 2>&1 && echo gruen || echo rot` muss `rot` ausgeben.
+      Prüfung: `d=$(mktemp -d); k=$(mktemp); git -C "$d" init -q; printf 'seen %d.%d.%d.%d\n' 11 22 33 44 > "$d/a.txt"; git -C "$d" add a.txt; printf '%d.%d.%d.%d erfunden test value from abc1234\n' 11 22 33 44 > "$k"; CP_SCAN_ROOT="$d" CP_KNOWN_IPS="$k" pnpm -s vitest run test/known-ips.test.ts >/dev/null 2>&1 && echo gruen || echo rot` muss `rot` ausgeben.
+      Prüfung: `d=$(mktemp -d); k=$(mktemp); git -C "$d" init -q; mkdir -p "$d/goals/x"; printf 'seen %d.%d.%d.%d\n' 11 22 33 44 > "$d/goals/x/01-a.md"; git -C "$d" add goals; printf '%d.%d.%d.%d erfunden test value from abc1234\n' 11 22 33 44 > "$k"; CP_SCAN_ROOT="$d" CP_KNOWN_IPS="$k" pnpm -s vitest run test/known-ips.test.ts >/dev/null 2>&1 && echo gruen || echo rot` muss `gruen` ausgeben.
+      Prüfung: `d=$(mktemp -d); k=$(mktemp); git -C "$d" init -q; printf 'seen %d.%d.%d.%d\n' 11 22 33 44 > "$d/a.txt"; git -C "$d" add a.txt; printf '%d.%d.%d.%d datacenter\n' 11 22 33 44 > "$k"; CP_SCAN_ROOT="$d" CP_KNOWN_IPS="$k" pnpm -s vitest run test/known-ips.test.ts 2>&1 | grep -cF "$(printf '%d.%d.%d.%d' 11 22 33 44)"` muss 0 ausgeben.
+- [ ] Kritik (Tech Lead, 12.11.2026): Ein Eintrag in `ops/known-ips.txt`, dessen Adresse in keiner anderen Datei aus `git ls-files`
+      mehr steht, macht den Test rot, damit die Liste nicht zur Freigabe auf Vorrat wird: Eine einmal eingetragene Adresse, deren
+      Fundstelle weg ist, ließe sonst jede spätere Besucheradresse gleichen Werts ungeprüft durch. Die Meldung nennt die Anzahl,
+      nie eine Adresse.
+      Prüfung: `d=$(mktemp -d); k=$(mktemp); git -C "$d" init -q; printf 'seen 192.0.2.%d\n' 7 > "$d/a.txt"; git -C "$d" add a.txt; printf '%d.%d.%d.%d datacenter Example (fetcher-cache)\n' 11 22 33 44 > "$k"; CP_SCAN_ROOT="$d" CP_KNOWN_IPS="$k" pnpm -s vitest run test/known-ips.test.ts >/dev/null 2>&1 && echo gruen || echo rot` muss `rot` ausgeben.
+      Prüfung: `d=$(mktemp -d); k=$(mktemp); git -C "$d" init -q; printf 'seen %d.%d.%d.%d\n' 11 22 33 44 > "$d/a.txt"; git -C "$d" add a.txt; printf '%d.%d.%d.%d datacenter Example (fetcher-cache)\n' 11 22 33 44 > "$k"; CP_SCAN_ROOT="$d" CP_KNOWN_IPS="$k" pnpm -s vitest run test/known-ips.test.ts >/dev/null 2>&1 && echo gruen || echo rot` muss `gruen` ausgeben.
+      Prüfung: `d=$(mktemp -d); k=$(mktemp); git -C "$d" init -q; printf 'seen 192.0.2.%d\n' 7 > "$d/a.txt"; git -C "$d" add a.txt; printf '%d.%d.%d.%d datacenter Example (fetcher-cache)\n' 11 22 33 44 > "$k"; CP_SCAN_ROOT="$d" CP_KNOWN_IPS="$k" pnpm -s vitest run test/known-ips.test.ts 2>&1 | grep -cF "$(printf '%d.%d.%d.%d' 11 22 33 44)"` muss 0 ausgeben.
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
