@@ -7,3 +7,5 @@ MVP: Schönheit
 
 Linse Q, Frage 6. Für abrechnung 02 (Merge 39d4549e) gibt derselbe grep ebenfalls 0.
 `src/app.ts` und `src/db.ts` lagen schon vor dem Goal über 500 Zeilen und zählen hier nicht.
+
+Verworfen: MVP Schönheit, Schwere 1, Größe von proxy.ts ohne Folge für Kunden (2026-11-12)

@@ -5,3 +5,5 @@ Beleg: `gh repo view matthiashippe/control-plane --json visibility` -> `PUBLIC` 
 Empfehlung: Matthias nimmt `ops/fetcher-cache.tsv` aus dem Repo, trägt sie in `.gitignore` ein und hält den Cache außerhalb des Checkouts; `ops/fetcher-cache.tsv` kommt in `deny_paths`. Ob die Historie bereinigt wird (Löschversprechen), entscheidet er. Bei der Gelegenheit `ops/own-ips.txt` (eigene Adressen) und die 17 Adressen außerhalb der Dokumentationsbereiche in `ops/fixtures/traffic-*.log` prüfen.
 
 Die Commits stammen aus der Zeit vor dem Loop-Vertrag (10.11.2026), der Cache wird aber weiter geschrieben, und jeder Commit eines Goals, der ihn mitnimmt, veröffentlicht neue Adressen. Schwere 4 statt 5, weil Grundregel 8 IP-Adressen nicht wörtlich nennt; der Loop selbst liest sie so (goals/sandbox/01, Verdict 02-z3-B.md:17).
+
+Übernommen: Tech Lead als Human Inbox des Loops (Datei aus dem Repo, .gitignore, deny_paths) (2026-11-12)

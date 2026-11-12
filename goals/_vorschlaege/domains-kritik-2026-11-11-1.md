@@ -5,3 +5,5 @@ Beleg: `git ls-tree --name-only origin/dev docs/sandbox/` -> leer; `git show ori
 Empfehlung: Tech Lead schneidet sandbox 01 so, dass Vertrag und Plan ohne den Serverkauf auf dev landen (Serverkauf in ein eigenes Goal sandbox 02), oder macht domains 01 nur von den Vertragsdateien abhängig. Dann baut domains 01 die Domain-Endpunkte jetzt statt nach dem Kauf.
 
 Loop-Kritik 2026-11-11, Growth Lead. Alle drei aktiven Goals (abrechnung 04, kanal 01, sandbox 01) warten auf Matthias, seite 01 auf Budget.
+
+Verworfen: erledigt, sandbox 01 ist seit 11.11. DONE und domains 01 läuft (2026-11-12)

@@ -9,3 +9,5 @@ Linse Q, Frage 1 (Randfall), dazu Grundregel 3 (Messwerkzeug in beide Richtungen
 Mit dem Zweig auf `false` melden `double` und `split` weiter FAIL, aber nur über „credit over 158458 mc“ bzw. „79228 mc“.
 In der Produktion verhindert der Index `ledger_refund_once` eine zweite Zeile ohnehin, darum Schwere 1.
 Hinweis stand schon im Verdict goals/abrechnung/verdicts/01-z4-K.md:39 als Vorschlag für die Nacharbeit.
+
+Verworfen: MVP Schönheit, Schwere 1, in der Produktion verhindert ledger_refund_once die zweite Zeile (2026-11-12)
