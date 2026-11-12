@@ -1,7 +1,7 @@
 # Betrieb Goal 02: Keine Anfrage scheitert am Neustart
 
 ## Status
-PLANNED
+ACTIVE
 
 ## Active Objective
 Eine Anfrage eines zahlenden Kunden scheitert nicht mehr daran, dass der Dienst gerade neu startet: Caddy hält eine Anfrage, deren
@@ -85,23 +85,23 @@ kann, bis der neue Prozess antwortet.
   vitest im Vordergrund mit eigenem Timeout.
 
 ## Done Condition
-- [ ] Caddy hält eine Anfrage an `cp:8402`, deren Verbindung scheitert, höchstens 30 Sekunden statt 502: `lb_try_duration 30s` und
+- [x] Caddy hält eine Anfrage an `cp:8402`, deren Verbindung scheitert, höchstens 30 Sekunden statt 502: `lb_try_duration 30s` und
       `lb_try_interval 250ms` im Block `reverse_proxy cp:8402` von `deploy/Caddyfile`, kein `lb_retry_match`, die Datei ist gültig.
       Prüfung: `T=$(mktemp -d); sed "s#/var/log/caddy/access.log#$T/access.log#" deploy/Caddyfile > $T/Caddyfile && PATH=$HOME/.local/bin:$PATH caddy validate --config $T/Caddyfile --adapter caddyfile 2>&1 | tail -1` muss eine Zeile ausgeben, die `Valid configuration` enthält.
       Prüfung: `PATH=$HOME/.local/bin:$PATH caddy adapt --config deploy/Caddyfile --adapter caddyfile 2>/dev/null | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const f=[];const w=o=>{if(Array.isArray(o))o.forEach(w);else if(o&&typeof o==="object"){if(o.handler==="reverse_proxy")f.push(o.upstreams.map(u=>u.dial).join(",")+" "+(o.load_balancing&&o.load_balancing.try_duration));Object.values(o).forEach(w)}};w(JSON.parse(s));console.log(f.join("\n"))})' | grep -cx "cp:8402 30000000000"` muss 1 ausgeben.
       Prüfung: `grep -c lb_retry_match deploy/Caddyfile` muss 0 ausgeben.
       Prüfung: `pnpm -s vitest run test/caddy-retry.test.ts` muss Exit-Code 0 haben.
-- [ ] Der Block aus `deploy/Caddyfile` hält im lokalen Versuch einen `POST` mit Body und ein `GET`, bis der Dienst nach 3 Sekunden
+- [x] Der Block aus `deploy/Caddyfile` hält im lokalen Versuch einen `POST` mit Body und ein `GET`, bis der Dienst nach 3 Sekunden
       startet, und derselbe Block ohne `lb_try_*` antwortet 502.
       Prüfung: `PATH=$HOME/.local/bin:$PATH bash ops/caddy-retry.sh --selftest` muss Exit-Code 0 haben und als letzte Zeile `CADDY RETRY SELFTEST OK` ausgeben.
       Prüfung: `PATH=$HOME/.local/bin:$PATH bash ops/caddy-retry.sh --selftest | grep -cE "^ok   (held|get-held|control)$"` muss 3 ausgeben.
-- [ ] `ops/deploy-window.sh` misst ein vergangenes Fenster mit `--at`, liest mit `--log` ohne ssh, zählt 502 in der Zeile
+- [x] `ops/deploy-window.sh` misst ein vergangenes Fenster mit `--at`, liest mit `--log` ohne ssh, zählt 502 in der Zeile
       `BAD GATEWAY` und nennt in keiner Ausgabezeile eine Adresse.
       Prüfung: `bash ops/deploy-window.sh --selftest` muss Exit-Code 0 haben und als letzte Zeile `DEPLOY WINDOW SELFTEST OK` ausgeben.
       Prüfung: `bash ops/deploy-window.sh --selftest | grep -cE "^ok   "` muss mindestens 5 ausgeben.
       Prüfung: `bash ops/deploy-window.sh --selftest | grep -c "198\.51\.100\.23"` muss 0 ausgeben.
       Prüfung: `pnpm -s vitest run test/deploy-window.test.ts` muss Exit-Code 0 haben.
-- [ ] Die 502 an fremde Adressen in den Fenstern der Rollouts seit dem 10.11.2026 sind gezählt und stehen je Fenster mit Befehl und
+- [x] Die 502 an fremde Adressen in den Fenstern der Rollouts seit dem 10.11.2026 sind gezählt und stehen je Fenster mit Befehl und
       Uhrzeit in `docs/betrieb/neustart.md`, ohne eine Adresse.
       Prüfung (Netz): `set -a; . ~/.config/control-plane/loop.env; set +a; bash ops/deploy-window.sh --at 2026-11-12T16:41:02` muss eine Zeile ausgeben, die mit `BAD GATEWAY ` beginnt.
       Prüfung: `awk '/^## Vorher/{f=1;next} /^## /{f=0} f' docs/betrieb/neustart.md | grep -cE "^- 20[0-9]{2}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2} UTC: [0-9]+ mal 502 an fremde Adressen, [0-9]+ Anfragen von außen$"` muss mindestens 5 ausgeben.
@@ -109,7 +109,7 @@ kann, bis der neue Prozess antwortet.
       Prüfung: `grep -c "ops/deploy-window.sh --at " docs/betrieb/neustart.md` muss mindestens 1 ausgeben.
       Prüfung: `grep -c "^## Nachher" docs/betrieb/neustart.md` muss 1 ausgeben.
       Prüfung: `grep -cE "(^|[^0-9.])([0-9]{1,3}\.){3}[0-9]{1,3}([^0-9.]|$)" docs/betrieb/neustart.md` muss 0 ausgeben.
-- [ ] `check` ist grün, und keine Datei des Goals trägt einen Schlüssel.
+- [x] `check` ist grün, und keine Datei des Goals trägt einen Schlüssel.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung: `cat deploy/Caddyfile ops/caddy-retry.sh ops/deploy-window.sh docs/betrieb/neustart.md test/caddy-retry.test.ts test/deploy-window.test.ts | grep -cE "sk-or-[A-Za-z0-9-]{8,}"` muss 0 ausgeben.
 - [ ] goal-verifier PASS (K und B)
@@ -133,6 +133,7 @@ kann, bis der neue Prozess antwortet.
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-12 Zyklus 1: Punkte 1, 2, 3, 4, 5 gebaut: `lb_try_duration 30s` und `lb_try_interval 250ms` im Block `reverse_proxy cp:8402`, neues `ops/caddy-retry.sh --selftest`, `ops/deploy-window.sh` mit `--at`, `--log`, `--selftest`, Zeile `BAD GATEWAY` und ohne Adresse in jeder Zeile, `docs/betrieb/neustart.md` mit 7 mal 502 in 6 Fenstern (ein sechster Rollout um 22:43:42 UTC kam nach der Vorabmessung dazu). Rot vor dem Fix: `test/caddy-retry.test.ts` 2 von 5 rot auf dem Caddyfile von `dev`, `ops/caddy-retry.sh --selftest` `FAIL held` und `FAIL get-held` mit 502 auf dem Caddyfile von `dev`, `test/deploy-window.test.ts` 7 von 7 rot gegen das Werkzeug von `dev`; Gegenprobe des Selftests von `deploy-window.sh` mit zwei Mutationen (Adresse wieder in der Zeile: `FAIL affected`, `FAIL no-address`; Zeile `BAD GATEWAY` umbenannt: 5 mal FAIL), Gegenprobe der Summenprüfung mit falscher Summe Exit 1. Prüfbefehle: P1 `caddy validate` -> `Valid configuration`, `caddy adapt` -> 1, `grep -c lb_retry_match` -> 0, vitest caddy-retry 5 passed; P2 Selftest Exit 0 `CADDY RETRY SELFTEST OK`, `grep -cE` -> 3; P3 Selftest Exit 0 `DEPLOY WINDOW SELFTEST OK`, `^ok   ` -> 7, gepflanzte fremde Adresse -> 0, vitest deploy-window 7 passed; P4 (Netz) `--at 2026-11-12T16:41:02` -> `BAD GATEWAY 3 of 67 request(s) from outside answered 502`, Zeilen -> 6, Summe Exit 0, `--at ` -> 6, `## Nachher` -> 1, Adressen -> 0; P5 `node scripts/check.mjs` Exit 0 (121 Dateien, 1483 Tests), `sk-or-` -> 0.
 
 ## Blockers
 - keine
