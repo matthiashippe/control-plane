@@ -110,8 +110,8 @@ describe("ops/abort-purchase.sh", () => {
   }, 120_000);
 
   it("names a counting killed from outside in its selftest instead of only a wrong number", () => {
-    // A node on PATH that SIGKILLs itself on its second call, like a sweep of another runner in the
-    // same worktree (audit 2026-11-12, line 84): the selftest must say which counting died and how.
+    // A node on PATH that SIGKILLs itself on its second call, like a SIGKILL from outside the run (cause of
+    // audit 2026-11-12, line 84 not determined): the selftest must say which counting died and how.
     const dir = mkdtempSync(join(tmpdir(), "abort-purchase-kill-"));
     const fake = join(dir, "node");
     writeFileSync(
