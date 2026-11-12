@@ -76,30 +76,35 @@ async function expectError(res: Response, expectedCode: string): Promise<ErrorBo
   return body;
 }
 
-describe("sandboxes: the 501 stays and now says that it is intentional", () => {
-  it("POST /v1/sandboxes names the reason, the runtime's way out and the switch in the config", async () => {
-    const { withKey } = setup();
+// sandbox 03: the sandboxes are real now (test/sandbox-api.test.ts). What stays from the 501 is the
+// way out of the runtime: without a sandbox server the create still answers 501, on which the runtime
+// falls back to a local worker, and now says why in its own words.
+describe("sandboxes: without a sandbox server the 501 stays and says why", () => {
+  it("POST /v1/sandboxes names the reason, the runtime's way out and that nothing was charged", async () => {
+    const { withKey, db, address } = setup();
     const res = await withKey("/v1/sandboxes", { method: "POST", body: JSON.stringify({ name: "child" }) });
     expect(res.status, "the status code stays 501: on it the runtime falls back to a local worker").toBe(501);
-    const body = await expectError(res, "not_implemented");
+    const body = await expectError(res, "sandbox_server_unreachable");
     // The creation attempt gets the answer to its own question, not the one for the sub-paths.
-    expect(body.message).toMatch(/^This control plane runs no sandboxes/);
-    expect(body.message).not.toContain("exec in");
-    expect(body.message).toContain("intended answer");
+    expect(body.message).toMatch(/^The sandbox server cannot be reached right now/);
+    expect(body.message).not.toContain("nothing ran");
+    expect(body.message).toContain("nothing was reserved or charged");
     expect(body.message).toContain("local worker");
-    expect(body.message).toContain("sandboxId");
+    expect((db.prepare("SELECT count(*) AS n FROM sandboxes WHERE address = ?").get(address) as { n: number }).n).toBe(0);
     expect(body.docs).toContain("docs/errors.md#sandboxes");
   });
 
-  it("the sub-paths say that there is nothing to exec anything in", async () => {
+  it("the sub-paths answer 404 for a sandbox that is not there, and a path the contract does not name is not found", async () => {
     const { withKey } = setup();
-    for (const path of ["/v1/sandboxes/abc/exec", "/v1/sandboxes/abc/files/tmp", "/v1/sandboxes/abc/ports/80"]) {
+    for (const path of ["/v1/sandboxes/abc/exec", "/v1/sandboxes/abc/ports/expose"]) {
       const res = await withKey(path, { method: "POST", body: "{}" });
-      expect(res.status).toBe(501);
-      const body = await expectError(res, "not_implemented");
-      expect(body.message).toMatch(/no sandbox to exec in/i);
+      expect(res.status).toBe(404);
+      const body = await expectError(res, "sandbox_not_found");
+      expect(body.message).toMatch(/no sandbox with this id/i);
       expect(body.docs).toContain("#sandboxes");
     }
+    const unnamed = await withKey("/v1/sandboxes/abc/files/tmp", { method: "POST", body: "{}" });
+    expect(unnamed.status).toBe(404);
   });
 
   it("GET /v1/sandboxes stays the empty list, so the runtime does not run into the error path", async () => {

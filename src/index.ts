@@ -21,6 +21,8 @@
  *                 anything else, or unset, sells them
  *   CP_INFERENCE_SUNSET_AT  ISO 8601; from then on a provider marked `resale: false` is no longer
  *                 sold. Default INFERENCE_SUNSET_AT_DEFAULT in app.ts, which is the production value
+ *   CP_SANDBOXD_URL  the control API of the sandbox server, default https://ctl.sbx.postyourprice.com
+ *   CP_SANDBOXES  "0" switches the sandbox API off (every call that needs the server answers 501)
  */
 
 import fs from "node:fs";
@@ -39,6 +41,9 @@ import { reconcileCheckouts } from "./checkout/index.js";
 import { deliverPaidOrders, deliveryWriter, type Mailer } from "./checkout/deliver.js";
 import { cleanupConversations } from "./checkout/conversation.js";
 import { siteOrigin } from "./public/site.js";
+import { createSandboxdClient, loadOrCreateClientKey, SANDBOXD_URL_DEFAULT } from "./sandbox/client.js";
+import { createSandboxService } from "./sandbox/service.js";
+import { grantLiveSandbox } from "./sandbox/grant.js";
 
 const port = Number(process.env.CP_PORT || 8402);
 const host = process.env.CP_HOST || "127.0.0.1";
@@ -46,6 +51,38 @@ const dbPath = process.env.CP_DB_PATH || path.resolve("data", "control-plane.db"
 fs.mkdirSync(path.dirname(dbPath), { recursive: true });
 
 const db = openDb(dbPath);
+// The credit of the own live check (src/sandbox/grant.ts). Once, and only where that account exists.
+try {
+  const g = grantLiveSandbox(db);
+  if (g.granted) console.log("[sandbox] live-sandbox credit booked");
+} catch (err) {
+  console.error(`[sandbox] live-sandbox credit failed: ${err instanceof Error ? err.message : String(err)}`);
+}
+
+// The sandbox API (sandbox 03). The key pair is made on the first start next to the database and kept
+// on every later one (docs/sandbox/plan.md, Verbindung); until its public half is installed on the
+// sandbox server, sandboxd answers 401 and every sandbox call here answers 501 as before.
+const sandbox = (() => {
+  if (process.env.CP_SANDBOXES === "0") return null;
+  try {
+    const key = loadOrCreateClientKey(path.dirname(dbPath));
+    if (key.created) console.log(`[sandbox] client key created in ${path.dirname(dbPath)}`);
+    const client = createSandboxdClient({ baseUrl: process.env.CP_SANDBOXD_URL || SANDBOXD_URL_DEFAULT, privateKey: key.privateKey });
+    return createSandboxService({ db, client });
+  } catch (err) {
+    console.error(`[sandbox] off, the client key failed: ${err instanceof Error ? err.message : String(err)}`);
+    return null;
+  }
+})();
+if (sandbox) {
+  // The first tick waits three minutes: the rollout canary runs this image for a few seconds against a
+  // copy of the database in the same volume, with the same key, and must not bill or stop anything.
+  const billing = () => void sandbox.tick().catch((err) => console.error(`[sandbox] tick failed: ${err instanceof Error ? err.message : String(err)}`));
+  setTimeout(() => {
+    billing();
+    setInterval(billing, 60 * 1000).unref();
+  }, 3 * 60 * 1000).unref();
+}
 const pay = payConfigFromEnv(process.env);
 const settler = settlerFromEnv(process.env, pay);
 const providers = providersFromEnv(process.env, {
@@ -110,6 +147,7 @@ const app = createApp({
   conversation: deliveryWriter(providers),
   // A round of changes writes on the same provider as the paid texts (HAN-95).
   rework: deliveryWriter(providers),
+  sandbox,
 });
 
 // Cleanup: once on start, hourly after that. Otherwise `siwe_nonces` grows with every call to

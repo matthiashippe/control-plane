@@ -94,6 +94,7 @@ import { Catalog, handleChat, MARKUP } from "./inference/proxy.js";
 import { clientKey, RateLimiter, type RateLimitOptions } from "./ratelimit.js";
 import { handlePay, TOPUP_TIERS_USD, type PayConfig } from "./payments/pay.js";
 import { handleRegister } from "./registry.js";
+import { createSandboxService, type Reply as SandboxReply, type SandboxService } from "./sandbox/service.js";
 import type { Settler } from "./payments/settler.js";
 import {
   AuthError,
@@ -160,6 +161,11 @@ export interface AppOptions {
   inferenceSunsetAt?: Date;
   /** The clock the sunset is judged against. Tests pass a fixed one to stand on either side of it. */
   now?: () => Date;
+  /**
+   * The sandbox API (sandbox 03, src/sandbox/service.ts). Left out or null, every call that needs
+   * the sandbox server answers 501 and the list is what the database holds.
+   */
+  sandbox?: SandboxService | null;
 }
 
 /**
@@ -3509,36 +3515,79 @@ export function createApp(opts: AppOptions) {
     return c.json(res.body, res.status as 200);
   });
 
-  // --- Sandboxes (phase 2) --------------------------------------
+  // --- Sandboxes (sandbox 03, docs/sandbox/vertrag.md, src/sandbox/) ----
 
-  // The 501 is right in substance and stays: the runtime catches it and starts a local worker
-  // instead of the sandbox (upstream `src/agent/loop.ts:304`, "Conway sandbox unavailable, spawning
-  // local worker"), which keeps working and keeps buying its inference here. A friendly 200 dummy
-  // would be harmful: `spawnChild` would create half a child and run aground at the next endpoint.
-  // What was missing was the sentence saying that this is intentional.
-  const SANDBOX_NOTE =
-    "This control plane runs no sandboxes: it sells provisioning, credits and inference, nothing " +
-    "that boots a VM. The 501 is the intended answer, not an outage. Your runtime handles it by " +
-    "spawning a local worker instead, which keeps the task running and its inference billed here; " +
-    'to skip the attempt entirely, leave "sandboxId" empty in ~/.automaton/automaton.json.';
-  app.get("/v1/sandboxes", (c) => c.json({ sandboxes: [] }));
-  // The route for the creation attempt stands before the wildcard: in Hono `/v1/sandboxes/*` also
-  // matches `/v1/sandboxes`, and then a `POST /v1/sandboxes` would get the text for the sub-paths
-  // ("nothing to exec in") instead of the answer to its own question.
-  app.post("/v1/sandboxes", (c) =>
-    c.json({ error: "not_implemented", message: SANDBOX_NOTE, docs: DOC.sandboxes }, 501),
-  );
-  app.all("/v1/sandboxes/*", (c) =>
-    c.json(
-      {
-        error: "not_implemented",
-        message:
-          "There is no sandbox to exec in, copy files to or expose a port from. " + SANDBOX_NOTE,
-        docs: DOC.sandboxes,
-      },
-      501,
-    ),
-  );
+  // The rows with /v1/sandboxes of the contract, passed on signed to sandboxd and billed per started
+  // step of 6 minutes. Without a sandbox service (tests, CP_SANDBOXES=0) every call that needs the
+  // sandbox server answers 501, which the runtime handles on create by starting a local worker; the
+  // list then comes from the database, which is empty. No route here ever answers 429 or 5xx: the
+  // runtime retries those and counts them for its circuit breaker (src/sandbox/service.ts).
+  const sandboxes = opts.sandbox ?? createSandboxService({ db, client: null, log: () => {} });
+  const sandboxJson = (c: Context, res: SandboxReply) => c.json(res.body, res.status);
+  const sandboxGuard = async (c: Context, fn: () => Promise<SandboxReply> | SandboxReply) => {
+    try {
+      return sandboxJson(c, await fn());
+    } catch (err) {
+      console.error(`[sandbox] ${c.req.method} ${c.req.path} failed: ${err instanceof Error ? err.message : String(err)}`);
+      return c.json(
+        {
+          error: "sandbox_server_unreachable",
+          message: "The sandbox request could not be completed, so nothing ran and nothing was charged. Try again in a few minutes.",
+          docs: DOC.sandboxes,
+        },
+        501,
+      );
+    }
+  };
+  app.get("/v1/sandboxes", (c) => sandboxGuard(c, () => sandboxes.list(c.get("address"))));
+  // The exact route stands before the wildcard: in Hono `/v1/sandboxes/*` also matches `/v1/sandboxes`.
+  app.post("/v1/sandboxes", async (c) => {
+    const body = await c.req.json().catch(() => ({}));
+    return sandboxGuard(c, () => sandboxes.create(c.get("address"), body));
+  });
+  // The sub-paths carry the sandbox id as a segment, which the auth middleware cannot match with its
+  // exact list, so this handler asks for the key itself, as the domain wildcard does. A path the
+  // contract does not name goes to the notFound handler before the key is looked at.
+  app.all("/v1/sandboxes/*", async (c) => {
+    const m = /^\/v1\/sandboxes\/([A-Za-z0-9_-]{1,64})(\/.*)?$/.exec(new URL(c.req.url).pathname);
+    if (!m) return c.notFound();
+    const [, id, sub = ""] = m;
+    const port = /^\/ports\/([0-9]{1,5})$/.test(sub);
+    const allowed =
+      sub === "" ? ["GET", "DELETE"]
+      : sub === "/exec" || sub === "/files/upload/json" || sub === "/ports/expose" ? ["POST"]
+      : sub === "/files/read" ? ["GET"]
+      : port ? ["DELETE"]
+      : null;
+    if (!allowed) return c.notFound();
+    const address = resolveApiKey(db, c.req.header("authorization"));
+    if (!address) throw invalidKeyError();
+    const asked = c.req.method === "HEAD" ? "GET" : c.req.method;
+    if (!allowed.includes(asked)) {
+      c.header("Allow", allowed.join(", "));
+      return c.json(
+        {
+          error: "method_not_allowed",
+          message: `${c.req.path} accepts ${allowed.join(" and ")}, not ${c.req.method}.`,
+          allow: allowed,
+          docs: DOC.sandboxes,
+        },
+        405,
+      );
+    }
+    const json = async () => c.req.json().catch(() => ({}));
+    if (sub === "") return sandboxGuard(c, () => (asked === "GET" ? sandboxes.get(address, id) : sandboxes.remove(address, id)));
+    if (sub === "/exec") {
+      const body = await json();
+      return sandboxGuard(c, () => sandboxes.exec(address, id, body, c.req.header("idempotency-key")));
+    }
+    if (sub === "/files/upload/json") {
+      const body = await json();
+      return sandboxGuard(c, () => sandboxes.upload(address, id, body));
+    }
+    if (sub === "/files/read") return sandboxGuard(c, () => sandboxes.read(address, id, c.req.query("path")));
+    return sandboxGuard(c, () => sandboxes.ports(address, id));
+  });
 
   // --- Domains (docs/sandbox/vertrag.md, src/domains.ts) ----------
 
