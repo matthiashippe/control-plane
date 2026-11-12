@@ -56,9 +56,10 @@ describe("/fix", () => {
     // and og.png behind, so the link is pinned by the rule and not by its wording: somewhere in
     // the section written for a stranded automaton, something points here.
     const html = await page("/");
-    const section = html.indexOf('id="agents"');
+    // Since goals/seite/02 that section is the move block at the top of the page; the whole block is read, up to its end.
+    const section = html.indexOf('id="umzug"');
     expect(section, "the section for a stranded automaton is gone").toBeGreaterThan(-1);
-    expect(html.slice(section, section + 1200), "nothing in that section links to /fix")
+    expect(html.slice(section, html.indexOf("</section>", section)), "nothing in that section links to /fix")
       .toContain('href="/fix"');
   });
 

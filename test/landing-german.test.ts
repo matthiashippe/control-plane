@@ -24,7 +24,12 @@ describe("the landing page speaks to the reader who came", () => {
     // Asked of the rendered headline and not of the whole document: two CSS comments in
     // index.html quote the English line as the longest one they measured against, and they are
     // not text a reader sees.
-    const h1 = html.slice(html.indexOf("<h1>"), html.indexOf("</h1>"));
+    // The h1 after the move block: that block (goals/seite/02) is English for every browser, because the operators it
+    // speaks to arrive from English Conway issues (goals/seite/ANNAHMEN.md), and the page's own headline follows it.
+    const move = html.indexOf('id="umzug"');
+    expect(move, "no move block").toBeGreaterThan(-1);
+    const rest = html.slice(html.indexOf("</section>", move));
+    const h1 = rest.slice(rest.indexOf("<h1>"), rest.indexOf("</h1>"));
     expect(h1).not.toContain("Several agents do it.");
     expect(h1).toContain("Mehrere Agenten schreiben ihn.");
     expect(html, "German prose under lang=en is read aloud as English").toMatch(/<html lang="de">/);

@@ -107,8 +107,12 @@ describe("/katalog", () => {
       const home = await (await get("/", { "accept-language": lang })).text();
       const link = home.indexOf('href="/katalog"');
       expect(link, `no link to /katalog on / (${lang})`).toBeGreaterThan(-1);
-      // The first-screen control mark sits right after the hero text; the link must come before it.
-      expect(link).toBeLessThan(home.indexOf("/px/top.png"));
+      // Since goals/seite/02 the move from Conway is the first block and carries the control mark. The link stays in
+      // the person's screen right under it: after the move block and before the agent hero.
+      const move = home.indexOf('id="umzug"');
+      expect(move, `no move block on / (${lang})`).toBeGreaterThan(-1);
+      expect(link).toBeGreaterThan(home.indexOf("</section>", move));
+      expect(link).toBeLessThan(home.indexOf('<section class="hero" id="fuer-agenten"'));
     }
     const sitemap = await (await get("/sitemap.xml")).text();
     expect(sitemap).toMatch(/<loc>[^<]*\/katalog<\/loc>/);

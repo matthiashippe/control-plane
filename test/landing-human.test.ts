@@ -34,7 +34,14 @@ describe("the first screen of / for a person", () => {
       const html = await (await get(plain(), lang)).text();
       const human = html.indexOf(HUMAN_HEADLINE);
       expect(human, `no human first screen (${lang})`).toBeGreaterThan(-1);
-      expect(human, "the agent hero came first").toBeLessThan(html.indexOf('<section class="hero"'));
+      // The one block above it is the move from Conway (goals/seite/02, SOLL pictures of seite 01): operators from
+      // Conway issues have to see their one line without scrolling. It is a single block, so the person still comes
+      // before the agent hero and before everything else written for agents.
+      const move = html.indexOf('<section class="hero" id="umzug"');
+      expect(move, `no move block (${lang})`).toBeGreaterThan(-1);
+      expect(move, "only the move block comes before the person").toBeLessThan(human);
+      expect(html.slice(0, move), "nothing for agents before the move block").not.toContain('<section class="hero"');
+      expect(human, "the agent hero came first").toBeLessThan(html.indexOf(`<section class="hero" id="${AGENT_ANCHOR}"`));
       expect(human).toBeLessThan(html.indexOf("/v1/briefs/check"));
       // Before the first link to /katalog in the hero, so the catalogue button is the first one.
       expect(html.indexOf('href="/katalog"')).toBeGreaterThan(human);
@@ -54,8 +61,13 @@ describe("the first screen of / for a person", () => {
   it("keeps the control mark in the first screen, after the catalogue button and once", async () => {
     const html = await (await get(plain())).text();
     expect(html.split("/px/top.png").length - 1).toBe(1);
-    expect(html.indexOf("/px/top.png")).toBeGreaterThan(html.indexOf("Zum Katalog"));
-    expect(html.indexOf("/px/top.png")).toBeLessThan(html.indexOf('<section class="hero"'));
+    // Since goals/seite/02 the first screen is the move block, on every width (docs/soll/startseite-390.png), so the
+    // control sits inside it, before its </section>, and the catalogue button follows below.
+    const move = html.indexOf('<section class="hero" id="umzug"');
+    expect(html.indexOf("/px/top.png")).toBeGreaterThan(move);
+    expect(html.indexOf("/px/top.png")).toBeLessThan(html.indexOf("</section>", move));
+    expect(html.indexOf("/px/top.png")).toBeLessThan(html.indexOf("Zum Katalog"));
+    expect(html.indexOf("/px/top.png")).toBeLessThan(html.indexOf(`<section class="hero" id="${AGENT_ANCHOR}"`));
   });
 
   it("names the three offers the catalogue sells, and nothing else", () => {
@@ -88,7 +100,8 @@ describe("the first screen of / for a person", () => {
     const home = await (await get(a)).text();
     const catalogue = await (await a.request("/katalog")).text();
     expect(catalogue).toContain(TEST_MODE_LINE);
-    expect(home.slice(0, home.indexOf('<section class="hero"'))).toContain(TEST_MODE_LINE);
+    // Up to the agent hero: the move block of goals/seite/02 is a hero too and comes before the person's screen.
+    expect(home.slice(0, home.indexOf(`<section class="hero" id="${AGENT_ANCHOR}"`))).toContain(TEST_MODE_LINE);
 
     // No card path, no test line, on both pages.
     delete process.env.CP_STRIPE_SECRET_KEY;

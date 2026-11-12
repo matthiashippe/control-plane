@@ -26,7 +26,13 @@ describe("public page and status", () => {
     expect(html).toContain("cp.hippe.eu");
     expect(html).toContain("conwayApiUrl");
     expect(html).toContain("automaton --provision");
-    expect(html).toMatch(/501/); // sandboxes and transfers are named as unavailable
+    // Sandboxes and transfers are named as unavailable. The sentence that said "transfers answer 501" sat in the old
+    // agent block at the end of this page; goals/seite/02 moved that block to the top as the move from Conway, which
+    // carries one line and one command and links to /fix for every step. So the limit is checked one click away, on the
+    // page the block sends the reader to, and the link itself is part of the rule.
+    expect(html, "the page has to send the reader to the page that names the limits").toContain('href="/fix"');
+    const fix = await (await app.request("/fix")).text();
+    expect(fix, "credit transfers are named as unavailable").toMatch(/transfers answer 501/);
     expect(html).toMatch(/not transferable|not redeemable/i);
     expect(html).not.toMatch(/<script[^>]+src=/i); // no external scripts
     expect(html).not.toMatch(/fonts\.googleapis|googletagmanager|analytics/i);
@@ -264,8 +270,13 @@ describe("public page and status", () => {
     const { app } = setup();
     const html = await (await app.request("/")).text();
 
-    const h1 = html
-      .slice(html.indexOf("<h1"), html.indexOf("</h1>"))
+    // The promise is the first h1 after the move block. goals/seite/02 put that block first on the page with its own h1,
+    // which speaks to operators arriving from Conway issues and is not what the service promises a buyer or an agent.
+    const moveStart = html.indexOf('id="umzug"');
+    expect(moveStart, "the move block is missing").toBeGreaterThan(-1);
+    const afterMove = html.slice(html.indexOf("</section>", moveStart));
+    const h1 = afterMove
+      .slice(afterMove.indexOf("<h1"), afterMove.indexOf("</h1>"))
       .replace(/<[^>]+>/g, " ")
       .replace(/\s+/g, " ")
       .trim();
@@ -285,8 +296,13 @@ describe("public page and status", () => {
     const html = await (await app.request("/")).text();
     const txt = await (await app.request("/llms.txt")).text();
 
-    const h1 = html
-      .slice(html.indexOf("<h1"), html.indexOf("</h1>"))
+    // The promise is the first h1 after the move block. goals/seite/02 put that block first on the page with its own h1,
+    // which speaks to operators arriving from Conway issues and is not what the service promises a buyer or an agent.
+    const moveStart = html.indexOf('id="umzug"');
+    expect(moveStart, "the move block is missing").toBeGreaterThan(-1);
+    const afterMove = html.slice(html.indexOf("</section>", moveStart));
+    const h1 = afterMove
+      .slice(afterMove.indexOf("<h1"), afterMove.indexOf("</h1>"))
       .replace(/<[^>]+>/g, " ")
       .replace(/\s+/g, " ")
       .trim();
@@ -832,19 +848,25 @@ describe("The buyer leads, not the plumbing", () => {
   it("shows a finished job before it explains the machinery", async () => {
     const { app } = setup();
     const html = await (await app.request("/")).text();
+    // goals/seite/02 moved the agent section to the top as the move from Conway: the readers our answers in Conway
+    // issues send here are operators whose automaton stopped, and they have to see the one line without scrolling.
+    // The buyer's argument keeps its order below it, and the move block stays a single block above the catalogue for
+    // people instead of spreading into the buyer's part.
+    const move = html.indexOf('id="umzug"');
+    const human = html.indexOf('class="human"');
     const diagram = html.indexOf('id="how"');
     const example = html.indexOf("What came back");
-    const agents = html.indexOf('id="agents"');
     const close = html.indexOf('id="start"');
-    for (const [at, label] of [[diagram, "the diagram"], [example, "the worked example"], [agents, "the agent section"], [close, "the close"]] as const) {
+    for (const [at, label] of [[move, "the agent section"], [human, "the catalogue for people"], [diagram, "the diagram"], [example, "the worked example"], [close, "the close"]] as const) {
       expect(at, `${label} is missing`).toBeGreaterThan(-1);
     }
     // Swapping any of these turns this red, and that is the point: the order is the argument.
     // The price section is gone from this page entirely; `/terms` carries it, and the tests above
     // read it there.
+    expect(move, "the operator from a Conway issue meets the move first").toBeLessThan(human);
+    expect(human, "then the person, before any machinery").toBeLessThan(diagram);
     expect(diagram, "how the money moves comes before the evidence").toBeLessThan(example);
-    expect(example, "a buyer sees the goods before the supply side").toBeLessThan(agents);
-    expect(agents, "and the close comes last").toBeLessThan(close);
+    expect(example, "and the close comes last").toBeLessThan(close);
   });
 
   it("proves the claim with work a reader can judge, not with adjectives", async () => {
@@ -871,19 +893,24 @@ describe("The buyer leads, not the plumbing", () => {
   it("names the failure its visitors arrive with, before it offers them work", async () => {
     const { app } = setup();
     const html = await (await app.request("/")).text();
-    const sectionStart = html.indexOf('id="agents"');
+    // Since goals/seite/02 the section is the move block at the top, built after docs/soll/startseite-*.png. The
+    // picture names the failure as "Conway not answering?", and the market pitch is no longer inside the block but
+    // further down the page, so the order is checked across the page: their problem first, our market second.
+    const sectionStart = html.indexOf('id="umzug"');
     const sectionEnd = html.indexOf("</section>", sectionStart);
     expect(sectionStart, "the agent section is missing").toBeGreaterThan(-1);
     const section = html.slice(sectionStart, sectionEnd);
 
     // The failure, in the words the reader has already read in the issue they came from.
-    expect(section, "the tier a dead billing endpoint resolves to").toContain("dead");
-    expect(section, "and what it costs them").toMatch(/zero tokens/);
-    expect(section, "and the one line that undoes it").toContain('"conwayApiUrl": "https://cp.hippe.eu"');
+    expect(section, "the failure the reader arrives with").toContain("Conway not answering?");
+    expect(section, "and what we do about it").toContain("Keep your automaton running.");
+    expect(section, "and the one line that undoes it").toMatch(/"conwayApiUrl":\s+"https:\/\/cp\.hippe\.eu" \}/);
 
-    const problem = section.indexOf("zero tokens");
-    const market = section.indexOf("open jobs are public");
+    const problem = html.indexOf("Conway not answering?");
+    const market = html.indexOf('href="/jobs"');
     expect(market, "the market pitch is missing").toBeGreaterThan(-1);
+    expect(section.indexOf("Conway not answering?"), "the failure comes before the line that fixes it")
+      .toBeLessThan(section.indexOf("conwayApiUrl"));
     expect(problem, "their problem comes before our market").toBeLessThan(market);
   });
 
@@ -959,25 +986,36 @@ describe("The buyer leads, not the plumbing", () => {
   it("claims what the daily check measures, which is the provisioning run", async () => {
     const { app } = setup();
     const html = await (await app.request("/")).text();
-    const sectionStart = html.indexOf('id="agents"');
+    // The move block of goals/seite/02 carries the claim now: the command is the run itself, and the sentence says
+    // what that run ends in (signed in, answers again), which is what ops/conway-zustand.sh checks.
+    const sectionStart = html.indexOf('id="umzug"');
+    expect(sectionStart, "the section with the claim is gone").toBeGreaterThan(-1);
     const section = html.slice(sectionStart, html.indexOf("</section>", sectionStart));
     expect(section, "the claim has to name the run ops/conway-zustand.sh exercises").toMatch(
-      /automaton --provision<\/code> finishes here/,
+      /automaton --provision<\/code>/,
     );
+    expect(section, "and say what the run ends in").toMatch(/signs in here with its own wallet and gets answers again/);
     expect(section, "and not invite a bare call that answers 400 on both sides").not.toMatch(
       /The same call answers 200/i,
     );
+    expect(section, "nor show one").not.toMatch(/curl/);
   });
 
   it("warns about the five dollars wherever it shows the config line", async () => {
     const { app } = setup();
     const html = await (await app.request("/")).text();
-    const sectionStart = html.indexOf('id="agents"');
+    // The config line is in the move block of goals/seite/02. Its picture says the five dollars in the block itself
+    // and puts the way out on /fix, one click away, because a sales block carries no proviso (rule V) and the page with
+    // every step does. So the warning is checked in the block, the link next to it, and the way out on /fix.
+    const sectionStart = html.indexOf('id="umzug"');
     expect(sectionStart, "the section with the config line is gone").toBeGreaterThan(-1);
     const section = html.slice(sectionStart, html.indexOf("</section>", sectionStart));
     expect(section, "the same runtime buys the $5 tier here too")
-      .toMatch(/buys the \$5 tier here on its first start/i);
-    expect(section, "and the way out has to stand next to it").toMatch(/move the USDC out first/i);
+      .toMatch(/the first start tops up \$5 of credit here/i);
+    const fine = section.slice(section.indexOf("tops up $5"));
+    expect(fine.slice(0, fine.indexOf("</p>")), "and the way to every step has to stand next to it").toContain('href="/fix"');
+    const fix = await (await app.request("/fix")).text();
+    expect(fix, "and the way out stands on that page").toMatch(/move the USDC out first/i);
   });
 
   it("sends every call to action where its label promises", async () => {
@@ -987,6 +1025,7 @@ describe("The buyer leads, not the plumbing", () => {
       { label: /Post a job/i, target: "/post", why: "a buyer who wants to post needs the path that posts" },
       { label: /Post your first job/i, target: "/post", why: "same promise, same destination" },
       { label: /See open jobs/i, target: "/jobs", why: "the open market, which is what that label means" },
+      { label: /Switch in two steps/i, target: "/fix", why: "the two steps are on /fix" },
     ];
     for (const { label, target, why } of pairs) {
       const matches = [...html.matchAll(/<a class="btn[^"]*" href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g)]
@@ -997,7 +1036,8 @@ describe("The buyer leads, not the plumbing", () => {
       }
     }
     // And an on-page destination has to exist, or the button scrolls nowhere.
-    expect(html, "the anchor the key button points at").toContain('id="agents"');
+    // The section the deleted key button pointed at is the move block at the top since goals/seite/02.
+    expect(html, "the anchor the key button points at").toContain('id="umzug"');
   });
 
   it("carries the name and the positioning sentence where a first-time reader lands", async () => {
