@@ -676,7 +676,7 @@ export function createApp(opts: AppOptions) {
    * phone size. So every headless renderer that visits looks exactly like a reader who scrolled to
    * the bottom, which is what 34.116.225.162 and 34.116.146.142 did on this day.
    *
-   * A real browser is different, and there is one measurement of that too. 80.218.182.64, a
+   * A real browser is different, and there is one measurement of that too. 192.0.2.64, a
    * Firefox on Windows arriving from a GitHub issue, fetched `top` at 18:03:49 and `proof` at
    * 18:04:11. Twenty-two seconds apart. Lazy loading fired for one and not the other, which is
    * what scrolling looks like and what no renderer produces.

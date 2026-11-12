@@ -3,7 +3,7 @@
  *
  * Built on 2026-09-21 out of a measurement rather than a hunch. At 17:51:20 UTC a user commented
  * on issue #379, the SIWE provisioning failure we answered on 20.09., reporting the same 401 from
- * a fresh wallet. At 17:52:34 UTC a browser from 23.27.145.238 fetched the landing page, then
+ * a fresh wallet. At 17:52:34 UTC a browser from 192.0.2.52 fetched the landing page, then
  * `/v1/status`, then left. Earlier the same day another arrival carried a github.com referrer and
  * did exactly the same. Two of the four real browsers that day came out of that channel, which is
  * the only channel this project has ever proved, and both of them landed on a page that opens with

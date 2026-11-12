@@ -240,7 +240,7 @@ def took_everything_at_once(ip):
     # Count the GAPS, not the marks. Measured on 2026-09-22: headless Chrome ignores
     # loading="lazy" entirely, in both headless modes and at both a desktop and a 390x700 phone
     # viewport, and fetches all five pixels within a tenth of a second, including the one 3312 px
-    # down. A real browser does not: 80.218.182.64, a Firefox on Windows, fetched top at 18:03:49
+    # down. A real browser does not: 192.0.2.64, a Firefox on Windows, fetched top at 18:03:49
     # and proof at 18:04:11, twenty-two seconds apart, which is what scrolling looks like.
     #
     # So an address whose marks all arrived inside one second of each other did not scroll, however

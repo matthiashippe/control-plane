@@ -21,20 +21,21 @@ DIR="$(cd "$(dirname "$0")" && pwd)"
 
 if [ "${1:-}" = "--selftest" ]; then
   # Two addresses, both claiming to be Googlebot in the log. 66.249.70.7 really did visit on
-  # 2026-09-22 and belongs to Google. 205.169.39.19 sent a bing.com referrer from a datacentre.
+  # 2026-09-22 and belongs to Google. 203.0.113.19 sent a bing.com referrer from a datacentre
+  # (a documentation address in place of the real one; it has no PTR, so it fails the round trip the same way).
   # A checker that believes the user agent calls both of them a crawler. This one must not.
   fixture="$(mktemp)"
   cat > "$fixture" <<'JSON'
 {"ts":1758563778,"request":{"remote_ip":"66.249.70.7","uri":"/robots.txt","headers":{"User-Agent":["Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)"]}},"status":200}
 {"ts":1758563779,"request":{"remote_ip":"66.249.70.7","uri":"/","headers":{"User-Agent":["Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)"]}},"status":200}
-{"ts":1758567459,"request":{"remote_ip":"205.169.39.19","uri":"/fix","headers":{"User-Agent":["Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)"],"Referer":["https://bing.com/"]}},"status":200}
+{"ts":1758567459,"request":{"remote_ip":"203.0.113.19","uri":"/fix","headers":{"User-Agent":["Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)"],"Referer":["https://bing.com/"]}},"status":200}
 JSON
   out="$(CP_CRAWLER_LOG="$fixture" "$0" 2>&1)"
   rm -f "$fixture"
   echo "$out"
   echo
   real=$(echo "$out" | grep -c "VERIFIED  *Googlebot" || true)
-  fake=$(echo "$out" | grep -c "205.169.39.19" || true)
+  fake=$(echo "$out" | grep -c "203.0.113.19" || true)
   claimed=$(echo "$out" | grep -c "claimed to be a crawler and is not" || true)
   echo "SELFTEST  real=$real fake_listed=$fake fake_section=$claimed"
   if [ "$real" -ge 1 ] && [ "$claimed" -ge 1 ]; then

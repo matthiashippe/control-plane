@@ -27,14 +27,19 @@ and says how many are left, which is the honest shape of the answer.
     ops/access-log.sh | ops/fetchers.py --summary  the split, in one block, for a cycle to read
     ops/fetchers.py --selftest                     plant both kinds and check they are told apart
 
-The cache is ops/fetcher-cache.tsv and is committed, like ops/own-ips.txt: it is evidence about
-what an address was on the day it visited, and a lookup a year later can answer differently.
+The cache lives at $CP_FETCHER_CACHE, by default ~/.cache/control-plane/fetcher-cache.tsv, and
+never in the repository. It is evidence about what an address was on the day it visited, and a
+lookup a year later can answer differently, so it is kept. But it is built from the production
+access log and holds addresses of real visitors, and this repository is public: until 2026-11-12
+it sat next to this script and was committed, which published them. The folder is created on the
+first write; nothing is ever written next to the script.
 """
 import json
 import os
 import pathlib
 import socket
 import sys
+import tempfile
 
 # The substring that gives a provider away in its own PTR record. Sources are each provider's
 # documentation of its reverse DNS naming; the check is the substring, not the whole name, because
@@ -60,7 +65,10 @@ PROVIDERS = {
     "oraclecloud.com": "Oracle",
 }
 
-CACHE = pathlib.Path(__file__).with_name("fetcher-cache.tsv")
+CACHE = pathlib.Path(
+    os.environ.get("CP_FETCHER_CACHE")
+    or pathlib.Path.home() / ".cache" / "control-plane" / "fetcher-cache.tsv"
+)
 
 
 def load_cache() -> dict:
@@ -98,9 +106,21 @@ def classify(ip: str, cache: dict) -> tuple:
 
 
 def save_cache(cache: dict) -> None:
-    lines = ["# ip\towner\tkind. Written by ops/fetchers.py; committed because it is evidence"]
+    lines = ["# ip\towner\tkind. Written by ops/fetchers.py; kept outside the repository, it holds visitor addresses"]
     lines += [f"{ip}\t{owner}\t{kind}" for ip, (owner, kind) in sorted(cache.items())]
-    CACHE.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    CACHE.parent.mkdir(parents=True, exist_ok=True)
+    # Every worktree and run on the host shares this one file. Write a new file in the same folder and rename it over the old
+    # one, so a concurrent reader sees either the old cache or the new one, never half of it.
+    fd, tmp = tempfile.mkstemp(prefix=".fetcher-cache-", suffix=".tmp", dir=CACHE.parent)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write("\n".join(lines) + "\n")
+        os.chmod(tmp, 0o644)
+        os.replace(tmp, CACHE)
+    except BaseException:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+        raise
 
 
 def addresses_from(stream) -> list:
@@ -132,7 +152,7 @@ def main() -> int:
         planted = {
             "52.16.245.145": "datacenter",   # AWS, in our own log since 19.09.
             "34.116.134.70": "datacenter",    # GCP, 70.134.116.34.bc.googleusercontent.com
-            "80.218.182.64": "unknown",       # the Swiss line that read the page after issue #392
+            "192.0.2.64": "unknown",       # documentation address standing in for the Swiss line that read the page after issue #392; no PTR
         }
         bad = 0
         for ip, want in planted.items():
