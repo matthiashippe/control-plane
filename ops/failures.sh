@@ -28,7 +28,7 @@ if [ "${1:-}" = "--selftest" ]; then
   # requests all worked. Only the first belongs in the list.
   fixture="$(mktemp)"
   cat > "$fixture" <<'JSON'
-{"ts":1758360000,"request":{"remote_ip":"31.77.203.199","uri":"/v1/status/v1/models","method":"GET","headers":{"User-Agent":["python-httpx/0.28.1"]}},"status":404}
+{"ts":1758360000,"request":{"remote_ip":"198.51.100.17","uri":"/v1/status/v1/models","method":"GET","headers":{"User-Agent":["python-httpx/0.28.1"]}},"status":404}
 {"ts":1758360060,"request":{"remote_ip":"185.220.101.5","uri":"/wp-login.php","method":"GET","headers":{"User-Agent":["curl/7.0"]}},"status":404}
 {"ts":1758360120,"request":{"remote_ip":"82.194.125.90","uri":"/v1/bounties","method":"POST","headers":{"User-Agent":["curl/8.7.1"]}},"status":401}
 {"ts":1758360180,"request":{"remote_ip":"9.9.9.9","uri":"/","method":"GET","headers":{"User-Agent":["Mozilla/5.0"]}},"status":200}
@@ -37,7 +37,7 @@ JSON
   rm -f "$fixture"
   echo "$out"
   echo
-  listed=$(echo "$out" | grep -c "31.77.203.199" || true)
+  listed=$(echo "$out" | grep -c "198.51.100.17" || true)
   scanner_hidden=$(echo "$out" | grep -c "185.220.101.5" || true)
   scanner_counted=$(echo "$out" | grep -c "1 scanner address" || true)
   ours_hidden=$(echo "$out" | grep -c "82.194.125.90" || true)

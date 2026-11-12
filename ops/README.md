@@ -687,7 +687,7 @@ like two strangers.
 Worked out by hand on 2026-09-22 and it produced the first new fact in hours: 2 of 46 foreign
 addresses had been here on more than one day, and both were tools walking API paths rather than
 people. `23.23.253.54` called `/v1/auth/verify`, `/v1/credits/history` and `/v1/submissions` by GET
-without a key over two days; `31.77.203.199` is the scanner that appends `/v1/models` to every path
+without a key over two days; `198.51.100.17` is the scanner that appends `/v1/models` to every path
 it finds. Every one of those got a usable 401 or 405 with a way forward, which is what those
 answers are for.
 

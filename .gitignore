@@ -11,3 +11,6 @@ harness/state/
 
 # Python-Bytecode aus den ops-Skripten (ops/fact-probe.py importiert invention-check.py).
 __pycache__/
+
+# Cache von ops/fetchers.py: Adressen echter Besucher, liegt unter ~/.cache/control-plane/ (CP_FETCHER_CACHE), nie im Repo.
+ops/fetcher-cache.tsv

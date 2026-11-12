@@ -1,7 +1,7 @@
 /**
  * The board, put where a runtime that has run out actually looks.
  *
- * On 2026-09-28 a Conway runtime at 209.38.227.177 provisioned itself at 17:47, spent its 15-cent
+ * On 2026-09-28 a Conway runtime at 203.0.113.28 provisioned itself at 17:47, spent its 15-cent
  * starter grant in 27 inferences by 18:18, and then spent two hours and six minutes asking
  * `/v1/credits/balance` and taking 402 INSUFFICIENT_CREDITS: 376 balance calls and 145 refusals,
  * in 27 bursts, until 20:25:16. In 552 requests it never fetched the board once, and it could not
