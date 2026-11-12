@@ -1,7 +1,7 @@
 # Fehler Goal 03: Die Guthaben-Warnung geht nicht verloren, wenn der Alarmweg scheitert
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Scheitert der POST von `ops/watchdog.sh` an den Webhook, kommt die Meldung im nächsten Lauf noch einmal, statt verloren zu gehen:
@@ -72,7 +72,7 @@ wieder 503 bekommen, ohne dass jemand davon hört.
       und die Regel „erst nach dem POST speichern“ an diesen zwei Stellen ungeprüft bleibt.
       Prüfung: `pnpm -s vitest run test/watchdog-webhook-fail-daily.test.ts` muss Exit-Code 0 haben.
       Prüfung: `d=$(mktemp -d); git show 5458fa3:ops/watchdog.sh > "$d/watchdog.sh"; cp ops/credit-runway.sh "$d/"; WATCHDOG_UNDER_TEST="$d/watchdog.sh" pnpm -s vitest run test/watchdog-webhook-fail-daily.test.ts >/dev/null 2>&1 && echo gruen || echo rot` muss `rot` ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Der neue Test war vor dem Fix rot; die Zeile im Progress Log nennt, welche Fälle.
@@ -96,5 +96,6 @@ wieder 503 bekommen, ohne dass jemand davon hört.
 - 2026-11-12 Zyklus 1: Punkte 1, 2, 3 gebaut: `report` ruft `curl --fail` und gibt bei gescheitertem POST 1 zurück, `ops/watchdog.sh` speichert jeden neuen Zustand (Guthaben, Gesundheit, Tagesstempel für `credit unreadable` und Zertifikat) erst nach erfolgreichem POST, neuer Test `test/watchdog-webhook-fail.test.ts` mit fünf Fällen, Satz in `ops/README.md`; vor dem Fix waren alle fünf Fälle rot (LOW, `empty`, OK, `OUTAGE`, `reachable again`, je „expected 0 to be 1“). Prüfbefehle: P1 vitest webhook-fail Exit 0, `grep -c -- '--fail'` 1, Gegenprobe gegen `5458fa3` rot (mit neuem Watchdog in derselben Form gruen); P2 vitest credit und credit-kritik Exit 0, `grep -c 'next run'` 1; P3 `node scripts/check.mjs` Exit 0 (114 Dateien, 1423 Tests).
 - 2026-11-12 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3; `dev` (03d4339) war schon im Branch, alle Prüfbefehle am Kopf a6cf379 neu gefahren. Prüfbefehle: P1 vitest webhook-fail Exit 0 (5 Tests), `grep -c -- '--fail'` 1, Gegenprobe gegen `5458fa3` rot (derselbe Befehl mit dem Watchdog des Branches gruen); P2 vitest credit und credit-kritik Exit 0 (8 Tests), `grep -c 'next run'` 1; P3 `node scripts/check.mjs` Exit 0 (1423 Tests); Jobs `check` und `e2e` am PR für a6cf379 pass.
 - 2026-11-12 Zyklus 3: Punkt 4 gebaut: neuer Test `test/watchdog-webhook-fail-daily.test.ts` mit zwei Fällen (`credit unreadable`, Warnung zum Zertifikat), Fakes wie in Punkt 1 plus `date` mit festem Tag, damit Mitternacht den Test nicht kippt; `ops/watchdog.sh` unverändert, weil er beide Tagesstempel seit Zyklus 1 erst nach dem POST speichert. Gegen den Watchdog von `5458fa3` sind beide Fälle rot („expected +0 to be 1“, der zweite Lauf postet nichts). Prüfbefehle: P4 vitest webhook-fail-daily Exit 0 (2 Tests), Gegenprobe gegen `5458fa3` rot (derselbe Befehl mit dem Watchdog des Branches gruen); P1 vitest webhook-fail Exit 0; P3 `node scripts/check.mjs` Exit 0 (1425 Tests).
+- 2026-11-12 Release: PASS K und B (Zyklus 3), DONE.
 
 ## Blockers
