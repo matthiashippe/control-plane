@@ -14,6 +14,7 @@ URL="${CP_URL:-https://postyourprice.com}"
 STATE_FILE="${CP_WATCHDOG_STATE:-/var/lib/cp-watchdog.state}"
 WEBHOOK="${CP_ALERT_WEBHOOK:-}"
 CERT_WARN_DAYS="${CP_CERT_WARN_DAYS:-20}"
+CREDIT_TIMEOUT="${CP_CREDIT_TIMEOUT:-45}"
 TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
 report() {
@@ -37,6 +38,57 @@ check_health() {
   done
   echo "${code:-000}"
 }
+
+# Balance at the inference provider. On 2026-11-11 it ran out and every inference request of a paying customer got 503 for
+# 28 hours while the service itself stayed healthy, so this runs before the health verdict and on every run. Like the health
+# check it reports the change only: one [WARN] when the runway falls below the threshold, one more [WARN] when the balance
+# reaches 0 (the state of 2026-11-11, so a missed first warning is not the only one), one [OK] when it is back. The line
+# comes from ops/credit-runway.sh, which asks from inside the service container, so no key passes through here. An unreadable
+# answer keeps the stored state and posts at most once a day. The whole query has a time limit: it runs before the health check,
+# and a hanging Docker daemon would otherwise hold every run and with it the outage alarm. `timeout` signals its whole process
+# group, so `docker exec` dies with the script.
+check_credit() {
+  local line code previous today left now
+  if command -v timeout >/dev/null 2>&1; then
+    line=$(timeout -k 5 "$CREDIT_TIMEOUT" bash "$HERE"/credit-runway.sh --container 2>/dev/null | head -n 1)
+    code=${PIPESTATUS[0]}
+  else
+    # No coreutils timeout (a Mac without it): unbounded, the server always has one.
+    line=$(bash "$HERE"/credit-runway.sh --container 2>/dev/null | head -n 1)
+    code=${PIPESTATUS[0]}
+  fi
+  [[ "$code" == 124 || "$code" == 137 ]] && line="no answer from ops/credit-runway.sh within ${CREDIT_TIMEOUT} s"
+  previous=$(cat "${STATE_FILE}.credit" 2>/dev/null || echo "unknown")
+  case "$code" in
+    0)
+      [[ "$previous" == "low" || "$previous" == "empty" ]] && report "OK" "credit $line"
+      echo "ok" > "${STATE_FILE}.credit" 2>/dev/null || true
+      echo "$TS [INFO] credit $line" ;;
+    1)
+      # The line starts with "CREDIT RUNWAY LOW: <left> USD"; a balance of 0 or below is empty.
+      left=${line#CREDIT RUNWAY LOW: }; left=${left%% USD*}
+      if [[ "$left" =~ ^(-[0-9.]+|0(\.0+)?)$ ]]; then now="empty"; else now="low"; fi
+      if [[ "$now" == "empty" && "$previous" != "empty" ]]; then
+        report "WARN" "credit empty, $left USD left, every inference request fails until topped up at https://openrouter.ai/settings/credits"
+      elif [[ "$now" == "low" && "$previous" != "low" && "$previous" != "empty" ]]; then
+        report "WARN" "credit $line, top up at https://openrouter.ai/settings/credits"
+      else
+        echo "$TS [INFO] credit still $now"
+      fi
+      echo "$now" > "${STATE_FILE}.credit" 2>/dev/null || true ;;
+    *)
+      today=$(date -u +%F)
+      if [[ "$(cat "${STATE_FILE}.credit-fail" 2>/dev/null)" != "$today" ]]; then
+        report "WARN" "credit unreadable (${line:-no answer from ops/credit-runway.sh})"
+        echo "$today" > "${STATE_FILE}.credit-fail" 2>/dev/null || true
+      else
+        echo "$TS [WARN] credit unreadable (${line:-no answer from ops/credit-runway.sh})"
+      fi ;;
+  esac
+}
+
+HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+check_credit
 
 CODE=$(check_health)
 PREVIOUS=$(cat "$STATE_FILE" 2>/dev/null || echo "unknown")

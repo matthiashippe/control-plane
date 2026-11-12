@@ -1,7 +1,7 @@
 # Fehler Goal 01: Warnung vor leerem Guthaben beim Inferenz-Anbieter
 
 ## Status
-PLANNED
+DONE
 
 ## Active Objective
 Bevor das Guthaben beim Inferenz-Anbieter ausgeht, kommt eine Warnung über den Alarmweg, der heute schon Ausfälle meldet
@@ -48,26 +48,37 @@ sieht, zu Conway zurück oder ganz geht.
   (`PATH=/usr/bin:$PATH`), `check` und vitest im Vordergrund mit eigenem Timeout.
 
 ## Done Condition
-- [ ] `ops/credit-runway.sh` rechnet Reichweite und Schwelle aus Guthaben und Verbrauch je Tag, und der Selftest zeigt beide Richtungen:
+- [x] `ops/credit-runway.sh` rechnet Reichweite und Schwelle aus Guthaben und Verbrauch je Tag, und der Selftest zeigt beide Richtungen:
       20 USD gekauft und 20,16 USD verbraucht ist LOW mit Exit 1, 40 USD Rest bei 7 USD Verbrauch in der Woche ist OK mit Exit 0,
       4 USD Rest bei 0 Verbrauch ist LOW (Mindestverbrauch und Mindestbetrag), eine leere Antwort ist FAIL mit Exit 2.
       Prüfung: `bash ops/credit-runway.sh --selftest` muss Exit-Code 0 haben und als letzte Zeile `CREDIT RUNWAY SELFTEST OK` ausgeben.
       Prüfung: `bash ops/credit-runway.sh --selftest | grep -cE "^ok   (low|ok|fail) "` muss mindestens 4 ausgeben.
       Prüfung: `pnpm -s vitest run test/credit-runway.test.ts` muss Exit-Code 0 haben.
-- [ ] `ops/watchdog.sh` warnt einmal, wenn die Reichweite unter die Schwelle fällt, und einmal, wenn sie zurückkommt. Der Test fährt
+- [x] `ops/watchdog.sh` warnt einmal, wenn die Reichweite unter die Schwelle fällt, und einmal, wenn sie zurückkommt. Der Test fährt
       den Watchdog dreimal mit gepflanztem niedrigem Guthaben und dann einmal mit ausreichendem und verlangt genau einen POST mit
       `credit` und `LOW` und danach genau einen mit `credit` und `OK`; mit dem Watchdog von heute gibt es keinen solchen POST, die
       Zeile im Progress Log nennt es. Kein POST und keine Zeile enthält den gepflanzten Schlüssel.
       Prüfung: `pnpm -s vitest run test/watchdog-credit.test.ts` muss Exit-Code 0 haben.
       Prüfung: `grep -c "credit-runway.sh --container" ops/watchdog.sh` muss mindestens 1 ausgeben.
-- [ ] Die Reichweite von heute ist gemessen und steht mit Befehl in `docs/betrieb/guthaben.md`: Rest, Verbrauch je Tag, Reichweite,
+- [x] Die Reichweite von heute ist gemessen und steht mit Befehl in `docs/betrieb/guthaben.md`: Rest, Verbrauch je Tag, Reichweite,
       Schwelle, Uhrzeit in UTC, ohne Schlüssel.
       Prüfung (Netz): `bash ops/credit-runway.sh` muss eine Zeile ausgeben, die mit `CREDIT RUNWAY OK: ` oder `CREDIT RUNWAY LOW: ` beginnt.
       Prüfung: `grep -c "bash ops/credit-runway.sh" docs/betrieb/guthaben.md` muss mindestens 1 ausgeben.
       Prüfung: `grep -cE "sk-or-[A-Za-z0-9-]{8,}" docs/betrieb/guthaben.md ops/credit-runway.sh ops/watchdog.sh` muss 0 ausgeben.
-- [ ] `check` ist grün.
+- [x] `check` ist grün.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] Kritik 1: Ein hängender `docker exec` hält den Watchdog nicht auf. `check_credit` läuft vor der Gesundheit; ohne Zeitlimit
+      blockiert ein hängender Docker-Daemon jeden Lauf, und der Alarm für einen Ausfall des Dienstes kommt nie. Der Test pflanzt ein
+      Fake-`docker`, das 300 Sekunden schläft, und verlangt, dass der Watchdog in höchstens 90 Sekunden endet, die Gesundheit
+      trotzdem abfragt (Fake-`curl` sieht `/health`) und `[WARN] credit unreadable` ausgibt.
+      Prüfung: `pnpm -s vitest run test/watchdog-credit-kritik.test.ts -t "hanging docker"` muss Exit-Code 0 haben.
+- [x] Kritik 2: Fällt der Rest nach einer LOW-Warnung auf 0 oder darunter, warnt der Watchdog genau einmal mehr, weil am 11.11. genau
+      dieser Zustand jeden Kunden mit 503 traf und eine verpasste Warnung drei Tage vorher sonst die einzige bliebe. Der Test fährt
+      zweimal 4 USD Rest, dann dreimal 0 USD Rest, dann einmal 40 USD, und verlangt genau einen POST mit `credit` und `LOW`, danach
+      genau einen mit `credit` und `empty`, danach genau einen mit `credit` und `OK`; ohne vorheriges LOW (erster Lauf mit 0 USD)
+      gibt es genau einen POST.
+      Prüfung: `pnpm -s vitest run test/watchdog-credit-kritik.test.ts -t "empty"` muss Exit-Code 0 haben.
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Jede neue Testdatei und jede neue Selftest-Zeile war vor dem Fix rot; die Zeile im Progress Log nennt, womit.
@@ -86,5 +97,11 @@ sieht, zu Conway zurück oder ganz geht.
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-12 Zyklus 1: Punkte 1, 2, 3, 4 gebaut: `ops/credit-runway.sh` (Rechnung, `--container`, `--files`, `--selftest`), `ops/watchdog.sh` meldet den Wechsel LOW und OK, Messung in `docs/betrieb/guthaben.md` (9,37 USD Rest, 2,49 USD je Tag, 3,7 Tage, Schwelle 7,46 USD, 10:51:33 UTC). Rot vor dem Fix: beide Testdateien liefen vor dem Bau rot, `test/credit-runway.test.ts` mit Exit 127 (Skript fehlte), `test/watchdog-credit.test.ts` gegen den Watchdog von heute mit `expected +0 to be 1` (kein POST mit `credit` und `LOW`); der Selftest wird rot (`CREDIT RUNWAY SELFTEST FAILED`, Zeile `FAIL low`), wenn der Mindestverbrauch aus dem Skript fällt (Fall im Test). Prüfbefehle: `bash ops/credit-runway.sh --selftest` Exit 0, letzte Zeile `CREDIT RUNWAY SELFTEST OK`; grep `^ok   (low|ok|fail) ` 10; `pnpm -s vitest run test/credit-runway.test.ts` Exit 0 (13 passed); `pnpm -s vitest run test/watchdog-credit.test.ts` Exit 0 (4 passed); grep `credit-runway.sh --container` in `ops/watchdog.sh` 1; `bash ops/credit-runway.sh` (Netz) `CREDIT RUNWAY OK: 9.37 USD, 3.7 days at 2.49 USD per day, threshold 7.46 USD`; grep `bash ops/credit-runway.sh` in der Doku 2; grep Schlüsselmuster 0 in allen drei Dateien; `node scripts/check.mjs` Exit 0 (1317 Tests, 85 s).
+- 2026-11-12 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4; `dev` ohne neue Commits, nichts zu mergen. Prüfbefehle: `bash ops/credit-runway.sh --selftest` Exit 0, letzte Zeile `CREDIT RUNWAY SELFTEST OK`; grep `^ok   (low|ok|fail) ` 10; `pnpm -s vitest run test/credit-runway.test.ts` Exit 0 (13 passed); `pnpm -s vitest run test/watchdog-credit.test.ts` Exit 0 (4 passed); grep `credit-runway.sh --container` in `ops/watchdog.sh` 1; `bash ops/credit-runway.sh` (Netz, 11:03:13 UTC) `CREDIT RUNWAY OK: 9.34 USD, 3.7 days at 2.49 USD per day, threshold 7.47 USD`; grep `bash ops/credit-runway.sh` in der Doku 2; grep Schlüsselmuster 0 in allen drei Dateien; `node scripts/check.mjs` Exit 0 (105 Testdateien, 34 s); Jobs `check` und `e2e` am PR #31 grün für `adf926c`.
+- 2026-11-12 Zyklus 3: Kritik 1 gebaut, die Abfrage des Guthabens in `ops/watchdog.sh` läuft unter `timeout -k 5` (Standard 45 s, `CP_CREDIT_TIMEOUT`), ein Zeitlimit meldet `[WARN] credit unreadable (no answer … within 45 s)`, danach läuft die Gesundheit. Rot vor dem Fix: `test/watchdog-credit-kritik.test.ts -t "hanging docker"` gegen den Watchdog von Zyklus 2 nach 150 s abgebrochen (`expected null not to be null`). Prüfbefehle: `pnpm -s vitest run test/watchdog-credit-kritik.test.ts -t "hanging docker"` Exit 0 (1 passed, Lauf 45 s); `pnpm -s vitest run test/watchdog-credit.test.ts test/credit-runway.test.ts` Exit 0 (17 passed); `node scripts/check.mjs` Exit 0.
+- 2026-11-12 Zyklus 4: Kritik 2 gebaut, `ops/watchdog.sh` kennt den Zustand `empty` (Rest 0 oder darunter) und meldet ihn nach LOW genau einmal mit `credit empty, … USD left`, ohne vorheriges LOW nur diese eine Meldung, `OK` auch aus `empty`; Doku `docs/betrieb/guthaben.md` nachgezogen. Rot vor dem Fix: `test/watchdog-credit-kritik.test.ts -t "empty"` gegen den Watchdog von Zyklus 2, alle drei Fälle `expected +0 to be 1`. Prüfbefehle: `pnpm -s vitest run test/watchdog-credit-kritik.test.ts -t "empty"` Exit 0 (3 passed); `pnpm -s vitest run test/watchdog-credit-kritik.test.ts -t "hanging docker"` Exit 0; `pnpm -s vitest run test/watchdog-credit.test.ts test/credit-runway.test.ts` Exit 0 (17 passed); `node scripts/check.mjs` Exit 0.
+- 2026-11-12 Zyklus 5: Abschluss gemeldet, Punkte 1, 2, 3, 4, Kritik 1, Kritik 2; `origin/dev` (`7771ce4`) in den Goal-Branch gemergt. Prüfbefehle: `bash ops/credit-runway.sh --selftest` Exit 0, letzte Zeile `CREDIT RUNWAY SELFTEST OK`; grep `^ok   (low|ok|fail) ` 10; `pnpm -s vitest run test/credit-runway.test.ts` Exit 0 (13 passed); `pnpm -s vitest run test/watchdog-credit.test.ts` Exit 0 (4 passed); grep `credit-runway.sh --container` in `ops/watchdog.sh` 2; `bash ops/credit-runway.sh` (Netz, 11:29:55 UTC) `CREDIT RUNWAY OK: 9.23 USD, 3.6 days at 2.51 USD per day, threshold 7.52 USD`; grep `bash ops/credit-runway.sh` in der Doku 2; grep Schlüsselmuster 0 in allen drei Dateien; `pnpm -s vitest run test/watchdog-credit-kritik.test.ts -t "hanging docker"` Exit 0 (1 passed); `pnpm -s vitest run test/watchdog-credit-kritik.test.ts -t "empty"` Exit 0 (3 passed); `node scripts/check.mjs` Exit 0 (61 s).
+- 2026-11-12 Release: PASS K und B (Zyklus 5), DONE.
 
 ## Blockers
