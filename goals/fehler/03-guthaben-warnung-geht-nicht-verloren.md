@@ -61,6 +61,17 @@ wieder 503 bekommen, ohne dass jemand davon hört.
       Prüfung: `grep -c 'next run' ops/README.md` muss mindestens 1 ausgeben.
 - [x] `check` ist grün.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
+- [ ] Auch die beiden Tagesmeldungen gehen nicht verloren: Scheitert der POST für `credit unreadable` oder für die Warnung zum
+      Zertifikat, postet der nächste Lauf am selben Tag die Meldung genau einmal, und ein dritter Lauf am selben Tag postet sie nicht
+      mehr (Kritik 2026-11-12: `ops/watchdog.sh` speichert beide Tagesstempel seit diesem Goal erst nach dem POST, aber kein Test
+      fährt diese zwei Wege; die fünf Fälle von Punkt 1 decken nur Guthaben und Gesundheit). Neuer Test
+      `test/watchdog-webhook-fail-daily.test.ts` mit dem Aufbau von `test/watchdog-webhook-fail.test.ts` und demselben
+      `WATCHDOG_UNDER_TEST`, je Weg ein `it`; für das Zertifikat gibt der Fake für `openssl` bei `s_client` Text aus, endet bei
+      `x509 -checkend` mit 1 und gibt bei `x509 -enddate` eine Zeile `notAfter=…` aus.
+      MVP: Funktion, weil eine Meldung, die einmal am Tag kommen soll, sonst bei einem gescheiterten POST bis zum nächsten Tag fehlt
+      und die Regel „erst nach dem POST speichern“ an diesen zwei Stellen ungeprüft bleibt.
+      Prüfung: `pnpm -s vitest run test/watchdog-webhook-fail-daily.test.ts` muss Exit-Code 0 haben.
+      Prüfung: `d=$(mktemp -d); git show 5458fa3:ops/watchdog.sh > "$d/watchdog.sh"; cp ops/credit-runway.sh "$d/"; WATCHDOG_UNDER_TEST="$d/watchdog.sh" pnpm -s vitest run test/watchdog-webhook-fail-daily.test.ts >/dev/null 2>&1 && echo gruen || echo rot` muss `rot` ausgeben.
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
