@@ -56,3 +56,52 @@
   /proc/cpuinfo` gab `0`), gVisor mit `systrap` bleibt richtig.
 - **Steuer-API über 443 statt 8443.** Regel 5 (ufw bleibt bei 22, 80 und 443) schließt den eigenen Port aus, darum läuft `sandboxd`
   hinter Caddy unter `ctl.sbx.postyourprice.com`, nur für `76.13.144.207`, mit derselben Ed25519-Signatur wie geplant.
+
+## Goal 02 (12.11.2026, Engineer CP)
+
+- **Zertifikat für `sbx-*` von Caddy selbst statt Origin CA.** Der Token `CLOUDFLARE_HTC_API_TOKEN` darf DNS lesen und schreiben, aber
+  kein Origin-CA-Zertifikat ausstellen: `POST /client/v4/certificates` gab am 12.11.2026 `1016 User is not authorized to perform this
+  action`. Die Zone steht auf SSL „Full“ (`GET /zones/<id>/settings/ssl` gab `full`), Cloudflare verschlüsselt also bis zum Server und
+  prüft dessen Zertifikat nicht. Ein Origin-CA-Zertifikat brächte erst mit „Full (strict)“ etwas. Darum stellt Caddy das Zertifikat für
+  `*.postyourprice.com` mit `tls internal` selbst aus, ohne ACME, ohne globale Option und ohne Schlüsseldatei, die vom code-host
+  kommen müsste. Kein Human Gate, weil der Weg ohne Matthias geht und gleich sicher ist; wer später „Full (strict)“ will, braucht einen
+  Token mit „SSL and Certificates: Edit“ und tauscht die Zeile `tls internal` gegen `tls <cert> <key>`.
+- **Sperren in einer eigenen Tabelle statt in `DOCKER-USER`.** `DOCKER-USER` ist eine Kette von iptables; Docker 29 auf Ubuntu 24.04
+  läuft über iptables-nft. Die Tabelle `inet sandbox` (`ops/sandbox/sandbox.nft`) hängt mit Priorität -10 an `forward` und `input`,
+  also vor Docker und ufw, und deckt IPv4 und IPv6 mit denselben Regeln. Jede Sperre hat einen benannten Zähler (`sbx_host`,
+  `sbx_peer`, `sbx_pay`, `sbx_meta`, `sbx_priv`, `sbx_smtp`) und eine Logzeile `sbx-…`; daran misst `ops/sandbox/probe.sh` die
+  Gegenprobe.
+- **Kein IPv6 in den Sandboxes.** Die Bridge-Netze bekommen keine IPv6 (`ip6tables: false`, kein IPv6-Pool in `daemon.json`). Eine
+  Sandbox erreicht also nichts über IPv6, auch nicht den Host; die Gegenprobe von `host_ipv6` ist, dass der code-host 22, 80 und 443 des
+  Hosts über IPv6 erreicht, das Ziel also lauscht. Die Regel in `input` greift trotzdem für IPv6, falls ein Netz später IPv6 bekommt.
+- **DNS über `resolv.conf` statt über Dockers eingebauten DNS.** Unter `runsc` antwortet `127.0.0.11` in einem eigenen Bridge-Netz
+  nicht (gemessen 12.11.2026: `getent hosts postyourprice.com` im Container gab nichts). Darum schreibt der Startbefehl jeder Sandbox
+  `nameserver 1.1.1.1` und `nameserver 9.9.9.9` in ihre eigene `/etc/resolv.conf`; `--dns` bleibt gesetzt.
+- **OOM beendet die ganze Sandbox.** Unter gVisor liegt die Sentry im Cgroup des Containers; überschreitet ein Prozess 512 MB, tötet der
+  Kernel die Sentry, nicht nur den Prozess (gemessen 12.11.2026: `oom-kill … task=gvisor_sentry` im Kernel-Log, `oom_kill 1` in
+  `memory.events`). Der Container startet mit `--restart unless-stopped` neu, der Datenträger unter `/root` bleibt. Der Host antwortet
+  dabei weiter.
+- **Root-Dateisystem im Speicher.** `runsc` läuft mit `--overlay2=root:memory`: Schreiben außerhalb von `/root` landet im Speicher der
+  Sandbox und zählt gegen ihre 512 MB, statt unbegrenzt auf der Platte des Hosts. Dauerhaft ist nur der Datenträger unter `/root`.
+- **Kein eigener Benutzer-Namensraum je Sandbox.** gVisor fängt jeden Systemaufruf in der Sentry ab, Root im Container ist kein Root im
+  Host-Kernel; `userns-remap` des Docker-Daemons kommt dazu nicht, weil es für den ganzen Daemon gilt.
+- **Eigenes Node 22 für `sandboxd`** unter `/opt/sandboxd/node-v22.23.4`, aus dem Tarball von nodejs.org mit Prüfung gegen
+  `SHASUMS256.txt`. Das Node 24 unter `/usr/local/bin` gehört zu wa-staging und bleibt unberührt.
+- **Neun Plätze statt zehn neben wa-staging, elf statt zwölf danach.** Gemessen: leere Sandbox 9 MB, `sandboxd` 18 MB, beide in
+  `sandbox.slice` (`docs/sandbox/server.md`). Weil die Sentry im Cgroup jedes Containers liegt, belegt eine volle Sandbox genau 512 MB;
+  zehn davon und `sandboxd` passen nicht in `MemoryMax=5G`. `## Grenzen` und `## Preis` in `docs/sandbox/plan.md` rechnen mit 9 und
+  11, `SANDBOXD_SLOTS=9` in `ops/sandbox/sandboxd.service`. Die Marge bei halber Belegung sinkt von Faktor 2,1 auf 1,9, bleibt also über
+  1,3.
+- **Peer-Sperre in `prerouting`.** Docker 29 verwirft Pakete an die Adresse eines anderen Containers schon in `raw PREROUTING`
+  (Priorität -300), bevor `forward` sie sieht; der Zähler `sbx_peer` blieb dort bei 0 (Messung 12.11.2026, `other_sandbox`). Die Regel
+  steht darum in einer Kette `prerouting` mit Priorität -310 und zählt, bevor Docker verwirft.
+
+## Goal 02, Kritik (12.11.2026, Tech Lead)
+
+- **Wildcard `*.postyourprice.com` bleibt bis sandbox 03, für Kunden kommt eine eigene Domain.** Entscheidung Tech Lead zu
+  `goals/_vorschlaege/sandbox-kritik-2026-11-12-1.md`: In sandbox 02 legt nur die Messung Sandboxes an, `POST /v1/sandboxes` antwortet
+  in der Produktion weiter 501, unter dem Wildcard läuft also kein fremder Code. Bevor sandbox 03 einem Kunden einen Port freigibt,
+  ziehen die freigegebenen Ports auf eine eigene registrierbare Domain um (Kauf über `server_kauf`), weil eine Phishing-Seite unter der
+  Zone des Zahlungsdienstes `postyourprice.com` bei Safe Browsing sperren lassen kann und damit jede Inferenz-Anfrage trifft; so trennen
+  es GitHub (`github.io`), Vercel (`vercel.app`) und Fly (`fly.dev`). Notschalter bis dahin: den einen Eintrag `*.postyourprice.com` in
+  Cloudflare löschen; `ctl.sbx`, die Hauptseite und alle anderen Einträge der Zone bleiben davon unberührt.

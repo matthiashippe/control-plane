@@ -1,0 +1,12 @@
+# All sandboxes and sandboxd share this slice, so wa-staging keeps 1 vCPU and about 3 GB (docs/sandbox/plan.md, Grenzen).
+[Unit]
+Description=Sandboxes (docs/sandbox/plan.md)
+Before=slices.target
+
+[Slice]
+CPUAccounting=yes
+CPUQuota=100%
+MemoryAccounting=yes
+MemoryMax=5G
+MemorySwapMax=0
+TasksMax=4096
