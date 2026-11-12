@@ -174,6 +174,41 @@ describe("empty credit", () => {
     // 24 h 3 min ran: 241 started steps, not 300.
     expect(w.sandboxRows(a.address)).toHaveLength(241);
   });
+
+  it("bills nothing when a stopped sandbox is deleted after a pause", async () => {
+    const { w, a, id } = await started(1_000_000);
+    w.clock.t += 24 * 60 * MINUTE + 3 * MINUTE;
+    await w.d.sweep();
+    await w.service.tick();
+    expect(w.row(id)).toMatchObject({ status: "stopped", stop_reason: "sandboxd" });
+    expect(w.sandboxRows(a.address)).toHaveLength(241);
+    const balance = w.balance(a.address);
+    // 12 hours later the customer deletes it: the stopped time is not billed.
+    w.clock.t += 12 * 60 * MINUTE;
+    expect((await a.call("DELETE", `/v1/sandboxes/${id}`)).status).toBe(200);
+    expect(w.row(id)).toMatchObject({ status: "deleted", hold_mc: 0 });
+    expect(w.sandboxRows(a.address)).toHaveLength(241);
+    expect(w.balance(a.address)).toBe(balance);
+  });
+
+  it("bills nothing when a sandbox stopped for empty credit is deleted after a topup", async () => {
+    const { w, a, id } = await started(1250);
+    for (let i = 0; i < 90; i++) {
+      w.clock.t += MINUTE;
+      await w.service.tick();
+      if (w.row(id)!.status === "stopped") break;
+    }
+    expect(w.row(id)).toMatchObject({ status: "stopped", stop_reason: "credit" });
+    const count = w.sandboxRows(a.address).length;
+    // The account gets credit again, but the stopped sandbox is deleted before any call starts it.
+    postLedger(w.db, { address: a.address, deltaMc: 50_000, kind: "topup", ref: "test:topup:delete" });
+    const balance = w.balance(a.address);
+    w.clock.t += 5 * 60 * MINUTE;
+    expect((await a.call("DELETE", `/v1/sandboxes/${id}`)).status).toBe(200);
+    expect(w.row(id)!.status).toBe("deleted");
+    expect(w.sandboxRows(a.address)).toHaveLength(count);
+    expect(w.balance(a.address)).toBe(balance);
+  });
 });
 
 describe("topup starts it again", () => {
