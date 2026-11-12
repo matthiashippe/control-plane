@@ -14,7 +14,7 @@ import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSy
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { FOLD, WIDTHS, assess, decodePng, isLocal, pixelDiffRatio, summary } from "./soll-assess.mjs";
+import { FOLD, WIDTHS, assess, decodePng, isLocal, pixelDiffCount, summary } from "./soll-assess.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const args = process.argv.slice(2);
@@ -148,18 +148,18 @@ async function main() {
     for (const width of WIDTHS) {
       const r = await within(60000, `render ${width}`, renderAt(browser, width, pathToFileURL(SOURCE).href));
       const fresh = decodePng(r.png);
-      let diffRatio = null, pngWidth;
+      let diffPixels = null, pngWidth;
       if (CHECK) {
         writeFileSync(path.join(scratch, `startseite-${width}.png`), r.png);
         const committed = pictureOf(PICTURES, width);
-        if (existsSync(committed)) { const old = decodePng(readFileSync(committed)); pngWidth = old.width; diffRatio = pixelDiffRatio(old, fresh); }
+        if (existsSync(committed)) { const old = decodePng(readFileSync(committed)); pngWidth = old.width; diffPixels = pixelDiffCount(old, fresh); }
       } else {
         writeFileSync(pictureOf(PICTURES, width), r.png);
-        pngWidth = fresh.width; diffRatio = 0;
+        pngWidth = fresh.width; diffPixels = 0;
       }
-      const defects = assess({ width, pngWidth, diffRatio, scrollWidth: r.scrollWidth, text: r.text, foreign: r.foreign, umzugBottom: r.umzugBottom });
+      const defects = assess({ width, pngWidth, diffPixels, scrollWidth: r.scrollWidth, text: r.text, foreign: r.foreign, umzugBottom: r.umzugBottom });
       for (const d of defects) console.log(`soll: defect ${d}`);
-      console.log(`soll: ${width} px, ${fresh.height} px tall, diff ${diffRatio === null ? "nothing to compare" : (diffRatio * 100).toFixed(3) + " %"}`);
+      console.log(`soll: ${width} px, ${fresh.height} px tall, diff ${diffPixels === null ? "nothing to compare" : diffPixels + " px"}`);
       results.push({ width, umzugBottom: r.umzugBottom, defects });
     }
   } finally {

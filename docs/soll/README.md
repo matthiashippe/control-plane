@@ -22,7 +22,7 @@ node ops/soll.mjs            # Bilder neu schreiben
 node ops/soll.mjs --pruefen  # neu rendern und vergleichen, Exit 1 bei jedem Mangel
 ```
 
-Mängel: mehr als 1 % der Pixel weichen vom neuen Render ab, waagrechter Überlauf (auch abgeschnittener Inhalt), Gedankenstrich im
+Mängel: ein einziger Pixel weicht vom neuen Render ab (über der Kanaltoleranz von 8), waagrechter Überlauf (auch abgeschnittener Inhalt), Gedankenstrich im
 sichtbaren Text, Anfrage an eine fremde Adresse, Umzug endet unter dem ersten Bildschirm. Die Auswertung steht in
 `ops/soll-assess.mjs` und wird von `test/soll.test.ts` ohne Browser geprüft.
 

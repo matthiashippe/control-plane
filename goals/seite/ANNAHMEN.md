@@ -12,3 +12,7 @@
   drei Zeilen bricht und der Umzug unter den ersten Bildschirm rutscht. Das JSON bleibt gültig.
 - 2026-11-12 (seite 01): Chromium läuft mit `--no-sandbox` wie unter Playwright, weil der code-host keine User-Namespaces erlaubt; geladen
   wird nur die eigene Datei, jede andere Anfrage scheitert und zählt als Mangel.
+- 2026-11-12 (seite 01, Punkt 6): Der Bildvergleich zählt Pixel statt Anteile, die Grenze ist 0 Pixel über der Kanaltoleranz von 8. Ein
+  geänderter Preis bewegt rund 50 Pixel auf einer Seite mit über 2 Millionen, das deckt keine Grenze in Prozent ab. Das Rendern ist
+  deterministisch: 12 parallele Läufe bei Load 70 ergaben je 0 px. Wird es auf einem anderen Rechner unruhig, steigt die Grenze auf
+  eine kleine feste Zahl und nicht zurück auf Prozent.

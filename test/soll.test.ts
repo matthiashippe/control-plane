@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 // @ts-expect-error plain ESM module under ops/, no declaration file
-import { FOLD, MAX_DIFF, assess, decodePng, encodePng, isLocal, pixelDiffRatio, summary } from "../ops/soll-assess.mjs";
+import { FOLD, MAX_DIFF_PIXELS, assess, decodePng, encodePng, isLocal, pixelDiffCount, summary } from "../ops/soll-assess.mjs";
 
 /**
  * The judgement of ops/soll.mjs, without a browser: the GitHub runners have no Chromium, so the browser only measures and this
@@ -25,7 +25,7 @@ function picture(width: number, height: number, paint?: (x: number, y: number) =
 const clean = (over: Record<string, unknown> = {}) => ({
   width: 390,
   pngWidth: 390,
-  diffRatio: 0,
+  diffPixels: 0,
   scrollWidth: 390,
   text: "Conway not answering?\nKeep your automaton running.\nautomaton --provision",
   foreign: [] as string[],
@@ -41,22 +41,22 @@ describe("soll judgement", () => {
       .toBe("soll: 2 Bilder, umzug oben 390=801 1440=656, 0 Mängel");
   });
 
-  it("rejects a picture whose pixels differ from a fresh render by more than one per cent", () => {
+  it("rejects a picture with even one pixel that differs from a fresh render", () => {
+    expect(MAX_DIFF_PIXELS).toBe(0);
     const base = picture(100, 100);
-    // 2 % of the pixels changed: 200 of 10000.
-    const changed = picture(100, 100, (x, y) => (y < 2 ? [240, 240, 240] : [10, 11, 9]));
-    const ratio = pixelDiffRatio(base, changed);
-    expect(ratio).toBeCloseTo(0.02, 5);
-    expect(assess(clean({ diffRatio: ratio })).join("\n")).toMatch(/2\.00 % of the pixels differ/);
-    // Exactly at the limit is still fine, and antialiasing noise below the channel tolerance is no change.
-    expect(assess(clean({ diffRatio: MAX_DIFF }))).toEqual([]);
-    expect(pixelDiffRatio(base, picture(100, 100, () => [14, 15, 13]))).toBe(0);
+    // One changed pixel, as a changed price or word leaves a few dozen on a page of millions.
+    const changed = picture(100, 100, (x, y) => (x === 50 && y === 50 ? [240, 240, 240] : [10, 11, 9]));
+    const diff = pixelDiffCount(base, changed);
+    expect(diff).toBe(1);
+    expect(assess(clean({ diffPixels: diff })).join("\n")).toMatch(/390: 1 pixels differ from a fresh render/);
+    // Antialiasing noise below the channel tolerance is no change.
+    expect(pixelDiffCount(base, picture(100, 100, () => [14, 15, 13]))).toBe(0);
     // A missing picture is a defect, not a pass.
-    expect(assess(clean({ diffRatio: null })).join("\n")).toMatch(/no committed picture/);
+    expect(assess(clean({ diffPixels: null })).join("\n")).toMatch(/no committed picture/);
   });
 
   it("counts every pixel outside the smaller picture as different, so a longer page cannot hide", () => {
-    expect(pixelDiffRatio(picture(10, 10), picture(10, 20))).toBeCloseTo(0.5, 5);
+    expect(pixelDiffCount(picture(10, 10), picture(10, 20))).toBe(100);
     expect(assess(clean({ pngWidth: 1440 })).join("\n")).toMatch(/picture is 1440 px wide/);
   });
 

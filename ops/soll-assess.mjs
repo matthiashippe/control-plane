@@ -5,8 +5,12 @@ import { deflateSync, inflateSync } from "node:zlib";
 /** Bottom of the first screen per width: a phone at 390x844, a laptop at 1440x900. */
 export const FOLD = Object.freeze({ 390: 844, 1440: 900 });
 export const WIDTHS = Object.freeze([390, 1440]);
-/** More than this share of differing pixels between the committed picture and a fresh render is a defect. */
-export const MAX_DIFF = 0.01;
+/**
+ * More differing pixels than this between the committed picture and a fresh render is a defect. Zero, because the
+ * render is deterministic (repeated parallel runs under load were pixel-identical) and a changed price or word moves
+ * only a few dozen pixels on a page of millions, which any share-based limit lets through.
+ */
+export const MAX_DIFF_PIXELS = 0;
 /** A channel difference up to this is antialiasing noise, not a change. */
 export const CHANNEL_TOLERANCE = 8;
 const DASHES = /[\u2013\u2014]/;
@@ -67,22 +71,21 @@ export function encodePng(width, height, rgba) {
   return Buffer.concat([SIGNATURE, chunk("IHDR", ihdr), chunk("IDAT", deflateSync(raw)), chunk("IEND", Buffer.alloc(0))]);
 }
 
-/** Share of pixels that differ between two decoded pictures; a pixel outside the smaller one always differs. */
-export function pixelDiffRatio(a, b) {
+/** Number of pixels that differ between two decoded pictures; a pixel outside the smaller one always differs. */
+export function pixelDiffCount(a, b) {
   const w = Math.max(a.width, b.width), h = Math.max(a.height, b.height);
-  if (w === 0 || h === 0) return 0;
   let differ = 0;
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
     if (x >= a.width || y >= a.height || x >= b.width || y >= b.height) { differ++; continue; }
     const i = (y * a.width + x) * 4, j = (y * b.width + x) * 4;
     for (let k = 0; k < 4; k++) if (Math.abs(a.data[i + k] - b.data[j + k]) > CHANNEL_TOLERANCE) { differ++; break; }
   }
-  return differ / (w * h);
+  return differ;
 }
 
 /**
  * Defects of one render. `m` holds what the browser measured:
- * width, pngWidth (width of the committed picture), diffRatio (null when there is nothing to compare with),
+ * width, pngWidth (width of the committed picture), diffPixels (null when there is nothing to compare with),
  * scrollWidth, text (visible text of the page), foreign (addresses requested that are not file: or data:),
  * umzugBottom (bottom edge of the block data-soll="umzug" in page pixels, null when it is missing).
  */
@@ -90,8 +93,8 @@ export function assess(m) {
   const out = [], fold = FOLD[m.width];
   if (!fold) out.push(`${m.width}: no first screen known for this width`);
   if (m.pngWidth !== undefined && m.pngWidth !== m.width) out.push(`${m.width}: picture is ${m.pngWidth} px wide`);
-  if (m.diffRatio === null || m.diffRatio === undefined) out.push(`${m.width}: no committed picture to compare with`);
-  else if (m.diffRatio > MAX_DIFF) out.push(`${m.width}: ${(m.diffRatio * 100).toFixed(2)} % of the pixels differ from a fresh render`);
+  if (m.diffPixels === null || m.diffPixels === undefined) out.push(`${m.width}: no committed picture to compare with`);
+  else if (m.diffPixels > MAX_DIFF_PIXELS) out.push(`${m.width}: ${m.diffPixels} pixels differ from a fresh render`);
   if (m.scrollWidth > m.width) out.push(`${m.width}: horizontal overflow, scrollWidth ${m.scrollWidth}`);
   const dash = String(m.text ?? "").split("\n").find((l) => DASHES.test(l));
   if (dash !== undefined) out.push(`${m.width}: dash in the visible text: ${dash.trim().slice(0, 80)}`);
