@@ -38,6 +38,39 @@ check_health() {
   echo "${code:-000}"
 }
 
+# Balance at the inference provider. On 2026-11-11 it ran out and every inference request of a paying customer got 503 for
+# 28 hours while the service itself stayed healthy, so this runs before the health verdict and on every run. Like the health
+# check it reports the change only: one [WARN] when the runway falls below the threshold, one [OK] when it is back. The line
+# comes from ops/credit-runway.sh, which asks from inside the service container, so no key passes through here. An unreadable
+# answer keeps the stored state and posts at most once a day.
+check_credit() {
+  local line code previous today
+  line=$(bash "$HERE"/credit-runway.sh --container 2>/dev/null | head -n 1)
+  code=${PIPESTATUS[0]}
+  previous=$(cat "${STATE_FILE}.credit" 2>/dev/null || echo "unknown")
+  case "$code" in
+    0)
+      [[ "$previous" == "low" ]] && report "OK" "credit $line"
+      echo "ok" > "${STATE_FILE}.credit" 2>/dev/null || true
+      echo "$TS [INFO] credit $line" ;;
+    1)
+      [[ "$previous" == "low" ]] || report "WARN" "credit $line, top up at https://openrouter.ai/settings/credits"
+      echo "low" > "${STATE_FILE}.credit" 2>/dev/null || true
+      [[ "$previous" == "low" ]] && echo "$TS [INFO] credit still low" ;;
+    *)
+      today=$(date -u +%F)
+      if [[ "$(cat "${STATE_FILE}.credit-fail" 2>/dev/null)" != "$today" ]]; then
+        report "WARN" "credit unreadable (${line:-no answer from ops/credit-runway.sh})"
+        echo "$today" > "${STATE_FILE}.credit-fail" 2>/dev/null || true
+      else
+        echo "$TS [WARN] credit unreadable (${line:-no answer from ops/credit-runway.sh})"
+      fi ;;
+  esac
+}
+
+HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+check_credit
+
 CODE=$(check_health)
 PREVIOUS=$(cat "$STATE_FILE" 2>/dev/null || echo "unknown")
 

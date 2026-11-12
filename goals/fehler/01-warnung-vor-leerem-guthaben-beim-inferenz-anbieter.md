@@ -1,7 +1,7 @@
 # Fehler Goal 01: Warnung vor leerem Guthaben beim Inferenz-Anbieter
 
 ## Status
-PLANNED
+ACTIVE
 
 ## Active Objective
 Bevor das Guthaben beim Inferenz-Anbieter ausgeht, kommt eine Warnung über den Alarmweg, der heute schon Ausfälle meldet
@@ -48,24 +48,24 @@ sieht, zu Conway zurück oder ganz geht.
   (`PATH=/usr/bin:$PATH`), `check` und vitest im Vordergrund mit eigenem Timeout.
 
 ## Done Condition
-- [ ] `ops/credit-runway.sh` rechnet Reichweite und Schwelle aus Guthaben und Verbrauch je Tag, und der Selftest zeigt beide Richtungen:
+- [x] `ops/credit-runway.sh` rechnet Reichweite und Schwelle aus Guthaben und Verbrauch je Tag, und der Selftest zeigt beide Richtungen:
       20 USD gekauft und 20,16 USD verbraucht ist LOW mit Exit 1, 40 USD Rest bei 7 USD Verbrauch in der Woche ist OK mit Exit 0,
       4 USD Rest bei 0 Verbrauch ist LOW (Mindestverbrauch und Mindestbetrag), eine leere Antwort ist FAIL mit Exit 2.
       Prüfung: `bash ops/credit-runway.sh --selftest` muss Exit-Code 0 haben und als letzte Zeile `CREDIT RUNWAY SELFTEST OK` ausgeben.
       Prüfung: `bash ops/credit-runway.sh --selftest | grep -cE "^ok   (low|ok|fail) "` muss mindestens 4 ausgeben.
       Prüfung: `pnpm -s vitest run test/credit-runway.test.ts` muss Exit-Code 0 haben.
-- [ ] `ops/watchdog.sh` warnt einmal, wenn die Reichweite unter die Schwelle fällt, und einmal, wenn sie zurückkommt. Der Test fährt
+- [x] `ops/watchdog.sh` warnt einmal, wenn die Reichweite unter die Schwelle fällt, und einmal, wenn sie zurückkommt. Der Test fährt
       den Watchdog dreimal mit gepflanztem niedrigem Guthaben und dann einmal mit ausreichendem und verlangt genau einen POST mit
       `credit` und `LOW` und danach genau einen mit `credit` und `OK`; mit dem Watchdog von heute gibt es keinen solchen POST, die
       Zeile im Progress Log nennt es. Kein POST und keine Zeile enthält den gepflanzten Schlüssel.
       Prüfung: `pnpm -s vitest run test/watchdog-credit.test.ts` muss Exit-Code 0 haben.
       Prüfung: `grep -c "credit-runway.sh --container" ops/watchdog.sh` muss mindestens 1 ausgeben.
-- [ ] Die Reichweite von heute ist gemessen und steht mit Befehl in `docs/betrieb/guthaben.md`: Rest, Verbrauch je Tag, Reichweite,
+- [x] Die Reichweite von heute ist gemessen und steht mit Befehl in `docs/betrieb/guthaben.md`: Rest, Verbrauch je Tag, Reichweite,
       Schwelle, Uhrzeit in UTC, ohne Schlüssel.
       Prüfung (Netz): `bash ops/credit-runway.sh` muss eine Zeile ausgeben, die mit `CREDIT RUNWAY OK: ` oder `CREDIT RUNWAY LOW: ` beginnt.
       Prüfung: `grep -c "bash ops/credit-runway.sh" docs/betrieb/guthaben.md` muss mindestens 1 ausgeben.
       Prüfung: `grep -cE "sk-or-[A-Za-z0-9-]{8,}" docs/betrieb/guthaben.md ops/credit-runway.sh ops/watchdog.sh` muss 0 ausgeben.
-- [ ] `check` ist grün.
+- [x] `check` ist grün.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
 - [ ] goal-verifier PASS (K und B)
 
@@ -86,5 +86,6 @@ sieht, zu Conway zurück oder ganz geht.
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-12 Zyklus 1: Punkte 1, 2, 3, 4 gebaut: `ops/credit-runway.sh` (Rechnung, `--container`, `--files`, `--selftest`), `ops/watchdog.sh` meldet den Wechsel LOW und OK, Messung in `docs/betrieb/guthaben.md` (9,37 USD Rest, 2,49 USD je Tag, 3,7 Tage, Schwelle 7,46 USD, 10:51:33 UTC). Rot vor dem Fix: beide Testdateien liefen vor dem Bau rot, `test/credit-runway.test.ts` mit Exit 127 (Skript fehlte), `test/watchdog-credit.test.ts` gegen den Watchdog von heute mit `expected +0 to be 1` (kein POST mit `credit` und `LOW`); der Selftest wird rot (`CREDIT RUNWAY SELFTEST FAILED`, Zeile `FAIL low`), wenn der Mindestverbrauch aus dem Skript fällt (Fall im Test). Prüfbefehle: `bash ops/credit-runway.sh --selftest` Exit 0, letzte Zeile `CREDIT RUNWAY SELFTEST OK`; grep `^ok   (low|ok|fail) ` 10; `pnpm -s vitest run test/credit-runway.test.ts` Exit 0 (13 passed); `pnpm -s vitest run test/watchdog-credit.test.ts` Exit 0 (4 passed); grep `credit-runway.sh --container` in `ops/watchdog.sh` 1; `bash ops/credit-runway.sh` (Netz) `CREDIT RUNWAY OK: 9.37 USD, 3.7 days at 2.49 USD per day, threshold 7.46 USD`; grep `bash ops/credit-runway.sh` in der Doku 2; grep Schlüsselmuster 0 in allen drei Dateien; `node scripts/check.mjs` Exit 0 (1317 Tests, 85 s).
 
 ## Blockers
