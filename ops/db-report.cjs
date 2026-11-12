@@ -173,6 +173,8 @@ const OURS = [
   // ops/claim-keyless.sh: no ledger, no submission, no bounty. It had to be called to be
   // proved, because a GET on that door answers 405.
   "key:6587e904da177a93d3b4ebcfc854763b6a263bdf",
+  // live-sandbox: the own account of the live check of the sandbox API (ops/live.sh), 2026-11-12.
+  "0x2f2817d4985991ba3c078edb4e7d328b051c8098",
 ];
 
 // The hardcoded pair is not enough. Every production check provisions a throwaway wallet, and on

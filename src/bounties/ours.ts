@@ -24,6 +24,9 @@
  */
 import type { Db } from "../db.js";
 
+/** live-sandbox: the account `ops/live.sh` creates, runs and deletes a sandbox with after a rollout. */
+export const LIVE_SANDBOX_ADDRESS = "0x2f2817d4985991ba3c078edb4e7d328b051c8098";
+
 /** Addresses that are ours by history, not by key name. */
 export const OUR_ADDRESSES = [
   "0xd24f37d0838e62621ed24111164485ded0f0924f", // operator wallet, posts the seed jobs
@@ -103,6 +106,11 @@ export const OUR_ADDRESSES = [
   // ops/claim-keyless.sh: no ledger, no submission, no bounty. It had to be called to be
   // proved, because a GET on that door answers 405.
   "key:6587e904da177a93d3b4ebcfc854763b6a263bdf",
+  // live-sandbox: the own account of the live check of the sandbox API (ops/live.sh, check
+  // `sandbox`, sandbox 03), provisioned 2026-11-12 over SIWE with a fresh wallet that holds nothing,
+  // because the keyless door had no handle left that day. Its key lives only on the code-host in
+  // ~/.config/control-plane/live-sandbox.env; its credit is one internal grant (src/sandbox/grant.ts).
+  LIVE_SANDBOX_ADDRESS,
 ];
 
 /** SQL LIKE patterns. A key carrying one of these names was provisioned by a tool of ours. */

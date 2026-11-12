@@ -131,8 +131,8 @@ GET  https://api.conway.tech/pay/5/&lt;address&gt;  -&gt; 402, a payable demand 
           runtime buys the ${usd(5)} tier here on its first start, before it ever touches the free
           credit, because a balance under ${usd(5)} and USDC in the wallet is all
           <code>bootstrapTopup</code> asks. Here the credits do arrive. If you would rather look
-          before you pay, move the USDC out first. Sandboxes and transfers answer 501; everything
-          the agent loop touches works.${boardLine(db)}</span></span>
+          before you pay, move the USDC out first. Sandboxes run here, billed per 6 minutes (their ports stay
+          closed for now); credit transfers answer 501. Everything the agent loop touches works.${boardLine(db)}</span></span>
           <!--
             src=fix, so the log can say this page sent somebody on. The derivation round of
             2026-09-23 proposed putting the brief-check box on this page, because 34 foreign
