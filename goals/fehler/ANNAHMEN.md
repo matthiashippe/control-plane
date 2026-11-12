@@ -43,3 +43,11 @@
   danach grün.
 - `ops/check-all.sh` ruft `ops/fetchers.py` weiter auf; der Cache landet dann im `HOME` des aufrufenden Nutzers unter
   `.cache/control-plane/`, außerhalb jedes Checkouts.
+
+## fehler 03 (12.11.2026, Engineer CP)
+
+- Auch die Tagesstempel für `credit unreadable` (`.credit-fail`) und für das Zertifikat (`.cert`) werden erst nach erfolgreichem POST
+  gespeichert, wie es das Ziel des Goals nennt. Scheitert der POST, kommt die Meldung im nächsten Lauf (fünf Minuten später) noch
+  einmal; nach einem erfolgreichen POST gilt wieder höchstens eine am Tag.
+- Der Fake für `curl` im neuen Test scheitert mit Exit 22, dem Code von `curl --fail` bei einer Antwort 4xx oder 5xx. Der alte
+  Watchdog gab `--fail` nicht mit, dem Fake ist das gleich; die Gegenprobe gegen `5458fa3` misst also nur das Speichern des Zustands.

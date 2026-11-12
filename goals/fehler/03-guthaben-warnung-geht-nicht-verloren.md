@@ -1,7 +1,7 @@
 # Fehler Goal 03: Die Guthaben-Warnung geht nicht verloren, wenn der Alarmweg scheitert
 
 ## Status
-PLANNED
+ACTIVE
 
 ## Active Objective
 Scheitert der POST von `ops/watchdog.sh` an den Webhook, kommt die Meldung im nächsten Lauf noch einmal, statt verloren zu gehen:
@@ -49,17 +49,17 @@ wieder 503 bekommen, ohne dass jemand davon hört.
   Adresse in Log, Kommentar, Commit oder Verdict.
 
 ## Done Condition
-- [ ] Scheitert der POST an den Webhook, speichert `ops/watchdog.sh` den neuen Zustand nicht, und der nächste Lauf postet die Meldung
+- [x] Scheitert der POST an den Webhook, speichert `ops/watchdog.sh` den neuen Zustand nicht, und der nächste Lauf postet die Meldung
       genau einmal: für LOW, `empty` und OK beim Guthaben und für `OUTAGE` und `reachable again` bei der Gesundheit. `report` ruft
       `curl` mit `--fail` und gibt bei gescheitertem POST einen Exit-Code ungleich 0 zurück.
       Prüfung: `pnpm -s vitest run test/watchdog-webhook-fail.test.ts` muss Exit-Code 0 haben.
       Prüfung: `sed -n '/^report()/,/^}/p' ops/watchdog.sh | grep -c -- '--fail'` muss mindestens 1 ausgeben.
       Prüfung: `d=$(mktemp -d); git show 5458fa3:ops/watchdog.sh > "$d/watchdog.sh"; cp ops/credit-runway.sh "$d/"; WATCHDOG_UNDER_TEST="$d/watchdog.sh" pnpm -s vitest run test/watchdog-webhook-fail.test.ts >/dev/null 2>&1 && echo gruen || echo rot` muss `rot` ausgeben.
-- [ ] Das Verhalten aus fehler 01 bleibt: eine Meldung je Wechsel, `credit unreadable` höchstens einmal am Tag, keine Meldung ohne
+- [x] Das Verhalten aus fehler 01 bleibt: eine Meldung je Wechsel, `credit unreadable` höchstens einmal am Tag, keine Meldung ohne
       Wechsel, kein Schlüssel im Log.
       Prüfung: `pnpm -s vitest run test/watchdog-credit.test.ts test/watchdog-credit-kritik.test.ts` muss Exit-Code 0 haben.
       Prüfung: `grep -c 'next run' ops/README.md` muss mindestens 1 ausgeben.
-- [ ] `check` ist grün.
+- [x] `check` ist grün.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
 - [ ] goal-verifier PASS (K und B)
 
@@ -82,5 +82,6 @@ wieder 503 bekommen, ohne dass jemand davon hört.
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-12 Zyklus 1: Punkte 1, 2, 3 gebaut: `report` ruft `curl --fail` und gibt bei gescheitertem POST 1 zurück, `ops/watchdog.sh` speichert jeden neuen Zustand (Guthaben, Gesundheit, Tagesstempel für `credit unreadable` und Zertifikat) erst nach erfolgreichem POST, neuer Test `test/watchdog-webhook-fail.test.ts` mit fünf Fällen, Satz in `ops/README.md`; vor dem Fix waren alle fünf Fälle rot (LOW, `empty`, OK, `OUTAGE`, `reachable again`, je „expected 0 to be 1“). Prüfbefehle: P1 vitest webhook-fail Exit 0, `grep -c -- '--fail'` 1, Gegenprobe gegen `5458fa3` rot (mit neuem Watchdog in derselben Form gruen); P2 vitest credit und credit-kritik Exit 0, `grep -c 'next run'` 1; P3 `node scripts/check.mjs` Exit 0 (114 Dateien, 1423 Tests).
 
 ## Blockers

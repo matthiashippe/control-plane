@@ -66,7 +66,8 @@ which status code? If yes and all 200, it is on their side. If no, they are gone
 instance that notices an outage without anybody looking. It checks `/health` from the outside (two
 attempts 20 s apart, so a single hiccup does not raise an alarm) and the remaining lifetime of the
 certificate. What gets reported is the **change** of state, not every run: an outage reports once,
-the return reports once.
+the return reports once. A message whose POST to the webhook fails (no answer or an HTTP error) is
+sent again by the next run, because the new state is stored only after the POST went through.
 
 Without `CP_ALERT_WEBHOOK` it only writes to the log. With the URL set (ntfy, Slack, Discord, no
 matter which) it sends one line of text there. For delivery to work, put the variable into the cron
