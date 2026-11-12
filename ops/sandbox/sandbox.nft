@@ -1,0 +1,42 @@
+#!/usr/sbin/nft -f
+# Network locks of the sandbox host (docs/sandbox/plan.md, ## Netz). Loaded by sandbox-nft.service before docker.service.
+# Replaces only its own table; ufw and docker keep their tables. Every drop has a named counter so ops/sandbox/probe.sh can
+# show that the lock counted (counter-proof), and a log prefix sbx- for the journal.
+table inet sandbox
+delete table inet sandbox
+
+table inet sandbox {
+	counter sbx_host {}
+	counter sbx_peer {}
+	counter sbx_pay {}
+	counter sbx_meta {}
+	counter sbx_priv {}
+	counter sbx_smtp {}
+
+	# A sandbox to any other container address, before Docker's own raw PREROUTING drop (priority -300), so the lock counts.
+	# Its own gateway is a local address and goes on to input.
+	chain prerouting {
+		type filter hook prerouting priority -310; policy accept;
+		iifname "sbx-*" ip daddr 172.16.0.0/12 fib daddr type != local counter name sbx_peer log prefix "sbx-peer " drop
+	}
+
+	# Traffic from a sandbox bridge to any address of the host itself (bridge address, public IPv4, IPv6), before ufw.
+	chain input {
+		type filter hook input priority -10; policy accept;
+		iifname "sbx-*" ct state established,related accept
+		iifname "sbx-*" counter name sbx_host log prefix "sbx-host " drop
+	}
+
+	# Traffic a sandbox sends through the host, before docker and ufw.
+	chain forward {
+		type filter hook forward priority -10; policy accept;
+		iifname "sbx-*" oifname "sbx-*" counter name sbx_peer log prefix "sbx-peer " drop
+		iifname "sbx-*" ip daddr 76.13.144.207 tcp dport 443 accept
+		iifname "sbx-*" ip daddr 76.13.144.207 counter name sbx_pay log prefix "sbx-pay " drop
+		iifname "sbx-*" ip daddr 169.254.0.0/16 counter name sbx_meta log prefix "sbx-meta " drop
+		iifname "sbx-*" ip6 daddr fe80::/10 counter name sbx_meta log prefix "sbx-meta " drop
+		iifname "sbx-*" ip daddr { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 100.64.0.0/10 } counter name sbx_priv log prefix "sbx-priv " drop
+		iifname "sbx-*" ip6 daddr fc00::/7 counter name sbx_priv log prefix "sbx-priv " drop
+		iifname "sbx-*" tcp dport 25 counter name sbx_smtp log prefix "sbx-smtp " drop
+	}
+}

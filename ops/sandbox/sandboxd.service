@@ -1,0 +1,24 @@
+# sandboxd, the control API of the sandbox host on the loopback (docs/sandbox/plan.md, ## Verbindung), in sandbox.slice.
+[Unit]
+Description=sandboxd
+After=docker.service sandbox-nft.service network-online.target
+Requires=docker.service sandbox-nft.service
+Wants=network-online.target
+
+[Service]
+Slice=sandbox.slice
+Environment=SANDBOXD_API_PORT=8730
+Environment=SANDBOXD_PROXY_PORT=8731
+Environment=SANDBOXD_KEYS_DIR=/etc/sandboxd/keys
+Environment=SANDBOXD_STATE=/var/lib/sandboxd/state.json
+Environment=SANDBOXD_DISKS=/var/lib/sandboxd/disks
+Environment=SANDBOXD_MNT=/var/lib/sandboxd/mnt
+Environment=SANDBOXD_IMAGE=sandboxd-base:1
+Environment=SANDBOXD_SLOTS=9
+Environment=SANDBOXD_DOMAIN=postyourprice.com
+ExecStart=/opt/sandboxd/node-v22.23.4/bin/node /opt/sandboxd/sandboxd.mjs
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,23 @@
+{
+  "runtimes": {
+    "runsc": {
+      "path": "/usr/bin/runsc",
+      "runtimeArgs": [
+        "--platform=systrap",
+        "--overlay2=root:memory"
+      ]
+    }
+  },
+  "default-address-pools": [
+    {
+      "base": "172.18.0.0/16",
+      "size": 24
+    }
+  ],
+  "ip6tables": false,
+  "log-driver": "local",
+  "log-opts": {
+    "max-size": "10m",
+    "max-file": "3"
+  }
+}
