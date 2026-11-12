@@ -67,6 +67,17 @@ sieht, zu Conway zurück oder ganz geht.
       Prüfung: `grep -cE "sk-or-[A-Za-z0-9-]{8,}" docs/betrieb/guthaben.md ops/credit-runway.sh ops/watchdog.sh` muss 0 ausgeben.
 - [x] `check` ist grün.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
+- [ ] Kritik 1: Ein hängender `docker exec` hält den Watchdog nicht auf. `check_credit` läuft vor der Gesundheit; ohne Zeitlimit
+      blockiert ein hängender Docker-Daemon jeden Lauf, und der Alarm für einen Ausfall des Dienstes kommt nie. Der Test pflanzt ein
+      Fake-`docker`, das 300 Sekunden schläft, und verlangt, dass der Watchdog in höchstens 90 Sekunden endet, die Gesundheit
+      trotzdem abfragt (Fake-`curl` sieht `/health`) und `[WARN] credit unreadable` ausgibt.
+      Prüfung: `pnpm -s vitest run test/watchdog-credit-kritik.test.ts -t "hanging docker"` muss Exit-Code 0 haben.
+- [ ] Kritik 2: Fällt der Rest nach einer LOW-Warnung auf 0 oder darunter, warnt der Watchdog genau einmal mehr, weil am 11.11. genau
+      dieser Zustand jeden Kunden mit 503 traf und eine verpasste Warnung drei Tage vorher sonst die einzige bliebe. Der Test fährt
+      zweimal 4 USD Rest, dann dreimal 0 USD Rest, dann einmal 40 USD, und verlangt genau einen POST mit `credit` und `LOW`, danach
+      genau einen mit `credit` und `empty`, danach genau einen mit `credit` und `OK`; ohne vorheriges LOW (erster Lauf mit 0 USD)
+      gibt es genau einen POST.
+      Prüfung: `pnpm -s vitest run test/watchdog-credit-kritik.test.ts -t "empty"` muss Exit-Code 0 haben.
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
