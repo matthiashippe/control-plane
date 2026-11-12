@@ -68,8 +68,8 @@ Vertrag der Upstream-Runtime.
 
 - Ein Goal ist eine Datei `goals/<topic>/NN-<slug>.md` im Format des `/goal`-Skills. Der Loop Master startet es mit
   `pc-issue goal-start`: ein Topic „control-plane: <topic> NN“ beim Maker auf `goal/<topic>-<NN>`, bei `verify: goal` genau ein
-  Child „<topic> NN: alle Done-Punkte“, danach die Stufen Kritik, Abschluss (K und B) und Release. Bis zu drei Goals laufen
-  parallel (`parallel_goals: 3`, Matthias 12.11.2026). Die Dateien `goals/20*-goal-*.md` sind abgeschlossene Goals des alten Loops und zählen nicht.
+  Child „<topic> NN: alle Done-Punkte“, danach die Stufen Kritik, Abschluss (K und B) und Release. Bis zu zwei Goals laufen
+  parallel (`parallel_goals: 2`, Matthias 12.11.2026). Die Dateien `goals/20*-goal-*.md` sind abgeschlossene Goals des alten Loops und zählen nicht.
 - Folge-Goals schreibt der Tech Lead aus der Spalte Kette in `ROADMAP.md`, wenn der Loop Master ihn beauftragt, als Pflege-PR auf
   `loop/goal/<topic>-<NN>`; die ausführliche Fassung jedes Glieds steht in `docs/kette.md`.
 - Ein Run des Makers baut alle offenen Done-Punkte seines Childs, führt jeden Prüfbefehl selbst aus, hakt die erreichten Punkte ab,
