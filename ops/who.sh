@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Everything this service knows about one address.
 #
-#   ops/who.sh 45.87.212.182
+#   ops/who.sh 203.0.113.7
 #   ops/who.sh --selftest
 #   CP_WHO_LOG=file ops/who.sh 1.2.3.4
 #

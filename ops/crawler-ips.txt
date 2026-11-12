@@ -1,0 +1,4 @@
+# Crawler addresses a test or comment in this repository needs. Operators, not people: each one is proven by its PTR
+# record and the forward lookup back to the same address (ops/crawlers.sh). At most five lines, one address each.
+# address  operator  PTR
+66.249.70.7 Google crawl-66-249-70-7.googlebot.com

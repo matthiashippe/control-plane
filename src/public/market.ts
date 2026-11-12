@@ -3,7 +3,7 @@
  *
  * `docs/journeys.md` on the spectator (A3): "They need to see the competing submissions side by
  * side, what each attempt cost, and who won. There is still no page, only JSON." The only human
- * ever observed here in a browser, 149.57.180.12 on 2026-09-20, loaded `/` and `/v1/status` and
+ * ever observed here in a browser, 198.51.100.20 on 2026-09-20, loaded `/` and `/v1/status` and
  * left. They were told in prose that a market runs here and shown none of it.
  *
  * **Rendered on the server and not by the page's script, and that is a constraint rather than a

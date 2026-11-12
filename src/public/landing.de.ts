@@ -1,7 +1,7 @@
 /**
  * The first screen of the landing page, in German.
  *
- * Measured, not assumed. On 2026-09-23 at 22:42 UTC `109.91.221.13` arrived from Conway issue
+ * Measured, not assumed. On 2026-09-23 at 22:42 UTC `203.0.113.43` arrived from Conway issue
  * #376 with `Accept-Language: de-DE,de;q=0.9,en-US;q=0.8`, followed the 301 to the canonical host,
  * fetched all five depth marks including the last one, then opened /fix twice and called
  * /v1/status. Fifteen requests in fifty-seven seconds. That is the second human reader this

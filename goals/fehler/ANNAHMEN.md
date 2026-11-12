@@ -29,3 +29,17 @@
   `low` nach `empty` genau eine weitere; die Meldung `empty` trägt das Wort `LOW` nicht, damit sie von der ersten Warnung zu
   unterscheiden ist. Steigt der Rest nach `empty` über 0, aber nicht über die Schwelle, wird der Zustand still wieder `low`; fällt er
   dann erneut auf 0, kommt wieder eine Meldung `empty`. `OK` meldet aus `low` und aus `empty`.
+
+## fehler 02 (12.11.2026, Engineer CP)
+
+- Der Test `test/fetcher-cache.test.ts` fährt eine Kopie von `ops/fetchers.py` in einem leeren Ordner mit `HOME` in einem zweiten
+  leeren Ordner, damit „neben dem Skript entsteht keine Datei“ auf einem Ordner geprüft wird, der leer anfängt, auch wenn im
+  eigenen Checkout noch eine alte `ops/fetcher-cache.tsv` liegt. Die einzige nicht gecachte Adresse ist `127.0.0.1`, die der
+  Resolver aus `/etc/hosts` beantwortet; der Test braucht kein Netz.
+- Die Adresse des echten Googlebot aus dem Selbsttest von `ops/crawlers.sh` bleibt, weil der Selbsttest ohne sie nicht zeigen kann,
+  dass die DNS-Probe einen echten Crawler durchlässt; sie steht mit Betreiber und PTR in `ops/crawler-ips.txt` (eine Zeile). Alle
+  anderen Besucheradressen sind durch Adressen aus `192.0.2.0/24`, `198.51.100.0/24` und `203.0.113.0/24` ersetzt, je Adresse
+  dieselbe Ersatzadresse in allen Dateien. Die Selbsttests von `ops/fetchers.py`, `ops/crawlers.sh` und `ops/failures.sh` sind
+  danach grün.
+- `ops/check-all.sh` ruft `ops/fetchers.py` weiter auf; der Cache landet dann im `HOME` des aufrufenden Nutzers unter
+  `.cache/control-plane/`, außerhalb jedes Checkouts.

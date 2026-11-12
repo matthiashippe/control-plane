@@ -468,13 +468,13 @@ def all_at_once(stamps):
     #
     # Measured on 2026-09-22: headless Chrome ignores loading="lazy" and fetches every pixel on
     # load, at a desktop size and at a 390x700 phone viewport alike. A real browser does not:
-    # 80.218.182.64 fetched top at 18:03:49 and proof at 18:04:11. The gap is the evidence.
+    # 192.0.2.64 fetched top at 18:03:49 and proof at 18:04:11. The gap is the evidence.
     #
     # The span test that stood here was one hundredth of a second away from being useless. On
     # 2026-09-23 two scanners arrived through the new domain and both got past it:
     #
     #   35.165.215.140  top at +0.00, then proof, market, end and close ALL at +1.03
-    #   93.180.238.143  top at +0.00, four marks between +3.30 and +3.68, three more at +4.30
+    #   192.0.2.35  top at +0.00, four marks between +3.30 and +3.68, three more at +4.30
     #
     # Span 1.03 and 4.31, so both read as readers, and the column jumped from one to three. Four
     # marks in the same millisecond is a page being rendered, however long after the first one it
@@ -1129,7 +1129,7 @@ def from_us(ref):
 # A referrer is a string somebody put in a header, and a scanner can put anything there. On
 # 2026-09-22 at 18:57:39 an address arrived on /fix with `Referer: https://bing.com/`, which would
 # have been the first search referrer this project has seen. It was not one: the /24 behind it had sent six
-# addresses since 20.09., one to five requests each, always / then /v1/status, and 205.169.39.191
+# addresses since 20.09., one to five requests each, always / then /v1/status, and 198.51.100.61
 # changed its Windows version between 02:17:36 and 02:17:39 from the same address. No browser does
 # that. Printed beside the github referrers with nothing to tell them apart, that line reads like a
 # channel, and a channel is what this section exists to find.
@@ -1150,7 +1150,7 @@ networks = collections.defaultdict(set)
 # has had as a scanner, which is the wrong answer in the worst possible place.
 #
 # What no person does is arrive as one browser and come back as a different browser seconds later.
-# 205.169.39.191 did exactly that at 02:17:36 and 02:17:39, Windows NT 6.1 then NT 10.0, both
+# 198.51.100.61 did exactly that at 02:17:36 and 02:17:39, Windows NT 6.1 then NT 10.0, both
 # claiming to be Chrome. So the tell is two BROWSER identities in quick succession, not two tools.
 AGENT_SWAP_SECONDS = 60
 
