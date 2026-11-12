@@ -1,7 +1,7 @@
 # Betrieb Goal 01: Das Guthaben beim Inferenz-Anbieter lädt sich selbst nach
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Das Guthaben beim Inferenz-Anbieter wird nie leer, weil es sich selbst nachlädt: Die automatische Aufladung beim Anbieter ist mit
@@ -74,7 +74,7 @@ einzige Weg ist, auf dem das nicht mehr von einem Menschen abhängt, der rechtze
 - [x] `check` ist grün, und keine Datei des Goals trägt einen Schlüssel.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung: `cat docs/betrieb/guthaben.md ops/credit-runway.sh test/credit-topup.test.ts | grep -cE "sk-or-[A-Za-z0-9-]{8,}"` muss 0 ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Jede neue Testdatei und jede neue Selftest-Zeile war vor dem Fix rot; die Zeile im Progress Log nennt, womit.
@@ -96,6 +96,7 @@ einzige Weg ist, auf dem das nicht mehr von einem Menschen abhängt, der rechtze
 ## Progress Log
 - 2026-11-12 Zyklus 1: Punkte 1, 2 und 4 gebaut (`--topup` in `ops/credit-runway.sh` mit fünf Selftest-Fällen, `test/credit-topup.test.ts`, Messung und Abschnitt `## Automatische Aufladung` in `docs/betrieb/guthaben.md`), Punkt 3 wartet am Human Gate `server_kauf`; rot vor dem Fix war `test/credit-topup.test.ts` mit 13 von 13 (das alte Werkzeug lehnt `--topup` mit `unknown argument` ab, die Mutationsmarker fehlten), die Zeilen `ok   topup` gab es nicht, und die Doku-Prüfung von Punkt 2 wird mit verfälschtem Betrag (30 statt 25 USD) rot mit Exit 1. Prüfbefehle: `bash ops/credit-runway.sh --selftest` Exit 0, letzte Zeile `CREDIT RUNWAY SELFTEST OK`; `grep -cE "^ok   topup "` 5; `pnpm -s vitest run test/credit-topup.test.ts test/credit-runway.test.ts` 26 passed; `bash ops/credit-runway.sh --topup` (16:56:57 UTC) `AUTO TOPUP: threshold 16 USD, amount 25 USD, warn threshold 9.49 USD, 3.16 USD per day`; Abschnittszeilen 3; Schwelle über Warnschwelle Exit 0; Doku gleich Messung Exit 0; Befehl in der Doku 1; Zeile `Eingeschaltet:` 0 (Punkt 3 offen); Messung aus dem Container (16:57:03 UTC) `CREDIT RUNWAY OK: 34.62 USD, 10.9 days at 3.16 USD per day, threshold 9.49 USD`; `node scripts/check.mjs` Exit 0 (1380 Tests, 115 s); Schlüssel-Grep 0.
 - 2026-11-12 Zyklus 2: Punkt 3 nach dem Human Gate gebaut (Zeile `Eingeschaltet: 2026-11-12 20:35 UTC` aus der Antwort auf der Karte, Messung aus dem Container in `docs/betrieb/guthaben.md`), `dev` gemergt, Abschluss gemeldet, Punkte 1, 2, 3 und 4; rot vor dem Eintrag war die Zeilenzählung von Punkt 3 mit 0. Prüfbefehle: `bash ops/credit-runway.sh --selftest` Exit 0, letzte Zeile `CREDIT RUNWAY SELFTEST OK`; `grep -cE "^ok   topup "` 5; `pnpm -s vitest run test/credit-topup.test.ts test/credit-runway.test.ts` 26 passed; `bash ops/credit-runway.sh --topup` (20:43:11 UTC) `AUTO TOPUP: threshold 17 USD, amount 25 USD, warn threshold 9.79 USD, 3.26 USD per day` (Verbrauch gestiegen, eingestellte 16 USD liegen 1,9 Tage über der Warnschwelle, steht in der Doku); Abschnittszeilen 3; Schwelle über Warnschwelle Exit 0; Doku gleich Messung Exit 0; Befehl in der Doku 1; Zeile `Eingeschaltet:` 1; Messung aus dem Container (20:43:11 UTC) `CREDIT RUNWAY OK: 33.94 USD, 10.4 days at 3.26 USD per day, threshold 9.79 USD`; `node scripts/check.mjs` Exit 0 (114 Testdateien, 60 s); Schlüssel-Grep 0.
+- 2026-11-12 Release: PASS K und B (Zyklus 2), DONE.
 
 ## Blockers
 - keine (Human Gate `server_kauf` am 12.11.2026 um 20:35 UTC gelöst, Antwort auf der Karte: „schon erledigt“)
