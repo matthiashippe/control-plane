@@ -26,47 +26,15 @@ import re
 import subprocess
 import sys
 
+import answers_args
+
 REPO = "Conway-Research/automaton"
-ROOT = pathlib.Path(__file__).resolve().parent.parent
-FOLDER = pathlib.Path(".scratch/gtm/issue-antworten")
 
-
-def folder_from(argv: list[str]) -> tuple[pathlib.Path, list[str]]:
-    """The drafts folder and the remaining arguments, which are issue numbers.
-
-    The default folder is `.scratch/`, which is not in the repository, so no goal could put a draft
-    where a reviewer sees it. `--folder` names one in the repository instead. A folder that is named
-    and missing, or that lies outside the repository, refuses: a typo would otherwise find no drafts
-    and print the green "No drafts to check.", and a gate that goes green on a typo is not a gate.
-    """
-    rest, folder = [], None
-    i = 0
-    while i < len(argv):
-        a = argv[i]
-        if a == "--folder" or a.startswith("--folder="):
-            value = a.split("=", 1)[1] if "=" in a else (argv[i + 1] if i + 1 < len(argv) else "")
-            i += 1 if "=" in a else 2
-            if not value or value.startswith("--"):
-                print("REFUSED: --folder needs a folder in the repository, e.g. --folder goals/kanal/antworten")
-                raise SystemExit(1)
-            folder = value
-            continue
-        rest.append(a)
-        i += 1
-    if folder is None:
-        return FOLDER, rest
-    path = pathlib.Path(folder).resolve()
-    if not path.is_relative_to(ROOT):
-        print(f"REFUSED: --folder {folder} is outside the repository ({ROOT})")
-        raise SystemExit(1)
-    if not path.is_dir():
-        print(f"REFUSED: --folder {folder} is not a folder")
-        raise SystemExit(1)
-    return path, rest
-
-
-# Before anything goes to the network: a wrong folder refuses in a second, not after two minutes.
-FOLDER, wanted = folder_from(sys.argv[1:])
+# Before anything goes to the network: a wrong folder or an unknown argument refuses in a second, not
+# after two minutes. The reader is shared with ops/post-the-answers.py, so both scripts mean the same
+# drafts by the same arguments (`--folder <dir>` and `--folder=<dir>` alike).
+ARGS = answers_args.parse(sys.argv[1:], accepts={"--folder"}, numbers=True)
+FOLDER, wanted = ARGS.folder, ARGS.numbers
 
 # The address a new answer has to carry, and every address this service has ever answered to.
 # Not a literal typed once: this file enforced "cp.hippe.eu" for two days after the move, which

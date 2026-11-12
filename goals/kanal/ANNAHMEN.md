@@ -16,3 +16,11 @@
   `dev` belegt `grep -cE "^[0-9]{4}-.* (434|430|427) " ops/posted-answers.log` 3, und zu jeder der drei Nummern liegt der Entwurf in
   `goals/kanal/antworten/`. Code und Log auf `dev` sind richtig, die Goal-Datei ist eingefroren; die Lösung gehört ins Audit
   (`goals/_vorschlaege/loop-audit-2026-11-12-1.md`).
+- 2026-11-12, kanal 02: Die gemeinsame Funktion `ops/answers_args.py` kennt neben `--folder`, `--send`, `--selftest`, `--verify-posted`
+  und Issue-Nummern auch `--only`, weil `ops/post-the-answers.py` es heute schon nimmt und der Ablauf in der Ordner-README darauf
+  steht. Jedes Skript nennt beim Aufruf, welche davon es annimmt: das Gatter nur `--folder` und Nummern, das Postwerkzeug alle
+  Schalter, aber keine nackten Nummern (die hat es nie gelesen, sie würden still übergangen). Alles andere ist `REFUSED: unknown
+  argument <arg>` mit Exit 1, auch ein zweimal genanntes `--folder`.
+- 2026-11-12, kanal 02: `--verify-posted` vergleicht Byte für Byte. `gh api … --jq .body` hängt genau ein `\n` an, das wird entfernt,
+  sonst nichts; gemessen an #434, #430, #427 (Live-Text gleich `body_to_send` des Entwurfs plus dieses eine Zeichen). Das Werkzeug ruft
+  dabei das Gatter nicht, weil es nichts sendet.
