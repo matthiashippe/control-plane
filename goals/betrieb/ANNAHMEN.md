@@ -7,3 +7,7 @@
   dem Container der Produktion lesen, ohne dass der Schlüssel den Container verlässt.
 - 12.11.2026, betrieb 01: Das Minimum von 10 USD greift mit den Standardwerten nie, weil der Mindestverbrauch von 1 USD je Tag schon
   7 USD und damit 10 USD ergibt; der Selftest zeigt es deshalb mit `CP_CREDIT_MIN_DAILY_USD=0.5`.
+- 12.11.2026, betrieb 01: Matthias' Antwort am Human Gate („schon erledigt“, 21:35 deutscher Zeit) nennt keine Uhrzeit des
+  Einschaltens. Die Zeile `Eingeschaltet:` trägt deshalb den Zeitpunkt der Antwort in UTC (20:35), also die späteste Zeit, zu der die
+  Aufladung eingeschaltet war. Die Uhrzeiten der Karte sind deutsche Zeit: Der Kartentext von 18:21 kam nach dem Kommentar des Tech
+  Leads um 17:12 UTC.

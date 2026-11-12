@@ -80,6 +80,24 @@ und die Zeit, bis die Aufladung gebucht ist, ohne dass der Rest die Warnschwelle
 abgelehnte Karte), meldet der Watchdog trotzdem noch mit 3 Tagen Reichweite. Steigt der Verbrauch, rechnet derselbe Befehl neue Zahlen;
 die eingestellten Zahlen ändert nur Matthias beim Anbieter.
 
+Eingeschaltet: 2026-11-12 20:35 UTC
+
+Matthias hat die Aufladung beim Anbieter mit 16 USD Schwelle und 25 USD Betrag eingeschaltet und das am 12.11.2026 um 20:35 UTC
+(21:35 deutscher Zeit) auf der Karte des Human Gates mit „schon erledigt“ bestätigt. Die Antwort nennt keine eigene Uhrzeit, darum
+steht oben der Zeitpunkt der Bestätigung: Spätestens dann war die Aufladung eingeschaltet. Mit dem normalen Schlüssel zeigt keine
+Abfrage, ob sie eingeschaltet ist; widerlegt wird sie, wenn der Rest in den 14 Tagen danach unter die Warnschwelle fällt.
+
+Danach um 20:42:30 UTC aus dem Container der Produktion, nur lesend:
+
+```
+$ ssh -i "$CP_SSH_KEY" "$CP_HOST" 'bash -s -- --container' < ops/credit-runway.sh
+CREDIT RUNWAY OK: 33.94 USD, 10.4 days at 3.26 USD per day, threshold 9.79 USD
+```
+
+Der Verbrauch ist seit der ersten Messung von 3,16 auf 3,26 USD je Tag gestiegen, und `--topup --container` rechnet zur selben Zeit
+eine Schwelle von 17 USD bei 25 USD Betrag und 9,79 USD Warnschwelle. Die eingestellten 16 USD liegen weiter 6,21 USD (1,9 Tage
+Verbrauch) über der Warnschwelle. Wächst der Verbrauch weiter, gehört die Schwelle beim Anbieter auf den neu gemessenen Wert.
+
 ## Watchdog
 
 `ops/watchdog.sh` ruft bei jedem Lauf (Cron auf dem Server, alle 5 Minuten) `ops/credit-runway.sh --container` und meldet nur den
