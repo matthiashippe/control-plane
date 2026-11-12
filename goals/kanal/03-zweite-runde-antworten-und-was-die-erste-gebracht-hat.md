@@ -1,7 +1,7 @@
 # Kanal Goal 03: Zweite Runde Antworten und was die erste gebracht hat
 
 ## Status
-PLANNED
+DONE
 
 ## Active Objective
 Zwei Dinge in einem Goal, weil das zweite das erste begründet: Zuerst ist gemessen, was die drei Antworten vom 11.11.2026 (#434,
@@ -73,14 +73,14 @@ ohne die Zahl niemand weiß, ob dieser Kanal zahlende Kunden bringt oder nur Arb
   einer dritten Runde und sucht einen anderen Kanal.
 
 ## Done Condition
-- [ ] `ops/github-yield.sh` zählt Ankünfte mit Referrer `github.com/Conway-Research`, Anmeldungen und Zahlungen derselben Adresse
+- [x] `ops/github-yield.sh` zählt Ankünfte mit Referrer `github.com/Conway-Research`, Anmeldungen und Zahlungen derselben Adresse
       seit einem Zeitpunkt, als Summe ohne Adressen, in beide Richtungen bewiesen.
       Prüfung: `bash ops/github-yield.sh --selftest | tail -1` muss `SELFTEST OK` ausgeben.
       Prüfung: `pnpm -s vitest run test/github-yield.test.ts` muss Exit-Code 0 haben.
       Prüfung: `grep -cE "^\s*(it|test)\(" test/github-yield.test.ts` muss mindestens 3 ausgeben.
       Prüfung: `bash ops/github-yield.sh --log ops/fixtures/github-yield.log --since 2000-01-01T00:00:00Z | grep -cE "([0-9]{1,3}\.){3}[0-9]{1,3}|0x[0-9a-fA-F]{40}"` muss 0 ausgeben.
       Prüfung: `grep -oE '"(remote_ip|client_ip)":"[^"]*"' ops/fixtures/github-yield.log | grep -cvE '"(192\.0\.2|198\.51\.100|203\.0\.113)\.[0-9]+"'` muss 0 ausgeben.
-- [ ] Was die erste Runde gebracht hat, steht gemessen in `goals/kanal/ertrag.md`, untere und obere Zahl mit Zeitraum und Befehl,
+- [x] Was die erste Runde gebracht hat, steht gemessen in `goals/kanal/ertrag.md`, untere und obere Zahl mit Zeitraum und Befehl,
       ohne Adresse.
       Prüfung: `grep -cE "^Ertrag Runde 1: [0-9]+ kamen von github.com/Conway-Research, [0-9]+ angemeldet, [0-9]+ gezahlt" goals/kanal/ertrag.md` muss 1 ausgeben.
       Prüfung: `grep -cE "^Alle neuen: [0-9]+ Wallets, [0-9]+ zahlend" goals/kanal/ertrag.md` muss 1 ausgeben.
@@ -88,7 +88,7 @@ ohne die Zahl niemand weiß, ob dieser Kanal zahlende Kunden bringt oder nur Arb
       Prüfung: `grep -c "2026-11-25" goals/kanal/ertrag.md` muss mindestens 1 ausgeben.
       Prüfung: `grep -cE "([0-9]{1,3}\.){3}[0-9]{1,3}|0x[0-9a-fA-F]{40}" goals/kanal/ertrag.md` muss 0 ausgeben.
       Prüfung (Netz): `bash ops/github-yield.sh --since 2026-11-11T07:04:50Z | head -1 | grep -c "^GITHUB YIELD since 2026-11-11T07:04:50Z: [0-9]"` muss 1 ausgeben.
-- [ ] Die neuen Issues mit Anmelde- oder Zahlungsfehlern stehen in `goals/kanal/issues-03.md`, je Issue mit Antwort liegt ein Entwurf
+- [x] Die neuen Issues mit Anmelde- oder Zahlungsfehlern stehen in `goals/kanal/issues-03.md`, je Issue mit Antwort liegt ein Entwurf
       in `goals/kanal/antworten-03/`, höchstens drei, keiner zu einem Issue, das wir schon beantwortet haben, und das Gatter ist grün.
       Prüfung: `grep -cE "^[|] *#?[0-9]+ " goals/kanal/issues-03.md` muss mindestens 1 ausgeben.
       Prüfung: `grep -c "gh issue" goals/kanal/issues-03.md` muss mindestens 1 ausgeben.
@@ -96,15 +96,15 @@ ohne die Zahl niemand weiß, ob dieser Kanal zahlende Kunden bringt oder nur Arb
       Prüfung: `grep -E "^[0-9]{4}-" ops/posted-answers.log | awk '$1 <= "2026-11-11T07:07:57Z" {print $2}' | while read -r n; do test -f "goals/kanal/antworten-03/$n.md" && echo "schon beantwortet $n"; done` muss nichts ausgeben.
       Prüfung: `grep -lE "0x[0-9a-fA-F]{40}" goals/kanal/antworten-03/*.md | wc -l` muss 0 ausgeben.
       Prüfung (Netz): `python3 ops/before-the-answers.py --folder goals/kanal/antworten-03` muss Exit-Code 0 haben.
-- [ ] Gepostet ist genau, was Matthias freigegeben hat, höchstens drei am Tag, und jeder Kommentar steht live so wie sein Entwurf; der
+- [x] Gepostet ist genau, was Matthias freigegeben hat, höchstens drei am Tag, und jeder Kommentar steht live so wie sein Entwurf; der
       Kommentar „Matthias hat den Kommentar auf seinem privaten Board mit „ok“ freigegeben“ steht am Topic vor dem ersten neuen Eintrag.
       Prüfung: `grep -E "^[0-9]{4}-" ops/posted-answers.log | awk '$1 > "2026-11-12T00:00:00Z" {print $2}' | while read -r n; do test -f "goals/kanal/antworten-03/$n.md" && echo "$n"; done | wc -l` muss mindestens 1 ausgeben.
       Prüfung: `grep -E "^[0-9]{4}-" ops/posted-answers.log | awk '{print $2}' | sort | uniq -d | while read -r n; do test -f "goals/kanal/antworten-03/$n.md" && echo "doppelt $n"; done` muss nichts ausgeben.
       Prüfung: `grep -E "^[0-9]{4}-" ops/posted-answers.log | cut -c1-10 | sort | uniq -c | awk '$1 > 3'` muss nichts ausgeben.
       Prüfung (Netz): `python3 ops/post-the-answers.py --verify-posted --folder goals/kanal/antworten-03 | tail -1` muss mit `VERIFY POSTED OK:` beginnen.
-- [ ] `check` ist grün.
+- [x] `check` ist grün.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Jeder neue Test war vor dem Werkzeug rot; die Zeile im Progress Log nennt, womit.
@@ -129,5 +129,9 @@ ohne die Zahl niemand weiß, ob dieser Kanal zahlende Kunden bringt oder nur Arb
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-12 Zyklus 1: Punkte 1, 2, 3, 5 gebaut (`ops/github-yield.sh` mit Fixture und 10 Tests, `goals/kanal/ertrag.md` gemessen, Liste mit 4 Issues, Entwürfe zu #447, #406 und #408), Punkt 4 wartet auf das Human Gate public_post. Prüfbefehle: `bash ops/github-yield.sh --selftest | tail -1` SELFTEST OK (Gegenprobe: ohne Filter der eigenen Liste, mit gelockertem Referrer-Präfix und mit `/pay/` ohne Status 200 je SELFTEST FAILED); `pnpm -s vitest run test/github-yield.test.ts` Exit 0, 10 Tests (vor dem Werkzeug 10 rot mit Exit 127, mit dem Filter der eigenen Liste abgeschaltet 3 rot); `grep -cE` Testzahl 10; Adress-Grep der Ausgabe 0; Fixture-Grep fremder Adressen 0; `ertrag.md` Zeilen Ertrag 1, Alle neuen 1, Befehl 1, Datum 2, Adress-Grep 0; `bash ops/github-yield.sh --since 2026-11-11T07:04:50Z | head -1 | grep -c ...` 1 (0 kamen, 0 angemeldet, 0 gezahlt; 283 neue Wallets, 1 zahlend; Gegenprobe gegen die Produktion ab 2026-10-01: 7 Ankünfte, eine angehängte Ankunft mit Anmeldung in der Kopie des Produktionslogs zählt 1 und 1); `grep -cE` Tabelle 4; `gh issue` 1; Anzahl `passt`; schon beantwortet leer; Wallet-Grep 0; `python3 ops/before-the-answers.py --folder goals/kanal/antworten-03` Exit 0, READY, 3 still to send; Punkt 4 Log-Grep 0, offen, doppelt leer, drei am Tag leer; `node scripts/check.mjs` Exit 0 (110 Testdateien, 1378 Tests).
+- 2026-11-12 Zyklus 2: Punkt 4 gepostet nach Matthias' Freigabe am Topic (2026-11-12 20:41 UTC), genau die drei freigegebenen Texte über `python3 ops/post-the-answers.py --folder goals/kanal/antworten-03 --send 3 --only 447,406,408`: https://github.com/Conway-Research/automaton/issues/447#issuecomment-6835431307, https://github.com/Conway-Research/automaton/issues/406#issuecomment-6835466852, https://github.com/Conway-Research/automaton/issues/408#issuecomment-6835502716; Entwurf gegen Freigabe und Live-Kommentar gegen Freigabe je identisch (Gegenprobe mit einem geänderten Wort meldet ABWEICHUNG), `origin/dev` gemergt, Abschluss gemeldet, Punkte 1, 2, 3, 4, 5. Prüfbefehle: `bash ops/github-yield.sh --selftest | tail -1` SELFTEST OK; `pnpm -s vitest run test/github-yield.test.ts` Exit 0; Testzahl 10; Adress-Grep der Ausgabe 0; Fixture-Grep fremder Adressen 0; `ertrag.md` Zeilen Ertrag 1, Alle neuen 1, Befehl 1, Datum 2, Adress-Grep 0; `bash ops/github-yield.sh --since 2026-11-11T07:04:50Z | head -1 | grep -c ...` 1; Tabelle 4; `gh issue` 1; Anzahl `passt`; schon beantwortet leer; Wallet-Grep 0; `python3 ops/before-the-answers.py --folder goals/kanal/antworten-03` Exit 0, READY, 3 already posted; Punkt 4 Log-Grep 3, doppelt leer, drei am Tag leer (Gegenprobe mit einer gepflanzten vierten Zeile am 2026-11-12 meldet `doppelt 447` und `4 2026-11-12`); `python3 ops/post-the-answers.py --verify-posted --folder goals/kanal/antworten-03 | tail -1` VERIFY POSTED OK: 3 same; `node scripts/check.mjs` lokal zweimal Exit 1 bei Load 84 bis 130, je an anderen Tests außerhalb dieses Diffs (`test/abort-purchase.test.ts`, dann `test/live-selftest.test.ts` und `test/sandbox-api.test.ts`), einzeln je grün, im dritten Lauf bei Load 62 Exit 0 (114 Testdateien, 1429 Tests).
+- 2026-11-12 Release: PASS K und B (Zyklus 2), DONE.
 
 ## Blockers
+Gate public_post erledigt: Freigabe am Topic am 2026-11-12 20:41 UTC, die drei Texte sind Wort für Wort gepostet (Links im Progress Log).
