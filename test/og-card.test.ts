@@ -54,7 +54,11 @@ describe("The preview card", () => {
   it("says the same thing the page says, so a shared link does not mis-sell", async () => {
     const app = createApp({ db: openDb(":memory:") });
     const html = await (await app.request("/")).text();
-    const h1 = html.match(/<h1>([\s\S]*?)<\/h1>/)?.[1].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+    // The promise is the first h1 after the move block. That block (goals/seite/02) leads the page for operators from
+    // Conway issues and has its own h1, which is not what the service promises a buyer.
+    const move = html.indexOf('id="umzug"');
+    expect(move, "no move block").toBeGreaterThan(-1);
+    const h1 = html.slice(html.indexOf("</section>", move)).match(/<h1>([\s\S]*?)<\/h1>/)?.[1].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
     expect(h1, "the landing page lost its h1").toBeTruthy();
     // The card carries the same three sentences as the h1, in the same order.
     for (const part of h1!.split(".").map((s) => s.trim()).filter(Boolean)) {

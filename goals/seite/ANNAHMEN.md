@@ -16,3 +16,20 @@
   geänderter Preis bewegt rund 50 Pixel auf einer Seite mit über 2 Millionen, das deckt keine Grenze in Prozent ab. Das Rendern ist
   deterministisch: 12 parallele Läufe bei Load 70 ergaben je 0 px. Wird es auf einem anderen Rechner unruhig, steigt die Grenze auf
   eine kleine feste Zahl und nicht zurück auf Prozent.
+- 2026-11-12 (seite 02): Sechs Tests außerhalb der Pfadliste von Punkt 6 hingen am alten Aufbau und widersprechen dem abgenommenen
+  Bild: `test/landing-human.test.ts` (Katalog für Menschen und `top.png` vor jedem `.hero`), `test/catalog-page.test.ts` (Link auf
+  `/katalog` vor `top.png`), `test/landing-german.test.ts`, `test/og-card.test.ts` und `test/readme.test.ts` (erstes `h1` der Seite
+  gleich Überschrift, README und Vorschaukarte). Das Bild gilt, also prüfen sie ihre Regel am neuen Ort: der Umzug als einziger Block
+  vor der Person, `top.png` im Umzug, das Versprechen ist das erste `h1` nach dem Umzug. README, `/llms.txt` und die Karte bleiben
+  unverändert. Damit ist `check` grün und der erste Prüfbefehl von Punkt 6 nennt genau diese Dateien; Punkt 6 bleibt offen.
+- 2026-11-12 (seite 02): `ops/landing-yield.sh` liest die eigenen Adressen nur aus `ops/own-ips.txt` (oder `CP_OWN_IPS`), nicht
+  zusätzlich die Live-Adresse aus `ops/own-ips.sh` wie `ops/traffic.sh`. Eigene Läufe tragen keinen Referrer aus Conway-Issues und
+  zählen deshalb nicht als Ankunft. Es liest `client_ip` und fällt auf `remote_ip` zurück; ohne `trusted_proxies` sind beide gleich.
+- 2026-11-12 (seite 02, Kritik Tech Lead): Entscheidung: Der erste Prüfbefehl von Punkt 6 wird repariert, nicht abgeschwächt, weil er
+  mit keinem Bau grün werden konnte. `goals/seite/` war mit `$` verankert und traf weder die Goal-Datei noch `ANNAHMEN.md` noch die
+  Verdicts der Linsen, die erst im Abschluss auf den Branch kommen; jetzt `goals/seite/(verdicts/)?[A-Za-z0-9._-]+\.md`. Die fünf Tests
+  `test/landing-human.test.ts`, `test/catalog-page.test.ts`, `test/landing-german.test.ts`, `test/og-card.test.ts` und
+  `test/readme.test.ts` kommen in die Liste, weil das abgenommene Bild einen eigenen `h1` und `top.png` in den Umzug setzt und diese
+  Tests ihre Regel am neuen Ort prüfen (Diff gelesen, kein Fall und keine Assertion weniger). Damit die Erweiterung nicht ungeprüft
+  bleibt, sichert Punkt 7 diese fünf Tests wie Punkt 3 die ersten drei. Die Änderung am Vertrag schickt den Goal-PR in die Human
+  Inbox; die liegt bei diesem Loop beim Tech Lead, der nach dieser Entscheidung nach `dev` merged.
