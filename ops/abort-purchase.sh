@@ -217,6 +217,20 @@ selftest() {
   absent() { # $1 name, $2 output, $3 pattern that must not appear at the start of a line
     if printf '%s\n' "$2" | grep -qF -- "$3"; then echo "FAIL purchase $1 (found: $3)"; all_ok=0; else echo "ok   purchase $1"; fi
   }
+  # Runs the counting into $out. A counting that dies (a signal from outside, a crash) names itself in a
+  # FAIL line with its exit code, so a killed process is not mistaken for a wrong number further down.
+  count() { # $1 name of the run, $2 activity file, $3 rows file; AP_NOW and AP_SINCE come from the caller
+    local rc=0
+    out="$(calc "$2" "$3")" || rc=$?
+    if [ "$rc" != 0 ]; then
+      if [ "$rc" -gt 128 ]; then
+        echo "FAIL purchase counting $1 exited $rc (killed by signal $((rc - 128)), not a result of the counting)"
+      else
+        echo "FAIL purchase counting $1 exited $rc"
+      fi
+      all_ok=0
+    fi
+  }
   arow() { printf '{"src":"%s","at":"%sT%s.000Z","model":"%s","provider":"%s","purchase_mc":%s%s}\n' "$1" "$2" "$3" "$4" "${6:-openrouter}" "$5" "${7:-}"; }
 
   # Now is 2026-11-16 08:00 UTC: the 12th to the 15th are completed, the 16th is running.
@@ -250,7 +264,7 @@ JSON
     arow ledger 2026-11-13 10:00:00 openai/gpt-5-mini 55555 mock
   } >"$dir/rows.jsonl"
 
-  out="$(AP_NOW=2026-11-16T08:00:00Z AP_SINCE=2026-11-10 calc "$dir/activity.json" "$dir/rows.jsonl")" || all_ok=0
+  AP_NOW=2026-11-16T08:00:00Z AP_SINCE=2026-11-10 count planted "$dir/activity.json" "$dir/rows.jsonl"
   printf '%s\n' "$out" | sed 's/^/  planted: /'
   expect "equal day, gap 0" "$out" "| 2026-11-12 | openai/gpt-5-mini | 3000 | 3000 | 0 | 0 | - |"
   absent "equal day, no noise line" "$out" "noise 2026-11-12 openai/gpt-5-mini"
@@ -265,13 +279,13 @@ JSON
   expect "baseline 0 when the day without abort agrees" "$out" "baseline openai/gpt-5-mini: 0"
 
   # A day later the 16th is completed and counts: the filter follows AP_NOW and is not blind to the day.
-  out="$(AP_NOW=2026-11-17T08:00:00Z AP_SINCE=2026-11-10 calc "$dir/activity.json" "$dir/rows.jsonl")" || all_ok=0
+  AP_NOW=2026-11-17T08:00:00Z AP_SINCE=2026-11-10 count "day later" "$dir/activity.json" "$dir/rows.jsonl"
   expect "completed day counts once AP_NOW has passed it" "$out" "| 2026-11-16 | openai/gpt-5-mini | 999000 | 99999 | 899001 | 1 | 899001 |"
 
   # The other direction: a period where both sides agree on every day has no noise at all.
   printf '{"data":[{"date":"2026-11-12","model":"openai/gpt-5-mini","usage":0.03}]}\n' >"$dir/quiet.json"
   { arow ledger 2026-11-12 10:00:00 openai/gpt-5-mini 3000; } >"$dir/quiet.jsonl"
-  out="$(AP_NOW=2026-11-16T08:00:00Z AP_SINCE=2026-11-10 calc "$dir/quiet.json" "$dir/quiet.jsonl")" || all_ok=0
+  AP_NOW=2026-11-16T08:00:00Z AP_SINCE=2026-11-10 count quiet "$dir/quiet.json" "$dir/quiet.jsonl"
   expect "quiet period, no noise" "$out" "noise: none"
 
   # Drift without any abort: two days without an abort (gaps 700 and 900 mc) give the model a baseline of
@@ -283,7 +297,7 @@ JSON
     arow ledger 2026-11-14 10:00:00 openai/gpt-5-mini 1000
     arow abort 2026-11-14 10:05:00 openai/gpt-5-mini 0 openrouter ',"answered":0'
   } >"$dir/drift.jsonl"
-  out="$(AP_NOW=2026-11-16T08:00:00Z AP_SINCE=2026-11-10 calc "$dir/drift.json" "$dir/drift.jsonl")" || all_ok=0
+  AP_NOW=2026-11-16T08:00:00Z AP_SINCE=2026-11-10 count drift "$dir/drift.json" "$dir/drift.jsonl"
   printf '%s\n' "$out" | sed 's/^/  drift: /'
   expect "baseline is the median of the days without abort" "$out" "baseline openai/gpt-5-mini: 800"
   expect "per abort subtracts the baseline, gap stays raw" "$out" "| 2026-11-14 | openai/gpt-5-mini | 2100 | 1000 | 1100 | 1 | 300 |"

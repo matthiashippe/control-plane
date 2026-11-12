@@ -109,6 +109,32 @@ describe("ops/abort-purchase.sh", () => {
     expect(run.status).toBe(1);
   }, 120_000);
 
+  it("names a counting killed from outside in its selftest instead of only a wrong number", () => {
+    // A node on PATH that SIGKILLs itself on its second call, like a SIGKILL from outside the run (cause of
+    // audit 2026-11-12, line 84 not determined): the selftest must say which counting died and how.
+    const dir = mkdtempSync(join(tmpdir(), "abort-purchase-kill-"));
+    const fake = join(dir, "node");
+    writeFileSync(
+      fake,
+      [
+        "#!/usr/bin/env bash",
+        `f="${join(dir, "calls")}"; n=$(( $(cat "$f" 2>/dev/null || echo 0) + 1 )); echo $n >"$f"`,
+        'if [ "$n" = 2 ]; then kill -9 $$; fi',
+        `exec "${process.execPath}" "$@"`,
+      ].join("\n") + "\n",
+      { mode: 0o755 },
+    );
+    const run = spawnSync("bash", [SCRIPT, "--selftest"], {
+      encoding: "utf8",
+      timeout: 60_000,
+      env: { ...process.env, PATH: `${dir}:${process.env.PATH ?? ""}` },
+    });
+    expect(run.stdout).toMatch(/^FAIL purchase counting day later exited 137 \(killed by signal 9, not a result of the counting\)$/m);
+    expect(run.stdout).not.toMatch(/^FAIL purchase counting (planted|quiet|drift) /m);
+    expect(run.stdout.trim().split("\n").at(-1)).toBe("ABORT PURCHASE SELFTEST FAIL");
+    expect(run.status).toBe(1);
+  }, 120_000);
+
   it("stops with exit 2 before any request when the management key is missing", () => {
     const home = mkdtempSync(join(tmpdir(), "abort-purchase-home-"));
     const clean: NodeJS.ProcessEnv = { ...process.env, HOME: home, HTTPS_PROXY: "http://127.0.0.1:9" };
