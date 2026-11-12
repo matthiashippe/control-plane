@@ -1,7 +1,7 @@
 # ROADMAP.md: Topics, Priorität, Goal-Ketten
 
-Quelle: `docs/kette.md` (ausführliche Fassung jedes Glieds), Reihenfolge nach Wirkung beim zahlenden Kunden, ein Goal zur Zeit
-(`parallel_goals: 1`). Der Loop Master startet Topics in der Reihenfolge der Spalte Prio (bei gleicher Prio in der Reihenfolge der
+Quelle: `docs/kette.md` (ausführliche Fassung jedes Glieds), Reihenfolge nach Wirkung beim zahlenden Kunden, bis zu zwei Goals
+parallel (`parallel_goals: 2`). Der Loop Master startet Topics in der Reihenfolge der Spalte Prio (bei gleicher Prio in der Reihenfolge der
 Tabelle), sobald ihre Voraussetzung abgeschlossen ist. Innerhalb eines Topics laufen die Goals seriell (`goals/<topic>/01-…`,
 `02-…`). Maßgeblich sind die Zeilen `- <topic> Goal NN DONE` unter `## Voraussetzungen` der Goal-Datei; die Spalte Voraussetzung
 gilt für ein erstes Goal, dessen Datei noch fehlt. Fehlt die Datei eines Glieds der Spalte Kette, bekommt der Writer den Auftrag
