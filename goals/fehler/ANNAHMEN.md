@@ -51,3 +51,23 @@
   einmal; nach einem erfolgreichen POST gilt wieder höchstens eine am Tag.
 - Der Fake für `curl` im neuen Test scheitert mit Exit 22, dem Code von `curl --fail` bei einer Antwort 4xx oder 5xx. Der alte
   Watchdog gab `--fail` nicht mit, dem Fake ist das gleich; die Gegenprobe gegen `5458fa3` misst also nur das Speichern des Zustands.
+
+## fehler 04 (12.11.2026, Engineer CP)
+
+- `ops/traffic.sh` legt eine Adresse beiseite, deren /24 im Log drei oder mehr Adressen hat. Die Dokumentationsbereiche haben nur drei
+  /24-Netze, deshalb sind die Ersatzadressen nicht der Reihe nach vergeben, sondern so auf die drei Netze verteilt, dass in jeder
+  Fixture jede Adresse dieselbe Antwort auf „drei oder mehr aus ihrem /24“ bekommt wie vorher (die sechs Adressen des Scanners teilen
+  weiter ein Netz). Gemessen über alle Fixtures von `ops/traffic.sh` mit Adressen als `X` und zusammengezogenen Leerzeichen: gleiche
+  Ausgabe bis auf die Zusammenfassung „N address(es) in M network(s)“ in drei Fixtures mit vier oder neun fremden Netzen, die mit drei
+  Netzen nicht darstellbar sind. Der Selbsttest von `ops/traffic.sh` und die Fixtures von `ops/depth.sh` sind gleich.
+- Versionen in Browserkennungen der Fixtures (`Chrome/<n>.0.0.0`) sehen für die Regex des Tests aus wie öffentliche Adressen. Sie sind
+  auf vierteilige Versionen mit vierstelligem dritten Teil umgestellt (Form echter Chrome-Builds); kein Skript liest die Version, und
+  jede Version bekommt genau einen Ersatz, damit gleiche Kennungen gleich bleiben.
+- Ein Kommentar in `ops/fetchers.py` nannte den PTR einer GCP-Adresse, dessen Anfang die Oktette rückwärts als eigene Adresse
+  enthielt; er nennt jetzt nur die Domain.
+- Die beiden öffentlichen DNS-Resolver (Cloudflare, Quad9) stehen als `datacenter` mit dem PTR aus der Abfrage durch `ops/fetchers.py` in der Liste, weil sie als
+  Resolver der Sandboxes in Goal-Dateien, Verdicts und `ANNAHMEN.md` des Topics sandbox stehen; die Ersetzung lässt sie überall
+  unverändert, auch dort, wo ein Selbsttest sie als Besucher nutzt.
+- Eine Adresse eines Contabo-Servers steht in den Momentaufnahmen des x402-Verzeichnisses unter `docs/research/data/` als Host eines öffentlichen Dienstes;
+  der Betreiber kommt aus RDAP von RIPE, weil der Cache von `ops/fetchers.py` ihn nicht als Rechenzentrum erkennt.
+- Der Absatz in `ops/README.md` ist Englisch wie die ganze Datei.

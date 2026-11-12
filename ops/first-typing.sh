@@ -32,15 +32,15 @@ if [[ "${1:-}" == "--selftest" ]]; then
   log=$(mktemp)
   now=$(date -u +%s)
   {
-    printf '{"ts":%s,"request":{"remote_ip":"9.9.9.1","uri":"/check?via=form&kind=factual"},"status":200}\n' "$now"
+    printf '{"ts":%s,"request":{"remote_ip":"192.0.2.116","uri":"/check?via=form&kind=factual"},"status":200}\n' "$now"
     # Two hours later: a return. And one minute later: the same person pressing the button twice,
     # which must NOT read as coming back, or every double-click inflates the one number of the week.
-    printf '{"ts":%s,"request":{"remote_ip":"9.9.9.1","uri":"/check?via=form&kind=factual"},"status":200}\n' "$((now + 7200))"
-    printf '{"ts":%s,"request":{"remote_ip":"9.9.9.3","uri":"/check?src=nit&via=form"},"status":200}\n' "$((now + 60))"
-    printf '{"ts":%s,"request":{"remote_ip":"9.9.9.2","uri":"/check?src=ex1&kind=factual"},"status":200}\n' "$now"
-    printf '{"ts":%s,"request":{"remote_ip":"9.9.9.3","uri":"/check?src=nit&via=form"},"status":200}\n' "$now"
-    printf '{"ts":%s,"request":{"remote_ip":"9.9.9.4","uri":"/b?src=nit"},"status":302}\n' "$now"
-    printf '{"ts":%s,"request":{"remote_ip":"9.9.9.5","uri":"/check"},"status":200}\n' "$now"
+    printf '{"ts":%s,"request":{"remote_ip":"192.0.2.116","uri":"/check?via=form&kind=factual"},"status":200}\n' "$((now + 7200))"
+    printf '{"ts":%s,"request":{"remote_ip":"192.0.2.118","uri":"/check?src=nit&via=form"},"status":200}\n' "$((now + 60))"
+    printf '{"ts":%s,"request":{"remote_ip":"192.0.2.117","uri":"/check?src=ex1&kind=factual"},"status":200}\n' "$now"
+    printf '{"ts":%s,"request":{"remote_ip":"192.0.2.118","uri":"/check?src=nit&via=form"},"status":200}\n' "$now"
+    printf '{"ts":%s,"request":{"remote_ip":"192.0.2.119","uri":"/b?src=nit"},"status":302}\n' "$now"
+    printf '{"ts":%s,"request":{"remote_ip":"192.0.2.120","uri":"/check"},"status":200}\n' "$now"
   } > "$log"
   out=$(CP_TYPING_LOG="$log" CP_TYPING_OWN=" " "$DIR/first-typing.sh" 30 2>&1)
   echo "$out"

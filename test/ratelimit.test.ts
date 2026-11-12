@@ -68,7 +68,7 @@ describe("RateLimiter", () => {
   it("reads the real client address behind the proxy, not the one the client claims", () => {
     // Caddy appends the real address at the end. Reading the first entry would let any client
     // fake as many identities as it likes with a self-set X-Forwarded-For.
-    const h = new Headers({ "x-forwarded-for": "1.2.3.4, 5.6.7.8, 203.0.113.9" });
+    const h = new Headers({ "x-forwarded-for": "198.51.100.117, 203.0.113.110, 203.0.113.9" });
     expect(clientKey(h)).toBe("203.0.113.9");
     expect(clientKey(new Headers({ "x-real-ip": "198.51.100.7" }))).toBe("198.51.100.7");
     expect(clientKey(new Headers())).toBe("unknown");

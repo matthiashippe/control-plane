@@ -40,8 +40,8 @@ found_in() { # haystack-file marker -> 0 when present
 if [[ "${1:-}" == "--selftest" ]]; then
   fixture=$(mktemp); trap 'rm -f "$fixture"' EXIT
   printf '%s\n' \
-    '{"ts":1,"request":{"uri":"/check?brief=SELFTEST+MARKER+ALPHA","remote_ip":"1.2.3.4"}}' \
-    '{"ts":2,"request":{"uri":"/v1/briefs/check","remote_ip":"1.2.3.4"}}' > "$fixture"
+    '{"ts":1,"request":{"uri":"/check?brief=SELFTEST+MARKER+ALPHA","remote_ip":"198.51.100.117"}}' \
+    '{"ts":2,"request":{"uri":"/v1/briefs/check","remote_ip":"198.51.100.117"}}' > "$fixture"
   fail=0
   found_in "$fixture" "SELFTEST" || { echo "SELFTEST FAILED: did not find a marker that is there"; fail=1; }
   found_in "$fixture" "NOT_IN_THERE_AT_ALL" && { echo "SELFTEST FAILED: found a marker that is not there"; fail=1; }
