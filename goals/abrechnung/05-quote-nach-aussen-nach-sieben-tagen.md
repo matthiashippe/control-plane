@@ -47,6 +47,23 @@ Skalierung abbricht.
   behaupten, die die Zahl nicht trägt.
 - Produktion nur lesend: Caddy-Log über `ops/access-log.sh`, Datenbank mit `readonly: true` im Container `deploy-cp-1` (wie `ROWS_JS`).
   Ausgegeben wird nie eine Adresse, eine Wallet oder ein Guthaben. Variablen aus `~/.config/control-plane/loop.env`, Werte nie ausgeben.
+- Management-Key (abrechnung-kritik-2026-11-11-2, Entscheidung Tech Lead 12.11.2026): `OPENROUTER_MANAGEMENT_KEY` stand in
+  `~/.config/control-plane/loop.env`, die jede Rolle lädt; ein Management-Key darf Schlüssel und Limits des Kontos ändern. Seit dem
+  12.11.2026 liegt er in einer eigenen Datei `~/.config/control-plane/openrouter-management.env` (0600, eine Zeile
+  `OPENROUTER_MANAGEMENT_KEY=…`), und `loop.env` trägt ihn nicht mehr. `ops/abort-purchase.sh` liest ihn nur von dort (Pfad
+  überschreibbar mit `AP_MANAGEMENT_KEY_FILE`, für den Test), parst genau diese eine Zeile, ohne die Datei zu sourcen und ohne zu
+  exportieren, nimmt ihn nicht mehr aus der Umgebung oder aus `loop.env` und bricht mit Exit 2 ab, wenn die Datei fehlt, leer ist oder
+  andere Rechte als 0600 hat. Bis dieser Punkt gebaut ist, endet das Werkzeug mit `OPENROUTER_MANAGEMENT_KEY missing`; das ist erwartet.
+  Kein Agent liest oder sourct die Datei selbst, auch nicht zum Prüfen; ihr Inhalt steht nie in einer Ausgabe.
+- Einkauf je Abbruch (abrechnung-kritik-2026-11-11-4): Die Zahl „Einkauf ohne Verkauf 0 mc“ in `docs/abrechnung/einkauf-abbrueche.md`
+  stammt aus dem 10.11.2026, einem Tag ohne Zeile in `inference_aborts`; die Frage, was ein Abbruch ohne Antwort beim Anbieter kostet,
+  ist damit offen. Dieses Goal fährt `bash ops/abort-purchase.sh` über dieselben ganzen UTC-Tage wie `--compare` (`AP_SINCE=2026-11-10`,
+  `AP_NOW=2026-11-18T00:00:00Z`, also 10. bis 17.11.2026; die Aktivität des Anbieters kennt nur ganze Tage, der Rollout-Tag zählt
+  ganz) und schreibt die Zahl je Abbruch neu. Gibt es keine Zeile mit `answered = 0` oder nur `noise`, steht dort keine Zahl, sondern
+  der Grund.
+- Ausfall im Messfenster: Vom 11.11.2026 02:01 UTC bis zur Aufladung war das Guthaben beim Anbieter leer, der Dienst antwortete auf
+  Inferenz 503 (fehler 01). Diese Anfragen sind keine Timeouts und keine Abbrüche; nenne den Zeitraum in `timeouts.md` und
+  `einkauf-abbrueche.md`, damit niemand die Quote oder den Einkauf je Abbruch aus dem Ausfall liest.
 - Traction: Eine gemessene Quote über sieben Tage ist der Satz, mit dem kanal 01 einem Automaton aus einem Conway-Issue sagt, dass seine
   Anfragen bei uns ankommen; ohne sie nennt die Antwort keine Zahl oder eine, die nicht hält.
 - Der Laufzeitpfad ändert sich nicht: kein `src/**`, also kein Rollout. Node 22 vorn im `PATH` (`PATH=/usr/bin:$PATH`), `check` und
@@ -96,6 +113,32 @@ Skalierung abbricht.
       Prüfung: `sed -n '/^## Nach sieben Tagen/,/^## /p' docs/abrechnung/timeouts.md | grep -c "^Widerlegt: "` muss 1 ausgeben.
       Prüfung: `grep -c "^## Goal 05" goals/abrechnung/ANNAHMEN.md` muss 1 ausgeben.
       Prüfung: `grep -cE "0x[0-9a-fA-F]{40}|\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" docs/abrechnung/timeouts.md` muss 0 ausgeben.
+- [ ] Kritik: `ops/abort-purchase.sh` liest den Management-Key nur aus `~/.config/control-plane/openrouter-management.env` (0600),
+      nie aus der Umgebung oder aus `loop.env`. Der Test fährt das Skript ohne Netz mit einem `HOME` aus `mktemp`: Ein gepflanzter Key nur
+      in `loop.env` oder nur in der Umgebung ergibt Exit 2 mit `OPENROUTER_MANAGEMENT_KEY missing`; eine Key-Datei mit 0644 ergibt Exit 2;
+      eine Key-Datei mit 0600 kommt an der Key-Stufe vorbei und endet ohne `CP_HOST` mit Exit 2 und `CP_HOST and CP_SSH_KEY are not set`.
+      Kein Lauf gibt den gepflanzten Key aus. Mit dem Skript von heute ist der erste Fall rot, die Zeile im Progress Log nennt es.
+      MVP: Funktion, weil ein Management-Key, den jede Rolle in ihre Umgebung lädt, Schlüssel und Limits des Kontos ändern kann, über
+      das jede Antwort an zahlende Kunden läuft.
+      Prüfung: `pnpm -s vitest run test/abort-purchase-key-file.test.ts` muss Exit-Code 0 haben.
+      Prüfung: `grep -c "openrouter-management.env" ops/abort-purchase.sh` muss mindestens 1 ausgeben.
+      Prüfung: `grep -c '^OPENROUTER_MANAGEMENT_KEY=' ~/.config/control-plane/loop.env` muss 0 ausgeben.
+      Prüfung: `stat -c %a ~/.config/control-plane/openrouter-management.env` muss `600` ausgeben.
+      Prüfung: `bash ops/abort-purchase.sh --selftest` muss Exit-Code 0 haben.
+- [ ] Kritik: Der Einkauf je Abbruch ohne Antwort ist über dieselben Tage gemessen wie `--compare`. `docs/abrechnung/einkauf-abbrueche.md`
+      hat den Abschnitt `## Nach sieben Tagen` mit dem Befehl `AP_SINCE=2026-11-10 AP_NOW=2026-11-18T00:00:00Z bash ops/abort-purchase.sh`,
+      der Tabelle, den Zeilen `noise`, `baseline` und `purchase without sale` und genau einer Zeile
+      `Einkauf je Abbruch ohne Antwort: <mc> mc (<n> Abbrüche, 10.11. bis 17.11.2026)` oder `Einkauf je Abbruch ohne Antwort: keine Zahl,
+      weil <Grund>`. Dieselbe Zeile steht in `docs/abrechnung/timeouts.md`. Die Zahl „0 mc“ vom 10.11.2026 verweist auf den neuen
+      Abschnitt. Keine Adresse.
+      MVP: Funktion, weil Timeout-Quote und Anbieterwahl sonst mit einem Einkauf rechnen, der auf einem Tag ohne einen einzigen Abbruch
+      ohne Antwort steht.
+      Prüfung (Netz): `AP_SINCE=2026-11-10 AP_NOW=2026-11-18T00:00:00Z bash ops/abort-purchase.sh | grep -c "^purchase without sale "` muss mindestens 1 ausgeben.
+      Prüfung: `grep -c "^## Nach sieben Tagen" docs/abrechnung/einkauf-abbrueche.md` muss 1 ausgeben.
+      Prüfung: `grep -c "AP_SINCE=2026-11-10 AP_NOW=2026-11-18T00:00:00Z bash ops/abort-purchase.sh" docs/abrechnung/einkauf-abbrueche.md` muss mindestens 1 ausgeben.
+      Prüfung: `grep -cE "^Einkauf je Abbruch ohne Antwort: ([0-9]+ mc \([0-9]+ Abbrüche, 10\.11\. bis 17\.11\.2026\)|keine Zahl, weil )" docs/abrechnung/einkauf-abbrueche.md` muss 1 ausgeben.
+      Prüfung: `grep -cE "^Einkauf je Abbruch ohne Antwort: " docs/abrechnung/timeouts.md` muss 1 ausgeben.
+      Prüfung: `grep -cE "0x[0-9a-fA-F]{40}|\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" docs/abrechnung/einkauf-abbrueche.md` muss 0 ausgeben.
 - [ ] Der Laufzeitpfad bleibt unverändert, und `check` ist grün.
       Prüfung: `git diff --name-only origin/dev...HEAD -- src deploy | wc -l` muss 0 ausgeben.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
@@ -110,7 +153,8 @@ Skalierung abbricht.
 - `loop.yaml`, `gate.yaml`, `loop-constraints.md`, `LOOP.md`, `ops/prompts/**`, `.github/**`, `scripts/check.mjs`, `deploy/**`,
   `src/**`, `ops/conway-series.sh`, `ops/conway-money-series.sh`, `harness/runtime/**`, `.env*`
 - jede schreibende Handlung in der Produktion; Datenbank nur mit `readonly: true`, Caddy-Log nur lesend
-- `~/.config/control-plane/loop.env` schreibt kein Agent
+- `~/.config/control-plane/loop.env` und `~/.config/control-plane/openrouter-management.env` schreibt kein Agent; die zweite liest nur
+  `ops/abort-purchase.sh`, kein Agent sourct oder liest sie
 - loop-constraints.md gilt zusätzlich
 
 ## Budget
