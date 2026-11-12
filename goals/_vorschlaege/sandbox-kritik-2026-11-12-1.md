@@ -1,0 +1,6 @@
+Schwere: 3
+Goal: sandbox 02
+Befund: sandbox 02 legt fremden Code unter die Zone des Zahlungsdienstes (`*.postyourprice.com` proxied auf den Sandbox-Server, Namen `sbx-<id>-<port>.postyourprice.com`); eine einzige Sandbox mit Phishing- oder Wallet-Drainer-Seite kann damit die Domain `postyourprice.com` bei Safe Browsing, Cloudflare-Abuse oder Mail-Reputation sperren lassen, und mit ihr den Dienst, über den jeder zahlende Automaton läuft.
+Beleg: docs/sandbox/plan.md:68 (Eintrag `*.postyourprice.com`, proxied, auf `72.62.51.224`); goals/sandbox/02-der-sandbox-server-steht.md:43 (Kontext für den Maker, DNS); docs/sandbox/plan.md:72 schützt nur die Cookies (ohne `Domain`-Attribut), nicht den Ruf der registrierbaren Domain.
+Empfehlung: Tech Lead entscheidet vor dem DNS-Punkt von sandbox 02: freigegebene Ports unter einer eigenen registrierbaren Domain (Kauf bei Matthias über Human Gate, Universal SSL deckt `*.<neue-domain>` ebenso kostenlos), oder die Entscheidung für die Hauptzone mit Grund und Notschalter (Wildcard löschen) in `goals/sandbox/ANNAHMEN.md`. Bis dahin baut sandbox 02 alles außer dem Wildcard-Eintrag.
+MVP: Funktion, weil ein gesperrtes `postyourprice.com` jede Inferenz-Anfrage jedes zahlenden Kunden trifft, nicht nur die Sandboxes.
