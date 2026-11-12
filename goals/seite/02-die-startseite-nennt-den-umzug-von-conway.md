@@ -1,7 +1,7 @@
 # Seite Goal 02: Die Startseite nennt den Umzug von Conway
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Wer aus einem Conway-Issue auf `/` landet, sieht im ersten Bildschirm den Umzug: `conwayApiUrl` auf `https://postyourprice.com`,
@@ -117,7 +117,7 @@ hinter „Agent stuck?“ findet und nach diesem Goal ohne Suche im ersten Bilds
 - [x] Die fünf Tests, die am alten ersten `h1` und an `top.png` vor jedem `.hero` hingen, prüfen ihre Regel am neuen Ort weiter, keiner fehlt.
       Prüfung: `for f in test/landing-human.test.ts test/catalog-page.test.ts test/landing-german.test.ts test/og-card.test.ts test/readme.test.ts; do for k in '(it|test)\(' 'expect\('; do a=$(git show origin/dev:$f | grep -cE "^\s*$k"); b=$(grep -cE "^\s*$k" $f); [ "$b" -ge "$a" ] || echo "weniger $f $k $a $b"; done; done; grep -nE '\.(skip|only|todo)\(' test/landing-human.test.ts test/catalog-page.test.ts test/landing-german.test.ts test/og-card.test.ts test/readme.test.ts | wc -l` muss als einzige Ausgabe `0` haben.
       Prüfung: `pnpm -s vitest run test/landing-human.test.ts test/catalog-page.test.ts test/landing-german.test.ts test/og-card.test.ts test/readme.test.ts` muss Exit-Code 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Ein Betreiber, der aus einem Conway-Issue kommt, sieht auf `postyourprice.com` ohne Scrollen die eine Zeile und den einen
@@ -146,6 +146,7 @@ hinter „Agent stuck?“ findet und nach diesem Goal ohne Suche im ersten Bilds
 - 2026-11-12 Zyklus 1: Punkte 1, 2, 3, 4, 5 gebaut (Umzug als erster Block in `src/public/index.html`, `ops/soll-live.mjs`, `ops/landing-yield.sh` mit Fixture, Zahl vorher gegen die Produktion), Punkt 6 offen. Jeder neue und geänderte Test war vorher rot: `test/landing-move.test.ts` 5 von 5 und die geänderten Tests 14 von 85 gegen das `index.html` von `origin/dev`, `test/landing-yield.test.ts` 15 von 15 ohne Werkzeug. Prüfbefehle: P1 vitest exit 0, 5 Fälle; P2 `0 Mängel` mit `umzug oben 390=828 1440=656`, Gegenprobe `exit=1` ohne `sed-miss`, grep 0; P3 `0`, vitest exit 0; P4 `SELFTEST OK`, vitest exit 0, 15 Fälle, `adressen=34 fremd=0`; P5 grep 1, 1, 1, Netz exit 0 mit 1, 0, 0, 1 wie `Vorher:`; P6 Pfadliste `6` statt 0 (fünf Tests außerhalb der Liste, dazu `goals/seite/ANNAHMEN.md`, weil `goals/seite/` in der Regex mit `$` verankert ist und auch die Goal-Datei trifft), `src` 0, `check` exit 0 (1439 Tests).
 - 2026-11-12 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5; Punkt 6 bleibt offen, weil sein erster Prüfbefehl die Goal-Datei selbst zählt (`goals/seite/` ist mit `$` verankert, die Goal-Datei ändert sich auf jedem Goal-Branch) und fünf Tests nicht nennt, die am alten ersten `h1` und an `top.png` vor jedem `.hero` hingen und dem Bild folgen mussten (`goals/seite/ANNAHMEN.md`). dev `c8e3540` ist im Branch. Prüfbefehle: P1 vitest exit 0, 5 Fälle; P2 `soll: 2 Bilder, umzug oben 390=828 1440=656, 0 Mängel` exit 0, Gegenprobe `2 Mängel` und `exit=1` ohne `sed-miss`, grep 0; P3 `0`, vitest exit 0; P4 `SELFTEST OK`, vitest exit 0, 15 Fälle, `adressen=34 fremd=0`; P5 grep 1, 1, 1, Netz exit 0 mit 1, 0, 0, 1 wie `Vorher:`; P6 Pfadliste `7`, `src` 0, `check` exit 0 (1439 Tests, 174 s); Job `e2e` pass an `40ad493`.
 - 2026-11-12 Zyklus 3: Punkte 6 (Prüfbefehl aus der Kritik repariert) und 7 (neu aus der Kritik) ohne Codeänderung ausgeführt und abgehakt, Abschluss gemeldet, Punkte 1 bis 7; dev `c8e3540` ist im Branch. Prüfbefehle: P1 bis P4 vitest exit 0 (100 Tests), P2 `0 Mängel` mit `umzug oben 390=828 1440=656`, Gegenprobe `2 Mängel` und `exit=1` ohne `sed-miss`; P4 `SELFTEST OK`; P5 Netz exit 0 mit 1, 0, 0, 1 wie `Vorher:`; P6 Pfadliste `0`, `src` `0`, `check` exit 0 (1439 Tests, 63 s); P7 Schleife und grep `0`, vitest exit 0 (32 Tests).
+- 2026-11-12 Release: PASS K und B (Zyklus 3), DONE.
 
 ## Blockers
 keine
