@@ -76,3 +76,8 @@
   acht Abfragen dieses Laufs machten den Test auf dem code-host rot; die acht Zeilen, die nur dieser Lauf geschrieben hatte, sind
   wieder aus dem Cache genommen (Datei bleibt, 960 Zeilen wie vorher, atomar per rename), danach ist der Test grün. Für eine
   Abfrage ohne Cache-Eintrag `CP_FETCHER_CACHE` auf eine Datei aus `mktemp` setzen.
+- Kritik-Punkte 5 und 6 (Zyklus 3): Fundstellen für `erfunden` und für einen Eintrag ohne Fundstelle sind die getrackten Dateien von
+  `CP_SCAN_ROOT` und die des Work Trees, der die Liste trackt (`git ls-files --error-unmatch`), die Liste selbst ausgenommen. Nur
+  `CP_SCAN_ROOT` hätte Prüfbefehl 4 von Punkt 2 rot gemacht (Wegwerf-Repo mit der echten Liste, Erwartung `gruen`), weil dort keiner
+  der 13 Einträge steht; eine Liste aus `mktemp` liegt in keinem Work Tree und hat nur `CP_SCAN_ROOT`, wie die Prüfbefehle von
+  Punkt 5 und 6 es verlangen.

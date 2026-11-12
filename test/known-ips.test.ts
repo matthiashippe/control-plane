@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync, statSync } from "node:fs";
-import { isAbsolute, join, resolve } from "node:path";
+import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
+import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 
 /**
  * The repository is public, so every public IPv4 address in a tracked file has to be accounted for. An address is accounted for
@@ -9,8 +9,13 @@ import { isAbsolute, join, resolve } from "node:path";
  * ops/crawler-ips.txt (crawlers proven by their PTR record). Everything else has to be replaced by an address from the
  * documentation ranges (RFC 5737), because an unlisted public address may belong to a real visitor.
  *
- * This test needs no lookup and no network, so it runs in check and in CI. The failure message names the count and the files,
- * never an address.
+ * The list keeps its own rules here as well, so that they hold after the goal that introduced them: every line has the form
+ * <address> <kind> <evidence>, an address of kind erfunden stands only in files a goal may not change, and every entry still has
+ * a finding outside the list, so the list never turns into a permit for an address that comes later. Findings are the tracked
+ * files of the scan root and of the work tree that tracks the list.
+ *
+ * This test needs no lookup and no network, so it runs in check and in CI. The failure message names the count, the files or
+ * the line numbers, never an address.
  *
  *   CP_KNOWN_IPS   the list to read instead of ops/known-ips.txt (/dev/null is an empty list)
  *   CP_SCAN_ROOT   the git work tree to scan instead of this repository
@@ -21,6 +26,11 @@ const KNOWN = fromRoot(process.env.CP_KNOWN_IPS || "ops/known-ips.txt");
 const SCAN_ROOT = fromRoot(process.env.CP_SCAN_ROOT || ROOT);
 // The same candidate pattern as test/visitor-addresses.test.ts.
 const IPV4 = /\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b/g;
+
+// One line of ops/known-ips.txt besides comments and blank lines, the same pattern as the goal that introduced the list.
+const LINE = /^((?:[0-9]{1,3}\.){3}[0-9]{1,3}) (datacenter|crawler|erfunden|eigene) [^ ].*$/;
+// Paths no goal may change; an address of kind erfunden may only be left there.
+const FROZEN = /^(?:goals\/|docs\/audit\/|\.github\/|deploy\/|harness\/|LOOP\.md$|loop-constraints\.md$|loop-dauerauftrag\.md$)/;
 
 // Ranges that are not public: this network, private, shared, loopback, link-local, IETF protocol assignments, the three
 // documentation ranges, benchmarking, multicast and reserved.
@@ -72,6 +82,60 @@ function trackedFiles(root: string): string[] {
   return r.stdout.split("\0").filter(Boolean);
 }
 
+interface ListEntry {
+  line: number;
+  ip: string;
+  kind: string;
+}
+
+// Every line except comments and blank lines; entry is null when the line breaks the format.
+function listLines(path: string): Array<{ line: number; entry: ListEntry | null }> {
+  if (!existsSync(path)) throw new Error(`address list missing: ${path}`);
+  const out: Array<{ line: number; entry: ListEntry | null }> = [];
+  readFileSync(path, "utf-8")
+    .split("\n")
+    .forEach((text, i) => {
+      if (text === "" || text.startsWith("#")) return;
+      const m = LINE.exec(text);
+      out.push({ line: i + 1, entry: m && toNumber(m[1]) !== null ? { line: i + 1, ip: m[1], kind: m[2] } : null });
+    });
+  return out;
+}
+
+// The work tree that tracks the list, or null for a list outside git (a scratch file in a test).
+function listWorkTree(list: string): string | null {
+  const dir = dirname(list);
+  const tracked = spawnSync("git", ["ls-files", "--error-unmatch", "--", basename(list)], { cwd: dir, encoding: "utf-8" });
+  if (tracked.status !== 0) return null;
+  const top = spawnSync("git", ["rev-parse", "--show-toplevel"], { cwd: dir, encoding: "utf-8" });
+  return top.status === 0 ? top.stdout.trim() : null;
+}
+
+// Every text file tracked in the scan root and in the work tree of the list, the list itself excluded, by repository path.
+function findingFiles(): Array<{ rel: string; text: string }> {
+  const list = realpathSync(KNOWN);
+  const seen = new Set<string>();
+  const out: Array<{ rel: string; text: string }> = [];
+  for (const root of [SCAN_ROOT, listWorkTree(KNOWN)]) {
+    if (root === null) continue;
+    for (const rel of trackedFiles(root)) {
+      const path = join(root, rel);
+      if (!existsSync(path) || !statSync(path).isFile()) continue;
+      const real = realpathSync(path);
+      if (real === list || seen.has(real)) continue;
+      seen.add(real);
+      const buf = readFileSync(path);
+      if (buf.includes(0)) continue;
+      out.push({ rel, text: buf.toString("utf-8") });
+    }
+  }
+  return out;
+}
+
+function addressesIn(text: string): Set<string> {
+  return new Set(text.match(IPV4) ?? []);
+}
+
 describe("no tracked file carries an unaccounted public IPv4 address", () => {
   it("tells public addresses from documentation, private and reserved ones", () => {
     expect(isPublic("192.0.2.7")).toBe(false);
@@ -121,4 +185,38 @@ describe("no tracked file carries an unaccounted public IPv4 address", () => {
         "Replace each with a documentation address or list it in ops/known-ips.txt with its kind and evidence.",
     ).toBe(0);
   });
+  it("keeps every line of the address list in the form <address> <kind> <evidence>", () => {
+    const broken = listLines(KNOWN)
+      .filter((l) => l.entry === null)
+      .map((l) => l.line);
+    expect(
+      broken.length,
+      `${broken.length} line(s) of the address list break the form <address> <datacenter|crawler|erfunden|eigene> <evidence>: ` +
+        `line(s) ${broken.join(", ")}.`,
+    ).toBe(0);
+  });
+
+  it("leaves an address of kind erfunden only in files a goal may not change", () => {
+    const invented = listLines(KNOWN)
+      .map((l) => l.entry)
+      .filter((e): e is ListEntry => e !== null && e.kind === "erfunden");
+    const files = findingFiles().filter((f) => !FROZEN.test(f.rel));
+    const lines = new Set<number>();
+    const where = new Set<string>();
+    for (const f of files) {
+      const found = addressesIn(f.text);
+      for (const e of invented) {
+        if (found.has(e.ip)) {
+          lines.add(e.line);
+          where.add(f.rel);
+        }
+      }
+    }
+    expect(
+      lines.size,
+      `${lines.size} address(es) of kind erfunden (list line(s) ${[...lines].join(", ")}) stand in file(s) a goal may change: ` +
+        `${[...where].join(", ")}. Replace them there with a documentation address.`,
+    ).toBe(0);
+  });
+
 });
