@@ -146,9 +146,10 @@ describe("tiers and limits of docs/sandbox/plan.md, Grenzen", () => {
   it("holds two slots per account, a medium one counting as two", async () => {
     const w = await sandboxWorld();
     const a = w.account();
-    expect((await a.call("POST", "/v1/sandboxes", { memory_mb: 512 })).status).toBe(201);
-    expect((await a.call("POST", "/v1/sandboxes", { memory_mb: 512 })).status).toBe(201);
-    const third = await a.call("POST", "/v1/sandboxes", { memory_mb: 512 });
+    // Three different creates: the same body again within 60 s would be the same sandbox (repeated create).
+    expect((await a.call("POST", "/v1/sandboxes", { name: "s1", memory_mb: 512 })).status).toBe(201);
+    expect((await a.call("POST", "/v1/sandboxes", { name: "s2", memory_mb: 512 })).status).toBe(201);
+    const third = await a.call("POST", "/v1/sandboxes", { name: "s3", memory_mb: 512 });
     expect(third.status).toBe(409);
     expect(third.json).toMatchObject({ error: "sandbox_slots_full", slots_used: 2, slots_limit: 2 });
     const b = w.account();
@@ -258,7 +259,7 @@ describe("sandboxd unreachable", () => {
     const a = w.account();
     const id = (await a.call("POST", "/v1/sandboxes", { memory_mb: 512 })).json.id as string;
     w.keys.list = [];
-    const create = await a.call("POST", "/v1/sandboxes", { memory_mb: 512 });
+    const create = await a.call("POST", "/v1/sandboxes", { name: "second", memory_mb: 512 });
     expect(create.status).toBe(501);
     const exec = await a.call("POST", `/v1/sandboxes/${id}/exec`, { command: "echo ok" });
     expect(exec.status).toBe(501);
@@ -293,7 +294,7 @@ describe("sandboxd unreachable", () => {
         res.end("<html>bad gateway</html>");
       });
       for (const [method, target, body] of [
-        ["POST", "/v1/sandboxes", { memory_mb: 512 }],
+        ["POST", "/v1/sandboxes", { name: "second", memory_mb: 512 }],
         ["POST", `/v1/sandboxes/${id}/exec`, { command: "echo ok" }],
         ["POST", `/v1/sandboxes/${id}/files/upload/json`, { path: "/root/x", content: "x" }],
         ["GET", `/v1/sandboxes/${id}/files/read?path=%2Froot%2Fx`, undefined],
@@ -385,6 +386,103 @@ describe("exec with the same Idempotency-Key", () => {
     });
     await a.call("POST", `/v1/sandboxes/${id}/exec`, { command: "echo ok" }, { "Idempotency-Key": "01JC0000000000000000000KEY" });
     expect(seen).toContain("01JC0000000000000000000KEY");
+  });
+});
+
+describe("repeated create without an Idempotency-Key", () => {
+  // The runtime gives up on every attempt after 30 s and sends createSandbox again, with the same body
+  // and without an Idempotency-Key (src/conway/http-client.ts:115, src/conway/client.ts:255 at d8f8168).
+  const creates = (w: { hits: string[] }) => w.hits.filter((h) => h === "POST /v1/sandboxes").length;
+  const runs = (w: { calls: { cmd: string; args: string[] }[] }) => w.calls.filter((c) => c.cmd === "docker" && c.args[0] === "run").length;
+  const live = (w: { db: any }) => (w.db.prepare("SELECT count(*) AS n FROM sandboxes").get() as { n: number }).n;
+
+  it("repeated create while the first one still runs: nothing new, the same sandbox in every answer", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const w = await sandboxWorld({
+      respond: async (cmd, args) => {
+        if (cmd === "docker" && args[0] === "run") await gate;
+        return undefined;
+      },
+    });
+    const a = w.account();
+    const body = { name: "child-1", vcpu: 1, memory_mb: 512, disk_gb: 5, region: "" };
+    // The control plane on a real socket, so the runtime's abort after its 30 s is a real abort.
+    const cp = serve({ fetch: w.app.fetch, port: 0, hostname: "127.0.0.1" });
+    try {
+      await new Promise((r) => cp.once("listening", r));
+      const base = `http://127.0.0.1:${(cp.address() as AddressInfo).port}`;
+      const send = (signal?: AbortSignal) =>
+        fetch(`${base}/v1/sandboxes`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: a.key },
+          body: JSON.stringify(body),
+          signal,
+        });
+      // First attempt: the client gives up while sandboxd still creates.
+      await expect(send(AbortSignal.timeout(200))).rejects.toThrow();
+      expect(creates(w)).toBe(1);
+      // Two repeats while the first create still runs start nothing new.
+      const repeat = send();
+      const second = send();
+      await new Promise((r) => setTimeout(r, 100));
+      expect(creates(w)).toBe(1);
+      release();
+      const [r1, r2] = await Promise.all([repeat, second]);
+      expect([r1.status, r2.status]).toEqual([201, 201]);
+      const [j1, j2] = (await Promise.all([r1.json(), r2.json()])) as any[];
+      expect(j1.id).toBeTruthy();
+      expect(j2.id).toBe(j1.id);
+      expect(creates(w)).toBe(1);
+      expect(runs(w)).toBe(1);
+      expect(live(w)).toBe(1);
+      // One reservation, for the one sandbox.
+      expect(getAvailableMc(w.db, a.address)).toBe(100_000 - 1000);
+      expect((await a.call("GET", "/v1/sandboxes")).json.sandboxes.map((s: any) => s.id)).toEqual([j1.id]);
+    } finally {
+      cp.close();
+    }
+  });
+
+  it("repeated create after the first one answered, within 60 s: the same sandbox; later, another body or another account: a new one", async () => {
+    const w = await sandboxWorld();
+    const a = w.account();
+    const body = { name: "child-1", vcpu: 1, memory_mb: 512, disk_gb: 5, region: "" };
+    const first = await a.call("POST", "/v1/sandboxes", body);
+    expect(first.status).toBe(201);
+    w.clock.t += 59_000;
+    const repeat = await a.call("POST", "/v1/sandboxes", body);
+    expect(repeat.status).toBe(201);
+    expect(repeat.json.id).toBe(first.json.id);
+    expect(creates(w)).toBe(1);
+    expect(runs(w)).toBe(1);
+    expect(live(w)).toBe(1);
+    expect(getAvailableMc(w.db, a.address)).toBe(100_000 - 1000);
+    // The counter-checks: another account with the same body, and another body, each get their own sandbox.
+    const b = w.account();
+    const other = await b.call("POST", "/v1/sandboxes", body);
+    expect(other.status).toBe(201);
+    expect(other.json.id).not.toBe(first.json.id);
+    const renamed = await a.call("POST", "/v1/sandboxes", { ...body, name: "child-2" });
+    expect(renamed.status).toBe(201);
+    expect(renamed.json.id).not.toBe(first.json.id);
+    expect(creates(w)).toBe(3);
+  });
+
+  it("repeated create more than 60 s after the answer, or after the sandbox was deleted, creates a new one", async () => {
+    const w = await sandboxWorld();
+    const a = w.account();
+    const body = { memory_mb: 512 };
+    const first = await a.call("POST", "/v1/sandboxes", body);
+    w.clock.t += 61_000;
+    const later = await a.call("POST", "/v1/sandboxes", body);
+    expect(later.status).toBe(201);
+    expect(later.json.id).not.toBe(first.json.id);
+    expect((await a.call("DELETE", `/v1/sandboxes/${later.json.id}`)).status).toBe(200);
+    const again = await a.call("POST", "/v1/sandboxes", body);
+    expect(again.status).toBe(201);
+    expect(again.json.id).not.toBe(later.json.id);
+    expect(creates(w)).toBe(3);
   });
 });
 

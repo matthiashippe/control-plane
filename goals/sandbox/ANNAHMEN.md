@@ -157,3 +157,9 @@
   Adresse“ und zählt zum Topf der Startgutschriften. `internal_grant` hat einen eigenen eindeutigen Index über `ref`
   (`grant:live-sandbox`); gebucht wird beim Start des Dienstes nur, wenn das Konto existiert, also in keiner Test-Datenbank und
   nicht im Harness.
+- **Wiederholtes Anlegen ohne `Idempotency-Key` (Kritik 12.11.2026, Punkt 12).** Gleich ist eine Wiederholung, wenn Konto und Body
+  übereinstimmen (Body mit sortierten Schlüsseln verglichen). Läuft das erste Anlegen noch, wartet die Wiederholung auf dessen
+  Antwort; bis 60 s nach einer Antwort 201 bekommt sie dieselbe Sandbox, solange sie noch lebt. Eine Ablehnung (400, 402, 409, 501)
+  wird nicht gemerkt, der nächste Versuch fragt neu. Folge: Wer innerhalb von 60 s bewusst zwei gleiche Sandboxes will, gibt ihnen
+  verschiedene `name`; die Runtime legt Kinder ohnehin mit eigenem Namen an. Der Merker liegt im Speicher des Dienstes und gilt bis zum
+  nächsten Neustart.

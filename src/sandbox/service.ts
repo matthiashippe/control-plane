@@ -29,6 +29,8 @@ export const EXEC_DEFAULT_MS = 30_000;
 export const EXEC_MAX_MS = 600_000;
 /** How long the result of an exec stays available to a repeat with the same Idempotency-Key. */
 export const IDEMPOTENCY_MS = 600_000;
+/** How long a create of the same account and body after its answer still gets the same sandbox. */
+export const CREATE_REPEAT_MS = 60_000;
 
 export const TIERS = [
   { name: "small", vcpu: 1, memory_mb: 512, disk_gb: 5, slots: 1, step_mc: 100 },
@@ -81,6 +83,16 @@ const UNREACHABLE =
   "The sandbox server cannot be reached right now, so nothing ran and nothing was charged. Try again in a few minutes.";
 
 const reply = (status: SandboxStatus, body: Record<string, unknown>): Reply => ({ status, body });
+/** JSON with sorted keys, so two bodies with the same fields in another order are the same body. */
+const canonicalJson = (v: unknown): string =>
+  Array.isArray(v)
+    ? `[${v.map(canonicalJson).join(",")}]`
+    : v && typeof v === "object"
+      ? `{${Object.keys(v as object)
+          .sort()
+          .map((k) => `${JSON.stringify(k)}:${canonicalJson((v as Record<string, unknown>)[k])}`)
+          .join(",")}}`
+      : JSON.stringify(v) ?? "null";
 const unreachable = (create = false): Reply =>
   reply(501, { error: "sandbox_server_unreachable", message: create ? UNREACHABLE_CREATE : UNREACHABLE, docs: DOC.sandboxes });
 const notFound = (): Reply =>
@@ -166,6 +178,11 @@ export function createSandboxService(opts: SandboxServiceOptions) {
   const log = opts.log ?? ((l: string) => console.log(l));
   const locks = new Map<string, Promise<unknown>>();
   const execs = new Map<string, { promise: Promise<Reply>; doneAt: number | null }>();
+  // The runtime gives up on a create after 30 s and sends it again with the same body and without an
+  // Idempotency-Key (src/conway/http-client.ts:115, src/conway/client.ts:255 at d8f8168). A repeat of the
+  // same account and body joins the create that runs, or gets its sandbox up to CREATE_REPEAT_MS after it
+  // answered, so the customer never pays for a sandbox whose id never reached him.
+  const creates = new Map<string, { promise: Promise<Reply>; doneAt: number | null; id: string | null }>();
 
   function withLock<T>(id: string, fn: () => Promise<T>): Promise<T> {
     const prev = locks.get(id) ?? Promise.resolve();
@@ -373,6 +390,36 @@ export function createSandboxService(opts: SandboxServiceOptions) {
       });
     }
     const name = typeof b.name === "string" && NAME_RE.test(b.name) ? b.name : null;
+    const t = now();
+    for (const [k, e] of creates) if (e.doneAt !== null && t - e.doneAt > CREATE_REPEAT_MS) creates.delete(k);
+    const key = `${addr}\n${canonicalJson(b)}`;
+    const known = creates.get(key);
+    if (known && known.doneAt === null) return known.promise;
+    if (known && known.id) {
+      const r = ownRow(addr, known.id);
+      if (r) return reply(201, view(r));
+      creates.delete(key);
+    }
+    const entry: { promise: Promise<Reply>; doneAt: number | null; id: string | null } = { promise: Promise.resolve(notFound()), doneAt: null, id: null };
+    entry.promise = createOnce(addr, tier, name).then(
+      (res) => {
+        // Only a created sandbox is kept; any refusal may be tried again at once.
+        if (res.status === 201 && typeof res.body.id === "string") {
+          entry.id = res.body.id;
+          entry.doneAt = now();
+        } else if (creates.get(key) === entry) creates.delete(key);
+        return res;
+      },
+      (e) => {
+        if (creates.get(key) === entry) creates.delete(key);
+        throw e;
+      },
+    );
+    creates.set(key, entry);
+    return entry.promise;
+  }
+
+  async function createOnce(addr: string, tier: Tier, name: string | null): Promise<Reply> {
     if (knownDown()) return unreachable(true);
     // Slots, credit and the reservation in one transaction, so two creates at once cannot both pass.
     const pendingId = `creating:${crypto.randomBytes(8).toString("hex")}`;
