@@ -1,7 +1,7 @@
 # Sandbox Goal 03: Die Sandbox-API ist frei und abgerechnet
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Das Control Plane beantwortet jede Zeile mit `/v1/sandboxes` aus `docs/sandbox/vertrag.md`, `## Endpunkte`, so, wie die unveränderte
@@ -155,7 +155,7 @@ startet und dafür bezahlt, und weil das Abschlusskriterium in `ROADMAP.md` erst
       `src/conway/client.ts:255` am Pin; heute hält das Control Plane das Anlegen bis 120 s, und ein Abbruch ergibt eine zweite
       Sandbox, während die erste ohne Wissen des Kunden läuft und abgerechnet wird, gegen Grundregel 6).
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/sandbox-api.test.ts -t "repeated create"` muss Exit-Code 0 haben und mindestens zwei Tests ausführen (`passed`, nicht `skipped`), einen mit der Wiederholung während des Anlegens und einen danach, je mit genau einem Anlegen am nachgebauten `sandboxd` und derselben `id` in beiden Antworten.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Jede neue Testdatei und jede neue Selftest-Zeile war vor dem Fix rot; die Zeile im Progress Log nennt, womit.
@@ -182,5 +182,6 @@ startet und dafür bezahlt, und weil das Abschlusskriterium in `ROADMAP.md` erst
 - 2026-11-12 Zyklus 2: Abschluss gemeldet, Punkte 1 bis 9 und 11; `dev` brachte nichts Neues (`git log HEAD..origin/dev` leer), Punkt 10 bleibt offen, weil sein zweiter Prüfbefehl mit dem Muster `sandbox-client` genau die Testdatei `test/sandbox-client.test.ts` trifft, die Punkt 4 mit diesem Namen verlangt; beide Prüfbefehle sind Vertrag, ein Schlüssel liegt nicht im Diff. Prüfbefehle: P1 Exit 0 (18 passed), grep vertrag.md 6, Wortliste leer; P2 Exit 0 (2 passed); P3 Exit 0 (12 passed), Wortliste leer; P4 Exit 0 (8 passed), grep 6, 3 und 5; P5 Exit 0 (1 passed), ANNAHMEN 3; P6 Exit 0 `SETUP SELFTEST OK`, grep 7; P7 Exit 0 `LIVE SELFTEST OK`, Kopfzeilen da, `readonly: true` 4; P8 grep 3, `test/ours.test.ts` Exit 0 (8 passed), Satz 0; P9 1 und 1; P10 erster Befehl 0, zweiter 1 (`test/sandbox-client.test.ts`); P11 `node scripts/check.mjs` Exit 0 (110 Dateien, 1400 passed), (Netz) `e2e` an PR #36 für ba34ae9 `SUCCESS`.
 - 2026-11-12 Zyklus 3: Kritik-Punkt 12 gebaut (eine Wiederholung von `POST /v1/sandboxes` mit gleichem Konto und Body wartet auf das laufende Anlegen oder bekommt bis 60 s nach der Antwort 201 dieselbe Sandbox, Annahme in `ANNAHMEN.md`, Goal 03), Punkt 10 mit dem Muster der Kritik erneut ausgeführt, Abschluss gemeldet, Punkte 1 bis 12; `dev` brachte nichts Neues. Rot vor dem Fix: die drei Tests `repeated create` gegen den alten Code 2 rot (zweites `POST /v1/sandboxes` an `sandboxd`, andere `id`); Mutationen am neuen Code: ohne Beitritt zum laufenden Anlegen 1 rot, ohne Wiederverwendung nach der Antwort 2 rot, Fenster ohne Ende 1 rot; der Schlüssel ohne Konto bleibt grün, weil `ownRow` eine fremde Sandbox nie zurückgibt. Zwei Slot-Tests und ein 401-Test legen jetzt mit eigenem `name` an, weil derselbe Body binnen 60 s dieselbe Sandbox ist; keine Prüfung gestrichen. Prüfbefehle: P1 Exit 0 (21 passed), grep vertrag.md 6, Wortliste leer; P2 Exit 0 (5 passed); P3 Exit 0 (12 passed), Wortliste leer; P4 Exit 0 (8 passed), grep 6, 3 und 5; P5 Exit 0 (1 passed), ANNAHMEN 3; P6 Exit 0 `SETUP SELFTEST OK`, grep 7; P7 Exit 0 `LIVE SELFTEST OK`, Kopfzeilen da, `readonly: true` 4; P8 grep 3, `test/ours.test.ts` Exit 0 (8 passed), Satz 0; P9 1 und 1; P10 0 und 0; P11 lokal `node scripts/check.mjs` Exit 1 bei 110 Dateien und 1403 passed, einziger Fehler `Timeout calling "onTaskUpdate"` von vitest unter Last 113 bis 117 auf 16 Kernen, dreimal gleich; Job `check` auf GitHub für 141c72f `SUCCESS`, (Netz) `e2e` an PR #36 für 141c72f `SUCCESS`; P12 Exit 0 (3 passed).
 - 2026-11-12 Zyklus 4: Gap der Linse K zu Punkt 3 abgearbeitet und Abschluss gemeldet, Punkte 1 bis 12: zwei Tests in `test/sandbox-billing.test.ts` löschen eine gestoppte Sandbox nach einer Pause (vom Sweep nach 24 h 3 min gestoppt, 12 h später gelöscht; wegen leeren Guthabens gestoppt, nach Topup 5 h später gelöscht) und sehen keine neue Zeile `sandbox` und denselben Saldo; mit der Mutation aus dem Verdict (in `closeRun` ohne `if (r.status === "running")`, `src/sandbox/service.ts:310`) beide rot (361 statt 241 Zeilen, 62 statt 12), ohne sie grün; am Code nichts geändert; `dev` bis 98454c2 gemergt. Prüfbefehle: P1 Exit 0 (21 passed), grep vertrag.md 6, Wortliste leer; P2 Exit 0 (5 passed); P3 Exit 0 (14 passed), Wortliste leer; P4 Exit 0 (8 passed), grep 6, 3 und 5; P5 Exit 0 (1 passed), ANNAHMEN 3; P6 Exit 0 `SETUP SELFTEST OK`, grep 7; P7 Exit 0 `LIVE SELFTEST OK`, Kopfzeilen da, `readonly: true` 4; P8 grep 3, `test/ours.test.ts` Exit 0 (8 passed), Satz 0; P9 1 und 1; P10 0 und 0; P11 `node scripts/check.mjs` Exit 0 (112 Dateien, 1410 passed), (Netz) `e2e` am neuen Kopf folgt im Kommentar; P12 Exit 0 (3 passed).
+- 2026-11-12 Release: PASS K und B (Zyklus 4), DONE.
 
 ## Blockers
