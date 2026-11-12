@@ -14,6 +14,7 @@ URL="${CP_URL:-https://postyourprice.com}"
 STATE_FILE="${CP_WATCHDOG_STATE:-/var/lib/cp-watchdog.state}"
 WEBHOOK="${CP_ALERT_WEBHOOK:-}"
 CERT_WARN_DAYS="${CP_CERT_WARN_DAYS:-20}"
+CREDIT_TIMEOUT="${CP_CREDIT_TIMEOUT:-45}"
 TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
 report() {
@@ -42,11 +43,20 @@ check_health() {
 # 28 hours while the service itself stayed healthy, so this runs before the health verdict and on every run. Like the health
 # check it reports the change only: one [WARN] when the runway falls below the threshold, one [OK] when it is back. The line
 # comes from ops/credit-runway.sh, which asks from inside the service container, so no key passes through here. An unreadable
-# answer keeps the stored state and posts at most once a day.
+# answer keeps the stored state and posts at most once a day. The whole query has a time limit: it runs before the health check,
+# and a hanging Docker daemon would otherwise hold every run and with it the outage alarm. `timeout` signals its whole process
+# group, so `docker exec` dies with the script.
 check_credit() {
   local line code previous today
-  line=$(bash "$HERE"/credit-runway.sh --container 2>/dev/null | head -n 1)
-  code=${PIPESTATUS[0]}
+  if command -v timeout >/dev/null 2>&1; then
+    line=$(timeout -k 5 "$CREDIT_TIMEOUT" bash "$HERE"/credit-runway.sh --container 2>/dev/null | head -n 1)
+    code=${PIPESTATUS[0]}
+  else
+    # No coreutils timeout (a Mac without it): unbounded, the server always has one.
+    line=$(bash "$HERE"/credit-runway.sh --container 2>/dev/null | head -n 1)
+    code=${PIPESTATUS[0]}
+  fi
+  [[ "$code" == 124 || "$code" == 137 ]] && line="no answer from ops/credit-runway.sh within ${CREDIT_TIMEOUT} s"
   previous=$(cat "${STATE_FILE}.credit" 2>/dev/null || echo "unknown")
   case "$code" in
     0)

@@ -19,3 +19,8 @@
 - Erster Lauf ohne gespeicherten Zustand: LOW meldet sofort, OK meldet nichts.
 - Die Messung aus dem Container der Produktion lief per `ssh … 'bash -s -- --container' < ops/credit-runway.sh`: lesend, zwei
   GET an den Anbieter aus `deploy-cp-1`, keine Datei auf dem Server.
+- Kritik 1: Die Abfrage des Guthabens im Watchdog läuft unter `timeout -k 5 ${CP_CREDIT_TIMEOUT:-45}`. 45 Sekunden decken die zwei
+  GET aus dem Container (je 15 s Zeitlimit) samt Start von `node`; mit der Gesundheit (höchstens 60 s) bleibt ein Lauf unter den
+  5 Minuten des Cron. GNU `timeout` signalisiert seine ganze Prozessgruppe, also stirbt `docker exec` mit. Auf dem Server liegt
+  `/usr/bin/timeout` (GNU coreutils 9.4, gelesen am 12.11.2026 per `ssh … 'command -v timeout; timeout --version'`); ohne `timeout`
+  (Mac ohne coreutils) läuft die Abfrage ohne Grenze.
