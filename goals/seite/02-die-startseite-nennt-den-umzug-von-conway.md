@@ -111,9 +111,12 @@ hinter „Agent stuck?“ findet und nach diesem Goal ohne Suche im ersten Bilds
       Prüfung: `grep -c 'Widerlegt, wenn' docs/seite/conway-ankuenfte.md` muss mindestens `1` ausgeben.
       Prüfung (Netz): `set -a; . ~/.config/control-plane/loop.env; set +a; u=$(sed -n 's/^Vorher: .* bis \(.*\)$/\1/p' docs/seite/conway-ankuenfte.md); bash ops/landing-yield.sh --since 2026-11-02T00:00:00Z --until "$u" | head -2` muss Exit 0 haben und in den beiden Zeilen dieselben Zahlen für angekommen, angemeldet, noch offen und Telefon ausgeben wie die Zeile `Vorher:`.
 - [ ] Der Diff bleibt in den Pfaden dieses Goals, unter `src/` ändert sich nur die Startseite, und `check` ist grün.
-      Prüfung: `git diff --name-only origin/dev...HEAD | grep -vE '^(src/public/index\.html|ops/soll-live\.mjs|ops/landing-yield\.sh|ops/fixtures/landing-yield\.log|test/landing-move\.test\.ts|test/landing-yield\.test\.ts|test/public\.test\.ts|test/depth\.test\.ts|test/fix-page\.test\.ts|docs/seite/conway-ankuenfte\.md|goals/seite/|goals/_vorschlaege/seite-[a-z0-9.-]+\.md)$' | wc -l` muss `0` ausgeben.
+      Prüfung: `git diff --name-only origin/dev...HEAD | grep -vE '^(src/public/index\.html|ops/soll-live\.mjs|ops/landing-yield\.sh|ops/fixtures/landing-yield\.log|test/landing-move\.test\.ts|test/landing-yield\.test\.ts|test/public\.test\.ts|test/depth\.test\.ts|test/fix-page\.test\.ts|test/landing-human\.test\.ts|test/catalog-page\.test\.ts|test/landing-german\.test\.ts|test/og-card\.test\.ts|test/readme\.test\.ts|docs/seite/conway-ankuenfte\.md|goals/seite/(verdicts/)?[A-Za-z0-9._-]+\.md|goals/_vorschlaege/seite-[a-z0-9.-]+\.md)$' | wc -l` muss `0` ausgeben.
       Prüfung: `git diff --name-only origin/dev...HEAD -- src | grep -vx 'src/public/index.html' | wc -l` muss `0` ausgeben.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
+- [ ] Die fünf Tests, die am alten ersten `h1` und an `top.png` vor jedem `.hero` hingen, prüfen ihre Regel am neuen Ort weiter, keiner fehlt.
+      Prüfung: `for f in test/landing-human.test.ts test/catalog-page.test.ts test/landing-german.test.ts test/og-card.test.ts test/readme.test.ts; do for k in '(it|test)\(' 'expect\('; do a=$(git show origin/dev:$f | grep -cE "^\s*$k"); b=$(grep -cE "^\s*$k" $f); [ "$b" -ge "$a" ] || echo "weniger $f $k $a $b"; done; done; grep -nE '\.(skip|only|todo)\(' test/landing-human.test.ts test/catalog-page.test.ts test/landing-german.test.ts test/og-card.test.ts test/readme.test.ts | wc -l` muss als einzige Ausgabe `0` haben.
+      Prüfung: `pnpm -s vitest run test/landing-human.test.ts test/catalog-page.test.ts test/landing-german.test.ts test/og-card.test.ts test/readme.test.ts` muss Exit-Code 0 haben.
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria

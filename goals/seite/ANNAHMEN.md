@@ -25,3 +25,11 @@
 - 2026-11-12 (seite 02): `ops/landing-yield.sh` liest die eigenen Adressen nur aus `ops/own-ips.txt` (oder `CP_OWN_IPS`), nicht
   zusätzlich die Live-Adresse aus `ops/own-ips.sh` wie `ops/traffic.sh`. Eigene Läufe tragen keinen Referrer aus Conway-Issues und
   zählen deshalb nicht als Ankunft. Es liest `client_ip` und fällt auf `remote_ip` zurück; ohne `trusted_proxies` sind beide gleich.
+- 2026-11-12 (seite 02, Kritik Tech Lead): Entscheidung: Der erste Prüfbefehl von Punkt 6 wird repariert, nicht abgeschwächt, weil er
+  mit keinem Bau grün werden konnte. `goals/seite/` war mit `$` verankert und traf weder die Goal-Datei noch `ANNAHMEN.md` noch die
+  Verdicts der Linsen, die erst im Abschluss auf den Branch kommen; jetzt `goals/seite/(verdicts/)?[A-Za-z0-9._-]+\.md`. Die fünf Tests
+  `test/landing-human.test.ts`, `test/catalog-page.test.ts`, `test/landing-german.test.ts`, `test/og-card.test.ts` und
+  `test/readme.test.ts` kommen in die Liste, weil das abgenommene Bild einen eigenen `h1` und `top.png` in den Umzug setzt und diese
+  Tests ihre Regel am neuen Ort prüfen (Diff gelesen, kein Fall und keine Assertion weniger). Damit die Erweiterung nicht ungeprüft
+  bleibt, sichert Punkt 7 diese fünf Tests wie Punkt 3 die ersten drei. Die Änderung am Vertrag schickt den Goal-PR in die Human
+  Inbox; die liegt bei diesem Loop beim Tech Lead, der nach dieser Entscheidung nach `dev` merged.
