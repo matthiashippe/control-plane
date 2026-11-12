@@ -39,6 +39,7 @@ import os
 import pathlib
 import socket
 import sys
+import tempfile
 
 # The substring that gives a provider away in its own PTR record. Sources are each provider's
 # documentation of its reverse DNS naming; the check is the substring, not the whole name, because
@@ -108,7 +109,18 @@ def save_cache(cache: dict) -> None:
     lines = ["# ip\towner\tkind. Written by ops/fetchers.py; kept outside the repository, it holds visitor addresses"]
     lines += [f"{ip}\t{owner}\t{kind}" for ip, (owner, kind) in sorted(cache.items())]
     CACHE.parent.mkdir(parents=True, exist_ok=True)
-    CACHE.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    # Every worktree and run on the host shares this one file. Write a new file in the same folder and rename it over the old
+    # one, so a concurrent reader sees either the old cache or the new one, never half of it.
+    fd, tmp = tempfile.mkstemp(prefix=".fetcher-cache-", suffix=".tmp", dir=CACHE.parent)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write("\n".join(lines) + "\n")
+        os.chmod(tmp, 0o644)
+        os.replace(tmp, CACHE)
+    except BaseException:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+        raise
 
 
 def addresses_from(stream) -> list:

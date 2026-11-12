@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { spawnSync } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -64,6 +64,26 @@ describe("ops/fetchers.py keeps its cache outside the repository", () => {
     expect(existsSync(cache)).toBe(true);
     expect(readFileSync(cache, "utf-8")).toContain(`${NOT_CACHED}\t`);
     expect(existsSync(join(box.opsDir, "fetcher-cache.tsv"))).toBe(false);
+  });
+
+  it("writes the cache atomically: a new file renamed over the old one, never rewritten in place", () => {
+    // All worktrees and runs on the code-host share one cache file now. Rewriting it in place lets a concurrent reader see half a
+    // file and write that half back. A cache with mode 0444 in a writable folder tells the two apart: rewriting in place fails with
+    // PermissionError, a temp file in the same folder plus os.replace succeeds.
+    const box = sandbox();
+    const cacheDir = mkdtempSync(join(tmpdir(), "fetcher-cache-atomic-"));
+    const cache = join(cacheDir, "fetcher-cache.tsv");
+    writeFileSync(cache, `# ip\towner\tkind\n${DOC_ADDRESS}\tPlantedOwner\tdatacenter\n`, "utf-8");
+    chmodSync(cache, 0o444);
+
+    const r = run(box.script, { HOME: box.home, CP_FETCHER_CACHE: cache }, `${NOT_CACHED}\n`);
+    expect(r.status, r.stderr).toBe(0);
+
+    const written = readFileSync(cache, "utf-8");
+    expect(written).toContain(`${NOT_CACHED}\t`);
+    expect(written).toContain(`${DOC_ADDRESS}\tPlantedOwner\tdatacenter`);
+    // No temp file left behind.
+    expect(readdirSync(cacheDir)).toEqual(["fetcher-cache.tsv"]);
   });
 
   it("is not tracked by git and is ignored", () => {
