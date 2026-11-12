@@ -1,7 +1,7 @@
 # Kanal Goal 02: Das Postwerkzeug postet nur den freigegebenen Text
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Vor dem nächsten `public_post` ist `ops/post-the-answers.py` so, dass es nie einen anderen Text sendet als den freigegebenen und dass
@@ -54,7 +54,7 @@ etwas wert ist, wenn ein Befehl zeigt, dass genau dieser Text draußen steht.
       Prüfung (Netz): `python3 ops/post-the-answers.py --verify-posted --folder goals/kanal/antworten | tail -1` muss `VERIFY POSTED OK: 3 same` ausgeben.
 - [x] `check` ist grün.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Jeder neue Test war vor dem Fix rot; die Zeile im Progress Log nennt, womit.
@@ -75,5 +75,6 @@ etwas wert ist, wenn ein Befehl zeigt, dass genau dieser Text draußen steht.
 ## Progress Log
 - 2026-11-12 Zyklus 1: Punkte 1, 2, 3 gebaut: gemeinsame Argument-Funktion `ops/answers_args.py` für Gatter und Postwerkzeug (unbekanntes Argument Exit 1 vor jedem Netzaufruf, `--folder=` wie `--folder`), dazu `--verify-posted` nur lesend; die sechs neuen Tests waren vor dem Fix rot (alte Skripte, leere `answers_args.py` nur für den Copy-Schritt): `--folder=… --send 1` postete 0 statt 1 (Rückfall auf den Standardordner), beide Unknown-Argument-Tests liefen ins Gatter statt Exit 1, die drei Verify-Tests bekamen den Gatter-Lauf statt `VERIFY POSTED`; Gegenprobe Verify: Vergleich auf `if False` gesetzt macht den Ein-Zeichen-Test rot, gegen GitHub mit einem Zeichen geändert in einer Kopie von 430.md `DIFFERS #430`, Exit 1. Prüfbefehle: `pnpm -s vitest run test/answers-folder.test.ts` Exit 0 (13 passed); grep folder=/unknown argument 3; `--no-such-flag` 1; grep `if "--folder" in argv` 0; grep verify 3; (Netz) `--verify-posted --folder goals/kanal/antworten | tail -1` `VERIFY POSTED OK: 3 same`; `node scripts/check.mjs` Exit 0 (1340 passed, erster Lauf 1 rot in `test/abort-purchase.test.ts` bei Load 161, allein 6 passed, zweiter Lauf grün).
 - 2026-11-12 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, nach Merge von `origin/dev` (8d52eb9) in den Goal-Branch. Prüfbefehle: `pnpm -s vitest run test/answers-folder.test.ts` Exit 0 (13 passed); grep folder=/unknown argument 3; `--no-such-flag` 1; grep `if "--folder" in argv` 0; grep verify 3; (Netz) `--verify-posted --folder goals/kanal/antworten | tail -1` `VERIFY POSTED OK: 3 same`; `node scripts/check.mjs` Exit 0 (1340 passed, Load 161).
+- 2026-11-12 Release: PASS K, B (Zyklus 2), DONE.
 
 ## Blockers
