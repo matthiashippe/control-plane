@@ -105,3 +105,61 @@
   Zone des Zahlungsdienstes `postyourprice.com` bei Safe Browsing sperren lassen kann und damit jede Inferenz-Anfrage trifft; so trennen
   es GitHub (`github.io`), Vercel (`vercel.app`) und Fly (`fly.dev`). Notschalter bis dahin: den einen Eintrag `*.postyourprice.com` in
   Cloudflare löschen; `ctl.sbx`, die Hauptseite und alle anderen Einträge der Zone bleiben davon unberührt.
+
+## Goal 03 (12.11.2026, Engineer CP)
+
+- **Freigegebene Ports antworten 409 `port_exposure_unavailable`.** Entscheidung Tech Lead vom 12.11.2026 (Goal 02, Kritik), gebaut in
+  `src/sandbox/service.ts`: `POST /v1/sandboxes/{id}/ports/expose` und `DELETE /v1/sandboxes/{id}/ports/{port}` antworten nach der
+  Prüfung, dass die Sandbox dem Konto gehört, mit 409 und `{"error": "port_exposure_unavailable", ...}` und rufen `sandboxd` nicht
+  auf, weil unter `*.postyourprice.com` kein Dienst eines Kunden auftreten darf, solange die eigene Domain für Ports fehlt (Kauf über
+  `server_kauf`). Die Runtime gibt den Fehler an das Werkzeug `expose_port` weiter und läuft weiter. Belegt in
+  `test/sandbox-api.test.ts` („port_exposure_unavailable“: kein Aufruf erreicht `sandboxd`).
+- **Reservierung in `sandboxes.hold_mc`, nicht in `wallets.reserved_mc`.** `migrate()` setzt `reserved_mc` bei jedem Start auf 0, und
+  `deploy/rollout-remote.sh` wartet vor dem Umschalten auf ein Fenster ohne `reserved_mc <> 0`: Eine Sandbox, die tagelang läuft,
+  hielte jeden Rollout bis zum Timeout auf. Die Summe der `hold_mc` zählt in `reserveMc`, `getAvailableMc` und in `postLedger` bei
+  Abbuchungen ohne eigene Reservierung wie `reserved_mc` mit, Inferenz und Bounties können die 1000 mc also nicht ausgeben. Die
+  Schritte selbst buchen mit `settlesHold` gegen den Saldo, nie darunter. Die Reservierung gilt, solange die Sandbox läuft; beim
+  Stopp und beim Löschen geht sie zurück, ein Neustart nach Topup nimmt sie wieder.
+- **`exec` hält die Anfrage, bis das Ergebnis da ist, statt nach 25 s zu antworten.** Der Kontext nennt höchstens rund 25 s. Gelesen
+  im Klon am Pin (`src/conway/http-client.ts:75` bis `:120`, `src/conway/client.ts:45`): Die Runtime wiederholt einen Versuch mit
+  demselben `Idempotency-Key` nur nach eigenem Abbruch (30 s), nach 429 und 5xx und, eine Ebene höher, nach 404. Jede Antwort, die
+  wir nach 25 s geben könnten, wäre entweder ein Status, den der Vertrag verbietet (429, 5xx, 404 für eine bekannte Sandbox), ein
+  Fehler, den die Runtime ohne Wiederholung an das Modell gibt (das den Befehl dann mit neuem Schlüssel ein zweites Mal startet),
+  oder ein 2xx mit falschem Ergebnis. Darum hält das Control Plane die Anfrage offen; bricht die Runtime nach 30 s ab, loggt Caddy
+  Status 0 (kein 4xx oder 5xx, `goals/abrechnung/ANNAHMEN.md`), und die Wiederholung mit demselben Schlüssel wartet auf denselben
+  laufenden Befehl. Der Befehl läuft also genau einmal, auch über mehrere Versuche, bis zu seinem `timeout` von höchstens 600 s.
+  Der Abbruch zählt bei der Runtime für ihren Circuit Breaker wie bei Conway; das ändert keine Antwort von uns. sandbox 04 misst es
+  im Harness mit der unveränderten Runtime.
+- **`cp_nonce` an jeder Anfrage an `sandboxd`.** Ed25519 signiert deterministisch: zwei gleiche Anfragen in derselben Sekunde (zwei
+  Lesezugriffe der Runtime, ein doppelter Takt) trügen dieselbe Signatur, und `sandboxd` lehnt eine schon gesehene Signatur mit 401
+  ab. Der Client hängt deshalb `cp_nonce=<16 hex>` als Text an die Query und signiert den Pfad danach; `sandboxd` liest nur die
+  Parameter, die es kennt. Als Text, weil `URLSearchParams` die ganze Query neu kodiert (`%20` wird `+`), das fing
+  `test/sandbox-client.test.ts` beim ersten Lauf.
+- **501 vor 402, wenn `sandboxd` gerade nicht erreichbar war.** Scheiterte der letzte Aufruf an `sandboxd` vor weniger als 60 s (der
+  Abrechnungstakt fragt jede Minute), antwortet `POST /v1/sandboxes` sofort 501, ohne das Guthaben anzusehen: Ein 402 ließe die
+  Runtime Guthaben kaufen für eine Sandbox, die nicht starten kann. Ein 402 geht nie an `sandboxd`.
+- **Erster Abrechnungstakt drei Minuten nach dem Start.** Der Kanarienvogel von `deploy/rollout-remote.sh` startet das neue Image mit
+  `CP_DB_PATH=/data/rollout-canary.db` im selben Volume, findet also denselben Schlüssel; er läuft nur Sekunden und darf nichts
+  stoppen oder buchen. Eine Sandbox, die `sandboxd` kennt und keinem Eintrag gehört, löscht der Takt nicht, er schreibt eine Logzeile.
+- **Begonnener Schritt beim Stopp wegen leeren Guthabens.** Der Takt läuft jede Minute, ein Schritt kann also bis zu einer Minute
+  begonnen sein, wenn das Guthaben ihn nicht mehr deckt. Dann stoppt das Control Plane die Sandbox und bucht für diesen begonnenen
+  Schritt, was noch da ist (weniger als der Preis, `meta.partial`), nie mehr; der Saldo wird nie negativ.
+- **Lesen einer fehlenden Datei ist 404 `file_not_found`.** Die Runtime liest Dateien mit `retries404: 0` (`src/conway/client.ts:208`
+  am Pin), ein 404 dort heißt für sie „Datei fehlt“ und wird nicht wiederholt. Sonst gibt es 404 nur für eine unbekannte ID oder die
+  Sandbox eines anderen Kontos.
+- **Eigene Adresse über SIWE statt über `POST /v1/auth/keyless`.** Die Tür `keyless` antwortete am 12.11.2026 gegen 14:30 UTC mit 429
+  `daily_limit` (`curl -s -X POST https://postyourprice.com/v1/auth/keyless`). Die eigene Adresse entstand deshalb über
+  `/v1/auth/nonce`, `/v1/auth/verify` und `/v1/auth/api-keys` mit einer frischen Wallet ohne Guthaben, Schlüsselname
+  `ops-live-sandbox` (Muster `ops-%` in `OUR_KEY_NAMES`). Adresse in `src/bounties/ours.ts` (`LIVE_SANDBOX_ADDRESS`) und
+  `ops/db-report.cjs`; API-Key und Wallet-Schlüssel nur in `~/.config/control-plane/live-sandbox.env` (0600) auf dem code-host.
+  `ops/ours.txt` führt Mail-Adressen, darum steht dort nur ein Kommentar mit dem Verweis.
+- **Gutschrift der eigenen Adresse als Art `internal_grant`.** Die Art `grant` trägt den eindeutigen Index „eine Startgutschrift je
+  Adresse“ und zählt zum Topf der Startgutschriften. `internal_grant` hat einen eigenen eindeutigen Index über `ref`
+  (`grant:live-sandbox`); gebucht wird beim Start des Dienstes nur, wenn das Konto existiert, also in keiner Test-Datenbank und
+  nicht im Harness.
+- **Wiederholtes Anlegen ohne `Idempotency-Key` (Kritik 12.11.2026, Punkt 12).** Gleich ist eine Wiederholung, wenn Konto und Body
+  übereinstimmen (Body mit sortierten Schlüsseln verglichen). Läuft das erste Anlegen noch, wartet die Wiederholung auf dessen
+  Antwort; bis 60 s nach einer Antwort 201 bekommt sie dieselbe Sandbox, solange sie noch lebt. Eine Ablehnung (400, 402, 409, 501)
+  wird nicht gemerkt, der nächste Versuch fragt neu. Folge: Wer innerhalb von 60 s bewusst zwei gleiche Sandboxes will, gibt ihnen
+  verschiedene `name`; die Runtime legt Kinder ohnehin mit eigenem Namen an. Der Merker liegt im Speicher des Dienstes und gilt bis zum
+  nächsten Neustart.

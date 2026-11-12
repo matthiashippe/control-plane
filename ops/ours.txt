@@ -18,3 +18,5 @@ email-domain example.net        2026-09-29  RFC 2606, reserved for examples
 email-domain test               2026-09-29  RFC 2606 top-level domain, reserved for testing
 email-domain invalid            2026-09-29  RFC 2606 top-level domain, never valid
 email-domain example            2026-09-29  RFC 2606 top-level domain, reserved for examples
+# live-sandbox (2026-11-12): the account of the sandbox live check in ops/live.sh is a wallet, not a mail
+# address, so it stands in src/bounties/ours.ts and ops/db-report.cjs and not as a line here.

@@ -281,6 +281,47 @@ function migrate(db: Db): void {
   // src/credits/aborted.ts, for the same reason as the grant index above.
   db.exec("CREATE UNIQUE INDEX IF NOT EXISTS ledger_refund_once ON ledger(ref) WHERE kind = 'refund'");
 
+  // Sandboxes (sandbox 03, src/sandbox/). `sandbox_owners` maps an account to the random handle
+  // sandboxd knows it by: the host that runs foreign code never sees an address. `sandboxes` holds
+  // what sandboxd does not: which account a sandbox belongs to, its reservation and how far it is
+  // billed. The reservation (`hold_mc`) lives here and not in wallets.reserved_mc, because that
+  // column is zeroed on every start below, and because deploy/rollout-remote.sh waits for a quiet
+  // window with no reserved_mc anywhere: a sandbox that runs for days would hold every rollout back.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS sandbox_owners (
+      address    TEXT PRIMARY KEY REFERENCES wallets(address),
+      owner      TEXT NOT NULL UNIQUE,
+      created_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS sandboxes (
+      id           TEXT PRIMARY KEY,               -- id from sandboxd; 'creating:<n>' while a create runs
+      address      TEXT NOT NULL REFERENCES wallets(address),
+      name         TEXT,
+      tier         TEXT NOT NULL,                  -- small | medium
+      vcpu         INTEGER NOT NULL,
+      memory_mb    INTEGER NOT NULL,
+      disk_gb      INTEGER NOT NULL,
+      slots        INTEGER NOT NULL,
+      step_mc      INTEGER NOT NULL,               -- price of one started step of 6 minutes
+      hold_mc      INTEGER NOT NULL DEFAULT 0,     -- reservation, survives a restart
+      status       TEXT NOT NULL,                  -- creating | running | stopped | deleted
+      stop_reason  TEXT,                           -- credit | sandboxd | deleted
+      period_start TEXT,                           -- started_at of the current run, as sandboxd reports it
+      period_base  INTEGER NOT NULL DEFAULT 0,     -- number of the first step of the current run
+      steps_billed INTEGER NOT NULL DEFAULT 0,     -- steps billed so far, also the number of the next one
+      created_at   TEXT NOT NULL,
+      updated_at   TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS sandboxes_address ON sandboxes(address, status);
+  `);
+  // One ledger row per sandbox step, ever: `ref` is `sandbox:<id>:<step>`.
+  db.exec("CREATE UNIQUE INDEX IF NOT EXISTS ledger_sandbox_step ON ledger(ref) WHERE kind = 'sandbox'");
+  // One internal grant per key, ever (the credit of the own live check, src/sandbox/grant.ts).
+  db.exec("CREATE UNIQUE INDEX IF NOT EXISTS ledger_internal_grant_once ON ledger(ref) WHERE kind = 'internal_grant'");
+  // A create that was in flight when the process stopped never reached its caller: its row and its
+  // reservation go. What sandboxd may have made in that moment is logged by the billing tick.
+  db.exec("DELETE FROM sandboxes WHERE status = 'creating'");
+
   try {
     db.exec("CREATE UNIQUE INDEX IF NOT EXISTS ledger_topup_ref ON ledger(ref) WHERE kind = 'topup' AND ref IS NOT NULL");
   } catch {
@@ -465,7 +506,11 @@ export interface LedgerEntry {
     | "grant" | "grant_returned"
     // refund gives back what was charged for answers that never reached the client (abrechnung 01,
     // src/credits/aborted.ts). Internal credit only, never a payout.
-    | "refund";
+    | "refund"
+    // sandbox is one started step of 6 minutes of a running sandbox (src/sandbox/billing.ts);
+    // internal_grant is credit we give one of our own accounts (src/sandbox/grant.ts), outside the
+    // starter pot and never a payout.
+    | "sandbox" | "internal_grant";
   deltaMc: number;
   ref?: string;
   meta?: Record<string, unknown>;
@@ -474,7 +519,15 @@ export interface LedgerEntry {
    * there would be a window between release and charge in which a parallel call sees the credit.
    */
   releaseReservedMc?: number;
+  /**
+   * A sandbox step: it is what the sandbox reservation exists for, so it may reach into it. Only
+   * the balance itself has to cover it; it never goes negative.
+   */
+  settlesHold?: boolean;
 }
+
+/** SQL for the sum of the sandbox reservations of the wallet in the current UPDATE or SELECT. */
+const HOLDS_SQL = "(SELECT coalesce(sum(s.hold_mc), 0) FROM sandboxes s WHERE s.address = wallets.address)";
 
 /**
  * Books a balance change together with its ledger row. Has to run inside a db.transaction() when
@@ -494,13 +547,16 @@ export function postLedger(db: Db, entry: LedgerEntry): { balanceMc: number } {
   // The inference booking itself is the opposite case: the money is already spent upstream, so it
   // settles against its own reservation and against everything else the wallet still holds.
   // `releaseReservedMc` is what tells the two apart.
-  const againstReserved = entry.deltaMc < 0 && !entry.releaseReservedMc ? 1 : 0;
+  //
+  // The sandbox reservations count as reserved in the same way, so neither inference nor a bounty
+  // can spend the credit a running sandbox holds for its next steps.
+  const againstReserved = entry.deltaMc < 0 && !entry.releaseReservedMc && !entry.settlesHold ? 1 : 0;
   const run = db.transaction(() => {
     ensureWallet(db, address);
     const res = db
       .prepare(
         "UPDATE wallets SET balance_mc = balance_mc + ? " +
-          "WHERE address = ? AND balance_mc + ? - (CASE WHEN ? = 1 THEN reserved_mc ELSE 0 END) >= 0",
+          `WHERE address = ? AND balance_mc + ? - (CASE WHEN ? = 1 THEN reserved_mc + ${HOLDS_SQL} ELSE 0 END) >= 0`,
       )
       .run(entry.deltaMc, address, entry.deltaMc, againstReserved);
     if (res.changes !== 1) throw new Error("insufficient_balance");
@@ -571,7 +627,7 @@ export function reserveMc(db: Db, address: string, mc: number): boolean {
   const run = db.transaction(() => {
     ensureWallet(db, addr);
     const res = db
-      .prepare("UPDATE wallets SET reserved_mc = reserved_mc + ? WHERE address = ? AND balance_mc - reserved_mc - ? >= 0")
+      .prepare(`UPDATE wallets SET reserved_mc = reserved_mc + ? WHERE address = ? AND balance_mc - reserved_mc - ${HOLDS_SQL} - ? >= 0`)
       .run(mc, addr, mc);
     return res.changes === 1;
   });
@@ -586,7 +642,7 @@ export function releaseMc(db: Db, address: string, mc: number): void {
 /** Balance minus reservations in flight. That is what a new call may actually spend. */
 export function getAvailableMc(db: Db, address: string): number {
   const row = db
-    .prepare("SELECT balance_mc - reserved_mc AS available FROM wallets WHERE address = ?")
+    .prepare(`SELECT max(0, balance_mc - reserved_mc - ${HOLDS_SQL}) AS available FROM wallets WHERE address = ?`)
     .get(address.toLowerCase()) as { available: number } | undefined;
   return row?.available ?? 0;
 }
