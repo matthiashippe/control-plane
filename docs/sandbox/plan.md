@@ -20,9 +20,11 @@ Linux-Maschine mit `apt-get`, `node`, `npm` und `git` (`src/replication/spawn.ts
 Container. Prüft sandbox 02 auf dem neuen Server doch ein `/dev/kvm`, bleibt es trotzdem bei gVisor, weil der Plan dann ohne
 zweiten Weg auskommt.
 
-Dazu je Sandbox: eigener Benutzer-Namensraum, keine Capabilities außer den für `apt-get` nötigen, `no-new-privileges`, kein
-Docker-Socket, kein Host-Pfad gemountet außer dem eigenen Datenträger, Root-Dateisystem aus dem Image, beschreibbar nur über den
-Datenträger der Sandbox.
+Dazu je Sandbox: keine Capabilities außer den für `apt-get` nötigen, `no-new-privileges`, kein Docker-Socket, kein Host-Pfad
+gemountet außer dem eigenen Datenträger, Root-Dateisystem aus dem Image. Gebaut in sandbox 02 (`goals/sandbox/ANNAHMEN.md`, Goal 02):
+kein eigener Benutzer-Namensraum je Sandbox, weil gVisor jeden Systemaufruf in der Sentry abfängt und `userns-remap` für den ganzen
+Docker-Daemon gälte; `runsc` läuft mit `--overlay2=root:memory`, Schreiben außerhalb von `/root` landet also im Speicher der Sandbox
+und zählt gegen ihre 512 MB, dauerhaft ist nur der Datenträger unter `/root`.
 
 ## Netz
 
@@ -40,23 +42,31 @@ Entscheidung: Eine Sandbox darf ins Internet (Paketquellen, Git, APIs ihrer Kund
   heißt das auch 127.0.0.1, die Bridge-Adresse und Postgres von wa-staging (`docs/sandbox/server.md`, Nebeneinander mit wa-staging);
 - ausgehend Port 25, weil ein Server, der Spam versendet, bei Hostinger gesperrt wird und dann jede Sandbox trifft.
 
-Umgesetzt mit nftables in der Kette `DOCKER-USER` (gilt für jeden weitergeleiteten Paketfluss der Container), mit Logzeile je
-Verwurf. Eingehend erreicht eine Sandbox nur, was sie über `ports/expose` freigibt, und zwar über Cloudflare und Caddy auf dem
+Umgesetzt mit nftables in einer eigenen Tabelle `inet sandbox` (`ops/sandbox/sandbox.nft`, geladen von `sandbox-nft.service` vor
+Docker), nicht in der iptables-Kette `DOCKER-USER`, weil Docker 29 auf Ubuntu 24.04 über iptables-nft läuft und die eigene Tabelle IPv4
+und IPv6 mit denselben Regeln deckt (`goals/sandbox/ANNAHMEN.md`, Goal 02). Die Kette `forward` (`type filter hook forward priority
+-10`, also vor Docker und ufw) trägt die Sperren für weitergeleitete Pakete; die Sperre zwischen Sandboxes steht zusätzlich in einer
+Kette `prerouting` mit Priorität -310, weil Docker Pakete an einen anderen Container schon in `raw PREROUTING` (Priorität -300)
+verwirft, bevor `forward` sie sieht. Jeder Verwurf hat einen benannten Zähler (`sbx_host`, `sbx_peer`, `sbx_pay`, `sbx_meta`,
+`sbx_priv`, `sbx_smtp`) und eine Logzeile mit Präfix `sbx-`; daran misst `ops/sandbox/probe.sh` die Gegenprobe. Die Bridge-Netze
+bekommen kein IPv6, eine Sandbox erreicht also nichts über IPv6. Eingehend erreicht eine Sandbox nur, was sie über `ports/expose` freigibt, und zwar über Cloudflare und Caddy auf dem
 Sandbox-Server unter `https://sbx-<id>-<port>.postyourprice.com` (`public_url` der Antwort, Zertifikat unten). Offen auf dem Host sind nur 22 (nur Schlüssel), 80 und 443 (Caddy); ufw bleibt dabei (Matthias, 11.11.2026). Der
 Eingang der Sandboxes ist eine eigene Caddy-Datei, die die Caddyfile mit einer `import`-Zeile lädt. Kein Container veröffentlicht einen
 Port auf dem Host, weil Docker dabei an ufw vorbei öffnet; Caddy leitet auf die Adresse des Containers im Bridge-Netz.
 Der Host und `sandboxd` selbst bauen nie eine Verbindung zum Zahlungsserver auf; nur Container dürfen dort tcp/443.
 
-Weg zum Host selbst: `DOCKER-USER` sieht nur weitergeleitete Pakete. Was eine Sandbox an eine Adresse des Hosts schickt (die
+Weg zum Host selbst: `forward` sieht nur weitergeleitete Pakete. Was eine Sandbox an eine Adresse des Hosts schickt (die
 Bridge-Adresse ihres Netzes, `72.62.51.224`, die IPv6 des Hosts, 127.0.0.1 ist im Container ohnehin der eigene), läuft durch die
 Eingangskette (`input`), und dort lässt ufw 22, 80 und 443 von überall zu (gemessen 11.11.2026, `ufw status verbose`, dazu 443/udp). Darum bekommt
-der Host eine eigene Tabelle `inet sandbox` mit der Kette `input` (`type filter hook input priority -10`, also vor ufw) und genau
+die Tabelle `inet sandbox` dazu die Kette `input` (`type filter hook input priority -10`, also vor ufw) und genau
 zwei Regeln: `iifname "sbx-*" ct state established,related accept` und `iifname "sbx-*" counter log prefix "sbx-host " drop`. Jedes
 Bridge-Netz einer Sandbox heißt `sbx-<id>` (Docker-Option `com.docker.network.bridge.name`, höchstens 15 Zeichen, also eine ID von
 `sandboxd` mit höchstens 11 Zeichen), deshalb greift die Regel für IPv4 und
 IPv6 an jeder Zieladresse des Hosts. Danach erreicht eine Sandbox auf dem Host keinen Port mehr, weder 22, 80 und 443 noch
 Postgres auf 5432 oder einen anderen Dienst von wa-staging; durch kommen nur Antworten auf Verbindungen, die der Host selbst
-geöffnet hat (Caddy zur Sandbox). DNS fragt die Sandbox direkt bei `1.1.1.1` und `9.9.9.9` (`--dns`), nicht beim Host. Ihren
+geöffnet hat (Caddy zur Sandbox). DNS fragt die Sandbox direkt bei `1.1.1.1` und `9.9.9.9`, nicht beim Host: Unter `runsc` antwortet Dockers eingebauter DNS
+`127.0.0.11` im eigenen Bridge-Netz nicht, darum schreibt der Startbefehl jeder Sandbox beide in ihre eigene `/etc/resolv.conf`, `--dns`
+bleibt gesetzt (`goals/sandbox/ANNAHMEN.md`, Goal 02). Ihren
 eigenen freigegebenen Port erreicht sie wie jeder andere über den öffentlichen Namen und Cloudflare. ufw bleibt dabei unverändert.
 
 Zertifikat für die freigegebenen Ports: Die Namen liegen auf der ersten Ebene unter der Zone, `sbx-<id>-<port>.postyourprice.com`
@@ -66,14 +76,22 @@ Advanced Certificate Manager, also einen Kauf. Verworfen sind DNS-01 (braucht ei
 Binary unter dem Caddy von wa-staging, und einen Zonen-Token auf dem Server mit fremdem Code) und On-Demand-TLS (braucht eine
 globale Option in der Caddyfile und stößt an 50 Zertifikate je Woche für `postyourprice.com` bei Let's Encrypt, geteilt mit der
 Hauptseite). Ein Eintrag `*.postyourprice.com`, proxied, zeigt auf `72.62.51.224`; jeder Name mit eigenem Eintrag (Hauptseite, `www`,
-`ctl.sbx`) geht davor. Zwischen Cloudflare und Caddy gilt ein Cloudflare-Origin-CA-Zertifikat für `*.postyourprice.com` (kostenlos,
-15 Jahre, nur von Cloudflare anerkannt), als Datei unter `/etc/caddy/sbx/` und mit `tls <cert> <key>` in der eigenen Caddy-Datei,
-ohne ACME. Die eigene Datei bedient nur Namen der Form `sbx-<id>-<port>`, die `sandboxd` kennt, alles andere unter
+`ctl.sbx`) geht davor. Zwischen Cloudflare und Caddy stellt Caddy das Zertifikat für `*.postyourprice.com` mit `tls internal` selbst
+aus (`ops/sandbox/sandbox.caddy`), ohne ACME, ohne globale Option und ohne Schlüsseldatei vom code-host. Die Zone steht auf SSL „Full“
+(gemessen 12.11.2026, `GET /zones/<id>/settings/ssl` gab `full`): Cloudflare verschlüsselt bis zum Server und prüft dessen Zertifikat
+nicht. Ein Cloudflare-Origin-CA-Zertifikat war geplant, der Token darf es aber nicht ausstellen (`POST /client/v4/certificates` gab
+am 12.11.2026 `1016 User is not authorized to perform this action`) und es brächte erst mit „Full (strict)“ etwas
+(`goals/sandbox/ANNAHMEN.md`, Goal 02). Wer „Full (strict)“ will, braucht einen Token mit „SSL and Certificates: Edit“, legt das
+Origin-CA-Zertifikat als Datei auf den Server und tauscht `tls internal` gegen `tls <cert> <key>`.
+Die eigene Datei bedient nur Namen der Form `sbx-<id>-<port>`, die `sandboxd` kennt, alles andere unter
 `*.postyourprice.com` bekommt 404, damit keine Sandbox unter einem beliebigen Namen der Zone auftritt; die Cookies des Control
 Planes bleiben ohne `Domain`-Attribut, also nur für ihren eigenen Namen. Für wa-staging heißt das: kein neues Binary, keine globale
 Option, sein Block bleibt Zeichen für Zeichen, die Caddyfile bekommt nur die eine `import`-Zeile, und sein Name
-`wa-staging.72-62-51-224.sslip.io` kommt mit seinem eigenen Zertifikat von Let's Encrypt weiter direkt an. Steht die Zone auf
-„Flexible“, setzt sandbox 02 für `sbx-*` per Konfigurationsregel „Full (strict)“, weil Caddy sonst auf Port 80 im Kreis umleitet.
+`wa-staging.72-62-51-224.sslip.io` kommt mit seinem eigenen Zertifikat von Let's Encrypt weiter direkt an. Die Zone darf nicht auf
+„Flexible“ stehen, weil Caddy sonst auf Port 80 im Kreis umleitet, und mit `tls internal` nicht auf „Full (strict)“. Der Eintrag
+`*.postyourprice.com` bleibt nur bis sandbox 03: Bevor ein Kunde einen Port freigibt, ziehen die freigegebenen Ports auf eine eigene
+Domain (Entscheidung Tech Lead 12.11.2026, `goals/sandbox/ANNAHMEN.md`, Goal 02, Kritik); Notschalter bis dahin ist, den einen
+Eintrag zu löschen.
 
 ## Grenzen
 
@@ -103,7 +121,8 @@ Nach dem Auszug von wa-staging bekommt die Slice 6 GB (8 GB, davon 2 GB für Hos
 also 11 Plätze. 100 GB Platte tragen 11 mal 5 GB mit Platz für Images.
 
 Begründung: Die Runtime hat kein Löschen (`deleteSandbox` ist am Pin leer), also muss der Server selbst aufräumen, sonst läuft eine
-vergessene Sandbox bis zum leeren Guthaben. Swap aus, damit ein Prozess über der Grenze stirbt, statt den Host in den Swap zu ziehen.
+vergessene Sandbox bis zum leeren Guthaben. Swap aus, damit eine Sandbox über der Grenze stirbt, statt den Host in den Swap zu ziehen; unter gVisor tötet der Kernel dabei die
+Sentry, also die ganze Sandbox, und `--restart unless-stopped` startet sie neu, der Datenträger unter `/root` bleibt.
 
 ## Preis
 
@@ -194,10 +213,11 @@ in den Bytes, aus denen der Hash stammt.
 - **sandbox 02, der Sandbox-Server steht:** Einrichtungsskript im Repo (idempotent, vom code-host per SSH mit
   `~/.ssh/id_ed25519_cp_sandbox`): Ubuntu auf Stand, nftables nach `## Netz`, Docker mit `runsc`, Caddy, `sandboxd` mit Anlegen,
   `exec`, Dateien, Ports, Stoppen, Löschen und Aufräumen nach `## Grenzen`, Eintrag `*.postyourprice.com` und
-  Origin-CA-Zertifikat nach `## Netz`. Prüfungen
+  Zertifikat mit `tls internal` nach `## Netz`. Prüfungen
   gegen den Server: keine Host-Datei lesbar; `76.13.144.207` aus einer Sandbox nur auf tcp/443 erreichbar (443/tcp offen, 22/tcp
   und 443/udp gesperrt, nach `## Netz`); `169.254.169.254` nicht erreichbar; kein Port des Hosts erreichbar, weder über die
-  Bridge-Adresse noch über `72.62.51.224` oder die IPv6 des Hosts; ein Prozess über 512 MB stirbt, der Host bleibt
+  Bridge-Adresse noch über `72.62.51.224` oder die IPv6 des Hosts; ein Prozess über 512 MB beendet die Sandbox (unter gVisor tötet
+  der Kernel die Sentry, `goals/sandbox/ANNAHMEN.md`, Goal 02), der Host bleibt
   von außen erreichbar.
 - **sandbox 03, die Sandbox-API ist frei und abgerechnet:** Das Control Plane beantwortet jede Zeile aus `docs/sandbox/vertrag.md`,
   Abschnitt `## Endpunkte`, für Sandboxes mit den Feldern dort und reicht sie signiert an `sandboxd` weiter; Abrechnung nach
