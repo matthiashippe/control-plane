@@ -1,7 +1,7 @@
 # Fehler Goal 02: Besucheradressen raus aus dem öffentlichen Repo
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Im öffentlichen Repo liegen keine Adressen echter Besucher mehr am Kopf von `dev`, und kein Lauf schreibt neue hinein: Der Cache von
@@ -78,7 +78,7 @@ der Seite das Gegenteil zusagt.
       Prüfung: `pnpm -s vitest run test/visitor-addresses.test.ts` muss Exit-Code 0 haben.
       Prüfung: `d=$(mktemp -d); printf '# ip\towner\tkind\n192.0.2.64\t-\tunknown\n' > "$d/c.tsv"; CP_FETCHER_CACHE="$d/c.tsv" pnpm -s vitest run test/visitor-addresses.test.ts >/dev/null 2>&1 && echo gruen || echo rot` muss `rot` ausgeben (die Dokumentationsadresse steht in `ops/fetchers.py`).
       Prüfung: `CP_FETCHER_CACHE=/nonexistent pnpm -s vitest run test/visitor-addresses.test.ts 2>&1 | grep -c skipped` muss mindestens 1 ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Jede neue Testdatei war vor dem Fix rot; die Zeile im Progress Log nennt, womit.
@@ -102,5 +102,6 @@ der Seite das Gegenteil zusagt.
 - 2026-11-12 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3 (Kopf `975368c`, `origin/dev` ohne neue Commits, nichts zu mergen). Prüfbefehle: `git ls-files ops/fetcher-cache.tsv | wc -l` -> 0; `git check-ignore` -> ignoriert; `grep -c with_name(...)` -> 0; `grep -c CP_FETCHER_CACHE` -> 2; `pnpm -s vitest run test/fetcher-cache.test.ts` -> 3 passed, Exit 0; `test -s` Cache -> vorhanden; Adresszähler -> 0; Crawler-Zeilen -> passt; Nicht-Kommentarzeilen unter `src/` -> 0; `pnpm -s vitest run` -> 1365 passed, Exit 0 (im fünften Lauf; Läufe 1 bis 4 bei Load 80 bis 160 rot durch 5-s-Timeouts und `onTaskUpdate` in `stripe-sessions-selftest`, `db-report`, `abort-purchase`, die einzeln grün sind, `stripe-sessions-selftest` auch auf `origin/dev`); `node scripts/check.mjs` -> grün in 74 s, Exit 0.
 - 2026-11-12 Zyklus 3: Punkt Kritik 1 gebaut: `save_cache` schreibt über `tempfile.mkstemp` im Ordner des Caches und `os.replace`, neuer Test `writes the cache atomically` in `test/fetcher-cache.test.ts` war mit `write_text` rot (`PermissionError` am Cache mit Modus 0444). Prüfbefehle: `grep -c "os.replace" ops/fetchers.py` -> 1; `pnpm -s vitest run test/fetcher-cache.test.ts -t "atomic"` -> 1 passed, 3 skipped, Exit 0; `pnpm -s vitest run test/fetcher-cache.test.ts` -> 4 passed; Selbsttest `ops/fetchers.py` -> passed; Prüfbefehle der Punkte 1 und 2 unverändert grün.
 - 2026-11-12 Zyklus 4: Punkt Kritik 2 gebaut und Abschluss gemeldet, Punkte 1, 2, 3, Kritik 1, Kritik 2: neuer Test `test/visitor-addresses.test.ts` nimmt dieselbe Menge wie der zweite Prüfbefehl von Punkt 2 und meldet nur Anzahl und Dateinamen; auf `c55d9f6` (dev vor dem Goal) war er rot (736 Adressen in 14 Dateien), am Kopf grün. Prüfbefehle: `pnpm -s vitest run test/visitor-addresses.test.ts` -> 1 passed, Exit 0; Gegenprobe mit gepflanzter Dokumentationsadresse -> rot (4 Dateien); `CP_FETCHER_CACHE=/nonexistent` -> skipped gezählt 3; Punkt 1 -> 0, ignoriert, 0, 2, `test/fetcher-cache.test.ts` 4 passed; Punkt 2 -> vorhanden, 0, passt, 0, `pnpm -s vitest run` 1367 passed, Exit 0 im ersten Lauf; Kritik 1 -> 1, Exit 0; `node scripts/check.mjs` -> grün in 129 s, Exit 0. `origin/dev` ohne neue Commits.
+- 2026-11-12 Release: PASS K und B (Zyklus 4), DONE.
 
 ## Blockers
