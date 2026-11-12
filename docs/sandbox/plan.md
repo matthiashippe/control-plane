@@ -127,7 +127,10 @@ Sentry, also die ganze Sandbox, und `--restart unless-stopped` startet sie neu, 
 ## Preis
 
 Entscheidung: 1000 mc je Stunde für die Stufe klein, 2000 mc je Stunde für die Stufe mittel (100000 mc = 1 USD). Berechnet in
-Schritten von 6 Minuten im Nachhinein, also 100 mc je Schritt für klein und 200 mc für mittel. Beim Anlegen werden 1000 mc
+Schritten von 6 Minuten im Nachhinein, also 100 mc je Schritt für klein und 200 mc für mittel. Berechnet wird jeder begonnene
+Schritt, in dem die Sandbox lief (gebaut in sandbox 03, `src/sandbox/service.ts`): gebucht am Ende des Schritts oder beim Stopp,
+eine Ledger-Zeile `sandbox` je Schritt mit `ref` `sandbox:<id>:<schritt>` unter einem eindeutigen Index; die Laufzeit belegt
+`sandboxd` mit `started_at` und `stopped_at`, gestoppte Zeit kostet nichts. Beim Anlegen werden 1000 mc
 (eine Stunde der Stufe klein) reserviert; fehlt das Guthaben, antwortet `POST /v1/sandboxes` mit 402 und `details.required_cents`
 und `details.current_balance_cents`, damit die Runtime ihr Topup selbst auslöst (`src/conway/topup.ts:81` am Pin). Reicht das
 Guthaben für den nächsten Schritt nicht, wird die Sandbox gestoppt, nicht gelöscht.
@@ -159,7 +162,12 @@ hat.
 
 Das Schlüsselpaar erzeugt der Dienst `cp` beim ersten Start selbst in seinem Volume (`/data/sandbox-client.key`, 0600), die
 öffentliche Hälfte liegt daneben (`/data/sandbox-client.pub`). Der Maker liest sie lesend mit
-`docker exec deploy-cp-1 cat /data/sandbox-client.pub` und trägt sie mit dem Einrichtungsskript in `sandboxd` ein. Die Gegenrichtung
+`docker exec deploy-cp-1 cat /data/sandbox-client.pub` und trägt sie mit dem Einrichtungsskript in `sandboxd` ein:
+`bash ops/sandbox/setup.sh --client-key 72.62.51.224` holt die Datei über `CP_SSH_KEY` vom Zahlungsserver, prüft, dass es ein
+Ed25519-Schlüssel ist, legt sie nur bei Abweichung als `/etc/sandboxd/keys/cp.pub` ab und meldet `changed=0` oder `changed=1`;
+`ops/live.sh` ruft diesen Schritt nach jedem Rollout zuerst auf. `sandboxd` liest die Schlüssel bei jeder Anfrage neu, ein
+Neustart ist nicht nötig. Weil Ed25519 deterministisch signiert und `sandboxd` eine Signatur in 5 Minuten nur einmal annimmt,
+hängt der Client an jede Anfrage den Parameter `cp_nonce` mit 16 zufälligen Hex-Zeichen an (`goals/sandbox/ANNAHMEN.md`, Goal 03). Die Gegenrichtung
 sichert das Zertifikat, das Caddy für `ctl.sbx.postyourprice.com` holt. Die Adresse des Sandbox-Servers steht im Repo
 (`docs/sandbox/server.md`); ein eigener Port 8443 entfällt, weil ufw bei 22, 80 und 443 bleibt.
 
