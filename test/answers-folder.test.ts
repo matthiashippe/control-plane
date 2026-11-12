@@ -22,9 +22,15 @@ with open(os.environ["FAKE_GH_LOG"], "a", encoding="utf-8") as fh:
 path = args[1] if len(args) > 1 else ""
 jq = args[args.index("--jq") + 1] if "--jq" in args else ""
 answered = set(filter(None, os.environ.get("FAKE_ANSWERED", "").split(",")))
+comments = json.loads(os.environ.get("FAKE_COMMENTS", "{}"))
 if "-f" in args:
     n = re.search(r"issues/(\\d+)/comments$", path).group(1)
     print(f"https://github.com/Conway-Research/automaton/issues/{n}#issuecomment-1")
+elif m := re.search(r"/issues/comments/(\\d+)$", path):
+    if m.group(1) not in comments:
+        print("gh: Not Found (HTTP 404)", file=sys.stderr)
+        sys.exit(1)
+    print(comments[m.group(1)])
 elif re.search(r"/issues/\\d+$", path):
     print("open")
 elif m := re.search(r"/issues/(\\d+)/comments$", path):
@@ -52,7 +58,7 @@ function sandbox(drafts: Record<string, string>) {
   const root = mkdtempSync(join(tmpdir(), "answers-folder-"));
   mkdirSync(join(root, "ops"));
   mkdirSync(join(root, "bin"));
-  for (const f of ["before-the-answers.py", "post-the-answers.py"]) copyFileSync(join(OPS, f), join(root, "ops", f));
+  for (const f of ["answers_args.py", "before-the-answers.py", "post-the-answers.py"]) copyFileSync(join(OPS, f), join(root, "ops", f));
   writeFileSync(join(root, "ops", "posted-answers.log"), "# <iso8601-utc> <issue> <url>\n");
   writeFileSync(join(root, "bin", "gh"), FAKE_GH);
   writeFileSync(join(root, "bin", "curl"), "#!/bin/sh\nexit 7\n");
@@ -73,7 +79,9 @@ function sandbox(drafts: Record<string, string>) {
     const calls = readFileSync(log, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l) as string[]);
     return { status: r.status, out: `${r.stdout}${r.stderr}`, calls, log: readFileSync(join(root, "ops", "posted-answers.log"), "utf8") };
   };
-  return { root, folder, run };
+  const posted = (lines: string[]) =>
+    writeFileSync(join(root, "ops", "posted-answers.log"), ["# <iso8601-utc> <issue> <url>", ...lines, ""].join("\n"));
+  return { root, folder, run, posted };
 }
 
 const posts = (calls: string[][]) => calls.filter((c) => c.includes("-f"));
@@ -154,5 +162,77 @@ describe("the issue answers take a folder in the repository", () => {
     expect(r.status).toBe(0);
     expect(posts(r.calls)).toEqual([]);
     expect(existsSync(join(s.folder, "none.md"))).toBe(false);
+  }, 120_000);
+
+  it("post-the-answers.py --folder=<dir> --send 1 posts the draft from that folder, like --folder <dir>", () => {
+    const s = sandbox({ "434.md": GOOD });
+    const r = s.run("post-the-answers.py", ["--folder=goals/kanal/antworten", "--send", "1"]);
+    expect(r.status).toBe(0);
+    const sent = posts(r.calls);
+    expect(sent.length).toBe(1);
+    expect(sent[0][1]).toBe("repos/Conway-Research/automaton/issues/434/comments");
+    expect(r.log).toMatch(/ 434 https:\/\/github\.com\/Conway-Research\/automaton\/issues\/434#issuecomment-1\n$/);
+  }, 120_000);
+
+  it("post-the-answers.py stops on an unknown argument with exit 1 before anything is sent", () => {
+    const s = sandbox({ "434.md": GOOD });
+    const r = s.run("post-the-answers.py", ["--folder", "goals/kanal/antworten", "--send", "1", "--no-such-flag"]);
+    expect(r.out).toContain("REFUSED: unknown argument --no-such-flag");
+    expect(r.status).toBe(1);
+    expect(r.calls).toEqual([]);
+    expect(r.log).toBe("# <iso8601-utc> <issue> <url>\n");
+  }, 120_000);
+
+  it("before-the-answers.py stops on an unknown argument with exit 1 before it asks the network", () => {
+    const s = sandbox({ "434.md": GOOD });
+    const r = s.run("before-the-answers.py", ["--folder", "goals/kanal/antworten", "--send", "1"]);
+    expect(r.out).toContain("REFUSED: unknown argument --send");
+    expect(r.status).toBe(1);
+    expect(r.calls).toEqual([]);
+  }, 120_000);
+
+  it("post-the-answers.py --verify-posted says same when the live comment is the body the draft would send", () => {
+    const s = sandbox({ "434.md": GOOD });
+    s.posted([
+      "2026-11-10T14:03:20Z 440 https://github.com/Conway-Research/automaton/issues/440#issuecomment-41",
+      "2026-11-11T07:04:50Z 434 https://github.com/Conway-Research/automaton/issues/434#issuecomment-42",
+    ]);
+    const live = "The 401 is the retry, not the first answer. The first verify answers 500.\n\nDisclosure: I run PostYourPrice (https://postyourprice.com), a control plane for this runtime.\n";
+    const r = s.run("post-the-answers.py", ["--verify-posted", "--folder", "goals/kanal/antworten"], {
+      FAKE_COMMENTS: JSON.stringify({ "42": live }),
+    });
+    expect(r.out).toContain("no draft #440");
+    expect(r.out).toContain("same #434");
+    expect(r.out.trim().split("\n").at(-1)).toBe("VERIFY POSTED OK: 1 same");
+    expect(r.status).toBe(0);
+    expect(posts(r.calls)).toEqual([]);
+    expect(r.calls.map((c) => c[1])).toEqual(["repos/Conway-Research/automaton/issues/comments/42"]);
+  }, 120_000);
+
+  it("post-the-answers.py --verify-posted fails with exit 1 when the live comment differs by one character", () => {
+    const s = sandbox({ "434.md": GOOD });
+    s.posted(["2026-11-11T07:04:50Z 434 https://github.com/Conway-Research/automaton/issues/434#issuecomment-42"]);
+    const live = "The 401 is the retry, not the first answer. The first verify answers 501.\n\nDisclosure: I run PostYourPrice (https://postyourprice.com), a control plane for this runtime.\n";
+    const r = s.run("post-the-answers.py", ["--verify-posted", "--folder=goals/kanal/antworten"], {
+      FAKE_COMMENTS: JSON.stringify({ "42": live }),
+    });
+    expect(r.out).toContain("DIFFERS #434");
+    expect(r.out).toContain("VERIFY POSTED FAILED");
+    expect(r.status).toBe(1);
+    expect(posts(r.calls)).toEqual([]);
+  }, 120_000);
+
+  it("post-the-answers.py --verify-posted fails when a comment cannot be read or nothing was compared", () => {
+    const s = sandbox({ "434.md": GOOD });
+    s.posted(["2026-11-11T07:04:50Z 434 https://github.com/Conway-Research/automaton/issues/434#issuecomment-42"]);
+    const missing = s.run("post-the-answers.py", ["--verify-posted", "--folder", "goals/kanal/antworten"]);
+    expect(missing.out).toContain("VERIFY POSTED FAILED");
+    expect(missing.status).toBe(1);
+    s.posted(["2026-11-10T14:03:20Z 440 https://github.com/Conway-Research/automaton/issues/440#issuecomment-41"]);
+    const none = s.run("post-the-answers.py", ["--verify-posted", "--folder", "goals/kanal/antworten"]);
+    expect(none.out).toContain("no draft #440");
+    expect(none.out).toContain("VERIFY POSTED FAILED");
+    expect(none.status).toBe(1);
+    expect(posts([...missing.calls, ...none.calls])).toEqual([]);
   }, 120_000);
 });

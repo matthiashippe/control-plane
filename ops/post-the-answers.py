@@ -14,6 +14,13 @@ Nothing here posts by itself. A dry run is the default and prints exactly what w
     ops/post-the-answers.py --send 3 --only 335,373,385   posts those three, in that order
     ops/post-the-answers.py --folder goals/kanal/antworten   a dry run over the drafts in that folder
                                                           of the repo; the gate checks the same folder
+    ops/post-the-answers.py --verify-posted --folder goals/kanal/antworten
+                                                          reads every comment in ops/posted-answers.log
+                                                          that has a draft in the folder and compares it
+                                                          with what this file would send; read-only
+
+`--folder=<dir>` is the same as `--folder <dir>`, and an argument this file does not know stops it
+with exit 1 before anything is asked of GitHub (ops/answers_args.py, shared with the gate).
 
 Every one of these has to hold before a single comment goes out:
 
@@ -40,9 +47,10 @@ import sys
 import time
 import datetime
 
+import answers_args
+
 REPO = "Conway-Research/automaton"
 OPS = pathlib.Path(__file__).resolve().parent
-FOLDER = pathlib.Path(".scratch/gtm/issue-antworten")
 ACCOUNT = "matthiashippe"
 DAILY_CAP = 3
 GAP_SECONDS = 90
@@ -83,9 +91,74 @@ def die(reason: str) -> None:
     raise SystemExit(1)
 
 
-argv = sys.argv[1:]
+def verify_posted(folder: pathlib.Path) -> int:
+    """Whether what stands under our name is exactly what this file would send from the draft.
 
-if "--selftest" in argv:
+    Every line `<time> <issue> <url>` of ops/posted-answers.log whose issue has a draft in `folder`
+    is fetched from GitHub by the comment id in the URL and compared with `body_to_send` of that
+    draft, byte for byte. `gh api --jq .body` prints the body and one newline of its own; that one
+    newline is removed and nothing else is normalised. Read-only: nothing is written, edited or
+    deleted, also not when a comment differs.
+
+    Exit 1 when a comment differs, is missing or cannot be read, when a draft would refuse, or when
+    not a single comment was compared, because "nothing differed" over nothing is no evidence.
+    """
+    log = OPS / "posted-answers.log"
+    same, bad = 0, []
+    for line in log.read_text(encoding="utf-8").splitlines():
+        if not line.strip() or line.startswith("#"):
+            continue
+        parts = line.split()
+        if len(parts) < 3:
+            print(f"  unreadable log line: {line}")
+            bad.append(line)
+            continue
+        number, url = parts[1], parts[2]
+        draft = folder / f"{number}.md"
+        if not draft.is_file():
+            print(f"  no draft #{number}")
+            continue
+        m = re.search(r"#issuecomment-(\d+)$", url)
+        if not m:
+            print(f"  DIFFERS #{number}: no comment id in {url}")
+            bad.append(number)
+            continue
+        try:
+            expected = body_to_send(draft.read_text(encoding="utf-8"))
+        except ValueError as e:
+            print(f"  DIFFERS #{number}: the draft would refuse, {e}")
+            bad.append(number)
+            continue
+        r = subprocess.run(["gh", "api", f"repos/{REPO}/issues/comments/{m.group(1)}", "--jq", ".body"],
+                           capture_output=True, text=True)
+        if r.returncode != 0:
+            print(f"  DIFFERS #{number}: comment {m.group(1)} not readable, {r.stderr.strip()[:200]}")
+            bad.append(number)
+            continue
+        live = r.stdout[:-1] if r.stdout.endswith("\n") else r.stdout
+        if live != expected:
+            at = next((k for k, (x, y) in enumerate(zip(live, expected)) if x != y), min(len(live), len(expected)))
+            print(f"  DIFFERS #{number}: live {len(live)} characters, draft {len(expected)}, first difference at {at}")
+            bad.append(number)
+            continue
+        print(f"  same #{number}")
+        same += 1
+    if bad:
+        print(f"VERIFY POSTED FAILED: {len(bad)} differ or unreadable, {same} same")
+        return 1
+    if same == 0:
+        print(f"VERIFY POSTED FAILED: no comment in {log.name} has a draft in {folder}, nothing compared")
+        return 1
+    print(f"VERIFY POSTED OK: {same} same")
+    return 0
+
+
+# Every argument is read here, before anything else runs, by the reader the gate uses too. An
+# argument it does not know stops the run with exit 1, so a typo cannot post from another folder.
+ARGS = answers_args.parse(sys.argv[1:], accepts={"--folder", "--send", "--only", "--selftest", "--verify-posted"})
+FOLDER = ARGS.folder
+
+if ARGS.selftest:
     # The one function that decides what a stranger reads, proved on cases rather than on the
     # nine real drafts, which all happen to have the note in the same place.
     fail = 0
@@ -120,22 +193,16 @@ if "--selftest" in argv:
                   if not fail else "SELFTEST FAILED"))
     raise SystemExit(fail)
 
-# The folder, passed to the gate exactly as given, so the gate judges the drafts this file posts and
-# not some other folder. The gate refuses a missing folder or one outside the repository.
-folder_args: list[str] = []
-if "--folder" in argv:
-    i = argv.index("--folder")
-    if i + 1 >= len(argv) or argv[i + 1].startswith("--"):
-        die("--folder needs a folder in the repository, e.g. --folder goals/kanal/antworten")
-    folder_args = ["--folder", argv[i + 1]]
-    FOLDER = pathlib.Path(argv[i + 1])
+if ARGS.verify_posted:
+    if ARGS.send or ARGS.only:
+        die("--verify-posted only reads; it does not take --send or --only.")
+    print(f"Comparing what stands under our name with the drafts in {FOLDER}.\n")
+    raise SystemExit(verify_posted(FOLDER))
 
-send = 0
-if "--send" in argv:
-    i = argv.index("--send")
-    if i + 1 >= len(argv) or not argv[i + 1].isdigit():
-        die("--send needs a number. `--send 3` sends three; `--send` alone sends nothing.")
-    send = int(argv[i + 1])
+# The folder, passed to the gate as resolved here, so the gate judges the drafts this file posts and
+# not some other folder. A missing folder or one outside the repository has already refused.
+folder_args = ARGS.folder_args()
+send = ARGS.send
 
 print("The gate first, because nothing goes out that it has not passed.\n")
 gate = subprocess.run([sys.executable, str(OPS / "before-the-answers.py"), *folder_args],
@@ -168,12 +235,8 @@ if not pending:
 # a decision that does not run.
 #
 #   ops/post-the-answers.py --send 3 --only 335,373,385
-only = []
-if "--only" in argv:
-    i = argv.index("--only")
-    if i + 1 >= len(argv):
-        die("--only needs a comma-separated list of issue numbers, e.g. --only 335,373,385")
-    only = [n.strip().lstrip("#") for n in argv[i + 1].split(",") if n.strip()]
+only = ARGS.only
+if only:
     unknown = [n for n in only if n not in pending]
     if unknown:
         die(f"--only names {', '.join('#' + n for n in unknown)}, which is not pending. "
@@ -209,7 +272,8 @@ if send == 0:
     if room < len(pending):
         print(f"  ({len(pending) - room} would wait for tomorrow: the cap is {DAILY_CAP} a day)")
     print("\nTo send, and only after Matthias has said so in the conversation:")
-    print(f"  ops/post-the-answers.py --send {min(room, len(pending))} {' '.join(folder_args)}".rstrip())
+    shown = f"--folder {ARGS.folder_given}" if ARGS.folder_given is not None else ""
+    print(f"  ops/post-the-answers.py --send {min(room, len(pending))} {shown}".rstrip())
     raise SystemExit(0)
 
 if send > room:
