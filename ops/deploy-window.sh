@@ -107,6 +107,16 @@ selftest() {
   [[ $code -eq 2 ]] && r=yes
   verdict log-needs-at "$r" "--log without --at must refuse with exit 2"
 
+  printf '# only a comment\n\n' > "$dir/own-empty.txt"
+  set +e
+  out=$(PATH="$dir/bin:$PATH" CP_OWN_IPS_FILE="$dir/own-empty.txt" CP_WINDOW_NOW="" bash "$HERE/deploy-window.sh" --at "$at" \
+    --log "$dir/own.log" 2>&1)
+  code=$?
+  set -e
+  r=no
+  [[ $code -eq 2 ]] && grep -q "^COULD NOT TELL: " <<<"$out" && ! grep -q "^BAD GATEWAY" <<<"$out" && r=yes
+  verdict own-list-empty "$r" "a list of our own addresses without an address must refuse with exit 2"
+
   r=no
   [[ ! -e "$dir/ssh-called" ]] && r=yes
   verdict no-ssh "$r" "--log must not call ssh"
@@ -164,7 +174,12 @@ if [[ -n "$LOGFILE" ]]; then
     echo "COULD NOT TELL: the list of our own addresses is not there; without it every count is guesswork." >&2
     exit 2
   fi
-  OWN=$(grep -v '^#' "$CP_OWN_IPS_FILE" | awk 'NF {print $1}' | sort -u | tr '\n' ' ')
+  OWN=$(awk '!/^#/ && NF {print $1}' "$CP_OWN_IPS_FILE" | sort -u | tr '\n' ' ')
+  # A list without a single address would count our own checks as strangers.
+  if [[ -z "${OWN// /}" ]]; then
+    echo "COULD NOT TELL: the list of our own addresses names no address; without it every count is guesswork." >&2
+    exit 2
+  fi
 else
   # own_ips reports a newly seen own address on stderr, with the address. That line would land in
   # the public log too, so it is passed on with the address blanked.

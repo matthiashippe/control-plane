@@ -24,14 +24,14 @@ function line(offset: number, ip: string, method: string, uri: string, status: n
   return JSON.stringify({ ts: T0 + offset, request: { remote_ip: ip, method, uri }, status });
 }
 
-function sandbox() {
+function sandbox(ownList = `# planted\n${OWN} 2026-11-01  planted own address\n`) {
   const root = mkdtempSync(join(tmpdir(), "deploy-window-"));
   mkdirSync(join(root, "bin"));
   const mark = join(root, "ssh-called");
   writeFileSync(join(root, "bin", "ssh"), `#!/bin/sh\ntouch ${JSON.stringify(mark)}\nexit 255\n`);
   chmodSync(join(root, "bin", "ssh"), 0o755);
   const own = join(root, "own-ips.txt");
-  writeFileSync(own, `# planted\n${OWN} 2026-11-01  planted own address\n`);
+  writeFileSync(own, ownList);
   const run = (rows: string[], args: string[] = ["--at", AT]): Run => {
     const log = join(root, `access-${Math.random().toString(36).slice(2)}.log`);
     writeFileSync(log, rows.map((r) => `${r}\n`).join(""));
@@ -98,6 +98,14 @@ describe("ops/deploy-window.sh measures a past window from a file and names no a
   it("refuses --log without --at, because the container start needs ssh", () => {
     const r = sandbox().run([], []);
     expect(r.status, r.out).toBe(2);
+    expect(r.sshCalled).toBe(false);
+  });
+
+  it("refuses with exit 2 when the own-address list holds only comments, instead of counting ourselves as strangers", () => {
+    const r = sandbox("# only a comment\n\n").run([line(5, OWN, "GET", "/health", 502)]);
+    expect(r.status, r.out).toBe(2);
+    expect(r.out).toMatch(/^COULD NOT TELL: /m);
+    expect(r.out).not.toMatch(/^BAD GATEWAY/m);
     expect(r.sshCalled).toBe(false);
   });
 

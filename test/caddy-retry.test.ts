@@ -14,6 +14,7 @@ import { join } from "node:path";
  * only for GET. Matching more would buy a broken inference a second time from the provider.
  */
 const CADDYFILE = readFileSync(join(__dirname, "..", "deploy", "Caddyfile"), "utf8");
+const SELFTEST = readFileSync(join(__dirname, "..", "ops", "caddy-retry.sh"), "utf8");
 
 /** The text between the opening brace of `reverse_proxy <upstream> {` and its matching closing brace. */
 function proxyBlock(source: string, upstream: string): string | null {
@@ -84,5 +85,15 @@ describe("deploy/Caddyfile holds a request to cp:8402 while the service restarts
     expect(seconds("250ms")).toBe(0.25);
     expect(seconds("1m30s")).toBe(90);
     expect(seconds("abc")).toBeNaN();
+  });
+});
+
+describe("ops/caddy-retry.sh talks to its local caddy without a proxy", () => {
+  // The nightly audit runs every check with HTTP_PROXY pointing at a dead port. curl sends even 127.0.0.1 through it unless
+  // told not to, and every case would read `got 000`.
+  it("passes --noproxy to every curl call", () => {
+    const calls = SELFTEST.split("\n").filter((l) => /(^|[\s(])curl\s/.test(l.replace(/#.*/, "")));
+    expect(calls.length).toBeGreaterThanOrEqual(2);
+    for (const c of calls) expect(c).toContain("--noproxy '*'");
   });
 });

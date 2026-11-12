@@ -110,11 +110,12 @@ run_case() {
   ( sleep 3; exec python3 "$TMP/upstream.py" "$up" ) &
   upid=$!; echo "$upid" >> "$TMP/pids"
   start=$(date +%s.%N)
+  # --noproxy: the nightly audit sets HTTP_PROXY to a dead port, and curl would send even 127.0.0.1 through it.
   if [[ "$method" == POST ]]; then
-    out=$(curl -s -m 40 -o "$TMP/$name.out" -w '%{http_code}' -X POST -H 'Content-Type: application/json' \
+    out=$(curl --noproxy '*' -s -m 40 -o "$TMP/$name.out" -w '%{http_code}' -X POST -H 'Content-Type: application/json' \
       --data-binary "$body" "http://127.0.0.1:$proxy/v1/chat/completions")
   else
-    out=$(curl -s -m 40 -o "$TMP/$name.out" -w '%{http_code}' "http://127.0.0.1:$proxy/v1/credits/balance")
+    out=$(curl --noproxy '*' -s -m 40 -o "$TMP/$name.out" -w '%{http_code}' "http://127.0.0.1:$proxy/v1/credits/balance")
   fi
   status=$out
   local took
