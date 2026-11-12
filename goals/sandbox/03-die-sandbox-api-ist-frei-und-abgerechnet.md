@@ -145,10 +145,16 @@ startet und dafür bezahlt, und weil das Abschlusskriterium in `ROADMAP.md` erst
       Prüfung: `awk '/^## Preis/{f=1;next} /^## /{f=0} f' docs/sandbox/plan.md | grep -ci "begonnen"` muss mindestens 1 ausgeben.
 - [ ] Das Goal ändert weder Zahlung, Anmeldung, Harness noch Betrieb und bringt keinen Schlüssel ins Repo.
       Prüfung: `git diff --name-only origin/dev...HEAD -- src/payments src/auth harness deploy .github | wc -l` muss 0 ausgeben.
-      Prüfung: `git diff --name-only origin/dev...HEAD | grep -cE "\.(key|pem|env)$|sandbox-client|live-sandbox\.env"` muss 0 ausgeben.
+      Prüfung: `git diff --name-only origin/dev...HEAD | grep -cE "\.(key|pem|env)$|sandbox-client\.(key|pub)|live-sandbox\.env"` muss 0 ausgeben (Kritik 12.11.2026: das Muster `sandbox-client` traf die Testdatei, die Punkt 4 verlangt).
 - [x] `check` ist grün, und der Job `e2e` des Goal-PR ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung (Netz): `n=$(gh pr list -R matthiashippe/control-plane --head goal/sandbox-03 --state all --json number -q '.[0].number'); gh pr checks "${n:?}" -R matthiashippe/control-plane --json name,state -q '.[] | select(.name=="e2e") | .state'` muss `SUCCESS` ausgeben.
+- [ ] Eine Wiederholung von `POST /v1/sandboxes` desselben Kontos mit demselben Body, die kommt, während das erste Anlegen noch
+      läuft oder bis 60 s danach, legt nichts Neues an und bekommt dieselbe Sandbox (Kritik 12.11.2026: Die Runtime bricht jeden
+      Versuch nach 30 s ab und schickt `createSandbox` ohne `Idempotency-Key` noch einmal, `src/conway/http-client.ts:115` und
+      `src/conway/client.ts:255` am Pin; heute hält das Control Plane das Anlegen bis 120 s, und ein Abbruch ergibt eine zweite
+      Sandbox, während die erste ohne Wissen des Kunden läuft und abgerechnet wird, gegen Grundregel 6).
+      Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/sandbox-api.test.ts -t "repeated create"` muss Exit-Code 0 haben und mindestens zwei Tests ausführen (`passed`, nicht `skipped`), einen mit der Wiederholung während des Anlegens und einen danach, je mit genau einem Anlegen am nachgebauten `sandboxd` und derselben `id` in beiden Antworten.
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
