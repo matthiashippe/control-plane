@@ -33,10 +33,10 @@ breaker:
   same_gap: 3
   no_progress_runs: 2            # zwei Maker-Runs ohne Progress-Log-Zeile: BLOCKED umgebung
   retry_after_hours: 4
-# Matthias 12.11.2026 („das Thema maximal pushen“): drei Goals bauen parallel, Merges und Rollouts bleiben einzeln nacheinander
+# Matthias 12.11.2026 („das Thema maximal pushen“, dann „2 parallel, das reicht“): zwei Goals bauen parallel, Merges und Rollouts bleiben einzeln nacheinander
 # (`concurrency: deploy-production` in deploy.yml). share 6 ist das höchste Gewicht im Slot-Budget der VM, weil dieser Loop als
 # einziger zahlende fremde Kunden hat.
-parallel_goals: 3
+parallel_goals: 2
 share: 6
 nightly: [audit, nacharbeit, redteam, triage, critic]
 # Karten an Matthias nur, wenn wirklich nur er es kann (loop-constraints.md, Grundregel 9). public_post: jeder Kommentar in einem
@@ -49,5 +49,5 @@ course:
   stale_hours: 12
 # Die Kette läuft nie leer (code-host docs/paperclip/loops.md Abschnitt 19); Quellen in LOOP.md, Abschnitt Kette nachfüllen.
 refill:
-  min_open: 3
+  min_open: 2
   every_h: 6
