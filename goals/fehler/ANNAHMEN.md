@@ -24,3 +24,8 @@
   5 Minuten des Cron. GNU `timeout` signalisiert seine ganze Prozessgruppe, also stirbt `docker exec` mit. Auf dem Server liegt
   `/usr/bin/timeout` (GNU coreutils 9.4, gelesen am 12.11.2026 per `ssh … 'command -v timeout; timeout --version'`); ohne `timeout`
   (Mac ohne coreutils) läuft die Abfrage ohne Grenze.
+- Kritik 2: Der Watchdog kennt drei Zustände des Guthabens (`ok`, `low`, `empty`). `empty` heißt ein Rest von 0 oder darunter in der
+  Zeile des Werkzeugs (`CREDIT RUNWAY LOW: <Rest> USD`). Von `ok` oder ohne Zustand nach `empty` kommt nur die Meldung `empty`, von
+  `low` nach `empty` genau eine weitere; die Meldung `empty` trägt das Wort `LOW` nicht, damit sie von der ersten Warnung zu
+  unterscheiden ist. Steigt der Rest nach `empty` über 0, aber nicht über die Schwelle, wird der Zustand still wieder `low`; fällt er
+  dann erneut auf 0, kommt wieder eine Meldung `empty`. `OK` meldet aus `low` und aus `empty`.

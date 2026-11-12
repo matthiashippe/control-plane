@@ -49,9 +49,11 @@ Der Rest liegt 1,91 USD über der Schwelle; beim Verbrauch von heute fällt er i
 
 `ops/watchdog.sh` ruft bei jedem Lauf (Cron auf dem Server, alle 5 Minuten) `ops/credit-runway.sh --container` und meldet nur den
 Wechsel: einmal `[WARN] credit CREDIT RUNWAY LOW: …` mit dem Weg zum Aufladen `https://openrouter.ai/settings/credits`, wenn LOW
-beginnt, einmal `[OK] credit CREDIT RUNWAY OK: …`, wenn es endet. Zwischen den Wechseln steht im Log je Lauf eine Zeile `[INFO]
-credit …`. Ist die Antwort nicht lesbar, steht `[WARN] credit unreadable` im Log, über den Webhook höchstens einmal am Tag, und der
-gespeicherte Zustand (`<CP_WATCHDOG_STATE>.credit`) bleibt. Auf dem Server wirkt das mit dem nächsten Rollout des Laufzeitpfads,
+beginnt, noch einmal `[WARN] credit empty, … USD left, …`, wenn der Rest danach auf 0 oder darunter fällt (der Zustand vom
+11.11.2026), und einmal `[OK] credit CREDIT RUNWAY OK: …`, wenn es endet. Ist der Rest schon beim ersten Lauf 0, kommt nur die
+Meldung `empty`. Zwischen den Wechseln steht im Log je Lauf eine Zeile `[INFO] credit …`. Ist die Antwort nicht lesbar oder kommt
+sie nicht binnen `CP_CREDIT_TIMEOUT` Sekunden (Standard 45, danach läuft die Gesundheit trotzdem), steht `[WARN] credit
+unreadable` im Log, über den Webhook höchstens einmal am Tag, und der gespeicherte Zustand (`<CP_WATCHDOG_STATE>.credit`) bleibt. Auf dem Server wirkt das mit dem nächsten Rollout des Laufzeitpfads,
 denn `ops/` rollt nicht allein aus (`LOOP.md`, Release).
 
 Selbsttest ohne Netz: `bash ops/credit-runway.sh --selftest`.
