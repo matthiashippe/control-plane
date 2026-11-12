@@ -13,6 +13,9 @@ describe("ops/live.sh", () => {
     expect(run.stdout).toContain("planted none: FAIL");
     expect(run.stdout).toContain("planted double: FAIL");
     expect(run.stdout).toContain("planted single: OK");
+    expect(run.stdout).toContain("planted domains 401: OK domains: /v1/domains/search 401 without a key");
+    expect(run.stdout).toContain("planted domains 404: FAIL domains: /v1/domains/search answered 404, the route is missing");
+    expect(run.stdout).toContain("planted domains 200: FAIL");
     expect(run.stdout).toContain("planted timeout-quote long: OK timeout-quote: since 2026-11-12T09:00:00.000Z: ");
     expect(run.stdout).toContain("openai/gpt-5.2 1/2 (50.0 %)");
     expect(run.stdout).toContain("planted timeout-quote answer '': FAIL");

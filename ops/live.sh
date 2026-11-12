@@ -17,6 +17,9 @@
 #   status   GET /v1/status answers 200 with a JSON object
 #   refund   the credit for the five calls of 2026-11-10 whose answers never arrived
 #            (src/credits/aborted.ts) is in the ledger exactly once, over exactly 79229 mc
+#   domains  GET /v1/domains/search from the code-host (an own address, ops/own-ips.txt) without a key answers 401 from
+#            the auth in front of the route, not the 404 of the fallback route (domains 01). Reads only, buys nothing,
+#            and creates no key, because provisioning one would write into production
 #   timeout-quote  the timeout quote per model since the rollout of abrechnung 02, from the durations in the ledger and in
 #            inference_aborts (ops/timeout-quote.sh --since-rollout); shown, and FAIL only when it cannot be read
 set -uo pipefail
@@ -64,6 +67,20 @@ judge_refund() { # $1 = "<rows> <sum mc>" from QUERY_JS
     echo "FAIL refund: credit over $s mc, expected $REFUND_MC mc"
   else
     echo "OK refund: credited once, $REFUND_MC mc"
+  fi
+}
+
+DOMAINS_PATH="/v1/domains/search?query=livecheck&tlds=com"
+
+judge_domains() { # $1 = HTTP status, $2 = body
+  local err
+  err="$(grep -o '"error":"[^"]*"' <<<"${2:-}" | head -n 1)"
+  if [ "$1" = "401" ] && [ -n "$err" ] && [ "$err" != '"error":"not_found"' ]; then
+    echo "OK domains: ${DOMAINS_PATH%%\?*} 401 without a key, the route is there"
+  elif [ "$1" = "404" ]; then
+    echo "FAIL domains: ${DOMAINS_PATH%%\?*} answered 404, the route is missing"
+  else
+    echo "FAIL domains: ${DOMAINS_PATH%%\?*} answered ${1:-nothing} ${err:-without an error field}"
   fi
 }
 
@@ -132,6 +149,18 @@ selftest() {
     [ "${got%% *}" = "$expect" ] || all_ok=0
   done
 
+  # The domain route, both directions: the 401 of the auth in front of it, the 404 of the fallback route as it answered
+  # before domains 01, a 401 without a JSON error, a 200 (the route would then answer without a key) and no answer.
+  local body401='{"error":"Invalid API key","message":"Send the control plane API key"}'
+  local body404='{"error":"not_found","message":"No endpoint at /v1/domains/search"}'
+  local d_case d_code d_body d_expect
+  for d_case in "401|$body401|OK" "404|$body404|FAIL" "401|<html>|FAIL" "200|{\"results\":[]}|FAIL" "||FAIL"; do
+    IFS='|' read -r d_code d_body d_expect <<<"$d_case"
+    got="$(judge_domains "$d_code" "$d_body")"
+    echo "planted domains ${d_code:-none}: $got"
+    [ "${got%% *}" = "$d_expect" ] || all_ok=0
+  done
+
   # The timeout quote since the rollout, through the real ops/timeout-quote.sh: a long abort shows a quote above 0, calls
   # without one show exactly 0, a row from before the rollout stays out, and no answer is a FAIL.
   printf '%s\n' '{"src":"ledger","at":"2026-11-11T09:00:00.000Z","ref":"gen-1","model":"openai/gpt-5.2","duration_ms":null}' \
@@ -185,6 +214,11 @@ live() {
   say "$(judge_status "$code" "$(head -c 1 "$body")")"
   rm -f "$body"
 
+  body="$(mktemp)"
+  code="$(curl -s -o "$body" -w '%{http_code}' --max-time 15 "$BASE$DOMAINS_PATH")"
+  say "$(judge_domains "$code" "$(head -c 2000 "$body")")"
+  rm -f "$body"
+
   local remote answer
   remote="docker exec deploy-cp-1 node -e $(printf %q "$QUERY_JS") /data/cp.db $(printf %q "$REFUND_KEY")"
   answer="$(ssh -i "$key" -o BatchMode=yes -o ConnectTimeout=10 "$CP_HOST" "$remote" 2>/dev/null)"
@@ -203,7 +237,7 @@ live() {
 case "${1:-}" in
   --selftest) selftest ;;
   "") live ;;
-  -h | --help) sed -n '2,21p' "$0" | sed 's/^# \{0,1\}//' ;;
+  -h | --help) sed -n '2,24p' "$0" | sed 's/^# \{0,1\}//' ;;
   *)
     echo "unknown switch: $1" >&2
     exit 2
