@@ -11,10 +11,11 @@ des alten Loops bis zum 10.11.2026 steht unverändert in `docs/state-bis-2026-11
 
 ## Lage
 
-Stand 11.11.2026, 06:00 (Loop-Triage). Stufe L3, Kill Switch aus, Budget core, Drill grün (10.11.), Kurs-Check „auf Kurs“
-(11.11., 01:51). Gemergt: abrechnung 01, 02, 03; `deploy.yml` lief auf `dev` viermal grün (zuletzt 11.11., 02:11). Seed vom 10.11.2026: Der Dienst läuft unter `https://postyourprice.com` (auch `cp.hippe.eu`) auf
-`srv1336627`, Container seit dem Rollout vom 30.10.2026. Gemessen am 10.11.2026: 6 registrierte Automatons, davon 4 fremde,
-8 Zahlungen über zusammen 36 USDC. Conway antwortet seit Wochen mit 500.
+Stand 12.11.2026, 06:20 (Loop-Triage). Stufe L3, Kill Switch aus, Budget full, Drill grün (10.11.), Kurs-Check „auf Kurs“
+(11.11., 15:33); der Kurs-Check PRO-18222 blieb zwei Stunden ohne Antwort, Goals starten weiter. Seit der letzten Triage gemergt:
+kanal 01 (PR #5), abrechnung 04 (PR #10), sandbox 01 (PR #4) und die Goal-Datei sandbox 02 (PR #19); `deploy.yml` lief auf `dev`
+dreimal grün (zuletzt 11.11., 19:51). Aktiv ist domains 01 (PRO-18126, PR #18). Der Dienst läuft unter `https://postyourprice.com`
+(`/health` 200 am 12.11., 06:15), eine Anfrage ohne Schlüssel bekommt 401 mit dem Weg über `/v1/auth/nonce`.
 
 Entscheidung 30.10.2026: Inferenz wird wieder über OpenRouter verkauft, Matthias' Entscheidung. Notschalter:
 `CP_OPENROUTER_RESALE=0` in `/opt/control-plane/.env`, danach Neustart des Containers.
@@ -22,41 +23,35 @@ Entscheidung 30.10.2026: Inferenz wird wieder über OpenRouter verkauft, Matthia
 Entscheidungen 10.11.2026 (Matthias): Sandboxes sind das nächste Produkt, als PoC auf einem eigenen kleinen Server, getrennt vom
 Zahlungsdienst. Antworten, die beim Kunden nicht ankommen, berechnen wir nicht mehr.
 
-Drift Server gegen Repo am 10.11.2026: 391 Dateien geprüft, drei unterscheiden sich nur in Kommentaren und stehen in
-`deploy/drift-ok.txt`; die Fassung im Repo gilt und ersetzt sie mit dem ersten Rollout.
-
 ## Topics
 
 | Topic | Goal | Status |
 |---|---|---|
-| fehler | keine Glieder | leer, der Writer hängt Fehler echter Nutzer an |
-| abrechnung | 01 Keine Abbuchung ohne angekommene Antwort | DONE |
-| abrechnung | 02 Schnellere Anbieter über das Provider-Routing | DONE |
-| abrechnung | 03 Timeout-Quote vorher und nachher auf derselben Grundlage | DONE |
-| abrechnung | 04 Einkauf abgebrochener Anfragen gegen die Abrechnung des Anbieters | BLOCKED matthias (PRO-17684, PR #10) |
-| sandbox | 01 Sandbox-Vertrag, Isolation, Preis und PoC-Plan | BLOCKED matthias (PRO-17522, PR #4) |
-| sandbox | 02 bis 04 | Dateien fehlen, Writer nach sandbox 01 |
-| domains | 01 Die Domain-Endpunkte der Runtime | PLANNED, wartet auf sandbox 01 |
-| kanal | 01 Antworten auf neue Conway-Issues vorbereiten | BLOCKED matthias (PRO-17542, PR #5) |
-| seite | 01 | wartet auf Budget (Stufe core, nur Prio 1 bis 3) |
+| fehler | keine Glieder | Fehler echter Nutzer vom 11.11. (503 bei leerem Guthaben beim Anbieter, fehler-2026-11-11-1), Glied beim Tech Lead |
+| abrechnung | 01 bis 04 | DONE |
+| abrechnung | 05 Quote nach außen nach sieben Tagen | PLANNED, startet frühestens 18.11.2026 |
+| sandbox | 01 Sandbox-Vertrag, Isolation, Preis und PoC-Plan | DONE |
+| sandbox | 02 Der Sandbox-Server steht | PLANNED, wartet auf einen Platz (parallel_goals 1) |
+| sandbox | 03, 04 | Dateien fehlen, Writer nach sandbox 02 |
+| domains | 01 Die Domain-Endpunkte der Runtime | ACTIVE (PRO-18126, PR #18) |
+| kanal | 01 Antworten auf neue Conway-Issues vorbereiten | DONE |
+| seite | 01 | wartet auf Budget |
 
 ## Human Inbox
 
 - keine PR mit „Human Inbox“
-- Human Gate sandbox 01 (`server_kauf`): VPS KVM 1 bei Hostinger, Karte auf seinem privaten Board seit 10.11., 23:10
-- Human Gate kanal 01 (`public_post`): drei Antworten in Conway-Issues, wartet auf sein „ok“ seit 10.11., 23:50
-- Human Gate abrechnung 04 (`security_settings`): Management-Key bei OpenRouter, seit 11.11., 03:54; Punkte ohne Schlüssel
-  baut der Maker vorher
+- kein Human Gate offen; `server_kauf` (sandbox 01), `public_post` (kanal 01) und `security_settings` (abrechnung 04) sind erledigt
 
 ## Watch List
 
-- Quote nach außen frühestens ab 17.11.2026 nach einem neuen `--compare`; das Glied dafür fehlt in der Kette
-  (abrechnung-kritik-2026-11-10-4, beim Tech Lead), `--compare` skaliert vorher nicht (abrechnung-kritik-2026-11-10-6)
-- `LOOP.md:24` nennt noch die ungemessenen 0,37 USD statt 79229 mc; ändern darf das nur ein Mensch (beim Tech Lead als
-  Human Inbox des Loops)
-- Server-Kauf für sandbox 01 (Human Gate `server_kauf`).
-- Upstream-Drift: `Conway-Research/automaton` gegen den Pin `d8f8168`.
+- Schlüssel für die Aktivität beim Inferenz-Anbieter liegt in `~/.config/control-plane/loop.env`, die jede Rolle lädt
+  (abrechnung-kritik-2026-11-11-2, Schwere 4, beim Tech Lead)
+- `ops/fetcher-cache.tsv` mit Adressen echter Besucher im öffentlichen Repo (loop-redteam-2026-11-11-1, Schwere 4, beim Tech Lead)
+- `LOOP.md:24` nennt noch die ungemessenen 0,37 USD statt 79229 mc; der Satz wird mit der nächsten Fassung von `LOOP.md` korrigiert
+- `--join` und `--compare` teilen Filter und Zuordnung nicht (abrechnung-nacharbeit-2026-11-11-3); abrechnung 05 baut beide um
+- Upstream-Drift: `Conway-Research/automaton` gegen den Pin `d8f8168`
 
 ## Annahmen
 
-- `goals/abrechnung/ANNAHMEN.md`: unter anderem „Quote nach außen noch keine“ (0 Timeouts in 46 Anfragen sind kein Beleg)
+- `goals/abrechnung/ANNAHMEN.md`: unter anderem „Quote nach außen noch keine“ bis abrechnung 05
+- `goals/sandbox/ANNAHMEN.md` und `goals/kanal/ANNAHMEN.md`: Annahmen von sandbox 01 und kanal 01

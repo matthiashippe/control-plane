@@ -5,3 +5,5 @@ Beleg: `git show origin/dev:ROADMAP.md | grep -n "abrechnung 05\|17.11\|compare"
 Empfehlung: Writer oder Tech Lead trägt abrechnung 05 (Vergleich ab 17.11., Gegenrechnung, Abgleich im gleitenden Fenster) als Kettenglied in ROADMAP.md und docs/kette.md ein.
 
 Loop-Kritik 2026-11-11, Growth Lead.
+
+Übernommen: abrechnung 05 in ROADMAP.md und goals/abrechnung/05-quote-nach-aussen-nach-sieben-tagen.md (2026-11-12)

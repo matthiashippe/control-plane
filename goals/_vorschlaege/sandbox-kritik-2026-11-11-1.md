@@ -4,3 +4,5 @@ Befund: Drei kleine Lücken im Plan, die sandbox 02 sonst erst auf dem Server fi
 Beleg: `ssh ... root@72.62.51.224 'ip -6 addr show scope global | grep -c inet6'` gab 1 (Tech Lead, 11.11.2026); `docs/sandbox/plan.md`, `## Grenzen` und `## Verbindung`; `docs/sandbox/server.md`, Zeile `Zugang:`.
 Empfehlung: sandbox 02 misst den Speicher einer leeren Sandbox unter `runsc` und setzt die Platzzahl danach, legt `ctl.sbx` nur mit A-Eintrag an oder gibt die IPv6 des Zahlungsservers mit frei, und zählt die Root-Schlüssel in `authorized_keys` als Prüfung (Soll nach dem Auszug von wa-staging: genau einer).
 MVP: Funktion, weil jeder Punkt sonst als Fehler im ersten echten Lauf auftaucht.
+
+Übernommen: sandbox 02, Kontext für den Maker und Done-Punkt zu server.md und plan.md (2026-11-12)

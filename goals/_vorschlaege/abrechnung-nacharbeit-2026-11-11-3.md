@@ -7,3 +7,5 @@ MVP: Schönheit
 
 Linse Q, Frage 2. Das Goal heißt „auf derselben Grundlage“: Ändert ein späteres Goal das Fenster (2 s, 15 s) nur in einem Modus, zählen `--join` und die Spalte `caddy` still verschieden.
 Abgrenzung: abrechnung-kritik-2026-11-10-5 verlangt eine Gegenrechnung `caddy` gegen `--join`, abrechnung-kritik-2026-11-10-6 die Laufzeit des Abgleichs; die Kopie nennt keiner.
+
+Übernommen: Watch List in STATE.md, abrechnung 05 baut join und compare gemeinsam um (2026-11-12)
