@@ -95,3 +95,13 @@
 - **Peer-Sperre in `prerouting`.** Docker 29 verwirft Pakete an die Adresse eines anderen Containers schon in `raw PREROUTING`
   (Priorität -300), bevor `forward` sie sieht; der Zähler `sbx_peer` blieb dort bei 0 (Messung 12.11.2026, `other_sandbox`). Die Regel
   steht darum in einer Kette `prerouting` mit Priorität -310 und zählt, bevor Docker verwirft.
+
+## Goal 02, Kritik (12.11.2026, Tech Lead)
+
+- **Wildcard `*.postyourprice.com` bleibt bis sandbox 03, für Kunden kommt eine eigene Domain.** Entscheidung Tech Lead zu
+  `goals/_vorschlaege/sandbox-kritik-2026-11-12-1.md`: In sandbox 02 legt nur die Messung Sandboxes an, `POST /v1/sandboxes` antwortet
+  in der Produktion weiter 501, unter dem Wildcard läuft also kein fremder Code. Bevor sandbox 03 einem Kunden einen Port freigibt,
+  ziehen die freigegebenen Ports auf eine eigene registrierbare Domain um (Kauf über `server_kauf`), weil eine Phishing-Seite unter der
+  Zone des Zahlungsdienstes `postyourprice.com` bei Safe Browsing sperren lassen kann und damit jede Inferenz-Anfrage trifft; so trennen
+  es GitHub (`github.io`), Vercel (`vercel.app`) und Fly (`fly.dev`). Notschalter bis dahin: den einen Eintrag `*.postyourprice.com` in
+  Cloudflare löschen; `ctl.sbx`, die Hauptseite und alle anderen Einträge der Zone bleiben davon unberührt.
