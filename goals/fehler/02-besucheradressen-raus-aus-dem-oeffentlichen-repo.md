@@ -61,6 +61,23 @@ der Seite das Gegenteil zusagt.
       Prüfung: `pnpm -s vitest run` muss Exit-Code 0 haben.
 - [x] `check` ist grün.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
+- [ ] Kritik 1: `save_cache` schreibt den Cache atomar, über eine Temp-Datei im selben Ordner und `os.replace`. Bisher hatte jeder
+      Checkout seine eigene Datei, jetzt teilen sich alle Worktrees und Läufe auf dem code-host eine unter `~/.cache`; ein Lauf, der
+      liest, während ein anderer mit `write_text` mitten im Schreiben ist, liest eine halbe Datei und schreibt sie so zurück, und die
+      Belege der 959 Adressen, die eine spätere Abfrage nicht mehr gleich beantwortet, sind weg. Der Test pflanzt einen Cache mit
+      Modus 0444 in einem beschreibbaren Ordner aus `mktemp`, fährt das Skript mit `127.0.0.1` und verlangt Exit 0, die neue Zeile
+      und die gepflanzte Zeile im Cache und keine weitere Datei im Ordner; mit `write_text` scheitert er an `PermissionError`.
+      Prüfung: `grep -c "os.replace" ops/fetchers.py` muss mindestens 1 ausgeben.
+      Prüfung: `pnpm -s vitest run test/fetcher-cache.test.ts -t "atomic"` muss Exit-Code 0 haben.
+- [ ] Kritik 2: Ein neuer Test `test/visitor-addresses.test.ts` hält Punkt 2 nach dem Merge fest, weil die 12 Dateien mit Adressen
+      nicht aus dem Cache kamen, sondern aus Kommentaren, die Maker-Läufe über einen Besuch geschrieben haben, und der nächste Lauf
+      das wieder tut. Er liest den Cache aus `CP_FETCHER_CACHE` (Standard `~/.cache/control-plane/fetcher-cache.tsv`), nimmt dieselben
+      Adressen wie der zweite Prüfbefehl von Punkt 2 (nicht `datacenter`, nicht in `ops/own-ips.txt` oder `ops/crawler-ips.txt`) und
+      verlangt, dass keine Datei aus `git ls-files` eine davon trägt; die Meldung nennt Anzahl und Dateinamen, nie eine Adresse.
+      Fehlt der Cache (CI), wird der Test übersprungen, nicht grün gemeldet.
+      Prüfung: `pnpm -s vitest run test/visitor-addresses.test.ts` muss Exit-Code 0 haben.
+      Prüfung: `d=$(mktemp -d); printf '# ip\towner\tkind\n192.0.2.64\t-\tunknown\n' > "$d/c.tsv"; CP_FETCHER_CACHE="$d/c.tsv" pnpm -s vitest run test/visitor-addresses.test.ts >/dev/null 2>&1 && echo gruen || echo rot` muss `rot` ausgeben (die Dokumentationsadresse steht in `ops/fetchers.py`).
+      Prüfung: `CP_FETCHER_CACHE=/nonexistent pnpm -s vitest run test/visitor-addresses.test.ts 2>&1 | grep -c skipped` muss mindestens 1 ausgeben.
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
