@@ -858,6 +858,13 @@ documentation address (the same replacement in every file, so a fixture behaves 
 one is always replaced, because "invented" cannot be checked. `CP_KNOWN_IPS` reads another list (`/dev/null` is an empty one),
 `CP_SCAN_ROOT` scans another git work tree; both exist for the counter-test in both directions.
 
+The same test keeps the rules of the list itself, so they hold after the goal that brought them: every line has the form
+`<address> <kind> <evidence>` with one of the four kinds and an evidence, an address of kind `erfunden` stands only in paths no goal
+may change (`goals/`, `docs/audit/`, `LOOP.md`, `loop-constraints.md`, `loop-dauerauftrag.md`, `.github/`, `deploy/`, `harness/`),
+and every entry still stands in a tracked file besides the list. An entry whose finding is gone is removed, otherwise the list
+would let a later visitor with the same address through. Findings are the tracked files of the scan root and of the work tree
+that tracks the list; the message names the count and the line numbers or files, never an address.
+
 Three /24 networks are all the documentation ranges offer. A fixture with more foreign /24 networks than that keeps the behaviour
 that depends on them (no address shares its /24 with two others unless it did before), but the summary "N address(es) in M
 network(s)" of `ops/traffic.sh` names fewer networks than before.

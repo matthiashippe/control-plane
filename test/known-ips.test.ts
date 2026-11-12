@@ -219,4 +219,17 @@ describe("no tracked file carries an unaccounted public IPv4 address", () => {
     ).toBe(0);
   });
 
+  it("finds every entry of the address list in a tracked file besides the list", () => {
+    const found = new Set<string>();
+    for (const f of findingFiles()) for (const ip of addressesIn(f.text)) found.add(ip);
+    const stale = listLines(KNOWN)
+      .map((l) => l.entry)
+      .filter((e): e is ListEntry => e !== null && !found.has(e.ip))
+      .map((e) => e.line);
+    expect(
+      stale.length,
+      `${stale.length} entries of the address list stand in no tracked file besides the list: line(s) ${stale.join(", ")}. ` +
+        "Remove them from the list.",
+    ).toBe(0);
+  });
 });
