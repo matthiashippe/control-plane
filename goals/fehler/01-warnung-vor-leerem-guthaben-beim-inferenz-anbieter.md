@@ -1,7 +1,7 @@
 # Fehler Goal 01: Warnung vor leerem Guthaben beim Inferenz-Anbieter
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Bevor das Guthaben beim Inferenz-Anbieter ausgeht, kommt eine Warnung über den Alarmweg, der heute schon Ausfälle meldet
@@ -78,7 +78,7 @@ sieht, zu Conway zurück oder ganz geht.
       genau einen mit `credit` und `empty`, danach genau einen mit `credit` und `OK`; ohne vorheriges LOW (erster Lauf mit 0 USD)
       gibt es genau einen POST.
       Prüfung: `pnpm -s vitest run test/watchdog-credit-kritik.test.ts -t "empty"` muss Exit-Code 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Jede neue Testdatei und jede neue Selftest-Zeile war vor dem Fix rot; die Zeile im Progress Log nennt, womit.
@@ -102,5 +102,6 @@ sieht, zu Conway zurück oder ganz geht.
 - 2026-11-12 Zyklus 3: Kritik 1 gebaut, die Abfrage des Guthabens in `ops/watchdog.sh` läuft unter `timeout -k 5` (Standard 45 s, `CP_CREDIT_TIMEOUT`), ein Zeitlimit meldet `[WARN] credit unreadable (no answer … within 45 s)`, danach läuft die Gesundheit. Rot vor dem Fix: `test/watchdog-credit-kritik.test.ts -t "hanging docker"` gegen den Watchdog von Zyklus 2 nach 150 s abgebrochen (`expected null not to be null`). Prüfbefehle: `pnpm -s vitest run test/watchdog-credit-kritik.test.ts -t "hanging docker"` Exit 0 (1 passed, Lauf 45 s); `pnpm -s vitest run test/watchdog-credit.test.ts test/credit-runway.test.ts` Exit 0 (17 passed); `node scripts/check.mjs` Exit 0.
 - 2026-11-12 Zyklus 4: Kritik 2 gebaut, `ops/watchdog.sh` kennt den Zustand `empty` (Rest 0 oder darunter) und meldet ihn nach LOW genau einmal mit `credit empty, … USD left`, ohne vorheriges LOW nur diese eine Meldung, `OK` auch aus `empty`; Doku `docs/betrieb/guthaben.md` nachgezogen. Rot vor dem Fix: `test/watchdog-credit-kritik.test.ts -t "empty"` gegen den Watchdog von Zyklus 2, alle drei Fälle `expected +0 to be 1`. Prüfbefehle: `pnpm -s vitest run test/watchdog-credit-kritik.test.ts -t "empty"` Exit 0 (3 passed); `pnpm -s vitest run test/watchdog-credit-kritik.test.ts -t "hanging docker"` Exit 0; `pnpm -s vitest run test/watchdog-credit.test.ts test/credit-runway.test.ts` Exit 0 (17 passed); `node scripts/check.mjs` Exit 0.
 - 2026-11-12 Zyklus 5: Abschluss gemeldet, Punkte 1, 2, 3, 4, Kritik 1, Kritik 2; `origin/dev` (`7771ce4`) in den Goal-Branch gemergt. Prüfbefehle: `bash ops/credit-runway.sh --selftest` Exit 0, letzte Zeile `CREDIT RUNWAY SELFTEST OK`; grep `^ok   (low|ok|fail) ` 10; `pnpm -s vitest run test/credit-runway.test.ts` Exit 0 (13 passed); `pnpm -s vitest run test/watchdog-credit.test.ts` Exit 0 (4 passed); grep `credit-runway.sh --container` in `ops/watchdog.sh` 2; `bash ops/credit-runway.sh` (Netz, 11:29:55 UTC) `CREDIT RUNWAY OK: 9.23 USD, 3.6 days at 2.51 USD per day, threshold 7.52 USD`; grep `bash ops/credit-runway.sh` in der Doku 2; grep Schlüsselmuster 0 in allen drei Dateien; `pnpm -s vitest run test/watchdog-credit-kritik.test.ts -t "hanging docker"` Exit 0 (1 passed); `pnpm -s vitest run test/watchdog-credit-kritik.test.ts -t "empty"` Exit 0 (3 passed); `node scripts/check.mjs` Exit 0 (61 s).
+- 2026-11-12 Release: PASS K und B (Zyklus 5), DONE.
 
 ## Blockers
