@@ -24,3 +24,12 @@
 - 2026-11-12, kanal 02: `--verify-posted` vergleicht Byte für Byte. `gh api … --jq .body` hängt genau ein `\n` an, das wird entfernt,
   sonst nichts; gemessen an #434, #430, #427 (Live-Text gleich `body_to_send` des Entwurfs plus dieses eine Zeichen). Das Werkzeug ruft
   dabei das Gatter nicht, weil es nichts sendet.
+- 2026-11-12, kanal 03: `ops/github-yield.sh` vergleicht den Referrer `https://github.com/Conway-Research` ohne Rücksicht auf Groß- und
+  Kleinschreibung und nur, wenn danach `/` oder nichts folgt, damit eine fremde Organisation wie `Conway-Research-fan` nicht zählt.
+- 2026-11-12, kanal 03: `CP_OWN_IPS` nennt in diesem Werkzeug eine Datei (Goal-Datei), nicht eine Liste von Adressen wie in
+  `ops/own-ips.sh`. Eine fehlende oder leere Datei ist Exit 2, damit eigene Adressen nie still als fremde zählen.
+- 2026-11-12, kanal 03: Ist die Datenbank in der Produktion nicht lesbar, steht in der zweiten Zeile `not read` und der Exit ist 2, wie
+  beim Log. Die Zeile mit dem nackten Referrer `https://github.com/` steht als dritte Zeile, eine Zeile `WINDOW` mit Zahl der Logzeilen und
+  fremden Adressen als vierte, damit die Null im Fenster als gemessen erkennbar ist. Keine der Zeilen nennt eine Adresse.
+- 2026-11-12, kanal 03: Die obere Zahl in `goals/kanal/ertrag.md` zählt jede Wallet mit `created_at` im Zeitraum, auch unsere eigenen
+  Prüfläufe (`ops/smoke.sh` meldet sich mit einer Wegwerf-Wallet an). Das hält sie als obere Grenze; die Widerlegung gilt für die untere.

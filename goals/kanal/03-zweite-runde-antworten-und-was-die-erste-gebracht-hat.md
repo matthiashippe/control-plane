@@ -1,7 +1,7 @@
 # Kanal Goal 03: Zweite Runde Antworten und was die erste gebracht hat
 
 ## Status
-PLANNED
+BLOCKED matthias
 
 ## Active Objective
 Zwei Dinge in einem Goal, weil das zweite das erste begründet: Zuerst ist gemessen, was die drei Antworten vom 11.11.2026 (#434,
@@ -73,14 +73,14 @@ ohne die Zahl niemand weiß, ob dieser Kanal zahlende Kunden bringt oder nur Arb
   einer dritten Runde und sucht einen anderen Kanal.
 
 ## Done Condition
-- [ ] `ops/github-yield.sh` zählt Ankünfte mit Referrer `github.com/Conway-Research`, Anmeldungen und Zahlungen derselben Adresse
+- [x] `ops/github-yield.sh` zählt Ankünfte mit Referrer `github.com/Conway-Research`, Anmeldungen und Zahlungen derselben Adresse
       seit einem Zeitpunkt, als Summe ohne Adressen, in beide Richtungen bewiesen.
       Prüfung: `bash ops/github-yield.sh --selftest | tail -1` muss `SELFTEST OK` ausgeben.
       Prüfung: `pnpm -s vitest run test/github-yield.test.ts` muss Exit-Code 0 haben.
       Prüfung: `grep -cE "^\s*(it|test)\(" test/github-yield.test.ts` muss mindestens 3 ausgeben.
       Prüfung: `bash ops/github-yield.sh --log ops/fixtures/github-yield.log --since 2000-01-01T00:00:00Z | grep -cE "([0-9]{1,3}\.){3}[0-9]{1,3}|0x[0-9a-fA-F]{40}"` muss 0 ausgeben.
       Prüfung: `grep -oE '"(remote_ip|client_ip)":"[^"]*"' ops/fixtures/github-yield.log | grep -cvE '"(192\.0\.2|198\.51\.100|203\.0\.113)\.[0-9]+"'` muss 0 ausgeben.
-- [ ] Was die erste Runde gebracht hat, steht gemessen in `goals/kanal/ertrag.md`, untere und obere Zahl mit Zeitraum und Befehl,
+- [x] Was die erste Runde gebracht hat, steht gemessen in `goals/kanal/ertrag.md`, untere und obere Zahl mit Zeitraum und Befehl,
       ohne Adresse.
       Prüfung: `grep -cE "^Ertrag Runde 1: [0-9]+ kamen von github.com/Conway-Research, [0-9]+ angemeldet, [0-9]+ gezahlt" goals/kanal/ertrag.md` muss 1 ausgeben.
       Prüfung: `grep -cE "^Alle neuen: [0-9]+ Wallets, [0-9]+ zahlend" goals/kanal/ertrag.md` muss 1 ausgeben.
@@ -88,7 +88,7 @@ ohne die Zahl niemand weiß, ob dieser Kanal zahlende Kunden bringt oder nur Arb
       Prüfung: `grep -c "2026-11-25" goals/kanal/ertrag.md` muss mindestens 1 ausgeben.
       Prüfung: `grep -cE "([0-9]{1,3}\.){3}[0-9]{1,3}|0x[0-9a-fA-F]{40}" goals/kanal/ertrag.md` muss 0 ausgeben.
       Prüfung (Netz): `bash ops/github-yield.sh --since 2026-11-11T07:04:50Z | head -1 | grep -c "^GITHUB YIELD since 2026-11-11T07:04:50Z: [0-9]"` muss 1 ausgeben.
-- [ ] Die neuen Issues mit Anmelde- oder Zahlungsfehlern stehen in `goals/kanal/issues-03.md`, je Issue mit Antwort liegt ein Entwurf
+- [x] Die neuen Issues mit Anmelde- oder Zahlungsfehlern stehen in `goals/kanal/issues-03.md`, je Issue mit Antwort liegt ein Entwurf
       in `goals/kanal/antworten-03/`, höchstens drei, keiner zu einem Issue, das wir schon beantwortet haben, und das Gatter ist grün.
       Prüfung: `grep -cE "^[|] *#?[0-9]+ " goals/kanal/issues-03.md` muss mindestens 1 ausgeben.
       Prüfung: `grep -c "gh issue" goals/kanal/issues-03.md` muss mindestens 1 ausgeben.
@@ -102,7 +102,7 @@ ohne die Zahl niemand weiß, ob dieser Kanal zahlende Kunden bringt oder nur Arb
       Prüfung: `grep -E "^[0-9]{4}-" ops/posted-answers.log | awk '{print $2}' | sort | uniq -d | while read -r n; do test -f "goals/kanal/antworten-03/$n.md" && echo "doppelt $n"; done` muss nichts ausgeben.
       Prüfung: `grep -E "^[0-9]{4}-" ops/posted-answers.log | cut -c1-10 | sort | uniq -c | awk '$1 > 3'` muss nichts ausgeben.
       Prüfung (Netz): `python3 ops/post-the-answers.py --verify-posted --folder goals/kanal/antworten-03 | tail -1` muss mit `VERIFY POSTED OK:` beginnen.
-- [ ] `check` ist grün.
+- [x] `check` ist grün.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
 - [ ] goal-verifier PASS (K und B)
 
@@ -129,5 +129,88 @@ ohne die Zahl niemand weiß, ob dieser Kanal zahlende Kunden bringt oder nur Arb
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-12 Zyklus 1: Punkte 1, 2, 3, 5 gebaut (`ops/github-yield.sh` mit Fixture und 10 Tests, `goals/kanal/ertrag.md` gemessen, Liste mit 4 Issues, Entwürfe zu #447, #406 und #408), Punkt 4 wartet auf das Human Gate public_post. Prüfbefehle: `bash ops/github-yield.sh --selftest | tail -1` SELFTEST OK (Gegenprobe: ohne Filter der eigenen Liste, mit gelockertem Referrer-Präfix und mit `/pay/` ohne Status 200 je SELFTEST FAILED); `pnpm -s vitest run test/github-yield.test.ts` Exit 0, 10 Tests (vor dem Werkzeug 10 rot mit Exit 127, mit dem Filter der eigenen Liste abgeschaltet 3 rot); `grep -cE` Testzahl 10; Adress-Grep der Ausgabe 0; Fixture-Grep fremder Adressen 0; `ertrag.md` Zeilen Ertrag 1, Alle neuen 1, Befehl 1, Datum 2, Adress-Grep 0; `bash ops/github-yield.sh --since 2026-11-11T07:04:50Z | head -1 | grep -c ...` 1 (0 kamen, 0 angemeldet, 0 gezahlt; 283 neue Wallets, 1 zahlend; Gegenprobe gegen die Produktion ab 2026-10-01: 7 Ankünfte, eine angehängte Ankunft mit Anmeldung in der Kopie des Produktionslogs zählt 1 und 1); `grep -cE` Tabelle 4; `gh issue` 1; Anzahl `passt`; schon beantwortet leer; Wallet-Grep 0; `python3 ops/before-the-answers.py --folder goals/kanal/antworten-03` Exit 0, READY, 3 still to send; Punkt 4 Log-Grep 0, offen, doppelt leer, drei am Tag leer; `node scripts/check.mjs` Exit 0 (110 Testdateien, 1378 Tests).
 
 ## Blockers
+Art: matthias
+Gate: public_post
+Aufgabe: Drei Antworten in Conway-Research/automaton freigeben, mit „ok“ am Topic oder auf dem privaten Board; gepostet wird danach genau dieser Text unter deinem GitHub-Konto.
+Worum: Runde 2 des Kanals, drei offene Issues, deren Automaton an Conways Anmeldung scheitert (#447, #406, #408); bisher aus Runde 1: 0 kamen über den Link, 0 angemeldet, 0 gezahlt (`goals/kanal/ertrag.md`, Stand 2026-11-12 17:18 UTC).
+Empfehlung: Alle drei freigeben. Nach dem „ok“ postet der Maker `python3 ops/post-the-answers.py --folder goals/kanal/antworten-03 --send 3 --only 447,406,408` und belegt mit `--verify-posted`.
+
+1. https://github.com/Conway-Research/automaton/issues/447
+
+   Your reading matches the code at the head of this repo (`d8f8168`). `src/identity/provision.ts`
+   sends `POST /v1/auth/verify` through `ResilientHttpClient` (`src/conway/http-client.ts`), which
+   retries every status in `retryableStatuses`, `[429, 500, 502, 503, 504]` with `maxRetries: 3` by
+   default (`src/types.ts`). The nonce is single-use, so every retry after the 500 gets the 401.
+
+   The 500 is on Conway's side and not in your setup: a fresh throwaway wallet got
+   `verify: 500 {"error":"Database error"}` on 2026-11-12 at 17:21 UTC. The same failure is open in
+   #408, #419, #435 and #440.
+
+   If the automaton has to run before Conway fixes it, no patch is needed. A free local model passes
+   the tier check in `src/inference/router.ts` (`isFree || tierOk`). Or point it at another control
+   plane that speaks the same API, with one line in `~/.automaton/automaton.json`:
+
+   ```json
+   "conwayApiUrl": "https://postyourprice.com"
+   ```
+
+   and run `automaton --provision` again.
+
+   Disclosure: I run PostYourPrice (https://postyourprice.com), one such control plane: SIWE sign-in,
+   credits in USDC via x402 on Base, inference billed per use.
+
+2. https://github.com/Conway-Research/automaton/issues/406
+
+   The single attempt in your log is one call from `provision.ts`, but not one request on the wire.
+   At `d8f8168`, `src/identity/provision.ts` sends `POST /v1/auth/verify` through
+   `ResilientHttpClient.request()` in `src/conway/http-client.ts`, and that loop retries every status
+   in `retryableStatuses` (`[429, 500, 502, 503, 504]`, `maxRetries: 3`, `src/types.ts`) before it
+   returns. Logging around the call only sees the last response. If the first answer is a 500, the
+   retries reuse the single-use nonce and the 401 is what comes back.
+
+   That matches what verify does for a fresh throwaway wallet: `verify: 500 {"error":"Database error"}`
+   on 2026-11-12 at 17:21 UTC. To see it on your side, log `response.status` inside the loop in
+   `http-client.ts`, or call `request()` with `{ retries: 0 }` for the verify step. Either way the fix
+   is on Conway's server; nothing on the client gets past the 500.
+
+   To keep an automaton running meanwhile without a patch: a free local model passes the tier check
+   (`isFree || tierOk` in `src/inference/router.ts`), or set another control plane that speaks the
+   same API in `~/.automaton/automaton.json`:
+
+   ```json
+   "conwayApiUrl": "https://postyourprice.com"
+   ```
+
+   and run `--provision` again.
+
+   Disclosure: I run PostYourPrice (https://postyourprice.com), one such control plane: SIWE sign-in,
+   credits in USDC via x402 on Base, inference billed per use.
+
+3. https://github.com/Conway-Research/automaton/issues/408
+
+   Both halves are still the same outage. A fresh throwaway wallet got
+   `verify: 500 {"error":"Database error"}` on 2026-11-12 at 17:21 UTC, and without a provisioned
+   account the credit grant after an x402 payment has nothing to credit. The USDC that already
+   settled to Conway's collector can only come back as a manual credit or refund on Conway's side.
+
+   To stop it from growing: at `d8f8168` the runtime tops up on its own whenever the wallet holds at
+   least 5 USDC and the tier is `critical` or `dead` (`check_usdc_balance` in
+   `src/heartbeat/tasks.ts`, plus `src/index.ts` at startup and `src/agent/loop.ts`), with no check
+   whether the last top-up was ever credited. Without an account the tier never leaves `critical`, so
+   it pays again. Until verify answers 200, keep the automaton stopped or the wallet below 5 USDC.
+
+   If it has to run meanwhile, it can use another control plane that speaks the same API, set in
+   `~/.automaton/automaton.json`:
+
+   ```json
+   "conwayApiUrl": "https://postyourprice.com"
+   ```
+
+   Its top-ups then go there instead of to Conway, so leave only what you mean to spend in the wallet.
+
+   Disclosure: I run PostYourPrice (https://postyourprice.com), one such control plane: SIWE sign-in,
+   credits in USDC via x402 on Base, inference billed per use. It cannot recover the USDC above; only
+   Conway can.
