@@ -19,16 +19,11 @@
 import crypto from "node:crypto";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import { RETRIED, createFetchTap, redactor, statusOf } from "./runtime-tap.mjs";
 
-/** The statuses the runtime's HTTP client retries and counts for its circuit breaker (`src/types.ts:613` at d8f8168). */
-export const RETRIED = [429, 500, 502, 503, 504];
+export { RETRIED };
 export const WALK_FILE = "/root/sandbox-walk.txt";
 export const WALK_PORT = 8080;
-
-const statusOf = (text) => {
-  const m = /-> ([0-9]{3}):/.exec(String(text ?? ""));
-  return m ? Number(m[1]) : null;
-};
 
 /**
  * Judges one walk result; { ok: true, reasons: [] } or { ok: false, reasons }. With `ledger_rows` set (the caller
@@ -109,23 +104,19 @@ export async function runSandboxWalk({ runtimeDist, apiUrl, apiKey, name }) {
   const base = apiUrl.replace(/\/+$/, "");
   const result = { name, id: null, content: `sandbox-walk-${crypto.randomBytes(6).toString("hex")}`, steps: [] };
   let id = null;
-  const redact = (t) => (id ? String(t ?? "").split(id).join("{id}") : String(t ?? ""));
+  const redact = redactor(() => id);
 
-  const realFetch = globalThis.fetch;
-  let seen = [];
-  globalThis.fetch = async (input, init) => {
-    const res = await realFetch(input, init);
-    seen.push(res.status);
-    return res;
-  };
+  // Only answered requests count here, as before the tap was shared: a request that failed has no status.
+  const tap = createFetchTap();
+  const realFetch = tap.realFetch;
   // One client without a sandbox for the create, then one client for the new sandbox for every later step, as the
   // runtime holds one client per sandbox: the step after expose_port shows that the 409 did not open its breaker.
   const tool = async (stepName, toolName, args, conway, sandboxId) => {
-    seen = [];
+    tap.reset();
     const ctx = { conway, identity: { sandboxId } };
     const r = await executeTool(toolName, args, createBuiltinTools(sandboxId), ctx);
     const text = r.error ? r.error : r.result;
-    const http = seen.slice();
+    const http = tap.take().filter((h) => typeof h === "number");
     const status = r.error ? statusOf(r.error) ?? http[http.length - 1] ?? null : http[http.length - 1] ?? null;
     return { step: stepName, tool: toolName, status, http, text, error: Boolean(r.error) };
   };
@@ -156,7 +147,7 @@ export async function runSandboxWalk({ runtimeDist, apiUrl, apiKey, name }) {
   } finally {
     if (id) {
       // deleteSandbox is a no-op at the pin, so the walk deletes the way the own live check does: plain HTTP.
-      seen = [];
+      tap.reset();
       let status = null;
       try {
         const res = await realFetch(`${base}/v1/sandboxes/${id}`, {
@@ -173,7 +164,7 @@ export async function runSandboxWalk({ runtimeDist, apiUrl, apiKey, name }) {
       const after = await tool("list_after_delete", "list_sandboxes", {}, client ?? createConwayClient({ apiUrl: base, apiKey, sandboxId: id }), id);
       push({ ...after, listed: isListed(after) });
     }
-    globalThis.fetch = realFetch;
+    tap.restore();
   }
   return result;
 }
