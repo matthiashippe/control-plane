@@ -41,12 +41,17 @@ vm_stats=$("${SSH[@]}" 'cd /opt/control-plane/repo/deploy && printf "%s|%s|%s|%s
   "$(docker system df --format "{{.Type}}={{.Size}}" 2>/dev/null | paste -sd, -)" \
   "$(docker exec deploy-caddy-1 stat -c %s /var/log/caddy/access.log 2>/dev/null || echo 0)"' 2>/dev/null)
 db_json=$("${SSH[@]}" 'cd /opt/control-plane/repo/deploy && docker compose -f docker-compose.prod.yml exec -T cp node -' < "$DIR/db-report.cjs" 2>/dev/null)
+# Is the alarm path alive? ops/watchdog.sh writes `[WARN] webhook unreachable` for every failed POST to the webhook, and the
+# credit warning hangs on that same path. The count runs on the server (the log lives there); CP_WATCHDOG_LOG does not travel
+# over ssh, so there the default path applies. Any exit other than 0 (no answer, no log) is "unknown", never a zero.
+alarm_count=$("${SSH[@]}" 'bash -s' < "$DIR/webhook-unreachable.sh" 2>/dev/null)
+alarm_rc=$?
 or_json=$(curl -s -m 10 https://openrouter.ai/api/v1/credits -H "Authorization: Bearer ${OPENROUTER_API_KEY:-none}" 2>/dev/null)
 payto_hex=$(curl -s -m 10 -X POST https://mainnet.base.org -H 'content-type: application/json' \
   --data '{"jsonrpc":"2.0","id":1,"method":"eth_call","params":[{"to":"0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913","data":"0x70a08231000000000000000000000000914102284463F4F58B1D2f6DB9aC80BFcaA7d614"},"latest"]}' 2>/dev/null)
 
 HEALTH_CODE="$health_code" HEALTH_BODY="$health_body" CERT_END="$cert_end" VM_STATS="$vm_stats" \
-DB_JSON="$db_json" OR_JSON="$or_json" PAYTO_HEX="$payto_hex" python3 <<'PY'
+DB_JSON="$db_json" OR_JSON="$or_json" PAYTO_HEX="$payto_hex" ALARM_COUNT="$alarm_count" ALARM_RC="$alarm_rc" python3 <<'PY'
 import os, json, datetime
 def j(s, default=None):
     try: return json.loads(s)
@@ -79,6 +84,12 @@ if len(parts) >= 5:
         "docker": parts[6] if len(parts) > 6 else "",
         "access_log_mb": round(num(parts[7]) / 1048576, 1) if len(parts) > 7 else None,
     }
+# Three lines in 24 hours are fifteen minutes in which no alarm reached anybody (one retry per five-minute run).
+alarm_count = None
+if os.environ.get("ALARM_RC") == "0" and os.environ.get("ALARM_COUNT", "").strip().isdigit():
+    alarm_count = int(os.environ["ALARM_COUNT"].strip())
+alarm_path = {"unreachable_24h": alarm_count,
+              "status": "unknown" if alarm_count is None else ("red" if alarm_count >= 3 else "ok")}
 orc = j(os.environ.get("OR_JSON", ""), {}) or {}
 ord_ = orc.get("data", {})
 payto = None
@@ -88,6 +99,7 @@ print(json.dumps({
     "at": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
     "health": {"status": int(os.environ.get("HEALTH_CODE", 0)), "body": os.environ.get("HEALTH_BODY", "")},
     "cert_days_left": cert_days,
+    "alarm_path": alarm_path,
     "vm": vm,
     "db": j(os.environ.get("DB_JSON", ""), {}),
     "openrouter": {"credits": ord_.get("total_credits"), "usage": round(ord_.get("total_usage", 0), 4),

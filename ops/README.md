@@ -42,6 +42,7 @@ local start and does not replace the run against the real endpoint.
 | `vm.disk_used` | above 80 % | rotate the logs (json-file max 20m x 5), check for old images |
 | `db.day.margin_mc` | negative | the sale price does not cover the purchase: check markup or catalogue |
 | `db.paying_without_thinking` | one entry older than 24 h | a customer paid and buys no inference. No alarm, but go and look |
+| `alarm_path.status` | `red` (3 or more `[WARN] webhook unreachable` in 24 h) | no alarm reaches anybody: post to the webhook by hand, compare URL and topic in the crontab of the VM with `CP_ALERT_WEBHOOK` in `~/brain/connectors/secrets.env`, never write the URL into a file of this repo. `unknown` (log not read) is no alarm, but two runs in a row are a finding like a missing `vm` block |
 
 ### Paying without thinking
 
@@ -84,6 +85,11 @@ reads the messages along with us and can send some of their own. It lives in
 
 Checked on 19.09.2026: a simulated outage (`CP_URL` pointed at a 404 path) triggered a message with
 priority `high` from the VM that was readable over ntfy.
+
+A dead alarm path does not announce itself over the alarm path. Every failed POST leaves a line
+`[WARN] webhook unreachable` in `/var/log/cp-watchdog.log`, and `ops/status.sh` counts those of the
+last 24 hours on the VM (`ops/webhook-unreachable.sh`, sent over ssh) into `alarm_path`: from 3 on
+the status is `red`, see the thresholds above.
 
 ## Backup
 
