@@ -1,0 +1,6 @@
+Schwere: 3
+Goal: betrieb 04
+Befund: Ob Caddy eine Anfrage am Neustart wirklich hält, belegt nur Fremdverkehr, der zufällig in die Sekunden nach dem Start fällt; in den zwei Fenstern nach betrieb 02 kam dort keine einzige Anfrage von außen, und der Rauchtest von `deploy.yml` fragt erst, wenn `cp` schon wieder antwortet.
+Beleg: Zugriffslog, Anfragen von außen mit `ts` bis 10 s nach dem Start: 0 um 2026-11-13 00:48:29 und 0 um 09:55:22; die eigenen Anfragen des Rollouts beginnen 7,7 und 13,2 s nach dem Start, keine länger als 0,11 s | .github/workflows/deploy.yml:164, deploy/Caddyfile:31
+Empfehlung: Ein Goal betrieb lässt den Rollout selbst eine Probe durch Caddy schicken, die vor dem Neustart von `cp` startet und in den Sekunden danach alle 250 ms `GET /health` fragt; jede Antwort muss 200 sein, mindestens eine muss länger als 0,5 s gehalten worden sein, sonst meldet der Schritt den Rollout als nicht belegt. Damit ist der Retry an jedem Rollout belegt statt nur an Fremdverkehr. Test mit nachgebautem Zugriffslog rot vor dem Bau.
+MVP: Funktion, weil zahlende Automatons an jedem Rollout erst dann sicher keinen Fehler sehen, wenn jemand den Neustart aktiv prüft statt auf Zufall zu warten.
