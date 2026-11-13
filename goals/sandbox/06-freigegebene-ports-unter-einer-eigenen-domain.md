@@ -1,7 +1,7 @@
 # Sandbox Goal 06: Freigegebene Ports unter einer eigenen Domain
 
 ## Status
-PLANNED
+BLOCKED fachlich
 
 ## Active Objective
 Ein fremder Automaton gibt einen Port seiner Sandbox mit `expose_port` frei und bekommt eine öffentliche Adresse
@@ -178,5 +178,24 @@ uns) bleibt unerreichbar. Die eigene Domain hält eine Phishing-Seite eines Kund
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-13 Zyklus 1: Punkt 1 gemessen und widerlegt, Punkte 2 bis 10 nach der Goal-Datei nicht gebaut: `ops/ports-demand.sh` (Commit 0ce27f0) zählt seit dem Start des Deploy-Laufs von sandbox 03 (PR #36, 2026-11-12 18:12:46 UTC) 0 fremde Adressen mit 409 auf `ports/expose` und 0 Aufrufe, gemessen 2026-11-13 12:38 UTC; die einzige 409 im Log kam vom code-host selbst, und seit dem Rollout rief keine fremde Adresse irgendeinen Pfad unter `/v1/sandboxes` auf. Prüfbefehle: P1 `ops/ports-demand.sh --selftest` Exit 0 mit `PORTS DEMAND SELFTEST OK` (vorher rot: fünf Mutationen am Zähler, je `PORTS DEMAND SELFTEST FAILED`), Zeile in `docs/sandbox/ports.md` 0 (Datei nicht angelegt, weil n 0 ist), Reihenfolge Exit 0; P2 0; P3 bis P8 rot wie vor dem Goal (kein Kauf, kein Bau); P9 und P10 nach dem Zurücksetzen grün, Ergebnis im Kommentar des Childs.
+- 2026-11-13 Zyklus 2: Abschluss gemeldet, Punkte keine, das Goal bleibt `BLOCKED fachlich` (Nachfrage 0), aktuelles `dev` eingemergt, der Branch trägt gegenüber `dev` nur die Goal-Datei. Prüfbefehle: P1 Selftest rot (Werkzeug nach dem Zurücksetzen nicht auf dem Branch, liegt in 0ce27f0), P1 Zeile und Zahl rot (keine `docs/sandbox/ports.md`), P2 0, P3 bis P8 rot wie vor dem Goal, P9 Annahmen 0 (kein Abschnitt `## Goal 06`), Pfade 0, Schlüssel 0 und 0, P10 `check` Exit 0 (grün in 50 s).
+- 2026-11-13 Zyklus 3: Abschluss gemeldet, Punkte keine, Antwort auf das REJECT der Linse K aus Zyklus 2 (`verdicts/06-z2-K.md`): die Befunde 1 bis 10 sind die roten Punkte 1 bis 9 eines widerlegten Goals, ein Bauzyklus ändert sie nach „Kontext für den Maker“ nicht. Aktuelles `dev` eingemergt, der Branch trägt gegenüber `dev` nur Goal-Datei und Verdict. Nachfrage neu gemessen: `ops/ports-demand.sh` aus 0ce27f0 im Scratch-Verzeichnis, `--selftest` ergibt `PORTS DEMAND SELFTEST OK`, live `--since "2026-11-12 18:12:46"` ergibt `PORTS DEMAND: 0 foreign addresses, 0 calls` (2026-11-13 13:22 UTC). Prüfbefehle: P1 bis P9 rot wie in Zyklus 2, P10 `PATH=/usr/bin:$PATH node scripts/check.mjs` Exit 0 (grün in 52 s).
+- 2026-11-13 Zyklus 4: Abschluss gemeldet, Punkte keine, Antwort auf das REJECT der Linse K aus Zyklus 3 (`verdicts/06-z3-K.md`): Befunde 1 und 2 behoben, die Zeile für Zyklus 3 stand mitten in „Kontext für den Maker“ und steht jetzt hier, der Abschnitt ist wieder Wort für Wort wie auf `dev`. Aktuelles `dev` eingemergt. Befunde 3 bis 12 sind die roten Punkte 1 bis 9 wie in Zyklus 3, Nachfrage weiter 0. Prüfbefehle: `goalDrift` gegen `origin/dev` [], `readGoalHead` progress 4, P10 `PATH=/usr/bin:$PATH node scripts/check.mjs` Exit 0 (grün in 167 s).
 
 ## Blockers
+Art: fachlich
+Grund: Die Messung aus Punkt 1 widerlegt das Goal (fremde Adressen mit 409 auf `ports/expose` seit dem Rollout von sandbox 03: 0, Aufrufe: 0). Nach „Kontext für den Maker“ heißt das: kein Kauf, kein Bau.
+Landung: `loop-master gate` erlässt die Verdict-Regel nur mit Breaker. Weiter geht es über den Vorschlag in PR #87 (neues Kettenglied ohne Mindestzahl) oder den Breaker nach `cycles_per_goal`.
+
+## Ehrliche Lücken
+- Punkt 1: Werkzeug gebaut und in beide Richtungen bewiesen, die Zahl ist 0 statt mindestens 1. Befehl vom code-host mit `~/.config/control-plane/loop.env`: `bash ops/ports-demand.sh --since '2026-11-12 18:12:46'` -> `PORTS DEMAND: 0 foreign addresses, 0 calls, since 2026-11-12 18:12:46 UTC` (2026-11-13 12:38 UTC). Gegenprobe am echten Log: dieselbe Datei mit `--log` und leerer Liste der live gesehenen eigenen Adressen ergibt 1 Adresse, 1 Aufruf, also sieht das Werkzeug die Zeile und ordnet sie dem code-host zu. Das Log reicht bis 2026-10-01 zurück; in dieser Zeit rief keine fremde Adresse `ports/expose` auf. `docs/sandbox/ports.md` ist deshalb nicht angelegt. Das Werkzeug liegt in Commit 0ce27f0 auf diesem Branch (`git show 0ce27f0:ops/ports-demand.sh`) und landet nach der Regel für `BLOCKED fachlich` nicht auf `dev`; der Writer hängt das Glied neu an, sobald es eine fremde Adresse zeigt.
+- Punkt 2: kein Vorschlag der Domain, weil ohne Nachfrage kein Kauf vorbereitet wird.
+- Punkt 3: kein Human Gate `server_kauf`, Matthias bekommt keine Karte.
+- Punkt 4: Sandbox-Server unverändert (`tls internal`, Block `*.postyourprice.com`), nichts gebaut.
+- Punkt 5: Eintrag `*.postyourprice.com` nicht gelöscht; `curl https://sbx-zz9-8080.postyourprice.com/` antwortet heute `404 0`, der Name löst also auf. Das Risiko aus `goals/_vorschlaege/sandbox-kritik-2026-11-12-2.md` (Dienst eines Kunden in der Zone der Zahlung) besteht erst, wenn das Control Plane Ports freigibt, und das tut es weiter nicht (409).
+- Punkt 6: Control Plane antwortet weiter 409 `port_exposure_unavailable`, nichts gebaut.
+- Punkt 7: Harness unverändert, erwartet weiter 409.
+- Punkt 8: `ops/live.sh` unverändert.
+- Punkt 9: keine Entscheidung zu Domain, Registrar und Token getroffen, darum kein Abschnitt `## Goal 06` in `goals/sandbox/ANNAHMEN.md`; der Branch trägt nach dem Zurücksetzen nur die Goal-Datei.
+- Punkt 10: `check` am Kopf des Branches, Ergebnis im Kommentar des Childs.
