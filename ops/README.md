@@ -837,3 +837,34 @@ Exit codes: 0 fresh, 1 something is stale and is named with its age, 2 the VM di
 is explicitly not a statement about the service.
 
 `CP_MAX_AGE_HOURS` moves the limit, which is also how the failing path was checked.
+
+## Public addresses in this repository
+
+The repository is public, and an address from the access log can be a real visitor. `ops/known-ips.txt` is the list of public
+IPv4 addresses a tracked file may carry besides `ops/own-ips.txt` (our machines, appended by `ops/own-ips.sh`) and
+`ops/crawler-ips.txt` (crawlers). One line per address: the address, its kind and the evidence, separated by single spaces.
+
+| kind | evidence |
+|---|---|
+| `datacenter` | the operator, from the cache of `ops/fetchers.py` (`fetcher-cache`) or from the lookup the line names |
+| `crawler` | the PTR name, proven by the DNS round trip of `ops/crawlers.sh` |
+| `eigene` | which of our machines, and the file that names it (payment server, sandbox server in `docs/sandbox/server.md`) |
+| `erfunden` | the commit that brought it as a test value; only for an address left in a file a goal may not change (a DONE goal file, a verdict, `docs/audit/`) |
+
+`test/known-ips.test.ts` reads the three lists and every file in `git ls-files`, without the cache and without network, and fails
+`check` for any public address outside `192.0.2.0/24`, `198.51.100.0/24` and `203.0.113.0/24` that none of them names. The message
+gives the count and the files, never an address. A new address in a fixture, a comment or a test is therefore either replaced by a
+documentation address (the same replacement in every file, so a fixture behaves as before) or listed with its evidence; an invented
+one is always replaced, because "invented" cannot be checked. `CP_KNOWN_IPS` reads another list (`/dev/null` is an empty one),
+`CP_SCAN_ROOT` scans another git work tree; both exist for the counter-test in both directions.
+
+The same test keeps the rules of the list itself, so they hold after the goal that brought them: every line has the form
+`<address> <kind> <evidence>` with one of the four kinds and an evidence, an address of kind `erfunden` stands only in paths no goal
+may change (`goals/`, `docs/audit/`, `LOOP.md`, `loop-constraints.md`, `loop-dauerauftrag.md`, `.github/`, `deploy/`, `harness/`),
+and every entry still stands in a tracked file besides the list. An entry whose finding is gone is removed, otherwise the list
+would let a later visitor with the same address through. Findings are the tracked files of the scan root and of the work tree
+that tracks the list; the message names the count and the line numbers or files, never an address.
+
+Three /24 networks are all the documentation ranges offer. A fixture with more foreign /24 networks than that keeps the behaviour
+that depends on them (no address shares its /24 with two others unless it did before), but the summary "N address(es) in M
+network(s)" of `ops/traffic.sh` names fewer networks than before.

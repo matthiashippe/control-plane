@@ -51,3 +51,33 @@
   einmal; nach einem erfolgreichen POST gilt wieder höchstens eine am Tag.
 - Der Fake für `curl` im neuen Test scheitert mit Exit 22, dem Code von `curl --fail` bei einer Antwort 4xx oder 5xx. Der alte
   Watchdog gab `--fail` nicht mit, dem Fake ist das gleich; die Gegenprobe gegen `5458fa3` misst also nur das Speichern des Zustands.
+
+## fehler 04 (12.11.2026, Engineer CP)
+
+- `ops/traffic.sh` legt eine Adresse beiseite, deren /24 im Log drei oder mehr Adressen hat. Die Dokumentationsbereiche haben nur drei
+  /24-Netze, deshalb sind die Ersatzadressen nicht der Reihe nach vergeben, sondern so auf die drei Netze verteilt, dass in jeder
+  Fixture jede Adresse dieselbe Antwort auf „drei oder mehr aus ihrem /24“ bekommt wie vorher (die sechs Adressen des Scanners teilen
+  weiter ein Netz). Gemessen über alle Fixtures von `ops/traffic.sh` mit Adressen als `X` und zusammengezogenen Leerzeichen: gleiche
+  Ausgabe bis auf die Zusammenfassung „N address(es) in M network(s)“ in drei Fixtures mit vier oder neun fremden Netzen, die mit drei
+  Netzen nicht darstellbar sind. Der Selbsttest von `ops/traffic.sh` und die Fixtures von `ops/depth.sh` sind gleich.
+- Versionen in Browserkennungen der Fixtures (`Chrome/<n>.0.0.0`) sehen für die Regex des Tests aus wie öffentliche Adressen. Sie sind
+  auf vierteilige Versionen mit vierstelligem dritten Teil umgestellt (Form echter Chrome-Builds); kein Skript liest die Version, und
+  jede Version bekommt genau einen Ersatz, damit gleiche Kennungen gleich bleiben.
+- Ein Kommentar in `ops/fetchers.py` nannte den PTR einer GCP-Adresse, dessen Anfang die Oktette rückwärts als eigene Adresse
+  enthielt; er nennt jetzt nur die Domain.
+- Die beiden öffentlichen DNS-Resolver (Cloudflare, Quad9) stehen als `datacenter` mit dem PTR aus der Abfrage durch `ops/fetchers.py` in der Liste, weil sie als
+  Resolver der Sandboxes in Goal-Dateien, Verdicts und `ANNAHMEN.md` des Topics sandbox stehen; die Ersetzung lässt sie überall
+  unverändert, auch dort, wo ein Selbsttest sie als Besucher nutzt.
+- Eine Adresse eines Contabo-Servers steht in den Momentaufnahmen des x402-Verzeichnisses unter `docs/research/data/` als Host eines öffentlichen Dienstes;
+  der Betreiber kommt aus RDAP von RIPE, weil der Cache von `ops/fetchers.py` ihn nicht als Rechenzentrum erkennt.
+- Der Absatz in `ops/README.md` ist Englisch wie die ganze Datei.
+- Falle: Eine Abfrage mit `ops/fetchers.py` schreibt jede Adresse in den gemeinsamen Cache, auch eine, die kein Rechenzentrum ist, und
+  `test/visitor-addresses.test.ts` aus fehler 02 hält jede solche Adresse für einen Besucher, ohne `ops/known-ips.txt` zu lesen. Die
+  acht Abfragen dieses Laufs machten den Test auf dem code-host rot; die acht Zeilen, die nur dieser Lauf geschrieben hatte, sind
+  wieder aus dem Cache genommen (Datei bleibt, 960 Zeilen wie vorher, atomar per rename), danach ist der Test grün. Für eine
+  Abfrage ohne Cache-Eintrag `CP_FETCHER_CACHE` auf eine Datei aus `mktemp` setzen.
+- Kritik-Punkte 5 und 6 (Zyklus 3): Fundstellen für `erfunden` und für einen Eintrag ohne Fundstelle sind die getrackten Dateien von
+  `CP_SCAN_ROOT` und die des Work Trees, der die Liste trackt (`git ls-files --error-unmatch`), die Liste selbst ausgenommen. Nur
+  `CP_SCAN_ROOT` hätte Prüfbefehl 4 von Punkt 2 rot gemacht (Wegwerf-Repo mit der echten Liste, Erwartung `gruen`), weil dort keiner
+  der 13 Einträge steht; eine Liste aus `mktemp` liegt in keinem Work Tree und hat nur `CP_SCAN_ROOT`, wie die Prüfbefehle von
+  Punkt 5 und 6 es verlangen.

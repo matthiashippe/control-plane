@@ -151,7 +151,7 @@ def main() -> int:
         cache = {}
         planted = {
             "52.16.245.145": "datacenter",   # AWS, in our own log since 19.09.
-            "34.116.134.70": "datacenter",    # GCP, 70.134.116.34.bc.googleusercontent.com
+            "34.116.134.70": "datacenter",    # GCP, PTR under bc.googleusercontent.com
             "192.0.2.64": "unknown",       # documentation address standing in for the Swiss line that read the page after issue #392; no PTR
         }
         bad = 0

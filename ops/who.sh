@@ -3,7 +3,7 @@
 #
 #   ops/who.sh 203.0.113.7
 #   ops/who.sh --selftest
-#   CP_WHO_LOG=file ops/who.sh 1.2.3.4
+#   CP_WHO_LOG=file ops/who.sh 198.51.100.117
 #
 # The standing order says to look at the referrer on the FIRST request of a new address, because
 # that is the evidence for whether the issue answers are the channel. Doing that by hand took a
@@ -29,17 +29,17 @@ DIR="$(cd "$(dirname "$0")" && pwd)"
 if [ "${1:-}" = "--selftest" ]; then
   fixture="$(mktemp)"
   cat > "$fixture" <<'JSON'
-{"ts":1758594174,"request":{"remote_ip":"1.1.1.1","uri":"/fix","headers":{"User-Agent":["Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36"],"Accept":["*/*"]}},"status":200}
-{"ts":1758594175,"request":{"remote_ip":"2.2.2.2","uri":"/","headers":{"User-Agent":["Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:143.0) Gecko/20100101 Firefox/143.0"],"Accept":["text/html,application/xhtml+xml"],"Accept-Language":["de-DE,de;q=0.9"],"Sec-Fetch-Dest":["document"],"Referer":["https://github.com/Conway-Research/automaton/issues/392"]}},"status":200}
-{"ts":1758594200,"request":{"remote_ip":"2.2.2.2","uri":"/px/top.png","headers":{"User-Agent":["Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:143.0) Gecko/20100101 Firefox/143.0"]}},"status":200}
-{"ts":1758594260,"request":{"remote_ip":"2.2.2.2","uri":"/px/proof.png","headers":{"User-Agent":["Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:143.0) Gecko/20100101 Firefox/143.0"]}},"status":200}
+{"ts":1758594174,"request":{"remote_ip":"1.1.1.1","uri":"/fix","headers":{"User-Agent":["Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.7258.155 Safari/537.36"],"Accept":["*/*"]}},"status":200}
+{"ts":1758594175,"request":{"remote_ip":"192.0.2.126","uri":"/","headers":{"User-Agent":["Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:143.0) Gecko/20100101 Firefox/143.0"],"Accept":["text/html,application/xhtml+xml"],"Accept-Language":["de-DE,de;q=0.9"],"Sec-Fetch-Dest":["document"],"Referer":["https://github.com/Conway-Research/automaton/issues/392"]}},"status":200}
+{"ts":1758594200,"request":{"remote_ip":"192.0.2.126","uri":"/px/top.png","headers":{"User-Agent":["Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:143.0) Gecko/20100101 Firefox/143.0"]}},"status":200}
+{"ts":1758594260,"request":{"remote_ip":"192.0.2.126","uri":"/px/proof.png","headers":{"User-Agent":["Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:143.0) Gecko/20100101 Firefox/143.0"]}},"status":200}
 JSON
   echo "--- the fetcher wearing a browser name ---"
   a="$(CP_WHO_LOG="$fixture" "$0" 1.1.1.1 2>&1)"
   echo "$a"
   echo
   echo "--- the reader who scrolled ---"
-  b="$(CP_WHO_LOG="$fixture" "$0" 2.2.2.2 2>&1)"
+  b="$(CP_WHO_LOG="$fixture" "$0" 192.0.2.126 2>&1)"
   echo "$b"
   rm -f "$fixture"
   echo
