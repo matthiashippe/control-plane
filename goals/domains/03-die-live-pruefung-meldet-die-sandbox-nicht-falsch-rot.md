@@ -1,7 +1,7 @@
 # Domains Goal 03: Die Live-Prüfung meldet die Sandbox nicht falsch rot und lässt keinen Schlüssel liegen
 
 ## Status
-PLANNED
+ACTIVE
 
 ## Active Objective
 `ops/live.sh` wartet nach einem neuen Client-Schlüssel (`changed=1` von `ops/sandbox/setup.sh --client-key`), bis ein
@@ -57,22 +57,22 @@ Kontos als Datei in `/tmp` des code-host liegen lässt.
   neu ist.
 
 ## Done Condition
-- [ ] Der Selbsttest prüft das Warten in beide Richtungen: der echte `sandbox_live` wartet nach `changed=1` mehr als 60 s und nach
+- [x] Der Selbsttest prüft das Warten in beide Richtungen: der echte `sandbox_live` wartet nach `changed=1` mehr als 60 s und nach
       `changed=0` nicht, ein Anlegen direkt nach `changed=1` und eines nach genau 60 s sind FAIL.
       Prüfung: `bash ops/live.sh --selftest` muss Exit-Code 0 haben und als letzte Zeile `LIVE SELFTEST OK` ausgeben.
       Prüfung: `bash ops/live.sh --selftest | grep -cE '^planted sandbox-wait (new-key|old-key): OK '` muss `2` ausgeben.
       Prüfung: `bash ops/live.sh --selftest | grep -cE '^planted sandbox-wait (no-wait|short): FAIL '` muss `2` ausgeben.
-- [ ] Die Wartezeit hängt an `RECHECK_MS`: ein vitest-Test liest beide Zahlen und verlangt, dass die Wartezeit größer ist als
+- [x] Die Wartezeit hängt an `RECHECK_MS`: ein vitest-Test liest beide Zahlen und verlangt, dass die Wartezeit größer ist als
       `RECHECK_MS / 1000`.
       Prüfung: `pnpm -s vitest run test/live-selftest.test.ts -t "RECHECK_MS"` muss Exit-Code 0 haben und mindestens einen Test als passed zählen.
-- [ ] Ein mit `kill -TERM` abgebrochener Lauf lässt keine Datei liegen, weder während der Domain-Suche noch während des Anlegens der
+- [x] Ein mit `kill -TERM` abgebrochener Lauf lässt keine Datei liegen, weder während der Domain-Suche noch während des Anlegens der
       Sandbox, und eine liegen gebliebene Datei ist FAIL.
       Prüfung: `bash ops/live.sh --selftest | grep -cE '^planted key-cleanup (term-search|term-sandbox): OK '` muss `2` ausgeben.
       Prüfung: `bash ops/live.sh --selftest | grep -c '^planted key-cleanup leftover: FAIL '` muss `1` ausgeben.
       Prüfung: `t="$(mktemp -d)"; TMPDIR="$t" bash ops/live.sh --selftest >/dev/null; echo "left=$(find "$t" -mindepth 1 | wc -l)"; rm -rf "$t"` muss `left=0` ausgeben.
-- [ ] Der Live-Lauf bleibt grün, lässt in seinem `TMPDIR` nichts liegen und gibt den Schlüssel nie aus.
+- [x] Der Live-Lauf bleibt grün, lässt in seinem `TMPDIR` nichts liegen und gibt den Schlüssel nie aus.
       Prüfung (Netz): `t="$(mktemp -d)"; k="$(sed -n 's/^LIVE_SANDBOX_KEY=//p' ~/.config/control-plane/live-sandbox.env | head -n 1 | tr -d "\"'\r")"; out="$(TMPDIR="$t" bash ops/live.sh 2>&1)"; echo "ok=$(grep -c '^OK sandbox: ' <<<"$out") live=$(tail -n 1 <<<"$out") left=$(find "$t" -mindepth 1 | wc -l) key=$(grep -cF -- "$k" <<<"$out")"; rm -rf "$t"` muss `ok=1 live=LIVE OK left=0 key=0` ausgeben.
-- [ ] `check` ist grün.
+- [x] `check` ist grün.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
 - [ ] goal-verifier PASS (K und B)
 
@@ -91,5 +91,6 @@ Kontos als Datei in `/tmp` des code-host liegen lässt.
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-13 Zyklus 1: Punkte 1, 2, 3, 4, 5 gebaut: `sandbox_live` wartet nach `SETUP CLIENT-KEY OK changed=1` `CLIENT_KEY_WAIT_S=75` Sekunden über `live_wait` vor dem Anlegen, `setup.sh` ist über `CLIENT_KEY_SETUP` ersetzbar, `live()` legt alle Dateien samt Schlüssel-Headern in einen Ordner aus `mktemp -d` (auch als `TMPDIR`), den `trap` auf EXIT, INT und TERM löscht; Selbsttest-Fälle `sandbox-wait` (new-key, old-key, no-wait, short) durch den echten `sandbox_live` und `key-cleanup` (term-search, term-sandbox als eigene Prozessgruppe mit `kill -TERM`, leftover), vitest-Test `RECHECK_MS`. Rot vorher: Selbsttest ohne die Zeile `live_wait` mit `new-key: FAIL` (created 0 s), ohne `trap` mit `term-search` 3 und `term-sandbox` 4 liegen gebliebenen Dateien, mit Warten auch bei `changed=0` `old-key: FAIL`, jeweils `LIVE SELFTEST FAIL`; vitest `RECHECK_MS` gegen das alte `ops/live.sh` und mit `CLIENT_KEY_WAIT_S=60` je 1 failed. Prüfbefehle (Node 22, Last um 110): P1 `--selftest` Exit 0, letzte Zeile `LIVE SELFTEST OK`, `sandbox-wait` OK 2, FAIL 2; P2 `vitest -t "RECHECK_MS"` 1 passed Exit 0; P3 `key-cleanup` OK 2, leftover FAIL 1, `left=0`; P4 (Netz) `ok=1 live=LIVE OK left=0 key=0` (Schlüssel 39 Zeichen, Gegenprobe mit gepflanztem Schlüssel zählt 1); P5 `node scripts/check.mjs` Exit 0 (1628 Tests, 446 s).
 
 ## Blockers

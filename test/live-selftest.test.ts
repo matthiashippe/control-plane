@@ -50,9 +50,34 @@ describe("ops/live.sh", () => {
     expect(run.stdout).toContain(
       "planted sandbox 'client_key=ok ctl=200 create=201 exec=ok files=ok delete=200 ledger=1': FAIL sandbox: background exec did not run",
     );
+    expect(run.stdout).toMatch(/^planted sandbox-wait new-key: OK sandbox-wait: created [0-9]+ s after a new client key/m);
+    expect(run.stdout).toContain("planted sandbox-wait old-key: OK sandbox-wait: created at once");
+    expect(run.stdout).toMatch(/^planted sandbox-wait no-wait: FAIL sandbox-wait: created 0 s after a new client key/m);
+    expect(run.stdout).toMatch(/^planted sandbox-wait short: FAIL sandbox-wait: created 60 s after a new client key/m);
+    expect(run.stdout).toContain("planted key-cleanup term-search: OK key-cleanup: TMPDIR empty after kill -TERM");
+    expect(run.stdout).toContain("planted key-cleanup term-sandbox: OK key-cleanup: TMPDIR empty after kill -TERM");
+    expect(run.stdout).toMatch(/^planted key-cleanup leftover: FAIL key-cleanup: 1 files left/m);
     expect(run.stdout.trim().split("\n").at(-1)).toBe("LIVE SELFTEST OK");
     expect(run.status).toBe(0);
   }, 300_000);
+});
+
+/**
+ * After a new client key the check `sandbox` waits CLIENT_KEY_WAIT_S before it creates (goals/domains/03), because the
+ * service answers POST /v1/sandboxes with 501 at once for RECHECK_MS after its last failed call to sandboxd. Both numbers
+ * are read from their files, so a longer RECHECK_MS cannot make the live check falsely red again unnoticed.
+ */
+describe("ops/live.sh wait after a new client key", () => {
+  it("waits longer than RECHECK_MS of src/sandbox/service.ts", () => {
+    const wait = readFileSync(LIVE_SH, "utf8").match(/^CLIENT_KEY_WAIT_S=([0-9]+)$/m);
+    if (!wait) throw new Error("ops/live.sh has no CLIENT_KEY_WAIT_S");
+    const recheck = readFileSync(join(__dirname, "..", "src", "sandbox", "service.ts"), "utf8").match(/const RECHECK_MS = ([0-9_]+);/);
+    if (!recheck) throw new Error("src/sandbox/service.ts has no RECHECK_MS");
+    const waitS = Number(wait[1]);
+    const recheckMs = Number(recheck[1].replace(/_/g, ""));
+    expect(recheckMs).toBeGreaterThan(0);
+    expect(waitS).toBeGreaterThan(recheckMs / 1000);
+  });
 });
 
 /**
