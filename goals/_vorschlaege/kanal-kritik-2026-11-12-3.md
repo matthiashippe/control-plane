@@ -4,3 +4,4 @@ Befund: `ops/github-yield.sh` zählt jede Ankunft mit Referrer `https://github.c
 Beleg: `funnel()` in `ops/github-yield.sh` prüft nur das Präfix des Referrers; der Pfad `/issues/<n>` wird nicht gelesen. `ops/posted-answers.log` trägt seit Zyklus 2 sechs Einträge nach 2026-11-11.
 Empfehlung: Im Glied mit dem Urteil am 2026-11-25 eine Zeile je Issue-Nummer aus dem Referrer-Pfad (`ISSUE <n>: <a> arrived, <b> signed in, <c> paid`), nur Summen, und die Regel an die Nummern der Runde binden statt an den Zeitraum. Fixture: eine Ankunft über #434 mit Anmeldung und eine über #447 mit Anmeldung, jede zählt nur in ihrer Zeile.
 MVP: Funktion, weil das Urteil sonst die zwei Runden vermischt und über einen Kanal entscheidet, dessen Wirkung je Antwort niemand kennt.
+Übernommen: Triage-Glieder 13.11. an den Tech Lead, Glied 7 (Ertrag je Issue-Nummer vor dem Urteil am 25.11.) (2026-11-13)

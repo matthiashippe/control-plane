@@ -6,3 +6,4 @@ Empfehlung: Zeile 48 streichen und `--help` auf `sed -n '2,45p'` setzen oder den
 MVP: Schönheit
 
 Linse Q, Frage 3 (tote Pfade, ungenutzte Variablen). `ROOT` wird vor `set -a` gesetzt, also auch nicht exportiert, und weder `calc` noch `production` noch `selftest` lesen es. Die abgeschnittene Hilfe sieht man mit `bash ops/abort-purchase.sh --help | tail -2` (am Merge 24cc376): nach dem Satz zu `purchase without sale` folgt nur eine Leerzeile, der Absatz „The provider is asked once …“ kommt nicht mehr.
+Verworfen: Schwere 1, ungenutzte Variable und gekürzte Hilfe ohne Wirkung beim Kunden (2026-11-13)
