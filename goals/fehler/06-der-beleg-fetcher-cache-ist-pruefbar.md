@@ -1,7 +1,7 @@
 # Fehler Goal 06: Der Beleg (fetcher-cache) in ops/known-ips.txt ist prüfbar
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Eine Zeile `<Adresse> datacenter <Betreiber> (fetcher-cache)` in `ops/known-ips.txt` erlaubt einer öffentlichen Adresse, in einer
@@ -82,7 +82,7 @@ Besucheradresse im öffentlichen Repo Grundregel 8 bricht.
 - [x] Nur die Testdatei, die Liste, `ops/README.md` und Dateien des Goals ändern sich, und `check` ist grün.
       Prüfung: `git diff --name-only origin/dev...HEAD | grep -vE '^(test/known-ips\.test\.ts|ops/known-ips\.txt|ops/README\.md|goals/fehler/)' | wc -l` muss 0 ausgeben.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Die Zeile im Progress Log nennt die Gegenprobe: alte Testdatei mit gepflanzter Besucheradresse grün, neue rot.
@@ -106,5 +106,6 @@ Besucheradresse im öffentlichen Repo Grundregel 8 bricht.
 ## Progress Log
 - 2026-11-13 Zyklus 1: Punkte 1, 2, 3, 4, 5 gebaut: neues `it.skipIf` in `test/known-ips.test.ts` prüft jede Zeile mit `(fetcher-cache)` gegen den Cache (Form, Art `datacenter`, Betreiber), Kopf von `ops/known-ips.txt` und `ops/README.md` nennen die Prüfung, Einträge unverändert. Gegenprobe: alte Testdatei von `92ffe8a` mit gepflanzter Besucheradresse grün, neue rot (1 failed, 5 passed), mit passendem Cache wieder grün; echte Liste mit einem verfälschten Betreiber gegen den echten Cache rot. Prüfbefehle: P1 rot, rot, rot, rot, `1 0`, `0`; P2 gruen, rot, 0; P3 `1 0`, `0 0`, 0, 1; P4 1, 1, gleich; P5 0, `check` Exit 0 (1592 Tests grün).
 - 2026-11-13 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, `dev` (5d27c18) ohne Änderung gemergt. Prüfbefehle: P1 rot, rot, rot, rot, `1 0`, `0`; P2 gruen, rot, 0; P3 `1 0`, `0 0`, 0, 1; P4 1, 1, gleich; P5 0, `check` Exit 0 (1592 Tests grün).
+- 2026-11-13 Release: PASS K und B (Zyklus 2), DONE.
 
 ## Blockers
