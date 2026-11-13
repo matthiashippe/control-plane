@@ -29,6 +29,51 @@ export const EXEC_DEFAULT_MS = 30_000;
 export const EXEC_MAX_MS = 600_000;
 /** How long the result of an exec stays available to a repeat with the same Idempotency-Key. */
 export const IDEMPOTENCY_MS = 600_000;
+/**
+ * Long commands (goals/sandbox/05, goals/sandbox/ANNAHMEN.md Goal 05). The runtime at d8f8168 aborts every attempt
+ * after 30 s and tries four times with the same Idempotency-Key. A command with a timeout up to EXEC_HOLD_MAX_MS is
+ * held as before: its result reaches the runtime through a repeat at the latest by the fourth attempt (sent no earlier
+ * than 93.5 s after the first). A longer one runs in the background and is answered after EXEC_EARLY_MS, before the
+ * runtime aborts, with a text that names the files its output and exit code go to.
+ */
+export const EXEC_HOLD_MAX_MS = 90_000;
+export const EXEC_EARLY_MS = 20_000;
+/** Where a command running in the background writes `<tag>.out`, `<tag>.err` and `<tag>.exit` in the sandbox. */
+export const EXEC_DIR = "/root/.exec";
+/** Room between the timeout inside the background wrapper and the one sandboxd enforces, so the exit file is written. */
+const EXEC_WRAP_MARGIN_MS = 15_000;
+
+/**
+ * The command sandboxd runs for a command in the background: the command itself in `bash -c` under coreutils
+ * `timeout` (124 when it is stopped), its stdout and stderr into `<base>.out` and `<base>.err`, its exit code into
+ * `<base>.exit` when it ends; then both are printed and the exit code returned, so the answer to a repeat after the
+ * end is the same as for a held command.
+ */
+export function backgroundCommand(command: string, base: string, seconds: number): string {
+  const quoted = `'${command.replace(/'/g, `'\\''`)}'`;
+  const dir = base.slice(0, base.lastIndexOf("/")) || "/";
+  return (
+    `mkdir -p ${dir} && timeout -k 5 ${seconds} bash -c ${quoted} >${base}.out 2>${base}.err; ` +
+    `c=$?; echo $c >${base}.exit; cat ${base}.out; cat ${base}.err >&2; exit $c`
+  );
+}
+
+/** The answer to a command that is still running: no exit code yet (-1, as the runtime reads a missing one). */
+function stillRunning(base: string, seconds: number): Reply {
+  return reply(200, {
+    stdout:
+      `The command is still running in the background. It takes longer than ${EXEC_EARLY_MS / 1000} seconds, so this ` +
+      `answer comes before it ends; it runs for at most ${seconds} seconds (its timeout). Its output goes to ${base}.out ` +
+      `and its errors to ${base}.err. When it ends, its exit code is written to ${base}.exit (124 means it was stopped ` +
+      `at its timeout). Read these files later with read_file, or with exec and cat. Do not start the command again.`,
+    stderr: "",
+    exit_code: -1,
+    running: true,
+    output_file: `${base}.out`,
+    error_file: `${base}.err`,
+    exit_code_file: `${base}.exit`,
+  });
+}
 /** How long a create of the same account and body after its answer still gets the same sandbox. */
 export const CREATE_REPEAT_MS = 60_000;
 
@@ -177,7 +222,7 @@ export function createSandboxService(opts: SandboxServiceOptions) {
   const now = opts.now ?? Date.now;
   const log = opts.log ?? ((l: string) => console.log(l));
   const locks = new Map<string, Promise<unknown>>();
-  const execs = new Map<string, { promise: Promise<Reply>; doneAt: number | null }>();
+  const execs = new Map<string, { promise: Promise<Reply>; answer: Promise<Reply>; doneAt: number | null }>();
   // The runtime gives up on a create after 30 s and sends it again with the same body and without an
   // Idempotency-Key (src/conway/http-client.ts:115, src/conway/client.ts:255 at d8f8168). A repeat of the
   // same account and body joins the create that runs, or gets its sandbox up to CREATE_REPEAT_MS after it
@@ -547,34 +592,68 @@ export function createSandboxService(opts: SandboxServiceOptions) {
     let ms = Number(b.timeout);
     if (!Number.isFinite(ms) || ms <= 0) ms = EXEC_DEFAULT_MS;
     ms = Math.min(Math.floor(ms), EXEC_MAX_MS);
-    const command = b.command;
+    // A long command runs in the background; its files are named after sandbox and key, so a repeat names the same.
+    const background = ms > EXEC_HOLD_MAX_MS;
+    const tag = crypto
+      .createHash("sha256")
+      .update(`${id}\n${idempotencyKey ?? crypto.randomUUID()}`)
+      .digest("hex")
+      .slice(0, 12);
+    const base = `${EXEC_DIR}/${tag}`;
+    const seconds = Math.ceil(Math.min(ms, EXEC_MAX_MS - EXEC_WRAP_MARGIN_MS) / 1000);
+    const sandboxdMs = background ? Math.min(seconds * 1000 + EXEC_WRAP_MARGIN_MS, EXEC_MAX_MS) : ms;
+    const command = background ? backgroundCommand(b.command, base, seconds) : b.command;
     const run = async (): Promise<Reply> => {
       const stopped = await ensureRunning(id);
       if (stopped) return stopped;
-      const res = await call("POST", `/v1/sandboxes/${id}/exec`, { command, timeout: ms }, { timeoutMs: ms + 30_000, idempotencyKey });
+      const res = await call("POST", `/v1/sandboxes/${id}/exec`, { command, timeout: sandboxdMs }, { timeoutMs: sandboxdMs + 30_000, idempotencyKey });
       return passOn(id, res, (o) => ({
         stdout: typeof o.stdout === "string" ? o.stdout : "",
         stderr: typeof o.stderr === "string" ? o.stderr : "",
         exit_code: typeof o.exit_code === "number" ? o.exit_code : -1,
       }));
     };
-    if (!idempotencyKey) return run();
+    // The answer to the runtime: the result, or for a command in the background the text that it still runs once
+    // EXEC_EARLY_MS have passed. The command itself keeps running either way.
+    const answer = (final: Promise<Reply>): Promise<Reply> => {
+      if (!background) return final;
+      return new Promise<Reply>((resolve, reject) => {
+        const timer = setTimeout(() => resolve(stillRunning(base, seconds)), EXEC_EARLY_MS);
+        final.then(
+          (r) => {
+            clearTimeout(timer);
+            resolve(r);
+          },
+          (e) => {
+            clearTimeout(timer);
+            reject(e);
+          },
+        );
+      });
+    };
+    if (!idempotencyKey) return answer(run());
     const t = now();
     for (const [k, e] of execs) if (e.doneAt !== null && t - e.doneAt > IDEMPOTENCY_MS) execs.delete(k);
     const key = `${id}\n${idempotencyKey}`;
     const known = execs.get(key);
-    // A repeat with the same key starts nothing: it waits for the command that already runs and gets
-    // its result, however long the first request was held.
-    if (known) return known.promise;
-    const entry: { promise: Promise<Reply>; doneAt: number | null } = { promise: Promise.resolve(notFound()), doneAt: null };
+    // A repeat with the same key starts nothing: it waits for the command that already runs and gets its result,
+    // however long the first request was held; a repeat of a command in the background gets the same answer as the
+    // first request, and its result once it has ended.
+    if (known) return known.doneAt !== null ? known.promise : known.answer;
+    const entry: { promise: Promise<Reply>; answer: Promise<Reply>; doneAt: number | null } = {
+      promise: Promise.resolve(notFound()),
+      answer: Promise.resolve(notFound()),
+      doneAt: null,
+    };
     entry.promise = run().then((res) => {
       // Only a result is kept; a sandbox server that was down may be tried again with the same key.
       if (res.status === 501) execs.delete(key);
       else entry.doneAt = now();
       return res;
     });
+    entry.answer = answer(entry.promise);
     execs.set(key, entry);
-    return entry.promise;
+    return entry.answer;
   }
 
   async function upload(address: string, id: string, body: unknown): Promise<Reply> {

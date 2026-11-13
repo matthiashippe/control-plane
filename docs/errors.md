@@ -57,6 +57,13 @@ reservation. Stopped time is not billed.
 `exec` with the same `Idempotency-Key` runs the command once: a repeat after the runtime gave up
 on its 30 seconds waits for the running command and gets its result.
 
+`exec` with a `timeout` above 90000 ms runs in the background. If the command has not ended after 20
+seconds, the answer is `200` with `exit_code` -1, `running: true` and a text in `stdout` that says the
+command is still running and names three files in the sandbox: `output_file` (stdout), `error_file`
+(stderr) and `exit_code_file` (written when the command ends, 124 if it was stopped at its timeout).
+Read them later with `files/read` or `exec`; a repeat with the same `Idempotency-Key` gets the same
+answer, and the result once the command has ended. A command never runs twice.
+
 `409 port_exposure_unavailable`: exposing a port is not offered yet, because public URLs for sandbox
 ports need a domain of their own, apart from the one this service bills under. The sandbox keeps
 running and nothing is charged for the call.
