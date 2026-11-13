@@ -38,3 +38,17 @@
   register 501, dreimal 403) ruft `harness/e2e/full.sh` `executeTool("search_domains", …)` aus `dist/agent/tools.js` der
   unveränderten Runtime mit dem Client als Kontext und verlangt einen Text ohne `taken` mit „No domain can be registered here“.
   Fehlt die Zeile `DOMAIN_TOOL`, weil der Import scheitert, ist der Lauf rot.
+
+## Goal 02 (13.11.2026, Engineer CP)
+
+- **Der Test ruft den Richter über `ops/live.sh --judge domains-search <status>`.** Der Schalter liest den Body von stdin und ruft
+  dieselbe Funktion `judge_domains_search`, die Live-Lauf und Selbsttest rufen; er braucht kein Netz und keinen Port, weil der Test
+  die Antwort mit `app.request` holt. Den Pfad nimmt der Test aus der Zeile `DOMAINS_PATH=` von `ops/live.sh`, damit Test und
+  Live-Lauf dieselbe Anfrage stellen.
+- **Die fünf Merkmale prüft ein kleines Node-Skript, nicht `grep`.** `names` ist ein Array und `message` darf Satzzeichen und
+  Anführungszeichen tragen; ein Treffer per Muster im rohen Text hätte auch ein `livecheck.com` in `message` als Name gezählt. Node
+  liegt auf dem code-host wie für `json_field` der Prüfung `sandbox`. Status prüft Bash vorher, damit 404, 401, ein 200 und keine
+  Antwort ihren eigenen Text bekommen.
+- **Der Fall `nokey` läuft im Selbsttest durch den Live-Pfad.** `domains_search_live` mit einer fehlenden `LIVE_SANDBOX_ENV` gibt
+  `nokey` aus, ohne `curl` zu rufen (der Selbsttest sperrt `curl`), und dieser Wert geht in den Richter. Drei weitere Fälle
+  `mark-names`, `mark-message` und `mark-taken` nehmen der richtigen Antwort je ein Merkmal und werden FAIL.
