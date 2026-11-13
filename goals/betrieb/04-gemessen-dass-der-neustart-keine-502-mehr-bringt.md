@@ -71,7 +71,7 @@ erledigt gilt, ohne dass jemand nachgesehen hat.
 - [x] `check` ist grün und lässt `ops/own-ips.txt` unverändert.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung: `node scripts/check.mjs >/dev/null 2>&1; git status --porcelain -- ops/own-ips.txt | wc -l` muss 0 ausgeben.
-- [ ] Kritik: `## Nachher` sagt je Fenster, ob überhaupt eine Anfrage von außen in die Sekunden des Neustarts fiel. Alle 7 mal 502 unter
+- [x] Kritik: `## Nachher` sagt je Fenster, ob überhaupt eine Anfrage von außen in die Sekunden des Neustarts fiel. Alle 7 mal 502 unter
       `## Vorher` kamen 0,2 bis 5,1 s nach dem Start des Containers; in den zwei Fenstern danach hat das Zugriffslog in den 10 s nach dem
       Start keine Anfrage von außen (gemessen vom Tech Lead am 13.11.2026 gegen 17:45 UTC, Befehl unten), also hat keine fremde Anfrage
       den Retry von betrieb 02 gebraucht, und das „0 mal 502“ belegt ihn noch nicht. Je Fenster genau eine Zeile ab Spalte 0
@@ -105,6 +105,7 @@ erledigt gilt, ohne dass jemand nachgesehen hat.
 ## Progress Log
 - 2026-11-13 Zyklus 1: Punkte 1, 2, 3, 4 gebaut, beide Fenster am 13.11.2026 um 17:06 UTC mit `ops/deploy-window.sh --at` gemessen (00:48:29: 0 mal 502 von 53, `CLEAN`; 09:55:22: 0 mal 502 von 104, `AFFECTED` nur mit 4xx) und unter `## Nachher` eingetragen, Ergebnis betrieb 02 hält; Gegenprobe des Werkzeugs im Vorher-Fenster 2026-11-12T16:41:02 zählt weiter 3 mal 502, `--selftest` OK. Prüfbefehle: Punkt 1 gibt 2, Exit 0, 2, 2, 2 und (Netz) 2; Punkt 2 gibt 1 und Exit 0; Punkt 3 gibt 0, 0, 0; Punkt 4 `check` grün in 68 s (1592 Tests), `ops/own-ips.txt` 0 Zeilen geändert.
 - 2026-11-13 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4; `dev` brachte nichts Neues, alle Prüfbefehle am Kopf 15bf124 erneut ausgeführt. Prüfbefehle: Punkt 1 gibt 2, Exit 0, 2, 2, 2 und (Netz, 17:10 UTC) 2; Punkt 2 gibt 1 und Exit 0; Punkt 3 gibt 0, 0, 0; Punkt 4 `check` grün in 78 s (1592 Tests), `ops/own-ips.txt` 0 Zeilen geändert; am PR `check` und `e2e` grün.
+- 2026-11-13 Zyklus 3: Punkt 5 (Kritik) gebaut, je Fenster die Anfragen von außen in den 10 s nach dem Start um 17:23 UTC gemessen (00:48:29: 0, 09:55:22: 0) und unter `## Nachher` eingetragen, `Ergebnis:` sagt jetzt, dass keine Anfrage von außen in die Sekunden des Neustarts fiel und der Beleg aussteht; Gegenprobe des Zählers an 2026-11-12 16:41:02 (4, darunter 3 mal 502) und 2026-11-10 20:27:07 (3, darunter 2 mal 502), Log deckt beide Fenster ab (162 und 606 Einträge in ±5 min). Prüfbefehle: Punkt 5 am alten Stand 0 und Exit 1, jetzt 2, Exit 0 und (Netz) 2; Punkt 1 gibt 2, Exit 0, 2, 2, 2 und (Netz) 2; Punkt 2 gibt 1 und Exit 0; Punkt 3 gibt 0, 0, 0; Punkt 4 `check` grün in 51 s (1592 Tests), `ops/own-ips.txt` 0 Zeilen geändert.
 
 ## Blockers
 - keine

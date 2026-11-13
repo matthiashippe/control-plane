@@ -72,4 +72,22 @@ Das erste Fenster ist `CLEAN`. Das zweite meldet `AFFECTED` mit 21 Antworten mit
 `POST /v1/auth/verify`, 429 auf `POST /v1/auth/keyless`, 402 auf `POST /v1/chat/completions`): Kein 502 ist darunter, und keine
 dieser Antworten kommt vom Neustart.
 
-Ergebnis: betrieb 02 hält, in beiden Fenstern seit dem Merge bekam keine fremde Adresse ein 502 am Neustart von `cp` (vorher 7 in 6 Fenstern).
+Alle 7 mal 502 unter `## Vorher` kamen 0,2 bis 5,1 s nach dem Start des Containers. In den 10 s nach dem Start fiel in keines der
+zwei Fenster eine Anfrage von außen:
+
+- 2026-11-13 00:48:29 UTC: 0 Anfragen von außen in den 10 s nach dem Start
+- 2026-11-13 09:55:22 UTC: 0 Anfragen von außen in den 10 s nach dem Start
+
+Gemessen am 13.11.2026 um 17:23 UTC mit diesem Befehl, der je Fenster die Anfragen von Adressen außerhalb von `own_ips` mit
+Zeitstempel bis 10 s nach dem Start zählt:
+
+```
+set -a; . ~/.config/control-plane/loop.env; set +a; . ops/own-ips.sh; o=$(own_ips 2>/dev/null); bash ops/access-log.sh | python3 -c 'import sys,json,datetime as D;own=set(sys.argv[1].split());w={t:D.datetime.fromisoformat("2026-11-13T"+t+"+00:00").timestamp() for t in sys.argv[2:]};rs=[json.loads(l) for l in sys.stdin if l.startswith("{")];[print(t,sum(1 for r in rs if s<=r["ts"]<=s+10 and r.get("request",{}).get("remote_ip") not in own)) for t,s in w.items()]' "$o" 00:48:29 09:55:22
+```
+
+Gegenprobe mit demselben Zähler an zwei Fenstern aus `## Vorher`: 2026-11-12 16:41:02 UTC zählt 4 Anfragen von außen in den 10 s,
+darunter die 3 mal 502, 2026-11-10 20:27:07 UTC zählt 3, darunter die 2 mal 502. Das Zugriffslog deckt beide Fenster nachher ab
+(162 und 606 Einträge in den 5 Minuten vor und nach dem Start). Im Fenster 09:55:22 bekamen 13 eigene Anfragen in den 10 s nach dem
+Start alle 200; das ist ein Hinweis, kein Beleg, weil Anfragen von außen den Retry anders treffen können.
+
+Ergebnis: betrieb 02 hält, aber keine Anfrage von außen in die Sekunden des Neustarts fiel, deshalb steht der Beleg für den Retry noch aus; seit dem Merge bekam in beiden Fenstern keine fremde Adresse ein 502 am Neustart von `cp` (vorher 7 in 6 Fenstern).
