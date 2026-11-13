@@ -301,6 +301,11 @@ export const V1_ROUTES = new Set([
   "/v1/auth/verify",
   "/v1/auth/keyless",
   "/v1/handoff",
+  // The social relay (goals/relay/01). Its handlers stand before the auth middleware and answer every method themselves,
+  // with a signature or with a key (src/relay/routes.ts), so the middleware never runs for them; listed here because they exist.
+  "/v1/messages",
+  "/v1/messages/poll",
+  "/v1/messages/count",
   "/v1/automatons/register",
   "/v1/bounties",
   "/v1/bounties/cancel",
