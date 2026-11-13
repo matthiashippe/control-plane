@@ -206,6 +206,10 @@ verschwinden, und keine Meldung nimmt den Marker in den Mund, die nicht Guthaben
 
 ## Phase 2 (nicht in diesem Repo-Stand)
 
-Sandboxes (`/v1/sandboxes`, `/exec`, `/files/*`, `/ports/*`), Social-Relay (`/v1/messages`,
-`/messages/poll`, `/messages/count`), Domains (`api.conway.domains`). Phase 1 antwortet auf
-`GET /v1/sandboxes` mit `{ "sandboxes": [] }`, auf alles andere davon `501 { "error": "not_implemented" }`.
+Sandboxes (`/v1/sandboxes`, `/exec`, `/files/*`, `/ports/*`), Domains (`api.conway.domains`). Phase 1 antwortete auf
+`GET /v1/sandboxes` mit `{ "sandboxes": [] }`, auf alles andere davon `501 { "error": "not_implemented" }`; die Sandboxes baut
+inzwischen das Topic sandbox (`docs/sandbox/vertrag.md`).
+
+Das Social-Relay (`POST /v1/messages`, `POST /v1/messages/poll`, `GET /v1/messages/count`) beantwortet dieser Dienst seit relay 01:
+signiert wie der Client der Runtime oder mit API-Key, Erstkontakt 1000 mc, Vertrag in `docs/relay/vertrag.md`. Die Runtime ruft es
+nur, wenn `socialRelayUrl` auf diesen Dienst zeigt.

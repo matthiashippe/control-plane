@@ -96,6 +96,7 @@ import { registerHandoff, type HandoffDeps } from "./handoff/routes.js";
 import { handlePay, TOPUP_TIERS_USD, type PayConfig } from "./payments/pay.js";
 import { handleRegister } from "./registry.js";
 import { createSandboxService, type Reply as SandboxReply, type SandboxService } from "./sandbox/service.js";
+import { registerRelay } from "./relay/routes.js";
 import type { Settler } from "./payments/settler.js";
 import {
   AuthError,
@@ -1793,6 +1794,11 @@ export function createApp(opts: AppOptions) {
   // the /v1/* auth middleware for the same reason as /v1/auth/keyless above.
   const indexStyle = /<style>[\s\S]*?<\/style>/.exec(indexHtml ?? "")?.[0] ?? "";
   registerHandoff(app, { db, clock, indexStyle: () => indexStyle, ...opts.handoff });
+
+  // The social relay of the runtime (goals/relay/01, docs/relay/vertrag.md): POST /v1/messages, POST /v1/messages/poll and
+  // GET /v1/messages/count. Before the /v1/* auth middleware, because the signed way carries no API key; the way with a key
+  // asks for it in src/relay/routes.ts.
+  registerRelay(app, { db, clock, resolveKey: (header) => resolveApiKey(db, header) });
 
   app.get("/v1/status", (c) => {
     // One entry per real model; the IDs the runtime hard-codes sit next to them as aliases.
