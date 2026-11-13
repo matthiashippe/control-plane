@@ -6,3 +6,4 @@ Empfehlung: Einen gemeinsamen Helfer unter `ops/` anlegen (Umgebung laden, Schl�
 MVP: Schönheit
 
 Linse Q, Frage 2 (Logik-Duplikate). Die Kopien laufen schon auseinander: `load_env` in abort-purchase.sh liest `loop.env` immer, die Fassung in timeout-quote.sh nur ohne gesetztes `CP_HOST`. Ändern sich Containername oder Datenbankpfad, muss jede Kopie nachgezogen werden (dazu `ops/live.sh:189`). Verwandt mit `abrechnung-nacharbeit-2026-11-11-3` (Duplikat innerhalb von timeout-quote.sh), aber eine andere Stelle.
+Verworfen: Schwere 1, gemeinsamer Helfer ohne Wirkung beim Kunden; abrechnung 05 baut die Werkzeuge ohnehin um (2026-11-13)
