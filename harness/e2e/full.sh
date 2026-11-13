@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Complete first run of the unmodified upstream runtime against the control plane:
-# provisioning, registration, bootstrap topup, five turns, sleep. No Conway API error allowed.
+# provisioning, registration, bootstrap topup, five turns, sleep, the domain calls and the sandbox walk.
+# No Conway API error allowed.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 COMPOSE=(docker compose -f docker-compose.yml)
@@ -10,7 +11,7 @@ trap cleanup EXIT
 
 ./gen-certs.sh
 "${COMPOSE[@]}" build --quiet
-"${COMPOSE[@]}" up -d --wait chain cp
+"${COMPOSE[@]}" up -d --wait chain cp sandboxd
 "${COMPOSE[@]}" run --rm chain-tools setup >/dev/null
 
 echo "--- provision"
@@ -90,12 +91,46 @@ tool_text=$(printf '%s\n' "$domains" | grep '^DOMAIN_TOOL search_domains ' || tr
 printf '%s\n' "$tool_text" | grep -qi 'taken' && domains_ok=false
 printf '%s\n' "$tool_text" | grep -q 'No domain can be registered here' || domains_ok=false
 
+# The sandbox walk of goals/sandbox/04 (harness/e2e/sandbox-walk.mjs, bind-mounted into the container runtime): the
+# runtime's own client and tools against cp, which passes every call on signed to the rebuilt sandboxd
+# (harness/sandboxd/). Then the ledger of cp, read only: exactly one row of kind sandbox for this sandbox (create and
+# delete at once is one started step, 100 mc for small), its reservation back to 0, the ledger still consistent. Then
+# the state of the rebuilt sandboxd: no sandbox, no container, no network left.
+echo "--- sandbox through the runtime's own client and tools"
+walk=$("${COMPOSE[@]}" run --rm --no-deps -e SANDBOX_WALK_KEY="$key" -e SANDBOX_WALK_NAME="e2e-walk-$RANDOM" runtime \
+  node /opt/harness/sandbox-walk.mjs 2>&1) || true
+printf '%s\n' "$walk" | grep -E '^SANDBOX_VERDICT' || printf '%s\n' "$walk" | tail -20
+sandbox_id=$(printf '%s\n' "$walk" | grep '^SANDBOX_RESULT ' | tail -1 | grep -o '"id":"[a-z0-9]*"' | head -1 | cut -d'"' -f4 || true)
+sandbox_ledger=$("${COMPOSE[@]}" exec -T cp node -e '
+  const id = process.argv[1] || "";
+  const db = require("better-sqlite3")("/data/cp.db", { readonly: true });
+  const rows = db.prepare("SELECT delta_mc FROM ledger WHERE kind = ? AND ref LIKE ?").all("sandbox", "sandbox:" + id + ":%");
+  const sb = db.prepare("SELECT status, hold_mc FROM sandboxes WHERE id = ?").get(id) || {};
+  const w = db.prepare("SELECT balance_mc FROM wallets ORDER BY created_at LIMIT 1").get();
+  const sum = db.prepare("SELECT coalesce(sum(delta_mc),0) AS s FROM ledger").get().s;
+  console.log(JSON.stringify({ rows: rows.length, mc: rows.map((r) => r.delta_mc), status: sb.status ?? null, hold_mc: sb.hold_mc ?? null, consistent: sum === w.balance_mc }));' "${sandbox_id:-none}" 2>&1 || true)
+echo "ledger of the sandbox: $sandbox_ledger"
+sandbox_left=$("${COMPOSE[@]}" exec -T sandboxd node -e '
+  const fs = require("fs");
+  const read = (f) => { try { return JSON.parse(fs.readFileSync(f, "utf8")); } catch { return null; } };
+  const st = read("/var/lib/sandboxd/state.json") || { sandboxes: {} };
+  const dk = read("/var/lib/sandboxd/docker.json");
+  const homes = fs.readdirSync("/var/lib/sandboxd/mnt");
+  console.log(JSON.stringify({ sandboxes: Object.keys(st.sandboxes || {}).length, containers: dk ? Object.keys(dk.containers).length : -1, networks: dk ? dk.networks.length : -1, homes: homes.length }));' 2>&1 || true)
+echo "rebuilt sandboxd after the walk: $sandbox_left"
+sandbox=false
+if printf '%s\n' "$walk" | grep -qx 'SANDBOX_VERDICT ok' && [[ -n "$sandbox_id" ]] \
+  && [[ "$sandbox_ledger" == '{"rows":1,"mc":[-100],"status":"deleted","hold_mc":0,"consistent":true}' ]] \
+  && [[ "$sandbox_left" == '{"sandboxes":0,"containers":0,"networks":0,"homes":0}' ]]; then
+  sandbox=true
+fi
+
 cleanup
 trap - EXIT
 remaining=$("${COMPOSE[@]}" ps -q | wc -l | tr -d ' ')
 [[ "$remaining" == "0" ]] || { echo "E2E FAIL: containers left behind"; exit 1; }
-if [[ "$turns" -lt 5 || "$registered" != "true" || "$api_errors" != "0" || "$consistent" != "true" || "$db_registered" != "1" || "$balance_cents" -ge 500 || "$domains_ok" != "true" ]]; then
-  echo "E2E FAIL turns=$turns registered=$registered api_errors=$api_errors ledger_consistent=$consistent db_registered=$db_registered balance_cents=$balance_cents domains=$domains_ok"
+if [[ "$turns" -lt 5 || "$registered" != "true" || "$api_errors" != "0" || "$consistent" != "true" || "$db_registered" != "1" || "$balance_cents" -ge 500 || "$domains_ok" != "true" || "$sandbox" != "true" ]]; then
+  echo "E2E FAIL turns=$turns registered=$registered api_errors=$api_errors ledger_consistent=$consistent db_registered=$db_registered balance_cents=$balance_cents domains=$domains_ok sandbox=$sandbox"
   exit 1
 fi
-echo "E2E OK turns=$turns registered=$registered api_errors=$api_errors ledger_consistent=$consistent balance_cents=$balance_cents domains=$domains_ok"
+echo "E2E OK turns=$turns registered=$registered api_errors=$api_errors ledger_consistent=$consistent balance_cents=$balance_cents domains=$domains_ok sandbox=$sandbox"

@@ -163,3 +163,32 @@
   wird nicht gemerkt, der nächste Versuch fragt neu. Folge: Wer innerhalb von 60 s bewusst zwei gleiche Sandboxes will, gibt ihnen
   verschiedene `name`; die Runtime legt Kinder ohnehin mit eigenem Namen an. Der Merker liegt im Speicher des Dienstes und gilt bis zum
   nächsten Neustart.
+
+## Goal 04 (13.11.2026, Engineer CP)
+
+- **409 statt freigegebenem Port.** `expose_port` der Runtime bekommt wie seit sandbox 03 die Antwort 409
+  `port_exposure_unavailable`, kein Port wird freigegeben und am 409 ändert sich kein Code. Belegt im Gang: Das Werkzeug gibt den
+  Fehlertext mit `port_exposure_unavailable` an das Modell zurück, und der nächste Aufruf desselben Clients (`list_sandboxes`)
+  gelingt mit 200, weil 409 nicht in den Status steht, die ihr HTTP-Client wiederholt und für den Circuit Breaker zählt
+  (`src/types.ts:613` am Pin). Ports kommen mit sandbox 06 unter einer eigenen Domain.
+- **Gang über Client und Werkzeuge statt über einen Turn.** `harness/e2e/sandbox-walk.mjs` ruft `createConwayClient` und
+  `executeTool` mit `createBuiltinTools` aus `dist/` der unveränderten Runtime direkt auf, wie der Block der Domains in `full.sh`. Ein
+  Turn des Mock-Modells hätte die Reihenfolge, die Namen und die Argumente vom Mock abhängig gemacht; die Werkzeuge sind dieselben,
+  die ein Modell aufruft. Je Sandbox ein Client, wie die Runtime ihn hält. `DELETE /v1/sandboxes/{id}` geht direkt über HTTP mit
+  demselben Schlüssel, weil `deleteSandbox` am Pin leer ist. Jeder HTTP-Status, den der Client der Runtime bekommt, wird über das
+  globale `fetch` mitgeschrieben, das die Runtime benutzt; so fällt auch auf, wenn `read_file` nur über seinen Rückfall auf `cat`
+  gelang (zwei Anfragen statt einer).
+- **Lauf gegen die Produktion ohne Topup.** `ops/runtime-sandbox.sh` läuft mit dem Konto `live-sandbox` aus sandbox 03 und bezahlt aus
+  dessen vorhandenen Credits (Gutschrift `internal_grant`). Der Gang hat keine Wallet und ruft das Topup der Runtime
+  (`src/conway/topup.ts:81` am Pin, sonst aus der Schleife des Agenten bei einem 402) nie auf; ein 402 beim Anlegen endet mit
+  `FAIL credits`. Keine Wallet-Bewegung, kein Gas (`loop-constraints.md`, Grundregel 10). Die Runtime dafür baut das Skript auf dem
+  code-host in `~/.cache/control-plane/automaton-d8f8168` und prüft vor dem Gang Pin und leeres `git status --porcelain`.
+- **Nachbau von `sandboxd` ohne Docker im Docker.** `harness/sandboxd/` startet den echten `createSandboxd` mit einem eigenen `run`:
+  Netz, Image und Container führt es nur im Zustand (`/var/lib/sandboxd/docker.json`), `docker exec` läuft als Prozess im Container
+  des Nachbaus, `/root` in den Argumenten zeigt auf das Verzeichnis, das `sandboxd` sonst als Platte einhängt; `umount` leert es,
+  `rmdir` entfernt es. Die Signaturprüfung bleibt echt, die Schlüssel liest der Nachbau je Anfrage aus dem Volume `cp-data` (nur
+  lesend). `cp` spricht ihn über `http://sandboxd:8730` an: Der Client in `src/sandbox/client.ts` verlangt kein `https`, ein
+  Zertifikat aus `harness/gen-certs.sh` war darum nicht nötig. Isolation zeigt der Nachbau nicht, die prüft sandbox 02 am echten
+  Server.
+- **Kein Fehler der Sandbox-API gefunden.** Der Gang lief lokal (echtes `dist/index.js` über TLS, Nachbau, Runtime am Pin) und gegen
+  die Produktion ohne Befund, `src/` ändert dieses Goal deshalb nicht.
