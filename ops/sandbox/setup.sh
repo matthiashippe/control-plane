@@ -7,6 +7,10 @@
 #   bash ops/sandbox/setup.sh --client-key <address>  read the public key of the service cp from the payment server (read only)
 #                                                and install it as /etc/sandboxd/keys/cp.pub after an Ed25519 check, idempotent;
 #                                                last line SETUP CLIENT-KEY OK changed=0 or changed=1, a broken key changes nothing
+#   bash ops/sandbox/setup.sh --origin-cert <address>  put the Cloudflare Origin CA certificate of the ports domain into
+#                                                /etc/caddy/sbx/ (0600, owner caddy), only if the host has none valid for that domain;
+#                                                last line SETUP ORIGIN-CERT OK changed=0 or changed=1. Run it before the first run
+#                                                with a new domain: a run refuses to install a Caddy file whose certificate is missing.
 #   bash ops/sandbox/setup.sh --selftest         without network: the comparison reports a planted deviation and a clean state not,
 #                                                and --client-key installs a valid key once and rejects broken ones
 #
@@ -15,6 +19,7 @@
 # code-host in /etc/sandboxd/keys, the base image, unattended-upgrades, and the Caddy file of the sandbox with exactly one import
 # line in /etc/caddy/Caddyfile (caddy validate before every reload). It never touches wa-staging, ufw, Postgres or the block of
 # wa-staging in the Caddyfile. DNS lives in cloudflare.py, run from the code-host. The nightly check runs --check only.
+# The domain of exposed ports is SANDBOXD_DOMAIN in sandboxd.service, written down there only.
 set -euo pipefail
 
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -24,6 +29,10 @@ NODE_VERSION=22.23.4
 NODE_DIR=/opt/sandboxd/node-v$NODE_VERSION
 IMAGE=sandboxd-base:1
 IMPORT_LINE="import /etc/caddy/sandbox.caddy"
+PORTS_DOMAIN=$(sed -n 's/^Environment=SANDBOXD_DOMAIN=//p' "$HERE/sandboxd.service")
+case "$PORTS_DOMAIN" in
+  ""|postyourprice.com|*.postyourprice.com) echo "setup: SANDBOXD_DOMAIN in sandboxd.service must be a domain of its own" >&2; exit 2 ;;
+esac
 
 # repo file -> path on the host
 FILES=(
@@ -71,6 +80,7 @@ desired() {
   echo "fact nft_table yes"
   echo "fact caddy_import 1"
   echo "fact caddy_valid yes"
+  echo "fact origin_cert $PORTS_DOMAIN"
   echo "fact image $(sha < "$HERE/image/Dockerfile")"
   echo "fact sshd_password no"
   echo "fact sandboxd_public 0"
@@ -91,6 +101,19 @@ echo "fact runsc_runtime $(docker info --format '{{range $k, $v := .Runtimes}}{{
 echo "fact nft_table $(nft list table inet sandbox >/dev/null 2>&1 && echo yes || echo no)"
 echo "fact caddy_import $(grep -cxF 'IMPORT_PLACEHOLDER' /etc/caddy/Caddyfile 2>/dev/null)"
 echo "fact caddy_valid $(caddy validate --config /etc/caddy/Caddyfile >/dev/null 2>&1 && echo yes || echo no)"
+# origin_cert: the domain of the wildcard name in /etc/caddy/sbx/origin.pem, if certificate and key belong together, the key is
+# 0600 and owned by caddy and the certificate holds for 30 more days; else missing or invalid. Never prints a key.
+oc=missing
+if [ -s /etc/caddy/sbx/origin.pem ] && [ -s /etc/caddy/sbx/origin.key ]; then
+  oc=invalid
+  if [ "$(stat -c '%U %a' /etc/caddy/sbx/origin.key 2>/dev/null)" = "caddy 600" ] \
+     && openssl x509 -checkend 2592000 -noout -in /etc/caddy/sbx/origin.pem >/dev/null 2>&1 \
+     && [ "$(openssl x509 -noout -pubkey -in /etc/caddy/sbx/origin.pem 2>/dev/null | sha256sum)" = "$(openssl pkey -pubout -in /etc/caddy/sbx/origin.key 2>/dev/null | sha256sum)" ]; then
+    oc=$(openssl x509 -noout -ext subjectAltName -in /etc/caddy/sbx/origin.pem 2>/dev/null | grep -o 'DNS:\*\.[a-z0-9.-]*' | head -1 | sed 's/^DNS:\*\.//')
+    [ -n "$oc" ] || oc=invalid
+  fi
+fi
+echo "fact origin_cert $oc"
 echo "fact image $(docker image inspect --format '{{index .Config.Labels "sandboxd.dockerfile"}}' IMAGE_PLACEHOLDER 2>/dev/null || echo missing)"
 echo "fact sshd_password $(sshd -T 2>/dev/null | awk '$1=="passwordauthentication"{print $2}')"
 echo "fact sandboxd_public $(ss -Hltnp 2>/dev/null | grep sandboxd | grep -vc '127.0.0.1')"
@@ -168,7 +191,8 @@ if [ "$("$NODE_DIR/bin/node" --version 2>/dev/null)" != "v$NODE_VERSION" ]; then
   rm -rf "$t"
 fi
 
-# files
+# files; the Caddy file of the sandbox is kept, so a failed validate below restores it too
+if [ -f /etc/caddy/sandbox.caddy ]; then cp -p /etc/caddy/sandbox.caddy "$S/sandbox.caddy.before"; fi
 while [ $# -gt 0 ]; do install_file "$S/$1" "$2" 0644; shift 2; done
 chmod 0755 /opt/sandboxd; install -d -m 0700 /var/lib/sandboxd /var/lib/sandboxd/disks /var/lib/sandboxd/mnt
 systemctl daemon-reload
@@ -206,7 +230,8 @@ if ! grep -qxF "$IMPORT_LINE" /etc/caddy/Caddyfile || was /etc/caddy/sandbox.cad
     systemctl reload caddy
   else
     cp -p "$S/Caddyfile.before" /etc/caddy/Caddyfile
-    echo "setup: caddy validate failed, Caddyfile restored" >&2
+    if [ -f "$S/sandbox.caddy.before" ]; then cp -p "$S/sandbox.caddy.before" /etc/caddy/sandbox.caddy; fi
+    echo "setup: caddy validate failed, Caddyfile and sandbox.caddy restored" >&2
     exit 1
   fi
 fi
@@ -214,8 +239,17 @@ rm -rf "$S"
 REMOTE
 )
 
+# origin_cert_fact <address>: the value of fact origin_cert on the host, read only.
+origin_cert_fact() { gather "$1" | awk '$1 == "fact" && $2 == "origin_cert" { print $3 }'; }
+
 apply() {
-  local host=$1 stage pub f args=()
+  local host=$1 stage pub f args=() oc
+  # The Caddy file names the certificate in /etc/caddy/sbx/; without it Caddy would not load after its next restart.
+  oc=$(origin_cert_fact "$host")
+  if [ "$oc" != "$PORTS_DOMAIN" ]; then
+    echo "setup: no valid origin certificate for $PORTS_DOMAIN on the host ($oc); run: bash $0 --origin-cert $host" >&2
+    return 1
+  fi
   pub=$(probe_pub)
   stage=$(mktemp -d)
   for f in "${FILES[@]}"; do
@@ -228,6 +262,37 @@ apply() {
   rm -rf "$stage"
   ssh_host "$host" bash -s -- /root/.sandbox-setup "$NODE_VERSION" "$NODE_DIR" "$IMAGE" "'$IMPORT_LINE'" "${args[@]}" <<<"$APPLY"
   check "$host"
+}
+
+# --origin-cert: certificate and key from cloudflare.py origin-cert (token of the ports zone, code-host only) in a private temporary
+# directory, copied to /etc/caddy/sbx/ over SSH and removed here at once. Nothing of it is printed.
+ORIGIN_WRITE=$(cat <<'REMOTE'
+set -eu
+id caddy >/dev/null 2>&1 || { echo "setup: no user caddy on the host" >&2; exit 1; }
+install -d -m 0700 -o caddy -g caddy /etc/caddy/sbx
+t=$(mktemp -d)
+trap 'rm -rf "$t"' EXIT
+tar -C "$t" -xf -
+install -m 0600 -o caddy -g caddy "$t/origin.key" /etc/caddy/sbx/origin.key
+install -m 0600 -o caddy -g caddy "$t/origin.pem" /etc/caddy/sbx/origin.pem
+REMOTE
+)
+
+origin_cert() {
+  local host=$1 t oc
+  oc=$(origin_cert_fact "$host")
+  if [ "$oc" = "$PORTS_DOMAIN" ]; then echo "SETUP ORIGIN-CERT OK changed=0"; return 0; fi
+  t=$(mktemp -d); chmod 0700 "$t"
+  if ! python3 "$HERE/cloudflare.py" origin-cert "$t" >/dev/null; then
+    rm -rf "$t"; echo "SETUP ORIGIN-CERT FAIL: cloudflare.py origin-cert for $PORTS_DOMAIN"; return 1
+  fi
+  if ! tar -C "$t" -cf - origin.pem origin.key | ssh_host "$host" "$ORIGIN_WRITE"; then
+    rm -rf "$t"; echo "SETUP ORIGIN-CERT FAIL: cannot write /etc/caddy/sbx on the host"; return 1
+  fi
+  rm -rf "$t"
+  oc=$(origin_cert_fact "$host")
+  if [ "$oc" != "$PORTS_DOMAIN" ]; then echo "SETUP ORIGIN-CERT FAIL: the host reports $oc"; return 1; fi
+  echo "SETUP ORIGIN-CERT OK changed=1"
 }
 
 # --client-key: the public key of the service cp (SPKI PEM from /data/sandbox-client.pub in deploy-cp-1) as
@@ -378,7 +443,14 @@ selftest
     grep -q "^file ${f#*:} [0-9a-f]\{64\}$" "$t/desired" || { echo "selftest files: FAIL ${f#*:}"; fail=1; }
   done
   if declare -f check | grep -q 'APPLY\|apply '; then echo "selftest check: FAIL check runs apply"; fail=1; else echo "selftest check: ok (read only)"; fi
-  # 4. --client-key against a fake host in a subshell, so the stubs stay local
+  # 4. the Caddy file of exposed ports needs the origin certificate of the domain in sandboxd.service, never the payment zone
+  if grep -qx "fact origin_cert $PORTS_DOMAIN" "$t/desired"; then echo "selftest origin-cert: ok (wanted for $PORTS_DOMAIN)"; else echo "selftest origin-cert: FAIL not wanted"; fail=1; fi
+  out=$(compare "$t/desired" <(sed "/^fact origin_cert /s/ [^ ]*\$/ missing/" "$t/desired"))
+  if grep -qxF "CHANGE fact origin_cert want=$PORTS_DOMAIN have=missing" <<<"$out"; then echo "selftest origin-cert: ok (missing is a change)"; else echo "selftest origin-cert: FAIL $out"; fail=1; fi
+  if grep -qF "*.$PORTS_DOMAIN {" "$HERE/sandbox.caddy" && ! grep -q '^\*\.postyourprice\.com' "$HERE/sandbox.caddy"; then
+    echo "selftest origin-cert: ok (sandbox.caddy serves *.$PORTS_DOMAIN only)"
+  else echo "selftest origin-cert: FAIL sandbox.caddy and sandboxd.service name different domains"; fail=1; fi
+  # 5. --client-key against a fake host in a subshell, so the stubs stay local
   ( selftest_client_key "$t" ) || fail=1
   rm -rf "$t"
   if [ $fail -eq 0 ]; then echo "SETUP SELFTEST OK"; else echo "SETUP SELFTEST FAIL"; return 1; fi
@@ -388,6 +460,7 @@ case "${1:-}" in
   --selftest) selftest ;;
   --check) [ -n "${2:-}" ] || { echo "usage: $0 --check <address>" >&2; exit 2; }; check "$2" ;;
   --client-key) [ -n "${2:-}" ] || { echo "usage: $0 --client-key <address>" >&2; exit 2; }; client_key "$2" ;;
-  -*|"") echo "usage: $0 <address> | --check <address> | --client-key <address> | --selftest" >&2; exit 2 ;;
+  --origin-cert) [ -n "${2:-}" ] || { echo "usage: $0 --origin-cert <address>" >&2; exit 2; }; origin_cert "$2" ;;
+  -*|"") echo "usage: $0 <address> | --check <address> | --client-key <address> | --origin-cert <address> | --selftest" >&2; exit 2 ;;
   *) apply "$1" ;;
 esac

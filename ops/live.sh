@@ -37,7 +37,12 @@
 #            the ledger holds at least one row of kind sandbox for exactly this sandbox (sandbox 03). Before the DELETE a
 #            command runs in the background there (`sleep 25; echo bg-ok`, timeout 120000, sandbox 05): its answer is 200
 #            with running true and exit_code -1, the file from exit_code_file reads 0 within 60 s and the one from
-#            output_file holds bg-ok, so the wrapper, coreutils timeout under gVisor and /root/.exec are proven in production
+#            output_file holds bg-ok, so the wrapper, coreutils timeout under gVisor and /root/.exec are proven in production.
+#            Also before the DELETE, port 8080 of the sandbox is exposed (POST .../ports/expose, sandbox 07), a python3
+#            http.server there serves a canary line, the canary comes back through the public_url
+#            https://sbx-<id>-8080.<domain> within 60 s (through Cloudflare and Caddy, no key sent), and DELETE
+#            .../ports/8080 gives the port back; `port=<ok|...>` in the result, `FAIL sandbox: exposed port: ...` otherwise.
+#            Until the rollout of sandbox 07 that is the 409 of the control plane
 #   handoff  POST /v1/handoff with example values answers 201 with a two-digit match, GET /h/{code} shows three different
 #            two-digit numbers with match among them, and the stream GET /v1/handoff/{code} with the poll token says pending
 #            within 5 s (konto 02). Approves nothing: the code runs out unused after ten minutes. The poll token goes through
@@ -245,6 +250,10 @@ SANDBOX_HOST="${SANDBOX_HOST:-72.62.51.224}"
 CTL_URL="https://ctl.sbx.postyourprice.com"
 LIVE_SANDBOX_ENV="$HOME/.config/control-plane/live-sandbox.env"
 OURS_TS="$ROOT/src/bounties/ours.ts"
+# The port the check `sandbox` exposes in its own sandbox (sandbox 07), the one ops/sandbox/probe.sh uses, and how long
+# it waits at most for the canary through the public_url.
+PORT_NUMBER=8080
+PORT_WAIT=60
 
 # Rows of kind sandbox for one sandbox id (refs `sandbox:<id>:<step>`), the same text in production and in the selftest.
 # Only the count leaves the database; an id that is not lowercase alphanumeric (the format sandboxd gives) is refused, so
@@ -308,11 +317,27 @@ bg_reason() {
   esac
 }
 
+# Why the port step failed, $1 = its token from port_live.
+port_reason() {
+  case "${1:-}" in
+    "" | skipped) echo "step did not run" ;;
+    expose_none) echo "POST /v1/sandboxes/{id}/ports/expose gave no answer" ;;
+    expose_*) echo "POST /v1/sandboxes/{id}/ports/expose answered ${1#expose_}, expected 200" ;;
+    no_url) echo "answer to ports/expose holds no public_url" ;;
+    bad_url) echo "public_url is not https://sbx-<id>-$PORT_NUMBER.<domain> outside postyourprice.com" ;;
+    server_*) echo "exec that starts the server answered ${1#server_}, expected 200" ;;
+    fetch_failed) echo "canary did not come back through the public_url within $PORT_WAIT s" ;;
+    unexpose_*) echo "DELETE /v1/sandboxes/{id}/ports/$PORT_NUMBER answered ${1#unexpose_}, expected 2xx" ;;
+    *) echo "failed: $1" ;;
+  esac
+}
+
 # $1 = "client_key=<ok|fail> ctl=<status> create=<status> exec=<ok|wrong|status> bg=<ok|...> files=<ok|wrong|...>
-# delete=<status> ledger=<rows>", the result line of sandbox_live. Judges in the order of the steps and names the first
-# one that failed.
+# delete=<status> ledger=<rows> port=<ok|...>", the result line of sandbox_live. Judges in the order of the steps and
+# names the first one that failed; the port step comes last, so its 409 until the rollout of sandbox 07 hides no other
+# step.
 judge_sandbox() {
-  local toks tok client_key="" ctl="" create="" exec_="" bg="" files="" delete="" ledger=""
+  local toks tok client_key="" ctl="" create="" exec_="" bg="" files="" delete="" ledger="" port=""
   read -ra toks <<<"${1:-}"
   for tok in "${toks[@]}"; do
     case "$tok" in
@@ -324,6 +349,7 @@ judge_sandbox() {
       files=*) files="${tok#*=}" ;;
       delete=*) delete="${tok#*=}" ;;
       ledger=*) ledger="${tok#*=}" ;;
+      port=*) port="${tok#*=}" ;;
     esac
   done
   if [ "${#toks[@]}" -eq 0 ]; then
@@ -350,8 +376,10 @@ judge_sandbox() {
     echo "FAIL sandbox: ledger query gave no answer"
   elif [ "$ledger" -eq 0 ]; then
     echo "FAIL sandbox: no ledger row of kind sandbox for the sandbox"
+  elif [ "$port" != ok ]; then
+    echo "FAIL sandbox: exposed port: $(port_reason "$port")"
   else
-    echo "OK sandbox: client key set, ctl.sbx 200, created, exec ok, background exec ok, files ok, deleted, ledger rows: $ledger"
+    echo "OK sandbox: client key set, ctl.sbx 200, created, exec ok, background exec ok, files ok, deleted, ledger rows: $ledger, exposed port ok"
   fi
 }
 
@@ -382,10 +410,81 @@ sandbox_api() { # $1 = header file, $2 = method, $3 = path, $4 = answer file, $5
   curl "${args[@]}" "$BASE$3"
 }
 
+# The public_url of the exposed port, $1 = url, $2 = sandbox id: exactly https://sbx-<id>-<port>.<domain>, and never a
+# name under the payment domain, so a customer's service never answers inside the zone every paid call goes through.
+port_url_ok() {
+  [[ "$1" =~ ^https://(sbx-$2-$PORT_NUMBER(\.[a-z0-9-]+)+)$ ]] || return 1
+  case "${BASH_REMATCH[1]}" in *.postyourprice.com) return 1 ;; esac
+}
+
+# One fetch through the public_url, $1 = url, $2 = seconds at most. No key goes with it: the address is a customer's.
+port_fetch() {
+  curl -s --proto '=https' --max-time "$2" "$1/" 2>/dev/null | head -c 200
+}
+
+# The port step of the check `sandbox` (sandbox 07), $1 = header file, $2 = answer file, $3 = sandbox id. Exposes
+# PORT_NUMBER, starts a small server with a canary line in the sandbox, fetches the canary through the public_url for at
+# most PORT_WAIT s and gives the port back. Prints one token: ok, expose_<status>, no_url, bad_url, server_<status>,
+# fetch_failed or unexpose_<status>. Once ports/expose answered 2xx the port is given back, whatever failed after it.
+port_live() {
+  local hdr="$1" ans="$2" id="$3" code url canary result="" deadline left got
+  code="$(sandbox_api "$hdr" POST "/v1/sandboxes/$id/ports/expose" "$ans" "{\"port\":$PORT_NUMBER}")"
+  case "$code" in
+    200 | 201) ;;
+    "" | 000)
+      echo expose_none
+      return
+      ;;
+    *)
+      echo "expose_$code"
+      return
+      ;;
+  esac
+  url="$(json_field "$ans" public_url)"
+  url="${url%/}"
+  if [ -z "$url" ]; then
+    result=no_url
+  elif ! port_url_ok "$url" "$id"; then
+    result=bad_url
+  else
+    canary="live-port-$(rand_hex)"
+    code="$(sandbox_api "$hdr" POST "/v1/sandboxes/$id/exec" "$ans" "{\"command\":\"mkdir -p /root/live-port && echo $canary > /root/live-port/index.html && cd /root/live-port && (setsid python3 -m http.server $PORT_NUMBER > /dev/null 2>&1 &) ; sleep 1; true\",\"timeout\":30000}" "Idempotency-Key: live-check-port-$(rand_hex)")"
+    if [ "$code" != 200 ]; then
+      result="server_${code:-none}"
+    else
+      # Through Cloudflare and Caddy: the first fetches may meet a name or a route not there yet, so it retries every
+      # 5 s, each fetch bounded by the time left.
+      result=fetch_failed
+      deadline=$((SECONDS + PORT_WAIT))
+      while :; do
+        left=$((deadline - SECONDS))
+        [ "$left" -ge 1 ] || left=1
+        [ "$left" -le 10 ] || left=10
+        got="$(port_fetch "$url" "$left")"
+        if [ "${got%$'\r'}" = "$canary" ]; then
+          result=""
+          break
+        fi
+        [ $((SECONDS + 5)) -lt "$deadline" ] || break
+        sleep 5
+      done
+    fi
+  fi
+  code="$(sandbox_api "$hdr" DELETE "/v1/sandboxes/$id/ports/$PORT_NUMBER" "$ans")"
+  if [ -z "$result" ]; then
+    case "$code" in
+      2[0-9][0-9]) result=ok ;;
+      "" | 000) result=unexpose_none ;;
+      *) result="unexpose_$code" ;;
+    esac
+  fi
+  echo "$result"
+}
+
 # The live part of the check `sandbox`, $1 = ssh key. Prints the result line for judge_sandbox and nothing else: no id,
 # no key. Once a sandbox exists it is deleted, whatever failed before.
 sandbox_live() {
-  local sshkey="$1" client_key=fail ctl=none create=none exec_=skipped bg=skipped files=skipped delete=skipped ledger=none
+  local sshkey="$1" client_key=fail ctl=none create=none exec_=skipped bg=skipped files=skipped delete=skipped ledger=none port=skipped
   local last remote apikey="" hdr ans code id="" out text start exitf outf deadline
   last="$(CP_HOST="$CP_HOST" CP_SSH_KEY="$sshkey" bash "$ROOT/ops/sandbox/setup.sh" --client-key "$SANDBOX_HOST" </dev/null 2>/dev/null | tail -n 1)"
   case "$last" in "SETUP CLIENT-KEY OK"*) client_key=ok ;; esac
@@ -461,6 +560,11 @@ sandbox_live() {
         fi
       fi
 
+      # The exposed port (sandbox 07) runs in a subshell of its own and only prints its token, so whatever it meets, the
+      # DELETE below still runs.
+      port="$(port_live "$hdr" "$ans" "$id")"
+      port="${port:-none}"
+
       delete="$(sandbox_api "$hdr" DELETE "/v1/sandboxes/$id" "$ans")"
 
       remote="docker exec deploy-cp-1 node -e $(printf %q "$SANDBOX_LEDGER_JS") /data/cp.db $(printf %q "$id")"
@@ -470,7 +574,7 @@ sandbox_live() {
     rm -f "$hdr" "$ans"
   fi
   apikey=""
-  echo "client_key=$client_key ctl=${ctl:-none} create=${create:-none} exec=$exec_ bg=$bg files=$files delete=${delete:-none} ledger=$ledger"
+  echo "client_key=$client_key ctl=${ctl:-none} create=${create:-none} exec=$exec_ bg=$bg files=$files delete=${delete:-none} ledger=$ledger port=$port"
 }
 
 # The query of the check `sandbox-foreign` against one database, $1 = how to run node on it: "local <file>" in the
@@ -589,15 +693,21 @@ selftest() {
   # missing, the wrong exec text, a 401 over ctl.sbx, the client key not set, the 501 of an unreachable sandbox server),
   # a file that reads back different, a ledger query without an answer, and no result at all. The background exec
   # (sandbox 05) fails on its own too: held instead of running, a 504, no exit file within 60 s, stopped at its timeout
-  # (124), no bg-ok in the output, and a result line without the step at all.
-  local s_good="client_key=ok ctl=200 create=201 exec=ok bg=ok files=ok delete=200 ledger=1"
+  # (124), no bg-ok in the output, and a result line without the step at all. The exposed port (sandbox 07) fails on its
+  # own too: the 409 of the control plane before the rollout, no answer, no public_url, a public_url under the payment
+  # domain, the server not started, no canary within 60 s, the port not given back, and a result line without the step.
+  local s_good="client_key=ok ctl=200 create=201 exec=ok bg=ok files=ok delete=200 ledger=1 port=ok"
   local s_case s_line s_expect
   for s_case in "$s_good|OK" "${s_good/ledger=1/ledger=0}|FAIL" "${s_good/exec=ok/exec=wrong}|FAIL" \
     "${s_good/ctl=200/ctl=401}|FAIL" "${s_good/client_key=ok/client_key=fail}|FAIL" \
     "client_key=ok ctl=200 create=501 exec=skipped files=skipped delete=skipped ledger=none|FAIL" \
     "${s_good/files=ok/files=wrong}|FAIL" "${s_good/ledger=1/ledger=none}|FAIL" "|FAIL" \
     "${s_good/bg=ok/bg=start-notrunning}|FAIL" "${s_good/bg=ok/bg=start-504}|FAIL" "${s_good/bg=ok/bg=noexit}|FAIL" \
-    "${s_good/bg=ok/bg=exit-124}|FAIL" "${s_good/bg=ok/bg=wrong}|FAIL" "${s_good/ bg=ok/}|FAIL"; do
+    "${s_good/bg=ok/bg=exit-124}|FAIL" "${s_good/bg=ok/bg=wrong}|FAIL" "${s_good/ bg=ok/}|FAIL" \
+    "client_key=ok ctl=200 create=201 exec=ok files=ok delete=200 ledger=1|FAIL" \
+    "${s_good/port=ok/port=expose_409}|FAIL" "${s_good/port=ok/port=expose_none}|FAIL" \
+    "${s_good/port=ok/port=no_url}|FAIL" "${s_good/port=ok/port=bad_url}|FAIL" "${s_good/port=ok/port=server_504}|FAIL" \
+    "${s_good/port=ok/port=fetch_failed}|FAIL" "${s_good/port=ok/port=unexpose_404}|FAIL" "${s_good/ port=ok/}|FAIL"; do
     s_line="${s_case%|*}"
     s_expect="${s_case##*|}"
     got="$(judge_sandbox "$s_line")"
@@ -657,6 +767,68 @@ selftest() {
     echo "planted sandbox ledger for id $l_id (${l_n:-no answer} rows): $got"
     [ "${got%% *}" = "$l_expect" ] || all_ok=0
   done
+
+  # The port step of the check `sandbox` (sandbox 07) through the real port_live, with stand-ins for the public API, the
+  # fetch through the public_url and sleep (which only moves SECONDS on, so 60 s pass at once). Both directions: the canary
+  # on the first and on the third fetch is ok; no canary within 60 s, the 409 before the rollout, no answer, no
+  # public_url, one under the payment domain or for another sandbox, a 504 of the server start and a 404 of the DELETE
+  # each give their own token. The port is given back whenever ports/expose answered 2xx, also when a later step failed.
+  local p_good="https://sbx-k3v9q2m7x1-8080.example.dev"
+  local pc pc_name pc_expose pc_url pc_server pc_hit pc_unexpose pc_expect pc_back pc_log pc_tok pc_un pc_n
+  port_step() { # $1 = expose status, $2 = public_url or -, $3 = exec status, $4 = fetch that sees the canary (0: none), $5 = unexpose status, $6 = call log
+    (
+      p_expose="$1" p_url="$2" p_server="$3" p_hit="$4" p_unexpose="$5" p_log="$6"
+      sandbox_api() { # stand-in of the public API: logs the call, answers from the case
+        echo "$2 $3" >>"$p_log"
+        case "$2 $3" in
+          "POST /v1/sandboxes/k3v9q2m7x1/ports/expose")
+            if [ "$p_url" = - ]; then printf '{"port":8080}' >"$4"; else printf '{"port":8080,"public_url":"%s"}' "$p_url" >"$4"; fi
+            echo "$p_expose"
+            ;;
+          "POST /v1/sandboxes/k3v9q2m7x1/exec")
+            printf '%s' "$5" >"$p_log.exec"
+            printf '{"stdout":"","stderr":"","exit_code":0}' >"$4"
+            echo "$p_server"
+            ;;
+          "DELETE /v1/sandboxes/k3v9q2m7x1/ports/8080") echo "$p_unexpose" ;;
+          *) echo 404 ;;
+        esac
+      }
+      port_fetch() { # stand-in of the fetch: the canary of the server start from fetch number p_hit on
+        echo "FETCH $1" >>"$p_log"
+        [ "$p_hit" != 0 ] && [ "$(grep -c '^FETCH ' "$p_log")" -ge "$p_hit" ] && grep -oE 'live-port-[0-9a-f]+' "$p_log.exec" | head -n 1
+      }
+      sleep() { SECONDS=$((SECONDS + ${1%%.*})); }
+      port_live "$dir/port-hdr" "$dir/port-ans" k3v9q2m7x1
+    )
+  }
+  for pc in "ok|200|$p_good|200|1|200|ok|yes" "late|201|$p_good|200|3|200|ok|yes" "never|200|$p_good|200|0|200|fetch_failed|yes" \
+    "409|409|-|200|1|200|expose_409|no" "none|000|-|200|1|200|expose_none|no" "nourl|200|-|200|1|200|no_url|yes" \
+    "payurl|200|https://sbx-k3v9q2m7x1-8080.postyourprice.com|200|1|200|bad_url|yes" \
+    "otherid|200|https://sbx-q0q0q0q0q0-8080.example.dev|200|1|200|bad_url|yes" \
+    "server|200|$p_good|504|1|200|server_504|yes" "unexpose|200|$p_good|200|1|404|unexpose_404|yes"; do
+    IFS='|' read -r pc_name pc_expose pc_url pc_server pc_hit pc_unexpose pc_expect pc_back <<<"$pc"
+    pc_log="$dir/port-$pc_name.log"
+    : >"$pc_log"
+    pc_tok="$(port_step "$pc_expose" "$pc_url" "$pc_server" "$pc_hit" "$pc_unexpose" "$pc_log")"
+    pc_un=no
+    grep -qx "DELETE /v1/sandboxes/k3v9q2m7x1/ports/8080" "$pc_log" && pc_un=yes
+    pc_n="$(grep -c '^FETCH ' "$pc_log")"
+    echo "planted port step $pc_name: port=${pc_tok:-nothing} unexposed=$pc_un fetches=$pc_n"
+    [ "$pc_tok" = "$pc_expect" ] && [ "$pc_un" = "$pc_back" ] || all_ok=0
+    # Fetches go to the public_url only, and only after the server start answered 200.
+    if grep '^FETCH ' "$pc_log" | grep -vqx "FETCH $p_good"; then
+      echo "FAIL selftest: port step $pc_name fetched another address than the public_url"
+      all_ok=0
+    fi
+    case "$pc_name" in
+      ok | late | never | unexpose) [ "$pc_n" -ge 1 ] || all_ok=0 ;;
+      *) [ "$pc_n" = 0 ] || all_ok=0 ;;
+    esac
+  done
+  # Without the canary it retries for 60 s, not once and not longer: one fetch every 5 s.
+  pc_n="$(grep -c '^FETCH ' "$dir/port-never.log")"
+  [ "$pc_n" -ge 2 ] && [ "$pc_n" -le 12 ] || { echo "FAIL selftest: port step never made $pc_n fetches, expected 2 to 12"; all_ok=0; }
 
   # The check `handoff` through the real parts (HANDOFF_PREP_JS, HANDOFF_JS, judge_handoff), both directions: the answer of a
   # working service, then a 404 of the POST, an answer without match, a stream without pending, a page without match among

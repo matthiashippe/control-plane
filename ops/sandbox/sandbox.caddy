@@ -13,12 +13,14 @@ ctl.sbx.postyourprice.com {
 	}
 }
 
-# Exposed sandbox ports, through the Cloudflare proxy. The zone runs SSL mode Full, so Cloudflare encrypts to this origin without
-# checking the certificate; Caddy's internal issuer serves it, no ACME and no global option (goals/sandbox/ANNAHMEN.md, Goal 02).
-# sandboxd answers 404 for every name it does not know, so no sandbox shows up under an arbitrary name of the zone.
-*.postyourprice.com {
-	tls internal
-	@sandbox header_regexp Host ^sbx-[a-z0-9]{1,11}-[0-9]{1,5}\.postyourprice\.com(:[0-9]+)?$
+# Exposed sandbox ports under a domain of their own, never under the zone of the payment service (goals/sandbox/07), through
+# the Cloudflare proxy. The zone runs SSL mode Full (strict): Cloudflare checks this origin against the Origin CA certificate in
+# /etc/caddy/sbx/, which ops/sandbox/setup.sh --origin-cert puts there (0600, owner caddy); certificate and key never enter the
+# repo. The site name already pins the domain, so the matcher only checks the label. sandboxd answers 404 for every name it does
+# not know, so no sandbox shows up under an arbitrary name of the zone.
+*.sandboxhost.dev {
+	tls /etc/caddy/sbx/origin.pem /etc/caddy/sbx/origin.key
+	@sandbox header_regexp Host ^sbx-[a-z0-9]{1,11}-[0-9]{1,5}\.
 	handle @sandbox {
 		reverse_proxy 127.0.0.1:8731 {
 			header_up Host {host}
