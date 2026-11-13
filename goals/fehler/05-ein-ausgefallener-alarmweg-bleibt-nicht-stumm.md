@@ -1,7 +1,7 @@
 # Fehler Goal 05: Ein ausgefallener Alarmweg bleibt nicht stumm
 
 ## Status
-PLANNED
+DONE
 
 ## Active Objective
 Fällt der Alarmweg aus (Thema gesperrt, URL falsch, Webhook-Dienst weg), sieht es die Ops-Triage: `ops/status.sh` zählt die Zeilen
@@ -57,13 +57,13 @@ davor nur hilft, wenn ihr Ausfall auffällt.
   `check` stagen, weil die Regeln nur `git ls-files` lesen.
 
 ## Done Condition
-- [ ] `ops/webhook-unreachable.sh` zählt die Zeilen `[WARN] webhook unreachable` der letzten 24 Stunden eines Logs und endet bei
+- [x] `ops/webhook-unreachable.sh` zählt die Zeilen `[WARN] webhook unreachable` der letzten 24 Stunden eines Logs und endet bei
       fehlendem Log mit Exit 2 ohne Ausgabe.
       MVP: Funktion, weil ohne diese Zahl der Ausfall des Alarmwegs nirgends lesbar ist.
       Prüfung: `d=$(mktemp -d); printf '%s [WARN] webhook unreachable\n' 2026-11-13T11:50:00Z 2026-11-13T11:40:00Z 2026-11-12T12:01:00Z 2026-11-12T11:59:00Z > "$d/w.log"; printf '2026-11-13T11:55:00Z [WARN] credit unreadable\n2026-11-13T11:56:00Z [OUTAGE] HTTP 500, twice in a row\n' >> "$d/w.log"; CP_NOW=1794571200 bash ops/webhook-unreachable.sh "$d/w.log"` muss `3` ausgeben.
       Prüfung: `d=$(mktemp -d); printf '%s [WARN] webhook unreachable\n' 2026-11-12T11:59:59Z 2026-11-01T00:00:00Z > "$d/w.log"; CP_NOW=1794571200 bash ops/webhook-unreachable.sh "$d/w.log"` muss `0` ausgeben.
       Prüfung: `d=$(mktemp -d); CP_NOW=1794571200 bash ops/webhook-unreachable.sh "$d/fehlt.log"; echo "exit=$?"` muss genau `exit=2` ausgeben.
-- [ ] `ops/status.sh` meldet `alarm_path` mit `red` ab 3 Zeilen der letzten 24 Stunden, `ok` darunter und `unknown` mit `null` ohne
+- [x] `ops/status.sh` meldet `alarm_path` mit `red` ab 3 Zeilen der letzten 24 Stunden, `ok` darunter und `unknown` mit `null` ohne
       lesbares Log; der neue Test `test/status-alarm-path.test.ts` belegt es ohne Netz und war vor dem Fix rot. `ops/README.md` führt
       `alarm_path.status` in der Schwellentabelle.
       MVP: Funktion, weil die Ops-Triage nur meldet, was `ops/status.sh` ausgibt und `ops/README.md` als Schwelle nennt.
@@ -71,21 +71,21 @@ davor nur hilft, wenn ihr Ausfall auffällt.
       Prüfung: `d=$(mktemp -d); git show de06752:ops/status.sh > "$d/status.sh"; cp ops/db-report.cjs "$d/"; STATUS_UNDER_TEST="$d/status.sh" pnpm -s vitest run test/status-alarm-path.test.ts >/dev/null 2>&1 && echo gruen || echo rot` muss `rot` ausgeben.
       Prüfung: `grep -c '^| .alarm_path\.status. |' ops/README.md` muss 1 ausgeben.
       Prüfung: `grep -cE '\.skip|skipIf|\.only|\.todo' test/status-alarm-path.test.ts` muss 0 ausgeben.
-- [ ] `test/watchdog-webhook-fail.test.ts` misst eine Antwort 4xx oder 5xx des Webhooks: Ein Watchdog, dessen `report` ohne `--fail`
+- [x] `test/watchdog-webhook-fail.test.ts` misst eine Antwort 4xx oder 5xx des Webhooks: Ein Watchdog, dessen `report` ohne `--fail`
       postet, macht den Test rot; der Watchdog im Repo hält ihn grün, auch den Test der Tagesmeldungen aus fehler 03.
       MVP: Funktion, weil sonst ein entferntes `--fail` jede Meldung bei einem Webhook mit 5xx als zugestellt speichert und der Test es
       nicht merkt.
       Prüfung: `pnpm -s vitest run test/watchdog-webhook-fail.test.ts test/watchdog-webhook-fail-daily.test.ts` muss Exit-Code 0 haben.
       Prüfung: `d=$(mktemp -d); sed 's/curl -s --fail /curl -s /' ops/watchdog.sh > "$d/watchdog.sh"; cmp -s "$d/watchdog.sh" ops/watchdog.sh && echo gleich || echo anders` muss `anders` ausgeben.
       Prüfung: `d=$(mktemp -d); sed 's/curl -s --fail /curl -s /' ops/watchdog.sh > "$d/watchdog.sh"; cp ops/credit-runway.sh "$d/"; WATCHDOG_UNDER_TEST="$d/watchdog.sh" pnpm -s vitest run test/watchdog-webhook-fail.test.ts >/dev/null 2>&1 && echo gruen || echo rot` muss `rot` ausgeben.
-- [ ] `ops/watchdog.sh` und `src/` bleiben unverändert, und `check` ist grün.
+- [x] `ops/watchdog.sh` und `src/` bleiben unverändert, und `check` ist grün.
       Prüfung: `git diff --name-only origin/dev...HEAD -- src ops/watchdog.sh | wc -l` muss 0 ausgeben.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
-- [ ] `ops/status.sh` gegen die Produktion liefert `alarm_path.unreachable_24h` als Zahl, also findet und liest das Skript das Log auf
+- [x] `ops/status.sh` gegen die Produktion liefert `alarm_path.unreachable_24h` als Zahl, also findet und liest das Skript das Log auf
       dem Server, nur lesend über den Schlüssel aus `~/.config/control-plane/loop.env`.
       MVP: Funktion, weil ein Feld, das auf dem Server nur `unknown` meldet, den Ausfall genauso verschweigt wie heute.
       Prüfung (Netz): `set -a; . ~/.config/control-plane/loop.env; set +a; bash ops/status.sh | python3 -c 'import json,sys; print(type(json.load(sys.stdin)["alarm_path"]["unreachable_24h"]).__name__)'` muss `int` ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Der neue Test war vor dem Fix rot, und der Test des Watchdogs war mit dem Watchdog ohne `--fail` vor dem Fix grün; die Zeile im
@@ -107,5 +107,8 @@ davor nur hilft, wenn ihr Ausfall auffällt.
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-13 Zyklus 1: Punkte 1, 2, 3, 4, 5 gebaut (neues `ops/webhook-unreachable.sh`, Feld `alarm_path` in `ops/status.sh`, Schwelle in `ops/README.md`, neuer Test `test/status-alarm-path.test.ts`, Fall `http-500-next` in `test/watchdog-webhook-fail.test.ts`); vor dem Fix war `test/status-alarm-path.test.ts` rot (5 von 5) und `test/watchdog-webhook-fail.test.ts` mit dem Watchdog ohne `--fail` grün (5 von 5), danach mit ihm rot (neuer Fall). Prüfbefehle: P1 `3`, `0`, `exit=2`; P2 Exit 0, `rot`, `1`, `0`; P3 Exit 0, `anders`, `rot`; P4 `0`, `check` grün in 291 s (129 Dateien, 1576 Tests); P5 `int` (Wert 0, Status ok), Gegenprobe lesend: Server-Log kopiert 0, mit gepflanzter Zeile 1, auf dem Server ohne Log Exit 2.
+- 2026-11-13 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5 (dev `44e7787` schon enthalten, Merge ohne Änderung). Prüfbefehle: P1 `3`, `0`, `exit=2`; P2 Exit 0, `rot`, `1`, `0`; P3 Exit 0, `anders`, `rot`; P4 `0`, `check` grün in 248 s (129 Dateien); P5 `int` (Wert 0, Status ok); Job `e2e` am Kopf `af2b340` grün.
+- 2026-11-13 Release: PASS K und B (Zyklus 2), DONE.
 
 ## Blockers

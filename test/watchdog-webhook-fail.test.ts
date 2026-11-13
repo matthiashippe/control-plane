@@ -33,6 +33,7 @@ function sandbox() {
   const container = join(root, "container.json");
   const health = join(root, "health-code");
   const failNext = join(root, "fail-next");
+  const http500Next = join(root, "http-500-next");
   writeFileSync(posts, "");
   const fake = (name: string, lines: string[]) => {
     writeFileSync(join(bin, name), ["#!/bin/sh", ...lines].join("\n") + "\n");
@@ -41,6 +42,7 @@ function sandbox() {
   fake("curl", [
     'case "$*" in',
     `  *"-X POST"*) if [ -e "${failNext}" ]; then rm -f "${failNext}"; exit 22; fi;`,
+    `    if [ -e "${http500Next}" ]; then rm -f "${http500Next}"; case "$*" in *--fail*) exit 22 ;; *) exit 0 ;; esac; fi;`,
     `    for a in "$@"; do printf '%s\\t' "$a"; done >> "${posts}"; echo >> "${posts}" ;;`,
     `  */health*) cat "${health}" ;;`,
     "  *) exit 7 ;;",
@@ -50,10 +52,14 @@ function sandbox() {
   fake("openssl", ["exit 1"]);
   fake("sleep", ["exit 0"]);
   const state = join(mkdtempSync(join(tmpdir(), "watchdog-webhook-fail-state-")), "state");
-  const run = (containerAnswer: string, opts: { healthCode?: string; failPost?: boolean } = {}) => {
+  const run = (
+    containerAnswer: string,
+    opts: { healthCode?: string; failPost?: boolean; http500Post?: boolean } = {},
+  ) => {
     writeFileSync(container, containerAnswer);
     writeFileSync(health, opts.healthCode ?? "200");
     if (opts.failPost) writeFileSync(failNext, "");
+    if (opts.http500Post) writeFileSync(http500Next, "");
     const r = spawnSync("bash", [WATCHDOG], {
       encoding: "utf8",
       timeout: 60_000,
@@ -143,4 +149,14 @@ describe("ops/watchdog.sh posts a message again in the next run when the POST to
     expect(back(all).length).toBe(1);
     expect(all.length).toBe(2);
   }, 240_000);
+
+  it("LOW: an answer 500 of the webhook is not taken as delivered, the next run posts exactly once", () => {
+    const s = sandbox();
+    const failed = s.run(answer(4, 0), { http500Post: true });
+    expect(failed.out).toContain("[WARN] webhook unreachable");
+    expect(s.postLines()).toEqual([]);
+    s.run(answer(4, 0));
+    expect(low(s.postLines()).length).toBe(1);
+    expect(s.postLines().length).toBe(1);
+  }, 180_000);
 });
