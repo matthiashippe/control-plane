@@ -1,7 +1,7 @@
 # Fehler Goal 06: Der Beleg (fetcher-cache) in ops/known-ips.txt ist prüfbar
 
 ## Status
-PLANNED
+DONE
 
 ## Active Objective
 Eine Zeile `<Adresse> datacenter <Betreiber> (fetcher-cache)` in `ops/known-ips.txt` erlaubt einer öffentlichen Adresse, in einer
@@ -52,7 +52,7 @@ Besucheradresse im öffentlichen Repo Grundregel 8 bricht.
   `check` stagen, weil die Regeln nur `git ls-files` lesen.
 
 ## Done Condition
-- [ ] `test/known-ips.test.ts` prüft jede Zeile mit `(fetcher-cache)` gegen den Cache: Eine gepflanzte Besucheradresse mit diesem
+- [x] `test/known-ips.test.ts` prüft jede Zeile mit `(fetcher-cache)` gegen den Cache: Eine gepflanzte Besucheradresse mit diesem
       Beleg, ein anderer Betreiber, eine im Cache fehlende Adresse und Text nach dem Beleg machen den Test rot, eine passende Zeile
       lässt ihn grün, und die Meldung nennt keine Adresse.
       MVP: Funktion, weil genau dieser Fall heute durch `check` kommt.
@@ -62,27 +62,27 @@ Besucheradresse im öffentlichen Repo Grundregel 8 bricht.
       Prüfung: `d=$(mktemp -d); printf '203.0.113.7 datacenter AWS (fetcher-cache) since 2026\n' > "$d/list"; printf '# ip\towner\tkind\n203.0.113.7\tAWS\tdatacenter\n' > "$d/c"; CP_KNOWN_IPS="$d/list" CP_FETCHER_CACHE="$d/c" pnpm -s vitest run test/known-ips.test.ts -t 'against the cache of ops/fetchers' >/dev/null 2>&1 && echo gruen || echo rot` muss `rot` ausgeben.
       Prüfung: `d=$(mktemp -d); printf '203.0.113.7 datacenter AWS (fetcher-cache)\n' > "$d/list"; printf '# ip\towner\tkind\n203.0.113.7\tAWS\tdatacenter\n' > "$d/c"; CP_KNOWN_IPS="$d/list" CP_FETCHER_CACHE="$d/c" pnpm -s vitest run test/known-ips.test.ts -t 'against the cache of ops/fetchers' --reporter=json 2>/dev/null | python3 -c 'import json,sys; r=json.load(sys.stdin); print(r["numPassedTests"], r["numFailedTests"])'` muss `1 0` ausgeben.
       Prüfung: `d=$(mktemp -d); printf '203.0.113.7 datacenter AWS (fetcher-cache)\n' > "$d/list"; printf '# ip\towner\tkind\n203.0.113.7\t-\tunknown\n' > "$d/c"; CP_KNOWN_IPS="$d/list" CP_FETCHER_CACHE="$d/c" pnpm -s vitest run test/known-ips.test.ts -t 'against the cache of ops/fetchers' 2>&1 | grep -c '203\.0\.113\.7'` muss `0` ausgeben.
-- [ ] Vor dem Fix war derselbe Fall grün, danach ist er rot: Mit gepflanzter Besucheradresse und einem Scan-Wurzelverzeichnis, in dem
+- [x] Vor dem Fix war derselbe Fall grün, danach ist er rot: Mit gepflanzter Besucheradresse und einem Scan-Wurzelverzeichnis, in dem
       sie steht, besteht die ganze Testdatei von `92ffe8a`, die neue nicht.
       MVP: Funktion, weil nur so belegt ist, dass der neue Teil die Lücke schließt und nicht ein anderer Fall der Datei.
       Prüfung: `d=$(mktemp -d); git init -q "$d/r"; printf 'seen 203.0.113.7\n' > "$d/r/a.txt"; git -C "$d/r" add a.txt; printf '203.0.113.7 datacenter AWS (fetcher-cache)\n' > "$d/list"; printf '# ip\towner\tkind\n203.0.113.7\t-\tunknown\n' > "$d/c"; git show 92ffe8a:test/known-ips.test.ts > test/known-ips-before.test.ts; CP_KNOWN_IPS="$d/list" CP_SCAN_ROOT="$d/r" CP_FETCHER_CACHE="$d/c" pnpm -s vitest run test/known-ips-before.test.ts >/dev/null 2>&1 && echo gruen || echo rot; rm -f test/known-ips-before.test.ts` muss `gruen` ausgeben.
       Prüfung: `d=$(mktemp -d); git init -q "$d/r"; printf 'seen 203.0.113.7\n' > "$d/r/a.txt"; git -C "$d/r" add a.txt; printf '203.0.113.7 datacenter AWS (fetcher-cache)\n' > "$d/list"; printf '# ip\towner\tkind\n203.0.113.7\t-\tunknown\n' > "$d/c"; CP_KNOWN_IPS="$d/list" CP_SCAN_ROOT="$d/r" CP_FETCHER_CACHE="$d/c" pnpm -s vitest run test/known-ips.test.ts >/dev/null 2>&1 && echo gruen || echo rot` muss `rot` ausgeben.
       Prüfung: `git ls-files test/known-ips-before.test.ts | wc -l` muss 0 ausgeben.
-- [ ] Ohne Cache ist der neue Teil übersprungen und der Rest grün; auf dem code-host hält die echte Liste gegen den echten Cache.
+- [x] Ohne Cache ist der neue Teil übersprungen und der Rest grün; auf dem code-host hält die echte Liste gegen den echten Cache.
       MVP: Funktion, weil CI keinen Cache hat und `check` dort grün bleiben muss, und weil die sieben Einträge von heute echt sind.
       Prüfung: `d=$(mktemp -d); CP_FETCHER_CACHE="$d/fehlt.tsv" pnpm -s vitest run test/known-ips.test.ts --reporter=json 2>/dev/null | python3 -c 'import json,sys; r=json.load(sys.stdin); print(r["numPendingTests"], r["numFailedTests"])'` muss `1 0` ausgeben.
       Prüfung: `test -f ~/.cache/control-plane/fetcher-cache.tsv && env -u CP_FETCHER_CACHE pnpm -s vitest run test/known-ips.test.ts --reporter=json 2>/dev/null | python3 -c 'import json,sys; r=json.load(sys.stdin); print(r["numPendingTests"], r["numFailedTests"])'` muss auf dem code-host `0 0` ausgeben.
       Prüfung: `grep -cE '\.skip\(|\.only|\.todo' test/known-ips.test.ts` muss 0 ausgeben.
       Prüfung: `grep -c 'skipIf' test/known-ips.test.ts` muss 1 ausgeben.
-- [ ] `ops/known-ips.txt` und `ops/README.md` nennen die Prüfung gegen den Cache, die Einträge der Liste bleiben unverändert.
+- [x] `ops/known-ips.txt` und `ops/README.md` nennen die Prüfung gegen den Cache, die Einträge der Liste bleiben unverändert.
       MVP: Funktion, weil wer eine Zeile einträgt, wissen muss, dass der Beleg geprüft wird und in welcher Form.
       Prüfung: `grep -c 'CP_FETCHER_CACHE' ops/README.md` muss mindestens 1 ausgeben.
       Prüfung: `grep -c '^#.*(fetcher-cache).*test/known-ips.test.ts\|^#.*test/known-ips.test.ts.*(fetcher-cache)' ops/known-ips.txt` muss mindestens 1 ausgeben.
       Prüfung: `diff <(git show origin/dev:ops/known-ips.txt | grep -vE '^(#|$)') <(grep -vE '^(#|$)' ops/known-ips.txt) && echo gleich` muss `gleich` ausgeben.
-- [ ] Nur die Testdatei, die Liste, `ops/README.md` und Dateien des Goals ändern sich, und `check` ist grün.
+- [x] Nur die Testdatei, die Liste, `ops/README.md` und Dateien des Goals ändern sich, und `check` ist grün.
       Prüfung: `git diff --name-only origin/dev...HEAD | grep -vE '^(test/known-ips\.test\.ts|ops/known-ips\.txt|ops/README\.md|goals/fehler/)' | wc -l` muss 0 ausgeben.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Die Zeile im Progress Log nennt die Gegenprobe: alte Testdatei mit gepflanzter Besucheradresse grün, neue rot.
@@ -104,5 +104,8 @@ Besucheradresse im öffentlichen Repo Grundregel 8 bricht.
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-13 Zyklus 1: Punkte 1, 2, 3, 4, 5 gebaut: neues `it.skipIf` in `test/known-ips.test.ts` prüft jede Zeile mit `(fetcher-cache)` gegen den Cache (Form, Art `datacenter`, Betreiber), Kopf von `ops/known-ips.txt` und `ops/README.md` nennen die Prüfung, Einträge unverändert. Gegenprobe: alte Testdatei von `92ffe8a` mit gepflanzter Besucheradresse grün, neue rot (1 failed, 5 passed), mit passendem Cache wieder grün; echte Liste mit einem verfälschten Betreiber gegen den echten Cache rot. Prüfbefehle: P1 rot, rot, rot, rot, `1 0`, `0`; P2 gruen, rot, 0; P3 `1 0`, `0 0`, 0, 1; P4 1, 1, gleich; P5 0, `check` Exit 0 (1592 Tests grün).
+- 2026-11-13 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, `dev` (5d27c18) ohne Änderung gemergt. Prüfbefehle: P1 rot, rot, rot, rot, `1 0`, `0`; P2 gruen, rot, 0; P3 `1 0`, `0 0`, 0, 1; P4 1, 1, gleich; P5 0, `check` Exit 0 (1592 Tests grün).
+- 2026-11-13 Release: PASS K und B (Zyklus 2), DONE.
 
 ## Blockers

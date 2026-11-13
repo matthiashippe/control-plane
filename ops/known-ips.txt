@@ -2,6 +2,8 @@
 # test/known-ips.test.ts turns check red for any public address in git ls-files that none of the three lists names.
 # One line per address: <address> <kind> <evidence>, separated by single spaces, the evidence is free text up to the end of the line.
 #   datacenter  the operator, from the cache of ops/fetchers.py (fetcher-cache) or from a lookup named in the line
+#               as <operator> (fetcher-cache) and nothing after it; where the cache exists (CP_FETCHER_CACHE), test/known-ips.test.ts
+#               checks that it holds the address with kind datacenter and exactly that operator
 #   crawler     the PTR name, proven by the DNS round trip of ops/crawlers.sh
 #   eigene      which of our machines, and the file that names it
 #   erfunden    the commit that brought it as a test value; only for an address left in a file this list may not change

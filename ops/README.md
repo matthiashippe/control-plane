@@ -863,7 +863,7 @@ IPv4 addresses a tracked file may carry besides `ops/own-ips.txt` (our machines,
 | `eigene` | which of our machines, and the file that names it (payment server, sandbox server in `docs/sandbox/server.md`) |
 | `erfunden` | the commit that brought it as a test value; only for an address left in a file a goal may not change (a DONE goal file, a verdict, `docs/audit/`) |
 
-`test/known-ips.test.ts` reads the three lists and every file in `git ls-files`, without the cache and without network, and fails
+`test/known-ips.test.ts` reads the three lists and every file in `git ls-files`, without a lookup and without network, and fails
 `check` for any public address outside `192.0.2.0/24`, `198.51.100.0/24` and `203.0.113.0/24` that none of them names. The message
 gives the count and the files, never an address. A new address in a fixture, a comment or a test is therefore either replaced by a
 documentation address (the same replacement in every file, so a fixture behaves as before) or listed with its evidence; an invented
@@ -876,6 +876,12 @@ may change (`goals/`, `docs/audit/`, `LOOP.md`, `loop-constraints.md`, `loop-dau
 and every entry still stands in a tracked file besides the list. An entry whose finding is gone is removed, otherwise the list
 would let a later visitor with the same address through. Findings are the tracked files of the scan root and of the work tree
 that tracks the list; the message names the count and the line numbers or files, never an address.
+
+A `datacenter` line with the evidence `fetcher-cache` reads exactly `<address> datacenter <operator> (fetcher-cache)`.
+Where the cache of `ops/fetchers.py` exists (`CP_FETCHER_CACHE`, default `~/.cache/control-plane/fetcher-cache.tsv`),
+`test/known-ips.test.ts` checks every such line against it: the cache must hold the address with kind `datacenter` and exactly
+that operator. Without the cache, as in CI, that part is skipped; the test only reads the cache and never runs `ops/fetchers.py`.
+Here too the message names the count, the line numbers and the reason, never an address.
 
 Three /24 networks are all the documentation ranges offer. A fixture with more foreign /24 networks than that keeps the behaviour
 that depends on them (no address shares its /24 with two others unless it did before), but the summary "N address(es) in M

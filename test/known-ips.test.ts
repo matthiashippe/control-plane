@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
+import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 
 /**
@@ -14,16 +15,26 @@ import { basename, dirname, isAbsolute, join, resolve } from "node:path";
  * a finding outside the list, so the list never turns into a permit for an address that comes later. Findings are the tracked
  * files of the scan root and of the work tree that tracks the list.
  *
+ * An entry whose evidence is (fetcher-cache) is checked against the cache of ops/fetchers.py where that cache exists: the line
+ * reads exactly <address> datacenter <operator> (fetcher-cache), and the cache holds the address with kind datacenter and the
+ * same operator. Without the cache (CI) that case is skipped, the others still run.
+ *
  * This test needs no lookup and no network, so it runs in check and in CI. The failure message names the count, the files or
  * the line numbers, never an address.
  *
- *   CP_KNOWN_IPS   the list to read instead of ops/known-ips.txt (/dev/null is an empty list)
- *   CP_SCAN_ROOT   the git work tree to scan instead of this repository
+ *   CP_KNOWN_IPS       the list to read instead of ops/known-ips.txt (/dev/null is an empty list)
+ *   CP_SCAN_ROOT       the git work tree to scan instead of this repository
+ *   CP_FETCHER_CACHE   the cache of ops/fetchers.py instead of ~/.cache/control-plane/fetcher-cache.tsv, read only
  */
 const ROOT = join(__dirname, "..");
 const fromRoot = (p: string): string => (isAbsolute(p) ? p : resolve(ROOT, p));
 const KNOWN = fromRoot(process.env.CP_KNOWN_IPS || "ops/known-ips.txt");
 const SCAN_ROOT = fromRoot(process.env.CP_SCAN_ROOT || ROOT);
+// The same cache path as test/visitor-addresses.test.ts.
+const CACHE = process.env.CP_FETCHER_CACHE || join(homedir(), ".cache", "control-plane", "fetcher-cache.tsv");
+// The evidence that points at the cache, and the only form a line carrying it may have.
+const FETCHER_CACHE = "(fetcher-cache)";
+const CACHE_LINE = /^((?:[0-9]{1,3}\.){3}[0-9]{1,3}) datacenter ([^ ].*) \(fetcher-cache\)$/;
 // The same candidate pattern as test/visitor-addresses.test.ts.
 const IPV4 = /\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b/g;
 
@@ -132,6 +143,31 @@ function findingFiles(): Array<{ rel: string; text: string }> {
   return out;
 }
 
+// Address to owner and kind from the cache of ops/fetchers.py; comment and blank lines do not count.
+function cacheEntries(path: string): Map<string, Array<{ owner: string; kind: string }>> {
+  const out = new Map<string, Array<{ owner: string; kind: string }>>();
+  for (const line of readFileSync(path, "utf-8").split("\n")) {
+    if (line === "" || line.startsWith("#")) continue;
+    const [ip, owner = "", kind = ""] = line.split("\t");
+    out.set(ip, [...(out.get(ip) ?? []), { owner, kind }]);
+  }
+  return out;
+}
+
+// Why a list line carrying (fetcher-cache) does not hold against the cache, or null when it does.
+function cacheFinding(text: string, cache: Map<string, Array<{ owner: string; kind: string }>>): string | null {
+  const m = CACHE_LINE.exec(text);
+  if (m === null) {
+    if (!/^\S+ datacenter /.test(text)) return "kind is not datacenter";
+    return `text besides the operator and ${FETCHER_CACHE}`;
+  }
+  const rows = cache.get(m[1]);
+  if (rows === undefined) return "address not in the cache";
+  if (!rows.some((r) => r.kind === "datacenter")) return "kind in the cache is not datacenter";
+  if (!rows.some((r) => r.kind === "datacenter" && r.owner === m[2])) return "other operator in the cache";
+  return null;
+}
+
 function addressesIn(text: string): Set<string> {
   return new Set(text.match(IPV4) ?? []);
 }
@@ -230,6 +266,24 @@ describe("no tracked file carries an unaccounted public IPv4 address", () => {
       stale.length,
       `${stale.length} entries of the address list stand in no tracked file besides the list: line(s) ${stale.join(", ")}. ` +
         "Remove them from the list.",
+    ).toBe(0);
+  });
+
+  it.skipIf(!existsSync(CACHE))("holds every (fetcher-cache) line against the cache of ops/fetchers.py", () => {
+    const cache = cacheEntries(CACHE);
+    const bad: string[] = [];
+    readFileSync(KNOWN, "utf-8")
+      .split("\n")
+      .forEach((text, i) => {
+        if (text === "" || text.startsWith("#") || !text.includes(FETCHER_CACHE)) return;
+        const why = cacheFinding(text, cache);
+        if (why !== null) bad.push(`line ${i + 1}: ${why}`);
+      });
+    expect(
+      bad.length,
+      `${bad.length} line(s) of the address list with ${FETCHER_CACHE} do not hold against the cache of ops/fetchers.py ` +
+        `(${bad.join("; ")}). The line must read <address> datacenter <operator> ${FETCHER_CACHE}, and the cache must hold the ` +
+        "address with kind datacenter and that operator; otherwise name another evidence or replace the address.",
     ).toBe(0);
   });
 });
