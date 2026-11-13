@@ -49,6 +49,8 @@
 #
 # Every temporary file of a live run, the header files with LIVE_SANDBOX_KEY among them, lies in one mktemp -d folder
 # that a trap on EXIT, INT and TERM in live() deletes, so a run stopped with kill -TERM leaves nothing in TMPDIR.
+# A run stopped with kill -KILL, which no trap catches, leaves that folder only until the next run: its name is live-run.<PID>.*,
+# and live() deletes such folders of its own user whose PID no longer runs before it starts, and nothing else.
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -70,11 +72,29 @@ say() {
 }
 
 # The folder of the run's temporary files: the mktemp -d folder of live(), which its trap deletes, else TMPDIR.
+# The prefix of that folder, followed by the PID of the run, so the next run finds the folders of runs that ended
+# without their trap (kill -KILL) and deletes them.
+LIVE_PREFIX="live-run"
 LIVE_TMP=""
 live_tmp() { echo "${LIVE_TMP:-${TMPDIR:-/tmp}}"; }
 live_cleanup() {
   [ -n "$LIVE_TMP" ] && rm -rf -- "$LIVE_TMP"
   LIVE_TMP=""
+}
+# Deletes the folders of earlier runs that no trap deleted (kill -KILL): only folders of the prefix in TMPDIR that this
+# user owns and whose PID no longer runs. A foreign file, a folder of another user and that of a living run stay; a reused
+# PID keeps a folder until the next run. Prints nothing.
+live_sweep() {
+  local d pid
+  for d in "${TMPDIR:-/tmp}/$LIVE_PREFIX".*.*; do
+    [ -d "$d" ] && [ ! -L "$d" ] && [ -O "$d" ] || continue
+    pid="${d##*/"$LIVE_PREFIX".}"
+    pid="${pid%%.*}"
+    [[ "$pid" =~ ^[0-9]+$ ]] || continue
+    kill -0 "$pid" 2>/dev/null && continue
+    ps -p "$pid" >/dev/null 2>&1 && continue
+    rm -rf -- "$d"
+  done
 }
 
 judge_health() { # $1 = HTTP status
@@ -296,6 +316,32 @@ judge_sandbox_wait() {
   else
     echo "FAIL sandbox-wait: no changed=0 or changed=1 from ops/sandbox/setup.sh --client-key"
   fi
+}
+
+# $1 = "killed=<n> kept=<n> foreign=<yes|no> alive=<yes|no>" from key_sweep_run: killed counts the folders a run stopped
+# with kill -KILL left, kept how many of them were still there after the next run of live().
+judge_kill_sweep() {
+  local killed kept
+  killed="$(sed -n 's/.*killed=\([0-9]*\).*/\1/p' <<<"${1:-}")"
+  kept="$(sed -n 's/.*kept=\([0-9]*\).*/\1/p' <<<"${1:-}")"
+  if [ -z "$killed" ] || [ -z "$kept" ]; then
+    echo "FAIL key-cleanup: no result"
+  elif [ "$killed" -eq 0 ]; then
+    echo "FAIL key-cleanup: the run stopped with kill -KILL left no folder, so the next run proves nothing"
+  elif [ "$kept" -gt 0 ]; then
+    echo "FAIL key-cleanup: $kept folders of the run stopped with kill -KILL still in TMPDIR after the next run"
+  else
+    echo "OK key-cleanup: the next run deleted the folder of the run stopped with kill -KILL"
+  fi
+}
+# The same result: what the next run must leave alone, a foreign file and the folder of a run whose process lives.
+judge_sweep_foreign() {
+  case "${1:-}" in
+    *foreign=yes*alive=yes*) echo "OK key-cleanup: a foreign file and the folder of a living run stayed" ;;
+    *foreign=no*) echo "FAIL key-cleanup: the next run deleted a foreign file in TMPDIR" ;;
+    *alive=no*) echo "FAIL key-cleanup: the next run deleted the folder of a run whose process lives" ;;
+    *) echo "FAIL key-cleanup: no result" ;;
+  esac
 }
 
 # $1 = "seen=<yes|no> ended=<yes|no> left=<files>" from a run of live() stopped with kill -TERM: seen says the key file
@@ -812,22 +858,18 @@ selftest() {
     [ "${got%% *}" = "$w_expect" ] || all_ok=0
   done
 
-  # The key files of a run of live() stopped with kill -TERM (domains 03): the run gets its own TMPDIR, the made-up key,
-  # CP_HOST=fake.invalid and the stand-ins, and runs as its own process group, so kill -TERM reaches every process of it as
-  # it does from a terminal or a supervisor. curl holds the call the case names (the header file is then in TMPDIR) until
-  # the kill; everything else answers nothing at once. Prints "seen=<yes|no> ended=<yes|no> left=<files>". $1 = search or
-  # sandbox.
-  key_cleanup_run() {
+  # The key files of a run of live() stopped with a signal (domains 03): the run gets its own TMPDIR, the made-up key,
+  # CP_HOST=fake.invalid and the stand-ins, and runs as its own process group, so the signal reaches every process of it as
+  # it does from a terminal, a supervisor or the timeout of an agent tool. curl holds the call to $3 (the header file is
+  # then in TMPDIR) until the signal; everything else answers nothing at once. Prints "seen=<yes|no> ended=<yes|no>".
+  # $1 = folder for the run's control files, $2 = TMPDIR of the run, $3 = URL to hold, $4 = TERM or KILL.
+  held_live() {
     (
-      local w="$dir/term-$1" pid i seen=no ended=no target
-      mkdir -p "$w/tmp"
-      case "$1" in
-        search) target="$BASE$DOMAINS_PATH" ;;
-        sandbox) target="$BASE/v1/sandboxes" ;;
-      esac
+      local c="$1" pid i seen=no ended=no
+      mkdir -p "$c" "$2"
       set -m
       (
-        export TMPDIR="$w/tmp"
+        export TMPDIR="$2"
         CP_HOST=fake.invalid
         CP_SSH_KEY="$dir/no-such-ssh-key"
         CLIENT_KEY_SETUP="$dir/setup-changed-0.sh"
@@ -835,9 +877,9 @@ selftest() {
         PATH="$dir/bin:$PATH"
         curl() {
           local a held=no n=0
-          for a in "$@"; do [ "$a" = "$target" ] && held=yes; done
+          for a in "$@"; do [ "$a" = "$3" ] && held=yes; done
           if [ "$held" = yes ] && [[ " $* " == *" @"* || " $* " == *"-H @"* ]]; then
-            : >"$w/started"
+            : >"$c/started"
             while [ "$n" -lt 300 ]; do
               sleep 0.1
               n=$((n + 1))
@@ -847,22 +889,31 @@ selftest() {
           return 7
         }
         live
-      ) </dev/null >"$w/out" 2>&1 &
+      ) </dev/null >"$c/out" 2>&1 &
       pid=$!
       for i in $(seq 1 300); do
-        [ -e "$w/started" ] && break
+        [ -e "$c/started" ] && break
         sleep 0.1
       done
-      [ -e "$w/started" ] && grep -rqF -- "$fake_key" "$w/tmp" 2>/dev/null && seen=yes
-      kill -TERM -- "-$pid" 2>/dev/null
+      [ -e "$c/started" ] && grep -rqF -- "$fake_key" "$2" 2>/dev/null && seen=yes
+      kill "-$4" -- "-$pid" 2>/dev/null
       for i in $(seq 1 150); do
         kill -0 "$pid" 2>/dev/null || { ended=yes; break; }
         sleep 0.1
       done
       [ "$ended" = yes ] || kill -KILL -- "-$pid" 2>/dev/null
       wait "$pid" 2>/dev/null
-      echo "seen=$seen ended=$ended left=$(find "$w/tmp" -mindepth 1 | wc -l)"
+      echo "seen=$seen ended=$ended"
     ) 2>/dev/null
+  }
+  # A run stopped with kill -TERM. Prints "seen=<yes|no> ended=<yes|no> left=<files>". $1 = search or sandbox.
+  key_cleanup_run() {
+    local w="$dir/term-$1" target
+    case "$1" in
+      search) target="$BASE$DOMAINS_PATH" ;;
+      sandbox) target="$BASE/v1/sandboxes" ;;
+    esac
+    echo "$(held_live "$w/ctl" "$w/tmp" "$target" TERM) left=$(find "$w/tmp" -mindepth 1 | wc -l)"
   }
   local k_name
   for k_name in search sandbox; do
@@ -870,6 +921,51 @@ selftest() {
     echo "planted key-cleanup term-$k_name: $got"
     [ "${got%% *}" = OK ] || all_ok=0
   done
+  # A run stopped with kill -KILL, which no trap catches (the timeout of an agent tool, a cancelled run), then a second run
+  # with the same TMPDIR. Before it, a foreign file and a folder of the prefix whose process lives (this subshell) are put
+  # there. Prints "killed=<folders of the first run after the kill> kept=<of them after the second run> foreign=<yes|no>
+  # alive=<yes|no>".
+  key_sweep_run() {
+    (
+      local w="$dir/sweep" f n=0 kept=0 foreign=no alive=no
+      held_live "$w/first" "$w/tmp" "$BASE/v1/sandboxes" KILL >/dev/null
+      : >"$w/killed"
+      for f in "$w/tmp/$LIVE_PREFIX".*; do
+        [ -d "$f" ] || continue
+        echo "$f" >>"$w/killed"
+        n=$((n + 1))
+      done
+      printf 'foreign\n' >"$w/tmp/foreign.txt"
+      mkdir -p "$w/tmp/$LIVE_PREFIX.$BASHPID.living"
+      printf 'living\n' >"$w/tmp/$LIVE_PREFIX.$BASHPID.living/file"
+      held_live "$w/second" "$w/tmp" "$BASE$DOMAINS_PATH" TERM >/dev/null
+      while read -r f; do [ -e "$f" ] && kept=$((kept + 1)); done <"$w/killed"
+      [ -f "$w/tmp/foreign.txt" ] && foreign=yes
+      [ -f "$w/tmp/$LIVE_PREFIX.$BASHPID.living/file" ] && alive=yes
+      echo "killed=$n kept=$kept foreign=$foreign alive=$alive"
+    )
+  }
+  local sweep
+  sweep="$(key_sweep_run)"
+  got="$(judge_kill_sweep "$sweep")"
+  echo "planted key-cleanup kill-sweep: $got"
+  [ "${got%% *}" = OK ] || all_ok=0
+  got="$(judge_sweep_foreign "$sweep")"
+  echo "planted key-cleanup foreign: $got"
+  [ "${got%% *}" = OK ] || all_ok=0
+  for case_ in "kill-sweep-kept killed=1 kept=1 foreign=yes alive=yes" "kill-sweep-none killed=0 kept=0 foreign=yes alive=yes"; do
+    read -r name sweep <<<"$case_"
+    got="$(judge_kill_sweep "$sweep")"
+    echo "planted key-cleanup $name: $got"
+    [ "${got%% *}" = FAIL ] || all_ok=0
+  done
+  for case_ in "foreign-gone killed=1 kept=0 foreign=no alive=yes" "foreign-living killed=1 kept=0 foreign=yes alive=no"; do
+    read -r name sweep <<<"$case_"
+    got="$(judge_sweep_foreign "$sweep")"
+    echo "planted key-cleanup $name: $got"
+    [ "${got%% *}" = FAIL ] || all_ok=0
+  done
+
   mkdir -p "$dir/leftover"
   printf 'Authorization: %s\n' "$fake_key" >"$dir/leftover/tmp.planted"
   got="$(judge_key_cleanup "seen=yes ended=yes left=$(find "$dir/leftover" -mindepth 1 | wc -l)")"
@@ -899,8 +995,10 @@ live() {
   fi
 
   # One folder for every temporary file of the run, the key files among them, and for those of the scripts it starts
-  # (TMPDIR); the trap deletes it however the run ends. It deletes only this folder and prints nothing.
-  LIVE_TMP="$(mktemp -d)" || {
+  # (TMPDIR); the trap deletes it however the run ends. It deletes only this folder and prints nothing. Its name carries
+  # the prefix and this run's PID, so a later run deletes it through live_sweep when kill -KILL left it behind.
+  live_sweep
+  LIVE_TMP="$(mktemp -d -p "${TMPDIR:-/tmp}" "$LIVE_PREFIX.$BASHPID.XXXXXX")" || {
     LIVE_TMP=""
     echo "FAIL setup: no temporary folder"
     echo "LIVE FAIL"

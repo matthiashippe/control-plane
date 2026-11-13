@@ -73,3 +73,12 @@
   `curl`-Attrappe endet sofort, danach führt die Haupt-Shell den `trap` aus. Gemessen endet der Lauf in unter einer Sekunde; nach
   15 s ohne Ende gilt der Fall als FAIL und die Gruppe bekommt `kill -KILL`. Ohne `trap` bleiben 3 (Suche) und 4 (Sandbox) Dateien
   liegen. Der Fall gilt nur, wenn die Datei mit dem erfundenen Schlüssel während des gehaltenen Aufrufs in `TMPDIR` lag.
+- **Der Ordner nennt seinen Prozess im Namen (Zyklus 3, Kritik Punkt 6).** `live()` legt ihn als
+  `${TMPDIR:-/tmp}/live-run.<PID>.XXXXXX` an, mit `$BASHPID` statt `$$`, weil `$$` in einer Subshell die PID der äußeren Shell
+  bleibt und der Selbsttest `live()` in einer Subshell fährt. Vor dem Anlegen löscht `live_sweep` jeden Ordner `live-run.*.*` in
+  `TMPDIR`, der dem eigenen Nutzer gehört (`-O`, kein Symlink) und dessen PID weder `kill -0` noch `ps -p` kennt, und sonst nichts.
+  Eine wiederverwendete PID lässt einen Ordner nur bis zum nächsten Lauf liegen, löscht aber nie einen lebenden. Der Selbsttest
+  beendet den ersten Lauf mit `kill -KILL` an die Prozessgruppe, während `POST /v1/sandboxes` gehalten wird, legt dann eine fremde
+  Datei und einen Ordner `live-run.<PID der Selbsttest-Subshell>.living` dazu und fährt einen zweiten Lauf, den er mit `kill -TERM`
+  beendet. Gegenproben: ohne `live_sweep` ist `kill-sweep` FAIL (1 Ordner bleibt), ohne Präfix FAIL (kein Ordner, also kein Beweis);
+  ein `live_sweep` ohne Prüfung der PID und ein Löschen von ganz `TMPDIR` machen `foreign` FAIL.

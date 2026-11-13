@@ -57,6 +57,16 @@ describe("ops/live.sh", () => {
     expect(run.stdout).toContain("planted key-cleanup term-search: OK key-cleanup: TMPDIR empty after kill -TERM");
     expect(run.stdout).toContain("planted key-cleanup term-sandbox: OK key-cleanup: TMPDIR empty after kill -TERM");
     expect(run.stdout).toMatch(/^planted key-cleanup leftover: FAIL key-cleanup: 1 files left/m);
+    expect(run.stdout).toContain(
+      "planted key-cleanup kill-sweep: OK key-cleanup: the next run deleted the folder of the run stopped with kill -KILL",
+    );
+    expect(run.stdout).toContain("planted key-cleanup foreign: OK key-cleanup: a foreign file and the folder of a living run stayed");
+    expect(run.stdout).toMatch(/^planted key-cleanup kill-sweep-kept: FAIL key-cleanup: 1 folders .* still in TMPDIR/m);
+    expect(run.stdout).toMatch(/^planted key-cleanup kill-sweep-none: FAIL key-cleanup: .* left no folder/m);
+    expect(run.stdout).toContain("planted key-cleanup foreign-gone: FAIL key-cleanup: the next run deleted a foreign file in TMPDIR");
+    expect(run.stdout).toContain(
+      "planted key-cleanup foreign-living: FAIL key-cleanup: the next run deleted the folder of a run whose process lives",
+    );
     expect(run.stdout.trim().split("\n").at(-1)).toBe("LIVE SELFTEST OK");
     expect(run.status).toBe(0);
   }, 300_000);
