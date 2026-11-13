@@ -110,3 +110,5 @@ Handoff als Abstand um die Haken-Liste. Neu, im zweiten `<style>` der Quellen un
 - `.balanced`: bricht die Überschrift in zwei gleich lange Zeilen (`text-wrap: balance`), weil sonst bei 1440 „passkey“ und bei 390
   „a passkey“ allein in der zweiten Zeile stehen; als Klasse am Block um die Überschrift, weil die Überschrift selbst ein nacktes
   `<h1>` bleibt (Punkt 4 ändert sie zur Gegenprobe).
+
+Abnahme-Issue konto: PRO-20104
