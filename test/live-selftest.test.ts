@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { createApp } from "../src/app.js";
@@ -15,9 +15,22 @@ const LIVE_SH = join(__dirname, "..", "ops", "live.sh");
  * check against planted data in both directions without network; running it here keeps it from
  * rotting between rollouts, when nobody calls it.
  */
+/**
+ * The selftest starts some sixty node processes and took 58 s alone at load 108 on the code-host (audit 2026-11-13, line 146),
+ * so a 60 s limit cut it off mid-run. It runs without blocking the worker, which spawnSync did for as long as the
+ * selftest ran, past vitest's fixed 60 s worker RPC timer. Patience, not a threshold: nothing asserts the duration.
+ */
+const runSelftest = () =>
+  new Promise<{ stdout: string; status: number | null }>((resolve) => {
+    const child = spawn("bash", [LIVE_SH, "--selftest"], { stdio: ["ignore", "pipe", "ignore"], timeout: 240_000 });
+    let stdout = "";
+    child.stdout.setEncoding("utf8").on("data", (chunk: string) => (stdout += chunk));
+    child.on("close", (status) => resolve({ stdout, status }));
+  });
+
 describe("ops/live.sh", () => {
-  it("passes its own selftest without network", () => {
-    const run = spawnSync("bash", [LIVE_SH, "--selftest"], { encoding: "utf8", timeout: 60_000 });
+  it("passes its own selftest without network", async () => {
+    const run = await runSelftest();
     expect(run.stdout).toContain("planted none: FAIL");
     expect(run.stdout).toContain("planted double: FAIL");
     expect(run.stdout).toContain("planted single: OK");
@@ -39,7 +52,7 @@ describe("ops/live.sh", () => {
     );
     expect(run.stdout.trim().split("\n").at(-1)).toBe("LIVE SELFTEST OK");
     expect(run.status).toBe(0);
-  }, 120_000);
+  }, 300_000);
 });
 
 /**
