@@ -20,6 +20,9 @@ als Zahl statt String, mit Komma oder Punkt, negativ, null oder kein Vielfaches 
 Name. Mehr Anfragen von einer Adresse, als das Rate Limit der Pfade ohne Schlüssel erlaubt (60 je Minute, gemeinsam mit `/v1/auth/*`
 und `/pay/*`), ergeben 429 mit `Retry-After`.
 
+`GET /v1/handoff` ohne Schlüssel beschreibt die Anfrage als JSON (Felder, Beispiel, Antwortfelder), für einen Agenten, der erst
+nachsieht, bevor er schreibt.
+
 ## Antwort
 
 201, JSON:
@@ -45,7 +48,8 @@ Zahl noch das Token.
 | `burned` | eine falsche Zahl wurde gewählt; der Code ist verbrannt, auch die richtige Zahl gibt danach nichts mehr frei | `ungueltig` |
 | `expired` | 600 Sekunden nach der Anlage ohne Wahl | `ungueltig` |
 
-Jeder Code gilt genau einmal. Die Wahl ist ein Formular (`POST /h/{code}`, Feld `pick`), das ohne JavaScript funktioniert. Ein
+Die Seite antwortet für einen offenen Code mit 200, nach der richtigen Zahl mit 200 und `erledigt`, für einen bekannten Code, der
+nicht mehr offen ist, mit 410 und `ungueltig`. Jeder Code gilt genau einmal. Die Wahl ist ein Formular (`POST /h/{code}`, Feld `pick`), das ohne JavaScript funktioniert. Ein
 unbekannter Code ergibt 404 mit der Seite `ungueltig`; mehr unbekannte Codes von einer Adresse, als das Rate Limit erlaubt (20 in 10
 Minuten), ergeben 429. Jede Antwort von `/h/{code}` trägt `Cache-Control: no-store`, `Referrer-Policy: no-referrer` und `noindex`
 (Kopfzeile `X-Robots-Tag` und `<meta name="robots">`); der Pfad steht nicht in der Sitemap.
@@ -53,7 +57,7 @@ Minuten), ergeben 429. Jede Antwort von `/h/{code}` trägt `Cache-Control: no-st
 `GET /v1/handoff/{code}` mit `Authorization: Bearer <poll_token>` antwortet als Server-Sent Events (`text/event-stream`): sofort ein
 Ereignis `state` mit `{"state":"pending"}` oder dem Endzustand, danach jeden Wechsel, und der Strom endet nach `done`, `burned` oder
 `expired`. Alle 15 Sekunden hält ein Kommentar die Verbindung über Caddy offen. Ohne Token oder mit dem Token eines anderen Handoffs
-kommt 401 ohne Zustand im Körper, für einen unbekannten Code 404.
+kommt 401 ohne Zustand im Körper, für einen unbekannten Code 404. Kein Strom lebt länger als zehn Minuten und eine Minute.
 
 ## Für konto 03 und 04
 

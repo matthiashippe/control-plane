@@ -399,6 +399,25 @@ function migrate(db: Db): void {
   if (!deliveryCols.some((c) => c.name === "rounds")) db.exec("ALTER TABLE deliveries ADD COLUMN rounds INTEGER NOT NULL DEFAULT 0");
   if (!deliveryCols.some((c) => c.name === "rework_at")) db.exec("ALTER TABLE deliveries ADD COLUMN rework_at TEXT");
 
+  // The step a person approves on their phone (goals/konto/02, docs/konto/handoff.md). `code` is public
+  // (QR code and link), `poll_hash` is the sha256 of the terminal's secret and the only form it is
+  // stored in. `choices` holds the three numbers in the order the page shows them, `match` among them.
+  // Times in epoch milliseconds, because the ten minutes are compared and not displayed.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS handoffs (
+      code             TEXT PRIMARY KEY,
+      poll_hash        TEXT NOT NULL UNIQUE,
+      automaton_name   TEXT NOT NULL,
+      daily_limit_usdc TEXT NOT NULL,
+      amount_usdc      TEXT NOT NULL,
+      match            INTEGER NOT NULL CHECK (match BETWEEN 10 AND 99),
+      choices          TEXT NOT NULL,
+      state            TEXT NOT NULL CHECK (state IN ('pending', 'done', 'burned', 'expired')),
+      created_at       INTEGER NOT NULL,
+      updated_at       INTEGER NOT NULL
+    );
+  `);
+
   // The conversation that asks back (HAN-77). `fields` is what was understood so far, `turns` the
   // transcript; both are a person's words and are deleted after a day (`cleanupConversations` in
   // src/checkout/conversation.ts). `conversation_days` counts model calls and their cost per UTC
