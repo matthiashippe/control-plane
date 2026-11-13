@@ -108,5 +108,6 @@ davor nur hilft, wenn ihr Ausfall auffällt.
 
 ## Progress Log
 - 2026-11-13 Zyklus 1: Punkte 1, 2, 3, 4, 5 gebaut (neues `ops/webhook-unreachable.sh`, Feld `alarm_path` in `ops/status.sh`, Schwelle in `ops/README.md`, neuer Test `test/status-alarm-path.test.ts`, Fall `http-500-next` in `test/watchdog-webhook-fail.test.ts`); vor dem Fix war `test/status-alarm-path.test.ts` rot (5 von 5) und `test/watchdog-webhook-fail.test.ts` mit dem Watchdog ohne `--fail` grün (5 von 5), danach mit ihm rot (neuer Fall). Prüfbefehle: P1 `3`, `0`, `exit=2`; P2 Exit 0, `rot`, `1`, `0`; P3 Exit 0, `anders`, `rot`; P4 `0`, `check` grün in 291 s (129 Dateien, 1576 Tests); P5 `int` (Wert 0, Status ok), Gegenprobe lesend: Server-Log kopiert 0, mit gepflanzter Zeile 1, auf dem Server ohne Log Exit 2.
+- 2026-11-13 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5 (dev `44e7787` schon enthalten, Merge ohne Änderung). Prüfbefehle: P1 `3`, `0`, `exit=2`; P2 Exit 0, `rot`, `1`, `0`; P3 Exit 0, `anders`, `rot`; P4 `0`, `check` grün in 248 s (129 Dateien); P5 `int` (Wert 0, Status ok); Job `e2e` am Kopf `af2b340` grün.
 
 ## Blockers
