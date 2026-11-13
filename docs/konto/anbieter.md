@@ -79,3 +79,14 @@ Stand 2026-11-13); wir bauen deshalb nicht darauf.
   Tausch und eine optionale eigene Gebühr von HTC. Einzahlung per Karte in Deutschland bietet keiner der beiden an; der Weg ist die
   eigene EUR-IBAN des Kunden bei Bridge per SEPA, ob Bridge von dort an seine Smart Wallet auf Base auszahlt, klärt konto 05 als
   Erstes.
+  Die Auszahlung läuft nicht über eine Spend Permission: `spend()` darf nur der Spender aufrufen (`requireSender(spender)`) und
+  überweist nur an den Spender
+  ([Quelle](https://github.com/coinbase/spend-permissions/blob/e0004e63edc4e17de7aa978293800ac7a16892e5/src/SpendPermissionManager.sol#L420-L425),
+  Stand 2026-11-13). Mit der Auszahladresse von Bridge als Spender ruft sie niemand auf, mit unserer Adresse als Spender liefe Kundengeld
+  über uns. Der Weg für konto 05: Der Kunde gibt jede Auszahlung auf der Handy-Seite aus konto 02 mit seinem Passkey frei, die
+  Turnkey-Wallet signiert als Eigentümer eine User Operation seiner Smart Wallet mit genau einem Aufruf `execute(USDC, 0,
+  transfer(<Auszahladresse>, <Betrag>))`, und USDC geht im selben Aufruf von seiner Smart Wallet direkt an seine feste Auszahladresse
+  bei Bridge ([Quelle](https://github.com/coinbase/smart-wallet/blob/a4e83fd36c47b64cb4e21e1fa6bb9b04181a66da/src/CoinbaseSmartWallet.sol#L228-L235),
+  Stand 2026-11-13). Die Auszahladresse liest die Handy-Seite aus der API von Bridge für diesen Kunden, unser Server kann keine
+  Auszahlung auslösen. Wer das Gas der User Operation zahlt (Paymaster oder ETH in der Smart Wallet), klärt konto 05; ein Paymaster auf
+  unsere Kosten ist eine Aufladung und geht über `server_kauf`.
