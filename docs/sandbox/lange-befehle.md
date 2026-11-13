@@ -53,5 +53,8 @@ times, expected once; …` und `E2E FAIL … sandbox=true long_exec=false`
 
 Was der Harness nicht zeigt: Caddy und der echte Sandbox-Server liegen nicht dazwischen. Im Harness spricht die Runtime das Control
 Plane direkt über TLS an, und der Nachbau führt Befehle als Prozess aus statt mit `docker exec` in gVisor. Ob Caddy eine Antwort nach
-20 s durchreicht und ob `timeout` aus coreutils im Image des Servers den Befehl stoppt, prüft der Release Manager nach dem Rollout
-wie immer mit `ops/live.sh`; dieses Goal läuft nicht gegen die Produktion.
+20 s durchreicht und ob die Hülle im Image des Servers ihre Dateien schreibt, prüft der Release Manager nach dem Rollout mit
+`ops/live.sh`: Die Prüfung `sandbox` fährt dort in der eigenen Sandbox `sleep 25; echo bg-ok` mit `timeout` 120000, erwartet 200 mit
+`running` true und `exit_code` -1, liest `exit_code_file` höchstens 60 s lang, bis dort `0` steht, und erwartet `bg-ok` in
+`output_file`; sonst meldet sie `FAIL sandbox: background exec …` (Kritik, Punkt 10). Dieses Goal selbst läuft nicht gegen die
+Produktion.

@@ -34,7 +34,10 @@
 #   sandbox  ops/sandbox/setup.sh --client-key ends with SETUP CLIENT-KEY OK, a signed GET /v1/sandboxes over ctl.sbx from
 #            the container cp answers 200, and with our own account (LIVE_SANDBOX_ADDRESS in src/bounties/ours.ts) a small
 #            sandbox is created (201), `echo ok` runs in it, an uploaded file reads back the same, DELETE answers 200, and
-#            the ledger holds at least one row of kind sandbox for exactly this sandbox (sandbox 03)
+#            the ledger holds at least one row of kind sandbox for exactly this sandbox (sandbox 03). Before the DELETE a
+#            command runs in the background there (`sleep 25; echo bg-ok`, timeout 120000, sandbox 05): its answer is 200
+#            with running true and exit_code -1, the file from exit_code_file reads 0 within 60 s and the one from
+#            output_file holds bg-ok, so the wrapper, coreutils timeout under gVisor and /root/.exec are proven in production
 #   sandbox-foreign  the number of foreign accounts (no address and no key name of src/bounties/ours.ts) with at least one
 #            ledger row of kind sandbox, the measure of the ROADMAP criterion; shown, and FAIL only when it cannot be read
 set -uo pipefail
@@ -222,10 +225,43 @@ ours_json() { # $1 = path of ours.ts
   printf '[%s]\n[%s]\n' "$addrs" "$names"
 }
 
-# $1 = "client_key=<ok|fail> ctl=<status> create=<status> exec=<ok|wrong|status> files=<ok|wrong|...> delete=<status>
-# ledger=<rows>", the result line of sandbox_live. Judges in the order of the steps and names the first one that failed.
+# The answer to the background exec of the check `sandbox`, $1 = file: "files <exit_code_file> <output_file>" when it
+# is the answer to a command still running (running true, exit_code -1, both files under /root/.exec), else one word
+# (`nojson`, `notrunning`, `nofiles`). Only paths of that form leave it, so nothing else of the answer reaches a URL.
+# shellcheck disable=SC2016
+BG_ANSWER_JS='let o; try { o = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")); } catch (e) { o = null; } if (!o || typeof o !== "object") { console.log("nojson"); process.exit(0); } if (o.running !== true || o.exit_code !== -1) { console.log("notrunning"); process.exit(0); } const ok = (v, ext) => typeof v === "string" && new RegExp("^/root/\\.exec/[0-9a-f]{1,64}\\." + ext + "$").test(v); if (!ok(o.exit_code_file, "exit") || !ok(o.output_file, "out")) { console.log("nofiles"); process.exit(0); } console.log("files " + o.exit_code_file + " " + o.output_file);'
+
+# $1 = HTTP status, $2 = answer file of the background exec. Prints the status itself when it is not 200, else the
+# output of BG_ANSWER_JS.
+bg_start() {
+  if [ "${1:-}" != 200 ]; then
+    echo "${1:-none}"
+    return
+  fi
+  (cd "$ROOT" && NODE_NO_WARNINGS=1 node -e "$BG_ANSWER_JS" "$2" 2>/dev/null) || echo nojson
+}
+
+# Why the background step failed, $1 = its token from sandbox_live.
+bg_reason() {
+  case "${1:-}" in
+    "" | skipped) echo "did not run" ;;
+    start-notrunning) echo "of sleep 25 answered 200 without running true and exit_code -1" ;;
+    start-nofiles) echo "answered 200 without exit_code_file and output_file under /root/.exec" ;;
+    start-nojson) echo "answered 200 without a JSON object" ;;
+    start-*) echo "of sleep 25 answered ${1#start-}, expected 200" ;;
+    noexit) echo "wrote no exit_code_file within 60 s" ;;
+    exit-*) echo "ended with exit code ${1#exit-}, expected 0" ;;
+    out-*) echo "output_file read answered ${1#out-}, expected 200" ;;
+    wrong) echo "output_file holds no bg-ok" ;;
+    *) echo "failed: $1" ;;
+  esac
+}
+
+# $1 = "client_key=<ok|fail> ctl=<status> create=<status> exec=<ok|wrong|status> bg=<ok|...> files=<ok|wrong|...>
+# delete=<status> ledger=<rows>", the result line of sandbox_live. Judges in the order of the steps and names the first
+# one that failed.
 judge_sandbox() {
-  local toks tok client_key="" ctl="" create="" exec_="" files="" delete="" ledger=""
+  local toks tok client_key="" ctl="" create="" exec_="" bg="" files="" delete="" ledger=""
   read -ra toks <<<"${1:-}"
   for tok in "${toks[@]}"; do
     case "$tok" in
@@ -233,6 +269,7 @@ judge_sandbox() {
       ctl=*) ctl="${tok#*=}" ;;
       create=*) create="${tok#*=}" ;;
       exec=*) exec_="${tok#*=}" ;;
+      bg=*) bg="${tok#*=}" ;;
       files=*) files="${tok#*=}" ;;
       delete=*) delete="${tok#*=}" ;;
       ledger=*) ledger="${tok#*=}" ;;
@@ -250,6 +287,8 @@ judge_sandbox() {
     echo "FAIL sandbox: exec of echo ok answered 200 with another stdout than ok"
   elif [ "$exec_" != ok ]; then
     echo "FAIL sandbox: exec answered ${exec_:-nothing}, expected 200"
+  elif [ "$bg" != ok ]; then
+    echo "FAIL sandbox: background exec $(bg_reason "$bg")"
   elif [ "$files" = wrong ]; then
     echo "FAIL sandbox: the file read back differs from the one uploaded"
   elif [ "$files" != ok ]; then
@@ -261,7 +300,7 @@ judge_sandbox() {
   elif [ "$ledger" -eq 0 ]; then
     echo "FAIL sandbox: no ledger row of kind sandbox for the sandbox"
   else
-    echo "OK sandbox: client key set, ctl.sbx 200, created, exec ok, files ok, deleted, ledger rows: $ledger"
+    echo "OK sandbox: client key set, ctl.sbx 200, created, exec ok, background exec ok, files ok, deleted, ledger rows: $ledger"
   fi
 }
 
@@ -295,8 +334,8 @@ sandbox_api() { # $1 = header file, $2 = method, $3 = path, $4 = answer file, $5
 # The live part of the check `sandbox`, $1 = ssh key. Prints the result line for judge_sandbox and nothing else: no id,
 # no key. Once a sandbox exists it is deleted, whatever failed before.
 sandbox_live() {
-  local sshkey="$1" client_key=fail ctl=none create=none exec_=skipped files=skipped delete=skipped ledger=none
-  local last remote apikey="" hdr ans code id="" out text
+  local sshkey="$1" client_key=fail ctl=none create=none exec_=skipped bg=skipped files=skipped delete=skipped ledger=none
+  local last remote apikey="" hdr ans code id="" out text start exitf outf deadline
   last="$(CP_HOST="$CP_HOST" CP_SSH_KEY="$sshkey" bash "$ROOT/ops/sandbox/setup.sh" --client-key "$SANDBOX_HOST" </dev/null 2>/dev/null | tail -n 1)"
   case "$last" in "SETUP CLIENT-KEY OK"*) client_key=ok ;; esac
 
@@ -325,6 +364,37 @@ sandbox_live() {
         exec_="$code"
       fi
 
+      # A command longer than the hold limit runs in the background (sandbox 05): answered after 20 s, then its exit
+      # code and output are read from the files the answer names, for at most 60 s.
+      code="$(sandbox_api "$hdr" POST "/v1/sandboxes/$id/exec" "$ans" '{"command":"sleep 25; echo bg-ok","timeout":120000}' "Idempotency-Key: live-check-bg-$(rand_hex)")"
+      start="$(bg_start "$code" "$ans")"
+      if [[ "$start" == "files "* ]]; then
+        read -r _ exitf outf <<<"$start"
+        bg=noexit
+        deadline=$((SECONDS + 60))
+        while [ "$SECONDS" -lt "$deadline" ]; do
+          sleep 5
+          code="$(sandbox_api "$hdr" GET "/v1/sandboxes/$id/files/read?path=${exitf//\//%2F}" "$ans")"
+          [ "$code" = 200 ] || continue
+          out="$(json_field "$ans" content | tr -d '[:space:]')"
+          if [ "$out" != 0 ]; then
+            [[ "$out" =~ ^[0-9]{1,3}$ ]] && bg="exit-$out" || bg="exit-unreadable"
+          else
+            code="$(sandbox_api "$hdr" GET "/v1/sandboxes/$id/files/read?path=${outf//\//%2F}" "$ans")"
+            if [ "$code" != 200 ]; then
+              bg="out-$code"
+            elif grep -qx 'bg-ok' <<<"$(json_field "$ans" content | tr -d '\r')"; then
+              bg=ok
+            else
+              bg=wrong
+            fi
+          fi
+          break
+        done
+      else
+        bg="start-${start:-none}"
+      fi
+
       text="live-check-$(rand_hex)"
       code="$(sandbox_api "$hdr" POST "/v1/sandboxes/$id/files/upload/json" "$ans" "{\"path\":\"/root/live-check.txt\",\"content\":\"$text\"}")"
       if [ "$code" != 200 ]; then
@@ -349,7 +419,7 @@ sandbox_live() {
     rm -f "$hdr" "$ans"
   fi
   apikey=""
-  echo "client_key=$client_key ctl=${ctl:-none} create=${create:-none} exec=$exec_ files=$files delete=${delete:-none} ledger=$ledger"
+  echo "client_key=$client_key ctl=${ctl:-none} create=${create:-none} exec=$exec_ bg=$bg files=$files delete=${delete:-none} ledger=$ledger"
 }
 
 # The query of the check `sandbox-foreign` against one database, $1 = how to run node on it: "local <file>" in the
@@ -466,13 +536,17 @@ selftest() {
 
   # The check `sandbox`, its judge in both directions: all steps good, then each step failing on its own (the ledger row
   # missing, the wrong exec text, a 401 over ctl.sbx, the client key not set, the 501 of an unreachable sandbox server),
-  # a file that reads back different, a ledger query without an answer, and no result at all.
-  local s_good="client_key=ok ctl=200 create=201 exec=ok files=ok delete=200 ledger=1"
+  # a file that reads back different, a ledger query without an answer, and no result at all. The background exec
+  # (sandbox 05) fails on its own too: held instead of running, a 504, no exit file within 60 s, stopped at its timeout
+  # (124), no bg-ok in the output, and a result line without the step at all.
+  local s_good="client_key=ok ctl=200 create=201 exec=ok bg=ok files=ok delete=200 ledger=1"
   local s_case s_line s_expect
   for s_case in "$s_good|OK" "${s_good/ledger=1/ledger=0}|FAIL" "${s_good/exec=ok/exec=wrong}|FAIL" \
     "${s_good/ctl=200/ctl=401}|FAIL" "${s_good/client_key=ok/client_key=fail}|FAIL" \
     "client_key=ok ctl=200 create=501 exec=skipped files=skipped delete=skipped ledger=none|FAIL" \
-    "${s_good/files=ok/files=wrong}|FAIL" "${s_good/ledger=1/ledger=none}|FAIL" "|FAIL"; do
+    "${s_good/files=ok/files=wrong}|FAIL" "${s_good/ledger=1/ledger=none}|FAIL" "|FAIL" \
+    "${s_good/bg=ok/bg=start-notrunning}|FAIL" "${s_good/bg=ok/bg=start-504}|FAIL" "${s_good/bg=ok/bg=noexit}|FAIL" \
+    "${s_good/bg=ok/bg=exit-124}|FAIL" "${s_good/bg=ok/bg=wrong}|FAIL" "${s_good/ bg=ok/}|FAIL"; do
     s_line="${s_case%|*}"
     s_expect="${s_case##*|}"
     got="$(judge_sandbox "$s_line")"
@@ -600,6 +674,13 @@ case "${1:-}" in
     # One judge without network, the answer's body on stdin (test/live-selftest.test.ts hands it the handler's answer).
     case "${2:-}" in
       domains-search) judge_domains_search "${3:-}" "$(head -c 4000)" ;;
+      sandbox-bg)
+        # The start of the background exec of the check `sandbox`, the answer's body on stdin.
+        bg_body="$(mktemp)"
+        head -c 4000 >"$bg_body"
+        bg_start "${3:-}" "$bg_body"
+        rm -f "$bg_body"
+        ;;
       *)
         echo "unknown judge: ${2:-}" >&2
         exit 2
