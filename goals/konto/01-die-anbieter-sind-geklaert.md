@@ -1,7 +1,7 @@
 # Konto Goal 01: Die Anbieter sind geklärt
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Der Loop weiß, bei wem das Konto eines Menschen ohne Wallet liegt und wer dessen Geld in Euro auszahlt, bevor konto 02 bis 05 dagegen
@@ -115,7 +115,7 @@ Euro an Kunden in Deutschland die ganze Kette widerlegt, bevor sie Code kostet.
       Link und Datum; was konto 03 dann noch zuerst belegt, ist nur der Lauf selbst.
       Prüfung: `awk '/^## Für die nächsten Goals/{f=1;next} /^## /{f=0} f' docs/konto/anbieter.md | grep -cF "github.com/coinbase/smart-wallet"` muss mindestens 1 ausgeben.
       Prüfung: `awk '/^## Für die nächsten Goals/{f=1;next} /^## /{f=0} f' docs/konto/anbieter.md | grep -c "addOwnerAddress"` muss mindestens 1 ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Jede Aussage über einen Anbieter mit Link und Abrufdatum aus seiner eigenen Doku; nichts aus der Erinnerung, keine Vermutung als
@@ -141,5 +141,6 @@ Euro an Kunden in Deutschland die ganze Kette widerlegt, bevor sie Code kostet.
 - 2026-11-13 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, 7; `origin/dev` (615a34e) in den Branch gemergt, nur Goal-Dateien anderer Topics kamen dazu, alle Prüfbefehle am Merge-Kopf neu gefahren. Prüfbefehle (Node 22.23.4, PATH=/usr/bin:$PATH): P1 Kopf 1, fehlende Fragen leer, Zeilen ohne Beleg 0; P2 Kopf 1, fehlende Fragen leer, Zeilen ohne Beleg 0; P3 (Netz) 86 Links, kein 404 oder 410; P4 2, 2, 1; P5 leer, 4; P6 Annahmen 9, Pfade außerhalb 0, Secrets 0; P7 `check` grün in 165 s (131 Dateien, 1591 Tests, Exit 0). Kein Laufzeitpfad im Diff, Job `check` am PR pass; kein Gedankenstrich in hinzugefügten Zeilen.
 - 2026-11-13 Zyklus 3: Punkt 8 aus der Kritik gebaut: Die Auszahlung an die feste Auszahladresse bei Bridge gibt der Kunde je Auszahlung per Passkey frei (User Operation seiner Smart Wallet, `execute` mit `transfer` direkt an die Auszahladresse), weil `spend()` nur der Spender aufrufen darf und nur an ihn zahlt (SpendPermissionManager.sol Zeilen 420 bis 425 am Commit e0004e6 gelesen); Wahl und verworfener Spender-Vertrag in ANNAHMEN.md. Prüfbefehle: P8 vorher 0, 0, 0, jetzt 3, 3, 2; übrige Punkte unverändert grün.
 - 2026-11-13 Zyklus 4: Punkt 9 aus der Kritik gebaut, Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, 7, 8, 9: Dass die Turnkey-Wallet Eigentümer der Coinbase Smart Wallet sein kann, ist aus dem Quellcode belegt (`createAccount` der Factory, `_initializeOwners` und `addOwnerAddress` in MultiOwnable.sol, `isValidSignatureNow` in CoinbaseSmartWallet.sol, Permalinks am Commit a4e83fd) und aus der Doku von Turnkey (`ADDRESS_FORMAT_ETHEREUM`, `CURVE_SECP256K1`) und viem (`toCoinbaseSmartAccount` nimmt ein LocalAccount); konto 03 belegt nur noch den Lauf, die zweite Annahme ist angepasst. `origin/dev` ohne neue Commits seit 615a34e. Prüfbefehle (Node 22.23.4, PATH=/usr/bin:$PATH): P1 1, leer, 0; P2 1, leer, 0; P3 (Netz) 94 Links, kein 404 oder 410 (Gegenprobe mit gepflanztem MultiOwnableX.sol: 404); P4 2, 2, 1; P5 leer, 3; P6 9, 0, 0; P7 `check` grün in 51 s (1591 Tests, Exit 0); P8 3, 3, 2; P9 vorher 1, 0, jetzt 5, 1. Kein Gedankenstrich in hinzugefügten Zeilen.
+- 2026-11-13 Release: PASS K und B (Zyklus 4), DONE.
 
 ## Blockers
