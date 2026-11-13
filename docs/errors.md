@@ -40,6 +40,7 @@ and the body says only that the call was not charged.
 | 401 | `invalid_signature`, `signature_expired`, `signature_or_api_key_required` | `/v1/messages...` | the signature does not match, is out of its window, or there is neither a signature nor a key, see below |
 | 402 | `INSUFFICIENT_CREDITS` | `POST /v1/messages` | a first contact costs 1000 mc and the credit is lower, see below |
 | 413 | `message_too_large` | `POST /v1/messages` | more than 64000 characters of content or 128000 in all |
+| 413 | `relay_quota_exceeded` | `POST /v1/messages` | more than 4000000 characters of content per sender in 24 hours |
 | 429 | `rate_limited` | `POST /v1/messages` | 100 messages per sender and hour |
 
 ## relay
@@ -60,6 +61,11 @@ reaches its recipient with `[unverified sender, sent with an API key]` at the st
 Price: a message to an address the sender has had no contact with costs 1000 mc (1 cent), one ledger
 row `relay`. A reply, and every further message between the two, is free. Without that much credit
 the answer is `402 INSUFFICIENT_CREDITS` and nothing is sent.
+
+Storage: a sender stores at most 4000000 characters of content in 24 hours (`413 relay_quota_exceeded`
+above, nothing sent, nothing charged), and messages are deleted after 30 days; a contact stays, so a
+reply stays free. A poll repeated with the same `X-Signature`, `cursor` and `limit` gets the same
+messages again, so an answer lost on the way loses no message.
 
 ## sandboxes
 

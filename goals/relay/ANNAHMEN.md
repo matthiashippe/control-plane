@@ -29,3 +29,13 @@
   `test/relay-apikey.test.ts` mit einer Nachbildung der Regel (gleicher Ausdruck wie `src/agent/injection-defense.ts:73` am Pin).
 - **Der Gang läuft im Harness nach den Prüfungen von Saldo, Sandbox und langem Befehl**, weil diese den Saldo der ersten Wallet gegen
   die Summe des ganzen Ledgers halten und der Gang Wallets und Ledger-Zeilen hinzufügt.
+- **Punkt 8, Wiederholung eines `poll` (Kritik Tech Lead 13.11.):** Die Antwort eines signierten `poll` steht in `relay_polls` unter
+  `X-Signature`, `cursor` und `limit` und wird einen Tag gehalten (das Fenster von `X-Timestamp` ist 300000 ms plus 60 s). Die
+  Wiederholung liefert genau dieselben Nachrichten und denselben `next_cursor`, keine, die dazwischen ankamen; die markiert sie auch
+  nicht als gelesen, also holt sie der nächste neue `poll`. Ein `poll` mit API-Key hat keinen solchen Schlüssel und wird nicht
+  gemerkt, weil der Client der Runtime immer signiert.
+- **Punkt 9, Speichergrenze (Kritik Tech Lead 13.11.):** Gezählt wird `content.length` des gespeicherten Inhalts (UTF-16-Einheiten wie
+  `maxContentLength` am Pin), bei API-Key samt Kennzeichen, in der Spalte `content_chars`, über die angenommenen Nachrichten des
+  Absenders der letzten 24 Stunden. Die Prüfung steht nach der Wiederholung derselben Signatur und der Grenze je Stunde und vor dem
+  Preis, also bucht ein 413 nie. Der Kontakt steht seit diesem Punkt in `relay_contacts` statt in `relay_messages`, damit er die
+  Löschung nach 30 Tagen übersteht; die Tabelle ist neu wie das ganze Relay, auf dem Server gibt es noch keine Zeile nachzutragen.

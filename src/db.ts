@@ -328,6 +328,7 @@ function migrate(db: Db): void {
       sender     TEXT NOT NULL,                      -- lowercase 0x address, or key:<hex> for an API key send
       recipient  TEXT NOT NULL,
       content    TEXT NOT NULL,
+      content_chars INTEGER NOT NULL,                -- content.length, for the quota of 4000000 per sender and 24 h
       signed_at  TEXT NOT NULL,
       signature  TEXT UNIQUE,
       reply_to   TEXT,
@@ -341,6 +342,21 @@ function migrate(db: Db): void {
     CREATE INDEX IF NOT EXISTS relay_inbox ON relay_messages(recipient, seq);
     CREATE INDEX IF NOT EXISTS relay_sent ON relay_messages(sender, created_ms);
     CREATE INDEX IF NOT EXISTS relay_pair ON relay_messages(sender, recipient);
+    -- A contact outlives its messages (deleted after 30 days), so the reply stays free. a < b.
+    CREATE TABLE IF NOT EXISTS relay_contacts (
+      a          TEXT NOT NULL,
+      b          TEXT NOT NULL,
+      created_ms INTEGER NOT NULL,
+      PRIMARY KEY (a, b)
+    );
+    -- The answer to a signed poll, so a repeat with the same X-Signature gets the same messages.
+    CREATE TABLE IF NOT EXISTS relay_polls (
+      key         TEXT PRIMARY KEY,                  -- signature, cursor and limit
+      recipient   TEXT NOT NULL,
+      seqs        TEXT NOT NULL,                     -- JSON array of relay_messages.seq
+      next_cursor TEXT,
+      created_ms  INTEGER NOT NULL
+    );
   `);
   // One charge per message, ever: `ref` is `relay:<message id>`.
   db.exec("CREATE UNIQUE INDEX IF NOT EXISTS ledger_relay_once ON ledger(ref) WHERE kind = 'relay'");
@@ -705,11 +721,13 @@ export function getAvailableMc(db: Db, address: string): number {
 export function cleanupExpired(
   db: Db,
   now = Date.now(),
-): { nonces: number; sessions: number; payments: number; handoffs: number } {
+): { nonces: number; sessions: number; payments: number; handoffs: number; relay: number } {
   const NONCE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
   // POST /v1/handoff needs no key, so its rows go a day after they were created, in every state (goals/konto/02, Punkt 11).
   const HANDOFF_MAX_AGE_MS = 24 * 60 * 60 * 1000;
   const FAILED_PAYMENT_MAX_AGE_DAYS = 30;
+  const RELAY_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+  const RELAY_POLL_MAX_AGE_MS = 24 * 60 * 60 * 1000;
   const run = db.transaction(() => {
     const nonces = db.prepare("DELETE FROM siwe_nonces WHERE issued_at < ?").run(now - NONCE_MAX_AGE_MS).changes;
     const sessions = db.prepare("DELETE FROM sessions WHERE expires_at < ?").run(now).changes;
@@ -717,7 +735,11 @@ export function cleanupExpired(
       .prepare("DELETE FROM payments WHERE status = 'failed' AND created_at < ?")
       .run(new Date(now - FAILED_PAYMENT_MAX_AGE_DAYS * 24 * 60 * 60 * 1000).toISOString()).changes;
     const handoffs = db.prepare("DELETE FROM handoffs WHERE created_at < ?").run(now - HANDOFF_MAX_AGE_MS).changes;
-    return { nonces, sessions, payments, handoffs };
+    // Relay messages go after 30 days, their contact stays (goals/relay/01, point 9). A remembered poll answer is only
+    // needed while its X-Timestamp is in the window of 300000 ms, a day is plenty.
+    const relay = db.prepare("DELETE FROM relay_messages WHERE created_ms < ?").run(now - RELAY_MAX_AGE_MS).changes;
+    db.prepare("DELETE FROM relay_polls WHERE created_ms < ?").run(now - RELAY_POLL_MAX_AGE_MS);
+    return { nonces, sessions, payments, handoffs, relay };
   });
   return run();
 }

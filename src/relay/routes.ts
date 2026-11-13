@@ -73,7 +73,7 @@ async function signedBy(address: string, message: string, signature: string): Pr
 const str = (v: unknown): string | null => (typeof v === "string" ? v : null);
 
 /** The account a poll or count speaks for: the signed address in the headers, or the API key's account. */
-async function reader(c: Context, deps: RelayDeps): Promise<{ address: string } | RelayReply> {
+async function reader(c: Context, deps: RelayDeps): Promise<{ address: string; signature: string | null } | RelayReply> {
   const sig = c.req.header("x-signature");
   const wallet = c.req.header("x-wallet-address");
   const stamp = c.req.header("x-timestamp");
@@ -89,10 +89,10 @@ async function reader(c: Context, deps: RelayDeps): Promise<{ address: string } 
     if (!(await signedBy(address, `Conway:poll:${address}:${stamp}`, sig))) {
       return fail(401, "invalid_signature", "X-Signature is not a signature of Conway:poll:{address}:{timestamp} by X-Wallet-Address.");
     }
-    return { address };
+    return { address, signature: sig };
   }
   const account = deps.resolveKey(c.req.header("authorization"));
-  return account ? { address: account.toLowerCase() } : NO_AUTH;
+  return account ? { address: account.toLowerCase(), signature: null } : NO_AUTH;
 }
 
 /** The send: a signed message, or one with an API key that gets the mark. */
@@ -179,7 +179,7 @@ export function registerRelay<E extends Env>(app: Hono<E>, deps: RelayDeps): voi
     const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown> | null;
     const cursor = body && typeof body.cursor === "string" ? body.cursor : null;
     const limit = body && typeof body.limit === "number" ? body.limit : POLL_LIMIT_DEFAULT;
-    return reply(c, pollMessages(deps.db, who.address, cursor, limit, deps.clock()));
+    return reply(c, pollMessages(deps.db, who.address, cursor, limit, deps.clock(), who.signature));
   });
 
   app.all("/v1/messages/count", async (c) => {

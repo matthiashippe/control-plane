@@ -29,7 +29,13 @@ export const RELAY_LIMITS = {
   replayWindowMs: 300_000,
   futureSkewMs: 60_000,
   maxPerHour: 100,
+  /** Characters of `content` one sender may store in 24 hours (`## Grenzen` in the contract); not in MESSAGE_LIMITS. */
+  maxStoredCharsPerDay: 4_000_000,
+  /** Days a message is kept; cleanupExpired in src/db.ts deletes older ones, the contact stays. */
+  retentionDays: 30,
 } as const;
+
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 export const POLL_LIMIT_DEFAULT = 50;
 export const POLL_LIMIT_MAX = 100;
@@ -81,15 +87,15 @@ export function view(m: StoredMessage): Record<string, unknown> {
   };
 }
 
-/** Whether a message was ever accepted between the two, in either direction. */
+/** The two ends of a contact in a fixed order, so a to b and b to a are the same row of relay_contacts. */
+const pair = (a: string, b: string): [string, string] => (a < b ? [a, b] : [b, a]);
+
+/**
+ * Whether a message was ever accepted between the two, in either direction. Kept in relay_contacts, not read from
+ * relay_messages, because messages go after 30 days and the reply has to stay free.
+ */
 export function inContact(db: Db, a: string, b: string): boolean {
-  return Boolean(
-    db
-      .prepare(
-        "SELECT 1 FROM relay_messages WHERE (sender = ? AND recipient = ?) OR (sender = ? AND recipient = ?) LIMIT 1",
-      )
-      .get(a, b, b, a),
-  );
+  return Boolean(db.prepare("SELECT 1 FROM relay_contacts WHERE a = ? AND b = ?").get(...pair(a, b)));
 }
 
 export interface SendInput {
@@ -136,6 +142,24 @@ export function acceptMessage(db: Db, input: SendInput): RelayReply {
         },
       };
     }
+    const stored = (
+      db
+        .prepare("SELECT coalesce(sum(content_chars), 0) AS n FROM relay_messages WHERE sender = ? AND created_ms > ?")
+        .get(input.sender, nowMs - DAY_MS) as { n: number }
+    ).n;
+    if (stored + input.content.length > RELAY_LIMITS.maxStoredCharsPerDay) {
+      return {
+        status: 413,
+        body: {
+          error: "relay_quota_exceeded",
+          message:
+            `A sender may store ${RELAY_LIMITS.maxStoredCharsPerDay} characters of content in 24 hours, this one has ` +
+            `stored ${stored} and this message has ${input.content.length}. Nothing was sent and nothing was charged; ` +
+            "send again later or send less.",
+          docs: DOCS,
+        },
+      };
+    }
     const id = `msg_${randomBytes(12).toString("hex")}`;
     const price = inContact(db, input.sender, input.recipient) ? 0 : FIRST_CONTACT_MC;
     if (price > 0) {
@@ -155,13 +179,14 @@ export function acceptMessage(db: Db, input: SendInput): RelayReply {
       }
     }
     db.prepare(
-      "INSERT INTO relay_messages (id, sender, recipient, content, signed_at, signature, reply_to, nonce, verified, charged_mc, created_at, created_ms) " +
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO relay_messages (id, sender, recipient, content, content_chars, signed_at, signature, reply_to, nonce, verified, charged_mc, created_at, created_ms) " +
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     ).run(
       id,
       input.sender,
       input.recipient,
       input.content,
+      input.content.length,
       input.signedAt,
       input.signature,
       input.replyTo,
@@ -169,6 +194,10 @@ export function acceptMessage(db: Db, input: SendInput): RelayReply {
       input.signature ? 1 : 0,
       price,
       input.now.toISOString(),
+      nowMs,
+    );
+    db.prepare("INSERT OR IGNORE INTO relay_contacts (a, b, created_ms) VALUES (?, ?, ?)").run(
+      ...pair(input.sender, input.recipient),
       nowMs,
     );
     return { status: 201, body: { id } };
@@ -195,11 +224,41 @@ function insufficient(availableMc: number): RelayReply {
  * The recipient's messages after `cursor` (or, without one, the unread ones), oldest first, at most
  * `limit`; what it hands out counts as read. `next_cursor` is the number of the last one handed out,
  * or the cursor that came in when there was nothing new.
+ *
+ * `repeatKey` is the X-Signature of a signed poll. The runtime's client repeats a poll after a timeout
+ * or a 5xx with the same headers; when the first answer never arrived, the repeat must get the same
+ * messages, or those already marked read are lost. So the answer to a signed poll is remembered by
+ * signature, cursor and limit, and a repeat gets the same messages and the same `next_cursor`. A poll
+ * with an API key has no such key; the runtime's client always signs.
  */
-export function pollMessages(db: Db, recipient: string, cursor: string | null, limit: number, now: Date): RelayReply {
+export function pollMessages(
+  db: Db,
+  recipient: string,
+  cursor: string | null,
+  limit: number,
+  now: Date,
+  repeatKey: string | null = null,
+): RelayReply {
   const n = Math.min(Math.max(1, Math.floor(limit) || POLL_LIMIT_DEFAULT), POLL_LIMIT_MAX);
   const after = cursor !== null && /^[0-9]{1,15}$/.test(cursor) ? Number(cursor) : null;
+  const key = repeatKey === null ? null : `${repeatKey}\n${after ?? ""}\n${n}`;
   const run = db.transaction((): RelayReply => {
+    if (key !== null) {
+      const seen = db.prepare("SELECT seqs, next_cursor FROM relay_polls WHERE key = ? AND recipient = ?").get(key, recipient) as
+        | { seqs: string; next_cursor: string | null }
+        | undefined;
+      if (seen) {
+        const seqs = JSON.parse(seen.seqs) as number[];
+        const rows = (
+          seqs.length
+            ? db
+                .prepare(`SELECT * FROM relay_messages WHERE recipient = ? AND seq IN (${seqs.map(() => "?").join(",")}) ORDER BY seq`)
+                .all(recipient, ...seqs)
+            : []
+        ) as StoredMessage[];
+        return { status: 200, body: { messages: rows.map(view), next_cursor: seen.next_cursor } };
+      }
+    }
     const rows = (
       after === null
         ? db
@@ -213,6 +272,15 @@ export function pollMessages(db: Db, recipient: string, cursor: string | null, l
       ).run(now.toISOString(), ...rows.map((r) => r.seq));
     }
     const last = rows.length ? String(rows[rows.length - 1].seq) : after === null ? null : String(after);
+    if (key !== null) {
+      db.prepare("INSERT INTO relay_polls (key, recipient, seqs, next_cursor, created_ms) VALUES (?, ?, ?, ?, ?)").run(
+        key,
+        recipient,
+        JSON.stringify(rows.map((r) => r.seq)),
+        last,
+        now.getTime(),
+      );
+    }
     return { status: 200, body: { messages: rows.map(view), next_cursor: last } };
   });
   return run();

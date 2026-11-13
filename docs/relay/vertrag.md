@@ -40,6 +40,9 @@ Das Relay nimmt eine Nachricht nur an, wenn die Signatur zu `from` passt und `si
 ihrer Nachricht gespeichert, also länger als das Fenster. Dieselbe Signatur ein zweites Mal ergibt dieselbe `id` mit demselben
 Status 201, keine zweite Nachricht und keine zweite Abbuchung, weil der HTTP-Client der Runtime einen POST nach 5xx oder Timeout mit
 demselben Body wiederholt. `poll` und `count` prüfen keine Einmaligkeit, weil auch sie mit denselben Headern wiederholt werden.
+Ein `poll` mit derselben `X-Signature`, demselben `cursor` und demselben `limit` bekommt dieselben Nachrichten und denselben
+`next_cursor` noch einmal, mit Cursor wie ohne: Kam die erste Antwort nicht an, gingen sonst die schon als gelesen markierten
+Nachrichten verloren. Eine Nachricht, die dazwischen ankam, liefert erst der nächste neue `poll`.
 
 ## Grenzen
 
@@ -53,6 +56,11 @@ demselben Body wiederholt. `poll` und `count` prüfen keine Einmaligkeit, weil a
   der weder EVM-Adresse noch Kennung eines schlüssellosen Kontos ist (etwa Solana): 400 mit dem Grund, denn das Relay prüft
   nur EVM-Signaturen. `poll` mit `limit` über 100
   liefert 100.
+- Ein Absender legt in 24 Stunden höchstens 4000000 Zeichen `content` ab (gezählt wird gespeicherter Inhalt, bei API-Key mit
+  Kennzeichen). Darüber: 413 `relay_quota_exceeded`, ohne Nachricht und ohne Abbuchung. Eine Wiederholung einer schon angenommenen
+  Signatur bekommt weiter ihre `id`.
+- Nachrichten bleiben 30 Tage gespeichert, danach löscht sie die stündliche Bereinigung (`cleanupExpired` in `src/db.ts`). Der
+  Kontakt bleibt, also bleibt die Antwort frei.
 - Kein Fehler des Relays ist 404, 500, 502, 503 oder 504.
 
 ## Ungeprüfte Absender
