@@ -103,7 +103,7 @@ Erlaubnis aufsetzen und ohne beides kein Mensch ohne Wallet einen Automaton bei 
 - `ops/live.sh`: Die Prüfung `handoff` liest zusätzlich die Kopfzeile `Referrer-Policy` von `/h/<code>` und verlangt `no-referrer`
   (Vorschlag konto-kritik-3), mit einem gepflanzten Fall `strict-origin-when-cross-origin`, der `FAIL handoff` ergibt; es bleibt
   genau ein gepflanzter Fall `OK handoff`, weil konto 02 Punkt 8 genau 1 zählt. `deploy/Caddyfile` setzt an beiden Stellen
-  `Referrer-Policy "?strict-origin-when-cross-origin"`, damit Caddy nur einen fehlenden Wert ergänzt.
+  `?Referrer-Policy "strict-origin-when-cross-origin"`, damit Caddy nur einen fehlenden Wert ergänzt.
 - Der Lauf auf Base Sepolia (`ops/konto/sepolia-run.mjs`): startet das Control Plane auf dem code-host mit einer frischen
   Datenbank aus `mktemp -d` am gewählten Port auf `127.0.0.1`, legt einen Handoff mit `step: "konto"` und Tageslimit 5.00 USD an,
   öffnet `/h/<code>` in Chromium aus `~/.cache/ms-playwright/` mit einem virtuellen Authenticator über das DevTools-Protokoll
@@ -195,7 +195,7 @@ Erlaubnis aufsetzen und ohne beides kein Mensch ohne Wallet einen Automaton bei 
 - [ ] Die Kopfzeile `Referrer-Policy: no-referrer` von `/h/{code}` kommt in der Produktion an, und die Live-Prüfung merkt, wenn
       nicht.
       MVP: Funktion, weil an `/h/{code}` jetzt die Kontoanlage hängt und Caddy die Kopfzeile der App bisher überschreibt.
-      Prüfung: `grep -c 'Referrer-Policy "?strict-origin-when-cross-origin"' deploy/Caddyfile` muss mindestens `2` ausgeben, und `grep -c 'Referrer-Policy "strict-origin-when-cross-origin"' deploy/Caddyfile` muss `0` ausgeben.
+      Prüfung: `grep -c '?Referrer-Policy "strict-origin-when-cross-origin"' deploy/Caddyfile` muss mindestens `2` ausgeben, und `grep -cE '^[[:space:]]*Referrer-Policy |"[?]strict' deploy/Caddyfile` muss `0` ausgeben.
       Prüfung: `bash ops/live.sh --selftest` muss Exit-Code 0 haben und als letzte Zeile `LIVE SELFTEST OK` ausgeben, `bash ops/live.sh --selftest | grep -E '^planted handoff ' | grep -c ': OK handoff'` muss `1` ausgeben, und `bash ops/live.sh --selftest | grep -E '^planted handoff ' | grep -i 'referrer' | grep -c ': FAIL handoff'` muss mindestens `1` ausgeben.
 - [x] Der Ablauf steht für konto 04 und 05 fest, und die Entscheidungen stehen mit Grund in `goals/konto/ANNAHMEN.md`.
       MVP: Funktion, weil konto 04 die Tools gegen diesen Ablauf baut und konto 05 ihn ins Hauptnetz bringt.
