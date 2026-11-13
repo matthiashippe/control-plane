@@ -1,7 +1,7 @@
 # Sandbox Goal 04: Ende zu Ende mit der unveränderten Upstream-Runtime
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Die unveränderte Runtime am Pin `d8f8168` legt über ihren eigenen Client und ihre eigenen Werkzeuge eine Sandbox an, führt darin aus,
@@ -114,7 +114,7 @@ könnte, ohne dass ein Check rot wird.
       Prüfung: `git diff --name-only origin/dev...HEAD | grep -cE "\.(key|pem|env)$|live-sandbox\.env"` muss 0 ausgeben.
 - [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Jede neue Testdatei und jede neue Selftest-Zeile war vor dem Fix rot; die Zeile im Progress Log nennt, womit.
@@ -139,5 +139,6 @@ könnte, ohne dass ein Check rot wird.
 - 2026-11-13 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6, 7, 8, 9 gebaut (Nachbau `sandboxd` mit echtem `createSandboxd`, Gang über Client und Werkzeuge der Runtime am Pin, Bedingung `sandbox` in `pnpm e2e`, `ops/runtime-sandbox.sh`, Lauf gegen die Produktion 01:10 UTC, Doku und Annahmen); rot gesehen: `test/harness-sandboxd.test.ts` alle 5 Tests mit exec ohne Prozess, ohne Schlüssel, Schlüssel nur einmal geladen, `umount` ohne Leeren und `mapRoot` ohne Lookahead, Kopie statt echtem `createSandboxd`; `test/sandbox-walk.test.ts` alle 10 Tests mit je einer abgeschalteten Prüfung in `judgeSandboxWalk` (exec-Text, 200 bei `expose_port`, wiederholte Status, noch gelistet, Ledger-Zeilen, 402, Rückfall von `read_file`, erste statt letzter Zeile, immer ok); `--selftest` alle 18 Zeilen mit je einem Defekt in `runtime_state`, Urteil oder Ledger-Abfrage (ohne Pin, ohne `status --porcelain`, ohne Build-Prüfung, fehlend als ok, `hold_mc` ignoriert, 402 ohne eigenen Text, Urteil immer OK und immer FAIL, fehlendes Ergebnis, jede Sandbox-Zeile gezählt, ID ohne Prüfung). Prüfbefehle: P1 vitest Exit 0, Wortprüfung leer, `sandboxd:` 1 und `CP_SANDBOXD_URL` 1; P2 vitest Exit 0, beide Wortprüfungen leer; P3 `sandbox-walk.mjs` 2, `sandbox=$` 2, `readonly: true` 2, Wortprüfung leer; P4 `SUCCESS` und 1 (PR #57, Job e2e an f94fdb8: `E2E OK turns=5 ... balance_cents=490 domains=true sandbox=true`); P5 Exit 0 mit `RUNTIME SANDBOX SELFTEST OK`, Wortprüfung leer; P6 `bash ops/runtime-sandbox.sh` Exit 0 mit `RUNTIME SANDBOX OK ... ledger_rows=1 hold_mc=0`, `RUNTIME SANDBOX OK` in e2e.md 1, Adressen und Schlüssel 0; P7 2 und 3; P8 0 und 0; P9 `check` Exit 0 (124 Testdateien, 1506 Tests).
 - 2026-11-13 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, 7, 8, 9, alle Prüfbefehle am Kopf `2cb50bf` neu gefahren, `dev` brachte nichts Neues; den Lauf von P6 gegen die Produktion habe ich nicht wiederholt, weil das Goal ihn genau einmal vorsieht (Zyklus 1, 01:10 UTC, `docs/sandbox/e2e.md`). Prüfbefehle: P1 vitest Exit 0 (5 Tests), Wortprüfung leer, `sandboxd:` 1, `CP_SANDBOXD_URL` 1; P2 vitest Exit 0 (10 Tests), beide Wortprüfungen leer; P3 `sandbox-walk.mjs` 2, `sandbox=$` 2, `readonly: true` 2, Wortprüfung leer; P4 `e2e` SUCCESS an 2cb50bf, Log 1 Treffer `E2E OK .*sandbox=true`; P5 Exit 0 mit `RUNTIME SANDBOX SELFTEST OK`, Wortprüfung leer; P6 `RUNTIME SANDBOX OK` in e2e.md 1, Adressen und Schlüssel 0; P7 2 und 3; P8 0 und 0; P9 `check` Exit 0 (1506 Tests, grün in 61 s).
 - 2026-11-13 Zyklus 3: Gap der Linse K zu Punkt 3 abgearbeitet: `test/e2e-sandbox-gate.test.ts` führt den Urteilsblock von `harness/e2e/full.sh` (nach der Zeile mit dem Zustand des Nachbaus bis zur Schlusszeile) in bash mit gepflanzten `walk`, `sandbox_id`, `sandbox_ledger` und `sandbox_left` aus, Compose und `cleanup` als leere Stubs; der gute Gang ergibt `E2E OK … sandbox=true`, `SANDBOX_VERDICT fail`, kein Urteil, keine ID, sieben falsche Ledger-Zeilen, fünf Reste des Nachbaus je `E2E FAIL … sandbox=false`, und fehlgeschlagene Domains, vier Turns oder 500 Cent bleiben trotz gutem Gang `E2E FAIL`; rot gesehen mit (a) `sandbox=false` zu `sandbox=true` 15 von 17 rot, (b) `|| "$sandbox" != "true"` entfernt 15 rot, (c) Ledger-Bedingung entfernt 7 rot, dazu ohne ID-Bedingung 1 rot, je zurückgenommen. Prüfbefehle: `pnpm -s vitest run test/e2e-sandbox-gate.test.ts` Exit 0 (17 Tests); P1 bis P3, P5, P7, P8 unverändert grün; `check` Exit 0 (125 Testdateien, 1523 Tests).
+- 2026-11-13 Release: PASS K und B (Zyklus 3), DONE.
 
 ## Blockers
