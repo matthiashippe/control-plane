@@ -1,7 +1,7 @@
 # Sandbox Goal 04: Ende zu Ende mit der unveränderten Upstream-Runtime
 
 ## Status
-PLANNED
+DONE
 
 ## Active Objective
 Die unveränderte Runtime am Pin `d8f8168` legt über ihren eigenen Client und ihre eigenen Werkzeuge eine Sandbox an, führt darin aus,
@@ -79,42 +79,42 @@ könnte, ohne dass ein Check rot wird.
   `ROADMAP.md`).
 
 ## Done Condition
-- [ ] Der nachgebaute `sandboxd` unter `harness/sandboxd/` nimmt nur signierte Anfragen des Schlüssels aus `cp` an, legt an, führt
+- [x] Der nachgebaute `sandboxd` unter `harness/sandboxd/` nimmt nur signierte Anfragen des Schlüssels aus `cp` an, legt an, führt
       `echo ok` wirklich aus, schreibt und liest eine Datei und hat nach dem Löschen keine Sandbox mehr; der Test startet ihn im Prozess
       auf Port 0 mit dem echten signierten Client aus `src/sandbox/client.ts`.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/harness-sandboxd.test.ts` muss Exit-Code 0 haben.
       Prüfung: `for w in createSandboxd sandbox-client.pub 401 "echo ok" files/read DELETE; do grep -qF -- "$w" test/harness-sandboxd.test.ts || echo "fehlt $w"; done` muss nichts ausgeben.
       Prüfung: `grep -cE "^  sandboxd:" harness/docker-compose.yml` muss 1 ausgeben, und `grep -c "CP_SANDBOXD_URL" harness/docker-compose.yml` mindestens 1.
-- [ ] `harness/e2e/sandbox-walk.mjs` geht den Weg aus dem Kontext mit dem Client und den Werkzeugen der Runtime, und
+- [x] `harness/e2e/sandbox-walk.mjs` geht den Weg aus dem Kontext mit dem Client und den Werkzeugen der Runtime, und
       `judgeSandboxWalk` ist in beide Richtungen bewiesen.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/sandbox-walk.test.ts` muss Exit-Code 0 haben.
       Prüfung: `for w in createConwayClient executeTool create_sandbox exec write_file read_file expose_port list_sandboxes port_exposure_unavailable SANDBOX_RESULT judgeSandboxWalk; do grep -qF -- "$w" harness/e2e/sandbox-walk.mjs || echo "fehlt $w"; done` muss nichts ausgeben.
       Prüfung: `for w in "echo ok" 409 200 503 "still listed" ledger; do grep -qF -- "$w" test/sandbox-walk.test.ts || echo "fehlt $w"; done` muss nichts ausgeben.
-- [ ] `pnpm e2e` geht den Weg mit der Runtime im Harness, prüft Ledger und Zustand des Nachbaus und wird bei `sandbox=false` rot; die
+- [x] `pnpm e2e` geht den Weg mit der Runtime im Harness, prüft Ledger und Zustand des Nachbaus und wird bei `sandbox=false` rot; die
       bestehenden Bedingungen bleiben.
       Prüfung: `grep -c "sandbox-walk.mjs" harness/e2e/full.sh` muss mindestens 1 ausgeben, und `grep -cE 'sandbox=\$' harness/e2e/full.sh` mindestens 2 (Zeile `E2E FAIL` und Zeile `E2E OK`).
       Prüfung: `grep -cE "readonly: *true" harness/e2e/full.sh` muss mindestens 2 ausgeben.
       Prüfung: `for w in 'turns" -lt 5' 'domains_ok" != "true"' 'balance_cents" -ge 500'; do grep -qF -- "$w" harness/e2e/full.sh || echo "fehlt $w"; done` muss nichts ausgeben.
-- [ ] Der Job `e2e` des Goal-PR ist grün und hat den Gang mit der Runtime wirklich gemacht.
+- [x] Der Job `e2e` des Goal-PR ist grün und hat den Gang mit der Runtime wirklich gemacht.
       Prüfung (Netz): `n=$(gh pr list -R matthiashippe/control-plane --head goal/sandbox-04 --state all --json number -q '.[0].number'); gh pr checks "${n:?}" -R matthiashippe/control-plane --json name,state -q '.[] | select(.name=="e2e") | .state'` muss `SUCCESS` ausgeben.
       Prüfung (Netz): `n=$(gh pr list -R matthiashippe/control-plane --head goal/sandbox-04 --state all --json number -q '.[0].number'); l=$(gh pr checks "${n:?}" -R matthiashippe/control-plane --json name,link -q '.[] | select(.name=="e2e") | .link'); gh run view --job "${l##*/}" --log -R matthiashippe/control-plane | grep -c "E2E OK .*sandbox=true"` muss mindestens 1 ausgeben.
-- [ ] `ops/runtime-sandbox.sh` prüft, dass die Runtime am Pin unverändert ist, löst kein Topup aus, und sein Selbsttest ist in beide
+- [x] `ops/runtime-sandbox.sh` prüft, dass die Runtime am Pin unverändert ist, löst kein Topup aus, und sein Selbsttest ist in beide
       Richtungen bewiesen.
       Prüfung: `bash ops/runtime-sandbox.sh --selftest` muss Exit-Code 0 haben und als letzte Zeile `RUNTIME SANDBOX SELFTEST OK` ausgeben.
       Prüfung: `for w in d8f8168 "status --porcelain" sandbox-walk.mjs LIVE_SANDBOX_KEY "readonly: true" "FAIL credits"; do grep -qF -- "$w" ops/runtime-sandbox.sh || echo "fehlt $w"; done` muss nichts ausgeben.
-- [ ] Die unveränderte Runtime hat in der Produktion mit der eigenen Adresse eine Sandbox angelegt, darin ausgeführt, ist dafür mit genau
+- [x] Die unveränderte Runtime hat in der Produktion mit der eigenen Adresse eine Sandbox angelegt, darin ausgeführt, ist dafür mit genau
       einer Ledger-Zeile abgerechnet, und die Sandbox ist weg; das Ergebnis steht ohne ID, Adresse oder Schlüssel in `docs/sandbox/e2e.md`.
       Prüfung (Netz): `bash ops/runtime-sandbox.sh` muss Exit-Code 0 haben und als letzte Zeile `RUNTIME SANDBOX OK` mit `ledger_rows=1` ausgeben.
       Prüfung: `grep -c "RUNTIME SANDBOX OK" docs/sandbox/e2e.md` muss mindestens 1 ausgeben, und `grep -cE "0x[0-9a-fA-F]{40}|cnwy_k_" docs/sandbox/e2e.md` muss 0 ausgeben.
-- [ ] Die Entscheidungen dieses Goals (409 statt Port, Gang über Client und Werkzeuge statt Turn, Lauf gegen die Produktion ohne Topup)
+- [x] Die Entscheidungen dieses Goals (409 statt Port, Gang über Client und Werkzeuge statt Turn, Lauf gegen die Produktion ohne Topup)
       stehen in `goals/sandbox/ANNAHMEN.md`.
       Prüfung: `awk '/^## Goal 04/{f=1} f' goals/sandbox/ANNAHMEN.md | grep -c "port_exposure_unavailable"` muss mindestens 1 ausgeben, und `awk '/^## Goal 04/{f=1} f' goals/sandbox/ANNAHMEN.md | grep -ci "topup"` mindestens 1.
-- [ ] Das Goal ändert weder Runtime, Zahlung, Anmeldung noch Betrieb und bringt keinen Schlüssel ins Repo.
+- [x] Das Goal ändert weder Runtime, Zahlung, Anmeldung noch Betrieb und bringt keinen Schlüssel ins Repo.
       Prüfung: `git diff --name-only origin/dev...HEAD -- harness/runtime src/payments src/auth deploy .github scripts/check.mjs | wc -l` muss 0 ausgeben.
       Prüfung: `git diff --name-only origin/dev...HEAD | grep -cE "\.(key|pem|env)$|live-sandbox\.env"` muss 0 ausgeben.
-- [ ] `check` ist grün.
+- [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Jede neue Testdatei und jede neue Selftest-Zeile war vor dem Fix rot; die Zeile im Progress Log nennt, womit.
@@ -136,5 +136,9 @@ könnte, ohne dass ein Check rot wird.
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-13 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6, 7, 8, 9 gebaut (Nachbau `sandboxd` mit echtem `createSandboxd`, Gang über Client und Werkzeuge der Runtime am Pin, Bedingung `sandbox` in `pnpm e2e`, `ops/runtime-sandbox.sh`, Lauf gegen die Produktion 01:10 UTC, Doku und Annahmen); rot gesehen: `test/harness-sandboxd.test.ts` alle 5 Tests mit exec ohne Prozess, ohne Schlüssel, Schlüssel nur einmal geladen, `umount` ohne Leeren und `mapRoot` ohne Lookahead, Kopie statt echtem `createSandboxd`; `test/sandbox-walk.test.ts` alle 10 Tests mit je einer abgeschalteten Prüfung in `judgeSandboxWalk` (exec-Text, 200 bei `expose_port`, wiederholte Status, noch gelistet, Ledger-Zeilen, 402, Rückfall von `read_file`, erste statt letzter Zeile, immer ok); `--selftest` alle 18 Zeilen mit je einem Defekt in `runtime_state`, Urteil oder Ledger-Abfrage (ohne Pin, ohne `status --porcelain`, ohne Build-Prüfung, fehlend als ok, `hold_mc` ignoriert, 402 ohne eigenen Text, Urteil immer OK und immer FAIL, fehlendes Ergebnis, jede Sandbox-Zeile gezählt, ID ohne Prüfung). Prüfbefehle: P1 vitest Exit 0, Wortprüfung leer, `sandboxd:` 1 und `CP_SANDBOXD_URL` 1; P2 vitest Exit 0, beide Wortprüfungen leer; P3 `sandbox-walk.mjs` 2, `sandbox=$` 2, `readonly: true` 2, Wortprüfung leer; P4 `SUCCESS` und 1 (PR #57, Job e2e an f94fdb8: `E2E OK turns=5 ... balance_cents=490 domains=true sandbox=true`); P5 Exit 0 mit `RUNTIME SANDBOX SELFTEST OK`, Wortprüfung leer; P6 `bash ops/runtime-sandbox.sh` Exit 0 mit `RUNTIME SANDBOX OK ... ledger_rows=1 hold_mc=0`, `RUNTIME SANDBOX OK` in e2e.md 1, Adressen und Schlüssel 0; P7 2 und 3; P8 0 und 0; P9 `check` Exit 0 (124 Testdateien, 1506 Tests).
+- 2026-11-13 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, 7, 8, 9, alle Prüfbefehle am Kopf `2cb50bf` neu gefahren, `dev` brachte nichts Neues; den Lauf von P6 gegen die Produktion habe ich nicht wiederholt, weil das Goal ihn genau einmal vorsieht (Zyklus 1, 01:10 UTC, `docs/sandbox/e2e.md`). Prüfbefehle: P1 vitest Exit 0 (5 Tests), Wortprüfung leer, `sandboxd:` 1, `CP_SANDBOXD_URL` 1; P2 vitest Exit 0 (10 Tests), beide Wortprüfungen leer; P3 `sandbox-walk.mjs` 2, `sandbox=$` 2, `readonly: true` 2, Wortprüfung leer; P4 `e2e` SUCCESS an 2cb50bf, Log 1 Treffer `E2E OK .*sandbox=true`; P5 Exit 0 mit `RUNTIME SANDBOX SELFTEST OK`, Wortprüfung leer; P6 `RUNTIME SANDBOX OK` in e2e.md 1, Adressen und Schlüssel 0; P7 2 und 3; P8 0 und 0; P9 `check` Exit 0 (1506 Tests, grün in 61 s).
+- 2026-11-13 Zyklus 3: Gap der Linse K zu Punkt 3 abgearbeitet: `test/e2e-sandbox-gate.test.ts` führt den Urteilsblock von `harness/e2e/full.sh` (nach der Zeile mit dem Zustand des Nachbaus bis zur Schlusszeile) in bash mit gepflanzten `walk`, `sandbox_id`, `sandbox_ledger` und `sandbox_left` aus, Compose und `cleanup` als leere Stubs; der gute Gang ergibt `E2E OK … sandbox=true`, `SANDBOX_VERDICT fail`, kein Urteil, keine ID, sieben falsche Ledger-Zeilen, fünf Reste des Nachbaus je `E2E FAIL … sandbox=false`, und fehlgeschlagene Domains, vier Turns oder 500 Cent bleiben trotz gutem Gang `E2E FAIL`; rot gesehen mit (a) `sandbox=false` zu `sandbox=true` 15 von 17 rot, (b) `|| "$sandbox" != "true"` entfernt 15 rot, (c) Ledger-Bedingung entfernt 7 rot, dazu ohne ID-Bedingung 1 rot, je zurückgenommen. Prüfbefehle: `pnpm -s vitest run test/e2e-sandbox-gate.test.ts` Exit 0 (17 Tests); P1 bis P3, P5, P7, P8 unverändert grün; `check` Exit 0 (125 Testdateien, 1523 Tests).
+- 2026-11-13 Release: PASS K und B (Zyklus 3), DONE.
 
 ## Blockers

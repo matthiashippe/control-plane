@@ -1,5 +1,5 @@
 # Harness: local chain (Anvil, chainId 8453, USDC mock at the mainnet address), control plane
-# behind TLS (own CA) with a local settler, unmodified upstream runtime.
+# behind TLS (own CA) with a local settler, a rebuilt sandboxd, unmodified upstream runtime.
 x-anvil-account-0-key: &relayer-key "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
 
 services:
@@ -47,6 +47,8 @@ services:
       CP_PROVIDER: ${CP_PROVIDER:-mock}
       CP_MODEL_ALIASES: ${CP_MODEL_ALIASES-gpt-5.2=mock-1,gpt-5-mini=mock-1,gpt-5.3=mock-1}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      # Sandboxes go to the rebuilt sandboxd below, signed with the key cp makes in /data on its first start.
+      CP_SANDBOXD_URL: http://sandboxd:8730
     volumes:
       - ./certs:/certs:ro
       - cp-data:/data
@@ -60,6 +62,26 @@ services:
       timeout: 3s
       retries: 15
 
+  # Rebuilt sandboxd (goals/sandbox/04): the real ops/sandbox/sandboxd.mjs, commands of a sandbox as processes in
+  # this container instead of Docker. It reads the public key cp wrote (/data/sandbox-client.pub) from cp-data, read
+  # only, and is reachable inside the compose network only (no ports).
+  sandboxd:
+    build:
+      context: ..
+      dockerfile: harness/sandboxd/Dockerfile
+    environment:
+      SANDBOXD_KEYS_DIR: /cp-data
+    volumes:
+      - cp-data:/cp-data:ro
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8730/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+    depends_on:
+      cp:
+        condition: service_healthy
+
   runtime:
     build:
       context: ./runtime
@@ -71,6 +93,8 @@ services:
       - ./certs:/certs:ro
       - ${SETUP_JSON:-./runtime/setup.json}:/setup.json:ro
       - runtime-home:/home/automaton
+      # The sandbox walk (harness/e2e/sandbox-walk.mjs) with the runtime's own client and tools; not part of the image.
+      - ./e2e/sandbox-walk.mjs:/opt/harness/sandbox-walk.mjs:ro
     depends_on:
       cp:
         condition: service_healthy
