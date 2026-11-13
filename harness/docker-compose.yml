@@ -93,8 +93,11 @@ services:
       - ./certs:/certs:ro
       - ${SETUP_JSON:-./runtime/setup.json}:/setup.json:ro
       - runtime-home:/home/automaton
-      # The sandbox walk (harness/e2e/sandbox-walk.mjs) with the runtime's own client and tools; not part of the image.
+      # The sandbox walk (harness/e2e/sandbox-walk.mjs) and the long exec walk (harness/e2e/long-exec.mjs) with the
+      # runtime's own client and tools, and what both share (runtime-tap.mjs); not part of the image.
       - ./e2e/sandbox-walk.mjs:/opt/harness/sandbox-walk.mjs:ro
+      - ./e2e/long-exec.mjs:/opt/harness/long-exec.mjs:ro
+      - ./e2e/runtime-tap.mjs:/opt/harness/runtime-tap.mjs:ro
     depends_on:
       cp:
         condition: service_healthy
