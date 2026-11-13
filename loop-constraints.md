@@ -53,6 +53,10 @@ Geschichte.
     im Paperclip-Loop nicht. Credits sind nie auszahlbar und nie an Dritte übertragbar außer per `/v1/credits/transfer` innerhalb des
     Control Plane; jede Auszahlbarkeit ist ein REJECT-Grund. Kein Facilitator-Code, der selbst settlet, außerhalb von `harness/`.
     Der private Schlüssel der Betreiber-Wallet wird nie gelesen, ausgegeben, geloggt oder committet.
+    **Ausnahme Base Sepolia** (Matthias, 13.11.2026, für das Topic konto): Auf Base Sepolia (chainId 84532) darf der Loop on-chain
+    senden, mit Test-USDC und Gas aus einem Faucet, über einen eigenen Testschlüssel, der nur auf dem code-host liegt und nie im Repo,
+    in einem Log oder in einer Ausgabe steht. Code, der sendet, prüft die chainId und verweigert jede andere; ein Test zeigt das mit
+    chainId 8453. Im Hauptnetz gilt diese Regel unverändert, und der Schlüssel der Betreiber-Wallet bleibt auch hier tabu.
 11. **Kein Claude und kein Anthropic im Produkt.** In der Inferenz-Auswahl, in den Aliasen, in Vorschlägen und auf der Seite nie ein
     Claude- oder Anthropic-Modell; im Produkt nie ein `ANTHROPIC_API_KEY` und keine Anthropic-API (Standing Rule 29.09.2026). `check`
     prüft es.
