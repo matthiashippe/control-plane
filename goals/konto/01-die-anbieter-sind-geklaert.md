@@ -95,10 +95,26 @@ Euro an Kunden in Deutschland die ganze Kette widerlegt, bevor sie Code kostet.
 - [x] Die Annahmen stehen mit Grund in `goals/konto/ANNAHMEN.md`, und das Goal ändert nur Doku und Goal-Dateien des Topics, ohne
       Schlüssel oder Token.
       Prüfung: `awk '/^## Goal 01/{f=1;next} /^## /{f=0} f' goals/konto/ANNAHMEN.md | grep -cE "^- .+, weil .+"` muss mindestens 1 ausgeben.
-      Prüfung: `git diff --name-only origin/dev...HEAD | grep -vE '^(docs/konto/|goals/konto/)' | wc -l` muss 0 ausgeben.
+      Prüfung: `git diff --name-only origin/dev...HEAD | grep -vE '^(docs/konto/|goals/konto/|goals/_vorschlaege/konto-)' | wc -l` muss 0 ausgeben.
       Prüfung: `git diff origin/dev...HEAD | grep -E '^[+]' | grep -iE "(api[_-]?key|secret|token|private[_-]?key)[\"' ]*[:=] *[\"']?[A-Za-z0-9_+/=-]{16,}|BEGIN [A-Z ]*PRIVATE KEY" | wc -l` muss 0 ausgeben.
 - [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
+- [ ] `## Für die nächsten Goals` nennt für konto 05, wie die Auszahlung on-chain nur an die feste Auszahladresse des Kunden geht, ohne
+      dass USDC über eine Adresse von uns läuft. `spend()` in `SpendPermissionManager` verlangt `msg.sender == spender` und zahlt nur an
+      den Spender (Zeilen 420 bis 425), eine Spend Permission mit der Auszahladresse von Bridge als Spender kann also niemand ausführen,
+      und eine mit unserer Adresse als Spender machte uns zum Halter von Kundengeld. Das Goal belegt aus der Quelle und wählt mit Grund
+      einen Weg (etwa ein Spender-Vertrag, der jede Abbuchung im selben Aufruf fest an die eine Auszahladresse weiterleitet, oder jede
+      Auszahlung signiert der Kunde per Passkey über den Handoff), die Wahl steht zusätzlich in `goals/konto/ANNAHMEN.md`.
+      Prüfung: `awk '/^## Für die nächsten Goals/{f=1;next} /^## /{f=0} f' docs/konto/anbieter.md | awk '/konto 05/{g=1} g' | grep -cE "Spender|spend\(\)"` muss mindestens 1 ausgeben.
+      Prüfung: `awk '/^## Für die nächsten Goals/{f=1;next} /^## /{f=0} f' docs/konto/anbieter.md | awk '/konto 05/{g=1} g' | grep -c "Auszahladresse"` muss mindestens 1 ausgeben.
+      Prüfung: `awk '/^## Goal 01/{f=1;next} /^## /{f=0} f' goals/konto/ANNAHMEN.md | grep -c "Auszahladresse"` muss mindestens 1 ausgeben.
+- [ ] Dass die Turnkey-Wallet des Kunden Eigentümer seiner Coinbase Smart Wallet sein kann, ist aus dem Quellcode der Smart Wallet
+      belegt statt auf konto 03 verschoben: `MultiOwnable.sol` in `coinbase/smart-wallet` nimmt mit `addOwnerAddress` und beim Anlegen
+      (Eigentümer mit 32 Byte) jede Adresse als Eigentümer, und die Turnkey-Wallet ist für die Chain eine gewöhnliche Adresse mit
+      secp256k1-Signatur. Die Zeile in `## Für die nächsten Goals` und die zweite Annahme in `goals/konto/ANNAHMEN.md` sagen das mit
+      Link und Datum; was konto 03 dann noch zuerst belegt, ist nur der Lauf selbst.
+      Prüfung: `awk '/^## Für die nächsten Goals/{f=1;next} /^## /{f=0} f' docs/konto/anbieter.md | grep -cF "github.com/coinbase/smart-wallet"` muss mindestens 1 ausgeben.
+      Prüfung: `awk '/^## Für die nächsten Goals/{f=1;next} /^## /{f=0} f' docs/konto/anbieter.md | grep -c "addOwnerAddress"` muss mindestens 1 ausgeben.
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
