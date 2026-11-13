@@ -72,8 +72,7 @@ Das erste Fenster ist `CLEAN`. Das zweite meldet `AFFECTED` mit 21 Antworten mit
 `POST /v1/auth/verify`, 429 auf `POST /v1/auth/keyless`, 402 auf `POST /v1/chat/completions`): Kein 502 ist darunter, und keine
 dieser Antworten kommt vom Neustart.
 
-Alle 7 mal 502 unter `## Vorher` kamen 0,2 bis 5,1 s nach dem Start des Containers. In den 10 s nach dem Start fiel in keines der
-zwei Fenster eine Anfrage von außen:
+In den 10 s nach dem Start fiel in keines der zwei Fenster eine Anfrage von außen:
 
 - 2026-11-13 00:48:29 UTC: 0 Anfragen von außen in den 10 s nach dem Start
 - 2026-11-13 09:55:22 UTC: 0 Anfragen von außen in den 10 s nach dem Start
@@ -85,9 +84,32 @@ Zeitstempel bis 10 s nach dem Start zählt:
 set -a; . ~/.config/control-plane/loop.env; set +a; . ops/own-ips.sh; o=$(own_ips 2>/dev/null); bash ops/access-log.sh | python3 -c 'import sys,json,datetime as D;own=set(sys.argv[1].split());w={t:D.datetime.fromisoformat("2026-11-13T"+t+"+00:00").timestamp() for t in sys.argv[2:]};rs=[json.loads(l) for l in sys.stdin if l.startswith("{")];[print(t,sum(1 for r in rs if s<=r["ts"]<=s+10 and r.get("request",{}).get("remote_ip") not in own)) for t,s in w.items()]' "$o" 00:48:29 09:55:22
 ```
 
-Gegenprobe mit demselben Zähler an zwei Fenstern aus `## Vorher`: 2026-11-12 16:41:02 UTC zählt 4 Anfragen von außen in den 10 s,
-darunter die 3 mal 502, 2026-11-10 20:27:07 UTC zählt 3, darunter die 2 mal 502. Das Zugriffslog deckt beide Fenster nachher ab
-(162 und 606 Einträge in den 5 Minuten vor und nach dem Start). Im Fenster 09:55:22 bekamen 13 eigene Anfragen in den 10 s nach dem
-Start alle 200; das ist ein Hinweis, kein Beleg, weil Anfragen von außen den Retry anders treffen können.
+Warum gerade diese 10 s zählen, ob das Zugriffslog die Fenster überhaupt abdeckt und ob der Zähler einen Treffer findet, zeigt der
+folgende Befehl, gemessen am 13.11.2026 um 18:18 UTC. Er gibt je Start die Einträge des Zugriffslogs in den 5 Minuten davor und
+danach, die Anfragen von außen in den 10 s nach dem Start und den Abstand jedes 502 an eine fremde Adresse zum Start in Sekunden
+aus, für die zwei Fenster nachher, die sechs Fenster unter `## Vorher` und als leere Kontrolle einen Zeitpunkt ohne Log:
+
+```
+set -a; . ~/.config/control-plane/loop.env; set +a; . ops/own-ips.sh; o=$(own_ips 2>/dev/null); bash ops/access-log.sh | python3 -c 'import sys,json,datetime as D;own=set(sys.argv[1].split());rs=[json.loads(l) for l in sys.stdin if l.startswith("{")];T=lambda t:D.datetime.fromisoformat(t+"+00:00").timestamp();x=lambda r:r.get("request",{}).get("remote_ip") not in own;[print(t,sum(1 for r in rs if abs(r["ts"]-T(t))<=300),sum(1 for r in rs if 0<=r["ts"]-T(t)<=10 and x(r)),*["%.1f"%(r["ts"]-T(t)) for r in rs if 0<=r["ts"]-T(t)<=180 and r.get("status")==502 and x(r)]) for t in sys.argv[2:]]' "$o" 2026-11-13T00:48:29 2026-11-13T09:55:22 2026-11-10T18:53:58 2026-11-10T20:27:07 2026-11-12T05:57:56 2026-11-12T16:41:02 2026-11-12T18:15:46 2026-11-12T22:43:42 2030-01-01T00:00:00
+```
+
+Ausgabe:
+
+```
+2026-11-13T00:48:29 162 0
+2026-11-13T09:55:22 606 0
+2026-11-10T18:53:58 327 0
+2026-11-10T20:27:07 103 3 0.2 1.4
+2026-11-12T05:57:56 75 0
+2026-11-12T16:41:02 225 4 2.4 3.3 5.1
+2026-11-12T18:15:46 204 13 2.6
+2026-11-12T22:43:42 175 13 1.8
+2030-01-01T00:00:00 0 0
+```
+
+Alle 7 mal 502 unter `## Vorher` kamen also 0,2 bis 5,1 s nach dem Start, alle in den 10 s, die der Zähler oben prüft. Der Zähler
+findet dort Anfragen von außen (3, 4, 13 und 13 in den Fenstern mit 502), das Zugriffslog deckt beide Fenster nachher mit 162 und 606
+Einträgen ab, und am Zeitpunkt ohne Log gibt er 0 und 0 aus. Die zwei Nullen nachher heißen deshalb, dass keine Anfrage von außen
+kam, nicht, dass das Log blind war.
 
 Ergebnis: betrieb 02 hält, aber keine Anfrage von außen in die Sekunden des Neustarts fiel, deshalb steht der Beleg für den Retry noch aus; seit dem Merge bekam in beiden Fenstern keine fremde Adresse ein 502 am Neustart von `cp` (vorher 7 in 6 Fenstern).
