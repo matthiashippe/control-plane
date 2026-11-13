@@ -1,7 +1,7 @@
 # Sandbox Goal 05: Lange Befehle scheitern nicht an der Runtime
 
 ## Status
-PLANNED
+ACTIVE
 
 ## Active Objective
 Ein `exec` von 60 s und von 180 s über die unveränderte Runtime am Pin `d8f8168` endet ohne Fehler der Runtime und ohne Zählung in
@@ -81,36 +81,36 @@ seinen Dienst bei uns (Abschlusskriterium in `ROADMAP.md`).
   fremder Automaton seinen Dienst bei uns betreiben.
 
 ## Done Condition
-- [ ] Die Messung vorher steht mit Ort, Commit und Zahlen für 60 s und 180 s in `docs/sandbox/lange-befehle.md`, bevor `src/` sich
+- [x] Die Messung vorher steht mit Ort, Commit und Zahlen für 60 s und 180 s in `docs/sandbox/lange-befehle.md`, bevor `src/` sich
       ändert.
       Prüfung: `awk '/^## Vorher/{f=1;next} /^## /{f=0} f' docs/sandbox/lange-befehle.md | grep -cE "^- vorher (60|180) s: "` muss 2 ausgeben.
       Prüfung: `b=$(git merge-base origin/dev HEAD); d=$(git log --format=%H --diff-filter=A -1 -- docs/sandbox/lange-befehle.md); s=$(git log --format=%H --reverse "$b"..HEAD -- src | head -1); [ -z "$s" ] || { [ "$d" != "$s" ] && git merge-base --is-ancestor "$d" "$s"; }` muss Exit-Code 0 haben.
-- [ ] `harness/e2e/long-exec.mjs` geht beide Befehle mit dem Client und den Werkzeugen der Runtime, schreibt jeden Versuch mit, auch
+- [x] `harness/e2e/long-exec.mjs` geht beide Befehle mit dem Client und den Werkzeugen der Runtime, schreibt jeden Versuch mit, auch
       abgebrochene, und `judgeLongExec` ist in beide Richtungen bewiesen.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/long-exec.test.ts` muss Exit-Code 0 haben.
       Prüfung: `for w in createConwayClient executeTool list_sandboxes "sleep 60" "sleep 180" abort LONG_EXEC_RESULT judgeLongExec; do grep -qF -- "$w" harness/e2e/long-exec.mjs || echo "fehlt $w"; done` muss nichts ausgeben.
       Prüfung: `for w in abort 503 long-60 long-180 failures_after next_status; do grep -qF -- "$w" test/long-exec.test.ts || echo "fehlt $w"; done` muss nichts ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/sandbox-walk.test.ts` muss Exit-Code 0 haben.
-- [ ] Die Entscheidung zwischen Hintergrundlauf und 400 steht mit den Zahlen der Messung und dem Grund in `goals/sandbox/ANNAHMEN.md`.
+- [x] Die Entscheidung zwischen Hintergrundlauf und 400 steht mit den Zahlen der Messung und dem Grund in `goals/sandbox/ANNAHMEN.md`.
       Prüfung: `awk '/^## Goal 05/{f=1} f' goals/sandbox/ANNAHMEN.md | grep -cE "60 s|180 s"` muss mindestens 2 ausgeben, und `awk '/^## Goal 05/{f=1} f' goals/sandbox/ANNAHMEN.md | grep -ciE "hintergrund|120000"` mindestens 1.
-- [ ] Das Control Plane beantwortet ein `exec` von 60 s und von 180 s auf dem entschiedenen Weg, ohne den Befehl zweimal zu starten;
+- [x] Das Control Plane beantwortet ein `exec` von 60 s und von 180 s auf dem entschiedenen Weg, ohne den Befehl zweimal zu starten;
       der Test war vor dem Fix rot.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/sandbox-long-exec.test.ts test/sandbox-api.test.ts` muss Exit-Code 0 haben.
       Prüfung: `for w in 180000 60000 Idempotency-Key useFakeTimers; do grep -qF -- "$w" test/sandbox-long-exec.test.ts || echo "fehlt $w"; done` muss nichts ausgeben.
-- [ ] `pnpm e2e` geht beide Befehle mit der Runtime im Harness und wird bei `long_exec=false` rot; die bestehenden Bedingungen bleiben.
+- [x] `pnpm e2e` geht beide Befehle mit der Runtime im Harness und wird bei `long_exec=false` rot; die bestehenden Bedingungen bleiben.
       Prüfung: `grep -c "long-exec.mjs" harness/e2e/full.sh` muss mindestens 1 ausgeben, und `grep -cE 'long_exec=\$' harness/e2e/full.sh` mindestens 2 (Zeile `E2E FAIL` und Zeile `E2E OK`).
       Prüfung: `for w in 'turns" -lt 5' 'domains_ok" != "true"' 'balance_cents" -ge 500' 'sandbox" != "true"' 'long_exec" != "true"'; do grep -qF -- "$w" harness/e2e/full.sh || echo "fehlt $w"; done` muss nichts ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/e2e-sandbox-gate.test.ts` muss Exit-Code 0 haben, und `grep -c "long_exec" test/e2e-sandbox-gate.test.ts` mindestens 2 ausgeben.
-- [ ] Der Job `e2e` des Goal-PR ist grün und hat beide Befehle wirklich gefahren.
+- [x] Der Job `e2e` des Goal-PR ist grün und hat beide Befehle wirklich gefahren.
       Prüfung (Netz): `n=$(gh pr list -R matthiashippe/control-plane --head goal/sandbox-05 --state all --json number -q '.[0].number'); gh pr checks "${n:?}" -R matthiashippe/control-plane --json name,state -q '.[] | select(.name=="e2e") | .state'` muss `SUCCESS` ausgeben.
       Prüfung (Netz): `n=$(gh pr list -R matthiashippe/control-plane --head goal/sandbox-05 --state all --json number -q '.[0].number'); l=$(gh pr checks "${n:?}" -R matthiashippe/control-plane --json name,link -q '.[] | select(.name=="e2e") | .link'); gh run view --job "${l##*/}" --log -R matthiashippe/control-plane | grep -cE "E2E OK .*sandbox=true.*long_exec=true"` muss mindestens 1 ausgeben.
-- [ ] Die Messung nachher steht für 60 s und 180 s in `docs/sandbox/lange-befehle.md`, ohne ID einer Sandbox, Adresse oder Schlüssel.
+- [x] Die Messung nachher steht für 60 s und 180 s in `docs/sandbox/lange-befehle.md`, ohne ID einer Sandbox, Adresse oder Schlüssel.
       Prüfung: `awk '/^## Nachher/{f=1;next} /^## /{f=0} f' docs/sandbox/lange-befehle.md | grep -cE "^- nachher (60|180) s: "` muss 2 ausgeben.
       Prüfung: `grep -cE "0x[0-9a-fA-F]{40}|cnwy_k_" docs/sandbox/lange-befehle.md` muss 0 ausgeben.
-- [ ] Das Goal ändert weder Runtime, Sandbox-Server, Zahlung, Anmeldung noch Betrieb und bringt keinen Schlüssel ins Repo.
+- [x] Das Goal ändert weder Runtime, Sandbox-Server, Zahlung, Anmeldung noch Betrieb und bringt keinen Schlüssel ins Repo.
       Prüfung: `git diff --name-only origin/dev...HEAD -- harness/runtime harness/sandboxd ops/sandbox src/payments src/auth deploy .github scripts/check.mjs | wc -l` muss 0 ausgeben.
       Prüfung: `git diff --name-only origin/dev...HEAD | grep -cE "\.(key|pem|env)$|live-sandbox\.env"` muss 0 ausgeben.
-- [ ] `check` ist grün.
+- [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
 - [ ] goal-verifier PASS (K und B)
 
@@ -138,5 +138,6 @@ seinen Dienst bei uns (Abschlusskriterium in `ROADMAP.md`).
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-13 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6, 7, 8, 9 gebaut (Gang `harness/e2e/long-exec.mjs` mit gemeinsamem `runtime-tap.mjs`, Messung vorher lokal gegen `e8ab65f` vor jeder Änderung an `src/`, Entscheidung Hintergrundlauf ab `timeout` über 90000 ms mit Antwort nach 20 s und Hülle mit Dateien unter `/root/.exec/`, Bedingung `long_exec` in `pnpm e2e`, Messung nachher aus dem Job `e2e` an `3ad795e`); rot gesehen: `test/long-exec.test.ts` mit je einer abgeschalteten Bedingung in `judgeLongExec`, `failuresAfter` und `createFetchTap` (Werkzeug warf, keine Anfrage, wiederholter Status, `failures_after`, `next_status`, `runs`, Ergebnis immer da, Text immer klar, Dateien immer gelesen, `abort` nicht gezählt, Teilstring statt Zeile, `abort` als `error`, Löschen ignoriert) 13 von 13 rot; `test/sandbox-long-exec.test.ts` vor dem Fix 5 von 7 rot, danach je Mutation (Grenze 600000, Antwort nach 30 s, Timer ohne Antwort, Wiederholung ohne Antwort oder ohne Ergebnis, keine Hülle, keine Exit-Datei, kein `timeout`, keine Kappung bei 585 s) 10 von 10 rot, der Test mit `mapRoot` vor dem Leerzeichen-Fix rot; `test/e2e-sandbox-gate.test.ts` mit `long_exec` immer true, ohne Bedingung in der Schlusszeile, ohne Zählung der Ergebnisse, ohne Zustand des Nachbaus, ohne exaktes Urteil je rot; der Job `e2e` an `eb849e1` war rot mit `long_exec=false`. Prüfbefehle: P1 2 und Exit 0; P2 vitest Exit 0 (20 Tests), beide Wortprüfungen leer, `sandbox-walk` Exit 0; P3 3 und 6; P4 vitest Exit 0, Wortprüfung leer; P5 2 und 2, Wortprüfung leer, vitest Exit 0 und 8; P6 `e2e` SUCCESS an `3ad795e` mit 1 Treffer `E2E OK … sandbox=true long_exec=true`, am Kopf erneut; P7 2 und 0; P8 0 und 0; P9 `check` Exit 0 (127 Testdateien, 1557 Tests), ein zweiter Lauf unter Last 189 mit allen 1558 Tests grün und zwei RPC-Timeouts von vitest.
 
 ## Blockers

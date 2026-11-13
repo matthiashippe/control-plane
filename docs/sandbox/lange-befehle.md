@@ -30,3 +30,28 @@ Urteil des Gangs: `LONG_EXEC_VERDICT fail long-180: the tool failed: This operat
 Damit ist die Erwartung aus der Goal-Datei bestätigt: 60 s kommt heute über die Wiederholung mit demselben Schlüssel an, 180 s
 endet beim Modell als Fehler und lässt den Zähler auf 4 stehen; ein weiterer Fehlschlag irgendeines Aufrufs öffnet danach den
 Circuit Breaker für 60 s, Credits und Inferenz eingeschlossen.
+
+## Nachher
+
+Ort: Job `e2e` des Goal-PR #62 auf `ubuntu-latest`, Commit `3ad795e`, 13.11.2026 05:28:25 bis 05:32:45 UTC, `pnpm e2e`
+(`harness/e2e/full.sh`: Image des Control Plane aus diesem Stand, Nachbau `sandboxd`, Runtime am Pin `d8f8168`, derselbe Schlüssel
+wie im Gang aus Goal 04, eigene Sandbox). Lauf: https://github.com/matthiashippe/control-plane/actions/runs/43372085984/job/131709945589
+
+- nachher 60 s: 60022 ms, 2 Versuche (`abort` nach 30 s, dann 200 mit demselben Schlüssel ab 30689 ms), 1 Abbruch,
+  `failures_after` 0, folgendes `list_sandboxes` 200, Befehl 1 Mal gelaufen, erste Zeile des Werkzeugtexts `exit_code: 0` mit
+  `long-60` in stdout. Unverändert gegenüber vorher, weil bis `timeout` 90000 ms gehalten wird.
+- nachher 180 s: 20008 ms, 1 Versuch mit 200, kein Abbruch, `failures_after` 0, folgendes `list_sandboxes` 200, Befehl 1 Mal
+  gelaufen, das Werkzeug warf nicht, erste Zeile des Werkzeugtexts `exit_code: -1`, stdout beginnt mit `The command is still
+  running in the background.` und nennt `/root/.exec/<tag>.out`, `.err` und `.exit`. Nach dem Ende gelesen mit `read_file`:
+  `.out` gibt `long-180`, `.err` leer, `.exit` gibt `0`.
+
+Schlusszeile des Jobs: `E2E OK turns=5 registered=true api_errors=0 ledger_consistent=true balance_cents=490 domains=true
+sandbox=true long_exec=true`; der Nachbau war danach leer (`{"sandboxes":0,"containers":0,"networks":0,"homes":0}`). Gegenprobe:
+Der Job am Commit davor (`eb849e1`, Hülle ohne Leerzeichen nach `>`) endete mit `LONG_EXEC_VERDICT fail long-180: the command ran 0
+times, expected once; …` und `E2E FAIL … sandbox=true long_exec=false`
+(https://github.com/matthiashippe/control-plane/actions/runs/43370906489).
+
+Was der Harness nicht zeigt: Caddy und der echte Sandbox-Server liegen nicht dazwischen. Im Harness spricht die Runtime das Control
+Plane direkt über TLS an, und der Nachbau führt Befehle als Prozess aus statt mit `docker exec` in gVisor. Ob Caddy eine Antwort nach
+20 s durchreicht und ob `timeout` aus coreutils im Image des Servers den Befehl stoppt, prüft der Release Manager nach dem Rollout
+wie immer mit `ops/live.sh`; dieses Goal läuft nicht gegen die Produktion.
