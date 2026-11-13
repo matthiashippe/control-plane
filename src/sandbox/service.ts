@@ -52,9 +52,11 @@ const EXEC_WRAP_MARGIN_MS = 15_000;
 export function backgroundCommand(command: string, base: string, seconds: number): string {
   const quoted = `'${command.replace(/'/g, `'\\''`)}'`;
   const dir = base.slice(0, base.lastIndexOf("/")) || "/";
+  // A space after every redirection: the rebuilt sandboxd of the harness maps `/root` only after a space, a quote
+  // or a separator (mapRoot in harness/sandboxd/harness-run.mjs), as a shell word starts there.
   return (
-    `mkdir -p ${dir} && timeout -k 5 ${seconds} bash -c ${quoted} >${base}.out 2>${base}.err; ` +
-    `c=$?; echo $c >${base}.exit; cat ${base}.out; cat ${base}.err >&2; exit $c`
+    `mkdir -p ${dir} && timeout -k 5 ${seconds} bash -c ${quoted} > ${base}.out 2> ${base}.err; ` +
+    `c=$?; echo $c > ${base}.exit; cat ${base}.out; cat ${base}.err >&2; exit $c`
   );
 }
 

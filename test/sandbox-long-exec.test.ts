@@ -16,6 +16,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { EXEC_EARLY_MS, EXEC_HOLD_MAX_MS, backgroundCommand } from "../src/sandbox/service.js";
 import { closeWorlds, sandboxWorld } from "./sandbox-world.js";
+import { mapRoot } from "../harness/sandboxd/harness-run.mjs";
 
 afterEach(async () => {
   vi.useRealTimers();
@@ -186,6 +187,17 @@ describe("backgroundCommand in a real bash", () => {
       stderr: "oops\n",
       files: { out: `it's "quoted"\n`, err: "oops\n", exit: "3\n" },
     });
+  });
+
+  it("works in the rebuilt sandboxd of the harness, which maps /root to the home of the sandbox", () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "cp-home-"));
+    const wrapped = mapRoot(backgroundCommand("cd /root && echo run >> /root/x.runs; echo long-x", "/root/.exec/t2", 10), home);
+    expect(wrapped).not.toMatch(/(^|[^A-Za-z0-9_.-])\/root\//);
+    const r = spawnSync("bash", ["-lc", wrapped], { encoding: "utf8", timeout: 20_000 });
+    const read = (f: string) => (fs.existsSync(path.join(home, f)) ? fs.readFileSync(path.join(home, f), "utf8") : null);
+    const got = { code: r.status, stdout: r.stdout, out: read(".exec/t2.out"), exit: read(".exec/t2.exit"), runs: read("x.runs") };
+    fs.rmSync(home, { recursive: true, force: true });
+    expect(got).toEqual({ code: 0, stdout: "long-x\n", out: "long-x\n", exit: "0\n", runs: "run\n" });
   });
 
   it("stops the command at its timeout and writes 124 to the exit file", () => {
