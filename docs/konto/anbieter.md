@@ -62,9 +62,20 @@ Stand 2026-11-13); wir bauen deshalb nicht darauf.
 - **konto 03:** Vertrag `SpendPermissionManager` auf Base Sepolia (84532) unter `0xf85210B21cC50302F477BA56686d2019dC9b67Ad`, auf Base
   (8453) unter derselben Adresse; `eth_getCode` lieferte am 13.11.2026 auf https://sepolia.base.org und https://mainnet.base.org je
   12.610 Byte Code. Test-USDC auf Base Sepolia ist `0x036CbD53842c5426634e7929541eC2318f3dCF7e`
-  ([Quelle](https://developers.circle.com/stablecoins/usdc-contract-addresses), Stand 2026-11-13). Dass Turnkey Eigentümer einer
-  Coinbase Smart Wallet sein kann, ist nicht dokumentiert ([Quelle](https://docs.turnkey.com/features/wallets/aa-wallets), Stand
-  2026-11-13); konto 03 baut das selbst und belegt es als Erstes. Das Gegenstück zu „Abbuchung über der Grenze scheitert on-chain“ ist
+  ([Quelle](https://developers.circle.com/stablecoins/usdc-contract-addresses), Stand 2026-11-13). Dass die Turnkey-Wallet des Kunden
+  Eigentümer seiner Coinbase Smart Wallet sein kann, steht im Quellcode der Smart Wallet: Beim Anlegen über `createAccount(bytes[]
+  owners, uint256 nonce)` der Factory nimmt sie jeden Eigentümer mit 32 Byte als Ethereum-Adresse an, später jede Adresse über
+  `addOwnerAddress` ([Quelle](https://github.com/coinbase/smart-wallet/blob/a4e83fd36c47b64cb4e21e1fa6bb9b04181a66da/src/CoinbaseSmartWalletFactory.sol#L50-L54),
+  [Quelle](https://github.com/coinbase/smart-wallet/blob/a4e83fd36c47b64cb4e21e1fa6bb9b04181a66da/src/MultiOwnable.sol#L213-L227),
+  [Quelle](https://github.com/coinbase/smart-wallet/blob/a4e83fd36c47b64cb4e21e1fa6bb9b04181a66da/src/MultiOwnable.sol#L101-L103),
+  Stand 2026-11-13), und die Signatur eines solchen Eigentümers prüft sie mit `SignatureCheckerLib.isValidSignatureNow`, also per
+  `ecrecover` ([Quelle](https://github.com/coinbase/smart-wallet/blob/a4e83fd36c47b64cb4e21e1fa6bb9b04181a66da/src/CoinbaseSmartWallet.sol#L318-L334),
+  Stand 2026-11-13). Die Turnkey-Wallet ist für die Chain eine gewöhnliche Adresse mit secp256k1-Signatur (`ADDRESS_FORMAT_ETHEREUM`,
+  `CURVE_SECP256K1`), und `@turnkey/viem` liefert dazu ein Konto, das viem als Eigentümer in `toCoinbaseSmartAccount` annimmt
+  ([Quelle](https://docs.turnkey.com/concepts/wallets), [Quelle](https://docs.turnkey.com/features/networks/ethereum),
+  [Quelle](https://viem.sh/account-abstraction/accounts/smart/toCoinbaseSmartAccount), Stand 2026-11-13). Eine fertige Anleitung von
+  Turnkey für die Coinbase Smart Wallet gibt es nicht ([Quelle](https://docs.turnkey.com/features/wallets/aa-wallets), Stand
+  2026-11-13); konto 03 belegt deshalb nur noch den Lauf selbst. Das Gegenstück zu „Abbuchung über der Grenze scheitert on-chain“ ist
   der Revert `ExceededSpendPermission`.
   Human Gate `security_settings`, Schritte für Matthias (rund fünf Minuten,
   [Quelle](https://docs.turnkey.com/get-started/quickstart), [Quelle](https://docs.turnkey.com/features/authentication/auth-proxy),
