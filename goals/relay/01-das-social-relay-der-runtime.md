@@ -116,6 +116,23 @@ funktionierendes Relay ist ein zweiter Grund für einen Automaton, `conwayApiUrl
       Prüfung (Netz): `gh pr checks goal/relay-01 -R matthiashippe/control-plane | awk '$1=="e2e"{print $2}'` muss `pass` ausgeben.
 - [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
+- [ ] Ein `poll`, dessen Antwort nicht ankam, verliert keine Nachricht (Kritik Tech Lead 13.11.): Heute liest `poll` ohne Cursor nur
+      Ungelesenes und markiert es gelesen (`src/relay/store.ts`, `pollMessages`), und der Client der Runtime wiederholt einen `poll`
+      nach Timeout oder 5xx mit denselben Headern (`src/conway/http-client.ts:113` am Pin); die Wiederholung bekommt dann nichts, und
+      jede Runtime ohne erste Nachricht pollt ohne Cursor, weil `next_cursor` bei leerem Ergebnis `null` ist. Die Wiederholung eines
+      signierten `poll` mit derselben `X-Signature` liefert dieselben Nachrichten noch einmal, mit Cursor wie ohne, und `count` fällt nach
+      dem gelieferten `poll` weiter auf 0.
+      Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/relay-poll-retry.test.ts` muss Exit-Code 0 haben.
+      Prüfung: `grep -ciE "x-signature" test/relay-poll-retry.test.ts` muss mindestens 1 ausgeben.
+- [ ] Das Relay füllt den Speicher des Zahlungsservers nicht ohne Grenze (Kritik Tech Lead 13.11., `loop-constraints.md`
+      Grundregel 5): Heute legt ein Absender nach einem bezahlten Erstkontakt, auch an die eigene Adresse, kostenlos 100 Nachrichten je
+      Stunde zu 128000 Zeichen ab, und nichts löscht sie. Ein Absender legt in 24 Stunden höchstens 4000000 Zeichen `content` ab,
+      darüber antwortet `POST /v1/messages` mit 413 und Klartext, ohne Nachricht und ohne Abbuchung; `cleanupExpired` in `src/db.ts`
+      löscht Nachrichten, die älter als 30 Tage sind, und ein Kontakt bleibt danach bestehen (die Antwort bleibt frei). Der Vertrag nennt
+      beides unter `## Grenzen`.
+      Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/relay-storage.test.ts` muss Exit-Code 0 haben.
+      Prüfung: `awk '/^export function cleanupExpired/,/^}/' src/db.ts | grep -c relay_messages` muss mindestens 1 ausgeben.
+      Prüfung: `awk '/^## Grenzen/{f=1;next} /^## /{f=0} f' docs/relay/vertrag.md | grep -cE '4000000|30 Tage'` muss mindestens 2 ausgeben.
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
