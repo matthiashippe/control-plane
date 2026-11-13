@@ -1,7 +1,7 @@
 # Konto Goal 01: Die Anbieter sind geklärt
 
 ## Status
-PLANNED
+ACTIVE
 
 ## Active Objective
 Der Loop weiß, bei wem das Konto eines Menschen ohne Wallet liegt und wer dessen Geld in Euro auszahlt, bevor konto 02 bis 05 dagegen
@@ -70,34 +70,34 @@ Euro an Kunden in Deutschland die ganze Kette widerlegt, bevor sie Code kostet.
   besitzen (konto 04), und genau an der Wallet blieben bis 23.09.2026 alle 43 Besucher hängen (`src/auth/keyless.ts`).
 
 ## Done Condition
-- [ ] `docs/konto/anbieter.md` vergleicht Privy und Turnkey in einer Tabelle `## Konto` mit je einer Zeile zu Passkey, Base und Base
+- [x] `docs/konto/anbieter.md` vergleicht Privy und Turnkey in einer Tabelle `## Konto` mit je einer Zeile zu Passkey, Base und Base
       Sepolia, Abbuchungserlaubnis, Tagesgrenze on-chain, Schlüssel, Ausstieg, Einbindung und Preis, und jede Zeile belegt beide
       Anbieter mit Link und Datum.
       Prüfung: `awk '/^## Konto/{f=1;next} /^## /{f=0} f && /^[|]/' docs/konto/anbieter.md | head -1 | grep -cE "^[|] *Frage *[|] *Privy *[|] *Turnkey *[|]$"` muss 1 ausgeben.
       Prüfung: `for q in Passkey "Base Sepolia" Abbuchungserlaubnis "Tagesgrenze on-chain" "Schlüssel" Ausstieg Einbindung Preis; do awk '/^## Konto/{f=1;next} /^## /{f=0} f && /^[|]/' docs/konto/anbieter.md | sed -n '3,$p' | cut -d'|' -f2 | grep -qiF -- "$q" || echo "fehlt $q"; done` muss nichts ausgeben.
       Prüfung: `awk '/^## Konto/{f=1;next} /^## /{f=0} f && /^[|]/' docs/konto/anbieter.md | sed -n '3,$p' | grep -vE '^[|][^|]+[|][^|]*https://[^|]*Stand 20[0-9]{2}-[0-9]{2}-[0-9]{2}[^|]*[|][^|]*https://[^|]*Stand 20[0-9]{2}-[0-9]{2}-[0-9]{2}[^|]*[|]$' | wc -l` muss 0 ausgeben.
-- [ ] `docs/konto/anbieter.md` vergleicht Bridge und Due in einer Tabelle `## Euro` mit je einer Zeile zu SEPA an Privatkunden in
+- [x] `docs/konto/anbieter.md` vergleicht Bridge und Due in einer Tabelle `## Euro` mit je einer Zeile zu SEPA an Privatkunden in
       Deutschland, fester Auszahladresse, Einzahlung per Karte, Gebühren, Identitätsprüfung, Firmenprüfung HTC und Erlaubnis, und jede
       Zeile belegt beide Anbieter mit Link und Datum.
       Prüfung: `awk '/^## Euro/{f=1;next} /^## /{f=0} f && /^[|]/' docs/konto/anbieter.md | head -1 | grep -cE "^[|] *Frage *[|] *Bridge *[|] *Due *[|]$"` muss 1 ausgeben.
       Prüfung: `for q in SEPA Auszahladresse Karte "Gebühren" "Identitätsprüfung" "Firmenprüfung HTC" Erlaubnis; do awk '/^## Euro/{f=1;next} /^## /{f=0} f && /^[|]/' docs/konto/anbieter.md | sed -n '3,$p' | cut -d'|' -f2 | grep -qiF -- "$q" || echo "fehlt $q"; done` muss nichts ausgeben.
       Prüfung: `awk '/^## Euro/{f=1;next} /^## /{f=0} f && /^[|]/' docs/konto/anbieter.md | sed -n '3,$p' | grep -vE '^[|][^|]+[|][^|]*https://[^|]*Stand 20[0-9]{2}-[0-9]{2}-[0-9]{2}[^|]*[|][^|]*https://[^|]*Stand 20[0-9]{2}-[0-9]{2}-[0-9]{2}[^|]*[|]$' | wc -l` muss 0 ausgeben.
-- [ ] Jeder Link der Doku führt auf eine Seite, die es gibt.
+- [x] Jeder Link der Doku führt auf eine Seite, die es gibt.
       Prüfung (Netz): `grep -oE 'https://[^ ),|>]+' docs/konto/anbieter.md | sort -u | while read -r u; do c=$(curl -s -o /dev/null -L --max-time 20 -w '%{http_code}' "$u"); case "$c" in 404|410) echo "$c $u";; esac; done` muss nichts ausgeben.
-- [ ] `## Entscheidung` entscheidet je Seite genau einen Anbieter mit Grund; fällt die Euro-Seite aus, steht der andere Weg darunter.
+- [x] `## Entscheidung` entscheidet je Seite genau einen Anbieter mit Grund; fällt die Euro-Seite aus, steht der andere Weg darunter.
       Prüfung: `awk '/^## Entscheidung/{f=1;next} /^## /{f=0} f' docs/konto/anbieter.md | grep -cE "^(Konto: (Privy|Turnkey)|Euro: (Bridge|Due|keiner))$"` muss 2 ausgeben.
       Prüfung: `awk '/^## Entscheidung/{f=1;next} /^## /{f=0} f' docs/konto/anbieter.md | grep -cE "^Grund: .{20,}"` muss mindestens 2 ausgeben.
       Prüfung: `if grep -qx "Euro: keiner" docs/konto/anbieter.md; then awk '/^## Anderer Weg/{f=1;next} /^## /{f=0} f' docs/konto/anbieter.md | grep -c "Vorschlag"; else echo 1; fi` muss mindestens 1 ausgeben.
-- [ ] `## Für die nächsten Goals` nennt, was aus der Entscheidung für konto 02, konto 03 und konto 05 folgt, darunter Vertrag und
+- [x] `## Für die nächsten Goals` nennt, was aus der Entscheidung für konto 02, konto 03 und konto 05 folgt, darunter Vertrag und
       Adresse der Abbuchungserlaubnis auf Base Sepolia und die Schritte am Human Gate `security_settings`.
       Prüfung: `for g in "konto 02" "konto 03" "konto 05" "Base Sepolia" security_settings; do awk '/^## Für die nächsten Goals/{f=1;next} /^## /{f=0} f' docs/konto/anbieter.md | grep -qF -- "$g" || echo "fehlt $g"; done` muss nichts ausgeben.
       Prüfung: `awk '/^## Für die nächsten Goals/{f=1;next} /^## /{f=0} f' docs/konto/anbieter.md | grep -cE "0x[0-9a-fA-F]{40}|nicht dokumentiert"` muss mindestens 1 ausgeben.
-- [ ] Die Annahmen stehen mit Grund in `goals/konto/ANNAHMEN.md`, und das Goal ändert nur Doku und Goal-Dateien des Topics, ohne
+- [x] Die Annahmen stehen mit Grund in `goals/konto/ANNAHMEN.md`, und das Goal ändert nur Doku und Goal-Dateien des Topics, ohne
       Schlüssel oder Token.
       Prüfung: `awk '/^## Goal 01/{f=1;next} /^## /{f=0} f' goals/konto/ANNAHMEN.md | grep -cE "^- .+, weil .+"` muss mindestens 1 ausgeben.
       Prüfung: `git diff --name-only origin/dev...HEAD | grep -vE '^(docs/konto/|goals/konto/)' | wc -l` muss 0 ausgeben.
       Prüfung: `git diff origin/dev...HEAD | grep -E '^[+]' | grep -iE "(api[_-]?key|secret|token|private[_-]?key)[\"' ]*[:=] *[\"']?[A-Za-z0-9_+/=-]{16,}|BEGIN [A-Z ]*PRIVATE KEY" | wc -l` muss 0 ausgeben.
-- [ ] `check` ist grün.
+- [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
 - [ ] goal-verifier PASS (K und B)
 
@@ -121,5 +121,6 @@ Euro an Kunden in Deutschland die ganze Kette widerlegt, bevor sie Code kostet.
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-13 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6, 7 gebaut: `docs/konto/anbieter.md` vergleicht Privy und Turnkey sowie Bridge und Due aus der Doku der Anbieter (86 Links, Stand 2026-11-13) und entscheidet Konto: Turnkey und Euro: Bridge, die Tagesgrenze kommt on-chain aus Coinbase Smart Wallet mit `SpendPermissionManager` (Code auf Base und Base Sepolia per `eth_getCode` belegt), Annahmen in `goals/konto/ANNAHMEN.md`; kein Konto, kein Formular, keine Mail, kein Geld bewegt. Prüfbefehle: P1 Kopf 1, fehlende Fragen leer, Zeilen ohne Beleg 0 (Gegenprobe ohne Stand in der Zeile Ausstieg: 1); P2 Kopf 1, fehlende Fragen leer, Zeilen ohne Beleg 0; P3 (Netz) leer (Gegenprobe https://www.bridge.xyz/pricing: 404); P4 2, 2, 1; P5 leer, 4; P6 Annahmen 9, Pfade außerhalb 0, Secrets 0; P7 `check` Exit 0 (131 Dateien, 1591 Tests).
 
 ## Blockers
