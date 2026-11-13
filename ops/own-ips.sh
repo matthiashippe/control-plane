@@ -15,8 +15,10 @@
 # So the list is written down and grows: an address this machine is observed to have is appended
 # to ops/own-ips.txt with the date it was first seen when the caller sets CP_OWN_IPS_WRITE=1, and
 # the file is in the repository because it is evidence, not a scratch file. Without the variable
-# the live address counts for the current run only and stderr says how to keep it, so a check
-# with network never leaves the checkout dirty. Filtering an address that later belongs to somebody else
+# the live address is not written to the list and stderr says how to keep it there, so a check
+# with network never leaves the checkout dirty; it is remembered outside the checkout instead
+# (CP_OWN_IPS_SEEN, default $XDG_STATE_HOME/control-plane/own-ips-seen.txt) and counted as ours in
+# every later run on this machine. Filtering an address that later belongs to somebody else
 # loses a real reader, which is the direction this counter must err in.
 #
 #   source ops/own-ips.sh; OWN=$(own_ips)
@@ -72,11 +74,23 @@ own_ips() {
       echo "  (new own address $live, counted for this run only; CP_OWN_IPS_WRITE=1 writes it to $(basename "$list_file"))" >&2
     fi
   fi
+  # The list above only grows by hand now, and this line reconnects to a new address most days, so
+  # an address seen yesterday would count as a stranger today: the 2026-09-22 error again. Every
+  # address seen live is therefore remembered outside the checkout, in CP_OWN_IPS_SEEN or the state
+  # directory, and counted as ours in every later run. A failed write there must not cost the
+  # caller its answer, so errors are dropped.
+  local seen_file="${CP_OWN_IPS_SEEN:-${XDG_STATE_HOME:-$HOME/.local/state}/control-plane/own-ips-seen.txt}"
+  if [[ -n "$live" ]] && ! grep -q "^$live " "$list_file" 2>/dev/null \
+    && ! grep -q "^$live " "$seen_file" 2>/dev/null; then
+    { mkdir -p "$(dirname "$seen_file")" \
+      && printf '%s %s\n' "$live" "$(date -u +%Y-%m-%d)" >> "$seen_file"; } 2>/dev/null || true
+  fi
   {
     # tr, not word splitting: this file gets sourced by scripts, and one shell that does not split
     # an unquoted variable turns the whole list into a single line that matches no address.
     printf '%s\n' "${CP_OWN_IPS:-}" | tr ' ' '\n'
     printf '%s\n' "$live"
     grep -v '^#' "$list_file" | awk 'NF {print $1}'
+    if [[ -f "$seen_file" ]]; then awk 'NF {print $1}' "$seen_file" 2>/dev/null; fi
   } | grep -v '^$' | sort -u | tr '\n' ' '
 }

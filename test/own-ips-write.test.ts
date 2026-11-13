@@ -13,10 +13,12 @@ import { join } from "node:path";
  *
  * Everything runs without network: `ssh` on PATH is a fake that answers the SSH_CLIENT probe with 192.0.2.77, the access
  * log fetch from ops/access-log.sh with planted lines, and everything else with exit 255. Addresses come from the
- * documentation ranges only. The real ops/own-ips.txt is only ever copied, never written.
+ * documentation ranges only. The real ops/own-ips.txt is only ever copied, never written, and every run has HOME in a temp
+ * dir, so the default seen file under ~/.local/state is never the real one either.
  */
 const OPS = join(__dirname, "..", "ops");
 const LIVE = "192.0.2.77";
+const LATER = "192.0.2.78";
 const STRANGER = "198.51.100.23";
 const AT = "2026-11-01T12:00:00";
 const T0 = Date.parse(`${AT}Z`) / 1000;
@@ -41,7 +43,7 @@ function sandbox(accessLog: string[] = []) {
       "#!/bin/sh",
       'for last in "$@"; do :; done',
       'case "$last" in',
-      `  *SSH_CLIENT*) echo "${LIVE} 40000 22" ;;`,
+      `  *SSH_CLIENT*) echo "\${FAKE_LIVE:-${LIVE}} 40000 22" ;;`,
       `  *"docker exec deploy-caddy-1"*) gzip -c < ${JSON.stringify(planted)} ;;`,
       "  *) exit 255 ;;",
       "esac",
@@ -142,6 +144,57 @@ describe("own_ips writes to the list only with CP_OWN_IPS_WRITE=1", () => {
     const { root, env } = sandbox();
     const r = ownIps(root, env({ CP_OWN_IPS_FILE: join(root, "absent.txt") }));
     expect(r.status).toBe(1);
+  });
+});
+
+describe("own_ips remembers live addresses outside the checkout", () => {
+  it("counts an address seen in an earlier run as ours in a later one, without touching the list", () => {
+    const { root, env } = sandbox();
+    const list = listWithoutLive(root);
+    const before = sha256(list);
+    const seen = join(mkdtempSync(join(tmpdir(), "own-ips-seen-")), "state", "own-ips-seen.txt");
+    const first = ownIps(root, env({ CP_OWN_IPS_FILE: list, CP_OWN_IPS_SEEN: seen }));
+    expect(first.status, first.stderr).toBe(0);
+    const second = ownIps(root, env({ CP_OWN_IPS_FILE: list, CP_OWN_IPS_SEEN: seen, FAKE_LIVE: LATER }));
+    expect(second.status, second.stderr).toBe(0);
+    const out = second.stdout.split(" ");
+    expect(out).toContain(LATER);
+    expect(out).toContain(LIVE);
+    expect(sha256(list)).toBe(before);
+    const lines = readFileSync(seen, "utf8").split("\n").filter(Boolean);
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toMatch(new RegExp(`^${LIVE.replace(/\./g, "\\.")} \\d{4}-\\d{2}-\\d{2}$`));
+  });
+
+  it("does not add a second line for an address it already remembers", () => {
+    const { root, env } = sandbox();
+    const list = listWithoutLive(root);
+    const seen = join(root, "seen.txt");
+    ownIps(root, env({ CP_OWN_IPS_FILE: list, CP_OWN_IPS_SEEN: seen }));
+    const after = sha256(seen);
+    const r = ownIps(root, env({ CP_OWN_IPS_FILE: list, CP_OWN_IPS_SEEN: seen }));
+    expect(r.status, r.stderr).toBe(0);
+    expect(sha256(seen)).toBe(after);
+  });
+
+  it("uses XDG_STATE_HOME for the default seen file", () => {
+    const { root, env } = sandbox();
+    const list = listWithoutLive(root);
+    const state = mkdtempSync(join(tmpdir(), "own-ips-xdg-"));
+    const r = ownIps(root, env({ CP_OWN_IPS_FILE: list, XDG_STATE_HOME: state }));
+    expect(r.status, r.stderr).toBe(0);
+    const seen = join(state, "control-plane", "own-ips-seen.txt");
+    expect(readFileSync(seen, "utf8").startsWith(`${LIVE} `)).toBe(true);
+  });
+
+  it("still answers when the seen file cannot be written", () => {
+    const { root, env } = sandbox();
+    const list = listWithoutLive(root);
+    const blocker = join(root, "not-a-dir");
+    writeFileSync(blocker, "");
+    const r = ownIps(root, env({ CP_OWN_IPS_FILE: list, CP_OWN_IPS_SEEN: join(blocker, "seen.txt") }));
+    expect(r.status, r.stderr).toBe(0);
+    expect(r.stdout.split(" ")).toContain(LIVE);
   });
 });
 
