@@ -1,7 +1,7 @@
 # Fehler Goal 04: Keine Besucheradresse kommt ungeprüft nach `dev`
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Jede öffentliche IPv4-Adresse in einer getrackten Datei ist belegt oder fliegt in `check` auf, auch in CI ohne den Cache von
@@ -115,7 +115,7 @@ Zusage der Datenschutzerklärung bricht, ohne dass `check` es merkt.
       Prüfung: `d=$(mktemp -d); k=$(mktemp); git -C "$d" init -q; printf 'seen 192.0.2.%d\n' 7 > "$d/a.txt"; git -C "$d" add a.txt; printf '%d.%d.%d.%d datacenter Example (fetcher-cache)\n' 11 22 33 44 > "$k"; CP_SCAN_ROOT="$d" CP_KNOWN_IPS="$k" pnpm -s vitest run test/known-ips.test.ts >/dev/null 2>&1 && echo gruen || echo rot` muss `rot` ausgeben.
       Prüfung: `d=$(mktemp -d); k=$(mktemp); git -C "$d" init -q; printf 'seen %d.%d.%d.%d\n' 11 22 33 44 > "$d/a.txt"; git -C "$d" add a.txt; printf '%d.%d.%d.%d datacenter Example (fetcher-cache)\n' 11 22 33 44 > "$k"; CP_SCAN_ROOT="$d" CP_KNOWN_IPS="$k" pnpm -s vitest run test/known-ips.test.ts >/dev/null 2>&1 && echo gruen || echo rot` muss `gruen` ausgeben.
       Prüfung: `d=$(mktemp -d); k=$(mktemp); git -C "$d" init -q; printf 'seen 192.0.2.%d\n' 7 > "$d/a.txt"; git -C "$d" add a.txt; printf '%d.%d.%d.%d datacenter Example (fetcher-cache)\n' 11 22 33 44 > "$k"; CP_SCAN_ROOT="$d" CP_KNOWN_IPS="$k" pnpm -s vitest run test/known-ips.test.ts 2>&1 | grep -cF "$(printf '%d.%d.%d.%d' 11 22 33 44)"` muss 0 ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Der neue Test war vor der Liste rot; die Zeile im Progress Log nennt, mit wie vielen Adressen in wie vielen Dateien.
@@ -142,5 +142,6 @@ Zusage der Datenschutzerklärung bricht, ohne dass `check` es merkt.
 - 2026-11-12 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4; `dev` ohne neue Commits, jeder Prüfbefehl am Kopf `ca0074a` neu gefahren. Prüfbefehle: Punkt 1 `da`, 0, 0, 0, 0, 1; Punkt 2 Exit 0, `rot`, `rot`, `gruen`, 0, 2, 0; Punkt 3 0, `pnpm -s vitest run` Exit 0 (120 Dateien, 1472 Tests), `test/visitor-addresses.test.ts` Exit 0, depth-Fixtures 0, `ops/fetchers.py --selftest` Exit 0, `ops/crawlers.sh --selftest` Exit 0, `ops/traffic.sh --selftest` (Netz) Exit 0; Punkt 4 `node scripts/check.mjs` Exit 0 (grün in 213 s); am PR #56 Jobs `check` und `e2e` grün.
 - 2026-11-12 Zyklus 3: Punkt Kritik 1 (Punkt 5) gebaut: `test/known-ips.test.ts` prüft jede Zeile von `ops/known-ips.txt` auf die Form `<adresse> <art> <beleg>` und hält eine Adresse der Art `erfunden` aus jeder getrackten Datei außerhalb von `goals/`, `docs/audit/`, `LOOP.md`, `loop-constraints.md`, `loop-dauerauftrag.md`, `.github/`, `deploy/`, `harness/`; Fundstellen sind `CP_SCAN_ROOT` und der Work Tree, der die Liste trackt (`ANNAHMEN.md`), die Meldung nennt Zeilennummer und Datei. Prüfbefehle: Exit 0, `rot`, `rot`, `rot`, `gruen`, 0.
 - 2026-11-12 Zyklus 4: Punkt Kritik 2 (Punkt 6) gebaut und Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6: `test/known-ips.test.ts` wird rot für jeden Eintrag von `ops/known-ips.txt`, dessen Adresse in keiner anderen getrackten Datei steht (Meldung nennt Anzahl und Zeilennummern), Absatz in `ops/README.md`; am Zwischenstand von Zyklus 3 lieferte Prüfbefehl 1 von Punkt 6 noch `gruen`, `origin/dev` ohne neue Commits. Prüfbefehle: Punkt 1 `da`, 0, 0, 0, 0, 1; Punkt 2 Exit 0, `rot`, `rot`, `gruen`, 0, 2, 0; Punkt 3 0, `pnpm -s vitest run` Exit 0 (120 Dateien, 1475 Tests; ein Lauf davor rot nur am 5-s-Timeout von `test/stripe-sessions-selftest.test.ts` bei Load 42, einzeln grün), `test/visitor-addresses.test.ts` Exit 0, depth-Fixtures 0, `ops/fetchers.py --selftest` Exit 0, `ops/crawlers.sh --selftest` Exit 0, `ops/traffic.sh --selftest` (Netz) Exit 0; Punkt 4 `node scripts/check.mjs` Exit 0 (grün in 71 s); Punkt 5 Exit 0, `rot`, `rot`, `rot`, `gruen`, 0; Punkt 6 `rot`, `gruen`, 0.
+- 2026-11-13 Release: PASS K und B (Zyklus 4), DONE.
 
 ## Blockers
