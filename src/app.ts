@@ -3600,7 +3600,11 @@ export function createApp(opts: AppOptions) {
       return sandboxGuard(c, () => sandboxes.upload(address, id, body));
     }
     if (sub === "/files/read") return sandboxGuard(c, () => sandboxes.read(address, id, c.req.query("path")));
-    return sandboxGuard(c, () => sandboxes.ports(address, id));
+    if (sub === "/ports/expose") {
+      const body = await json();
+      return sandboxGuard(c, () => sandboxes.exposePort(address, id, body));
+    }
+    return sandboxGuard(c, () => sandboxes.removePort(address, id, sub.slice("/ports/".length)));
   });
 
   // --- Domains (docs/sandbox/vertrag.md, src/domains.ts) ----------

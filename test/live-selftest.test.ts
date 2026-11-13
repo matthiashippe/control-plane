@@ -50,6 +50,23 @@ describe("ops/live.sh", () => {
     expect(run.stdout).toContain(
       "planted sandbox 'client_key=ok ctl=200 create=201 exec=ok files=ok delete=200 ledger=1': FAIL sandbox: background exec did not run",
     );
+    // The exposed port of the check `sandbox` (goals/sandbox/07, point 8): judged in both directions, and the live step
+    // itself gives each failure its own token and gives the port back once ports/expose answered 2xx.
+    expect(run.stdout).toMatch(/planted sandbox '[^']*port=ok[^']*': OK sandbox: .*exposed port ok/);
+    for (const port of ["expose_409", "expose_none", "no_url", "bad_url", "server_504", "fetch_failed", "unexpose_404"]) {
+      expect(run.stdout).toMatch(new RegExp(`planted sandbox '[^']*port=${port}[^']*': FAIL sandbox: exposed port`));
+    }
+    expect(run.stdout).toContain(
+      "planted sandbox 'client_key=ok ctl=200 create=201 exec=ok bg=ok files=ok delete=200 ledger=1': FAIL sandbox: exposed port",
+    );
+    expect(run.stdout).toContain("planted port step ok: port=ok unexposed=yes");
+    expect(run.stdout).toContain("planted port step late: port=ok unexposed=yes fetches=3");
+    expect(run.stdout).toMatch(/planted port step never: port=fetch_failed unexposed=yes fetches=([2-9]|1[0-2])\n/);
+    expect(run.stdout).toContain("planted port step 409: port=expose_409 unexposed=no fetches=0");
+    expect(run.stdout).toContain("planted port step nourl: port=no_url unexposed=yes fetches=0");
+    expect(run.stdout).toContain("planted port step payurl: port=bad_url unexposed=yes fetches=0");
+    expect(run.stdout).toContain("planted port step server: port=server_504 unexposed=yes fetches=0");
+    expect(run.stdout).toContain("planted port step unexpose: port=unexpose_404 unexposed=yes");
     expect(run.stdout.trim().split("\n").at(-1)).toBe("LIVE SELFTEST OK");
     expect(run.status).toBe(0);
   }, 300_000);

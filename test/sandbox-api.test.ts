@@ -50,6 +50,7 @@ const readCreate = (result: any) => ({
 const readList = (result: any) => (Array.isArray(result) ? result : result.sandboxes || []).map((s: any) => ({ id: s.id || s.sandbox_id, status: s.status || "unknown" }));
 const readExec = (result: any) => ({ stdout: result.stdout || "", stderr: result.stderr || "", exitCode: result.exit_code ?? result.exitCode ?? -1 });
 const readFile = (result: any) => (typeof result === "string" ? result : result.content || "");
+const readExpose = (result: any) => ({ port: result.port, publicUrl: result.public_url || result.publicUrl || result.url });
 
 const CREATE_FIELDS = ["id", "status", "region", "vcpu", "memory_mb", "disk_gb", "terminal_url", "created_at"];
 
@@ -91,12 +92,12 @@ describe("every /v1/sandboxes row of docs/sandbox/vertrag.md", () => {
         expect(readFile(res.json)).toBe("hello sandbox");
       } else if (key === "POST /v1/sandboxes/{id}/ports/expose") {
         const res = await a.call("POST", `/v1/sandboxes/${id}/ports/expose`, { port: 8080 });
-        expect(res.status).toBe(409);
-        expect(res.json.error).toBe("port_exposure_unavailable");
+        expect(res.status).toBe(200);
+        expect(readExpose(res.json)).toEqual({ port: 8080, publicUrl: `https://sbx-${id}-8080.example.dev` });
       } else if (key === "DELETE /v1/sandboxes/{id}/ports/{port}") {
         const res = await a.call("DELETE", `/v1/sandboxes/${id}/ports/8080`);
-        expect(res.status).toBe(409);
-        expect(res.json.error).toBe("port_exposure_unavailable");
+        expect(res.status).toBeGreaterThanOrEqual(200);
+        expect(res.status).toBeLessThan(300);
       } else {
         throw new Error(`a contract row without a test: ${key}`);
       }
@@ -487,20 +488,19 @@ describe("repeated create without an Idempotency-Key", () => {
 });
 
 describe("ports", () => {
-  it("port_exposure_unavailable: expose and remove answer 409 and never reach sandboxd", async () => {
+  it("expose and remove reach sandboxd and answer port and public_url instead of 409 port_exposure_unavailable", async () => {
     const w = await sandboxWorld();
     const a = w.account();
     const id = (await a.call("POST", "/v1/sandboxes", { memory_mb: 512 })).json.id as string;
-    const before = [...w.hits];
     const expose = await a.call("POST", `/v1/sandboxes/${id}/ports/expose`, { port: 3000 });
     const remove = await a.call("DELETE", `/v1/sandboxes/${id}/ports/3000`);
-    for (const res of [expose, remove]) {
-      expect(res.status).toBe(409);
-      expect(res.json.error).toBe("port_exposure_unavailable");
-      expect(res.json).not.toHaveProperty("public_url");
-    }
-    expect(w.hits).toEqual(before);
-    expect(w.hits.some((h) => h.includes("/ports"))).toBe(false);
+    expect(expose.status).toBe(200);
+    expect(expose.json).toMatchObject({ port: 3000, public_url: `https://sbx-${id}-3000.example.dev` });
+    expect(remove.status).toBe(200);
+    for (const res of [expose, remove]) expect(res.json.error).toBeUndefined();
+    expect(w.hits).toContain(`POST /v1/sandboxes/${id}/ports/expose`);
+    expect(w.hits).toContain(`DELETE /v1/sandboxes/${id}/ports/3000`);
+    expect(w.d.sandboxes()[id].ports).toEqual([]);
   });
 });
 

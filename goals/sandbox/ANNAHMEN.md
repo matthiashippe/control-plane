@@ -243,3 +243,47 @@
   ausgelassen). Gegenprobe: `bash ops/smoke.sh https://ctl.sbx.postyourprice.com` Exit 1 (12 Fehler), `dig +short A
   ctl.sbx.postyourprice.com | grep -cx 76.13.144.207` 0; beide Werkzeuge können also rot werden. Der Punkt hält, Code und Server
   sind unverändert. Ursache und Empfehlung stehen im Vorschlag `goals/_vorschlaege/loop-audit-2026-11-13-2.md`.
+
+## Goal 07 (13.11.2026, Engineer CP)
+
+- **Ausgangslage.** `ops/ports-demand.sh` ist unverändert aus Commit 0ce27f0 übernommen; sein Selbsttest war am heutigen Stand
+  grün, also gab es keinen Grund für eine Änderung. Seit dem Rollout von sandbox 03 (2026-11-12 18:12:46 UTC) baten 0 fremde
+  Adressen um einen Port (`docs/sandbox/ports.md`, `## Vorher`). Die 0 hält das Goal nicht auf (Fast track in `ROADMAP.md`).
+- **Domain `sandboxhost.dev`.** Ein Name, der ohne Vorwissen nach einer Sandbox klingt und nicht nach der Zahlung; Ausweich
+  `runsandbox.dev` und `sbxhost.dev`. `.dev` steht auf der HSTS-Preload-Liste, jeder Aufruf geht also nur über HTTPS. Die Domain
+  steht im Code genau an einer Stelle je Datei: `SANDBOXD_DOMAIN` in `ops/sandbox/sandboxd.service` (daraus lesen
+  `cloudflare.py` und `setup.sh` sie) und der Name des Blocks in `ops/sandbox/sandbox.caddy`. Kauft Matthias einen Ausweichnamen,
+  ändern sich nur diese zwei Zeilen.
+- **Registrar Cloudflare.** Im Konto, in dem die Zone `postyourprice.com` liegt, weil die Zone dann ohne Umzug der Nameserver dort
+  steht und Cloudflare zum Selbstkostenpreis verkauft (12.20 USD im Jahr laut Preisliste, `docs/sandbox/ports.md`).
+- **Token.** Ein eigener API-Token `CLOUDFLARE_SBX_API_TOKEN` nur für die neue Zone mit Zone DNS Edit, Zone SSL and Certificates
+  Edit und Zone Settings Edit, statt den Token der Zahlungszone zu erweitern: Ein Fehler im Werkzeug der Ports kann dann die Zone
+  der Zahlung nicht ändern. Er liegt nur in `~/brain/connectors/secrets.env` auf dem code-host, nie auf dem Sandbox-Server. Den
+  Token der Zahlungszone braucht `cloudflare.py` nur noch für `ctl.sbx`, das Löschen von `*.postyourprice.com` und
+  `zone-digest`.
+- **Origin CA statt `tls internal`.** Die neue Zone läuft auf SSL „Full (strict)“, Cloudflare prüft also das Zertifikat des
+  Sandbox-Servers. Das Zertifikat (`*.sandboxhost.dev` und `sandboxhost.dev`, 15 Jahre) holt `setup.sh --origin-cert` über
+  `cloudflare.py origin-cert` in ein privates Temp-Verzeichnis des code-host, legt es nach `/etc/caddy/sbx/` (0600, Besitzer
+  caddy) und löscht es lokal sofort. `setup.sh` verweigert einen Lauf, solange dort kein gültiges Zertifikat der Domain liegt,
+  weil Caddy mit einer Datei, die auf ein fehlendes Zertifikat zeigt, nach dem nächsten Neustart nicht mehr lädt (lokal belegt:
+  `caddy validate` mit Wegwerf-Zertifikat „Valid configuration“, ohne Zertifikat „loading certificates: open …“), und stellt bei
+  einem roten `caddy validate` jetzt auch `sandbox.caddy` zurück, nicht nur `Caddyfile`. Die Zahlungszone bleibt bei ihrem
+  SSL-Modus, das Goal ändert ihn nicht.
+- **sandboxd verweigert die Domain der Zahlung.** `assertPortsDomain` in `ops/sandbox/sandboxd.mjs` lehnt eine leere Domain, einen
+  ungültigen Namen und `postyourprice.com` samt jedem Namen darunter ab; `main` bricht vor jedem Verzeichnis und jedem Port ab, den
+  Rückfall auf `postyourprice.com` gibt es nicht mehr. Das Control Plane prüft jede `public_url` zusätzlich selbst und gibt eine
+  unter `postyourprice.com` nie weiter, damit ein alter Stand des Servers keinen Dienst eines Kunden unter die Zone der Zahlung
+  legt.
+- **Wildcard der Zahlungszone gelöscht** am 2026-11-13 um 19:33 UTC mit `python3 ops/sandbox/cloudflare.py dns-apply 72.62.51.224`
+  („deleted A *.postyourprice.com“), vor dem Kauf der neuen Domain: Bis dahin antwortete das Control Plane auf `ports/expose` mit
+  409, kein Kunde hatte also eine Adresse darunter, und die Zone hatte außer Wurzel, `www` und `ctl.sbx` keinen Namen, der über den
+  Wildcard lief. Fingerabdruck vorher und nachher `29c9eb2596f4`.
+- **Notschalter** bei Missbrauch eines freigegebenen Ports (etwa einer Phishing-Seite): den einen Eintrag `*.sandboxhost.dev` in der
+  Zone der Ports löschen. Alle Adressen freigegebener Ports sind dann weg, die Zahlung ist davon nie berührt, weil sie in einer
+  anderen Zone liegt. Für eine einzelne Sandbox reicht `DELETE /v1/sandboxes/{id}/ports/{port}` über das Control Plane.
+- **Public Suffix List.** Nicht Teil dieses Goals, weil die Aufnahme ein PR in einem fremden Repo ist (Gate `public_post`). Ohne sie
+  kann eine Sandbox ein Cookie für `.sandboxhost.dev` setzen, das der Browser an jede andere Sandbox mitschickt; die Zahlung ist
+  davon nicht betroffen, weil sie unter einer anderen Domain läuft. Steht als Vorschlag in
+  `goals/_vorschlaege/sandbox-nacharbeit-2026-11-13-5.md`.
+- **Kein Aufpreis.** Ein freigegebener Port kostet nichts extra, abgerechnet wird weiter nach Laufzeit (`docs/sandbox/plan.md`,
+  `## Preis`); das Control Plane schreibt für `ports/expose` und `ports/{port}` keine Ledger-Zeile.

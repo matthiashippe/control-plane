@@ -18,8 +18,11 @@ import {
   bodyHash,
   canonicalMessage,
   createFileState,
+  assertPortsDomain,
   createSandboxd,
+  loadConfig,
   loadKeys,
+  main,
   memoryState,
   parseProxyHost,
   privateKeyFromSeed,
@@ -66,7 +69,7 @@ async function setup(opts: { respond?: Responder; slots?: number } = {}) {
     now: () => clock.t,
     keys: [publicKey],
     state,
-    config: { slots: opts.slots ?? 10, disksDir: "/d", mntDir: "/m", image: "sandboxd-base:1", domain: "postyourprice.com" },
+    config: { slots: opts.slots ?? 10, disksDir: "/d", mntDir: "/m", image: "sandboxd-base:1", domain: "example.dev" },
     log: () => {},
   });
   const apiPort = await listen(d.handleApi);
@@ -462,20 +465,20 @@ describe("expose and proxy", () => {
     const id = (await s.make()).json.id;
     const r = await s.call("POST", `/v1/sandboxes/${id}/ports/expose`, { port: 3000 });
     expect(r.status).toBe(200);
-    expect(r.json).toEqual({ port: 3000, public_url: `https://sbx-${id}-3000.postyourprice.com` });
+    expect(r.json).toEqual({ port: 3000, public_url: `https://sbx-${id}-3000.example.dev` });
     expect((await s.call("POST", `/v1/sandboxes/${id}/ports/expose`, { port: 70000 })).status).toBe(400);
     expect((await s.call("DELETE", `/v1/sandboxes/${id}/ports/3000`)).status).toBe(200);
     expect(s.d.sandboxes()[id].ports).toEqual([]);
   });
 
   it("parses the proxy host case-insensitive and strips the port", () => {
-    expect(parseProxyHost("SBX-abcdefghij-8080.PostYourPrice.com:443", "postyourprice.com")).toEqual({ id: "abcdefghij", port: 8080 });
-    expect(parseProxyHost("sbx-abcdefghij-0.postyourprice.com", "postyourprice.com")).toBeNull();
-    expect(parseProxyHost("sbx-abcdefghij-65536.postyourprice.com", "postyourprice.com")).toBeNull();
-    expect(parseProxyHost("sbx-abcdefghij-80.evil.com", "postyourprice.com")).toBeNull();
-    expect(parseProxyHost("sbx-abcdefghij-80xpostyourprice.com", "postyourprice.com")).toBeNull();
-    expect(parseProxyHost("x.sbx-abcdefghij-80.postyourprice.com", "postyourprice.com")).toBeNull();
-    expect(parseProxyHost(undefined, "postyourprice.com")).toBeNull();
+    expect(parseProxyHost("SBX-abcdefghij-8080.Example.dev:443", "example.dev")).toEqual({ id: "abcdefghij", port: 8080 });
+    expect(parseProxyHost("sbx-abcdefghij-0.example.dev", "example.dev")).toBeNull();
+    expect(parseProxyHost("sbx-abcdefghij-65536.example.dev", "example.dev")).toBeNull();
+    expect(parseProxyHost("sbx-abcdefghij-80.evil.com", "example.dev")).toBeNull();
+    expect(parseProxyHost("sbx-abcdefghij-80xexample.dev", "example.dev")).toBeNull();
+    expect(parseProxyHost("x.sbx-abcdefghij-80.example.dev", "example.dev")).toBeNull();
+    expect(parseProxyHost(undefined, "example.dev")).toBeNull();
   });
 
   it("answers 404 for an unknown host and for an unexposed port, proxies an exposed one, 502 when upstream is down", async () => {
@@ -491,11 +494,11 @@ describe("expose and proxy", () => {
     });
     const s = await setup({ respond: (cmd, args) => (args[0] === "inspect" ? { stdout: "127.0.0.1\n" } : undefined) });
     const id = (await s.make()).json.id;
-    const host = `sbx-${id}-${upstreamPort}.postyourprice.com`;
+    const host = `sbx-${id}-${upstreamPort}.example.dev`;
 
-    const unknown = await s.proxy(`sbx-zzzzzzzzzz-${upstreamPort}.postyourprice.com`);
+    const unknown = await s.proxy(`sbx-zzzzzzzzzz-${upstreamPort}.example.dev`);
     expect(unknown).toEqual({ status: 404, body: "not found" });
-    expect((await s.proxy("postyourprice.com")).status).toBe(404);
+    expect((await s.proxy("example.dev")).status).toBe(404);
     expect(await s.proxy(host)).toEqual({ status: 404, body: "not found" });
 
     await s.call("POST", `/v1/sandboxes/${id}/ports/expose`, { port: upstreamPort });
@@ -507,10 +510,59 @@ describe("expose and proxy", () => {
     expect(s.dockerCalls("inspect")).toHaveLength(1);
 
     await s.call("POST", `/v1/sandboxes/${id}/ports/expose`, { port: 1 });
-    expect((await s.proxy(`sbx-${id}-1.postyourprice.com`)).status).toBe(502);
+    expect((await s.proxy(`sbx-${id}-1.example.dev`)).status).toBe(502);
 
     await s.call("POST", `/v1/sandboxes/${id}/stop`);
     expect((await s.proxy(host)).status).toBe(404);
+  });
+});
+
+// ---- the domain of exposed ports is never the domain of the payment service
+
+describe("ports domain", () => {
+  const refused = ["postyourprice.com", "PostYourPrice.com", "postyourprice.com.", "sbx.postyourprice.com", "a.b.postyourprice.com"];
+
+  it("refuses postyourprice.com and every name under it", () => {
+    for (const d of refused) expect(() => assertPortsDomain(d), d).toThrow(/postyourprice\.com/);
+  });
+
+  it("refuses an empty or malformed domain and accepts a domain of its own", () => {
+    for (const d of ["", "   ", "localhost", "-bad.dev", "a..dev", "x.dev/evil"]) expect(() => assertPortsDomain(d), d).toThrow();
+    expect(assertPortsDomain("example.dev")).toBe("example.dev");
+    expect(assertPortsDomain("Sandbox-Host.DEV.")).toBe("sandbox-host.dev");
+    expect(assertPortsDomain("notpostyourprice.com")).toBe("notpostyourprice.com");
+  });
+
+  it("has no fallback to postyourprice.com when SANDBOXD_DOMAIN is unset", () => {
+    expect(loadConfig({}).domain).toBe("");
+    expect(loadConfig({ SANDBOXD_DOMAIN: "Example.dev" }).domain).toBe("example.dev");
+  });
+
+  it("does not build a sandboxd that would hand out URLs under postyourprice.com", () => {
+    for (const domain of refused) {
+      expect(() => createSandboxd({ run: async () => ({ code: 0, stdout: "", stderr: "", timedOut: false }), config: { domain }, log: () => {} }), domain).toThrow(
+        /postyourprice\.com/,
+      );
+    }
+  });
+
+  it("does not start with SANDBOXD_DOMAIN=postyourprice.com and touches nothing before it refuses", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "sandboxd-domain-"));
+    dirs.push(dir);
+    // Port 1 cannot be bound without root, so a sandboxd that skipped the domain check fails at listen, not here.
+    const env = {
+      SANDBOXD_DOMAIN: "postyourprice.com",
+      SANDBOXD_API_PORT: "1",
+      SANDBOXD_PROXY_PORT: "1",
+      SANDBOXD_KEYS_DIR: path.join(dir, "keys"),
+      SANDBOXD_STATE: path.join(dir, "state", "state.json"),
+      SANDBOXD_DISKS: path.join(dir, "disks"),
+      SANDBOXD_MNT: path.join(dir, "mnt"),
+    };
+    await expect(main(env)).rejects.toThrow(/postyourprice\.com/);
+    expect(fs.readdirSync(dir)).toEqual([]);
+    await expect(main({ ...env, SANDBOXD_DOMAIN: "" })).rejects.toThrow(/SANDBOXD_DOMAIN/);
+    expect(fs.readdirSync(dir)).toEqual([]);
   });
 });
 

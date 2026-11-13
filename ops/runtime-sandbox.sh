@@ -133,13 +133,16 @@ const r = { name: "walk-selftest", id: "abcde12345", content: "sandbox-walk-0123
   { step: "exec", tool: "exec", status: 200, http: [200], text: "exit_code: 0\nstdout: ok\n\nstderr: ", error: false },
   { step: "write_file", tool: "write_file", status: 200, http: [200], text: "File written: /root/sandbox-walk.txt", error: false },
   { step: "read_file", tool: "read_file", status: 200, http: [200], text: "sandbox-walk-0123456789ab", error: false },
-  { step: "expose_port", tool: "expose_port", status: 409, http: [409], text: "Conway API error: POST /v1/sandboxes/{id}/ports/expose -> 409: {\"error\":\"port_exposure_unavailable\"}", error: true },
+  { step: "expose_port", tool: "expose_port", status: 200, http: [200], text: "Port 8080 exposed at: https://sbx-{id}-8080.sbx.example", error: false },
+  { step: "remove_port", tool: "remove_port", status: 200, http: [200], text: "Port 8080 removed", error: false },
   { step: "list_sandboxes", tool: "list_sandboxes", status: 200, http: [200], text: "{id} [running] 1vCPU/512MB ", error: false, listed: true },
   { step: "delete", tool: null, status: 200, http: [], text: "" },
   { step: "list_after_delete", tool: "list_sandboxes", status: 200, http: [200], text: "No sandboxes found.", error: false, listed: false } ] };
 const s = (n) => r.steps.find((x) => x.step === n);
 if (which === "exec_wrong") s("exec").text = "exit_code: 0\nstdout: \n\nstderr: ";
-if (which === "expose_200") Object.assign(s("expose_port"), { status: 200, http: [200], text: "Port 8080 exposed at: https://x.example", error: false });
+if (which === "expose_409") Object.assign(s("expose_port"), { status: 409, http: [409], text: "Conway API error: POST /v1/sandboxes/{id}/ports/expose -> 409: {}", error: true });
+if (which === "expose_payment") s("expose_port").text = "Port 8080 exposed at: https://sbx-{id}-8080.postyourprice.com";
+if (which === "remove_missing") r.steps = r.steps.filter((x) => x.step !== "remove_port");
 if (which === "retried_503") s("list_sandboxes").http = [503, 200];
 if (which === "still_listed") s("list_after_delete").listed = true;
 if (which === "create_402") { r.id = null; r.steps = [{ step: "create_sandbox", tool: "create_sandbox", status: 402, http: [402], text: "Conway API error: POST /v1/sandboxes -> 402: {}", error: true }]; }
@@ -191,7 +194,9 @@ selftest() {
 
   check good "RUNTIME SANDBOX OK" "$(runtime_state "$repo" "$pin")" good "$ledger_good"
   check exec-wrong "RUNTIME SANDBOX FAIL exec" ok exec_wrong "1 0"
-  check expose-200 "RUNTIME SANDBOX FAIL expose_port: status 200" ok expose_200 "1 0"
+  check expose-409 "RUNTIME SANDBOX FAIL expose_port: status 409" ok expose_409 "1 0"
+  check expose-payment-domain "RUNTIME SANDBOX FAIL expose_port" ok expose_payment "1 0"
+  check remove-missing "RUNTIME SANDBOX FAIL remove_port" ok remove_missing "1 0"
   check retried-503 "RUNTIME SANDBOX FAIL list_sandboxes: the runtime got 503" ok retried_503 "1 0"
   check still-listed "RUNTIME SANDBOX FAIL list_after_delete" ok still_listed "1 0"
   check ledger-0 "RUNTIME SANDBOX FAIL ledger: 0 rows" ok good "0 0"
@@ -222,7 +227,8 @@ selftest() {
 }
 
 case "${1:-}" in
-  --selftest) selftest ;;
-  "") live ;;
+  --selftest) SANDBOX_WALK_DOMAIN=sbx.example selftest ;;
+  # Against production the public URL of an exposed port lies under the domain of the sandbox host (sandboxd.service).
+  "") SANDBOX_WALK_DOMAIN="${SANDBOX_WALK_DOMAIN:-$(sed -n 's/^Environment=SANDBOXD_DOMAIN=//p' "$ROOT/ops/sandbox/sandboxd.service")}" live ;;
   *) echo "usage: bash ops/runtime-sandbox.sh [--selftest]"; exit 2 ;;
 esac

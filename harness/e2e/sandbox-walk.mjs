@@ -5,13 +5,15 @@
 // runtime, bind-mounted) and ops/runtime-sandbox.sh (against production, from a clone at the pin on the code-host).
 //
 // Steps: create_sandbox (small, an own name per run), then with a client for the new sandbox exec (`echo ok`),
-// write_file and read_file (the same text back), expose_port (409 port_exposure_unavailable, sandbox 03),
-// list_sandboxes (the sandbox is listed); then DELETE /v1/sandboxes/{id} over plain HTTP with the same key, because
+// write_file and read_file (the same text back), expose_port (a public_url https://sbx-<id>-<port>.<domain> since
+// sandbox 07, before that 409 port_exposure_unavailable), remove_port (2xx), list_sandboxes (answered 200 for the same
+// client, the sandbox is listed); then DELETE /v1/sandboxes/{id} over plain HTTP with the same key, because
 // deleteSandbox is empty at the pin, and list_sandboxes again (the sandbox is gone). Every HTTP status the runtime's
 // client got is recorded per step; none may be one its HTTP client retries and counts for its circuit breaker.
 //
 // Environment: SANDBOX_WALK_URL (else CONWAY_API_URL), SANDBOX_WALK_KEY (the API key, never printed),
-// RUNTIME_DIST (dist/ of the runtime, default /opt/automaton/dist), SANDBOX_WALK_NAME (optional).
+// RUNTIME_DIST (dist/ of the runtime, default /opt/automaton/dist), SANDBOX_WALK_NAME (optional), SANDBOX_WALK_DOMAIN
+// (the domain public URLs of exposed ports are expected under; default WALK_DOMAIN, the one of harness/sandboxd/).
 // Prints one line `SANDBOX_RESULT <JSON>` and one line `SANDBOX_VERDICT ok` or `SANDBOX_VERDICT fail <reasons>`;
 // exit code 0 only for ok. The JSON holds the sandbox id (the callers need it for the ledger); step texts and paths
 // carry `{id}` instead. A 402 on create ends the walk: no topup, the runtime's topup is never called.
@@ -24,13 +26,21 @@ import { RETRIED, createFetchTap, redactor, statusOf } from "./runtime-tap.mjs";
 export { RETRIED };
 export const WALK_FILE = "/root/sandbox-walk.txt";
 export const WALK_PORT = 8080;
+/** The domain of the rebuilt sandboxd of the harness (HARNESS_DOMAIN in harness/sandboxd/start.mjs). */
+export const WALK_DOMAIN = "sbx.example";
+/** The zone every paid request goes through; a public URL under it is always wrong. */
+const PAYMENT_ZONE = "postyourprice.com";
+const underPaymentZone = (host) => {
+  const h = String(host ?? "").toLowerCase().replace(/\.+$/, "");
+  return h === PAYMENT_ZONE || h.endsWith(`.${PAYMENT_ZONE}`);
+};
 
 /**
  * Judges one walk result; { ok: true, reasons: [] } or { ok: false, reasons }. With `ledger_rows` set (the caller
  * counted the ledger rows of kind sandbox for this sandbox), exactly one is right: create and delete at once is one
  * started step. A reason that starts with `credits` means the create answered 402.
  */
-export function judgeSandboxWalk(result) {
+export function judgeSandboxWalk(result, { domain = process.env.SANDBOX_WALK_DOMAIN || WALK_DOMAIN } = {}) {
   const reasons = [];
   const steps = Array.isArray(result?.steps) ? result.steps : [];
   const step = (name) => steps.find((s) => s.step === name);
@@ -61,10 +71,26 @@ export function judgeSandboxWalk(result) {
     if (read && !(one200(read) && typeof result.content === "string" && result.content && read.text === result.content)) {
       reasons.push(`read_file: status ${read.status}, the text read back differs from the one written`);
     }
+    // expose_port tells the model `Port <port> exposed at: <public_url>` (src/agent/tools.ts:228 at d8f8168); the id in
+    // the text is redacted to {id}.
     const expose = need("expose_port");
     if (expose) {
-      if (expose.status !== 409) reasons.push(`expose_port: status ${expose.status}, expected 409`);
-      else if (!String(expose.text ?? "").includes("port_exposure_unavailable")) reasons.push("expose_port: the text does not name port_exposure_unavailable");
+      const want = `https://sbx-{id}-${WALK_PORT}.${domain}`;
+      const m = /^Port ([0-9]+) exposed at: (\S+)$/.exec(String(expose.text ?? ""));
+      let host = null;
+      try {
+        host = m ? new URL(m[2]).hostname : null;
+      } catch {
+        host = null;
+      }
+      if (!one200(expose) || expose.error) reasons.push(`expose_port: status ${expose.status}, expected 200 with a public_url`);
+      else if (host && underPaymentZone(host)) reasons.push(`expose_port: public_url ${m[2]} lies under ${PAYMENT_ZONE}`);
+      else if (!m || m[1] !== String(WALK_PORT) || m[2] !== want) reasons.push(`expose_port: public_url ${m ? m[2] : "missing"}, expected ${want}`);
+    }
+    const unexpose = need("remove_port");
+    if (unexpose) {
+      const ok2xx = !unexpose.error && Number.isInteger(unexpose.status) && unexpose.status >= 200 && unexpose.status < 300;
+      if (!ok2xx || unexpose.text !== `Port ${WALK_PORT} removed`) reasons.push(`remove_port: status ${unexpose.status}, expected 2xx`);
     }
     const listed = need("list_sandboxes");
     if (listed && !(listed.status === 200 && listed.listed === true)) reasons.push(`list_sandboxes: status ${listed?.status}, the new sandbox is not listed`);
@@ -110,7 +136,7 @@ export async function runSandboxWalk({ runtimeDist, apiUrl, apiKey, name }) {
   const tap = createFetchTap();
   const realFetch = tap.realFetch;
   // One client without a sandbox for the create, then one client for the new sandbox for every later step, as the
-  // runtime holds one client per sandbox: the step after expose_port shows that the 409 did not open its breaker.
+  // runtime holds one client per sandbox: the step after remove_port shows that this client still gets 200.
   const tool = async (stepName, toolName, args, conway, sandboxId) => {
     tap.reset();
     const ctx = { conway, identity: { sandboxId } };
@@ -142,6 +168,7 @@ export async function runSandboxWalk({ runtimeDist, apiUrl, apiKey, name }) {
     push(await tool("write_file", "write_file", { path: WALK_FILE, content: result.content }, client, id));
     push(await tool("read_file", "read_file", { path: WALK_FILE }, client, id));
     push(await tool("expose_port", "expose_port", { port: WALK_PORT }, client, id));
+    push(await tool("remove_port", "remove_port", { port: WALK_PORT }, client, id));
     const listed = await tool("list_sandboxes", "list_sandboxes", {}, client, id);
     push({ ...listed, listed: isListed(listed) });
   } finally {
