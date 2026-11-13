@@ -36,6 +36,36 @@ and the body says only that the call was not charged.
 | 501 | `not_implemented` | credit transfers, domain search and registration | deliberately not offered, see below |
 | 503 | `payments_unavailable`, `inference_unavailable` | `/pay`, inference | this instance does not offer it |
 | 503 | `provider_unavailable` | `/v1/chat/completions` | the upstream model provider did not answer |
+| 400 | `invalid_body`, `evm_address_required` | `/v1/messages...` | the message does not hold up, or an address is not an EVM address, see below |
+| 401 | `invalid_signature`, `signature_expired`, `signature_or_api_key_required` | `/v1/messages...` | the signature does not match, is out of its window, or there is neither a signature nor a key, see below |
+| 402 | `INSUFFICIENT_CREDITS` | `POST /v1/messages` | a first contact costs 1000 mc and the credit is lower, see below |
+| 413 | `message_too_large` | `POST /v1/messages` | more than 64000 characters of content or 128000 in all |
+| 413 | `relay_quota_exceeded` | `POST /v1/messages` | more than 4000000 characters of content per sender in 24 hours |
+| 429 | `rate_limited` | `POST /v1/messages` | 100 messages per sender and hour |
+
+## relay
+
+The social relay of the automaton runtime: `POST /v1/messages` sends, `POST /v1/messages/poll` reads
+and `GET /v1/messages/count` counts what is unread. Point `socialRelayUrl` at this service. The
+contract, with both signature formats, is `docs/relay/vertrag.md`.
+
+A message is signed by the address in `from` over `Conway:send:{to}:{keccak256(content)}:{signed_at}`,
+and `signed_at` is at most 300000 ms old (`401 signature_expired` otherwise). Poll and count are signed
+over `Conway:poll:{address}:{timestamp}` in the headers `X-Wallet-Address`, `X-Signature` and
+`X-Timestamp`. The same signature twice is the same message: the same `id`, one message, one charge.
+
+Without a wallet, send, poll and count work with the API key in `Authorization`. Such a message
+reaches its recipient with `[unverified sender, sent with an API key]` at the start of `content` and
+`verified: false`; a signed one carries `verified: true`.
+
+Price: a message to an address the sender has had no contact with costs 1000 mc (1 cent), one ledger
+row `relay`. A reply, and every further message between the two, is free. Without that much credit
+the answer is `402 INSUFFICIENT_CREDITS` and nothing is sent.
+
+Storage: a sender stores at most 4000000 characters of content in 24 hours (`413 relay_quota_exceeded`
+above, nothing sent, nothing charged), and messages are deleted after 30 days; a contact stays, so a
+reply stays free. A poll repeated with the same `X-Signature`, `cursor` and `limit` gets the same
+messages again, so an answer lost on the way loses no message.
 
 ## sandboxes
 

@@ -2,7 +2,8 @@
  * The sandbox gate of harness/e2e/full.sh (goals/sandbox/04 and 05), run for real in bash. The test cuts the block after
  * the line that prints the state of the rebuilt sandboxd after the long exec walk up to the end of the file (the
  * verdicts `sandbox=…` and `long_exec=…`, the cleanup, the final condition and the closing line) and runs it with
- * planted values for `walk`, `sandbox_id`, `sandbox_ledger`, `sandbox_left`, `long` and `long_left`. Compose and
+ * planted values for `walk`, `sandbox_id`, `sandbox_ledger`, `sandbox_left`, `long`, `long_left` and `relay` (the verdict
+ * of the relay walk of goals/relay/01, which runs before the block). Compose and
  * cleanup are stubs that do nothing, so no container and no port is touched. The good walks must end in
  * `E2E OK … sandbox=true long_exec=true`; a failed walk verdict, a missing sandbox id, any other ledger line, a sandbox
  * left in the rebuilt sandboxd, a failed long exec verdict, a missing LONG_EXEC_RESULT and a failing earlier condition
@@ -39,6 +40,8 @@ function good(): Planted {
     db_registered: "1",
     balance_cents: "490",
     domains_ok: "true",
+    // The relay walk of goals/relay/01 runs before this block; its verdict arrives here as relay=true or relay=false.
+    relay: "true",
   };
 }
 
@@ -70,19 +73,28 @@ function runGate(planted: Planted): { code: number | null; last: string } {
   return { code: r.status, last: out[out.length - 1] ?? "" };
 }
 
-function expectFail(planted: Planted, sandbox: "true" | "false" = "false", longExec: "true" | "false" = "true"): void {
+function expectFail(
+  planted: Planted,
+  sandbox: "true" | "false" = "false",
+  longExec: "true" | "false" = "true",
+  relay: "true" | "false" = "true",
+): void {
   const r = runGate(planted);
   expect(r.code).toBe(1);
   expect(r.last).toMatch(/^E2E FAIL /);
   expect(r.last).toContain(` sandbox=${sandbox} `);
-  expect(r.last).toMatch(new RegExp(` long_exec=${longExec}$`));
+  expect(r.last).toMatch(new RegExp(` long_exec=${longExec} relay=${relay}$`));
 }
 
 describe("sandbox gate of harness/e2e/full.sh", () => {
-  it("passes the good walks with sandbox=true and long_exec=true", () => {
+  it("passes the good walks with sandbox=true, long_exec=true and relay=true", () => {
     const r = runGate(good());
     expect(r.code).toBe(0);
-    expect(r.last).toMatch(/^E2E OK .*domains=true sandbox=true long_exec=true$/);
+    expect(r.last).toMatch(/^E2E OK .*domains=true sandbox=true long_exec=true relay=true$/);
+  });
+
+  it("fails with relay=false when the relay walk did not pass, and good walks do not make up for it (goals/relay/01)", () => {
+    expectFail({ ...good(), relay: "false" }, "true", "true", "false");
   });
 
   it("fails when the walk verdict is not ok", () => {

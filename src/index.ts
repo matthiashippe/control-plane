@@ -158,6 +158,7 @@ const cleanup = () => {
     if (removed.nonces || removed.sessions || removed.payments) {
       console.log(`[cleanup] removed ${removed.nonces} nonces, ${removed.sessions} sessions, ${removed.payments} old failed payments`);
     }
+    if (removed.relay) console.log(`[cleanup] removed ${removed.relay} relay messages older than 30 days`);
     // A count only: the rows hold a person's email and what they wrote (HAN-25, condition 8).
     const briefs = cleanupOrderBriefs(db);
     if (briefs) console.log(`[cleanup] removed ${briefs} order briefs past their retention period`);
