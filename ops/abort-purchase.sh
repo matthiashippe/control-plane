@@ -39,8 +39,11 @@
 # estimated purchase of those without (no estimate for a model with noise, the line says so).
 #
 # The provider is asked once, with GET on the activity endpoint and the management key
-# OPENROUTER_MANAGEMENT_KEY (from the environment or ~/.config/control-plane/loop.env). Without the
-# key the tool stops with exit 2 before it asks anyone. The key goes to curl on stdin, never on the
+# OPENROUTER_MANAGEMENT_KEY, read only from its own file ~/.config/control-plane/openrouter-management.env
+# (path overridable with AP_MANAGEMENT_KEY_FILE, for tests): one line OPENROUTER_MANAGEMENT_KEY=...,
+# parsed without sourcing the file and never exported. A key in the environment or in loop.env, which
+# every role loads, is ignored. Without the file, with an empty key or with a mode other than 600 the
+# tool stops with exit 2 before it asks anyone. The key goes to curl on stdin, never on the
 # command line, and is never printed. The database is opened with `readonly: true` inside the
 # container; no address, wallet or balance leaves it, only day, model, provider, purchase and answered.
 set -uo pipefail
@@ -159,18 +162,40 @@ console.log(`other models at the provider: ${otherModels.size} (${Math.round(oth
 
 calc() { NODE_NO_WARNINGS=1 node -e "$CALC_JS" "$1" "$2" "${AP_NOW:-}" "${AP_SINCE:-2026-11-10}" "${AP_TOLERANCE_MC:-1000}"; }
 
+load_key() { # sets MGMT_KEY (not exported) from the key file, or stops with exit 2
+  local file="${AP_MANAGEMENT_KEY_FILE:-$HOME/.config/control-plane/openrouter-management.env}" mode line
+  MGMT_KEY=""
+  if [ ! -f "$file" ]; then
+    echo "OPENROUTER_MANAGEMENT_KEY missing ($file not found)" >&2
+    exit 2
+  fi
+  mode="$(stat -c %a "$file" 2>/dev/null)"
+  if [ "$mode" != 600 ]; then
+    echo "OPENROUTER_MANAGEMENT_KEY missing ($file has mode ${mode:-unknown}, needs 600)" >&2
+    exit 2
+  fi
+  line="$(grep -m 1 '^OPENROUTER_MANAGEMENT_KEY=' "$file" 2>/dev/null | tr -d '\r')"
+  MGMT_KEY="${line#OPENROUTER_MANAGEMENT_KEY=}"
+  MGMT_KEY="${MGMT_KEY#\"}"; MGMT_KEY="${MGMT_KEY%\"}"
+  MGMT_KEY="${MGMT_KEY#\'}"; MGMT_KEY="${MGMT_KEY%\'}"
+  if [ -z "$MGMT_KEY" ]; then
+    echo "OPENROUTER_MANAGEMENT_KEY missing (no value in $file)" >&2
+    exit 2
+  fi
+}
+
 load_env() {
+  # Neither the environment nor loop.env may carry the management key into this tool.
+  unset OPENROUTER_MANAGEMENT_KEY
   if [ -f "$HOME/.config/control-plane/loop.env" ]; then
     set -a
     # shellcheck disable=SC1091
     . "$HOME/.config/control-plane/loop.env"
     set +a
   fi
+  unset OPENROUTER_MANAGEMENT_KEY
   # The key comes first: without it nobody is asked, not even the server.
-  if [ -z "${OPENROUTER_MANAGEMENT_KEY:-}" ]; then
-    echo "OPENROUTER_MANAGEMENT_KEY missing (~/.config/control-plane/loop.env)" >&2
-    exit 2
-  fi
+  load_key
   KEY="${CP_SSH_KEY:-${CP_DEPLOY_KEY:-}}"
   if [ -z "${CP_HOST:-}" ] || [ -z "$KEY" ]; then
     echo "ABORT PURCHASE FAIL: CP_HOST and CP_SSH_KEY are not set (~/.config/control-plane/loop.env)" >&2
@@ -179,7 +204,7 @@ load_env() {
 }
 
 fetch_activity() { # $1 = target file; the key goes to curl on stdin, never on the command line
-  printf 'Authorization: Bearer %s\n' "$OPENROUTER_MANAGEMENT_KEY" |
+  printf 'Authorization: Bearer %s\n' "$MGMT_KEY" |
     curl -sS --fail -m 30 -H @- "$ACTIVITY_URL" -o "$1"
 }
 
