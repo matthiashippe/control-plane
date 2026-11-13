@@ -1,7 +1,7 @@
 # Konto Goal 02: Der Handoff zum Handy
 
 ## Status
-PLANNED
+ACTIVE
 
 ## Active Objective
 Wer im Terminal einen Automaton startet und keine Wallet hat, gibt den einen Schritt, den nur er freigeben darf, auf seinem Handy
@@ -94,14 +94,14 @@ bei uns startet.
   je eine Wallet zu besitzen, und genau an der Wallet blieben bis 23.09.2026 alle 43 Besucher hängen (`src/auth/keyless.ts`).
 
 ## Done Condition
-- [ ] Die sechs SOLL-Bilder der Handy-Seite kommen aus ihren Quellen, ohne Netz und ohne Mangel, die Freigabe steht ganz im ersten
+- [x] Die sechs SOLL-Bilder der Handy-Seite kommen aus ihren Quellen, ohne Netz und ohne Mangel, die Freigabe steht ganz im ersten
       Bildschirm, und die Quellen bauen aus den Bausteinen der Seite.
       MVP: Funktion, weil die Seite nur nach Bild gebaut werden darf und ein Mensch die Freigabe ohne Scrollen sehen muss.
       Prüfung: `node ops/soll-handoff.mjs --pruefen` muss Exit 0 haben und als letzte Zeile `soll handoff: 6 Bilder, freigabe oben 390=<y> 1440=<y>, 0 Mängel` ausgeben, mit y bei 390 höchstens 844 und bei 1440 höchstens 900.
       Prüfung: `node -e 'const fs=require("fs");for(const z of ["freigabe","erledigt","ungueltig"])for(const w of [390,1440]){const b=fs.readFileSync("docs/soll/handoff-"+z+"-"+w+".png");if(b.readUInt32BE(16)!==w){console.error(z,w);process.exit(1)}}console.log("breiten ok")'` muss `breiten ok` ausgeben.
       Prüfung: `node -e 'const fs=require("fs");const bad=[];for(const z of ["freigabe","erledigt","ungueltig"]){const s=fs.readFileSync("docs/soll/src/handoff-"+z+".html","utf8");const t=s.replace(/<style[\s\S]*?<\/style>/g,"").replace(/<[^>]+>/g," ");if(/<script/i.test(s))bad.push(z+" script");if(!/<h1[ >]/.test(s))bad.push(z+" h1");if(/(src|srcset)="(https?:)?\/\/|<link[^>]+href="(https?:)?\/\/|url\(["\x27]?(https?:)?\/\//.test(s))bad.push(z+" fremde adresse");if(/[\u2013\u2014]/.test(s))bad.push(z+" gedankenstrich");if(/handoff|phishing|token|\bsse\b/i.test(t))bad.push(z+" wort")}const f=fs.readFileSync("docs/soll/src/handoff-freigabe.html","utf8");const u=f.indexOf("data-soll=\"freigabe\"");const blk=u<0?"":f.slice(u);const v=[...blk.matchAll(/<button[^>]*value="([0-9]+)"/g)].map(m=>m[1]);if(u<0)bad.push("freigabe fehlt");if(!/<form[^>]+method="post"/i.test(blk))bad.push("form");if(v.length!==3||new Set(v).size!==3||!v.every(x=>/^[1-9][0-9]$/.test(x)))bad.push("drei zahlen "+v);if(!/Atlas/.test(blk)||!/\$[0-9]+\.[0-9]{2}/.test(blk))bad.push("was freigegeben wird");if(bad.length){console.error(bad);process.exit(1)}console.log("quellen ok")'` muss `quellen ok` ausgeben.
       Prüfung: `node -e 'const fs=require("fs");const css=(fs.readFileSync("src/public/index.html","utf8").match(/<style[^>]*>[\s\S]*?<\/style>/g)||[]).join("");const cl=new Set();for(const z of ["freigabe","erledigt","ungueltig"]){const s=fs.readFileSync("docs/soll/src/handoff-"+z+".html","utf8");for(const m of s.matchAll(/class="([^"]+)"/g))for(const c of m[1].split(/\s+/))if(c)cl.add(c)}const neu=[...cl].filter(c=>!new RegExp("\\."+c.replace(/[.*+?^${}()|[\]\\-]/g,"\\$&")+"(?![\\w-])").test(css));const r=fs.readFileSync("docs/soll/README.md","utf8");const ohne=neu.filter(c=>!r.includes("`."+c+"`"));if(neu.length>3||ohne.length||!/^## Handoff \/h\/\{code\}$/m.test(r)){console.error({neu,ohne});process.exit(1)}console.log("bausteine ok neu="+neu.length)'` muss `bausteine ok neu=<n>` mit n höchstens 3 ausgeben.
-- [ ] Die Auswertung der Handy-Bilder lehnt jeden Mangel ab und lässt den sauberen Stand durch, und die Startseite prüft sich weiter
+- [x] Die Auswertung der Handy-Bilder lehnt jeden Mangel ab und lässt den sauberen Stand durch, und die Startseite prüft sich weiter
       wie vorher.
       MVP: Funktion, weil ein Bild, das seine Prüfung nicht in beide Richtungen besteht, kein SOLL ist.
       Prüfung: `pnpm -s vitest run test/soll-handoff.test.ts` muss Exit-Code 0 haben.
@@ -140,7 +140,7 @@ bei uns startet.
       MVP: Funktion, weil der Release Manager nach dem Rollout belegen muss, dass der Weg aufs Handy in der Produktion antwortet.
       Prüfung: `bash ops/live.sh --selftest` muss Exit-Code 0 haben und als letzte Zeile `LIVE SELFTEST OK` ausgeben.
       Prüfung: `bash ops/live.sh --selftest | grep -E '^planted handoff ' | grep -c ': OK handoff'` muss `1` ausgeben, und `bash ops/live.sh --selftest | grep -E '^planted handoff ' | grep -c ': FAIL handoff'` muss mindestens `3` ausgeben (404, Antwort ohne `match`, Strom ohne `pending`).
-- [ ] Der Vertrag des Handoffs steht für konto 03 und 04 fest, und die Entscheidungen stehen mit Grund in `goals/konto/ANNAHMEN.md`.
+- [x] Der Vertrag des Handoffs steht für konto 03 und 04 fest, und die Entscheidungen stehen mit Grund in `goals/konto/ANNAHMEN.md`.
       MVP: Funktion, weil konto 03 den Platzhalter ersetzt und konto 04 die Tools gegen diesen Vertrag baut.
       Prüfung: `for w in automaton_name daily_limit_usdc amount_usdc code url qr match expires_at poll_token pending done burned expired 401 404 429; do grep -qw -- "$w" docs/konto/handoff.md || echo "fehlt $w"; done; for h in "## Anfrage" "## Antwort" "## Zustände" "## Für konto 03 und 04"; do grep -qx -- "$h" docs/konto/handoff.md || echo "fehlt $h"; done` muss nichts ausgeben.
       Prüfung: `awk '/^## Goal 02/{f=1;next} /^## /{f=0} f' goals/konto/ANNAHMEN.md | grep -cE "^- .+, weil .+"` muss mindestens 7 ausgeben.
@@ -179,6 +179,7 @@ bei uns startet.
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-13 Zyklus 1: Punkte 1, 2, 9 gebaut: drei Quellen `docs/soll/src/handoff-<zustand>.html` aus dem `<style>` der Startseite und zwei neuen Bausteinen (`.grant`, `.choices`), sechs Bilder, `ops/soll-handoff.mjs` (Browser-Teil aus `ops/soll.mjs`, ohne Port und Netz) mit `assessHandoff` in `ops/soll-assess.mjs`, Vertrag `docs/konto/handoff.md`, 12 Annahmen unter `## Goal 02`; Punkte 3 bis 8 und 10 warten auf die Abnahme des Design Reviewers auf PRO-19925, weil Punkt 3 jeden Commit unter `src/handoff` vor der Abnahme ausschließt. Jeder der 8 Tests in `test/soll-handoff.test.ts` war rot, je mit der zugehörigen Prüfung in `assessHandoff` abgeschaltet (gemeinsame Prüfungen, Wortliste, Faltgrenze, Zeile `soll handoff:`, Umzug der Startseite); Gegenprobe des Werkzeugs mit gepflanzten Quellen (Gedankenstrich, 400 px über der Freigabe, fremdes Bild, 1600 px breite Box, „poll token“ im Text): Exit 1 mit genau diesen 16 Mängeln; 6 parallele `--pruefen` bei Load 50 je 0 Mängel. Prüfbefehle: `node ops/soll-handoff.mjs --pruefen` -> `soll handoff: 6 Bilder, freigabe oben 390=528 1440=603, 0 Mängel` (Exit 0); Breiten -> `breiten ok`; Quellen -> `quellen ok`; Bausteine -> `bausteine ok neu=2`; `pnpm -s vitest run test/soll-handoff.test.ts` -> Exit 0, 8 passed; grep -> 8; Startseite -> `startseite gleich`; `node ops/soll.mjs --pruefen` -> `soll: 2 Bilder, umzug oben 390=828 1440=656, 0 Mängel`; `pnpm -s vitest run test/soll.test.ts` -> Exit 0, 8 passed; Punkt 9 Vertrag -> keine Ausgabe, Annahmen -> 12; `node scripts/check.mjs` -> Exit 0 (1600 Tests); Punkt 3 (Netz) -> offen, Abnahme angefragt.
 
 ## Blockers
 keine
