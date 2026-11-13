@@ -234,6 +234,19 @@ if [[ -n "$LOG" ]]; then
 fi
 [[ -z "$WALLETS" ]] || { echo "github-yield: --wallets needs --log; production reads the database" >&2; exit 1; }
 
+# Production needs host and key. The audit runs this line verbatim on the code-host without sourcing
+# loop.env first, and the fallback key path does not exist there, so like ops/live.sh the script reads
+# loop.env itself when the environment has none. Sourced in a subshell: only these two values come
+# out, the other secrets in that file never reach ssh or python.
+env_file="$HOME/.config/control-plane/loop.env"
+if [[ ( -z "${CP_HOST:-}" || -z "${CP_SSH_KEY:-}" ) && -f "$env_file" ]]; then
+  # shellcheck disable=SC1090
+  from_env=$( set -a; . "$env_file" >/dev/null 2>&1; printf '%s\n%s\n' "${CP_HOST:-}" "${CP_SSH_KEY:-}" )
+  env_host=$(sed -n 1p <<<"$from_env"); env_key=$(sed -n 2p <<<"$from_env")
+  [[ -n "${CP_HOST:-}" || -z "$env_host" ]] || HOST="$env_host"
+  [[ -n "${CP_SSH_KEY:-}" || -z "$env_key" ]] || KEY="$env_key"
+fi
+
 dir=$(mktemp -d); trap 'rm -rf "$dir"' EXIT
 CP_SSH_KEY="$KEY" CP_HOST="$HOST" bash "$ROOT/ops/access-log.sh" >"$dir/access.jsonl" || {
   echo "github-yield: the access log could not be read. This says nothing about traffic." >&2
