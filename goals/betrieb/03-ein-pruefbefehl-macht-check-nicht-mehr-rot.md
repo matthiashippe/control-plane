@@ -1,7 +1,7 @@
 # Betrieb Goal 03: Ein Prüfbefehl macht check nicht mehr rot
 
 ## Status
-PLANNED
+DONE
 
 ## Active Objective
 Ein Prüfbefehl mit Netz verändert das Repo nicht mehr: `own_ips` in `ops/own-ips.sh` schreibt eine neu gesehene eigene Adresse nur
@@ -56,22 +56,35 @@ einen Zyklus oder eine Reparatur ohne Befund kostet, also Zeit, die den Goals f�
   Checkout hinterlassen hat. Kein `pkill -f`.
 
 ## Done Condition
-- [ ] `own_ips` schreibt nur mit `CP_OWN_IPS_WRITE=1` nach der Liste, zählt die live gesehene Adresse ohne die Variable trotzdem als
+- [x] `own_ips` schreibt nur mit `CP_OWN_IPS_WRITE=1` nach der Liste, zählt die live gesehene Adresse ohne die Variable trotzdem als
       eigene und sagt auf stderr, wie man sie behält.
       Prüfung: `pnpm -s vitest run test/own-ips-write.test.ts` muss Exit-Code 0 haben.
       Prüfung: `grep -c "CP_OWN_IPS_WRITE" ops/own-ips.sh` muss mindestens 2 ausgeben.
       Prüfung: `grep -cE "192\.0\.2\.77" test/own-ips-write.test.ts` muss mindestens 1 ausgeben.
-- [ ] `ops/deploy-window.sh --at …` mit nachgebautem `ssh` lässt die Liste neben dem Skript unverändert und zählt die live gesehene
+- [x] `ops/deploy-window.sh --at …` mit nachgebautem `ssh` lässt die Liste neben dem Skript unverändert und zählt die live gesehene
       Adresse als eigene.
       Prüfung: `grep -c "deploy-window.sh" test/own-ips-write.test.ts` muss mindestens 1 ausgeben.
       Prüfung: `grep -c "BAD GATEWAY 0 of 1 request(s) from outside answered 502" test/own-ips-write.test.ts` muss mindestens 1 ausgeben.
       Prüfung: `pnpm -s vitest run test/own-ips-write.test.ts test/deploy-window.test.ts` muss Exit-Code 0 haben.
       Prüfung: `bash ops/deploy-window.sh --selftest` muss Exit-Code 0 haben und als letzte Zeile `DEPLOY WINDOW SELFTEST OK` ausgeben.
       Prüfung (Netz): `set -a; . ~/.config/control-plane/loop.env; set +a; bash ops/deploy-window.sh --at 2026-11-12T16:41:02 >/dev/null 2>&1; git status --porcelain -- ops/own-ips.txt | wc -l` muss 0 ausgeben.
-- [ ] `check` ist grün und lässt `ops/own-ips.txt` unverändert.
+- [x] `check` ist grün und lässt `ops/own-ips.txt` unverändert.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung: `node scripts/check.mjs >/dev/null 2>&1; git status --porcelain -- ops/own-ips.txt | wc -l` muss 0 ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] (Kritik) `own_ips` merkt sich jede live gesehene Adresse außerhalb des Checkouts und zählt sie in jedem späteren Lauf als
+      eigene, auch ohne `CP_OWN_IPS_WRITE`: Datei aus `CP_OWN_IPS_SEEN`, sonst
+      `${XDG_STATE_HOME:-$HOME/.local/state}/control-plane/own-ips-seen.txt`, je neuer Adresse eine Zeile `<adresse> <JJJJ-MM-TT>`,
+      Ordner bei Bedarf angelegt; ein Schreibfehler dort bricht `own_ips` nicht ab. Grund: `ops/own-ips.txt` wuchs zuletzt am
+      23.09.2026 (`git log -- ops/own-ips.txt`), weil jede live angehängte Zeile wieder verworfen wurde, und seit diesem Goal schreibt
+      nur noch ein Mensch hinein; ein Lauf am nächsten Tag zählt dann die Prüfungen über die Adresse von gestern als fremde Anfragen,
+      der Fehler vom 22.09., gegen den die Liste existiert. Test in `test/own-ips-write.test.ts`: zwei Aufrufe mit `CP_OWN_IPS_SEEN`
+      auf einer Datei in einem `mktemp`-Ordner, das nachgebaute `ssh` meldet erst `192.0.2.77`, dann `192.0.2.78`; die Ausgabe des
+      zweiten enthält beide Adressen, die Liste bleibt byte-gleich, rot vor dem Fix. Kein Test schreibt in das echte Zustandsverzeichnis.
+      Prüfung: `pnpm -s vitest run test/own-ips-write.test.ts` muss Exit-Code 0 haben.
+      Prüfung: `grep -c "CP_OWN_IPS_SEEN" ops/own-ips.sh` muss mindestens 1 ausgeben.
+      Prüfung: `grep -cE "192\.0\.2\.78" test/own-ips-write.test.ts` muss mindestens 1 ausgeben.
+      Prüfung: `S=$(mktemp -d); XDG_STATE_HOME=$S node scripts/check.mjs >/dev/null 2>&1; find "$S" -type f | wc -l` muss 0 ausgeben.
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Jede neue Testdatei war vor dem Fix rot; die Zeile im Progress Log nennt, welche Fälle und womit.
@@ -93,6 +106,10 @@ einen Zyklus oder eine Reparatur ohne Befund kostet, also Zeit, die den Goals f�
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-13 Zyklus 1: Punkte 1, 2, 3 gebaut: `own_ips` schreibt nur mit `CP_OWN_IPS_WRITE=1`, zählt die live gesehene Adresse sonst nur für den Lauf und nennt die Variable auf stderr; neuer Test `test/own-ips-write.test.ts` vor dem Fix rot in 3 von 6 Fällen (ohne Variable, Wert `yes`, Ende zu Ende über `deploy-window.sh`: Liste wuchs um eine Zeile), dazu ein siebter Fall für das Verkleben von `CP_OWN_IPS` mit der ersten Listenadresse, am alten Stand nachgewiesen. Prüfbefehle: vitest own-ips-write Exit 0 (7 passed); grep CP_OWN_IPS_WRITE 4; grep 192.0.2.77 2; grep deploy-window.sh 3; grep BAD GATEWAY 1; vitest own-ips-write und deploy-window Exit 0 (15 passed); `--selftest` Exit 0, letzte Zeile DEPLOY WINDOW SELFTEST OK; (Netz) `--at 2026-11-12T16:41:02` 0, stderr meldete eine neue eigene Adresse nur für den Lauf, sha256 der Liste vorher und nachher gleich; `check` Exit 0 (129 Dateien, 1576 Tests); `check` und danach `git status` der Liste 0.
+- 2026-11-13 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, nach Merge von origin/dev (6a55518). Prüfbefehle: vitest own-ips-write Exit 0; grep CP_OWN_IPS_WRITE 4; grep 192.0.2.77 2; grep deploy-window.sh 3; grep BAD GATEWAY 1; vitest own-ips-write und deploy-window Exit 0 (15 passed); `--selftest` Exit 0, letzte Zeile DEPLOY WINDOW SELFTEST OK; (Netz) `--at 2026-11-12T16:41:02` 0, stderr meldete die neue eigene Adresse nur für den Lauf, sha256 der Liste vorher und nachher gleich; `check` Exit 0 (129 Dateien, 1576 Tests); `check` und danach `git status` der Liste 0.
+- 2026-11-13 Zyklus 3: Punkt 4 (Kritik) gebaut: `own_ips` merkt sich jede live gesehene Adresse in `CP_OWN_IPS_SEEN` (sonst `$XDG_STATE_HOME/control-plane/own-ips-seen.txt`) und zählt sie in späteren Läufen als eigene, ein Schreibfehler dort wird verschluckt; vier neue Fälle in `test/own-ips-write.test.ts`, vor dem Fix rot in 3 von 4 (zweiter Lauf ohne `192.0.2.77`, doppelte Zeile, XDG-Pfad; der Fall mit unbeschreibbarer Datei sichert nur ab). Prüfbefehle: vitest own-ips-write Exit 0 (11 passed); grep CP_OWN_IPS_SEEN 3; grep 192.0.2.78 1; `check` mit `XDG_STATE_HOME` auf `mktemp -d` Exit 0 und `find` 0 Dateien, Gegenprobe mit nachgebautem `ssh` und demselben Befehl 1 Datei; Punkte 1 bis 3 erneut: grep 4, 2, 3, 1; vitest own-ips-write und deploy-window Exit 0 (19 passed, ein Selftest-Fall einmal unter Load 123 im 5-s-Timeout, danach dreimal grün); `--selftest` Exit 0, DEPLOY WINDOW SELFTEST OK; (Netz) `--at 2026-11-12T16:41:02` 0; `check` Exit 0; danach `git status` der Liste 0.
+- 2026-11-13 Release: PASS K und B (Zyklus 3), DONE.
 
 ## Blockers
 - keine
