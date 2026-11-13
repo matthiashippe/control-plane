@@ -1,7 +1,7 @@
 # Domains Goal 02: Die Live-Prüfung belegt, dass die Domain-Suche antwortet
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 `ops/live.sh` prüft nach jedem Rollout nicht nur, dass `/v1/domains/search` hinter der Schlüsselprüfung steht (401 ohne Schlüssel,
@@ -62,7 +62,7 @@ nach dem Rollout niemand.
       Prüfung (Netz): `k="$(sed -n 's/^LIVE_SANDBOX_KEY=//p' ~/.config/control-plane/live-sandbox.env | head -n 1 | tr -d "\"'\r")"; out="$(bash ops/live.sh 2>&1)"; echo "ok=$(grep -c '^OK domains-search: ' <<<"$out") key=$(grep -cF -- "$k" <<<"$out")"` muss `ok=1 key=0` ausgeben.
 - [x] `check` ist grün.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Die neuen Fälle im Selbsttest und der neue vitest-Test waren vor dem Fix rot; die Zeile im Progress Log nennt, womit.
@@ -81,5 +81,6 @@ nach dem Rollout niemand.
 ## Progress Log
 - 2026-11-13 Zyklus 1: Punkte 1, 2, 3, 4 gebaut: neue Prüfung `domains-search` in `ops/live.sh` (Richter `judge_domains_search` über Status und die fünf Merkmale, Live-Aufruf mit `LIVE_SANDBOX_KEY` über eine Header-Datei aus `mktemp`, Schalter `--judge domains-search`, Kommentarkopf), Selbsttest mit den Fällen ok, 404, 401, fields, taken, none, nokey und drei Fällen je Merkmal, vitest-Test mit der echten Antwort des Handlers; `src/` unverändert. Rot vorher: `test/live-selftest.test.ts` 4 von 4 rot gegen das alte `ops/live.sh` (`--judge` Exit 2, Selbsttest ohne `planted domains-search`), `grep -c '^planted domains-search'` auf dem alten Selbsttest 0. Prüfbefehle (Node 22.23.4): P1 `bash ops/live.sh --selftest` Exit 0, letzte Zeile `LIVE SELFTEST OK`, ok-Zeile 1, FAIL-Zeilen 6, `planted domains 401: OK domains` 1; P2 `vitest run test/live-selftest.test.ts -t "domains-search"` 3 passed Exit 0, `grep -c` 12; P3 `--help` 3, Live-Lauf `ok=1 key=0` (Schlüssel nicht leer, Gegenprobe mit gepflanztem Schlüssel zählt 1), `LIVE OK`; P4 `node scripts/check.mjs` Exit 0 (1493 Tests, 149 s; der erste Lauf bei Last 167 mit zwei vitest-RPC-Timeouts rot, alle Tests grün).
 - 2026-11-13 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4; `dev` (72fcfbb) war schon im Branch. Prüfbefehle (Node 22.23.4, Kopf 469a938): P1 `bash ops/live.sh --selftest` Exit 0, letzte Zeile `LIVE SELFTEST OK`, ok-Zeile 1, FAIL-Zeilen 6, `planted domains 401: OK domains` 1; P2 `pnpm -s vitest run test/live-selftest.test.ts -t "domains-search"` 3 passed Exit 0, `grep -c` 12; P3 `--help` 3, Live-Lauf `ok=1 key=0` (Schlüssel 39 Zeichen), `LIVE OK`, 0 FAIL-Zeilen; P4 `node scripts/check.mjs` Exit 0 (1493 Tests, 53 s); Jobs `check` und `e2e` an PR #58 pass.
+- 2026-11-13 Release: PASS K und B (Zyklus 2), DONE.
 
 ## Blockers
