@@ -54,7 +54,10 @@ uns) bleibt unerreichbar. Die eigene Domain hält eine Phishing-Seite eines Kund
   `Preis: <USD> USD im Jahr`, `Frei: <Ergebnis der Abfrage>, <JJJJ-MM-TT HH:MM> UTC`.
 - Ablauf: Punkte 1 und 2 messen und vorschlagen, dazu alles, was ohne den Namen geht (Punkte 4 und 6 mit der Domain an genau einer
   Stelle je Datei, Tests mit einer Dokumentationsdomain wie `example.dev`), committen, pushen, dann `## Status` auf `BLOCKED matthias` und
-  unter `## Blockers` die Zeilen `Art: matthias`, `Gate: server_kauf`, `Aufgabe:`, `Worum:`, `Empfehlung:`. Die Empfehlung nennt den
+  unter `
+- 2026-11-13 Zyklus 3: Abschluss gemeldet, Punkte keine, Antwort auf das REJECT der Linse K aus Zyklus 2 (`verdicts/06-z2-K.md`): die Befunde 1 bis 10 sind die roten Punkte 1 bis 9 eines widerlegten Goals, ein Bauzyklus ändert sie nach „Kontext für den Maker“ nicht. Aktuelles `dev` eingemergt, der Branch trägt gegenüber `dev` nur Goal-Datei und Verdict. Nachfrage neu gemessen: `ops/ports-demand.sh` aus 0ce27f0 im Scratch-Verzeichnis, `--selftest` ergibt `PORTS DEMAND SELFTEST OK`, live `--since "2026-11-12 18:12:46"` ergibt `PORTS DEMAND: 0 foreign addresses, 0 calls` (2026-11-13 13:22 UTC). Prüfbefehle: P1 bis P9 rot wie in Zyklus 2, P10 `PATH=/usr/bin:$PATH node scripts/check.mjs` Exit 0 (grün in 52 s).
+
+## Blockers` die Zeilen `Art: matthias`, `Gate: server_kauf`, `Aufgabe:`, `Worum:`, `Empfehlung:`. Die Empfehlung nennt den
   Kauf (Name, Preis, die Klicks im Registrar), dann einen API-Token mit genau den Rechten Zone DNS Edit, Zone SSL and Certificates Edit
   und Zone Settings Edit nur für die neue Zone, den Namen der Variablen, unter der Matthias ihn in `~/brain/connectors/secrets.env`
   einträgt, und was am Ende dastehen muss (Zone aktiv, Token eingetragen, Antwort auf der Karte mit dem gekauften Namen). Wenige Minuten
@@ -184,6 +187,7 @@ uns) bleibt unerreichbar. Die eigene Domain hält eine Phishing-Seite eines Kund
 ## Blockers
 Art: fachlich
 Grund: Die Messung aus Punkt 1 widerlegt das Goal (fremde Adressen mit 409 auf `ports/expose` seit dem Rollout von sandbox 03: 0, Aufrufe: 0). Nach „Kontext für den Maker“ heißt das: kein Kauf, kein Bau.
+Landung: `loop-master gate` erlässt die Verdict-Regel nur mit Breaker. Weiter geht es über den Vorschlag in PR #87 (neues Kettenglied ohne Mindestzahl) oder den Breaker nach `cycles_per_goal`.
 
 ## Ehrliche Lücken
 - Punkt 1: Werkzeug gebaut und in beide Richtungen bewiesen, die Zahl ist 0 statt mindestens 1. Befehl vom code-host mit `~/.config/control-plane/loop.env`: `bash ops/ports-demand.sh --since '2026-11-12 18:12:46'` -> `PORTS DEMAND: 0 foreign addresses, 0 calls, since 2026-11-12 18:12:46 UTC` (2026-11-13 12:38 UTC). Gegenprobe am echten Log: dieselbe Datei mit `--log` und leerer Liste der live gesehenen eigenen Adressen ergibt 1 Adresse, 1 Aufruf, also sieht das Werkzeug die Zeile und ordnet sie dem code-host zu. Das Log reicht bis 2026-10-01 zurück; in dieser Zeit rief keine fremde Adresse `ports/expose` auf. `docs/sandbox/ports.md` ist deshalb nicht angelegt. Das Werkzeug liegt in Commit 0ce27f0 auf diesem Branch (`git show 0ce27f0:ops/ports-demand.sh`) und landet nach der Regel für `BLOCKED fachlich` nicht auf `dev`; der Writer hängt das Glied neu an, sobald es eine fremde Adresse zeigt.
