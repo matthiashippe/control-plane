@@ -71,6 +71,18 @@ erledigt gilt, ohne dass jemand nachgesehen hat.
 - [x] `check` ist grün und lässt `ops/own-ips.txt` unverändert.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung: `node scripts/check.mjs >/dev/null 2>&1; git status --porcelain -- ops/own-ips.txt | wc -l` muss 0 ausgeben.
+- [ ] Kritik: `## Nachher` sagt je Fenster, ob überhaupt eine Anfrage von außen in die Sekunden des Neustarts fiel. Alle 7 mal 502 unter
+      `## Vorher` kamen 0,2 bis 5,1 s nach dem Start des Containers; in den zwei Fenstern danach hat das Zugriffslog in den 10 s nach dem
+      Start keine Anfrage von außen (gemessen vom Tech Lead am 13.11.2026 gegen 17:45 UTC, Befehl unten), also hat keine fremde Anfrage
+      den Retry von betrieb 02 gebraucht, und das „0 mal 502“ belegt ihn noch nicht. Je Fenster genau eine Zeile ab Spalte 0
+      `- <JJJJ-MM-TT HH:MM:SS> UTC: <h> Anfragen von außen in den 10 s nach dem Start`, `<h>` aus dem Befehl der Prüfung (Netz), und die
+      Uhrzeit dieser Messung in UTC. Ist die Summe der `<h>` 0, sagt die eine Zeile `Ergebnis: betrieb 02 hält, …` nach „hält, “, dass
+      keine Anfrage von außen in die Sekunden des Neustarts fiel und der Beleg noch aussteht; sonst nennt sie, wie viele es waren.
+      MVP: Funktion, weil betrieb 05 und die Goals für zahlende Kunden sonst auf einem Beleg aufbauen, den keine Anfrage am Neustart
+      gedeckt hat.
+      Prüfung: `awk '/^## Nachher/{f=1;next} /^## /{f=0} f' docs/betrieb/neustart.md | grep -cE "^- 2026-11-13 (00:48:29|09:55:22) UTC: [0-9]+ Anfragen von außen in den 10 s nach dem Start$"` muss 2 ausgeben.
+      Prüfung: `awk '/^- 20.* Anfragen von außen in den 10 s nach dem Start$/{h+=$5} /^Ergebnis: /{e=$0} END{exit !(h>0 || e ~ /keine Anfrage von außen in die Sekunden des Neustarts fiel/)}' docs/betrieb/neustart.md` muss Exit-Code 0 haben.
+      Prüfung (Netz): `set -a; . ~/.config/control-plane/loop.env; set +a; . ops/own-ips.sh; o=$(own_ips 2>/dev/null); bash ops/access-log.sh | python3 -c 'import sys,json,datetime as D;own=set(sys.argv[1].split());w={t:D.datetime.fromisoformat("2026-11-13T"+t+"+00:00").timestamp() for t in sys.argv[2:]};rs=[json.loads(l) for l in sys.stdin if l.startswith("{")];[print(t,sum(1 for r in rs if s<=r["ts"]<=s+10 and r.get("request",{}).get("remote_ip") not in own)) for t,s in w.items()]' "$o" 00:48:29 09:55:22 | while read t h; do grep -c "^- 2026-11-13 $t UTC: $h Anfragen von außen in den 10 s nach dem Start$" docs/betrieb/neustart.md; done | awk '{s+=$1} END{print s}'` muss 2 ausgeben.
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
