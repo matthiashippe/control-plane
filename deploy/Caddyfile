@@ -28,6 +28,8 @@ cp.hippe.eu, postyourprice.com {
 
 	reverse_proxy cp:8402 {
 		# x402 und Inferenz können lange dauern; Caddy soll nicht vor dem Control Plane abbrechen.
+		lb_try_duration 30s
+		lb_try_interval 250ms
 		transport http {
 			response_header_timeout 180s
 		}

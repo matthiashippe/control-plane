@@ -679,6 +679,12 @@ our own addresses removed from the filter it reports the smoke test's 23 deliber
 `AFFECTED` and exits 1, with an unreachable host it exits 2, and with a tail long enough to run
 past the end of the log it prints `PARTIAL`.
 
+Since 2026-11-12 (betrieb 02) no output line names an address: `deploy.yml` prints this into the
+public logs of a public repository, so a line shows time, method, path without query and status.
+`BAD GATEWAY <n> of <m>` counts the 502s Caddy answered while `cp` restarted. `--at <UTC time>`
+measures a past window instead of the container start, `--log <file>` reads the access log from a
+file without ssh (only together with `--at`), and `--selftest` plants every case without network.
+
 ### Did anybody come back
 
 The last section of `ops/traffic.sh`, and the only one that ignores the window and reads the whole

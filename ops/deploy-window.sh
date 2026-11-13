@@ -12,34 +12,200 @@
 #
 #   ops/deploy-window.sh          the last deploy
 #   ops/deploy-window.sh 300      the same, with a 300 second tail instead of 180
+#   ops/deploy-window.sh --at 2026-11-12T16:41:02
+#                                 a past window, centred on that time (UTC) instead of the container start
+#   ops/deploy-window.sh --at <time> --log <file>
+#                                 the same from an access log on disk, no ssh at all: our own addresses
+#                                 come only from CP_OWN_IPS_FILE (default ops/own-ips.txt)
+#   ops/deploy-window.sh --selftest
+#                                 planted log lines, no network, every direction
 #
 # Exit 0 means nobody outside saw an error. Exit 1 means somebody did, and the lines are printed.
 # Exit 2 means the check could not run.
+#
+# No line names an address. `deploy.yml` prints this output into the public logs of a public
+# repository, and until 2026-11-12 every line under AFFECTED and NO KEY carried a visitor's
+# address. A line now shows time, method, path without query and status, which is all the reader
+# needs to tell a restart from a fault.
 #
 # The one thing it will not do is say "all good" when it measured nothing. An empty window is the
 # normal case on a service this small, and reading it as proof that the deploy was clean is the
 # same mistake one layer down.
 set -euo pipefail
 
-TAIL_SECONDS="${1:-180}"
+HERE="$(cd "$(dirname "$0")" && pwd)"
+
+# Planted access logs in a temp directory, addresses only from the documentation ranges. The
+# stranger's address is assembled at runtime so this output never prints it, not even in a FAIL.
+selftest() {
+  local dir fails=0 out="" code=0 r at t0 stranger
+  dir=$(mktemp -d)
+  trap 'rm -rf "$dir"' RETURN
+  mkdir -p "$dir/bin"
+  # Any ssh would be a selftest that reaches the network. The fake only leaves a mark.
+  printf '#!/bin/sh\ntouch "%s/ssh-called"\nexit 255\n' "$dir" > "$dir/bin/ssh"
+  chmod +x "$dir/bin/ssh"
+  printf '# planted\n192.0.2.10 2026-11-01  planted own address\n' > "$dir/own.txt"
+  at=2026-11-01T12:00:00
+  t0=$(python3 -c 'import datetime; print(int(datetime.datetime(2026, 11, 1, 12, 0, 0, tzinfo=datetime.timezone.utc).timestamp()))')
+  stranger="198.51.100"
+  stranger="$stranger.23"
+  row() { printf '{"ts":%s,"request":{"remote_ip":"%s","method":"%s","uri":"%s"},"status":%s}\n' "$((t0 + $1))" "$2" "$3" "$4" "$5"; }
+  run() {
+    local log=$1
+    shift
+    set +e
+    out=$(PATH="$dir/bin:$PATH" CP_OWN_IPS_FILE="$dir/own.txt" CP_WINDOW_NOW="" bash "$HERE/deploy-window.sh" "$@" --log "$log" 2>&1)
+    code=$?
+    set -e
+  }
+  verdict() {
+    if [[ "$2" == yes ]] && ! grep -qF "$stranger" <<<"$out"; then
+      echo "ok   $1"
+    else
+      echo "FAIL $1: $3 (exit $code)"
+      fails=$((fails + 1))
+    fi
+  }
+
+  row 5 "$stranger" POST /v1/chat/completions 502 > "$dir/affected.log"
+  run "$dir/affected.log" --at "$at"
+  r=no
+  [[ $code -eq 1 ]] && grep -qx "BAD GATEWAY 1 of 1 request(s) from outside answered 502" <<<"$out" \
+    && grep -q "^AFFECTED" <<<"$out" && r=yes
+  verdict affected "$r" "a 502 to a stranger inside the window must be AFFECTED and BAD GATEWAY 1"
+
+  { row -3600 "$stranger" POST /v1/chat/completions 502; row 10 "$stranger" GET /v1/credits/balance 200; } > "$dir/outside.log"
+  run "$dir/outside.log" --at "$at"
+  r=no
+  [[ $code -eq 0 ]] && grep -qx "BAD GATEWAY 0 of 1 request(s) from outside answered 502" <<<"$out" \
+    && grep -q "^CLEAN" <<<"$out" && r=yes
+  verdict outside "$r" "a 502 outside the window must not be counted"
+
+  row 5 192.0.2.10 GET /health 502 > "$dir/own.log"
+  run "$dir/own.log" --at "$at"
+  r=no
+  [[ $code -eq 0 ]] && grep -q "^ours     1 request" <<<"$out" && grep -q "^MEASURED NOTHING" <<<"$out" \
+    && ! grep -q "^BAD GATEWAY" <<<"$out" && r=yes
+  verdict own "$r" "a 502 to our own address must not be counted"
+
+  : > "$dir/empty.log"
+  run "$dir/empty.log" --at "$at"
+  r=no
+  [[ $code -eq 0 ]] && grep -q "^MEASURED NOTHING" <<<"$out" && ! grep -q "^CLEAN" <<<"$out" && r=yes
+  verdict empty "$r" "an empty window must say MEASURED NOTHING"
+
+  { row 1 "$stranger" GET "/v1/credits/balance?brief=x" 502; row 2 203.0.113.7 GET /v1/models 401; } > "$dir/address.log"
+  run "$dir/address.log" --at "$at"
+  r=no
+  ! grep -qE '(^|[^0-9.])([0-9]{1,3}\.){3}[0-9]{1,3}([^0-9.]|$)' <<<"$out" && ! grep -qF "?brief" <<<"$out" \
+    && grep -q "^NO KEY" <<<"$out" && grep -qF "GET /v1/credits/balance  502" <<<"$out" && r=yes
+  verdict no-address "$r" "no line may name an address or a query"
+
+  run "$dir/empty.log"
+  r=no
+  [[ $code -eq 2 ]] && r=yes
+  verdict log-needs-at "$r" "--log without --at must refuse with exit 2"
+
+  printf '# only a comment\n\n' > "$dir/own-empty.txt"
+  set +e
+  out=$(PATH="$dir/bin:$PATH" CP_OWN_IPS_FILE="$dir/own-empty.txt" CP_WINDOW_NOW="" bash "$HERE/deploy-window.sh" --at "$at" \
+    --log "$dir/own.log" 2>&1)
+  code=$?
+  set -e
+  r=no
+  [[ $code -eq 2 ]] && grep -q "^COULD NOT TELL: " <<<"$out" && ! grep -q "^BAD GATEWAY" <<<"$out" && r=yes
+  verdict own-list-empty "$r" "a list of our own addresses without an address must refuse with exit 2"
+
+  r=no
+  [[ ! -e "$dir/ssh-called" ]] && r=yes
+  verdict no-ssh "$r" "--log must not call ssh"
+
+  if [[ $fails -eq 0 ]]; then
+    echo "DEPLOY WINDOW SELFTEST OK"
+    return 0
+  fi
+  echo "DEPLOY WINDOW SELFTEST FAIL"
+  return 1
+}
+
+TAIL_SECONDS=180
+AT=""
+LOGFILE=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --selftest) selftest; exit $? ;;
+    --at|--log)
+      if [[ $# -lt 2 ]]; then
+        echo "COULD NOT TELL: $1 needs a value" >&2
+        exit 2
+      fi
+      if [[ "$1" == --at ]]; then AT="$2"; else LOGFILE="$2"; fi
+      shift 2 ;;
+    ""|*[!0-9]*) echo "COULD NOT TELL: unknown argument $1 (tail seconds, --at, --log, --selftest)" >&2; exit 2 ;;
+    *) TAIL_SECONDS="$1"; shift ;;
+  esac
+done
 LEAD_SECONDS=60
-KEY="${CP_SSH_KEY:-$HOME/.ssh/id_ed25519_automaton}"
+
+if [[ -n "$AT" && ! "$AT" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}$ ]]; then
+  echo "COULD NOT TELL: --at takes YYYY-MM-DDTHH:MM:SS in UTC, not $AT" >&2
+  exit 2
+fi
+if [[ -n "$LOGFILE" && -z "$AT" ]]; then
+  echo "COULD NOT TELL: --log needs --at. Without it the window comes from the container start," >&2
+  echo "        and that is only readable over ssh, which --log exists to avoid." >&2
+  exit 2
+fi
+
+KEY="${CP_SSH_KEY:-${HOME:-}/.ssh/id_ed25519_automaton}"
 HOST="${CP_HOST:-root@76.13.144.207}"
-source "$(dirname "$0")/own-ips.sh"
-OWN=$(own_ips)
+source "$HERE/own-ips.sh"
 SSH=(ssh -i "$KEY" -o BatchMode=yes -o ConnectTimeout=10)
 
 # `own_ips` asks the VM which address this machine goes out through right now and keeps every
 # one it has ever seen. A constant alone went stale on 2026-09-22 when the line reconnected, and
 # here that counts our own post-deploy checks as strangers inside the window: the one number this
 # script exists to produce, wrong in the direction that looks like traffic.
+#
+# With --log nothing goes over ssh, so the list is the file alone.
+if [[ -n "$LOGFILE" ]]; then
+  if [[ ! -f "$CP_OWN_IPS_FILE" ]]; then
+    echo "COULD NOT TELL: the list of our own addresses is not there; without it every count is guesswork." >&2
+    exit 2
+  fi
+  OWN=$(awk '!/^#/ && NF {print $1}' "$CP_OWN_IPS_FILE" | sort -u | tr '\n' ' ')
+  # A list without a single address would count our own checks as strangers.
+  if [[ -z "${OWN// /}" ]]; then
+    echo "COULD NOT TELL: the list of our own addresses names no address; without it every count is guesswork." >&2
+    exit 2
+  fi
+else
+  # own_ips reports a newly seen own address on stderr, with the address. That line would land in
+  # the public log too, so it is passed on with the address blanked.
+  own_err=$(mktemp)
+  if ! OWN=$(own_ips 2>"$own_err"); then
+    sed -E 's/([0-9]{1,3}\.){3}[0-9]{1,3}/<address>/g' "$own_err" >&2
+    rm -f "$own_err"
+    echo "COULD NOT TELL: the list of our own addresses was not readable." >&2
+    exit 2
+  fi
+  sed -E 's/([0-9]{1,3}\.){3}[0-9]{1,3}/<address>/g' "$own_err" >&2
+  rm -f "$own_err"
+fi
 
-started=$("${SSH[@]}" "$HOST" 'docker inspect deploy-cp-1 --format "{{.State.StartedAt}}"' 2>/dev/null || true)
-if [[ -z "$started" ]]; then
-  echo "COULD NOT TELL: the container start time was not readable." >&2
-  echo "        Without it the window would be a guess, and a guessed window measures nothing." >&2
-  echo "        This says nothing about the deploy. Run it again." >&2
-  exit 2
+if [[ -n "$AT" ]]; then
+  started="$AT"
+  source_label="taken from --at"
+else
+  started=$("${SSH[@]}" "$HOST" 'docker inspect deploy-cp-1 --format "{{.State.StartedAt}}"' 2>/dev/null || true)
+  source_label="taken from the container start"
+  if [[ -z "$started" ]]; then
+    echo "COULD NOT TELL: the container start time was not readable." >&2
+    echo "        Without it the window would be a guess, and a guessed window measures nothing." >&2
+    echo "        This says nothing about the deploy. Run it again." >&2
+    exit 2
+  fi
 fi
 
 log=$(mktemp); trap 'rm -f "$log"' EXIT
@@ -61,17 +227,23 @@ log=$(mktemp); trap 'rm -f "$log"' EXIT
 # 2026-09-23 at 17:28 and every script here silently lost its history: one cycle counted three
 # arrivals from github.com, the next said nobody had ever come from there. 45,067 lines against
 # the 273 that were left in the current file.
-if ! "$(dirname "$0")/access-log.sh" > "$log"; then
+if [[ -n "$LOGFILE" ]]; then
+  if [[ ! -r "$LOGFILE" ]]; then
+    echo "COULD NOT TELL: $LOGFILE is not readable." >&2
+    exit 2
+  fi
+  cat "$LOGFILE" > "$log"
+elif ! "$HERE/access-log.sh" > "$log"; then
   echo "COULD NOT TELL: the access log was not readable in 45 seconds." >&2
   echo "        A hiccup on the ssh connection, not a finding about the deploy. Run it again." >&2
   exit 2
 fi
 
-python3 - "$started" "$LEAD_SECONDS" "$TAIL_SECONDS" "$OWN" "$log" <<'PY'
+python3 - "$started" "$LEAD_SECONDS" "$TAIL_SECONDS" "$OWN" "$log" "$source_label" <<'PY'
 import datetime
 import re, json, os, sys
 
-started_iso, lead, tail, own_raw, path = sys.argv[1:6]
+started_iso, lead, tail, own_raw, path, source_label = sys.argv[1:7]
 # Docker prints nanoseconds; fromisoformat takes at most microseconds.
 head, _, _rest = started_iso.partition(".")
 started = datetime.datetime.fromisoformat(head).replace(tzinfo=datetime.timezone.utc)
@@ -79,7 +251,7 @@ since = started - datetime.timedelta(seconds=int(lead))
 until = started + datetime.timedelta(seconds=int(tail))
 own = set(own_raw.split())
 
-strangers = failures = ours = 0
+strangers = failures = ours = bad_gateway = 0
 unauth = 0
 unauth_lines = []
 lines = []
@@ -119,6 +291,8 @@ for raw in open(path):
     # caller that wanted to pay could not.
     selling = re.match(r"^/pay/\d+(/|$)", req.get("uri", "") or "")
     status = row.get("status", 200)
+    # The path without its query: a query can carry a token, and these lines end up in public logs.
+    path_only = (req.get("uri", "") or "").split("?", 1)[0]
     if status < 400 or (selling and status == 402):
         pass
     elif status == 401:
@@ -132,12 +306,14 @@ for raw in open(path):
         #
         # So they are counted and shown apart, and the caption says what the report does not know.
         unauth += 1
-        unauth_lines.append(f"   {at:%H:%M:%S}  {req.get('remote_ip')}  {req.get('method')} {req.get('uri')}")
+        unauth_lines.append(f"   {at:%H:%M:%S}  {req.get('method')} {path_only}")
     else:
         failures += 1
-        lines.append(f"   {at:%H:%M:%S}  {req.get('remote_ip')}  {req.get('method')} {req.get('uri')}  {status}")
+        if status == 502:
+            bad_gateway += 1
+        lines.append(f"   {at:%H:%M:%S}  {req.get('method')} {path_only}  {status}")
 
-print(f"deploy   {started:%Y-%m-%d %H:%M:%S} UTC, taken from the container start")
+print(f"deploy   {started:%Y-%m-%d %H:%M:%S} UTC, {source_label}")
 print(f"window   {since:%H:%M:%S} to {until:%H:%M:%S} UTC, {lead} s before and {tail} s after")
 print(f"ours     {ours} request(s), the smoke test and the checks")
 
@@ -176,6 +352,10 @@ if strangers == 0:
     print("                  That is not evidence the deploy was clean. It is evidence nobody was")
     print("                  there, which on a service this size is the normal case.")
     sys.exit(0)
+
+# The restart itself: Caddy answers 502 while nothing listens on cp:8402. Printed whenever a
+# stranger was in the window, also as 0, so a quiet rollout and a blind one look different.
+print(f"BAD GATEWAY {bad_gateway} of {strangers} request(s) from outside answered 502")
 
 if unauth:
     print(f"NO KEY   {unauth} of {strangers} request(s) from outside answered 401:")
