@@ -74,6 +74,15 @@ Kontos als Datei in `/tmp` des code-host liegen lässt.
       Prüfung (Netz): `t="$(mktemp -d)"; k="$(sed -n 's/^LIVE_SANDBOX_KEY=//p' ~/.config/control-plane/live-sandbox.env | head -n 1 | tr -d "\"'\r")"; out="$(TMPDIR="$t" bash ops/live.sh 2>&1)"; echo "ok=$(grep -c '^OK sandbox: ' <<<"$out") live=$(tail -n 1 <<<"$out") left=$(find "$t" -mindepth 1 | wc -l) key=$(grep -cF -- "$k" <<<"$out")"; rm -rf "$t"` muss `ok=1 live=LIVE OK left=0 key=0` ausgeben.
 - [x] `check` ist grün.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
+- [ ] Ein mit `kill -KILL` abgebrochener Lauf, gegen den kein `trap` hilft (Timeout eines Agent-Werkzeugs, Abbruch eines Runs), lässt
+      den Schlüssel nur bis zum nächsten Lauf liegen: `live()` legt seinen Ordner mit festem Präfix an und löscht beim Start die Ordner
+      dieses Präfixes aus früheren Läufen, deren Prozess nicht mehr lebt, und keine andere Datei in `TMPDIR`. Selbsttest-Fälle
+      `kill-sweep` (Lauf während des gehaltenen `curl` in `sandbox_live` mit `kill -KILL` beendet, danach ein zweiter Lauf von `live()`
+      mit demselben `TMPDIR`; OK, wenn der Ordner des ersten Laufs danach fehlt) und `foreign` (eine fremde Datei und ein Ordner des
+      Präfixes mit lebendem Prozess in `TMPDIR` überstehen den zweiten Lauf, OK). Wie der Ordner seinen Prozess nennt, hältst du in
+      `goals/domains/ANNAHMEN.md` fest.
+      Prüfung: `bash ops/live.sh --selftest | grep -cE '^planted key-cleanup (kill-sweep|foreign): OK '` muss `2` ausgeben.
+      Prüfung: `bash ops/live.sh --selftest` muss Exit-Code 0 haben und als letzte Zeile `LIVE SELFTEST OK` ausgeben.
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
