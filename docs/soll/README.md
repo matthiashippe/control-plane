@@ -71,3 +71,42 @@ Neue Bausteine, im zweiten `<style>` der Quellen und später der Seite, weil `sr
   treffen muss und `.btn` auf einem `<button>` sonst den Hintergrund des Browsers trägt.
 
 Abnahme-Issue handoff: PRO-19925
+
+## Konto /h/{code}
+
+Der Schritt Konto derselben Handy-Seite (goals/konto/03): Nach der richtigen Zahl legt der Mensch per Passkey sein Konto an und
+erlaubt die tägliche Abbuchung. Zwei Zustände, je zwei Bilder:
+
+| Zustand | 390 | 1440 | Quelle |
+|---|---|---|---|
+| `passkey` | `konto-passkey-390.png` | `konto-passkey-1440.png` | `src/konto-passkey.html` |
+| `fehlgeschlagen` | `konto-fehlgeschlagen-390.png` | `konto-fehlgeschlagen-1440.png` | `src/konto-fehlgeschlagen.html` |
+
+`passkey` sagt in der Überschrift, was beim Tippen passiert, darunter in einer Zeile, was wir abbuchen dürfen (Tageslimit und für
+welchen Automaton), zwei Haken dazu, wer das Konto öffnen kann, und einen Knopf über die ganze Breite; der Block
+`data-soll="passkey"` endet im ersten Bildschirm (390 x 844 und 1440 x 900). `fehlgeschlagen` zeigt den abgebrochenen Passkey und
+schickt zurück ins Terminal für einen neuen Code; Anbieter nicht erreichbar und abgelehnte Erlaubnis tauschen nur die Zeile unter
+der Überschrift. Die Werte im Bild sind erfunden (`Atlas`, 5.00 USD), keine Kundendaten. `freigabe`, `erledigt` und `ungueltig`
+bleiben die Bilder aus dem Abschnitt Handoff.
+
+Bauen und prüfen, ohne Netz, mit dem Chromium aus `~/.cache/ms-playwright/`:
+
+```
+node ops/soll-konto.mjs                          # Bilder neu schreiben
+node ops/soll-konto.mjs --pruefen                # neu rendern und vergleichen, Exit 1 bei jedem Mangel
+node ops/soll-konto.mjs --pruefen --source <dir> # dieselbe Prüfung gegen die zwei Quellen konto-<zustand>.html in <dir>
+```
+
+Mängel wie beim Handoff, dazu: Block `passkey` fehlt oder endet unter dem ersten Bildschirm, eine fremde Adresse in einem Attribut
+(Link, Formularziel, Stil), auch wenn nichts sie lädt, und ein Wort, das der Leser erst übersetzen muss (`handoff`, `token`,
+`wallet`, `smart`, `permission`, `sepolia`, `turnkey`, `erc`), im sichtbaren Text; „passkey“ ist ein bekanntes Wort und steht. Die
+Auswertung ist `assessKonto` in `ops/soll-assess.mjs`, geprüft von `test/soll-konto.test.ts` ohne Browser.
+
+Die Quellen nutzen die Klassen der Startseite (die Haken-Liste feats, cta um den Knopf) und den Baustein grant aus dem Abschnitt
+Handoff als Abstand um die Haken-Liste. Neu, im zweiten `<style>` der Quellen und später der Seite:
+
+- `.wide`: der Knopf Passkey über die ganze Spalte und 56 px hoch, weil er der einzige Schritt der Seite ist, ein Daumen ihn auf
+  dem Handy sofort treffen soll und der Knopf der Startseite sonst nur so breit wie sein Text ist.
+- `.balanced`: bricht die Überschrift in zwei gleich lange Zeilen (`text-wrap: balance`), weil sonst bei 1440 „passkey“ und bei 390
+  „a passkey“ allein in der zweiten Zeile stehen; als Klasse am Block um die Überschrift, weil die Überschrift selbst ein nacktes
+  `<h1>` bleibt (Punkt 4 ändert sie zur Gegenprobe).

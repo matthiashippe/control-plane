@@ -23,6 +23,9 @@
  *                 sold. Default INFERENCE_SUNSET_AT_DEFAULT in app.ts, which is the production value
  *   CP_SANDBOXD_URL  the control API of the sandbox server, default https://ctl.sbx.postyourprice.com
  *   CP_SANDBOXES  "0" switches the sandbox API off (every call that needs the server answers 501)
+ *   CP_KONTO_CHAIN_ID  unset: the account of konto 03 is off; 84532 switches it on (Base Sepolia only), anything else stops
+ *                 the start. With it CP_KONTO_KEY_FILE (file of the test key), CP_KONTO_RPC_URL, CP_KONTO_TOPUP_BELOW_USDC and
+ *                 CP_KONTO_TOPUP_USDC (docs/konto/konto.md). No deploy file sets any of them.
  */
 
 import fs from "node:fs";
@@ -44,6 +47,7 @@ import { siteOrigin } from "./public/site.js";
 import { createSandboxdClient, loadOrCreateClientKey, SANDBOXD_URL_DEFAULT } from "./sandbox/client.js";
 import { createSandboxService } from "./sandbox/service.js";
 import { grantLiveSandbox } from "./sandbox/grant.js";
+import { kontoFromEnv } from "./konto/setup.js";
 
 const port = Number(process.env.CP_PORT || 8402);
 const host = process.env.CP_HOST || "127.0.0.1";
@@ -148,6 +152,8 @@ const app = createApp({
   // A round of changes writes on the same provider as the paid texts (HAN-95).
   rework: deliveryWriter(providers),
   sandbox,
+  // konto 03: off without CP_KONTO_CHAIN_ID; any value other than 84532 throws here and the service does not start.
+  konto: kontoFromEnv(db, process.env),
 });
 
 // Cleanup: once on start, hourly after that. Otherwise `siwe_nonces` grows with every call to

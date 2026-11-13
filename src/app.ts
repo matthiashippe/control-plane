@@ -92,7 +92,7 @@ import { DOC } from "./errors.js";
 import { domainNotHeld, invalidDomain, parseDnsPath, registerDomain, searchDomains } from "./domains.js";
 import { Catalog, handleChat, MARKUP } from "./inference/proxy.js";
 import { clientKey, RateLimiter, type RateLimitOptions } from "./ratelimit.js";
-import { registerHandoff, type HandoffDeps } from "./handoff/routes.js";
+import { registerHandoff, type HandoffDeps, type KontoDeps } from "./handoff/routes.js";
 import { handlePay, TOPUP_TIERS_USD, type PayConfig } from "./payments/pay.js";
 import { handleRegister } from "./registry.js";
 import { createSandboxService, type Reply as SandboxReply, type SandboxService } from "./sandbox/service.js";
@@ -173,6 +173,12 @@ export interface AppOptions {
    * on /h/{code} and where the chance comes from. Left out, production values.
    */
   handoff?: Pick<HandoffDeps, "pollMs" | "keepAliveMs" | "missLimit" | "random">;
+  /**
+   * The account of konto 03 (src/konto/, docs/konto/konto.md). Left out or null while CP_KONTO_CHAIN_ID is unset: then `step:
+   * "konto"` and /h/{code}/konto answer 503. `topUp` is called after every request with an API key and decides itself whether
+   * the account behind the key needs credit from its spend permission.
+   */
+  konto?: (KontoDeps & { topUp?: (address: string) => void }) | null;
 }
 
 /**
@@ -1798,7 +1804,7 @@ export function createApp(opts: AppOptions) {
   // The way to the phone (goals/konto/02): POST /v1/handoff, the page /h/{code} and the stream GET /v1/handoff/{code}. Before
   // the /v1/* auth middleware for the same reason as /v1/auth/keyless above.
   const indexStyle = /<style>[\s\S]*?<\/style>/.exec(indexHtml ?? "")?.[0] ?? "";
-  registerHandoff(app, { db, clock, indexStyle: () => indexStyle, ...opts.handoff });
+  registerHandoff(app, { db, clock, indexStyle: () => indexStyle, ...opts.handoff, konto: opts.konto ?? null });
 
   // The social relay of the runtime (goals/relay/01, docs/relay/vertrag.md): POST /v1/messages, POST /v1/messages/poll and
   // GET /v1/messages/count. Before the /v1/* auth middleware, because the signed way carries no API key; the way with a key
@@ -2598,6 +2604,9 @@ export function createApp(opts: AppOptions) {
     if (!address) throw invalidKeyError();
     c.set("address", address);
     await next();
+    // konto 03: an account that spent below its threshold is topped up from its spend permission, in the background, because a
+    // spend() waits for a block; this answer does not wait for it, the next one sees the credit.
+    opts.konto?.topUp?.(address);
   });
 
   /**

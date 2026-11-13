@@ -454,9 +454,57 @@ function migrate(db: Db): void {
       amount_usdc      TEXT NOT NULL,
       match            INTEGER NOT NULL CHECK (match BETWEEN 10 AND 99),
       choices          TEXT NOT NULL,
-      state            TEXT NOT NULL CHECK (state IN ('pending', 'done', 'burned', 'expired')),
+      state            TEXT NOT NULL CHECK (state IN ('pending', 'matched', 'done', 'burned', 'expired')),
       created_at       INTEGER NOT NULL,
-      updated_at       INTEGER NOT NULL
+      updated_at       INTEGER NOT NULL,
+      step             TEXT NOT NULL DEFAULT 'confirm' CHECK (step IN ('confirm', 'konto')),
+      account          TEXT,
+      api_key          TEXT
+    );
+  `);
+
+  // konto 03 (docs/konto/konto.md): a handoff with `step` 'konto' goes from the right number to `matched` and only to `done`
+  // once a matching, validly signed spend permission arrives. The CHECK of konto 02 does not know `matched`, and SQLite cannot
+  // change a CHECK, so a table without it is rebuilt once; its rows live ten minutes and are copied over. `account` is the smart
+  // wallet, `api_key` the key in clear until the terminal's stream has read it once (then NULL, the hash stays in api_keys).
+  const handoffSql = (db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'handoffs'").get() as { sql: string }).sql;
+  if (!handoffSql.includes("'matched'")) {
+    db.transaction(() => {
+      db.exec(`
+        ALTER TABLE handoffs RENAME TO handoffs_konto02;
+        CREATE TABLE handoffs (
+          code             TEXT PRIMARY KEY,
+          poll_hash        TEXT NOT NULL UNIQUE,
+          automaton_name   TEXT NOT NULL,
+          daily_limit_usdc TEXT NOT NULL,
+          amount_usdc      TEXT NOT NULL,
+          match            INTEGER NOT NULL CHECK (match BETWEEN 10 AND 99),
+          choices          TEXT NOT NULL,
+          state            TEXT NOT NULL CHECK (state IN ('pending', 'matched', 'done', 'burned', 'expired')),
+          created_at       INTEGER NOT NULL,
+          updated_at       INTEGER NOT NULL,
+          step             TEXT NOT NULL DEFAULT 'confirm' CHECK (step IN ('confirm', 'konto')),
+          account          TEXT,
+          api_key          TEXT
+        );
+        INSERT INTO handoffs (code, poll_hash, automaton_name, daily_limit_usdc, amount_usdc, match, choices, state, created_at, updated_at)
+          SELECT code, poll_hash, automaton_name, daily_limit_usdc, amount_usdc, match, choices, state, created_at, updated_at FROM handoffs_konto02;
+        DROP TABLE handoffs_konto02;
+      `);
+    })();
+  }
+
+  // The accounts of konto 03: one smart wallet per row (lowercase, the same address as in `wallets`), its owner is the person's
+  // passkey wallet, and the spend permission it signed for us, as JSON with numbers as strings, plus the signature. `approved_tx`
+  // is the hash of approveWithSignature once it was sent.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS konto_accounts (
+      address     TEXT PRIMARY KEY REFERENCES wallets(address),
+      chain_id    INTEGER NOT NULL,
+      permission  TEXT NOT NULL,
+      signature   TEXT NOT NULL,
+      approved_tx TEXT,
+      created_at  TEXT NOT NULL
     );
   `);
 
