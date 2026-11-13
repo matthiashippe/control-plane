@@ -92,6 +92,7 @@ erledigt gilt, ohne dass jemand nachgesehen hat.
 
 ## Progress Log
 - 2026-11-13 Zyklus 1: Punkte 1, 2, 3, 4 gebaut, beide Fenster am 13.11.2026 um 17:06 UTC mit `ops/deploy-window.sh --at` gemessen (00:48:29: 0 mal 502 von 53, `CLEAN`; 09:55:22: 0 mal 502 von 104, `AFFECTED` nur mit 4xx) und unter `## Nachher` eingetragen, Ergebnis betrieb 02 hält; Gegenprobe des Werkzeugs im Vorher-Fenster 2026-11-12T16:41:02 zählt weiter 3 mal 502, `--selftest` OK. Prüfbefehle: Punkt 1 gibt 2, Exit 0, 2, 2, 2 und (Netz) 2; Punkt 2 gibt 1 und Exit 0; Punkt 3 gibt 0, 0, 0; Punkt 4 `check` grün in 68 s (1592 Tests), `ops/own-ips.txt` 0 Zeilen geändert.
+- 2026-11-13 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4; `dev` brachte nichts Neues, alle Prüfbefehle am Kopf 15bf124 erneut ausgeführt. Prüfbefehle: Punkt 1 gibt 2, Exit 0, 2, 2, 2 und (Netz, 17:10 UTC) 2; Punkt 2 gibt 1 und Exit 0; Punkt 3 gibt 0, 0, 0; Punkt 4 `check` grün in 78 s (1592 Tests), `ops/own-ips.txt` 0 Zeilen geändert; am PR `check` und `e2e` grün.
 
 ## Blockers
 - keine
