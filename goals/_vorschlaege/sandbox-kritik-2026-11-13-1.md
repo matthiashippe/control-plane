@@ -1,0 +1,5 @@
+Schwere: 2
+Goal: sandbox 05
+Befund: Die Antwort auf einen Befehl im Hintergrund sagt dem Modell, es solle die Dateien „später“ lesen, aber nicht wann und nicht wie es auf das Ende wartet; ein Modell, das sofort `cat <tag>.exit` ruft, bekommt `No such file` und fragt in einer Schleife nach, jede Runde eine bezahlte Inferenz des Kunden.
+Beleg: src/sandbox/service.ts:70 (`Read these files later with read_file, or with exec and cat.`) | `grep -c "wait" src/sandbox/service.ts` -> kein Befehl zum Warten in der Antwort
+Empfehlung: Die Antwort nennt einen fertigen Befehl für `exec` mit dem Standard-`timeout` 30000, der bis zu 25 s auf `<tag>.exit` wartet und dann Exit-Code, Ausgabe und Fehler druckt oder sagt, dass der Befehl noch läuft (etwa `for i in $(seq 25); do [ -f <tag>.exit ] && break; sleep 1; done; …`), als Feld `wait_command` und im Text; `harness/e2e/long-exec.mjs` holt das Ergebnis von 180 s mit genau diesem Befehl, und `judgeLongExec` verlangt es. Bleibt unter 30 s, also ohne Abbruch der Runtime und ohne Zählung im Circuit Breaker.

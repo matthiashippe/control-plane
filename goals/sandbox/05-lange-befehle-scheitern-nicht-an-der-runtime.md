@@ -112,6 +112,17 @@ seinen Dienst bei uns (Abschlusskriterium in `ROADMAP.md`).
       Prüfung: `git diff --name-only origin/dev...HEAD | grep -cE "\.(key|pem|env)$|live-sandbox\.env"` muss 0 ausgeben.
 - [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
+- [ ] Die Prüfung `sandbox` in `ops/live.sh` fährt nach dem Rollout auch einen Befehl im Hintergrund (Kritik): in derselben eigenen
+      Sandbox `exec` mit `sleep 25; echo bg-ok` und `timeout` 120000 erwartet 200 mit `running` true und `exit_code` -1, liest danach
+      die Datei aus `exit_code_file` über `files/read`, bis sie da ist (höchstens 60 s), und erwartet `0`, dazu `bg-ok` aus
+      `output_file`; die Ergebniszeile bekommt `bg=<ok|…>`, `judge_sandbox` nennt einen Fehlschlag dort mit eigener Zeile
+      `FAIL sandbox: background exec …`, und der Selftest beweist beide Richtungen. Heute prüft `ops/live.sh` nur `echo ok`, also
+      gehalten; der Hintergrundweg (Hülle durch `docker exec bash -lc`, `timeout` aus coreutils unter gVisor, `/root/.exec` im
+      Image, Caddy vor `sandboxd`) läuft in Produktion zum ersten Mal beim ersten Kunden, und der Harness hat die Hülle schon einmal
+      anders gelesen als ein Shell (Leerzeichen nach `>`).
+      Prüfung: `for w in '"timeout":120000' 'bg-ok' exit_code_file output_file 'bg=ok' 'FAIL sandbox: background exec'; do grep -qF -- "$w" ops/live.sh || echo "fehlt $w"; done` muss nichts ausgeben.
+      Prüfung: `PATH=/usr/bin:$PATH bash ops/live.sh --selftest` muss Exit-Code 0 haben, und `PATH=/usr/bin:$PATH bash ops/live.sh --selftest | grep -c "background exec"` mindestens 1 ausgeben.
+      Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/live-selftest.test.ts` muss Exit-Code 0 haben.
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
