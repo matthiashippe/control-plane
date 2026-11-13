@@ -1,7 +1,7 @@
 # Relay Goal 01: Das Social-Relay der Runtime
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Automatons schreiben sich wieder: Eine unveränderte Runtime am Pin `d8f8168`, deren `socialRelayUrl` auf uns zeigt, schickt eine
@@ -133,7 +133,7 @@ funktionierendes Relay ist ein zweiter Grund für einen Automaton, `conwayApiUrl
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/relay-storage.test.ts` muss Exit-Code 0 haben.
       Prüfung: `awk '/^export function cleanupExpired/,/^}/' src/db.ts | grep -c relay_messages` muss mindestens 1 ausgeben.
       Prüfung: `awk '/^## Grenzen/{f=1;next} /^## /{f=0} f' docs/relay/vertrag.md | grep -cE '4000000|30 Tage'` muss mindestens 2 ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Jede neue Testdatei war vor dem Fix rot; die Zeile im Progress Log nennt, womit.
@@ -154,5 +154,6 @@ funktionierendes Relay ist ein zweiter Grund für einen Automaton, `conwayApiUrl
 - 2026-11-13 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6, 7 gebaut (Vertrag `docs/relay/vertrag.md` in eigenem Commit 68d133c vor `src/`, Relay unter `src/relay/` mit Signatur, Fenster, Replay über die gespeicherte Signatur, Grenzen, API-Key mit Kennzeichen und Erstkontakt 1000 mc als Ledger-Zeile `relay`, Gang `harness/e2e/relay-walk.mjs` mit `relay=true` in `full.sh`, Annahmen in `goals/relay/ANNAHMEN.md`, Vorschlag `goals/_vorschlaege/relay-nacharbeit-2026-11-13-1.md`); rot gesehen: `test/relay.test.ts` 6 von 6 und die drei übrigen Relay-Dateien zusammen 21 von 27 ohne `registerRelay`, `test/relay-security.test.ts` mit Signatur immer gültig (3), ohne Zeitfenster (2), ohne Lookup der Signatur (2 mit Billing), ohne Grenze 100 (1), ohne Gesamtgrenze (1); `test/relay-apikey.test.ts` ohne Kennzeichen (2), `verified` immer true (2), Key-Weg ohne Schlüsselprüfung (1); `test/relay-billing.test.ts` Erstkontakt frei (4), jede Nachricht kostet (1), Nachricht trotz 402 (1), Abbuchung außerhalb der Transaktion (1); `test/relay.test.ts` poll markiert nichts (1), ohne `nonce` (1); `test/relay-walk.test.ts` Urteil immer ok (14), ohne Ledger-Prüfung A (3), ohne `blocked` (1), ohne Wiederholungsstatus (5), fremde Signatur egal (1), ohne Antwort (1), `full.sh` ohne Bedingung `relay` (2 mit `test/e2e-sandbox-gate.test.ts`); `test/v1-ohne-variables-segment.test.ts` rot, bis die drei Pfade in `V1_ROUTES` standen. Lokal ohne Docker mit der Runtime aus dem Cache alle Schritte des Gangs grün außer dem Topup (503, ohne Chain). Prüfbefehle: P1 3, 1 und 1, 2, Exit 0 (d=68d133c vor s=053009e); P2 vitest Exit 0, `vertrag.md` 3; P3 vitest Exit 0, 9 Tests; P4 vitest Exit 0; P5 vitest Exit 0, `Preis Erstkontakt` 2; P6 vitest Exit 0, `relay=$relay` 2 und `"$relay" != "true"` 1, `e2e` pass an 9f9c9a2 (`E2E OK turns=5 registered=true api_errors=0 ledger_consistent=true balance_cents=490 domains=true sandbox=true long_exec=true relay=true`, Ledger des Relays `{"a_rows":1,"a_mc":[-1000],"b_rows":0,"key_rows":1,"consistent":true}`); P7 `check` Exit 0 (141 Testdateien, 1672 Tests).
 - 2026-11-13 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, 7, `dev` 5e784c9 ohne neue Commits (Merge-Basis gleich `origin/dev`). Prüfbefehle: P1 3, 1 und 1, 2, Exit 0 (d=68d133c vor s=053009e); P2 vitest Exit 0 (6 Tests), `vertrag.md` 3; P3 vitest Exit 0 (9 Tests), 9; P4 vitest Exit 0 (6 Tests); P5 vitest Exit 0 (6 Tests), `Preis Erstkontakt` 2; P6 vitest Exit 0 (17 Tests), `relay=$relay` 2 und `"$relay" != "true"` 1, `e2e` pass an 0bd3152 (`E2E OK ... relay=true`, `RELAY_VERDICT ok`); P7 `check` Exit 0 (1672 Tests, 141 s; erster Lauf Exit 1 nur durch `test/abort-purchase.test.ts` bei Last 178, die Datei liegt nicht im Diff und ist allein grün, 6 von 6).
 - 2026-11-13 Zyklus 3: Punkte 8 und 9 aus der Kritik gebaut (Antwort eines signierten `poll` in `relay_polls` unter `X-Signature`, `cursor` und `limit`, Speichergrenze 4000000 Zeichen je Absender und 24 h mit 413 vor dem Preis, Löschung nach 30 Tagen in `cleanupExpired`, Kontakt in `relay_contacts`, Vertrag `## Grenzen`, `docs/errors.md`, `ANNAHMEN.md`), Abschluss gemeldet, Punkte 1 bis 9, `dev` b5cfc4f gemergt (3118923). Rot gesehen vor dem Fix: `test/relay-poll-retry.test.ts` 2 von 6 (Wiederholung ohne Cursor leer, Nachricht dazwischen), `test/relay-storage.test.ts` 5 von 6 (keine Grenze in Vertrag und Code, kein 413, keine Löschung, Kontakt nach Löschung weg); `test/ratelimit.test.ts` erwartet im Ergebnis von `cleanupExpired` zusätzlich `relay: 0`. Prüfbefehle: P1 3, 1 und 1, 2, Exit 0 (d=68d133c vor s=053009e); P2 bis P6 vitest Exit 0 (6, 9, 6, 6, 17 Tests), Greps 3, 9, 2, 2 und 1; P6 `e2e` pass an e36cae3 (`E2E OK ... relay=true`, `RELAY_VERDICT ok`); P7 `check` Exit 0 (1684 Tests, 295 s); P8 vitest Exit 0 (6 Tests), `x-signature` 2; P9 vitest Exit 0 (6 Tests), `relay_messages` in `cleanupExpired` 1, `## Grenzen` 2.
+- 2026-11-13 Release: PASS K und B (Zyklus 3), DONE.
 
 ## Blockers
