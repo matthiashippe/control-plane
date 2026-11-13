@@ -15,8 +15,35 @@ import { clientKey, RateLimiter, type RateLimitOptions } from "../ratelimit.js";
 import { siteOrigin } from "../public/site.js";
 import { renderHandoffPage, type HandoffPage } from "../public/handoff.js";
 import { HANDOFF_TTL_MS, pollTokenMatches } from "./rules.js";
-import { chooseHandoff, createHandoff, readHandoff, type Handoff, type HandoffRandom, type HandoffState } from "./store.js";
+import { chooseHandoff, createHandoff, readHandoff, type Handoff, type HandoffRandom, type HandoffState, type HandoffStep } from "./store.js";
 import { qrText } from "./qr.js";
+import type { Address, Hex, PublicClient } from "viem";
+import { burnMatched, finishKonto, takeApiKey } from "../konto/account.js";
+import { parsePermission, permissionMatches, signatureValid } from "../konto/permission.js";
+import { FAIL_REASONS, renderKontoPage, type FailReason } from "../public/konto.js";
+
+/** What the passkey step shows: the page asks the person to create the account and to sign exactly this permission. */
+export interface PasskeyView {
+  code: string;
+  automatonName: string;
+  dailyLimitUsdc: bigint;
+  chainId: number;
+  spender: Address;
+  token: Address;
+}
+
+/**
+ * The account of konto 03 (src/konto/, docs/konto/konto.md). Null or left out while CP_KONTO_CHAIN_ID is unset: then `step:
+ * "konto"` and /h/{code}/konto answer 503.
+ */
+export interface KontoDeps {
+  chainId: number;
+  /** Our spender, the address of the key in CP_KONTO_KEY_FILE. */
+  spender: Address;
+  token: Address;
+  /** Asks the chain whether a smart wallet signed (ERC-1271 or ERC-6492). */
+  verifyClient: PublicClient;
+}
 
 export interface HandoffDeps {
   db: Db;
@@ -30,6 +57,7 @@ export interface HandoffDeps {
   /** Cap on unknown codes per address on /h/{code}; null switches it off. */
   missLimit?: RateLimitOptions | null;
   random?: HandoffRandom;
+  konto?: KontoDeps | null;
 }
 
 /** 20 unknown codes in 10 minutes from one address (docs/konto/handoff.md). */
@@ -58,6 +86,7 @@ function private_(c: Context): void {
 }
 
 const REASON: Record<Exclude<HandoffState, "pending">, "used" | "wrong" | "expired"> = {
+  matched: "used",
   done: "used",
   burned: "wrong",
   expired: "expired",
@@ -69,6 +98,26 @@ export function registerHandoff<E extends Env>(app: Hono<E>, deps: HandoffDeps):
   const keepAliveMs = deps.keepAliveMs ?? 15_000;
   const misses = deps.missLimit === null ? null : new RateLimiter({ ...(deps.missLimit ?? DEFAULT_MISS_LIMIT), now: () => clock().getTime() });
   const nowMs = () => clock().getTime();
+  const konto = deps.konto ?? null;
+  const KONTO_OFF = {
+    error: "konto_unavailable",
+    message: "Creating an account is not switched on here yet. Leave out step or send step \"confirm\".",
+    docs: CONTRACT,
+  };
+
+  const passkey = (c: Context, h: Handoff) => {
+    private_(c);
+    if (!konto) return c.text("Creating an account is not switched on here. Start again in your terminal.", 503);
+    const view: PasskeyView = {
+      code: h.code,
+      automatonName: h.automatonName,
+      dailyLimitUsdc: h.dailyLimitUsdc,
+      chainId: konto.chainId,
+      spender: konto.spender,
+      token: konto.token,
+    };
+    return c.html(renderKontoPage({ state: "passkey", ...view }, deps.indexStyle()), 200);
+  };
 
   const page = (c: Context, view: HandoffPage, status: 200 | 404 | 410) => {
     private_(c);
@@ -102,19 +151,27 @@ export function registerHandoff<E extends Env>(app: Hono<E>, deps: HandoffDeps):
     const automatonName = parseName(body?.automaton_name);
     const dailyLimitUsdc = parseUsdc(body?.daily_limit_usdc);
     const amountUsdc = parseUsdc(body?.amount_usdc);
-    if (!body || typeof body !== "object" || !automatonName || dailyLimitUsdc === null || amountUsdc === null) {
+    const step = body?.step === undefined ? "confirm" : body.step;
+    if (!body || typeof body !== "object" || !automatonName || dailyLimitUsdc === null || amountUsdc === null || (step !== "confirm" && step !== "konto")) {
       return c.json(
         {
           error: "invalid_handoff",
           message:
             "Send JSON with automaton_name (1 to 64 characters), daily_limit_usdc and amount_usdc, both a positive whole number of " +
-            'atomic USDC (6 decimals) in whole cents, as a string: {"automaton_name":"Atlas","daily_limit_usdc":"5000000","amount_usdc":"5000000"}.',
+            'atomic USDC (6 decimals) in whole cents, as a string, and optionally step "confirm" (the default) or "konto": ' +
+            '{"automaton_name":"Atlas","daily_limit_usdc":"5000000","amount_usdc":"5000000"}.',
           docs: CONTRACT,
         },
         400,
       );
     }
-    const { handoff, pollToken, expiresAtMs } = createHandoff(db, { automatonName, dailyLimitUsdc, amountUsdc }, nowMs(), deps.random);
+    if (step === "konto" && !konto) return c.json(KONTO_OFF, 503);
+    const { handoff, pollToken, expiresAtMs } = createHandoff(
+      db,
+      { automatonName, dailyLimitUsdc, amountUsdc, step: step as HandoffStep },
+      nowMs(),
+      deps.random,
+    );
     const url = `${siteOrigin()}/h/${handoff.code}`;
     return c.json(
       {
@@ -135,8 +192,11 @@ export function registerHandoff<E extends Env>(app: Hono<E>, deps: HandoffDeps):
       method: "POST",
       path: "/v1/handoff",
       body: { automaton_name: "Atlas", daily_limit_usdc: "5000000", amount_usdc: "5000000" },
+      optional: { step: "confirm (default) or konto: konto creates an account with a passkey after the right number" },
       answer: ["code", "url", "qr", "match", "expires_at", "poll_token"],
-      outcome: "GET /v1/handoff/{code} with Authorization: Bearer <poll_token>, as Server-Sent Events: pending, then done, burned or expired.",
+      outcome:
+        "GET /v1/handoff/{code} with Authorization: Bearer <poll_token>, as Server-Sent Events: pending, then done, burned or expired; " +
+        "with step konto matched comes before done, and the first done carries account and api_key.",
       docs: CONTRACT,
     }),
   );
@@ -169,12 +229,20 @@ export function registerHandoff<E extends Env>(app: Hono<E>, deps: HandoffDeps):
       // the clock of the app says.
       const until = Date.now() + HANDOFF_TTL_MS + 60_000;
       while (!stream.aborted && Date.now() < until) {
-        const state = readHandoff(db, code, nowMs())?.handoff.state ?? "expired";
+        const now = readHandoff(db, code, nowMs())?.handoff;
+        const state = now?.state ?? "expired";
         if (state !== last) {
-          await stream.writeSSE({ event: "state", data: JSON.stringify({ state }) });
+          const data: Record<string, string> = { state };
+          // The account of a konto step, and its API key exactly once: whoever reads the first done gets it, nobody after.
+          if (state === "done" && now?.step === "konto" && now.account) {
+            data.account = now.account;
+            const key = takeApiKey(db, code);
+            if (key) data.api_key = key;
+          }
+          await stream.writeSSE({ event: "state", data: JSON.stringify(data) });
           last = state;
         }
-        if (state !== "pending") break;
+        if (state !== "pending" && state !== "matched") break;
         if (Date.now() - beat >= keepAliveMs) {
           await stream.write(": keep-alive\n\n");
           beat = Date.now();
@@ -189,6 +257,7 @@ export function registerHandoff<E extends Env>(app: Hono<E>, deps: HandoffDeps):
     if (!found) return unknown(c);
     const { handoff } = found;
     if (handoff.state === "pending") return page(c, freigabe(handoff), 200);
+    if (handoff.state === "matched") return passkey(c, handoff);
     return page(c, { state: "ungueltig", reason: REASON[handoff.state] }, 410);
   });
 
@@ -197,8 +266,62 @@ export function registerHandoff<E extends Env>(app: Hono<E>, deps: HandoffDeps):
     const outcome = chooseHandoff(db, c.req.param("code").toUpperCase(), (form as Record<string, unknown>).pick, nowMs());
     if (outcome.kind === "unknown") return unknown(c);
     if (outcome.kind === "done") return page(c, { state: "erledigt" }, 200);
+    if (outcome.kind === "matched") return passkey(c, outcome.handoff);
     if (outcome.kind === "wrong") return page(c, { state: "ungueltig", reason: "wrong" }, 410);
     const state = outcome.handoff.state;
     return page(c, { state: "ungueltig", reason: state === "pending" ? "used" : REASON[state] }, 410);
+  });
+
+  // The passkey step (konto 03): the page sends the smart wallet, the permission it signed and the signature. Only a matching,
+  // validly signed permission ends the handoff `done`; any other burns it, as a wrong number does.
+  app.post("/h/:code/konto", async (c) => {
+    c.header("Cache-Control", "no-store");
+    c.header("Referrer-Policy", "no-referrer");
+    if (!konto) return c.json(KONTO_OFF, 503);
+    const code = c.req.param("code").toUpperCase();
+    const found = readHandoff(db, code, nowMs());
+    if (!found) return c.json({ error: "handoff_not_found", message: "There is no such code.", docs: CONTRACT }, 404);
+    const { handoff } = found;
+    if (handoff.step !== "konto" || handoff.state === "pending") {
+      return c.json({ error: "not_matched", message: "Tap the number shown in your terminal first.", docs: CONTRACT }, 409);
+    }
+    if (handoff.state !== "matched") {
+      return c.json({ error: "handoff_closed", message: "This code no longer works. Start again in your terminal.", docs: CONTRACT }, 410);
+    }
+    const body = (await c.req.json().catch(() => null)) as Record<string, unknown> | null;
+    const permission = parsePermission(body?.permission);
+    const signature = typeof body?.signature === "string" ? (body.signature as Hex) : null;
+    const now = nowMs();
+    const refuse = (message: string) => {
+      burnMatched(db, code, now);
+      return c.json({ error: "permission_refused", message: `${message} Nothing was set up. Start again in your terminal.`, docs: CONTRACT }, 400);
+    };
+    if (!permission || !signature) return refuse("The request did not carry a permission and its signature.");
+    const want = { account: permission.account, spender: konto.spender, token: konto.token, allowance: handoff.dailyLimitUsdc, nowSec: Math.floor(now / 1000) };
+    if (typeof body?.account !== "string" || body.account.toLowerCase() !== permission.account) return refuse("The permission is not for this account.");
+    if (!permissionMatches(permission, want)) return refuse("The permission is not the one this code asked for.");
+    if (!(await signatureValid(konto.verifyClient, konto.chainId, permission, signature))) return refuse("The signature does not belong to this account.");
+    const ok = finishKonto(db, { code, account: permission.account, chainId: konto.chainId, permission, signature, name: handoff.automatonName, nowMs: nowMs() });
+    if (!ok) return c.json({ error: "handoff_closed", message: "This code no longer works. Start again in your terminal.", docs: CONTRACT }, 410);
+    return c.json({ state: "done", account: permission.account }, 200);
+  });
+
+  // The passkey step failed on the phone (cancelled, the service that creates the account not reachable, or the permission
+  // refused): the script of the page sends the reason here as a form, the code is burned like after a wrong number, and the page
+  // says that no account was created.
+  app.post("/h/:code/fehlgeschlagen", async (c) => {
+    private_(c);
+    if (!konto) return c.text("Creating an account is not switched on here. Start again in your terminal.", 503);
+    const code = c.req.param("code").toUpperCase();
+    const found = readHandoff(db, code, nowMs());
+    if (!found) return unknown(c);
+    const { handoff } = found;
+    if (handoff.step !== "konto" || handoff.state === "pending" || handoff.state === "done") {
+      return c.text("This code is not at the passkey step. Go back to your terminal.", 409);
+    }
+    const form = (await c.req.parseBody().catch(() => ({}))) as Record<string, unknown>;
+    const reason: FailReason = typeof form.reason === "string" && form.reason in FAIL_REASONS ? (form.reason as FailReason) : "cancelled";
+    burnMatched(db, code, nowMs());
+    return c.html(renderKontoPage({ state: "fehlgeschlagen", reason }, deps.indexStyle()), 200);
   });
 }

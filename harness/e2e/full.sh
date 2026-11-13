@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Complete first run of the unmodified upstream runtime against the control plane:
-# provisioning, registration, bootstrap topup, five turns, sleep, the domain calls, the sandbox walk, the relay walk and the
-# long exec walk.
+# provisioning, registration, bootstrap topup, five turns, sleep, the domain calls, the sandbox walk, the relay walk, the
+# konto chain walk on a second chain (84532) and the long exec walk.
 # No Conway API error allowed.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -162,6 +162,21 @@ echo "$relay_verdict"
 relay=false
 if [[ "$relay_verdict" == "RELAY_VERDICT ok" ]]; then relay=true; fi
 
+# The konto chain walk of goals/konto/03 (harness/e2e/konto-chain.mjs, bind-mounted into chain-konto-tools): on the second
+# anvil chain chain-konto (chainId 84532) with the runtime code of the real Base Sepolia contracts (harness/chain/konto/)
+# and the USDC mock at the test USDC address, a fresh secp256k1 key owns a Coinbase Smart Wallet created through
+# CoinbaseSmartWalletFactory.createAccount by an ERC-6492 signed approveWithSignature, spend() up to the allowance succeeds
+# and the next spend() reverts with ExceededSpendPermission (0xfd1ebc88).
+echo "--- konto-chain on the second chain (84532)"
+konto_walk="KONTO_CHAIN_VERDICT fail chain-konto or the USDC mock did not start"
+if "${COMPOSE[@]}" up -d --wait chain-konto >/dev/null 2>&1 \
+  && "${COMPOSE[@]}" run --rm chain-konto-tools chain.mjs setup >/dev/null 2>&1; then
+  konto_walk=$("${COMPOSE[@]}" run --rm chain-konto-tools konto-chain.mjs 2>&1) || true
+fi
+printf '%s\n' "$konto_walk" | grep -E '^KONTO_CHAIN_(RESULT|VERDICT)' || printf '%s\n' "$konto_walk" | tail -20
+konto_chain=false
+if printf '%s\n' "$konto_walk" | grep -qx 'KONTO_CHAIN_VERDICT ok'; then konto_chain=true; fi
+
 # The long exec walk of goals/sandbox/05 (harness/e2e/long-exec.mjs, bind-mounted into the container runtime): the
 # runtime's own client and tools with the same key and a sandbox of its own, `sleep 60` (timeout 90000) and `sleep 180`
 # (timeout 240000) through the tool exec, each followed by list_sandboxes; every attempt recorded, aborted ones too.
@@ -191,8 +206,8 @@ cleanup
 trap - EXIT
 remaining=$("${COMPOSE[@]}" ps -q | wc -l | tr -d ' ')
 [[ "$remaining" == "0" ]] || { echo "E2E FAIL: containers left behind"; exit 1; }
-if [[ "$turns" -lt 5 || "$registered" != "true" || "$api_errors" != "0" || "$consistent" != "true" || "$db_registered" != "1" || "$balance_cents" -ge 500 || "$domains_ok" != "true" || "$sandbox" != "true" || "$long_exec" != "true" || "$relay" != "true" ]]; then
-  echo "E2E FAIL turns=$turns registered=$registered api_errors=$api_errors ledger_consistent=$consistent db_registered=$db_registered balance_cents=$balance_cents domains=$domains_ok sandbox=$sandbox long_exec=$long_exec relay=$relay"
+if [[ "$turns" -lt 5 || "$registered" != "true" || "$api_errors" != "0" || "$consistent" != "true" || "$db_registered" != "1" || "$balance_cents" -ge 500 || "$domains_ok" != "true" || "$sandbox" != "true" || "$long_exec" != "true" || "$konto_chain" != "true" || "$relay" != "true" ]]; then
+  echo "E2E FAIL turns=$turns registered=$registered api_errors=$api_errors ledger_consistent=$consistent db_registered=$db_registered balance_cents=$balance_cents konto_chain=$konto_chain domains=$domains_ok sandbox=$sandbox long_exec=$long_exec relay=$relay"
   exit 1
 fi
-echo "E2E OK turns=$turns registered=$registered api_errors=$api_errors ledger_consistent=$consistent balance_cents=$balance_cents domains=$domains_ok sandbox=$sandbox long_exec=$long_exec relay=$relay"
+echo "E2E OK turns=$turns registered=$registered api_errors=$api_errors ledger_consistent=$consistent balance_cents=$balance_cents konto_chain=$konto_chain domains=$domains_ok sandbox=$sandbox long_exec=$long_exec relay=$relay"

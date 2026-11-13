@@ -235,18 +235,29 @@ HANDOFF_BODY='{"automaton_name":"Live check","daily_limit_usdc":"10000","amount_
 HANDOFF_PREP_JS='const fs = require("fs"); const [file, hdr] = process.argv.slice(1); let j; try { j = JSON.parse(fs.readFileSync(file, "utf8")); } catch (e) { process.exit(0); } if (!j || typeof j.code !== "string" || !/^[0-9A-Z]{10,32}$/.test(j.code) || typeof j.poll_token !== "string" || !/^[A-Za-z0-9_-]{32,128}$/.test(j.poll_token)) process.exit(0); fs.writeFileSync(hdr, "Authorization: Bearer " + j.poll_token + "\n", { mode: 0o600 }); console.log(j.code);'
 
 # The result line of the check from what was received: $1 status of the POST, $2 its body file, $3 status of the page, $4 its
-# body file, $5 what the stream sent within 5 s. Only words leave it, no code and no token.
+# body file, $5 what the stream sent within 5 s, $6 the response headers of the page. Only words leave it, no code and no token.
+# referrer=ok only when every Referrer-Policy header of the page together says exactly no-referrer (konto 03): Caddy used to
+# overwrite the header of the app, and a second value next to it would be one too many.
 # shellcheck disable=SC2016
-HANDOFF_JS='const fs = require("fs"); const [cs, cf, ps, pf, sf] = process.argv.slice(1); const read = (f) => { try { return fs.readFileSync(f, "utf8"); } catch (e) { return ""; } }; let j = null; try { j = JSON.parse(read(cf)); } catch (e) { j = null; } const match = j && Number.isInteger(j.match) && j.match >= 10 && j.match <= 99 ? j.match : null; const nums = [...read(pf).matchAll(/<button[^>]*name="pick" value="([0-9]+)"/g)].map((m) => Number(m[1])); const two = nums.length === 3 && new Set(nums).size === 3 && nums.every((n) => n >= 10 && n <= 99); const numbers = !two ? "missing" : match !== null && nums.includes(match) ? "ok" : "nomatch"; const ev = /^event: state\r?\ndata: (.*)$/m.exec(read(sf)); let st = "none"; if (ev) { try { st = String(JSON.parse(ev[1]).state || "other"); } catch (e) { st = "other"; } } if (!/^[a-z]+$/.test(st)) st = "other"; console.log("create=" + cs + " match=" + (match === null ? "missing" : "ok") + " page=" + ps + " numbers=" + numbers + " stream=" + st);'
-HANDOFF_GOOD="create=201 match=ok page=200 numbers=ok stream=pending"
+HANDOFF_JS='const fs = require("fs"); const [cs, cf, ps, pf, sf, hf] = process.argv.slice(1); const read = (f) => { try { return fs.readFileSync(f, "utf8"); } catch (e) { return ""; } }; let j = null; try { j = JSON.parse(read(cf)); } catch (e) { j = null; } const match = j && Number.isInteger(j.match) && j.match >= 10 && j.match <= 99 ? j.match : null; const nums = [...read(pf).matchAll(/<button[^>]*name="pick" value="([0-9]+)"/g)].map((m) => Number(m[1])); const two = nums.length === 3 && new Set(nums).size === 3 && nums.every((n) => n >= 10 && n <= 99); const numbers = !two ? "missing" : match !== null && nums.includes(match) ? "ok" : "nomatch"; const ev = /^event: state\r?\ndata: (.*)$/m.exec(read(sf)); let st = "none"; if (ev) { try { st = String(JSON.parse(ev[1]).state || "other"); } catch (e) { st = "other"; } } if (!/^[a-z]+$/.test(st)) st = "other"; const rp = [...read(hf).matchAll(/^referrer-policy:[ \t]*(.*?)[ \t]*\r?$/gim)].flatMap((m) => m[1].split(",")).map((v) => v.trim().toLowerCase()).filter(Boolean); const referrer = rp.length === 0 ? "missing" : rp.length === 1 && rp[0] === "no-referrer" ? "ok" : "other"; console.log("create=" + cs + " match=" + (match === null ? "missing" : "ok") + " page=" + ps + " numbers=" + numbers + " stream=" + st + " referrer=" + referrer);'
+HANDOFF_GOOD="create=201 match=ok page=200 numbers=ok stream=pending referrer=ok"
 
 judge_handoff() { # $1 = result line from HANDOFF_JS
   case "${1:-}" in
-    "$HANDOFF_GOOD") echo "OK handoff: POST /v1/handoff 201, /h/{code} shows match among three numbers, the stream says pending; nothing approved" ;;
+    "$HANDOFF_GOOD") echo "OK handoff: POST /v1/handoff 201, /h/{code} shows match among three numbers with Referrer-Policy no-referrer, the stream says pending; nothing approved" ;;
     "") echo "FAIL handoff: no result" ;;
     create=201\ match=missing*) echo "FAIL handoff: POST /v1/handoff answered 201 without a two-digit match" ;;
-    create=201\ *page=200\ numbers=ok\ *) echo "FAIL handoff: the stream did not say pending within 5 s (${1##* })" ;;
-    create=201\ *page=200\ *) echo "FAIL handoff: /h/{code} does not show match among three numbers (${1#*numbers=})" ;;
+    create=201\ match=ok\ page=200\ numbers=ok\ stream=pending\ *)
+      echo "FAIL handoff: /h/{code} does not send Referrer-Policy no-referrer alone (referrer ${1##*referrer=})"
+      ;;
+    create=201\ *page=200\ numbers=ok\ *)
+      local s="${1#*stream=}"
+      echo "FAIL handoff: the stream did not say pending within 5 s (stream=${s%% *})"
+      ;;
+    create=201\ *page=200\ *)
+      local n="${1#*numbers=}"
+      echo "FAIL handoff: /h/{code} does not show match among three numbers (${n%% *})"
+      ;;
     create=201\ *)
       local p="${1#*page=}"
       echo "FAIL handoff: /h/{code} answered ${p%% *}"
@@ -266,10 +277,10 @@ handoff_live() {
   c_code="$(curl -s -o "$d/create" -w '%{http_code}' --max-time 15 -H 'content-type: application/json' --data "$HANDOFF_BODY" "$BASE/v1/handoff")"
   code="$(NODE_NO_WARNINGS=1 node -e "$HANDOFF_PREP_JS" "$d/create" "$d/hdr" 2>/dev/null)"
   if [ -n "$code" ]; then
-    p_code="$(curl -s -o "$d/page" -w '%{http_code}' --max-time 15 "$BASE/h/$code")"
+    p_code="$(curl -s -o "$d/page" -D "$d/page-headers" -w '%{http_code}' --max-time 15 "$BASE/h/$code")"
     curl -s -N --max-time 5 -H "@$d/hdr" "$BASE/v1/handoff/$code" >"$d/stream" 2>/dev/null
   fi
-  NODE_NO_WARNINGS=1 node -e "$HANDOFF_JS" "${c_code:-none}" "$d/create" "${p_code:-none}" "$d/page" "$d/stream"
+  NODE_NO_WARNINGS=1 node -e "$HANDOFF_JS" "${c_code:-none}" "$d/create" "${p_code:-none}" "$d/page" "$d/stream" "$d/page-headers"
 }
 
 # ---- sandbox (sandbox 03)
@@ -783,7 +794,7 @@ selftest() {
   # The check `handoff` through the real parts (HANDOFF_PREP_JS, HANDOFF_JS, judge_handoff), both directions: the answer of a
   # working service, then a 404 of the POST, an answer without match, a stream without pending, a page without match among
   # its numbers and a 404 of the page. The poll token of the planted answer is made here, not written out.
-  local h_tok h_ok h_page h_pending h_case h_name h_cs h_cf h_ps h_pf h_sf h_expect
+  local h_tok h_ok h_page h_pending h_case h_name h_cs h_cf h_ps h_pf h_sf h_hf h_expect
   h_tok="$(head -c 43 /dev/zero | tr '\0' 'q')"
   h_ok="{\"code\":\"7KQ2M9XC4D7K\",\"url\":\"https://postyourprice.com/h/7KQ2M9XC4D7K\",\"qr\":\" \",\"match\":47,\"expires_at\":\"2026-11-13T12:10:00.000Z\",\"poll_token\":\"$h_tok\"}"
   h_page='<form method="post" class="choices"><button class="btn" type="submit" name="pick" value="62">62</button><button class="btn" type="submit" name="pick" value="47">47</button><button class="btn" type="submit" name="pick" value="18">18</button></form>'
@@ -796,14 +807,21 @@ selftest() {
   printf '%s' '<h1>This code no longer works.</h1>' >"$dir/h-page-404"
   printf '%s' "$h_pending" >"$dir/h-stream-ok"
   printf '%s' ': keep-alive' >"$dir/h-stream-none"
+  # The headers of the page: what the app sends behind Caddy with ?Referrer-Policy, what Caddy sent before konto 03 instead of
+  # it, both values next to each other, and none.
+  printf 'HTTP/2 200\r\ncache-control: no-store\r\nreferrer-policy: no-referrer\r\n\r\n' >"$dir/h-headers-ok"
+  printf 'HTTP/2 200\r\nreferrer-policy: strict-origin-when-cross-origin\r\n\r\n' >"$dir/h-headers-caddy"
+  printf 'HTTP/2 200\r\nreferrer-policy: no-referrer\r\nreferrer-policy: strict-origin-when-cross-origin\r\n\r\n' >"$dir/h-headers-both"
+  printf 'HTTP/2 200\r\ncache-control: no-store\r\n\r\n' >"$dir/h-headers-none"
   [ -n "$(NODE_NO_WARNINGS=1 node -e "$HANDOFF_PREP_JS" "$dir/h-create-ok" "$dir/h-hdr")" ] && grep -q "Bearer $h_tok" "$dir/h-hdr" ||
     { echo "FAIL selftest: HANDOFF_PREP_JS did not take the planted answer"; all_ok=0; }
   [ -z "$(NODE_NO_WARNINGS=1 node -e "$HANDOFF_PREP_JS" "$dir/h-create-404" "$dir/h-hdr-404")" ] && [ ! -e "$dir/h-hdr-404" ] ||
     { echo "FAIL selftest: HANDOFF_PREP_JS took a 404"; all_ok=0; }
-  for h_case in "ok 201 ok 200 ok ok OK" "404 404 404 none 404 none FAIL" "nomatch 201 nomatch 200 ok ok FAIL" \
-    "nopending 201 ok 200 ok none FAIL" "pagenomatch 201 ok 200 nomatch ok FAIL" "page404 201 ok 404 404 ok FAIL"; do
-    read -r h_name h_cs h_cf h_ps h_pf h_sf h_expect <<<"$h_case"
-    got="$(judge_handoff "$(NODE_NO_WARNINGS=1 node -e "$HANDOFF_JS" "$h_cs" "$dir/h-create-$h_cf" "$h_ps" "$dir/h-page-$h_pf" "$dir/h-stream-$h_sf")")"
+  for h_case in "ok 201 ok 200 ok ok ok OK" "404 404 404 none 404 none ok FAIL" "nomatch 201 nomatch 200 ok ok ok FAIL" \
+    "nopending 201 ok 200 ok none ok FAIL" "pagenomatch 201 ok 200 nomatch ok ok FAIL" "page404 201 ok 404 404 ok ok FAIL" \
+    "referrer-caddy 201 ok 200 ok ok caddy FAIL" "referrer-both 201 ok 200 ok ok both FAIL" "referrer-none 201 ok 200 ok ok none FAIL"; do
+    read -r h_name h_cs h_cf h_ps h_pf h_sf h_hf h_expect <<<"$h_case"
+    got="$(judge_handoff "$(NODE_NO_WARNINGS=1 node -e "$HANDOFF_JS" "$h_cs" "$dir/h-create-$h_cf" "$h_ps" "$dir/h-page-$h_pf" "$dir/h-stream-$h_sf" "$dir/h-headers-$h_hf")")"
     echo "planted handoff $h_name: $got"
     [ "${got%% *}" = "$h_expect" ] || all_ok=0
   done
