@@ -1,7 +1,7 @@
 # Betrieb Goal 02: Keine Anfrage scheitert am Neustart
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Eine Anfrage eines zahlenden Kunden scheitert nicht mehr daran, dass der Dienst gerade neu startet: Caddy hält eine Anfrage, deren
@@ -112,7 +112,7 @@ kann, bis der neue Prozess antwortet.
 - [x] `check` ist grün, und keine Datei des Goals trägt einen Schlüssel.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung: `cat deploy/Caddyfile ops/caddy-retry.sh ops/deploy-window.sh docs/betrieb/neustart.md test/caddy-retry.test.ts test/deploy-window.test.ts | grep -cE "sk-or-[A-Za-z0-9-]{8,}"` muss 0 ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Jede neue Testdatei und jede neue Selftest-Zeile war vor dem Fix rot; die Zeile im Progress Log nennt, womit.
@@ -136,6 +136,7 @@ kann, bis der neue Prozess antwortet.
 - 2026-11-12 Zyklus 1: Punkte 1, 2, 3, 4, 5 gebaut: `lb_try_duration 30s` und `lb_try_interval 250ms` im Block `reverse_proxy cp:8402`, neues `ops/caddy-retry.sh --selftest`, `ops/deploy-window.sh` mit `--at`, `--log`, `--selftest`, Zeile `BAD GATEWAY` und ohne Adresse in jeder Zeile, `docs/betrieb/neustart.md` mit 7 mal 502 in 6 Fenstern (ein sechster Rollout um 22:43:42 UTC kam nach der Vorabmessung dazu). Rot vor dem Fix: `test/caddy-retry.test.ts` 2 von 5 rot auf dem Caddyfile von `dev`, `ops/caddy-retry.sh --selftest` `FAIL held` und `FAIL get-held` mit 502 auf dem Caddyfile von `dev`, `test/deploy-window.test.ts` 7 von 7 rot gegen das Werkzeug von `dev`; Gegenprobe des Selftests von `deploy-window.sh` mit zwei Mutationen (Adresse wieder in der Zeile: `FAIL affected`, `FAIL no-address`; Zeile `BAD GATEWAY` umbenannt: 5 mal FAIL), Gegenprobe der Summenprüfung mit falscher Summe Exit 1. Prüfbefehle: P1 `caddy validate` -> `Valid configuration`, `caddy adapt` -> 1, `grep -c lb_retry_match` -> 0, vitest caddy-retry 5 passed; P2 Selftest Exit 0 `CADDY RETRY SELFTEST OK`, `grep -cE` -> 3; P3 Selftest Exit 0 `DEPLOY WINDOW SELFTEST OK`, `^ok   ` -> 7, gepflanzte fremde Adresse -> 0, vitest deploy-window 7 passed; P4 (Netz) `--at 2026-11-12T16:41:02` -> `BAD GATEWAY 3 of 67 request(s) from outside answered 502`, Zeilen -> 6, Summe Exit 0, `--at ` -> 6, `## Nachher` -> 1, Adressen -> 0; P5 `node scripts/check.mjs` Exit 0 (121 Dateien, 1483 Tests), `sk-or-` -> 0.
 - 2026-11-12 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, alle Prüfbefehle am Kopf `93a6b0e` neu gefahren, `dev` brachte nichts Neues. Prüfbefehle: P1 `caddy validate` -> `Valid configuration`, `caddy adapt` -> 1, `grep -c lb_retry_match` -> 0, vitest caddy-retry 5 passed; P2 Selftest Exit 0 `CADDY RETRY SELFTEST OK`, `grep -cE` -> 3; P3 Selftest Exit 0 `DEPLOY WINDOW SELFTEST OK`, `^ok   ` -> 7, gepflanzte fremde Adresse -> 0, vitest deploy-window 7 passed; P4 (Netz) `--at 2026-11-12T16:41:02` -> `BAD GATEWAY 3 of 67 request(s) from outside answered 502` ohne Adresse in der Ausgabe, Zeilen -> 6, Summe Exit 0, `--at ` -> 6, `## Nachher` -> 1, Adressen -> 0; P5 `node scripts/check.mjs` Exit 0 (1483 Tests, nachdem die Messung von P4 `ops/own-ips.txt` beschrieben hatte und die Datei zurückgesetzt war), `sk-or-` -> 0; Job `e2e` am PR #54 grün im zweiten Versuch, der erste scheiterte am Abruf des Images `foundry-rs/foundry` bei `ghcr.io` (Timeout), nicht am Diff.
 - 2026-11-12 Zyklus 3: Gaps von K aus Zyklus 2 behoben: `curl` in `ops/caddy-retry.sh` mit `--noproxy '*'`, damit der Selftest ohne Netz nicht über den Proxy geht, und `ops/deploy-window.sh --log` meldet bei einer eigenen Liste ohne Adresse `COULD NOT TELL` mit Exit 2 statt stumm Exit 1 (Hinweis von K). Rot vor dem Fix: Selftest von `caddy-retry.sh` mit den vier Proxy-Variablen auf 127.0.0.1:9 Exit 1, `FAIL held`, `FAIL get-held`, `FAIL control` mit `got 000`; neuer Test `passes --noproxy to every curl call` rot; neuer Test zur Liste nur aus Kommentaren rot (Exit 1); neuer Selftest-Fall `own-list-empty` in einer Kopie mit der alten Zeile `FAIL own-list-empty (exit 1)`. Prüfbefehle, alle ohne Netz (Proxy 127.0.0.1:9), P4 Netz-Zeile mit Netz: P1 `Valid configuration`, `caddy adapt` -> 1, `lb_retry_match` -> 0, vitest caddy-retry 6 passed; P2 Selftest Exit 0 `CADDY RETRY SELFTEST OK` (auch mit Netz), `grep -cE` -> 3; P3 Selftest Exit 0 `DEPLOY WINDOW SELFTEST OK`, `^ok   ` -> 8, gepflanzte fremde Adresse -> 0, vitest deploy-window 8 passed; P4 (Netz, eigene Liste als Kopie in `CP_OWN_IPS_FILE`) `BAD GATEWAY 3 of 67 request(s) from outside answered 502`, Zeilen -> 6, Summe Exit 0, `--at ` -> 6, `## Nachher` -> 1, Adressen -> 0; P5 `node scripts/check.mjs` Exit 0 (121 Dateien, 1485 Tests), `sk-or-` -> 0.
+- 2026-11-13 Release: PASS K und B (Zyklus 3), DONE.
 
 ## Blockers
 - keine
