@@ -45,5 +45,31 @@ Die 502 trafen `POST /v1/chat/completions` (2 mal am 10.11. um 20:27) und `GET /
 ## Nachher
 
 Eine reine Änderung am Caddyfile startet `cp` nicht neu, nur Caddy (`deploy/README.md`, Was rollout.sh tut, Schritt 4); gemessen wird
-deshalb im Fenster des nächsten Rollouts, der `cp` neu startet, über die Zeile `BAD GATEWAY` im Schritt „Deploy-Fenster“ von
-`deploy.yml`.
+deshalb im Fenster der Rollouts nach betrieb 02, die `cp` neu starteten. Der Schritt „Deploy-Fenster“ von `deploy.yml` misst 21 s nach
+dem Start des Containers, wenn vom Fenster noch 158 s fehlen, und meldet deshalb nur `PARTIAL`. Das ganze Fenster
+misst erst `ops/deploy-window.sh --at` danach, und nur diese Zahlen stehen hier.
+
+- 2026-11-13 00:48:29 UTC: 0 mal 502 an fremde Adressen, 53 Anfragen von außen
+- 2026-11-13 09:55:22 UTC: 0 mal 502 an fremde Adressen, 104 Anfragen von außen
+
+Summe nachher: 0 mal 502 in 2 Fenstern
+
+Gemessen am 13.11.2026 um 17:06 UTC, je Fenster mit genau einem dieser Befehle (Zahlen aus der Zeile `BAD GATEWAY <n> of <m> request(s)
+from outside answered 502`):
+
+```
+set -a; . ~/.config/control-plane/loop.env; set +a
+bash ops/deploy-window.sh --at 2026-11-13T00:48:29
+bash ops/deploy-window.sh --at 2026-11-13T09:55:22
+```
+
+Die Zeiten sind der Start des Containers aus `gh run view <id> -R matthiashippe/control-plane --log` (Zeile
+`deploy   <Zeit> UTC, taken from the container start`): Lauf 43339659780 (Merge von PR #54, betrieb 02) für 00:48:29 und Lauf
+43404327407 (Merge von PR #62, sandbox 05, der erste Rollout danach, der `cp` neu startete) für 09:55:22. Seit dem 13.11.2026 00:00 UTC
+hatten nur diese zwei Läufe einen grünen Job `deploy`. Im Lauf meldete der Schritt `PARTIAL` mit 0 von 25 und 0 von 91 Anfragen.
+
+Das erste Fenster ist `CLEAN`. Das zweite meldet `AFFECTED` mit 21 Antworten mit 4xx (400 und 405 auf `/pay/…`, 400 auf
+`POST /v1/auth/verify`, 429 auf `POST /v1/auth/keyless`, 402 auf `POST /v1/chat/completions`): Kein 502 ist darunter, und keine
+dieser Antworten kommt vom Neustart.
+
+Ergebnis: betrieb 02 hält, in beiden Fenstern seit dem Merge bekam keine fremde Adresse ein 502 am Neustart von `cp` (vorher 7 in 6 Fenstern).

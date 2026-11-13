@@ -1,7 +1,7 @@
 # Betrieb Goal 04: Gemessen, dass der Neustart keine 502 mehr bringt
 
 ## Status
-PLANNED
+ACTIVE
 
 ## Active Objective
 Belegt ist, ob ein zahlender Kunde am Neustart von `cp` seit betrieb 02 noch 502 bekommt: Die Fenster der zwei Rollouts nach dem Merge
@@ -53,7 +53,7 @@ erledigt gilt, ohne dass jemand nachgesehen hat.
   Timeout; nach `check` mit `git status --short` prüfen, dass der Lauf nichts im Checkout hinterlassen hat. Kein `pkill -f`.
 
 ## Done Condition
-- [ ] Unter `## Nachher` in `docs/betrieb/neustart.md` steht je Fenster eine Zeile mit den Zahlen aus `ops/deploy-window.sh --at`, die
+- [x] Unter `## Nachher` in `docs/betrieb/neustart.md` steht je Fenster eine Zeile mit den Zahlen aus `ops/deploy-window.sh --at`, die
       Summe, die Befehle und die Lauf-IDs, und der Abschnitt sagt, warum `deploy.yml` nur `PARTIAL` meldet.
       Prüfung: `awk '/^## Nachher/{f=1;next} /^## /{f=0} f' docs/betrieb/neustart.md | grep -cE "^- 2026-11-13 (00:48:29|09:55:22) UTC: [0-9]+ mal 502 an fremde Adressen, [0-9]+ Anfragen von außen$"` muss 2 ausgeben.
       Prüfung: `awk '/^## Nachher/{f=1;next} /^## /{f=0} f && /^- 20.* mal 502 an fremde Adressen/{s+=$5; k++} /^Summe nachher: /{t=$3; w=$7} END{exit !(k==2 && s==t && w==k)}' docs/betrieb/neustart.md` muss Exit-Code 0 haben.
@@ -61,14 +61,14 @@ erledigt gilt, ohne dass jemand nachgesehen hat.
       Prüfung: `grep -cE "43339659780|43404327407" docs/betrieb/neustart.md` muss mindestens 2 ausgeben.
       Prüfung: `awk '/^## Nachher/{f=1;next} /^## /{f=0} f' docs/betrieb/neustart.md | grep -c "PARTIAL"` muss mindestens 1 ausgeben.
       Prüfung (Netz): `set -a; . ~/.config/control-plane/loop.env; set +a; for t in 00:48:29 09:55:22; do n=$(bash ops/deploy-window.sh --at 2026-11-13T$t 2>/dev/null | sed -n 's/^BAD GATEWAY \([0-9][0-9]*\) of .*/\1/p'); grep -c "^- 2026-11-13 $t UTC: $n mal 502 an fremde Adressen, " docs/betrieb/neustart.md; done | awk '{s+=$1} END{print s}'` muss 2 ausgeben.
-- [ ] Die Zeile `Ergebnis:` passt zur Summe: `hält` bei 0 mal 502, sonst `widerlegt`.
+- [x] Die Zeile `Ergebnis:` passt zur Summe: `hält` bei 0 mal 502, sonst `widerlegt`.
       Prüfung: `grep -cE "^Ergebnis: betrieb 02 (hält|widerlegt), " docs/betrieb/neustart.md` muss 1 ausgeben.
       Prüfung: `awk '/^Summe nachher: /{t=$3} /^Ergebnis: betrieb 02 /{r=$4} END{exit !((t==0 && r=="hält,") || (t>0 && r=="widerlegt,"))}' docs/betrieb/neustart.md` muss Exit-Code 0 haben.
-- [ ] `## Vorher` bleibt unverändert, die Doku nennt keine Adresse, und das Goal ändert nur die Doku und Dateien unter `goals/betrieb/`.
+- [x] `## Vorher` bleibt unverändert, die Doku nennt keine Adresse, und das Goal ändert nur die Doku und Dateien unter `goals/betrieb/`.
       Prüfung: `diff <(git show origin/dev:docs/betrieb/neustart.md | awk '/^## Nachher/{exit} {print}') <(awk '/^## Nachher/{exit} {print}' docs/betrieb/neustart.md) | wc -l` muss 0 ausgeben.
       Prüfung: `grep -E "(^|[^0-9.])([0-9]{1,3}\.){3}[0-9]{1,3}([^0-9.]|$)" docs/betrieb/neustart.md | wc -l` muss 0 ausgeben.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD | grep -vE "^(docs/betrieb/neustart\.md|goals/betrieb/)" | wc -l` muss 0 ausgeben.
-- [ ] `check` ist grün und lässt `ops/own-ips.txt` unverändert.
+- [x] `check` ist grün und lässt `ops/own-ips.txt` unverändert.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung: `node scripts/check.mjs >/dev/null 2>&1; git status --porcelain -- ops/own-ips.txt | wc -l` muss 0 ausgeben.
 - [ ] goal-verifier PASS (K und B)
@@ -91,7 +91,7 @@ erledigt gilt, ohne dass jemand nachgesehen hat.
 - max Versuche pro Gap: 2
 
 ## Progress Log
-- keine
+- 2026-11-13 Zyklus 1: Punkte 1, 2, 3, 4 gebaut, beide Fenster am 13.11.2026 um 17:06 UTC mit `ops/deploy-window.sh --at` gemessen (00:48:29: 0 mal 502 von 53, `CLEAN`; 09:55:22: 0 mal 502 von 104, `AFFECTED` nur mit 4xx) und unter `## Nachher` eingetragen, Ergebnis betrieb 02 hält; Gegenprobe des Werkzeugs im Vorher-Fenster 2026-11-12T16:41:02 zählt weiter 3 mal 502, `--selftest` OK. Prüfbefehle: Punkt 1 gibt 2, Exit 0, 2, 2, 2 und (Netz) 2; Punkt 2 gibt 1 und Exit 0; Punkt 3 gibt 0, 0, 0; Punkt 4 `check` grün in 68 s (1592 Tests), `ops/own-ips.txt` 0 Zeilen geändert.
 
 ## Blockers
 - keine
