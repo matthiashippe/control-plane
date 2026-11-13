@@ -20,6 +20,7 @@ import { qrText } from "./qr.js";
 import type { Address, Hex, PublicClient } from "viem";
 import { burnMatched, finishKonto, takeApiKey } from "../konto/account.js";
 import { parsePermission, permissionMatches, signatureValid } from "../konto/permission.js";
+import { FAIL_REASONS, renderKontoPage, type FailReason } from "../public/konto.js";
 
 /** What the passkey step shows: the page asks the person to create the account and to sign exactly this permission. */
 export interface PasskeyView {
@@ -42,8 +43,6 @@ export interface KontoDeps {
   token: Address;
   /** Asks the chain whether a smart wallet signed (ERC-1271 or ERC-6492). */
   verifyClient: PublicClient;
-  /** The page of the passkey step (src/public/konto.ts). */
-  renderPasskey?: (view: PasskeyView, indexStyle: string) => string;
 }
 
 export interface HandoffDeps {
@@ -107,11 +106,8 @@ export function registerHandoff<E extends Env>(app: Hono<E>, deps: HandoffDeps):
   };
 
   const passkey = (c: Context, h: Handoff) => {
-    if (!konto?.renderPasskey) {
-      private_(c);
-      return c.text("Creating an account is not switched on here yet. Start again in your terminal.", 503);
-    }
     private_(c);
+    if (!konto) return c.text("Creating an account is not switched on here. Start again in your terminal.", 503);
     const view: PasskeyView = {
       code: h.code,
       automatonName: h.automatonName,
@@ -120,7 +116,7 @@ export function registerHandoff<E extends Env>(app: Hono<E>, deps: HandoffDeps):
       spender: konto.spender,
       token: konto.token,
     };
-    return c.html(konto.renderPasskey(view, deps.indexStyle()), 200);
+    return c.html(renderKontoPage({ state: "passkey", ...view }, deps.indexStyle()), 200);
   };
 
   const page = (c: Context, view: HandoffPage, status: 200 | 404 | 410) => {
@@ -308,5 +304,24 @@ export function registerHandoff<E extends Env>(app: Hono<E>, deps: HandoffDeps):
     const ok = finishKonto(db, { code, account: permission.account, chainId: konto.chainId, permission, signature, name: handoff.automatonName, nowMs: nowMs() });
     if (!ok) return c.json({ error: "handoff_closed", message: "This code no longer works. Start again in your terminal.", docs: CONTRACT }, 410);
     return c.json({ state: "done", account: permission.account }, 200);
+  });
+
+  // The passkey step failed on the phone (cancelled, the service that creates the account not reachable, or the permission
+  // refused): the script of the page sends the reason here as a form, the code is burned like after a wrong number, and the page
+  // says that no account was created.
+  app.post("/h/:code/fehlgeschlagen", async (c) => {
+    private_(c);
+    if (!konto) return c.text("Creating an account is not switched on here. Start again in your terminal.", 503);
+    const code = c.req.param("code").toUpperCase();
+    const found = readHandoff(db, code, nowMs());
+    if (!found) return unknown(c);
+    const { handoff } = found;
+    if (handoff.step !== "konto" || handoff.state === "pending" || handoff.state === "done") {
+      return c.text("This code is not at the passkey step. Go back to your terminal.", 409);
+    }
+    const form = (await c.req.parseBody().catch(() => ({}))) as Record<string, unknown>;
+    const reason: FailReason = typeof form.reason === "string" && form.reason in FAIL_REASONS ? (form.reason as FailReason) : "cancelled";
+    burnMatched(db, code, nowMs());
+    return c.html(renderKontoPage({ state: "fehlgeschlagen", reason }, deps.indexStyle()), 200);
   });
 }

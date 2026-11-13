@@ -27,7 +27,6 @@ const kontoDeps = (over: Partial<KontoDeps> = {}): KontoDeps => ({
   spender,
   token: SEPOLIA_USDC,
   verifyClient: noChain,
-  renderPasskey: (v) => `<!doctype html><p data-step="passkey">${v.automatonName} ${v.code}</p>`,
   ...over,
 });
 
@@ -101,7 +100,10 @@ describe("handoff with step konto", () => {
     const { app, db } = setup();
     const { h, res } = await matched(app);
     expect(res.status).toBe(200);
-    expect(await res.text()).toContain('data-step="passkey"');
+    const html = await res.text();
+    expect(html).toContain('data-soll="passkey"');
+    expect(html).toContain("PostYourPrice can charge up to $5.00 a day, only for Atlas.");
+    expect(html).toContain(`data-code="${h.code}"`);
     expect(stateOf(db, h.code)).toBe("matched");
     const again = await app.request(`/h/${h.code}`);
     expect(again.status).toBe(200);
