@@ -29,6 +29,12 @@
   `low` nach `empty` genau eine weitere; die Meldung `empty` trägt das Wort `LOW` nicht, damit sie von der ersten Warnung zu
   unterscheiden ist. Steigt der Rest nach `empty` über 0, aber nicht über die Schwelle, wird der Zustand still wieder `low`; fällt er
   dann erneut auf 0, kommt wieder eine Meldung `empty`. `OK` meldet aus `low` und aus `empty`.
+- Audit 2026-11-13 Zeile 133 (Reparatur, 13.11.2026): Prüfbefehl 3 von Punkt 3 (`grep -cE "sk-or-[A-Za-z0-9-]{8,}" …` über drei
+  Dateien) gibt je Datei eine Zeile `<Datei>:<Zahl>` aus und endet mit Exit 1, wenn keine Datei trifft. „muss 0 ausgeben“ heißt
+  hier: jede Zeile endet auf `:0`; Exit 1 ist das Ergebnis ohne Treffer, kein Fehler. Auf `dev` 66d2422 ergibt er
+  `ops/watchdog.sh:0`, `docs/betrieb/guthaben.md:0`, `ops/credit-runway.sh:0`, Exit 1; mit einem gepflanzten `sk-or-v1-…` in einer
+  Kopie von `ops/watchdog.sh` ergibt er dort `:1` und Exit 0. Code und Doku sind ohne Schlüssel, die Goal-Datei ist eingefroren;
+  die Lesart des Audits steht als Vorschlag in `goals/_vorschlaege/loop-audit-2026-11-13-1.md`.
 
 ## fehler 02 (12.11.2026, Engineer CP)
 
