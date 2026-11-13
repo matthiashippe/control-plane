@@ -222,3 +222,12 @@
   Antwort sofort, nach dem Ende das Ergebnis. Abgerechnet wird weiter nur die Laufzeit der Sandbox.
 - **Run-Zähler im Gang.** `harness/e2e/long-exec.mjs` stellt jedem Befehl `echo run >> /root/<label>.runs;` voran und liest die
   Datei nach dem Ende, damit `judgeLongExec` belegt, dass der Befehl genau einmal lief, auch über mehrere Versuche.
+
+## Goal 02, Audit 2026-11-13 (13.11.2026, Engineer CP)
+
+- **Zeile 256 (Reparatur).** Prüfung 1 von Punkt 5 trägt zwei Befehle; das Audit fuhr nur `dig +short A ctl.sbx.postyourprice.com`
+  (Ausgabe `72.62.51.224`) und schrieb ROT, weil die AAAA-Abfrage nicht lief. Mit Netz auf dem code-host am 13.11.2026 gibt
+  `dig +short AAAA ctl.sbx.postyourprice.com` keine Zeile aus; die Gegenprobe `dig +short AAAA
+  google.com` liefert zwei Adressen, die Abfrage kann also treffen. Der Punkt hält, Code und Server sind unverändert, die Goal-Datei
+  ist eingefroren. Dasselbe gilt für die Zeilen 258 und 259 (`dig … sbx-unknown0-80 … | grep -c` 0, `ops/smoke.sh` Exit 0). Die
+  Lesart des Audits steht als Vorschlag in `goals/_vorschlaege/loop-audit-2026-11-13-2.md`.
