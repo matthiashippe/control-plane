@@ -1,7 +1,7 @@
 # Betrieb Goal 04: Gemessen, dass der Neustart keine 502 mehr bringt
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Belegt ist, ob ein zahlender Kunde am Neustart von `cp` seit betrieb 02 noch 502 bekommt: Die Fenster der zwei Rollouts nach dem Merge
@@ -83,7 +83,7 @@ erledigt gilt, ohne dass jemand nachgesehen hat.
       Prüfung: `awk '/^## Nachher/{f=1;next} /^## /{f=0} f' docs/betrieb/neustart.md | grep -cE "^- 2026-11-13 (00:48:29|09:55:22) UTC: [0-9]+ Anfragen von außen in den 10 s nach dem Start$"` muss 2 ausgeben.
       Prüfung: `awk '/^- 20.* Anfragen von außen in den 10 s nach dem Start$/{h+=$5} /^Ergebnis: /{e=$0} END{exit !(h>0 || e ~ /keine Anfrage von außen in die Sekunden des Neustarts fiel/)}' docs/betrieb/neustart.md` muss Exit-Code 0 haben.
       Prüfung (Netz): `set -a; . ~/.config/control-plane/loop.env; set +a; . ops/own-ips.sh; o=$(own_ips 2>/dev/null); bash ops/access-log.sh | python3 -c 'import sys,json,datetime as D;own=set(sys.argv[1].split());w={t:D.datetime.fromisoformat("2026-11-13T"+t+"+00:00").timestamp() for t in sys.argv[2:]};rs=[json.loads(l) for l in sys.stdin if l.startswith("{")];[print(t,sum(1 for r in rs if s<=r["ts"]<=s+10 and r.get("request",{}).get("remote_ip") not in own)) for t,s in w.items()]' "$o" 00:48:29 09:55:22 | while read t h; do grep -c "^- 2026-11-13 $t UTC: $h Anfragen von außen in den 10 s nach dem Start$" docs/betrieb/neustart.md; done | awk '{s+=$1} END{print s}'` muss 2 ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Jede Zahl unter `## Nachher` mit dem Befehl, aus dem sie stammt, und der Uhrzeit der Messung in UTC.
@@ -107,6 +107,7 @@ erledigt gilt, ohne dass jemand nachgesehen hat.
 - 2026-11-13 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4; `dev` brachte nichts Neues, alle Prüfbefehle am Kopf 15bf124 erneut ausgeführt. Prüfbefehle: Punkt 1 gibt 2, Exit 0, 2, 2, 2 und (Netz, 17:10 UTC) 2; Punkt 2 gibt 1 und Exit 0; Punkt 3 gibt 0, 0, 0; Punkt 4 `check` grün in 78 s (1592 Tests), `ops/own-ips.txt` 0 Zeilen geändert; am PR `check` und `e2e` grün.
 - 2026-11-13 Zyklus 3: Punkt 5 (Kritik) gebaut, je Fenster die Anfragen von außen in den 10 s nach dem Start um 17:23 UTC gemessen (00:48:29: 0, 09:55:22: 0) und unter `## Nachher` eingetragen, `Ergebnis:` sagt jetzt, dass keine Anfrage von außen in die Sekunden des Neustarts fiel und der Beleg aussteht; Gegenprobe des Zählers an 2026-11-12 16:41:02 (4, darunter 3 mal 502) und 2026-11-10 20:27:07 (3, darunter 2 mal 502), Log deckt beide Fenster ab (162 und 606 Einträge in ±5 min). Prüfbefehle: Punkt 5 am alten Stand 0 und Exit 1, jetzt 2, Exit 0 und (Netz) 2; Punkt 1 gibt 2, Exit 0, 2, 2, 2 und (Netz) 2; Punkt 2 gibt 1 und Exit 0; Punkt 3 gibt 0, 0, 0; Punkt 4 `check` grün in 51 s (1592 Tests), `ops/own-ips.txt` 0 Zeilen geändert.
 - 2026-11-13 Zyklus 4: Gaps von B aus Zyklus 3 behoben, jede Zahl unter `## Nachher` hat jetzt ihren Befehl: ein zweiter Befehl (18:18 UTC) mit Ausgabe belegt je Start die Einträge in ±5 min (162 und 606 nachher), die Anfragen von außen in den 10 s und den Abstand jedes 502 zum Start (7 mal, 0,2 bis 5,1 s), mit leerer Kontrolle 2030-01-01 (0 und 0); der Satz zu den eigenen Anfragen ist gestrichen; `dev` (nur Vorschläge) gemergt. Prüfbefehle: Punkt 1 gibt 2, Exit 0, 2, 2, 2 und (Netz) 2; Punkt 2 gibt 1 und Exit 0; Punkt 3 gibt 0, 0, 0; Punkt 4 `check` grün in 151 s (1592 Tests), `ops/own-ips.txt` 0 Zeilen geändert; Punkt 5 gibt 2, Exit 0 und (Netz) 2.
+- 2026-11-13 Release: PASS K und B (Zyklus 4), DONE.
 
 ## Blockers
 - keine
