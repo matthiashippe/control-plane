@@ -153,6 +153,12 @@ bei uns startet.
       Prüfung: `git diff origin/dev...HEAD | grep -E '^[+]' | grep -iE "(api[_-]?key|secret|token|private[_-]?key)[\"' ]*[:=] *[\"']?[A-Za-z0-9_+/=-]{16,}|BEGIN [A-Z ]*PRIVATE KEY" | wc -l` muss `0` ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung (Netz): `n=$(gh pr list -R matthiashippe/control-plane --head goal/konto-02 --state open --json number -q '.[0].number'); gh pr checks "$n" -R matthiashippe/control-plane | awk -F'\t' '$1=="e2e" && $2=="pass"' | wc -l` muss mindestens `1` ausgeben.
+- [ ] Ein Handoff bleibt nach seinem Ende nicht für immer in der Datenbank: Die stündliche Bereinigung `cleanupExpired` in
+      `src/db.ts` löscht jede Zeile von `handoffs`, die vor mehr als 24 Stunden angelegt wurde, in jedem Zustand, und lässt jüngere stehen.
+      MVP: Funktion, weil `POST /v1/handoff` ohne Schlüssel auf das Wort eines Fremden schreibt und die Tabelle sonst ohne Grenze wächst, wie `siwe_nonces` vor dem Security Review vom 19.09.2026.
+      Prüfung: `pnpm -s vitest run test/handoff-cleanup.test.ts` muss Exit-Code 0 haben.
+      Prüfung: `grep -cE "^\s*(it|test)\(" test/handoff-cleanup.test.ts` muss mindestens 2 ausgeben (je ein Fall: nach `cleanupExpired(db, now)` sind Handoffs, die vor mehr als 24 Stunden angelegt wurden, weg, je einer in `pending`, `done`, `burned` und `expired`, und `GET /h/{code}` eines gelöschten ergibt 404; ein Handoff von vor 23 Stunden bleibt).
+      Prüfung: `T=$(mktemp -d); git archive HEAD | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; grep -q "DELETE FROM handoffs WHERE" $T/src/db.ts || echo "fehlt DELETE"; sed -i 's/DELETE FROM handoffs WHERE/DELETE FROM handoffs WHERE 0 AND/' $T/src/db.ts; (cd $T && pnpm -s vitest run test/handoff-cleanup.test.ts >/dev/null 2>&1) && echo "gruen ohne bereinigung"` muss nichts ausgeben.
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
