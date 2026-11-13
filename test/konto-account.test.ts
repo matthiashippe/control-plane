@@ -13,6 +13,8 @@ import { SPEND_PERMISSION_TYPES, spendPermissionDomain } from "../src/konto/perm
 import { ATLAS, create, handoffApp, post, tap } from "./handoff-helpers.js";
 
 const KONTO = { ...ATLAS, step: "konto" };
+/** USDC on Base mainnet: the right token on the wrong chain. */
+const MAINNET_USDC = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913";
 const DAY = 86_400;
 
 /**
@@ -164,7 +166,7 @@ describe("handoff with step konto", () => {
   });
 
   it("refuses another token with 400 and burns the handoff", async () => {
-    await expectRefused({ token: "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913" });
+    await expectRefused({ token: MAINNET_USDC });
   });
 
   it("refuses an allowance other than daily_limit_usdc with 400 and burns the handoff", async () => {
