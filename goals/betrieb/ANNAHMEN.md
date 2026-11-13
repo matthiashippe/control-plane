@@ -21,3 +21,9 @@
   `deploy.yml` keine Adresse trägt.
 - 12.11.2026, betrieb 02: `--log` ohne `--at` endet mit Exit 2, und unter `--log` liest das Werkzeug als eigene Adressen nur die Datei
   aus `CP_OWN_IPS_FILE`, nicht zusätzlich `CP_OWN_IPS`, wie es das Goal festlegt.
+- 13.11.2026, betrieb 03: `own_ips` schrieb `CP_OWN_IPS` ohne abschließenden Zeilenumbruch in die Liste, sodass dessen letzte Adresse
+  mit der ersten Adresse aus `ops/own-ips.txt` zu einem Wort verklebte (gemessen am alten Stand: `203.0.113.5198.51.100.40`). Beim
+  Einfügen der live gesehenen Adresse in dieselbe Liste ist das behoben (`printf '%s\n'`), mit eigenem Testfall in
+  `test/own-ips-write.test.ts`.
+- 13.11.2026, betrieb 03: Ohne `CP_OWN_IPS_WRITE=1` sagt die stderr-Zeile die Adresse wie bisher; `ops/deploy-window.sh` ersetzt sie
+  vor der Ausgabe durch `<address>`, also bleibt das öffentliche Log von `deploy.yml` ohne Adresse.

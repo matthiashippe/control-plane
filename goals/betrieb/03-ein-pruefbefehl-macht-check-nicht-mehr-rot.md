@@ -1,7 +1,7 @@
 # Betrieb Goal 03: Ein Prüfbefehl macht check nicht mehr rot
 
 ## Status
-PLANNED
+ACTIVE
 
 ## Active Objective
 Ein Prüfbefehl mit Netz verändert das Repo nicht mehr: `own_ips` in `ops/own-ips.sh` schreibt eine neu gesehene eigene Adresse nur
@@ -56,19 +56,19 @@ einen Zyklus oder eine Reparatur ohne Befund kostet, also Zeit, die den Goals f�
   Checkout hinterlassen hat. Kein `pkill -f`.
 
 ## Done Condition
-- [ ] `own_ips` schreibt nur mit `CP_OWN_IPS_WRITE=1` nach der Liste, zählt die live gesehene Adresse ohne die Variable trotzdem als
+- [x] `own_ips` schreibt nur mit `CP_OWN_IPS_WRITE=1` nach der Liste, zählt die live gesehene Adresse ohne die Variable trotzdem als
       eigene und sagt auf stderr, wie man sie behält.
       Prüfung: `pnpm -s vitest run test/own-ips-write.test.ts` muss Exit-Code 0 haben.
       Prüfung: `grep -c "CP_OWN_IPS_WRITE" ops/own-ips.sh` muss mindestens 2 ausgeben.
       Prüfung: `grep -cE "192\.0\.2\.77" test/own-ips-write.test.ts` muss mindestens 1 ausgeben.
-- [ ] `ops/deploy-window.sh --at …` mit nachgebautem `ssh` lässt die Liste neben dem Skript unverändert und zählt die live gesehene
+- [x] `ops/deploy-window.sh --at …` mit nachgebautem `ssh` lässt die Liste neben dem Skript unverändert und zählt die live gesehene
       Adresse als eigene.
       Prüfung: `grep -c "deploy-window.sh" test/own-ips-write.test.ts` muss mindestens 1 ausgeben.
       Prüfung: `grep -c "BAD GATEWAY 0 of 1 request(s) from outside answered 502" test/own-ips-write.test.ts` muss mindestens 1 ausgeben.
       Prüfung: `pnpm -s vitest run test/own-ips-write.test.ts test/deploy-window.test.ts` muss Exit-Code 0 haben.
       Prüfung: `bash ops/deploy-window.sh --selftest` muss Exit-Code 0 haben und als letzte Zeile `DEPLOY WINDOW SELFTEST OK` ausgeben.
       Prüfung (Netz): `set -a; . ~/.config/control-plane/loop.env; set +a; bash ops/deploy-window.sh --at 2026-11-12T16:41:02 >/dev/null 2>&1; git status --porcelain -- ops/own-ips.txt | wc -l` muss 0 ausgeben.
-- [ ] `check` ist grün und lässt `ops/own-ips.txt` unverändert.
+- [x] `check` ist grün und lässt `ops/own-ips.txt` unverändert.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung: `node scripts/check.mjs >/dev/null 2>&1; git status --porcelain -- ops/own-ips.txt | wc -l` muss 0 ausgeben.
 - [ ] goal-verifier PASS (K und B)
@@ -93,6 +93,7 @@ einen Zyklus oder eine Reparatur ohne Befund kostet, also Zeit, die den Goals f�
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-13 Zyklus 1: Punkte 1, 2, 3 gebaut: `own_ips` schreibt nur mit `CP_OWN_IPS_WRITE=1`, zählt die live gesehene Adresse sonst nur für den Lauf und nennt die Variable auf stderr; neuer Test `test/own-ips-write.test.ts` vor dem Fix rot in 3 von 6 Fällen (ohne Variable, Wert `yes`, Ende zu Ende über `deploy-window.sh`: Liste wuchs um eine Zeile), dazu ein siebter Fall für das Verkleben von `CP_OWN_IPS` mit der ersten Listenadresse, am alten Stand nachgewiesen. Prüfbefehle: vitest own-ips-write Exit 0 (7 passed); grep CP_OWN_IPS_WRITE 4; grep 192.0.2.77 2; grep deploy-window.sh 3; grep BAD GATEWAY 1; vitest own-ips-write und deploy-window Exit 0 (15 passed); `--selftest` Exit 0, letzte Zeile DEPLOY WINDOW SELFTEST OK; (Netz) `--at 2026-11-12T16:41:02` 0, stderr meldete eine neue eigene Adresse nur für den Lauf, sha256 der Liste vorher und nachher gleich; `check` Exit 0 (129 Dateien, 1576 Tests); `check` und danach `git status` der Liste 0.
 
 ## Blockers
 - keine

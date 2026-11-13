@@ -12,9 +12,11 @@
 # address we had held that morning, and the run before it had already moved on. A measurement that
 # can only flatter is not a measurement.
 #
-# So the list is written down and grows: every address this machine is observed to have is appended
-# to ops/own-ips.txt with the date it was first seen, and the file is in the repository because
-# it is evidence, not a scratch file. Filtering an address that later belongs to somebody else
+# So the list is written down and grows: an address this machine is observed to have is appended
+# to ops/own-ips.txt with the date it was first seen when the caller sets CP_OWN_IPS_WRITE=1, and
+# the file is in the repository because it is evidence, not a scratch file. Without the variable
+# the live address counts for the current run only and stderr says how to keep it, so a check
+# with network never leaves the checkout dirty. Filtering an address that later belongs to somebody else
 # loses a real reader, which is the direction this counter must err in.
 #
 #   source ops/own-ips.sh; OWN=$(own_ips)
@@ -58,14 +60,23 @@ own_ips() {
   fi
   live=$(timeout 15 ssh -i "$key" -o BatchMode=yes -o ConnectTimeout=8 "$host" \
     'echo "$SSH_CLIENT"' 2>/dev/null | awk '{print $1}' || true)
+  # A new address is written only when a human asks for it with CP_OWN_IPS_WRITE=1. Until
+  # 2026-11-13 every call appended it, and since the list is tracked, any check with network left
+  # the checkout dirty and `check` red. Without the variable the address still counts as ours for
+  # this run, because dropping it would count our own checks as strangers.
   if [[ -n "$live" ]] && ! grep -q "^$live " "$list_file" 2>/dev/null; then
-    printf '%s %s  this machine, seen live\n' "$live" "$(date -u +%Y-%m-%d)" >> "$list_file"
-    echo "  (new own address $live, written to $(basename "$list_file"))" >&2
+    if [[ "${CP_OWN_IPS_WRITE:-}" == "1" ]]; then
+      printf '%s %s  this machine, seen live\n' "$live" "$(date -u +%Y-%m-%d)" >> "$list_file"
+      echo "  (new own address $live, written to $(basename "$list_file"))" >&2
+    else
+      echo "  (new own address $live, counted for this run only; CP_OWN_IPS_WRITE=1 writes it to $(basename "$list_file"))" >&2
+    fi
   fi
   {
     # tr, not word splitting: this file gets sourced by scripts, and one shell that does not split
     # an unquoted variable turns the whole list into a single line that matches no address.
-    printf '%s' "${CP_OWN_IPS:-}" | tr ' ' '\n'
+    printf '%s\n' "${CP_OWN_IPS:-}" | tr ' ' '\n'
+    printf '%s\n' "$live"
     grep -v '^#' "$list_file" | awk 'NF {print $1}'
   } | grep -v '^$' | sort -u | tr '\n' ' '
 }

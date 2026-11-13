@@ -163,8 +163,9 @@ HOST="${CP_HOST:-root@76.13.144.207}"
 source "$HERE/own-ips.sh"
 SSH=(ssh -i "$KEY" -o BatchMode=yes -o ConnectTimeout=10)
 
-# `own_ips` asks the VM which address this machine goes out through right now and keeps every
-# one it has ever seen. A constant alone went stale on 2026-09-22 when the line reconnected, and
+# `own_ips` asks the VM which address this machine goes out through right now and counts it as
+# ours together with every one in the list; it writes a new one to the list only with
+# CP_OWN_IPS_WRITE=1, so this run leaves the checkout as it found it. A constant alone went stale on 2026-09-22 when the line reconnected, and
 # here that counts our own post-deploy checks as strangers inside the window: the one number this
 # script exists to produce, wrong in the direction that looks like traffic.
 #
