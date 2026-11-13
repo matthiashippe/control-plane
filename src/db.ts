@@ -674,8 +674,13 @@ export function getAvailableMc(db: Db, address: string): number {
  * Nonces stay as long as a signature can be valid, plus a buffer. Payments are only discarded in
  * state `failed`, and only old ones: `settled` is the receipt of a credit and is never deleted.
  */
-export function cleanupExpired(db: Db, now = Date.now()): { nonces: number; sessions: number; payments: number } {
+export function cleanupExpired(
+  db: Db,
+  now = Date.now(),
+): { nonces: number; sessions: number; payments: number; handoffs: number } {
   const NONCE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+  // POST /v1/handoff needs no key, so its rows go a day after they were created, in every state (goals/konto/02, Punkt 11).
+  const HANDOFF_MAX_AGE_MS = 24 * 60 * 60 * 1000;
   const FAILED_PAYMENT_MAX_AGE_DAYS = 30;
   const run = db.transaction(() => {
     const nonces = db.prepare("DELETE FROM siwe_nonces WHERE issued_at < ?").run(now - NONCE_MAX_AGE_MS).changes;
@@ -683,7 +688,8 @@ export function cleanupExpired(db: Db, now = Date.now()): { nonces: number; sess
     const payments = db
       .prepare("DELETE FROM payments WHERE status = 'failed' AND created_at < ?")
       .run(new Date(now - FAILED_PAYMENT_MAX_AGE_DAYS * 24 * 60 * 60 * 1000).toISOString()).changes;
-    return { nonces, sessions, payments };
+    const handoffs = db.prepare("DELETE FROM handoffs WHERE created_at < ?").run(now - HANDOFF_MAX_AGE_MS).changes;
+    return { nonces, sessions, payments, handoffs };
   });
   return run();
 }
