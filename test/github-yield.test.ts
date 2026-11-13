@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -86,5 +86,55 @@ describe("ops/github-yield.sh", () => {
   it("refuses a time that is not ISO in UTC", () => {
     const r = run(["--log", LOG, "--since", "yesterday"]);
     expect(r.status).toBe(1);
+  });
+
+  // The audit runs the (Netz) line verbatim on the code-host, without sourcing loop.env first. The
+  // script then has to find host and key there itself, like ops/live.sh, instead of falling back to a
+  // key path that does not exist on that machine. A fake ssh records how it was called and fails.
+  const production = (env: Record<string, string>) => {
+    const dir = mkdtempSync(join(tmpdir(), "github-yield-env-"));
+    const home = join(dir, "home");
+    mkdirSync(join(home, ".config", "control-plane"), { recursive: true });
+    writeFileSync(
+      join(home, ".config", "control-plane", "loop.env"),
+      `CP_HOST=probe@host.invalid\nCP_SSH_KEY=${dir}/from_loop_env\nOPENROUTER_API_KEY=planted-loop-env-secret\n`,
+    );
+    const bin = join(dir, "bin");
+    mkdirSync(bin);
+    const record = join(dir, "ssh-calls.txt");
+    writeFileSync(
+      join(bin, "ssh"),
+      `#!/usr/bin/env bash\necho "ARGS $*" >> ${JSON.stringify(record)}\nenv | grep -c planted-loop-env-secret | sed 's/^/LEAK /' >> ${JSON.stringify(record)}\nexit 1\n`,
+    );
+    chmodSync(join(bin, "ssh"), 0o755);
+    const base: Record<string, string | undefined> = { ...process.env, CP_OWN_IPS: OWN, HOME: home, PATH: `${bin}:${process.env.PATH}` };
+    delete base.CP_HOST;
+    delete base.CP_SSH_KEY;
+    delete base.OPENROUTER_API_KEY;
+    const r = spawnSync("bash", [SCRIPT, "--since", SINCE], { encoding: "utf8", timeout: 60_000, env: { ...base, ...env } });
+    let calls = "";
+    try {
+      calls = readFileSync(record, "utf8");
+    } catch {
+      calls = "";
+    }
+    return { r, calls, dir };
+  };
+
+  it("takes host and key from loop.env when the environment has none", () => {
+    const { r, calls, dir } = production({});
+    expect(calls).toContain(`ARGS -i ${dir}/from_loop_env `);
+    expect(calls).toContain(" probe@host.invalid ");
+    expect(calls).not.toContain("id_ed25519_automaton");
+    expect(calls).not.toMatch(/LEAK [1-9]/);
+    expect(r.status).toBe(2);
+  });
+
+  it("keeps host and key from the environment over loop.env", () => {
+    const { r, calls } = production({ CP_HOST: "env@host.invalid", CP_SSH_KEY: "/nowhere/from_env" });
+    expect(calls).toContain("ARGS -i /nowhere/from_env ");
+    expect(calls).toContain(" env@host.invalid ");
+    expect(calls).not.toContain("probe@host.invalid");
+    expect(r.status).toBe(2);
   });
 });
