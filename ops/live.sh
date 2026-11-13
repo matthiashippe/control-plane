@@ -4,13 +4,14 @@
 #
 #   ops/live.sh              against https://postyourprice.com and, over ssh, the production ledger
 #   ops/live.sh --selftest   no network: proves every check against planted data, in both directions
+#   ops/live.sh --judge domains-search <status>   no network: judges one answer of the search, its body on stdin
 #
 # One line per check, `OK <check>: ...` or `FAIL <check>: ...`, then `LIVE OK` or `LIVE FAIL`; exit 1
 # as soon as one check fails. Later goals append their live check here (a judge function, a planted
 # case in the selftest, a call in live mode).
 #
-# Live mode needs the variables from ~/.config/control-plane/loop.env (CP_HOST, CP_SSH_KEY) and, for the check `sandbox`,
-# LIVE_SANDBOX_KEY from ~/.config/control-plane/live-sandbox.env; it is run from the code-host only. The ledger is opened
+# Live mode needs the variables from ~/.config/control-plane/loop.env (CP_HOST, CP_SSH_KEY) and, for the checks `sandbox`
+# and `domains-search`, LIVE_SANDBOX_KEY from ~/.config/control-plane/live-sandbox.env; it is run from the code-host only. The ledger is opened
 # with `readonly: true` inside the container. The script restarts nothing and never prints an address, an API key, a
 # sandbox id or a balance. It writes in two places only, both for the check `sandbox` and never on the payment server's
 # disk: ops/sandbox/setup.sh --client-key on the sandbox server, and one small sandbox of our own account, created, used
@@ -24,6 +25,10 @@
 #   domains  GET /v1/domains/search from the code-host (an own address, ops/own-ips.txt) without a key answers 401 from
 #            the auth in front of the route, not the 404 of the fallback route (domains 01). Reads only, buys nothing,
 #            and creates no key, because provisioning one would write into production
+#   domains-search  GET /v1/domains/search with the key of our own account (LIVE_SANDBOX_KEY, sandbox 03) answers what
+#            the handler answers (domains 02): 501, error not_implemented, reason "domain search is not offered", names
+#            with livecheck.com and a message that says no domain can be registered here and holds no "taken". Reads
+#            only, buys nothing; the key goes through a header file, never onto a command line or into the output
 #   timeout-quote  the timeout quote per model since the rollout of abrechnung 02, from the durations in the ledger and in
 #            inference_aborts (ops/timeout-quote.sh --since-rollout); shown, and FAIL only when it cannot be read
 #   sandbox  ops/sandbox/setup.sh --client-key ends with SETUP CLIENT-KEY OK, a signed GET /v1/sandboxes over ctl.sbx from
@@ -92,6 +97,67 @@ judge_domains() { # $1 = HTTP status, $2 = body
   else
     echo "FAIL domains: ${DOMAINS_PATH%%\?*} answered ${1:-nothing} ${err:-without an error field}"
   fi
+}
+
+# The search with a key (domains 02). The five marks of the right answer, checked in this order; the first one missing
+# is named. Prints `ok` or the missing mark, `nojson` for a body that is not a JSON object.
+# shellcheck disable=SC2016
+DOMAINS_SEARCH_JS='let b = ""; process.stdin.on("data", (d) => (b += d)).on("end", () => { let j; try { j = JSON.parse(b); } catch (e) { j = null; } if (!j || typeof j !== "object" || Array.isArray(j)) return console.log("nojson"); const msg = typeof j.message === "string" ? j.message : ""; if (j.error !== "not_implemented") return console.log("error"); if (j.reason !== "domain search is not offered") return console.log("reason"); if (!Array.isArray(j.names) || !j.names.includes("livecheck.com")) return console.log("names"); if (!msg.includes("No domain can be registered here")) return console.log("message"); if (/taken/i.test(msg)) return console.log("taken"); console.log("ok"); });'
+
+judge_domains_search() { # $1 = HTTP status, `nokey` without a readable key, empty without an answer; $2 = body
+  local p="${DOMAINS_PATH%%\?*}" mark
+  case "${1:-}" in
+    nokey)
+      echo "FAIL domains-search: no LIVE_SANDBOX_KEY readable in live-sandbox.env"
+      return
+      ;;
+    "")
+      echo "FAIL domains-search: $p with a key gave no answer"
+      return
+      ;;
+    404)
+      echo "FAIL domains-search: $p with a key answered 404, the route is missing"
+      return
+      ;;
+    501) ;;
+    *)
+      echo "FAIL domains-search: $p with a key answered $1, expected 501"
+      return
+      ;;
+  esac
+  mark="$(NODE_NO_WARNINGS=1 node -e "$DOMAINS_SEARCH_JS" <<<"${2:-}" 2>/dev/null)"
+  case "$mark" in
+    ok) echo "OK domains-search: $p with a key 501 not_implemented, livecheck.com named, nothing called taken" ;;
+    nojson) echo "FAIL domains-search: $p with a key answered 501 without a JSON object" ;;
+    error) echo "FAIL domains-search: $p with a key answered 501 without error not_implemented" ;;
+    reason) echo "FAIL domains-search: $p with a key answered 501 without reason \"domain search is not offered\"" ;;
+    names) echo "FAIL domains-search: $p with a key answered 501 without livecheck.com in names" ;;
+    message) echo "FAIL domains-search: $p with a key answered 501 without the message that no domain can be registered here" ;;
+    taken) echo "FAIL domains-search: $p with a key answered 501 with a message that calls a name taken" ;;
+    *) echo "FAIL domains-search: the body could not be judged" ;;
+  esac
+}
+
+# The live part of the check `domains-search`: the key of our own account from LIVE_SANDBOX_ENV through a header file,
+# deleted after the call. Prints the HTTP status (`nokey`, or nothing without an answer) on the first line and the body
+# (at most 4000 bytes) after it, never the key.
+domains_search_live() {
+  local apikey="" hdr ans code
+  [ -r "$LIVE_SANDBOX_ENV" ] && apikey="$(sed -n 's/^LIVE_SANDBOX_KEY=//p' "$LIVE_SANDBOX_ENV" | head -n 1 | tr -d "\"'\r")"
+  if [ -z "$apikey" ]; then
+    echo nokey
+    return
+  fi
+  hdr="$(mktemp)"
+  ans="$(mktemp)"
+  printf 'Authorization: %s\n' "$apikey" >"$hdr"
+  apikey=""
+  code="$(curl -s -o "$ans" -w '%{http_code}' --max-time 15 -H "@$hdr" "$BASE$DOMAINS_PATH")"
+  rm -f "$hdr"
+  [ "$code" = 000 ] && code=""
+  echo "$code"
+  head -c 4000 "$ans"
+  rm -f "$ans"
 }
 
 # $1 = output of ops/timeout-quote.sh --since-rollout (or --rows). One line per model over all days, aborted and answered
@@ -353,6 +419,29 @@ selftest() {
     [ "${got%% *}" = "$d_expect" ] || all_ok=0
   done
 
+  # The search with a key, both directions: the answer of the handler (501 with the five marks), the 404 of the fallback
+  # route, a 401 for a key the auth refused, a 501 without names and reason (the answer of POST /v1/domains/register), a
+  # 200 with results[] and available: false (the answer before domains 01 Zyklus 3), no answer and no readable key. The
+  # case nokey goes through domains_search_live with a missing key file, so the live path itself says nokey. The cases
+  # mark-* take one mark at a time out of the right answer.
+  local ds_ok='{"error":"not_implemented","reason":"domain search is not offered","names":["livecheck.com"],"message":"No domain can be registered here, so availability was not checked for livecheck.com. Nothing was charged.","docs":"https://postyourprice.com/docs#domains"}'
+  local ds_fields='{"error":"not_implemented","message":"The domain was not registered and nothing was charged.","docs":"https://postyourprice.com/docs#domains"}'
+  local ds_taken='{"results":[{"domain":"livecheck.com","available":false,"registrationPrice":0,"renewalPrice":0,"currency":"USD"}]}'
+  local ds_401='{"error":"Invalid API key","message":"Send the control plane API key"}'
+  local ds_live ds_case ds_name ds_code ds_body ds_expect
+  ds_live="$(LIVE_SANDBOX_ENV="$dir/missing-live-sandbox.env" domains_search_live)"
+  for ds_case in "ok|501|$ds_ok|OK" "404|404|$body404|FAIL" "401|401|$ds_401|FAIL" "fields|501|$ds_fields|FAIL" \
+    "taken|200|$ds_taken|FAIL" "none|||FAIL" "nokey|${ds_live%%$'\n'*}||FAIL" \
+    "mark-names|501|${ds_ok/livecheck.com\"]/other.com\"]}|FAIL" \
+    "mark-message|501|${ds_ok/No domain can be registered here/Search is down}|FAIL" \
+    "mark-taken|501|${ds_ok/Nothing was charged./The name is TAKEN.}|FAIL"; do
+    IFS='|' read -r ds_name ds_code ds_body ds_expect <<<"$ds_case"
+    got="$(judge_domains_search "$ds_code" "$ds_body")"
+    echo "planted domains-search $ds_name: $got"
+    [ "${got%% *}" = "$ds_expect" ] || all_ok=0
+  done
+  [ "$ds_live" = nokey ] || { echo "FAIL selftest: domains_search_live without a key file did not say nokey"; all_ok=0; }
+
   # The timeout quote since the rollout, through the real ops/timeout-quote.sh: a long abort shows a quote above 0, calls
   # without one show exactly 0, a row from before the rollout stays out, and no answer is a FAIL.
   printf '%s\n' '{"src":"ledger","at":"2026-11-11T09:00:00.000Z","ref":"gen-1","model":"openai/gpt-5.2","duration_ms":null}' \
@@ -480,6 +569,13 @@ live() {
   say "$(judge_domains "$code" "$(head -c 2000 "$body")")"
   rm -f "$body"
 
+  local ds ds_body=""
+  ds="$(domains_search_live)"
+  [[ "$ds" == *$'\n'* ]] && ds_body="${ds#*$'\n'}"
+  say "$(judge_domains_search "${ds%%$'\n'*}" "$ds_body")"
+  ds=""
+  ds_body=""
+
   local remote answer
   remote="docker exec deploy-cp-1 node -e $(printf %q "$QUERY_JS") /data/cp.db $(printf %q "$REFUND_KEY")"
   answer="$(ssh -i "$key" -o BatchMode=yes -o ConnectTimeout=10 "$CP_HOST" "$remote" 2>/dev/null)"
@@ -500,6 +596,16 @@ live() {
 
 case "${1:-}" in
   --selftest) selftest ;;
+  --judge)
+    # One judge without network, the answer's body on stdin (test/live-selftest.test.ts hands it the handler's answer).
+    case "${2:-}" in
+      domains-search) judge_domains_search "${3:-}" "$(head -c 4000)" ;;
+      *)
+        echo "unknown judge: ${2:-}" >&2
+        exit 2
+        ;;
+    esac
+    ;;
   "") live ;;
   -h | --help) awk 'NR == 1 { next } /^#/ { sub(/^# ?/, ""); print; next } { exit }' "$0" ;;
   *)
