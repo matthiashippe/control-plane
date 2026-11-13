@@ -179,6 +179,7 @@ uns) bleibt unerreichbar. Die eigene Domain hält eine Phishing-Seite eines Kund
 
 ## Progress Log
 - 2026-11-13 Zyklus 1: Punkt 1 gemessen und widerlegt, Punkte 2 bis 10 nach der Goal-Datei nicht gebaut: `ops/ports-demand.sh` (Commit 0ce27f0) zählt seit dem Start des Deploy-Laufs von sandbox 03 (PR #36, 2026-11-12 18:12:46 UTC) 0 fremde Adressen mit 409 auf `ports/expose` und 0 Aufrufe, gemessen 2026-11-13 12:38 UTC; die einzige 409 im Log kam vom code-host selbst, und seit dem Rollout rief keine fremde Adresse irgendeinen Pfad unter `/v1/sandboxes` auf. Prüfbefehle: P1 `ops/ports-demand.sh --selftest` Exit 0 mit `PORTS DEMAND SELFTEST OK` (vorher rot: fünf Mutationen am Zähler, je `PORTS DEMAND SELFTEST FAILED`), Zeile in `docs/sandbox/ports.md` 0 (Datei nicht angelegt, weil n 0 ist), Reihenfolge Exit 0; P2 0; P3 bis P8 rot wie vor dem Goal (kein Kauf, kein Bau); P9 und P10 nach dem Zurücksetzen grün, Ergebnis im Kommentar des Childs.
+- 2026-11-13 Zyklus 2: Abschluss gemeldet, Punkte keine, das Goal bleibt `BLOCKED fachlich` (Nachfrage 0), aktuelles `dev` eingemergt, der Branch trägt gegenüber `dev` nur die Goal-Datei. Prüfbefehle: P1 Selftest rot (Werkzeug nach dem Zurücksetzen nicht auf dem Branch, liegt in 0ce27f0), P1 Zeile und Zahl rot (keine `docs/sandbox/ports.md`), P2 0, P3 bis P8 rot wie vor dem Goal, P9 Annahmen 0 (kein Abschnitt `## Goal 06`), Pfade 0, Schlüssel 0 und 0, P10 `check` Exit 0 (grün in 50 s).
 
 ## Blockers
 Art: fachlich
