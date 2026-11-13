@@ -71,6 +71,19 @@ einen Zyklus oder eine Reparatur ohne Befund kostet, also Zeit, die den Goals f�
 - [x] `check` ist grün und lässt `ops/own-ips.txt` unverändert.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung: `node scripts/check.mjs >/dev/null 2>&1; git status --porcelain -- ops/own-ips.txt | wc -l` muss 0 ausgeben.
+- [ ] (Kritik) `own_ips` merkt sich jede live gesehene Adresse außerhalb des Checkouts und zählt sie in jedem späteren Lauf als
+      eigene, auch ohne `CP_OWN_IPS_WRITE`: Datei aus `CP_OWN_IPS_SEEN`, sonst
+      `${XDG_STATE_HOME:-$HOME/.local/state}/control-plane/own-ips-seen.txt`, je neuer Adresse eine Zeile `<adresse> <JJJJ-MM-TT>`,
+      Ordner bei Bedarf angelegt; ein Schreibfehler dort bricht `own_ips` nicht ab. Grund: `ops/own-ips.txt` wuchs zuletzt am
+      23.09.2026 (`git log -- ops/own-ips.txt`), weil jede live angehängte Zeile wieder verworfen wurde, und seit diesem Goal schreibt
+      nur noch ein Mensch hinein; ein Lauf am nächsten Tag zählt dann die Prüfungen über die Adresse von gestern als fremde Anfragen,
+      der Fehler vom 22.09., gegen den die Liste existiert. Test in `test/own-ips-write.test.ts`: zwei Aufrufe mit `CP_OWN_IPS_SEEN`
+      auf einer Datei in einem `mktemp`-Ordner, das nachgebaute `ssh` meldet erst `192.0.2.77`, dann `192.0.2.78`; die Ausgabe des
+      zweiten enthält beide Adressen, die Liste bleibt byte-gleich, rot vor dem Fix. Kein Test schreibt in das echte Zustandsverzeichnis.
+      Prüfung: `pnpm -s vitest run test/own-ips-write.test.ts` muss Exit-Code 0 haben.
+      Prüfung: `grep -c "CP_OWN_IPS_SEEN" ops/own-ips.sh` muss mindestens 1 ausgeben.
+      Prüfung: `grep -cE "192\.0\.2\.78" test/own-ips-write.test.ts` muss mindestens 1 ausgeben.
+      Prüfung: `S=$(mktemp -d); XDG_STATE_HOME=$S node scripts/check.mjs >/dev/null 2>&1; find "$S" -type f | wc -l` muss 0 ausgeben.
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
