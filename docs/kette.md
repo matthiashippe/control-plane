@@ -75,6 +75,14 @@ zeigt: Die unveränderte Runtime am Pin legt eine Sandbox an, führt darin aus, 
 Sandbox ist danach weg. Dazu einmal gegen die Produktion mit einem eigenen Automaton (Adresse aus `src/bounties/ours.ts`), bezahlt aus
 vorhandenen Credits, ohne Wallet-Bewegung.
 
+## sandbox 07: Ein ganzer Automaton läuft in einer Sandbox
+
+Bis sandbox 06 startet ein Automaton, der woanders läuft, seinen Dienst bei uns. Ab hier läuft der Automaton selbst bei uns, weil
+ein Mensch ohne Wallet (konto) meist auch keinen Server hat. Die Runtime bleibt unverändert am Pin; was sie zum Start braucht
+(Genesis, Config, Wallet-Datei), schreibt das Control Plane in die Sandbox, und die Grenzen aus `docs/sandbox/plan.md` gelten wie
+für jede Sandbox. Die Wallet der Runtime signiert nur (Anmeldung, Nachrichten) und hält nie Geld, damit wir nie Kundengeld in
+einem Schlüssel auf unserem Server haben.
+
 ## domains 01: Die Domain-Endpunkte der Runtime
 
 Ziel: Die Domain-Endpunkte aus `docs/sandbox/vertrag.md` antworten, wie die Runtime es erwartet, statt mit 404. Was dahinter
@@ -90,3 +98,23 @@ letzten Eintrag in `ops/posted-answers.log`), je Issue eine Antwort vorbereiten,
 Entwürfe stehen im öffentlichen Repo, also nichts darin, was nicht auch im Issue stehen dürfte. Gepostet wird erst nach Matthias'
 Freigabe (Human Gate `public_post`), genau der freigegebene Text, über `ops/post-the-answers.py`, und `ops/posted-answers.log` hält
 jeden Kommentar fest.
+
+## konto: Ein Automaton für Menschen ohne Wallet
+
+Grundsatz für alle Glieder 01 bis 05 (Matthias 13.11.2026, fast track). Die meisten Nutzer kommen aus Claude Code im Terminal und
+haben keine Wallet. Bis 23.09.2026 blieben 43 Besucher an der Wallet-Signatur hängen (`src/auth/keyless.ts`), und keiner kam weiter.
+
+- Wir halten nie einen Key und nie Kundengeld. Das Konto liegt beim Anbieter für eingebettete Wallets und wird nur mit dem Passkey
+  des Kunden entsperrt; Verwahrung, Tausch und Auszahlung in Euro machen Anbieter mit Erlaubnis.
+- Jede Geldbewegung ist on-chain an ein Ziel gebunden: die Abbuchung für Inferenz nur an uns und mit Tagesgrenze, die Auszahlung
+  nur an die feste Auszahladresse des Kunden. Kapert eine Prompt-Injection den Agent im Terminal, kostet das höchstens das Tageslimit.
+- Credits bleiben unauszahlbar (Regel 10). Was ausgezahlt wird, gehört schon dem Kunden und liegt auf seinem Konto.
+- Das Terminal verlässt der Nutzer nur für einen QR-Code aufs Handy: beim Start (Passkey, Erlaubnis, erste Zahlung) und bei der
+  ersten Auszahlung (Identitätsprüfung des Anbieters). Alles andere ist ein Tool in `mcp/server.mjs`.
+
+## relay 01: Das Social-Relay der Runtime
+
+Beleg: Die Runtime am Pin hat in `src/social/` einen fertigen Client für Nachrichten, die mit dem Wallet-Key signiert sind, und
+spricht mit `socialRelayUrl` (Default `https://social.conway.tech`, DNS tot, `docs/protocol.md`). Wir antworten auf dieselben Pfade
+mit 501. Ein Automaton, der `socialRelayUrl` auf uns stellt, braucht keine Zeile Code, um wieder mit anderen zu schreiben. Die
+Nachrichten selbst kommen nie on-chain; Identität ist die Signatur, Spam hält der Preis für Erstkontakte ab.
