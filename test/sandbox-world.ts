@@ -72,8 +72,11 @@ export async function sandboxWorld(opts: WorldOptions = {}) {
           ? { code: 0, stdout: files.get(k)!, stderr: "", timedOut: false }
           : { code: 1, stdout: "", stderr: "No such file", timedOut: false };
       }
-      // exec: docker exec <name> bash -lc <command>; `echo X` prints X.
-      const command = args[args.length - 1];
+      // exec: docker exec <name> bash -lc <command>; `echo X` prints X. A command in the background
+      // (backgroundCommand in src/sandbox/service.ts) prints what its inner `bash -c '<command>'` prints.
+      const sent = args[args.length - 1];
+      const inner = / bash -c '((?:[^']|'\\'')*)' >/.exec(sent);
+      const command = inner ? inner[1].replace(/'\\''/g, "'") : sent;
       const m = /echo ([^;&|]*)$/.exec(command);
       return { code: 0, stdout: m ? `${m[1].trim()}\n` : "", stderr: "", timedOut: false };
     }

@@ -192,3 +192,33 @@
   Server.
 - **Kein Fehler der Sandbox-API gefunden.** Der Gang lief lokal (echtes `dist/index.js` über TLS, Nachbau, Runtime am Pin) und gegen
   die Produktion ohne Befund, `src/` ändert dieses Goal deshalb nicht.
+
+## Goal 05 (13.11.2026, Engineer CP)
+
+- **Messung vorher** (`docs/sandbox/lange-befehle.md`, `## Vorher`, Commit `e8ab65f`, lokal mit Runtime am Pin): 60 s kam nach
+  einem Abbruch über die Wiederholung mit demselben `Idempotency-Key` an (60168 ms, 2 Versuche, `failures_after` 0). 180 s
+  scheiterte: 4 Versuche, alle nach 30 s abgebrochen, das Werkzeug warf `This operation was aborted` nach 127665 ms,
+  `failures_after` 4, der Befehl lief bei uns einmal und bis zum Ende weiter.
+- **Entschieden: Hintergrundlauf, nicht 400.** Ein 400 für `timeout` über 120000 ms ist für die Runtime ein Fehler: ihr Client
+  wirft bei jedem Status außer 2xx, das Werkzeug `exec` gibt dem Modell einen Fehlertext, und der Befehl, den das Modell eben
+  ausführen wollte (`apt-get install`, `npm install`), läuft gar nicht. Beim Hintergrundlauf läuft er, die Antwort kommt mit 200
+  nach 20 s, bevor die Runtime nach 30 s abbricht, kein Versuch wird abgebrochen und der Zähler ihres Circuit Breakers geht auf 0.
+- **Grenze 90000 ms statt 120000.** Bis `timeout` 90000 ms bleibt `exec` wie bisher gehalten, weil 60 s heute schon ohne Fehler
+  ankommt (Messung oben) und das Modell sein Ergebnis sofort hat. Den vierten Versuch schickt die Runtime frühestens 93,5 s nach
+  dem ersten (30 s Abbruch plus Backoff 1 s mal 2 hoch Versuch mal mindestens 0,5, dreimal), er bricht frühestens bei 123,5 s ab.
+  Bei 120000 ms blieben einem Befehl, der bis zu seinem `timeout` läuft, 3,5 s Rand für Start, Signatur und Weg zu `sandboxd`; bei
+  90000 ms sind es 33,5 s. Was schneller fertig ist, bekommt auch über 90000 ms sein Ergebnis direkt: geantwortet wird erst nach 20 s.
+- **Ausgabe in Dateien der Sandbox.** Für den Hintergrundlauf schickt das Control Plane `sandboxd` den Befehl in einer Hülle
+  (`backgroundCommand` in `src/sandbox/service.ts`): `bash -c '<Befehl>'` unter `timeout -k 5 <s>` aus coreutils (im Image
+  `ubuntu:24.04` enthalten), stdout nach `/root/.exec/<tag>.out`, stderr nach `<tag>.err`, der Exit-Code beim Ende nach
+  `<tag>.exit` (124 heißt am `timeout` gestoppt), danach beide Ausgaben auf stdout und stderr wie bisher. `<tag>` sind 12
+  Hex-Zeichen aus SHA-256 über Sandbox und `Idempotency-Key`, damit eine Wiederholung dieselben Dateien nennt. `sandboxd` bekommt
+  15 s mehr als der innere `timeout`, damit die Hülle ihre Exit-Datei schreibt, bevor `sandboxd` den Prozess beendet; bei 600000 ms
+  bleiben innen 585 s. `sandboxd` selbst ändert sich nicht (Deny List), die Hülle ist ein gewöhnlicher Befehl.
+- **Antwort an das Modell.** 200 mit `exit_code` -1 (so liest die Runtime einen fehlenden Exit-Code), `stdout` mit dem Text, dass
+  der Befehl im Hintergrund weiterläuft, wie lange höchstens, in welchen Dateien Ausgabe, Fehler und Exit-Code landen, dass es sie
+  später mit `read_file` oder `exec` und `cat` liest und den Befehl nicht noch einmal startet; dazu `running`, `output_file`,
+  `error_file` und `exit_code_file`, die die Runtime nicht liest. Eine Wiederholung mit demselben Schlüssel bekommt dieselbe
+  Antwort sofort, nach dem Ende das Ergebnis. Abgerechnet wird weiter nur die Laufzeit der Sandbox.
+- **Run-Zähler im Gang.** `harness/e2e/long-exec.mjs` stellt jedem Befehl `echo run >> /root/<label>.runs;` voran und liest die
+  Datei nach dem Ende, damit `judgeLongExec` belegt, dass der Befehl genau einmal lief, auch über mehrere Versuche.

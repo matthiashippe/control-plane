@@ -38,6 +38,8 @@ Nicht aufgerufen: `DELETE /v1/sandboxes/{id}`. `deleteSandbox` ist am Pin leer, 
 - Timeout 30 s je Versuch, auch bei `exec` mit größerem `timeout`; ein abgebrochener Versuch wird mit demselben
   `Idempotency-Key` wiederholt (`src/conway/http-client.ts:75`). Ein `exec` über 30 s muss deshalb an der Wiederholung mit
   demselben Schlüssel das Ergebnis des schon laufenden Befehls liefern, ohne ihn ein zweites Mal zu starten oder zu berechnen.
+  Ab `timeout` über 90000 ms läuft der Befehl im Hintergrund: Nach 20 s ohne Ende kommt 200 mit `exit_code` -1 und einem Text, der
+  die Dateien für Ausgabe und Exit-Code nennt (sandbox 05, `docs/sandbox/lange-befehle.md`).
 - Ohne `sandboxId` führt die Runtime `exec`, Dateien und Ports lokal aus und ruft keinen dieser Pfade (`src/conway/client.ts:109`).
 
 ## Aufrufe in der Produktion

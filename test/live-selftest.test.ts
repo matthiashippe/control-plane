@@ -1,10 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { createApp } from "../src/app.js";
 import { openDb } from "../src/db.js";
 import { hashApiKey } from "../src/auth/siwe.js";
+import { EXEC_EARLY_MS } from "../src/sandbox/service.js";
+import { closeWorlds, sandboxWorld } from "./sandbox-world.js";
 
 const LIVE_SH = join(__dirname, "..", "ops", "live.sh");
 
@@ -28,6 +30,13 @@ describe("ops/live.sh", () => {
     expect(run.stdout).toContain("planted timeout-quote long: OK timeout-quote: since 2026-11-12T09:00:00.000Z: ");
     expect(run.stdout).toContain("openai/gpt-5.2 1/2 (50.0 %)");
     expect(run.stdout).toContain("planted timeout-quote answer '': FAIL");
+    expect(run.stdout).toMatch(/planted sandbox '[^']*bg=ok[^']*': OK sandbox: .*background exec ok/);
+    for (const bg of ["start-notrunning", "start-504", "noexit", "exit-124", "wrong"]) {
+      expect(run.stdout).toMatch(new RegExp(`planted sandbox '[^']*bg=${bg}[^']*': FAIL sandbox: background exec `));
+    }
+    expect(run.stdout).toContain(
+      "planted sandbox 'client_key=ok ctl=200 create=201 exec=ok files=ok delete=200 ledger=1': FAIL sandbox: background exec did not run",
+    );
     expect(run.stdout.trim().split("\n").at(-1)).toBe("LIVE SELFTEST OK");
     expect(run.status).toBe(0);
   }, 120_000);
@@ -97,5 +106,71 @@ describe("ops/live.sh check domains-search", () => {
     expect(res.status).toBe(501);
     const got = await judge(res);
     expect(got).toMatch(/^FAIL domains-search: /);
+  });
+});
+
+/**
+ * The background step of the check `sandbox` (goals/sandbox/05, point 10) against the real answer of the handler: the
+ * answer to a command that still runs, as the service gives it after EXEC_EARLY_MS, goes through
+ * `ops/live.sh --judge sandbox-bg`, which must find both files the live check then reads; the answer to a held command
+ * must not pass for one. The rebuilt sandboxd runs `sleep N` on the faked clock of vitest, so nothing waits for real.
+ */
+describe("ops/live.sh check sandbox, background exec", () => {
+  afterEach(async () => {
+    vi.useRealTimers();
+    await closeWorlds();
+  });
+
+  function judgeBg(status: number, json: unknown): string {
+    const run = spawnSync("bash", [LIVE_SH, "--judge", "sandbox-bg", String(status)], {
+      input: JSON.stringify(json),
+      encoding: "utf8",
+      timeout: 30_000,
+    });
+    expect(run.status).toBe(0);
+    return run.stdout.trim();
+  }
+
+  async function world() {
+    const started: string[] = [];
+    const w = await sandboxWorld({
+      respond: async (cmd, args) => {
+        if (cmd !== "docker" || args[0] !== "exec" || !args.includes("-lc")) return undefined;
+        const command = args[args.length - 1];
+        started.push(command);
+        const sleep = /sleep ([0-9]+)/.exec(command);
+        if (sleep) await new Promise((r) => setTimeout(r, Number(sleep[1]) * 1000));
+        return { code: 0, stdout: /echo ok/.test(command) ? "ok\n" : "", stderr: "" };
+      },
+    });
+    return { ...w, started };
+  }
+
+  it("finds exit_code_file and output_file in the answer to sleep 25 with timeout 120000", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const w = await world();
+    const a = w.account();
+    const id = (await a.call("POST", "/v1/sandboxes", {})).json.id as string;
+    let res: { status: number; json: any } | null = null;
+    void a
+      .call("POST", `/v1/sandboxes/${id}/exec`, { command: "sleep 25; echo bg-ok", timeout: 120000 }, { "Idempotency-Key": "live-check-bg-1" })
+      .then((r) => (res = r));
+    for (let i = 0; i < 5000 && w.started.length === 0; i++) await new Promise((r) => setImmediate(r));
+    await vi.advanceTimersByTimeAsync(EXEC_EARLY_MS);
+    for (let i = 0; i < 5000 && !res; i++) await new Promise((r) => setImmediate(r));
+    expect(res!.status).toBe(200);
+    expect(res!.json.running).toBe(true);
+    expect(judgeBg(res!.status, res!.json)).toMatch(/^files \/root\/\.exec\/[0-9a-f]{12}\.exit \/root\/\.exec\/[0-9a-f]{12}\.out$/);
+  });
+
+  it("does not take the answer to a held echo ok, a 504 or a body without files for a background run", async () => {
+    const w = await world();
+    const a = w.account();
+    const id = (await a.call("POST", "/v1/sandboxes", {})).json.id as string;
+    const held = await a.call("POST", `/v1/sandboxes/${id}/exec`, { command: "echo ok", timeout: 30000 }, { "Idempotency-Key": "live-check-2" });
+    expect(held.status).toBe(200);
+    expect(judgeBg(held.status, held.json)).toBe("notrunning");
+    expect(judgeBg(504, { error: "gateway_timeout" })).toBe("504");
+    expect(judgeBg(200, { running: true, exit_code: -1, exit_code_file: "/etc/passwd", output_file: "/root/.exec/a.out" })).toBe("nofiles");
   });
 });

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Complete first run of the unmodified upstream runtime against the control plane:
-# provisioning, registration, bootstrap topup, five turns, sleep, the domain calls and the sandbox walk.
+# provisioning, registration, bootstrap topup, five turns, sleep, the domain calls, the sandbox walk and the long exec walk.
 # No Conway API error allowed.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -110,27 +110,49 @@ sandbox_ledger=$("${COMPOSE[@]}" exec -T cp node -e '
   const sum = db.prepare("SELECT coalesce(sum(delta_mc),0) AS s FROM ledger").get().s;
   console.log(JSON.stringify({ rows: rows.length, mc: rows.map((r) => r.delta_mc), status: sb.status ?? null, hold_mc: sb.hold_mc ?? null, consistent: sum === w.balance_mc }));' "${sandbox_id:-none}" 2>&1 || true)
 echo "ledger of the sandbox: $sandbox_ledger"
-sandbox_left=$("${COMPOSE[@]}" exec -T sandboxd node -e '
+sandboxd_state() {
+  "${COMPOSE[@]}" exec -T sandboxd node -e '
   const fs = require("fs");
   const read = (f) => { try { return JSON.parse(fs.readFileSync(f, "utf8")); } catch { return null; } };
   const st = read("/var/lib/sandboxd/state.json") || { sandboxes: {} };
   const dk = read("/var/lib/sandboxd/docker.json");
   const homes = fs.readdirSync("/var/lib/sandboxd/mnt");
-  console.log(JSON.stringify({ sandboxes: Object.keys(st.sandboxes || {}).length, containers: dk ? Object.keys(dk.containers).length : -1, networks: dk ? dk.networks.length : -1, homes: homes.length }));' 2>&1 || true)
+  console.log(JSON.stringify({ sandboxes: Object.keys(st.sandboxes || {}).length, containers: dk ? Object.keys(dk.containers).length : -1, networks: dk ? dk.networks.length : -1, homes: homes.length }));' 2>&1 || true
+}
+sandbox_left=$(sandboxd_state)
 echo "rebuilt sandboxd after the walk: $sandbox_left"
+
+# The long exec walk of goals/sandbox/05 (harness/e2e/long-exec.mjs, bind-mounted into the container runtime): the
+# runtime's own client and tools with the same key and a sandbox of its own, `sleep 60` (timeout 90000) and `sleep 180`
+# (timeout 240000) through the tool exec, each followed by list_sandboxes; every attempt recorded, aborted ones too.
+# LONG_EXEC_VERDICT ok needs both commands without a failed tool, without a retried status, with the runtime's circuit
+# breaker counter at 0 after the call, list_sandboxes 200, the command run exactly once and its output reached. Then the
+# state of the rebuilt sandboxd again: no sandbox, no container, no network, no home left. Takes about five minutes.
+echo "--- long exec through the runtime's own client and tools"
+long=$("${COMPOSE[@]}" run --rm --no-deps -e LONG_EXEC_KEY="$key" -e LONG_EXEC_NAME="e2e-long-$RANDOM" runtime \
+  node /opt/harness/long-exec.mjs 2>&1) || true
+printf '%s\n' "$long" | grep -E '^LONG_EXEC_(RESULT|DELETE|VERDICT)' || printf '%s\n' "$long" | tail -20
+long_left=$(sandboxd_state)
+echo "rebuilt sandboxd after the long exec walk: $long_left"
 sandbox=false
 if printf '%s\n' "$walk" | grep -qx 'SANDBOX_VERDICT ok' && [[ -n "$sandbox_id" ]] \
   && [[ "$sandbox_ledger" == '{"rows":1,"mc":[-100],"status":"deleted","hold_mc":0,"consistent":true}' ]] \
   && [[ "$sandbox_left" == '{"sandboxes":0,"containers":0,"networks":0,"homes":0}' ]]; then
   sandbox=true
 fi
+long_exec=false
+if printf '%s\n' "$long" | grep -qx 'LONG_EXEC_VERDICT ok' \
+  && [[ "$(printf '%s\n' "$long" | grep -c '^LONG_EXEC_RESULT ')" == "2" ]] \
+  && [[ "$long_left" == '{"sandboxes":0,"containers":0,"networks":0,"homes":0}' ]]; then
+  long_exec=true
+fi
 
 cleanup
 trap - EXIT
 remaining=$("${COMPOSE[@]}" ps -q | wc -l | tr -d ' ')
 [[ "$remaining" == "0" ]] || { echo "E2E FAIL: containers left behind"; exit 1; }
-if [[ "$turns" -lt 5 || "$registered" != "true" || "$api_errors" != "0" || "$consistent" != "true" || "$db_registered" != "1" || "$balance_cents" -ge 500 || "$domains_ok" != "true" || "$sandbox" != "true" ]]; then
-  echo "E2E FAIL turns=$turns registered=$registered api_errors=$api_errors ledger_consistent=$consistent db_registered=$db_registered balance_cents=$balance_cents domains=$domains_ok sandbox=$sandbox"
+if [[ "$turns" -lt 5 || "$registered" != "true" || "$api_errors" != "0" || "$consistent" != "true" || "$db_registered" != "1" || "$balance_cents" -ge 500 || "$domains_ok" != "true" || "$sandbox" != "true" || "$long_exec" != "true" ]]; then
+  echo "E2E FAIL turns=$turns registered=$registered api_errors=$api_errors ledger_consistent=$consistent db_registered=$db_registered balance_cents=$balance_cents domains=$domains_ok sandbox=$sandbox long_exec=$long_exec"
   exit 1
 fi
-echo "E2E OK turns=$turns registered=$registered api_errors=$api_errors ledger_consistent=$consistent balance_cents=$balance_cents domains=$domains_ok sandbox=$sandbox"
+echo "E2E OK turns=$turns registered=$registered api_errors=$api_errors ledger_consistent=$consistent balance_cents=$balance_cents domains=$domains_ok sandbox=$sandbox long_exec=$long_exec"

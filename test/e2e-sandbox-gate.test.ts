@@ -1,10 +1,12 @@
 /**
- * The sandbox gate of harness/e2e/full.sh (goals/sandbox/04), run for real in bash. The test cuts the block after the
- * line that prints the state of the rebuilt sandboxd up to the end of the file (the verdict `sandbox=…`, the cleanup,
- * the final condition and the closing line) and runs it with planted values for `walk`, `sandbox_id`,
- * `sandbox_ledger` and `sandbox_left`. Compose and cleanup are stubs that do nothing, so no container and no port is
- * touched. The good walk must end in `E2E OK … sandbox=true`; a failed walk verdict, a missing sandbox id, any other
- * ledger line, a sandbox left in the rebuilt sandboxd and a failing earlier condition must each end in `E2E FAIL`.
+ * The sandbox gate of harness/e2e/full.sh (goals/sandbox/04 and 05), run for real in bash. The test cuts the block after
+ * the line that prints the state of the rebuilt sandboxd after the long exec walk up to the end of the file (the
+ * verdicts `sandbox=…` and `long_exec=…`, the cleanup, the final condition and the closing line) and runs it with
+ * planted values for `walk`, `sandbox_id`, `sandbox_ledger`, `sandbox_left`, `long` and `long_left`. Compose and
+ * cleanup are stubs that do nothing, so no container and no port is touched. The good walks must end in
+ * `E2E OK … sandbox=true long_exec=true`; a failed walk verdict, a missing sandbox id, any other ledger line, a sandbox
+ * left in the rebuilt sandboxd, a failed long exec verdict, a missing LONG_EXEC_RESULT and a failing earlier condition
+ * must each end in `E2E FAIL`.
  */
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
@@ -12,10 +14,13 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const FULL_SH = join(__dirname, "..", "harness", "e2e", "full.sh");
-const START = 'echo "rebuilt sandboxd after the walk: $sandbox_left"';
+const START = 'echo "rebuilt sandboxd after the long exec walk: $long_left"';
 
 const GOOD_LEDGER = '{"rows":1,"mc":[-100],"status":"deleted","hold_mc":0,"consistent":true}';
 const GOOD_LEFT = '{"sandboxes":0,"containers":0,"networks":0,"homes":0}';
+const RESULT_60 = 'LONG_EXEC_RESULT {"label":"long-60","attempts":["abort",200],"threw":false,"failures_after":0,"next_status":200,"runs":1}';
+const RESULT_180 = 'LONG_EXEC_RESULT {"label":"long-180","attempts":[200],"threw":false,"failures_after":0,"next_status":200,"runs":1}';
+const GOOD_LONG = `${RESULT_60}\n${RESULT_180}\nLONG_EXEC_DELETE 200\nLONG_EXEC_VERDICT ok`;
 
 type Planted = Record<string, string>;
 
@@ -25,6 +30,8 @@ function good(): Planted {
     sandbox_id: "abcde12345",
     sandbox_ledger: GOOD_LEDGER,
     sandbox_left: GOOD_LEFT,
+    long: GOOD_LONG,
+    long_left: GOOD_LEFT,
     turns: "5",
     registered: "true",
     api_errors: "0",
@@ -63,18 +70,19 @@ function runGate(planted: Planted): { code: number | null; last: string } {
   return { code: r.status, last: out[out.length - 1] ?? "" };
 }
 
-function expectFail(planted: Planted, sandbox: "true" | "false" = "false"): void {
+function expectFail(planted: Planted, sandbox: "true" | "false" = "false", longExec: "true" | "false" = "true"): void {
   const r = runGate(planted);
   expect(r.code).toBe(1);
   expect(r.last).toMatch(/^E2E FAIL /);
-  expect(r.last).toContain(`sandbox=${sandbox}`);
+  expect(r.last).toContain(` sandbox=${sandbox} `);
+  expect(r.last).toMatch(new RegExp(` long_exec=${longExec}$`));
 }
 
 describe("sandbox gate of harness/e2e/full.sh", () => {
-  it("passes the good walk with sandbox=true", () => {
+  it("passes the good walks with sandbox=true and long_exec=true", () => {
     const r = runGate(good());
     expect(r.code).toBe(0);
-    expect(r.last).toMatch(/^E2E OK .*domains=true sandbox=true$/);
+    expect(r.last).toMatch(/^E2E OK .*domains=true sandbox=true long_exec=true$/);
   });
 
   it("fails when the walk verdict is not ok", () => {
@@ -111,9 +119,34 @@ describe("sandbox gate of harness/e2e/full.sh", () => {
     expectFail({ ...good(), sandbox_left: left });
   });
 
-  it("keeps the earlier conditions: a good walk does not pass failed domains or too few turns", () => {
+  it("keeps the earlier conditions: good walks do not pass failed domains or too few turns", () => {
     expectFail({ ...good(), domains_ok: "false" }, "true");
     expectFail({ ...good(), turns: "4" }, "true");
     expectFail({ ...good(), balance_cents: "500" }, "true");
+  });
+
+  it("fails with long_exec=false when the long exec verdict is not ok", () => {
+    const failed = `${RESULT_60}\nLONG_EXEC_RESULT {"label":"long-180","attempts":["abort","abort","abort","abort"],"threw":true,"failures_after":4}\nLONG_EXEC_DELETE 200\nLONG_EXEC_VERDICT fail long-180: the tool failed: This operation was aborted`;
+    expectFail({ ...good(), long: failed }, "true", "false");
+  });
+
+  it("fails with long_exec=false when the long exec walk printed no verdict or not both results", () => {
+    expectFail({ ...good(), long: "LONG_EXEC_VERDICT fail the walk stopped: fetch failed" }, "true", "false");
+    expectFail({ ...good(), long: "" }, "true", "false");
+    expectFail({ ...good(), long: `${RESULT_60}\nLONG_EXEC_DELETE 200\nLONG_EXEC_VERDICT ok` }, "true", "false");
+    expectFail({ ...good(), long: `${RESULT_60}\nLONG_EXEC_VERDICT okay` }, "true", "false");
+  });
+
+  it.each([
+    ["a sandbox", '{"sandboxes":1,"containers":0,"networks":0,"homes":0}'],
+    ["a container", '{"sandboxes":0,"containers":1,"networks":0,"homes":0}'],
+    ["a home", '{"sandboxes":0,"containers":0,"networks":0,"homes":1}'],
+    ["no state of the rebuilt sandboxd", "Error: no such service"],
+  ])("fails with long_exec=false when the rebuilt sandboxd keeps %s after the long exec walk", (_name, left) => {
+    expectFail({ ...good(), long_left: left }, "true", "false");
+  });
+
+  it("keeps the sandbox condition: a good long exec walk does not pass a failed sandbox walk", () => {
+    expectFail({ ...good(), walk: "SANDBOX_VERDICT fail exec text" }, "false", "true");
   });
 });

@@ -37,4 +37,5 @@ eines davon fehlt (`sandbox=false` in der Schlusszeile).
 
 Nicht abgedeckt: Isolation, Grenzen und Netz der Sandbox. Der Nachbau unter `harness/sandboxd/` führt Befehle als Prozess in seinem
 eigenen Container aus, ohne gVisor, ohne eigene Platte und ohne eigenes Netz; das prüft sandbox 02 gegen den echten Server.
-Ebenso nicht: lange Befehle über 30 s (sandbox 05) und freigegebene Ports (sandbox 06).
+Ebenso nicht: freigegebene Ports (sandbox 06). Lange Befehle über 30 s geht seit sandbox 05 ein eigener Gang
+(`harness/e2e/long-exec.mjs`, `docs/sandbox/lange-befehle.md`).
