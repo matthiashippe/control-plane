@@ -231,3 +231,15 @@
   google.com` liefert zwei Adressen, die Abfrage kann also treffen. Der Punkt hält, Code und Server sind unverändert, die Goal-Datei
   ist eingefroren. Dasselbe gilt für die Zeilen 258 und 259 (`dig … sbx-unknown0-80 … | grep -c` 0, `ops/smoke.sh` Exit 0). Die
   Lesart des Audits steht als Vorschlag in `goals/_vorschlaege/loop-audit-2026-11-13-2.md`.
+- **Zeile 258 (Reparatur).** Prüfung 3 von Punkt 5 trägt zwei Befehle; das Audit fuhr nur den `curl` auf
+  `sbx-unknown0-80.postyourprice.com` (404) und schrieb ROT, weil `dig +short A sbx-unknown0-80.postyourprice.com | grep -c
+  72.62.51.224` nicht lief. Mit Netz auf dem code-host am 13.11.2026 um 13:41 UTC: `curl` 404, `grep -c` 0, der Name zeigt auf
+  den Proxy. Gegenprobe `dig +short A ctl.sbx.postyourprice.com | grep -c 72.62.51.224` gibt 1, der Zähler kann also treffen.
+  Der Punkt hält; `node scripts/check.mjs` auf `dev` 10526f4 grün (131 Dateien, 1591 Tests). Ursache und Empfehlung stehen
+  im Vorschlag `goals/_vorschlaege/loop-audit-2026-11-13-2.md`.
+- **Zeile 259 (Reparatur).** Prüfung 4 von Punkt 5 trägt zwei Befehle; das Audit fuhr nur `dig +short A postyourprice.com`
+  (`76.13.144.207`) und schrieb ROT, weil `bash ops/smoke.sh https://postyourprice.com` ohne Netz nicht lief. Mit Netz auf dem
+  code-host am 13.11.2026 um 14:08 UTC: `dig` gibt genau `76.13.144.207`, `ops/smoke.sh` Exit 0 (13 Prüfungen, 0 Fehler, 1
+  ausgelassen). Gegenprobe: `bash ops/smoke.sh https://ctl.sbx.postyourprice.com` Exit 1 (12 Fehler), `dig +short A
+  ctl.sbx.postyourprice.com | grep -cx 76.13.144.207` 0; beide Werkzeuge können also rot werden. Der Punkt hält, Code und Server
+  sind unverändert. Ursache und Empfehlung stehen im Vorschlag `goals/_vorschlaege/loop-audit-2026-11-13-2.md`.
