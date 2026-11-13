@@ -37,13 +37,20 @@
 #            the ledger holds at least one row of kind sandbox for exactly this sandbox (sandbox 03). Before the DELETE a
 #            command runs in the background there (`sleep 25; echo bg-ok`, timeout 120000, sandbox 05): its answer is 200
 #            with running true and exit_code -1, the file from exit_code_file reads 0 within 60 s and the one from
-#            output_file holds bg-ok, so the wrapper, coreutils timeout under gVisor and /root/.exec are proven in production
+#            output_file holds bg-ok, so the wrapper, coreutils timeout under gVisor and /root/.exec are proven in production.
+#            After a new client key (changed=1) it waits CLIENT_KEY_WAIT_S before the create (domains 03): for RECHECK_MS
+#            (src/sandbox/service.ts) after the last failed call to sandboxd the service answers 501 at once
 #   handoff  POST /v1/handoff with example values answers 201 with a two-digit match, GET /h/{code} shows three different
 #            two-digit numbers with match among them, and the stream GET /v1/handoff/{code} with the poll token says pending
 #            within 5 s (konto 02). Approves nothing: the code runs out unused after ten minutes. The poll token goes through
 #            a header file in a mktemp -d folder that a trap deletes, never onto a command line or into the output
 #   sandbox-foreign  the number of foreign accounts (no address and no key name of src/bounties/ours.ts) with at least one
 #            ledger row of kind sandbox, the measure of the ROADMAP criterion; shown, and FAIL only when it cannot be read
+#
+# Every temporary file of a live run, the header files with LIVE_SANDBOX_KEY among them, lies in one mktemp -d folder
+# that a trap on EXIT, INT and TERM in live() deletes, so a run stopped with kill -TERM leaves nothing in TMPDIR.
+# A run stopped with kill -KILL, which no trap catches, leaves that folder only until the next run: its name is live-run.<PID>.*,
+# and live() deletes such folders of its own user whose PID no longer runs before it starts, and nothing else.
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -62,6 +69,32 @@ FAILED=0
 say() {
   echo "$1"
   case "$1" in FAIL*) FAILED=1 ;; esac
+}
+
+# The folder of the run's temporary files: the mktemp -d folder of live(), which its trap deletes, else TMPDIR.
+# The prefix of that folder, followed by the PID of the run, so the next run finds the folders of runs that ended
+# without their trap (kill -KILL) and deletes them.
+LIVE_PREFIX="live-run"
+LIVE_TMP=""
+live_tmp() { echo "${LIVE_TMP:-${TMPDIR:-/tmp}}"; }
+live_cleanup() {
+  [ -n "$LIVE_TMP" ] && rm -rf -- "$LIVE_TMP"
+  LIVE_TMP=""
+}
+# Deletes the folders of earlier runs that no trap deleted (kill -KILL): only folders of the prefix in TMPDIR that this
+# user owns and whose PID no longer runs. A foreign file, a folder of another user and that of a living run stay; a reused
+# PID keeps a folder until the next run. Prints nothing.
+live_sweep() {
+  local d pid
+  for d in "${TMPDIR:-/tmp}/$LIVE_PREFIX".*.*; do
+    [ -d "$d" ] && [ ! -L "$d" ] && [ -O "$d" ] || continue
+    pid="${d##*/"$LIVE_PREFIX".}"
+    pid="${pid%%.*}"
+    [[ "$pid" =~ ^[0-9]+$ ]] || continue
+    kill -0 "$pid" 2>/dev/null && continue
+    ps -p "$pid" >/dev/null 2>&1 && continue
+    rm -rf -- "$d"
+  done
 }
 
 judge_health() { # $1 = HTTP status
@@ -155,8 +188,8 @@ domains_search_live() {
     echo nokey
     return
   fi
-  hdr="$(mktemp)"
-  ans="$(mktemp)"
+  hdr="$(mktemp -p "$(live_tmp)")"
+  ans="$(mktemp -p "$(live_tmp)")"
   printf 'Authorization: %s\n' "$apikey" >"$hdr"
   apikey=""
   code="$(curl -s -o "$ans" -w '%{http_code}' --max-time 15 -H "@$hdr" "$BASE$DOMAINS_PATH")"
@@ -228,7 +261,7 @@ judge_handoff() { # $1 = result line from HANDOFF_JS
 # The live part: one handoff with example values, its page and 5 s of its stream. Prints the result line only.
 handoff_live() {
   local d c_code p_code="none" code
-  d="$(mktemp -d)"
+  d="$(mktemp -d -p "$(live_tmp)")"
   trap 'rm -rf "$d"' RETURN
   c_code="$(curl -s -o "$d/create" -w '%{http_code}' --max-time 15 -H 'content-type: application/json' --data "$HANDOFF_BODY" "$BASE/v1/handoff")"
   code="$(NODE_NO_WARNINGS=1 node -e "$HANDOFF_PREP_JS" "$d/create" "$d/hdr" 2>/dev/null)"
@@ -245,6 +278,92 @@ SANDBOX_HOST="${SANDBOX_HOST:-72.62.51.224}"
 CTL_URL="https://ctl.sbx.postyourprice.com"
 LIVE_SANDBOX_ENV="$HOME/.config/control-plane/live-sandbox.env"
 OURS_TS="$ROOT/src/bounties/ours.ts"
+CLIENT_KEY_SETUP="$ROOT/ops/sandbox/setup.sh"
+SERVICE_TS="$ROOT/src/sandbox/service.ts"
+
+# Seconds the check `sandbox` waits after SETUP CLIENT-KEY OK changed=1 before it creates (domains 03). For RECHECK_MS after
+# its last failed call to sandboxd the service answers POST /v1/sandboxes with 501 at once, and until the new key is in
+# place every call fails; so the wait is longer than RECHECK_MS. test/live-selftest.test.ts holds it above RECHECK_MS / 1000.
+CLIENT_KEY_WAIT_S=75
+live_wait() { sleep "$1"; } # the selftest replaces it and counts the seconds instead
+
+# RECHECK_MS of src/sandbox/service.ts in whole seconds, nothing when the line is not there.
+recheck_s() {
+  local ms
+  ms="$(grep -oE 'const RECHECK_MS = [0-9_]+;' "$SERVICE_TS" 2>/dev/null | head -n 1 | tr -dc '0-9')"
+  [ -n "$ms" ] && echo $((ms / 1000))
+}
+
+# $1 = "changed=<0|1> created_after=<seconds|none>" from a run of sandbox_live, $2 = RECHECK_MS in seconds. A create after
+# a new client key is OK only more than RECHECK_MS later, one with the key unchanged only without any wait.
+judge_sandbox_wait() {
+  local changed after recheck="${2:-}"
+  read -r changed after <<<"${1:-}"
+  changed="${changed#changed=}"
+  after="${after#created_after=}"
+  if ! [[ "$recheck" =~ ^[0-9]+$ ]]; then
+    echo "FAIL sandbox-wait: no RECHECK_MS in src/sandbox/service.ts"
+  elif ! [[ "$after" =~ ^[0-9]+$ ]]; then
+    echo "FAIL sandbox-wait: no POST /v1/sandboxes seen"
+  elif [ "$changed" = 1 ] && [ "$after" -gt "$recheck" ]; then
+    echo "OK sandbox-wait: created $after s after a new client key, past the $recheck s of RECHECK_MS"
+  elif [ "$changed" = 1 ]; then
+    echo "FAIL sandbox-wait: created $after s after a new client key, within the $recheck s the service answers 501 at once"
+  elif [ "$changed" = 0 ] && [ "$after" -eq 0 ]; then
+    echo "OK sandbox-wait: created at once, the client key was unchanged"
+  elif [ "$changed" = 0 ]; then
+    echo "FAIL sandbox-wait: waited $after s although the client key was unchanged"
+  else
+    echo "FAIL sandbox-wait: no changed=0 or changed=1 from ops/sandbox/setup.sh --client-key"
+  fi
+}
+
+# $1 = "killed=<n> kept=<n> foreign=<yes|no> alive=<yes|no>" from key_sweep_run: killed counts the folders a run stopped
+# with kill -KILL left, kept how many of them were still there after the next run of live().
+judge_kill_sweep() {
+  local killed kept
+  killed="$(sed -n 's/.*killed=\([0-9]*\).*/\1/p' <<<"${1:-}")"
+  kept="$(sed -n 's/.*kept=\([0-9]*\).*/\1/p' <<<"${1:-}")"
+  if [ -z "$killed" ] || [ -z "$kept" ]; then
+    echo "FAIL key-cleanup: no result"
+  elif [ "$killed" -eq 0 ]; then
+    echo "FAIL key-cleanup: the run stopped with kill -KILL left no folder, so the next run proves nothing"
+  elif [ "$kept" -gt 0 ]; then
+    echo "FAIL key-cleanup: $kept folders of the run stopped with kill -KILL still in TMPDIR after the next run"
+  else
+    echo "OK key-cleanup: the next run deleted the folder of the run stopped with kill -KILL"
+  fi
+}
+# The same result: what the next run must leave alone, a foreign file and the folder of a run whose process lives.
+judge_sweep_foreign() {
+  case "${1:-}" in
+    *foreign=yes*alive=yes*) echo "OK key-cleanup: a foreign file and the folder of a living run stayed" ;;
+    *foreign=no*) echo "FAIL key-cleanup: the next run deleted a foreign file in TMPDIR" ;;
+    *alive=no*) echo "FAIL key-cleanup: the next run deleted the folder of a run whose process lives" ;;
+    *) echo "FAIL key-cleanup: no result" ;;
+  esac
+}
+
+# $1 = "seen=<yes|no> ended=<yes|no> left=<files>" from a run of live() stopped with kill -TERM: seen says the key file
+# was in TMPDIR while the call ran, ended that the run was over within 15 s, left what was in TMPDIR afterwards.
+judge_key_cleanup() {
+  local seen ended left
+  read -r seen ended left <<<"${1:-}"
+  seen="${seen#seen=}"
+  ended="${ended#ended=}"
+  left="${left#left=}"
+  if ! [[ "$left" =~ ^[0-9]+$ ]]; then
+    echo "FAIL key-cleanup: no result"
+  elif [ "$seen" != yes ]; then
+    echo "FAIL key-cleanup: no key file in TMPDIR while the call ran, so the kill proves nothing"
+  elif [ "$ended" != yes ]; then
+    echo "FAIL key-cleanup: the run did not end within 15 s of kill -TERM"
+  elif [ "$left" -gt 0 ]; then
+    echo "FAIL key-cleanup: $left files left in TMPDIR after kill -TERM"
+  else
+    echo "OK key-cleanup: TMPDIR empty after kill -TERM"
+  fi
+}
 
 # Rows of kind sandbox for one sandbox id (refs `sandbox:<id>:<step>`), the same text in production and in the selftest.
 # Only the count leaves the database; an id that is not lowercase alphanumeric (the format sandboxd gives) is refused, so
@@ -387,19 +506,22 @@ sandbox_api() { # $1 = header file, $2 = method, $3 = path, $4 = answer file, $5
 sandbox_live() {
   local sshkey="$1" client_key=fail ctl=none create=none exec_=skipped bg=skipped files=skipped delete=skipped ledger=none
   local last remote apikey="" hdr ans code id="" out text start exitf outf deadline
-  last="$(CP_HOST="$CP_HOST" CP_SSH_KEY="$sshkey" bash "$ROOT/ops/sandbox/setup.sh" --client-key "$SANDBOX_HOST" </dev/null 2>/dev/null | tail -n 1)"
+  last="$(CP_HOST="$CP_HOST" CP_SSH_KEY="$sshkey" bash "$CLIENT_KEY_SETUP" --client-key "$SANDBOX_HOST" </dev/null 2>/dev/null | tail -n 1)"
   case "$last" in "SETUP CLIENT-KEY OK"*) client_key=ok ;; esac
 
   remote="docker exec deploy-cp-1 node -e $(printf %q "$CTL_JS") $(printf %q "$CTL_URL") /data/sandbox-client.key"
   ctl="$(ssh -i "$sshkey" -o BatchMode=yes -o ConnectTimeout=10 "$CP_HOST" "$remote" 2>/dev/null | tail -n 1)"
   [[ "$ctl" =~ ^[a-z0-9]{1,8}$ ]] || ctl="${ctl:+error}"
 
+  # A new client key: wait out the 501 the service gives for RECHECK_MS after its last failed call to sandboxd.
+  [ "$last" = "SETUP CLIENT-KEY OK changed=1" ] && live_wait "$CLIENT_KEY_WAIT_S"
+
   [ -r "$LIVE_SANDBOX_ENV" ] && apikey="$(sed -n 's/^LIVE_SANDBOX_KEY=//p' "$LIVE_SANDBOX_ENV" | head -n 1 | tr -d "\"'\r")"
   if [ -z "$apikey" ]; then
     create=nokey
   else
-    hdr="$(mktemp)"
-    ans="$(mktemp)"
+    hdr="$(mktemp -p "$(live_tmp)")"
+    ans="$(mktemp -p "$(live_tmp)")"
     printf 'Authorization: %s\n' "$apikey" >"$hdr"
     create="$(sandbox_api "$hdr" POST /v1/sandboxes "$ans" '{"memory_mb":512,"vcpu":1,"disk_gb":5}')"
     if [ "$create" = 201 ]; then
@@ -686,6 +808,170 @@ selftest() {
     [ "${got%% *}" = "$h_expect" ] || all_ok=0
   done
 
+  # A made-up key for the runs below, never a real one; the stand-in for ops/sandbox/setup.sh prints only its last line,
+  # so no run starts the real script, which would reach the sandbox server over ssh in a child process.
+  local fake_key
+  fake_key="cnwy_k_planted$(head -c 24 /dev/zero | tr '\0' 'z')"
+  printf 'LIVE_SANDBOX_KEY=%s\n' "$fake_key" >"$dir/live-sandbox.env"
+  printf '#!/usr/bin/env bash\necho "SETUP CLIENT-KEY OK changed=0"\n' >"$dir/setup-changed-0.sh"
+  printf '#!/usr/bin/env bash\necho "SETUP CLIENT-KEY OK changed=1"\n' >"$dir/setup-changed-1.sh"
+  # Stand-ins for child processes (ops/timeout-quote.sh, the setup stand-in): curl and ssh on PATH fail as the functions do.
+  mkdir -p "$dir/bin"
+  printf '#!/usr/bin/env bash\necho "selftest must not reach the network ($(basename "$0"))" >&2\nexit 99\n' >"$dir/bin/curl"
+  cp "$dir/bin/curl" "$dir/bin/ssh"
+  chmod +x "$dir/bin/curl" "$dir/bin/ssh"
+
+  # The wait after a new client key (domains 03), through the real sandbox_live: live_wait counts the seconds instead of
+  # sleeping, and curl notes how many had passed when POST /v1/sandboxes went out, then answers nothing. Prints
+  # "changed=<0|1> created_after=<seconds|none>". $1 = changed of the setup stand-in, $2 = CLIENT_KEY_WAIT_S or - for the
+  # script's own.
+  sandbox_wait_run() {
+    (
+      local w="$dir/wait-$1-$2"
+      mkdir -p "$w"
+      : >"$w/waited"
+      : >"$w/created"
+      CLIENT_KEY_SETUP="$dir/setup-changed-$1.sh"
+      [ "$2" = - ] || CLIENT_KEY_WAIT_S="$2"
+      LIVE_SANDBOX_ENV="$dir/live-sandbox.env"
+      CP_HOST=fake.invalid
+      PATH="$dir/bin:$PATH"
+      live_wait() { echo "$1" >>"$w/waited"; }
+      curl() {
+        local a
+        for a in "$@"; do
+          case "$a" in "$BASE/v1/sandboxes") awk '{ s += $1 } END { print s + 0 }' "$w/waited" >>"$w/created" ;; esac
+        done
+        printf 000
+        return 7
+      }
+      sandbox_live "$dir/no-such-ssh-key" >/dev/null
+      echo "changed=$1 created_after=$(head -n 1 "$w/created" | grep -E '^[0-9]+$' || echo none)"
+    )
+  }
+  local w_case w_name w_changed w_wait w_expect recheck
+  recheck="$(recheck_s)"
+  for w_case in "new-key 1 - OK" "old-key 0 - OK" "no-wait 1 0 FAIL" "short 1 60 FAIL"; do
+    read -r w_name w_changed w_wait w_expect <<<"$w_case"
+    got="$(judge_sandbox_wait "$(sandbox_wait_run "$w_changed" "$w_wait")" "$recheck")"
+    echo "planted sandbox-wait $w_name: $got"
+    [ "${got%% *}" = "$w_expect" ] || all_ok=0
+  done
+
+  # The key files of a run of live() stopped with a signal (domains 03): the run gets its own TMPDIR, the made-up key,
+  # CP_HOST=fake.invalid and the stand-ins, and runs as its own process group, so the signal reaches every process of it as
+  # it does from a terminal, a supervisor or the timeout of an agent tool. curl holds the call to $3 (the header file is
+  # then in TMPDIR) until the signal; everything else answers nothing at once. Prints "seen=<yes|no> ended=<yes|no>".
+  # $1 = folder for the run's control files, $2 = TMPDIR of the run, $3 = URL to hold, $4 = TERM or KILL.
+  held_live() {
+    (
+      local c="$1" pid i seen=no ended=no
+      mkdir -p "$c" "$2"
+      set -m
+      (
+        export TMPDIR="$2"
+        CP_HOST=fake.invalid
+        CP_SSH_KEY="$dir/no-such-ssh-key"
+        CLIENT_KEY_SETUP="$dir/setup-changed-0.sh"
+        LIVE_SANDBOX_ENV="$dir/live-sandbox.env"
+        PATH="$dir/bin:$PATH"
+        curl() {
+          local a held=no n=0
+          for a in "$@"; do [ "$a" = "$3" ] && held=yes; done
+          if [ "$held" = yes ] && [[ " $* " == *" @"* || " $* " == *"-H @"* ]]; then
+            : >"$c/started"
+            while [ "$n" -lt 300 ]; do
+              sleep 0.1
+              n=$((n + 1))
+            done
+          fi
+          printf 000
+          return 7
+        }
+        live
+      ) </dev/null >"$c/out" 2>&1 &
+      pid=$!
+      for i in $(seq 1 300); do
+        [ -e "$c/started" ] && break
+        sleep 0.1
+      done
+      [ -e "$c/started" ] && grep -rqF -- "$fake_key" "$2" 2>/dev/null && seen=yes
+      kill "-$4" -- "-$pid" 2>/dev/null
+      for i in $(seq 1 150); do
+        kill -0 "$pid" 2>/dev/null || { ended=yes; break; }
+        sleep 0.1
+      done
+      [ "$ended" = yes ] || kill -KILL -- "-$pid" 2>/dev/null
+      wait "$pid" 2>/dev/null
+      echo "seen=$seen ended=$ended"
+    ) 2>/dev/null
+  }
+  # A run stopped with kill -TERM. Prints "seen=<yes|no> ended=<yes|no> left=<files>". $1 = search or sandbox.
+  key_cleanup_run() {
+    local w="$dir/term-$1" target
+    case "$1" in
+      search) target="$BASE$DOMAINS_PATH" ;;
+      sandbox) target="$BASE/v1/sandboxes" ;;
+    esac
+    echo "$(held_live "$w/ctl" "$w/tmp" "$target" TERM) left=$(find "$w/tmp" -mindepth 1 | wc -l)"
+  }
+  local k_name
+  for k_name in search sandbox; do
+    got="$(judge_key_cleanup "$(key_cleanup_run "$k_name")")"
+    echo "planted key-cleanup term-$k_name: $got"
+    [ "${got%% *}" = OK ] || all_ok=0
+  done
+  # A run stopped with kill -KILL, which no trap catches (the timeout of an agent tool, a cancelled run), then a second run
+  # with the same TMPDIR. Before it, a foreign file and a folder of the prefix whose process lives (this subshell) are put
+  # there. Prints "killed=<folders of the first run after the kill> kept=<of them after the second run> foreign=<yes|no>
+  # alive=<yes|no>".
+  key_sweep_run() {
+    (
+      local w="$dir/sweep" f n=0 kept=0 foreign=no alive=no
+      held_live "$w/first" "$w/tmp" "$BASE/v1/sandboxes" KILL >/dev/null
+      : >"$w/killed"
+      for f in "$w/tmp/$LIVE_PREFIX".*; do
+        [ -d "$f" ] || continue
+        echo "$f" >>"$w/killed"
+        n=$((n + 1))
+      done
+      printf 'foreign\n' >"$w/tmp/foreign.txt"
+      mkdir -p "$w/tmp/$LIVE_PREFIX.$BASHPID.living"
+      printf 'living\n' >"$w/tmp/$LIVE_PREFIX.$BASHPID.living/file"
+      held_live "$w/second" "$w/tmp" "$BASE$DOMAINS_PATH" TERM >/dev/null
+      while read -r f; do [ -e "$f" ] && kept=$((kept + 1)); done <"$w/killed"
+      [ -f "$w/tmp/foreign.txt" ] && foreign=yes
+      [ -f "$w/tmp/$LIVE_PREFIX.$BASHPID.living/file" ] && alive=yes
+      echo "killed=$n kept=$kept foreign=$foreign alive=$alive"
+    )
+  }
+  local sweep
+  sweep="$(key_sweep_run)"
+  got="$(judge_kill_sweep "$sweep")"
+  echo "planted key-cleanup kill-sweep: $got"
+  [ "${got%% *}" = OK ] || all_ok=0
+  got="$(judge_sweep_foreign "$sweep")"
+  echo "planted key-cleanup foreign: $got"
+  [ "${got%% *}" = OK ] || all_ok=0
+  for case_ in "kill-sweep-kept killed=1 kept=1 foreign=yes alive=yes" "kill-sweep-none killed=0 kept=0 foreign=yes alive=yes"; do
+    read -r name sweep <<<"$case_"
+    got="$(judge_kill_sweep "$sweep")"
+    echo "planted key-cleanup $name: $got"
+    [ "${got%% *}" = FAIL ] || all_ok=0
+  done
+  for case_ in "foreign-gone killed=1 kept=0 foreign=no alive=yes" "foreign-living killed=1 kept=0 foreign=yes alive=no"; do
+    read -r name sweep <<<"$case_"
+    got="$(judge_sweep_foreign "$sweep")"
+    echo "planted key-cleanup $name: $got"
+    [ "${got%% *}" = FAIL ] || all_ok=0
+  done
+
+  mkdir -p "$dir/leftover"
+  printf 'Authorization: %s\n' "$fake_key" >"$dir/leftover/tmp.planted"
+  got="$(judge_key_cleanup "seen=yes ended=yes left=$(find "$dir/leftover" -mindepth 1 | wc -l)")"
+  echo "planted key-cleanup leftover: $got"
+  [ "${got%% *}" = FAIL ] || all_ok=0
+
   if [ "$all_ok" = 1 ]; then
     echo "LIVE SELFTEST OK"
     return 0
@@ -708,16 +994,31 @@ live() {
     return 1
   fi
 
+  # One folder for every temporary file of the run, the key files among them, and for those of the scripts it starts
+  # (TMPDIR); the trap deletes it however the run ends. It deletes only this folder and prints nothing. Its name carries
+  # the prefix and this run's PID, so a later run deletes it through live_sweep when kill -KILL left it behind.
+  live_sweep
+  LIVE_TMP="$(mktemp -d -p "${TMPDIR:-/tmp}" "$LIVE_PREFIX.$BASHPID.XXXXXX")" || {
+    LIVE_TMP=""
+    echo "FAIL setup: no temporary folder"
+    echo "LIVE FAIL"
+    return 1
+  }
+  trap 'live_cleanup' EXIT
+  trap 'live_cleanup; exit 130' INT
+  trap 'live_cleanup; exit 143' TERM
+  export TMPDIR="$LIVE_TMP"
+
   local code body
   code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 "$BASE/health")"
   say "$(judge_health "$code")"
 
-  body="$(mktemp)"
+  body="$(mktemp -p "$LIVE_TMP")"
   code="$(curl -s -o "$body" -w '%{http_code}' --max-time 15 "$BASE/v1/status")"
   say "$(judge_status "$code" "$(head -c 1 "$body")")"
   rm -f "$body"
 
-  body="$(mktemp)"
+  body="$(mktemp -p "$LIVE_TMP")"
   code="$(curl -s -o "$body" -w '%{http_code}' --max-time 15 "$BASE$DOMAINS_PATH")"
   say "$(judge_domains "$code" "$(head -c 2000 "$body")")"
   rm -f "$body"

@@ -52,3 +52,33 @@
 - **Der Fall `nokey` läuft im Selbsttest durch den Live-Pfad.** `domains_search_live` mit einer fehlenden `LIVE_SANDBOX_ENV` gibt
   `nokey` aus, ohne `curl` zu rufen (der Selbsttest sperrt `curl`), und dieser Wert geht in den Richter. Drei weitere Fälle
   `mark-names`, `mark-message` und `mark-taken` nehmen der richtigen Antwort je ein Merkmal und werden FAIL.
+
+## Goal 03 (13.11.2026, Engineer CP)
+
+- **Die Wartezeit steht als Zeile `CLIENT_KEY_WAIT_S=75` in `ops/live.sh`.** Der vitest-Test liest sie mit `^CLIENT_KEY_WAIT_S=([0-9]+)$`
+  wie `DOMAINS_PATH=` und `RECHECK_MS` mit `const RECHECK_MS = ([0-9_]+);` aus `src/sandbox/service.ts`. 75 statt 61, weil ein
+  Aufruf an `sandboxd`, der kurz vor dem Schlüsselwechsel startet, erst nach dem Wechsel scheitern und `lastFailure` setzen kann.
+  Der Richter `judge_sandbox_wait` liest `RECHECK_MS` im Selbsttest ebenfalls aus `src/sandbox/service.ts` (Funktion `recheck_s`),
+  damit seine Grenze nicht als zweite Zahl im Skript veraltet.
+- **Warten und Setup sind im Selbsttest ersetzbar, ohne Schalter von außen.** `live_wait` (sonst `sleep`) ersetzt der Selbsttest
+  durch eine Funktion, die die Sekunden in eine Datei schreibt; `CLIENT_KEY_SETUP` (sonst `ops/sandbox/setup.sh`) zeigt auf eine
+  Attrappe, die nur `SETUP CLIENT-KEY OK changed=0` oder `changed=1` ausgibt. Beides setzt nur der Selbsttest in seiner eigenen
+  Shell; keine Umgebungsvariable lenkt den Live-Lauf um. Für Kindprozesse (`ops/timeout-quote.sh`) liegen `curl` und `ssh` als
+  Attrappen vorn im `PATH` und enden mit Exit 99.
+- **`live()` legt mit `mktemp -d` einen Ordner an, setzt `TMPDIR` darauf und löscht ihn per `trap` auf EXIT, INT und TERM.** Damit
+  landen auch die Dateien von `handoff_live`, `ops/timeout-quote.sh` und `setup.sh` dort. Der `trap` ruft `live_cleanup`, das nur
+  diesen Ordner löscht und nichts ausgibt; der `trap … RETURN` des Selbsttests bleibt unberührt.
+- **Der Abbruch im Selbsttest geht an die Prozessgruppe.** Der Lauf von `live()` startet mit `set -m` als eigene Prozessgruppe, und
+  `kill -TERM -- -<pid>` trifft wie Strg-C oder ein Supervisor jeden Prozess der Gruppe: Die Befehlssubstitution mit der
+  `curl`-Attrappe endet sofort, danach führt die Haupt-Shell den `trap` aus. Gemessen endet der Lauf in unter einer Sekunde; nach
+  15 s ohne Ende gilt der Fall als FAIL und die Gruppe bekommt `kill -KILL`. Ohne `trap` bleiben 3 (Suche) und 4 (Sandbox) Dateien
+  liegen. Der Fall gilt nur, wenn die Datei mit dem erfundenen Schlüssel während des gehaltenen Aufrufs in `TMPDIR` lag.
+- **Der Ordner nennt seinen Prozess im Namen (Zyklus 3, Kritik Punkt 6).** `live()` legt ihn als
+  `${TMPDIR:-/tmp}/live-run.<PID>.XXXXXX` an, mit `$BASHPID` statt `$$`, weil `$$` in einer Subshell die PID der äußeren Shell
+  bleibt und der Selbsttest `live()` in einer Subshell fährt. Vor dem Anlegen löscht `live_sweep` jeden Ordner `live-run.*.*` in
+  `TMPDIR`, der dem eigenen Nutzer gehört (`-O`, kein Symlink) und dessen PID weder `kill -0` noch `ps -p` kennt, und sonst nichts.
+  Eine wiederverwendete PID lässt einen Ordner nur bis zum nächsten Lauf liegen, löscht aber nie einen lebenden. Der Selbsttest
+  beendet den ersten Lauf mit `kill -KILL` an die Prozessgruppe, während `POST /v1/sandboxes` gehalten wird, legt dann eine fremde
+  Datei und einen Ordner `live-run.<PID der Selbsttest-Subshell>.living` dazu und fährt einen zweiten Lauf, den er mit `kill -TERM`
+  beendet. Gegenproben: ohne `live_sweep` ist `kill-sweep` FAIL (1 Ordner bleibt), ohne Präfix FAIL (kein Ordner, also kein Beweis);
+  ein `live_sweep` ohne Prüfung der PID und ein Löschen von ganz `TMPDIR` machen `foreign` FAIL.
