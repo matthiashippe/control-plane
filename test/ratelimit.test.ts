@@ -125,7 +125,7 @@ describe("cleanupExpired", () => {
 
     const removed = cleanupExpired(db, now);
 
-    expect(removed).toEqual({ nonces: 1, sessions: 1, payments: 1 });
+    expect(removed).toEqual({ nonces: 1, sessions: 1, payments: 1, handoffs: 0 });
     expect((db.prepare("SELECT count(*) AS n FROM siwe_nonces").get() as { n: number }).n).toBe(1);
     expect((db.prepare("SELECT count(*) AS n FROM sessions").get() as { n: number }).n).toBe(1);
     const left = db.prepare("SELECT nonce FROM payments ORDER BY nonce").all() as { nonce: string }[];

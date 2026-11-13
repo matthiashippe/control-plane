@@ -113,3 +113,40 @@ export function summary(results) {
   const n = results.reduce((s, r) => s + r.defects.length, 0);
   return `soll: ${results.length} Bilder, umzug oben ${y}, ${n} Mängel`;
 }
+
+// ---- /h/{code} (goals/konto/02) -----------------------------------------------------------------------------------------
+// The phone page has three states and the block that has to sit in the first screen is data-soll="freigabe". On top of the
+// defects of the start page, a word the reader would first have to translate is a defect (TEAM.md "Klare Wörter").
+
+/** The states of /h/{code}, each one source docs/soll/src/handoff-<state>.html and two pictures. */
+export const HANDOFF_STATES = Object.freeze(["freigabe", "erledigt", "ungueltig"]);
+/** Words that name how the page is built instead of what happens; the same list the goal's source check uses. */
+export const HANDOFF_WORDS = /handoff|phishing|token|\bsse\b/i;
+
+/**
+ * Defects of one render of /h/{code}. `m` is what assess() takes, with `state` and `blockBottom` (bottom edge of
+ * data-soll="freigabe" in page pixels, null when missing) instead of umzugBottom. Only the state freigabe has to carry the block.
+ */
+export function assessHandoff(m) {
+  // The checks shared with the start page; umzugBottom 0 switches off only its own block, which this page does not have.
+  const base = assess({ ...m, umzugBottom: 0 }).map((d) => `${m.state} ${d}`);
+  const out = [...base], fold = FOLD[m.width];
+  if (!HANDOFF_STATES.includes(m.state)) out.push(`${m.state} ${m.width}: unknown state`);
+  const word = String(m.text ?? "").split("\n").find((l) => HANDOFF_WORDS.test(l));
+  if (word !== undefined) out.push(`${m.state} ${m.width}: word the reader has to translate in the visible text: ${word.trim().slice(0, 80)}`);
+  if (m.state === "freigabe") {
+    if (m.blockBottom === null || m.blockBottom === undefined) out.push(`${m.state} ${m.width}: block data-soll="freigabe" is missing`);
+    else if (fold && m.blockBottom > fold) out.push(`${m.state} ${m.width}: block freigabe ends at ${m.blockBottom} px, below the first screen at ${fold}`);
+  }
+  return out;
+}
+
+/** The last line of ops/soll-handoff.mjs. Wording fixed by goals/konto/02, Punkt 1. */
+export function summaryHandoff(results) {
+  const y = WIDTHS.map((w) => {
+    const r = results.find((x) => x.state === "freigabe" && x.width === w);
+    return `${w}=${r?.blockBottom ?? "fehlt"}`;
+  }).join(" ");
+  const n = results.reduce((s, r) => s + r.defects.length, 0);
+  return `soll handoff: ${results.length} Bilder, freigabe oben ${y}, ${n} Mängel`;
+}

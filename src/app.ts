@@ -92,6 +92,7 @@ import { DOC } from "./errors.js";
 import { domainNotHeld, invalidDomain, parseDnsPath, registerDomain, searchDomains } from "./domains.js";
 import { Catalog, handleChat, MARKUP } from "./inference/proxy.js";
 import { clientKey, RateLimiter, type RateLimitOptions } from "./ratelimit.js";
+import { registerHandoff, type HandoffDeps } from "./handoff/routes.js";
 import { handlePay, TOPUP_TIERS_USD, type PayConfig } from "./payments/pay.js";
 import { handleRegister } from "./registry.js";
 import { createSandboxService, type Reply as SandboxReply, type SandboxService } from "./sandbox/service.js";
@@ -166,6 +167,11 @@ export interface AppOptions {
    * the sandbox server answers 501 and the list is what the database holds.
    */
   sandbox?: SandboxService | null;
+  /**
+   * The way to the phone (goals/konto/02, src/handoff/routes.ts): how often the stream looks at the row, the cap on unknown codes
+   * on /h/{code} and where the chance comes from. Left out, production values.
+   */
+  handoff?: Pick<HandoffDeps, "pollMs" | "keepAliveMs" | "missLimit" | "random">;
 }
 
 /**
@@ -281,7 +287,8 @@ const SUNSET_PATHS = new Set(["/v1/chat/completions", "/v1/check", "/v1/models"]
 // every member of this set against the live app: each one has to answer without a key, or it does
 // not belong here. /v1/auth/nonce, /v1/auth/verify and /v1/briefs/check are keyless too and get
 // their 405 from the two middlewares above, which carry a message about their own path.
-export const V1_KEYLESS = new Set(["/v1/status", "/v1/models", "/v1/auth/keyless"]);
+// /v1/handoff (goals/konto/02): the account comes into being over this very path in konto 03, so it cannot ask for one.
+export const V1_KEYLESS = new Set(["/v1/status", "/v1/models", "/v1/auth/keyless", "/v1/handoff"]);
 
 export const V1_ROUTES = new Set([
   "/v1/auth/api-keys",
@@ -292,6 +299,7 @@ export const V1_ROUTES = new Set([
   "/v1/auth/nonce",
   "/v1/auth/verify",
   "/v1/auth/keyless",
+  "/v1/handoff",
   "/v1/automatons/register",
   "/v1/bounties",
   "/v1/bounties/cancel",
@@ -576,7 +584,8 @@ export function createApp(opts: AppOptions) {
   // having signed in at all.
   //
   // Exact paths, one prefix. A prefix match is what put a child path under its parent's rule.
-  const OPEN_PATHS = ["/v1/auth/nonce", "/v1/auth/verify", "/v1/auth/api-keys", "/v1/auth/keyless"];
+  // POST /v1/handoff writes a row on the word of a stranger, like the keyless key (goals/konto/02).
+  const OPEN_PATHS = ["/v1/auth/nonce", "/v1/auth/verify", "/v1/auth/api-keys", "/v1/auth/keyless", "/v1/handoff"];
   const OPEN_PREFIXES = ["/pay/"];
   // The card path (Goal 20). Both call Stripe with our secret key on a stranger's word: the POST
   // creates a session, the GET asks whether one is paid. HAN-17: without the GET in here, anybody
@@ -603,7 +612,7 @@ export function createApp(opts: AppOptions) {
             retry_after_seconds: retryAfterSec,
             message:
               `More than ${rateLimitOpts.limit} requests in ${windowSec} seconds from your address to the ` +
-              "endpoints that work without an API key (/v1/auth/*, /pay/*, /katalog/bestellen, /katalog/kaufen, /katalog/danke, /katalog/gespraech, /katalog/nachbessern). Those write to the database " +
+              "endpoints that work without an API key (/v1/auth/*, /v1/handoff, /pay/*, /katalog/bestellen, /katalog/kaufen, /katalog/danke, /katalog/gespraech, /katalog/nachbessern). Those write to the database " +
               "and /pay also calls a payment facilitator that costs money per call, so they are capped " +
               `to keep the service up for everyone. Wait ${retryAfterSec} seconds and retry; calls to ` +
               "/v1/* with an API key are not capped.",
@@ -1779,6 +1788,11 @@ export function createApp(opts: AppOptions) {
       throw e;
     }
   });
+
+  // The way to the phone (goals/konto/02): POST /v1/handoff, the page /h/{code} and the stream GET /v1/handoff/{code}. Before
+  // the /v1/* auth middleware for the same reason as /v1/auth/keyless above.
+  const indexStyle = /<style>[\s\S]*?<\/style>/.exec(indexHtml ?? "")?.[0] ?? "";
+  registerHandoff(app, { db, clock, indexStyle: () => indexStyle, ...opts.handoff });
 
   app.get("/v1/status", (c) => {
     // One entry per real model; the IDs the runtime hard-codes sit next to them as aliases.

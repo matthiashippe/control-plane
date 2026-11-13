@@ -22,6 +22,7 @@ const ERLAUBTE_WILDCARDS = new Map([
   ["/v1/briefs/*", "eigene Middleware, /v1/briefs/check braucht keinen Schluessel"],
   ["/v1/sandboxes/*", "checks the key in its own handler, test/sandbox-api.test.ts holds the 401 and the 404"],
   ["/v1/domains/*", "checks the key in its own handler, test/domains.test.ts holds the 401"],
+  ["/v1/handoff/*", "checks the poll token in its own handler, test/handoff-events.test.ts holds the 401 and the 404"],
   // Zwei exakte Pfade, die absichtlich ausserhalb der Liste liegen, jeder mit seinem Grund im Code:
   ["/v1/models", "bewusst nicht in V1_ROUTES, weil jeder OpenAI-Client ihn ohne Schluessel ruft"],
   ["/v1/briefs/check", "eigene Middleware darueber, braucht keinen Schluessel"],

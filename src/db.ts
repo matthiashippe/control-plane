@@ -399,6 +399,25 @@ function migrate(db: Db): void {
   if (!deliveryCols.some((c) => c.name === "rounds")) db.exec("ALTER TABLE deliveries ADD COLUMN rounds INTEGER NOT NULL DEFAULT 0");
   if (!deliveryCols.some((c) => c.name === "rework_at")) db.exec("ALTER TABLE deliveries ADD COLUMN rework_at TEXT");
 
+  // The step a person approves on their phone (goals/konto/02, docs/konto/handoff.md). `code` is public
+  // (QR code and link), `poll_hash` is the sha256 of the terminal's secret and the only form it is
+  // stored in. `choices` holds the three numbers in the order the page shows them, `match` among them.
+  // Times in epoch milliseconds, because the ten minutes are compared and not displayed.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS handoffs (
+      code             TEXT PRIMARY KEY,
+      poll_hash        TEXT NOT NULL UNIQUE,
+      automaton_name   TEXT NOT NULL,
+      daily_limit_usdc TEXT NOT NULL,
+      amount_usdc      TEXT NOT NULL,
+      match            INTEGER NOT NULL CHECK (match BETWEEN 10 AND 99),
+      choices          TEXT NOT NULL,
+      state            TEXT NOT NULL CHECK (state IN ('pending', 'done', 'burned', 'expired')),
+      created_at       INTEGER NOT NULL,
+      updated_at       INTEGER NOT NULL
+    );
+  `);
+
   // The conversation that asks back (HAN-77). `fields` is what was understood so far, `turns` the
   // transcript; both are a person's words and are deleted after a day (`cleanupConversations` in
   // src/checkout/conversation.ts). `conversation_days` counts model calls and their cost per UTC
@@ -655,8 +674,13 @@ export function getAvailableMc(db: Db, address: string): number {
  * Nonces stay as long as a signature can be valid, plus a buffer. Payments are only discarded in
  * state `failed`, and only old ones: `settled` is the receipt of a credit and is never deleted.
  */
-export function cleanupExpired(db: Db, now = Date.now()): { nonces: number; sessions: number; payments: number } {
+export function cleanupExpired(
+  db: Db,
+  now = Date.now(),
+): { nonces: number; sessions: number; payments: number; handoffs: number } {
   const NONCE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+  // POST /v1/handoff needs no key, so its rows go a day after they were created, in every state (goals/konto/02, Punkt 11).
+  const HANDOFF_MAX_AGE_MS = 24 * 60 * 60 * 1000;
   const FAILED_PAYMENT_MAX_AGE_DAYS = 30;
   const run = db.transaction(() => {
     const nonces = db.prepare("DELETE FROM siwe_nonces WHERE issued_at < ?").run(now - NONCE_MAX_AGE_MS).changes;
@@ -664,7 +688,8 @@ export function cleanupExpired(db: Db, now = Date.now()): { nonces: number; sess
     const payments = db
       .prepare("DELETE FROM payments WHERE status = 'failed' AND created_at < ?")
       .run(new Date(now - FAILED_PAYMENT_MAX_AGE_DAYS * 24 * 60 * 60 * 1000).toISOString()).changes;
-    return { nonces, sessions, payments };
+    const handoffs = db.prepare("DELETE FROM handoffs WHERE created_at < ?").run(now - HANDOFF_MAX_AGE_MS).changes;
+    return { nonces, sessions, payments, handoffs };
   });
   return run();
 }
