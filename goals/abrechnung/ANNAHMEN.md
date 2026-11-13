@@ -124,3 +124,14 @@
   Schlüssel-API kommt, die dieses Goal nicht aufrufen darf; die Gegenprobe über die Tage ohne Abbruch ersetzt ihn.
 - **Stand der Produktion am 11.11.2026 01:35 UTC** (`ROWS_JS` aus `ops/abort-purchase.sh`, lesend über `ssh` und `docker exec`): 483
   Zeilen, keine Zeile in `inference_aborts`.
+
+## Reparatur Audit 2026-11-13 Zeile 70 (13.11.2026, Engineer CP)
+- **Ursache:** Der Management-Key liegt seit dem 12.11.2026 nur noch in `~/.config/control-plane/openrouter-management.env`
+  (Entscheidung Tech Lead, abrechnung 05), `ops/abort-purchase.sh` las ihn aber weiter aus der Umgebung oder `loop.env`. Damit endete
+  die Prüfung (Netz) von abrechnung 04 Punkt 3 mit Exit 2, und abrechnung 05 startet frühestens am 18.11.2026.
+- **Vorgezogen:** Die Reparatur baut den Kritik-Punkt „liest den Management-Key nur aus `openrouter-management.env`“ aus
+  `goals/abrechnung/05-quote-nach-aussen-nach-sieben-tagen.md` nach dessen Text, mit `test/abort-purchase-key-file.test.ts`. Rot vorher
+  mit dem Skript von `origin/dev` 57acba8: 4 failed von 6 (Key nur in `loop.env`, nur in der Umgebung, Datei mit 0600, Pfad aus
+  `AP_MANAGEMENT_KEY_FILE`). Der Maker von abrechnung 05 findet den Punkt gebaut vor und belegt ihn mit seinen Prüfbefehlen.
+- **Format der Datei:** genau eine Zeile `OPENROUTER_MANAGEMENT_KEY=<Wert>`, Anführungszeichen um den Wert werden entfernt; die Datei
+  wird nicht gesourct, der Wert nicht exportiert und nur auf stdin an `curl` gegeben.
