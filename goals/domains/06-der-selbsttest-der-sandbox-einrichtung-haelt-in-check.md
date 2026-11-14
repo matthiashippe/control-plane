@@ -1,7 +1,7 @@
 # Domains Goal 06: Der Selbsttest der Sandbox-Einrichtung hält in check
 
 ## Status
-PLANNED
+DONE
 
 ## Active Objective
 `test/sandbox-setup-selftest.test.ts` startet `bash ops/sandbox/setup.sh --selftest` ohne Netz und verlangt Exit 0, die letzte Zeile
@@ -81,7 +81,7 @@ keinen Kunden mehr aussperrt, dessen Anlage gerade startet.
 - [x] `check` ist grün, hier und im Required Check am PR auf dem GitHub-Rechner.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung (Netz): `gh pr checks goal/domains-06 -R matthiashippe/control-plane --required --json name,bucket --jq '.[] | select(.name=="check") | .bucket'` muss `pass` ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Der Fall `late` war vor dem Fix rot (der alte `client_key_reset` meldete `moved=1` und ließ `cp.pub` weg); die Zeile im Progress
@@ -108,5 +108,6 @@ keinen Kunden mehr aussperrt, dessen Anlage gerade startet.
 ## Progress Log
 - 2026-11-14 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6 gebaut: neuer Test `test/sandbox-setup-selftest.test.ts` (spawn, 240 s Geduld) verlangt Exit 0, letzte Zeile `SETUP SELFTEST OK`, keine Zeile mit ` FAIL` und jede der vier Zeilen `selftest image-pin: ok (…)` und zehn Zeilen `selftest client-key-reset: ok (…)` wörtlich; `client_key_reset` fragt nach dem Verschieben (`moved=1`) `foreign_sandboxes` ein zweites Mal ab und legt über `cp_pub_back` (Schnipsel `CP_PUB_RESTORE`, `mv -n`) sofort zurück, bei fremder Sandbox mit der letzten Zeile `SETUP CLIENT-KEY-RESET FAIL: foreign sandbox started`, bei unlesbarer Seite mit `SETUP CLIENT-KEY-RESET FAIL: second check: …`; Selbsttestfall `late` mit vier Varianten (fremde Sandbox gestartet, `state.json` weg, Zahlungsserver weg, neuerer Schlüssel vor dem Zurücklegen); die sieben lokalen Node-Aufrufe nehmen `LOCAL_NODE` (`SETUP_NODE`, `/usr/bin/node`, Node auf dem `PATH`, der erste mit `node:sqlite` und Type-Stripping), Weg und verbleibendes Fenster in `goals/domains/ANNAHMEN.md`, `ops/README.md` nennt die zweite Prüfung. Rot vor dem Fix: der neue Test ohne Fall `late` (`selftest client-key-reset: ok (late)` fehlte), dann `late` gegen den alten `client_key_reset` (`FAIL late: exit 0, last line SETUP CLIENT-KEY-RESET OK moved=1, 1 reads of state.json, want 2`). Gepflanzt und rot: Reset ohne zweite Abfrage (`FAIL late`), unlesbare zweite Abfrage ohne Zurücklegen (`FAIL late: no state.json: cp.pub not back`), Zurücklegen mit `mv -f` ohne Prüfung auf `cp.pub` (`FAIL keep`, `FAIL late: newer key`; die erste Fassung mit gleichem Schlüsselinhalt blieb grün und wurde ersetzt), Test ohne fehlenden Fall (Punkt 1, `ok (kept)`: `exit 1`); Node-Wahl: mit `SETUP_NODE` auf Node 24 `SETUP SELFTEST OK`, ein unbrauchbarer `SETUP_NODE` fällt auf `/usr/bin/node` zurück. Prüfbefehle: P1 Exit 0, `1` `exit 1`, `1` `exit 1`; P2 `1`, `4`; P3 `9`, `4`, Exit 0 mit `SETUP SELFTEST OK`; P4 `1`; P5 `0`; P6 `node scripts/check.mjs` Exit 0 (1781 Tests grün, mit Node 22 auf dem `PATH`), Required Check am PR folgt im Kommentar.
 - 2026-11-14 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, nach Merge von `origin/dev` (9d7d99e) in den Goal-Branch. Prüfbefehle: P1 Exit 0, `1` `exit 1`, `1` `exit 1`; P2 `1`, `4`; P3 `9`, `4`, Exit 0 mit `SETUP SELFTEST OK`; P4 `1`; P5 `0`; P6 `node scripts/check.mjs` Exit 0 (154 Dateien, 1781 Tests grün, Node 22), Required Check `check` am PR im Kommentar.
+- 2026-11-14 Release: PASS K und B (Zyklus 2), DONE.
 
 ## Blockers
