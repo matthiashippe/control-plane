@@ -1,7 +1,7 @@
 # Adressen Goal 01: Besucheradressen aus den Actions-Logs und im Gate gesperrt
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Kein Besucher des Dienstes findet seine Adresse in den Logs der Actions des öffentlichen Repos, und kein PR bringt den Cache von
@@ -102,7 +102,7 @@ lesbar hält, und weil heute nur `.gitignore` und ein Test den Cache aus dem Rep
       Prüfung: `a=$(git log --format=%cI -S'ops/fetcher-cache.tsv' -- gate.yaml | tail -n 1); ~/work/code-host/tools/loop-master drill control-plane | node -e 'let s="";process.stdin.on("data",c=>s+=c).on("end",()=>{const d=JSON.parse(s).counted||{};const a=new Date(process.argv[1]);console.log(d.status==="grün"&&a.getTime()>0&&new Date(d.at)>a?"gezeigt":"fehlt")})' "$a"` muss `gezeigt` ausgeben.
 - [x] `check` ist grün.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Die neue Testdatei war vor dem Fix rot; die Zeile im Progress Log nennt, womit.
@@ -127,6 +127,7 @@ lesbar hält, und weil heute nur `.gitignore` und ein Test den Cache aus dem Rep
 - 2026-11-14 Zyklus 1: Punkte 1, 2 und 5 gebaut (Zähler `ops/actions-log-addresses.sh` mit Test und README-Abschnitt, Zählung in `docs/adressen/actions-logs.md`: 5 der 6 Läufe mit fremden Adressen, 2 verschiedene, 5 von 112 Läufen von deploy.yml), Punkte 3 und 4 warten auf das Human Gate `delete_data`; der neue Test war vor dem Skript rot (12 failed, Skript fehlte). Prüfbefehle: P1 `da`, `1 1 2 2 total 2 `, `2 0`, vitest 12 passed Exit 0, README 4; P2 6, 1, 1, 1, 0; P3 offen (Netz: 6 Läufe liefern noch ein Log); P4 Diff gate.yaml 0, Eintrag 0 und Drill offen; P5 `node scripts/check.mjs` Exit 0 (148 Dateien, 1731 Tests).
 - 2026-11-14 Zyklus 2: Punkt 3 gebaut (`origin/dev` mit dem Eintrag in `gate.yaml` gemergt, Abschnitt `## Nach dem Löschen` in `docs/adressen/actions-logs.md`: keiner der sechs Läufe liefert ein Log, 0 fremde Adressen in 128 Läufen von deploy.yml), Punkt 4 wartet auf den Drill 20261114-094046Z, den der Loop Master nach der Änderung an `gate.yaml` gestartet hat. Prüfbefehle: P3 Netz 0, Netz `0`, Abschnitt 1, `total 0` 1; P4 Eintrag 1, Diff gate.yaml 0, Drill `fehlt` (Drill läuft, Verdicts der Linsen fehlen); P2 6, 1, 1, 1, 0; P5 `node scripts/check.mjs` Exit 0 (149 Dateien, 1736 Tests).
 - 2026-11-14 Zyklus 3: Abschluss gemeldet, Punkte 1, 2, 3, 4 und 5 (`origin/dev` gemergt, Punkt 4 nach dem grünen Drill 20261114-094046Z abgehakt; derselbe Prüfbefehl gab vor dem Takt um 12:00 UTC `fehlt` aus, weil der Takt um 11:50 UTC den Beleg der Linse K noch nicht gelesen hatte). Prüfbefehle: P1 `da`, `1 1 2 2 total 2 `, `2 0`, vitest Exit 0, README 4; P2 6, 1, 1, 1, 0; P3 Netz 0, Netz `0`, Abschnitt 1, `total 0` 1; P4 Eintrag 1, Diff gate.yaml 0, Drill `gezeigt`; P5 `node scripts/check.mjs` Exit 0 (150 Dateien, 1760 Tests).
+- 2026-11-14 Release: PASS K und B (Zyklus 3), DONE.
 
 ## Blockers
 - keine (Human Gate `delete_data` am 14.11.2026 um 09:32 UTC gelöst: Logs gelöscht, `gate.yaml` auf dev mit Commit 3f1ac20)
