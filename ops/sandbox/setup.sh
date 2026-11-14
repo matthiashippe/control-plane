@@ -7,8 +7,12 @@
 #   bash ops/sandbox/setup.sh --client-key <address>  read the public key of the service cp from the payment server (read only)
 #                                                and install it as /etc/sandboxd/keys/cp.pub after an Ed25519 check, idempotent;
 #                                                last line SETUP CLIENT-KEY OK changed=0 or changed=1, a broken key changes nothing
+#   bash ops/sandbox/setup.sh --client-key-reset <address>  move cp.pub to cp.pub.prev, which sandboxd does not read, so the next
+#                                                --client-key gives changed=1 (domains 04, the measured key change); the probe
+#                                                key stays; last line SETUP CLIENT-KEY-RESET OK moved=1, without cp.pub moved=0
 #   bash ops/sandbox/setup.sh --selftest         without network: the comparison reports a planted deviation and a clean state not,
-#                                                and --client-key installs a valid key once and rejects broken ones
+#                                                --client-key installs a valid key once and rejects broken ones, and
+#                                                --client-key-reset takes cp.pub away from sandboxd and leaves the probe key
 #
 # What it manages: Docker with the gVisor runtime runsc (platform systrap), the nftables table inet sandbox (sandbox.nft), the
 # systemd slice sandbox.slice, sandboxd as a unit in that slice on the loopback with its own Node 22, the probe key of the
@@ -251,8 +255,19 @@ mv -f "$t" "$d/cp.pub"
 REMOTE
 )
 
+# --client-key-reset: moves cp.pub to cp.pub.prev, a name sandboxd does not read (it takes *.pub only), so the service's
+# calls fail with "key not accepted" until the next --client-key writes the key again (changed=1). The probe key stays.
+CP_PUB_RESET=$(cat <<'REMOTE'
+set -eu
+d=$1/etc/sandboxd/keys
+if [ -f "$d/cp.pub" ]; then mv -f "$d/cp.pub" "$d/cp.pub.prev"; echo moved=1; else echo moved=0; fi
+REMOTE
+)
+
 sbx_read_sha() { ssh_host "$1" "set -- ''
 $CP_PUB_READ"; }
+sbx_reset_cp_pub() { ssh_host "$1" "set -- ''
+$CP_PUB_RESET"; }
 sbx_write_cp_pub() { ssh_host "$1" "set -- ''
 $CP_PUB_WRITE"; }
 
@@ -279,6 +294,19 @@ install_client_key() {
   if ! printf '%s\n' "$pub" | sbx_write_cp_pub "$host"; then echo "SETUP CLIENT-KEY FAIL: cannot write $CP_PUB"; return 1; fi
   if [ "$(sbx_read_sha "$host")" != "$want" ]; then echo "SETUP CLIENT-KEY FAIL: $CP_PUB differs after the write"; return 1; fi
   echo "SETUP CLIENT-KEY OK changed=1"
+}
+
+# client_key_reset <address>: takes cp.pub out of what sandboxd reads; last line SETUP CLIENT-KEY-RESET OK moved=1, or
+# moved=0 when there was no cp.pub. Prints neither key nor CP_HOST.
+client_key_reset() {
+  local out
+  if ! out=$(sbx_reset_cp_pub "$1"); then echo "SETUP CLIENT-KEY-RESET FAIL: cannot move $CP_PUB on the sandbox host"; return 1; fi
+  case "$out" in
+    moved=0 | moved=1) ;;
+    *) echo "SETUP CLIENT-KEY-RESET FAIL: no moved=0 or moved=1 from the sandbox host"; return 1 ;;
+  esac
+  if [ "$(sbx_read_sha "$1")" != missing ]; then echo "SETUP CLIENT-KEY-RESET FAIL: $CP_PUB still there"; return 1; fi
+  echo "SETUP CLIENT-KEY-RESET OK $out"
 }
 
 # client_key <address>: the one read on the payment server, then install_client_key. Never prints CP_HOST or the key path.
@@ -352,6 +380,50 @@ selftest_client_key() {
   return $fail
 }
 
+# selftest of --client-key-reset: a fake sandbox host under $1/reset with cp.pub and the probe key, the same snippets as on
+# the host, no network. sandboxd takes every *.pub in the keys folder, so after the reset no *.pub but probe.pub may be left.
+selftest_client_key_reset() {
+  local t=$1 root=$1/reset fail=0 out rc probe_before
+  ssh() { echo "selftest must not reach the network (ssh)" >&2; return 99; }
+  curl() { echo "selftest must not reach the network (curl)" >&2; return 99; }
+  sbx_read_sha() { bash -c "$CP_PUB_READ" _ "$root"; }
+  sbx_write_cp_pub() { bash -c "$CP_PUB_WRITE" _ "$root"; }
+  sbx_reset_cp_pub() { bash -c "$CP_PUB_RESET" _ "$root"; }
+  mkdir -p "$root/etc/sandboxd/keys"
+  cp "$t/a.pub" "$root$CP_PUB"
+  cp "$t/b.pub" "$root/etc/sandboxd/keys/probe.pub"
+  probe_before=$(sha < "$root/etc/sandboxd/keys/probe.pub")
+  listing() { (cd "$root/etc/sandboxd/keys" && find . -mindepth 1 -printf '%P %s %T@\n' | sort); }
+  pubs() { (cd "$root/etc/sandboxd/keys" && find . -mindepth 1 -maxdepth 1 -name '*.pub' -printf '%P\n' | sort | paste -sd, -); }
+  # rs <label> <want moved>: one reset, then its last line and what sandboxd would read
+  rs() {
+    local why=
+    rc=0
+    out=$(client_key_reset selftest-host) || rc=$?
+    [ $rc -eq 0 ] || why="exit $rc"
+    [ "$(tail -1 <<<"$out")" = "SETUP CLIENT-KEY-RESET OK moved=$2" ] || why="$why, last line $(tail -1 <<<"$out")"
+    [ ! -e "$root$CP_PUB" ] || why="$why, cp.pub still there"
+    [ "$(pubs)" = probe.pub ] || why="$why, sandboxd reads $(pubs)"
+    [ "$(sha < "$root/etc/sandboxd/keys/probe.pub")" = "$probe_before" ] || why="$why, probe key changed"
+    echo "${why#, }"
+  }
+  local why before
+  why=$(rs moved 1)
+  cmp -s "$t/a.pub" "$root$CP_PUB.prev" || why="${why:+$why, }cp.pub.prev differs from the old cp.pub"
+  if [ -z "$why" ]; then echo "selftest client-key-reset: ok (moved)"; else echo "selftest client-key-reset: FAIL moved: $why"; fail=1; fi
+  before=$(listing)
+  why=$(rs again 0)
+  [ "$(listing)" = "$before" ] || why="${why:+$why, }the keys folder changed"
+  if [ -z "$why" ]; then echo "selftest client-key-reset: ok (again)"; else echo "selftest client-key-reset: FAIL again: $why"; fail=1; fi
+  why=
+  out=$(install_client_key selftest-host "$(cat "$t/a.pub")") || why="exit $?"
+  [ "$(tail -1 <<<"$out")" = "SETUP CLIENT-KEY OK changed=1" ] || why="${why:+$why, }last line $(tail -1 <<<"$out")"
+  cmp -s "$t/a.pub" "$root$CP_PUB" || why="${why:+$why, }cp.pub is not the old key"
+  [ "$(sha < "$root/etc/sandboxd/keys/probe.pub")" = "$probe_before" ] || why="${why:+$why, }probe key changed"
+  if [ -z "$why" ]; then echo "selftest client-key-reset: ok (reinstall)"; else echo "selftest client-key-reset: FAIL reinstall: $why"; fail=1; fi
+  return $fail
+}
+
 selftest() {
   local t d o out fail=0
   t=$(mktemp -d)
@@ -380,6 +452,8 @@ selftest
   if declare -f check | grep -q 'APPLY\|apply '; then echo "selftest check: FAIL check runs apply"; fail=1; else echo "selftest check: ok (read only)"; fi
   # 4. --client-key against a fake host in a subshell, so the stubs stay local
   ( selftest_client_key "$t" ) || fail=1
+  # 5. --client-key-reset on a second fake host, with the keys selftest_client_key made
+  ( selftest_client_key_reset "$t" ) || fail=1
   rm -rf "$t"
   if [ $fail -eq 0 ]; then echo "SETUP SELFTEST OK"; else echo "SETUP SELFTEST FAIL"; return 1; fi
 }
@@ -388,6 +462,7 @@ case "${1:-}" in
   --selftest) selftest ;;
   --check) [ -n "${2:-}" ] || { echo "usage: $0 --check <address>" >&2; exit 2; }; check "$2" ;;
   --client-key) [ -n "${2:-}" ] || { echo "usage: $0 --client-key <address>" >&2; exit 2; }; client_key "$2" ;;
-  -*|"") echo "usage: $0 <address> | --check <address> | --client-key <address> | --selftest" >&2; exit 2 ;;
+  --client-key-reset) [ -n "${2:-}" ] || { echo "usage: $0 --client-key-reset <address>" >&2; exit 2; }; client_key_reset "$2" ;;
+  -*|"") echo "usage: $0 <address> | --check <address> | --client-key <address> | --client-key-reset <address> | --selftest" >&2; exit 2 ;;
   *) apply "$1" ;;
 esac
