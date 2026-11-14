@@ -42,17 +42,23 @@ report() {
 }
 
 # A dead webhook does not announce itself: on a day without a change of state nothing is posted, so nothing can fail.
-# Once a UTC day, the first run posts a sign of life with priority `min` (ntfy delivers it without sound or vibration).
-# The day stamp is stored only after the POST went through, so with a dead webhook every run tries again and leaves one
-# line `[WARN] webhook unreachable`. It runs before the health check, so a run during an outage tries it as well.
+# The first run in each of three windows per UTC day (from 00:00, 08:00 and 16:00 UTC) posts a sign of life with priority
+# `min` (ntfy delivers it without sound or vibration). Three windows, because ops/status.sh compares the last delivery with
+# the topic only while it is younger than 11 hours (ntfy caches 12 hours); with one sign of life a day `received` was
+# `unknown` from about 11:05 UTC on. The stamp is the start of the window (`YYYY-MM-DDTHH`), taken from TS and not from
+# another call of `date`; a stamp of the old format (`YYYY-MM-DD`) counts as a missing window. It is stored only after the
+# POST went through, so with a dead webhook every run of the window tries again and leaves one line
+# `[WARN] webhook unreachable`. It runs before the health check, so a run during an outage tries it as well.
 # CP_WATCHDOG_ALIVE=0 switches only this off, for tests that count every POST.
 sign_of_life() {
-  local today
+  local hour window
   [[ -n "$WEBHOOK" && "${CP_WATCHDOG_ALIVE:-1}" != "0" ]] || return 0
-  today=$(date -u +%F)
-  [[ "$(cat "${STATE_FILE}.alive" 2>/dev/null)" == "$today" ]] && return 0
+  hour=$((10#${TS:11:2}))
+  if (( hour >= 16 )); then window=16; elif (( hour >= 8 )); then window=08; else window=00; fi
+  window="${TS:0:10}T$window"
+  [[ "$(cat "${STATE_FILE}.alive" 2>/dev/null)" == "$window" ]] && return 0
   report "ALIVE" "daily sign of life, the alarm path works" &&
-    { echo "$today" > "${STATE_FILE}.alive" 2>/dev/null || true; }
+    { echo "$window" > "${STATE_FILE}.alive" 2>/dev/null || true; }
 }
 
 # Two attempts with a pause, so a single hiccup does not alarm straight away.
