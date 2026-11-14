@@ -13,6 +13,12 @@
 #   held      POST with a JSON body, answer 200, the body arrives unchanged
 #   get-held  the same with GET
 #   control   the same block without the lb_try_* lines answers 502, so this test can see an outage
+#   restart   a running service, a GET /health through caddy every 250 ms; after the fourth answer
+#             the service is stopped by PID and started again on the same port 2 s later, and
+#             probing goes on until four answers came after the restart. ok only if every answer
+#             was 200 and at least one was held longer than 0.5 s, otherwise
+#             `FAIL restart: <answers>, <answers not 200>, longest <s> s`
+#   restart-control  the same without the lb_try_* lines, ok if at least one answer was 502
 # Last line CADDY RETRY SELFTEST OK (exit 0) or CADDY RETRY SELFTEST FAIL (exit 1).
 # Without caddy on PATH: COULD NOT TELL: caddy not found (exit 2).
 #
@@ -79,12 +85,10 @@ class H(http.server.BaseHTTPRequestHandler):
 http.server.ThreadingHTTPServer(("127.0.0.1", int(sys.argv[1])), H).serve_forever()
 PY
 
-# One case: start caddy with the block, send the request while nothing listens upstream, start the
-# upstream after 3 s, read status and body. Prints "<status> <body>".
-run_case() {
-  local name=$1 method=$2 strip=$3
-  local up proxy cfg body status out cpid upid start
-  up=$(free_port); proxy=$(free_port)
+# Start caddy with the block (without the lb_try_* lines for `strip`) on <proxy>, pointed at <up>,
+# and wait until it listens. Prints the PID of caddy.
+start_caddy() {
+  local name=$1 strip=$2 up=$3 proxy=$4 cfg cpid
   cfg="$TMP/$name.Caddyfile"
   local b="$block"
   if [[ "$strip" == strip ]]; then
@@ -106,6 +110,16 @@ run_case() {
     if (exec 3<>"/dev/tcp/127.0.0.1/$proxy") 2>/dev/null; then break; fi
     sleep 0.1
   done
+  echo "$cpid"
+}
+
+# One case: start caddy with the block, send the request while nothing listens upstream, start the
+# upstream after 3 s, read status and body. Prints "<status> <body>".
+run_case() {
+  local name=$1 method=$2 strip=$3
+  local up proxy body status out cpid upid start
+  up=$(free_port); proxy=$(free_port)
+  cpid=$(start_caddy "$name" "$strip" "$up" "$proxy")
   body="{\"model\":\"planted\",\"messages\":[{\"role\":\"user\",\"content\":\"hold me $name\"}]}"
   ( sleep 3; exec python3 "$TMP/upstream.py" "$up" ) &
   upid=$!; echo "$upid" >> "$TMP/pids"
@@ -160,9 +174,100 @@ check() {
   fi
 }
 
+# The restart, as a rollout does it: the service runs and answers, then it is gone for 2 s, then a
+# new process answers on the same port. The probes are fired on a fixed beat whether or not the
+# earlier ones came back, like independent callers, and each one records its status and how long
+# it took. Prints "<answers> <answers not 200> <longest> <answers that were 502>".
+cat > "$TMP/restart.py" <<'PY'
+import http.client, socket, subprocess, sys, threading, time
+
+upstream, up, proxy, pids = sys.argv[1], int(sys.argv[2]), int(sys.argv[3]), sys.argv[4]
+results, lock = [], threading.Lock()
+
+def start():
+    p = subprocess.Popen([sys.executable, upstream, str(up)])
+    with open(pids, "a") as f:
+        f.write(f"{p.pid}\n")
+    for _ in range(100):
+        try:
+            socket.create_connection(("127.0.0.1", up), 0.2).close()
+            break
+        except OSError:
+            time.sleep(0.05)
+    return p
+
+def probe(fired):
+    status, t0 = 0, time.monotonic()
+    try:
+        c = http.client.HTTPConnection("127.0.0.1", proxy, timeout=40)
+        c.request("GET", "/health")
+        status = c.getresponse().status
+        c.close()
+    except Exception:
+        pass
+    with lock:
+        results.append((fired, time.monotonic(), status, time.monotonic() - t0))
+
+service = start()
+stopped_at = restarted_at = None
+threads, deadline = [], time.monotonic() + 60
+while time.monotonic() < deadline:
+    t = threading.Thread(target=probe, args=(time.monotonic(),))
+    t.start()
+    threads.append(t)
+    time.sleep(0.25)
+    with lock:
+        done = len(results)
+        after = sum(1 for r in results if restarted_at is not None and r[0] >= restarted_at)
+    if stopped_at is None and done >= 4:
+        service.terminate()
+        service.wait()
+        stopped_at = time.monotonic()
+    elif stopped_at is not None and restarted_at is None and time.monotonic() - stopped_at >= 2:
+        service = start()
+        restarted_at = time.monotonic()
+    elif restarted_at is not None and after >= 4:
+        break
+for t in threads:
+    t.join()
+service.terminate()
+service.wait()
+bad = sum(1 for r in results if r[2] != 200)
+gateway = sum(1 for r in results if r[2] == 502)
+longest = max((r[3] for r in results), default=0.0)
+print(len(results), bad, f"{longest:.2f}", gateway, "restarted" if restarted_at is not None else "not-restarted")
+PY
+
+check_restart() {
+  local name=$1 strip=$2 up proxy cpid res answers bad longest gateway restarted
+  up=$(free_port); proxy=$(free_port)
+  cpid=$(start_caddy "$name" "$strip" "$up" "$proxy")
+  res=$(python3 "$TMP/restart.py" "$TMP/upstream.py" "$up" "$proxy" "$TMP/pids")
+  kill "$cpid" 2>/dev/null
+  read -r answers bad longest gateway restarted <<<"$res"
+  if [[ "$strip" == keep ]]; then
+    if [[ "$restarted" == restarted && "${answers:-0}" -gt 0 && "$bad" == 0 ]] \
+      && python3 -c "import sys; sys.exit(0 if float('$longest') > 0.5 else 1)"; then
+      echo "ok   $name"
+    else
+      echo "FAIL $name: ${answers:-0}, ${bad:-0}, longest ${longest:-0} s"
+      fails=$((fails + 1))
+    fi
+  else
+    if [[ "${gateway:-0}" -gt 0 ]]; then
+      echo "ok   $name"
+    else
+      echo "FAIL $name: no 502 among ${answers:-0} answers, longest ${longest:-0} s"
+      fails=$((fails + 1))
+    fi
+  fi
+}
+
 check held 200 POST keep
 check get-held 200 GET keep
 check control 502 POST strip
+check_restart restart keep
+check_restart restart-control strip
 
 if [[ $fails -eq 0 ]]; then
   echo "CADDY RETRY SELFTEST OK"
