@@ -146,3 +146,26 @@
   am Zahlungsserver mit gepflanzten Konten: leer `0`, ein unbekanntes Konto `1`, das Konto der Live-Prüfung (`LIVE_SANDBOX_ADDRESS`
   in `sandbox_owners`) `0`, beide zusammen `1`. Eine laufende Sandbox auf dem echten Server pflanzt das Goal nicht, weil das eine
   Anlage über den Dienst wäre; die Seite `state.json` ist im Selbsttest mit laufenden, gestoppten und kaputten Einträgen belegt.
+
+## domains 06 (14.11.2026, Engineer CP)
+
+- **Node für die lokalen Aufrufe von `setup.sh`.** Die sieben Aufrufe, die auf dem code-host laufen (`probe_pub`, die Prüfung eines
+  Ed25519-Schlüssels, `RUNNING_OWNERS_JS` und die drei des Selbsttests), nehmen `LOCAL_NODE`: zuerst `SETUP_NODE`, dann
+  `/usr/bin/node`, dann den Node auf dem `PATH`, jeweils den ersten, der `node:sqlite` laden kann und Type-Stripping hat (der
+  Selbsttest lädt `src/bounties/ours.ts` direkt). Auf dem code-host bleibt das `/usr/bin/node` (v22.23.4) wie bisher. Der Required
+  Check auf `ubuntu-latest` hat Node 22 von `actions/setup-node` auf dem `PATH`; ob dort ein `/usr/bin/node` liegt und welche Version
+  es hat, ist nicht belegt, darum prüft `setup.sh` die Fähigkeit statt des Pfads. Gibt es keinen passenden, bleibt `/usr/bin/node`
+  und der Selbsttest wird rot statt still zu überspringen. Auf dem Sandbox-Server ändert sich nichts: `sandboxd` läuft weiter mit
+  `NODE_DIR`, und die entfernten Schnipsel bleiben unverändert. Der Test setzt keinen Pfad zu Node.
+- **Die zweite Abfrage verkürzt das Fenster, schließt es nicht.** `client_key_reset` ruft nach dem Verschieben dieselbe Funktion
+  `foreign_sandboxes` noch einmal; läuft jetzt eine fremde Sandbox oder ist eine Seite nicht lesbar, legt `cp_pub_back` mit dem
+  Schnipsel `CP_PUB_RESTORE` sofort zurück (nur bei fehlendem `cp.pub`, `mv -n`, ein neuerer Schlüssel gewinnt), und die letzte
+  Zeile ist `SETUP CLIENT-KEY-RESET FAIL: foreign sandbox started` oder `SETUP CLIENT-KEY-RESET FAIL: second check: …`. Offen bleibt
+  eine Anlage, die zwischen dem Verschieben und der zweiten Abfrage beginnt, und jede, die `sandboxd` noch in seiner Map `pending`
+  hält (`ops/sandbox/sandboxd.mjs:294`), weil sie erst nach dem Start in `state.json` steht. Sie zu sehen hieße `sandboxd` ändern,
+  der in diesem Goal gesperrt ist. Scheitert das sofortige Zurücklegen selbst (SSH weg), bleibt der Timer `cp-pub-restore` als
+  Rückfall stehen; er tut bei vorhandenem `cp.pub` nichts.
+- **Der Selbsttestfall `late` zählt die Leseversuche von `state.json`** über die Subshells von `foreign_sandboxes` hinweg in einer
+  Datei und fährt nach dem ersten oder zweiten Versuch ein Skript (fremde Sandbox gestartet, `state.json` weg, Zahlungsserver nach
+  dem zweiten Lesen weg, neuerer Schlüssel vor dem Zurücklegen). Der neuere Schlüssel hat einen eigenen Inhalt, weil ein Zurücklegen
+  mit `mv -f` bei gleichem Inhalt nicht auffiele (erste Fassung der Gegenprobe blieb so grün).

@@ -945,7 +945,10 @@ einen Schlüsselwechsel zu messen (domains 04). Es verweigert mit `SETUP CLIENT-
 fremde Sandbox läuft, und mit einer anderen Zeile `FAIL`, wenn es eine der beiden Seiten nicht lesen kann; dann bleibt `cp.pub`
 liegen. Sonst setzt es zuerst den Timer `cp-pub-restore` (`systemd-run --on-active=<s>`, Standard 120, erlaubt 60 bis 3600, sonst
 Exit 2), der `cp.pub.prev` nach `<s>` Sekunden zurücklegt, wenn `cp.pub` dann noch fehlt; einen Schlüssel, den `--client-key`
-inzwischen geschrieben hat, überschreibt er nie. Scheitert der Timer, verschiebt es nichts. Danach `--client-key` fahren.
+inzwischen geschrieben hat, überschreibt er nie. Scheitert der Timer, verschiebt es nichts. Nach dem Verschieben prüft es ein
+zweites Mal und legt `cp.pub` sofort zurück, wenn jetzt eine fremde Sandbox läuft
+(`SETUP CLIENT-KEY-RESET FAIL: foreign sandbox started`) oder eine Seite nicht lesbar ist (domains 06); eine Anlage, die
+`sandboxd` gerade noch startet, steht noch nicht in `state.json`. Danach `--client-key` fahren. Den Selbsttest (`--selftest`) fährt `check` mit `test/sandbox-setup-selftest.test.ts`.
 
 ## Visitor addresses in the logs of GitHub Actions
 
