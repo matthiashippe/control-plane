@@ -1,7 +1,7 @@
 # Messung Goal 04: Kein Messwerkzeug liest die eigenen Adressen an `own_ips` vorbei
 
 ## Status
-PLANNED
+ACTIVE
 
 ## Active Objective
 Nach messung 03 lesen noch zwei Messwerkzeuge die Liste der eigenen Adressen direkt: `ops/timeout-quote.sh` (Zeile 46,
@@ -121,7 +121,7 @@ verfälscht beide Zahlen zugunsten des Kanals.
   `check` und vitest im Vordergrund mit eigenem Timeout; neue Dateien vor `check` mit `git add` stagen. Kein `pkill -f`.
 
 ## Done Condition
-- [ ] `ops/timeout-quote.sh` nimmt die eigenen Adressen über `own_ips`, zählt die live gesehene Adresse, jede Adresse aus
+- [x] `ops/timeout-quote.sh` nimmt die eigenen Adressen über `own_ips`, zählt die live gesehene Adresse, jede Adresse aus
       `CP_OWN_IPS_SEEN` und aus `CP_OWN_IPS` als `own`, bricht bei einer Liste ohne Adresse oder ohne Datei mit Exit 2 ab und ruft
       `ssh` nur im Produktionslauf und in `--join`.
       Prüfung: `grep -cE '^[^#]*(source|\.) .*own-ips\.sh' ops/timeout-quote.sh` muss mindestens 1 ausgeben.
@@ -130,20 +130,20 @@ verfälscht beide Zahlen zugunsten des Kanals.
       Prüfung: `grep -cE "an address only in CP_OWN_IPS_SEEN counts as own|the live address counts as own|an address in CP_OWN_IPS counts as own|an address in the list file counts as own|stops with exit 2 when the own list names no address even with a live address and a seen address|stops with exit 2 when the own list is missing|rows, compare-files and selftest never call ssh" test/timeout-quote-own-ips.test.ts` muss mindestens 7 ausgeben.
       Prüfung: `bash ops/timeout-quote.sh --selftest | tail -1 | grep -c "^TIMEOUT QUOTE SELFTEST OK"` muss 1 ausgeben.
       Prüfung: `pnpm -s vitest run test/timeout-quote-selftest.test.ts test/timeout-quote-compare.test.ts` muss Exit-Code 0 haben.
-- [ ] `ops/anzeigen-rechnung.py` zählt an der Bezahlroute nur Adressen, die `own_ips` nicht nennt, und endet bei einer Liste ohne
+- [x] `ops/anzeigen-rechnung.py` zählt an der Bezahlroute nur Adressen, die `own_ips` nicht nennt, und endet bei einer Liste ohne
       Adresse oder ohne Datei mit Exit 2, statt mit einer leeren Liste weiterzurechnen.
       Prüfung: `grep -cE "own-ips\.sh.*own_ips" ops/anzeigen-rechnung.py` muss mindestens 1 ausgeben.
       Prüfung: `pnpm -s vitest run test/anzeigen-rechnung-own-ips.test.ts` muss Exit-Code 0 haben.
       Prüfung: `grep -cE "an address only in CP_OWN_IPS_SEEN is not counted at the payment route|the live address is not counted at the payment route|stops with exit 2 when the own list names no address even with a live address and a seen address|stops with exit 2 when the own list is missing" test/anzeigen-rechnung-own-ips.test.ts` muss mindestens 4 ausgeben.
       Prüfung: `T=$(mktemp -d); printf '#!/bin/sh\necho called >> %s/calls\nexit 255\n' "$T" > "$T/ssh"; chmod +x "$T/ssh"; PATH="$T:$PATH" python3 ops/anzeigen-rechnung.py --selftest | tail -1; cat "$T/calls" 2>/dev/null | wc -l` muss `ANZEIGEN SELFTEST OK` und danach 0 ausgeben.
-- [ ] Außer `ops/own-ips.sh` nennt keine Datei unter `ops/` die Liste `own-ips.txt` außerhalb eines Kommentars, und ein Test in
+- [x] Außer `ops/own-ips.sh` nennt keine Datei unter `ops/` die Liste `own-ips.txt` außerhalb eines Kommentars, und ein Test in
       `check` hält das fest.
       Prüfung: `git ls-files -co --exclude-standard ops | grep -vE '^ops/fixtures/|^ops/own-ips\.sh$' | grep -E '\.(sh|py|cjs|mjs|js|ts)$' | xargs grep -nP '^(?!\s*(#|//|/\*|\*)).*(?<![\w-])own-ips\.txt' | wc -l` muss 0 ausgeben (auf `origin/dev` heute 6: `ops/actions-log-addresses.sh:43`, `ops/anzeigen-rechnung.py:42`, `ops/timeout-quote.sh:46`, `ops/traffic.sh:292`, `:831`, `:934`).
       Prüfung: `pnpm -s vitest run test/own-ips-readers.test.ts` muss Exit-Code 0 haben.
       Prüfung: `grep -cE "no file under ops/ besides ops/own-ips.sh names own-ips.txt outside a comment|the matcher trips on a direct read and passes comments and known-ips.txt" test/own-ips-readers.test.ts` muss 2 ausgeben.
       Prüfung: `grep -cE '^[^#]*\bown_ips\b' ops/actions-log-addresses.sh` muss 0 ausgeben, und `pnpm -s vitest run test/actions-log-addresses.test.ts` muss Exit-Code 0 haben.
       Prüfung: `git diff -U0 $(git merge-base origin/dev HEAD) HEAD -- ops/traffic.sh | grep -cE '^[-+]([^-+]|$)'` muss 6 ausgeben.
-- [ ] `check` ist grün, gesperrte Pfade bleiben unverändert, unter `ops/` ändern sich nur die vier genannten Dateien, und `check`
+- [x] `check` ist grün, gesperrte Pfade bleiben unverändert, unter `ops/` ändern sich nur die vier genannten Dateien, und `check`
       lässt die Liste der eigenen Adressen und das Zustandsverzeichnis unberührt.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD | grep -cE '^(\.github|deploy|src|harness|scripts|docs)/|^goals/kanal/|^ops/(fixtures/|own-ips\.(sh|txt)$|access-log\.sh$|conway|landing-yield\.sh$|github-yield\.sh$|claim-keyless\.sh$)|^test/(timeout-quote-(compare|selftest)|actions-log-addresses|conway-arrivals)\.test\.ts$'` muss 0 ausgeben.
@@ -177,7 +177,7 @@ verfälscht beide Zahlen zugunsten des Kanals.
 - max Versuche pro Gap: 3
 
 ## Progress Log
-- (leer)
+- 2026-11-14 Zyklus 1: Punkte 1, 2, 3, 4 gebaut. Nicht widerlegt: vor dem Fix zählte `ops/timeout-quote.sh --join` eine Adresse nur aus `CP_OWN_IPS_SEEN` als `foreign` (Fall „an address only in CP_OWN_IPS_SEEN counts as own“ rot). `ops/timeout-quote.sh` holt die Liste nur in Produktionslauf und `--join` über `own_list` (sourct `ops/own-ips.sh`, prüft die Datei auf eine Adresse, ruft `own_ips` mit verworfener stderr und stdin aus `/dev/null`, Exit 2 sonst), die übrigen Wege geben einen Platzhalter an den Zählkern; `ops/anzeigen-rechnung.py` holt sie über `bash -c 'source ops/own-ips.sh && <Prüfung> && own_ips'` und endet mit Exit 2 vor der Zeile der Betrachter; `ops/actions-log-addresses.sh` nimmt nur den Pfad aus `ops/own-ips.sh`, `ops/traffic.sh` nennt `own_ips (ops/own-ips.sh)` in drei Ausgabezeilen. Rot vor dem Fix (Stand origin/dev, 11 von 13): timeout-quote-own-ips 6 von 7 (SEEN, live, CP_OWN_IPS, leere Liste, fehlende Liste, ssh-Fall, weil `--join` den nachgebauten `ssh` nicht erreichte; grün war nur der Fall der Listendatei), anzeigen-rechnung-own-ips 4 von 4, own-ips-readers der erste Fall mit genau den sechs Treffern `ops/actions-log-addresses.sh:43`, `ops/anzeigen-rechnung.py:42`, `ops/timeout-quote.sh:46`, `ops/traffic.sh:292`, `:831`, `:934`. Prüfbefehle (Node 22.23.4): P1 `1`, `5`, vitest Exit 0, `7`, `1`, vitest selftest und compare Exit 0; P2 `1`, vitest Exit 0, `4`, `ANZEIGEN SELFTEST OK` und `0`; P3 `0`, vitest Exit 0, `2`, `0` und vitest actions-log-addresses Exit 0, `6`; P4 `check` Exit 0 (grün in 175 s), `0`, `0`, `0`, `0`.
 
 ## Blockers
 - keine

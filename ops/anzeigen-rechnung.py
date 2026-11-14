@@ -28,20 +28,53 @@ MC_PER_CENT = 1000
 FEE_PERCENT = 10
 
 
+# The list `own_ips` reads must name an address itself, read the way `own_ips` reads it (a line not
+# starting with # that has a first field). The live address and the remembered ones must not stand in
+# for it: an emptied list would then pass unnoticed and count the addresses it used to name as foreign.
+LIST_NAMES_AN_ADDRESS = (
+    '[ -f "$CP_OWN_IPS_FILE" ] || exit 3; '
+    "awk '!/^#/ && NF { n++ } END { exit !n }' \"$CP_OWN_IPS_FILE\" || exit 4"
+)
+
+
+class OwnListMissing(Exception):
+    """`own_ips` could not name our own addresses; nothing is counted then."""
+
+
+def eigene_adressen() -> set:
+    """Our own addresses from `own_ips` in ops/own-ips.sh: the list, the live address, every
+    address in CP_OWN_IPS_SEEN and in CP_OWN_IPS.
+
+    A missing list or one without an address raises instead of returning an empty set, because an
+    empty set would count our own visits as foreign ones. The stderr of `own_ips` is dropped, it can
+    name the live address.
+    """
+    try:
+        r = subprocess.run(["bash", "-c", "source ops/own-ips.sh && " + LIST_NAMES_AN_ADDRESS + " && own_ips 2>/dev/null"],
+                           capture_output=True, text=True, timeout=60, stdin=subprocess.DEVNULL)
+    except Exception as exc:
+        raise OwnListMissing("own_ips did not finish") from exc
+    if r.returncode == 3:
+        raise OwnListMissing("own_ips has no list of our own addresses (the file is missing)")
+    if r.returncode == 4:
+        raise OwnListMissing("own_ips has an empty list of our own addresses (it names none)")
+    own = set(r.stdout.split())
+    if r.returncode != 0 or not own:
+        raise OwnListMissing("own_ips could not name our own addresses")
+    return own
+
+
 def adressen_an_der_bezahlroute() -> int:
     """Foreign addresses that have ever been handed the payment offer.
 
     The denominator of the conversion, and it has to come from the log because a wallet that
     looked and left never appears in the database at all.
     """
+    own = eigene_adressen()
     try:
         log = subprocess.run(["./ops/access-log.sh"], capture_output=True, text=True, timeout=180).stdout
     except Exception:
         return 0
-    try:
-        own = set(open("ops/own-ips.txt").read().split())
-    except OSError:
-        own = set()
     adressen = set()
     for line in log.splitlines():
         line = line.strip()
@@ -114,7 +147,11 @@ def main() -> int:
     eingezahlt_c = markt.get("foreign_topup_mc", 0) / MC_PER_CENT
     marge_c = markt.get("foreign_margin_mc", 0) / MC_PER_CENT
     verbraucht_c = markt.get("foreign_inference_mc", 0) / MC_PER_CENT
-    gesehen = adressen_an_der_bezahlroute()
+    try:
+        gesehen = adressen_an_der_bezahlroute()
+    except OwnListMissing as exc:
+        print(f"anzeigen-rechnung: {exc}, so nothing is counted.", file=sys.stderr)
+        return 2
 
     print("Anzeigen, gerechnet gegen das Hauptbuch und das Zugriffslog")
     print()
