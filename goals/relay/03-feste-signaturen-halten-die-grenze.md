@@ -1,7 +1,7 @@
 # Relay Goal 03: Feste Signaturen halten die Grenze
 
 ## Status
-PLANNED
+ACTIVE
 
 ## Active Objective
 Die einzige Form einer Signatur aus relay 02 bleibt fest, auch wenn jemand die Grenze verschiebt: `test/relay-signature.test.ts`
@@ -52,22 +52,22 @@ eine zweite Schreibweise derselben Signatur als neue, neu berechnete Nachricht d
   Datei vor dem lokalen `check` stagen. Der Harness ändert sich nicht.
 
 ## Done Condition
-- [ ] Der Befund hält: Mit `s >= HALF_N` bleiben die Tests aus relay 02 grün.
+- [x] Der Befund hält: Mit `s >= HALF_N` bleiben die Tests aus relay 02 grün.
       Prüfung: `T=$(mktemp -d); git archive "$(git merge-base origin/dev HEAD)" | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; sed -i 's/s > HALF_N/s >= HALF_N/' $T/src/relay/signature.ts; grep -q 's >= HALF_N' $T/src/relay/signature.ts || echo sed-miss; (cd $T && PATH=/usr/bin:$PATH pnpm -s vitest run test/relay-signature-form.test.ts test/relay-self-message.test.ts >/dev/null 2>&1) && echo gruen || echo rot` muss genau `gruen` ausgeben.
-- [ ] Die Tabelle fester Signaturen und der `poll` mit `v` als 0 oder 1 sind grün: `s` gleich `n / 2` angenommen, `n / 2 + 1`, `s`
+- [x] Die Tabelle fester Signaturen und der `poll` mit `v` als 0 oder 1 sind grün: `s` gleich `n / 2` angenommen, `n / 2 + 1`, `s`
       gleich 0, Präfix `0X` und 132 Hex-Zeichen abgelehnt, `v` 27, 28, 0 und 1 mit derselben Form für 0 und 27 sowie 1 und 28, und
       die Wiederholung des `poll` bekommt dieselbe Antwort wie der erste.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/relay-signature.test.ts` muss Exit-Code 0 haben.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/relay-signature.test.ts --reporter=json 2>/dev/null | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const j=JSON.parse(s);console.log(j.numFailedTests===0&&j.numPassedTests>=10?"ok":"zu wenig "+j.numPassedTests)})'` muss genau `ok` ausgeben.
       Prüfung: `grep -c "canonicalSignature" test/relay-signature.test.ts` muss mindestens 1 ausgeben.
-- [ ] Jeder Fall hält gegen eine Mutation der Grenze: Die neue Datei ist rot gegen `s >= HALF_N`, gegen den fehlenden Abweis von `s`
+- [x] Jeder Fall hält gegen eine Mutation der Grenze: Die neue Datei ist rot gegen `s >= HALF_N`, gegen den fehlenden Abweis von `s`
       gleich 0, gegen `/i` am Muster und gegen den rohen Header als Schlüssel des gemerkten `poll`.
       Prüfung: `for m in 's/s > HALF_N/s >= HALF_N/' 's/s === 0n || //' 's|{130}\$/;|{130}$/i;|'; do T=$(mktemp -d); git archive HEAD | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; cp $T/src/relay/signature.ts $T/orig.ts; sed -i "$m" $T/src/relay/signature.ts; cmp -s $T/orig.ts $T/src/relay/signature.ts && echo "sed-miss $m"; (cd $T && PATH=/usr/bin:$PATH pnpm -s vitest run test/relay-signature.test.ts >/dev/null 2>&1) && echo "gruen bei $m"; done; T=$(mktemp -d); git archive HEAD | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; grep -q 'return { address, signature: one };' $T/src/relay/routes.ts || echo "sed-miss routes"; sed -i 's/return { address, signature: one };/return { address, signature: sig };/' $T/src/relay/routes.ts; (cd $T && PATH=/usr/bin:$PATH pnpm -s vitest run test/relay-signature.test.ts >/dev/null 2>&1) && echo "gruen bei routes"` darf nichts ausgeben.
-- [ ] Nur Tests: Der Branch ändert außer `test/relay-signature.test.ts` nur Dateien unter `goals/relay/`, also nichts unter `src/`,
+- [x] Nur Tests: Der Branch ändert außer `test/relay-signature.test.ts` nur Dateien unter `goals/relay/`, also nichts unter `src/`,
       keine Testdatei aus relay 01 oder 02 und nichts, was ausrollt.
       Prüfung: `git diff --name-only "$(git merge-base origin/dev HEAD)" HEAD | grep -v -e '^test/relay-signature\.test\.ts$' -e '^goals/relay/' | wc -l` muss 0 ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/relay.test.ts test/relay-security.test.ts test/relay-apikey.test.ts test/relay-billing.test.ts test/relay-poll-retry.test.ts test/relay-storage.test.ts test/relay-signature-form.test.ts test/relay-self-message.test.ts` muss Exit-Code 0 haben.
-- [ ] `check` ist grün.
+- [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
 - [ ] goal-verifier PASS (K und B)
 
@@ -90,5 +90,6 @@ eine zweite Schreibweise derselben Signatur als neue, neu berechnete Nachricht d
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-14 Zyklus 1: Punkte 1, 2, 3, 4, 5 gebaut: `test/relay-signature.test.ts` mit 24 Tests (22 Fälle der Tabelle fester Signaturen für `canonicalSignature`, gleiche Form für `v` 0 und 27 sowie 1 und 28, `poll`-Wiederholung mit `v` als 0 oder 1), nichts unter `src/`; jeder Test war gegen mindestens eine Mutation in einer Kopie aus `git archive HEAD` rot: `s >= HALF_N` 4 von 24, ohne Abweis von `s` gleich 0 2, `/i` am Muster 2, `signature: sig` in `routes.ts` 1, ohne obere Grenze von `s` 3, `s <= 1n` 1, ohne Faltung von `v` 0 und 1 5, nur `v` 28 7, nur `v` 27 4, ohne Abweis anderer `v` 2, ohne `toLowerCase` 2, `{130,132}` 1, ohne Musterprüfung 5. Prüfbefehle: P1 `gruen`; P2 vitest Exit 0, JSON `ok`, grep 9; P3 keine Ausgabe; P4 Diff 0, vitest Exit 0; P5 `check` Exit 0 (149 Dateien, 1747 Tests, grün in 88 s).
 
 ## Blockers
