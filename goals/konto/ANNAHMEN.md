@@ -82,3 +82,8 @@
   nach 60 s stumm mit Exit 0 endete (`close()` wartete auf eine Antwort, die Event Loop lief leer); jetzt scheitert jede Anfrage
   an einen beendeten Browser sofort, Exit 2 mit `browser exited`. `ops/soll.mjs` (seite 01) hat dieselbe Stelle und bleibt hier
   unverändert, weil diese Reparatur nur Zeile 386 betrifft.
+- Audit 2026-11-14 Zeile 406 (konto 02 Punkt 10, `check`) scheiterte auf `033245c` an derselben Stelle wie Zeile 371: Der
+  Idempotency-Test in `test/sandbox-api.test.ts` brach den ersten Anlauf nach `AbortSignal.timeout(200)` ab, unter Host-Last vor
+  dem `docker run`. Seit `2de5407` gibt es diesen festen Abbruch nicht mehr (`grep -c "AbortSignal.timeout(200)"` gibt 0 aus).
+  `PATH=/usr/bin:$PATH node scripts/check.mjs` auf `dev` `2d9fe38` ist bei Last 8,7 je Kern grün (150 Dateien, 1756 Tests,
+  275 s). Der Code bleibt unverändert, weil `dev` die Ursache schon behoben hat.
