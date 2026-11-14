@@ -69,6 +69,7 @@ function sandbox() {
         CP_URL: "https://watchdog.invalid",
         CP_ALERT_WEBHOOK: "https://hook.invalid/alerts",
         CP_WATCHDOG_STATE: state,
+        CP_WATCHDOG_ALIVE: "0",
       },
     });
     return { status: r.status, out: `${r.stdout}${r.stderr}` };

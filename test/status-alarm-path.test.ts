@@ -6,12 +6,15 @@ import { join, resolve } from "node:path";
 
 /**
  * ops/status.sh reports whether the alarm path works: it counts the lines `[WARN] webhook unreachable` of the last 24 hours in
- * the watchdog log on the server (ops/webhook-unreachable.sh, sent over ssh) and writes `alarm_path` into its JSON. From 3 lines
- * on the status is `red`, below that `ok`, and without a readable log `unknown` with `null`.
+ * the watchdog log on the server (ops/webhook-unreachable.sh, sent over ssh), takes the last failed and the last delivered POST
+ * from the whole log (ops/webhook-last.sh, sent the same way) and writes `alarm_path` into its JSON. From 3 lines on the status
+ * is `red` unless a `[INFO] webhook delivered` came after the last failure, below that `ok`, and without a readable log
+ * `unknown` with `null`. An unreadable answer of ops/webhook-last.sh gives `null` for both times and keeps `red` from 3.
  *
  * No network and no server: `ssh`, `curl` and `openssl` are fakes on PATH. The fake `ssh` runs a call ending in `bash -s` locally,
  * with the planted log in CP_WATCHDOG_LOG and a fixed CP_NOW, and exits 255 for every other call, like a server that does not
- * answer. CP_NOW is 2026-11-13T12:00:00Z.
+ * answer. CP_NOW is 2026-11-13T12:00:00Z. With `brokenLast` it answers the script that looks for `webhook delivered` with a line
+ * that is no time at all.
  *
  * STATUS_UNDER_TEST points the test at another copy of ops/status.sh, so the counter-proof can run it against an older one.
  */
@@ -20,9 +23,14 @@ const STATUS = process.env.STATUS_UNDER_TEST
   : join(__dirname, "..", "ops", "status.sh");
 const NOW = 1794571200;
 
-type AlarmPath = { unreachable_24h: number | null; status: string };
+type AlarmPath = {
+  unreachable_24h: number | null;
+  last_unreachable: string | null;
+  last_delivered: string | null;
+  status: string;
+};
 
-function run(log: string | null): { status: number | null; out: string; alarm: AlarmPath | undefined } {
+function run(log: string | null, opts: { brokenLast?: boolean } = {}): { status: number | null; out: string; alarm: AlarmPath | undefined } {
   const root = mkdtempSync(join(tmpdir(), "status-alarm-path-"));
   const bin = join(root, "bin");
   mkdirSync(bin);
@@ -34,9 +42,11 @@ function run(log: string | null): { status: number | null; out: string; alarm: A
   };
   fake("ssh", [
     'case "$*" in',
-    `  *" bash -s") CP_WATCHDOG_LOG=${JSON.stringify(logPath)} CP_NOW=${NOW} exec bash -s ;;`,
+    '  *" bash -s") script=$(cat) ;;',
     "  *) exit 255 ;;",
     "esac",
+    ...(opts.brokenLast ? ['case "$script" in *"webhook delivered"*) echo "not a time"; exit 0 ;; esac'] : []),
+    `printf '%s\\n' "$script" | CP_WATCHDOG_LOG=${JSON.stringify(logPath)} CP_NOW=${NOW} bash -s`,
   ]);
   fake("curl", ["exit 7"]);
   fake("openssl", ["exit 1"]);
@@ -62,30 +72,51 @@ function run(log: string | null): { status: number | null; out: string; alarm: A
 }
 
 const unreachable = (...ts: string[]) => ts.map((t) => `${t} [WARN] webhook unreachable\n`).join("");
+const delivered = (t: string) => `${t} [INFO] webhook delivered\n`;
 
 describe("ops/status.sh reports a failed alarm path from the watchdog log", () => {
   it("3 lines in the last 24 hours are red", () => {
     const r = run(unreachable("2026-11-13T11:50:00Z", "2026-11-13T11:45:00Z", "2026-11-12T12:01:00Z"));
     expect(r.status, r.out).toBe(0);
-    expect(r.alarm, r.out).toEqual({ unreachable_24h: 3, status: "red" });
+    expect(r.alarm, r.out).toEqual({
+      unreachable_24h: 3,
+      last_unreachable: "2026-11-13T11:50:00Z",
+      last_delivered: null,
+      status: "red",
+    });
   });
 
   it("2 lines in the last 24 hours are ok", () => {
     const r = run(unreachable("2026-11-13T11:50:00Z", "2026-11-13T11:45:00Z"));
     expect(r.status, r.out).toBe(0);
-    expect(r.alarm, r.out).toEqual({ unreachable_24h: 2, status: "ok" });
+    expect(r.alarm, r.out).toEqual({
+      unreachable_24h: 2,
+      last_unreachable: "2026-11-13T11:50:00Z",
+      last_delivered: null,
+      status: "ok",
+    });
   });
 
   it("3 lines older than 24 hours are ok with 0", () => {
     const r = run(unreachable("2026-11-12T11:59:59Z", "2026-11-12T11:00:00Z", "2026-11-01T00:00:00Z"));
     expect(r.status, r.out).toBe(0);
-    expect(r.alarm, r.out).toEqual({ unreachable_24h: 0, status: "ok" });
+    expect(r.alarm, r.out).toEqual({
+      unreachable_24h: 0,
+      last_unreachable: "2026-11-12T11:59:59Z",
+      last_delivered: null,
+      status: "ok",
+    });
   });
 
   it("a missing log is unknown with null", () => {
     const r = run(null);
     expect(r.status, r.out).toBe(0);
-    expect(r.alarm, r.out).toEqual({ unreachable_24h: null, status: "unknown" });
+    expect(r.alarm, r.out).toEqual({
+      unreachable_24h: null,
+      last_unreachable: null,
+      last_delivered: null,
+      status: "unknown",
+    });
   });
 
   it("other lines do not count", () => {
@@ -93,9 +124,58 @@ describe("ops/status.sh reports a failed alarm path from the watchdog log", () =
       unreachable("2026-11-13T11:50:00Z", "2026-11-13T11:45:00Z") +
         "2026-11-13T11:55:00Z [WARN] credit unreadable\n" +
         "2026-11-13T11:56:00Z [OUTAGE] HTTP 500, twice in a row\n" +
-        "2026-11-13T11:57:00Z [WARN] webhook unreachable again\n",
+        "2026-11-13T11:57:00Z [WARN] webhook unreachable again\n" +
+        "2026-11-13T11:58:00Z [INFO] webhook delivered again\n",
     );
     expect(r.status, r.out).toBe(0);
-    expect(r.alarm, r.out).toEqual({ unreachable_24h: 2, status: "ok" });
+    expect(r.alarm, r.out).toEqual({
+      unreachable_24h: 2,
+      last_unreachable: "2026-11-13T11:50:00Z",
+      last_delivered: null,
+      status: "ok",
+    });
+  });
+
+  it("delivered after the last failure is ok", () => {
+    const r = run(
+      unreachable("2026-11-13T11:00:00Z", "2026-11-13T11:05:00Z", "2026-11-13T11:10:00Z") +
+        delivered("2026-11-13T11:15:00Z"),
+    );
+    expect(r.status, r.out).toBe(0);
+    expect(r.alarm, r.out).toEqual({
+      unreachable_24h: 3,
+      last_unreachable: "2026-11-13T11:10:00Z",
+      last_delivered: "2026-11-13T11:15:00Z",
+      status: "ok",
+    });
+  });
+
+  it("delivered before the failures is red", () => {
+    const r = run(
+      delivered("2026-11-13T10:55:00Z") +
+        unreachable("2026-11-13T11:00:00Z", "2026-11-13T11:05:00Z", "2026-11-13T11:10:00Z"),
+    );
+    expect(r.status, r.out).toBe(0);
+    expect(r.alarm, r.out).toEqual({
+      unreachable_24h: 3,
+      last_unreachable: "2026-11-13T11:10:00Z",
+      last_delivered: "2026-11-13T10:55:00Z",
+      status: "red",
+    });
+  });
+
+  it("an unreadable answer for the last delivery keeps red from 3 lines", () => {
+    const r = run(
+      unreachable("2026-11-13T11:00:00Z", "2026-11-13T11:05:00Z", "2026-11-13T11:10:00Z") +
+        delivered("2026-11-13T11:15:00Z"),
+      { brokenLast: true },
+    );
+    expect(r.status, r.out).toBe(0);
+    expect(r.alarm, r.out).toEqual({
+      unreachable_24h: 3,
+      last_unreachable: null,
+      last_delivered: null,
+      status: "red",
+    });
   });
 });

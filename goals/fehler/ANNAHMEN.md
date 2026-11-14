@@ -87,3 +87,5 @@
   `CP_SCAN_ROOT` hätte Prüfbefehl 4 von Punkt 2 rot gemacht (Wegwerf-Repo mit der echten Liste, Erwartung `gruen`), weil dort keiner
   der 13 Einträge steht; eine Liste aus `mktemp` liegt in keinem Work Tree und hat nur `CP_SCAN_ROOT`, wie die Prüfbefehle von
   Punkt 5 und 6 es verlangen.
+- fehler 07 (Maker, 2026-11-14): `ops/webhook-last.sh` nimmt je Art den größten Zeitstempel statt der letzten Zeile im Log. Das Log wächst nur hinten an, beides ist dort gleich; die Fixtures von fehler 05 stehen aber absteigend, und der größte Zeitstempel ist dort der richtige.
+- fehler 07 (Maker, 2026-11-14): `alarm_path.status` ist bei gleichem Zeitstempel von Fehler und Zustellung `ok`, weil die Regel nur „älter als“ nennt und beides im selben Lauf passiert. Kommen 3 oder mehr Zeilen, aber `last_unreachable` ist `null` (widersprüchlich), bleibt es `red`, damit ein Fehler im neuen Skript nie grün macht.

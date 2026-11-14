@@ -46,13 +46,18 @@ db_json=$("${SSH[@]}" 'cd /opt/control-plane/repo/deploy && docker compose -f do
 # over ssh, so there the default path applies. Any exit other than 0 (no answer, no log) is "unknown", never a zero.
 alarm_count=$("${SSH[@]}" 'bash -s' < "$DIR/webhook-unreachable.sh" 2>/dev/null)
 alarm_rc=$?
+# The last failed and the last delivered POST (ops/webhook-last.sh): a delivery after the last failure means the path works
+# again, so a fifteen-minute failure does not stay red for 24 hours.
+alarm_last=$("${SSH[@]}" 'bash -s' < "$DIR/webhook-last.sh" 2>/dev/null)
+alarm_last_rc=$?
 or_json=$(curl -s -m 10 https://openrouter.ai/api/v1/credits -H "Authorization: Bearer ${OPENROUTER_API_KEY:-none}" 2>/dev/null)
 payto_hex=$(curl -s -m 10 -X POST https://mainnet.base.org -H 'content-type: application/json' \
   --data '{"jsonrpc":"2.0","id":1,"method":"eth_call","params":[{"to":"0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913","data":"0x70a08231000000000000000000000000914102284463F4F58B1D2f6DB9aC80BFcaA7d614"},"latest"]}' 2>/dev/null)
 
 HEALTH_CODE="$health_code" HEALTH_BODY="$health_body" CERT_END="$cert_end" VM_STATS="$vm_stats" \
-DB_JSON="$db_json" OR_JSON="$or_json" PAYTO_HEX="$payto_hex" ALARM_COUNT="$alarm_count" ALARM_RC="$alarm_rc" python3 <<'PY'
-import os, json, datetime
+DB_JSON="$db_json" OR_JSON="$or_json" PAYTO_HEX="$payto_hex" ALARM_COUNT="$alarm_count" ALARM_RC="$alarm_rc" \
+ALARM_LAST="$alarm_last" ALARM_LAST_RC="$alarm_last_rc" python3 <<'PY'
+import os, json, datetime, re
 def j(s, default=None):
     try: return json.loads(s)
     except Exception: return default
@@ -88,8 +93,21 @@ if len(parts) >= 5:
 alarm_count = None
 if os.environ.get("ALARM_RC") == "0" and os.environ.get("ALARM_COUNT", "").strip().isdigit():
     alarm_count = int(os.environ["ALARM_COUNT"].strip())
-alarm_path = {"unreachable_24h": alarm_count,
-              "status": "unknown" if alarm_count is None else ("red" if alarm_count >= 3 else "ok")}
+# Red only while no delivery followed the last failure. Anything unreadable from ops/webhook-last.sh gives null for both
+# times and leaves the rule "red from 3" alone, so a fault in that script never turns a red alarm path green.
+last_unreachable = last_delivered = None
+ts_re = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
+last = os.environ.get("ALARM_LAST", "").split()
+if os.environ.get("ALARM_LAST_RC") == "0" and len(last) == 2 and all(x == "-" or ts_re.match(x) for x in last):
+    last_unreachable, last_delivered = (None if x == "-" else x for x in last)
+if alarm_count is None:
+    alarm_status = "unknown"
+elif alarm_count >= 3 and (last_delivered is None or last_unreachable is None or last_delivered < last_unreachable):
+    alarm_status = "red"
+else:
+    alarm_status = "ok"
+alarm_path = {"unreachable_24h": alarm_count, "last_unreachable": last_unreachable,
+              "last_delivered": last_delivered, "status": alarm_status}
 orc = j(os.environ.get("OR_JSON", ""), {}) or {}
 ord_ = orc.get("data", {})
 payto = None
