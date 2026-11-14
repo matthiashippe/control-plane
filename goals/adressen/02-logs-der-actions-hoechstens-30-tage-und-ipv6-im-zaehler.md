@@ -1,7 +1,7 @@
 # Adressen Goal 02: Logs der Actions höchstens 30 Tage und IPv6 im Zähler
 
 ## Status
-ACTIVE
+BLOCKED matthias
 
 ## Active Objective
 Die Logs der Actions des öffentlichen Repos bleiben höchstens 30 Tage lesbar, so wie die Datenschutzerklärung der Seite die Löschung
@@ -113,4 +113,8 @@ MVP: Funktion, weil adressen 01 nur die sechs bekannten Läufe geräumt hat: Tr�
 - 2026-11-14 Zyklus 1: Punkte 1 und 4 gebaut, IPv6 im Zähler (volle Form, privat `::`, `::1`, `fe80::/10`, `fc00::/7`, `::ffff:` als IPv4), sieben neue Fälle in `test/actions-log-addresses.test.ts`, davon drei gegen das alte Skript rot (`pnpm -s vitest run test/actions-log-addresses.test.ts` -> 3 failed | 16 passed), Punkte 2 und 3 warten auf das Human Gate `security_settings` (gemessen 18:36 UTC: `days` 90). Prüfbefehle: Punkt 1 Fixture -> `1 1 2 2 total 3 ` mit gawk und mawk, Gegenprobe mit dem alten Skript -> `1 0 2 1 total 1 `; vitest -> 19 passed, auch mit mawk; `grep -c 'IPv6' ops/README.md` -> 3; adressen 01 Punkt 1 -> `1 1 2 2 total 2 `, `2 0`, `da`; `node scripts/check.mjs` -> Exit 0, 1796 Tests grün.
 
 ## Blockers
-- keine
+Art: matthias
+Gate: security_settings
+Aufgabe: Aufbewahrung von Logs und Artefakten im Repo control-plane von 90 auf 30 Tage setzen
+Worum: Die Datenschutzerklärung sagt die Löschung nach 30 Tagen zu, GitHub hält die Logs der Actions heute 90 Tage öffentlich lesbar.
+Empfehlung: `gh api -X PUT repos/matthiashippe/control-plane/actions/permissions/artifact-and-log-retention -F days=30` (im Browser: Settings, Actions, General, Artifact and log retention auf 30, Save)
