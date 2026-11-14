@@ -1,7 +1,7 @@
 # Messung Goal 03: Auch die Ankünfte der Startseite zählen keine eigenen Anfragen
 
 ## Status
-PLANNED
+DONE
 
 ## Active Objective
 `ops/landing-yield.sh` und `ops/github-yield.sh` zählen dieselbe Ankunft (Referrer von `github.com/Conway-Research`, danach
@@ -95,21 +95,21 @@ eigene Anfrage als fremde Ankunft diese Entscheidung nach oben verfälscht.
   `check` und vitest im Vordergrund mit eigenem Timeout; neue Dateien vor `check` mit `git add` stagen. Kein `pkill -f`.
 
 ## Done Condition
-- [ ] Die Regel für eine Ankunft von Conway-Research steht einmal in `ops/conway-arrivals.sh` und `ops/conway_arrivals.py`, beide
+- [x] Die Regel für eine Ankunft von Conway-Research steht einmal in `ops/conway-arrivals.sh` und `ops/conway_arrivals.py`, beide
       Werkzeuge rufen sie, und keines liest `ops/own-ips.txt` direkt.
       Prüfung: `grep -lE '^[^#]*(source|\.) .*conway-arrivals\.sh' ops/landing-yield.sh ops/github-yield.sh | wc -l` muss 2 ausgeben.
       Prüfung: `grep -cE '^[^#]*(source|\.) .*own-ips\.sh' ops/conway-arrivals.sh` muss mindestens 1 ausgeben.
       Prüfung: `grep -rlF --include='*.sh' --include='*.py' 'Conway-Research(/|$)' ops/` muss genau `ops/conway_arrivals.py` ausgeben.
       Prüfung: `grep -lF '"/v1/auth/verify"' ops/landing-yield.sh ops/github-yield.sh ops/conway_arrivals.py` muss genau `ops/conway_arrivals.py` ausgeben.
       Prüfung: `{ grep -hv '^[[:space:]]*#' ops/landing-yield.sh ops/github-yield.sh ops/conway-arrivals.sh ops/conway_arrivals.py | grep -c 'own-ips\.txt'; } || true` muss 0 ausgeben.
-- [ ] Beide Werkzeuge brechen bei leerer oder fehlender eigener Liste mit Exit 2 ab und zählen die live gesehene Adresse und jede
+- [x] Beide Werkzeuge brechen bei leerer oder fehlender eigener Liste mit Exit 2 ab und zählen die live gesehene Adresse und jede
       Adresse aus `CP_OWN_IPS_SEEN` nicht als fremde; `ops/landing-yield.sh` nimmt den Referrer ohne Rücksicht auf Groß- und
       Kleinschreibung.
       Prüfung: `pnpm -s vitest run test/conway-arrivals.test.ts` muss Exit-Code 0 haben.
       Prüfung: `pnpm -s vitest run test/conway-arrivals.test.ts -t "own list is empty"` muss Exit-Code 0 haben.
       Prüfung: `grep -cE "both tools stop with exit 2 when the own list is empty|both tools stop with exit 2 when the own list is missing|an address only in CP_OWN_IPS_SEEN is not foreign in either tool|the live address is not foreign in either tool|landing-yield counts a lowercase conway-research referrer like github-yield does" test/conway-arrivals.test.ts` muss mindestens 5 ausgeben.
       Prüfung: `grep -c "CP_OWN_IPS_SEEN" test/conway-arrivals.test.ts` muss mindestens 1 ausgeben.
-- [ ] Auf ihren bisherigen Fixtures geben beide Werkzeuge dieselben Summen aus wie heute, und ihre Selftests erreichen das Netz
+- [x] Auf ihren bisherigen Fixtures geben beide Werkzeuge dieselben Summen aus wie heute, und ihre Selftests erreichen das Netz
       nicht.
       Prüfung: `bash ops/landing-yield.sh --selftest` muss Exit-Code 0 haben und als letzte Zeile `SELFTEST OK` ausgeben.
       Prüfung: `bash ops/github-yield.sh --selftest | tail -1 | grep -c "^SELFTEST OK"` muss 1 ausgeben.
@@ -118,13 +118,28 @@ eigene Anfrage als fremde Ankunft diese Entscheidung nach oben verfälscht.
       Prüfung: `T=$(mktemp -d); printf '#!/bin/sh\necho called >> %s/calls\nexit 255\n' "$T" > "$T/ssh"; chmod +x "$T/ssh"; PATH="$T:$PATH" bash ops/landing-yield.sh --selftest >/dev/null 2>&1; PATH="$T:$PATH" bash ops/github-yield.sh --selftest >/dev/null 2>&1; cat "$T/calls" 2>/dev/null | wc -l` muss 0 ausgeben.
       Prüfung: `pnpm -s vitest run test/landing-yield.test.ts test/github-yield.test.ts` muss Exit-Code 0 haben.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD -- ops/fixtures | wc -l` muss 0 ausgeben.
-- [ ] `check` ist grün, gesperrte Pfade bleiben unverändert, und `check` lässt die Liste der eigenen Adressen und das
+- [x] `check` ist grün, gesperrte Pfade bleiben unverändert, und `check` lässt die Liste der eigenen Adressen und das
       Zustandsverzeichnis unberührt.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD | grep -cE '^(\.github|deploy|src|harness|scripts)/|^ops/(own-ips\.(sh|txt)|access-log\.sh)$'` muss 0 ausgeben.
       Prüfung: `node scripts/check.mjs >/dev/null 2>&1; git status --porcelain -- ops/own-ips.txt | wc -l` muss 0 ausgeben.
       Prüfung: `S=$(mktemp -d); XDG_STATE_HOME=$S node scripts/check.mjs >/dev/null 2>&1; find "$S" -type f | wc -l` muss 0 ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] (Kritik Tech Lead, 14.11.2026) Eine Liste ohne Adresse stoppt beide Werkzeuge mit Exit 2 auch dann, wenn `ssh` eine live
+      gesehene Adresse liefert und `CP_OWN_IPS_SEEN` Adressen nennt. Heute prüft `conway_own_list` nur, ob `own_ips` insgesamt
+      etwas nennt: Mit `<tmp>/own.txt` nur `# no own address`, `FAKE_LIVE=198.51.100.23` und einem Log, in dem `203.0.113.99`
+      und `192.0.2.50` je mit `GET /` und Referer von Conway-Research kommen, melden beide Werkzeuge Exit 0 und `2 arrived`,
+      zählen also eine Adresse aus der Geschichte unserer Liste als fremde. Für `ops/github-yield.sh` ist das ein Rückschritt:
+      auf `origin/dev` bricht es bei leerer Liste immer mit Exit 2 ab („the own address list is empty“). Die Prüfung auf
+      Adressen gilt der Datei (`CP_OWN_IPS`, sonst `CP_OWN_IPS_FILE`) vor dem Aufruf von `own_ips`; die Prüfung des
+      Gesamtergebnisses bleibt. Neuer Fall in `test/conway-arrivals.test.ts`:
+      `it("both tools stop with exit 2 when the own list is empty even with a live address and a seen address")` mit
+      `<tmp>/own.txt` nur `# no own address`, `FAKE_LIVE=198.51.100.23` und `<tmp>/seen.txt` gleich `192.0.2.50 2026-11-01`;
+      beide Exit 2, keine Zeile beginnt mit `LANDING YIELD` oder `GITHUB YIELD`, stderr nennt `own_ips`, stdout und stderr
+      nennen keine gepflanzte Adresse. Vor dem Fix rot (beide Exit 0); die Zeile im Progress Log nennt das.
+      Prüfung: `grep -c "both tools stop with exit 2 when the own list is empty even with a live address and a seen address" test/conway-arrivals.test.ts` muss 1 ausgeben.
+      Prüfung: `pnpm -s vitest run test/conway-arrivals.test.ts -t "even with a live address and a seen address"` muss Exit-Code 0 haben.
+      Prüfung: `pnpm -s vitest run test/conway-arrivals.test.ts test/landing-yield.test.ts test/github-yield.test.ts` muss Exit-Code 0 haben.
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Jede neue Testdatei und jeder neue Fall war vor dem Fix rot, soweit oben so genannt; die Zeile im Progress Log nennt, welche
@@ -150,7 +165,10 @@ eigene Anfrage als fremde Ankunft diese Entscheidung nach oben verfälscht.
 - max Versuche pro Gap: 3
 
 ## Progress Log
-- (leer)
+- 2026-11-14 Zyklus 1: Punkte 1, 2, 3, 4 gebaut: die Regel der Ankunft steht in `ops/conway_arrivals.py` (Log, Referrer mit `re.I`, Anmeldung) und `ops/conway-arrivals.sh` (`conway_own_list` über `own_ips`, Exit 2 bei fehlender oder leerer Liste), beide Werkzeuge sourcen und importieren sie, beide Selftests und alle `spawnSync` der drei Testdateien haben ein nachgebautes `ssh` und `CP_OWN_IPS_SEEN` im Temp-Ordner; `test/conway-arrivals.test.ts` war vor dem Fix in 5 von 5 Fällen rot (empty: landing Exit 0 statt 2; missing: stderr ohne `own_ips`; CP_OWN_IPS_SEEN: 2 statt 1 arrived; live: 2 statt 1; lowercase: landing 0 statt 1), stdout und Exit beider Werkzeuge auf ihren Fixtures und beide Selftest-Ausgaben byte-gleich zum Stand vor dem Goal (`diff -r`). Prüfbefehle: P1 `grep -lE … | wc -l` 2, `grep -cE … own-ips.sh` 1, `grep -rlF 'Conway-Research(/|$)'` nur `ops/conway_arrivals.py`, `grep -lF '"/v1/auth/verify"'` nur `ops/conway_arrivals.py`, `own-ips.txt` in Codezeilen 0; P2 vitest conway-arrivals Exit 0, `-t "own list is empty"` Exit 0, Testnamen 5, `CP_OWN_IPS_SEEN` 5; P3 landing-Selftest Exit 0 und letzte Zeile `SELFTEST OK`, github-Selftest 1, `sums (…)` 4, github-Summen 2, ssh-Aufrufe der Selftests 0, vitest landing und github Exit 0, `ops/fixtures` 0; P4 `node scripts/check.mjs` Exit 0 (156 Dateien, 1796 Tests), gesperrte Pfade 0, `own-ips.txt` nach check 0, Dateien im Zustandsordner nach check 0.
+- 2026-11-14 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, nach Merge von `origin/dev` (fb27b40, nur `goals/sandbox/ANNAHMEN.md`, Werkzeuge und Tests seit Zyklus 1 unverändert), alle Prüfbefehle am Kopf neu gefahren. Prüfbefehle (Node 22.23.4): P1 `2`, `1`, nur `ops/conway_arrivals.py`, nur `ops/conway_arrivals.py`, `0`; P2 vitest conway-arrivals Exit 0, `-t "own list is empty"` Exit 0, `5`, `5`; P3 landing-Selftest Exit 0 mit letzter Zeile `SELFTEST OK`, github-Selftest `1`, `4`, `2`, ssh-Aufrufe `0`, vitest landing und github Exit 0, `ops/fixtures` `0`; P4 `node scripts/check.mjs` Exit 0 (156 Dateien, 1796 Tests, 204 s), gesperrte Pfade `0`, `own-ips.txt` `0`, Zustandsordner `0`; Job `e2e` am PR für 2e37178 grün.
+- 2026-11-14 Zyklus 3: Punkt 5 aus der Kritik gebaut, Abschluss gemeldet, Punkte 1, 2, 3, 4, 5: `conway_own_list` in `ops/conway-arrivals.sh` prüft die Liste selbst (Zeilen ohne `#`, erstes Feld, wie `own_ips` sie liest) vor dem Aufruf von `own_ips` auf mindestens eine Adresse und endet sonst mit 2 und einer stderr-Zeile, die `own_ips` nennt; die Prüfung des Gesamtergebnisses bleibt. Der neue Fall `both tools stop with exit 2 when the own list is empty even with a live address and a seen address` war vor dem Fix rot, in beiden Werkzeugen Exit 0 statt 2 (landing `1 arrived on /`, github `1 arrived from github.com/Conway-Research`, je einzeln gefahren). Prüfbefehle (Node 22.23.4): P1 `2`, `1`, nur `ops/conway_arrivals.py`, nur `ops/conway_arrivals.py`, `0`; P2 vitest conway-arrivals Exit 0, `-t "own list is empty"` Exit 0, `6`, `5`; P3 landing-Selftest Exit 0 mit letzter Zeile `SELFTEST OK`, github-Selftest `1`, `4`, `2`, ssh-Aufrufe `0`, vitest landing und github Exit 0, `ops/fixtures` `0`; P4 `node scripts/check.mjs` Exit 0 (156 Dateien, 1797 Tests), gesperrte Pfade `0`, `own-ips.txt` `0`, Zustandsordner `0`; P5 Testname `1`, `-t "even with a live address and a seen address"` Exit 0, vitest conway-arrivals, landing-yield und github-yield Exit 0 (33 Tests).
+- 2026-11-14 Release: PASS K und B (Zyklus 3), DONE.
 
 ## Blockers
 - keine
