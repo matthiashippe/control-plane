@@ -39,7 +39,8 @@
 #            with running true and exit_code -1, the file from exit_code_file reads 0 within 60 s and the one from
 #            output_file holds bg-ok, so the wrapper, coreutils timeout under gVisor and /root/.exec are proven in production.
 #            After a new client key (changed=1) it waits CLIENT_KEY_WAIT_S before the create (domains 03): for RECHECK_MS
-#            (src/sandbox/service.ts) after the last failed call to sandboxd the service answers 501 at once
+#            (src/sandbox/service.ts) after the last failed call to sandboxd the service answers 501 at once. Before that
+#            wait it prints `WAIT sandbox: new client key, <CLIENT_KEY_WAIT_S> s before the create` on stderr (domains 04)
 #   handoff  POST /v1/handoff with example values answers 201 with a two-digit match, GET /h/{code} shows three different
 #            two-digit numbers with match among them, and the stream GET /v1/handoff/{code} with the poll token says pending
 #            within 5 s (konto 02). Approves nothing: the code runs out unused after ten minutes. The poll token goes through
@@ -287,6 +288,16 @@ SERVICE_TS="$ROOT/src/sandbox/service.ts"
 CLIENT_KEY_WAIT_S=75
 live_wait() { sleep "$1"; } # the selftest replaces it and counts the seconds instead
 
+# The line before the wait after a new client key (domains 04), $1 = CLIENT_KEY_WAIT_S. On stderr, because live() hands the
+# stdout of sandbox_live to judge_sandbox and shows it only after the run; so the line is on screen when the wait starts and
+# leaves the verdict of judge_sandbox as it is.
+wait_line() { echo "WAIT sandbox: new client key, $1 s before the create" >&2; }
+# What sandbox_live does after SETUP CLIENT-KEY OK changed=1: say what it waits for, then wait.
+client_key_wait() {
+  wait_line "$1"
+  live_wait "$1"
+}
+
 # RECHECK_MS of src/sandbox/service.ts in whole seconds, nothing when the line is not there.
 recheck_s() {
   local ms
@@ -315,6 +326,48 @@ judge_sandbox_wait() {
     echo "FAIL sandbox-wait: waited $after s although the client key was unchanged"
   else
     echo "FAIL sandbox-wait: no changed=0 or changed=1 from ops/sandbox/setup.sh --client-key"
+  fi
+}
+
+# $1 = "changed=<0|1> events=<list>" from sandbox_line_run, the events of one run of sandbox_live in their order, comma
+# separated: line:<seconds> for the line of wait_line (line:bad for another line starting with WAIT), wait:<seconds> for
+# live_wait, create for POST /v1/sandboxes. $2 = CLIENT_KEY_WAIT_S. After a new client key exactly one line naming
+# CLIENT_KEY_WAIT_S has to come before the wait and before the create; with the key unchanged no line at all.
+judge_sandbox_wait_line() {
+  local changed events want="${2:-}" e i=0 n=0 value="" line_at="" wait_at="" create_at=""
+  read -r changed events <<<"${1:-}"
+  changed="${changed#changed=}"
+  events="${events#events=}"
+  local IFS=,
+  for e in $events; do
+    i=$((i + 1))
+    case "$e" in
+      line:*) n=$((n + 1)); value="${e#line:}"; [ -n "$line_at" ] || line_at=$i ;;
+      wait:*) [ -n "$wait_at" ] || wait_at=$i ;;
+      create) [ -n "$create_at" ] || create_at=$i ;;
+    esac
+  done
+  unset IFS
+  if [ "$changed" = 0 ]; then
+    if [ "$n" = 0 ]; then
+      echo "OK sandbox-wait-line: no line, the client key was unchanged"
+    else
+      echo "FAIL sandbox-wait-line: $n line(s) although the client key was unchanged"
+    fi
+  elif [ "$changed" != 1 ]; then
+    echo "FAIL sandbox-wait-line: no changed=0 or changed=1 from ops/sandbox/setup.sh --client-key"
+  elif [ "$n" = 0 ]; then
+    echo "FAIL sandbox-wait-line: waited after a new client key without saying so"
+  elif [ "$n" != 1 ]; then
+    echo "FAIL sandbox-wait-line: $n lines after a new client key, want one"
+  elif [ "$value" != "$want" ]; then
+    echo "FAIL sandbox-wait-line: the line names ${value} s, CLIENT_KEY_WAIT_S is ${want:-unset}"
+  elif [ -z "$wait_at" ] || [ -z "$create_at" ]; then
+    echo "FAIL sandbox-wait-line: no wait or no POST /v1/sandboxes after the line"
+  elif [ "$line_at" -gt "$wait_at" ] || [ "$line_at" -gt "$create_at" ]; then
+    echo "FAIL sandbox-wait-line: the line came after the wait it announces"
+  else
+    echo "OK sandbox-wait-line: said $value s before the wait and the create"
   fi
 }
 
@@ -514,7 +567,7 @@ sandbox_live() {
   [[ "$ctl" =~ ^[a-z0-9]{1,8}$ ]] || ctl="${ctl:+error}"
 
   # A new client key: wait out the 501 the service gives for RECHECK_MS after its last failed call to sandboxd.
-  [ "$last" = "SETUP CLIENT-KEY OK changed=1" ] && live_wait "$CLIENT_KEY_WAIT_S"
+  [ "$last" = "SETUP CLIENT-KEY OK changed=1" ] && client_key_wait "$CLIENT_KEY_WAIT_S"
 
   [ -r "$LIVE_SANDBOX_ENV" ] && apikey="$(sed -n 's/^LIVE_SANDBOX_KEY=//p' "$LIVE_SANDBOX_ENV" | head -n 1 | tr -d "\"'\r")"
   if [ -z "$apikey" ]; then
@@ -845,7 +898,7 @@ selftest() {
         printf 000
         return 7
       }
-      sandbox_live "$dir/no-such-ssh-key" >/dev/null
+      sandbox_live "$dir/no-such-ssh-key" >/dev/null 2>/dev/null
       echo "changed=$1 created_after=$(head -n 1 "$w/created" | grep -E '^[0-9]+$' || echo none)"
     )
   }
@@ -856,6 +909,49 @@ selftest() {
     got="$(judge_sandbox_wait "$(sandbox_wait_run "$w_changed" "$w_wait")" "$recheck")"
     echo "planted sandbox-wait $w_name: $got"
     [ "${got%% *}" = "$w_expect" ] || all_ok=0
+  done
+
+  # The line before the wait (domains 04), through the real sandbox_live: its stderr, live_wait and the curl stand-in write
+  # into one file in the order they happen, so the judge sees whether the line came before the wait and the create. $1 =
+  # changed of the setup stand-in, $2 = real, or a planted client_key_wait: silent (waits without the line, as before
+  # domains 04) or late (says it after the wait). Prints "changed=<0|1> events=<list>".
+  sandbox_line_run() {
+    (
+      local w="$dir/line-$1-$2" ev
+      mkdir -p "$w"
+      : >"$w/events"
+      CLIENT_KEY_SETUP="$dir/setup-changed-$1.sh"
+      LIVE_SANDBOX_ENV="$dir/live-sandbox.env"
+      CP_HOST=fake.invalid
+      PATH="$dir/bin:$PATH"
+      live_wait() { echo "wait:$1" >>"$w/events"; }
+      case "$2" in
+        silent) client_key_wait() { live_wait "$1"; } ;;
+        late) client_key_wait() {
+          live_wait "$1"
+          wait_line "$1"
+        } ;;
+      esac
+      curl() {
+        local a
+        for a in "$@"; do
+          case "$a" in "$BASE/v1/sandboxes") echo create >>"$w/events" ;; esac
+        done
+        printf 000
+        return 7
+      }
+      sandbox_live "$dir/no-such-ssh-key" >/dev/null 2>>"$w/events"
+      ev="$(sed -E -e 's/^WAIT sandbox: new client key, ([0-9]+) s before the create$/line:\1/' -e 's/^WAIT.*/line:bad/' \
+        "$w/events" | grep -E '^(line|wait):|^create$' | paste -sd, -)"
+      echo "changed=$1 events=$ev"
+    )
+  }
+  local l_case l_name l_changed l_plant l_expect
+  for l_case in "new-key 1 real OK" "old-key 0 real OK" "silent 1 silent FAIL" "late 1 late FAIL"; do
+    read -r l_name l_changed l_plant l_expect <<<"$l_case"
+    got="$(judge_sandbox_wait_line "$(sandbox_line_run "$l_changed" "$l_plant")" "$CLIENT_KEY_WAIT_S")"
+    echo "planted sandbox-wait-line $l_name: $got"
+    [ "${got%% *}" = "$l_expect" ] || all_ok=0
   done
 
   # The key files of a run of live() stopped with a signal (domains 03): the run gets its own TMPDIR, the made-up key,

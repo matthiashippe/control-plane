@@ -82,3 +82,37 @@
   Datei und einen Ordner `live-run.<PID der Selbsttest-Subshell>.living` dazu und fährt einen zweiten Lauf, den er mit `kill -TERM`
   beendet. Gegenproben: ohne `live_sweep` ist `kill-sweep` FAIL (1 Ordner bleibt), ohne Präfix FAIL (kein Ordner, also kein Beweis);
   ein `live_sweep` ohne Prüfung der PID und ein Löschen von ganz `TMPDIR` machen `foreign` FAIL.
+
+## domains 04
+
+- **Die Zeile `WAIT sandbox:` geht auf stderr.** `live()` reicht die Standardausgabe von `sandbox_live` an `judge_sandbox` und
+  zeigt sie erst nach dem Lauf; auf stderr steht die Zeile sofort auf dem Bildschirm und ändert das Urteil nicht. `sandbox_live`
+  ruft nach `changed=1` die Funktion `client_key_wait`, die erst `wait_line` und dann `live_wait` ruft.
+- **Die Reihenfolge hält eine Ereignisdatei fest.** `sandbox_line_run` fährt den echten `sandbox_live` mit der Attrappe für
+  `setup.sh`; dessen stderr, das gezählte `live_wait` (`wait:<s>`) und die `curl`-Attrappe bei `POST /v1/sandboxes` (`create`)
+  hängen in dieselbe Datei an, in der Reihenfolge, in der sie geschehen. `judge_sandbox_wait_line` verlangt nach `changed=1` genau
+  eine Zeile mit `CLIENT_KEY_WAIT_S`, vor dem ersten `wait` und vor `create`, nach `changed=0` keine. Gepflanzt werden `silent`
+  (ein `client_key_wait` nur mit `live_wait`, der Stand vor domains 04) und `late` (Zeile nach dem Warten). Gegenproben am echten
+  Code: `sandbox_live` wieder mit `live_wait` macht `new-key` FAIL, eine doppelte Zeile, eine falsche Zahl, die Zeile auf stdout
+  und eine Zeile auch nach `changed=0` machen `new-key` oder `old-key` FAIL.
+- **Das Goal löst den Schlüsselwechsel selbst aus.** `--client-key` schreibt nur, wenn `cp.pub` auf dem Sandbox-Server vom
+  Schlüssel in `/data` von `deploy-cp-1` abweicht; das passiert nur mit einem neuen Volume oder einem verlorenen `cp.pub`, und ein
+  früherer Lauf mit `changed=1` hat keine Zeitstempel. Ohne Auslöser bliebe das Warten aus domains 03 nur gegen Attrappen belegt.
+  `--client-key-reset` verschiebt `cp.pub` nach `cp.pub.prev` (nicht `.pub`, sonst nähme `sandboxd` ihn weiter an), der
+  Prüfschlüssel bleibt. Fenster am 14.11.2026: Reset 01:35:20 UTC, Schlüssel zurück 01:36:48, letzter 401 um 01:35:58, also lehnte
+  der Dienst neue Sandboxes von 01:35:20 bis 01:36:58 (rund 100 s) ab. Fremde Sandboxes liefen keine.
+- **Zwei Läufe statt einem (Abweichung vom Kontext „genau einmal“).** Der erste Lauf um 01:28 wartete richtig, scheiterte aber an
+  einem fehlenden Basis-Image auf dem Sandbox-Server (Cron des Mitbewohners, `docs/sandbox/schluesselwechsel.md`); sein Fenster
+  ging von 01:28:26 bis 01:29:47. Das Image hat der Maker mit `bash ops/sandbox/setup.sh 72.62.51.224` neu gebaut, dem Weg aus
+  `docs/sandbox/server.md`, danach lief die Messung einmal. Ein Fehlschlag ohne Bezug zum Warten belegt domains 03 weder noch
+  widerlegt er es; `BLOCKED fachlich` hätte das Produkt für alle Kunden bis zum nächsten Goal ohne Image gelassen.
+- **Pin des Basis-Images (Punkt 6, Kritik).** `docker image prune -a` löscht nur Images ohne Container; ein mit `docker create`
+  angelegter, nie gestarteter Container zählt als Nutzer (Docker-Doku zu `image prune`, Option `--all`). Auf dem code-host gibt es
+  kein Docker, darum ist das nicht lokal nachgestellt, und gegen den Cron auf dem Server löst der Maker kein `prune` aus, weil das
+  den Server des Mitbewohners ändert. Der Pin trägt das Label `sandboxd.pin=1` (nicht `sandboxd=1`, das räumt `sandboxd` beim Start
+  weg) und `--network none`. `pin_fact` sagt nur `yes`, wenn der Pin auf die aktuelle Image-ID zeigt, im Zustand `created` ist und
+  kein `sandboxd=1` trägt; in jedem anderen Fall ersetzt `pin_image` ihn (`docker rm -f`, dann `docker create`), damit ein
+  gestarteter oder falsch markierter Pin nicht als Dauerabweichung in `--check` hängen bleibt. Der Selbsttest benutzt eine
+  `docker`-Attrappe auf `PATH`, die wie Docker ein `create` auf einen belegten Namen ablehnt, und dieselben Funktionen
+  `PIN_FUNCS` wie `GATHER` und `APPLY`. Ausgerollt am 14.11.2026 gegen 02:09 UTC mit `bash ops/sandbox/setup.sh 72.62.51.224`;
+  davor zeigte `--check` nur `CHANGE fact image_pin want=yes have=no`, kein Container lief, `sandboxd` wurde nicht neu gestartet.

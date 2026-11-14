@@ -1,7 +1,7 @@
 # Domains Goal 04: Die Live-Prüfung sagt, worauf sie wartet, und das Warten ist in der Produktion belegt
 
 ## Status
-PLANNED
+DONE
 
 ## Active Objective
 `ops/live.sh` gibt nach `SETUP CLIENT-KEY OK changed=1` vor dem Warten die Zeile
@@ -65,25 +65,36 @@ Release Manager wie ein hängender Lauf aussieht; bricht er ihn ab, fehlt `LIVE 
 - Die Fälle des Selbsttests aus domains 02, domains 03 und sandbox 05 bleiben, wie sie sind.
 
 ## Done Condition
-- [ ] `ops/live.sh` sagt nach `changed=1` vor dem Warten, worauf es wartet, und schweigt nach `changed=0`; eine fehlende und eine
+- [x] `ops/live.sh` sagt nach `changed=1` vor dem Warten, worauf es wartet, und schweigt nach `changed=0`; eine fehlende und eine
       späte Zeile sind FAIL.
       Prüfung: `bash ops/live.sh --selftest` muss Exit-Code 0 haben und als letzte Zeile `LIVE SELFTEST OK` ausgeben.
       Prüfung: `bash ops/live.sh --selftest | grep -cE '^planted sandbox-wait-line (new-key|old-key): OK '` muss `2` ausgeben.
       Prüfung: `bash ops/live.sh --selftest | grep -cE '^planted sandbox-wait-line (silent|late): FAIL '` muss `2` ausgeben.
-- [ ] `ops/sandbox/setup.sh --client-key-reset` nimmt `cp.pub` aus dem Ordner, den `sandboxd` liest, lässt den Prüfschlüssel stehen
+- [x] `ops/sandbox/setup.sh --client-key-reset` nimmt `cp.pub` aus dem Ordner, den `sandboxd` liest, lässt den Prüfschlüssel stehen
       und macht den nächsten `--client-key` zu `changed=1`.
       Prüfung: `bash ops/sandbox/setup.sh --selftest` muss Exit-Code 0 haben.
       Prüfung: `bash ops/sandbox/setup.sh --selftest | grep -cE '^selftest client-key-reset: ok \((moved|again|reinstall)\)$'` muss `3` ausgeben.
-- [ ] Der Lauf in der Produktion mit `changed=1` ist gemessen: zwischen Reset und Warten scheiterte mindestens ein Aufruf mit
+- [x] Der Lauf in der Produktion mit `changed=1` ist gemessen: zwischen Reset und Warten scheiterte mindestens ein Aufruf mit
       `key not accepted`, die Anlage kam mehr als `RECHECK_MS` nach der letzten solchen Zeile und mindestens `CLIENT_KEY_WAIT_S`
       nach der Zeile `WAIT`, und Sandbox und Live-Prüfung waren grün.
       Prüfung: `node -e 'const fs=require("fs");const d=fs.readFileSync("docs/sandbox/schluesselwechsel.md","utf8");const r=Number(/const RECHECK_MS = ([0-9_]+);/.exec(fs.readFileSync("src/sandbox/service.ts","utf8"))[1].replace(/_/g,""))/1000;const w=Number(/^CLIENT_KEY_WAIT_S=([0-9]+)$/m.exec(fs.readFileSync("ops/live.sh","utf8"))[1]);const m=[...d.matchAll(/^Messung: reset=(\S+Z) last_401=(\S+Z) wait=(\S+Z) create=(\S+Z) changed=1 sandbox=OK live=OK run_s=([0-9]+)$/gm)];if(m.length!==1){console.log("lines "+m.length);process.exit(1)}const [,a,b,c,e,s]=m[0];const t=x=>Date.parse(x)/1000;console.log(t(a)<t(b)&&t(b)<t(c)&&t(e)-t(b)>r&&t(e)-t(c)>=w&&Number(s)>w?"measured ok":"measured bad")'` muss `measured ok` ausgeben.
       Prüfung: `grep -cE '(PRIVATE KEY|CP_HOST=|0x[0-9a-fA-F]{40})' docs/sandbox/schluesselwechsel.md` muss `0` ausgeben.
-- [ ] Der Sandbox-Server hat nach dem Lauf wieder genau den Schlüssel des Dienstes.
+- [x] Der Sandbox-Server hat nach dem Lauf wieder genau den Schlüssel des Dienstes.
       Prüfung (Netz): `bash ops/sandbox/setup.sh --client-key 72.62.51.224 | tail -n 1` muss `SETUP CLIENT-KEY OK changed=0` ausgeben.
-- [ ] `check` ist grün.
+- [x] `check` ist grün.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] Kritik: Das Basis-Image der Sandboxes übersteht den täglichen `docker image prune -af --filter "until=24h"` auf dem
+      Sandbox-Server, weil `ops/sandbox/setup.sh` es mit einem nie gestarteten Container `sandboxd-base-pin` belegt, und `--check`
+      meldet einen fehlenden oder veralteten Pin als Abweichung. Sonst fällt das um 01:35 gebaute Image am 16.11.2026 um 00:26 UTC,
+      jede Anlage antwortet 501, und die Live-Prüfung ist rot, ohne dass eine Änderung schuld ist
+      (`goals/_vorschlaege/sandbox-nacharbeit-2026-11-14-1.md`, `docs/sandbox/schluesselwechsel.md`). Fallen: Der Pin trägt nicht
+      das Label `sandboxd=1`, sonst löscht ihn `sandboxd` beim Start (`ops/sandbox/sandboxd.mjs`, Aufräumen über
+      `label=sandboxd=1`); nach einem Neubau des Images zeigt ein alter Pin auf die alte Image-ID und schützt das neue nicht, also
+      legt der Bau ihn neu an. Den Cron des Mitbewohners fasst `setup.sh` nicht an.
+      Prüfung: `bash ops/sandbox/setup.sh --selftest | grep -cE '^selftest image-pin: ok \((desired|fresh|rebuild|again)\)$'` muss `4` ausgeben (`desired`: die Sollwerte enthalten genau eine Zeile `fact image_pin yes`; `fresh`, `rebuild`, `again`: dasselbe Snippet wie auf dem Host mit einer Attrappe für `docker`, ohne Pin genau ein `docker create --name sandboxd-base-pin` ohne `sandboxd=1`, nach neuer Image-ID Pin entfernt und neu angelegt, mit aktuellem Pin kein `create` und kein `rm`, danach meldet der Fakt jeweils `yes` und vorher bei `fresh` und `rebuild` nicht).
+      Prüfung: `bash ops/sandbox/setup.sh --selftest` muss Exit-Code 0 haben und als letzte Zeile `SETUP SELFTEST OK` ausgeben.
+      Prüfung (Netz): `bash ops/sandbox/setup.sh --check 72.62.51.224 | tail -n 1` muss `SETUP CHECK OK changed=0` ausgeben.
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Die neuen Fälle beider Selbsttests waren vor dem Fix rot; die Zeile im Progress Log nennt, womit.
@@ -102,5 +113,9 @@ Release Manager wie ein hängender Lauf aussieht; bricht er ihn ab, fehlt `LIVE 
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-14 Zyklus 1: Punkte 1, 2, 3, 4, 5 gebaut: `sandbox_live` gibt nach `changed=1` über `client_key_wait` vor dem Warten auf stderr `WAIT sandbox: new client key, 75 s before the create` aus (Selbsttest `sandbox-wait-line` über eine Ereignisdatei), `setup.sh --client-key-reset` verschiebt `cp.pub` nach `cp.pub.prev` (Selbsttest moved, again, reinstall), und der Lauf in der Produktion mit `changed=1` ist in `docs/sandbox/schluesselwechsel.md` gemessen (letzter 401 01:35:58, `WAIT` 01:36:49, Anlage 01:38:05, `LIVE OK`, `run_s=124`); ein erster Lauf um 01:28 wartete richtig, scheiterte aber am fehlenden Image `sandboxd-base:1` (Prune-Cron des Mitbewohners), das `bash ops/sandbox/setup.sh 72.62.51.224` neu baute (ANNAHMEN.md, Vorschlag `sandbox-nacharbeit-2026-11-14-1.md`). Rot vor dem Fix: `new-key` FAIL mit `sandbox_live` auf `live_wait` (Stand vor dem Goal), dazu FAIL bei doppelter Zeile, falscher Zahl, Zeile auf stdout, Zeile nach `changed=0`; die drei `client-key-reset`-Fälle FAIL ohne `client_key_reset` (command not found), mit `cp.prev.pub`, mit Kopie statt Verschieben, mit gelöschtem Prüfschlüssel. Prüfbefehle: P1 `bash ops/live.sh --selftest` Exit 0, letzte Zeile `LIVE SELFTEST OK`, `2`, `2`; P2 `bash ops/sandbox/setup.sh --selftest` Exit 0, `3`; P3 `measured ok` (Gegenprobe: Anlage 2 s früher `measured bad`, `live=FAIL` `lines 0`), `0`; P4 (Netz) `SETUP CLIENT-KEY OK changed=0`; P5 `node scripts/check.mjs` Exit 0 (146 Dateien, 1709 Tests, Node 22, Last 124).
+- 2026-11-14 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, nach Merge von `dev` (7020272) in den Goal-Branch. Prüfbefehle: P1 `bash ops/live.sh --selftest` Exit 0, letzte Zeile `LIVE SELFTEST OK`, `2`, `2`; P2 `bash ops/sandbox/setup.sh --selftest` Exit 0, `3`; P3 `measured ok`, `0`; P4 (Netz) `SETUP CLIENT-KEY OK changed=0`; P5 `node scripts/check.mjs` Exit 0 (147 Dateien, 1718 Tests, Node 22, Last 81).
+- 2026-11-14 Zyklus 3: Punkt 6 gebaut: `setup.sh` belegt `sandboxd-base:1` mit dem nie gestarteten Container `sandboxd-base-pin` (`PIN_FUNCS` in `GATHER`, `APPLY` und Selbsttest, Label `sandboxd.pin=1`, `--network none`, nach Neubau ersetzt), `--check` führt `fact image_pin yes`, ausgerollt mit `bash ops/sandbox/setup.sh 72.62.51.224` (vorher einzige Abweichung `CHANGE fact image_pin want=yes have=no`, kein Container, `sandboxd` nicht neu gestartet). Rot vor dem Fix: alter Stand `0` Zeilen image-pin; gepflanzt `pin_image` ohne Wirkung FAIL fresh, rebuild, again; Label `sandboxd=1` FAIL fresh, rebuild, again; ohne `docker rm` FAIL rebuild, again; immer neu anlegen FAIL again; ohne Sollzeile FAIL desired. Prüfbefehle: P1 Exit 0, `LIVE SELFTEST OK`, `2`, `2`; P2 Exit 0, `3`; P3 `measured ok`, `0`; P4 (Netz) `SETUP CLIENT-KEY OK changed=0`; P5 `node scripts/check.mjs` Exit 0 (Last 106); P6 `4`, Exit 0 mit `SETUP SELFTEST OK`, (Netz) `SETUP CHECK OK changed=0`.
+- 2026-11-14 Release: PASS K und B (Zyklus 3), DONE.
 
 ## Blockers
