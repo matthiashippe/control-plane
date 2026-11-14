@@ -10,7 +10,8 @@
 # So the window is no longer typed. It comes from when the container actually started, which is
 # the deploy, to the second.
 #
-#   ops/deploy-window.sh          the last deploy
+#   ops/deploy-window.sh          the last deploy; waits until the window is over, then measures it
+#                                 whole and posts a 502 to a stranger to the webhook of the VM
 #   ops/deploy-window.sh 300      the same, with a 300 second tail instead of 180
 #   ops/deploy-window.sh --at 2026-11-12T16:41:02
 #                                 a past window, centred on that time (UTC) instead of the container start
@@ -22,6 +23,18 @@
 #
 # Exit 0 means nobody outside saw an error. Exit 1 means somebody did, and the lines are printed.
 # Exit 2 means the check could not run.
+#
+# deploy.yml calls this about 20 s after the new container started, and the window runs 180 s past
+# the start. Until 2026-11-14 every rollout therefore got PARTIAL, an answer about time that had not
+# passed yet. Without --at the tool now waits until the window is over (plus a 2 s margin) before it
+# reads the log. With --at or --log it never waits: that is a past window, read by a person.
+#   CP_WINDOW_NOW     the clock before the wait, ISO time in UTC (default: the system clock)
+#   CP_WINDOW_SLEEP   a command run instead of `sleep` with the seconds as its only argument (tests)
+#
+# And a 502 used to reach nobody: the step only wrote a warning into the job log. Without --at, a
+# `BAD GATEWAY` above 0 now runs ops/deploy-alarm.sh on the VM, which posts one line without an
+# address to the webhook the crontab sets for ops/watchdog.sh. The URL is never printed here.
+# The tool then prints ALARM SENT or ALARM NOT SENT: exit <k> and keeps its exit 1.
 #
 # No line names an address. `deploy.yml` prints this output into the public logs of a public
 # repository, and until 2026-11-12 every line under AFFECTED and NO KEY carried a visitor's
@@ -209,6 +222,33 @@ else
   fi
 fi
 
+# Wait for the end of the window, but only for a window taken from the container start. The clock
+# after the wait is the clock before it plus the time waited, so a fake sleep in a test and a real
+# one on the runner both end in a window that is over, never in PARTIAL.
+if [[ -z "$AT" ]]; then
+  read -r wait_s now_after < <(python3 - "$started" "$TAIL_SECONDS" "${CP_WINDOW_NOW:-}" <<'PY'
+import datetime, math, sys
+started_iso, tail, now_raw = sys.argv[1], int(sys.argv[2]), sys.argv[3]
+utc = datetime.timezone.utc
+head = started_iso.partition(".")[0].rstrip("Z")
+started = datetime.datetime.fromisoformat(head).replace(tzinfo=utc)
+now = datetime.datetime.fromisoformat(now_raw).replace(tzinfo=utc) if now_raw else datetime.datetime.now(utc)
+missing = (started + datetime.timedelta(seconds=tail) - now).total_seconds()
+wait = math.ceil(missing) + 2 if missing > 0 else 0
+print(wait, (now + datetime.timedelta(seconds=wait)).strftime("%Y-%m-%dT%H:%M:%S"))
+PY
+  )
+  if [[ -z "${wait_s:-}" ]]; then
+    echo "COULD NOT TELL: the container start time was not readable as a time." >&2
+    exit 2
+  fi
+  if [[ "$wait_s" -gt 0 ]]; then
+    echo "waiting  $wait_s s for the window to end, so it is measured whole"
+    "${CP_WINDOW_SLEEP:-sleep}" "$wait_s"
+    export CP_WINDOW_NOW="$now_after"
+  fi
+fi
+
 log=$(mktemp); trap 'rm -f "$log"' EXIT
 # gzip on the far side, because the access log is 20 MB and growing.
 #
@@ -240,7 +280,8 @@ elif ! "$HERE/access-log.sh" > "$log"; then
   exit 2
 fi
 
-python3 - "$started" "$LEAD_SECONDS" "$TAIL_SECONDS" "$OWN" "$log" "$source_label" <<'PY'
+set +e
+report=$(python3 - "$started" "$LEAD_SECONDS" "$TAIL_SECONDS" "$OWN" "$log" "$source_label" <<'PY'
 import datetime
 import re, json, os, sys
 
@@ -375,3 +416,30 @@ if failures:
 
 print(f"CLEAN    {strangers} request(s) from outside in the window, none of them an error.")
 PY
+)
+rc=$?
+set -e
+printf '%s\n' "$report"
+
+# The alarm, only for a window taken from the container start: a past window (--at, --log) is read
+# by a person who is already looking. Only a 502 counts, the restart itself; any other error stays
+# in the report above.
+bad=$(sed -nE 's/^BAD GATEWAY ([0-9]+) of .*/\1/p' <<<"$report" | head -n 1)
+if [[ -z "$AT" && "$rc" -eq 1 && "${bad:-0}" -gt 0 ]]; then
+  set +e
+  # Whatever comes back is printed with every address and URL blanked, because it lands in the
+  # public log of the deploy job.
+  alarm_out=$("${SSH[@]}" "$HOST" "bash -s $bad ${started:11:8}" < "$HERE/deploy-alarm.sh" 2>&1)
+  k=$?
+  set -e
+  if [[ -n "$alarm_out" ]]; then
+    sed -E 's#[A-Za-z][A-Za-z0-9+.-]*://[^[:space:]]+#<url>#g; s/([0-9]{1,3}\.){3}[0-9]{1,3}/<address>/g' <<<"$alarm_out" \
+      | sed 's/^/         /'
+  fi
+  if [[ $k -eq 0 ]]; then
+    echo "ALARM SENT"
+  else
+    echo "ALARM NOT SENT: exit $k"
+  fi
+fi
+exit "$rc"
