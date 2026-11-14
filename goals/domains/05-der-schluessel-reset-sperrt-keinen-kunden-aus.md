@@ -1,7 +1,7 @@
 # Domains Goal 05: Der Schlüssel-Reset sperrt keinen Kunden aus
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 `ops/sandbox/setup.sh --client-key-reset <address>` verweigert mit `SETUP CLIENT-KEY-RESET FAIL: foreign sandbox running`, ohne
@@ -90,7 +90,7 @@ nächsten Live-Prüfung.
       Prüfung: `grep -q -- '--restore-after' ops/README.md && grep -q -- '--foreign-sandboxes' ops/README.md && echo yes` muss `yes` ausgeben.
 - [x] `check` ist grün.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Die neuen Fälle des Selbsttests waren vor dem Fix rot (`foreign` meldete `moved=1`); die Zeile im Progress Log nennt, womit.
@@ -114,5 +114,6 @@ nächsten Live-Prüfung.
 ## Progress Log
 - 2026-11-14 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6 gebaut: `--client-key-reset` fragt zuerst über `foreign_sandboxes` `state.json` von `sandboxd` (laufende Sandboxes) und am Zahlungsserver `ourAddresses` aus `/app/dist/bounties/ours.js` mit `readonly: true` ab, verweigert bei fremder Sandbox oder unlesbarer Seite und setzt danach den Timer `cp-pub-restore` (`systemd-run --on-active=<s>`, `--restore-after` 60 bis 3600, Standard 120), erst dann wird verschoben; neuer lesender Schalter `--foreign-sandboxes`, `ops/README.md` und Kopf von `setup.sh` nennen beide, Annahmen in `goals/domains/ANNAHMEN.md`. Rot vor dem Fix: neue Fälle gegen den alten `client_key_reset`, `foreign` FAIL mit `SETUP CLIENT-KEY-RESET OK moved=1`, dazu FAIL unknown, no-timer, ours, restore, keep. Gepflanzt und rot: Reset ohne Abfrage (FAIL foreign, unknown, no-timer, ours), Reset, der bei unlesbarem `state.json` verschiebt (FAIL unknown, no-timer, ours), Timer nach dem Verschieben (FAIL no-timer, ours: `timer set after the move`), Timer, der `cp.pub` überschreibt (FAIL keep). Gegenprobe der Abfrage am Zahlungsserver: leer `0`, gepflanztes unbekanntes Konto `1`, Konto der Live-Prüfung `0`, beide `1`. Prüfbefehle: P1 `3`; P2 `3`, `exit 2`; P3 `3`, `4`, Exit 0 mit `SETUP SELFTEST OK`; P4 (Netz) `1` (`SETUP FOREIGN-SANDBOXES OK running=0 foreign=0`), `SETUP CLIENT-KEY OK changed=0`, `SETUP CHECK OK changed=0`; P5 `yes`; P6 `node scripts/check.mjs` Exit 0.
 - 2026-11-14 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6; `dev` ohne neue Commits gegenüber dem Goal-Branch, nichts zu mergen. Prüfbefehle: P1 `3`; P2 `3`, `exit 2`; P3 `3`, `4`, Exit 0 mit `SETUP SELFTEST OK`; P4 (Netz) `1` (`SETUP FOREIGN-SANDBOXES OK running=0 foreign=0`), `SETUP CLIENT-KEY OK changed=0`, `SETUP CHECK OK changed=0`; P5 `yes`; P6 `node scripts/check.mjs` Exit 0 (1723 Tests grün).
+- 2026-11-14 Release: PASS K und B (Zyklus 2), DONE.
 
 ## Blockers
