@@ -83,6 +83,17 @@ Release Manager wie ein hängender Lauf aussieht; bricht er ihn ab, fehlt `LIVE 
       Prüfung (Netz): `bash ops/sandbox/setup.sh --client-key 72.62.51.224 | tail -n 1` muss `SETUP CLIENT-KEY OK changed=0` ausgeben.
 - [x] `check` ist grün.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
+- [ ] Kritik: Das Basis-Image der Sandboxes übersteht den täglichen `docker image prune -af --filter "until=24h"` auf dem
+      Sandbox-Server, weil `ops/sandbox/setup.sh` es mit einem nie gestarteten Container `sandboxd-base-pin` belegt, und `--check`
+      meldet einen fehlenden oder veralteten Pin als Abweichung. Sonst fällt das um 01:35 gebaute Image am 16.11.2026 um 00:26 UTC,
+      jede Anlage antwortet 501, und die Live-Prüfung ist rot, ohne dass eine Änderung schuld ist
+      (`goals/_vorschlaege/sandbox-nacharbeit-2026-11-14-1.md`, `docs/sandbox/schluesselwechsel.md`). Fallen: Der Pin trägt nicht
+      das Label `sandboxd=1`, sonst löscht ihn `sandboxd` beim Start (`ops/sandbox/sandboxd.mjs`, Aufräumen über
+      `label=sandboxd=1`); nach einem Neubau des Images zeigt ein alter Pin auf die alte Image-ID und schützt das neue nicht, also
+      legt der Bau ihn neu an. Den Cron des Mitbewohners fasst `setup.sh` nicht an.
+      Prüfung: `bash ops/sandbox/setup.sh --selftest | grep -cE '^selftest image-pin: ok \((desired|fresh|rebuild|again)\)$'` muss `4` ausgeben (`desired`: die Sollwerte enthalten genau eine Zeile `fact image_pin yes`; `fresh`, `rebuild`, `again`: dasselbe Snippet wie auf dem Host mit einer Attrappe für `docker`, ohne Pin genau ein `docker create --name sandboxd-base-pin` ohne `sandboxd=1`, nach neuer Image-ID Pin entfernt und neu angelegt, mit aktuellem Pin kein `create` und kein `rm`, danach meldet der Fakt jeweils `yes` und vorher bei `fresh` und `rebuild` nicht).
+      Prüfung: `bash ops/sandbox/setup.sh --selftest` muss Exit-Code 0 haben und als letzte Zeile `SETUP SELFTEST OK` ausgeben.
+      Prüfung (Netz): `bash ops/sandbox/setup.sh --check 72.62.51.224 | tail -n 1` muss `SETUP CHECK OK changed=0` ausgeben.
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
