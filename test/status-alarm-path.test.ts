@@ -24,12 +24,15 @@ const STATUS = process.env.STATUS_UNDER_TEST
   ? resolve(process.env.STATUS_UNDER_TEST)
   : join(__dirname, "..", "ops", "status.sh");
 const NOW = 1794571200;
+// Without CP_ALERT_WEBHOOK ops/status.sh does not read the topic (test/status-alarm-received.test.ts).
+const NOT_ASKED = { last_alive: null, last_message: null, status: "unknown" };
 
 type AlarmPath = {
   unreachable_24h: number | null;
   last_unreachable: string | null;
   last_delivered: string | null;
   status: string;
+  received: { last_alive: string | null; last_message: string | null; status: string };
 };
 
 function run(log: string | null, opts: { brokenLast?: boolean } = {}): { status: number | null; out: string; alarm: AlarmPath | undefined } {
@@ -86,6 +89,7 @@ describe("ops/status.sh reports a failed alarm path from the watchdog log", () =
       last_unreachable: "2026-11-13T11:50:00Z",
       last_delivered: null,
       status: "red",
+      received: NOT_ASKED,
     });
   });
 
@@ -97,6 +101,7 @@ describe("ops/status.sh reports a failed alarm path from the watchdog log", () =
       last_unreachable: "2026-11-13T11:50:00Z",
       last_delivered: null,
       status: "ok",
+      received: NOT_ASKED,
     });
   });
 
@@ -108,6 +113,7 @@ describe("ops/status.sh reports a failed alarm path from the watchdog log", () =
       last_unreachable: "2026-11-12T11:59:59Z",
       last_delivered: null,
       status: "ok",
+      received: NOT_ASKED,
     });
   });
 
@@ -119,6 +125,7 @@ describe("ops/status.sh reports a failed alarm path from the watchdog log", () =
       last_unreachable: null,
       last_delivered: null,
       status: "unknown",
+      received: NOT_ASKED,
     });
   });
 
@@ -136,6 +143,7 @@ describe("ops/status.sh reports a failed alarm path from the watchdog log", () =
       last_unreachable: "2026-11-13T11:50:00Z",
       last_delivered: null,
       status: "ok",
+      received: NOT_ASKED,
     });
   });
 
@@ -150,6 +158,7 @@ describe("ops/status.sh reports a failed alarm path from the watchdog log", () =
       last_unreachable: "2026-11-13T11:10:00Z",
       last_delivered: "2026-11-13T11:15:00Z",
       status: "ok",
+      received: NOT_ASKED,
     });
   });
 
@@ -164,6 +173,7 @@ describe("ops/status.sh reports a failed alarm path from the watchdog log", () =
       last_unreachable: "2026-11-13T11:10:00Z",
       last_delivered: "2026-11-13T10:55:00Z",
       status: "red",
+      received: NOT_ASKED,
     });
   });
 
@@ -175,6 +185,7 @@ describe("ops/status.sh reports a failed alarm path from the watchdog log", () =
       last_unreachable: null,
       last_delivered: "2026-11-12T09:59:00Z",
       status: "red",
+      received: NOT_ASKED,
     });
   });
 
@@ -186,6 +197,7 @@ describe("ops/status.sh reports a failed alarm path from the watchdog log", () =
       last_unreachable: null,
       last_delivered: "2026-11-12T10:01:00Z",
       status: "ok",
+      received: NOT_ASKED,
     });
   });
 
@@ -201,6 +213,7 @@ describe("ops/status.sh reports a failed alarm path from the watchdog log", () =
       last_unreachable: null,
       last_delivered: null,
       status: "red",
+      received: NOT_ASKED,
     });
   });
 });

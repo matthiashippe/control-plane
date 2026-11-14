@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Read-only status report of the running control plane, as JSON. Changes nothing, starts nothing.
-#   OPENROUTER_API_KEY=... ops/status.sh
+#   OPENROUTER_API_KEY=... CP_ALERT_WEBHOOK=... ops/status.sh
 set -uo pipefail
 HOST="${CP_DEPLOY_HOST:-root@76.13.144.207}"
 KEY="${CP_DEPLOY_KEY:-$HOME/.ssh/id_ed25519_automaton}"
@@ -50,13 +50,29 @@ alarm_rc=$?
 # again, so a fifteen-minute failure does not stay red for 24 hours.
 alarm_last=$("${SSH[@]}" 'bash -s' < "$DIR/webhook-last.sh" 2>/dev/null)
 alarm_last_rc=$?
+# Did those deliveries reach the topic? ntfy accepts a POST to any topic, so `[INFO] webhook delivered` does not prove that a
+# phone got anything: a wrong or stale topic in the crontab of the server looks exactly like the right one. With
+# CP_ALERT_WEBHOOK in the local environment the messages of the topic are read back. ntfy keeps messages in its cache for 12
+# hours by default, hence since=12h. The URL goes to curl as a config on stdin (-K -), never as an argument, because arguments
+# show up in `ps` on the shared code-host and whoever knows the topic can write to the phone; errors of curl go to /dev/null
+# for the same reason. Without CP_ALERT_WEBHOOK nobody is asked and the result is "unknown".
+alarm_topic=""
+alarm_topic_rc=-
+if [ -n "${CP_ALERT_WEBHOOK:-}" ]; then
+  topic_url="${CP_ALERT_WEBHOOK%/}/json?poll=1&since=12h"
+  topic_url="${topic_url//\\/\\\\}"
+  topic_url="${topic_url//\"/\\\"}"
+  alarm_topic=$(printf 'url = "%s"\n' "$topic_url" | curl -s --fail -m 10 -K - 2>/dev/null)
+  alarm_topic_rc=$?
+  unset topic_url
+fi
 or_json=$(curl -s -m 10 https://openrouter.ai/api/v1/credits -H "Authorization: Bearer ${OPENROUTER_API_KEY:-none}" 2>/dev/null)
 payto_hex=$(curl -s -m 10 -X POST https://mainnet.base.org -H 'content-type: application/json' \
   --data '{"jsonrpc":"2.0","id":1,"method":"eth_call","params":[{"to":"0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913","data":"0x70a08231000000000000000000000000914102284463F4F58B1D2f6DB9aC80BFcaA7d614"},"latest"]}' 2>/dev/null)
 
 HEALTH_CODE="$health_code" HEALTH_BODY="$health_body" CERT_END="$cert_end" VM_STATS="$vm_stats" \
 DB_JSON="$db_json" OR_JSON="$or_json" PAYTO_HEX="$payto_hex" ALARM_COUNT="$alarm_count" ALARM_RC="$alarm_rc" \
-ALARM_LAST="$alarm_last" ALARM_LAST_RC="$alarm_last_rc" python3 <<'PY'
+ALARM_LAST="$alarm_last" ALARM_LAST_RC="$alarm_last_rc" ALARM_TOPIC_RC="$alarm_topic_rc" python3 3<<<"$alarm_topic" <<'PY'
 import os, json, datetime, re, time
 def j(s, default=None):
     try: return json.loads(s)
@@ -118,8 +134,46 @@ elif delivered_age is not None and delivered_age > 26 * 3600:
     alarm_status = "red"
 else:
     alarm_status = "ok"
+# alarm_path.received: what of the watchdog really stands on the topic. The answer comes on fd 3, not in the environment,
+# because it names the topic. Only messages titled `control-plane ...` count (the posts of ops/watchdog.sh, not those of
+# ops/backup.sh or ops/x402-series.sh); last_alive is the newest titled exactly `control-plane ALIVE`. A failed poll or a
+# non-empty line that is no JSON object makes the topic unreadable: "unknown". A delivery from the log is compared only while
+# it must still be in the cache of ntfy (12 hours), so only one younger than 11 hours, with 300 seconds for the clocks of the
+# server and of ntfy: red when no counted message is at most 300 seconds older than the delivery or later. Red turns
+# alarm_path red; unknown leaves it alone, so a run without CP_ALERT_WEBHOOK reports exactly what it reported before.
+received = {"last_alive": None, "last_message": None, "status": "unknown"}
+if os.environ.get("ALARM_TOPIC_RC") == "0":
+    try:
+        with os.fdopen(3, encoding="utf-8", errors="replace") as topic:
+            lines = topic.read().splitlines()
+        sent, alive = [], []
+        for line in lines:
+            if not line.strip():
+                continue
+            msg = json.loads(line)
+            if not isinstance(msg, dict):
+                raise ValueError("not an object")
+            title = msg.get("title")
+            if msg.get("event") != "message" or not isinstance(title, str) or not title.startswith("control-plane "):
+                continue
+            sent_at = msg.get("time")
+            if isinstance(sent_at, bool) or not isinstance(sent_at, (int, float)):
+                raise ValueError("no time")
+            sent.append(sent_at)
+            if title == "control-plane ALIVE":
+                alive.append(sent_at)
+        stamp = lambda t: datetime.datetime.fromtimestamp(t, datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        received = {"last_alive": stamp(max(alive)) if alive else None,
+                    "last_message": stamp(max(sent)) if sent else None, "status": "unknown"}
+        if delivered_age is not None and delivered_age <= 11 * 3600:
+            delivered_ts = now - delivered_age
+            received["status"] = "ok" if any(t >= delivered_ts - 300 for t in sent) else "red"
+    except Exception:
+        received = {"last_alive": None, "last_message": None, "status": "unknown"}
+if received["status"] == "red":
+    alarm_status = "red"
 alarm_path = {"unreachable_24h": alarm_count, "last_unreachable": last_unreachable,
-              "last_delivered": last_delivered, "status": alarm_status}
+              "last_delivered": last_delivered, "status": alarm_status, "received": received}
 orc = j(os.environ.get("OR_JSON", ""), {}) or {}
 ord_ = orc.get("data", {})
 payto = None

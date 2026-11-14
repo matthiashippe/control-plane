@@ -43,6 +43,7 @@ local start and does not replace the run against the real endpoint.
 | `db.day.margin_mc` | negative | the sale price does not cover the purchase: check markup or catalogue |
 | `db.paying_without_thinking` | one entry older than 24 h | a customer paid and buys no inference. No alarm, but go and look |
 | `alarm_path.status` | `red` (3 or more `[WARN] webhook unreachable` in 24 h and no `[INFO] webhook delivered` after the last of them, see `last_unreachable` and `last_delivered`; or a `last_delivered` older than 26 h, even with 0 failed POSTs) | no alarm reaches anybody: with a `last_delivered` older than 26 h the watchdog itself no longer posts, so check `crontab -l` and the end of `/var/log/cp-watchdog.log` on the VM first; otherwise post to the webhook by hand, compare URL and topic in the crontab of the VM with `CP_ALERT_WEBHOOK` in `~/brain/connectors/secrets.env`, never write the URL into a file of this repo. A delivery after the last failure means the path works again and the status is `ok` even with 3 lines in 24 h. When `last_unreachable` and `last_delivered` are both `null` although lines were counted, `ops/webhook-last.sh` gave nothing readable and `red` holds from 3 lines as before. `unknown` (log not read) is no alarm, but two runs in a row are a finding like a missing `vm` block |
+| `alarm_path.received.status` | `red` (the last delivery of the watchdog, `alarm_path.last_delivered`, is younger than 11 h and no message of the watchdog on the topic is at most 300 s older than it or later; this also turns `alarm_path.status` red) | the watchdog posts to a topic nobody reads: compare URL and topic in the crontab of the VM (`crontab -l`) with `CP_ALERT_WEBHOOK` in `~/brain/connectors/secrets.env`, never write either into a file of this repo, then check `last_alive` and `last_message` on the next run. `unknown` (no `CP_ALERT_WEBHOOK` in the local environment, topic not readable, or no delivery younger than 11 h) is no alarm and leaves `alarm_path.status` alone |
 
 ### Paying without thinking
 
@@ -105,6 +106,17 @@ a failure of fifteen minutes that is over does not stay red for 24 hours. A last
 longer runs or no longer posts (crontab gone, script stops before the sign of life, sign of life
 switched off), even though that leaves no line `[WARN] webhook unreachable`. `CP_WATCHDOG_ALIVE=0`
 switches only the sign of life off; it is meant for tests that count every POST, never for the VM.
+
+A delivery in the log only proves that ntfy accepted the POST, and ntfy accepts any topic: with a
+wrong or stale topic in the crontab the watchdog logs a delivery every day and no phone rings. So
+`ops/status.sh` reads the topic back when `CP_ALERT_WEBHOOK` is set in the local environment
+(`json?poll=1&since=12h`, the URL handed to `curl` on stdin with `-K -`, never as an argument and
+never in the output) and reports `alarm_path.received`: `last_alive` (the newest `control-plane
+ALIVE`), `last_message` (the newest message titled `control-plane ...`; posts of other scripts do
+not count) and `status`. ntfy keeps messages in its cache for 12 hours by default, so the sign of
+life from just after 00:00 UTC is gone by the afternoon. That is why the window is 11 h: only a
+last delivery younger than 11 h is compared with the topic (one hour of margin before the cache
+ends, 300 s for the clocks), and an older one gives `unknown`, never a false red.
 
 ## Backup
 
