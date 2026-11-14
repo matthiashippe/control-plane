@@ -52,3 +52,11 @@
   Runtime schickt nie an sich selbst.
 - **Kontakt mit sich selbst:** Zeilen in `relay_contacts` mit `a` gleich `b` aus relay 01 bleiben stehen; sie wirken nicht mehr, weil
   keine Nachricht an sich selbst mehr bis zum Preis kommt.
+
+## Reparatur dev, Audit 2026-11-14 Zeile 425 (14.11.2026, Engineer CP)
+
+- relay 01 Punkt 7 (`check`) scheiterte im Audit auf `033245c` am Idempotency-Test in `test/sandbox-api.test.ts`: Der feste
+  Abbruch `AbortSignal.timeout(200)` feuerte unter Host-Last vor dem `docker run`. Dieselbe Ursache wie Zeilen 371 und 406; seit
+  `2de5407` gibt es den festen Abbruch auf `dev` nicht mehr (`grep -c "AbortSignal.timeout(200)" test/sandbox-api.test.ts` gibt 0
+  aus). `PATH=/usr/bin:$PATH node scripts/check.mjs` auf `dev` `04e521c` ist bei Last 3,8 je Kern grün (151 Dateien, 1769 Tests,
+  68 s). Der Code bleibt unverändert, weil `dev` die Ursache schon behoben hat.
