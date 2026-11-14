@@ -305,3 +305,14 @@
   test/sandbox-api.test.ts` gibt `2 passed (2)`, `29 passed (29)`; `PATH=/usr/bin:$PATH node scripts/check.mjs` Exit 0,
   `check: grün in 78 s`. Gegenprobe: der Test vom Stand vor 2de5407 mit `AbortSignal.timeout(1)` wird mit `-t "repeated create"` rot,
   `1 failed | 2 passed`, `expected +0 to be 1`, genau der Fehler aus Zeile 528.
+
+## Goal 05, Audit 2026-11-14 Zeile 539 (14.11.2026, Engineer CP)
+
+- **Dieselbe Ursache wie Zeile 478, 499, 520 und 528, auf `dev` seit 2de5407 behoben, keine Codeänderung.** Zeile 539 (sandbox 05
+  Punkt 9, `check`) meldet den Idempotency-Test in `test/sandbox-api.test.ts` mit 0 statt 1 Exec nach `AbortSignal.timeout(200)`. Das
+  Audit lief auf 033245cd, vor dem Merge von 2de5407; seither bricht der Test erst ab, wenn `sandboxd` das Kommando hat, und
+  `grep -rn "AbortSignal.timeout" test/ | wc -l` gibt 0.
+- **Beleg auf frischem `dev` (6b2653a), Load 70 auf 16 Kernen:** `PATH=/usr/bin:$PATH node scripts/check.mjs` Exit 0,
+  `check: grün in 94 s`; `pnpm -s vitest run test/sandbox-api.test.ts -t "Idempotency-Key"` gibt `5 passed | 16 skipped`. Gegenprobe:
+  der Test vom Stand vor 2de5407 mit `AbortSignal.timeout(1)` wird rot, `2 failed | 3 passed | 16 skipped`, `expected +0 to be 1`,
+  genau der Fehler aus Zeile 539.
