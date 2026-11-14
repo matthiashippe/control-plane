@@ -294,3 +294,14 @@
 - **Beleg auf frischem `dev` (c6cb15d), Last 1 je Kern:** `PATH=/usr/bin:$PATH node scripts/check.mjs` Exit 0, `check: grün in 62 s`;
   `pnpm -s vitest run test/sandbox-api.test.ts -t "Idempotency-Key"` gibt `5 passed | 16 skipped`. Gegenprobe: der Test vom Stand
   vor 2de5407 mit `AbortSignal.timeout(1)` wird rot mit `expected +0 to be 1` in 2 Tests, genau der Fehler aus Zeile 520.
+
+## Goal 05, Audit 2026-11-14 Zeile 528 (14.11.2026, Engineer CP)
+
+- **Dieselbe Ursache wie Zeile 478, 499 und 520, auf `dev` seit 2de5407 behoben, keine Codeänderung.** Zeile 528 (sandbox 05 Punkt 4)
+  meldet den Test `repeated create while the first one still runs` in `test/sandbox-api.test.ts` mit 0 statt 1 Anlegen nach
+  `AbortSignal.timeout(200)`. Das Audit lief vor dem Merge von 2de5407; seither bricht der Test erst ab, wenn `sandboxd` den Container
+  startet, und `grep -rn "AbortSignal.timeout" test/ | wc -l` gibt 0.
+- **Beleg auf frischem `dev` (c5b2654), Load 48 auf 16 Kernen:** `PATH=/usr/bin:$PATH pnpm -s vitest run test/sandbox-long-exec.test.ts
+  test/sandbox-api.test.ts` gibt `2 passed (2)`, `29 passed (29)`; `PATH=/usr/bin:$PATH node scripts/check.mjs` Exit 0,
+  `check: grün in 78 s`. Gegenprobe: der Test vom Stand vor 2de5407 mit `AbortSignal.timeout(1)` wird mit `-t "repeated create"` rot,
+  `1 failed | 2 passed`, `expected +0 to be 1`, genau der Fehler aus Zeile 528.
