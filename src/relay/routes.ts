@@ -24,6 +24,7 @@ import {
   unreadCount,
   type RelayReply,
 } from "./store.js";
+import { canonicalSignature } from "./signature.js";
 
 export interface RelayDeps {
   db: Db;
@@ -53,6 +54,13 @@ const SOLANA = (who: string) =>
     `The ${who} is not a lowercase EVM address. This relay checks EVM signatures only, so a Solana identity cannot use it yet.`,
   );
 
+const SELF = fail(
+  400,
+  "recipient_is_sender",
+  "to is the sender's own address. This relay delivers a message only to another address; nothing was sent and nothing " +
+    "was charged.",
+);
+
 /** Whether `signed_at` lies within the window: at most 300000 ms old and at most 60 s ahead. */
 function inWindow(stamp: string, now: Date): boolean {
   const t = Date.parse(stamp);
@@ -61,8 +69,8 @@ function inWindow(stamp: string, now: Date): boolean {
   return age <= RELAY_LIMITS.replayWindowMs && age >= -RELAY_LIMITS.futureSkewMs;
 }
 
+/** `signature` must already be in its one form (canonicalSignature of src/relay/signature.ts). */
 async function signedBy(address: string, message: string, signature: string): Promise<boolean> {
-  if (!/^0x[0-9a-fA-F]+$/.test(signature)) return false;
   try {
     return await verifyMessage({ address: address as Hex, message, signature: signature as Hex });
   } catch {
@@ -86,10 +94,12 @@ async function reader(c: Context, deps: RelayDeps): Promise<{ address: string; s
     if (!inWindow(stamp, deps.clock())) {
       return fail(401, "signature_expired", "X-Timestamp is older than 300000 ms or more than 60 s ahead. Sign again with the current time.");
     }
-    if (!(await signedBy(address, `Conway:poll:${address}:${stamp}`, sig))) {
+    const one = canonicalSignature(sig);
+    if (one === null || !(await signedBy(address, `Conway:poll:${address}:${stamp}`, one))) {
       return fail(401, "invalid_signature", "X-Signature is not a signature of Conway:poll:{address}:{timestamp} by X-Wallet-Address.");
     }
-    return { address, signature: sig };
+    // The poll is remembered under the one form, so a repeat in another spelling gets the first answer.
+    return { address, signature: one };
   }
   const account = deps.resolveKey(c.req.header("authorization"));
   return account ? { address: account.toLowerCase(), signature: null } : NO_AUTH;
@@ -119,22 +129,25 @@ async function send(c: Context, deps: RelayDeps): Promise<RelayReply> {
   if (!isRecipient(to)) return SOLANA("recipient in to");
   const now = deps.clock();
 
-  const signature = str(body.signature);
-  if (signature !== null || body.from !== undefined || body.signed_at !== undefined) {
+  const sent = str(body.signature);
+  if (sent !== null || body.from !== undefined || body.signed_at !== undefined) {
     const from = str(body.from)?.toLowerCase() ?? null;
     const signedAt = str(body.signed_at);
-    if (from === null || signedAt === null || signature === null) {
+    if (from === null || signedAt === null || sent === null) {
       return fail(401, "invalid_signature", "A signed message carries from, signed_at and signature; one of them is missing.");
     }
     if (!isEvmAddress(from)) return SOLANA("sender in from");
+    // The one form comes before the check, the lookup and the store, so another spelling is the same message.
+    const signature = canonicalSignature(sent);
     const canonical = `Conway:send:${to}:${keccak256(toBytes(content))}:${signedAt}`;
-    if (!(await signedBy(from, canonical, signature))) {
+    if (signature === null || !(await signedBy(from, canonical, signature))) {
       return fail(
         401,
         "invalid_signature",
         "signature is not a signature of Conway:send:{to}:{keccak256(content)}:{signed_at} by the address in from.",
       );
     }
+    if (to === from) return SELF;
     // A repeat of an accepted signature is the same message, whenever it comes; only a new one has to be fresh.
     const known = deps.db.prepare("SELECT id FROM relay_messages WHERE signature = ?").get(signature) as { id: string } | undefined;
     if (known) return { status: 201, body: { id: known.id } };
@@ -146,8 +159,10 @@ async function send(c: Context, deps: RelayDeps): Promise<RelayReply> {
 
   const account = deps.resolveKey(c.req.header("authorization"));
   if (!account) return NO_AUTH;
+  const sender = account.toLowerCase();
+  if (to === sender) return SELF;
   return acceptMessage(deps.db, {
-    sender: account.toLowerCase(),
+    sender,
     recipient: to,
     content: `${UNVERIFIED_MARK} ${content}`,
     signedAt: now.toISOString(),
