@@ -60,3 +60,11 @@
   `2de5407` gibt es den festen Abbruch auf `dev` nicht mehr (`grep -c "AbortSignal.timeout(200)" test/sandbox-api.test.ts` gibt 0
   aus). `PATH=/usr/bin:$PATH node scripts/check.mjs` auf `dev` `04e521c` ist bei Last 3,8 je Kern grün (151 Dateien, 1769 Tests,
   68 s). Der Code bleibt unverändert, weil `dev` die Ursache schon behoben hat.
+
+## Reparatur dev, Audit 2026-11-14 Zeile 440 (14.11.2026, Engineer CP)
+
+- relay 02 Punkt 6 (`check`) scheiterte im Audit auf `033245c` an derselben Stelle wie Zeile 425: Der feste Abbruch
+  `AbortSignal.timeout(200)` im Idempotency-Test von `test/sandbox-api.test.ts` feuerte unter Host-Last vor dem `docker run`. Seit
+  `2de5407` fehlt er auf `dev` (`grep -c "AbortSignal.timeout(200)" test/sandbox-api.test.ts` gibt 0 aus).
+  `PATH=/usr/bin:$PATH node scripts/check.mjs` auf `dev` `eef3eb2` ist bei Load 72 auf 16 Kernen grün (151 Dateien, 1769 Tests,
+  130 s). Der Code bleibt unverändert, weil `dev` die Ursache schon behoben hat.
