@@ -1,7 +1,7 @@
 # Adressen Goal 01: Besucheradressen aus den Actions-Logs und im Gate gesperrt
 
 ## Status
-BLOCKED matthias
+ACTIVE
 
 ## Active Objective
 Kein Besucher des Dienstes findet seine Adresse in den Logs der Actions des öffentlichen Repos, und kein PR bringt den Cache von
@@ -87,7 +87,7 @@ lesbar hält, und weil heute nur `.gitignore` und ein Test den Cache aus dem Rep
       Prüfung: `awk '/^## Zählung vor dem Löschen/{f=1;next} /^## /{f=0} f' docs/adressen/actions-logs.md | grep -cE '^Gemessen: 2026-11-[0-9]{2} [0-9]{2}:[0-9]{2} UTC$'` muss 1 ausgeben.
       Prüfung: `awk '/^## Zählung vor dem Löschen/{f=1;next} /^## /{f=0} f' docs/adressen/actions-logs.md | grep -cE '^Läufe von deploy\.yml mit fremden Adressen: [0-9]+ von [0-9]+$'` muss 1 ausgeben.
       Prüfung: `grep -cE '\b([0-9]{1,3}\.){3}[0-9]{1,3}\b' docs/adressen/actions-logs.md` muss 0 ausgeben.
-- [ ] Nach dem Human Gate `delete_data` liefert keiner der sechs Läufe mehr ein Log, kein Lauf von `deploy.yml` trägt eine fremde
+- [x] Nach dem Human Gate `delete_data` liefert keiner der sechs Läufe mehr ein Log, kein Lauf von `deploy.yml` trägt eine fremde
       Adresse, und die Doku hält das fest.
       MVP: Funktion, weil erst das die Adressen aus dem öffentlichen Repo nimmt.
       Prüfung (Netz): `gh api repos/matthiashippe/control-plane --jq .full_name >/dev/null && for id in 42879222074 42895005251 43164473390 43260817090 43277458881 43322130930; do gh api repos/matthiashippe/control-plane/actions/runs/$id/logs >/dev/null 2>&1 && echo "$id log"; done | wc -l` muss 0 ausgeben.
@@ -125,10 +125,7 @@ lesbar hält, und weil heute nur `.gitignore` und ein Test den Cache aus dem Rep
 
 ## Progress Log
 - 2026-11-14 Zyklus 1: Punkte 1, 2 und 5 gebaut (Zähler `ops/actions-log-addresses.sh` mit Test und README-Abschnitt, Zählung in `docs/adressen/actions-logs.md`: 5 der 6 Läufe mit fremden Adressen, 2 verschiedene, 5 von 112 Läufen von deploy.yml), Punkte 3 und 4 warten auf das Human Gate `delete_data`; der neue Test war vor dem Skript rot (12 failed, Skript fehlte). Prüfbefehle: P1 `da`, `1 1 2 2 total 2 `, `2 0`, vitest 12 passed Exit 0, README 4; P2 6, 1, 1, 1, 0; P3 offen (Netz: 6 Läufe liefern noch ein Log); P4 Diff gate.yaml 0, Eintrag 0 und Drill offen; P5 `node scripts/check.mjs` Exit 0 (148 Dateien, 1731 Tests).
+- 2026-11-14 Zyklus 2: Punkt 3 gebaut (`origin/dev` mit dem Eintrag in `gate.yaml` gemergt, Abschnitt `## Nach dem Löschen` in `docs/adressen/actions-logs.md`: keiner der sechs Läufe liefert ein Log, 0 fremde Adressen in 128 Läufen von deploy.yml), Punkt 4 wartet auf den Drill 20261114-094046Z, den der Loop Master nach der Änderung an `gate.yaml` gestartet hat. Prüfbefehle: P3 Netz 0, Netz `0`, Abschnitt 1, `total 0` 1; P4 Eintrag 1, Diff gate.yaml 0, Drill `fehlt` (Drill läuft, Verdicts der Linsen fehlen); P2 6, 1, 1, 1, 0; P5 `node scripts/check.mjs` Exit 0 (149 Dateien, 1736 Tests).
 
 ## Blockers
-Art: matthias
-Gate: delete_data
-Aufgabe: Logs der sechs deploy-Läufe vom 10. bis 12.11. löschen und ops/fetcher-cache.tsv in deny_paths von gate.yaml eintragen
-Worum: In den Logs von 5 der 6 Läufe stehen 2 verschiedene Adressen fremder Besucher, öffentlich lesbar (gezählt am 14.11.2026 um 02:18 UTC, docs/adressen/actions-logs.md).
-Empfehlung: Im Terminal `for id in 42879222074 42895005251 43164473390 43260817090 43277458881 43322130930; do gh api -X DELETE repos/matthiashippe/control-plane/actions/runs/$id/logs; done`, dann in `gate.yaml` auf `dev` im Block „Schlüssel und lokaler Zustand“ unter `- "*.db"` die Zeile `  - "ops/fetcher-cache.tsv"` einfügen und committen.
+- keine (Human Gate `delete_data` am 14.11.2026 um 09:32 UTC gelöst: Logs gelöscht, `gate.yaml` auf dev mit Commit 3f1ac20)
