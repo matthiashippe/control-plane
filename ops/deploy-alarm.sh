@@ -15,6 +15,10 @@
 # repository, and whoever knows the topic can read and post to it (ops/README.md, Watchdog). curl's
 # own error lines name the host, so they are dropped.
 #
+# The POST carries the headers `Title: deploy-window 502` and `Priority: high`, following the headers of
+# ops/watchdog.sh, so a 502 to a stranger rings as loud as an outage. The title is fixed text without an address;
+# it does not start with `control-plane `, so ops/status.sh does not count it as a delivery of the watchdog.
+#
 #   CP_CRONTAB_FILE   read this file instead of `crontab -l` (tests)
 #
 # Exit 0: posted. Exit 1: the POST failed. Exit 2: no webhook in the crontab, or bad arguments.
@@ -43,7 +47,7 @@ if [[ -z "$url" ]]; then
 fi
 
 text="deploy window: $count request(s) from outside answered 502 after the rollout at $at UTC"
-if ! curl -fsS -m 10 -d "$text" "$url" >/dev/null 2>&1; then
+if ! curl -fsS -m 10 -H "Title: deploy-window 502" -H "Priority: high" -d "$text" "$url" >/dev/null 2>&1; then
   echo "the POST to the webhook failed" >&2
   exit 1
 fi

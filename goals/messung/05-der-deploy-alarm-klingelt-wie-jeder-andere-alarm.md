@@ -1,7 +1,7 @@
 # Messung Goal 05: Der Deploy-Alarm klingelt wie jeder andere Alarm
 
 ## Status
-PLANNED
+DONE
 
 ## Active Objective
 Seit messung 02 meldet `ops/deploy-window.sh` jeden 502 an eine fremde Anfrage nach einem Rollout über `ops/deploy-alarm.sh` an
@@ -53,25 +53,25 @@ wie gar keiner.
   Kein `pkill -f`.
 
 ## Done Condition
-- [ ] `ops/deploy-alarm.sh` sendet die Kopfzeilen `Title:` mit einem festen Titel und `Priority: high`, sonst unverändert.
+- [x] `ops/deploy-alarm.sh` sendet die Kopfzeilen `Title:` mit einem festen Titel und `Priority: high`, sonst unverändert.
       Prüfung: `grep -cE "^[^#]*-H [\"']?Priority: high" ops/deploy-alarm.sh` muss 1 ausgeben.
       Prüfung: `grep -cE "^[^#]*-H [\"']?Title: [A-Za-z]" ops/deploy-alarm.sh` muss 1 ausgeben.
       Prüfung: `grep -E '^[^#]*-H' ops/deploy-alarm.sh | grep -oE "Title: [^\"']+" | grep -cE '\$|://|([0-9]{1,3}\.){3}[0-9]{1,3}'` muss 0 ausgeben.
       Prüfung: `grep -cE "^[^#]*curl -fsS -m 10( |$)" ops/deploy-alarm.sh` muss 1 ausgeben.
-- [ ] `test/deploy-alarm.test.ts` prüft beide Kopfzeilen in den Argumenten des nachgebauten `curl`, auch bei rotem POST, und die
+- [x] `test/deploy-alarm.test.ts` prüft beide Kopfzeilen in den Argumenten des nachgebauten `curl`, auch bei rotem POST, und die
       fünf bisherigen Fälle bleiben unverändert.
       Prüfung: `pnpm -s vitest run test/deploy-alarm.test.ts test/deploy-window-rollout.test.ts` muss Exit-Code 0 haben.
       Prüfung: `grep -cE "sends a title and priority high like the watchdog|the title names no address and no URL|sends the headers also when the POST fails" test/deploy-alarm.test.ts` muss 3 ausgeben.
       Prüfung: `git diff -U0 $(git merge-base origin/dev HEAD) HEAD -- test/deploy-alarm.test.ts | grep -cE '^-([^-]|$)'` muss 0 ausgeben.
-- [ ] Der gewählte Titel steht mit Begründung in `goals/messung/ANNAHMEN.md`.
+- [x] Der gewählte Titel steht mit Begründung in `goals/messung/ANNAHMEN.md`.
       Prüfung: `grep -cE '^- messung 05 ' goals/messung/ANNAHMEN.md` muss mindestens 1 ausgeben.
       Prüfung: `grep -E '^[^#]*-H' ops/deploy-alarm.sh | grep -oE "Title: [^\"']+" | head -n 1 | cut -c8- | grep -cFf - goals/messung/ANNAHMEN.md` muss mindestens 1 ausgeben.
-- [ ] `check` ist grün, gesperrte Pfade bleiben unverändert, und unter `ops/` ändert sich nur `ops/deploy-alarm.sh`.
+- [x] `check` ist grün, gesperrte Pfade bleiben unverändert, und unter `ops/` ändert sich nur `ops/deploy-alarm.sh`.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD | grep -cE '^(\.github|deploy|src|harness|scripts|docs)/|^goals/kanal/|^test/deploy-window-rollout\.test\.ts$'` muss 0 ausgeben.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD -- ops | grep -vcE '^ops/deploy-alarm\.sh$'` muss 0 ausgeben.
       Prüfung: `S=$(mktemp -d); XDG_STATE_HOME=$S node scripts/check.mjs >/dev/null 2>&1; find "$S" -type f | wc -l` muss 0 ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Die drei neuen Fälle waren vor dem Fix rot; die Zeile im Progress Log nennt sie und womit.
@@ -96,7 +96,10 @@ wie gar keiner.
 - max Versuche pro Gap: 3
 
 ## Progress Log
-- (leer)
+- 2026-11-14 Widerlegungsprobe am Kopf von `dev` (9d904ba): `grep -cE "Priority|Title" ops/deploy-alarm.sh` -> 0, das Goal gilt.
+- 2026-11-14 Zyklus 1: Punkte 1, 2, 3, 4 gebaut, `ops/deploy-alarm.sh` sendet `Title: deploy-window 502` und `Priority: high`, drei neue Fälle in `test/deploy-alarm.test.ts` (vor dem Fix 3 failed, 5 passed mit `pnpm -s vitest run test/deploy-alarm.test.ts`), Titel in `ANNAHMEN.md`. Prüfbefehle: Punkt 1 grep 1, 1, 0, 1; Punkt 2 vitest Exit 0 (13 passed), grep 3, Diff 0; Punkt 3 grep 1, 1; Punkt 4 `node scripts/check.mjs` Exit 0 (1821 passed), Pfade 0, ops 0, Zustand 0.
+- 2026-11-14 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, `dev` (9d904ba) steckt schon im Goal-Branch, alle Prüfbefehle am Kopf 99ea389 erneut ausgeführt. Prüfbefehle: Punkt 1 grep 1, 1, 0, 1; Punkt 2 vitest Exit 0 (13 passed), grep 3, Diff 0; Punkt 3 grep 1, 1; Punkt 4 `node scripts/check.mjs` Exit 0, Pfade 0, ops 0, Zustand 0; PR #171 Jobs `check` und `e2e` pass.
+- 2026-11-15 Release: PASS K und B (Zyklus 2), DONE.
 
 ## Blockers
 - keine

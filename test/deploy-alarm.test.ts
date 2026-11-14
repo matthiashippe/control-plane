@@ -90,4 +90,40 @@ describe("ops/deploy-alarm.sh posts the deploy alarm to the webhook from the cro
     expect(r.calls.length).toBe(0);
     expect(`${r.stdout}${r.stderr}`).not.toContain("planted-topic");
   });
+  it("sends a title and priority high like the watchdog", () => {
+    const r = alarm(`${CRON_LINE}\n`);
+    expect(r.status, r.stderr).toBe(0);
+    expect(r.calls.length).toBe(1);
+    expect(headers(r.calls[0])).toContain("Priority: high");
+    const title = titleOf(r.calls[0]);
+    expect(title, r.calls[0].join(" ")).toBeDefined();
+    expect(title!.slice("Title: ".length).trim()).not.toBe("");
+  });
+
+  it("the title names no address and no URL", () => {
+    const r = alarm(`${CRON_LINE}\n`);
+    expect(r.status, r.stderr).toBe(0);
+    const title = titleOf(r.calls[0] ?? []);
+    expect(title, (r.calls[0] ?? []).join(" ")).toBeDefined();
+    expect(title).not.toMatch(/(\d{1,3}\.){3}\d{1,3}/);
+    expect(title).not.toContain("planted-topic");
+    expect(title).not.toContain("alarm.invalid");
+    expect(title).not.toContain("://");
+  });
+
+  it("sends the headers also when the POST fails", () => {
+    const r = alarm(`${CRON_LINE}\n`, 22);
+    expect(r.status).toBe(1);
+    expect(r.calls.length).toBe(1);
+    expect(headers(r.calls[0])).toContain("Priority: high");
+  });
 });
+
+/** The arguments that follow an `-H` in one call of the fake curl. */
+function headers(call: string[]): string[] {
+  return call.flatMap((a, i) => (a === "-H" && i + 1 < call.length ? [call[i + 1]] : []));
+}
+
+function titleOf(call: string[]): string | undefined {
+  return headers(call).find((h) => h.startsWith("Title: "));
+}

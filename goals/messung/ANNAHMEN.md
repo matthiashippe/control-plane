@@ -14,3 +14,7 @@
 - messung 03 (Engineer CP, 14.11.2026): `test/landing-yield.test.ts` kopiert in den beiden Fällen mit einer Kopie des Werkzeugs
   zusätzlich `ops/conway-arrivals.sh`, `ops/conway_arrivals.py` und `ops/own-ips.sh` daneben, weil das Werkzeug sie sourct und
   importiert. Erwartete Summen und Exit-Codes bleiben unverändert.
+- messung 05 (Engineer CP, 14.11.2026): Der Deploy-Alarm titelt fest `deploy-window 502`. `ops/status.sh` zählt ihn nicht, weil
+  der Titel nicht mit `control-plane ` beginnt (Zeile 157). Das ist gewollt: `received` im Alarmweg soll belegen, dass die Posts
+  von `ops/watchdog.sh` ankommen, und ein Deploy-Alarm auf dem Thema darf dort kein `ok` melden, wenn der Watchdog selbst nichts
+  zugestellt hat. Der Titel nennt die Quelle (`ops/deploy-window.sh`) und den Fehler, keine Adresse und keine URL.
