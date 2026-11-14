@@ -8,3 +8,4 @@ MVP: Schönheit
 Linse Q, Frage 5 (Bezeichner und Kommentare Englisch), Regelstelle `loop-constraints.md`, Grundregel 12.
 Linse B hat die Zitate in `goals/domains/verdicts/01-z3-B.md:23` als Quelle gewertet und selbst notiert, eine englische Paraphrase mit Zeilenverweis wäre sauberer; den Bezeichner `VERTRAG` nennt das Verdict nicht.
 domains 01 hat `VERTRAG` eingeführt (c369e08), sandbox 03 hat ihn nach `test/sandbox-api.test.ts:19` übernommen.
+Übernommen: Triage-Glieder 14.11. an den Tech Lead, Glied 9 (Grundregel 12, deutsche Bezeichner und Kommentare) (2026-11-14)

@@ -4,3 +4,4 @@ Befund: Der Wert bindet das Senden an den Trockenlauf, aber nicht an den Text, d
 Beleg: `ops/post-the-answers.py`, Zweig `send == 0`: `print(f"            opens: {first[:90]}")` und `print(f"  #{number}  sha12 {values[-1][1]}")`, kein Ausdruck von `body`.
 Empfehlung: Der Trockenlauf druckt je Entwurf den vollständigen `body` zwischen `--- #<n> sha12 <wert> ---` und `--- end #<n> ---`; die Schritte für Matthias übernehmen Text und Wert aus genau dieser einen Ausgabe. Test in `test/answers-approved.test.ts`: der Block zwischen den Markern ist Byte für Byte `body_to_send` des Entwurfs, und `sha256` darüber (mit `node:crypto`) ist der Wert in der Kopfzeile.
 MVP: Funktion, weil die Freigabe erst dann am gelesenen Text hängt, wenn Text und Wert aus demselben Lauf stammen.
+Übernommen: Triage-Glieder 14.11. an den Tech Lead, Glied 4 (Trockenlauf druckt den vollen Text, vor dem nächsten `public_post`) (2026-11-14)

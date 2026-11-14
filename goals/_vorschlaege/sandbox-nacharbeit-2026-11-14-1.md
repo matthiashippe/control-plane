@@ -6,3 +6,4 @@ Empfehlung: `ops/sandbox/setup.sh` legt nach dem Bau einen nie gestarteten Conta
 MVP: Funktion
 
 Gefunden im Messlauf von domains 04 am 14.11.2026; das Image wurde dort mit `bash ops/sandbox/setup.sh 72.62.51.224` neu gebaut. Die beiden 501 seit 00:26 kamen von der Adresse des code-host, kein fremder Kunde (Zugriffslog, `ops/access-log.sh`).
+Übernommen: domains 04 Punkt 6, Pin `sandboxd-base-pin` in `ops/sandbox/setup.sh` (d802631), ausgerollt im Zyklus 3, gemergt (PR #116) (2026-11-14)
