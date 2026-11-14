@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import { chmodSync, copyFileSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -39,6 +39,27 @@ function halfHours(from: string, to: string): string[] {
   const out: string[] = [];
   for (let t = at(from); t <= at(to); t += 1800) out.push(iso(t));
   return out;
+}
+
+type Result = { status: number | null; stdout: string; stderr: string };
+
+/**
+ * Runs a command without blocking the worker: a case runs up to 49 watchdogs in a row, and with spawnSync the worker could
+ * not answer vitest for that long under load.
+ */
+function run(cmd: string, args: string[], opts: { cwd?: string; env: Record<string, string> }): Promise<Result> {
+  return new Promise((done) => {
+    const child = spawn(cmd, args, { cwd: opts.cwd, env: opts.env, stdio: ["ignore", "pipe", "pipe"] });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.setEncoding("utf8").on("data", (d: string) => (stdout += d));
+    child.stderr.setEncoding("utf8").on("data", (d: string) => (stderr += d));
+    const timer = setTimeout(() => child.kill("SIGKILL"), 60_000);
+    child.on("close", (status) => {
+      clearTimeout(timer);
+      done({ status, stdout, stderr });
+    });
+  });
 }
 
 function fake(bin: string, name: string, lines: string[]) {
@@ -87,11 +108,9 @@ function sandbox(opts: { alive?: string } = {}) {
   const state = join(stateDir, "state");
   if (opts.alive !== undefined) writeFileSync(`${state}.alive`, `${opts.alive}\n`);
   const script = watchdogScript(root);
-  const run = (moment: string) => {
+  const runAt = async (moment: string) => {
     writeFileSync(clock, moment);
-    const r = spawnSync("bash", [script], {
-      encoding: "utf8",
-      timeout: 60_000,
+    const r = await run("bash", [script], {
       env: {
         PATH: `${bin}:/usr/bin:/bin`,
         HOME: root,
@@ -113,7 +132,7 @@ function sandbox(opts: { alive?: string } = {}) {
       });
   const alivePosts = () => postList().filter((p) => p.title === "control-plane ALIVE");
   const dead = (on: boolean) => (on ? writeFileSync(failAll, "") : rmSync(failAll, { force: true }));
-  return { run, postList, alivePosts, dead, root, state };
+  return { run: runAt, postList, alivePosts, dead, root, state };
 }
 
 const unreachableLines = (out: string) => out.split("\n").filter((l) => /^\S+ \[WARN\] webhook unreachable$/.test(l));
@@ -124,7 +143,7 @@ type Received = { last_alive: string | null; last_message: string | null; status
  * Runs the real ops/status.sh like test/status-alarm-received.test.ts: the fake `ssh` hands the watchdog log to the helper
  * scripts with CP_NOW, the fake `curl` answers only the poll of the planted topic (config on stdin with `-K -`).
  */
-function statusReceived(log: string, topicBody: string, now: string): { received: Received | undefined; out: string } {
+async function statusReceived(log: string, topicBody: string, now: string): Promise<{ received: Received | undefined; out: string }> {
   const root = mkdtempSync(join(tmpdir(), "watchdog-slots-status-"));
   const bin = join(root, "bin");
   mkdirSync(bin);
@@ -148,10 +167,8 @@ function statusReceived(log: string, topicBody: string, now: string): { received
     `cat ${JSON.stringify(bodyPath)}`,
   ]);
   fake(bin, "openssl", ["exit 1"]);
-  const r = spawnSync("bash", [join(OPS, "status.sh")], {
+  const r = await run("bash", [join(OPS, "status.sh")], {
     cwd: root,
-    encoding: "utf8",
-    timeout: 60_000,
     env: {
       PATH: `${bin}:/usr/bin:/bin`,
       HOME: root,
@@ -172,10 +189,10 @@ function statusReceived(log: string, topicBody: string, now: string): { received
 }
 
 describe("ops/watchdog.sh posts a sign of life in three windows per UTC day", () => {
-  it("posts a sign of life at 00:00, 08:00 and 16:00 UTC, once per window", () => {
+  it("posts a sign of life at 00:00, 08:00 and 16:00 UTC, once per window", async () => {
     const s = sandbox();
     for (const moment of halfHours(`${DAY}T00:00:00Z`, `${DAY}T23:30:00Z`)) {
-      const r = s.run(moment);
+      const r = await s.run(moment);
       expect(r.status, `${moment}\n${r.out}`).toBe(0);
     }
     expect(s.alivePosts().map((p) => p.at)).toEqual([
@@ -188,12 +205,12 @@ describe("ops/watchdog.sh posts a sign of life in three windows per UTC day", ()
     expect(readFileSync(`${s.state}.alive`, "utf8").trim()).toBe(`${DAY}T16`);
   }, 300_000);
 
-  it("at every run of a quiet day the last sign of life is younger than 11 hours", () => {
+  it("at every run of a quiet day the last sign of life is younger than 11 hours", async () => {
     const s = sandbox();
     const moments = [...halfHours(`${DAY}T00:00:00Z`, `${DAY}T23:30:00Z`), "2026-11-14T00:00:00Z"];
     const ages: string[] = [];
     for (const moment of moments) {
-      const r = s.run(moment);
+      const r = await s.run(moment);
       expect(r.status, `${moment}\n${r.out}`).toBe(0);
       const last = s.alivePosts().at(-1);
       expect(last, moment).toBeDefined();
@@ -204,15 +221,15 @@ describe("ops/watchdog.sh posts a sign of life in three windows per UTC day", ()
     expect(s.alivePosts().at(-1)?.at).toBe("2026-11-14T00:00:00Z");
   }, 300_000);
 
-  it("a dead webhook is tried again on every run of the window", () => {
+  it("a dead webhook is tried again on every run of the window", async () => {
     const s = sandbox({ alive: `${DAY}T00` });
-    const before = s.run(`${DAY}T07:30:00Z`);
+    const before = await s.run(`${DAY}T07:30:00Z`);
     expect(before.status, before.out).toBe(0);
     expect(s.postList(), before.out).toEqual([]);
 
     s.dead(true);
     for (const moment of [`${DAY}T08:00:00Z`, `${DAY}T08:30:00Z`, `${DAY}T09:00:00Z`]) {
-      const r = s.run(moment);
+      const r = await s.run(moment);
       expect(r.status, r.out).toBe(0);
       expect(unreachableLines(r.out), r.out).toEqual([`${moment} [WARN] webhook unreachable`]);
       expect(r.out).not.toContain("webhook delivered");
@@ -221,7 +238,7 @@ describe("ops/watchdog.sh posts a sign of life in three windows per UTC day", ()
 
     s.dead(false);
     for (const moment of halfHours(`${DAY}T09:30:00Z`, `${DAY}T15:30:00Z`)) {
-      const r = s.run(moment);
+      const r = await s.run(moment);
       expect(r.status, r.out).toBe(0);
       expect(unreachableLines(r.out), r.out).toEqual([]);
     }
@@ -229,24 +246,24 @@ describe("ops/watchdog.sh posts a sign of life in three windows per UTC day", ()
     expect(s.postList().length).toBe(1);
   }, 300_000);
 
-  it("a stamp of the old format counts as a missing window", () => {
+  it("a stamp of the old format counts as a missing window", async () => {
     const s = sandbox({ alive: DAY });
-    const r = s.run(`${DAY}T11:00:00Z`);
+    const r = await s.run(`${DAY}T11:00:00Z`);
     expect(r.status, r.out).toBe(0);
     expect(s.alivePosts().map((p) => p.at), r.out).toEqual([`${DAY}T11:00:00Z`]);
     expect(r.out).toContain(`${DAY}T11:00:00Z [INFO] webhook delivered`);
     expect(readFileSync(`${s.state}.alive`, "utf8").trim()).toBe(`${DAY}T08`);
 
-    const again = s.run(`${DAY}T11:30:00Z`);
+    const again = await s.run(`${DAY}T11:30:00Z`);
     expect(again.status, again.out).toBe(0);
     expect(s.alivePosts().length, again.out).toBe(1);
   }, 180_000);
 
-  it("ops/status.sh at 18:00 UTC after a quiet day is never unknown", () => {
+  it("ops/status.sh at 18:00 UTC after a quiet day is never unknown", async () => {
     const s = sandbox();
     let log = "";
     for (const moment of halfHours(`${DAY}T00:00:00Z`, `${DAY}T18:00:00Z`)) {
-      const r = s.run(moment);
+      const r = await s.run(moment);
       expect(r.status, `${moment}\n${r.out}`).toBe(0);
       log += r.out;
     }
@@ -258,11 +275,11 @@ describe("ops/watchdog.sh posts a sign of life in three windows per UTC day", ()
       .map((p) => JSON.stringify({ event: "message", time: at(p.at), title: p.title, message: "planted message" }) + "\n")
       .join("");
 
-    const ok = statusReceived(log, onTopic, now);
+    const ok = await statusReceived(log, onTopic, now);
     expect(ok.received?.status, ok.out).toBe("ok");
     expect(ok.received?.last_alive, ok.out).toBe(`${DAY}T16:00:00Z`);
 
-    const red = statusReceived(log, "", now);
+    const red = await statusReceived(log, "", now);
     expect(red.received?.status, red.out).toBe("red");
 
     for (const r of [ok, red]) {
