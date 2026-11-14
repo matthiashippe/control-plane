@@ -39,7 +39,8 @@
 #            with running true and exit_code -1, the file from exit_code_file reads 0 within 60 s and the one from
 #            output_file holds bg-ok, so the wrapper, coreutils timeout under gVisor and /root/.exec are proven in production.
 #            After a new client key (changed=1) it waits CLIENT_KEY_WAIT_S before the create (domains 03): for RECHECK_MS
-#            (src/sandbox/service.ts) after the last failed call to sandboxd the service answers 501 at once
+#            (src/sandbox/service.ts) after the last failed call to sandboxd the service answers 501 at once. Before that
+#            wait it prints `WAIT sandbox: new client key, <CLIENT_KEY_WAIT_S> s before the create` on stderr (domains 04)
 #   handoff  POST /v1/handoff with example values answers 201 with a two-digit match, GET /h/{code} shows three different
 #            two-digit numbers with match among them, and the stream GET /v1/handoff/{code} with the poll token says pending
 #            within 5 s (konto 02). Approves nothing: the code runs out unused after ten minutes. The poll token goes through

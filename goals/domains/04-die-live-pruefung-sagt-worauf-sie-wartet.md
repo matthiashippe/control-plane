@@ -1,7 +1,7 @@
 # Domains Goal 04: Die Live-Prüfung sagt, worauf sie wartet, und das Warten ist in der Produktion belegt
 
 ## Status
-PLANNED
+ACTIVE
 
 ## Active Objective
 `ops/live.sh` gibt nach `SETUP CLIENT-KEY OK changed=1` vor dem Warten die Zeile
@@ -65,23 +65,23 @@ Release Manager wie ein hängender Lauf aussieht; bricht er ihn ab, fehlt `LIVE 
 - Die Fälle des Selbsttests aus domains 02, domains 03 und sandbox 05 bleiben, wie sie sind.
 
 ## Done Condition
-- [ ] `ops/live.sh` sagt nach `changed=1` vor dem Warten, worauf es wartet, und schweigt nach `changed=0`; eine fehlende und eine
+- [x] `ops/live.sh` sagt nach `changed=1` vor dem Warten, worauf es wartet, und schweigt nach `changed=0`; eine fehlende und eine
       späte Zeile sind FAIL.
       Prüfung: `bash ops/live.sh --selftest` muss Exit-Code 0 haben und als letzte Zeile `LIVE SELFTEST OK` ausgeben.
       Prüfung: `bash ops/live.sh --selftest | grep -cE '^planted sandbox-wait-line (new-key|old-key): OK '` muss `2` ausgeben.
       Prüfung: `bash ops/live.sh --selftest | grep -cE '^planted sandbox-wait-line (silent|late): FAIL '` muss `2` ausgeben.
-- [ ] `ops/sandbox/setup.sh --client-key-reset` nimmt `cp.pub` aus dem Ordner, den `sandboxd` liest, lässt den Prüfschlüssel stehen
+- [x] `ops/sandbox/setup.sh --client-key-reset` nimmt `cp.pub` aus dem Ordner, den `sandboxd` liest, lässt den Prüfschlüssel stehen
       und macht den nächsten `--client-key` zu `changed=1`.
       Prüfung: `bash ops/sandbox/setup.sh --selftest` muss Exit-Code 0 haben.
       Prüfung: `bash ops/sandbox/setup.sh --selftest | grep -cE '^selftest client-key-reset: ok \((moved|again|reinstall)\)$'` muss `3` ausgeben.
-- [ ] Der Lauf in der Produktion mit `changed=1` ist gemessen: zwischen Reset und Warten scheiterte mindestens ein Aufruf mit
+- [x] Der Lauf in der Produktion mit `changed=1` ist gemessen: zwischen Reset und Warten scheiterte mindestens ein Aufruf mit
       `key not accepted`, die Anlage kam mehr als `RECHECK_MS` nach der letzten solchen Zeile und mindestens `CLIENT_KEY_WAIT_S`
       nach der Zeile `WAIT`, und Sandbox und Live-Prüfung waren grün.
       Prüfung: `node -e 'const fs=require("fs");const d=fs.readFileSync("docs/sandbox/schluesselwechsel.md","utf8");const r=Number(/const RECHECK_MS = ([0-9_]+);/.exec(fs.readFileSync("src/sandbox/service.ts","utf8"))[1].replace(/_/g,""))/1000;const w=Number(/^CLIENT_KEY_WAIT_S=([0-9]+)$/m.exec(fs.readFileSync("ops/live.sh","utf8"))[1]);const m=[...d.matchAll(/^Messung: reset=(\S+Z) last_401=(\S+Z) wait=(\S+Z) create=(\S+Z) changed=1 sandbox=OK live=OK run_s=([0-9]+)$/gm)];if(m.length!==1){console.log("lines "+m.length);process.exit(1)}const [,a,b,c,e,s]=m[0];const t=x=>Date.parse(x)/1000;console.log(t(a)<t(b)&&t(b)<t(c)&&t(e)-t(b)>r&&t(e)-t(c)>=w&&Number(s)>w?"measured ok":"measured bad")'` muss `measured ok` ausgeben.
       Prüfung: `grep -cE '(PRIVATE KEY|CP_HOST=|0x[0-9a-fA-F]{40})' docs/sandbox/schluesselwechsel.md` muss `0` ausgeben.
-- [ ] Der Sandbox-Server hat nach dem Lauf wieder genau den Schlüssel des Dienstes.
+- [x] Der Sandbox-Server hat nach dem Lauf wieder genau den Schlüssel des Dienstes.
       Prüfung (Netz): `bash ops/sandbox/setup.sh --client-key 72.62.51.224 | tail -n 1` muss `SETUP CLIENT-KEY OK changed=0` ausgeben.
-- [ ] `check` ist grün.
+- [x] `check` ist grün.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
 - [ ] goal-verifier PASS (K und B)
 
@@ -102,5 +102,6 @@ Release Manager wie ein hängender Lauf aussieht; bricht er ihn ab, fehlt `LIVE 
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-14 Zyklus 1: Punkte 1, 2, 3, 4, 5 gebaut: `sandbox_live` gibt nach `changed=1` über `client_key_wait` vor dem Warten auf stderr `WAIT sandbox: new client key, 75 s before the create` aus (Selbsttest `sandbox-wait-line` über eine Ereignisdatei), `setup.sh --client-key-reset` verschiebt `cp.pub` nach `cp.pub.prev` (Selbsttest moved, again, reinstall), und der Lauf in der Produktion mit `changed=1` ist in `docs/sandbox/schluesselwechsel.md` gemessen (letzter 401 01:35:58, `WAIT` 01:36:49, Anlage 01:38:05, `LIVE OK`, `run_s=124`); ein erster Lauf um 01:28 wartete richtig, scheiterte aber am fehlenden Image `sandboxd-base:1` (Prune-Cron des Mitbewohners), das `bash ops/sandbox/setup.sh 72.62.51.224` neu baute (ANNAHMEN.md, Vorschlag `sandbox-nacharbeit-2026-11-14-1.md`). Rot vor dem Fix: `new-key` FAIL mit `sandbox_live` auf `live_wait` (Stand vor dem Goal), dazu FAIL bei doppelter Zeile, falscher Zahl, Zeile auf stdout, Zeile nach `changed=0`; die drei `client-key-reset`-Fälle FAIL ohne `client_key_reset` (command not found), mit `cp.prev.pub`, mit Kopie statt Verschieben, mit gelöschtem Prüfschlüssel. Prüfbefehle: P1 `bash ops/live.sh --selftest` Exit 0, letzte Zeile `LIVE SELFTEST OK`, `2`, `2`; P2 `bash ops/sandbox/setup.sh --selftest` Exit 0, `3`; P3 `measured ok` (Gegenprobe: Anlage 2 s früher `measured bad`, `live=FAIL` `lines 0`), `0`; P4 (Netz) `SETUP CLIENT-KEY OK changed=0`; P5 `node scripts/check.mjs` Exit 0 (146 Dateien, 1709 Tests, Node 22, Last 124).
 
 ## Blockers
