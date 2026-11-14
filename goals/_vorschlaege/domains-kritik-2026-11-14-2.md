@@ -1,0 +1,6 @@
+Schwere: 2
+Goal: domains 05
+Befund: Die Prüfung auf fremde Sandboxes sieht eine Anlage nicht, die gerade läuft: `sandboxd` hält sie bis zum Ende von `docker run` nur in der Map `pending` im Speicher und schreibt sie erst danach in `state.json`. Fällt ein Reset in dieses Fenster, ist die neue Sandbox des Kunden fertig, aber jeder weitere Aufruf über den Dienst scheitert, bis `--client-key` läuft oder der Timer nach `--restore-after` greift.
+Beleg: `grep -n 'pending' ops/sandbox/sandboxd.mjs` -> `pending.set(id, …)` vor `docker run`, `pending.delete(id)` danach, `state.save` erst mit `status: "running"` | ops/sandbox/sandboxd.mjs:294
+Empfehlung: `client_key_reset` fragt `foreign_sandboxes` nach dem Verschieben ein zweites Mal ab und legt `cp.pub.prev` sofort zurück, wenn jetzt eine fremde Sandbox läuft (letzte Zeile `SETUP CLIENT-KEY-RESET FAIL: foreign sandbox started`); dazu ein Selbsttestfall `late`, in dem die Attrappe von `sbx_state` beim zweiten Lesen eine fremde laufende Sandbox liefert. Die Anlagen in `pending` selbst sieht nur `sandboxd`; sie zu zeigen hieße den Dienst ändern.
+MVP: Robustheit, weil das Fenster Sekunden lang ist und der Timer den Kunden nach spätestens 120 s wieder hereinlässt.

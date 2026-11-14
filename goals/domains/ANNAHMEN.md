@@ -116,3 +116,33 @@
   `docker`-Attrappe auf `PATH`, die wie Docker ein `create` auf einen belegten Namen ablehnt, und dieselben Funktionen
   `PIN_FUNCS` wie `GATHER` und `APPLY`. Ausgerollt am 14.11.2026 gegen 02:09 UTC mit `bash ops/sandbox/setup.sh 72.62.51.224`;
   davor zeigte `--check` nur `CHANGE fact image_pin want=yes have=no`, kein Container lief, `sandboxd` wurde nicht neu gestartet.
+
+## domains 05 (14.11.2026, Engineer CP)
+
+- **Quelle der eigenen Adressen ist das gebaute Modul im Container.** Die Abfrage am Zahlungsserver (`FOREIGN_OWNERS_JS` in
+  `ops/sandbox/setup.sh`) importiert `ourAddresses` aus `/app/dist/bounties/ours.js` in `deploy-cp-1` und ruft sie mit der
+  Datenbank `/data/cp.db` (`readonly: true`). So entscheidet dieselbe Funktion, die der Dienst benutzt, samt `OUR_ADDRESSES` und
+  `OUR_KEY_NAMES`, und es entsteht keine dritte Kopie der Listen. Der Selbsttest führt denselben Text gegen
+  `src/bounties/ours.ts` des Checkouts aus (Node 22 entfernt die Typen beim Import) und baut seine Datenbank mit
+  `OUR_ADDRESSES[0]` aus derselben Datei, damit keine eigene Adresse im Selbsttest steht. Folge: Zwischen einem Merge, der
+  `ours.ts` ändert, und dem nächsten Rollout gilt im Reset die ausgerollte Fassung; das ist die, nach der der Dienst gerade bucht.
+- **Fremd ist jede laufende Sandbox, deren Konto nicht auf eine eigene Adresse zeigt**, auch ein Konto, das `sandbox_owners` nicht
+  kennt. Über die Leitung zum Zahlungsserver gehen nur die Konten (`acct-…`) auf stdin, zurück kommt nur eine Zahl; ausgegeben wird
+  `running=<n> foreign=<m>`.
+- **Fail closed.** `state.json` fehlt, ist kein JSON, hat kein Objekt `sandboxes` oder eine laufende Sandbox ohne gültiges Konto,
+  `ssh` scheitert, der Zahlungsserver antwortet nicht mit einer Zahl oder mit mehr fremden als laufenden: Der Reset meldet
+  `SETUP CLIENT-KEY-RESET FAIL: …` und verschiebt nichts. `sandboxd` selbst nimmt ein fehlendes `state.json` als leer; der Reset
+  nicht, weil er dann nicht weiß, ob er einen Kunden aussperrt.
+- **Unit-Name `cp-pub-restore`, fest.** Vor `systemd-run` stoppt der Reset einen Timer desselben Namens und setzt einen
+  gescheiterten Lauf zurück (`systemctl stop`, `systemctl reset-failed`), sonst schlüge ein zweiter Reset an dem Namen fehl, den ein
+  abgelaufener Timer noch hält. Der Befehl des Timers legt `cp.pub.prev` nur zurück, wenn `cp.pub` fehlt, und mit `mv -n`, damit ein
+  Schlüssel, der im letzten Moment kommt, nicht ersetzt wird. Der Timer entsteht auch bei `moved=0`; liegt dann ein altes
+  `cp.pub.prev`, kommt es zurück, was der Zustand vor dem früheren Reset war.
+- **`--restore-after` nur 60 bis 3600 ganze Sekunden.** Unter 60 schnitte der Timer die Messung aus domains 04 ab (dort kam
+  `--client-key` 88 s nach dem Reset), über eine Stunde bliebe ein abgebrochener Lauf zu lange unbemerkt. Andere Werte und
+  führende Nullen geben die Usage-Zeile und Exit 2, ohne Netz.
+- **Zweiseitiger Beleg gegen die Produktion (14.11.2026).** `--foreign-sandboxes 72.62.51.224` gab `running=0 foreign=0`; auf dem
+  Sandbox-Server liegen keine Sandboxes (`state.json` mit 0 Einträgen). Damit die Null keine Blindheit ist, lief dieselbe Abfrage
+  am Zahlungsserver mit gepflanzten Konten: leer `0`, ein unbekanntes Konto `1`, das Konto der Live-Prüfung (`LIVE_SANDBOX_ADDRESS`
+  in `sandbox_owners`) `0`, beide zusammen `1`. Eine laufende Sandbox auf dem echten Server pflanzt das Goal nicht, weil das eine
+  Anlage über den Dienst wäre; die Seite `state.json` ist im Selbsttest mit laufenden, gestoppten und kaputten Einträgen belegt.

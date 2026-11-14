@@ -66,3 +66,11 @@
   der beiden Pakete seine Typen mitbringt und so je Art genau ein neues Paket reicht (Punkt 10).
 - Ein Strom endet spätestens zehn Minuten und eine Minute nach dem Öffnen, auch wenn die Uhr der App etwas anderes sagt, weil kein
   Code länger lebt und ein hängender Strom sonst einen Prozess ewig belegt.
+
+## Reparatur dev (14.11.2026, Engineer CP)
+
+- Audit 2026-11-14 Zeile 371 (konto 01 Punkt 7, `check`) lief auf `033245c` rot, weil `test/sandbox-api.test.ts` den ersten Anlauf
+  nach `AbortSignal.timeout(200)` abbrach und das unter Host-Last vor dem `docker run` feuerte. Seit `2de5407` bricht der Test erst
+  ab, wenn sandboxd den Container startet (0 Stellen mit `AbortSignal.timeout(200)`); dieselbe Ursache hat die Reparatur zu Zeile 297
+  in `goals/fehler/ANNAHMEN.md` belegt. `PATH=/usr/bin:$PATH node scripts/check.mjs` auf `dev` `8eab58d` ist bei Last 4,9 je Kern
+  grün (149 Dateien, 1747 Tests, 73 s); Code bleibt unverändert, weil die Ursache auf `dev` schon behoben ist.
