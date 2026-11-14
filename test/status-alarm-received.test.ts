@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { spawnSync } from "node:child_process";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -19,10 +19,12 @@ import { join, resolve } from "node:path";
  * 2026-11-13T12:00:00Z, CP_ALERT_WEBHOOK points at an address under `.invalid` with a made-up topic.
  *
  * STATUS_UNDER_TEST points the test at another copy of ops/status.sh, so the counter-proof can run it against an older one.
+ * That copy runs next to the helper scripts of this ops/ (it finds them through its own directory), so an older copy fails
+ * only for what it lacks itself and not for a missing ops/webhook-last.sh.
  */
-const STATUS = process.env.STATUS_UNDER_TEST
-  ? resolve(process.env.STATUS_UNDER_TEST)
-  : join(__dirname, "..", "ops", "status.sh");
+const OPS = join(__dirname, "..", "ops");
+const UNDER_TEST = process.env.STATUS_UNDER_TEST ? resolve(process.env.STATUS_UNDER_TEST) : null;
+const HELPERS = ["webhook-unreachable.sh", "webhook-last.sh", "db-report.cjs"];
 const NOW = 1794571200;
 const HOST = "alerts.invalid";
 const TOPIC = "made-up-topic-4711";
@@ -72,6 +74,14 @@ function run(log: string, opts: { topic?: string; curlRc?: number; webhook?: str
     `cat ${JSON.stringify(bodyPath)}`,
   ]);
   fake("openssl", ["exit 1"]);
+  let status = join(OPS, "status.sh");
+  if (UNDER_TEST) {
+    const ops = join(root, "ops");
+    mkdirSync(ops);
+    for (const helper of HELPERS) copyFileSync(join(OPS, helper), join(ops, helper));
+    status = join(ops, "status.sh");
+    copyFileSync(UNDER_TEST, status);
+  }
   const env: Record<string, string> = {
     PATH: `${bin}:/usr/bin:/bin`,
     HOME: root,
@@ -81,7 +91,7 @@ function run(log: string, opts: { topic?: string; curlRc?: number; webhook?: str
     CP_NOW: String(NOW),
   };
   if (opts.webhook !== null) env.CP_ALERT_WEBHOOK = opts.webhook ?? WEBHOOK;
-  const r = spawnSync("bash", [STATUS], { cwd: root, encoding: "utf8", timeout: 60_000, env });
+  const r = spawnSync("bash", [status], { cwd: root, encoding: "utf8", timeout: 60_000, env });
   let alarm: AlarmPath | undefined;
   try {
     alarm = JSON.parse(r.stdout).alarm_path;
