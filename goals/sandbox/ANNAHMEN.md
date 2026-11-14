@@ -274,3 +274,13 @@
   `pnpm -s vitest run test/sandbox-api.test.ts -t "Idempotency-Key"` dreimal `5 passed | 16 skipped`. Gegenprobe: der Test vom Stand
   033245cd mit `AbortSignal.timeout(1)` statt 200 wird rot mit `expected +0 to be 1` in 2 Tests, also genau der Fehler aus Zeile 478;
   der Test kann rot werden, der heutige Ablauf hängt nicht mehr an der Zeit.
+
+## Goal 03, Audit 2026-11-14 Zeile 499 (14.11.2026, Engineer CP)
+
+- **Dieselbe Ursache wie Zeile 478, auf `dev` seit 2de5407 behoben, keine Codeänderung.** Zeile 499 (sandbox 03 Punkt 11, `check`)
+  meldet denselben Idempotency-Test in `test/sandbox-api.test.ts` mit 0 statt 1 Exec nach `AbortSignal.timeout(200)`. Seit 2de5407
+  bricht der Test erst ab, wenn `sandboxd` das Kommando hat; `grep -rn "AbortSignal.timeout" test/ | wc -l` gibt 0.
+- **Beleg auf frischem `dev` (9d7d99e), Last 6 je Kern:** `PATH=/usr/bin:$PATH node scripts/check.mjs` Exit 0, `check: grün in 147 s`;
+  `pnpm -s vitest run test/sandbox-api.test.ts -t "Idempotency-Key"` gibt `5 passed | 16 skipped`. Gegenprobe: der Test vom Stand
+  033245cd mit `AbortSignal.timeout(1)` wird rot mit `expected +0 to be 1` in 2 Tests, genau der Fehler aus Zeile 499. Die Zeilen 520
+  (sandbox 04 Punkt 9), 528 (sandbox 05 Punkt 4) und 539 (sandbox 05 Punkt 9) desselben Audits nennen dieselbe Ursache.
