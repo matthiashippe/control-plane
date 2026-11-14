@@ -1,7 +1,7 @@
 # Relay Goal 02: Jede Nachricht zählt genau einmal und braucht ein Gegenüber
 
 ## Status
-PLANNED
+ACTIVE
 
 ## Active Objective
 Eine Nachricht auf dem Relay ist genau eine Nachricht und geht an jemand anderen: `src/relay/routes.ts` bringt jede Signatur vor
@@ -67,26 +67,26 @@ Zählung des Zahlungsservers füllt, bevor sandbox 07 die ersten Automatons auf 
   Dateien vor dem lokalen `check` stagen. Der Harness ändert sich nicht.
 
 ## Done Condition
-- [ ] Der Befund steht als roter Test, bevor `src/` sich ändert: `test/relay-signature-form.test.ts` und
+- [x] Der Befund steht als roter Test, bevor `src/` sich ändert: `test/relay-signature-form.test.ts` und
       `test/relay-self-message.test.ts` kommen in einem Commit vor dem ersten Commit unter `src/`.
       Prüfung: `b=$(git merge-base origin/dev HEAD); t=$(git log --format=%H --diff-filter=A -1 -- test/relay-signature-form.test.ts); u=$(git log --format=%H --diff-filter=A -1 -- test/relay-self-message.test.ts); s=$(git log --format=%H --reverse "$b"..HEAD -- src | head -1); [ -n "$t" ] && [ "$t" = "$u" ] && [ -n "$s" ] && [ "$t" != "$s" ] && git merge-base --is-ancestor "$t" "$s"` muss Exit-Code 0 haben.
-- [ ] Jede Signatur hat genau eine Form: Die großgeschriebene Form und `v` als 0 oder 1 einer angenommenen Signatur ergeben dieselbe
+- [x] Jede Signatur hat genau eine Form: Die großgeschriebene Form und `v` als 0 oder 1 einer angenommenen Signatur ergeben dieselbe
       `id`, eine Nachricht und eine Ledger-Zeile `relay`, die gespiegelte Form mit `s` in der oberen Hälfte und eine Signatur ohne 65
       Byte ergeben 401, gespeichert wird nur die klein geschriebene Form, und ein `poll` mit der großgeschriebenen Form einer
       gelieferten `X-Signature` bekommt dieselbe Antwort wie der erste.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/relay-signature-form.test.ts` muss Exit-Code 0 haben.
       Prüfung: `grep -cE "^\s*(it|test)\(" test/relay-signature-form.test.ts` muss mindestens 5 ausgeben.
-- [ ] Keine Nachricht an sich selbst: `to` gleich Absender ergibt 400 `recipient_is_sender` mit Klartext, signiert wie mit API-Key,
+- [x] Keine Nachricht an sich selbst: `to` gleich Absender ergibt 400 `recipient_is_sender` mit Klartext, signiert wie mit API-Key,
       ohne Nachricht und ohne Ledger-Zeile `relay`; eine Nachricht an eine andere Adresse geht wie bisher.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/relay-self-message.test.ts` muss Exit-Code 0 haben.
       Prüfung: `grep -c "recipient_is_sender" test/relay-self-message.test.ts src/relay/routes.ts | grep -c ':[1-9]'` muss 2 ausgeben.
-- [ ] Die Tests aus relay 01 bleiben unverändert und grün.
+- [x] Die Tests aus relay 01 bleiben unverändert und grün.
       Prüfung: `git diff --name-only "$(git merge-base origin/dev HEAD)" HEAD -- test/relay.test.ts test/relay-security.test.ts test/relay-apikey.test.ts test/relay-billing.test.ts test/relay-poll-retry.test.ts test/relay-storage.test.ts test/relay-walk.test.ts test/relay-world.ts | wc -l` muss 0 ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/relay.test.ts test/relay-security.test.ts test/relay-apikey.test.ts test/relay-billing.test.ts test/relay-poll-retry.test.ts test/relay-storage.test.ts` muss Exit-Code 0 haben.
-- [ ] Vertrag und Fehlerliste nennen beides: die Form der Signatur und `recipient_is_sender`.
+- [x] Vertrag und Fehlerliste nennen beides: die Form der Signatur und `recipient_is_sender`.
       Prüfung: `awk '/^## Signatur/{f=1;next} /^## /{f=0} f' docs/relay/vertrag.md | grep -c '^Form der Signatur: .'` muss 1 ausgeben.
       Prüfung: `grep -l "recipient_is_sender" docs/relay/vertrag.md docs/errors.md | wc -l` muss 2 ausgeben.
-- [ ] `check` ist grün.
+- [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
 - [ ] goal-verifier PASS (K und B)
 
@@ -109,5 +109,6 @@ Zählung des Zahlungsservers füllt, bevor sandbox 07 die ersten Automatons auf 
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-14 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6 gebaut: canonicalSignature in `src/relay/signature.ts` bringt jede Signatur vor Prüfung, Lookup und Speichern in ihre einzige Form (auch `X-Signature` von `poll` und `count`), `to` gleich Absender bekommt 400 `recipient_is_sender`, Vertrag, Fehlerliste und `ANNAHMEN.md` ergänzt; die Testdateien kamen vorher in Commit 46722ee und waren dort rot (`relay-signature-form` 6 von 7 Tests, `relay-self-message` 5 von 6, Befund bestätigt: die großgeschriebene Form bekam eine neue `id`). Prüfbefehle: P1 Exit 0; P2 vitest Exit 0, 7 Tests; P3 vitest Exit 0, grep 2; P4 Diff 0 Dateien, vitest Exit 0; P5 1 und 2; P6 `check` Exit 0 (146 Dateien, 1709 Tests, grün in 184 s).
 
 ## Blockers
