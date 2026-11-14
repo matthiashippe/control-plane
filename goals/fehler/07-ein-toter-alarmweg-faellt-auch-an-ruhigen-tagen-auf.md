@@ -74,7 +74,7 @@ der nur im Ernstfall geprüft wird, im Ernstfall schon verloren ist.
   `check` stagen, weil die Regeln nur `git ls-files` lesen.
 
 ## Done Condition
-- [ ] `ops/watchdog.sh` postet einmal am Tag ein Lebenszeichen mit Priorität `min`, schreibt nach jedem zugestellten POST
+- [x] `ops/watchdog.sh` postet einmal am Tag ein Lebenszeichen mit Priorität `min`, schreibt nach jedem zugestellten POST
       `[INFO] webhook delivered`, und ein toter Webhook an einem Tag ohne Meldung hinterlässt nach drei Läufen drei Zeilen
       `[WARN] webhook unreachable`; vor dem Fix blieb dieser Fall stumm.
       MVP: Funktion, weil genau dieser Fall heute niemandem auffällt.
@@ -83,34 +83,34 @@ der nur im Ernstfall geprüft wird, im Ernstfall schon verloren ist.
       Prüfung: `d=$(mktemp -d); git show 3694a55:ops/watchdog.sh > "$d/watchdog.sh"; cp ops/credit-runway.sh "$d/"; WATCHDOG_UNDER_TEST="$d/watchdog.sh" PATH=/usr/bin:$PATH pnpm -s vitest run test/watchdog-alive.test.ts -t 'quiet day posts one sign of life' >/dev/null 2>&1 && echo gruen || echo rot` muss `rot` ausgeben.
       Prüfung: `grep -c 'curl -s --fail ' ops/watchdog.sh` muss 1 ausgeben.
       Prüfung: `grep -cE '\.skip|skipIf|\.only|\.todo' test/watchdog-alive.test.ts` muss 0 ausgeben.
-- [ ] `ops/webhook-last.sh` nennt die letzte Zeile `webhook unreachable` und die letzte Zustellung eines Logs, mit `-` für keine, und
+- [x] `ops/webhook-last.sh` nennt die letzte Zeile `webhook unreachable` und die letzte Zustellung eines Logs, mit `-` für keine, und
       endet ohne Log mit Exit 2 ohne Ausgabe.
       MVP: Funktion, weil `ops/status.sh` ohne diese beiden Zeitpunkte einen behobenen Ausfall nicht von einem laufenden trennt.
       Prüfung: `d=$(mktemp -d); printf '%s [WARN] webhook unreachable\n' 2026-11-13T11:00:00Z 2026-11-13T11:05:00Z 2026-11-13T11:10:00Z > "$d/w.log"; printf '2026-11-13T11:15:00Z [INFO] webhook delivered\n2026-11-13T11:20:00Z [WARN] webhook unreachable again\n' >> "$d/w.log"; bash ops/webhook-last.sh "$d/w.log"` muss genau `2026-11-13T11:10:00Z 2026-11-13T11:15:00Z` ausgeben.
       Prüfung: `d=$(mktemp -d); printf '%s [WARN] webhook unreachable\n' 2026-11-13T11:00:00Z 2026-11-13T11:05:00Z > "$d/w.log"; bash ops/webhook-last.sh "$d/w.log"` muss genau `2026-11-13T11:05:00Z -` ausgeben.
       Prüfung: `d=$(mktemp -d); bash ops/webhook-last.sh "$d/fehlt.log"; echo "exit=$?"` muss genau `exit=2` ausgeben.
       Prüfung: `d=$(mktemp -d); printf '%s [WARN] webhook unreachable\n' 2026-11-13T11:50:00Z 2026-11-13T11:40:00Z 2026-11-12T12:01:00Z 2026-11-12T11:59:00Z > "$d/w.log"; printf '2026-11-13T11:55:00Z [INFO] webhook delivered\n' >> "$d/w.log"; CP_NOW=1794571200 bash ops/webhook-unreachable.sh "$d/w.log"` muss `3` ausgeben.
-- [ ] `ops/status.sh` meldet `alarm_path` mit `last_unreachable` und `last_delivered` und `red` nur, wenn nach dem letzten Fehler keine
+- [x] `ops/status.sh` meldet `alarm_path` mit `last_unreachable` und `last_delivered` und `red` nur, wenn nach dem letzten Fehler keine
       Zustellung kam; `test/status-alarm-path.test.ts` belegt es ohne Netz, und der Fall mit Zustellung danach war vor dem Fix rot.
       MVP: Funktion, weil ein Ausfall von 15 Minuten sonst 24 Stunden lang rot meldet und die rote Zeile ihren Wert verliert.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/status-alarm-path.test.ts --reporter=json 2>/dev/null | python3 -c 'import json,sys; r=json.load(sys.stdin); print(r["numPassedTests"] >= 7, r["numFailedTests"], r["numPendingTests"])'` muss `True 0 0` ausgeben.
       Prüfung: `d=$(mktemp -d); git show 3694a55:ops/status.sh > "$d/status.sh"; cp ops/db-report.cjs ops/webhook-unreachable.sh ops/webhook-last.sh "$d/"; STATUS_UNDER_TEST="$d/status.sh" PATH=/usr/bin:$PATH pnpm -s vitest run test/status-alarm-path.test.ts -t 'delivered after the last failure is ok' >/dev/null 2>&1 && echo gruen || echo rot` muss `rot` ausgeben.
       Prüfung: `d=$(mktemp -d); git show de06752:ops/status.sh > "$d/status.sh"; cp ops/db-report.cjs "$d/"; STATUS_UNDER_TEST="$d/status.sh" PATH=/usr/bin:$PATH pnpm -s vitest run test/status-alarm-path.test.ts >/dev/null 2>&1 && echo gruen || echo rot` muss `rot` ausgeben.
       Prüfung: `grep -cE '\.skip|skipIf|\.only|\.todo' test/status-alarm-path.test.ts` muss 0 ausgeben.
-- [ ] Jeder andere Test, der `ops/watchdog.sh` laufen lässt, schaltet das Lebenszeichen ab und bleibt grün, und die Gegenproben von
+- [x] Jeder andere Test, der `ops/watchdog.sh` laufen lässt, schaltet das Lebenszeichen ab und bleibt grün, und die Gegenproben von
       fehler 03 und 05 bleiben rot.
       MVP: Funktion, weil diese Tests jeden POST zählen und ein zusätzlicher POST sie rot machen würde, ohne dass etwas kaputt ist.
       Prüfung: `for f in $(git grep -l '"watchdog.sh"' -- test/ | grep -v '^test/watchdog-alive\.test\.ts$'); do grep -q 'CP_WATCHDOG_ALIVE: "0"' "$f" || echo "$f"; done | wc -l` muss 0 ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/watchdog-credit.test.ts test/watchdog-credit-kritik.test.ts test/watchdog-webhook-fail.test.ts test/watchdog-webhook-fail-daily.test.ts` muss Exit-Code 0 haben.
       Prüfung: `d=$(mktemp -d); git show 5458fa3:ops/watchdog.sh > "$d/watchdog.sh"; cp ops/credit-runway.sh "$d/"; WATCHDOG_UNDER_TEST="$d/watchdog.sh" PATH=/usr/bin:$PATH pnpm -s vitest run test/watchdog-webhook-fail.test.ts >/dev/null 2>&1 && echo gruen || echo rot` muss `rot` ausgeben.
       Prüfung: `d=$(mktemp -d); sed 's/curl -s --fail /curl -s /' ops/watchdog.sh > "$d/watchdog.sh"; cp ops/credit-runway.sh "$d/"; WATCHDOG_UNDER_TEST="$d/watchdog.sh" PATH=/usr/bin:$PATH pnpm -s vitest run test/watchdog-webhook-fail.test.ts >/dev/null 2>&1 && echo gruen || echo rot` muss `rot` ausgeben.
-- [ ] `ops/README.md` nennt das Lebenszeichen und die neue Regel für `alarm_path.status`.
+- [x] `ops/README.md` nennt das Lebenszeichen und die neue Regel für `alarm_path.status`.
       MVP: Funktion, weil die Ops-Triage nach der Schwellentabelle urteilt und wer die Meldung mit `min` sieht, wissen muss, was sie heißt.
       Prüfung: `grep -c 'webhook delivered' ops/README.md` muss mindestens 1 ausgeben.
       Prüfung: `grep -c 'CP_WATCHDOG_ALIVE' ops/README.md` muss mindestens 1 ausgeben.
       Prüfung: `grep -c '^| .alarm_path\.status. |' ops/README.md` muss 1 ausgeben.
       Prüfung: `grep '^| .alarm_path\.status. |' ops/README.md | grep -c 'delivered'` muss 1 ausgeben.
-- [ ] Nur Watchdog, Status, das neue Skript, `ops/README.md`, die genannten Tests und Dateien des Goals ändern sich, `src/` nicht,
+- [x] Nur Watchdog, Status, das neue Skript, `ops/README.md`, die genannten Tests und Dateien des Goals ändern sich, `src/` nicht,
       und `check` ist grün.
       Prüfung: `git diff --name-only origin/dev...HEAD | grep -vE '^(ops/watchdog\.sh|ops/status\.sh|ops/webhook-last\.sh|ops/README\.md|test/watchdog-alive\.test\.ts|test/status-alarm-path\.test\.ts|test/watchdog-credit\.test\.ts|test/watchdog-credit-kritik\.test\.ts|test/watchdog-webhook-fail\.test\.ts|test/watchdog-webhook-fail-daily\.test\.ts|test/watchdog-topup\.test\.ts|goals/fehler/)' | wc -l` muss 0 ausgeben.
       Prüfung: `git diff --name-only origin/dev...HEAD -- src ops/webhook-unreachable.sh | wc -l` muss 0 ausgeben.
@@ -139,5 +139,6 @@ der nur im Ernstfall geprüft wird, im Ernstfall schon verloren ist.
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-14 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6 gebaut: `ops/watchdog.sh` postet einmal am UTC-Tag ein Lebenszeichen mit `Priority: min` und schreibt nach jeder Zustellung `[INFO] webhook delivered`, neues `ops/webhook-last.sh`, `ops/status.sh` meldet `last_unreachable` und `last_delivered` und `red` nur ohne Zustellung danach, die vier Watchdog-Tests setzen `CP_WATCHDOG_ALIVE: "0"`, `ops/README.md` nennt Lebenszeichen und Regel. Gegenprobe: alter Watchdog (3694a55) mit totem Webhook an einem ruhigen Tag ohne Zeile `webhook unreachable` (Test rot), neuer mit dreien; die vier alten Tests ohne Abschalter rot (13 failed), mit grün; neuer Fall „unreadable answer“ gegen einen Status, der ein unlesbares `webhook-last.sh` als Zustellung nimmt, rot. Prüfbefehle: P1 `True 0 0`, rot, rot, 1, 0; P2 `2026-11-13T11:10:00Z 2026-11-13T11:15:00Z`, `2026-11-13T11:05:00Z -`, `exit=2`, 3; P3 `True 0 0` (8 Tests), rot, rot, 0; P4 0, Exit 0, rot, rot; P5 2, 1, 1, 1; P6 0, 0, `check` Exit 0 (1703 Tests grün).
 
 ## Blockers
