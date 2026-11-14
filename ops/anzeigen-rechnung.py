@@ -41,7 +41,7 @@ class OwnListMissing(Exception):
     """`own_ips` could not name our own addresses; nothing is counted then."""
 
 
-def eigene_adressen() -> set:
+def own_addresses() -> set:
     """Our own addresses from `own_ips` in ops/own-ips.sh: the list, the live address, every
     address in CP_OWN_IPS_SEEN and in CP_OWN_IPS.
 
@@ -70,7 +70,7 @@ def adressen_an_der_bezahlroute() -> int:
     The denominator of the conversion, and it has to come from the log because a wallet that
     looked and left never appears in the database at all.
     """
-    own = eigene_adressen()
+    own = own_addresses()
     try:
         log = subprocess.run(["./ops/access-log.sh"], capture_output=True, text=True, timeout=180).stdout
     except Exception:
