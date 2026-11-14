@@ -1,7 +1,7 @@
 # Messung Goal 04: Kein Messwerkzeug liest die eigenen Adressen an `own_ips` vorbei
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Nach messung 03 lesen noch zwei Messwerkzeuge die Liste der eigenen Adressen direkt: `ops/timeout-quote.sh` (Zeile 46,
@@ -157,7 +157,7 @@ verfälscht beide Zahlen zugunsten des Kanals.
       Prüfung: `grep -cF '*) OWN="$ROOT/ops/own-ips.txt" ;;' test/own-ips-readers.test.ts` muss mindestens 1 ausgeben.
       Prüfung: `grep -cF '" * ops/own-ips.txt"' test/own-ips-readers.test.ts` muss mindestens 1 ausgeben.
       Prüfung: `pnpm -s vitest run test/own-ips-readers.test.ts` muss Exit-Code 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Jede neue Testdatei und jeder neue Fall war vor dem Fix rot, soweit oben so genannt; die Zeile im Progress Log nennt, welche
@@ -188,6 +188,7 @@ verfälscht beide Zahlen zugunsten des Kanals.
 - 2026-11-14 Zyklus 2: CI-Fehler des Jobs `check` an PR #165 behoben und Abschluss gemeldet, Punkte 1, 2, 3, 4; `dev` brachte nichts Neues (`git log HEAD..origin/dev` leer). Auf dem GitHub-Rechner liegt `node` nicht in `/usr/bin`, der `PATH` aus `test/timeout-quote-own-ips.test.ts` (`<tmp>/bin:/usr/bin:/bin`) fand es nicht, und 5 von 7 Fällen endeten mit `node: command not found` (Lauf 43638452773 für 5a885ce, rot); der Test setzt jetzt das Verzeichnis des laufenden `node` direkt hinter das nachgebaute `ssh`, am Werkzeug und an den Erwartungen ändert sich nichts. Prüfbefehle (Node 22.23.4): P1 `1`, `5`, vitest timeout-quote-own-ips Exit 0 (7 passed), `7`, `1`, vitest selftest und compare Exit 0; P2 `1`, vitest Exit 0, `4`, `ANZEIGEN SELFTEST OK` und `0`; P3 `0`, vitest Exit 0, `2`, `0` und vitest actions-log-addresses Exit 0, `6`; P4 `node scripts/check.mjs` Exit 0 (160 Dateien, 1818 passed, grün in 49 s), `0`, `0`, `0`, `0`.
 - 2026-11-14 Zyklus 3: Punkt 5 aus der Kritik gebaut und Abschluss gemeldet, Punkte 1 bis 5; `dev` brachte nichts Neues. `COMMENT` in `test/own-ips-readers.test.ts` nimmt `*` nur noch mit folgendem Leerraum oder Zeilenende als Kommentar (`^\s*(#|\/\/|\/\*|\*(\s|$))`), der Matcher-Fall trifft `  *) OWN="$ROOT/ops/own-ips.txt" ;;` und lässt ` * ops/own-ips.txt` durch. Rot vor dem Fix: der Matcher-Fall mit `expected false to be true` am `case`-Zweig; Gegenprobe am Dateiscan: ein gepflanztes `ops/zz-planted-probe.sh` mit dem `case`-Zweig machte den ersten Fall rot (`ops/zz-planted-probe.sh:2`), danach entfernt. Prüfbefehle (Node 22.23.4): P1 `1`, `5`, vitest Exit 0, `7`, `1`, vitest selftest und compare Exit 0; P2 `1`, vitest Exit 0, `4`, `ANZEIGEN SELFTEST OK` und `0`; P3 `0`, vitest Exit 0, `2`, `0` und vitest actions-log-addresses Exit 0, `6`; P4 `node scripts/check.mjs` Exit 0 (160 Dateien, 1818 passed, grün in 103 s), `0`, `0`, `0`, `0`; P5 `1`, `1`, vitest Exit 0.
 - 2026-11-14 Zyklus 4: Gap aus Verdict B Zyklus 3 behoben und Abschluss gemeldet, Punkte 1 bis 5; `dev` brachte nichts Neues. Die neue Funktion `eigene_adressen` in `ops/anzeigen-rechnung.py` heißt jetzt `own_addresses` (Definition und Aufruf), sonst keine Änderung; die übrigen deutschen Wörter in neuen Zeilen sind der Dateiname, die vom Goal vorgegebene Ausgabezeile und Bezeichner, die es auf `dev` schon gab. Prüfbefehle (Node 22.23.4): P1 `1`, `5`, vitest Exit 0, `7`, `1`, vitest selftest und compare Exit 0; P2 `1`, vitest Exit 0 (4 passed), `4`, `ANZEIGEN SELFTEST OK` und `0`; P3 `0`, vitest Exit 0, `2`, `0` und vitest actions-log-addresses Exit 0, `6`; P4 `node scripts/check.mjs` Exit 0 (1818 passed, grün in 69 s), `0`, `0`, `0`, `0`; P5 `1`, `1`, vitest Exit 0.
+- 2026-11-14 Release: PASS K und B (Zyklus 4), DONE.
 
 ## Blockers
 - keine
