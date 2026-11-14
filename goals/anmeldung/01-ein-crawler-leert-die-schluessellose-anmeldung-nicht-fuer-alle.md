@@ -1,7 +1,7 @@
 # Anmeldung Goal 01: Ein Crawler leert die schlüssellose Anmeldung nicht für alle
 
 ## Status
-PLANNED
+ACTIVE
 
 ## Active Objective
 Seit dem 11.11.2026 holt sich ein erklärter Crawler (User-Agent mit Crawler-Link, über wechselnde Adressen) jeden Tag alle 200
@@ -128,14 +128,14 @@ Wallet vor seinem ersten Schlüssel sieht.
   `check` und vitest im Vordergrund mit eigenem Timeout; neue Dateien vor `check` mit `git add` stagen. Kein `pkill -f`.
 
 ## Done Condition
-- [ ] `ops/keyless-mints.sh` zählt `POST /v1/auth/keyless` je Tag, Art des Aufrufers und Status ohne eigene Adressen, nennt keine
+- [x] `ops/keyless-mints.sh` zählt `POST /v1/auth/keyless` je Tag, Art des Aufrufers und Status ohne eigene Adressen, nennt keine
       Adresse, bricht ohne Liste der eigenen Adressen mit Exit 2 ab und beweist sich im Selbsttest in beide Richtungen.
       Prüfung: `T=$(mktemp -d); printf '#!/bin/sh\necho called >> %s/calls\nexit 255\n' "$T" > "$T/ssh"; chmod +x "$T/ssh"; PATH="$T:$PATH" bash ops/keyless-mints.sh --selftest | tail -1; cat "$T/calls" 2>/dev/null | wc -l` muss `KEYLESS MINTS SELFTEST OK` und danach 0 ausgeben.
       Prüfung: `pnpm -s vitest run test/keyless-mints.test.ts` muss Exit-Code 0 haben.
       Prüfung: `grep -cE "counts keyless mints per day, caller and status|counts only POST /v1/auth/keyless|leaves out our own addresses from the list, the live address and CP_OWN_IPS_SEEN|stops with exit 2 when the own list names no address|stops with exit 2 when the own list is missing|the selftest passes and calls no real ssh" test/keyless-mints.test.ts` muss mindestens 6 ausgeben.
       Prüfung: `grep -cE '^[^#]*(source|\.) .*own-ips\.sh' ops/keyless-mints.sh` muss mindestens 1 ausgeben.
       Prüfung: `grep -nP '^(?!\s*(#|//|/\*|\*)).*(?<![\w-])own-ips\.txt' ops/keyless-mints.sh | wc -l` muss 0 ausgeben.
-- [ ] Ein erklärter Crawler zählt gegen eine eigene Tagesgrenze von 5, und jeder andere Aufrufer bekommt einen Schlüssel, auch wenn
+- [x] Ein erklärter Crawler zählt gegen eine eigene Tagesgrenze von 5, und jeder andere Aufrufer bekommt einen Schlüssel, auch wenn
       Crawler an diesem Tag 200 genommen haben.
       Prüfung: `pnpm -s vitest run test/keyless-crawler.test.ts` muss Exit-Code 0 haben.
       Prüfung: `grep -cE "a runtime still gets a key after a crawler took the whole day|a declared crawler stops at its own small daily cap|crawler keys do not count against the places of everybody else|CP_CRAWLER_MINTS_PER_DAY overrides the crawler cap|a user agent is a declared crawler only with a link and a crawler word" test/keyless-crawler.test.ts` muss mindestens 5 ausgeben.
@@ -143,12 +143,12 @@ Wallet vor seinem ersten Schlüssel sieht.
       Prüfung: `grep -c 'crawler_daily_limit' src/auth/keyless.ts` muss mindestens 1 ausgeben.
       Prüfung: `grep -cE '^export const AGENT_MINTS_PER_DAY_DEFAULT = 200;' src/auth/keyless.ts` muss 1 ausgeben.
       Prüfung: `pnpm -s vitest run test/keyless-agent.test.ts test/goal-18-die-tuer.test.ts test/keyless.test.ts` muss Exit-Code 0 haben.
-- [ ] Werkzeug und Server erkennen Crawler nach derselben Regel, und der Bericht führt Schlüssel der Crawler als fremde.
+- [x] Werkzeug und Server erkennen Crawler nach derselben Regel, und der Bericht führt Schlüssel der Crawler als fremde.
       Prüfung: `grep -c "the tool and the server classify user agents the same way" test/keyless-crawler.test.ts` muss 1 ausgeben.
       Prüfung: `printf 'ExampleCrawler/1.0 (+https://crawler.example/about)\nnode\nExampleBot/1.0\nMozilla/5.0 https://example.com\n' | bash ops/keyless-mints.sh --classify | tr '\n' ' '` muss `crawler node other other ` ausgeben.
       Prüfung: `grep -cE '^const STRANGER_KEY_NAMES = \[.*"crawler"' ops/db-report.cjs` muss 1 ausgeben.
       Prüfung: `git diff -U0 $(git merge-base origin/dev HEAD) HEAD -- src/app.ts | grep -cE '^[-+]([^-+]|$)'` muss höchstens 12 ausgeben.
-- [ ] `check` ist grün, nur die genannten Dateien ändern sich, bestehende Tests der Tür bleiben unverändert, und `check` lässt die
+- [x] `check` ist grün, nur die genannten Dateien ändern sich, bestehende Tests der Tür bleiben unverändert, und `check` lässt die
       Liste der eigenen Adressen und das Zustandsverzeichnis unberührt.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD | grep -vcE '^(src/auth/keyless\.ts|src/app\.ts|ops/keyless-mints\.sh|ops/db-report\.cjs|test/keyless-(crawler|mints)\.test\.ts|goals/anmeldung/.+)$'` muss 0 ausgeben.
@@ -182,7 +182,7 @@ Wallet vor seinem ersten Schlüssel sieht.
 - max Versuche pro Gap: 3
 
 ## Progress Log
-- (leer)
+- 2026-11-14 Zyklus 1: Punkte 1, 2, 3, 4 gebaut. Produktion, nur lesend: `ops/keyless-mints.sh --since 2026-11-11 --until 2026-11-14` (Exit 0, eigene Adressen ausgelassen: 1) zählt je Tag 11./12./13./14.11. crawler 201 198/198/199/197 und 429 168/170/361/88, node 201 2/2/1/3 und 429 2/2/2/1, other 429 1/1/1/1; also 7 Ablehnungen der Art `node` und 4 der Art `other` mit 429, die Annahme ist nicht widerlegt (das Goal nannte 6 für `node`, der 14.11. lief seitdem weiter). Rot vor dem Fix: `test/keyless-crawler.test.ts` 5 von 6 (die vier Fälle zur Tagesgrenze mit 429 statt 201, 201 statt 429 und `keys_left_today` 199 statt 4, dazu der Vergleich mit dem Werkzeug, weil `ops/keyless-mints.sh` fehlte), `test/keyless-mints.test.ts` 6 von 6 ohne Werkzeug und 2 von 6 mit abgeschaltetem Filter der eigenen Adressen; der Selbsttest endet bei derselben Mutation und bei mitgezähltem GET mit `KEYLESS MINTS SELFTEST FAILED` und Exit 1. Prüfbefehle (Node 22.23.4): P1 `KEYLESS MINTS SELFTEST OK` und `0`, vitest Exit 0, `6`, `1`, `0`; P2 vitest Exit 0, `5`, `5`, `2`, `1`, vitest der drei Tür-Tests Exit 0; P3 `1`, `crawler node other other `, `1`, `7`; P4 `node scripts/check.mjs` Exit 0 (1831 passed, grün in 97 s; ein Lauf davor bei Last 3,5 je Kern rot an `test/abort-purchase.test.ts`, allein 6 von 6 grün), `0`, `0`, `0`, `0`.
 
 ## Blockers
 - keine
