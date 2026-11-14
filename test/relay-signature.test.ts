@@ -42,7 +42,7 @@ describe("canonicalSignature on a table of fixed signatures", () => {
     ["v 28", sig(S_LOW, "1c"), sig(S_LOW, "1c")],
     ["v 0 as 27", sig(S_LOW, "00"), sig(S_LOW, "1b")],
     ["v 1 as 28", sig(S_LOW, "01"), sig(S_LOW, "1c")],
-    ["uppercase hex as lowercase", `0x${(R + S_LOW + "1C").toUpperCase()}`, sig(S_LOW, "1c")],
+    ["uppercase hex as lowercase", `0x${("ab".repeat(32) + S_LOW + "1C").toUpperCase()}`, sig(S_LOW, "1c", "ab".repeat(32))],
     ["uppercase s equal to n / 2", `0x${R}${hex64(HALF_N).toUpperCase()}1B`, sig(hex64(HALF_N), "1b")],
   ])("accepts %s in its one form", (_name, raw, one) => {
     expect(canonicalSignature(raw)).toBe(one);
