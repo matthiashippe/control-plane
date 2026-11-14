@@ -19,19 +19,40 @@ CREDIT_TIMEOUT="${CP_CREDIT_TIMEOUT:-45}"
 TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
 # Exits non-zero when the POST failed: no answer or an HTTP error of the webhook (`--fail`). The caller then keeps the
-# old state, so the next run sends the message again.
+# old state, so the next run sends the message again. Every delivered POST leaves `[INFO] webhook delivered`, so
+# ops/status.sh can tell a failure that is over from one that still lasts (ops/webhook-last.sh).
 report() {
-  local severity="$1" text="$2"
+  local severity="$1" text="$2" priority
   echo "$TS [$severity] $text"
   [[ -n "$WEBHOOK" ]] || return 0
+  case "$severity" in
+    OK) priority=default ;;
+    ALIVE) priority=min ;;
+    *) priority=high ;;
+  esac
   if ! curl -s --fail -m 15 -X POST "$WEBHOOK" \
     -H "Content-Type: text/plain" \
     -H "Title: control-plane $severity" \
-    -H "Priority: $([[ "$severity" == OK ]] && echo default || echo high)" \
+    -H "Priority: $priority" \
     --data "control-plane $severity: $text ($URL, $TS)" >/dev/null; then
     echo "$TS [WARN] webhook unreachable"
     return 1
   fi
+  echo "$TS [INFO] webhook delivered"
+}
+
+# A dead webhook does not announce itself: on a day without a change of state nothing is posted, so nothing can fail.
+# Once a UTC day, the first run posts a sign of life with priority `min` (ntfy delivers it without sound or vibration).
+# The day stamp is stored only after the POST went through, so with a dead webhook every run tries again and leaves one
+# line `[WARN] webhook unreachable`. It runs before the health check, so a run during an outage tries it as well.
+# CP_WATCHDOG_ALIVE=0 switches only this off, for tests that count every POST.
+sign_of_life() {
+  local today
+  [[ -n "$WEBHOOK" && "${CP_WATCHDOG_ALIVE:-1}" != "0" ]] || return 0
+  today=$(date -u +%F)
+  [[ "$(cat "${STATE_FILE}.alive" 2>/dev/null)" == "$today" ]] && return 0
+  report "ALIVE" "daily sign of life, the alarm path works" &&
+    { echo "$today" > "${STATE_FILE}.alive" 2>/dev/null || true; }
 }
 
 # Two attempts with a pause, so a single hiccup does not alarm straight away.
@@ -95,6 +116,7 @@ check_credit() {
 
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 check_credit
+sign_of_life
 
 CODE=$(check_health)
 PREVIOUS=$(cat "$STATE_FILE" 2>/dev/null || echo "unknown")
