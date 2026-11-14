@@ -896,6 +896,8 @@ A `datacenter` line with the evidence `fetcher-cache` reads exactly `<address> d
 Where the cache of `ops/fetchers.py` exists (`CP_FETCHER_CACHE`, default `~/.cache/control-plane/fetcher-cache.tsv`),
 `test/known-ips.test.ts` checks every such line against it: the cache must hold the address with kind `datacenter` and exactly
 that operator. Without the cache, as in CI, that part is skipped; the test only reads the cache and never runs `ops/fetchers.py`.
+The default cache applies only to `ops/known-ips.txt`; a list from `CP_KNOWN_IPS` (a fixture) is held only against a cache
+named in `CP_FETCHER_CACHE`, so the same command gives the same result on the code-host and in CI.
 Here too the message names the count, the line numbers and the reason, never an address.
 
 Every `datacenter` line names its evidence in a fixed form, and `test/known-ips.test.ts` checks that form without the cache, so
