@@ -1,7 +1,7 @@
 # Fehler Goal 07: Ein toter Alarmweg fällt auch an ruhigen Tagen auf
 
 ## Status
-PLANNED
+DONE
 
 ## Active Objective
 `ops/watchdog.sh` postet nur einen Wechsel (Ausfall, zurück, Guthaben, Zertifikat). Solange alles grün ist, gibt es keinen POST und
@@ -129,7 +129,7 @@ der nur im Ernstfall geprüft wird, im Ernstfall schon verloren ist.
       Prüfung: `d=$(mktemp -d); git show 2f8e0a8:ops/status.sh > "$d/status.sh"; cp ops/db-report.cjs ops/webhook-unreachable.sh ops/webhook-last.sh "$d/"; STATUS_UNDER_TEST="$d/status.sh" PATH=/usr/bin:$PATH pnpm -s vitest run test/status-alarm-path.test.ts -t 'a delivery older than 26 hours is red' >/dev/null 2>&1 && echo gruen || echo rot` muss `rot` ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/status-alarm-path.test.ts --reporter=json 2>/dev/null | python3 -c 'import json,sys; r=json.load(sys.stdin); print(r["numPassedTests"] >= 10, r["numFailedTests"], r["numPendingTests"])'` muss `True 0 0` ausgeben.
       Prüfung: `grep '^| .alarm_path\.status. |' ops/README.md | grep -c '26 h'` muss 1 ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Die Zeile im Progress Log nennt die Gegenprobe: alter Watchdog mit totem Webhook an einem ruhigen Tag ohne Zeile
@@ -156,5 +156,6 @@ der nur im Ernstfall geprüft wird, im Ernstfall schon verloren ist.
 - 2026-11-14 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6 gebaut: `ops/watchdog.sh` postet einmal am UTC-Tag ein Lebenszeichen mit `Priority: min` und schreibt nach jeder Zustellung `[INFO] webhook delivered`, neues `ops/webhook-last.sh`, `ops/status.sh` meldet `last_unreachable` und `last_delivered` und `red` nur ohne Zustellung danach, die vier Watchdog-Tests setzen `CP_WATCHDOG_ALIVE: "0"`, `ops/README.md` nennt Lebenszeichen und Regel. Gegenprobe: alter Watchdog (3694a55) mit totem Webhook an einem ruhigen Tag ohne Zeile `webhook unreachable` (Test rot), neuer mit dreien; die vier alten Tests ohne Abschalter rot (13 failed), mit grün; neuer Fall „unreadable answer“ gegen einen Status, der ein unlesbares `webhook-last.sh` als Zustellung nimmt, rot. Prüfbefehle: P1 `True 0 0`, rot, rot, 1, 0; P2 `2026-11-13T11:10:00Z 2026-11-13T11:15:00Z`, `2026-11-13T11:05:00Z -`, `exit=2`, 3; P3 `True 0 0` (8 Tests), rot, rot, 0; P4 0, Exit 0, rot, rot; P5 2, 1, 1, 1; P6 0, 0, `check` Exit 0 (1703 Tests grün).
 - 2026-11-14 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, `dev` ohne neue Commits seit Zyklus 1 (Merge-Basis 54db0e0). Prüfbefehle: P1 `True 0 0`, rot, rot, 1, 0; P2 `2026-11-13T11:10:00Z 2026-11-13T11:15:00Z`, `2026-11-13T11:05:00Z -`, `exit=2`, 3; P3 `True 0 0`, rot, rot, 0; P4 0, Exit 0, rot, rot; P5 2, 1, 1, 1; P6 0, 0, `check` Exit 0 (1703 Tests grün).
 - 2026-11-14 Zyklus 3: Punkt 7 aus der Kritik gebaut, nach Merge von `origin/dev` (303dcce): `ops/status.sh` meldet `alarm_path` `red`, wenn `last_delivered` älter als 26 Stunden ist, Uhr aus `CP_NOW`, `test/status-alarm-path.test.ts` setzt `CP_NOW` und hat die Fälle „a delivery older than 26 hours is red“ und „a delivery within 26 hours is ok“, `ops/README.md` nennt die 26 h. Gegenprobe: der neue Fall „older than 26 hours“ war vor dem Fix rot (Status `ok` statt `red`), gegen `2f8e0a8` ebenso. Prüfbefehle: P7 `True 0`, `True 0`, rot, `True 0 0` (10 Tests), 1; P1 `True 0 0`, rot, rot, 1, 0; P2 `2026-11-13T11:10:00Z 2026-11-13T11:15:00Z`, `2026-11-13T11:05:00Z -`, `exit=2`, 3; P3 `True 0 0`, rot, rot, 0; P4 0, Exit 0, rot, rot; P5 2, 1, 1, 1; P6 0, 0, `check` Exit 0 (1705 Tests grün).
+- 2026-11-14 Release: PASS K und B (Zyklus 3), DONE.
 
 ## Blockers
