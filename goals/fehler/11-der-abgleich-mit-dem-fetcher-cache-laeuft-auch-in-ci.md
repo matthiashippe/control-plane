@@ -1,7 +1,7 @@
 # Fehler Goal 11: Der Abgleich mit dem Fetcher-Cache läuft auch in CI
 
 ## Status
-PLANNED
+PAUSED
 
 ## Active Objective
 Seit fehler 06 prüft `test/known-ips.test.ts` jede Zeile `(fetcher-cache)` in `ops/known-ips.txt` gegen den Cache von
@@ -103,3 +103,4 @@ ohne dass `check` es merkt.
 ## Progress Log
 
 ## Blockers
+Pause: Kurs-Check 2026-11-14, reine Testnacharbeit ohne Fehler eines echten Nutzers (Prüfwerkzeug ohne Messauftrag, LOOP.md, Traction zuerst), bringt das Abschlusskriterium nicht näher; Detail-Anteil 48,8 % über der Schwelle 40 %
