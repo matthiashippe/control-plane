@@ -17,7 +17,9 @@ import { basename, dirname, isAbsolute, join, resolve } from "node:path";
  *
  * An entry whose evidence is (fetcher-cache) is checked against the cache of ops/fetchers.py where that cache exists: the line
  * reads exactly <address> datacenter <operator> (fetcher-cache), and the cache holds the address with kind datacenter and the
- * same operator. Without the cache (CI) that case is skipped, the others still run.
+ * same operator. Without the cache (CI) that case is skipped, the others still run. Only the list of this repository is held
+ * against the default cache; any other list (a fixture from CP_KNOWN_IPS) only against a cache named explicitly, because a
+ * fixture holds documentation addresses that the real cache never has, and the outcome would depend on the host.
  *
  * Every datacenter line names its evidence in a fixed form, with or without the cache: a line whose text mentions the fetcher
  * cache in any spelling reads exactly <address> datacenter <operator> (fetcher-cache), and every other one carries a bracket
@@ -29,14 +31,16 @@ import { basename, dirname, isAbsolute, join, resolve } from "node:path";
  *
  *   CP_KNOWN_IPS       the list to read instead of ops/known-ips.txt (/dev/null is an empty list)
  *   CP_SCAN_ROOT       the git work tree to scan instead of this repository
- *   CP_FETCHER_CACHE   the cache of ops/fetchers.py instead of ~/.cache/control-plane/fetcher-cache.tsv, read only
+ *   CP_FETCHER_CACHE   the cache of ops/fetchers.py, read only; default for the own list ~/.cache/control-plane/fetcher-cache.tsv
  */
 const ROOT = join(__dirname, "..");
 const fromRoot = (p: string): string => (isAbsolute(p) ? p : resolve(ROOT, p));
 const KNOWN = fromRoot(process.env.CP_KNOWN_IPS || "ops/known-ips.txt");
 const SCAN_ROOT = fromRoot(process.env.CP_SCAN_ROOT || ROOT);
-// The same cache path as test/visitor-addresses.test.ts.
-const CACHE = process.env.CP_FETCHER_CACHE || join(homedir(), ".cache", "control-plane", "fetcher-cache.tsv");
+// The same cache path as test/visitor-addresses.test.ts, but the default only for the list of this repository; an empty path
+// never exists, so a fixture list without an explicit cache skips the check against the cache, on every host alike.
+const OWN_LIST = KNOWN === join(ROOT, "ops", "known-ips.txt");
+const CACHE = process.env.CP_FETCHER_CACHE || (OWN_LIST ? join(homedir(), ".cache", "control-plane", "fetcher-cache.tsv") : "");
 // The evidence that points at the cache, and the only form a line carrying it may have.
 const FETCHER_CACHE = "(fetcher-cache)";
 const CACHE_LINE = /^((?:[0-9]{1,3}\.){3}[0-9]{1,3}) datacenter ([^ ].*) \(fetcher-cache\)$/;
