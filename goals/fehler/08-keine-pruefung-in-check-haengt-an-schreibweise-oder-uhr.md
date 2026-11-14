@@ -123,5 +123,6 @@ Test, der unter Last bei korrektem Code rot wird, Zyklen und Linsen an der Uhr s
 
 ## Progress Log
 - 2026-11-14 Zyklus 1: Punkte 1, 2, 3, 4, 5 gebaut: neuer Fall „names the source of every datacenter line in a fixed form“ in test/known-ips.test.ts (ohne Cache, Meldung nur mit Zeilennummer), beide Sandbox-Tests brechen per AbortController erst ab, wenn der nachgebaute sandboxd den Aufruf hat, Form des Belegs in ops/known-ips.txt und ops/README.md. Gegenprobe: `203.0.113.7 datacenter AWS (fetcher cache)` ohne Cache mit der alten Testdatei (7020272) gruen, mit der neuen rot. Prüfbefehle: P1 `rot rot rot rot rot rot rot rot rot `, `1 0`, line 2 `1`, Adressen `0`, skip-Zeilen `1`; P2 `rot`, `gruen`, `True 0`, `10`; P3 `0`, `2`, `3`, `4`, `10 ok` (Load 136), `0 0`; P4 `1`, `1`, `1`, `3`; P5 `0`, `0`, check Exit 0 (1719 Tests grün).
+- 2026-11-14 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, `dev` ohne neue Commits (479f6df). Prüfbefehle: P1 `rot rot rot rot rot rot rot rot rot `, `1 0`, line 2 `2`, Adressen `0`, skip-Zeilen `1`; P2 `rot`, `gruen` (Gegenprobe alte Testdatei 7020272), `True 0`, `10`; P3 `0`, `2`, `3`, `4`, `10 ok` (Load 70), `0 0`; P4 `1`, `1`, `1`, `3`; P5 `0`, `0`, check Exit 0 (1719 Tests grün); Job `e2e` und `check` am PR-Kopf 056c208 grün.
 
 ## Blockers
