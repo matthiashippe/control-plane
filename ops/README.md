@@ -42,7 +42,7 @@ local start and does not replace the run against the real endpoint.
 | `vm.disk_used` | above 80 % | rotate the logs (json-file max 20m x 5), check for old images |
 | `db.day.margin_mc` | negative | the sale price does not cover the purchase: check markup or catalogue |
 | `db.paying_without_thinking` | one entry older than 24 h | a customer paid and buys no inference. No alarm, but go and look |
-| `alarm_path.status` | `red` (3 or more `[WARN] webhook unreachable` in 24 h and no `[INFO] webhook delivered` after the last of them, see `last_unreachable` and `last_delivered`) | no alarm reaches anybody: post to the webhook by hand, compare URL and topic in the crontab of the VM with `CP_ALERT_WEBHOOK` in `~/brain/connectors/secrets.env`, never write the URL into a file of this repo. A delivery after the last failure means the path works again and the status is `ok` even with 3 lines in 24 h. When `last_unreachable` and `last_delivered` are both `null` although lines were counted, `ops/webhook-last.sh` gave nothing readable and `red` holds from 3 lines as before. `unknown` (log not read) is no alarm, but two runs in a row are a finding like a missing `vm` block |
+| `alarm_path.status` | `red` (3 or more `[WARN] webhook unreachable` in 24 h and no `[INFO] webhook delivered` after the last of them, see `last_unreachable` and `last_delivered`; or a `last_delivered` older than 26 h, even with 0 failed POSTs) | no alarm reaches anybody: with a `last_delivered` older than 26 h the watchdog itself no longer posts, so check `crontab -l` and the end of `/var/log/cp-watchdog.log` on the VM first; otherwise post to the webhook by hand, compare URL and topic in the crontab of the VM with `CP_ALERT_WEBHOOK` in `~/brain/connectors/secrets.env`, never write the URL into a file of this repo. A delivery after the last failure means the path works again and the status is `ok` even with 3 lines in 24 h. When `last_unreachable` and `last_delivered` are both `null` although lines were counted, `ops/webhook-last.sh` gave nothing readable and `red` holds from 3 lines as before. `unknown` (log not read) is no alarm, but two runs in a row are a finding like a missing `vm` block |
 
 ### Paying without thinking
 
@@ -100,7 +100,10 @@ webhook every run tries again and three runs leave three lines `[WARN] webhook u
 delivered POST, the sign of life included, leaves `[INFO] webhook delivered` in the log.
 `ops/webhook-last.sh` prints the time of the last failure and of the last delivery (`-` for none),
 and `ops/status.sh` reports both as `alarm_path.last_unreachable` and `alarm_path.last_delivered`, so
-a failure of fifteen minutes that is over does not stay red for 24 hours. `CP_WATCHDOG_ALIVE=0`
+a failure of fifteen minutes that is over does not stay red for 24 hours. A last delivery older than
+26 hours is red as well: the sign of life comes every UTC day, so silence means the watchdog no
+longer runs or no longer posts (crontab gone, script stops before the sign of life, sign of life
+switched off), even though that leaves no line `[WARN] webhook unreachable`. `CP_WATCHDOG_ALIVE=0`
 switches only the sign of life off; it is meant for tests that count every POST, never for the VM.
 
 ## Backup

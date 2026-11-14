@@ -57,7 +57,7 @@ payto_hex=$(curl -s -m 10 -X POST https://mainnet.base.org -H 'content-type: app
 HEALTH_CODE="$health_code" HEALTH_BODY="$health_body" CERT_END="$cert_end" VM_STATS="$vm_stats" \
 DB_JSON="$db_json" OR_JSON="$or_json" PAYTO_HEX="$payto_hex" ALARM_COUNT="$alarm_count" ALARM_RC="$alarm_rc" \
 ALARM_LAST="$alarm_last" ALARM_LAST_RC="$alarm_last_rc" python3 <<'PY'
-import os, json, datetime, re
+import os, json, datetime, re, time
 def j(s, default=None):
     try: return json.loads(s)
     except Exception: return default
@@ -100,9 +100,21 @@ ts_re = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
 last = os.environ.get("ALARM_LAST", "").split()
 if os.environ.get("ALARM_LAST_RC") == "0" and len(last) == 2 and all(x == "-" or ts_re.match(x) for x in last):
     last_unreachable, last_delivered = (None if x == "-" else x for x in last)
+# The watchdog posts a sign of life in the first run of every UTC day, so two deliveries lie at most 24 hours and a few runs
+# apart. A last delivery older than 26 hours means the watchdog no longer runs or no longer posts (crontab gone, script stops
+# early, sign of life switched off), even with 0 failed POSTs. Clock from CP_NOW (seconds since 1970) like the scripts.
+now = time.time()
+if os.environ.get("CP_NOW", "").strip().isdigit():
+    now = int(os.environ["CP_NOW"].strip())
+delivered_age = None
+if last_delivered is not None:
+    delivered_at = datetime.datetime.strptime(last_delivered, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=datetime.timezone.utc)
+    delivered_age = now - delivered_at.timestamp()
 if alarm_count is None:
     alarm_status = "unknown"
 elif alarm_count >= 3 and (last_delivered is None or last_unreachable is None or last_delivered < last_unreachable):
+    alarm_status = "red"
+elif delivered_age is not None and delivered_age > 26 * 3600:
     alarm_status = "red"
 else:
     alarm_status = "ok"

@@ -10,6 +10,8 @@ import { join, resolve } from "node:path";
  * from the whole log (ops/webhook-last.sh, sent the same way) and writes `alarm_path` into its JSON. From 3 lines on the status
  * is `red` unless a `[INFO] webhook delivered` came after the last failure, below that `ok`, and without a readable log
  * `unknown` with `null`. An unreadable answer of ops/webhook-last.sh gives `null` for both times and keeps `red` from 3.
+ * A last delivery older than 26 hours is `red` even without a failed POST, because the watchdog posts a sign of life every UTC
+ * day and silence means it no longer runs or no longer posts. ops/status.sh reads the clock from CP_NOW like the scripts.
  *
  * No network and no server: `ssh`, `curl` and `openssl` are fakes on PATH. The fake `ssh` runs a call ending in `bash -s` locally,
  * with the planted log in CP_WATCHDOG_LOG and a fixed CP_NOW, and exits 255 for every other call, like a server that does not
@@ -60,6 +62,7 @@ function run(log: string | null, opts: { brokenLast?: boolean } = {}): { status:
       CP_URL: "https://status.invalid",
       CP_DEPLOY_HOST: "root@server.invalid",
       CP_DEPLOY_KEY: join(root, "no-key"),
+      CP_NOW: String(NOW),
     },
   });
   let alarm: AlarmPath | undefined;
@@ -161,6 +164,28 @@ describe("ops/status.sh reports a failed alarm path from the watchdog log", () =
       last_unreachable: "2026-11-13T11:10:00Z",
       last_delivered: "2026-11-13T10:55:00Z",
       status: "red",
+    });
+  });
+
+  it("a delivery older than 26 hours is red", () => {
+    const r = run(delivered("2026-11-12T09:59:00Z"));
+    expect(r.status, r.out).toBe(0);
+    expect(r.alarm, r.out).toEqual({
+      unreachable_24h: 0,
+      last_unreachable: null,
+      last_delivered: "2026-11-12T09:59:00Z",
+      status: "red",
+    });
+  });
+
+  it("a delivery within 26 hours is ok", () => {
+    const r = run(delivered("2026-11-12T10:01:00Z"));
+    expect(r.status, r.out).toBe(0);
+    expect(r.alarm, r.out).toEqual({
+      unreachable_24h: 0,
+      last_unreachable: null,
+      last_delivered: "2026-11-12T10:01:00Z",
+      status: "ok",
     });
   });
 
