@@ -150,6 +150,13 @@ verfälscht beide Zahlen zugunsten des Kanals.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD -- ops | grep -vcE '^ops/(timeout-quote\.sh|anzeigen-rechnung\.py|actions-log-addresses\.sh|traffic\.sh)$'` muss 0 ausgeben.
       Prüfung: `node scripts/check.mjs >/dev/null 2>&1; git status --porcelain -- ops/own-ips.txt | wc -l` muss 0 ausgeben.
       Prüfung: `S=$(mktemp -d); XDG_STATE_HOME=$S node scripts/check.mjs >/dev/null 2>&1; find "$S" -type f | wc -l` muss 0 ausgeben.
+- [ ] Der Matcher in `test/own-ips-readers.test.ts` hält eine Zeile, die mit `*` und danach weder Leerraum noch Zeilenende
+      beginnt, nicht für einen Kommentar: Ein `case`-Zweig wie `  *) OWN="$ROOT/ops/own-ips.txt" ;;` liest die Liste an
+      `own_ips` vorbei und wird gemeldet, eine JSDoc-Zeile ` * ops/own-ips.txt` bleibt ein Kommentar (Kritik Tech Lead,
+      14.11.2026: unter `ops/` beginnen heute 37 Zeilen mit `*)`, der Ausdruck `^\s*(#|\/\/|\/\*|\*)` nimmt sie alle aus).
+      Prüfung: `grep -cF '*) OWN="$ROOT/ops/own-ips.txt" ;;' test/own-ips-readers.test.ts` muss mindestens 1 ausgeben.
+      Prüfung: `grep -cF '" * ops/own-ips.txt"' test/own-ips-readers.test.ts` muss mindestens 1 ausgeben.
+      Prüfung: `pnpm -s vitest run test/own-ips-readers.test.ts` muss Exit-Code 0 haben.
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
