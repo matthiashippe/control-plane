@@ -141,6 +141,43 @@ export function agentMintsToday(db: Db, now: Date = new Date()): number {
   return row.n;
 }
 
+/**
+ * The name a key minted for a declared crawler carries, and how many of those a day.
+ *
+ * From 2026-11-11 on one declared crawler, over changing addresses, took all 200 places of
+ * `AGENT_MINTS_PER_DAY_DEFAULT` every day, and runtimes that arrived later (user agent `node`) got
+ * 429 `daily_limit`. A crawler that says what it is gets its own small count instead, under its own
+ * name so the count stays one query in the same transaction as the mint, and everybody else keeps
+ * the 200. A crawler that hides its marker lands with everybody else, as before; that gap is known.
+ */
+export const KEYLESS_CRAWLER_NAME = "crawler";
+
+export const CRAWLER_MINTS_PER_DAY_DEFAULT = 5;
+
+/**
+ * A declared crawler: the user agent carries a link and one of the words crawler, bot or indexer
+ * (any case, also inside a word such as Googlebot). Both have to hold. ops/keyless-mints.sh applies
+ * the same rule, and test/keyless-crawler.test.ts keeps the two on the same answer.
+ */
+export function isDeclaredCrawler(userAgent: string | undefined): boolean {
+  if (!userAgent) return false;
+  const hasLink = userAgent.includes("http://") || userAgent.includes("https://");
+  return hasLink && /crawler|bot|indexer/i.test(userAgent);
+}
+
+export function crawlerMintsPerDay(): number {
+  const raw = Number(process.env.CP_CRAWLER_MINTS_PER_DAY);
+  return Number.isInteger(raw) && raw > 0 ? raw : CRAWLER_MINTS_PER_DAY_DEFAULT;
+}
+
+export function crawlerMintsToday(db: Db, now: Date = new Date()): number {
+  const day = now.toISOString().slice(0, 10);
+  const row = db
+    .prepare("SELECT count(*) AS n FROM api_keys WHERE name = ? AND substr(created_at, 1, 10) = ?")
+    .get(KEYLESS_CRAWLER_NAME, day) as { n: number };
+  return row.n;
+}
+
 export class KeylessError extends Error {
   constructor(readonly code: string, readonly status: number, readonly hint: string) {
     super(code);
@@ -151,10 +188,24 @@ export class KeylessError extends Error {
  * A key for an agent that has no wallet, or `KeylessError` when the day is spent.
  *
  * Counted and minted in one transaction, because two callers arriving together would otherwise
- * both read four and both mint.
+ * both read four and both mint. A declared crawler (`isDeclaredCrawler`) is counted against its own
+ * cap under its own name and refused with `crawler_daily_limit`, so a 429 `daily_limit` still means
+ * an ordinary caller was turned away. Without a user agent this is the same as before.
  */
-export function mintAgentIdentity(db: Db, now = Date.now()): MintedIdentity {
+export function mintAgentIdentity(db: Db, now = Date.now(), userAgent?: string): MintedIdentity {
   const run = db.transaction(() => {
+    if (isDeclaredCrawler(userAgent)) {
+      if (crawlerMintsToday(db, new Date(now)) >= crawlerMintsPerDay()) {
+        throw new KeylessError(
+          "crawler_daily_limit",
+          429,
+          "Declared crawlers get their own few keyless keys a day, apart from everybody else, and " +
+            "today's are gone. It refills at midnight UTC. With a wallet there is no limit: " +
+            "POST /v1/auth/nonce, /v1/auth/verify, /v1/auth/api-keys.",
+        );
+      }
+      return mintKeylessIdentity(db, KEYLESS_CRAWLER_NAME, now);
+    }
     if (agentMintsToday(db, new Date(now)) >= agentMintsPerDay()) {
       throw new KeylessError(
         "daily_limit",
