@@ -87,3 +87,10 @@
   dem `docker run`. Seit `2de5407` gibt es diesen festen Abbruch nicht mehr (`grep -c "AbortSignal.timeout(200)"` gibt 0 aus).
   `PATH=/usr/bin:$PATH node scripts/check.mjs` auf `dev` `2d9fe38` ist bei Last 8,7 je Kern grün (150 Dateien, 1756 Tests,
   275 s). Der Code bleibt unverändert, weil `dev` die Ursache schon behoben hat.
+- Audit 2026-11-14 Zeile 407 (konto 02 Punkt 10, (Netz) `e2e`) gab 0 aus, weil der Prüfbefehl den PR mit `--state open` sucht und
+  PR #97 seit dem Merge `6856c07` geschlossen ist; `gh pr checks` bekommt dann eine leere Nummer und liest den Branch des Audits.
+  Der belegte Stand hält: `gh pr checks 97` meldet `e2e pass` am gemergten Kopf `c6ca529`, derselbe Befehl mit `--state all` gibt
+  `1` aus, mit einem Head ohne PR (`goal/konto-99`) `0`. `PATH=/usr/bin:$PATH node scripts/check.mjs` auf `dev` `1cdbde8` ist bei
+  Last 4,4 je Kern grün (151 Dateien, 1769 Tests, 255 s). Code und Goal-Datei bleiben unverändert, weil das Goal DONE ist und der
+  Prüfbefehl Vertrag; nach jedem Merge bleibt die Zeile im Audit rot, bis der Tech Lead sie ablöst oder das Audit Zeilen mit
+  `--state open` am gemergten PR misst.
