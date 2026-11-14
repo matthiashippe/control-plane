@@ -61,24 +61,24 @@ keinen Kunden mehr aussperrt, dessen Anlage gerade startet.
   Sandbox-Server.
 
 ## Done Condition
-- [ ] `check` hält den Selbsttest von `setup.sh`: Der neue Test ist grün, und ein gepflanztes Label `sandboxd=1` in `pin_image` oder
+- [x] `check` hält den Selbsttest von `setup.sh`: Der neue Test ist grün, und ein gepflanztes Label `sandboxd=1` in `pin_image` oder
       ein umbenannter Fall des Schlüssel-Resets macht ihn rot.
       Prüfung: `node_modules/.bin/vitest run test/sandbox-setup-selftest.test.ts` muss Exit-Code 0 haben.
       Prüfung: `bash -c 'd=$(mktemp -d); git archive HEAD | tar -x -C "$d"; ln -s "$PWD/node_modules" "$d/node_modules"; sed -i "s/--label sandboxd.pin=1/--label sandboxd=1 --label sandboxd.pin=1/" "$d/ops/sandbox/setup.sh"; grep -c -- "--label sandboxd=1 --label sandboxd.pin=1" "$d/ops/sandbox/setup.sh"; (cd "$d" && node_modules/.bin/vitest run test/sandbox-setup-selftest.test.ts >/dev/null 2>&1); echo "exit $?"; rm -rf "$d"'` muss `1` und danach `exit 1` ausgeben.
       Prüfung: `bash -c 'd=$(mktemp -d); git archive HEAD | tar -x -C "$d"; ln -s "$PWD/node_modules" "$d/node_modules"; sed -i "s/ok (keep)/ok (kept)/" "$d/ops/sandbox/setup.sh"; grep -c "ok (kept)" "$d/ops/sandbox/setup.sh"; (cd "$d" && node_modules/.bin/vitest run test/sandbox-setup-selftest.test.ts >/dev/null 2>&1); echo "exit $?"; rm -rf "$d"'` muss `1` und danach `exit 1` ausgeben.
-- [ ] Der Schlüssel-Reset prüft nach dem Verschieben ein zweites Mal und legt `cp.pub` sofort zurück, wenn jetzt eine fremde Sandbox
+- [x] Der Schlüssel-Reset prüft nach dem Verschieben ein zweites Mal und legt `cp.pub` sofort zurück, wenn jetzt eine fremde Sandbox
       läuft oder eine Seite nicht lesbar ist.
       Prüfung: `bash ops/sandbox/setup.sh --selftest | grep -cE '^selftest client-key-reset: ok \(late\)$'` muss `1` ausgeben.
       Prüfung: `grep -c 'SETUP CLIENT-KEY-RESET FAIL: foreign sandbox started' ops/sandbox/setup.sh` muss mindestens `1` ausgeben.
-- [ ] Die bisherigen Fälle bleiben grün, und der ganze Selbsttest ist grün.
+- [x] Die bisherigen Fälle bleiben grün, und der ganze Selbsttest ist grün.
       Prüfung: `bash ops/sandbox/setup.sh --selftest | grep -cE '^selftest client-key-reset: ok \((moved|again|reinstall|foreign|unknown|no-timer|ours|restore|keep)\)$'` muss `9` ausgeben.
       Prüfung: `bash ops/sandbox/setup.sh --selftest | grep -cE '^selftest image-pin: ok \((desired|fresh|rebuild|again)\)$'` muss `4` ausgeben.
       Prüfung: `bash ops/sandbox/setup.sh --selftest` muss Exit-Code 0 haben und als letzte Zeile `SETUP SELFTEST OK` ausgeben.
-- [ ] `ops/README.md` nennt die zweite Prüfung des Resets.
+- [x] `ops/README.md` nennt die zweite Prüfung des Resets.
       Prüfung: `grep -c 'foreign sandbox started' ops/README.md` muss mindestens `1` ausgeben.
-- [ ] Das Goal ändert nur `ops/sandbox/setup.sh`, den neuen Test, `ops/README.md` und Dateien unter `goals/domains/`.
+- [x] Das Goal ändert nur `ops/sandbox/setup.sh`, den neuen Test, `ops/README.md` und Dateien unter `goals/domains/`.
       Prüfung: `git diff --name-only origin/dev...HEAD | grep -cvE '^(ops/sandbox/setup\.sh|ops/README\.md|test/sandbox-setup-selftest\.test\.ts|goals/domains/.*)$'` muss `0` ausgeben.
-- [ ] `check` ist grün, hier und im Required Check am PR auf dem GitHub-Rechner.
+- [x] `check` ist grün, hier und im Required Check am PR auf dem GitHub-Rechner.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung (Netz): `gh pr checks goal/domains-06 -R matthiashippe/control-plane --required --json name,bucket --jq '.[] | select(.name=="check") | .bucket'` muss `pass` ausgeben.
 - [ ] goal-verifier PASS (K und B)
@@ -106,5 +106,6 @@ keinen Kunden mehr aussperrt, dessen Anlage gerade startet.
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-14 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6 gebaut: neuer Test `test/sandbox-setup-selftest.test.ts` (spawn, 240 s Geduld) verlangt Exit 0, letzte Zeile `SETUP SELFTEST OK`, keine Zeile mit ` FAIL` und jede der vier Zeilen `selftest image-pin: ok (…)` und zehn Zeilen `selftest client-key-reset: ok (…)` wörtlich; `client_key_reset` fragt nach dem Verschieben (`moved=1`) `foreign_sandboxes` ein zweites Mal ab und legt über `cp_pub_back` (Schnipsel `CP_PUB_RESTORE`, `mv -n`) sofort zurück, bei fremder Sandbox mit der letzten Zeile `SETUP CLIENT-KEY-RESET FAIL: foreign sandbox started`, bei unlesbarer Seite mit `SETUP CLIENT-KEY-RESET FAIL: second check: …`; Selbsttestfall `late` mit vier Varianten (fremde Sandbox gestartet, `state.json` weg, Zahlungsserver weg, neuerer Schlüssel vor dem Zurücklegen); die sieben lokalen Node-Aufrufe nehmen `LOCAL_NODE` (`SETUP_NODE`, `/usr/bin/node`, Node auf dem `PATH`, der erste mit `node:sqlite` und Type-Stripping), Weg und verbleibendes Fenster in `goals/domains/ANNAHMEN.md`, `ops/README.md` nennt die zweite Prüfung. Rot vor dem Fix: der neue Test ohne Fall `late` (`selftest client-key-reset: ok (late)` fehlte), dann `late` gegen den alten `client_key_reset` (`FAIL late: exit 0, last line SETUP CLIENT-KEY-RESET OK moved=1, 1 reads of state.json, want 2`). Gepflanzt und rot: Reset ohne zweite Abfrage (`FAIL late`), unlesbare zweite Abfrage ohne Zurücklegen (`FAIL late: no state.json: cp.pub not back`), Zurücklegen mit `mv -f` ohne Prüfung auf `cp.pub` (`FAIL keep`, `FAIL late: newer key`; die erste Fassung mit gleichem Schlüsselinhalt blieb grün und wurde ersetzt), Test ohne fehlenden Fall (Punkt 1, `ok (kept)`: `exit 1`); Node-Wahl: mit `SETUP_NODE` auf Node 24 `SETUP SELFTEST OK`, ein unbrauchbarer `SETUP_NODE` fällt auf `/usr/bin/node` zurück. Prüfbefehle: P1 Exit 0, `1` `exit 1`, `1` `exit 1`; P2 `1`, `4`; P3 `9`, `4`, Exit 0 mit `SETUP SELFTEST OK`; P4 `1`; P5 `0`; P6 `node scripts/check.mjs` Exit 0 (1781 Tests grün, mit Node 22 auf dem `PATH`), Required Check am PR folgt im Kommentar.
 
 ## Blockers
