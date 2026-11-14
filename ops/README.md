@@ -873,7 +873,7 @@ IPv4 addresses a tracked file may carry besides `ops/own-ips.txt` (our machines,
 
 | kind | evidence |
 |---|---|
-| `datacenter` | the operator, from the cache of `ops/fetchers.py` (`fetcher-cache`) or from the lookup the line names |
+| `datacenter` | the operator, then exactly `(fetcher-cache)` at the end of the line, or a lookup `(<source> YYYY-MM-DD` with the source `ops/fetchers.py lookup`, `RIPE RDAP` or `ARIN RDAP` |
 | `crawler` | the PTR name, proven by the DNS round trip of `ops/crawlers.sh` |
 | `eigene` | which of our machines, and the file that names it (payment server, sandbox server in `docs/sandbox/server.md`) |
 | `erfunden` | the commit that brought it as a test value; only for an address left in a file a goal may not change (a DONE goal file, a verdict, `docs/audit/`) |
@@ -897,6 +897,14 @@ Where the cache of `ops/fetchers.py` exists (`CP_FETCHER_CACHE`, default `~/.cac
 `test/known-ips.test.ts` checks every such line against it: the cache must hold the address with kind `datacenter` and exactly
 that operator. Without the cache, as in CI, that part is skipped; the test only reads the cache and never runs `ops/fetchers.py`.
 Here too the message names the count, the line numbers and the reason, never an address.
+
+Every `datacenter` line names its evidence in a fixed form, and `test/known-ips.test.ts` checks that form without the cache, so
+also in CI. A line whose text mentions the fetcher cache in any spelling (`/fetcher.?cache/i`) must read exactly
+`<address> datacenter <operator> (fetcher-cache)`; `(fetcher cache)`, `(Fetcher-Cache)` or text after the bracket fail `check`
+instead of dropping out of the check against the cache. Every other `datacenter` line carries a bracket
+`(<source> YYYY-MM-DD)` or `(<source> YYYY-MM-DD, ...)`, the source being `ops/fetchers.py lookup`, `RIPE RDAP` or `ARIN RDAP` and
+the date a real calendar day (`2026-02-30` fails); the date is not compared with the clock, so the test never turns red on a later
+day. The message names the count and `line <n>: <reason>`, never an address.
 
 Three /24 networks are all the documentation ranges offer. A fixture with more foreign /24 networks than that keeps the behaviour
 that depends on them (no address shares its /24 with two others unless it did before), but the summary "N address(es) in M

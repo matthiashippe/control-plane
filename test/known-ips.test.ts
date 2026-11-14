@@ -19,6 +19,11 @@ import { basename, dirname, isAbsolute, join, resolve } from "node:path";
  * reads exactly <address> datacenter <operator> (fetcher-cache), and the cache holds the address with kind datacenter and the
  * same operator. Without the cache (CI) that case is skipped, the others still run.
  *
+ * Every datacenter line names its evidence in a fixed form, with or without the cache: a line whose text mentions the fetcher
+ * cache in any spelling reads exactly <address> datacenter <operator> (fetcher-cache), and every other one carries a bracket
+ * (<source> <YYYY-MM-DD>) or (<source> <YYYY-MM-DD>, ...) with the source ops/fetchers.py lookup, RIPE RDAP or ARIN RDAP and a
+ * real calendar day. A misspelt evidence would otherwise drop the line out of the check against the cache without a word.
+ *
  * This test needs no lookup and no network, so it runs in check and in CI. The failure message names the count, the files or
  * the line numbers, never an address.
  *
@@ -35,6 +40,10 @@ const CACHE = process.env.CP_FETCHER_CACHE || join(homedir(), ".cache", "control
 // The evidence that points at the cache, and the only form a line carrying it may have.
 const FETCHER_CACHE = "(fetcher-cache)";
 const CACHE_LINE = /^((?:[0-9]{1,3}\.){3}[0-9]{1,3}) datacenter ([^ ].*) \(fetcher-cache\)$/;
+// Any spelling of the fetcher cache in a line; such a line must read exactly CACHE_LINE.
+const MENTIONS_CACHE = /fetcher.?cache/i;
+// The bracket of a lookup: source and calendar day, then a comma or the closing bracket.
+const LOOKUP = /\((ops\/fetchers\.py lookup|RIPE RDAP|ARIN RDAP) ([0-9]{4})-([0-9]{2})-([0-9]{2})[,)]/;
 // The same candidate pattern as test/visitor-addresses.test.ts.
 const IPV4 = /\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b/g;
 
@@ -168,6 +177,23 @@ function cacheFinding(text: string, cache: Map<string, Array<{ owner: string; ki
   return null;
 }
 
+// True for a day that exists in the calendar; no comparison with the clock, so the result never changes with the date.
+function isCalendarDay(year: number, month: number, day: number): boolean {
+  if (month < 1 || month > 12 || day < 1) return false;
+  return day <= new Date(Date.UTC(year, month, 0)).getUTCDate();
+}
+
+// Why a datacenter line does not name its evidence in the fixed form, or null when it does.
+function evidenceFinding(text: string): string | null {
+  if (MENTIONS_CACHE.test(text)) {
+    return CACHE_LINE.test(text) ? null : "the fetcher cache must stand as exactly (fetcher-cache) at the end of the line";
+  }
+  const m = LOOKUP.exec(text);
+  if (m === null) return "no bracket with ops/fetchers.py lookup, RIPE RDAP or ARIN RDAP and a date YYYY-MM-DD";
+  if (!isCalendarDay(Number(m[2]), Number(m[3]), Number(m[4]))) return "the date of the lookup is not a calendar day";
+  return null;
+}
+
 function addressesIn(text: string): Set<string> {
   return new Set(text.match(IPV4) ?? []);
 }
@@ -266,6 +292,23 @@ describe("no tracked file carries an unaccounted public IPv4 address", () => {
       stale.length,
       `${stale.length} entries of the address list stand in no tracked file besides the list: line(s) ${stale.join(", ")}. ` +
         "Remove them from the list.",
+    ).toBe(0);
+  });
+
+  it("names the source of every datacenter line in a fixed form", () => {
+    const bad: string[] = [];
+    readFileSync(KNOWN, "utf-8")
+      .split("\n")
+      .forEach((text, i) => {
+        if (text === "" || text.startsWith("#") || !/^\S+ datacenter /.test(text)) return;
+        const why = evidenceFinding(text);
+        if (why !== null) bad.push(`line ${i + 1}: ${why}`);
+      });
+    expect(
+      bad.length,
+      `${bad.length} datacenter line(s) of the address list do not name their evidence in the fixed form (${bad.join("; ")}). ` +
+        "Write <address> datacenter <operator> (fetcher-cache), or name the lookup as (<source> <YYYY-MM-DD>) with the source " +
+        "ops/fetchers.py lookup, RIPE RDAP or ARIN RDAP.",
     ).toBe(0);
   });
 

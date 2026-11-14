@@ -1,7 +1,7 @@
 # Fehler Goal 08: Keine Prüfung in check hängt an Schreibweise oder Uhr
 
 ## Status
-PLANNED
+DONE
 
 ## Active Objective
 Zwei Prüfungen in `check` urteilen heute nicht über den Code, den sie prüfen sollen. `test/known-ips.test.ts` hält eine
@@ -65,7 +65,7 @@ Test, der unter Last bei korrektem Code rot wird, Zyklen und Linsen an der Uhr s
   `CP_FETCHER_CACHE` auf eine Datei aus `mktemp`, nie auf den echten Cache schreibend.
 
 ## Done Condition
-- [ ] `test/known-ips.test.ts` verlangt für jede `datacenter`-Zeile, deren Beleg `/fetcher.?cache/i` trifft, genau `(fetcher-cache)`
+- [x] `test/known-ips.test.ts` verlangt für jede `datacenter`-Zeile, deren Beleg `/fetcher.?cache/i` trifft, genau `(fetcher-cache)`
       am Zeilenende und für jede andere eine Klammer mit Quelle aus `ops/fetchers.py lookup`, `RIPE RDAP` oder `ARIN RDAP` und
       einem Kalendertag `JJJJ-MM-TT`, auch ohne Cache; sonst rot mit Zeilennummer und ohne Adresse.
       MVP: Funktion, weil ein Tippfehler im Beleg die Prüfung heute still abschaltet.
@@ -74,14 +74,14 @@ Test, der unter Last bei korrektem Code rot wird, Zyklen und Linsen an der Uhr s
       Prüfung: `d=$(mktemp -d); printf '%s\n' '203.0.113.7 datacenter AWS (fetcher-cache)' '203.0.113.8 datacenter AWS (fetcher cache)' > "$d/list"; CP_KNOWN_IPS="$d/list" CP_FETCHER_CACHE="$d/none.tsv" PATH=/usr/bin:$PATH pnpm -s vitest run test/known-ips.test.ts -t 'source of every datacenter line' 2>&1 | grep -c 'line 2: '` muss mindestens 1 ausgeben.
       Prüfung: `d=$(mktemp -d); printf '%s\n' '203.0.113.7 datacenter AWS (fetcher-cache)' '203.0.113.8 datacenter AWS (fetcher cache)' > "$d/list"; CP_KNOWN_IPS="$d/list" CP_FETCHER_CACHE="$d/none.tsv" PATH=/usr/bin:$PATH pnpm -s vitest run test/known-ips.test.ts -t 'source of every datacenter line' 2>&1 | grep -c '203\.0\.113\.'` muss `0` ausgeben.
       Prüfung: `grep -cE '\.skip|skipIf|\.only|\.todo' test/known-ips.test.ts` muss `1` ausgeben.
-- [ ] Die Zeile `203.0.113.7 datacenter AWS (fetcher cache)` ist mit der neuen Testdatei rot und war mit der alten grün, beide Male
+- [x] Die Zeile `203.0.113.7 datacenter AWS (fetcher cache)` ist mit der neuen Testdatei rot und war mit der alten grün, beide Male
       ohne Cache, und die echte Liste bleibt grün.
       MVP: Funktion, weil erst die Gegenprobe zeigt, dass der neue Fall genau die Lücke schließt, die der Vorschlag belegt.
       Prüfung: `d=$(mktemp -d); git init -q "$d/r"; printf 'seen 203.0.113.7\n' > "$d/r/a.txt"; git -C "$d/r" add a.txt; printf '203.0.113.7 datacenter AWS (fetcher cache)\n' > "$d/list"; CP_KNOWN_IPS="$d/list" CP_SCAN_ROOT="$d/r" CP_FETCHER_CACHE="$d/none.tsv" PATH=/usr/bin:$PATH pnpm -s vitest run test/known-ips.test.ts >/dev/null 2>&1 && echo gruen || echo rot` muss `rot` ausgeben.
       Prüfung: `d=$(mktemp -d); git init -q "$d/r"; printf 'seen 203.0.113.7\n' > "$d/r/a.txt"; git -C "$d/r" add a.txt; printf '203.0.113.7 datacenter AWS (fetcher cache)\n' > "$d/list"; git show 7020272:test/known-ips.test.ts > test/known-ips-before.test.ts; CP_KNOWN_IPS="$d/list" CP_SCAN_ROOT="$d/r" CP_FETCHER_CACHE="$d/none.tsv" PATH=/usr/bin:$PATH pnpm -s vitest run test/known-ips-before.test.ts >/dev/null 2>&1 && echo gruen || echo rot; rm -f test/known-ips-before.test.ts` muss `gruen` ausgeben.
       Prüfung: `d=$(mktemp -d); CP_FETCHER_CACHE="$d/none.tsv" PATH=/usr/bin:$PATH pnpm -s vitest run test/known-ips.test.ts --reporter=json 2>/dev/null | python3 -c 'import json,sys; r=json.load(sys.stdin); print(r["numPassedTests"] >= 6, r["numFailedTests"])'` muss `True 0` ausgeben.
       Prüfung: `grep -c '^[0-9][0-9.]* datacenter ' ops/known-ips.txt` muss `10` ausgeben.
-- [ ] Die beiden Tests in `test/sandbox-api.test.ts`, die den ersten Aufruf nach festen 200 ms abbrachen, brechen erst ab, wenn der
+- [x] Die beiden Tests in `test/sandbox-api.test.ts`, die den ersten Aufruf nach festen 200 ms abbrachen, brechen erst ab, wenn der
       nachgebaute `sandboxd` ihn gesehen hat, mit denselben Erwartungen, und sind in zehn Läufen hintereinander grün.
       MVP: Funktion, weil `check` und Linse K sonst unter Last bei korrektem Code rot werden und ein Zyklus an der Uhr hängt.
       Prüfung: `grep -c 'AbortSignal.timeout(' test/sandbox-api.test.ts` muss `0` ausgeben.
@@ -90,17 +90,17 @@ Test, der unter Last bei korrektem Code rot wird, Zyklen und Linsen an der Uhr s
       Prüfung: `grep -c 'expect(creates(w)).toBe(1)' test/sandbox-api.test.ts` muss `4` ausgeben.
       Prüfung: `for i in 1 2 3 4 5 6 7 8 9 10; do PATH=/usr/bin:$PATH pnpm -s vitest run test/sandbox-api.test.ts -t 'runs the command once and hands the repeat its result|repeated create while the first one still runs' --reporter=json 2>/dev/null | python3 -c 'import json,sys; r=json.load(sys.stdin); print("ok" if r["numPassedTests"] == 2 and r["numFailedTests"] == 0 else "rot")'; done | sort | uniq -c | sed 's/^ *//'` muss genau `10 ok` ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/sandbox-api.test.ts --reporter=json 2>/dev/null | python3 -c 'import json,sys; r=json.load(sys.stdin); print(r["numFailedTests"], r["numPendingTests"])'` muss `0 0` ausgeben.
-- [ ] `ops/known-ips.txt` und `ops/README.md` nennen die feste Form des Belegs einer `datacenter`-Zeile.
+- [x] `ops/known-ips.txt` und `ops/README.md` nennen die feste Form des Belegs einer `datacenter`-Zeile.
       MVP: Funktion, weil wer die nächste Adresse einträgt, die Form aus der Liste und der Doku liest, nicht aus dem Test.
       Prüfung: `grep '^#' ops/known-ips.txt | grep -c 'RIPE RDAP'` muss mindestens 1 ausgeben.
       Prüfung: `grep '^#' ops/known-ips.txt | grep -c 'YYYY-MM-DD'` muss mindestens 1 ausgeben.
       Prüfung: `grep '^| .datacenter. |' ops/README.md | grep -c 'ARIN RDAP'` muss `1` ausgeben.
       Prüfung: `grep -c 'YYYY-MM-DD' ops/README.md` muss mindestens 1 ausgeben.
-- [ ] Nur die beiden Tests, `ops/known-ips.txt`, `ops/README.md` und Dateien des Goals ändern sich, `src/` nicht, und `check` ist grün.
+- [x] Nur die beiden Tests, `ops/known-ips.txt`, `ops/README.md` und Dateien des Goals ändern sich, `src/` nicht, und `check` ist grün.
       Prüfung: `git diff --name-only origin/dev...HEAD | grep -vE '^(test/known-ips\.test\.ts|test/sandbox-api\.test\.ts|ops/known-ips\.txt|ops/README\.md|goals/fehler/)' | wc -l` muss `0` ausgeben.
       Prüfung: `git diff --name-only origin/dev...HEAD -- src test/sandbox-world.ts ops/fetchers.py | wc -l` muss `0` ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Die Zeile im Progress Log nennt die Gegenprobe: alte Testdatei mit `(fetcher cache)` ohne Cache grün, neue rot.
@@ -122,5 +122,8 @@ Test, der unter Last bei korrektem Code rot wird, Zyklen und Linsen an der Uhr s
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-14 Zyklus 1: Punkte 1, 2, 3, 4, 5 gebaut: neuer Fall „names the source of every datacenter line in a fixed form“ in test/known-ips.test.ts (ohne Cache, Meldung nur mit Zeilennummer), beide Sandbox-Tests brechen per AbortController erst ab, wenn der nachgebaute sandboxd den Aufruf hat, Form des Belegs in ops/known-ips.txt und ops/README.md. Gegenprobe: `203.0.113.7 datacenter AWS (fetcher cache)` ohne Cache mit der alten Testdatei (7020272) gruen, mit der neuen rot. Prüfbefehle: P1 `rot rot rot rot rot rot rot rot rot `, `1 0`, line 2 `1`, Adressen `0`, skip-Zeilen `1`; P2 `rot`, `gruen`, `True 0`, `10`; P3 `0`, `2`, `3`, `4`, `10 ok` (Load 136), `0 0`; P4 `1`, `1`, `1`, `3`; P5 `0`, `0`, check Exit 0 (1719 Tests grün).
+- 2026-11-14 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, `dev` ohne neue Commits (479f6df). Prüfbefehle: P1 `rot rot rot rot rot rot rot rot rot `, `1 0`, line 2 `2`, Adressen `0`, skip-Zeilen `1`; P2 `rot`, `gruen` (Gegenprobe alte Testdatei 7020272), `True 0`, `10`; P3 `0`, `2`, `3`, `4`, `10 ok` (Load 70), `0 0`; P4 `1`, `1`, `1`, `3`; P5 `0`, `0`, check Exit 0 (1719 Tests grün); Job `e2e` und `check` am PR-Kopf 056c208 grün.
+- 2026-11-14 Release: PASS K und B (Zyklus 2), DONE.
 
 ## Blockers
