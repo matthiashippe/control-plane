@@ -23,7 +23,9 @@
 # handles that a crawler minted at 11:10:09 and 11:10:28 that day, because a crawler that mints
 # and leaves also does nothing. That is the falsification this tool exists to prevent, in the tool
 # itself. So every handle is matched against the `201 POST /v1/auth/keyless` in the access log at
-# its creation second, and the caller's address decides; `ops/own-ips.txt` says which are ours.
+# its creation second, and the caller's address decides; `own_ips` from ops/own-ips.sh says which
+# are ours, the same answer every other traffic tool gets: the written list, the address this machine
+# goes out through right now, and every address it was seen with before (CP_OWN_IPS_SEEN).
 #
 # A handle whose mint is not in the log, or that came from an address that is not ours, is never
 # offered. A handle that did something is not offered either, whoever minted it: it moved a
@@ -35,6 +37,15 @@ VM="${CP_VM:-76.13.144.207}"
 KEY="${CP_VM_KEY:-$HOME/.ssh/id_ed25519_automaton}"
 WRITE=0
 [[ "${1:-}" == "--write" ]] && WRITE=1
+
+# Our own addresses, asked of the same host the handles come from. A missing list must never read as
+# an empty one: that would call every handle a stranger, which is the error this file exists to end.
+# So no handle is judged without it.
+source ops/own-ips.sh
+if ! own_ips=$(CP_HOST="root@$VM" CP_SSH_KEY="$KEY" own_ips); then
+  echo "claim-keyless: own_ips could not name our own addresses, so no handle is judged." >&2
+  exit 2
+fi
 
 handles=$(ssh -o ConnectTimeout=10 -i "$KEY" "root@$VM" 'cd /opt/control-plane/repo/deploy && docker compose -f docker-compose.prod.yml exec -T cp node -e "
 const db=require(\"better-sqlite3\")(\"/data/cp.db\");
@@ -68,7 +79,6 @@ for line in sys.stdin:
     t = datetime.datetime.fromtimestamp(d["ts"], datetime.UTC).isoformat()[:19]
     print(t, r.get("client_ip", "?"))
 ')
-own_ips=$(cat ops/own-ips.txt 2>/dev/null | tr "\n" " ")
 
 unclaimed=()
 while read -r addr created led sub bou; do

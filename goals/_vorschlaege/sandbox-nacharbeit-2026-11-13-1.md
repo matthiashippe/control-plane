@@ -8,3 +8,4 @@ MVP: Schönheit
 Linse Q, Frage 3 (tote Pfade, ungenutzte Rückgaben), gebündelt über sandbox 02 (cloudflare.py, sandboxd.mjs) und sandbox 03 (db.ts, service.ts).
 Den Verweis auf billing.ts haben die Linsen K und B schon an die Nacharbeit gegeben (goals/sandbox/verdicts/03-z4-K.md:28, 03-z4-B.md und 03-z3-K.md im Abschnitt Hinweis).
 `ownerFor` wird nur intern in service.ts:443 gerufen; `d.config` liest weder ein Test noch der Harness.
+Verworfen: Schwere 1, tote Verweise und ungenutzte Rückgaben ohne Wirkung beim Kunden (2026-11-14)

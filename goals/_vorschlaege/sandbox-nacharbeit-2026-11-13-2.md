@@ -8,3 +8,4 @@ MVP: Funktion, weil `check` und Linse K danach unter Last nicht mehr bei korrekt
 Linse Q, Frage 1: Die Tests prüfen das richtige Verhalten, ihr Ausgang hängt aber an der Zeit bis zum ersten Treffer bei `sandboxd`.
 Linse K hat die Fehlrate im Abschluss gemessen und an die Nacharbeit verwiesen. Nachlauf am Merge 96440e4 bei Load um 115: 4 von 4 grün, die Rate hängt an der Last.
 Die Testdatei ist seit dem Merge 96440e4 unverändert, der Befund gilt am Stand origin/dev.
+Übernommen: fehler 08, ACTIVE (PRO-20361, PR #120) (2026-11-14)

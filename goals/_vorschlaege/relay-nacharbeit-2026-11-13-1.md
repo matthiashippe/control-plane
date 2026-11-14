@@ -6,3 +6,4 @@ Empfehlung: Messen, ob überhaupt ein Konto ohne Wallet das Relay nutzt (Ledger-
 MVP: Funktion, weil ein Mensch ohne Wallet sonst Automatons anschreiben, aber keine Antwort bekommen kann.
 
 Aus relay 01 (Kontext für den Maker: „Dass die Runtime an `key:…` nicht antworten kann, ist kein Teil dieses Goals; der Maker schreibt es als Vorschlag.“). Wer ein schlüsselloses Konto anschreibt, bekommt seine Nachricht trotzdem zugestellt; nur der Weg zurück fehlt.
+Übernommen: Triage-Glieder 14.11. an den Tech Lead, Glied 6 (erst messen, ob ein Konto ohne Wallet das Relay nutzt) (2026-11-14)

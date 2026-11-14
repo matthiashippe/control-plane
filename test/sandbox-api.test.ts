@@ -324,9 +324,13 @@ describe("exec with the same Idempotency-Key", () => {
   it("runs the command once and hands the repeat its result, even when it runs longer than the first request was held", async () => {
     let release!: () => void;
     const gate = new Promise<void>((r) => (release = r));
+    // Resolves once sandboxd has the command, so the first attempt is aborted after it arrived, not after a fixed time.
+    let started!: () => void;
+    const execStarted = new Promise<void>((r) => (started = r));
     const w = await sandboxWorld({
       respond: async (cmd, args) => {
         if (cmd === "docker" && args.includes("-lc") && args[args.length - 1].includes("apt-get")) {
+          started();
           await gate;
           return { code: 0, stdout: "installed\n", stderr: "" };
         }
@@ -348,7 +352,11 @@ describe("exec with the same Idempotency-Key", () => {
           signal,
         });
       // First attempt: the client gives up, as the runtime does after 30 s, while the command still runs.
-      await expect(send("01JC0000000000000000000IDK", AbortSignal.timeout(200))).rejects.toThrow();
+      const abortFirst = new AbortController();
+      const first = send("01JC0000000000000000000IDK", abortFirst.signal);
+      await execStarted;
+      abortFirst.abort();
+      await expect(first).rejects.toThrow();
       expect(w.execs().length).toBe(1);
       // The repeat with the same key starts nothing new and waits for the running command.
       const repeat = send("01JC0000000000000000000IDK");
@@ -399,9 +407,15 @@ describe("repeated create without an Idempotency-Key", () => {
   it("repeated create while the first one still runs: nothing new, the same sandbox in every answer", async () => {
     let release!: () => void;
     const gate = new Promise<void>((r) => (release = r));
+    // Resolves once sandboxd runs the container, so the first attempt is aborted after it arrived, not after a fixed time.
+    let started!: () => void;
+    const runStarted = new Promise<void>((r) => (started = r));
     const w = await sandboxWorld({
       respond: async (cmd, args) => {
-        if (cmd === "docker" && args[0] === "run") await gate;
+        if (cmd === "docker" && args[0] === "run") {
+          started();
+          await gate;
+        }
         return undefined;
       },
     });
@@ -420,7 +434,11 @@ describe("repeated create without an Idempotency-Key", () => {
           signal,
         });
       // First attempt: the client gives up while sandboxd still creates.
-      await expect(send(AbortSignal.timeout(200))).rejects.toThrow();
+      const abortFirst = new AbortController();
+      const first = send(abortFirst.signal);
+      await runStarted;
+      abortFirst.abort();
+      await expect(first).rejects.toThrow();
       expect(creates(w)).toBe(1);
       // Two repeats while the first create still runs start nothing new.
       const repeat = send();

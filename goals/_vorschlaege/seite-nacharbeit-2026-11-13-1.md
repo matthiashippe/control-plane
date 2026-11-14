@@ -8,3 +8,4 @@ MVP: Schönheit
 Linse Q, Frage 5, dazu seite 02 (Merge 9b67824, `id="umzug"` in src/public/index.html und `ops/soll-live.mjs`, das `--pruefen` nutzt).
 Die Namen geben die Goal-Dateien selbst vor (seite 01 Punkt 1 und 3, seite 02 Kontext Zeile 27); Verdict 01-z3-B nennt das und lässt es durch. Grundregel 12 gilt ausnahmslos für Bezeichner und Log-Zeilen, deshalb liegt der Fehler beim Goal-Text.
 `umzugBottom` (ops/soll-assess.mjs:102, ops/soll.mjs:122) und `"fehlt"` (ops/soll-assess.mjs:112) gibt kein Goal vor.
+Übernommen: Triage-Glieder 14.11. an den Tech Lead, Glied 9 (Grundregel 12, deutsche Bezeichner und Kommentare) (2026-11-14)

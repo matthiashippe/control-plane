@@ -7,12 +7,16 @@
 #   bash ops/sandbox/setup.sh --client-key <address>  read the public key of the service cp from the payment server (read only)
 #                                                and install it as /etc/sandboxd/keys/cp.pub after an Ed25519 check, idempotent;
 #                                                last line SETUP CLIENT-KEY OK changed=0 or changed=1, a broken key changes nothing
+#   bash ops/sandbox/setup.sh --client-key-reset <address>  move cp.pub to cp.pub.prev, which sandboxd does not read, so the next
+#                                                --client-key gives changed=1 (domains 04, the measured key change); the probe
+#                                                key stays; last line SETUP CLIENT-KEY-RESET OK moved=1, without cp.pub moved=0
 #   bash ops/sandbox/setup.sh --selftest         without network: the comparison reports a planted deviation and a clean state not,
-#                                                and --client-key installs a valid key once and rejects broken ones
+#                                                --client-key installs a valid key once and rejects broken ones, and
+#                                                --client-key-reset takes cp.pub away from sandboxd and leaves the probe key
 #
 # What it manages: Docker with the gVisor runtime runsc (platform systrap), the nftables table inet sandbox (sandbox.nft), the
 # systemd slice sandbox.slice, sandboxd as a unit in that slice on the loopback with its own Node 22, the probe key of the
-# code-host in /etc/sandboxd/keys, the base image, unattended-upgrades, and the Caddy file of the sandbox with exactly one import
+# code-host in /etc/sandboxd/keys, the base image with its pin (PIN_FUNCS), unattended-upgrades, and the Caddy file of the sandbox with exactly one import
 # line in /etc/caddy/Caddyfile (caddy validate before every reload). It never touches wa-staging, ufw, Postgres or the block of
 # wa-staging in the Caddyfile. DNS lives in cloudflare.py, run from the code-host. The nightly check runs --check only.
 set -euo pipefail
@@ -23,6 +27,7 @@ PROBE_KEY=${SANDBOXD_PROBE_KEY:-$HOME/.config/control-plane/sandboxd-probe.key}
 NODE_VERSION=22.23.4
 NODE_DIR=/opt/sandboxd/node-v$NODE_VERSION
 IMAGE=sandboxd-base:1
+PIN=sandboxd-base-pin
 IMPORT_LINE="import /etc/caddy/sandbox.caddy"
 
 # repo file -> path on the host
@@ -72,12 +77,34 @@ desired() {
   echo "fact caddy_import 1"
   echo "fact caddy_valid yes"
   echo "fact image $(sha < "$HERE/image/Dockerfile")"
+  echo "fact image_pin yes"
   echo "fact sshd_password no"
   echo "fact sandboxd_public 0"
   echo "fact published_ports 0"
   echo "dir /var/lib/sandboxd/disks yes"
   echo "dir /var/lib/sandboxd/mnt yes"
 }
+
+# The pin of the base image: a never started container of the image, which docker image prune -a counts as a user of it, so
+# the daily prune cron of the other tenant on the host (until=24h, which setup.sh does not touch) keeps the image (domains 04).
+# No label sandboxd=1, because sandboxd removes every such container that is not in its state when it starts; a pin of an older
+# build guards the old image ID only, so pin_image replaces it. Shared by GATHER, APPLY and the selftest; no ampersand inside.
+PIN_FUNCS=$(cat <<'REMOTE'
+pin_fact() { # <image> <pin>: yes when the pin is a never started container of the current image ID without label sandboxd=1
+  local img got id status label
+  img=$(docker image inspect --format '{{.Id}}' "$1" 2>/dev/null) || { echo no; return 0; }
+  got=$(docker container inspect --format '{{.Image}} {{.State.Status}} {{index .Config.Labels "sandboxd"}}' "$2" 2>/dev/null) \
+    || { echo no; return 0; }
+  read -r id status label <<<"$got"
+  if [ "$id" = "$img" ] && [ "$status" = created ] && [ "$label" != 1 ]; then echo yes; else echo no; fi
+}
+pin_image() { # <image> <pin>: creates the pin when it is missing, stale or not a plain created container; else changes nothing
+  if [ "$(pin_fact "$1" "$2")" = yes ]; then return 0; fi
+  if docker container inspect --format '{{.Id}}' "$2" >/dev/null 2>/dev/null; then docker rm -f "$2" >/dev/null; fi
+  docker create --name "$2" --label sandboxd.pin=1 --network none "$1" >/dev/null
+}
+REMOTE
+)
 
 # What the host has, in the same format. Runs on the host; reads only.
 GATHER=$(cat <<'REMOTE'
@@ -96,8 +123,12 @@ echo "fact sshd_password $(sshd -T 2>/dev/null | awk '$1=="passwordauthenticatio
 echo "fact sandboxd_public $(ss -Hltnp 2>/dev/null | grep sandboxd | grep -vc '127.0.0.1')"
 echo "fact published_ports $(docker ps --format '{{.Ports}}' 2>/dev/null | grep -c '0.0.0.0\|:::')"
 for d in /var/lib/sandboxd/disks /var/lib/sandboxd/mnt; do echo "dir $d $([ -d "$d" ] && echo yes || echo no)"; done
+PIN_FUNCS_PLACEHOLDER
+echo "fact image_pin $(pin_fact IMAGE_PLACEHOLDER PIN_PLACEHOLDER)"
 REMOTE
 )
+GATHER=${GATHER//PIN_FUNCS_PLACEHOLDER/"$PIN_FUNCS"}
+GATHER=${GATHER//PIN_PLACEHOLDER/$PIN}
 GATHER=${GATHER//NODE_DIR_PLACEHOLDER/$NODE_DIR}
 GATHER=${GATHER//IMPORT_PLACEHOLDER/$IMPORT_LINE}
 GATHER=${GATHER//IMAGE_PLACEHOLDER/$IMAGE}
@@ -187,6 +218,9 @@ have=$(docker image inspect --format '{{index .Config.Labels "sandboxd.dockerfil
 if [ "$want" != "$have" ]; then
   docker build -q --pull --label "sandboxd.dockerfile=$want" -t "$IMAGE" /opt/sandboxd/image >/dev/null
 fi
+# its pin, new after every build (PIN_FUNCS)
+PIN_FUNCS_PLACEHOLDER
+pin_image "$IMAGE" PIN_PLACEHOLDER
 
 # sandboxd
 systemctl enable -q sandboxd
@@ -213,6 +247,8 @@ fi
 rm -rf "$S"
 REMOTE
 )
+APPLY=${APPLY//PIN_FUNCS_PLACEHOLDER/"$PIN_FUNCS"}
+APPLY=${APPLY//PIN_PLACEHOLDER/$PIN}
 
 apply() {
   local host=$1 stage pub f args=()
@@ -251,8 +287,19 @@ mv -f "$t" "$d/cp.pub"
 REMOTE
 )
 
+# --client-key-reset: moves cp.pub to cp.pub.prev, a name sandboxd does not read (it takes *.pub only), so the service's
+# calls fail with "key not accepted" until the next --client-key writes the key again (changed=1). The probe key stays.
+CP_PUB_RESET=$(cat <<'REMOTE'
+set -eu
+d=$1/etc/sandboxd/keys
+if [ -f "$d/cp.pub" ]; then mv -f "$d/cp.pub" "$d/cp.pub.prev"; echo moved=1; else echo moved=0; fi
+REMOTE
+)
+
 sbx_read_sha() { ssh_host "$1" "set -- ''
 $CP_PUB_READ"; }
+sbx_reset_cp_pub() { ssh_host "$1" "set -- ''
+$CP_PUB_RESET"; }
 sbx_write_cp_pub() { ssh_host "$1" "set -- ''
 $CP_PUB_WRITE"; }
 
@@ -279,6 +326,19 @@ install_client_key() {
   if ! printf '%s\n' "$pub" | sbx_write_cp_pub "$host"; then echo "SETUP CLIENT-KEY FAIL: cannot write $CP_PUB"; return 1; fi
   if [ "$(sbx_read_sha "$host")" != "$want" ]; then echo "SETUP CLIENT-KEY FAIL: $CP_PUB differs after the write"; return 1; fi
   echo "SETUP CLIENT-KEY OK changed=1"
+}
+
+# client_key_reset <address>: takes cp.pub out of what sandboxd reads; last line SETUP CLIENT-KEY-RESET OK moved=1, or
+# moved=0 when there was no cp.pub. Prints neither key nor CP_HOST.
+client_key_reset() {
+  local out
+  if ! out=$(sbx_reset_cp_pub "$1"); then echo "SETUP CLIENT-KEY-RESET FAIL: cannot move $CP_PUB on the sandbox host"; return 1; fi
+  case "$out" in
+    moved=0 | moved=1) ;;
+    *) echo "SETUP CLIENT-KEY-RESET FAIL: no moved=0 or moved=1 from the sandbox host"; return 1 ;;
+  esac
+  if [ "$(sbx_read_sha "$1")" != missing ]; then echo "SETUP CLIENT-KEY-RESET FAIL: $CP_PUB still there"; return 1; fi
+  echo "SETUP CLIENT-KEY-RESET OK $out"
 }
 
 # client_key <address>: the one read on the payment server, then install_client_key. Never prints CP_HOST or the key path.
@@ -352,6 +412,112 @@ selftest_client_key() {
   return $fail
 }
 
+# selftest of --client-key-reset: a fake sandbox host under $1/reset with cp.pub and the probe key, the same snippets as on
+# the host, no network. sandboxd takes every *.pub in the keys folder, so after the reset no *.pub but probe.pub may be left.
+selftest_client_key_reset() {
+  local t=$1 root=$1/reset fail=0 out rc probe_before
+  ssh() { echo "selftest must not reach the network (ssh)" >&2; return 99; }
+  curl() { echo "selftest must not reach the network (curl)" >&2; return 99; }
+  sbx_read_sha() { bash -c "$CP_PUB_READ" _ "$root"; }
+  sbx_write_cp_pub() { bash -c "$CP_PUB_WRITE" _ "$root"; }
+  sbx_reset_cp_pub() { bash -c "$CP_PUB_RESET" _ "$root"; }
+  mkdir -p "$root/etc/sandboxd/keys"
+  cp "$t/a.pub" "$root$CP_PUB"
+  cp "$t/b.pub" "$root/etc/sandboxd/keys/probe.pub"
+  probe_before=$(sha < "$root/etc/sandboxd/keys/probe.pub")
+  listing() { (cd "$root/etc/sandboxd/keys" && find . -mindepth 1 -printf '%P %s %T@\n' | sort); }
+  pubs() { (cd "$root/etc/sandboxd/keys" && find . -mindepth 1 -maxdepth 1 -name '*.pub' -printf '%P\n' | sort | paste -sd, -); }
+  # rs <label> <want moved>: one reset, then its last line and what sandboxd would read
+  rs() {
+    local why=
+    rc=0
+    out=$(client_key_reset selftest-host) || rc=$?
+    [ $rc -eq 0 ] || why="exit $rc"
+    [ "$(tail -1 <<<"$out")" = "SETUP CLIENT-KEY-RESET OK moved=$2" ] || why="$why, last line $(tail -1 <<<"$out")"
+    [ ! -e "$root$CP_PUB" ] || why="$why, cp.pub still there"
+    [ "$(pubs)" = probe.pub ] || why="$why, sandboxd reads $(pubs)"
+    [ "$(sha < "$root/etc/sandboxd/keys/probe.pub")" = "$probe_before" ] || why="$why, probe key changed"
+    echo "${why#, }"
+  }
+  local why before
+  why=$(rs moved 1)
+  cmp -s "$t/a.pub" "$root$CP_PUB.prev" || why="${why:+$why, }cp.pub.prev differs from the old cp.pub"
+  if [ -z "$why" ]; then echo "selftest client-key-reset: ok (moved)"; else echo "selftest client-key-reset: FAIL moved: $why"; fail=1; fi
+  before=$(listing)
+  why=$(rs again 0)
+  [ "$(listing)" = "$before" ] || why="${why:+$why, }the keys folder changed"
+  if [ -z "$why" ]; then echo "selftest client-key-reset: ok (again)"; else echo "selftest client-key-reset: FAIL again: $why"; fail=1; fi
+  why=
+  out=$(install_client_key selftest-host "$(cat "$t/a.pub")") || why="exit $?"
+  [ "$(tail -1 <<<"$out")" = "SETUP CLIENT-KEY OK changed=1" ] || why="${why:+$why, }last line $(tail -1 <<<"$out")"
+  cmp -s "$t/a.pub" "$root$CP_PUB" || why="${why:+$why, }cp.pub is not the old key"
+  [ "$(sha < "$root/etc/sandboxd/keys/probe.pub")" = "$probe_before" ] || why="${why:+$why, }probe key changed"
+  if [ -z "$why" ]; then echo "selftest client-key-reset: ok (reinstall)"; else echo "selftest client-key-reset: FAIL reinstall: $why"; fail=1; fi
+  return $fail
+}
+
+# selftest of the image pin: the same PIN_FUNCS as on the host, with a fake docker on PATH that keeps images and containers in
+# files and refuses a create over an existing name like docker does; no network. Lines selftest image-pin: ok (<case>).
+selftest_image_pin() {
+  local t=$1/pin fail=0 why before
+  mkdir -p "$t/bin" "$t/state"
+  cat > "$t/bin/docker" <<'FAKE'
+#!/usr/bin/env bash
+s=${PIN_STATE:?}
+echo "$*" >> "$s/log"
+case "$1 $2" in
+  "image inspect") [ -f "$s/image" ] || exit 1; cat "$s/image" ;;
+  "container inspect")
+    n=${*: -1}; [ -f "$s/c.$n" ] || exit 1
+    read -r id status label < "$s/c.$n"
+    case "$4" in *State.Status*) echo "$id $status $label" ;; *.Image*) echo "$id" ;; *) echo "cid-$n" ;; esac ;;
+  "rm -f") rm -f "$s/c.$3" ;;
+  *)
+    [ "$1" = create ] || { echo "fake docker: unexpected $*" >&2; exit 2; }
+    shift; name=; label=
+    while [ $# -gt 1 ]; do
+      case "$1" in
+        --name) name=$2; shift 2 ;;
+        --label) case "$2" in sandboxd=*) label=${2#sandboxd=} ;; esac; shift 2 ;;
+        --network) shift 2 ;;
+        *) shift ;;
+      esac
+    done
+    [ -n "$name" ] || exit 2
+    [ ! -f "$s/c.$name" ] || { echo "fake docker: name $name in use" >&2; exit 1; }
+    [ -f "$s/image" ] || exit 1
+    echo "$(cat "$s/image") created $label" > "$s/c.$name" ;;
+esac
+FAKE
+  chmod 0755 "$t/bin/docker"
+  export PIN_STATE=$t/state
+  fake() { PATH="$t/bin:$PATH" bash -c "$PIN_FUNCS"$'\n''"$@"' _ "$@"; }
+  fact() { fake pin_fact "$IMAGE" "$PIN"; }
+  # pr <case> <want creates> <want removes> <want fact before: yes or no>: one pin_image, then what it did and the fact
+  pr() {
+    local why= rc=0 creates removes
+    [ "$(fact)" = "$4" ] || why="fact before $(fact), want $4"
+    : > "$t/state/log"
+    fake pin_image "$IMAGE" "$PIN" 2>/dev/null || rc=$?
+    [ $rc -eq 0 ] || why="$why, exit $rc"
+    creates=$(grep -c "^create --name $PIN " "$t/state/log" || true)
+    removes=$(grep -c "^rm -f $PIN\$" "$t/state/log" || true)
+    [ "$creates" = "$2" ] || why="$why, $creates creates, want $2"
+    [ "$removes" = "$3" ] || why="$why, $removes removes, want $3"
+    if grep "^create " "$t/state/log" | grep -q 'sandboxd=1'; then why="$why, pin labeled sandboxd=1"; fi
+    [ "$(fact)" = yes ] || why="$why, fact after $(fact)"
+    if [ -z "${why#, }" ]; then echo "selftest image-pin: ok ($1)"; else echo "selftest image-pin: FAIL $1: ${why#, }"; return 1; fi
+  }
+  if [ "$(grep -c '^fact image_pin yes$' "$1/desired")" = 1 ]; then echo "selftest image-pin: ok (desired)"
+  else echo "selftest image-pin: FAIL desired: $(grep -c '^fact image_pin yes$' "$1/desired") lines fact image_pin yes"; fail=1; fi
+  echo "sha256:$(printf 1 | sha)" > "$t/state/image"
+  pr fresh 1 0 no || fail=1
+  echo "sha256:$(printf 2 | sha)" > "$t/state/image"
+  pr rebuild 1 1 no || fail=1
+  pr again 0 0 yes || fail=1
+  return $fail
+}
+
 selftest() {
   local t d o out fail=0
   t=$(mktemp -d)
@@ -380,6 +546,10 @@ selftest
   if declare -f check | grep -q 'APPLY\|apply '; then echo "selftest check: FAIL check runs apply"; fail=1; else echo "selftest check: ok (read only)"; fi
   # 4. --client-key against a fake host in a subshell, so the stubs stay local
   ( selftest_client_key "$t" ) || fail=1
+  # 5. --client-key-reset on a second fake host, with the keys selftest_client_key made
+  ( selftest_client_key_reset "$t" ) || fail=1
+  # 6. the pin of the base image against a fake docker
+  ( selftest_image_pin "$t" ) || fail=1
   rm -rf "$t"
   if [ $fail -eq 0 ]; then echo "SETUP SELFTEST OK"; else echo "SETUP SELFTEST FAIL"; return 1; fi
 }
@@ -388,6 +558,7 @@ case "${1:-}" in
   --selftest) selftest ;;
   --check) [ -n "${2:-}" ] || { echo "usage: $0 --check <address>" >&2; exit 2; }; check "$2" ;;
   --client-key) [ -n "${2:-}" ] || { echo "usage: $0 --client-key <address>" >&2; exit 2; }; client_key "$2" ;;
-  -*|"") echo "usage: $0 <address> | --check <address> | --client-key <address> | --selftest" >&2; exit 2 ;;
+  --client-key-reset) [ -n "${2:-}" ] || { echo "usage: $0 --client-key-reset <address>" >&2; exit 2; }; client_key_reset "$2" ;;
+  -*|"") echo "usage: $0 <address> | --check <address> | --client-key <address> | --client-key-reset <address> | --selftest" >&2; exit 2 ;;
   *) apply "$1" ;;
 esac

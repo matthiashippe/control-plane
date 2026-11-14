@@ -6,3 +6,4 @@ Empfehlung: Die Abfrage der Sandbox-Zeilen einmal unter `ops/` ablegen (etwa ein
 MVP: Schönheit
 
 Linse Q, Frage 2 (Logik-Duplikate). Ändert sich das Format `sandbox:<id>:<n>` aus `src/sandbox/service.ts:265`, müssen `ops/live.sh`, `ops/runtime-sandbox.sh` und `harness/e2e/full.sh:107` einzeln nachgezogen werden. Die `ssh`-Zeile gehört zur Klasse aus `abrechnung-nacharbeit-2026-11-12-1` (gemeinsamer Lesehelfer), neu ist hier die kopierte Abfrage. `test/domains.test.ts:29` (domains 01) kam vor `test/sandbox-world.ts`, die Kopie in `sandbox-walk.mjs:24` ist die dritte.
+Verworfen: Schwere 1, kopierte Abfrage ohne Wirkung beim Kunden (2026-11-14)
