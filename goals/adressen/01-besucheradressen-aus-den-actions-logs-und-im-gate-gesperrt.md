@@ -1,7 +1,7 @@
 # Adressen Goal 01: Besucheradressen aus den Actions-Logs und im Gate gesperrt
 
 ## Status
-PLANNED
+DONE
 
 ## Active Objective
 Kein Besucher des Dienstes findet seine Adresse in den Logs der Actions des öffentlichen Repos, und kein PR bringt den Cache von
@@ -71,7 +71,7 @@ lesbar hält, und weil heute nur `.gitignore` und ein Test den Cache aus dem Rep
   keinem Log, Kommentar, Commit, PR oder Verdict eine Adresse aus, nur Zahlen.
 
 ## Done Condition
-- [ ] `ops/actions-log-addresses.sh` zählt fremde Adressen in Zeilen einer Anfrage je Lauf und über alle, ohne eine Adresse
+- [x] `ops/actions-log-addresses.sh` zählt fremde Adressen in Zeilen einer Anfrage je Lauf und über alle, ohne eine Adresse
       auszugeben, und endet bei einem Fehler von `gh` mit Exit 2 statt mit einer 0.
       MVP: Funktion, weil die Zählung vor dem Löschen und die Prüfung danach sonst niemand wiederholen kann.
       Prüfung: `test -x ops/actions-log-addresses.sh && echo da` muss `da` ausgeben.
@@ -79,7 +79,7 @@ lesbar hält, und weil heute nur `.gitignore` und ein Test den Cache aus dem Rep
       Prüfung: `d=$(mktemp -d); printf '#!/bin/sh\nexit 1\n' > "$d/gh"; chmod +x "$d/gh"; PATH="$d:$PATH" bash ops/actions-log-addresses.sh --workflow deploy.yml > "$d/out" 2>&1; echo "$? $(grep -c '^total' "$d/out")"` muss `2 0` ausgeben.
       Prüfung: `pnpm -s vitest run test/actions-log-addresses.test.ts` muss Exit-Code 0 haben.
       Prüfung: `grep -c 'actions-log-addresses.sh' ops/README.md` muss mindestens 1 ausgeben.
-- [ ] `docs/adressen/actions-logs.md` nennt je der sechs Läufe die Zahl fremder Adressen, die Zahl verschiedener über alle sechs und
+- [x] `docs/adressen/actions-logs.md` nennt je der sechs Läufe die Zahl fremder Adressen, die Zahl verschiedener über alle sechs und
       die Zahl der Läufe von `deploy.yml` mit fremden Adressen, mit Befehl und Zeit, und keine Adresse.
       MVP: Funktion, weil Matthias am Gate wissen muss, was er löscht, und weil die Zahl das Goal widerlegen kann.
       Prüfung: `awk '/^## Zählung vor dem Löschen/{f=1;next} /^## /{f=0} f' docs/adressen/actions-logs.md | grep -cE '^(42879222074|42895005251|43164473390|43260817090|43277458881|43322130930) [0-9]+$'` muss 6 ausgeben.
@@ -87,22 +87,22 @@ lesbar hält, und weil heute nur `.gitignore` und ein Test den Cache aus dem Rep
       Prüfung: `awk '/^## Zählung vor dem Löschen/{f=1;next} /^## /{f=0} f' docs/adressen/actions-logs.md | grep -cE '^Gemessen: 2026-11-[0-9]{2} [0-9]{2}:[0-9]{2} UTC$'` muss 1 ausgeben.
       Prüfung: `awk '/^## Zählung vor dem Löschen/{f=1;next} /^## /{f=0} f' docs/adressen/actions-logs.md | grep -cE '^Läufe von deploy\.yml mit fremden Adressen: [0-9]+ von [0-9]+$'` muss 1 ausgeben.
       Prüfung: `grep -cE '\b([0-9]{1,3}\.){3}[0-9]{1,3}\b' docs/adressen/actions-logs.md` muss 0 ausgeben.
-- [ ] Nach dem Human Gate `delete_data` liefert keiner der sechs Läufe mehr ein Log, kein Lauf von `deploy.yml` trägt eine fremde
+- [x] Nach dem Human Gate `delete_data` liefert keiner der sechs Läufe mehr ein Log, kein Lauf von `deploy.yml` trägt eine fremde
       Adresse, und die Doku hält das fest.
       MVP: Funktion, weil erst das die Adressen aus dem öffentlichen Repo nimmt.
       Prüfung (Netz): `gh api repos/matthiashippe/control-plane --jq .full_name >/dev/null && for id in 42879222074 42895005251 43164473390 43260817090 43277458881 43322130930; do gh api repos/matthiashippe/control-plane/actions/runs/$id/logs >/dev/null 2>&1 && echo "$id log"; done | wc -l` muss 0 ausgeben.
       Prüfung (Netz): `bash ops/actions-log-addresses.sh --workflow deploy.yml | awk '$1=="total"{print $2}'` muss `0` ausgeben.
       Prüfung: `awk '/^## Nach dem Löschen/{f=1;next} /^## /{f=0} f' docs/adressen/actions-logs.md | grep -cE '^Keine Logs mehr: 2026-(11|12)-[0-9]{2} [0-9]{2}:[0-9]{2} UTC$'` muss 1 ausgeben.
       Prüfung: `awk '/^## Nach dem Löschen/{f=1;next} /^## /{f=0} f' docs/adressen/actions-logs.md | grep -cx 'total 0'` muss 1 ausgeben.
-- [ ] `gate.yaml` sperrt `ops/fetcher-cache.tsv` in `deny_paths`, der Goal-PR ändert `gate.yaml` nicht, und ein grüner Drill des Loop
+- [x] `gate.yaml` sperrt `ops/fetcher-cache.tsv` in `deny_paths`, der Goal-PR ändert `gate.yaml` nicht, und ein grüner Drill des Loop
       Masters lief nach dem Eintrag.
       MVP: Funktion, weil nur das Gate einen PR aufhält, der den Cache wieder hinzufügt, und ein Eintrag erst mit einem Drill gilt.
       Prüfung: `awk '/^deny_paths:/{f=1;next} /^[^ #]/{f=0} f && /^ *- *"?ops\/fetcher-cache\.tsv"? *$/' gate.yaml | wc -l` muss 1 ausgeben.
       Prüfung: `git diff --name-only origin/dev...HEAD -- gate.yaml | wc -l` muss 0 ausgeben.
       Prüfung: `a=$(git log --format=%cI -S'ops/fetcher-cache.tsv' -- gate.yaml | tail -n 1); ~/work/code-host/tools/loop-master drill control-plane | node -e 'let s="";process.stdin.on("data",c=>s+=c).on("end",()=>{const d=JSON.parse(s).counted||{};const a=new Date(process.argv[1]);console.log(d.status==="grün"&&a.getTime()>0&&new Date(d.at)>a?"gezeigt":"fehlt")})' "$a"` muss `gezeigt` ausgeben.
-- [ ] `check` ist grün.
+- [x] `check` ist grün.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Die neue Testdatei war vor dem Fix rot; die Zeile im Progress Log nennt, womit.
@@ -124,5 +124,11 @@ lesbar hält, und weil heute nur `.gitignore` und ein Test den Cache aus dem Rep
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-14 Zyklus 1: Punkte 1, 2 und 5 gebaut (Zähler `ops/actions-log-addresses.sh` mit Test und README-Abschnitt, Zählung in `docs/adressen/actions-logs.md`: 5 der 6 Läufe mit fremden Adressen, 2 verschiedene, 5 von 112 Läufen von deploy.yml), Punkte 3 und 4 warten auf das Human Gate `delete_data`; der neue Test war vor dem Skript rot (12 failed, Skript fehlte). Prüfbefehle: P1 `da`, `1 1 2 2 total 2 `, `2 0`, vitest 12 passed Exit 0, README 4; P2 6, 1, 1, 1, 0; P3 offen (Netz: 6 Läufe liefern noch ein Log); P4 Diff gate.yaml 0, Eintrag 0 und Drill offen; P5 `node scripts/check.mjs` Exit 0 (148 Dateien, 1731 Tests).
+- 2026-11-14 Zyklus 2: Punkt 3 gebaut (`origin/dev` mit dem Eintrag in `gate.yaml` gemergt, Abschnitt `## Nach dem Löschen` in `docs/adressen/actions-logs.md`: keiner der sechs Läufe liefert ein Log, 0 fremde Adressen in 128 Läufen von deploy.yml), Punkt 4 wartet auf den Drill 20261114-094046Z, den der Loop Master nach der Änderung an `gate.yaml` gestartet hat. Prüfbefehle: P3 Netz 0, Netz `0`, Abschnitt 1, `total 0` 1; P4 Eintrag 1, Diff gate.yaml 0, Drill `fehlt` (Drill läuft, Verdicts der Linsen fehlen); P2 6, 1, 1, 1, 0; P5 `node scripts/check.mjs` Exit 0 (149 Dateien, 1736 Tests).
+- 2026-11-14 Zyklus 3: Abschluss gemeldet, Punkte 1, 2, 3, 4 und 5 (`origin/dev` gemergt, Punkt 4 nach dem grünen Drill 20261114-094046Z abgehakt; derselbe Prüfbefehl gab vor dem Takt um 12:00 UTC `fehlt` aus, weil der Takt um 11:50 UTC den Beleg der Linse K noch nicht gelesen hatte). Prüfbefehle: P1 `da`, `1 1 2 2 total 2 `, `2 0`, vitest Exit 0, README 4; P2 6, 1, 1, 1, 0; P3 Netz 0, Netz `0`, Abschnitt 1, `total 0` 1; P4 Eintrag 1, Diff gate.yaml 0, Drill `gezeigt`; P5 `node scripts/check.mjs` Exit 0 (150 Dateien, 1760 Tests).
+- 2026-11-14 Release: PASS K und B (Zyklus 3), DONE.
+- 2026-11-14 Zyklus 4: Abschluss gemeldet, Punkte 1, 2, 3, 4 und 5 (Merge-Konflikt mit dev in `ops/README.md` aus dem Release gelöst: `origin/dev` 07c170f gemergt, beide Abschnitte behalten, keine Zeile aus dev entfernt; sonst keine Änderung). Prüfbefehle: P1 `da`, `1 1 2 2 total 2 `, `2 0`, vitest Exit 0, README 4; P2 6, 1, 1, 1, 0; P3 Netz 0, Netz `0` (136 Läufe, 7 ohne Log), Abschnitt 1, `total 0` 1; P4 Eintrag 1, Diff gate.yaml 0, Drill `gezeigt`; P5 `node scripts/check.mjs` Exit 0 (150 Dateien, 1760 Tests).
 
 ## Blockers
+- keine (Human Gate `delete_data` am 14.11.2026 um 09:32 UTC gelöst: Logs gelöscht, `gate.yaml` auf dev mit Commit 3f1ac20)
