@@ -58,17 +58,17 @@ Kunden vortäuscht, den es nicht gibt.
   `check` und vitest im Vordergrund mit eigenem Timeout; neue Dateien vor `check` mit `git add` stagen. Kein `pkill -f`.
 
 ## Done Condition
-- [ ] `ops/claim-keyless.sh` nimmt die eigenen Adressen aus `own_ips` statt aus `ops/own-ips.txt` und zählt eine Adresse, die nur
+- [x] `ops/claim-keyless.sh` nimmt die eigenen Adressen aus `own_ips` statt aus `ops/own-ips.txt` und zählt eine Adresse, die nur
       in der Datei aus `CP_OWN_IPS_SEEN` steht, und die live gesehene Adresse als eigene.
       Prüfung: `pnpm -s vitest run test/claim-keyless-own-ips.test.ts` muss Exit-Code 0 haben.
       Prüfung: `grep -cE '^[^#]*(source|\.) .*own-ips\.sh' ops/claim-keyless.sh` muss mindestens 1 ausgeben.
       Prüfung: `{ grep -v '^[[:space:]]*#' ops/claim-keyless.sh | grep -c 'own-ips\.txt'; } || true` muss 0 ausgeben.
       Prüfung: `grep -c "CP_OWN_IPS_SEEN" test/claim-keyless-own-ips.test.ts` muss mindestens 1 ausgeben.
       Prüfung: `grep -cE "203\.0\.113\.9[^0-9]" test/claim-keyless-own-ips.test.ts` muss mindestens 1 ausgeben.
-- [ ] Fehlt die Liste der eigenen Adressen, endet `ops/claim-keyless.sh` mit Exit 2, bevor es eine Wallet beurteilt.
+- [x] Fehlt die Liste der eigenen Adressen, endet `ops/claim-keyless.sh` mit Exit 2, bevor es eine Wallet beurteilt.
       Prüfung: `grep -c "stops with exit 2 when the list of own addresses is missing" test/claim-keyless-own-ips.test.ts` muss mindestens 1 ausgeben.
       Prüfung: `pnpm -s vitest run test/claim-keyless-own-ips.test.ts -t "stops with exit 2"` muss Exit-Code 0 haben.
-- [ ] `check` ist grün und lässt Liste, Adresslisten und Zustandsverzeichnis unberührt.
+- [x] `check` ist grün und lässt Liste, Adresslisten und Zustandsverzeichnis unberührt.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung: `node scripts/check.mjs >/dev/null 2>&1; git status --porcelain -- ops/own-ips.txt src/bounties/ours.ts ops/db-report.cjs | wc -l` muss 0 ausgeben.
       Prüfung: `S=$(mktemp -d); XDG_STATE_HOME=$S node scripts/check.mjs >/dev/null 2>&1; find "$S" -type f | wc -l` muss 0 ausgeben.
@@ -93,6 +93,7 @@ Kunden vortäuscht, den es nicht gibt.
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-14 Zyklus 1: Punkte 1, 2, 3 gebaut: `ops/claim-keyless.sh` sourct `ops/own-ips.sh`, nimmt `own_ips` mit `CP_HOST` und `CP_SSH_KEY` der Wallet-Abfrage und endet mit Exit 2 vor der ersten Wallet, wenn `own_ips` scheitert; neuer Test `test/claim-keyless-own-ips.test.ts` vor dem Fix 3 failed, 1 passed (Adresse nur in `CP_OWN_IPS_SEEN` und live gesehene Adresse als `STRANGER` statt `OURS`, fehlende Liste Exit 0 statt 2; der Fall STRANGER war grün). Prüfbefehle: P1 vitest Exit 0 (4 passed), source-Zeile 1, `own-ips.txt` außerhalb von Kommentaren 0, `CP_OWN_IPS_SEEN` 4, `203.0.113.9` 1; P2 Testname 1, vitest `-t "stops with exit 2"` Exit 0 (1 passed, 3 skipped); P3 `check` Exit 0 (1722 passed), `git status` der drei Dateien 0, Dateien im `XDG_STATE_HOME` 0 (Gegenprobe mit gepflanzter Datei 1). Ein erster `check` war rot an `test/sandbox-api.test.ts` (Timeout 200 ms bei Last 2,8 je Kern), einzeln zweimal 21 passed, danach drei `check` grün.
 
 ## Blockers
 - keine
