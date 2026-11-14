@@ -23,9 +23,12 @@
 # generation ID (`gen-<unix start>-...`) started within 2 s of the request and was written before
 # the request ended plus 15 s (an abort was booked up to 8 s after the client left). A request that
 # found none takes the model of a row written while it ran (the coalescer answered it with another
-# request's answer); the rest is `unattributed`. Origin is `own` for an address in ops/own-ips.txt
-# and `foreign` otherwise. No address, wallet or balance is ever printed; the database is opened with
-# `readonly: true` inside the container.
+# request's answer); the rest is `unattributed`. Origin is `own` for an address `own_ips` from
+# ops/own-ips.sh names (the list in CP_OWN_IPS_FILE, the address this machine is seen with live, every
+# address in CP_OWN_IPS_SEEN and in CP_OWN_IPS) and `foreign` otherwise. Only production and --join
+# ask `own_ips`; a list that is missing or names no address stops them with exit 2 before any number.
+# No address, wallet or balance is ever printed; the database is opened with `readonly: true` inside
+# the container.
 #
 # Output: a markdown table `| model | day | origin | requests | timeouts | quote |`, one line per model,
 # day and origin, then one line per model and origin over all days (day `all`).
@@ -43,7 +46,40 @@ set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LIMIT_S="${TQ_LIMIT_S:-59.5}"
-OWN_FILE="${CP_OWN_IPS_FILE:-$ROOT/ops/own-ips.txt}"
+# The ways that do not tell own from foreign (--rows, --since-rollout, --compare, --compare-files,
+# --selftest) pass this in place of the own list, so the counter keeps its argument positions.
+NO_OWN_LIST="-no-own-list-"
+
+# Writes our own addresses to $1, one per line, from `own_ips` (ops/own-ips.sh). Exits 2 with one
+# line on stderr when the list `own_ips` reads is missing, names no address itself, or `own_ips`
+# fails: a missing or empty list must never read as "every caller is foreign", and the live address
+# or a remembered one must not stand in for the list. The stderr of `own_ips` is dropped because it
+# can name the live address.
+own_list() {
+  local target="$1" file list
+  # shellcheck source=ops/own-ips.sh
+  source "$ROOT/ops/own-ips.sh"
+  file="$CP_OWN_IPS_FILE"
+  if [ ! -f "$file" ]; then
+    echo "TIMEOUT QUOTE FAIL: own_ips has no list of our own addresses ($file is missing), so nothing is counted." >&2
+    exit 2
+  fi
+  # Read the way `own_ips` reads it: a line not starting with # that has a first field.
+  if ! awk '!/^#/ && NF { n++ } END { exit !n }' "$file"; then
+    echo "TIMEOUT QUOTE FAIL: own_ips has an empty list of our own addresses ($file names none), so nothing is counted." >&2
+    exit 2
+  fi
+  # stdin stays with the caller: --join reads the Caddy log from it when CADDY is `-`, and ssh would eat it.
+  if ! list=$(own_ips 2>/dev/null </dev/null); then
+    echo "TIMEOUT QUOTE FAIL: own_ips could not name our own addresses, so nothing is counted." >&2
+    exit 2
+  fi
+  printf '%s\n' "$list" | tr ' ' '\n' | grep -v '^$' >"$target"
+  if [ ! -s "$target" ]; then
+    echo "TIMEOUT QUOTE FAIL: own_ips named no own address, so nothing is counted." >&2
+    exit 2
+  fi
+}
 
 # The rows the database gives, one JSON object per line, without address: when the row was written,
 # the generation ID, the model bought and the duration when the row carries one.
@@ -263,7 +299,8 @@ production() {
     echo "TIMEOUT QUOTE FAIL: ledger not readable" >&2
     exit 2
   }
-  count join "$TQ_DIR/caddy.jsonl" "$TQ_DIR/rows.jsonl" "$OWN_FILE" "$LIMIT_S"
+  CP_HOST="$CP_HOST" CP_SSH_KEY="$KEY" own_list "$TQ_DIR/own.txt"
+  count join "$TQ_DIR/caddy.jsonl" "$TQ_DIR/rows.jsonl" "$TQ_DIR/own.txt" "$LIMIT_S"
 }
 
 compare() {
@@ -278,7 +315,14 @@ compare() {
     echo "TIMEOUT QUOTE FAIL: ledger not readable" >&2
     exit 2
   }
-  count compare "$TQ_DIR/caddy.jsonl" "$TQ_DIR/rows.jsonl" "$OWN_FILE" "$LIMIT_S" "${TQ_SINCE:-}" "${TQ_UNTIL:-}"
+  count compare "$TQ_DIR/caddy.jsonl" "$TQ_DIR/rows.jsonl" "$NO_OWN_LIST" "$LIMIT_S" "${TQ_SINCE:-}" "${TQ_UNTIL:-}"
+}
+
+join_files() { # $1 = CADDY file or -, $2 = ROWS file; own_ips with CP_HOST and CP_SSH_KEY as the environment sets them
+  TQ_DIR="$(mktemp -d)"
+  trap 'rm -rf "$TQ_DIR"' EXIT
+  own_list "$TQ_DIR/own.txt"
+  count join "$1" "$2" "$TQ_DIR/own.txt" "$LIMIT_S"
 }
 
 since_rollout() {
@@ -289,7 +333,7 @@ since_rollout() {
     echo "TIMEOUT QUOTE FAIL: ledger not readable" >&2
     exit 2
   }
-  count rows "$TQ_DIR/rows.jsonl" "${TQ_SINCE:-}" "$OWN_FILE" "$LIMIT_S"
+  count rows "$TQ_DIR/rows.jsonl" "${TQ_SINCE:-}" "$NO_OWN_LIST" "$LIMIT_S"
 }
 
 selftest() {
@@ -464,13 +508,13 @@ selftest() {
 
 case "${1:-}" in
   --selftest) selftest ;;
-  --join) count join "${2:?CADDY file or -}" "${3:?ROWS file}" "$OWN_FILE" "$LIMIT_S" ;;
-  --rows) count rows "${2:?ROWS file or -}" "${TQ_SINCE:-}" "$OWN_FILE" "$LIMIT_S" ;;
+  --join) join_files "${2:?CADDY file or -}" "${3:?ROWS file}" ;;
+  --rows) count rows "${2:?ROWS file or -}" "${TQ_SINCE:-}" "$NO_OWN_LIST" "$LIMIT_S" ;;
   --since-rollout) since_rollout ;;
   --compare) compare ;;
-  --compare-files) count compare "${2:?CADDY file or -}" "${3:?ROWS file}" "$OWN_FILE" "$LIMIT_S" "${TQ_SINCE:-}" "${TQ_UNTIL:-}" ;;
+  --compare-files) count compare "${2:?CADDY file or -}" "${3:?ROWS file}" "$NO_OWN_LIST" "$LIMIT_S" "${TQ_SINCE:-}" "${TQ_UNTIL:-}" ;;
   "") production ;;
-  -h | --help) sed -n '2,41p' "$0" | sed 's/^# \{0,1\}//' ;;
+  -h | --help) sed -n '2,44p' "$0" | sed 's/^# \{0,1\}//' ;;
   *)
     echo "unknown switch: $1" >&2
     exit 2
