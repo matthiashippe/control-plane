@@ -1,7 +1,7 @@
 # Messung Goal 02: Jeder Rollout belegt selbst, dass der Neustart keine Anfrage verliert
 
 ## Status
-PLANNED
+DONE
 
 ## Active Objective
 Dass Caddy eine Anfrage hält, während `cp` neu startet (betrieb 02, `lb_try_duration 30s`), belegt heute nur Fremdverkehr, der
@@ -90,31 +90,31 @@ ein Rückfall jemanden erreicht, statt auf eine Nachmessung von Hand zu warten.
   `check` und vitest im Vordergrund mit eigenem Timeout; neue Dateien vor `check` mit `git add` stagen. Kein `pkill -f`.
 
 ## Done Condition
-- [ ] `ops/deploy-window.sh` ohne `--at` wartet selbst bis zum Ende des Fensters, 180 s nach dem Start des Containers, und misst
+- [x] `ops/deploy-window.sh` ohne `--at` wartet selbst bis zum Ende des Fensters, 180 s nach dem Start des Containers, und misst
       dann das ganze Fenster statt `PARTIAL`; mit `--at` oder `--log` wartet es nie.
       Prüfung: `pnpm -s vitest run test/deploy-window-rollout.test.ts -t "wait"` muss Exit-Code 0 haben.
       Prüfung: `grep -cE "waits for the end of the window before it reads the log|does not wait when the window is already over|never waits and never alarms for a past window" test/deploy-window-rollout.test.ts` muss mindestens 3 ausgeben.
       Prüfung: `grep -c "CP_WINDOW_SLEEP" ops/deploy-window.sh` muss mindestens 1 ausgeben.
       Prüfung: `bash ops/deploy-window.sh --selftest` muss Exit-Code 0 haben und als letzte Zeile `DEPLOY WINDOW SELFTEST OK` ausgeben.
       Prüfung: `pnpm -s vitest run test/deploy-window.test.ts` muss Exit-Code 0 haben.
-- [ ] `BAD GATEWAY` größer 0 nach einem Rollout geht über den Webhook aus der Crontab der VM raus, ohne Adresse und ohne die URL in
+- [x] `BAD GATEWAY` größer 0 nach einem Rollout geht über den Webhook aus der Crontab der VM raus, ohne Adresse und ohne die URL in
       einer Ausgabe; ohne 502 und bei einem vergangenen Fenster geht kein Alarm raus.
       Prüfung: `pnpm -s vitest run test/deploy-window-rollout.test.ts test/deploy-alarm.test.ts` muss Exit-Code 0 haben.
       Prüfung: `grep -cE "sends the alarm when a stranger got a 502|sends no alarm without a 502" test/deploy-window-rollout.test.ts` muss 2 ausgeben.
       Prüfung: `grep -c "planted-topic" test/deploy-alarm.test.ts` muss mindestens 2 ausgeben.
       Prüfung: `grep -cE "deploy-alarm\.sh" ops/deploy-window.sh` muss mindestens 1 ausgeben.
       Prüfung: `grep -cE "https?://[A-Za-z0-9.-]*ntfy" ops/deploy-alarm.sh ops/deploy-window.sh | awk -F: '{s+=$2} END{print s}'` muss 0 ausgeben.
-- [ ] Der Block `reverse_proxy cp:8402` aus `deploy/Caddyfile` hält im lokalen Versuch jede Probe alle 250 ms auf `GET /health` über
+- [x] Der Block `reverse_proxy cp:8402` aus `deploy/Caddyfile` hält im lokalen Versuch jede Probe alle 250 ms auf `GET /health` über
       einen Neustart des Dienstes mit 200, mindestens eine länger als 0,5 s, und derselbe Versuch ohne `lb_try_duration` ist rot.
       Prüfung: `PATH=$HOME/.local/bin:$PATH bash ops/caddy-retry.sh --selftest` muss Exit-Code 0 haben und als letzte Zeile `CADDY RETRY SELFTEST OK` ausgeben.
       Prüfung: `PATH=$HOME/.local/bin:$PATH bash ops/caddy-retry.sh --selftest | grep -cE "^ok   (held|get-held|control|restart|restart-control)$"` muss 5 ausgeben.
       Prüfung: `T=$(mktemp -d); grep -v "lb_try_duration" deploy/Caddyfile > $T/Caddyfile; CP_CADDYFILE=$T/Caddyfile PATH=$HOME/.local/bin:$PATH bash ops/caddy-retry.sh --selftest | grep -c "^FAIL restart:"` muss 1 ausgeben.
       Prüfung: `pnpm -s vitest run test/caddy-retry.test.ts` muss Exit-Code 0 haben.
-- [ ] `check` ist grün, `.github/**` und `deploy/**` bleiben unverändert, und `check` lässt die Liste der eigenen Adressen unberührt.
+- [x] `check` ist grün, `.github/**` und `deploy/**` bleiben unverändert, und `check` lässt die Liste der eigenen Adressen unberührt.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD | grep -cE "^(\.github|deploy)/"` muss 0 ausgeben.
       Prüfung: `node scripts/check.mjs >/dev/null 2>&1; git status --porcelain -- ops/own-ips.txt | wc -l` muss 0 ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Jede neue Testdatei und jeder neue Selftest-Fall war vor dem Fix rot; die Zeile im Progress Log nennt, welche Fälle und womit.
@@ -137,6 +137,9 @@ ein Rückfall jemanden erreicht, statt auf eine Nachmessung von Hand zu warten.
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-14 Zyklus 1: Punkte 1, 2, 3, 4 gebaut: ops/deploy-window.sh wartet ohne --at bis 2 s nach dem Ende des Fensters (CP_WINDOW_SLEEP, Uhr danach CP_WINDOW_NOW plus Wartezeit) und schickt bei BAD GATEWAY größer 0 die neue ops/deploy-alarm.sh per ssh bash -s an die VM (URL aus der Crontab-Zeile mit CP_ALERT_WEBHOOK, curl-Fehler verworfen, Rückmeldung mit <url>/<address> geschwärzt); ops/caddy-retry.sh hat die Fälle restart und restart-control (Proben per http.client, kein neues curl). Rot vor dem Fix: test/deploy-alarm.test.ts 5 von 5, test/deploy-window-rollout.test.ts 2 von 5 (wait, alarm; PARTIAL und kein alarm-args), die Wächterfälle 2, 4 und 5 je mit gepflanzter Mutation rot (Warten auch mit --at, Warten nach dem Fenster, Alarm bei jedem Fehler, Alarm auch mit --at), Selftest vorher 3 statt 5 ok-Zeilen, ohne lb_try_duration `FAIL restart: 16, 8, longest 0.28 s`. Prüfbefehle: P1 Exit 0, `3`, `2`, `DEPLOY WINDOW SELFTEST OK` Exit 0, Exit 0; P2 Exit 0, `2`, `4`, `2`, `0`; P3 `CADDY RETRY SELFTEST OK` Exit 0, `5`, `1`, Exit 0; P4 check Exit 0 (1767 Tests grün), `0`, `0`.
+- 2026-11-14 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4 nach Merge von origin/dev (1cdbde8, ohne Konflikt). Prüfbefehle: P1 Exit 0, `3`, `2`, `DEPLOY WINDOW SELFTEST OK` Exit 0, Exit 0; P2 Exit 0, `2`, `4`, `2`, `0`; P3 `CADDY RETRY SELFTEST OK` Exit 0, `5`, `1`, Exit 0; P4 check Exit 0 (1780 Tests grün), `0`, `0`; Job e2e am PR #143 grün für d34166e.
+- 2026-11-14 Release: PASS K und B (Zyklus 2), DONE.
 
 ## Blockers
 - keine
