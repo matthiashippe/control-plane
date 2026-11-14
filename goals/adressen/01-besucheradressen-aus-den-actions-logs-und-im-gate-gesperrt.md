@@ -1,7 +1,7 @@
 # Adressen Goal 01: Besucheradressen aus den Actions-Logs und im Gate gesperrt
 
 ## Status
-PLANNED
+BLOCKED matthias
 
 ## Active Objective
 Kein Besucher des Dienstes findet seine Adresse in den Logs der Actions des öffentlichen Repos, und kein PR bringt den Cache von
@@ -71,7 +71,7 @@ lesbar hält, und weil heute nur `.gitignore` und ein Test den Cache aus dem Rep
   keinem Log, Kommentar, Commit, PR oder Verdict eine Adresse aus, nur Zahlen.
 
 ## Done Condition
-- [ ] `ops/actions-log-addresses.sh` zählt fremde Adressen in Zeilen einer Anfrage je Lauf und über alle, ohne eine Adresse
+- [x] `ops/actions-log-addresses.sh` zählt fremde Adressen in Zeilen einer Anfrage je Lauf und über alle, ohne eine Adresse
       auszugeben, und endet bei einem Fehler von `gh` mit Exit 2 statt mit einer 0.
       MVP: Funktion, weil die Zählung vor dem Löschen und die Prüfung danach sonst niemand wiederholen kann.
       Prüfung: `test -x ops/actions-log-addresses.sh && echo da` muss `da` ausgeben.
@@ -79,7 +79,7 @@ lesbar hält, und weil heute nur `.gitignore` und ein Test den Cache aus dem Rep
       Prüfung: `d=$(mktemp -d); printf '#!/bin/sh\nexit 1\n' > "$d/gh"; chmod +x "$d/gh"; PATH="$d:$PATH" bash ops/actions-log-addresses.sh --workflow deploy.yml > "$d/out" 2>&1; echo "$? $(grep -c '^total' "$d/out")"` muss `2 0` ausgeben.
       Prüfung: `pnpm -s vitest run test/actions-log-addresses.test.ts` muss Exit-Code 0 haben.
       Prüfung: `grep -c 'actions-log-addresses.sh' ops/README.md` muss mindestens 1 ausgeben.
-- [ ] `docs/adressen/actions-logs.md` nennt je der sechs Läufe die Zahl fremder Adressen, die Zahl verschiedener über alle sechs und
+- [x] `docs/adressen/actions-logs.md` nennt je der sechs Läufe die Zahl fremder Adressen, die Zahl verschiedener über alle sechs und
       die Zahl der Läufe von `deploy.yml` mit fremden Adressen, mit Befehl und Zeit, und keine Adresse.
       MVP: Funktion, weil Matthias am Gate wissen muss, was er löscht, und weil die Zahl das Goal widerlegen kann.
       Prüfung: `awk '/^## Zählung vor dem Löschen/{f=1;next} /^## /{f=0} f' docs/adressen/actions-logs.md | grep -cE '^(42879222074|42895005251|43164473390|43260817090|43277458881|43322130930) [0-9]+$'` muss 6 ausgeben.
@@ -100,7 +100,7 @@ lesbar hält, und weil heute nur `.gitignore` und ein Test den Cache aus dem Rep
       Prüfung: `awk '/^deny_paths:/{f=1;next} /^[^ #]/{f=0} f && /^ *- *"?ops\/fetcher-cache\.tsv"? *$/' gate.yaml | wc -l` muss 1 ausgeben.
       Prüfung: `git diff --name-only origin/dev...HEAD -- gate.yaml | wc -l` muss 0 ausgeben.
       Prüfung: `a=$(git log --format=%cI -S'ops/fetcher-cache.tsv' -- gate.yaml | tail -n 1); ~/work/code-host/tools/loop-master drill control-plane | node -e 'let s="";process.stdin.on("data",c=>s+=c).on("end",()=>{const d=JSON.parse(s).counted||{};const a=new Date(process.argv[1]);console.log(d.status==="grün"&&a.getTime()>0&&new Date(d.at)>a?"gezeigt":"fehlt")})' "$a"` muss `gezeigt` ausgeben.
-- [ ] `check` ist grün.
+- [x] `check` ist grün.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
 - [ ] goal-verifier PASS (K und B)
 
@@ -124,5 +124,11 @@ lesbar hält, und weil heute nur `.gitignore` und ein Test den Cache aus dem Rep
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-14 Zyklus 1: Punkte 1, 2 und 5 gebaut (Zähler `ops/actions-log-addresses.sh` mit Test und README-Abschnitt, Zählung in `docs/adressen/actions-logs.md`: 5 der 6 Läufe mit fremden Adressen, 2 verschiedene, 5 von 112 Läufen von deploy.yml), Punkte 3 und 4 warten auf das Human Gate `delete_data`; der neue Test war vor dem Skript rot (12 failed, Skript fehlte). Prüfbefehle: P1 `da`, `1 1 2 2 total 2 `, `2 0`, vitest 12 passed Exit 0, README 4; P2 6, 1, 1, 1, 0; P3 offen (Netz: 6 Läufe liefern noch ein Log); P4 Diff gate.yaml 0, Eintrag 0 und Drill offen; P5 `node scripts/check.mjs` Exit 0 (148 Dateien, 1731 Tests).
 
 ## Blockers
+Art: matthias
+Gate: delete_data
+Aufgabe: Logs der sechs deploy-Läufe vom 10. bis 12.11. löschen und ops/fetcher-cache.tsv in deny_paths von gate.yaml eintragen
+Worum: In den Logs von 5 der 6 Läufe stehen 2 verschiedene Adressen fremder Besucher, öffentlich lesbar (gezählt am 14.11.2026 um 02:18 UTC, docs/adressen/actions-logs.md).
+Empfehlung: Im Terminal `for id in 42879222074 42895005251 43164473390 43260817090 43277458881 43322130930; do gh api -X DELETE repos/matthiashippe/control-plane/actions/runs/$id/logs; done`, dann in `gate.yaml` auf `dev` im Block „Schlüssel und lokaler Zustand“ unter `- "*.db"` die Zeile `  - "ops/fetcher-cache.tsv"` einfügen und committen.
