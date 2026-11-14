@@ -7,12 +7,20 @@
 #   bash ops/sandbox/setup.sh --client-key <address>  read the public key of the service cp from the payment server (read only)
 #                                                and install it as /etc/sandboxd/keys/cp.pub after an Ed25519 check, idempotent;
 #                                                last line SETUP CLIENT-KEY OK changed=0 or changed=1, a broken key changes nothing
-#   bash ops/sandbox/setup.sh --client-key-reset <address>  move cp.pub to cp.pub.prev, which sandboxd does not read, so the next
-#                                                --client-key gives changed=1 (domains 04, the measured key change); the probe
-#                                                key stays; last line SETUP CLIENT-KEY-RESET OK moved=1, without cp.pub moved=0
+#   bash ops/sandbox/setup.sh --client-key-reset <address> [--restore-after <s>]  move cp.pub to cp.pub.prev, which sandboxd
+#                                                does not read, so the next --client-key gives changed=1 (domains 04, the measured
+#                                                key change); the probe key stays; last line SETUP CLIENT-KEY-RESET OK moved=1,
+#                                                without cp.pub moved=0. Refuses and moves nothing while a foreign sandbox runs or
+#                                                when it cannot read either side (domains 05); sets the timer cp-pub-restore first,
+#                                                which puts cp.pub back after <s> seconds (60 to 3600, default 120) if it is still
+#                                                missing then, and never replaces a newer key
+#   bash ops/sandbox/setup.sh --foreign-sandboxes <address>  read only: the running sandboxes on the sandbox host and how many
+#                                                of them belong to an account that is not ours (payment server, readonly);
+#                                                last line SETUP FOREIGN-SANDBOXES OK running=<n> foreign=<m>
 #   bash ops/sandbox/setup.sh --selftest         without network: the comparison reports a planted deviation and a clean state not,
 #                                                --client-key installs a valid key once and rejects broken ones, and
-#                                                --client-key-reset takes cp.pub away from sandboxd and leaves the probe key
+#                                                --client-key-reset takes cp.pub away from sandboxd and leaves the probe key,
+#                                                refuses for a foreign sandbox or an unreadable side, and its timer restores
 #
 # What it manages: Docker with the gVisor runtime runsc (platform systrap), the nftables table inet sandbox (sandbox.nft), the
 # systemd slice sandbox.slice, sandboxd as a unit in that slice on the loopback with its own Node 22, the probe key of the
@@ -296,12 +304,112 @@ if [ -f "$d/cp.pub" ]; then mv -f "$d/cp.pub" "$d/cp.pub.prev"; echo moved=1; el
 REMOTE
 )
 
+# The restore timer of every reset: a transient systemd timer with a fixed name, set before cp.pub moves, that puts
+# cp.pub.prev back as cp.pub when cp.pub is still missing then. A key written in between (--client-key) always wins: the
+# snippet does nothing when cp.pub exists, and mv -n never replaces one that appears at the last moment. $1 is the root prefix.
+RESTORE_UNIT=cp-pub-restore
+RESTORE_AFTER_DEFAULT=120
+CP_PUB_RESTORE=$(cat <<'REMOTE'
+d=$1/etc/sandboxd/keys
+if [ -e "$d/cp.pub" ]; then echo "restore: cp.pub present, kept"; exit 0; fi
+if [ ! -f "$d/cp.pub.prev" ]; then echo "restore: no cp.pub.prev"; exit 0; fi
+mv -n "$d/cp.pub.prev" "$d/cp.pub" || true
+echo "restore: cp.pub back"
+REMOTE
+)
+# $1 root prefix, $2 seconds. Stops a timer of an earlier reset first, so the fixed name is free again.
+CP_PUB_TIMER=$(cat <<'REMOTE'
+set -eu
+r=$1; s=$2
+restore=$(cat <<'RESTORE'
+RESTORE_PLACEHOLDER
+RESTORE
+)
+systemctl stop UNIT_PLACEHOLDER.timer >/dev/null 2>&1 || true
+systemctl reset-failed UNIT_PLACEHOLDER.timer UNIT_PLACEHOLDER.service >/dev/null 2>&1 || true
+systemd-run --quiet --unit=UNIT_PLACEHOLDER --on-active="$s" --timer-property=AccuracySec=1s /bin/sh -c "$restore" restore "$r"
+REMOTE
+)
+CP_PUB_TIMER=${CP_PUB_TIMER//RESTORE_PLACEHOLDER/"$CP_PUB_RESTORE"}
+CP_PUB_TIMER=${CP_PUB_TIMER//UNIT_PLACEHOLDER/$RESTORE_UNIT}
+
+# The state file of sandboxd, read only; fails when it is not there. $1 is the root prefix.
+SBX_STATE_READ=$(cat <<'REMOTE'
+f=$1/var/lib/sandboxd/state.json
+[ -f "$f" ] || exit 3
+cat "$f"
+REMOTE
+)
+
+# The owners of the running sandboxes in a state.json on stdin, one line per sandbox; exit 1 when the text is not a state
+# of sandboxd (no JSON, no sandboxes object, a running sandbox without a valid owner). Runs on the code-host.
+# shellcheck disable=SC2016
+RUNNING_OWNERS_JS='const OWNER_RE = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
+let data;
+try { data = JSON.parse(require("node:fs").readFileSync(0, "utf8")); } catch { process.exit(1); }
+const all = data && typeof data === "object" ? data.sandboxes : undefined;
+if (!all || typeof all !== "object" || Array.isArray(all)) process.exit(1);
+const out = [];
+for (const s of Object.values(all)) {
+  if (!s || typeof s !== "object" || typeof s.status !== "string") process.exit(1);
+  if (s.status !== "running") continue;
+  if (typeof s.owner !== "string" || !OWNER_RE.test(s.owner)) process.exit(1);
+  out.push(s.owner);
+}
+if (out.length) process.stdout.write(out.join("\n") + "\n");'
+
+# How many of the owners on stdin (one per running sandbox) are not ours, by the definition of src/bounties/ours.ts at run
+# time: $1 is that module (the built /app/dist/bounties/ours.js in deploy-cp-1, the source file in the selftest), $2 the
+# database, opened read only. An owner that sandbox_owners does not know is foreign. Prints one number, nothing else.
+# shellcheck disable=SC2016
+FOREIGN_OWNERS_JS='const [mod, file] = process.argv.slice(1); const fs = await import("node:fs"); const url = await import("node:url"); const { createRequire } = await import("node:module"); const require = createRequire(process.cwd() + "/"); const { ourAddresses } = await import(url.pathToFileURL(mod).href); if (typeof ourAddresses !== "function") process.exit(3); const owners = fs.readFileSync(0, "utf8").split("\n").filter(Boolean); if (owners.some((o) => !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(o))) process.exit(2); if (!fs.existsSync(file)) process.exit(4); let db; try { db = require("better-sqlite3")(file, { readonly: true, fileMustExist: true }); } catch { const { DatabaseSync } = await import("node:sqlite"); db = new DatabaseSync(file, { readOnly: true }); } const q = db.prepare("SELECT address FROM sandbox_owners WHERE owner = ?"); const addr = new Map(); for (const o of new Set(owners)) { const r = q.get(o); if (r) addr.set(o, String(r.address).toLowerCase()); } const ours = ourAddresses(db, [...addr.values()]); console.log(owners.filter((o) => !(addr.has(o) && ours.has(addr.get(o)))).length);'
+
 sbx_read_sha() { ssh_host "$1" "set -- ''
 $CP_PUB_READ"; }
 sbx_reset_cp_pub() { ssh_host "$1" "set -- ''
 $CP_PUB_RESET"; }
 sbx_write_cp_pub() { ssh_host "$1" "set -- ''
 $CP_PUB_WRITE"; }
+sbx_timer() { ssh_host "$1" "set -- '' $(printf %q "$2")
+$CP_PUB_TIMER"; }
+sbx_state() { ssh_host "$1" "set -- ''
+$SBX_STATE_READ"; }
+
+# The access to the payment server, read only, from ~/.config/control-plane/loop.env when CP_HOST is not set yet.
+cp_env() {
+  if [ -z "${CP_HOST:-}" ] && [ -f "$HOME/.config/control-plane/loop.env" ]; then
+    set -a
+    # shellcheck disable=SC1091
+    . "$HOME/.config/control-plane/loop.env"
+    set +a
+  fi
+  CP_KEY=${CP_SSH_KEY:-${CP_DEPLOY_KEY:-}}
+  [ -n "${CP_HOST:-}" ] && [ -n "$CP_KEY" ]
+}
+
+# Owners on stdin, the count of foreign ones on stdout: FOREIGN_OWNERS_JS inside deploy-cp-1 against /data/cp.db.
+cp_foreign_count() {
+  cp_env || return 1
+  ssh -i "$CP_KEY" -o BatchMode=yes -o ConnectTimeout=10 "$CP_HOST" \
+    "docker exec -i deploy-cp-1 node --input-type=module -e $(printf %q "$FOREIGN_OWNERS_JS") /app/dist/bounties/ours.js /data/cp.db" 2>/dev/null
+}
+
+# foreign_sandboxes <address>: reads the running sandboxes on the sandbox host and their accounts on the payment server,
+# changes nothing on either; prints running=<n> foreign=<m>, or one line why and exit 1 when one side cannot be read. Prints
+# no account, no address and not CP_HOST. The same function decides --foreign-sandboxes and --client-key-reset.
+foreign_sandboxes() {
+  local state owners running foreign
+  if ! state=$(sbx_state "$1" 2>/dev/null); then echo "cannot read the state of sandboxd on the sandbox host"; return 1; fi
+  if ! owners=$(/usr/bin/node -e "$RUNNING_OWNERS_JS" <<<"$state" 2>/dev/null); then
+    echo "the state of sandboxd is not readable"; return 1
+  fi
+  running=$(grep -c . <<<"$owners" || true)
+  if ! foreign=$(cp_foreign_count <<<"$owners"); then echo "cannot read the accounts of the sandboxes on the payment server"; return 1; fi
+  if ! [[ $foreign =~ ^[0-9]+$ ]] || [ "$foreign" -gt "$running" ]; then
+    echo "no count of foreign sandboxes from the payment server"; return 1
+  fi
+  echo "running=$running foreign=$foreign"
+}
 
 # Reads PEM text on stdin; exit 0 only for exactly one Ed25519 public key in SPKI PEM, else one line why.
 check_ed25519_pub() {
@@ -328,10 +436,21 @@ install_client_key() {
   echo "SETUP CLIENT-KEY OK changed=1"
 }
 
-# client_key_reset <address>: takes cp.pub out of what sandboxd reads; last line SETUP CLIENT-KEY-RESET OK moved=1, or
-# moved=0 when there was no cp.pub. Prints neither key nor CP_HOST.
+# client_key_reset <address> [<seconds>]: takes cp.pub out of what sandboxd reads, but only when no foreign sandbox runs
+# (foreign_sandboxes, fail closed: a side it cannot read refuses too) and only after the restore timer is set, which puts
+# cp.pub back after <seconds> (default RESTORE_AFTER_DEFAULT) unless --client-key wrote a key by then. Last line SETUP
+# CLIENT-KEY-RESET OK moved=1, or moved=0 when there was no cp.pub; a refusal moves nothing. Prints neither key nor CP_HOST.
 client_key_reset() {
-  local out
+  local after=${2:-$RESTORE_AFTER_DEFAULT} out count running foreign
+  if ! count=$(foreign_sandboxes "$1"); then echo "SETUP CLIENT-KEY-RESET FAIL: $count"; return 1; fi
+  [[ $count =~ ^running=([0-9]+)\ foreign=([0-9]+)$ ]] || { echo "SETUP CLIENT-KEY-RESET FAIL: no count of sandboxes"; return 1; }
+  running=${BASH_REMATCH[1]}; foreign=${BASH_REMATCH[2]}
+  echo "Running foreign sandboxes: $foreign of $running"
+  if [ "$foreign" != 0 ]; then echo "SETUP CLIENT-KEY-RESET FAIL: foreign sandbox running"; return 1; fi
+  if ! sbx_timer "$1" "$after" >/dev/null 2>&1; then
+    echo "SETUP CLIENT-KEY-RESET FAIL: cannot set the restore timer $RESTORE_UNIT, $CP_PUB stays"; return 1
+  fi
+  echo "Timer $RESTORE_UNIT puts $CP_PUB back in $after s if it is still missing then"
   if ! out=$(sbx_reset_cp_pub "$1"); then echo "SETUP CLIENT-KEY-RESET FAIL: cannot move $CP_PUB on the sandbox host"; return 1; fi
   case "$out" in
     moved=0 | moved=1) ;;
@@ -341,20 +460,20 @@ client_key_reset() {
   echo "SETUP CLIENT-KEY-RESET OK $out"
 }
 
+# --foreign-sandboxes <address>: the check of client_key_reset on its own, reads only.
+foreign_sandboxes_report() {
+  local out
+  if ! out=$(foreign_sandboxes "$1"); then echo "SETUP FOREIGN-SANDBOXES FAIL: $out"; return 1; fi
+  echo "SETUP FOREIGN-SANDBOXES OK $out"
+}
+
 # client_key <address>: the one read on the payment server, then install_client_key. Never prints CP_HOST or the key path.
 client_key() {
-  local key pub
-  if [ -z "${CP_HOST:-}" ] && [ -f "$HOME/.config/control-plane/loop.env" ]; then
-    set -a
-    # shellcheck disable=SC1091
-    . "$HOME/.config/control-plane/loop.env"
-    set +a
-  fi
-  key=${CP_SSH_KEY:-${CP_DEPLOY_KEY:-}}
-  if [ -z "${CP_HOST:-}" ] || [ -z "$key" ]; then
+  local pub
+  if ! cp_env; then
     echo "SETUP CLIENT-KEY FAIL: CP_HOST and CP_SSH_KEY are not set (~/.config/control-plane/loop.env)"; return 1
   fi
-  if ! pub=$(ssh -i "$key" -o BatchMode=yes -o ConnectTimeout=10 "$CP_HOST" 'docker exec deploy-cp-1 cat /data/sandbox-client.pub' 2>/dev/null); then
+  if ! pub=$(ssh -i "$CP_KEY" -o BatchMode=yes -o ConnectTimeout=10 "$CP_HOST" 'docker exec deploy-cp-1 cat /data/sandbox-client.pub' 2>/dev/null); then
     echo "SETUP CLIENT-KEY FAIL: cannot read /data/sandbox-client.pub in deploy-cp-1"; return 1
   fi
   install_client_key "$1" "$pub"
@@ -374,6 +493,7 @@ selftest_client_key() {
     const a = generateKeyPairSync("ed25519");
     fs.writeFileSync(d + "/a.pub", spki(a));
     fs.writeFileSync(d + "/b.pub", spki(generateKeyPairSync("ed25519")));
+    fs.writeFileSync(d + "/c.pub", spki(generateKeyPairSync("ed25519")));
     fs.writeFileSync(d + "/rsa.pub", spki(generateKeyPairSync("rsa", { modulusLength: 2048 })));
     fs.writeFileSync(d + "/ecdsa.pub", spki(generateKeyPairSync("ec", { namedCurve: "P-256" })));
     fs.writeFileSync(d + "/private.pem", a.privateKey.export({ type: "pkcs8", format: "pem" }));
@@ -421,6 +541,57 @@ selftest_client_key_reset() {
   sbx_read_sha() { bash -c "$CP_PUB_READ" _ "$root"; }
   sbx_write_cp_pub() { bash -c "$CP_PUB_WRITE" _ "$root"; }
   sbx_reset_cp_pub() { bash -c "$CP_PUB_RESET" _ "$root"; }
+  # The two sides of the check for foreign sandboxes: state.json under the root prefix with the same snippet as on the host,
+  # and the same query as in deploy-cp-1 against a database from mktemp, with src/bounties/ours.ts as the definition.
+  sbx_state() { bash -c "$SBX_STATE_READ" _ "$root"; }
+  cp_foreign_count() { [ ! -e "$t/cp-down" ] || return 1; (cd "$HERE/../.." && NODE_NO_WARNINGS=1 /usr/bin/node --input-type=module -e "$FOREIGN_OWNERS_JS" "$HERE/../../src/bounties/ours.ts" "$t/cp.db" 2>/dev/null); }
+  # A fake systemd-run that records each call (NUL separated, and whether cp.pub was there at that moment) and fails on
+  # demand, and a fake systemctl that records only. sbx_timer runs the same snippet as on the host against the root prefix.
+  mkdir -p "$t/bin"
+  cat > "$t/bin/systemd-run" <<'FAKE'
+#!/usr/bin/env bash
+n=$(find "$TIMER_LOG" -maxdepth 1 -name 'call.*' | wc -l)
+printf '%s\0' "$@" > "$TIMER_LOG/call.$n"
+if [ -e "$TIMER_ROOT/etc/sandboxd/keys/cp.pub" ]; then echo present > "$TIMER_LOG/seen.$n"; else echo missing > "$TIMER_LOG/seen.$n"; fi
+[ ! -e "$TIMER_LOG/fail" ] || exit 1
+FAKE
+  printf '#!/usr/bin/env bash\necho "$*" >> "$TIMER_LOG/systemctl"\n' > "$t/bin/systemctl"
+  chmod 0755 "$t/bin/systemd-run" "$t/bin/systemctl"
+  export TIMER_LOG=$t/timer TIMER_ROOT=$root
+  mkdir -p "$TIMER_LOG"
+  sbx_timer() { PATH="$t/bin:$PATH" bash -c "$CP_PUB_TIMER" _ "$root" "$2"; }
+  calls() { find "$TIMER_LOG" -maxdepth 1 -name 'call.*' | wc -l; }
+  # fire: the timer has run out, so the recorded command of the last call runs, as systemd would run it
+  fire() {
+    local n=$(( $(calls) - 1 )) a=() i=0
+    mapfile -d '' a < "$TIMER_LOG/call.$n"
+    while [ $i -lt ${#a[@]} ] && [[ ${a[$i]} == --* ]]; do i=$((i + 1)); done
+    "${a[@]:$i}" >/dev/null
+  }
+  # The database: one account of ours by OUR_ADDRESSES, one by a key name from OUR_KEY_NAMES, one foreign; plus one owner
+  # that sandbox_owners does not know. Made with the same source file, so no address of ours is copied in here.
+  (cd "$HERE/../.." && NODE_NO_WARNINGS=1 /usr/bin/node --input-type=module -e '
+    const url = await import("node:url");
+    const { OUR_ADDRESSES } = await import(url.pathToFileURL(process.argv[1]).href);
+    const { DatabaseSync } = await import("node:sqlite");
+    const db = new DatabaseSync(process.argv[2]);
+    db.exec("CREATE TABLE sandbox_owners (address TEXT PRIMARY KEY, owner TEXT NOT NULL UNIQUE, created_at TEXT NOT NULL)");
+    db.exec("CREATE TABLE api_keys (id INTEGER PRIMARY KEY, address TEXT NOT NULL, key_hash TEXT NOT NULL UNIQUE, key_prefix TEXT NOT NULL, name TEXT NOT NULL, created_at TEXT NOT NULL, revoked_at TEXT)");
+    const own = db.prepare("INSERT INTO sandbox_owners VALUES (?, ?, ?)");
+    own.run(OUR_ADDRESSES[0].toLowerCase(), "acct-0000000000000000000000a1", "2026-11-14");
+    own.run("0x00000000000000000000000000000000000000b2", "acct-0000000000000000000000b2", "2026-11-14");
+    own.run("0x00000000000000000000000000000000000000c3", "acct-0000000000000000000000c3", "2026-11-14");
+    db.prepare("INSERT INTO api_keys VALUES (1, ?, ?, ?, ?, ?, NULL)").run("0x00000000000000000000000000000000000000b2", "h1", "p1", "ops-selftest", "2026-11-14");
+    db.prepare("INSERT INTO api_keys VALUES (2, ?, ?, ?, ?, ?, NULL)").run("0x00000000000000000000000000000000000000c3", "h2", "p2", "conway-automaton", "2026-11-14");
+    db.close();' "$HERE/../../src/bounties/ours.ts" "$t/cp.db" 2>/dev/null)
+  # sandboxes <owner:status> ...: writes state.json of sandboxd with these sandboxes
+  sandboxes() {
+    local i=0 o items=()
+    for o in "$@"; do items+=("\"sb$i\":{\"id\":\"sb$i\",\"owner\":\"${o%%:*}\",\"status\":\"${o#*:}\"}"); i=$((i + 1)); done
+    mkdir -p "$root/var/lib/sandboxd"
+    (IFS=,; printf '{"sandboxes":{%s}}\n' "${items[*]}") > "$root/var/lib/sandboxd/state.json"
+  }
+  sandboxes acct-0000000000000000000000a1:running acct-0000000000000000000000b2:running acct-0000000000000000000000c3:stopped
   mkdir -p "$root/etc/sandboxd/keys"
   cp "$t/a.pub" "$root$CP_PUB"
   cp "$t/b.pub" "$root/etc/sandboxd/keys/probe.pub"
@@ -432,6 +603,7 @@ selftest_client_key_reset() {
     local why=
     rc=0
     out=$(client_key_reset selftest-host) || rc=$?
+    printf '%s\n' "$out" > "$t/last"
     [ $rc -eq 0 ] || why="exit $rc"
     [ "$(tail -1 <<<"$out")" = "SETUP CLIENT-KEY-RESET OK moved=$2" ] || why="$why, last line $(tail -1 <<<"$out")"
     [ ! -e "$root$CP_PUB" ] || why="$why, cp.pub still there"
@@ -453,6 +625,74 @@ selftest_client_key_reset() {
   cmp -s "$t/a.pub" "$root$CP_PUB" || why="${why:+$why, }cp.pub is not the old key"
   [ "$(sha < "$root/etc/sandboxd/keys/probe.pub")" = "$probe_before" ] || why="${why:+$why, }probe key changed"
   if [ -z "$why" ]; then echo "selftest client-key-reset: ok (reinstall)"; else echo "selftest client-key-reset: FAIL reinstall: $why"; fail=1; fi
+
+  # refused <label> <setup>: after <setup> a reset must fail, keep cp.pub byte for byte and set no timer
+  refused() {
+    local before_sha before_calls why=
+    before_sha=$(sha < "$root$CP_PUB"); before_calls=$(calls)
+    rc=0; out=$(client_key_reset selftest-host) || rc=$?
+    printf '%s\n' "$out" > "$t/last"
+    [ $rc -ne 0 ] || why="exit 0"
+    [[ "$(tail -1 <<<"$out")" == "SETUP CLIENT-KEY-RESET FAIL: "* ]] || why="$why, last line $(tail -1 <<<"$out")"
+    [ -f "$root$CP_PUB" ] && [ "$(sha < "$root$CP_PUB")" = "$before_sha" ] || why="$why, cp.pub moved or changed"
+    [ "$(pubs)" = cp.pub,probe.pub ] || why="$why, sandboxd reads $(pubs)"
+    echo "${why#, }"
+  }
+  # foreign: a foreign sandbox runs next to two of ours; and an owner sandbox_owners does not know counts as foreign too
+  sandboxes acct-0000000000000000000000a1:running acct-0000000000000000000000c3:running acct-0000000000000000000000b2:running
+  why=$(refused)
+  [ "$(tail -1 "$t/last")" = "SETUP CLIENT-KEY-RESET FAIL: foreign sandbox running" ] || why="${why:+$why, }last line $(tail -1 "$t/last")"
+  [ "$(calls)" = 2 ] || why="${why:+$why, }systemd-run called"
+  sandboxes acct-0000000000000000000000a1:running acct-00000000000000000000ffff:running
+  w=$(refused); [ -z "$w" ] || why="${why:+$why, }unknown owner: $w"
+  if [ -z "$why" ]; then echo "selftest client-key-reset: ok (foreign)"; else echo "selftest client-key-reset: FAIL foreign: $why"; fail=1; fi
+  # unknown: no state.json, a state.json that is not JSON, one without sandboxes, a running sandbox without owner, and a
+  # payment server that cannot be read; each one refuses and moves nothing
+  why=
+  rm -f "$root/var/lib/sandboxd/state.json"
+  w=$(refused); [ -z "$w" ] || why="no state.json: $w"
+  echo 'not json' > "$root/var/lib/sandboxd/state.json"
+  w=$(refused); [ -z "$w" ] || why="${why:+$why, }not json: $w"
+  echo '{}' > "$root/var/lib/sandboxd/state.json"
+  w=$(refused); [ -z "$w" ] || why="${why:+$why, }no sandboxes: $w"
+  echo '{"sandboxes":{"x":{"status":"running"}}}' > "$root/var/lib/sandboxd/state.json"
+  w=$(refused); [ -z "$w" ] || why="${why:+$why, }no owner: $w"
+  sandboxes acct-0000000000000000000000a1:running
+  touch "$t/cp-down"
+  w=$(refused); [ -z "$w" ] || why="${why:+$why, }payment server down: $w"
+  rm -f "$t/cp-down"
+  [ "$(calls)" = 2 ] || why="${why:+$why, }systemd-run called"
+  if [ -z "$why" ]; then echo "selftest client-key-reset: ok (unknown)"; else echo "selftest client-key-reset: FAIL unknown: $why"; fail=1; fi
+  # no-timer: systemd-run fails, so nothing moves
+  touch "$TIMER_LOG/fail"
+  why=$(refused)
+  [ "$(calls)" = 3 ] || why="${why:+$why, }$(calls) calls of systemd-run, want 3"
+  rm -f "$TIMER_LOG/fail"
+  if [ -z "$why" ]; then echo "selftest client-key-reset: ok (no-timer)"; else echo "selftest client-key-reset: FAIL no-timer: $why"; fail=1; fi
+  # ours: one of ours runs, a foreign one is stopped; the reset moves, after exactly one timer of 120 s set before the move
+  sandboxes acct-0000000000000000000000a1:running acct-0000000000000000000000c3:stopped
+  local n0; n0=$(calls)
+  why=$(rs ours 1)
+  [ "$(calls)" = $((n0 + 1)) ] || why="${why:+$why, }$(( $(calls) - n0 )) calls of systemd-run, want 1"
+  tr '\0' '\n' < "$TIMER_LOG/call.$n0" | grep -qx -- '--on-active=120' || why="${why:+$why, }no --on-active=120"
+  [ "$(cat "$TIMER_LOG/seen.$n0" 2>/dev/null)" = present ] || why="${why:+$why, }timer set after the move"
+  grep -qx -- "Running foreign sandboxes: 0 of 1" "$t/last" || why="${why:+$why, }no line with the count"
+  grep -q -- "$RESTORE_UNIT" "$t/last" || why="${why:+$why, }no line naming the timer"
+  if [ -z "$why" ]; then echo "selftest client-key-reset: ok (ours)"; else echo "selftest client-key-reset: FAIL ours: $why"; fail=1; fi
+  # restore: the timer runs out without --client-key; cp.pub is back with its old content, sandboxd reads cp.pub and probe.pub
+  why=
+  fire || why="timer command failed"
+  cmp -s "$t/a.pub" "$root$CP_PUB" || why="${why:+$why, }cp.pub is not the old key"
+  [ "$(pubs)" = cp.pub,probe.pub ] || why="${why:+$why, }sandboxd reads $(pubs)"
+  [ "$(sha < "$root/etc/sandboxd/keys/probe.pub")" = "$probe_before" ] || why="${why:+$why, }probe key changed"
+  if [ -z "$why" ]; then echo "selftest client-key-reset: ok (restore)"; else echo "selftest client-key-reset: FAIL restore: $why"; fail=1; fi
+  # keep: a reset, then --client-key writes another key, then the timer runs out; the newer key stays
+  why=$(rs keep 1)
+  out=$(install_client_key selftest-host "$(cat "$t/c.pub")") || why="${why:+$why, }client-key exit $?"
+  fire || why="${why:+$why, }timer command failed"
+  cmp -s "$t/c.pub" "$root$CP_PUB" || why="${why:+$why, }cp.pub is not the newer key"
+  [ "$(pubs)" = cp.pub,probe.pub ] || why="${why:+$why, }sandboxd reads $(pubs)"
+  if [ -z "$why" ]; then echo "selftest client-key-reset: ok (keep)"; else echo "selftest client-key-reset: FAIL keep: $why"; fail=1; fi
   return $fail
 }
 
@@ -558,7 +798,17 @@ case "${1:-}" in
   --selftest) selftest ;;
   --check) [ -n "${2:-}" ] || { echo "usage: $0 --check <address>" >&2; exit 2; }; check "$2" ;;
   --client-key) [ -n "${2:-}" ] || { echo "usage: $0 --client-key <address>" >&2; exit 2; }; client_key "$2" ;;
-  --client-key-reset) [ -n "${2:-}" ] || { echo "usage: $0 --client-key-reset <address>" >&2; exit 2; }; client_key_reset "$2" ;;
-  -*|"") echo "usage: $0 <address> | --check <address> | --client-key <address> | --client-key-reset <address> | --selftest" >&2; exit 2 ;;
+  --client-key-reset)
+    reset_usage="usage: $0 --client-key-reset <address> [--restore-after <seconds, 60 to 3600, default $RESTORE_AFTER_DEFAULT>]"
+    [ -n "${2:-}" ] && [[ $2 != -* ]] || { echo "$reset_usage" >&2; exit 2; }
+    after=$RESTORE_AFTER_DEFAULT
+    if [ $# -gt 2 ]; then
+      [ $# -eq 4 ] && [ "$3" = --restore-after ] && [[ $4 =~ ^[1-9][0-9]{1,3}$ ]] && [ "$4" -ge 60 ] && [ "$4" -le 3600 ] \
+        || { echo "$reset_usage" >&2; exit 2; }
+      after=$4
+    fi
+    client_key_reset "$2" "$after" ;;
+  --foreign-sandboxes) [ -n "${2:-}" ] || { echo "usage: $0 --foreign-sandboxes <address>" >&2; exit 2; }; foreign_sandboxes_report "$2" ;;
+  -*|"") echo "usage: $0 <address> | --check <address> | --client-key <address> | --client-key-reset <address> [--restore-after <seconds>] | --foreign-sandboxes <address> | --selftest" >&2; exit 2 ;;
   *) apply "$1" ;;
 esac

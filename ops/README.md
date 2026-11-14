@@ -911,3 +911,17 @@ day. The message names the count and `line <n>: <reason>`, never an address.
 Three /24 networks are all the documentation ranges offer. A fixture with more foreign /24 networks than that keeps the behaviour
 that depends on them (no address shares its /24 with two others unless it did before), but the summary "N address(es) in M
 network(s)" of `ops/traffic.sh` names fewer networks than before.
+
+## Schlüssel des Dienstes auf dem Sandbox-Server zurücksetzen
+
+`bash ops/sandbox/setup.sh --foreign-sandboxes <address>` liest `state.json` von `sandboxd` und am Zahlungsserver die Konten
+dazu (`readonly: true`, Definition aus `src/bounties/ours.ts` im Container) und ändert nichts. Die letzte Zeile ist
+`SETUP FOREIGN-SANDBOXES OK running=<n> foreign=<m>`; man fährt es vor jedem Reset und immer, wenn man wissen will, ob fremde
+Sandboxes laufen. Es nennt nur Zahlen, nie ein Konto oder eine Adresse.
+
+`bash ops/sandbox/setup.sh --client-key-reset <address> [--restore-after <s>]` nimmt `cp.pub` aus dem, was `sandboxd` liest, um
+einen Schlüsselwechsel zu messen (domains 04). Es verweigert mit `SETUP CLIENT-KEY-RESET FAIL: foreign sandbox running`, wenn eine
+fremde Sandbox läuft, und mit einer anderen Zeile `FAIL`, wenn es eine der beiden Seiten nicht lesen kann; dann bleibt `cp.pub`
+liegen. Sonst setzt es zuerst den Timer `cp-pub-restore` (`systemd-run --on-active=<s>`, Standard 120, erlaubt 60 bis 3600, sonst
+Exit 2), der `cp.pub.prev` nach `<s>` Sekunden zurücklegt, wenn `cp.pub` dann noch fehlt; einen Schlüssel, den `--client-key`
+inzwischen geschrieben hat, überschreibt er nie. Scheitert der Timer, verschiebt es nichts. Danach `--client-key` fahren.
