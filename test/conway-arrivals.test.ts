@@ -133,6 +133,21 @@ describe("ops/conway-arrivals.sh and ops/conway_arrivals.py hold one rule for bo
     s.unchanged();
   });
 
+  it("both tools stop with exit 2 when the own list is empty even with a live address and a seen address", () => {
+    // The live and the remembered address are ours too, but they must not stand in for the list itself: an emptied
+    // list would then pass unnoticed and count the addresses it used to name as foreign arrivals.
+    const s = sandbox([arrive(BASE + H, "203.0.113.99"), arrive(BASE + 2 * H, STRANGER)], "# no own address\n");
+    for (const tool of ["landing", "github"] as const) {
+      writeFileSync(join(s.root, "seen.txt"), `${STRANGER} 2026-11-01\n`);
+      const r = s.run(tool, { FAKE_LIVE: SEEN_ONLY });
+      expect(r.status, r.stdout + r.stderr).toBe(2);
+      expect(r.stdout.split("\n").some((l) => l.startsWith("LANDING YIELD") || l.startsWith("GITHUB YIELD"))).toBe(false);
+      expect(r.stderr).toContain("own_ips");
+      for (const ip of PLANTED) expect(r.stdout + r.stderr).not.toContain(ip);
+    }
+    s.unchanged();
+  });
+
   it("both tools stop with exit 2 when the own list is missing", () => {
     const s = sandbox(bothSignIn);
     for (const tool of ["landing", "github"] as const) {

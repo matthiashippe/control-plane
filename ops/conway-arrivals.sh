@@ -18,14 +18,21 @@ CONWAY_ARRIVALS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$CONWAY_ARRIVALS_DIR/own-ips.sh"
 
 # Writes our own addresses to <file>, one per line. Returns 2 with one line on stderr when the list
-# `own_ips` reads is missing or `own_ips` names no address at all: a missing or empty list must never read as
-# "none of these addresses are ours". The stderr of `own_ips` is dropped because it can name the live
+# `own_ips` reads is missing, names no address itself, or `own_ips` names no address at all: a missing
+# or empty list must never read as "none of these addresses are ours". The stderr of `own_ips` is dropped because it can name the live
 # address, and no output of the tools may name an address.
 conway_own_list() {
   local out="$1" file list
   file="${CP_OWN_IPS:-$CP_OWN_IPS_FILE}"
   if [[ ! -f "$file" ]]; then
     echo "conway-arrivals: own_ips has no list of our own addresses ($file is missing), so nothing is counted." >&2
+    return 2
+  fi
+  # The list itself must name an address, read the way `own_ips` reads it. The live address and the ones
+  # remembered in CP_OWN_IPS_SEEN are ours too, but they must not stand in for the list: an emptied list
+  # would then pass unnoticed and count every address it used to name as a foreign arrival.
+  if ! grep -v '^#' "$file" | awk 'NF {print $1}' | grep -q .; then
+    echo "conway-arrivals: own_ips has an empty list of our own addresses ($file names none), so nothing is counted." >&2
     return 2
   fi
   # own_ips ends with 1 under pipefail when it finds no address at all; the size check below says so.
