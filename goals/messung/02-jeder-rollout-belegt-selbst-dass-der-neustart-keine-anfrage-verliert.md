@@ -1,7 +1,7 @@
 # Messung Goal 02: Jeder Rollout belegt selbst, dass der Neustart keine Anfrage verliert
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Dass Caddy eine Anfrage hält, während `cp` neu startet (betrieb 02, `lb_try_duration 30s`), belegt heute nur Fremdverkehr, der
@@ -114,7 +114,7 @@ ein Rückfall jemanden erreicht, statt auf eine Nachmessung von Hand zu warten.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD | grep -cE "^(\.github|deploy)/"` muss 0 ausgeben.
       Prüfung: `node scripts/check.mjs >/dev/null 2>&1; git status --porcelain -- ops/own-ips.txt | wc -l` muss 0 ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Jede neue Testdatei und jeder neue Selftest-Fall war vor dem Fix rot; die Zeile im Progress Log nennt, welche Fälle und womit.
@@ -139,6 +139,7 @@ ein Rückfall jemanden erreicht, statt auf eine Nachmessung von Hand zu warten.
 ## Progress Log
 - 2026-11-14 Zyklus 1: Punkte 1, 2, 3, 4 gebaut: ops/deploy-window.sh wartet ohne --at bis 2 s nach dem Ende des Fensters (CP_WINDOW_SLEEP, Uhr danach CP_WINDOW_NOW plus Wartezeit) und schickt bei BAD GATEWAY größer 0 die neue ops/deploy-alarm.sh per ssh bash -s an die VM (URL aus der Crontab-Zeile mit CP_ALERT_WEBHOOK, curl-Fehler verworfen, Rückmeldung mit <url>/<address> geschwärzt); ops/caddy-retry.sh hat die Fälle restart und restart-control (Proben per http.client, kein neues curl). Rot vor dem Fix: test/deploy-alarm.test.ts 5 von 5, test/deploy-window-rollout.test.ts 2 von 5 (wait, alarm; PARTIAL und kein alarm-args), die Wächterfälle 2, 4 und 5 je mit gepflanzter Mutation rot (Warten auch mit --at, Warten nach dem Fenster, Alarm bei jedem Fehler, Alarm auch mit --at), Selftest vorher 3 statt 5 ok-Zeilen, ohne lb_try_duration `FAIL restart: 16, 8, longest 0.28 s`. Prüfbefehle: P1 Exit 0, `3`, `2`, `DEPLOY WINDOW SELFTEST OK` Exit 0, Exit 0; P2 Exit 0, `2`, `4`, `2`, `0`; P3 `CADDY RETRY SELFTEST OK` Exit 0, `5`, `1`, Exit 0; P4 check Exit 0 (1767 Tests grün), `0`, `0`.
 - 2026-11-14 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4 nach Merge von origin/dev (1cdbde8, ohne Konflikt). Prüfbefehle: P1 Exit 0, `3`, `2`, `DEPLOY WINDOW SELFTEST OK` Exit 0, Exit 0; P2 Exit 0, `2`, `4`, `2`, `0`; P3 `CADDY RETRY SELFTEST OK` Exit 0, `5`, `1`, Exit 0; P4 check Exit 0 (1780 Tests grün), `0`, `0`; Job e2e am PR #143 grün für d34166e.
+- 2026-11-14 Release: PASS K und B (Zyklus 2), DONE.
 
 ## Blockers
 - keine
