@@ -950,8 +950,9 @@ inzwischen geschrieben hat, überschreibt er nie. Scheitert der Timer, verschieb
 ## Visitor addresses in the logs of GitHub Actions
 
 Until 2026-11-12 `ops/deploy-window.sh` printed visitor addresses, and `deploy.yml` put that output into the Actions logs of this
-public repository, which GitHub keeps readable for 90 days. `ops/actions-log-addresses.sh` counts how many stranger addresses
-those logs still carry, before they are deleted and to prove afterwards that none is left (`docs/adressen/actions-logs.md`).
+public repository. GitHub kept those logs readable for 90 days; since 2026-11-14 the repository keeps logs and artifacts of
+Actions for 30 days at most. `ops/actions-log-addresses.sh` counts how many stranger addresses those logs still carry, before
+they are deleted and to prove afterwards that none is left (`docs/adressen/actions-logs.md`).
 
     ops/actions-log-addresses.sh --runs <id>,<id>,...   # downloads these runs' logs with gh into mktemp -d, deletes them after
     ops/actions-log-addresses.sh --workflow deploy.yml  # every run of that workflow, all pages
