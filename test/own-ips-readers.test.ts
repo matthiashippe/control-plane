@@ -11,7 +11,8 @@ const REPO = join(__dirname, "..");
 const OPS = join(REPO, "ops");
 const EXT = /\.(sh|py|cjs|mjs|js|ts)$/;
 const NAMES_LIST = /(?<![\w-])own-ips\.txt/;
-const COMMENT = /^\s*(#|\/\/|\/\*|\*)/;
+// "*" counts as a comment only when followed by whitespace or the end of the line, so a shell case branch "*)" stays code.
+const COMMENT = /^\s*(#|\/\/|\/\*|\*(\s|$))/;
 
 const readsListPastOwnIps = (line: string): boolean => !COMMENT.test(line) && NAMES_LIST.test(line);
 
@@ -48,9 +49,17 @@ describe("own-ips.txt is read only through own_ips", () => {
       'OWN_FILE="${CP_OWN_IPS_FILE:-$ROOT/ops/own-ips.txt}"',
       'own = set(open("ops/own-ips.txt").read().split())',
       'print("Ours are out: ops/own-ips.txt")',
+      // A shell case branch starts with "*" but is code, not a comment.
+      '  *) OWN="$ROOT/ops/own-ips.txt" ;;',
     ])
       expect(readsListPastOwnIps(hit), hit).toBe(true);
-    for (const pass of ["# default ops/own-ips.txt", "  // ops/own-ips.txt", 'KNOWN="$ROOT/ops/known-ips.txt"', 'source "$HERE/own-ips.sh"'])
+    for (const pass of [
+      "# default ops/own-ips.txt",
+      "  // ops/own-ips.txt",
+      " * ops/own-ips.txt",
+      'KNOWN="$ROOT/ops/known-ips.txt"',
+      'source "$HERE/own-ips.sh"',
+    ])
       expect(readsListPastOwnIps(pass), pass).toBe(false);
   });
 });
