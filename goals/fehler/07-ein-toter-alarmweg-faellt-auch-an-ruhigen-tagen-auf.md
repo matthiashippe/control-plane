@@ -115,6 +115,20 @@ der nur im Ernstfall geprüft wird, im Ernstfall schon verloren ist.
       Prüfung: `git diff --name-only origin/dev...HEAD | grep -vE '^(ops/watchdog\.sh|ops/status\.sh|ops/webhook-last\.sh|ops/README\.md|test/watchdog-alive\.test\.ts|test/status-alarm-path\.test\.ts|test/watchdog-credit\.test\.ts|test/watchdog-credit-kritik\.test\.ts|test/watchdog-webhook-fail\.test\.ts|test/watchdog-webhook-fail-daily\.test\.ts|test/watchdog-topup\.test\.ts|goals/fehler/)' | wc -l` muss 0 ausgeben.
       Prüfung: `git diff --name-only origin/dev...HEAD -- src ops/webhook-unreachable.sh | wc -l` muss 0 ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
+- [ ] Ein Watchdog, der nicht mehr postet, fällt auf: `ops/status.sh` meldet `alarm_path` `red`, wenn `last_delivered` gesetzt und
+      älter als 26 Stunden ist, auch bei 0 Zeilen `webhook unreachable`; ist `last_delivered` `null` (vor dem Rollout, Log rotiert,
+      Antwort unlesbar), gilt die Regel von oben unverändert. Die Uhr ist `CP_NOW` (Sekunden seit 1970), ohne die Variable die
+      Systemzeit; `test/status-alarm-path.test.ts` setzt `CP_NOW` auch für `ops/status.sh`. `ops/README.md` nennt die 26 Stunden in
+      der Zeile `alarm_path.status`.
+      MVP: Funktion, weil das Lebenszeichen nur Zeilen schreibt, solange der Watchdog läuft: Fällt die crontab weg, bricht das
+      Skript vor `sign_of_life` ab oder steht `CP_WATCHDOG_ALIVE=0` auf dem Server, entsteht keine einzige Zeile, und `alarm_path`
+      bleibt `ok`, obwohl keine Warnung mehr rausgeht. 26 Stunden, weil das Lebenszeichen im ersten Lauf jedes UTC-Tags kommt, also
+      höchstens 24 Stunden und ein paar Läufe auseinanderliegt.
+      Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/status-alarm-path.test.ts -t 'a delivery older than 26 hours is red' --reporter=json 2>/dev/null | python3 -c 'import json,sys; r=json.load(sys.stdin); print(r["numPassedTests"] >= 1, r["numFailedTests"])'` muss `True 0` ausgeben.
+      Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/status-alarm-path.test.ts -t 'a delivery within 26 hours is ok' --reporter=json 2>/dev/null | python3 -c 'import json,sys; r=json.load(sys.stdin); print(r["numPassedTests"] >= 1, r["numFailedTests"])'` muss `True 0` ausgeben.
+      Prüfung: `d=$(mktemp -d); git show 2f8e0a8:ops/status.sh > "$d/status.sh"; cp ops/db-report.cjs ops/webhook-unreachable.sh ops/webhook-last.sh "$d/"; STATUS_UNDER_TEST="$d/status.sh" PATH=/usr/bin:$PATH pnpm -s vitest run test/status-alarm-path.test.ts -t 'a delivery older than 26 hours is red' >/dev/null 2>&1 && echo gruen || echo rot` muss `rot` ausgeben.
+      Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/status-alarm-path.test.ts --reporter=json 2>/dev/null | python3 -c 'import json,sys; r=json.load(sys.stdin); print(r["numPassedTests"] >= 10, r["numFailedTests"], r["numPendingTests"])'` muss `True 0 0` ausgeben.
+      Prüfung: `grep '^| .alarm_path\.status. |' ops/README.md | grep -c '26 h'` muss 1 ausgeben.
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
