@@ -1,7 +1,7 @@
 # Messung Goal 01: Eigene Anfragen zählen nie als fremde
 
 ## Status
-PLANNED
+DONE
 
 ## Active Objective
 `ops/claim-keyless.sh` entscheidet, welche schlüssellose Wallet (`key:…`) wir selbst angelegt haben, nach der Adresse, von der der
@@ -72,7 +72,7 @@ Kunden vortäuscht, den es nicht gibt.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung: `node scripts/check.mjs >/dev/null 2>&1; git status --porcelain -- ops/own-ips.txt src/bounties/ours.ts ops/db-report.cjs | wc -l` muss 0 ausgeben.
       Prüfung: `S=$(mktemp -d); XDG_STATE_HOME=$S node scripts/check.mjs >/dev/null 2>&1; find "$S" -type f | wc -l` muss 0 ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Die neue Testdatei war vor dem Fix rot; die Zeile im Progress Log nennt, welche Fälle und womit.
@@ -95,6 +95,7 @@ Kunden vortäuscht, den es nicht gibt.
 ## Progress Log
 - 2026-11-14 Zyklus 1: Punkte 1, 2, 3 gebaut: `ops/claim-keyless.sh` sourct `ops/own-ips.sh`, nimmt `own_ips` mit `CP_HOST` und `CP_SSH_KEY` der Wallet-Abfrage und endet mit Exit 2 vor der ersten Wallet, wenn `own_ips` scheitert; neuer Test `test/claim-keyless-own-ips.test.ts` vor dem Fix 3 failed, 1 passed (Adresse nur in `CP_OWN_IPS_SEEN` und live gesehene Adresse als `STRANGER` statt `OURS`, fehlende Liste Exit 0 statt 2; der Fall STRANGER war grün). Prüfbefehle: P1 vitest Exit 0 (4 passed), source-Zeile 1, `own-ips.txt` außerhalb von Kommentaren 0, `CP_OWN_IPS_SEEN` 4, `203.0.113.9` 1; P2 Testname 1, vitest `-t "stops with exit 2"` Exit 0 (1 passed, 3 skipped); P3 `check` Exit 0 (1722 passed), `git status` der drei Dateien 0, Dateien im `XDG_STATE_HOME` 0 (Gegenprobe mit gepflanzter Datei 1). Ein erster `check` war rot an `test/sandbox-api.test.ts` (Timeout 200 ms bei Last 2,8 je Kern), einzeln zweimal 21 passed, danach drei `check` grün.
 - 2026-11-14 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3; `dev` ohne neue Commits seit der Merge-Basis, kein Merge nötig. Prüfbefehle: P1 vitest Exit 0 (4 passed), source-Zeile 1, `own-ips.txt` außerhalb von Kommentaren 0, `CP_OWN_IPS_SEEN` 4, `203.0.113.9` 1; P2 Testname 1, vitest `-t "stops with exit 2"` Exit 0 (1 passed, 3 skipped); P3 `check` Exit 0 (148 Dateien, 1722 passed, 294 s bei Last 11,6 je Kern), `git status` der drei Dateien 0, Dateien im `XDG_STATE_HOME` 0 (Gegenprobe mit gepflanzter Datei 1); Jobs `check` und `e2e` an PR #119 am Kopf 8cd005b grün.
+- 2026-11-14 Release: PASS K und B (Zyklus 2), DONE.
 
 ## Blockers
 - keine
