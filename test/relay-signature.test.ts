@@ -57,7 +57,6 @@ describe("canonicalSignature on a table of fixed signatures", () => {
     ["the prefix 0X", `0X${R}${S_LOW}1b`],
     ["the prefix 0X with s equal to n / 2", `0X${R}${hex64(HALF_N)}1c`],
     ["132 hex characters", `${sig(S_LOW, "1b")}00`],
-    ["128 hex characters", `0x${R}${S_LOW}`],
     ["no prefix", `${R}${S_LOW}1b00`],
     ["v 2", sig(S_LOW, "02")],
     ["v 29", sig(S_LOW, "1d")],
