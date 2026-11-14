@@ -33,3 +33,13 @@
   fremden Adressen als vierte, damit die Null im Fenster als gemessen erkennbar ist. Keine der Zeilen nennt eine Adresse.
 - 2026-11-12, kanal 03: Die obere Zahl in `goals/kanal/ertrag.md` zählt jede Wallet mit `created_at` im Zeitraum, auch unsere eigenen
   Prüfläufe (`ops/smoke.sh` meldet sich mit einer Wegwerf-Wallet an). Das hält sie als obere Grenze; die Widerlegung gilt für die untere.
+- 2026-11-13, kanal 04: Die Schritte am Gate `public_post` nennen je Kommentar den Wert `sha12` aus dem Trockenlauf von
+  `ops/post-the-answers.py --folder <ordner>` und übernehmen dessen letzte Zeile als Sendezeile, also `--send <k> --only <n,…>
+  --approved <n>:<sha12>,…`. Die Freigabe am Topic heißt dann: Matthias' „ok“ gilt genau diesen Werten, gesendet wird nur, was
+  beim Senden noch denselben Wert hat. Ändert sich ein Entwurf danach, braucht er einen neuen Trockenlauf und ein neues „ok“.
+- 2026-11-13, kanal 04: Eine Nummer in `--approved`, die nicht unter den zu sendenden steht, lehnt das Werkzeug ab, bevor GitHub
+  gefragt wird, soweit das ohne GitHub feststeht (kein Entwurf im Ordner, nicht in `--only`). Ohne `--only` steht die Liste erst
+  nach Gatter und Tageszählung fest; dann prüft es vor dem ersten POST (`is approved but would not be sent`). `--approved` ohne
+  `--send` ist ebenfalls `REFUSED`, weil der Trockenlauf die Werte selbst rechnet.
+- 2026-11-13, kanal 04: Die letzte Zeile von `--selftest` steht ohne Einrückung, damit `tail -1` mit `SELFTEST OK` beginnt, wie der
+  Prüfbefehl von Punkt 3 es verlangt. Der Hinweis in `ops/sperren.sh` nennt statt `--send 3` den Trockenlauf und `--approved`.

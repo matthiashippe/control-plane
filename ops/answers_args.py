@@ -8,26 +8,32 @@ the run with exit 1 before either script touches the network.
 
     parse(argv, accepts={"--folder", "--send", ...}, numbers=True)
 
-`--folder`, `--send` and `--only` take a value as `--flag value` or `--flag=value`, the same for
-each. `--selftest` and `--verify-posted` take none. Bare issue numbers are only read where the
+`--folder`, `--send`, `--only` and `--approved` take a value as `--flag value` or `--flag=value`, the
+same for each. `--approved 335:<sha12>,373:<sha12>` is the approval of exactly the texts the dry run
+showed (kanal 04); only ops/post-the-answers.py accepts it, the gate refuses it like any argument it
+does not know. `--selftest` and `--verify-posted` take none. Bare issue numbers are only read where the
 caller says so (`numbers=True`); anywhere else they are an unknown argument like any other.
 """
 from __future__ import annotations
 
 import dataclasses
 import pathlib
+import re
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 DEFAULT_FOLDER = pathlib.Path(".scratch/gtm/issue-antworten")
 
-VALUED = ("--folder", "--send", "--only")
+VALUED = ("--folder", "--send", "--only", "--approved")
 SWITCHES = ("--selftest", "--verify-posted")
 
 EXAMPLES = {
     "--folder": "--folder needs a folder in the repository, e.g. --folder goals/kanal/antworten",
     "--send": "--send needs a number. `--send 3` sends three; `--send` alone sends nothing.",
     "--only": "--only needs a comma-separated list of issue numbers, e.g. --only 335,373,385",
+    "--approved": "--approved needs <issue>:<12 hex digits> for every draft to send, as the dry run prints it, "
+                  "e.g. --approved 335:0123456789ab,373:abcdef012345",
 }
+APPROVAL = re.compile(r"#?(\d+):([0-9a-f]{12})")
 
 
 @dataclasses.dataclass
@@ -38,6 +44,8 @@ class Args:
     only: list[str] = dataclasses.field(default_factory=list)
     selftest: bool = False
     verify_posted: bool = False
+    # issue number -> the first 12 hex digits of sha256 over the body the dry run showed, in the order given
+    approved: dict[str, str] = dataclasses.field(default_factory=dict)
     numbers: list[str] = dataclasses.field(default_factory=list)
 
     def folder_args(self) -> list[str]:
@@ -78,10 +86,18 @@ def parse(argv: list[str], accepts: set[str], numbers: bool = False) -> Args:
                 if not value.isdigit():
                     refuse(EXAMPLES[name])
                 out.send = int(value)
-            else:
+            elif name == "--only":
                 out.only = [n.strip().lstrip("#") for n in value.split(",") if n.strip()]
                 if not out.only or not all(n.isdigit() for n in out.only):
                     refuse(EXAMPLES[name])
+            else:
+                for item in value.split(","):
+                    m = APPROVAL.fullmatch(item.strip())
+                    if not m:
+                        refuse(EXAMPLES[name])
+                    if m.group(1) in out.approved:
+                        refuse(f"#{m.group(1)} is approved twice")
+                    out.approved[m.group(1)] = m.group(2)
             continue
         if a in accepts and a in SWITCHES:
             if a == "--selftest":

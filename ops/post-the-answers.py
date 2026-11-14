@@ -9,9 +9,11 @@ scrolled this site, and Googlebot eighteen seconds later.
 
 Nothing here posts by itself. A dry run is the default and prints exactly what would go where.
 
-    ops/post-the-answers.py                          a dry run, always
-    ops/post-the-answers.py --send 3                 posts at most three, in folder order
-    ops/post-the-answers.py --send 3 --only 335,373,385   posts those three, in that order
+    ops/post-the-answers.py                          a dry run, always; prints `sha12 <value>` for every
+                                                     draft and the send line with --only and --approved
+    ops/post-the-answers.py --send 3 --only 335,373,385 --approved 335:<sha12>,373:<sha12>,385:<sha12>
+                                                     posts those three, in that order, and only if each
+                                                     draft is still the text its value was computed over
     ops/post-the-answers.py --folder goals/kanal/antworten   a dry run over the drafts in that folder
                                                           of the repo; the gate checks the same folder
     ops/post-the-answers.py --verify-posted --folder goals/kanal/antworten
@@ -24,9 +26,17 @@ with exit 1 before anything is asked of GitHub (ops/answers_args.py, shared with
 
 Every one of these has to hold before a single comment goes out:
 
-  1. Matthias said so in the conversation. No flag can establish that, and this file cannot check
-     it. It is written here because the standing order says so and because the person running this
-     is the person who read it.
+  1. Matthias approved exactly this text, and the approval is the value, not the conversation. The
+     dry run prints, for every draft, the first 12 hex digits of sha256 over the body that would be
+     posted (`sha12 <value>`) and the send line with `--approved <n>:<value>,...`; the steps at the
+     human gate `public_post` name those values, and his "ok" is an "ok" to them. `--send` without
+     `--approved` refuses, and before the first POST every number that would go out needs exactly
+     one value equal to the sha12 of its draft right now. One missing or different value and
+     nothing goes out (`REFUSED: #<n> changed since it was approved`), so a draft edited after the
+     approval cannot leave under his name, and no half of a package does either. What is posted is
+     the string the value was computed over, held in memory, not the file read a second time.
+     After every POST the comment is read back by its id and compared byte for byte with what was
+     sent; when it is not the same text or cannot be read, `DIFFERS #<n>` ends the run with exit 1.
   2. `ops/before-the-answers.py` is READY. It is run first, from here, and a single FAILED stops
      everything. No answer goes out carrying a date GitHub disagrees with or an address we have
      moved away from.
@@ -40,6 +50,7 @@ Every one of these has to hold before a single comment goes out:
 Exit 0: everything that was meant to go out went out, or it was a dry run. Exit 1: something
 refused, and the line says which.
 """
+import hashlib
 import pathlib
 import re
 import subprocess
@@ -47,6 +58,8 @@ import sys
 import time
 import datetime
 
+# The reader sits next to this file; under `python3 -I` the script's folder is not on sys.path by itself.
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import answers_args
 
 REPO = "Conway-Research/automaton"
@@ -79,6 +92,33 @@ def body_to_send(text: str) -> str:
     if not out.strip():
         raise ValueError("nothing left after the internal note was stripped")
     return out.strip() + "\n"
+
+
+def sha12(body: str) -> str:
+    """The approval value of a body: the first 12 hex digits of sha256 over exactly what is posted."""
+    return hashlib.sha256(body.encode("utf-8")).hexdigest()[:12]
+
+
+def live_differs(url: str, expected: str, called: str) -> str | None:
+    """Why the comment at `url` is not `expected`, or None when it is the same text.
+
+    The one comparison of a comment under our name with a body, for --verify-posted and for the read
+    back after every POST. The comment is fetched by the id in the URL; `gh api --jq .body` prints
+    the body and one newline of its own, that one newline is removed and nothing else is normalised.
+    `called` names `expected` in the line: "draft" for --verify-posted, "sent" for the read back.
+    """
+    m = re.search(r"#issuecomment-(\d+)$", url)
+    if not m:
+        return f"no comment id in {url}"
+    r = subprocess.run(["gh", "api", f"repos/{REPO}/issues/comments/{m.group(1)}", "--jq", ".body"],
+                       capture_output=True, text=True)
+    if r.returncode != 0:
+        return f"comment {m.group(1)} not readable, {r.stderr.strip()[:200]}"
+    live = r.stdout[:-1] if r.stdout.endswith("\n") else r.stdout
+    if live != expected:
+        at = next((k for k, (x, y) in enumerate(zip(live, expected)) if x != y), min(len(live), len(expected)))
+        return f"live {len(live)} characters, {called} {len(expected)}, first difference at {at}"
+    return None
 
 
 def gh(path: str, jq: str) -> str:
@@ -118,8 +158,7 @@ def verify_posted(folder: pathlib.Path) -> int:
         if not draft.is_file():
             print(f"  no draft #{number}")
             continue
-        m = re.search(r"#issuecomment-(\d+)$", url)
-        if not m:
+        if not re.search(r"#issuecomment-(\d+)$", url):
             print(f"  DIFFERS #{number}: no comment id in {url}")
             bad.append(number)
             continue
@@ -129,16 +168,9 @@ def verify_posted(folder: pathlib.Path) -> int:
             print(f"  DIFFERS #{number}: the draft would refuse, {e}")
             bad.append(number)
             continue
-        r = subprocess.run(["gh", "api", f"repos/{REPO}/issues/comments/{m.group(1)}", "--jq", ".body"],
-                           capture_output=True, text=True)
-        if r.returncode != 0:
-            print(f"  DIFFERS #{number}: comment {m.group(1)} not readable, {r.stderr.strip()[:200]}")
-            bad.append(number)
-            continue
-        live = r.stdout[:-1] if r.stdout.endswith("\n") else r.stdout
-        if live != expected:
-            at = next((k for k, (x, y) in enumerate(zip(live, expected)) if x != y), min(len(live), len(expected)))
-            print(f"  DIFFERS #{number}: live {len(live)} characters, draft {len(expected)}, first difference at {at}")
+        why = live_differs(url, expected, "draft")
+        if why:
+            print(f"  DIFFERS #{number}: {why}")
             bad.append(number)
             continue
         print(f"  same #{number}")
@@ -155,7 +187,7 @@ def verify_posted(folder: pathlib.Path) -> int:
 
 # Every argument is read here, before anything else runs, by the reader the gate uses too. An
 # argument it does not know stops the run with exit 1, so a typo cannot post from another folder.
-ARGS = answers_args.parse(sys.argv[1:], accepts={"--folder", "--send", "--only", "--selftest", "--verify-posted"})
+ARGS = answers_args.parse(sys.argv[1:], accepts={"--folder", "--send", "--only", "--approved", "--selftest", "--verify-posted"})
 FOLDER = ARGS.folder
 
 if ARGS.selftest:
@@ -189,13 +221,15 @@ if ARGS.selftest:
     case("a second note after the first stops it", "<!-- eins -->\nThe answer.\n<!-- zwei -->", refuse=True)
     case("a stray closing marker stops it", "The answer. -->", refuse=True)
     case("a draft that is only a note stops it", "<!-- nur eine Notiz -->", refuse=True)
-    print("  " + ("SELFTEST OK: the note goes, anything else that looks like one stops the send."
-                  if not fail else "SELFTEST FAILED"))
+    print("SELFTEST OK: the note goes, anything else that looks like one stops the send."
+          if not fail else "SELFTEST FAILED")
     raise SystemExit(fail)
 
 if ARGS.verify_posted:
     if ARGS.send or ARGS.only:
         die("--verify-posted only reads; it does not take --send or --only.")
+    if ARGS.approved:
+        die("--verify-posted only reads; it does not take --approved.")
     print(f"Comparing what stands under our name with the drafts in {FOLDER}.\n")
     raise SystemExit(verify_posted(FOLDER))
 
@@ -203,6 +237,19 @@ if ARGS.verify_posted:
 # not some other folder. A missing folder or one outside the repository has already refused.
 folder_args = ARGS.folder_args()
 send = ARGS.send
+approved = ARGS.approved
+
+# The approval, checked as far as it can be before the gate or GitHub is asked: a send needs it, a dry
+# run computes it itself, and every approved number has a draft and, with --only, is one of those.
+if send and not approved:
+    die("--send needs --approved <n>:<sha12>,... with the values the dry run printed for the approved drafts.")
+if approved and not send:
+    die("--approved goes with --send; a dry run prints the values itself.")
+for number in approved:
+    if not (FOLDER / f"{number}.md").is_file():
+        die(f"#{number} has no draft in {FOLDER}.")
+    if ARGS.only and number not in ARGS.only:
+        die(f"#{number} is approved but not in --only.")
 
 print("The gate first, because nothing goes out that it has not passed.\n")
 gate = subprocess.run([sys.executable, str(OPS / "before-the-answers.py"), *folder_args],
@@ -259,6 +306,7 @@ print(f"posted by {ACCOUNT} in {REPO} today ({today} UTC): {already}, so room fo
 
 if send == 0:
     print("\nDRY RUN. Nothing was sent. What would go, in this order:")
+    values = []
     for number in pending[:room]:
         raw = (FOLDER / f"{number}.md").read_text()
         try:
@@ -267,21 +315,48 @@ if send == 0:
             print(f"  #{number}  WOULD REFUSE: {e}")
             continue
         first = next((l for l in body.splitlines() if l.strip()), "")
+        values.append((number, sha12(body)))
         print(f"  #{number}  {len(body)} of {len(raw)} characters after the internal note is stripped")
         print(f"            opens: {first[:90]}")
+        print(f"  #{number}  sha12 {values[-1][1]}")
     if room < len(pending):
         print(f"  ({len(pending) - room} would wait for tomorrow: the cap is {DAILY_CAP} a day)")
-    print("\nTo send, and only after Matthias has said so in the conversation:")
-    shown = f"--folder {ARGS.folder_given}" if ARGS.folder_given is not None else ""
-    print(f"  ops/post-the-answers.py --send {min(room, len(pending))} {shown}".rstrip())
+    print("\nTo send, and only after Matthias has approved these values at the gate public_post:")
+    line = [f"--send {len(values)}"]
+    if values:
+        line.append(f"--only {','.join(n for n, _ in values)}")
+        line.append(f"--approved {','.join(f'{n}:{v}' for n, v in values)}")
+    if ARGS.folder_given is not None:
+        line.append(f"--folder {ARGS.folder_given}")
+    print(f"  ops/post-the-answers.py {' '.join(line)}")
     raise SystemExit(0)
 
 if send > room:
     die(f"--send {send} would exceed the cap: {already} already posted today, room for {room}.")
 
+# Every number that would go out, checked before the first POST: exactly one value, equal to the sha12 of
+# its draft now. One missing or different and nothing goes, so no half of a package stands under his name.
+# The bodies are kept here and posted from memory; the file is not read again in the 90 s between posts.
+to_send = pending[:send]
+for number in approved:
+    if number not in to_send:
+        die(f"#{number} is approved but would not be sent: sending {', '.join('#' + n for n in to_send)}.")
+bodies = {}
+for number in to_send:
+    if number not in approved:
+        die(f"#{number} is not approved: --approved has no value for it. Nothing was sent.")
+    try:
+        body = body_to_send((FOLDER / f"{number}.md").read_text())
+    except ValueError as e:
+        die(f"#{number} would refuse, {e}. Nothing was sent.")
+    if sha12(body) != approved[number]:
+        die(f"#{number} changed since it was approved: the draft is sha12 {sha12(body)} now, "
+            f"approved was {approved[number]}. Nothing was sent.")
+    bodies[number] = body
+
 print(f"\nSending {send}, {GAP_SECONDS} s apart.\n")
 sent = 0
-for number in pending[:send]:
+for number in to_send:
     state = gh(f"repos/{REPO}/issues/{number}", ".state")
     if state != "open":
         print(f"  #{number} skipped: the issue is {state} now")
@@ -290,11 +365,7 @@ for number in pending[:send]:
     if ACCOUNT in authors:
         print(f"  #{number} skipped: we have already answered there")
         continue
-    try:
-        body = body_to_send((FOLDER / f"{number}.md").read_text())
-    except ValueError as e:
-        print(f"  #{number} skipped: {e}")
-        continue
+    body = bodies[number]
     r = subprocess.run(
         ["gh", "api", f"repos/{REPO}/issues/{number}/comments", "-f", f"body={body}", "--jq", ".html_url"],
         capture_output=True, text=True,
@@ -310,6 +381,13 @@ for number in pending[:send]:
     # counts that fleet as arrivals. Appended after the post succeeded, never before.
     with open(OPS / "posted-answers.log", "a", encoding="utf-8") as fh:
         fh.write(f"{datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')} {number} {url}\n")
+    # Read back what now stands under his name, by the id GitHub returned, before anything else goes.
+    why = live_differs(url, body, "sent")
+    if why:
+        print(f"  DIFFERS #{number}: {why}")
+        print(f"\n{sent} posted, then stopped: #{number} does not read back as the text that was sent.")
+        raise SystemExit(1)
+    print(f"  #{number} read back: same")
     if sent < send:
         time.sleep(GAP_SECONDS)
 
