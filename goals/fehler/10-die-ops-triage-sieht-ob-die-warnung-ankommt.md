@@ -1,7 +1,7 @@
 # Fehler Goal 10: Die Ops-Triage sieht, ob die Warnung ankommt
 
 ## Status
-PLANNED
+DONE
 
 ## Active Objective
 Seit fehler 09 meldet `ops/status.sh` mit `alarm_path.received`, ob die Zustellungen des Watchdogs auf dem Thema stehen. Zwei Lücken
@@ -139,7 +139,7 @@ jeder Uhrzeit, zu der er läuft.
       Prüfung: `git diff --name-only origin/dev...HEAD | grep -vE '^(ops/watchdog\.sh|ops/README\.md|\.claude/skills/ops-triage/SKILL\.md|test/watchdog-alive-slots\.test\.ts|test/ops-triage-skill\.test\.ts|goals/fehler/)' | wc -l` muss `0` ausgeben.
       Prüfung: `git diff --name-only origin/dev...HEAD -- src deploy ops/status.sh ops/webhook-last.sh ops/webhook-unreachable.sh | wc -l` muss `0` ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Die Zeile im Progress Log nennt beide Gegenproben: alter Watchdog in den Fällen zu drei Fenstern und 18:00 UTC rot, alter Skill
@@ -167,5 +167,6 @@ jeder Uhrzeit, zu der er läuft.
 ## Progress Log
 - 2026-11-14 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6, 7, 8 gebaut: `ops/watchdog.sh` postet das Lebenszeichen in drei Fenstern (00:00, 08:00, 16:00 UTC, Stempel `JJJJ-MM-TTTHH`), Schritt 2 der Ops-Triage gibt `CP_ALERT_WEBHOOK` nur in der Umgebung mit, `received` `red` ist Befund und zweimal `unknown` Hinweis, `ops/README.md` nennt beides; neue Tests `test/watchdog-alive-slots.test.ts` (gegen den Watchdog von `eef3eb2` 5 von 5 rot, darunter drei Fenster und 18:00 UTC, neu 5 von 5 grün) und `test/ops-triage-skill.test.ts` (gegen den Skill von `eef3eb2` 4 von 4 rot, Schritt 2 mit `webhook=<unset>`, neu 4 von 4 grün). Prüfbefehle: P1 `True 0 0`, `5 0`, `0`; P2 `rot`, `rot`, `gruen`; P3 `4 0 0`, `1`, `0`; P4 `rot`, `gruen`; P5 `0`, `0 0`; P6 `0`, `0`; P7 `1`, `1`; P8 `0`, `0`, `check` Exit 0 (1789 Tests).
 - 2026-11-14 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, 7, 8, nach Merge von `dev` (`6b08671`) in den Goal-Branch. Prüfbefehle: P1 `True 0 0`, `5 0`, `0`; P2 alter Watchdog `rot` (18:00 UTC), `rot` (drei Fenster), neu `gruen`; P3 `4 0 0`, `1`, `0`; P4 alter Skill `rot`, neu `gruen`; P5 `0`, `0 0`; P6 `0`, `0`; P7 `1`, `1`; P8 `0`, `0`, `check` Exit 0 (1789 Tests).
+- 2026-11-14 Release: PASS K und B (Zyklus 2), DONE.
 
 ## Blockers
