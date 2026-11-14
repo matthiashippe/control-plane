@@ -39,3 +39,16 @@
   Absenders der letzten 24 Stunden. Die Prüfung steht nach der Wiederholung derselben Signatur und der Grenze je Stunde und vor dem
   Preis, also bucht ein 413 nie. Der Kontakt steht seit diesem Punkt in `relay_contacts` statt in `relay_messages`, damit er die
   Löschung nach 30 Tagen übersteht; die Tabelle ist neu wie das ganze Relay, auf dem Server gibt es noch keine Zeile nachzutragen.
+
+## Goal 02 (14.11.2026, Engineer CP)
+
+- **Bestand:** Zeilen, die relay 01 schon in `relay_messages` und `relay_polls` gespeichert hat, schreibt dieses Goal nicht um. Steht
+  auf dem Server eine Signatur in anderer Form (groß geschrieben oder mit `v` als 0 oder 1), ist ihr Fenster von 300000 ms längst
+  abgelaufen; eine Wiederholung bekommt 401 `signature_expired` wie heute, weil der Lookup nur noch die einzige Form sucht.
+- **`s` gleich 0** gilt wie die obere Hälfte als keine Form und bekommt 401; `verifyMessage` nähme eine solche Signatur ohnehin nicht an.
+- **Reihenfolge im signierten Weg:** erst Form, dann Signaturprüfung, dann `recipient_is_sender`, dann Lookup der Wiederholung und
+  Fenster. Wer nicht nachweist, dass er `from` ist, bekommt 401 statt 400 und erfährt nichts über die Regel. Eine Nachricht an sich
+  selbst, die relay 01 schon angenommen hat, bekommt bei Wiederholung 400 statt ihrer `id`; 400 wiederholt der Client nicht, und die
+  Runtime schickt nie an sich selbst.
+- **Kontakt mit sich selbst:** Zeilen in `relay_contacts` mit `a` gleich `b` aus relay 01 bleiben stehen; sie wirken nicht mehr, weil
+  keine Nachricht an sich selbst mehr bis zum Preis kommt.
