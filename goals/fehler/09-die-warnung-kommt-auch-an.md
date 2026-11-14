@@ -1,7 +1,7 @@
 # Fehler Goal 09: Die Warnung kommt auch an
 
 ## Status
-PLANNED
+ACTIVE
 
 ## Active Objective
 `[INFO] webhook delivered` im Log des Watchdogs belegt nur, dass ntfy den POST angenommen hat. ntfy nimmt jedes Thema an: Steht in
@@ -82,31 +82,31 @@ falsches Thema heute in keiner Zeile von `ops/status.sh` auffällt.
 - Node 22 vorn im `PATH` (`PATH=/usr/bin:$PATH`), `check` und vitest im Vordergrund mit eigenem Timeout.
 
 ## Done Condition
-- [ ] `ops/status.sh` meldet `alarm_path.received` mit `last_alive`, `last_message` und `status` nach den Regeln oben und setzt
+- [x] `ops/status.sh` meldet `alarm_path.received` mit `last_alive`, `last_message` und `status` nach den Regeln oben und setzt
       `alarm_path.status` auf `red`, wenn eine Zustellung der letzten 11 Stunden nicht auf dem Thema steht.
       MVP: Funktion, weil ein falsches Thema heute als `ok` durchgeht.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/status-alarm-received.test.ts --reporter=json 2>/dev/null | python3 -c 'import json,sys; r=json.load(sys.stdin); print(r["numPassedTests"] >= 7, r["numFailedTests"], r["numPendingTests"])'` muss `True 0 0` ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/status-alarm-received.test.ts -t 'a sign of life on the topic is ok|a delivery that never reached the topic is red|an unreadable topic is unknown and leaves the status alone|a line that is no JSON makes the topic unreadable|without CP_ALERT_WEBHOOK it is unknown and asks nobody|a delivery older than the cache of the topic is unknown|never shows URL or topic' --reporter=json 2>/dev/null | python3 -c 'import json,sys; r=json.load(sys.stdin); print(r["numPassedTests"], r["numFailedTests"])'` muss `7 0` ausgeben.
       Prüfung: `grep -c 'since=12h' ops/status.sh` muss mindestens 1 ausgeben.
       Prüfung: `grep -cE '\.skip|skipIf|\.only|\.todo' test/status-alarm-received.test.ts` muss `0` ausgeben.
-- [ ] Gegenprobe: Der rote Fall ist mit dem `ops/status.sh` von `cf09ee2` rot und mit dem neuen grün.
+- [x] Gegenprobe: Der rote Fall ist mit dem `ops/status.sh` von `cf09ee2` rot und mit dem neuen grün.
       MVP: Funktion, weil erst die Gegenprobe zeigt, dass der Test genau die Lücke des Vorschlags misst.
       Prüfung: `d=$(mktemp -d); git show cf09ee2:ops/status.sh > "$d/status.sh"; STATUS_UNDER_TEST="$d/status.sh" PATH=/usr/bin:$PATH pnpm -s vitest run test/status-alarm-received.test.ts -t 'a delivery that never reached the topic is red' >/dev/null 2>&1 && echo gruen || echo rot` muss `rot` ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/status-alarm-received.test.ts -t 'a delivery that never reached the topic is red' >/dev/null 2>&1 && echo gruen || echo rot` muss `gruen` ausgeben.
-- [ ] Die bestehenden Fälle von `test/status-alarm-path.test.ts` bleiben, wie sie sind, und bekommen nur das neue Feld.
+- [x] Die bestehenden Fälle von `test/status-alarm-path.test.ts` bleiben, wie sie sind, und bekommen nur das neue Feld.
       MVP: Funktion, weil die Regeln aus fehler 05 und 07 weiter gelten müssen.
       Prüfung: `git diff -U0 origin/dev...HEAD -- test/status-alarm-path.test.ts | grep -c '^-[^-]'` muss `0` ausgeben.
       Prüfung: `test "$(grep -c '^  it(' test/status-alarm-path.test.ts)" = "$(git show cf09ee2:test/status-alarm-path.test.ts | grep -c '^  it(')" && echo gleich || echo anders` muss `gleich` ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/status-alarm-path.test.ts --reporter=json 2>/dev/null | python3 -c 'import json,sys; r=json.load(sys.stdin); print(r["numFailedTests"], r["numPendingTests"])'` muss `0 0` ausgeben.
-- [ ] URL und Thema stehen nirgends: nicht als Argument von `curl`, nicht im Diff, nicht in einer Ausgabe.
+- [x] URL und Thema stehen nirgends: nicht als Argument von `curl`, nicht im Diff, nicht in einer Ausgabe.
       MVP: Funktion, weil wer das Thema kennt, auf das Telefon von Matthias schreiben kann und das Repo öffentlich ist.
       Prüfung: `grep -c -- '-K -' ops/status.sh` muss mindestens 1 ausgeben.
       Prüfung: `git diff origin/dev...HEAD | grep -cE 'ntfy\.sh/[A-Za-z0-9_-]'` muss `0` ausgeben.
-- [ ] `ops/README.md` erklärt `alarm_path.received` mit Schwelle, Handgriff und dem Fenster von 11 Stunden.
+- [x] `ops/README.md` erklärt `alarm_path.received` mit Schwelle, Handgriff und dem Fenster von 11 Stunden.
       MVP: Funktion, weil die Ops-Triage ihre Schwellen aus dieser Tabelle liest.
       Prüfung: `grep -c '^| `alarm_path.received.status` |' ops/README.md` muss `1` ausgeben.
       Prüfung: `grep -c '11 h' ops/README.md` muss mindestens 1 ausgeben.
-- [ ] Nur `ops/status.sh`, die beiden Tests, `ops/README.md` und Dateien des Goals ändern sich, und `check` ist grün.
+- [x] Nur `ops/status.sh`, die beiden Tests, `ops/README.md` und Dateien des Goals ändern sich, und `check` ist grün.
       Prüfung: `git diff --name-only origin/dev...HEAD | grep -vE '^(ops/status\.sh|ops/README\.md|test/status-alarm-path\.test\.ts|test/status-alarm-received\.test\.ts|goals/fehler/)' | wc -l` muss `0` ausgeben.
       Prüfung: `git diff --name-only origin/dev...HEAD -- src deploy ops/watchdog.sh ops/webhook-last.sh ops/webhook-unreachable.sh | wc -l` muss `0` ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
@@ -133,5 +133,6 @@ falsches Thema heute in keiner Zeile von `ops/status.sh` auffällt.
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-14 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6 gebaut: ops/status.sh liest mit CP_ALERT_WEBHOOK das Thema zurück (json?poll=1&since=12h, URL per -K - auf stdin) und meldet alarm_path.received, neuer Test test/status-alarm-received.test.ts mit 9 Fällen (alle 9 gegen den alten Stand rot gesehen), bestehende 10 Fälle nur um `received: NOT_ASKED` ergänzt, Schwelle und Fenster 11 h in ops/README.md. Gegenprobe: alter ops/status.sh (cf09ee2) im roten Fall rot (`alarm_path.status` `ok` ohne `received`), neuer grün; eine Kopie aus STATUS_UNDER_TEST läuft im Test neben den Hilfsskripten aus ops/, sonst wäre der alte Stand nur an fehlendem ops/webhook-last.sh gescheitert. Prüfbefehle: P1 `True 0 0`, `7 0`, `2`, `0`; P2 `rot`, `gruen`; P3 `0`, `gleich`, `0 0`; P4 `2`, `0`; P5 `1`, `3`; P6 `0`, `0`, check Exit 0 (1756 Tests grün).
 
 ## Blockers
