@@ -1,7 +1,7 @@
 # Adressen Goal 02: Logs der Actions höchstens 30 Tage und IPv6 im Zähler
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Die Logs der Actions des öffentlichen Repos bleiben höchstens 30 Tage lesbar, so wie die Datenschutzerklärung der Seite die Löschung
@@ -86,7 +86,7 @@ MVP: Funktion, weil adressen 01 nur die sechs bekannten Läufe geräumt hat: Tr�
       Prüfung: `grep -ciE '\b[23][0-9a-f]{3}:[0-9a-f]{0,4}:' docs/adressen/actions-logs.md` muss 0 ausgeben.
 - [x] `check` ist grün.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Die neuen Testfälle waren vor dem Fix rot; die Zeile im Progress Log nennt, womit.
@@ -112,5 +112,6 @@ MVP: Funktion, weil adressen 01 nur die sechs bekannten Läufe geräumt hat: Tr�
 ## Progress Log
 - 2026-11-14 Zyklus 1: Punkte 1 und 4 gebaut, IPv6 im Zähler (volle Form, privat `::`, `::1`, `fe80::/10`, `fc00::/7`, `::ffff:` als IPv4), sieben neue Fälle in `test/actions-log-addresses.test.ts`, davon drei gegen das alte Skript rot (`pnpm -s vitest run test/actions-log-addresses.test.ts` -> 3 failed | 16 passed), Punkte 2 und 3 warten auf das Human Gate `security_settings` (gemessen 18:36 UTC: `days` 90). Prüfbefehle: Punkt 1 Fixture -> `1 1 2 2 total 3 ` mit gawk und mawk, Gegenprobe mit dem alten Skript -> `1 0 2 1 total 1 `; vitest -> 19 passed, auch mit mawk; `grep -c 'IPv6' ops/README.md` -> 3; adressen 01 Punkt 1 -> `1 1 2 2 total 2 `, `2 0`, `da`; `node scripts/check.mjs` -> Exit 0, 1796 Tests grün.
 - 2026-11-14 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4; Punkte 2 und 3 gebaut, nachdem der Tech Lead das Gate `security_settings` aufgehoben und die Aufbewahrung auf 30 Tage gesetzt hat; `origin/dev` gemergt (schon aktuell), Abschnitt `## Aufbewahrung` mit Messung 18:43 UTC, Einleitung der Doku und Satz in `ops/README.md` auf 30 Tage gebracht. Prüfbefehle: Punkt 1 Fixture -> `1 1 2 2 total 3 `, vitest -> 19 passed, `grep -c 'IPv6' ops/README.md` -> 3; Punkt 2 -> `true` (Gegenprobe `{"days":90}` -> `false`); Punkt 3 -> 1, 1, 1, 0, 0 (Gegenproben: Zeile auf dev -> 0, mit 90 Tagen -> 0, gepflanzte IPv4- und IPv6-Adresse -> 1 und 1); adressen 01 Punkte 1 bis 3 ohne Netz grün (4, 6, 1, 1, 1, 1, 1); `node scripts/check.mjs` -> Exit 0, 1796 Tests grün.
+- 2026-11-14 Release: PASS K und B (Zyklus 2), DONE.
 
 ## Blockers
