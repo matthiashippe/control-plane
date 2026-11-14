@@ -1,7 +1,7 @@
 # Fehler Goal 09: Die Warnung kommt auch an
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 `[INFO] webhook delivered` im Log des Watchdogs belegt nur, dass ntfy den POST angenommen hat. ntfy nimmt jedes Thema an: Steht in
@@ -110,7 +110,7 @@ falsches Thema heute in keiner Zeile von `ops/status.sh` auffällt.
       Prüfung: `git diff --name-only origin/dev...HEAD | grep -vE '^(ops/status\.sh|ops/README\.md|test/status-alarm-path\.test\.ts|test/status-alarm-received\.test\.ts|goals/fehler/)' | wc -l` muss `0` ausgeben.
       Prüfung: `git diff --name-only origin/dev...HEAD -- src deploy ops/watchdog.sh ops/webhook-last.sh ops/webhook-unreachable.sh | wc -l` muss `0` ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Die Zeile im Progress Log nennt die Gegenprobe: alter `ops/status.sh` im roten Fall rot, neuer grün.
@@ -135,5 +135,6 @@ falsches Thema heute in keiner Zeile von `ops/status.sh` auffällt.
 ## Progress Log
 - 2026-11-14 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6 gebaut: ops/status.sh liest mit CP_ALERT_WEBHOOK das Thema zurück (json?poll=1&since=12h, URL per -K - auf stdin) und meldet alarm_path.received, neuer Test test/status-alarm-received.test.ts mit 9 Fällen (alle 9 gegen den alten Stand rot gesehen), bestehende 10 Fälle nur um `received: NOT_ASKED` ergänzt, Schwelle und Fenster 11 h in ops/README.md. Gegenprobe: alter ops/status.sh (cf09ee2) im roten Fall rot (`alarm_path.status` `ok` ohne `received`), neuer grün; eine Kopie aus STATUS_UNDER_TEST läuft im Test neben den Hilfsskripten aus ops/, sonst wäre der alte Stand nur an fehlendem ops/webhook-last.sh gescheitert. Prüfbefehle: P1 `True 0 0`, `7 0`, `2`, `0`; P2 `rot`, `gruen`; P3 `0`, `gleich`, `0 0`; P4 `2`, `0`; P5 `1`, `3`; P6 `0`, `0`, check Exit 0 (1756 Tests grün).
 - 2026-11-14 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6; origin/dev war schon im Branch (HEAD..origin/dev leer), alle Prüfbefehle am Kopf 43c5f62 erneut gefahren, Gegenprobe alter ops/status.sh (cf09ee2) im roten Fall rot, neuer grün. Prüfbefehle: P1 `True 0 0`, `7 0`, `2`, `0`; P2 `rot`, `gruen`; P3 `0`, `gleich`, `0 0`; P4 `2`, `0`; P5 `1`, `3`; P6 `0`, `0`, check Exit 0 (1756 Tests grün); PR #139 check und e2e SUCCESS am Kopf 43c5f62.
+- 2026-11-14 Release: PASS K und B (Zyklus 2), DONE.
 
 ## Blockers
