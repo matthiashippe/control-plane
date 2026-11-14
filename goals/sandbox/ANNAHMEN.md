@@ -243,3 +243,22 @@
   ausgelassen). Gegenprobe: `bash ops/smoke.sh https://ctl.sbx.postyourprice.com` Exit 1 (12 Fehler), `dig +short A
   ctl.sbx.postyourprice.com | grep -cx 76.13.144.207` 0; beide Werkzeuge können also rot werden. Der Punkt hält, Code und Server
   sind unverändert. Ursache und Empfehlung stehen im Vorschlag `goals/_vorschlaege/loop-audit-2026-11-13-2.md`.
+
+## Goal 02, Audit 2026-11-14 Zeile 465 (14.11.2026, Engineer CP)
+
+- **Wildcard `*.postyourprice.com` wieder angelegt, bis sandbox 07 auf `dev` landet.** Audit 2026-11-14 Zeile 465 (sandbox 02 Punkt
+  4) meldete `fehlt expose` und `SANDBOX PROBE FAIL failed=1 left=0`. Ursache: Der Eintrag `*.postyourprice.com` fehlte in der Zone,
+  `dig sbx-unknown0-80.postyourprice.com @1.1.1.1` gab `NXDOMAIN`, und die `public_url`, die `sandboxd` liefert, löste nicht auf.
+  Gelöscht hatte ihn der Maker von sandbox 07 am 13.11.2026 um 19:33 UTC mit `cloudflare.py dns-apply` vom Goal-Branch, bevor das Goal
+  auf `dev` lag (es wartet am Gate `server_kauf` auf die eigene Domain). Auf `dev` verlangen sandbox 02 Punkt 4 und Punkt 5 den
+  Eintrag, und `dev` ist der Stand, gegen den das Audit misst. Darum am 14.11.2026 um 16:07 UTC wieder angelegt mit
+  `python3 ops/sandbox/cloudflare.py dns-apply 72.62.51.224` vom Stand `dev` (`created A *.postyourprice.com`, `CF DNS OK
+  changed=0`); das Werkzeug legt nur fehlende Einträge an und ändert oder löscht keinen. Vorher meldete `dns-check` genau `CHANGE dns
+  create A *.postyourprice.com proxied=true`. Danach: der Prüfbefehl aus Zeile 465 gibt `SANDBOX PROBE OK left=0` aus (vorher derselbe
+  Befehl `fehlt expose`), `curl https://sbx-unknown0-80.postyourprice.com/` antwortet `404`, der Name löst nur über den Proxy auf
+  (`grep -c 72.62.51.224` 0), `postyourprice.com` und `ctl.sbx` unverändert. Kein Kunde bekommt dadurch eine Adresse: Das Control
+  Plane antwortet auf `ports/expose` weiter 409 `port_exposure_unavailable` (Goal 03). Das ist der Stand, den Goal 02, Kritik, bis
+  zur eigenen Domain hinnimmt.
+- **Regel daraus:** Ein Goal ändert DNS, Server und andere geteilte Zustände, die DONE-Goals auf `dev` messen, erst mit seinem
+  Merge. sandbox 07 löscht den Eintrag deshalb mit dem eigenen `dns-apply`, sobald es nach dem Kauf ausrollt; danach steht sandbox 02
+  Punkt 5 (`sbx-unknown0-80.postyourprice.com` mit `404`) gegen sandbox 07 Punkt 5, und der Tech Lead trägt die Ablösung ein.
