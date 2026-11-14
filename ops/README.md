@@ -937,3 +937,20 @@ fremde Sandbox läuft, und mit einer anderen Zeile `FAIL`, wenn es eine der beid
 liegen. Sonst setzt es zuerst den Timer `cp-pub-restore` (`systemd-run --on-active=<s>`, Standard 120, erlaubt 60 bis 3600, sonst
 Exit 2), der `cp.pub.prev` nach `<s>` Sekunden zurücklegt, wenn `cp.pub` dann noch fehlt; einen Schlüssel, den `--client-key`
 inzwischen geschrieben hat, überschreibt er nie. Scheitert der Timer, verschiebt es nichts. Danach `--client-key` fahren.
+
+## Visitor addresses in the logs of GitHub Actions
+
+Until 2026-11-12 `ops/deploy-window.sh` printed visitor addresses, and `deploy.yml` put that output into the Actions logs of this
+public repository, which GitHub keeps readable for 90 days. `ops/actions-log-addresses.sh` counts how many stranger addresses
+those logs still carry, before they are deleted and to prove afterwards that none is left (`docs/adressen/actions-logs.md`).
+
+    ops/actions-log-addresses.sh --runs <id>,<id>,...   # downloads these runs' logs with gh into mktemp -d, deletes them after
+    ops/actions-log-addresses.sh --workflow deploy.yml  # every run of that workflow, all pages
+    ops/actions-log-addresses.sh --dir <dir>            # unpacked logs on disk, one subdirectory per run id
+
+A stranger address is an IPv4 address in a request line (an HTTP method followed by a path from `/`) that is in none of
+`CP_OWN_IPS_FILE`, `CP_KNOWN_IPS` and `CP_CRAWLER_IPS` (defaults: the three lists above) and not in `0.0.0.0/8`, `10.0.0.0/8`,
+`127.0.0.0/8`, `169.254.0.0/16`, `172.16.0.0/12` or `192.168.0.0/16`; documentation addresses count, so tests can plant visitors.
+The output is one line `<id> <n>` or `<id> no-log` per run and a last line `total <n>` (distinct over all runs). It never prints
+an address, not on stdout and not on stderr. If `gh` fails while listing or on a log for another reason than a missing one
+(404 or 410), it exits 2 without a `total` line, so a network error is never read as zero. `CP_REPO` picks another repository.
