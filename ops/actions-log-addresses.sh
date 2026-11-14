@@ -40,7 +40,12 @@ set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$HERE/.." && pwd)"
 REPO="${CP_REPO:-matthiashippe/control-plane}"
-OWN="${CP_OWN_IPS_FILE:-$ROOT/ops/own-ips.txt}"
+# The path of the list comes from ops/own-ips.sh (CP_OWN_IPS_FILE, else the list beside it). Only the
+# path: this counts strangers in public logs, not customers, and --dir must run without network, so
+# the live probe in `own_ips` is not wanted here.
+# shellcheck source=ops/own-ips.sh
+source "$HERE/own-ips.sh"
+OWN="$CP_OWN_IPS_FILE"
 KNOWN="${CP_KNOWN_IPS:-$ROOT/ops/known-ips.txt}"
 CRAWLER="${CP_CRAWLER_IPS:-$ROOT/ops/crawler-ips.txt}"
 
