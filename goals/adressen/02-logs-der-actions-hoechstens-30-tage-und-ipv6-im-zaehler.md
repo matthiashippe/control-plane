@@ -1,7 +1,7 @@
 # Adressen Goal 02: Logs der Actions höchstens 30 Tage und IPv6 im Zähler
 
 ## Status
-PLANNED
+ACTIVE
 
 ## Active Objective
 Die Logs der Actions des öffentlichen Repos bleiben höchstens 30 Tage lesbar, so wie die Datenschutzerklärung der Seite die Löschung
@@ -67,7 +67,7 @@ MVP: Funktion, weil adressen 01 nur die sechs bekannten Läufe geräumt hat: Tr�
   nur Zahlen.
 
 ## Done Condition
-- [ ] `ops/actions-log-addresses.sh` zählt fremde IPv6-Adressen in Zeilen einer Anfrage, eine Adresse in zwei Schreibweisen einmal,
+- [x] `ops/actions-log-addresses.sh` zählt fremde IPv6-Adressen in Zeilen einer Anfrage, eine Adresse in zwei Schreibweisen einmal,
       lässt `::1`, `fe80::/10`, `fc00::/7`, Uhrzeiten und Adressen der Listen aus und gibt keine Adresse aus.
       MVP: Funktion, weil der Zähler sonst `total 0` meldet, sobald Besucher über IPv6 kommen.
       Prüfung: `d=$(mktemp -d); mkdir -p "$d/logs/1" "$d/logs/2"; printf '05:57:46  2001:db8::7  POST /v1/chat/completions  503\n06:00:01  ::1  GET /health  200\n06:00:02  fe80::1  GET /health  200\n06:00:03  2001:DB8:0:0:0:0:0:7  GET /health  200\n06:00:04  2001:db8:0::9  GET /health  200\n06:00:05  fd00::1  GET /health  200\n(new own address 2001:db8::5, written to own-ips.txt)\n' > "$d/logs/1/0_deploy.txt"; printf '16:41:04  2001:db8::8  GET /v1/credits/balance  502\n18:15:25  203.0.113.7  POST /v1/chat/completions  402\n18:15:26  ::ffff:203.0.113.7  GET /health  200\n' > "$d/logs/2/0_deploy.txt"; printf '2001:db8::9 2026-11-14 test\n' > "$d/own"; CP_OWN_IPS_FILE="$d/own" CP_KNOWN_IPS=/dev/null CP_CRAWLER_IPS=/dev/null bash ops/actions-log-addresses.sh --dir "$d/logs" | tr '\n' ' '` muss `1 1 2 2 total 3 ` ausgeben.
@@ -84,7 +84,7 @@ MVP: Funktion, weil adressen 01 nur die sechs bekannten Läufe geräumt hat: Tr�
       Prüfung: `awk '/^## Aufbewahrung/{f=1;next} /^## /{f=0} f' docs/adressen/actions-logs.md | grep -cF 'bash ops/actions-log-addresses.sh --workflow deploy.yml'` muss mindestens 1 ausgeben.
       Prüfung: `grep -cE '\b([0-9]{1,3}\.){3}[0-9]{1,3}\b' docs/adressen/actions-logs.md` muss 0 ausgeben.
       Prüfung: `grep -ciE '\b[23][0-9a-f]{3}:[0-9a-f]{0,4}:' docs/adressen/actions-logs.md` muss 0 ausgeben.
-- [ ] `check` ist grün.
+- [x] `check` ist grün.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
 - [ ] goal-verifier PASS (K und B)
 
@@ -110,6 +110,7 @@ MVP: Funktion, weil adressen 01 nur die sechs bekannten Läufe geräumt hat: Tr�
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-14 Zyklus 1: Punkte 1 und 4 gebaut, IPv6 im Zähler (volle Form, privat `::`, `::1`, `fe80::/10`, `fc00::/7`, `::ffff:` als IPv4), sieben neue Fälle in `test/actions-log-addresses.test.ts`, davon drei gegen das alte Skript rot (`pnpm -s vitest run test/actions-log-addresses.test.ts` -> 3 failed | 16 passed), Punkte 2 und 3 warten auf das Human Gate `security_settings` (gemessen 18:36 UTC: `days` 90). Prüfbefehle: Punkt 1 Fixture -> `1 1 2 2 total 3 ` mit gawk und mawk, Gegenprobe mit dem alten Skript -> `1 0 2 1 total 1 `; vitest -> 19 passed, auch mit mawk; `grep -c 'IPv6' ops/README.md` -> 3; adressen 01 Punkt 1 -> `1 1 2 2 total 2 `, `2 0`, `da`; `node scripts/check.mjs` -> Exit 0, 1796 Tests grün.
 
 ## Blockers
 - keine

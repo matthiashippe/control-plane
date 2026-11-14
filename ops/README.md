@@ -957,9 +957,13 @@ those logs still carry, before they are deleted and to prove afterwards that non
     ops/actions-log-addresses.sh --workflow deploy.yml  # every run of that workflow, all pages
     ops/actions-log-addresses.sh --dir <dir>            # unpacked logs on disk, one subdirectory per run id
 
-A stranger address is an IPv4 address in a request line (an HTTP method followed by a path from `/`) that is in none of
+A stranger address is an IPv4 or IPv6 address in a request line (an HTTP method followed by a path from `/`) that is in none of
 `CP_OWN_IPS_FILE`, `CP_KNOWN_IPS` and `CP_CRAWLER_IPS` (defaults: the three lists above) and not in `0.0.0.0/8`, `10.0.0.0/8`,
 `127.0.0.0/8`, `169.254.0.0/16`, `172.16.0.0/12` or `192.168.0.0/16`; documentation addresses count, so tests can plant visitors.
+IPv6 addresses count by the same rules: a valid address glued to no letter (eight groups, or fewer with one `::`, optionally with a
+dotted IPv4 tail), compared in its full form, so `2001:db8::7` and `2001:DB8:0:0:0:0:0:7` are one address, also against the three
+lists. The private IPv6 ranges `::`, `::1`, `fe80::/10` and `fc00::/7` never count, `::ffff:<IPv4>` counts once as that IPv4
+address, and a clock time like `05:57:46` is no address.
 The output is one line `<id> <n>` or `<id> no-log` per run and a last line `total <n>` (distinct over all runs). It never prints
 an address, not on stdout and not on stderr. If `gh` fails while listing or on a log for another reason than a missing one
 (404 or 410), it exits 2 without a `total` line, so a network error is never read as zero. `CP_REPO` picks another repository.

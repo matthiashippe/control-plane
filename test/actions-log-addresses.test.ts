@@ -15,6 +15,8 @@ import { crc32 } from "node:zlib";
  */
 const SCRIPT = join(__dirname, "..", "ops", "actions-log-addresses.sh");
 const IPV4 = /\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b/;
+// Any group of hex digits next to a colon that is not a clock time: catches every IPv6 address the fixtures plant.
+const IPV6 = /(?:[0-9a-f]{0,4}:){2,}[0-9a-f]{0,4}|2001|db8|fe80|fd00|ffff/i;
 
 type Run = { status: number | null; stdout: string; out: string; lines: string[] };
 
@@ -232,5 +234,101 @@ describe("ops/actions-log-addresses.sh counts stranger addresses in Actions logs
     const r = w.run([]);
     expect(r.status, r.out).toBe(2);
     expect(r.stdout).not.toMatch(/^total/m);
+  });
+});
+
+describe("ops/actions-log-addresses.sh counts stranger IPv6 addresses and names none", () => {
+  it("counts the same IPv6 address in two spellings once and skips loopback, link-local, unique-local, own and times", () => {
+    const w = workspace();
+    const own = w.file("own6", "# planted\n2001:db8::9 2026-11-14 planted own address\n");
+    w.file(
+      "logs/1/0_deploy.txt",
+      "05:57:46  2001:db8::7  POST /v1/chat/completions  503\n" +
+        "06:00:01  ::1  GET /health  200\n" +
+        "06:00:02  fe80::1  GET /health  200\n" +
+        "06:00:03  2001:DB8:0:0:0:0:0:7  GET /health  200\n" +
+        "06:00:04  2001:db8:0::9  GET /health  200\n" +
+        "06:00:05  fd00::1  GET /health  200\n" +
+        "06:00:06  febf:ffff::2  GET /health  200\n" +
+        "06:00:07  fc12:3456::3  GET /health  200\n" +
+        "06:00:08  ::  GET /health  200\n" +
+        "(new own address 2001:db8::5, written to own-ips.txt)\n",
+    );
+    w.file(
+      "logs/2/0_deploy.txt",
+      "16:41:04  2001:db8::8  GET /v1/credits/balance  502\n" +
+        "18:15:25  203.0.113.7  POST /v1/chat/completions  402\n" +
+        "18:15:26  ::ffff:203.0.113.7  GET /health  200\n",
+    );
+    const r = w.run(["--dir", join(w.root, "logs")], { CP_OWN_IPS_FILE: own });
+    expect(r.status, r.out).toBe(0);
+    expect(r.lines).toEqual(["1 1", "2 2", "total 3"]);
+    expect(r.out).not.toMatch(IPV4);
+    expect(r.out).not.toMatch(IPV6);
+  });
+
+  it("counts an IPv6 visitor in a timestamped Actions log line", () => {
+    const w = workspace();
+    w.file("logs/3/a.txt", "2026-11-10T20:27:20.6490622Z    20:27:07  2001:db8:1:2:3:4:5:6  POST /v1/chat/completions  502\n");
+    const r = w.run(["--dir", join(w.root, "logs")]);
+    expect(r.status, r.out).toBe(0);
+    expect(r.lines).toEqual(["3 1", "total 1"]);
+  });
+
+  it("never counts a clock time or a timestamp as an address", () => {
+    const w = workspace();
+    w.file(
+      "logs/4/a.txt",
+      "2026-11-10T20:27:20.6490622Z    20:27:07  10.0.0.1  GET /health  200\n" + "12:34:56:78  10.0.0.2  GET /health  200\n",
+    );
+    const r = w.run(["--dir", join(w.root, "logs")]);
+    expect(r.status, r.out).toBe(0);
+    expect(r.lines).toEqual(["4 0", "total 0"]);
+  });
+
+  it("skips an own IPv6 address written in another spelling than the list", () => {
+    const w = workspace();
+    const own = w.file("own6", "2001:0DB8:0000:0000:0000:0000:0000:0042 2026-11-14 planted\n");
+    w.file("logs/6/a.txt", "06:00:01  2001:db8::42  GET /health  200\n06:00:02  [2001:db8::43]:443  GET /health  200\n");
+    const r = w.run(["--dir", join(w.root, "logs")], { CP_OWN_IPS_FILE: own });
+    expect(r.status, r.out).toBe(0);
+    expect(r.lines).toEqual(["6 1", "total 1"]);
+  });
+
+  it("counts ::ffff: before an IPv4 address once, as that IPv4 address, also in hex", () => {
+    const w = workspace();
+    w.file(
+      "logs/8/a.txt",
+      "06:00:01  ::ffff:203.0.113.9  GET /health  200\n" +
+        "06:00:02  ::ffff:cb00:7109  GET /health  200\n" +
+        "06:00:03  203.0.113.9  GET /health  200\n" +
+        "06:00:04  ::ffff:10.0.0.1  GET /health  200\n" +
+        "06:00:05  ::ffff:c633:6401  GET /health  200\n",
+    );
+    const r = w.run(["--dir", join(w.root, "logs")]);
+    expect(r.status, r.out).toBe(0);
+    expect(r.lines).toEqual(["8 1", "total 1"]);
+  });
+
+  it("does not take invalid colon groups or words for addresses", () => {
+    const w = workspace();
+    w.file(
+      "logs/9/a.txt",
+      "06:00:01  1:2:3:4:5:6:7:8:9  GET /health  200\n" +
+        "06:00:02  2001:db8::1::2  GET /health  200\n" +
+        "06:00:03  12345::1  GET /health  200\n" +
+        "06:00:04  Foo::Bar  GET /v1/chat:completions  200\n",
+    );
+    const r = w.run(["--dir", join(w.root, "logs")]);
+    expect(r.status, r.out).toBe(0);
+    expect(r.lines).toEqual(["9 0", "total 0"]);
+  });
+
+  it("does not count an IPv6 address outside a request line", () => {
+    const w = workspace();
+    w.file("logs/10/a.txt", "(new own address 2001:db8::5, written to own-ips.txt)\nconnect [2001:db8::50]:443 refused\n");
+    const r = w.run(["--dir", join(w.root, "logs")]);
+    expect(r.status, r.out).toBe(0);
+    expect(r.lines).toEqual(["10 0", "total 0"]);
   });
 });
