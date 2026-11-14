@@ -9,3 +9,4 @@ Empfehlung: Matthias löscht die Logs der sechs Läufe (`gh api -X DELETE repos/
 Grundregel 8 (loop-constraints.md:38-40) verbietet Personendaten im öffentlichen Repo; der Loop liest IP-Adressen selbst so (betrieb 02:61, loop-redteam-2026-11-11-1). Laut docs/betrieb/neustart.md:15-20 gab es in den sechs Fenstern mindestens 7 Antworten mit 502 an fremde Adressen, also mindestens so viele Zeilen mit fremden IPs. Die Datenschutzerklärung sagt Löschung nach 30 Tagen zu, GitHub hält die Logs 90 Tage. Alle sechs Läufe sind noch gelistet; der Inhalt der Logs wurde nicht geladen.
 
 Schwere 3 statt 4 wie loop-redteam-2026-11-11-1: rund ein Dutzend Adressen, überwiegend Crawler, lesbar nur für angemeldete GitHub-Nutzer, Abhilfe klein. Abgegrenzt von loop-redteam-2026-11-11-1 (`ops/fetcher-cache.tsv` im Git-Baum).
+Übernommen: adressen 01, BLOCKED matthias am Gate `delete_data` (PRO-20298, Draft-PR #118) (2026-11-14)
