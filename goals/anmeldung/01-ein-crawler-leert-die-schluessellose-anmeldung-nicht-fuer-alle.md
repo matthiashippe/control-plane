@@ -1,7 +1,7 @@
 # Anmeldung Goal 01: Ein Crawler leert die schlüssellose Anmeldung nicht für alle
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Seit dem 11.11.2026 holt sich ein erklärter Crawler (User-Agent mit Crawler-Link, über wechselnde Adressen) jeden Tag alle 200
@@ -155,7 +155,7 @@ Wallet vor seinem ersten Schlüssel sieht.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD -- test/keyless-agent.test.ts test/goal-18-die-tuer.test.ts test/keyless.test.ts test/claim-keyless-own-ips.test.ts | wc -l` muss 0 ausgeben.
       Prüfung: `node scripts/check.mjs >/dev/null 2>&1; git status --porcelain -- ops/own-ips.txt | wc -l` muss 0 ausgeben.
       Prüfung: `S=$(mktemp -d); XDG_STATE_HOME=$S node scripts/check.mjs >/dev/null 2>&1; find "$S" -type f | wc -l` muss 0 ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Jede neue Testdatei und jeder neue Fall war vor dem Fix rot, soweit oben so genannt; die Zeile im Progress Log nennt, welche
@@ -184,6 +184,7 @@ Wallet vor seinem ersten Schlüssel sieht.
 ## Progress Log
 - 2026-11-14 Zyklus 1: Punkte 1, 2, 3, 4 gebaut. Produktion, nur lesend: `ops/keyless-mints.sh --since 2026-11-11 --until 2026-11-14` (Exit 0, eigene Adressen ausgelassen: 1) zählt je Tag 11./12./13./14.11. crawler 201 198/198/199/197 und 429 168/170/361/88, node 201 2/2/1/3 und 429 2/2/2/1, other 429 1/1/1/1; also 7 Ablehnungen der Art `node` und 4 der Art `other` mit 429, die Annahme ist nicht widerlegt (das Goal nannte 6 für `node`, der 14.11. lief seitdem weiter). Rot vor dem Fix: `test/keyless-crawler.test.ts` 5 von 6 (die vier Fälle zur Tagesgrenze mit 429 statt 201, 201 statt 429 und `keys_left_today` 199 statt 4, dazu der Vergleich mit dem Werkzeug, weil `ops/keyless-mints.sh` fehlte), `test/keyless-mints.test.ts` 6 von 6 ohne Werkzeug und 2 von 6 mit abgeschaltetem Filter der eigenen Adressen; der Selbsttest endet bei derselben Mutation und bei mitgezähltem GET mit `KEYLESS MINTS SELFTEST FAILED` und Exit 1. Prüfbefehle (Node 22.23.4): P1 `KEYLESS MINTS SELFTEST OK` und `0`, vitest Exit 0, `6`, `1`, `0`; P2 vitest Exit 0, `5`, `5`, `2`, `1`, vitest der drei Tür-Tests Exit 0; P3 `1`, `crawler node other other `, `1`, `7`; P4 `node scripts/check.mjs` Exit 0 (1831 passed, grün in 97 s; ein Lauf davor bei Last 3,5 je Kern rot an `test/abort-purchase.test.ts`, allein 6 von 6 grün), `0`, `0`, `0`, `0`.
 - 2026-11-14 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, nach Merge von `dev` (9d904ba, nur die Goal-Datei messung 05). Prüfbefehle (Node 22.23.4): P1 `KEYLESS MINTS SELFTEST OK` und `0`, vitest Exit 0, `6`, `1`, `0`; P2 vitest Exit 0, `5`, `5`, `2`, `1`, vitest der drei Tür-Tests Exit 0; P3 `1`, `crawler node other other `, `1`, `7`; P4 `node scripts/check.mjs` Exit 0 (1831 passed), `0`, `0`, `0`, `0`.
+- 2026-11-15 Release: PASS K und B (Zyklus 2), DONE.
 
 ## Blockers
 - keine
