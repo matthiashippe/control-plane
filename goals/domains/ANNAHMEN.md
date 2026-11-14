@@ -106,3 +106,13 @@
   ging von 01:28:26 bis 01:29:47. Das Image hat der Maker mit `bash ops/sandbox/setup.sh 72.62.51.224` neu gebaut, dem Weg aus
   `docs/sandbox/server.md`, danach lief die Messung einmal. Ein Fehlschlag ohne Bezug zum Warten belegt domains 03 weder noch
   widerlegt er es; `BLOCKED fachlich` hätte das Produkt für alle Kunden bis zum nächsten Goal ohne Image gelassen.
+- **Pin des Basis-Images (Punkt 6, Kritik).** `docker image prune -a` löscht nur Images ohne Container; ein mit `docker create`
+  angelegter, nie gestarteter Container zählt als Nutzer (Docker-Doku zu `image prune`, Option `--all`). Auf dem code-host gibt es
+  kein Docker, darum ist das nicht lokal nachgestellt, und gegen den Cron auf dem Server löst der Maker kein `prune` aus, weil das
+  den Server des Mitbewohners ändert. Der Pin trägt das Label `sandboxd.pin=1` (nicht `sandboxd=1`, das räumt `sandboxd` beim Start
+  weg) und `--network none`. `pin_fact` sagt nur `yes`, wenn der Pin auf die aktuelle Image-ID zeigt, im Zustand `created` ist und
+  kein `sandboxd=1` trägt; in jedem anderen Fall ersetzt `pin_image` ihn (`docker rm -f`, dann `docker create`), damit ein
+  gestarteter oder falsch markierter Pin nicht als Dauerabweichung in `--check` hängen bleibt. Der Selbsttest benutzt eine
+  `docker`-Attrappe auf `PATH`, die wie Docker ein `create` auf einen belegten Namen ablehnt, und dieselben Funktionen
+  `PIN_FUNCS` wie `GATHER` und `APPLY`. Ausgerollt am 14.11.2026 gegen 02:09 UTC mit `bash ops/sandbox/setup.sh 72.62.51.224`;
+  davor zeigte `--check` nur `CHANGE fact image_pin want=yes have=no`, kein Container lief, `sandboxd` wurde nicht neu gestartet.
