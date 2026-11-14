@@ -91,5 +91,6 @@ eine zweite Schreibweise derselben Signatur als neue, neu berechnete Nachricht d
 
 ## Progress Log
 - 2026-11-14 Zyklus 1: Punkte 1, 2, 3, 4, 5 gebaut: `test/relay-signature.test.ts` mit 24 Tests (22 Fälle der Tabelle fester Signaturen für `canonicalSignature`, gleiche Form für `v` 0 und 27 sowie 1 und 28, `poll`-Wiederholung mit `v` als 0 oder 1), nichts unter `src/`; jeder Test war gegen mindestens eine Mutation in einer Kopie aus `git archive HEAD` rot: `s >= HALF_N` 4 von 24, ohne Abweis von `s` gleich 0 2, `/i` am Muster 2, `signature: sig` in `routes.ts` 1, ohne obere Grenze von `s` 3, `s <= 1n` 1, ohne Faltung von `v` 0 und 1 5, nur `v` 28 7, nur `v` 27 4, ohne Abweis anderer `v` 2, ohne `toLowerCase` 2, `{130,132}` 1, ohne Musterprüfung 5. Prüfbefehle: P1 `gruen`; P2 vitest Exit 0, JSON `ok`, grep 9; P3 keine Ausgabe; P4 Diff 0, vitest Exit 0; P5 `check` Exit 0 (149 Dateien, 1747 Tests, grün in 88 s).
+- 2026-11-14 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, `dev` ohne neue Commits seit cf09ee2. Prüfbefehle: P1 `gruen`; P2 vitest Exit 0, JSON `ok`, grep 9; P3 keine Ausgabe; P4 Diff 0, vitest Exit 0; P5 `check` Exit 0 (149 Dateien, 1747 Tests, grün in 53 s).
 
 ## Blockers
