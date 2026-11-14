@@ -98,6 +98,7 @@ wie gar keiner.
 ## Progress Log
 - 2026-11-14 Widerlegungsprobe am Kopf von `dev` (9d904ba): `grep -cE "Priority|Title" ops/deploy-alarm.sh` -> 0, das Goal gilt.
 - 2026-11-14 Zyklus 1: Punkte 1, 2, 3, 4 gebaut, `ops/deploy-alarm.sh` sendet `Title: deploy-window 502` und `Priority: high`, drei neue Fälle in `test/deploy-alarm.test.ts` (vor dem Fix 3 failed, 5 passed mit `pnpm -s vitest run test/deploy-alarm.test.ts`), Titel in `ANNAHMEN.md`. Prüfbefehle: Punkt 1 grep 1, 1, 0, 1; Punkt 2 vitest Exit 0 (13 passed), grep 3, Diff 0; Punkt 3 grep 1, 1; Punkt 4 `node scripts/check.mjs` Exit 0 (1821 passed), Pfade 0, ops 0, Zustand 0.
+- 2026-11-14 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, `dev` (9d904ba) steckt schon im Goal-Branch, alle Prüfbefehle am Kopf 99ea389 erneut ausgeführt. Prüfbefehle: Punkt 1 grep 1, 1, 0, 1; Punkt 2 vitest Exit 0 (13 passed), grep 3, Diff 0; Punkt 3 grep 1, 1; Punkt 4 `node scripts/check.mjs` Exit 0, Pfade 0, ops 0, Zustand 0; PR #171 Jobs `check` und `e2e` pass.
 
 ## Blockers
 - keine
