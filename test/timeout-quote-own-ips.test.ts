@@ -4,7 +4,7 @@ import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 /**
  * ops/timeout-quote.sh tells our own calls from foreign ones by `own_ips` from ops/own-ips.sh: the list file
@@ -70,7 +70,8 @@ function sandbox(own = OWN) {
       encoding: "utf8",
       timeout: 60_000,
       env: {
-        PATH: `${join(root, "bin")}:/usr/bin:/bin`,
+        // The directory of the running node comes right after the fake ssh: on a CI runner node is not in /usr/bin.
+        PATH: `${join(root, "bin")}:${dirname(process.execPath)}:/usr/bin:/bin`,
         HOME: root,
         CP_OWN_IPS_FILE: join(root, "own.txt"),
         CP_OWN_IPS_SEEN: join(root, "seen.txt"),
