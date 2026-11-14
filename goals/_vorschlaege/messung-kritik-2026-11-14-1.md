@@ -1,0 +1,6 @@
+Schwere: 3
+Goal: messung 01
+Befund: Nach messung 01 lesen noch vier Messwerkzeuge die eigenen Adressen direkt aus `ops/own-ips.txt` statt über `own_ips`, darunter `ops/timeout-quote.sh` (Herkunft `own` der Quote) und `ops/landing-yield.sh` (Ertrag der Seite); sie sehen weder die live gesehene Adresse noch die Datei aus `CP_OWN_IPS_SEEN` und zählen eigene Anfragen als fremde, was der Zeile messung in `ROADMAP.md` („Eigene Adressen kommen nur aus `own_ips`“) widerspricht.
+Beleg: `git grep -n "own-ips" origin/dev -- ops/anzeigen-rechnung.py ops/timeout-quote.sh ops/landing-yield.sh ops/github-yield.sh` -> `ops/anzeigen-rechnung.py:42`, `ops/github-yield.sh:158`, `ops/landing-yield.sh:278`, `ops/timeout-quote.sh:46` lesen die Datei direkt
+Empfehlung: Ein Glied messung 03: die vier Werkzeuge nehmen `own_ips` (Python über `bash -c 'source ops/own-ips.sh; own_ips'`), die Überschreibung per `CP_OWN_IPS`/`CP_OWN_IPS_FILE` für Fixtures bleibt; dazu ein Test in `check`, der außer `ops/own-ips.sh` keiner Datei unter `ops/` erlaubt, `own-ips.txt` außerhalb von Kommentaren zu lesen. Das Glied kanal 05 nennt `own_ips` statt der Datei.
+MVP: Funktion, weil Quote und Ertrag der Seite die Zahlen sind, die der Loop nach außen nennt und an denen er Kanäle beurteilt.
