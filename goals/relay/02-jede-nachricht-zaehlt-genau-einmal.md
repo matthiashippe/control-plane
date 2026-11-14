@@ -110,5 +110,6 @@ Zählung des Zahlungsservers füllt, bevor sandbox 07 die ersten Automatons auf 
 
 ## Progress Log
 - 2026-11-14 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6 gebaut: canonicalSignature in `src/relay/signature.ts` bringt jede Signatur vor Prüfung, Lookup und Speichern in ihre einzige Form (auch `X-Signature` von `poll` und `count`), `to` gleich Absender bekommt 400 `recipient_is_sender`, Vertrag, Fehlerliste und `ANNAHMEN.md` ergänzt; die Testdateien kamen vorher in Commit 46722ee und waren dort rot (`relay-signature-form` 6 von 7 Tests, `relay-self-message` 5 von 6, Befund bestätigt: die großgeschriebene Form bekam eine neue `id`). Prüfbefehle: P1 Exit 0; P2 vitest Exit 0, 7 Tests; P3 vitest Exit 0, grep 2; P4 Diff 0 Dateien, vitest Exit 0; P5 1 und 2; P6 `check` Exit 0 (146 Dateien, 1709 Tests, grün in 184 s).
+- 2026-11-14 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, `dev` ohne neue Commits seit 54db0e0. Prüfbefehle: P1 Exit 0; P2 vitest Exit 0 (7 Tests), grep 7; P3 vitest Exit 0 (6 Tests), grep 2; P4 Diff 0, vitest Exit 0 (39 Tests); P5 1 und 2; P6 `check` Exit 0 (146 Dateien, 1709 Tests, 62 s); Job `e2e` am Kopf 2a54105 grün (Run 43535059544, 6 min).
 
 ## Blockers
