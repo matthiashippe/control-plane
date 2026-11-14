@@ -1,9 +1,10 @@
 # Besucheradressen in den Logs der Actions
 
 Bis zum 12.11.2026 schrieb `ops/deploy-window.sh` unter `AFFECTED` die Adresse jedes betroffenen Besuchers, und `deploy.yml` legte
-diese Ausgabe in die Logs der Actions dieses öffentlichen Repos. GitHub hält solche Logs 90 Tage lesbar, die Datenschutzerklärung der
-Seite sagt die Löschung nach 30 Tagen zu. Diese Datei hält nur Zahlen fest, nie eine Adresse. Gezählt wird mit
-`ops/actions-log-addresses.sh` (Regeln in `ops/README.md`): fremd ist eine Adresse in einer Zeile einer Anfrage, die in keiner der
+diese Ausgabe in die Logs der Actions dieses öffentlichen Repos. GitHub hielt solche Logs 90 Tage lesbar, seit dem 14.11.2026 hält
+das Repo sie höchstens 30 Tage (Abschnitt Aufbewahrung), so wie die Datenschutzerklärung der Seite die Löschung nach 30 Tagen
+zusagt. Diese Datei hält nur Zahlen fest, nie eine Adresse. Gezählt wird mit `ops/actions-log-addresses.sh` (Regeln in
+`ops/README.md`): fremd ist eine Adresse in einer Zeile einer Anfrage, die in keiner der
 Listen `ops/own-ips.txt`, `ops/known-ips.txt` und `ops/crawler-ips.txt` steht und in keinem privaten Bereich liegt. Dass der Zähler
 einen gepflanzten Treffer findet und eine eigene Adresse auslässt, zeigen die zweite Prüfung von Punkt 1 des Goals und
 `test/actions-log-addresses.test.ts`.
@@ -179,3 +180,24 @@ verschiedener fremder Adressen, 128 Läufe, davon 7 ohne Log (die sechs gelösch
 43578170234 0
 43580454007 0
 total 0
+
+## Aufbewahrung
+
+Das Repo hält Logs und Artefakte der Actions höchstens 30 Tage. Die Einstellung liest man mit:
+
+```
+gh api repos/matthiashippe/control-plane/actions/permissions/artifact-and-log-retention
+```
+
+Aufbewahrung der Logs: 30 Tage, geprüft 2026-11-14 18:43 UTC
+
+Die Einstellung gilt nur für Logs und Artefakte, die nach der Änderung entstehen; ältere behalten ihre 90 Tage, und laut Abschnitt
+Nach dem Löschen trägt keiner der älteren Läufe von deploy.yml eine fremde Adresse.
+
+Nach jedem neuen Lauf von deploy.yml zählt dieser Aufruf die fremden Adressen in allen Läufen:
+
+```
+bash ops/actions-log-addresses.sh --workflow deploy.yml
+```
+
+Er muss `total 0` ausgeben. Endet er mit Exit 2, belegt er nichts, und die Zählung muss wiederholt werden.

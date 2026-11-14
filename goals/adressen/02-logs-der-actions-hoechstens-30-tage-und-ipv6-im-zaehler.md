@@ -1,7 +1,7 @@
 # Adressen Goal 02: Logs der Actions höchstens 30 Tage und IPv6 im Zähler
 
 ## Status
-PLANNED
+DONE
 
 ## Active Objective
 Die Logs der Actions des öffentlichen Repos bleiben höchstens 30 Tage lesbar, so wie die Datenschutzerklärung der Seite die Löschung
@@ -67,16 +67,16 @@ MVP: Funktion, weil adressen 01 nur die sechs bekannten Läufe geräumt hat: Tr�
   nur Zahlen.
 
 ## Done Condition
-- [ ] `ops/actions-log-addresses.sh` zählt fremde IPv6-Adressen in Zeilen einer Anfrage, eine Adresse in zwei Schreibweisen einmal,
+- [x] `ops/actions-log-addresses.sh` zählt fremde IPv6-Adressen in Zeilen einer Anfrage, eine Adresse in zwei Schreibweisen einmal,
       lässt `::1`, `fe80::/10`, `fc00::/7`, Uhrzeiten und Adressen der Listen aus und gibt keine Adresse aus.
       MVP: Funktion, weil der Zähler sonst `total 0` meldet, sobald Besucher über IPv6 kommen.
       Prüfung: `d=$(mktemp -d); mkdir -p "$d/logs/1" "$d/logs/2"; printf '05:57:46  2001:db8::7  POST /v1/chat/completions  503\n06:00:01  ::1  GET /health  200\n06:00:02  fe80::1  GET /health  200\n06:00:03  2001:DB8:0:0:0:0:0:7  GET /health  200\n06:00:04  2001:db8:0::9  GET /health  200\n06:00:05  fd00::1  GET /health  200\n(new own address 2001:db8::5, written to own-ips.txt)\n' > "$d/logs/1/0_deploy.txt"; printf '16:41:04  2001:db8::8  GET /v1/credits/balance  502\n18:15:25  203.0.113.7  POST /v1/chat/completions  402\n18:15:26  ::ffff:203.0.113.7  GET /health  200\n' > "$d/logs/2/0_deploy.txt"; printf '2001:db8::9 2026-11-14 test\n' > "$d/own"; CP_OWN_IPS_FILE="$d/own" CP_KNOWN_IPS=/dev/null CP_CRAWLER_IPS=/dev/null bash ops/actions-log-addresses.sh --dir "$d/logs" | tr '\n' ' '` muss `1 1 2 2 total 3 ` ausgeben.
       Prüfung: `pnpm -s vitest run test/actions-log-addresses.test.ts` muss Exit-Code 0 haben.
       Prüfung: `grep -c 'IPv6' ops/README.md` muss mindestens 1 ausgeben.
-- [ ] Nach dem Human Gate `security_settings` hält das Repo Logs und Artefakte der Actions höchstens 30 Tage.
+- [x] Nach dem Human Gate `security_settings` hält das Repo Logs und Artefakte der Actions höchstens 30 Tage.
       MVP: Funktion, weil erst das die Zusage der Datenschutzerklärung für jeden künftigen Lauf einhält.
       Prüfung (Netz): `gh api repos/matthiashippe/control-plane/actions/permissions/artifact-and-log-retention --jq '.days <= 30'` muss `true` ausgeben.
-- [ ] `docs/adressen/actions-logs.md` nennt unter `## Aufbewahrung` die gemessene Einstellung mit Zeit, den Befehl, mit dem man sie
+- [x] `docs/adressen/actions-logs.md` nennt unter `## Aufbewahrung` die gemessene Einstellung mit Zeit, den Befehl, mit dem man sie
       liest, und den Aufruf des Zählers für jeden neuen Lauf, und keine Adresse.
       MVP: Funktion, weil sonst niemand weiß, wie man nachprüft, dass die Zusage gilt.
       Prüfung: `awk '/^## Aufbewahrung/{f=1;next} /^## /{f=0} f' docs/adressen/actions-logs.md | grep -cE '^Aufbewahrung der Logs: ([1-9]|[12][0-9]|30) Tage, geprüft 2026-(11|12)-[0-9]{2} [0-9]{2}:[0-9]{2} UTC$'` muss 1 ausgeben.
@@ -84,9 +84,9 @@ MVP: Funktion, weil adressen 01 nur die sechs bekannten Läufe geräumt hat: Tr�
       Prüfung: `awk '/^## Aufbewahrung/{f=1;next} /^## /{f=0} f' docs/adressen/actions-logs.md | grep -cF 'bash ops/actions-log-addresses.sh --workflow deploy.yml'` muss mindestens 1 ausgeben.
       Prüfung: `grep -cE '\b([0-9]{1,3}\.){3}[0-9]{1,3}\b' docs/adressen/actions-logs.md` muss 0 ausgeben.
       Prüfung: `grep -ciE '\b[23][0-9a-f]{3}:[0-9a-f]{0,4}:' docs/adressen/actions-logs.md` muss 0 ausgeben.
-- [ ] `check` ist grün.
+- [x] `check` ist grün.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Die neuen Testfälle waren vor dem Fix rot; die Zeile im Progress Log nennt, womit.
@@ -110,6 +110,8 @@ MVP: Funktion, weil adressen 01 nur die sechs bekannten Läufe geräumt hat: Tr�
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-14 Zyklus 1: Punkte 1 und 4 gebaut, IPv6 im Zähler (volle Form, privat `::`, `::1`, `fe80::/10`, `fc00::/7`, `::ffff:` als IPv4), sieben neue Fälle in `test/actions-log-addresses.test.ts`, davon drei gegen das alte Skript rot (`pnpm -s vitest run test/actions-log-addresses.test.ts` -> 3 failed | 16 passed), Punkte 2 und 3 warten auf das Human Gate `security_settings` (gemessen 18:36 UTC: `days` 90). Prüfbefehle: Punkt 1 Fixture -> `1 1 2 2 total 3 ` mit gawk und mawk, Gegenprobe mit dem alten Skript -> `1 0 2 1 total 1 `; vitest -> 19 passed, auch mit mawk; `grep -c 'IPv6' ops/README.md` -> 3; adressen 01 Punkt 1 -> `1 1 2 2 total 2 `, `2 0`, `da`; `node scripts/check.mjs` -> Exit 0, 1796 Tests grün.
+- 2026-11-14 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4; Punkte 2 und 3 gebaut, nachdem der Tech Lead das Gate `security_settings` aufgehoben und die Aufbewahrung auf 30 Tage gesetzt hat; `origin/dev` gemergt (schon aktuell), Abschnitt `## Aufbewahrung` mit Messung 18:43 UTC, Einleitung der Doku und Satz in `ops/README.md` auf 30 Tage gebracht. Prüfbefehle: Punkt 1 Fixture -> `1 1 2 2 total 3 `, vitest -> 19 passed, `grep -c 'IPv6' ops/README.md` -> 3; Punkt 2 -> `true` (Gegenprobe `{"days":90}` -> `false`); Punkt 3 -> 1, 1, 1, 0, 0 (Gegenproben: Zeile auf dev -> 0, mit 90 Tagen -> 0, gepflanzte IPv4- und IPv6-Adresse -> 1 und 1); adressen 01 Punkte 1 bis 3 ohne Netz grün (4, 6, 1, 1, 1, 1, 1); `node scripts/check.mjs` -> Exit 0, 1796 Tests grün.
+- 2026-11-14 Release: PASS K und B (Zyklus 2), DONE.
 
 ## Blockers
-- keine
