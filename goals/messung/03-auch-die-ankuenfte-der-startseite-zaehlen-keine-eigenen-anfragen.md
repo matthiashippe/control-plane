@@ -124,6 +124,21 @@ eigene Anfrage als fremde Ankunft diese Entscheidung nach oben verfälscht.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD | grep -cE '^(\.github|deploy|src|harness|scripts)/|^ops/(own-ips\.(sh|txt)|access-log\.sh)$'` muss 0 ausgeben.
       Prüfung: `node scripts/check.mjs >/dev/null 2>&1; git status --porcelain -- ops/own-ips.txt | wc -l` muss 0 ausgeben.
       Prüfung: `S=$(mktemp -d); XDG_STATE_HOME=$S node scripts/check.mjs >/dev/null 2>&1; find "$S" -type f | wc -l` muss 0 ausgeben.
+- [ ] (Kritik Tech Lead, 14.11.2026) Eine Liste ohne Adresse stoppt beide Werkzeuge mit Exit 2 auch dann, wenn `ssh` eine live
+      gesehene Adresse liefert und `CP_OWN_IPS_SEEN` Adressen nennt. Heute prüft `conway_own_list` nur, ob `own_ips` insgesamt
+      etwas nennt: Mit `<tmp>/own.txt` nur `# no own address`, `FAKE_LIVE=198.51.100.23` und einem Log, in dem `203.0.113.99`
+      und `192.0.2.50` je mit `GET /` und Referer von Conway-Research kommen, melden beide Werkzeuge Exit 0 und `2 arrived`,
+      zählen also eine Adresse aus der Geschichte unserer Liste als fremde. Für `ops/github-yield.sh` ist das ein Rückschritt:
+      auf `origin/dev` bricht es bei leerer Liste immer mit Exit 2 ab („the own address list is empty“). Die Prüfung auf
+      Adressen gilt der Datei (`CP_OWN_IPS`, sonst `CP_OWN_IPS_FILE`) vor dem Aufruf von `own_ips`; die Prüfung des
+      Gesamtergebnisses bleibt. Neuer Fall in `test/conway-arrivals.test.ts`:
+      `it("both tools stop with exit 2 when the own list is empty even with a live address and a seen address")` mit
+      `<tmp>/own.txt` nur `# no own address`, `FAKE_LIVE=198.51.100.23` und `<tmp>/seen.txt` gleich `192.0.2.50 2026-11-01`;
+      beide Exit 2, keine Zeile beginnt mit `LANDING YIELD` oder `GITHUB YIELD`, stderr nennt `own_ips`, stdout und stderr
+      nennen keine gepflanzte Adresse. Vor dem Fix rot (beide Exit 0); die Zeile im Progress Log nennt das.
+      Prüfung: `grep -c "both tools stop with exit 2 when the own list is empty even with a live address and a seen address" test/conway-arrivals.test.ts` muss 1 ausgeben.
+      Prüfung: `pnpm -s vitest run test/conway-arrivals.test.ts -t "even with a live address and a seen address"` muss Exit-Code 0 haben.
+      Prüfung: `pnpm -s vitest run test/conway-arrivals.test.ts test/landing-yield.test.ts test/github-yield.test.ts` muss Exit-Code 0 haben.
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
