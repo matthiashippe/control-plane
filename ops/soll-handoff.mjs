@@ -63,9 +63,17 @@ function launch(chrome, profile) {
       } else if (msg.method) for (const l of listeners) l(msg);
     }
   });
+  // Once the browser is gone every request fails at once: a request that waits for an answer that cannot come leaves the event
+  // loop empty, and node then ends with exit 0 without a single line, a green check that rendered nothing.
+  let gone = null;
   const exited = new Promise((resolve) => child.on("exit", resolve));
-  exited.then(() => { for (const { fail } of waiting.values()) fail(new Error(`browser exited: ${stderr.trim().split("\n").pop() ?? ""}`)); });
+  exited.then(() => {
+    gone = new Error(`browser exited: ${stderr.trim().split("\n").pop() ?? ""}`);
+    for (const { fail } of waiting.values()) fail(gone);
+    waiting.clear();
+  });
   const send = (method, params = {}, sessionId) => new Promise((ok, fail) => {
+    if (gone) return fail(gone);
     const n = ++id; waiting.set(n, { ok, fail });
     child.stdio[3].write(JSON.stringify({ id: n, method, params, ...(sessionId ? { sessionId } : {}) }) + "\0");
   });
@@ -73,6 +81,10 @@ function launch(chrome, profile) {
   return { send, on: (l) => listeners.push(l), close };
 }
 
+// Limits against a hanging browser, not a measure of the page: the judgement is assessHandoff() alone.
+const START_MS = 180000;
+const RENDER_MS = 120000;
+const LOAD_MS = 60000;
 const within = (ms, what, p) => Promise.race([p, new Promise((_, fail) => setTimeout(() => fail(new Error(`${what}: no answer after ${ms} ms`)), ms))]);
 
 async function renderAt(browser, width, url) {
@@ -101,7 +113,7 @@ async function renderAt(browser, width, url) {
   await send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-reduced-motion", value: "reduce" }, { name: "prefers-color-scheme", value: "dark" }] });
   await send("Page.navigate", { url });
   // Polling the document instead of the load event, which can still be the one of about:blank (see ops/soll.mjs).
-  const deadline = Date.now() + 20000;
+  const deadline = Date.now() + LOAD_MS;
   while (!(await evaluate(`location.href === ${JSON.stringify(url)} && document.readyState === "complete"`))) {
     if (Date.now() > deadline) throw new Error(`render ${width}: page did not load`);
     await new Promise((r) => setTimeout(r, 50));
@@ -145,8 +157,11 @@ async function main() {
   const browser = launch(chrome, path.join(scratch, "profile"));
   const results = [];
   try {
+    // The browser start gets its own limit: on a shared host under load (swap full, load above 100) a cold start took longer than
+    // the 60 s of one render, and the first picture failed although the page was fine (audit 2026-11-14, line 386).
+    await within(START_MS, "browser start", browser.send("Browser.getVersion"));
     for (const state of HANDOFF_STATES) for (const width of WIDTHS) {
-      const r = await within(60000, `render ${state} ${width}`, renderAt(browser, width, pathToFileURL(sourceOf(state)).href));
+      const r = await within(RENDER_MS, `render ${state} ${width}`, renderAt(browser, width, pathToFileURL(sourceOf(state)).href));
       const fresh = decodePng(r.png);
       let diffPixels = null, pngWidth;
       if (CHECK) {

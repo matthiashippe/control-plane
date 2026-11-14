@@ -74,3 +74,11 @@
   ab, wenn sandboxd den Container startet (0 Stellen mit `AbortSignal.timeout(200)`); dieselbe Ursache hat die Reparatur zu Zeile 297
   in `goals/fehler/ANNAHMEN.md` belegt. `PATH=/usr/bin:$PATH node scripts/check.mjs` auf `dev` `8eab58d` ist bei Last 4,9 je Kern
   grün (149 Dateien, 1747 Tests, 73 s); Code bleibt unverändert, weil die Ursache auf `dev` schon behoben ist.
+- Audit 2026-11-14 Zeile 386 (konto 02 Punkt 4) brach mit `render freigabe 390: no answer after 60000 ms` ab, obwohl die Seite
+  stimmt: Die 60 s des ersten Bildes schlossen den Kaltstart von Chromium ein, und der code-host lief mit Last über 100 und vollem
+  Swap. `ops/soll-handoff.mjs` wartet jetzt bis 180 s auf den Start (`Browser.getVersion`), danach bis 120 s je Bild und bis 60 s auf
+  das Laden; das Urteil bleibt allein `assessHandoff()`. Gegenprobe mit einem Chromium, der 70 s bis zum Start schläft: alter Stand
+  Exit 2 mit genau der Audit-Ausgabe, neuer Stand Exit 0 mit 0 Mängeln. Dabei fiel auf, dass ein toter Browser auf dem alten Stand
+  nach 60 s stumm mit Exit 0 endete (`close()` wartete auf eine Antwort, die Event Loop lief leer); jetzt scheitert jede Anfrage
+  an einen beendeten Browser sofort, Exit 2 mit `browser exited`. `ops/soll.mjs` (seite 01) hat dieselbe Stelle und bleibt hier
+  unverändert, weil diese Reparatur nur Zeile 386 betrifft.
