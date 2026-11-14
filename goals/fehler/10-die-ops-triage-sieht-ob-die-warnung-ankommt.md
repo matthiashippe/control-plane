@@ -1,7 +1,7 @@
 # Fehler Goal 10: Die Ops-Triage sieht, ob die Warnung ankommt
 
 ## Status
-PLANNED
+DONE
 
 ## Active Objective
 Seit fehler 09 meldet `ops/status.sh` mit `alarm_path.received`, ob die Zustellungen des Watchdogs auf dem Thema stehen. Zwei Lücken
@@ -100,46 +100,46 @@ jeder Uhrzeit, zu der er läuft.
 - Node 22 vorn im `PATH` (`PATH=/usr/bin:$PATH`), `check` und vitest im Vordergrund mit eigenem Timeout.
 
 ## Done Condition
-- [ ] `ops/watchdog.sh` postet je UTC-Tag ein Lebenszeichen in jedem der Fenster ab 00:00, 08:00 und 16:00 UTC, mit Stempel nach
+- [x] `ops/watchdog.sh` postet je UTC-Tag ein Lebenszeichen in jedem der Fenster ab 00:00, 08:00 und 16:00 UTC, mit Stempel nach
       erfolgreichem POST, und `ops/status.sh` sieht damit um 18:00 UTC nach einem ruhigen Tag `ok` oder `red`, nie `unknown`.
       MVP: Funktion, weil `received` heute ab etwa 11:05 UTC nichts mehr prüft.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/watchdog-alive-slots.test.ts --reporter=json 2>/dev/null | python3 -c 'import json,sys; r=json.load(sys.stdin); print(r["numPassedTests"] >= 5, r["numFailedTests"], r["numPendingTests"])'` muss `True 0 0` ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/watchdog-alive-slots.test.ts -t 'posts a sign of life at 00:00, 08:00 and 16:00 UTC, once per window|at every run of a quiet day the last sign of life is younger than 11 hours|a dead webhook is tried again on every run of the window|a stamp of the old format counts as a missing window|ops/status.sh at 18:00 UTC after a quiet day is never unknown' --reporter=json 2>/dev/null | python3 -c 'import json,sys; r=json.load(sys.stdin); print(r["numPassedTests"], r["numFailedTests"])'` muss `5 0` ausgeben.
       Prüfung: `grep -cE '\.skip|skipIf|\.only|\.todo' test/watchdog-alive-slots.test.ts` muss `0` ausgeben.
-- [ ] Gegenprobe Watchdog: Mit dem `ops/watchdog.sh` von `eef3eb2` sind die Fälle zu drei Fenstern und 18:00 UTC rot, mit dem neuen
+- [x] Gegenprobe Watchdog: Mit dem `ops/watchdog.sh` von `eef3eb2` sind die Fälle zu drei Fenstern und 18:00 UTC rot, mit dem neuen
       grün.
       MVP: Funktion, weil erst die Gegenprobe zeigt, dass der Test genau die Lücke des Vorschlags misst.
       Prüfung: `d=$(mktemp -d); git show eef3eb2:ops/watchdog.sh > "$d/watchdog.sh"; WATCHDOG_UNDER_TEST="$d/watchdog.sh" PATH=/usr/bin:$PATH pnpm -s vitest run test/watchdog-alive-slots.test.ts -t 'ops/status.sh at 18:00 UTC after a quiet day is never unknown' >/dev/null 2>&1 && echo gruen || echo rot` muss `rot` ausgeben.
       Prüfung: `d=$(mktemp -d); git show eef3eb2:ops/watchdog.sh > "$d/watchdog.sh"; WATCHDOG_UNDER_TEST="$d/watchdog.sh" PATH=/usr/bin:$PATH pnpm -s vitest run test/watchdog-alive-slots.test.ts -t 'posts a sign of life at 00:00, 08:00 and 16:00 UTC, once per window' >/dev/null 2>&1 && echo gruen || echo rot` muss `rot` ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/watchdog-alive-slots.test.ts -t 'ops/status.sh at 18:00 UTC after a quiet day is never unknown' >/dev/null 2>&1 && echo gruen || echo rot` muss `gruen` ausgeben.
-- [ ] Schritt 2 der Ops-Triage gibt `CP_ALERT_WEBHOOK` aus `secrets.env` nur in der Umgebung an `ops/status.sh`, und der Skill führt
+- [x] Schritt 2 der Ops-Triage gibt `CP_ALERT_WEBHOOK` aus `secrets.env` nur in der Umgebung an `ops/status.sh`, und der Skill führt
       `received` `red` als Befund und zweimal `unknown` als Hinweis.
       MVP: Funktion, weil `received` in der Triage heute immer `unknown` ist.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/ops-triage-skill.test.ts -t 'step 2 hands CP_ALERT_WEBHOOK to ops/status.sh in its environment, not as an argument|step 2 never exports the webhook|a red received is a finding and two unknown in a row a hint|the run log line names received and nothing names URL or topic' --reporter=json 2>/dev/null | python3 -c 'import json,sys; r=json.load(sys.stdin); print(r["numPassedTests"], r["numFailedTests"], r["numPendingTests"])'` muss `4 0 0` ausgeben.
       Prüfung: `grep -cF "CP_ALERT_WEBHOOK=\$(grep '^CP_ALERT_WEBHOOK=' ~/brain/connectors/secrets.env | cut -d= -f2-) ops/status.sh" .claude/skills/ops-triage/SKILL.md` muss `1` ausgeben.
       Prüfung: `grep -cE '\.skip|skipIf|\.only|\.todo' test/ops-triage-skill.test.ts` muss `0` ausgeben.
-- [ ] Gegenprobe Skill: Mit dem Skill von `eef3eb2` ist der Fall zu Schritt 2 rot, mit dem neuen grün.
+- [x] Gegenprobe Skill: Mit dem Skill von `eef3eb2` ist der Fall zu Schritt 2 rot, mit dem neuen grün.
       MVP: Funktion, weil der Test sonst nur Text bestätigt, den er selbst mitbringt.
       Prüfung: `d=$(mktemp -d); git show eef3eb2:.claude/skills/ops-triage/SKILL.md > "$d/SKILL.md"; TRIAGE_SKILL_UNDER_TEST="$d/SKILL.md" PATH=/usr/bin:$PATH pnpm -s vitest run test/ops-triage-skill.test.ts -t 'step 2 hands CP_ALERT_WEBHOOK to ops/status.sh in its environment, not as an argument' >/dev/null 2>&1 && echo gruen || echo rot` muss `rot` ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/ops-triage-skill.test.ts -t 'step 2 hands CP_ALERT_WEBHOOK to ops/status.sh in its environment, not as an argument' >/dev/null 2>&1 && echo gruen || echo rot` muss `gruen` ausgeben.
-- [ ] Die bestehenden Tests des Lebenszeichens und von `received` bleiben, wie sie sind, und sind grün.
+- [x] Die bestehenden Tests des Lebenszeichens und von `received` bleiben, wie sie sind, und sind grün.
       MVP: Funktion, weil die Regeln aus fehler 07 und 09 weiter gelten müssen.
       Prüfung: `git diff --name-only origin/dev...HEAD -- test/watchdog-alive.test.ts test/status-alarm-received.test.ts test/status-alarm-path.test.ts ops/status.sh | wc -l` muss `0` ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/watchdog-alive.test.ts test/status-alarm-received.test.ts test/status-alarm-path.test.ts test/watchdog-webhook-fail-daily.test.ts --reporter=json 2>/dev/null | python3 -c 'import json,sys; r=json.load(sys.stdin); print(r["numFailedTests"], r["numPendingTests"])'` muss `0 0` ausgeben.
-- [ ] URL und Thema stehen nirgends: nicht im Diff, nicht als Argument, nicht in einer Ausgabe des Skills.
+- [x] URL und Thema stehen nirgends: nicht im Diff, nicht als Argument, nicht in einer Ausgabe des Skills.
       MVP: Funktion, weil wer das Thema kennt, auf das Telefon von Matthias schreiben kann und das Repo öffentlich ist.
       Prüfung: `git diff origin/dev...HEAD | grep -cE 'ntfy\.sh/[A-Za-z0-9_-]'` muss `0` ausgeben.
       Prüfung: `git diff origin/dev...HEAD -- test/ | grep -E '^\+' | grep -oE 'https?://[A-Za-z0-9.-]+' | grep -vcE '\.invalid$'` muss `0` ausgeben.
-- [ ] `ops/README.md` erklärt die drei Fenster des Lebenszeichens und dass die Ops-Triage `CP_ALERT_WEBHOOK` mitgibt.
+- [x] `ops/README.md` erklärt die drei Fenster des Lebenszeichens und dass die Ops-Triage `CP_ALERT_WEBHOOK` mitgibt.
       MVP: Funktion, weil die Ops-Triage ihre Schwellen aus dieser Datei liest.
       Prüfung: `grep -c '08:00' ops/README.md` muss mindestens 1 ausgeben.
       Prüfung: `grep '^| `alarm_path.received.status` |' ops/README.md | grep -ci 'ops.triage'` muss `1` ausgeben.
-- [ ] Nur `ops/watchdog.sh`, `ops/README.md`, `.claude/skills/ops-triage/SKILL.md`, die beiden neuen Tests und Dateien des Goals ändern
+- [x] Nur `ops/watchdog.sh`, `ops/README.md`, `.claude/skills/ops-triage/SKILL.md`, die beiden neuen Tests und Dateien des Goals ändern
       sich, und `check` ist grün.
       Prüfung: `git diff --name-only origin/dev...HEAD | grep -vE '^(ops/watchdog\.sh|ops/README\.md|\.claude/skills/ops-triage/SKILL\.md|test/watchdog-alive-slots\.test\.ts|test/ops-triage-skill\.test\.ts|goals/fehler/)' | wc -l` muss `0` ausgeben.
       Prüfung: `git diff --name-only origin/dev...HEAD -- src deploy ops/status.sh ops/webhook-last.sh ops/webhook-unreachable.sh | wc -l` muss `0` ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Die Zeile im Progress Log nennt beide Gegenproben: alter Watchdog in den Fällen zu drei Fenstern und 18:00 UTC rot, alter Skill
@@ -165,5 +165,8 @@ jeder Uhrzeit, zu der er läuft.
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-14 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6, 7, 8 gebaut: `ops/watchdog.sh` postet das Lebenszeichen in drei Fenstern (00:00, 08:00, 16:00 UTC, Stempel `JJJJ-MM-TTTHH`), Schritt 2 der Ops-Triage gibt `CP_ALERT_WEBHOOK` nur in der Umgebung mit, `received` `red` ist Befund und zweimal `unknown` Hinweis, `ops/README.md` nennt beides; neue Tests `test/watchdog-alive-slots.test.ts` (gegen den Watchdog von `eef3eb2` 5 von 5 rot, darunter drei Fenster und 18:00 UTC, neu 5 von 5 grün) und `test/ops-triage-skill.test.ts` (gegen den Skill von `eef3eb2` 4 von 4 rot, Schritt 2 mit `webhook=<unset>`, neu 4 von 4 grün). Prüfbefehle: P1 `True 0 0`, `5 0`, `0`; P2 `rot`, `rot`, `gruen`; P3 `4 0 0`, `1`, `0`; P4 `rot`, `gruen`; P5 `0`, `0 0`; P6 `0`, `0`; P7 `1`, `1`; P8 `0`, `0`, `check` Exit 0 (1789 Tests).
+- 2026-11-14 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, 7, 8, nach Merge von `dev` (`6b08671`) in den Goal-Branch. Prüfbefehle: P1 `True 0 0`, `5 0`, `0`; P2 alter Watchdog `rot` (18:00 UTC), `rot` (drei Fenster), neu `gruen`; P3 `4 0 0`, `1`, `0`; P4 alter Skill `rot`, neu `gruen`; P5 `0`, `0 0`; P6 `0`, `0`; P7 `1`, `1`; P8 `0`, `0`, `check` Exit 0 (1789 Tests).
+- 2026-11-14 Release: PASS K und B (Zyklus 2), DONE.
 
 ## Blockers
