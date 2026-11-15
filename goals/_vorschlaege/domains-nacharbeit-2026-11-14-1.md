@@ -8,3 +8,4 @@ MVP: Funktion, weil danach `check` vor dem Merge rot wird, wenn ein Goal den Pin
 Linse Q, Frage 1. `ops/prompts/verifier.md`, Abschnitt „Für diesen Loop“: ein Done-Punkt, dessen Test `check` nicht findet, ist ein Gap; die Punkte 2 und 6 von domains 04 prüfen nur über diesen Selbsttest.
 Am Merge 479f6dfd ist der Selbsttest grün (`SETUP SELFTEST OK`, Exit 0). Ihn fährt heute nur der nächtliche Loop-Audit als Regression von sandbox 02 und 03 (docs/audit/2026-11-13.md:252), also erst nach dem Merge.
 Der offene PR #100 (sandbox 07) ändert `setup.sh` erneut, ohne einen solchen Test.
+Übernommen: domains 06, DONE und gemergt (PR #155) (2026-11-15)

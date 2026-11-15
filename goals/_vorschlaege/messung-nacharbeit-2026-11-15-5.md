@@ -6,3 +6,4 @@ Empfehlung: Einen Fall in `test/deploy-alarm-pending.test.ts` ergänzen, der bei
 MVP: Funktion, weil ein nachgeholter Alarm, der in die falsche Datei geht, wieder niemanden erreicht, also genau der Fall, für den messung 06 gebaut ist.
 
 Linse Q, Frage 2 (Duplikat mit Driftgefahr), Merge 9e9f5ae. Jeder Test des Goals setzt `CP_WATCHDOG_STATE` in der Crontab, der Weg über den Standardwert läuft also nie; die älteren Tests in `test/deploy-alarm.test.ts` laufen dagegen über ihn und versuchen dabei `/var/lib/cp-watchdog.state.deploy-502` zu schreiben, was die Goal-Datei für normale Nutzer als stilles Scheitern hinnimmt.
+Übernommen: Triage-Glieder PRO-21518 an den Tech Lead, Glied 5 (Pfad der Merkdatei gleich gehalten) (2026-11-15)

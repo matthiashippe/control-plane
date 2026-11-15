@@ -6,3 +6,4 @@ Empfehlung: Das Muster in `setup.sh` einmal als Shell-Variable führen und in be
 MVP: Schönheit
 
 Linse Q, Frage 2 (Logik-Duplikat), Merge 8eab58d. Weitet `sandboxd` das Muster, verweigert `--client-key-reset` mit „the state of sandboxd is not readable“ statt zu zählen; das schlägt sicher fehl, kostet aber einen Lauf, bis jemand die Kopie findet. Die beiden Kopien in `setup.sh` laufen an verschiedenen Orten (code-host und `deploy-cp-1`), deshalb stehen sie als eingebetteter Text; ein gemeinsames Teilstück ändert daran nichts.
+Verworfen: Schwere 1, die Kopie des Kontomusters scheitert sicher, ohne Wirkung beim Kunden (2026-11-15)

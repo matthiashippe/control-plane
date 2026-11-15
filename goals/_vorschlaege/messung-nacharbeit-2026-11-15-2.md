@@ -6,3 +6,4 @@ Empfehlung: Die Prüfung in `ops/own-ips.sh` als eine Funktion (etwa `own_ips_ch
 MVP: Funktion, weil jede Kopie, die beim nächsten Umbau auseinanderläuft, eigene Anfragen wieder als fremde zählen kann, und das trifft Quote, Ertrag der Seite und Konversion der Anzeigen.
 
 Linse Q, Frage 2 (Logik-Duplikate), Merge 6ceb63d. Das Leere-Liste-Kriterium ist zweimal als `awk '!/^#/ && NF { n++ } END { exit !n }'` (ops/anzeigen-rechnung.py:36, ops/timeout-quote.sh:68) und einmal als `grep -v '^#' | awk 'NF {print $1}' | grep -q .` (ops/conway-arrivals.sh:34) geschrieben. Verwandt mit messung-kritik-2026-11-14-7 (Wächter für Leser von `CP_OWN_IPS_FILE`), das diese Prüfungen als Ausnahmen führt, statt sie zusammenzulegen.
+Übernommen: Triage-Glieder PRO-21518 an den Tech Lead, Glied 4 (eine Sperre für die eigene Liste in `ops/own-ips.sh`) (2026-11-15)

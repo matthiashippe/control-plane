@@ -7,3 +7,4 @@ MVP: Schönheit
 
 Linse Q, Frage 1 (Randfall). Nachgestellt in einer Wegwerfkopie von ops/live.sh am Stand origin/dev: Präfix auf `^/.*` geweitet, dann ergibt `/etc/x.exit` `files /etc/x.exit /root/.exec/a.out`, `/etc/passwd` weiter `nofiles`, der Test bliebe also grün.
 Linse K hat den Fall im Hinweis an die Nacharbeit gegeben (goals/sandbox/verdicts/05-z3-K.md, Abschnitt Hinweis, erster Punkt).
+Verworfen: Schwere 1 ohne Wirkung beim Kunden (Triage-Glieder PRO-21463) (2026-11-15)

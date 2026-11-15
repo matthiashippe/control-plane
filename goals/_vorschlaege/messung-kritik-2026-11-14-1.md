@@ -4,3 +4,4 @@ Befund: Nach messung 01 lesen noch vier Messwerkzeuge die eigenen Adressen direk
 Beleg: `git grep -n "own-ips" origin/dev -- ops/anzeigen-rechnung.py ops/timeout-quote.sh ops/landing-yield.sh ops/github-yield.sh` -> `ops/anzeigen-rechnung.py:42`, `ops/github-yield.sh:158`, `ops/landing-yield.sh:278`, `ops/timeout-quote.sh:46` lesen die Datei direkt
 Empfehlung: Ein Glied messung 03: die vier Werkzeuge nehmen `own_ips` (Python über `bash -c 'source ops/own-ips.sh; own_ips'`), die Überschreibung per `CP_OWN_IPS`/`CP_OWN_IPS_FILE` für Fixtures bleibt; dazu ein Test in `check`, der außer `ops/own-ips.sh` keiner Datei unter `ops/` erlaubt, `own-ips.txt` außerhalb von Kommentaren zu lesen. Das Glied kanal 05 nennt `own_ips` statt der Datei.
 MVP: Funktion, weil Quote und Ertrag der Seite die Zahlen sind, die der Loop nach außen nennt und an denen er Kanäle beurteilt.
+Übernommen: messung 03 und 04, DONE und gemergt (PR #162 und #165) (2026-11-15)

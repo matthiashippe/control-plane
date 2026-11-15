@@ -6,3 +6,4 @@ Empfehlung: Im Fall „sends a title and priority high like the watchdog“ den 
 MVP: Funktion, weil `received` im Alarmweg sonst nach jedem Deploy-Alarm einen stummen Watchdog als gesund melden kann.
 
 Linse Q, Frage 1 (Verhalten der neuen Tests), Merge 7bb6d62. messung-kritik-2026-11-14-9 sichert die Seite von `ops/status.sh` ab (Präfix statt genauer Titel); dieser Vorschlag sichert die Seite des Senders, beide Tests zusammen schließen die Lücke.
+Übernommen: Triage-Glieder PRO-21518 an den Tech Lead, Glied 3 (Titel des Deploy-Alarms genau geprüft, mit messung 09) (2026-11-15)
