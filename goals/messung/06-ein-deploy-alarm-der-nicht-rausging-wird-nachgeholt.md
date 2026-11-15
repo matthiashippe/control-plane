@@ -1,7 +1,7 @@
 # Messung Goal 06: Ein Deploy-Alarm, der nicht rausging, wird nachgeholt
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Seit messung 02 und 05 meldet `ops/deploy-window.sh` jeden 502 an eine fremde Anfrage nach einem Rollout über
@@ -123,7 +123,7 @@ jemanden erreicht.
       Prüfung: `grep -cE 'it\("watchdog logs a sent deploy alarm as deploy alarm delivered, not as webhook delivered"' test/deploy-alarm-pending.test.ts` muss 1 ausgeben.
       Prüfung: `pnpm -s vitest run test/deploy-alarm-pending` muss Exit-Code 0 haben.
       Prüfung: `grep -c 'deploy alarm delivered' ops/README.md` muss mindestens 1 ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Die sechs neuen Fälle waren vor dem Fix rot; die Zeile im Progress Log nennt sie und womit.
@@ -152,6 +152,7 @@ jemanden erreicht.
 - 2026-11-15 Zyklus 1: Punkte 1, 2, 3, 4, 5 gebaut: `ops/deploy-window.sh` endet bei ALARM NOT SENT mit Exit 3, `ops/deploy-alarm.sh` hängt bei rotem POST und fehlender Webhook-Zeile `<count> <HH:MM:SS>` an `<state>.deploy-502` (Zustandspfad aus der Crontab), `ops/watchdog.sh` sendet die Datei vor dem Health-Check mit `Title: deploy-window 502` und `Priority: high` und löscht sie erst nach zugestelltem POST, dazu `ops/README.md` und `test/deploy-alarm-pending.test.ts`; vor dem Fix waren alle 6 neuen Fälle rot (`pnpm -s vitest run test/deploy-alarm-pending` -> 6 failed, 6 Tests). Prüfbefehle: P1 `Exit 3` 3, `ALARM NOT SENT` 1, Selftest Exit 0; P2 `deploy-502` 2, `CP_WATCHDOG_STATE` 1, `curl`-Zeile 1; P3 `deploy-502` 2, Titelzeile 1, README `deploy-502` 3; P4 vitest Exit 0 (10 Dateien, 51 Tests), sechs Testnamen 6, fremde Tests 0; P5 `check` Exit 0 (163 Dateien, 1840 Tests), gesperrte Pfade 0, fremde ops-Dateien 0, Dateien unter XDG_STATE_HOME 0.
 - 2026-11-15 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5; `dev` ohne neue Commits seit der Merge-Basis 19ac027, kein Merge nötig. Prüfbefehle: P1 `Exit 3` 3, `ALARM NOT SENT` 1, Selftest Exit 0; P2 `deploy-502` 2, `CP_WATCHDOG_STATE` 1, `curl`-Zeile 1; P3 `deploy-502` 2, Titelzeile 1, README `deploy-502` 3; P4 vitest Exit 0 (10 Dateien, 51 Tests), sechs Testnamen 6, fremde Tests 0; P5 `check` Exit 0 (163 Dateien, 1840 Tests, 180 s), gesperrte Pfade 0, fremde ops-Dateien 0, Dateien unter XDG_STATE_HOME 0; Job `check` am PR grün, `e2e` lief beim Melden noch (Diff ohne Laufzeitpfad).
 - 2026-11-15 Zyklus 3: Punkt 6 gebaut: `ops/watchdog.sh` schreibt nach dem zugestellten POST eines nachgeholten Deploy-Alarms `[INFO] deploy alarm delivered` statt `[INFO] webhook delivered`, `ops/README.md` nennt die Zeile, neuer Fall in `test/deploy-alarm-pending.test.ts` und die Log-Erwartung von Fall 4 angepasst; vor dem Fix rot (`pnpm -s vitest run test/deploy-alarm-pending` -> 2 failed, 7 Tests). Prüfbefehle: P6 Testname 1, vitest Exit 0 (7 Tests), README `deploy alarm delivered` 1; P1 3, 1, Selftest Exit 0; P2 2, 1, 1; P3 2, 1, 3; P4 vitest Exit 0 (10 Dateien, 52 Tests), sechs Testnamen 6, fremde Tests 0; P5 `check` Exit 0 (163 Dateien, 1841 Tests), gesperrte Pfade 0, fremde ops-Dateien 0, Dateien unter XDG_STATE_HOME 0.
+- 2026-11-15 Release: PASS K und B (Zyklus 3), DONE.
 
 ## Blockers
 - keine
