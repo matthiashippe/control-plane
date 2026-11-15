@@ -111,6 +111,18 @@ jemanden erreicht.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD | grep -cE '^(\.github|deploy|src|harness|scripts|docs)/|^goals/kanal/'` muss 0 ausgeben.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD -- ops | grep -vcE '^ops/(deploy-window\.sh|deploy-alarm\.sh|watchdog\.sh|README\.md)$'` muss 0 ausgeben.
       Prüfung: `S=$(mktemp -d); XDG_STATE_HOME=$S node scripts/check.mjs >/dev/null 2>&1; find "$S" -type f | wc -l` muss 0 ausgeben.
+- [ ] (Kritik) Ein nachgeholter Deploy-Alarm färbt `alarm_path.received` in `ops/status.sh` nicht rot: `ops/watchdog.sh`
+      schreibt nach seinem zugestellten POST die Zeile `[INFO] deploy alarm delivered` statt `[INFO] webhook delivered`, weil
+      `ops/webhook-last.sh` jede Zeile `[INFO] webhook delivered` als Zustellung des Watchdogs liest und `ops/status.sh` dazu
+      eine Meldung mit Titel `control-plane …` auf dem Thema verlangt, die es zu `Title: deploy-window 502` nicht gibt (heute
+      Zeile 91 von `ops/watchdog.sh`, rot bis zum nächsten Zeichen des Lebens, bis zu acht Stunden). Ein roter POST schreibt
+      weiter `[WARN] webhook unreachable`. Der neue Fall in `test/deploy-alarm-pending.test.ts` läuft mit `CP_WATCHDOG_ALIVE=0`
+      und gesundem Health-Check ohne Zustandswechsel, sendet eine Merkdatei und verlangt im Log genau eine Zeile, die auf
+      `/\[INFO\] deploy alarm delivered$/` endet, und keine, die auf `/\[INFO\] webhook delivered$/` endet; `ops/README.md`
+      nennt die Zeile im Abschnitt „Watchdog on the VM“.
+      Prüfung: `grep -cE 'it\("watchdog logs a sent deploy alarm as deploy alarm delivered, not as webhook delivered"' test/deploy-alarm-pending.test.ts` muss 1 ausgeben.
+      Prüfung: `pnpm -s vitest run test/deploy-alarm-pending` muss Exit-Code 0 haben.
+      Prüfung: `grep -c 'deploy alarm delivered' ops/README.md` muss mindestens 1 ausgeben.
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
