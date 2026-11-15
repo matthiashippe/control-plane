@@ -16,6 +16,9 @@ import { join } from "node:path";
 const SCRIPT = join(__dirname, "..", "ops", "deploy-window.sh");
 const LISTED = "192.0.2.10";
 const SEEN = "192.0.2.44";
+const ENV_OWN = "198.51.100.7";
+// No run may print an address: the output of ops/deploy-window.sh lands in public Actions logs.
+const ANY_ADDRESS = /\b(192\.0\.2|198\.51\.100|203\.0\.113)\.\d+\b/;
 const AT = "2026-11-01T12:00:00";
 const T0 = Date.parse(`${AT}Z`) / 1000;
 
@@ -25,7 +28,7 @@ function row(offset: number, ip: string, method: string, uri: string, status: nu
   return JSON.stringify({ ts: T0 + offset, request: { remote_ip: ip, method, uri }, status });
 }
 
-function sandbox(opts: { list?: string; seen?: string; seenVar?: boolean } = {}) {
+function sandbox(opts: { list?: string; seen?: string; seenVar?: boolean; ownIps?: string } = {}) {
   const root = mkdtempSync(join(tmpdir(), "deploy-window-own-seen-"));
   mkdirSync(join(root, "bin"));
   const mark = join(root, "ssh-called");
@@ -48,8 +51,10 @@ function sandbox(opts: { list?: string; seen?: string; seenVar?: boolean } = {})
       CP_OWN_IPS_FILE: list,
     };
     if (seenVar) env.CP_OWN_IPS_SEEN = seen;
+    if (opts.ownIps !== undefined) env.CP_OWN_IPS = opts.ownIps;
     const r = spawnSync("bash", [SCRIPT, "--at", AT, "--log", log], { cwd: root, encoding: "utf8", timeout: 60_000, env });
     const out = `${r.stdout}${r.stderr}`;
+    expect(out, "a run printed an address").not.toMatch(ANY_ADDRESS);
     return { status: r.status, out, lines: out.split("\n").filter(Boolean), sshCalled: existsSync(mark) };
   };
   return { run, list, seen };
@@ -91,5 +96,12 @@ describe("ops/deploy-window.sh --log counts the addresses in CP_OWN_IPS_SEEN as 
     expect(readFileSync(box.seen, "utf8")).toBe(seenBefore);
     expect(readFileSync(box.list, "utf8")).toBe(listBefore);
     expect(r.sshCalled).toBe(false);
+  });
+
+  it("--log counts an address only in CP_OWN_IPS as ours and prints no address", () => {
+    const r = sandbox({ seen: "", ownIps: ENV_OWN }).run([row(5, ENV_OWN, "GET", "/health", 502)]);
+    expect(r.status, r.out).toBe(0);
+    expect(r.lines.filter((l) => /^ours {5}1 request/.test(l))).toHaveLength(1);
+    expect(r.out).not.toMatch(/^BAD GATEWAY/m);
   });
 });
