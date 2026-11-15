@@ -23,6 +23,16 @@ CERT_WARN_DAYS="${CP_CERT_WARN_DAYS:-20}"
 CREDIT_TIMEOUT="${CP_CREDIT_TIMEOUT:-45}"
 TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
+# The one POST to the webhook, for every message of this script: the Title and Priority headers, then the text. Exits
+# non-zero when there was no answer or the webhook answered with an HTTP error (`--fail`).
+post_webhook() {
+  curl -s --fail -m 15 -X POST "$WEBHOOK" \
+    -H "Content-Type: text/plain" \
+    -H "$1" \
+    -H "$2" \
+    --data "$3" >/dev/null
+}
+
 # Exits non-zero when the POST failed: no answer or an HTTP error of the webhook (`--fail`). The caller then keeps the
 # old state, so the next run sends the message again. Every delivered POST leaves `[INFO] webhook delivered`, so
 # ops/status.sh can tell a failure that is over from one that still lasts (ops/webhook-last.sh).
@@ -35,11 +45,7 @@ report() {
     ALIVE) priority=min ;;
     *) priority=high ;;
   esac
-  if ! curl -s --fail -m 15 -X POST "$WEBHOOK" \
-    -H "Content-Type: text/plain" \
-    -H "Title: control-plane $severity" \
-    -H "Priority: $priority" \
-    --data "control-plane $severity: $text ($URL, $TS)" >/dev/null; then
+  if ! post_webhook "Title: control-plane $severity" "Priority: $priority" "control-plane $severity: $text ($URL, $TS)"; then
     echo "$TS [WARN] webhook unreachable"
     return 1
   fi
@@ -80,11 +86,7 @@ send_kept_deploy_alarm() {
   text=$(printf '%s\n' "$kept" | awk '$1 ~ /^[0-9]+$/ && $2 ~ /^[0-9][0-9]:[0-9][0-9]:[0-9][0-9]$/ {
     printf "%s%s request(s) from outside answered 502 after the rollout at %s UTC", (n++ ? "; " : ""), $1, $2 }')
   [[ -n "$text" ]] || text="a deploy alarm was kept, its lines are not readable"
-  if ! curl -s --fail -m 15 -X POST "$WEBHOOK" \
-    -H "Content-Type: text/plain" \
-    -H "Title: deploy-window 502" \
-    -H "Priority: high" \
-    --data "deploy window, sent late by the watchdog: $text" >/dev/null; then
+  if ! post_webhook "Title: deploy-window 502" "Priority: high" "deploy window, sent late by the watchdog: $text"; then
     echo "$TS [WARN] webhook unreachable"
     return 0
   fi
