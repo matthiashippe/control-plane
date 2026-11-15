@@ -44,6 +44,15 @@ Frei: RDAP der Registry von .dev antwortet 404 (nicht registriert), 2026-11-13 1
   `curl -s -o /dev/null -w '%{http_code}' https://pubapi.registry.google/rdap/domain/sandboxhost.dev` (404 heißt frei;
   `agentsandbox.dev` als Gegenprobe gibt 200, vergeben).
 
+Entscheidung Matthias, 15.11.2026: Gekauft wird `sandboxhost.de` bei INWX (etwa 6 € im Jahr), weil Cloudflare Registrar keine
+`.de` verkauft. Die Zone liegt im Cloudflare-Konto von HTC (Nameserver `dolly.ns.cloudflare.com` und `kobe.ns.cloudflare.com`),
+der Token `sbx-ports` gilt nur für sie. Die Adressen lauten `https://sbx-<id>-<port>.sandboxhost.de`.
+
+- `sandboxhost.de` war am 2026-11-15 um 16:49 UTC noch frei: `curl -s -o /dev/null -w '%{http_code}' https://rdap.denic.de/domain/sandboxhost.de`
+  gibt 404, `denic.de` als Gegenprobe 200. Status der Zone zur selben Zeit `pending` (Nameserver noch nicht bei INWX gesetzt).
+- `.de` steht nicht auf der HSTS-Preload-Liste. Den Ersatz trägt die Zone: „Always Use HTTPS“ an, gesetzt von
+  `cloudflare.py ports-apply` und geprüft von `ports-check`, damit jeder Aufruf über `http://` auf HTTPS umgeleitet wird.
+
 ## Zone der Zahlung
 
 In der Zone `postyourprice.com` löscht das Goal genau den Eintrag `*.postyourprice.com`; alle anderen Einträge und der SSL-Modus

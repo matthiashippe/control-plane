@@ -18,7 +18,7 @@ ctl.sbx.postyourprice.com {
 # /etc/caddy/sbx/, which ops/sandbox/setup.sh --origin-cert puts there (0600, owner caddy); certificate and key never enter the
 # repo. The site name already pins the domain, so the matcher only checks the label. sandboxd answers 404 for every name it does
 # not know, so no sandbox shows up under an arbitrary name of the zone.
-*.sandboxhost.dev {
+*.sandboxhost.de {
 	tls /etc/caddy/sbx/origin.pem /etc/caddy/sbx/origin.key
 	@sandbox header_regexp Host ^sbx-[a-z0-9]{1,11}-[0-9]{1,5}\.
 	handle @sandbox {

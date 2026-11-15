@@ -6,15 +6,16 @@ Runs on the code-host only. Two zones, two tokens, each never printed and never 
 - the zone of the payment service, postyourprice.com, token CLOUDFLARE_HTC_API_TOKEN. Here only ctl.sbx.postyourprice.com
   (A, not proxied, no AAAA) is managed, and the old wildcard *.postyourprice.com must be gone.
 - the zone of exposed ports, the domain from SANDBOXD_DOMAIN in sandboxd.service, token CLOUDFLARE_SBX_API_TOKEN, scoped to
-  that zone only (Zone DNS Edit, Zone SSL and Certificates Edit, Zone Settings Edit). Managed: *.<domain> (A, proxied) and the
-  SSL mode Full (strict).
+  that zone only (Zone DNS Edit, Zone SSL and Certificates Edit, Zone Settings Edit). Managed: *.<domain> (A, proxied), the
+  SSL mode Full (strict) and Always Use HTTPS on.
 
 A token is read from the environment or from ~/brain/connectors/secrets.env.
 
   cloudflare.py dns-check <ip>      payment zone: one CHANGE line per record that would change, last line CF DNS OK changed=0
   cloudflare.py dns-apply <ip>      payment zone: create ctl.sbx, delete exactly the record(s) named *.postyourprice.com
   cloudflare.py ports-check <ip>    ports zone, read only: one CHANGE line per deviation, last line PORTS DNS OK
-  cloudflare.py ports-apply <ip>    ports zone: create *.<domain>, set SSL to Full (strict); never deletes a record
+  cloudflare.py ports-apply <ip>    ports zone: create *.<domain>, set SSL to Full (strict) and Always Use HTTPS on; never
+                                    deletes a record
   cloudflare.py origin-cert <dir>   write origin.pem and origin.key for *.<domain> and <domain> into <dir> (0600)
   cloudflare.py zone-digest <zone>  read only: sha256 over the sorted records except *.<zone> and the SSL mode, first 12 hex
   cloudflare.py --selftest          without network: the planners report planted deviations and a clean zone not
@@ -100,6 +101,10 @@ def ssl_mode(zone, z):
     return call(kind_of(zone), "GET", f"/zones/{z}/settings/ssl")["value"]
 
 
+def always_https(zone, z):
+    return call(kind_of(zone), "GET", f"/zones/{z}/settings/always_use_https")["value"]
+
+
 # ---- planners: pure, so the selftest can feed them planted zones
 
 def plan_payment(recs, ip):
@@ -119,8 +124,10 @@ def plan_payment(recs, ip):
     return out
 
 
-def plan_ports(recs, ssl, ip, domain):
-    """[(action, what)] for the ports zone: *.<domain> A proxied to ip, SSL strict."""
+def plan_ports(recs, ssl, https, ip, domain):
+    """[(action, what)] for the ports zone: *.<domain> A proxied to ip, SSL strict, Always Use HTTPS on.
+
+    The ports domain may sit under a TLD without HSTS preload (.de), so Cloudflare redirects every plain http call."""
     out = []
     w = {"type": "A", "name": f"*.{domain}", "content": ip, "proxied": True}
     same = [r for r in recs if r["name"] == w["name"] and r["type"] in ("A", "AAAA", "CNAME")]
@@ -131,6 +138,7 @@ def plan_ports(recs, ssl, ip, domain):
     else:
         out.append(("conflict", w))
     out.append(("ok" if ssl == "strict" else "ssl", {"type": "SSL", "name": domain, "content": "strict", "have": ssl}))
+    out.append(("ok" if https == "on" else "https", {"type": "HTTPS", "name": domain, "content": "on", "have": https}))
     return out
 
 
@@ -182,19 +190,23 @@ def dns_apply(ip):
 def ports_check(ip):
     domain = ports_domain()
     z = zone_id(domain)
-    return report(plan_ports(records(domain, z), ssl_mode(domain, z), ip, domain), "PORTS DNS OK", "ports")
+    steps = plan_ports(records(domain, z), ssl_mode(domain, z), always_https(domain, z), ip, domain)
+    return report(steps, "PORTS DNS OK", "ports")
 
 
 def ports_apply(ip):
     domain = ports_domain()
     z = zone_id(domain)
-    for action, w in plan_ports(records(domain, z), ssl_mode(domain, z), ip, domain):
+    for action, w in plan_ports(records(domain, z), ssl_mode(domain, z), always_https(domain, z), ip, domain):
         if action == "create":
             call("ports", "POST", f"/zones/{z}/dns_records", {**w, "ttl": 1})
             print(f"created {w['type']} {w['name']}")
         elif action == "ssl":
             call("ports", "PATCH", f"/zones/{z}/settings/ssl", {"value": "strict"})
             print(f"ssl {domain} strict")
+        elif action == "https":
+            call("ports", "PATCH", f"/zones/{z}/settings/always_use_https", {"value": "on"})
+            print(f"always_use_https {domain} on")
         elif action == "conflict":
             sys.exit(f"cloudflare: {w['name']} exists with other content, left unchanged")
     return ports_check(ip)
@@ -250,14 +262,15 @@ def selftest():
     expect("payment ctl proxied is a conflict", [("conflict", ctl["name"])], acts(plan_payment([{**ctl, "proxied": True}], ip)))
 
     pw = {"id": "4", "type": "A", "name": f"*.{dom}", "content": ip, "proxied": True, "ttl": 1}
-    ports = lambda recs, ssl: [a for a, _ in plan_ports(recs, ssl, ip, dom)]
-    expect("ports zone clean", ["ok", "ok"], ports([pw], "strict"))
-    expect("ports record missing", ["create", "ok"], ports([], "strict"))
-    expect("ports record not proxied", ["conflict", "ok"], ports([{**pw, "proxied": False}], "strict"))
-    expect("ports record other address", ["conflict", "ok"], ports([{**pw, "content": "198.51.100.9"}], "strict"))
-    expect("ports ssl full is not strict", ["ok", "ssl"], ports([pw], "full"))
-    expect("ports zone clean prints PORTS DNS OK", 0, report(plan_ports([pw], "strict", ip, dom), "PORTS DNS OK", "ports"))
-    expect("ports drift counts", 2, report(plan_ports([], "flexible", ip, dom), "PORTS DNS OK", "ports"))
+    ports = lambda recs, ssl, https="on": [a for a, _ in plan_ports(recs, ssl, https, ip, dom)]
+    expect("ports zone clean", ["ok", "ok", "ok"], ports([pw], "strict"))
+    expect("ports record missing", ["create", "ok", "ok"], ports([], "strict"))
+    expect("ports record not proxied", ["conflict", "ok", "ok"], ports([{**pw, "proxied": False}], "strict"))
+    expect("ports record other address", ["conflict", "ok", "ok"], ports([{**pw, "content": "198.51.100.9"}], "strict"))
+    expect("ports ssl full is not strict", ["ok", "ssl", "ok"], ports([pw], "full"))
+    expect("ports plain http is not redirected", ["ok", "ok", "https"], ports([pw], "strict", "off"))
+    expect("ports zone clean prints PORTS DNS OK", 0, report(plan_ports([pw], "strict", "on", ip, dom), "PORTS DNS OK", "ports"))
+    expect("ports drift counts", 3, report(plan_ports([], "flexible", "off", ip, dom), "PORTS DNS OK", "ports"))
 
     base = digest([ctl, apex], "full", PAYMENT_ZONE)
     expect("digest ignores the wildcard", base, digest([wild, ctl, apex], "full", PAYMENT_ZONE))

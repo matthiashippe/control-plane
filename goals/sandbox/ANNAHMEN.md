@@ -254,15 +254,23 @@
   steht im Code genau an einer Stelle je Datei: `SANDBOXD_DOMAIN` in `ops/sandbox/sandboxd.service` (daraus lesen
   `cloudflare.py` und `setup.sh` sie) und der Name des Blocks in `ops/sandbox/sandbox.caddy`. Kauft Matthias einen Ausweichnamen,
   ändern sich nur diese zwei Zeilen.
+- **Domain `sandboxhost.de` statt `sandboxhost.dev` (Matthias, 15.11.2026).** Matthias kauft `sandboxhost.de` bei INWX, etwa 6 €
+  im Jahr; Cloudflare Registrar verkauft keine `.de`. Die Zone liegt im Cloudflare-Konto von HTC, der Token `sbx-ports` gilt nur
+  für sie. Geändert haben sich nur die zwei Zeilen oben (`SANDBOXD_DOMAIN` und der Block in `sandbox.caddy`). Weil `.de` nicht auf
+  der HSTS-Preload-Liste steht, setzt `cloudflare.py ports-apply` in der Zone „Always Use HTTPS“ an und `ports-check` meldet
+  `CHANGE ports https`, solange es aus ist; das Recht dafür (Zone Settings Edit) hat der Token schon. Ein HSTS-Kopf von Caddy
+  käme dazu, wenn ein Browser einen Kunden über eine offene WLAN-Verbindung auf `http://` locken kann; das hält die Umleitung
+  nicht auf, ist aber erst mit eigenem Befund nötig.
 - **Registrar Cloudflare.** Im Konto, in dem die Zone `postyourprice.com` liegt, weil die Zone dann ohne Umzug der Nameserver dort
-  steht und Cloudflare zum Selbstkostenpreis verkauft (12.20 USD im Jahr laut Preisliste, `docs/sandbox/ports.md`).
+  steht und Cloudflare zum Selbstkostenpreis verkauft (12.20 USD im Jahr laut Preisliste, `docs/sandbox/ports.md`). Abgelöst am
+  15.11.2026: INWX für `sandboxhost.de`, Zone trotzdem bei Cloudflare (siehe unten).
 - **Token.** Ein eigener API-Token `CLOUDFLARE_SBX_API_TOKEN` nur für die neue Zone mit Zone DNS Edit, Zone SSL and Certificates
   Edit und Zone Settings Edit, statt den Token der Zahlungszone zu erweitern: Ein Fehler im Werkzeug der Ports kann dann die Zone
   der Zahlung nicht ändern. Er liegt nur in `~/brain/connectors/secrets.env` auf dem code-host, nie auf dem Sandbox-Server. Den
   Token der Zahlungszone braucht `cloudflare.py` nur noch für `ctl.sbx`, das Löschen von `*.postyourprice.com` und
   `zone-digest`.
 - **Origin CA statt `tls internal`.** Die neue Zone läuft auf SSL „Full (strict)“, Cloudflare prüft also das Zertifikat des
-  Sandbox-Servers. Das Zertifikat (`*.sandboxhost.dev` und `sandboxhost.dev`, 15 Jahre) holt `setup.sh --origin-cert` über
+  Sandbox-Servers. Das Zertifikat (`*.sandboxhost.de` und `sandboxhost.de`, 15 Jahre) holt `setup.sh --origin-cert` über
   `cloudflare.py origin-cert` in ein privates Temp-Verzeichnis des code-host, legt es nach `/etc/caddy/sbx/` (0600, Besitzer
   caddy) und löscht es lokal sofort. `setup.sh` verweigert einen Lauf, solange dort kein gültiges Zertifikat der Domain liegt,
   weil Caddy mit einer Datei, die auf ein fehlendes Zertifikat zeigt, nach dem nächsten Neustart nicht mehr lädt (lokal belegt:
@@ -278,11 +286,11 @@
   („deleted A *.postyourprice.com“), vor dem Kauf der neuen Domain: Bis dahin antwortete das Control Plane auf `ports/expose` mit
   409, kein Kunde hatte also eine Adresse darunter, und die Zone hatte außer Wurzel, `www` und `ctl.sbx` keinen Namen, der über den
   Wildcard lief. Fingerabdruck vorher und nachher `29c9eb2596f4`.
-- **Notschalter** bei Missbrauch eines freigegebenen Ports (etwa einer Phishing-Seite): den einen Eintrag `*.sandboxhost.dev` in der
+- **Notschalter** bei Missbrauch eines freigegebenen Ports (etwa einer Phishing-Seite): den einen Eintrag `*.sandboxhost.de` in der
   Zone der Ports löschen. Alle Adressen freigegebener Ports sind dann weg, die Zahlung ist davon nie berührt, weil sie in einer
   anderen Zone liegt. Für eine einzelne Sandbox reicht `DELETE /v1/sandboxes/{id}/ports/{port}` über das Control Plane.
 - **Public Suffix List.** Nicht Teil dieses Goals, weil die Aufnahme ein PR in einem fremden Repo ist (Gate `public_post`). Ohne sie
-  kann eine Sandbox ein Cookie für `.sandboxhost.dev` setzen, das der Browser an jede andere Sandbox mitschickt; die Zahlung ist
+  kann eine Sandbox ein Cookie für `.sandboxhost.de` setzen, das der Browser an jede andere Sandbox mitschickt; die Zahlung ist
   davon nicht betroffen, weil sie unter einer anderen Domain läuft. Steht als Vorschlag in
   `goals/_vorschlaege/sandbox-nacharbeit-2026-11-13-5.md`.
 - **Kein Aufpreis.** Ein freigegebener Port kostet nichts extra, abgerechnet wird weiter nach Laufzeit (`docs/sandbox/plan.md`,
