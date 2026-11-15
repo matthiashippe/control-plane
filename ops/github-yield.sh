@@ -216,7 +216,11 @@ print(t.strftime("%Y-%m-%dT%H:%M:%SZ"))
   want "$rc" "2" "an empty window exits 2 instead of printing zeros"
   CP_OWN_IPS="$fx/no-such-list.txt" count "$log" - "$since" >/dev/null 2>&1; rc=$?
   want "$rc" "2" "a missing own list exits 2"
-  if [[ "$fail" -eq 0 ]]; then echo "SELFTEST OK: planted GitHub arrival, sign-in and payment counted, every decoy left out, both directions"; else echo "SELFTEST FAILED"; fi
+  # The last line is exactly SELFTEST OK, because the check of kanal 03 point 1 reads it as a whole.
+  if [[ "$fail" -eq 0 ]]; then
+    echo "planted GitHub arrival, sign-in and payment counted, every decoy left out, both directions"
+    echo "SELFTEST OK"
+  else echo "SELFTEST FAILED"; fi
   exit "$fail"
 fi
 
