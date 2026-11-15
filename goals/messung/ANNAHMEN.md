@@ -22,3 +22,5 @@
   was er gesendet hat. Hängt `ops/deploy-alarm.sh` während des POST eine Zeile an, bleibt genau diese Zeile für den nächsten Lauf
   stehen. In den Text kommen nur Zeilen der Form `<count> <HH:MM:SS>`; eine Datei ohne lesbare Zeile wird trotzdem gesendet
   (Text „its lines are not readable“) und erst danach gelöscht, damit kein Weg sie ohne zugestellten POST entfernt.
+- messung 07 (Engineer CP, 2026-11-15): `own_ips_offline` endet bei leerer Liste mit 2 ohne stderr-Zeile, weil die Goal-Datei „druckt nichts“ sagt; `ops/deploy-window.sh --log` nennt den Grund selbst. Einen anderen Exit als 0, 1 oder 2 der Funktion meldet `--log` als „COULD NOT TELL: the list of our own addresses was not readable.“ mit Exit 2.
+- messung 07 (Engineer CP, 2026-11-15): `existsSync` kommt in `test/own-ips-readers.test.ts` als eigene Import-Zeile dazu, weil Punkt 4 keine entfernte Zeile im Diff erlaubt. Der Selftest legt eine Merkdatei mit `192.0.2.44` für alle Läufe an, damit auch der Fall `own-list-empty` zeigt, dass eine Adresse nur in der Merkdatei die leere Liste nicht ersetzt.

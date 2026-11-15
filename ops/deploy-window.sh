@@ -17,7 +17,9 @@
 #                                 a past window, centred on that time (UTC) instead of the container start
 #   ops/deploy-window.sh --at <time> --log <file>
 #                                 the same from an access log on disk, no ssh at all: our own addresses
-#                                 come only from CP_OWN_IPS_FILE (default ops/own-ips.txt)
+#                                 come from the list in CP_OWN_IPS_FILE (default ops/own-ips.txt),
+#                                 CP_OWN_IPS and the seen file in CP_OWN_IPS_SEEN (default
+#                                 $XDG_STATE_HOME/control-plane/own-ips-seen.txt), never a live address
 #   ops/deploy-window.sh --selftest
 #                                 planted log lines, no network, every direction
 #
@@ -64,6 +66,9 @@ selftest() {
   printf '#!/bin/sh\ntouch "%s/ssh-called"\nexit 255\n' "$dir" > "$dir/bin/ssh"
   chmod +x "$dir/bin/ssh"
   printf '# planted\n192.0.2.10 2026-11-01  planted own address\n' > "$dir/own.txt"
+  # An address seen live on an earlier day, kept only in the seen file. Every run reads this file
+  # through CP_OWN_IPS_SEEN, so the selftest never reads the seen file of the machine.
+  printf '192.0.2.44 2026-10-31\n' > "$dir/seen.txt"
   at=2026-11-01T12:00:00
   t0=$(python3 -c 'import datetime; print(int(datetime.datetime(2026, 11, 1, 12, 0, 0, tzinfo=datetime.timezone.utc).timestamp()))')
   stranger="198.51.100"
@@ -73,7 +78,8 @@ selftest() {
     local log=$1
     shift
     set +e
-    out=$(PATH="$dir/bin:$PATH" CP_OWN_IPS_FILE="$dir/own.txt" CP_WINDOW_NOW="" bash "$HERE/deploy-window.sh" "$@" --log "$log" 2>&1)
+    out=$(PATH="$dir/bin:$PATH" CP_OWN_IPS_FILE="$dir/own.txt" CP_OWN_IPS_SEEN="$dir/seen.txt" CP_WINDOW_NOW="" \
+      bash "$HERE/deploy-window.sh" "$@" --log "$log" 2>&1)
     code=$?
     set -e
   }
@@ -107,6 +113,14 @@ selftest() {
     && ! grep -q "^BAD GATEWAY" <<<"$out" && r=yes
   verdict own "$r" "a 502 to our own address must not be counted"
 
+  cp "$dir/seen.txt" "$dir/seen.before"
+  row 5 192.0.2.44 GET /health 502 > "$dir/own-seen.log"
+  run "$dir/own-seen.log" --at "$at"
+  r=no
+  [[ $code -eq 0 ]] && grep -q "^ours     1 request" <<<"$out" && ! grep -q "^BAD GATEWAY" <<<"$out" \
+    && cmp -s "$dir/seen.txt" "$dir/seen.before" && r=yes
+  verdict own-seen "$r" "a 502 to an address only in CP_OWN_IPS_SEEN must not be counted, and the file must stay as it was"
+
   : > "$dir/empty.log"
   run "$dir/empty.log" --at "$at"
   r=no
@@ -127,8 +141,8 @@ selftest() {
 
   printf '# only a comment\n\n' > "$dir/own-empty.txt"
   set +e
-  out=$(PATH="$dir/bin:$PATH" CP_OWN_IPS_FILE="$dir/own-empty.txt" CP_WINDOW_NOW="" bash "$HERE/deploy-window.sh" --at "$at" \
-    --log "$dir/own.log" 2>&1)
+  out=$(PATH="$dir/bin:$PATH" CP_OWN_IPS_FILE="$dir/own-empty.txt" CP_OWN_IPS_SEEN="$dir/seen.txt" CP_WINDOW_NOW="" \
+    bash "$HERE/deploy-window.sh" --at "$at" --log "$dir/own.log" 2>&1)
   code=$?
   set -e
   r=no
@@ -187,16 +201,26 @@ SSH=(ssh -i "$KEY" -o BatchMode=yes -o ConnectTimeout=10)
 # here that counts our own post-deploy checks as strangers inside the window: the one number this
 # script exists to produce, wrong in the direction that looks like traffic.
 #
-# With --log nothing goes over ssh, so the list is the file alone.
+# With --log nothing goes over ssh, so there is no live address: own_ips_offline reads the list,
+# CP_OWN_IPS and the seen file in CP_OWN_IPS_SEEN, where every address seen live on an earlier day
+# is kept. Without that file one of our own checks from yesterday counts as a stranger with a 502.
+# Its stderr names the path of the list, so it is dropped and the reason given here instead.
 if [[ -n "$LOGFILE" ]]; then
-  if [[ ! -f "$CP_OWN_IPS_FILE" ]]; then
+  set +e
+  OWN=$(own_ips_offline 2>/dev/null)
+  own_rc=$?
+  set -e
+  if [[ $own_rc -eq 1 ]]; then
     echo "COULD NOT TELL: the list of our own addresses is not there; without it every count is guesswork." >&2
     exit 2
   fi
-  OWN=$(awk '!/^#/ && NF {print $1}' "$CP_OWN_IPS_FILE" | sort -u | tr '\n' ' ')
-  # A list without a single address would count our own checks as strangers.
-  if [[ -z "${OWN// /}" ]]; then
+  # A list without a single address would count our own checks as strangers, whatever else is known.
+  if [[ $own_rc -eq 2 ]]; then
     echo "COULD NOT TELL: the list of our own addresses names no address; without it every count is guesswork." >&2
+    exit 2
+  fi
+  if [[ $own_rc -ne 0 || -z "${OWN// /}" ]]; then
+    echo "COULD NOT TELL: the list of our own addresses was not readable." >&2
     exit 2
   fi
 else
