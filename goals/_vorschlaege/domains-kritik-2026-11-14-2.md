@@ -4,3 +4,4 @@ Befund: Die Prüfung auf fremde Sandboxes sieht eine Anlage nicht, die gerade l�
 Beleg: `grep -n 'pending' ops/sandbox/sandboxd.mjs` -> `pending.set(id, …)` vor `docker run`, `pending.delete(id)` danach, `state.save` erst mit `status: "running"` | ops/sandbox/sandboxd.mjs:294
 Empfehlung: `client_key_reset` fragt `foreign_sandboxes` nach dem Verschieben ein zweites Mal ab und legt `cp.pub.prev` sofort zurück, wenn jetzt eine fremde Sandbox läuft (letzte Zeile `SETUP CLIENT-KEY-RESET FAIL: foreign sandbox started`); dazu ein Selbsttestfall `late`, in dem die Attrappe von `sbx_state` beim zweiten Lesen eine fremde laufende Sandbox liefert. Die Anlagen in `pending` selbst sieht nur `sandboxd`; sie zu zeigen hieße den Dienst ändern.
 MVP: Robustheit, weil das Fenster Sekunden lang ist und der Timer den Kunden nach spätestens 120 s wieder hereinlässt.
+Übernommen: domains 06, DONE und gemergt (PR #155) (2026-11-15)

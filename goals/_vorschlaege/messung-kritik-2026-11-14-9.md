@@ -4,3 +4,4 @@ Befund: `ops/status.sh` zählt jede Meldung, deren Titel mit `control-plane ` be
 Beleg: ops/status.sh:157 (`title.startswith("control-plane ")`) | ops/backup.sh:27 (`-H "Title: control-plane backup failed"`) | ops/status.sh:138-139 (Kommentar „not those of ops/backup.sh“)
 Empfehlung: Ein Glied messung: `ops/status.sh` zählt nur die Titel, die `report` in `ops/watchdog.sh` setzt (`control-plane <severity>` mit genau dessen Severities), statt des Präfixes; ein Test legt auf dem nachgebauten Thema je eine Meldung `control-plane backup failed` und `deploy-window 502` ab, ohne eine Meldung des Watchdogs, und erwartet `received` rot, rot vor dem Fix.
 MVP: Funktion, weil `received` sonst einen stummen Watchdog als gesund meldet, sobald ein Backup scheitert.
+Übernommen: messung 09 in ROADMAP.md (Triage-Glieder PRO-21463) (2026-11-15)

@@ -4,3 +4,4 @@ Befund: Der Timer `cp-pub-restore` ist eine transiente Unit von `systemd-run` un
 Beleg: `grep -n 'systemd-run --quiet' ops/sandbox/setup.sh` -> Unit nur unter `/run`, keine Unit-Datei unter `/etc/systemd/system`; `ops/sandbox/auto-upgrades.conf` setzt kein `Automatic-Reboot`, ein Neustart kommt also nur von Hand oder vom Hoster | ops/sandbox/setup.sh:330
 Empfehlung: `--check` meldet `CHANGE fact cp_pub want=yes have=no`, wenn `cp.pub` fehlt und kein Timer `cp-pub-restore` aktiv ist, damit die nächste Live-Prüfung den Zustand nennt statt ihn als Ausfall der Anlage zu zeigen.
 MVP: Robustheit, weil ein Neustart in einem Fenster von höchstens einer Stunde selten ist, die Folge aber ein Ausfall für alle Kunden ohne Frist.
+Übernommen: Triage-Glieder PRO-21463, Glied 2, Entscheidung des Tech Lead: domains 07 mit Fakt `cp_pub` in `--check` (Roadmap-PR #176) (2026-11-15)

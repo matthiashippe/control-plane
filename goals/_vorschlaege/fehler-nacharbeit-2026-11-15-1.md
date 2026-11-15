@@ -6,3 +6,4 @@ Empfehlung: In `test/status-alarm-received.test.ts` zwei Fälle ergänzen: Zuste
 MVP: Funktion, weil danach ein Umbau, der das Fenster verkürzt, in `check` rot wird; heute bliebe ein falsches Thema in der crontab bis auf ein Fenster von zwei Stunden nach jedem Lebenszeichen unbemerkt.
 
 Linse Q, Frage 1 (Randfall). Am Merge 2d9fe38 prüft die Suite die Grenze 300 s genau, das Fenster von 11 h nur von oben (goals/fehler/verdicts/09-z2-K.md:28, Mutation 12 h); der spätere Fall „at 18:00 UTC“ aus fehler 10 (test/watchdog-alive-slots.test.ts) nutzt eine Zustellung von genau 2 h und fängt nur Fenster unter 2 h. fehler-kritik-2026-11-14-3 betrifft die Lage des Fensters am Tag, nicht diesen fehlenden Test.
+Übernommen: Triage-Glieder PRO-21518 an den Tech Lead, Glied 7 (Fenster von 11 h an beiden Rändern geprüft) (2026-11-15)

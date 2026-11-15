@@ -6,3 +6,4 @@ Empfehlung: `mintAgentIdentity` gibt aus derselben Transaktion die Zahl der heut
 MVP: Funktion, weil ein Agent danach an der Antwort sieht, ob er morgen wiederkommen muss, statt bei 0 freien Plätzen „4 übrig“ zu lesen und in ein 429 zu laufen.
 
 Linse Q, Frage 1 (erwartete Ausgabe), Merge 91e1890. Die Goal-Datei (Annahme des Tech Lead, Zeile 49) ließ die Formel bewusst gleich und tauschte nur die Grenze, eine Begründung für den konstanten Wert steht weder dort noch in einer Commit-Message. Kein anderer Test prüft `keys_left_today` (`git grep -n keys_left origin/dev -- test` trifft nur Zeile 78 und 79).
+Übernommen: Triage-Glieder PRO-21518 an den Tech Lead, Glied 2 (`keys_left_today` zählt die freien Plätze) (2026-11-15)

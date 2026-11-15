@@ -4,3 +4,4 @@ Befund: Der Wächter `test/own-ips-readers.test.ts` sucht nur den Dateinamen `ow
 Beleg: `grep -rn 'CP_OWN_IPS_FILE' ops --include=*.sh | grep -v '^ops/own-ips.sh'` zeigt `ops/deploy-window.sh:191` mit `awk '!/^#/ && NF {print $1}' "$CP_OWN_IPS_FILE"`.
 Empfehlung: Ein späteres Glied messung: `ops/deploy-window.sh --log` zählt zusätzlich die Adressen aus `CP_OWN_IPS_SEEN` (ohne ssh), und der Wächter meldet auch jede Zeile außerhalb eines Kommentars, die `CP_OWN_IPS_FILE` an `awk`, `grep`, `cat` oder `open` gibt, mit einer benannten Ausnahmeliste (`ops/actions-log-addresses.sh`, die Prüfung der Liste in `ops/timeout-quote.sh` und `ops/anzeigen-rechnung.py`).
 MVP: Funktion, weil das Fenster nach einem Rollout sonst eine eigene Prüfung von gestern als Fremden mit Fehler melden kann.
+Übernommen: messung 07 in ROADMAP.md (Triage-Glieder PRO-21463) (2026-11-15)

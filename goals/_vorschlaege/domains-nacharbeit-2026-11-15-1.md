@@ -6,3 +6,4 @@ Empfehlung: Den Schlüssel-Reset mit seinem Selbsttest (`client_key_reset`, `for
 MVP: Schönheit
 
 Linse Q, Frage 6 (Datei über 500 Zeilen), Merge 8eab58d, dazu b685b77 (domains 06) an derselben Datei. Die Datei lag vorher schon knapp über 500, die beiden Goals fügen zusammen 337 Zeilen hinzu, fast alles für den Reset. Dieselbe Klasse wurde für `src/inference/proxy.ts` verworfen (abrechnung-nacharbeit-2026-11-11-2).
+Verworfen: Schwere 1, Dateigröße ohne Wirkung beim Kunden, wie abrechnung-nacharbeit-2026-11-11-2 (2026-11-15)

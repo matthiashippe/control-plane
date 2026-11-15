@@ -4,3 +4,4 @@ Befund: `test/deploy-window-rollout.test.ts` und `test/deploy-alarm.test.ts` leg
 Beleg: `cat test/deploy-window-rollout.test.ts test/deploy-alarm.test.ts | grep -c rmSync` -> 0
 Empfehlung: Zusammen mit messung-kritik-2026-11-14-2 in einem `afterEach` mit `rmSync(root, { recursive: true, force: true })` aufräumen, ohne Assertions zu ändern.
 MVP: Schönheit
+Verworfen: Schwere 1 ohne Wirkung beim Kunden (Triage-Glieder PRO-21463) (2026-11-15)

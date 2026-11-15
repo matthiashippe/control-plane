@@ -6,3 +6,4 @@ Empfehlung: `own_list` mit der Sperre aus messung-nacharbeit-2026-11-15-2 nach `
 MVP: Schönheit
 
 Linse Q, Frage 6 (Datei über 500 Zeilen), Merge 6ceb63d. `ops/traffic.sh` (1415 Zeilen) lag schon vor dem Goal darüber und zählt hier nicht. Dieselbe Klasse wurde für `src/inference/proxy.ts` verworfen (abrechnung-nacharbeit-2026-11-11-2); hier hängt die Behebung an der Zusammenlegung aus Vorschlag 2.
+Übernommen: Triage-Glieder PRO-21518 an den Tech Lead, Glied 4 (fällt mit der Zusammenlegung unter 500 Zeilen) (2026-11-15)

@@ -8,3 +8,4 @@ MVP: Funktion, weil danach ein Umbau, der den Betreibervergleich oder die Prüfu
 Linse Q, Frage 1. Die vier roten Fälle aus Punkt 1 des Goals existieren nur als Prüfbefehle der Goal-Datei (Umgebung `CP_KNOWN_IPS`, `CP_FETCHER_CACHE`) und laufen nach dem Merge nirgends mehr.
 Gegenprobe am Merge 7020272 auf dem code-host mit vorhandenem Cache: `r.owner === m[2]` aus Zeile 167 entfernt und Zeile 165 auf `return null` gesetzt, dann `pnpm -s vitest run test/known-ips.test.ts` -> 6 bestanden, 0 übersprungen, 0 rot.
 fehler 08 (PR #120) lässt den Fall mit dem Cache laut Goal-Datei „wie er ist“ und deckt nur die Schreibweise ab; fehler-kritik-2026-11-13-2 betrifft die Schreibweise, nicht diese Lücke.
+Übernommen: fehler 11, Goal-Datei auf dev, PAUSED durch den Kurs-Check 14.11. (2026-11-15)

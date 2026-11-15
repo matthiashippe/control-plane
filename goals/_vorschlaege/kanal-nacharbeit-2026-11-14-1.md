@@ -8,3 +8,4 @@ MVP: Funktion, weil danach ein Rückfall auf das zweite Lesen der Datei in `chec
 Linse Q, Frage 1 (Randfall). Selbst nachgestellt in einer Wegwerfkopie am Merge d8f319b: Zeile 368 durch das Nachlesen der Datei ersetzt, `vitest run test/answers-approved.test.ts test/answers-folder.test.ts` -> 24 von 24 grün.
 Linse K (Mutation M4) und Linse B haben den Fall im Hinweis an die Nacharbeit gegeben. Das Rücklesen nach dem POST fängt ihn nicht, weil es mit dem gesendeten und nicht mit dem freigegebenen Text vergleicht.
 Der Code am Stand origin/dev ist richtig (Zeile 339 und 368), es fehlt nur der Test, der ihn hält.
+Übernommen: kanal 07 in ROADMAP.md (Triage-Glieder PRO-21463) (2026-11-15)

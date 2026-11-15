@@ -6,3 +6,4 @@ Empfehlung: Einen Fall in `test/deploy-window-rollout.test.ts` ergänzen, dessen
 MVP: Funktion, weil der Webhook im öffentlichen Repo als Secret gilt (Grundregel 8) und die Schwärzung die zweite Sperre davor ist.
 
 Linse Q, Frage 1 (Verhalten der neuen Tests), Merge cedf1da. `test/deploy-alarm.test.ts` prüft nur die erste Sperre (keine URL in der Ausgabe von `ops/deploy-alarm.sh` selbst); die Schwärzung im Aufrufer bleibt ungeprüft. Nebenbei erfasst das Muster an Zeile 441 weder IPv6 noch einen Host ohne Schema, was ein solcher Test mit festhalten kann.
+Übernommen: Triage-Glieder PRO-21518 an den Tech Lead, Glied 6 (Schwärzung in `ops/deploy-window.sh` getestet) (2026-11-15)

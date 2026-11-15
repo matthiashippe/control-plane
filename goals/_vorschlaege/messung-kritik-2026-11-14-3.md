@@ -4,3 +4,4 @@ Befund: `ops/deploy-alarm.sh` postet ohne `Title:` und ohne `Priority:`, also ko
 Beleg: `grep -cE "Priority|Title" ops/deploy-alarm.sh` -> 0 | ops/watchdog.sh:31 (`*) priority=high`)
 Empfehlung: In `ops/deploy-alarm.sh` dieselben Kopfzeilen wie der Watchdog senden, `Title: control-plane DEPLOY 502` und `Priority: high`, und `test/deploy-alarm.test.ts` prüft beide in den Argumenten des nachgebauten `curl`. Der Titel beginnt mit `control-plane `, also zählt `ops/status.sh` (Zeile 138) ihn als Meldung des Watchdogs; entweder ist das gewollt (der Alarmweg gilt dann auch nach einem Deploy-Alarm als gelesen) oder der Titel heißt `deploy-window 502`, das entscheidet der Maker mit einer Zeile in `goals/messung/ANNAHMEN.md`.
 MVP: Funktion, weil ein Alarm, der nicht klingelt, den Kunden genauso wenig schützt wie gar keiner.
+Übernommen: messung 05, DONE und gemergt (PR #171) (2026-11-15)

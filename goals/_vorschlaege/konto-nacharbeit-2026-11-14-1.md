@@ -8,3 +8,4 @@ MVP: Schönheit
 Linse Q, Frage 5 (Bezeichner und Log-Zeilen Englisch), Regelstelle `loop-constraints.md:63` (Grundregel 12, ausnahmslos).
 Die Goal-Datei gibt nur Dateinamen der Bilder und die Summenzeile vor (Done-Punkt 1); `state: "freigabe"` in src/public/handoff.ts:21 bis :23 und `freigabe()` in src/handoff/routes.ts:78 gibt sie nicht vor.
 Gleiche Klasse wie seite-nacharbeit-2026-11-13-1 (Startseite, `umzug`), fehler-nacharbeit-2026-11-13-2 und domains-nacharbeit-2026-11-13-1, alle offen; deren Empfehlung, Goal-Texte keine deutschen Bezeichner vorgeben zu lassen, hat konto 02 noch nicht erreicht.
+Übernommen: Triage-Glieder PRO-21463, Glied 3, Entscheidung des Tech Lead: konto 04 nennt die Umbenennung (Roadmap-PR #176) (2026-11-15)

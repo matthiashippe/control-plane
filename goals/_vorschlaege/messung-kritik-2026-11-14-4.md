@@ -4,3 +4,4 @@ Befund: Scheitert der Alarm nach einem Rollout mit 502 (ssh weg, keine Zeile `CP
 Beleg: ops/deploy-window.sh:442 (`echo "ALARM NOT SENT: exit $k"`) | .github/workflows/deploy.yml:165 (`|| echo "::warning::…"`)
 Empfehlung: Ein eigener Exit-Code für „502 und Alarm nicht raus“ (etwa 3) in `ops/deploy-window.sh` mit Test, dazu ein eigener PR, der im Schritt „Deploy-Fenster“ von `deploy.yml` bei Exit 3 den Job rot macht; der geht in die Human Inbox, weil `.github/**` für Goals gesperrt ist.
 MVP: Funktion, weil der Alarm nur zählt, wenn auch sein Ausfall jemanden erreicht.
+Übernommen: messung 06, DONE und gemergt (PR #173) (2026-11-15)

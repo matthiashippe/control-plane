@@ -6,3 +6,4 @@ Empfehlung: Im Fall „counts 0 for a run whose addresses all stand in the three
 MVP: Funktion, weil danach ein Umbau, der einen privaten Bereich zu weit fasst, in `check` rot wird; heute meldet der Zähler dann eine öffentliche Besucheradresse in den Actions-Logs nicht, und genau diese Zahl entscheidet, ob Logs gelöscht werden müssen (Grundregel 8).
 
 Linse Q, Frage 1 (Randfall), Merge 1cdbde8. Die Suite pflanzt nur Adressen tief in den privaten Bereichen (`172.17.0.1`, `169.254.1.1`) und Fremde aus `203.0.113.0/24`, also prüft sie, dass Privates nicht zählt, aber nie, dass Öffentliches neben einer Grenze zählt.
+Übernommen: Triage-Glieder PRO-21518 an den Tech Lead, Glied 8 (öffentliche Adressen neben privaten Bereichen) (2026-11-15)

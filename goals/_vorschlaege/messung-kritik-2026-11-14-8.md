@@ -4,3 +4,4 @@ Befund: `adressen_an_der_bezahlroute` in `ops/anzeigen-rechnung.py` gibt still 0
 Beleg: `grep -n 'return 0' ops/anzeigen-rechnung.py` und `subprocess.run(["./ops/access-log.sh"] ...)` ohne Prüfung von `returncode`.
 Empfehlung: In einem späteren Glied messung: Exit 2 mit stderr-Zeile, wenn `access-log.sh` mit Fehler endet; Test mit nachgebautem `access-log.sh`, das mit 1 endet, rot vor dem Fix.
 MVP: Funktion, weil die Konversion der Anzeigen sonst bei einem Lesefehler stillschweigend falsch wird.
+Übernommen: messung 08 in ROADMAP.md (Triage-Glieder PRO-21463) (2026-11-15)
