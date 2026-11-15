@@ -123,6 +123,33 @@ Alarm aus messung 05 und 06 dann für einen 502 klingelt, den kein Kunde bekomme
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD | grep -cE '^(\.github|deploy|src|harness|scripts|docs)/|^goals/kanal/'` muss 0 ausgeben.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD -- ops | grep -vcE '^ops/(deploy-window\.sh|own-ips\.sh|README\.md)$'` muss 0 ausgeben.
       Prüfung: `S=$(mktemp -d); XDG_STATE_HOME=$S node scripts/check.mjs >/dev/null 2>&1; find "$S" -type f | wc -l` muss 0 ausgeben.
+- [ ] Kritik 1: `test/deploy-window-own-seen.test.ts` belegt auch eine Adresse nur in `CP_OWN_IPS` als eigene im Weg `--log`,
+      und kein Lauf dieser Datei druckt eine Adresse, auch nicht die aus der Merkdatei. Neuer Fall
+      `it("--log counts an address only in CP_OWN_IPS as ours and prints no address")`: Liste mit `192.0.2.10`, Merkdatei leer,
+      `CP_OWN_IPS=198.51.100.7`, Log mit einem 502 von `198.51.100.7` im Fenster; Exit 0, eine Zeile `ours     1 request`, keine
+      Zeile `BAD GATEWAY`. Dazu steht in keinem Lauf der Datei in stdout oder stderr eine Zeichenfolge, die
+      `/\b(192\.0\.2|198\.51\.100|203\.0\.113)\.\d+\b/` trifft (eine gemeinsame Prüfung in `run()`). Die fünf bestehenden
+      Fälle bleiben mit ihren Namen. MVP: Funktion, weil `CP_OWN_IPS` heute im Weg `--log` an keinem Test hängt und die Ausgabe
+      von `ops/deploy-window.sh` in öffentlichen Actions-Logs landet.
+      Prüfung: `grep -cF 'it("--log counts an address only in CP_OWN_IPS as ours and prints no address"' test/deploy-window-own-seen.test.ts` muss 1 ausgeben.
+      Prüfung: `grep -cF '198.51.100.7' test/deploy-window-own-seen.test.ts` muss mindestens 1 ausgeben.
+      Prüfung: `pnpm -s vitest run test/deploy-window-own-seen` muss Exit-Code 0 haben.
+- [ ] Kritik 2: Der Wächter in `test/own-ips-readers.test.ts` meldet auch die üblichen Leser ohne `awk`, `grep` oder `cat`: eine
+      Umleitung `< "$CP_OWN_IPS_FILE"` oder `<"${CP_OWN_IPS_FILE}"`, `sed`, `cut`, `head`, `tail` und `while read` als eigenes Wort
+      sowie `readFileSync(` und `read_text(` zusammen mit `CP_OWN_IPS_FILE`. Neuer Fall
+      `it("the reader matcher also trips on a redirect, sed, cut, head, tail, readFileSync and read_text with CP_OWN_IPS_FILE")`
+      mit den Treffern `done < "$CP_OWN_IPS_FILE"`, `while read -r ip _; do :; done <"${CP_OWN_IPS_FILE}"`,
+      `sed -n '/^[^#]/p' "$CP_OWN_IPS_FILE"`, `cut -d' ' -f1 "$CP_OWN_IPS_FILE"`, `head -n1 "$CP_OWN_IPS_FILE"`,
+      `readFileSync(process.env.CP_OWN_IPS_FILE, "utf8")` und `Path(os.environ["CP_OWN_IPS_FILE"]).read_text()`; die fünf
+      Nicht-Treffer des bestehenden Matcher-Falls bleiben Nicht-Treffer, dazu `echo "using $CP_OWN_IPS_FILE" >&2` und
+      `headline="$CP_OWN_IPS_FILE"`. Die drei Testnamen aus Punkt 4 bleiben Zeichen für Zeichen, der erste neue Fall läuft mit dem
+      erweiterten Matcher weiter grün. MVP: Funktion, weil das Ziel dieses Goals „kein künftiges Werkzeug liest die Liste an
+      `own_ips` vorbei, ohne dass `check` rot wird“ heißt und `while read … < "$CP_OWN_IPS_FILE"` der gängigste Leser in Bash ist,
+      den der Wächter heute durchlässt.
+      Prüfung: `grep -cF 'it("the reader matcher also trips on a redirect, sed, cut, head, tail, readFileSync and read_text with CP_OWN_IPS_FILE"' test/own-ips-readers.test.ts` muss 1 ausgeben.
+      Prüfung: `grep -cF 'done < "$CP_OWN_IPS_FILE"' test/own-ips-readers.test.ts` muss mindestens 1 ausgeben.
+      Prüfung: `pnpm -s vitest run test/own-ips-readers` muss Exit-Code 0 haben.
+      Prüfung: `git diff -U0 $(git merge-base origin/dev HEAD) HEAD -- test/own-ips-readers.test.ts | grep -cE '^-[^-]'` muss 0 ausgeben.
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
