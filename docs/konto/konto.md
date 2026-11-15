@@ -75,6 +75,12 @@ Gebucht wird erst nach einer Quittung mit Status `success` (`receiptSucceeded`):
 Transaktion als `ref` und `meta` mit `source` `spend_permission`, `chain_id` 84532 und dem Betrag in atomaren USDC. Zehn atomare USDC
 sind ein mc. Derselbe Hash bucht nie zweimal; eine Quittung `reverted` bucht nichts.
 
+Ein gesendetes `spend()` geht nie verloren: Sein Hash und Betrag stehen in `konto_accounts.pending_tx` und `pending_usdc`, bevor der
+Dienst auf die Quittung wartet. Scheitert das Warten (Fehler des RPC, Zeitüberschreitung, Neustart), bleibt der Hash offen, und der
+nächste Lauf für dieses Konto prüft zuerst ihn: `success` bucht genau eine Zeile `topup` und schließt ihn in derselben Transaktion,
+`reverted` schließt ihn ohne Buchung, und erst der Lauf danach darf ein neues `spend()` senden. Solange ein Hash offen ist, sendet
+der Dienst für dieses Konto nichts Neues.
+
 ## Base Sepolia
 
 Gesendet wird nur über `sendKontoTx` in `src/konto/chain.ts`. Sie ruft vor jedem Aufruf ans Netz `requireSepolia(chainId)`, das jede

@@ -114,6 +114,10 @@
   dem Anschalten im Hauptnetz geändert werden, heute ist das Konto in der Produktion aus.
 - Der Lauf auf Base Sepolia nutzt Port 47391, weil `http://localhost:47391` als Allowed Origin im Auth Proxy steht und der Passkey
   an diese Origin gebunden wird; das Skript bricht ab, wenn der Port belegt ist.
+- Der Hash eines `spend()` steht in `konto_accounts.pending_tx`, bevor auf die Quittung gewartet wird, und der nächste Lauf
+  prüft ihn vor allem anderen, auch vor der Schwelle, weil er Geld des Kunden bewegt haben kann (Punkt 15). Eine Lücke bleibt
+  zwischen dem Senden und dem Schreiben des Hashes (Absturz genau dazwischen); sie ließe sich nur schließen, indem die Transaktion
+  erst signiert, dann gespeichert und dann gesendet wird. Das steht für konto 05 an, bevor echtes Geld läuft.
 
 ## Reparatur dev (14.11.2026, Engineer CP)
 

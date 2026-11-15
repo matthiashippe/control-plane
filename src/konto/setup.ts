@@ -32,6 +32,7 @@ export function kontoFromEnv(db: Db, env: Record<string, string | undefined>, tr
         .then((r) => {
           if (r.kind === "booked") console.log(`[konto] topped up ${r.mc} mc from the spend permission, tx ${r.hash}`);
           if (r.kind === "reverted") console.error(`[konto] spend reverted, nothing booked, tx ${r.hash}`);
+          if (r.kind === "pending") console.error(`[konto] no receipt yet, spend stays open and is settled on the next request, tx ${r.hash}`);
         })
         .catch((err) => console.error(`[konto] top-up failed: ${err instanceof Error ? err.message.slice(0, 200) : "unknown error"}`));
     },

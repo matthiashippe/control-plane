@@ -507,6 +507,11 @@ function migrate(db: Db): void {
       created_at  TEXT NOT NULL
     );
   `);
+  // A spend() that was sent and not yet settled (goals/konto/03, point 15): its hash and amount, written before the wait for the
+  // receipt, so that a failed wait or a restart books it later instead of losing it or spending a second time.
+  const kontoColumns = db.prepare("PRAGMA table_info(konto_accounts)").all() as { name: string }[];
+  if (!kontoColumns.some((c) => c.name === "pending_tx")) db.exec("ALTER TABLE konto_accounts ADD COLUMN pending_tx TEXT");
+  if (!kontoColumns.some((c) => c.name === "pending_usdc")) db.exec("ALTER TABLE konto_accounts ADD COLUMN pending_usdc TEXT");
 
   // The conversation that asks back (HAN-77). `fields` is what was understood so far, `turns` the
   // transcript; both are a person's words and are deleted after a day (`cleanupConversations` in

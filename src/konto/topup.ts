@@ -5,6 +5,11 @@
  * most what is left of the current period (getCurrentPeriod of the contract); with nothing left there is no transaction and the
  * request gets its 402 as today. At most one top-up per account runs at a time. Credits are booked only after a receipt with
  * status success (`receiptSucceeded`), as one ledger row `topup` with the transaction hash as `ref`, and a hash never books twice.
+ *
+ * A sent spend() is never lost (point 15): its hash and amount go into `konto_accounts.pending_tx` before the wait for the
+ * receipt. When the wait fails (an error, a timeout, a restart), the hash stays open; the next run for the account settles it
+ * first and sends no new spend() while it is open. Success books it and clears it in one transaction; reverted clears it and
+ * books nothing, and only the run after that may send a new spend().
  */
 import { createPublicClient, encodeFunctionData, type Address, type Hex, type LocalAccount, type PublicClient, type Transport } from "viem";
 import { baseSepolia } from "viem/chains";
@@ -45,6 +50,7 @@ export interface TopUpDeps {
 
 export type TopUpResult =
   | { kind: "none"; reason: "no_account" | "wrong_chain" | "enough" | "period_used_up" | "approve_failed" | "busy" }
+  | { kind: "pending"; hash: Hex }
   | { kind: "reverted"; hash: Hex }
   | { kind: "booked"; hash: Hex; usdc: bigint; mc: number };
 
@@ -53,6 +59,8 @@ interface AccountRow {
   permission: string;
   signature: Hex;
   approved_tx: string | null;
+  pending_tx: string | null;
+  pending_usdc: string | null;
 }
 
 /** Books a successful spend once: a second call with the same hash adds nothing. Returns whether a row was written. */
@@ -71,6 +79,34 @@ export function bookTopup(db: Db, address: string, hash: Hex, usdc: bigint): boo
   })();
 }
 
+/** Books a settled spend and closes it as the open one of the account, in one transaction. */
+function settle(db: Db, address: string, hash: Hex, usdc: bigint): void {
+  db.transaction(() => {
+    bookTopup(db, address, hash, usdc);
+    db.prepare("UPDATE konto_accounts SET pending_tx = NULL, pending_usdc = NULL WHERE address = ? AND pending_tx = ?").run(address, hash.toLowerCase());
+  })();
+}
+
+function release(db: Db, address: string, hash: Hex): void {
+  db.prepare("UPDATE konto_accounts SET pending_tx = NULL, pending_usdc = NULL WHERE address = ? AND pending_tx = ?").run(address, hash.toLowerCase());
+}
+
+/** Waits for the receipt of a sent spend(): booked, reverted, or still open when the wait fails. */
+async function waitForSpend(deps: TopUpDeps, address: string, hash: Hex, usdc: bigint): Promise<TopUpResult> {
+  let receipt: TxReceiptLike;
+  try {
+    receipt = await deps.chain.receipt(hash);
+  } catch {
+    return { kind: "pending", hash };
+  }
+  if (!receiptSucceeded(receipt)) {
+    release(deps.db, address, hash);
+    return { kind: "reverted", hash };
+  }
+  settle(deps.db, address, hash, usdc);
+  return { kind: "booked", hash, usdc, mc: Number(usdc / ATOMIC_PER_MC) };
+}
+
 const running = new Map<string, Promise<TopUpResult>>();
 
 /** Tops the account up when its credit is low. A second call while one runs for the same account waits for that one. */
@@ -85,7 +121,7 @@ export function topUpIfLow(deps: TopUpDeps, address: string): Promise<TopUpResul
 
 async function topUp(deps: TopUpDeps, address: string): Promise<TopUpResult> {
   const { db, chain } = deps;
-  const row = db.prepare("SELECT chain_id, permission, signature, approved_tx FROM konto_accounts WHERE address = ?").get(address) as
+  const row = db.prepare("SELECT chain_id, permission, signature, approved_tx, pending_tx, pending_usdc FROM konto_accounts WHERE address = ?").get(address) as
     | AccountRow
     | undefined;
   if (!row) return { kind: "none", reason: "no_account" };
@@ -94,6 +130,8 @@ async function topUp(deps: TopUpDeps, address: string): Promise<TopUpResult> {
   } catch {
     return { kind: "none", reason: "wrong_chain" };
   }
+  // An open spend() first: it may have moved the customer's money, so it is settled before anything new is sent.
+  if (row.pending_tx) return waitForSpend(deps, address, row.pending_tx as Hex, BigInt(row.pending_usdc ?? "0"));
   if (BigInt(getAvailableMc(db, address)) * ATOMIC_PER_MC >= deps.topupBelowUsdc) return { kind: "none", reason: "enough" };
   const permission = permissionFromJson(row.permission);
   const spent = await chain.spentThisPeriod(permission);
@@ -106,9 +144,8 @@ async function topUp(deps: TopUpDeps, address: string): Promise<TopUpResult> {
     db.prepare("UPDATE konto_accounts SET approved_tx = ? WHERE address = ?").run(approveTx.toLowerCase(), address);
   }
   const hash = await chain.spend(permission, value);
-  if (!receiptSucceeded(await chain.receipt(hash))) return { kind: "reverted", hash };
-  bookTopup(db, address, hash, value);
-  return { kind: "booked", hash, usdc: value, mc: Number(value / ATOMIC_PER_MC) };
+  db.prepare("UPDATE konto_accounts SET pending_tx = ?, pending_usdc = ? WHERE address = ?").run(hash.toLowerCase(), String(value), address);
+  return waitForSpend(deps, address, hash, value);
 }
 
 const PERMISSION_TUPLE = {
