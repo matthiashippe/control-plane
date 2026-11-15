@@ -1,0 +1,9 @@
+Schwere: 2
+Goal: fehler 09
+Befund: Kein Fall der Suite vergleicht eine Zustellung, die älter als zwei Stunden und jünger als 11 h ist, deshalb bleibt sie grün, wenn das Fenster in `ops/status.sh` auf 2 h schrumpft und `alarm_path.received` an einem ruhigen Tag die meiste Zeit `unknown` statt `red` meldet.
+Beleg: `sed -i 's/delivered_age <= 11 \* 3600/delivered_age <= 2 * 3600/' ops/status.sh; pnpm -s vitest run test/status-alarm-received.test.ts test/watchdog-alive-slots.test.ts test/status-alarm-path.test.ts` (in einer Wegwerfkopie von origin/dev) -> `Tests  24 passed (24)` | ops/status.sh:168, test/status-alarm-received.test.ts:222 (einziger Fall über einer Stunde, Alter 11,5 h)
+Empfehlung: In `test/status-alarm-received.test.ts` zwei Fälle ergänzen: Zustellung `2026-11-13T01:01:00Z` (10 h 59 min vor `CP_NOW`) ohne passende Nachricht auf dem Thema ergibt `received.status` `red`, Zustellung `2026-11-13T00:59:00Z` (11 h 1 min) ergibt `unknown`; der erste muss mit einer Kopie unter `STATUS_UNDER_TEST` mit Fenster 2 h rot werden, der zweite mit Fenster 12 h.
+MVP: Funktion, weil danach ein Umbau, der das Fenster verkürzt, in `check` rot wird; heute bliebe ein falsches Thema in der crontab bis auf ein Fenster von zwei Stunden nach jedem Lebenszeichen unbemerkt.
+
+Linse Q, Frage 1 (Randfall). Am Merge 2d9fe38 prüft die Suite die Grenze 300 s genau, das Fenster von 11 h nur von oben (goals/fehler/verdicts/09-z2-K.md:28, Mutation 12 h); der spätere Fall „at 18:00 UTC“ aus fehler 10 (test/watchdog-alive-slots.test.ts) nutzt eine Zustellung von genau 2 h und fängt nur Fenster unter 2 h. fehler-kritik-2026-11-14-3 betrifft die Lage des Fensters am Tag, nicht diesen fehlenden Test.
+Übernommen: Triage-Glieder PRO-21518 an den Tech Lead, Glied 7 (Fenster von 11 h an beiden Rändern geprüft) (2026-11-15)

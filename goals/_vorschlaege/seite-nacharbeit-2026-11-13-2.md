@@ -7,3 +7,4 @@ MVP: Schönheit
 
 Linse Q, Frage 2 (Logik-Duplikate). Die Kopien laufen schon auseinander: github-yield prüft den Referrer mit `re.I` (:74), landing-yield ohne; github-yield bricht bei leerer eigener Liste mit Exit 2 ab (:66 bis :67), landing-yield zählt dann eigene Adressen als fremd. Das Urteil im nächsten Glied (`docs/seite/conway-ankuenfte.md`) und der Ertrag von kanal 03 messen damit dieselbe Ankunft nach zwei Regeln.
 Abgrenzung: kanal-kritik-2026-11-12-3 und -4 betreffen Issue-Pfad und Wallet-Zählung in github-yield, nicht die Kopie.
+Übernommen: Triage-Glieder 14.11. an den Tech Lead, Glied 7 (`ops/landing-yield.sh` liest die eigene Liste direkt und bricht bei leerer Liste nicht ab) (2026-11-14)

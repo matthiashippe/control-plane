@@ -46,18 +46,6 @@ count_demand() {
   ' 2>/dev/null
 }
 
-# Own addresses without network: the tracked list, CP_OWN_IPS and the remembered live addresses.
-own_ips_offline() {
-  local list_file="${CP_OWN_IPS_FILE:-$HERE/own-ips.txt}"
-  local seen_file="${CP_OWN_IPS_SEEN:-${XDG_STATE_HOME:-$HOME/.local/state}/control-plane/own-ips-seen.txt}"
-  [[ -f "$list_file" ]] || { echo "ports-demand: $list_file is not there" >&2; return 1; }
-  {
-    printf '%s\n' "${CP_OWN_IPS:-}" | tr ' ' '\n'
-    grep -v '^#' "$list_file" | awk 'NF {print $1}'
-    if [[ -f "$seen_file" ]]; then awk 'NF {print $1}' "$seen_file"; fi
-  } | grep -v '^$' | sort -u | tr '\n' ' '
-}
-
 report() {
   local n m from
   read -r n m from <<<"$1"
@@ -141,13 +129,15 @@ if [[ -n "$since_arg" ]]; then
   since=$(date -u -d "$since_arg UTC" +%s 2>/dev/null) || { echo "ports-demand: --since is not a time" >&2; exit 64; }
 fi
 
+# Our own addresses come from one rule, ops/own-ips.sh: own_ips with the live address, own_ips_offline for a log read from
+# disk (the tracked list, CP_OWN_IPS and the remembered live addresses, nothing over the network).
+# shellcheck source=ops/own-ips.sh
+source "$HERE/own-ips.sh"
 if [[ -n "$log_file" ]]; then
   [[ -s "$log_file" ]] || { echo "ports-demand: $log_file is empty or missing" >&2; exit 2; }
   own=$(own_ips_offline) || exit 2
   result=$(count_demand "$own" "$since" < "$log_file")
 else
-  # shellcheck source=ops/own-ips.sh
-  source "$HERE/own-ips.sh"
   own=$(own_ips) || exit 2
   log=$(mktemp); trap 'rm -f "$log"' EXIT
   bash "$HERE/access-log.sh" > "$log" || exit 2

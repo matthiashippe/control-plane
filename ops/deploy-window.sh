@@ -10,18 +10,38 @@
 # So the window is no longer typed. It comes from when the container actually started, which is
 # the deploy, to the second.
 #
-#   ops/deploy-window.sh          the last deploy
+#   ops/deploy-window.sh          the last deploy; waits until the window is over, then measures it
+#                                 whole and posts a 502 to a stranger to the webhook of the VM
 #   ops/deploy-window.sh 300      the same, with a 300 second tail instead of 180
 #   ops/deploy-window.sh --at 2026-11-12T16:41:02
 #                                 a past window, centred on that time (UTC) instead of the container start
 #   ops/deploy-window.sh --at <time> --log <file>
 #                                 the same from an access log on disk, no ssh at all: our own addresses
-#                                 come only from CP_OWN_IPS_FILE (default ops/own-ips.txt)
+#                                 come from the list in CP_OWN_IPS_FILE (default ops/own-ips.txt),
+#                                 CP_OWN_IPS and the seen file in CP_OWN_IPS_SEEN (default
+#                                 $XDG_STATE_HOME/control-plane/own-ips-seen.txt), never a live address
 #   ops/deploy-window.sh --selftest
 #                                 planted log lines, no network, every direction
 #
 # Exit 0 means nobody outside saw an error. Exit 1 means somebody did, and the lines are printed.
-# Exit 2 means the check could not run.
+# Exit 2 means the check could not run. Exit 3 means a stranger got a 502 after the rollout and the
+# alarm for it was due but not sent (ALARM NOT SENT: exit <k>, 255 for ssh gone, 1 for a failed POST,
+# 2 for no webhook in the crontab).
+#
+# deploy.yml calls this about 20 s after the new container started, and the window runs 180 s past
+# the start. Until 2026-11-14 every rollout therefore got PARTIAL, an answer about time that had not
+# passed yet. Without --at the tool now waits until the window is over (plus a 2 s margin) before it
+# reads the log. With --at or --log it never waits: that is a past window, read by a person.
+#   CP_WINDOW_NOW     the clock before the wait, ISO time in UTC (default: the system clock)
+#   CP_WINDOW_SLEEP   a command run instead of `sleep` with the seconds as its only argument (tests)
+#
+# And a 502 used to reach nobody: the step only wrote a warning into the job log. Without --at, a
+# `BAD GATEWAY` above 0 now runs ops/deploy-alarm.sh on the VM, which posts one line without an
+# address to the webhook the crontab sets for ops/watchdog.sh. The URL is never printed here.
+# The tool then prints ALARM SENT and keeps its exit 1, or ALARM NOT SENT: exit <k> and ends with
+# Exit 3, so a 502 that reached nobody differs from one that did. ops/deploy-alarm.sh keeps a failed
+# alarm on the VM, and ops/watchdog.sh sends it on its next run; with ssh gone nothing can be kept,
+# and Exit 3 in the job log is the only trace.
 #
 # No line names an address. `deploy.yml` prints this output into the public logs of a public
 # repository, and until 2026-11-12 every line under AFFECTED and NO KEY carried a visitor's
@@ -46,6 +66,9 @@ selftest() {
   printf '#!/bin/sh\ntouch "%s/ssh-called"\nexit 255\n' "$dir" > "$dir/bin/ssh"
   chmod +x "$dir/bin/ssh"
   printf '# planted\n192.0.2.10 2026-11-01  planted own address\n' > "$dir/own.txt"
+  # An address seen live on an earlier day, kept only in the seen file. Every run reads this file
+  # through CP_OWN_IPS_SEEN, so the selftest never reads the seen file of the machine.
+  printf '192.0.2.44 2026-10-31\n' > "$dir/seen.txt"
   at=2026-11-01T12:00:00
   t0=$(python3 -c 'import datetime; print(int(datetime.datetime(2026, 11, 1, 12, 0, 0, tzinfo=datetime.timezone.utc).timestamp()))')
   stranger="198.51.100"
@@ -55,7 +78,8 @@ selftest() {
     local log=$1
     shift
     set +e
-    out=$(PATH="$dir/bin:$PATH" CP_OWN_IPS_FILE="$dir/own.txt" CP_WINDOW_NOW="" bash "$HERE/deploy-window.sh" "$@" --log "$log" 2>&1)
+    out=$(PATH="$dir/bin:$PATH" CP_OWN_IPS_FILE="$dir/own.txt" CP_OWN_IPS_SEEN="$dir/seen.txt" CP_WINDOW_NOW="" \
+      bash "$HERE/deploy-window.sh" "$@" --log "$log" 2>&1)
     code=$?
     set -e
   }
@@ -89,6 +113,14 @@ selftest() {
     && ! grep -q "^BAD GATEWAY" <<<"$out" && r=yes
   verdict own "$r" "a 502 to our own address must not be counted"
 
+  cp "$dir/seen.txt" "$dir/seen.before"
+  row 5 192.0.2.44 GET /health 502 > "$dir/own-seen.log"
+  run "$dir/own-seen.log" --at "$at"
+  r=no
+  [[ $code -eq 0 ]] && grep -q "^ours     1 request" <<<"$out" && ! grep -q "^BAD GATEWAY" <<<"$out" \
+    && cmp -s "$dir/seen.txt" "$dir/seen.before" && r=yes
+  verdict own-seen "$r" "a 502 to an address only in CP_OWN_IPS_SEEN must not be counted, and the file must stay as it was"
+
   : > "$dir/empty.log"
   run "$dir/empty.log" --at "$at"
   r=no
@@ -109,8 +141,8 @@ selftest() {
 
   printf '# only a comment\n\n' > "$dir/own-empty.txt"
   set +e
-  out=$(PATH="$dir/bin:$PATH" CP_OWN_IPS_FILE="$dir/own-empty.txt" CP_WINDOW_NOW="" bash "$HERE/deploy-window.sh" --at "$at" \
-    --log "$dir/own.log" 2>&1)
+  out=$(PATH="$dir/bin:$PATH" CP_OWN_IPS_FILE="$dir/own-empty.txt" CP_OWN_IPS_SEEN="$dir/seen.txt" CP_WINDOW_NOW="" \
+    bash "$HERE/deploy-window.sh" --at "$at" --log "$dir/own.log" 2>&1)
   code=$?
   set -e
   r=no
@@ -169,16 +201,26 @@ SSH=(ssh -i "$KEY" -o BatchMode=yes -o ConnectTimeout=10)
 # here that counts our own post-deploy checks as strangers inside the window: the one number this
 # script exists to produce, wrong in the direction that looks like traffic.
 #
-# With --log nothing goes over ssh, so the list is the file alone.
+# With --log nothing goes over ssh, so there is no live address: own_ips_offline reads the list,
+# CP_OWN_IPS and the seen file in CP_OWN_IPS_SEEN, where every address seen live on an earlier day
+# is kept. Without that file one of our own checks from yesterday counts as a stranger with a 502.
+# Its stderr names the path of the list, so it is dropped and the reason given here instead.
 if [[ -n "$LOGFILE" ]]; then
-  if [[ ! -f "$CP_OWN_IPS_FILE" ]]; then
+  set +e
+  OWN=$(own_ips_offline 2>/dev/null)
+  own_rc=$?
+  set -e
+  if [[ $own_rc -eq 1 ]]; then
     echo "COULD NOT TELL: the list of our own addresses is not there; without it every count is guesswork." >&2
     exit 2
   fi
-  OWN=$(awk '!/^#/ && NF {print $1}' "$CP_OWN_IPS_FILE" | sort -u | tr '\n' ' ')
-  # A list without a single address would count our own checks as strangers.
-  if [[ -z "${OWN// /}" ]]; then
+  # A list without a single address would count our own checks as strangers, whatever else is known.
+  if [[ $own_rc -eq 2 ]]; then
     echo "COULD NOT TELL: the list of our own addresses names no address; without it every count is guesswork." >&2
+    exit 2
+  fi
+  if [[ $own_rc -ne 0 || -z "${OWN// /}" ]]; then
+    echo "COULD NOT TELL: the list of our own addresses was not readable." >&2
     exit 2
   fi
 else
@@ -206,6 +248,33 @@ else
     echo "        Without it the window would be a guess, and a guessed window measures nothing." >&2
     echo "        This says nothing about the deploy. Run it again." >&2
     exit 2
+  fi
+fi
+
+# Wait for the end of the window, but only for a window taken from the container start. The clock
+# after the wait is the clock before it plus the time waited, so a fake sleep in a test and a real
+# one on the runner both end in a window that is over, never in PARTIAL.
+if [[ -z "$AT" ]]; then
+  read -r wait_s now_after < <(python3 - "$started" "$TAIL_SECONDS" "${CP_WINDOW_NOW:-}" <<'PY'
+import datetime, math, sys
+started_iso, tail, now_raw = sys.argv[1], int(sys.argv[2]), sys.argv[3]
+utc = datetime.timezone.utc
+head = started_iso.partition(".")[0].rstrip("Z")
+started = datetime.datetime.fromisoformat(head).replace(tzinfo=utc)
+now = datetime.datetime.fromisoformat(now_raw).replace(tzinfo=utc) if now_raw else datetime.datetime.now(utc)
+missing = (started + datetime.timedelta(seconds=tail) - now).total_seconds()
+wait = math.ceil(missing) + 2 if missing > 0 else 0
+print(wait, (now + datetime.timedelta(seconds=wait)).strftime("%Y-%m-%dT%H:%M:%S"))
+PY
+  )
+  if [[ -z "${wait_s:-}" ]]; then
+    echo "COULD NOT TELL: the container start time was not readable as a time." >&2
+    exit 2
+  fi
+  if [[ "$wait_s" -gt 0 ]]; then
+    echo "waiting  $wait_s s for the window to end, so it is measured whole"
+    "${CP_WINDOW_SLEEP:-sleep}" "$wait_s"
+    export CP_WINDOW_NOW="$now_after"
   fi
 fi
 
@@ -240,7 +309,8 @@ elif ! "$HERE/access-log.sh" > "$log"; then
   exit 2
 fi
 
-python3 - "$started" "$LEAD_SECONDS" "$TAIL_SECONDS" "$OWN" "$log" "$source_label" <<'PY'
+set +e
+report=$(python3 - "$started" "$LEAD_SECONDS" "$TAIL_SECONDS" "$OWN" "$log" "$source_label" <<'PY'
 import datetime
 import re, json, os, sys
 
@@ -375,3 +445,31 @@ if failures:
 
 print(f"CLEAN    {strangers} request(s) from outside in the window, none of them an error.")
 PY
+)
+rc=$?
+set -e
+printf '%s\n' "$report"
+
+# The alarm, only for a window taken from the container start: a past window (--at, --log) is read
+# by a person who is already looking. Only a 502 counts, the restart itself; any other error stays
+# in the report above.
+bad=$(sed -nE 's/^BAD GATEWAY ([0-9]+) of .*/\1/p' <<<"$report" | head -n 1)
+if [[ -z "$AT" && "$rc" -eq 1 && "${bad:-0}" -gt 0 ]]; then
+  set +e
+  # Whatever comes back is printed with every address and URL blanked, because it lands in the
+  # public log of the deploy job.
+  alarm_out=$("${SSH[@]}" "$HOST" "bash -s $bad ${started:11:8}" < "$HERE/deploy-alarm.sh" 2>&1)
+  k=$?
+  set -e
+  if [[ -n "$alarm_out" ]]; then
+    sed -E 's#[A-Za-z][A-Za-z0-9+.-]*://[^[:space:]]+#<url>#g; s/([0-9]{1,3}\.){3}[0-9]{1,3}/<address>/g' <<<"$alarm_out" \
+      | sed 's/^/         /'
+  fi
+  if [[ $k -eq 0 ]]; then
+    echo "ALARM SENT"
+  else
+    echo "ALARM NOT SENT: exit $k"
+    rc=3
+  fi
+fi
+exit "$rc"

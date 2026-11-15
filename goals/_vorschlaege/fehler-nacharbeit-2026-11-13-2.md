@@ -9,3 +9,4 @@ Linse Q, Frage 5 (Bezeichner, Dateien und Kommentare Englisch), Regelstelle `loo
 Der Testname in test/known-ips.test.ts:199 lautet „leaves an address of kind erfunden …“, die Meldung in Zeile 217 nennt „kind erfunden“, der Regex in Zeile 31 erlaubt nur `erfunden|eigene`.
 Die deutschen Arten kommen aus fehler-kritik-2026-11-12-3 und der Goal-Datei von fehler 04 (Punkt 1), deshalb hat Linse B sie in 04-z4-B durchgelassen; Goal-Datei und Vorschlag dürfen Deutsch bleiben.
 Prüfbefehl nach der Umbenennung: beide Einzeiler oben geben 0 aus, `pnpm -s vitest run test/known-ips.test.ts` Exit 0.
+Übernommen: Triage-Glieder 14.11. an den Tech Lead, Glied 9 (Grundregel 12, deutsche Bezeichner und Kommentare) (2026-11-14)

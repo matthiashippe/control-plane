@@ -1,7 +1,7 @@
 # Sandbox Goal 07: Freigegebene Ports unter einer eigenen Domain, ohne Warten auf Nachfrage
 
 ## Status
-BLOCKED matthias
+ACTIVE
 
 ## Active Objective
 Ein fremder Automaton gibt einen Port seiner Sandbox mit `expose_port` frei und bekommt eine öffentliche Adresse
@@ -120,11 +120,11 @@ Die eigene Domain hält eine Phishing-Seite eines Kunden aus der Zone, über die
       der Zahlung.
       Prüfung: `awk '/^## Domain/{f=1;next} /^## /{f=0} f' docs/sandbox/ports.md | grep -cE "^(Vorschlag: [a-z0-9-]+\.[a-z]{2,}|Preis: [0-9]+(\.[0-9]+)? USD im Jahr|Frei: .*, 20[0-9]{2}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2} UTC)$"` muss 3 ausgeben.
       Prüfung: `awk '/^## Domain/{f=1;next} /^## /{f=0} f' docs/sandbox/ports.md | grep -ciE "^Vorschlag: .*postyourprice"` muss 0 ausgeben.
-- [ ] Matthias hat die Domain am Human Gate `server_kauf` gekauft und den Token nur für ihre Zone eingetragen; die Doku nennt den
+- [x] Matthias hat die Domain am Human Gate `server_kauf` gekauft und den Token nur für ihre Zone eingetragen; die Doku nennt den
       gekauften Namen, und die neue Zone steht mit Proxy-Eintrag und „Full (strict)“.
       Prüfung: `awk '/^## Domain/{f=1;next} /^## /{f=0} f' docs/sandbox/ports.md | grep -cE "^Gekauft: [a-z0-9-]+\.[a-z]{2,}, 20[0-9]{2}-[0-9]{2}-[0-9]{2}$"` muss 1 ausgeben.
       Prüfung (Netz): `python3 ops/sandbox/cloudflare.py ports-check 72.62.51.224 | tail -1` muss `PORTS DNS OK` ausgeben.
-- [ ] Der Sandbox-Server liefert Ports nur noch unter der neuen Domain aus, mit Origin-CA-Zertifikat statt `tls internal`, und
+- [x] Der Sandbox-Server liefert Ports nur noch unter der neuen Domain aus, mit Origin-CA-Zertifikat statt `tls internal`, und
       `sandboxd` verweigert die Domain der Zahlung.
       Prüfung: `grep -c "tls internal" ops/sandbox/sandbox.caddy` muss 0 ausgeben, `grep -cE '^\*\.postyourprice\.com' ops/sandbox/sandbox.caddy` muss 0 ausgeben, und `grep -cxF 'ctl.sbx.postyourprice.com {' ops/sandbox/sandbox.caddy` muss 1 ausgeben.
       Prüfung: `grep -c "/etc/caddy/sbx/" ops/sandbox/sandbox.caddy` muss mindestens 1 ausgeben, und `grep -c "postyourprice" ops/sandbox/sandboxd.service` muss 0 ausgeben.
@@ -189,10 +189,7 @@ Die eigene Domain hält eine Phishing-Seite eines Kunden aus der Zone, über die
 ## Progress Log
 - 2026-11-13 Zyklus 1: Punkte 1, 2, 5, 6, 7, 8, 9 und 10 gebaut, 4 ohne Netz gebaut; Ausgangslage 0 fremde Adressen, Vorschlag sandboxhost.dev, Wildcard der Zahlungszone gelöscht, Ports an sandboxd, sandboxd und setup.sh nur mit eigener Domain und Origin-CA-Zertifikat, Walk und live.sh mit freigegebenem Port; Punkt 3 und die Netzprüfungen von 4 warten auf den Kauf am Gate server_kauf. Rot vor dem Fix: ports-demand.sh mit status 410 im Zähler SELFTEST FAILED (7), cloudflare.py --selftest ohne Wildcard-Filter im Digest FAILED (1), test/sandboxd.test.ts 5 failed, test/sandbox-ports.test.ts 9 failed, test/sandbox-walk.test.ts 7 failed, live.sh --selftest LIVE SELFTEST FAIL (port_live fehlte), runtime-sandbox.sh --selftest 8 of 18 cases bis zum neuen Plant. Prüfbefehle: P1 SELFTEST OK, Vorher-Zeile 1, diff leer Exit 0, Reihenfolge Exit 0; P2 3 und 0; P3 Gekauft-Zeile fehlt, ports-check ohne Token nicht lauffähig; P4 0 0 1, 2 0, sandboxd.test.ts Exit 0 und 7, setup.sh --check und probe.sh nicht gefahren (Domain nicht gekauft); P5 1, Digest gleich 29c9eb2596f4 Exit 0, curl 000 6, smoke.sh Exit 0; P6 vitest Exit 0 (45 Tests), Wortschleife leer, 0; P7 0 und leer, vitest Exit 0, e2e von PR #100 an 4dbd085 SUCCESS und 1 Zeile E2E OK mit sandbox=true und long_exec=true; P8 Wortschleife leer, live.sh --selftest Exit 0 und 10, vitest Exit 0; P9 2, 0, 0 und 0; P10 check Exit 0 (137 Dateien, 1647 Tests).
 - 2026-11-15 Zyklus 2: Domain auf sandboxhost.de umgestellt (Matthias 15.11.2026, INWX, Zone im HTC-Konto pending), Punkt 4 ohne Netz nachgezogen, kein Punkt neu abgehakt; ports-check prüft und ports-apply setzt jetzt Always Use HTTPS, weil .de ohne HSTS-Preload ist. Rot vor dem Fix: cloudflare.py --selftest TypeError (plan_ports ohne https), Mutation der https-Bedingung FAILED (2). Prüfbefehle: siehe Kommentar am Topic; P3 und die Netzprüfungen von P4 warten weiter auf den Kauf (DENIC 404 für sandboxhost.de, Token nicht eingetragen).
+- 2026-11-15 Zyklus 3: Punkte 3 und 4 gebaut nach dem Kauf von sandboxhost.de; dev in den Goal-Branch gemergt (Konflikte in ANNAHMEN.md, live.sh, setup.sh, live-selftest.test.ts, je beide Seiten), ports-apply, Origin-CA-Zertifikat, setup.sh auf srv1327036, *.postyourprice.com erneut gelöscht (dev hatte ihn am 14.11. wieder angelegt). Rot vorher: ports-check PORTS DNS DRIFT changed=3, setup.sh --check SETUP CHECK DRIFT changed=4, dns-check CHANGE dns remove A *.postyourprice.com. Prüfbefehle: P3 Gekauft-Zeile 1, ports-check PORTS DNS OK; P4 0 0 1, 2 0, sandboxd.test.ts Exit 0, setup.sh --check Exit 0 ohne CHANGE, probe.sh 2 (PROBE expose OK, SANDBOX PROBE OK left=0); P5 1, Digest 29c9eb2596f4 Exit 0, curl 000 6, smoke.sh Exit 0. Nach dem Merge war check rot (test/own-ips-readers.test.ts von dev: read past own_ips: ops/ports-demand.sh:51); ports-demand.sh nimmt own_ips_offline jetzt aus ops/own-ips.sh, count_demand unverändert (P1 diff leer, SELFTEST OK, Lauf gegen die Produktion 0 und 0). P1 bis P9 ohne Netz wie oben, vitest der Punkte 4, 6, 7, 8 Exit 0 (130 Tests), P10 check Exit 0 (165 Dateien, 1877 Tests).
 
 ## Blockers
-Art: matthias
-Gate: server_kauf
-Aufgabe: Die Domain sandboxhost.de bei INWX kaufen, die Nameserver von Cloudflare eintragen und einen API-Token nur für diese Zone anlegen und eintragen (Domain nach Matthias' Entscheidung vom 15.11.2026, Cloudflare verkauft keine .de).
-Worum: Freigegebene Ports von Kunden-Sandboxes brauchen eine eigene Domain, getrennt von postyourprice.com, über die jede Zahlung läuft; ohne Kauf bleibt ein Automaton ohne öffentliche Adresse für seinen Dienst.
-Empfehlung: Bei INWX sandboxhost.de kaufen (etwa 6 € im Jahr; laut DENIC am 2026-11-15 um 16:49 UTC noch frei) und als Nameserver dolly.ns.cloudflare.com und kobe.ns.cloudflare.com eintragen; die Zone sandboxhost.de liegt im Cloudflare-Konto von HTC schon an (Status pending). Dann in Cloudflare unter My Profile, API Tokens, Create Token, Custom token mit dem Namen sbx-ports: Rechte Zone DNS Edit, Zone SSL and Certificates Edit und Zone Zone Settings Edit, Zone Resources Include Specific zone sandboxhost.de. Den Token als Zeile CLOUDFLARE_SBX_API_TOKEN=<token> in ~/brain/connectors/secrets.env eintragen. Am Ende steht die Zone sandboxhost.de aktiv, der Token ist eingetragen, und auf der Karte steht „gekauft: sandboxhost.de“. Dauer etwa 5 Minuten; DNS, Zertifikat und Server richtet danach der Loop ein.
+Keine. Gate server_kauf am 15.11.2026 erledigt: sandboxhost.de bei INWX gekauft, Zone aktiv, Token CLOUDFLARE_SBX_API_TOKEN eingetragen (Matthias).

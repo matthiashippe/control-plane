@@ -52,3 +52,120 @@
 - **Der Fall `nokey` läuft im Selbsttest durch den Live-Pfad.** `domains_search_live` mit einer fehlenden `LIVE_SANDBOX_ENV` gibt
   `nokey` aus, ohne `curl` zu rufen (der Selbsttest sperrt `curl`), und dieser Wert geht in den Richter. Drei weitere Fälle
   `mark-names`, `mark-message` und `mark-taken` nehmen der richtigen Antwort je ein Merkmal und werden FAIL.
+
+## Goal 03 (13.11.2026, Engineer CP)
+
+- **Die Wartezeit steht als Zeile `CLIENT_KEY_WAIT_S=75` in `ops/live.sh`.** Der vitest-Test liest sie mit `^CLIENT_KEY_WAIT_S=([0-9]+)$`
+  wie `DOMAINS_PATH=` und `RECHECK_MS` mit `const RECHECK_MS = ([0-9_]+);` aus `src/sandbox/service.ts`. 75 statt 61, weil ein
+  Aufruf an `sandboxd`, der kurz vor dem Schlüsselwechsel startet, erst nach dem Wechsel scheitern und `lastFailure` setzen kann.
+  Der Richter `judge_sandbox_wait` liest `RECHECK_MS` im Selbsttest ebenfalls aus `src/sandbox/service.ts` (Funktion `recheck_s`),
+  damit seine Grenze nicht als zweite Zahl im Skript veraltet.
+- **Warten und Setup sind im Selbsttest ersetzbar, ohne Schalter von außen.** `live_wait` (sonst `sleep`) ersetzt der Selbsttest
+  durch eine Funktion, die die Sekunden in eine Datei schreibt; `CLIENT_KEY_SETUP` (sonst `ops/sandbox/setup.sh`) zeigt auf eine
+  Attrappe, die nur `SETUP CLIENT-KEY OK changed=0` oder `changed=1` ausgibt. Beides setzt nur der Selbsttest in seiner eigenen
+  Shell; keine Umgebungsvariable lenkt den Live-Lauf um. Für Kindprozesse (`ops/timeout-quote.sh`) liegen `curl` und `ssh` als
+  Attrappen vorn im `PATH` und enden mit Exit 99.
+- **`live()` legt mit `mktemp -d` einen Ordner an, setzt `TMPDIR` darauf und löscht ihn per `trap` auf EXIT, INT und TERM.** Damit
+  landen auch die Dateien von `handoff_live`, `ops/timeout-quote.sh` und `setup.sh` dort. Der `trap` ruft `live_cleanup`, das nur
+  diesen Ordner löscht und nichts ausgibt; der `trap … RETURN` des Selbsttests bleibt unberührt.
+- **Der Abbruch im Selbsttest geht an die Prozessgruppe.** Der Lauf von `live()` startet mit `set -m` als eigene Prozessgruppe, und
+  `kill -TERM -- -<pid>` trifft wie Strg-C oder ein Supervisor jeden Prozess der Gruppe: Die Befehlssubstitution mit der
+  `curl`-Attrappe endet sofort, danach führt die Haupt-Shell den `trap` aus. Gemessen endet der Lauf in unter einer Sekunde; nach
+  15 s ohne Ende gilt der Fall als FAIL und die Gruppe bekommt `kill -KILL`. Ohne `trap` bleiben 3 (Suche) und 4 (Sandbox) Dateien
+  liegen. Der Fall gilt nur, wenn die Datei mit dem erfundenen Schlüssel während des gehaltenen Aufrufs in `TMPDIR` lag.
+- **Der Ordner nennt seinen Prozess im Namen (Zyklus 3, Kritik Punkt 6).** `live()` legt ihn als
+  `${TMPDIR:-/tmp}/live-run.<PID>.XXXXXX` an, mit `$BASHPID` statt `$$`, weil `$$` in einer Subshell die PID der äußeren Shell
+  bleibt und der Selbsttest `live()` in einer Subshell fährt. Vor dem Anlegen löscht `live_sweep` jeden Ordner `live-run.*.*` in
+  `TMPDIR`, der dem eigenen Nutzer gehört (`-O`, kein Symlink) und dessen PID weder `kill -0` noch `ps -p` kennt, und sonst nichts.
+  Eine wiederverwendete PID lässt einen Ordner nur bis zum nächsten Lauf liegen, löscht aber nie einen lebenden. Der Selbsttest
+  beendet den ersten Lauf mit `kill -KILL` an die Prozessgruppe, während `POST /v1/sandboxes` gehalten wird, legt dann eine fremde
+  Datei und einen Ordner `live-run.<PID der Selbsttest-Subshell>.living` dazu und fährt einen zweiten Lauf, den er mit `kill -TERM`
+  beendet. Gegenproben: ohne `live_sweep` ist `kill-sweep` FAIL (1 Ordner bleibt), ohne Präfix FAIL (kein Ordner, also kein Beweis);
+  ein `live_sweep` ohne Prüfung der PID und ein Löschen von ganz `TMPDIR` machen `foreign` FAIL.
+
+## domains 04
+
+- **Die Zeile `WAIT sandbox:` geht auf stderr.** `live()` reicht die Standardausgabe von `sandbox_live` an `judge_sandbox` und
+  zeigt sie erst nach dem Lauf; auf stderr steht die Zeile sofort auf dem Bildschirm und ändert das Urteil nicht. `sandbox_live`
+  ruft nach `changed=1` die Funktion `client_key_wait`, die erst `wait_line` und dann `live_wait` ruft.
+- **Die Reihenfolge hält eine Ereignisdatei fest.** `sandbox_line_run` fährt den echten `sandbox_live` mit der Attrappe für
+  `setup.sh`; dessen stderr, das gezählte `live_wait` (`wait:<s>`) und die `curl`-Attrappe bei `POST /v1/sandboxes` (`create`)
+  hängen in dieselbe Datei an, in der Reihenfolge, in der sie geschehen. `judge_sandbox_wait_line` verlangt nach `changed=1` genau
+  eine Zeile mit `CLIENT_KEY_WAIT_S`, vor dem ersten `wait` und vor `create`, nach `changed=0` keine. Gepflanzt werden `silent`
+  (ein `client_key_wait` nur mit `live_wait`, der Stand vor domains 04) und `late` (Zeile nach dem Warten). Gegenproben am echten
+  Code: `sandbox_live` wieder mit `live_wait` macht `new-key` FAIL, eine doppelte Zeile, eine falsche Zahl, die Zeile auf stdout
+  und eine Zeile auch nach `changed=0` machen `new-key` oder `old-key` FAIL.
+- **Das Goal löst den Schlüsselwechsel selbst aus.** `--client-key` schreibt nur, wenn `cp.pub` auf dem Sandbox-Server vom
+  Schlüssel in `/data` von `deploy-cp-1` abweicht; das passiert nur mit einem neuen Volume oder einem verlorenen `cp.pub`, und ein
+  früherer Lauf mit `changed=1` hat keine Zeitstempel. Ohne Auslöser bliebe das Warten aus domains 03 nur gegen Attrappen belegt.
+  `--client-key-reset` verschiebt `cp.pub` nach `cp.pub.prev` (nicht `.pub`, sonst nähme `sandboxd` ihn weiter an), der
+  Prüfschlüssel bleibt. Fenster am 14.11.2026: Reset 01:35:20 UTC, Schlüssel zurück 01:36:48, letzter 401 um 01:35:58, also lehnte
+  der Dienst neue Sandboxes von 01:35:20 bis 01:36:58 (rund 100 s) ab. Fremde Sandboxes liefen keine.
+- **Zwei Läufe statt einem (Abweichung vom Kontext „genau einmal“).** Der erste Lauf um 01:28 wartete richtig, scheiterte aber an
+  einem fehlenden Basis-Image auf dem Sandbox-Server (Cron des Mitbewohners, `docs/sandbox/schluesselwechsel.md`); sein Fenster
+  ging von 01:28:26 bis 01:29:47. Das Image hat der Maker mit `bash ops/sandbox/setup.sh 72.62.51.224` neu gebaut, dem Weg aus
+  `docs/sandbox/server.md`, danach lief die Messung einmal. Ein Fehlschlag ohne Bezug zum Warten belegt domains 03 weder noch
+  widerlegt er es; `BLOCKED fachlich` hätte das Produkt für alle Kunden bis zum nächsten Goal ohne Image gelassen.
+- **Pin des Basis-Images (Punkt 6, Kritik).** `docker image prune -a` löscht nur Images ohne Container; ein mit `docker create`
+  angelegter, nie gestarteter Container zählt als Nutzer (Docker-Doku zu `image prune`, Option `--all`). Auf dem code-host gibt es
+  kein Docker, darum ist das nicht lokal nachgestellt, und gegen den Cron auf dem Server löst der Maker kein `prune` aus, weil das
+  den Server des Mitbewohners ändert. Der Pin trägt das Label `sandboxd.pin=1` (nicht `sandboxd=1`, das räumt `sandboxd` beim Start
+  weg) und `--network none`. `pin_fact` sagt nur `yes`, wenn der Pin auf die aktuelle Image-ID zeigt, im Zustand `created` ist und
+  kein `sandboxd=1` trägt; in jedem anderen Fall ersetzt `pin_image` ihn (`docker rm -f`, dann `docker create`), damit ein
+  gestarteter oder falsch markierter Pin nicht als Dauerabweichung in `--check` hängen bleibt. Der Selbsttest benutzt eine
+  `docker`-Attrappe auf `PATH`, die wie Docker ein `create` auf einen belegten Namen ablehnt, und dieselben Funktionen
+  `PIN_FUNCS` wie `GATHER` und `APPLY`. Ausgerollt am 14.11.2026 gegen 02:09 UTC mit `bash ops/sandbox/setup.sh 72.62.51.224`;
+  davor zeigte `--check` nur `CHANGE fact image_pin want=yes have=no`, kein Container lief, `sandboxd` wurde nicht neu gestartet.
+
+## domains 05 (14.11.2026, Engineer CP)
+
+- **Quelle der eigenen Adressen ist das gebaute Modul im Container.** Die Abfrage am Zahlungsserver (`FOREIGN_OWNERS_JS` in
+  `ops/sandbox/setup.sh`) importiert `ourAddresses` aus `/app/dist/bounties/ours.js` in `deploy-cp-1` und ruft sie mit der
+  Datenbank `/data/cp.db` (`readonly: true`). So entscheidet dieselbe Funktion, die der Dienst benutzt, samt `OUR_ADDRESSES` und
+  `OUR_KEY_NAMES`, und es entsteht keine dritte Kopie der Listen. Der Selbsttest führt denselben Text gegen
+  `src/bounties/ours.ts` des Checkouts aus (Node 22 entfernt die Typen beim Import) und baut seine Datenbank mit
+  `OUR_ADDRESSES[0]` aus derselben Datei, damit keine eigene Adresse im Selbsttest steht. Folge: Zwischen einem Merge, der
+  `ours.ts` ändert, und dem nächsten Rollout gilt im Reset die ausgerollte Fassung; das ist die, nach der der Dienst gerade bucht.
+- **Fremd ist jede laufende Sandbox, deren Konto nicht auf eine eigene Adresse zeigt**, auch ein Konto, das `sandbox_owners` nicht
+  kennt. Über die Leitung zum Zahlungsserver gehen nur die Konten (`acct-…`) auf stdin, zurück kommt nur eine Zahl; ausgegeben wird
+  `running=<n> foreign=<m>`.
+- **Fail closed.** `state.json` fehlt, ist kein JSON, hat kein Objekt `sandboxes` oder eine laufende Sandbox ohne gültiges Konto,
+  `ssh` scheitert, der Zahlungsserver antwortet nicht mit einer Zahl oder mit mehr fremden als laufenden: Der Reset meldet
+  `SETUP CLIENT-KEY-RESET FAIL: …` und verschiebt nichts. `sandboxd` selbst nimmt ein fehlendes `state.json` als leer; der Reset
+  nicht, weil er dann nicht weiß, ob er einen Kunden aussperrt.
+- **Unit-Name `cp-pub-restore`, fest.** Vor `systemd-run` stoppt der Reset einen Timer desselben Namens und setzt einen
+  gescheiterten Lauf zurück (`systemctl stop`, `systemctl reset-failed`), sonst schlüge ein zweiter Reset an dem Namen fehl, den ein
+  abgelaufener Timer noch hält. Der Befehl des Timers legt `cp.pub.prev` nur zurück, wenn `cp.pub` fehlt, und mit `mv -n`, damit ein
+  Schlüssel, der im letzten Moment kommt, nicht ersetzt wird. Der Timer entsteht auch bei `moved=0`; liegt dann ein altes
+  `cp.pub.prev`, kommt es zurück, was der Zustand vor dem früheren Reset war.
+- **`--restore-after` nur 60 bis 3600 ganze Sekunden.** Unter 60 schnitte der Timer die Messung aus domains 04 ab (dort kam
+  `--client-key` 88 s nach dem Reset), über eine Stunde bliebe ein abgebrochener Lauf zu lange unbemerkt. Andere Werte und
+  führende Nullen geben die Usage-Zeile und Exit 2, ohne Netz.
+- **Zweiseitiger Beleg gegen die Produktion (14.11.2026).** `--foreign-sandboxes 72.62.51.224` gab `running=0 foreign=0`; auf dem
+  Sandbox-Server liegen keine Sandboxes (`state.json` mit 0 Einträgen). Damit die Null keine Blindheit ist, lief dieselbe Abfrage
+  am Zahlungsserver mit gepflanzten Konten: leer `0`, ein unbekanntes Konto `1`, das Konto der Live-Prüfung (`LIVE_SANDBOX_ADDRESS`
+  in `sandbox_owners`) `0`, beide zusammen `1`. Eine laufende Sandbox auf dem echten Server pflanzt das Goal nicht, weil das eine
+  Anlage über den Dienst wäre; die Seite `state.json` ist im Selbsttest mit laufenden, gestoppten und kaputten Einträgen belegt.
+
+## domains 06 (14.11.2026, Engineer CP)
+
+- **Node für die lokalen Aufrufe von `setup.sh`.** Die sieben Aufrufe, die auf dem code-host laufen (`probe_pub`, die Prüfung eines
+  Ed25519-Schlüssels, `RUNNING_OWNERS_JS` und die drei des Selbsttests), nehmen `LOCAL_NODE`: zuerst `SETUP_NODE`, dann
+  `/usr/bin/node`, dann den Node auf dem `PATH`, jeweils den ersten, der `node:sqlite` laden kann und Type-Stripping hat (der
+  Selbsttest lädt `src/bounties/ours.ts` direkt). Auf dem code-host bleibt das `/usr/bin/node` (v22.23.4) wie bisher. Der Required
+  Check auf `ubuntu-latest` hat Node 22 von `actions/setup-node` auf dem `PATH`; ob dort ein `/usr/bin/node` liegt und welche Version
+  es hat, ist nicht belegt, darum prüft `setup.sh` die Fähigkeit statt des Pfads. Gibt es keinen passenden, bleibt `/usr/bin/node`
+  und der Selbsttest wird rot statt still zu überspringen. Auf dem Sandbox-Server ändert sich nichts: `sandboxd` läuft weiter mit
+  `NODE_DIR`, und die entfernten Schnipsel bleiben unverändert. Der Test setzt keinen Pfad zu Node.
+- **Die zweite Abfrage verkürzt das Fenster, schließt es nicht.** `client_key_reset` ruft nach dem Verschieben dieselbe Funktion
+  `foreign_sandboxes` noch einmal; läuft jetzt eine fremde Sandbox oder ist eine Seite nicht lesbar, legt `cp_pub_back` mit dem
+  Schnipsel `CP_PUB_RESTORE` sofort zurück (nur bei fehlendem `cp.pub`, `mv -n`, ein neuerer Schlüssel gewinnt), und die letzte
+  Zeile ist `SETUP CLIENT-KEY-RESET FAIL: foreign sandbox started` oder `SETUP CLIENT-KEY-RESET FAIL: second check: …`. Offen bleibt
+  eine Anlage, die zwischen dem Verschieben und der zweiten Abfrage beginnt, und jede, die `sandboxd` noch in seiner Map `pending`
+  hält (`ops/sandbox/sandboxd.mjs:294`), weil sie erst nach dem Start in `state.json` steht. Sie zu sehen hieße `sandboxd` ändern,
+  der in diesem Goal gesperrt ist. Scheitert das sofortige Zurücklegen selbst (SSH weg), bleibt der Timer `cp-pub-restore` als
+  Rückfall stehen; er tut bei vorhandenem `cp.pub` nichts.
+- **Der Selbsttestfall `late` zählt die Leseversuche von `state.json`** über die Subshells von `foreign_sandboxes` hinweg in einer
+  Datei und fährt nach dem ersten oder zweiten Versuch ein Skript (fremde Sandbox gestartet, `state.json` weg, Zahlungsserver nach
+  dem zweiten Lesen weg, neuerer Schlüssel vor dem Zurücklegen). Der neuere Schlüssel hat einen eigenen Inhalt, weil ein Zurücklegen
+  mit `mv -f` bei gleichem Inhalt nicht auffiele (erste Fassung der Gegenprobe blieb so grün).

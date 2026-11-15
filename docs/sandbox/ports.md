@@ -44,6 +44,8 @@ Frei: RDAP der Registry von .dev antwortet 404 (nicht registriert), 2026-11-13 1
   `curl -s -o /dev/null -w '%{http_code}' https://pubapi.registry.google/rdap/domain/sandboxhost.dev` (404 heißt frei;
   `agentsandbox.dev` als Gegenprobe gibt 200, vergeben).
 
+Gekauft: sandboxhost.de, 2026-11-15
+
 Entscheidung Matthias, 15.11.2026: Gekauft wird `sandboxhost.de` bei INWX (etwa 6 € im Jahr), weil Cloudflare Registrar keine
 `.de` verkauft. Die Zone liegt im Cloudflare-Konto von HTC (Nameserver `dolly.ns.cloudflare.com` und `kobe.ns.cloudflare.com`),
 der Token `sbx-ports` gilt nur für sie. Die Adressen lauten `https://sbx-<id>-<port>.sandboxhost.de`.
@@ -52,6 +54,11 @@ der Token `sbx-ports` gilt nur für sie. Die Adressen lauten `https://sbx-<id>-<
   gibt 404, `denic.de` als Gegenprobe 200. Status der Zone zur selben Zeit `pending` (Nameserver noch nicht bei INWX gesetzt).
 - `.de` steht nicht auf der HSTS-Preload-Liste. Den Ersatz trägt die Zone: „Always Use HTTPS“ an, gesetzt von
   `cloudflare.py ports-apply` und geprüft von `ports-check`, damit jeder Aufruf über `http://` auf HTTPS umgeleitet wird.
+- Nach dem Kauf (Zone `active`, Token `sbx-ports` eingetragen) am 2026-11-15 vor 17:03 UTC: `python3 ops/sandbox/cloudflare.py
+  ports-check 72.62.51.224` meldete vorher drei Abweichungen (`create A *.sandboxhost.de`, `ssl want=strict have=full`,
+  `https want=on have=off`), `ports-apply` legte sie an, danach `PORTS DNS OK`, erneut um 17:10 UTC.
+- Um 17:10 UTC: `curl -s -o /dev/null -w '%{http_code} %{redirect_url}' http://sbx-zz9-8080.sandboxhost.de/` gibt
+  `301 https://sbx-zz9-8080.sandboxhost.de/`, derselbe Name über HTTPS `404` (kein solcher Port, Antwort von Caddy über Cloudflare).
 
 ## Zone der Zahlung
 
@@ -65,3 +72,8 @@ Zone vorher: 29c9eb2596f4
 Die Zone hatte zu diesem Zeitpunkt vier Einträge: die Wurzel, `www`, `ctl.sbx` und den Wildcard. Im Caddy-Zugriffslog des
 Zahlungsservers (137065 Zeilen bis 2026-11-13 19:26 UTC) kommt kein anderer Name der Zone vor als die Wurzel, also hing kein Dienst
 am Wildcard.
+
+Am 2026-11-14 um 16:07 UTC legte ein Lauf vom Stand `dev` den Eintrag wieder an (sandbox 02 misst ihn dort,
+`goals/sandbox/ANNAHMEN.md`, Audit 2026-11-14 Zeile 465). Nach dem Kauf löschte ihn dieses Goal am 2026-11-15 um 17:04 UTC erneut mit
+`python3 ops/sandbox/cloudflare.py dns-apply 72.62.51.224` (`deleted A *.postyourprice.com`, `CF DNS OK changed=0`). Fingerabdruck
+davor und danach `29c9eb2596f4`, also gleich `Zone vorher`.

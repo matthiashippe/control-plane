@@ -22,6 +22,12 @@
 # loses a real reader, which is the direction this counter must err in.
 #
 #   source ops/own-ips.sh; OWN=$(own_ips)
+#   source ops/own-ips.sh; OWN=$(own_ips_offline)
+#
+# own_ips_offline is the same answer without the live address, for a log read from disk: the list,
+# CP_OWN_IPS and the seen file, nothing over the network, nothing written. It ends with 1 when the
+# list is not there and with 2, printing nothing, when the list names no address, even if
+# CP_OWN_IPS or the seen file do: an emptied list must never read as "we have no addresses".
 
 # Resolved here and not inside the function: ${BASH_SOURCE[0]} names the file being sourced at
 # THIS moment, and by the time the function runs it can be empty. It was, and the function
@@ -46,6 +52,29 @@ if [[ -z "${CP_OWN_IPS_FILE:-}" ]]; then
   fi
 fi
 
+# The rules both own_ips and own_ips_offline read by, kept in one place.
+_own_ips_list_missing() {
+  echo "own_ips: $1 is not there. The list of our own addresses lives in the" >&2
+  echo "            repository; without it every traffic count is guesswork." >&2
+  echo "            If you are in zsh, source this from the repository root or set" >&2
+  echo "            CP_OWN_IPS_FILE=<repo>/ops/own-ips.txt; zsh has no BASH_SOURCE." >&2
+}
+
+# Where addresses seen live are remembered, outside the checkout.
+_own_ips_seen_file() {
+  printf '%s\n' "${CP_OWN_IPS_SEEN:-${XDG_STATE_HOME:-${HOME:-}/.local/state}/control-plane/own-ips-seen.txt}"
+}
+
+# The addresses the list names: first field of every line that does not start with "#".
+_own_ips_listed() {
+  grep -v '^#' "$1" | awk 'NF {print $1}' || true
+}
+
+# The addresses the seen file names, nothing when it is not there.
+_own_ips_seen() {
+  if [[ -f "$1" ]]; then awk 'NF {print $1}' "$1" 2>/dev/null || true; fi
+}
+
 own_ips() {
   local list_file="$CP_OWN_IPS_FILE"
   local key="${CP_SSH_KEY:-$HOME/.ssh/id_ed25519_automaton}"
@@ -54,10 +83,7 @@ own_ips() {
   # Missing means the path is wrong, not that the history is empty. Say so rather than start a
   # fresh one somewhere else.
   if [[ ! -f "$list_file" ]]; then
-    echo "own_ips: $list_file is not there. The list of our own addresses lives in the" >&2
-    echo "            repository; without it every traffic count is guesswork." >&2
-    echo "            If you are in zsh, source this from the repository root or set" >&2
-    echo "            CP_OWN_IPS_FILE=<repo>/ops/own-ips.txt; zsh has no BASH_SOURCE." >&2
+    _own_ips_list_missing "$list_file"
     return 1
   fi
   live=$(timeout 15 ssh -i "$key" -o BatchMode=yes -o ConnectTimeout=8 "$host" \
@@ -79,7 +105,8 @@ own_ips() {
   # address seen live is therefore remembered outside the checkout, in CP_OWN_IPS_SEEN or the state
   # directory, and counted as ours in every later run. A failed write there must not cost the
   # caller its answer, so errors are dropped.
-  local seen_file="${CP_OWN_IPS_SEEN:-${XDG_STATE_HOME:-$HOME/.local/state}/control-plane/own-ips-seen.txt}"
+  local seen_file
+  seen_file=$(_own_ips_seen_file)
   if [[ -n "$live" ]] && ! grep -q "^$live " "$list_file" 2>/dev/null \
     && ! grep -q "^$live " "$seen_file" 2>/dev/null; then
     { mkdir -p "$(dirname "$seen_file")" \
@@ -90,7 +117,25 @@ own_ips() {
     # an unquoted variable turns the whole list into a single line that matches no address.
     printf '%s\n' "${CP_OWN_IPS:-}" | tr ' ' '\n'
     printf '%s\n' "$live"
-    grep -v '^#' "$list_file" | awk 'NF {print $1}'
-    if [[ -f "$seen_file" ]]; then awk 'NF {print $1}' "$seen_file" 2>/dev/null; fi
+    _own_ips_listed "$list_file"
+    _own_ips_seen "$seen_file"
+  } | grep -v '^$' | sort -u | tr '\n' ' '
+}
+
+# The answer of own_ips for a log read from disk: no live address, no network, no write.
+own_ips_offline() {
+  local list_file="$CP_OWN_IPS_FILE" listed
+  if [[ ! -f "$list_file" ]]; then
+    _own_ips_list_missing "$list_file"
+    return 1
+  fi
+  listed=$(_own_ips_listed "$list_file" | grep -v '^$' || true)
+  if [[ -z "$listed" ]]; then
+    return 2
+  fi
+  {
+    printf '%s\n' "${CP_OWN_IPS:-}" | tr ' ' '\n'
+    printf '%s\n' "$listed"
+    _own_ips_seen "$(_own_ips_seen_file)"
   } | grep -v '^$' | sort -u | tr '\n' ' '
 }

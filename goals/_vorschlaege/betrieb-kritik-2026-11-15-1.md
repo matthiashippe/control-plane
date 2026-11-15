@@ -1,0 +1,7 @@
+Schwere: 2
+Goal: betrieb 05
+Befund: Der neue Vergleich in `ops/watchdog.sh` kennt die beim Anbieter eingestellte Schwelle nur als festen Standard 16 aus dem Skript, weil die Crontab keine Variable setzt und der Loop sie nicht ändern darf; stellt Matthias nach der ersten Meldung den neuen Wert beim Anbieter ein, meldet der Watchdog trotzdem jeden Tag weiter, bis ein Goal den Standard im Skript ändert und ein Rollout des Laufzeitpfads `ops/` mitnimmt.
+Beleg: goals/betrieb/05-die-aufladung-beim-inferenz-anbieter-ist-belegt-und-bleibt-passend.md:36 (Crontab ändert der Loop nicht) | goals/betrieb/05-die-aufladung-beim-inferenz-anbieter-ist-belegt-und-bleibt-passend.md:38 (`${CP_CREDIT_TOPUP_USD:-16}`, Tagesstempel einmal am Tag) | docs/betrieb/guthaben.md:109 (wirkt erst mit dem nächsten Rollout des Laufzeitpfads)
+Empfehlung: Der Watchdog meldet je gerechneter Schwelle genau einmal statt einmal am Tag: Er speichert in `<CP_WATCHDOG_STATE>.topup` den zuletzt gemeldeten Wert und meldet erst wieder, wenn die gerechnete Schwelle um mehr als 1 USD über diesem Wert liegt. Die Meldung nennt den Wert, den Matthias einstellen soll; ein Test zeigt zwei Läufe an verschiedenen Tagen mit gleicher gerechneter Schwelle und genau einer Meldung.
+
+Derselbe Alarmweg trägt die Warnung vor leerem Guthaben, die jede Inferenz-Anfrage zahlender Kunden schützt (fehler 01, betrieb 01). Eine tägliche Meldung, die nach dem Handeln nicht aufhört, lehrt, Meldungen auf diesem Weg zu übergehen.

@@ -42,7 +42,8 @@ local start and does not replace the run against the real endpoint.
 | `vm.disk_used` | above 80 % | rotate the logs (json-file max 20m x 5), check for old images |
 | `db.day.margin_mc` | negative | the sale price does not cover the purchase: check markup or catalogue |
 | `db.paying_without_thinking` | one entry older than 24 h | a customer paid and buys no inference. No alarm, but go and look |
-| `alarm_path.status` | `red` (3 or more `[WARN] webhook unreachable` in 24 h) | no alarm reaches anybody: post to the webhook by hand, compare URL and topic in the crontab of the VM with `CP_ALERT_WEBHOOK` in `~/brain/connectors/secrets.env`, never write the URL into a file of this repo. `unknown` (log not read) is no alarm, but two runs in a row are a finding like a missing `vm` block |
+| `alarm_path.status` | `red` (3 or more `[WARN] webhook unreachable` in 24 h and no `[INFO] webhook delivered` after the last of them, see `last_unreachable` and `last_delivered`; or a `last_delivered` older than 26 h, even with 0 failed POSTs) | no alarm reaches anybody: with a `last_delivered` older than 26 h the watchdog itself no longer posts, so check `crontab -l` and the end of `/var/log/cp-watchdog.log` on the VM first; otherwise post to the webhook by hand, compare URL and topic in the crontab of the VM with `CP_ALERT_WEBHOOK` in `~/brain/connectors/secrets.env`, never write the URL into a file of this repo. A delivery after the last failure means the path works again and the status is `ok` even with 3 lines in 24 h. When `last_unreachable` and `last_delivered` are both `null` although lines were counted, `ops/webhook-last.sh` gave nothing readable and `red` holds from 3 lines as before. `unknown` (log not read) is no alarm, but two runs in a row are a finding like a missing `vm` block |
+| `alarm_path.received.status` | `red` (the last delivery of the watchdog, `alarm_path.last_delivered`, is younger than 11 h and no message of the watchdog on the topic is at most 300 s older than it or later; this also turns `alarm_path.status` red) | the watchdog posts to a topic nobody reads: compare URL and topic in the crontab of the VM (`crontab -l`) with `CP_ALERT_WEBHOOK` in `~/brain/connectors/secrets.env`, never write either into a file of this repo, then check `last_alive` and `last_message` on the next run. `unknown` (no `CP_ALERT_WEBHOOK` in the local environment, topic not readable, or no delivery younger than 11 h) is no alarm and leaves `alarm_path.status` alone. The ops triage passes `CP_ALERT_WEBHOOK` from `secrets.env` in the environment of `ops/status.sh` (step 2 of its skill), so there `red` is a finding and `unknown` in two runs in a row a hint |
 
 ### Paying without thinking
 
@@ -90,6 +91,54 @@ A dead alarm path does not announce itself over the alarm path. Every failed POS
 `[WARN] webhook unreachable` in `/var/log/cp-watchdog.log`, and `ops/status.sh` counts those of the
 last 24 hours on the VM (`ops/webhook-unreachable.sh`, sent over ssh) into `alarm_path`: from 3 on
 the status is `red`, see the thresholds above.
+
+On a quiet day nothing changes, so nothing is posted and a dead webhook would leave no line at all.
+That is why the watchdog posts a **sign of life** with priority `min`
+(`control-plane ALIVE: daily sign of life, the alarm path works`) in three windows per UTC day: the
+first run from 00:00, from 08:00 and from 16:00 UTC posts it. Three windows, because
+`alarm_path.received` (below) compares only a delivery younger than 11 h with the topic; with one sign
+of life a day it was `unknown` from about 11:05 UTC on, with three the last one is never more than
+8 h and one run old. ntfy delivers it without sound or vibration, so it proves the path without
+disturbing anybody. A message with `min` is nothing to act on. The stamp (`<state file>.alive`) holds
+the start of the window as `YYYY-MM-DDTHH` (`HH` is `00`, `08` or `16`); a stamp of the old format
+`YYYY-MM-DD` counts as a missing window, so the first run after the rollout posts once more. It is
+stored only after the POST went through, so with a dead webhook every run of the window tries again
+and three runs leave three lines `[WARN] webhook unreachable`. Every
+delivered POST, the sign of life included, leaves `[INFO] webhook delivered` in the log, except a
+late deploy alarm (below).
+`ops/webhook-last.sh` prints the time of the last failure and of the last delivery (`-` for none),
+and `ops/status.sh` reports both as `alarm_path.last_unreachable` and `alarm_path.last_delivered`, so
+a failure of fifteen minutes that is over does not stay red for 24 hours. A last delivery older than
+26 hours is red as well: the sign of life comes three times every UTC day, so silence means the watchdog no
+longer runs or no longer posts (crontab gone, script stops before the sign of life, sign of life
+switched off), even though that leaves no line `[WARN] webhook unreachable`. `CP_WATCHDOG_ALIVE=0`
+switches only the sign of life off; it is meant for tests that count every POST, never for the VM.
+
+A deploy alarm that did not go out waits next to the other states in `<state file>.deploy-502`
+(default `/var/lib/cp-watchdog.state.deploy-502`): `ops/deploy-alarm.sh` appends one line
+`<count> <HH:MM:SS>` when its POST failed or the crontab set no webhook. Every run of the watchdog
+looks for that file before the health check, so also during an outage, and posts it once with
+`Title: deploy-window 502` and `Priority: high`, the text naming every count and time, no address and
+no URL. The file goes only after a delivered POST, which leaves `[INFO] deploy alarm delivered`
+instead of `[INFO] webhook delivered`, because `ops/webhook-last.sh` reads the latter as a delivery of
+the watchdog and `ops/status.sh` then looks for a message titled `control-plane ...` on the topic.
+A failed POST keeps it and leaves `[WARN] webhook unreachable`; without `CP_ALERT_WEBHOOK` it stays as well and the log gets
+`[WARN] a deploy alarm is waiting, no webhook set`. The title is the same as that of
+`ops/deploy-alarm.sh`, so `ops/status.sh` does not count it as a message of the watchdog.
+
+A delivery in the log only proves that ntfy accepted the POST, and ntfy accepts any topic: with a
+wrong or stale topic in the crontab the watchdog logs a delivery every day and no phone rings. So
+`ops/status.sh` reads the topic back when `CP_ALERT_WEBHOOK` is set in the local environment
+(`json?poll=1&since=12h`, the URL handed to `curl` on stdin with `-K -`, never as an argument and
+never in the output) and reports `alarm_path.received`: `last_alive` (the newest `control-plane
+ALIVE`), `last_message` (the newest message titled `control-plane ...`; posts of other scripts do
+not count) and `status`. ntfy keeps messages in its cache for 12 hours by default, so the sign of
+life from just after 00:00 UTC is gone by the afternoon. That is why the window is 11 h: only a
+last delivery younger than 11 h is compared with the topic (one hour of margin before the cache
+ends, 300 s for the clocks), and an older one gives `unknown`, never a false red. With the three
+windows of the sign of life a quiet day always has such a delivery. The ops triage
+(`.claude/skills/ops-triage/SKILL.md`, step 2) passes `CP_ALERT_WEBHOOK` from `secrets.env` in the
+environment of its call of `ops/status.sh`, never exported and never as an argument.
 
 ## Backup
 
@@ -690,6 +739,20 @@ public logs of a public repository, so a line shows time, method, path without q
 `BAD GATEWAY <n> of <m>` counts the 502s Caddy answered while `cp` restarted. `--at <UTC time>`
 measures a past window instead of the container start, `--log <file>` reads the access log from a
 file without ssh (only together with `--at`), and `--selftest` plants every case without network.
+With `--log` there is no live address: our own addresses are the list in `CP_OWN_IPS_FILE`,
+`CP_OWN_IPS` and the seen file in `CP_OWN_IPS_SEEN` (default
+`$XDG_STATE_HOME/control-plane/own-ips-seen.txt`), read through `own_ips_offline` in
+`ops/own-ips.sh`, which never writes either file. Since 2026-11-15 (messung 07) an address seen live
+on an earlier day and kept only in the seen file counts as ours there too; a list that names no
+address still ends the run with exit 2.
+
+Without `--at`, a `BAD GATEWAY` above 0 sends `ops/deploy-alarm.sh` to the VM, which posts the alarm
+to the webhook of the watchdog. The tool prints `ALARM SENT` and keeps exit 1, or
+`ALARM NOT SENT: exit <k>` (255 for ssh gone, 1 for a failed POST, 2 for no webhook in the crontab)
+and ends with exit 3, so a 502 that reached nobody differs from one that did. On exit 1 and 2 of the
+alarm the VM keeps count and time in `<state file>.deploy-502`, and the watchdog sends them on its next
+run (see Watchdog on the VM). With ssh gone nothing can be kept; then exit 3, which `deploy.yml`
+prints in its warning, is the only trace.
 
 ### Did anybody come back
 
@@ -858,7 +921,7 @@ IPv4 addresses a tracked file may carry besides `ops/own-ips.txt` (our machines,
 
 | kind | evidence |
 |---|---|
-| `datacenter` | the operator, from the cache of `ops/fetchers.py` (`fetcher-cache`) or from the lookup the line names |
+| `datacenter` | the operator, then exactly `(fetcher-cache)` at the end of the line, or a lookup `(<source> YYYY-MM-DD` with the source `ops/fetchers.py lookup`, `RIPE RDAP` or `ARIN RDAP` |
 | `crawler` | the PTR name, proven by the DNS round trip of `ops/crawlers.sh` |
 | `eigene` | which of our machines, and the file that names it (payment server, sandbox server in `docs/sandbox/server.md`) |
 | `erfunden` | the commit that brought it as a test value; only for an address left in a file a goal may not change (a DONE goal file, a verdict, `docs/audit/`) |
@@ -881,8 +944,57 @@ A `datacenter` line with the evidence `fetcher-cache` reads exactly `<address> d
 Where the cache of `ops/fetchers.py` exists (`CP_FETCHER_CACHE`, default `~/.cache/control-plane/fetcher-cache.tsv`),
 `test/known-ips.test.ts` checks every such line against it: the cache must hold the address with kind `datacenter` and exactly
 that operator. Without the cache, as in CI, that part is skipped; the test only reads the cache and never runs `ops/fetchers.py`.
+The default cache applies only to `ops/known-ips.txt`; a list from `CP_KNOWN_IPS` (a fixture) is held only against a cache
+named in `CP_FETCHER_CACHE`, so the same command gives the same result on the code-host and in CI.
 Here too the message names the count, the line numbers and the reason, never an address.
+
+Every `datacenter` line names its evidence in a fixed form, and `test/known-ips.test.ts` checks that form without the cache, so
+also in CI. A line whose text mentions the fetcher cache in any spelling (`/fetcher.?cache/i`) must read exactly
+`<address> datacenter <operator> (fetcher-cache)`; `(fetcher cache)`, `(Fetcher-Cache)` or text after the bracket fail `check`
+instead of dropping out of the check against the cache. Every other `datacenter` line carries a bracket
+`(<source> YYYY-MM-DD)` or `(<source> YYYY-MM-DD, ...)`, the source being `ops/fetchers.py lookup`, `RIPE RDAP` or `ARIN RDAP` and
+the date a real calendar day (`2026-02-30` fails); the date is not compared with the clock, so the test never turns red on a later
+day. The message names the count and `line <n>: <reason>`, never an address.
 
 Three /24 networks are all the documentation ranges offer. A fixture with more foreign /24 networks than that keeps the behaviour
 that depends on them (no address shares its /24 with two others unless it did before), but the summary "N address(es) in M
 network(s)" of `ops/traffic.sh` names fewer networks than before.
+
+## Schlüssel des Dienstes auf dem Sandbox-Server zurücksetzen
+
+`bash ops/sandbox/setup.sh --foreign-sandboxes <address>` liest `state.json` von `sandboxd` und am Zahlungsserver die Konten
+dazu (`readonly: true`, Definition aus `src/bounties/ours.ts` im Container) und ändert nichts. Die letzte Zeile ist
+`SETUP FOREIGN-SANDBOXES OK running=<n> foreign=<m>`; man fährt es vor jedem Reset und immer, wenn man wissen will, ob fremde
+Sandboxes laufen. Es nennt nur Zahlen, nie ein Konto oder eine Adresse.
+
+`bash ops/sandbox/setup.sh --client-key-reset <address> [--restore-after <s>]` nimmt `cp.pub` aus dem, was `sandboxd` liest, um
+einen Schlüsselwechsel zu messen (domains 04). Es verweigert mit `SETUP CLIENT-KEY-RESET FAIL: foreign sandbox running`, wenn eine
+fremde Sandbox läuft, und mit einer anderen Zeile `FAIL`, wenn es eine der beiden Seiten nicht lesen kann; dann bleibt `cp.pub`
+liegen. Sonst setzt es zuerst den Timer `cp-pub-restore` (`systemd-run --on-active=<s>`, Standard 120, erlaubt 60 bis 3600, sonst
+Exit 2), der `cp.pub.prev` nach `<s>` Sekunden zurücklegt, wenn `cp.pub` dann noch fehlt; einen Schlüssel, den `--client-key`
+inzwischen geschrieben hat, überschreibt er nie. Scheitert der Timer, verschiebt es nichts. Nach dem Verschieben prüft es ein
+zweites Mal und legt `cp.pub` sofort zurück, wenn jetzt eine fremde Sandbox läuft
+(`SETUP CLIENT-KEY-RESET FAIL: foreign sandbox started`) oder eine Seite nicht lesbar ist (domains 06); eine Anlage, die
+`sandboxd` gerade noch startet, steht noch nicht in `state.json`. Danach `--client-key` fahren. Den Selbsttest (`--selftest`) fährt `check` mit `test/sandbox-setup-selftest.test.ts`.
+
+## Visitor addresses in the logs of GitHub Actions
+
+Until 2026-11-12 `ops/deploy-window.sh` printed visitor addresses, and `deploy.yml` put that output into the Actions logs of this
+public repository. GitHub kept those logs readable for 90 days; since 2026-11-14 the repository keeps logs and artifacts of
+Actions for 30 days at most. `ops/actions-log-addresses.sh` counts how many stranger addresses those logs still carry, before
+they are deleted and to prove afterwards that none is left (`docs/adressen/actions-logs.md`).
+
+    ops/actions-log-addresses.sh --runs <id>,<id>,...   # downloads these runs' logs with gh into mktemp -d, deletes them after
+    ops/actions-log-addresses.sh --workflow deploy.yml  # every run of that workflow, all pages
+    ops/actions-log-addresses.sh --dir <dir>            # unpacked logs on disk, one subdirectory per run id
+
+A stranger address is an IPv4 or IPv6 address in a request line (an HTTP method followed by a path from `/`) that is in none of
+`CP_OWN_IPS_FILE`, `CP_KNOWN_IPS` and `CP_CRAWLER_IPS` (defaults: the three lists above) and not in `0.0.0.0/8`, `10.0.0.0/8`,
+`127.0.0.0/8`, `169.254.0.0/16`, `172.16.0.0/12` or `192.168.0.0/16`; documentation addresses count, so tests can plant visitors.
+IPv6 addresses count by the same rules: a valid address glued to no letter (eight groups, or fewer with one `::`, optionally with a
+dotted IPv4 tail), compared in its full form, so `2001:db8::7` and `2001:DB8:0:0:0:0:0:7` are one address, also against the three
+lists. The private IPv6 ranges `::`, `::1`, `fe80::/10` and `fc00::/7` never count, `::ffff:<IPv4>` counts once as that IPv4
+address, and a clock time like `05:57:46` is no address.
+The output is one line `<id> <n>` or `<id> no-log` per run and a last line `total <n>` (distinct over all runs). It never prints
+an address, not on stdout and not on stderr. If `gh` fails while listing or on a log for another reason than a missing one
+(404 or 410), it exits 2 without a `total` line, so a network error is never read as zero. `CP_REPO` picks another repository.

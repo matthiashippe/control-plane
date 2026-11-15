@@ -1,7 +1,7 @@
 # Relay Goal 01: Das Social-Relay der Runtime
 
 ## Status
-PLANNED
+DONE
 
 ## Active Objective
 Automatons schreiben sich wieder: Eine unveränderte Runtime am Pin `d8f8168`, deren `socialRelayUrl` auf uns zeigt, schickt eine
@@ -80,33 +80,33 @@ funktionierendes Relay ist ein zweiter Grund für einen Automaton, `conwayApiUrl
   dieses Goal DONE ist, und ein Automaton, der bei uns läuft, kann anderen seinen Dienst per Nachricht anbieten.
 
 ## Done Condition
-- [ ] Der Vertrag steht, bevor `src/` sich ändert: `docs/relay/vertrag.md` nennt die drei Endpunkte mit Fundstelle am Pin, beide
+- [x] Der Vertrag steht, bevor `src/` sich ändert: `docs/relay/vertrag.md` nennt die drei Endpunkte mit Fundstelle am Pin, beide
       Signaturformate wörtlich, die Grenzen, das Kennzeichen ungeprüfter Absender und den Preis des Erstkontakts.
       Prüfung: `awk '/^## Endpunkte/{f=1;next} /^## /{f=0} f' docs/relay/vertrag.md | grep -E '^[|] (POST|GET) /v1/messages(/poll|/count)? ' | grep -c 'src/social/[a-z-]*\.ts:[0-9]'` muss 3 ausgeben.
       Prüfung: `grep -cF 'Conway:send:{to}:{keccak256(content)}:{signed_at}' docs/relay/vertrag.md` und `grep -cF 'Conway:poll:{address}:{timestamp}' docs/relay/vertrag.md` müssen je mindestens 1 ausgeben.
       Prüfung: `grep -cE '^(Preis Erstkontakt: [1-9][0-9]* mc|Kennzeichen: .+)$' docs/relay/vertrag.md` muss 2 ausgeben.
       Prüfung: `b=$(git merge-base origin/dev HEAD); d=$(git log --format=%H --diff-filter=A -1 -- docs/relay/vertrag.md); s=$(git log --format=%H --reverse "$b"..HEAD -- src | head -1); [ -z "$s" ] || { [ "$d" != "$s" ] && git merge-base --is-ancestor "$d" "$s"; }` muss Exit-Code 0 haben.
-- [ ] Die drei Endpunkte antworten, wie der Client der Runtime es liest: Eine mit dem Format der Runtime signierte Nachricht wird
+- [x] Die drei Endpunkte antworten, wie der Client der Runtime es liest: Eine mit dem Format der Runtime signierte Nachricht wird
       angenommen (`id`), steht im `poll` des Empfängers mit `id`, `from`, `to`, `content`, `signedAt`, `createdAt`, `replyTo`, `nonce`
       und `next_cursor`, `count` liefert `unread` und fällt nach dem `poll` auf 0, und keiner der drei Pfade antwortet mehr wie ein
       Pfad ohne Handler.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/relay.test.ts` muss Exit-Code 0 haben.
       Prüfung: `grep -c "vertrag.md" test/relay.test.ts` muss mindestens 1 ausgeben.
-- [ ] Keine fremde Signatur und kein Replay: Eine Nachricht, deren Signatur nicht zu `from` passt, eine mit `signed_at` älter als
+- [x] Keine fremde Signatur und kein Replay: Eine Nachricht, deren Signatur nicht zu `from` passt, eine mit `signed_at` älter als
       300000 ms und ein `poll` mit fremder Signatur werden abgelehnt; dieselbe Signatur zweimal ergibt dieselbe `id`, eine Nachricht und
       eine Abbuchung; zu große Nachrichten und die 101. Nachricht eines Absenders in einer Stunde werden abgelehnt.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/relay-security.test.ts` muss Exit-Code 0 haben.
       Prüfung: `grep -cE "^\s*(it|test)\(" test/relay-security.test.ts` muss mindestens 6 ausgeben.
-- [ ] Konten ohne Wallet: Mit API-Key gehen Senden, Lesen und Zählen ohne Signatur, die Nachricht kommt mit dem Kennzeichen aus dem
+- [x] Konten ohne Wallet: Mit API-Key gehen Senden, Lesen und Zählen ohne Signatur, die Nachricht kommt mit dem Kennzeichen aus dem
       Vertrag am Anfang von `content` und `verified: false` an, eine signierte mit `verified: true` und ohne Kennzeichen; ohne Schlüssel
       und ohne Signatur bleibt es 401.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/relay-apikey.test.ts` muss Exit-Code 0 haben.
-- [ ] Der Erstkontakt kostet den Preis aus dem Vertrag als genau eine Ledger-Zeile `relay` in derselben Transaktion wie Saldo und
+- [x] Der Erstkontakt kostet den Preis aus dem Vertrag als genau eine Ledger-Zeile `relay` in derselben Transaktion wie Saldo und
       Nachricht, eine Antwort im bestehenden Kontakt kostet nichts, ohne Guthaben gibt es 402 mit Klartext und keine Nachricht, und eine
       Wiederholung derselben Signatur bucht nicht zweimal.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/relay-billing.test.ts` muss Exit-Code 0 haben.
       Prüfung: `grep -c "Preis Erstkontakt" test/relay-billing.test.ts` muss mindestens 1 ausgeben.
-- [ ] Der Harness zeigt zwei unveränderte Runtimes, die sich schreiben: `harness/e2e/relay-walk.mjs` mit dem Client und dem Werkzeug
+- [x] Der Harness zeigt zwei unveränderte Runtimes, die sich schreiben: `harness/e2e/relay-walk.mjs` mit dem Client und dem Werkzeug
       `send_message` der Runtime, die Bewertung `judgeRelayWalk` ist in beide Richtungen getestet (ein vollständiger Lauf ist ok, eine
       fehlende Antwort, eine angenommene fremde Signatur, eine fehlende oder doppelte Ledger-Zeile `relay`, ein blockiertes Kennzeichen
       und ein Status aus der Liste der Wiederholungen sind je fail), `full.sh` verlangt `relay=true`, und der Job `e2e` am Kopf des PR ist
@@ -114,9 +114,26 @@ funktionierendes Relay ist ein zweiter Grund für einen Automaton, `conwayApiUrl
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/relay-walk.test.ts` muss Exit-Code 0 haben.
       Prüfung: `grep -c 'relay=\$relay' harness/e2e/full.sh` muss mindestens 2 ausgeben, und `grep -c '"\$relay" != "true"' harness/e2e/full.sh` muss mindestens 1 ausgeben.
       Prüfung (Netz): `gh pr checks goal/relay-01 -R matthiashippe/control-plane | awk '$1=="e2e"{print $2}'` muss `pass` ausgeben.
-- [ ] `check` ist grün.
+- [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] Ein `poll`, dessen Antwort nicht ankam, verliert keine Nachricht (Kritik Tech Lead 13.11.): Heute liest `poll` ohne Cursor nur
+      Ungelesenes und markiert es gelesen (`src/relay/store.ts`, `pollMessages`), und der Client der Runtime wiederholt einen `poll`
+      nach Timeout oder 5xx mit denselben Headern (`src/conway/http-client.ts:113` am Pin); die Wiederholung bekommt dann nichts, und
+      jede Runtime ohne erste Nachricht pollt ohne Cursor, weil `next_cursor` bei leerem Ergebnis `null` ist. Die Wiederholung eines
+      signierten `poll` mit derselben `X-Signature` liefert dieselben Nachrichten noch einmal, mit Cursor wie ohne, und `count` fällt nach
+      dem gelieferten `poll` weiter auf 0.
+      Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/relay-poll-retry.test.ts` muss Exit-Code 0 haben.
+      Prüfung: `grep -ciE "x-signature" test/relay-poll-retry.test.ts` muss mindestens 1 ausgeben.
+- [x] Das Relay füllt den Speicher des Zahlungsservers nicht ohne Grenze (Kritik Tech Lead 13.11., `loop-constraints.md`
+      Grundregel 5): Heute legt ein Absender nach einem bezahlten Erstkontakt, auch an die eigene Adresse, kostenlos 100 Nachrichten je
+      Stunde zu 128000 Zeichen ab, und nichts löscht sie. Ein Absender legt in 24 Stunden höchstens 4000000 Zeichen `content` ab,
+      darüber antwortet `POST /v1/messages` mit 413 und Klartext, ohne Nachricht und ohne Abbuchung; `cleanupExpired` in `src/db.ts`
+      löscht Nachrichten, die älter als 30 Tage sind, und ein Kontakt bleibt danach bestehen (die Antwort bleibt frei). Der Vertrag nennt
+      beides unter `## Grenzen`.
+      Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/relay-storage.test.ts` muss Exit-Code 0 haben.
+      Prüfung: `awk '/^export function cleanupExpired/,/^}/' src/db.ts | grep -c relay_messages` muss mindestens 1 ausgeben.
+      Prüfung: `awk '/^## Grenzen/{f=1;next} /^## /{f=0} f' docs/relay/vertrag.md | grep -cE '4000000|30 Tage'` muss mindestens 2 ausgeben.
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Jede neue Testdatei war vor dem Fix rot; die Zeile im Progress Log nennt, womit.
@@ -134,5 +151,9 @@ funktionierendes Relay ist ein zweiter Grund für einen Automaton, `conwayApiUrl
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-13 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6, 7 gebaut (Vertrag `docs/relay/vertrag.md` in eigenem Commit 68d133c vor `src/`, Relay unter `src/relay/` mit Signatur, Fenster, Replay über die gespeicherte Signatur, Grenzen, API-Key mit Kennzeichen und Erstkontakt 1000 mc als Ledger-Zeile `relay`, Gang `harness/e2e/relay-walk.mjs` mit `relay=true` in `full.sh`, Annahmen in `goals/relay/ANNAHMEN.md`, Vorschlag `goals/_vorschlaege/relay-nacharbeit-2026-11-13-1.md`); rot gesehen: `test/relay.test.ts` 6 von 6 und die drei übrigen Relay-Dateien zusammen 21 von 27 ohne `registerRelay`, `test/relay-security.test.ts` mit Signatur immer gültig (3), ohne Zeitfenster (2), ohne Lookup der Signatur (2 mit Billing), ohne Grenze 100 (1), ohne Gesamtgrenze (1); `test/relay-apikey.test.ts` ohne Kennzeichen (2), `verified` immer true (2), Key-Weg ohne Schlüsselprüfung (1); `test/relay-billing.test.ts` Erstkontakt frei (4), jede Nachricht kostet (1), Nachricht trotz 402 (1), Abbuchung außerhalb der Transaktion (1); `test/relay.test.ts` poll markiert nichts (1), ohne `nonce` (1); `test/relay-walk.test.ts` Urteil immer ok (14), ohne Ledger-Prüfung A (3), ohne `blocked` (1), ohne Wiederholungsstatus (5), fremde Signatur egal (1), ohne Antwort (1), `full.sh` ohne Bedingung `relay` (2 mit `test/e2e-sandbox-gate.test.ts`); `test/v1-ohne-variables-segment.test.ts` rot, bis die drei Pfade in `V1_ROUTES` standen. Lokal ohne Docker mit der Runtime aus dem Cache alle Schritte des Gangs grün außer dem Topup (503, ohne Chain). Prüfbefehle: P1 3, 1 und 1, 2, Exit 0 (d=68d133c vor s=053009e); P2 vitest Exit 0, `vertrag.md` 3; P3 vitest Exit 0, 9 Tests; P4 vitest Exit 0; P5 vitest Exit 0, `Preis Erstkontakt` 2; P6 vitest Exit 0, `relay=$relay` 2 und `"$relay" != "true"` 1, `e2e` pass an 9f9c9a2 (`E2E OK turns=5 registered=true api_errors=0 ledger_consistent=true balance_cents=490 domains=true sandbox=true long_exec=true relay=true`, Ledger des Relays `{"a_rows":1,"a_mc":[-1000],"b_rows":0,"key_rows":1,"consistent":true}`); P7 `check` Exit 0 (141 Testdateien, 1672 Tests).
+- 2026-11-13 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, 7, `dev` 5e784c9 ohne neue Commits (Merge-Basis gleich `origin/dev`). Prüfbefehle: P1 3, 1 und 1, 2, Exit 0 (d=68d133c vor s=053009e); P2 vitest Exit 0 (6 Tests), `vertrag.md` 3; P3 vitest Exit 0 (9 Tests), 9; P4 vitest Exit 0 (6 Tests); P5 vitest Exit 0 (6 Tests), `Preis Erstkontakt` 2; P6 vitest Exit 0 (17 Tests), `relay=$relay` 2 und `"$relay" != "true"` 1, `e2e` pass an 0bd3152 (`E2E OK ... relay=true`, `RELAY_VERDICT ok`); P7 `check` Exit 0 (1672 Tests, 141 s; erster Lauf Exit 1 nur durch `test/abort-purchase.test.ts` bei Last 178, die Datei liegt nicht im Diff und ist allein grün, 6 von 6).
+- 2026-11-13 Zyklus 3: Punkte 8 und 9 aus der Kritik gebaut (Antwort eines signierten `poll` in `relay_polls` unter `X-Signature`, `cursor` und `limit`, Speichergrenze 4000000 Zeichen je Absender und 24 h mit 413 vor dem Preis, Löschung nach 30 Tagen in `cleanupExpired`, Kontakt in `relay_contacts`, Vertrag `## Grenzen`, `docs/errors.md`, `ANNAHMEN.md`), Abschluss gemeldet, Punkte 1 bis 9, `dev` b5cfc4f gemergt (3118923). Rot gesehen vor dem Fix: `test/relay-poll-retry.test.ts` 2 von 6 (Wiederholung ohne Cursor leer, Nachricht dazwischen), `test/relay-storage.test.ts` 5 von 6 (keine Grenze in Vertrag und Code, kein 413, keine Löschung, Kontakt nach Löschung weg); `test/ratelimit.test.ts` erwartet im Ergebnis von `cleanupExpired` zusätzlich `relay: 0`. Prüfbefehle: P1 3, 1 und 1, 2, Exit 0 (d=68d133c vor s=053009e); P2 bis P6 vitest Exit 0 (6, 9, 6, 6, 17 Tests), Greps 3, 9, 2, 2 und 1; P6 `e2e` pass an e36cae3 (`E2E OK ... relay=true`, `RELAY_VERDICT ok`); P7 `check` Exit 0 (1684 Tests, 295 s); P8 vitest Exit 0 (6 Tests), `x-signature` 2; P9 vitest Exit 0 (6 Tests), `relay_messages` in `cleanupExpired` 1, `## Grenzen` 2.
+- 2026-11-13 Release: PASS K und B (Zyklus 3), DONE.
 
 ## Blockers

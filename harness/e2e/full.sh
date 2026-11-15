@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Complete first run of the unmodified upstream runtime against the control plane:
-# provisioning, registration, bootstrap topup, five turns, sleep, the domain calls, the sandbox walk and the long exec walk.
+# provisioning, registration, bootstrap topup, five turns, sleep, the domain calls, the sandbox walk, the relay walk and the
+# long exec walk.
 # No Conway API error allowed.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -122,6 +123,45 @@ sandboxd_state() {
 sandbox_left=$(sandboxd_state)
 echo "rebuilt sandboxd after the walk: $sandbox_left"
 
+# The relay walk of goals/relay/01 (harness/e2e/relay-walk.mjs, bind-mounted into the container runtime): two new wallets A
+# and B with the runtime's own social client and its tool send_message. A is funded with test USDC here and buys credits with
+# the runtime's topupCredits; A writes B (first contact), B counts, reads and answers without credit, A reads the answer; C
+# signs as A and is refused; the provisioned account writes B with its API key and no signature, and B reads the mark. After
+# the sandbox ledger check, because the walk adds wallets and ledger rows. Then the ledger of cp, read only: exactly one row
+# of kind relay for A (-1000 mc), none for B, one for the API key account, balance and ledger of all three in step. The
+# verdict comes from judgeRelayWalk on the host, with that ledger.
+echo "--- relay through the runtime's own social client and tool send_message"
+relay_a_key="0x$(od -An -tx1 -N32 /dev/urandom | tr -d ' \n')"
+relay_a=$("${COMPOSE[@]}" run --rm --no-deps -e RELAY_WALK_A_KEY="$relay_a_key" runtime node /opt/harness/relay-walk.mjs address 2>/dev/null | tail -1 || true)
+relay_walk="RELAY_VERDICT fail no address for A"
+relay_result=""
+relay_ledger="null"
+if [[ "$relay_a" =~ ^0x[0-9a-fA-F]{40}$ ]]; then
+  "${COMPOSE[@]}" run --rm chain-tools fund "$relay_a" 6 >/dev/null
+  relay_walk=$("${COMPOSE[@]}" run --rm --no-deps -e RELAY_WALK_A_KEY="$relay_a_key" -e RELAY_WALK_KEY="$key" runtime \
+    node /opt/harness/relay-walk.mjs 2>&1) || true
+  relay_result=$(printf '%s\n' "$relay_walk" | grep '^RELAY_RESULT ' | tail -1 || true)
+  relay_b=$(printf '%s\n' "$relay_result" | grep -o '"b":"0x[0-9a-f]*"' | head -1 | cut -d'"' -f4 || true)
+  relay_ledger=$("${COMPOSE[@]}" exec -T cp node -e '
+    const [a, b, k] = process.argv.slice(1).map((x) => String(x).toLowerCase());
+    const db = require("better-sqlite3")("/data/cp.db", { readonly: true });
+    const rows = (x) => db.prepare("SELECT delta_mc FROM ledger WHERE kind = ? AND address = ?").all("relay", x).map((r) => r.delta_mc);
+    const inStep = (x) => {
+      const w = db.prepare("SELECT balance_mc FROM wallets WHERE address = ?").get(x);
+      const sum = db.prepare("SELECT coalesce(sum(delta_mc),0) AS s FROM ledger WHERE address = ?").get(x).s;
+      return (w ? w.balance_mc : 0) === sum;
+    };
+    const am = rows(a);
+    console.log(JSON.stringify({ a_rows: am.length, a_mc: am, b_rows: rows(b).length, key_rows: rows(k).length, consistent: inStep(a) && inStep(b) && inStep(k) }));' \
+    "$relay_a" "${relay_b:-none}" "$wallet" 2>&1 || true)
+fi
+printf '%s\n' "$relay_walk" | grep -E '^RELAY_VERDICT' || printf '%s\n' "$relay_walk" | tail -20
+echo "ledger of the relay: $relay_ledger"
+relay_verdict=$(RELAY_RESULT_LINE="$relay_result" RELAY_LEDGER="$relay_ledger" node e2e/relay-walk.mjs judge 2>&1 | tail -1 || true)
+echo "$relay_verdict"
+relay=false
+if [[ "$relay_verdict" == "RELAY_VERDICT ok" ]]; then relay=true; fi
+
 # The long exec walk of goals/sandbox/05 (harness/e2e/long-exec.mjs, bind-mounted into the container runtime): the
 # runtime's own client and tools with the same key and a sandbox of its own, `sleep 60` (timeout 90000) and `sleep 180`
 # (timeout 240000) through the tool exec, each followed by list_sandboxes; every attempt recorded, aborted ones too.
@@ -151,8 +191,8 @@ cleanup
 trap - EXIT
 remaining=$("${COMPOSE[@]}" ps -q | wc -l | tr -d ' ')
 [[ "$remaining" == "0" ]] || { echo "E2E FAIL: containers left behind"; exit 1; }
-if [[ "$turns" -lt 5 || "$registered" != "true" || "$api_errors" != "0" || "$consistent" != "true" || "$db_registered" != "1" || "$balance_cents" -ge 500 || "$domains_ok" != "true" || "$sandbox" != "true" || "$long_exec" != "true" ]]; then
-  echo "E2E FAIL turns=$turns registered=$registered api_errors=$api_errors ledger_consistent=$consistent db_registered=$db_registered balance_cents=$balance_cents domains=$domains_ok sandbox=$sandbox long_exec=$long_exec"
+if [[ "$turns" -lt 5 || "$registered" != "true" || "$api_errors" != "0" || "$consistent" != "true" || "$db_registered" != "1" || "$balance_cents" -ge 500 || "$domains_ok" != "true" || "$sandbox" != "true" || "$long_exec" != "true" || "$relay" != "true" ]]; then
+  echo "E2E FAIL turns=$turns registered=$registered api_errors=$api_errors ledger_consistent=$consistent db_registered=$db_registered balance_cents=$balance_cents domains=$domains_ok sandbox=$sandbox long_exec=$long_exec relay=$relay"
   exit 1
 fi
-echo "E2E OK turns=$turns registered=$registered api_errors=$api_errors ledger_consistent=$consistent balance_cents=$balance_cents domains=$domains_ok sandbox=$sandbox long_exec=$long_exec"
+echo "E2E OK turns=$turns registered=$registered api_errors=$api_errors ledger_consistent=$consistent balance_cents=$balance_cents domains=$domains_ok sandbox=$sandbox long_exec=$long_exec relay=$relay"

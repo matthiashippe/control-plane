@@ -1,0 +1,7 @@
+Schwere: 2
+Goal: fehler 07
+Befund: `[INFO] webhook delivered` belegt nur, dass ntfy den POST angenommen hat, nicht, dass ihn jemand bekommt. ntfy nimmt jedes Thema an: Steht in der crontab des Servers ein falsches oder veraltetes Thema (Tippfehler, neues Abo auf dem Telefon, altes Thema gelöscht), antwortet der Webhook mit 200, der Watchdog schreibt jeden Tag eine Zustellung, und `alarm_path` bleibt `ok`, während keine Warnung auf einem Gerät ankommt. Diesen Fall fängt nur ein Abgleich auf der Empfangsseite.
+Beleg: ops/watchdog.sh, `report` wertet nur den Exit-Code von `curl -s --fail` aus | ops/README.md, Zeile `alarm_path.status`: der Abgleich von URL und Thema zwischen crontab und `CP_ALERT_WEBHOOK` steht dort nur als Handgriff, wenn der Status schon rot ist.
+Empfehlung: Glied am Topic `fehler` nach fehler 07: `ops/status.sh` liest mit `CP_ALERT_WEBHOOK` aus der lokalen Umgebung die Nachrichten des Themas der letzten 26 Stunden (ntfy `GET …/json?poll=1&since=26h`) und meldet `alarm_path.received` mit dem Zeitpunkt des letzten `control-plane ALIVE`, `red`, wenn keines kam, obwohl `last_delivered` in diesem Fenster liegt; Test mit nachgebautem `curl` ohne Netz, URL und Thema nie im Repo. Kein Rollout, weil nur `ops/status.sh` sich ändert.
+MVP: Funktion
+Übernommen: Triage-Glieder 14.11. an den Tech Lead, Glied 3 (Empfang am Thema statt nur Annahme des POST) (2026-11-14)

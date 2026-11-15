@@ -10,12 +10,15 @@
 #                                                              wallets from a file of JSON lines
 #                                                              {"created_at": "<ISO>", "paid": 0|1}
 #   ops/github-yield.sh --selftest                             no network: the planted fixture in both directions
+#   own addresses: own_ips from ops/own-ips.sh (CP_OWN_IPS=<file> replaces its list); none at all is exit 2
 #
-# For every foreign address (not in ops/own-ips.txt, or in the file CP_OWN_IPS names) the FIRST request
-# at or after --since decides how it arrived. It arrived from GitHub when its Referer starts with
-# https://github.com/Conway-Research followed by `/` or nothing. It signed in when the same address
-# later had `POST /v1/auth/verify` with status 200, and it paid when it later had a request on `/pay/`
-# with status 200.
+# For every foreign address (not named by own_ips from ops/own-ips.sh: the list, or the file CP_OWN_IPS
+# names, plus the address this machine is seen with live and every address in CP_OWN_IPS_SEEN) the
+# FIRST request at or after --since decides how it arrived. It arrived from GitHub when its Referer
+# starts with https://github.com/Conway-Research followed by `/` or nothing, in any case. It signed in
+# when the same address later had `POST /v1/auth/verify` with status 200, and it paid when it later had
+# a request on `/pay/` with status 200. The arrival and sign-in rule and the own addresses live once in
+# ops/conway-arrivals.sh and ops/conway_arrivals.py, shared with ops/landing-yield.sh.
 #
 #   GITHUB YIELD since <t>: <a> arrived from github.com/Conway-Research, <b> signed in, <c> paid
 #   ALL NEW since <t>: <w> new wallets, <p> paying wallets
@@ -35,15 +38,21 @@
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=ops/conway-arrivals.sh
+source "$ROOT/ops/conway-arrivals.sh"
 KEY="${CP_SSH_KEY:-$HOME/.ssh/id_ed25519_automaton}"
 HOST="${CP_HOST:-root@76.13.144.207}"
 
-usage() { sed -n '2,13p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' >&2; exit 1; }
+usage() { sed -n '2,14p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' >&2; exit 1; }
 
 # The counting, the same code for production and selftest. No address leaves this block.
 # shellcheck disable=SC2016
 COUNT_PY='
-import datetime, json, re, sys
+import datetime, json, os, re, sys
+
+sys.dont_write_bytecode = True
+sys.path.insert(0, os.environ["CONWAY_ARRIVALS_DIR"])
+import conway_arrivals as ca
 
 log_file, wallets_file, own_file, since_arg = sys.argv[1:5]
 
@@ -56,50 +65,31 @@ if not re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z", since_arg):
 since = datetime.datetime.fromisoformat(since_arg.replace("Z", "+00:00")).timestamp()
 
 try:
-    own = set()
-    for line in open(own_file, encoding="utf-8"):
-        line = line.split("#", 1)[0].strip()
-        if line:
-            own.add(line.split()[0])
-except OSError:
-    fail(f"github-yield: the own address list is not readable: {own_file}")
-if not own:
-    fail(f"github-yield: the own address list is empty: {own_file}")
+    own = ca.own_addresses(own_file)
+except ca.Unreadable as e:
+    fail(f"github-yield: {e}")
 
 try:
-    raw = open(log_file, encoding="utf-8", errors="replace").read()
-except OSError:
+    rows, _ = ca.read_log(log_file)
+except ca.Unreadable:
     fail("github-yield: the access log is not readable. This says nothing about traffic.")
 
-GH = re.compile(r"^https://github\.com/Conway-Research(/|$)", re.I)
 BARE = re.compile(r"^https://github\.com/?$", re.I)
 
 lines_in_window = 0
 last = None
 first = {}     # address -> (ts, referer) of its first request in the window
 events = {}    # address -> list of (ts, method, path, status)
-for row in raw.splitlines():
-    row = row.strip()
-    if not row.startswith("{"):
-        continue
-    try:
-        j = json.loads(row)
-        ts = float(j["ts"])
-        req = j.get("request") or {}
-    except Exception:
-        continue
-    if ts < since:
+for r in rows:
+    if r.ts < since:
         continue
     lines_in_window += 1
-    last = ts if last is None or ts > last else last
-    ip = req.get("client_ip") or req.get("remote_ip") or ""
-    if not ip or ip in own:
+    last = r.ts if last is None or r.ts > last else last
+    if not r.ip or r.ip in own:
         continue
-    ref = ((req.get("headers") or {}).get("Referer") or [""])[0]
-    if ip not in first or ts < first[ip][0]:
-        first[ip] = (ts, ref)
-    path = (req.get("uri") or "").split("?", 1)[0]
-    events.setdefault(ip, []).append((ts, req.get("method") or "", path, j.get("status")))
+    if r.ip not in first or r.ts < first[r.ip][0]:
+        first[r.ip] = (r.ts, r.referer)
+    events.setdefault(r.ip, []).append((r.ts, r.method, r.path, r.status))
 
 if lines_in_window == 0:
     fail(f"github-yield: not a single log line since {since_arg}; a zero here would be blindness.")
@@ -107,17 +97,17 @@ if lines_in_window == 0:
 def funnel(match):
     a = b = c = 0
     for ip, (t0, ref) in first.items():
-        if not match.search(ref):
+        if not match(ref):
             continue
         a += 1
         later = [e for e in events[ip] if e[0] >= t0]
-        if any(m == "POST" and p == "/v1/auth/verify" and s == 200 for _, m, p, s in later):
+        if any(ca.is_sign_in(m, p, s) for _, m, p, s in later):
             b += 1
         if any(p.startswith("/pay/") and s == 200 for _, m, p, s in later):
             c += 1
     return a, b, c
 
-a, b, c = funnel(GH)
+a, b, c = funnel(ca.from_conway)
 print(f"GITHUB YIELD since {since_arg}: {a} arrived from github.com/Conway-Research, {b} signed in, {c} paid")
 
 wallet_failed = False
@@ -143,7 +133,7 @@ else:
         print(f"ALL NEW since {since_arg}: not read")
         wallet_failed = True
 
-ba, bb, bc = funnel(BARE)
+ba, bb, bc = funnel(lambda ref: bool(BARE.search(ref)))
 print(f"BARE GITHUB REFERRER since {since_arg}: {ba} arrived from https://github.com/ without a path, {bb} signed in, {bc} paid")
 end = datetime.datetime.fromtimestamp(last, datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 print(f"WINDOW since {since_arg}: {lines_in_window} log line(s), {len(first)} foreign address(es), up to {end} UTC")
@@ -154,22 +144,35 @@ raise SystemExit(2 if wallet_failed else 0)
 # shellcheck disable=SC2016
 WALLETS_JS='const db = require("better-sqlite3")(process.argv[1] || "/data/cp.db", { readonly: true }); const rows = db.prepare("SELECT w.created_at AS created_at, EXISTS (SELECT 1 FROM ledger l WHERE l.address = w.address AND l.kind = ?) AS paid FROM wallets w").all("topup"); if (rows.length) console.log(rows.map((r) => JSON.stringify(r)).join("\n"));'
 
-own_list() {
-  local own="${CP_OWN_IPS:-$ROOT/ops/own-ips.txt}"
-  echo "$own"
-}
-
-count() { # log wallets(or -) since
-  python3 -c "$COUNT_PY" "$1" "$2" "$(own_list)" "$3"
+count() { # log wallets(or -) since; the own addresses come from own_ips with CP_HOST and CP_SSH_KEY as set
+  local own rc
+  own=$(mktemp)
+  if ! conway_own_list "$own"; then
+    rm -f "$own"
+    return 2
+  fi
+  CONWAY_ARRIVALS_DIR="$ROOT/ops" python3 -c "$COUNT_PY" "$1" "$2" "$own" "$3"
+  rc=$?
+  rm -f "$own"
+  return "$rc"
 }
 
 if [[ "${1:-}" == "--selftest" ]]; then
   [[ $# -eq 1 ]] || usage
-  ssh() { echo "selftest must not reach the network (ssh)" >&2; return 99; }
-  export -f ssh
+  # No network: own_ips asks ssh for the live address, and timeout runs the program ssh, not a shell
+  # function. A fake ssh first on PATH answers nothing, and CP_OWN_IPS_SEEN points into the temp dir,
+  # so neither the server nor the state directory of this machine reaches the selftest.
+  stub=$(mktemp -d); trap 'rm -rf "$stub"' EXIT
+  printf '#!/bin/sh\nexit 255\n' >"$stub/ssh"
+  chmod +x "$stub/ssh"
+  export PATH="$stub:$PATH" CP_OWN_IPS_SEEN="$stub/seen.txt"
+  unset CP_OWN_IPS_WRITE
   fx="$ROOT/ops/fixtures"
   log="$fx/github-yield.log"; wallets="$fx/github-yield-wallets.jsonl"
-  export CP_OWN_IPS="$fx/github-yield-own-ips.txt"
+  # The planted list is ops/fixtures/github-yield-own-ips.txt. Its name is built from a stem so that no
+  # code line here reads like the real list ops/own-ips.txt, which this tool only reaches through own_ips.
+  own_fixture="$fx/github-yield-own-ips"
+  export CP_OWN_IPS="$own_fixture.txt"
   [[ -f "$log" && -f "$wallets" && -f "$CP_OWN_IPS" ]] || { echo "SELFTEST FAILED: fixture missing in $fx"; exit 1; }
   # The window is computed from the fixture: one hour after its first line, which leaves exactly one
   # planted arrival before it.
@@ -195,7 +198,7 @@ print(datetime.datetime.fromtimestamp(int(t) + 3600, datetime.timezone.utc).strf
   leak=$(grep -cE '([0-9]{1,3}\.){3}[0-9]{1,3}|0x[0-9a-fA-F]{40}' <<<"$out")
   want "$leak" "0" "no address and no wallet in the output"
   # The other direction: our own address leaves the list and has to be counted.
-  other=$(mktemp); trap 'rm -f "$other"' EXIT
+  other="$stub/other-own.txt"
   echo "192.0.2.254 2026-11-12  not in the fixture" >"$other"
   want "$(CP_OWN_IPS="$other" count "$log" - "$since" | sed -n 1p)" \
     "GITHUB YIELD since $since: 4 arrived from github.com/Conway-Research, 2 signed in, 2 paid" \
@@ -256,4 +259,5 @@ if ! timeout 60 ssh -i "$KEY" -o BatchMode=yes -o ConnectTimeout=10 "$HOST" \
   "docker exec deploy-cp-1 node -e $(printf %q "$WALLETS_JS") /data/cp.db" >"$dir/wallets.jsonl" 2>/dev/null; then
   echo "x" >"$dir/wallets.jsonl"   # unparsable on purpose: the second line says `not read` and the exit is 2
 fi
-count "$dir/access.jsonl" "$dir/wallets.jsonl" "$SINCE"
+# own_ips asks the same host with the same key for the live address, like ops/access-log.sh above.
+CP_SSH_KEY="$KEY" CP_HOST="$HOST" count "$dir/access.jsonl" "$dir/wallets.jsonl" "$SINCE"

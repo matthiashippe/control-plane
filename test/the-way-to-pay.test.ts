@@ -108,7 +108,7 @@ describe("a guessed path that is looking for the way to pay", () => {
    */
   it("leaves a path that is not about paying alone", async () => {
     const { app } = setup();
-    for (const path of ["/v1/sandboxes/abc", "/v1/messages/poll", "/v1/nothing"]) {
+    for (const path of ["/v1/sandboxes/abc", "/v1/messages/archive", "/v1/nothing"]) {
       const res = await app.request(path);
       const body = (await res.json()) as Record<string, unknown>;
       expect(body.topup_url, `${path} should not carry a topup URL`).toBeUndefined();

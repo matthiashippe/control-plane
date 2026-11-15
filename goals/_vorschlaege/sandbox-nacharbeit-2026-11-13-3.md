@@ -6,3 +6,4 @@ Empfehlung: `build_runtime` baut `dist/` bei jedem Live-Lauf neu (oder vergleich
 MVP: Funktion, weil ein `RUNTIME SANDBOX OK` danach nur mit dem Build vom Pin kommt und damit Grundregel 13 belegt, vorher auch mit einem beliebigen `dist/` im Cache.
 
 Linse Q, Frage 1 (prüfen die neuen Tests Verhalten, Randfall). Der Selbsttest (18 Fälle) pflanzt geänderte und ungetrackte Quelldateien, aber nie ein geändertes `dist/`, also kann die Aussage „unchanged“ aus Zeile 10 nicht rot werden (`loop-constraints.md`, Grundregel 3). Linse K hat es in `goals/sandbox/verdicts/04-z2-K.md` (Hinweis 2) an Linse Q gegeben.
+Übernommen: Triage-Glieder 14.11. an den Tech Lead, Glied 8 (`dist/` der Runtime gegen den Pin prüfen, Grundregel 13) (2026-11-14)

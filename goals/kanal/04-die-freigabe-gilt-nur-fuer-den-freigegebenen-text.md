@@ -1,7 +1,7 @@
 # Kanal Goal 04: Die Freigabe gilt nur für den freigegebenen Text
 
 ## Status
-PLANNED
+DONE
 
 ## Active Objective
 Matthias gibt am Human Gate `public_post` einen Text frei, aber `ops/post-the-answers.py --send` liest den Entwurf erst beim Senden
@@ -63,7 +63,7 @@ Dateiname; jeder Kommentar steht öffentlich unter Matthias' Konto und lässt si
   (`PATH=/usr/bin:$PATH`), `check` und vitest im Vordergrund mit eigenem Timeout.
 
 ## Done Condition
-- [ ] Der Trockenlauf druckt je Entwurf die ersten 12 Zeichen von `sha256` über `body_to_send` und die Sendezeile mit `--approved`,
+- [x] Der Trockenlauf druckt je Entwurf die ersten 12 Zeichen von `sha256` über `body_to_send` und die Sendezeile mit `--approved`,
       und `--send` postet nur bei gleichem Wert für jede Nummer, sonst Exit 1 ohne einen einzigen POST; ein nach dem Trockenlauf
       geänderter Entwurf geht nicht raus.
       Prüfung: `pnpm -s vitest run test/answers-approved.test.ts` muss Exit-Code 0 haben.
@@ -72,20 +72,20 @@ Dateiname; jeder Kommentar steht öffentlich unter Matthias' Konto und lässt si
       Prüfung: `grep -c "node:crypto" test/answers-approved.test.ts` muss mindestens 1 ausgeben.
       Prüfung: `d=$(mktemp -d); printf '#!/bin/sh\nexit 9\n' >"$d/gh"; chmod +x "$d/gh"; PATH="$d:/usr/bin:/bin" python3 -I ops/post-the-answers.py --folder goals/kanal/antworten-03 --send 1 2>&1 | grep -c "REFUSED: .*--approved"` muss 1 ausgeben.
       Prüfung: `python3 ops/before-the-answers.py --approved 1:abcdefabcdef 2>&1 | tail -1` muss `REFUSED: unknown argument --approved` ausgeben.
-- [ ] Nach jedem POST liest das Werkzeug genau diesen Kommentar zurück und endet mit `DIFFERS` und Exit 1, wenn er nicht der gesendete
+- [x] Nach jedem POST liest das Werkzeug genau diesen Kommentar zurück und endet mit `DIFFERS` und Exit 1, wenn er nicht der gesendete
       Text ist; `--verify-posted` bleibt, wie es ist.
       Prüfung: `pnpm -s vitest run test/answers-approved.test.ts --reporter=json 2>/dev/null | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const j=JSON.parse(s);console.log(j.testResults.flatMap(f=>f.assertionResults).filter(a=>a.status==="passed"&&/DIFFERS/.test(a.title)).length)})'` muss mindestens 1 ausgeben.
       Prüfung: `pnpm -s vitest run test/answers-folder.test.ts` muss Exit-Code 0 haben.
       Prüfung: `grep -cE "^\s*(it|test)\(" test/answers-folder.test.ts` muss mindestens 13 ausgeben.
-- [ ] Beide Skripte laden `answers_args` unter `python3 -I` und aus jedem Arbeitsverzeichnis.
+- [x] Beide Skripte laden `answers_args` unter `python3 -I` und aus jedem Arbeitsverzeichnis.
       Prüfung: `r=$(pwd); cd "$(mktemp -d)" && python3 -I "$r/ops/post-the-answers.py" --selftest | tail -1` muss mit `SELFTEST OK` beginnen.
       Prüfung: `r=$(pwd); cd "$(mktemp -d)" && python3 -I "$r/ops/before-the-answers.py" --bogus 2>&1 | tail -1` muss `REFUSED: unknown argument --bogus` ausgeben.
-- [ ] Die Schritte am Gate `public_post` nennen den Wert: Docstring und `goals/kanal/ANNAHMEN.md` beschreiben `--approved`.
+- [x] Die Schritte am Gate `public_post` nennen den Wert: Docstring und `goals/kanal/ANNAHMEN.md` beschreiben `--approved`.
       Prüfung: `grep -c -- "--approved" ops/post-the-answers.py` muss mindestens 3 ausgeben.
       Prüfung: `grep -cE "kanal 04.*--approved|--approved.*kanal 04" goals/kanal/ANNAHMEN.md` muss mindestens 1 ausgeben.
-- [ ] `check` ist grün.
+- [x] `check` ist grün.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Jeder neue Test war vor dem Fix rot; die Zeile im Progress Log nennt, womit.
@@ -107,5 +107,8 @@ Dateiname; jeder Kommentar steht öffentlich unter Matthias' Konto und lässt si
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-13 Zyklus 1: Punkte 1, 2, 3, 4, 5 gebaut: `--approved <n>:<sha12>` in `ops/answers_args.py`, der Trockenlauf druckt je Entwurf `#<n>  sha12 <wert>` und die Sendezeile mit `--only` und `--approved`, `--send` ohne `--approved` ist `REFUSED` vor Gatter und GitHub, vor dem ersten POST braucht jede Nummer genau einen passenden Wert (sonst `changed since it was approved`, `is not approved` oder `would not be sent`, kein POST), gesendet wird der gehashte String aus dem Speicher, nach jedem POST liest `live_differs` (eine Funktion auch für `--verify-posted`) den Kommentar zurück und endet bei Abweichung mit `DIFFERS` und Exit 1; beide Skripte setzen das eigene Verzeichnis in `sys.path`; Sandbox nach `test/answers-sandbox.ts`, Fake `gh` merkt sich den Body (`FAKE_READBACK` für anderen Text oder 404), 11 Fälle in `test/answers-approved.test.ts`, die vier `--send`-Fälle in `test/answers-folder.test.ts` mit `--approved`, der NOT-READY-Fall prüft zusätzlich, dass das Gatter ablehnt. Rot vorher: alle 11 neuen Fälle gegen die `ops/`-Dateien von `origin/dev` rot (11 failed: kein `sha12` im Trockenlauf, `--approved` als unbekanntes Argument, `--send` ohne Wert postet, `ModuleNotFoundError: No module named 'answers_args'` unter `-I`), ebenso P1e (0) und P3 (`ModuleNotFoundError`) am Stand `origin/dev`. Prüfbefehle (Node 22): P1 vitest Exit 0, 11 Fälle, `changed after the dry run` 1, `node:crypto` 2, `REFUSED: .*--approved` 1, Gatter `REFUSED: unknown argument --approved`; P2 `DIFFERS` 2, `answers-folder` Exit 0, 13 Fälle; P3 `SELFTEST OK: …` und `REFUSED: unknown argument --bogus` aus fremdem Verzeichnis unter `-I`; P4 `--approved` 10, ANNAHMEN 1; P5 `node scripts/check.mjs` Exit 0 (1696 Tests, 130 s).
+- 2026-11-13 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5; `origin/dev` (33d4eb8) ist schon im Branch, kein Merge nötig. Prüfbefehle (Node 22, am Kopf 855d71e): P1 vitest Exit 0, 11 Fälle, `changed after the dry run` 1, `node:crypto` 2, `REFUSED: .*--approved` 1, Gatter `REFUSED: unknown argument --approved`; P2 `DIFFERS` 2, `answers-folder` Exit 0, 13 Fälle; P3 `SELFTEST OK: …` und `REFUSED: unknown argument --bogus` aus fremdem Verzeichnis unter `-I`; P4 `--approved` 10, ANNAHMEN 1; P5 `node scripts/check.mjs` Exit 0 (144 Dateien, 1696 Tests, 74 s); PR #106 Job `check` grün.
+- 2026-11-14 Release: PASS K und B (Zyklus 2), DONE.
 
 ## Blockers

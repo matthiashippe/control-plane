@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { spawnSync } from "node:child_process";
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, copyFileSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -10,9 +10,16 @@ import { join } from "node:path";
  * never an address, because the repo is public.
  *
  * Every case here runs without network: the log is a small planted file passed with --log, and the
- * own address list is a temp file passed with CP_OWN_IPS. Only documentation addresses are used.
+ * own address list is a temp file passed with CP_OWN_IPS. The own addresses come from own_ips, which asks
+ * ssh for the live address, so a fake ssh that answers nothing is first on PATH and CP_OWN_IPS_SEEN points
+ * into the temp dir. Only documentation addresses are used.
  */
 const SCRIPT = join(__dirname, "..", "ops", "landing-yield.sh");
+// The shared rule and own_ips, copied next to every copy of the script.
+const HELPERS = ["conway-arrivals.sh", "conway_arrivals.py", "own-ips.sh"].map((f) => join(__dirname, "..", "ops", f));
+const withHelpers = (dir: string) => {
+  for (const h of HELPERS) copyFileSync(h, join(dir, h.split("/").at(-1)!));
+};
 const FIXTURE = join(__dirname, "..", "ops", "fixtures", "landing-yield.log");
 
 // 2026-11-02T00:00:00Z, the start of every planted window below.
@@ -61,6 +68,9 @@ function sandbox() {
   const root = mkdtempSync(join(tmpdir(), "landing-yield-"));
   const ownFile = join(root, "own-ips.txt");
   writeFileSync(ownFile, "# own addresses for this test\n203.0.113.99 2026-11-02  planted own address\n");
+  mkdirSync(join(root, "bin"));
+  writeFileSync(join(root, "bin", "ssh"), "#!/bin/sh\nexit 255\n");
+  chmodSync(join(root, "bin", "ssh"), 0o755);
   const log = (lines: Line[]) => {
     const p = join(root, `log-${Math.random().toString(36).slice(2)}.log`);
     writeFileSync(p, lines.map(line).join("\n") + "\n");
@@ -71,7 +81,7 @@ function sandbox() {
       cwd: root,
       encoding: "utf8",
       timeout: 60_000,
-      env: { PATH: "/usr/bin:/bin", HOME: root, CP_OWN_IPS: ownFile, ...env },
+      env: { PATH: `${join(root, "bin")}:/usr/bin:/bin`, HOME: root, CP_OWN_IPS: ownFile, CP_OWN_IPS_SEEN: join(root, "seen.txt"), ...env },
     });
     return { status: r.status, stdout: r.stdout, stderr: r.stderr, lines: r.stdout.split("\n").filter(Boolean) };
   };
@@ -171,9 +181,10 @@ describe("ops/landing-yield.sh counts arrivals from Conway-Research on / and the
     expect(own.arrived).toBe(0);
     expect(own.signedIn).toBe(0);
     expect(own.foreign).toBe(1);
-    const empty = join(s.root, "no-own.txt");
-    writeFileSync(empty, "# nobody\n");
-    const foreign = sums(s.measure(planted, { CP_OWN_IPS: empty }));
+    // An empty list stops the tool, so the other direction names one address that is not in the log.
+    const other = join(s.root, "other-own.txt");
+    writeFileSync(other, "192.0.2.254 2026-11-02  not in the log\n");
+    const foreign = sums(s.measure(planted, { CP_OWN_IPS: other }));
     expect(foreign.arrived).toBe(1);
     expect(foreign.signedIn).toBe(1);
     expect(foreign.foreign).toBe(2);
@@ -269,6 +280,7 @@ describe("ops/landing-yield.sh counts arrivals from Conway-Research on / and the
     mkdirSync(dir);
     const copy = join(dir, "landing-yield.sh");
     copyFileSync(SCRIPT, copy);
+    withHelpers(dir);
     const reader = join(dir, "access-log.sh");
     writeFileSync(reader, 'echo "access-log: could not read the log." >&2\nexit 2\n');
     expect(s.run(["--since", SINCE, "--until", UNTIL], {}, copy).status).toBe(2);
@@ -298,6 +310,7 @@ describe("ops/landing-yield.sh counts arrivals from Conway-Research on / and the
     mkdirSync(join(dir, "fixtures"), { recursive: true });
     copyFileSync(FIXTURE, join(dir, "fixtures", "landing-yield.log"));
     const copy = join(dir, "landing-yield.sh");
+    withHelpers(dir);
     const text = readFileSync(SCRIPT, "utf8");
     const marker = "DEADLINE = 24 * 3600";
     expect(text).toContain(marker);

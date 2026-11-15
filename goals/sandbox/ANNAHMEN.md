@@ -244,6 +244,79 @@
   ctl.sbx.postyourprice.com | grep -cx 76.13.144.207` 0; beide Werkzeuge können also rot werden. Der Punkt hält, Code und Server
   sind unverändert. Ursache und Empfehlung stehen im Vorschlag `goals/_vorschlaege/loop-audit-2026-11-13-2.md`.
 
+## Goal 02, Audit 2026-11-14 Zeile 465 (14.11.2026, Engineer CP)
+
+- **Wildcard `*.postyourprice.com` wieder angelegt, bis sandbox 07 auf `dev` landet.** Audit 2026-11-14 Zeile 465 (sandbox 02 Punkt
+  4) meldete `fehlt expose` und `SANDBOX PROBE FAIL failed=1 left=0`. Ursache: Der Eintrag `*.postyourprice.com` fehlte in der Zone,
+  `dig sbx-unknown0-80.postyourprice.com @1.1.1.1` gab `NXDOMAIN`, und die `public_url`, die `sandboxd` liefert, löste nicht auf.
+  Gelöscht hatte ihn der Maker von sandbox 07 am 13.11.2026 um 19:33 UTC mit `cloudflare.py dns-apply` vom Goal-Branch, bevor das Goal
+  auf `dev` lag (es wartet am Gate `server_kauf` auf die eigene Domain). Auf `dev` verlangen sandbox 02 Punkt 4 und Punkt 5 den
+  Eintrag, und `dev` ist der Stand, gegen den das Audit misst. Darum am 14.11.2026 um 16:07 UTC wieder angelegt mit
+  `python3 ops/sandbox/cloudflare.py dns-apply 72.62.51.224` vom Stand `dev` (`created A *.postyourprice.com`, `CF DNS OK
+  changed=0`); das Werkzeug legt nur fehlende Einträge an und ändert oder löscht keinen. Vorher meldete `dns-check` genau `CHANGE dns
+  create A *.postyourprice.com proxied=true`. Danach: der Prüfbefehl aus Zeile 465 gibt `SANDBOX PROBE OK left=0` aus (vorher derselbe
+  Befehl `fehlt expose`), `curl https://sbx-unknown0-80.postyourprice.com/` antwortet `404`, der Name löst nur über den Proxy auf
+  (`grep -c 72.62.51.224` 0), `postyourprice.com` und `ctl.sbx` unverändert. Kein Kunde bekommt dadurch eine Adresse: Das Control
+  Plane antwortet auf `ports/expose` weiter 409 `port_exposure_unavailable` (Goal 03). Das ist der Stand, den Goal 02, Kritik, bis
+  zur eigenen Domain hinnimmt.
+- **Regel daraus:** Ein Goal ändert DNS, Server und andere geteilte Zustände, die DONE-Goals auf `dev` messen, erst mit seinem
+  Merge. sandbox 07 löscht den Eintrag deshalb mit dem eigenen `dns-apply`, sobald es nach dem Kauf ausrollt; danach steht sandbox 02
+  Punkt 5 (`sbx-unknown0-80.postyourprice.com` mit `404`) gegen sandbox 07 Punkt 5, und der Tech Lead trägt die Ablösung ein.
+
+## Goal 02, Audit 2026-11-14 Zeile 478 (14.11.2026, Engineer CP)
+
+- **Ursache auf `dev` schon behoben, keine Codeänderung nötig.** Zeile 478 (sandbox 02 Punkt 9, `check`) meldete den
+  Idempotency-Test in `test/sandbox-api.test.ts` mit 0 statt 1 Exec. Ursache: Der Test brach den ersten Aufruf nach festen 200 ms ab
+  (`AbortSignal.timeout(200)`); unter Last kam der Abbruch, bevor `sandboxd` das Kommando hatte. Das Audit lief auf 033245cd. Commit
+  2de5407 (fehler 08, 14.11.2026 04:29 UTC, gemergt vor 8fc996d) bricht den ersten Aufruf erst ab, wenn `sandboxd` das Kommando hat
+  (`execStarted`, beim wiederholten Anlegen `runStarted`); `grep -rn "AbortSignal.timeout" test/` ist seither leer.
+- **Beleg auf frischem `dev` (8fc996d), Last 6 je Kern:** `PATH=/usr/bin:$PATH node scripts/check.mjs` Exit 0, `check: grün in 223 s`;
+  `pnpm -s vitest run test/sandbox-api.test.ts -t "Idempotency-Key"` dreimal `5 passed | 16 skipped`. Gegenprobe: der Test vom Stand
+  033245cd mit `AbortSignal.timeout(1)` statt 200 wird rot mit `expected +0 to be 1` in 2 Tests, also genau der Fehler aus Zeile 478;
+  der Test kann rot werden, der heutige Ablauf hängt nicht mehr an der Zeit.
+
+## Goal 03, Audit 2026-11-14 Zeile 499 (14.11.2026, Engineer CP)
+
+- **Dieselbe Ursache wie Zeile 478, auf `dev` seit 2de5407 behoben, keine Codeänderung.** Zeile 499 (sandbox 03 Punkt 11, `check`)
+  meldet denselben Idempotency-Test in `test/sandbox-api.test.ts` mit 0 statt 1 Exec nach `AbortSignal.timeout(200)`. Seit 2de5407
+  bricht der Test erst ab, wenn `sandboxd` das Kommando hat; `grep -rn "AbortSignal.timeout" test/ | wc -l` gibt 0.
+- **Beleg auf frischem `dev` (9d7d99e), Last 6 je Kern:** `PATH=/usr/bin:$PATH node scripts/check.mjs` Exit 0, `check: grün in 147 s`;
+  `pnpm -s vitest run test/sandbox-api.test.ts -t "Idempotency-Key"` gibt `5 passed | 16 skipped`. Gegenprobe: der Test vom Stand
+  033245cd mit `AbortSignal.timeout(1)` wird rot mit `expected +0 to be 1` in 2 Tests, genau der Fehler aus Zeile 499. Die Zeilen 520
+  (sandbox 04 Punkt 9), 528 (sandbox 05 Punkt 4) und 539 (sandbox 05 Punkt 9) desselben Audits nennen dieselbe Ursache.
+
+## Goal 04, Audit 2026-11-14 Zeile 520 (14.11.2026, Engineer CP)
+
+- **Dieselbe Ursache wie Zeile 478 und 499, auf `dev` seit 2de5407 behoben, keine Codeänderung.** Zeile 520 (sandbox 04 Punkt 9,
+  `check`) meldet den Idempotency-Test in `test/sandbox-api.test.ts` mit 0 statt 1 Exec nach `AbortSignal.timeout(200)`. Das Audit
+  lief vor dem Merge von 2de5407; seither bricht der Test erst ab, wenn `sandboxd` das Kommando hat, und
+  `grep -rn "AbortSignal.timeout" test/ | wc -l` gibt 0.
+- **Beleg auf frischem `dev` (c6cb15d), Last 1 je Kern:** `PATH=/usr/bin:$PATH node scripts/check.mjs` Exit 0, `check: grün in 62 s`;
+  `pnpm -s vitest run test/sandbox-api.test.ts -t "Idempotency-Key"` gibt `5 passed | 16 skipped`. Gegenprobe: der Test vom Stand
+  vor 2de5407 mit `AbortSignal.timeout(1)` wird rot mit `expected +0 to be 1` in 2 Tests, genau der Fehler aus Zeile 520.
+
+## Goal 05, Audit 2026-11-14 Zeile 528 (14.11.2026, Engineer CP)
+
+- **Dieselbe Ursache wie Zeile 478, 499 und 520, auf `dev` seit 2de5407 behoben, keine Codeänderung.** Zeile 528 (sandbox 05 Punkt 4)
+  meldet den Test `repeated create while the first one still runs` in `test/sandbox-api.test.ts` mit 0 statt 1 Anlegen nach
+  `AbortSignal.timeout(200)`. Das Audit lief vor dem Merge von 2de5407; seither bricht der Test erst ab, wenn `sandboxd` den Container
+  startet, und `grep -rn "AbortSignal.timeout" test/ | wc -l` gibt 0.
+- **Beleg auf frischem `dev` (c5b2654), Load 48 auf 16 Kernen:** `PATH=/usr/bin:$PATH pnpm -s vitest run test/sandbox-long-exec.test.ts
+  test/sandbox-api.test.ts` gibt `2 passed (2)`, `29 passed (29)`; `PATH=/usr/bin:$PATH node scripts/check.mjs` Exit 0,
+  `check: grün in 78 s`. Gegenprobe: der Test vom Stand vor 2de5407 mit `AbortSignal.timeout(1)` wird mit `-t "repeated create"` rot,
+  `1 failed | 2 passed`, `expected +0 to be 1`, genau der Fehler aus Zeile 528.
+
+## Goal 05, Audit 2026-11-14 Zeile 539 (14.11.2026, Engineer CP)
+
+- **Dieselbe Ursache wie Zeile 478, 499, 520 und 528, auf `dev` seit 2de5407 behoben, keine Codeänderung.** Zeile 539 (sandbox 05
+  Punkt 9, `check`) meldet den Idempotency-Test in `test/sandbox-api.test.ts` mit 0 statt 1 Exec nach `AbortSignal.timeout(200)`. Das
+  Audit lief auf 033245cd, vor dem Merge von 2de5407; seither bricht der Test erst ab, wenn `sandboxd` das Kommando hat, und
+  `grep -rn "AbortSignal.timeout" test/ | wc -l` gibt 0.
+- **Beleg auf frischem `dev` (6b2653a), Load 70 auf 16 Kernen:** `PATH=/usr/bin:$PATH node scripts/check.mjs` Exit 0,
+  `check: grün in 94 s`; `pnpm -s vitest run test/sandbox-api.test.ts -t "Idempotency-Key"` gibt `5 passed | 16 skipped`. Gegenprobe:
+  der Test vom Stand vor 2de5407 mit `AbortSignal.timeout(1)` wird rot, `2 failed | 3 passed | 16 skipped`, `expected +0 to be 1`,
+  genau der Fehler aus Zeile 539.
+
 ## Goal 07 (13.11.2026, Engineer CP)
 
 - **Ausgangslage.** `ops/ports-demand.sh` ist unverändert aus Commit 0ce27f0 übernommen; sein Selbsttest war am heutigen Stand
@@ -254,9 +327,9 @@
   steht im Code genau an einer Stelle je Datei: `SANDBOXD_DOMAIN` in `ops/sandbox/sandboxd.service` (daraus lesen
   `cloudflare.py` und `setup.sh` sie) und der Name des Blocks in `ops/sandbox/sandbox.caddy`. Kauft Matthias einen Ausweichnamen,
   ändern sich nur diese zwei Zeilen.
-- **Domain `sandboxhost.de` statt `sandboxhost.dev` (Matthias, 15.11.2026).** Matthias kauft `sandboxhost.de` bei INWX, etwa 6 €
-  im Jahr; Cloudflare Registrar verkauft keine `.de`. Die Zone liegt im Cloudflare-Konto von HTC, der Token `sbx-ports` gilt nur
-  für sie. Geändert haben sich nur die zwei Zeilen oben (`SANDBOXD_DOMAIN` und der Block in `sandbox.caddy`). Weil `.de` nicht auf
+- **Domain `sandboxhost.de` statt `sandboxhost.dev` (Matthias, 15.11.2026).** Matthias hat `sandboxhost.de` bei INWX gekauft, etwa
+  6 € im Jahr; Cloudflare Registrar verkauft keine `.de`. Die Zone liegt im Cloudflare-Konto von HTC, der Token `sbx-ports` gilt nur
+  für sie (DNS Edit, Zone Settings Edit, SSL and Certificates Edit, dazu Zone Read für die Suche der Zone nach Namen). Geändert haben sich nur die zwei Zeilen oben (`SANDBOXD_DOMAIN` und der Block in `sandbox.caddy`). Weil `.de` nicht auf
   der HSTS-Preload-Liste steht, setzt `cloudflare.py ports-apply` in der Zone „Always Use HTTPS“ an und `ports-check` meldet
   `CHANGE ports https`, solange es aus ist; das Recht dafür (Zone Settings Edit) hat der Token schon. Ein HSTS-Kopf von Caddy
   käme dazu, wenn ein Browser einen Kunden über eine offene WLAN-Verbindung auf `http://` locken kann; das hält die Umleitung
@@ -295,3 +368,20 @@
   `goals/_vorschlaege/sandbox-nacharbeit-2026-11-13-5.md`.
 - **Kein Aufpreis.** Ein freigegebener Port kostet nichts extra, abgerechnet wird weiter nach Laufzeit (`docs/sandbox/plan.md`,
   `## Preis`); das Control Plane schreibt für `ports/expose` und `ports/{port}` keine Ledger-Zeile.
+- **Umstellung vor dem Merge (15.11.2026, nach dem Kauf).** Die Punkte 3, 4 und 5 prüfen DNS und Sandbox-Server mit Netz am Stand
+  des Goal-Branch, also muss beides vor dem Merge so stehen. Um 17:03 UTC lief `setup.sh --origin-cert` und `setup.sh` vom
+  Goal-Branch, nachdem `dev` hineingemergt war, damit kein Stand von `dev` auf dem Server zurückgedreht wird (`--check` vorher: nur
+  `sandboxd.service`, `sandboxd.mjs`, `sandbox.caddy` und das Zertifikat). Davor `setup.sh --foreign-sandboxes`: `running=0
+  foreign=0`, der Neustart von `sandboxd` traf also keinen Kunden. Um 17:04 UTC löschte `dns-apply` den Eintrag `*.postyourprice.com`
+  erneut. Kein Kunde verliert eine Adresse, weil das Control Plane auf `dev` für `ports/expose` weiter 409 antwortet und `sandboxd`
+  selbst nur noch `sandboxhost.de` vergibt. Folge auf `dev` bis zum Merge: sandbox 02 Punkt 5 (`sbx-unknown0-80.postyourprice.com`
+  mit `404`) wird rot, weil der Name nicht mehr auflöst; das ist die Ablösung durch sandbox 07 Punkt 5, die der Tech Lead eintragen
+  soll. Ein Lauf von `dev`, der den Eintrag wieder anlegt, würde Punkt 5 dieses Goals rot machen und eine Adresse unter der Zone
+  der Zahlung zurückbringen; er unterbleibt.
+- **`ops/ports-demand.sh` nach dem Merge von `dev` angepasst (15.11.2026).** Auf `dev` verlangt `test/own-ips-readers.test.ts`
+  (messung 07), dass kein Werkzeug unter `ops/` die Datei `own-ips.txt` an `own_ips` vorbei liest; `check` war damit rot
+  (`read past own_ips: ops/ports-demand.sh:51`), der Selbsttest des Werkzeugs selbst blieb grün. Die eigene Kopie von
+  `own_ips_offline` ist darum weg, `--log` nimmt die Funktion aus `ops/own-ips.sh`. `count_demand` ist unverändert (Prüfung von
+  Punkt 1, `diff` leer). Folge: Eine Liste ohne Adresse endet jetzt mit Exit 2 statt mit einer Zählung ohne eigene Adressen. Lauf
+  gegen die Produktion danach, 2026-11-15 17:17 UTC: `bash ops/ports-demand.sh --since '2026-11-12 18:12:46'` gibt
+  `PORTS DEMAND: 0 foreign addresses, 0 calls, since 2026-11-12 18:12:46 UTC`, also dieselbe Zahl wie unter `## Vorher`.
