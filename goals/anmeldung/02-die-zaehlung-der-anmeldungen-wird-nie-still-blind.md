@@ -1,7 +1,7 @@
 # Anmeldung Goal 02: Die Zählung der Anmeldungen wird nie still blind
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 `ops/keyless-mints.sh` (anmeldung 01) überspringt heute eine Zeile auf `POST /v1/auth/keyless` still, wenn es `ts` oder `status`
@@ -118,7 +118,7 @@ sieht, schlechter ist als keiner.
       Prüfung: `grep -cE "stops with exit 2 when the access log cannot be read|the access log wins over unreadable keyless lines" test/keyless-mints.test.ts` muss mindestens 2 ausgeben.
       Prüfung: `pnpm -s vitest run test/keyless-mints.test.ts -t "access log"` muss Exit-Code 0 haben.
       Prüfung: `T=$(mktemp -d); cp ops/keyless-mints.sh "$T/km"; grep -vF '[[ ${ps[0]} -eq 0 ]] || exit 1' "$T/km" > ops/keyless-mints.sh; pnpm -s vitest run test/keyless-mints.test.ts -t "access log" >/dev/null 2>&1; echo "rc=$?"; cp "$T/km" ops/keyless-mints.sh; git status --porcelain -- ops/keyless-mints.sh | wc -l` muss `rc=1` und `0` ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Jeder neue Fall und der neue Lauf im Selbsttest war vor dem Fix rot, soweit oben so genannt; die Zeile im Progress Log nennt,
@@ -150,6 +150,7 @@ sieht, schlechter ist als keiner.
 - 2026-11-15 Zyklus 3: Punkt 5 gebaut: zwei neue Fälle ohne `--file` in einem eigenen `describe` mit der Hilfsfunktion `sshPrintsThenFails` (das nachgebaute `ssh` gibt auf den Abruf des Logs die Zeile mit `ts` als Text gzip-gepackt aus und endet mit 255); `ops/keyless-mints.sh` ist unverändert. Rot: unter der Mutation ohne `[[ ${ps[0]} -eq 0 ]] || exit 1` scheitern beide Fälle (Exit 0 und leere Tabelle statt Exit 2), Gegenprobe: dasselbe `ssh` mit Exit 0 ergibt Exit 2 mit `1 lines on POST /v1/auth/keyless`, die Zeile kommt also wirklich durch. Prüfbefehle (Node 22.23.4): P5 `2`, vitest `-t "access log"` Exit 0, Mutation `rc=1` und `0`; P1 bis P3 `4`, `0`, `6`, Selbsttest `KEYLESS MINTS SELFTEST OK` und `0`, vitest Exit 0 (12 passed); P4 `node scripts/check.mjs` Exit 0 (grün in 262 s), fremde Dateien `0`, `src` `0`, `ops/own-ips.txt` `0`, Zustandsverzeichnis `0`.
 - 2026-11-15 Zyklus 4: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5; `dev` ist im Branch (kein Merge nötig), alle Prüfbefehle am Kopf `6a58866` gelaufen (Zahlen wie Zyklus 3); am PR #185 `check` pass und `e2e` pass am Kopf `6a58866`.
 - 2026-11-15 Zyklus 5: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5; ohne Codeänderung, nur diese Zeile nach dem REJECT von B in Zyklus 4. Alle Prüfbefehle am Kopf `cbb6315` neu gelaufen, Code-Stand gleich `6a58866` (seit dort nur Goal-Datei und Verdicts), `dev` ist im Branch. Prüfbefehle: (Node 22.23.4) P1 Zeile mit `c.jsonl`: `rc=2`, `0`, `keyless-mints: 1 lines on POST /v1/auth/keyless could not be read (ts or status), so nothing is counted.`; P1 `pnpm -s vitest run test/keyless-mints.test.ts`: Exit 0 (12 passed); P1 grep der vier neuen Fälle: `4`; P2 Selbsttest mit Zähl-`ssh`: `KEYLESS MINTS SELFTEST OK`, `0`; P2 `grep -c '2026-11-11T12:00:00Z' ops/keyless-mints.sh`: `1`; P3 entfernte Testzeilen: `0`; P3 grep der sechs bestehenden Fälle: `6`; P3 Diff von `check`-Zeilen und Crawler-Regel: `0`; P3 `--classify`: `crawler node other other `; P3 `pnpm -s vitest run test/keyless-crawler.test.ts test/claim-keyless-own-ips.test.ts`: Exit 0 (10 passed); P4 `node scripts/check.mjs`: Exit 0 (grün in 295 s); P4 fremde Dateien: `0`; P4 `src`: `0`; P4 `ops/own-ips.txt` nach `check`: `0`; P4 Zustandsverzeichnis nach `check`: `0`; P5 grep der zwei neuen Fälle: `2`; P5 `pnpm -s vitest run test/keyless-mints.test.ts -t "access log"`: Exit 0 (2 passed, 10 skipped); P5 Mutation ohne `[[ ${ps[0]} -eq 0 ]] || exit 1`: `rc=1`, `0`. PR #185: `check` pass und `e2e` pass an `029921e` und `cbb6315`.
+- 2026-11-15 Release: PASS K und B (Zyklus 5), DONE.
 
 ## Blockers
 - keine
