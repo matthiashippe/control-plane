@@ -104,6 +104,20 @@ sieht, schlechter ist als keiner.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD -- src | wc -l` muss 0 ausgeben.
       Prüfung: `node scripts/check.mjs >/dev/null 2>&1; git status --porcelain -- ops/own-ips.txt | wc -l` muss 0 ausgeben.
       Prüfung: `S=$(mktemp -d); XDG_STATE_HOME=$S node scripts/check.mjs >/dev/null 2>&1; find "$S" -type f | wc -l` muss 0 ausgeben.
+- [ ] Ein Log, das nicht gelesen werden kann, endet weiter mit Exit 2, leerem stdout und auf stderr genau der Zeile
+      `keyless-mints: the access log could not be read, which is not a finding about traffic.`, auch wenn vor dem Abbruch eine
+      unlesbare Zeile auf `POST /v1/auth/keyless` kam, und zwei neue Fälle in `test/keyless-mints.test.ts` halten das (Kritik
+      Tech Lead, 15.11.2026). Heute hält kein Test diese Grenze: Ohne die Zeile `[[ ${ps[0]} -eq 0 ]] || exit 1` meldet das
+      Werkzeug bei `ssh` mit Exit 255 eine leere Tabelle und Exit 0, und alle 10 Fälle und der Selbsttest bleiben grün. Fälle
+      ohne `--file`, also über `ops/access-log.sh` und das nachgebaute `ssh`, nur neue Fälle und neue Hilfsfunktionen:
+      `it("stops with exit 2 when the access log cannot be read")` mit dem `ssh` aus `sandbox`, das auf den Abruf des Logs mit
+      Exit 255 endet, und `it("the access log wins over unreadable keyless lines")` mit einem `ssh`, das auf den Abruf des Logs
+      eine Zeile auf `POST /v1/auth/keyless` mit `"ts":"2026-11-11T12:00:00Z"` von `192.0.2.53` ausgibt und dann mit Exit 255
+      endet. Beide prüfen `expectNothingNamed` und `<tmp>/own.txt` byte-gleich. Die Zeile `[[ ${ps[0]} -eq 0 ]] || exit 1` in
+      `ops/keyless-mints.sh` bleibt wörtlich, weil die dritte Prüfung sie herausnimmt.
+      Prüfung: `grep -cE "stops with exit 2 when the access log cannot be read|the access log wins over unreadable keyless lines" test/keyless-mints.test.ts` muss mindestens 2 ausgeben.
+      Prüfung: `pnpm -s vitest run test/keyless-mints.test.ts -t "access log"` muss Exit-Code 0 haben.
+      Prüfung: `T=$(mktemp -d); cp ops/keyless-mints.sh "$T/km"; grep -vF '[[ ${ps[0]} -eq 0 ]] || exit 1' "$T/km" > ops/keyless-mints.sh; pnpm -s vitest run test/keyless-mints.test.ts -t "access log" >/dev/null 2>&1; echo "rc=$?"; cp "$T/km" ops/keyless-mints.sh; git status --porcelain -- ops/keyless-mints.sh | wc -l` muss `rc=1` und `0` ausgeben.
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
