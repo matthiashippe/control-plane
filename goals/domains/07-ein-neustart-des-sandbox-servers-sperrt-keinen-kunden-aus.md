@@ -1,7 +1,7 @@
 # Domains Goal 07: Ein Neustart des Sandbox-Servers sperrt nach einem Schlüssel-Reset keinen Kunden aus
 
 ## Status
-PLANNED
+PAUSED
 
 ## Active Objective
 `ops/sandbox/setup.sh --check <address>` bekommt den Fakt `cp_pub`: gewünscht `yes`, auf dem Sandbox-Server `yes`, wenn
@@ -103,3 +103,4 @@ Kunden ohne Frist, den bisher kein Lauf als fehlenden Schlüssel benennt.
 ## Progress Log
 
 ## Blockers
+Pause: Kurs-Check 2026-11-15, Robustheit für einen seltenen Fall (Neustart im Fenster eines Schlüssel-Resets) aus einer Kritik, ohne Fehler eines echten Nutzers, bringt das Abschlusskriterium (erste fremde Sandbox) nicht näher; Detail-Anteil 47,4 % über der Schwelle 40 %
