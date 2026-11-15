@@ -1,7 +1,7 @@
 # Messung Goal 07: Auch der Weg `--log` und jedes Werkzeug nach ihm lesen die eigenen Adressen über `own_ips`
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Seit messung 04 liest kein Messwerkzeug `ops/own-ips.txt` an `own_ips` vorbei, aber der Wächter `test/own-ips-readers.test.ts`
@@ -150,7 +150,7 @@ Alarm aus messung 05 und 06 dann für einen 502 klingelt, den kein Kunde bekomme
       Prüfung: `grep -cF 'done < "$CP_OWN_IPS_FILE"' test/own-ips-readers.test.ts` muss mindestens 1 ausgeben.
       Prüfung: `pnpm -s vitest run test/own-ips-readers` muss Exit-Code 0 haben.
       Prüfung: `git diff -U0 $(git merge-base origin/dev HEAD) HEAD -- test/own-ips-readers.test.ts | grep -cE '^-[^-]'` muss 0 ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Die Fälle 1 und 2 des neuen Tests und der erste neue Fall des Wächters waren vor dem Fix rot; die Zeile im Progress Log
@@ -182,6 +182,7 @@ Alarm aus messung 05 und 06 dann für einen 502 klingelt, den kein Kunde bekomme
 - 2026-11-15 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5; `origin/dev` steht auf der Merge-Basis 907bde7, kein Merge nötig. Prüfbefehle: P1 Funktion 1, ssh 0, leere Liste Exit 2, Ausgabe `192.0.2.10 192.0.2.44` ohne `ssh-called`; P2 `own_ips_offline` 1, Leser 0, `CP_OWN_IPS_SEEN` 6, Selftest Exit 0, `ok   own-seen` 1, README 1; P3 vitest Exit 0 (64 Tests), fünf Testnamen 5; P4 drei Testnamen 3, Ausnahmen 4, entfernte Zeilen 0, vitest Exit 0 (5 Tests), fremde Tests 0; P5 `check` Exit 0 (164 Dateien, 1849 Tests), gesperrte Pfade 0, fremde ops-Dateien 0, Dateien unter XDG_STATE_HOME 0; Jobs `check` und `e2e` am PR #184 grün am Kopf 5da89c9.
 - 2026-11-15 Zyklus 3: Punkt Kritik 1 gebaut: `test/deploy-window-own-seen.test.ts` hat den Fall `--log counts an address only in CP_OWN_IPS as ours and prints no address` (`CP_OWN_IPS=198.51.100.7`, 502 von dort, Exit 0, `ours     1 request`) und in `run()` die Prüfung, dass kein Lauf eine Adresse aus den Dokumentationsbereichen druckt; Gegenprobe rot: `CP_OWN_IPS` in `own_ips_offline` vorübergehend ausgeschaltet -> 1 failed, 5 passed, eine vorübergehende Zeile `echo "own: $OWN" >&2` in `ops/deploy-window.sh` -> `a run printed an address`, beide zurückgenommen. Prüfbefehle: Testname 1, `198.51.100.7` 1, `pnpm -s vitest run test/deploy-window-own-seen` Exit 0 (6 Tests).
 - 2026-11-15 Zyklus 4: Punkt Kritik 2 gebaut, Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, Kritik 1, Kritik 2: der Matcher in `test/own-ips-readers.test.ts` erkennt zu `CP_OWN_IPS_FILE` zusätzlich `sed`, `cut`, `head`, `tail`, `while read`, `readFileSync(`, `read_text(` und die Umleitung `<`, neuer Fall `the reader matcher also trips on a redirect, sed, cut, head, tail, readFileSync and read_text with CP_OWN_IPS_FILE`; vor dem Fix rot: `pnpm -s vitest run test/own-ips-readers` -> 1 failed, 5 passed (`done < "$CP_OWN_IPS_FILE"` kein Treffer), Gegenprobe am Scan: vorübergehend gepflanzter Leser `while read … < "$CP_OWN_IPS_FILE"` unter `ops/` -> rot mit seiner Zeile, danach entfernt; `origin/dev` steht auf der Merge-Basis 907bde7, kein Merge nötig. Prüfbefehle: P1 Funktion 1, ssh 0, leere Liste Exit 2, Ausgabe `192.0.2.10 192.0.2.44` ohne `ssh-called`; P2 `own_ips_offline` 1, Leser 0, `CP_OWN_IPS_SEEN` 6, Selftest Exit 0, `ok   own-seen` 1, README 1; P3 vitest Exit 0 (66 Tests), fünf Testnamen 5; P4 drei Testnamen 3, Ausnahmen 4, entfernte Zeilen 0, vitest Exit 0, fremde Tests 0; P5 `check` Exit 0 (164 Dateien, 1851 Tests, 289 s), gesperrte Pfade 0, fremde ops-Dateien 0, Dateien unter XDG_STATE_HOME 0; Kritik 1 Testname 1, `198.51.100.7` 1, vitest Exit 0; Kritik 2 Testname 1, `done < "$CP_OWN_IPS_FILE"` 1, vitest Exit 0 (6 Tests), entfernte Zeilen 0.
+- 2026-11-15 Release: PASS K und B (Zyklus 4), DONE.
 
 ## Blockers
 - keine
