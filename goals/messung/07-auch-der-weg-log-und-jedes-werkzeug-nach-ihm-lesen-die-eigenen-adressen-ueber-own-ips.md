@@ -1,7 +1,7 @@
 # Messung Goal 07: Auch der Weg `--log` und jedes Werkzeug nach ihm lesen die eigenen Adressen über `own_ips`
 
 ## Status
-PLANNED
+ACTIVE
 
 ## Active Objective
 Seit messung 04 liest kein Messwerkzeug `ops/own-ips.txt` an `own_ips` vorbei, aber der Wächter `test/own-ips-readers.test.ts`
@@ -92,13 +92,13 @@ Alarm aus messung 05 und 06 dann für einen 502 klingelt, den kein Kunde bekomme
   <Datum>): …` in `goals/messung/ANNAHMEN.md`.
 
 ## Done Condition
-- [ ] `ops/own-ips.sh` hat `own_ips_offline`, die Liste, `CP_OWN_IPS` und die Merkdatei liest, ohne ssh, und bei fehlender oder
+- [x] `ops/own-ips.sh` hat `own_ips_offline`, die Liste, `CP_OWN_IPS` und die Merkdatei liest, ohne ssh, und bei fehlender oder
       leerer Liste mit 1 oder 2 endet.
       Prüfung: `grep -cE '^own_ips_offline\(\)' ops/own-ips.sh` muss 1 ausgeben.
       Prüfung: `awk '/^own_ips_offline\(\)/,/^}/' ops/own-ips.sh | grep -cE '^[^#]*\bssh\b'` muss 0 ausgeben.
       Prüfung: `T=$(mktemp -d); printf '# x\n' > $T/l; printf '192.0.2.44 2026-11-14\n' > $T/s; env -u CP_OWN_IPS CP_OWN_IPS_FILE=$T/l CP_OWN_IPS_SEEN=$T/s bash -c 'source ops/own-ips.sh; own_ips_offline' >/dev/null 2>&1; echo $?` muss 2 ausgeben.
       Prüfung: `T=$(mktemp -d); mkdir $T/bin; printf '#!/bin/sh\ntouch %s/ssh-called\nexit 255\n' $T > $T/bin/ssh; chmod +x $T/bin/ssh; printf '192.0.2.10 x\n' > $T/l; printf '192.0.2.44 2026-11-14\n' > $T/s; env -u CP_OWN_IPS PATH=$T/bin:$PATH HOME=$T CP_OWN_IPS_FILE=$T/l CP_OWN_IPS_SEEN=$T/s bash -c 'source ops/own-ips.sh; own_ips_offline' | xargs; [ -e $T/ssh-called ] && echo ssh-called` muss genau `192.0.2.10 192.0.2.44` ausgeben.
-- [ ] `ops/deploy-window.sh --log` liest die eigenen Adressen über `own_ips_offline` und gibt `CP_OWN_IPS_FILE` an kein `awk`,
+- [x] `ops/deploy-window.sh --log` liest die eigenen Adressen über `own_ips_offline` und gibt `CP_OWN_IPS_FILE` an kein `awk`,
       `grep` oder `cat`; Kopfkommentar, Selftest und `ops/README.md` nennen `CP_OWN_IPS_SEEN`.
       Prüfung: `grep -cE '^[^#]*own_ips_offline' ops/deploy-window.sh` muss mindestens 1 ausgeben.
       Prüfung: `grep -cE '^[^#]*CP_OWN_IPS_FILE.*\b(awk|grep|cat)\b|^[^#]*\b(awk|grep|cat)\b.*CP_OWN_IPS_FILE' ops/deploy-window.sh` muss 0 ausgeben.
@@ -106,18 +106,18 @@ Alarm aus messung 05 und 06 dann für einen 502 klingelt, den kein Kunde bekomme
       Prüfung: `bash ops/deploy-window.sh --selftest` muss Exit-Code 0 haben.
       Prüfung: `bash ops/deploy-window.sh --selftest | grep -cx 'ok   own-seen'` muss 1 ausgeben.
       Prüfung: `awk '/^## Did the deploy cost a stranger an answer/,/^## Does a backup come back up/' ops/README.md | grep -c 'CP_OWN_IPS_SEEN'` muss mindestens 1 ausgeben.
-- [ ] `test/deploy-window-own-seen.test.ts` belegt die fünf Fälle, und die bestehenden Tests von `ops/deploy-window.sh` und
+- [x] `test/deploy-window-own-seen.test.ts` belegt die fünf Fälle, und die bestehenden Tests von `ops/deploy-window.sh` und
       `own_ips` bleiben unverändert grün.
       Prüfung: `pnpm -s vitest run test/deploy-window test/deploy-alarm test/own-ips test/anzeigen-rechnung-own-ips test/timeout-quote-own-ips test/claim-keyless-own-ips` muss Exit-Code 0 haben.
       Prüfung: `grep -cE 'it\("(--log counts an address only in CP_OWN_IPS_SEEN as ours, not as a stranger|--log without CP_OWN_IPS_SEEN reads the seen file under XDG_STATE_HOME|--log still counts an address only in the list as ours|--log refuses with exit 2 when the list names no address, even if CP_OWN_IPS_SEEN does|--log reads CP_OWN_IPS_SEEN but never writes it and never calls ssh)"' test/deploy-window-own-seen.test.ts` muss 5 ausgeben.
-- [ ] Der Wächter meldet jede Zeile, die `CP_OWN_IPS_FILE` an `awk`, `grep`, `cat` oder `open` gibt, außer in den vier benannten
+- [x] Der Wächter meldet jede Zeile, die `CP_OWN_IPS_FILE` an `awk`, `grep`, `cat` oder `open` gibt, außer in den vier benannten
       Ausnahmen, und seine beiden bestehenden Fälle bleiben.
       Prüfung: `grep -cE 'it\("(no file under ops/ besides ops/own-ips.sh and the named exceptions gives CP_OWN_IPS_FILE to awk, grep, cat or open outside a comment|the reader matcher trips on awk, grep, cat and open with CP_OWN_IPS_FILE and passes a test, an assignment and a comment|every named exception is a file under ops/ with a reason)"' test/own-ips-readers.test.ts` muss 3 ausgeben.
       Prüfung: `grep -cE 'ops/(actions-log-addresses\.sh|timeout-quote\.sh|keyless-mints\.sh|anzeigen-rechnung\.py)' test/own-ips-readers.test.ts` muss mindestens 4 ausgeben.
       Prüfung: `git diff -U0 $(git merge-base origin/dev HEAD) HEAD -- test/own-ips-readers.test.ts | grep -cE '^-[^-]'` muss 0 ausgeben.
       Prüfung: `pnpm -s vitest run test/own-ips-readers` muss Exit-Code 0 haben.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD -- test | grep -vcE '^test/(deploy-window-own-seen|own-ips-readers)\.test\.ts$'` muss 0 ausgeben.
-- [ ] `check` ist grün, gesperrte Pfade bleiben unverändert, und unter `ops/` ändern sich nur `ops/deploy-window.sh`,
+- [x] `check` ist grün, gesperrte Pfade bleiben unverändert, und unter `ops/` ändern sich nur `ops/deploy-window.sh`,
       `ops/own-ips.sh` und `ops/README.md`.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD | grep -cE '^(\.github|deploy|src|harness|scripts|docs)/|^goals/kanal/'` muss 0 ausgeben.
@@ -150,6 +150,8 @@ Alarm aus messung 05 und 06 dann für einen 502 klingelt, den kein Kunde bekomme
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-15 Widerlegung geprüft: `grep -c 'CP_OWN_IPS_SEEN' ops/deploy-window.sh` -> 0, `grep -cE '^[^#]*awk .*CP_OWN_IPS_FILE' ops/deploy-window.sh` -> 1 an der Merge-Basis 907bde7, das Goal ist nicht widerlegt.
+- 2026-11-15 Zyklus 1: Punkte 1, 2, 3, 4, 5 gebaut: `own_ips_offline` in `ops/own-ips.sh` liest Liste, `CP_OWN_IPS` und Merkdatei über dieselben Hilfsfunktionen wie `own_ips`, ohne ssh und ohne Schreiben, `ops/deploy-window.sh --log` ruft sie statt `awk` auf der Liste, Kopfkommentar, Selftest (Fall `own-seen`, Merkdatei im Temp-Ordner) und `ops/README.md` nennen `CP_OWN_IPS_SEEN`, neuer Test `test/deploy-window-own-seen.test.ts`, Wächter um drei Fälle und vier Ausnahmen ergänzt; vor dem Fix rot: `pnpm -s vitest run test/deploy-window-own-seen test/own-ips-readers` -> 4 failed, 10 Tests (Fälle 1, 2 und 5 Exit 1 statt 0 mit `BAD GATEWAY`, Wächter mit `ops/deploy-window.sh:196`), Selftest mit dem alten `awk`-Weg -> `FAIL own-seen`. Prüfbefehle: P1 Funktion 1, ssh 0, leere Liste Exit 2, Ausgabe `192.0.2.10 192.0.2.44` ohne `ssh-called`; P2 `own_ips_offline` 1, Leser 0, `CP_OWN_IPS_SEEN` 6, Selftest Exit 0, `ok   own-seen` 1, README 1; P3 vitest Exit 0 (10 Dateien, 64 Tests), fünf Testnamen 5; P4 drei Testnamen 3, Ausnahmen 4, entfernte Zeilen 0, vitest Exit 0 (5 Tests), fremde Tests 0; P5 `check` Exit 0 (164 Dateien, 1849 Tests), gesperrte Pfade 0, fremde ops-Dateien 0, Dateien unter XDG_STATE_HOME 0.
 
 ## Blockers
 - keine
