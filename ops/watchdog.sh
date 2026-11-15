@@ -9,6 +9,11 @@
 # It reports the change of state, not every run: an outage reports once, the return reports once.
 # Otherwise the message goes blunt and gets ignored when it counts. The new state is stored only after the
 # POST went through: when the webhook fails, the next run reports the same change again.
+#
+# It also sends a deploy alarm that did not go out: ops/deploy-alarm.sh appends `<count> <HH:MM:SS>` to
+# `<state file>.deploy-502` when its POST failed or the crontab set no webhook. Every run looks for that file before the
+# health check, posts it once with `Title: deploy-window 502` and priority high and removes it only after the POST went
+# through.
 set -uo pipefail
 
 URL="${CP_URL:-https://postyourprice.com}"
@@ -59,6 +64,39 @@ sign_of_life() {
   [[ "$(cat "${STATE_FILE}.alive" 2>/dev/null)" == "$window" ]] && return 0
   report "ALIVE" "daily sign of life, the alarm path works" &&
     { echo "$window" > "${STATE_FILE}.alive" 2>/dev/null || true; }
+}
+
+# A deploy alarm kept by ops/deploy-alarm.sh. Same title as there, so ops/status.sh does not count it as a message of
+# the watchdog. Only lines of the form `<count> <HH:MM:SS>` go into the text, so it names no address and no URL. The file
+# goes only after a delivered POST; lines appended while the POST ran stay for the next run.
+send_kept_deploy_alarm() {
+  local file="${STATE_FILE}.deploy-502" kept text rest
+  [[ -f "$file" ]] || return 0
+  if [[ -z "$WEBHOOK" ]]; then
+    echo "$TS [WARN] a deploy alarm is waiting, no webhook set"
+    return 0
+  fi
+  kept=$(cat "$file" 2>/dev/null) || return 0
+  text=$(printf '%s\n' "$kept" | awk '$1 ~ /^[0-9]+$/ && $2 ~ /^[0-9][0-9]:[0-9][0-9]:[0-9][0-9]$/ {
+    printf "%s%s request(s) from outside answered 502 after the rollout at %s UTC", (n++ ? "; " : ""), $1, $2 }')
+  [[ -n "$text" ]] || text="a deploy alarm was kept, its lines are not readable"
+  if ! curl -s --fail -m 15 -X POST "$WEBHOOK" \
+    -H "Content-Type: text/plain" \
+    -H "Title: deploy-window 502" \
+    -H "Priority: high" \
+    --data "deploy window, sent late by the watchdog: $text" >/dev/null; then
+    echo "$TS [WARN] webhook unreachable"
+    return 0
+  fi
+  # Its own line, not `[INFO] webhook delivered`: ops/webhook-last.sh reads that line as a delivery of the watchdog, and
+  # ops/status.sh then wants a message titled `control-plane ...` on the topic, which this title is not.
+  echo "$TS [INFO] deploy alarm delivered"
+  rest=$(cat "$file" 2>/dev/null)
+  if [[ "$rest" == "$kept" ]]; then
+    rm -f "$file"
+  else
+    printf '%s\n' "${rest#"$kept"$'\n'}" > "$file" 2>/dev/null || true
+  fi
 }
 
 # Two attempts with a pause, so a single hiccup does not alarm straight away.
@@ -123,6 +161,7 @@ check_credit() {
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 check_credit
 sign_of_life
+send_kept_deploy_alarm
 
 CODE=$(check_health)
 PREVIOUS=$(cat "$STATE_FILE" 2>/dev/null || echo "unknown")

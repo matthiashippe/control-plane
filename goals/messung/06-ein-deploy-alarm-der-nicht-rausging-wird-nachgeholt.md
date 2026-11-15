@@ -1,7 +1,7 @@
 # Messung Goal 06: Ein Deploy-Alarm, der nicht rausging, wird nachgeholt
 
 ## Status
-PLANNED
+DONE
 
 ## Active Objective
 Seit messung 02 und 05 meldet `ops/deploy-window.sh` jeden 502 an eine fremde Anfrage nach einem Rollout über
@@ -85,33 +85,45 @@ jemanden erreicht.
   <Datum>): …` in `goals/messung/ANNAHMEN.md`.
 
 ## Done Condition
-- [ ] `ops/deploy-window.sh` endet mit Exit 3, wenn ein fälliger Alarm nicht gesendet wurde, und Kopfkommentar und `ops/README.md`
+- [x] `ops/deploy-window.sh` endet mit Exit 3, wenn ein fälliger Alarm nicht gesendet wurde, und Kopfkommentar und `ops/README.md`
       nennen das.
       Prüfung: `grep -c 'Exit 3' ops/deploy-window.sh` muss mindestens 1 ausgeben.
       Prüfung: `grep -c 'ALARM NOT SENT' ops/README.md` muss mindestens 1 ausgeben.
       Prüfung: `bash ops/deploy-window.sh --selftest` muss Exit-Code 0 haben.
-- [ ] `ops/deploy-alarm.sh` hängt bei rotem POST und bei fehlender Webhook-Zeile Zahl und Uhrzeit an `<state>.deploy-502`, den
+- [x] `ops/deploy-alarm.sh` hängt bei rotem POST und bei fehlender Webhook-Zeile Zahl und Uhrzeit an `<state>.deploy-502`, den
       Zustandspfad nimmt es aus der Crontab, und der `curl`-Aufruf aus messung 05 bleibt.
       Prüfung: `grep -c 'deploy-502' ops/deploy-alarm.sh` muss mindestens 1 ausgeben.
       Prüfung: `grep -cE '^[^#]*CP_WATCHDOG_STATE' ops/deploy-alarm.sh` muss mindestens 1 ausgeben.
       Prüfung: `grep -cE '^[^#]*curl -fsS -m 10 -H "Title: deploy-window 502" -H "Priority: high" ' ops/deploy-alarm.sh` muss 1 ausgeben.
-- [ ] `ops/watchdog.sh` sendet eine Merkdatei mit `Title: deploy-window 502` und `Priority: high` und löscht sie erst nach
+- [x] `ops/watchdog.sh` sendet eine Merkdatei mit `Title: deploy-window 502` und `Priority: high` und löscht sie erst nach
       erfolgreichem POST.
       Prüfung: `grep -c 'deploy-502' ops/watchdog.sh` muss mindestens 1 ausgeben.
       Prüfung: `grep -cE '^[^#]*Title: deploy-window 502' ops/watchdog.sh` muss mindestens 1 ausgeben.
       Prüfung: `grep -c 'deploy-502' ops/README.md` muss mindestens 1 ausgeben.
-- [ ] `test/deploy-alarm-pending.test.ts` belegt Exit 3, Merkdatei und Nachholen in den sechs Fällen, und die bestehenden Tests der
+- [x] `test/deploy-alarm-pending.test.ts` belegt Exit 3, Merkdatei und Nachholen in den sechs Fällen, und die bestehenden Tests der
       drei Werkzeuge bleiben unverändert grün.
       Prüfung: `pnpm -s vitest run test/deploy-alarm test/deploy-window test/watchdog` muss Exit-Code 0 haben.
       Prüfung: `grep -cE 'it\("(deploy-window ends with exit 3 for every alarm that was not sent|deploy-alarm keeps count and time for the watchdog only when the alarm failed|deploy-alarm appends a second failed alarm to the first|watchdog sends a kept deploy alarm with priority high and then removes the file|watchdog keeps the file while the POST fails and sends it on the next run|watchdog keeps the file without a webhook and sends it once a webhook is set)"' test/deploy-alarm-pending.test.ts` muss 6 ausgeben.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD -- test | grep -vcE '^test/deploy-alarm-pending\.test\.ts$'` muss 0 ausgeben.
-- [ ] `check` ist grün, gesperrte Pfade bleiben unverändert, und unter `ops/` ändern sich nur die drei Werkzeuge und
+- [x] `check` ist grün, gesperrte Pfade bleiben unverändert, und unter `ops/` ändern sich nur die drei Werkzeuge und
       `ops/README.md`.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD | grep -cE '^(\.github|deploy|src|harness|scripts|docs)/|^goals/kanal/'` muss 0 ausgeben.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD -- ops | grep -vcE '^ops/(deploy-window\.sh|deploy-alarm\.sh|watchdog\.sh|README\.md)$'` muss 0 ausgeben.
       Prüfung: `S=$(mktemp -d); XDG_STATE_HOME=$S node scripts/check.mjs >/dev/null 2>&1; find "$S" -type f | wc -l` muss 0 ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] (Kritik) Ein nachgeholter Deploy-Alarm färbt `alarm_path.received` in `ops/status.sh` nicht rot: `ops/watchdog.sh`
+      schreibt nach seinem zugestellten POST die Zeile `[INFO] deploy alarm delivered` statt `[INFO] webhook delivered`, weil
+      `ops/webhook-last.sh` jede Zeile `[INFO] webhook delivered` als Zustellung des Watchdogs liest und `ops/status.sh` dazu
+      eine Meldung mit Titel `control-plane …` auf dem Thema verlangt, die es zu `Title: deploy-window 502` nicht gibt (heute
+      Zeile 91 von `ops/watchdog.sh`, rot bis zum nächsten Zeichen des Lebens, bis zu acht Stunden). Ein roter POST schreibt
+      weiter `[WARN] webhook unreachable`. Der neue Fall in `test/deploy-alarm-pending.test.ts` läuft mit `CP_WATCHDOG_ALIVE=0`
+      und gesundem Health-Check ohne Zustandswechsel, sendet eine Merkdatei und verlangt im Log genau eine Zeile, die auf
+      `/\[INFO\] deploy alarm delivered$/` endet, und keine, die auf `/\[INFO\] webhook delivered$/` endet; `ops/README.md`
+      nennt die Zeile im Abschnitt „Watchdog on the VM“.
+      Prüfung: `grep -cE 'it\("watchdog logs a sent deploy alarm as deploy alarm delivered, not as webhook delivered"' test/deploy-alarm-pending.test.ts` muss 1 ausgeben.
+      Prüfung: `pnpm -s vitest run test/deploy-alarm-pending` muss Exit-Code 0 haben.
+      Prüfung: `grep -c 'deploy alarm delivered' ops/README.md` muss mindestens 1 ausgeben.
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Die sechs neuen Fälle waren vor dem Fix rot; die Zeile im Progress Log nennt sie und womit.
@@ -136,6 +148,11 @@ jemanden erreicht.
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-15 Widerlegung geprüft: `grep -cE "exit 3|rc=3" ops/deploy-window.sh` -> 0, `grep -c "deploy-502" ops/watchdog.sh` -> 0 am Kopf von `dev` (19ac027), das Goal ist nicht widerlegt.
+- 2026-11-15 Zyklus 1: Punkte 1, 2, 3, 4, 5 gebaut: `ops/deploy-window.sh` endet bei ALARM NOT SENT mit Exit 3, `ops/deploy-alarm.sh` hängt bei rotem POST und fehlender Webhook-Zeile `<count> <HH:MM:SS>` an `<state>.deploy-502` (Zustandspfad aus der Crontab), `ops/watchdog.sh` sendet die Datei vor dem Health-Check mit `Title: deploy-window 502` und `Priority: high` und löscht sie erst nach zugestelltem POST, dazu `ops/README.md` und `test/deploy-alarm-pending.test.ts`; vor dem Fix waren alle 6 neuen Fälle rot (`pnpm -s vitest run test/deploy-alarm-pending` -> 6 failed, 6 Tests). Prüfbefehle: P1 `Exit 3` 3, `ALARM NOT SENT` 1, Selftest Exit 0; P2 `deploy-502` 2, `CP_WATCHDOG_STATE` 1, `curl`-Zeile 1; P3 `deploy-502` 2, Titelzeile 1, README `deploy-502` 3; P4 vitest Exit 0 (10 Dateien, 51 Tests), sechs Testnamen 6, fremde Tests 0; P5 `check` Exit 0 (163 Dateien, 1840 Tests), gesperrte Pfade 0, fremde ops-Dateien 0, Dateien unter XDG_STATE_HOME 0.
+- 2026-11-15 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5; `dev` ohne neue Commits seit der Merge-Basis 19ac027, kein Merge nötig. Prüfbefehle: P1 `Exit 3` 3, `ALARM NOT SENT` 1, Selftest Exit 0; P2 `deploy-502` 2, `CP_WATCHDOG_STATE` 1, `curl`-Zeile 1; P3 `deploy-502` 2, Titelzeile 1, README `deploy-502` 3; P4 vitest Exit 0 (10 Dateien, 51 Tests), sechs Testnamen 6, fremde Tests 0; P5 `check` Exit 0 (163 Dateien, 1840 Tests, 180 s), gesperrte Pfade 0, fremde ops-Dateien 0, Dateien unter XDG_STATE_HOME 0; Job `check` am PR grün, `e2e` lief beim Melden noch (Diff ohne Laufzeitpfad).
+- 2026-11-15 Zyklus 3: Punkt 6 gebaut: `ops/watchdog.sh` schreibt nach dem zugestellten POST eines nachgeholten Deploy-Alarms `[INFO] deploy alarm delivered` statt `[INFO] webhook delivered`, `ops/README.md` nennt die Zeile, neuer Fall in `test/deploy-alarm-pending.test.ts` und die Log-Erwartung von Fall 4 angepasst; vor dem Fix rot (`pnpm -s vitest run test/deploy-alarm-pending` -> 2 failed, 7 Tests). Prüfbefehle: P6 Testname 1, vitest Exit 0 (7 Tests), README `deploy alarm delivered` 1; P1 3, 1, Selftest Exit 0; P2 2, 1, 1; P3 2, 1, 3; P4 vitest Exit 0 (10 Dateien, 52 Tests), sechs Testnamen 6, fremde Tests 0; P5 `check` Exit 0 (163 Dateien, 1841 Tests), gesperrte Pfade 0, fremde ops-Dateien 0, Dateien unter XDG_STATE_HOME 0.
+- 2026-11-15 Release: PASS K und B (Zyklus 3), DONE.
 
 ## Blockers
 - keine

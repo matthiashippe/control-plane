@@ -22,7 +22,9 @@
 #                                 planted log lines, no network, every direction
 #
 # Exit 0 means nobody outside saw an error. Exit 1 means somebody did, and the lines are printed.
-# Exit 2 means the check could not run.
+# Exit 2 means the check could not run. Exit 3 means a stranger got a 502 after the rollout and the
+# alarm for it was due but not sent (ALARM NOT SENT: exit <k>, 255 for ssh gone, 1 for a failed POST,
+# 2 for no webhook in the crontab).
 #
 # deploy.yml calls this about 20 s after the new container started, and the window runs 180 s past
 # the start. Until 2026-11-14 every rollout therefore got PARTIAL, an answer about time that had not
@@ -34,7 +36,10 @@
 # And a 502 used to reach nobody: the step only wrote a warning into the job log. Without --at, a
 # `BAD GATEWAY` above 0 now runs ops/deploy-alarm.sh on the VM, which posts one line without an
 # address to the webhook the crontab sets for ops/watchdog.sh. The URL is never printed here.
-# The tool then prints ALARM SENT or ALARM NOT SENT: exit <k> and keeps its exit 1.
+# The tool then prints ALARM SENT and keeps its exit 1, or ALARM NOT SENT: exit <k> and ends with
+# Exit 3, so a 502 that reached nobody differs from one that did. ops/deploy-alarm.sh keeps a failed
+# alarm on the VM, and ops/watchdog.sh sends it on its next run; with ssh gone nothing can be kept,
+# and Exit 3 in the job log is the only trace.
 #
 # No line names an address. `deploy.yml` prints this output into the public logs of a public
 # repository, and until 2026-11-12 every line under AFFECTED and NO KEY carried a visitor's
@@ -440,6 +445,7 @@ if [[ -z "$AT" && "$rc" -eq 1 && "${bad:-0}" -gt 0 ]]; then
     echo "ALARM SENT"
   else
     echo "ALARM NOT SENT: exit $k"
+    rc=3
   fi
 fi
 exit "$rc"

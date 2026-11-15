@@ -104,7 +104,8 @@ the start of the window as `YYYY-MM-DDTHH` (`HH` is `00`, `08` or `16`); a stamp
 `YYYY-MM-DD` counts as a missing window, so the first run after the rollout posts once more. It is
 stored only after the POST went through, so with a dead webhook every run of the window tries again
 and three runs leave three lines `[WARN] webhook unreachable`. Every
-delivered POST, the sign of life included, leaves `[INFO] webhook delivered` in the log.
+delivered POST, the sign of life included, leaves `[INFO] webhook delivered` in the log, except a
+late deploy alarm (below).
 `ops/webhook-last.sh` prints the time of the last failure and of the last delivery (`-` for none),
 and `ops/status.sh` reports both as `alarm_path.last_unreachable` and `alarm_path.last_delivered`, so
 a failure of fifteen minutes that is over does not stay red for 24 hours. A last delivery older than
@@ -112,6 +113,18 @@ a failure of fifteen minutes that is over does not stay red for 24 hours. A last
 longer runs or no longer posts (crontab gone, script stops before the sign of life, sign of life
 switched off), even though that leaves no line `[WARN] webhook unreachable`. `CP_WATCHDOG_ALIVE=0`
 switches only the sign of life off; it is meant for tests that count every POST, never for the VM.
+
+A deploy alarm that did not go out waits next to the other states in `<state file>.deploy-502`
+(default `/var/lib/cp-watchdog.state.deploy-502`): `ops/deploy-alarm.sh` appends one line
+`<count> <HH:MM:SS>` when its POST failed or the crontab set no webhook. Every run of the watchdog
+looks for that file before the health check, so also during an outage, and posts it once with
+`Title: deploy-window 502` and `Priority: high`, the text naming every count and time, no address and
+no URL. The file goes only after a delivered POST, which leaves `[INFO] deploy alarm delivered`
+instead of `[INFO] webhook delivered`, because `ops/webhook-last.sh` reads the latter as a delivery of
+the watchdog and `ops/status.sh` then looks for a message titled `control-plane ...` on the topic.
+A failed POST keeps it and leaves `[WARN] webhook unreachable`; without `CP_ALERT_WEBHOOK` it stays as well and the log gets
+`[WARN] a deploy alarm is waiting, no webhook set`. The title is the same as that of
+`ops/deploy-alarm.sh`, so `ops/status.sh` does not count it as a message of the watchdog.
 
 A delivery in the log only proves that ntfy accepted the POST, and ntfy accepts any topic: with a
 wrong or stale topic in the crontab the watchdog logs a delivery every day and no phone rings. So
@@ -726,6 +739,14 @@ public logs of a public repository, so a line shows time, method, path without q
 `BAD GATEWAY <n> of <m>` counts the 502s Caddy answered while `cp` restarted. `--at <UTC time>`
 measures a past window instead of the container start, `--log <file>` reads the access log from a
 file without ssh (only together with `--at`), and `--selftest` plants every case without network.
+
+Without `--at`, a `BAD GATEWAY` above 0 sends `ops/deploy-alarm.sh` to the VM, which posts the alarm
+to the webhook of the watchdog. The tool prints `ALARM SENT` and keeps exit 1, or
+`ALARM NOT SENT: exit <k>` (255 for ssh gone, 1 for a failed POST, 2 for no webhook in the crontab)
+and ends with exit 3, so a 502 that reached nobody differs from one that did. On exit 1 and 2 of the
+alarm the VM keeps count and time in `<state file>.deploy-502`, and the watchdog sends them on its next
+run (see Watchdog on the VM). With ssh gone nothing can be kept; then exit 3, which `deploy.yml`
+prints in its warning, is the only trace.
 
 ### Did anybody come back
 

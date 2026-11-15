@@ -18,3 +18,7 @@
   der Titel nicht mit `control-plane ` beginnt (Zeile 157). Das ist gewollt: `received` im Alarmweg soll belegen, dass die Posts
   von `ops/watchdog.sh` ankommen, und ein Deploy-Alarm auf dem Thema darf dort kein `ok` melden, wenn der Watchdog selbst nichts
   zugestellt hat. Der Titel nennt die Quelle (`ops/deploy-window.sh`) und den Fehler, keine Adresse und keine URL.
+- messung 06 (Engineer CP, 15.11.2026): Der Watchdog liest die Merkdatei vor dem POST und löscht nach einem zugestellten POST nur,
+  was er gesendet hat. Hängt `ops/deploy-alarm.sh` während des POST eine Zeile an, bleibt genau diese Zeile für den nächsten Lauf
+  stehen. In den Text kommen nur Zeilen der Form `<count> <HH:MM:SS>`; eine Datei ohne lesbare Zeile wird trotzdem gesendet
+  (Text „its lines are not readable“) und erst danach gelöscht, damit kein Weg sie ohne zugestellten POST entfernt.
