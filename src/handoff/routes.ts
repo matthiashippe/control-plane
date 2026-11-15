@@ -8,6 +8,9 @@
  *
  * Registered before the `/v1/*` auth middleware of src/app.ts, which is how a keyless path answers without a key there.
  */
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import type { Context, Env, Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import type { Db } from "../db.js";
@@ -30,6 +33,8 @@ export interface PasskeyView {
   chainId: number;
   spender: Address;
   token: Address;
+  /** The public ID of Turnkey's Auth Proxy configuration the page signs up with; null when CP_KONTO_AUTH_PROXY_ID is unset. */
+  authProxyId: string | null;
 }
 
 /**
@@ -43,6 +48,24 @@ export interface KontoDeps {
   token: Address;
   /** Asks the chain whether a smart wallet signed (ERC-1271 or ERC-6492). */
   verifyClient: PublicClient;
+  /** Public ID of Turnkey's Auth Proxy configuration (CP_KONTO_AUTH_PROXY_ID); without it the button reports the service missing. */
+  authProxyId?: string | null;
+}
+
+/**
+ * The script of the passkey step, bundled by ops/konto/build-client.mjs from src/public/konto-client/. Next to the compiled file in
+ * the image (dist/public, harness/cp/Dockerfile), next to the source under tsx.
+ */
+function loadKontoScript(): string | null {
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  for (const candidate of [path.join(here, "../public/konto-client/konto.js"), path.resolve("src/public/konto-client/konto.js")]) {
+    try {
+      return readFileSync(candidate, "utf-8");
+    } catch {
+      continue;
+    }
+  }
+  return null;
 }
 
 export interface HandoffDeps {
@@ -115,6 +138,7 @@ export function registerHandoff<E extends Env>(app: Hono<E>, deps: HandoffDeps):
       chainId: konto.chainId,
       spender: konto.spender,
       token: konto.token,
+      authProxyId: konto.authProxyId ?? null,
     };
     return c.html(renderKontoPage({ state: "passkey", ...view }, deps.indexStyle()), 200);
   };
@@ -252,12 +276,23 @@ export function registerHandoff<E extends Env>(app: Hono<E>, deps: HandoffDeps):
     });
   });
 
+  // Before /h/:code, which would take "konto.js" for a code. Only there while the account is on.
+  const kontoScript = konto ? loadKontoScript() : null;
+  app.get("/h/konto.js", (c) => {
+    if (!kontoScript) return c.text("Not found", 404);
+    c.header("Cache-Control", "no-store");
+    c.header("Referrer-Policy", "no-referrer");
+    return c.body(kontoScript, 200, { "Content-Type": "text/javascript; charset=utf-8" });
+  });
+
   app.get("/h/:code", (c) => {
     const found = readHandoff(db, c.req.param("code").toUpperCase(), nowMs());
     if (!found) return unknown(c);
     const { handoff } = found;
     if (handoff.state === "pending") return page(c, freigabe(handoff), 200);
     if (handoff.state === "matched") return passkey(c, handoff);
+    // The script of the passkey step comes back here after done: the account exists, so the page says what `erledigt` says.
+    if (handoff.state === "done" && handoff.step === "konto") return page(c, { state: "erledigt" }, 200);
     return page(c, { state: "ungueltig", reason: REASON[handoff.state] }, 410);
   });
 

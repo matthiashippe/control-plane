@@ -26,6 +26,7 @@ export function kontoFromEnv(db: Db, env: Record<string, string | undefined>, tr
     spender: account.address,
     token: config.token,
     verifyClient,
+    authProxyId: config.authProxyId,
     topUp: (address) => {
       topUpIfLow({ db, chain, topupBelowUsdc: config.topupBelowUsdc, topupUsdc: config.topupUsdc }, address)
         .then((r) => {

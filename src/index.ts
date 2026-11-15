@@ -25,7 +25,8 @@
  *   CP_SANDBOXES  "0" switches the sandbox API off (every call that needs the server answers 501)
  *   CP_KONTO_CHAIN_ID  unset: the account of konto 03 is off; 84532 switches it on (Base Sepolia only), anything else stops
  *                 the start. With it CP_KONTO_KEY_FILE (file of the test key), CP_KONTO_RPC_URL, CP_KONTO_TOPUP_BELOW_USDC and
- *                 CP_KONTO_TOPUP_USDC (docs/konto/konto.md). No deploy file sets any of them.
+ *                 CP_KONTO_TOPUP_USDC, CP_KONTO_AUTH_PROXY_ID (public ID of Turnkey's Auth Proxy configuration for the
+ *                 page; docs/konto/konto.md). No deploy file sets any of them.
  */
 
 import fs from "node:fs";

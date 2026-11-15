@@ -1,7 +1,7 @@
 # Konto Goal 03: Konto und Abbuchung auf Base Sepolia
 
 ## Status
-BLOCKED matthias
+ACTIVE
 
 ## Active Objective
 Wer im Terminal einen Automaton startet und keine Wallet hat, bekommt über den Handoff aus konto 02 ein eigenes Konto: Nach der
@@ -181,7 +181,7 @@ Erlaubnis aufsetzen und ohne beides kein Mensch ohne Wallet einen Automaton bei 
       MVP: Funktion, weil Credits aus Test-Geld in der Produktion verschenkte Inferenz wären.
       Prüfung: `pnpm -s vitest run test/konto-config.test.ts` muss Exit-Code 0 haben, und `grep -cE "^\s*(it|test)\(" test/konto-config.test.ts` muss mindestens 3 ausgeben (je ein Fall: ohne Variable ist das Konto aus; 84532 schaltet es an; 8453 ergibt beim Start einen Fehler).
       Prüfung: `grep -rn "CP_KONTO_" deploy .github | wc -l` muss `0` ausgeben.
-- [ ] Auf Base Sepolia entstand ein Konto per Passkey über den Handoff, es bekam eine Zahlung, die Erlaubnis buchte Credits ab, und
+- [x] Auf Base Sepolia entstand ein Konto per Passkey über den Handoff, es bekam eine Zahlung, die Erlaubnis buchte Credits ab, und
       eine Abbuchung über der Tagesgrenze scheiterte on-chain.
       MVP: Funktion, weil erst der echte Lauf belegt, dass Turnkey, die Smart Wallet und die Erlaubnis zusammen tragen (Widerlegung
       dieses Goals).
@@ -243,9 +243,6 @@ Erlaubnis aufsetzen und ohne beides kein Mensch ohne Wallet einen Automaton bei 
 ## Progress Log
 - 2026-11-13 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 13 gebaut (Harness auf anvil 84532, src/konto, Handoff mit step konto, SOLL-Bilder mit Abnahme 22:06:50 UTC vor dem ersten Commit der Seite um 22:15:36 UTC, Seite pixelgleich, Testschlüssel, Vertrag), Punkt 10 wartet auf das Human Gate, Punkt 12 gebaut mit `?Referrer-Policy` und offen, weil beide Prüfbefehle die Schreibweise `Referrer-Policy "?…"` verlangen, die Caddy 2.11.7 als zweiten Kopf mit dem Wert `?strict-origin-when-cross-origin` sendet (`goals/konto/ANNAHMEN.md`), Punkt 14 offen bis Punkt 10. Prüfbefehle: P1 `soll konto: 4 Bilder, passkey oben 390=527 1440=510, 0 Mängel`, `breiten ok`, `quellen ok`, `bausteine ok neu=2`; P2 vitest Exit 0, 8 Fälle, `bestand gleich`, `soll handoff: 6 Bilder, freigabe oben 390=528 1440=603, 0 Mängel`, `soll: 2 Bilder, umzug oben 390=828 1440=656, 0 Mängel`; P3 `abnahme ok 1`; P4 live `0 Mängel`, mit X in der Überschrift `2 Mängel` und `exit=1`, Handoff live `0 Mängel`, grep `0`; P5 vitest Exit 0, 4 Fälle, Gegenprobe still, `0` und `2`; P6 vitest Exit 0, 12 Fälle, Gegenproben still (5 und 1 rote Fälle), Handoff-Tests Exit 0; P7 vitest Exit 0, 9 Fälle, Gegenprobe still (1 roter Fall); P8 `1`, `20`, `1`, `1`, `code gleich 4`, `e2e pass` mit `KONTO_CHAIN_VERDICT ok`; P9 vitest Exit 0, 4 Fälle, `0`; P11 `0`; P12 `0` statt mindestens 2 und `2` statt 0, Selbsttest `LIVE SELFTEST OK`, `1`, `3`; P13 leer, `10`. Jeder neue Test war rot: konto-chain mit Schlüssel im Fehlertext und ohne requireSepolia, konto-account ohne permissionMatches und signatureValid, konto-topup ohne receiptSucceeded, soll-konto mit je einer Mutation in assessKonto, e2e-sandbox-gate ohne konto_chain in full.sh, live.sh-Selbsttest mit Referrer immer ok.
 - 2026-11-13 Zyklus 2: Punkt 12 nach der Entscheidung des Tech Lead (Commit 84282c6, Prüfbefehl folgt `?Referrer-Policy`) ausgeführt und abgehakt, ohne Codeänderung, Punkte 10 und 14 warten weiter auf das Human Gate. Prüfbefehle: P12 `2` und `0`, Gegenprobe mit `Referrer-Policy "?strict-origin-when-cross-origin"` in einer Kopie ergibt `0` und `2`; Selbsttest Exit 0 mit `LIVE SELFTEST OK`, `1`, `3`.
+- 2026-11-15 Zyklus 3: Punkt 10 gebaut nach dem Human Gate (Turnkey-Werte in `secrets.env`, 20 Test-USDC und 0,009 ETH an der Testadresse): Skript der Seite `src/public/konto-client/` als `/h/konto.js` (Passkey, Signup über den Auth Proxy mit einem Schlüssel des Tabs für 120 s, Unterschrift der Turnkey-Wallet, Smart Wallet per CREATE2 ohne Chain), `CP_KONTO_AUTH_PROXY_ID`, `erledigt` nach `done`, `ops/konto/sepolia-run.mjs`, `ops/konto/turnkey-check.mjs`, Lauf mit Hashes in `docs/konto/sepolia.md`, esbuild als Entwicklungspaket. Prüfbefehle: P10 `sepolia ok`, `turnkey ok passkey=1 owner=1`, `spender eigen`; Gegenproben: getauschte Hashes von abbuchung und ueber-grenze ergeben 5 Befunde und `exit=1`, die Testadresse als besitzer `besitzer ist nicht eigentuemer` und `exit=1`, turnkey-check mit der Testadresse Exit 1; P4 live `0 Mängel`, Handoff live `0 Mängel`. Jeder neue Test war rot: konto-client mit falschem initCodeHash, DER ohne führende Null, vertauschtem v, Abbruch als unreachable, Schlüssel für 3600 s, signWith klein geschrieben (Turnkey antwortete im ersten echten Lauf 404), ohne Skript-Tag; konto-account ohne `erledigt` nach done.
 
 ## Blockers
-Art: matthias
-Aufgabe: Turnkey-Zugang für das Kundenkonto anlegen und die Testadresse mit Test-Geld füllen
-Worum: konto 03 legt auf Base Sepolia ein Konto per Passkey an und bucht daraus ab, dafür braucht der Loop den Zugang zu Turnkey und Test-Geld aus dem Faucet
-Empfehlung: Auf https://app.turnkey.com ein Konto anlegen (daraus die Organization ID), unter My Profile ein API-Schlüsselpaar erzeugen, den Auth Proxy einschalten mit Passkey als Methode und den Allowed Origins https://postyourprice.com und http://localhost:47391 (daraus die Auth Proxy Config ID); die vier Werte in `~/brain/connectors/secrets.env` unter TURNKEY_ORGANIZATION_ID, TURNKEY_API_PUBLIC_KEY, TURNKEY_API_PRIVATE_KEY und TURNKEY_AUTH_PROXY_CONFIG_ID eintragen. Dann auf https://faucet.circle.com 20 USDC auf Base Sepolia an 0x24369Bc24AE5389144576ded6585785EF652Cfc4 schicken und über einen Base-Sepolia-Faucet (etwa https://portal.cdp.coinbase.com/products/faucet) 0,01 ETH an dieselbe Adresse.

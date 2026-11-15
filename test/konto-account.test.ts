@@ -111,6 +111,15 @@ describe("handoff with step konto", () => {
     expect(again.status).toBe(200);
   });
 
+  it("shows the page of konto 02 for done once the account exists, where the script of the page returns to", async () => {
+    const { app } = setup();
+    const { h } = await matched(app);
+    expect((await send(app, h.code, await permit())).status).toBe(200);
+    const res = await app.request(`/h/${h.code}`);
+    expect(res.status).toBe(200);
+    expect(await res.text()).toContain("<title>Approved | PostYourPrice</title>");
+  });
+
   it("ends done with a matching permission; the first done event carries account and api_key, a second read none", async () => {
     const { app, db } = setup();
     const { h } = await matched(app);

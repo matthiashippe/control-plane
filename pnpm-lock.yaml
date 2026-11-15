@@ -30,6 +30,9 @@ importers:
       '@types/node':
         specifier: ^22.0.0
         version: 22.20.3
+      esbuild:
+        specifier: 0.28.2
+        version: 0.28.2
       jsqr:
         specifier: 1.4.0
         version: 1.4.0

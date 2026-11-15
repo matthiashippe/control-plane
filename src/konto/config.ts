@@ -28,6 +28,8 @@ export interface KontoConfig {
   topupUsdc: bigint;
   token: typeof SEPOLIA_USDC;
   manager: typeof SPEND_PERMISSION_MANAGER;
+  /** Public ID of Turnkey's Auth Proxy configuration the page signs up with; not a secret, Turnkey hands it to browsers. */
+  authProxyId: string | null;
 }
 
 function atomic(name: string, raw: string | undefined, fallback: bigint): bigint {
@@ -51,5 +53,6 @@ export function readKontoConfig(env: Record<string, string | undefined>): KontoC
     topupUsdc: atomic("CP_KONTO_TOPUP_USDC", env.CP_KONTO_TOPUP_USDC, 2_000_000n),
     token: SEPOLIA_USDC,
     manager: SPEND_PERMISSION_MANAGER,
+    authProxyId: env.CP_KONTO_AUTH_PROXY_ID?.trim() || null,
   };
 }

@@ -12,7 +12,7 @@ import { esc } from "./market.js";
 import { phonePage, usd } from "./handoff.js";
 
 export type KontoPage =
-  | { state: "passkey"; code: string; automatonName: string; dailyLimitUsdc: bigint; chainId: number; spender: string; token: string }
+  | { state: "passkey"; code: string; automatonName: string; dailyLimitUsdc: bigint; chainId: number; spender: string; token: string; authProxyId?: string | null }
   | { state: "fehlgeschlagen"; reason: FailReason };
 
 /** Why no account was created. The SOLL picture shows `cancelled`. */
@@ -52,6 +52,7 @@ function body(page: KontoPage): string {
       `data-chain="${page.chainId}"`,
       `data-spender="${esc(page.spender)}"`,
       `data-token="${esc(page.token)}"`,
+      `data-proxy="${esc(page.authProxyId ?? "")}"`,
     ].join(" ");
     return `<section class="hero">
   <div class="wrap narrow" data-soll="passkey">
@@ -70,6 +71,7 @@ function body(page: KontoPage): string {
       </div>
       <p class="fine">Close this page and nothing is charged. The code works once, for 10 minutes.</p>
       <noscript><p class="fine">This step needs a browser with JavaScript switched on.</p></noscript>
+      <script type="module" src="/h/konto.js"></script>
     </div>
   </div>
 </section>

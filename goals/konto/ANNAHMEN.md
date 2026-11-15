@@ -95,3 +95,22 @@
 - Entscheidung (Tech Lead, 2026-11-13): Die Prüfung von Punkt 12 und der Kontext verlangen `?Referrer-Policy "strict-origin-when-cross-origin"`
   und keine Zeile, die den Kopf ohne `?` setzt, weil `caddy adapt` mit 2.11.7 die alte Schreibweise als festes `set` mit dem Wert
   `?strict-origin-when-cross-origin` übersetzt und nur das `?` vor dem Feldnamen ein `require` auf einen fehlenden Kopf ergibt.
+- Die Seite legt den Passkey an und gibt Turnkey beim Signup zusätzlich einen P-256-Schlüssel des Tabs (nicht exportierbar, 120
+  Sekunden gültig), der die Erlaubnis einmal unterschreibt, weil sonst nach dem Anlegen ein zweiter Passkey-Dialog käme; Turnkeys
+  eigenes SDK macht es mit 60 Sekunden genauso (`signUpWithPasskey`, `@turnkey/core` 2.14.1). Der Schlüssel verlässt den Tab nie.
+- Das Skript der Seite nutzt viem und kein Paket von Turnkey, weil die vier Aufrufe (WebAuthn, Signup, Stempel, Signatur) in
+  `src/public/konto-client/flow.mjs` passen und jedes weitere Paket fremden Code auf die Seite brächte; gebündelt wird mit esbuild
+  (neues Entwicklungspaket), und das Bündel liegt im Repo, weil das Image nur mit tsc baut und `harness/cp/Dockerfile` zur Deny List
+  gehört. Ein Test baut es neu und vergleicht.
+- Die Seite fragt keine Chain: Die Adresse der Smart Wallet folgt per CREATE2 aus `initCodeHash()` der Factory (am 15.11.2026 von
+  Base Sepolia gelesen, gleich `getAddress`), und `eth_getCode` beantwortet ein Transport ohne Netz mit `0x`, weil ein Eigentümer,
+  der eine Sekunde alt ist, keine deployte Wallet hat. So geht vom Handy nichts an einen fremden RPC.
+- `signWith` geht in der Schreibweise an Turnkey, die der Signup zurückgibt (mit Prüfsumme), weil Turnkey Adressen nach Groß- und
+  Kleinschreibung unterscheidet; der erste Lauf scheiterte daran mit 404. Bei uns steht die Adresse klein.
+- `GET /h/{code}` zeigt nach `done` eines Handoffs mit `step: "konto"` den Zustand `erledigt` aus konto 02, weil das Skript nach dem
+  200 dorthin zurückkehrt und kein neuer Zustand ohne SOLL-Bild entstehen soll; ohne `step: "konto"` bleibt `ungueltig` wie bisher.
+- Die Auth-Proxy-ID kommt als `CP_KONTO_AUTH_PROXY_ID` in die Seite, weil Turnkey sie für Browser vorsieht und sie kein Schlüssel ist.
+  Für konto 05 bleibt offen: Die CSP aus `deploy/Caddyfile` erlaubt weder `/h/konto.js` noch `connect-src` zu Turnkey; das muss mit
+  dem Anschalten im Hauptnetz geändert werden, heute ist das Konto in der Produktion aus.
+- Der Lauf auf Base Sepolia nutzt Port 47391, weil `http://localhost:47391` als Allowed Origin im Auth Proxy steht und der Passkey
+  an diese Origin gebunden wird; das Skript bricht ab, wenn der Port belegt ist.

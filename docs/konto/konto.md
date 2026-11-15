@@ -15,7 +15,14 @@ Alles läuft auf Base Sepolia (chainId 84532) mit Test-USDC; in der Produktion i
    statt `done`, die Seite zeigt den Schritt Passkey; eine falsche verbrennt den Code wie bisher (`burned`).
 3. Die Seite legt im Browser das Konto bei Turnkey an, berechnet die Smart Wallet mit der Turnkey-Wallet als Eigentümer und
    `SpendPermissionManager` als zweitem Eigentümer, unterschreibt die Erlaubnis und schickt `POST /h/{code}/konto` mit JSON
-   `{"account": "0x…", "permission": {…}, "signature": "0x…"}`. Die Zahlen der Erlaubnis stehen als Strings.
+   `{"account": "0x…", "permission": {…}, "signature": "0x…"}`. Die Zahlen der Erlaubnis stehen als Strings. Das Skript ist
+   `/h/konto.js` auf unserer Adresse (gebündelt aus `src/public/konto-client/` mit `node ops/konto/build-client.mjs`); es ruft nur
+   Turnkey auf: `POST https://authproxy.turnkey.com/v1/signup_v2` mit der öffentlichen ID aus `CP_KONTO_AUTH_PROXY_ID` legt die
+   Sub-Organisation mit dem Passkey, einer Ethereum-Wallet und einem P-256-Schlüssel des Tabs an, der nicht exportierbar ist und
+   nach 120 Sekunden verfällt; dieser Schlüssel lässt die Wallet einmal den Hash unterschreiben
+   (`/public/v1/submit/sign_raw_payload`). Ein Tipp, ein Passkey. Die Adresse der Smart Wallet folgt per CREATE2 aus der Factory,
+   die Unterschrift ist ERC-6492, weil die Wallet noch keinen Code hat; die Seite fragt keine Chain. Nach 200 zeigt `/h/{code}` den
+   Zustand `erledigt` aus konto 02, nach einem Fehler schickt das Skript den Grund an `POST /h/{code}/fehlgeschlagen`.
 4. Der Server prüft mit `permissionMatches` und `signatureValid` (Abschnitt Erlaubnis). Passt alles, wird der Handoff `done`: die
    Smart Wallet steht als Konto in `wallets` und `konto_accounts`, ein neuer API-Schlüssel entsteht über `createApiKey` aus
    `src/auth/siwe.ts`. Passt etwas nicht, antwortet der Server 400 mit `error: "permission_refused"` und verbrennt den Handoff,
@@ -82,6 +89,11 @@ Umgebungsvariable mit dem Wert und nie aus einem Schlüssel der Betreiber-Wallet
 | `CP_KONTO_RPC_URL` | JSON-RPC von Base Sepolia, Vorgabe `https://sepolia.base.org` |
 | `CP_KONTO_TOPUP_BELOW_USDC` | Schwelle in atomaren USDC, Vorgabe 1000000 |
 | `CP_KONTO_TOPUP_USDC` | Betrag je Nachbuchen in atomaren USDC, Vorgabe 2000000 |
+| `CP_KONTO_AUTH_PROXY_ID` | öffentliche ID der Auth-Proxy-Konfiguration bei Turnkey, die die Seite an das Skript gibt; ohne sie meldet der Knopf den Anbieter als nicht erreichbar |
+
+Der Lauf auf Base Sepolia steht in `docs/konto/sepolia.md` (`node --import tsx ops/konto/sepolia-run.mjs`, auf dem code-host am Port
+47391, der als `http://localhost:47391` Allowed Origin des Auth Proxy ist); `node ops/konto/turnkey-check.mjs` liest danach die
+Sub-Organisation des Kontos.
 
 Kein Deploy setzt eine dieser Variablen (`deploy/**`, `.github/**`), damit die Produktion nie Credits aus Test-USDC bucht.
 
