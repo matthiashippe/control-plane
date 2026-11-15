@@ -1,0 +1,8 @@
+Schwere: 2
+Goal: messung 04
+Befund: Die Sperre „fehlende oder leere eigene Liste stoppt die Zählung“ steht nach messung 04 dreimal außerhalb von `ops/own-ips.sh` (`ops/conway-arrivals.sh` aus messung 03, `ops/timeout-quote.sh` und `ops/anzeigen-rechnung.py` aus messung 04), mit gleichen Meldungen, aber schon abweichender Logik: `conway_own_list` übergeht den Exit-Code von `own_ips`, `own_list` in `ops/timeout-quote.sh` bricht daran ab.
+Beleg: `git grep -n "has no list of our own addresses\|has an empty list of our own" origin/dev -- ops` -> ops/anzeigen-rechnung.py:58 und :60, ops/conway-arrivals.sh:28 und :35, ops/timeout-quote.sh:64 und :69 | ops/conway-arrivals.sh:39 gegen ops/timeout-quote.sh:73
+Empfehlung: Die Prüfung in `ops/own-ips.sh` als eine Funktion (etwa `own_ips_checked <file>`, Exit 2 mit einer stderr-Zeile ohne Adresse bei fehlender oder leerer Liste) anlegen, die alle drei Werkzeuge rufen; die bestehenden Tests der drei Werkzeuge bleiben unverändert und belegen, dass die Meldungen und Exit-Codes gleich bleiben.
+MVP: Funktion, weil jede Kopie, die beim nächsten Umbau auseinanderläuft, eigene Anfragen wieder als fremde zählen kann, und das trifft Quote, Ertrag der Seite und Konversion der Anzeigen.
+
+Linse Q, Frage 2 (Logik-Duplikate), Merge 6ceb63d. Das Leere-Liste-Kriterium ist zweimal als `awk '!/^#/ && NF { n++ } END { exit !n }'` (ops/anzeigen-rechnung.py:36, ops/timeout-quote.sh:68) und einmal als `grep -v '^#' | awk 'NF {print $1}' | grep -q .` (ops/conway-arrivals.sh:34) geschrieben. Verwandt mit messung-kritik-2026-11-14-7 (Wächter für Leser von `CP_OWN_IPS_FILE`), das diese Prüfungen als Ausnahmen führt, statt sie zusammenzulegen.
