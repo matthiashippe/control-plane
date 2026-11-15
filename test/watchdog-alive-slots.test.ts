@@ -80,7 +80,7 @@ function watchdogScript(root: string): string {
 
 type Post = { at: string; title: string; line: string };
 
-function sandbox(opts: { alive?: string } = {}) {
+function sandbox(opts: { alive?: string; env?: Record<string, string> } = {}) {
   const root = mkdtempSync(join(tmpdir(), "watchdog-slots-"));
   const bin = join(root, "bin");
   mkdirSync(bin);
@@ -117,6 +117,7 @@ function sandbox(opts: { alive?: string } = {}) {
         CP_URL: "https://watchdog.invalid",
         CP_ALERT_WEBHOOK: WEBHOOK,
         CP_WATCHDOG_STATE: state,
+        ...opts.env,
       },
     });
     return { status: r.status, out: `${r.stdout}${r.stderr}` };
@@ -258,6 +259,16 @@ describe("ops/watchdog.sh posts a sign of life in three windows per UTC day", ()
     expect(again.status, again.out).toBe(0);
     expect(s.alivePosts().length, again.out).toBe(1);
   }, 180_000);
+
+  it("the switch for tests that count every POST keeps all three windows quiet", async () => {
+    const s = sandbox({ env: { CP_WATCHDOG_ALIVE: "0" } });
+    for (const moment of halfHours(`${DAY}T00:00:00Z`, `${DAY}T23:30:00Z`)) {
+      const r = await s.run(moment);
+      expect(r.status, `${moment}\n${r.out}`).toBe(0);
+      expect(r.out, moment).not.toContain("webhook delivered");
+    }
+    expect(s.postList()).toEqual([]);
+  }, 300_000);
 
   it("ops/status.sh at 18:00 UTC after a quiet day is never unknown", async () => {
     const s = sandbox();

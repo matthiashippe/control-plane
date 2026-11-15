@@ -38,7 +38,7 @@ const run = (args: string[], env: Record<string, string> = {}) =>
 describe("ops/github-yield.sh", () => {
   it("passes its own selftest without network", () => {
     const r = run(["--selftest"]);
-    expect(r.stdout.trim().split("\n").at(-1)).toMatch(/^SELFTEST OK/);
+    expect(r.stdout.trim().split("\n").at(-1)).toBe("SELFTEST OK");
     expect(r.status).toBe(0);
   }, 120_000);
 

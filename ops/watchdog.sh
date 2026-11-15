@@ -23,27 +23,37 @@ CERT_WARN_DAYS="${CP_CERT_WARN_DAYS:-20}"
 CREDIT_TIMEOUT="${CP_CREDIT_TIMEOUT:-45}"
 TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
-# Exits non-zero when the POST failed: no answer or an HTTP error of the webhook (`--fail`). The caller then keeps the
-# old state, so the next run sends the message again. Every delivered POST leaves `[INFO] webhook delivered`, so
-# ops/status.sh can tell a failure that is over from one that still lasts (ops/webhook-last.sh).
+# The one POST to the webhook, for every message of this script. Exits non-zero when the POST failed: no answer or an
+# HTTP error of the webhook (`--fail`). The caller then keeps the old state, so the next run sends the message again.
+# Every delivered POST of the watchdog leaves `[INFO] webhook delivered`, so ops/status.sh can tell a failure that is over
+# from one that still lasts (ops/webhook-last.sh).
+# `report <severity> <text>` sends a message of the watchdog. `report "" <text> <title header> <priority header>
+# <delivered line>` sends the text as it is with its own headers and its own log line after delivery (the kept deploy
+# alarm), without the line `[<severity>] <text>`.
 report() {
-  local severity="$1" text="$2" priority
-  echo "$TS [$severity] $text"
+  local severity="$1" text="$2" title="${3:-}" priority="${4:-}" delivered="${5:-webhook delivered}" data
+  if [[ -n "$title" ]]; then
+    data="$text"
+  else
+    echo "$TS [$severity] $text"
+    title="Title: control-plane $severity"
+    case "$severity" in
+      OK) priority="Priority: default" ;;
+      ALIVE) priority="Priority: min" ;;
+      *) priority="Priority: high" ;;
+    esac
+    data="control-plane $severity: $text ($URL, $TS)"
+  fi
   [[ -n "$WEBHOOK" ]] || return 0
-  case "$severity" in
-    OK) priority=default ;;
-    ALIVE) priority=min ;;
-    *) priority=high ;;
-  esac
   if ! curl -s --fail -m 15 -X POST "$WEBHOOK" \
     -H "Content-Type: text/plain" \
-    -H "Title: control-plane $severity" \
-    -H "Priority: $priority" \
-    --data "control-plane $severity: $text ($URL, $TS)" >/dev/null; then
+    -H "$title" \
+    -H "$priority" \
+    --data "$data" >/dev/null; then
     echo "$TS [WARN] webhook unreachable"
     return 1
   fi
-  echo "$TS [INFO] webhook delivered"
+  echo "$TS [INFO] $delivered"
 }
 
 # A dead webhook does not announce itself: on a day without a change of state nothing is posted, so nothing can fail.
@@ -80,17 +90,10 @@ send_kept_deploy_alarm() {
   text=$(printf '%s\n' "$kept" | awk '$1 ~ /^[0-9]+$/ && $2 ~ /^[0-9][0-9]:[0-9][0-9]:[0-9][0-9]$/ {
     printf "%s%s request(s) from outside answered 502 after the rollout at %s UTC", (n++ ? "; " : ""), $1, $2 }')
   [[ -n "$text" ]] || text="a deploy alarm was kept, its lines are not readable"
-  if ! curl -s --fail -m 15 -X POST "$WEBHOOK" \
-    -H "Content-Type: text/plain" \
-    -H "Title: deploy-window 502" \
-    -H "Priority: high" \
-    --data "deploy window, sent late by the watchdog: $text" >/dev/null; then
-    echo "$TS [WARN] webhook unreachable"
-    return 0
-  fi
-  # Its own line, not `[INFO] webhook delivered`: ops/webhook-last.sh reads that line as a delivery of the watchdog, and
-  # ops/status.sh then wants a message titled `control-plane ...` on the topic, which this title is not.
-  echo "$TS [INFO] deploy alarm delivered"
+  # Its own line after delivery, not `[INFO] webhook delivered`: ops/webhook-last.sh reads that line as a delivery of the
+  # watchdog, and ops/status.sh then wants a message titled `control-plane ...` on the topic, which this title is not.
+  report "" "deploy window, sent late by the watchdog: $text" "Title: deploy-window 502" "Priority: high" \
+    "deploy alarm delivered" || return 0
   rest=$(cat "$file" 2>/dev/null)
   if [[ "$rest" == "$kept" ]]; then
     rm -f "$file"
