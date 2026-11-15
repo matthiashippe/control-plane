@@ -21,7 +21,8 @@
 # come from own_ips in ops/own-ips.sh, the same answer every traffic tool gets; without a list that
 # names at least one address it stops with exit 2 before it prints a number, because a missing list
 # must never read as an empty one. own_ips may name the live address on stderr, so its stderr is
-# dropped.
+# dropped. A line on POST /v1/auth/keyless whose ts or status it cannot read also ends it with exit 2
+# and only their number on stderr, because a table without them would read as complete.
 set -uo pipefail
 SELF="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
 cd "$(dirname "$0")/.."
@@ -53,6 +54,7 @@ until = os.environ.get("KM_UNTIL") or None
 order = {"crawler": 0, "node": 1, "other": 2}
 counts = {}
 left_out = 0
+unreadable = 0
 for line in sys.stdin:
     line = line.strip()
     if not line.startswith("{"):
@@ -68,8 +70,10 @@ for line in sys.stdin:
         continue
     try:
         day = datetime.datetime.fromtimestamp(float(d["ts"]), datetime.timezone.utc).strftime("%Y-%m-%d")
-        status = int(d.get("status", 0))
+        status = int(d["status"])
     except Exception:
+        # Its day is unknown, so it counts whatever --since and --until ask for.
+        unreadable += 1
         continue
     if (since and day < since) or (until and day > until):
         continue
@@ -82,6 +86,10 @@ for line in sys.stdin:
     k = kind(ua)
     key = (day, order[k], k, status)
     counts[key] = counts.get(key, 0) + 1
+if unreadable:
+    # Only the number, never the line: no address, no user agent, no ts.
+    print(unreadable)
+    sys.exit(3)
 print("| day | caller | status | requests |")
 print("|---|---|---|---|")
 for (day, _, k, status), n in sorted(counts.items()):
@@ -108,7 +116,7 @@ selftest() {
 LOG
   run() {
     env -u CP_OWN_IPS -u CP_OWN_IPS_WRITE PATH="$t/bin:$PATH" HOME="$t" CP_OWN_IPS_FILE="$1" \
-      CP_OWN_IPS_SEEN="$t/seen.txt" bash "$SELF" --file "$t/caddy.jsonl" > "$t/out" 2> "$t/err"
+      CP_OWN_IPS_SEEN="$t/seen.txt" bash "$SELF" --file "${2:-$t/caddy.jsonl}" > "$t/out" 2> "$t/err"
   }
   check() {
     if eval "$2"; then echo "ok: $1"; else echo "FAIL: $1"; fail=1; fi
@@ -126,6 +134,20 @@ LOG
   check "no planted address on stdout or stderr" \
     '! grep -Eq "192\.0\.2\.5[01]|198\.51\.100\.10|203\.0\.113\.99" <<<"$out$err"'
   check "no planted user agent on stdout or stderr" '! grep -Fq "ExampleCrawler" <<<"$out$err"'
+
+  # The same readable 429 next to a keyless line whose ts is text (Caddy's iso8601 format), which the
+  # tool cannot place on a day. A table without that line would read as complete, so there is none.
+  cat > "$t/unreadable.jsonl" <<'LOG'
+{"ts":1794398400,"request":{"client_ip":"192.0.2.50","method":"POST","uri":"/v1/auth/keyless","headers":{"User-Agent":["node"]}},"status":429}
+{"ts":"2026-11-11T12:00:00Z","request":{"client_ip":"192.0.2.53","method":"POST","uri":"/v1/auth/keyless","headers":{"User-Agent":["node"]}},"status":429}
+LOG
+  run "$t/own.txt" "$t/unreadable.jsonl"; rc=$?
+  out=$(cat "$t/out"); err=$(cat "$t/err")
+  check "exit 2 when a keyless line cannot be read" '[[ $rc -eq 2 ]]'
+  check "and no count is printed then" '! grep -q "^|" <<<"$out"'
+  check "and stderr names how many lines" 'grep -Fq "1 lines on POST /v1/auth/keyless" <<<"$err"'
+  check "and no planted address or ts on stdout or stderr" \
+    '! grep -Eq "192\.0\.2\.5[0-3]|198\.51\.100\.10|203\.0\.113\.99|2026-11-11T" <<<"$out$err"'
 
   printf '# no own address\n' > "$t/empty.txt"
   run "$t/empty.txt"; rc=$?
@@ -184,7 +206,19 @@ else
   read_log() { ./ops/access-log.sh 2>/dev/null; }
 fi
 
-if ! table=$(read_log | KM_OWN="$own" KM_SINCE="$SINCE" KM_UNTIL="$UNTIL" python3 -c "$KIND_PY"$'\n'"$COUNT_PY"); then
+# Exit 3 of the count means lines it could not read; a log that could not be read at all wins over it.
+table=$(
+  read_log | KM_OWN="$own" KM_SINCE="$SINCE" KM_UNTIL="$UNTIL" python3 -c "$KIND_PY"$'\n'"$COUNT_PY"
+  ps=("${PIPESTATUS[@]}")
+  [[ ${ps[0]} -eq 0 ]] || exit 1
+  exit "${ps[1]}"
+)
+rc=$?
+if [[ $rc -eq 3 && "$table" =~ ^[0-9]+$ ]]; then
+  echo "keyless-mints: $table lines on POST /v1/auth/keyless could not be read (ts or status), so nothing is counted." >&2
+  exit 2
+fi
+if [[ $rc -ne 0 ]]; then
   echo "keyless-mints: the access log could not be read, which is not a finding about traffic." >&2
   exit 2
 fi

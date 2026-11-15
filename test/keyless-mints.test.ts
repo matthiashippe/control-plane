@@ -203,4 +203,107 @@ describe("ops/keyless-mints.sh counts keyless mints without naming anybody", () 
     expectNothingNamed(r);
     expect(sha256(join(root, "own.txt"))).toBe(ownHash);
   });
+
+  it("stops with exit 2 when a keyless line has a ts it cannot read", () => {
+    const { root, ownHash } = sandbox([
+      line(DAY_11, "192.0.2.50", "POST", "/v1/auth/keyless", 429, "node"),
+      JSON.stringify({
+        ts: TS_AS_TEXT,
+        request: { client_ip: "192.0.2.53", method: "POST", uri: "/v1/auth/keyless", headers: { "User-Agent": ["node"] } },
+        status: 429,
+      }),
+    ]);
+    const r = run(root, ["--file", join(root, "caddy.jsonl")]);
+    expectUnreadable(r, 1);
+    expect(sha256(join(root, "own.txt"))).toBe(ownHash);
+  });
+
+  it("stops with exit 2 when a keyless line has no status it can read", () => {
+    const { root, ownHash } = sandbox([
+      line(DAY_11, "192.0.2.50", "POST", "/v1/auth/keyless", 429, "node"),
+      JSON.stringify({
+        ts: DAY_11 + 1,
+        request: { client_ip: "192.0.2.54", method: "POST", uri: "/v1/auth/keyless", headers: { "User-Agent": ["node"] } },
+      }),
+      JSON.stringify({
+        ts: DAY_11 + 2,
+        request: { client_ip: "192.0.2.55", method: "POST", uri: "/v1/auth/keyless", headers: { "User-Agent": ["node"] } },
+        status: "n/a",
+      }),
+    ]);
+    const r = run(root, ["--file", join(root, "caddy.jsonl")]);
+    expectUnreadable(r, 2);
+    expect(sha256(join(root, "own.txt"))).toBe(ownHash);
+  });
+
+  it("counts unreadable lines whatever days are asked for", () => {
+    const { root, ownHash } = sandbox([
+      line(DAY_12, "192.0.2.51", "POST", "/v1/auth/keyless", 201, "node/22.11.0"),
+      JSON.stringify({
+        ts: TS_AS_TEXT,
+        request: { client_ip: "192.0.2.53", method: "POST", uri: "/v1/auth/keyless", headers: { "User-Agent": ["node"] } },
+        status: 429,
+      }),
+    ]);
+    const r = run(root, ["--file", join(root, "caddy.jsonl"), "--since", "2026-11-12", "--until", "2026-11-12"]);
+    expectUnreadable(r, 1);
+    expect(sha256(join(root, "own.txt"))).toBe(ownHash);
+  });
+
+  it("unreadable lines elsewhere change nothing", () => {
+    const { root, ownHash } = sandbox([
+      line(DAY_11, "198.51.100.10", "POST", "/v1/auth/keyless", 201, CRAWLER_UA),
+      line(DAY_11 + 1, "198.51.100.11", "POST", "/v1/auth/keyless", 201, CRAWLER_UA),
+      line(DAY_11 + 2, "198.51.100.12", "POST", "/v1/auth/keyless", 201, CRAWLER_UA),
+      line(DAY_11 + 3, "198.51.100.10", "POST", "/v1/auth/keyless", 429, CRAWLER_UA),
+      line(DAY_11 + 4, "198.51.100.11", "POST", "/v1/auth/keyless", 429, CRAWLER_UA),
+      line(DAY_11 + 5, "192.0.2.50", "POST", "/v1/auth/keyless", 429, "node"),
+      line(DAY_12, "192.0.2.51", "POST", "/v1/auth/keyless", 201, "node/22.11.0"),
+      line(DAY_12 + 1, "192.0.2.52", "POST", "/v1/auth/keyless", 201, "python-requests/2.31"),
+      JSON.stringify({
+        ts: TS_AS_TEXT,
+        request: { client_ip: "192.0.2.53", method: "GET", uri: "/v1/auth/keyless", headers: { "User-Agent": ["node"] } },
+        status: 405,
+      }),
+      JSON.stringify({
+        ts: TS_AS_TEXT,
+        request: { client_ip: "192.0.2.54", method: "POST", uri: "/v1/auth/nonce", headers: { "User-Agent": ["node"] } },
+        status: 200,
+      }),
+      JSON.stringify({
+        ts: DAY_12 + 2,
+        request: { client_ip: "192.0.2.55", method: "POST", uri: "/v1/auth/keyless-other", headers: { "User-Agent": ["node"] } },
+      }),
+      "not json",
+      '{"ts":',
+    ]);
+    const r = run(root, ["--file", join(root, "caddy.jsonl")]);
+    expect(r.status, r.stderr).toBe(0);
+    expect(rows(r.stdout)).toEqual([
+      "| 2026-11-11 | crawler | 201 | 3 |",
+      "| 2026-11-11 | crawler | 429 | 2 |",
+      "| 2026-11-11 | node | 429 | 1 |",
+      "| 2026-11-12 | node | 201 | 1 |",
+      "| 2026-11-12 | other | 201 | 1 |",
+    ]);
+    expect(r.stderr).toBe("");
+    expectNothingNamed(r);
+    expect(r.stdout).not.toContain(TS_AS_TEXT);
+    expect(sha256(join(root, "own.txt"))).toBe(ownHash);
+  });
 });
+
+/** A ts in the form Caddy writes with `time_format iso8601`, which the tool cannot read as seconds. */
+const TS_AS_TEXT = "2026-11-11T12:00:00Z";
+
+/** Exit 2, nothing on stdout, and on stderr only the one line with the number of unreadable keyless lines. */
+function expectUnreadable(r: { status: number | null; stdout: string; stderr: string }, n: number) {
+  expect(r.status, `${r.stdout}${r.stderr}`).toBe(2);
+  expect(r.stdout.split("\n").some((l) => l.startsWith("|"))).toBe(false);
+  expect(r.stdout).toBe("");
+  expect(r.stderr).toBe(
+    `keyless-mints: ${n} lines on POST /v1/auth/keyless could not be read (ts or status), so nothing is counted.\n`,
+  );
+  expectNothingNamed(r);
+  expect(`${r.stdout}${r.stderr}`).not.toContain(TS_AS_TEXT);
+}
