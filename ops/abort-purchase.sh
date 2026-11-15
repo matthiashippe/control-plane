@@ -236,11 +236,13 @@ selftest() {
   dir="$(mktemp -d)"
   trap 'rm -rf "$dir"' RETURN
 
+  # A here-string, not `printf | grep -q`: under pipefail an early exit of grep -q kills printf with
+  # SIGPIPE and the pipeline returns 141, which flipped a present line to FAIL (audit 2026-11-15).
   expect() { # $1 name, $2 output, $3 wanted line
-    if printf '%s\n' "$2" | grep -qxF -- "$3"; then echo "ok   purchase $1"; else echo "FAIL purchase $1 (wanted: $3)"; all_ok=0; fi
+    if grep -qxF -- "$3" <<<"$2"; then echo "ok   purchase $1"; else echo "FAIL purchase $1 (wanted: $3)"; all_ok=0; fi
   }
   absent() { # $1 name, $2 output, $3 pattern that must not appear at the start of a line
-    if printf '%s\n' "$2" | grep -qF -- "$3"; then echo "FAIL purchase $1 (found: $3)"; all_ok=0; else echo "ok   purchase $1"; fi
+    if grep -qF -- "$3" <<<"$2"; then echo "FAIL purchase $1 (found: $3)"; all_ok=0; else echo "ok   purchase $1"; fi
   }
   # Runs the counting into $out. A counting that dies (a signal from outside, a crash) names itself in a
   # FAIL line with its exit code, so a killed process is not mistaken for a wrong number further down.
