@@ -307,3 +307,57 @@ function expectUnreadable(r: { status: number | null; stdout: string; stderr: st
   expectNothingNamed(r);
   expect(`${r.stdout}${r.stderr}`).not.toContain(TS_AS_TEXT);
 }
+
+/** The line the tool prints when the access log could not be read, and nothing else on stderr. */
+const LOG_UNREADABLE = "keyless-mints: the access log could not be read, which is not a finding about traffic.\n";
+
+/** Replaces the fake ssh: the log fetch prints the given lines gzipped, as the real call does, and then fails with 255. */
+function sshPrintsThenFails(root: string, logLines: string[]) {
+  writeFileSync(join(root, "fetched.jsonl"), `${logLines.join("\n")}\n`);
+  writeFileSync(
+    join(root, "bin", "ssh"),
+    [
+      "#!/bin/sh",
+      `echo "$*" >> ${JSON.stringify(join(root, "ssh-calls"))}`,
+      'for last in "$@"; do :; done',
+      'case "$last" in',
+      "  *SSH_CLIENT*) exit 255 ;;",
+      `  *) gzip -c < ${JSON.stringify(join(root, "fetched.jsonl"))}; exit 255 ;;`,
+      "esac",
+      "",
+    ].join("\n"),
+  );
+  chmodSync(join(root, "bin", "ssh"), 0o755);
+}
+
+describe("ops/keyless-mints.sh without --file reads the log over ssh", () => {
+  it("stops with exit 2 when the access log cannot be read", () => {
+    const { root, ownHash } = sandbox([]);
+    const r = run(root, []);
+    expect(r.status, `${r.stdout}${r.stderr}`).toBe(2);
+    expect(r.stdout).toBe("");
+    expect(r.stderr).toBe(LOG_UNREADABLE);
+    expect(readFileSync(join(root, "ssh-calls"), "utf8")).toContain("deploy-caddy-1");
+    expectNothingNamed(r);
+    expect(sha256(join(root, "own.txt"))).toBe(ownHash);
+  });
+
+  it("the access log wins over unreadable keyless lines", () => {
+    const { root, ownHash } = sandbox([]);
+    sshPrintsThenFails(root, [
+      JSON.stringify({
+        ts: TS_AS_TEXT,
+        request: { client_ip: "192.0.2.53", method: "POST", uri: "/v1/auth/keyless", headers: { "User-Agent": ["node"] } },
+        status: 429,
+      }),
+    ]);
+    const r = run(root, []);
+    expect(r.status, `${r.stdout}${r.stderr}`).toBe(2);
+    expect(r.stdout).toBe("");
+    expect(r.stderr).toBe(LOG_UNREADABLE);
+    expect(readFileSync(join(root, "ssh-calls"), "utf8")).toContain("deploy-caddy-1");
+    expectNothingNamed(r);
+    expect(`${r.stdout}${r.stderr}`).not.toContain(TS_AS_TEXT);
+    expect(sha256(join(root, "own.txt"))).toBe(ownHash);
+  });
+});
