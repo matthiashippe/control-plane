@@ -385,3 +385,4 @@
   Punkt 1, `diff` leer). Folge: Eine Liste ohne Adresse endet jetzt mit Exit 2 statt mit einer Zählung ohne eigene Adressen. Lauf
   gegen die Produktion danach, 2026-11-15 17:17 UTC: `bash ops/ports-demand.sh --since '2026-11-12 18:12:46'` gibt
   `PORTS DEMAND: 0 foreign addresses, 0 calls, since 2026-11-12 18:12:46 UTC`, also dieselbe Zahl wie unter `## Vorher`.
+- Abgelöst: sandbox 02 Punkt 5 durch sandbox 07 Punkt 5, Ausgabe dann genau `000` (Tech Lead, 2026-11-15)

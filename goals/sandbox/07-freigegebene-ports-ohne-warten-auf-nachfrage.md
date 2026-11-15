@@ -158,6 +158,13 @@ Die eigene Domain hält eine Phishing-Seite eines Kunden aus der Zone, über die
       Prüfung: `git diff --name-only origin/dev...HEAD | grep -cE "\.(key|pem|crt|env)$|origin\.(pem|key)"` muss 0 ausgeben, und `git diff origin/dev...HEAD | grep -cE "BEGIN (CERTIFICATE|PRIVATE KEY)"` muss 0 ausgeben.
 - [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
+- [ ] Was ein Automaton und sein Betreiber über Ports lesen, stimmt nach dem Merge: Die Fehlerreferenz `docs/errors.md`, auf die
+      jede Fehlerantwort verlinkt, die öffentlichen Seiten unter `src/public/` und `docs/sandbox/e2e.md` nennen weder
+      `port_exposure_unavailable` noch geschlossene Ports, und der Abschnitt `## sandboxes` der Fehlerreferenz nennt die Antwort mit
+      `public_url` und den Fehler `invalid_request` für einen ungültigen Port.
+      Prüfung: `git grep -ciE "port_exposure_unavailable|ports stay|409 für Ports" -- docs/errors.md src/public docs/sandbox/e2e.md | wc -l` muss 0 ausgeben.
+      Prüfung: `awk '/^## sandboxes/{f=1;next} /^## /{f=0} f' docs/errors.md | grep -c "public_url"` muss mindestens 1 ausgeben.
+      Prüfung: `awk '/^## sandboxes/{f=1;next} /^## /{f=0} f' docs/errors.md | grep -c "invalid_request"` muss mindestens 1 ausgeben.
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
