@@ -94,3 +94,23 @@
   Last 4,4 je Kern grün (151 Dateien, 1769 Tests, 255 s). Code und Goal-Datei bleiben unverändert, weil das Goal DONE ist und der
   Prüfbefehl Vertrag; nach jedem Merge bleibt die Zeile im Audit rot, bis der Tech Lead sie ablöst oder das Audit Zeilen mit
   `--state open` am gemergten PR misst.
+
+## Reparatur dev (15.11.2026, Engineer CP)
+
+- Audit 2026-11-15 Zeile 549 (konto 02 Punkt 10, (Netz) `e2e`) ist dieselbe Ursache wie Zeile 407 vom 14.11.: Der Prüfbefehl sucht
+  den PR mit `--state open`, PR #97 ist seit dem Merge `6856c07` geschlossen, `gh pr checks` bekommt eine leere Nummer. Der belegte
+  Stand hält: mit `--state all` gibt derselbe Befehl `1` aus (PR #97, `e2e pass` am gemergten Kopf `c6ca529`), mit einem Head ohne
+  PR (`goal/konto-99`) eine leere Nummer. Goal-Datei bleibt unverändert, weil das Goal DONE ist und der Prüfbefehl Vertrag; die Zeile
+  bleibt in jedem Audit rot, bis der Tech Lead sie ablöst oder das Audit Zeilen mit `--state open` am gemergten PR misst. konto 03
+  (PLANNED) trägt dasselbe Muster in zwei Prüfzeilen und wird nach seinem Merge ebenso rot.
+- `PATH=/usr/bin:$PATH node scripts/check.mjs` auf frischem `dev` `4195e44` war dabei rot, aber an anderer Stelle:
+  `test/abort-purchase.test.ts` (Selbsttest von `ops/abort-purchase.sh`, abrechnung 04). Ursache: Das Skript läuft mit
+  `set -o pipefail`, und `expect()` und `absent()` verglichen mit `printf '%s\n' "$2" | grep -q`. bash schreibt die Ausgabe
+  zeilenweise; schließt `grep -q` nach dem Treffer, bevor `printf` fertig ist, endet `printf` mit SIGPIPE und die Pipe mit 141. Dann
+  meldet `expect()` FAIL für eine vorhandene Zeile und `absent()` ok für eine verbotene. Gemessen unter Last 2 bis 2,5 je Kern:
+  Stand von `dev` 2 von 90 parallelen Selbsttests FAIL (davor 1 von 24, jeweils an einer vorhandenen Zeile), neuer Stand mit
+  Here-String 0 von 90. Gegenprobe: eine gepflanzte falsche Erwartung gibt FAIL, ein gepflanztes verbotenes Muster gibt FAIL.
+  Neuer Test in `test/abort-purchase.test.ts` sperrt die Pipe in `grep -q` für dieses Skript, rot auf dem alten Skript. Danach
+  `check` grün (164 Dateien, 1859 Tests, 52 s). Dasselbe Muster unter `pipefail` steht noch in `ops/cron-points-somewhere.sh`,
+  `ops/jobs.sh`, `ops/own-briefs.sh`, `ops/conway-zustand.sh`, `ops/sperren.sh`, `ops/visibility.sh` und `ops/stranger-client.sh`;
+  es kippt nur, wenn nach der Trefferzeile noch Zeilen folgen, und bleibt hier unverändert, weil es `check` heute nicht rot macht.
