@@ -30,7 +30,7 @@ and the body says only that the call was not charged.
 | 429 | `too_many_automatons` | `/v1/automatons/register` | this wallet hit the registration cap |
 | 500 | `internal_error` | any | our fault, nothing charged |
 | 402 | `INSUFFICIENT_CREDITS` | `POST /v1/sandboxes` and a call that starts a stopped sandbox | the credit cannot hold the reservation of 1000 mc, see below |
-| 409 | `port_exposure_unavailable` | `/v1/sandboxes/{id}/ports/...` | sandbox ports are not exposed yet, see below |
+| 400 | `invalid_request` | `/v1/sandboxes/{id}/ports/...` | the port is not a whole number from 1 to 65535, see below |
 | 409 | `sandbox_slots_full`, `sandbox_host_full` | `POST /v1/sandboxes` | two slots per account, or the sandbox server is full |
 | 501 | `sandbox_server_unreachable` | `/v1/sandboxes` | the sandbox server cannot be reached, nothing ran and nothing was charged |
 | 501 | `not_implemented` | credit transfers, domain search and registration | deliberately not offered, see below |
@@ -77,7 +77,8 @@ messages again, so an answer lost on the way loses no message.
 
 Sandboxes run on a server of their own, never on the server that holds payments. Every path of
 the sandbox API the automaton runtime calls is answered: create (`POST /v1/sandboxes`), list,
-`exec`, `files/upload/json` and `files/read`; `DELETE /v1/sandboxes/{id}` deletes one.
+`exec`, `files/upload/json`, `files/read`, `ports/expose` and `ports/{port}`; `DELETE /v1/sandboxes/{id}`
+deletes one.
 
 Tiers: small (`memory_mb` 512, `vcpu` 1, `disk_gb` 5) and medium (`memory_mb` 1024, `vcpu` 1,
 `disk_gb` 10). A larger request gets `400 sandbox_too_large` with both tiers. An account runs at
@@ -100,9 +101,13 @@ command is still running and names three files in the sandbox: `output_file` (st
 Read them later with `files/read` or `exec`; a repeat with the same `Idempotency-Key` gets the same
 answer, and the result once the command has ended. A command never runs twice.
 
-`409 port_exposure_unavailable`: exposing a port is not offered yet, because public URLs for sandbox
-ports need a domain of their own, apart from the one this service bills under. The sandbox keeps
-running and nothing is charged for the call.
+Ports: `POST /v1/sandboxes/{id}/ports/expose` with `{"port": 8080}` answers `200` with `port` and
+`public_url`, an HTTPS address `https://sbx-<id>-<port>.sandboxhost.de` that reaches the service
+listening on `0.0.0.0:<port>` inside the sandbox. Give that address to your own customers.
+`DELETE /v1/sandboxes/{id}/ports/{port}` closes the port again; the address then no longer reaches
+the sandbox. An exposed port costs nothing extra, the sandbox is billed by run time as before. A port
+that is not a whole number from 1 to 65535 gets `400 invalid_request`, a sandbox of another account
+`404 sandbox_not_found`.
 
 `501 sandbox_server_unreachable`: the sandbox server did not answer, so nothing ran and nothing was
 charged. On create the runtime handles this by starting a local worker instead, as before.

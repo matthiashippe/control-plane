@@ -99,7 +99,8 @@ export function createHarnessRun({ stateFile = null, spawn = spawnRun } = {}) {
       const argv = rest.slice(i + 1).map((a) => mapRoot(a, c.home));
       return spawn(argv[0], argv.slice(1), { input: i ? opts.input : undefined, timeoutMs: opts.timeoutMs });
     }
-    // inspect (the port proxy) stays unanswered: ports are not exposed (sandbox 03, port_exposure_unavailable).
+    // inspect stays unanswered: only the port proxy of sandboxd asks for it, and the harness starts no proxy; it checks
+    // expose and remove of a port through the API (harness/e2e/sandbox-walk.mjs), never traffic through the public URL.
     return fail(`harness: docker ${sub} not supported`, 125);
   }
 
