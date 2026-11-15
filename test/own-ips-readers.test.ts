@@ -17,9 +17,11 @@ const COMMENT = /^\s*(#|\/\/|\/\*|\*(\s|$))/;
 
 const readsListPastOwnIps = (line: string): boolean => !COMMENT.test(line) && NAMES_LIST.test(line);
 
-// A line that hands the list file itself to a reader: CP_OWN_IPS_FILE together with awk, grep or cat as a word, or open(.
+// A line that hands the list file itself to a reader: CP_OWN_IPS_FILE together with awk, grep, cat, sed, cut, head, tail or
+// "while read" as a word, open(, readFileSync( or read_text(, or the file as the target of an input redirect.
 const NAMES_LIST_VAR = /CP_OWN_IPS_FILE/;
-const READS_FILE = /\b(awk|grep|cat)\b|\bopen\(/;
+const READS_FILE =
+  /\b(awk|grep|cat|sed|cut|head|tail)\b|\bwhile\s+read\b|\b(open|readFileSync|read_text)\(|<\s*"?\$\{?CP_OWN_IPS_FILE\b/;
 const readsListFileDirectly = (line: string): boolean =>
   !COMMENT.test(line) && NAMES_LIST_VAR.test(line) && READS_FILE.test(line);
 
@@ -109,6 +111,30 @@ describe("own-ips.txt is read only through own_ips", () => {
       'CP_OWN_IPS_FILE="$dir/own.txt" bash "$HERE/x.sh"',
       `# awk '!/^#/' "$CP_OWN_IPS_FILE"`,
       'concatenate "$CP_OWN_IPS_FILE"',
+    ])
+      expect(readsListFileDirectly(pass), pass).toBe(false);
+  });
+
+  it("the reader matcher also trips on a redirect, sed, cut, head, tail, readFileSync and read_text with CP_OWN_IPS_FILE", () => {
+    for (const hit of [
+      'done < "$CP_OWN_IPS_FILE"',
+      'while read -r ip _; do :; done <"${CP_OWN_IPS_FILE}"',
+      `sed -n '/^[^#]/p' "$CP_OWN_IPS_FILE"`,
+      `cut -d' ' -f1 "$CP_OWN_IPS_FILE"`,
+      'head -n1 "$CP_OWN_IPS_FILE"',
+      'tail -n +2 "$CP_OWN_IPS_FILE"',
+      'readFileSync(process.env.CP_OWN_IPS_FILE, "utf8")',
+      'Path(os.environ["CP_OWN_IPS_FILE"]).read_text()',
+    ])
+      expect(readsListFileDirectly(hit), hit).toBe(true);
+    for (const pass of [
+      '[[ ! -f "$CP_OWN_IPS_FILE" ]]',
+      'OWN="$CP_OWN_IPS_FILE"',
+      'CP_OWN_IPS_FILE="$dir/own.txt" bash "$HERE/x.sh"',
+      `# awk '!/^#/' "$CP_OWN_IPS_FILE"`,
+      'concatenate "$CP_OWN_IPS_FILE"',
+      'echo "using $CP_OWN_IPS_FILE" >&2',
+      'headline="$CP_OWN_IPS_FILE"',
     ])
       expect(readsListFileDirectly(pass), pass).toBe(false);
   });
