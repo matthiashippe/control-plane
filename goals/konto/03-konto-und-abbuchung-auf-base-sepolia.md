@@ -210,6 +210,13 @@ Erlaubnis aufsetzen und ohne beides kein Mensch ohne Wallet einen Automaton bei 
       Prüfung: `git diff origin/dev...HEAD | grep -E '^[+]' | grep -iE "(api[_-]?key|secret|token|private[_-]?key)[\"' ]*[:=] *[\"']?[A-Za-z0-9_+/=-]{16,}|BEGIN [A-Z ]*PRIVATE KEY" | wc -l` muss `0` ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung (Netz): `n=$(gh pr list -R matthiashippe/control-plane --head goal/konto-03 --state open --json number -q '.[0].number'); gh pr checks "$n" -R matthiashippe/control-plane | awk -F'\t' '$1=="check" && $2=="pass"' | wc -l` muss mindestens `1` ausgeben.
+- [ ] Ein gesendetes `spend()` geht nie verloren: Sein Hash steht in der Datenbank, bevor auf die Quittung gewartet wird, und
+      scheitert das Warten (Fehler, Zeitüberschreitung, Neustart), prüft der nächste Lauf für dieses Konto zuerst diesen Hash, bucht
+      ihn nach Quittung `success` genau einmal und sendet kein neues `spend()`, solange er offen ist.
+      MVP: Funktion, weil heute ein `spend()`, dessen Quittung nicht ankommt, das Geld des Kunden bewegt und keine Credits bucht, und
+      der nächste Lauf dann noch einmal abbucht; in konto 05 wäre das echtes Geld (Kritik Tech Lead 2026-11-15).
+      Prüfung: `pnpm -s vitest run test/konto-topup-pending.test.ts test/konto-topup.test.ts` muss Exit-Code 0 haben.
+      Prüfung: `grep -cE "^\s*(it|test)\(" test/konto-topup-pending.test.ts` muss mindestens 5 ausgeben (je ein Fall: `receipt()` wirft nach einem gesendeten `spend()`, es gibt keine Zeile `topup` und der Hash steht offen in der Datenbank; der nächste Aufruf für dieses Konto mit Quittung `success` bucht genau eine Zeile `topup` mit diesem Hash als `ref` und ruft `spend()` insgesamt nur einmal; wirft auch das zweite Warten, bleibt der Hash offen, es gibt keine Zeile und kein zweites `spend()`; ein offener Hash mit Quittung `reverted` bucht nichts, gibt das Konto frei, und erst der Aufruf danach sendet ein neues `spend()`; derselbe offene Hash wird nach einem Neustart, also mit frisch geladenem Modul und derselben Datenbank, genau einmal gebucht).
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
