@@ -75,7 +75,7 @@ if [[ "$rest" == "0" ]]; then
 elif [[ "$rest" == "?" ]]; then
   grey "Antworten: das Gatter war nicht lesbar"
 else
-  bad "$rest Antwort(en) liegen noch" "ops/post-the-answers.py --send 3"
+  bad "$rest Antwort(en) liegen noch" "ops/post-the-answers.py (dry run), then --send with --approved from it"
 fi
 
 # 4. Gas. Und die Antwort darauf ist seit dem 29.09. nein, aus einem messbaren Grund.

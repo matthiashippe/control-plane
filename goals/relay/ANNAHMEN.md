@@ -39,3 +39,32 @@
   Absenders der letzten 24 Stunden. Die Prüfung steht nach der Wiederholung derselben Signatur und der Grenze je Stunde und vor dem
   Preis, also bucht ein 413 nie. Der Kontakt steht seit diesem Punkt in `relay_contacts` statt in `relay_messages`, damit er die
   Löschung nach 30 Tagen übersteht; die Tabelle ist neu wie das ganze Relay, auf dem Server gibt es noch keine Zeile nachzutragen.
+
+## Goal 02 (14.11.2026, Engineer CP)
+
+- **Bestand:** Zeilen, die relay 01 schon in `relay_messages` und `relay_polls` gespeichert hat, schreibt dieses Goal nicht um. Steht
+  auf dem Server eine Signatur in anderer Form (groß geschrieben oder mit `v` als 0 oder 1), ist ihr Fenster von 300000 ms längst
+  abgelaufen; eine Wiederholung bekommt 401 `signature_expired` wie heute, weil der Lookup nur noch die einzige Form sucht.
+- **`s` gleich 0** gilt wie die obere Hälfte als keine Form und bekommt 401; `verifyMessage` nähme eine solche Signatur ohnehin nicht an.
+- **Reihenfolge im signierten Weg:** erst Form, dann Signaturprüfung, dann `recipient_is_sender`, dann Lookup der Wiederholung und
+  Fenster. Wer nicht nachweist, dass er `from` ist, bekommt 401 statt 400 und erfährt nichts über die Regel. Eine Nachricht an sich
+  selbst, die relay 01 schon angenommen hat, bekommt bei Wiederholung 400 statt ihrer `id`; 400 wiederholt der Client nicht, und die
+  Runtime schickt nie an sich selbst.
+- **Kontakt mit sich selbst:** Zeilen in `relay_contacts` mit `a` gleich `b` aus relay 01 bleiben stehen; sie wirken nicht mehr, weil
+  keine Nachricht an sich selbst mehr bis zum Preis kommt.
+
+## Reparatur dev, Audit 2026-11-14 Zeile 425 (14.11.2026, Engineer CP)
+
+- relay 01 Punkt 7 (`check`) scheiterte im Audit auf `033245c` am Idempotency-Test in `test/sandbox-api.test.ts`: Der feste
+  Abbruch `AbortSignal.timeout(200)` feuerte unter Host-Last vor dem `docker run`. Dieselbe Ursache wie Zeilen 371 und 406; seit
+  `2de5407` gibt es den festen Abbruch auf `dev` nicht mehr (`grep -c "AbortSignal.timeout(200)" test/sandbox-api.test.ts` gibt 0
+  aus). `PATH=/usr/bin:$PATH node scripts/check.mjs` auf `dev` `04e521c` ist bei Last 3,8 je Kern grün (151 Dateien, 1769 Tests,
+  68 s). Der Code bleibt unverändert, weil `dev` die Ursache schon behoben hat.
+
+## Reparatur dev, Audit 2026-11-14 Zeile 440 (14.11.2026, Engineer CP)
+
+- relay 02 Punkt 6 (`check`) scheiterte im Audit auf `033245c` an derselben Stelle wie Zeile 425: Der feste Abbruch
+  `AbortSignal.timeout(200)` im Idempotency-Test von `test/sandbox-api.test.ts` feuerte unter Host-Last vor dem `docker run`. Seit
+  `2de5407` fehlt er auf `dev` (`grep -c "AbortSignal.timeout(200)" test/sandbox-api.test.ts` gibt 0 aus).
+  `PATH=/usr/bin:$PATH node scripts/check.mjs` auf `dev` `eef3eb2` ist bei Load 72 auf 16 Kernen grün (151 Dateien, 1769 Tests,
+  130 s). Der Code bleibt unverändert, weil `dev` die Ursache schon behoben hat.

@@ -44,6 +44,12 @@ Ein `poll` mit derselben `X-Signature`, demselben `cursor` und demselben `limit`
 `next_cursor` noch einmal, mit Cursor wie ohne: Kam die erste Antwort nicht an, gingen sonst die schon als gelesen markierten
 Nachrichten verloren. Eine Nachricht, die dazwischen ankam, liefert erst der nächste neue `poll`.
 
+Form der Signatur: Jede Signatur in `signature` und `X-Signature` muss genau 65 Byte haben (`0x` und 130 Hex-Zeichen), `s` in der unteren Hälfte der Ordnung von secp256k1 und `v` als 27, 28, 0 oder 1, sonst 401 `invalid_signature`; das Relay prüft, sucht und speichert sie nur in ihrer einzigen Form, klein geschrieben mit `v` als 27 oder 28.
+
+Dieselbe Signatur in Großschreibung oder mit `v` als 0 oder 1 ist also dieselbe Nachricht (dieselbe `id`, keine zweite Abbuchung)
+und derselbe `poll` (dieselbe Antwort). Die gespiegelte Form mit `s` ersetzt durch `n - s` nimmt `verifyMessage` von viem zwar an,
+das Relay lehnt sie aber ab, weil `signMessage` und damit die Runtime am Pin nur die untere Form erzeugt (`src/relay/signature.ts`).
+
 ## Grenzen
 
 - `content` höchstens 64000 Zeichen (`maxContentLength`), die Nachricht als JSON höchstens 128000 Zeichen (`maxTotalSize`), beides
@@ -56,6 +62,9 @@ Nachrichten verloren. Eine Nachricht, die dazwischen ankam, liefert erst der nä
   der weder EVM-Adresse noch Kennung eines schlüssellosen Kontos ist (etwa Solana): 400 mit dem Grund, denn das Relay prüft
   nur EVM-Signaturen. `poll` mit `limit` über 100
   liefert 100.
+- Eine Nachricht an den eigenen Absender (`to` gleich `from`, bei API-Key gleich der Adresse oder Kennung `key:…` des Kontos, klein
+  geschrieben verglichen): 400 `recipient_is_sender`, ohne Nachricht und ohne Abbuchung, weil das Relay nur an eine andere Adresse
+  zustellt. 400 wiederholt der Client der Runtime nicht, und die Runtime schickt nie an sich selbst.
 - Ein Absender legt in 24 Stunden höchstens 4000000 Zeichen `content` ab (gezählt wird gespeicherter Inhalt, bei API-Key mit
   Kennzeichen). Darüber: 413 `relay_quota_exceeded`, ohne Nachricht und ohne Abbuchung. Eine Wiederholung einer schon angenommenen
   Signatur bekommt weiter ihre `id`.

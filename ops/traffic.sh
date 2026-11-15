@@ -289,7 +289,7 @@ export CP_OWN_IPS_RESOLVED="$OWN"
 echo "Requests to ${BASE_URL#https://} in the last $HOURS hours"
 if [[ -n "$added" ]]; then
   echo "(counted as ours beyond the configured list: $(printf '%s' "$added" | tr '\n' ' '))"
-  echo "(these sent our own checker UA; addresses of this machine live in ops/own-ips.txt)"
+  echo "(these sent our own checker UA; addresses of this machine live in own_ips (ops/own-ips.sh))"
 fi
 echo
 
@@ -828,7 +828,7 @@ for ip in scrolled:
     print(f"     {ip:<16} marks: {', '.join(reached)}")
 for reason, n in why.most_common():
     print(f"     {n:>4}  set aside: {reason}")
-print("   Ours are out: ops/own-ips.txt and the control-plane-check/1.0 user agent.")
+print("   Ours are out: own_ips (ops/own-ips.sh) and the control-plane-check/1.0 user agent.")
 KATALOG
 echo
 
@@ -931,7 +931,7 @@ elif int(reported) > posts[303]:
           "so a purchase of ours got past ops/ours.txt. Find it by IP, add its address as an `email` line.")
 else:
     print(f"   order_briefs_30d = {reported}, not more than the {posts[303]} foreign 303(s) here: consistent")
-print("   Ours are out: ops/own-ips.txt and the control-plane-check/1.0 user agent.")
+print("   Ours are out: own_ips (ops/own-ips.sh) and the control-plane-check/1.0 user agent.")
 ORDER
 echo
 

@@ -37,6 +37,7 @@ and the body says only that the call was not charged.
 | 503 | `payments_unavailable`, `inference_unavailable` | `/pay`, inference | this instance does not offer it |
 | 503 | `provider_unavailable` | `/v1/chat/completions` | the upstream model provider did not answer |
 | 400 | `invalid_body`, `evm_address_required` | `/v1/messages...` | the message does not hold up, or an address is not an EVM address, see below |
+| 400 | `recipient_is_sender` | `POST /v1/messages` | `to` is the sender's own address; the relay delivers only to another address, nothing sent, nothing charged |
 | 401 | `invalid_signature`, `signature_expired`, `signature_or_api_key_required` | `/v1/messages...` | the signature does not match, is out of its window, or there is neither a signature nor a key, see below |
 | 402 | `INSUFFICIENT_CREDITS` | `POST /v1/messages` | a first contact costs 1000 mc and the credit is lower, see below |
 | 413 | `message_too_large` | `POST /v1/messages` | more than 64000 characters of content or 128000 in all |
@@ -53,6 +54,11 @@ A message is signed by the address in `from` over `Conway:send:{to}:{keccak256(c
 and `signed_at` is at most 300000 ms old (`401 signature_expired` otherwise). Poll and count are signed
 over `Conway:poll:{address}:{timestamp}` in the headers `X-Wallet-Address`, `X-Signature` and
 `X-Timestamp`. The same signature twice is the same message: the same `id`, one message, one charge.
+A signature has one form: 65 bytes, `s` in the lower half of the curve order, `v` as 27, 28, 0 or 1;
+the relay checks and stores it lowercase with `v` as 27 or 28, so another spelling of an accepted
+signature is the same message, and the mirrored form with `s` in the upper half gets
+`401 invalid_signature`. A message whose `to` is the sender itself gets `400 recipient_is_sender`,
+with nothing sent and nothing charged.
 
 Without a wallet, send, poll and count work with the API key in `Authorization`. Such a message
 reaches its recipient with `[unverified sender, sent with an API key]` at the start of `content` and

@@ -249,7 +249,8 @@ const SEED_KEY_NAME = "ops-seed-%";
 // `agent` joins them on 2026-09-23 with POST /v1/auth/keyless: it is the name every keyless key
 // for the supply side carries, for anybody. Same safeguard as the other two, our own use is
 // excluded one level up by address.
-const STRANGER_KEY_NAMES = ["conway-automaton", "browser", "agent"];
+// `crawler` joins on 2026-11-14 (goals/anmeldung/01): the name a keyless key for a declared crawler carries, a stranger by definition.
+const STRANGER_KEY_NAMES = ["conway-automaton", "browser", "agent", "crawler"];
 const oursClause = `(
   address in (${OURS.map(() => "?").join(",")})
   or exists (select 1 from api_keys k where k.address = ledger.address

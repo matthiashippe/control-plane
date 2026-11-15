@@ -243,3 +243,76 @@
   ausgelassen). Gegenprobe: `bash ops/smoke.sh https://ctl.sbx.postyourprice.com` Exit 1 (12 Fehler), `dig +short A
   ctl.sbx.postyourprice.com | grep -cx 76.13.144.207` 0; beide Werkzeuge können also rot werden. Der Punkt hält, Code und Server
   sind unverändert. Ursache und Empfehlung stehen im Vorschlag `goals/_vorschlaege/loop-audit-2026-11-13-2.md`.
+
+## Goal 02, Audit 2026-11-14 Zeile 465 (14.11.2026, Engineer CP)
+
+- **Wildcard `*.postyourprice.com` wieder angelegt, bis sandbox 07 auf `dev` landet.** Audit 2026-11-14 Zeile 465 (sandbox 02 Punkt
+  4) meldete `fehlt expose` und `SANDBOX PROBE FAIL failed=1 left=0`. Ursache: Der Eintrag `*.postyourprice.com` fehlte in der Zone,
+  `dig sbx-unknown0-80.postyourprice.com @1.1.1.1` gab `NXDOMAIN`, und die `public_url`, die `sandboxd` liefert, löste nicht auf.
+  Gelöscht hatte ihn der Maker von sandbox 07 am 13.11.2026 um 19:33 UTC mit `cloudflare.py dns-apply` vom Goal-Branch, bevor das Goal
+  auf `dev` lag (es wartet am Gate `server_kauf` auf die eigene Domain). Auf `dev` verlangen sandbox 02 Punkt 4 und Punkt 5 den
+  Eintrag, und `dev` ist der Stand, gegen den das Audit misst. Darum am 14.11.2026 um 16:07 UTC wieder angelegt mit
+  `python3 ops/sandbox/cloudflare.py dns-apply 72.62.51.224` vom Stand `dev` (`created A *.postyourprice.com`, `CF DNS OK
+  changed=0`); das Werkzeug legt nur fehlende Einträge an und ändert oder löscht keinen. Vorher meldete `dns-check` genau `CHANGE dns
+  create A *.postyourprice.com proxied=true`. Danach: der Prüfbefehl aus Zeile 465 gibt `SANDBOX PROBE OK left=0` aus (vorher derselbe
+  Befehl `fehlt expose`), `curl https://sbx-unknown0-80.postyourprice.com/` antwortet `404`, der Name löst nur über den Proxy auf
+  (`grep -c 72.62.51.224` 0), `postyourprice.com` und `ctl.sbx` unverändert. Kein Kunde bekommt dadurch eine Adresse: Das Control
+  Plane antwortet auf `ports/expose` weiter 409 `port_exposure_unavailable` (Goal 03). Das ist der Stand, den Goal 02, Kritik, bis
+  zur eigenen Domain hinnimmt.
+- **Regel daraus:** Ein Goal ändert DNS, Server und andere geteilte Zustände, die DONE-Goals auf `dev` messen, erst mit seinem
+  Merge. sandbox 07 löscht den Eintrag deshalb mit dem eigenen `dns-apply`, sobald es nach dem Kauf ausrollt; danach steht sandbox 02
+  Punkt 5 (`sbx-unknown0-80.postyourprice.com` mit `404`) gegen sandbox 07 Punkt 5, und der Tech Lead trägt die Ablösung ein.
+
+## Goal 02, Audit 2026-11-14 Zeile 478 (14.11.2026, Engineer CP)
+
+- **Ursache auf `dev` schon behoben, keine Codeänderung nötig.** Zeile 478 (sandbox 02 Punkt 9, `check`) meldete den
+  Idempotency-Test in `test/sandbox-api.test.ts` mit 0 statt 1 Exec. Ursache: Der Test brach den ersten Aufruf nach festen 200 ms ab
+  (`AbortSignal.timeout(200)`); unter Last kam der Abbruch, bevor `sandboxd` das Kommando hatte. Das Audit lief auf 033245cd. Commit
+  2de5407 (fehler 08, 14.11.2026 04:29 UTC, gemergt vor 8fc996d) bricht den ersten Aufruf erst ab, wenn `sandboxd` das Kommando hat
+  (`execStarted`, beim wiederholten Anlegen `runStarted`); `grep -rn "AbortSignal.timeout" test/` ist seither leer.
+- **Beleg auf frischem `dev` (8fc996d), Last 6 je Kern:** `PATH=/usr/bin:$PATH node scripts/check.mjs` Exit 0, `check: grün in 223 s`;
+  `pnpm -s vitest run test/sandbox-api.test.ts -t "Idempotency-Key"` dreimal `5 passed | 16 skipped`. Gegenprobe: der Test vom Stand
+  033245cd mit `AbortSignal.timeout(1)` statt 200 wird rot mit `expected +0 to be 1` in 2 Tests, also genau der Fehler aus Zeile 478;
+  der Test kann rot werden, der heutige Ablauf hängt nicht mehr an der Zeit.
+
+## Goal 03, Audit 2026-11-14 Zeile 499 (14.11.2026, Engineer CP)
+
+- **Dieselbe Ursache wie Zeile 478, auf `dev` seit 2de5407 behoben, keine Codeänderung.** Zeile 499 (sandbox 03 Punkt 11, `check`)
+  meldet denselben Idempotency-Test in `test/sandbox-api.test.ts` mit 0 statt 1 Exec nach `AbortSignal.timeout(200)`. Seit 2de5407
+  bricht der Test erst ab, wenn `sandboxd` das Kommando hat; `grep -rn "AbortSignal.timeout" test/ | wc -l` gibt 0.
+- **Beleg auf frischem `dev` (9d7d99e), Last 6 je Kern:** `PATH=/usr/bin:$PATH node scripts/check.mjs` Exit 0, `check: grün in 147 s`;
+  `pnpm -s vitest run test/sandbox-api.test.ts -t "Idempotency-Key"` gibt `5 passed | 16 skipped`. Gegenprobe: der Test vom Stand
+  033245cd mit `AbortSignal.timeout(1)` wird rot mit `expected +0 to be 1` in 2 Tests, genau der Fehler aus Zeile 499. Die Zeilen 520
+  (sandbox 04 Punkt 9), 528 (sandbox 05 Punkt 4) und 539 (sandbox 05 Punkt 9) desselben Audits nennen dieselbe Ursache.
+
+## Goal 04, Audit 2026-11-14 Zeile 520 (14.11.2026, Engineer CP)
+
+- **Dieselbe Ursache wie Zeile 478 und 499, auf `dev` seit 2de5407 behoben, keine Codeänderung.** Zeile 520 (sandbox 04 Punkt 9,
+  `check`) meldet den Idempotency-Test in `test/sandbox-api.test.ts` mit 0 statt 1 Exec nach `AbortSignal.timeout(200)`. Das Audit
+  lief vor dem Merge von 2de5407; seither bricht der Test erst ab, wenn `sandboxd` das Kommando hat, und
+  `grep -rn "AbortSignal.timeout" test/ | wc -l` gibt 0.
+- **Beleg auf frischem `dev` (c6cb15d), Last 1 je Kern:** `PATH=/usr/bin:$PATH node scripts/check.mjs` Exit 0, `check: grün in 62 s`;
+  `pnpm -s vitest run test/sandbox-api.test.ts -t "Idempotency-Key"` gibt `5 passed | 16 skipped`. Gegenprobe: der Test vom Stand
+  vor 2de5407 mit `AbortSignal.timeout(1)` wird rot mit `expected +0 to be 1` in 2 Tests, genau der Fehler aus Zeile 520.
+
+## Goal 05, Audit 2026-11-14 Zeile 528 (14.11.2026, Engineer CP)
+
+- **Dieselbe Ursache wie Zeile 478, 499 und 520, auf `dev` seit 2de5407 behoben, keine Codeänderung.** Zeile 528 (sandbox 05 Punkt 4)
+  meldet den Test `repeated create while the first one still runs` in `test/sandbox-api.test.ts` mit 0 statt 1 Anlegen nach
+  `AbortSignal.timeout(200)`. Das Audit lief vor dem Merge von 2de5407; seither bricht der Test erst ab, wenn `sandboxd` den Container
+  startet, und `grep -rn "AbortSignal.timeout" test/ | wc -l` gibt 0.
+- **Beleg auf frischem `dev` (c5b2654), Load 48 auf 16 Kernen:** `PATH=/usr/bin:$PATH pnpm -s vitest run test/sandbox-long-exec.test.ts
+  test/sandbox-api.test.ts` gibt `2 passed (2)`, `29 passed (29)`; `PATH=/usr/bin:$PATH node scripts/check.mjs` Exit 0,
+  `check: grün in 78 s`. Gegenprobe: der Test vom Stand vor 2de5407 mit `AbortSignal.timeout(1)` wird mit `-t "repeated create"` rot,
+  `1 failed | 2 passed`, `expected +0 to be 1`, genau der Fehler aus Zeile 528.
+
+## Goal 05, Audit 2026-11-14 Zeile 539 (14.11.2026, Engineer CP)
+
+- **Dieselbe Ursache wie Zeile 478, 499, 520 und 528, auf `dev` seit 2de5407 behoben, keine Codeänderung.** Zeile 539 (sandbox 05
+  Punkt 9, `check`) meldet den Idempotency-Test in `test/sandbox-api.test.ts` mit 0 statt 1 Exec nach `AbortSignal.timeout(200)`. Das
+  Audit lief auf 033245cd, vor dem Merge von 2de5407; seither bricht der Test erst ab, wenn `sandboxd` das Kommando hat, und
+  `grep -rn "AbortSignal.timeout" test/ | wc -l` gibt 0.
+- **Beleg auf frischem `dev` (6b2653a), Load 70 auf 16 Kernen:** `PATH=/usr/bin:$PATH node scripts/check.mjs` Exit 0,
+  `check: grün in 94 s`; `pnpm -s vitest run test/sandbox-api.test.ts -t "Idempotency-Key"` gibt `5 passed | 16 skipped`. Gegenprobe:
+  der Test vom Stand vor 2de5407 mit `AbortSignal.timeout(1)` wird rot, `2 failed | 3 passed | 16 skipped`, `expected +0 to be 1`,
+  genau der Fehler aus Zeile 539.

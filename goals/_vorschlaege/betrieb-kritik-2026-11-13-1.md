@@ -4,3 +4,4 @@ Befund: `ops/claim-keyless.sh` liest die eigenen Adressen direkt aus `ops/own-ip
 Beleg: ops/claim-keyless.sh:71 (`own_ips=$(cat ops/own-ips.txt …)`) | ROADMAP.md, Zeile kanal, Glied 05 („gegen `ops/own-ips.txt` gehalten“) | `git log -1 --format=%ad -- ops/own-ips.txt` -> 2026-09-23
 Empfehlung: `ops/claim-keyless.sh` sourct `ops/own-ips.sh` und nimmt `own_ips`, Test mit nachgebautem `ssh` und einer Adresse nur in der Datei aus `CP_OWN_IPS_SEEN`, rot vor dem Fix; das Glied kanal 05 nennt `own_ips` statt der Datei.
 MVP: Funktion, weil eine eigene Anfrage, die als fremde zählt, genau die Zahl verfälscht, an der kanal und seite ihren Ertrag messen.
+Übernommen: messung 01, Abschluss gemeldet (PRO-20314, PR #119) (2026-11-14)

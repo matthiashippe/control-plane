@@ -114,3 +114,31 @@
   dem Anschalten im Hauptnetz geändert werden, heute ist das Konto in der Produktion aus.
 - Der Lauf auf Base Sepolia nutzt Port 47391, weil `http://localhost:47391` als Allowed Origin im Auth Proxy steht und der Passkey
   an diese Origin gebunden wird; das Skript bricht ab, wenn der Port belegt ist.
+
+## Reparatur dev (14.11.2026, Engineer CP)
+
+- Audit 2026-11-14 Zeile 371 (konto 01 Punkt 7, `check`) lief auf `033245c` rot, weil `test/sandbox-api.test.ts` den ersten Anlauf
+  nach `AbortSignal.timeout(200)` abbrach und das unter Host-Last vor dem `docker run` feuerte. Seit `2de5407` bricht der Test erst
+  ab, wenn sandboxd den Container startet (0 Stellen mit `AbortSignal.timeout(200)`); dieselbe Ursache hat die Reparatur zu Zeile 297
+  in `goals/fehler/ANNAHMEN.md` belegt. `PATH=/usr/bin:$PATH node scripts/check.mjs` auf `dev` `8eab58d` ist bei Last 4,9 je Kern
+  grün (149 Dateien, 1747 Tests, 73 s); Code bleibt unverändert, weil die Ursache auf `dev` schon behoben ist.
+- Audit 2026-11-14 Zeile 386 (konto 02 Punkt 4) brach mit `render freigabe 390: no answer after 60000 ms` ab, obwohl die Seite
+  stimmt: Die 60 s des ersten Bildes schlossen den Kaltstart von Chromium ein, und der code-host lief mit Last über 100 und vollem
+  Swap. `ops/soll-handoff.mjs` wartet jetzt bis 180 s auf den Start (`Browser.getVersion`), danach bis 120 s je Bild und bis 60 s auf
+  das Laden; das Urteil bleibt allein `assessHandoff()`. Gegenprobe mit einem Chromium, der 70 s bis zum Start schläft: alter Stand
+  Exit 2 mit genau der Audit-Ausgabe, neuer Stand Exit 0 mit 0 Mängeln. Dabei fiel auf, dass ein toter Browser auf dem alten Stand
+  nach 60 s stumm mit Exit 0 endete (`close()` wartete auf eine Antwort, die Event Loop lief leer); jetzt scheitert jede Anfrage
+  an einen beendeten Browser sofort, Exit 2 mit `browser exited`. `ops/soll.mjs` (seite 01) hat dieselbe Stelle und bleibt hier
+  unverändert, weil diese Reparatur nur Zeile 386 betrifft.
+- Audit 2026-11-14 Zeile 406 (konto 02 Punkt 10, `check`) scheiterte auf `033245c` an derselben Stelle wie Zeile 371: Der
+  Idempotency-Test in `test/sandbox-api.test.ts` brach den ersten Anlauf nach `AbortSignal.timeout(200)` ab, unter Host-Last vor
+  dem `docker run`. Seit `2de5407` gibt es diesen festen Abbruch nicht mehr (`grep -c "AbortSignal.timeout(200)"` gibt 0 aus).
+  `PATH=/usr/bin:$PATH node scripts/check.mjs` auf `dev` `2d9fe38` ist bei Last 8,7 je Kern grün (150 Dateien, 1756 Tests,
+  275 s). Der Code bleibt unverändert, weil `dev` die Ursache schon behoben hat.
+- Audit 2026-11-14 Zeile 407 (konto 02 Punkt 10, (Netz) `e2e`) gab 0 aus, weil der Prüfbefehl den PR mit `--state open` sucht und
+  PR #97 seit dem Merge `6856c07` geschlossen ist; `gh pr checks` bekommt dann eine leere Nummer und liest den Branch des Audits.
+  Der belegte Stand hält: `gh pr checks 97` meldet `e2e pass` am gemergten Kopf `c6ca529`, derselbe Befehl mit `--state all` gibt
+  `1` aus, mit einem Head ohne PR (`goal/konto-99`) `0`. `PATH=/usr/bin:$PATH node scripts/check.mjs` auf `dev` `1cdbde8` ist bei
+  Last 4,4 je Kern grün (151 Dateien, 1769 Tests, 255 s). Code und Goal-Datei bleiben unverändert, weil das Goal DONE ist und der
+  Prüfbefehl Vertrag; nach jedem Merge bleibt die Zeile im Audit rot, bis der Tech Lead sie ablöst oder das Audit Zeilen mit
+  `--state open` am gemergten PR misst.

@@ -26,6 +26,8 @@ import re
 import subprocess
 import sys
 
+# The reader sits next to this file; under `python3 -I` the script's folder is not on sys.path by itself.
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import answers_args
 
 REPO = "Conway-Research/automaton"

@@ -17,11 +17,22 @@ const WALLETS = join(ROOT, "ops", "fixtures", "github-yield-wallets.jsonl");
 const OWN = join(ROOT, "ops", "fixtures", "github-yield-own-ips.txt");
 const SINCE = "2026-11-06T22:20:00Z";
 
+// own_ips asks ssh for the live address. A fake ssh that answers nothing goes first on PATH, and
+// CP_OWN_IPS_SEEN points into a temp dir, so no case reaches the network or the state directory.
+const STUB = mkdtempSync(join(tmpdir(), "github-yield-stub-"));
+writeFileSync(join(STUB, "ssh"), "#!/bin/sh\nexit 255\n");
+chmodSync(join(STUB, "ssh"), 0o755);
+const quiet = (): Record<string, string | undefined> => {
+  const env: Record<string, string | undefined> = { ...process.env, PATH: `${STUB}:${process.env.PATH}`, CP_OWN_IPS_SEEN: join(STUB, "seen.txt") };
+  delete env.CP_OWN_IPS_WRITE;
+  return env;
+};
+
 const run = (args: string[], env: Record<string, string> = {}) =>
   spawnSync("bash", [SCRIPT, ...args], {
     encoding: "utf8",
     timeout: 60_000,
-    env: { ...process.env, CP_OWN_IPS: OWN, ...env },
+    env: { ...quiet(), CP_OWN_IPS: OWN, ...env },
   });
 
 describe("ops/github-yield.sh", () => {
@@ -107,7 +118,14 @@ describe("ops/github-yield.sh", () => {
       `#!/usr/bin/env bash\necho "ARGS $*" >> ${JSON.stringify(record)}\nenv | grep -c planted-loop-env-secret | sed 's/^/LEAK /' >> ${JSON.stringify(record)}\nexit 1\n`,
     );
     chmodSync(join(bin, "ssh"), 0o755);
-    const base: Record<string, string | undefined> = { ...process.env, CP_OWN_IPS: OWN, HOME: home, PATH: `${bin}:${process.env.PATH}` };
+    const base: Record<string, string | undefined> = {
+      ...process.env,
+      CP_OWN_IPS: OWN,
+      CP_OWN_IPS_SEEN: join(dir, "seen.txt"),
+      HOME: home,
+      PATH: `${bin}:${process.env.PATH}`,
+    };
+    delete base.CP_OWN_IPS_WRITE;
     delete base.CP_HOST;
     delete base.CP_SSH_KEY;
     delete base.OPENROUTER_API_KEY;

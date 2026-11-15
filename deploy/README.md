@@ -28,6 +28,15 @@ Let's-Encrypt-Zertifikat, SQLite unter dem Volume `cp-data`. Secrets liegen nur 
 hochkommt. Am 19.09.2026 war der Dienst dreimal deswegen weg. Für den Kaltstart ist das richtig,
 für ein Update nicht.
 
+Beide Skripte schicken den Arbeitsbaum, aus dem sie laufen, per `rsync --delete` nach
+`/opt/control-plane/repo/`, samt allem, was darin nicht committet ist; ausgenommen ist nur die
+`--exclude`-Liste im Skript. Am 30.09.2026 rollte so ein Deploy fremde, halbfertige Änderungen aus
+einem gemeinsamen Checkout mit aus. Seit dem 10.11.2026 rollt `deploy.yml` aus einem frischen
+Checkout aus, und die Drift-Prüfung davor vergleicht den Server mit dem Repo. Fährt ein Mensch
+`ops/deploy.sh` (ruft `deploy/rollout.sh`) am eigenen Rechner, dann aus einem eigenen
+`git worktree` mit leerem `git status`. Fremde Änderungen im Haupt-Checkout werden dabei nie
+gestasht oder überschrieben.
+
 ### Was rollout.sh tut, und warum in dieser Reihenfolge
 
 1. **Von außen prüfen, ob der Dienst überhaupt gesund ist.** Ist er es nicht, bricht das Skript ab.

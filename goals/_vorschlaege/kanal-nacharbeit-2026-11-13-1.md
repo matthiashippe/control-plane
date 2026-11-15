@@ -7,3 +7,4 @@ MVP: Schönheit
 
 Linse Q, Frage 1. Die erste Zeile von `ops/fixtures/github-yield.log` hat `ts` 1794000000.25, also 2026-11-06T21:20:00Z, und liegt damit im Fenster ab 21:00.
 Der Selftest in `ops/github-yield.sh` beschreibt denselben Fall richtig („the arrival before the window counts once the window includes it“).
+Verworfen: Schwere 1, nur ein Testname, Assertion stimmt (2026-11-14)
