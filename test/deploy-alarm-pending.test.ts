@@ -240,7 +240,7 @@ describe("a deploy alarm that was not sent is kept on the VM and sent by the wat
     expect(text).toMatch(/\b5\b/);
     expect(text).not.toMatch(IP);
     expect(text).not.toContain("hook.invalid");
-    expect(r.out).toContain("[INFO] webhook delivered");
+    expect(r.out).toContain("[INFO] deploy alarm delivered");
     expect(existsSync(w.pending), r.out).toBe(false);
 
     const again = w.run();
@@ -273,5 +273,19 @@ describe("a deploy alarm that was not sent is kept on the VM and sent by the wat
     const hooked = w.run();
     expect(deployAlarms(w.calls()).length, hooked.out).toBe(1);
     expect(existsSync(w.pending), hooked.out).toBe(false);
+  }, 120_000);
+
+  it("watchdog logs a sent deploy alarm as deploy alarm delivered, not as webhook delivered", () => {
+    // ops/webhook-last.sh reads every `[INFO] webhook delivered` as a delivery of the watchdog, and ops/status.sh then wants
+    // a message titled `control-plane ...` on the topic. A late deploy alarm carries another title, so it must log its own line.
+    const w = watchdogBox();
+    writeFileSync(w.pending, KEPT);
+    const r = w.run();
+    expect(deployAlarms(w.calls()).length, r.out).toBe(1);
+    expect(w.calls().length, r.out).toBe(1);
+    const lines = r.out.split("\n");
+    expect(lines.filter((l) => /\[INFO\] deploy alarm delivered$/.test(l)).length, r.out).toBe(1);
+    expect(lines.filter((l) => /\[INFO\] webhook delivered$/.test(l)).length, r.out).toBe(0);
+    expect(existsSync(w.pending), r.out).toBe(false);
   }, 120_000);
 });

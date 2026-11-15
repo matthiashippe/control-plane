@@ -104,7 +104,8 @@ the start of the window as `YYYY-MM-DDTHH` (`HH` is `00`, `08` or `16`); a stamp
 `YYYY-MM-DD` counts as a missing window, so the first run after the rollout posts once more. It is
 stored only after the POST went through, so with a dead webhook every run of the window tries again
 and three runs leave three lines `[WARN] webhook unreachable`. Every
-delivered POST, the sign of life included, leaves `[INFO] webhook delivered` in the log.
+delivered POST, the sign of life included, leaves `[INFO] webhook delivered` in the log, except a
+late deploy alarm (below).
 `ops/webhook-last.sh` prints the time of the last failure and of the last delivery (`-` for none),
 and `ops/status.sh` reports both as `alarm_path.last_unreachable` and `alarm_path.last_delivered`, so
 a failure of fifteen minutes that is over does not stay red for 24 hours. A last delivery older than
@@ -118,8 +119,10 @@ A deploy alarm that did not go out waits next to the other states in `<state fil
 `<count> <HH:MM:SS>` when its POST failed or the crontab set no webhook. Every run of the watchdog
 looks for that file before the health check, so also during an outage, and posts it once with
 `Title: deploy-window 502` and `Priority: high`, the text naming every count and time, no address and
-no URL. The file goes only after a delivered POST. A failed POST keeps it and leaves
-`[WARN] webhook unreachable`; without `CP_ALERT_WEBHOOK` it stays as well and the log gets
+no URL. The file goes only after a delivered POST, which leaves `[INFO] deploy alarm delivered`
+instead of `[INFO] webhook delivered`, because `ops/webhook-last.sh` reads the latter as a delivery of
+the watchdog and `ops/status.sh` then looks for a message titled `control-plane ...` on the topic.
+A failed POST keeps it and leaves `[WARN] webhook unreachable`; without `CP_ALERT_WEBHOOK` it stays as well and the log gets
 `[WARN] a deploy alarm is waiting, no webhook set`. The title is the same as that of
 `ops/deploy-alarm.sh`, so `ops/status.sh` does not count it as a message of the watchdog.
 

@@ -88,7 +88,9 @@ send_kept_deploy_alarm() {
     echo "$TS [WARN] webhook unreachable"
     return 0
   fi
-  echo "$TS [INFO] webhook delivered"
+  # Its own line, not `[INFO] webhook delivered`: ops/webhook-last.sh reads that line as a delivery of the watchdog, and
+  # ops/status.sh then wants a message titled `control-plane ...` on the topic, which this title is not.
+  echo "$TS [INFO] deploy alarm delivered"
   rest=$(cat "$file" 2>/dev/null)
   if [[ "$rest" == "$kept" ]]; then
     rm -f "$file"
