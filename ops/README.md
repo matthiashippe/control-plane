@@ -739,6 +739,12 @@ public logs of a public repository, so a line shows time, method, path without q
 `BAD GATEWAY <n> of <m>` counts the 502s Caddy answered while `cp` restarted. `--at <UTC time>`
 measures a past window instead of the container start, `--log <file>` reads the access log from a
 file without ssh (only together with `--at`), and `--selftest` plants every case without network.
+With `--log` there is no live address: our own addresses are the list in `CP_OWN_IPS_FILE`,
+`CP_OWN_IPS` and the seen file in `CP_OWN_IPS_SEEN` (default
+`$XDG_STATE_HOME/control-plane/own-ips-seen.txt`), read through `own_ips_offline` in
+`ops/own-ips.sh`, which never writes either file. Since 2026-11-15 (messung 07) an address seen live
+on an earlier day and kept only in the seen file counts as ours there too; a list that names no
+address still ends the run with exit 2.
 
 Without `--at`, a `BAD GATEWAY` above 0 sends `ops/deploy-alarm.sh` to the VM, which posts the alarm
 to the webhook of the watchdog. The tool prints `ALARM SENT` and keeps exit 1, or
