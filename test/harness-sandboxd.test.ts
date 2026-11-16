@@ -11,9 +11,9 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { CLIENT_PUB_FILE, SandboxdUnavailable, createSandboxdClient, loadOrCreateClientKey } from "../src/sandbox/client.js";
-import { createSandboxd } from "../ops/sandbox/sandboxd.mjs";
+import { CONTAINER_CMD, createSandboxd } from "../ops/sandbox/sandboxd.mjs";
 import { createSandboxd as harnessCreateSandboxd, startHarnessSandboxd } from "../harness/sandboxd/start.mjs";
-import { mapRoot } from "../harness/sandboxd/harness-run.mjs";
+import { autostartCommand, createHarnessRun, mapRoot, processesOfHome } from "../harness/sandboxd/harness-run.mjs";
 
 const stops: Array<() => Promise<void>> = [];
 const dirs: string[] = [];
@@ -130,5 +130,220 @@ describe("harness sandboxd: the real daemon with a Docker stand-in", () => {
     expect(mapRoot("cat '/root/a b'", "/h/a")).toBe("cat '/h/a/a b'");
     expect(mapRoot("/rootfs/x", "/h/a")).toBe("/rootfs/x");
     expect(mapRoot("/srv/root/x", "/h/a")).toBe("/srv/root/x");
+  });
+});
+
+// ---- the autostart of CONTAINER_CMD in the stand-in (goals/sandbox/08, point 6)
+
+/** A stub automaton-supervise in a PATH of its own: one line `<pid> <AUTOMATON_HOME>` per start, then it sleeps. */
+function stubPath(root: string): string {
+  const bin = path.join(root, "bin");
+  fs.mkdirSync(bin, { recursive: true });
+  fs.writeFileSync(
+    path.join(bin, "automaton-supervise"),
+    '#!/usr/bin/env bash\necho "$$ $AUTOMATON_HOME" >> "$AUTOMATON_HOME/supervise.started"\nexec sleep 300\n',
+    { mode: 0o755 },
+  );
+  return `${bin}:${process.env.PATH}`;
+}
+
+/** The pids the stub wrote, in order. */
+function starts(home: string): Array<{ pid: number; home: string }> {
+  let text = "";
+  try {
+    text = fs.readFileSync(path.join(home, "supervise.started"), "utf8");
+  } catch {
+    return [];
+  }
+  return text
+    .split("\n")
+    .filter(Boolean)
+    .map((l) => ({ pid: Number(l.split(" ")[0]), home: l.slice(l.indexOf(" ") + 1) }));
+}
+
+/** Alive and not a zombie. */
+function alive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+  } catch {
+    return false;
+  }
+  try {
+    return !/^\d+ \(.*\) Z/.test(fs.readFileSync(`/proc/${pid}/stat`, "utf8"));
+  } catch {
+    return false;
+  }
+}
+
+async function until(f: () => boolean, ms = 5000): Promise<boolean> {
+  const end = Date.now() + ms;
+  while (Date.now() < end) {
+    if (f()) return true;
+    await new Promise((r) => setTimeout(r, 25));
+  }
+  return f();
+}
+
+const homes: string[] = [];
+afterEach(() => {
+  // Whatever a failed case left running: only processes whose environment names one of this file's homes.
+  for (const h of homes.splice(0)) for (const pid of processesOfHome(h)) process.kill(pid, "SIGKILL");
+});
+
+function standIn() {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "harness-run-"));
+  dirs.push(root);
+  const home = path.join(root, "mnt", "abcde12345");
+  fs.mkdirSync(home, { recursive: true });
+  homes.push(home);
+  const env = { ...process.env, PATH: stubPath(root) };
+  const stateFile = path.join(root, "docker.json");
+  const name = "sbx-abcde12345";
+  const runArgs = ["run", "-d", "--name", name, "--mount", `type=bind,src=${home},dst=/root`, "img", "bash", "-c", CONTAINER_CMD];
+  const mark = () => {
+    fs.mkdirSync(path.join(home, ".automaton"), { recursive: true });
+    fs.writeFileSync(path.join(home, ".automaton", "autostart"), "");
+  };
+  return { root, home, env, stateFile, name, runArgs, mark };
+}
+
+describe("harness sandboxd: CONTAINER_CMD's autostart as a real process", () => {
+  it("cuts exactly the autostart part out of CONTAINER_CMD, never resolv.conf and never sleep infinity", () => {
+    const part = autostartCommand(CONTAINER_CMD);
+    expect(CONTAINER_CMD).toContain(part);
+    expect(part).toMatch(/^if \[ -f \/root\/\.automaton\/autostart \]; then .*automaton-supervise.* fi$/);
+    expect(part).not.toContain("resolv.conf");
+    expect(part).not.toContain("sleep infinity");
+    const before = 'printf "nameserver 1.1.1.1\\n" > /etc/resolv.conf; exec sleep infinity';
+    expect(() => autostartCommand(before)).toThrow(/autostart/);
+    expect(() => createHarnessRun({ containerCmd: before })).toThrow(/autostart/);
+  });
+
+  it("starts the supervisor on docker run, start and restart when the mark is there, and stop and rm end it", async () => {
+    const s = standIn();
+    s.mark();
+    const h = createHarnessRun({ stateFile: s.stateFile, env: s.env });
+    expect((await h.run("docker", s.runArgs)).code).toBe(0);
+    expect(await until(() => starts(s.home).length === 1)).toBe(true);
+    const [first] = starts(s.home);
+    expect(first.home).toBe(s.home);
+    expect(await until(() => alive(first.pid))).toBe(true);
+    expect(processesOfHome(s.home)).toContain(first.pid);
+
+    expect((await h.run("docker", ["stop", s.name])).code).toBe(0);
+    expect(await until(() => !alive(first.pid))).toBe(true);
+    expect(processesOfHome(s.home)).toEqual([]);
+    expect(h.docker().containers[s.name]).toEqual({ home: s.home, running: false });
+
+    expect((await h.run("docker", ["start", s.name])).code).toBe(0);
+    expect(await until(() => starts(s.home).length === 2)).toBe(true);
+    const second = starts(s.home)[1];
+    expect(await until(() => alive(second.pid))).toBe(true);
+    // A start of a running container with its supervisor alive starts no second one.
+    expect((await h.run("docker", ["start", s.name])).code).toBe(0);
+    await new Promise((r) => setTimeout(r, 300));
+    expect(starts(s.home)).toHaveLength(2);
+
+    expect((await h.run("docker", ["restart", s.name])).code).toBe(0);
+    expect(await until(() => starts(s.home).length === 3)).toBe(true);
+    expect(await until(() => !alive(second.pid))).toBe(true);
+    const third = starts(s.home)[2];
+    expect(await until(() => alive(third.pid))).toBe(true);
+
+    expect((await h.run("docker", ["rm", "-f", s.name])).code).toBe(0);
+    expect(await until(() => !alive(third.pid))).toBe(true);
+    expect(processesOfHome(s.home)).toEqual([]);
+    expect(h.docker()).toEqual({ containers: {}, networks: [] });
+  });
+
+  it("starts nothing without the mark", async () => {
+    const s = standIn();
+    const h = createHarnessRun({ stateFile: s.stateFile, env: s.env });
+    expect((await h.run("docker", s.runArgs)).code).toBe(0);
+    expect((await h.run("docker", ["restart", s.name])).code).toBe(0);
+    await new Promise((r) => setTimeout(r, 300));
+    expect(starts(s.home)).toEqual([]);
+    expect(processesOfHome(s.home)).toEqual([]);
+  });
+
+  it("runs only the autostart part, with /root mapped to the home, and never the line that writes resolv.conf", async () => {
+    const s = standIn();
+    s.mark();
+    const h = createHarnessRun({ stateFile: s.stateFile, env: s.env });
+    await h.run("docker", s.runArgs);
+    await h.run("docker", ["restart", s.name]);
+    const ran = h.autostarts();
+    expect(ran).toHaveLength(2);
+    for (const r of ran) {
+      expect(r).toEqual({ name: s.name, command: mapRoot(autostartCommand(CONTAINER_CMD), s.home) });
+      expect(r.command).not.toContain("resolv.conf");
+      expect(r.command).not.toContain("sleep infinity");
+      expect(r.command).not.toMatch(/(^|[\s=])\/root(\/|\s|$)/);
+    }
+    await h.run("docker", ["rm", "-f", s.name]);
+  });
+
+  it("loads its state file, so a new stand-in knows the containers and starts the supervisor again on docker start", async () => {
+    const s = standIn();
+    s.mark();
+    const first = createHarnessRun({ stateFile: s.stateFile, env: s.env });
+    await first.run("docker", ["network", "create", "--label", "sandboxd=1", s.name]);
+    await first.run("docker", s.runArgs);
+    expect(await until(() => starts(s.home).length === 1)).toBe(true);
+    // What a restart of the container sandboxd does to the processes in it.
+    for (const pid of processesOfHome(s.home)) process.kill(pid, "SIGKILL");
+    expect(await until(() => processesOfHome(s.home).length === 0)).toBe(true);
+
+    const second = createHarnessRun({ stateFile: s.stateFile, env: s.env });
+    expect(second.docker()).toEqual({ containers: { [s.name]: { home: s.home, running: true } }, networks: [s.name] });
+    expect((await second.run("docker", ["ps", "-a", "--filter", "label=sandboxd=1", "--format", "{{.Names}}"])).stdout).toBe(`${s.name}\n`);
+    expect((await second.run("docker", ["start", s.name])).code).toBe(0);
+    expect(await until(() => starts(s.home).length === 2)).toBe(true);
+    expect(await until(() => alive(starts(s.home)[1].pid))).toBe(true);
+    await second.run("docker", ["rm", "-f", s.name]);
+    expect(processesOfHome(s.home)).toEqual([]);
+  });
+
+  it("after a restart of the rebuilt sandboxd, reconcile starts the supervisor of a running sandbox with the mark", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "harness-sandboxd-"));
+    dirs.push(root);
+    const data = path.join(root, "cp-data");
+    fs.mkdirSync(data);
+    const key = loadOrCreateClientKey(data);
+    const env = { ...process.env, PATH: stubPath(root) };
+    const opts = {
+      host: "127.0.0.1",
+      port: 0,
+      keysDir: data,
+      stateFile: path.join(root, "state.json"),
+      dockerStateFile: path.join(root, "docker.json"),
+      mntDir: path.join(root, "mnt"),
+      disksDir: path.join(root, "disks"),
+      env,
+      log: () => {},
+    };
+    const s1 = await startHarnessSandboxd(opts);
+    const c1 = createSandboxdClient({ baseUrl: s1.url, privateKey: key.privateKey, timeoutMs: 15_000 });
+    const created = await c1.request("POST", "/v1/sandboxes", { owner: "o-test", keep_running: true });
+    expect(created.status).toBe(201);
+    const id = String(created.body.id);
+    const home = path.join(root, "mnt", id);
+    homes.push(home);
+    // automaton-start sets the mark; at the create there was none, so nothing runs yet.
+    expect((await c1.request("POST", `/v1/sandboxes/${id}/exec`, { command: "mkdir -p /root/.automaton && touch /root/.automaton/autostart" })).body).toMatchObject({ exit_code: 0 });
+    expect(starts(home)).toEqual([]);
+    await s1.close();
+
+    const s2 = await startHarnessSandboxd(opts);
+    stops.push(s2.close);
+    expect(s2.docker().containers).toEqual({ [`sbx-${id}`]: { home, running: true } });
+    expect(await until(() => starts(home).length === 1)).toBe(true);
+    expect(starts(home)[0].home).toBe(home);
+    expect(await until(() => alive(starts(home)[0].pid))).toBe(true);
+
+    const c2 = createSandboxdClient({ baseUrl: s2.url, privateKey: key.privateKey, timeoutMs: 15_000 });
+    expect((await c2.request("DELETE", `/v1/sandboxes/${id}`)).status).toBe(200);
+    expect(processesOfHome(home)).toEqual([]);
+    expect(s2.docker()).toEqual({ containers: {}, networks: [] });
   });
 });

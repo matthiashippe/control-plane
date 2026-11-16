@@ -22,7 +22,9 @@ export const HARNESS_DOMAIN = "sbx.example";
 
 /**
  * Starts the stand-in on host:port (port 0 picks a free one) and gives { url, d, docker, close }.
- * Without stateFile the sandboxd state stays in memory.
+ * Without stateFile the sandboxd state stays in memory. `env` is the environment the supervisor of an automaton gets when
+ * a container starts (harness-run.mjs); in the harness it is this container's, with NODE_EXTRA_CA_CERTS and
+ * AUTOMATON_RPC_URL from harness/docker-compose.yml.
  */
 export async function startHarnessSandboxd({
   host = "0.0.0.0",
@@ -33,11 +35,12 @@ export async function startHarnessSandboxd({
   mntDir = "/var/lib/sandboxd/mnt",
   disksDir = "/var/lib/sandboxd/disks",
   domain = HARNESS_DOMAIN,
+  env = process.env,
   log = (l) => console.log(l),
 } = {}) {
   if (!keysDir) throw new Error("keysDir is required");
   fs.mkdirSync(mntDir, { recursive: true });
-  const harness = createHarnessRun({ stateFile: dockerStateFile });
+  const harness = createHarnessRun({ stateFile: dockerStateFile, env });
   const config = { ...loadConfig({ SANDBOXD_DOMAIN: domain }), host, apiPort: port, keysDir, mntDir, disksDir, domain };
   const d = createSandboxd({
     run: harness.run,

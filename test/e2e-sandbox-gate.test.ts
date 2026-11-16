@@ -1,27 +1,43 @@
 /**
- * The sandbox gate of harness/e2e/full.sh (goals/sandbox/04 and 05), run for real in bash. The test cuts the block after
- * the line that prints the state of the rebuilt sandboxd after the long exec walk up to the end of the file (the
- * verdicts `sandbox=…` and `long_exec=…`, the cleanup, the final condition and the closing line) and runs it with
- * planted values for `walk`, `sandbox_id`, `sandbox_ledger`, `sandbox_left`, `long`, `long_left` and `relay` (the verdict
- * of the relay walk of goals/relay/01, which runs before the block). Compose and
- * cleanup are stubs that do nothing, so no container and no port is touched. The good walks must end in
- * `E2E OK … sandbox=true long_exec=true`; a failed walk verdict, a missing sandbox id, any other ledger line, a sandbox
- * left in the rebuilt sandboxd, a failed long exec verdict, a missing LONG_EXEC_RESULT and a failing earlier condition
- * must each end in `E2E FAIL`.
+ * The sandbox gate of harness/e2e/full.sh (goals/sandbox/04, 05 and 08), run for real in bash. The test cuts the block
+ * after the line that prints the state of the rebuilt sandboxd after the automaton walk up to the end of the file (the
+ * judge of the automaton walk, the verdicts `sandbox=…`, `long_exec=…` and `automaton=…`, the cleanup, the final
+ * condition and the closing line) and runs it in harness/ with planted values for `walk`, `sandbox_id`, `sandbox_ledger`,
+ * `sandbox_left`, `long`, `long_left`, `relay` (the verdict of the relay walk of goals/relay/01, which runs before the
+ * block), `automaton_results`, `automaton_ledger` and `automaton_left`. The judge is the real one
+ * (`node e2e/automaton-walk.mjs judge`). Compose and cleanup are stubs that do nothing, so no container and no port is
+ * touched. The good walks must end in `E2E OK … sandbox=true long_exec=true relay=true automaton=true`; a failed walk
+ * verdict, a missing sandbox id, any other ledger line, a sandbox left in the rebuilt sandboxd, a failed long exec
+ * verdict, a missing LONG_EXEC_RESULT, a failing earlier condition, a bad automaton walk, a bad automaton ledger and an
+ * automaton left in the rebuilt sandboxd must each end in `E2E FAIL`.
  */
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-const FULL_SH = join(__dirname, "..", "harness", "e2e", "full.sh");
-const START = 'echo "rebuilt sandboxd after the long exec walk: $long_left"';
+const HARNESS = join(__dirname, "..", "harness");
+const FULL_SH = join(HARNESS, "e2e", "full.sh");
+const START = 'echo "rebuilt sandboxd after the automaton walk: $automaton_left"';
 
 const GOOD_LEDGER = '{"rows":1,"mc":[-100],"status":"deleted","hold_mc":0,"consistent":true}';
 const GOOD_LEFT = '{"sandboxes":0,"containers":0,"networks":0,"homes":0}';
 const RESULT_60 = 'LONG_EXEC_RESULT {"label":"long-60","attempts":["abort",200],"threw":false,"failures_after":0,"next_status":200,"runs":1}';
 const RESULT_180 = 'LONG_EXEC_RESULT {"label":"long-180","attempts":[200],"threw":false,"failures_after":0,"next_status":200,"runs":1}';
 const GOOD_LONG = `${RESULT_60}\n${RESULT_180}\nLONG_EXEC_DELETE 200\nLONG_EXEC_VERDICT ok`;
+// The phases of the automaton walk of goals/sandbox/08 as full.sh collects them, and the ledger it reads for them.
+const AUTOMATON_PHASES = [
+  { phase: "create", status: 201, id: "abcdefghij12", sandbox_id: "fghij67890", state: "starting" },
+  { phase: "turns", want: 5, turns: 5, state: "running", log_turns: 5, key_in_log: false, waited_ms: 21000 },
+  { phase: "crash", turns_before: 5, exec_status: 200, exit_code: 0, killed: 1, turns: 6, waited_ms: 12000 },
+  { phase: "sandboxd_restart", ok: true },
+  { phase: "restart", turns_before: 6, turns: 7, state: "running", waited_ms: 15000 },
+  { phase: "wallet", wallet_ok: true, wallet_usdc: "0" },
+  { phase: "delete", status: 200, state: "deleted", after: 404 },
+];
+const automatonResults = (patch: Record<string, Record<string, unknown>> = {}) =>
+  AUTOMATON_PHASES.map((r) => `AUTOMATON_RESULT ${JSON.stringify({ ...r, ...(patch[r.phase] ?? {}) })}`).join("\n");
+const AUTOMATON_LEDGER = { sandbox_rows: 1, inference_before: 6, inference_after: 13, status: "deleted", hold_mc: 0, consistent: true };
 
 type Planted = Record<string, string>;
 
@@ -44,6 +60,10 @@ function good(): Planted {
     relay: "true",
     // The harness walk of goals/konto/03 (harness/e2e/konto-chain.mjs) runs before this block too; konto_chain=true or false.
     konto_chain: "true",
+    // The automaton walk of goals/sandbox/08 runs before this block; its judge runs in it.
+    automaton_results: automatonResults(),
+    automaton_ledger: JSON.stringify(AUTOMATON_LEDGER),
+    automaton_left: GOOD_LEFT,
   };
 }
 
@@ -70,7 +90,7 @@ function runGate(planted: Planted): { code: number | null; last: string } {
   ].join("\n");
   const env: NodeJS.ProcessEnv = { PATH: process.env.PATH };
   for (const [k, v] of Object.entries(planted)) env[`P_${k}`] = v;
-  const r = spawnSync("bash", ["-c", script], { env, encoding: "utf8" });
+  const r = spawnSync("bash", ["-c", script], { env, encoding: "utf8", cwd: HARNESS });
   const out = r.stdout.trim().split("\n");
   return { code: r.status, last: out[out.length - 1] ?? "" };
 }
@@ -80,19 +100,46 @@ function expectFail(
   sandbox: "true" | "false" = "false",
   longExec: "true" | "false" = "true",
   relay: "true" | "false" = "true",
+  automaton: "true" | "false" = "true",
 ): void {
   const r = runGate(planted);
   expect(r.code).toBe(1);
   expect(r.last).toMatch(/^E2E FAIL /);
   expect(r.last).toContain(` sandbox=${sandbox} `);
-  expect(r.last).toMatch(new RegExp(` long_exec=${longExec} relay=${relay}$`));
+  expect(r.last).toMatch(new RegExp(` long_exec=${longExec} relay=${relay} automaton=${automaton}$`));
 }
 
 describe("sandbox gate of harness/e2e/full.sh", () => {
-  it("passes the good walks with sandbox=true, long_exec=true and relay=true", () => {
+  it("passes the good walks with sandbox=true, long_exec=true, relay=true and automaton=true", () => {
     const r = runGate(good());
     expect(r.code).toBe(0);
-    expect(r.last).toMatch(/^E2E OK .*domains=true sandbox=true long_exec=true relay=true$/);
+    expect(r.last).toMatch(/^E2E OK .*domains=true sandbox=true long_exec=true relay=true automaton=true$/);
+  });
+
+  it.each([
+    ["too few turns", automatonResults({ turns: { turns: 4 } })],
+    ["no turn after the crash", automatonResults({ crash: { turns: 5 } })],
+    ["no turn after the restart of sandboxd", automatonResults({ restart: { turns: 6 } })],
+    ["sandboxd not back after its restart", automatonResults({ sandboxd_restart: { ok: false } })],
+    ["USDC in the runtime wallet", automatonResults({ wallet: { wallet_usdc: "1000000" } })],
+    ["no result at all", ""],
+  ])("fails with automaton=false on an automaton walk with %s, and good walks do not make up for it", (_name, results) => {
+    expectFail({ ...good(), automaton_results: results }, "true", "true", "true", "false");
+  });
+
+  it.each([
+    ["no row of kind sandbox", { ...AUTOMATON_LEDGER, sandbox_rows: 0 }],
+    ["no new inference", { ...AUTOMATON_LEDGER, inference_after: 6 }],
+    ["a hold left", { ...AUTOMATON_LEDGER, hold_mc: 1000 }],
+    ["the sandbox not deleted", { ...AUTOMATON_LEDGER, status: "running" }],
+    ["balance and ledger out of step", { ...AUTOMATON_LEDGER, consistent: false }],
+  ])("fails with automaton=false on an automaton ledger with %s", (_name, ledger) => {
+    expectFail({ ...good(), automaton_ledger: JSON.stringify(ledger) }, "true", "true", "true", "false");
+  });
+
+  it("fails with automaton=false on an error of the automaton ledger query or a sandbox left after the automaton walk", () => {
+    expectFail({ ...good(), automaton_ledger: "Error: SQLITE_CANTOPEN" }, "true", "true", "true", "false");
+    expectFail({ ...good(), automaton_left: '{"sandboxes":1,"containers":1,"networks":1,"homes":1}' }, "true", "true", "true", "false");
   });
 
   it("fails with relay=false when the relay walk did not pass, and good walks do not make up for it (goals/relay/01)", () => {

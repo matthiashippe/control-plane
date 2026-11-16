@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Complete first run of the unmodified upstream runtime against the control plane:
 # provisioning, registration, bootstrap topup, five turns, sleep, the domain calls, the sandbox walk, the relay walk, the
-# konto chain walk on a second chain (84532) and the long exec walk.
+# konto chain walk on a second chain (84532), the long exec walk and the automaton walk (a hosted automaton in the rebuilt
+# sandboxd through a crash and a restart of sandboxd).
 # No Conway API error allowed.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -189,6 +190,65 @@ long=$("${COMPOSE[@]}" run --rm --no-deps -e LONG_EXEC_KEY="$key" -e LONG_EXEC_N
 printf '%s\n' "$long" | grep -E '^LONG_EXEC_(RESULT|DELETE|VERDICT)' || printf '%s\n' "$long" | tail -20
 long_left=$(sandboxd_state)
 echo "rebuilt sandboxd after the long exec walk: $long_left"
+
+# The automaton walk of goals/sandbox/08 (harness/e2e/automaton-walk.mjs, bind-mounted into the container runtime): the
+# provisioned account starts a hosted automaton with POST /v1/automatons. cp creates a sandbox with keep_running in the
+# rebuilt sandboxd, uploads the setup file and runs automaton-start there, so the unmodified runtime at the pin thinks as a
+# process of the container sandboxd (harness-run.mjs runs the autostart part of CONTAINER_CMD on every container start,
+# never the line that writes resolv.conf). Five turns; then the runtime process is killed over exec and the supervisor
+# brings it back (one more turn); then the container sandboxd restarts, its state files bring the sandbox back, reconcile
+# starts the container and with it the supervisor (one more turn). Then the runtime wallet holds no USDC on the harness
+# chain, the automaton is deleted, and the ledger of cp, read only: at least one row of kind sandbox for its sandbox, more
+# rows of kind inference on the account than before the walk, its reservation back to 0, the sandbox deleted, balance and
+# ledger of the account in step. After the long exec walk, whose sandbox is gone by then (two places per account), so the
+# checks of the other walks above are done; the rebuilt sandboxd must be empty again after it. Takes about two minutes.
+echo "--- automaton in a sandbox: five turns, crash, restart of sandboxd"
+account=$(printf '%s' "$wallet" | tr 'A-F' 'a-f')
+automaton_walk() {
+  "${COMPOSE[@]}" run --rm --no-deps -e AUTOMATON_WALK_KEY="$key" runtime node /opt/harness/automaton-walk.mjs "$@" 2>&1 || true
+}
+# One field of the last AUTOMATON_RESULT line in $1: a string of [a-z0-9] or a number.
+automaton_field() {
+  printf '%s\n' "$1" | grep '^AUTOMATON_RESULT ' | tail -1 | grep -o "\"$2\":\"*[a-z0-9]*" | head -1 | sed 's/^[^:]*://; s/"//g' || true
+}
+automaton_inference_before=$("${COMPOSE[@]}" exec -T cp node -e '
+  const db = require("better-sqlite3")("/data/cp.db", { readonly: true });
+  console.log(db.prepare("SELECT count(*) AS n FROM ledger WHERE kind = ? AND address = ?").get("inference", process.argv[1]).n);' \
+  "$account" 2>/dev/null || echo -1)
+automaton_out=$(automaton_walk create "e2e-automaton-$RANDOM")
+automaton_results="$automaton_out"
+automaton_id=$(automaton_field "$automaton_out" id)
+automaton_sandbox=$(automaton_field "$automaton_out" sandbox_id)
+if [[ "$automaton_id" =~ ^[a-z0-9]{12}$ ]]; then
+  automaton_results+=$'\n'"$(automaton_walk turns "$automaton_id" 5)"
+  automaton_out=$(automaton_walk crash "$automaton_id")
+  automaton_results+=$'\n'"$automaton_out"
+  automaton_after_crash=$(automaton_field "$automaton_out" turns)
+  automaton_restarted=false
+  if "${COMPOSE[@]}" restart sandboxd >/dev/null 2>&1 && "${COMPOSE[@]}" up -d --wait --no-deps sandboxd >/dev/null 2>&1; then
+    automaton_restarted=true
+  fi
+  automaton_results+=$'\n'"AUTOMATON_RESULT {\"phase\":\"sandboxd_restart\",\"ok\":$automaton_restarted}"
+  automaton_results+=$'\n'"$(automaton_walk restart "$automaton_id" "${automaton_after_crash:-0}")"
+  automaton_results+=$'\n'"$(automaton_walk wallet "$automaton_id")"
+  automaton_results+=$'\n'"$(automaton_walk delete "$automaton_id")"
+fi
+printf '%s\n' "$automaton_results" | grep '^AUTOMATON_RESULT ' || printf '%s\n' "$automaton_results" | tail -20
+automaton_ledger=$("${COMPOSE[@]}" exec -T cp node -e '
+  const [id, acct, before] = process.argv.slice(1);
+  const db = require("better-sqlite3")("/data/cp.db", { readonly: true });
+  const rows = db.prepare("SELECT count(*) AS n FROM ledger WHERE kind = ? AND ref LIKE ?").get("sandbox", "sandbox:" + id + ":%").n;
+  const inference = db.prepare("SELECT count(*) AS n FROM ledger WHERE kind = ? AND address = ?").get("inference", acct).n;
+  const sb = db.prepare("SELECT status, hold_mc FROM sandboxes WHERE id = ?").get(id) || {};
+  const w = db.prepare("SELECT balance_mc FROM wallets WHERE address = ?").get(acct);
+  const sum = db.prepare("SELECT coalesce(sum(delta_mc),0) AS s FROM ledger WHERE address = ?").get(acct).s;
+  console.log(JSON.stringify({ sandbox_rows: rows, inference_before: Number(before), inference_after: inference, status: sb.status ?? null, hold_mc: sb.hold_mc ?? null, consistent: Boolean(w) && w.balance_mc === sum }));' \
+  "${automaton_sandbox:-none}" "$account" "$automaton_inference_before" 2>&1 || true)
+echo "ledger of the automaton: $automaton_ledger"
+automaton_left=$(sandboxd_state)
+echo "rebuilt sandboxd after the automaton walk: $automaton_left"
+automaton_verdict=$(AUTOMATON_RESULTS="$automaton_results" AUTOMATON_LEDGER="$automaton_ledger" node e2e/automaton-walk.mjs judge 2>&1 | tail -1 || true)
+echo "$automaton_verdict"
 sandbox=false
 if printf '%s\n' "$walk" | grep -qx 'SANDBOX_VERDICT ok' && [[ -n "$sandbox_id" ]] \
   && [[ "$sandbox_ledger" == '{"rows":1,"mc":[-100],"status":"deleted","hold_mc":0,"consistent":true}' ]] \
@@ -201,13 +261,18 @@ if printf '%s\n' "$long" | grep -qx 'LONG_EXEC_VERDICT ok' \
   && [[ "$long_left" == '{"sandboxes":0,"containers":0,"networks":0,"homes":0}' ]]; then
   long_exec=true
 fi
+automaton=false
+if [[ "$automaton_verdict" == "AUTOMATON_VERDICT ok" ]] \
+  && [[ "$automaton_left" == '{"sandboxes":0,"containers":0,"networks":0,"homes":0}' ]]; then
+  automaton=true
+fi
 
 cleanup
 trap - EXIT
 remaining=$("${COMPOSE[@]}" ps -q | wc -l | tr -d ' ')
 [[ "$remaining" == "0" ]] || { echo "E2E FAIL: containers left behind"; exit 1; }
-if [[ "$turns" -lt 5 || "$registered" != "true" || "$api_errors" != "0" || "$consistent" != "true" || "$db_registered" != "1" || "$balance_cents" -ge 500 || "$domains_ok" != "true" || "$sandbox" != "true" || "$long_exec" != "true" || "$konto_chain" != "true" || "$relay" != "true" ]]; then
-  echo "E2E FAIL turns=$turns registered=$registered api_errors=$api_errors ledger_consistent=$consistent db_registered=$db_registered balance_cents=$balance_cents konto_chain=$konto_chain domains=$domains_ok sandbox=$sandbox long_exec=$long_exec relay=$relay"
+if [[ "$turns" -lt 5 || "$registered" != "true" || "$api_errors" != "0" || "$consistent" != "true" || "$db_registered" != "1" || "$balance_cents" -ge 500 || "$domains_ok" != "true" || "$sandbox" != "true" || "$long_exec" != "true" || "$konto_chain" != "true" || "$relay" != "true" || "$automaton" != "true" ]]; then
+  echo "E2E FAIL turns=$turns registered=$registered api_errors=$api_errors ledger_consistent=$consistent db_registered=$db_registered balance_cents=$balance_cents konto_chain=$konto_chain domains=$domains_ok sandbox=$sandbox long_exec=$long_exec relay=$relay automaton=$automaton"
   exit 1
 fi
-echo "E2E OK turns=$turns registered=$registered api_errors=$api_errors ledger_consistent=$consistent balance_cents=$balance_cents konto_chain=$konto_chain domains=$domains_ok sandbox=$sandbox long_exec=$long_exec relay=$relay"
+echo "E2E OK turns=$turns registered=$registered api_errors=$api_errors ledger_consistent=$consistent balance_cents=$balance_cents konto_chain=$konto_chain domains=$domains_ok sandbox=$sandbox long_exec=$long_exec relay=$relay automaton=$automaton"
