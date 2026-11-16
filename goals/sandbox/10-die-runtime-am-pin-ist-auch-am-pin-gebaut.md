@@ -93,7 +93,7 @@ nächsten zahlenden Automaton auf.
       Prüfung: `git diff origin/dev...HEAD -- . ':(exclude)goals/' | grep -cE '^\+.*(cnwy_k_[0-9a-f]{32}|-{5}BEGIN [A-Z ]*PRIVATE KEY-{5})'` muss 0 ausgeben.
 - [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
-- [ ] Der Neubau beginnt mit leerem `dist/`: Eine fremde Datei unter `dist/`, die `pnpm build` nicht überschreibt, ist nach
+- [x] Der Neubau beginnt mit leerem `dist/`: Eine fremde Datei unter `dist/`, die `pnpm build` nicht überschreibt, ist nach
       `build_runtime` weg und steht nicht im neuen Stempel; der Selbsttest fällt, wenn `build_runtime` `dist/` vor dem Bau nicht löscht.
       MVP: Funktion, weil `write_dist_stamp` sonst jede liegengebliebene Datei aus einem alten oder veränderten `dist/` als Build am
       Pin stempelt und der nächste Lauf `RUNTIME SANDBOX OK` meldet (Kritik Tech Lead 16.11.2026: ohne die Zeile mit `rm -rf` bleibt
@@ -127,6 +127,7 @@ nächsten zahlenden Automaton auf.
 ## Progress Log
 - 2026-11-16 Zyklus 1: Punkte 1, 2, 3, 4, 5 gebaut, Stempel über dist/ im Git-Verzeichnis, runtime_state meldet dist, build_runtime baut dann neu; vorher rot mit SELFTEST FAIL (5 of 26 cases), rot waren die vier dist-Fälle (OK statt FAIL) und rebuild-changed-dist (builds=0). Prüfbefehle: Punkt 1 SELFTEST OK, 6, 4, 1, nichts fehlt; Punkt 2 beide Mutationen ohne Ausgabe (konstante Summe macht 3 Fälle rot, Bau ohne Stempel 2); Punkt 3 1, 1, 0, 10; Punkt 4 0, 0, 0; Punkt 5 check Exit 0 (grün in 98 s, 2067 Tests).
 - 2026-11-16 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, dev war schon im Branch. Prüfbefehle: Punkt 1 SELFTEST OK, 6, 4, 1, nichts fehlt; Punkt 2 beide Mutationen ohne Ausgabe; Punkt 3 1, 1, 0, 10; Punkt 4 0, 0, 0; Punkt 5 check Exit 0 (grün in 54 s).
+- 2026-11-16 Zyklus 3: Punkt 6 aus der Kritik gebaut, neuer Fall rebuild-drops-stale (fremde Datei unter dist/ ist nach dem Neubau weg), vorher rot ohne das Löschen mit SELFTEST FAIL (1 of 27 cases), stale=kept; Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6. Prüfbefehle: Punkt 1 SELFTEST OK, 6, 4, 1, nichts fehlt; Punkt 2 beide Mutationen ohne Ausgabe; Punkt 3 1, 1, 0, 14; Punkt 4 0, 0, 0; Punkt 5 check Exit 0 (grün in 50 s); Punkt 6 1, SELFTEST OK, Mutation ohne Ausgabe (Gegenprobe ohne Mutation meldet grün).
 
 ## Blockers
 - keine
