@@ -1,7 +1,7 @@
 # Sandbox Goal 10: Die Runtime am Pin ist auch am Pin gebaut
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 `ops/runtime-sandbox.sh` meldet `RUNTIME SANDBOX OK` nur noch, wenn `dist/` der Runtime genau der Build ist, den `build_runtime` am
@@ -101,7 +101,7 @@ nächsten zahlenden Automaton auf.
       Prüfung: `PATH=/usr/bin:$PATH bash ops/runtime-sandbox.sh --selftest | grep -cE '^ok   rebuild-drops-stale: '` muss 1 ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH bash ops/runtime-sandbox.sh --selftest | tail -n 1` muss `RUNTIME SANDBOX SELFTEST OK` ausgeben.
       Prüfung: `T=$(mktemp -d); git archive HEAD | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; f=$T/ops/runtime-sandbox.sh; if ! grep -q 'rm -rf "$RUNTIME_DIR/dist"' $f; then echo "fehlt rm"; else sed -i '/rm -rf "\$RUNTIME_DIR\/dist"/d' $f; PATH=/usr/bin:$PATH bash $f --selftest 2>/dev/null | tail -n 1 | grep -q 'SELFTEST OK' && echo "gruen ohne Loeschen"; fi; rm -rf $T` muss nichts ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Jeder neue Selbsttest-Fall war vor dem Fix rot oder zeigt die Gegenrichtung (`reuse-stamped-dist`); die Zeile im Progress Log
@@ -129,6 +129,7 @@ nächsten zahlenden Automaton auf.
 - 2026-11-16 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, dev war schon im Branch. Prüfbefehle: Punkt 1 SELFTEST OK, 6, 4, 1, nichts fehlt; Punkt 2 beide Mutationen ohne Ausgabe; Punkt 3 1, 1, 0, 10; Punkt 4 0, 0, 0; Punkt 5 check Exit 0 (grün in 54 s).
 - 2026-11-16 Zyklus 3: Punkt 6 aus der Kritik gebaut, neuer Fall rebuild-drops-stale (fremde Datei unter dist/ ist nach dem Neubau weg), vorher rot ohne das Löschen mit SELFTEST FAIL (1 of 27 cases), stale=kept; Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6. Prüfbefehle: Punkt 1 SELFTEST OK, 6, 4, 1, nichts fehlt; Punkt 2 beide Mutationen ohne Ausgabe; Punkt 3 1, 1, 0, 14; Punkt 4 0, 0, 0; Punkt 5 check Exit 0 (grün in 50 s); Punkt 6 1, SELFTEST OK, Mutation ohne Ausgabe (Gegenprobe ohne Mutation meldet grün).
 - 2026-11-16 Zyklus 4: Gap aus dem Verdict B Zyklus 3 behoben, Punkt 4 wieder im Wortlaut von dev (nur das Kästchen gesetzt), der Vorschlag der Kritik nicht mehr auf dem Goal-Branch, dev bis cb9797f eingemergt; Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6. Prüfbefehle aus der Goal-Datei gelesen, in bash ohne Profil: Punkt 1 SELFTEST OK, 6, 4, 1, nichts fehlt; Punkt 2 beide Mutationen ohne Ausgabe; Punkt 3 1, 1, 0, 14; Punkt 4 0, 0, 0; Punkt 5 check Exit 0 (grün in 65 s); Punkt 6 1, SELFTEST OK, Mutation ohne Ausgabe.
+- 2026-11-16 Release: PASS K und B (Zyklus 4), DONE.
 
 ## Blockers
 - keine
