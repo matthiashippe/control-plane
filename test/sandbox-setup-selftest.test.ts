@@ -21,6 +21,10 @@ const runSelftest = () =>
 
 const IMAGE_PIN_CASES = ["desired", "fresh", "rebuild", "again"];
 const CLIENT_KEY_RESET_CASES = ["moved", "again", "reinstall", "foreign", "unknown", "no-timer", "ours", "restore", "keep", "late"];
+// goals/sandbox/08: the line of --check for the runtime in the image (IMAGE runtime <pin> clean or CHANGE image_runtime) both ways
+const IMAGE_RUNTIME_CASES = [
+  "desired", "clean", "dirty", "other-rev", "missing", "fact-clean", "fact-dirty", "fact-other-rev", "fact-no-repo", "fact-no-image", "image-hash",
+];
 
 describe("ops/sandbox/setup.sh", () => {
   it("passes its own selftest without network, every case by name", async () => {
@@ -29,6 +33,7 @@ describe("ops/sandbox/setup.sh", () => {
     const missing = [
       ...IMAGE_PIN_CASES.map((c) => `selftest image-pin: ok (${c})`),
       ...CLIENT_KEY_RESET_CASES.map((c) => `selftest client-key-reset: ok (${c})`),
+      ...IMAGE_RUNTIME_CASES.map((c) => `selftest image-runtime: ok (${c})`),
     ].filter((want) => !lines.includes(want));
     expect(missing, run.stdout).toEqual([]);
     expect(lines.filter((line) => / FAIL/.test(line)), run.stdout).toEqual([]);

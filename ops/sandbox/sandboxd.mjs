@@ -49,7 +49,7 @@ export function loadConfig(env = process.env) {
     stateFile: env.SANDBOXD_STATE || "/var/lib/sandboxd/state.json",
     disksDir: env.SANDBOXD_DISKS || "/var/lib/sandboxd/disks",
     mntDir: env.SANDBOXD_MNT || "/var/lib/sandboxd/mnt",
-    image: env.SANDBOXD_IMAGE || "sandboxd-base:1",
+    image: env.SANDBOXD_IMAGE || "sandboxd-base:2",
     slots: int(env.SANDBOXD_SLOTS, 10),
     domain: (env.SANDBOXD_DOMAIN || "").trim().toLowerCase(),
     sweepS: int(env.SANDBOXD_SWEEP_S, 60),
@@ -184,7 +184,12 @@ export function networkCreateArgs(id) {
 
 // Measured on the server: Docker's embedded DNS 127.0.0.11 does not answer under runsc on a user-defined
 // network, so the container writes its own resolv.conf (and keeps --dns for the record).
-export const CONTAINER_CMD = 'printf "nameserver 1.1.1.1\\nnameserver 9.9.9.9\\n" > /etc/resolv.conf; exec sleep infinity';
+// After every container start (create, docker start, the restart after an OOM, reconcile after a reboot) it starts the
+// supervisor of the runtime when automaton-start has set the mark (goals/sandbox/08, decision 2); without it, as before.
+// /root stands only after a blank or =, so the harness maps it to the home of the sandbox (mapRoot in harness-run.mjs).
+export const CONTAINER_CMD = 'printf "nameserver 1.1.1.1\\nnameserver 9.9.9.9\\n" > /etc/resolv.conf; '
+  + "if [ -f /root/.automaton/autostart ]; then AUTOMATON_HOME=/root setsid automaton-supervise >/dev/null 2>&1 < /dev/null & fi; "
+  + "exec sleep infinity";
 
 // --restart unless-stopped: an OOM kills the gVisor sentry and with it the whole container; docker brings it
 // back, while `docker stop` stays sticky, so stop and start keep working. Status comes from state.
@@ -333,7 +338,7 @@ export function createSandboxd({ run, now = Date.now, keys = [], state = memoryS
     id: s.id, status: s.status, owner: s.owner, name: s.name, region: null, tier: s.tier,
     vcpu: s.vcpu, memory_mb: s.memory_mb, disk_gb: s.disk_gb,
     created_at: s.created_at, started_at: s.started_at, stopped_at: s.stopped_at, last_activity: s.last_activity,
-    terminal_url: null, ports: s.ports.map((p) => ({ port: p, public_url: publicUrl(s.id, p) })),
+    keep_running: s.keep_running === true, terminal_url: null, ports: s.ports.map((p) => ({ port: p, public_url: publicUrl(s.id, p) })),
   });
 
   // Slots count running sandboxes and creates in flight; a stopped one frees its place until it starts again.
@@ -381,8 +386,9 @@ export function createSandboxd({ run, now = Date.now, keys = [], state = memoryS
   }
 
   async function create(body) {
-    const { owner, name: label, vcpu, memory_mb, disk_gb } = body;
+    const { owner, name: label, vcpu, memory_mb, disk_gb, keep_running } = body;
     if (typeof owner !== "string" || !OWNER_RE.test(owner)) return [400, { error: "owner is required: 1 to 128 of [A-Za-z0-9._:-]" }];
+    if (keep_running !== undefined && typeof keep_running !== "boolean") return [400, { error: "keep_running must be true or false" }];
     if (label != null && (typeof label !== "string" || !NAME_RE.test(label))) return [400, { error: "name: 1 to 64 of [A-Za-z0-9._-]" }];
     for (const [k, v] of Object.entries({ vcpu, memory_mb, disk_gb })) {
       if (v != null && !(typeof v === "number" && Number.isFinite(v) && v > 0)) return [400, { error: `${k} must be a positive number` }];
@@ -419,6 +425,7 @@ export function createSandboxd({ run, now = Date.now, keys = [], state = memoryS
     data.sandboxes[id] = {
       id, owner, name: label ?? null, tier: tier.name, vcpu: tier.vcpu, memory_mb: tier.memory_mb, disk_gb: tier.disk_gb,
       pids: tier.pids, slots: tier.slots, status: "running", created_at: t, started_at: t, stopped_at: null, last_activity: t, ports: [],
+      keep_running: keep_running === true,
     };
     pending.delete(id);
     persist();
@@ -654,6 +661,9 @@ export function createSandboxd({ run, now = Date.now, keys = [], state = memoryS
       const due = [];
       for (const s of Object.values(data.sandboxes)) {
         if (s.status === "running") {
+          // An automaton calls the control plane, not sandboxd, so neither limit applies to it (goals/sandbox/08, decision 3);
+          // it ends by stop or delete of its owner and by an empty balance. A sandbox of an older state has no field.
+          if (s.keep_running) continue;
           if (t - Date.parse(s.started_at) > MAX_RUN_MS) due.push({ id: s.id, action: "stop", reason: "max-runtime" });
           else if (s.ports.length === 0 && t - Date.parse(s.last_activity) > IDLE_MS) due.push({ id: s.id, action: "stop", reason: "idle" });
         } else if (s.status === "stopped" && s.stopped_at && t - Date.parse(s.stopped_at) > STOPPED_KEEP_MS) {

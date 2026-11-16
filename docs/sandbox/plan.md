@@ -108,6 +108,11 @@ eigene Sandbox trifft. Laufzeit: Eine Sandbox läuft, solange Guthaben da ist, h
 freigegebenen Port für 24 Stunden wird sie gestoppt und nicht mehr berechnet; gestoppt bleibt sie 7 Tage, dann wird sie gelöscht.
 Ein `exec` dauert höchstens 10 Minuten. Höchstens zwei Sandboxes je Konto, eine mittlere zählt als zwei Plätze.
 
+Ausnahme seit sandbox 08: Die Sandbox eines Automatons (`POST /v1/automatons`, `docs/sandbox/automaton.md`) legt das Control Plane
+mit `keep_running` an. Sie fällt weder unter die 24 Stunden ohne Aufruf noch unter die 30 Tage, weil ein Automaton Inferenz und
+Credits beim Control Plane ruft und nie bei `sandboxd`. Sie endet nur durch Stopp oder Löschen des Kunden und durch leeres Guthaben.
+`keep_running` setzt nur der signierte Weg des Control Planes; die öffentliche Route `POST /v1/sandboxes` reicht es nie durch.
+
 Solange wa-staging auf dem Server läuft, laufen alle Sandboxes und `sandboxd` in einer eigenen systemd-Slice `sandbox.slice` mit
 `CPUQuota=100%` und `MemoryMax=5G`; Host und wa-staging bleiben damit immer 1 vCPU und rund 3 GB, mehr als die 1 vCPU und 2 GB für
 wa-staging (Regel 4 in `docs/sandbox/server.md`, Entscheidung Tech Lead 11.11.2026). Unter `runsc` liegt die Sentry im Cgroup des

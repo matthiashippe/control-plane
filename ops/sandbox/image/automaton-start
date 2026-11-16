@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# automaton-start [setup-file]: first start of the runtime in a sandbox (goals/sandbox/08, decision 1).
+#
+# Without $H/.automaton/automaton.json it runs the headless setup at the pin with the setup file (default
+# $H/.automaton-setup.json): wallet, automaton.json, config.json with the API key, heartbeat.yml. The setup file is removed
+# in every case, then the mark $H/.automaton/autostart is set, so CONTAINER_CMD of sandboxd starts the supervisor after
+# every container start, and the supervisor starts now in the background. Last line AUTOMATON_START ok, or
+# AUTOMATON_START FAIL <why> with exit 1. Never prints the setup file, config.json or the wallet; no line here reads the wallet.
+set -uo pipefail
+
+H="${AUTOMATON_HOME:-/root}"
+export HOME="$H"
+SETUP="${1:-$H/.automaton-setup.json}"
+DIR="$H/.automaton"
+SETUP_JS="${AUTOMATON_SETUP_JS:-/opt/automaton-setup/setup-headless.mjs}"
+
+if [ ! -f "$DIR/automaton.json" ]; then
+  if [ ! -f "$SETUP" ]; then
+    echo "AUTOMATON_START FAIL no setup file"
+    exit 1
+  fi
+  # The output of the setup names the wallet address; it goes to a file in the sandbox, not to the caller.
+  mkdir -p "$DIR" && chmod 0700 "$DIR"
+  if ! node "$SETUP_JS" "$SETUP" > "$DIR/setup.log" 2>&1; then
+    rm -f "$SETUP"
+    echo "AUTOMATON_START FAIL setup"
+    exit 1
+  fi
+fi
+rm -f "$SETUP"
+mkdir -p "$DIR"
+touch "$DIR/autostart"
+AUTOMATON_HOME="$H" setsid automaton-supervise >/dev/null 2>&1 < /dev/null &
+echo "AUTOMATON_START ok"
