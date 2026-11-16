@@ -11,7 +11,7 @@ derselben Fläche.
 | 1440 | `startseite-1440.png` | 1440 x 900 |
 
 Quelle ist `src/startseite.html`: der gerenderte Stand von `/` (englisch, `CP_PUBLIC_URL=https://postyourprice.com`, leere
-Datenbank), ohne Kommentare, Zählpixel und Skripte, mit dem Umzug für Conway-Betreiber als erstem Block (`data-soll="umzug"`). Der
+Datenbank), ohne Kommentare, Zählpixel und Skripte, mit dem Umzug für Conway-Betreiber als erstem Block (`data-soll="move"`). Der
 Block `#agents` vom Seitenende ist dorthin gewandert. Markt und Fußzeile zeigen den leeren Stand der Renderer, keine Zahl aus der
 Produktion; seite 02 füllt sie mit den echten Renderern.
 
@@ -19,7 +19,7 @@ Bauen und prüfen, ohne Netz, mit dem Chromium aus `~/.cache/ms-playwright/`:
 
 ```
 node ops/soll.mjs            # Bilder neu schreiben
-node ops/soll.mjs --pruefen  # neu rendern und vergleichen, Exit 1 bei jedem Mangel
+node ops/soll.mjs --check    # neu rendern und vergleichen, Exit 1 bei jedem Mangel
 ```
 
 Mängel: ein einziger Pixel weicht vom neuen Render ab (über der Kanaltoleranz von 8), waagrechter Überlauf (auch abgeschnittener Inhalt), Gedankenstrich im
@@ -55,8 +55,8 @@ Bauen und prüfen, ohne Netz, mit dem Chromium aus `~/.cache/ms-playwright/`:
 
 ```
 node ops/soll-handoff.mjs                          # Bilder neu schreiben
-node ops/soll-handoff.mjs --pruefen                # neu rendern und vergleichen, Exit 1 bei jedem Mangel
-node ops/soll-handoff.mjs --pruefen --source <dir> # dieselbe Prüfung gegen die drei Quellen in <dir>
+node ops/soll-handoff.mjs --check                  # neu rendern und vergleichen, Exit 1 bei jedem Mangel
+node ops/soll-handoff.mjs --check --source <dir>   # dieselbe Prüfung gegen die drei Quellen in <dir>
 ```
 
 Mängel wie bei der Startseite, dazu: Block `freigabe` endet unter dem ersten Bildschirm, und ein Wort, das der Leser erst übersetzen
@@ -93,8 +93,8 @@ Bauen und prüfen, ohne Netz, mit dem Chromium aus `~/.cache/ms-playwright/`:
 
 ```
 node ops/soll-konto.mjs                          # Bilder neu schreiben
-node ops/soll-konto.mjs --pruefen                # neu rendern und vergleichen, Exit 1 bei jedem Mangel
-node ops/soll-konto.mjs --pruefen --source <dir> # dieselbe Prüfung gegen die zwei Quellen konto-<zustand>.html in <dir>
+node ops/soll-konto.mjs --check                  # neu rendern und vergleichen, Exit 1 bei jedem Mangel
+node ops/soll-konto.mjs --check --source <dir>   # dieselbe Prüfung gegen die zwei Quellen konto-<zustand>.html in <dir>
 ```
 
 Mängel wie beim Handoff, dazu: Block `passkey` fehlt oder endet unter dem ersten Bildschirm, eine fremde Adresse in einem Attribut

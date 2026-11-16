@@ -33,3 +33,10 @@
   Tests ihre Regel am neuen Ort prüfen (Diff gelesen, kein Fall und keine Assertion weniger). Damit die Erweiterung nicht ungeprüft
   bleibt, sichert Punkt 7 diese fünf Tests wie Punkt 3 die ersten drei. Die Änderung am Vertrag schickt den Goal-PR in die Human
   Inbox; die liegt bei diesem Loop beim Tech Lead, der nach dieser Entscheidung nach `dev` merged.
+
+## Abgelöst durch seite 03 (Maker, 2026-11-16)
+
+- Abgelöst: seite 01 Punkt 1 durch seite 03 Punkt 1, Ausgabe dann genau `Exit 1, unknown argument: --pruefen` (Tech Lead, 2026-11-14)
+- Abgelöst: seite 01 Punkt 6 durch seite 03 Punkt 1, Ausgabe dann genau `Exit 1, unknown argument: --pruefen` (Tech Lead, 2026-11-14)
+- Abgelöst: seite 01 Punkt 3 durch seite 03 Punkt 2, Ausgabe dann genau `Exit 1, [ 'umzug', 'inhalt umzug' ]` (Tech Lead, 2026-11-14)
+- Abgelöst: seite 02 Punkt 2 durch seite 03 Punkt 1, Ausgabe dann genau `Exit 1, unknown argument: --pruefen` (Tech Lead, 2026-11-14)
