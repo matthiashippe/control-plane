@@ -10,6 +10,7 @@ import type { KontoDeps } from "../handoff/routes.js";
 import { loadKontoKey } from "./chain.js";
 import { readKontoConfig } from "./config.js";
 import { createKontoChain, topUpIfLow } from "./topup.js";
+import { createPayoutChain } from "./payout.js";
 
 export type KontoSetup = KontoDeps & { topUp: (address: string) => void };
 
@@ -28,6 +29,8 @@ export function kontoFromEnv(db: Db, env: Record<string, string | undefined>, tr
     verifyClient,
     authProxyId: config.authProxyId,
     topupUsdc: config.topupUsdc,
+    // The payout of konto 05: the same key and transport, every transaction through sendKontoTx.
+    payoutChain: createPayoutChain({ chainId: config.chainId, account, transport: rpc, token: config.token, client: verifyClient }),
     topUp: (address) => {
       topUpIfLow({ db, chain, topupBelowUsdc: config.topupBelowUsdc, topupUsdc: config.topupUsdc }, address)
         .then((r) => {

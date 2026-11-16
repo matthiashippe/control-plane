@@ -18,10 +18,20 @@ const MAINNET_USDC = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913";
 const DAY = 86_400;
 
 /**
- * A chain that is not there: every eth_call fails, so the ERC-6492 check of viem falls back to ecrecover. The account of these
- * tests is a plain key standing in for the smart wallet; the signature path of a real smart wallet runs in harness/e2e/konto-chain.mjs.
+ * A chain without code at the account: the ERC-6492 validator answers false for every eth_call, so viem falls back to ecrecover,
+ * and every other request fails. The account of these tests is a plain key standing in for the smart wallet; the signature path of
+ * a real smart wallet runs in harness/e2e/konto-chain.mjs. Since goals/konto/05 (point 7) a chain that cannot be asked at all is
+ * no longer a no but a 503 (test/konto-signature-retry.test.ts), so this one answers.
  */
-const noChain = createPublicClient({ chain: baseSepolia, transport: custom({ request: async () => { throw new Error("no chain in unit tests"); } }), }) as unknown as PublicClient;
+const noChain = createPublicClient({
+  chain: baseSepolia,
+  transport: custom({
+    request: async ({ method }: { method: string }) => {
+      if (method === "eth_call") return "0x0000000000000000000000000000000000000000000000000000000000000000";
+      throw new Error("no chain in unit tests");
+    },
+  }),
+}) as unknown as PublicClient;
 
 const spender = privateKeyToAccount(generatePrivateKey()).address;
 const kontoDeps = (over: Partial<KontoDeps> = {}): KontoDeps => ({

@@ -28,12 +28,21 @@ import { ATLAS, create, handoffApp, post, tap } from "./handoff-helpers.js";
 const DAY = 86_400;
 const START = Math.floor(Date.parse("2026-11-13T12:00:00Z") / 1000);
 
-/** A chain that counts every request and answers none: the ERC-6492 check of viem then falls back to ecrecover. */
+/**
+ * A chain that counts every request and answers only eth_call, with the false of the ERC-6492 validator for an address without
+ * code: viem then falls back to ecrecover. Since goals/konto/05 (point 7) a chain that cannot be asked is a 503, not a no.
+ */
 function countingChain() {
   const calls: string[] = [];
   const client = createPublicClient({
     chain: baseSepolia,
-    transport: custom({ request: async ({ method }: { method: string }) => { calls.push(method); throw new Error("no chain in unit tests"); } }),
+    transport: custom({
+      request: async ({ method }: { method: string }) => {
+        calls.push(method);
+        if (method === "eth_call") return "0x0000000000000000000000000000000000000000000000000000000000000000";
+        throw new Error("no chain in unit tests");
+      },
+    }),
   }) as unknown as PublicClient;
   return { calls, client };
 }
