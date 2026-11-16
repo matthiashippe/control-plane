@@ -1,7 +1,7 @@
 # Konto Goal 03: Konto und Abbuchung auf Base Sepolia
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Wer im Terminal einen Automaton startet und keine Wallet hat, bekommt über den Handoff aus konto 02 ein eigenes Konto: Nach der
@@ -217,7 +217,7 @@ Erlaubnis aufsetzen und ohne beides kein Mensch ohne Wallet einen Automaton bei 
       der nächste Lauf dann noch einmal abbucht; in konto 05 wäre das echtes Geld (Kritik Tech Lead 2026-11-15).
       Prüfung: `pnpm -s vitest run test/konto-topup-pending.test.ts test/konto-topup.test.ts` muss Exit-Code 0 haben.
       Prüfung: `grep -cE "^\s*(it|test)\(" test/konto-topup-pending.test.ts` muss mindestens 5 ausgeben (je ein Fall: `receipt()` wirft nach einem gesendeten `spend()`, es gibt keine Zeile `topup` und der Hash steht offen in der Datenbank; der nächste Aufruf für dieses Konto mit Quittung `success` bucht genau eine Zeile `topup` mit diesem Hash als `ref` und ruft `spend()` insgesamt nur einmal; wirft auch das zweite Warten, bleibt der Hash offen, es gibt keine Zeile und kein zweites `spend()`; ein offener Hash mit Quittung `reverted` bucht nichts, gibt das Konto frei, und erst der Aufruf danach sendet ein neues `spend()`; derselbe offene Hash wird nach einem Neustart, also mit frisch geladenem Modul und derselben Datenbank, genau einmal gebucht).
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Ein Mensch ohne Wallet hat nach der Zahl und einem Tipp auf den Passkey ein Konto und sieht vorher, was wir abbuchen dürfen.
@@ -256,5 +256,6 @@ Erlaubnis aufsetzen und ohne beides kein Mensch ohne Wallet einen Automaton bei 
 - 2026-11-15 Zyklus 4: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15. `origin/dev` ohne neue Commits, Kopf 5fa520b. Prüfbefehle (Node 22.23.4, PATH=/usr/bin:$PATH, Last 186 auf 14 Kernen): P1 `0 Mängel`, `breiten ok`, `quellen ok`, `bausteine ok neu=2`; P2 Exit 0, 8, `bestand gleich`, Handoff und Startseite `0 Mängel`; P3 `abnahme ok 1`; P4 live `0 Mängel`, mit X `2 Mängel` und `exit=1`, Handoff live `0 Mängel`, `0`; P5 Exit 0, 4, Gegenprobe still, `0`, `2`; P6 Exit 0, 13, Gegenprobe still, Handoff-Tests Exit 0; P7 Exit 0, 9, Gegenprobe still; P8 `1`, `20`, `1`, `1`, `code gleich 4`, `1`; P9 Exit 0, 4, `0`; P10 `sepolia ok`, `turnkey ok passkey=1 owner=1`, `spender eigen`; P11 `0`; P12 `2`, `0`, `LIVE SELFTEST OK`, `1`, `3`; P13 leer, `15`; P14 `0`, `0`, `pakete ok 0 1`, `0`, `check: grün in 421 s` (1909 Tests), `1`; P15 Exit 0, `5`; am PR #104 `check pass` und `e2e pass`.
 - 2026-11-15 Zyklus 5: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, Gap aus `goals/konto/verdicts/03-z4-B.md` behoben: Die Commit-Message dieses Zyklus nennt den Grund für `esbuild` als devDependency in `package.json` und `pnpm-lock.yaml`. Code, Tests und Prüfbefehle unverändert seit `3b3f7f8` (nur die beiden Verdicts kamen dazu, `git diff 3b3f7f8 -- . ':!goals/konto/verdicts'` leer), `origin/dev` ohne neue Commits; die Prüfbefehle von Zyklus 4 und das Verdict K PASS gelten für denselben Code.
 - 2026-11-15 Zyklus 6: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, Gap aus `goals/konto/verdicts/03-z5-B.md` behoben (eigene Prüfbefehle statt Verweis). `origin/dev` `a4ee65b` gemergt (nur `ops/watchdog.sh` und sein Test, kein Konflikt), Prüfbefehle am Kopf 9ab88b8 selbst gefahren (Node 22.23.4, PATH=/usr/bin:$PATH). Die SOLL-Befehle liefen mit `FONTCONFIG_FILE` ohne `/usr/share/fonts/truetype/dejavu/*`, weil `sans-serif` auf dem code-host seit 20:22 UTC zu DejaVu Sans auflöst, die Bilder aber mit WenQuanYi Zen Hei gerendert sind; ohne diese Einstellung meldet `node ops/soll-konto.mjs --pruefen` `4 Mängel`, auf `origin/dev` ebenso (Verdict K `03-z4-K.md`). Prüfbefehle: P1 `soll konto: 4 Bilder, passkey oben 390=527 1440=510, 0 Mängel`, `breiten ok`, `quellen ok`, `bausteine ok neu=2`; P2 vitest Exit 0, `8`, `bestand gleich`, `soll handoff: 6 Bilder, freigabe oben 390=528 1440=603, 0 Mängel`, `soll: 2 Bilder, umzug oben 390=828 1440=656, 0 Mängel`; P3 `abnahme ok 1`; P4 live `0 Mängel`, mit X `2 Mängel` und `exit=1`, Handoff live `0 Mängel`, `0`; P5 vitest Exit 0, `4`, Gegenprobe ohne Ausgabe, `0`, `2`; P6 vitest Exit 0, `13`, Gegenprobe ohne Ausgabe, Handoff-Tests Exit 0; P7 vitest Exit 0, `9`, Gegenprobe ohne Ausgabe; P8 `1`, `20`, `1`, `1`, `code gleich 4`, e2e am PR siehe unten; P9 vitest Exit 0, `4`, `0`; P10 `sepolia ok`, `turnkey ok passkey=1 owner=1`, `spender eigen`; P11 `0`; P12 `2`, `0`, `LIVE SELFTEST OK` mit Exit 0, `1`, `3`; P13 ohne Ausgabe, `15`; P14 `0`, `0`, `pakete ok 0 1`, `0`, `check: grün in 155 s` (1910 Tests), check am PR siehe unten; P15 vitest Exit 0, `5`.
+- 2026-11-16 Release: PASS K und B (Zyklus 6), DONE.
 
 ## Blockers
