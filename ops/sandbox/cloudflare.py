@@ -9,7 +9,8 @@ Runs on the code-host only. Two zones, two tokens, each never printed and never 
   that zone only (Zone DNS Edit, Zone SSL and Certificates Edit, Zone Settings Edit). Managed: *.<domain> (A, proxied), the
   SSL mode Full (strict) and Always Use HTTPS on.
 
-A token is read from the environment or from ~/brain/connectors/secrets.env.
+A token is read from the environment or from ~/brain/connectors/secrets.env. CLOUDFLARE_API_BASE replaces the API base for
+tests (a fake API on loopback only); without it the base is https://api.cloudflare.com/client/v4.
 
   cloudflare.py dns-check <ip>      payment zone: one CHANGE line per record that would change, last line CF DNS OK changed=0
   cloudflare.py dns-apply <ip>      payment zone: create ctl.sbx, delete exactly the record(s) named *.postyourprice.com
@@ -18,6 +19,10 @@ A token is read from the environment or from ~/brain/connectors/secrets.env.
                                     deletes a record
   cloudflare.py origin-cert <dir>   write origin.pem and origin.key for *.<domain> and <domain> into <dir> (0600)
   cloudflare.py zone-digest <zone>  read only: sha256 over the sorted records except *.<zone> and the SSL mode, first 12 hex
+  cloudflare.py psl-txt <url>       ports zone: the one TXT record _psl.<domain> with the Public Suffix List pull request
+                                    <url> (only https://github.com/publicsuffix/list/pull/<n>, any other url is refused before
+                                    any API call); creates it, or patches only this record when it holds another url; never
+                                    deletes, never touches another record; last line PSL TXT OK (goals/sandbox/11)
   cloudflare.py --selftest          without network: the planners report planted deviations and a clean zone not
 
 A managed name that already exists with other content is reported as a conflict and left as it is. Emergency switch for abuse
@@ -35,6 +40,7 @@ from pathlib import Path
 
 PAYMENT_ZONE = "postyourprice.com"
 API = "https://api.cloudflare.com/client/v4"
+PSL_PR = re.compile(r"https://github\.com/publicsuffix/list/pull/[1-9][0-9]*")
 HERE = Path(__file__).resolve().parent
 TOKENS = {"payment": "CLOUDFLARE_HTC_API_TOKEN", "ports": "CLOUDFLARE_SBX_API_TOKEN"}
 
@@ -66,9 +72,17 @@ def token(kind):
     sys.exit(f"cloudflare: no token {name}")
 
 
+def api_base():
+    """The real API, or a fake one on loopback for tests, so a token is never sent anywhere else."""
+    base = os.environ.get("CLOUDFLARE_API_BASE") or API
+    if base != API and not re.fullmatch(r"http://(127\.0\.0\.1|localhost):[0-9]+(/[A-Za-z0-9/_.-]*)?", base):
+        sys.exit("cloudflare: CLOUDFLARE_API_BASE must be the Cloudflare API or a loopback address")
+    return base.rstrip("/")
+
+
 def call(kind, method, path, body=None):
     data = json.dumps(body).encode() if body is not None else None
-    req = urllib.request.Request(API + path, data=data, method=method)
+    req = urllib.request.Request(api_base() + path, data=data, method=method)
     req.add_header("Authorization", "Bearer " + token(kind))
     req.add_header("Content-Type", "application/json")
     try:
@@ -140,6 +154,30 @@ def plan_ports(recs, ssl, https, ip, domain):
     out.append(("ok" if ssl == "strict" else "ssl", {"type": "SSL", "name": domain, "content": "strict", "have": ssl}))
     out.append(("ok" if https == "on" else "https", {"type": "HTTPS", "name": domain, "content": "on", "have": https}))
     return out
+
+
+def psl_url(url):
+    """The pull request url, or None for anything else (other repo, no number, trailing text, http)."""
+    return url if isinstance(url, str) and PSL_PR.fullmatch(url) else None
+
+
+def txt_value(content):
+    """TXT content as Cloudflare stores it, with or without the surrounding quotes."""
+    c = content or ""
+    return c[1:-1] if len(c) >= 2 and c[0] == c[-1] == '"' else c
+
+
+def plan_psl(recs, name, url):
+    """(action, record) for the TXT record <name>: create, ok, patch (the one existing record) or conflict (more than one)."""
+    same = [r for r in recs if r["name"] == name and r["type"] == "TXT"]
+    want = {"type": "TXT", "name": name, "content": f'"{url}"', "ttl": 1}
+    if not same:
+        return ("create", want)
+    if len(same) > 1:
+        return ("conflict", want)
+    if txt_value(same[0]["content"]) == url:
+        return ("ok", same[0])
+    return ("patch", {**want, "id": same[0]["id"]})
 
 
 def digest(recs, ssl, zone):
@@ -218,6 +256,27 @@ def zone_digest(zone):
     return 0
 
 
+def psl_txt(url):
+    if psl_url(url) is None:
+        sys.exit("cloudflare: psl-txt takes only https://github.com/publicsuffix/list/pull/<n>")
+    domain = ports_domain()
+    name = f"_psl.{domain}"
+    z = zone_id(domain)
+    action, w = plan_psl(records(domain, z), name, url)
+    if action == "create":
+        call("ports", "POST", f"/zones/{z}/dns_records", {k: w[k] for k in ("type", "name", "content", "ttl")})
+        print(f"created TXT {name}")
+    elif action == "patch":
+        call("ports", "PATCH", f"/zones/{z}/dns_records/{w['id']}", {k: w[k] for k in ("type", "name", "content", "ttl")})
+        print(f"patched TXT {name}")
+    elif action == "conflict":
+        sys.exit(f"cloudflare: more than one TXT {name}, left unchanged")
+    else:
+        print(f"unchanged TXT {name}")
+    print("PSL TXT OK")
+    return 0
+
+
 def origin_cert(directory):
     domain = ports_domain()
     d = Path(directory)
@@ -279,6 +338,20 @@ def selftest():
     expect("digest sees a removed record", True, base != digest([ctl], "full", PAYMENT_ZONE))
     expect("digest sees the ssl mode", True, base != digest([ctl, apex], "strict", PAYMENT_ZONE))
     expect("digest is 12 hex", True, bool(re.fullmatch(r"[0-9a-f]{12}", base)))
+    pr = "https://github.com/publicsuffix/list/pull/2999"
+    expect("psl url accepted", pr, psl_url(pr))
+    for bad in ("https://github.com/x/list/pull/1", "https://github.com/publicsuffix/list/pull/", pr + "/files", pr + "\n",
+                "https://github.com/publicsuffix/list/pull/0", "http://github.com/publicsuffix/list/pull/1"):
+        expect(f"psl url refused {bad!r}", None, psl_url(bad))
+    pn = "_psl." + dom
+    txt = {"id": "5", "type": "TXT", "name": pn, "content": f'"{pr}"', "ttl": 1}
+    expect("psl txt missing is created", "create", plan_psl([pw], pn, pr)[0])
+    expect("psl txt same is ok", "ok", plan_psl([pw, txt], pn, pr)[0])
+    expect("psl txt unquoted same is ok", "ok", plan_psl([{**txt, "content": pr}], pn, pr)[0])
+    expect("psl txt other url is patched by id", ("patch", "5"),
+           (lambda s: (s[0], s[1].get("id")))(plan_psl([{**txt, "content": '"x"'}], pn, pr)))
+    expect("psl txt twice is a conflict", "conflict", plan_psl([txt, {**txt, "id": "6"}], pn, pr)[0])
+    expect("psl txt ignores other names", "create", plan_psl([{**txt, "name": dom}], pn, pr)[0])
     expect("ports domain is not the payment zone", True, ports_domain() != PAYMENT_ZONE and not ports_domain().endswith("." + PAYMENT_ZONE))
 
     print("CLOUDFLARE SELFTEST OK" if fails == 0 else f"CLOUDFLARE SELFTEST FAILED ({fails})")
@@ -292,6 +365,7 @@ COMMANDS = {
     "ports-apply": lambda a: 1 if ports_apply(a) else 0,
     "origin-cert": origin_cert,
     "zone-digest": zone_digest,
+    "psl-txt": psl_txt,
 }
 
 if __name__ == "__main__":
