@@ -49,6 +49,11 @@ geht es nur nach unten, weil eine Prompt-Injection im Terminal höchstens den Sc
   `sendKontoTx` erst `approveWithSignature` für die neue, dann `revokeAsSpender` für die alte und bucht erst danach mit `spend()`
   aus der neuen ab. So gelten on-chain nie zwei unserer Erlaubnisse länger als diese zwei Transaktionen, und ein `spend()` aus der
   alten scheitert ab dem Widerruf.
+- Eine Erhöhung setzt die Periode nicht zurück. Die neue Erlaubnis hat ein eigenes `start` und damit eine frische Periode, darum
+  hält `topUpIfLow` nach dem Widerruf fest, was die alte in ihrer laufenden Periode abgebucht hat (`carry_usdc`), und bis diese
+  Periode endet (`carry_until`, `periodEnd` in `src/konto/topup.ts`) zählt es gegen das neue Limit. Nach einer Erhöhung von 5 auf
+  10, bei der die alte schon 4 abgebucht hat, bucht der Server am selben Tag also höchstens 6 aus der neuen ab, danach gilt die
+  Periode der neuen allein.
 - Im MCP-Server entscheidet `raiseNeedsPhone`, ob `set_daily_limit` den Handoff braucht. Der Server lehnt jede Erhöhung ohne
   Handoff trotzdem ab; das Tool ist Bequemlichkeit, nicht die Sperre.
 - Ohne `CP_KONTO_CHAIN_ID` antworten `step: "limit"`, `POST /h/{code}/limit` und `POST /v1/konto/limit` mit 503.

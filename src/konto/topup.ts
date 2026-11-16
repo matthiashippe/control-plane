@@ -16,6 +16,12 @@
  * permission (`next_permission`); before anything else the next run sends approveWithSignature for it and revokeAsSpender for the
  * old one, both through sendKontoTx, and spends only from the new one, so that on-chain never two of our permissions for an
  * account hold at once for longer than these two transactions.
+ *
+ * A raise does not reset the period (point 13): the new permission has its own `start` and so a fresh period. When the old one is
+ * revoked, what it spent in its running period is kept as `carry_usdc` until that period ends (`carry_until`, unix seconds), and
+ * until then a run spends from the new one at most the limit minus what the new one and the carry spent; after that the period of
+ * the new one holds alone. A second raise in the same period adds what the second permission spent to the carry and keeps the
+ * later of both ends, so a run may spend less than it could, never more.
  */
 import { createPublicClient, encodeFunctionData, type Address, type Hex, type LocalAccount, type PublicClient, type Transport } from "viem";
 import { baseSepolia } from "viem/chains";
@@ -55,6 +61,8 @@ export interface TopUpDeps {
   chain: KontoChain;
   topupBelowUsdc: bigint;
   topupUsdc: bigint;
+  /** The clock in milliseconds, for the end of the period of a revoked permission; production uses Date.now. */
+  now?: () => number;
 }
 
 export type TopUpResult =
@@ -73,6 +81,15 @@ interface AccountRow {
   cap_usdc: string | null;
   next_permission: string | null;
   next_signature: string | null;
+  carry_usdc: string | null;
+  carry_until: string | null;
+}
+
+/** The end (unix seconds) of the period of `p` that holds at `nowSeconds`, as getCurrentPeriod of the contract counts it. */
+export function periodEnd(p: SpendPermission, nowSeconds: number): number {
+  const elapsed = Math.max(0, nowSeconds - p.start);
+  const end = p.start + (Math.floor(elapsed / p.period) + 1) * p.period;
+  return Math.min(end, p.end);
 }
 
 /** Books a successful spend once: a second call with the same hash adds nothing. Returns whether a row was written. */
@@ -119,6 +136,19 @@ async function waitForSpend(deps: TopUpDeps, address: string, hash: Hex, usdc: b
   return { kind: "booked", hash, usdc, mc: Number(usdc / ATOMIC_PER_MC) };
 }
 
+/** What a revoked permission spent in its running period, while that period holds; 0 once it ended. */
+function activeCarry(row: Pick<AccountRow, "carry_usdc" | "carry_until">, nowSeconds: number): bigint {
+  if (row.carry_usdc === null || row.carry_until === null) return 0n;
+  return nowSeconds < Number(row.carry_until) ? BigInt(row.carry_usdc) : 0n;
+}
+
+/** The carry after a switch: what the revoked one spent in its period, plus a carry that still holds, until the later end. */
+function carryAfterSwitch(row: AccountRow, oldSpent: bigint, oldEnd: number, nowSeconds: number): { usdc: bigint; until: number } {
+  const held = activeCarry(row, nowSeconds);
+  const until = held > 0n ? Math.max(oldEnd, Number(row.carry_until)) : oldEnd;
+  return { usdc: oldSpent + held, until };
+}
+
 const running = new Map<string, Promise<TopUpResult>>();
 
 /** Tops the account up when its credit is low. A second call while one runs for the same account waits for that one. */
@@ -133,8 +163,9 @@ export function topUpIfLow(deps: TopUpDeps, address: string): Promise<TopUpResul
 
 async function topUp(deps: TopUpDeps, address: string): Promise<TopUpResult> {
   const { db, chain } = deps;
+  const nowSeconds = Math.floor((deps.now ?? Date.now)() / 1000);
   const row = db
-    .prepare("SELECT chain_id, permission, signature, approved_tx, pending_tx, pending_usdc, cap_usdc, next_permission, next_signature FROM konto_accounts WHERE address = ?")
+    .prepare("SELECT chain_id, permission, signature, approved_tx, pending_tx, pending_usdc, cap_usdc, next_permission, next_signature, carry_usdc, carry_until FROM konto_accounts WHERE address = ?")
     .get(address) as AccountRow | undefined;
   if (!row) return { kind: "none", reason: "no_account" };
   try {
@@ -157,18 +188,22 @@ async function topUp(deps: TopUpDeps, address: string): Promise<TopUpResult> {
     }
     const revokeTx = await chain.revoke(old);
     if (!receiptSucceeded(await chain.receipt(revokeTx))) return { kind: "none", reason: "revoke_failed" };
+    // Revoked, so what the old one spent in its running period can no longer grow: it counts against the new limit until then.
+    const carry = carryAfterSwitch(row, await chain.spentThisPeriod(old), periodEnd(old, nowSeconds), nowSeconds);
     db.prepare(
       `UPDATE konto_accounts SET permission = next_permission, signature = next_signature, approved_tx = COALESCE(?, approved_tx),
-       next_permission = NULL, next_signature = NULL WHERE address = ? AND next_permission = ?`,
-    ).run(approvedTx?.toLowerCase() ?? null, address, row.next_permission);
+       next_permission = NULL, next_signature = NULL, carry_usdc = ?, carry_until = ? WHERE address = ? AND next_permission = ?`,
+    ).run(approvedTx?.toLowerCase() ?? null, String(carry.usdc), String(carry.until), address, row.next_permission);
     row.permission = row.next_permission!;
     row.signature = row.next_signature as Hex;
+    row.carry_usdc = String(carry.usdc);
+    row.carry_until = String(carry.until);
     switched = true;
   }
   if (BigInt(getAvailableMc(db, address)) * ATOMIC_PER_MC >= deps.topupBelowUsdc) return { kind: "none", reason: "enough" };
   const permission = permissionFromJson(row.permission);
   const limit = spendableLimit(permission, row.cap_usdc === null ? null : BigInt(row.cap_usdc));
-  const spent = await chain.spentThisPeriod(permission);
+  const spent = (await chain.spentThisPeriod(permission)) + activeCarry(row, nowSeconds);
   const rest = limit > spent ? limit - spent : 0n;
   const value = rest < deps.topupUsdc ? rest : deps.topupUsdc;
   if (value <= 0n) return { kind: "none", reason: "period_used_up" };

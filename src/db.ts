@@ -546,6 +546,8 @@ function migrate(db: Db): void {
   // copied over); `previous_limit_usdc` is the limit the account had when the handoff started, which the page shows next to the
   // new one. On the account: `cap_usdc` is a lower daily limit set with the API key (NULL: the limit of the permission), and
   // `next_permission`/`next_signature` the permission a raise brought, which replaces the current one before the next spend().
+  // `carry_usdc` is what a revoked permission spent in its running period and `carry_until` (unix seconds) the end of that period:
+  // until then it counts against the limit of the new one (goals/konto/04, point 13).
   // `owner` and `organization_id` are the passkey wallet and its group at the passkey service as the page reported them at sign
   // up, so the page of a raise can ask that same passkey to sign; neither is a secret.
   const handoffSql04 = (db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'handoffs'").get() as { sql: string }).sql;
@@ -575,7 +577,7 @@ function migrate(db: Db): void {
       `);
     })();
   }
-  for (const column of ["cap_usdc", "next_permission", "next_signature", "owner", "organization_id"]) {
+  for (const column of ["cap_usdc", "next_permission", "next_signature", "owner", "organization_id", "carry_usdc", "carry_until"]) {
     if (!(db.prepare("PRAGMA table_info(konto_accounts)").all() as { name: string }[]).some((c) => c.name === column)) {
       db.exec(`ALTER TABLE konto_accounts ADD COLUMN ${column} TEXT`);
     }
