@@ -10,9 +10,9 @@ Belegt ist, ob die automatische Aufladung aus betrieb 01 das Guthaben beim Infer
 des Rests um rund 25 USD zwischen zwei Läufen) und der niedrigste Rest in diesem Fenster, dazu die Messung aus dem Container und eine
 Zeile `Ergebnis:`. Dazu vergleicht `ops/watchdog.sh` einmal am Tag die Schwelle, die `ops/credit-runway.sh --topup` rechnet, mit der
 beim Anbieter eingestellten aus `CP_CREDIT_TOPUP_USD` und meldet über den Alarmweg, wenn die gerechnete sie um mehr als 1 USD
-übersteigt. Heute belegt nur die Antwort „schon erledigt“ am Gate die Aufladung, und dass `--topup` am 12.11.2026 schon 17 statt der
+übersteigt, genau einmal je gerechneter Schwelle statt jeden Tag. Heute belegt nur die Antwort „schon erledigt“ am Gate die Aufladung, und dass `--topup` am 12.11.2026 schon 17 statt der
 eingestellten 16 USD rechnete, meldet niemand (`ROADMAP.md`, betrieb 05; übernimmt `goals/_vorschlaege/betrieb-kritik-2026-11-12-1.md`
-und `goals/_vorschlaege/betrieb-kritik-2026-11-12-2.md`).
+und `goals/_vorschlaege/betrieb-kritik-2026-11-12-2.md`, seit 16.11.2026 auch `goals/_vorschlaege/betrieb-kritik-2026-11-15-1.md`).
 Widerlegt, wenn im Fenster eine Warnung `[WARN] credit CREDIT RUNWAY LOW` oder `[WARN] credit empty` im Log steht oder kein Sprung
 im Log steht, obwohl der Rest unter 16 USD lag; dann ist betrieb 01 widerlegt.
 MVP: Funktion, weil ein leeres Guthaben jede Inferenz-Anfrage jedes zahlenden Kunden mit 503 beantwortet und eine Aufladung, deren
@@ -37,24 +37,36 @@ Schwelle hinter dem Verbrauch zurückbleibt, genau das wieder möglich macht, oh
 - Vergleich im Watchdog (Punkt 1): Die eingestellte Schwelle kommt aus `CP_CREDIT_TOPUP_USD` mit dem Standard 16 im Skript
   (`${CP_CREDIT_TOPUP_USD:-16}`), weil das die Zahl ist, die Matthias am 12.11.2026 beim Anbieter eingestellt hat
   (`docs/betrieb/guthaben.md`), und weil der Cron-Eintrag keine weitere Variable setzt. Einmal am Tag (Tagesstempel in
-  `<CP_WATCHDOG_STATE>.topup`, wie `.cert` und `.credit-fail`) ruft der Watchdog `credit-runway.sh --topup --container` mit derselben
-  Zeitgrenze wie `check_credit`. Liegt `threshold <X> USD` um mehr als 1 USD über der eingestellten Schwelle, geht über `report`
-  genau eine Meldung `WARN` mit dem Text ab `credit top-up threshold <X> USD computed, <S> USD set at the provider`, dazu der Weg
-  `https://openrouter.ai/settings/credits`. Den Tagesstempel speichert er erst, wenn die Abfrage lesbar war und eine nötige Meldung
-  durchging; eine unlesbare Antwort schreibt nur eine Zeile `[INFO] credit top-up unreadable` ins Log, ohne Meldung. Der Text beginnt
-  mit `credit top-up`, damit die Zählung unter Punkt 2 ihn nicht als Warnung zum Guthaben liest.
+  `<CP_WATCHDOG_STATE>.topup-day`, wie `.cert` und `.credit-fail`) ruft der Watchdog `credit-runway.sh --topup --container` mit
+  derselben Zeitgrenze wie `check_credit`. Liegt `threshold <X> USD` um mehr als 1 USD über der eingestellten Schwelle, geht über
+  `report` genau eine Meldung `WARN` mit dem Text ab `credit top-up threshold <X> USD computed, <S> USD set at the provider`, dazu der
+  Weg `https://openrouter.ai/settings/credits`. Den Tagesstempel speichert er erst, wenn die Abfrage lesbar war und eine nötige
+  Meldung durchging; eine unlesbare Antwort schreibt nur eine Zeile `[INFO] credit top-up unreadable` ins Log, ohne Meldung. Der Text
+  beginnt mit `credit top-up`, damit die Zählung unter Punkt 3 ihn nicht als Warnung zum Guthaben liest.
+- Einmal je Schwelle (Punkt 2, Tech Lead 16.11.2026, übernimmt `goals/_vorschlaege/betrieb-kritik-2026-11-15-1.md`): Weil die
+  eingestellte Schwelle auf dem Server nur der Standard im Skript ist, sieht der Watchdog nicht, dass Matthias nach der ersten Meldung
+  den neuen Wert beim Anbieter eingestellt hat, und würde bis zum nächsten Rollout jeden Tag dasselbe melden. Deshalb merkt er sich
+  nach jeder Meldung, die durchging, die gemeldete Schwelle als ganze Zahl in `<CP_WATCHDOG_STATE>.topup` und meldet an einem späteren
+  Tag nur, wenn die gerechnete Schwelle sowohl die eingestellte als auch diesen Merkwert um mehr als 1 USD übersteigt. Ohne Merkwert
+  gilt nur die eingestellte. Eine Meldung, deren POST scheiterte, schreibt keinen Merkwert. Der Merkwert sinkt nie von selbst; ändert
+  ein Rollout den Standard im Skript, gilt weiter die höhere der beiden Zahlen.
 - Test `test/watchdog-topup.test.ts` ohne Netz, mit den Fakes aus `test/watchdog-credit.test.ts`; Rechenwerte aus der Regel von
   betrieb 01: `usage_weekly` 35 ergibt Schwelle 25 USD, 21,84 ergibt 16, 22,82 ergibt 17, 24,5 ergibt 18. Fälle: 25 gegen
   `CP_CREDIT_TOPUP_USD=16` meldet genau einmal, ein zweiter Lauf am selben Tag meldet nichts und ruft `docker exec` nur noch einmal
   (nur die Reichweite); 16 und 17 gegen 16 melden nichts (17 liegt genau 1 USD darüber, nicht mehr); 18 ohne die Variable meldet
   (Standard 16); scheitert der erste POST der Meldung, meldet der nächste Lauf am selben Tag genau einmal; eine leere Antwort des
-  Containers meldet nichts zur Schwelle. Rot vor dem Fix, weil der Watchdog von heute `--topup` nicht aufruft. Die vier bestehenden
+  Containers meldet nichts zur Schwelle. Für Punkt 2 dazu, mit einem nachgebauten `date` vorn im `PATH` wie die Fakes für `curl` und
+  `docker`, weil `ops/watchdog.sh` das Datum aus `date -u +%F` nimmt (keine echte Uhr im Test): `it("reports the top-up threshold once per computed threshold across days")` mit 25 gegen 16
+  an zwei verschiedenen Tagen und genau einer Meldung über beide Tage, danach `<CP_WATCHDOG_STATE>.topup` mit dem Inhalt `25`;
+  `it("reports the top-up threshold again only above the remembered one")` mit Merkwert 25: eine gerechnete 26 meldet nichts, eine
+  gerechnete Schwelle von mindestens 27 meldet genau einmal und setzt den Merkwert neu; scheitert der POST dieser Meldung, bleibt der
+  Merkwert 25. Rot vor dem Fix, weil der Watchdog von heute `--topup` nicht aufruft. Die vier bestehenden
   Tests bleiben unverändert grün: Sie nutzen `usage_weekly` 0 und 7, also eine Schwelle von 7 USD.
 - Auf dem Server wirkt der Vergleich erst mit dem nächsten Rollout des Laufzeitpfads, weil `ops/` nicht allein ausrollt
   (`docs/betrieb/guthaben.md`, Abschnitt Watchdog); der Abschnitt `## Watchdog` der Doku sagt das in einem Satz und beschreibt den
   Vergleich in zwei bis drei Sätzen.
-- Nachmessung (Punkt 2), nur lesend: `set -a; . ~/.config/control-plane/loop.env; set +a`, dann der Befehl aus der Prüfung (Netz) von
-  Punkt 2 ohne den `diff`, also `ssh … 'cat /var/log/cp-watchdog.log'` durch die beiden `awk`. Er druckt je Sprung eine Zeile
+- Nachmessung (Punkt 3), nur lesend: `set -a; . ~/.config/control-plane/loop.env; set +a`, dann der Befehl aus der Prüfung (Netz) von
+  Punkt 3 ohne den `diff`, also `ssh … 'cat /var/log/cp-watchdog.log'` durch die beiden `awk`. Er druckt je Sprung eine Zeile
   `- <JJJJ-MM-TT HH:MM:SS> UTC: <vorher> USD auf <nachher> USD` und dann vier Zeilen `Warnungen seit …`, `Nicht lesbar seit …`,
   `Aufladungen seit …` und `Niedrigster Rest seit …`. Diese Zeilen stehen genau so, ab Spalte 0 und in dieser Reihenfolge, außerhalb
   eines Codeblocks im Abschnitt `## Nachmessung nach 14 Tagen`; der Befehl selbst steht davor in einem Codeblock, dazu
@@ -87,6 +99,15 @@ Schwelle hinter dem Verbrauch zurückbleibt, genau das wieder möglich macht, oh
       Prüfung: `grep -c 'CP_CREDIT_TOPUP_USD:-16}' ops/watchdog.sh` muss mindestens 1 ausgeben.
       Prüfung: `grep -c -- '--topup --container' ops/watchdog.sh` muss mindestens 1 ausgeben.
       Prüfung: `grep -cE "22\.82|24\.5" test/watchdog-topup.test.ts` muss mindestens 2 ausgeben.
+- [ ] Der Watchdog meldet je gerechneter Schwelle genau einmal: Er merkt sich die gemeldete Schwelle in `<CP_WATCHDOG_STATE>.topup`
+      und meldet an einem späteren Tag erst wieder, wenn die gerechnete mehr als 1 USD über diesem Merkwert liegt; zwei Tage mit
+      derselben gerechneten Schwelle ergeben genau eine Meldung. Der Tagesstempel liegt in `<CP_WATCHDOG_STATE>.topup-day`.
+      MVP: Funktion, weil eine tägliche Meldung, die nach Matthias' Handgriff nicht aufhört, lehrt, den Alarmweg zu übergehen, der
+      auch die Warnung vor leerem Guthaben trägt.
+      Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/watchdog-topup.test.ts` muss Exit-Code 0 haben.
+      Prüfung: `grep -cE "reports the top-up threshold once per computed threshold across days|reports the top-up threshold again only above the remembered one" test/watchdog-topup.test.ts` muss 2 ausgeben.
+      Prüfung: `grep -c 'STATE_FILE}\.topup-day' ops/watchdog.sh` muss mindestens 1 ausgeben.
+      Prüfung: `grep -c 'STATE_FILE}\.topup"' ops/watchdog.sh` muss mindestens 1 ausgeben.
 - [ ] Unter `## Nachmessung nach 14 Tagen` in `docs/betrieb/guthaben.md` stehen Warnungen, nicht lesbare Abfragen, Aufladungen und
       der niedrigste Rest im Fenster vom 12.11.2026 20:35 UTC bis 26.11.2026 20:35 UTC, je Aufladung eine Zeile, mit Befehl und
       Uhrzeit der Messung, und die Zahlen sind die aus dem Log.
