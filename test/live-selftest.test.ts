@@ -44,9 +44,29 @@ describe("ops/live.sh", () => {
     expect(run.stdout).toContain("openai/gpt-5.2 1/2 (50.0 %)");
     expect(run.stdout).toContain("planted timeout-quote answer '': FAIL");
     expect(run.stdout).toMatch(/planted sandbox '[^']*bg=ok[^']*': OK sandbox: .*background exec ok/);
-    for (const bg of ["start-notrunning", "start-504", "noexit", "exit-124", "wrong"]) {
+    for (const bg of ["start-notrunning", "start-504", "start-nowait", "start-waitnotlast", "wait-still", "wait-slow-30000", "wait-status-504", "wait-exit-124", "wait-wrong"]) {
       expect(run.stdout).toMatch(new RegExp(`planted sandbox '[^']*bg=${bg}[^']*': FAIL sandbox: background exec `));
     }
+    // The background step through the real bg_live (goals/sandbox/09, point 4): wait_command from the answer, called
+    // with exec and no timeout, at most twice, each call under 30000 ms, in both directions.
+    expect(run.stdout).toContain("planted background step ok: bg=ok waits=1");
+    expect(run.stdout).toContain("planted background step still: bg=ok waits=2");
+    expect(run.stdout).toMatch(/^planted background still: OK sandbox: .*background exec ok/m);
+    for (const [name, tok, waits, reason] of [
+      ["twice", "wait-still", 2, "still said running after two calls"],
+      ["504", "wait-status-504", 1, "answered 504, expected 200"],
+      ["slow", "wait-slow-30000", 1, "took 30000 ms, not under 30000"],
+      ["exit124", "wait-exit-124", 1, "reported exit code 124, expected 0"],
+      ["nobgok", "wait-wrong", 1, "reported the end without bg-ok in stdout"],
+      ["nowait", "start-nowait", 0, "missing in the answer"],
+      ["notlast", "start-waitnotlast", 0, "is not the last line of stdout"],
+      ["otherexit", "start-nowait", 0, "missing in the answer"],
+    ] as const) {
+      expect(run.stdout).toContain(`planted background step ${name}: bg=${tok} waits=${waits}`);
+      expect(run.stdout).toContain(`planted background ${name}: FAIL sandbox: background exec wait_command ${reason}`);
+    }
+    expect(run.stdout).toContain("planted background step held: bg=start-notrunning waits=0");
+    expect(run.stdout).not.toContain("sent another body");
     expect(run.stdout).toContain(
       "planted sandbox 'client_key=ok ctl=200 create=201 exec=ok files=ok delete=200 ledger=1': FAIL sandbox: background exec did not run",
     );
@@ -230,7 +250,7 @@ describe("ops/live.sh check sandbox, background exec", () => {
     return { ...w, started };
   }
 
-  it("finds exit_code_file and output_file in the answer to sleep 25 with timeout 120000", async () => {
+  it("finds wait_command, the last line of stdout, in the answer to sleep 25 with timeout 120000", async () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     const w = await world();
     const a = w.account();
@@ -244,7 +264,12 @@ describe("ops/live.sh check sandbox, background exec", () => {
     for (let i = 0; i < 5000 && !res; i++) await new Promise((r) => setImmediate(r));
     expect(res!.status).toBe(200);
     expect(res!.json.running).toBe(true);
-    expect(judgeBg(res!.status, res!.json)).toMatch(/^files \/root\/\.exec\/[0-9a-f]{12}\.exit \/root\/\.exec\/[0-9a-f]{12}\.out$/);
+    expect(judgeBg(res!.status, res!.json)).toMatch(/^wait \/root\/\.exec\/[0-9a-f]{12}\.exit$/);
+    // The answer before goals/sandbox/09 named the files only; the check does not take it.
+    const { wait_command: _w, ...before } = res!.json;
+    expect(judgeBg(200, { ...before, stdout: String(before.stdout).split("\n")[0] })).toBe("nowait");
+    expect(judgeBg(200, { ...res!.json, stdout: `${res!.json.stdout}\nmore` })).toBe("waitnotlast");
+    await vi.advanceTimersByTimeAsync(120_000);
   });
 
   it("does not take the answer to a held echo ok, a 504 or a body without files for a background run", async () => {
