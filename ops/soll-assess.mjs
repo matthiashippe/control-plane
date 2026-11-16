@@ -87,7 +87,7 @@ export function pixelDiffCount(a, b) {
  * Defects of one render. `m` holds what the browser measured:
  * width, pngWidth (width of the committed picture), diffPixels (null when there is nothing to compare with),
  * scrollWidth, text (visible text of the page), foreign (addresses requested that are not file: or data:),
- * umzugBottom (bottom edge of the block data-soll="umzug" in page pixels, null when it is missing).
+ * moveBottom (bottom edge of the block data-soll="move" in page pixels, null when it is missing).
  */
 export function assess(m) {
   const out = [], fold = FOLD[m.width];
@@ -99,8 +99,8 @@ export function assess(m) {
   const dash = String(m.text ?? "").split("\n").find((l) => DASHES.test(l));
   if (dash !== undefined) out.push(`${m.width}: dash in the visible text: ${dash.trim().slice(0, 80)}`);
   for (const url of m.foreign ?? []) out.push(`${m.width}: request to a foreign address: ${url}`);
-  if (m.umzugBottom === null || m.umzugBottom === undefined) out.push(`${m.width}: block data-soll="umzug" is missing`);
-  else if (fold && m.umzugBottom > fold) out.push(`${m.width}: block umzug ends at ${m.umzugBottom} px, below the first screen at ${fold}`);
+  if (m.moveBottom === null || m.moveBottom === undefined) out.push(`${m.width}: block data-soll="move" is missing`);
+  else if (fold && m.moveBottom > fold) out.push(`${m.width}: block move ends at ${m.moveBottom} px, below the first screen at ${fold}`);
   return out;
 }
 
@@ -109,9 +109,9 @@ export const isLocal = (url) => /^(file:|data:|about:blank$)/.test(url);
 
 /** The last line of ops/soll.mjs. Wording fixed by goals/seite/01, Punkt 1. */
 export function summary(results) {
-  const y = results.map((r) => `${r.width}=${r.umzugBottom ?? "fehlt"}`).join(" ");
+  const y = results.map((r) => `${r.width}=${r.moveBottom ?? "missing"}`).join(" ");
   const n = results.reduce((s, r) => s + r.defects.length, 0);
-  return `soll: ${results.length} Bilder, umzug oben ${y}, ${n} Mängel`;
+  return `soll: ${results.length} pictures, move top ${y}, ${n} defects`;
 }
 
 // ---- /h/{code} (goals/konto/02) -----------------------------------------------------------------------------------------
@@ -138,11 +138,11 @@ export const HANDOFF_WORDS = /handoff|phishing|token|\bsse\b/i;
 
 /**
  * Defects of one render of /h/{code}. `m` is what assess() takes, with `state` and `blockBottom` (bottom edge of the block of
- * the state approve in page pixels, null when missing) instead of umzugBottom. Only the state approve has to carry the block.
+ * the state approve in page pixels, null when missing) instead of moveBottom. Only the state approve has to carry the block.
  */
 export function assessHandoff(m) {
-  // The checks shared with the start page; umzugBottom 0 switches off only its own block, which this page does not have.
-  const base = assess({ ...m, umzugBottom: 0 }).map((d) => `${m.state} ${d}`);
+  // The checks shared with the start page; moveBottom 0 switches off only its own block, which this page does not have.
+  const base = assess({ ...m, moveBottom: 0 }).map((d) => `${m.state} ${d}`);
   const out = [...base], fold = FOLD[m.width];
   if (!HANDOFF_STATES.includes(m.state)) out.push(`${m.state} ${m.width}: unknown state`);
   const word = String(m.text ?? "").split("\n").find((l) => HANDOFF_WORDS.test(l));
@@ -158,10 +158,10 @@ export function assessHandoff(m) {
 export function summaryHandoff(results) {
   const y = WIDTHS.map((w) => {
     const r = results.find((x) => x.state === "approve" && x.width === w);
-    return `${w}=${r?.blockBottom ?? "fehlt"}`;
+    return `${w}=${r?.blockBottom ?? "missing"}`;
   }).join(" ");
   const n = results.reduce((s, r) => s + r.defects.length, 0);
-  return `soll handoff: ${results.length} Bilder, ${handoffFile("approve")} oben ${y}, ${n} Mängel`;
+  return `soll handoff: ${results.length} pictures, ${handoffFile("approve")} top ${y}, ${n} defects`;
 }
 
 // ---- /h/{code}, account step (goals/konto/03) ----------------------------------------------------------------------------
@@ -180,7 +180,7 @@ export const KONTO_WORDS = /handoff|token|wallet|smart|permission|sepolia|turnke
  * `blockBottom` (bottom edge of data-soll="passkey" in page pixels, null when missing). Only the state passkey carries the block.
  */
 export function assessKonto(m) {
-  const out = assess({ ...m, umzugBottom: 0 }).map((d) => `${m.state} ${d}`), fold = FOLD[m.width];
+  const out = assess({ ...m, moveBottom: 0 }).map((d) => `${m.state} ${d}`), fold = FOLD[m.width];
   if (!KONTO_STATES.includes(m.state)) out.push(`${m.state} ${m.width}: unknown state`);
   const word = String(m.text ?? "").split("\n").find((l) => KONTO_WORDS.test(l));
   if (word !== undefined) out.push(`${m.state} ${m.width}: word the reader has to translate in the visible text: ${word.trim().slice(0, 80)}`);
@@ -195,10 +195,10 @@ export function assessKonto(m) {
 export function summaryKonto(results) {
   const y = WIDTHS.map((w) => {
     const r = results.find((x) => x.state === "passkey" && x.width === w);
-    return `${w}=${r?.blockBottom ?? "fehlt"}`;
+    return `${w}=${r?.blockBottom ?? "missing"}`;
   }).join(" ");
   const n = results.reduce((s, r) => s + r.defects.length, 0);
-  return `soll konto: ${results.length} Bilder, passkey oben ${y}, ${n} Mängel`;
+  return `soll konto: ${results.length} pictures, passkey top ${y}, ${n} defects`;
 }
 
 // ---- /h/{code}, step limit (goals/konto/04) -------------------------------------------------------------------------------
@@ -219,7 +219,7 @@ export const LIMIT_WORDS = /handoff|token|wallet|smart|permission|sepolia|turnke
  * `scrollWidth`, `text`, `foreign` and `blockBottom` (bottom edge of the block of the state in page pixels, null when missing).
  */
 export function assessLimit(m) {
-  const out = assess({ ...m, umzugBottom: 0 }).map((d) => `${m.state} ${d}`), fold = FOLD[m.width];
+  const out = assess({ ...m, moveBottom: 0 }).map((d) => `${m.state} ${d}`), fold = FOLD[m.width];
   const block = LIMIT_BLOCKS[m.state];
   if (!LIMIT_STATES.includes(m.state)) out.push(`${m.state} ${m.width}: unknown state`);
   const word = String(m.text ?? "").split("\n").find((l) => LIMIT_WORDS.test(l));

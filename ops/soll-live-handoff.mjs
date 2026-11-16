@@ -50,7 +50,7 @@ const { handoffFile } = await import("./soll-assess.mjs");
 const write = async (state, res) => {
   const html = await res.text();
   writeFileSync(path.join(out, `handoff-${handoffFile(state)}.html`), html);
-  console.log(`soll-live-handoff: ${state} ${res.status}, ${html.length} bytes`);
+  console.error(`soll-live-handoff: ${state} ${res.status}, ${html.length} bytes`);
 };
 
 const first = await create();
@@ -65,4 +65,4 @@ draws.push(47, 62, 18, 1);
 const second = await create();
 now += 601_000;
 await write("invalid", await ask("invalid", `/h/${second.code}`, undefined, 410));
-console.log(`soll-live-handoff: written to ${out}`);
+console.error(`soll-live-handoff: written to ${out}`);

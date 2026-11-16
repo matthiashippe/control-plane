@@ -63,7 +63,7 @@ const ask = async (name, url, init, status) => {
 const write = async (state, res) => {
   const html = await res.text();
   writeFileSync(path.join(out, `limit-${state}.html`), html);
-  console.log(`soll-live-limit: ${state} ${res.status}, ${html.length} bytes`);
+  console.error(`soll-live-limit: ${state} ${res.status}, ${html.length} bytes`);
 };
 
 const raise = await (await ask("raise", "/v1/handoff", {
@@ -77,4 +77,4 @@ await write("passkey", await ask("passkey", `/h/${raise.code}`, {
   headers: { "content-type": "application/x-www-form-urlencoded" },
   body: `pick=${raise.match}`,
 }, 200));
-console.log(`soll-live-limit: written to ${out}`);
+console.error(`soll-live-limit: written to ${out}`);

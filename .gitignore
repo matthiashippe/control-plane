@@ -9,8 +9,8 @@ harness/state/
 .scratch/
 !deploy/.env.example
 
-# Python-Bytecode aus den ops-Skripten (ops/fact-probe.py importiert invention-check.py).
+# Python bytecode of the ops scripts (ops/fact-probe.py imports invention-check.py).
 __pycache__/
 
-# Cache von ops/fetchers.py: Adressen echter Besucher, liegt unter ~/.cache/control-plane/ (CP_FETCHER_CACHE), nie im Repo.
+# Cache of ops/fetchers.py: addresses of real visitors, kept in ~/.cache/control-plane/ (CP_FETCHER_CACHE), never in the repo.
 ops/fetcher-cache.tsv

@@ -2,14 +2,13 @@
 // the headless Chromium from ~/.cache/ms-playwright/ into docs/soll/handoff-<state>-<width>.png, full page, width as in the name.
 //
 //   node ops/soll-handoff.mjs                     render and write all six pictures, then report defects
-//   node ops/soll-handoff.mjs --pruefen           (German for "check") render into a mktemp folder, compare with the committed
+//   node ops/soll-handoff.mjs --check             render into a mktemp folder, compare with the committed
 //                                                 pictures, exit 1 on any defect
-//   node ops/soll-handoff.mjs --pruefen --source <dir> [--pictures <dir>]
+//   node ops/soll-handoff.mjs --check --source <dir> [--pictures <dir>]
 //                                                 the same with the three sources from another folder: the real page written by
 //                                                 ops/soll-live-handoff.mjs, or a counter-test with planted defects
 //
-// No network, no port, no package: the browser part is the one of ops/soll.mjs (which stays as it is, because the audit runs the
-// frozen checks of seite 01 and 02 against it). The judgement is assessHandoff() in ops/soll-assess.mjs, a pure function that
+// No network, no port, no package: the browser part is the one of ops/soll.mjs. The judgement is assessHandoff() in ops/soll-assess.mjs, a pure function that
 // test/soll-handoff.test.ts checks without a browser.
 import { spawn } from "node:child_process";
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -22,7 +21,13 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const args = process.argv.slice(2);
 const flag = (name) => args.includes(name);
 const value = (name, fallback) => { const i = args.indexOf(name); return i >= 0 && args[i + 1] ? path.resolve(args[i + 1]) : fallback; };
-const CHECK = flag("--pruefen");
+const CHECK = flag("--check");
+// Every argument is a known flag or the value right after --source or --pictures; anything else ends the tool here, before it
+// renders or writes a picture, so a check command with an old or misspelt flag cannot overwrite the committed pictures.
+for (let i = 0; i < args.length; i++) {
+  if (args[i] === "--source" || args[i] === "--pictures") { i++; continue; }
+  if (args[i] !== "--check") { console.error(`unknown argument: ${args[i]}`); process.exit(1); }
+}
 const SOURCES = value("--source", path.join(ROOT, "docs/soll/src"));
 const PICTURES = value("--pictures", path.join(ROOT, "docs/soll"));
 // The files keep the names of the approved pictures; the code names the states in English (handoffFile in ops/soll-assess.mjs).

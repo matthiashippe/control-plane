@@ -185,3 +185,16 @@
 - Katalog `postyourprice`, Plugin `automaton`, weil der Mensch das Produkt unter diesem Namen kennt und der Befehl `claude plugin install automaton@postyourprice` sagt, was er installiert.
 - Nach einer Erhöhung zählt der Verbrauch der alten Erlaubnis bis zum Ende ihrer laufenden Periode gegen das neue Limit, festgehalten beim Widerruf als `carry_usdc` und `carry_until`, weil `getCurrentPeriod` des Vertrags den Widerruf nicht prüft und eine widerrufene Erlaubnis nichts mehr abbucht, der Wert also ab dann feststeht; bei einer zweiten Erhöhung in derselben Periode addiert sich der Verbrauch und das spätere Ende gilt, weil das höchstens zu wenig abbucht, nie zu viel (Punkt 13, Zyklus 2).
 - Scheitert beim Wechsel eine Transaktion, auch durch einen Fehler beim Senden oder einen Abbruch beim Warten, endet der Lauf ohne `spend()` und der nächste widerruft einfach erneut, statt zu prüfen, ob der erste Widerruf ankam, weil `_revoke` im SpendPermissionManager (coinbase/spend-permissions) bei einer schon widerrufenen Erlaubnis ohne Revert zurückkehrt und `isApproved` dort einen Widerruf nicht anzeigt (Punkt 14, Zyklus 3).
+
+## Abgelöst durch seite 03 (Maker, 2026-11-16)
+
+- Abgelöst: konto 02 Punkt 1 durch seite 03 Punkt 1, Ausgabe dann genau `Exit 1, unknown argument: --pruefen` (Tech Lead, 2026-11-14)
+- Abgelöst: konto 02 Punkt 2 durch seite 03 Punkt 1, Ausgabe dann genau `Exit 1, unknown argument: --pruefen` (Tech Lead, 2026-11-14)
+- Abgelöst: konto 02 Punkt 4 durch seite 03 Punkt 1, Ausgabe dann genau `Exit 1, unknown argument: --pruefen` (Tech Lead, 2026-11-14)
+- Abgelöst: konto 03 Punkt 1 durch seite 03 Punkt 1, Ausgabe dann genau `Exit 1, unknown argument: --pruefen` (Tech Lead, 2026-11-14)
+- Abgelöst: konto 03 Punkt 2 durch seite 03 Punkt 1, Ausgabe dann genau `Exit 1, unknown argument: --pruefen` (Tech Lead, 2026-11-14)
+- Abgelöst: konto 03 Punkt 4 durch seite 03 Punkt 1, Ausgabe dann genau `Exit 1, unknown argument: --pruefen` (Tech Lead, 2026-11-14)
+- Abgelöst: konto 04 Punkt 2 durch seite 03 Punkt 1, Ausgabe dann genau `Exit 1, unknown argument: --pruefen` (Tech Lead, 2026-11-14)
+- Abgelöst: konto 04 Punkt 4 durch seite 03 Punkt 1, Ausgabe dann genau `Exit 1, unknown argument: --pruefen` (Tech Lead, 2026-11-14)
+- Abgelöst: konto 04 Punkt 1 durch seite 03 Punkt 8, Ausgabe dann genau `Exit 1, unknown argument: --pruefen` (Tech Lead, 2026-11-14)
+- Abgelöst: konto 04 Punkt 4 durch seite 03 Punkt 8, Ausgabe dann genau `Exit 1, unknown argument: --pruefen` (Tech Lead, 2026-11-14)

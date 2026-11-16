@@ -16,7 +16,7 @@ import { createApp } from "../src/app.js";
 import { getAvailableMc } from "../src/db.js";
 import { RETRIED, closeWorlds, sandboxWorld } from "./sandbox-world.js";
 
-const VERTRAG = path.join(__dirname, "..", "docs", "sandbox", "vertrag.md");
+const CONTRACT_FILE = path.join(__dirname, "..", "docs", "sandbox", "vertrag.md");
 
 afterEach(closeWorlds);
 
@@ -24,7 +24,7 @@ type ContractRow = { method: string; path: string; answer: string };
 
 /** The rows of `## Endpunkte` in docs/sandbox/vertrag.md that name `/v1/sandboxes`. */
 function contractRows(): ContractRow[] {
-  const text = fs.readFileSync(VERTRAG, "utf8");
+  const text = fs.readFileSync(CONTRACT_FILE, "utf8");
   const section = text.split(/^## /m).find((s) => s.startsWith("Endpunkte"));
   if (!section) throw new Error("docs/sandbox/vertrag.md has no section ## Endpunkte");
   return section

@@ -8,11 +8,11 @@
 #               ops/fetchers.py lookup, RIPE RDAP or ARIN RDAP and a real calendar day; any other spelling of the cache or the
 #               lookup turns check red, with or without the cache
 #   crawler     the PTR name, proven by the DNS round trip of ops/crawlers.sh
-#   eigene      which of our machines, and the file that names it
-#   erfunden    the commit that brought it as a test value; only for an address left in a file this list may not change
+#   own         which of our machines, and the file that names it
+#   invented    the commit that brought it as a test value; only for an address left in a file this list may not change
 # Any other address is replaced by one from 192.0.2.0/24, 198.51.100.0/24 or 203.0.113.0/24 instead of being listed here.
 1.1.1.1 datacenter Cloudflare public DNS resolver, PTR one.one.one.one (ops/fetchers.py lookup 2026-11-12); resolver and egress target of the sandboxes
-9.8.0.1 erfunden test value from 6815eda; only left in goals/fehler/02-besucheradressen-raus-aus-dem-oeffentlichen-repo.md, a DONE goal file
+9.8.0.1 invented test value from 6815eda; only left in goals/fehler/02-besucheradressen-raus-aus-dem-oeffentlichen-repo.md, a DONE goal file
 9.9.9.9 datacenter Quad9 public DNS resolver, PTR dns9.quad9.net (ops/fetchers.py lookup 2026-11-12); resolver of the sandboxes
 23.23.253.54 datacenter AWS (fetcher-cache)
 34.116.134.70 datacenter GCP (fetcher-cache)
@@ -23,4 +23,4 @@
 45.67.221.128 datacenter Contabo GmbH (RIPE RDAP 2026-11-12, PTR 448c.org); host of a public x402 service in the directory snapshots under docs/research/data
 52.16.245.145 datacenter AWS (fetcher-cache)
 66.249.66.1 crawler Google crawl-66-249-66-1.googlebot.com (ops/crawlers.sh VERIFIED 2026-11-12)
-72.62.51.224 eigene the sandbox server srv1327036.hstgr.cloud, named in docs/sandbox/server.md
+72.62.51.224 own the sandbox server srv1327036.hstgr.cloud, named in docs/sandbox/server.md

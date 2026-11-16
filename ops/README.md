@@ -925,8 +925,8 @@ IPv4 addresses a tracked file may carry besides `ops/own-ips.txt` (our machines,
 |---|---|
 | `datacenter` | the operator, then exactly `(fetcher-cache)` at the end of the line, or a lookup `(<source> YYYY-MM-DD` with the source `ops/fetchers.py lookup`, `RIPE RDAP` or `ARIN RDAP` |
 | `crawler` | the PTR name, proven by the DNS round trip of `ops/crawlers.sh` |
-| `eigene` | which of our machines, and the file that names it (payment server, sandbox server in `docs/sandbox/server.md`) |
-| `erfunden` | the commit that brought it as a test value; only for an address left in a file a goal may not change (a DONE goal file, a verdict, `docs/audit/`) |
+| `own` | which of our machines, and the file that names it (payment server, sandbox server in `docs/sandbox/server.md`) |
+| `invented` | the commit that brought it as a test value; only for an address left in a file a goal may not change (a DONE goal file, a verdict, `docs/audit/`) |
 
 `test/known-ips.test.ts` reads the three lists and every file in `git ls-files`, without a lookup and without network, and fails
 `check` for any public address outside `192.0.2.0/24`, `198.51.100.0/24` and `203.0.113.0/24` that none of them names. The message
@@ -936,7 +936,7 @@ one is always replaced, because "invented" cannot be checked. `CP_KNOWN_IPS` rea
 `CP_SCAN_ROOT` scans another git work tree; both exist for the counter-test in both directions.
 
 The same test keeps the rules of the list itself, so they hold after the goal that brought them: every line has the form
-`<address> <kind> <evidence>` with one of the four kinds and an evidence, an address of kind `erfunden` stands only in paths no goal
+`<address> <kind> <evidence>` with one of the four kinds and an evidence, an address of kind `invented` stands only in paths no goal
 may change (`goals/`, `docs/audit/`, `LOOP.md`, `loop-constraints.md`, `loop-dauerauftrag.md`, `.github/`, `deploy/`, `harness/`),
 and every entry still stands in a tracked file besides the list. An entry whose finding is gone is removed, otherwise the list
 would let a later visitor with the same address through. Findings are the tracked files of the scan root and of the work tree

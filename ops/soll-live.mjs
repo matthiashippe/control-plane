@@ -52,4 +52,4 @@ page = reduce(page, "canonical link", /<link rel="canonical"[^>]*>/g);
 page = reduce(page, "status line", /(<span id="s-health">)[^<]*(<\/span>)/, "$1online$2");
 
 writeFileSync(out, page);
-console.log(`soll-live: / rendered, ${html.length} bytes, ${page.length} after reduction, written to ${out}`);
+console.error(`soll-live: / rendered, ${html.length} bytes, ${page.length} after reduction, written to ${out}`);
