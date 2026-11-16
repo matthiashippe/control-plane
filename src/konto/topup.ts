@@ -22,6 +22,11 @@
  * until then a run spends from the new one at most the limit minus what the new one and the carry spent; after that the period of
  * the new one holds alone. A second raise in the same period adds what the second permission spent to the carry and keeps the
  * later of both ends, so a run may spend less than it could, never more.
+ *
+ * A used-up period is remembered (goals/konto/05, point 8): after `period_used_up` the run keeps the end of that period per
+ * account and answers `period_used_up` until then without asking the chain, and a permission whose `end` has passed answers
+ * `permission_expired` without any call. A raise brings a new permission, so a waiting `next_permission` forgets what was kept and
+ * the next run asks at once. The memory lives in the process: after a restart the first run asks once more.
  */
 import { createPublicClient, encodeFunctionData, type Address, type Hex, type LocalAccount, type PublicClient, type Transport } from "viem";
 import { baseSepolia } from "viem/chains";
@@ -66,7 +71,10 @@ export interface TopUpDeps {
 }
 
 export type TopUpResult =
-  | { kind: "none"; reason: "no_account" | "wrong_chain" | "enough" | "period_used_up" | "approve_failed" | "revoke_failed" | "busy" }
+  | {
+      kind: "none";
+      reason: "no_account" | "wrong_chain" | "enough" | "period_used_up" | "permission_expired" | "approve_failed" | "revoke_failed" | "busy";
+    }
   | { kind: "pending"; hash: Hex }
   | { kind: "reverted"; hash: Hex }
   | { kind: "booked"; hash: Hex; usdc: bigint; mc: number };
@@ -161,6 +169,17 @@ function carryAfterSwitch(row: AccountRow, oldSpent: bigint, oldEnd: number, now
 
 const running = new Map<string, Promise<TopUpResult>>();
 
+/**
+ * Per database and account: until when (unix seconds) the current period is used up, so that no run asks the chain before then.
+ * Keyed by the database too, because an address means an account only within its database.
+ */
+const usedUpByDb = new WeakMap<Db, Map<string, number>>();
+function usedUpMemo(db: Db): Map<string, number> {
+  let memo = usedUpByDb.get(db);
+  if (!memo) usedUpByDb.set(db, (memo = new Map()));
+  return memo;
+}
+
 /** Tops the account up when its credit is low. A second call while one runs for the same account waits for that one. */
 export function topUpIfLow(deps: TopUpDeps, address: string): Promise<TopUpResult> {
   const key = address.toLowerCase();
@@ -189,6 +208,11 @@ async function topUp(deps: TopUpDeps, address: string): Promise<TopUpResult> {
   // account use the new one.
   const next = nextPermission(row);
   let switched = false;
+  const usedUpUntil = usedUpMemo(db);
+  // A raise waits: the new permission has its own period, so what was kept about the old one no longer says anything.
+  if (next) usedUpUntil.delete(address);
+  else if ((usedUpUntil.get(address) ?? 0) > nowSeconds) return { kind: "none", reason: "period_used_up" };
+  if (!next && permissionFromJson(row.permission).end <= nowSeconds) return { kind: "none", reason: "permission_expired" };
   if (next) {
     const old = permissionFromJson(row.permission);
     let approvedTx: Hex | null = null;
@@ -218,7 +242,13 @@ async function topUp(deps: TopUpDeps, address: string): Promise<TopUpResult> {
   const spent = (await chain.spentThisPeriod(permission)) + activeCarry(row, nowSeconds);
   const rest = limit > spent ? limit - spent : 0n;
   const value = rest < deps.topupUsdc ? rest : deps.topupUsdc;
-  if (value <= 0n) return { kind: "none", reason: "period_used_up" };
+  if (value <= 0n) {
+    // Nothing left until the period ends, or earlier, when the carry of a revoked permission ends first.
+    const carry = activeCarry(row, nowSeconds);
+    const end = periodEnd(permission, nowSeconds);
+    usedUpUntil.set(address, carry > 0n ? Math.min(end, Number(row.carry_until)) : end);
+    return { kind: "none", reason: "period_used_up" };
+  }
   // Just approved above, so the node need not be asked again (it may not even have the block yet).
   if (!switched && !(await chain.isApproved(permission))) {
     const approveTx = await confirmed(chain, () => chain.approve(permission, row.signature));
