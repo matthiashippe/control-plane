@@ -1,7 +1,7 @@
 # Messung Goal 09: Nur der Watchdog selbst zählt als Zustellung des Watchdogs
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 `alarm_path.received` in `ops/status.sh` soll belegen, dass die Posts von `ops/watchdog.sh` wirklich auf dem Thema ankommen. Am
@@ -98,7 +98,7 @@ Backup auf dem Thema sie heute still auf `ok` setzt; ohne Alarmweg erfährt niem
       `ops/watchdog.sh` wie im Fall „every severity that ops/watchdog.sh reports counts as its delivery“.
       Prüfung: `grep -c 'SENDERS_UNDER_TEST' test/status-alarm-received.test.ts` muss mindestens 1 ausgeben.
       Prüfung: `T=$(mktemp -d); mkdir $T/same $T/mut; cp ops/*.sh $T/same/; cp ops/*.sh $T/mut/; sed -i 's/Title: control-plane backup failed/Title: control-plane WARN/' $T/mut/backup.sh; for s in same mut; do PATH=/usr/bin:$PATH SENDERS_UNDER_TEST=$T/$s timeout 300 pnpm -s vitest run test/status-alarm-received.test.ts -t "no other script under ops/ posts a title of the watchdog" > $T/$s.out 2>&1; echo "$s $?"; done | tr '\n' ' '` muss genau `same 0 mut 1 ` ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Der Fall „a message of ops/backup.sh or of the deploy alarm is no delivery of the watchdog“ war vor dem Fix rot; die Zeile
@@ -129,6 +129,7 @@ Backup auf dem Thema sie heute still auf `ok` setzt; ohne Alarmweg erfährt niem
 - 2026-11-16 Zyklus 1: Punkte 1, 2, 3, 4, 5 gebaut (`WATCHDOG_SEVERITIES` und genaue Titel statt `startswith` in `ops/status.sh`, README, vier neue Fälle in `test/status-alarm-received.test.ts`, genauer Titel und `DEPLOY_ALARM_UNDER_TEST` in `test/deploy-alarm.test.ts`); jeder neue Fall einmal rot gesehen (Merge-Basis, ohne `WARNING`, Titel `control-plane DEPLOY 502`, Fenster 2 h und 12 h). Prüfbefehle: P1 `startswith` 0, `WATCHDOG_SEVERITIES` 1, Merge-Basis `exit 1 failed 1`, ohne `WARNING` `exit 1 failed 1`; P2 `DEPLOY_ALARM_UNDER_TEST` 3, `same 0 mut 1 `; P3 Fenster 1, `11:0 11:0 2:1 2:0 12:0 12:1 `; P4 vitest Exit 0 (120 passed), Diff `test` 0; P5 `check` Exit 0 (2125 passed), gesperrte Pfade 0, `ops` 0.
 - 2026-11-16 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5; `dev` unverändert seit c141093, kein Merge nötig. Prüfbefehle: P1 `startswith` 0, `WATCHDOG_SEVERITIES` 1, Merge-Basis `exit 1 failed 1`, ohne `WARNING` `exit 1 failed 1`; P2 `DEPLOY_ALARM_UNDER_TEST` 3, `same 0 mut 1 `; P3 Fenster 1, `11:0 11:0 2:1 2:0 12:0 12:1 `; P4 vitest Exit 0 (120 passed), Diff `test` 0; P5 `check` Exit 0 (2125 passed), gesperrte Pfade 0, `ops` 0; Job `check` am PR grün, kein Laufzeitpfad im Diff.
 - 2026-11-16 Zyklus 3: Punkt 6 aus der Kritik gebaut (Fall „no other script under ops/ posts a title of the watchdog“ mit `SENDERS_UNDER_TEST` in `test/status-alarm-received.test.ts`, rot gesehen mit `Title: control-plane WARN` in einer Kopie von `ops/backup.sh`), Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6. Prüfbefehle: P1 `startswith` 0, `WATCHDOG_SEVERITIES` 1, Merge-Basis `exit 1 failed 1`, ohne `WARNING` `exit 1 failed 1`; P2 `DEPLOY_ALARM_UNDER_TEST` 3, `same 0 mut 1 `; P3 Fenster 1, `11:0 11:0 2:1 2:0 12:0 12:1 `; P4 vitest Exit 0 (121 passed), Diff `test` 0; P5 `check` Exit 0 (2126 passed), gesperrte Pfade 0, `ops` 0; P6 `SENDERS_UNDER_TEST` 2, `same 0 mut 1 `.
+- 2026-11-16 Release: PASS K und B (Zyklus 3), DONE.
 
 ## Blockers
 - keine
