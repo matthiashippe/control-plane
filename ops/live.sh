@@ -13,9 +13,10 @@
 # Live mode needs the variables from ~/.config/control-plane/loop.env (CP_HOST, CP_SSH_KEY) and, for the checks `sandbox`
 # and `domains-search`, LIVE_SANDBOX_KEY from ~/.config/control-plane/live-sandbox.env; it is run from the code-host only. The ledger is opened
 # with `readonly: true` inside the container. The script restarts nothing and never prints an address, an API key, a
-# sandbox id or a balance. It writes in two places only, both for the check `sandbox` and never on the payment server's
-# disk: ops/sandbox/setup.sh --client-key on the sandbox server, and one small sandbox of our own account, created, used
-# and deleted through the public API, which books its started step in the ledger like any customer's.
+# sandbox id or a balance. It writes in three places only, never on the payment server's disk: for the check `sandbox`
+# ops/sandbox/setup.sh --client-key on the sandbox server and one small sandbox of our own account, for the check
+# `automaton` one automaton of our own account; each is created, used and deleted through the public API and books its
+# started steps and its inference in the ledger like any customer's.
 #
 # Checks:
 #   health   GET /health answers 200
@@ -52,6 +53,12 @@
 #            a header file in a mktemp -d folder that a trap deletes, never onto a command line or into the output
 #   sandbox-foreign  the number of foreign accounts (no address and no key name of src/bounties/ours.ts) with at least one
 #            ledger row of kind sandbox, the measure of the ROADMAP criterion; shown, and FAIL only when it cannot be read
+#   automaton  with our own account (LIVE_SANDBOX_KEY) POST /v1/automatons answers 201, within AUTOMATON_WAIT (180) s
+#            GET /v1/automatons/{id} says running with turns >= 1, the key of the automaton (apiKey in config.json of its
+#            sandbox, read into a header file, never printed) answers 200 on GET /v1/credits/balance, GET .../logs holds
+#            neither LIVE_SANDBOX_KEY nor that key nor any cnwy_k_ key, DELETE /v1/automatons/{id} answers 200 with status
+#            deleted, and afterwards the same key answers 401 (sandbox 08). `automaton=<ok|...>`; the DELETE runs once the
+#            create answered with an id, whatever failed after it. Until the rollout of sandbox 08 that is the 404 of the route
 #
 # Every temporary file of a live run, the header files with LIVE_SANDBOX_KEY among them, lies in one mktemp -d folder
 # that a trap on EXIT, INT and TERM in live() deletes, so a run stopped with kill -TERM leaves nothing in TMPDIR.
@@ -778,6 +785,144 @@ sandbox_foreign_count() {
   fi
 }
 
+# ---- automaton (sandbox 08)
+
+# How long the check `automaton` waits at most for status running with a turn, and what it creates: one automaton of our
+# own account with a short genesis prompt (short turns, read only tools, then sleep), deleted again in every case.
+AUTOMATON_WAIT=180
+AUTOMATON_BODY='{"name":"live-check","genesis_prompt":"You are a test automaton inside a disposable live check. Nothing you do here matters. Keep every turn short: call at most one cheap read-only tool (check_credits, system_synopsis), then answer in one sentence. After your first turn, call the sleep tool with duration_seconds 3600."}'
+
+# The answer of GET /v1/automatons/{id} ($1) as "<status> <turns>": status in lowercase letters or `other`, turns a
+# number or -1. Nothing else of the answer leaves it.
+# shellcheck disable=SC2016
+AUTOMATON_STATE_JS='let o; try { o = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")); } catch (e) { o = null; } const s = o && typeof o.status === "string" && /^[a-z]{1,20}$/.test(o.status) ? o.status : "other"; const t = o && Number.isInteger(o.turns) && o.turns >= 0 ? o.turns : -1; console.log(s + " " + t);'
+
+# The key of the automaton from the answer of files/read on /root/.automaton/config.json ($1) into the header file $2 (mode
+# 0600). Prints nothing; exit 1 without a key of the form cnwy_k_...
+# shellcheck disable=SC2016
+AUTOMATON_KEY_JS='const fs = require("fs"); const [ans, hdr] = process.argv.slice(1); let k = ""; try { k = JSON.parse(JSON.parse(fs.readFileSync(ans, "utf8")).content).apiKey; } catch (e) { k = ""; } if (typeof k !== "string" || !/^cnwy_k_[0-9A-Za-z]{8,128}$/.test(k)) process.exit(1); fs.writeFileSync(hdr, "Authorization: " + k + "\n", { mode: 0o600 });'
+
+# The answer of GET /v1/automatons/{id}/logs ($1) against the keys in the header files $2 (LIVE_SANDBOX_KEY) and $3 (the key
+# of the automaton): `leak` when the lines hold either key or any cnwy_k_ with 32 hex, `nolines` without a lines array,
+# else `ok`. Never prints a line of the log.
+# shellcheck disable=SC2016
+AUTOMATON_LOGS_JS='const fs = require("fs"); const [ans, ...hdrs] = process.argv.slice(1); let o; try { o = JSON.parse(fs.readFileSync(ans, "utf8")); } catch (e) { o = null; } if (!o || !Array.isArray(o.lines)) { console.log("nolines"); process.exit(0); } const text = o.lines.map(String).join("\n"); const keys = hdrs.map((f) => { try { return fs.readFileSync(f, "utf8").replace(/^Authorization: (Bearer )?/, "").trim(); } catch (e) { return ""; } }).filter((k) => k.length >= 8); console.log(keys.some((k) => text.includes(k)) || /cnwy_k_[0-9a-f]{32}/.test(text) ? "leak" : "ok");'
+
+# The live part of the check `automaton`: POST /v1/automatons with the key of our own account, at most AUTOMATON_WAIT s for
+# status running with turns >= 1, the key of the automaton from config.json of its sandbox (into a header file, never into
+# the output), that key answers 200 on GET /v1/credits/balance, the log holds no key, DELETE, and afterwards the same key
+# answers 401. Prints one token: ok, nokey, create_<status>, noid, timeout, status_<status>, key_<status>, key_missing,
+# key_rejected_<status>, logs_<status>, logs_leak, logs_nolines, delete_<status> or revoked_<status>. Once the create
+# answered with an id, the DELETE runs, whatever failed after it.
+automaton_live() {
+  local apikey="" hdr ans akhdr code id="" sbx="" token="" deadline st turns
+  [ -r "$LIVE_SANDBOX_ENV" ] && apikey="$(sed -n 's/^LIVE_SANDBOX_KEY=//p' "$LIVE_SANDBOX_ENV" | head -n 1 | tr -d "\"'\r")"
+  if [ -z "$apikey" ]; then
+    echo nokey
+    return
+  fi
+  hdr="$(mktemp -p "$(live_tmp)")"
+  ans="$(mktemp -p "$(live_tmp)")"
+  akhdr="$(mktemp -p "$(live_tmp)")"
+  printf 'Authorization: %s\n' "$apikey" >"$hdr"
+  apikey=""
+  code="$(sandbox_api "$hdr" POST /v1/automatons "$ans" "$AUTOMATON_BODY")"
+  case "$code" in
+    201)
+      id="$(json_field "$ans" id)"
+      sbx="$(json_field "$ans" sandbox_id)"
+      [[ "$id" =~ ^[a-z0-9]{1,40}$ ]] || { id=""; token=noid; }
+      ;;
+    "" | 000) token=create_none ;;
+    *) token="create_$code" ;;
+  esac
+
+  if [ -z "$token" ]; then
+    token=timeout
+    deadline=$((SECONDS + AUTOMATON_WAIT))
+    while :; do
+      code="$(sandbox_api "$hdr" GET "/v1/automatons/$id" "$ans")"
+      if [ "$code" = 200 ]; then
+        read -r st turns <<<"$(NODE_NO_WARNINGS=1 node -e "$AUTOMATON_STATE_JS" "$ans" 2>/dev/null)"
+        [ -n "$sbx" ] || sbx="$(json_field "$ans" sandbox_id)"
+        if [ "$st" = running ] && [ "${turns:--1}" -ge 1 ]; then
+          token=""
+          break
+        fi
+        case "$st" in failed | stopped) token="status_$st"; break ;; esac
+      fi
+      [ $((SECONDS + 5)) -lt "$deadline" ] || break
+      sleep 5
+    done
+  fi
+
+  if [ -z "$token" ]; then
+    [[ "$sbx" =~ ^[a-z0-9]{1,40}$ ]] || sbx=""
+    code="$(sandbox_api "$hdr" GET "/v1/sandboxes/${sbx:-none}/files/read?path=%2Froot%2F.automaton%2Fconfig.json" "$ans")"
+    if [ "$code" != 200 ]; then
+      token="key_${code:-none}"
+    elif ! (cd "$ROOT" && NODE_NO_WARNINGS=1 node -e "$AUTOMATON_KEY_JS" "$ans" "$akhdr" 2>/dev/null); then
+      token=key_missing
+    else
+      # The key read from config.json must work before the DELETE, or the 401 after it proves nothing.
+      code="$(sandbox_api "$akhdr" GET /v1/credits/balance "$ans")"
+      [ "$code" = 200 ] || token="key_rejected_${code:-none}"
+    fi
+  fi
+
+  if [ -z "$token" ]; then
+    code="$(sandbox_api "$hdr" GET "/v1/automatons/$id/logs" "$ans")"
+    if [ "$code" != 200 ]; then
+      token="logs_${code:-none}"
+    else
+      case "$(NODE_NO_WARNINGS=1 node -e "$AUTOMATON_LOGS_JS" "$ans" "$hdr" "$akhdr" 2>/dev/null)" in
+        ok) ;;
+        leak) token=logs_leak ;;
+        *) token=logs_nolines ;;
+      esac
+    fi
+  fi
+
+  if [ -n "$id" ]; then
+    code="$(sandbox_api "$hdr" DELETE "/v1/automatons/$id" "$ans")"
+    if [ -z "$token" ] && { [ "$code" != 200 ] || [ "$(json_field "$ans" status)" != deleted ]; }; then
+      token="delete_${code:-none}"
+    fi
+  fi
+
+  if [ -z "$token" ]; then
+    code="$(sandbox_api "$akhdr" GET /v1/credits/balance "$ans")"
+    [ "$code" = 401 ] || token="revoked_${code:-none}"
+  fi
+  rm -f "$hdr" "$ans" "$akhdr"
+  echo "${token:-ok}"
+}
+
+judge_automaton() { # $1 = token of automaton_live
+  local t="${1:-}" p="POST /v1/automatons"
+  case "$t" in
+    ok) echo "OK automaton: automaton=ok, $p 201, running with a turn within $AUTOMATON_WAIT s, logs without a key, deleted, the key of the automaton answered 401 after the DELETE" ;;
+    "") echo "FAIL automaton: no result" ;;
+    nokey) echo "FAIL automaton: no LIVE_SANDBOX_KEY readable in live-sandbox.env" ;;
+    create_404) echo "FAIL automaton: $p answered 404 (not rolled out yet)" ;;
+    create_402) echo "FAIL automaton: $p answered 402, the own account has not enough credits" ;;
+    create_none) echo "FAIL automaton: $p gave no answer" ;;
+    create_*) echo "FAIL automaton: $p answered ${t#create_}, expected 201" ;;
+    noid) echo "FAIL automaton: $p answered 201 without an id" ;;
+    timeout) echo "FAIL automaton: no status running with a turn within $AUTOMATON_WAIT s" ;;
+    status_*) echo "FAIL automaton: status ${t#status_} before the first turn" ;;
+    key_missing) echo "FAIL automaton: config.json of its sandbox holds no apiKey" ;;
+    key_rejected_*) echo "FAIL automaton: the key of the automaton answered ${t#key_rejected_} on GET /v1/credits/balance before the DELETE, expected 200" ;;
+    key_*) echo "FAIL automaton: read of config.json of its sandbox answered ${t#key_}, expected 200" ;;
+    logs_leak) echo "FAIL automaton: the log holds an API key" ;;
+    logs_nolines) echo "FAIL automaton: GET /v1/automatons/{id}/logs answered 200 without lines" ;;
+    logs_*) echo "FAIL automaton: GET /v1/automatons/{id}/logs answered ${t#logs_}, expected 200" ;;
+    delete_*) echo "FAIL automaton: DELETE /v1/automatons/{id} answered ${t#delete_}, expected 200 with status deleted" ;;
+    revoked_*) echo "FAIL automaton: the key of the automaton answered ${t#revoked_} on GET /v1/credits/balance after the DELETE, expected 401" ;;
+    *) echo "FAIL automaton: failed: $t" ;;
+  esac
+}
+
 selftest() {
   # No network in here, by construction: any attempt is an error.
   curl() { echo "selftest must not reach the network (curl)" >&2; return 99; }
@@ -1144,6 +1289,116 @@ selftest() {
     [ "${got%% *}" = "$l_expect" ] || all_ok=0
   done
 
+  # The check `automaton` (sandbox 08) through the real automaton_live and judge_automaton, with a stand-in for the public
+  # API and for sleep (which only moves SECONDS on, so 180 s pass at once). Both directions: a working route is ok; the 404
+  # before the rollout, the 402 of an empty account, no turn within 180 s, a failed automaton, the own key, the key of the
+  # automaton or any cnwy_k_ key in the log, a key that does not work before the DELETE, a DELETE without status deleted
+  # and a key that still works after the DELETE each give their own FAIL automaton line. Once the create answered with an
+  # id, the DELETE ran.
+  local a_key a_other
+  a_key="cnwy_k_$(head -c 32 /dev/zero | tr '\0' 'q')"
+  a_other="cnwy_k_$(head -c 32 /dev/zero | tr '\0' 'b')"
+  automaton_step() { # $1 = case, $2 = call log
+    (
+      a_case="$1" a_log="$2"
+      LIVE_SANDBOX_ENV="$dir/live-sandbox.env"
+      export TMPDIR="$dir"
+      sandbox_api() { # stand-in of the public API: logs the call with whose key it came, answers from the case
+        local who=live line=""
+        grep -qF -- "$a_key" "$1" && who=automaton
+        echo "$2 $3 $who" >>"$a_log"
+        case "$2 $3 $who" in
+          "POST /v1/automatons live")
+            case "$a_case" in
+              404) printf '{"error":"not_found"}' >"$4"; echo 404 ;;
+              402) printf '{"error":"INSUFFICIENT_CREDITS"}' >"$4"; echo 402 ;;
+              *) printf '{"id":"a1b2c3d4e5f6","name":"live-check","status":"starting","sandbox_id":"k3v9q2m7x1"}' >"$4"; echo 201 ;;
+            esac
+            ;;
+          "GET /v1/automatons/a1b2c3d4e5f6 live")
+            # starting without a turn on the first two reads, then running with one (or never, or failed).
+            local n
+            n="$(grep -c '^GET /v1/automatons/a1b2c3d4e5f6 live$' "$a_log")"
+            if [ "$a_case" = failed ]; then
+              printf '{"id":"a1b2c3d4e5f6","status":"failed","reason":"setup","turns":0}' >"$4"
+            elif [ "$a_case" = noturn ] || [ "$n" -le 2 ]; then
+              printf '{"id":"a1b2c3d4e5f6","status":"starting","turns":0,"sandbox_id":"k3v9q2m7x1"}' >"$4"
+            else
+              printf '{"id":"a1b2c3d4e5f6","status":"running","turns":1,"sandbox_id":"k3v9q2m7x1"}' >"$4"
+            fi
+            echo 200
+            ;;
+          "GET /v1/sandboxes/k3v9q2m7x1/files/read?path=%2Froot%2F.automaton%2Fconfig.json live")
+            printf '{"content":"{\\"apiKey\\":\\"%s\\",\\"walletAddress\\":\\"0x%s\\"}"}' "$a_key" "$(head -c 40 /dev/zero | tr '\0' '7')" >"$4"
+            echo 200
+            ;;
+          "GET /v1/credits/balance automaton")
+            if grep -q '^DELETE /v1/automatons/a1b2c3d4e5f6 live$' "$a_log"; then
+              [ "$a_case" = notrevoked ] && { printf '{"balance_cents":1}' >"$4"; echo 200; return; }
+              printf '{"error":"Invalid API key"}' >"$4"
+              echo 401
+            elif [ "$a_case" = keyrejected ]; then
+              printf '{"error":"Invalid API key"}' >"$4"
+              echo 401
+            else
+              printf '{"balance_cents":1}' >"$4"
+              echo 200
+            fi
+            ;;
+          "GET /v1/automatons/a1b2c3d4e5f6/logs live")
+            case "$a_case" in
+              leak-own) line="Authorization: $fake_key" ;;
+              leak-automaton) line="apiKey $a_key" ;;
+              leak-other) line="key $a_other" ;;
+              *) line="Turn t1: 1 tools, 900 tokens apiKey [redacted]" ;;
+            esac
+            node -e 'process.stdout.write(JSON.stringify({ id: "a1b2c3d4e5f6", lines: ["[2026-11-16T10:00:00.000Z] start", process.argv[1]] }))' "$line" >"$4"
+            echo 200
+            ;;
+          "DELETE /v1/automatons/a1b2c3d4e5f6 live")
+            if [ "$a_case" = deletebad ]; then printf '{"ok":true,"status":"stopped"}' >"$4"; else printf '{"ok":true,"id":"a1b2c3d4e5f6","status":"deleted"}' >"$4"; fi
+            echo 200
+            ;;
+          *)
+            printf '{"error":"not_found"}' >"$4"
+            echo 404
+            ;;
+        esac
+      }
+      sleep() { SECONDS=$((SECONDS + ${1%%.*})); }
+      automaton_live
+    )
+  }
+  local ac ac_name ac_tok ac_del ac_log ac_out ac_got
+  for ac in "ok|ok|yes" "404|create_404|no" "402|create_402|no" "noturn|timeout|yes" "failed|status_failed|yes" \
+    "leak-own|logs_leak|yes" "leak-automaton|logs_leak|yes" "leak-other|logs_leak|yes" "keyrejected|key_rejected_401|yes" \
+    "deletebad|delete_200|yes" "notrevoked|revoked_200|yes"; do
+    IFS='|' read -r ac_name ac_tok ac_del <<<"$ac"
+    ac_log="$dir/automaton-$ac_name.log"
+    : >"$ac_log"
+    ac_out="$(automaton_step "$ac_name" "$ac_log")"
+    ac_got=no
+    grep -qx "DELETE /v1/automatons/a1b2c3d4e5f6 live" "$ac_log" && ac_got=yes
+    got="$(judge_automaton "$ac_out")"
+    echo "planted automaton step $ac_name: automaton=${ac_out:-nothing} deleted=$ac_got"
+    echo "planted automaton $ac_name: $got"
+    [ "$ac_out" = "$ac_tok" ] && [ "$ac_got" = "$ac_del" ] || all_ok=0
+    if [ "$ac_name" = ok ]; then [ "${got%% *}" = OK ] || all_ok=0; else [ "${got%%:*}" = "FAIL automaton" ] || all_ok=0; fi
+    # Until the rollout the route is missing, and the line says so in exactly these words.
+    [ "$ac_name" != 404 ] || [ "$got" = "FAIL automaton: POST /v1/automatons answered 404 (not rolled out yet)" ] || all_ok=0
+    # The key of the automaton is never in the output of the check.
+    if grep -qF -- "$a_key" <<<"$ac_out$got"; then
+      echo "FAIL selftest: automaton $ac_name printed the key of the automaton"
+      all_ok=0
+    fi
+  done
+  # Without the canary turn it waits 180 s, not once and not longer: one read every 5 s.
+  ac_got="$(grep -c '^GET /v1/automatons/a1b2c3d4e5f6 live$' "$dir/automaton-noturn.log")"
+  [ "$ac_got" -ge 2 ] && [ "$ac_got" -le 37 ] || { echo "FAIL selftest: automaton noturn made $ac_got reads, expected 2 to 37"; all_ok=0; }
+  got="$(judge_automaton "$(LIVE_SANDBOX_ENV="$dir/missing-live-sandbox.env" automaton_live)")"
+  echo "planted automaton nokey: $got"
+  [ "${got%%:*}" = "FAIL automaton" ] || all_ok=0
+
   # The key files of a run of live() stopped with a signal (domains 03): the run gets its own TMPDIR, the made-up key,
   # CP_HOST=fake.invalid and the stand-ins, and runs as its own process group, so the signal reaches every process of it as
   # it does from a terminal, a supervisor or the timeout of an agent tool. curl holds the call to $3 (the header file is
@@ -1327,6 +1582,8 @@ live() {
 
   say "$(judge_sandbox "$(sandbox_live "$key")")"
   say "$(judge_sandbox_foreign "$(sandbox_foreign_count remote "$key")")"
+
+  say "$(judge_automaton "$(automaton_live)")"
 
   if [ "$FAILED" = 0 ]; then
     echo "LIVE OK"

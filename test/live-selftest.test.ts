@@ -67,6 +67,25 @@ describe("ops/live.sh", () => {
     expect(run.stdout).toContain("planted port step payurl: port=bad_url unexposed=yes fetches=0");
     expect(run.stdout).toContain("planted port step server: port=server_504 unexposed=yes fetches=0");
     expect(run.stdout).toContain("planted port step unexpose: port=unexpose_404 unexposed=yes");
+    // The check `automaton` (goals/sandbox/08, point 8): through the real automaton_live in both directions, each planted
+    // failure with its own FAIL automaton line, and the DELETE once the create answered with an id.
+    expect(run.stdout).toContain("planted automaton step ok: automaton=ok deleted=yes");
+    expect(run.stdout).toMatch(/^planted automaton ok: OK automaton: automaton=ok, /m);
+    expect(run.stdout).toContain("planted automaton step 404: automaton=create_404 deleted=no");
+    expect(run.stdout).toContain("planted automaton 404: FAIL automaton: POST /v1/automatons answered 404 (not rolled out yet)");
+    expect(run.stdout).toContain("planted automaton step noturn: automaton=timeout deleted=yes");
+    expect(run.stdout).toContain("planted automaton noturn: FAIL automaton: no status running with a turn within 180 s");
+    for (const leak of ["leak-own", "leak-automaton", "leak-other"]) {
+      expect(run.stdout).toContain(`planted automaton step ${leak}: automaton=logs_leak deleted=yes`);
+      expect(run.stdout).toContain(`planted automaton ${leak}: FAIL automaton: the log holds an API key`);
+    }
+    expect(run.stdout).toContain("planted automaton step notrevoked: automaton=revoked_200 deleted=yes");
+    expect(run.stdout).toMatch(/^planted automaton notrevoked: FAIL automaton: .* after the DELETE, expected 401$/m);
+    expect(run.stdout).toContain("planted automaton step keyrejected: automaton=key_rejected_401 deleted=yes");
+    for (const name of ["402", "failed", "keyrejected", "deletebad", "nokey"]) {
+      expect(run.stdout).toMatch(new RegExp(`^planted automaton ${name}: FAIL automaton: `, "m"));
+    }
+    expect(run.stdout).not.toContain("printed the key of the automaton");
     expect(run.stdout).toMatch(/^planted sandbox-wait new-key: OK sandbox-wait: created [0-9]+ s after a new client key/m);
     expect(run.stdout).toContain("planted sandbox-wait old-key: OK sandbox-wait: created at once");
     expect(run.stdout).toMatch(/^planted sandbox-wait no-wait: FAIL sandbox-wait: created 0 s after a new client key/m);
