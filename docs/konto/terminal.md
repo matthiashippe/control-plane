@@ -54,6 +54,11 @@ geht es nur nach unten, weil eine Prompt-Injection im Terminal höchstens den Sc
   Periode endet (`carry_until`, `periodEnd` in `src/konto/topup.ts`) zählt es gegen das neue Limit. Nach einer Erhöhung von 5 auf
   10, bei der die alte schon 4 abgebucht hat, bucht der Server am selben Tag also höchstens 6 aus der neuen ab, danach gilt die
   Periode der neuen allein.
+- Scheitert beim Wechsel die Freischaltung oder der Widerruf (Quittung `reverted`, Fehler beim Senden, Abbruch beim Warten auf
+  die Quittung), endet der Lauf ohne `spend()` mit `approve_failed` oder `revoke_failed`. Der nächste Lauf findet die neue
+  Erlaubnis schon freigeschaltet (`isApproved`) und schickt kein zweites `approveWithSignature`, widerruft die alte erneut und
+  bucht erst danach ab. Ein zweiter `revokeAsSpender` geht auch durch, wenn der erste doch angekommen war, weil der Vertrag bei
+  einer schon widerrufenen Erlaubnis ohne Revert zurückkehrt.
 - Im MCP-Server entscheidet `raiseNeedsPhone`, ob `set_daily_limit` den Handoff braucht. Der Server lehnt jede Erhöhung ohne
   Handoff trotzdem ab; das Tool ist Bequemlichkeit, nicht die Sperre.
 - Ohne `CP_KONTO_CHAIN_ID` antworten `step: "limit"`, `POST /h/{code}/limit` und `POST /v1/konto/limit` mit 503.

@@ -136,6 +136,16 @@ async function waitForSpend(deps: TopUpDeps, address: string, hash: Hex, usdc: b
   return { kind: "booked", hash, usdc, mc: Number(usdc / ATOMIC_PER_MC) };
 }
 
+/** Sends a transaction and waits for its receipt: the hash when it went through, null when it reverted, failed or the wait broke off. */
+async function confirmed(chain: KontoChain, send: () => Promise<Hex>): Promise<Hex | null> {
+  try {
+    const hash = await send();
+    return receiptSucceeded(await chain.receipt(hash)) ? hash : null;
+  } catch {
+    return null;
+  }
+}
+
 /** What a revoked permission spent in its running period, while that period holds; 0 once it ended. */
 function activeCarry(row: Pick<AccountRow, "carry_usdc" | "carry_until">, nowSeconds: number): bigint {
   if (row.carry_usdc === null || row.carry_until === null) return 0n;
@@ -182,12 +192,14 @@ async function topUp(deps: TopUpDeps, address: string): Promise<TopUpResult> {
   if (next) {
     const old = permissionFromJson(row.permission);
     let approvedTx: Hex | null = null;
+    // A failed transaction here (reverted, an error, a wait that broke off) ends the run without spend(): two of our permissions
+    // may hold on-chain until the old one is revoked. The next run finds the new one approved and sends no second approval, and it
+    // revokes the old one again, which the contract accepts also when the first revocation landed after all.
     if (!(await chain.isApproved(next.permission))) {
-      approvedTx = await chain.approve(next.permission, next.signature);
-      if (!receiptSucceeded(await chain.receipt(approvedTx))) return { kind: "none", reason: "approve_failed" };
+      approvedTx = await confirmed(chain, () => chain.approve(next.permission, next.signature));
+      if (!approvedTx) return { kind: "none", reason: "approve_failed" };
     }
-    const revokeTx = await chain.revoke(old);
-    if (!receiptSucceeded(await chain.receipt(revokeTx))) return { kind: "none", reason: "revoke_failed" };
+    if (!(await confirmed(chain, () => chain.revoke(old)))) return { kind: "none", reason: "revoke_failed" };
     // Revoked, so what the old one spent in its running period can no longer grow: it counts against the new limit until then.
     const carry = carryAfterSwitch(row, await chain.spentThisPeriod(old), periodEnd(old, nowSeconds), nowSeconds);
     db.prepare(
@@ -209,8 +221,8 @@ async function topUp(deps: TopUpDeps, address: string): Promise<TopUpResult> {
   if (value <= 0n) return { kind: "none", reason: "period_used_up" };
   // Just approved above, so the node need not be asked again (it may not even have the block yet).
   if (!switched && !(await chain.isApproved(permission))) {
-    const approveTx = await chain.approve(permission, row.signature);
-    if (!receiptSucceeded(await chain.receipt(approveTx))) return { kind: "none", reason: "approve_failed" };
+    const approveTx = await confirmed(chain, () => chain.approve(permission, row.signature));
+    if (!approveTx) return { kind: "none", reason: "approve_failed" };
     db.prepare("UPDATE konto_accounts SET approved_tx = ? WHERE address = ?").run(approveTx.toLowerCase(), address);
   }
   const hash = await chain.spend(permission, value);
