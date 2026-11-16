@@ -60,6 +60,8 @@ function good(): Planted {
     relay: "true",
     // The harness walk of goals/konto/03 (harness/e2e/konto-chain.mjs) runs before this block too; konto_chain=true or false.
     konto_chain: "true",
+    // The terminal walk of goals/konto/04 (harness/e2e/terminal.mjs) runs before this block too; terminal=true or false.
+    terminal: "true",
     // The automaton walk of goals/sandbox/08 runs before this block; its judge runs in it.
     automaton_results: automatonResults(),
     automaton_ledger: JSON.stringify(AUTOMATON_LEDGER),
@@ -150,6 +152,13 @@ describe("sandbox gate of harness/e2e/full.sh", () => {
     const r = runGate({ ...good(), konto_chain: "false" });
     expect(r.code).toBe(1);
     expect(r.last).toMatch(/^E2E FAIL .* konto_chain=false /);
+  });
+
+  it("fails when the terminal walk from start_automaton to the first turn did not pass, and good walks do not make up for it (goals/konto/04)", () => {
+    const r = runGate({ ...good(), terminal: "false" });
+    expect(r.code).toBe(1);
+    expect(r.last).toMatch(/^E2E FAIL .* konto_chain=true terminal=false /);
+    expect(runGate(good()).last).toMatch(/ konto_chain=true terminal=true domains=true /);
   });
 
   it("fails when the walk verdict is not ok", () => {

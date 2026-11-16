@@ -2,7 +2,8 @@
 # Complete first run of the unmodified upstream runtime against the control plane:
 # provisioning, registration, bootstrap topup, five turns, sleep, the domain calls, the sandbox walk, the relay walk, the
 # konto chain walk on a second chain (84532), the long exec walk and the automaton walk (a hosted automaton in the rebuilt
-# sandboxd through a crash and a restart of sandboxd).
+# sandboxd through a crash and a restart of sandboxd) and the terminal walk (mcp/server.mjs from start_automaton to the first
+# turn, then the daily limit).
 # No Conway API error allowed.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -250,6 +251,27 @@ automaton_ledger=$("${COMPOSE[@]}" exec -T cp node -e '
   "${automaton_sandbox:-none}" "$account" "$automaton_inference_before" 2>&1 || true)
 echo "ledger of the automaton: $automaton_ledger"
 automaton_left=$(sandboxd_state)
+
+# The terminal walk of goals/konto/04 (harness/e2e/terminal.mjs, bind-mounted into chain-konto-tools): mcp/server.mjs over
+# stdio against cp, start_automaton without a key, the phone played with fetch (number, permission of a smart wallet whose owner
+# is a local key), the account of konto 03 on chain-konto (84532), the hosted automaton of sandbox 08 until its first turn, then
+# the daily limit: lower with the key, a raise with the key alone refused (limit_raise_needs_phone), a raise over the phone, the
+# old permission revoked and a spend() from it failing on-chain, stop_automaton. After the automaton walk and its count of the
+# rebuilt sandboxd, because this automaton is only stopped. terminal=true needs TERMINAL_VERDICT ok and at least one inference
+# row in the ledger of cp for the account the walk made (the first turn of the runtime), read only.
+echo "--- terminal: start_automaton to the first turn, daily limit"
+terminal_walk=$("${COMPOSE[@]}" run --rm chain-konto-tools terminal.mjs 2>&1) || true
+printf '%s\n' "$terminal_walk" | grep -E '^TERMINAL_(RESULT|VERDICT)' || printf '%s\n' "$terminal_walk" | tail -20
+terminal_account=$(printf '%s\n' "$terminal_walk" | grep '^TERMINAL_RESULT ' | tail -1 | grep -o '"account":"0x[0-9a-f]*"' | grep -o '0x[0-9a-f]*' || true)
+terminal_inference=$("${COMPOSE[@]}" exec -T cp node -e '
+  const db = require("better-sqlite3")("/data/cp.db", { readonly: true });
+  console.log(db.prepare("SELECT count(*) AS n FROM ledger WHERE kind = ? AND address = ?").get("inference", process.argv[1]).n);' \
+  "${terminal_account:-none}" 2>/dev/null || echo 0)
+echo "inference rows of the terminal account: $terminal_inference"
+terminal=false
+if printf '%s\n' "$terminal_walk" | grep -qE '^TERMINAL_VERDICT ok first_turn_ms=[0-9]+$' && [[ "$terminal_inference" =~ ^[1-9][0-9]*$ ]]; then
+  terminal=true
+fi
 echo "rebuilt sandboxd after the automaton walk: $automaton_left"
 automaton_verdict=$(AUTOMATON_RESULTS="$automaton_results" AUTOMATON_LEDGER="$automaton_ledger" node e2e/automaton-walk.mjs judge 2>&1 | tail -1 || true)
 echo "$automaton_verdict"
@@ -275,8 +297,8 @@ cleanup
 trap - EXIT
 remaining=$("${COMPOSE[@]}" ps -q | wc -l | tr -d ' ')
 [[ "$remaining" == "0" ]] || { echo "E2E FAIL: containers left behind"; exit 1; }
-if [[ "$turns" -lt 5 || "$registered" != "true" || "$api_errors" != "0" || "$consistent" != "true" || "$db_registered" != "1" || "$balance_cents" -ge 500 || "$domains_ok" != "true" || "$sandbox" != "true" || "$long_exec" != "true" || "$konto_chain" != "true" || "$relay" != "true" || "$automaton" != "true" ]]; then
-  echo "E2E FAIL turns=$turns registered=$registered api_errors=$api_errors ledger_consistent=$consistent db_registered=$db_registered balance_cents=$balance_cents konto_chain=$konto_chain domains=$domains_ok sandbox=$sandbox long_exec=$long_exec relay=$relay automaton=$automaton"
+if [[ "$turns" -lt 5 || "$registered" != "true" || "$api_errors" != "0" || "$consistent" != "true" || "$db_registered" != "1" || "$balance_cents" -ge 500 || "$domains_ok" != "true" || "$sandbox" != "true" || "$long_exec" != "true" || "$konto_chain" != "true" || "$terminal" != "true" || "$relay" != "true" || "$automaton" != "true" ]]; then
+  echo "E2E FAIL turns=$turns registered=$registered api_errors=$api_errors ledger_consistent=$consistent db_registered=$db_registered balance_cents=$balance_cents konto_chain=$konto_chain terminal=$terminal domains=$domains_ok sandbox=$sandbox long_exec=$long_exec relay=$relay automaton=$automaton"
   exit 1
 fi
-echo "E2E OK turns=$turns registered=$registered api_errors=$api_errors ledger_consistent=$consistent balance_cents=$balance_cents konto_chain=$konto_chain domains=$domains_ok sandbox=$sandbox long_exec=$long_exec relay=$relay automaton=$automaton"
+echo "E2E OK turns=$turns registered=$registered api_errors=$api_errors ledger_consistent=$consistent balance_cents=$balance_cents konto_chain=$konto_chain terminal=$terminal domains=$domains_ok sandbox=$sandbox long_exec=$long_exec relay=$relay automaton=$automaton"
