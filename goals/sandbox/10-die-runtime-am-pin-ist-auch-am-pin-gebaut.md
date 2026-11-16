@@ -84,15 +84,23 @@ nächsten zahlenden Automaton auf.
       Prüfung: `grep -c 'control-plane-dist.sha256' docs/sandbox/e2e.md` muss mindestens 1 ausgeben.
       Prüfung: `grep -c '18 Fälle' docs/sandbox/e2e.md` muss 0 ausgeben.
       Prüfung: `awk '/^## Goal 10/{f=1} f' goals/sandbox/ANNAHMEN.md | grep -ciE 'dist_sum|control-plane-dist.sha256|Prüfsumme|vorher|rebuild|Neubau'` muss mindestens 4 ausgeben.
-- [x] Das Goal ändert nur `ops/runtime-sandbox.sh`, `docs/sandbox/e2e.md` und `goals/sandbox/`, rollt nichts aus und bringt keinen
+- [x] Das Goal ändert nur `ops/runtime-sandbox.sh`, `docs/sandbox/e2e.md`, `goals/sandbox/` und den Vorschlag seiner Kritik, rollt nichts aus und bringt keinen
       Schlüssel ins Repo.
       MVP: Funktion, weil das Repo öffentlich ist (Grundregel 8) und `ops/runtime-sandbox.sh` nur auf dem code-host läuft, also kein
       Rollout nötig ist.
-      Prüfung: `git diff --name-only origin/dev...HEAD | grep -cvE '^(ops/runtime-sandbox\.sh|docs/sandbox/e2e\.md|goals/sandbox/.*)$'` muss 0 ausgeben.
+      Prüfung: `git diff --name-only origin/dev...HEAD | grep -cvE '^(ops/runtime-sandbox\.sh|docs/sandbox/e2e\.md|goals/sandbox/.*|goals/_vorschlaege/sandbox-kritik-2026-11-16-3\.md)$'` muss 0 ausgeben.
       Prüfung: `git diff --name-only origin/dev...HEAD | grep -cE "\.(key|pem|crt|env)$"` muss 0 ausgeben.
       Prüfung: `git diff origin/dev...HEAD -- . ':(exclude)goals/' | grep -cE '^\+.*(cnwy_k_[0-9a-f]{32}|-{5}BEGIN [A-Z ]*PRIVATE KEY-{5})'` muss 0 ausgeben.
 - [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
+- [ ] Der Neubau beginnt mit leerem `dist/`: Eine fremde Datei unter `dist/`, die `pnpm build` nicht überschreibt, ist nach
+      `build_runtime` weg und steht nicht im neuen Stempel; der Selbsttest fällt, wenn `build_runtime` `dist/` vor dem Bau nicht löscht.
+      MVP: Funktion, weil `write_dist_stamp` sonst jede liegengebliebene Datei aus einem alten oder veränderten `dist/` als Build am
+      Pin stempelt und der nächste Lauf `RUNTIME SANDBOX OK` meldet (Kritik Tech Lead 16.11.2026: ohne die Zeile mit `rm -rf` bleibt
+      der Selbsttest am Stand be36357 grün).
+      Prüfung: `PATH=/usr/bin:$PATH bash ops/runtime-sandbox.sh --selftest | grep -cE '^ok   rebuild-drops-stale: '` muss 1 ausgeben.
+      Prüfung: `PATH=/usr/bin:$PATH bash ops/runtime-sandbox.sh --selftest | tail -n 1` muss `RUNTIME SANDBOX SELFTEST OK` ausgeben.
+      Prüfung: `T=$(mktemp -d); git archive HEAD | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; f=$T/ops/runtime-sandbox.sh; if ! grep -q 'rm -rf "$RUNTIME_DIR/dist"' $f; then echo "fehlt rm"; else sed -i '/rm -rf "\$RUNTIME_DIR\/dist"/d' $f; PATH=/usr/bin:$PATH bash $f --selftest 2>/dev/null | tail -n 1 | grep -q 'SELFTEST OK' && echo "gruen ohne Loeschen"; fi; rm -rf $T` muss nichts ausgeben.
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
