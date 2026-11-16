@@ -112,3 +112,41 @@ Handoff als Abstand um die Haken-Liste. Neu, im zweiten `<style>` der Quellen un
   `<h1>` bleibt (Punkt 4 ändert sie zur Gegenprobe).
 
 Abnahme-Issue konto: PRO-20104
+
+## Limit /h/{code}
+
+Der Schritt Limit derselben Handy-Seite (goals/konto/04): Ein Konto erhöht sein Tageslimit. Nach der richtigen Zahl bestätigt der
+Mensch das neue Limit mit dem Passkey, mit dem er das Konto angelegt hat. Zwei Zustände, je zwei Bilder:
+
+| Zustand | 390 | 1440 | Quelle |
+|---|---|---|---|
+| `approve` | `limit-approve-390.png` | `limit-approve-1440.png` | `src/limit-approve.html` |
+| `passkey` | `limit-passkey-390.png` | `limit-passkey-1440.png` | `src/limit-passkey.html` |
+
+`approve` ist die Wahl der Zahl wie beim Handoff, zeigt aber das heutige und das neue Tageslimit statt der ersten Zahlung; der Block
+`data-soll="approve"` endet im ersten Bildschirm. `passkey` sagt in der Überschrift, was beim Tippen passiert, darunter in einer
+Zeile das neue Limit und für wen, zwei Haken (das alte Limit endet, derselbe Passkey) und einen Knopf über die ganze Breite; der
+Block `data-soll="limit"` endet im ersten Bildschirm (390 x 844 und 1440 x 900). Abbruch und Fehler zeigen den Zustand
+`fehlgeschlagen` aus dem Abschnitt Konto unverändert. Die Werte im Bild sind erfunden (`Atlas`, 5.00 auf 10.00 USD), keine
+Kundendaten.
+
+Bauen und prüfen, ohne Netz, mit dem Chromium aus `~/.cache/ms-playwright/`:
+
+```
+node ops/soll-limit.mjs                          # Bilder neu schreiben
+node ops/soll-limit.mjs --pruefen                # neu rendern und vergleichen, Exit 1 bei jedem Mangel
+node ops/soll-limit.mjs --pruefen --source <dir> # dieselbe Prüfung gegen die zwei Quellen limit-<zustand>.html in <dir>
+```
+
+Mängel wie beim Konto, dazu: Block `approve` oder `limit` fehlt oder endet unter dem ersten Bildschirm, und zur Sperrliste kommt
+`allowance`; „passkey“ und „daily limit“ sind bekannte Wörter und stehen. Die Auswertung ist `assessLimit` in `ops/soll-assess.mjs`,
+geprüft von `test/soll-limit.test.ts` ohne Browser.
+
+Neue Bausteine: keine. Die Quellen nutzen die Klassen der Startseite und die Bausteine grant und choices aus dem Abschnitt Handoff
+sowie wide und balanced aus dem Abschnitt Konto, jeweils mit demselben Zweck.
+
+Die Bilder sind wie alle anderen dieser Datei mit WenQuanYi Zen Hei als `sans-serif` gerendert. Seit dem 15.11.2026 löst
+`sans-serif` auf dem code-host zu DejaVu Sans auf; dort laufen die SOLL-Befehle mit `FONTCONFIG_FILE` auf eine Konfiguration, die
+`/etc/fonts/fonts.conf` einbindet und `/usr/share/fonts/truetype/dejavu/*` mit `rejectfont` ausschließt.
+
+Abnahme-Issue limit: PRO-22848

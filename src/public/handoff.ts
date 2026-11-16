@@ -2,8 +2,9 @@
  * The page a person opens on their phone, /h/{code} (goals/konto/02), built 1:1 after the approved SOLL pictures
  * docs/soll/handoff-<state>-<width>.png and their sources docs/soll/src/handoff-<state>.html.
  *
- * Three states: `freigabe` shows what is approved and three numbers as buttons in a form that works without JavaScript;
- * `erledigt` sends the person back to the terminal; `ungueltig` says the code no longer works and, in one line, why.
+ * Three states: `approve` shows what is approved and three numbers as buttons in a form that works without JavaScript;
+ * `approved` sends the person back to the terminal; `invalid` says the code no longer works and, in one line, why. The pictures
+ * keep the names they were approved under; ops/soll-assess.mjs maps the states to them.
  *
  * The page carries the start page's stylesheet, passed in by the app from src/public/index.html, and a second <style> with the
  * two blocks it adds (docs/soll/README.md, "Handoff /h/{code}"). No script, no font, no picture and no style of another service.
@@ -18,11 +19,11 @@ export function usd(atomic: bigint): string {
 }
 
 export type HandoffPage =
-  | { state: "freigabe"; automatonName: string; dailyLimitUsdc: bigint; amountUsdc: bigint; choices: number[] }
-  | { state: "erledigt" }
-  | { state: "ungueltig"; reason: "expired" | "used" | "wrong" | "unknown" };
+  | { state: "approve"; automatonName: string; dailyLimitUsdc: bigint; amountUsdc: bigint; choices: number[] }
+  | { state: "approved" }
+  | { state: "invalid"; reason: "expired" | "used" | "wrong" | "unknown" };
 
-/** The one line under the heading of `ungueltig`. The SOLL picture shows `expired`. */
+/** The one line under the heading of `invalid`. The SOLL picture shows `expired`. */
 const REASONS = {
   expired: "It ran out after 10 minutes.",
   used: "It was already used.",
@@ -31,9 +32,9 @@ const REASONS = {
 } as const;
 
 const TITLES = {
-  freigabe: "Approve on your phone | PostYourPrice",
-  erledigt: "Approved | PostYourPrice",
-  ungueltig: "Nothing was approved | PostYourPrice",
+  approve: "Approve on your phone | PostYourPrice",
+  approved: "Approved | PostYourPrice",
+  invalid: "Nothing was approved | PostYourPrice",
 } as const;
 
 const ICON =
@@ -50,13 +51,13 @@ const OWN_STYLE = `<style>
 </style>`;
 
 function body(page: HandoffPage): string {
-  if (page.state === "freigabe") {
+  if (page.state === "approve") {
     const name = esc(page.automatonName);
     const buttons = page.choices
       .map((n) => `      <button class="btn" type="submit" name="pick" value="${n}">${n}</button>`)
       .join("\n");
     return `<section class="hero">
-  <div class="wrap narrow" data-soll="freigabe">
+  <div class="wrap narrow" data-soll="approve">
     <p class="eyebrow">Approve on your phone</p>
     <h1>Allow ${name} to spend up to ${usd(page.dailyLimitUsdc)} a day?</h1>
     <div class="stats grant">
@@ -72,7 +73,7 @@ ${buttons}
 </section>
 `;
   }
-  if (page.state === "erledigt") {
+  if (page.state === "approved") {
     return `<section class="hero">
   <div class="wrap narrow">
     <div class="hero-text">

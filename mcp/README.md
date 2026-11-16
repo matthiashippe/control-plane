@@ -8,6 +8,31 @@ stdio can use it: Claude Desktop, Claude Code, an MCP-capable IDE, or your own l
 
 Node 20 or newer. Nothing is installed, nothing is compiled.
 
+## Run an automaton from Claude Code
+
+One line installs the plugin, which brings this server and a skill that tells Claude how to use it:
+
+    claude plugin marketplace add matthiashippe/control-plane && claude plugin install automaton@postyourprice
+
+Then ask Claude to start an automaton. The first time, Claude shows a QR code, a link and a
+number: scan the code with your phone, pick that number and confirm with a passkey. That creates
+your account, and a minute later the automaton runs in a sandbox and pays from your account,
+never more per day than the daily limit you chose. No signing key ever lives on your computer;
+the only thing kept there is the API key of the account, in `~/.config/control-plane/api-key`
+with mode 0600 (another path via `CP_KEY_FILE`). A key file other users can read is refused with
+`key_file_mode`. `CP_API_KEY`, when set, wins over the file.
+
+| Tool | What it does |
+|---|---|
+| `start_automaton` | starts an automaton from a genesis prompt, a name and a daily limit in dollars such as `"5.00"`; the first time it answers with `qr`, `url` and `match` for the phone |
+| `automaton_status` | `waiting_for_phone`, `matched`, `starting`, `running`, `stopped` or `failed` with the reason (`burned` or `expired` when the phone step failed; the next start makes a new code) |
+| `automaton_logs` | the last lines the automaton wrote, with keys blanked out |
+| `set_daily_limit` | lowers the daily limit at once; raising it needs the phone and the passkey again, and nothing in the terminal can raise it alone |
+| `stop_automaton` | stops it; stopped time costs nothing |
+
+`id` is optional on the last three: without it they act on the automaton started from this
+server, else on the newest of the account.
+
 ## What your host needs to know
 
     {
@@ -25,7 +50,7 @@ Node 20 or newer. Nothing is installed, nothing is compiled.
 key the server still starts and `list_open_bounties` still works, because the open list is public.
 Every other tool answers with `no_api_key` instead of making a call.
 
-## The six tools
+## The six bounty tools
 
 | Tool | What it does | Costs |
 |---|---|---|

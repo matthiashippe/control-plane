@@ -45,15 +45,17 @@ const create = async () => (await (await ask("create", "/v1/handoff", {
   headers: { "content-type": "application/json" },
   body: JSON.stringify({ automaton_name: "Atlas", daily_limit_usdc: "5000000", amount_usdc: "5000000" }),
 }, 201)).json());
+// Each answer under the file name of the approved picture of its state, which ops/soll-assess.mjs knows.
+const { handoffFile } = await import("./soll-assess.mjs");
 const write = async (state, res) => {
   const html = await res.text();
-  writeFileSync(path.join(out, `handoff-${state}.html`), html);
+  writeFileSync(path.join(out, `handoff-${handoffFile(state)}.html`), html);
   console.log(`soll-live-handoff: ${state} ${res.status}, ${html.length} bytes`);
 };
 
 const first = await create();
-await write("freigabe", await ask("freigabe", `/h/${first.code}`, undefined, 200));
-await write("erledigt", await ask("erledigt", `/h/${first.code}`, {
+await write("approve", await ask("approve", `/h/${first.code}`, undefined, 200));
+await write("approved", await ask("approved", `/h/${first.code}`, {
   method: "POST",
   headers: { "content-type": "application/x-www-form-urlencoded" },
   body: `pick=${first.match}`,
@@ -62,5 +64,5 @@ await write("erledigt", await ask("erledigt", `/h/${first.code}`, {
 draws.push(47, 62, 18, 1);
 const second = await create();
 now += 601_000;
-await write("ungueltig", await ask("ungueltig", `/h/${second.code}`, undefined, 410));
+await write("invalid", await ask("invalid", `/h/${second.code}`, undefined, 410));
 console.log(`soll-live-handoff: written to ${out}`);

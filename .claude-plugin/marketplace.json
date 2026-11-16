@@ -1,0 +1,13 @@
+{
+  "name": "postyourprice",
+  "owner": {
+    "name": "PostYourPrice"
+  },
+  "plugins": [
+    {
+      "name": "automaton",
+      "source": "./mcp",
+      "description": "Start an automaton from Claude Code: it runs in a sandbox of PostYourPrice and pays from your account up to a daily limit you set on your phone."
+    }
+  ]
+}

@@ -10,12 +10,25 @@
  * receipt. When the wait fails (an error, a timeout, a restart), the hash stays open; the next run for the account settles it
  * first and sends no new spend() while it is open. Success books it and clears it in one transaction; reverted clears it and
  * books nothing, and only the run after that may send a new spend().
+ *
+ * The daily limit (goals/konto/04): a cap set with the API key (`konto_accounts.cap_usdc`) is kept on top of the rest of the
+ * period, so a run spends at most the lower of cap and allowance minus what the period already spent. A raise brings a new
+ * permission (`next_permission`); before anything else the next run sends approveWithSignature for it and revokeAsSpender for the
+ * old one, both through sendKontoTx, and spends only from the new one, so that on-chain never two of our permissions for an
+ * account hold at once for longer than these two transactions.
+ *
+ * A raise does not reset the period (point 13): the new permission has its own `start` and so a fresh period. When the old one is
+ * revoked, what it spent in its running period is kept as `carry_usdc` until that period ends (`carry_until`, unix seconds), and
+ * until then a run spends from the new one at most the limit minus what the new one and the carry spent; after that the period of
+ * the new one holds alone. A second raise in the same period adds what the second permission spent to the carry and keeps the
+ * later of both ends, so a run may spend less than it could, never more.
  */
 import { createPublicClient, encodeFunctionData, type Address, type Hex, type LocalAccount, type PublicClient, type Transport } from "viem";
 import { baseSepolia } from "viem/chains";
 import { getAvailableMc, postLedger, type Db } from "../db.js";
 import { permissionFromJson } from "./account.js";
 import { requireSepolia, sendKontoTx } from "./chain.js";
+import { nextPermission, spendableLimit } from "./limit.js";
 import { KONTO_CHAIN_ID, SPEND_PERMISSION_MANAGER } from "./config.js";
 import type { SpendPermission } from "./permission.js";
 
@@ -37,6 +50,8 @@ export interface KontoChain {
   spentThisPeriod(p: SpendPermission): Promise<bigint>;
   isApproved(p: SpendPermission): Promise<boolean>;
   approve(p: SpendPermission, signature: Hex): Promise<Hex>;
+  /** revokeAsSpender: the old permission ends, and a spend() from it reverts from then on. */
+  revoke(p: SpendPermission): Promise<Hex>;
   spend(p: SpendPermission, value: bigint): Promise<Hex>;
   receipt(hash: Hex): Promise<TxReceiptLike>;
 }
@@ -46,10 +61,12 @@ export interface TopUpDeps {
   chain: KontoChain;
   topupBelowUsdc: bigint;
   topupUsdc: bigint;
+  /** The clock in milliseconds, for the end of the period of a revoked permission; production uses Date.now. */
+  now?: () => number;
 }
 
 export type TopUpResult =
-  | { kind: "none"; reason: "no_account" | "wrong_chain" | "enough" | "period_used_up" | "approve_failed" | "busy" }
+  | { kind: "none"; reason: "no_account" | "wrong_chain" | "enough" | "period_used_up" | "approve_failed" | "revoke_failed" | "busy" }
   | { kind: "pending"; hash: Hex }
   | { kind: "reverted"; hash: Hex }
   | { kind: "booked"; hash: Hex; usdc: bigint; mc: number };
@@ -61,6 +78,18 @@ interface AccountRow {
   approved_tx: string | null;
   pending_tx: string | null;
   pending_usdc: string | null;
+  cap_usdc: string | null;
+  next_permission: string | null;
+  next_signature: string | null;
+  carry_usdc: string | null;
+  carry_until: string | null;
+}
+
+/** The end (unix seconds) of the period of `p` that holds at `nowSeconds`, as getCurrentPeriod of the contract counts it. */
+export function periodEnd(p: SpendPermission, nowSeconds: number): number {
+  const elapsed = Math.max(0, nowSeconds - p.start);
+  const end = p.start + (Math.floor(elapsed / p.period) + 1) * p.period;
+  return Math.min(end, p.end);
 }
 
 /** Books a successful spend once: a second call with the same hash adds nothing. Returns whether a row was written. */
@@ -107,6 +136,29 @@ async function waitForSpend(deps: TopUpDeps, address: string, hash: Hex, usdc: b
   return { kind: "booked", hash, usdc, mc: Number(usdc / ATOMIC_PER_MC) };
 }
 
+/** Sends a transaction and waits for its receipt: the hash when it went through, null when it reverted, failed or the wait broke off. */
+async function confirmed(chain: KontoChain, send: () => Promise<Hex>): Promise<Hex | null> {
+  try {
+    const hash = await send();
+    return receiptSucceeded(await chain.receipt(hash)) ? hash : null;
+  } catch {
+    return null;
+  }
+}
+
+/** What a revoked permission spent in its running period, while that period holds; 0 once it ended. */
+function activeCarry(row: Pick<AccountRow, "carry_usdc" | "carry_until">, nowSeconds: number): bigint {
+  if (row.carry_usdc === null || row.carry_until === null) return 0n;
+  return nowSeconds < Number(row.carry_until) ? BigInt(row.carry_usdc) : 0n;
+}
+
+/** The carry after a switch: what the revoked one spent in its period, plus a carry that still holds, until the later end. */
+function carryAfterSwitch(row: AccountRow, oldSpent: bigint, oldEnd: number, nowSeconds: number): { usdc: bigint; until: number } {
+  const held = activeCarry(row, nowSeconds);
+  const until = held > 0n ? Math.max(oldEnd, Number(row.carry_until)) : oldEnd;
+  return { usdc: oldSpent + held, until };
+}
+
 const running = new Map<string, Promise<TopUpResult>>();
 
 /** Tops the account up when its credit is low. A second call while one runs for the same account waits for that one. */
@@ -121,9 +173,10 @@ export function topUpIfLow(deps: TopUpDeps, address: string): Promise<TopUpResul
 
 async function topUp(deps: TopUpDeps, address: string): Promise<TopUpResult> {
   const { db, chain } = deps;
-  const row = db.prepare("SELECT chain_id, permission, signature, approved_tx, pending_tx, pending_usdc FROM konto_accounts WHERE address = ?").get(address) as
-    | AccountRow
-    | undefined;
+  const nowSeconds = Math.floor((deps.now ?? Date.now)() / 1000);
+  const row = db
+    .prepare("SELECT chain_id, permission, signature, approved_tx, pending_tx, pending_usdc, cap_usdc, next_permission, next_signature, carry_usdc, carry_until FROM konto_accounts WHERE address = ?")
+    .get(address) as AccountRow | undefined;
   if (!row) return { kind: "none", reason: "no_account" };
   try {
     requireSepolia(row.chain_id);
@@ -132,15 +185,44 @@ async function topUp(deps: TopUpDeps, address: string): Promise<TopUpResult> {
   }
   // An open spend() first: it may have moved the customer's money, so it is settled before anything new is sent.
   if (row.pending_tx) return waitForSpend(deps, address, row.pending_tx as Hex, BigInt(row.pending_usdc ?? "0"));
+  // A raise first (konto 04): the new permission is approved and the old one revoked before any spend(), and only then does the
+  // account use the new one.
+  const next = nextPermission(row);
+  let switched = false;
+  if (next) {
+    const old = permissionFromJson(row.permission);
+    let approvedTx: Hex | null = null;
+    // A failed transaction here (reverted, an error, a wait that broke off) ends the run without spend(): two of our permissions
+    // may hold on-chain until the old one is revoked. The next run finds the new one approved and sends no second approval, and it
+    // revokes the old one again, which the contract accepts also when the first revocation landed after all.
+    if (!(await chain.isApproved(next.permission))) {
+      approvedTx = await confirmed(chain, () => chain.approve(next.permission, next.signature));
+      if (!approvedTx) return { kind: "none", reason: "approve_failed" };
+    }
+    if (!(await confirmed(chain, () => chain.revoke(old)))) return { kind: "none", reason: "revoke_failed" };
+    // Revoked, so what the old one spent in its running period can no longer grow: it counts against the new limit until then.
+    const carry = carryAfterSwitch(row, await chain.spentThisPeriod(old), periodEnd(old, nowSeconds), nowSeconds);
+    db.prepare(
+      `UPDATE konto_accounts SET permission = next_permission, signature = next_signature, approved_tx = COALESCE(?, approved_tx),
+       next_permission = NULL, next_signature = NULL, carry_usdc = ?, carry_until = ? WHERE address = ? AND next_permission = ?`,
+    ).run(approvedTx?.toLowerCase() ?? null, String(carry.usdc), String(carry.until), address, row.next_permission);
+    row.permission = row.next_permission!;
+    row.signature = row.next_signature as Hex;
+    row.carry_usdc = String(carry.usdc);
+    row.carry_until = String(carry.until);
+    switched = true;
+  }
   if (BigInt(getAvailableMc(db, address)) * ATOMIC_PER_MC >= deps.topupBelowUsdc) return { kind: "none", reason: "enough" };
   const permission = permissionFromJson(row.permission);
-  const spent = await chain.spentThisPeriod(permission);
-  const rest = permission.allowance > spent ? permission.allowance - spent : 0n;
+  const limit = spendableLimit(permission, row.cap_usdc === null ? null : BigInt(row.cap_usdc));
+  const spent = (await chain.spentThisPeriod(permission)) + activeCarry(row, nowSeconds);
+  const rest = limit > spent ? limit - spent : 0n;
   const value = rest < deps.topupUsdc ? rest : deps.topupUsdc;
   if (value <= 0n) return { kind: "none", reason: "period_used_up" };
-  if (!(await chain.isApproved(permission))) {
-    const approveTx = await chain.approve(permission, row.signature);
-    if (!receiptSucceeded(await chain.receipt(approveTx))) return { kind: "none", reason: "approve_failed" };
+  // Just approved above, so the node need not be asked again (it may not even have the block yet).
+  if (!switched && !(await chain.isApproved(permission))) {
+    const approveTx = await confirmed(chain, () => chain.approve(permission, row.signature));
+    if (!approveTx) return { kind: "none", reason: "approve_failed" };
     db.prepare("UPDATE konto_accounts SET approved_tx = ? WHERE address = ?").run(approveTx.toLowerCase(), address);
   }
   const hash = await chain.spend(permission, value);
@@ -181,6 +263,7 @@ export const SPEND_PERMISSION_MANAGER_ABI = [
     outputs: [{ type: "bool" }],
   },
   { type: "function", name: "spend", stateMutability: "nonpayable", inputs: [PERMISSION_TUPLE, { name: "value", type: "uint160" }], outputs: [] },
+  { type: "function", name: "revokeAsSpender", stateMutability: "nonpayable", inputs: [PERMISSION_TUPLE], outputs: [] },
 ] as const;
 
 /** The chain of production: reads over `transport`, writes only through sendKontoTx with the test key. */
@@ -196,6 +279,7 @@ export function createKontoChain(params: { chainId: number; account: LocalAccoun
     },
     isApproved: (p) => client.readContract({ address, abi: SPEND_PERMISSION_MANAGER_ABI, functionName: "isApproved", args: [p] }),
     approve: (p, signature) => send(encodeFunctionData({ abi: SPEND_PERMISSION_MANAGER_ABI, functionName: "approveWithSignature", args: [p, signature] })),
+    revoke: (p) => send(encodeFunctionData({ abi: SPEND_PERMISSION_MANAGER_ABI, functionName: "revokeAsSpender", args: [p] })),
     spend: (p, value) => send(encodeFunctionData({ abi: SPEND_PERMISSION_MANAGER_ABI, functionName: "spend", args: [p, value] })),
     receipt: (hash) => client.waitForTransactionReceipt({ hash }),
   };

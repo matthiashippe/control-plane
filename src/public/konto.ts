@@ -30,7 +30,7 @@ const TITLES = {
 } as const;
 
 /** The two blocks of the account step, as in the SOLL sources. */
-const KONTO_STYLE = `
+export const KONTO_STYLE = `
 <style>
 /* The passkey step (goals/konto/03): one button across the column, as tall as a thumb wants it. */
 .wide .btn { width: 100%; height: 56px; justify-content: center; font-size: var(--t-lead); font-weight: 600; cursor: pointer; }
@@ -39,7 +39,7 @@ const KONTO_STYLE = `
 .balanced h1 { text-wrap: balance; }
 </style>`;
 
-const KEY_ICON =
+export const KEY_ICON =
   `<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4.5"/><path d="M11.2 11.8 20 3M16.5 6.5l2.5 2.5M14 9l2 2"/></svg>`;
 
 function body(page: KontoPage): string {

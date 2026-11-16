@@ -16,7 +16,7 @@ import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSy
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { FONTS_CONF, FOLD, HANDOFF_STATES, WIDTHS, assessHandoff, decodePng, isLocal, pixelDiffCount, summaryHandoff } from "./soll-assess.mjs";
+import { FONTS_CONF, FOLD, HANDOFF_BLOCK_MARKS, HANDOFF_STATES, WIDTHS, assessHandoff, decodePng, handoffFile, isLocal, pixelDiffCount, summaryHandoff } from "./soll-assess.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const args = process.argv.slice(2);
@@ -25,8 +25,11 @@ const value = (name, fallback) => { const i = args.indexOf(name); return i >= 0 
 const CHECK = flag("--pruefen");
 const SOURCES = value("--source", path.join(ROOT, "docs/soll/src"));
 const PICTURES = value("--pictures", path.join(ROOT, "docs/soll"));
-const sourceOf = (state) => path.join(SOURCES, `handoff-${state}.html`);
-const pictureOf = (dir, state, w) => path.join(dir, `handoff-${state}-${w}.png`);
+// The files keep the names of the approved pictures; the code names the states in English (handoffFile in ops/soll-assess.mjs).
+const sourceOf = (state) => path.join(SOURCES, `handoff-${handoffFile(state)}.html`);
+const pictureOf = (dir, state, w) => path.join(dir, `handoff-${handoffFile(state)}-${w}.png`);
+/** The block of the state approve: the approved source marks it with the name of its file, the page with the name of the state. */
+const BLOCK = HANDOFF_BLOCK_MARKS.map((v) => `[data-soll="${v}"]`).join(", ");
 
 function findChrome() {
   if (process.env.SOLL_CHROME) return process.env.SOLL_CHROME;
@@ -123,7 +126,7 @@ async function renderAt(browser, width, url) {
   }
   await settle();
   const m = await evaluate(`(() => {
-      const d = document.documentElement, b = document.body, u = document.querySelector('[data-soll="freigabe"]');
+      const d = document.documentElement, b = document.body, u = document.querySelector(${JSON.stringify(BLOCK)});
       // html and .hero clip sideways, so every box that pokes out counts, except inside a container that scrolls sideways.
       const W = window.innerWidth;
       let over = Math.max(d.scrollWidth, b.scrollWidth);
@@ -168,7 +171,7 @@ async function main() {
       const fresh = decodePng(r.png);
       let diffPixels = null, pngWidth;
       if (CHECK) {
-        writeFileSync(path.join(scratch, `handoff-${state}-${width}.png`), r.png);
+        writeFileSync(path.join(scratch, `handoff-${handoffFile(state)}-${width}.png`), r.png);
         const committed = pictureOf(PICTURES, state, width);
         if (existsSync(committed)) { const old = decodePng(readFileSync(committed)); pngWidth = old.width; diffPixels = pixelDiffCount(old, fresh); }
       } else {

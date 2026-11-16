@@ -99,6 +99,6 @@ describe("soll judgement of the account step", () => {
   });
 
   it("rejects a state the account step does not have", () => {
-    expect(assessKonto(clean({ state: "freigabe", blockBottom: null })).join("\n")).toMatch(/freigabe 390: unknown state/);
+    expect(assessKonto(clean({ state: "approve", blockBottom: null })).join("\n")).toMatch(/approve 390: unknown state/);
   });
 });

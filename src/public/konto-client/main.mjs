@@ -1,7 +1,9 @@
 // The script of /h/{code} in the state `passkey` (goals/konto/03): one tap on the button runs flow.mjs, sends the result to
-// POST /h/{code}/konto and, once the server said done, shows the page of the code again (the state `erledigt` of konto 02). On
+// POST /h/{code}/konto and, once the server said done, shows the page of the code again (the state `approved` of konto 02). On
 // any failure the page sends the reason to POST /h/{code}/fehlgeschlagen as a form, which closes the code and shows why.
-import { KontoError, runKonto } from "./flow.mjs";
+// The step limit (goals/konto/04, data-mode="limit") signs with the passkey the account already has and sends the result to
+// POST /h/{code}/limit instead.
+import { KontoError, runKonto, runLimit } from "./flow.mjs";
 
 const button = document.getElementById("konto-passkey");
 
@@ -25,18 +27,21 @@ if (button) {
     const d = button.dataset;
     const code = d.code || "";
     try {
-      const { body } = await runKonto(
-        {
-          create: (options) => navigator.credentials.create(options),
-          fetch: (url, init) => window.fetch(url, init),
-          subtle: window.crypto.subtle,
-          random: (n) => window.crypto.getRandomValues(new Uint8Array(n)),
-          now: () => Date.now(),
-          rpId: window.location.hostname,
-        },
-        { proxyId: d.proxy || "", limit: d.limit || "", chainId: Number(d.chain), spender: d.spender || "", token: d.token || "" },
-      );
-      const res = await window.fetch(`/h/${encodeURIComponent(code)}/konto`, {
+      const env = {
+        create: (options) => navigator.credentials.create(options),
+        get: (options) => navigator.credentials.get(options),
+        fetch: (url, init) => window.fetch(url, init),
+        subtle: window.crypto.subtle,
+        random: (n) => window.crypto.getRandomValues(new Uint8Array(n)),
+        now: () => Date.now(),
+        rpId: window.location.hostname,
+      };
+      const limit = d.mode === "limit";
+      const page = { proxyId: d.proxy || "", limit: d.limit || "", chainId: Number(d.chain), spender: d.spender || "", token: d.token || "" };
+      const { body } = limit
+        ? await runLimit(env, { ...page, account: d.account || "", owner: d.owner || "", org: d.org || "" })
+        : await runKonto(env, page);
+      const res = await window.fetch(`/h/${encodeURIComponent(code)}/${limit ? "limit" : "konto"}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),

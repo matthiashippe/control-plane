@@ -49,9 +49,17 @@ services:
       CHAIN_ID: "84532"
       USDC_ADDRESS: "0x036CbD53842c5426634e7929541eC2318f3dCF7e"
       KONTO_DIR: /chain/konto
+      CP_URL: https://cp.test:8443
+      MCP_SERVER: /chain/mcp/server.mjs
+      NODE_EXTRA_CA_CERTS: /certs/ca.pem
     volumes:
       - ./e2e/konto-chain.mjs:/chain/konto-chain.mjs:ro
       - ./chain/konto:/chain/konto:ro
+      # The terminal walk of goals/konto/04 (harness/e2e/terminal.mjs): mcp/server.mjs over stdio against cp, the phone played
+      # with fetch and viem from this image, the CA of cp.test.
+      - ./e2e/terminal.mjs:/chain/terminal.mjs:ro
+      - ../mcp:/chain/mcp:ro
+      - ./certs:/certs:ro
     depends_on:
       chain-konto:
         condition: service_healthy
@@ -84,6 +92,14 @@ services:
       # The public base a hosted automaton calls back (conwayApiUrl and socialRelayUrl of its setup file, goals/sandbox/08):
       # the name of cp in this network, the same origin every client of the harness already calls.
       CP_PUBLIC_URL: https://cp.test:8443
+      # The account of konto 03 on the second chain (goals/konto/04, harness/e2e/terminal.mjs): switched on for 84532 only,
+      # against chain-konto. The spender is Anvil account 0, written to a file at start because cp reads the key only from
+      # CP_KONTO_KEY_FILE; on chain-konto it has nothing to do with the settler on chain.
+      CP_KONTO_CHAIN_ID: "84532"
+      CP_KONTO_RPC_URL: http://chain-konto:8545
+      CP_KONTO_KEY_FILE: /tmp/konto-spender.key
+      KONTO_SPENDER: *relayer-key
+    command: ["sh", "-c", "printf '%s' \"$$KONTO_SPENDER\" > /tmp/konto-spender.key && exec node dist/index.js"]
     volumes:
       - ./certs:/certs:ro
       - cp-data:/data

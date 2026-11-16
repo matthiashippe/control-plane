@@ -115,17 +115,30 @@ export function summary(results) {
 }
 
 // ---- /h/{code} (goals/konto/02) -----------------------------------------------------------------------------------------
-// The phone page has three states and the block that has to sit in the first screen is data-soll="freigabe". On top of the
-// defects of the start page, a word the reader would first have to translate is a defect (TEAM.md "Klare Wörter").
+// The phone page has three states and the block that has to sit in the first screen is the one of the state approve. On top of
+// the defects of the start page, a word the reader would first have to translate is a defect (TEAM.md "Klare Wörter").
 
-/** The states of /h/{code}, each one source docs/soll/src/handoff-<state>.html and two pictures. */
-export const HANDOFF_STATES = Object.freeze(["freigabe", "erledigt", "ungueltig"]);
+/**
+ * The states of /h/{code} as the code names them, each with the name its approved picture and source carry:
+ * docs/soll/handoff-<file>-<width>.png and docs/soll/src/handoff-<file>.html. The pictures keep the names they were approved
+ * under (goals/konto/04), and this is the only place that knows them; everything else asks handoffFile().
+ */
+export const HANDOFF_FILES = Object.freeze({ approve: "freigabe", approved: "erledigt", invalid: "ungueltig" });
+/** The states of /h/{code}, each one source and two pictures. */
+export const HANDOFF_STATES = Object.freeze(Object.keys(HANDOFF_FILES));
+/** The part of the file names of a state's picture and source. */
+export const handoffFile = (state) => HANDOFF_FILES[state];
+/**
+ * The marks of the block that has to sit in the first screen: the approved source carries the name of its file, the page the
+ * name of its state. Both describe the same block.
+ */
+export const HANDOFF_BLOCK_MARKS = Object.freeze(["approve", handoffFile("approve")]);
 /** Words that name how the page is built instead of what happens; the same list the goal's source check uses. */
 export const HANDOFF_WORDS = /handoff|phishing|token|\bsse\b/i;
 
 /**
- * Defects of one render of /h/{code}. `m` is what assess() takes, with `state` and `blockBottom` (bottom edge of
- * data-soll="freigabe" in page pixels, null when missing) instead of umzugBottom. Only the state freigabe has to carry the block.
+ * Defects of one render of /h/{code}. `m` is what assess() takes, with `state` and `blockBottom` (bottom edge of the block of
+ * the state approve in page pixels, null when missing) instead of umzugBottom. Only the state approve has to carry the block.
  */
 export function assessHandoff(m) {
   // The checks shared with the start page; umzugBottom 0 switches off only its own block, which this page does not have.
@@ -134,21 +147,21 @@ export function assessHandoff(m) {
   if (!HANDOFF_STATES.includes(m.state)) out.push(`${m.state} ${m.width}: unknown state`);
   const word = String(m.text ?? "").split("\n").find((l) => HANDOFF_WORDS.test(l));
   if (word !== undefined) out.push(`${m.state} ${m.width}: word the reader has to translate in the visible text: ${word.trim().slice(0, 80)}`);
-  if (m.state === "freigabe") {
-    if (m.blockBottom === null || m.blockBottom === undefined) out.push(`${m.state} ${m.width}: block data-soll="freigabe" is missing`);
-    else if (fold && m.blockBottom > fold) out.push(`${m.state} ${m.width}: block freigabe ends at ${m.blockBottom} px, below the first screen at ${fold}`);
+  if (m.state === "approve") {
+    if (m.blockBottom === null || m.blockBottom === undefined) out.push(`${m.state} ${m.width}: block data-soll="approve" is missing`);
+    else if (fold && m.blockBottom > fold) out.push(`${m.state} ${m.width}: block approve ends at ${m.blockBottom} px, below the first screen at ${fold}`);
   }
   return out;
 }
 
-/** The last line of ops/soll-handoff.mjs. Wording fixed by goals/konto/02, Punkt 1. */
+/** The last line of ops/soll-handoff.mjs. Wording fixed by goals/konto/02, Punkt 1, with the name of the approved picture. */
 export function summaryHandoff(results) {
   const y = WIDTHS.map((w) => {
-    const r = results.find((x) => x.state === "freigabe" && x.width === w);
+    const r = results.find((x) => x.state === "approve" && x.width === w);
     return `${w}=${r?.blockBottom ?? "fehlt"}`;
   }).join(" ");
   const n = results.reduce((s, r) => s + r.defects.length, 0);
-  return `soll handoff: ${results.length} Bilder, freigabe oben ${y}, ${n} Mängel`;
+  return `soll handoff: ${results.length} Bilder, ${handoffFile("approve")} oben ${y}, ${n} Mängel`;
 }
 
 // ---- /h/{code}, account step (goals/konto/03) ----------------------------------------------------------------------------
@@ -186,6 +199,43 @@ export function summaryKonto(results) {
   }).join(" ");
   const n = results.reduce((s, r) => s + r.defects.length, 0);
   return `soll konto: ${results.length} Bilder, passkey oben ${y}, ${n} Mängel`;
+}
+
+// ---- /h/{code}, step limit (goals/konto/04) -------------------------------------------------------------------------------
+// Two more states of the phone page for raising the daily limit: `approve` (the number, with today's and the new daily limit)
+// and `passkey` (confirm the new limit with the passkey of the account). Each carries a block that has to end in the first
+// screen: data-soll="approve" and data-soll="limit". On top of the defects of the start page, a word the reader would first have
+// to translate is a defect, with the list of goals/konto/04 ("passkey" and "daily limit" are known words).
+
+/** The states of the step limit, each one source docs/soll/src/limit-<state>.html and two pictures. */
+export const LIMIT_STATES = Object.freeze(["approve", "passkey"]);
+/** The block of each state that has to end in the first screen, as its data-soll value. */
+export const LIMIT_BLOCKS = Object.freeze({ approve: "approve", passkey: "limit" });
+/** Words that name how the limit is built instead of what happens; the same list the goal's source check uses. */
+export const LIMIT_WORDS = /handoff|token|wallet|smart|permission|sepolia|turnkey|\berc|allowance/i;
+
+/**
+ * Defects of one render of the step limit. `m` is what assessKonto() takes: `state`, `width`, `pngWidth`, `diffPixels`,
+ * `scrollWidth`, `text`, `foreign` and `blockBottom` (bottom edge of the block of the state in page pixels, null when missing).
+ */
+export function assessLimit(m) {
+  const out = assess({ ...m, umzugBottom: 0 }).map((d) => `${m.state} ${d}`), fold = FOLD[m.width];
+  const block = LIMIT_BLOCKS[m.state];
+  if (!LIMIT_STATES.includes(m.state)) out.push(`${m.state} ${m.width}: unknown state`);
+  const word = String(m.text ?? "").split("\n").find((l) => LIMIT_WORDS.test(l));
+  if (word !== undefined) out.push(`${m.state} ${m.width}: word the reader has to translate in the visible text: ${word.trim().slice(0, 80)}`);
+  if (block) {
+    if (m.blockBottom === null || m.blockBottom === undefined) out.push(`${m.state} ${m.width}: block data-soll="${block}" is missing`);
+    else if (fold && m.blockBottom > fold) out.push(`${m.state} ${m.width}: block ${block} ends at ${m.blockBottom} px, below the first screen at ${fold}`);
+  }
+  return out;
+}
+
+/** The last line of ops/soll-limit.mjs. Wording fixed by goals/konto/04, Punkt 1. */
+export function summaryLimit(results) {
+  const top = (state) => WIDTHS.map((w) => `${w}=${results.find((x) => x.state === state && x.width === w)?.blockBottom ?? "missing"}`).join(" ");
+  const n = results.reduce((s, r) => s + r.defects.length, 0);
+  return `soll limit: ${results.length} images, ${LIMIT_BLOCKS.approve} top ${top("approve")}, ${LIMIT_BLOCKS.passkey} top ${top("passkey")}, ${n} defects`;
 }
 
 /**

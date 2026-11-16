@@ -93,6 +93,7 @@ import { domainNotHeld, invalidDomain, parseDnsPath, registerDomain, searchDomai
 import { Catalog, handleChat, MARKUP } from "./inference/proxy.js";
 import { clientKey, RateLimiter, type RateLimitOptions } from "./ratelimit.js";
 import { registerHandoff, type HandoffDeps, type KontoDeps } from "./handoff/routes.js";
+import { registerKontoLimit } from "./konto/limit.js";
 import { handlePay, TOPUP_TIERS_USD, type PayConfig } from "./payments/pay.js";
 import { handleRegister } from "./registry.js";
 import { createSandboxService, type Reply as SandboxReply, type SandboxService } from "./sandbox/service.js";
@@ -333,6 +334,8 @@ export const V1_ROUTES = new Set([
   "/v1/chat/completions",
   "/v1/check",
   "/v1/credits/balance",
+  // The daily limit of an account (goals/konto/04): read it, and lower it with the API key; raising needs the phone.
+  "/v1/konto/limit",
   "/v1/credits/history",
   "/v1/credits/pricing",
   "/v1/credits/starter",
@@ -2640,6 +2643,9 @@ export function createApp(opts: AppOptions) {
    *
    * `balance_cents` keeps its name, its type and its place, because the runtime reads it.
    */
+  // goals/konto/04: the daily limit of the account of this key. Behind the auth middleware above, which sets `address`.
+  registerKontoLimit(app, { db, on: () => Boolean(opts.konto) });
+
   app.get("/v1/credits/balance", (c) => {
     const address = c.get("address");
     // A runtime that has read an empty balance three times over more than a minute is stuck, not

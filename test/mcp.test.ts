@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import {
   DEFAULT_BASE_URL,
   DEFAULT_PROTOCOL_VERSION,
+  AUTOMATON_TOOLS,
   TOOLS,
   callTool,
   createClient,
@@ -74,7 +75,7 @@ describe("MCP protocol", () => {
     expect(await handleMessage({ jsonrpc: "2.0", method: "notifications/cancelled", params: {} }, ctx)).toBeNull();
   });
 
-  it("lists six tools with their schemas and nothing internal", async () => {
+  it("lists the six bounty tools and the five automaton tools with their schemas and nothing internal", async () => {
     const listed = (await handleMessage({ jsonrpc: "2.0", id: 1, method: "tools/list" }, ctx)).result.tools;
     expect(listed.map((t: any) => t.name)).toEqual([
       "list_open_bounties",
@@ -83,6 +84,11 @@ describe("MCP protocol", () => {
       "read_my_submissions",
       "check_submission",
       "read_balance",
+      "start_automaton",
+      "automaton_status",
+      "automaton_logs",
+      "set_daily_limit",
+      "stop_automaton",
     ]);
     for (const tool of listed) {
       expect(tool.inputSchema.type).toBe("object");
@@ -90,7 +96,7 @@ describe("MCP protocol", () => {
       // Counter-check: the request builder is ours and must not reach the client.
       expect(Object.keys(tool).sort()).toEqual(["description", "inputSchema", "name"]);
     }
-    expect(toolDefinitions()).toHaveLength(TOOLS.length);
+    expect(toolDefinitions()).toHaveLength(TOOLS.length + AUTOMATON_TOOLS.length);
   });
 
   it("separates an unknown method from an unknown tool", async () => {
@@ -167,7 +173,7 @@ describe("Starting it without a build step", () => {
     expect(code).toBe(0);
     const lines = out.split("\n").filter(Boolean).map((l) => JSON.parse(l));
     expect(lines.map((l) => l.id)).toEqual([1, 2]);
-    expect(lines[1].result.tools).toHaveLength(6);
+    expect(lines[1].result.tools).toHaveLength(11);
     // Counter-check: the startup note goes to stderr. On stdout it would corrupt the protocol,
     // so every single line out there has to be a JSON-RPC message.
     expect(err).toContain("control-plane-bounties");
