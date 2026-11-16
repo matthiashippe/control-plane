@@ -74,3 +74,4 @@ Gemessen mit neuem Harness und neuem Urteil (`waits` ist die Zahl der Aufrufe de
 die Zahl der Anfragen der Runtime über alle Aufrufe):
 
 - vorher 180 s: code-host lokal ohne Docker (`dist/index.js` über TLS, Nachbau `sandboxd`, Runtime am Pin `d8f8168`), Commit `08164a6` (Stand von `dev`), 16.11.2026 12:23:01 bis 12:24:24 UTC: LONG_EXEC_VERDICT fail long-180: neither the result (long-180 in stdout, exit_code 0) nor a text that says the command is still running and names a command to wait with on its last line
+- nachher 180 s: Job `e2e` von PR #210 auf GitHub (Lauf 43867113773, Nachbau `sandboxd`, Runtime am Pin `d8f8168`), Commit `b37f852`, 16.11.2026 12:36:08 UTC: waits=7 max_wait_ms=25046 attempts=7 failures_after=0 runs=1
