@@ -84,11 +84,11 @@ nächsten zahlenden Automaton auf.
       Prüfung: `grep -c 'control-plane-dist.sha256' docs/sandbox/e2e.md` muss mindestens 1 ausgeben.
       Prüfung: `grep -c '18 Fälle' docs/sandbox/e2e.md` muss 0 ausgeben.
       Prüfung: `awk '/^## Goal 10/{f=1} f' goals/sandbox/ANNAHMEN.md | grep -ciE 'dist_sum|control-plane-dist.sha256|Prüfsumme|vorher|rebuild|Neubau'` muss mindestens 4 ausgeben.
-- [x] Das Goal ändert nur `ops/runtime-sandbox.sh`, `docs/sandbox/e2e.md`, `goals/sandbox/` und den Vorschlag seiner Kritik, rollt nichts aus und bringt keinen
+- [x] Das Goal ändert nur `ops/runtime-sandbox.sh`, `docs/sandbox/e2e.md` und `goals/sandbox/`, rollt nichts aus und bringt keinen
       Schlüssel ins Repo.
       MVP: Funktion, weil das Repo öffentlich ist (Grundregel 8) und `ops/runtime-sandbox.sh` nur auf dem code-host läuft, also kein
       Rollout nötig ist.
-      Prüfung: `git diff --name-only origin/dev...HEAD | grep -cvE '^(ops/runtime-sandbox\.sh|docs/sandbox/e2e\.md|goals/sandbox/.*|goals/_vorschlaege/sandbox-kritik-2026-11-16-3\.md)$'` muss 0 ausgeben.
+      Prüfung: `git diff --name-only origin/dev...HEAD | grep -cvE '^(ops/runtime-sandbox\.sh|docs/sandbox/e2e\.md|goals/sandbox/.*)$'` muss 0 ausgeben.
       Prüfung: `git diff --name-only origin/dev...HEAD | grep -cE "\.(key|pem|crt|env)$"` muss 0 ausgeben.
       Prüfung: `git diff origin/dev...HEAD -- . ':(exclude)goals/' | grep -cE '^\+.*(cnwy_k_[0-9a-f]{32}|-{5}BEGIN [A-Z ]*PRIVATE KEY-{5})'` muss 0 ausgeben.
 - [x] `check` ist grün.
