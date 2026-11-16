@@ -1,7 +1,7 @@
 # Konto Goal 04: Die Terminal-Tools
 
 ## Status
-PLANNED
+ACTIVE
 
 ## Active Objective
 Wer in Claude Code arbeitet und keine Wallet hat, startet einen Automaton mit einem Satz: Das Plugin bringt `mcp/server.mjs` und
