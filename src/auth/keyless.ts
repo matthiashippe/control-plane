@@ -178,6 +178,11 @@ export function crawlerMintsToday(db: Db, now: Date = new Date()): number {
   return row.n;
 }
 
+/** What `mintAgentIdentity` hands back: the identity, and how many places the caller's cap has left today. */
+export interface MintedAgentIdentity extends MintedIdentity {
+  keysLeftToday: number;
+}
+
 export class KeylessError extends Error {
   constructor(readonly code: string, readonly status: number, readonly hint: string) {
     super(code);
@@ -191,11 +196,16 @@ export class KeylessError extends Error {
  * both read four and both mint. A declared crawler (`isDeclaredCrawler`) is counted against its own
  * cap under its own name and refused with `crawler_daily_limit`, so a 429 `daily_limit` still means
  * an ordinary caller was turned away. Without a user agent this is the same as before.
+ * `keysLeftToday` is the caller's cap minus its keys of the UTC day of `now` including this one,
+ * never below 0, taken from the count this transaction reads, so two calls in a row never see the
+ * same number.
  */
-export function mintAgentIdentity(db: Db, now = Date.now(), userAgent?: string): MintedIdentity {
-  const run = db.transaction(() => {
+export function mintAgentIdentity(db: Db, now = Date.now(), userAgent?: string): MintedAgentIdentity {
+  const run = db.transaction((): MintedAgentIdentity => {
     if (isDeclaredCrawler(userAgent)) {
-      if (crawlerMintsToday(db, new Date(now)) >= crawlerMintsPerDay()) {
+      const crawlerCap = crawlerMintsPerDay();
+      const crawlerToday = crawlerMintsToday(db, new Date(now));
+      if (crawlerToday >= crawlerCap) {
         throw new KeylessError(
           "crawler_daily_limit",
           429,
@@ -204,9 +214,12 @@ export function mintAgentIdentity(db: Db, now = Date.now(), userAgent?: string):
             "POST /v1/auth/nonce, /v1/auth/verify, /v1/auth/api-keys.",
         );
       }
-      return mintKeylessIdentity(db, KEYLESS_CRAWLER_NAME, now);
+      const minted = mintKeylessIdentity(db, KEYLESS_CRAWLER_NAME, now);
+      return { ...minted, keysLeftToday: Math.max(0, crawlerCap - (crawlerToday + 1)) };
     }
-    if (agentMintsToday(db, new Date(now)) >= agentMintsPerDay()) {
+    const agentCap = agentMintsPerDay();
+    const agentToday = agentMintsToday(db, new Date(now));
+    if (agentToday >= agentCap) {
       throw new KeylessError(
         "daily_limit",
         429,
@@ -216,7 +229,8 @@ export function mintAgentIdentity(db: Db, now = Date.now(), userAgent?: string):
           "wallet there is no limit: POST /v1/auth/nonce, /v1/auth/verify, /v1/auth/api-keys.",
       );
     }
-    return mintKeylessIdentity(db, KEYLESS_AGENT_NAME, now);
+    const minted = mintKeylessIdentity(db, KEYLESS_AGENT_NAME, now);
+    return { ...minted, keysLeftToday: Math.max(0, agentCap - (agentToday + 1)) };
   });
   return run();
 }

@@ -21,7 +21,7 @@ import {
   StarterError,
 } from "./credits/starter.js";
 import { verifyFindings, messages, type CheckMode } from "./check/fabrication.js";
-import { mintKeylessIdentity, mintAgentIdentity, KeylessError, agentMintsPerDay, crawlerMintsPerDay, isDeclaredCrawler } from "./auth/keyless.js";
+import { mintKeylessIdentity, mintAgentIdentity, KeylessError } from "./auth/keyless.js";
 import { renderStarted, renderNoFreeJob } from "./public/startpage.js";
 import { reviewBrief } from "./bounties/brief.js";
 import { receipts, PUBLICATION_FROM } from "./bounties/receipts.js";
@@ -1774,12 +1774,12 @@ export function createApp(opts: AppOptions) {
    *
    * Capped at a few a day (see src/auth/keyless.ts for the own goal that prevents), and the cap is
    * named in the answer rather than hidden in a 429, because an agent that reads the message can
-   * take the route with a wallet instead of giving up.
+   * take the route with a wallet instead of giving up; keys_left_today comes from the count of this call.
    */
   app.post("/v1/auth/keyless", (c) => {
     try {
       const userAgent = c.req.header("user-agent");
-      const { key, keyPrefix, address } = mintAgentIdentity(db, Date.now(), userAgent);
+      const { key, keyPrefix, address, keysLeftToday } = mintAgentIdentity(db, Date.now(), userAgent);
       return c.json(
         {
           key,
@@ -1789,7 +1789,7 @@ export function createApp(opts: AppOptions) {
             "This key is the whole account. It is shown once and stored only as a hash, so there " +
             "is no way to get it back. It carries no credit: POST /v1/credits/starter claims the " +
             "free starter credit, and /bounties.json lists what is open.",
-          keys_left_today: Math.max(0, (isDeclaredCrawler(userAgent) ? crawlerMintsPerDay() : agentMintsPerDay()) - 1),
+          keys_left_today: keysLeftToday,
           docs: DOC.authentication,
         },
         201,
