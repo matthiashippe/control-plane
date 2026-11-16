@@ -537,4 +537,9 @@
 - **Mutationen.** Mit einem `dist_sum`, das eine Konstante ausgibt, werden `dist-changed`, `dist-added` und `rebuild-changed-dist`
   rot; mit einem `build_runtime`, das nur den Pin auscheckt, werden `rebuild-changed-dist` und `reuse-stamped-dist` rot. Die
   unveränderte Kopie desselben Archivs bleibt grün.
+- **Leeres `dist/` vor dem Neubau (Kritik Tech Lead, Zyklus 3).** Ohne `rm -rf` vor dem Bau bliebe eine Datei, die `pnpm build`
+  nicht überschreibt, liegen, und `write_dist_stamp` nähme sie in die Prüfsumme des neuen Stempels auf. Der Fall `rebuild-drops-stale`
+  legt `dist/stale.js` an, ruft `build_runtime` wie `rebuild-changed-dist` und erwartet einen Bau, keine `stale.js` mehr und `ok`.
+  Vorher rot: ohne die Zeile mit `rm -rf` gibt er `builds=1 stale=kept state=ok` (16.11.2026, code-host), mit ihr
+  `builds=1 stale=gone state=ok`; der Selbsttest hat damit 27 Fälle.
 - **Kein Rollout.** `ops/runtime-sandbox.sh` läuft nur auf dem code-host; `src/`, `deploy/` und der Sandbox-Server bleiben unverändert.

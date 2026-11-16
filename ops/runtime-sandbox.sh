@@ -293,6 +293,12 @@ selftest() {
   build_case
   got="pnpm_calls=$(grep -c . "$calls") state=$(runtime_state "$repo" "$pin")"
   if [ "$got" = "pnpm_calls=0 state=ok" ]; then echo "ok   reuse-stamped-dist: $got"; else echo "FAIL reuse-stamped-dist: expected 'pnpm_calls=0 state=ok', got '$got'"; bad=$((bad + 1)); fi
+  # A stale file the build does not overwrite must be gone after the rebuild, so the new stamp cannot cover it.
+  n=$((n + 1))
+  printf 'stale\n' >"$repo/dist/stale.js"
+  build_case
+  got="builds=$(grep -c '^build$' "$calls") stale=$([ -e "$repo/dist/stale.js" ] && echo kept || echo gone) state=$(runtime_state "$repo" "$pin")"
+  if [ "$got" = "builds=1 stale=gone state=ok" ] && ! grep -q failed "$calls"; then echo "ok   rebuild-drops-stale: $got"; else echo "FAIL rebuild-drops-stale: expected 'builds=1 stale=gone state=ok', got '$got'"; bad=$((bad + 1)); fi
 
   rm -f "$repo/dist/agent/tools.js"
   check unbuilt "RUNTIME SANDBOX FAIL the runtime clone is unbuilt" "$(runtime_state "$repo" "$pin")" good "1 0"
