@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -143,4 +143,14 @@ describe("ops/abort-purchase.sh", () => {
     expect(run.stderr + run.stdout).toContain("OPENROUTER_MANAGEMENT_KEY missing");
     expect(run.status).toBe(2);
   }, 120_000);
+
+  it("does not pipe into grep -q under pipefail, so an early exit of grep cannot flip a comparison", () => {
+    // With pipefail, `printf ... | grep -q` returns 141 when grep exits on its match before printf has
+    // written its last line: expect() then reports FAIL on a present line and absent() reports ok on one.
+    const source = readFileSync(SCRIPT, "utf8");
+    expect(source).toMatch(/^set -[a-z]*o pipefail$/m);
+    const code = source.split("\n").filter((line) => !/^\s*#/.test(line));
+    const piped = code.filter((line) => /\b(printf|echo)\b[^|]*\|\s*grep\s+-[A-Za-z]*q/.test(line));
+    expect(piped).toEqual([]);
+  });
 });
