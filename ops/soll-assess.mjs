@@ -237,3 +237,20 @@ export function summaryLimit(results) {
   const n = results.reduce((s, r) => s + r.defects.length, 0);
   return `soll limit: ${results.length} images, ${LIMIT_BLOCKS.approve} top ${top("approve")}, ${LIMIT_BLOCKS.passkey} top ${top("passkey")}, ${n} defects`;
 }
+
+/**
+ * Font configuration for the browser that renders the SOLL pictures. The page stacks start with system-ui and end in the
+ * generic sans-serif and monospace, which resolve to whatever the host prefers: the committed pictures were rendered while
+ * those were WenQuanYi Zen Hei, and since 2026-11-15 the code-host prefers DejaVu, which renders the same source 56 px taller
+ * at 390 px. The edits run after the system configuration and put the reference fonts in front of its own preferences, and
+ * DejaVu is left out entirely, because glyphs the reference fonts lack fell back to other fonts when the pictures were made.
+ */
+const REFERENCE_FONTS = [["sans-serif", "WenQuanYi Zen Hei"], ["system-ui", "WenQuanYi Zen Hei"], ["monospace", "WenQuanYi Zen Hei Mono"]];
+export const FONTS_CONF = `<?xml version="1.0"?>
+<!DOCTYPE fontconfig SYSTEM "fonts.dtd">
+<fontconfig>
+  <include ignore_missing="yes">/etc/fonts/fonts.conf</include>
+  <selectfont><rejectfont><glob>*/dejavu/*</glob><glob>*/DejaVu*</glob></rejectfont></selectfont>
+${REFERENCE_FONTS.map(([generic, font]) => `  <match target="pattern"><test name="family"><string>${generic}</string></test><edit name="family" mode="prepend" binding="strong"><string>${font}</string></edit></match>`).join("\n")}
+</fontconfig>
+`;
