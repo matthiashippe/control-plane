@@ -499,5 +499,8 @@
   und das ginge sonst vom Rand von 5 s bis zum Abbruch der Runtime ab. `$SECONDS` zählt ganze Sekunden, darum endet der Befehl
   frühestens knapp eine Sekunde vor der Grenze und spätestens eine Runde nach ihr. Der Test mit 2 s je `sleep` endet nach rund 4 s
   statt nach 6 s; der Test vor dem Ende verlangt darum mindestens `(seconds - 1) * 1000` ms statt 1900 ms, die Obergrenze bleibt.
+  Die Dauer im neuen Test nimmt Bash selbst mit `$EPOCHREALTIME` direkt vor und nach dem Wartebefehl, weil der Job `check` auf
+  GitHub mit der Zeit von außen 4501 ms maß (Lauf 43874571613): Start von Kindprozess und Shell unter der Last der parallelen Tests
+  zählen nicht zum Warten. Gegen den Befehl, der nach Runden zählt, misst der Test so 6008 ms und bleibt rot.
 - **Kein Rollout auf dem Sandbox-Server.** `sandboxd`, Image und `ops/sandbox/` bleiben unverändert; der neue Text geht mit dem
   nächsten Rollout des Control Plane über `deploy.yml` hinaus.

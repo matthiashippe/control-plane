@@ -165,12 +165,18 @@ describe("waitCommand in a real bash", () => {
     const bin = fs.mkdtempSync(path.join(os.tmpdir(), "cp-wait-bin-"));
     dirs.push(bin);
     fs.writeFileSync(path.join(bin, "sleep"), "#!/bin/bash\nexec /bin/sleep 2\n", { mode: 0o755 });
-    const r = runWait(`PATH=${bin}:$PATH; ${waitCommand(base, 3)}`);
+    // The time of the wait command itself, taken by bash right before and after it, so the start of node's child and of
+    // the shell under the load of a parallel test run does not count.
+    const clock = "${EPOCHREALTIME/[.,]/}";
+    const r = runWait(`PATH=${bin}:$PATH; t0=${clock}; ${waitCommand(base, 3)}; echo "waited_us=$((${clock} - t0))" >&2`);
     expect(r.code).toBe(0);
     expect(r.stdout).toBe("The command is still running. Run the same command again to wait up to 3 more seconds.\n");
+    const waited = /^waited_us=([0-9]+)$/m.exec(r.stderr);
+    expect(waited, r.stderr).not.toBeNull();
+    const ms = Number(waited![1]) / 1000;
     // By the clock it ends at most one round after 3 s, about 4 s; by the number of rounds it would be 6 s.
-    expect(r.ms).toBeGreaterThanOrEqual(2000);
-    expect(r.ms).toBeLessThan(4500);
+    expect(ms).toBeGreaterThanOrEqual(2000);
+    expect(ms).toBeLessThan(4500);
   });
 
   it("stops waiting as soon as the command ends", async () => {
