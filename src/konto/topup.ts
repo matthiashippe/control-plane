@@ -147,6 +147,7 @@ async function topUp(deps: TopUpDeps, address: string): Promise<TopUpResult> {
   // A raise first (konto 04): the new permission is approved and the old one revoked before any spend(), and only then does the
   // account use the new one.
   const next = nextPermission(row);
+  let switched = false;
   if (next) {
     const old = permissionFromJson(row.permission);
     let approvedTx: Hex | null = null;
@@ -162,6 +163,7 @@ async function topUp(deps: TopUpDeps, address: string): Promise<TopUpResult> {
     ).run(approvedTx?.toLowerCase() ?? null, address, row.next_permission);
     row.permission = row.next_permission!;
     row.signature = row.next_signature as Hex;
+    switched = true;
   }
   if (BigInt(getAvailableMc(db, address)) * ATOMIC_PER_MC >= deps.topupBelowUsdc) return { kind: "none", reason: "enough" };
   const permission = permissionFromJson(row.permission);
@@ -170,7 +172,8 @@ async function topUp(deps: TopUpDeps, address: string): Promise<TopUpResult> {
   const rest = limit > spent ? limit - spent : 0n;
   const value = rest < deps.topupUsdc ? rest : deps.topupUsdc;
   if (value <= 0n) return { kind: "none", reason: "period_used_up" };
-  if (!(await chain.isApproved(permission))) {
+  // Just approved above, so the node need not be asked again (it may not even have the block yet).
+  if (!switched && !(await chain.isApproved(permission))) {
     const approveTx = await chain.approve(permission, row.signature);
     if (!receiptSucceeded(await chain.receipt(approveTx))) return { kind: "none", reason: "approve_failed" };
     db.prepare("UPDATE konto_accounts SET approved_tx = ? WHERE address = ?").run(approveTx.toLowerCase(), address);

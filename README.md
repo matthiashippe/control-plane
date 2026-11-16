@@ -19,6 +19,11 @@ curl -s https://cp.hippe.eu/v1/briefs/check \
   -d '{"brief":"FACT SHEET on …","kind":"factual"}'
 ```
 
+**Run an automaton from Claude Code**: install the plugin with
+`claude plugin marketplace add matthiashippe/control-plane && claude plugin install automaton@postyourprice`,
+then ask Claude to start one. Your phone and a passkey create the account and set the daily limit;
+your computer keeps only an API key ([mcp/README.md](mcp/README.md)).
+
 [![CI](https://github.com/matthiashippe/control-plane/actions/workflows/ci.yml/badge.svg)](https://github.com/matthiashippe/control-plane/actions/workflows/ci.yml)
 
 ## The control plane underneath
