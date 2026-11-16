@@ -461,3 +461,34 @@
   Sandbox ohne Automaton stehen; das ist der Vorschlag `goals/_vorschlaege/sandbox-kritik-2026-11-16-1.md`, nicht dieser Punkt.
 - **Guthaben grant:live-automaton.** Gemessen 2026-11-16 02:41 UTC über `GET /v1/credits/history` des eigenen Kontos: 11 Cent je
   Lauf ohne Neustart, mal 300 über der Obergrenze, also 500000 mc (`docs/sandbox/automaton.md`).
+
+## Goal 09 (16.11.2026, Engineer CP)
+
+- **Vorher gemessen** (`docs/sandbox/lange-befehle.md`, `## Warten`): neuer Harness mit neuem Urteil gegen `dist/index.js` von
+  `08164a6` (Stand von `dev`), lokal auf dem code-host über TLS mit Nachbau `sandboxd` und Runtime am Pin, 16.11.2026 12:23:01 bis
+  12:24:24 UTC. `long-60` bestand wie bisher, `long-180` endete mit `LONG_EXEC_VERDICT fail`, weil der Text keinen Befehl zum Warten
+  nennt; `waits` blieb leer. Das widerlegt die Annahme aus `ROADMAP.md`, ein Modell komme mit dem alten Text ohne Nachfragen aus.
+- **EXEC_WAIT_S = 25, Befehl `waitCommand`.** Die Runtime ruft `exec` ohne eigenes `timeout` mit 30000 ms und bricht dort ab;
+  25 s lassen 5 s für Signatur, Caddy, `docker exec` in gVisor und den Start der Shell. Der Befehl prüft einmal je Sekunde mit
+  `[ -f ]`, ob `<tag>.exit` besteht, und nutzt nur Bash, `sleep` und `cat`, die das Image hat. Ist die Datei da, aber noch leer
+  (sie entsteht mit `echo $c >`, zwischen Anlegen und Schreiben), liest er nach einer Sekunde ein zweites Mal, damit `exit` nie ohne
+  Zahl endet. Der Exit-Code des Befehls kommt durch, auch 124. Ein Leerzeichen vor jedem Pfad wie in `backgroundCommand` (`mapRoot`).
+- **wait_command in Feld und Text.** Die Runtime zeigt dem Modell nur `stdout`, darum steht der Befehl als letzte Zeile dort und
+  zugleich im Feld `wait_command`. Der Satz „Read these files later …“ entfällt, „Do not start the command again.“ bleibt. Der
+  Befehl hängt nur an `<tag>` aus Sandbox und `Idempotency-Key`, eine Wiederholung nennt also denselben. Ein Aufruf ohne `timeout`
+  ist mit `EXEC_DEFAULT_MS` gehalten, nie im Hintergrund, weil 30000 ms unter `EXEC_HOLD_MAX_MS` liegt.
+- **still running.** Läuft der Befehl nach 25 s noch, druckt der Wartebefehl `The command is still running. Run the same command
+  again …` und endet mit 0, damit die Runtime den Aufruf nicht als Fehler zählt. Das Urteil des Harness sucht „still running“
+  nur im Text vor dem Befehl, weil der Befehl den Satz selbst enthält und sonst jeder Text bestünde.
+- **waitCommandOf.** Die letzte Zeile von stdout zählt nur als Befehl, wenn sie eine eigene Zeile nach dem erklärenden Text ist und
+  die Exit-Datei nennt; der Text von dev besteht aus einer Zeile und nennt darum keinen Befehl. `failures_after` ist der Zähler der
+  Runtime nach dem letzten Aufruf des Wartebefehls, ohne Warten wie bisher nach dem `exec`. Die Dateien liest der Harness nicht
+  mehr, `pathsIn` und `SETTLE_MS` sind weg.
+- **live.sh.** Nach jedem Rollout ruft die Prüfung `sandbox` den `wait_command` der Antwort auf `sleep 25; echo bg-ok` höchstens
+  zweimal mit `exec` ohne `timeout` auf (der erste wartet rund 5 s), mit genau dem Body `{"command": <wait_command>}`. Sie nimmt den
+  Befehl nur, wenn er eine Zeile ist, `[ -f <exit_code_file> ]` nennt und die letzte Zeile von stdout ist. Jeder Aufruf muss 200
+  geben, unter 30000 ms bleiben und mit Exit-Code 0 und `bg-ok` enden; sonst steht eine Zeile `FAIL sandbox: background exec
+  wait_command …` mit Grund da. Der Selbsttest fährt den echten Schritt `bg_live` mit Stellvertretern für API und Uhr in beide
+  Richtungen und war gegen `live.sh` von `dev` rot.
+- **Kein Rollout auf dem Sandbox-Server.** `sandboxd`, Image und `ops/sandbox/` bleiben unverändert; der neue Text geht mit dem
+  nächsten Rollout des Control Plane über `deploy.yml` hinaus.
