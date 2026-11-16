@@ -6,3 +6,4 @@ Empfehlung: Einen Fehler des Transports von einer ungültigen Unterschrift trenn
 MVP: Funktion
 
 Folge heute: ein zweiter Passkey und eine zweite Sub-Organisation bei Turnkey für denselben Menschen. Gehört nach konto 04 oder 05, bevor echte Kunden die Seite sehen.
+Übernommen: Triage-Glieder 16.11. an den Tech Lead, Glied 5 (PRO-22463, RPC-Fehler verbrennt den Handoff nicht) (2026-11-16)

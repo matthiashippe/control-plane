@@ -4,3 +4,4 @@ Befund: `own_ips`, `own_ips_offline` und die Vorprüfungen in `ops/timeout-quote
 Beleg: `printf '  # x\n' > $T/l; printf '192.0.2.44 d\n' > $T/s; env -u CP_OWN_IPS CP_OWN_IPS_FILE=$T/l CP_OWN_IPS_SEEN=$T/s bash -c 'source ops/own-ips.sh; own_ips_offline'; echo $?` -> `# 192.0.2.44 0` | ops/own-ips.sh (`_own_ips_listed`, `grep -v '^#'`)
 Empfehlung: Ein Glied messung: `_own_ips_listed` und `_own_ips_seen` geben nur ein erstes Feld weiter, das eine IPv4- oder IPv6-Adresse ist, und die Vorprüfungen der drei Werkzeuge nutzen dieselbe Regel; ein Test mit eingerückter Kommentarzeile und Kopfzeile erwartet Exit 2 bei sonst leerer Liste, rot vor dem Fix.
 MVP: Funktion, weil eine geleerte Liste sonst still als vollständige gelesen wird und eigene Prüfungen als Fremde zählen.
+Übernommen: Triage-Glieder 16.11. an den Tech Lead, Glied 7 (PRO-22463, eingerückte Kommentarzeile in own_ips) (2026-11-16)

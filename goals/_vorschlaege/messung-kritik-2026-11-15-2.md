@@ -4,3 +4,4 @@ Befund: Der Wächter in `test/own-ips-readers.test.ts` prüft je Zeile, ob `CP_O
 Beleg: test/own-ips-readers.test.ts (`readsListFileDirectly`, Prüfung je Zeile) | ops/conway-arrivals.sh:26 (`file="${CP_OWN_IPS:-$CP_OWN_IPS_FILE}"`)
 Empfehlung: Ein Glied messung: Der Wächter verfolgt je Datei die Variablen, denen `CP_OWN_IPS_FILE` zugewiesen wird, und meldet jeden Leser auf einer dieser Variablen außerhalb von `own_ips`-Aufrufen und der Ausnahmeliste; Matcher-Test mit dem Zwei-Zeilen-Fall, rot vor dem Fix.
 MVP: Funktion, weil das Ziel aus messung 07 („kein künftiges Werkzeug liest die Liste an own_ips vorbei“) sonst an der Schreibweise des nächsten Werkzeugs hängt.
+Übernommen: Triage-Glieder 16.11. an den Tech Lead, Glied 8 (PRO-22463, Wächter folgt Zwischenvariablen) (2026-11-16)

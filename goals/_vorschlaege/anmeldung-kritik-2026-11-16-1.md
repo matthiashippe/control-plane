@@ -6,3 +6,4 @@ Empfehlung: Ein Goal gibt der Antwort 201 in `src/public/openapi.ts` ein Schema 
 MVP: Funktion, weil ein Agent die Tagesgrenze und ihren Rest dann vor dem ersten Aufruf aus der Schnittstelle lesen kann.
 
 Kritik Tech Lead an anmeldung 03 (PR #194). Nicht als Done-Punkt, weil `src/public/openapi.ts` auf der Deny List dieses Goals steht (unter `src/` nur `src/auth/keyless.ts` und die Route).
+Übernommen: Triage-Glieder 16.11. an den Tech Lead, Glied 1 (PRO-22463, Schema der Antwort 201 in der OpenAPI) (2026-11-16)
