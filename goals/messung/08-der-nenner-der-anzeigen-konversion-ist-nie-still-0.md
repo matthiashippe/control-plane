@@ -1,7 +1,7 @@
 # Messung Goal 08: Der Nenner der Anzeigen-Konversion ist nie still 0
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 `ops/anzeigen-rechnung.py` rechnet aus, ob eine bezahlte Anzeige sich trägt, und ihr Nenner sind die fremden Adressen an der
@@ -98,7 +98,7 @@ halbes Log sie heute still auf „trägt“ kippen kann.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD | grep -cE '^(\.github|deploy|src|harness|scripts|docs)/|^goals/kanal/'` muss 0 ausgeben.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD -- ops | grep -vcE '^ops/anzeigen-rechnung\.py$'` muss 0 ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Die Fälle 1 bis 6 des neuen Tests waren vor dem Fix rot; die Zeile im Progress Log nennt sie und womit.
@@ -126,6 +126,7 @@ halbes Log sie heute still auf „trägt“ kippen kann.
 - 2026-11-16 Widerlegung geprüft: vierter Prüfbefehl von Punkt 1 an der Merge-Basis adee769 gibt `exit 0 stdout 653 stderr 0`, das Goal ist nicht widerlegt.
 - 2026-11-16 Zyklus 1: Punkte 1, 2, 3, 4 gebaut (`AccessLogUnreadable` statt `return 0`, `CP_ACCESS_LOG_TIMEOUT`, neuer Test mit sieben Fällen); vor dem Fix rot die Fälle 1 und 5 mit Exit 0 und „TRAEGT“, die Fälle 2, 3, 4 und 6 mit Exit 2 und „Adressen, die das Angebot ansahen 0“ auf `stdout` (6 failed, 1 passed). Prüfbefehle: P1 `grep` 1, `awk` 0, `grep CP_ACCESS_LOG_TIMEOUT` 4, Probe `exit 2 stdout 0 stderr 1`; P2 `same` (Gegenprobe mit gepflanzter Abweichung in `new.py`: leer), Selftest `ANZEIGEN SELFTEST OK`; P3 `grep it(` 7, vitest Exit 0 (28 passed), Diff `test` 0; P4 `check` Exit 0 (1948 passed), gesperrte Pfade 0, `ops` 0.
 - 2026-11-16 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4; `origin/dev` (adee769) war schon im Branch, kein Code geändert, kein Laufzeitpfad. Prüfbefehle: P1 `grep` 1, `awk` 0, `grep CP_ACCESS_LOG_TIMEOUT` 4, Probe `exit 2 stdout 0 stderr 1`; P2 `same`, Selftest `ANZEIGEN SELFTEST OK`; P3 `grep it(` 7, vitest Exit 0 (28 passed), Diff `test` 0; P4 `check` Exit 0 (1948 passed), gesperrte Pfade 0, `ops` 0.
+- 2026-11-16 Release: PASS K und B (Zyklus 2), DONE.
 
 ## Blockers
 - keine
