@@ -102,20 +102,29 @@ SOLL-Werkzeuge dasselbe Flag und dieselbe Zeile in derselben Sprache führen, ge
       Prüfung: `git grep -n -w -E 'erfunden|eigene' -- ops/known-ips.txt test/known-ips.test.ts ops/README.md | wc -l` muss `0` ausgeben.
       Prüfung: `grep -vE '^(#|$)' ops/known-ips.txt | grep -cvE '^([0-9]{1,3}\.){3}[0-9]{1,3} (datacenter|crawler|invented|own) [^ ].*$'` muss `0` ausgeben, und `grep -cE '^([0-9]{1,3}\.){3}[0-9]{1,3} (invented|own) ' ops/known-ips.txt` muss mindestens `2` ausgeben.
       Prüfung: `B=$(git merge-base origin/dev HEAD); for c in $(git log --no-merges --format=%H $B..HEAD -- ops/known-ips.txt test/known-ips.test.ts); do n=$(git show --name-only --format= $c -- ops/known-ips.txt test/known-ips.test.ts | wc -l); [ "$n" -eq 2 ] || echo "allein $c"; done` muss nichts ausgeben.
-      Prüfung: `CP_FETCHER_CACHE=$(mktemp) pnpm -s vitest run test/known-ips.test.ts` muss Exit-Code 0 haben.
+      Prüfung: `CP_FETCHER_CACHE=$(mktemp -u) pnpm -s vitest run test/known-ips.test.ts` muss Exit-Code 0 haben.
       Prüfung: `grep -E '^#' .gitignore | grep -ciE '[äöüß]|\b(aus|von|der|die|nie|liegt|unter|im|Adressen|echter|Besucher|importiert)\b'` muss `0` ausgeben.
-- [x] Jeder Prüfbefehl eines fertigen Goals, den die Umbenennung ändert, ist mit seiner neuen Ausgabe als abgelöst eingetragen.
+- [ ] Jeder Prüfbefehl eines fertigen Goals, den die Umbenennung ändert, ist mit seiner neuen Ausgabe als abgelöst eingetragen.
       Prüfung: `q=$(printf '\140'); for f in $(git grep -l -E -- '--pruefen|Mängel|umzug oben|umzugBottom|erfunden' -- 'goals/*/[0-9][0-9]-*.md' | grep -v '^goals/seite/03-'); do [ "$(sed -n '/^## Status/{n;p;q}' $f)" = DONE ] || continue; grep -E '^\s+Prüfung' $f | grep -qE -- '--pruefen|Mängel|umzug oben|umzugBottom|erfunden' || continue; t=$(basename $(dirname $f)); n=$(basename $f | cut -c1-2); grep -qE "^- Abgelöst: $t $n Punkt [0-9]+ durch seite 03 Punkt [0-9]+, Ausgabe dann genau ${q}Exit [0-9]+, " goals/$t/ANNAHMEN.md 2>/dev/null || echo "fehlt $t $n"; done` muss nichts ausgeben.
-      Prüfung: `q=$(printf '\140'); cat goals/seite/ANNAHMEN.md goals/konto/ANNAHMEN.md goals/fehler/ANNAHMEN.md 2>/dev/null | grep -E '^- Abgelöst: .* durch seite 03 ' | grep -vcE " durch seite 03 Punkt [124], Ausgabe dann genau ${q}Exit [0-9]+, [^${q}]*${q} \\(Tech Lead, 2026-11-14\\)\$"` muss `0` ausgeben.
+      Prüfung: `q=$(printf '\140'); cat goals/seite/ANNAHMEN.md goals/konto/ANNAHMEN.md goals/fehler/ANNAHMEN.md 2>/dev/null | grep -E '^- Abgelöst: .* durch seite 03 ' | grep -vcE " durch seite 03 Punkt [1248], Ausgabe dann genau ${q}Exit [0-9]+, [^${q}]*${q} \\(Tech Lead, 2026-11-14\\)\$"` muss `0` ausgeben.
 - [ ] Keiner der alten Namen steht am Goal-Branch noch in Code, Test oder Log-Zeile.
       Prüfung: `git grep -n -E -- '--pruefen|umzugBottom|"fehlt"|\bumzug\b|[0-9]+ Bilder|Bilder,|Mängel|=fehlt' -- src ops test ':!test/soll-flags.test.ts' | wc -l` muss `0` ausgeben.
       Prüfung: `git grep -n -E -- '--pruefen|data-soll="umzug"|id="umzug"' -- docs/soll | wc -l` muss `0` ausgeben.
-- [x] Der Diff bleibt in den Pfaden dieses Goals, unter `src/` ändert sich nur die Startseite, jeder geänderte Test trug vorher einen
+- [ ] Der Diff bleibt in den Pfaden dieses Goals, unter `src/` ändert sich nur die Startseite, jeder geänderte Test trug vorher einen
       der alten Namen, und `check` ist grün.
-      Prüfung: `git diff --name-only origin/dev...HEAD | grep -vE '^(src/public/index\.html|docs/soll/src/startseite\.html|docs/soll/README\.md|ops/soll(-assess|-handoff|-konto|-live|-live-handoff|-live-konto)?\.mjs|ops/known-ips\.txt|ops/README\.md|\.gitignore|test/[a-z0-9-]+\.test\.ts|goals/(seite|konto|fehler)/ANNAHMEN\.md|goals/seite/03-[a-z0-9-]+\.md|goals/seite/verdicts/[A-Za-z0-9._-]+\.md|goals/_vorschlaege/seite-[a-z0-9.-]+\.md)$' | wc -l` muss `0` ausgeben.
+      Prüfung: `git diff --name-only origin/dev...HEAD | grep -vE '^(src/public/index\.html|docs/soll/src/startseite\.html|docs/soll/README\.md|ops/soll(-assess|-handoff|-konto|-limit|-live|-live-handoff|-live-konto|-live-limit)?\.mjs|ops/known-ips\.txt|ops/README\.md|\.gitignore|test/[a-z0-9-]+\.test\.ts|goals/(seite|konto|fehler)/ANNAHMEN\.md|goals/seite/03-[a-z0-9-]+\.md|goals/seite/verdicts/[A-Za-z0-9._-]+\.md|goals/_vorschlaege/seite-[a-z0-9.-]+\.md)$' | wc -l` muss `0` ausgeben.
       Prüfung: `git diff --name-only origin/dev...HEAD -- src | grep -vx 'src/public/index.html' | wc -l` muss `0` ausgeben.
       Prüfung: `B=$(git merge-base origin/dev HEAD); for f in $(git diff --name-only $B HEAD -- test); do [ "$f" = test/soll-flags.test.ts ] && continue; git show $B:$f 2>/dev/null | grep -qE -- '--pruefen|umzugBottom|"fehlt"|umzug|VERTRAG|vertrag\.md row|erfunden|eigene|Bilder|Mängel' || echo "fremd $f"; done` muss nichts ausgeben.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
+- [ ] Kritik: `ops/soll-limit.mjs` aus konto 04 nimmt wie die drei anderen SOLL-Werkzeuge `--check`, lehnt `--pruefen` ab, ohne ein
+      Bild zu schreiben, meldet gegen dieselben Bilder dieselbe Zeile wie vorher, und sein Prüfbefehl in konto 04 Punkt 1 ist als
+      abgelöst durch Punkt 8 eingetragen.
+      Prüfung: `grep -c '"soll-limit.mjs"' test/soll-flags.test.ts` muss mindestens 1 ausgeben.
+      Prüfung: `pnpm -s vitest run test/soll-flags.test.ts test/soll-limit.test.ts` muss Exit-Code 0 haben.
+      Prüfung: `node ops/soll-limit.mjs --pruefen >/dev/null 2>&1; echo "exit=$?"; node ops/soll-limit.mjs --pruefen 2>&1 >/dev/null | tail -1; git status --porcelain -- docs/soll | wc -l` muss genau die drei Zeilen `exit=1`, `unknown argument: --pruefen` und `0` ausgeben.
+      Prüfung: `B=$(git merge-base origin/dev HEAD); T=$(mktemp -d); git archive $B | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; a=$(cd $T && node ops/soll-limit.mjs --pruefen | tail -1); b=$(node ops/soll-limit.mjs --check | tail -1); [ -n "$b" ] && [ "$a" = "$b" ] && echo "gleich: $b" || echo "anders: $a | $b"` muss genau eine Zeile ausgeben, die mit `gleich: soll limit: 4 images, approve top ` beginnt und auf `, 0 defects` endet.
+      Prüfung: `T=$(mktemp -d); node --import tsx ops/soll-live-limit.mjs --out $T && node ops/soll-limit.mjs --check --source $T | tail -1` muss Exit 0 haben und `soll limit: 4 images, approve top 390=<y> 1440=<y>, limit top 390=<y> 1440=<y>, 0 defects` ausgeben.
+      Prüfung: `q=$(printf '\140'); grep -c "^- Abgelöst: konto 04 Punkt 1 durch seite 03 Punkt 8, Ausgabe dann genau ${q}Exit 1, unknown argument: --pruefen${q} (Tech Lead, 2026-11-14)\$" goals/konto/ANNAHMEN.md` muss `1` ausgeben.
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
