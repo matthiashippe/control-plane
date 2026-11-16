@@ -3,9 +3,9 @@
 // docs/soll/limit-<state>-<width>.png, full page, width as in the name.
 //
 //   node ops/soll-limit.mjs                       render and write all four pictures, then report defects
-//   node ops/soll-limit.mjs --pruefen             (German for "check", as in the other SOLL tools) render into a mktemp folder,
-//                                                 compare with the committed pictures, exit 1 on any defect
-//   node ops/soll-limit.mjs --pruefen --source <dir> [--pictures <dir>]
+//   node ops/soll-limit.mjs --check               render into a mktemp folder, compare with the committed pictures, exit 1 on
+//                                                 any defect
+//   node ops/soll-limit.mjs --check --source <dir> [--pictures <dir>]
 //                                                 the same with the two sources limit-<state>.html from another folder: the real
 //                                                 page written by ops/soll-live-limit.mjs, or a counter-test with planted defects
 //
@@ -23,7 +23,13 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const args = process.argv.slice(2);
 const flag = (name) => args.includes(name);
 const value = (name, fallback) => { const i = args.indexOf(name); return i >= 0 && args[i + 1] ? path.resolve(args[i + 1]) : fallback; };
-const CHECK = flag("--pruefen");
+const CHECK = flag("--check");
+// Every argument is a known flag or the value right after --source or --pictures; anything else ends the tool here, before it
+// renders or writes a picture, so a check command with an old or misspelt flag cannot overwrite the committed pictures.
+for (let i = 0; i < args.length; i++) {
+  if (args[i] === "--source" || args[i] === "--pictures") { i++; continue; }
+  if (args[i] !== "--check") { console.error(`unknown argument: ${args[i]}`); process.exit(1); }
+}
 const SOURCES = value("--source", path.join(ROOT, "docs/soll/src"));
 const PICTURES = value("--pictures", path.join(ROOT, "docs/soll"));
 const sourceOf = (state) => path.join(SOURCES, `limit-${state}.html`);
