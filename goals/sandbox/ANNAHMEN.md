@@ -494,5 +494,10 @@
   geben, unter 30000 ms bleiben und mit Exit-Code 0 und `bg-ok` enden; sonst steht eine Zeile `FAIL sandbox: background exec
   wait_command …` mit Grund da. Der Selbsttest fährt den echten Schritt `bg_live` mit Stellvertretern für API und Uhr in beide
   Richtungen und war gegen `live.sh` von `dev` rot.
+- **Grenze nach der Uhr (Kritik 16.11.2026, Punkt 9).** Der Wartebefehl merkt sich zu Beginn `$SECONDS` der Bash und wartet, bis
+  25 s vergangen sind, statt 25 Runden zu zählen: In gVisor kostet jede Runde aus `sleep 1` und Prüfung den Start eines Prozesses,
+  und das ginge sonst vom Rand von 5 s bis zum Abbruch der Runtime ab. `$SECONDS` zählt ganze Sekunden, darum endet der Befehl
+  frühestens knapp eine Sekunde vor der Grenze und spätestens eine Runde nach ihr. Der Test mit 2 s je `sleep` endet nach rund 4 s
+  statt nach 6 s; der Test vor dem Ende verlangt darum mindestens `(seconds - 1) * 1000` ms statt 1900 ms, die Obergrenze bleibt.
 - **Kein Rollout auf dem Sandbox-Server.** `sandboxd`, Image und `ops/sandbox/` bleiben unverändert; der neue Text geht mit dem
   nächsten Rollout des Control Plane über `deploy.yml` hinaus.

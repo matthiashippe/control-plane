@@ -154,7 +154,22 @@ describe("waitCommand in a real bash", () => {
     expect(r.code).toBe(0);
     expect(r.stdout).toBe("The command is still running. Run the same command again to wait up to 2 more seconds.\n");
     expect(r.stderr).toBe("");
-    expect(r.ms).toBeGreaterThanOrEqual(1900);
+    // $SECONDS counts whole seconds, so the wait may end up to a second before `seconds`, never after one more round.
+    expect(r.ms).toBeGreaterThanOrEqual(1000);
+    expect(r.ms).toBeLessThan(4500);
+  });
+
+  it("bounds its wait by the clock, not by the number of rounds, when every sleep takes longer than a second", () => {
+    const base = freshBase();
+    // A sleep that takes 2 s per call, as a slow start of a process in gVisor would stretch each round.
+    const bin = fs.mkdtempSync(path.join(os.tmpdir(), "cp-wait-bin-"));
+    dirs.push(bin);
+    fs.writeFileSync(path.join(bin, "sleep"), "#!/bin/bash\nexec /bin/sleep 2\n", { mode: 0o755 });
+    const r = runWait(`PATH=${bin}:$PATH; ${waitCommand(base, 3)}`);
+    expect(r.code).toBe(0);
+    expect(r.stdout).toBe("The command is still running. Run the same command again to wait up to 3 more seconds.\n");
+    // By the clock it ends at most one round after 3 s, about 4 s; by the number of rounds it would be 6 s.
+    expect(r.ms).toBeGreaterThanOrEqual(2000);
     expect(r.ms).toBeLessThan(4500);
   });
 

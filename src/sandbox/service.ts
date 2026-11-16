@@ -70,7 +70,8 @@ export const EXEC_WAIT_S = 25;
 
 /**
  * The command a model runs with exec (no timeout) to wait for a command in the background: it looks once a second
- * whether `<base>.exit` exists, for at most `seconds` seconds. When it exists, the first line of stdout is
+ * whether `<base>.exit` exists, for at most `seconds` seconds by the clock of bash (`$SECONDS`), not by the number of
+ * rounds, so a slow start of `sleep` in gVisor does not stretch the wait past one more round. When it exists, the first line of stdout is
  * `The command has ended with exit code <n>.`, then `<base>.out` follows, `<base>.err` goes to stderr, and it ends with
  * the exit code of the command (124 too). Otherwise it says the command is still running and ends with 0. Only bash,
  * sleep, cat and test, which the image has; a space before every path, as in backgroundCommand (mapRoot).
@@ -78,7 +79,7 @@ export const EXEC_WAIT_S = 25;
 export function waitCommand(base: string, seconds = EXEC_WAIT_S): string {
   const exit = `${base}.exit`;
   return (
-    `i=0; while [ ! -f ${exit} ] && [ $i -lt ${seconds} ]; do sleep 1; i=$((i+1)); done; ` +
+    `s=$SECONDS; while [ ! -f ${exit} ] && [ $((SECONDS-s)) -lt ${seconds} ]; do sleep 1; done; ` +
     `if [ -f ${exit} ]; then c=$(cat ${exit}); [ -n "$c" ] || { sleep 1; c=$(cat ${exit}); }; ` +
     `echo "The command has ended with exit code $c."; cat ${base}.out; cat ${base}.err >&2; exit "$c"; fi; ` +
     `echo "The command is still running. Run the same command again to wait up to ${seconds} more seconds."`
