@@ -1,7 +1,7 @@
 # Sandbox Goal 10: Die Runtime am Pin ist auch am Pin gebaut
 
 ## Status
-PLANNED
+ACTIVE
 
 ## Active Objective
 `ops/runtime-sandbox.sh` meldet `RUNTIME SANDBOX OK` nur noch, wenn `dist/` der Runtime genau der Build ist, den `build_runtime` am
@@ -63,7 +63,7 @@ nächsten zahlenden Automaton auf.
   konto 04 gibt Menschen ohne Wallet die Terminal-Tools für ihren Automaton.
 
 ## Done Condition
-- [ ] `runtime_state` meldet `dist`, wenn `dist/` nicht der gestempelte Build am Pin ist, `judge` endet dann mit
+- [x] `runtime_state` meldet `dist`, wenn `dist/` nicht der gestempelte Build am Pin ist, `judge` endet dann mit
       `RUNTIME SANDBOX FAIL dist/ is not the build at the pin`, und `build_runtime` baut genau dann neu; der Selbsttest zeigt beide
       Richtungen und war vor dem Fix rot.
       MVP: Funktion, weil sonst ein beliebiges `dist/` im Cache als Runtime am Pin durchläuft.

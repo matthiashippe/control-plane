@@ -6,8 +6,10 @@
 #
 # Live mode builds the runtime in ${RUNTIME_DIR:-$HOME/.cache/control-plane/automaton-d8f8168} (clone of
 # Conway-Research/automaton, checkout of the pin, pnpm install --frozen-lockfile, pnpm build; no Docker on the
-# code-host), and before the walk checks that `git rev-parse HEAD` starts with the pin and `git status --porcelain` is
-# empty: the runtime is unchanged. Then harness/e2e/sandbox-walk.mjs (the runtime's own client and tools) runs with
+# code-host), and before the walk checks that `git rev-parse HEAD` starts with the pin, `git status --porcelain` is
+# empty and dist/ (ignored by git) is the stamped build: after each build one line "<HEAD> <dist_sum>" goes to
+# $(git rev-parse --absolute-git-dir)/control-plane-dist.sha256, and a missing or other stamp, or another checksum over
+# dist/, ends with FAIL dist/ and makes the next live run rebuild dist/. Only then the runtime is unchanged. Then harness/e2e/sandbox-walk.mjs (the runtime's own client and tools) runs with
 # LIVE_SANDBOX_KEY from ~/.config/control-plane/live-sandbox.env, the own account of the live check, paid from the
 # credits it has. Then the ledger of production over CP_SSH_KEY from ~/.config/control-plane/loop.env, opened with
 # `readonly: true` inside the container, like ops/live.sh: only two numbers leave it, the rows of kind sandbox for this
@@ -54,15 +56,44 @@ if (v.reasons.length === 0) { console.log(`RUNTIME SANDBOX OK pin=__PIN__ ${step
 if (v.reasons[0].startsWith("credits")) { console.log("RUNTIME SANDBOX FAIL credits: create answered 402, no topup was started"); process.exit(1); }
 console.log(`RUNTIME SANDBOX FAIL ${v.reasons.join("; ")}`); process.exit(1);'
 
-# ok | missing | commit | changed | unbuilt, for the clone in $1 against the pin $2.
+# The checksum over dist/ of the clone in $1: sha256sum of every regular file under dist/ with its path relative to $1,
+# sorted by path with LC_ALL=C, and sha256sum over that list. A changed, an added and a removed file all change it.
+dist_sum() {
+  local dir="$1" list
+  list="$(cd "$dir" && find dist -type f -print0 | LC_ALL=C sort -z | xargs -0 -r sha256sum)" || return 1
+  list="$(printf '%s\n' "$list" | sha256sum)"
+  echo "${list%% *}"
+}
+
+# The stamp of the clone in $1: inside its git directory, so `git status --porcelain` stays empty and it moves with the clone.
+dist_stamp_file() {
+  local gitdir
+  gitdir="$(git -C "$1" rev-parse --absolute-git-dir 2>/dev/null)" || return 1
+  echo "$gitdir/control-plane-dist.sha256"
+}
+
+# Writes the one line "<git rev-parse HEAD> <dist_sum>" for the clone in $1, after each build.
+write_dist_stamp() {
+  local dir="$1" head sum file
+  head="$(git -C "$dir" rev-parse HEAD 2>/dev/null)" || return 1
+  sum="$(dist_sum "$dir")" || return 1
+  file="$(dist_stamp_file "$dir")" || return 1
+  printf '%s %s\n' "$head" "$sum" >"$file"
+}
+
+# ok | missing | commit | changed | unbuilt | dist, for the clone in $1 against the pin $2. dist: dist/ is not the stamped
+# build at HEAD (no stamp, a stamp of another commit, or another checksum).
 runtime_state() {
-  local dir="$1" pin="$2" head porcelain
+  local dir="$1" pin="$2" head porcelain stamp line=""
   [ -d "$dir/.git" ] || { echo missing; return; }
   head="$(git -C "$dir" rev-parse HEAD 2>/dev/null)" || { echo missing; return; }
   [[ -n "$pin" && "$head" == "$pin"* ]] || { echo commit; return; }
   porcelain="$(git -C "$dir" status --porcelain 2>/dev/null)" || { echo changed; return; }
   [ -z "$porcelain" ] || { echo changed; return; }
   [ -f "$dir/dist/conway/client.js" ] && [ -f "$dir/dist/agent/tools.js" ] || { echo unbuilt; return; }
+  stamp="$(dist_stamp_file "$dir")" || { echo dist; return; }
+  [ -f "$stamp" ] && read -r line <"$stamp"
+  [ "$line" = "$head $(dist_sum "$dir")" ] || { echo dist; return; }
   echo ok
 }
 
@@ -72,6 +103,7 @@ judge() {
     ok) ;;
     commit) echo "RUNTIME SANDBOX FAIL the runtime clone is not at the pin $PIN"; return 1 ;;
     changed) echo "RUNTIME SANDBOX FAIL the runtime clone has changes (git status --porcelain is not empty)"; return 1 ;;
+    dist) echo "RUNTIME SANDBOX FAIL dist/ is not the build at the pin"; return 1 ;;
     *) echo "RUNTIME SANDBOX FAIL the runtime clone is $1"; return 1 ;;
   esac
   node --input-type=module -e "${JUDGE_JS//__PIN__/$PIN}" "$WALK" "$2" "${3:-}"
@@ -83,9 +115,14 @@ build_runtime() {
     git clone -q "$RUNTIME_REPO" "$RUNTIME_DIR" || return 1
   fi
   git -C "$RUNTIME_DIR" checkout -q "$PIN" || return 1
-  if [ ! -f "$RUNTIME_DIR/dist/conway/client.js" ] || [ ! -f "$RUNTIME_DIR/dist/agent/tools.js" ]; then
-    (cd "$RUNTIME_DIR" && pnpm install --frozen-lockfile >/dev/null 2>&1 && pnpm build >/dev/null 2>&1) || return 1
-  fi
+  # Build when dist/ is missing or is not the stamped build at the pin; a clone with changes is left as it is for judge.
+  case "$(runtime_state "$RUNTIME_DIR" "$PIN")" in
+    unbuilt | dist)
+      [ -d "$RUNTIME_DIR/.git" ] && rm -rf "$RUNTIME_DIR/dist"
+      (cd "$RUNTIME_DIR" && pnpm install --frozen-lockfile >/dev/null 2>&1 && pnpm build >/dev/null 2>&1) || return 1
+      write_dist_stamp "$RUNTIME_DIR" || return 1
+      ;;
+  esac
 }
 
 rand_hex() { od -An -tx1 -N4 /dev/urandom | tr -d ' \n'; }
@@ -167,6 +204,8 @@ selftest() {
   git -C "$repo" -c user.name=selftest -c user.email=selftest@invalid add .gitignore index.ts
   git -C "$repo" -c user.name=selftest -c user.email=selftest@invalid commit -qm planted
   pin="$(git -C "$repo" rev-parse --short=7 HEAD)"
+  # The stamp of the planted build, through the same code as after a live build.
+  write_dist_stamp "$repo"
 
   # case: <name> <expected prefix> <runtime state> <walk variant> <ledger answer>
   check() {
@@ -212,6 +251,49 @@ selftest() {
   printf 'x\n' >"$repo/extra.ts"
   check untracked-file "RUNTIME SANDBOX FAIL the runtime clone has changes" "$(runtime_state "$repo" "$pin")" good "1 0"
   rm -f "$repo/extra.ts"
+  # dist/ is ignored by git, so only the stamp tells the build at the pin from any other dist/.
+  printf 'changed\n' >"$repo/dist/conway/client.js"
+  check dist-changed "RUNTIME SANDBOX FAIL dist/ is not the build at the pin" "$(runtime_state "$repo" "$pin")" good "1 0"
+  : >"$repo/dist/conway/client.js"
+  printf 'x\n' >"$repo/dist/extra.js"
+  check dist-added "RUNTIME SANDBOX FAIL dist/ is not the build at the pin" "$(runtime_state "$repo" "$pin")" good "1 0"
+  rm -f "$repo/dist/extra.js"
+  rm -f "$(dist_stamp_file "$repo")"
+  check dist-unstamped "RUNTIME SANDBOX FAIL dist/ is not the build at the pin" "$(runtime_state "$repo" "$pin")" good "1 0"
+  write_dist_stamp "$repo"
+  printf '%s %s\n' 0000000000000000000000000000000000000000 "$(dist_sum "$repo")" >"$(dist_stamp_file "$repo")"
+  check dist-other-commit "RUNTIME SANDBOX FAIL dist/ is not the build at the pin" "$(runtime_state "$repo" "$pin")" good "1 0"
+  write_dist_stamp "$repo"
+
+  # build_runtime against the planted clone, with a pnpm that counts its calls and writes the built files on build.
+  local calls="$tmp/pnpm.calls" got
+  build_case() {
+    : >"$calls"
+    (
+      PIN="$pin"
+      RUNTIME_DIR="$repo"
+      pnpm() {
+        echo "$*" >>"$calls"
+        if [ "${1:-}" = build ]; then
+          mkdir -p dist/conway dist/agent
+          printf 'export const built = true;\n' >dist/conway/client.js
+          printf 'export const built = true;\n' >dist/agent/tools.js
+        fi
+        return 0
+      }
+      build_runtime
+    ) || echo "build_runtime failed" >>"$calls"
+  }
+  n=$((n + 1))
+  printf 'changed\n' >"$repo/dist/conway/client.js"
+  build_case
+  got="builds=$(grep -c '^build$' "$calls") state=$(runtime_state "$repo" "$pin")"
+  if [ "$got" = "builds=1 state=ok" ] && ! grep -q failed "$calls"; then echo "ok   rebuild-changed-dist: $got"; else echo "FAIL rebuild-changed-dist: expected 'builds=1 state=ok', got '$got'"; bad=$((bad + 1)); fi
+  n=$((n + 1))
+  build_case
+  got="pnpm_calls=$(grep -c . "$calls") state=$(runtime_state "$repo" "$pin")"
+  if [ "$got" = "pnpm_calls=0 state=ok" ]; then echo "ok   reuse-stamped-dist: $got"; else echo "FAIL reuse-stamped-dist: expected 'pnpm_calls=0 state=ok', got '$got'"; bad=$((bad + 1)); fi
+
   rm -f "$repo/dist/agent/tools.js"
   check unbuilt "RUNTIME SANDBOX FAIL the runtime clone is unbuilt" "$(runtime_state "$repo" "$pin")" good "1 0"
   check missing "RUNTIME SANDBOX FAIL the runtime clone is missing" "$(runtime_state "$tmp/nothing" "$pin")" good "1 0"
