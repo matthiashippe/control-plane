@@ -115,7 +115,7 @@ async function renderAt(browser, width, url) {
   }
   await settle();
   const m = await evaluate(`(() => {
-      const d = document.documentElement, b = document.body, u = document.querySelector('[data-soll="umzug"]');
+      const d = document.documentElement, b = document.body, u = document.querySelector('[data-soll="move"]');
       // The page sets overflow-x: clip on html and .hero, so scrollWidth alone stays at the viewport while content is cut off.
       // Every box that pokes out counts, except inside a container the reader can scroll sideways (tables, long code).
       const W = window.innerWidth;

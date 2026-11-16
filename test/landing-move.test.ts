@@ -19,7 +19,7 @@ async function home(lang = "en-US,en;q=0.9"): Promise<string> {
 }
 
 function moveBlock(html: string): string {
-  const start = html.indexOf('<section class="hero" id="umzug"');
+  const start = html.indexOf('<section class="hero" id="move"');
   expect(start, "the move block is missing").toBeGreaterThan(-1);
   return html.slice(start, html.indexOf("</section>", start));
 }
@@ -36,7 +36,7 @@ describe("the start page leads with the move from Conway", () => {
 
   it("puts the move before the catalogue for people and that before the agent path, for an English browser", async () => {
     const html = await home();
-    const move = html.indexOf('id="umzug"');
+    const move = html.indexOf('id="move"');
     const human = html.indexOf('class="human"');
     const agents = html.indexOf('id="fuer-agenten"');
     expect(move, "the move block is missing").toBeGreaterThan(-1);
@@ -50,7 +50,7 @@ describe("the start page leads with the move from Conway", () => {
     // goals/seite/ANNAHMEN.md (seite 01): readers from Conway issues write English, so germanFirstScreen leaves the block
     // alone and it stays above the German first screen.
     const html = await home("de-DE,de;q=0.9");
-    const move = html.indexOf('id="umzug"');
+    const move = html.indexOf('id="move"');
     const human = html.indexOf('class="human"');
     const agents = html.indexOf('id="fuer-agenten"');
     expect(move, "the move block is missing for a German browser").toBeGreaterThan(-1);
@@ -80,7 +80,7 @@ describe("the start page leads with the move from Conway", () => {
 
   it("keeps the control mark of ops/depth.sh inside the move block, the first screen on every width", async () => {
     const html = await home();
-    const start = html.indexOf('id="umzug"');
+    const start = html.indexOf('id="move"');
     const end = html.indexOf("</section>", start);
     const top = html.indexOf("/px/top.png");
     expect(top, "the control mark is gone").toBeGreaterThan(-1);

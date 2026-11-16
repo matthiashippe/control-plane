@@ -26,7 +26,7 @@ describe("the landing page speaks to the reader who came", () => {
     // not text a reader sees.
     // The h1 after the move block: that block (goals/seite/02) is English for every browser, because the operators it
     // speaks to arrive from English Conway issues (goals/seite/ANNAHMEN.md), and the page's own headline follows it.
-    const move = html.indexOf('id="umzug"');
+    const move = html.indexOf('id="move"');
     expect(move, "no move block").toBeGreaterThan(-1);
     const rest = html.slice(html.indexOf("</section>", move));
     const h1 = rest.slice(rest.indexOf("<h1>"), rest.indexOf("</h1>"));

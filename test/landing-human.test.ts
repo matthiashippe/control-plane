@@ -37,7 +37,7 @@ describe("the first screen of / for a person", () => {
       // The one block above it is the move from Conway (goals/seite/02, SOLL pictures of seite 01): operators from
       // Conway issues have to see their one line without scrolling. It is a single block, so the person still comes
       // before the agent hero and before everything else written for agents.
-      const move = html.indexOf('<section class="hero" id="umzug"');
+      const move = html.indexOf('<section class="hero" id="move"');
       expect(move, `no move block (${lang})`).toBeGreaterThan(-1);
       expect(move, "only the move block comes before the person").toBeLessThan(human);
       expect(html.slice(0, move), "nothing for agents before the move block").not.toContain('<section class="hero"');
@@ -63,7 +63,7 @@ describe("the first screen of / for a person", () => {
     expect(html.split("/px/top.png").length - 1).toBe(1);
     // Since goals/seite/02 the first screen is the move block, on every width (docs/soll/startseite-390.png), so the
     // control sits inside it, before its </section>, and the catalogue button follows below.
-    const move = html.indexOf('<section class="hero" id="umzug"');
+    const move = html.indexOf('<section class="hero" id="move"');
     expect(html.indexOf("/px/top.png")).toBeGreaterThan(move);
     expect(html.indexOf("/px/top.png")).toBeLessThan(html.indexOf("</section>", move));
     expect(html.indexOf("/px/top.png")).toBeLessThan(html.indexOf("Zum Katalog"));

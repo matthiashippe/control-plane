@@ -109,7 +109,7 @@ describe("/katalog", () => {
       expect(link, `no link to /katalog on / (${lang})`).toBeGreaterThan(-1);
       // Since goals/seite/02 the move from Conway is the first block and carries the control mark. The link stays in
       // the person's screen right under it: after the move block and before the agent hero.
-      const move = home.indexOf('id="umzug"');
+      const move = home.indexOf('id="move"');
       expect(move, `no move block on / (${lang})`).toBeGreaterThan(-1);
       expect(link).toBeGreaterThan(home.indexOf("</section>", move));
       expect(link).toBeLessThan(home.indexOf('<section class="hero" id="fuer-agenten"'));
