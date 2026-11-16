@@ -388,3 +388,62 @@
 - Abgelöst: sandbox 02 Punkt 5 durch sandbox 07 Punkt 5, Ausgabe dann genau `000` (Tech Lead, 2026-11-15)
 - Entscheidung: Der dritte Prüfbefehl von Punkt 9 gilt ab Zyklus 8 ohne die Verdicts, also `git diff origin/dev...HEAD -- . ':(exclude)goals/sandbox/verdicts/' | grep -cE "BEGIN (CERTIFICATE|PRIVATE KEY)"` muss 0 ausgeben, und für die Verdicts `git diff origin/dev...HEAD -- goals/sandbox/verdicts/ | grep -cE -- '-{5}BEGIN'` muss 0 ausgeben, weil der einzige Treffer am Kopf `bde3094` das Zitat des Befunds in `goals/sandbox/verdicts/07-z7-K.md:39` ist, ein Verdict mit sha256-Beleg nicht umgeschrieben wird und jedes künftige Verdict zu diesem Befund ihn sonst wieder träfe; ein echter Schlüssel oder ein echtes Zertifikat trägt immer die fünf Striche vor BEGIN, die zweite Prüfung fängt ihn also auch dort (Tech Lead, 2026-11-15)
 - Entscheidung: Für die Verdicts gilt ab Zyklus 10 statt des zweiten Befehls der Zeile davor `git diff origin/dev...HEAD -- goals/sandbox/verdicts/ | grep -cE '^\+[[:space:]]*-{5}BEGIN [A-Z ]*(CERTIFICATE|PRIVATE KEY)-{5}'` muss 0 ausgeben, weil am Kopf `d4ed986` der einzige Treffer des alten Befehls das Zitat eines Suchausdrucks in `goals/sandbox/verdicts/07-z9-B.md:14` ist; ein echter PEM-Block beginnt immer mit einer eigenen Kopfzeile aus fünf Strichen, BEGIN, Typ und fünf Strichen, ein Zitat im Fließtext tut das nie. Der erste Befehl der Zeile davor (ohne die Verdicts) bleibt (Tech Lead, 2026-11-16)
+
+## Goal 08 (16.11.2026, Engineer CP)
+
+- **Runtime im Image** (Entscheidung 1 des Tech Lead). `sandboxd-base:2` ist `node:22-bookworm` mit der Runtime als Klon am Pin
+  unter `/opt/automaton`, gebaut mit `pnpm install --frozen-lockfile` und `pnpm build` ohne Patch, dazu eine Kopie von
+  `harness/runtime/setup-headless.mjs` und die Skripte `automaton-start` und `automaton-supervise`. Grund: Ein Bau in einer
+  Sandbox mit 512 MB dauert Minuten und kann am Speicher scheitern; im Image ist die Runtime bei jedem Start gleich und in Sekunden
+  da. Das Label `sandboxd.dockerfile` ist der sha256 über Dockerfile, `setup-headless.mjs` und beide Skripte, damit eine Änderung an
+  einem Skript das Image neu baut. `setup.sh --check` meldet `IMAGE runtime d8f8168 clean`, wenn `git rev-parse --short HEAD` im
+  Image den Pin ergibt und `git status --porcelain` leer ist; der Container dafür läuft mit `--network none` und `--pull never`.
+  Laufende Container behalten ihr altes Image, neue Sandboxes bekommen `sandboxd-base:2`.
+- **Start nach jedem Containerstart** (Entscheidung 2). `CONTAINER_CMD` startet `automaton-supervise` im Hintergrund, wenn die Marke
+  `/root/.automaton/autostart` besteht, sonst bleibt er wie vorher. Das gilt nach dem Anlegen, nach `docker start`, nach dem
+  Neustart durch `--restart unless-stopped` und nach `reconcile` bei einem Neustart des Servers. `/root` steht dort nur nach einem
+  Leerzeichen oder `=`, damit der Nachbau im Harness es auf die Home der Sandbox abbildet. Der Supervisor prüft am Pidfile auch
+  `/proc/<pid>/cmdline`, weil das Pidfile im dauerhaften `/root` liegt und ein frischer Container dieselben kleinen PIDs neu vergibt.
+  `automaton-start` schreibt die Ausgabe von `setup-headless.mjs` nach `/root/.automaton/setup.log`, weil sie die Adresse der
+  Wallet nennt.
+- **keep_running** (Entscheidung 3). `sandboxd` nimmt beim Anlegen `keep_running` nur als Boolean (sonst 400), Vorgabe false; eine
+  Sandbox damit fällt weder unter `IDLE_MS` noch unter `MAX_RUN_MS`. Eine gestoppte Sandbox mit keep_running wird wie jede andere
+  7 Tage nach dem Stopp gelöscht. Das Control Plane setzt es nur über `create(address, body, { keepRunning: true })` in
+  `src/sandbox/service.ts`, das nur `src/automaton/service.ts` aufruft; die Route `POST /v1/sandboxes` baut den Aufruf an `sandboxd`
+  aus Stufe und Name und reicht kein Feld des Kunden durch.
+- **Ein Schlüssel je Automaton** (Entscheidung 4). `src/automaton/keys.ts` legt einen Schlüssel des Kontos mit dem Namen
+  `automaton:<id>` an, im Format und mit dem Hash von `createApiKey` (über `hashApiKey`, `src/auth/` unverändert), weil
+  `createApiKey` eine SIWE-Sitzung braucht, die ein schlüsselloses Konto nie hat. Der Schlüssel im Klartext steht nur in der
+  Setup-Datei und danach in `config.json` in der Sandbox. `isAutomatonKey` gibt auf `POST /v1/automatons` 403 `forbidden`; Löschen
+  setzt `revoked_at`. Schlägt der Start in der Sandbox fehl, löscht das Control Plane die Sandbox gleich wieder, widerruft den
+  Schlüssel und antwortet 501 `automaton_start_failed`; gebucht ist dann nur der erste angefangene Schritt.
+- **creatorAddress** (Entscheidung 5). Am Pin liest die Runtime `creatorAddress` nur als Kennung: `src/index.ts:221` und `:232`
+  (Identität und ihre Datenbank), `:258` (`POST /v1/automatons/register`, das eine EVM-Adresse verlangt, `src/registry.ts`) und im
+  Text des Systemprompts (`src/agent/system-prompt.ts:591`, `:810`); sie schickt von sich aus kein Geld dorthin. Darum bekommt ein
+  schlüsselloses Konto (`key:`) die Nulladresse, ein Konto aus `konto_accounts` seine Smart Wallet (die Adresse des Kontos selbst)
+  und jedes andere seine SIWE-Adresse. `payTo` ist dieselbe Adresse; die Runtime hat dafür kein Feld, darum steht sie in
+  `creatorMessage`. `setup-headless.mjs` schneidet am Genesis-Prompt Leerzeichen an Anfang und Ende ab; das Control Plane gibt ihn
+  unverändert in die Setup-Datei.
+- **Kein Modell in der Setup-Datei.** Die Setup-Datei setzt `inferenceModel` nicht, die Runtime nimmt ihre Vorgabe `gpt-5.2`; am Pin
+  fragt sie ohnehin nach den Kandidaten ihrer Routing-Matrix, die das Control Plane über `CP_MODEL_ALIASES` abbildet.
+- **wallet.json bleibt in der Sandbox** (Entscheidung 6). Keine Zeile in `src/`, `ops/` oder `harness/e2e/` liest die Schlüsseldatei
+  der Runtime-Wallet; die Adresse für `GET /v1/automatons/{id}` liest ein `grep` auf das Feld `walletAddress` in `automaton.json`.
+- **Zustand.** Eine eigene Tabelle `hosted_automatons` neben `automatons` (dort stehen die Anmeldungen der Runtime): `active`,
+  `failed` oder `deleted`. `running`, `starting` und `stopped` kommen aus der Sandbox und ihrem Log: `stopped` mit `reason` aus
+  `stop_reason` der Sandbox (`credit`, `stopped`, `sandboxd`), `running` ab dem ersten Turn im Log. Für das Log eines gestoppten
+  Automatons startet das Control Plane die Sandbox nicht, sondern antwortet mit leeren `lines`.
+- **Neustart.** Der Neustart des Sandbox-Servers trifft keine fremde Sandbox nur, wenn keine läuft; das prüft
+  `ops/automaton-live.sh --reboot` vorher mit `setup.sh --foreign-sandboxes`.
+- **Harness.** Der Nachbau von `sandboxd` trägt die Runtime am Pin als eigene Stufe aus demselben Klon wie
+  `harness/runtime/Dockerfile` (die Datei bleibt unverändert) und führt bei `docker run`, `start` und `restart` genau den
+  Autostart-Teil von `CONTAINER_CMD` als Prozess aus, nie das Schreiben von `/etc/resolv.conf` (es bräche das DNS des
+  Compose-Netzes). Bei `stop`, `rm` und `restart` beendet er nur Prozesse, deren `HOME` oder `AUTOMATON_HOME` die Home dieser
+  Sandbox ist; sein Zustand überlebt einen Neustart des Containers `sandboxd`, damit `reconcile` den Automaton wieder startet. Am
+  Pin löscht `runAgentLoop` beim Start `sleep_until` (`src/agent/loop.ts`), die Runtime denkt nach Absturz und Neustart also sofort
+  weiter, auch wenn sie vorher schlief.
+- **ops/automaton-live.sh.** Neu gestartet wird nur, wenn `setup.sh --foreign-sandboxes` genau `foreign=0` meldet; ist eine Seite
+  nicht lesbar, startet nichts neu. Der Neustart gilt erst, wenn `/proc/sys/kernel/random/boot_id` einen neuen Wert hat. Die
+  Speicher-Spitze ist das Maximum aus `memory.peak` der Cgroup des Containers nach dem ersten Turn, vor dem Neustart und am Ende.
+  Die OK-Zeile verlangt mindestens eine Zeile `sandbox` und eine Zeile `inference` im Ledger, damit eine 0 nicht Blindheit ist.
+- **Guthaben grant:live-automaton.** Gemessen 2026-11-16 02:41 UTC über `GET /v1/credits/history` des eigenen Kontos: 11 Cent je
+  Lauf ohne Neustart, mal 300 über der Obergrenze, also 500000 mc (`docs/sandbox/automaton.md`).
