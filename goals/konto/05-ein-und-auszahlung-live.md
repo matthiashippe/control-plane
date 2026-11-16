@@ -1,7 +1,7 @@
 # Konto Goal 05: Ein- und Auszahlung live
 
 ## Status
-BLOCKED matthias
+BLOCKED umgebung
 
 ## Active Objective
 Wer aus Claude Code einen Automaton betreibt und keine Wallet hat, bringt Geld per Karte auf sein Konto und bekommt die Einnahmen
@@ -350,24 +350,37 @@ Wallet ohne Karte kein Geld auf sein Konto bekommt.
   `node` im PATH des code-host v24 ist und `better-sqlite3` für Node 22 gebaut ist. Gegenproben: Punkt 5 mit geänderter Überschrift
   `exit=1` und 8 Mängel, Punkt 10 mit vertauschtem `forwarderAddress` rot. Punkt 16 offen: Der Absatz „Ausnahme Hauptnetz“ fehlt auf
   `origin/dev`, deshalb gibt es weder `MAINNET_CHAIN_ID` in `src` noch `test/konto-mainnet.test.ts`; Human Gate gesetzt.
+- 2026-11-16 Breaker no_progress_runs gegriffen (2 Maker-Runs ohne neue Zeile, während das Goal am Human Gate
+  für Punkt 16 wartete); Status `BLOCKED umgebung`, `## Ehrliche Lücken` geschrieben, kein Bauversuch. Prüfbefehle: Reihenfolge-Prüfung
+  von Punkt 16 gegen `origin/dev` `a127d5d` gibt leeres `a` und `b` aus, also nicht `reihenfolge ok`.
 
 ## Blockers
-- Art: matthias
-- Gate: security_settings
-- Aufgabe: (a) In `loop-constraints.md` auf `dev` unter Regel 10, direkt nach der Ausnahme Base Sepolia, den Absatz eintragen:
-  „**Ausnahme Hauptnetz** (Matthias, <Datum>, für das Topic konto): Auf Base (chainId 8453) sendet das Control Plane nur
-  `approveWithSignature`, `revokeAsSpender` und `spend()` von Erlaubnissen, die ein Kunde mit seinem Passkey unterschrieben hat, dazu
-  das Anlegen und den Aufruf seiner Weiterleitung `PayoutForwarder`, deren einziges Ziel seine feste Auszahladresse ist. Gas zahlt ein
-  eigener Schlüssel, nie der Schlüssel der Betreiber-Wallet. Eingeschaltet wird das nur mit `CP_KONTO_MAINNET=1` in
-  `/opt/control-plane/.env`, die nur Matthias setzt. Credits bleiben unauszahlbar.“ (b) Die Anfrage an den Vertrieb von Bridge
-  für HTC selbst senden (Entwurf unter Empfehlung); die Unterlagen dafür stehen in `docs/konto/euro.md`, Abschnitt `## Für konto 06`,
-  Punkt 1.
-- Worum: Ohne den Absatz (a) darf der Code für das Hauptnetz nicht entstehen (Punkt 16 prüft die Reihenfolge an den Commits). Es
-  bewegt sich dadurch kein Geld: 8453 bleibt ohne `CP_KONTO_MAINNET=1` verweigert, und in der Produktion steht kein `CP_KONTO_*`.
-  Auf (b) wartet erst konto 06.
-- Empfehlung: (a) eintragen, das Goal läuft dann mit Punkt 16 weiter. (b) an `sales@bridge.xyz`, Betreff „Platform account for
-  Hanseatic Tech Company: EUR payouts via SEPA“, Text: „Hello, Hanseatic Tech Company (Germany) runs a developer platform where each
-  customer holds USDC on Base in their own smart wallet; we never hold customer funds or keys. We would like to use Bridge as a
-  platform to let our customers verify their identity through your hosted KYC links, add their own IBAN as an external account and
-  receive payouts in EUR over SEPA from a liquidation address on Base. Could you open a platform account for us and tell us which
-  documents you need for our business verification? We are ready to start with a small volume. Kind regards, Matthias Hippe“
+- Art: umgebung
+- Breaker: no_progress_runs (Grenze 2), das Goal hing davor am Human Gate `security_settings` für Punkt 16; Aufgabe, Worum und
+  Empfehlung dazu stehen unverändert unter `## Ehrliche Lücken`.
+
+## Ehrliche Lücken
+- Punkt 16 (Hauptnetz vorbereitet, nicht eingeschaltet): offen. Es fehlt der Absatz „Ausnahme Hauptnetz“ in Regel 10 von
+  `loop-constraints.md` auf `dev` (Stand `a127d5d`: nur „Ausnahme Base Sepolia“). Ohne ihn darf der Code für 8453 laut Regel 10 und
+  Prüfung 3 von Punkt 16 nicht entstehen, deshalb gibt es weder `MAINNET_CHAIN_ID` in `src` noch `test/konto-mainnet.test.ts`;
+  Prüfung 1 und 2 laufen dadurch rot, Prüfung 3 gibt nicht `reihenfolge ok` aus. Versucht: alle anderen Punkte gebaut und belegt
+  (Zyklus 1, PR #220 mit `check` und `e2e` grün), für Punkt 16 das Human Gate gesetzt; der Absatz darf nur ein Mensch eintragen,
+  weil `loop-constraints.md` auf der Deny List steht. Was Matthias dafür tun soll, stand im Gate `security_settings`:
+  - Aufgabe: (a) In `loop-constraints.md` auf `dev` unter Regel 10, direkt nach der Ausnahme Base Sepolia, den Absatz eintragen:
+    „**Ausnahme Hauptnetz** (Matthias, <Datum>, für das Topic konto): Auf Base (chainId 8453) sendet das Control Plane nur
+    `approveWithSignature`, `revokeAsSpender` und `spend()` von Erlaubnissen, die ein Kunde mit seinem Passkey unterschrieben hat, dazu
+    das Anlegen und den Aufruf seiner Weiterleitung `PayoutForwarder`, deren einziges Ziel seine feste Auszahladresse ist. Gas zahlt ein
+    eigener Schlüssel, nie der Schlüssel der Betreiber-Wallet. Eingeschaltet wird das nur mit `CP_KONTO_MAINNET=1` in
+    `/opt/control-plane/.env`, die nur Matthias setzt. Credits bleiben unauszahlbar.“ (b) Die Anfrage an den Vertrieb von Bridge
+    für HTC selbst senden (Entwurf unter Empfehlung); die Unterlagen dafür stehen in `docs/konto/euro.md`, Abschnitt `## Für konto 06`,
+    Punkt 1.
+  - Worum: Ohne den Absatz (a) darf der Code für das Hauptnetz nicht entstehen (Punkt 16 prüft die Reihenfolge an den Commits). Es
+    bewegt sich dadurch kein Geld: 8453 bleibt ohne `CP_KONTO_MAINNET=1` verweigert, und in der Produktion steht kein `CP_KONTO_*`.
+    Auf (b) wartet erst konto 06.
+  - Empfehlung: (a) eintragen, das Goal läuft dann mit Punkt 16 weiter. (b) an `sales@bridge.xyz`, Betreff „Platform account for
+    Hanseatic Tech Company: EUR payouts via SEPA“, Text: „Hello, Hanseatic Tech Company (Germany) runs a developer platform where each
+    customer holds USDC on Base in their own smart wallet; we never hold customer funds or keys. We would like to use Bridge as a
+    platform to let our customers verify their identity through your hosted KYC links, add their own IBAN as an external account and
+    receive payouts in EUR over SEPA from a liquidation address on Base. Could you open a platform account for us and tell us which
+    documents you need for our business verification? We are ready to start with a small volume. Kind regards, Matthias Hippe“
+- Punkt goal-verifier PASS (K und B): offen, weil Punkt 16 offen ist; den setzt nur das Gate.
