@@ -94,5 +94,6 @@ gefasster privater Bereich sie still auf 0 setzt.
 
 ## Progress Log
 - 2026-11-16 Zyklus 1: Punkte 1, 2, 3, 4, 5 gebaut, neuer Fall in `test/actions-log-addresses.test.ts` mit sechs Läufen, je eine öffentliche Adresse knapp neben 10/8, 172.16/12 oder 169.254/16 (aus `ip(…)` gebaut) und beide Enden des Bereichs, die nicht zählen. Prüfbefehle: Punkt 1 drei Mutanten je `1`, `exit 1`; Punkt 2 drei Mutanten je `1`, `exit 1`; Punkt 3 zwei Mutanten je `1`, `exit 1`; Gegenprobe aller acht auf `origin/dev` je `1`, `exit 0`; Punkt 4 vitest Exit 0, grep `0`, Umfang `0`; Punkt 5 `check` Exit 0 (194 Dateien, 2145 Tests); adressen 01 Punkt 1 `1 1 2 2 total 2 `, adressen 02 Punkt 1 `1 1 2 2 total 3 `.
+- 2026-11-16 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, `dev` ohne neue Commits, nichts zu mergen. Prüfbefehle: Punkt 1 drei Mutanten je `1`, `exit 1`; Punkt 2 drei Mutanten je `1`, `exit 1`; Punkt 3 zwei Mutanten je `1`, `exit 1`; Punkt 4 vitest Exit 0 (20 Tests), grep `0`, Umfang `0`; Punkt 5 `check` Exit 0 (194 Dateien, 2145 Tests).
 
 ## Blockers
