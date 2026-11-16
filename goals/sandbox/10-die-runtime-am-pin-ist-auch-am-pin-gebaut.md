@@ -84,14 +84,14 @@ nächsten zahlenden Automaton auf.
       Prüfung: `grep -c 'control-plane-dist.sha256' docs/sandbox/e2e.md` muss mindestens 1 ausgeben.
       Prüfung: `grep -c '18 Fälle' docs/sandbox/e2e.md` muss 0 ausgeben.
       Prüfung: `awk '/^## Goal 10/{f=1} f' goals/sandbox/ANNAHMEN.md | grep -ciE 'dist_sum|control-plane-dist.sha256|Prüfsumme|vorher|rebuild|Neubau'` muss mindestens 4 ausgeben.
-- [ ] Das Goal ändert nur `ops/runtime-sandbox.sh`, `docs/sandbox/e2e.md` und `goals/sandbox/`, rollt nichts aus und bringt keinen
+- [x] Das Goal ändert nur `ops/runtime-sandbox.sh`, `docs/sandbox/e2e.md` und `goals/sandbox/`, rollt nichts aus und bringt keinen
       Schlüssel ins Repo.
       MVP: Funktion, weil das Repo öffentlich ist (Grundregel 8) und `ops/runtime-sandbox.sh` nur auf dem code-host läuft, also kein
       Rollout nötig ist.
       Prüfung: `git diff --name-only origin/dev...HEAD | grep -cvE '^(ops/runtime-sandbox\.sh|docs/sandbox/e2e\.md|goals/sandbox/.*)$'` muss 0 ausgeben.
       Prüfung: `git diff --name-only origin/dev...HEAD | grep -cE "\.(key|pem|crt|env)$"` muss 0 ausgeben.
       Prüfung: `git diff origin/dev...HEAD -- . ':(exclude)goals/' | grep -cE '^\+.*(cnwy_k_[0-9a-f]{32}|-{5}BEGIN [A-Z ]*PRIVATE KEY-{5})'` muss 0 ausgeben.
-- [ ] `check` ist grün.
+- [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
 - [ ] goal-verifier PASS (K und B)
 
@@ -117,6 +117,7 @@ nächsten zahlenden Automaton auf.
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-16 Zyklus 1: Punkte 1, 2, 3, 4, 5 gebaut, Stempel über dist/ im Git-Verzeichnis, runtime_state meldet dist, build_runtime baut dann neu; vorher rot mit SELFTEST FAIL (5 of 26 cases), rot waren die vier dist-Fälle (OK statt FAIL) und rebuild-changed-dist (builds=0). Prüfbefehle: Punkt 1 SELFTEST OK, 6, 4, 1, nichts fehlt; Punkt 2 beide Mutationen ohne Ausgabe (konstante Summe macht 3 Fälle rot, Bau ohne Stempel 2); Punkt 3 1, 1, 0, 10; Punkt 4 0, 0, 0; Punkt 5 check Exit 0 (grün in 98 s, 2067 Tests).
 
 ## Blockers
 - keine
