@@ -31,9 +31,7 @@ const READER_EXCEPTIONS: { path: string; reason: string }[] = [
     path: "ops/actions-log-addresses.sh",
     reason: "counts strangers in public logs, not customers, and needs only the path without a live query (messung 04)",
   },
-  { path: "ops/timeout-quote.sh", reason: "checks that the list itself names an address before own_ips is asked" },
   { path: "ops/keyless-mints.sh", reason: "checks that the list itself names an address before own_ips is asked" },
-  { path: "ops/anzeigen-rechnung.py", reason: "checks that the list itself names an address before own_ips is asked" },
 ];
 
 function files(dir: string): string[] {
