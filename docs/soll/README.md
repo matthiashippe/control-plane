@@ -150,3 +150,58 @@ Die Bilder sind wie alle anderen dieser Datei mit WenQuanYi Zen Hei als `sans-se
 `/etc/fonts/fonts.conf` einbindet und `/usr/share/fonts/truetype/dejavu/*` mit `rejectfont` ausschließt.
 
 Abnahme-Issue limit: PRO-22848
+
+## Geld /h/{code}
+
+Einzahlung und Auszahlung auf derselben Handy-Seite (goals/konto/05): Der Mensch zahlt per Karte Geld auf das Konto seines
+Automatons ein oder richtet beim ersten Mal die Auszahlung auf sein eigenes Bankkonto ein. Dazu der Zustand `retry`, wenn die
+Prüfung der Unterschrift gerade nicht ging. Sieben Zustände, je zwei Bilder:
+
+| Zustand | 390 | 1440 | Quelle |
+|---|---|---|---|
+| `deposit-approve` | `money-deposit-approve-390.png` | `money-deposit-approve-1440.png` | `src/money-deposit-approve.html` |
+| `deposit-card` | `money-deposit-card-390.png` | `money-deposit-card-1440.png` | `src/money-deposit-card.html` |
+| `payout-approve` | `money-payout-approve-390.png` | `money-payout-approve-1440.png` | `src/money-payout-approve.html` |
+| `payout-verify` | `money-payout-verify-390.png` | `money-payout-verify-1440.png` | `src/money-payout-verify.html` |
+| `payout-bank` | `money-payout-bank-390.png` | `money-payout-bank-1440.png` | `src/money-payout-bank.html` |
+| `payout-passkey` | `money-payout-passkey-390.png` | `money-payout-passkey-1440.png` | `src/money-payout-passkey.html` |
+| `retry` | `money-retry-390.png` | `money-retry-1440.png` | `src/money-retry.html` |
+
+`deposit-approve` und `payout-approve` sind die Wahl der Zahl wie beim Limit (Block `data-soll="approve"`), sagen aber, was
+geschieht: „Add $20.00 to Atlas?“ mit Betrag und Karte, „Send money from Atlas to your bank account?“ mit dem eigenen Bankkonto als
+einzigem Ziel. `deposit-card` (Block `card`) nennt Betrag und Karte und hat einen Knopf. `payout-verify` (Block `verify`) sagt,
+dass Bridge einmal die Identität prüft, mit einem Knopf. `payout-bank` (Block `bank`) fragt IBAN (`name="iban"`) und Name des
+Kontoinhabers (`name="owner_name"`) ab, mit einem Knopf. `payout-passkey` (Block `payout`) sagt in der Überschrift, was beim Tippen
+passiert, darunter in einer Zeile „PostYourPrice can send money from Atlas only to your bank account ending 3000.“, zwei Haken und
+einen Knopf über die ganze Breite. `retry` (Block `retry`) sagt, dass die Prüfung gerade nicht ging, und hat den Knopf „Tap
+again“. Jeder Block endet im ersten Bildschirm (390 x 844 und 1440 x 900). Abbruch und Fehler zeigen den Zustand `fehlgeschlagen`
+aus dem Abschnitt Konto unverändert. Die Werte im Bild sind erfunden (`Atlas`, 20.00 USD, Beispiel-IBAN
+`DE89 3704 0044 0532 0130 00` als Platzhalter, Bankkonto mit Endung 3000), keine Kundendaten. Die Quellen zeigen nur den sichtbaren
+Teil der Seite: Die `data-*`-Werte der Knöpfe, das Formularziel und das Skript setzt erst `src/public/money.ts`.
+
+Bauen und prüfen, ohne Netz, mit dem Chromium aus `~/.cache/ms-playwright/`, auf dem code-host mit
+`FONTCONFIG_FILE=~/.config/control-plane/soll-fonts.conf` wie beim Limit:
+
+```
+node ops/soll-money.mjs                         # Bilder neu schreiben
+node ops/soll-money.mjs --check                 # neu rendern und vergleichen, Exit 1 bei jedem Mangel
+node ops/soll-money.mjs --check --source <dir>  # dieselbe Prüfung gegen die sieben Quellen money-<zustand>.html in <dir>
+```
+
+Ein unbekanntes Argument endet mit Exit 1, bevor der Browser startet, und schreibt kein Bild. Die letzte Zeile ist englisch:
+`soll money: 14 images, blocks end 390=<y> 1440=<y>, 0 defects`, y ist je Breite das tiefste Blockende aller Zustände.
+
+Mängel wie beim Limit: ein einziger Pixel weicht vom neuen Render ab, waagrechter Überlauf, Gedankenstrich im sichtbaren Text,
+fremde Adresse (angefragt oder in einem Attribut), Bild mit falscher Breite, Block fehlt oder endet unter dem ersten Bildschirm. Zur
+Sperrliste kommen `liquidation`, `onramp` (auch `on-ramp`), `kyc`, `forwarder`, `spender` und `usdc`, Groß- und Kleinschreibung
+egal; „passkey“, „IBAN“, „card“, „identity“, Bridge und MoonPay sind bekannte Wörter und stehen. Die Auswertung ist `assessMoney` in
+`ops/soll-assess.mjs`, geprüft von `test/soll-money.test.ts` ohne Browser.
+
+Die Quellen nutzen die Klassen der Startseite und die Bausteine grant und choices aus dem Abschnitt Handoff sowie wide und balanced
+aus dem Abschnitt Konto, jeweils mit demselben Zweck. Neu, in einem dritten `<style>` der Quellen und später der Seite:
+
+- `.field`: Beschriftung und Textfeld für IBAN und Kontoinhaber, das Feld so breit wie die Spalte und 52 px hoch, Beschriftung im
+  Stil der Zeile über der Überschrift, weil der Stil der Startseite kein Eingabefeld kennt und ein `<input>` sonst klein und hell
+  im Stil des Browsers auf der dunklen Seite steht.
+
+Abnahme-Issue money: PRO-23251
