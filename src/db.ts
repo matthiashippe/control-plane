@@ -507,6 +507,23 @@ function migrate(db: Db): void {
       created_at  TEXT NOT NULL
     );
   `);
+  // Hosted automatons (goals/sandbox/08, src/automaton/): one row per automaton started with POST /v1/automatons, on top of the
+  // sandbox it runs in (`sandboxes`, which holds reservation and billing). `status` is what this table alone knows: `active`
+  // while the sandbox carries it, `failed` when the start in the sandbox failed, `deleted` after DELETE. Running, starting and
+  // stopped come from the sandbox and its log. Not the table `automatons`, which holds the registrations of the runtime.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS hosted_automatons (
+      id          TEXT PRIMARY KEY,
+      address     TEXT NOT NULL REFERENCES wallets(address),
+      name        TEXT NOT NULL,
+      sandbox_id  TEXT,
+      status      TEXT NOT NULL,
+      reason      TEXT,
+      created_at  TEXT NOT NULL,
+      updated_at  TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS hosted_automatons_address ON hosted_automatons(address, status);
+  `);
   // A spend() that was sent and not yet settled (goals/konto/03, point 15): its hash and amount, written before the wait for the
   // receipt, so that a failed wait or a restart books it later instead of losing it or spending a second time.
   const kontoColumns = db.prepare("PRAGMA table_info(konto_accounts)").all() as { name: string }[];

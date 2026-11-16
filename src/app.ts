@@ -96,6 +96,7 @@ import { registerHandoff, type HandoffDeps, type KontoDeps } from "./handoff/rou
 import { handlePay, TOPUP_TIERS_USD, type PayConfig } from "./payments/pay.js";
 import { handleRegister } from "./registry.js";
 import { createSandboxService, type Reply as SandboxReply, type SandboxService } from "./sandbox/service.js";
+import { createAutomatonService } from "./automaton/service.js";
 import { registerRelay } from "./relay/routes.js";
 import type { Settler } from "./payments/settler.js";
 import {
@@ -168,6 +169,11 @@ export interface AppOptions {
    * the sandbox server answers 501 and the list is what the database holds.
    */
   sandbox?: SandboxService | null;
+  /**
+   * The public base a hosted automaton calls back (goals/sandbox/08: conwayApiUrl and socialRelayUrl). Left out, the origin
+   * of src/public/site.ts (CP_PUBLIC_URL).
+   */
+  automatonPublicUrl?: string;
   /**
    * The way to the phone (goals/konto/02, src/handoff/routes.ts): how often the stream looks at the row, the cap on unknown codes
    * on /h/{code} and where the chance comes from. Left out, production values.
@@ -313,6 +319,9 @@ export const V1_ROUTES = new Set([
   "/v1/messages/poll",
   "/v1/messages/count",
   "/v1/automatons/register",
+  // Hosted automatons (goals/sandbox/08). The sub-paths carry the id as a segment and live behind the wildcard
+  // /v1/automatons/*, whose handler checks the key itself (test/automaton-api.test.ts).
+  "/v1/automatons",
   "/v1/bounties",
   "/v1/bounties/cancel",
   "/v1/bounties/award",
@@ -3626,6 +3635,37 @@ export function createApp(opts: AppOptions) {
       return sandboxGuard(c, () => sandboxes.exposePort(address, id, body));
     }
     return sandboxGuard(c, () => sandboxes.removePort(address, id, sub.slice("/ports/".length)));
+  });
+
+  // --- Hosted automatons (goals/sandbox/08, docs/sandbox/automaton.md, src/automaton/) ----
+
+  // An automaton that runs entirely here, in a sandbox of its own, billed like every sandbox plus its inference on the same
+  // account. POST /v1/automatons/register stands above and keeps answering the runtime as before: `register` is never an id.
+  const automatons = createAutomatonService({ db, sandboxes, publicUrl: () => opts.automatonPublicUrl ?? siteOrigin() });
+  app.get("/v1/automatons", (c) => sandboxGuard(c, () => automatons.list(c.get("address"))));
+  app.post("/v1/automatons", async (c) => {
+    const body = await c.req.json().catch(() => ({}));
+    return sandboxGuard(c, () => automatons.create(c.get("address"), c.req.header("authorization"), body));
+  });
+  app.all("/v1/automatons/*", async (c) => {
+    const m = /^\/v1\/automatons\/([A-Za-z0-9_-]{1,64})(\/.*)?$/.exec(new URL(c.req.url).pathname);
+    if (!m) return c.notFound();
+    const [, id, sub = ""] = m;
+    const allowed = sub === "" ? ["GET", "DELETE"] : sub === "/logs" ? ["GET"] : sub === "/stop" || sub === "/start" ? ["POST"] : null;
+    if (!allowed) return c.notFound();
+    const address = resolveApiKey(db, c.req.header("authorization"));
+    if (!address) throw invalidKeyError();
+    const asked = c.req.method === "HEAD" ? "GET" : c.req.method;
+    if (!allowed.includes(asked)) {
+      c.header("Allow", allowed.join(", "));
+      return c.json(
+        { error: "method_not_allowed", message: `${c.req.path} accepts ${allowed.join(" and ")}, not ${c.req.method}.`, allow: allowed, docs: DOC.automatons },
+        405,
+      );
+    }
+    if (sub === "") return sandboxGuard(c, () => (asked === "GET" ? automatons.get(address, id) : automatons.remove(address, id)));
+    if (sub === "/logs") return sandboxGuard(c, () => automatons.logs(address, id));
+    return sandboxGuard(c, () => (sub === "/stop" ? automatons.stop(address, id) : automatons.start(address, id)));
   });
 
   // --- Domains (docs/sandbox/vertrag.md, src/domains.ts) ----------

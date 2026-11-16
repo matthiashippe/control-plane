@@ -21,6 +21,7 @@ const ERLAUBTE_WILDCARDS = new Map([
   ["/v1/auth/*", "eigene Middleware, die den 405 fuer nonce und verify traegt"],
   ["/v1/briefs/*", "eigene Middleware, /v1/briefs/check braucht keinen Schluessel"],
   ["/v1/sandboxes/*", "checks the key in its own handler, test/sandbox-api.test.ts holds the 401 and the 404"],
+  ["/v1/automatons/*", "checks the key in its own handler, test/automaton-api.test.ts holds the 401 and the 404"],
   ["/v1/domains/*", "checks the key in its own handler, test/domains.test.ts holds the 401"],
   ["/v1/handoff/*", "checks the poll token in its own handler, test/handoff-events.test.ts holds the 401 and the 404"],
   // Zwei exakte Pfade, die absichtlich ausserhalb der Liste liegen, jeder mit seinem Grund im Code:
