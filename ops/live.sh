@@ -546,22 +546,23 @@ bg_live() {
   echo "$tok"
 }
 
-# Why the background step failed, $1 = its token from bg_live.
+# Why the background step failed, $1 = its token from bg_live; for the tokens of wait_command judge_sandbox puts
+# `wait_command` in front.
 bg_reason() {
   case "${1:-}" in
     "" | skipped) echo "did not run" ;;
     start-notrunning) echo "of sleep 25 answered 200 without running true and exit_code -1" ;;
     start-nofiles) echo "answered 200 without exit_code_file and output_file under /root/.exec" ;;
     start-nojson) echo "answered 200 without a JSON object" ;;
-    start-nowait) echo "wait_command missing in the answer, or it does not name the exit_code_file" ;;
-    start-waitnotlast) echo "wait_command is not the last line of stdout" ;;
+    start-nowait) echo "missing in the answer, or it does not name the exit_code_file" ;;
+    start-waitnotlast) echo "is not the last line of stdout" ;;
     start-*) echo "of sleep 25 answered ${1#start-}, expected 200" ;;
-    wait-status-*) echo "wait_command answered ${1#wait-status-}, expected 200" ;;
-    wait-slow-*) echo "wait_command took ${1#wait-slow-} ms, not under 30000" ;;
-    wait-exit-*) echo "wait_command reported exit code ${1#wait-exit-}, expected 0" ;;
-    wait-wrong) echo "wait_command reported the end without bg-ok in stdout" ;;
-    wait-still) echo "wait_command still said running after two calls" ;;
-    wait-unreadable) echo "wait_command answered 200 with neither the end nor still running" ;;
+    wait-status-*) echo "answered ${1#wait-status-}, expected 200" ;;
+    wait-slow-*) echo "took ${1#wait-slow-} ms, not under 30000" ;;
+    wait-exit-*) echo "reported exit code ${1#wait-exit-}, expected 0" ;;
+    wait-wrong) echo "reported the end without bg-ok in stdout" ;;
+    wait-still) echo "still said running after two calls" ;;
+    wait-unreadable) echo "answered 200 with neither the end nor still running" ;;
     *) echo "failed: $1" ;;
   esac
 }
@@ -614,7 +615,10 @@ judge_sandbox() {
   elif [ "$exec_" != ok ]; then
     echo "FAIL sandbox: exec answered ${exec_:-nothing}, expected 200"
   elif [ "$bg" != ok ]; then
-    echo "FAIL sandbox: background exec $(bg_reason "$bg")"
+    case "$bg" in
+      wait-* | start-nowait | start-waitnotlast) echo "FAIL sandbox: background exec wait_command $(bg_reason "$bg")" ;;
+      *) echo "FAIL sandbox: background exec $(bg_reason "$bg")" ;;
+    esac
   elif [ "$files" = wrong ]; then
     echo "FAIL sandbox: the file read back differs from the one uploaded"
   elif [ "$files" != ok ]; then
