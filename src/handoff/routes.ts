@@ -207,6 +207,17 @@ export function registerHandoff<E extends Env>(app: Hono<E>, deps: HandoffDeps):
     (db.prepare("SELECT owner, organization_id FROM konto_accounts WHERE address = ?").get(address) as
       | { owner: string | null; organization_id: string | null }
       | undefined) ?? { owner: null, organization_id: null };
+  /**
+   * The codes whose page showed the identity step of Bridge, so that bank and passkey step count three steps; a person Bridge
+   * had checked before sees two (note of the Design Reviewer). Only the counter on the page hangs on it, so memory is enough:
+   * after a restart within the ten minutes of a code the page counts two steps for it. Entries go after the life of a code.
+   */
+  const showedVerify = new Map<string, number>();
+  const stepsOf = (code: string): 2 | 3 => {
+    const cutoff = nowMs() - 3_600_000;
+    for (const [k, at] of showedVerify) if (at < cutoff) showedVerify.delete(k);
+    return showedVerify.has(code) ? 3 : 2;
+  };
   /** The address the person gives Bridge for the identity check: one per account on our own domain, because we hold no email. */
   const payoutEmail = (address: string) => `payout-${address.slice(2, 18)}@postyourprice.com`;
 
@@ -232,6 +243,7 @@ export function registerHandoff<E extends Env>(app: Hono<E>, deps: HandoffDeps):
         account,
         owner: row.owner ?? "",
         organizationId: row.organization_id ?? "",
+        steps: stepsOf(h.code),
       });
     }
     ensurePayoutRow(db, account, nowMs());
@@ -249,13 +261,16 @@ export function registerHandoff<E extends Env>(app: Hono<E>, deps: HandoffDeps):
           nowMs(),
           account,
         );
-        if (!approved) return moneyPage(c, { state: "payout-verify", code: h.code, automatonName: h.automatonName, kycLink: link.kycLink });
+        if (!approved) {
+          showedVerify.set(h.code, nowMs());
+          return moneyPage(c, { state: "payout-verify", code: h.code, automatonName: h.automatonName, kycLink: link.kycLink });
+        }
       } catch (err) {
         if (!(err instanceof BridgeError)) throw err;
         return c.text("Bridge could not be reached just now. Reload this page in a minute.", 502);
       }
     }
-    return moneyPage(c, { state: "payout-bank", code: h.code, automatonName: h.automatonName });
+    return moneyPage(c, { state: "payout-bank", code: h.code, automatonName: h.automatonName, steps: stepsOf(h.code) });
   };
 
   /** The page of a matched handoff: the passkey step of konto and limit, the card of a deposit, the next step of a payout. */
@@ -763,7 +778,7 @@ export function registerHandoff<E extends Env>(app: Hono<E>, deps: HandoffDeps):
     const payout = readPayout(db, account);
     if (!payout?.kyc_approved || !payout.bridge_customer_id) return payoutStep(c, h);
     const form = (await c.req.parseBody().catch(() => ({}))) as Record<string, unknown>;
-    const again = (error: string) => moneyPage(c, { state: "payout-bank", code: h.code, automatonName: h.automatonName, error }, 400);
+    const again = (error: string) => moneyPage(c, { state: "payout-bank", code: h.code, automatonName: h.automatonName, error, steps: stepsOf(h.code) }, 400);
     const iban = parseIban(form.iban);
     if (!iban) return again("This IBAN is not valid. Check it and try again.");
     const ownerName = typeof form.owner_name === "string" ? form.owner_name.trim() : "";

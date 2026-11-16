@@ -6,7 +6,8 @@
  * happens. `deposit-card` (block `card`) names amount and card and has the one button the script of the page opens the card
  * payment with. `payout-verify` (block `verify`) sends the person to Bridge to confirm their identity once, `payout-bank` (block
  * `bank`) asks for IBAN and account holder, `payout-passkey` (block `payout`) has the one button that signs with the existing
- * passkey. `retry` (block `retry`) comes after a signature that could not be checked and sends the same one again. Cancel and
+ * passkey. Bank and passkey step count three steps, or two when Bridge had checked the person before and the identity step was
+ * left out (`steps`). `retry` (block `retry`) comes after a signature that could not be checked and sends the same one again. Cancel and
  * failure show the state `fehlgeschlagen` of konto 03 unchanged.
  *
  * The frame is phonePage() of src/public/handoff.ts with the blocks of konto 02 and 03; this page adds the field of the bank step.
@@ -31,7 +32,14 @@ export type MoneyPage =
     }
   | { state: "payout-approve"; automatonName: string; choices: number[] }
   | { state: "payout-verify"; code: string; automatonName: string; kycLink: string }
-  | { state: "payout-bank"; code: string; automatonName: string; error?: string | null }
+  | {
+      state: "payout-bank";
+      code: string;
+      automatonName: string;
+      error?: string | null;
+      /** 2 when Bridge had checked the person before this code, so the identity step was left out; else 3. */
+      steps?: 2 | 3;
+    }
   | {
       state: "payout-passkey";
       code: string;
@@ -44,6 +52,8 @@ export type MoneyPage =
       account: string;
       owner: string;
       organizationId: string;
+      /** As in payout-bank. */
+      steps?: 2 | 3;
     }
   | { state: "retry"; code: string; automatonName: string };
 
@@ -168,6 +178,8 @@ ${choices(page.choices)}
       );
     }
     case "payout-verify": {
+      // The link of Bridge sits in a data attribute, not in href: the page names no other address in a place a browser loads
+      // from, and the script of the page opens it in a new tab on the tap.
       const link = /^https:\/\/[^\s"<>]+$/.test(page.kycLink) ? esc(page.kycLink) : "";
       return step(
         "verify",
@@ -175,8 +187,9 @@ ${choices(page.choices)}
         "Confirm your identity once",
         `Bridge sends money from ${name} to your bank account and checks your identity once before the first payout.`,
         ["Have your ID card or passport ready.", "You do this only once, not for every payout."],
-        `<a class="btn btn-1" id="money-verify" data-code="${esc(page.code)}" href="${link}" target="_blank" rel="noopener noreferrer">${ID_ICON}Confirm identity with Bridge</a>`,
+        `<button class="btn btn-1" type="button" id="money-verify" data-code="${esc(page.code)}" data-href="${link}">${ID_ICON}Confirm identity with Bridge</button>`,
         "Close this page and nothing is sent. Come back to this page when Bridge is done.",
+        `${SCRIPT}\n`,
       );
     }
     case "payout-bank": {
@@ -184,7 +197,7 @@ ${choices(page.choices)}
       return `<section class="hero">
   <div class="wrap narrow" data-soll="bank">
     <div class="hero-text balanced">
-      <p class="eyebrow">Step 2 of 3</p>
+      <p class="eyebrow">${page.steps === 2 ? "Step 1 of 2" : "Step 2 of 3"}</p>
       <h1>Where should money from ${name} go?</h1>
       <p class="sub">Money from ${name} can go only to this bank account.</p>
 ${error}      <form method="post" action="/h/${esc(page.code)}/payout-bank">
@@ -220,7 +233,7 @@ ${error}      <form method="post" action="/h/${esc(page.code)}/payout-bank">
       ].join(" ");
       return step(
         "payout",
-        "Last step",
+        page.steps === 2 ? "Step 2 of 2" : "Last step",
         "Allow payouts to your bank account",
         `PostYourPrice can send money from ${name} only to your bank account ending ${esc(page.bankLast4)}.`,
         [`Payouts from ${name} cannot go to any other account.`, "You confirm with the passkey you already have."],
@@ -234,7 +247,7 @@ ${error}      <form method="post" action="/h/${esc(page.code)}/payout-bank">
         "retry",
         "Almost done",
         "Tap again to finish",
-        `The check for ${name} did not go through just now.`,
+        `Your passkey worked, but we could not confirm it for ${name} just now.`,
         ["You do not need your passkey again.", "Nothing has changed yet."],
         `<button class="btn btn-1" type="button" id="konto-retry" data-code="${esc(page.code)}">${AGAIN_ICON}Tap again</button>`,
         "Close this page and nothing changes. The code works once, for 10 minutes.",

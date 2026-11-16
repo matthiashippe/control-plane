@@ -163,7 +163,7 @@ async function postJson(fetchFn, url, headers, body) {
 }
 
 /** A new sub-organization with the passkey, the key of this tab and one Ethereum wallet. */
-export async function signup({ fetch: fetchFn, proxyId, passkey, sessionPublicKey, nowMs }) {
+export async function signUpWithPasskey({ fetch: fetchFn, proxyId, passkey, sessionPublicKey, nowMs }) {
   const body = JSON.stringify({
     userName: "Account",
     organizationName: `account-${nowMs}`,
@@ -228,9 +228,9 @@ function offlineClient(chainId) {
 
 /**
  * The permission for this handoff and the smart wallet's signature over it. `signRaw` signs a 32-byte hash as the owner.
- * Numbers go out as strings (docs/konto/konto.md, step 3).
+ * Numbers go out as strings (docs/konto/konto.md, step 3). `period` and `end` default to the daily limit without an end.
  */
-export async function signPermission({ owner, signRaw, chainId, spender, token, allowance, nowSec, salt }) {
+export async function signPermission({ owner, signRaw, chainId, spender, token, allowance, nowSec, salt, period = PERIOD_SECONDS, end = END_NEVER }) {
   const ownerAccount = toAccount({
     address: owner,
     sign: ({ hash }) => signRaw(hash),
@@ -251,9 +251,9 @@ export async function signPermission({ owner, signRaw, chainId, spender, token, 
     spender: spender.toLowerCase(),
     token: token.toLowerCase(),
     allowance: BigInt(allowance),
-    period: PERIOD_SECONDS,
+    period,
     start: nowSec,
-    end: END_NEVER,
+    end,
     salt,
     extraData: "0x",
   };
@@ -293,21 +293,17 @@ export async function passkeyStamp({ get, subtle, rpId, body }) {
 }
 
 /**
- * The step limit (goals/konto/04): the account exists, so there is no signup. Its passkey stamps one request to Turnkey that
- * signs the hash of the new permission with the wallet of the account (`owner`, as Turnkey wrote it, in the group `org`).
- * Returns the body of POST /h/{code}/limit. Throws KontoError with the reason the page shows.
+ * The signer of an account that exists (konto 04 and 05): its passkey stamps one request to Turnkey that signs a hash with the
+ * wallet of the account (`owner`, as Turnkey wrote it, in the group `org`). Throws KontoError when the page does not name an
+ * account this passkey wallet owns.
  */
-export async function runLimit(deps, page) {
-  const { get, fetch: fetchFn, subtle, random, now, rpId } = deps;
-  if (!/^0x[0-9a-fA-F]{40}$/.test(page.spender || "") || !/^0x[0-9a-fA-F]{40}$/.test(page.token || "") || !/^[0-9]+$/.test(page.limit || "")) {
-    throw new KontoError("unreachable", "page data incomplete");
-  }
+function accountSigner(deps, page) {
+  const { get, fetch: fetchFn, subtle, now, rpId } = deps;
   if (!/^0x[0-9a-fA-F]{40}$/.test(page.owner || "") || !page.org || !/^0x[0-9a-fA-F]{40}$/.test(page.account || "")) {
     throw new KontoError("unreachable", "the account has no passkey on record");
   }
   const owner = page.owner.toLowerCase();
   if (smartWalletAddress(owner) !== page.account.toLowerCase()) throw new KontoError("refused", "the passkey wallet does not own this account");
-  const nowMs = now();
   const signRaw = async (hash) => {
     const body = JSON.stringify({
       type: "ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2",
@@ -325,6 +321,20 @@ export async function runLimit(deps, page) {
     const v = Number.parseInt(String(result.v), 16);
     return `0x${result.r.padStart(64, "0")}${result.s.padStart(64, "0")}${v === 0 || v === 27 ? "1b" : "1c"}`;
   };
+  return { owner, signRaw };
+}
+
+/**
+ * The step limit (goals/konto/04): the account exists, so there is no signup. Its passkey signs the new permission once.
+ * Returns the body of POST /h/{code}/limit. Throws KontoError with the reason the page shows.
+ */
+export async function runLimit(deps, page) {
+  const { random, now } = deps;
+  if (!/^0x[0-9a-fA-F]{40}$/.test(page.spender || "") || !/^0x[0-9a-fA-F]{40}$/.test(page.token || "") || !/^[0-9]+$/.test(page.limit || "")) {
+    throw new KontoError("unreachable", "page data incomplete");
+  }
+  const { owner, signRaw } = accountSigner(deps, page);
+  const nowMs = now();
   const signed = await signPermission({
     owner,
     signRaw,
@@ -336,6 +346,85 @@ export async function runLimit(deps, page) {
     salt: BigInt(`0x${hex(random(32))}`),
   });
   return { body: signed };
+}
+
+/** The second permission of an account (goals/konto/05, decision 2): no cap, because the target on-chain is fixed. */
+export const PAYOUT_ALLOWANCE = 2n ** 160n - 1n;
+export const PAYOUT_PERIOD_SECONDS = 2592000;
+
+/**
+ * The passkey step of the first payout (goals/konto/05): the passkey of the account signs the second permission, whose spender
+ * is the forwarder to the person's bank account (`spender` of the page, set by the server), USDC, no cap, 30 days, no end and
+ * a salt of its own. Returns the body of POST /h/{code}/payout. Throws KontoError with the reason the page shows.
+ */
+export async function runPayout(deps, page) {
+  const { random, now } = deps;
+  if (!/^0x[0-9a-fA-F]{40}$/.test(page.spender || "") || !/^0x[0-9a-fA-F]{40}$/.test(page.token || "")) {
+    throw new KontoError("unreachable", "page data incomplete");
+  }
+  const { owner, signRaw } = accountSigner(deps, page);
+  const nowMs = now();
+  const signed = await signPermission({
+    owner,
+    signRaw,
+    chainId: page.chainId,
+    spender: page.spender,
+    token: page.token,
+    allowance: PAYOUT_ALLOWANCE,
+    period: PAYOUT_PERIOD_SECONDS,
+    end: END_NEVER,
+    nowSec: Math.floor(nowMs / 1000),
+    salt: BigInt(`0x${hex(random(32))}`),
+  });
+  return { body: signed };
+}
+
+/** Turnkey takes an amount for the card payment only above 20 (docs/konto/euro.md, Einzahlung); below, MoonPay asks for it. */
+const ONRAMP_AMOUNT_ABOVE = 20000000n;
+
+/** Dollars with two decimals from atomic USDC (6 decimals), without a float. */
+function dollars(atomic) {
+  const cents = atomic / 10000n;
+  return `${cents / 100n}.${String(cents % 100n).padStart(2, "0")}`;
+}
+
+/**
+ * The deposit (goals/konto/05, decision 6): the passkey of the account stamps one INIT_FIAT_ON_RAMP for its group at Turnkey,
+ * with MoonPay, card, Base, USDC and exactly the address the server set on the page (the smart wallet of the account), then the
+ * page reports POST /h/{code}/deposit {opened:true} and opens the card payment of MoonPay. Returns the address it opened.
+ * Throws KontoError with the reason the page shows.
+ */
+export async function runDeposit(deps, page) {
+  const { get, fetch: fetchFn, subtle, now, rpId, open } = deps;
+  if (!/^0x[0-9a-fA-F]{40}$/.test(page.address || "") || !/^[0-9]{1,18}$/.test(page.amount || "") || !page.org || !page.code) {
+    throw new KontoError("unreachable", "page data incomplete");
+  }
+  const amount = BigInt(page.amount);
+  const body = JSON.stringify({
+    type: "ACTIVITY_TYPE_INIT_FIAT_ON_RAMP",
+    timestampMs: String(now()),
+    organizationId: page.org,
+    parameters: {
+      onrampProvider: "FIAT_ON_RAMP_PROVIDER_MOONPAY",
+      walletAddress: page.address,
+      network: "FIAT_ON_RAMP_BLOCKCHAIN_NETWORK_BASE",
+      cryptoCurrencyCode: "FIAT_ON_RAMP_CRYPTO_CURRENCY_USDC",
+      fiatCurrencyCode: "FIAT_ON_RAMP_CURRENCY_USD",
+      ...(amount > ONRAMP_AMOUNT_ABOVE ? { fiatCurrencyAmount: dollars(amount) } : {}),
+      paymentMethod: "FIAT_ON_RAMP_PAYMENT_METHOD_CREDIT_DEBIT_CARD",
+    },
+  });
+  const stamp = await passkeyStamp({ get, subtle, rpId, body });
+  const data = await postJson(fetchFn, `${TURNKEY_API_URL}/public/v1/submit/init_fiat_on_ramp`, { "X-Stamp-WebAuthn": stamp }, body);
+  const result = data.activity && data.activity.status === "ACTIVITY_STATUS_COMPLETED" && data.activity.result
+    ? data.activity.result.initFiatOnRampResult : null;
+  const url = result && typeof result.onRampUrl === "string" ? result.onRampUrl : "";
+  if (!/^https:\/\/[^\s"<>]+$/.test(url)) {
+    throw new KontoError("unreachable", `no card payment from Turnkey (${data.activity ? data.activity.status : "no activity"})`);
+  }
+  await postJson(fetchFn, `/h/${encodeURIComponent(page.code)}/deposit`, {}, JSON.stringify({ opened: true }));
+  open(url);
+  return { onRampUrl: url };
 }
 
 /**
@@ -352,7 +441,7 @@ export async function runKonto(deps, page) {
   const nowMs = now();
   const key = await sessionKey(subtle);
   const passkey = await createPasskey({ create, random, rpId, name: `PostYourPrice ${new Date(nowMs).toISOString().slice(0, 10)}` });
-  const { organizationId, owner, wallet } = await signup({ fetch: fetchFn, proxyId: page.proxyId, passkey, sessionPublicKey: key.publicKey, nowMs });
+  const { organizationId, owner, wallet } = await signUpWithPasskey({ fetch: fetchFn, proxyId: page.proxyId, passkey, sessionPublicKey: key.publicKey, nowMs });
   const salt = BigInt(`0x${hex(random(32))}`);
   const signed = await signPermission({
     owner,
@@ -366,4 +455,51 @@ export async function runKonto(deps, page) {
   });
   // The passkey wallet as Turnkey wrote it and its group, so that a raise of the limit can ask the same passkey (konto 04).
   return { body: { ...signed, owner: wallet, organization_id: organizationId }, owner, organizationId };
+}
+
+/** The sessionStorage key under which the page keeps what it sent for one code, until the server took it. */
+export const retryKey = (code) => `konto-retry:${code}`;
+
+async function sendSigned({ fetch: fetchFn, storage }, code, route, text) {
+  let res;
+  try {
+    res = await fetchFn(`/h/${encodeURIComponent(code)}/${route}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: text });
+  } catch {
+    res = null;
+  }
+  if (res && res.ok) {
+    storage.removeItem(retryKey(code));
+    return "done";
+  }
+  const data = res ? await res.json().catch(() => null) : null;
+  if (res && res.status === 503 && data && data.error === "signature_check_unavailable") {
+    storage.setItem(retryKey(code), JSON.stringify({ route, body: text }));
+    return "retry";
+  }
+  storage.removeItem(retryKey(code));
+  return res && res.status === 400 ? "refused" : "unreachable";
+}
+
+/**
+ * Sends the signed body of a passkey step (konto, limit or payout) to POST /h/{code}/{route}. A 503 signature_check_unavailable
+ * keeps route and body in `storage`, so that the page /h/{code}/retry can send the very same body again without a second passkey
+ * (goals/konto/05, point 7). Returns "done", "retry", "refused" (400) or "unreachable".
+ */
+export function submitSigned(deps, code, route, body) {
+  return sendSigned(deps, code, route, JSON.stringify(body));
+}
+
+/**
+ * The tap on /h/{code}/retry: the body kept by submitSigned goes to the same route again, byte for byte. "missing" when this
+ * tab kept nothing for the code (another tab, a cleared storage).
+ */
+export async function retrySigned(deps, code) {
+  let kept = null;
+  try {
+    kept = JSON.parse(deps.storage.getItem(retryKey(code)) || "null");
+  } catch {
+    kept = null;
+  }
+  if (!kept || !["konto", "limit", "payout"].includes(kept.route) || typeof kept.body !== "string") return "missing";
+  return sendSigned(deps, code, kept.route, kept.body);
 }

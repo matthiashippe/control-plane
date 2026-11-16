@@ -69,7 +69,7 @@ describe("the payout to the person's bank account", () => {
     const h = (await (await json(s, "/v1/handoff", { automaton_name: "Atlas", step: "payout" }, a.key)).json()) as { code: string; match: number };
     const verify = await (await tap(s.app, h.code, h.match)).text();
     expect(verify).toContain('data-soll="verify"');
-    expect(verify).toContain('href="https://bridge.example/verify/kyc_1"');
+    expect(verify).toContain('data-href="https://bridge.example/verify/kyc_1"');
     const created = s.bridge.calls.find((c) => c.method === "POST" && c.path === "/v0/kyc_links")!;
     expect(created.body).toMatchObject({ type: "individual" });
     expect(created.headers["Api-Key"]).toBe("fake-bridge");
