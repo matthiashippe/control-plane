@@ -126,6 +126,26 @@ bezahlte Inferenz des Kunden; mit dem Befehl kostet das Warten höchstens eine R
       Prüfung: `git diff origin/dev...HEAD -- . ':(exclude)goals/' | grep -cE '^\+.*(cnwy_k_[0-9a-f]{32}|-{5}BEGIN [A-Z ]*PRIVATE KEY-{5})'` muss 0 ausgeben.
 - [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
+- [ ] Nach jedem Rollout beweist `ops/live.sh` einen vollen Aufruf des Wartebefehls von 25 s durch Caddy und gVisor: Die Prüfung
+      `sandbox` startet im Hintergrund `sleep 50; echo bg-ok` (Antwort nach 20 s, der erste Aufruf wartet die vollen 25 s, der zweite
+      bekommt das Ende), ruft `wait_command` höchstens dreimal auf, verlangt, dass der erste Aufruf „still running“ meldet, und jeder
+      Aufruf bleibt unter 30000 ms; meldet schon der erste Aufruf das Ende, steht dort
+      `FAIL sandbox: background exec wait_command ended on the first call`. Der Selbsttest war vor dem Fix rot.
+      MVP: Funktion, weil mit `sleep 25` der einzige Aufruf in Produktion rund 5 s wartet: Ob ein voller Aufruf mit `bash -lc` in
+      gVisor, `docker exec`, Caddy und Signatur unter den 30 s der Runtime bleibt, misst sonst nur der Harness ohne all das
+      (`max_wait_ms=25046` bei 5 s Rand), und ein Automaton mit `npm install` fände es als Erster heraus.
+      Prüfung: `grep -oE 'sleep [0-9]+; echo bg-ok' ops/live.sh | awk '$2+0 < 50' | wc -l` muss 0 ausgeben.
+      Prüfung: `grep -oE '"command":"sleep [0-9]+; echo bg-ok"' ops/live.sh | grep -c '"command":"sleep 50; echo bg-ok"'` muss mindestens 1 ausgeben.
+      Prüfung: `PATH=/usr/bin:$PATH bash ops/live.sh --selftest | grep -c "FAIL sandbox: background exec wait_command ended on the first call"` muss mindestens 1 ausgeben.
+      Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/live-selftest.test.ts` muss Exit-Code 0 haben.
+- [ ] Der Wartebefehl begrenzt sein Warten nach der Uhr (`$SECONDS` der Bash), nicht nach der Zahl der Runden: Er endet spätestens
+      eine Runde nach `seconds` Sekunden seit seinem Start, auch wenn jedes `sleep 1` in gVisor länger dauert. Der Test war vor dem Fix
+      rot.
+      MVP: Funktion, weil heute 25 Runden aus `sleep 1` und Prüfung je Runde Zeit für den Start eines Prozesses kosten, die in gVisor
+      ein Vielfaches beträgt; das zählt gegen dieselben 5 s Rand bis zum Abbruch der Runtime.
+      Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/sandbox-wait.test.ts` muss Exit-Code 0 haben.
+      Prüfung: `grep -cE "^\s*(it|test)\(" test/sandbox-wait.test.ts` muss mindestens 9 ausgeben (neu: mit einem `sleep` im `PATH`, das je Aufruf 2 s braucht, endet `waitCommand(base, 3)` ohne Exit-Datei in echtem Bash in weniger als 4500 ms; nach der Zahl der Runden wären es 6 s).
+      Prüfung: `awk '/export function waitCommand\(/,/^}/' src/sandbox/service.ts | grep -c 'SECONDS'` muss mindestens 1 ausgeben.
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
