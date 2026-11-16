@@ -76,7 +76,7 @@ gefasster privater Bereich sie still auf 0 setzt.
       Prüfung: `git diff --name-only origin/dev...HEAD | grep -v '^goals/adressen/' | grep -vc '^test/actions-log-addresses\.test\.ts$'` muss 0 ausgeben.
 - [x] `check` ist grün.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
-- [ ] Die Suite zählt auch öffentliche Adressen knapp neben `192.168.0.0/16`, `127.0.0.0/8` und `0.0.0.0/8`: Ein `private()`,
+- [x] Die Suite zählt auch öffentliche Adressen knapp neben `192.168.0.0/16`, `127.0.0.0/8` und `0.0.0.0/8`: Ein `private()`,
       das jede Adresse mit erstem Oktett 192 privat nennt, `192.168/16` um ein zweites Oktett oder `127/8` um ein erstes Oktett nach
       unten oder oben erweitert oder `0/8` nach oben erweitert, macht die Suite rot; die Testdatei trägt keine dieser Adressen als Text.
       MVP: Funktion, weil `private()` sechs Bereiche kennt und dieselbe Zahl still auf 0 fällt, wenn einer der drei übrigen zu weit
@@ -115,5 +115,6 @@ gefasster privater Bereich sie still auf 0 setzt.
 ## Progress Log
 - 2026-11-16 Zyklus 1: Punkte 1, 2, 3, 4, 5 gebaut, neuer Fall in `test/actions-log-addresses.test.ts` mit sechs Läufen, je eine öffentliche Adresse knapp neben 10/8, 172.16/12 oder 169.254/16 (aus `ip(…)` gebaut) und beide Enden des Bereichs, die nicht zählen. Prüfbefehle: Punkt 1 drei Mutanten je `1`, `exit 1`; Punkt 2 drei Mutanten je `1`, `exit 1`; Punkt 3 zwei Mutanten je `1`, `exit 1`; Gegenprobe aller acht auf `origin/dev` je `1`, `exit 0`; Punkt 4 vitest Exit 0, grep `0`, Umfang `0`; Punkt 5 `check` Exit 0 (194 Dateien, 2145 Tests); adressen 01 Punkt 1 `1 1 2 2 total 2 `, adressen 02 Punkt 1 `1 1 2 2 total 3 `.
 - 2026-11-16 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, `dev` ohne neue Commits, nichts zu mergen. Prüfbefehle: Punkt 1 drei Mutanten je `1`, `exit 1`; Punkt 2 drei Mutanten je `1`, `exit 1`; Punkt 3 zwei Mutanten je `1`, `exit 1`; Punkt 4 vitest Exit 0 (20 Tests), grep `0`, Umfang `0`; Punkt 5 `check` Exit 0 (194 Dateien, 2145 Tests).
+- 2026-11-16 Zyklus 3: Punkt 6 gebaut, zweiter neuer Fall in `test/actions-log-addresses.test.ts` mit fünf Läufen, je eine öffentliche Adresse knapp neben 0/8, 127/8 oder 192.168/16 (aus `ip(…)` gebaut) und die Enden des Bereichs, die nicht zählen; `ip` und `line` auf die Ebene des `describe` gehoben. Prüfbefehle: Punkt 6 sechs Mutanten je `1`, `exit 1`, Gegenprobe derselben sechs am alten Kopf `89077be` je `1`, `exit 0`, grep `0`, vitest Exit 0 (21 Tests); Punkte 1 bis 3 alle acht Mutanten weiter je `1`, `exit 1`; Punkt 4 vitest Exit 0, grep `0`, Umfang `0`; Punkt 5 `check` Exit 0 (194 Dateien, 2146 Tests).
 
 ## Blockers
