@@ -210,6 +210,25 @@ startet, und weil konto 05 Einzahlung und Auszahlung als weitere Tools in genau 
       Prüfung: `grep -rn "CP_KONTO_" deploy .github | wc -l` muss `0` ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung (Netz): `n=$(gh pr list -R matthiashippe/control-plane --head goal/konto-04 --state open --json number -q '.[0].number'); gh pr checks "$n" -R matthiashippe/control-plane | awk -F'\t' '$1=="check" && $2=="pass"' | wc -l` muss mindestens `1` ausgeben.
+- [ ] Eine Erhöhung setzt die Periode nicht zurück: Bis die laufende Periode der alten Erlaubnis endet, bucht `topUpIfLow` aus der
+      neuen höchstens das neue Limit (oder die Obergrenze, wenn sie kleiner ist) minus dem, was die alte in dieser Periode schon
+      abgebucht hat; danach gilt die Periode der neuen allein. Der Test war vor dem Fix rot.
+      MVP: Funktion, weil die Seite „PostYourPrice can charge up to $10.00 a day“ verspricht und die neue Erlaubnis mit eigenem
+      `start` eine frische Periode bekommt: Heute bucht der Server nach einer Erhöhung von 5 auf 10 am selben Tag 5 aus der alten und
+      10 aus der neuen ab, also 15, und bei jeder weiteren Erhöhung wieder.
+      Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/konto-limit-period.test.ts` muss Exit-Code 0 haben.
+      Prüfung: `grep -cE "^\s*(it|test)\(" test/konto-limit-period.test.ts` muss mindestens 3 ausgeben (je ein Fall: die alte hat 4 USD der Periode abgebucht, Erhöhung von 5 auf 10, der nächste `topUpIfLow` schickt `spend()` aus der neuen mit höchstens 6 USD, über mehrere Läufe zusammen höchstens 6 USD bis zum Ende der alten Periode; nach dem Ende der alten Periode bis 10 USD; mit Obergrenze 3 nach der Erhöhung höchstens 3 minus 4, also kein `spend()`).
+      Prüfung: `for w in topUpIfLow spentThisPeriod revoke spend; do grep -qF -- "$w" test/konto-limit-period.test.ts || echo "fehlt $w"; done` muss nichts ausgeben.
+- [ ] Scheitert nach der Freischaltung der neuen Erlaubnis der Widerruf der alten (Quittung `reverted`, Fehler oder Abbruch beim Warten
+      auf die Quittung), schickt dieser Lauf kein `spend()`, und der nächste Lauf schickt kein zweites `approveWithSignature`, widerruft
+      die alte erneut und bucht erst danach aus der neuen ab; ein Widerruf, dessen Quittung beim ersten Lauf fehlte, obwohl er on-chain
+      gelang, hält das Konto nicht auf. Der Test war vor dem Fix rot.
+      MVP: Funktion, weil zwischen Freischaltung und Widerruf on-chain zwei unserer Erlaubnisse gelten und ein Lauf, der in diesem
+      Zustand abbucht, das Tageslimit verdoppelt, während ein Konto, das nach einem abgebrochenen Warten nie wieder nachbucht, den
+      Automaton mitten im Lauf ohne Geld lässt.
+      Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/konto-limit-switch.test.ts` muss Exit-Code 0 haben.
+      Prüfung: `grep -cE "^\s*(it|test)\(" test/konto-limit-switch.test.ts` muss mindestens 3 ausgeben (je ein Fall: Widerruf `reverted`, danach null `spend()` in diesem Lauf und im nächsten genau ein `revokeAsSpender`, kein `approveWithSignature`, dann `spend()` aus der neuen; `receipt` des Widerrufs wirft, gleiches Ergebnis; der Widerruf war on-chain schon gelungen und der nächste Lauf bucht trotzdem ab).
+      Prüfung: `for w in topUpIfLow approve revoke spend reverted; do grep -qF -- "$w" test/konto-limit-switch.test.ts || echo "fehlt $w"; done` muss nichts ausgeben.
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
