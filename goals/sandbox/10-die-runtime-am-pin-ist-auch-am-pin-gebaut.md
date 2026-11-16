@@ -1,7 +1,7 @@
 # Sandbox Goal 10: Die Runtime am Pin ist auch am Pin gebaut
 
 ## Status
-PLANNED
+DONE
 
 ## Active Objective
 `ops/runtime-sandbox.sh` meldet `RUNTIME SANDBOX OK` nur noch, wenn `dist/` der Runtime genau der Build ist, den `build_runtime` am
@@ -63,7 +63,7 @@ nächsten zahlenden Automaton auf.
   konto 04 gibt Menschen ohne Wallet die Terminal-Tools für ihren Automaton.
 
 ## Done Condition
-- [ ] `runtime_state` meldet `dist`, wenn `dist/` nicht der gestempelte Build am Pin ist, `judge` endet dann mit
+- [x] `runtime_state` meldet `dist`, wenn `dist/` nicht der gestempelte Build am Pin ist, `judge` endet dann mit
       `RUNTIME SANDBOX FAIL dist/ is not the build at the pin`, und `build_runtime` baut genau dann neu; der Selbsttest zeigt beide
       Richtungen und war vor dem Fix rot.
       MVP: Funktion, weil sonst ein beliebiges `dist/` im Cache als Runtime am Pin durchläuft.
@@ -72,28 +72,36 @@ nächsten zahlenden Automaton auf.
       Prüfung: `PATH=/usr/bin:$PATH bash ops/runtime-sandbox.sh --selftest | grep -cE '^ok   (dist-changed|dist-added|dist-unstamped|dist-other-commit): RUNTIME SANDBOX FAIL dist/ is not the build at the pin'` muss 4 ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH bash ops/runtime-sandbox.sh --selftest | grep -cE '^[0-9]+ cases as expected$'` muss 1 ausgeben.
       Prüfung: `for w in 'dist_sum()' 'write_dist_stamp()' control-plane-dist.sha256 'rev-parse --absolute-git-dir' 'dist/ is not the build at the pin'; do grep -qF -- "$w" ops/runtime-sandbox.sh || echo "fehlt $w"; done` muss nichts ausgeben.
-- [ ] Der Selbsttest fällt, wenn die Prüfsumme nichts prüft oder der Bau den Stempel nicht prüft.
+- [x] Der Selbsttest fällt, wenn die Prüfsumme nichts prüft oder der Bau den Stempel nicht prüft.
       MVP: Funktion, weil ein Selbsttest, der mit einer konstanten Summe grün bliebe, die Aussage „Build am Pin“ nicht belegt
       (`loop-constraints.md`, Grundregel 3).
       Prüfung: `T=$(mktemp -d); git archive HEAD | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; f=$T/ops/runtime-sandbox.sh; if ! grep -q '^dist_sum() {' $f; then echo "fehlt dist_sum"; else sed -i 's/^dist_sum() {/dist_sum() { echo 0; }\ndist_sum_orig() {/' $f; PATH=/usr/bin:$PATH bash $f --selftest 2>/dev/null | tail -n 1 | grep -q 'SELFTEST OK' && echo "gruen mit konstanter Summe"; fi; rm -rf $T` muss nichts ausgeben.
       Prüfung: `T=$(mktemp -d); git archive HEAD | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; f=$T/ops/runtime-sandbox.sh; if ! grep -q '^build_runtime() {' $f; then echo "fehlt build_runtime"; else sed -i 's/^build_runtime() {/build_runtime() { git -C "$RUNTIME_DIR" checkout -q "$PIN"; return 0; }\nbuild_runtime_orig() {/' $f; PATH=/usr/bin:$PATH bash $f --selftest 2>/dev/null | tail -n 1 | grep -q 'SELFTEST OK' && echo "gruen ohne Neubau"; fi; rm -rf $T` muss nichts ausgeben.
-- [ ] Kopf des Skripts, Doku und Annahmen nennen den Stempel, die Entscheidungen stehen mit Grund unter `## Goal 10`, und die Messung
+- [x] Kopf des Skripts, Doku und Annahmen nennen den Stempel, die Entscheidungen stehen mit Grund unter `## Goal 10`, und die Messung
       von vorher steht dabei.
       MVP: Funktion, weil der Betrieb bei `RUNTIME SANDBOX FAIL dist/ …` wissen muss, dass der nächste Lauf den Cache neu baut.
       Prüfung: `sed -n '1,25p' ops/runtime-sandbox.sh | grep -c 'control-plane-dist.sha256'` muss mindestens 1 ausgeben.
       Prüfung: `grep -c 'control-plane-dist.sha256' docs/sandbox/e2e.md` muss mindestens 1 ausgeben.
       Prüfung: `grep -c '18 Fälle' docs/sandbox/e2e.md` muss 0 ausgeben.
       Prüfung: `awk '/^## Goal 10/{f=1} f' goals/sandbox/ANNAHMEN.md | grep -ciE 'dist_sum|control-plane-dist.sha256|Prüfsumme|vorher|rebuild|Neubau'` muss mindestens 4 ausgeben.
-- [ ] Das Goal ändert nur `ops/runtime-sandbox.sh`, `docs/sandbox/e2e.md` und `goals/sandbox/`, rollt nichts aus und bringt keinen
+- [x] Das Goal ändert nur `ops/runtime-sandbox.sh`, `docs/sandbox/e2e.md` und `goals/sandbox/`, rollt nichts aus und bringt keinen
       Schlüssel ins Repo.
       MVP: Funktion, weil das Repo öffentlich ist (Grundregel 8) und `ops/runtime-sandbox.sh` nur auf dem code-host läuft, also kein
       Rollout nötig ist.
       Prüfung: `git diff --name-only origin/dev...HEAD | grep -cvE '^(ops/runtime-sandbox\.sh|docs/sandbox/e2e\.md|goals/sandbox/.*)$'` muss 0 ausgeben.
       Prüfung: `git diff --name-only origin/dev...HEAD | grep -cE "\.(key|pem|crt|env)$"` muss 0 ausgeben.
       Prüfung: `git diff origin/dev...HEAD -- . ':(exclude)goals/' | grep -cE '^\+.*(cnwy_k_[0-9a-f]{32}|-{5}BEGIN [A-Z ]*PRIVATE KEY-{5})'` muss 0 ausgeben.
-- [ ] `check` ist grün.
+- [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] Der Neubau beginnt mit leerem `dist/`: Eine fremde Datei unter `dist/`, die `pnpm build` nicht überschreibt, ist nach
+      `build_runtime` weg und steht nicht im neuen Stempel; der Selbsttest fällt, wenn `build_runtime` `dist/` vor dem Bau nicht löscht.
+      MVP: Funktion, weil `write_dist_stamp` sonst jede liegengebliebene Datei aus einem alten oder veränderten `dist/` als Build am
+      Pin stempelt und der nächste Lauf `RUNTIME SANDBOX OK` meldet (Kritik Tech Lead 16.11.2026: ohne die Zeile mit `rm -rf` bleibt
+      der Selbsttest am Stand be36357 grün).
+      Prüfung: `PATH=/usr/bin:$PATH bash ops/runtime-sandbox.sh --selftest | grep -cE '^ok   rebuild-drops-stale: '` muss 1 ausgeben.
+      Prüfung: `PATH=/usr/bin:$PATH bash ops/runtime-sandbox.sh --selftest | tail -n 1` muss `RUNTIME SANDBOX SELFTEST OK` ausgeben.
+      Prüfung: `T=$(mktemp -d); git archive HEAD | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; f=$T/ops/runtime-sandbox.sh; if ! grep -q 'rm -rf "$RUNTIME_DIR/dist"' $f; then echo "fehlt rm"; else sed -i '/rm -rf "\$RUNTIME_DIR\/dist"/d' $f; PATH=/usr/bin:$PATH bash $f --selftest 2>/dev/null | tail -n 1 | grep -q 'SELFTEST OK' && echo "gruen ohne Loeschen"; fi; rm -rf $T` muss nichts ausgeben.
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Jeder neue Selbsttest-Fall war vor dem Fix rot oder zeigt die Gegenrichtung (`reuse-stamped-dist`); die Zeile im Progress Log
@@ -117,6 +125,11 @@ nächsten zahlenden Automaton auf.
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-16 Zyklus 1: Punkte 1, 2, 3, 4, 5 gebaut, Stempel über dist/ im Git-Verzeichnis, runtime_state meldet dist, build_runtime baut dann neu; vorher rot mit SELFTEST FAIL (5 of 26 cases), rot waren die vier dist-Fälle (OK statt FAIL) und rebuild-changed-dist (builds=0). Prüfbefehle: Punkt 1 SELFTEST OK, 6, 4, 1, nichts fehlt; Punkt 2 beide Mutationen ohne Ausgabe (konstante Summe macht 3 Fälle rot, Bau ohne Stempel 2); Punkt 3 1, 1, 0, 10; Punkt 4 0, 0, 0; Punkt 5 check Exit 0 (grün in 98 s, 2067 Tests).
+- 2026-11-16 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, dev war schon im Branch. Prüfbefehle: Punkt 1 SELFTEST OK, 6, 4, 1, nichts fehlt; Punkt 2 beide Mutationen ohne Ausgabe; Punkt 3 1, 1, 0, 10; Punkt 4 0, 0, 0; Punkt 5 check Exit 0 (grün in 54 s).
+- 2026-11-16 Zyklus 3: Punkt 6 aus der Kritik gebaut, neuer Fall rebuild-drops-stale (fremde Datei unter dist/ ist nach dem Neubau weg), vorher rot ohne das Löschen mit SELFTEST FAIL (1 of 27 cases), stale=kept; Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6. Prüfbefehle: Punkt 1 SELFTEST OK, 6, 4, 1, nichts fehlt; Punkt 2 beide Mutationen ohne Ausgabe; Punkt 3 1, 1, 0, 14; Punkt 4 0, 0, 0; Punkt 5 check Exit 0 (grün in 50 s); Punkt 6 1, SELFTEST OK, Mutation ohne Ausgabe (Gegenprobe ohne Mutation meldet grün).
+- 2026-11-16 Zyklus 4: Gap aus dem Verdict B Zyklus 3 behoben, Punkt 4 wieder im Wortlaut von dev (nur das Kästchen gesetzt), der Vorschlag der Kritik nicht mehr auf dem Goal-Branch, dev bis cb9797f eingemergt; Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6. Prüfbefehle aus der Goal-Datei gelesen, in bash ohne Profil: Punkt 1 SELFTEST OK, 6, 4, 1, nichts fehlt; Punkt 2 beide Mutationen ohne Ausgabe; Punkt 3 1, 1, 0, 14; Punkt 4 0, 0, 0; Punkt 5 check Exit 0 (grün in 65 s); Punkt 6 1, SELFTEST OK, Mutation ohne Ausgabe.
+- 2026-11-16 Release: PASS K und B (Zyklus 4), DONE.
 
 ## Blockers
 - keine
