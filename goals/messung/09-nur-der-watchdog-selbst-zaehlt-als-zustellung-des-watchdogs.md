@@ -89,6 +89,15 @@ Backup auf dem Thema sie heute still auf `ok` setzt; ohne Alarmweg erfährt niem
       Prüfung: `PATH=/usr/bin:$PATH timeout 900 node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD | grep -cE '^(\.github|deploy|src|harness|scripts|docs)/|^goals/kanal/'` muss 0 ausgeben.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD -- ops | grep -vcE '^ops/(status\.sh|README\.md)$'` muss 0 ausgeben.
+- [ ] Kein anderes Skript unter `ops/` sendet einen der fünf Titel des Watchdogs: Ein Titel `control-plane WARN` in
+      `ops/backup.sh` wird in `check` rot, so wie ein Titel des Watchdogs im Deploy-Alarm (Kritik Tech Lead 16.11.: der Titel
+      von `ops/backup.sh` ist heute in keinem Test festgehalten). In `test/status-alarm-received.test.ts` ein Fall
+      `it("no other script under ops/ posts a title of the watchdog")`: Er liest aus jeder Datei `*.sh` im Verzeichnis
+      `SENDERS_UNDER_TEST` (sonst `ops/`) die Header per Regex `"Title: ([^"]*)"`, verlangt mindestens zwei und lässt für keinen
+      Text einen Titel `control-plane <SEVERITY>` zu, mit den Severities aus den Aufrufen `report "<SEVERITY>"` im echten
+      `ops/watchdog.sh` wie im Fall „every severity that ops/watchdog.sh reports counts as its delivery“.
+      Prüfung: `grep -c 'SENDERS_UNDER_TEST' test/status-alarm-received.test.ts` muss mindestens 1 ausgeben.
+      Prüfung: `T=$(mktemp -d); mkdir $T/same $T/mut; cp ops/*.sh $T/same/; cp ops/*.sh $T/mut/; sed -i 's/Title: control-plane backup failed/Title: control-plane WARN/' $T/mut/backup.sh; for s in same mut; do PATH=/usr/bin:$PATH SENDERS_UNDER_TEST=$T/$s timeout 300 pnpm -s vitest run test/status-alarm-received.test.ts -t "no other script under ops/ posts a title of the watchdog" > $T/$s.out 2>&1; echo "$s $?"; done | tr '\n' ' '` muss genau `same 0 mut 1 ` ausgeben.
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
