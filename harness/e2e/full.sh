@@ -228,6 +228,10 @@ if [[ "$automaton_id" =~ ^[a-z0-9]{12}$ ]]; then
   if "${COMPOSE[@]}" restart sandboxd >/dev/null 2>&1 && "${COMPOSE[@]}" up -d --wait --no-deps sandboxd >/dev/null 2>&1; then
     automaton_restarted=true
   fi
+  if [[ "$automaton_restarted" != "true" ]]; then
+    "${COMPOSE[@]}" ps -a sandboxd 2>&1 | tail -3 || true
+    "${COMPOSE[@]}" logs --no-color --tail 40 sandboxd 2>&1 || true
+  fi
   automaton_results+=$'\n'"AUTOMATON_RESULT {\"phase\":\"sandboxd_restart\",\"ok\":$automaton_restarted}"
   automaton_results+=$'\n'"$(automaton_walk restart "$automaton_id" "${automaton_after_crash:-0}")"
   automaton_results+=$'\n'"$(automaton_walk wallet "$automaton_id")"

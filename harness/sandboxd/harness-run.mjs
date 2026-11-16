@@ -171,8 +171,10 @@ export function createHarnessRun({ stateFile = null, spawn = spawnRun, env = pro
         return;
       }
       child.once("error", () => resolve());
+      // Not unref'd: reconcile awaits this before the API listens, and an unref'd child leaves nothing that keeps the event
+      // loop alive, so node would end quietly in the middle of the start after a restart of the container sandboxd. What the
+      // shell starts in the background is in a session of its own (setsid) and outlives it either way.
       child.once("exit", () => resolve());
-      child.unref();
     });
   }
 

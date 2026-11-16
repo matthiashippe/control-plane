@@ -5,6 +5,7 @@
  * start of cp (sandbox-client.key and sandbox-client.pub) and the signed client of src/sandbox/client.ts. Commands run
  * for real, as processes; the home of a sandbox is a directory under the mount dir of the stand-in.
  */
+import { spawn } from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
@@ -346,4 +347,61 @@ describe("harness sandboxd: CONTAINER_CMD's autostart as a real process", () => 
     expect(processesOfHome(home)).toEqual([]);
     expect(s2.docker()).toEqual({ containers: {}, networks: [] });
   });
+});
+
+describe("harness sandboxd: a restart of its container, as its own node process", () => {
+  it("comes up again with a running sandbox with the mark and starts its supervisor, instead of ending quietly", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "harness-sandboxd-"));
+    dirs.push(root);
+    const data = path.join(root, "cp-data");
+    fs.mkdirSync(data);
+    const key = loadOrCreateClientKey(data);
+    const files = {
+      keysDir: data,
+      stateFile: path.join(root, "state.json"),
+      dockerStateFile: path.join(root, "docker.json"),
+      mntDir: path.join(root, "mnt"),
+      disksDir: path.join(root, "disks"),
+    };
+    // The first life of the container: one sandbox with keep_running and the mark automaton-start sets.
+    const s1 = await startHarnessSandboxd({ host: "127.0.0.1", port: 0, ...files, env: { ...process.env, PATH: stubPath(root) }, log: () => {} });
+    const c1 = createSandboxdClient({ baseUrl: s1.url, privateKey: key.privateKey, timeoutMs: 15_000 });
+    const created = await c1.request("POST", "/v1/sandboxes", { owner: "o-test", keep_running: true });
+    const id = String(created.body.id);
+    const home = path.join(files.mntDir, id);
+    homes.push(home);
+    await c1.request("POST", `/v1/sandboxes/${id}/exec`, { command: "mkdir -p /root/.automaton && touch /root/.automaton/autostart" });
+    await s1.close();
+
+    // The second life: start.mjs as the container runs it, with nothing else in its event loop before the API listens.
+    const child = spawn(process.execPath, [path.resolve("harness/sandboxd/start.mjs")], {
+      env: {
+        ...process.env,
+        PATH: stubPath(root),
+        SANDBOXD_HOST: "127.0.0.1",
+        SANDBOXD_API_PORT: "0",
+        SANDBOXD_KEYS_DIR: files.keysDir,
+        SANDBOXD_STATE: files.stateFile,
+        SANDBOXD_DOCKER_STATE: files.dockerStateFile,
+        SANDBOXD_MNT: files.mntDir,
+        SANDBOXD_DISKS: files.disksDir,
+      },
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    let out = "";
+    let exited: number | null = null;
+    child.stdout.on("data", (b) => (out += String(b)));
+    child.stderr.on("data", (b) => (out += String(b)));
+    child.on("exit", (code) => (exited = code ?? -1));
+    stops.push(async () => {
+      if (exited === null) child.kill("SIGKILL");
+    });
+    const up = await until(() => /api on 127\.0\.0\.1:[0-9]+/.test(out) || exited !== null, 20_000);
+    expect(up).toBe(true);
+    expect(exited, out).toBeNull();
+    expect(out).toMatch(/api on 127\.0\.0\.1:[0-9]+/);
+    expect(await until(() => starts(home).length === 1)).toBe(true);
+    child.kill("SIGTERM");
+    expect(await until(() => exited !== null, 10_000)).toBe(true);
+  }, 40_000);
 });
