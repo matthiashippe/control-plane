@@ -1,7 +1,7 @@
 # Messung Goal 09: Nur der Watchdog selbst zählt als Zustellung des Watchdogs
 
 ## Status
-PLANNED
+ACTIVE
 
 ## Active Objective
 `alarm_path.received` in `ops/status.sh` soll belegen, dass die Posts von `ops/watchdog.sh` wirklich auf dem Thema ankommen. Am
@@ -68,23 +68,23 @@ Backup auf dem Thema sie heute still auf `ok` setzt; ohne Alarmweg erfährt niem
   dieser Text offen lässt, schreibt der Maker als Zeile `- messung 09 (Engineer CP, <Datum>): …` in `goals/messung/ANNAHMEN.md`.
 
 ## Done Condition
-- [ ] `received` zählt nur die fünf Titel des Watchdogs: Eine Meldung von `ops/backup.sh` oder des Deploy-Alarms setzt es nie auf
+- [x] `received` zählt nur die fünf Titel des Watchdogs: Eine Meldung von `ops/backup.sh` oder des Deploy-Alarms setzt es nie auf
       `ok`, jede Severity aus `report` in `ops/watchdog.sh` zählt.
       Prüfung: `grep -c 'startswith("control-plane ")' ops/status.sh` muss 0 ausgeben.
       Prüfung: `grep -cE '^WATCHDOG_SEVERITIES = \("ALIVE", "OK", "OUTAGE", "WARN", "WARNING"\)$' ops/status.sh` muss 1 ausgeben.
       Prüfung: `T=$(mktemp -d); git show $(git merge-base origin/dev HEAD):ops/status.sh > $T/status.sh; PATH=/usr/bin:$PATH STATUS_UNDER_TEST=$T/status.sh timeout 300 pnpm -s vitest run test/status-alarm-received.test.ts -t "a message of ops/backup.sh or of the deploy alarm is no delivery of the watchdog" > $T/out 2>&1; echo "exit $? failed $(grep -cE 'Tests +1 failed' $T/out)"` muss genau `exit 1 failed 1` ausgeben.
       Prüfung: `T=$(mktemp -d); sed 's/, "WARNING")/)/' ops/status.sh > $T/status.sh; PATH=/usr/bin:$PATH STATUS_UNDER_TEST=$T/status.sh timeout 300 pnpm -s vitest run test/status-alarm-received.test.ts -t "every severity that ops/watchdog.sh reports counts as its delivery" > $T/out 2>&1; echo "exit $? failed $(grep -cE 'Tests +1 failed' $T/out)"` muss genau `exit 1 failed 1` ausgeben.
-- [ ] Der Sender-Test verlangt genau `Title: deploy-window 502` und keinen Titel des Watchdogs.
+- [x] Der Sender-Test verlangt genau `Title: deploy-window 502` und keinen Titel des Watchdogs.
       Prüfung: `grep -c 'DEPLOY_ALARM_UNDER_TEST' test/deploy-alarm.test.ts` muss mindestens 1 ausgeben.
       Prüfung: `T=$(mktemp -d); cp ops/deploy-alarm.sh $T/same.sh; sed 's/Title: deploy-window 502/Title: control-plane DEPLOY 502/' ops/deploy-alarm.sh > $T/mut.sh; for s in same mut; do PATH=/usr/bin:$PATH DEPLOY_ALARM_UNDER_TEST=$T/$s.sh timeout 300 pnpm -s vitest run test/deploy-alarm.test.ts -t "sends a title and priority high like the watchdog" > $T/$s.out 2>&1; echo "$s $?"; done | tr '\n' ' '` muss genau `same 0 mut 1 ` ausgeben.
-- [ ] Das Fenster von 11 h ist an beiden Rändern geprüft: Mit 2 h wird der Fall bei 10 h 59 min rot, mit 12 h der Fall bei
+- [x] Das Fenster von 11 h ist an beiden Rändern geprüft: Mit 2 h wird der Fall bei 10 h 59 min rot, mit 12 h der Fall bei
       11 h 1 min.
       Prüfung: `grep -c 'delivered_age <= 11 \* 3600' ops/status.sh` muss 1 ausgeben.
       Prüfung: `T=$(mktemp -d); for w in 11 2 12; do sed "s/delivered_age <= 11 \* 3600/delivered_age <= $w * 3600/" ops/status.sh > $T/s$w.sh; for c in "a delivery 10 h 59 min old without a message of the watchdog is red" "a delivery 11 h 1 min old is unknown"; do PATH=/usr/bin:$PATH STATUS_UNDER_TEST=$T/s$w.sh timeout 300 pnpm -s vitest run test/status-alarm-received.test.ts -t "$c" > $T/out 2>&1; printf '%s:%s ' $w $?; done; done` muss genau `11:0 11:0 2:1 2:0 12:0 12:1 ` ausgeben.
-- [ ] Die bestehenden Tests rund um den Alarmweg bleiben grün, und unter `test/` ändern sich nur die beiden genannten Dateien.
+- [x] Die bestehenden Tests rund um den Alarmweg bleiben grün, und unter `test/` ändern sich nur die beiden genannten Dateien.
       Prüfung: `PATH=/usr/bin:$PATH timeout 600 pnpm -s vitest run test/status test/watchdog test/deploy-alarm test/deploy-window test/error-counter test/db-report test/ops-triage-skill` muss Exit-Code 0 haben.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD -- test | grep -vcE '^test/(status-alarm-received|deploy-alarm)\.test\.ts$'` muss 0 ausgeben.
-- [ ] `check` ist grün, gesperrte Pfade bleiben unverändert, und unter `ops/` ändern sich nur `ops/status.sh` und
+- [x] `check` ist grün, gesperrte Pfade bleiben unverändert, und unter `ops/` ändern sich nur `ops/status.sh` und
       `ops/README.md`.
       Prüfung: `PATH=/usr/bin:$PATH timeout 900 node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD | grep -cE '^(\.github|deploy|src|harness|scripts|docs)/|^goals/kanal/'` muss 0 ausgeben.
@@ -116,7 +116,8 @@ Backup auf dem Thema sie heute still auf `ok` setzt; ohne Alarmweg erfährt niem
 - max Versuche pro Gap: 3
 
 ## Progress Log
-- (leer)
+- 2026-11-16 Widerlegung geprüft: dritter Prüfbefehl von Punkt 1 an der Merge-Basis c141093 gibt `exit 1 failed 1`, dort meldet `received` mit nur `control-plane backup failed` und `deploy-window 502` auf dem Thema `{"last_alive":null,"last_message":"2026-11-13T11:00:00Z","status":"ok"}`; das Goal ist nicht widerlegt.
+- 2026-11-16 Zyklus 1: Punkte 1, 2, 3, 4, 5 gebaut (`WATCHDOG_SEVERITIES` und genaue Titel statt `startswith` in `ops/status.sh`, README, vier neue Fälle in `test/status-alarm-received.test.ts`, genauer Titel und `DEPLOY_ALARM_UNDER_TEST` in `test/deploy-alarm.test.ts`); jeder neue Fall einmal rot gesehen (Merge-Basis, ohne `WARNING`, Titel `control-plane DEPLOY 502`, Fenster 2 h und 12 h). Prüfbefehle: P1 `startswith` 0, `WATCHDOG_SEVERITIES` 1, Merge-Basis `exit 1 failed 1`, ohne `WARNING` `exit 1 failed 1`; P2 `DEPLOY_ALARM_UNDER_TEST` 3, `same 0 mut 1 `; P3 Fenster 1, `11:0 11:0 2:1 2:0 12:0 12:1 `; P4 vitest Exit 0 (120 passed), Diff `test` 0; P5 `check` Exit 0 (2125 passed), gesperrte Pfade 0, `ops` 0.
 
 ## Blockers
 - keine
