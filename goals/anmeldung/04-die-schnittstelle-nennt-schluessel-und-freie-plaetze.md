@@ -1,7 +1,7 @@
 # Anmeldung Goal 04: Die Schnittstelle nennt Schlüssel und freie Plätze
 
 ## Status
-PLANNED
+ACTIVE
 
 ## Active Objective
 `/openapi.json` beschreibt `POST /v1/auth/keyless` heute ohne Schema für die Antwort 201 (`src/public/openapi.ts` Zeile 108 am
@@ -78,26 +78,26 @@ lesen kann, statt beim sechsten Crawler-Aufruf überrascht in 429 `crawler_daily
   `check` und vitest im Vordergrund mit eigenem Timeout. Kein `pkill -f`.
 
 ## Done Condition
-- [ ] Die Antwort 201 von `POST /v1/auth/keyless` in `/openapi.json` hat ein Schema mit genau den Feldern einer echten Antwort, und
+- [x] Die Antwort 201 von `POST /v1/auth/keyless` in `/openapi.json` hat ein Schema mit genau den Feldern einer echten Antwort, und
       mit dem Stand von `src/public/openapi.ts` vor dem Goal ist der neue Test rot.
       Prüfung: `pnpm -s vitest run test/openapi-keyless.test.ts` muss Exit-Code 0 haben.
       Prüfung: `grep -cE "the 201 schema of POST /v1/auth/keyless names exactly the fields of a real answer|the description of POST /v1/auth/keyless names the cap for everybody and the crawler cap|the description of POST /v1/auth/keyless follows the caps set by the environment" test/openapi-keyless.test.ts` muss mindestens 3 ausgeben.
       Prüfung: `grep -cE 'content: JSON_CONTENT\(KEYLESS_KEY_SCHEMA\)' src/public/openapi.ts` muss 1 ausgeben.
       Prüfung: `B=$(git merge-base origin/dev HEAD); T=$(mktemp -d); cp src/public/openapi.ts "$T/"; git show "$B:src/public/openapi.ts" > src/public/openapi.ts; pnpm -s vitest run test/openapi-keyless.test.ts >/dev/null 2>&1; echo "rc=$?"; cp "$T/openapi.ts" src/public/openapi.ts; git status --porcelain -- src | wc -l` muss `rc=1` und danach 0 ausgeben.
-- [ ] Der Text der Operation nennt die Grenze für alle und die eigene Grenze erklärter Crawler aus der laufenden Konfiguration statt
+- [x] Der Text der Operation nennt die Grenze für alle und die eigene Grenze erklärter Crawler aus der laufenden Konfiguration statt
       „Capped per day across the instance“.
       Prüfung: `grep -c 'Capped per day across the instance' src/public/openapi.ts` muss 0 ausgeben.
       Prüfung: `grep -cE '^import \{ agentMintsPerDay, crawlerMintsPerDay \} from "\.\./auth/keyless\.js";$' src/public/openapi.ts` muss 1 ausgeben.
       Prüfung: `grep -cE '\$\{(agentMintsPerDay|crawlerMintsPerDay)\(\)\}' src/public/openapi.ts` muss mindestens 2 ausgeben.
       Prüfung: `pnpm -s vitest run test/openapi-keyless.test.ts -t "follows the caps set by the environment"` muss Exit-Code 0 haben.
-- [ ] Alles andere am Dokument und an der Tür bleibt gleich: die Antwort 429, die übrigen Pfade, `src/auth/keyless.ts`, die Route
+- [x] Alles andere am Dokument und an der Tür bleibt gleich: die Antwort 429, die übrigen Pfade, `src/auth/keyless.ts`, die Route
       und die bestehenden Tests.
       Prüfung: `grep -cE '429: \{ description: "The day.s mints are used up", content: JSON_CONTENT\(ERROR_SCHEMA\) \}' src/public/openapi.ts` muss 1 ausgeben.
       Prüfung: `git diff -U0 $(git merge-base origin/dev HEAD) HEAD -- src/public/openapi.ts | grep -E '^-([^-]|$)' | grep -vcE 'One call, no signature|than run a whole automaton|security: \[\], responses: \{ 201: \{ description: "The key" \}'` muss 0 ausgeben.
       Prüfung: `git diff -U0 $(git merge-base origin/dev HEAD) HEAD -- src/public/openapi.ts | grep -cE '^-([^-]|$)'` muss höchstens 3 ausgeben.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD -- src/auth src/app.ts src/errors.ts test/openapi.test.ts test/bazaar.test.ts test/goal-19-ein-dollar.test.ts test/not-for-sale.test.ts test/inference-sunset.test.ts test/goal-18-die-tuer.test.ts test/keyless-crawler.test.ts ops | wc -l` muss 0 ausgeben.
       Prüfung: `pnpm -s vitest run test/openapi.test.ts test/bazaar.test.ts test/goal-19-ein-dollar.test.ts test/not-for-sale.test.ts test/inference-sunset.test.ts test/goal-18-die-tuer.test.ts test/keyless-crawler.test.ts` muss Exit-Code 0 haben.
-- [ ] `check` ist grün, nur die genannten Dateien ändern sich, und `check` lässt die Liste der eigenen Adressen und das
+- [x] `check` ist grün, nur die genannten Dateien ändern sich, und `check` lässt die Liste der eigenen Adressen und das
       Zustandsverzeichnis unberührt.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD | grep -vcE '^(src/public/openapi\.ts|test/openapi-keyless\.test\.ts|goals/anmeldung/.+)$'` muss 0 ausgeben.
@@ -127,6 +127,7 @@ lesen kann, statt beim sechsten Crawler-Aufruf überrascht in 429 `crawler_daily
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-16 Zyklus 1: Punkte 1, 2, 3, 4 gebaut: `KEYLESS_KEY_SCHEMA` mit den sechs Feldern der echten Antwort hängt an der Antwort 201, der Text nennt `agentMintsPerDay()` und `crawlerMintsPerDay()` je Anfrage statt „across the instance“, 429 und alle anderen Pfade unverändert. Rot vor dem Fix: alle 3 neuen Fälle (3 failed mit dem Stand von `src/public/openapi.ts` der Merge-Basis e225bbf). Produktion nicht aufgerufen. Prüfbefehle (Node 22.23.5, PATH=/usr/bin:$PATH, am Commit a352b36): P1 vitest Exit 0 (3 passed), `3`, `1`, `rc=1` und `0`; P2 `0`, `1`, `2`, vitest Exit 0; P3 `1`, `0`, `2`, `0`, vitest Exit 0 (78 passed in 7 Dateien); P4 `node scripts/check.mjs` Exit 0 (1941 passed, grün in 119 s), `0`, `0`, `0`.
 
 ## Blockers
 - keine
