@@ -1,7 +1,7 @@
 # Konto Goal 04: Die Terminal-Tools
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Wer in Claude Code arbeitet und keine Wallet hat, startet einen Automaton mit einem Satz: Das Plugin bringt `mcp/server.mjs` und
@@ -229,7 +229,7 @@ startet, und weil konto 05 Einzahlung und Auszahlung als weitere Tools in genau 
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/konto-limit-switch.test.ts` muss Exit-Code 0 haben.
       Prüfung: `grep -cE "^\s*(it|test)\(" test/konto-limit-switch.test.ts` muss mindestens 3 ausgeben (je ein Fall: Widerruf `reverted`, danach null `spend()` in diesem Lauf und im nächsten genau ein `revokeAsSpender`, kein `approveWithSignature`, dann `spend()` aus der neuen; `receipt` des Widerrufs wirft, gleiches Ergebnis; der Widerruf war on-chain schon gelungen und der nächste Lauf bucht trotzdem ab).
       Prüfung: `for w in topUpIfLow approve revoke spend reverted; do grep -qF -- "$w" test/konto-limit-switch.test.ts || echo "fehlt $w"; done` muss nichts ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Ein Mensch ohne Wallet startet aus Claude Code einen Automaton mit einem Satz, einem QR-Code, einer Zahl und einem Passkey.
@@ -272,5 +272,6 @@ startet, und weil konto 05 Einzahlung und Auszahlung als weitere Tools in genau 
 - 2026-11-16 Zyklus 3: Abschluss gemeldet, Punkte 1 bis 14; `origin/dev` ohne neue Commits seit 74a4553, jeder Prüfbefehl aller Punkte mit `PATH=/usr/bin:$PATH` (Node 22) und `FONTCONFIG_FILE=~/.config/control-plane/soll-fonts.conf` am Kopf 03adca1. Prüfbefehle: P1 `soll limit: 4 images, approve top 390=528 1440=603, limit top 390=486 1440=510, 0 defects`, `breiten ok`, `quellen ok`, `bausteine ok neu=0`; P2 vitest Exit 0, `8`, `bestand gleich`, `soll handoff: 6 Bilder, freigabe oben 390=528 1440=603, 0 Mängel`, `soll konto: 4 Bilder, passkey oben 390=527 1440=510, 0 Mängel`, `soll: 2 Bilder, umzug oben 390=828 1440=656, 0 Mängel`; P3 `abnahme ok 1`; P4 `0 defects`, `exit=1` ohne `sed-miss`, Handoff und Konto wie P2, `0`; P5 vitest Exit 0, `0`, `1`, `1`, keine Ausgabe; P6 vitest Exit 0, `13`, keine Ausgabe, `0`; P7 vitest Exit 0, `13`, keine Ausgabe, `0`, `0`; P8 `plugin ok automaton`, `skill ok`, `1`, `1`; P9 `2`, `40`, `0`, Job `e2e` pass (11m4s) am Kopf 03adca1; P10 `sepolia limit ok`, `spender eigen`, `0`; P11 keine Ausgabe, `16`; P12 `0`, `0`, `pakete ok 0 0`, `0`, `0`, `check: grün in 67 s`, Job `check` pass; P13 vitest Exit 0, `4`, keine Ausgabe; P14 vitest Exit 0, `5`, keine Ausgabe.
 - 2026-11-16 Zyklus 4: Gap aus Verdict K Zyklus 3 (Punkt 6) behoben: neuer Fall in `test/konto-limit.test.ts` schickt an `POST /h/{code}/limit` die passende Erlaubnis (Konto, Spender, Token, Limit) einmal mit der Unterschrift eines fremden Schlüssels und einmal mit einer kaputten, bei vorher auf 2 USD gesenktem Limit, und erwartet 400, `burned`, unveränderte Erlaubnis und `cap_usdc`; in einer Kopie aus `git archive HEAD` ohne Zeile 484 von `src/handoff/routes.ts` (`signatureValid`) ist er rot (`expected 200 to be 400`, `1 failed | 13 passed`), mit ihr grün. `origin/dev` gemergt (6b86aad, Konflikte in `ops/soll-assess.mjs` und `ops/soll-handoff.mjs` mit der Reparatur der SOLL-Schriften zusammengeführt), `ops/soll-limit.mjs` nutzt jetzt wie die drei anderen Renderer `FONTS_CONF`, `test/soll-fonts.test.ts` prüft auch ihn (ohne die Verdrahtung rot); damit laufen alle SOLL-Befehle ohne `FONTCONFIG_FILE`. Prüfbefehle aller Punkte mit `PATH=/usr/bin:$PATH` ohne `FONTCONFIG_FILE`: P1 `soll limit: 4 images, approve top 390=528 1440=603, limit top 390=486 1440=510, 0 defects`, `breiten ok`, `quellen ok`, `bausteine ok neu=0`; P2 vitest Exit 0, `8`, `bestand gleich`, `soll handoff: 6 Bilder, freigabe oben 390=528 1440=603, 0 Mängel`, `soll konto: 4 Bilder, passkey oben 390=527 1440=510, 0 Mängel`, `soll: 2 Bilder, umzug oben 390=828 1440=656, 0 Mängel`; P3 `abnahme ok 1`; P4 `0 defects`, `exit=1` ohne `sed-miss`, Handoff und Konto wie P2, `0`; P5 vitest Exit 0, `0`, `1`, `1`, keine Ausgabe; P6 vitest Exit 0, `14`, keine Ausgabe, `0`; P7 vitest Exit 0, `13`, keine Ausgabe, `0`, `0`; P8 `plugin ok automaton`, `skill ok`, `1`, `1`; P9 `2`, `40`, `0`, Job `e2e` am PR nach dem Push; P10 `sepolia limit ok`, `spender eigen`, `0`; P11 keine Ausgabe, `16`; P12 `0`, `0`, `pakete ok 0 0`, `0`, `0`, `check: grün in 77 s`; P13 vitest Exit 0, `4`, keine Ausgabe; P14 vitest Exit 0, `5`, keine Ausgabe.
 - 2026-11-16 Zyklus 4: Abschluss gemeldet, Punkte 1 bis 14; Prüfbefehle wie in der Zeile davor, `check: grün in 77 s`, Jobs `check` und `e2e` am PR #208 am Kopf dieses Commits.
+- 2026-11-16 Release: PASS K und B (Zyklus 4), DONE.
 
 ## Blockers
