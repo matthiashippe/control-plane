@@ -36,12 +36,12 @@
 #            the container cp answers 200, and with our own account (LIVE_SANDBOX_ADDRESS in src/bounties/ours.ts) a small
 #            sandbox is created (201), `echo ok` runs in it, an uploaded file reads back the same, DELETE answers 200, and
 #            the ledger holds at least one row of kind sandbox for exactly this sandbox (sandbox 03). Before the DELETE a
-#            command runs in the background there (`sleep 25; echo bg-ok`, timeout 120000, sandbox 05): its answer is 200
+#            command runs in the background there (`sleep 50; echo bg-ok`, timeout 120000, sandbox 05): its answer is 200
 #            with running true and exit_code -1 and names wait_command, the same as the last line of stdout (sandbox 09).
-#            That command is then called with exec and no timeout, as the runtime does, at most twice: it must answer 200,
-#            each call under 30000 ms, and end with exit code 0 and bg-ok in stdout, so the wrapper, coreutils timeout and
-#            the wait command under gVisor and through Caddy are proven in production; `FAIL sandbox: background exec
-#            wait_command ...` otherwise.
+#            That command is then called with exec and no timeout, as the runtime does, at most three times: the first
+#            call waits the full 25 s and must say still running, each call answers 200 under 30000 ms, and the last one
+#            ends with exit code 0 and bg-ok in stdout, so the wrapper, coreutils timeout and a full wait under gVisor and
+#            through Caddy are proven in production; `FAIL sandbox: background exec wait_command ...` otherwise.
 #            Also before the DELETE, port 8080 of the sandbox is exposed (POST .../ports/expose, sandbox 07), a python3
 #            http.server there serves a canary line, the canary comes back through the public_url
 #            https://sbx-<id>-8080.<domain> within 60 s (through Cloudflare and Caddy, no key sent), and DELETE
@@ -504,20 +504,21 @@ bg_start() {
 now_ms() { date +%s%3N; } # the selftest replaces it with a planted clock
 
 # The background step of the check `sandbox` (sandbox 05 and 09), $1 = header file, $2 = answer file, $3 = sandbox id.
-# Starts `sleep 25; echo bg-ok` with timeout 120000, takes wait_command from the answer and calls it with exec and no
-# timeout, at most twice. Prints one token: ok, start-<word or status> or wait-<status-N|slow-MS|exit-N|wrong|still|
-# unreadable>.
+# Starts `sleep 50; echo bg-ok` with timeout 120000, takes wait_command from the answer and calls it with exec and no
+# timeout, at most three times. The answer comes after 20 s, so the first call waits the full 25 s and must say still
+# running (sandbox 09, point 8); the second one gets the end. Prints one token: ok, start-<word or status> or
+# wait-<status-N|slow-MS|first|exit-N|wrong|still|unreadable>.
 bg_live() {
   local hdr="$1" ans="$2" id="$3" code start body t0 ms got n i tok=wait-still
   body="$(mktemp -p "$(live_tmp)")"
-  code="$(sandbox_api "$hdr" POST "/v1/sandboxes/$id/exec" "$ans" '{"command":"sleep 25; echo bg-ok","timeout":120000}' "Idempotency-Key: live-check-bg-$(rand_hex)")"
+  code="$(sandbox_api "$hdr" POST "/v1/sandboxes/$id/exec" "$ans" '{"command":"sleep 50; echo bg-ok","timeout":120000}' "Idempotency-Key: live-check-bg-$(rand_hex)")"
   start="$(bg_start "$code" "$ans" "$body")"
   if [[ "$start" != "wait "* ]]; then
     rm -f "$body"
     echo "start-${start:-none}"
     return
   fi
-  for i in 1 2; do
+  for i in 1 2 3; do
     t0="$(now_ms)"
     code="$(sandbox_api "$hdr" POST "/v1/sandboxes/$id/exec" "$ans" "$(cat "$body")" "Idempotency-Key: live-check-wait-$i-$(rand_hex)")"
     ms=$(($(now_ms) - t0))
@@ -530,6 +531,10 @@ bg_live() {
       break
     fi
     got="$(cd "$ROOT" && NODE_NO_WARNINGS=1 node -e "$WAIT_ANSWER_JS" "$ans" 2>/dev/null)"
+    if [ "$i" = 1 ] && [[ "$got" == ended\ * ]]; then
+      tok=wait-first
+      break
+    fi
     case "$got" in
       "ended 0 1") tok=ok ;;
       "ended 0 0") tok=wait-wrong ;;
@@ -551,17 +556,18 @@ bg_live() {
 bg_reason() {
   case "${1:-}" in
     "" | skipped) echo "did not run" ;;
-    start-notrunning) echo "of sleep 25 answered 200 without running true and exit_code -1" ;;
+    start-notrunning) echo "of sleep 50 answered 200 without running true and exit_code -1" ;;
     start-nofiles) echo "answered 200 without exit_code_file and output_file under /root/.exec" ;;
     start-nojson) echo "answered 200 without a JSON object" ;;
     start-nowait) echo "missing in the answer, or it does not name the exit_code_file" ;;
     start-waitnotlast) echo "is not the last line of stdout" ;;
-    start-*) echo "of sleep 25 answered ${1#start-}, expected 200" ;;
+    start-*) echo "of sleep 50 answered ${1#start-}, expected 200" ;;
     wait-status-*) echo "answered ${1#wait-status-}, expected 200" ;;
     wait-slow-*) echo "took ${1#wait-slow-} ms, not under 30000" ;;
     wait-exit-*) echo "reported exit code ${1#wait-exit-}, expected 0" ;;
     wait-wrong) echo "reported the end without bg-ok in stdout" ;;
-    wait-still) echo "still said running after two calls" ;;
+    wait-first) echo "ended on the first call" ;;
+    wait-still) echo "still said running after three calls" ;;
     wait-unreadable) echo "answered 200 with neither the end nor still running" ;;
     *) echo "failed: $1" ;;
   esac
@@ -1061,7 +1067,7 @@ selftest() {
   # missing, the wrong exec text, a 401 over ctl.sbx, the client key not set, the 501 of an unreachable sandbox server),
   # a file that reads back different, a ledger query without an answer, and no result at all. The background exec
   # (sandbox 05 and 09) fails on its own too: held instead of running, a 504, no wait_command or not on the last line,
-  # still running after two calls, a call of 30000 ms, a 504 of the call, stopped at its timeout (124), no bg-ok in the
+  # the end on the first call, still running after three calls, a call of 30000 ms, a 504 of the call, stopped at its timeout (124), no bg-ok in the
   # output, and a result line without the step at all. The exposed port (sandbox 07) fails on its
   # own too: the 409 of the control plane before the rollout, no answer, no public_url, a public_url under the payment
   # domain, the server not started, no canary within 60 s, the port not given back, and a result line without the step.
@@ -1072,7 +1078,7 @@ selftest() {
     "client_key=ok ctl=200 create=501 exec=skipped files=skipped delete=skipped ledger=none|FAIL" \
     "${s_good/files=ok/files=wrong}|FAIL" "${s_good/ledger=1/ledger=none}|FAIL" "|FAIL" \
     "${s_good/bg=ok/bg=start-notrunning}|FAIL" "${s_good/bg=ok/bg=start-504}|FAIL" "${s_good/bg=ok/bg=start-nowait}|FAIL" \
-    "${s_good/bg=ok/bg=start-waitnotlast}|FAIL" "${s_good/bg=ok/bg=wait-still}|FAIL" "${s_good/bg=ok/bg=wait-slow-30000}|FAIL" \
+    "${s_good/bg=ok/bg=start-waitnotlast}|FAIL" "${s_good/bg=ok/bg=wait-still}|FAIL" "${s_good/bg=ok/bg=wait-first}|FAIL" "${s_good/bg=ok/bg=wait-slow-30000}|FAIL" \
     "${s_good/bg=ok/bg=wait-status-504}|FAIL" "${s_good/bg=ok/bg=wait-exit-124}|FAIL" "${s_good/bg=ok/bg=wait-wrong}|FAIL" \
     "${s_good/ bg=ok/}|FAIL" \
     "client_key=ok ctl=200 create=201 exec=ok files=ok delete=200 ledger=1|FAIL" \
@@ -1140,8 +1146,8 @@ selftest() {
   done
 
   # The background step of the check `sandbox` (sandbox 09) through the real bg_live, with stand-ins for the public API
-  # and the clock. Both directions: the end on the first call and after one "still running" is ok; still running twice,
-  # a 504 of the call, a call of 30000 ms, exit code 124, no bg-ok, an answer without wait_command, one where it is not
+  # and the clock. Both directions: the end after one or two "still running" is ok; the end on the first call (no full
+  # wait), still running three times, a 504 of the call, a call of 30000 ms on the first or second call, exit code 124, no bg-ok, an answer without wait_command, one where it is not
   # the last line of stdout, one naming another exit file and a held answer each give their own token. Every call of the
   # wait command sends exactly {"command": wait_command}, no timeout.
   local b_wc='i=0; while [ ! -f /root/.exec/0a1b2c3d4e5f.exit ] && [ $i -lt 25 ]; do sleep 1; i=$((i+1)); done; if [ -f /root/.exec/0a1b2c3d4e5f.exit ]; then cat /root/.exec/0a1b2c3d4e5f.out; fi'
@@ -1187,10 +1193,12 @@ selftest() {
       bg_live "$dir/bg-hdr" "$dir/bg-ans" k3v9q2m7x1
     )
   }
-  for b_case in "ok|ok|200:5000:ended0|ok|1" "still|ok|200:25000:still,200:5000:ended0|ok|2" \
-    "twice|ok|200:25000:still,200:25000:still|wait-still|2" "504|ok|504:100:none|wait-status-504|1" \
-    "slow|ok|200:30000:ended0|wait-slow-30000|1" "exit124|ok|200:5000:ended124|wait-exit-124|1" \
-    "nobgok|ok|200:5000:nobgok|wait-wrong|1" "nowait|nowait||start-nowait|0" "notlast|notlast||start-waitnotlast|0" \
+  for b_case in "ok|ok|200:25000:still,200:5000:ended0|ok|2" \
+    "still|ok|200:25000:still,200:25000:still,200:5000:ended0|ok|3" "first|ok|200:5000:ended0|wait-first|1" \
+    "thrice|ok|200:25000:still,200:25000:still,200:25000:still|wait-still|3" "504|ok|504:100:none|wait-status-504|1" \
+    "slow|ok|200:30000:still|wait-slow-30000|1" "slow2|ok|200:25000:still,200:30000:ended0|wait-slow-30000|2" \
+    "exit124|ok|200:25000:still,200:5000:ended124|wait-exit-124|2" \
+    "nobgok|ok|200:25000:still,200:5000:nobgok|wait-wrong|2" "nowait|nowait||start-nowait|0" "notlast|notlast||start-waitnotlast|0" \
     "otherexit|otherexit||start-nowait|0" "held|held||start-notrunning|0"; do
     IFS='|' read -r b_name b_start b_waits b_expect b_calls <<<"$b_case"
     : >"$dir/bg-$b_name.log"

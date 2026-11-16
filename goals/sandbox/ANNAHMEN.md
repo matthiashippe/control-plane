@@ -484,8 +484,12 @@
   die Exit-Datei nennt; der Text von dev besteht aus einer Zeile und nennt darum keinen Befehl. `failures_after` ist der Zähler der
   Runtime nach dem letzten Aufruf des Wartebefehls, ohne Warten wie bisher nach dem `exec`. Die Dateien liest der Harness nicht
   mehr, `pathsIn` und `SETTLE_MS` sind weg.
-- **live.sh.** Nach jedem Rollout ruft die Prüfung `sandbox` den `wait_command` der Antwort auf `sleep 25; echo bg-ok` höchstens
-  zweimal mit `exec` ohne `timeout` auf (der erste wartet rund 5 s), mit genau dem Body `{"command": <wait_command>}`. Sie nimmt den
+- **live.sh.** Nach jedem Rollout ruft die Prüfung `sandbox` den `wait_command` der Antwort auf `sleep 50; echo bg-ok` höchstens
+  dreimal mit `exec` ohne `timeout` auf, mit genau dem Body `{"command": <wait_command>}`. Bis Zyklus 2 lief dort `sleep 25`, und der
+  einzige Aufruf wartete rund 5 s; seit der Kritik vom 16.11.2026 (Punkt 8) kommt die Antwort nach 20 s, der erste Aufruf wartet die
+  vollen 25 s und muss „still running“ melden, der zweite bekommt das Ende, der dritte ist Reserve. Endet schon der erste, steht
+  `FAIL sandbox: background exec wait_command ended on the first call` da, weil ein voller Aufruf mit `bash -lc` in gVisor,
+  `docker exec`, Caddy und Signatur sonst nur im Harness gemessen ist. Sie nimmt den
   Befehl nur, wenn er eine Zeile ist, `[ -f <exit_code_file> ]` nennt und die letzte Zeile von stdout ist. Jeder Aufruf muss 200
   geben, unter 30000 ms bleiben und mit Exit-Code 0 und `bg-ok` enden; sonst steht eine Zeile `FAIL sandbox: background exec
   wait_command …` mit Grund da. Der Selbsttest fährt den echten Schritt `bg_live` mit Stellvertretern für API und Uhr in beide

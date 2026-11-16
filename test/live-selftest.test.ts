@@ -44,20 +44,23 @@ describe("ops/live.sh", () => {
     expect(run.stdout).toContain("openai/gpt-5.2 1/2 (50.0 %)");
     expect(run.stdout).toContain("planted timeout-quote answer '': FAIL");
     expect(run.stdout).toMatch(/planted sandbox '[^']*bg=ok[^']*': OK sandbox: .*background exec ok/);
-    for (const bg of ["start-notrunning", "start-504", "start-nowait", "start-waitnotlast", "wait-still", "wait-slow-30000", "wait-status-504", "wait-exit-124", "wait-wrong"]) {
+    for (const bg of ["start-notrunning", "start-504", "start-nowait", "start-waitnotlast", "wait-still", "wait-first", "wait-slow-30000", "wait-status-504", "wait-exit-124", "wait-wrong"]) {
       expect(run.stdout).toMatch(new RegExp(`planted sandbox '[^']*bg=${bg}[^']*': FAIL sandbox: background exec `));
     }
-    // The background step through the real bg_live (goals/sandbox/09, point 4): wait_command from the answer, called
-    // with exec and no timeout, at most twice, each call under 30000 ms, in both directions.
-    expect(run.stdout).toContain("planted background step ok: bg=ok waits=1");
-    expect(run.stdout).toContain("planted background step still: bg=ok waits=2");
+    // The background step through the real bg_live (goals/sandbox/09, points 4 and 8): wait_command from the answer to
+    // sleep 50, called with exec and no timeout, at most three times, each call under 30000 ms, the first one a full
+    // wait that says still running, in both directions.
+    expect(run.stdout).toContain("planted background step ok: bg=ok waits=2");
+    expect(run.stdout).toContain("planted background step still: bg=ok waits=3");
     expect(run.stdout).toMatch(/^planted background still: OK sandbox: .*background exec ok/m);
     for (const [name, tok, waits, reason] of [
-      ["twice", "wait-still", 2, "still said running after two calls"],
+      ["first", "wait-first", 1, "ended on the first call"],
+      ["thrice", "wait-still", 3, "still said running after three calls"],
       ["504", "wait-status-504", 1, "answered 504, expected 200"],
       ["slow", "wait-slow-30000", 1, "took 30000 ms, not under 30000"],
-      ["exit124", "wait-exit-124", 1, "reported exit code 124, expected 0"],
-      ["nobgok", "wait-wrong", 1, "reported the end without bg-ok in stdout"],
+      ["slow2", "wait-slow-30000", 2, "took 30000 ms, not under 30000"],
+      ["exit124", "wait-exit-124", 2, "reported exit code 124, expected 0"],
+      ["nobgok", "wait-wrong", 2, "reported the end without bg-ok in stdout"],
       ["nowait", "start-nowait", 0, "missing in the answer"],
       ["notlast", "start-waitnotlast", 0, "is not the last line of stdout"],
       ["otherexit", "start-nowait", 0, "missing in the answer"],
@@ -250,14 +253,14 @@ describe("ops/live.sh check sandbox, background exec", () => {
     return { ...w, started };
   }
 
-  it("finds wait_command, the last line of stdout, in the answer to sleep 25 with timeout 120000", async () => {
+  it("finds wait_command, the last line of stdout, in the answer to sleep 50 with timeout 120000", async () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     const w = await world();
     const a = w.account();
     const id = (await a.call("POST", "/v1/sandboxes", {})).json.id as string;
     let res: { status: number; json: any } | null = null;
     void a
-      .call("POST", `/v1/sandboxes/${id}/exec`, { command: "sleep 25; echo bg-ok", timeout: 120000 }, { "Idempotency-Key": "live-check-bg-1" })
+      .call("POST", `/v1/sandboxes/${id}/exec`, { command: "sleep 50; echo bg-ok", timeout: 120000 }, { "Idempotency-Key": "live-check-bg-1" })
       .then((r) => (res = r));
     for (let i = 0; i < 5000 && w.started.length === 0; i++) await new Promise((r) => setImmediate(r));
     await vi.advanceTimersByTimeAsync(EXEC_EARLY_MS);
