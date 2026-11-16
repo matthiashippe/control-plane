@@ -28,7 +28,18 @@ export function permissionFromJson(s: string): SpendPermission {
  */
 export function finishKonto(
   db: Db,
-  input: { code: string; account: string; chainId: number; permission: SpendPermission; signature: Hex; name: string; nowMs: number },
+  input: {
+    code: string;
+    account: string;
+    chainId: number;
+    permission: SpendPermission;
+    signature: Hex;
+    name: string;
+    nowMs: number;
+    /** The passkey wallet and its group at the passkey service, which a later raise of the limit signs with (konto 04). */
+    owner?: string | null;
+    organizationId?: string | null;
+  },
 ): boolean {
   return db.transaction((): boolean => {
     const row = db.prepare("SELECT state FROM handoffs WHERE code = ?").get(input.code) as { state: string } | undefined;
@@ -41,9 +52,18 @@ export function finishKonto(
     const { key } = createApiKey(db, session, input.name, input.nowMs);
     db.prepare("DELETE FROM sessions WHERE token = ?").run(session);
     db.prepare(
-      `INSERT INTO konto_accounts (address, chain_id, permission, signature, created_at) VALUES (?, ?, ?, ?, ?)
-       ON CONFLICT(address) DO UPDATE SET chain_id = excluded.chain_id, permission = excluded.permission, signature = excluded.signature, approved_tx = NULL`,
-    ).run(account, input.chainId, permissionJson(input.permission), input.signature, new Date(input.nowMs).toISOString());
+      `INSERT INTO konto_accounts (address, chain_id, permission, signature, created_at, owner, organization_id) VALUES (?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(address) DO UPDATE SET chain_id = excluded.chain_id, permission = excluded.permission, signature = excluded.signature, approved_tx = NULL,
+         owner = excluded.owner, organization_id = excluded.organization_id`,
+    ).run(
+      account,
+      input.chainId,
+      permissionJson(input.permission),
+      input.signature,
+      new Date(input.nowMs).toISOString(),
+      input.owner ?? null,
+      input.organizationId ?? null,
+    );
     const changed = db
       .prepare("UPDATE handoffs SET state = 'done', account = ?, api_key = ?, updated_at = ? WHERE code = ? AND state = 'matched'")
       .run(account, key, input.nowMs, input.code).changes;

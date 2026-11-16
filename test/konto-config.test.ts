@@ -41,8 +41,10 @@ describe("CP_KONTO_CHAIN_ID", () => {
     expect(konto?.chainId).toBe(84532);
     expect(konto?.spender).toBe(address);
     const { app } = handoffApp({ konto });
-    const h = await create(app, { ...ATLAS, step: "konto" });
+    // The first payment is the lower of CP_KONTO_TOPUP_USDC (2.00) and the daily limit (5.00), goals/konto/04.
+    const h = await create(app, { ...ATLAS, amount_usdc: "2000000", step: "konto" });
     expect(h.code).toMatch(/^[0-9A-Z]{12}$/);
+    expect(konto?.topupUsdc).toBe(2_000_000n);
   });
 
   it("stops the start with 8453, with 1 and with anything else", () => {

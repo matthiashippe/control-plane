@@ -1,5 +1,5 @@
 // The script of /h/{code} in the state `passkey` (goals/konto/03): one tap on the button runs flow.mjs, sends the result to
-// POST /h/{code}/konto and, once the server said done, shows the page of the code again (the state `erledigt` of konto 02). On
+// POST /h/{code}/konto and, once the server said done, shows the page of the code again (the state `approved` of konto 02). On
 // any failure the page sends the reason to POST /h/{code}/fehlgeschlagen as a form, which closes the code and shows why.
 import { KontoError, runKonto } from "./flow.mjs";
 

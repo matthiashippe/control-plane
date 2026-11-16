@@ -457,9 +457,10 @@ function migrate(db: Db): void {
       state            TEXT NOT NULL CHECK (state IN ('pending', 'matched', 'done', 'burned', 'expired')),
       created_at       INTEGER NOT NULL,
       updated_at       INTEGER NOT NULL,
-      step             TEXT NOT NULL DEFAULT 'confirm' CHECK (step IN ('confirm', 'konto')),
+      step             TEXT NOT NULL DEFAULT 'confirm' CHECK (step IN ('confirm', 'konto', 'limit')),
       account          TEXT,
-      api_key          TEXT
+      api_key          TEXT,
+      previous_limit_usdc TEXT
     );
   `);
 
@@ -539,6 +540,46 @@ function migrate(db: Db): void {
   const kontoColumns = db.prepare("PRAGMA table_info(konto_accounts)").all() as { name: string }[];
   if (!kontoColumns.some((c) => c.name === "pending_tx")) db.exec("ALTER TABLE konto_accounts ADD COLUMN pending_tx TEXT");
   if (!kontoColumns.some((c) => c.name === "pending_usdc")) db.exec("ALTER TABLE konto_accounts ADD COLUMN pending_usdc TEXT");
+
+  // konto 04 (docs/konto/terminal.md, "Tageslimit"): a handoff with `step` 'limit' raises the daily limit of the account of an API
+  // key. The CHECK of konto 03 does not know 'limit', so a table without it is rebuilt once (its rows live ten minutes and are
+  // copied over); `previous_limit_usdc` is the limit the account had when the handoff started, which the page shows next to the
+  // new one. On the account: `cap_usdc` is a lower daily limit set with the API key (NULL: the limit of the permission), and
+  // `next_permission`/`next_signature` the permission a raise brought, which replaces the current one before the next spend().
+  // `owner` and `organization_id` are the passkey wallet and its group at the passkey service as the page reported them at sign
+  // up, so the page of a raise can ask that same passkey to sign; neither is a secret.
+  const handoffSql04 = (db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'handoffs'").get() as { sql: string }).sql;
+  if (!handoffSql04.includes("'limit'")) {
+    db.transaction(() => {
+      db.exec(`
+        ALTER TABLE handoffs RENAME TO handoffs_konto03;
+        CREATE TABLE handoffs (
+          code                TEXT PRIMARY KEY,
+          poll_hash           TEXT NOT NULL UNIQUE,
+          automaton_name      TEXT NOT NULL,
+          daily_limit_usdc    TEXT NOT NULL,
+          amount_usdc         TEXT NOT NULL,
+          match               INTEGER NOT NULL CHECK (match BETWEEN 10 AND 99),
+          choices             TEXT NOT NULL,
+          state               TEXT NOT NULL CHECK (state IN ('pending', 'matched', 'done', 'burned', 'expired')),
+          created_at          INTEGER NOT NULL,
+          updated_at          INTEGER NOT NULL,
+          step                TEXT NOT NULL DEFAULT 'confirm' CHECK (step IN ('confirm', 'konto', 'limit')),
+          account             TEXT,
+          api_key             TEXT,
+          previous_limit_usdc TEXT
+        );
+        INSERT INTO handoffs (code, poll_hash, automaton_name, daily_limit_usdc, amount_usdc, match, choices, state, created_at, updated_at, step, account, api_key)
+          SELECT code, poll_hash, automaton_name, daily_limit_usdc, amount_usdc, match, choices, state, created_at, updated_at, step, account, api_key FROM handoffs_konto03;
+        DROP TABLE handoffs_konto03;
+      `);
+    })();
+  }
+  for (const column of ["cap_usdc", "next_permission", "next_signature", "owner", "organization_id"]) {
+    if (!(db.prepare("PRAGMA table_info(konto_accounts)").all() as { name: string }[]).some((c) => c.name === column)) {
+      db.exec(`ALTER TABLE konto_accounts ADD COLUMN ${column} TEXT`);
+    }
+  }
 
   // The conversation that asks back (HAN-77). `fields` is what was understood so far, `turns` the
   // transcript; both are a person's words and are deleted after a day (`cleanupConversations` in

@@ -50,7 +50,7 @@ describe("GET /h/{code}", () => {
     for (const n of at) expect(n).toBeGreaterThanOrEqual(50);
   });
 
-  it("answers an unknown code with 404 and the page ungueltig", async () => {
+  it("answers an unknown code with 404 and the page invalid", async () => {
     const { app } = handoffApp();
     for (const code of ["ZZZZZZZZZZZZ", "not-a-code", "0000000000000000000"]) {
       const res = await app.request(`/h/${code}`);
@@ -92,7 +92,7 @@ describe("GET /h/{code}", () => {
 });
 
 describe("POST /h/{code}", () => {
-  it("turns the handoff done with the right number and shows the page erledigt", async () => {
+  it("turns the handoff done with the right number and shows the page approved", async () => {
     const { app, db } = handoffApp();
     const h = await create(app);
     const res = await tap(app, h.code, h.match);
@@ -101,7 +101,7 @@ describe("POST /h/{code}", () => {
     expect(state(db, h.code)).toBe("done");
   });
 
-  it("burns the code on a wrong number, shows ungueltig, and the right number afterwards approves nothing", async () => {
+  it("burns the code on a wrong number, shows invalid, and the right number afterwards approves nothing", async () => {
     const { app, db } = handoffApp();
     const h = await create(app);
     const nums = buttons(await (await app.request(`/h/${h.code}`)).text());
@@ -132,7 +132,7 @@ describe("POST /h/{code}", () => {
     expect(state(db, own.code)).toBe("pending");
   });
 
-  it("answers a second tap after done with ungueltig and leaves the handoff done", async () => {
+  it("answers a second tap after done with invalid and leaves the handoff done", async () => {
     const { app, db } = handoffApp();
     const h = await create(app);
     expect((await tap(app, h.code, h.match)).status).toBe(200);
@@ -144,7 +144,7 @@ describe("POST /h/{code}", () => {
     expect(state(db, h.code)).toBe("done");
   });
 
-  it("answers page and tap after 601 seconds with ungueltig and the state expired, and not one second earlier", async () => {
+  it("answers page and tap after 601 seconds with invalid and the state expired, and not one second earlier", async () => {
     const { app, db, clock } = handoffApp();
     const early = await create(app);
     clock.now += 599_000;

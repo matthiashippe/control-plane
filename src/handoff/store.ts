@@ -11,8 +11,11 @@ import { HANDOFF_TTL_MS, isExpired, pickMatches } from "./rules.js";
 
 export type HandoffState = "pending" | "matched" | "done" | "burned" | "expired";
 
-/** What the right number leads to: `confirm` ends the handoff (konto 02), `konto` goes on to the passkey step (konto 03). */
-export type HandoffStep = "confirm" | "konto";
+/**
+ * What the right number leads to: `confirm` ends the handoff (konto 02), `konto` goes on to the passkey step that creates the
+ * account (konto 03), `limit` to the passkey step that raises the daily limit of an existing account (konto 04).
+ */
+export type HandoffStep = "confirm" | "konto" | "limit";
 
 export interface Handoff {
   code: string;
@@ -25,8 +28,10 @@ export interface Handoff {
   state: HandoffState;
   createdAtMs: number;
   step: HandoffStep;
-  /** The smart wallet of a finished konto step, lowercase; null otherwise. */
+  /** The smart wallet of a finished konto step, or the account a limit step raises, lowercase; null otherwise. */
   account: string | null;
+  /** The daily limit the account had when a limit step started; null for the other steps. */
+  previousLimitUsdc: bigint | null;
 }
 
 export interface HandoffInput {
@@ -35,6 +40,9 @@ export interface HandoffInput {
   amountUsdc: bigint;
   /** Left out, `confirm`: the handoff behaves exactly as in konto 02. */
   step?: HandoffStep;
+  /** Step limit: the account of the API key that asked, and the daily limit it has today. */
+  account?: string;
+  previousLimitUsdc?: bigint;
 }
 
 /** Where the chance comes from. Production uses node:crypto; a test or the SOLL comparison can pass a fixed one. */
@@ -90,9 +98,22 @@ export function createHandoff(
     const pollToken = random.bytes(32).toString("base64url");
     try {
       db.prepare(
-        `INSERT INTO handoffs (code, poll_hash, automaton_name, daily_limit_usdc, amount_usdc, match, choices, state, created_at, updated_at, step)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)`,
-      ).run(code, hashApiKey(pollToken), input.automatonName, String(input.dailyLimitUsdc), String(input.amountUsdc), match, choices.join(","), nowMs, nowMs, step);
+        `INSERT INTO handoffs (code, poll_hash, automaton_name, daily_limit_usdc, amount_usdc, match, choices, state, created_at, updated_at, step, account, previous_limit_usdc)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?)`,
+      ).run(
+        code,
+        hashApiKey(pollToken),
+        input.automatonName,
+        String(input.dailyLimitUsdc),
+        String(input.amountUsdc),
+        match,
+        choices.join(","),
+        nowMs,
+        nowMs,
+        step,
+        input.account?.toLowerCase() ?? null,
+        input.previousLimitUsdc === undefined ? null : String(input.previousLimitUsdc),
+      );
       const handoff: Handoff = {
         code,
         automatonName: input.automatonName,
@@ -103,7 +124,8 @@ export function createHandoff(
         state: "pending",
         createdAtMs: nowMs,
         step,
-        account: null,
+        account: input.account?.toLowerCase() ?? null,
+        previousLimitUsdc: input.previousLimitUsdc ?? null,
       };
       return { handoff, pollToken, expiresAtMs: nowMs + HANDOFF_TTL_MS };
     } catch (err) {
@@ -124,6 +146,7 @@ interface Row {
   created_at: number;
   step: HandoffStep;
   account: string | null;
+  previous_limit_usdc: string | null;
 }
 
 const toHandoff = (r: Row): Handoff => ({
@@ -137,6 +160,7 @@ const toHandoff = (r: Row): Handoff => ({
   createdAtMs: r.created_at,
   step: r.step,
   account: r.account,
+  previousLimitUsdc: r.previous_limit_usdc === null ? null : BigInt(r.previous_limit_usdc),
 });
 
 /**
@@ -174,8 +198,8 @@ export function chooseHandoff(db: Db, code: string, picked: unknown, nowMs: numb
     if (!found) return { kind: "unknown" };
     const { handoff } = found;
     if (handoff.state !== "pending") return { kind: "unusable", handoff };
-    // The right number ends a confirm step and opens the passkey step of a konto handoff (konto 03).
-    const right: HandoffState = handoff.step === "konto" ? "matched" : "done";
+    // The right number ends a confirm step and opens the passkey step of a konto handoff (konto 03) or a limit handoff (konto 04).
+    const right: HandoffState = handoff.step === "confirm" ? "done" : "matched";
     const next: HandoffState = pickMatches(picked, handoff.match) ? right : "burned";
     const changed = db
       .prepare("UPDATE handoffs SET state = ?, updated_at = ? WHERE code = ? AND state = 'pending'")
