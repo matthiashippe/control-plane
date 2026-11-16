@@ -3,14 +3,13 @@
 // full page, width as in the name.
 //
 //   node ops/soll-konto.mjs                       render and write all four pictures, then report defects
-//   node ops/soll-konto.mjs --pruefen             (German for "check") render into a mktemp folder, compare with the committed
+//   node ops/soll-konto.mjs --check               render into a mktemp folder, compare with the committed
 //                                                 pictures, exit 1 on any defect
-//   node ops/soll-konto.mjs --pruefen --source <dir> [--pictures <dir>]
+//   node ops/soll-konto.mjs --check --source <dir> [--pictures <dir>]
 //                                                 the same with the two sources konto-<state>.html from another folder: the real
 //                                                 page written by ops/soll-live-konto.mjs, or a counter-test with planted defects
 //
-// No network, no port, no package: the browser part is the one of ops/soll-handoff.mjs (which stays as it is, because the audit
-// runs the frozen checks of konto 02 against it), plus a look at the attributes for addresses of other services that the page
+// No network, no port, no package: the browser part is the one of ops/soll-handoff.mjs, plus a look at the attributes for addresses of other services that the page
 // names without requesting them. The judgement is assessKonto() in ops/soll-assess.mjs, a pure function that
 // test/soll-konto.test.ts checks without a browser.
 import { spawn } from "node:child_process";
@@ -24,7 +23,13 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const args = process.argv.slice(2);
 const flag = (name) => args.includes(name);
 const value = (name, fallback) => { const i = args.indexOf(name); return i >= 0 && args[i + 1] ? path.resolve(args[i + 1]) : fallback; };
-const CHECK = flag("--pruefen");
+const CHECK = flag("--check");
+// Every argument is a known flag or the value right after --source or --pictures; anything else ends the tool here, before it
+// renders or writes a picture, so a check command with an old or misspelt flag cannot overwrite the committed pictures.
+for (let i = 0; i < args.length; i++) {
+  if (args[i] === "--source" || args[i] === "--pictures") { i++; continue; }
+  if (args[i] !== "--check") { console.error(`unknown argument: ${args[i]}`); process.exit(1); }
+}
 const SOURCES = value("--source", path.join(ROOT, "docs/soll/src"));
 const PICTURES = value("--pictures", path.join(ROOT, "docs/soll"));
 const sourceOf = (state) => path.join(SOURCES, `konto-${state}.html`);

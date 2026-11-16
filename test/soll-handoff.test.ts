@@ -42,7 +42,7 @@ describe("soll judgement of the phone page", () => {
       results.push({ state, width, blockBottom: m.blockBottom, defects });
     }
     // The summary line keeps the name of the approved picture, which the audit of konto 02 expects (test/state-names.test.ts).
-    expect(summaryHandoff(results)).toBe(`soll handoff: 6 Bilder, ${handoffFile("approve")} oben 390=528 1440=603, 0 Mängel`);
+    expect(summaryHandoff(results)).toBe(`soll handoff: 6 pictures, ${handoffFile("approve")} top 390=528 1440=603, 0 defects`);
   });
 
   it("rejects a picture with even one pixel that differs from a fresh render", () => {
@@ -90,8 +90,8 @@ describe("soll judgement of the phone page", () => {
   });
 
   it("leaves the judgement of the start page as it was", () => {
-    const start = { width: 390, pngWidth: 390, diffPixels: 0, scrollWidth: 390, text: "Conway not answering?", foreign: [], umzugBottom: 828 };
+    const start = { width: 390, pngWidth: 390, diffPixels: 0, scrollWidth: 390, text: "Conway not answering?", foreign: [], moveBottom: 828 };
     expect(assess(start)).toEqual([]);
-    expect(assess({ ...start, umzugBottom: null }).join("\n")).toMatch(/block data-soll="umzug" is missing/);
+    expect(assess({ ...start, moveBottom: null }).join("\n")).toMatch(/block data-soll="move" is missing/);
   });
 });
