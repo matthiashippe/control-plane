@@ -102,9 +102,11 @@ describe("exec with a long timeout", () => {
     expect(first.res!.json.exit_code).toBe(-1);
     expect(text).toMatch(/still running in the background/);
     expect(text).toMatch(/180 seconds/);
-    const files = text.match(/\/root\/\.exec\/[0-9a-f]{12}\.(out|err|exit)/g);
+    const told = text.split("\n")[0];
+    const files = told.match(/\/root\/\.exec\/[0-9a-f]{12}\.(out|err|exit)/g);
     expect(files).toHaveLength(3);
-    expect(text).toMatch(/read_file/);
+    // The last line is the command to wait with (goals/sandbox/09), the same as the field wait_command.
+    expect(text.split("\n").pop()).toBe(first.res!.json.wait_command);
     expect(text).toMatch(/Do not start the command again/);
 
     // A repeat with the same key starts nothing and gets the same answer at once.

@@ -98,8 +98,13 @@ on its 30 seconds waits for the running command and gets its result.
 seconds, the answer is `200` with `exit_code` -1, `running: true` and a text in `stdout` that says the
 command is still running and names three files in the sandbox: `output_file` (stdout), `error_file`
 (stderr) and `exit_code_file` (written when the command ends, 124 if it was stopped at its timeout).
-Read them later with `files/read` or `exec`; a repeat with the same `Idempotency-Key` gets the same
-answer, and the result once the command has ended. A command never runs twice.
+To wait for the end, call `exec` with the command in `wait_command` and no `timeout`; it is also the
+last line of `stdout`. It waits at most 25 seconds, then prints `The command has ended with exit code
+<n>.`, the output and, on stderr, the errors, and ends with the exit code of the command; or it says
+`The command is still running.` and ends with 0, then call it again. Each call ends before the 30
+seconds after which the runtime gives up. A repeat with the same `Idempotency-Key` gets the same
+answer and the same `wait_command`, and the result once the command has ended. Do not start the
+command again; a command never runs twice.
 
 Ports: `POST /v1/sandboxes/{id}/ports/expose` with `{"port": 8080}` answers `200` with `port` and
 `public_url`, an HTTPS address `https://sbx-<id>-<port>.sandboxhost.de` that reaches the service

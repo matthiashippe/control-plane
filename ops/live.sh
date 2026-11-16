@@ -36,9 +36,12 @@
 #            the container cp answers 200, and with our own account (LIVE_SANDBOX_ADDRESS in src/bounties/ours.ts) a small
 #            sandbox is created (201), `echo ok` runs in it, an uploaded file reads back the same, DELETE answers 200, and
 #            the ledger holds at least one row of kind sandbox for exactly this sandbox (sandbox 03). Before the DELETE a
-#            command runs in the background there (`sleep 25; echo bg-ok`, timeout 120000, sandbox 05): its answer is 200
-#            with running true and exit_code -1, the file from exit_code_file reads 0 within 60 s and the one from
-#            output_file holds bg-ok, so the wrapper, coreutils timeout under gVisor and /root/.exec are proven in production.
+#            command runs in the background there (`sleep 50; echo bg-ok`, timeout 120000, sandbox 05): its answer is 200
+#            with running true and exit_code -1 and names wait_command, the same as the last line of stdout (sandbox 09).
+#            That command is then called with exec and no timeout, as the runtime does, at most three times: the first
+#            call waits the full 25 s and must say still running, each call answers 200 under 30000 ms, and the last one
+#            ends with exit code 0 and bg-ok in stdout, so the wrapper, coreutils timeout and a full wait under gVisor and
+#            through Caddy are proven in production; `FAIL sandbox: background exec wait_command ...` otherwise.
 #            Also before the DELETE, port 8080 of the sandbox is exposed (POST .../ports/expose, sandbox 07), a python3
 #            http.server there serves a canary line, the canary comes back through the public_url
 #            https://sbx-<id>-8080.<domain> within 60 s (through Cloudflare and Caddy, no key sent), and DELETE
@@ -475,34 +478,97 @@ ours_json() { # $1 = path of ours.ts
   printf '[%s]\n[%s]\n' "$addrs" "$names"
 }
 
-# The answer to the background exec of the check `sandbox`, $1 = file: "files <exit_code_file> <output_file>" when it
-# is the answer to a command still running (running true, exit_code -1, both files under /root/.exec), else one word
-# (`nojson`, `notrunning`, `nofiles`). Only paths of that form leave it, so nothing else of the answer reaches a URL.
+# The answer to the background exec of the check `sandbox`, $1 = file, $2 = file for the body of the wait call
+# (optional): "wait <exit_code_file>" when it is the answer to a command still running (running true, exit_code -1,
+# both files under /root/.exec) whose wait_command is one line, names `[ -f <exit_code_file> ]` and is the last line of
+# stdout (sandbox 09); then the body {"command": wait_command}, without a timeout as the runtime sends it, goes to $2.
+# Else one word (`nojson`, `notrunning`, `nofiles`, `nowait`, `waitnotlast`). Only paths of that form leave it.
 # shellcheck disable=SC2016
-BG_ANSWER_JS='let o; try { o = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")); } catch (e) { o = null; } if (!o || typeof o !== "object") { console.log("nojson"); process.exit(0); } if (o.running !== true || o.exit_code !== -1) { console.log("notrunning"); process.exit(0); } const ok = (v, ext) => typeof v === "string" && new RegExp("^/root/\\.exec/[0-9a-f]{1,64}\\." + ext + "$").test(v); if (!ok(o.exit_code_file, "exit") || !ok(o.output_file, "out")) { console.log("nofiles"); process.exit(0); } console.log("files " + o.exit_code_file + " " + o.output_file);'
+BG_ANSWER_JS='const fs = require("fs"); let o; try { o = JSON.parse(fs.readFileSync(process.argv[1], "utf8")); } catch (e) { o = null; } if (!o || typeof o !== "object") { console.log("nojson"); process.exit(0); } if (o.running !== true || o.exit_code !== -1) { console.log("notrunning"); process.exit(0); } const ok = (v, ext) => typeof v === "string" && new RegExp("^/root/\\.exec/[0-9a-f]{1,64}\\." + ext + "$").test(v); if (!ok(o.exit_code_file, "exit") || !ok(o.output_file, "out")) { console.log("nofiles"); process.exit(0); } const w = o.wait_command; if (typeof w !== "string" || !w || w.length > 4000 || /[\r\n]/.test(w) || !w.includes("[ -f " + o.exit_code_file + " ]")) { console.log("nowait"); process.exit(0); } const lines = typeof o.stdout === "string" ? o.stdout.split("\n") : []; if (lines[lines.length - 1] !== w) { console.log("waitnotlast"); process.exit(0); } if (process.argv[2]) fs.writeFileSync(process.argv[2], JSON.stringify({ command: w })); console.log("wait " + o.exit_code_file);'
 
-# $1 = HTTP status, $2 = answer file of the background exec. Prints the status itself when it is not 200, else the
-# output of BG_ANSWER_JS.
+# The answer to one call of wait_command, $1 = file: "ended <exit_code> <1 when a line of stdout is bg-ok, else 0>"
+# when the first line of stdout says the command has ended, "still" when it says it is still running, else `other`.
+# shellcheck disable=SC2016
+WAIT_ANSWER_JS='let o; try { o = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")); } catch (e) { o = null; } if (!o || typeof o !== "object" || typeof o.stdout !== "string" || typeof o.exit_code !== "number") { console.log("other"); process.exit(0); } const lines = o.stdout.split("\n").map((l) => l.replace(/\r$/, "")); if (/^The command has ended with exit code -?[0-9]+\.$/.test(lines[0])) { console.log("ended " + o.exit_code + " " + (lines.includes("bg-ok") ? 1 : 0)); } else if (lines[0].startsWith("The command is still running.")) { console.log("still"); } else { console.log("other"); }'
+
+# $1 = HTTP status, $2 = answer file of the background exec, $3 = file for the body of the wait call (optional).
+# Prints the status itself when it is not 200, else the output of BG_ANSWER_JS.
 bg_start() {
   if [ "${1:-}" != 200 ]; then
     echo "${1:-none}"
     return
   fi
-  (cd "$ROOT" && NODE_NO_WARNINGS=1 node -e "$BG_ANSWER_JS" "$2" 2>/dev/null) || echo nojson
+  (cd "$ROOT" && NODE_NO_WARNINGS=1 node -e "$BG_ANSWER_JS" "$2" "${3:-}" 2>/dev/null) || echo nojson
 }
 
-# Why the background step failed, $1 = its token from sandbox_live.
+now_ms() { date +%s%3N; } # the selftest replaces it with a planted clock
+
+# The background step of the check `sandbox` (sandbox 05 and 09), $1 = header file, $2 = answer file, $3 = sandbox id.
+# Starts `sleep 50; echo bg-ok` with timeout 120000, takes wait_command from the answer and calls it with exec and no
+# timeout, at most three times. The answer comes after 20 s, so the first call waits the full 25 s and must say still
+# running (sandbox 09, point 8); the second one gets the end. Prints one token: ok, start-<word or status> or
+# wait-<status-N|slow-MS|first|exit-N|wrong|still|unreadable>.
+bg_live() {
+  local hdr="$1" ans="$2" id="$3" code start body t0 ms got n i tok=wait-still
+  body="$(mktemp -p "$(live_tmp)")"
+  code="$(sandbox_api "$hdr" POST "/v1/sandboxes/$id/exec" "$ans" '{"command":"sleep 50; echo bg-ok","timeout":120000}' "Idempotency-Key: live-check-bg-$(rand_hex)")"
+  start="$(bg_start "$code" "$ans" "$body")"
+  if [[ "$start" != "wait "* ]]; then
+    rm -f "$body"
+    echo "start-${start:-none}"
+    return
+  fi
+  for i in 1 2 3; do
+    t0="$(now_ms)"
+    code="$(sandbox_api "$hdr" POST "/v1/sandboxes/$id/exec" "$ans" "$(cat "$body")" "Idempotency-Key: live-check-wait-$i-$(rand_hex)")"
+    ms=$(($(now_ms) - t0))
+    if [ "$code" != 200 ]; then
+      tok="wait-status-${code:-none}"
+      break
+    fi
+    if [ "$ms" -ge 30000 ]; then
+      tok="wait-slow-$ms"
+      break
+    fi
+    got="$(cd "$ROOT" && NODE_NO_WARNINGS=1 node -e "$WAIT_ANSWER_JS" "$ans" 2>/dev/null)"
+    if [ "$i" = 1 ] && [[ "$got" == ended\ * ]]; then
+      tok=wait-first
+      break
+    fi
+    case "$got" in
+      "ended 0 1") tok=ok ;;
+      "ended 0 0") tok=wait-wrong ;;
+      ended\ *)
+        read -r _ n _ <<<"$got"
+        tok="wait-exit-$n"
+        ;;
+      still) continue ;;
+      *) tok=wait-unreadable ;;
+    esac
+    break
+  done
+  rm -f "$body"
+  echo "$tok"
+}
+
+# Why the background step failed, $1 = its token from bg_live; for the tokens of wait_command judge_sandbox puts
+# `wait_command` in front.
 bg_reason() {
   case "${1:-}" in
     "" | skipped) echo "did not run" ;;
-    start-notrunning) echo "of sleep 25 answered 200 without running true and exit_code -1" ;;
+    start-notrunning) echo "of sleep 50 answered 200 without running true and exit_code -1" ;;
     start-nofiles) echo "answered 200 without exit_code_file and output_file under /root/.exec" ;;
     start-nojson) echo "answered 200 without a JSON object" ;;
-    start-*) echo "of sleep 25 answered ${1#start-}, expected 200" ;;
-    noexit) echo "wrote no exit_code_file within 60 s" ;;
-    exit-*) echo "ended with exit code ${1#exit-}, expected 0" ;;
-    out-*) echo "output_file read answered ${1#out-}, expected 200" ;;
-    wrong) echo "output_file holds no bg-ok" ;;
+    start-nowait) echo "missing in the answer, or it does not name the exit_code_file" ;;
+    start-waitnotlast) echo "is not the last line of stdout" ;;
+    start-*) echo "of sleep 50 answered ${1#start-}, expected 200" ;;
+    wait-status-*) echo "answered ${1#wait-status-}, expected 200" ;;
+    wait-slow-*) echo "took ${1#wait-slow-} ms, not under 30000" ;;
+    wait-exit-*) echo "reported exit code ${1#wait-exit-}, expected 0" ;;
+    wait-wrong) echo "reported the end without bg-ok in stdout" ;;
+    wait-first) echo "ended on the first call" ;;
+    wait-still) echo "still said running after three calls" ;;
+    wait-unreadable) echo "answered 200 with neither the end nor still running" ;;
     *) echo "failed: $1" ;;
   esac
 }
@@ -555,7 +621,10 @@ judge_sandbox() {
   elif [ "$exec_" != ok ]; then
     echo "FAIL sandbox: exec answered ${exec_:-nothing}, expected 200"
   elif [ "$bg" != ok ]; then
-    echo "FAIL sandbox: background exec $(bg_reason "$bg")"
+    case "$bg" in
+      wait-* | start-nowait | start-waitnotlast) echo "FAIL sandbox: background exec wait_command $(bg_reason "$bg")" ;;
+      *) echo "FAIL sandbox: background exec $(bg_reason "$bg")" ;;
+    esac
   elif [ "$files" = wrong ]; then
     echo "FAIL sandbox: the file read back differs from the one uploaded"
   elif [ "$files" != ok ]; then
@@ -707,36 +776,10 @@ sandbox_live() {
         exec_="$code"
       fi
 
-      # A command longer than the hold limit runs in the background (sandbox 05): answered after 20 s, then its exit
-      # code and output are read from the files the answer names, for at most 60 s.
-      code="$(sandbox_api "$hdr" POST "/v1/sandboxes/$id/exec" "$ans" '{"command":"sleep 25; echo bg-ok","timeout":120000}' "Idempotency-Key: live-check-bg-$(rand_hex)")"
-      start="$(bg_start "$code" "$ans")"
-      if [[ "$start" == "files "* ]]; then
-        read -r _ exitf outf <<<"$start"
-        bg=noexit
-        deadline=$((SECONDS + 60))
-        while [ "$SECONDS" -lt "$deadline" ]; do
-          sleep 5
-          code="$(sandbox_api "$hdr" GET "/v1/sandboxes/$id/files/read?path=${exitf//\//%2F}" "$ans")"
-          [ "$code" = 200 ] || continue
-          out="$(json_field "$ans" content | tr -d '[:space:]')"
-          if [ "$out" != 0 ]; then
-            [[ "$out" =~ ^[0-9]{1,3}$ ]] && bg="exit-$out" || bg="exit-unreadable"
-          else
-            code="$(sandbox_api "$hdr" GET "/v1/sandboxes/$id/files/read?path=${outf//\//%2F}" "$ans")"
-            if [ "$code" != 200 ]; then
-              bg="out-$code"
-            elif grep -qx 'bg-ok' <<<"$(json_field "$ans" content | tr -d '\r')"; then
-              bg=ok
-            else
-              bg=wrong
-            fi
-          fi
-          break
-        done
-      else
-        bg="start-${start:-none}"
-      fi
+      # A command longer than the hold limit runs in the background (sandbox 05): answered after 20 s, then waited for
+      # with the wait_command of the answer, the way the runtime follows the text (sandbox 09).
+      bg="$(bg_live "$hdr" "$ans" "$id")"
+      bg="${bg:-none}"
 
       text="live-check-$(rand_hex)"
       code="$(sandbox_api "$hdr" POST "/v1/sandboxes/$id/files/upload/json" "$ans" "{\"path\":\"/root/live-check.txt\",\"content\":\"$text\"}")"
@@ -1023,8 +1066,9 @@ selftest() {
   # The check `sandbox`, its judge in both directions: all steps good, then each step failing on its own (the ledger row
   # missing, the wrong exec text, a 401 over ctl.sbx, the client key not set, the 501 of an unreachable sandbox server),
   # a file that reads back different, a ledger query without an answer, and no result at all. The background exec
-  # (sandbox 05) fails on its own too: held instead of running, a 504, no exit file within 60 s, stopped at its timeout
-  # (124), no bg-ok in the output, and a result line without the step at all. The exposed port (sandbox 07) fails on its
+  # (sandbox 05 and 09) fails on its own too: held instead of running, a 504, no wait_command or not on the last line,
+  # the end on the first call, still running after three calls, a call of 30000 ms, a 504 of the call, stopped at its timeout (124), no bg-ok in the
+  # output, and a result line without the step at all. The exposed port (sandbox 07) fails on its
   # own too: the 409 of the control plane before the rollout, no answer, no public_url, a public_url under the payment
   # domain, the server not started, no canary within 60 s, the port not given back, and a result line without the step.
   local s_good="client_key=ok ctl=200 create=201 exec=ok bg=ok files=ok delete=200 ledger=1 port=ok"
@@ -1033,8 +1077,10 @@ selftest() {
     "${s_good/ctl=200/ctl=401}|FAIL" "${s_good/client_key=ok/client_key=fail}|FAIL" \
     "client_key=ok ctl=200 create=501 exec=skipped files=skipped delete=skipped ledger=none|FAIL" \
     "${s_good/files=ok/files=wrong}|FAIL" "${s_good/ledger=1/ledger=none}|FAIL" "|FAIL" \
-    "${s_good/bg=ok/bg=start-notrunning}|FAIL" "${s_good/bg=ok/bg=start-504}|FAIL" "${s_good/bg=ok/bg=noexit}|FAIL" \
-    "${s_good/bg=ok/bg=exit-124}|FAIL" "${s_good/bg=ok/bg=wrong}|FAIL" "${s_good/ bg=ok/}|FAIL" \
+    "${s_good/bg=ok/bg=start-notrunning}|FAIL" "${s_good/bg=ok/bg=start-504}|FAIL" "${s_good/bg=ok/bg=start-nowait}|FAIL" \
+    "${s_good/bg=ok/bg=start-waitnotlast}|FAIL" "${s_good/bg=ok/bg=wait-still}|FAIL" "${s_good/bg=ok/bg=wait-first}|FAIL" "${s_good/bg=ok/bg=wait-slow-30000}|FAIL" \
+    "${s_good/bg=ok/bg=wait-status-504}|FAIL" "${s_good/bg=ok/bg=wait-exit-124}|FAIL" "${s_good/bg=ok/bg=wait-wrong}|FAIL" \
+    "${s_good/ bg=ok/}|FAIL" \
     "client_key=ok ctl=200 create=201 exec=ok files=ok delete=200 ledger=1|FAIL" \
     "${s_good/port=ok/port=expose_409}|FAIL" "${s_good/port=ok/port=expose_none}|FAIL" \
     "${s_good/port=ok/port=no_url}|FAIL" "${s_good/port=ok/port=bad_url}|FAIL" "${s_good/port=ok/port=server_504}|FAIL" \
@@ -1097,6 +1143,80 @@ selftest() {
     got="$(judge_sandbox "${s_good/ledger=1/ledger=$l_n}")"
     echo "planted sandbox ledger for id $l_id (${l_n:-no answer} rows): $got"
     [ "${got%% *}" = "$l_expect" ] || all_ok=0
+  done
+
+  # The background step of the check `sandbox` (sandbox 09) through the real bg_live, with stand-ins for the public API
+  # and the clock. Both directions: the end after one or two "still running" is ok; the end on the first call (no full
+  # wait), still running three times, a 504 of the call, a call of 30000 ms on the first or second call, exit code 124, no bg-ok, an answer without wait_command, one where it is not
+  # the last line of stdout, one naming another exit file and a held answer each give their own token. Every call of the
+  # wait command sends exactly {"command": wait_command}, no timeout.
+  local b_wc='i=0; while [ ! -f /root/.exec/0a1b2c3d4e5f.exit ] && [ $i -lt 25 ]; do sleep 1; i=$((i+1)); done; if [ -f /root/.exec/0a1b2c3d4e5f.exit ]; then cat /root/.exec/0a1b2c3d4e5f.out; fi'
+  local b_files='"output_file":"/root/.exec/0a1b2c3d4e5f.out","error_file":"/root/.exec/0a1b2c3d4e5f.err","exit_code_file":"/root/.exec/0a1b2c3d4e5f.exit"'
+  printf '{"stdout":"The command is still running in the background.\\n%s","stderr":"","exit_code":-1,"running":true,%s,"wait_command":"%s"}' "$b_wc" "$b_files" "$b_wc" >"$dir/bg-start-ok.json"
+  printf '{"stdout":"The command is still running in the background.","stderr":"","exit_code":-1,"running":true,%s}' "$b_files" >"$dir/bg-start-nowait.json"
+  printf '{"stdout":"The command is still running in the background.\\n%s\\nmore","stderr":"","exit_code":-1,"running":true,%s,"wait_command":"%s"}' "$b_wc" "$b_files" "$b_wc" >"$dir/bg-start-notlast.json"
+  printf '{"stdout":"The command is still running in the background.\\n%s","stderr":"","exit_code":-1,"running":true,%s,"wait_command":"%s"}' "${b_wc//0a1b2c3d4e5f.exit/ffffffffffff.exit}" "$b_files" "${b_wc//0a1b2c3d4e5f.exit/ffffffffffff.exit}" >"$dir/bg-start-otherexit.json"
+  printf '{"stdout":"bg-ok\\n","stderr":"","exit_code":0}' >"$dir/bg-start-held.json"
+  printf '{"stdout":"The command has ended with exit code 0.\\nbg-ok\\n","stderr":"","exit_code":0}' >"$dir/bg-wait-ended0.json"
+  printf '{"stdout":"The command has ended with exit code 124.\\n","stderr":"","exit_code":124}' >"$dir/bg-wait-ended124.json"
+  printf '{"stdout":"The command has ended with exit code 0.\\n\\n","stderr":"","exit_code":0}' >"$dir/bg-wait-nobgok.json"
+  printf '{"stdout":"The command is still running. Run the same command again to wait up to 25 more seconds.\\n","stderr":"","exit_code":0}' >"$dir/bg-wait-still.json"
+  printf '{"error":"gateway_timeout"}' >"$dir/bg-wait-none.json"
+  local b_body b_case b_name b_start b_waits b_expect b_calls b_tok b_n
+  b_body="$(cd "$ROOT" && NODE_NO_WARNINGS=1 node -e 'process.stdout.write(JSON.stringify({ command: process.argv[1] }))' "$b_wc")"
+  bg_step() { # $1 = start answer, $2 = comma list of wait answers <status>:<ms>:<answer>, $3 = call log
+    (
+      b_start="$1" b_waits="$2" b_log="$3"
+      echo 0 >"$b_log.clock"
+      now_ms() { cat "$b_log.clock"; }
+      sandbox_api() { # stand-in of the public API: logs the call, answers from the case
+        local k spec st ms what
+        case "$2 $3" in
+          "POST /v1/sandboxes/k3v9q2m7x1/exec")
+            if [[ "$5" == *'"timeout":120000'* ]]; then
+              echo "START $5" >>"$b_log"
+              cp "$dir/bg-start-$b_start.json" "$4"
+              echo 200
+              return
+            fi
+            echo "WAIT $5" >>"$b_log"
+            k="$(grep -c '^WAIT ' "$b_log")"
+            spec="$(tr ',' '\n' <<<"$b_waits" | sed -n "${k}p")"
+            IFS=: read -r st ms what <<<"$spec"
+            echo $(($(cat "$b_log.clock") + ${ms:-0})) >"$b_log.clock"
+            cp "$dir/bg-wait-${what:-none}.json" "$4"
+            echo "${st:-000}"
+            ;;
+          *) echo 404 ;;
+        esac
+      }
+      bg_live "$dir/bg-hdr" "$dir/bg-ans" k3v9q2m7x1
+    )
+  }
+  for b_case in "ok|ok|200:25000:still,200:5000:ended0|ok|2" \
+    "still|ok|200:25000:still,200:25000:still,200:5000:ended0|ok|3" "first|ok|200:5000:ended0|wait-first|1" \
+    "thrice|ok|200:25000:still,200:25000:still,200:25000:still|wait-still|3" "504|ok|504:100:none|wait-status-504|1" \
+    "slow|ok|200:30000:still|wait-slow-30000|1" "slow2|ok|200:25000:still,200:30000:ended0|wait-slow-30000|2" \
+    "exit124|ok|200:25000:still,200:5000:ended124|wait-exit-124|2" \
+    "nobgok|ok|200:25000:still,200:5000:nobgok|wait-wrong|2" "nowait|nowait||start-nowait|0" "notlast|notlast||start-waitnotlast|0" \
+    "otherexit|otherexit||start-nowait|0" "held|held||start-notrunning|0"; do
+    IFS='|' read -r b_name b_start b_waits b_expect b_calls <<<"$b_case"
+    : >"$dir/bg-$b_name.log"
+    b_tok="$(bg_step "$b_start" "$b_waits" "$dir/bg-$b_name.log")"
+    b_n="$(grep -c '^WAIT ' "$dir/bg-$b_name.log")"
+    echo "planted background step $b_name: bg=${b_tok:-nothing} waits=$b_n"
+    [ "$b_tok" = "$b_expect" ] && [ "$b_n" = "$b_calls" ] || all_ok=0
+    if grep '^WAIT ' "$dir/bg-$b_name.log" | grep -vqxF "WAIT $b_body"; then
+      echo "FAIL selftest: background step $b_name sent another body than {\"command\": wait_command}"
+      all_ok=0
+    fi
+    got="$(judge_sandbox "${s_good/bg=ok/bg=${b_tok:-nothing}}")"
+    echo "planted background $b_name: $got"
+    if [ "$b_expect" = ok ]; then
+      [ "${got%% *}" = OK ] || all_ok=0
+    else
+      [ "${got%% *}" = FAIL ] || all_ok=0
+    fi
   done
 
   # The port step of the check `sandbox` (sandbox 07) through the real port_live, with stand-ins for the public API, the

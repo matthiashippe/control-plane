@@ -34,7 +34,8 @@ export const IDEMPOTENCY_MS = 600_000;
  * after 30 s and tries four times with the same Idempotency-Key. A command with a timeout up to EXEC_HOLD_MAX_MS is
  * held as before: its result reaches the runtime through a repeat at the latest by the fourth attempt (sent no earlier
  * than 93.5 s after the first). A longer one runs in the background and is answered after EXEC_EARLY_MS, before the
- * runtime aborts, with a text that names the files its output and exit code go to.
+ * runtime aborts, with a text that names the files its output and exit code go to and, on its last line, the
+ * command to wait for the end with (waitCommand, goals/sandbox/09).
  */
 export const EXEC_HOLD_MAX_MS = 90_000;
 export const EXEC_EARLY_MS = 20_000;
@@ -60,20 +61,53 @@ export function backgroundCommand(command: string, base: string, seconds: number
   );
 }
 
-/** The answer to a command that is still running: no exit code yet (-1, as the runtime reads a missing one). */
+/**
+ * How long the command from `waitCommand` waits for the end at most (goals/sandbox/09). The runtime at d8f8168 calls
+ * exec without its own timeout with 30000 ms and aborts there; 25 s leave 5 s for signature, Caddy, `docker exec` in
+ * gVisor and the start of the shell, so every call ends before the abort.
+ */
+export const EXEC_WAIT_S = 25;
+
+/**
+ * The command a model runs with exec (no timeout) to wait for a command in the background: it looks once a second
+ * whether `<base>.exit` exists, for at most `seconds` seconds by the clock of bash (`$SECONDS`), not by the number of
+ * rounds, so a slow start of `sleep` in gVisor does not stretch the wait past one more round. When it exists, the first line of stdout is
+ * `The command has ended with exit code <n>.`, then `<base>.out` follows, `<base>.err` goes to stderr, and it ends with
+ * the exit code of the command (124 too). Otherwise it says the command is still running and ends with 0. Only bash,
+ * sleep, cat and test, which the image has; a space before every path, as in backgroundCommand (mapRoot).
+ */
+export function waitCommand(base: string, seconds = EXEC_WAIT_S): string {
+  const exit = `${base}.exit`;
+  return (
+    `s=$SECONDS; while [ ! -f ${exit} ] && [ $((SECONDS-s)) -lt ${seconds} ]; do sleep 1; done; ` +
+    `if [ -f ${exit} ]; then c=$(cat ${exit}); [ -n "$c" ] || { sleep 1; c=$(cat ${exit}); }; ` +
+    `echo "The command has ended with exit code $c."; cat ${base}.out; cat ${base}.err >&2; exit "$c"; fi; ` +
+    `echo "The command is still running. Run the same command again to wait up to ${seconds} more seconds."`
+  );
+}
+
+/**
+ * The answer to a command that is still running: no exit code yet (-1, as the runtime reads a missing one). The runtime
+ * shows the model only the text of stdout, so its last line is the command to wait with, the same as `wait_command`.
+ */
 function stillRunning(base: string, seconds: number): Reply {
+  const wait = waitCommand(base);
   return reply(200, {
     stdout:
       `The command is still running in the background. It takes longer than ${EXEC_EARLY_MS / 1000} seconds, so this ` +
       `answer comes before it ends; it runs for at most ${seconds} seconds (its timeout). Its output goes to ${base}.out ` +
       `and its errors to ${base}.err. When it ends, its exit code is written to ${base}.exit (124 means it was stopped ` +
-      `at its timeout). Read these files later with read_file, or with exec and cat. Do not start the command again.`,
+      `at its timeout). Do not start the command again. To wait for its end, call exec with the command on the last ` +
+      `line of this answer and no timeout: it waits at most ${EXEC_WAIT_S} seconds, then prints the exit code, the ` +
+      `output and the errors of the command, or says that it is still running. As long as it says so, call exec with ` +
+      `the same command again.\n${wait}`,
     stderr: "",
     exit_code: -1,
     running: true,
     output_file: `${base}.out`,
     error_file: `${base}.err`,
     exit_code_file: `${base}.exit`,
+    wait_command: wait,
   });
 }
 /** How long a create of the same account and body after its answer still gets the same sandbox. */

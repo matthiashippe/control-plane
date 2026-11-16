@@ -54,7 +54,25 @@ times, expected once; …` und `E2E FAIL … sandbox=true long_exec=false`
 Was der Harness nicht zeigt: Caddy und der echte Sandbox-Server liegen nicht dazwischen. Im Harness spricht die Runtime das Control
 Plane direkt über TLS an, und der Nachbau führt Befehle als Prozess aus statt mit `docker exec` in gVisor. Ob Caddy eine Antwort nach
 20 s durchreicht und ob die Hülle im Image des Servers ihre Dateien schreibt, prüft der Release Manager nach dem Rollout mit
-`ops/live.sh`: Die Prüfung `sandbox` fährt dort in der eigenen Sandbox `sleep 25; echo bg-ok` mit `timeout` 120000, erwartet 200 mit
-`running` true und `exit_code` -1, liest `exit_code_file` höchstens 60 s lang, bis dort `0` steht, und erwartet `bg-ok` in
-`output_file`; sonst meldet sie `FAIL sandbox: background exec …` (Kritik, Punkt 10). Dieses Goal selbst läuft nicht gegen die
-Produktion.
+`ops/live.sh`: Die Prüfung `sandbox` fährt dort in der eigenen Sandbox `sleep 50; echo bg-ok` mit `timeout` 120000, erwartet 200 mit
+`running` true und `exit_code` -1 und wartet seit sandbox 09 mit dem Befehl aus `wait_command` auf das Ende (Abschnitt `## Warten`);
+sonst meldet sie `FAIL sandbox: background exec …` (Kritik, Punkt 10). Dieses Goal selbst läuft nicht gegen die Produktion.
+
+## Warten
+
+Seit sandbox 09 nennt die Antwort auf einen Befehl im Hintergrund im Feld `wait_command` und als letzte Zeile von `stdout` einen
+Befehl. Ein Automaton ruft ihn mit `exec` ohne `timeout` auf: Er wartet höchstens 25 s (`EXEC_WAIT_S`) auf `<tag>.exit` und druckt
+dann `The command has ended with exit code <n>.`, die Ausgabe und auf stderr die Fehler und endet mit dem Exit-Code des Befehls,
+oder er sagt `The command is still running.` und endet mit 0; dann ruft das Modell denselben Befehl noch einmal. Jeder Aufruf
+bleibt unter den 30 s, nach denen die Runtime am Pin abbricht, und zählt nicht für ihren Circuit Breaker. Für 180 s sind das
+höchstens 8 Aufrufe. `harness/e2e/long-exec.mjs` folgt genau diesem Befehl und schreibt jeden Aufruf in `waits`; nach jedem
+Rollout ruft `ops/live.sh` den Befehl in der eigenen Sandbox durch Caddy und gVisor auf und meldet einen Fehlschlag als
+`FAIL sandbox: background exec wait_command …`. Dort läuft `sleep 50; echo bg-ok`, damit der erste Aufruf die vollen 25 s wartet und
+„still running“ meldet; endet schon der erste Aufruf, steht `FAIL sandbox: background exec wait_command ended on the first call` da,
+weil dann kein voller Aufruf durch Caddy und gVisor gemessen ist.
+
+Gemessen mit neuem Harness und neuem Urteil (`waits` ist die Zahl der Aufrufe des Wartebefehls, `max_wait_ms` der längste, `attempts`
+die Zahl der Anfragen der Runtime über alle Aufrufe):
+
+- vorher 180 s: code-host lokal ohne Docker (`dist/index.js` über TLS, Nachbau `sandboxd`, Runtime am Pin `d8f8168`), Commit `08164a6` (Stand von `dev`), 16.11.2026 12:23:01 bis 12:24:24 UTC: LONG_EXEC_VERDICT fail long-180: neither the result (long-180 in stdout, exit_code 0) nor a text that says the command is still running and names a command to wait with on its last line
+- nachher 180 s: Job `e2e` von PR #210 auf GitHub (Lauf 43874571613, Nachbau `sandboxd`, Runtime am Pin `d8f8168`, Wartebefehl nach der Uhr), Commit `6fbcaa0`, 16.11.2026 13:25:00 UTC: waits=7 max_wait_ms=25046 attempts=7 failures_after=0 runs=1

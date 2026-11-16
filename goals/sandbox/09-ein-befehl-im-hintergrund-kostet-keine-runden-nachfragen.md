@@ -1,7 +1,7 @@
 # Sandbox Goal 09: Ein Befehl im Hintergrund kostet keine Runden Nachfragen
 
 ## Status
-PLANNED
+DONE
 
 ## Active Objective
 Die Antwort auf ein langes `exec` aus sandbox 05 nennt im Feld `wait_command` und als letzte Zeile von `stdout` einen fertigen
@@ -76,7 +76,7 @@ bezahlte Inferenz des Kunden; mit dem Befehl kostet das Warten höchstens eine R
   Wallet die Terminal-Tools für ihren Automaton.
 
 ## Done Condition
-- [ ] Die Antwort auf einen Befehl im Hintergrund nennt im Feld `wait_command` und als letzte Zeile von `stdout` einen Befehl, der bis
+- [x] Die Antwort auf einen Befehl im Hintergrund nennt im Feld `wait_command` und als letzte Zeile von `stdout` einen Befehl, der bis
       zu 25 s auf das Ende wartet und dann Exit-Code, Ausgabe und Fehler druckt oder sagt, dass der Befehl noch läuft; der Test war vor
       dem Fix rot.
       MVP: Funktion, weil das Modell nur den Text der Antwort sieht und ohne den Befehl in einer Schleife aus Fehlern nachfragt.
@@ -85,7 +85,7 @@ bezahlte Inferenz des Kunden; mit dem Befehl kostet das Warten höchstens eine R
       Prüfung: `for w in wait_command waitCommand EXEC_WAIT_S EXEC_DEFAULT_MS "still running" 124 Idempotency-Key; do grep -qF -- "$w" test/sandbox-wait.test.ts || echo "fehlt $w"; done` muss nichts ausgeben.
       Prüfung: `grep -cxE "export const EXEC_WAIT_S = 25;" src/sandbox/service.ts` muss 1 ausgeben.
       Prüfung: `T=$(mktemp -d); git archive HEAD | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; f=$T/src/sandbox/service.ts; if ! grep -q "export function waitCommand(" $f; then echo "fehlt waitCommand"; else sed -i "s/export function waitCommand(/function waitCommandOrig(/" $f; echo 'export function waitCommand(..._a: unknown[]): string { return "true"; }' >> $f; (cd $T && PATH=/usr/bin:$PATH pnpm -s vitest run test/sandbox-wait.test.ts >/dev/null 2>&1) && echo "gruen ohne waitCommand"; fi; rm -rf $T` muss nichts ausgeben.
-- [ ] `harness/e2e/long-exec.mjs` holt das Ergebnis eines Befehls ohne direktes Ergebnis nur mit dem Befehl aus dem Text, über das
+- [x] `harness/e2e/long-exec.mjs` holt das Ergebnis eines Befehls ohne direktes Ergebnis nur mit dem Befehl aus dem Text, über das
       Werkzeug `exec` ohne `timeout`, und `judgeLongExec` verlangt es; die Tests waren vor dem Fix rot.
       MVP: Funktion, weil erst der Gang mit Client und Werkzeugen der unveränderten Runtime zeigt, dass ein Modell, das dem Text folgt,
       das Ergebnis bekommt, ohne dass die Runtime abbricht (Grundregel 13).
@@ -94,21 +94,21 @@ bezahlte Inferenz des Kunden; mit dem Befehl kostet das Warten höchstens eine R
       Prüfung: `grep -c "SETTLE_MS" harness/e2e/long-exec.mjs` muss 0 ausgeben.
       Prüfung: `grep -cE "^\s*(it|test)\(" test/long-exec.test.ts` muss mindestens 26 ausgeben (die 20 bestehenden Fälle, angepasst an `waits`, dazu je einer: long-180 mit einem Eintrag „still running“ und einem mit dem Ende besteht; ein Text ohne Befehl fällt durch, auch wenn die Dateien das Ergebnis tragen; ein Eintrag mit 30000 ms oder mehr oder mit `abort` fällt durch; ein Eintrag mit einem anderen Befehl als dem aus dem Text fällt durch; mehr Einträge als die Grenze fallen durch; ein letzter Eintrag ohne Label oder mit anderem Exit-Code fällt durch; long-60 mit direktem Ergebnis besteht ohne `waits`).
       Prüfung: `T=$(mktemp -d); git archive HEAD | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; f=$T/harness/e2e/long-exec.mjs; if ! grep -q "export function waitCommandOf(" $f; then echo "fehlt waitCommandOf"; else sed -i "s/export function waitCommandOf(/function waitCommandOfOrig(/" $f; echo 'export function waitCommandOf() { return "true"; }' >> $f; (cd $T && PATH=/usr/bin:$PATH pnpm -s vitest run test/long-exec.test.ts >/dev/null 2>&1) && echo "gruen ohne waitCommandOf"; fi; rm -rf $T` muss nichts ausgeben.
-- [ ] Im Job `e2e` des Goal-PR holt der Gang mit der unveränderten Runtime das Ergebnis von 180 s über den Befehl aus dem Text, jeder
+- [x] Im Job `e2e` des Goal-PR holt der Gang mit der unveränderten Runtime das Ergebnis von 180 s über den Befehl aus dem Text, jeder
       Aufruf unter 30 s, und der Job ist grün.
       MVP: Funktion, weil nur dieser Lauf Control Plane, Nachbau `sandboxd` und Runtime am Pin zusammen zeigt.
       Prüfung: `grep -cE 'long_exec=\$long_exec' harness/e2e/full.sh` muss mindestens 2 ausgeben.
       Prüfung (Netz): `n=$(gh pr list -R matthiashippe/control-plane --head goal/sandbox-09 --state all --json number -q '.[0].number'); gh pr checks "${n:?}" -R matthiashippe/control-plane --json name,state -q '.[] | select(.name=="e2e") | .state'` muss `SUCCESS` ausgeben.
       Prüfung (Netz): `n=$(gh pr list -R matthiashippe/control-plane --head goal/sandbox-09 --state all --json number -q '.[0].number'); l=$(gh pr checks "${n:?}" -R matthiashippe/control-plane --json name,link -q '.[] | select(.name=="e2e") | .link'); gh run view --job "${l##*/}" --log -R matthiashippe/control-plane | grep -cE "E2E OK .*long_exec=true"` muss mindestens 1 ausgeben.
       Prüfung (Netz): `n=$(gh pr list -R matthiashippe/control-plane --head goal/sandbox-09 --state all --json number -q '.[0].number'); l=$(gh pr checks "${n:?}" -R matthiashippe/control-plane --json name,link -q '.[] | select(.name=="e2e") | .link'); gh run view --job "${l##*/}" --log -R matthiashippe/control-plane | grep -cE 'LONG_EXEC_RESULT .*"label":"long-180".*"waits":\[\{'` muss mindestens 1 ausgeben.
-- [ ] Nach jedem Rollout prüft `ops/live.sh` den Befehl aus `wait_command` in der eigenen Sandbox durch Caddy und gVisor und meldet
+- [x] Nach jedem Rollout prüft `ops/live.sh` den Befehl aus `wait_command` in der eigenen Sandbox durch Caddy und gVisor und meldet
       einen Fehlschlag mit eigener Zeile; der Selbsttest war vor dem Fix rot.
       MVP: Funktion, weil der Harness weder Caddy noch gVisor hat und ein Befehl, der dort länger als 30 s braucht oder nicht läuft,
       sonst erst beim nächsten Automaton auffällt.
       Prüfung: `for w in wait_command 'FAIL sandbox: background exec wait_command'; do grep -qF -- "$w" ops/live.sh || echo "fehlt $w"; done` muss nichts ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH bash ops/live.sh --selftest | grep -c "FAIL sandbox: background exec wait_command"` muss mindestens 1 ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/live-selftest.test.ts` muss Exit-Code 0 haben.
-- [ ] Die Doku sagt Runtime und Betrieb, wie ein Automaton auf einen Befehl im Hintergrund wartet, mit Messung vorher und nachher, und
+- [x] Die Doku sagt Runtime und Betrieb, wie ein Automaton auf einen Befehl im Hintergrund wartet, mit Messung vorher und nachher, und
       die Entscheidungen stehen mit Grund in den Annahmen.
       MVP: Funktion, weil ein Automaton die Fehlerreferenz liest, auf die jede Fehlerantwort verlinkt, und der Betrieb die Zahlen braucht,
       um eine Regression zu erkennen.
@@ -117,16 +117,36 @@ bezahlte Inferenz des Kunden; mit dem Befehl kostet das Warten höchstens eine R
       Prüfung: `awk '/^## Warten/{f=1;next} /^## /{f=0} f' docs/sandbox/lange-befehle.md | grep -cE "^- nachher 180 s: .*waits=[1-9][0-9]* max_wait_ms=[0-9]+ attempts=[1-9][0-9]* failures_after=0 runs=1$"` muss 1 ausgeben.
       Prüfung: `awk '/^## Warten/{f=1;next} /^## /{f=0} f' docs/sandbox/lange-befehle.md | grep -oE "max_wait_ms=[0-9]+" | awk -F= '$2 >= 30000' | wc -l` muss 0 ausgeben.
       Prüfung: `awk '/^## Goal 09/{f=1} f' goals/sandbox/ANNAHMEN.md | grep -ciE "wait_command|EXEC_WAIT_S|25 s|still running|vorher|live.sh"` muss mindestens 5 ausgeben.
-- [ ] Das Goal ändert weder `sandboxd`, Image und Server noch Runtime, Zahlung, Anmeldung, Deploy oder CI und bringt keinen Schlüssel
+- [x] Das Goal ändert weder `sandboxd`, Image und Server noch Runtime, Zahlung, Anmeldung, Deploy oder CI und bringt keinen Schlüssel
       ins Repo.
       MVP: Funktion, weil das Repo öffentlich ist (Grundregel 8), die Runtime am Pin die Referenz bleibt (Grundregel 13) und ein Wechsel
       des Textes keinen Rollout auf dem Sandbox-Server braucht.
       Prüfung: `git diff --name-only origin/dev...HEAD -- ops/sandbox harness/runtime src/payments src/auth deploy .github scripts/check.mjs | wc -l` muss 0 ausgeben.
       Prüfung: `git diff --name-only origin/dev...HEAD | grep -cE "\.(key|pem|crt|env)$"` muss 0 ausgeben.
       Prüfung: `git diff origin/dev...HEAD -- . ':(exclude)goals/' | grep -cE '^\+.*(cnwy_k_[0-9a-f]{32}|-{5}BEGIN [A-Z ]*PRIVATE KEY-{5})'` muss 0 ausgeben.
-- [ ] `check` ist grün.
+- [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] Nach jedem Rollout beweist `ops/live.sh` einen vollen Aufruf des Wartebefehls von 25 s durch Caddy und gVisor: Die Prüfung
+      `sandbox` startet im Hintergrund `sleep 50; echo bg-ok` (Antwort nach 20 s, der erste Aufruf wartet die vollen 25 s, der zweite
+      bekommt das Ende), ruft `wait_command` höchstens dreimal auf, verlangt, dass der erste Aufruf „still running“ meldet, und jeder
+      Aufruf bleibt unter 30000 ms; meldet schon der erste Aufruf das Ende, steht dort
+      `FAIL sandbox: background exec wait_command ended on the first call`. Der Selbsttest war vor dem Fix rot.
+      MVP: Funktion, weil mit `sleep 25` der einzige Aufruf in Produktion rund 5 s wartet: Ob ein voller Aufruf mit `bash -lc` in
+      gVisor, `docker exec`, Caddy und Signatur unter den 30 s der Runtime bleibt, misst sonst nur der Harness ohne all das
+      (`max_wait_ms=25046` bei 5 s Rand), und ein Automaton mit `npm install` fände es als Erster heraus.
+      Prüfung: `grep -oE 'sleep [0-9]+; echo bg-ok' ops/live.sh | awk '$2+0 < 50' | wc -l` muss 0 ausgeben.
+      Prüfung: `grep -oE '"command":"sleep [0-9]+; echo bg-ok"' ops/live.sh | grep -c '"command":"sleep 50; echo bg-ok"'` muss mindestens 1 ausgeben.
+      Prüfung: `PATH=/usr/bin:$PATH bash ops/live.sh --selftest | grep -c "FAIL sandbox: background exec wait_command ended on the first call"` muss mindestens 1 ausgeben.
+      Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/live-selftest.test.ts` muss Exit-Code 0 haben.
+- [x] Der Wartebefehl begrenzt sein Warten nach der Uhr (`$SECONDS` der Bash), nicht nach der Zahl der Runden: Er endet spätestens
+      eine Runde nach `seconds` Sekunden seit seinem Start, auch wenn jedes `sleep 1` in gVisor länger dauert. Der Test war vor dem Fix
+      rot.
+      MVP: Funktion, weil heute 25 Runden aus `sleep 1` und Prüfung je Runde Zeit für den Start eines Prozesses kosten, die in gVisor
+      ein Vielfaches beträgt; das zählt gegen dieselben 5 s Rand bis zum Abbruch der Runtime.
+      Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/sandbox-wait.test.ts` muss Exit-Code 0 haben.
+      Prüfung: `grep -cE "^\s*(it|test)\(" test/sandbox-wait.test.ts` muss mindestens 9 ausgeben (neu: mit einem `sleep` im `PATH`, das je Aufruf 2 s braucht, endet `waitCommand(base, 3)` ohne Exit-Datei in echtem Bash in weniger als 4500 ms; nach der Zahl der Runden wären es 6 s).
+      Prüfung: `awk '/export function waitCommand\(/,/^}/' src/sandbox/service.ts | grep -c 'SECONDS'` muss mindestens 1 ausgeben.
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Jede neue Testdatei, jeder neue Fall und jede neue Selbsttest-Zeile war vor dem Fix rot; die Zeile im Progress Log nennt, womit.
@@ -150,6 +170,13 @@ bezahlte Inferenz des Kunden; mit dem Befehl kostet das Warten höchstens eine R
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-16 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6, 7 gebaut: Wartebefehl mit 25 s in `src/sandbox/service.ts` als Feld und letzte Zeile von stdout, Harness und Urteil folgen dem Befehl aus dem Text, `ops/live.sh` prüft ihn nach dem Rollout, Doku und Annahmen mit Messung vorher (lokal, Commit `08164a6`) und nachher (Job e2e von PR #210, Commit `b37f852`). Rot vor dem Fix: die vier neuen oder geänderten Testdateien gegen den Code von `origin/dev` (`08164a6`) mit 4 von 4 Dateien und 11 Fällen rot, der Selbsttest von `ops/live.sh` auf `dev` ohne die neue Fehlzeile, die Ersatzproben aus Punkt 1 und 2 (Funktion durch eine leere ersetzt) rot. Prüfbefehle: Punkt 1 vitest Exit 0, 8 Fälle, keine Zeichenfolge fehlt, Konstante 1, Ersatzprobe leer; Punkt 2 vitest Exit 0, keine Zeichenfolge fehlt, alte Konstante 0, 28 Fälle, Ersatzprobe leer; Punkt 3 full.sh 2, Job e2e grün, Erfolgszeile 1, Ergebnis long-180 mit Wartezeilen 1 (7 Aufrufe, längster 25046 ms); Punkt 4 keine Zeichenfolge fehlt, Selbsttest 15 Fehlzeilen, vitest Exit 0; Punkt 5 errors.md 2, vorher 1, nachher 1, ab 30000 ms 0 (Gegenprobe mit gepflanztem Wert 1), Annahmen 11; Punkt 6 0, 0, 0; Punkt 7 check Exit 0.
+- 2026-11-16 Zyklus 2: Abschluss gemeldet, Punkte 1 bis 7, dev ohne neuen Commit seit dem Start (`08164a6` ist Vorfahr des Kopfs), kein Code geändert. Prüfbefehle: jeder einzeln am Kopf `d2ae82c`, 2026-11-16 12:54 bis 12:57 UTC; dieser Commit ändert danach nur diese Zeile. P1 vitest Exit 0; 8 Fälle; keine Zeichenfolge fehlt; Konstante 1; Ersatzprobe leer. P2 vitest Exit 0; keine Zeichenfolge fehlt; alte Konstante 0; 28 Fälle; Ersatzprobe leer. P3 full.sh 2; e2e SUCCESS (Run 43869061515); Erfolgszeile 1; Ergebnis long-180 mit Wartezeilen 1. P4 keine Zeichenfolge fehlt; Selbsttest 15 Fehlzeilen; vitest live-selftest Exit 0. P5 errors.md 2; vorher 1; nachher 1; ab 30000 ms 0; Annahmen 11. P6 Deny-Pfade 0; Schlüsseldateien 0; Schlüssel im Diff ohne goals/ 0. P7 check Exit 0 (184 Dateien, 2063 Tests); check auf GitHub SUCCESS.
+- 2026-11-16 Zyklus 3: Punkt 8 gebaut: Die Prüfung `sandbox` in `ops/live.sh` startet nach der Kritik den Befehl von 50 s, ruft den Wartebefehl höchstens dreimal auf und verlangt, dass der erste die vollen 25 s wartet und „still running“ meldet, sonst die neue Fehlzeile; Doku und Annahmen nachgezogen. Rot vor dem Fix am Kopf `c346ce6`: Zähler der kurzen Befehle 3, Zähler des Befehls von 50 s 0, neue Fehlzeile im Selbsttest 0, vitest live-selftest 1 von 7 Fällen rot. Prüfbefehle: kurze Befehle 0; Befehl von 50 s 1; Selbsttest mit der neuen Fehlzeile 2; vitest live-selftest Exit 0; dazu Punkt 4 unverändert grün (keine Zeichenfolge fehlt, Selbsttest 18 Fehlzeilen).
+- 2026-11-16 Zyklus 4: Punkt 9 gebaut: `waitCommand` merkt sich `$SECONDS` beim Start und wartet nach der Uhr statt nach der Zahl der Runden; ein neuer Test fährt ihn in echtem Bash mit einem `sleep` von 2 s je Aufruf, die Untergrenze des Tests vor dem Ende ist wegen ganzer Sekunden `(seconds - 1) * 1000` ms statt 1900 ms, Grund in den Annahmen. Rot vor dem Fix am Kopf `c0ecab6`: der neue Fall mit 6013 ms statt unter 4500 ms, Zähler der Uhr in `waitCommand` 0. Prüfbefehle: vitest sandbox-wait Exit 0 (dreimal hintereinander); 9 Fälle; Uhr in `waitCommand` 1; check Exit 0 (184 Dateien, 2064 Tests).
+- 2026-11-16 Zyklus 5: Punkt 9 nachgebessert, weil der Job `check` auf GitHub am Kopf `6fbcaa0` den neuen Fall mit 4501 ms von außen gemessen rot meldete (Lauf 43874571613): Der Fall nimmt die Dauer jetzt in Bash direkt vor und nach dem Wartebefehl, Grund in den Annahmen. Rot gegen den Befehl, der nach Runden zählt (`c0ecab6`): 6008 ms. Prüfbefehle: vitest sandbox-wait Exit 0 (zweimal, 4010 und 4014 ms); 9 Fälle; Uhr in `waitCommand` 1.
+- 2026-11-16 Zyklus 6: Abschluss gemeldet, Punkte 1 bis 9, nach der Kritik mit den Punkten 8 (Zyklus 3) und 9 (Zyklen 4 und 5); danach die Zeile nachher in der Doku auf den Lauf am Wartebefehl nach der Uhr gesetzt (`99d9b5d`, Werte gleich) und dev (`2defd78`, nur Audit und Vorschläge) ohne Konflikt gemergt als `8d026c3`. Prüfbefehle: P1 bis P4, P8 und P9 am Kopf `6fbcaa0` 13:19 bis 13:20 UTC, die seither berührten (P1, P5, P6, P9) noch einmal am Kopf `99d9b5d` um 13:43 UTC, P6 und P7 am Merge-Kopf `8d026c3` um 13:44 UTC. P1 vitest Exit 0; 9 Fälle; keine Zeichenfolge fehlt; Konstante 1; Ersatzprobe leer. P2 vitest Exit 0; keine Zeichenfolge fehlt; alte Konstante 0; 28 Fälle; Ersatzprobe leer. P3 full.sh 2; e2e SUCCESS am Kopf `99d9b5d` (Run 43876710314); Erfolgszeile 1; Ergebnis long-180 mit Wartezeilen 1. P4 keine Zeichenfolge fehlt; Selbsttest 18 Fehlzeilen; vitest live-selftest Exit 0. P5 errors.md 2; vorher 1; nachher 1; ab 30000 ms 0; Annahmen 14. P6 Deny-Pfade 0; Schlüsseldateien 0; Schlüssel im Diff ohne goals/ 0. P7 check Exit 0 (184 Dateien, 2064 Tests), check auf GitHub SUCCESS am Kopf `99d9b5d`. P8 kurze Befehle 0; Befehl von 50 s 1; Selbsttest mit der neuen Fehlzeile 2; vitest live-selftest Exit 0. P9 vitest sandbox-wait Exit 0; 9 Fälle; Uhr in `waitCommand` 1.
+- 2026-11-16 Release: PASS K und B (Zyklus 6), DONE.
 
 ## Blockers
 Keine.
