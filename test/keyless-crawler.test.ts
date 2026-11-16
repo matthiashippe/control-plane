@@ -6,6 +6,7 @@ import { createApp } from "../src/app.js";
 import { openDb } from "../src/db.js";
 import { resolveApiKey } from "../src/auth/siwe.js";
 import { agentMintsToday, crawlerMintsToday, isDeclaredCrawler, KEYLESS_CRAWLER_NAME } from "../src/auth/keyless.js";
+import { mintAgentIdentity } from "../src/auth/keyless.js";
 
 /**
  * A declared crawler must not empty the keyless door for everybody else.
@@ -76,7 +77,7 @@ describe("a declared crawler has its own cap at the keyless door", () => {
       const res = await mint(app, CRAWLER_UA, crawlerAddress(i));
       expect(res.status).toBe(201);
       const body = (await res.json()) as { keys_left_today: number };
-      expect(body.keys_left_today, "the crawler is told its own cap, not the 200").toBe(4);
+      expect(body.keys_left_today, "the crawler is told its own cap, not the 200").toBe(4 - i);
     }
     expect(agentMintsToday(db)).toBe(0);
     expect(crawlerMintsToday(db)).toBe(5);
@@ -93,6 +94,74 @@ describe("a declared crawler has its own cap at the keyless door", () => {
     const third = await mint(app, CRAWLER_UA, crawlerAddress(2));
     expect(third.status).toBe(429);
     expect(((await third.json()) as { error: string }).error).toBe("crawler_daily_limit");
+  });
+});
+
+describe("keys_left_today counts the places that are really left", () => {
+  const leftOf = async (res: Response) => ((await res.json()) as { keys_left_today: number }).keys_left_today;
+
+  it("keys_left_today counts down a declared crawler's own places", async () => {
+    const { app } = setup();
+    const seen: number[] = [];
+    for (let i = 0; i < 5; i++) {
+      const res = await mint(app, CRAWLER_UA, crawlerAddress(i));
+      expect(res.status, `crawler request ${i + 1}`).toBe(201);
+      seen.push(await leftOf(res));
+    }
+    expect(seen).toEqual([4, 3, 2, 1, 0]);
+    const sixth = await mint(app, CRAWLER_UA, crawlerAddress(5));
+    expect(sixth.status).toBe(429);
+    const body = (await sixth.json()) as Record<string, unknown>;
+    expect(body.error).toBe("crawler_daily_limit");
+    expect(body).not.toHaveProperty("keys_left_today");
+  });
+
+  it("keys_left_today counts down the places of everybody else", async () => {
+    const { app } = setup();
+    for (let i = 0; i < 3; i++) expect((await mint(app, CRAWLER_UA, crawlerAddress(i))).status).toBe(201);
+    const first = await mint(app, "node", "192.0.2.50");
+    expect(first.status).toBe(201);
+    expect(await leftOf(first)).toBe(199);
+    const second = await mint(app, "node", "192.0.2.51");
+    expect(second.status).toBe(201);
+    expect(await leftOf(second)).toBe(198);
+    const crawler = await mint(app, CRAWLER_UA, crawlerAddress(3));
+    expect(crawler.status).toBe(201);
+    expect(await leftOf(crawler)).toBe(1);
+  });
+
+  it("keys_left_today follows the caps set by the environment", async () => {
+    process.env.CP_AGENT_MINTS_PER_DAY = "3";
+    process.env.CP_CRAWLER_MINTS_PER_DAY = "2";
+    const { app } = setup();
+    const agents: number[] = [];
+    for (let i = 0; i < 3; i++) {
+      const res = await mint(app, "node", `192.0.2.${60 + i}`);
+      expect(res.status, `agent request ${i + 1}`).toBe(201);
+      agents.push(await leftOf(res));
+    }
+    expect(agents).toEqual([2, 1, 0]);
+    const fourth = await mint(app, "node", "192.0.2.63");
+    expect(fourth.status).toBe(429);
+    expect(((await fourth.json()) as { error: string }).error).toBe("daily_limit");
+    const crawlers: number[] = [];
+    for (let i = 0; i < 2; i++) {
+      const res = await mint(app, CRAWLER_UA, crawlerAddress(i));
+      expect(res.status, `crawler request ${i + 1}`).toBe(201);
+      crawlers.push(await leftOf(res));
+    }
+    expect(crawlers).toEqual([1, 0]);
+  });
+
+  it("keys_left_today refills at midnight UTC", () => {
+    const db = openDb(":memory:");
+    const late = Date.parse("2026-11-16T23:59:00Z");
+    const early = Date.parse("2026-11-17T00:01:00Z");
+    expect(mintAgentIdentity(db, late, CRAWLER_UA).keysLeftToday).toBe(4);
+    expect(mintAgentIdentity(db, late, CRAWLER_UA).keysLeftToday).toBe(3);
+    expect(mintAgentIdentity(db, late).keysLeftToday).toBe(199);
+    expect(mintAgentIdentity(db, early, CRAWLER_UA).keysLeftToday).toBe(4);
+    expect(mintAgentIdentity(db, early).keysLeftToday).toBe(199);
   });
 });
 
