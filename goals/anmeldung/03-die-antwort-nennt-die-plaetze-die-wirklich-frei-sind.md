@@ -129,6 +129,7 @@ statt bei 0 freien Plätzen „4 übrig“ zu lesen und in ein 429 zu laufen.
 
 ## Progress Log
 - 2026-11-16 Zyklus 1: Punkte 1, 2, 3, 4 gebaut: `mintAgentIdentity` rechnet `keysLeftToday` in seiner Transaktion aus der Zählung vor dem Eintrag plus 1 (`MintedAgentIdentity`), die Route setzt damit `keys_left_today`, die drei Importe fallen aus `src/app.ts`. Rot vor dem Fix: alle 4 neuen Fälle und die geänderte Erwartung in Zeile 79 (5 failed, 5 passed mit dem Stand von `src/` der Merge-Basis). Produktion nicht aufgerufen. Prüfbefehle (Node 22.23.5, PATH=/usr/bin:$PATH, am Commit d5bfe00): P1 vitest Exit 0 (10 passed), `4`, `1`, `0`, `rc=1` und `0`; P2 `1`, `1`, vitest Exit 0, `8`; P3 `0`, `1`, `6`, `0`, `8`, vitest Exit 0 (49 passed); P4 `node scripts/check.mjs` Exit 0 (1915 passed, grün in 81 s), `0`, `0`, `0`, `0`.
+- 2026-11-16 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4; `dev` ohne neuen Commit seit der Merge-Basis c1d7f74, kein Merge nötig. Prüfbefehle (Node 22.23.5, am Commit 7ac0c73): P1 vitest Exit 0 (10 passed), `4`, `1`, `0`, `rc=1` und `0`; P2 `1`, `1`, vitest Exit 0 (1 passed, 9 skipped durch `-t`), `8`; P3 `0`, `1`, `6`, `0`, `8`, vitest Exit 0 (49 passed); P4 `node scripts/check.mjs` Exit 0 (1915 passed, grün in 52 s), `0`, `0`, `0`, `0`; Job `e2e` am PR #194 grün (`E2E OK turns=5 registered=true api_errors=0 ledger_consistent=true`). Produktion nicht aufgerufen.
 
 ## Blockers
 - keine
