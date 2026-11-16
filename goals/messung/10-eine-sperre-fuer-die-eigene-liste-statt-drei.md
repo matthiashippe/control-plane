@@ -166,6 +166,7 @@ Kunden misst.
 ## Progress Log
 - 2026-11-16 Widerlegung geprüft: vierter Prüfbefehl von Punkt 1 an der Merge-Basis a127d5d gibt `exit 1 failed 1`, dort gibt `conway_own_list` bei einem `own_ips` mit Exit 1 die Rückgabe 0 und schreibt die Adresse in seine Datei; das Goal ist nicht widerlegt.
 - 2026-11-16 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6 gebaut (`own_ips_checked` in `ops/own-ips.sh`, die drei Werkzeuge rufen nur sie, `fetch_rows` in `ops/timeout-quote.sh` bricht selbst ab, die Datei hat 497 Zeilen, zwei Zeilen weniger in `READER_EXCEPTIONS`, neuer Test `test/own-ips-checked.test.ts` an der Merge-Basis mit 5 roten und 1 grünem Fall); `ops/README.md` nennt die Werkzeuge nicht und blieb unverändert. Prüfbefehle: P1 Kopfzeile 1, vitest Exit 0, Merge-Basis `exit 1 failed 1`, Merge-Basis conway `exit 1 failed 1`; P2 0, 0; P3 0, 2, 0, vitest Exit 0; P4 `kleiner`, `ok`, 0; P5 vitest Exit 0 (119 passed), Diff `test` 0; P6 `check` Exit 0 (2132 passed), gesperrte Pfade 0, `ops` 0.
+- 2026-11-16 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6 (`dev` unverändert auf a127d5d, kein Merge nötig). Prüfbefehle am Kopf 75982c3: P1 Kopfzeile 1, vitest Exit 0, Merge-Basis `exit 1 failed 1`, Merge-Basis conway `exit 1 failed 1`; P2 0, 0; P3 0, 2, 0, vitest Exit 0; P4 `kleiner` (497 Zeilen), `ok`, 0; P5 vitest Exit 0 (119 passed), Diff `test` 0; P6 `check` Exit 0 (2132 passed), gesperrte Pfade 0, `ops` 0; `ops/own-ips.txt` unverändert.
 
 ## Blockers
 - keine
