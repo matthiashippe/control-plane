@@ -1,7 +1,7 @@
 # Messung Goal 10: Eine Sperre für die eigene Liste statt drei
 
 ## Status
-PLANNED
+ACTIVE
 
 ## Active Objective
 Die Regel „eine fehlende oder leere eigene Liste hält die Zählung an“ steht am Kopf von `dev` (82fd213) dreimal außerhalb von
@@ -105,32 +105,32 @@ Kunden misst.
   dieser Text offen lässt, schreibt der Maker als Zeile `- messung 10 (Engineer CP, <Datum>): …` in `goals/messung/ANNAHMEN.md`.
 
 ## Done Condition
-- [ ] `ops/own-ips.sh` hat `own_ips_checked`, die bei fehlender oder leerer Liste und bei gescheitertem `own_ips` mit 2 und einer
+- [x] `ops/own-ips.sh` hat `own_ips_checked`, die bei fehlender oder leerer Liste und bei gescheitertem `own_ips` mit 2 und einer
       Zeile ohne Adresse endet und sonst nennt, was `own_ips` nennt; der neue Test war an der Merge-Basis rot.
       Prüfung: `grep -c '^own_ips_checked() {$' ops/own-ips.sh` muss 1 ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH timeout 300 pnpm -s vitest run test/own-ips-checked.test.ts` muss Exit-Code 0 haben.
       Prüfung: `T=$(mktemp -d); mb=$(git merge-base origin/dev HEAD); git show $mb:ops/own-ips.sh > $T/own-ips.sh; git show $mb:ops/conway-arrivals.sh > $T/conway-arrivals.sh; PATH=/usr/bin:$PATH OPS_UNDER_TEST=$T timeout 300 pnpm -s vitest run test/own-ips-checked.test.ts > $T/out 2>&1; echo "exit $? failed $(grep -cE 'Tests +5 failed \| 1 passed' $T/out)"` muss genau `exit 1 failed 1` ausgeben.
       Prüfung: `T=$(mktemp -d); mb=$(git merge-base origin/dev HEAD); git show $mb:ops/own-ips.sh > $T/own-ips.sh; git show $mb:ops/conway-arrivals.sh > $T/conway-arrivals.sh; PATH=/usr/bin:$PATH OPS_UNDER_TEST=$T timeout 300 pnpm -s vitest run test/own-ips-checked.test.ts -t "conway_own_list returns 2 when own_ips ends with an exit other than 0" > $T/out 2>&1; echo "exit $? failed $(grep -cE 'Tests +1 failed' $T/out)"` muss genau `exit 1 failed 1` ausgeben.
-- [ ] `ops/conway-arrivals.sh`, `ops/timeout-quote.sh` und `ops/anzeigen-rechnung.py` rufen `own_ips_checked`, und keine ihrer
+- [x] `ops/conway-arrivals.sh`, `ops/timeout-quote.sh` und `ops/anzeigen-rechnung.py` rufen `own_ips_checked`, und keine ihrer
       eigenen Prüfungen der Liste steht mehr da.
       Prüfung: `for f in ops/conway-arrivals.sh ops/timeout-quote.sh ops/anzeigen-rechnung.py; do grep -c own_ips_checked $f; done | grep -c '^0$'` muss 0 ausgeben.
       Prüfung: `cat ops/conway-arrivals.sh ops/timeout-quote.sh ops/anzeigen-rechnung.py | grep -cE "awk '!/\^#/|grep -v '\^#'|LIST_NAMES_AN_ADDRESS|has no list of our own|has an empty list of our own|named no own address"` muss 0 ausgeben.
-- [ ] Die Ausnahmeliste des Wächters verliert genau `ops/timeout-quote.sh` und `ops/anzeigen-rechnung.py`, und der Wächter bleibt
+- [x] Die Ausnahmeliste des Wächters verliert genau `ops/timeout-quote.sh` und `ops/anzeigen-rechnung.py`, und der Wächter bleibt
       grün.
       Prüfung: `grep -cE 'path: "ops/(timeout-quote\.sh|anzeigen-rechnung\.py)"' test/own-ips-readers.test.ts` muss 0 ausgeben.
       Prüfung: `grep -cE 'path: "ops/(actions-log-addresses|keyless-mints)\.sh"' test/own-ips-readers.test.ts` muss 2 ausgeben.
       Prüfung: `git diff -U0 $(git merge-base origin/dev HEAD) HEAD -- test/own-ips-readers.test.ts | grep -E '^[-+]' | grep -vE '^(---|\+\+\+) ' | grep -vcE '^-  \{ path: "ops/(timeout-quote\.sh|anzeigen-rechnung\.py)"'` muss 0 ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH timeout 300 pnpm -s vitest run test/own-ips-readers.test.ts` muss Exit-Code 0 haben.
-- [ ] `ops/timeout-quote.sh` hat höchstens 500 Zeilen oder die Commit-Message nennt die Größe, und die Hilfe zeigt weiter nur den
+- [x] `ops/timeout-quote.sh` hat höchstens 500 Zeilen oder die Commit-Message nennt die Größe, und die Hilfe zeigt weiter nur den
       Kopfkommentar.
       Prüfung: `test $(wc -l < ops/timeout-quote.sh) -lt 522 && echo kleiner` muss genau `kleiner` ausgeben.
       Prüfung: `test $(wc -l < ops/timeout-quote.sh) -le 500 && echo ok || { git log --format=%B $(git merge-base origin/dev HEAD)..HEAD -- ops/timeout-quote.sh | grep -qE '[0-9]+ (Zeilen|lines)' && echo begründet; }` muss `ok` oder `begründet` ausgeben.
       Prüfung: `r=$(sed -nE "s/.*sed -n '([0-9]+,[0-9]+)p' .*/\1/p" ops/timeout-quote.sh); sed -n "${r}p" ops/timeout-quote.sh | grep -vcE '^#( |$)'` muss 0 ausgeben.
-- [ ] Die bestehenden Tests der drei Werkzeuge und rund um die eigene Liste bleiben unverändert und grün, und unter `test/` ändern
+- [x] Die bestehenden Tests der drei Werkzeuge und rund um die eigene Liste bleiben unverändert und grün, und unter `test/` ändern
       sich nur die beiden genannten Dateien.
       Prüfung: `PATH=/usr/bin:$PATH timeout 600 pnpm -s vitest run test/own-ips test/conway-arrivals test/landing-yield test/github-yield test/timeout-quote test/anzeigen-rechnung test/keyless-mints test/claim-keyless test/deploy-window` muss Exit-Code 0 haben.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD -- test | grep -vcE '^test/(own-ips-checked|own-ips-readers)\.test\.ts$'` muss 0 ausgeben.
-- [ ] `check` ist grün, gesperrte Pfade bleiben unverändert, und unter `ops/` ändern sich nur die vier Dateien und
+- [x] `check` ist grün, gesperrte Pfade bleiben unverändert, und unter `ops/` ändern sich nur die vier Dateien und
       `ops/README.md`.
       Prüfung: `PATH=/usr/bin:$PATH timeout 900 node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD | grep -cE '^(\.github|deploy|src|harness|scripts|docs)/|^goals/kanal/|^ops/own-ips\.txt$'` muss 0 ausgeben.
@@ -164,6 +164,8 @@ Kunden misst.
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-16 Widerlegung geprüft: vierter Prüfbefehl von Punkt 1 an der Merge-Basis a127d5d gibt `exit 1 failed 1`, dort gibt `conway_own_list` bei einem `own_ips` mit Exit 1 die Rückgabe 0 und schreibt die Adresse in seine Datei; das Goal ist nicht widerlegt.
+- 2026-11-16 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6 gebaut (`own_ips_checked` in `ops/own-ips.sh`, die drei Werkzeuge rufen nur sie, `fetch_rows` in `ops/timeout-quote.sh` bricht selbst ab, die Datei hat 497 Zeilen, zwei Zeilen weniger in `READER_EXCEPTIONS`, neuer Test `test/own-ips-checked.test.ts` an der Merge-Basis mit 5 roten und 1 grünem Fall); `ops/README.md` nennt die Werkzeuge nicht und blieb unverändert. Prüfbefehle: P1 Kopfzeile 1, vitest Exit 0, Merge-Basis `exit 1 failed 1`, Merge-Basis conway `exit 1 failed 1`; P2 0, 0; P3 0, 2, 0, vitest Exit 0; P4 `kleiner`, `ok`, 0; P5 vitest Exit 0 (119 passed), Diff `test` 0; P6 `check` Exit 0 (2132 passed), gesperrte Pfade 0, `ops` 0.
 
 ## Blockers
 - keine
