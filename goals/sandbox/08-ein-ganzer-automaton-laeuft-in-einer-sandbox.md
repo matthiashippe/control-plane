@@ -208,6 +208,30 @@ betreibt seinen Dienst bei uns, bezahlt aus Credits) bleibt für alle ohne eigen
       Prüfung: `git diff origin/dev...HEAD -- . ':(exclude)goals/' | grep -cE '^\+.*(cnwy_k_[0-9a-f]{32}|-{5}BEGIN [A-Z ]*PRIVATE KEY-{5})'` muss 0 ausgeben.
 - [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
+- [ ] Ein Schlüssel `automaton:<id>` (erkannt mit `isAutomatonKey`) bekommt 403 `forbidden` auf `GET /v1/auth/api-keys` und
+      `POST /v1/auth/api-keys/revoke`, 404 auf Zustand, Log, Stopp, Start und Löschen jedes anderen Automatons seines Kontos und 404 auf
+      `/v1/sandboxes/{id}` samt `/exec`, `/files/upload/json`, `/files/read` und `/ports/expose` jeder Sandbox, in der ein anderer
+      Automaton läuft; der eigene Automaton, die eigene Sandbox, Kind-Sandboxes, Inferenz, Credits, Relay und
+      `POST /v1/automatons/register` bleiben ihm offen, und ein Schlüssel des Kunden bleibt unverändert. Der Test war vor dem Fix rot.
+      MVP: Funktion, weil die Runtime Nachrichten Fremder über das Relay liest (`check_social_inbox` bleibt an) und mit ihrem Schlüssel
+      jede Route ruft: Ohne diese Grenze genügt eine Nachricht, damit ein Automaton den Hauptschlüssel des Kunden widerruft, dessen
+      andere Automatons löscht oder in deren Sandbox mit `/files/read` die Schlüsseldatei der Wallet liest (Entscheidung 6, Isolation).
+      Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/automaton-scope.test.ts` muss Exit-Code 0 haben.
+      Prüfung: `grep -cE "^\s*(it|test)\(" test/automaton-scope.test.ts` muss mindestens 6 ausgeben (je ein Fall: Schlüsselliste 403; Widerruf 403 und der Schlüssel des Kunden bleibt gültig; anderer Automaton 404 auf Zustand, Log, Stopp, Start und Löschen; Sandbox eines anderen Automatons 404 auf exec, upload, read und expose; eigener Automaton und Kind-Sandbox bleiben offen; der Schlüssel des Kunden erreicht alles wie vorher).
+      Prüfung: `for w in /v1/auth/api-keys /v1/auth/api-keys/revoke 403 404 /exec /files/read /logs DELETE; do grep -qF -- "$w" test/automaton-scope.test.ts || echo "fehlt $w"; done` muss nichts ausgeben.
+      Prüfung: `T=$(mktemp -d); git archive HEAD | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; f=$(grep -rlE "export function isAutomatonKey\(" $T/src/automaton | head -1); if [ -z "$f" ]; then echo "fehlt isAutomatonKey"; else sed -i "s/export function isAutomatonKey(/function isAutomatonKeyOrig(/" $f; echo "export function isAutomatonKey(..._a: unknown[]): boolean { return false; }" >> $f; (cd $T && PATH=/usr/bin:$PATH pnpm -s vitest run test/automaton-scope.test.ts >/dev/null 2>&1) && echo "gruen ohne isAutomatonKey"; fi; rm -rf $T` muss nichts ausgeben.
+      Prüfung: `git diff --name-only origin/dev...HEAD -- src/auth | wc -l` muss 0 ausgeben.
+- [ ] `POST /v1/automatons` mit dem Header `Idempotency-Key` legt bei einer Wiederholung keinen zweiten Automaton, keine zweite
+      Sandbox und keinen zweiten Schlüssel an, auch nicht, solange die erste Anfrage noch läuft, und nicht nach einem Neustart des
+      Control Planes dazwischen (der Schlüssel steht in der Datenbank, nicht nur im Speicher); derselbe Header mit anderem Body gibt 409
+      ohne Aufruf an `sandboxd`, ohne Header bleibt es wie bisher. Der Test war vor dem Fix rot.
+      MVP: Funktion, weil das Anlegen bis zu dreieinhalb Minuten dauern kann (Sandbox bis 120 s, `automaton-start` bis 90 s) und ein
+      Client, der nach seinem Timeout wiederholt (konto 04 baut darauf), sonst einen zweiten Automaton bekommt, der den zweiten Platz des
+      Kontos belegt und doppelt kostet (Abrechnung, `LOOP.md` Technik: Idempotenz über den Schlüssel, den der Client liefert).
+      Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/automaton-idempotency.test.ts` muss Exit-Code 0 haben.
+      Prüfung: `grep -cE "^\s*(it|test)\(" test/automaton-idempotency.test.ts` muss mindestens 4 ausgeben (je ein Fall: zweimal derselbe Header und Body nacheinander und gleichzeitig gibt dieselbe id und genau einen Aufruf an den nachgebauten sandboxd; derselbe Header mit anderem Body gibt 409; ein neues createApp auf derselben Datenbank gibt dieselbe id ohne Aufruf; ohne Header je Aufruf ein eigener Automaton).
+      Prüfung: `for w in Idempotency-Key 409 createApp sandboxd; do grep -qF -- "$w" test/automaton-idempotency.test.ts || echo "fehlt $w"; done` muss nichts ausgeben.
+      Prüfung: `awk '/^## automatons/{f=1;next} /^## /{f=0} f' docs/errors.md | grep -c "Idempotency-Key"` muss mindestens 1 ausgeben.
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
