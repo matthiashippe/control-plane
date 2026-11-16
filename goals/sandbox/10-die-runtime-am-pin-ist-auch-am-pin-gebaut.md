@@ -118,6 +118,7 @@ nächsten zahlenden Automaton auf.
 
 ## Progress Log
 - 2026-11-16 Zyklus 1: Punkte 1, 2, 3, 4, 5 gebaut, Stempel über dist/ im Git-Verzeichnis, runtime_state meldet dist, build_runtime baut dann neu; vorher rot mit SELFTEST FAIL (5 of 26 cases), rot waren die vier dist-Fälle (OK statt FAIL) und rebuild-changed-dist (builds=0). Prüfbefehle: Punkt 1 SELFTEST OK, 6, 4, 1, nichts fehlt; Punkt 2 beide Mutationen ohne Ausgabe (konstante Summe macht 3 Fälle rot, Bau ohne Stempel 2); Punkt 3 1, 1, 0, 10; Punkt 4 0, 0, 0; Punkt 5 check Exit 0 (grün in 98 s, 2067 Tests).
+- 2026-11-16 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, dev war schon im Branch. Prüfbefehle: Punkt 1 SELFTEST OK, 6, 4, 1, nichts fehlt; Punkt 2 beide Mutationen ohne Ausgabe; Punkt 3 1, 1, 0, 10; Punkt 4 0, 0, 0; Punkt 5 check Exit 0 (grün in 54 s).
 
 ## Blockers
 - keine
