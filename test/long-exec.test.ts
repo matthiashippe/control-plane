@@ -4,18 +4,25 @@
  * section Vorher): the unmodified runtime at d8f8168 against dist/index.js of e8ab65f over TLS with the rebuilt sandboxd,
  * 2026-11-13 on the code-host. long-60 passed there (one abort, then the result through the repeat with the same key),
  * long-180 failed (four aborts, the tool failed, counter 4). Each other case changes one thing the walk must catch.
+ * Since goals/sandbox/09 a command without a direct result passes only when the walk got its result with the command on
+ * the last line of the text (`waits`), each call under 30000 ms, as a model that follows the text would.
  */
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  EXEC_EARLY_MS as WALK_EARLY_MS,
+  EXEC_WAIT_S as WALK_WAIT_S,
   LONG_EXECS,
+  RUNTIME_ABORT_MS,
   exitCodeOf,
   failuresAfter,
   judgeLongExec,
   judgeLongExecWalk,
+  maxWaits,
   parseLongExecResults,
-  pathsIn,
   stdoutOf,
+  waitCommandOf,
 } from "../harness/e2e/long-exec.mjs";
+import { EXEC_EARLY_MS, EXEC_WAIT_S, waitCommand } from "../src/sandbox/service.js";
 import { RETRIED, createFetchTap } from "../harness/e2e/runtime-tap.mjs";
 
 const measured60 = () => ({
@@ -50,12 +57,26 @@ const measured180 = () => ({
   runs: 1,
 });
 
-const BACKGROUND_TEXT =
-  "exit_code: -1\nstdout: The command is still running in the background. Its output goes to /root/.exec/0a1b2c3d4e5f.out " +
-  "(stdout) and /root/.exec/0a1b2c3d4e5f.err (stderr). When it ends, its exit code is written to /root/.exec/0a1b2c3d4e5f.exit." +
+const BASE = "/root/.exec/0a1b2c3d4e5f";
+const WAIT = waitCommand(BASE);
+
+/** The text of a command answered in the background before goals/sandbox/09: files, but no command to wait with. */
+const OLD_BACKGROUND_TEXT =
+  `exit_code: -1\nstdout: The command is still running in the background. Its output goes to ${BASE}.out ` +
+  `(stdout) and ${BASE}.err (stderr). When it ends, its exit code is written to ${BASE}.exit.` +
   "\nstderr: ";
 
-/** A 180 s command answered in the background, followed by reading the files the text names. */
+/** The text since goals/sandbox/09: the same, and on the last line of stdout the command to wait with. */
+const BACKGROUND_TEXT =
+  `exit_code: -1\nstdout: The command is still running in the background. Its output goes to ${BASE}.out ` +
+  `and its errors to ${BASE}.err. Do not start the command again. To wait for its end, call exec with the command on ` +
+  `the last line of this answer and no timeout.\n${WAIT}\nstderr: `;
+
+const STILL = "exit_code: 0\nstdout: The command is still running. Run the same command again to wait up to 25 more seconds.\n\nstderr: ";
+const ENDED = "exit_code: 0\nstdout: The command has ended with exit code 0.\nlong-180\n\nstderr: ";
+const wait = (text: string, duration_ms = 25013) => ({ command: WAIT, attempts: [200] as (number | string)[], duration_ms, status: 200, threw: false, text });
+
+/** A 180 s command answered in the background, followed by calling the command on the last line of the text. */
 const background180 = () => ({
   ...measured180(),
   duration_ms: 20012,
@@ -64,11 +85,7 @@ const background180 = () => ({
   threw: false,
   text: BACKGROUND_TEXT,
   failures_after: 0,
-  followup: [
-    { path: "/root/.exec/0a1b2c3d4e5f.out", status: 200, text: "long-180\n" },
-    { path: "/root/.exec/0a1b2c3d4e5f.err", status: 200, text: "" },
-    { path: "/root/.exec/0a1b2c3d4e5f.exit", status: 200, text: "0\n" },
-  ],
+  waits: [...Array(6)].map(() => wait(STILL)).concat([wait(ENDED, 10211)]),
 });
 
 const fails = (r: unknown, pattern: RegExp) => {
@@ -102,11 +119,11 @@ describe("judgeLongExec", () => {
     expect(v.reasons).toEqual([
       "long-180: the tool failed: This operation was aborted",
       "long-180: failures_after 4, the circuit breaker counter of the runtime is not 0 after the call",
-      "long-180: neither the result (long-180 in stdout, exit_code 0) nor a text that says the command is still running and where its output goes",
+      "long-180: neither the result (long-180 in stdout, exit_code 0) nor a text that says the command is still running and names a command to wait with on its last line",
     ]);
   });
 
-  it("passes long-180 answered in the background when the files it names give the result", () => {
+  it("passes long-180 answered in the background when the calls of its wait command give the result", () => {
     expect(judgeLongExec(background180())).toEqual({ ok: true, reasons: [] });
   });
 
@@ -146,20 +163,79 @@ describe("judgeLongExec", () => {
     fails({ ...measured60(), text: "exit_code: 0\nstdout: long-600\n\nstderr: " }, /neither the result/);
   });
 
-  it("fails a background text that names no file or does not say the command still runs", () => {
+  it("fails a background text that names no command to wait with or does not say the command still runs", () => {
     fails({ ...background180(), text: "exit_code: -1\nstdout: The command is still running.\nstderr: " }, /neither the result/);
     fails({ ...background180(), text: BACKGROUND_TEXT.replace("still running", "running") }, /neither the result/);
   });
 
-  it("fails a background text whose files do not give the result", () => {
+  it("fails a background text whose wait command was never called or did not give the result", () => {
     const r = background180();
-    fails({ ...r, followup: [] }, /reading it after the command ended did not give long-180/);
-    fails({ ...r, followup: r.followup.map((f) => ({ ...f, text: "" })) }, /did not give long-180/);
-    fails({ ...r, followup: r.followup.map((f) => ({ ...f, status: 404 })) }, /did not give long-180/);
+    fails({ ...r, waits: [] }, /never called it/);
+    fails({ ...r, waits: undefined }, /never called it/);
+    fails({ ...r, waits: [wait(STILL)] }, /did not give the end with exit code 0 and long-180/);
   });
 
   it("fails on no result at all", () => {
     expect(judgeLongExec(null)).toEqual({ ok: false, reasons: ["no result"] });
+  });
+});
+
+describe("judgeLongExec of a command in the background (goals/sandbox/09)", () => {
+  it("passes long-180 with one call that says still running and one with the end", () => {
+    expect(judgeLongExec({ ...background180(), waits: [wait(STILL), wait(ENDED, 9000)] })).toEqual({ ok: true, reasons: [] });
+  });
+
+  it("fails a text without a command to wait with, even when the files it names carry the result", () => {
+    const followup = [
+      { path: `${BASE}.out`, status: 200, text: "long-180\n" },
+      { path: `${BASE}.exit`, status: 200, text: "0\n" },
+    ];
+    fails({ ...background180(), text: OLD_BACKGROUND_TEXT, followup, waits: [] }, /names a command to wait with on its last line/);
+    fails({ ...background180(), text: OLD_BACKGROUND_TEXT, followup }, /names a command to wait with on its last line/);
+  });
+
+  it("fails a call that took 30000 ms or more, or whose attempt was aborted", () => {
+    expect(RUNTIME_ABORT_MS).toBe(30000);
+    const r = background180();
+    fails({ ...r, waits: [wait(STILL, 30000), wait(ENDED)] }, /wait 1: duration_ms 30000, not under 30000/);
+    fails({ ...r, waits: [wait(STILL), { ...wait(ENDED), duration_ms: undefined }] }, /wait 2: duration_ms undefined/);
+    fails({ ...r, waits: [{ ...wait(STILL), attempts: ["abort", 200] }, wait(ENDED)] }, /wait 1: attempts \["abort",200\]/);
+    fails({ ...r, waits: [wait(STILL), { ...wait(ENDED), attempts: [] }] }, /wait 2: attempts \[\]/);
+    fails({ ...r, waits: [wait(STILL), { ...wait(ENDED), threw: true }] }, /wait 2: the tool failed/);
+  });
+
+  it("fails a call with another command than the one from the text", () => {
+    const r = background180();
+    fails({ ...r, waits: [wait(STILL), { ...wait(ENDED), command: `cat ${BASE}.out` }] }, /wait 2: another command/);
+    fails({ ...r, waits: [{ ...wait(ENDED), command: waitCommand("/root/.exec/ffffffffffff") }] }, /wait 1: another command/);
+  });
+
+  it("fails more calls than the limit", () => {
+    expect(maxWaits(180)).toBe(8);
+    const r = background180();
+    expect(judgeLongExec({ ...r, waits: [...Array(7)].map(() => wait(STILL)).concat([wait(ENDED)]) }).ok).toBe(true);
+    fails({ ...r, waits: [...Array(8)].map(() => wait(STILL)).concat([wait(ENDED)]) }, /9 calls of the wait command, more than 8/);
+  });
+
+  it("fails when the last call has no label or another exit code", () => {
+    const r = background180();
+    fails({ ...r, waits: [wait(ENDED.replace("long-180\n", "long-60\n"))] }, /did not give the end/);
+    fails({ ...r, waits: [wait(ENDED.replace(/^exit_code: 0/, "exit_code: 1").replace("exit code 0.", "exit code 1."))] }, /did not give the end/);
+    fails({ ...r, waits: [wait(ENDED.replace(/^exit_code: 0/, "exit_code: 124").replace("exit code 0.", "exit code 124."))] }, /did not give the end/);
+    fails({ ...r, waits: [wait("exit_code: 0\nstdout: long-180\n\nstderr: ")] }, /did not give the end/);
+  });
+
+  it("passes long-60 with its direct result without waits", () => {
+    const r = measured60();
+    expect("waits" in r).toBe(false);
+    expect(judgeLongExec(r)).toEqual({ ok: true, reasons: [] });
+    expect(judgeLongExec({ ...r, waits: [] })).toEqual({ ok: true, reasons: [] });
+  });
+
+  it("uses the same EXEC_EARLY_MS and EXEC_WAIT_S as the Control Plane", () => {
+    expect(WALK_EARLY_MS).toBe(EXEC_EARLY_MS);
+    expect(WALK_WAIT_S).toBe(EXEC_WAIT_S);
+    expect(maxWaits(60)).toBe(3);
   });
 });
 
@@ -190,12 +266,14 @@ describe("the walk's commands and texts", () => {
     }
   });
 
-  it("reads stdout, exit code and paths out of a tool text", () => {
+  it("reads stdout, exit code and the command to wait with out of a tool text", () => {
     expect(stdoutOf("exit_code: 0\nstdout: a\nb\n\nstderr: c")).toBe("a\nb\n");
     expect(stdoutOf("This operation was aborted")).toBeNull();
     expect(exitCodeOf("exit_code: -1\nstdout: \nstderr: ")).toBe(-1);
-    expect(pathsIn(BACKGROUND_TEXT)).toEqual(["/root/.exec/0a1b2c3d4e5f.out", "/root/.exec/0a1b2c3d4e5f.err", "/root/.exec/0a1b2c3d4e5f.exit"]);
-    expect(pathsIn("nothing here")).toEqual([]);
+    expect(waitCommandOf(BACKGROUND_TEXT)).toBe(WAIT);
+    expect(waitCommandOf(OLD_BACKGROUND_TEXT)).toBeNull();
+    expect(waitCommandOf("exit_code: 0\nstdout: long-60\n\nstderr: ")).toBeNull();
+    expect(waitCommandOf("This operation was aborted")).toBeNull();
   });
 
   it("parses every LONG_EXEC_RESULT line", () => {
