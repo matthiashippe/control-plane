@@ -17,13 +17,21 @@ day a customer spends more or a job is worth more, this says so by itself.
 
 Exit 0 when the case carries at the given click price, 1 when it does not, 2 when it could not
 look. An open question with a clear no is exit 1, which is the normal state and not a failure.
+An access log that was not read in full could not look either: when ./ops/access-log.sh does not
+start, ends with an exit other than 0 or runs past its time limit, the program ends with exit 2, an
+empty stdout and one line on stderr, and counts nothing. The limit is 180 s; CP_ACCESS_LOG_TIMEOUT
+(seconds, a positive number) overrides it.
 """
 import argparse
 import json
+import math
+import os
 import subprocess
 import sys
 
 MC_PER_CENT = 1000
+# Seconds ./ops/access-log.sh may take before the log counts as unreadable.
+ACCESS_LOG_TIMEOUT_S = 180.0
 # What the operator keeps of a job, in percent. src/bounties/store.ts FEE_PERCENT.
 FEE_PERCENT = 10
 
@@ -39,6 +47,24 @@ LIST_NAMES_AN_ADDRESS = (
 
 class OwnListMissing(Exception):
     """`own_ips` could not name our own addresses; nothing is counted then."""
+
+
+class AccessLogUnreadable(Exception):
+    """./ops/access-log.sh was not read in full; nothing is counted then, not even the part it printed."""
+
+
+def access_log_timeout() -> float:
+    """The time limit for ./ops/access-log.sh: CP_ACCESS_LOG_TIMEOUT in seconds, 180 when it is unset."""
+    raw = os.environ.get("CP_ACCESS_LOG_TIMEOUT")
+    if raw is None:
+        return ACCESS_LOG_TIMEOUT_S
+    try:
+        value = float(raw)
+    except ValueError:
+        value = math.nan
+    if not (math.isfinite(value) and value > 0):
+        raise AccessLogUnreadable("CP_ACCESS_LOG_TIMEOUT is not a positive number of seconds")
+    return value
 
 
 def own_addresses() -> set:
@@ -69,12 +95,26 @@ def adressen_an_der_bezahlroute() -> int:
 
     The denominator of the conversion, and it has to come from the log because a wallet that
     looked and left never appears in the database at all.
+
+    A log that does not start, ends with an exit other than 0 or runs past the time limit raises
+    AccessLogUnreadable instead of returning a count: a part of the log is not the log. Its stderr is
+    dropped and never forwarded, it can name the host of the server.
     """
     own = own_addresses()
+    timeout = access_log_timeout()
     try:
-        log = subprocess.run(["./ops/access-log.sh"], capture_output=True, text=True, timeout=180).stdout
-    except Exception:
-        return 0
+        r = subprocess.run(["./ops/access-log.sh"], capture_output=True, text=True, timeout=timeout)
+    except subprocess.TimeoutExpired as exc:
+        raise AccessLogUnreadable(f"./ops/access-log.sh ran past {timeout:g} s") from exc
+    except OSError as exc:
+        raise AccessLogUnreadable("./ops/access-log.sh did not start") from exc
+    except UnicodeDecodeError as exc:
+        raise AccessLogUnreadable("./ops/access-log.sh printed a log that is not text") from exc
+    if r.returncode < 0:
+        raise AccessLogUnreadable(f"./ops/access-log.sh was stopped by signal {-r.returncode}")
+    if r.returncode != 0:
+        raise AccessLogUnreadable(f"./ops/access-log.sh ended with exit {r.returncode}")
+    log = r.stdout
     adressen = set()
     for line in log.splitlines():
         line = line.strip()
@@ -149,7 +189,7 @@ def main() -> int:
     verbraucht_c = markt.get("foreign_inference_mc", 0) / MC_PER_CENT
     try:
         gesehen = adressen_an_der_bezahlroute()
-    except OwnListMissing as exc:
+    except (OwnListMissing, AccessLogUnreadable) as exc:
         print(f"anzeigen-rechnung: {exc}, so nothing is counted.", file=sys.stderr)
         return 2
 
