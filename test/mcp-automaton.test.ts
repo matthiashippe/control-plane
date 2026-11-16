@@ -99,8 +99,8 @@ function harness({ routes, env = {}, keyFile = tempKeyFile() }: { routes: Record
     texts.push(...content);
     return { json: JSON.parse(content[0]), isError: Boolean(answer.result.isError), all: content.join("\n") };
   }
-  const only = (method: string, path: string) => calls.filter((c) => c.method === method && c.path === path);
-  return { tools, calls, only, call, logs, texts, keyFile, clock: () => clock };
+  const callsTo = (method: string, path: string) => calls.filter((c) => c.method === method && c.path === path);
+  return { tools, calls, callsTo, call, logs, texts, keyFile, clock: () => clock };
 }
 
 const START = { genesis_prompt: "Write one short poem a day and sell it.", name: "Atlas", daily_limit_usd: "5.00" };
@@ -131,7 +131,7 @@ describe("Automaton tools in mcp/server.mjs", () => {
     });
     const answer = await h.call("start_automaton", START);
     expect(answer.isError).toBe(false);
-    const posts = h.only("POST", "/v1/handoff");
+    const posts = h.callsTo("POST", "/v1/handoff");
     expect(posts).toHaveLength(1);
     const body = JSON.parse(posts[0].body!);
     expect(body).toEqual({ automaton_name: "Atlas", daily_limit_usdc: "5000000", step: "konto" });
@@ -163,18 +163,18 @@ describe("Automaton tools in mcp/server.mjs", () => {
     expect(statSync(h.keyFile).mode & 0o777).toBe(0o600);
     expect(statSync(join(h.keyFile, "..")).mode & 0o777).toBe(0o700);
 
-    const starts = h.only("POST", "/v1/automatons");
+    const starts = h.callsTo("POST", "/v1/automatons");
     expect(starts).toHaveLength(1);
     expect(starts[0].headers.authorization).toBe(`Bearer ${KEY}`);
     expect(starts[0].headers["idempotency-key"]).toBeTruthy();
     expect(JSON.parse(starts[0].body!)).toEqual({ name: "Atlas", genesis_prompt: START.genesis_prompt });
-    expect(h.only("GET", "/v1/handoff/ABCD")[0].headers.authorization).toBe(`Bearer ${POLL}`);
+    expect(h.callsTo("GET", "/v1/handoff/ABCD")[0].headers.authorization).toBe(`Bearer ${POLL}`);
 
     const status = await h.call("automaton_status", {});
     expect(status.json).toMatchObject({ id: "a-1", status: "running", turns: 1 });
     // A second start reads the key from the file and needs no phone.
     await h.call("start_automaton", { ...START, name: "Nova" });
-    expect(h.only("POST", "/v1/handoff")).toHaveLength(1);
+    expect(h.callsTo("POST", "/v1/handoff")).toHaveLength(1);
   });
 
   it("never puts the key in a tool result or a stderr line, even when the service echoes it", async () => {
@@ -217,14 +217,14 @@ describe("Automaton tools in mcp/server.mjs", () => {
     expect(burned.json.message).toContain("burned");
 
     const again = await h.call("start_automaton", START);
-    expect(h.only("POST", "/v1/handoff")).toHaveLength(2);
+    expect(h.callsTo("POST", "/v1/handoff")).toHaveLength(2);
     expect(again.json.url).toBe(`${BASE}/h/EFGH`);
     expect(again.json.url).not.toBe(`${BASE}/h/ABCD`);
     await h.tools.settled();
     const expired = await h.call("automaton_status", {});
     expect(expired.json).toMatchObject({ status: "failed", reason: "expired" });
     expect(expired.all).toContain("expired");
-    expect(h.only("GET", "/v1/handoff/EFGH")).toHaveLength(1);
+    expect(h.callsTo("GET", "/v1/handoff/EFGH")).toHaveLength(1);
   });
 
   it("with a key already on this machine starts at once without any phone step, and CP_API_KEY wins over the file", async () => {
@@ -234,13 +234,13 @@ describe("Automaton tools in mcp/server.mjs", () => {
     const fromFile = harness({ routes, keyFile: keyFileWith(KEY) });
     const answer = await fromFile.call("start_automaton", START);
     expect(answer.json).toMatchObject({ status: "starting", id: "a-3" });
-    expect(fromFile.only("POST", "/v1/handoff")).toHaveLength(0);
-    expect(fromFile.only("POST", "/v1/automatons")[0].headers.authorization).toBe(`Bearer ${KEY}`);
+    expect(fromFile.callsTo("POST", "/v1/handoff")).toHaveLength(0);
+    expect(fromFile.callsTo("POST", "/v1/automatons")[0].headers.authorization).toBe(`Bearer ${KEY}`);
 
     const fromEnv = harness({ routes, env: { CP_API_KEY: ENV_KEY }, keyFile: keyFileWith(KEY) });
     await fromEnv.call("start_automaton", START);
-    expect(fromEnv.only("POST", "/v1/handoff")).toHaveLength(0);
-    expect(fromEnv.only("POST", "/v1/automatons")[0].headers.authorization).toBe(`Bearer ${ENV_KEY}`);
+    expect(fromEnv.callsTo("POST", "/v1/handoff")).toHaveLength(0);
+    expect(fromEnv.callsTo("POST", "/v1/automatons")[0].headers.authorization).toBe(`Bearer ${ENV_KEY}`);
   });
 
   it("retries a start that answers 402 while reading the balance and gives up with failed after 90 seconds", async () => {
@@ -254,10 +254,10 @@ describe("Automaton tools in mcp/server.mjs", () => {
     });
     await h.call("start_automaton", START);
     await h.tools.settled();
-    const starts = h.only("POST", "/v1/automatons");
+    const starts = h.callsTo("POST", "/v1/automatons");
     expect(starts.length, "one attempt every 5 seconds over 90 seconds").toBeGreaterThan(10);
     expect(new Set(starts.map((c) => c.headers["idempotency-key"])).size, "a retry must not create a second automaton").toBe(1);
-    expect(h.only("GET", "/v1/credits/balance").length).toBeGreaterThan(0);
+    expect(h.callsTo("GET", "/v1/credits/balance").length).toBeGreaterThan(0);
     expect(h.clock()).toBeGreaterThanOrEqual(90_000);
     expect(h.clock()).toBeLessThan(100_000);
     for (const c of h.calls) expect(c.body ?? "").not.toContain("amount_usdc");
@@ -282,7 +282,7 @@ describe("Automaton tools in mcp/server.mjs", () => {
     // Counter-check: the same file with mode 0600 is read and used.
     chmodSync(path, 0o600);
     await h.call("start_automaton", START);
-    expect(h.only("POST", "/v1/automatons")[0].headers.authorization).toBe(`Bearer ${KEY}`);
+    expect(h.callsTo("POST", "/v1/automatons")[0].headers.authorization).toBe(`Bearer ${KEY}`);
   });
 
   it("set_daily_limit lower makes exactly one POST /v1/konto/limit and no phone step", async () => {
@@ -296,14 +296,14 @@ describe("Automaton tools in mcp/server.mjs", () => {
     const lower = await h.call("set_daily_limit", { daily_limit_usd: "2.50" });
     expect(lower.isError).toBe(false);
     expect(lower.json).toMatchObject({ status: "done", daily_limit_usd: "2.50" });
-    const posts = h.only("POST", "/v1/konto/limit");
+    const posts = h.callsTo("POST", "/v1/konto/limit");
     expect(posts).toHaveLength(1);
     expect(JSON.parse(posts[0].body!)).toEqual({ daily_limit_usdc: "2500000" });
     expect(posts[0].headers.authorization).toBe(`Bearer ${KEY}`);
     expect(h.calls.filter((c) => c.path.startsWith("/v1/handoff"))).toHaveLength(0);
     // Boundary: back up to exactly what the phone confirmed is not a raise.
     await h.call("set_daily_limit", { daily_limit_usd: "5" });
-    expect(h.only("POST", "/v1/konto/limit")).toHaveLength(2);
+    expect(h.callsTo("POST", "/v1/konto/limit")).toHaveLength(2);
     expect(h.calls.filter((c) => c.path.startsWith("/v1/handoff"))).toHaveLength(0);
   });
 
@@ -329,11 +329,11 @@ describe("Automaton tools in mcp/server.mjs", () => {
 
     const raise = await h.call("set_daily_limit", { daily_limit_usd: "10.00" });
     expect(raise.isError).toBe(false);
-    const posts = h.only("POST", "/v1/handoff");
+    const posts = h.callsTo("POST", "/v1/handoff");
     expect(posts).toHaveLength(1);
     expect(posts[0].headers.authorization).toBe(`Bearer ${KEY}`);
     expect(JSON.parse(posts[0].body!)).toEqual({ automaton_name: "Nova", daily_limit_usdc: "10000000", step: "limit" });
-    expect(h.only("POST", "/v1/konto/limit"), "the terminal never raises the limit itself").toHaveLength(0);
+    expect(h.callsTo("POST", "/v1/konto/limit"), "the terminal never raises the limit itself").toHaveLength(0);
     expect(raise.json).toMatchObject({ status: "waiting_for_phone", url: `${BASE}/h/LIMT`, match: "17", daily_limit_usd: "10.00" });
     expect(raise.json.qr).toBe(handoffAnswer("LIMT").qr);
     expect(raise.all).not.toContain(POLL);
@@ -341,7 +341,7 @@ describe("Automaton tools in mcp/server.mjs", () => {
     await h.tools.settled();
     const status = await h.call("automaton_status", {});
     expect(status.json.daily_limit_change).toMatchObject({ status: "done", daily_limit_usd: "10.00" });
-    expect(h.only("POST", "/v1/konto/limit")).toHaveLength(0);
+    expect(h.callsTo("POST", "/v1/konto/limit")).toHaveLength(0);
   });
 
   it("automaton_logs shows the lines of the log without the key or a long hex secret", async () => {
@@ -361,7 +361,7 @@ describe("Automaton tools in mcp/server.mjs", () => {
     expect(logs.all).not.toContain(KEY);
     expect(logs.all).not.toContain(hex);
     expect(logs.json.lines[1]).toContain("[redacted]");
-    expect(h.only("GET", "/v1/automatons/a-5/logs")[0].headers.authorization).toBe(`Bearer ${KEY}`);
+    expect(h.callsTo("GET", "/v1/automatons/a-5/logs")[0].headers.authorization).toBe(`Bearer ${KEY}`);
   });
 
   it("stop_automaton calls the stop of the given automaton, and of the one started here without id", async () => {
@@ -375,13 +375,13 @@ describe("Automaton tools in mcp/server.mjs", () => {
     });
     const given = await h.call("stop_automaton", { id: "a-1" });
     expect(given.json).toMatchObject({ id: "a-1", status: "stopped" });
-    expect(h.only("POST", "/v1/automatons/a-1/stop")).toHaveLength(1);
-    expect(h.only("POST", "/v1/automatons/a-1/stop")[0].headers.authorization).toBe(`Bearer ${KEY}`);
+    expect(h.callsTo("POST", "/v1/automatons/a-1/stop")).toHaveLength(1);
+    expect(h.callsTo("POST", "/v1/automatons/a-1/stop")[0].headers.authorization).toBe(`Bearer ${KEY}`);
 
     await h.call("start_automaton", START);
     const own = await h.call("stop_automaton", {});
     expect(own.json).toMatchObject({ id: "a-7", status: "stopped" });
-    expect(h.only("POST", "/v1/automatons/a-7/stop")).toHaveLength(1);
+    expect(h.callsTo("POST", "/v1/automatons/a-7/stop")).toHaveLength(1);
   });
 
   it("refuses amounts like 5.001, -1, abc, 0 or a number with invalid_arguments and makes no call", async () => {
@@ -408,6 +408,6 @@ describe("Automaton tools in mcp/server.mjs", () => {
     expect(parseUsd("0.50")).toBe(500_000n);
     expect(parseUsd("123456.78")).toBe(123_456_780_000n);
     await h.call("set_daily_limit", { daily_limit_usd: "1.00" });
-    expect(h.only("POST", "/v1/konto/limit")).toHaveLength(1);
+    expect(h.callsTo("POST", "/v1/konto/limit")).toHaveLength(1);
   });
 });
