@@ -125,6 +125,7 @@ halbes Log sie heute still auf „trägt“ kippen kann.
 ## Progress Log
 - 2026-11-16 Widerlegung geprüft: vierter Prüfbefehl von Punkt 1 an der Merge-Basis adee769 gibt `exit 0 stdout 653 stderr 0`, das Goal ist nicht widerlegt.
 - 2026-11-16 Zyklus 1: Punkte 1, 2, 3, 4 gebaut (`AccessLogUnreadable` statt `return 0`, `CP_ACCESS_LOG_TIMEOUT`, neuer Test mit sieben Fällen); vor dem Fix rot die Fälle 1 und 5 mit Exit 0 und „TRAEGT“, die Fälle 2, 3, 4 und 6 mit Exit 2 und „Adressen, die das Angebot ansahen 0“ auf `stdout` (6 failed, 1 passed). Prüfbefehle: P1 `grep` 1, `awk` 0, `grep CP_ACCESS_LOG_TIMEOUT` 4, Probe `exit 2 stdout 0 stderr 1`; P2 `same` (Gegenprobe mit gepflanzter Abweichung in `new.py`: leer), Selftest `ANZEIGEN SELFTEST OK`; P3 `grep it(` 7, vitest Exit 0 (28 passed), Diff `test` 0; P4 `check` Exit 0 (1948 passed), gesperrte Pfade 0, `ops` 0.
+- 2026-11-16 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4; `origin/dev` (adee769) war schon im Branch, kein Code geändert, kein Laufzeitpfad. Prüfbefehle: P1 `grep` 1, `awk` 0, `grep CP_ACCESS_LOG_TIMEOUT` 4, Probe `exit 2 stdout 0 stderr 1`; P2 `same`, Selftest `ANZEIGEN SELFTEST OK`; P3 `grep it(` 7, vitest Exit 0 (28 passed), Diff `test` 0; P4 `check` Exit 0 (1948 passed), gesperrte Pfade 0, `ops` 0.
 
 ## Blockers
 - keine
