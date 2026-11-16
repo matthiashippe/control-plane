@@ -1,7 +1,7 @@
 # Sandbox Goal 09: Ein Befehl im Hintergrund kostet keine Runden Nachfragen
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Die Antwort auf ein langes `exec` aus sandbox 05 nennt im Feld `wait_command` und als letzte Zeile von `stdout` einen fertigen
@@ -146,7 +146,7 @@ bezahlte Inferenz des Kunden; mit dem Befehl kostet das Warten höchstens eine R
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/sandbox-wait.test.ts` muss Exit-Code 0 haben.
       Prüfung: `grep -cE "^\s*(it|test)\(" test/sandbox-wait.test.ts` muss mindestens 9 ausgeben (neu: mit einem `sleep` im `PATH`, das je Aufruf 2 s braucht, endet `waitCommand(base, 3)` ohne Exit-Datei in echtem Bash in weniger als 4500 ms; nach der Zahl der Runden wären es 6 s).
       Prüfung: `awk '/export function waitCommand\(/,/^}/' src/sandbox/service.ts | grep -c 'SECONDS'` muss mindestens 1 ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Jede neue Testdatei, jeder neue Fall und jede neue Selbsttest-Zeile war vor dem Fix rot; die Zeile im Progress Log nennt, womit.
@@ -176,6 +176,7 @@ bezahlte Inferenz des Kunden; mit dem Befehl kostet das Warten höchstens eine R
 - 2026-11-16 Zyklus 4: Punkt 9 gebaut: `waitCommand` merkt sich `$SECONDS` beim Start und wartet nach der Uhr statt nach der Zahl der Runden; ein neuer Test fährt ihn in echtem Bash mit einem `sleep` von 2 s je Aufruf, die Untergrenze des Tests vor dem Ende ist wegen ganzer Sekunden `(seconds - 1) * 1000` ms statt 1900 ms, Grund in den Annahmen. Rot vor dem Fix am Kopf `c0ecab6`: der neue Fall mit 6013 ms statt unter 4500 ms, Zähler der Uhr in `waitCommand` 0. Prüfbefehle: vitest sandbox-wait Exit 0 (dreimal hintereinander); 9 Fälle; Uhr in `waitCommand` 1; check Exit 0 (184 Dateien, 2064 Tests).
 - 2026-11-16 Zyklus 5: Punkt 9 nachgebessert, weil der Job `check` auf GitHub am Kopf `6fbcaa0` den neuen Fall mit 4501 ms von außen gemessen rot meldete (Lauf 43874571613): Der Fall nimmt die Dauer jetzt in Bash direkt vor und nach dem Wartebefehl, Grund in den Annahmen. Rot gegen den Befehl, der nach Runden zählt (`c0ecab6`): 6008 ms. Prüfbefehle: vitest sandbox-wait Exit 0 (zweimal, 4010 und 4014 ms); 9 Fälle; Uhr in `waitCommand` 1.
 - 2026-11-16 Zyklus 6: Abschluss gemeldet, Punkte 1 bis 9, nach der Kritik mit den Punkten 8 (Zyklus 3) und 9 (Zyklen 4 und 5); danach die Zeile nachher in der Doku auf den Lauf am Wartebefehl nach der Uhr gesetzt (`99d9b5d`, Werte gleich) und dev (`2defd78`, nur Audit und Vorschläge) ohne Konflikt gemergt als `8d026c3`. Prüfbefehle: P1 bis P4, P8 und P9 am Kopf `6fbcaa0` 13:19 bis 13:20 UTC, die seither berührten (P1, P5, P6, P9) noch einmal am Kopf `99d9b5d` um 13:43 UTC, P6 und P7 am Merge-Kopf `8d026c3` um 13:44 UTC. P1 vitest Exit 0; 9 Fälle; keine Zeichenfolge fehlt; Konstante 1; Ersatzprobe leer. P2 vitest Exit 0; keine Zeichenfolge fehlt; alte Konstante 0; 28 Fälle; Ersatzprobe leer. P3 full.sh 2; e2e SUCCESS am Kopf `99d9b5d` (Run 43876710314); Erfolgszeile 1; Ergebnis long-180 mit Wartezeilen 1. P4 keine Zeichenfolge fehlt; Selbsttest 18 Fehlzeilen; vitest live-selftest Exit 0. P5 errors.md 2; vorher 1; nachher 1; ab 30000 ms 0; Annahmen 14. P6 Deny-Pfade 0; Schlüsseldateien 0; Schlüssel im Diff ohne goals/ 0. P7 check Exit 0 (184 Dateien, 2064 Tests), check auf GitHub SUCCESS am Kopf `99d9b5d`. P8 kurze Befehle 0; Befehl von 50 s 1; Selbsttest mit der neuen Fehlzeile 2; vitest live-selftest Exit 0. P9 vitest sandbox-wait Exit 0; 9 Fälle; Uhr in `waitCommand` 1.
+- 2026-11-16 Release: PASS K und B (Zyklus 6), DONE.
 
 ## Blockers
 Keine.
