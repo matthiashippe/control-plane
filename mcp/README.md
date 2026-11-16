@@ -30,8 +30,21 @@ with mode 0600 (another path via `CP_KEY_FILE`). A key file other users can read
 | `set_daily_limit` | lowers the daily limit at once; raising it needs the phone and the passkey again, and nothing in the terminal can raise it alone |
 | `stop_automaton` | stops it; stopped time costs nothing |
 
-`id` is optional on the last three: without it they act on the automaton started from this
-server, else on the newest of the account.
+`id` is optional on `automaton_status`, `automaton_logs` and `stop_automaton`: without it they act
+on the automaton started from this server, else on the newest of the account.
+
+Three more tools move money. Money can only go to your own bank account: none of them takes a
+destination, and the bank account is entered once on your phone.
+
+| Tool | What it does |
+|---|---|
+| `deposit` | `{"amount_usd": "20.00"}`: answers with `qr`, `url` and `match`; you scan, pick the number and pay by card on the phone |
+| `payout` | `{"amount_usd": "10.00"}` or `{"all": true}`: sends money to your bank account and answers with the amount and `ending 3000`. The first time it answers with `qr`, `url` and `match`: you scan, confirm your identity once with Bridge, enter your IBAN and confirm with your passkey, then the money goes out. After that it pays without the phone |
+| `set_payout_rule` | `{"keep_usd": "20.00", "weekday": "monday"}` pays out everything above `keep_usd` once a week, when that is at least $1.00; `{"off": true}` removes the rule |
+
+`automaton_status` also shows `balance_usd` and `payout_rule` (`keep_usd` and `weekday`, or
+`"no payout rule"`). Amounts are strings with at most seven digits and two decimals; a number,
+`"5.001"` or `"-1"` is refused with `invalid_arguments` before any request.
 
 ## What your host needs to know
 
