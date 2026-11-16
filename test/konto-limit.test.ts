@@ -262,6 +262,29 @@ describe("the daily limit of an account", () => {
     }
   });
 
+  it("refuses the matching permission with a foreign or broken signature: 400, burned, permission and cap unchanged", async () => {
+    const s = setup();
+    const a = await account(s);
+    expect((await setLimit(s, a.key, "2000000")).status).toBe(200);
+    const stranger = privateKeyToAccount(generatePrivateKey());
+    // Account, spender, token and limit are the ones the code asked for; only the signature is not the account's.
+    const foreign = await permit(stranger, { account: a.address, allowance: 10_000_000n, salt: 8n });
+    expect(foreign.account).toBe(a.address);
+    const broken = { ...(await permit(a.owner, { allowance: 10_000_000n, salt: 8n })), signature: ("0x" + "11".repeat(65)) as Hex };
+    for (const body of [foreign, broken]) {
+      const h = (await (await raise(s, a.key, "10000000")).json()) as { code: string; match: number };
+      await tap(s.app, h.code, h.match);
+      const before = row(s.db, a.address);
+      const res = await s.app.request(`/h/${h.code}/limit`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+      expect(res.status).toBe(400);
+      expect(stateOf(s.db, h.code)).toBe("burned");
+      expect(row(s.db, a.address)).toEqual(before);
+      expect(before.cap_usdc).toBe("2000000");
+      expect(before.next_permission).toBeNull();
+      expect(permissionFromJson(before.permission).allowance).toBe(5_000_000n);
+    }
+  });
+
   it("sends approveWithSignature of the new and revokeAsSpender of the old through sendKontoTx before spend() from the new", async () => {
     const s = setup();
     const a = await account(s);
