@@ -1,7 +1,7 @@
 # Sandbox Goal 08: Ein ganzer Automaton läuft in einer Sandbox
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Ein Konto, auch ein schlüsselloses aus `src/auth/keyless.ts`, startet mit einem Aufruf `POST /v1/automatons` (Name und
@@ -232,7 +232,7 @@ betreibt seinen Dienst bei uns, bezahlt aus Credits) bleibt für alle ohne eigen
       Prüfung: `grep -cE "^\s*(it|test)\(" test/automaton-idempotency.test.ts` muss mindestens 4 ausgeben (je ein Fall: zweimal derselbe Header und Body nacheinander und gleichzeitig gibt dieselbe id und genau einen Aufruf an den nachgebauten sandboxd; derselbe Header mit anderem Body gibt 409; ein neues createApp auf derselben Datenbank gibt dieselbe id ohne Aufruf; ohne Header je Aufruf ein eigener Automaton).
       Prüfung: `for w in Idempotency-Key 409 createApp sandboxd; do grep -qF -- "$w" test/automaton-idempotency.test.ts || echo "fehlt $w"; done` muss nichts ausgeben.
       Prüfung: `awk '/^## automatons/{f=1;next} /^## /{f=0} f' docs/errors.md | grep -c "Idempotency-Key"` muss mindestens 1 ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Jede neue Testdatei, jede neue Selftest-Zeile und jede neue Bedingung war vor dem Fix rot; die Zeile im Progress Log nennt, womit.
@@ -269,6 +269,7 @@ betreibt seinen Dienst bei uns, bezahlt aus Credits) bleibt für alle ohne eigen
 - 2026-11-16 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11; dev ohne neue Commits seit adee769. Prüfbefehle am Kopf b74130f: Punkt 1 lokal 1, 6, 0, 1, nichts, Netz Exit 0 ohne CHANGE und 1 (SETUP CHECK OK changed=0, 09:19 UTC); Punkt 2 Exit 0, nichts, nichts; Punkt 3 Exit 0, 14, nichts, nichts; Punkt 4 Exit 0, nichts, 0; Punkt 5 Exit 0, nichts; Punkt 6 nichts, 2, Exit 0, e2e SUCCESS, 1; Punkt 7 Selbsttest Exit 0 mit AUTOMATON LIVE SELFTEST OK, Doku 1 und 1, 0, 0, Netz 1 (09:19 bis 09:20 UTC, turns=3 reboot=skipped hold_mc=0 wallet_usdc=0); Punkt 8 nichts, 11, Exit 0, 1; Punkt 9 nichts, 5, 2, 17; Punkt 10 0, 0, 0; Punkt 11 check grün in 51 s.
 - 2026-11-16 Zyklus 3: Punkte 12, 13 gebaut (src/automaton/scope.ts mit automatonOfKey über isAutomatonKey, Prüfung an Schlüsselliste, Widerruf, /v1/automatons und /v1/sandboxes in src/app.ts, src/auth unverändert; Tabelle hosted_automaton_requests und Idempotency-Key in createAutomatonService, Doku in docs/errors.md und docs/sandbox/automaton.md, Annahmen unter Goal 08). Rot vor dem Fix: automaton-scope 4 von 6 rot (Schlüsselliste, Widerruf, anderer Automaton, Sandbox eines anderen Automatons; die beiden Fälle für eigene Routen und den Schlüssel des Kunden sichern ab, dass nichts zu viel gesperrt wird), automaton-idempotency 4 von 5 rot (ohne Header bleibt wie bisher), Mutation isAutomatonKey auf false rot an automaton-scope. Prüfbefehle: Punkt 12 Exit 0, 6, nichts, nichts, 0; Punkt 13 Exit 0, 5, nichts, 1; check grün in 108 s.
 - 2026-11-16 Zyklus 3: Abschluss gemeldet, Punkte 1 bis 13; dev ohne neue Commits seit adee769, Punkt 7 nach Entscheidung des Tech Leads nicht neu gefahren (12 und 13 betreffen nur Routen des Control Planes). Prüfbefehle am Kopf fe849b8: Punkt 12 Exit 0, 6, nichts, nichts, 0; Punkt 13 Exit 0, 5, nichts, 1; Punkte 3, 4, 7, 9, 10 erneut wie erwartet (Mutation isAutomatonKey an automaton-api nichts, wallet.json 0, Doku 0 und 0, errors 9, Annahmen 19, 0, 0, 0); check grün in 108 s; Jobs check und e2e SUCCESS mit E2E OK sandbox=true automaton=true.
+- 2026-11-16 Release: PASS K und B (Zyklus 3), DONE.
 
 ## Blockers
 Keine. Human Gate erledigt am 16.11.2026 08:52 UTC: Matthias hat auf dem Zahlungsserver die neue Adresse des code-host in authorized_keys eingetragen, ssh mit dem Deploy-Schlüssel endet mit Exit 0.
