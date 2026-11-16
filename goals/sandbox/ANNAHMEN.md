@@ -543,3 +543,43 @@
   Vorher rot: ohne die Zeile mit `rm -rf` gibt er `builds=1 stale=kept state=ok` (16.11.2026, code-host), mit ihr
   `builds=1 stale=gone state=ok`; der Selbsttest hat damit 27 Fälle.
 - **Kein Rollout.** `ops/runtime-sandbox.sh` läuft nur auf dem code-host; `src/`, `deploy/` und der Sandbox-Server bleiben unverändert.
+
+## Goal 11 (16.11.2026, Engineer CP)
+
+- **Vorher gemessen, nur lesend.** PSL am 2026-11-16 um 20:25 UTC: 0 Zeilen mit `sandboxhost` in `public_suffix_list.dat`, die Gegenprobe
+  `herokuapp.com` gibt 1. `dig +short TXT _psl.sandboxhost.de` leer, Gegenprobe `_psl.pages.dev` zeigt den Link auf PR 1093. Datenbank
+  der Produktion mit `readonly: true` um 20:30 UTC: 1 Konto, 68 Sandboxes, keine Zeile `creating:`; dieselbe Abfrage auf die Nulladresse
+  gibt 0 Konten. Das eine Konto ist das eigene der Live-Prüfung, eine 0 hieße Blindheit.
+- **Zahl der Nutzer ehrlich.** Der PR-Text nennt `0 (current actual count: at most 1 accounts …)` aus genau dieser Messung. Die
+  Richtlinien der PSL lehnen Projekte mit wenigen Nutzern meist ab („projects not serving more then thousands of users are quite likely
+  to be declined“); der Text sagt das nicht weg, sondern begründet, warum die Isolation ab dem ersten Kunden gelten muss.
+- **Kein anderer Weg reicht** (Begründung im PR-Text): das Präfix `__Host-` schützt nur Dienste, deren Code es benutzt; ein Filter für
+  `Set-Cookie` im Proxy fängt kein Cookie aus JavaScript; eine registrierbare Domain je Sandbox geht nicht. Der Filter im Proxy ist der
+  Rückfall bei Ablehnung, als Vorschlag `goals/_vorschlaege/sandbox-nacharbeit-2026-11-16-1.md` mit Schwere 2, nicht in diesem Goal gebaut.
+- **Adresse im Eintrag.** `matthias@hanseatictech.de`, weil sie schon öffentlich in `README.md`, `LICENSE.md` und im Impressum steht.
+  Die Vorlage verlangt eine Rollenadresse; das Kästchen dazu bleibt leer, mit einem Satz im PR-Text, dass die Adresse die des
+  Impressums ist. Die Richtlinien verlangen außerdem, dass die Adresse zur Domain passt (meist über WHOIS); DENIC zeigt für `.de` keine
+  Kontaktdaten, also kann ein Maintainer nachfragen. Nennt Matthias am Gate eine Rollenadresse, ändern sich Eintrag und PR-Text und
+  damit der Prüfwert.
+- **Prüfwert.** sha256 über `PR-Titel` mit Zeilenende, `psl-pr-body.md` und `psl-entry.txt`, erste 12 Zeichen, heute `b3fa541138d7`. Er
+  bindet die Freigabe `public_post` an genau diese Bytes; vor dem Posten rechnet der Maker ihn neu, und weicht er ab, geht nichts raus.
+- **Kästchen.** Angekreuzt ist, was am Tag des Postens wahr ist, auch DNS-Prüfung (das TXT steht Minuten nach dem PR, vor
+  `gh pr edit`) und zwei Jahre Restlaufzeit, weil Schritt 1 die Verlängerung vor dem Posten verlangt. Bietet INWX keine Verlängerung im
+  Voraus an, wird dieses Kästchen leer und der Satz im Abschnitt Reason geändert, also ein neuer Prüfwert und ein neues Gate.
+- **Restlaufzeit und server_kauf.** RDAP von DENIC zeigt am 2026-11-16 nur „last changed 2026-11-15T17:55:10+01:00“, kein Ablaufdatum;
+  `docs/sandbox/ports.md` nennt nur etwa 6 € im Jahr. Die PSL verlangt bei der Einreichung mehr als zwei Jahre Restlaufzeit, danach mehr
+  als ein Jahr. Die Verlängerung ist ein Kauf und geht mit der Freigabe in dieselbe Aufgabe an Matthias (Gates `public_post` und
+  `server_kauf`).
+- **Token sbx-ports.** `cloudflare.py psl-txt` schreibt mit `CLOUDFLARE_SBX_API_TOKEN` (Token `sbx-ports`, Zone DNS Edit nur für
+  `sandboxhost.de`) in die Zone aus `ports_domain()`, nie mit dem Token der Zahlungszone. Es nimmt nur
+  `https://github.com/publicsuffix/list/pull/<n>` (`<n>` ab 1, nichts danach) und prüft das vor jedem Aufruf der API. Der Wert geht in
+  Anführungszeichen an Cloudflare, wie Cloudflare es für TXT empfiehlt; ein gespeicherter Wert mit oder ohne Anführungszeichen gilt als
+  derselbe. Stehen zwei TXT unter `_psl.sandboxhost.de`, ändert es nichts und endet mit Fehler, statt einen zu löschen.
+- **CLOUDFLARE_API_BASE nur für Tests.** Erlaubt sind die echte Basis und `http://127.0.0.1:<port>` oder `http://localhost:<port>`, damit
+  ein falsch gesetzter Wert keinen Token an einen fremden Rechner schickt.
+- **Test vorher rot.** `test/cloudflare-psl-txt.test.ts` gegen das `cloudflare.py` von `dev`: `4 failed | 9 passed`, weil `COMMANDS` kein
+  `psl-txt` kennt und das Skript den Docstring mit Exit 1 ausgibt; die Fälle mit abgelehnter URL und zwei TXT sind dort schon grün, weil
+  jeder Aufruf scheitert, die vier Fälle mit Schreiben oder Nichtschreiben nicht.
+- **Kopfzeile.** `// PostYourPrice : https://postyourprice.com`, weil dort Dienst und Impressum stehen; unter `sandboxhost.de` antwortet
+  nichts. Einsortiert zwischen `// Postman, Inc : https://postman.com` und `// prequalifyme.today : https://prequalifyme.today`
+  (`LC_ALL=C sort -f`, Stand 2026-11-16 20:25 UTC).
