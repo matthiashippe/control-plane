@@ -128,6 +128,7 @@ lesen kann, statt beim sechsten Crawler-Aufruf überrascht in 429 `crawler_daily
 
 ## Progress Log
 - 2026-11-16 Zyklus 1: Punkte 1, 2, 3, 4 gebaut: `KEYLESS_KEY_SCHEMA` mit den sechs Feldern der echten Antwort hängt an der Antwort 201, der Text nennt `agentMintsPerDay()` und `crawlerMintsPerDay()` je Anfrage statt „across the instance“, 429 und alle anderen Pfade unverändert. Rot vor dem Fix: alle 3 neuen Fälle (3 failed mit dem Stand von `src/public/openapi.ts` der Merge-Basis e225bbf). Produktion nicht aufgerufen. Prüfbefehle (Node 22.23.5, PATH=/usr/bin:$PATH, am Commit a352b36): P1 vitest Exit 0 (3 passed), `3`, `1`, `rc=1` und `0`; P2 `0`, `1`, `2`, vitest Exit 0; P3 `1`, `0`, `2`, `0`, vitest Exit 0 (78 passed in 7 Dateien); P4 `node scripts/check.mjs` Exit 0 (1941 passed, grün in 119 s), `0`, `0`, `0`.
+- 2026-11-16 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4; `dev` (e225bbf) war schon im Branch, Merge leer, kein Code geändert. Prüfbefehle (Node 22.23.5, am Commit 082de52): P1 vitest Exit 0, `3`, `1`, `rc=1` und `0`; P2 `0`, `1`, `2`, vitest Exit 0; P3 `1`, `0`, `2`, `0`, vitest Exit 0 (78 passed in 7 Dateien); P4 `node scripts/check.mjs` Exit 0 (1941 passed, grün in 60 s), `0`, `0`, `0`; Job `e2e` am PR #203 für 082de52 pass (6m14s), Job `check` pass.
 
 ## Blockers
 - keine
