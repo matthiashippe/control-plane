@@ -319,7 +319,7 @@ trap - EXIT
 remaining=$("${COMPOSE[@]}" ps -q | wc -l | tr -d ' ')
 [[ "$remaining" == "0" ]] || { echo "E2E FAIL: containers left behind"; exit 1; }
 if [[ "$turns" -lt 5 || "$registered" != "true" || "$api_errors" != "0" || "$consistent" != "true" || "$db_registered" != "1" || "$balance_cents" -ge 500 || "$domains_ok" != "true" || "$sandbox" != "true" || "$long_exec" != "true" || "$konto_chain" != "true" || "$terminal" != "true" || "$money" != "true" || "$relay" != "true" || "$automaton" != "true" ]]; then
-  echo "E2E FAIL turns=$turns registered=$registered api_errors=$api_errors ledger_consistent=$consistent db_registered=$db_registered balance_cents=$balance_cents konto_chain=$konto_chain terminal=$terminal money=$money domains=$domains_ok sandbox=$sandbox long_exec=$long_exec relay=$relay automaton=$automaton"
+  echo "E2E FAIL turns=$turns registered=$registered api_errors=$api_errors ledger_consistent=$consistent db_registered=$db_registered balance_cents=$balance_cents money=$money konto_chain=$konto_chain terminal=$terminal domains=$domains_ok sandbox=$sandbox long_exec=$long_exec relay=$relay automaton=$automaton"
   exit 1
 fi
-echo "E2E OK turns=$turns registered=$registered api_errors=$api_errors ledger_consistent=$consistent balance_cents=$balance_cents konto_chain=$konto_chain terminal=$terminal money=$money domains=$domains_ok sandbox=$sandbox long_exec=$long_exec relay=$relay automaton=$automaton"
+echo "E2E OK turns=$turns registered=$registered api_errors=$api_errors ledger_consistent=$consistent balance_cents=$balance_cents money=$money konto_chain=$konto_chain terminal=$terminal domains=$domains_ok sandbox=$sandbox long_exec=$long_exec relay=$relay automaton=$automaton"
