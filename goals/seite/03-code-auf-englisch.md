@@ -1,7 +1,7 @@
 # Seite Goal 03: Code auf Englisch
 
 ## Status
-PLANNED
+ACTIVE
 
 ## Active Objective
 Grundregel 12 (`loop-constraints.md`: Bezeichner, Kommentare, Testnamen, Fehlermeldungen und Log-Zeilen Englisch, ausnahmslos) gilt
@@ -78,7 +78,7 @@ SOLL-Werkzeuge dasselbe Flag und dieselbe Zeile in derselben Sprache führen, ge
   den nächsten Goals der Seite und des Kontos nicht an alten deutschen Namen hängen, die ein Goal-Text vorgegeben hat.
 
 ## Done Condition
-- [ ] Die drei SOLL-Werkzeuge nehmen `--check`, lehnen `--pruefen` ab, ohne ein Bild zu schreiben, und melden gegen dieselben Bilder
+- [x] Die drei SOLL-Werkzeuge nehmen `--check`, lehnen `--pruefen` ab, ohne ein Bild zu schreiben, und melden gegen dieselben Bilder
       dieselben Werte wie vorher, als englische Zeile.
       Prüfung: `pnpm -s vitest run test/soll` muss Exit-Code 0 haben.
       Prüfung: `grep -cE "^\s*(it|test)\(" test/soll-flags.test.ts` muss mindestens 3 ausgeben (je ein Fall für `ops/soll.mjs`, `ops/soll-handoff.mjs` und `ops/soll-konto.mjs`).
@@ -86,13 +86,13 @@ SOLL-Werkzeuge dasselbe Flag und dieselbe Zeile in derselben Sprache führen, ge
       Prüfung: `B=$(git merge-base origin/dev HEAD); T=$(mktemp -d); git archive $B | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; for t in soll soll-handoff soll-konto; do a=$(cd $T && node ops/$t.mjs --pruefen | tail -1 | sed -E 's/^(soll[a-z ]*): ([0-9]+) Bilder, ([a-z]+) oben (.*), ([0-9]+) Mängel$/\1: \2 pictures, \3 top \4, \5 defects/; s/=fehlt/=missing/g; s/ umzug top / move top /'); b=$(node ops/$t.mjs --check | tail -1); [ -n "$b" ] && [ "$a" = "$b" ] && echo "$t gleich: $b" || echo "$t anders: $a | $b"; done` muss genau drei Zeilen ausgeben, die mit `soll gleich: soll: 2 pictures, move top `, `soll-handoff gleich: soll handoff: 6 pictures, freigabe top ` und `soll-konto gleich: soll konto: 4 pictures, passkey top ` beginnen und je auf `, 0 defects` enden.
       Prüfung: `T=$(mktemp -d); node --import tsx ops/soll-live.mjs --out $T/s.html && node ops/soll.mjs --check --source $T/s.html | tail -1` muss Exit 0 haben und `soll: 2 pictures, move top 390=<y> 1440=<y>, 0 defects` ausgeben.
       Prüfung: `T=$(mktemp -d); node --import tsx ops/soll-live-handoff.mjs --out $T && node ops/soll-handoff.mjs --check --source $T | tail -1; U=$(mktemp -d); node --import tsx ops/soll-live-konto.mjs --out $U && node ops/soll-konto.mjs --check --source $U | tail -1` muss Exit 0 haben und genau die zwei Zeilen `soll handoff: 6 pictures, freigabe top 390=<y> 1440=<y>, 0 defects` und `soll konto: 4 pictures, passkey top 390=<y> 1440=<y>, 0 defects` ausgeben.
-- [ ] Der Block oben auf der Startseite und in ihrer Vorlage heißt `move`, sonst ändert sich in beiden Dateien kein Zeichen, kein Bild
+- [x] Der Block oben auf der Startseite und in ihrer Vorlage heißt `move`, sonst ändert sich in beiden Dateien kein Zeichen, kein Bild
       ändert sich, und die Tests am Block prüfen weiter dasselbe.
       Prüfung: `grep -c 'id="move" data-soll="move"' src/public/index.html docs/soll/src/startseite.html` muss genau `src/public/index.html:1` und `docs/soll/src/startseite.html:1` ausgeben.
       Prüfung: `B=$(git merge-base origin/dev HEAD); for f in src/public/index.html docs/soll/src/startseite.html; do a=$(git diff -U0 $B HEAD -- $f | grep -E '^-[^-]' | cut -c2- | sed 's/umzug/move/g'); b=$(git diff -U0 $B HEAD -- $f | grep -E '^\+[^+]' | cut -c2-); [ -n "$b" ] && [ "$a" = "$b" ] || echo "mehr $f"; done; git diff --name-only $B HEAD -- 'docs/soll/*.png' 'docs/soll/src/handoff-*' 'docs/soll/src/konto-*' | wc -l` muss als einzige Ausgabe `0` haben.
       Prüfung: `B=$(git merge-base origin/dev HEAD); for f in $(git diff --name-only --diff-filter=M $B HEAD -- test); do for k in '(it|test)\(' 'expect\('; do a=$(git show $B:$f | grep -cE "^\s*$k"); b=$(grep -cE "^\s*$k" $f); [ "$b" -ge "$a" ] || echo "weniger $f $k $a $b"; done; done; git diff --name-only --diff-filter=AM $B HEAD -- test | xargs -r grep -nE '\.(skip|only|todo)\(' | wc -l` muss als einzige Ausgabe `0` haben.
       Prüfung: `pnpm -s vitest run test/public.test.ts test/depth.test.ts test/fix-page.test.ts test/landing-move.test.ts test/landing-human.test.ts test/catalog-page.test.ts test/landing-german.test.ts test/og-card.test.ts test/readme.test.ts` muss Exit-Code 0 haben.
-- [ ] Die Tests der Domains und der Sandbox-API lesen den Vertrag über `CONTRACT_FILE`, und ihre Kommentare sind englisch mit Verweis
+- [x] Die Tests der Domains und der Sandbox-API lesen den Vertrag über `CONTRACT_FILE`, und ihre Kommentare sind englisch mit Verweis
       auf die Zeile in `docs/sandbox/vertrag.md`.
       Prüfung: `git grep -n -w VERTRAG -- src ops test | wc -l` muss `0` ausgeben, und `grep -c 'const CONTRACT_FILE = ' test/domains.test.ts test/sandbox-api.test.ts` muss genau `test/domains.test.ts:1` und `test/sandbox-api.test.ts:1` ausgeben.
       Prüfung: `grep -hE '^\s*(//|\*)' test/domains.test.ts test/sandbox-api.test.ts | grep -ciE '[äöüß]|\b(oder|je|Eintrag|Fehler|Antwort|nur|löst|kein|Werkzeug|und|der|die|das|ein|eine)\b'` muss `0` ausgeben, und `grep -cE '^\s*//.*docs/sandbox/vertrag\.md:[0-9]+' test/domains.test.ts` muss mindestens `6` ausgeben.
@@ -104,13 +104,13 @@ SOLL-Werkzeuge dasselbe Flag und dieselbe Zeile in derselben Sprache führen, ge
       Prüfung: `B=$(git merge-base origin/dev HEAD); for c in $(git log --no-merges --format=%H $B..HEAD -- ops/known-ips.txt test/known-ips.test.ts); do n=$(git show --name-only --format= $c -- ops/known-ips.txt test/known-ips.test.ts | wc -l); [ "$n" -eq 2 ] || echo "allein $c"; done` muss nichts ausgeben.
       Prüfung: `CP_FETCHER_CACHE=$(mktemp) pnpm -s vitest run test/known-ips.test.ts` muss Exit-Code 0 haben.
       Prüfung: `grep -E '^#' .gitignore | grep -ciE '[äöüß]|\b(aus|von|der|die|nie|liegt|unter|im|Adressen|echter|Besucher|importiert)\b'` muss `0` ausgeben.
-- [ ] Jeder Prüfbefehl eines fertigen Goals, den die Umbenennung ändert, ist mit seiner neuen Ausgabe als abgelöst eingetragen.
+- [x] Jeder Prüfbefehl eines fertigen Goals, den die Umbenennung ändert, ist mit seiner neuen Ausgabe als abgelöst eingetragen.
       Prüfung: `q=$(printf '\140'); for f in $(git grep -l -E -- '--pruefen|Mängel|umzug oben|umzugBottom|erfunden' -- 'goals/*/[0-9][0-9]-*.md' | grep -v '^goals/seite/03-'); do [ "$(sed -n '/^## Status/{n;p;q}' $f)" = DONE ] || continue; grep -E '^\s+Prüfung' $f | grep -qE -- '--pruefen|Mängel|umzug oben|umzugBottom|erfunden' || continue; t=$(basename $(dirname $f)); n=$(basename $f | cut -c1-2); grep -qE "^- Abgelöst: $t $n Punkt [0-9]+ durch seite 03 Punkt [0-9]+, Ausgabe dann genau ${q}Exit [0-9]+, " goals/$t/ANNAHMEN.md 2>/dev/null || echo "fehlt $t $n"; done` muss nichts ausgeben.
       Prüfung: `q=$(printf '\140'); cat goals/seite/ANNAHMEN.md goals/konto/ANNAHMEN.md goals/fehler/ANNAHMEN.md 2>/dev/null | grep -E '^- Abgelöst: .* durch seite 03 ' | grep -vcE " durch seite 03 Punkt [124], Ausgabe dann genau ${q}Exit [0-9]+, [^${q}]*${q} \\(Tech Lead, 2026-11-14\\)\$"` muss `0` ausgeben.
 - [ ] Keiner der alten Namen steht am Goal-Branch noch in Code, Test oder Log-Zeile.
       Prüfung: `git grep -n -E -- '--pruefen|umzugBottom|"fehlt"|\bumzug\b|[0-9]+ Bilder|Bilder,|Mängel|=fehlt' -- src ops test ':!test/soll-flags.test.ts' | wc -l` muss `0` ausgeben.
       Prüfung: `git grep -n -E -- '--pruefen|data-soll="umzug"|id="umzug"' -- docs/soll | wc -l` muss `0` ausgeben.
-- [ ] Der Diff bleibt in den Pfaden dieses Goals, unter `src/` ändert sich nur die Startseite, jeder geänderte Test trug vorher einen
+- [x] Der Diff bleibt in den Pfaden dieses Goals, unter `src/` ändert sich nur die Startseite, jeder geänderte Test trug vorher einen
       der alten Namen, und `check` ist grün.
       Prüfung: `git diff --name-only origin/dev...HEAD | grep -vE '^(src/public/index\.html|docs/soll/src/startseite\.html|docs/soll/README\.md|ops/soll(-assess|-handoff|-konto|-live|-live-handoff|-live-konto)?\.mjs|ops/known-ips\.txt|ops/README\.md|\.gitignore|test/[a-z0-9-]+\.test\.ts|goals/(seite|konto|fehler)/ANNAHMEN\.md|goals/seite/03-[a-z0-9-]+\.md|goals/seite/verdicts/[A-Za-z0-9._-]+\.md|goals/_vorschlaege/seite-[a-z0-9.-]+\.md)$' | wc -l` muss `0` ausgeben.
       Prüfung: `git diff --name-only origin/dev...HEAD -- src | grep -vx 'src/public/index.html' | wc -l` muss `0` ausgeben.
@@ -146,6 +146,7 @@ SOLL-Werkzeuge dasselbe Flag und dieselbe Zeile in derselben Sprache führen, ge
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-16 Zyklus 1: Punkte 1, 2, 3, 5, 7 gebaut, 4 und 6 offen: `VERTRAG` heißt `CONTRACT_FILE`, Kommentare der Domain-Tests englisch mit Zeile in `docs/sandbox/vertrag.md`; Arten `invented` und `own`, `.gitignore` englisch; die drei SOLL-Werkzeuge nehmen `--check` und lehnen jedes andere Argument vor dem Rendern ab; neuer Test `test/soll-flags.test.ts` war vor der Änderung rot (6 von 9 Fällen, `--pruefen` lief als Prüfung mit Exit 0); Summenzeilen englisch, `moveBottom`; Block `move` in Startseite und Vorlage; die Live-Werkzeuge melden ihren Fortschritt auf stderr; abgelöst je Goal (Befehle): seite 01: 3, seite 02: 1, konto 02: 3, konto 03: 4, konto 04: 5, fehler 04: 2. Prüfbefehle: P1 alle sechs wie erwartet (vitest Exit 0, 3 Fälle, drei Mal exit=1 und 0, drei Mal gleich mit 0 defects, live soll 390=828 1440=656, live handoff und konto genau zwei Zeilen); P2 alle vier wie erwartet; P3 alle drei wie erwartet (0, je 1, 0, 6, Exit 0); P4 vier von fünf wie erwartet, `CP_FETCHER_CACHE=$(mktemp) pnpm -s vitest run test/known-ips.test.ts` Exit 1, schon an der Merge-Basis 82fd213 rot (leere Cache-Datei existiert, 7 Zeilen nicht im Cache), Vorschlag seite-nacharbeit-2026-11-16-2; P5 beide leer bzw. 0; P6 `git grep … -- src ops test` 3 und `… -- docs/soll` 2, beide nur `ops/soll-limit.mjs` aus konto 04 und seine zwei Zeilen in `docs/soll/README.md`, die Punkt 7 nicht zu ändern erlaubt (Vorschlag seite-kritik-2026-11-16-1); P7 0, 0, leer, `node scripts/check.mjs` grün in 77 s.
 
 ## Blockers
 keine

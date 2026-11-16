@@ -40,3 +40,10 @@
 - Abgelöst: seite 01 Punkt 6 durch seite 03 Punkt 1, Ausgabe dann genau `Exit 1, unknown argument: --pruefen` (Tech Lead, 2026-11-14)
 - Abgelöst: seite 01 Punkt 3 durch seite 03 Punkt 2, Ausgabe dann genau `Exit 1, [ 'umzug', 'inhalt umzug' ]` (Tech Lead, 2026-11-14)
 - Abgelöst: seite 02 Punkt 2 durch seite 03 Punkt 1, Ausgabe dann genau `Exit 1, unknown argument: --pruefen` (Tech Lead, 2026-11-14)
+
+## seite 03 (Maker, 2026-11-16)
+
+- `ops/soll-limit.mjs` (konto 04) nimmt weiter `--pruefen` und bleibt unverändert, weil Punkt 7 diese Datei nicht zum Ändern zulässt; deshalb bleibt Punkt 6 offen. Der Tech Lead entscheidet nach Vorschlag seite-kritik-2026-11-16-1, ob seite 03 sie mit umbenennt.
+- `docs/soll/README.md` nennt für `ops/soll-limit.mjs` weiter `--pruefen`, weil das Werkzeug es so nimmt; mit `--check` würde es die Bilder neu schreiben, statt zu prüfen.
+- Die Live-Werkzeuge `ops/soll-live.mjs`, `ops/soll-live-handoff.mjs` und `ops/soll-live-konto.mjs` melden ihren Fortschritt auf stderr, damit stdout nur die Summenzeilen trägt, die Punkt 1 verlangt.
+- Abgelöst steht je Goal, Punkt und neuer Ausgabe eine Zeile; mehrere Befehle desselben Punkts mit derselben neuen Ausgabe teilen sie (konto 04 Punkt 2: drei Befehle, konto 03 Punkt 4 und konto 04 Punkt 4: je zwei).
