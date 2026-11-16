@@ -18,7 +18,7 @@ import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSy
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { FOLD, KONTO_STATES, WIDTHS, assessKonto, decodePng, isLocal, pixelDiffCount, summaryKonto } from "./soll-assess.mjs";
+import { FONTS_CONF, FOLD, KONTO_STATES, WIDTHS, assessKonto, decodePng, isLocal, pixelDiffCount, summaryKonto } from "./soll-assess.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const args = process.argv.slice(2);
@@ -41,6 +41,9 @@ function findChrome() {
 
 /** A DevTools session over --remote-debugging-pipe: fd 3 into the browser, fd 4 out of it, messages ending in NUL. */
 function launch(chrome, profile) {
+  // The fonts are part of the picture: see FONTS_CONF in ops/soll-assess.mjs.
+  const fonts = path.join(path.dirname(profile), "fonts.conf");
+  writeFileSync(fonts, FONTS_CONF);
   // --no-sandbox as Playwright passes it: the code-host allows no user namespaces, and the only page loaded is our own file.
   const child = spawn(chrome, [
     "--headless", "--no-sandbox", "--remote-debugging-pipe", `--user-data-dir=${profile}`, "--no-first-run", "--no-default-browser-check",
@@ -48,7 +51,7 @@ function launch(chrome, profile) {
     "--disable-background-networking", "--disable-component-update", "--disable-sync", "--disable-extensions",
     "--disable-default-apps", "--mute-audio", "--host-resolver-rules=MAP * ~NOTFOUND", "--allow-file-access-from-files",
     "about:blank",
-  ], { stdio: ["ignore", "ignore", "pipe", "pipe", "pipe"] });
+  ], { stdio: ["ignore", "ignore", "pipe", "pipe", "pipe"], env: { ...process.env, FONTCONFIG_FILE: fonts } });
   let id = 0, rest = "", stderr = "";
   const waiting = new Map(), listeners = [];
   for (const s of [child.stdio[3], child.stdio[4]]) s.on("error", () => { /* reported through exit below */ });
