@@ -121,7 +121,8 @@ looks for that file before the health check, so also during an outage, and posts
 `Title: deploy-window 502` and `Priority: high`, the text naming every count and time, no address and
 no URL. The file goes only after a delivered POST, which leaves `[INFO] deploy alarm delivered`
 instead of `[INFO] webhook delivered`, because `ops/webhook-last.sh` reads the latter as a delivery of
-the watchdog and `ops/status.sh` then looks for a message titled `control-plane ...` on the topic.
+the watchdog and `ops/status.sh` then looks for one of the five titles of the watchdog on the topic
+(`control-plane ALIVE`, `OK`, `OUTAGE`, `WARN`, `WARNING`).
 A failed POST keeps it and leaves `[WARN] webhook unreachable`; without `CP_ALERT_WEBHOOK` it stays as well and the log gets
 `[WARN] a deploy alarm is waiting, no webhook set`. The title is the same as that of
 `ops/deploy-alarm.sh`, so `ops/status.sh` does not count it as a message of the watchdog.
@@ -131,8 +132,9 @@ wrong or stale topic in the crontab the watchdog logs a delivery every day and n
 `ops/status.sh` reads the topic back when `CP_ALERT_WEBHOOK` is set in the local environment
 (`json?poll=1&since=12h`, the URL handed to `curl` on stdin with `-K -`, never as an argument and
 never in the output) and reports `alarm_path.received`: `last_alive` (the newest `control-plane
-ALIVE`), `last_message` (the newest message titled `control-plane ...`; posts of other scripts do
-not count) and `status`. ntfy keeps messages in its cache for 12 hours by default, so the sign of
+ALIVE`), `last_message` (the newest message with one of the five titles of the watchdog, `control-plane ALIVE`,
+`OK`, `OUTAGE`, `WARN`, `WARNING`; posts of other scripts such as `control-plane backup failed` of
+`ops/backup.sh` or `deploy-window 502` do not count) and `status`. ntfy keeps messages in its cache for 12 hours by default, so the sign of
 life from just after 00:00 UTC is gone by the afternoon. That is why the window is 11 h: only a
 last delivery younger than 11 h is compared with the topic (one hour of margin before the cache
 ends, 300 s for the clocks), and an older one gives `unknown`, never a false red. With the three

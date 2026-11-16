@@ -231,6 +231,37 @@ describe("ops/status.sh checks that a delivery of the watchdog really reached th
     });
   });
 
+  it("a message of ops/backup.sh or of the deploy alarm is no delivery of the watchdog", () => {
+    const r = run(delivered("2026-11-13T11:00:00Z"), {
+      topic: message("control-plane backup failed", "2026-11-13T11:00:00Z") + message("deploy-window 502", "2026-11-13T11:00:00Z"),
+    });
+    expect(r.status, r.out).toBe(0);
+    expect(r.alarm?.received, r.out).toEqual({ last_alive: null, last_message: null, status: "red" });
+    expect(r.alarm?.status, r.out).toBe("red");
+  });
+
+  it("every severity that ops/watchdog.sh reports counts as its delivery", () => {
+    const watchdog = readFileSync(join(OPS, "watchdog.sh"), "utf8");
+    const severities = [...new Set([...watchdog.matchAll(/report "([A-Z]+)"/g)].map((m) => m[1]))];
+    expect(severities.length, severities.join(" ")).toBeGreaterThanOrEqual(5);
+    for (const severity of severities) {
+      const r = run(delivered("2026-11-13T11:00:00Z"), { topic: message(`control-plane ${severity}`, "2026-11-13T11:00:00Z") });
+      expect(r.alarm?.received?.status, `${severity}: ${r.out}`).toBe("ok");
+    }
+  });
+
+  it("a delivery 10 h 59 min old without a message of the watchdog is red", () => {
+    const r = run(delivered("2026-11-13T01:01:00Z"));
+    expect(r.status, r.out).toBe(0);
+    expect(r.alarm?.received?.status, r.out).toBe("red");
+  });
+
+  it("a delivery 11 h 1 min old is unknown", () => {
+    const r = run(delivered("2026-11-13T00:59:00Z"));
+    expect(r.status, r.out).toBe(0);
+    expect(r.alarm?.received, r.out).toEqual(UNKNOWN);
+  });
+
   it("never shows URL or topic, in the output or in the arguments of curl", () => {
     const red = run(delivered("2026-11-13T11:00:00Z"), { topic: message("nightly backup", "2026-11-13T11:00:00Z") });
     const unreadable = run(delivered("2026-11-13T11:00:00Z"), { topic: message("nightly backup", "2026-11-13T11:00:00Z"), curlRc: 22 });
