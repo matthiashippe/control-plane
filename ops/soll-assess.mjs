@@ -150,3 +150,40 @@ export function summaryHandoff(results) {
   const n = results.reduce((s, r) => s + r.defects.length, 0);
   return `soll handoff: ${results.length} Bilder, freigabe oben ${y}, ${n} Mängel`;
 }
+
+// ---- /h/{code}, account step (goals/konto/03) ----------------------------------------------------------------------------
+// Two more states of the phone page: `passkey` (create the account and allow the daily charge) and `fehlgeschlagen` (no account
+// was created). The block that has to sit in the first screen is data-soll="passkey". On top of the defects of the start page,
+// a word the reader would first have to translate is a defect, with the list of goals/konto/03 ("passkey" is a known word).
+
+/** The states of the account step, each one source docs/soll/src/konto-<state>.html and two pictures. */
+export const KONTO_STATES = Object.freeze(["passkey", "fehlgeschlagen"]);
+/** Words that name how the account is built instead of what happens; the same list the goal's source check uses. */
+export const KONTO_WORDS = /handoff|token|wallet|smart|permission|sepolia|turnkey|\berc/i;
+
+/**
+ * Defects of one render of the account step. `m` is what assessHandoff() takes: `state`, `width`, `pngWidth`, `diffPixels`,
+ * `scrollWidth`, `text`, `foreign` (requests made and addresses named in attributes that are not file:, data: or relative) and
+ * `blockBottom` (bottom edge of data-soll="passkey" in page pixels, null when missing). Only the state passkey carries the block.
+ */
+export function assessKonto(m) {
+  const out = assess({ ...m, umzugBottom: 0 }).map((d) => `${m.state} ${d}`), fold = FOLD[m.width];
+  if (!KONTO_STATES.includes(m.state)) out.push(`${m.state} ${m.width}: unknown state`);
+  const word = String(m.text ?? "").split("\n").find((l) => KONTO_WORDS.test(l));
+  if (word !== undefined) out.push(`${m.state} ${m.width}: word the reader has to translate in the visible text: ${word.trim().slice(0, 80)}`);
+  if (m.state === "passkey") {
+    if (m.blockBottom === null || m.blockBottom === undefined) out.push(`${m.state} ${m.width}: block data-soll="passkey" is missing`);
+    else if (fold && m.blockBottom > fold) out.push(`${m.state} ${m.width}: block passkey ends at ${m.blockBottom} px, below the first screen at ${fold}`);
+  }
+  return out;
+}
+
+/** The last line of ops/soll-konto.mjs. Wording fixed by goals/konto/03, Punkt 1. */
+export function summaryKonto(results) {
+  const y = WIDTHS.map((w) => {
+    const r = results.find((x) => x.state === "passkey" && x.width === w);
+    return `${w}=${r?.blockBottom ?? "fehlt"}`;
+  }).join(" ");
+  const n = results.reduce((s, r) => s + r.defects.length, 0);
+  return `soll konto: ${results.length} Bilder, passkey oben ${y}, ${n} Mängel`;
+}

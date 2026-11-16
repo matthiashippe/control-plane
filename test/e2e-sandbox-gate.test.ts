@@ -42,6 +42,8 @@ function good(): Planted {
     domains_ok: "true",
     // The relay walk of goals/relay/01 runs before this block; its verdict arrives here as relay=true or relay=false.
     relay: "true",
+    // The harness walk of goals/konto/03 (harness/e2e/konto-chain.mjs) runs before this block too; konto_chain=true or false.
+    konto_chain: "true",
   };
 }
 
@@ -95,6 +97,12 @@ describe("sandbox gate of harness/e2e/full.sh", () => {
 
   it("fails with relay=false when the relay walk did not pass, and good walks do not make up for it (goals/relay/01)", () => {
     expectFail({ ...good(), relay: "false" }, "true", "true", "false");
+  });
+
+  it("fails when the spend permission walk on chain 84532 did not pass, and good walks do not make up for it (goals/konto/03)", () => {
+    const r = runGate({ ...good(), konto_chain: "false" });
+    expect(r.code).toBe(1);
+    expect(r.last).toMatch(/^E2E FAIL .* konto_chain=false /);
   });
 
   it("fails when the walk verdict is not ok", () => {

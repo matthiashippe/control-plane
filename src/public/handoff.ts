@@ -99,6 +99,14 @@ ${buttons}
 
 /** The whole document. `indexStyle` is the <style> block of src/public/index.html. */
 export function renderHandoffPage(page: HandoffPage, indexStyle: string): string {
+  return phonePage(TITLES[page.state], body(page), indexStyle, "");
+}
+
+/**
+ * The frame of every state of /h/{code}: head with the start page's stylesheet and the blocks of this page, the bar, `main` and
+ * the footer. konto 03 (src/public/konto.ts) passes its own blocks as `extra` and its script as `head`.
+ */
+export function phonePage(title: string, main: string, indexStyle: string, extra: string, head = ""): string {
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -106,10 +114,10 @@ export function renderHandoffPage(page: HandoffPage, indexStyle: string): string
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <meta name="referrer" content="no-referrer">
-<title>${TITLES[page.state]}</title>
+<title>${title}</title>
 ${ICON}
 ${indexStyle}
-${OWN_STYLE}
+${OWN_STYLE}${extra}${head}
 </head>
 <body>
 <header class="bar"><div class="wrap narrow">
@@ -119,7 +127,7 @@ ${OWN_STYLE}
   </span>
 </div></header>
 <main>
-${body(page)}</main>
+${main}</main>
 <footer><div class="wrap narrow">
   PostYourPrice, Matthias Hippe, San-Francisco-Straße 1, 20457 Hamburg, Germany.
   <a href="/terms">The fine print</a>, the <a href="/terms#impressum">Impressum</a> and <a href="/datenschutz">Datenschutz</a>.

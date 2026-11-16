@@ -67,6 +67,58 @@
 - Ein Strom endet spätestens zehn Minuten und eine Minute nach dem Öffnen, auch wenn die Uhr der App etwas anderes sagt, weil kein
   Code länger lebt und ein hängender Strom sonst einen Prozess ewig belegt.
 
+## Goal 03 (13.11.2026, Engineer CP)
+
+- `POST /v1/handoff` nimmt `step` mit `confirm` (Vorgabe) oder `konto`, weil Terminals aus konto 02 ohne das Feld genau so weiterlaufen
+  sollen; bei `konto` führt die richtige Zahl nach `matched`, erst ein gültiges `POST /h/{code}/konto` setzt `done`.
+- Eine abgelehnte Erlaubnis verbrennt den Handoff, weil das Terminal sonst auf einen halb fertigen Schritt wartet und ein neuer
+  Handoff billiger ist als ein Zustand, aus dem es nicht herausfindet.
+- `SpendPermissionManager` ist zweiter Eigentümer der Smart Wallet, weil `spend()` über `execute` der Wallet läuft und das nur ein
+  Eigentümer darf; der Harness-Lauf zeigt, dass `approveWithSignature` mit ERC-6492 die Wallet mit beiden Eigentümern anlegt.
+- Die Identität des Kontos ist die Adresse der Smart Wallet in `wallets`, weil Einnahmen mit payTo und die Credits dann an derselben
+  Adresse hängen, die der Kunde besitzt.
+- Der API-Schlüssel entsteht über `createApiKey` aus `src/auth/siwe.ts` mit einer Sitzung, die nur innerhalb der Transaktion lebt,
+  weil das Goal `src/auth/**` nur zum Importieren freigibt und die Funktion eine Sitzung verlangt.
+- Der Klartext des Schlüssels steht bis zum ersten Lesen des Stroms in der Zeile des Handoffs, weil das Terminal den Strom nach einem
+  Abbruch neu öffnen darf und der Schlüssel sonst verloren wäre; das erste Ereignis `done` löscht ihn in derselben Transaktion.
+- In den Unit-Tests ist das Konto eine gewöhnliche Adresse und `signatureValid` fällt ohne Chain auf `ecrecover` zurück, weil der
+  Prüfbefehl ohne Netz und ohne anvil laufen muss; die Unterschrift einer echten Smart Wallet belegt der Harness auf anvil 84532.
+- Nachgebucht wird im Hintergrund nach jeder Anfrage mit API-Schlüssel, weil `spend()` auf einen Block wartet und keine Antwort an
+  den Kunden darauf warten soll; die Anfrage, die das Guthaben leert, bekommt 402, die nächste sieht die Credits.
+- Kennt `SpendPermissionManager` die Erlaubnis noch nicht, sendet `topUpIfLow` vorher `approveWithSignature`, weil erst der Server
+  Gas hat und der Kunde auf dem Handy nichts senden soll.
+- Der Spender ist die Adresse des Testschlüssels selbst, weil `spend()` an den Spender zahlt und so kein weiterer Schlüssel und keine
+  Adresse der Betreiber-Wallet nötig ist.
+- `deploy/Caddyfile` setzt `?Referrer-Policy "strict-origin-when-cross-origin"`, weil in Caddy das `?` vor dem Feldnamen steht und nur
+  dann einen fehlenden Wert ergänzt; die Schreibweise `Referrer-Policy "?strict-origin-when-cross-origin"` aus dem Prüfbefehl von
+  Punkt 12 schickt nachgestellt mit Caddy 2.11.7 einen zweiten Kopf mit dem Wert `?strict-origin-when-cross-origin` neben dem der App.
+- Entscheidung (Tech Lead, 2026-11-13): Die Prüfung von Punkt 12 und der Kontext verlangen `?Referrer-Policy "strict-origin-when-cross-origin"`
+  und keine Zeile, die den Kopf ohne `?` setzt, weil `caddy adapt` mit 2.11.7 die alte Schreibweise als festes `set` mit dem Wert
+  `?strict-origin-when-cross-origin` übersetzt und nur das `?` vor dem Feldnamen ein `require` auf einen fehlenden Kopf ergibt.
+- Die Seite legt den Passkey an und gibt Turnkey beim Signup zusätzlich einen P-256-Schlüssel des Tabs (nicht exportierbar, 120
+  Sekunden gültig), der die Erlaubnis einmal unterschreibt, weil sonst nach dem Anlegen ein zweiter Passkey-Dialog käme; Turnkeys
+  eigenes SDK macht es mit 60 Sekunden genauso (`signUpWithPasskey`, `@turnkey/core` 2.14.1). Der Schlüssel verlässt den Tab nie.
+- Das Skript der Seite nutzt viem und kein Paket von Turnkey, weil die vier Aufrufe (WebAuthn, Signup, Stempel, Signatur) in
+  `src/public/konto-client/flow.mjs` passen und jedes weitere Paket fremden Code auf die Seite brächte; gebündelt wird mit esbuild
+  (neues Entwicklungspaket), und das Bündel liegt im Repo, weil das Image nur mit tsc baut und `harness/cp/Dockerfile` zur Deny List
+  gehört. Ein Test baut es neu und vergleicht.
+- Die Seite fragt keine Chain: Die Adresse der Smart Wallet folgt per CREATE2 aus `initCodeHash()` der Factory (am 15.11.2026 von
+  Base Sepolia gelesen, gleich `getAddress`), und `eth_getCode` beantwortet ein Transport ohne Netz mit `0x`, weil ein Eigentümer,
+  der eine Sekunde alt ist, keine deployte Wallet hat. So geht vom Handy nichts an einen fremden RPC.
+- `signWith` geht in der Schreibweise an Turnkey, die der Signup zurückgibt (mit Prüfsumme), weil Turnkey Adressen nach Groß- und
+  Kleinschreibung unterscheidet; der erste Lauf scheiterte daran mit 404. Bei uns steht die Adresse klein.
+- `GET /h/{code}` zeigt nach `done` eines Handoffs mit `step: "konto"` den Zustand `erledigt` aus konto 02, weil das Skript nach dem
+  200 dorthin zurückkehrt und kein neuer Zustand ohne SOLL-Bild entstehen soll; ohne `step: "konto"` bleibt `ungueltig` wie bisher.
+- Die Auth-Proxy-ID kommt als `CP_KONTO_AUTH_PROXY_ID` in die Seite, weil Turnkey sie für Browser vorsieht und sie kein Schlüssel ist.
+  Für konto 05 bleibt offen: Die CSP aus `deploy/Caddyfile` erlaubt weder `/h/konto.js` noch `connect-src` zu Turnkey; das muss mit
+  dem Anschalten im Hauptnetz geändert werden, heute ist das Konto in der Produktion aus.
+- Der Lauf auf Base Sepolia nutzt Port 47391, weil `http://localhost:47391` als Allowed Origin im Auth Proxy steht und der Passkey
+  an diese Origin gebunden wird; das Skript bricht ab, wenn der Port belegt ist.
+- Der Hash eines `spend()` steht in `konto_accounts.pending_tx`, bevor auf die Quittung gewartet wird, und der nächste Lauf
+  prüft ihn vor allem anderen, auch vor der Schwelle, weil er Geld des Kunden bewegt haben kann (Punkt 15). Eine Lücke bleibt
+  zwischen dem Senden und dem Schreiben des Hashes (Absturz genau dazwischen); sie ließe sich nur schließen, indem die Transaktion
+  erst signiert, dann gespeichert und dann gesendet wird. Das steht für konto 05 an, bevor echtes Geld läuft.
+
 ## Reparatur dev (14.11.2026, Engineer CP)
 
 - Audit 2026-11-14 Zeile 371 (konto 01 Punkt 7, `check`) lief auf `033245c` rot, weil `test/sandbox-api.test.ts` den ersten Anlauf

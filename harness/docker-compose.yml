@@ -1,4 +1,5 @@
-# Harness: local chain (Anvil, chainId 8453, USDC mock at the mainnet address), control plane
+# Harness: local chain (Anvil, chainId 8453, USDC mock at the mainnet address), a second chain for the konto walk
+# (chainId 84532, Base Sepolia contract code), control plane
 # behind TLS (own CA) with a local settler, a rebuilt sandboxd, unmodified upstream runtime.
 x-anvil-account-0-key: &relayer-key "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
 
@@ -22,6 +23,37 @@ services:
       FUNDER_KEY: *relayer-key
     depends_on:
       chain:
+        condition: service_healthy
+
+  # Second chain for goals/konto/03: chainId 84532 (Base Sepolia). konto-chain.mjs places the runtime code of the real
+  # Base Sepolia contracts (harness/chain/konto/) here with anvil_setCode; the USDC mock sits at the test USDC address.
+  chain-konto:
+    image: ghcr.io/foundry-rs/foundry:latest
+    entrypoint: ["anvil"]
+    command: ["--chain-id", "84532", "--host", "0.0.0.0", "--port", "8545", "--silent"]
+    healthcheck:
+      test: ["CMD-SHELL", "cast chain-id --rpc-url http://127.0.0.1:8545 | grep -q 84532"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+  # The image of chain-tools (viem and solc in /chain/node_modules) with the konto walk and the contract code mounted
+  # in; not part of the image. Commands: "chain.mjs setup" (USDC mock) and "konto-chain.mjs" (the walk).
+  chain-konto-tools:
+    build:
+      context: ./chain
+    entrypoint: ["node"]
+    command: ["konto-chain.mjs"]
+    environment:
+      RPC_URL: http://chain-konto:8545
+      CHAIN_ID: "84532"
+      USDC_ADDRESS: "0x036CbD53842c5426634e7929541eC2318f3dCF7e"
+      KONTO_DIR: /chain/konto
+    volumes:
+      - ./e2e/konto-chain.mjs:/chain/konto-chain.mjs:ro
+      - ./chain/konto:/chain/konto:ro
+    depends_on:
+      chain-konto:
         condition: service_healthy
 
   cp:
