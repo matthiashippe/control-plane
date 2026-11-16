@@ -267,6 +267,77 @@ export async function signPermission({ owner, signRaw, chainId, spender, token, 
   return { account: address, permission: strings, signature };
 }
 
+/** The hex SHA-256 of a request body, as text: the challenge a Turnkey stamp by passkey signs (their WebAuthn stamper). */
+export async function stampChallenge(subtle, body) {
+  return new TextEncoder().encode(hex(new Uint8Array(await subtle.digest("SHA-256", new TextEncoder().encode(body)))));
+}
+
+/**
+ * A stamp of a request body by the passkey that is already on this phone (konto 04): one passkey dialog, the value of the
+ * header X-Stamp-WebAuthn. No allowCredentials, so the phone offers the passkey of this site that it has.
+ */
+export async function passkeyStamp({ get, subtle, rpId, body }) {
+  let cred;
+  try {
+    cred = await get({ publicKey: { rpId, challenge: await stampChallenge(subtle, body), userVerification: "preferred", timeout: 300000 } });
+  } catch (err) {
+    throw new KontoError("cancelled", err && err.name ? err.name : "passkey not used");
+  }
+  if (!cred) throw new KontoError("cancelled", "no passkey");
+  return JSON.stringify({
+    authenticatorData: base64url(new Uint8Array(cred.response.authenticatorData)),
+    clientDataJson: base64url(new Uint8Array(cred.response.clientDataJSON)),
+    credentialId: base64url(new Uint8Array(cred.rawId)),
+    signature: base64url(new Uint8Array(cred.response.signature)),
+  });
+}
+
+/**
+ * The step limit (goals/konto/04): the account exists, so there is no signup. Its passkey stamps one request to Turnkey that
+ * signs the hash of the new permission with the wallet of the account (`owner`, as Turnkey wrote it, in the group `org`).
+ * Returns the body of POST /h/{code}/limit. Throws KontoError with the reason the page shows.
+ */
+export async function runLimit(deps, page) {
+  const { get, fetch: fetchFn, subtle, random, now, rpId } = deps;
+  if (!/^0x[0-9a-fA-F]{40}$/.test(page.spender || "") || !/^0x[0-9a-fA-F]{40}$/.test(page.token || "") || !/^[0-9]+$/.test(page.limit || "")) {
+    throw new KontoError("unreachable", "page data incomplete");
+  }
+  if (!/^0x[0-9a-fA-F]{40}$/.test(page.owner || "") || !page.org || !/^0x[0-9a-fA-F]{40}$/.test(page.account || "")) {
+    throw new KontoError("unreachable", "the account has no passkey on record");
+  }
+  const owner = page.owner.toLowerCase();
+  if (smartWalletAddress(owner) !== page.account.toLowerCase()) throw new KontoError("refused", "the passkey wallet does not own this account");
+  const nowMs = now();
+  const signRaw = async (hash) => {
+    const body = JSON.stringify({
+      type: "ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2",
+      timestampMs: String(now()),
+      organizationId: page.org,
+      parameters: { signWith: page.owner, payload: hash, encoding: "PAYLOAD_ENCODING_HEXADECIMAL", hashFunction: "HASH_FUNCTION_NO_OP" },
+    });
+    const stamp = await passkeyStamp({ get, subtle, rpId, body });
+    const data = await postJson(fetchFn, `${TURNKEY_API_URL}/public/v1/submit/sign_raw_payload`, { "X-Stamp-WebAuthn": stamp }, body);
+    const result = data.activity && data.activity.status === "ACTIVITY_STATUS_COMPLETED" && data.activity.result
+      ? data.activity.result.signRawPayloadResult : null;
+    if (!result || !/^[0-9a-fA-F]{1,64}$/.test(result.r) || !/^[0-9a-fA-F]{1,64}$/.test(result.s)) {
+      throw new KontoError("unreachable", `no signature from the wallet (${data.activity ? data.activity.status : "no activity"})`);
+    }
+    const v = Number.parseInt(String(result.v), 16);
+    return `0x${result.r.padStart(64, "0")}${result.s.padStart(64, "0")}${v === 0 || v === 27 ? "1b" : "1c"}`;
+  };
+  const signed = await signPermission({
+    owner,
+    signRaw,
+    chainId: page.chainId,
+    spender: page.spender,
+    token: page.token,
+    allowance: page.limit,
+    nowSec: Math.floor(nowMs / 1000),
+    salt: BigInt(`0x${hex(random(32))}`),
+  });
+  return { body: signed };
+}
+
 /**
  * The whole step: passkey, signup, signature. Returns the body of POST /h/{code}/konto and, for the run on Base Sepolia, the
  * Turnkey wallet that owns the account. Throws KontoError with the reason the page shows.
@@ -293,5 +364,6 @@ export async function runKonto(deps, page) {
     nowSec: Math.floor(nowMs / 1000),
     salt,
   });
-  return { body: signed, owner, organizationId };
+  // The passkey wallet as Turnkey wrote it and its group, so that a raise of the limit can ask the same passkey (konto 04).
+  return { body: { ...signed, owner: wallet, organization_id: organizationId }, owner, organizationId };
 }
