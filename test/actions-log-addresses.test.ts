@@ -147,6 +147,29 @@ describe("ops/actions-log-addresses.sh counts stranger addresses in Actions logs
     expect(r.lines).toEqual(["7 0", "total 0"]);
   });
 
+  it("counts a public address just outside 10/8, 172.16/12 and 169.254/16", () => {
+    // Built from parts so that no public address stands in the repository as text.
+    const ip = (...parts: number[]): string => parts.join(".");
+    const line = (addr: string): string => `06:00:05  ${addr}  GET /health  200\n`;
+    // Each run plants one public neighbour of a private range and both ends of that range, which must not count.
+    const runs: [string, string[]][] = [
+      [ip(9, 255, 255, 254), [ip(10, 0, 0, 1), ip(10, 255, 255, 254)]],
+      [ip(11, 0, 0, 1), [ip(10, 0, 0, 1), ip(10, 255, 255, 254)]],
+      [ip(172, 15, 255, 254), [ip(172, 16, 0, 1), ip(172, 31, 255, 254)]],
+      [ip(172, 32, 0, 1), [ip(172, 16, 0, 1), ip(172, 31, 255, 254)]],
+      [ip(169, 253, 255, 254), [ip(169, 254, 0, 1), ip(169, 254, 255, 254)]],
+      [ip(169, 255, 0, 1), [ip(169, 254, 0, 1), ip(169, 254, 255, 254)]],
+    ];
+    const w = workspace();
+    runs.forEach(([outside, inside], i) => {
+      w.file(`logs/${i + 1}/deploy/1_x.txt`, [...inside, outside].map(line).join(""));
+    });
+    const r = w.run(["--dir", join(w.root, "logs")]);
+    expect(r.status, r.out).toBe(0);
+    expect(r.lines).toEqual(["1 1", "2 1", "3 1", "4 1", "5 1", "6 1", "total 6"]);
+    expect(r.out).not.toMatch(IPV4);
+  });
+
   it("sorts runs by numeric id", () => {
     const w = workspace();
     w.file("logs/100/a.txt", STRANGER_LINE);
