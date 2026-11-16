@@ -31,7 +31,17 @@ export interface WorldOptions {
   respond?: (cmd: string, args: string[], input?: string) => Partial<RunResult> | Promise<Partial<RunResult>> | undefined;
   /** Start the clock here instead of T0. */
   t0?: number;
+  /** The domain sandboxd builds public URLs of exposed ports under; a documentation domain by default. */
+  domain?: string;
+  /**
+   * Answers one request instead of sandboxd, as an older or broken sandboxd would; return undefined to let
+   * sandboxd answer. The request still counts in `hits`.
+   */
+  answer?: (method: string, path: string) => { status: number; body: unknown } | undefined;
 }
+
+/** The documentation domain the rebuilt sandboxd of the tests serves exposed ports under. */
+export const WORLD_DOMAIN = "example.dev";
 
 const servers: http.Server[] = [];
 
@@ -87,12 +97,20 @@ export async function sandboxWorld(opts: WorldOptions = {}) {
     now: () => clock.t,
     keys: () => keys.list,
     state: memoryState(),
-    config: { slots: opts.slots ?? 10, disksDir: "/d", mntDir: "/m", image: "sandboxd-base:1", domain: "postyourprice.com" },
+    config: { slots: opts.slots ?? 10, disksDir: "/d", mntDir: "/m", image: "sandboxd-base:1", domain: opts.domain ?? WORLD_DOMAIN },
     log: () => {},
   });
   const hits: string[] = [];
   const { server, url } = await listen((req, res) => {
-    hits.push(`${req.method} ${String(req.url).split("?")[0]}`);
+    const target = String(req.url).split("?")[0];
+    hits.push(`${req.method} ${target}`);
+    const planted = opts.answer?.(String(req.method), target);
+    if (planted) {
+      req.resume();
+      res.writeHead(planted.status, { "content-type": "application/json" });
+      res.end(JSON.stringify(planted.body));
+      return;
+    }
     return d.handleApi(req, res);
   });
   const db = opts.db ?? openDb(":memory:");

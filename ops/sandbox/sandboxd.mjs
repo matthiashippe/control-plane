@@ -51,9 +51,26 @@ export function loadConfig(env = process.env) {
     mntDir: env.SANDBOXD_MNT || "/var/lib/sandboxd/mnt",
     image: env.SANDBOXD_IMAGE || "sandboxd-base:1",
     slots: int(env.SANDBOXD_SLOTS, 10),
-    domain: (env.SANDBOXD_DOMAIN || "postyourprice.com").toLowerCase(),
+    domain: (env.SANDBOXD_DOMAIN || "").trim().toLowerCase(),
     sweepS: int(env.SANDBOXD_SWEEP_S, 60),
   };
+}
+
+// ---- the domain of exposed ports (goals/sandbox/07)
+
+/** The zone of the payment service. A customer's service never gets a name in it (goals/sandbox/ANNAHMEN.md, Goal 07). */
+export const PAYMENT_ZONE = "postyourprice.com";
+const DOMAIN_RE = /^(?=.{4,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
+
+/** The domain for public URLs of exposed ports, lowercased without a trailing dot; throws for an empty or malformed name and for the payment zone. */
+export function assertPortsDomain(domain) {
+  const d = String(domain ?? "").trim().toLowerCase().replace(/\.$/, "");
+  if (!d) throw new Error("SANDBOXD_DOMAIN is not set: exposed ports need a domain of their own");
+  if (d === PAYMENT_ZONE || d.endsWith(`.${PAYMENT_ZONE}`)) {
+    throw new Error(`SANDBOXD_DOMAIN ${d} is the zone of the payment service ${PAYMENT_ZONE}; exposed ports need a domain of their own`);
+  }
+  if (!DOMAIN_RE.test(d)) throw new Error(`SANDBOXD_DOMAIN ${d} is not a domain name`);
+  return d;
 }
 
 // ---- signature (docs/sandbox/plan.md, Verbindung, byte for byte)
@@ -287,6 +304,8 @@ function sendText(res, status, text) {
 
 export function createSandboxd({ run, now = Date.now, keys = [], state = memoryState(), config = {}, log = (l) => console.log(l), randomId = newId }) {
   const cfg = { ...loadConfig({}), ...config };
+  // An empty domain is allowed for code paths without ports (tests of other parts); the payment zone never is.
+  if (cfg.domain) cfg.domain = assertPortsDomain(cfg.domain);
   const data = state.load() ?? {};
   if (!data.sandboxes) data.sandboxes = {};
   const persist = () => state.save(data);
@@ -702,6 +721,7 @@ function listen(server, port, host) {
 
 export async function main(env = process.env) {
   const config = loadConfig(env);
+  config.domain = assertPortsDomain(config.domain);
   for (const d of [config.disksDir, config.mntDir, path.dirname(config.stateFile)]) fs.mkdirSync(d, { recursive: true, mode: 0o700 });
   const log = (l) => console.log(l);
   log(`sandboxd: ${loadKeys(config.keysDir, log).length} keys in ${config.keysDir}`);

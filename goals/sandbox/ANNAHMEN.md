@@ -316,3 +316,75 @@
   `check: grün in 94 s`; `pnpm -s vitest run test/sandbox-api.test.ts -t "Idempotency-Key"` gibt `5 passed | 16 skipped`. Gegenprobe:
   der Test vom Stand vor 2de5407 mit `AbortSignal.timeout(1)` wird rot, `2 failed | 3 passed | 16 skipped`, `expected +0 to be 1`,
   genau der Fehler aus Zeile 539.
+
+## Goal 07 (13.11.2026, Engineer CP)
+
+- **Ausgangslage.** `ops/ports-demand.sh` ist unverändert aus Commit 0ce27f0 übernommen; sein Selbsttest war am heutigen Stand
+  grün, also gab es keinen Grund für eine Änderung. Seit dem Rollout von sandbox 03 (2026-11-12 18:12:46 UTC) baten 0 fremde
+  Adressen um einen Port (`docs/sandbox/ports.md`, `## Vorher`). Die 0 hält das Goal nicht auf (Fast track in `ROADMAP.md`).
+- **Domain `sandboxhost.dev`.** Ein Name, der ohne Vorwissen nach einer Sandbox klingt und nicht nach der Zahlung; Ausweich
+  `runsandbox.dev` und `sbxhost.dev`. `.dev` steht auf der HSTS-Preload-Liste, jeder Aufruf geht also nur über HTTPS. Die Domain
+  steht im Code genau an einer Stelle je Datei: `SANDBOXD_DOMAIN` in `ops/sandbox/sandboxd.service` (daraus lesen
+  `cloudflare.py` und `setup.sh` sie) und der Name des Blocks in `ops/sandbox/sandbox.caddy`. Kauft Matthias einen Ausweichnamen,
+  ändern sich nur diese zwei Zeilen.
+- **Domain `sandboxhost.de` statt `sandboxhost.dev` (Matthias, 15.11.2026).** Matthias hat `sandboxhost.de` bei INWX gekauft, etwa
+  6 € im Jahr; Cloudflare Registrar verkauft keine `.de`. Die Zone liegt im Cloudflare-Konto von HTC, der Token `sbx-ports` gilt nur
+  für sie (DNS Edit, Zone Settings Edit, SSL and Certificates Edit, dazu Zone Read für die Suche der Zone nach Namen). Geändert haben sich nur die zwei Zeilen oben (`SANDBOXD_DOMAIN` und der Block in `sandbox.caddy`). Weil `.de` nicht auf
+  der HSTS-Preload-Liste steht, setzt `cloudflare.py ports-apply` in der Zone „Always Use HTTPS“ an und `ports-check` meldet
+  `CHANGE ports https`, solange es aus ist; das Recht dafür (Zone Settings Edit) hat der Token schon. Ein HSTS-Kopf von Caddy
+  käme dazu, wenn ein Browser einen Kunden über eine offene WLAN-Verbindung auf `http://` locken kann; das hält die Umleitung
+  nicht auf, ist aber erst mit eigenem Befund nötig.
+- **Registrar Cloudflare.** Im Konto, in dem die Zone `postyourprice.com` liegt, weil die Zone dann ohne Umzug der Nameserver dort
+  steht und Cloudflare zum Selbstkostenpreis verkauft (12.20 USD im Jahr laut Preisliste, `docs/sandbox/ports.md`). Abgelöst am
+  15.11.2026: INWX für `sandboxhost.de`, Zone trotzdem bei Cloudflare (siehe unten).
+- **Token.** Ein eigener API-Token `CLOUDFLARE_SBX_API_TOKEN` nur für die neue Zone mit Zone DNS Edit, Zone SSL and Certificates
+  Edit und Zone Settings Edit, statt den Token der Zahlungszone zu erweitern: Ein Fehler im Werkzeug der Ports kann dann die Zone
+  der Zahlung nicht ändern. Er liegt nur in `~/brain/connectors/secrets.env` auf dem code-host, nie auf dem Sandbox-Server. Den
+  Token der Zahlungszone braucht `cloudflare.py` nur noch für `ctl.sbx`, das Löschen von `*.postyourprice.com` und
+  `zone-digest`.
+- **Origin CA statt `tls internal`.** Die neue Zone läuft auf SSL „Full (strict)“, Cloudflare prüft also das Zertifikat des
+  Sandbox-Servers. Das Zertifikat (`*.sandboxhost.de` und `sandboxhost.de`, 15 Jahre) holt `setup.sh --origin-cert` über
+  `cloudflare.py origin-cert` in ein privates Temp-Verzeichnis des code-host, legt es nach `/etc/caddy/sbx/` (0600, Besitzer
+  caddy) und löscht es lokal sofort. `setup.sh` verweigert einen Lauf, solange dort kein gültiges Zertifikat der Domain liegt,
+  weil Caddy mit einer Datei, die auf ein fehlendes Zertifikat zeigt, nach dem nächsten Neustart nicht mehr lädt (lokal belegt:
+  `caddy validate` mit Wegwerf-Zertifikat „Valid configuration“, ohne Zertifikat „loading certificates: open …“), und stellt bei
+  einem roten `caddy validate` jetzt auch `sandbox.caddy` zurück, nicht nur `Caddyfile`. Die Zahlungszone bleibt bei ihrem
+  SSL-Modus, das Goal ändert ihn nicht.
+- **sandboxd verweigert die Domain der Zahlung.** `assertPortsDomain` in `ops/sandbox/sandboxd.mjs` lehnt eine leere Domain, einen
+  ungültigen Namen und `postyourprice.com` samt jedem Namen darunter ab; `main` bricht vor jedem Verzeichnis und jedem Port ab, den
+  Rückfall auf `postyourprice.com` gibt es nicht mehr. Das Control Plane prüft jede `public_url` zusätzlich selbst und gibt eine
+  unter `postyourprice.com` nie weiter, damit ein alter Stand des Servers keinen Dienst eines Kunden unter die Zone der Zahlung
+  legt.
+- **Wildcard der Zahlungszone gelöscht** am 2026-11-13 um 19:33 UTC mit `python3 ops/sandbox/cloudflare.py dns-apply 72.62.51.224`
+  („deleted A *.postyourprice.com“), vor dem Kauf der neuen Domain: Bis dahin antwortete das Control Plane auf `ports/expose` mit
+  409, kein Kunde hatte also eine Adresse darunter, und die Zone hatte außer Wurzel, `www` und `ctl.sbx` keinen Namen, der über den
+  Wildcard lief. Fingerabdruck vorher und nachher `29c9eb2596f4`.
+- **Notschalter** bei Missbrauch eines freigegebenen Ports (etwa einer Phishing-Seite): den einen Eintrag `*.sandboxhost.de` in der
+  Zone der Ports löschen. Alle Adressen freigegebener Ports sind dann weg, die Zahlung ist davon nie berührt, weil sie in einer
+  anderen Zone liegt. Für eine einzelne Sandbox reicht `DELETE /v1/sandboxes/{id}/ports/{port}` über das Control Plane.
+- **Public Suffix List.** Nicht Teil dieses Goals, weil die Aufnahme ein PR in einem fremden Repo ist (Gate `public_post`). Ohne sie
+  kann eine Sandbox ein Cookie für `.sandboxhost.de` setzen, das der Browser an jede andere Sandbox mitschickt; die Zahlung ist
+  davon nicht betroffen, weil sie unter einer anderen Domain läuft. Steht als Vorschlag in
+  `goals/_vorschlaege/sandbox-nacharbeit-2026-11-13-5.md`.
+- **Kein Aufpreis.** Ein freigegebener Port kostet nichts extra, abgerechnet wird weiter nach Laufzeit (`docs/sandbox/plan.md`,
+  `## Preis`); das Control Plane schreibt für `ports/expose` und `ports/{port}` keine Ledger-Zeile.
+- **Umstellung vor dem Merge (15.11.2026, nach dem Kauf).** Die Punkte 3, 4 und 5 prüfen DNS und Sandbox-Server mit Netz am Stand
+  des Goal-Branch, also muss beides vor dem Merge so stehen. Um 17:03 UTC lief `setup.sh --origin-cert` und `setup.sh` vom
+  Goal-Branch, nachdem `dev` hineingemergt war, damit kein Stand von `dev` auf dem Server zurückgedreht wird (`--check` vorher: nur
+  `sandboxd.service`, `sandboxd.mjs`, `sandbox.caddy` und das Zertifikat). Davor `setup.sh --foreign-sandboxes`: `running=0
+  foreign=0`, der Neustart von `sandboxd` traf also keinen Kunden. Um 17:04 UTC löschte `dns-apply` den Eintrag `*.postyourprice.com`
+  erneut. Kein Kunde verliert eine Adresse, weil das Control Plane auf `dev` für `ports/expose` weiter 409 antwortet und `sandboxd`
+  selbst nur noch `sandboxhost.de` vergibt. Folge auf `dev` bis zum Merge: sandbox 02 Punkt 5 (`sbx-unknown0-80.postyourprice.com`
+  mit `404`) wird rot, weil der Name nicht mehr auflöst; das ist die Ablösung durch sandbox 07 Punkt 5, die der Tech Lead eintragen
+  soll. Ein Lauf von `dev`, der den Eintrag wieder anlegt, würde Punkt 5 dieses Goals rot machen und eine Adresse unter der Zone
+  der Zahlung zurückbringen; er unterbleibt.
+- **`ops/ports-demand.sh` nach dem Merge von `dev` angepasst (15.11.2026).** Auf `dev` verlangt `test/own-ips-readers.test.ts`
+  (messung 07), dass kein Werkzeug unter `ops/` die Datei `own-ips.txt` an `own_ips` vorbei liest; `check` war damit rot
+  (`read past own_ips: ops/ports-demand.sh:51`), der Selbsttest des Werkzeugs selbst blieb grün. Die eigene Kopie von
+  `own_ips_offline` ist darum weg, `--log` nimmt die Funktion aus `ops/own-ips.sh`. `count_demand` ist unverändert (Prüfung von
+  Punkt 1, `diff` leer). Folge: Eine Liste ohne Adresse endet jetzt mit Exit 2 statt mit einer Zählung ohne eigene Adressen. Lauf
+  gegen die Produktion danach, 2026-11-15 17:17 UTC: `bash ops/ports-demand.sh --since '2026-11-12 18:12:46'` gibt
+  `PORTS DEMAND: 0 foreign addresses, 0 calls, since 2026-11-12 18:12:46 UTC`, also dieselbe Zahl wie unter `## Vorher`.
+- Abgelöst: sandbox 02 Punkt 5 durch sandbox 07 Punkt 5, Ausgabe dann genau `000` (Tech Lead, 2026-11-15)
+- Entscheidung: Der dritte Prüfbefehl von Punkt 9 gilt ab Zyklus 8 ohne die Verdicts, also `git diff origin/dev...HEAD -- . ':(exclude)goals/sandbox/verdicts/' | grep -cE "BEGIN (CERTIFICATE|PRIVATE KEY)"` muss 0 ausgeben, und für die Verdicts `git diff origin/dev...HEAD -- goals/sandbox/verdicts/ | grep -cE -- '-{5}BEGIN'` muss 0 ausgeben, weil der einzige Treffer am Kopf `bde3094` das Zitat des Befunds in `goals/sandbox/verdicts/07-z7-K.md:39` ist, ein Verdict mit sha256-Beleg nicht umgeschrieben wird und jedes künftige Verdict zu diesem Befund ihn sonst wieder träfe; ein echter Schlüssel oder ein echtes Zertifikat trägt immer die fünf Striche vor BEGIN, die zweite Prüfung fängt ihn also auch dort (Tech Lead, 2026-11-15)
+- Entscheidung: Für die Verdicts gilt ab Zyklus 10 statt des zweiten Befehls der Zeile davor `git diff origin/dev...HEAD -- goals/sandbox/verdicts/ | grep -cE '^\+[[:space:]]*-{5}BEGIN [A-Z ]*(CERTIFICATE|PRIVATE KEY)-{5}'` muss 0 ausgeben, weil am Kopf `d4ed986` der einzige Treffer des alten Befehls das Zitat eines Suchausdrucks in `goals/sandbox/verdicts/07-z9-B.md:14` ist; ein echter PEM-Block beginnt immer mit einer eigenen Kopfzeile aus fünf Strichen, BEGIN, Typ und fünf Strichen, ein Zitat im Fließtext tut das nie. Der erste Befehl der Zeile davor (ohne die Verdicts) bleibt (Tech Lead, 2026-11-16)

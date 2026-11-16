@@ -6,7 +6,8 @@
 //
 // Environment: SANDBOXD_API_PORT (8730), SANDBOXD_HOST (0.0.0.0), SANDBOXD_KEYS_DIR (/cp-data),
 // SANDBOXD_STATE (/var/lib/sandboxd/state.json), SANDBOXD_DOCKER_STATE (/var/lib/sandboxd/docker.json),
-// SANDBOXD_MNT (/var/lib/sandboxd/mnt), SANDBOXD_DISKS (/var/lib/sandboxd/disks).
+// SANDBOXD_MNT (/var/lib/sandboxd/mnt), SANDBOXD_DISKS (/var/lib/sandboxd/disks), SANDBOXD_DOMAIN (HARNESS_DOMAIN, the
+// domain public URLs of exposed ports are built under; harness/e2e/sandbox-walk.mjs expects the same one).
 
 import fs from "node:fs";
 import http from "node:http";
@@ -15,6 +16,9 @@ import { createFileState, createSandboxd, loadConfig, loadKeys, memoryState } fr
 import { createHarnessRun } from "./harness-run.mjs";
 
 export { createSandboxd };
+
+/** A documentation domain (RFC 2606), never the zone of the payment. */
+export const HARNESS_DOMAIN = "sbx.example";
 
 /**
  * Starts the stand-in on host:port (port 0 picks a free one) and gives { url, d, docker, close }.
@@ -28,12 +32,13 @@ export async function startHarnessSandboxd({
   dockerStateFile = null,
   mntDir = "/var/lib/sandboxd/mnt",
   disksDir = "/var/lib/sandboxd/disks",
+  domain = HARNESS_DOMAIN,
   log = (l) => console.log(l),
 } = {}) {
   if (!keysDir) throw new Error("keysDir is required");
   fs.mkdirSync(mntDir, { recursive: true });
   const harness = createHarnessRun({ stateFile: dockerStateFile });
-  const config = { ...loadConfig({}), host, apiPort: port, keysDir, mntDir, disksDir };
+  const config = { ...loadConfig({ SANDBOXD_DOMAIN: domain }), host, apiPort: port, keysDir, mntDir, disksDir, domain };
   const d = createSandboxd({
     run: harness.run,
     keys: () => loadKeys(keysDir, log),
@@ -69,6 +74,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     dockerStateFile: env.SANDBOXD_DOCKER_STATE || "/var/lib/sandboxd/docker.json",
     mntDir: env.SANDBOXD_MNT || "/var/lib/sandboxd/mnt",
     disksDir: env.SANDBOXD_DISKS || "/var/lib/sandboxd/disks",
+    domain: env.SANDBOXD_DOMAIN || HARNESS_DOMAIN,
   }).then(
     (s) => {
       console.log(`sandboxd (harness): api on ${env.SANDBOXD_HOST || "0.0.0.0"}:${s.port}, keys in ${env.SANDBOXD_KEYS_DIR || "/cp-data"}`);

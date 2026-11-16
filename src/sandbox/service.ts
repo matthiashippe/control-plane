@@ -160,14 +160,28 @@ const hostFull = (): Reply =>
     message: "The sandbox server has no free place right now. Nothing was started and nothing was charged; try again later.",
     docs: DOC.sandboxes,
   });
-const PORTS_UNAVAILABLE: Reply = reply(409, {
-  error: "port_exposure_unavailable",
-  message:
-    "Exposing a port of a sandbox is not offered yet: public URLs for sandbox ports need a domain of their own, " +
-    "apart from the one this service pays and bills under. The sandbox keeps running and nothing was charged; " +
-    "exec and files work as usual.",
-  docs: DOC.sandboxes,
-});
+/** The zone every paid request goes through; a customer's service is never published under it. */
+const PAYMENT_ZONE = "postyourprice.com";
+
+/**
+ * The public URL sandboxd gave for an exposed port, if it may be passed on: https, and a host that is neither the
+ * zone of the payment nor a name under it (any case, a trailing dot or a port does not change that). null otherwise.
+ */
+export function passablePublicUrl(v: unknown): string | null {
+  if (typeof v !== "string" || !v) return null;
+  let u: URL;
+  try {
+    u = new URL(v);
+  } catch {
+    return null;
+  }
+  if (u.protocol !== "https:") return null;
+  const host = u.hostname.toLowerCase().replace(/\.+$/, "");
+  if (!host || host === PAYMENT_ZONE || host.endsWith(`.${PAYMENT_ZONE}`)) return null;
+  return v;
+}
+
+const validPort = (v: unknown): v is number => typeof v === "number" && Number.isInteger(v) && v >= 1 && v <= 65535;
 
 function insufficient(availableMc: number): Reply {
   return reply(402, {
@@ -681,9 +695,53 @@ export function createSandboxService(opts: SandboxServiceOptions) {
     return passOn(id, res, (o) => ({ content: typeof o.content === "string" ? o.content : "" }));
   }
 
-  /** Ports stay closed (goals/sandbox/ANNAHMEN.md, Goal 03): nothing goes to sandboxd. */
-  function ports(address: string, id: string): Reply {
-    return ownRow(address, id) ? PORTS_UNAVAILABLE : notFound();
+  /**
+   * Exposes a port of the sandbox through sandboxd (goals/sandbox/07): the answer carries `port` and `public_url`,
+   * the runtime tells its model `Port <port> exposed at: <public_url>`. A stopped sandbox is started again first,
+   * as for exec, because a port only answers while the sandbox runs. A URL under the zone of the payment is never
+   * passed on (passablePublicUrl), whatever sandboxd says. Nothing is booked: the sandbox is billed by run time only.
+   */
+  async function exposePort(address: string, id: string, body: unknown): Promise<Reply> {
+    if (!ownRow(address, id)) return notFound();
+    const b = (body && typeof body === "object" && !Array.isArray(body) ? body : {}) as Record<string, unknown>;
+    if (!validPort(b.port)) {
+      return reply(400, { error: "invalid_request", message: "port must be a whole number from 1 to 65535.", docs: DOC.sandboxes });
+    }
+    const port = b.port;
+    const stopped = await ensureRunning(id);
+    if (stopped) return stopped;
+    const res = await call("POST", `/v1/sandboxes/${id}/ports/expose`, { port }, { timeoutMs: 60_000 });
+    if (res && res.status === 200) {
+      const url = passablePublicUrl(res.body.public_url);
+      if (!url) {
+        log(`[sandbox] POST /v1/sandboxes/${id}/ports/expose: sandboxd gave no public URL that may be passed on`);
+        return unreachable();
+      }
+      return reply(200, {
+        port,
+        public_url: url,
+        message:
+          `Your service on port ${port} in sandbox ${id} is now reachable from the internet at ${url}. ` +
+          `It must listen on 0.0.0.0:${port} inside the sandbox. Exposing a port costs nothing extra; the sandbox ` +
+          `is billed by run time as before. To close it again, call DELETE /v1/sandboxes/${id}/ports/${port}.`,
+      });
+    }
+    return passOn(id, res, (o) => o);
+  }
+
+  /** Closes an exposed port at sandboxd. Nothing is booked. */
+  async function removePort(address: string, id: string, rawPort: string): Promise<Reply> {
+    if (!ownRow(address, id)) return notFound();
+    const port = Number(rawPort);
+    if (!validPort(port)) {
+      return reply(400, { error: "invalid_request", message: "port must be a whole number from 1 to 65535.", docs: DOC.sandboxes });
+    }
+    const res = await call("DELETE", `/v1/sandboxes/${id}/ports/${port}`, undefined, { timeoutMs: 60_000 });
+    return passOn(id, res, () => ({
+      ok: true,
+      port,
+      message: `Port ${port} of sandbox ${id} is closed; its public address no longer reaches the sandbox.`,
+    }));
   }
 
   /** Not called by the runtime (deleteSandbox is empty at the pin); the own live check cleans up with it. */
@@ -697,5 +755,5 @@ export function createSandboxService(opts: SandboxServiceOptions) {
     });
   }
 
-  return { create, list, get, exec, upload, read, ports, remove, tick, ownerFor };
+  return { create, list, get, exec, upload, read, exposePort, removePort, remove, tick, ownerFor };
 }
