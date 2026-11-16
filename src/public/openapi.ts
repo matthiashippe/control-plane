@@ -30,6 +30,7 @@ import { TOPUP_TIERS_USD } from "../payments/pay.js";
  * A description is a statement about the running service, so it comes from the running service.
  */
 import { FEE_PERCENT } from "../bounties/store.js";
+import { agentMintsPerDay, crawlerMintsPerDay } from "../auth/keyless.js";
 
 const JSON_CONTENT = (schema: Record<string, unknown>) => ({ "application/json": { schema } });
 
@@ -46,6 +47,24 @@ const ERROR_SCHEMA = {
     docs: { type: "string", format: "uri", description: "The section of docs/errors.md for this code." },
   },
   required: ["error"],
+} as const;
+
+/** The answer 201 of `POST /v1/auth/keyless`, field for field as the route in src/app.ts sets it. */
+const KEYLESS_KEY_SCHEMA = {
+  type: "object",
+  properties: {
+    key: { type: "string", description: "The API key itself, shown once and stored only as a hash." },
+    key_prefix: { type: "string", description: "The first characters of the key, to tell keys apart without the key." },
+    address: { type: "string", description: "The identity this key stands for, not a wallet address." },
+    note: { type: "string", description: "What the key carries and where to go next, in plain words." },
+    keys_left_today: {
+      type: "integer",
+      minimum: 0,
+      description: "Places of the caller's cap left today after this key, refills at midnight UTC.",
+    },
+    docs: { type: "string", format: "uri", description: "The section of the documentation on authentication." },
+  },
+  required: ["key", "key_prefix", "address", "note", "keys_left_today", "docs"],
 } as const;
 
 export function openApiDocument(
@@ -104,8 +123,18 @@ export function openApiDocument(
     post: op(
       "A key with no wallet at all",
       "One call, no signature, no account. For an agent that wants to compete for a job rather " +
-        "than run a whole automaton. Capped per day across the instance.",
-      { security: [], responses: { 201: { description: "The key" }, 429: { description: "The day's mints are used up", content: JSON_CONTENT(ERROR_SCHEMA) } } },
+        "than run a whole automaton. " +
+        `Capped per day: everybody shares ${agentMintsPerDay()} keys a day, and a declared crawler (a user agent ` +
+        `with a link and one of the words crawler, bot or indexer) has its own cap of ${crawlerMintsPerDay()} a day ` +
+        "apart from that. Both refill at midnight UTC, and keys_left_today in the answer counts what is left of " +
+        "the caller's cap.",
+      {
+        security: [],
+        responses: {
+          201: { description: "The key", content: JSON_CONTENT(KEYLESS_KEY_SCHEMA) },
+          429: { description: "The day's mints are used up", content: JSON_CONTENT(ERROR_SCHEMA) },
+        },
+      },
     ),
   };
 
