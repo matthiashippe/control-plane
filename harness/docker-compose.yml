@@ -81,6 +81,9 @@ services:
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       # Sandboxes go to the rebuilt sandboxd below, signed with the key cp makes in /data on its first start.
       CP_SANDBOXD_URL: http://sandboxd:8730
+      # The public base a hosted automaton calls back (conwayApiUrl and socialRelayUrl of its setup file, goals/sandbox/08):
+      # the name of cp in this network, the same origin every client of the harness already calls.
+      CP_PUBLIC_URL: https://cp.test:8443
     volumes:
       - ./certs:/certs:ro
       - cp-data:/data
@@ -96,15 +99,21 @@ services:
 
   # Rebuilt sandboxd (goals/sandbox/04): the real ops/sandbox/sandboxd.mjs, commands of a sandbox as processes in
   # this container instead of Docker. It reads the public key cp wrote (/data/sandbox-client.pub) from cp-data, read
-  # only, and is reachable inside the compose network only (no ports).
+  # only, and is reachable inside the compose network only (no ports). Since goals/sandbox/08 the runtime at the pin of a
+  # hosted automaton runs here too, as a process with the environment of this container: the CA of cp.test and the chain
+  # of the harness, like the service runtime. init reaps the processes the stand-in ends.
   sandboxd:
     build:
       context: ..
       dockerfile: harness/sandboxd/Dockerfile
+    init: true
     environment:
       SANDBOXD_KEYS_DIR: /cp-data
+      NODE_EXTRA_CA_CERTS: /certs/ca.pem
+      AUTOMATON_RPC_URL: http://chain:8545
     volumes:
       - cp-data:/cp-data:ro
+      - ./certs:/certs:ro
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8730/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 2s
@@ -132,6 +141,8 @@ services:
       - ./e2e/long-exec.mjs:/opt/harness/long-exec.mjs:ro
       - ./e2e/runtime-tap.mjs:/opt/harness/runtime-tap.mjs:ro
       - ./e2e/relay-walk.mjs:/opt/harness/relay-walk.mjs:ro
+      # The automaton walk (harness/e2e/automaton-walk.mjs, goals/sandbox/08): plain HTTP against cp, no runtime module.
+      - ./e2e/automaton-walk.mjs:/opt/harness/automaton-walk.mjs:ro
     depends_on:
       cp:
         condition: service_healthy

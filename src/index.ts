@@ -48,6 +48,7 @@ import { siteOrigin } from "./public/site.js";
 import { createSandboxdClient, loadOrCreateClientKey, SANDBOXD_URL_DEFAULT } from "./sandbox/client.js";
 import { createSandboxService } from "./sandbox/service.js";
 import { grantLiveSandbox } from "./sandbox/grant.js";
+import { grantLiveAutomaton } from "./automaton/grant.js";
 import { kontoFromEnv } from "./konto/setup.js";
 
 const port = Number(process.env.CP_PORT || 8402);
@@ -62,6 +63,13 @@ try {
   if (g.granted) console.log("[sandbox] live-sandbox credit booked");
 } catch (err) {
   console.error(`[sandbox] live-sandbox credit failed: ${err instanceof Error ? err.message : String(err)}`);
+}
+// The credit of the check `automaton` of ops/live.sh (src/automaton/grant.ts), the same way.
+try {
+  const g = grantLiveAutomaton(db);
+  if (g.granted) console.log("[automaton] live-automaton credit booked");
+} catch (err) {
+  console.error(`[automaton] live-automaton credit failed: ${err instanceof Error ? err.message : String(err)}`);
 }
 
 // The sandbox API (sandbox 03). The key pair is made on the first start next to the database and kept

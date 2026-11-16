@@ -96,6 +96,8 @@ import { registerHandoff, type HandoffDeps, type KontoDeps } from "./handoff/rou
 import { handlePay, TOPUP_TIERS_USD, type PayConfig } from "./payments/pay.js";
 import { handleRegister } from "./registry.js";
 import { createSandboxService, type Reply as SandboxReply, type SandboxService } from "./sandbox/service.js";
+import { automatonOfKey, isOtherAutomatonSandbox, keysForbidden, otherAutomatonSandboxes } from "./automaton/scope.js";
+import { automatonNotFound, createAutomatonService } from "./automaton/service.js";
 import { registerRelay } from "./relay/routes.js";
 import type { Settler } from "./payments/settler.js";
 import {
@@ -168,6 +170,11 @@ export interface AppOptions {
    * the sandbox server answers 501 and the list is what the database holds.
    */
   sandbox?: SandboxService | null;
+  /**
+   * The public base a hosted automaton calls back (goals/sandbox/08: conwayApiUrl and socialRelayUrl). Left out, the origin
+   * of src/public/site.ts (CP_PUBLIC_URL).
+   */
+  automatonPublicUrl?: string;
   /**
    * The way to the phone (goals/konto/02, src/handoff/routes.ts): how often the stream looks at the row, the cap on unknown codes
    * on /h/{code} and where the chance comes from. Left out, production values.
@@ -313,6 +320,9 @@ export const V1_ROUTES = new Set([
   "/v1/messages/poll",
   "/v1/messages/count",
   "/v1/automatons/register",
+  // Hosted automatons (goals/sandbox/08). The sub-paths carry the id as a segment and live behind the wildcard
+  // /v1/automatons/*, whose handler checks the key itself (test/automaton-api.test.ts).
+  "/v1/automatons",
   "/v1/bounties",
   "/v1/bounties/cancel",
   "/v1/bounties/award",
@@ -2700,6 +2710,8 @@ export function createApp(opts: AppOptions) {
    * Never returns a key, only its prefix, which is what `docs/api-key.md` says listings show.
    */
   app.get("/v1/auth/api-keys", (c) => {
+    // The key of a hosted automaton never sees the keys of its account (goals/sandbox/08, point 12, src/automaton/scope.ts).
+    if (automatonOfKey(db, c.req.header("authorization"))) return c.json(keysForbidden(), 403);
     const rows = db
       .prepare(
         "SELECT key_prefix, name, created_at, revoked_at FROM api_keys WHERE address = ? ORDER BY created_at DESC",
@@ -2727,6 +2739,7 @@ export function createApp(opts: AppOptions) {
    * because the next call with that key is a 401 and that should not come as a surprise.
    */
   app.post("/v1/auth/api-keys/revoke", async (c) => {
+    if (automatonOfKey(db, c.req.header("authorization"))) return c.json(keysForbidden(), 403);
     const raw = await c.req.json().catch(() => null);
     const b = (typeof raw === "object" && raw !== null ? raw : {}) as Record<string, unknown>;
     const prefix = typeof b.key_prefix === "string" ? b.key_prefix.trim() : "";
@@ -3574,7 +3587,16 @@ export function createApp(opts: AppOptions) {
       );
     }
   };
-  app.get("/v1/sandboxes", (c) => sandboxGuard(c, () => sandboxes.list(c.get("address"))));
+  app.get("/v1/sandboxes", (c) =>
+    sandboxGuard(c, () => {
+      const res = sandboxes.list(c.get("address"));
+      // The key of a hosted automaton does not see the sandboxes of the other automatons of its account (point 12).
+      const own = automatonOfKey(db, c.req.header("authorization"));
+      if (!own || !Array.isArray(res.body.sandboxes)) return res;
+      const hidden = otherAutomatonSandboxes(db, c.get("address"), own);
+      return { ...res, body: { ...res.body, sandboxes: (res.body.sandboxes as { id: string }[]).filter((s) => !hidden.has(s.id)) } };
+    }),
+  );
   // The exact route stands before the wildcard: in Hono `/v1/sandboxes/*` also matches `/v1/sandboxes`.
   app.post("/v1/sandboxes", async (c) => {
     const body = await c.req.json().catch(() => ({}));
@@ -3610,6 +3632,11 @@ export function createApp(opts: AppOptions) {
         405,
       );
     }
+    // A sandbox another automaton runs in does not exist for the key of an automaton (goals/sandbox/08, point 12).
+    const ownAutomaton = automatonOfKey(db, c.req.header("authorization"));
+    if (ownAutomaton && isOtherAutomatonSandbox(db, address, ownAutomaton, id)) {
+      return c.json({ error: "sandbox_not_found", message: "No sandbox with this id belongs to this API key.", docs: DOC.sandboxes }, 404);
+    }
     const json = async () => c.req.json().catch(() => ({}));
     if (sub === "") return sandboxGuard(c, () => (asked === "GET" ? sandboxes.get(address, id) : sandboxes.remove(address, id)));
     if (sub === "/exec") {
@@ -3626,6 +3653,42 @@ export function createApp(opts: AppOptions) {
       return sandboxGuard(c, () => sandboxes.exposePort(address, id, body));
     }
     return sandboxGuard(c, () => sandboxes.removePort(address, id, sub.slice("/ports/".length)));
+  });
+
+  // --- Hosted automatons (goals/sandbox/08, docs/sandbox/automaton.md, src/automaton/) ----
+
+  // An automaton that runs entirely here, in a sandbox of its own, billed like every sandbox plus its inference on the same
+  // account. POST /v1/automatons/register stands above and keeps answering the runtime as before: `register` is never an id.
+  const automatons = createAutomatonService({ db, sandboxes, publicUrl: () => opts.automatonPublicUrl ?? siteOrigin() });
+  // The key of a hosted automaton reaches only its own automaton; every other one of its account answers 404 (point 12).
+  app.get("/v1/automatons", (c) =>
+    sandboxGuard(c, () => automatons.list(c.get("address"), automatonOfKey(db, c.req.header("authorization")))),
+  );
+  app.post("/v1/automatons", async (c) => {
+    const body = await c.req.json().catch(() => ({}));
+    return sandboxGuard(c, () => automatons.create(c.get("address"), c.req.header("authorization"), body, c.req.header("idempotency-key")));
+  });
+  app.all("/v1/automatons/*", async (c) => {
+    const m = /^\/v1\/automatons\/([A-Za-z0-9_-]{1,64})(\/.*)?$/.exec(new URL(c.req.url).pathname);
+    if (!m) return c.notFound();
+    const [, id, sub = ""] = m;
+    const allowed = sub === "" ? ["GET", "DELETE"] : sub === "/logs" ? ["GET"] : sub === "/stop" || sub === "/start" ? ["POST"] : null;
+    if (!allowed) return c.notFound();
+    const address = resolveApiKey(db, c.req.header("authorization"));
+    if (!address) throw invalidKeyError();
+    const asked = c.req.method === "HEAD" ? "GET" : c.req.method;
+    if (!allowed.includes(asked)) {
+      c.header("Allow", allowed.join(", "));
+      return c.json(
+        { error: "method_not_allowed", message: `${c.req.path} accepts ${allowed.join(" and ")}, not ${c.req.method}.`, allow: allowed, docs: DOC.automatons },
+        405,
+      );
+    }
+    const ownAutomaton = automatonOfKey(db, c.req.header("authorization"));
+    if (ownAutomaton && ownAutomaton !== id) return c.json(automatonNotFound().body, 404);
+    if (sub === "") return sandboxGuard(c, () => (asked === "GET" ? automatons.get(address, id) : automatons.remove(address, id)));
+    if (sub === "/logs") return sandboxGuard(c, () => automatons.logs(address, id));
+    return sandboxGuard(c, () => (sub === "/stop" ? automatons.stop(address, id) : automatons.start(address, id)));
   });
 
   // --- Domains (docs/sandbox/vertrag.md, src/domains.ts) ----------

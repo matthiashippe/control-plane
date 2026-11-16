@@ -13,7 +13,7 @@ Environment=SANDBOXD_KEYS_DIR=/etc/sandboxd/keys
 Environment=SANDBOXD_STATE=/var/lib/sandboxd/state.json
 Environment=SANDBOXD_DISKS=/var/lib/sandboxd/disks
 Environment=SANDBOXD_MNT=/var/lib/sandboxd/mnt
-Environment=SANDBOXD_IMAGE=sandboxd-base:1
+Environment=SANDBOXD_IMAGE=sandboxd-base:2
 Environment=SANDBOXD_SLOTS=9
 Environment=SANDBOXD_DOMAIN=sandboxhost.de
 ExecStart=/opt/sandboxd/node-v22.23.4/bin/node /opt/sandboxd/sandboxd.mjs

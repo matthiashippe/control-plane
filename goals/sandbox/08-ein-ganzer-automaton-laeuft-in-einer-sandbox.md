@@ -1,7 +1,7 @@
 # Sandbox Goal 08: Ein ganzer Automaton läuft in einer Sandbox
 
 ## Status
-PLANNED
+DONE
 
 ## Active Objective
 Ein Konto, auch ein schlüsselloses aus `src/auth/keyless.ts`, startet mit einem Aufruf `POST /v1/automatons` (Name und
@@ -128,7 +128,7 @@ betreibt seinen Dienst bei uns, bezahlt aus Credits) bleibt für alle ohne eigen
   ohne Wallet aus Claude Code einen Automaton startet; sandbox 09 und 10 machen lange Befehle und den Bau am Pin sicherer.
 
 ## Done Condition
-- [ ] Das Image jeder Sandbox trägt die unveränderte Runtime am Pin mit Node 22 und die beiden Skripte, und der Sandbox-Server läuft
+- [x] Das Image jeder Sandbox trägt die unveränderte Runtime am Pin mit Node 22 und die beiden Skripte, und der Sandbox-Server läuft
       mit diesem Image.
       MVP: Funktion, weil ohne Runtime im Image keine Sandbox in Sekunden einen Automaton starten kann.
       Prüfung: `grep -cxE "ARG AUTOMATON_REV=d8f8168" ops/sandbox/image/Dockerfile` muss 1 ausgeben.
@@ -138,14 +138,14 @@ betreibt seinen Dienst bei uns, bezahlt aus Credits) bleibt für alle ohne eigen
       Prüfung: `for f in ops/sandbox/image/automaton-start ops/sandbox/image/automaton-supervise; do [ -f "$f" ] || echo "fehlt $f"; done` muss nichts ausgeben.
       Prüfung (Netz): `bash ops/sandbox/setup.sh --check 72.62.51.224` muss Exit-Code 0 haben und keine Zeile `CHANGE` ausgeben.
       Prüfung (Netz): `bash ops/sandbox/setup.sh --check 72.62.51.224 | grep -cx "IMAGE runtime d8f8168 clean"` muss 1 ausgeben.
-- [ ] `sandboxd` startet die Runtime nach jedem Containerstart, wenn die Marke besteht, und hält eine Sandbox mit `keep_running` weder
+- [x] `sandboxd` startet die Runtime nach jedem Containerstart, wenn die Marke besteht, und hält eine Sandbox mit `keep_running` weder
       nach 24 Stunden noch nach 30 Tagen an; der Test war vor dem Fix rot.
       MVP: Funktion, weil ein Automaton sonst nach einem Neustart des Servers stumm bleibt und nach einem Tag ohne Aufruf an `sandboxd`
       gestoppt wird.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/sandboxd-automaton.test.ts test/sandboxd.test.ts` muss Exit-Code 0 haben.
       Prüfung: `for w in keep_running autostart automaton-supervise idle max-runtime reconcile; do grep -qF -- "$w" test/sandboxd-automaton.test.ts || echo "fehlt $w"; done` muss nichts ausgeben.
       Prüfung: `T=$(mktemp -d); git archive HEAD | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; f=$T/ops/sandbox/sandboxd.mjs; if ! grep -q "s\.keep_running" $f; then echo "fehlt s.keep_running"; else sed -i "s/s\.keep_running/false/g" $f; (cd $T && PATH=/usr/bin:$PATH pnpm -s vitest run test/sandboxd-automaton.test.ts >/dev/null 2>&1) && echo "gruen ohne keep_running"; fi; rm -rf $T` muss nichts ausgeben.
-- [ ] Das Control Plane beantwortet die Routen unter `/v1/automatons` für jedes Konto, auch ein schlüsselloses, legt je Automaton
+- [x] Das Control Plane beantwortet die Routen unter `/v1/automatons` für jedes Konto, auch ein schlüsselloses, legt je Automaton
       einen eigenen Schlüssel an, den ein Automaton nicht für einen weiteren Automaton nutzen kann, und gibt einem fremden Konto 404; der
       Test war vor dem Fix rot.
       MVP: Funktion, weil das die Schnittstelle ist, über die ein Kunde und konto 04 einen Automaton starten, beobachten und stoppen.
@@ -153,7 +153,7 @@ betreibt seinen Dienst bei uns, bezahlt aus Credits) bleibt für alle ohne eigen
       Prüfung: `grep -cE "^\s*(it|test)\(" test/automaton-api.test.ts` muss mindestens 12 ausgeben (je ein Fall: Anlegen mit Name und Genesis-Prompt gibt 201 und genau einen Aufruf an den nachgebauten sandboxd mit keep_running; Anlegen für ein schlüsselloses Konto; POST /v1/sandboxes reicht keep_running nie durch; Genesis-Prompt leer oder über 8000 Zeichen gibt 400 invalid_request; ein Schlüssel automaton:<id> bekommt 403 auf POST /v1/automatons; fremde ID gibt 404 auf Zustand, Log, Stopp, Start und Löschen; GET /v1/automatons nennt nur eigene; Zustand starting ohne Turn und running mit Turn im Log; Log ohne Schlüssel und ohne 64-stellige Hex-Folge; Stopp und Start; Löschen widerruft den Schlüssel, danach 401; POST /v1/automatons/register antwortet wie vorher).
       Prüfung: `for w in /v1/automatons genesis_prompt keep_running automaton: 403 404 401 redacted; do grep -qF -- "$w" test/automaton-api.test.ts || echo "fehlt $w"; done` muss nichts ausgeben.
       Prüfung: `T=$(mktemp -d); git archive HEAD | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; f=$(grep -rlE "export function isAutomatonKey\(" $T/src/automaton | head -1); if [ -z "$f" ]; then echo "fehlt isAutomatonKey"; else sed -i "s/export function isAutomatonKey(/function isAutomatonKeyOrig(/" $f; echo "export function isAutomatonKey(..._a: unknown[]): boolean { return false; }" >> $f; (cd $T && PATH=/usr/bin:$PATH pnpm -s vitest run test/automaton-api.test.ts >/dev/null 2>&1) && echo "gruen ohne isAutomatonKey"; fi; rm -rf $T` muss nichts ausgeben.
-- [ ] Was das Control Plane in die Sandbox schreibt, stimmt: `conwayApiUrl` und `socialRelayUrl` auf uns, `creatorAddress` und
+- [x] Was das Control Plane in die Sandbox schreibt, stimmt: `conwayApiUrl` und `socialRelayUrl` auf uns, `creatorAddress` und
       `payTo` auf das Konto des Kunden, der Genesis-Prompt unverändert, `check_for_updates` aus, und kein Code liest den Schlüssel der
       Runtime-Wallet; der Test war vor dem Fix rot.
       MVP: Funktion, weil die Runtime nur mit dieser Config bei uns denkt, schreibt und Einnahmen auf das Konto des Kunden lenkt statt in
@@ -161,13 +161,13 @@ betreibt seinen Dienst bei uns, bezahlt aus Credits) bleibt für alle ohne eigen
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/automaton-setup.test.ts` muss Exit-Code 0 haben.
       Prüfung: `for w in conwayApiUrl socialRelayUrl creatorAddress payTo genesisPrompt check_for_updates konto_accounts 0x0000000000000000000000000000000000000000; do grep -qF -- "$w" test/automaton-setup.test.ts || echo "fehlt $w"; done` muss nichts ausgeben.
       Prüfung: `git diff origin/dev...HEAD -- src ops harness/e2e harness/sandboxd | grep -cE '^\+.*\.automaton/wallet\.json'` muss 0 ausgeben.
-- [ ] Ein Automaton kostet genau die Sandbox-Schritte und seine Inferenz auf dem Konto, dem die Sandbox gehört, hält bei leerem
+- [x] Ein Automaton kostet genau die Sandbox-Schritte und seine Inferenz auf dem Konto, dem die Sandbox gehört, hält bei leerem
       Guthaben an und lässt beim Löschen keine Reservierung zurück; der Test war vor dem Fix rot.
       MVP: Funktion, weil jede Stunde und jede Antwort genau einmal berechnet werden muss und ein Automaton ohne Guthaben nicht auf
       unsere Kosten weiterlaufen darf.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/automaton-billing.test.ts test/sandbox-billing.test.ts` muss Exit-Code 0 haben.
       Prüfung: `for w in ledger "kind" sandbox: hold_mc stop_reason credit revoked_at; do grep -qF -- "$w" test/automaton-billing.test.ts || echo "fehlt $w"; done` muss nichts ausgeben.
-- [ ] Im Harness denkt die unveränderte Runtime in der nachgebildeten Sandbox fünf Turns, denkt nach einem Absturz und nach einem
+- [x] Im Harness denkt die unveränderte Runtime in der nachgebildeten Sandbox fünf Turns, denkt nach einem Absturz und nach einem
       Neustart des nachgebauten `sandboxd` weiter, die Runtime-Wallet hält nichts, das Ledger stimmt, und der Job `e2e` des Goal-PR ist
       grün.
       MVP: Funktion, weil erst dieser Lauf zeigt, dass die unveränderte Runtime den ganzen Weg von der Route bis zum Denken übersteht
@@ -177,7 +177,7 @@ betreibt seinen Dienst bei uns, bezahlt aus Credits) bleibt für alle ohne eigen
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/automaton-walk.test.ts test/harness-sandboxd.test.ts test/e2e-sandbox-gate.test.ts` muss Exit-Code 0 haben.
       Prüfung (Netz): `n=$(gh pr list -R matthiashippe/control-plane --head goal/sandbox-08 --state all --json number -q '.[0].number'); gh pr checks "${n:?}" -R matthiashippe/control-plane --json name,state -q '.[] | select(.name=="e2e") | .state'` muss `SUCCESS` ausgeben.
       Prüfung (Netz): `n=$(gh pr list -R matthiashippe/control-plane --head goal/sandbox-08 --state all --json number -q '.[0].number'); l=$(gh pr checks "${n:?}" -R matthiashippe/control-plane --json name,link -q '.[] | select(.name=="e2e") | .link'); gh run view --job "${l##*/}" --log -R matthiashippe/control-plane | grep -cE "E2E OK .*sandbox=true.*automaton=true"` muss mindestens 1 ausgeben.
-- [ ] Ein eigener Automaton hat in der Produktion vor dem Merge gedacht, nach einem Neustart des Sandbox-Servers von selbst weiter
+- [x] Ein eigener Automaton hat in der Produktion vor dem Merge gedacht, nach einem Neustart des Sandbox-Servers von selbst weiter
       gedacht, ist aus Credits bezahlt und hat keine Wallet bewegt; die Spitze des Speichers und die Stufe stehen in der Doku.
       MVP: Funktion, weil nur der echte Server mit gVisor, nftables und `reconcile` zeigt, dass ein Automaton einen Neustart übersteht.
       Prüfung: `PATH=/usr/bin:$PATH bash ops/automaton-live.sh --selftest` muss Exit-Code 0 haben und als letzte Zeile `AUTOMATON LIVE SELFTEST OK` ausgeben.
@@ -186,14 +186,14 @@ betreibt seinen Dienst bei uns, bezahlt aus Credits) bleibt für alle ohne eigen
       Prüfung: `grep -ciE "cnwy_k_[0-9a-f]{8}|sbx-[a-z0-9]+-[0-9]+\." docs/sandbox/automaton.md` muss 0 ausgeben.
       Prüfung: `grep -oiE "0x[0-9a-f]{40}" docs/sandbox/automaton.md | grep -cvx "0x0\{40\}"` muss 0 ausgeben.
       Prüfung (Netz): `bash ops/automaton-live.sh | tail -1 | grep -cE "^AUTOMATON LIVE OK turns=[1-9][0-9]* reboot=skipped .*hold_mc=0 wallet_usdc=0$"` muss 1 ausgeben.
-- [ ] Nach jedem Rollout prüft `ops/live.sh` die Route `/v1/automatons` mit dem eigenen Konto und meldet einen Fehlschlag mit eigener
+- [x] Nach jedem Rollout prüft `ops/live.sh` die Route `/v1/automatons` mit dem eigenen Konto und meldet einen Fehlschlag mit eigener
       Zeile, und das eigene Konto hat das Guthaben dafür.
       MVP: Funktion, weil ein Rollout, der den Start eines Automatons bricht, sonst erst beim nächsten Kunden auffällt.
       Prüfung: `for w in /v1/automatons 'automaton=ok' 'FAIL automaton:' 401; do grep -qF -- "$w" ops/live.sh || echo "fehlt $w"; done` muss nichts ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH bash ops/live.sh --selftest | grep -c "FAIL automaton:"` muss mindestens 1 ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/live-selftest.test.ts test/automaton-grant.test.ts` muss Exit-Code 0 haben.
       Prüfung: `git grep -c "grant:live-automaton" -- src | wc -l` muss mindestens 1 ausgeben.
-- [ ] Die Doku sagt Kunde, Runtime und Betrieb, wie ein Automaton bei uns läuft, und die Entscheidungen stehen mit Grund in den
+- [x] Die Doku sagt Kunde, Runtime und Betrieb, wie ein Automaton bei uns läuft, und die Entscheidungen stehen mit Grund in den
       Annahmen.
       MVP: Funktion, weil ein Automaton und konto 04 die Felder und Fehler aus der Fehlerreferenz lesen, auf die jede Fehlerantwort
       verlinkt.
@@ -201,14 +201,38 @@ betreibt seinen Dienst bei uns, bezahlt aus Credits) bleibt für alle ohne eigen
       Prüfung: `awk '/^## automatons/{f=1;next} /^## /{f=0} f' docs/errors.md | grep -cE "genesis_prompt|invalid_request|forbidden|automaton_not_found"` muss mindestens 3 ausgeben.
       Prüfung: `awk '/^## Grenzen/{f=1;next} /^## /{f=0} f' docs/sandbox/plan.md | grep -c "keep_running"` muss mindestens 1 ausgeben.
       Prüfung: `awk '/^## Goal 08/{f=1} f' goals/sandbox/ANNAHMEN.md | grep -ciE "image|keep_running|creatorAddress|automaton:|wallet.json|neustart"` muss mindestens 6 ausgeben.
-- [ ] Das Goal ändert weder Runtime noch Zahlung, Anmeldung, Deploy oder CI und bringt keinen Schlüssel und kein Zertifikat ins Repo.
+- [x] Das Goal ändert weder Runtime noch Zahlung, Anmeldung, Deploy oder CI und bringt keinen Schlüssel und kein Zertifikat ins Repo.
       MVP: Funktion, weil das Repo öffentlich ist (Grundregel 8) und die Runtime am Pin die Referenz bleibt (Grundregel 13).
       Prüfung: `git diff --name-only origin/dev...HEAD -- harness/runtime src/payments src/auth deploy .github scripts/check.mjs | wc -l` muss 0 ausgeben.
       Prüfung: `git diff --name-only origin/dev...HEAD | grep -cE "\.(key|pem|crt|env)$"` muss 0 ausgeben.
       Prüfung: `git diff origin/dev...HEAD -- . ':(exclude)goals/' | grep -cE '^\+.*(cnwy_k_[0-9a-f]{32}|-{5}BEGIN [A-Z ]*PRIVATE KEY-{5})'` muss 0 ausgeben.
-- [ ] `check` ist grün.
+- [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] Ein Schlüssel `automaton:<id>` (erkannt mit `isAutomatonKey`) bekommt 403 `forbidden` auf `GET /v1/auth/api-keys` und
+      `POST /v1/auth/api-keys/revoke`, 404 auf Zustand, Log, Stopp, Start und Löschen jedes anderen Automatons seines Kontos und 404 auf
+      `/v1/sandboxes/{id}` samt `/exec`, `/files/upload/json`, `/files/read` und `/ports/expose` jeder Sandbox, in der ein anderer
+      Automaton läuft; der eigene Automaton, die eigene Sandbox, Kind-Sandboxes, Inferenz, Credits, Relay und
+      `POST /v1/automatons/register` bleiben ihm offen, und ein Schlüssel des Kunden bleibt unverändert. Der Test war vor dem Fix rot.
+      MVP: Funktion, weil die Runtime Nachrichten Fremder über das Relay liest (`check_social_inbox` bleibt an) und mit ihrem Schlüssel
+      jede Route ruft: Ohne diese Grenze genügt eine Nachricht, damit ein Automaton den Hauptschlüssel des Kunden widerruft, dessen
+      andere Automatons löscht oder in deren Sandbox mit `/files/read` die Schlüsseldatei der Wallet liest (Entscheidung 6, Isolation).
+      Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/automaton-scope.test.ts` muss Exit-Code 0 haben.
+      Prüfung: `grep -cE "^\s*(it|test)\(" test/automaton-scope.test.ts` muss mindestens 6 ausgeben (je ein Fall: Schlüsselliste 403; Widerruf 403 und der Schlüssel des Kunden bleibt gültig; anderer Automaton 404 auf Zustand, Log, Stopp, Start und Löschen; Sandbox eines anderen Automatons 404 auf exec, upload, read und expose; eigener Automaton und Kind-Sandbox bleiben offen; der Schlüssel des Kunden erreicht alles wie vorher).
+      Prüfung: `for w in /v1/auth/api-keys /v1/auth/api-keys/revoke 403 404 /exec /files/read /logs DELETE; do grep -qF -- "$w" test/automaton-scope.test.ts || echo "fehlt $w"; done` muss nichts ausgeben.
+      Prüfung: `T=$(mktemp -d); git archive HEAD | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; f=$(grep -rlE "export function isAutomatonKey\(" $T/src/automaton | head -1); if [ -z "$f" ]; then echo "fehlt isAutomatonKey"; else sed -i "s/export function isAutomatonKey(/function isAutomatonKeyOrig(/" $f; echo "export function isAutomatonKey(..._a: unknown[]): boolean { return false; }" >> $f; (cd $T && PATH=/usr/bin:$PATH pnpm -s vitest run test/automaton-scope.test.ts >/dev/null 2>&1) && echo "gruen ohne isAutomatonKey"; fi; rm -rf $T` muss nichts ausgeben.
+      Prüfung: `git diff --name-only origin/dev...HEAD -- src/auth | wc -l` muss 0 ausgeben.
+- [x] `POST /v1/automatons` mit dem Header `Idempotency-Key` legt bei einer Wiederholung keinen zweiten Automaton, keine zweite
+      Sandbox und keinen zweiten Schlüssel an, auch nicht, solange die erste Anfrage noch läuft, und nicht nach einem Neustart des
+      Control Planes dazwischen (der Schlüssel steht in der Datenbank, nicht nur im Speicher); derselbe Header mit anderem Body gibt 409
+      ohne Aufruf an `sandboxd`, ohne Header bleibt es wie bisher. Der Test war vor dem Fix rot.
+      MVP: Funktion, weil das Anlegen bis zu dreieinhalb Minuten dauern kann (Sandbox bis 120 s, `automaton-start` bis 90 s) und ein
+      Client, der nach seinem Timeout wiederholt (konto 04 baut darauf), sonst einen zweiten Automaton bekommt, der den zweiten Platz des
+      Kontos belegt und doppelt kostet (Abrechnung, `LOOP.md` Technik: Idempotenz über den Schlüssel, den der Client liefert).
+      Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/automaton-idempotency.test.ts` muss Exit-Code 0 haben.
+      Prüfung: `grep -cE "^\s*(it|test)\(" test/automaton-idempotency.test.ts` muss mindestens 4 ausgeben (je ein Fall: zweimal derselbe Header und Body nacheinander und gleichzeitig gibt dieselbe id und genau einen Aufruf an den nachgebauten sandboxd; derselbe Header mit anderem Body gibt 409; ein neues createApp auf derselben Datenbank gibt dieselbe id ohne Aufruf; ohne Header je Aufruf ein eigener Automaton).
+      Prüfung: `for w in Idempotency-Key 409 createApp sandboxd; do grep -qF -- "$w" test/automaton-idempotency.test.ts || echo "fehlt $w"; done` muss nichts ausgeben.
+      Prüfung: `awk '/^## automatons/{f=1;next} /^## /{f=0} f' docs/errors.md | grep -c "Idempotency-Key"` muss mindestens 1 ausgeben.
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Jede neue Testdatei, jede neue Selftest-Zeile und jede neue Bedingung war vor dem Fix rot; die Zeile im Progress Log nennt, womit.
@@ -238,6 +262,14 @@ betreibt seinen Dienst bei uns, bezahlt aus Credits) bleibt für alle ohne eigen
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-16 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6, 8, 9, 10, 11 gebaut (Image sandboxd-base:2 mit Runtime am Pin, Autostart und keep_running in sandboxd, Routen unter /v1/automatons auf createSandboxService, Setup-Datei, Harness-Walk, ops/automaton-live.sh, Prüfung automaton in ops/live.sh, Guthaben grant:live-automaton 500000 mc, Doku und Annahmen); Punkt 7 offen, weil der Zahlungsserver den lesenden Schlüssel des code-host seit 01:31 UTC abweist (Permission denied (publickey), auch der Job deploy von deploy.yml), und automaton-live.sh mit --reboot ihn für --foreign-sandboxes und das Ledger braucht; ohne ihn kein Neustart. Vor der Umstellung lag auf dem Sandbox-Server keine Sandbox und kein Container (Zustand von sandboxd und docker ps, 02:33 UTC), setup.sh --foreign-sandboxes endete mit FAIL, weil der Zahlungsserver nicht lesbar war. Rot vor dem Fix: sandboxd-automaton 8 von 16 vor der Änderung an sandboxd.mjs, mit der Mutation keep_running 2 rot; automaton-api, -setup, -billing, -grant, -walk ohne die Module rot, Mutation isAutomatonKey 1 rot, Wächter auf die Schlüsseldatei der Wallet rot am eigenen Kommentar; harness-sandboxd Neustart als eigener Prozess rot mit unref; Selbsttests von automaton-live.sh und live.sh je per Mutation rot; erster e2e-Lauf rot (automaton=false, sandboxd kam nach dem Neustart nicht zurück). Prüfbefehle: Punkt 1 lokal 1, 6, 0, 1, nichts, Netz Exit 0 ohne CHANGE und 1 (02:34 UTC); Punkt 2 Exit 0, nichts, nichts; Punkt 3 Exit 0, 14, nichts, nichts; Punkt 4 Exit 0, nichts, 0; Punkt 5 Exit 0, nichts; Punkt 6 nichts, 2, Exit 0, e2e SUCCESS, 1 am Kopf 4fecf05; Punkt 7 Selbsttest OK, Doku 0 und 0 (offen), 0, 0, Netz nicht gelaufen; Punkt 8 nichts, 11, Exit 0, 1; Punkt 9 nichts, 5, 2, 17; Punkt 10 0, 0, 0; Punkt 11 check grün in 193 s.
+
+- 2026-11-16 Topic: Abschluss nicht gemeldet, weil Punkt 7 am lesenden Zugang zum Zahlungsserver hängt (Human Gate unter Blockers); dev ohne neue Commits, Prüfbefehle der Punkte 1 bis 6 und 8 bis 10 wie erwartet (Punkt 1 Netz SETUP CHECK OK changed=0), Punkt 7 Selbsttest OK, check grün in 162 s, e2e SUCCESS am Kopf ba07d14 mit automaton=true, ssh zum Zahlungsserver 03:38 UTC Permission denied (publickey), Sandbox-Server erreichbar.
+- 2026-11-16 Zyklus 2: Punkt 7 gebaut (Lauf gegen die Produktion mit Neustart des Sandbox-Servers, Doku unter Lauf gegen die Produktion), nachdem der Zahlungsserver den Schlüssel des code-host wieder annimmt und dev (adee769) gemergt ist. Vor dem Neustart 09:00 UTC setup.sh --foreign-sandboxes mit SETUP FOREIGN-SANDBOXES OK running=0 foreign=0, setup.sh --check Exit 0 mit IMAGE runtime d8f8168 clean und SETUP CHECK OK changed=0; im Lauf vor dem Neustart running=1 foreign=0 (nur die eigene Sandbox). automaton-live.sh --reboot 09:00 bis 09:04 UTC: turns=4 reboot=ok turns_after_reboot=1 mem_peak_mb=246 ledger_sandbox_rows=1 ledger_inference_rows=5 hold_mc=0 wallet_usdc=0; Stufe klein bei 246 MB. Rot vor dem Fix: die beiden Prüfungen der Doku gaben vor dem Eintrag 0. Prüfbefehle: Punkt 7 Selbsttest Exit 0 mit SELFTEST OK, Doku 1 und 1, 0, 0, Netz 1 (Lauf ohne Neustart 09:04 UTC, turns=2 reboot=skipped).
+- 2026-11-16 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11; dev ohne neue Commits seit adee769. Prüfbefehle am Kopf b74130f: Punkt 1 lokal 1, 6, 0, 1, nichts, Netz Exit 0 ohne CHANGE und 1 (SETUP CHECK OK changed=0, 09:19 UTC); Punkt 2 Exit 0, nichts, nichts; Punkt 3 Exit 0, 14, nichts, nichts; Punkt 4 Exit 0, nichts, 0; Punkt 5 Exit 0, nichts; Punkt 6 nichts, 2, Exit 0, e2e SUCCESS, 1; Punkt 7 Selbsttest Exit 0 mit AUTOMATON LIVE SELFTEST OK, Doku 1 und 1, 0, 0, Netz 1 (09:19 bis 09:20 UTC, turns=3 reboot=skipped hold_mc=0 wallet_usdc=0); Punkt 8 nichts, 11, Exit 0, 1; Punkt 9 nichts, 5, 2, 17; Punkt 10 0, 0, 0; Punkt 11 check grün in 51 s.
+- 2026-11-16 Zyklus 3: Punkte 12, 13 gebaut (src/automaton/scope.ts mit automatonOfKey über isAutomatonKey, Prüfung an Schlüsselliste, Widerruf, /v1/automatons und /v1/sandboxes in src/app.ts, src/auth unverändert; Tabelle hosted_automaton_requests und Idempotency-Key in createAutomatonService, Doku in docs/errors.md und docs/sandbox/automaton.md, Annahmen unter Goal 08). Rot vor dem Fix: automaton-scope 4 von 6 rot (Schlüsselliste, Widerruf, anderer Automaton, Sandbox eines anderen Automatons; die beiden Fälle für eigene Routen und den Schlüssel des Kunden sichern ab, dass nichts zu viel gesperrt wird), automaton-idempotency 4 von 5 rot (ohne Header bleibt wie bisher), Mutation isAutomatonKey auf false rot an automaton-scope. Prüfbefehle: Punkt 12 Exit 0, 6, nichts, nichts, 0; Punkt 13 Exit 0, 5, nichts, 1; check grün in 108 s.
+- 2026-11-16 Zyklus 3: Abschluss gemeldet, Punkte 1 bis 13; dev ohne neue Commits seit adee769, Punkt 7 nach Entscheidung des Tech Leads nicht neu gefahren (12 und 13 betreffen nur Routen des Control Planes). Prüfbefehle am Kopf fe849b8: Punkt 12 Exit 0, 6, nichts, nichts, 0; Punkt 13 Exit 0, 5, nichts, 1; Punkte 3, 4, 7, 9, 10 erneut wie erwartet (Mutation isAutomatonKey an automaton-api nichts, wallet.json 0, Doku 0 und 0, errors 9, Annahmen 19, 0, 0, 0); check grün in 108 s; Jobs check und e2e SUCCESS mit E2E OK sandbox=true automaton=true.
+- 2026-11-16 Release: PASS K und B (Zyklus 3), DONE.
 
 ## Blockers
-Keine.
+Keine. Human Gate erledigt am 16.11.2026 08:52 UTC: Matthias hat auf dem Zahlungsserver die neue Adresse des code-host in authorized_keys eingetragen, ssh mit dem Deploy-Schlüssel endet mit Exit 0.

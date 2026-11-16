@@ -432,7 +432,12 @@ export function createSandboxService(opts: SandboxServiceOptions) {
 
   // ---- the routes
 
-  async function create(address: string, body: unknown): Promise<Reply> {
+  /**
+   * `internal.keepRunning` (goals/sandbox/08) asks sandboxd for a sandbox it never stops for idleness or run time; only the
+   * hosted automatons of src/automaton/ pass it. The public route passes no third argument, so nothing a customer sends ever
+   * reaches sandboxd as keep_running.
+   */
+  async function create(address: string, body: unknown, internal: { keepRunning?: boolean } = {}): Promise<Reply> {
     const addr = address.toLowerCase();
     const b = (body && typeof body === "object" && !Array.isArray(body) ? body : {}) as Record<string, unknown>;
     const req: { vcpu?: number; memory_mb?: number; disk_gb?: number } = {};
@@ -453,7 +458,8 @@ export function createSandboxService(opts: SandboxServiceOptions) {
     const name = typeof b.name === "string" && NAME_RE.test(b.name) ? b.name : null;
     const t = now();
     for (const [k, e] of creates) if (e.doneAt !== null && t - e.doneAt > CREATE_REPEAT_MS) creates.delete(k);
-    const key = `${addr}\n${canonicalJson(b)}`;
+    const keepRunning = internal.keepRunning === true;
+    const key = `${addr}\n${keepRunning ? "keep_running\n" : ""}${canonicalJson(b)}`;
     const known = creates.get(key);
     if (known && known.doneAt === null) return known.promise;
     if (known && known.id) {
@@ -462,7 +468,7 @@ export function createSandboxService(opts: SandboxServiceOptions) {
       creates.delete(key);
     }
     const entry: { promise: Promise<Reply>; doneAt: number | null; id: string | null } = { promise: Promise.resolve(notFound()), doneAt: null, id: null };
-    entry.promise = createOnce(addr, tier, name).then(
+    entry.promise = createOnce(addr, tier, name, keepRunning).then(
       (res) => {
         // Only a created sandbox is kept; any refusal may be tried again at once.
         if (res.status === 201 && typeof res.body.id === "string") {
@@ -480,7 +486,7 @@ export function createSandboxService(opts: SandboxServiceOptions) {
     return entry.promise;
   }
 
-  async function createOnce(addr: string, tier: Tier, name: string | null): Promise<Reply> {
+  async function createOnce(addr: string, tier: Tier, name: string | null, keepRunning: boolean): Promise<Reply> {
     if (knownDown()) return unreachable(true);
     // Slots, credit and the reservation in one transaction, so two creates at once cannot both pass.
     const pendingId = `creating:${crypto.randomBytes(8).toString("hex")}`;
@@ -501,7 +507,14 @@ export function createSandboxService(opts: SandboxServiceOptions) {
     const res = await call(
       "POST",
       "/v1/sandboxes",
-      { owner: ownerFor(addr), ...(name ? { name } : {}), vcpu: tier.vcpu, memory_mb: tier.memory_mb, disk_gb: tier.disk_gb },
+      {
+        owner: ownerFor(addr),
+        ...(name ? { name } : {}),
+        vcpu: tier.vcpu,
+        memory_mb: tier.memory_mb,
+        disk_gb: tier.disk_gb,
+        ...(keepRunning ? { keep_running: true } : {}),
+      },
       { timeoutMs: 120_000 },
     );
     if (!res) {
@@ -744,6 +757,42 @@ export function createSandboxService(opts: SandboxServiceOptions) {
     }));
   }
 
+  /**
+   * Stops a sandbox at sandboxd and ends its billing like a stop for credit (goals/sandbox/08, POST /v1/automatons/{id}/stop):
+   * every started step is booked, the reservation goes back. `reason` lands in stop_reason.
+   */
+  function stop(address: string, id: string, reason = "stopped"): Promise<Reply> {
+    if (!ownRow(address, id)) return Promise.resolve(notFound());
+    return withLock(id, async () => {
+      const r = getRow(id);
+      if (!r || (r.status !== "running" && r.status !== "stopped")) return notFound();
+      if (r.status === "stopped") return reply(200, view(r));
+      const res = await call("POST", `/v1/sandboxes/${id}/stop`, undefined, { timeoutMs: 90_000 });
+      if (!res) return unreachable();
+      if (res.status === 404) {
+        update(id, { status: "deleted", stop_reason: "sandboxd", hold_mc: 0 });
+        return notFound();
+      }
+      if (res.status !== 200) return unreachable();
+      const stoppedAt = typeof res.body.stopped_at === "string" ? Date.parse(res.body.stopped_at) : now();
+      closeRun(id, Number.isFinite(stoppedAt) ? stoppedAt : now(), "stopped", reason);
+      return reply(200, view(getRow(id)!));
+    });
+  }
+
+  /** Starts a stopped sandbox again with the reservation of a create (goals/sandbox/08, POST /v1/automatons/{id}/start). */
+  async function start(address: string, id: string): Promise<Reply> {
+    if (!ownRow(address, id)) return notFound();
+    const refused = await ensureRunning(id);
+    if (refused) return refused;
+    return reply(200, view(getRow(id)!));
+  }
+
+  /** The row of a sandbox of this account (running or stopped), for the automatons built on it; undefined otherwise. */
+  function row(address: string, id: string): { status: string; stop_reason: string | null; hold_mc: number } | undefined {
+    return ownRow(address, id);
+  }
+
   /** Not called by the runtime (deleteSandbox is empty at the pin); the own live check cleans up with it. */
   function remove(address: string, id: string): Promise<Reply> {
     if (!ownRow(address, id)) return Promise.resolve(notFound());
@@ -755,5 +804,5 @@ export function createSandboxService(opts: SandboxServiceOptions) {
     });
   }
 
-  return { create, list, get, exec, upload, read, exposePort, removePort, remove, tick, ownerFor };
+  return { create, list, get, exec, upload, read, exposePort, removePort, remove, stop, start, row, tick, ownerFor };
 }

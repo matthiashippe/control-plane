@@ -285,7 +285,9 @@ describe("create: runsc, memory, pids, dns, bridge and no publish", () => {
     expect(added.sort()).toEqual(["CHOWN", "DAC_OVERRIDE", "FOWNER", "FSETID", "KILL", "SETGID", "SETUID"]);
     expect(pair("--restart", "unless-stopped")).toBe(true);
     // embedded docker dns does not answer under runsc, so the container writes its own resolv.conf
-    expect(a.slice(-4)).toEqual(["sandboxd-base:1", "bash", "-c", 'printf "nameserver 1.1.1.1\\nnameserver 9.9.9.9\\n" > /etc/resolv.conf; exec sleep infinity']);
+    // (and, since goals/sandbox/08, starts automaton-supervise when the autostart mark exists; test/sandboxd-automaton.test.ts)
+    expect(a.slice(-4, -1)).toEqual(["sandboxd-base:1", "bash", "-c"]);
+    expect(a.at(-1)).toMatch(/^printf "nameserver 1\.1\.1\.1\\nnameserver 9\.9\.9\.9\\n" > \/etc\/resolv\.conf; .*; exec sleep infinity$/);
     // never publish a port, never privileged, never the host network or the docker socket
     for (const bad of ["-p", "--publish", "--publish-all", "-P", "--privileged"]) expect(a).not.toContain(bad);
     expect(a.join(" ")).not.toMatch(/--network[ =]host|docker\.sock|--publish/);

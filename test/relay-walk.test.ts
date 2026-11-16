@@ -126,8 +126,9 @@ describe("the relay gate in harness/e2e/full.sh", () => {
   it("names relay in both closing lines and requires relay=true", () => {
     const closing = FULL_SH.split("\n").filter((l) => /^\s*echo "E2E (OK|FAIL) /.test(l));
     expect(closing.length).toBe(2);
-    for (const l of closing) expect(l).toMatch(/ relay=\$relay"$/);
-    expect(FULL_SH).toMatch(/\|\| "\$relay" != "true" \]\]; then/);
+    // The automaton condition of goals/sandbox/08 follows relay in both lines and in the condition.
+    for (const l of closing) expect(l).toMatch(/ relay=\$relay( automaton=\$automaton)?"$/);
+    expect(FULL_SH).toMatch(/\|\| "\$relay" != "true" (\|\| "\$automaton" != "true" )?\]\]; then/);
     expect(FULL_SH).toContain('if [[ "$relay_verdict" == "RELAY_VERDICT ok" ]]; then relay=true; fi');
     expect(FULL_SH).toContain("relay-walk.mjs judge");
   });

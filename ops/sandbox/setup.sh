@@ -3,7 +3,9 @@
 #
 #   bash ops/sandbox/setup.sh <address>          bring the host to the state below, then check it
 #   bash ops/sandbox/setup.sh --check <address>  change nothing; one CHANGE line per item a run would change,
-#                                                last line SETUP CHECK OK changed=0 or SETUP CHECK DRIFT changed=<n>
+#                                                last line SETUP CHECK OK changed=0 or SETUP CHECK DRIFT changed=<n>; the line
+#                                                IMAGE runtime <pin> clean when the runtime in the image is the clean pin, else
+#                                                CHANGE image_runtime want=<pin>-clean have=<rev>-<clean|dirty> or have=missing
 #   bash ops/sandbox/setup.sh --client-key <address>  read the public key of the service cp from the payment server (read only)
 #                                                and install it as /etc/sandboxd/keys/cp.pub after an Ed25519 check, idempotent;
 #                                                last line SETUP CLIENT-KEY OK changed=0 or changed=1, a broken key changes nothing
@@ -24,13 +26,14 @@
 #                                                of them belong to an account that is not ours (payment server, readonly);
 #                                                last line SETUP FOREIGN-SANDBOXES OK running=<n> foreign=<m>
 #   bash ops/sandbox/setup.sh --selftest         without network: the comparison reports a planted deviation and a clean state not,
+#                                                the runtime of the image is reported clean at the pin and a change otherwise,
 #                                                --client-key installs a valid key once and rejects broken ones, and
 #                                                --client-key-reset takes cp.pub away from sandboxd and leaves the probe key,
 #                                                refuses for a foreign sandbox or an unreadable side, and its timer restores
 #
 # What it manages: Docker with the gVisor runtime runsc (platform systrap), the nftables table inet sandbox (sandbox.nft), the
 # systemd slice sandbox.slice, sandboxd as a unit in that slice on the loopback with its own Node 22, the probe key of the
-# code-host in /etc/sandboxd/keys, the base image with its pin (PIN_FUNCS), unattended-upgrades, and the Caddy file of the sandbox with exactly one import
+# code-host in /etc/sandboxd/keys, the base image with the runtime at AUTOMATON_REV and its pin (PIN_FUNCS), unattended-upgrades, and the Caddy file of the sandbox with exactly one import
 # line in /etc/caddy/Caddyfile (caddy validate before every reload). It never touches wa-staging, ufw, Postgres or the block of
 # wa-staging in the Caddyfile. DNS lives in cloudflare.py, run from the code-host. The nightly check runs --check only.
 # The domain of exposed ports is SANDBOXD_DOMAIN in sandboxd.service, written down there only.
@@ -41,8 +44,11 @@ SSH_KEY=${SANDBOX_SSH_KEY:-$HOME/.ssh/id_ed25519_cp_sandbox}
 PROBE_KEY=${SANDBOXD_PROBE_KEY:-$HOME/.config/control-plane/sandboxd-probe.key}
 NODE_VERSION=22.23.4
 NODE_DIR=/opt/sandboxd/node-v$NODE_VERSION
-IMAGE=sandboxd-base:1
+IMAGE=sandboxd-base:2
 PIN=sandboxd-base-pin
+# The pin of the runtime in the image, from its one ARG line (goals/sandbox/08, decision 1).
+AUTOMATON_REV=$(sed -n 's/^ARG AUTOMATON_REV=//p' "$HERE/image/Dockerfile")
+[[ $AUTOMATON_REV =~ ^[0-9a-f]{7,40}$ ]] || { echo "setup: no ARG AUTOMATON_REV in image/Dockerfile" >&2; exit 2; }
 IMPORT_LINE="import /etc/caddy/sandbox.caddy"
 PORTS_DOMAIN=$(sed -n 's/^Environment=SANDBOXD_DOMAIN=//p' "$HERE/sandboxd.service")
 case "$PORTS_DOMAIN" in
@@ -59,9 +65,23 @@ FILES=(
   "sandboxd.mjs:/opt/sandboxd/sandboxd.mjs"
   "sandbox.caddy:/etc/caddy/sandbox.caddy"
   "image/Dockerfile:/opt/sandboxd/image/Dockerfile"
+  "image/setup-headless.mjs:/opt/sandboxd/image/setup-headless.mjs"
+  "image/automaton-start:/opt/sandboxd/image/automaton-start"
+  "image/automaton-supervise:/opt/sandboxd/image/automaton-supervise"
   "auto-upgrades.conf:/etc/apt/apt.conf.d/20auto-upgrades"
 )
 UNITS=(docker sandbox-nft sandboxd unattended-upgrades caddy)
+# The build context of the image in /opt/sandboxd/image, in the order of its hash (label sandboxd.dockerfile), so a change to
+# any of them builds anew. setup-headless.mjs is a copy of harness/runtime/setup-headless.mjs, which stays untouched.
+IMAGE_CONTEXT=(Dockerfile setup-headless.mjs automaton-start automaton-supervise)
+
+# The file in the repo behind a source name of FILES.
+src_path() {
+  case $1 in
+    image/setup-headless.mjs) echo "$HERE/../../harness/runtime/setup-headless.mjs" ;;
+    *) echo "$HERE/$1" ;;
+  esac
+}
 
 # The node for the calls on the code-host (never on the sandbox host, which runs its own NODE_DIR): SETUP_NODE, else
 # /usr/bin/node, else the node on PATH (the GitHub runner of check has setup-node on PATH only), the first one that has
@@ -79,6 +99,11 @@ local_node() {
 LOCAL_NODE=$(local_node)
 
 sha() { sha256sum | cut -c1-64; }
+# The hash of the build context of the image: its files in the order of IMAGE_CONTEXT, from the repo or from $1 when given.
+image_hash() {
+  local n
+  for n in "${IMAGE_CONTEXT[@]}"; do if [ -n "${1:-}" ]; then cat "$1/$n"; else cat "$(src_path "image/$n")"; fi; done | sha
+}
 ssh_host() { ssh -i "$SSH_KEY" -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=20 "root@$1" "${@:2}"; }
 
 # The public half of the probe key, SPKI PEM; the private half stays on the code-host (0600, outside the repo).
@@ -100,7 +125,7 @@ desired() {
   local f src dst
   for f in "${FILES[@]}"; do
     src=${f%%:*}; dst=${f#*:}
-    echo "file $dst $(sha < "$HERE/$src")"
+    echo "file $dst $(sha < "$(src_path "$src")")"
   done
   echo "file /etc/sandboxd/keys/probe.pub $(printf '%s' "$1" | sha)"
   for u in "${UNITS[@]}"; do echo "active $u active"; done
@@ -111,8 +136,9 @@ desired() {
   echo "fact caddy_import 1"
   echo "fact caddy_valid yes"
   echo "fact origin_cert $PORTS_DOMAIN"
-  echo "fact image $(sha < "$HERE/image/Dockerfile")"
+  echo "fact image $(image_hash)"
   echo "fact image_pin yes"
+  echo "fact image_runtime $AUTOMATON_REV-clean"
   echo "fact sshd_password no"
   echo "fact sandboxd_public 0"
   echo "fact published_ports 0"
@@ -137,6 +163,20 @@ pin_image() { # <image> <pin>: creates the pin when it is missing, stale or not 
   if [ "$(pin_fact "$1" "$2")" = yes ]; then return 0; fi
   if docker container inspect --format '{{.Id}}' "$2" >/dev/null 2>/dev/null; then docker rm -f "$2" >/dev/null; fi
   docker create --name "$2" --label sandboxd.pin=1 --network none "$1" >/dev/null
+}
+REMOTE
+)
+
+# The runtime in the image: <short rev of /opt/automaton>-clean when git status there is empty, else -dirty; missing without
+# the image or without a repository. A container of the image without network, removed at once; never pulls. Shared by
+# GATHER and the selftest.
+RUNTIME_FUNCS=$(cat <<'REMOTE'
+runtime_fact() { # <image>
+  local v
+  docker image inspect --format '{{.Id}}' "$1" >/dev/null 2>&1 || { echo missing; return 0; }
+  # shellcheck disable=SC2016
+  v=$(docker run --rm --pull never --network none "$1" sh -c 'r=$(git -C /opt/automaton rev-parse --short HEAD 2>/dev/null) || exit 3; s=$(git -C /opt/automaton status --porcelain 2>/dev/null) || exit 3; if [ -z "$s" ]; then echo "$r-clean"; else echo "$r-dirty"; fi' 2>/dev/null) || v=
+  if [[ $v =~ ^[0-9a-f]{4,40}-(clean|dirty)$ ]]; then echo "$v"; else echo missing; fi
 }
 REMOTE
 )
@@ -173,9 +213,12 @@ echo "fact published_ports $(docker ps --format '{{.Ports}}' 2>/dev/null | grep 
 for d in /var/lib/sandboxd/disks /var/lib/sandboxd/mnt; do echo "dir $d $([ -d "$d" ] && echo yes || echo no)"; done
 PIN_FUNCS_PLACEHOLDER
 echo "fact image_pin $(pin_fact IMAGE_PLACEHOLDER PIN_PLACEHOLDER)"
+RUNTIME_FUNCS_PLACEHOLDER
+echo "fact image_runtime $(runtime_fact IMAGE_PLACEHOLDER)"
 REMOTE
 )
 GATHER=${GATHER//PIN_FUNCS_PLACEHOLDER/"$PIN_FUNCS"}
+GATHER=${GATHER//RUNTIME_FUNCS_PLACEHOLDER/"$RUNTIME_FUNCS"}
 GATHER=${GATHER//PIN_PLACEHOLDER/$PIN}
 GATHER=${GATHER//NODE_DIR_PLACEHOLDER/$NODE_DIR}
 GATHER=${GATHER//IMPORT_PLACEHOLDER/$IMPORT_LINE}
@@ -189,13 +232,19 @@ remote_paths() {
 
 gather() { ssh_host "$1" bash -s -- $(remote_paths) <<<"$GATHER"; }
 
-# compare <desired file> <observed file>: one CHANGE line per differing or missing item, then the summary line.
+# compare <desired file> <observed file>: one CHANGE line per differing or missing item, then the summary line. The runtime of
+# the image has a line of its own either way: IMAGE runtime <pin> clean, or CHANGE image_runtime want=<pin>-clean have=<...>.
 compare() {
   awk '
     NR == FNR { have[$1 " " $2] = $3; next }
     {
       key = $1 " " $2; want = $3
       got = (key in have) ? have[key] : "missing"
+      if (key == "fact image_runtime") {
+        if (got == want) { pin = want; sub(/-clean$/, "", pin); printf "IMAGE runtime %s clean\n", pin }
+        else { n++; printf "CHANGE image_runtime want=%s have=%s\n", want, got }
+        next
+      }
       if (got != want) { n++; printf "CHANGE %s want=%s have=%s\n", key, want, got }
     }
     END { if (n) printf "SETUP CHECK DRIFT changed=%d\n", n; else print "SETUP CHECK OK changed=0" }
@@ -261,8 +310,8 @@ fi
 systemctl enable -q docker
 if was /etc/docker/daemon.json; then systemctl restart docker; else systemctl start docker; fi
 
-# base image, labeled with the hash of its Dockerfile
-want=$(sha256sum /opt/sandboxd/image/Dockerfile | cut -c1-64)
+# base image, labeled with the hash of its build context (Dockerfile, setup-headless.mjs and the two scripts, IMAGE_CONTEXT)
+want=$(cd /opt/sandboxd/image && cat IMAGE_CONTEXT_PLACEHOLDER | sha256sum | cut -c1-64)
 have=$(docker image inspect --format '{{index .Config.Labels "sandboxd.dockerfile"}}' "$IMAGE" 2>/dev/null || true)
 if [ "$want" != "$have" ]; then
   docker build -q --pull --label "sandboxd.dockerfile=$want" -t "$IMAGE" /opt/sandboxd/image >/dev/null
@@ -299,6 +348,7 @@ REMOTE
 )
 APPLY=${APPLY//PIN_FUNCS_PLACEHOLDER/"$PIN_FUNCS"}
 APPLY=${APPLY//PIN_PLACEHOLDER/$PIN}
+APPLY=${APPLY//IMAGE_CONTEXT_PLACEHOLDER/${IMAGE_CONTEXT[*]}}
 
 # origin_cert_fact <address>: the value of fact origin_cert on the host, read only.
 origin_cert_fact() { gather "$1" | awk '$1 == "fact" && $2 == "origin_cert" { print $3 }'; }
@@ -314,7 +364,7 @@ apply() {
   pub=$(probe_pub)
   stage=$(mktemp -d)
   for f in "${FILES[@]}"; do
-    install -D -m 0644 "$HERE/${f%%:*}" "$stage/${f%%:*}"
+    install -D -m 0644 "$(src_path "${f%%:*}")" "$stage/${f%%:*}"
     args+=("${f%%:*}" "${f#*:}")
   done
   printf '%s' "$pub" > "$stage/probe.pub"; args+=(probe.pub /etc/sandboxd/keys/probe.pub)
@@ -910,6 +960,114 @@ FAKE
   return $fail
 }
 
+# selftest of the runtime in the image: the line of --check in both directions through compare, runtime_fact (the same
+# RUNTIME_FUNCS as on the host) against a fake docker and a fake git on PATH, and the hash of the build context; no network.
+# Lines selftest image-runtime: ok (<case>).
+selftest_image_runtime() {
+  local t=$1/runtime fail=0 out why want_line="IMAGE runtime $AUTOMATON_REV clean" n h0 h1
+  mkdir -p "$t/bin" "$t/state" "$t/ctx"
+  ok() { echo "selftest image-runtime: ok ($1)"; }
+  bad() { echo "selftest image-runtime: FAIL $1: $2"; fail=1; }
+  # desired: exactly one line, the pin of the Dockerfile and clean
+  n=$(grep -c "^fact image_runtime " "$1/desired")
+  if [ "$n" = 1 ] && grep -qx "fact image_runtime $AUTOMATON_REV-clean" "$1/desired" \
+     && grep -qx "ARG AUTOMATON_REV=$AUTOMATON_REV" "$HERE/image/Dockerfile"; then ok desired
+  else bad desired "$n lines fact image_runtime, want one with $AUTOMATON_REV-clean"; fi
+  # obs <value>: the desired state with fact image_runtime set to <value> (empty: the line is gone)
+  obs() { if [ -n "$1" ]; then sed "/^fact image_runtime /s/ [^ ]*\$/ $1/" "$t/../desired"; else grep -v "^fact image_runtime " "$t/../desired"; fi; }
+  # cmp_case <case> <observed value> <want line> <want summary>
+  cmp_case() {
+    local why=
+    out=$(compare "$t/../desired" <(obs "$2"))
+    [ "$(grep -cxF -- "$3" <<<"$out")" = 1 ] || why="no line $3"
+    if [ "$3" = "$want_line" ]; then
+      grep -q '^CHANGE' <<<"$out" && why="${why:+$why, }a CHANGE line"
+    else
+      grep -qxF -- "$want_line" <<<"$out" && why="${why:+$why, }line $want_line"
+    fi
+    [ "$(tail -1 <<<"$out")" = "$4" ] || why="${why:+$why, }last line $(tail -1 <<<"$out")"
+    if [ -z "$why" ]; then ok "$1"; else bad "$1" "$why"; fi
+  }
+  cmp_case clean "$AUTOMATON_REV-clean" "$want_line" "SETUP CHECK OK changed=0"
+  cmp_case dirty "$AUTOMATON_REV-dirty" "CHANGE image_runtime want=$AUTOMATON_REV-clean have=$AUTOMATON_REV-dirty" "SETUP CHECK DRIFT changed=1"
+  cmp_case other-rev "abc1234-clean" "CHANGE image_runtime want=$AUTOMATON_REV-clean have=abc1234-clean" "SETUP CHECK DRIFT changed=1"
+  cmp_case missing "" "CHANGE image_runtime want=$AUTOMATON_REV-clean have=missing" "SETUP CHECK DRIFT changed=1"
+  # runtime_fact against fakes: docker knows the image when $RT_STATE/image exists and runs the sh -c script of docker run
+  # here, git answers from $RT_STATE/rev (none: not a repository) and $RT_STATE/status
+  cat > "$t/bin/docker" <<'FAKE'
+#!/usr/bin/env bash
+s=${RT_STATE:?}
+echo "$*" >> "$s/log"
+case "$1 $2" in
+  "image inspect") [ -f "$s/image" ] || exit 1; cat "$s/image" ;;
+  *)
+    [ "$1" = run ] || { echo "fake docker: unexpected $*" >&2; exit 2; }
+    while [ $# -gt 0 ] && [ "$1" != sh ]; do shift; done
+    [ "$1" = sh ] && [ "$2" = -c ] || exit 2
+    exec sh -c "$3" ;;
+esac
+FAKE
+  cat > "$t/bin/git" <<'FAKE'
+#!/usr/bin/env bash
+s=${RT_STATE:?}
+[ "$1 $2" = "-C /opt/automaton" ] || { echo "fake git: unexpected $*" >&2; exit 2; }
+[ -f "$s/rev" ] || { echo "fatal: not a git repository" >&2; exit 128; }
+case "$3" in
+  rev-parse) cat "$s/rev" ;;
+  status) cat "$s/status" 2>/dev/null ;;
+  *) exit 2 ;;
+esac
+FAKE
+  chmod 0755 "$t/bin/docker" "$t/bin/git"
+  export RT_STATE=$t/state
+  fact() { PATH="$t/bin:$PATH" bash -c "$RUNTIME_FUNCS"$'\n''runtime_fact "$1"' _ "$IMAGE"; }
+  # fact_case <case> <want value> <want line of compare>
+  fact_case() {
+    local why= v
+    : > "$t/state/log"
+    v=$(fact)
+    [ "$v" = "$2" ] || why="fact $v, want $2"
+    out=$(compare "$t/../desired" <(obs "$v"))
+    grep -qxF -- "$3" <<<"$out" || why="${why:+$why, }no line $3"
+    if grep -q '^run ' "$t/state/log"; then
+      grep -q "^run --rm --pull never --network none $IMAGE sh -c " "$t/state/log" || why="${why:+$why, }docker run without --rm, --pull never or --network none"
+    fi
+    if [ -z "$why" ]; then ok "$1"; else bad "$1" "$why"; fi
+  }
+  echo "sha256:$(printf 1 | sha)" > "$t/state/image"
+  printf '%s\n' "$AUTOMATON_REV" > "$t/state/rev"; : > "$t/state/status"
+  fact_case fact-clean "$AUTOMATON_REV-clean" "$want_line"
+  printf ' M src/index.ts\n' > "$t/state/status"
+  fact_case fact-dirty "$AUTOMATON_REV-dirty" "CHANGE image_runtime want=$AUTOMATON_REV-clean have=$AUTOMATON_REV-dirty"
+  : > "$t/state/status"; printf 'abc1234\n' > "$t/state/rev"
+  fact_case fact-other-rev "abc1234-clean" "CHANGE image_runtime want=$AUTOMATON_REV-clean have=abc1234-clean"
+  rm -f "$t/state/rev"
+  fact_case fact-no-repo missing "CHANGE image_runtime want=$AUTOMATON_REV-clean have=missing"
+  rm -f "$t/state/image"; printf '%s\n' "$AUTOMATON_REV" > "$t/state/rev"
+  fact_case fact-no-image missing "CHANGE image_runtime want=$AUTOMATON_REV-clean have=missing"
+  grep -q '^run ' "$t/state/log" && bad fact-no-image "docker run without the image"
+  # the hash of the build context: the fact image of desired, and a change to any of its files changes it
+  why=
+  h0=$(image_hash)
+  grep -qx "fact image $h0" "$1/desired" || why="fact image is not the hash of the build context"
+  for n in "${IMAGE_CONTEXT[@]}"; do cp "$(src_path "image/$n")" "$t/ctx/$n"; done
+  [ "$(image_hash "$t/ctx")" = "$h0" ] || why="${why:+$why, }copy hashes differently"
+  for n in "${IMAGE_CONTEXT[@]}"; do
+    cp "$t/ctx/$n" "$t/ctx/$n.orig"; printf '\n' >> "$t/ctx/$n"
+    h1=$(image_hash "$t/ctx")
+    [ "$h1" != "$h0" ] || why="${why:+$why, }a change to $n keeps the hash"
+    mv -f "$t/ctx/$n.orig" "$t/ctx/$n"
+  done
+  cmp -s "$HERE/../../harness/runtime/setup-headless.mjs" "$(src_path image/setup-headless.mjs)" || why="${why:+$why, }setup-headless.mjs is not the copy of harness/runtime"
+  # the run hashes the same files in the same order on the host, and every one of them is a managed file of the build context
+  grep -qF "want=\$(cd /opt/sandboxd/image && cat ${IMAGE_CONTEXT[*]} | sha256sum | cut -c1-64)" <<<"$APPLY" || why="${why:+$why, }the run hashes other files"
+  for n in "${IMAGE_CONTEXT[@]}"; do
+    grep -qx "file /opt/sandboxd/image/$n [0-9a-f]\{64\}" "$1/desired" || why="${why:+$why, }$n is not in the build context on the host"
+  done
+  if [ -z "$why" ]; then ok image-hash; else bad image-hash "$why"; fi
+  return $fail
+}
+
 selftest() {
   local t d o out fail=0
   t=$(mktemp -d)
@@ -919,7 +1077,7 @@ selftest
   # 1. a clean host reports nothing
   cp "$t/desired" "$t/clean"
   out=$(compare "$t/desired" "$t/clean")
-  if [ "$out" = "SETUP CHECK OK changed=0" ]; then echo "selftest clean: ok"; else echo "selftest clean: FAIL $out"; fail=1; fi
+  if [ "$(grep -v '^IMAGE runtime ' <<<"$out")" = "SETUP CHECK OK changed=0" ]; then echo "selftest clean: ok"; else echo "selftest clean: FAIL $out"; fail=1; fi
   # 2. planted deviations: a changed file, a stopped unit, a second import line, a missing item
   sed -e '/^file \/etc\/sandbox\/sandbox.nft /s/ [0-9a-f]*$/ 0000000000000000000000000000000000000000000000000000000000000000/' \
       -e '/^active sandboxd /s/active$/inactive/' \
@@ -949,6 +1107,8 @@ selftest
   ( selftest_client_key_reset "$t" ) || fail=1
   # 6. the pin of the base image against a fake docker
   ( selftest_image_pin "$t" ) || fail=1
+  # 7. the runtime in the image and the hash of its build context, against a fake docker and git
+  ( selftest_image_runtime "$t" ) || fail=1
   rm -rf "$t"
   if [ $fail -eq 0 ]; then echo "SETUP SELFTEST OK"; else echo "SETUP SELFTEST FAIL"; return 1; fi
 }

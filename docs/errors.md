@@ -112,6 +112,51 @@ that is not a whole number from 1 to 65535 gets `400 invalid_request`, a sandbox
 `501 sandbox_server_unreachable`: the sandbox server did not answer, so nothing ran and nothing was
 charged. On create the runtime handles this by starting a local worker instead, as before.
 
+## automatons
+
+A hosted automaton runs entirely here, in a sandbox of its own, with the unmodified runtime. Routes:
+`POST /v1/automatons` with `{"name": "...", "genesis_prompt": "..."}` answers `201` with `id`,
+`status` and `sandbox_id`; `GET /v1/automatons` lists the automatons of this account;
+`GET /v1/automatons/{id}` gives `status` (`starting`, `running`, `stopped` or `failed`), `reason`
+when stopped or failed, `wallet_address` of the runtime and `turns`; `GET /v1/automatons/{id}/logs`
+gives the last 200 lines of its log, every API key and every run of 64 hex digits replaced by
+`[redacted]`; `POST /v1/automatons/{id}/stop`, `POST /v1/automatons/{id}/start` and
+`DELETE /v1/automatons/{id}`. `POST /v1/automatons/register` is the registration the runtime makes
+itself and stays as it is.
+
+`400 invalid_request`: `name` (1 to 64 letters, digits, spaces, dots, underscores or hyphens) or
+`genesis_prompt` (1 to 8000 characters, kept unchanged) is missing or out of range. Nothing was
+started and nothing was charged.
+
+`Idempotency-Key` on `POST /v1/automatons` (1 to 200 characters): a repeat with the same key and
+the same body answers `200` with the automaton the first request created, without starting a
+second one, also while the first request still runs and after a restart of the service. Without
+the header every call creates its own automaton. `400 invalid_request`: the header is empty or
+longer than 200 characters. `409 idempotency_key_reused`: the same key came with another `name` or
+`genesis_prompt`; nothing was started. Send the same body again, or a new key for a new automaton.
+
+`403 forbidden`: the key is the key of a hosted automaton (named `automaton:<id>`). An automaton
+cannot start another automaton; sandboxes of its own (`POST /v1/sandboxes`) stay open to it. The
+same key gets `403 forbidden` on `GET /v1/auth/api-keys` and `POST /v1/auth/api-keys/revoke`: an
+automaton cannot see or revoke the keys of its account, the owner does that with their own key.
+It gets `404 automaton_not_found` for every other automaton of its account and
+`404 sandbox_not_found` for every sandbox another automaton runs in.
+
+`404 automaton_not_found`: no automaton with this id belongs to this key, also when it belongs to
+another account.
+
+`402 INSUFFICIENT_CREDITS`: the account cannot hold the reservation of its sandbox (1000 mc), with
+`details` as for sandboxes. An automaton costs what its sandbox costs (see sandboxes) plus its
+inference, both on the same account; at an empty balance its sandbox stops (`status` `stopped`,
+`reason` `credit`) and `POST /v1/automatons/{id}/start` starts it again once the credit holds the
+reservation.
+
+`409 automaton_failed`: the start of this automaton failed; delete it and create a new one.
+
+`501 automaton_start_failed`: the sandbox started but the automaton in it did not, so the sandbox was
+deleted again and only its first started step was booked. `501 sandbox_server_unreachable`: the
+sandbox server did not answer, nothing was started and nothing was charged.
+
 ## domains
 
 `GET /v1/domains/search` answers `501 not_implemented` with `reason: "domain search is not
