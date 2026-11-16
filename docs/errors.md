@@ -128,8 +128,19 @@ itself and stays as it is.
 `genesis_prompt` (1 to 8000 characters, kept unchanged) is missing or out of range. Nothing was
 started and nothing was charged.
 
+`Idempotency-Key` on `POST /v1/automatons` (1 to 200 characters): a repeat with the same key and
+the same body answers `200` with the automaton the first request created, without starting a
+second one, also while the first request still runs and after a restart of the service. Without
+the header every call creates its own automaton. `400 invalid_request`: the header is empty or
+longer than 200 characters. `409 idempotency_key_reused`: the same key came with another `name` or
+`genesis_prompt`; nothing was started. Send the same body again, or a new key for a new automaton.
+
 `403 forbidden`: the key is the key of a hosted automaton (named `automaton:<id>`). An automaton
-cannot start another automaton; sandboxes of its own (`POST /v1/sandboxes`) stay open to it.
+cannot start another automaton; sandboxes of its own (`POST /v1/sandboxes`) stay open to it. The
+same key gets `403 forbidden` on `GET /v1/auth/api-keys` and `POST /v1/auth/api-keys/revoke`: an
+automaton cannot see or revoke the keys of its account, the owner does that with their own key.
+It gets `404 automaton_not_found` for every other automaton of its account and
+`404 sandbox_not_found` for every sandbox another automaton runs in.
 
 `404 automaton_not_found`: no automaton with this id belongs to this key, also when it belongs to
 another account.

@@ -445,5 +445,19 @@
   nicht lesbar, startet nichts neu. Der Neustart gilt erst, wenn `/proc/sys/kernel/random/boot_id` einen neuen Wert hat. Die
   Speicher-Spitze ist das Maximum aus `memory.peak` der Cgroup des Containers nach dem ersten Turn, vor dem Neustart und am Ende.
   Die OK-Zeile verlangt mindestens eine Zeile `sandbox` und eine Zeile `inference` im Ledger, damit eine 0 nicht Blindheit ist.
+- **Grenzen des Schlüssels automaton:<id>** (Kritik 16.11.2026, Punkt 12). `src/auth/` bleibt unverändert, darum prüft
+  `src/automaton/scope.ts` den Schlüssel an den Routen in `src/app.ts`: `automatonOfKey` ruft `isAutomatonKey` und liest die ID aus dem
+  Namen des Schlüssels. Schlüsselliste und Widerruf geben 403, weil ein Automaton auch seinen eigenen Schlüssel nicht widerrufen soll
+  (das macht das Löschen). Andere Automatons und ihre Sandboxes geben 404 statt 403, damit der Schlüssel nicht erfährt, welche IDs es
+  gibt; aus demselben Grund fehlen sie auch in `GET /v1/automatons` und `GET /v1/sandboxes`. Eine Sandbox, die der Kunde selbst über
+  `POST /v1/sandboxes` angelegt hat, bleibt dem Schlüssel offen, weil der Punkt nur die Sandboxes anderer Automatons sperrt und das
+  Konto ohnehin nur zwei Plätze hat.
+- **Idempotency-Key auf POST /v1/automatons** (Kritik 16.11.2026, Punkt 13). Die Zeile in `hosted_automaton_requests` (Konto,
+  Schlüssel, SHA-256 aus Name und Genesis-Prompt, ID des Automatons) entsteht vor dem Aufruf an `sandboxd`, ohne `await` zwischen
+  Lesen und Schreiben, und eine zweite Anfrage, während die erste läuft, wartet auf deren Promise. Eine Wiederholung nach dem Ende
+  bekommt 200 mit derselben `id` aus der Datenbank, ohne Aufruf an `sandboxd`, auch nach einem Neustart. Hat die erste Anfrage keinen
+  Automaton angelegt (402, Sandbox-Server nicht erreichbar), versucht die Wiederholung es neu unter derselben ID, weil dann nichts
+  doppelt entstehen kann. Läuft ein Rollout genau zwischen dem Anlegen der Sandbox und der Zeile in `hosted_automatons`, bleibt die
+  Sandbox ohne Automaton stehen; das ist der Vorschlag `goals/_vorschlaege/sandbox-kritik-2026-11-16-1.md`, nicht dieser Punkt.
 - **Guthaben grant:live-automaton.** Gemessen 2026-11-16 02:41 UTC über `GET /v1/credits/history` des eigenen Kontos: 11 Cent je
   Lauf ohne Neustart, mal 300 über der Obergrenze, also 500000 mc (`docs/sandbox/automaton.md`).

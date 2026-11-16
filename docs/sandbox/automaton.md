@@ -10,6 +10,17 @@ ein schlüsselloses aus `POST /v1/auth/keyless`. Die Entscheidungen mit Grund st
 Alle Routen brauchen den API-Schlüssel des Kontos (`Authorization: <key>` oder `Bearer <key>`). Eine ID eines anderen Kontos gibt
 404 `automaton_not_found`, nie 403.
 
+`POST /v1/automatons` nimmt den Header `Idempotency-Key` (1 bis 200 Zeichen). Wer nach seinem eigenen Timeout mit demselben Header
+und demselben Body wiederholt, bekommt den Automaton, den die erste Anfrage angelegt hat (200 mit derselben `id`), keinen zweiten,
+auch während die erste noch läuft und nach einem Neustart des Control Planes. Derselbe Header mit anderem `name` oder
+`genesis_prompt` gibt 409 `idempotency_key_reused`, ohne dass etwas startet. Ohne den Header legt jeder Aufruf einen eigenen
+Automaton an.
+
+Der Schlüssel, den die Runtime in ihrer Sandbox bekommt (`automaton:<id>`), reicht nur für ihren eigenen Automaton: Er bekommt 403
+`forbidden` auf `GET /v1/auth/api-keys` und `POST /v1/auth/api-keys/revoke`, 404 auf jeden anderen Automaton des Kontos und 404
+auf jede Sandbox, in der ein anderer Automaton läuft. Offen bleiben ihm der eigene Automaton, die eigene Sandbox, Sandboxes, die er
+selbst anlegt, Inferenz, Guthaben, Relay und `POST /v1/automatons/register`. Der Schlüssel des Kunden reicht wie bisher überall hin.
+
 | Route | Antwort |
 |---|---|
 | `POST /v1/automatons` mit `{"name": "...", "genesis_prompt": "..."}` | 201 mit `id`, `name`, `status` (`starting`), `sandbox_id`, `created_at` |

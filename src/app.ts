@@ -96,7 +96,8 @@ import { registerHandoff, type HandoffDeps, type KontoDeps } from "./handoff/rou
 import { handlePay, TOPUP_TIERS_USD, type PayConfig } from "./payments/pay.js";
 import { handleRegister } from "./registry.js";
 import { createSandboxService, type Reply as SandboxReply, type SandboxService } from "./sandbox/service.js";
-import { createAutomatonService } from "./automaton/service.js";
+import { automatonOfKey, isOtherAutomatonSandbox, keysForbidden, otherAutomatonSandboxes } from "./automaton/scope.js";
+import { automatonNotFound, createAutomatonService } from "./automaton/service.js";
 import { registerRelay } from "./relay/routes.js";
 import type { Settler } from "./payments/settler.js";
 import {
@@ -2709,6 +2710,8 @@ export function createApp(opts: AppOptions) {
    * Never returns a key, only its prefix, which is what `docs/api-key.md` says listings show.
    */
   app.get("/v1/auth/api-keys", (c) => {
+    // The key of a hosted automaton never sees the keys of its account (goals/sandbox/08, point 12, src/automaton/scope.ts).
+    if (automatonOfKey(db, c.req.header("authorization"))) return c.json(keysForbidden(), 403);
     const rows = db
       .prepare(
         "SELECT key_prefix, name, created_at, revoked_at FROM api_keys WHERE address = ? ORDER BY created_at DESC",
@@ -2736,6 +2739,7 @@ export function createApp(opts: AppOptions) {
    * because the next call with that key is a 401 and that should not come as a surprise.
    */
   app.post("/v1/auth/api-keys/revoke", async (c) => {
+    if (automatonOfKey(db, c.req.header("authorization"))) return c.json(keysForbidden(), 403);
     const raw = await c.req.json().catch(() => null);
     const b = (typeof raw === "object" && raw !== null ? raw : {}) as Record<string, unknown>;
     const prefix = typeof b.key_prefix === "string" ? b.key_prefix.trim() : "";
@@ -3583,7 +3587,16 @@ export function createApp(opts: AppOptions) {
       );
     }
   };
-  app.get("/v1/sandboxes", (c) => sandboxGuard(c, () => sandboxes.list(c.get("address"))));
+  app.get("/v1/sandboxes", (c) =>
+    sandboxGuard(c, () => {
+      const res = sandboxes.list(c.get("address"));
+      // The key of a hosted automaton does not see the sandboxes of the other automatons of its account (point 12).
+      const own = automatonOfKey(db, c.req.header("authorization"));
+      if (!own || !Array.isArray(res.body.sandboxes)) return res;
+      const hidden = otherAutomatonSandboxes(db, c.get("address"), own);
+      return { ...res, body: { ...res.body, sandboxes: (res.body.sandboxes as { id: string }[]).filter((s) => !hidden.has(s.id)) } };
+    }),
+  );
   // The exact route stands before the wildcard: in Hono `/v1/sandboxes/*` also matches `/v1/sandboxes`.
   app.post("/v1/sandboxes", async (c) => {
     const body = await c.req.json().catch(() => ({}));
@@ -3619,6 +3632,11 @@ export function createApp(opts: AppOptions) {
         405,
       );
     }
+    // A sandbox another automaton runs in does not exist for the key of an automaton (goals/sandbox/08, point 12).
+    const ownAutomaton = automatonOfKey(db, c.req.header("authorization"));
+    if (ownAutomaton && isOtherAutomatonSandbox(db, address, ownAutomaton, id)) {
+      return c.json({ error: "sandbox_not_found", message: "No sandbox with this id belongs to this API key.", docs: DOC.sandboxes }, 404);
+    }
     const json = async () => c.req.json().catch(() => ({}));
     if (sub === "") return sandboxGuard(c, () => (asked === "GET" ? sandboxes.get(address, id) : sandboxes.remove(address, id)));
     if (sub === "/exec") {
@@ -3642,10 +3660,13 @@ export function createApp(opts: AppOptions) {
   // An automaton that runs entirely here, in a sandbox of its own, billed like every sandbox plus its inference on the same
   // account. POST /v1/automatons/register stands above and keeps answering the runtime as before: `register` is never an id.
   const automatons = createAutomatonService({ db, sandboxes, publicUrl: () => opts.automatonPublicUrl ?? siteOrigin() });
-  app.get("/v1/automatons", (c) => sandboxGuard(c, () => automatons.list(c.get("address"))));
+  // The key of a hosted automaton reaches only its own automaton; every other one of its account answers 404 (point 12).
+  app.get("/v1/automatons", (c) =>
+    sandboxGuard(c, () => automatons.list(c.get("address"), automatonOfKey(db, c.req.header("authorization")))),
+  );
   app.post("/v1/automatons", async (c) => {
     const body = await c.req.json().catch(() => ({}));
-    return sandboxGuard(c, () => automatons.create(c.get("address"), c.req.header("authorization"), body));
+    return sandboxGuard(c, () => automatons.create(c.get("address"), c.req.header("authorization"), body, c.req.header("idempotency-key")));
   });
   app.all("/v1/automatons/*", async (c) => {
     const m = /^\/v1\/automatons\/([A-Za-z0-9_-]{1,64})(\/.*)?$/.exec(new URL(c.req.url).pathname);
@@ -3663,6 +3684,8 @@ export function createApp(opts: AppOptions) {
         405,
       );
     }
+    const ownAutomaton = automatonOfKey(db, c.req.header("authorization"));
+    if (ownAutomaton && ownAutomaton !== id) return c.json(automatonNotFound().body, 404);
     if (sub === "") return sandboxGuard(c, () => (asked === "GET" ? automatons.get(address, id) : automatons.remove(address, id)));
     if (sub === "/logs") return sandboxGuard(c, () => automatons.logs(address, id));
     return sandboxGuard(c, () => (sub === "/stop" ? automatons.stop(address, id) : automatons.start(address, id)));

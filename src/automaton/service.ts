@@ -49,8 +49,9 @@ interface Row {
 }
 
 const reply = (status: Status, body: Record<string, unknown>): Reply => ({ status: status as Reply["status"], body });
-const notFound = (): Reply =>
+export const automatonNotFound = (): Reply =>
   reply(404, { error: "automaton_not_found", message: "No automaton with this id belongs to this API key.", docs: DOC.automatons });
+const notFound = automatonNotFound;
 const invalid = (message: string): Reply => reply(400, { error: "invalid_request", message, docs: DOC.automatons });
 
 /** The log as the customer may see it: every API key and every run of 64 hex digits (a private key) as [redacted]. */
@@ -109,7 +110,17 @@ export function createAutomatonService(opts: AutomatonServiceOptions) {
     return { ...base, status: turns > 0 ? "running" : "starting", wallet_address: wallet, turns };
   }
 
-  async function create(address: string, rawKey: string | undefined, body: unknown): Promise<Reply> {
+  /** Requests with an Idempotency-Key that are still running in this process, by address and key. */
+  const pending = new Map<string, Promise<Reply>>();
+
+  /**
+   * POST /v1/automatons. With `Idempotency-Key` (1 to 200 characters) a repeat of the same name and genesis prompt gets the
+   * automaton the first request created, without a second sandbox and without a second key: while the first one still
+   * runs it waits for it, afterwards and after a restart it reads the id from hosted_automaton_requests. The same key with
+   * another body answers 409 and asks nothing of sandboxd. Only when the first request created no automaton at all (402,
+   * an unreachable sandbox server) does a repeat try again, under the same id.
+   */
+  async function create(address: string, rawKey: string | undefined, body: unknown, idempotencyKey?: string): Promise<Reply> {
     const addr = address.toLowerCase();
     if (isAutomatonKey(db, rawKey)) {
       return reply(403, {
@@ -128,19 +139,72 @@ export function createAutomatonService(opts: AutomatonServiceOptions) {
     if (typeof prompt !== "string" || prompt.trim().length === 0 || prompt.length > GENESIS_MAX) {
       return invalid(`genesis_prompt is required: the text your automaton starts from, 1 to ${GENESIS_MAX} characters.`);
     }
-    let id: string;
-    do id = crypto.randomBytes(9).toString("base64").toLowerCase().replace(/[^a-z0-9]/g, "").padEnd(12, "0").slice(0, 12);
-    while (db.prepare("SELECT 1 FROM hosted_automatons WHERE id = ?").get(id));
+    const newId = () => {
+      let id: string;
+      do id = crypto.randomBytes(9).toString("base64").toLowerCase().replace(/[^a-z0-9]/g, "").padEnd(12, "0").slice(0, 12);
+      while (db.prepare("SELECT 1 FROM hosted_automatons WHERE id = ? UNION SELECT 1 FROM hosted_automaton_requests WHERE automaton_id = ?").get(id, id));
+      return id;
+    };
+    if (idempotencyKey === undefined) return createAs(addr, newId(), b.name, prompt);
+    if (idempotencyKey.length === 0 || idempotencyKey.length > 200) {
+      return invalid("Idempotency-Key must be 1 to 200 characters. Nothing was started and nothing was charged.");
+    }
+    const hash = crypto.createHash("sha256").update(JSON.stringify([b.name, prompt])).digest("hex");
+    // From here to pending.set nothing awaits, so a second request with the same key always finds the first one.
+    const known = db
+      .prepare("SELECT request_hash, automaton_id FROM hosted_automaton_requests WHERE address = ? AND idempotency_key = ?")
+      .get(addr, idempotencyKey) as { request_hash: string; automaton_id: string } | undefined;
+    if (known && known.request_hash !== hash) {
+      return reply(409, {
+        error: "idempotency_key_reused",
+        message:
+          "This Idempotency-Key was already used with another name or genesis prompt, so nothing was started and nothing " +
+          "was charged. Send the same body again to get that automaton, or a new Idempotency-Key for a new one.",
+        docs: DOC.automatons,
+      });
+    }
+    const slot = `${addr}\n${idempotencyKey}`;
+    const running = pending.get(slot);
+    if (running) return running;
+    if (known) {
+      const r = db.prepare("SELECT * FROM hosted_automatons WHERE id = ? AND address = ?").get(known.automaton_id, addr) as Row | undefined;
+      if (r) {
+        return reply(200, {
+          id: r.id,
+          name: r.name,
+          sandbox_id: r.sandbox_id,
+          created_at: r.created_at,
+          ...(r.status === "active" ? {} : { status: r.status === "deleted" ? "deleted" : "failed", reason: r.reason }),
+          message:
+            "This Idempotency-Key already created this automaton, so nothing new was started and nothing was charged. " +
+            (r.status === "deleted"
+              ? "It has been deleted since; send a new Idempotency-Key to create a new one."
+              : `GET /v1/automatons/${r.id} shows its status.`),
+        });
+      }
+    }
+    // No automaton under this key yet: either the first request, or one that created none (402, sandbox server down).
+    const id = known?.automaton_id ?? newId();
+    if (!known) {
+      db.prepare(
+        "INSERT INTO hosted_automaton_requests (address, idempotency_key, request_hash, automaton_id, created_at) VALUES (?, ?, ?, ?, ?)",
+      ).run(addr, idempotencyKey, hash, id, iso(now()));
+    }
+    const promise = createAs(addr, id, b.name, prompt).finally(() => pending.delete(slot));
+    pending.set(slot, promise);
+    return promise;
+  }
 
+  async function createAs(addr: string, id: string, name: string, prompt: string): Promise<Reply> {
     const sb = await sandboxes.create(addr, { name: `automaton-${id}` }, { keepRunning: true });
     if (sb.status !== 201 || typeof sb.body.id !== "string") return sb;
     const sandboxId = sb.body.id;
     const t = iso(now());
     db.prepare(
       "INSERT INTO hosted_automatons (id, address, name, sandbox_id, status, reason, created_at, updated_at) VALUES (?, ?, ?, ?, 'active', NULL, ?, ?)",
-    ).run(id, addr, b.name, sandboxId, t, t);
+    ).run(id, addr, name, sandboxId, t, t);
     const { key } = createAutomatonKey(db, addr, id, now());
-    const setup = buildSetup({ db, address: addr, name: b.name, genesisPrompt: prompt, apiKey: key, publicUrl: opts.publicUrl() });
+    const setup = buildSetup({ db, address: addr, name: name, genesisPrompt: prompt, apiKey: key, publicUrl: opts.publicUrl() });
     const up = await sandboxes.upload(addr, sandboxId, { path: SETUP_PATH, content: JSON.stringify(setup, null, 2) });
     const started = up.status === 200 ? await run(addr, sandboxId, START_COMMAND, START_TIMEOUT_MS) : null;
     if (!started || started.exit_code !== 0 || !/AUTOMATON_START ok/.test(started.stdout)) {
@@ -161,7 +225,7 @@ export function createAutomatonService(opts: AutomatonServiceOptions) {
     log(`[automaton] ${id} started in sandbox ${sandboxId}`);
     return reply(201, {
       id,
-      name: b.name,
+      name: name,
       status: "starting",
       sandbox_id: sandboxId,
       created_at: t,
@@ -171,10 +235,13 @@ export function createAutomatonService(opts: AutomatonServiceOptions) {
     });
   }
 
-  async function list(address: string): Promise<Reply> {
-    const rows = db
-      .prepare("SELECT * FROM hosted_automatons WHERE address = ? AND status <> 'deleted' ORDER BY created_at, id")
-      .all(address.toLowerCase()) as Row[];
+  /** `onlyId`: the key of a hosted automaton sees only itself (point 12, src/automaton/scope.ts). */
+  async function list(address: string, onlyId: string | null = null): Promise<Reply> {
+    const rows = (
+      db
+        .prepare("SELECT * FROM hosted_automatons WHERE address = ? AND status <> 'deleted' ORDER BY created_at, id")
+        .all(address.toLowerCase()) as Row[]
+    ).filter((r) => onlyId === null || r.id === onlyId);
     const automatons = [];
     for (const r of rows) automatons.push(await view(r));
     return reply(200, { automatons });

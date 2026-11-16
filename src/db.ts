@@ -523,6 +523,16 @@ function migrate(db: Db): void {
       updated_at  TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS hosted_automatons_address ON hosted_automatons(address, status);
+    -- Idempotency-Key on POST /v1/automatons (goals/sandbox/08, point 13): written before the sandbox is asked for, so that a
+    -- repeat, also one after a restart of the control plane, finds the id instead of creating a second automaton.
+    CREATE TABLE IF NOT EXISTS hosted_automaton_requests (
+      address          TEXT NOT NULL,
+      idempotency_key  TEXT NOT NULL,
+      request_hash     TEXT NOT NULL,
+      automaton_id     TEXT NOT NULL,
+      created_at       TEXT NOT NULL,
+      PRIMARY KEY (address, idempotency_key)
+    );
   `);
   // A spend() that was sent and not yet settled (goals/konto/03, point 15): its hash and amount, written before the wait for the
   // receipt, so that a failed wait or a restart books it later instead of losing it or spending a second time.
