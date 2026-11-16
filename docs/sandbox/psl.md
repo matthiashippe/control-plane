@@ -76,7 +76,7 @@ Der Eintrag kommt mit je einer Leerzeile davor und danach zwischen die beiden Ab
 ## PR
 
 PR-Titel: Add sandboxhost.de
-Prüfwert: b3fa541138d7
+Prüfwert: 797b2b2ddd05
 
 Der PR-Text ist `docs/sandbox/psl-pr-body.md`, Byte für Byte, wie `gh pr create --body-file` ihn postet. Er folgt der Vorlage
 `.github/pull_request_template.md` des PSL-Repos samt ihren Kommentaren, nur die Stellen zum Ausfüllen sind gefüllt. Angekreuzt ist

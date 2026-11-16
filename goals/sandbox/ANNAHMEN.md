@@ -561,7 +561,7 @@
   Impressums ist. Die Richtlinien verlangen außerdem, dass die Adresse zur Domain passt (meist über WHOIS); DENIC zeigt für `.de` keine
   Kontaktdaten, also kann ein Maintainer nachfragen. Nennt Matthias am Gate eine Rollenadresse, ändern sich Eintrag und PR-Text und
   damit der Prüfwert.
-- **Prüfwert.** sha256 über `PR-Titel` mit Zeilenende, `psl-pr-body.md` und `psl-entry.txt`, erste 12 Zeichen, heute `b3fa541138d7`. Er
+- **Prüfwert.** sha256 über `PR-Titel` mit Zeilenende, `psl-pr-body.md` und `psl-entry.txt`, erste 12 Zeichen, heute `797b2b2ddd05`. Er
   bindet die Freigabe `public_post` an genau diese Bytes; vor dem Posten rechnet der Maker ihn neu, und weicht er ab, geht nichts raus.
 - **Kästchen.** Angekreuzt ist, was am Tag des Postens wahr ist, auch DNS-Prüfung (das TXT steht Minuten nach dem PR, vor
   `gh pr edit`) und zwei Jahre Restlaufzeit, weil Schritt 1 die Verlängerung vor dem Posten verlangt. Bietet INWX keine Verlängerung im
@@ -583,3 +583,7 @@
 - **Kopfzeile.** `// PostYourPrice : https://postyourprice.com`, weil dort Dienst und Impressum stehen; unter `sandboxhost.de` antwortet
   nichts. Einsortiert zwischen `// Postman, Inc : https://postman.com` und `// prequalifyme.today : https://prequalifyme.today`
   (`LC_ALL=C sort -f`, Stand 2026-11-16 20:25 UTC).
+- **Zwei Beispieladressen der Vorlage fallen weg.** Ein HTML-Kommentar der Vorlage nennt als Beispiele eine Rollen- und eine
+  persönliche Adresse unter `example.com`; Punkt 8 lässt keine Mailadresse zu, die vor dem Goal nicht öffentlich im Repo stand. Darum
+  fehlen in `psl-pr-body.md` genau diese zwei Klammern, der Kommentar ist sonst wörtlich und im PR ohnehin unsichtbar. Alle Überschriften,
+  Kästchen und Stellen zum Ausfüllen der Vorlage stehen unverändert (Punkt 3).

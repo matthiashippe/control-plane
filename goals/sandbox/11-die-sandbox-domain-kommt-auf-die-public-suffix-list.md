@@ -163,20 +163,20 @@ Kunden die Cookies seiner Nutzer setzt, sonst bleibt er mit seinem Dienst nicht 
   genau die freigegebenen Bytes postet und der Prüfwert über sie gerechnet wird; `psl.md` erklärt sie für Matthias.
 
 ## Done Condition
-- [ ] Die Ausgangslage ist gemessen: Einträge für `sandboxhost` in der PSL, das TXT `_psl.sandboxhost.de` und die Zahl der Konten mit
+- [x] Die Ausgangslage ist gemessen: Einträge für `sandboxhost` in der PSL, das TXT `_psl.sandboxhost.de` und die Zahl der Konten mit
       Sandbox stehen mit Befehl und Uhrzeit unter `## Vorher` in `docs/sandbox/psl.md`, ohne Adresse und ohne Sandbox-ID.
       Prüfung: `awk '/^## Vorher/{f=1;next} /^## /{f=0} f' docs/sandbox/psl.md | grep -cE '^(PSL: [0-9]+ Einträge für sandboxhost|TXT _psl\.sandboxhost\.de: .+|Konten mit Sandbox: [0-9]+ \(eigene eingeschlossen\), Sandboxes: [0-9]+), 20[0-9]{2}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2} UTC$'` muss 3 ausgeben.
       Prüfung: `for w in public_suffix_list.dat 'dig +short TXT _psl.sandboxhost.de' readonly; do awk '/^## Vorher/{f=1;next} /^## /{f=0} f' docs/sandbox/psl.md | grep -qF -- "$w" || echo "fehlt $w"; done` muss nichts ausgeben.
       Prüfung: `grep -cE '0x[0-9a-fA-F]{40}|([0-9]{1,3}\.){3}[0-9]{1,3}' docs/sandbox/psl.md` muss 0 ausgeben.
       Prüfung (Netz): `curl -s https://publicsuffix.org/list/public_suffix_list.dat | grep -cE '^(sandboxhost\.de|herokuapp\.com)$'` muss 1 ausgeben, solange die PSL den Eintrag nicht aufgenommen hat (der Eintrag herokuapp.com ist die Gegenprobe gegen eine leere Antwort).
-- [ ] Der Eintrag steht in `docs/sandbox/psl-entry.txt` genau so, wie er in die private Sektion kommt, mit einer Adresse, die vor dem
+- [x] Der Eintrag steht in `docs/sandbox/psl-entry.txt` genau so, wie er in die private Sektion kommt, mit einer Adresse, die vor dem
       Goal schon öffentlich im Repo stand, und `docs/sandbox/psl.md` nennt die Nachbarn, zwischen die er alphabetisch gehört.
       Prüfung: `grep -cE '^(// [A-Za-z0-9][^:]* : https://[a-z0-9./-]+|// Submitted by [A-Z][^<]* <[^ <>]+@[^ <>]+>|sandboxhost\.de)$' docs/sandbox/psl-entry.txt` muss 3 ausgeben.
       Prüfung: `echo "$(wc -l < docs/sandbox/psl-entry.txt) $(sed -n 3p docs/sandbox/psl-entry.txt) $(grep -c '[[:space:]]$' docs/sandbox/psl-entry.txt)"` muss `3 sandboxhost.de 0` ausgeben.
       Prüfung: `m=$(sed -nE '2s/^.*<([^>]+)>$/\1/p' docs/sandbox/psl-entry.txt); [ -n "$m" ] && git grep -qF -- "$m" "$(git merge-base origin/dev HEAD)" -- README.md LICENSE.md src/public/terms.ts` muss Exit-Code 0 haben.
       Prüfung: `grep -cE '^(Davor|Danach): // .+ : https?://.+$' docs/sandbox/psl.md` muss 2 ausgeben.
       Prüfung (Netz): `f=$(mktemp); curl -s https://publicsuffix.org/list/public_suffix_list.dat > "$f"; a=$(sed -nE 's/^Davor: (.+)$/\1/p' docs/sandbox/psl.md); b=$(sed -nE 's/^Danach: (.+)$/\1/p' docs/sandbox/psl.md); e=$(head -1 docs/sandbox/psl-entry.txt); [ "$(sed -n '/===BEGIN PRIVATE DOMAINS===/,/===END PRIVATE DOMAINS===/p' "$f" | grep -E '^// [^ ].* : https?://' | grep -A1 -xF -- "$a" | tail -1)" = "$b" ] && printf '%s\n' "$a" "$e" "$b" | LC_ALL=C sort -fc` muss Exit-Code 0 haben.
-- [ ] Der PR-Text in `docs/sandbox/psl-pr-body.md` folgt der Vorlage des PSL-Repos mit allen Abschnitten, jede Stelle zum Ausfüllen ist
+- [x] Der PR-Text in `docs/sandbox/psl-pr-body.md` folgt der Vorlage des PSL-Repos mit allen Abschnitten, jede Stelle zum Ausfüllen ist
       gefüllt, die Beispielzeilen sind entfernt, und die Zahl der Nutzer ist die gemessene.
       Prüfung: `head -1 docs/sandbox/psl-pr-body.md` muss `# Public Suffix List (PSL) Submission` ausgeben.
       Prüfung: `for h in '### Checklist of required steps' '## Description of Organization' '**Organization Website:**' '## Reason for PSL Inclusion' '**Number of THOUSANDS of distinct users this request is being made to serve:**' '## DNS Verification' '**Abuse Contact:**'; do grep -qxF -- "$h" docs/sandbox/psl-pr-body.md || echo "fehlt $h"; done` muss nichts ausgeben.
@@ -187,10 +187,10 @@ Kunden die Cookies seiner Nutzer setzt, sonst bleibt er mit seinem Dienst nicht 
       Prüfung: `n=$(sed -nE 's/^Konten mit Sandbox: ([0-9]+) .*/\1/p' docs/sandbox/psl.md); [ -n "$n" ] && grep -cF "current actual count: at most $n accounts" docs/sandbox/psl-pr-body.md` muss 1 ausgeben.
       Prüfung (Netz): `gh api repos/publicsuffix/list/contents/.github/pull_request_template.md -q .content | base64 -d | grep -E '^(#+ |\*\*)' | while IFS= read -r l; do grep -qxF -- "$l" docs/sandbox/psl-pr-body.md || echo "fehlt $l"; done` muss nichts ausgeben.
       Prüfung (Netz): `[ "$(gh api repos/publicsuffix/list/contents/.github/pull_request_template.md -q .content | base64 -d | grep -cE '^ *\* \[[ x]\]')" = "$(grep -cE '^ *\* \[[ x]\]' docs/sandbox/psl-pr-body.md)" ]` muss Exit-Code 0 haben.
-- [ ] Titel und Prüfwert stehen in `docs/sandbox/psl.md`, und der Prüfwert ist der von Titel, PR-Text und Eintrag.
+- [x] Titel und Prüfwert stehen in `docs/sandbox/psl.md`, und der Prüfwert ist der von Titel, PR-Text und Eintrag.
       Prüfung: `grep -cE '^PR-Titel: .*sandboxhost\.de.*$' docs/sandbox/psl.md` muss 1 ausgeben.
       Prüfung: `v=$(sed -nE 's/^Prüfwert: ([0-9a-f]{12})$/\1/p' docs/sandbox/psl.md); [ -n "$v" ] && [ "$v" = "$({ sed -nE 's/^PR-Titel: (.+)$/\1/p' docs/sandbox/psl.md; cat docs/sandbox/psl-pr-body.md docs/sandbox/psl-entry.txt; } | sha256sum | cut -c1-12)" ]` muss Exit-Code 0 haben.
-- [ ] `ops/sandbox/cloudflare.py psl-txt <url>` legt genau das TXT `_psl.<domain>` in der Zone der Ports an oder ändert nur dieses,
+- [x] `ops/sandbox/cloudflare.py psl-txt <url>` legt genau das TXT `_psl.<domain>` in der Zone der Ports an oder ändert nur dieses,
       verweigert jede andere URL ohne Aufruf der API und fasst die Zahlungszone nie an; der Test gegen einen nachgebauten
       Cloudflare-Server war vor dem Fix rot.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/cloudflare-psl-txt.test.ts` muss Exit-Code 0 haben.
@@ -198,35 +198,35 @@ Kunden die Cookies seiner Nutzer setzt, sonst bleibt er mit seinem Dienst nicht 
       Prüfung: `grep -cE 'listen\([1-9]|port: *[1-9]' test/cloudflare-psl-txt.test.ts` muss 0 ausgeben.
       Prüfung: `echo "$(grep -c 'psl-txt' ops/sandbox/cloudflare.py) $(grep -c 'CLOUDFLARE_API_BASE' ops/sandbox/cloudflare.py)" | awk '{print ($1>=2 && $2>=1) ? "passt" : "fehlt"}'` muss `passt` ausgeben.
       Prüfung: `python3 ops/sandbox/cloudflare.py --selftest | tail -1` muss `CLOUDFLARE SELFTEST OK` ausgeben.
-- [ ] `docs/sandbox/psl.md` nennt das TXT mit Name, Wert, Befehl und Prüfung, die Laufzeit der Domain und die Schritte in der
+- [x] `docs/sandbox/psl.md` nennt das TXT mit Name, Wert, Befehl und Prüfung, die Laufzeit der Domain und die Schritte in der
       Reihenfolge, in der sie nach der Freigabe laufen.
       Prüfung: `awk '/^## TXT/{f=1;next} /^## /{f=0} f' docs/sandbox/psl.md | grep -cxE 'Name: _psl\.sandboxhost\.de|Wert: https://github\.com/publicsuffix/list/pull/<n>|Befehl: python3 ops/sandbox/cloudflare\.py psl-txt https://github\.com/publicsuffix/list/pull/<n>|Prüfen: dig \+short TXT _psl\.sandboxhost\.de'` muss 4 ausgeben.
       Prüfung: `awk '/^## Laufzeit/{f=1;next} /^## /{f=0} f' docs/sandbox/psl.md | grep -cE '^(Gekauft: 2026-11-15 bei INWX|Nötig: mindestens zwei Jahre Restlaufzeit am Tag der Einreichung, danach mehr als ein Jahr|RDAP: .+, 20[0-9]{2}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2} UTC)$'` muss 3 ausgeben.
       Prüfung: `awk '/^## Schritte/{f=1;next} /^## /{f=0} f' docs/sandbox/psl.md | grep -oE 'INWX|Prüfwert|gh repo fork|gh pr create|psl-txt|gh pr edit' | uniq | paste -sd' '` muss `INWX Prüfwert gh repo fork gh pr create psl-txt gh pr edit` ausgeben.
       Prüfung: `awk '/^## Schritte/{f=1;next} /^## /{f=0} f' docs/sandbox/psl.md | grep -cE '^[0-9]+\. '` muss mindestens 6 ausgeben.
       Prüfung (Netz): `curl -s https://rdap.denic.de/domain/sandboxhost.de | jq -r .ldhName` muss `sandboxhost.de` ausgeben.
-- [ ] Der Rückfall für eine Ablehnung durch die PSL steht als Vorschlag mit Schwere, und die Entscheidungen dieses Goals stehen mit
+- [x] Der Rückfall für eine Ablehnung durch die PSL steht als Vorschlag mit Schwere, und die Entscheidungen dieses Goals stehen mit
       Grund unter `## Goal 11` in `goals/sandbox/ANNAHMEN.md`.
       Prüfung: `git diff --name-only --diff-filter=A $(git merge-base origin/dev HEAD) HEAD -- goals/_vorschlaege | xargs -r grep -lE '^Schwere: [1-5]$' | xargs -r grep -l 'Set-Cookie' | wc -l` muss mindestens 1 ausgeben.
       Prüfung: `for w in public_post server_kauf Prüfwert Restlaufzeit Set-Cookie Rollenadresse sbx-ports; do awk '/^## Goal 11/{f=1;next} /^## /{f=0} f' goals/sandbox/ANNAHMEN.md | grep -qiF -- "$w" || echo "fehlt $w"; done` muss nichts ausgeben.
-- [ ] Alle neuen Texte sind ohne Gedankenstrich, und keine Mailadresse in ihnen ist neu im öffentlichen Repo.
+- [x] Alle neuen Texte sind ohne Gedankenstrich, und keine Mailadresse in ihnen ist neu im öffentlichen Repo.
       Prüfung: `cat docs/sandbox/psl.md docs/sandbox/psl-pr-body.md docs/sandbox/psl-entry.txt | grep -c $'\xe2\x80\x93\|\xe2\x80\x94'` muss 0 ausgeben.
       Prüfung: `cat docs/sandbox/psl.md docs/sandbox/psl-pr-body.md docs/sandbox/psl-entry.txt | grep -oE '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[a-z]{2,}' | sort -u | while read -r m; do git grep -qF -- "$m" "$(git merge-base origin/dev HEAD)" -- README.md LICENSE.md src/public || echo "neu $m"; done` muss nichts ausgeben.
-- [ ] Die Goal-Datei endet am Human Gate: `## Status` ist `BLOCKED matthias`, unter `## Blockers` stehen `Art: matthias`, die Gates
+- [x] Die Goal-Datei endet am Human Gate: `## Status` ist `BLOCKED matthias`, unter `## Blockers` stehen `Art: matthias`, die Gates
       `public_post` und `server_kauf`, `Aufgabe:`, `Worum:`, `Empfehlung:` und der Prüfwert; ist die Freigabe schon da, steht statt
       dessen ihre Zeile im Progress Log.
       Prüfung: `f=goals/sandbox/11-die-sandbox-domain-kommt-auf-die-public-suffix-list.md; [ "$(awk '/^## Status/{getline; print; exit}' "$f")" = "BLOCKED matthias" ] || grep -qE '^- .*Freigabe public_post: ok, .*Prüfwert [0-9a-f]{12}' "$f"` muss Exit-Code 0 haben.
       Prüfung: `f=goals/sandbox/11-die-sandbox-domain-kommt-auf-die-public-suffix-list.md; grep -qE '^- .*Freigabe public_post: ok, .*Prüfwert [0-9a-f]{12}' "$f" || [ "$(awk '/^## Blockers/{f=1;next} /^## /{f=0} f' "$f" | grep -cE '^(Art: matthias|Gate: public_post, server_kauf|Aufgabe: .*INWX.+|Worum: .+|Empfehlung: .+)$')" = 5 ]` muss Exit-Code 0 haben.
       Prüfung: `v=$(sed -nE 's/^Prüfwert: ([0-9a-f]{12})$/\1/p' docs/sandbox/psl.md); [ -n "$v" ] && grep -qF -- "$v" goals/sandbox/11-die-sandbox-domain-kommt-auf-die-public-suffix-list.md` muss Exit-Code 0 haben.
-- [ ] Vor der Freigabe legt kein Lauf etwas in `publicsuffix/list` an (kein PR, kein Fork, kein Kommentar) und setzt kein TXT
+- [x] Vor der Freigabe legt kein Lauf etwas in `publicsuffix/list` an (kein PR, kein Fork, kein Kommentar) und setzt kein TXT
       `_psl.sandboxhost.de`; geprüft wird lesend, und jede Prüfung gilt als erfüllt, sobald die Freigabe-Zeile im Progress Log steht.
       Prüfung (Netz): `f=goals/sandbox/11-die-sandbox-domain-kommt-auf-die-public-suffix-list.md; grep -qE '^- .*Freigabe public_post: ok, .*Prüfwert [0-9a-f]{12}' "$f" || [ "$(gh pr list -R publicsuffix/list --author @me --search sandboxhost --state all --json number | jq length)" = 0 ]` muss Exit-Code 0 haben.
       Prüfung (Netz): `f=goals/sandbox/11-die-sandbox-domain-kommt-auf-die-public-suffix-list.md; grep -qE '^- .*Freigabe public_post: ok, .*Prüfwert [0-9a-f]{12}' "$f" || [ "$(gh api -X GET search/issues -f q='repo:publicsuffix/list sandboxhost' -q .total_count)" = 0 ]` muss Exit-Code 0 haben.
       Prüfung (Netz): `f=goals/sandbox/11-die-sandbox-domain-kommt-auf-die-public-suffix-list.md; grep -qE '^- .*Freigabe public_post: ok, .*Prüfwert [0-9a-f]{12}' "$f" || ! gh api "repos/$(gh api user -q .login)/list" -q .parent.full_name 2>/dev/null | grep -qx publicsuffix/list` muss Exit-Code 0 haben.
       Prüfung (Netz): `f=goals/sandbox/11-die-sandbox-domain-kommt-auf-die-public-suffix-list.md; grep -qE '^- .*Freigabe public_post: ok, .*Prüfwert [0-9a-f]{12}' "$f" || [ -z "$(dig +short TXT _psl.sandboxhost.de)" ]` muss Exit-Code 0 haben.
-- [ ] Das Goal ändert nur seine eigenen Dateien.
+- [x] Das Goal ändert nur seine eigenen Dateien.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD | grep -vcE '^(docs/sandbox/psl\.md|docs/sandbox/psl-pr-body\.md|docs/sandbox/psl-entry\.txt|ops/sandbox/cloudflare\.py|test/cloudflare-psl-txt\.test\.ts|goals/_vorschlaege/sandbox-nacharbeit-[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]+\.md|goals/sandbox/.+)$'` muss 0 ausgeben.
-- [ ] `check` ist grün.
+- [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
 - [ ] goal-verifier PASS (K und B)
 
@@ -259,13 +259,13 @@ Kunden die Cookies seiner Nutzer setzt, sonst bleibt er mit seinem Dienst nicht 
 - max Versuche pro Gap: 3
 
 ## Progress Log
-- 2026-11-16 Zyklus 1: Punkte 1 bis 12 gebaut (Messung, Eintrag, PR-Text, Prüfwert b3fa541138d7, `cloudflare.py psl-txt` mit Test, Vorschlag zum Rückfall, Annahmen, Human Gate). Prüfbefehle: PRUEF.
+- 2026-11-16 Zyklus 1: Punkte 1 bis 12 gebaut (Messung, Eintrag, PR-Text, Prüfwert 797b2b2ddd05, `cloudflare.py psl-txt` mit Test, Vorschlag zum Rückfall, Annahmen, Human Gate). Prüfbefehle: Punkt 1 3, leer, 0, 1; Punkt 2 3, `3 sandboxhost.de 0`, Exit 0, 2, Exit 0; Punkt 3 Kopfzeile, leer, `6 7`, 0, 0, leer, 1, leer, Exit 0; Punkt 4 1, Exit 0; Punkt 5 vitest 13 passed (vorher gegen das cloudflare.py von dev 4 failed | 9 passed, weil `psl-txt` fehlte), leer, 0, passt, `CLOUDFLARE SELFTEST OK`; Punkt 6 4, 3, Reihenfolge passt, 7, `sandboxhost.de`; Punkt 7 1, leer; Punkt 8 0, leer (zwei Beispieladressen aus einem Kommentar der Vorlage entfernt); Punkt 9 drei mal Exit 0; Punkt 10 vier mal Exit 0; Punkt 11 0; Punkt 12 check grün in 93 s.
 
 ## Blockers
 Art: matthias
 Gate: public_post, server_kauf
 Aufgabe: Erst `sandboxhost.de` im Kundenkonto bei INWX auf mindestens zwei Jahre Restlaufzeit verlängern (Domains, sandboxhost.de, Verlängerung im Voraus, Preis laut INWX, etwa 6 € je Jahr) und das bestätigen, dann den PR unten an die Public Suffix List mit „ok“ freigeben.
-Worum: Ohne Eintrag auf der Public Suffix List kann der Dienst einer Sandbox ein Cookie für `sandboxhost.de` setzen, das der Browser an jede andere Sandbox schickt, also an Dienste anderer Kunden. Gepostet wird ein PR an `publicsuffix/list` mit dem Eintrag `sandboxhost.de` und dem Text unten, danach das TXT `_psl.sandboxhost.de`; Prüfwert b3fa541138d7.
+Worum: Ohne Eintrag auf der Public Suffix List kann der Dienst einer Sandbox ein Cookie für `sandboxhost.de` setzen, das der Browser an jede andere Sandbox schickt, also an Dienste anderer Kunden. Gepostet wird ein PR an `publicsuffix/list` mit dem Eintrag `sandboxhost.de` und dem Text unten, danach das TXT `_psl.sandboxhost.de`; Prüfwert 797b2b2ddd05.
 Empfehlung: Verlängern und freigeben (wenige Euro, wenige Minuten, kein Schaden bei Ablehnung). Die Richtlinien der PSL erwarten 2000 bis 3000 Nutzer, der PR nennt ehrlich 1 Konto mit Sandbox, die Aufnahme kann also abgelehnt werden oder lange liegen; dann greift der Rückfall im Proxy von `sandboxd`, der `Domain` aus `Set-Cookie` entfernt (goals/_vorschlaege/sandbox-nacharbeit-2026-11-16-1.md).
 
 1. Ziel: https://github.com/publicsuffix/list (neuer PR vom Fork `matthiashippe/list`, Branch `sandboxhost-de`)
@@ -276,7 +276,7 @@ Empfehlung: Verlängern und freigeben (wenige Euro, wenige Minuten, kein Schaden
     // Submitted by Matthias Hippe <matthias@hanseatictech.de>
     sandboxhost.de
 
-4. Prüfwert: b3fa541138d7 (sha256 über Titel, PR-Text und Eintrag, `docs/sandbox/psl.md`, Abschnitt PR)
+4. Prüfwert: 797b2b2ddd05 (sha256 über Titel, PR-Text und Eintrag, `docs/sandbox/psl.md`, Abschnitt PR)
 5. PR-Text, vollständig (`docs/sandbox/psl-pr-body.md`, hier um vier Leerzeichen eingerückt):
 
     # Public Suffix List (PSL) Submission
@@ -377,7 +377,7 @@ Empfehlung: Verlängern und freigeben (wenige Euro, wenige Minuten, kein Schaden
     -->
 
     <!--
-    In your submission, please include a role-based email address (e.g. security@example.com) rather than a personal email address (e.g. jane.doe@example.com) under your organization name, so that we can maintain contact with your organization, independent of personnel changes.
+    In your submission, please include a role-based email address rather than a personal email address under your organization name, so that we can maintain contact with your organization, independent of personnel changes.
     This email address will be used for any required verification or inquiries regarding your PSL listing. This inbox must be actively maintained and monitored for future communications from the PSL project for as long as the domain remains in the PSL. Any PSL inquiries sent to this address must receive a response within 30 days, as maintaining timely communication is required for continued inclusion in the PSL.
     -->
 
