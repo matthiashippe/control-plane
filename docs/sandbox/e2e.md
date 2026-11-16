@@ -29,8 +29,18 @@ unter der eigenen Domain und dazu `remove_port`; 409 oder eine Adresse unter `po
 Im Ledger der Produktion steht für diese Sandbox genau eine Zeile der Art `sandbox` (Anlegen und gleich Löschen ist ein begonnener
 Schritt von 6 Minuten, 100 mc für die Stufe klein, `docs/sandbox/plan.md`, `## Preis`), die Reservierung ist danach 0. Gelesen mit
 `readonly: true` im Container `cp`, nur die beiden Zahlen verlassen die Datenbank. Kein Aufruf der Runtime bekam 429, 500, 502, 503
-oder 504. Das Messwerkzeug ist in beide Richtungen bewiesen: `bash ops/runtime-sandbox.sh --selftest` (18 Fälle, jeder Fall war beim
-Bau einmal rot).
+oder 504. Das Messwerkzeug ist in beide Richtungen bewiesen: `bash ops/runtime-sandbox.sh --selftest` (26 Fälle, jeder Fall war beim
+Bau einmal rot oder zeigt die Gegenrichtung).
+
+## Stempel des Builds (sandbox 10)
+
+`dist/` ist in der Runtime von Git ignoriert, deshalb belegen Pin und leeres `git status --porcelain` allein nicht, dass `dist/` vom
+Pin gebaut wurde. Nach jedem Bau schreibt `ops/runtime-sandbox.sh` eine Zeile `<HEAD> <Prüfsumme über dist/>` in
+`control-plane-dist.sha256` im Git-Verzeichnis des Clones (`.git/control-plane-dist.sha256` im Cache
+`~/.cache/control-plane/automaton-d8f8168`). Vor dem Gang vergleicht es Stempel, Commit und Prüfsumme; fehlt der Stempel oder passt
+eines nicht, endet der Lauf mit `RUNTIME SANDBOX FAIL dist/ is not the build at the pin`. Der nächste Lauf löscht dann `dist/`,
+baut neu und schreibt den Stempel; von Hand ist nichts zu tun. Der Cache vom 16.11.2026 hat noch keinen Stempel, der erste Lauf nach
+sandbox 10 baut ihn darum einmal neu (`pnpm install --frozen-lockfile`, `pnpm build`).
 
 ## Was der Harness abdeckt und was nicht
 

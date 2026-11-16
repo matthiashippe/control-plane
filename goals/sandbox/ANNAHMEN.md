@@ -505,3 +505,36 @@
   zählen nicht zum Warten. Gegen den Befehl, der nach Runden zählt, misst der Test so 6008 ms und bleibt rot.
 - **Kein Rollout auf dem Sandbox-Server.** `sandboxd`, Image und `ops/sandbox/` bleiben unverändert; der neue Text geht mit dem
   nächsten Rollout des Control Plane über `deploy.yml` hinaus.
+
+## Goal 10 (16.11.2026, Engineer CP)
+
+- **Vorher gemessen.** Ein gepflanzter Clone unter `mktemp -d` mit `echo changed >dist/conway/client.js` und leerem
+  `git status --porcelain`: `runtime_state` aus `ops/runtime-sandbox.sh` von `dev` gibt `ok`, das neue gibt `dist` (16.11.2026,
+  17:19 UTC, code-host, Funktion per `sed` aus beiden Ständen geladen). Der Selbsttest mit den sechs neuen Fällen gegen das
+  `runtime_state` und `build_runtime` von vorher: `RUNTIME SANDBOX SELFTEST FAIL (5 of 26 cases)`, rot waren `dist-changed`,
+  `dist-added`, `dist-unstamped`, `dist-other-commit` (je `RUNTIME SANDBOX OK` statt FAIL) und `rebuild-changed-dist`
+  (`builds=0`); `reuse-stamped-dist` war schon grün und ist die Gegenrichtung.
+- **Prüfsumme statt Neubau bei jedem Lauf** (Entscheidung Tech Lead). Ein Neubau je Live-Lauf kostet `pnpm install` und `pnpm build`
+  und ließe sich im Selbsttest ohne Netz und ohne Bau nicht als FAIL zeigen; ein Stempel lässt sich in beide Richtungen pflanzen.
+- **Die Prüfsumme `dist_sum`.** `sha256sum` über jede reguläre Datei unter `dist/`, Pfad relativ zum Clone, nach Pfad sortiert mit
+  `LC_ALL=C` (`find -print0`, `sort -z`, `xargs -0`), darüber noch einmal `sha256sum`, 64 Hexzeichen. Eine geänderte, eine neue und
+  eine gelöschte Datei ändern die Summe, weil Pfad und Inhalt jeder Datei in der Liste stehen.
+- **Der Stempel `control-plane-dist.sha256`.** `write_dist_stamp` schreibt genau eine Zeile `<git rev-parse HEAD> <dist_sum>` in das
+  Verzeichnis aus `git rev-parse --absolute-git-dir`. Dort bleibt `git status --porcelain` leer, und der Stempel wandert mit dem
+  Clone. Den Pfad liefert eine kleine Funktion `dist_stamp_file`, damit Schreiben und Lesen denselben Ausdruck nehmen.
+- **Der Zustand `dist`.** `runtime_state` prüft den Stempel nach `unbuilt`: fehlt er, nennt er einen anderen Commit als `HEAD` oder
+  eine andere Summe, ist der Zustand `dist`, und `judge` gibt `RUNTIME SANDBOX FAIL dist/ is not the build at the pin`. Die
+  anderen Zustände und ihre Reihenfolge bleiben, also meldet ein Clone mit Änderungen weiter `changed`.
+- **Neubau nur bei `unbuilt` oder `dist`.** `build_runtime` fragt nach dem Checkout des Pins `runtime_state`; bei `unbuilt` oder `dist`
+  löscht es `dist/` (nur, wenn `.git` besteht), baut wie bisher und schreibt danach den Stempel, bei `ok` baut es nicht. Bei
+  `changed` baut es auch nicht, damit `judge` die Änderung meldet. Der Cache auf dem code-host hat am 16.11.2026 keinen Stempel
+  (`ls` auf den Pfad im Git-Verzeichnis: nicht vorhanden), der erste Live-Lauf nach dem Merge baut ihn darum einmal neu. Den Cache
+  hat dieses Goal nur gelesen.
+- **Selbsttest über denselben Code.** Der gepflanzte Clone bekommt seinen Stempel über `write_dist_stamp`. `rebuild-changed-dist` und
+  `reuse-stamped-dist` rufen das echte `build_runtime` in einer Subshell mit `PIN` und `RUNTIME_DIR` auf den gepflanzten Clone und
+  einem `pnpm`, das seine Aufrufe in eine Datei schreibt und bei `build` die beiden Dateien anlegt. Außerhalb dieser Subshell bleibt
+  `pnpm` die Sperre mit 99, `curl` und `ssh` bleiben überall gesperrt.
+- **Mutationen.** Mit einem `dist_sum`, das eine Konstante ausgibt, werden `dist-changed`, `dist-added` und `rebuild-changed-dist`
+  rot; mit einem `build_runtime`, das nur den Pin auscheckt, werden `rebuild-changed-dist` und `reuse-stamped-dist` rot. Die
+  unveränderte Kopie desselben Archivs bleibt grün.
+- **Kein Rollout.** `ops/runtime-sandbox.sh` läuft nur auf dem code-host; `src/`, `deploy/` und der Sandbox-Server bleiben unverändert.

@@ -72,12 +72,12 @@ nächsten zahlenden Automaton auf.
       Prüfung: `PATH=/usr/bin:$PATH bash ops/runtime-sandbox.sh --selftest | grep -cE '^ok   (dist-changed|dist-added|dist-unstamped|dist-other-commit): RUNTIME SANDBOX FAIL dist/ is not the build at the pin'` muss 4 ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH bash ops/runtime-sandbox.sh --selftest | grep -cE '^[0-9]+ cases as expected$'` muss 1 ausgeben.
       Prüfung: `for w in 'dist_sum()' 'write_dist_stamp()' control-plane-dist.sha256 'rev-parse --absolute-git-dir' 'dist/ is not the build at the pin'; do grep -qF -- "$w" ops/runtime-sandbox.sh || echo "fehlt $w"; done` muss nichts ausgeben.
-- [ ] Der Selbsttest fällt, wenn die Prüfsumme nichts prüft oder der Bau den Stempel nicht prüft.
+- [x] Der Selbsttest fällt, wenn die Prüfsumme nichts prüft oder der Bau den Stempel nicht prüft.
       MVP: Funktion, weil ein Selbsttest, der mit einer konstanten Summe grün bliebe, die Aussage „Build am Pin“ nicht belegt
       (`loop-constraints.md`, Grundregel 3).
       Prüfung: `T=$(mktemp -d); git archive HEAD | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; f=$T/ops/runtime-sandbox.sh; if ! grep -q '^dist_sum() {' $f; then echo "fehlt dist_sum"; else sed -i 's/^dist_sum() {/dist_sum() { echo 0; }\ndist_sum_orig() {/' $f; PATH=/usr/bin:$PATH bash $f --selftest 2>/dev/null | tail -n 1 | grep -q 'SELFTEST OK' && echo "gruen mit konstanter Summe"; fi; rm -rf $T` muss nichts ausgeben.
       Prüfung: `T=$(mktemp -d); git archive HEAD | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; f=$T/ops/runtime-sandbox.sh; if ! grep -q '^build_runtime() {' $f; then echo "fehlt build_runtime"; else sed -i 's/^build_runtime() {/build_runtime() { git -C "$RUNTIME_DIR" checkout -q "$PIN"; return 0; }\nbuild_runtime_orig() {/' $f; PATH=/usr/bin:$PATH bash $f --selftest 2>/dev/null | tail -n 1 | grep -q 'SELFTEST OK' && echo "gruen ohne Neubau"; fi; rm -rf $T` muss nichts ausgeben.
-- [ ] Kopf des Skripts, Doku und Annahmen nennen den Stempel, die Entscheidungen stehen mit Grund unter `## Goal 10`, und die Messung
+- [x] Kopf des Skripts, Doku und Annahmen nennen den Stempel, die Entscheidungen stehen mit Grund unter `## Goal 10`, und die Messung
       von vorher steht dabei.
       MVP: Funktion, weil der Betrieb bei `RUNTIME SANDBOX FAIL dist/ …` wissen muss, dass der nächste Lauf den Cache neu baut.
       Prüfung: `sed -n '1,25p' ops/runtime-sandbox.sh | grep -c 'control-plane-dist.sha256'` muss mindestens 1 ausgeben.
