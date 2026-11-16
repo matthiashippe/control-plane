@@ -134,8 +134,8 @@ Bauen und prüfen, ohne Netz, mit dem Chromium aus `~/.cache/ms-playwright/`:
 
 ```
 node ops/soll-limit.mjs                          # Bilder neu schreiben
-node ops/soll-limit.mjs --pruefen                # neu rendern und vergleichen, Exit 1 bei jedem Mangel
-node ops/soll-limit.mjs --pruefen --source <dir> # dieselbe Prüfung gegen die zwei Quellen limit-<zustand>.html in <dir>
+node ops/soll-limit.mjs --check                  # neu rendern und vergleichen, Exit 1 bei jedem Mangel
+node ops/soll-limit.mjs --check --source <dir>   # dieselbe Prüfung gegen die zwei Quellen limit-<zustand>.html in <dir>
 ```
 
 Mängel wie beim Konto, dazu: Block `approve` oder `limit` fehlt oder endet unter dem ersten Bildschirm, und zur Sperrliste kommt

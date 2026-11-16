@@ -196,3 +196,5 @@
 - Abgelöst: konto 03 Punkt 4 durch seite 03 Punkt 1, Ausgabe dann genau `Exit 1, unknown argument: --pruefen` (Tech Lead, 2026-11-14)
 - Abgelöst: konto 04 Punkt 2 durch seite 03 Punkt 1, Ausgabe dann genau `Exit 1, unknown argument: --pruefen` (Tech Lead, 2026-11-14)
 - Abgelöst: konto 04 Punkt 4 durch seite 03 Punkt 1, Ausgabe dann genau `Exit 1, unknown argument: --pruefen` (Tech Lead, 2026-11-14)
+- Abgelöst: konto 04 Punkt 1 durch seite 03 Punkt 8, Ausgabe dann genau `Exit 1, unknown argument: --pruefen` (Tech Lead, 2026-11-14)
+- Abgelöst: konto 04 Punkt 4 durch seite 03 Punkt 8, Ausgabe dann genau `Exit 1, unknown argument: --pruefen` (Tech Lead, 2026-11-14)
