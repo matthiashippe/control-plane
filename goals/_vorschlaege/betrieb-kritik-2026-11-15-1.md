@@ -5,3 +5,4 @@ Beleg: goals/betrieb/05-die-aufladung-beim-inferenz-anbieter-ist-belegt-und-blei
 Empfehlung: Der Watchdog meldet je gerechneter Schwelle genau einmal statt einmal am Tag: Er speichert in `<CP_WATCHDOG_STATE>.topup` den zuletzt gemeldeten Wert und meldet erst wieder, wenn die gerechnete Schwelle um mehr als 1 USD über diesem Wert liegt. Die Meldung nennt den Wert, den Matthias einstellen soll; ein Test zeigt zwei Läufe an verschiedenen Tagen mit gleicher gerechneter Schwelle und genau einer Meldung.
 
 Derselbe Alarmweg trägt die Warnung vor leerem Guthaben, die jede Inferenz-Anfrage zahlender Kunden schützt (fehler 01, betrieb 01). Eine tägliche Meldung, die nach dem Handeln nicht aufhört, lehrt, Meldungen auf diesem Weg zu übergehen.
+Übernommen: Triage-Glieder 16.11. an den Tech Lead, Glied 2 (PRO-22463, betrieb 05 meldet je Schwelle einmal) (2026-11-16)
