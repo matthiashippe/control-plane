@@ -1,0 +1,7 @@
+Schwere: 2
+Goal: messung 08
+Befund: messung 08 härtet `ops/anzeigen-rechnung.py`, die Rechnung für bezahlte Anzeigen am Auftragsbrett der Fassung vom 29.09.2026 (Gebühr aus `src/bounties/store.ts`, Nenner die Bezahlroute `/pay/`), obwohl weder der Produktsatz in `LOOP.md` noch eine Zeile der Topic-Tabelle bezahlte Anzeigen plant, bezahlte Werbung ein Human Gate ist und `LOOP.md` Prüfwerkzeuge ohne Messauftrag zu Vorschlägen statt Done-Punkten macht; messung 12 hängt mit `messung Goal 08 DONE` ohne inhaltlichen Bezug hinter ihm.
+Beleg: ops/anzeigen-rechnung.py:1 bis 27 („Do paid ads pay for themselves here?“, `FEE_PERCENT` aus `src/bounties/store.ts`) | LOOP.md:36 bis 37 (Prüfwerkzeuge ohne Messauftrag werden Vorschläge), LOOP.md:170 (bezahlte Werbung als Human Gate), goals/messung/12-nur-adressen-zaehlen-als-eigene-adressen.md:30 und :36 („Hängt nicht an den Gliedern 09 bis 11“)
+Empfehlung: Der nächste Kurs-Check prüft messung 08 gegen das Abschlusskriterium (erste fremde Sandbox) und pausiert es, wenn kein Messauftrag zu bezahlten Anzeigen offen ist; die Voraussetzung von messung 12 wird dann `messung Goal 07 DONE`, damit die eigene Liste nicht an der Anzeigenrechnung wartet.
+
+Nicht selbst pausiert, weil `ROADMAP.md` die Zielzahlen aus `ZIELE.md` stehen lässt und der Docstring einen Auftrag von Matthias vom 29.09.2026 nennt, die Rechnung regelmäßig zu prüfen. Der Kurs-Check meldet heute 80 % Detail-Anteil bei einer Schwelle von 40 %, und er hat fehler 11 und domains 07 mit demselben Grund pausiert.
