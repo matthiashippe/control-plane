@@ -102,5 +102,21 @@ Guthaben der Prüfung `automaton` von `ops/live.sh` (`src/automaton/grant.ts`, `
 Läufe sind 3300000 mc, aufgerundet auf 10000 mc unverändert, über der Obergrenze von 500000 mc, also 500000 mc. Es bucht einmal
 mit dem Rollout auf das eigene Konto aus `src/bounties/ours.ts`.
 
-Lauf mit Neustart: steht aus, bis der Zahlungsserver den lesenden Schlüssel des code-host wieder annimmt, weil
-`--foreign-sandboxes` und das Ledger ihn brauchen.
+Lauf mit Neustart, 2026-11-16 vom code-host, nachdem der Zahlungsserver den lesenden Schlüssel des code-host wieder annimmt
+(08:52 UTC) und `dev` in den Goal-Branch gemergt ist:
+
+- 09:00 UTC: `bash ops/sandbox/setup.sh --foreign-sandboxes 72.62.51.224` endete mit
+  `SETUP FOREIGN-SANDBOXES OK running=0 foreign=0`, `bash ops/sandbox/setup.sh --check 72.62.51.224` mit Exit 0,
+  `IMAGE runtime d8f8168 clean` und `SETUP CHECK OK changed=0`.
+- 09:00 bis 09:04 UTC: `bash ops/automaton-live.sh --reboot`, Modell `gpt-5-mini`; vor dem Neustart meldete die Prüfung im
+  Skript `running=1 foreign=0` (nur die eigene Sandbox), danach dachte der Automaton nach dem Neustart von selbst weiter.
+- 2026-11-16 09:00 UTC: AUTOMATON LIVE OK turns=4 reboot=ok turns_after_reboot=1 mem_peak_mb=246 ledger_sandbox_rows=1 ledger_inference_rows=5 hold_mc=0 wallet_usdc=0
+
+Lauf ohne Neustart (Prüfbefehl des Goals), 2026-11-16 09:04 UTC, `bash ops/automaton-live.sh`: letzte Zeile
+`AUTOMATON LIVE OK turns=2 reboot=skipped turns_after_reboot=0 mem_peak_mb=174 ledger_sandbox_rows=1 ledger_inference_rows=2 hold_mc=0 wallet_usdc=0`.
+`balance_cents` des eigenen Kontos aus `GET /v1/credits/history` (Befehl oben) fiel über beide Läufe von 87 auf 76.
+
+Die Spitze des Speichers ist das Maximum von `memory.peak` der Cgroup des Containers aus beiden Läufen (`mem_peak_mb`, 246 und
+174 MB), unter der Schwelle von 400 MB, darum bleibt es bei der Stufe klein:
+
+Speicher Spitze: 246 MB, Stufe: klein
