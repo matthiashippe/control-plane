@@ -6,3 +6,4 @@ Empfehlung: Die vier Namen aus der `local`-Zeile von `sandbox_live` streichen.
 MVP: Schönheit
 
 Linse Q, Frage 3 (tote Pfade), Merge 82719fd. An der Merge-Basis las die Funktion `exitf` und `outf` noch (`git show 82719fd^1:ops/live.sh`, Zeilen 715 bis 726).
+Verworfen: MVP: Schönheit ohne belegten Fehler, und der Kurs-Check vom 17.11. (PRO-23529) sieht den Detail-Anteil über der Schwelle; die ungenutzten Namen ändern kein Verhalten (2026-11-17)

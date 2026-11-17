@@ -6,3 +6,4 @@ Empfehlung: In `test/sandbox-wait.test.ts` die echte Ausgabe von `waitCommand` (
 MVP: Schönheit
 
 Linse Q, Frage 2 (Logik-Duplikate), Merge 82719fd. Ein Bruch fällt im Harness-E2E und in der Live-Prüfung laut auf, deshalb nur Schwere 1. Bekannt und nicht hier: die nicht atomare Exit-Datei (sandbox-kritik-2026-11-16-2).
+Verworfen: MVP: Schönheit ohne belegten Fehler, und der Kurs-Check vom 17.11. (PRO-23529) sieht den Detail-Anteil über der Schwelle; ein Bruch fällt im Harness-E2E und in der Live-Prüfung laut auf (2026-11-17)

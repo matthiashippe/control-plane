@@ -6,3 +6,4 @@ Empfehlung: Die Helfer, die das Skript mit `ops/live.sh` teilt (siehe sandbox-na
 MVP: Schönheit
 
 Linse Q, Frage 6 (Datei über 500 Zeilen), Merge 792a490. `ops/live.sh`, `ops/sandbox/setup.sh` und `src/app.ts` lagen schon vor dem Goal über 500 Zeilen und zählen hier nicht.
+Verworfen: MVP: Schönheit ohne belegten Fehler, und der Kurs-Check vom 17.11. (PRO-23529) sieht den Detail-Anteil über der Schwelle; die Größe allein ist kein Fehler (2026-11-17)

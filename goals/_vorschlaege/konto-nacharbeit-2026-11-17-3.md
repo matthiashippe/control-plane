@@ -6,3 +6,4 @@ Empfehlung: Den Treiber samt `gone`-Sperre in ein gemeinsames Modul unter `ops/`
 MVP: Funktion, weil `ops/soll.mjs` und `ops/soll-konto.mjs` ohne die Sperre nach einem abgestürzten Browser 0 Mängel melden können.
 
 Linse Q, Frage 2 (Logik-Duplikate), Merge c141093. `git grep -n -E '^(async )?function (launch|findChrome)' origin/dev -- ops` zeigt je sechs Definitionen.
+Übernommen: PRO-23679 Glied 4 (2026-11-17)

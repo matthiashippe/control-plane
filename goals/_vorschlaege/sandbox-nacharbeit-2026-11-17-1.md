@@ -6,3 +6,4 @@ Empfehlung: Einen vitest-Test `test/automaton-live-selftest.test.ts` anlegen, de
 MVP: Funktion, weil die Live-Prüfung des gehosteten Automatons sonst erst im nächsten Audit nach dem Merge rot wird, nicht vor ihm.
 
 Linse Q, Frage 1, Merge 792a490. Dieselbe Klasse wurde für `ops/sandbox/setup.sh` übernommen (domains-nacharbeit-2026-11-14-1, umgesetzt in domains 06).
+Übernommen: PRO-23679 Glied 5 (2026-11-17)

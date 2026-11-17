@@ -6,3 +6,4 @@ Empfehlung: Eine Funktion für Argumente (bekannte Flags, Werte nach `--source` 
 MVP: Schönheit
 
 Linse Q, Frage 2 (Logik-Duplikate), Merge 802b9d3. Verwandt, aber eigener Befund: der kopierte Browser-Treiber (konto-nacharbeit-2026-11-17-3).
+Verworfen: MVP: Schönheit ohne belegten Fehler, und der Kurs-Check vom 17.11. (PRO-23529) sieht den Detail-Anteil über der Schwelle; `test/soll-flags.test.ts` hält das Verhalten fest (2026-11-17)

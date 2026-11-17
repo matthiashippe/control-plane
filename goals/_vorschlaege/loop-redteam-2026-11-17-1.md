@@ -7,3 +7,4 @@ Empfehlung: Matthias gleicht `loop-constraints.md:122` an seine Entscheidung vom
 ## Herleitung
 
 Die Zeile steht unter „## Budget und Qualität“, nicht unter „## Verboten“, deshalb kein Bruch eines Verbots. Jeder der neun Merges hatte zusätzlich ein PASS von Linse K (`qa-skeptic`) auf Opus. Der code-host-Commit 394f8bc begründet den Wechsel mit dem Verbrauch und lässt Tech Lead und QA Skeptic als Kontrolle auf Opus; dass `loop-constraints.md` nachgezogen wird, steht nirgends. Die Triage gleicht nur `gate.yaml` gegen `loop-constraints.md` ab, und `gate.yaml` kennt kein Modell, also fängt keine Routine den Unterschied. Im Repo erwähnt weder `STATE.md` noch `ROADMAP.md`, `RISIKEN.md`, eine `ANNAHMEN.md` oder ein Vorschlag den Wechsel. Gegengeprüft von einem frischen Subagent (Urteil bestätigt, Schwere 2).
+Übernommen: Watch List in STATE.md, angleichen kann nur Matthias (2026-11-17)

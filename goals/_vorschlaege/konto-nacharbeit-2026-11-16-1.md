@@ -6,3 +6,4 @@ Empfehlung: Die Umbenennung von konto 04 um `fehlgeschlagen` zu `failed` erweite
 MVP: Schönheit
 
 Linse Q, Frage 5 (Bezeichner Englisch), Merge c1d7f74, Regelstelle `loop-constraints.md:63` (Grundregel 12, ausnahmslos). Die Goal-Datei von konto 03 gab nur die Namen der Bilder vor (Zeile 93 und 131), nicht Route und Zustand im Code. Gleiche Klasse wie konto-nacharbeit-2026-11-14-1 (übernommen in konto 04); konto 04 nennt `fehlgeschlagen` in Zeile 87 nur als Zustand, der auf der Seite unverändert bleibt.
+Übernommen: PRO-23679 Glied 1 (2026-11-17)

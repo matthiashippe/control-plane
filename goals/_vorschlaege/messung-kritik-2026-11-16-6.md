@@ -4,3 +4,4 @@ Befund: Zwei Zusagen aus messung 10 hält kein Test fest. Die Fälle in `test/ti
 Beleg: test/timeout-quote-own-ips.test.ts (Fälle „stops with exit 2 …“, `toContain("own_ips")`), test/anzeigen-rechnung-own-ips.test.ts (dieselben Fälle), ops/timeout-quote.sh (`fetch_rows`)
 Empfehlung: In einem späteren Glied messung: beide Fälle verlangen genau eine nicht leere stderr-Zeile mit dem Präfix des Werkzeugs und `own_ips_checked: `; ein neuer Fall lässt das nachgebaute `ssh` bei der Ledger-Abfrage mit 255 enden und verlangt Exit 2, leeres stdout und genau die Zeile `TIMEOUT QUOTE FAIL: ledger not readable`.
 MVP: Qualität, weil die Ausgabe heute stimmt und nur ein späterer Umbau sie unbemerkt ändern könnte.
+Übernommen: ROADMAP.md, Glied messung 14 (PR #227) (2026-11-17)

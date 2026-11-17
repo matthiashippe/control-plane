@@ -6,3 +6,4 @@ Empfehlung: Eine gemeinsame Funktion für interne Gutschriften der eigenen Live-
 MVP: Funktion, weil eine Gutschrift eine Ledger-Zeile ist und eine Korrektur der Idempotenz sonst nur in einer der beiden Kopien landet.
 
 Linse Q, Frage 2 (Logik-Duplikate), Merge 792a490.
+Übernommen: PRO-23679 Glied 6 (2026-11-17)
