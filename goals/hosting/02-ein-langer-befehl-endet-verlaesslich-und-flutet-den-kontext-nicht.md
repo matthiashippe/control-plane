@@ -1,7 +1,7 @@
 # Hosting Goal 02: Ein langer Befehl endet verlässlich und flutet den Kontext nicht
 
 ## Status
-PLANNED
+ACTIVE
 
 ## Active Objective
 Ein Befehl, der in einer Sandbox im Hintergrund läuft, meldet sein Ende immer mit seinem Exit-Code, und seine Ausgabe kommt höchstens
@@ -84,7 +84,7 @@ Exit-Code endet.
   `check`, damit ein Merge, der den gehosteten Automaton bricht, vor dem Merge rot wird.
 
 ## Done Condition
-- [ ] Die Exit-Datei eines Befehls im Hintergrund entsteht atomar über `<base>.exit.tmp` und `mv`, und der Wartebefehl wertet nur
+- [x] Die Exit-Datei eines Befehls im Hintergrund entsteht atomar über `<base>.exit.tmp` und `mv`, und der Wartebefehl wertet nur
       eine Exit-Datei mit Inhalt als Ende; eine leere gibt „still running“ mit Exit 0. Die Tests waren vor dem Fix rot.
       MVP: Funktion, weil ein Automaton sonst bei einem leer gelesenen Exit-Code einen Fehler der Bash statt des Ergebnisses sieht und
       den Befehl neu startet oder aufgibt.
@@ -93,7 +93,7 @@ Exit-Code endet.
       Prüfung: `grep -cF 'echo $c > ${base}.exit;' src/sandbox/service.ts` muss 0 ausgeben.
       Prüfung: `grep -cF '.exit.tmp' src/sandbox/service.ts` muss mindestens 1 ausgeben.
       Prüfung: `T=$(mktemp -d); git archive HEAD | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; git show $(git merge-base origin/dev HEAD):src/sandbox/service.ts > $T/src/sandbox/service.ts; (cd $T && PATH=/usr/bin:$PATH pnpm -s vitest run test/sandbox-background-output.test.ts --reporter=json --outputFile=$T/r.json >/dev/null 2>&1); node -p "JSON.parse(require('fs').readFileSync('$T/r.json','utf8')).numFailedTests"; rm -rf $T` muss mindestens 5 ausgeben.
-- [ ] Wartebefehl und Wrapper drucken von `<base>.out` und `<base>.err` höchstens die letzten `WAIT_TAIL_BYTES` (64 KB) je Strom,
+- [x] Wartebefehl und Wrapper drucken von `<base>.out` und `<base>.err` höchstens die letzten `WAIT_TAIL_BYTES` (64 KB) je Strom,
       davor bei einer größeren Datei genau eine Zeile mit Gesamtgröße, Pfad und dem Hinweis auf `read_file`; der Test mit 5 MB war vor
       dem Fix rot.
       MVP: Funktion, weil der Kunde jede Zeile im Kontext des Modells als Inferenz bezahlt und ein `npm install` mehrere MB schreibt.
@@ -101,7 +101,7 @@ Exit-Code endet.
       Prüfung: `grep -cxE "export const WAIT_TAIL_BYTES = 64 \* 1024;" src/sandbox/service.ts` muss 1 ausgeben.
       Prüfung: `grep -c "tail -c" src/sandbox/service.ts` muss mindestens 1 ausgeben.
       Prüfung: `for w in 65536 65537 5242880 read_file .exit.tmp; do grep -qF -- "$w" test/sandbox-background-output.test.ts || echo "fehlt $w"; done` muss nichts ausgeben.
-- [ ] `ops/live.sh` trägt die längste Dauer eines Wartebefehls als `bg_max_ms=<ms>` in die Ergebniszeile und die Zeile
+- [x] `ops/live.sh` trägt die längste Dauer eines Wartebefehls als `bg_max_ms=<ms>` in die Ergebniszeile und die Zeile
       `OK sandbox:`, warnt ab 27000 ms ohne `FAIL`, und `ops/README.md` nennt die Schwelle mit Handlung.
       MVP: Funktion, weil ein Aufruf über 30 s in der Runtime abbricht und der Betrieb das vorher sehen muss, nicht erst als `FAIL`.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/live-selftest.test.ts` muss Exit-Code 0 haben.
@@ -109,13 +109,13 @@ Exit-Code endet.
       Prüfung: `grep -cE "^BG_WARN_MS=27000( |$)" ops/live.sh` muss 1 ausgeben.
       Prüfung: `grep -c "bg_max_ms" test/live-selftest.test.ts` muss mindestens 3 ausgeben (die Zeile des Selbsttests für den Fall `ok`, eine Zeile `OK sandbox:` mit `bg_max_ms=26999` ohne `warning` und eine mit `bg_max_ms=27000` und `warning`).
       Prüfung: `awk '/^## Thresholds that call for action/{f=1;next} /^## /{f=0} f' ops/README.md | grep "bg_max_ms" | grep -c "27000"` muss 1 ausgeben.
-- [ ] Die Doku sagt, wie ein Befehl im Hintergrund endet und wie viel Ausgabe zurückkommt, und die Entscheidungen stehen mit Grund in
+- [x] Die Doku sagt, wie ein Befehl im Hintergrund endet und wie viel Ausgabe zurückkommt, und die Entscheidungen stehen mit Grund in
       den Annahmen.
       MVP: Funktion, weil ein Kunde, dessen Automaton nur das Ende einer langen Ausgabe sieht, wissen muss, wo der Rest liegt.
       Prüfung: `grep -cE "WAIT_TAIL_BYTES|tail -c|64 KB" docs/sandbox/lange-befehle.md` muss mindestens 1 ausgeben.
       Prüfung: `grep -c "bg_max_ms" docs/sandbox/lange-befehle.md` muss mindestens 1 ausgeben.
       Prüfung: `awk '/^## Goal 02/{f=1} f' goals/hosting/ANNAHMEN.md | grep -ciE "exit.tmp|mv -f|WAIT_TAIL_BYTES|read_file|bg_max_ms|27000|Wrapper"` muss mindestens 5 ausgeben.
-- [ ] Das Goal ändert nur Control Plane, Live-Prüfung, Doku und Tests, weder `sandboxd`, Image und Server noch Runtime, Zahlung,
+- [x] Das Goal ändert nur Control Plane, Live-Prüfung, Doku und Tests, weder `sandboxd`, Image und Server noch Runtime, Zahlung,
       Anmeldung, Automaton, Deploy oder CI, und bringt keinen Schlüssel ins Repo.
       MVP: Funktion, weil das Repo öffentlich ist (Grundregel 8), die Runtime am Pin die Referenz bleibt (Grundregel 13) und beide
       Änderungen im Control Plane liegen.
@@ -123,7 +123,7 @@ Exit-Code endet.
       Prüfung: `git diff --name-only origin/dev...HEAD | grep -vcE '^(src/sandbox/service\.ts|ops/live\.sh|ops/README\.md|docs/sandbox/lange-befehle\.md|harness/sandboxd/|test/|goals/hosting/)'` muss 0 ausgeben.
       Prüfung: `git diff --name-only origin/dev...HEAD | grep -cE "\.(key|pem|crt|env)$"` muss 0 ausgeben.
       Prüfung: `git diff origin/dev...HEAD -- . ':(exclude)goals/' | grep -cE '^\+.*(cnwy_k_[0-9a-f]{32}|-{5}BEGIN [A-Z ]*PRIVATE KEY-{5})'` muss 0 ausgeben.
-- [ ] `check` ist grün, und der Job `e2e` des Goal-PR ist grün.
+- [x] `check` ist grün, und der Job `e2e` des Goal-PR ist grün.
       MVP: Funktion, weil Wrapper und Wartebefehl auf dem Laufzeitpfad liegen und erst der Gang mit der unveränderten Runtime zeigt,
       dass ein langer Befehl weiter endet und gelesen wird (Grundregel 13).
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
@@ -154,6 +154,7 @@ Exit-Code endet.
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-17 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6 gebaut (Hülle schreibt den Exit-Code über eine temporäre Datei und `mv -f`, Wartebefehl endet nur bei einer Exit-Datei mit Inhalt, Wartebefehl und Hülle drucken je Strom höchstens die letzten 64 KB nach einer Zeile mit Größe, Pfad und `read_file`, `bg_max_ms` mit Warnung ab 27000 ms in `ops/live.sh` und `ops/README.md`, Doku und Annahmen); rot vor dem Fix: 6 von 8 Fällen in `test/sandbox-background-output.test.ts` mit `service.ts` der Merge-Basis (die zwei Fälle für unverändertes Verhalten grün), die neuen Assertions in `test/live-selftest.test.ts` mit `ops/live.sh` von `dev`, der Selbsttest mit Messung ohne Maximum und mit verschobener Schwelle (`LIVE SELFTEST FAIL`). Prüfbefehle: Punkt 1 vitest Exit 0, 8 Fälle, 0, 2, Gegenprobe 6; Punkt 2 vitest Exit 0, 1, 2, nichts; Punkt 3 vitest Exit 0, `last=LIVE SELFTEST OK ok=1`, 1, 10, 1; Punkt 4 1, 1, 11; Punkt 5 0, 0, 0, 0; Punkt 6 `check` grün in 78 s, `e2e` an PR #240 SUCCESS.
 
 ## Blockers
 Keine.
