@@ -1,7 +1,7 @@
 # Messung Goal 11: Der nachgeholte Deploy-Alarm aus messung 06 ist an beiden Enden getestet
 
 ## Status
-PLANNED
+PAUSED
 
 ## Active Objective
 Der Weg eines Deploy-Alarms, der nach einem 502 nicht rausging, hängt am Kopf von `dev` (595798e) an zwei Stellen, die kein Test
@@ -112,3 +112,4 @@ und eine Adresse oder der Webhook im öffentlichen Job-Log Grundregel 8 bricht.
 
 ## Blockers
 - keine
+- Pause: Kurs-Check 2026-11-17, Testnacharbeit an messung 06 aus einer Kritik, ohne Fehler eines echten Nutzers, bringt das Abschlusskriterium (Ledger-Zeile einer fremden Sandbox) nicht näher; Detail-Anteil 61,9 % über der Schwelle 40 %
