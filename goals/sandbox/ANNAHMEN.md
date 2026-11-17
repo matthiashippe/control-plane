@@ -588,8 +588,8 @@
   `Häkkinen.fi` zwischen `Hackclub Nest` und `Hashbang`. `LC_ALL=en_US.utf8 sort -c` über Häkkinen.fi, Hanseatic, Hashbang gibt Exit 0,
   Gegenprobe mit Hanseatic vor Häkkinen.fi Exit 1. Die Netz-Prüfung von Punkt 2 nutzt `LC_ALL=C sort -fc`, das nach Bytes sortiert
   (`ä` ist 0xC3 und steht hinter jedem ASCII-Buchstaben) und darum die richtige Stelle ablehnt; die Stelle zwischen Hackclub Nest und
-  Häkkinen.fi bestünde diese Prüfung, wäre aber für das Werkzeug der PSL falsch sortiert. Punkt 2 bleibt deshalb offen, bis der Tech
-  Lead die Prüfung entscheidet. Eintrag und PR-Text enthalten weder PostYourPrice noch `postyourprice.com`,
+  Häkkinen.fi bestünde diese Prüfung, wäre aber für das Werkzeug der PSL falsch sortiert. Die Mac-Session für Matthias hat die
+  Prüfung am 17.11.2026 auf `LC_ALL=en_US.UTF-8 sort -fc` umgestellt (Commit b3a5324), damit ist Punkt 2 an der richtigen Stelle erfüllt. Eintrag und PR-Text enthalten weder PostYourPrice noch `postyourprice.com`,
   `cp.hippe.eu`, Handsel oder einen Link auf das Repo; Konto und Zahlung erwähnt der Text nur als „andere Domain“ ohne Namen.
 - **Firma im PR-Text** (Zyklus 3). Das Impressum `https://hanseatictechcompany.com/impressum` nennt am 2026-11-17 um 08:00 UTC
   „Hanseatic Tech Company UG (haftungsbeschränkt)“ mit Sitz in Frankfurt am Main; so steht die Firma im Text, ohne Wohnort und ohne die
