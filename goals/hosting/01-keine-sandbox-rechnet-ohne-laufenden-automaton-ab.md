@@ -1,7 +1,7 @@
 # Hosting Goal 01: Keine Sandbox rechnet ohne laufenden Automaton ab
 
 ## Status
-PLANNED
+DONE
 
 ## Active Objective
 Ein Sweep im Control Plane räumt jede Sandbox eines gehosteten Automatons ab, der nicht läuft: Er löscht die Sandbox jeder Zeile
@@ -85,7 +85,7 @@ eine Wallet zu schicken, deren Schlüssel auf unserem Sandbox-Server liegt.
   der Inferenz; ein Kunde, der einmal für eine tote Sandbox zahlte, startet keinen zweiten Automaton.
 
 ## Done Condition
-- [ ] Der Sweep löscht die Sandbox einer Zeile `failed`, die noch besteht, und der Fehlerpfad von `create` prüft das Ergebnis von
+- [x] Der Sweep löscht die Sandbox einer Zeile `failed`, die noch besteht, und der Fehlerpfad von `create` prüft das Ergebnis von
       `remove`; nach dem Sweep bucht die Abrechnung für diese Sandbox keine Ledger-Zeile mehr. Die Tests waren vor dem Fix rot.
       MVP: Funktion, weil eine Sandbox mit `keep_running`, deren Löschen scheiterte, sonst bis zum leeren Guthaben abbucht.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/automaton-sweep.test.ts test/automaton-api.test.ts test/automaton-billing.test.ts test/automaton-idempotency.test.ts` muss Exit-Code 0 haben.
@@ -94,7 +94,7 @@ eine Wallet zu schicken, deren Schlüssel auf unserem Sandbox-Server liegt.
       Prüfung: `grep -cxE "export const SWEEP_GRACE_MS = 5 \* 60_000;" src/automaton/sweep.ts` muss 1 ausgeben.
       Prüfung: `grep -c "deleted again" src/automaton/service.ts` muss höchstens 1 ausgeben.
       Prüfung: `T=$(mktemp -d); git archive HEAD | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; f=$T/src/automaton/sweep.ts; if ! grep -q "export async function sweepAutomatons(" $f; then echo "fehlt sweepAutomatons"; else sed -i "s/export async function sweepAutomatons(/async function sweepAutomatonsOrig(/" $f; echo 'export async function sweepAutomatons(..._a: unknown[]) { return { removed: 0, interrupted: 0 }; }' >> $f; (cd $T && PATH=/usr/bin:$PATH pnpm -s vitest run test/automaton-sweep.test.ts >/dev/null 2>&1) && echo "gruen ohne sweepAutomatons"; fi; rm -rf $T` muss nichts ausgeben.
-- [ ] Ein Start ist in der Datenbank sichtbar: `hosted_automatons` hat die Spalte `started_at`, `createAs` setzt sie nach
+- [x] Ein Start ist in der Datenbank sichtbar: `hosted_automatons` hat die Spalte `started_at`, `createAs` setzt sie nach
       `AUTOMATON_START ok`, und die Migration läuft auf einer Datenbank ohne die Spalte und auf einer mit ihr; der Test war vor dem Fix
       rot.
       MVP: Funktion, weil der Sweep ohne diese Marke einen laufenden Automaton eines Kunden nicht von einem unterbrochenen Start
@@ -103,14 +103,14 @@ eine Wallet zu schicken, deren Schlüssel auf unserem Sandbox-Server liegt.
       Prüfung: `grep -cE "^\s*(it|test)\(.*migrat" test/automaton-sweep.test.ts` muss mindestens 1 ausgeben (eine Datenbank mit `hosted_automatons` ohne die Spalte bekommt sie beim Öffnen, ein zweites Öffnen ändert nichts).
       Prüfung: `grep -c "ADD COLUMN started_at" src/db.ts` muss 1 ausgeben.
       Prüfung: `grep -c "started_at" src/automaton/service.ts` muss mindestens 1 ausgeben.
-- [ ] Der Dienst ruft den Sweep im Takt der Sandbox-Abrechnung auf, nach `sandbox.tick()` und nie vor dem ersten Tick drei Minuten
+- [x] Der Dienst ruft den Sweep im Takt der Sandbox-Abrechnung auf, nach `sandbox.tick()` und nie vor dem ersten Tick drei Minuten
       nach dem Start.
       MVP: Funktion, weil ein Sweep, den nichts aufruft, keine Sandbox löscht, und einer beim Start im Kanarienvogel des Rollouts
       Sandboxes von Kunden löschen könnte.
       Prüfung: `awk '/const billing = /,/^}/' src/index.ts | grep -c "sweep"` muss mindestens 1 ausgeben.
       Prüfung: `awk '/const billing = /,/^}/' src/index.ts | grep -c "3 \* 60 \* 1000"` muss 1 ausgeben.
       Prüfung: `awk '/const billing = /,/^}/{next} /sweep/' src/index.ts | wc -l` muss 0 ausgeben.
-- [ ] `TRANSFER_501` und `docs/errors.md` nennen für einen Automaton, der über `POST /v1/automatons` läuft, das Guthaben des Kontos,
+- [x] `TRANSFER_501` und `docs/errors.md` nennen für einen Automaton, der über `POST /v1/automatons` läuft, das Guthaben des Kontos,
       das ihn gestartet hat, und sagen, dass nie USDC an seine Wallet geht; der Test war vor dem Fix rot.
       MVP: Funktion, weil USDC an diese Wallet bei einem Schlüssel auf unserem Sandbox-Server liegt, den der Kunde nicht hat, und das
       Geld weder Credits wird noch zurückkommt.
@@ -118,25 +118,25 @@ eine Wallet zu schicken, deren Schlüssel auf unserem Sandbox-Server liegt.
       Prüfung: `awk '/const TRANSFER_501 = /,/^  };/' src/app.ts | grep -c "POST /v1/automatons"` muss mindestens 1 ausgeben.
       Prüfung: `awk '/^## credit_transfers/{f=1;next} /^## /{f=0} f' docs/errors.md | grep -c "POST /v1/automatons"` muss mindestens 1 ausgeben.
       Prüfung: `grep -c "POST /v1/automatons" test/messages.test.ts` muss mindestens 1 ausgeben.
-- [ ] Die Doku sagt Kunden und Betrieb, was mit einem Automaton geschieht, dessen Start unterbrochen wurde, und die Entscheidungen
+- [x] Die Doku sagt Kunden und Betrieb, was mit einem Automaton geschieht, dessen Start unterbrochen wurde, und die Entscheidungen
       stehen mit Grund in den Annahmen.
       MVP: Funktion, weil ein Kunde, der `failed` mit `start_interrupted` sieht, wissen muss, dass nichts mehr abgerechnet wird und
       wie er neu startet.
       Prüfung: `grep -c "start_interrupted" docs/sandbox/automaton.md` muss mindestens 1 ausgeben.
       Prüfung: `awk '/^## Goal 01/{f=1} f' goals/hosting/ANNAHMEN.md | grep -ciE "sweep|started_at|SWEEP_GRACE_MS|390 s|Kanarienvogel|TRANSFER_501|Erstattung"` muss mindestens 6 ausgeben.
-- [ ] Das Goal ändert weder `sandboxd`, Image und Server noch Runtime, Zahlung, Anmeldung, Deploy oder CI und bringt keinen Schlüssel
+- [x] Das Goal ändert weder `sandboxd`, Image und Server noch Runtime, Zahlung, Anmeldung, Deploy oder CI und bringt keinen Schlüssel
       ins Repo.
       MVP: Funktion, weil das Repo öffentlich ist (Grundregel 8), die Runtime am Pin die Referenz bleibt (Grundregel 13) und der Sweep
       nur das Control Plane braucht.
       Prüfung: `git diff --name-only origin/dev...HEAD -- ops/sandbox harness/runtime src/payments src/auth deploy .github scripts/check.mjs | wc -l` muss 0 ausgeben.
       Prüfung: `git diff --name-only origin/dev...HEAD | grep -cE "\.(key|pem|crt|env)$"` muss 0 ausgeben.
       Prüfung: `git diff origin/dev...HEAD -- . ':(exclude)goals/' | grep -cE '^\+.*(cnwy_k_[0-9a-f]{32}|-{5}BEGIN [A-Z ]*PRIVATE KEY-{5})'` muss 0 ausgeben.
-- [ ] `check` ist grün, und der Job `e2e` des Goal-PR ist grün.
+- [x] `check` ist grün, und der Job `e2e` des Goal-PR ist grün.
       MVP: Funktion, weil der Sweep auf dem Laufzeitpfad liegt und erst der Gang mit der unveränderten Runtime zeigt, dass ein
       gehosteter Automaton weiter startet und läuft (Grundregel 13).
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung (Netz): `n=$(gh pr list -R matthiashippe/control-plane --head goal/hosting-01 --state all --json number -q '.[0].number'); gh pr checks "${n:?}" -R matthiashippe/control-plane --json name,state -q '.[] | select(.name=="e2e") | .state'` muss `SUCCESS` ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Jede neue Testdatei und jeder neue Fall war vor dem Fix rot; die Zeile im Progress Log nennt, womit.
@@ -159,6 +159,11 @@ eine Wallet zu schicken, deren Schlüssel auf unserem Sandbox-Server liegt.
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-17 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6, 7 gebaut (Sweep in `src/automaton/sweep.ts` nach jedem Abrechnungstakt, Spalte `started_at`, Fehlerpfad von `create` prüft `remove`, Text zu Transfers, Doku und Annahmen); neue Fälle in `test/automaton-sweep.test.ts` am Stand von `dev` rot (Modul fehlt) und je Mutation rot (Migration, `started_at`, Fehlerpfad, Frist ohne Grace, ohne `inFlight`, Abfrage ohne Antwort), die zwei neuen Prüfungen in `test/messages.test.ts` vor dem Text rot. Prüfbefehle: Punkt 1 vitest der vier Dateien Exit 0, 12 Fälle, keine Wortlücke, Konstante 1, Text einmal, No-op-Gegenprobe ohne Ausgabe (5 rot); Punkt 2 vitest Exit 0, Migrationsfall 1, Migration 1, Spalte im Dienst 2; Punkt 3 im Block 1 und 1, außerhalb 0; Punkt 4 vitest Exit 0, 1, 1, 2; Punkt 5 1 und 18; Punkt 6 0, 0, 0; Punkt 7 `check` Exit 0 (2159 Tests), `e2e` an PR #230 SUCCESS am Kopf f2b721d.
+- 2026-11-17 Zyklus 2: Abschluss gemeldet, Punkte 1 bis 7; `dev` brachte nichts Neues (9e1804f schon enthalten), am Code nichts geändert. Prüfbefehle am Kopf 480801b: P1 vitest der vier Dateien Exit 0 (36 passed), Fälle 12, Wortliste leer, Konstante 1, Text 1, No-op-Gegenprobe ohne Ausgabe (sichtbar gefahren: 5 failed, 7 passed); P2 vitest Exit 0, Migrationsfall 1, Migration 1, Spalte im Dienst 2; P3 1, 1 und 0; P4 vitest Exit 0, 1, 1 und 2; P5 1 und 18; P6 0, 0 und 0; P7 `node scripts/check.mjs` Exit 0 (195 Dateien, 2159 passed, 254 s), (Netz) `e2e` an PR #230 für 480801b `SUCCESS`.
+- 2026-11-17 Zyklus 3: Gap der Linse K zu Punkt 3 abgearbeitet und Abschluss gemeldet, Punkte 1 bis 7: Der Takt aus `src/index.ts` liegt jetzt in `startBillingRound` (`src/sandbox/round.ts`), und `test/billing-round.test.ts` zeigt mit falscher Uhr, dass vor drei Minuten weder Tick noch Sweep laufen, der Sweep erst nach dem Tick beginnt (auch nach rotem Tick) und `src/index.ts` den Sweep nur in einer Zeile an den Takt reicht; Verhalten unverändert, Annahme in `goals/hosting/ANNAHMEN.md`; `dev` brachte nichts Neues. Rot gesehen: ohne Modul rot (Import fehlt), sieben Mutationen alle rot (Sweep sofort im Modul 4, Sweep vor Tick 4, Sweep parallel zum Tick 2, kein Sweep nach rotem Tick 1, in `src/index.ts` Sweep im Block vor dem Takt 1, Sweep nach dem Takt 1, erste Frist 0 je 1 von 6). Prüfbefehle am Kopf d76b98e: P1 vitest Exit 0 (36 passed), 12, Wortliste leer, 1, 1, No-op-Gegenprobe ohne Ausgabe; P2 vitest Exit 0 (12 passed), 1, 1, 2; P3 1, 1 und 0; P4 vitest Exit 0 (58 passed), 1, 1, 2; P5 1 und 22; P6 0, 0, 0; P7 `node scripts/check.mjs` Exit 0 (196 Dateien, 2165 passed, 107 s), (Netz) `e2e` an PR #230 für d76b98e `SUCCESS`.
+- 2026-11-17 Zyklus 4: Gap der Linse K zu Punkt 3 abgearbeitet und Abschluss gemeldet, Punkte 1 bis 7: `test/sweep-not-on-start.test.ts` baut Sandbox-Dienst, Automaton-Dienst und App wie `src/index.ts` neben einer Zeile `failed` mit laufender Sandbox und einem abgeschnittenen Start von vor einer Stunde, spult mit falscher Uhr zehn Minuten ohne den Takt vor und sieht weder Abfrage noch DELETE bei `sandboxd`, danach räumt derselbe Dienst auf Anruf beide ab; dazu ein Pin auf die Aufrufstellen des Sweeps in `src/`; Verhalten unverändert, Annahme in `goals/hosting/ANNAHMEN.md`; `dev` bis a6eaedf gemergt (nur zwei Vorschläge). Rot gesehen: acht Mutationen alle rot (im Dienst Timer 1 s, Timer mit `unref`, Intervall 2 min, `setImmediate`, Microtask je 1 von 8; in `createApp` Timer 1 s, direkter Aufruf, `sweepAutomatons` per Timer je 2 von 8). Prüfbefehle am Kopf bb3c683: P1 vitest Exit 0 (36 passed), 12, Wortliste leer, 1, 1, No-op-Gegenprobe ohne Ausgabe; P2 vitest Exit 0 (12 passed), 1, 1, 2; P3 1, 1 und 0; P4 vitest Exit 0 (58 passed), 1, 1, 2; P5 1 und 26; P6 0, 0, 0; P7 `node scripts/check.mjs` Exit 0 (197 Dateien, 2167 passed, 66 s), (Netz) `e2e` an PR #230 für b8da61e `SUCCESS`.
+- 2026-11-17 Release: PASS K und B (Zyklus 4), DONE.
 
 ## Blockers
 Keine.

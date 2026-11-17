@@ -2,9 +2,11 @@
  * The world of the hosted automaton tests (goals/sandbox/08): the rebuilt sandboxd of test/sandbox-world.ts with a fake
  * `run` that also answers the three commands src/automaton/service.ts sends into a sandbox: `automaton-start` (ok, or a
  * failure when `startFails` is set), the status command (turns and wallet address from a per-container log) and `tail` of
- * the log. `logOf(sandboxId)` sets what the log of the runtime in that sandbox holds.
+ * the log. `logOf(sandboxId)` sets what the log of the runtime in that sandbox holds. It also answers PROBE_COMMAND of
+ * src/automaton/sweep.ts (goals/hosting/01): the mark is set once `automaton-start` answered ok, the turns come from the log.
  */
 import { LOG_COMMAND, START_COMMAND, STATUS_COMMAND, TURN_PATTERN } from "../src/automaton/service.js";
+import { PROBE_COMMAND } from "../src/automaton/sweep.js";
 import { sandboxWorld, type WorldOptions } from "./sandbox-world.js";
 
 export const RUNTIME_WALLET = "0x00000000000000000000000000000000000a11ce";
@@ -33,6 +35,10 @@ export async function automatonWorld(opts: WorldOptions & { startFails?: boolean
         return { code: 0, stdout: `turns=${turns}\nwallet=${started.has(name) ? RUNTIME_WALLET : ""}\n` };
       }
       if (command === LOG_COMMAND) return { code: 0, stdout: logs.get(name) ?? "" };
+      if (command === PROBE_COMMAND) {
+        const turns = (logs.get(name) ?? "").split("\n").filter((l) => TURN_RE.test(l)).length;
+        return { code: 0, stdout: `mark=${started.has(name) ? 1 : 0}\nturns=${turns}\n` };
+      }
       return undefined;
     },
   });

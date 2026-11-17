@@ -41,6 +41,26 @@ Kosten: genau die Sandbox (100 mc je angefangene 6 Minuten in der Stufe klein, 1
 Anlegen 402 `INSUFFICIENT_CREDITS` mit `details`. Bei leerem Guthaben hält die Sandbox an (`status` `stopped`, `reason` `credit`);
 `POST /v1/automatons/{id}/start` startet sie wieder, sobald das Guthaben die Reservierung trägt.
 
+## Ein Start, der nicht fertig wurde
+
+Keine Sandbox wird abgerechnet, ohne dass ein Automaton in ihr läuft (Goal hosting 01). Nach jedem Takt der Abrechnung, zum ersten
+Mal drei Minuten nach dem Start des Dienstes und danach jede Minute, räumt ein Sweep im Control Plane (`src/automaton/sweep.ts`)
+zwei Fälle ab:
+
+- Scheitert der Start und bestätigt der Sandbox-Server das Löschen der Sandbox nicht, steht der Automaton auf `failed` mit
+  `reason` `start_failed`, und die Antwort 501 sagt, dass die Sandbox in wenigen Minuten gelöscht wird und nur bis dahin kostet.
+  Der nächste Sweep, bei dem der Sandbox-Server antwortet, löscht sie; ab dann bucht die Abrechnung für sie nichts mehr.
+- Unterbricht ein Neustart des Dienstes einen Start, bevor `automaton-start` fertig war, bleibt eine Zeile `active` ohne
+  `started_at`. Ist sie älter als 390 s (90 s `START_TIMEOUT_MS` plus 5 Minuten `SWEEP_GRACE_MS`) und läuft ihr Start nicht in
+  diesem Prozess, fragt der Sweep ihre Sandbox einmal nach der Marke `/root/.automaton/autostart` und den Turns im Log. Fehlen
+  beide, zeigt `GET /v1/automatons/{id}` danach `status` `failed` mit `reason` `start_interrupted`: Der Schlüssel `automaton:<id>`
+  ist widerrufen, die Sandbox ist gelöscht, und es wird nichts mehr abgerechnet. Gebucht bleiben die angefangenen Schritte bis
+  dahin. Neu starten heißt: `DELETE /v1/automatons/{id}`, dann `POST /v1/automatons` (mit einem neuen `Idempotency-Key`, falls der erste einen hatte) mit demselben Namen und demselben
+  `genesis_prompt`. Hat die Sandbox die Marke oder einen Turn, läuft der Automaton und bekommt nur `started_at`.
+
+Antwortet der Sandbox-Server nicht, ändert der Sweep nichts und versucht es im nächsten Takt wieder; ein Automaton wird nie auf
+Verdacht `failed`.
+
 ## Was in der Sandbox liegt
 
 Das Image `sandboxd-base:2` (`ops/sandbox/image/Dockerfile`) trägt Node 22, die Runtime als Klon am Pin unter `/opt/automaton`
