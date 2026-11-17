@@ -37,6 +37,7 @@ local start and does not replace the run against the real endpoint.
 | `cert_days_left` | below 20 | check the Caddy logs (ACME), verify DNS is set to DNS-only |
 | `vm.restarts` | rises between two runs | read the logs of the last hour, put the cause in STATE.md |
 | `vm.errors_24h` | above 0 | tell `provider_unavailable` (OpenRouter) and `settlement_failed` (PayAI) apart |
+| `bg_max_ms` (line `OK sandbox:` of `ops/live.sh`) | 27000 ms or more (`BG_WARN_MS`, the line then carries `warning`, stays `OK`) | one call of the wait command comes close to the 30 s after which the runtime aborts it: read the start time of `docker exec` under gVisor on the sandbox server and lower `EXEC_WAIT_S` in `src/sandbox/service.ts` before a call breaks |
 | `db.stuck_payments` | above 0 | a payment hangs in `pending`: check the nonce and the facilitator response |
 | `openrouter.left` | below 5 USD | ask Matthias whether to top up; otherwise every tenant faces a 503 |
 | `vm.disk_used` | above 80 % | rotate the logs (json-file max 20m x 5), check for old images |

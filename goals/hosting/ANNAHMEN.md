@@ -50,3 +50,49 @@
   nur in `src/index.ts` und im Takt, `startBillingRound(` nur in `src/index.ts`, das Modul des Sweeps nur von
   `src/automaton/service.ts` importiert. Grund: Der Kanarienvogel des Rollouts baut die Dienste ebenfalls und darf nichts löschen.
   Am Verhalten ändert sich nichts.
+
+## Goal 02 (17.11.2026, Engineer CP)
+
+- **Exit-Datei atomar.** Die Hülle aus `backgroundCommand` schreibt `echo $c` nach `<base>.exit.tmp` und schiebt sie mit
+  `mv -f <base>.exit.tmp <base>.exit` an ihren Platz, mit einem Leerzeichen vor jedem Pfad wie bisher (`mapRoot`). Grund: Bei
+  `echo $c > <base>.exit` legt die Umleitung die Datei an, bevor die Zahl drinsteht; ein Wartebefehl, der genau dann liest, sah eine
+  leere Datei. `mv` liegt in coreutils, das das Image wegen `timeout` schon hat. Der Test legt ein `mv` vor das echte in den `PATH`,
+  das notiert, ob `<base>.exit` vor seinem Aufruf schon bestand.
+- **Nur eine Exit-Datei mit Inhalt ist ein Ende.** `waitCommand` wartet mit `[ ! -s ]`, das zweite Lesen nach einer Sekunde ist
+  weg, und eine leere Datei am Ende der Wartezeit gibt „still running“ mit Exit 0. Die Bedingung des Endes ist
+  `[ -f <base>.exit ] && [ -s <base>.exit ]`: Das `-f` ist für die Bash überflüssig, bleibt aber, weil `BG_ANSWER_JS` in
+  `ops/live.sh` den Wartebefehl daran erkennt, dass er `[ -f <exit_code_file> ]` nennt, und weil `test/sandbox-wait.test.ts` (sandbox
+  09) das prüft. So bleibt die Live-Prüfung auch zwischen Merge und Rollout grün, wenn sie noch gegen den alten Stand läuft.
+- **Höchstens 64 KB je Strom.** `export const WAIT_TAIL_BYTES = 64 * 1024;`. Eine Funktion `printOutputs` baut das Stück Shell für
+  beide Ströme, und Wrapper wie Wartebefehl nutzen sie, weil die Antwort des Wrappers (Befehl endet vor `EXEC_EARLY_MS` oder
+  Wiederholung mit demselben Schlüssel nach dem Ende) sonst denselben Weg mit Megabytes in den Kontext bringt. Größe mit
+  `wc -c 2>/dev/null < <datei>` (die Umleitung der Fehler zuerst, damit eine fehlende Datei keine zusätzliche Meldung bringt; dann
+  druckt `cat` wie bisher seinen Fehler), über 65536 Bytes eine Zeile und `tail -c 65536` auf demselben Strom, sonst `cat` wie
+  bisher. Damit kommt eine kleine Ausgabe Byte für Byte wie vorher. Den Wortlaut der Zeile legt Punkt 7 fest (unten); der
+  erste Wortlaut aus Zyklus 1 schickte das Modell mit `read_file` zum Rest. Der Text von `stillRunning` nennt die Grenze von 64 KB.
+- **Dauer der Wartebefehle in der Live-Prüfung.** `bg_live` gibt nach dem Token die längste Dauer eines Aufrufs von `wait_command`
+  aus (0, wenn keiner lief), `sandbox_live` schreibt sie als `bg_max_ms=<ms>` direkt nach `bg=<token>` in die Ergebniszeile, und die
+  Zeile `OK sandbox:` endet mit `bg_max_ms=<ms>`, ab `BG_WARN_MS=27000` gefolgt von `warning: …`. `bg=ok` bleibt, wie es ist. Grund
+  für 27000: 3 s Rand bis zum Abbruch der Runtime nach 30000 ms; ein `FAIL` löste einen Revert aus, obwohl der Aufruf rechtzeitig
+  endete, darum nur eine Warnung. Der Selbsttest prüft 25000 und 26999 ohne und 27000 und 29999 mit Warnung; die Gegenprobe mit
+  einer Messung ohne Maximum und mit `BG_WARN_MS=27001` macht ihn rot (`LIVE SELFTEST FAIL`).
+- **Teile lesen statt `read_file` (Punkt 7, Kritik Tech Lead 17.11.2026).** `read` in `src/sandbox/service.ts` gibt die Datei
+  ungekürzt zurück, also brächte ein Modell, das dem Hinweis „read the rest with read_file“ folgt, die 5 MB eines `npm install` im
+  nächsten Aufruf doch in den bezahlten Kontext. Wortlaut der Zeile jetzt: `This output has <n> bytes, only its last 65536 bytes
+  follow. The whole output is in <pfad>. Do not read it with read_file, that puts all <n> bytes into your context. Read parts with
+  exec: grep -n '<text>' <pfad> finds lines, sed -n '<from>,<to>p' <pfad> prints them.` Platzhalter in spitzen Klammern, weil das
+  Modell sie aus Hilfetexten kennt; beide Befehle mit vollem Pfad, damit es sie nur ausfüllen muss. Der Text von `stillRunning` sagt
+  dasselbe kurz (`grep -n` oder `sed -n` in exec, nicht `read_file`). Rot vor dem Fix: 3 der 8 Fälle in
+  `test/sandbox-background-output.test.ts` und die neue Assertion in `test/sandbox-long-exec.test.ts` mit `service.ts` von `15466cd`.
+- **Wartebefehl unter 2000 Zeichen (Punkt 7).** Der Job `e2e` am Kopf `e824ecf` war rot (`LONG_EXEC_VERDICT fail long-180`), obwohl
+  die Wartebefehle liefen und der letzte mit `long-180` und Exit 0 endete: `judgeLongExec` in `harness/e2e/long-exec.mjs` liest den
+  Text der Antwort auf 2000 Zeichen gekürzt, und mit der Zeile zweimal im Wartebefehl (für `.out` und `.err`) war die Antwort 2433
+  Zeichen lang, die letzte Zeile fehlte. `harness/e2e/` liegt außerhalb des Umfangs dieses Goals (Punkt 5), also wird der Wartebefehl
+  kürzer: Die Zeile und `tail -c` stehen einmal in der Shell-Funktion `cut_out` (Größe, Pfad), die beide Zweige für große Dateien
+  rufen; `cat <base>.out` und `cat <base>.err >&2` bleiben wörtlich, weil `test/sandbox-wait.test.ts` (sandbox 09) sie prüft. Die
+  Antwort ist jetzt 1925 Zeichen lang; `test/sandbox-long-exec.test.ts` prüft den Werkzeugtext der Runtime bis zum Beginn von
+  stderr gegen 2000 Zeichen (rot mit `service.ts` von `d06f2e4` und `15466cd`). Der Einstieg `--judge sandbox-bg` von `ops/live.sh`
+  liest weiter 4000 Bytes und reicht damit.
+- **Widerlegt?** Nein: Am Kopf von `dev` (`11a4475`) sind 6 der 8 neuen Fälle aus `test/sandbox-background-output.test.ts` rot
+  (leere Exit-Datei ohne Schreiber, leere mit spätem Code 3, `mv` der Hülle, 5 MB im Wartebefehl, 5 MB im Wrapper, 65537 Bytes);
+  die beiden Fälle für unverändertes Verhalten (genau 65536 Bytes, kleine Ausgabe) sind dort grün, wie sie sollen.

@@ -69,6 +69,18 @@ describe("ops/live.sh", () => {
       expect(run.stdout).toContain(`planted background ${name}: FAIL sandbox: background exec wait_command ${reason}`);
     }
     expect(run.stdout).toContain("planted background step held: bg=start-notrunning waits=0");
+    // The longest call of wait_command (goals/hosting/02, point 3): bg_live gives it with the token, the result line and the
+    // line OK sandbox: carry it as bg_max_ms, from BG_WARN_MS (27000) on with a warning, OK either way.
+    expect(run.stdout).toContain("planted background step ok: bg=ok waits=2 bg_max_ms=25000");
+    expect(run.stdout).toContain("planted background step slow2: bg=wait-slow-30000 waits=2 bg_max_ms=30000");
+    expect(run.stdout).toContain("planted background step held: bg=start-notrunning waits=0 bg_max_ms=0");
+    expect(run.stdout).toMatch(/^planted background ok: OK sandbox: .*background exec ok.*, bg_max_ms=25000$/m);
+    expect(run.stdout).toMatch(/^planted sandbox bg_max_ms=26999: OK sandbox: .*, bg_max_ms=26999$/m);
+    expect(run.stdout).not.toMatch(/^planted sandbox bg_max_ms=26999: .*warning/m);
+    expect(run.stdout).toMatch(/^planted sandbox bg_max_ms=27000: OK sandbox: .*, bg_max_ms=27000, warning: .*27000 ms/m);
+    expect(run.stdout).toMatch(/^planted sandbox bg_max_ms=29999: OK sandbox: .*, bg_max_ms=29999, warning: /m);
+    expect(readFileSync(LIVE_SH, "utf8")).toMatch(/^BG_WARN_MS=27000$/m);
+    expect(readFileSync(LIVE_SH, "utf8")).toContain("bg=$bg bg_max_ms=$bg_max files=$files");
     expect(run.stdout).not.toContain("sent another body");
     expect(run.stdout).toContain(
       "planted sandbox 'client_key=ok ctl=200 create=201 exec=ok files=ok delete=200 ledger=1': FAIL sandbox: background exec did not run",
