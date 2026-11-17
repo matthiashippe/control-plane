@@ -322,6 +322,14 @@ function logLines() {
   return () => spy.mock.calls.map((c) => String(c[0]));
 }
 
+/** The waiting retire of an account: the old forwarder and permission the next payout retires first. */
+function retireRow(s: MoneySetup, address: string) {
+  return s.db.prepare("SELECT retire_forwarder, retire_permission FROM konto_payouts WHERE address = ?").get(address.toLowerCase()) as {
+    retire_forwarder: string | null;
+    retire_permission: string | null;
+  };
+}
+
 describe("after a new gas key or a lost receipt", () => {
   afterEach(() => {
     vi.restoreAllMocks();
@@ -381,6 +389,20 @@ describe("after a new gas key or a lost receipt", () => {
     expect(after[2]).toMatchObject({ to: newForwarder, value: 5n * USD });
     expect(s.node.balances.get(newDestination)).toBe(5n * USD);
     expect(lines()).toContain(`[payout] retire skipped for ${oldForwarder}: other_caller`);
+    // The dropped permission leaves no waiting retire behind, so the next new IBAN retires the one of today's key.
+    expect(retireRow(s, a.address)).toEqual({ retire_forwarder: null, retire_permission: null });
+    const third = await toPasskey(b, a);
+    const thirdDestination = s.bridge.state.liquidation.at(-1)!;
+    const thirdForwarder = expectedForwarder(a.address, thirdDestination, b.gas.address);
+    expect(third.spender).toBe(thirdForwarder);
+    expect((await json(b, `/h/${third.h.code}/payout`, await payoutPermission(a.owner, a.address, thirdForwarder, { salt: 101n }))).status).toBe(200);
+    const next = await payout(b, a.key, { amount_usd: "5.00" });
+    expect(next.status).toBe(200);
+    const last = s.node.sent.slice(6);
+    expect(last.map((t) => t.kind)).toEqual(["retire", "deploy", "approveWithSignature", "payout"]);
+    expect(last[0]).toMatchObject({ to: newForwarder, salt: 100n });
+    expect(last[3]).toMatchObject({ to: thirdForwarder, value: 5n * USD });
+    expect(s.node.approved.has(`${a.address}:100`)).toBe(false);
   });
 
   it("sends no retire for a permission whose approveWithSignature never reached the node and logs not_approved", async () => {
@@ -405,6 +427,7 @@ describe("after a new gas key or a lost receipt", () => {
     expect(after.map((t) => t.kind)).toEqual(["deploy", "approveWithSignature", "payout"]);
     expect(after[2]).toMatchObject({ to: newForwarder, value: 5n * USD });
     expect(lines()).toContain(`[payout] retire skipped for ${oldForwarder}: not_approved`);
+    expect(retireRow(s, a.address)).toEqual({ retire_forwarder: null, retire_permission: null });
   });
 
   it("keeps a waiting retire through a second new IBAN and drops the permission between them, which never went on-chain", async () => {
@@ -463,12 +486,6 @@ describe("when the chain cannot be read before the retire", () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
-
-  const retireRow = (s: MoneySetup, address: string) =>
-    s.db.prepare("SELECT retire_forwarder, retire_permission FROM konto_payouts WHERE address = ?").get(address.toLowerCase()) as {
-      retire_forwarder: string | null;
-      retire_permission: string | null;
-    };
 
   for (const read of ["isApproved", "callerOf"] as const) {
     it(`stops in stage retire without a transaction when ${read} of the old one fails, keeps the retire and retires it on the next payout`, async () => {
