@@ -33,6 +33,10 @@ const NOW = 1794571200;
 const HOST = "alerts.invalid";
 const TOPIC = "made-up-topic-4711";
 const WEBHOOK = `https://${HOST}/${TOPIC}`;
+// This test only reads the source of ops/watchdog.sh for its severities and never runs the watchdog, so it needs no
+// CP_WATCHDOG_ALIVE switch (fehler 07 point 4 covers the tests that run it).
+const WATCHDOG_SOURCE = join(__dirname, "../ops/watchdog.sh");
+const watchdogSeverities = () => [...new Set([...readFileSync(WATCHDOG_SOURCE, "utf8").matchAll(/report "([A-Z]+)"/g)].map((m) => m[1]))];
 
 type Received = { last_alive: string | null; last_message: string | null; status: string };
 type AlarmPath = {
@@ -245,8 +249,7 @@ describe("ops/status.sh checks that a delivery of the watchdog really reached th
   });
 
   it("every severity that ops/watchdog.sh reports counts as its delivery", () => {
-    const watchdog = readFileSync(join(OPS, "watchdog.sh"), "utf8");
-    const severities = [...new Set([...watchdog.matchAll(/report "([A-Z]+)"/g)].map((m) => m[1]))];
+    const severities = watchdogSeverities();
     expect(severities.length, severities.join(" ")).toBeGreaterThanOrEqual(5);
     for (const severity of severities) {
       const r = run(delivered("2026-11-13T11:00:00Z"), { topic: message(`control-plane ${severity}`, "2026-11-13T11:00:00Z") });
@@ -255,8 +258,7 @@ describe("ops/status.sh checks that a delivery of the watchdog really reached th
   });
 
   it("no other script under ops/ posts a title of the watchdog", () => {
-    const watchdog = readFileSync(join(OPS, "watchdog.sh"), "utf8");
-    const severities = [...new Set([...watchdog.matchAll(/report "([A-Z]+)"/g)].map((m) => m[1]))];
+    const severities = watchdogSeverities();
     expect(severities.length, severities.join(" ")).toBeGreaterThanOrEqual(5);
     const watchdogTitles = new Set(severities.map((s) => `control-plane ${s}`));
     const titles = readdirSync(SENDERS)
