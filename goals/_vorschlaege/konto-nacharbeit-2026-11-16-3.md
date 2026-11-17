@@ -6,3 +6,4 @@ Empfehlung: `approved_tx` aus dem SELECT und aus `AccountRow` in `src/konto/topu
 MVP: Schönheit
 
 Linse Q, Frage 3 (tote Pfade, ungenutzte Werte), Merge c1d7f74. Ob ein gesetztes `approved_tx` den Aufruf `isApproved` sparen soll, berührt konto-kritik-2026-11-15-2 (RPC bei jeder Anfrage) und ist hier nicht verlangt.
+Verworfen: MVP: Schönheit ohne belegten Fehler, und der Kurs-Check vom 17.11. (PRO-23529) sieht den Detail-Anteil über der Schwelle; der ungenutzte Wert ändert kein Verhalten (2026-11-17)

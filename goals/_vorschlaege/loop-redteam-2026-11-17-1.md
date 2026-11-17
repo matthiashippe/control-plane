@@ -1,0 +1,10 @@
+Schwere: 2
+Goal: keines
+Befund: `loop-constraints.md:122` bindet „Modell Opus für Maker, Linsen und Kritik“, aber seit 16.11.2026 09:13 UTC läuft Linse B (`qa-scope`, `loop.yaml` `verifiers`) nach Matthias' Entscheidung im code-host (394f8bc, `paperclip/company/.paperclip.yaml`) auf Sonnet 5.5, und neun Goals kamen seitdem mit einem PASS von B auf Sonnet nach dev; die bindende Zeile beschreibt den Betrieb falsch, und Linse B prüft genau diese Regeln.
+Beleg: `python3 -I -c 'import json; r=[json.loads(l) for l in open("/home/code/.local/state/code-host/routines/loop-master/loops/control-plane/runs.jsonl")]; print(len({x["goal"] for x in r if x.get("role")=="B" and x.get("model")=="claude-sonnet-5-5" and x.get("result")=="pass"}))'` -> `10` (davon 9 auf origin/dev gemergt, sandbox-11 offen) | loop-constraints.md:122, loop.yaml `verifiers: B: qa-scope`
+Empfehlung: Matthias gleicht `loop-constraints.md:122` an seine Entscheidung vom 16.11. an (Linse B auf Sonnet, K bleibt Opus) oder setzt `qa-scope` für diesen Loop wieder auf Opus, weil control-plane zahlende fremde Kunden hat. Die Entscheidung selbst wird nicht neu aufgemacht; ändern darf die Datei nur ein Mensch (`loop-constraints.md:3`).
+
+## Herleitung
+
+Die Zeile steht unter „## Budget und Qualität“, nicht unter „## Verboten“, deshalb kein Bruch eines Verbots. Jeder der neun Merges hatte zusätzlich ein PASS von Linse K (`qa-skeptic`) auf Opus. Der code-host-Commit 394f8bc begründet den Wechsel mit dem Verbrauch und lässt Tech Lead und QA Skeptic als Kontrolle auf Opus; dass `loop-constraints.md` nachgezogen wird, steht nirgends. Die Triage gleicht nur `gate.yaml` gegen `loop-constraints.md` ab, und `gate.yaml` kennt kein Modell, also fängt keine Routine den Unterschied. Im Repo erwähnt weder `STATE.md` noch `ROADMAP.md`, `RISIKEN.md`, eine `ANNAHMEN.md` oder ein Vorschlag den Wechsel. Gegengeprüft von einem frischen Subagent (Urteil bestätigt, Schwere 2).
+Übernommen: Watch List in STATE.md, angleichen kann nur Matthias (2026-11-17)

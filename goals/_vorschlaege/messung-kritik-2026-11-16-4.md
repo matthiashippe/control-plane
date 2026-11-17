@@ -4,3 +4,4 @@ Befund: `WATCHDOG_SEVERITIES` in `ops/status.sh` ist nur in eine Richtung an `op
 Beleg: ops/status.sh (`WATCHDOG_SEVERITIES = ("ALIVE", "OK", "OUTAGE", "WARN", "WARNING")`), test/status-alarm-received.test.ts (Fall „every severity …“, nur `toBeGreaterThanOrEqual(5)`)
 Empfehlung: In einem späteren Glied messung: Der Fall liest auch die Zeile `WATCHDOG_SEVERITIES` aus `ops/status.sh` und verlangt Gleichheit der beiden Mengen; Gegenprobe mit einer Kopie, in der eine sechste Severity steht.
 MVP: Funktion, weil `received` sonst nach einer Änderung am Watchdog wieder fremde Meldungen zählen kann.
+Übernommen: ROADMAP.md, Glied messung 14 (PR #227) (2026-11-17)
