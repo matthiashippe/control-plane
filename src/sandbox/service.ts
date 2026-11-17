@@ -55,18 +55,20 @@ export const WAIT_TAIL_BYTES = 64 * 1024;
 
 /**
  * The shell that prints `<base>.out` to stdout and `<base>.err` to stderr: a file up to WAIT_TAIL_BYTES unchanged with
- * cat, a larger one as one line with its size, the number of bytes shown and its path, then its last WAIT_TAIL_BYTES
- * (`tail -c`), both on the stream of the file. Only bash, wc, tail and cat, which the image has; a space before every
- * path (mapRoot).
+ * cat, a larger one as one line with its size, its path and how to read parts of it, then its last WAIT_TAIL_BYTES
+ * (`tail -c`), both on the stream of the file. The line and the tail come from the shell function `cut_out` (size,
+ * path), defined once, so the line stands once in the wait command: the e2e walk reads the answer with the wait command
+ * cut to 2000 characters. Only bash, wc, tail and cat, which the image has; a space before every path (mapRoot).
  */
 function printOutputs(base: string): string {
+  const cutOut =
+    `cut_out() { echo "This output has $1 bytes, only its last ${WAIT_TAIL_BYTES} bytes follow. The whole output is in $2. ` +
+    `Do not read it with read_file, that puts all $1 bytes into your context. Read parts with exec: ` +
+    `grep -n '<text>' $2 finds lines, sed -n '<from>,<to>p' $2 prints them."; tail -c ${WAIT_TAIL_BYTES} $2; }`;
   const one = (file: string, to: string): string =>
     `n=$(wc -c 2>/dev/null < ${file}); if [ "\${n:-0}" -gt ${WAIT_TAIL_BYTES} ] 2>/dev/null; then ` +
-    `{ echo "This output has $n bytes, only its last ${WAIT_TAIL_BYTES} bytes follow. The whole output is in the file ${file}. ` +
-    `Do not read it with read_file: that puts all $n bytes into your context. To read only a part, use exec: ` +
-    `grep -n '<text>' ${file} finds lines, sed -n '<from>,<to>p' ${file} prints a range of lines."; ` +
-    `tail -c ${WAIT_TAIL_BYTES} ${file}; }${to}; else cat ${file}${to}; fi`;
-  return `${one(`${base}.out`, "")}; ${one(`${base}.err`, " >&2")}`;
+    `cut_out $n ${file}${to}; else cat ${file}${to}; fi`;
+  return `${cutOut}; ${one(`${base}.out`, "")}; ${one(`${base}.err`, " >&2")}`;
 }
 
 /**
@@ -130,8 +132,7 @@ function stillRunning(base: string, seconds: number): Reply {
       `line of this answer and no timeout: it waits at most ${EXEC_WAIT_S} seconds, then prints the exit code, the ` +
       `output and the errors of the command, or says that it is still running. As long as it says so, call exec with ` +
       `the same command again. Output or errors longer than ${WAIT_TAIL_BYTES / 1024} KB come as their last ` +
-      `${WAIT_TAIL_BYTES / 1024} KB, after a line that names the file; read parts of it with grep -n or sed -n in exec, ` +
-      `not with read_file, which returns the whole file.\n${wait}`,
+      `${WAIT_TAIL_BYTES / 1024} KB after a line on how to read parts with grep -n or sed -n in exec, not with read_file.\n${wait}`,
     stderr: "",
     exit_code: -1,
     running: true,
