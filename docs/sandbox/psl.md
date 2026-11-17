@@ -65,14 +65,16 @@ sandboxhost.de
 ```
 
 Die Adresse steht schon öffentlich in `README.md` und `LICENSE.md`. Kopfzeile und Website nennen Hanseatic Tech Company, nicht
-PostYourPrice (Korrektur von Matthias am 17.11.2026). Sortiert wird nach dem Namen der Organisation ohne Rücksicht auf Groß- und
-Kleinschreibung. Nachbarn in der privaten Sektion am 2026-11-17 um 08:00 UTC:
+PostYourPrice (Korrektur von Matthias am 17.11.2026). Sortiert wird nach dem Namen der Organisation in der englischen Sortierung, die das Werkzeug der PSL benutzt
+(`collate.New(language.MustParse("en"))` in `tools/internal/parser/unicode.go`): ohne Rücksicht auf Groß- und Kleinschreibung,
+ein Umlaut zählt wie sein Grundbuchstabe. Nachbarn in der privaten Sektion am 2026-11-17 um 08:00 UTC:
 
-Davor: // Hackclub Nest : https://hackclub.app
+Davor: // Häkkinen.fi : https://www.häkkinen.fi/
 Danach: // Hashbang : https://hashbang.sh
 
 Der Eintrag kommt mit je einer Leerzeile davor und danach zwischen die beiden Abschnitte; geprüft mit
-`printf '%s\n' <Davor> <Kopfzeile> <Danach> | LC_ALL=C sort -fc`.
+`printf '%s\n' <Davor> <Kopfzeile> <Danach> | LC_ALL=en_US.utf8 sort -c` (Exit 0). `LC_ALL=C sort -fc` taugt hier nicht, weil es
+`Häkkinen.fi` nach den Bytes hinter `Hanseatic` einordnet, die PSL aber davor.
 
 ## PR
 

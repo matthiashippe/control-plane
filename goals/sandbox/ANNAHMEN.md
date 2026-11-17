@@ -582,8 +582,14 @@
   jeder Aufruf scheitert, die vier Fälle mit Schreiben oder Nichtschreiben nicht.
 - **Kopfzeile** (Zyklus 3, Korrektur von Matthias am 17.11.2026, ersetzt die Fassung mit PostYourPrice). `// Hanseatic Tech Company :
   https://hanseatictechcompany.com`, weil PostYourPrice nicht das Angebot hinter den Sandboxes ist und nach außen weder genannt noch
-  verlinkt wird. Einsortiert zwischen `// Hackclub Nest : https://hackclub.app` und `// Hashbang : https://hashbang.sh`
-  (`LC_ALL=C sort -f`, Stand 2026-11-17 08:00 UTC). Eintrag und PR-Text enthalten weder PostYourPrice noch `postyourprice.com`,
+  verlinkt wird. Einsortiert zwischen `// Häkkinen.fi : https://www.häkkinen.fi/` und `// Hashbang : https://hashbang.sh`
+  (Stand 2026-11-17 08:00 UTC). Das Werkzeug der PSL sortiert Kopfzeilen mit `collate.New(language.MustParse("en"))`
+  (`tools/internal/parser/unicode.go`), also zählt `ä` wie `a` und `Häkkinen` steht vor `Hanseatic`; die Liste selbst führt
+  `Häkkinen.fi` zwischen `Hackclub Nest` und `Hashbang`. `LC_ALL=en_US.utf8 sort -c` über Häkkinen.fi, Hanseatic, Hashbang gibt Exit 0,
+  Gegenprobe mit Hanseatic vor Häkkinen.fi Exit 1. Die Netz-Prüfung von Punkt 2 nutzt `LC_ALL=C sort -fc`, das nach Bytes sortiert
+  (`ä` ist 0xC3 und steht hinter jedem ASCII-Buchstaben) und darum die richtige Stelle ablehnt; die Stelle zwischen Hackclub Nest und
+  Häkkinen.fi bestünde diese Prüfung, wäre aber für das Werkzeug der PSL falsch sortiert. Punkt 2 bleibt deshalb offen, bis der Tech
+  Lead die Prüfung entscheidet. Eintrag und PR-Text enthalten weder PostYourPrice noch `postyourprice.com`,
   `cp.hippe.eu`, Handsel oder einen Link auf das Repo; Konto und Zahlung erwähnt der Text nur als „andere Domain“ ohne Namen.
 - **Firma im PR-Text** (Zyklus 3). Das Impressum `https://hanseatictechcompany.com/impressum` nennt am 2026-11-17 um 08:00 UTC
   „Hanseatic Tech Company UG (haftungsbeschränkt)“ mit Sitz in Frankfurt am Main; so steht die Firma im Text, ohne Wohnort und ohne die
