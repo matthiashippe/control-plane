@@ -60,7 +60,8 @@ describe("main network 8453", () => {
     const file = keyFile();
     const env = { CP_KONTO_CHAIN_ID: "8453", CP_KONTO_MAINNET: "1", CP_KONTO_KEY_FILE: file };
     const cfg = readKontoConfig(env);
-    expect(cfg).toMatchObject({ chainId: 8453, token: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", rpcUrl: "https://mainnet.base.org" });
+    expect(cfg).toMatchObject({ chainId: 8453, rpcUrl: "https://mainnet.base.org" });
+    expect(cfg?.token).toBe("0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913");
     expect(cfg?.net.chain.id).toBe(8453);
     const konto = kontoFromEnv(openDb(":memory:"), env, offline);
     expect(konto?.chainId).toBe(8453);
@@ -104,7 +105,8 @@ describe("main network 8453", () => {
     const file = keyFile();
     for (const mainnet of [undefined, "1"]) {
       const cfg = readKontoConfig({ CP_KONTO_CHAIN_ID: "84532", CP_KONTO_KEY_FILE: file, CP_KONTO_MAINNET: mainnet });
-      expect(cfg).toMatchObject({ chainId: 84532, token: SEPOLIA_USDC, rpcUrl: "https://sepolia.base.org", topupBelowUsdc: 1_000_000n, topupUsdc: 2_000_000n });
+      expect(cfg).toMatchObject({ chainId: 84532, rpcUrl: "https://sepolia.base.org", topupBelowUsdc: 1_000_000n, topupUsdc: 2_000_000n });
+      expect(cfg?.token).toBe(SEPOLIA_USDC);
     }
     const account = privateKeyToAccount(generatePrivateKey());
     const sepolia = node("0x14a34");
