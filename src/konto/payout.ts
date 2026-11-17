@@ -144,6 +144,9 @@ export interface PayoutRow {
   permission_approved: number;
   retire_forwarder: string | null;
   retire_permission: string | null;
+  /** A sent payout whose receipt did not arrive yet, and its amount in atomic USDC. */
+  pending_tx: string | null;
+  pending_usdc: string | null;
 }
 
 export function readPayout(db: Db, address: string): PayoutRow | null {
@@ -261,18 +264,55 @@ export function forwarderFits(row: Pick<PayoutRow, "forwarder" | "destination">,
   return forwarderAddress(account as Address, row.destination as Address, fixed).toLowerCase() === row.forwarder.toLowerCase();
 }
 
+/** How a payout ended: `sent` with its receipt, or `pending` when it went out and the wait for the receipt broke off. */
+export interface PayoutResult {
+  state: "sent" | "pending";
+  tx: Hex;
+  value: bigint;
+  bankLast4: string | null;
+}
+
+/**
+ * Clears the open payout of an account, if there is one: `none` without, `pending` while its receipt is still missing, `sent`
+ * once it went through (then the open hash is cleared and nothing new is sent), `reverted` when it did not (cleared as well, the
+ * way is free for a new payout). Like `pending_tx` of topUpIfLow: a payout that may have left the account is never sent twice.
+ */
+export async function settlePendingPayout(
+  deps: Pick<PayoutDeps, "db" | "chain" | "log">,
+  address: string,
+): Promise<{ state: "none" } | { state: "pending" | "sent" | "reverted"; tx: Hex; value: bigint; bankLast4: string | null }> {
+  const account = address.toLowerCase();
+  const row = readPayout(deps.db, account);
+  if (!row?.pending_tx) return { state: "none" };
+  const tx = row.pending_tx as Hex;
+  const value = BigInt(row.pending_usdc ?? "0");
+  let receipt: TxReceiptLike;
+  try {
+    receipt = await deps.chain.receipt(tx);
+  } catch {
+    return { state: "pending", tx, value, bankLast4: row.bank_last4 };
+  }
+  deps.db.prepare("UPDATE konto_payouts SET pending_tx = NULL, pending_usdc = NULL WHERE address = ? AND pending_tx = ?").run(account, tx);
+  const went = receiptSucceeded(receipt);
+  (deps.log ?? ((line: string) => console.log(line)))(`[payout] open payout ${went ? "went through" : "reverted"}, tx ${tx}`);
+  return { state: went ? "sent" : "reverted", tx, value, bankLast4: row.bank_last4 };
+}
+
 const running = new Set<string>();
 
 /**
  * Pays `value` atomic USDC from the smart wallet of `address` to its fixed payout address. The caller has checked the amount
  * against balanceOf. Throws PayoutFailed when a transaction did not go through, and `busy` when a payout of the account runs.
  */
-export async function sendPayout(deps: PayoutDeps, address: string, value: bigint): Promise<{ tx: Hex; bankLast4: string | null }> {
+export async function sendPayout(deps: PayoutDeps, address: string, value: bigint): Promise<PayoutResult> {
   const account = address.toLowerCase();
   if (running.has(account)) throw new Error("busy");
   running.add(account);
   try {
     const { db, chain } = deps;
+    // An open payout first: while its receipt is missing nothing is sent, and one that went through is the answer.
+    const open = await settlePendingPayout(deps, account);
+    if (open.state === "pending" || open.state === "sent") return { state: open.state, tx: open.tx, value: open.value, bankLast4: open.bankLast4 };
     const row = readPayout(db, account);
     if (!row?.permission || !row.signature || !row.forwarder || !row.destination) throw new Error("payout_needs_phone");
     // The bank step stored the forwarder computed with the values of that day. When the gas key (the forwarder's `caller`), token
@@ -310,11 +350,24 @@ export async function sendPayout(deps: PayoutDeps, address: string, value: bigin
       }
       db.prepare("UPDATE konto_payouts SET permission_approved = 1 WHERE address = ?").run(account);
     }
-    const tx = await confirm(chain, "payout", {
-      to: forwarder,
-      data: encodeFunctionData({ abi: FORWARDER_ABI, functionName: "payout", args: [permission, value] }),
-    });
-    return { tx, bankLast4: row.bank_last4 };
+    // The payout itself: its hash and amount are stored before the wait, so a wait that breaks off (error, timeout, restart)
+    // leaves an open payout that the next one clears instead of sending the money a second time.
+    let tx: Hex;
+    try {
+      tx = await chain.send({ to: forwarder, data: encodeFunctionData({ abi: FORWARDER_ABI, functionName: "payout", args: [permission, value] }) });
+    } catch {
+      throw new PayoutFailed("payout", null);
+    }
+    db.prepare("UPDATE konto_payouts SET pending_tx = ?, pending_usdc = ? WHERE address = ?").run(tx, String(value), account);
+    let receipt: TxReceiptLike;
+    try {
+      receipt = await chain.receipt(tx);
+    } catch {
+      return { state: "pending", tx, value, bankLast4: row.bank_last4 };
+    }
+    db.prepare("UPDATE konto_payouts SET pending_tx = NULL, pending_usdc = NULL WHERE address = ? AND pending_tx = ?").run(account, tx);
+    if (!receiptSucceeded(receipt)) throw new PayoutFailed("payout", tx);
+    return { state: "sent", tx, value, bankLast4: row.bank_last4 };
   } finally {
     running.delete(account);
   }
@@ -346,6 +399,13 @@ export async function runPayoutRules(deps: PayoutDeps, nowMs: number): Promise<{
     .all(weekday, today) as RuleRow[];
   const out: { address: string; outcome: string }[] = [];
   for (const rule of due) {
+    // An open payout of the account first: nothing new while its receipt is missing, and the day stays unpaid.
+    const open = await settlePendingPayout(deps, rule.address);
+    if (open.state === "pending") {
+      log("[payout] a payout rule is due, but an earlier payout of the account is still waiting for its receipt; nothing was sent");
+      out.push({ address: rule.address, outcome: "pending" });
+      continue;
+    }
     const row = readPayout(deps.db, rule.address);
     if (!row?.permission || !row.forwarder) {
       log("[payout] payout_needs_phone: a payout rule is due, but the account has not set up its bank account on the phone yet");
@@ -361,6 +421,11 @@ export async function runPayoutRules(deps: PayoutDeps, nowMs: number): Promise<{
         continue;
       }
       const sent = await sendPayout(deps, rule.address, value);
+      if (sent.state === "pending") {
+        log(`[payout] rule sent ${formatUsd(value)} USD, the receipt has not arrived yet, tx ${sent.tx}`);
+        out.push({ address: rule.address, outcome: "pending" });
+        continue;
+      }
       deps.db.prepare("UPDATE konto_payout_rules SET last_paid_day = ? WHERE address = ?").run(today, rule.address);
       log(`[payout] rule paid ${formatUsd(value)} USD, tx ${sent.tx}`);
       out.push({ address: rule.address, outcome: "sent" });
@@ -395,6 +460,17 @@ export function registerKontoPayout<E extends Env>(app: Hono<E>, deps: { db: Db;
     c.json({ error: "no_account", message: "This API key belongs to no account. Create one with POST /v1/handoff and step konto.", docs: CONTRACT }, 404);
   const hasAccount = (a: string) => Boolean(db.prepare("SELECT 1 FROM konto_accounts WHERE address = ?").get(a));
   const invalid = (c: Context, message: string) => c.json({ error: "invalid_arguments", message, docs: CONTRACT }, 400);
+  const pendingAnswer = (c: Context, tx: Hex, value: bigint) =>
+    c.json(
+      {
+        state: "pending",
+        tx,
+        amount_usd: formatUsd(value),
+        message: "The payout was sent, but its confirmation has not arrived yet. Do not pay it again: send the same request later, it never pays twice.",
+        docs: CONTRACT,
+      },
+      202,
+    );
 
   app.post("/v1/konto/payout", async (c) => {
     c.header("Cache-Control", "no-store");
@@ -409,6 +485,10 @@ export function registerKontoPayout<E extends Env>(app: Hono<E>, deps: { db: Db;
     if (!bridge) return payoutOff(c);
     const account = address(c);
     if (!hasAccount(account)) return noAccount(c);
+    // An open payout first, before the balance: one that went through is the answer, and nothing is sent while one is open.
+    const open = await settlePendingPayout(payoutDeps, account);
+    if (open.state === "pending") return pendingAnswer(c, open.tx, open.value);
+    if (open.state === "sent") return c.json({ state: "sent", tx: open.tx, amount_usd: formatUsd(open.value), bank_last4: open.bankLast4 }, 200);
     const row = readPayout(db, account);
     if (!row?.permission || !row.forwarder || !forwarderFits(row, account, payoutDeps.fixed)) {
       return c.json(
@@ -437,7 +517,8 @@ export function registerKontoPayout<E extends Env>(app: Hono<E>, deps: { db: Db;
     }
     try {
       const sent = await sendPayout(payoutDeps, account, value);
-      return c.json({ state: "sent", tx: sent.tx, amount_usd: formatUsd(value), bank_last4: sent.bankLast4 }, 200);
+      if (sent.state === "pending") return pendingAnswer(c, sent.tx, sent.value);
+      return c.json({ state: "sent", tx: sent.tx, amount_usd: formatUsd(sent.value), bank_last4: sent.bankLast4 }, 200);
     } catch (err) {
       if (err instanceof Error && err.message === "payout_needs_phone") {
         return c.json(

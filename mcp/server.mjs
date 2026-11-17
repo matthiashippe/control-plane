@@ -1018,6 +1018,15 @@ export function createAutomatonTools({
     }
     const amount = typeof p.amount_usd === "string" ? p.amount_usd : fallbackAmount;
     const last4 = typeof p.bank_last4 === "string" && p.bank_last4 ? p.bank_last4 : null;
+    if (p.state === "pending") {
+      // 202: the money left, but the confirmation is still missing. Asking again with the same request never pays twice.
+      const pending = {
+        status: "pending",
+        amount_usd: amount,
+        message: `$${amount} is on its way, but the confirmation has not arrived yet. Do not pay it again: call payout with the same amount later to see whether it arrived.`,
+      };
+      return { view: pending, last4 };
+    }
     const view = { status: "sent", amount_usd: amount };
     if (last4) view.bank_account = `ending ${last4}`;
     view.message = `Sent $${amount} to your bank account${last4 ? ` ending ${last4}` : ""}.`;

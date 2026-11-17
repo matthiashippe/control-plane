@@ -204,6 +204,9 @@
 - Das Land der IBAN wird über eine Tabelle der SEPA-Länder auf drei Buchstaben gebracht, weil Bridge `iban.country` mit drei Buchstaben verlangt und eine Auszahlung außerhalb von SEPA nicht ankäme.
 - `keep_usd` darf 0 sein und `all: true` zahlt bei 0 USDC nichts (`nothing_to_pay`), unter 1,00 USD aber 400 `below_minimum`, weil Bridge Beträge unter 1 USD weder gutschreibt noch zurückgibt.
 - Ist der Mensch bei Bridge schon geprüft, zählen die Schritte „1 of 2“ und „2 of 2“ statt „of 3“, weil der Design Reviewer sonst einen fehlenden Schritt sah.
+- Eine Weiterleitung, die nicht mehr zu `forwarderAddress` mit den heutigen Werten passt, gibt 409 `payout_needs_phone` statt einer Reparatur auf dem Server, weil die zweite Erlaubnis des Menschen die alte Weiterleitung als Spender nennt und nur sein Passkey eine neue unterschreiben kann.
+- Die Route klärt eine offene Auszahlung vor der Prüfung des Kontostands, weil nach einer angekommenen Auszahlung der Kontostand schon gesunken ist und dieselbe Anfrage sonst `insufficient_balance` statt `sent` mit dem alten Hash bekäme.
+- Eine offene Auszahlung antwortet 202 `pending` statt 502, weil das Geld schon unterwegs sein kann und „Try again later“ zu einer zweiten Überweisung führen würde.
 
 ## Abgelöst durch seite 03 (Maker, 2026-11-16)
 

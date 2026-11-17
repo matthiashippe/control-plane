@@ -315,7 +315,7 @@ Wallet ohne Karte kein Geld auf sein Konto bekommt.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/konto-payout-guard.test.ts test/konto-payout.test.ts test/konto-payout-rule.test.ts` muss Exit-Code 0 haben.
       Prüfung: `grep -cE "^\s*(it|test)\(" test/konto-payout-guard.test.ts` muss mindestens 3 ausgeben (je ein Fall: Bank-Schritt mit `caller` A, dann `POST /v1/konto/payout` mit einem `fixed` mit `caller` B ergibt 409 `payout_needs_phone` und null Aufrufe von `send`; dasselbe über `runPayoutRules` ergibt eine Log-Zeile `payout_needs_phone`, null Aufrufe von `send` und kein `last_paid_day`; die Anlage gelingt, `code` der gespeicherten Adresse bleibt aber `0x`, dann kein `payout` und `PayoutFailed` mit Stufe `deploy`).
       Prüfung: `grep -c "forwarderAddress(" src/konto/payout.ts` muss mindestens `2` ausgeben.
-- [ ] Ein gesendetes `payout`, dessen Quittung fehlt, wird nie ein zweites Mal gesendet: Hash und Betrag stehen vor dem Warten auf die
+- [x] Ein gesendetes `payout`, dessen Quittung fehlt, wird nie ein zweites Mal gesendet: Hash und Betrag stehen vor dem Warten auf die
       Quittung in der Datenbank. Bricht das Warten ab (Fehler, Zeitüberschreitung, Neustart), antwortet die Route 202 mit
       `state: "pending"` und dem Hash. Die nächste Auszahlung des Kontos, über die Route oder die Regel, klärt zuerst diesen Hash und
       sendet nichts, solange er offen ist; `success` gibt der Route `state: "sent"` mit dem alten Hash und Betrag ohne neue Transaktion,
@@ -391,6 +391,11 @@ Wallet ohne Karte kein Geld auf sein Konto bekommt.
   der Adresse Code liegen, sonst `PayoutFailed` mit Stufe `deploy`. Prüfbefehle: Vitest von Punkt 19 Exit 0, `test/konto-payout-guard.test.ts`
   3 Fälle, `forwarderAddress(` 2 Treffer. Gegenprobe: vor dem Fix waren alle drei Fälle rot (502 statt 409, Regel `failed`, kein
   `PayoutFailed`).
+- 2026-11-17 Zyklus 4: Punkt 20 gebaut. `sendPayout` schreibt Hash und Betrag des `payout` vor dem Warten in
+  `konto_payouts.pending_tx`/`pending_usdc`; `settlePendingPayout` klärt einen offenen Hash in Route (vor dem Kontostand), Regel und
+  `sendPayout`; die Route antwortet 202 `pending`, das MCP-Tool meldet `pending` statt „Sent“. Prüfbefehle: Vitest von Punkt 20
+  Exit 0, `test/konto-payout-pending.test.ts` 4 Fälle, `pending` 24 Treffer in `src/konto/payout.ts`. Gegenprobe: vor dem Fix waren
+  alle vier Fälle rot (502 statt 202), der neue Fall in `test/mcp-money.test.ts` mit dem alten `mcp/server.mjs` ebenso.
 
 ## Blockers
 - keine; das Human Gate `security_settings` ist erledigt, der Absatz „Ausnahme Hauptnetz“ liegt seit `5f77e64` auf `dev`.

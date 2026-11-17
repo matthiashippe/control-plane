@@ -177,6 +177,21 @@ describe("Money tools in mcp/server.mjs", () => {
     expect(h.calls.filter((c) => c.path.startsWith("/v1/handoff"))).toHaveLength(0);
   });
 
+  it("payout on 202 pending says the money is on its way and must not be paid again, without claiming it was sent", async () => {
+    const h = harness({
+      "POST /v1/konto/payout": () => json(202, { state: "pending", tx: "0x" + "ef".repeat(32), amount_usd: "10.00" }),
+    });
+    const paid = await h.call("payout", { amount_usd: "10.00" });
+    expect(paid.isError).toBe(false);
+    expect(paid.json).toMatchObject({ status: "pending", amount_usd: "10.00" });
+    expect(paid.json.message).toContain("not arrived yet");
+    expect(paid.json.message).toContain("Do not pay it again");
+    expect(paid.json.message).not.toMatch(/^Sent/);
+    expect(paid.all).not.toMatch(BLOCKED);
+    expect(h.callsTo("POST", "/v1/konto/payout")).toHaveLength(1);
+    expect(h.calls.filter((c) => c.path.startsWith("/v1/handoff"))).toHaveLength(0);
+  });
+
   it("payout on 409 payout_needs_phone makes a POST /v1/handoff with step payout, answers with qr and pays after done", async () => {
     const h = harness({
       "GET /v1/automatons": AUTOMATONS,

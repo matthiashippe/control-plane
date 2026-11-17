@@ -624,6 +624,8 @@ function migrate(db: Db): void {
   // is the PayoutForwarder for account and destination, `permission`/`signature` the second spend permission the person signed for
   // it (JSON with numbers as strings), `permission_approved` 1 once approveWithSignature went through. After a new IBAN,
   // `retire_forwarder`/`retire_permission` are the forwarder and permission before it, which get `retire` before the next payout.
+  // `pending_tx`/`pending_usdc` are a sent `payout` whose receipt did not arrive yet (atomic USDC as a string); the next payout of
+  // the account clears it first and sends nothing while it is open.
   // `payout_handoffs` holds what the bank step of one handoff brought until its passkey step ends it; `konto_payout_rules` the
   // rule of an account (keep this much, pay the rest on this weekday) and the UTC day it last paid.
   db.exec(`
@@ -642,6 +644,8 @@ function migrate(db: Db): void {
       permission_approved    INTEGER NOT NULL DEFAULT 0,
       retire_forwarder       TEXT,
       retire_permission      TEXT,
+      pending_tx             TEXT,
+      pending_usdc           TEXT,
       updated_at             INTEGER NOT NULL
     );
     CREATE TABLE IF NOT EXISTS payout_handoffs (
@@ -662,6 +666,10 @@ function migrate(db: Db): void {
       updated_at    INTEGER NOT NULL
     );
   `);
+  const payoutColumns = db.prepare("PRAGMA table_info(konto_payouts)").all() as { name: string }[];
+  for (const column of ["pending_tx", "pending_usdc"]) {
+    if (!payoutColumns.some((c) => c.name === column)) db.exec(`ALTER TABLE konto_payouts ADD COLUMN ${column} TEXT`);
+  }
 
   // The conversation that asks back (HAN-77). `fields` is what was understood so far, `turns` the
   // transcript; both are a person's words and are deleted after a day (`cleanupConversations` in

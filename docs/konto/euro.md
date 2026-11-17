@@ -60,6 +60,15 @@ Bridge (`payout-verify`), IBAN und Name (`payout-bank`) und die zweite Erlaubnis
 Auszahlung läuft ohne Handy. Fällt beim Prüfen der Unterschrift der RPC aus, antwortet die Route 503 `signature_check_unavailable`,
 der Handoff bleibt `matched`, und `retry` schickt dieselbe Unterschrift noch einmal.
 
+Vor der ersten Transaktion prüft `sendPayout` mit `forwarderFits`, dass die gespeicherte Weiterleitung gleich
+`forwarderAddress(account, destination, fixed)` mit den heutigen Werten ist; nach einem Wechsel des Gasschlüssels (`caller`), des
+Tokens oder der Kette antwortet die Route 409 `payout_needs_phone` ohne Transaktion, und der Handoff legt die Weiterleitung neu an.
+Nach einer Anlage muss an der Adresse Code liegen, sonst stoppt die Auszahlung mit `PayoutFailed` in der Stufe `deploy`. Hash und
+Betrag des `payout` stehen vor dem Warten auf die Quittung in `konto_payouts.pending_tx` und `pending_usdc`. Bricht das Warten ab,
+antwortet die Route 202 mit `state: "pending"` und dem Hash; die nächste Auszahlung klärt mit `settlePendingPayout` zuerst diesen
+Hash, noch vor dem Kontostand: offen gibt wieder 202, `success` gibt `state: "sent"` mit dem alten Hash ohne neue Transaktion,
+`reverted` gibt den Weg für ein neues `payout` frei. Das MCP-Tool meldet `pending` mit dem Rat, nicht noch einmal zu zahlen.
+
 Bridge spricht man mit dem Header `Api-Key` an, ohne Benutzername
 ([Quelle](https://apidocs.bridge.xyz/api-reference/introduction/introduction), Stand 2026-11-16). Jeder `POST` braucht
 `Idempotency-Key`, `GET`, `PUT`, `PATCH` und `DELETE` dürfen ihn nicht tragen; derselbe Schlüssel gibt 24 Stunden lang dieselbe Antwort
@@ -129,7 +138,9 @@ deshalb vorher `eth_getCode`. Am 2026-11-16 liefert `eth_getCode` für den Proxy
 `set_payout_rule {keep_usd, weekday} | {off:true}` ruft `POST /v1/konto/payout-rule`; `weekday` ist `monday` bis `sunday`, `off: true`
 löscht die Regel. `runPayoutRules(deps, nowMs)` läuft stündlich aus `src/index.ts` (`setInterval` mit `unref`) und zahlt am Wochentag
 der Regel nach UTC einmal am Tag den Kontostand minus `keep_usd` aus, wenn das mindestens 1,00 USD sind (der Mindestbetrag von Bridge
-oben). Fehlt die zweite Erlaubnis, zahlt der Lauf nichts und loggt `payout_needs_phone`; das Handy braucht nur der Handoff.
+oben). Fehlt die zweite Erlaubnis oder passt die Weiterleitung nicht mehr zu den heutigen Werten, zahlt der Lauf nichts und loggt
+`payout_needs_phone`; das Handy braucht nur der Handoff. Ist eine Auszahlung des Kontos noch offen, sendet der Lauf nichts, meldet
+`pending` und lässt `last_paid_day` leer, damit er sie in der nächsten Stunde wieder prüft.
 
 In `topUpIfLow` merkt sich der Server je Konto das Ende der Periode, in der `period_used_up` galt, und meldet bis dahin ohne Aufruf ans
 Netz `period_used_up`. Eine Erlaubnis mit `end` in der Vergangenheit ergibt `permission_expired` ohne Aufruf, weil `spend()` dort
