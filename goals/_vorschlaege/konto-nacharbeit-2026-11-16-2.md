@@ -6,3 +6,4 @@ Empfehlung: `PERMISSION_TUPLE` in `src/konto/topup.ts` nimmt seine `components` 
 MVP: Schönheit
 
 Linse Q, Frage 2 (Logik-Duplikate), Merge c1d7f74. Ein Abweichen der beiden Listen in `src/konto/` fiele heute nur im Job `e2e` auf (approveWithSignature und spend gegen den Vertrag im Harness), kein Unit-Test vergleicht sie.
+Verworfen: MVP: Schönheit ohne belegten Fehler, und der Kurs-Check vom 17.11. (PRO-23529) sieht den Detail-Anteil über der Schwelle; eine Abweichung der Felder fiele im Job e2e auf (2026-11-17)

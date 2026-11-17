@@ -6,3 +6,4 @@ Empfehlung: Beide Helfer in eine Datei unter `ops/` legen, die beide Skripte per
 MVP: Schönheit
 
 Linse Q, Frage 2 (Logik-Duplikate), Merge 792a490.
+Verworfen: MVP: Schönheit ohne belegten Fehler, und der Kurs-Check vom 17.11. (PRO-23529) sieht den Detail-Anteil über der Schwelle; die Helfer sind Testwerkzeug ohne Ledger-Bezug (2026-11-17)

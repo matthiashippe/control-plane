@@ -6,3 +6,4 @@ Empfehlung: `parseLimit` streichen und `parseUsdc` importieren, oder beide Aufru
 MVP: Funktion, weil das Limit des Kontos und der Betrag des Handoffs sonst bei der nächsten Änderung verschiedene Beträge annehmen.
 
 Linse Q, Frage 2 (Logik-Duplikate), Merge c141093. Kein späterer Commit auf `origin/dev` hat die beiden Stellen geändert.
+Übernommen: PRO-23679 Glied 2 (2026-11-17)

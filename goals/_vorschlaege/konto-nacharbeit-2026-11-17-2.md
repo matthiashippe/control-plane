@@ -6,3 +6,4 @@ Empfehlung: In `test/konto-limit.test.ts` einen Fall für 400 `invalid_limit` mi
 MVP: Funktion, weil ein falsch angenommener Betrag das Tageslimit eines zahlenden Kontos setzt.
 
 Linse Q, Frage 1 (Tests prüfen Verhalten mit Randfall), Merge c141093. Die vorhandenen 400-Fälle in `test/konto-limit.test.ts` (Zeilen 197, 247, 265) prüfen ein Limit unter dem heutigen und falsche Signaturen, nicht das Format des Betrags.
+Übernommen: PRO-23679 Glied 3 (2026-11-17)

@@ -6,3 +6,4 @@ Empfehlung: `automatonOfKey` fragt einmal ab und gibt Id oder null zurück, `isA
 MVP: Schönheit
 
 Linse Q, Frage 2 (Logik-Duplikate), Merge 792a490.
+Verworfen: MVP: Schönheit ohne belegten Fehler, und der Kurs-Check vom 17.11. (PRO-23529) sieht den Detail-Anteil über der Schwelle; die doppelte Abfrage ist ein Lesezugriff auf einen Index (2026-11-17)

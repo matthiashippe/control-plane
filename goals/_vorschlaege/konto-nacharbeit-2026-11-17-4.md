@@ -6,3 +6,4 @@ Empfehlung: Die Automaton-Tools aus `mcp/server.mjs` in ein eigenes Modul unter 
 MVP: Schönheit
 
 Linse Q, Frage 6 (Datei über 500 Zeilen), Merge c141093. Dieselbe Klasse wurde zweimal verworfen (abrechnung-nacharbeit-2026-11-11-2, domains-nacharbeit-2026-11-15-1) und einmal übernommen (messung-nacharbeit-2026-11-15-3).
+Verworfen: MVP: Schönheit ohne belegten Fehler, und der Kurs-Check vom 17.11. (PRO-23529) sieht den Detail-Anteil über der Schwelle; die Größe allein ist kein Fehler, die Limit-Routen bündelt PRO-23679 Glied 2 (2026-11-17)

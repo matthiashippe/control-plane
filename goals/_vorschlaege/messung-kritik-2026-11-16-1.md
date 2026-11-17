@@ -5,3 +5,4 @@ Beleg: ops/anzeigen-rechnung.py:1 bis 27 („Do paid ads pay for themselves here
 Empfehlung: Der nächste Kurs-Check prüft messung 08 gegen das Abschlusskriterium (erste fremde Sandbox) und pausiert es, wenn kein Messauftrag zu bezahlten Anzeigen offen ist; die Voraussetzung von messung 12 wird dann `messung Goal 07 DONE`, damit die eigene Liste nicht an der Anzeigenrechnung wartet.
 
 Nicht selbst pausiert, weil `ROADMAP.md` die Zielzahlen aus `ZIELE.md` stehen lässt und der Docstring einen Auftrag von Matthias vom 29.09.2026 nennt, die Rechnung regelmäßig zu prüfen. Der Kurs-Check meldet heute 80 % Detail-Anteil bei einer Schwelle von 40 %, und er hat fehler 11 und domains 07 mit demselben Grund pausiert.
+Übernommen: ROADMAP.md, Glied messung 13 (PR #227) (2026-11-17)

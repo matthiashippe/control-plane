@@ -6,3 +6,4 @@ Empfehlung: Einen vitest-Test `test/runtime-sandbox-selftest.test.ts` anlegen, d
 MVP: Funktion, weil sonst ein Merge, der den Stempel bricht, grün bleibt und der Gang eine Runtime meldet, die nicht am Pin gebaut ist.
 
 Linse Q, Frage 1, Merge 4551d43. Vor dem Goal hatte der Selbsttest 18 Fälle und schon keinen Aufrufer unter `test/`; sandbox 10 macht ihn zum einzigen Beleg seiner Done-Punkte.
+Übernommen: PRO-23679 Glied 5 (2026-11-17)
