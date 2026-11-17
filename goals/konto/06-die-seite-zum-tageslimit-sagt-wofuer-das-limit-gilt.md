@@ -1,7 +1,7 @@
 # Konto Goal 06: Die Seite zum Tageslimit sagt, wofür das Limit gilt
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Wer auf dem Handy das Tageslimit hebt, sieht, dass es für sein ganzes Konto gilt, und kein Text aus dem Terminal verspricht ihm etwas
@@ -183,7 +183,7 @@ die es nicht gibt, und weil ein Text, den das Terminal bestimmt, auf dieser Seit
       Prüfung: `git diff origin/dev...HEAD | grep -E '^[+]' | grep -iE "(api[_-]?key|secret|token|private[_-]?key)[\"' ]*[:=] *[\"']?[A-Za-z0-9_+/=-]{16,}|BEGIN [A-Z ]*PRIVATE KEY|cnwy_k_[A-Za-z0-9_-]{16,}" | wc -l` muss `0` ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung (Netz): `n=$(gh pr list -R matthiashippe/control-plane --head goal/konto-06 --state open --json number -q '.[0].number'); gh pr checks "$n" -R matthiashippe/control-plane | awk -F'\t' '$1=="check" && $2=="pass"' | wc -l` muss mindestens `1` ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Wer auf dem Handy das Tageslimit hebt, liest, dass es für sein ganzes Konto gilt, unter dem Namen seines Kontos.
@@ -218,5 +218,6 @@ die es nicht gibt, und weil ein Text, den das Terminal bestimmt, auf dieser Seit
 - 2026-11-17 Zyklus 1: Punkte 1 bis 9 gebaut (Kopf vor diesem Commit `6f2d70d`, PR #247), Punkt 10 offen. Prüfbefehle: alle Prüfbefehle der Punkte 1 bis 9 selbst ausgeführt und grün, mit `FONTCONFIG_FILE=~/.config/control-plane/soll-fonts.conf` und `PATH=/usr/bin:$PATH`; Punkt 1 `soll limit: 4 pictures, approve top 390=555 1440=603, limit top 390=486 1440=510, 0 defects`, `breiten ok`, `konto ok`, `quellen ok`, `bausteine ok neu=0`; Punkt 2 alle vier Gegenproben `3`, Tests Exit 0, `bestand gleich`, `soll: 2 pictures, move top 390=828 1440=656, 0 defects`; Punkt 3 `fertig`, `soll handoff: 6 pictures, approve top 390=528 1440=603, 0 defects`, `0`, `0`; Punkt 4 `0`, `0`, `1`, `1`, Gegenprobe `exit=1`, Tests Exit 0, `0`; Punkt 5 Tests Exit 0, `5`, `0`, `0`; Punkt 6 `abnahme ok 1` (Abnahme PRO-24063 um 12:51, letzter Bild-Commit 12:48, erster Commit an `limit.ts` danach); Punkt 7 Limit, Handoff, Konto (`2` Zeilen `failed`) und Geld (`soll money: 14 images, blocks end 390=591 1440=615, 0 defects`) pixelgleich, Gegenprobe mit geänderter Überschrift `exit=1` mit 2 Mängeln; Punkt 8 nichts, `0`, `11`; Punkt 9 `11`, `1`, `0`, `2`. Neue Tests waren rot: `test/state-names.test.ts` vor der Umbenennung mit 11 Funden und fehlender Route `failed`, `test/konto-limit-account.test.ts` gegen den alten Stand von `routes.ts`, `server.mjs` und `limit.ts` in allen 5 Fällen. Punkt 8: 286 Prüfbefehle der fertigen Goals unter `goals/konto/` und `goals/seite/` an Merge-Basis und Goal-Branch verglichen (`origin/dev` als `HEAD` gelesen wie nach dem Merge; ausgelassen nur offene PR-Suchen, Schlüsseldateien, Turnkey, `loop.env` und externe Links), abgelöst: konto 02 drei, konto 04 zwei, konto 05 vier, seite 03 zwei, konto 01, 03, seite 01 und 02 keiner; die zwei Zeilen von konto 02 Punkt 1 enden mit `Node.js v22.23.5`, gemessen mit dem Node aus `/usr/bin`. Punkt 10: Pfade `0`, Tests `0`, `pakete gleich`, Schlüssel `0`, `check: grün in 122 s`; die Prüfung `git diff --quiet --diff-filter=DMR origin/dev...HEAD -- 'goals/*/[0-9][0-9]-*.md' && echo goals gleich` gibt nichts aus, weil die Pfadangabe diese Goal-Datei selbst trifft, die der Maker in Status, Kästchen und Progress Log ändern muss; deshalb bleibt Punkt 10 offen, Frage an den Tech Lead auf dem Topic.
 - 2026-11-17 Zyklus 2: Abschluss gemeldet, Punkte 1 bis 9; Punkt 10 offen, weil seine Prüfung `goals gleich` die eigene Goal-Datei trifft (Frage an den Tech Lead auf PRO-24063). Prüfbefehle am Kopf `ef07e6f`, `dev` schon enthalten: Punkt 1 `soll limit: 4 pictures, approve top 390=555 1440=603, limit top 390=486 1440=510, 0 defects`; Punkt 3 `soll handoff: 6 pictures, approve top 390=528 1440=603, 0 defects`; Punkt 5 Tests Exit 0, `0`, `0`; Punkt 7 Limit live `0 defects`; Punkt 10 Pfade `0`, `pakete gleich`, Goal-Dateien geändert nur `goals/konto/06-die-seite-zum-tageslimit-sagt-wofuer-das-limit-gilt.md`, `check: grün in 61 s`; am PR #247 `check` pass und `e2e` pass.
 - 2026-11-17 Zyklus 3: Punkt 10 mit der Prüfung aus der Kritik (`b0b2b16`) ausgeführt und abgehakt, Abschluss gemeldet, Punkte 1 bis 10. Prüfbefehle am Kopf `b0b2b16`, `dev` enthalten: Pfade `0`, Tests `0`, `pakete gleich`, `goals gleich` (Gegenprobe ohne die Ausnahme der eigenen Goal-Datei gibt nichts aus), Schlüssel `0`, `check: grün in 52 s`; Job `check` am PR liest der Kommentar am Topic nach dem Push.
+- 2026-11-17 Release: PASS K und B (Zyklus 3), DONE.
 
 ## Blockers
