@@ -45,10 +45,33 @@ export const EXEC_DIR = "/root/.exec";
 const EXEC_WRAP_MARGIN_MS = 15_000;
 
 /**
+ * How much of `<base>.out` and of `<base>.err` the wrapper and the wait command print at most (goals/hosting/02). The
+ * runtime puts every byte of an exec answer into the context of the model, which the customer pays as inference; an
+ * `npm install` writes several MB. A longer file is cut to its last WAIT_TAIL_BYTES, after one line that names its size
+ * and path, so the model reads the rest with read_file.
+ */
+export const WAIT_TAIL_BYTES = 64 * 1024;
+
+/**
+ * The shell that prints `<base>.out` to stdout and `<base>.err` to stderr: a file up to WAIT_TAIL_BYTES unchanged with
+ * cat, a larger one as one line with its size, the number of bytes shown and its path, then its last WAIT_TAIL_BYTES
+ * (`tail -c`), both on the stream of the file. Only bash, wc, tail and cat, which the image has; a space before every
+ * path (mapRoot).
+ */
+function printOutputs(base: string): string {
+  const one = (file: string, to: string): string =>
+    `n=$(wc -c 2>/dev/null < ${file}); if [ "\${n:-0}" -gt ${WAIT_TAIL_BYTES} ] 2>/dev/null; then ` +
+    `{ echo "This output has $n bytes, only its last ${WAIT_TAIL_BYTES} bytes follow. The whole output is in the file ${file}; read the rest with read_file."; ` +
+    `tail -c ${WAIT_TAIL_BYTES} ${file}; }${to}; else cat ${file}${to}; fi`;
+  return `${one(`${base}.out`, "")}; ${one(`${base}.err`, " >&2")}`;
+}
+
+/**
  * The command sandboxd runs for a command in the background: the command itself in `bash -c` under coreutils
  * `timeout` (124 when it is stopped), its stdout and stderr into `<base>.out` and `<base>.err`, its exit code into
- * `<base>.exit` when it ends; then both are printed and the exit code returned, so the answer to a repeat after the
- * end is the same as for a held command.
+ * `<base>.exit` when it ends; then both are printed (printOutputs) and the exit code returned, so the answer to a repeat
+ * after the end is the same as for a held command. The exit code goes into `<base>.exit.tmp` first and is moved to
+ * `<base>.exit` with `mv -f`, so `<base>.exit` never exists empty (goals/hosting/02).
  */
 export function backgroundCommand(command: string, base: string, seconds: number): string {
   const quoted = `'${command.replace(/'/g, `'\\''`)}'`;
@@ -57,7 +80,7 @@ export function backgroundCommand(command: string, base: string, seconds: number
   // or a separator (mapRoot in harness/sandboxd/harness-run.mjs), as a shell word starts there.
   return (
     `mkdir -p ${dir} && timeout -k 5 ${seconds} bash -c ${quoted} > ${base}.out 2> ${base}.err; ` +
-    `c=$?; echo $c > ${base}.exit; cat ${base}.out; cat ${base}.err >&2; exit $c`
+    `c=$?; echo $c > ${base}.exit.tmp; mv -f ${base}.exit.tmp ${base}.exit; ${printOutputs(base)}; exit $c`
   );
 }
 
@@ -70,18 +93,21 @@ export const EXEC_WAIT_S = 25;
 
 /**
  * The command a model runs with exec (no timeout) to wait for a command in the background: it looks once a second
- * whether `<base>.exit` exists, for at most `seconds` seconds by the clock of bash (`$SECONDS`), not by the number of
- * rounds, so a slow start of `sleep` in gVisor does not stretch the wait past one more round. When it exists, the first line of stdout is
- * `The command has ended with exit code <n>.`, then `<base>.out` follows, `<base>.err` goes to stderr, and it ends with
- * the exit code of the command (124 too). Otherwise it says the command is still running and ends with 0. Only bash,
- * sleep, cat and test, which the image has; a space before every path, as in backgroundCommand (mapRoot).
+ * whether `<base>.exit` exists with content, for at most `seconds` seconds by the clock of bash (`$SECONDS`), not by the
+ * number of rounds, so a slow start of `sleep` in gVisor does not stretch the wait past one more round. When it has
+ * content, the first line of stdout is `The command has ended with exit code <n>.`, then `<base>.out` follows,
+ * `<base>.err` goes to stderr (both cut by printOutputs), and it ends with the exit code of the command (124 too).
+ * Otherwise, also for an empty `<base>.exit`, it says the command is still running and ends with 0 (goals/hosting/02).
+ * The `[ -f <base>.exit ]` stays in the end test because the live check (BG_ANSWER_JS in ops/live.sh) finds the exit
+ * file of the answer by it. Only bash, sleep, cat, wc, tail and test, which the image has; a space before every path,
+ * as in backgroundCommand (mapRoot).
  */
 export function waitCommand(base: string, seconds = EXEC_WAIT_S): string {
   const exit = `${base}.exit`;
   return (
-    `s=$SECONDS; while [ ! -f ${exit} ] && [ $((SECONDS-s)) -lt ${seconds} ]; do sleep 1; done; ` +
-    `if [ -f ${exit} ]; then c=$(cat ${exit}); [ -n "$c" ] || { sleep 1; c=$(cat ${exit}); }; ` +
-    `echo "The command has ended with exit code $c."; cat ${base}.out; cat ${base}.err >&2; exit "$c"; fi; ` +
+    `s=$SECONDS; while [ ! -s ${exit} ] && [ $((SECONDS-s)) -lt ${seconds} ]; do sleep 1; done; ` +
+    `if [ -f ${exit} ] && [ -s ${exit} ]; then c=$(cat ${exit}); ` +
+    `echo "The command has ended with exit code $c."; ${printOutputs(base)}; exit "$c"; fi; ` +
     `echo "The command is still running. Run the same command again to wait up to ${seconds} more seconds."`
   );
 }
@@ -100,7 +126,8 @@ function stillRunning(base: string, seconds: number): Reply {
       `at its timeout). Do not start the command again. To wait for its end, call exec with the command on the last ` +
       `line of this answer and no timeout: it waits at most ${EXEC_WAIT_S} seconds, then prints the exit code, the ` +
       `output and the errors of the command, or says that it is still running. As long as it says so, call exec with ` +
-      `the same command again.\n${wait}`,
+      `the same command again. Output or errors longer than ${WAIT_TAIL_BYTES / 1024} KB come as their last ` +
+      `${WAIT_TAIL_BYTES / 1024} KB, after a line that names the file; read the rest of it with read_file.\n${wait}`,
     stderr: "",
     exit_code: -1,
     running: true,
