@@ -584,12 +584,6 @@ export const AUTOMATON_TOOLS = [
           maxLength: 13,
           description: 'The new daily limit in US dollars with at most two decimals, as a string, e.g. "10.00".',
         },
-        name: {
-          type: "string",
-          minLength: 1,
-          maxLength: 64,
-          description: "The automaton name the phone shows when raising. Default: the automaton started from here, else the newest.",
-        },
       },
       required: ["daily_limit_usd"],
       additionalProperties: false,
@@ -1235,12 +1229,12 @@ export function createAutomatonTools({
       const before = atomicFrom(current.payload?.daily_limit_usdc);
 
       if (raiseNeedsPhone(wanted, signed)) {
-        const name = await automatonName(k.key, args.name);
+        // No name: the phone shows the name of the account, which nothing on this machine sets (goals/konto/06).
         const res = await request({
           method: "POST",
           path: "/v1/handoff",
           key: k.key,
-          body: { automaton_name: name, daily_limit_usdc: wanted.toString(), step: "limit" },
+          body: { daily_limit_usdc: wanted.toString(), step: "limit" },
         });
         if (!res.ok) return httpError(res);
         const { code, url, qr, match, expires_at: expiresAt, poll_token: pollToken } = res.payload ?? {};

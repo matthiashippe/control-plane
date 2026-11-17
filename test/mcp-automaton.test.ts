@@ -332,7 +332,7 @@ describe("Automaton tools in mcp/server.mjs", () => {
     const posts = h.callsTo("POST", "/v1/handoff");
     expect(posts).toHaveLength(1);
     expect(posts[0].headers.authorization).toBe(`Bearer ${KEY}`);
-    expect(JSON.parse(posts[0].body!)).toEqual({ automaton_name: "Nova", daily_limit_usdc: "10000000", step: "limit" });
+    expect(JSON.parse(posts[0].body!)).toEqual({ daily_limit_usdc: "10000000", step: "limit" });
     expect(h.callsTo("POST", "/v1/konto/limit"), "the terminal never raises the limit itself").toHaveLength(0);
     expect(raise.json).toMatchObject({ status: "waiting_for_phone", url: `${BASE}/h/LIMT`, match: "17", daily_limit_usd: "10.00" });
     expect(raise.json.qr).toBe(handoffAnswer("LIMT").qr);

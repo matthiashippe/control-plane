@@ -22,7 +22,7 @@ import { HANDOFF_TTL_MS, pollTokenMatches } from "./rules.js";
 import { chooseHandoff, createHandoff, readHandoff, type Handoff, type HandoffRandom, type HandoffState, type HandoffStep } from "./store.js";
 import { qrText } from "./qr.js";
 import type { Address, Hex, PublicClient } from "viem";
-import { burnMatched, finishKonto, permissionFromJson, takeApiKey } from "../konto/account.js";
+import { burnMatched, finishKonto, permissionFromJson, readAccountName, takeApiKey } from "../konto/account.js";
 import { finishLimit, readAccountLimit } from "../konto/limit.js";
 import { parsePermission, permissionMatches, SignatureCheckUnavailable, signatureValid, type SpendPermission } from "../konto/permission.js";
 import { FAIL_REASONS, renderKontoPage, type FailReason } from "../public/konto.js";
@@ -184,9 +184,11 @@ export function registerHandoff<E extends Env>(app: Hono<E>, deps: HandoffDeps):
     private_(c);
     return c.html(renderLimitPage(view, deps.indexStyle()), status);
   };
+  /** The name of the account a raise shows: kept with the handoff of step limit, null when the account has none. */
+  const accountNameOf = (h: Handoff): string | null => (h.automatonName ? h.automatonName : null);
   const limitApprove = (h: Handoff): LimitPage => ({
     state: "approve",
-    automatonName: h.automatonName,
+    automatonName: accountNameOf(h) ?? "",
     previousLimitUsdc: h.previousLimitUsdc ?? 0n,
     dailyLimitUsdc: h.dailyLimitUsdc,
     choices: h.choices,
@@ -306,7 +308,7 @@ export function registerHandoff<E extends Env>(app: Hono<E>, deps: HandoffDeps):
         {
           state: "passkey",
           code: h.code,
-          automatonName: h.automatonName,
+          automatonName: accountNameOf(h) ?? "",
           previousLimitUsdc: h.previousLimitUsdc ?? 0n,
           dailyLimitUsdc: h.dailyLimitUsdc,
           chainId: konto.chainId,
@@ -414,10 +416,12 @@ export function registerHandoff<E extends Env>(app: Hono<E>, deps: HandoffDeps):
         400,
       );
     }
+    // A raise of the limit takes no name from the body (goals/konto/06, decision 2): the page shows the name of the account, which
+    // the terminal cannot set. A name an older plugin still sends is passed over without an error.
     if (
       !body ||
       typeof body !== "object" ||
-      !automatonName ||
+      (step !== "limit" && !automatonName) ||
       dailyLimitUsdc === null ||
       amountUsdc === null ||
       (step !== "confirm" && step !== "konto" && step !== "limit")
@@ -428,7 +432,7 @@ export function registerHandoff<E extends Env>(app: Hono<E>, deps: HandoffDeps):
           message:
             "Send JSON with automaton_name (1 to 64 characters), daily_limit_usdc and amount_usdc, both a positive whole number of " +
             'atomic USDC (6 decimals) in whole cents, as a string, and optionally step "confirm" (the default), "konto" (amount_usdc ' +
-            'may be left out) or "limit" (with your API key, without amount_usdc): ' +
+            'may be left out) or "limit" (with your API key, without amount_usdc and without automaton_name): ' +
             '{"automaton_name":"Atlas","daily_limit_usdc":"5000000","amount_usdc":"5000000"}.',
           docs: CONTRACT,
         },
@@ -437,6 +441,7 @@ export function registerHandoff<E extends Env>(app: Hono<E>, deps: HandoffDeps):
     }
     if ((step === "konto" || step === "limit") && !konto) return c.json(KONTO_OFF, 503);
     let limitOf: { account: string; previousLimitUsdc: bigint } | undefined;
+    let shownName = automatonName ?? "";
     if (step === "limit") {
       // A raise needs the API key of the account (goals/konto/04): the key alone can only lower the limit (POST /v1/konto/limit).
       const address = resolveApiKey(db, c.req.header("authorization"));
@@ -456,10 +461,12 @@ export function registerHandoff<E extends Env>(app: Hono<E>, deps: HandoffDeps):
         );
       }
       limitOf = { account: limit.account, previousLimitUsdc: limit.signed };
+      // The handoff of a raise keeps the name of the account (empty when it has none), never the one from the body.
+      shownName = readAccountName(db, limit.account) ?? "";
     }
     const { handoff, pollToken, expiresAtMs } = createHandoff(
       db,
-      { automatonName, dailyLimitUsdc, amountUsdc, step: step as HandoffStep, ...limitOf },
+      { automatonName: shownName, dailyLimitUsdc, amountUsdc, step: step as HandoffStep, ...limitOf },
       nowMs(),
       deps.random,
     );
