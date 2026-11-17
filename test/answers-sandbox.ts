@@ -63,12 +63,12 @@ export const GOOD = [
   "<!-- Entwurf, intern -->",
   "The 401 is the retry, not the first answer. The first verify answers 500.",
   "",
-  "Disclosure: I run PostYourPrice (https://postyourprice.com), a control plane for this runtime.",
+  "Disclosure: I run automatonhost.com (https://automatonhost.com), a control plane for this runtime.",
   "",
 ].join("\n");
 export const GOOD_BODY =
-  "The 401 is the retry, not the first answer. The first verify answers 500.\n\nDisclosure: I run PostYourPrice (https://postyourprice.com), a control plane for this runtime.\n";
-export const NO_DISCLOSURE = "The 401 is the retry. PostYourPrice at https://postyourprice.com works.\n";
+  "The 401 is the retry, not the first answer. The first verify answers 500.\n\nDisclosure: I run automatonhost.com (https://automatonhost.com), a control plane for this runtime.\n";
+export const NO_DISCLOSURE = "The 401 is the retry. automatonhost.com at https://automatonhost.com works.\n";
 export const HEADER = "# <iso8601-utc> <issue> <url>\n";
 
 /** The first 12 hex digits of sha256 over a body, computed here and not by the script under test. */
