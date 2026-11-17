@@ -1,7 +1,7 @@
 # Anmeldung Goal 05: Die Schnittstelle nennt beide Gründe für ein 429 der Anmeldung
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 `/openapi.json` beschreibt die Antwort 429 von `POST /v1/auth/keyless` heute nur mit `ERROR_SCHEMA` und freiem `error`
@@ -113,7 +113,7 @@ mit Wallet), nur die Grenze seiner Crawler-Kennung oder nur der Begrenzer je Adr
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD | grep -vcE '^(src/public/openapi\.ts|src/auth/keyless\.ts|test/openapi-keyless\.test\.ts|goals/anmeldung/.+)$'` muss 0 ausgeben.
       Prüfung: `node scripts/check.mjs >/dev/null 2>&1; git status --porcelain -- ops/own-ips.txt | wc -l` muss 0 ausgeben.
       Prüfung: `S=$(mktemp -d); XDG_STATE_HOME=$S node scripts/check.mjs >/dev/null 2>&1; find "$S" -type f | wc -l` muss 0 ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Jeder neue Fall war vor dem Fix rot; die Zeile im Progress Log nennt, welche und womit.
@@ -143,6 +143,7 @@ mit Wallet), nur die Grenze seiner Crawler-Kennung oder nur der Begrenzer je Adr
 ## Progress Log
 - 2026-11-17 Zyklus 1: Punkte 1, 2, 3, 4, 5 gebaut: `KEYLESS_LIMIT_CODES` steht einmal in `src/auth/keyless.ts` und speist beide `KeylessError` und das neue `KEYLESS_LIMIT_SCHEMA` (`error` als `enum` aus `daily_limit`, `crawler_daily_limit`, `rate_limited`, dazu `message`, `docs`, `retry_after_seconds`) an der Antwort 429 von `POST /v1/auth/keyless`; der Test löscht die beiden Grenzen zusätzlich in `beforeEach`, Route, Begrenzer, Grenzen und Hinweise unverändert. Rot vor dem Fix: beide neuen Fälle (2 failed, 3 passed, kein `enum`). Produktion nicht aufgerufen. Prüfbefehle (Node 22.23.5, PATH=/usr/bin:$PATH, am Commit 26840f1): P1 vitest Exit 0 (5 passed), `2`, `1`, `rc=1` und `0`; P2 `1`, `1`, `2`, `1`, `1`; P3 `2`, vitest mit Grenzen 9 Exit 0; P4 `0`, `2`, `0`, `2`, `0`, `0`, vitest Exit 0 (98 passed in 9 Dateien); P5 `node scripts/check.mjs` Exit 0 (2332 passed in 217 Dateien, grün in 79 s), `0`, `0`, `0`.
 - 2026-11-17 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5; `dev` ohne neuen Commit seit der Merge-Basis 664866d, kein Merge nötig. Prüfbefehle (Node 22.23.5, PATH=/usr/bin:$PATH, am Commit 6dba186): P1 vitest Exit 0, `2`, `1`, `rc=1` und `0`; P2 `1`, `1`, `2`, `1`, `1`; P3 `2`, vitest mit Grenzen 9 Exit 0; P4 `0`, `2`, `0`, `2`, `0`, `0`, vitest Exit 0 (98 passed in 9 Dateien); P5 `node scripts/check.mjs` Exit 0 (grün in 51 s), `0`, `0`, `0`. Am PR #259 Kopf 6dba186: Job `check` pass, Job `e2e` pass (10m49s). Produktion nicht aufgerufen.
+- 2026-11-17 Release: PASS K und B (Zyklus 2), DONE.
 
 ## Blockers
 - keine
