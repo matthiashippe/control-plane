@@ -155,6 +155,7 @@ Exit-Code endet.
 
 ## Progress Log
 - 2026-11-17 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6 gebaut (Hülle schreibt den Exit-Code über eine temporäre Datei und `mv -f`, Wartebefehl endet nur bei einer Exit-Datei mit Inhalt, Wartebefehl und Hülle drucken je Strom höchstens die letzten 64 KB nach einer Zeile mit Größe, Pfad und `read_file`, `bg_max_ms` mit Warnung ab 27000 ms in `ops/live.sh` und `ops/README.md`, Doku und Annahmen); rot vor dem Fix: 6 von 8 Fällen in `test/sandbox-background-output.test.ts` mit `service.ts` der Merge-Basis (die zwei Fälle für unverändertes Verhalten grün), die neuen Assertions in `test/live-selftest.test.ts` mit `ops/live.sh` von `dev`, der Selbsttest mit Messung ohne Maximum und mit verschobener Schwelle (`LIVE SELFTEST FAIL`). Prüfbefehle: Punkt 1 vitest Exit 0, 8 Fälle, 0, 2, Gegenprobe 6; Punkt 2 vitest Exit 0, 1, 2, nichts; Punkt 3 vitest Exit 0, `last=LIVE SELFTEST OK ok=1`, 1, 10, 1; Punkt 4 1, 1, 11; Punkt 5 0, 0, 0, 0; Punkt 6 `check` grün in 78 s, `e2e` an PR #240 SUCCESS.
+- 2026-11-17 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6 (`dev` war schon im Branch, kein neuer Code). Prüfbefehle: Punkt 1 vitest Exit 0, 8, 0, 2, Gegenprobe 6; Punkt 2 vitest Exit 0, 1, 2, nichts; Punkt 3 vitest Exit 0, `last=LIVE SELFTEST OK ok=1`, 1, 10, 1; Punkt 4 1, 1, 11; Punkt 5 0, 0, 0, 0; Punkt 6 `check` grün in 57 s, `e2e` an PR #240 am Kopf `ccaa707` SUCCESS.
 
 ## Blockers
 Keine.
