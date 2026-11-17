@@ -230,7 +230,7 @@ const hostFull = (): Reply =>
 const PAYMENT_ZONES = ["postyourprice.com", "automatonhost.com"] as const;
 
 /**
- * The public URL sandboxd gave for an exposed port, if it may be passed on: https, and a host that is neither the
+ * The public URL sandboxd gave for an exposed port, if it may be passed on: https, and a host that is neither
  * a zone of the payment nor a name under one (any case, a trailing dot or a port does not change that). null otherwise.
  */
 export function passablePublicUrl(v: unknown): string | null {

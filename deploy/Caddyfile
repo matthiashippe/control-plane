@@ -2,10 +2,10 @@
 	email matthias@hanseatictech.de
 }
 
-# cp.hippe.eu und postyourprice.com bleiben, damit nichts bricht, was heute darauf zeigt: die
-# Issue-Kommentare, das x402-Manifest der bisherigen Zahlungen, die veroeffentlichten CC0-Daten und
-# jeder Automaton mit einem dieser Hosts als conwayApiUrl. Welche der drei Adressen die kanonische
-# ist, entscheidet CP_PUBLIC_URL im Dienst, nicht diese Zeile (docs/umzug.md).
+# cp.hippe.eu and postyourprice.com stay, so nothing breaks that points at them today: the issue
+# comments, the x402 manifest of past payments, the published CC0 data and every automaton with one
+# of these hosts as conwayApiUrl. Which of the three addresses is canonical is decided by
+# CP_PUBLIC_URL in the service, not by this line (docs/umzug.md).
 automatonhost.com, postyourprice.com, cp.hippe.eu {
 	encode zstd gzip
 
