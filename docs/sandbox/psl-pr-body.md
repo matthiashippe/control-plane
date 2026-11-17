@@ -31,7 +31,9 @@ although that example uses an earlier template.
 * [x] Robust Reason for PSL Inclusion
 * [x] DNS verification via dig
 
-* [x] Each domain listed in the PRIVATE section has and shall maintain at least two years remaining on registration, and we shall keep the `_psl` TXT record in place in the respective zone(s).
+* [ ] Each domain listed in the PRIVATE section has and shall maintain at least two years remaining on registration, and we shall keep the `_psl` TXT record in place in the respective zone(s).
+
+Not checked: sandboxhost.de is paid until 2027-11-15 and cannot show two years remaining on the day of submission (see Reason for PSL Inclusion). We shall keep the `_psl` TXT record in place.
 
 __Submitter affirms the following:__ 
 <!--
@@ -85,8 +87,10 @@ that uses the PSL operates correctly. Typically, both are solved or
 neither.
 -->
 
- * [x] The [Guidelines](https://github.com/publicsuffix/list/wiki/Guidelines) were carefully _read_ and _understood_, and this request conforms to them.
+ * [ ] The [Guidelines](https://github.com/publicsuffix/list/wiki/Guidelines) were carefully _read_ and _understood_, and this request conforms to them.
  * [x] The submission follows the [Guidelines](https://github.com/publicsuffix/list/wiki/Format) on formatting and sorting.
+
+ Not checked: we read the guidelines, and this request does not meet two of them: the number of users (see below) and two years remaining on registration (see Reason for PSL Inclusion).
 
 <!-- 
 Sorting and formatting of the entries is outlined in the guidelines 
@@ -219,7 +223,7 @@ We checked other ways, and none of them covers this case. The `__Host-` cookie p
 
 The product is new, and the user count below is small. We are submitting now because isolation between customers has to hold from the first customer on, not only once there are thousands of them.
 
-sandboxhost.de was registered on 2026-11-15. Before this request was submitted, its registration was extended so that it has at least two years remaining on the day of submission, and we will keep more than one year remaining for as long as it is listed. We will keep the `_psl` TXT record in place.
+sandboxhost.de was registered on 2026-11-15 and is paid until 2027-11-15. A .de domain is registered and renewed in steps of one year only, and our registrar renews a .de no earlier than 60 days before it expires, so the domain cannot have two years remaining on the day of submission, and the box for it above is not checked. The registration renews automatically every year, and we will keep it renewed for as long as sandboxhost.de is listed. We will keep the `_psl` TXT record in place.
 
 There are no past issues or PRs for this domain. This request does not work around any third-party limit: certificates for these names come from Cloudflare's Origin CA, not from Let's Encrypt, and no vendor referred us to the PSL.
 <!-- END FILL IN -->

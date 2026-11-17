@@ -561,15 +561,19 @@
   persönliche des Einreichers bei HTC ist (Zyklus 3). Die Richtlinien verlangen außerdem, dass die Adresse zur Domain passt (meist über WHOIS); DENIC zeigt für `.de` keine
   Kontaktdaten, also kann ein Maintainer nachfragen. Nennt Matthias am Gate eine Rollenadresse, ändern sich Eintrag und PR-Text und
   damit der Prüfwert.
-- **Prüfwert.** sha256 über `PR-Titel` mit Zeilenende, `psl-pr-body.md` und `psl-entry.txt`, erste 12 Zeichen, seit Zyklus 3 `669a014158af` (vorher `797b2b2ddd05`, zurückgezogen). Er
+- **Prüfwert.** sha256 über `PR-Titel` mit Zeilenende, `psl-pr-body.md` und `psl-entry.txt`, erste 12 Zeichen, seit Zyklus 4 `8bd619501adc` (vorher `797b2b2ddd05` und `669a014158af`, beide zurückgezogen). Er
   bindet die Freigabe `public_post` an genau diese Bytes; vor dem Posten rechnet der Maker ihn neu, und weicht er ab, geht nichts raus.
 - **Kästchen.** Angekreuzt ist, was am Tag des Postens wahr ist, auch DNS-Prüfung (das TXT steht Minuten nach dem PR, vor
-  `gh pr edit`) und zwei Jahre Restlaufzeit, weil Schritt 1 die Verlängerung vor dem Posten verlangt. Bietet INWX keine Verlängerung im
-  Voraus an, wird dieses Kästchen leer und der Satz im Abschnitt Reason geändert, also ein neuer Prüfwert und ein neues Gate.
+  `gh pr edit`). Seit Zyklus 4 leer: zwei Jahre Restlaufzeit (Befund unten) und „this request conforms to them“ zu den Richtlinien,
+  weil der PR sie bei der Zahl der Nutzer und bei der Laufzeit verfehlt; unter beiden steht eine Zeile „Not checked: …“ mit dem Grund.
+  Die Zahl der Kästchen bleibt die der Vorlage (Punkt 3).
 - **Restlaufzeit und server_kauf.** RDAP von DENIC zeigt am 2026-11-16 nur „last changed 2026-11-15T17:55:10+01:00“, kein Ablaufdatum;
   `docs/sandbox/ports.md` nennt nur etwa 6 € im Jahr. Die PSL verlangt bei der Einreichung mehr als zwei Jahre Restlaufzeit, danach mehr
-  als ein Jahr. Die Verlängerung ist ein Kauf und geht mit der Freigabe in dieselbe Aufgabe an Matthias (Gates `public_post` und
-  `server_kauf`).
+  als ein Jahr. Bis Zyklus 3 stand die Verlängerung als Kauf am Gate `server_kauf`. Matthias hat am 17.11.2026 im Kundenkonto bei INWX
+  gesehen, dass `sandboxhost.de` bis 2027-11-15 läuft und sich jährlich automatisch verlängert; INWX verlängert eine `.de` erst ab
+  60 Tagen vor Ablauf und nur in Jahresschritten. Seit Zyklus 4 entfällt `server_kauf`, das Gate ist nur `public_post`: Das Kästchen
+  bleibt leer, der PR-Text sagt, bis wann die Domain bezahlt ist und dass wir sie verlängert halten, solange sie gelistet ist, und
+  `Empfehlung:` nennt, dass das leere Kästchen eine Ablehnung wahrscheinlicher macht.
 - **Token sbx-ports.** `cloudflare.py psl-txt` schreibt mit `CLOUDFLARE_SBX_API_TOKEN` (Token `sbx-ports`, Zone DNS Edit nur für
   `sandboxhost.de`) in die Zone aus `ports_domain()`, nie mit dem Token der Zahlungszone. Es nimmt nur
   `https://github.com/publicsuffix/list/pull/<n>` (`<n>` ab 1, nichts danach) und prüft das vor jedem Aufruf der API. Der Wert geht in

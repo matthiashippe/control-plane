@@ -1,7 +1,7 @@
 # sandboxhost.de auf der Public Suffix List
 
 Vorbereitung des PR an `publicsuffix/list` (Goal sandbox 11). Gepostet wird erst nach Matthias' Freigabe am Human Gate
-`public_post`; die Verlängerung der Domain ist ein Kauf am Gate `server_kauf`.
+`public_post`. Ein Kauf gehört nicht dazu: Eine `.de` lässt sich bei INWX nicht im Voraus verlängern (Abschnitt `## Laufzeit`).
 
 ## Warum
 
@@ -79,13 +79,14 @@ Der Eintrag kommt mit je einer Leerzeile davor und danach zwischen die beiden Ab
 ## PR
 
 PR-Titel: Add sandboxhost.de
-Prüfwert: 669a014158af
+Prüfwert: 8bd619501adc
 
 Der PR-Text ist `docs/sandbox/psl-pr-body.md`, Byte für Byte, wie `gh pr create --body-file` ihn postet. Er folgt der Vorlage
 `.github/pull_request_template.md` des PSL-Repos samt ihren Kommentaren, nur die Stellen zum Ausfüllen sind gefüllt. Angekreuzt ist
 jedes Kästchen, das am Tag des Postens wahr ist; das Kästchen zur Rollenadresse bleibt leer, weil die Adresse die persönliche des Einreichers ist.
-Das Kästchen zu zwei Jahren Restlaufzeit ist angekreuzt und gilt erst nach der Verlängerung bei INWX; geht die nicht, wird es leer,
-und es gibt einen neuen Prüfwert.
+Das Kästchen zu zwei Jahren Restlaufzeit bleibt leer, weil `sandboxhost.de` nur bis 2027-11-15 bezahlt ist und eine `.de` nicht im
+Voraus verlängert werden kann; der Abschnitt Reason sagt das ehrlich. Darum bleibt auch das Kästchen, der PR erfülle die Richtlinien,
+leer: Er verfehlt sie bei der Zahl der Nutzer und bei der Laufzeit. Beide leeren Kästchen machen eine Ablehnung wahrscheinlicher.
 
 Der Prüfwert sind die ersten 12 Zeichen von sha256 über den Titel mit Zeilenende, dann den PR-Text, dann den Eintrag:
 
@@ -116,15 +117,18 @@ Nötig: mindestens zwei Jahre Restlaufzeit am Tag der Einreichung, danach mehr a
 RDAP: Status active, letzte Änderung 2026-11-15T17:55:10+01:00, kein Ablaufdatum, 2026-11-16 20:25 UTC
 
 `curl -s https://rdap.denic.de/domain/sandboxhost.de | jq -c '{ldhName, events, status}'` zeigt nur das Ereignis „last changed“;
-DENIC nennt für `.de` kein Ablaufdatum. `docs/sandbox/ports.md` sagt zur Laufzeit nur „etwa 6 € im Jahr“, also ist die Domain
-vermutlich für ein Jahr bezahlt. Beleg für die zwei Jahre ist Matthias' Bestätigung der Verlängerung am Gate.
+DENIC nennt für `.de` kein Ablaufdatum. `docs/sandbox/ports.md` sagt zur Laufzeit nur „etwa 6 € im Jahr“. Matthias hat am 2026-11-17
+im Kundenkonto bei INWX nachgesehen: `sandboxhost.de` läuft bis 2027-11-15 17:50 und verlängert sich jedes Jahr automatisch. INWX
+verlängert eine `.de` nicht im Voraus, manuell erst ab 60 Tagen vor Ablauf (`https://kb.inwx.com/en-us/19/47`), und eine `.de` läuft
+in Jahresschritten. Zwei Jahre Restlaufzeit am Tag der Einreichung sind damit nicht erreichbar; das Kästchen dazu bleibt leer, und
+der PR-Text sagt, dass wir die Domain verlängert halten, solange sie auf der Liste steht.
 
 ## Schritte
 
 Ablauf nach der Freigabe, in dieser Reihenfolge. Davor geht nichts an `publicsuffix/list` und nichts ins DNS.
 
-1. Matthias verlängert `sandboxhost.de` im Kundenkonto bei INWX (Domains, `sandboxhost.de`, Verlängerung im Voraus) auf mindestens
-   zwei Jahre Restlaufzeit und bestätigt das am Gate. Danach steht im Kundenkonto ein Ablaufdatum nach dem 2028-11-16.
+1. Blick auf die Laufzeit im Kundenkonto bei INWX (Domains, `sandboxhost.de`), ohne Kauf: Danach ist klar, dass die automatische
+   Verlängerung noch an ist und das Ablaufdatum nicht vor dem 2027-11-15 liegt.
 2. Der Maker rechnet den Prüfwert mit dem Befehl aus `## PR` neu und vergleicht ihn mit dem freigegebenen. Weicht er ab, geht nichts
    raus, und es gibt ein neues Gate. Danach steht die Zeile „Freigabe public_post: ok, …“ im Progress Log der Goal-Datei.
 3. `gh repo fork publicsuffix/list --clone=false`, dann den Fork in einen Ordner aus `mktemp -d` klonen, Branch `sandboxhost-de`, den
