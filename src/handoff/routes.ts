@@ -188,7 +188,7 @@ export function registerHandoff<E extends Env>(app: Hono<E>, deps: HandoffDeps):
   const accountNameOf = (h: Handoff): string | null => (h.automatonName ? h.automatonName : null);
   const limitApprove = (h: Handoff): LimitPage => ({
     state: "approve",
-    automatonName: accountNameOf(h) ?? "",
+    accountName: accountNameOf(h),
     previousLimitUsdc: h.previousLimitUsdc ?? 0n,
     dailyLimitUsdc: h.dailyLimitUsdc,
     choices: h.choices,
@@ -308,7 +308,7 @@ export function registerHandoff<E extends Env>(app: Hono<E>, deps: HandoffDeps):
         {
           state: "passkey",
           code: h.code,
-          automatonName: accountNameOf(h) ?? "",
+          accountName: accountNameOf(h),
           previousLimitUsdc: h.previousLimitUsdc ?? 0n,
           dailyLimitUsdc: h.dailyLimitUsdc,
           chainId: konto.chainId,
