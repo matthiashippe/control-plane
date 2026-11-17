@@ -120,9 +120,10 @@ describe("the payout to the person's bank account", () => {
     expect(liq.body).toEqual({ chain: "base", currency: "usdc", external_account_id: "ext_1", destination_payment_rail: "sepa", destination_currency: "eur" });
     const pending = s.db.prepare("SELECT * FROM payout_handoffs WHERE code = ?").get(h.code) as Record<string, unknown>;
     expect(pending).toMatchObject({ bank_last4: "3000", external_account_id: "ext_1", liquidation_address_id: "liq_1", destination: s.bridge.state.liquidation[0] });
-    // Nowhere in the database is more of the IBAN than its last four characters.
+    // Nowhere in the database is more of the IBAN than its last four characters. Random addresses are taken out first: one in
+    // about 600 runs a fresh address holds "0532" by chance, which is no part of an IBAN.
     const dump = JSON.stringify(s.db.prepare("SELECT * FROM payout_handoffs").all()) + JSON.stringify(s.db.prepare("SELECT * FROM konto_payouts").all());
-    expect(dump).not.toMatch(/0532|DE89|37040044/);
+    expect(dump.replace(/0x[0-9a-fA-F]{40}/g, "0x")).not.toMatch(/0532|DE89|37040044/);
   });
 
   it("ends done with a permission whose spender is forwarderAddress(account, destination) and whose token is USDC", async () => {
