@@ -1,7 +1,7 @@
 # Konto Goal 09: Ein Wechsel des Gasschlüssels sperrt keine Auszahlung, und keine freigeschaltete alte Erlaubnis bleibt stehen
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Ein Kunde, der Geld auf sein Bankkonto holt, bekommt es auch nach einem Wechsel unseres Gasschlüssels, und jede Erlaubnis, die er
@@ -131,7 +131,7 @@ abgelöste Erlaubnis nach einer abgebrochenen Quittung freigeschaltet bleibt.
       (Kritik Tech Lead 2026-11-17).
       Prüfung: `T=$(mktemp -d); PATH=/usr/bin:$PATH pnpm -s vitest run test/konto-payout.test.ts --reporter=json --outputFile=$T/r.json >/dev/null 2>&1; echo "exit=$?"; node -e 'const r=require(process.argv[1]);const a=r.testResults.flatMap(f=>f.assertionResults).filter(x=>x.ancestorTitles.includes("when the chain cannot be read before the retire"));console.log(a.length, a.filter(x=>x.status==="passed").length)' $T/r.json` muss genau `exit=0` und `2 2` ausgeben.
       Prüfung: `T=$(mktemp -d); git archive HEAD | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; n=$(grep -c 'throw new PayoutFailed("retire", null);' $T/src/konto/payout.ts); sed -i 's/throw new PayoutFailed("retire", null);/skip = "not_approved";/' $T/src/konto/payout.ts; (cd $T && PATH=/usr/bin:$PATH pnpm -s vitest run test/konto-payout.test.ts --reporter=json --outputFile=r.json >/dev/null 2>&1); echo "$n $(node -e 'const r=require(process.argv[1]);const a=r.testResults.flatMap(f=>f.assertionResults).filter(x=>x.ancestorTitles.includes("when the chain cannot be read before the retire"));console.log(a.filter(x=>x.status!=="passed").length)' $T/r.json)"` muss genau `1 2` ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Nach einem Wechsel des Gasschlüssels zahlt ein Konto nach einmal Handy wieder aus, ohne an der alten Weiterleitung zu scheitern.
@@ -164,5 +164,6 @@ abgelöste Erlaubnis nach einer abgebrochenen Quittung freigeschaltet bleibt.
 - 2026-11-17 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5; `dev` ist im Branch (Merge-Basis gleich `origin/dev` `d493086`, kein Merge nötig), alle Prüfbefehle am Kopf `185af3b` neu gelaufen. Prüfbefehle: Punkt 1 `0`, `3`, `1`, `1`, vitest Exit 0 (26 passed); Punkt 2 `exit=0` und `4 4`, gegen die Merge-Basis `3 1`; Punkt 3 `1`, `7`; Punkt 4 `8`, `1`; Punkt 5 `0`, `vertrag gleich`, `0`, `pakete gleich`, `goals gleich`, `0`, `node scripts/check.mjs` Exit 0 (grün in 231 s, 2347 Tests), am PR #261 `check` pass und `e2e` pass am Kopf `185af3b`.
 - 2026-11-17 Zyklus 3: Punkt 6 aus der Kritik gebaut, zwei Fälle in `describe("when the chain cannot be read before the retire")` mit einem Wrapper, der `isApproved` der alten Erlaubnis oder `callerOf` der alten Weiterleitung werfen lässt (502 `retire`, keine Transaktion, `retire_*` bleibt, danach `retire`, `deploy`, `approveWithSignature`, `payout`), `src/` unverändert; Abschluss gemeldet, Punkte 1 bis 6, `dev` ist im Branch. Prüfbefehle am Kopf `990831e`: Punkt 6 `exit=0` und `2 2`, Mutation `1 2` (beide Fälle rot mit `expected 200 to be 502`); Punkt 1 `0`, `3`, `1`, `1`, vitest Exit 0 (28 passed); Punkt 2 `exit=0` und `4 4`, gegen die Merge-Basis `3 1`; Punkt 3 `1`, `7`; Punkt 4 `8`, `1`; Punkt 5 `0`, `vertrag gleich`, `0`, `pakete gleich`, `goals gleich`, `0`, `node scripts/check.mjs` Exit 0 (grün in 92 s, 2349 Tests), Netz-Prüfung am PR #261 nach dem Lauf des Jobs `check`.
 - 2026-11-17 Zyklus 4: Gap aus dem Verdict K Zyklus 3 behoben, Fall 2 und Fall 3 von „after a new gas key or a lost receipt“ halten nach der Auszahlung fest, dass `retire_*` leer ist, Fall 2 dazu mit dritter IBAN (salt 101) und `retire` an die Weiterleitung mit salt 100; mit der Mutation `if (!skip)` vor dem Leeren beide Fälle rot (`expected { …(2) } to deeply equal { retire_forwarder: null, …(1) }`), `src/` unverändert, Abschluss gemeldet, Punkte 1 bis 6. Prüfbefehle am Kopf `ca53d65`: Punkt 6 `exit=0` und `2 2`, Mutation `1 2`; Punkt 1 `0`, `3`, `1`, `1`, vitest Exit 0 (28 passed); Punkt 2 `exit=0` und `4 4`, gegen die Merge-Basis `3 1`; Punkt 3 `1`, `7`; Punkt 4 `8`, `1`; Punkt 5 `0`, `vertrag gleich`, `0`, `pakete gleich`, `goals gleich`, `0`, `node scripts/check.mjs` Exit 0 (grün in 58 s, 2349 Tests), Netz-Prüfung am PR #261 nach dem Lauf des Jobs `check`.
+- 2026-11-17 Release: PASS K und B (Zyklus 4), DONE.
 
 ## Blockers
