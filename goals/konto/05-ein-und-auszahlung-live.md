@@ -303,6 +303,29 @@ Wallet ohne Karte kein Geld auf sein Konto bekommt.
       Prüfung: `grep -rnE "CP_KONTO_|CP_BRIDGE_" deploy .github | wc -l` muss `0` ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung (Netz): `n=$(gh pr list -R matthiashippe/control-plane --head goal/konto-05 --state open --json number -q '.[0].number'); gh pr checks "$n" -R matthiashippe/control-plane | awk -F'\t' '$1=="check" && $2=="pass"' | wc -l` muss mindestens `1` ausgeben.
+- [ ] Eine Auszahlung geht nur über die Weiterleitung, die zu den heutigen Werten passt: Vor der ersten Transaktion prüft
+      `sendPayout`, dass die gespeicherte Weiterleitung gleich `forwarderAddress(account, destination, fixed)` mit dem heutigen
+      `fixed` ist, und nach einer Anlage, dass an dieser Adresse Code liegt. Sonst geht kein `payout` raus: Die Route antwortet 409
+      `payout_needs_phone` ohne Transaktion, die Regel loggt `payout_needs_phone` und setzt `last_paid_day` nicht. Der Test war vor dem
+      Fix rot.
+      MVP: Funktion, weil der Bank-Schritt die Adresse mit dem damaligen Gasschlüssel als `caller` rechnet und speichert, `sendPayout`
+      die Weiterleitung aber mit dem heutigen anlegt: Nach einem Wechsel des Schlüssels (oder von Token und Kette in konto 06) entsteht
+      der Vertrag an einer anderen Adresse, `payout` geht an die gespeicherte Adresse ohne Code, die Quittung meldet Erfolg, und Route
+      und Regel melden `sent`, obwohl kein Cent das Konto verlassen hat.
+      Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/konto-payout-guard.test.ts test/konto-payout.test.ts test/konto-payout-rule.test.ts` muss Exit-Code 0 haben.
+      Prüfung: `grep -cE "^\s*(it|test)\(" test/konto-payout-guard.test.ts` muss mindestens 3 ausgeben (je ein Fall: Bank-Schritt mit `caller` A, dann `POST /v1/konto/payout` mit einem `fixed` mit `caller` B ergibt 409 `payout_needs_phone` und null Aufrufe von `send`; dasselbe über `runPayoutRules` ergibt eine Log-Zeile `payout_needs_phone`, null Aufrufe von `send` und kein `last_paid_day`; die Anlage gelingt, `code` der gespeicherten Adresse bleibt aber `0x`, dann kein `payout` und `PayoutFailed` mit Stufe `deploy`).
+      Prüfung: `grep -c "forwarderAddress(" src/konto/payout.ts` muss mindestens `2` ausgeben.
+- [ ] Ein gesendetes `payout`, dessen Quittung fehlt, wird nie ein zweites Mal gesendet: Hash und Betrag stehen vor dem Warten auf die
+      Quittung in der Datenbank. Bricht das Warten ab (Fehler, Zeitüberschreitung, Neustart), antwortet die Route 202 mit
+      `state: "pending"` und dem Hash. Die nächste Auszahlung des Kontos, über die Route oder die Regel, klärt zuerst diesen Hash und
+      sendet nichts, solange er offen ist; `success` gibt der Route `state: "sent"` mit dem alten Hash und Betrag ohne neue Transaktion,
+      `reverted` gibt den Weg für ein neues `payout` frei. Der Test war vor dem Fix rot.
+      MVP: Funktion, weil die Route heute nach einem abgebrochenen Warten 502 „Try again later“ antwortet, obwohl das Geld schon
+      unterwegs sein kann: Wer „zahl 10 Dollar aus“ sagt und dem Rat folgt, bekommt 20 auf sein Bankkonto und hat 10 weniger für seinen
+      Automaton. `topUpIfLow` hat für denselben Fall seit konto 03 `pending_tx`.
+      Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/konto-payout-pending.test.ts test/konto-payout.test.ts test/mcp-money.test.ts` muss Exit-Code 0 haben.
+      Prüfung: `grep -cE "^\s*(it|test)\(" test/konto-payout-pending.test.ts` muss mindestens 4 ausgeben (je ein Fall: `receipt` des `payout` wirft, die Route antwortet 202 `pending` mit dem Hash, und eine zweite Anfrage mit demselben Betrag sendet null Transaktionen und antwortet wieder `pending`; meldet die Quittung danach `success`, antwortet die nächste Anfrage `sent` mit dem ersten Hash und null neuen Transaktionen; meldet sie `reverted`, sendet die nächste genau ein `payout`; `runPayoutRules` mit offenem Hash sendet nichts und setzt `last_paid_day` nicht).
+      Prüfung: `grep -c "pending" src/konto/payout.ts` muss mindestens `1` ausgeben.
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
