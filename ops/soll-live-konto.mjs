@@ -48,13 +48,15 @@ const create = async () => (await (await ask("create", "/v1/handoff", {
   body: JSON.stringify({ automaton_name: "Atlas", daily_limit_usdc: "5000000", amount_usdc: "5000000", step: "konto" }),
 }, 201)).json());
 const form = (body) => ({ method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body });
+// Each answer under the file name of the approved pictures of its state (KONTO_FILES in ops/soll-assess.mjs).
+const { KONTO_FILES } = await import("./soll-assess.mjs");
 const write = async (state, res) => {
   const html = await res.text();
-  writeFileSync(path.join(out, `konto-${state}.html`), html);
+  writeFileSync(path.join(out, `konto-${KONTO_FILES[state]}.html`), html);
   console.error(`soll-live-konto: ${state} ${res.status}, ${html.length} bytes`);
 };
 
 const first = await create();
 await write("passkey", await ask("passkey", `/h/${first.code}`, form(`pick=${first.match}`), 200));
-await write("fehlgeschlagen", await ask("fehlgeschlagen", `/h/${first.code}/fehlgeschlagen`, form("reason=cancelled"), 200));
+await write("failed", await ask("failed", `/h/${first.code}/failed`, form("reason=cancelled"), 200));
 console.error(`soll-live-konto: written to ${out}`);

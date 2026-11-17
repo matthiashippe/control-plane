@@ -47,7 +47,7 @@ const PERMISSION_TYPES = {
   ],
 };
 
-/** Why no account came into being; the names are the reasons of POST /h/{code}/fehlgeschlagen. */
+/** Why no account came into being; the names are the reasons of POST /h/{code}/failed. */
 export class KontoError extends Error {
   /** @param {"cancelled" | "unreachable" | "refused"} reason */
   constructor(reason, detail) {

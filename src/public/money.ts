@@ -8,7 +8,7 @@
  * `bank`) asks for IBAN and account holder, `payout-passkey` (block `payout`) has the one button that signs with the existing
  * passkey. Bank and passkey step count three steps, or two when Bridge had checked the person before and the identity step was
  * left out (`steps`). `retry` (block `retry`) comes after a signature that could not be checked and sends the same one again. Cancel and
- * failure show the state `fehlgeschlagen` of konto 03 unchanged.
+ * failure show the state `failed` of konto 03 unchanged.
  *
  * The frame is phonePage() of src/public/handoff.ts with the blocks of konto 02 and 03; this page adds the field of the bank step.
  * Each heading is a bare h1 element: the goal changes the first one to prove that the comparison with the picture notices.

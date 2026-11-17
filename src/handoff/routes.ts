@@ -685,7 +685,7 @@ export function registerHandoff<E extends Env>(app: Hono<E>, deps: HandoffDeps):
   // The passkey step failed on the phone (cancelled, the service that creates the account not reachable, or the permission
   // refused): the script of the page sends the reason here as a form, the code is burned like after a wrong number, and the page
   // says that no account was created.
-  app.post("/h/:code/fehlgeschlagen", async (c) => {
+  app.post("/h/:code/failed", async (c) => {
     private_(c);
     if (!konto) return c.text("Creating an account is not switched on here. Start again in your terminal.", 503);
     const code = c.req.param("code").toUpperCase();
@@ -698,7 +698,7 @@ export function registerHandoff<E extends Env>(app: Hono<E>, deps: HandoffDeps):
     const form = (await c.req.parseBody().catch(() => ({}))) as Record<string, unknown>;
     const reason: FailReason = typeof form.reason === "string" && form.reason in FAIL_REASONS ? (form.reason as FailReason) : "cancelled";
     burnMatched(db, code, nowMs());
-    return c.html(renderKontoPage({ state: "fehlgeschlagen", reason }, deps.indexStyle()), 200);
+    return c.html(renderKontoPage({ state: "failed", reason }, deps.indexStyle()), 200);
   });
 
   // goals/konto/05, point 7: after a 503 signature_check_unavailable the script of the page keeps what it sent and comes here; the

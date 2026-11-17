@@ -22,7 +22,7 @@ Alles läuft auf Base Sepolia (chainId 84532) mit Test-USDC; in der Produktion i
    nach 120 Sekunden verfällt; dieser Schlüssel lässt die Wallet einmal den Hash unterschreiben
    (`/public/v1/submit/sign_raw_payload`). Ein Tipp, ein Passkey. Die Adresse der Smart Wallet folgt per CREATE2 aus der Factory,
    die Unterschrift ist ERC-6492, weil die Wallet noch keinen Code hat; die Seite fragt keine Chain. Nach 200 zeigt `/h/{code}` den
-   Zustand `erledigt` aus konto 02, nach einem Fehler schickt das Skript den Grund an `POST /h/{code}/fehlgeschlagen`.
+   Zustand `approved` aus konto 02, nach einem Fehler schickt das Skript den Grund an `POST /h/{code}/failed` (Zustand `failed`).
 4. Der Server prüft mit `permissionMatches` und `signatureValid` (Abschnitt Erlaubnis). Passt alles, wird der Handoff `done`: die
    Smart Wallet steht als Konto in `wallets` und `konto_accounts`, ein neuer API-Schlüssel entsteht über `createApiKey` aus
    `src/auth/siwe.ts`. Passt etwas nicht, antwortet der Server 400 mit `error: "permission_refused"` und verbrennt den Handoff,
