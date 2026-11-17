@@ -1,7 +1,7 @@
 # Adressen Goal 03: Der Zähler sieht auch Adressen knapp neben privaten Bereichen
 
 ## Status
-PLANNED
+DONE
 
 ## Active Objective
 `test/actions-log-addresses.test.ts` pflanzt je Grenze von `10.0.0.0/8`, `172.16.0.0/12` und `169.254.0.0/16` eine öffentliche
@@ -36,6 +36,12 @@ gefasster privater Bereich sie still auf 0 setzt.
   `ip(169, 254, 255, 254)`), die nicht zählt, damit ein Mutant, der den Bereich verkleinert, auch rot wird. Die Ausgabe enthält keine
   Adresse (`expect(r.out).not.toMatch(IPV4)` wie in den anderen Fällen). Der bestehende Fall „counts 0 for a run whose addresses all
   stand in the three lists or in private ranges“ bleibt unverändert.
+- Entscheidung Tech Lead (Kritik, 16.11.2026) zu Punkt 6: ein zweiter Fall `it("counts a public address just outside 0/8, 127/8
+  and 192.168/16", …)` direkt nach dem ersten neuen, gleich gebaut, mit fünf Läufen in dieser Reihenfolge: `ip(1, 0, 0, 1)`,
+  `ip(126, 255, 255, 254)`, `ip(128, 0, 0, 1)`, `ip(192, 167, 255, 254)`, `ip(192, 169, 0, 1)`, je Lauf dazu die Enden des
+  Nachbarbereichs, die nicht zählen (`ip(0, 255, 255, 254)`; `ip(127, 0, 0, 1)` und `ip(127, 255, 255, 254)`; `ip(192, 168, 0, 1)` und
+  `ip(192, 168, 255, 254)`), erwartet genau `["1 1", "2 1", "3 1", "4 1", "5 1", "total 5"]` und `not.toMatch(IPV4)`. Der erste neue
+  Fall bleibt unverändert. Den Helfer `ip` und `line` darfst du dafür auf die Ebene des `describe` heben.
 - Die Mutanten der Done Condition laufen in einer Wegwerfkopie aus `git archive HEAD`, also erst nach dem Commit des neuen Falls.
   Die Progress-Log-Zeile nennt je Mutant `exit 1`; zur Gegenprobe einmal dieselben Befehle auf `origin/dev` (`git archive origin/dev`
   statt `HEAD`), die `exit 0` zeigen.
@@ -45,32 +51,46 @@ gefasster privater Bereich sie still auf 0 setzt.
   Kommentar, Commit, PR oder Verdict eine Adresse aus, auch keine der sechs oben in gepunkteter Form, nur `ip(…)` und Zahlen.
 
 ## Done Condition
-- [ ] Die Suite zählt öffentliche Adressen knapp neben `172.16.0.0/12`: Ein `private()`, das jede Adresse mit erstem Oktett 172
+- [x] Die Suite zählt öffentliche Adressen knapp neben `172.16.0.0/12`: Ein `private()`, das jede Adresse mit erstem Oktett 172
       privat nennt oder den Bereich nach unten oder oben um eins erweitert, macht `test/actions-log-addresses.test.ts` rot.
       MVP: Funktion, weil das genau der Umbau aus dem Vorschlag ist, der heute grün bleibt.
       Prüfung: `bash -c 'd=$(mktemp -d); git archive HEAD | tar -x -C "$d"; ln -s "$PWD/node_modules" "$d/node_modules"; sed -i "s/(a == 172 \&\& b >= 16 \&\& b <= 31)/a == 172/" "$d/ops/actions-log-addresses.sh"; grep -cF "|| a == 172 ||" "$d/ops/actions-log-addresses.sh"; (cd "$d" && node_modules/.bin/vitest run test/actions-log-addresses.test.ts >/dev/null 2>&1); echo "exit $?"; rm -rf "$d"'` muss `1` und danach `exit 1` ausgeben.
       Prüfung: `bash -c 'd=$(mktemp -d); git archive HEAD | tar -x -C "$d"; ln -s "$PWD/node_modules" "$d/node_modules"; sed -i "s/b >= 16 \&\& b <= 31/b >= 15 \&\& b <= 31/" "$d/ops/actions-log-addresses.sh"; grep -cF "b >= 15 && b <= 31" "$d/ops/actions-log-addresses.sh"; (cd "$d" && node_modules/.bin/vitest run test/actions-log-addresses.test.ts >/dev/null 2>&1); echo "exit $?"; rm -rf "$d"'` muss `1` und danach `exit 1` ausgeben.
       Prüfung: `bash -c 'd=$(mktemp -d); git archive HEAD | tar -x -C "$d"; ln -s "$PWD/node_modules" "$d/node_modules"; sed -i "s/b >= 16 \&\& b <= 31/b >= 16 \&\& b <= 32/" "$d/ops/actions-log-addresses.sh"; grep -cF "b >= 16 && b <= 32" "$d/ops/actions-log-addresses.sh"; (cd "$d" && node_modules/.bin/vitest run test/actions-log-addresses.test.ts >/dev/null 2>&1); echo "exit $?"; rm -rf "$d"'` muss `1` und danach `exit 1` ausgeben.
-- [ ] Die Suite zählt öffentliche Adressen knapp neben `169.254.0.0/16`: Ein `private()`, das jede Adresse mit erstem Oktett 169
+- [x] Die Suite zählt öffentliche Adressen knapp neben `169.254.0.0/16`: Ein `private()`, das jede Adresse mit erstem Oktett 169
       privat nennt oder den Bereich nach unten oder oben um eins erweitert, macht die Suite rot.
       MVP: Funktion, weil ein Besucher aus diesem Netz sonst still nicht gezählt wird.
       Prüfung: `bash -c 'd=$(mktemp -d); git archive HEAD | tar -x -C "$d"; ln -s "$PWD/node_modules" "$d/node_modules"; sed -i "s/(a == 169 \&\& b == 254)/a == 169/" "$d/ops/actions-log-addresses.sh"; grep -cF "|| a == 169 ||" "$d/ops/actions-log-addresses.sh"; (cd "$d" && node_modules/.bin/vitest run test/actions-log-addresses.test.ts >/dev/null 2>&1); echo "exit $?"; rm -rf "$d"'` muss `1` und danach `exit 1` ausgeben.
       Prüfung: `bash -c 'd=$(mktemp -d); git archive HEAD | tar -x -C "$d"; ln -s "$PWD/node_modules" "$d/node_modules"; sed -i "s/a == 169 \&\& b == 254/a == 169 \&\& b >= 253 \&\& b <= 254/" "$d/ops/actions-log-addresses.sh"; grep -cF "b >= 253 && b <= 254" "$d/ops/actions-log-addresses.sh"; (cd "$d" && node_modules/.bin/vitest run test/actions-log-addresses.test.ts >/dev/null 2>&1); echo "exit $?"; rm -rf "$d"'` muss `1` und danach `exit 1` ausgeben.
       Prüfung: `bash -c 'd=$(mktemp -d); git archive HEAD | tar -x -C "$d"; ln -s "$PWD/node_modules" "$d/node_modules"; sed -i "s/a == 169 \&\& b == 254/a == 169 \&\& b >= 254 \&\& b <= 255/" "$d/ops/actions-log-addresses.sh"; grep -cF "b >= 254 && b <= 255" "$d/ops/actions-log-addresses.sh"; (cd "$d" && node_modules/.bin/vitest run test/actions-log-addresses.test.ts >/dev/null 2>&1); echo "exit $?"; rm -rf "$d"'` muss `1` und danach `exit 1` ausgeben.
-- [ ] Die Suite zählt öffentliche Adressen knapp neben `10.0.0.0/8`: Ein `private()`, das den Bereich nach unten oder oben um ein
+- [x] Die Suite zählt öffentliche Adressen knapp neben `10.0.0.0/8`: Ein `private()`, das den Bereich nach unten oder oben um ein
       erstes Oktett erweitert, macht die Suite rot.
       MVP: Funktion, weil das die dritte Grenze aus dem Vorschlag ist und dieselbe Zahl betrifft.
       Prüfung: `bash -c 'd=$(mktemp -d); git archive HEAD | tar -x -C "$d"; ln -s "$PWD/node_modules" "$d/node_modules"; sed -i "s/|| a == 10 ||/|| (a >= 9 \&\& a <= 10) ||/" "$d/ops/actions-log-addresses.sh"; grep -cF "(a >= 9 && a <= 10)" "$d/ops/actions-log-addresses.sh"; (cd "$d" && node_modules/.bin/vitest run test/actions-log-addresses.test.ts >/dev/null 2>&1); echo "exit $?"; rm -rf "$d"'` muss `1` und danach `exit 1` ausgeben.
       Prüfung: `bash -c 'd=$(mktemp -d); git archive HEAD | tar -x -C "$d"; ln -s "$PWD/node_modules" "$d/node_modules"; sed -i "s/|| a == 10 ||/|| (a >= 10 \&\& a <= 11) ||/" "$d/ops/actions-log-addresses.sh"; grep -cF "(a >= 10 && a <= 11)" "$d/ops/actions-log-addresses.sh"; (cd "$d" && node_modules/.bin/vitest run test/actions-log-addresses.test.ts >/dev/null 2>&1); echo "exit $?"; rm -rf "$d"'` muss `1` und danach `exit 1` ausgeben.
-- [ ] Die Suite ist mit dem unveränderten Skript grün, die Testdatei trägt keine der sechs Adressen als Text, und das Goal ändert
+- [x] Die Suite ist mit dem unveränderten Skript grün, die Testdatei trägt keine der sechs Adressen als Text, und das Goal ändert
       außer Goal-Dateien nur `test/actions-log-addresses.test.ts`.
       MVP: Funktion, weil ein Test, der eine öffentliche Adresse ins öffentliche Repo schreibt, Grundregel 8 selbst bricht.
       Prüfung: `pnpm -s vitest run test/actions-log-addresses.test.ts` muss Exit-Code 0 haben.
       Prüfung: `grep -cE '\b(9\.255|11\.0|172\.(15|32)|169\.(253|255))\.[0-9]{1,3}\.[0-9]{1,3}\b' test/actions-log-addresses.test.ts` muss 0 ausgeben.
       Prüfung: `git diff --name-only origin/dev...HEAD | grep -v '^goals/adressen/' | grep -vc '^test/actions-log-addresses\.test\.ts$'` muss 0 ausgeben.
-- [ ] `check` ist grün.
+- [x] `check` ist grün.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] Die Suite zählt auch öffentliche Adressen knapp neben `192.168.0.0/16`, `127.0.0.0/8` und `0.0.0.0/8`: Ein `private()`,
+      das jede Adresse mit erstem Oktett 192 privat nennt, `192.168/16` um ein zweites Oktett oder `127/8` um ein erstes Oktett nach
+      unten oder oben erweitert oder `0/8` nach oben erweitert, macht die Suite rot; die Testdatei trägt keine dieser Adressen als Text.
+      MVP: Funktion, weil `private()` sechs Bereiche kennt und dieselbe Zahl still auf 0 fällt, wenn einer der drei übrigen zu weit
+      gefasst wird; gemessen vom Tech Lead am 16.11.2026 auf `89077be`: alle sechs Mutanten unten lassen die Suite grün (`exit 0`), das
+      unveränderte Skript zählt die fünf Nachbarn aus dem Kontext je Lauf als `1`, `total 5`.
+      Prüfung: `bash -c 'd=$(mktemp -d); git archive HEAD | tar -x -C "$d"; ln -s "$PWD/node_modules" "$d/node_modules"; sed -i "s/(a == 192 \&\& b == 168)/a == 192/" "$d/ops/actions-log-addresses.sh"; grep -c "|| a == 192$" "$d/ops/actions-log-addresses.sh"; (cd "$d" && node_modules/.bin/vitest run test/actions-log-addresses.test.ts >/dev/null 2>&1); echo "exit $?"; rm -rf "$d"'` muss `1` und danach `exit 1` ausgeben.
+      Prüfung: `bash -c 'd=$(mktemp -d); git archive HEAD | tar -x -C "$d"; ln -s "$PWD/node_modules" "$d/node_modules"; sed -i "s/a == 192 \&\& b == 168/a == 192 \&\& b >= 167 \&\& b <= 168/" "$d/ops/actions-log-addresses.sh"; grep -cF "b >= 167 && b <= 168" "$d/ops/actions-log-addresses.sh"; (cd "$d" && node_modules/.bin/vitest run test/actions-log-addresses.test.ts >/dev/null 2>&1); echo "exit $?"; rm -rf "$d"'` muss `1` und danach `exit 1` ausgeben.
+      Prüfung: `bash -c 'd=$(mktemp -d); git archive HEAD | tar -x -C "$d"; ln -s "$PWD/node_modules" "$d/node_modules"; sed -i "s/a == 192 \&\& b == 168/a == 192 \&\& b >= 168 \&\& b <= 169/" "$d/ops/actions-log-addresses.sh"; grep -cF "b >= 168 && b <= 169" "$d/ops/actions-log-addresses.sh"; (cd "$d" && node_modules/.bin/vitest run test/actions-log-addresses.test.ts >/dev/null 2>&1); echo "exit $?"; rm -rf "$d"'` muss `1` und danach `exit 1` ausgeben.
+      Prüfung: `bash -c 'd=$(mktemp -d); git archive HEAD | tar -x -C "$d"; ln -s "$PWD/node_modules" "$d/node_modules"; sed -i "s/|| a == 127 ||/|| (a >= 126 \&\& a <= 127) ||/" "$d/ops/actions-log-addresses.sh"; grep -cF "(a >= 126 && a <= 127)" "$d/ops/actions-log-addresses.sh"; (cd "$d" && node_modules/.bin/vitest run test/actions-log-addresses.test.ts >/dev/null 2>&1); echo "exit $?"; rm -rf "$d"'` muss `1` und danach `exit 1` ausgeben.
+      Prüfung: `bash -c 'd=$(mktemp -d); git archive HEAD | tar -x -C "$d"; ln -s "$PWD/node_modules" "$d/node_modules"; sed -i "s/|| a == 127 ||/|| (a >= 127 \&\& a <= 128) ||/" "$d/ops/actions-log-addresses.sh"; grep -cF "(a >= 127 && a <= 128)" "$d/ops/actions-log-addresses.sh"; (cd "$d" && node_modules/.bin/vitest run test/actions-log-addresses.test.ts >/dev/null 2>&1); echo "exit $?"; rm -rf "$d"'` muss `1` und danach `exit 1` ausgeben.
+      Prüfung: `bash -c 'd=$(mktemp -d); git archive HEAD | tar -x -C "$d"; ln -s "$PWD/node_modules" "$d/node_modules"; sed -i "s/return a == 0 ||/return (a >= 0 \&\& a <= 1) ||/" "$d/ops/actions-log-addresses.sh"; grep -cF "(a >= 0 && a <= 1)" "$d/ops/actions-log-addresses.sh"; (cd "$d" && node_modules/.bin/vitest run test/actions-log-addresses.test.ts >/dev/null 2>&1); echo "exit $?"; rm -rf "$d"'` muss `1` und danach `exit 1` ausgeben.
+      Prüfung: `grep -cE '\b(192\.(167|169)|126\.255|128\.0|1\.0)\.[0-9]{1,3}\.[0-9]{1,3}\b' test/actions-log-addresses.test.ts` muss 0 ausgeben.
+      Prüfung: `pnpm -s vitest run test/actions-log-addresses.test.ts` muss Exit-Code 0 haben.
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Die Progress-Log-Zeile nennt je Mutant `exit 1` und die Gegenprobe auf `origin/dev` mit `exit 0`.
@@ -93,5 +113,9 @@ gefasster privater Bereich sie still auf 0 setzt.
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-16 Zyklus 1: Punkte 1, 2, 3, 4, 5 gebaut, neuer Fall in `test/actions-log-addresses.test.ts` mit sechs Läufen, je eine öffentliche Adresse knapp neben 10/8, 172.16/12 oder 169.254/16 (aus `ip(…)` gebaut) und beide Enden des Bereichs, die nicht zählen. Prüfbefehle: Punkt 1 drei Mutanten je `1`, `exit 1`; Punkt 2 drei Mutanten je `1`, `exit 1`; Punkt 3 zwei Mutanten je `1`, `exit 1`; Gegenprobe aller acht auf `origin/dev` je `1`, `exit 0`; Punkt 4 vitest Exit 0, grep `0`, Umfang `0`; Punkt 5 `check` Exit 0 (194 Dateien, 2145 Tests); adressen 01 Punkt 1 `1 1 2 2 total 2 `, adressen 02 Punkt 1 `1 1 2 2 total 3 `.
+- 2026-11-16 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, `dev` ohne neue Commits, nichts zu mergen. Prüfbefehle: Punkt 1 drei Mutanten je `1`, `exit 1`; Punkt 2 drei Mutanten je `1`, `exit 1`; Punkt 3 zwei Mutanten je `1`, `exit 1`; Punkt 4 vitest Exit 0 (20 Tests), grep `0`, Umfang `0`; Punkt 5 `check` Exit 0 (194 Dateien, 2145 Tests).
+- 2026-11-16 Zyklus 3: Punkt 6 gebaut, zweiter neuer Fall in `test/actions-log-addresses.test.ts` mit fünf Läufen, je eine öffentliche Adresse knapp neben 0/8, 127/8 oder 192.168/16 (aus `ip(…)` gebaut) und die Enden des Bereichs, die nicht zählen; `ip` und `line` auf die Ebene des `describe` gehoben. Prüfbefehle: Punkt 6 sechs Mutanten je `1`, `exit 1`, Gegenprobe derselben sechs am alten Kopf `89077be` je `1`, `exit 0`, grep `0`, vitest Exit 0 (21 Tests); Punkte 1 bis 3 alle acht Mutanten weiter je `1`, `exit 1`; Punkt 4 vitest Exit 0, grep `0`, Umfang `0`; Punkt 5 `check` Exit 0 (194 Dateien, 2146 Tests).
+- 2026-11-17 Release: PASS K und B (Zyklus 3), DONE.
 
 ## Blockers
