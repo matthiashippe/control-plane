@@ -1,7 +1,7 @@
 # Adressen Goal 03: Der Zähler sieht auch Adressen knapp neben privaten Bereichen
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 `test/actions-log-addresses.test.ts` pflanzt je Grenze von `10.0.0.0/8`, `172.16.0.0/12` und `169.254.0.0/16` eine öffentliche
@@ -90,7 +90,7 @@ gefasster privater Bereich sie still auf 0 setzt.
       Prüfung: `bash -c 'd=$(mktemp -d); git archive HEAD | tar -x -C "$d"; ln -s "$PWD/node_modules" "$d/node_modules"; sed -i "s/return a == 0 ||/return (a >= 0 \&\& a <= 1) ||/" "$d/ops/actions-log-addresses.sh"; grep -cF "(a >= 0 && a <= 1)" "$d/ops/actions-log-addresses.sh"; (cd "$d" && node_modules/.bin/vitest run test/actions-log-addresses.test.ts >/dev/null 2>&1); echo "exit $?"; rm -rf "$d"'` muss `1` und danach `exit 1` ausgeben.
       Prüfung: `grep -cE '\b(192\.(167|169)|126\.255|128\.0|1\.0)\.[0-9]{1,3}\.[0-9]{1,3}\b' test/actions-log-addresses.test.ts` muss 0 ausgeben.
       Prüfung: `pnpm -s vitest run test/actions-log-addresses.test.ts` muss Exit-Code 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Die Progress-Log-Zeile nennt je Mutant `exit 1` und die Gegenprobe auf `origin/dev` mit `exit 0`.
@@ -116,5 +116,6 @@ gefasster privater Bereich sie still auf 0 setzt.
 - 2026-11-16 Zyklus 1: Punkte 1, 2, 3, 4, 5 gebaut, neuer Fall in `test/actions-log-addresses.test.ts` mit sechs Läufen, je eine öffentliche Adresse knapp neben 10/8, 172.16/12 oder 169.254/16 (aus `ip(…)` gebaut) und beide Enden des Bereichs, die nicht zählen. Prüfbefehle: Punkt 1 drei Mutanten je `1`, `exit 1`; Punkt 2 drei Mutanten je `1`, `exit 1`; Punkt 3 zwei Mutanten je `1`, `exit 1`; Gegenprobe aller acht auf `origin/dev` je `1`, `exit 0`; Punkt 4 vitest Exit 0, grep `0`, Umfang `0`; Punkt 5 `check` Exit 0 (194 Dateien, 2145 Tests); adressen 01 Punkt 1 `1 1 2 2 total 2 `, adressen 02 Punkt 1 `1 1 2 2 total 3 `.
 - 2026-11-16 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, `dev` ohne neue Commits, nichts zu mergen. Prüfbefehle: Punkt 1 drei Mutanten je `1`, `exit 1`; Punkt 2 drei Mutanten je `1`, `exit 1`; Punkt 3 zwei Mutanten je `1`, `exit 1`; Punkt 4 vitest Exit 0 (20 Tests), grep `0`, Umfang `0`; Punkt 5 `check` Exit 0 (194 Dateien, 2145 Tests).
 - 2026-11-16 Zyklus 3: Punkt 6 gebaut, zweiter neuer Fall in `test/actions-log-addresses.test.ts` mit fünf Läufen, je eine öffentliche Adresse knapp neben 0/8, 127/8 oder 192.168/16 (aus `ip(…)` gebaut) und die Enden des Bereichs, die nicht zählen; `ip` und `line` auf die Ebene des `describe` gehoben. Prüfbefehle: Punkt 6 sechs Mutanten je `1`, `exit 1`, Gegenprobe derselben sechs am alten Kopf `89077be` je `1`, `exit 0`, grep `0`, vitest Exit 0 (21 Tests); Punkte 1 bis 3 alle acht Mutanten weiter je `1`, `exit 1`; Punkt 4 vitest Exit 0, grep `0`, Umfang `0`; Punkt 5 `check` Exit 0 (194 Dateien, 2146 Tests).
+- 2026-11-17 Release: PASS K und B (Zyklus 3), DONE.
 
 ## Blockers
