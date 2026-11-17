@@ -128,6 +128,17 @@ Exit-Code endet.
       dass ein langer Befehl weiter endet und gelesen wird (Grundregel 13).
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung (Netz): `n=$(gh pr list -R matthiashippe/control-plane --head goal/hosting-02 --state all --json number -q '.[0].number'); gh pr checks "${n:?}" -R matthiashippe/control-plane --json name,state -q '.[] | select(.name=="e2e") | .state'` muss `SUCCESS` ausgeben.
+- [ ] Die Zeile vor einer gekürzten Ausgabe schickt das Modell nicht zum Lesen der ganzen Datei: Sie sagt, dass `read_file` die
+      ganze Datei mit allen Bytes in den Kontext bringt, und nennt für `exec` einen Befehl, der nur einen Teil liest, `grep -n` zum
+      Suchen und `sed -n '<von>,<bis>p'` für einen Zeilenbereich, je mit dem Pfad der Datei. Doku und Annahmen sagen dasselbe. Der
+      Test war vor dem Fix rot.
+      MVP: Funktion, weil `read` in `src/sandbox/service.ts` die Datei ungekürzt durchreicht und ein Modell, das dem heutigen Hinweis
+      folgt, die 5 MB eines `npm install` im nächsten Aufruf doch in den bezahlten Kontext holt (Kritik Tech Lead 17.11.2026).
+      Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/sandbox-background-output.test.ts` muss Exit-Code 0 haben.
+      Prüfung: `grep -c "sed -n" src/sandbox/service.ts` muss mindestens 1 ausgeben.
+      Prüfung: `grep -cF "grep -n" src/sandbox/service.ts` muss mindestens 1 ausgeben.
+      Prüfung: `grep -c "sed -n" test/sandbox-background-output.test.ts` muss mindestens 1 ausgeben.
+      Prüfung: `grep -c "sed -n" docs/sandbox/lange-befehle.md` muss mindestens 1 ausgeben.
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
