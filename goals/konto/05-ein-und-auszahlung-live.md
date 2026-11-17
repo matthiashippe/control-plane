@@ -398,7 +398,7 @@ Wallet ohne Karte kein Geld auf sein Konto bekommt.
   alle vier Fälle rot (502 statt 202), der neue Fall in `test/mcp-money.test.ts` mit dem alten `mcp/server.mjs` ebenso.
 - 2026-11-17 Zyklus 5: Abschluss gemeldet, Punkte 1 bis 20. `dev` erneut gemergt (nur eine neue Goal-Datei von hosting).
   Prüfbefehle: alle 78 der Goal-Datei einzeln am Kopf, jeder mit seiner Erwartung, `check` Exit 0. Ein Lauf des Vitest von Punkt 20
-  war einmal rot und danach elfmal grün; Ursache war die IBAN-Prüfung in `test/konto-payout.test.ts`, die in etwa einem von 600
+  war einmal rot und danach in 15 Läufen grün, 3 davon neben einem vollen Testlauf; Ursache war die IBAN-Prüfung in `test/konto-payout.test.ts`, die in etwa einem von 600
   Läufen „0532“ in einer zufälligen Adresse fand (nachgerechnet: 0,16 % je Lauf). Behoben, indem Adressen vor der Suche
   herausgenommen werden; eine IBAN in der Datenbank fällt weiter auf.
 
