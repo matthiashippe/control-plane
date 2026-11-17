@@ -1,7 +1,7 @@
 # Umzug Goal 02: Seiten und Texte nennen Automatons
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Nach außen heißt der Dienst `automatonhost.com`, und kein Text, den ein Besucher, ein Betreiber oder sein Automaton liest, nennt
@@ -248,7 +248,7 @@ und ein Betreiber aus einem Conway-Issue am Namen erkennen soll, was er hier bek
       Anmeldung, Zahlung und Inferenz weiter laufen (Grundregel 13).
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung (Netz): `n=$(gh pr list -R matthiashippe/control-plane --head goal/umzug-02 --state all --json number -q '.[0].number'); gh pr checks "${n:?}" -R matthiashippe/control-plane --json name,state -q '.[] | select(.name=="e2e") | .state'` muss `SUCCESS` ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Jede neue Testdatei und jeder neue Fall, der ein neues Verhalten verlangt, war vor dem Fix rot; die Zeile im Progress Log
@@ -281,6 +281,7 @@ und ein Betreiber aus einem Conway-Issue am Namen erkennen soll, was er hier bek
 - 2026-11-17 Zyklus 2: Abschluss gemeldet, Punkte 1 bis 13; nach Matthias' Wechsel (PR #255, `187ac7a`, `deploy.yml` grün) `dev` gemergt (Konflikt in `goals/konto/ANNAHMEN.md` aufgelöst, beide Abschnitte bleiben), Punkt 9 gemessen und Punkt 11 mit dem Ausgang des Wechsels in `docs/umzug.md` ergänzt; konto 07, seit Zyklus 1 fertig, hat 0 abgelöste Prüfbefehle. Prüfbefehle: Punkt 1 `0`, nichts, `start ok`, `30`, fünfmal `exit=0 0 defects`; Punkt 2 `1`, `abnahme ok 1`; Punkt 3 `0`, fünfmal `exit=0 0 defects`; Punkt 4 Exit 0, `4`, nichts, `4`, `0`, `2`, Selbsttest Exit 0; Punkt 5 `0`, `1`, `plugin ok`, `1`, `2`, Exit 0; Punkt 6 `0`, `3`, `1`, `gleich`, `2`, Exit 0; Punkt 7 `1`, `3`, Exit 0, `3`, `2`; Punkt 8 Exit 0, `21`, `1`, `1`, `2` ohne `sed-miss`; Punkt 9 `1`, `2`, `301 https://automatonhost.com/`, `200`, `8` (Startseite von `dev` ohne dieses Goal, belegt erst nach dem Rollout, `goals/umzug/ANNAHMEN.md`); Punkt 10 `0`, `7`, `1`; Punkt 11 nichts, `13`; Punkt 12 `0`, `0`, `0`, `0`; Punkt 13 `check: grün in 103 s`, `e2e` am PR #252 `SUCCESS` (`c0b26cc`).
 - 2026-11-17 Release: PASS K und B (Zyklus 2), DONE.
 - 2026-11-17 Zyklus 3: Abschluss gemeldet, Punkte 1 bis 13; `origin/dev` mit konto 08 (PR #257) in den Goal-Branch gemergt, weil der PR einen Konflikt in `goals/konto/ANNAHMEN.md` hatte (beide Abschnitte bleiben, `01bf57c`), dadurch Status wieder `ACTIVE` und der PASS aus Zyklus 2 offen; konto 08 hat 0 abgelöste Prüfbefehle (sein Zähler über `goals/konto/ANNAHMEN.md` gibt auf `dev` und am Goal-Branch `7`), kein eigener Code geändert. Prüfbefehle: Punkt 1 `0`, nichts, `start ok`, `30`, fünfmal `exit=0 0 defects`; Punkt 2 `1`, `abnahme ok 1`; Punkt 3 `0`, fünfmal `exit=0 0 defects`; Punkt 4 Exit 0, `4`, nichts, `4`, `0`, `2`, Selbsttest Exit 0; Punkt 5 `0`, `1`, `plugin ok`, `1`, `2`, Exit 0; Punkt 6 `0`, `3`, `1`, `gleich`, `2`, Exit 0; Punkt 7 `1`, `3`, Exit 0, `3`, `2`; Punkt 8 Exit 0, `21`, `1`, `1`, `2` ohne `sed-miss`; Punkt 9 `1`, `2`, `301 https://automatonhost.com/`, `200`, `8` (belegt erst nach dem Rollout dieses Goals, `goals/umzug/ANNAHMEN.md`); Punkt 10 `0`, `7`, `2`; Punkt 11 nichts, `13`; Punkt 12 `0`, `0`, `0`, `0`; Punkt 13 `check: grün in 150 s`, `e2e` am PR #252 `SUCCESS` (`01bf57c`).
+- 2026-11-17 Release: PASS K und B (Zyklus 3), DONE.
 
 ## Blockers
 Keine.
