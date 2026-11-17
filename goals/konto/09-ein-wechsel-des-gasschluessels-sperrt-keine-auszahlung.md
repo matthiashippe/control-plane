@@ -1,7 +1,7 @@
 # Konto Goal 09: Ein Wechsel des Gasschlüssels sperrt keine Auszahlung, und keine freigeschaltete alte Erlaubnis bleibt stehen
 
 ## Status
-PLANNED
+DONE
 
 ## Active Objective
 Ein Kunde, der Geld auf sein Bankkonto holt, bekommt es auch nach einem Wechsel unseres Gasschlüssels, und jede Erlaubnis, die er
@@ -85,7 +85,7 @@ abgelöste Erlaubnis nach einer abgebrochenen Quittung freigeschaltet bleibt.
 - Was danach kommt: konto 10 (was das Terminal ans Konto schickt, wird streng gelesen).
 
 ## Done Condition
-- [ ] `finishPayout` merkt jede alte Erlaubnis mit Weiterleitung zum Widerruf vor, und `sendPayout` verwirft vor dem `retire` ohne
+- [x] `finishPayout` merkt jede alte Erlaubnis mit Weiterleitung zum Widerruf vor, und `sendPayout` verwirft vor dem `retire` ohne
       Transaktion, was nicht freigeschaltet ist oder einen anderen `caller` hat, mit einer Log-Zeile.
       MVP: Funktion, weil nach einem Schlüsselwechsel sonst kein Konto mehr auszahlt und eine abgelöste Erlaubnis nach einer
       abgebrochenen Quittung freigeschaltet bleibt (Vorschläge konto-kritik-2026-11-17-1 und -2).
@@ -94,22 +94,22 @@ abgelöste Erlaubnis nach einer abgebrochenen Quittung freigeschaltet bleibt.
       Prüfung: `grep -c 'retire skipped for' src/konto/payout.ts` muss mindestens `1` ausgeben.
       Prüfung: `grep -cE 'callerOf\(forwarder: Address\): Promise<Address>' src/konto/payout.ts` muss genau `1` ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/konto-payout.test.ts test/konto-payout-pending.test.ts test/konto-payout-guard.test.ts` muss Exit-Code 0 haben.
-- [ ] Vier Fälle in `test/konto-payout.test.ts` decken abgebrochene Quittung, anderen `caller`, nie freigeschaltete Erlaubnis und ein
+- [x] Vier Fälle in `test/konto-payout.test.ts` decken abgebrochene Quittung, anderen `caller`, nie freigeschaltete Erlaubnis und ein
       wartendes `retire_*` ab; gegen den Stand der Merge-Basis sind genau die ersten drei rot.
       MVP: Funktion, weil erst der rote Lauf am alten Code zeigt, dass die Fälle den Fehler treffen, und der Wächter die Regel für ein
       wartendes `retire_*` festhält.
       Prüfung: `T=$(mktemp -d); PATH=/usr/bin:$PATH pnpm -s vitest run test/konto-payout.test.ts --reporter=json --outputFile=$T/r.json >/dev/null 2>&1; echo "exit=$?"; node -e 'const r=require(process.argv[1]);const a=r.testResults.flatMap(f=>f.assertionResults).filter(x=>x.ancestorTitles.includes("after a new gas key or a lost receipt"));console.log(a.length, a.filter(x=>x.status==="passed").length)' $T/r.json` muss genau `exit=0` und `4 4` ausgeben.
       Prüfung: `B=$(git merge-base origin/dev HEAD); T=$(mktemp -d); git archive $B | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; cp test/konto-payout.test.ts test/money-helpers.ts $T/test/; (cd $T && PATH=/usr/bin:$PATH pnpm -s vitest run test/konto-payout.test.ts --reporter=json --outputFile=r.json >/dev/null 2>&1); node -e 'const r=require(process.argv[1]);const a=r.testResults.flatMap(f=>f.assertionResults).filter(x=>x.ancestorTitles.includes("after a new gas key or a lost receipt"));console.log(a.filter(x=>x.status!=="passed").length, a.filter(x=>x.status==="passed").length)' $T/r.json` muss genau `3 1` ausgeben.
-- [ ] `docs/konto/euro.md` hat einen Abschnitt `## Wechsel des Gasschlüssels` mit dem Ablauf für Kunde und Betrieb.
+- [x] `docs/konto/euro.md` hat einen Abschnitt `## Wechsel des Gasschlüssels` mit dem Ablauf für Kunde und Betrieb.
       MVP: Funktion, weil wer den Schlüssel wechselt, wissen muss, dass jedes Konto einmal aufs Handy muss und was mit den alten
       Erlaubnissen geschieht.
       Prüfung: `grep -c '^## Wechsel des Gasschlüssels$' docs/konto/euro.md` muss genau `1` ausgeben.
       Prüfung: `awk '/^## Wechsel des Gasschlüssels$/{f=1;next} /^## /{f=0} f' docs/konto/euro.md | grep -oE 'payout_needs_phone|automaton_status|Passkey|Bridge|not_approved|other_caller|isApproved' | sort -u | wc -l` muss genau `7` ausgeben.
-- [ ] Die Entscheidungen stehen mit Grund in `goals/konto/ANNAHMEN.md`.
+- [x] Die Entscheidungen stehen mit Grund in `goals/konto/ANNAHMEN.md`.
       MVP: Funktion, weil die Linsen und die nächsten Goals der Kette gegen diese Annahmen prüfen.
       Prüfung: `awk '/^## Goal 09/{f=1;next} /^## /{f=0} f' goals/konto/ANNAHMEN.md | grep -cE "^- .+, weil .+"` muss mindestens `4` ausgeben.
       Prüfung: `awk '/^## Goal 09/{f=1;next} /^## /{f=0} f' goals/konto/ANNAHMEN.md | grep -cE 'caller.+Liste.+Verwalter'` muss mindestens `1` ausgeben.
-- [ ] Der Diff bleibt in den Pfaden dieses Goals, Vertrag und Bytecode bleiben gleich, kein Test wird schwächer, kein neues Paket,
+- [x] Der Diff bleibt in den Pfaden dieses Goals, Vertrag und Bytecode bleiben gleich, kein Test wird schwächer, kein neues Paket,
       kein Schlüssel im Diff, keine andere Goal-Datei geändert, und `check` ist grün.
       MVP: Funktion, weil `src/**` mit dem Merge ausrollt und eine Änderung am Vertrag jede Weiterleitung jedes Kunden verschöbe.
       Prüfung: `git diff --name-only origin/dev...HEAD | grep -vE '^(src/konto/payout\.ts|test/(konto-payout|konto-payout-pending|konto-payout-guard)\.test\.ts|test/money-helpers\.ts|docs/konto/euro\.md|goals/konto/09-ein-wechsel-des-gasschluessels-sperrt-keine-auszahlung\.md|goals/konto/verdicts/09-[A-Za-z0-9._-]+\.md|goals/konto/ANNAHMEN\.md|goals/_vorschlaege/konto-[a-z0-9.-]+\.md)$' | wc -l` muss `0` ausgeben.
@@ -120,7 +120,18 @@ abgelöste Erlaubnis nach einer abgebrochenen Quittung freigeschaltet bleibt.
       Prüfung: `git diff origin/dev...HEAD | grep -E '^[+]' | grep -iE "(api[_-]?key|secret|token|private[_-]?key)[\"' ]*[:=] *[\"']?[A-Za-z0-9_+/=-]{16,}|BEGIN [A-Z ]*PRIVATE KEY|cnwy_k_[A-Za-z0-9_-]{16,}" | wc -l` muss `0` ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung (Netz): `n=$(gh pr list -R matthiashippe/control-plane --head goal/konto-09 --state open --json number -q '.[0].number'); gh pr checks "$n" -R matthiashippe/control-plane | awk -F'\t' '$1=="check" && $2=="pass"' | wc -l` muss mindestens `1` ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] Ein Lesefehler vor dem `retire` (`isApproved` der alten Erlaubnis oder `callerOf` der alten Weiterleitung wirft) beendet die
+      Auszahlung mit 502 `payout_failed` in der Stufe `retire`, sendet keine Transaktion und lässt `retire_*` stehen; geht das Lesen
+      wieder, sendet die nächste Auszahlung zuerst `retire` an die alte Weiterleitung, dann `deploy`, `approveWithSignature` und
+      `payout` über die neue. Zwei Fälle (einer je Lesezugriff) in genau einem `describe("when the chain cannot be read before the retire", …)`
+      in `test/konto-payout.test.ts`, erste Auszahlung über IBAN 1, neue IBAN 2, dann der Lesefehler; den Fehler wirft ein Wrapper um
+      die Kette nur für die alte Erlaubnis oder Weiterleitung (Form wählt der Maker, etwa wie `lossySetup`). `src/` ändert sich dafür nicht.
+      MVP: Funktion, weil Entscheidung 4 die abgelöste Erlaubnis bei einem Lesefehler stehen lässt, kein Fall das festhält und ein
+      `catch`, das statt abzubrechen verwirft, alle vier Fälle grün ließe, während eine freigeschaltete alte Erlaubnis stehen bliebe
+      (Kritik Tech Lead 2026-11-17).
+      Prüfung: `T=$(mktemp -d); PATH=/usr/bin:$PATH pnpm -s vitest run test/konto-payout.test.ts --reporter=json --outputFile=$T/r.json >/dev/null 2>&1; echo "exit=$?"; node -e 'const r=require(process.argv[1]);const a=r.testResults.flatMap(f=>f.assertionResults).filter(x=>x.ancestorTitles.includes("when the chain cannot be read before the retire"));console.log(a.length, a.filter(x=>x.status==="passed").length)' $T/r.json` muss genau `exit=0` und `2 2` ausgeben.
+      Prüfung: `T=$(mktemp -d); git archive HEAD | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; n=$(grep -c 'throw new PayoutFailed("retire", null);' $T/src/konto/payout.ts); sed -i 's/throw new PayoutFailed("retire", null);/skip = "not_approved";/' $T/src/konto/payout.ts; (cd $T && PATH=/usr/bin:$PATH pnpm -s vitest run test/konto-payout.test.ts --reporter=json --outputFile=r.json >/dev/null 2>&1); echo "$n $(node -e 'const r=require(process.argv[1]);const a=r.testResults.flatMap(f=>f.assertionResults).filter(x=>x.ancestorTitles.includes("when the chain cannot be read before the retire"));console.log(a.filter(x=>x.status!=="passed").length)' $T/r.json)"` muss genau `1 2` ausgeben.
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Nach einem Wechsel des Gasschlüssels zahlt ein Konto nach einmal Handy wieder aus, ohne an der alten Weiterleitung zu scheitern.
@@ -148,5 +159,11 @@ abgelöste Erlaubnis nach einer abgebrochenen Quittung freigeschaltet bleibt.
 - max Versuche pro Gap: 3
 
 ## Progress Log
+
+- 2026-11-17 Zyklus 1: Punkte 1 bis 5 gebaut, `finishPayout` merkt jede alte Erlaubnis mit Weiterleitung vor, `sendPayout` verwirft vor dem `retire` mit `isApproved` und `callerOf` ohne Transaktion, Knoten mit `caller` und `withNewGasKey` im Test, Doku und Annahmen. Prüfbefehle: Punkt 1 `0`, `3`, `1`, `1`, vitest Exit 0 (26 Tests); Punkt 2 `exit=0` und `4 4`, gegen die Merge-Basis `3 1`; Punkt 3 `1`, `7`; Punkt 4 `8`, `1`; Punkt 5 `0`, `vertrag gleich`, `0`, `pakete gleich`, `goals gleich`, `0`, `check` Exit 0 (219 Dateien, 2347 Tests), Netz-Prüfung am PR nach dem Lauf des Jobs `check`.
+- 2026-11-17 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5; `dev` ist im Branch (Merge-Basis gleich `origin/dev` `d493086`, kein Merge nötig), alle Prüfbefehle am Kopf `185af3b` neu gelaufen. Prüfbefehle: Punkt 1 `0`, `3`, `1`, `1`, vitest Exit 0 (26 passed); Punkt 2 `exit=0` und `4 4`, gegen die Merge-Basis `3 1`; Punkt 3 `1`, `7`; Punkt 4 `8`, `1`; Punkt 5 `0`, `vertrag gleich`, `0`, `pakete gleich`, `goals gleich`, `0`, `node scripts/check.mjs` Exit 0 (grün in 231 s, 2347 Tests), am PR #261 `check` pass und `e2e` pass am Kopf `185af3b`.
+- 2026-11-17 Zyklus 3: Punkt 6 aus der Kritik gebaut, zwei Fälle in `describe("when the chain cannot be read before the retire")` mit einem Wrapper, der `isApproved` der alten Erlaubnis oder `callerOf` der alten Weiterleitung werfen lässt (502 `retire`, keine Transaktion, `retire_*` bleibt, danach `retire`, `deploy`, `approveWithSignature`, `payout`), `src/` unverändert; Abschluss gemeldet, Punkte 1 bis 6, `dev` ist im Branch. Prüfbefehle am Kopf `990831e`: Punkt 6 `exit=0` und `2 2`, Mutation `1 2` (beide Fälle rot mit `expected 200 to be 502`); Punkt 1 `0`, `3`, `1`, `1`, vitest Exit 0 (28 passed); Punkt 2 `exit=0` und `4 4`, gegen die Merge-Basis `3 1`; Punkt 3 `1`, `7`; Punkt 4 `8`, `1`; Punkt 5 `0`, `vertrag gleich`, `0`, `pakete gleich`, `goals gleich`, `0`, `node scripts/check.mjs` Exit 0 (grün in 92 s, 2349 Tests), Netz-Prüfung am PR #261 nach dem Lauf des Jobs `check`.
+- 2026-11-17 Zyklus 4: Gap aus dem Verdict K Zyklus 3 behoben, Fall 2 und Fall 3 von „after a new gas key or a lost receipt“ halten nach der Auszahlung fest, dass `retire_*` leer ist, Fall 2 dazu mit dritter IBAN (salt 101) und `retire` an die Weiterleitung mit salt 100; mit der Mutation `if (!skip)` vor dem Leeren beide Fälle rot (`expected { …(2) } to deeply equal { retire_forwarder: null, …(1) }`), `src/` unverändert, Abschluss gemeldet, Punkte 1 bis 6. Prüfbefehle am Kopf `ca53d65`: Punkt 6 `exit=0` und `2 2`, Mutation `1 2`; Punkt 1 `0`, `3`, `1`, `1`, vitest Exit 0 (28 passed); Punkt 2 `exit=0` und `4 4`, gegen die Merge-Basis `3 1`; Punkt 3 `1`, `7`; Punkt 4 `8`, `1`; Punkt 5 `0`, `vertrag gleich`, `0`, `pakete gleich`, `goals gleich`, `0`, `node scripts/check.mjs` Exit 0 (grün in 58 s, 2349 Tests), Netz-Prüfung am PR #261 nach dem Lauf des Jobs `check`.
+- 2026-11-17 Release: PASS K und B (Zyklus 4), DONE.
 
 ## Blockers

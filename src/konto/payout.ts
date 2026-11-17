@@ -8,7 +8,8 @@
  *
  * - forwarderAddress: where the forwarder for account and destination lives (CREATE2 over the deterministic deployment proxy,
  *   salt 0); the page lets the person sign exactly this address as spender.
- * - sendPayout: retire of the forwarder before a new IBAN, if one waits; the forwarder deployed if it has no code yet;
+ * - sendPayout: retire of the forwarder before a new IBAN, if one waits and is still approved with our gas key as its caller (else
+ *   it is dropped without a transaction and logged); the forwarder deployed if it has no code yet;
  *   approveWithSignature of the second permission the first time; then payout of the forwarder. Every transaction goes through
  *   sendKontoTx (src/konto/chain.ts), which refuses any chain but the one the account is set to.
  * - POST /v1/konto/payout, GET /v1/konto/payout and POST /v1/konto/payout-rule behind the auth middleware of src/app.ts.
@@ -105,6 +106,8 @@ export interface PayoutChain {
   /** USDC of the smart wallet: the only source of a payout. */
   balanceOf(account: Address): Promise<bigint>;
   isApproved(p: SpendPermission): Promise<boolean>;
+  /** The fixed `caller` of a deployed forwarder: the only sender its retire and payout accept. */
+  callerOf(forwarder: Address): Promise<Address>;
   /** One transaction with our gas key, through sendKontoTx. */
   send(tx: KontoTx): Promise<Hex>;
   receipt(hash: Hex): Promise<TxReceiptLike>;
@@ -123,6 +126,7 @@ export function createPayoutChain(params: { chainId: number; net?: KontoNet; acc
     code: async (address) => (await client.getCode({ address })) ?? "0x",
     balanceOf: (account) => client.readContract({ address: params.token, abi: ERC20_ABI, functionName: "balanceOf", args: [account] }),
     isApproved: (p) => client.readContract({ address: SPEND_PERMISSION_MANAGER, abi: SPEND_PERMISSION_MANAGER_ABI, functionName: "isApproved", args: [p] }),
+    callerOf: (forwarder) => client.readContract({ address: forwarder, abi: FORWARDER_ABI, functionName: "caller" }),
     send: (tx) => sendKontoTx({ chainId: params.chainId, net, account: params.account, transport: params.transport, tx }),
     receipt: (hash) => client.waitForTransactionReceipt({ hash }),
   };
@@ -189,8 +193,11 @@ export function payoutPermissionMatches(p: SpendPermission, want: { account: str
 
 /**
  * Ends a payout handoff `done` in one transaction: the bank account of its bank step and the new permission become the payout
- * setup of the account. A permission before it that went through approveWithSignature waits as `retire_*` until sendPayout has
- * ended it; one that never did is dropped, because nothing on-chain knows it. Returns false when the handoff was no longer matched.
+ * setup of the account. The permission before it waits as `retire_*` until sendPayout has ended it, whatever permission_approved
+ * says: a wait for the receipt of approveWithSignature that broke off leaves it at 0 although the approval went through, and
+ * sendPayout asks the chain before it sends anything. When a `retire_*` already waits, it stays and the permission before is
+ * dropped: approveWithSignature goes out only after a retire went through, so that one never reached the chain. Returns false
+ * when the handoff was no longer matched.
  */
 export function finishPayout(db: Db, input: { code: string; account: string; permission: SpendPermission; signature: Hex; nowMs: number }): boolean {
   return db.transaction((): boolean => {
@@ -202,9 +209,11 @@ export function finishPayout(db: Db, input: { code: string; account: string; per
     ensurePayoutRow(db, account, input.nowMs);
     const before = readPayout(db, account)!;
     const retire =
-      before.permission && before.forwarder && before.permission_approved
-        ? { forwarder: before.forwarder, permission: before.permission }
-        : { forwarder: before.retire_forwarder, permission: before.retire_permission };
+      before.retire_forwarder && before.retire_permission
+        ? { forwarder: before.retire_forwarder, permission: before.retire_permission }
+        : before.permission && before.forwarder
+          ? { forwarder: before.forwarder, permission: before.permission }
+          : { forwarder: null, permission: null };
     db.prepare(
       `UPDATE konto_payouts SET external_account_id = ?, liquidation_address_id = ?, destination = ?, bank_last4 = ?, forwarder = ?,
        permission = ?, signature = ?, permission_approved = 0, retire_forwarder = ?, retire_permission = ?, updated_at = ? WHERE address = ?`,
@@ -319,13 +328,24 @@ export async function sendPayout(deps: PayoutDeps, address: string, value: bigin
     // or chain changed since, the contract would be deployed at another address than the stored one: then nothing is sent, and the
     // phone sets up the forwarder again with today's values.
     if (!forwarderFits(row, account, deps.fixed)) throw new Error("payout_needs_phone");
-    // A new IBAN first: the permission of the old forwarder ends before money goes over the new one.
+    // A new IBAN first: the permission of the old forwarder ends before money goes over the new one. Only what is approved and
+    // has today's gas key as caller can be retired by us; anything else is dropped without a transaction, because a retire of it
+    // would revert (`only the fixed caller`) and block every payout of the account. A read that fails stops here and keeps it.
     if (row.retire_forwarder && row.retire_permission) {
       const old = permissionFromJson(row.retire_permission);
-      await confirm(chain, "retire", {
-        to: getAddress(row.retire_forwarder),
-        data: encodeFunctionData({ abi: FORWARDER_ABI, functionName: "retire", args: [old] }),
-      });
+      const oldForwarder = getAddress(row.retire_forwarder);
+      let skip: "not_approved" | "other_caller" | null = null;
+      try {
+        if (!(await chain.isApproved(old))) skip = "not_approved";
+        else if ((await chain.callerOf(oldForwarder)).toLowerCase() !== deps.fixed.caller.toLowerCase()) skip = "other_caller";
+      } catch {
+        throw new PayoutFailed("retire", null);
+      }
+      if (skip) {
+        (deps.log ?? ((line: string) => console.log(line)))(`[payout] retire skipped for ${oldForwarder.toLowerCase()}: ${skip}`);
+      } else {
+        await confirm(chain, "retire", { to: oldForwarder, data: encodeFunctionData({ abi: FORWARDER_ABI, functionName: "retire", args: [old] }) });
+      }
       db.prepare("UPDATE konto_payouts SET retire_forwarder = NULL, retire_permission = NULL WHERE address = ?").run(account);
     }
     const forwarder = getAddress(row.forwarder);

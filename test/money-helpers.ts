@@ -18,6 +18,7 @@ import {
   pad,
   parseTransaction,
   recoverAddress,
+  recoverTransactionAddress,
   type Address,
   type Hex,
   type PrivateKeyAccount,
@@ -33,6 +34,7 @@ import { createPayoutChain } from "../src/konto/payout.js";
 import { SPEND_PERMISSION_TYPES, spendPermissionDomain } from "../src/konto/permission.js";
 import { SPEND_PERMISSION_MANAGER_ABI } from "../src/konto/topup.js";
 import type { KontoDeps } from "../src/handoff/routes.js";
+import { createApp } from "../src/app.js";
 import { ATLAS, create, handoffApp, tap } from "./handoff-helpers.js";
 
 export const DAY = 86_400;
@@ -90,12 +92,15 @@ export interface Sent {
 /**
  * A Base Sepolia node for the payout: USDC balances, the code at addresses, approvals at the SpendPermissionManager, and every
  * raw transaction decoded and applied, so that a payout moves the USDC of the wallet to the destination of the forwarder.
+ * Like PayoutForwarder.sol, each deployed forwarder keeps the fifth constructor argument as its `caller`, answers `caller()`
+ * with it, and reverts `retire` and `payout` from any other sender.
  */
 export function payoutNode() {
   const balances = new Map<string, bigint>();
   const code = new Map<string, Hex>();
   const approved = new Set<string>();
   const destinations = new Map<string, string>();
+  const callers = new Map<string, string>();
   const sent: Sent[] = [];
   const reverted = new Set<string>();
   let n = 0;
@@ -119,12 +124,18 @@ export function payoutNode() {
               const [who] = decodeAbiParameters([{ type: "address" }], `0x${data.slice(10)}` as Hex);
               return encodeAbiParameters([{ type: "uint256" }], [balances.get(who.toLowerCase()) ?? 0n]);
             }
+            if (callers.has(to.toLowerCase())) {
+              const fcall = decodeFunctionData({ abi: FORWARDER_ABI, data });
+              if (fcall.functionName === "caller") return encodeAbiParameters([{ type: "address" }], [callers.get(to.toLowerCase()) as Address]);
+              throw new Error(`unexpected forwarder eth_call ${fcall.functionName}`);
+            }
             const call = decodeFunctionData({ abi: SPEND_PERMISSION_MANAGER_ABI, data });
             if (call.functionName === "isApproved") return encodeAbiParameters([{ type: "bool" }], [approved.has(key(call.args![0] as never))]);
             throw new Error(`unexpected eth_call ${call.functionName}`);
           }
           case "eth_sendRawTransaction": {
-            const tx = parseTransaction(params?.[0] as Hex);
+            const raw = params?.[0] as Hex;
+            const tx = parseTransaction(raw);
             const to = tx.to!.toLowerCase();
             const hash = hashOf();
             if (to === PROXY) {
@@ -136,6 +147,7 @@ export function payoutNode() {
               ).map((a) => a.toLowerCase());
               code.set(at, "0x6001");
               destinations.set(at, ctor[1]);
+              callers.set(at, ctor[4]);
               sent.push({ kind: "deploy", to, target: at, ctor });
             } else if (to === SPEND_PERMISSION_MANAGER) {
               const call = decodeFunctionData({ abi: SPEND_PERMISSION_MANAGER_ABI, data: tx.data! });
@@ -145,11 +157,13 @@ export function payoutNode() {
             } else {
               const call = decodeFunctionData({ abi: FORWARDER_ABI, data: tx.data! });
               const p = call.args![0] as { account: string; salt: bigint };
+              const sender = (await recoverTransactionAddress({ serializedTransaction: raw as never })).toLowerCase();
+              const byCaller = callers.get(to) === sender;
               if (call.functionName === "payout") {
                 const value = call.args![1] as bigint;
                 const from = p.account.toLowerCase();
                 const have = balances.get(from) ?? 0n;
-                if (!code.has(to) || have < value || !approved.has(key(p))) reverted.add(hash);
+                if (!code.has(to) || !byCaller || have < value || !approved.has(key(p))) reverted.add(hash);
                 else {
                   balances.set(from, have - value);
                   const dest = destinations.get(to)!;
@@ -157,7 +171,8 @@ export function payoutNode() {
                 }
                 sent.push({ kind: "payout", to, target: to, value, salt: p.salt });
               } else if (call.functionName === "retire") {
-                approved.delete(key(p));
+                if (byCaller) approved.delete(key(p));
+                else reverted.add(hash);
                 sent.push({ kind: "retire", to, target: to, salt: p.salt });
               } else sent.push({ kind: "other", to });
             }
@@ -175,7 +190,7 @@ export function payoutNode() {
     },
     { retryCount: 0 },
   );
-  return { balances, code, approved, sent, transport };
+  return { balances, code, approved, callers, sent, transport };
 }
 
 /** Bridge without a network: records every request; `kycStatus` is what the identity check reports. */
@@ -255,6 +270,25 @@ export function moneySetup(over: { konto?: Partial<KontoDeps> | null; bridge?: b
   return { ...s, verify, node, gas, bridge, konto };
 }
 export type MoneySetup = ReturnType<typeof moneySetup>;
+
+/**
+ * The service after a change of its gas key: a second app with a fresh key as spender and sender, on the same database, the same
+ * node, the same Bridge and the same wallet chain, so accounts, API keys and forwarders of `s` stay where they are.
+ */
+export function withNewGasKey(s: MoneySetup): MoneySetup {
+  const gas = privateKeyToAccount(generatePrivateKey());
+  const payoutChain = createPayoutChain({ chainId: 84532, account: gas, transport: s.node.transport, token: SEPOLIA_USDC });
+  const konto: KontoDeps = { ...s.konto!, spender: gas.address, payoutChain };
+  const app = createApp({
+    db: s.db,
+    now: () => new Date(s.clock.now),
+    rateLimit: null,
+    konto,
+    bridge: s.bridge.bridge,
+    handoff: { pollMs: 5, missLimit: null },
+  });
+  return { ...s, app, gas, konto };
+}
 
 /** An account of konto 03 for a fresh smart wallet owned by a fresh key, made through the handoff, and its API key. */
 export async function account(s: MoneySetup) {

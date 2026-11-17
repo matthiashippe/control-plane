@@ -23,6 +23,7 @@ function setup() {
     code: (a) => inner.chain!.code(a),
     balanceOf: (a) => inner.chain!.balanceOf(a),
     isApproved: (p) => inner.chain!.isApproved(p),
+    callerOf: (f) => inner.chain!.callerOf(f),
     send: (tx) => inner.chain!.send(tx),
     async receipt(hash: Hex) {
       if (mode.reverted.has(hash)) return { status: "reverted" };
