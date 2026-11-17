@@ -13,9 +13,10 @@ export type HandoffState = "pending" | "matched" | "done" | "burned" | "expired"
 
 /**
  * What the right number leads to: `confirm` ends the handoff (konto 02), `konto` goes on to the passkey step that creates the
- * account (konto 03), `limit` to the passkey step that raises the daily limit of an existing account (konto 04).
+ * account (konto 03), `limit` to the passkey step that raises the daily limit of an existing account (konto 04), `deposit` to
+ * the card payment into the account of an API key and `payout` to the setup of the payout to the person's bank account (konto 05).
  */
-export type HandoffStep = "confirm" | "konto" | "limit";
+export type HandoffStep = "confirm" | "konto" | "limit" | "deposit" | "payout";
 
 export interface Handoff {
   code: string;

@@ -6,7 +6,7 @@
  * - permissionMatches: is it the permission this handoff asked for?
  * - signatureValid: did the smart wallet sign it (ERC-1271, or ERC-6492 while the wallet is not deployed yet)?
  */
-import { isAddress, isHex, type Address, type Hex, type PublicClient } from "viem";
+import { BaseError, createPublicClient, custom, isAddress, isHex, type Address, type Hex, type PublicClient } from "viem";
 import { PERIOD_SECONDS, SPEND_PERMISSION_MANAGER } from "./config.js";
 
 export interface SpendPermission {
@@ -90,13 +90,57 @@ export function permissionMatches(p: SpendPermission, want: ExpectedPermission):
 }
 
 /**
+ * Thrown by signatureValid when the chain could not be asked (the RPC down, a timeout, a rate limit, an HTTP error): then nobody
+ * knows whether the signature is valid, so the route answers 503 `signature_check_unavailable`, the handoff stays `matched`, and
+ * the page sends the same signature again (goals/konto/05, point 7).
+ */
+export class SignatureCheckUnavailable extends Error {
+  constructor() {
+    super("the signature could not be checked: the chain did not answer");
+    this.name = "SignatureCheckUnavailable";
+  }
+}
+
+/** True when the node answered and the call reverted: the chain was asked and said no, which is not a failure of the transport. */
+function isRevert(err: unknown): boolean {
+  const reverted = (e: unknown) => {
+    const x = e as { code?: unknown; name?: unknown; message?: unknown; details?: unknown } | null;
+    if (!x || typeof x !== "object") return false;
+    if (x.code === 3 || x.name === "ExecutionRevertedError" || x.name === "ContractFunctionRevertedError") return true;
+    return /execution reverted/i.test(`${String(x.message ?? "")} ${String(x.details ?? "")}`);
+  };
+  if (err instanceof BaseError) return Boolean(err.walk(reverted)) || reverted(err);
+  return reverted(err);
+}
+
+/**
  * True when `signature` is the account's signature over the permission. Asks the chain through `client` (ERC-6492 universal
- * validator, so a wallet that is not deployed yet counts); any error is a no, never a yes.
+ * validator, so a wallet that is not deployed yet counts), with viem's fallback to ecrecover. A chain that answers no, or a
+ * signature that cannot be one, is false. A chain that could not be asked throws SignatureCheckUnavailable, never a yes: viem
+ * turns a failed eth_call into false, so every request goes through a wrapper that notes a failure of the transport.
  */
 export async function signatureValid(client: PublicClient, chainId: number, p: SpendPermission, signature: Hex): Promise<boolean> {
   if (!isHex(signature) || signature.length < 132) return false;
+  let unavailable = false;
+  const watched = createPublicClient({
+    chain: client.chain,
+    transport: custom(
+      {
+        async request(args: { method: string; params?: unknown }) {
+          try {
+            return await client.request(args as never);
+          } catch (err) {
+            if (!isRevert(err)) unavailable = true;
+            throw err;
+          }
+        },
+      },
+      { retryCount: 0 },
+    ),
+  });
+  let valid: boolean;
   try {
-    return await client.verifyTypedData({
+    valid = await watched.verifyTypedData({
       address: p.account,
       domain: spendPermissionDomain(chainId),
       types: SPEND_PERMISSION_TYPES,
@@ -105,6 +149,11 @@ export async function signatureValid(client: PublicClient, chainId: number, p: S
       signature,
     });
   } catch {
+    // What is left after a failed request is no answer; anything else is a signature that cannot be one.
+    if (unavailable) throw new SignatureCheckUnavailable();
     return false;
   }
+  // viem's fallback to ecrecover may say yes without the chain; a no after a failed request is no answer at all.
+  if (!valid && unavailable) throw new SignatureCheckUnavailable();
+  return valid;
 }

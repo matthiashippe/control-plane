@@ -22,14 +22,18 @@
  * until then a run spends from the new one at most the limit minus what the new one and the carry spent; after that the period of
  * the new one holds alone. A second raise in the same period adds what the second permission spent to the carry and keeps the
  * later of both ends, so a run may spend less than it could, never more.
+ *
+ * A used-up period is remembered (goals/konto/05, point 8): after `period_used_up` the run keeps the end of that period per
+ * account and answers `period_used_up` until then without asking the chain, and a permission whose `end` has passed answers
+ * `permission_expired` without any call. A raise brings a new permission, so a waiting `next_permission` forgets what was kept and
+ * the next run asks at once. The memory lives in the process: after a restart the first run asks once more.
  */
 import { createPublicClient, encodeFunctionData, type Address, type Hex, type LocalAccount, type PublicClient, type Transport } from "viem";
-import { baseSepolia } from "viem/chains";
 import { getAvailableMc, postLedger, type Db } from "../db.js";
 import { permissionFromJson } from "./account.js";
-import { requireSepolia, sendKontoTx } from "./chain.js";
+import { requireNet, sendKontoTx } from "./chain.js";
 import { nextPermission, spendableLimit } from "./limit.js";
-import { KONTO_CHAIN_ID, SPEND_PERMISSION_MANAGER } from "./config.js";
+import { SEPOLIA_NET, SPEND_PERMISSION_MANAGER, type KontoNet } from "./config.js";
 import type { SpendPermission } from "./permission.js";
 
 /** 100000 mc are one dollar, one dollar is 1000000 atomic USDC: ten atomic USDC are one mc. */
@@ -63,10 +67,15 @@ export interface TopUpDeps {
   topupUsdc: bigint;
   /** The clock in milliseconds, for the end of the period of a revoked permission; production uses Date.now. */
   now?: () => number;
+  /** The chain the account is set to; Base Sepolia when left out. An account row on another chain is never topped up. */
+  net?: KontoNet;
 }
 
 export type TopUpResult =
-  | { kind: "none"; reason: "no_account" | "wrong_chain" | "enough" | "period_used_up" | "approve_failed" | "revoke_failed" | "busy" }
+  | {
+      kind: "none";
+      reason: "no_account" | "wrong_chain" | "enough" | "period_used_up" | "permission_expired" | "approve_failed" | "revoke_failed" | "busy";
+    }
   | { kind: "pending"; hash: Hex }
   | { kind: "reverted"; hash: Hex }
   | { kind: "booked"; hash: Hex; usdc: bigint; mc: number };
@@ -93,7 +102,7 @@ export function periodEnd(p: SpendPermission, nowSeconds: number): number {
 }
 
 /** Books a successful spend once: a second call with the same hash adds nothing. Returns whether a row was written. */
-export function bookTopup(db: Db, address: string, hash: Hex, usdc: bigint): boolean {
+export function bookTopup(db: Db, address: string, hash: Hex, usdc: bigint, chainId: number = SEPOLIA_NET.chainId): boolean {
   return db.transaction((): boolean => {
     const seen = db.prepare("SELECT 1 FROM ledger WHERE kind = 'topup' AND ref = ?").get(hash.toLowerCase());
     if (seen) return false;
@@ -102,16 +111,16 @@ export function bookTopup(db: Db, address: string, hash: Hex, usdc: bigint): boo
       kind: "topup",
       deltaMc: Number(usdc / ATOMIC_PER_MC),
       ref: hash.toLowerCase(),
-      meta: { source: "spend_permission", chain_id: KONTO_CHAIN_ID, usdc: String(usdc) },
+      meta: { source: "spend_permission", chain_id: chainId, usdc: String(usdc) },
     });
     return true;
   })();
 }
 
 /** Books a settled spend and closes it as the open one of the account, in one transaction. */
-function settle(db: Db, address: string, hash: Hex, usdc: bigint): void {
+function settle(db: Db, address: string, hash: Hex, usdc: bigint, chainId: number): void {
   db.transaction(() => {
-    bookTopup(db, address, hash, usdc);
+    bookTopup(db, address, hash, usdc, chainId);
     db.prepare("UPDATE konto_accounts SET pending_tx = NULL, pending_usdc = NULL WHERE address = ? AND pending_tx = ?").run(address, hash.toLowerCase());
   })();
 }
@@ -132,7 +141,7 @@ async function waitForSpend(deps: TopUpDeps, address: string, hash: Hex, usdc: b
     release(deps.db, address, hash);
     return { kind: "reverted", hash };
   }
-  settle(deps.db, address, hash, usdc);
+  settle(deps.db, address, hash, usdc, (deps.net ?? SEPOLIA_NET).chainId);
   return { kind: "booked", hash, usdc, mc: Number(usdc / ATOMIC_PER_MC) };
 }
 
@@ -161,6 +170,17 @@ function carryAfterSwitch(row: AccountRow, oldSpent: bigint, oldEnd: number, now
 
 const running = new Map<string, Promise<TopUpResult>>();
 
+/**
+ * Per database and account: until when (unix seconds) the current period is used up, so that no run asks the chain before then.
+ * Keyed by the database too, because an address means an account only within its database.
+ */
+const usedUpByDb = new WeakMap<Db, Map<string, number>>();
+function usedUpMemo(db: Db): Map<string, number> {
+  let memo = usedUpByDb.get(db);
+  if (!memo) usedUpByDb.set(db, (memo = new Map()));
+  return memo;
+}
+
 /** Tops the account up when its credit is low. A second call while one runs for the same account waits for that one. */
 export function topUpIfLow(deps: TopUpDeps, address: string): Promise<TopUpResult> {
   const key = address.toLowerCase();
@@ -179,7 +199,7 @@ async function topUp(deps: TopUpDeps, address: string): Promise<TopUpResult> {
     .get(address) as AccountRow | undefined;
   if (!row) return { kind: "none", reason: "no_account" };
   try {
-    requireSepolia(row.chain_id);
+    requireNet(row.chain_id, deps.net);
   } catch {
     return { kind: "none", reason: "wrong_chain" };
   }
@@ -189,6 +209,11 @@ async function topUp(deps: TopUpDeps, address: string): Promise<TopUpResult> {
   // account use the new one.
   const next = nextPermission(row);
   let switched = false;
+  const usedUpUntil = usedUpMemo(db);
+  // A raise waits: the new permission has its own period, so what was kept about the old one no longer says anything.
+  if (next) usedUpUntil.delete(address);
+  else if ((usedUpUntil.get(address) ?? 0) > nowSeconds) return { kind: "none", reason: "period_used_up" };
+  if (!next && permissionFromJson(row.permission).end <= nowSeconds) return { kind: "none", reason: "permission_expired" };
   if (next) {
     const old = permissionFromJson(row.permission);
     let approvedTx: Hex | null = null;
@@ -218,7 +243,13 @@ async function topUp(deps: TopUpDeps, address: string): Promise<TopUpResult> {
   const spent = (await chain.spentThisPeriod(permission)) + activeCarry(row, nowSeconds);
   const rest = limit > spent ? limit - spent : 0n;
   const value = rest < deps.topupUsdc ? rest : deps.topupUsdc;
-  if (value <= 0n) return { kind: "none", reason: "period_used_up" };
+  if (value <= 0n) {
+    // Nothing left until the period ends, or earlier, when the carry of a revoked permission ends first.
+    const carry = activeCarry(row, nowSeconds);
+    const end = periodEnd(permission, nowSeconds);
+    usedUpUntil.set(address, carry > 0n ? Math.min(end, Number(row.carry_until)) : end);
+    return { kind: "none", reason: "period_used_up" };
+  }
   // Just approved above, so the node need not be asked again (it may not even have the block yet).
   if (!switched && !(await chain.isApproved(permission))) {
     const approveTx = await confirmed(chain, () => chain.approve(permission, row.signature));
@@ -267,11 +298,12 @@ export const SPEND_PERMISSION_MANAGER_ABI = [
 ] as const;
 
 /** The chain of production: reads over `transport`, writes only through sendKontoTx with the test key. */
-export function createKontoChain(params: { chainId: number; account: LocalAccount; transport: Transport; client?: PublicClient }): KontoChain {
-  requireSepolia(params.chainId);
-  const client = params.client ?? createPublicClient({ chain: baseSepolia, transport: params.transport });
+export function createKontoChain(params: { chainId: number; net?: KontoNet; account: LocalAccount; transport: Transport; client?: PublicClient }): KontoChain {
+  const net = params.net ?? SEPOLIA_NET;
+  requireNet(params.chainId, net);
+  const client = params.client ?? createPublicClient({ chain: net.chain, transport: params.transport });
   const address: Address = SPEND_PERMISSION_MANAGER;
-  const send = (data: Hex) => sendKontoTx({ chainId: params.chainId, account: params.account, transport: params.transport, tx: { to: address, data } });
+  const send = (data: Hex) => sendKontoTx({ chainId: params.chainId, net, account: params.account, transport: params.transport, tx: { to: address, data } });
   return {
     async spentThisPeriod(p) {
       const period = await client.readContract({ address, abi: SPEND_PERMISSION_MANAGER_ABI, functionName: "getCurrentPeriod", args: [p] });

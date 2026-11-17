@@ -587,6 +587,90 @@ function migrate(db: Db): void {
     }
   }
 
+  // konto 05 (docs/konto/euro.md): a handoff with `step` 'deposit' opens the card payment into the smart wallet of the account of
+  // an API key, one with 'payout' sets up the payout to the person's bank account. The CHECK of konto 04 knows neither, so a table
+  // without them is rebuilt once; its rows live ten minutes and are copied over.
+  const handoffSql05 = (db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'handoffs'").get() as { sql: string }).sql;
+  if (!handoffSql05.includes("'payout'")) {
+    db.transaction(() => {
+      db.exec(`
+        ALTER TABLE handoffs RENAME TO handoffs_konto04;
+        CREATE TABLE handoffs (
+          code                TEXT PRIMARY KEY,
+          poll_hash           TEXT NOT NULL UNIQUE,
+          automaton_name      TEXT NOT NULL,
+          daily_limit_usdc    TEXT NOT NULL,
+          amount_usdc         TEXT NOT NULL,
+          match               INTEGER NOT NULL CHECK (match BETWEEN 10 AND 99),
+          choices             TEXT NOT NULL,
+          state               TEXT NOT NULL CHECK (state IN ('pending', 'matched', 'done', 'burned', 'expired')),
+          created_at          INTEGER NOT NULL,
+          updated_at          INTEGER NOT NULL,
+          step                TEXT NOT NULL DEFAULT 'confirm' CHECK (step IN ('confirm', 'konto', 'limit', 'deposit', 'payout')),
+          account             TEXT,
+          api_key             TEXT,
+          previous_limit_usdc TEXT
+        );
+        INSERT INTO handoffs SELECT code, poll_hash, automaton_name, daily_limit_usdc, amount_usdc, match, choices, state, created_at,
+          updated_at, step, account, api_key, previous_limit_usdc FROM handoffs_konto04;
+        DROP TABLE handoffs_konto04;
+      `);
+    })();
+  }
+
+  // The payout of konto 05 (docs/konto/euro.md, "Auszahlung"), one row per account. From Bridge only the IDs: the customer, its
+  // identity link and whether Bridge reported it `approved`, the bank account (external account) and the payout address
+  // (liquidation address, `destination`, the only target of the forwarder); of the IBAN only its last four characters. `forwarder`
+  // is the PayoutForwarder for account and destination, `permission`/`signature` the second spend permission the person signed for
+  // it (JSON with numbers as strings), `permission_approved` 1 once approveWithSignature went through. After a new IBAN,
+  // `retire_forwarder`/`retire_permission` are the forwarder and permission before it, which get `retire` before the next payout.
+  // `pending_tx`/`pending_usdc` are a sent `payout` whose receipt did not arrive yet (atomic USDC as a string); the next payout of
+  // the account clears it first and sends nothing while it is open.
+  // `payout_handoffs` holds what the bank step of one handoff brought until its passkey step ends it; `konto_payout_rules` the
+  // rule of an account (keep this much, pay the rest on this weekday) and the UTC day it last paid.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS konto_payouts (
+      address                TEXT PRIMARY KEY REFERENCES wallets(address),
+      bridge_customer_id     TEXT,
+      kyc_link_id            TEXT,
+      kyc_approved           INTEGER NOT NULL DEFAULT 0,
+      external_account_id    TEXT,
+      liquidation_address_id TEXT,
+      destination            TEXT,
+      bank_last4             TEXT,
+      forwarder              TEXT,
+      permission             TEXT,
+      signature              TEXT,
+      permission_approved    INTEGER NOT NULL DEFAULT 0,
+      retire_forwarder       TEXT,
+      retire_permission      TEXT,
+      pending_tx             TEXT,
+      pending_usdc           TEXT,
+      updated_at             INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS payout_handoffs (
+      code                   TEXT PRIMARY KEY,
+      address                TEXT NOT NULL,
+      external_account_id    TEXT NOT NULL,
+      liquidation_address_id TEXT NOT NULL,
+      destination            TEXT NOT NULL,
+      bank_last4             TEXT NOT NULL,
+      forwarder              TEXT NOT NULL,
+      created_at             INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS konto_payout_rules (
+      address       TEXT PRIMARY KEY REFERENCES wallets(address),
+      keep_usdc     TEXT NOT NULL,
+      weekday       TEXT NOT NULL CHECK (weekday IN ('monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday')),
+      last_paid_day TEXT,
+      updated_at    INTEGER NOT NULL
+    );
+  `);
+  const payoutColumns = db.prepare("PRAGMA table_info(konto_payouts)").all() as { name: string }[];
+  for (const column of ["pending_tx", "pending_usdc"]) {
+    if (!payoutColumns.some((c) => c.name === column)) db.exec(`ALTER TABLE konto_payouts ADD COLUMN ${column} TEXT`);
+  }
+
   // The conversation that asks back (HAN-77). `fields` is what was understood so far, `turns` the
   // transcript; both are a person's words and are deleted after a day (`cleanupConversations` in
   // src/checkout/conversation.ts). `conversation_days` counts model calls and their cost per UTC
@@ -862,6 +946,8 @@ export function cleanupExpired(
       .prepare("DELETE FROM payments WHERE status = 'failed' AND created_at < ?")
       .run(new Date(now - FAILED_PAYMENT_MAX_AGE_DAYS * 24 * 60 * 60 * 1000).toISOString()).changes;
     const handoffs = db.prepare("DELETE FROM handoffs WHERE created_at < ?").run(now - HANDOFF_MAX_AGE_MS).changes;
+    // What the bank step of a payout handoff brought (goals/konto/05) goes with its handoff.
+    db.prepare("DELETE FROM payout_handoffs WHERE created_at < ?").run(now - HANDOFF_MAX_AGE_MS);
     // Relay messages go after 30 days, their contact stays (goals/relay/01, point 9). A remembered poll answer is only
     // needed while its X-Timestamp is in the window of 300000 ms, a day is plenty.
     const relay = db.prepare("DELETE FROM relay_messages WHERE created_ms < ?").run(now - RELAY_MAX_AGE_MS).changes;

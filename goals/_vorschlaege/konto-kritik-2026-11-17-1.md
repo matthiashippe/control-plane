@@ -1,0 +1,5 @@
+Schwere: 4
+Goal: konto 06
+Befund: Jede Weiterleitung trägt den Gasschlüssel als unveränderliches `caller`, auch für `retire`. Wechselt der Schlüssel (Leck, Rotation, neuer Server), kann der Server keine einzige bestehende Weiterleitung mehr aufrufen und keine zweite Erlaubnis mehr widerrufen; jeder Kunde braucht einen neuen Handoff mit Passkey, und die alten Erlaubnisse gelten weiter für den alten Schlüssel (Geld ginge dann nur an das alte eigene Ziel des Kunden).
+Beleg: `src/konto/contracts/PayoutForwarder.sol` (`fixedCaller`, `require(msg.sender == caller())` in `payout` und `retire`), `forwarderFixed` in `src/konto/payout.ts` (`caller: konto.spender`).
+Empfehlung: konto 06 schreibt vor dem Einschalten unter `## Für konto 06` in `docs/konto/euro.md`, wie ein Wechsel des Gasschlüssels abläuft (alle Konten auf `payout_needs_phone`, Nachricht an den Menschen über `automaton_status`, alte Erlaubnis nur über den Passkey des Kunden widerrufbar), und prüft, ob `caller` ein Verweis auf eine feste Liste werden soll, bevor die erste echte Erlaubnis im Hauptnetz unterschrieben ist. Danach ist jede Änderung am Vertrag ein neuer Handoff für jeden Kunden.

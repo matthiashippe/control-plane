@@ -94,6 +94,8 @@ import { Catalog, handleChat, MARKUP } from "./inference/proxy.js";
 import { clientKey, RateLimiter, type RateLimitOptions } from "./ratelimit.js";
 import { registerHandoff, type HandoffDeps, type KontoDeps } from "./handoff/routes.js";
 import { registerKontoLimit } from "./konto/limit.js";
+import { registerKontoPayout } from "./konto/payout.js";
+import type { Bridge } from "./konto/bridge.js";
 import { handlePay, TOPUP_TIERS_USD, type PayConfig } from "./payments/pay.js";
 import { handleRegister } from "./registry.js";
 import { createSandboxService, type Reply as SandboxReply, type SandboxService } from "./sandbox/service.js";
@@ -192,6 +194,11 @@ export interface AppOptions {
    * the account behind the key needs credit from its spend permission.
    */
   konto?: (KontoDeps & { topUp?: (address: string) => void }) | null;
+  /**
+   * Bridge (goals/konto/05, src/konto/bridge.ts). Left out or null while CP_BRIDGE_KEY_FILE is unset: then `step: "payout"`,
+   * POST /v1/konto/payout and POST /v1/konto/payout-rule answer 503.
+   */
+  bridge?: Bridge | null;
 }
 
 /**
@@ -341,6 +348,9 @@ export const V1_ROUTES = new Set([
   "/v1/credits/balance",
   // The daily limit of an account (goals/konto/04): read it, and lower it with the API key; raising needs the phone.
   "/v1/konto/limit",
+  // The payout of an account to its own bank account and its weekly rule (goals/konto/05), with the API key.
+  "/v1/konto/payout",
+  "/v1/konto/payout-rule",
   "/v1/credits/history",
   "/v1/credits/pricing",
   "/v1/credits/starter",
@@ -1823,7 +1833,7 @@ export function createApp(opts: AppOptions) {
   // The way to the phone (goals/konto/02): POST /v1/handoff, the page /h/{code} and the stream GET /v1/handoff/{code}. Before
   // the /v1/* auth middleware for the same reason as /v1/auth/keyless above.
   const indexStyle = /<style>[\s\S]*?<\/style>/.exec(indexHtml ?? "")?.[0] ?? "";
-  registerHandoff(app, { db, clock, indexStyle: () => indexStyle, ...opts.handoff, konto: opts.konto ?? null });
+  registerHandoff(app, { db, clock, indexStyle: () => indexStyle, ...opts.handoff, konto: opts.konto ?? null, bridge: opts.bridge ?? null });
 
   // The social relay of the runtime (goals/relay/01, docs/relay/vertrag.md): POST /v1/messages, POST /v1/messages/poll and
   // GET /v1/messages/count. Before the /v1/* auth middleware, because the signed way carries no API key; the way with a key
@@ -2650,6 +2660,9 @@ export function createApp(opts: AppOptions) {
    */
   // goals/konto/04: the daily limit of the account of this key. Behind the auth middleware above, which sets `address`.
   registerKontoLimit(app, { db, on: () => Boolean(opts.konto) });
+  // goals/konto/05: the payout of the account of this key, only to its fixed bank account, and the weekly rule. Behind the same
+  // middleware.
+  registerKontoPayout(app, { db, konto: opts.konto ?? null, bridge: opts.bridge ?? null });
 
   app.get("/v1/credits/balance", (c) => {
     const address = c.get("address");

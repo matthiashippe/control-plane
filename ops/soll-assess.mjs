@@ -238,6 +238,58 @@ export function summaryLimit(results) {
   return `soll limit: ${results.length} images, ${LIMIT_BLOCKS.approve} top ${top("approve")}, ${LIMIT_BLOCKS.passkey} top ${top("passkey")}, ${n} defects`;
 }
 
+// ---- /h/{code}, money in and out (goals/konto/05) -------------------------------------------------------------------------
+// Seven more states of the phone page: adding money by card and sending money to the person's own bank account, plus `retry`
+// after a signature check that did not go through. Every state carries a block that has to end in the first screen. On top of
+// the defects of the start page, a word the reader would first have to translate is a defect, with the list of goals/konto/05
+// ("passkey", "IBAN", "card", "identity", Bridge and MoonPay are known words).
+
+/** The states of money in and out, each one source docs/soll/src/money-<state>.html and two pictures. */
+export const MONEY_STATES = Object.freeze(["deposit-approve", "deposit-card", "payout-approve", "payout-verify", "payout-bank", "payout-passkey", "retry"]);
+/** The block of each state that has to end in the first screen, as its data-soll value. */
+export const MONEY_BLOCKS = Object.freeze({
+  "deposit-approve": "approve",
+  "deposit-card": "card",
+  "payout-approve": "approve",
+  "payout-verify": "verify",
+  "payout-bank": "bank",
+  "payout-passkey": "payout",
+  retry: "retry",
+});
+/** Words that name how money moves instead of what happens; the same list the goal's source check uses. */
+export const MONEY_WORDS = /handoff|token|wallet|smart|permission|sepolia|turnkey|\berc|allowance|liquidation|on-?ramp|\bkyc|forwarder|spender|usdc/i;
+
+/**
+ * Defects of one render of money in and out. `m` is what assessLimit() takes: `state`, `width`, `pngWidth`, `diffPixels`,
+ * `scrollWidth`, `text`, `foreign` and `blockBottom` (bottom edge of the block of the state in page pixels, null when missing).
+ */
+export function assessMoney(m) {
+  const out = assess({ ...m, moveBottom: 0 }).map((d) => `${m.state} ${d}`), fold = FOLD[m.width];
+  const block = MONEY_BLOCKS[m.state];
+  if (!MONEY_STATES.includes(m.state)) out.push(`${m.state} ${m.width}: unknown state`);
+  const word = String(m.text ?? "").split("\n").find((l) => MONEY_WORDS.test(l));
+  if (word !== undefined) out.push(`${m.state} ${m.width}: word the reader has to translate in the visible text: ${word.trim().slice(0, 80)}`);
+  if (block) {
+    if (m.blockBottom === null || m.blockBottom === undefined) out.push(`${m.state} ${m.width}: block data-soll="${block}" is missing`);
+    else if (fold && m.blockBottom > fold) out.push(`${m.state} ${m.width}: block ${block} ends at ${m.blockBottom} px, below the first screen at ${fold}`);
+  }
+  return out;
+}
+
+/**
+ * The last line of ops/soll-money.mjs. Wording fixed by goals/konto/05, Punkt 2: per width the block bottom furthest down of all
+ * states, `missing` when a state of that width has none.
+ */
+export function summaryMoney(results) {
+  const end = (w) => {
+    const at = results.filter((r) => r.width === w);
+    if (!at.length || at.some((r) => r.blockBottom === null || r.blockBottom === undefined)) return `${w}=missing`;
+    return `${w}=${Math.max(...at.map((r) => r.blockBottom))}`;
+  };
+  const n = results.reduce((s, r) => s + r.defects.length, 0);
+  return `soll money: ${results.length} images, blocks end ${WIDTHS.map(end).join(" ")}, ${n} defects`;
+}
+
 /**
  * Font configuration for the browser that renders the SOLL pictures. The page stacks start with system-ui and end in the
  * generic sans-serif and monospace, which resolve to whatever the host prefers: the committed pictures were rendered while

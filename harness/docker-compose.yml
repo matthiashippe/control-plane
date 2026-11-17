@@ -52,14 +52,44 @@ services:
       CP_URL: https://cp.test:8443
       MCP_SERVER: /chain/mcp/server.mjs
       NODE_EXTRA_CA_CERTS: /certs/ca.pem
+      MONEY_MOCK_URL: http://money-mock:8790
+      KONTO_SPENDER: *relayer-key
     volumes:
       - ./e2e/konto-chain.mjs:/chain/konto-chain.mjs:ro
       - ./chain/konto:/chain/konto:ro
       # The terminal walk of goals/konto/04 (harness/e2e/terminal.mjs): mcp/server.mjs over stdio against cp, the phone played
       # with fetch and viem from this image, the CA of cp.test.
       - ./e2e/terminal.mjs:/chain/terminal.mjs:ro
+      # The money walk of goals/konto/05 (harness/e2e/money.mjs): deposit, payout and payout rule through mcp/server.mjs, the
+      # phone played with fetch, Bridge and the card onramp from money-mock, our key (KONTO_SPENDER) for the refused calls.
+      - ./e2e/money.mjs:/chain/money.mjs:ro
       - ../mcp:/chain/mcp:ro
       - ./certs:/certs:ro
+    depends_on:
+      chain-konto:
+        condition: service_healthy
+
+  # Stand-in for Bridge and the card onramp (goals/konto/05, harness/money-mock/server.mjs): plain node from the chain-tools
+  # image, reachable inside the compose network only. The onramp mints test USDC on chain-konto; the Bridge part wants the
+  # fake key cp writes to CP_BRIDGE_KEY_FILE.
+  money-mock:
+    build:
+      context: ./chain
+    entrypoint: ["node"]
+    command: ["/money-mock/server.mjs"]
+    environment:
+      PORT: "8790"
+      BRIDGE_KEY: &bridge-fake-key "harness-fake-bridge-key-not-a-secret"
+      RPC_URL: http://chain-konto:8545
+      USDC_ADDRESS: "0x036CbD53842c5426634e7929541eC2318f3dCF7e"
+      CHAIN_ID: "84532"
+    volumes:
+      - ./money-mock:/money-mock:ro
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8790/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
     depends_on:
       chain-konto:
         condition: service_healthy
@@ -99,7 +129,12 @@ services:
       CP_KONTO_RPC_URL: http://chain-konto:8545
       CP_KONTO_KEY_FILE: /tmp/konto-spender.key
       KONTO_SPENDER: *relayer-key
-    command: ["sh", "-c", "printf '%s' \"$$KONTO_SPENDER\" > /tmp/konto-spender.key && exec node dist/index.js"]
+      # Bridge of goals/konto/05 against money-mock; the key is an obvious fake, written to a file at start because cp reads it
+      # only from CP_BRIDGE_KEY_FILE.
+      CP_BRIDGE_URL: http://money-mock:8790
+      CP_BRIDGE_KEY_FILE: /tmp/bridge-api-key.txt
+      BRIDGE_FAKE_KEY: *bridge-fake-key
+    command: ["sh", "-c", "printf '%s' \"$$KONTO_SPENDER\" > /tmp/konto-spender.key && printf '%s' \"$$BRIDGE_FAKE_KEY\" > /tmp/bridge-api-key.txt && exec node dist/index.js"]
     volumes:
       - ./certs:/certs:ro
       - cp-data:/data

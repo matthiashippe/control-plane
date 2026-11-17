@@ -23,10 +23,12 @@
  *                 sold. Default INFERENCE_SUNSET_AT_DEFAULT in app.ts, which is the production value
  *   CP_SANDBOXD_URL  the control API of the sandbox server, default https://ctl.sbx.postyourprice.com
  *   CP_SANDBOXES  "0" switches the sandbox API off (every call that needs the server answers 501)
- *   CP_KONTO_CHAIN_ID  unset: the account of konto 03 is off; 84532 switches it on (Base Sepolia only), anything else stops
- *                 the start. With it CP_KONTO_KEY_FILE (file of the test key), CP_KONTO_RPC_URL, CP_KONTO_TOPUP_BELOW_USDC and
+ *   CP_KONTO_CHAIN_ID  unset: the account of konto 03 is off; 84532 switches it on (Base Sepolia); 8453 (Base) only together
+ *                 with CP_KONTO_MAINNET=1, which only Matthias sets (konto 05); anything else stops the start. With it CP_KONTO_KEY_FILE (file of the test key), CP_KONTO_RPC_URL, CP_KONTO_TOPUP_BELOW_USDC and
  *                 CP_KONTO_TOPUP_USDC, CP_KONTO_AUTH_PROXY_ID (public ID of Turnkey's Auth Proxy configuration for the
  *                 page; docs/konto/konto.md). No deploy file sets any of them.
+ *   CP_BRIDGE_KEY_FILE  file with the API key of Bridge; unset, the payout to a bank account is off (goals/konto/05, 503).
+ *                 CP_BRIDGE_URL overrides https://api.bridge.xyz. No deploy file sets either.
  */
 
 import fs from "node:fs";
@@ -52,6 +54,8 @@ import { startBillingRound } from "./sandbox/round.js";
 import { grantLiveAutomaton } from "./automaton/grant.js";
 import { createAutomatonService } from "./automaton/service.js";
 import { kontoFromEnv } from "./konto/setup.js";
+import { bridgeFromEnv } from "./konto/bridge.js";
+import { forwarderFixed, runPayoutRules } from "./konto/payout.js";
 
 const port = Number(process.env.CP_PORT || 8402);
 const host = process.env.CP_HOST || "127.0.0.1";
@@ -159,6 +163,8 @@ const inferenceSunsetAt = new Date(sunsetRaw);
 if (Number.isNaN(inferenceSunsetAt.getTime())) {
   throw new Error(`CP_INFERENCE_SUNSET_AT is not an ISO 8601 date: ${sunsetRaw}`);
 }
+const konto = kontoFromEnv(db, process.env);
+const bridge = bridgeFromEnv(process.env, (input, init) => fetch(input, init));
 const app = createApp({
   db,
   siwe: process.env.CP_SIWE_DOMAIN ? { domain: process.env.CP_SIWE_DOMAIN } : undefined,
@@ -173,9 +179,19 @@ const app = createApp({
   rework: deliveryWriter(providers),
   sandbox,
   automatons,
-  // konto 03: off without CP_KONTO_CHAIN_ID; any value other than 84532 throws here and the service does not start.
-  konto: kontoFromEnv(db, process.env),
+  // konto 03: off without CP_KONTO_CHAIN_ID; any value other than 84532 (or 8453 with CP_KONTO_MAINNET=1) throws here.
+  konto,
+  // konto 05: off without CP_BRIDGE_KEY_FILE.
+  bridge,
 });
+
+// konto 05: the payout rules, hourly. A rule pays once per UTC day on its weekday, so the hour it runs in does not matter.
+if (konto?.payoutChain && bridge) {
+  const payoutDeps = { db, chain: konto.payoutChain, fixed: forwarderFixed(konto) };
+  setInterval(() => {
+    runPayoutRules(payoutDeps, Date.now()).catch((err) => console.error(`[payout] rules failed: ${err instanceof Error ? err.message.slice(0, 200) : "unknown error"}`));
+  }, 3_600_000).unref();
+}
 
 // Cleanup: once on start, hourly after that. Otherwise `siwe_nonces` grows with every call to
 // /v1/auth/nonce, and that one needs no API key.

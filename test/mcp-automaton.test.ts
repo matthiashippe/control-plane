@@ -110,7 +110,7 @@ describe("Automaton tools in mcp/server.mjs", () => {
     const h = harness({ routes: {} });
     const listed = (await handleMessage({ jsonrpc: "2.0", id: 1, method: "tools/list" }, { client: createClient({ baseUrl: BASE }), automaton: h.tools }))
       .result.tools.map((t: any) => t.name);
-    expect(listed).toHaveLength(11);
+    expect(listed).toHaveLength(14);
     expect(listed.slice(0, 6)).toEqual([
       "list_open_bounties",
       "submit_work",
@@ -119,7 +119,7 @@ describe("Automaton tools in mcp/server.mjs", () => {
       "check_submission",
       "read_balance",
     ]);
-    expect(listed.slice(6)).toEqual(["start_automaton", "automaton_status", "automaton_logs", "set_daily_limit", "stop_automaton"]);
+    expect(listed.slice(6, 11)).toEqual(["start_automaton", "automaton_status", "automaton_logs", "set_daily_limit", "stop_automaton"]);
   });
 
   it("start_automaton without a key makes one konto request without amount_usdc and answers with qr, url and match only", async () => {

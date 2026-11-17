@@ -2,8 +2,8 @@
 # Complete first run of the unmodified upstream runtime against the control plane:
 # provisioning, registration, bootstrap topup, five turns, sleep, the domain calls, the sandbox walk, the relay walk, the
 # konto chain walk on a second chain (84532), the long exec walk and the automaton walk (a hosted automaton in the rebuilt
-# sandboxd through a crash and a restart of sandboxd) and the terminal walk (mcp/server.mjs from start_automaton to the first
-# turn, then the daily limit).
+# sandboxd through a crash and a restart of sandboxd), the terminal walk (mcp/server.mjs from start_automaton to the first
+# turn, then the daily limit) and the money walk (deposit, payout and payout rule through mcp/server.mjs against money-mock).
 # No Conway API error allowed.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -272,6 +272,27 @@ terminal=false
 if printf '%s\n' "$terminal_walk" | grep -qE '^TERMINAL_VERDICT ok first_turn_ms=[0-9]+$' && [[ "$terminal_inference" =~ ^[1-9][0-9]*$ ]]; then
   terminal=true
 fi
+
+# The money walk of goals/konto/05 (harness/e2e/money.mjs, bind-mounted into chain-konto-tools): after the terminal walk, on the
+# same chain-konto (84532) with the Deterministic Deployment Proxy placed by anvil_setCode. An account over start_automaton, its
+# automaton stopped once it exists; deposit through mcp/server.mjs with the card onramp of money-mock (harness/money-mock/), which
+# mints test USDC to the smart wallet the page shows; the first payout over the phone (payout_needs_phone, identity and bank
+# account at the Bridge part of money-mock, the second permission for the PayoutForwarder the page names), USDC at the payout
+# address of the mock; a second payout without the phone; spend() of the second permission from our key, a payout over a
+# forwarder with another destination and a payout from a foreign address all revert on-chain; set_payout_rule stores the rule.
+# money=true needs MONEY_VERDICT ok as the last line.
+echo "--- money: deposit, first and second payout, payout rule"
+money_walk="MONEY_VERDICT fail money-mock did not start"
+if "${COMPOSE[@]}" up -d --wait money-mock >/dev/null 2>&1; then
+  money_walk=$("${COMPOSE[@]}" run --rm chain-konto-tools money.mjs 2>&1) || true
+fi
+printf '%s\n' "$money_walk" | grep -E '^MONEY_(RESULT|VERDICT)' || printf '%s\n' "$money_walk" | tail -20
+money=false
+if [[ "$(printf '%s\n' "$money_walk" | grep -v '^$' | tail -1)" == "MONEY_VERDICT ok" ]]; then money=true; fi
+if [[ "$money" != "true" ]]; then
+  "${COMPOSE[@]}" logs --no-color --tail 30 money-mock 2>&1 || true
+  "${COMPOSE[@]}" logs --no-color cp 2>&1 | grep -E '\[(konto|payout|automaton)\]' | tail -30 || true
+fi
 echo "rebuilt sandboxd after the automaton walk: $automaton_left"
 automaton_verdict=$(AUTOMATON_RESULTS="$automaton_results" AUTOMATON_LEDGER="$automaton_ledger" node e2e/automaton-walk.mjs judge 2>&1 | tail -1 || true)
 echo "$automaton_verdict"
@@ -297,8 +318,8 @@ cleanup
 trap - EXIT
 remaining=$("${COMPOSE[@]}" ps -q | wc -l | tr -d ' ')
 [[ "$remaining" == "0" ]] || { echo "E2E FAIL: containers left behind"; exit 1; }
-if [[ "$turns" -lt 5 || "$registered" != "true" || "$api_errors" != "0" || "$consistent" != "true" || "$db_registered" != "1" || "$balance_cents" -ge 500 || "$domains_ok" != "true" || "$sandbox" != "true" || "$long_exec" != "true" || "$konto_chain" != "true" || "$terminal" != "true" || "$relay" != "true" || "$automaton" != "true" ]]; then
-  echo "E2E FAIL turns=$turns registered=$registered api_errors=$api_errors ledger_consistent=$consistent db_registered=$db_registered balance_cents=$balance_cents konto_chain=$konto_chain terminal=$terminal domains=$domains_ok sandbox=$sandbox long_exec=$long_exec relay=$relay automaton=$automaton"
+if [[ "$turns" -lt 5 || "$registered" != "true" || "$api_errors" != "0" || "$consistent" != "true" || "$db_registered" != "1" || "$balance_cents" -ge 500 || "$domains_ok" != "true" || "$sandbox" != "true" || "$long_exec" != "true" || "$konto_chain" != "true" || "$terminal" != "true" || "$money" != "true" || "$relay" != "true" || "$automaton" != "true" ]]; then
+  echo "E2E FAIL turns=$turns registered=$registered api_errors=$api_errors ledger_consistent=$consistent db_registered=$db_registered balance_cents=$balance_cents money=$money konto_chain=$konto_chain terminal=$terminal domains=$domains_ok sandbox=$sandbox long_exec=$long_exec relay=$relay automaton=$automaton"
   exit 1
 fi
-echo "E2E OK turns=$turns registered=$registered api_errors=$api_errors ledger_consistent=$consistent balance_cents=$balance_cents konto_chain=$konto_chain terminal=$terminal domains=$domains_ok sandbox=$sandbox long_exec=$long_exec relay=$relay automaton=$automaton"
+echo "E2E OK turns=$turns registered=$registered api_errors=$api_errors ledger_consistent=$consistent balance_cents=$balance_cents money=$money konto_chain=$konto_chain terminal=$terminal domains=$domains_ok sandbox=$sandbox long_exec=$long_exec relay=$relay automaton=$automaton"
