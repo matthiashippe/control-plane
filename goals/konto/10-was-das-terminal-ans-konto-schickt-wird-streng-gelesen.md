@@ -1,7 +1,7 @@
 # Konto Goal 10: Was das Terminal ans Konto schickt, wird streng gelesen
 
 ## Status
-PLANNED
+ACTIVE
 
 ## Active Objective
 Auf der Seite, auf der ein Mensch mit dem Passkey Geld freigibt, steht nur, was er selbst festgelegt hat, und ein Betrag kommt nie
@@ -83,7 +83,7 @@ dort wie eine Aussage von uns aussieht.
   `POST /v1/automatons`, `docs/errors.md` oder `docs/sandbox/automaton.md`, eine Migration bestehender Namen in `api_keys`.
 
 ## Done Condition
-- [ ] `POST /v1/handoff` liest den Namen für `konto` und `confirm` mit `parseAccountName` aus `src/konto/account.ts`, `deposit` und
+- [x] `POST /v1/handoff` liest den Namen für `konto` und `confirm` mit `parseAccountName` aus `src/konto/account.ts`, `deposit` und
       `payout` weiter mit `parseName`, und `readAccountName` zeigt einen Bestandsnamen nur bis zum ersten anderen Zeichen.
       MVP: Funktion, weil sonst ein Satz des Terminals neben dem Passkey-Knopf steht (Vorschlag konto-kritik-2026-11-17-3).
       Prüfung: `grep -cE '^export function parseAccountName\(v: unknown\): string \| null' src/konto/account.ts` muss genau `1` ausgeben.
@@ -93,14 +93,14 @@ dort wie eine Aussage von uns aussieht.
       Prüfung: `awk '/const moneyHandoff/,/^  };/' src/handoff/routes.ts | grep -cE 'parseName\('` muss genau `1` ausgeben.
       Prüfung: `awk '/app.post\("\/v1\/handoff"/,/^  }\);/' src/handoff/routes.ts | grep -c '64'` muss genau `0` ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/konto-limit-account.test.ts test/handoff-api.test.ts test/handoff-page.test.ts test/konto-account.test.ts test/konto-limit.test.ts test/soll-limit.test.ts test/mcp.test.ts test/mcp-automaton.test.ts test/mcp-money.test.ts` muss Exit-Code 0 haben.
-- [ ] Drei Fälle in `test/konto-limit-account.test.ts` decken abgelehnte Namen, angenommene Namen und einen Bestandsnamen mit Satz
+- [x] Drei Fälle in `test/konto-limit-account.test.ts` decken abgelehnte Namen, angenommene Namen und einen Bestandsnamen mit Satz
       ab; gegen den Stand der Merge-Basis sind genau zwei rot.
       MVP: Funktion, weil erst der rote Lauf am alten Code zeigt, dass die Fälle den Fehler treffen, und der Wächter festhält, dass
       gültige Namen weiter durchgehen.
       Prüfung: `T=$(mktemp -d); PATH=/usr/bin:$PATH pnpm -s vitest run test/konto-limit-account.test.ts --reporter=json --outputFile=$T/r.json >/dev/null 2>&1; echo "exit=$?"; node -e 'const r=require(process.argv[1]);const a=r.testResults.flatMap(f=>f.assertionResults).filter(x=>x.ancestorTitles.includes("account names are read strictly"));console.log(a.length, a.filter(x=>x.status==="passed").length)' $T/r.json` muss genau `exit=0` und `3 3` ausgeben.
       Prüfung: `B=$(git merge-base origin/dev HEAD); T=$(mktemp -d); git archive $B | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; cp test/konto-limit-account.test.ts test/handoff-helpers.ts $T/test/; (cd $T && PATH=/usr/bin:$PATH pnpm -s vitest run test/konto-limit-account.test.ts --reporter=json --outputFile=r.json >/dev/null 2>&1); node -e 'const r=require(process.argv[1]);const a=r.testResults.flatMap(f=>f.assertionResults).filter(x=>x.ancestorTitles.includes("account names are read strictly"));console.log(a.filter(x=>x.status!=="passed").length, a.filter(x=>x.status==="passed").length)' $T/r.json` muss genau `2 1` ausgeben.
       Prüfung: `node -e 'const s=require("fs").readFileSync("test/konto-limit-account.test.ts","utf8");const miss=["Atlas. Only Atlas","Atlas.v2","Ätlas","\" Atlas\"","-Atlas","repeat(33)","repeat(32)","Atlas v2_b-1","Atlas. Only Atlas may spend this","FROM handoffs"].filter(x=>!s.includes(x));if(miss.length){console.error(miss);process.exit(1)}console.log("faelle ok")'` muss `faelle ok` ausgeben.
-- [ ] `test/konto-usdc.test.ts` hält `parseUsdc` mit einer Tabelle und einem Fall an `POST /v1/konto/limit` mit der JSON-Zahl `10000`
+- [x] `test/konto-usdc.test.ts` hält `parseUsdc` mit einer Tabelle und einem Fall an `POST /v1/konto/limit` mit der JSON-Zahl `10000`
       fest, und jede der zwei Mutationen (Typprüfung gestrichen, `{1,18}` zu `{1,19}`) macht einen Fall rot, belegt an einer Kopie im
       `mktemp`-Ordner.
       MVP: Funktion, weil ein Tageslimit, das als Zahl gerundet ankommt, ein anderer Betrag ist als der gesendete, und heute `check`
@@ -108,7 +108,7 @@ dort wie eine Aussage von uns aussieht.
       Prüfung: `T=$(mktemp -d); PATH=/usr/bin:$PATH pnpm -s vitest run test/konto-usdc.test.ts --reporter=json --outputFile=$T/r.json >/dev/null 2>&1; echo "exit=$?"; node -e 'const r=require(process.argv[1]);const a=r.testResults.flatMap(f=>f.assertionResults);const p=a.filter(x=>x.ancestorTitles.includes("parseUsdc"));const j=a.filter(x=>x.title.includes("JSON number 10000"));console.log(p.length>=6, j.length, a.filter(x=>x.status!=="passed").length)' $T/r.json` muss genau `exit=0` und `true 1 0` ausgeben.
       Prüfung: `node -e 'const s=require("fs").readFileSync("test/konto-usdc.test.ts","utf8");const miss=["\"1\" + \"0\".repeat(18)","\" 10000\"","\"+10000\"","\"1e4\"","\"10000\"","invalid_limit","/v1/konto/limit"].filter(x=>!s.includes(x));if(!/[^"0-9]10000[^"0-9n]/.test(s))miss.push("10000 als Zahl");if(miss.length){console.error(miss);process.exit(1)}console.log("werte ok")'` muss `werte ok` ausgeben.
       Prüfung: `for m in 's/typeof v !== "string" || //' 's/{1,18}/{1,19}/'; do T=$(mktemp -d); git archive HEAD | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; cp $T/src/konto/usdc.ts $T/orig; sed -i "$m" $T/src/konto/usdc.ts; cmp -s $T/orig $T/src/konto/usdc.ts && echo "sed-miss $m"; for k in parseUsdc 'JSON number 10000'; do (cd $T && PATH=/usr/bin:$PATH pnpm -s vitest run test/konto-usdc.test.ts -t "$k" >/dev/null 2>&1); echo "$k=$?"; done; done` muss genau die vier Zeilen `parseUsdc=1`, `JSON number 10000=1`, `parseUsdc=1`, `JSON number 10000=0` ausgeben und darf `sed-miss` nicht ausgeben.
-- [ ] Doku und MCP stimmen mit der Regel überein: `set_daily_limit` in `docs/konto/terminal.md` nennt nur `daily_limit_usd` und sagt,
+- [x] Doku und MCP stimmen mit der Regel überein: `set_daily_limit` in `docs/konto/terminal.md` nennt nur `daily_limit_usd` und sagt,
       dass die Erhöhung auf dem Handy den Namen des Kontos zeigt; `docs/konto/handoff.md` nennt beide Regeln für `automaton_name`;
       `start_automaton` in `mcp/server.mjs` und `mcp/skills/automaton/SKILL.md` erlauben keinen Punkt mehr.
       MVP: Funktion, weil wer der Doku folgt, heute einen Schemafehler bekommt und ein Modell nach der heutigen Beschreibung einen
@@ -120,7 +120,7 @@ dort wie eine Aussage von uns aussieht.
       Prüfung: `awk '/name: "start_automaton"/,/required:/' mcp/server.mjs | grep -c 'maxLength: 32,'` muss genau `1` ausgeben.
       Prüfung: `awk '/name: "start_automaton"/,/required:/' mcp/server.mjs | grep -c 'maxLength: 64,'` muss genau `0` ausgeben.
       Prüfung: `cat mcp/server.mjs mcp/skills/automaton/SKILL.md | grep -c 'spaces, dots'` muss genau `0` ausgeben.
-- [ ] Die Entscheidungen stehen mit Grund in `goals/konto/ANNAHMEN.md`.
+- [x] Die Entscheidungen stehen mit Grund in `goals/konto/ANNAHMEN.md`.
       MVP: Funktion, weil die Linsen und die nächsten Goals der Kette gegen diese Annahmen prüfen.
       Prüfung: `awk '/^## Goal 10/{f=1;next} /^## /{f=0} f' goals/konto/ANNAHMEN.md | grep -cE "^- .+, weil .+"` muss mindestens `4` ausgeben.
       Prüfung: `awk '/^## Goal 10/{f=1;next} /^## /{f=0} f' goals/konto/ANNAHMEN.md | grep -cE 'deposit.+payout.+parseName'` muss mindestens `1` ausgeben.
@@ -168,4 +168,5 @@ dort wie eine Aussage von uns aussieht.
 
 ## Progress Log
 
+- 2026-11-17 Zyklus 1: Punkte 1, 2, 3, 4, 5 gebaut, `parseAccountName` und gekürzter `readAccountName` in `src/konto/account.ts`, `POST /v1/handoff` liest den Namen für `konto` und `confirm` streng, `test/konto-usdc.test.ts` neu, Doku und Schema von `start_automaton` mit `pattern`; Punkt 6 bleibt offen, weil `test/handoff-page.test.ts` (Fall „escapes a name that carries markup“ legt die Übergabe jetzt mit `createHandoff` an) nicht in der Pfadliste steht. Prüfbefehle: Punkt 1 `1`, `1`, `0`, `1`, `1`, `0`, vitest Exit 0 (9 Dateien, 111 Tests); Punkt 2 `exit=0` und `3 3`, gegen die Merge-Basis `2 1`, `faelle ok`; Punkt 3 `exit=0` und `true 1 0`, `werte ok`, Mutationen `parseUsdc=1`, `JSON number 10000=1`, `parseUsdc=1`, `JSON number 10000=0` ohne `sed-miss`; Punkt 4 `1`, `1`, `1`, `1`, `1`, `0`, `0`; Punkt 5 `9`, `1`; Punkt 6 Pfadliste `1` (`test/handoff-page.test.ts`), `seite gleich`, `0`, `pakete gleich`, `goals gleich`, `0`, `node scripts/check.mjs` Exit 0 (grün in 75 s, 220 Dateien, 2370 Tests), Netz-Prüfung am PR nach dem Lauf des Jobs `check`.
 ## Blockers
