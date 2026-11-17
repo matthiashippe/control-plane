@@ -50,3 +50,34 @@
   nur in `src/index.ts` und im Takt, `startBillingRound(` nur in `src/index.ts`, das Modul des Sweeps nur von
   `src/automaton/service.ts` importiert. Grund: Der Kanarienvogel des Rollouts baut die Dienste ebenfalls und darf nichts löschen.
   Am Verhalten ändert sich nichts.
+
+## Goal 02 (17.11.2026, Engineer CP)
+
+- **Exit-Datei atomar.** Die Hülle aus `backgroundCommand` schreibt `echo $c` nach `<base>.exit.tmp` und schiebt sie mit
+  `mv -f <base>.exit.tmp <base>.exit` an ihren Platz, mit einem Leerzeichen vor jedem Pfad wie bisher (`mapRoot`). Grund: Bei
+  `echo $c > <base>.exit` legt die Umleitung die Datei an, bevor die Zahl drinsteht; ein Wartebefehl, der genau dann liest, sah eine
+  leere Datei. `mv` liegt in coreutils, das das Image wegen `timeout` schon hat. Der Test legt ein `mv` vor das echte in den `PATH`,
+  das notiert, ob `<base>.exit` vor seinem Aufruf schon bestand.
+- **Nur eine Exit-Datei mit Inhalt ist ein Ende.** `waitCommand` wartet mit `[ ! -s ]`, das zweite Lesen nach einer Sekunde ist
+  weg, und eine leere Datei am Ende der Wartezeit gibt „still running“ mit Exit 0. Die Bedingung des Endes ist
+  `[ -f <base>.exit ] && [ -s <base>.exit ]`: Das `-f` ist für die Bash überflüssig, bleibt aber, weil `BG_ANSWER_JS` in
+  `ops/live.sh` den Wartebefehl daran erkennt, dass er `[ -f <exit_code_file> ]` nennt, und weil `test/sandbox-wait.test.ts` (sandbox
+  09) das prüft. So bleibt die Live-Prüfung auch zwischen Merge und Rollout grün, wenn sie noch gegen den alten Stand läuft.
+- **Höchstens 64 KB je Strom.** `export const WAIT_TAIL_BYTES = 64 * 1024;`. Eine Funktion `printOutputs` baut das Stück Shell für
+  beide Ströme, und Wrapper wie Wartebefehl nutzen sie, weil die Antwort des Wrappers (Befehl endet vor `EXEC_EARLY_MS` oder
+  Wiederholung mit demselben Schlüssel nach dem Ende) sonst denselben Weg mit Megabytes in den Kontext bringt. Größe mit
+  `wc -c 2>/dev/null < <datei>` (die Umleitung der Fehler zuerst, damit eine fehlende Datei keine zusätzliche Meldung bringt; dann
+  druckt `cat` wie bisher seinen Fehler), über 65536 Bytes eine Zeile und `tail -c 65536` auf demselben Strom, sonst `cat` wie
+  bisher. Damit kommt eine kleine Ausgabe Byte für Byte wie vorher. Wortlaut der Zeile: `This output has <n> bytes, only its last
+  65536 bytes follow. The whole output is in the file <pfad>; read the rest with read_file.` Grund für den Wortlaut: Das Modell
+  liest Größe, Pfad und Werkzeug in einem Satz, ohne etwas übersetzen zu müssen. Der Text von `stillRunning` nennt die Grenze von
+  64 KB und `read_file`.
+- **Dauer der Wartebefehle in der Live-Prüfung.** `bg_live` gibt nach dem Token die längste Dauer eines Aufrufs von `wait_command`
+  aus (0, wenn keiner lief), `sandbox_live` schreibt sie als `bg_max_ms=<ms>` direkt nach `bg=<token>` in die Ergebniszeile, und die
+  Zeile `OK sandbox:` endet mit `bg_max_ms=<ms>`, ab `BG_WARN_MS=27000` gefolgt von `warning: …`. `bg=ok` bleibt, wie es ist. Grund
+  für 27000: 3 s Rand bis zum Abbruch der Runtime nach 30000 ms; ein `FAIL` löste einen Revert aus, obwohl der Aufruf rechtzeitig
+  endete, darum nur eine Warnung. Der Selbsttest prüft 25000 und 26999 ohne und 27000 und 29999 mit Warnung; die Gegenprobe mit
+  einer Messung ohne Maximum und mit `BG_WARN_MS=27001` macht ihn rot (`LIVE SELFTEST FAIL`).
+- **Widerlegt?** Nein: Am Kopf von `dev` (`11a4475`) sind 6 der 8 neuen Fälle aus `test/sandbox-background-output.test.ts` rot
+  (leere Exit-Datei ohne Schreiber, leere mit spätem Code 3, `mv` der Hülle, 5 MB im Wartebefehl, 5 MB im Wrapper, 65537 Bytes);
+  die beiden Fälle für unverändertes Verhalten (genau 65536 Bytes, kleine Ausgabe) sind dort grün, wie sie sollen.

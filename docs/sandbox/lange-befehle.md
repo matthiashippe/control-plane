@@ -76,3 +76,27 @@ die Zahl der Anfragen der Runtime über alle Aufrufe):
 
 - vorher 180 s: code-host lokal ohne Docker (`dist/index.js` über TLS, Nachbau `sandboxd`, Runtime am Pin `d8f8168`), Commit `08164a6` (Stand von `dev`), 16.11.2026 12:23:01 bis 12:24:24 UTC: LONG_EXEC_VERDICT fail long-180: neither the result (long-180 in stdout, exit_code 0) nor a text that says the command is still running and names a command to wait with on its last line
 - nachher 180 s: Job `e2e` von PR #210 auf GitHub (Lauf 43874571613, Nachbau `sandboxd`, Runtime am Pin `d8f8168`, Wartebefehl nach der Uhr), Commit `6fbcaa0`, 16.11.2026 13:25:00 UTC: waits=7 max_wait_ms=25046 attempts=7 failures_after=0 runs=1
+
+## Ende und Länge der Ausgabe (hosting 02)
+
+Wie ein Befehl im Hintergrund endet: Die Hülle schreibt den Exit-Code zuerst nach `<tag>.exit.tmp` und schiebt die Datei dann mit
+`mv -f` nach `<tag>.exit`. Damit gibt es `<tag>.exit` nie leer. Der Wartebefehl wertet nur eine Exit-Datei mit Inhalt als Ende
+(`[ -s ]`); eine leere Datei heißt weiter „still running“ mit Exit 0, nie ein Fehler der Bash. Die erste Zeile nach dem Ende bleibt
+genau `The command has ended with exit code <n>.`.
+
+Wie viel Ausgabe zurückkommt: Wartebefehl und Hülle drucken von `<tag>.out` (stdout) und `<tag>.err` (stderr) je Strom höchstens
+die letzten 64 KB (`WAIT_TAIL_BYTES` in `src/sandbox/service.ts`, 65536 Bytes, mit `tail -c`). Ist eine Datei größer, steht davor auf
+demselben Strom genau eine Zeile mit der Gesamtgröße in Bytes, der Zahl der gezeigten Bytes und dem Pfad der Datei, etwa
+`This output has 5242880 bytes, only its last 65536 bytes follow. The whole output is in the file /root/.exec/<tag>.out; read the
+rest with read_file.` Eine Datei bis genau 65536 Bytes kommt unverändert. Den Rest liest der Automaton mit `read_file` aus dem
+genannten Pfad; die Dateien bleiben in der Sandbox liegen. Grund: Jedes Byte der Antwort landet im Kontext des Modells und wird als
+Inferenz bezahlt, ein `npm install` schreibt mehrere MB.
+
+Wie lange ein Aufruf dauert: `ops/live.sh` trägt die längste Dauer eines Aufrufs des Wartebefehls als `bg_max_ms=<ms>` in die
+Ergebniszeile der Prüfung `sandbox` und in die Zeile `OK sandbox:`. Ab 27000 ms (`BG_WARN_MS`) steht dort zusätzlich `warning`; die
+Zeile bleibt `OK`, weil 27000 ms noch unter dem Abbruch der Runtime nach 30 s liegen und ein `FAIL` einen Revert auslöst. Die
+Handlung steht in `ops/README.md` unter `## Thresholds that call for action`.
+
+Belegt mit `test/sandbox-background-output.test.ts` in einer echten Bash: Am Kopf von `dev` (`11a4475`) sind 6 der 8 Fälle rot
+(leere Exit-Datei ohne Schreiber, leere Exit-Datei mit spätem Code 3, `mv` der Hülle, 5 MB im Wartebefehl, 5 MB in der Hülle,
+65537 Bytes); die beiden Fälle, die unverändertes Verhalten verlangen (genau 65536 Bytes, kleine Ausgabe), sind dort schon grün.
