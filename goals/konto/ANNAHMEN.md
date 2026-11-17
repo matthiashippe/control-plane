@@ -248,6 +248,17 @@
 - Abgelöst: konto 05 Punkt 5 durch konto 06 Punkt 7, Ausgabe dann genau `Exit 1, 0` (Tech Lead, 2026-11-17)
 - Abgelöst: konto 05 Punkt 5 durch konto 06 Punkt 7, Ausgabe dann genau `Exit 1, 0` (Tech Lead, 2026-11-17)
 
+## Goal 07 (17.11.2026, Engineer CP)
+
+- `parseUsdc` liegt in einem eigenen Modul `src/konto/usdc.ts` und nicht in `src/konto/limit.ts` oder `src/handoff/routes.ts`, weil `src/handoff/routes.ts` schon aus `src/konto/limit.ts` importiert und ein Import in die Gegenrichtung einen Kreis zwischen zwei Modulen mit Routen schlösse (Entscheidung 1 des Tech Lead).
+- `parseLimit` ist gestrichen und `src/handoff/routes.ts` exportiert kein eigenes `parseUsdc` mehr, weil zwei Namen für dieselbe Regel bei der nächsten Änderung wieder auseinanderlaufen; vorher importierte niemand außerhalb von `src/handoff/routes.ts` dessen `parseUsdc` (`git grep -n parseUsdc -- src test mcp`).
+- Reihenfolge und Text der Prüfungen bleiben, wie sie waren, weil Terminal und Plugin die Fehlercodes und Meldungen lesen: `POST /v1/konto/limit` prüft den Betrag vor dem Konto, `POST /v1/handoff` vor Schlüssel und Konto (Entscheidung 2).
+- Die drei neuen Fälle stehen als eigene `it(...)` mit dem Fehlercode im Titel in `test/konto-limit.test.ts`, weil die Mutationen aus Punkt 3 sie mit `-t` einzeln auswählen (Entscheidung 3).
+- Der Fall zu `invalid_handoff` prüft neben dem Code die Meldung `positive whole number of atomic USDC`, weil `"0"` und `"15000"` unter dem unterschriebenen Limit ohne die Regel ebenfalls 400 `invalid_handoff` bekämen, nur mit der Meldung „has to be above today's“; erst die Meldung unterscheidet die beiden Ausgänge.
+- `"10005000"` steht nur im Fall zu `invalid_handoff`, weil es über dem unterschriebenen Limit liegt und ohne `% 10_000n` einen Handoff über einen Betrag ohne ganzen Cent anlegen würde; an `POST /v1/konto/limit` wäre es ohnehin 403 `limit_raise_needs_phone`.
+- Kein eigener `test/konto-usdc.test.ts`, weil die Mutationen das Verhalten an beiden Endpunkten beweisen sollen und ein Test der Funktion allein das nicht zeigt (Entscheidung 4 erlaubt ihn, verlangt ihn nicht).
+- Die Fälle aus Punkt 2 waren schon vor `src/konto/usdc.ts` grün, weil sie vorhandenes Verhalten festhalten; rot gesehen wurden sie vorher mit denselben zwei Mutationen an beiden alten Kopien (`invalid_limit=1`, `invalid_handoff=1` je Mutation, `no_account=0`).
+
 ## Abgelöst durch umzug 02 (Maker, 2026-11-17)
 
 - Abgelöst: konto 02 Punkt 3 durch umzug 02 Punkt 2, Ausgabe dann genau `Exit 1, keine abnahme nach 2026-11-17T16:39:12+00:00` (Tech Lead, 2026-11-17)

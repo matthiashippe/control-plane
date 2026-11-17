@@ -24,6 +24,7 @@ import { qrText } from "./qr.js";
 import type { Address, Hex, PublicClient } from "viem";
 import { burnMatched, finishKonto, permissionFromJson, readAccountName, takeApiKey } from "../konto/account.js";
 import { finishLimit, readAccountLimit } from "../konto/limit.js";
+import { parseUsdc } from "../konto/usdc.js";
 import { parsePermission, permissionMatches, SignatureCheckUnavailable, signatureValid, type SpendPermission } from "../konto/permission.js";
 import { FAIL_REASONS, renderKontoPage, type FailReason } from "../public/konto.js";
 import { renderLimitPage, type LimitPage } from "../public/limit.js";
@@ -118,13 +119,6 @@ export interface HandoffDeps {
 export const DEFAULT_MISS_LIMIT: RateLimitOptions = { limit: 20, windowMs: 600_000 };
 const CONTRACT = "https://github.com/matthiashippe/control-plane/blob/dev/docs/konto/handoff.md";
 const NAME_MAX = 64;
-
-/** A positive whole number of atomic USDC in whole cents, as a string; anything else is null. */
-export function parseUsdc(v: unknown): bigint | null {
-  if (typeof v !== "string" || !/^[0-9]{1,18}$/.test(v)) return null;
-  const n = BigInt(v);
-  return n > 0n && n % 10_000n === 0n ? n : null;
-}
 
 /** 1 to 64 characters, no control characters. */
 export function parseName(v: unknown): string | null {
