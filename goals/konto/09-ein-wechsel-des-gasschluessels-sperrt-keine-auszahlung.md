@@ -150,5 +150,6 @@ abgelöste Erlaubnis nach einer abgebrochenen Quittung freigeschaltet bleibt.
 ## Progress Log
 
 - 2026-11-17 Zyklus 1: Punkte 1 bis 5 gebaut, `finishPayout` merkt jede alte Erlaubnis mit Weiterleitung vor, `sendPayout` verwirft vor dem `retire` mit `isApproved` und `callerOf` ohne Transaktion, Knoten mit `caller` und `withNewGasKey` im Test, Doku und Annahmen. Prüfbefehle: Punkt 1 `0`, `3`, `1`, `1`, vitest Exit 0 (26 Tests); Punkt 2 `exit=0` und `4 4`, gegen die Merge-Basis `3 1`; Punkt 3 `1`, `7`; Punkt 4 `8`, `1`; Punkt 5 `0`, `vertrag gleich`, `0`, `pakete gleich`, `goals gleich`, `0`, `check` Exit 0 (219 Dateien, 2347 Tests), Netz-Prüfung am PR nach dem Lauf des Jobs `check`.
+- 2026-11-17 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5; `dev` ist im Branch (Merge-Basis gleich `origin/dev` `d493086`, kein Merge nötig), alle Prüfbefehle am Kopf `185af3b` neu gelaufen. Prüfbefehle: Punkt 1 `0`, `3`, `1`, `1`, vitest Exit 0 (26 passed); Punkt 2 `exit=0` und `4 4`, gegen die Merge-Basis `3 1`; Punkt 3 `1`, `7`; Punkt 4 `8`, `1`; Punkt 5 `0`, `vertrag gleich`, `0`, `pakete gleich`, `goals gleich`, `0`, `node scripts/check.mjs` Exit 0 (grün in 231 s, 2347 Tests), am PR #261 `check` pass und `e2e` pass am Kopf `185af3b`.
 
 ## Blockers
