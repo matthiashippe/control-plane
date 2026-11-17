@@ -60,13 +60,13 @@ export type MoneyPage =
 export type MoneyState = MoneyPage["state"];
 
 const TITLES: Record<MoneyState, string> = {
-  "deposit-approve": "Add money | PostYourPrice",
-  "deposit-card": "Pay by card | PostYourPrice",
-  "payout-approve": "Send money to your bank | PostYourPrice",
-  "payout-verify": "Confirm your identity | PostYourPrice",
-  "payout-bank": "Your bank account | PostYourPrice",
-  "payout-passkey": "Allow payouts | PostYourPrice",
-  retry: "Tap again | PostYourPrice",
+  "deposit-approve": "Add money | automatonhost.com",
+  "deposit-card": "Pay by card | automatonhost.com",
+  "payout-approve": "Send money to your bank | automatonhost.com",
+  "payout-verify": "Confirm your identity | automatonhost.com",
+  "payout-bank": "Your bank account | automatonhost.com",
+  "payout-passkey": "Allow payouts | automatonhost.com",
+  retry: "Tap again | automatonhost.com",
 };
 
 /** The field of the bank step, as in the SOLL source of payout-bank. */
@@ -171,7 +171,7 @@ ${choices(page.choices)}
         "Last step",
         `Pay ${usd(page.amountUsdc)} by card`,
         `The money goes to ${name} and shows in your terminal.`,
-        ["You pay with your card on the next page.", "PostYourPrice never sees your card number."],
+        ["You pay with your card on the next page.", "We never see your card number."],
         `<button class="btn btn-1" type="button" id="money-card" ${data}>${CARD_ICON}Pay ${usd(page.amountUsdc)} by card</button>`,
         "Close this page and nothing is charged. The code works once, for 10 minutes.",
         `${SCRIPT}\n`,
@@ -235,7 +235,7 @@ ${error}      <form method="post" action="/h/${esc(page.code)}/payout-bank">
         "payout",
         page.steps === 2 ? "Step 2 of 2" : "Last step",
         "Allow payouts to your bank account",
-        `PostYourPrice can send money from ${name} only to your bank account ending ${esc(page.bankLast4)}.`,
+        `We can send money from ${name} only to your bank account ending ${esc(page.bankLast4)}.`,
         [`Payouts from ${name} cannot go to any other account.`, "You confirm with the passkey you already have."],
         `<button class="btn btn-1" type="button" id="konto-passkey" ${data}>${KEY_ICON}Confirm with passkey</button>`,
         "Close this page and nothing is sent. The code works once, for 10 minutes.",

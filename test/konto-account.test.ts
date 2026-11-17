@@ -114,7 +114,7 @@ describe("handoff with step konto", () => {
     expect(res.status).toBe(200);
     const html = await res.text();
     expect(html).toContain('data-soll="passkey"');
-    expect(html).toContain("PostYourPrice can charge up to $5.00 a day, only for Atlas.");
+    expect(html).toContain("We can charge up to $5.00 a day, only for Atlas.");
     expect(html).toContain(`data-code="${h.code}"`);
     expect(stateOf(db, h.code)).toBe("matched");
     const again = await app.request(`/h/${h.code}`);
@@ -127,7 +127,7 @@ describe("handoff with step konto", () => {
     expect((await send(app, h.code, await permit())).status).toBe(200);
     const res = await app.request(`/h/${h.code}`);
     expect(res.status).toBe(200);
-    expect(await res.text()).toContain("<title>Approved | PostYourPrice</title>");
+    expect(await res.text()).toContain("<title>Approved | automatonhost.com</title>");
   });
 
   it("ends done with a matching permission; the first done event carries account and api_key, a second read none", async () => {

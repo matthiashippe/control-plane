@@ -324,7 +324,7 @@ describe("public page and status", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toMatch(/text\/plain/);
     const txt = await res.text();
-    expect(txt).toContain("# PostYourPrice");
+    expect(txt).toContain("# automatonhost.com");
     expect(txt).toContain("conwayApiUrl");
     expect(txt).toContain("cp.hippe.eu");
     expect(txt).toContain("without-control-plane.md");
@@ -578,7 +578,7 @@ describe("preview and findability", () => {
     }
     expect(html).toMatch(/rel="canonical" href="https:\/\/cp\.hippe\.eu\/"/);
     // The description has to say what this is a replacement for, otherwise the preview is empty.
-    expect(html).toMatch(/og:description" content="Post the job and the price/);
+    expect(html).toMatch(/og:description" content="Conway not answering\? Point conwayApiUrl at automatonhost\.com/);
   });
 
   it("uses no em dash in the copy", async () => {
@@ -903,7 +903,7 @@ describe("The buyer leads, not the plumbing", () => {
 
     // The failure, in the words the reader has already read in the issue they came from.
     expect(section, "the failure the reader arrives with").toContain("Conway not answering?");
-    expect(section, "and what we do about it").toContain("Keep your automaton running.");
+    expect(section, "and what we do about it").toContain("Your automaton runs here.");
     expect(section, "and the one line that undoes it").toMatch(/"conwayApiUrl":\s+"https:\/\/cp\.hippe\.eu" \}/);
 
     const problem = html.indexOf("Conway not answering?");
@@ -1022,8 +1022,8 @@ describe("The buyer leads, not the plumbing", () => {
     const { app } = setup();
     const html = await (await app.request("/")).text();
     const pairs = [
-      { label: /Post a job/i, target: "/post", why: "a buyer who wants to post needs the path that posts" },
-      { label: /Post your first job/i, target: "/post", why: "same promise, same destination" },
+      { label: /Switch now/i, target: "/fix", why: "the switch is on /fix, and the header button leads with it since goals/umzug/02" },
+      { label: /Post your first job/i, target: "/post", why: "a buyer who wants to post needs the path that posts" },
       { label: /See open jobs/i, target: "/jobs", why: "the open market, which is what that label means" },
       { label: /Switch in two steps/i, target: "/fix", why: "the two steps are on /fix" },
     ];
@@ -1043,10 +1043,10 @@ describe("The buyer leads, not the plumbing", () => {
   it("carries the name and the positioning sentence where a first-time reader lands", async () => {
     const { app } = setup();
     const html = await (await app.request("/")).text();
-    expect(html).toMatch(/<title>PostYourPrice/);
+    expect(html).toMatch(/<title>automatonhost\.com/);
     // The name is the brand in the bar, not the first heading: the first heading is what the
     // service does, which is what a stranger needs in the first two seconds.
-    expect(html).toMatch(/class="brand"[\s\S]{0,400}PostYourPrice/);
+    expect(html).toMatch(/class="brand"[\s\S]{0,400}automatonhost\.com/);
     expect(html).toMatch(/<h1[^>]*>[\s\S]*?Pay one\./);
     // The sentence that carries the unusual economics, and the word that says who does the work.
     // Without the first, the headline is a marketplace like any other; without the second,

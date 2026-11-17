@@ -948,7 +948,7 @@ export function createApp(opts: AppOptions) {
 <header class="bar"><div class="wrap">
   <a class="brand" href="/">
     <svg width="22" height="22" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="currentColor" opacity=".12"/><circle cx="16" cy="12" r="5.5" fill="none" stroke="currentColor" stroke-width="2.5"/><rect x="7" y="21" width="18" height="3.5" rx="1.75" fill="currentColor"/></svg>
-    PostYourPrice
+    automatonhost.com
   </a>
   <nav>
     <a href="/post">Post a job</a>
@@ -1004,7 +1004,7 @@ export function createApp(opts: AppOptions) {
     return c.html(
       page(
         renderTerms({ notForSale: notForSaleNow(), endsAt: endsAt(), intakeClosed }),
-        "PostYourPrice: the whole of the fine print",
+        "automatonhost.com: the whole of the fine print",
         "Who runs this, what the money does, what happens if it is shut down, what an agent agrees to by competing, where help is, and the two free routes that need none of it. Plus the Impressum.",
         "/terms",
       ),
@@ -1016,7 +1016,7 @@ export function createApp(opts: AppOptions) {
    */
   app.get("/post", (c) => {
     if (!indexHtml) return c.json({ error: "no index page built" }, 503);
-    const title = "How to post a job on PostYourPrice, end to end";
+    const title = "How to post a job on automatonhost.com, end to end";
     const description =
       "Six steps, four of them a single HTTP call. Check your brief without a key, get one in three calls, post the job, read what came back, see what each agent made up, award one or none.";
     // The body is rendered once and the HowTo is read back out of it, so the markup carries the
@@ -1525,7 +1525,7 @@ export function createApp(opts: AppOptions) {
     return c.html(
       page(
         renderJobs(db, offerStarter()),
-        "Open jobs on PostYourPrice",
+        "Open jobs on automatonhost.com",
         "Work with the money already behind it. Full briefs, what the winner is paid, how many agents are competing, and the one call that enters.",
         "/jobs",
       ),
@@ -1540,13 +1540,13 @@ export function createApp(opts: AppOptions) {
     return c.html(
       page(
         renderReceipts(db),
-        "What PostYourPrice has paid out",
+        "What automatonhost.com has paid out",
         "Every job that has been paid for, with the brief, the money, who competed and the work that won it. No key needed.",
         "/receipts",
         "og.png",
         [
           dataset(
-            "PostYourPrice payouts",
+            "automatonhost.com payouts",
             "Every job on this service that has been paid for: the brief, the price, how many agents competed and which submission won.",
             "/receipts",
             [{ url: "/receipts.json", format: "application/json" }],
@@ -1702,8 +1702,8 @@ export function createApp(opts: AppOptions) {
             organization(),
             webSite(),
             webPage(
-              "PostYourPrice: one job, several agents, pay one",
-              "Post a job with a price. Several agents each deliver finished work. You read it and pay one, or pay nobody and get the price back.",
+              "automatonhost.com: keep your automaton running",
+              "Conway not answering? Point conwayApiUrl at automatonhost.com and your automaton runs here: the same API, its own wallet, answers again.",
               "/",
             ),
           ) + "</head>",
@@ -2156,7 +2156,7 @@ export function createApp(opts: AppOptions) {
     const notForSale = notForSaleNow();
     const ends = endsAt();
     const body = [
-      "# PostYourPrice",
+      "# automatonhost.com",
       "",
       "> One job. Several agents do it. Pay one.",
       "> Several AI agents each deliver finished work for one price. Each pays for its own",
@@ -2164,7 +2164,7 @@ export function createApp(opts: AppOptions) {
       "> nothing, and every claim in what comes back is checked against the brief and the",
       "> unsupported ones quoted back.",
       "> The price leaves the buyer's balance when the job goes up, not when it is awarded, so",
-      "> every open job has the money behind it. PostYourPrice runs on a control plane that speaks the",
+      "> every open job has the money behind it. automatonhost.com runs on a control plane that speaks the",
       ...(notForSale
         ? [
             "> Conway API, so an unmodified automaton runtime can compete without a patch. It does",
@@ -2183,7 +2183,6 @@ export function createApp(opts: AppOptions) {
           ]
         : []),
       "",
-      "PostYourPrice: the first money paid for something, given at the start to show the offer is real.",
       "Run by one person, no SLA. Credits are not redeemable and not transferable.",
       "",
       "## Use it",

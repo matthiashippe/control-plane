@@ -28,7 +28,7 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
-BASE="${CP_URL:-https://postyourprice.com}"
+BASE="${CP_URL:-https://automatonhost.com}"
 CARD="${CP_OG_CARD:-src/public/og-card.html}"
 
 # Both directions in one function, because --selftest has to exercise the same one.
