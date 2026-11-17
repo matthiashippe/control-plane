@@ -264,7 +264,7 @@ export const MONEY_WORDS = /handoff|token|wallet|smart|permission|sepolia|turnke
  * `scrollWidth`, `text`, `foreign` and `blockBottom` (bottom edge of the block of the state in page pixels, null when missing).
  */
 export function assessMoney(m) {
-  const out = assess({ ...m, umzugBottom: 0 }).map((d) => `${m.state} ${d}`), fold = FOLD[m.width];
+  const out = assess({ ...m, moveBottom: 0 }).map((d) => `${m.state} ${d}`), fold = FOLD[m.width];
   const block = MONEY_BLOCKS[m.state];
   if (!MONEY_STATES.includes(m.state)) out.push(`${m.state} ${m.width}: unknown state`);
   const word = String(m.text ?? "").split("\n").find((l) => MONEY_WORDS.test(l));
