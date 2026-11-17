@@ -11,7 +11,7 @@
 // ~/.config/control-plane/konto-sepolia.key and is never printed; the Auth Proxy configuration from ~/brain/connectors/secrets.env
 // (TURNKEY_AUTH_PROXY_CONFIG_ID, public by Turnkey's design, still not printed). Every transaction goes through sendKontoTx.
 import { spawn } from "node:child_process";
-import { existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
@@ -19,6 +19,7 @@ import { fileURLToPath } from "node:url";
 import Database from "better-sqlite3";
 import { createPublicClient, decodeFunctionData, encodeFunctionData, http, parseErc6492Signature, parseSignature } from "viem";
 import { baseSepolia } from "viem/chains";
+import { findChrome, launch } from "../browser.mjs";
 
 const { loadKontoKey, sendKontoTx } = await import("../../src/konto/chain.ts");
 const { KONTO_CHAIN_ID, SEPOLIA_USDC, SPEND_PERMISSION_MANAGER } = await import("../../src/konto/config.ts");
@@ -53,42 +54,6 @@ function portFree(port) {
     const s = net.createServer().once("error", () => resolve(false)).once("listening", () => s.close(() => resolve(true)));
     s.listen(port, "127.0.0.1");
   });
-}
-
-function findChrome() {
-  const base = path.join(os.homedir(), ".cache", "ms-playwright");
-  const dirs = existsSync(base) ? readdirSync(base) : [];
-  return dirs.filter((d) => d.startsWith("chromium-")).sort((a, b) => Number(b.split("-").pop()) - Number(a.split("-").pop()))
-    .map((d) => path.join(base, d, "chrome-linux64/chrome")).find((p) => existsSync(p));
-}
-
-/** A DevTools session over --remote-debugging-pipe (fd 3 in, fd 4 out, NUL-terminated), as ops/soll-konto.mjs does it. */
-function launch(chrome, profile) {
-  // --no-sandbox as Playwright passes it: the code-host allows no user namespaces.
-  const child = spawn(chrome, [
-    "--headless=new", "--no-sandbox", "--remote-debugging-pipe", `--user-data-dir=${profile}`, "--no-first-run",
-    "--no-default-browser-check", "--disable-gpu", "--disable-extensions", "--disable-sync", "--disable-component-update",
-    "about:blank",
-  ], { stdio: ["ignore", "ignore", "pipe", "pipe", "pipe"] });
-  let id = 0, rest = "";
-  const waiting = new Map(), listeners = [];
-  child.stdio[4].on("data", (d) => {
-    rest += d.toString("utf8");
-    let end;
-    while ((end = rest.indexOf("\0")) >= 0) {
-      const msg = JSON.parse(rest.slice(0, end));
-      rest = rest.slice(end + 1);
-      if (msg.id && waiting.has(msg.id)) {
-        const { ok, fail } = waiting.get(msg.id); waiting.delete(msg.id);
-        msg.error ? fail(new Error(`${msg.error.message} (${msg.error.code})`)) : ok(msg.result);
-      } else if (msg.method) for (const l of listeners) l(msg);
-    }
-  });
-  const send = (method, params = {}, sessionId) => new Promise((ok, fail) => {
-    const n = ++id; waiting.set(n, { ok, fail });
-    child.stdio[3].write(JSON.stringify({ id: n, method, params, ...(sessionId ? { sessionId } : {}) }) + "\0");
-  });
-  return { send, on: (l) => listeners.push(l), close: () => { try { child.kill("SIGKILL"); } catch { /* gone */ } } };
 }
 
 /** Server-Sent Events of the handoff, collected as they come. */
@@ -150,7 +115,7 @@ if (!UNTIL_KONTO) {
   if (usdc < PAYMENT) die("the test address needs 6 test USDC");
 }
 if (!(await portFree(PORT))) die(`port ${PORT} is taken`);
-const chrome = findChrome();
+const chrome = findChrome("passkey");
 if (!chrome) die("no Chromium under ~/.cache/ms-playwright");
 const proxyId = secret("TURNKEY_AUTH_PROXY_CONFIG_ID");
 
@@ -184,7 +149,7 @@ if (!created.code) die(`handoff not created: ${JSON.stringify(created).slice(0, 
 const stream = follow(created.code, created.poll_token);
 
 // ---- the phone: the number, then the passkey
-browser = launch(chrome, mkdtempSync(path.join(os.tmpdir(), "konto-chrome-")));
+browser = launch(chrome, mkdtempSync(path.join(os.tmpdir(), "konto-chrome-")), "passkey");
 const { targetId } = await browser.send("Target.createTarget", { url: "about:blank" });
 const { sessionId } = await browser.send("Target.attachToTarget", { targetId, flatten: true });
 const page = (m, p) => browser.send(m, p, sessionId);

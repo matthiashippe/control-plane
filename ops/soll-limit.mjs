@@ -9,15 +9,14 @@
 //                                                 the same with the two sources limit-<state>.html from another folder: the real
 //                                                 page written by ops/soll-live-limit.mjs, or a counter-test with planted defects
 //
-// No network, no port, no package: the browser part is the one of ops/soll-handoff.mjs with the look at the attributes of
-// ops/soll-konto.mjs (both stay as they are, because the audits run the frozen checks of konto 02 and 03 against them). The
-// judgement is assessLimit() in ops/soll-assess.mjs, a pure function that test/soll-limit.test.ts checks without a browser.
-import { spawn } from "node:child_process";
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+// No network, no port, no package: the browser part is ops/browser.mjs, the look at the attributes the one of ops/soll-konto.mjs.
+// The judgement is assessLimit() in ops/soll-assess.mjs, a pure function that test/soll-limit.test.ts checks without a browser.
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { FONTS_CONF, FOLD, LIMIT_BLOCKS, LIMIT_STATES, WIDTHS, assessLimit, decodePng, isLocal, pixelDiffCount, summaryLimit } from "./soll-assess.mjs";
+import { FOLD, LIMIT_BLOCKS, LIMIT_STATES, WIDTHS, assessLimit, decodePng, isLocal, pixelDiffCount, summaryLimit } from "./soll-assess.mjs";
+import { findChrome, launch } from "./browser.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const args = process.argv.slice(2);
@@ -34,62 +33,6 @@ const SOURCES = value("--source", path.join(ROOT, "docs/soll/src"));
 const PICTURES = value("--pictures", path.join(ROOT, "docs/soll"));
 const sourceOf = (state) => path.join(SOURCES, `limit-${state}.html`);
 const pictureOf = (dir, state, w) => path.join(dir, `limit-${state}-${w}.png`);
-
-function findChrome() {
-  if (process.env.SOLL_CHROME) return process.env.SOLL_CHROME;
-  const base = path.join(os.homedir(), ".cache", "ms-playwright");
-  const candidates = existsSync(base) ? readdirSync(base) : [];
-  const pick = (prefix, rel) => candidates.filter((d) => d.startsWith(prefix)).sort((a, b) => Number(b.split("-").pop()) - Number(a.split("-").pop()))
-    .map((d) => path.join(base, d, rel)).find((p) => existsSync(p));
-  return pick("chromium_headless_shell-", "chrome-headless-shell-linux64/chrome-headless-shell") ?? pick("chromium-", "chrome-linux64/chrome");
-}
-
-/** A DevTools session over --remote-debugging-pipe: fd 3 into the browser, fd 4 out of it, messages ending in NUL. */
-function launch(chrome, profile) {
-  // The fonts are part of the picture: see FONTS_CONF in ops/soll-assess.mjs.
-  const fonts = path.join(path.dirname(profile), "fonts.conf");
-  writeFileSync(fonts, FONTS_CONF);
-  // --no-sandbox as Playwright passes it: the code-host allows no user namespaces, and the only page loaded is our own file.
-  const child = spawn(chrome, [
-    "--headless", "--no-sandbox", "--remote-debugging-pipe", `--user-data-dir=${profile}`, "--no-first-run", "--no-default-browser-check",
-    "--disable-gpu", "--hide-scrollbars", "--force-color-profile=srgb", "--font-render-hinting=none", "--disable-lcd-text",
-    "--disable-background-networking", "--disable-component-update", "--disable-sync", "--disable-extensions",
-    "--disable-default-apps", "--mute-audio", "--host-resolver-rules=MAP * ~NOTFOUND", "--allow-file-access-from-files",
-    "about:blank",
-  ], { stdio: ["ignore", "ignore", "pipe", "pipe", "pipe"], env: { ...process.env, FONTCONFIG_FILE: fonts } });
-  let id = 0, rest = "", stderr = "";
-  const waiting = new Map(), listeners = [];
-  for (const s of [child.stdio[3], child.stdio[4]]) s.on("error", () => { /* reported through exit below */ });
-  child.stderr.on("data", (d) => { stderr = (stderr + d).slice(-4000); });
-  child.stdio[4].on("data", (d) => {
-    rest += d.toString("utf8");
-    let end;
-    while ((end = rest.indexOf("\0")) >= 0) {
-      const msg = JSON.parse(rest.slice(0, end));
-      rest = rest.slice(end + 1);
-      if (msg.id && waiting.has(msg.id)) {
-        const { ok, fail } = waiting.get(msg.id); waiting.delete(msg.id);
-        msg.error ? fail(new Error(`${msg.error.message} (${msg.error.code})`)) : ok(msg.result);
-      } else if (msg.method) for (const l of listeners) l(msg);
-    }
-  });
-  // Once the browser is gone every request fails at once: a request that waits for an answer that cannot come leaves the event
-  // loop empty, and node then ends with exit 0 without a single line, a green check that rendered nothing.
-  let gone = null;
-  const exited = new Promise((resolve) => child.on("exit", resolve));
-  exited.then(() => {
-    gone = new Error(`browser exited: ${stderr.trim().split("\n").pop() ?? ""}`);
-    for (const { fail } of waiting.values()) fail(gone);
-    waiting.clear();
-  });
-  const send = (method, params = {}, sessionId) => new Promise((ok, fail) => {
-    if (gone) return fail(gone);
-    const n = ++id; waiting.set(n, { ok, fail });
-    child.stdio[3].write(JSON.stringify({ id: n, method, params, ...(sessionId ? { sessionId } : {}) }) + "\0");
-  });
-  const close = async () => { try { await send("Browser.close"); } catch { /* already gone */ } await Promise.race([exited, new Promise((r) => setTimeout(r, 3000))]); if (child.exitCode === null) child.kill("SIGKILL"); };
-  return { send, on: (l) => listeners.push(l), close };
-}
 
 // Limits against a hanging browser, not a measure of the page: the judgement is assessLimit() alone.
 const START_MS = 180000;
@@ -170,11 +113,13 @@ async function renderAt(browser, width, url, block) {
 }
 
 async function main() {
-  const chrome = findChrome();
+  const chrome = findChrome("picture");
   if (!chrome) { console.error("soll limit: no Chromium under ~/.cache/ms-playwright (or SOLL_CHROME)"); process.exit(2); }
   for (const state of LIMIT_STATES) if (!existsSync(sourceOf(state))) { console.error(`soll limit: source missing: ${sourceOf(state)}`); process.exit(2); }
   const scratch = mkdtempSync(path.join(os.tmpdir(), "soll-limit-"));
-  const browser = launch(chrome, path.join(scratch, "profile"));
+  // The fonts are part of the picture: launch() in ops/browser.mjs starts the kind "picture" with
+  // env: { ...process.env, FONTCONFIG_FILE: fonts }, fonts being FONTS_CONF of ops/soll-assess.mjs next to the profile.
+  const browser = launch(chrome, path.join(scratch, "profile"), "picture");
   const results = [];
   try {
     // The browser start gets its own limit: on a shared host under load (swap full, load above 100) a cold start took longer than
