@@ -396,6 +396,11 @@ Wallet ohne Karte kein Geld auf sein Konto bekommt.
   `sendPayout`; die Route antwortet 202 `pending`, das MCP-Tool meldet `pending` statt „Sent“. Prüfbefehle: Vitest von Punkt 20
   Exit 0, `test/konto-payout-pending.test.ts` 4 Fälle, `pending` 24 Treffer in `src/konto/payout.ts`. Gegenprobe: vor dem Fix waren
   alle vier Fälle rot (502 statt 202), der neue Fall in `test/mcp-money.test.ts` mit dem alten `mcp/server.mjs` ebenso.
+- 2026-11-17 Zyklus 5: Abschluss gemeldet, Punkte 1 bis 20. `dev` erneut gemergt (nur eine neue Goal-Datei von hosting).
+  Prüfbefehle: alle 78 der Goal-Datei einzeln am Kopf, jeder mit seiner Erwartung, `check` Exit 0. Ein Lauf des Vitest von Punkt 20
+  war einmal rot und danach elfmal grün; Ursache war die IBAN-Prüfung in `test/konto-payout.test.ts`, die in etwa einem von 600
+  Läufen „0532“ in einer zufälligen Adresse fand (nachgerechnet: 0,16 % je Lauf). Behoben, indem Adressen vor der Suche
+  herausgenommen werden; eine IBAN in der Datenbank fällt weiter auf.
 
 ## Blockers
 - keine; das Human Gate `security_settings` ist erledigt, der Absatz „Ausnahme Hauptnetz“ liegt seit `5f77e64` auf `dev`.
