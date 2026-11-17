@@ -112,6 +112,41 @@ haben keine Wallet. Bis 23.09.2026 blieben 43 Besucher an der Wallet-Signatur h�
 - Das Terminal verlässt der Nutzer nur für einen QR-Code aufs Handy: beim Start (Passkey, Erlaubnis, erste Zahlung) und bei der
   ersten Auszahlung (Identitätsprüfung des Anbieters). Alles andere ist ein Tool in `mcp/server.mjs`.
 
+## umzug: Von PostYourPrice auf automatonhost.com
+
+Grundsatz (Matthias 17.11.2026): Nach außen (Seiten, README, Plugin, PRs, Einträge, Kommentare, Posts) wird PostYourPrice weder genannt
+noch verlinkt; das Angebot sind die Automatons, die bei uns laufen. Der Name ist die Domain `automatonhost.com` (Matthias' Wahl vom
+17.11.2026); einen anderen Markennamen setzt kein Goal. Die Domain kauft Matthias im Cloudflare-Konto von HTC. Fehlt die Zone
+`automatonhost.com` dort beim Start von umzug 01, steht das Goal zuerst am Human Gate `server_kauf` mit genau diesem Kauf.
+`postyourprice.com` und `cp.hippe.eu` bleiben registriert und erreichbar, weil laufende Automatons, installierte Plugins und
+veröffentlichte Kommentare auf sie zeigen.
+
+### umzug 01: Der Dienst zieht auf automatonhost.com
+
+Ziel: `https://automatonhost.com` ist der kanonische Host (`CP_PUBLIC_URL`) mit gültigem Zertifikat, `www.automatonhost.com` leitet mit
+308 auf den Apex. Muster ist der Umzug von `cp.hippe.eu` (`src/app.ts`, Kommentar über `PAGES_STAY`): Seiten unter `postyourprice.com`
+und `cp.hippe.eu` leiten mit 301 auf denselben Pfad unter `automatonhost.com`, die Pfade aus `PAGES_STAY` (`/v1/`, `/pay/`,
+`/.well-known/` und die übrigen) antworten auf allen drei Hosts, weil Clients bei einem Redirect über Hosts den Authorization-Header
+verwerfen und ein Automaton mit `conwayApiUrl: https://postyourprice.com` sonst unangemeldet ankäme. Die Zahlungsdomain darf nie an
+den Dienst eines Kunden gehen: Jede Sperre für `postyourprice.com` (`ops/sandbox/sandboxd.mjs`, `ops/sandbox/setup.sh`, die Prüfung
+der `public_url` im Control Plane) gilt genauso für `automatonhost.com`. Passkeys: Konten aus `/konto` haben ihren Passkey für die
+rpId des Hosts, auf dem sie entstanden (`src/public/konto-client/main.mjs`); das Goal zählt in der Produktion nur lesend die Konten
+mit Passkey und hält jedes davon benutzbar (etwa Related Origin Requests über `/.well-known/webauthn` oder `/konto` für sie auf dem
+alten Host). Die erlaubten Origins im Auth Proxy des Wallet-Anbieters bekommen `https://automatonhost.com` dazu; was dort nur
+Matthias einstellen kann, ist ein Human Gate. Stripe kehrt auf `automatonhost.com` zurück. Belegt mit Tests der Weiterleitung je Host
+und Pfadklasse und nach dem Rollout mit `ops/smoke.sh` gegen `https://automatonhost.com` und gegen `https://postyourprice.com`.
+
+### umzug 02: Seiten und Texte nennen Automatons
+
+Ziel: Startseite, Seitentitel, strukturierte Daten, `llms.txt`, README, das Plugin (`.claude-plugin/marketplace.json`,
+`mcp/.claude-plugin/plugin.json`, der Standard von `CP_URL` in `mcp/server.mjs`) und der Name im Passkey nennen Automatons und
+`automatonhost.com`, weder PostYourPrice noch Handsel; Beispiele mit `curl` zeigen `https://automatonhost.com`. Die Startseite führt
+mit dem Angebot für Automatons (einen Automaton bei uns starten, `conwayApiUrl` umstellen); der Markt für Menschen bleibt erreichbar,
+steht aber nicht mehr oben. Die Entwürfe aus kanal und jeder neue Text nach außen nennen `automatonhost.com`. Vor dem Bau SOLL-Bilder
+bei 390 und 1440 px unter `docs/soll/`, Abnahme durch den Design Reviewer; was seite 01 und 02 festlegen, übernimmt den neuen Namen.
+Belegt mit einem Prüfbefehl, der `PostYourPrice` und `Handsel` in ausgelieferten Seiten, README und Plugin zählt und 0 verlangt. Ein
+schon installiertes Plugin `automaton@postyourprice` läuft weiter, weil die API auf `postyourprice.com` antwortet.
+
 ## relay 01: Das Social-Relay der Runtime
 
 Beleg: Die Runtime am Pin hat in `src/social/` einen fertigen Client für Nachrichten, die mit dem Wallet-Key signiert sind, und
