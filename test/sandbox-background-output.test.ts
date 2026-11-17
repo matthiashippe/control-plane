@@ -2,7 +2,7 @@
  * How a command in the background ends and how much of its output comes back (goals/hosting/02). The wrapper writes the
  * exit code into `<base>.exit.tmp` and moves it to `<base>.exit`, so the wait command never reads an empty exit file as
  * the end; and both print at most the last 65536 bytes (WAIT_TAIL_BYTES) of `<base>.out` and `<base>.err`, after one line
- * that names the size, the path and read_file, because every byte of the answer lands in the context of the model and
+ * that names the size and the path and tells to read parts of it with grep -n or sed -n instead of read_file, because every byte of the answer lands in the context of the model and
  * is paid as inference. The shell runs here in a real bash with a small `seconds`, as in test/sandbox-wait.test.ts.
  */
 import { spawn, spawnSync } from "node:child_process";
@@ -55,7 +55,13 @@ function expectNotice(notice: string, size: number, file: string): void {
   expect(notice).toContain(String(size));
   expect(notice).toContain(String(TAIL));
   expect(notice).toContain(file);
+  // read_file returns the whole file (read in src/sandbox/service.ts), so the line warns against it and names exec
+  // commands that read only a part, each with the path of the file.
   expect(notice).toContain("read_file");
+  expect(notice).toMatch(/read_file[^.]*all [0-9]+ bytes into your context/);
+  expect(notice).toContain(`grep -n '<text>' ${file}`);
+  expect(notice).toContain(`sed -n '<from>,<to>p' ${file}`);
+  expect(notice).not.toMatch(/read the rest with read_file/);
 }
 
 describe("the exit file of a command in the background", () => {

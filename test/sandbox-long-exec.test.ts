@@ -108,6 +108,8 @@ describe("exec with a long timeout", () => {
     // The last line is the command to wait with (goals/sandbox/09), the same as the field wait_command.
     expect(text.split("\n").pop()).toBe(first.res!.json.wait_command);
     expect(text).toMatch(/Do not start the command again/);
+    // A cut output is read in parts with exec, not with read_file, which returns the whole file (goals/hosting/02).
+    expect(text).toMatch(/grep -n or sed -n in exec, not with read_file/);
 
     // A repeat with the same key starts nothing and gets the same answer at once.
     const again = track(a.call("POST", `/v1/sandboxes/${id}/exec`, body, key));

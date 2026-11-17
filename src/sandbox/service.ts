@@ -48,7 +48,8 @@ const EXEC_WRAP_MARGIN_MS = 15_000;
  * How much of `<base>.out` and of `<base>.err` the wrapper and the wait command print at most (goals/hosting/02). The
  * runtime puts every byte of an exec answer into the context of the model, which the customer pays as inference; an
  * `npm install` writes several MB. A longer file is cut to its last WAIT_TAIL_BYTES, after one line that names its size
- * and path, so the model reads the rest with read_file.
+ * and path and tells the model to read parts of it with exec (`grep -n`, `sed -n`), because read_file (`read` below)
+ * returns the whole file and would bring the megabytes into the context with the next call.
  */
 export const WAIT_TAIL_BYTES = 64 * 1024;
 
@@ -61,7 +62,9 @@ export const WAIT_TAIL_BYTES = 64 * 1024;
 function printOutputs(base: string): string {
   const one = (file: string, to: string): string =>
     `n=$(wc -c 2>/dev/null < ${file}); if [ "\${n:-0}" -gt ${WAIT_TAIL_BYTES} ] 2>/dev/null; then ` +
-    `{ echo "This output has $n bytes, only its last ${WAIT_TAIL_BYTES} bytes follow. The whole output is in the file ${file}; read the rest with read_file."; ` +
+    `{ echo "This output has $n bytes, only its last ${WAIT_TAIL_BYTES} bytes follow. The whole output is in the file ${file}. ` +
+    `Do not read it with read_file: that puts all $n bytes into your context. To read only a part, use exec: ` +
+    `grep -n '<text>' ${file} finds lines, sed -n '<from>,<to>p' ${file} prints a range of lines."; ` +
     `tail -c ${WAIT_TAIL_BYTES} ${file}; }${to}; else cat ${file}${to}; fi`;
   return `${one(`${base}.out`, "")}; ${one(`${base}.err`, " >&2")}`;
 }
@@ -127,7 +130,8 @@ function stillRunning(base: string, seconds: number): Reply {
       `line of this answer and no timeout: it waits at most ${EXEC_WAIT_S} seconds, then prints the exit code, the ` +
       `output and the errors of the command, or says that it is still running. As long as it says so, call exec with ` +
       `the same command again. Output or errors longer than ${WAIT_TAIL_BYTES / 1024} KB come as their last ` +
-      `${WAIT_TAIL_BYTES / 1024} KB, after a line that names the file; read the rest of it with read_file.\n${wait}`,
+      `${WAIT_TAIL_BYTES / 1024} KB, after a line that names the file; read parts of it with grep -n or sed -n in exec, ` +
+      `not with read_file, which returns the whole file.\n${wait}`,
     stderr: "",
     exit_code: -1,
     running: true,

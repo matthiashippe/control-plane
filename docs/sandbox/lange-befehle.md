@@ -87,9 +87,12 @@ genau `The command has ended with exit code <n>.`.
 Wie viel Ausgabe zurückkommt: Wartebefehl und Hülle drucken von `<tag>.out` (stdout) und `<tag>.err` (stderr) je Strom höchstens
 die letzten 64 KB (`WAIT_TAIL_BYTES` in `src/sandbox/service.ts`, 65536 Bytes, mit `tail -c`). Ist eine Datei größer, steht davor auf
 demselben Strom genau eine Zeile mit der Gesamtgröße in Bytes, der Zahl der gezeigten Bytes und dem Pfad der Datei, etwa
-`This output has 5242880 bytes, only its last 65536 bytes follow. The whole output is in the file /root/.exec/<tag>.out; read the
-rest with read_file.` Eine Datei bis genau 65536 Bytes kommt unverändert. Den Rest liest der Automaton mit `read_file` aus dem
-genannten Pfad; die Dateien bleiben in der Sandbox liegen. Grund: Jedes Byte der Antwort landet im Kontext des Modells und wird als
+`This output has 5242880 bytes, only its last 65536 bytes follow. The whole output is in the file /root/.exec/<tag>.out. Do not
+read it with read_file: that puts all 5242880 bytes into your context. To read only a part, use exec: grep -n '<text>'
+/root/.exec/<tag>.out finds lines, sed -n '<from>,<to>p' /root/.exec/<tag>.out prints a range of lines.` Eine Datei bis genau
+65536 Bytes kommt unverändert. Den Rest liest der Automaton in Teilen mit `exec`, `grep -n` zum Suchen und `sed -n` für einen
+Zeilenbereich, je mit dem genannten Pfad; die Dateien bleiben in der Sandbox liegen. `read_file` gibt die ganze Datei zurück und
+brächte die Megabytes doch in den Kontext. Grund: Jedes Byte der Antwort landet im Kontext des Modells und wird als
 Inferenz bezahlt, ein `npm install` schreibt mehrere MB.
 
 Wie lange ein Aufruf dauert: `ops/live.sh` trägt die längste Dauer eines Aufrufs des Wartebefehls als `bg_max_ms=<ms>` in die

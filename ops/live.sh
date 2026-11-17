@@ -1748,9 +1748,11 @@ case "${1:-}" in
     case "${2:-}" in
       domains-search) judge_domains_search "${3:-}" "$(head -c 4000)" ;;
       sandbox-bg)
-        # The start of the background exec of the check `sandbox`, the answer's body on stdin.
+        # The start of the background exec of the check `sandbox`, the answer's body on stdin. The check itself reads the
+        # whole answer file; 16000 bytes hold the answer with the wait command twice (stdout and wait_command), which
+        # grew past 4000 with the line before a cut output (goals/hosting/02, point 7).
         bg_body="$(mktemp)"
-        head -c 4000 >"$bg_body"
+        head -c 16000 >"$bg_body"
         bg_start "${3:-}" "$bg_body"
         rm -f "$bg_body"
         ;;

@@ -68,16 +68,26 @@
   Wiederholung mit demselben Schlüssel nach dem Ende) sonst denselben Weg mit Megabytes in den Kontext bringt. Größe mit
   `wc -c 2>/dev/null < <datei>` (die Umleitung der Fehler zuerst, damit eine fehlende Datei keine zusätzliche Meldung bringt; dann
   druckt `cat` wie bisher seinen Fehler), über 65536 Bytes eine Zeile und `tail -c 65536` auf demselben Strom, sonst `cat` wie
-  bisher. Damit kommt eine kleine Ausgabe Byte für Byte wie vorher. Wortlaut der Zeile: `This output has <n> bytes, only its last
-  65536 bytes follow. The whole output is in the file <pfad>; read the rest with read_file.` Grund für den Wortlaut: Das Modell
-  liest Größe, Pfad und Werkzeug in einem Satz, ohne etwas übersetzen zu müssen. Der Text von `stillRunning` nennt die Grenze von
-  64 KB und `read_file`.
+  bisher. Damit kommt eine kleine Ausgabe Byte für Byte wie vorher. Den Wortlaut der Zeile legt Punkt 7 fest (unten); der
+  erste Wortlaut aus Zyklus 1 schickte das Modell mit `read_file` zum Rest. Der Text von `stillRunning` nennt die Grenze von 64 KB.
 - **Dauer der Wartebefehle in der Live-Prüfung.** `bg_live` gibt nach dem Token die längste Dauer eines Aufrufs von `wait_command`
   aus (0, wenn keiner lief), `sandbox_live` schreibt sie als `bg_max_ms=<ms>` direkt nach `bg=<token>` in die Ergebniszeile, und die
   Zeile `OK sandbox:` endet mit `bg_max_ms=<ms>`, ab `BG_WARN_MS=27000` gefolgt von `warning: …`. `bg=ok` bleibt, wie es ist. Grund
   für 27000: 3 s Rand bis zum Abbruch der Runtime nach 30000 ms; ein `FAIL` löste einen Revert aus, obwohl der Aufruf rechtzeitig
   endete, darum nur eine Warnung. Der Selbsttest prüft 25000 und 26999 ohne und 27000 und 29999 mit Warnung; die Gegenprobe mit
   einer Messung ohne Maximum und mit `BG_WARN_MS=27001` macht ihn rot (`LIVE SELFTEST FAIL`).
+- **Teile lesen statt `read_file` (Punkt 7, Kritik Tech Lead 17.11.2026).** `read` in `src/sandbox/service.ts` gibt die Datei
+  ungekürzt zurück, also brächte ein Modell, das dem Hinweis „read the rest with read_file“ folgt, die 5 MB eines `npm install` im
+  nächsten Aufruf doch in den bezahlten Kontext. Wortlaut der Zeile jetzt: `This output has <n> bytes, only its last 65536 bytes
+  follow. The whole output is in the file <pfad>. Do not read it with read_file: that puts all <n> bytes into your context. To read
+  only a part, use exec: grep -n '<text>' <pfad> finds lines, sed -n '<from>,<to>p' <pfad> prints a range of lines.` Platzhalter
+  in spitzen Klammern, weil das Modell sie aus Hilfetexten kennt; beide Befehle mit vollem Pfad, damit es sie nur ausfüllen muss.
+  Der Text von `stillRunning` sagt dasselbe kurz (`grep -n` oder `sed -n` in exec, nicht `read_file`). Rot vor dem Fix: 3 der 8
+  Fälle in `test/sandbox-background-output.test.ts` und die neue Assertion in `test/sandbox-long-exec.test.ts` mit `service.ts` von
+  `15466cd`. Folge: Der Wartebefehl wird 1519 Zeichen lang, und die Antwort mit ihm zweimal (`stdout` und `wait_command`) ist länger
+  als 4000 Bytes. Der Live-Pfad von `ops/live.sh` liest die ganze Antwortdatei; nur der Einstieg `--judge sandbox-bg`, den
+  `test/live-selftest.test.ts` nutzt, schnitt bei 4000 Bytes ab und meldete `nojson`. Er liest jetzt bis 16000 Bytes; die Grenze
+  von 4000 Zeichen für `wait_command` selbst in `BG_ANSWER_JS` bleibt.
 - **Widerlegt?** Nein: Am Kopf von `dev` (`11a4475`) sind 6 der 8 neuen Fälle aus `test/sandbox-background-output.test.ts` rot
   (leere Exit-Datei ohne Schreiber, leere mit spätem Code 3, `mv` der Hülle, 5 MB im Wartebefehl, 5 MB im Wrapper, 65537 Bytes);
   die beiden Fälle für unverändertes Verhalten (genau 65536 Bytes, kleine Ausgabe) sind dort grün, wie sie sollen.
