@@ -1,7 +1,7 @@
 # Hosting Goal 02: Ein langer Befehl endet verlässlich und flutet den Kontext nicht
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Ein Befehl, der in einer Sandbox im Hintergrund läuft, meldet sein Ende immer mit seinem Exit-Code, und seine Ausgabe kommt höchstens
@@ -139,7 +139,7 @@ Exit-Code endet.
       Prüfung: `grep -cF "grep -n" src/sandbox/service.ts` muss mindestens 1 ausgeben.
       Prüfung: `grep -c "sed -n" test/sandbox-background-output.test.ts` muss mindestens 1 ausgeben.
       Prüfung: `grep -c "sed -n" docs/sandbox/lange-befehle.md` muss mindestens 1 ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Jede neue Testdatei und jeder neue Fall, der ein neues Verhalten verlangt, war vor dem Fix rot; die Zeile im Progress Log
@@ -168,6 +168,7 @@ Exit-Code endet.
 - 2026-11-17 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6 gebaut (Hülle schreibt den Exit-Code über eine temporäre Datei und `mv -f`, Wartebefehl endet nur bei einer Exit-Datei mit Inhalt, Wartebefehl und Hülle drucken je Strom höchstens die letzten 64 KB nach einer Zeile mit Größe, Pfad und `read_file`, `bg_max_ms` mit Warnung ab 27000 ms in `ops/live.sh` und `ops/README.md`, Doku und Annahmen); rot vor dem Fix: 6 von 8 Fällen in `test/sandbox-background-output.test.ts` mit `service.ts` der Merge-Basis (die zwei Fälle für unverändertes Verhalten grün), die neuen Assertions in `test/live-selftest.test.ts` mit `ops/live.sh` von `dev`, der Selbsttest mit Messung ohne Maximum und mit verschobener Schwelle (`LIVE SELFTEST FAIL`). Prüfbefehle: Punkt 1 vitest Exit 0, 8 Fälle, 0, 2, Gegenprobe 6; Punkt 2 vitest Exit 0, 1, 2, nichts; Punkt 3 vitest Exit 0, `last=LIVE SELFTEST OK ok=1`, 1, 10, 1; Punkt 4 1, 1, 11; Punkt 5 0, 0, 0, 0; Punkt 6 `check` grün in 78 s, `e2e` an PR #240 SUCCESS.
 - 2026-11-17 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6 (`dev` war schon im Branch, kein neuer Code). Prüfbefehle: Punkt 1 vitest Exit 0, 8, 0, 2, Gegenprobe 6; Punkt 2 vitest Exit 0, 1, 2, nichts; Punkt 3 vitest Exit 0, `last=LIVE SELFTEST OK ok=1`, 1, 10, 1; Punkt 4 1, 1, 11; Punkt 5 0, 0, 0, 0; Punkt 6 `check` grün in 57 s, `e2e` an PR #240 am Kopf `ccaa707` SUCCESS.
 - 2026-11-17 Zyklus 3: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, 7 (Punkt 7 aus der Kritik gebaut: die Zeile vor einer gekürzten Ausgabe warnt vor `read_file` und nennt für `exec` `grep -n` und `sed -n` mit Pfad, `stillRunning` sagt dasselbe kurz, Doku und Annahmen nachgezogen; die Zeile steht einmal in der Shell-Funktion `cut_out`, weil `e2e` am Zwischenstand `e824ecf` rot war: der Prüfer der Harness liest die Antwort mit dem Wartebefehl auf 2000 Zeichen gekürzt, sie hatte 2433, jetzt 1925); rot vor dem Fix: 3 von 8 Fällen in `test/sandbox-background-output.test.ts` und die neue Assertion in `test/sandbox-long-exec.test.ts` mit `service.ts` von `15466cd`, die Assertion auf 2000 Zeichen auch mit `service.ts` von `d06f2e4`. Prüfbefehle: Punkt 1 vitest Exit 0, 8, 0, 2, Gegenprobe 6; Punkt 2 vitest Exit 0, 1, 2, nichts; Punkt 3 vitest Exit 0, `last=LIVE SELFTEST OK ok=1`, 1, 10, 1; Punkt 4 1, 1, 14; Punkt 5 0, 1, 0, 0 (die eine Datei ist der Vorschlag `goals/_vorschlaege/hosting-kritik-2026-11-17-2.md` aus dem Kritik-Commit `15466cd`, keine Änderung des Goals); Punkt 6 `check` grün in 53 s, `e2e` am Kopf dieses Commits im Kommentar am Topic; Punkt 7 vitest Exit 0, 3, 3, 2, 2.
+- 2026-11-17 Release: PASS K und B (Zyklus 3), DONE.
 
 ## Blockers
 Keine.
