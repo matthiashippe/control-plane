@@ -42,3 +42,11 @@
   `test/billing-round.test.ts` liest dazu `src/index.ts`: Genau eine Zeile nennt den Sweep, und sie reicht ihn an
   `startBillingRound` mit `firstDelayMs` von drei Minuten. Grund: Ein Sweep beim Start würde im Kanarienvogel des Rollouts
   Sandboxes löschen, und vorher fing das kein Prüfbefehl. Am Verhalten ändert sich nichts.
+- **Kein Sweep beim Bau der Dienste (Zyklus 4, Gap der Linse K zu Punkt 3).** `test/sweep-not-on-start.test.ts` baut
+  Sandbox-Dienst, Automaton-Dienst und App so wie `src/index.ts`, neben einer Zeile `failed` mit laufender Sandbox und einem
+  abgeschnittenen Start von vor einer Stunde, und lässt eine falsche Uhr zehn Minuten ohne den Takt laufen: `sandboxd` bekommt
+  weder Abfrage noch DELETE, Zeilen und Sandboxes bleiben, wie sie waren. Danach räumt derselbe Dienst auf Anruf beide ab, damit der
+  Test in beide Richtungen zeigt. Dazu ein Pin auf `src/`: `sweepAutomatons(` nur im `sweep` des Dienstes, der Sweep des Dienstes
+  nur in `src/index.ts` und im Takt, `startBillingRound(` nur in `src/index.ts`, das Modul des Sweeps nur von
+  `src/automaton/service.ts` importiert. Grund: Der Kanarienvogel des Rollouts baut die Dienste ebenfalls und darf nichts löschen.
+  Am Verhalten ändert sich nichts.
