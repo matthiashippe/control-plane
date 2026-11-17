@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 // @ts-expect-error plain ESM module under ops/, no declaration file
-import { FOLD, HANDOFF_STATES, assess, assessHandoff, handoffFile, pixelDiffCount, summaryHandoff } from "../ops/soll-assess.mjs";
+import { FOLD, HANDOFF_STATES, assess, assessHandoff, pixelDiffCount, summaryHandoff } from "../ops/soll-assess.mjs";
 
 /**
  * The judgement of ops/soll-handoff.mjs over the phone page /h/{code}, without a browser (goals/konto/02, Punkt 2). One case per
@@ -41,8 +41,8 @@ describe("soll judgement of the phone page", () => {
       expect(defects).toEqual([]);
       results.push({ state, width, blockBottom: m.blockBottom, defects });
     }
-    // The summary line keeps the name of the approved picture, which the audit of konto 02 expects (test/state-names.test.ts).
-    expect(summaryHandoff(results)).toBe(`soll handoff: 6 pictures, ${handoffFile("approve")} top 390=528 1440=603, 0 defects`);
+    // The summary line names the block by the state in the code (goals/konto/06, Punkt 3).
+    expect(summaryHandoff(results)).toBe("soll handoff: 6 pictures, approve top 390=528 1440=603, 0 defects");
   });
 
   it("rejects a picture with even one pixel that differs from a fresh render", () => {

@@ -86,3 +86,15 @@ export function takeApiKey(db: Db, code: string): string | null {
     return row.api_key;
   })();
 }
+
+/**
+ * The name of an account (goals/konto/06, decision 1): the name of the oldest API key of its address. finishKonto writes that key
+ * with the name the person saw on the phone when the account was created; later keys (sandbox 08) carry names of automatons and
+ * do not count. Null when the address has no key, then the page says only "your account".
+ */
+export function readAccountName(db: Db, address: string): string | null {
+  const row = db.prepare("SELECT name FROM api_keys WHERE address = ? ORDER BY id LIMIT 1").get(address.toLowerCase()) as
+    | { name: string }
+    | undefined;
+  return row?.name ? row.name : null;
+}

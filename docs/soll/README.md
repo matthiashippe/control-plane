@@ -42,13 +42,16 @@ in drei Zuständen, je zwei Bilder:
 
 | Zustand | 390 | 1440 | Quelle |
 |---|---|---|---|
-| `freigabe` | `handoff-freigabe-390.png` | `handoff-freigabe-1440.png` | `src/handoff-freigabe.html` |
-| `erledigt` | `handoff-erledigt-390.png` | `handoff-erledigt-1440.png` | `src/handoff-erledigt.html` |
-| `ungueltig` | `handoff-ungueltig-390.png` | `handoff-ungueltig-1440.png` | `src/handoff-ungueltig.html` |
+| `approve` | `handoff-approve-390.png` | `handoff-approve-1440.png` | `src/handoff-approve.html` |
+| `approved` | `handoff-approved-390.png` | `handoff-approved-1440.png` | `src/handoff-approved.html` |
+| `invalid` | `handoff-invalid-390.png` | `handoff-invalid-1440.png` | `src/handoff-invalid.html` |
 
-`freigabe` zeigt, was freigegeben wird (Name des Automatons, Tageslimit, erste Zahlung), und drei Zahlen als Knöpfe in einem
-Formular ohne Skript; der Block `data-soll="freigabe"` endet im ersten Bildschirm (390 x 844 und 1440 x 900). `erledigt` schickt
-zurück ins Terminal. `ungueltig` zeigt den abgelaufenen Code; schon benutzt, falsche Zahl und unbekannt tauschen nur die Zeile unter
+Bilder und Quellen tragen seit goals/konto/06 die Namen der Zustände im Code, Byte für Byte die unter den alten deutschen Namen
+abgenommenen Bilder (abgenommen in PRO-19925, Umbenennung abgenommen mit dem Abnahme-Issue limit-account unten im Abschnitt Limit).
+
+`approve` zeigt, was freigegeben wird (Name des Automatons, Tageslimit, erste Zahlung), und drei Zahlen als Knöpfe in einem
+Formular ohne Skript; der Block `data-soll="approve"` endet im ersten Bildschirm (390 x 844 und 1440 x 900). `approved` schickt
+zurück ins Terminal. `invalid` zeigt den abgelaufenen Code; schon benutzt, falsche Zahl und unbekannt tauschen nur die Zeile unter
 der Überschrift. Die Werte im Bild sind erfunden (`Atlas`, 5.00 USD), keine Kundendaten.
 
 Bauen und prüfen, ohne Netz, mit dem Chromium aus `~/.cache/ms-playwright/`:
@@ -59,7 +62,7 @@ node ops/soll-handoff.mjs --check                  # neu rendern und vergleichen
 node ops/soll-handoff.mjs --check --source <dir>   # dieselbe Prüfung gegen die drei Quellen in <dir>
 ```
 
-Mängel wie bei der Startseite, dazu: Block `freigabe` endet unter dem ersten Bildschirm, und ein Wort, das der Leser erst übersetzen
+Mängel wie bei der Startseite, dazu: Block `approve` endet unter dem ersten Bildschirm, und ein Wort, das der Leser erst übersetzen
 muss (`handoff`, `phishing`, `token`, `SSE`), steht im sichtbaren Text. Die Auswertung ist `assessHandoff` in `ops/soll-assess.mjs`,
 geprüft von `test/soll-handoff.test.ts` ohne Browser.
 
@@ -80,14 +83,15 @@ erlaubt die tägliche Abbuchung. Zwei Zustände, je zwei Bilder:
 | Zustand | 390 | 1440 | Quelle |
 |---|---|---|---|
 | `passkey` | `konto-passkey-390.png` | `konto-passkey-1440.png` | `src/konto-passkey.html` |
-| `fehlgeschlagen` | `konto-fehlgeschlagen-390.png` | `konto-fehlgeschlagen-1440.png` | `src/konto-fehlgeschlagen.html` |
+| `failed` | `konto-fehlgeschlagen-390.png` | `konto-fehlgeschlagen-1440.png` | `src/konto-fehlgeschlagen.html` |
 
 `passkey` sagt in der Überschrift, was beim Tippen passiert, darunter in einer Zeile, was wir abbuchen dürfen (Tageslimit und für
 welchen Automaton), zwei Haken dazu, wer das Konto öffnen kann, und einen Knopf über die ganze Breite; der Block
-`data-soll="passkey"` endet im ersten Bildschirm (390 x 844 und 1440 x 900). `fehlgeschlagen` zeigt den abgebrochenen Passkey und
+`data-soll="passkey"` endet im ersten Bildschirm (390 x 844 und 1440 x 900). `failed` zeigt den abgebrochenen Passkey und
 schickt zurück ins Terminal für einen neuen Code; Anbieter nicht erreichbar und abgelehnte Erlaubnis tauschen nur die Zeile unter
-der Überschrift. Die Werte im Bild sind erfunden (`Atlas`, 5.00 USD), keine Kundendaten. `freigabe`, `erledigt` und `ungueltig`
-bleiben die Bilder aus dem Abschnitt Handoff.
+der Überschrift. Die Werte im Bild sind erfunden (`Atlas`, 5.00 USD), keine Kundendaten. `approve`, `approved` und `invalid`
+bleiben die Bilder aus dem Abschnitt Handoff. Der Zustand `failed` behält für Bilder und Quelle den Namen, unter dem sie
+abgenommen sind (`KONTO_FILES` in `ops/soll-assess.mjs`, goals/konto/06).
 
 Bauen und prüfen, ohne Netz, mit dem Chromium aus `~/.cache/ms-playwright/`:
 
@@ -115,7 +119,7 @@ Abnahme-Issue konto: PRO-20104
 
 ## Limit /h/{code}
 
-Der Schritt Limit derselben Handy-Seite (goals/konto/04): Ein Konto erhöht sein Tageslimit. Nach der richtigen Zahl bestätigt der
+Der Schritt Limit derselben Handy-Seite (goals/konto/04, Name des Kontos seit goals/konto/06): Ein Konto erhöht sein Tageslimit. Nach der richtigen Zahl bestätigt der
 Mensch das neue Limit mit dem Passkey, mit dem er das Konto angelegt hat. Zwei Zustände, je zwei Bilder:
 
 | Zustand | 390 | 1440 | Quelle |
@@ -123,11 +127,15 @@ Mensch das neue Limit mit dem Passkey, mit dem er das Konto angelegt hat. Zwei Z
 | `approve` | `limit-approve-390.png` | `limit-approve-1440.png` | `src/limit-approve.html` |
 | `passkey` | `limit-passkey-390.png` | `limit-passkey-1440.png` | `src/limit-passkey.html` |
 
-`approve` ist die Wahl der Zahl wie beim Handoff, zeigt aber das heutige und das neue Tageslimit statt der ersten Zahlung; der Block
-`data-soll="approve"` endet im ersten Bildschirm. `passkey` sagt in der Überschrift, was beim Tippen passiert, darunter in einer
-Zeile das neue Limit und für wen, zwei Haken (das alte Limit endet, derselbe Passkey) und einen Knopf über die ganze Breite; der
-Block `data-soll="limit"` endet im ersten Bildschirm (390 x 844 und 1440 x 900). Abbruch und Fehler zeigen den Zustand
-`fehlgeschlagen` aus dem Abschnitt Konto unverändert. Die Werte im Bild sind erfunden (`Atlas`, 5.00 auf 10.00 USD), keine
+`approve` ist die Wahl der Zahl wie beim Handoff, zeigt aber das heutige und das neue Tageslimit statt der ersten Zahlung; die
+Überschrift fragt nach dem Limit des Kontos („Raise the daily limit of your account to $10.00?“), die Zeile über den Zahlen nennt
+den Namen des Kontos („The new limit applies to your account Atlas.“); der Block `data-soll="approve"` endet im ersten
+Bildschirm. `passkey` sagt in der Überschrift, was beim Tippen passiert („Raise the daily limit for your account“), darunter in
+einer Zeile das neue Limit für das Konto mit seinem Namen („PostYourPrice can charge up to $10.00 a day for your account Atlas.“),
+zwei Haken (das alte Limit endet, derselbe Passkey) und einen Knopf über die ganze Breite; der Block `data-soll="limit"` endet im
+ersten Bildschirm (390 x 844 und 1440 x 900). Das Limit gilt für das ganze Konto, auch wenn es mehrere Automatons hat; deshalb
+bindet kein Satz die Grenze an einen Automaton, und der Name ist der Name des Kontos (Name des ältesten Schlüssels in
+`api_keys`), nie ein Text aus dem Terminal. Abbruch und Fehler zeigen den Zustand `failed` aus dem Abschnitt Konto unverändert. Die Werte im Bild sind erfunden (`Atlas`, 5.00 auf 10.00 USD), keine
 Kundendaten.
 
 Bauen und prüfen, ohne Netz, mit dem Chromium aus `~/.cache/ms-playwright/`:
@@ -150,6 +158,7 @@ Die Bilder sind wie alle anderen dieser Datei mit WenQuanYi Zen Hei als `sans-se
 `/etc/fonts/fonts.conf` einbindet und `/usr/share/fonts/truetype/dejavu/*` mit `rejectfont` ausschließt.
 
 Abnahme-Issue limit: PRO-22848
+Abnahme-Issue limit-account: PRO-24063
 
 ## Geld /h/{code}
 
@@ -174,7 +183,7 @@ dass Bridge einmal die Identität prüft, mit einem Knopf. `payout-bank` (Block 
 Kontoinhabers (`name="owner_name"`) ab, mit einem Knopf. `payout-passkey` (Block `payout`) sagt in der Überschrift, was beim Tippen
 passiert, darunter in einer Zeile „PostYourPrice can send money from Atlas only to your bank account ending 3000.“, zwei Haken und
 einen Knopf über die ganze Breite. `retry` (Block `retry`) sagt, dass die Prüfung gerade nicht ging, und hat den Knopf „Tap
-again“. Jeder Block endet im ersten Bildschirm (390 x 844 und 1440 x 900). Abbruch und Fehler zeigen den Zustand `fehlgeschlagen`
+again“. Jeder Block endet im ersten Bildschirm (390 x 844 und 1440 x 900). Abbruch und Fehler zeigen den Zustand `failed`
 aus dem Abschnitt Konto unverändert. Die Werte im Bild sind erfunden (`Atlas`, 20.00 USD, Beispiel-IBAN
 `DE89 3704 0044 0532 0130 00` als Platzhalter, Bankkonto mit Endung 3000), keine Kundendaten. Die Quellen zeigen nur den sichtbaren
 Teil der Seite: Die `data-*`-Werte der Knöpfe, das Formularziel und das Skript setzt erst `src/public/money.ts`.

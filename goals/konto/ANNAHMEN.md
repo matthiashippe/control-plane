@@ -220,3 +220,30 @@
 - Abgelöst: konto 04 Punkt 4 durch seite 03 Punkt 1, Ausgabe dann genau `Exit 1, unknown argument: --pruefen` (Tech Lead, 2026-11-14)
 - Abgelöst: konto 04 Punkt 1 durch seite 03 Punkt 8, Ausgabe dann genau `Exit 1, unknown argument: --pruefen` (Tech Lead, 2026-11-14)
 - Abgelöst: konto 04 Punkt 4 durch seite 03 Punkt 8, Ausgabe dann genau `Exit 1, unknown argument: --pruefen` (Tech Lead, 2026-11-14)
+
+## Goal 06 (17.11.2026, Engineer CP)
+
+- Der Name des Kontos ist `name` der ältesten Zeile in `api_keys` zur Adresse des Kontos (`ORDER BY id LIMIT 1`, `readAccountName` in `src/konto/account.ts`), weil `finishKonto` diese Zeile mit dem Namen schreibt, den der Mensch beim Anlegen auf dem Handy sah, und spätere Schlüssel aus sandbox 08 Namen von Automatons tragen (Entscheidung 1 des Tech Lead).
+- `POST /v1/handoff` mit `step: "limit"` liest `automaton_name` nicht mehr und übergeht ein mitgeschicktes Feld ohne Fehler, weil sonst ein gesteuertes Terminal (auch eine Prompt-Injection) den Text auf der Seite setzt, auf der der Kunde mit dem Passkey mehr Geld freigibt, und ein älteres Plugin weiter funktionieren soll (Entscheidung 2).
+- Der Handoff eines `limit` speichert den Namen des Kontos in der vorhandenen Spalte `automaton_name` (leer, wenn das Konto keinen hat), weil `src/db.ts` auf der Deny List steht und der Handoff nur diesen einen Namen für die Seite braucht; `accountNameOf` in `src/handoff/routes.ts` macht daraus `accountName` oder `null`.
+- `LimitPage` trägt `accountName` statt `automatonName`, und die Seite sagt „your account Atlas“ oder ohne Namen nur „your account“, weil das Limit für das ganze Konto gilt und ein Konto seit sandbox 08 bis zu zwei Automatons hat (Entscheidung 3).
+- `set_daily_limit` in `mcp/server.mjs` schickt kein `automaton_name` mehr und hat kein Argument `name`, weil der Server den Namen ohnehin übergeht und ein Argument ohne Wirkung den Nutzer täuscht (Entscheidung 3).
+- `src/public/openapi.ts` bleibt unverändert, weil es `/v1/handoff` gar nicht beschreibt; den Schritt `limit` beschreiben `docs/konto/handoff.md` und die Selbstbeschreibung `GET /v1/handoff`, deren Fehlermeldung jetzt „without automaton_name“ nennt.
+- Die Handoff-Bilder heißen nach ihren Zuständen (`handoff-approve`, `handoff-approved`, `handoff-invalid`), Byte für Byte die in PRO-19925 abgenommenen PNG, und `HANDOFF_FILES` und `handoffFile` gibt es nicht mehr, weil Grundregel 12 ausnahmslos gilt und jede Linse sonst zwei Namen für denselben Zustand pflegt (Entscheidung 4).
+- Der Fehlerzustand des Kontos heißt im Code `failed` (Route `POST /h/{code}/failed`), nur `KONTO_FILES` in `ops/soll-assess.mjs` kennt den Dateinamen `konto-fehlgeschlagen` der abgenommenen Bilder, weil die Bilder unter diesem Namen abgenommen sind und der Code englisch ist (Entscheidung 5); ein offener Handoff von vor dem Rollout auf der alten Route endet nach zehn Minuten von selbst.
+- `test/state-names.test.ts` nimmt `fehlgeschlagen` ins Muster und `mcp/` in den Umfang und erlaubt das Wort nur in Zeilen mit `KONTO_FILES`, weil die Gegenprobe von Punkt 4 die alte Route in `src/handoff/routes.ts` finden muss und `ops/soll-assess.mjs` sonst das Schlupfloch wäre.
+- `summaryLimit` schreibt `pictures`, `ops/soll-money.mjs` und `14 images` bleiben, weil konto 08 die SOLL-Werkzeuge zusammenlegt und die Deny List `ops/soll-money.mjs` sperrt (Entscheidung 6).
+- `docs/konto/terminal.md` nennt beim Tool `set_daily_limit` noch das Argument `name`, weil die Datei nicht in den Pfaden dieses Goals steht (Punkt 10); ich nenne es im Abschlusskommentar für die Kritik.
+- Entscheidung (Tech Lead, Kritik 2026-11-17): Die vierte Prüfung von Punkt 10 nimmt diese Goal-Datei mit `':!goals/konto/06-die-seite-zum-tageslimit-sagt-wofuer-das-limit-gilt.md'` aus, bei gleichem Text und gleicher Erwartung `goals gleich`, weil der Stern einer Git-Pfadangabe über `/` geht und die Prüfung sonst die eigene Goal-Datei trifft, die der Maker in Status, Kästchen und Progress Log ändern muss; was er in ihr ändern darf, prüft das Gate mit `goalDrift` ohnehin, und gemeint war laut Deny List „alle Goal-Dateien außer dieser“.
+
+## Abgelöst durch konto 06 (Maker, 2026-11-17)
+
+- Abgelöst: konto 02 Punkt 1 durch konto 06 Punkt 3, Ausgabe dann genau `Exit 1, Node.js v22.23.5` (Tech Lead, 2026-11-17)
+- Abgelöst: konto 02 Punkt 1 durch konto 06 Punkt 3, Ausgabe dann genau `Exit 1, Node.js v22.23.5` (Tech Lead, 2026-11-17)
+- Abgelöst: konto 02 Punkt 3 durch konto 06 Punkt 6, Ausgabe dann genau `Exit 1, keine abnahme nach 2026-11-17T12:48:57+00:00` (Tech Lead, 2026-11-17)
+- Abgelöst: konto 04 Punkt 3 durch konto 06 Punkt 6, Ausgabe dann genau `Exit 1, keine abnahme nach 2026-11-17T12:48:57+00:00` (Tech Lead, 2026-11-17)
+- Abgelöst: konto 04 Punkt 5 durch konto 06 Punkt 3, Ausgabe dann genau `Exit 0, 0` (Tech Lead, 2026-11-17)
+- Abgelöst: konto 05 Punkt 3 durch konto 06 Punkt 3, Ausgabe dann genau `Exit 1, 0` (Tech Lead, 2026-11-17)
+- Abgelöst: konto 05 Punkt 3 durch konto 06 Punkt 1, Ausgabe dann genau `Exit 1, 0` (Tech Lead, 2026-11-17)
+- Abgelöst: konto 05 Punkt 5 durch konto 06 Punkt 7, Ausgabe dann genau `Exit 1, 0` (Tech Lead, 2026-11-17)
+- Abgelöst: konto 05 Punkt 5 durch konto 06 Punkt 7, Ausgabe dann genau `Exit 1, 0` (Tech Lead, 2026-11-17)

@@ -20,6 +20,13 @@ als Zahl statt String, mit Komma oder Punkt, negativ, null oder kein Vielfaches 
 Name. Mehr Anfragen von einer Adresse, als das Rate Limit der Pfade ohne Schlüssel erlaubt (60 je Minute, gemeinsam mit `/v1/auth/*`
 und `/pay/*`), ergeben 429 mit `Retry-After`.
 
+Der Schritt `limit` (goals/konto/04, mit API-Schlüssel, ohne `amount_usdc`) braucht seit goals/konto/06 kein `automaton_name`:
+Fehlt das Feld, gibt es kein 400; steht es da, wird es ohne Fehler übergangen, damit ein älteres Plugin weiter funktioniert. Die
+Seite zeigt statt dessen den Namen des Kontos (account name): den Namen des ältesten Schlüssels des Kontos in `api_keys`, der beim
+Anlegen des Kontos entstand (`readAccountName` in `src/konto/account.ts`). Das Limit gilt für das ganze Konto, deshalb sagt die Seite
+„for your account Atlas“ und nie „only for“ einen Automaton; ohne Namen steht nur „your account“. Ein Text aus dem Terminal kommt auf
+diese Seite nicht. Die Schritte `confirm`, `konto`, `deposit` und `payout` verlangen `automaton_name` wie bisher.
+
 `GET /v1/handoff` ohne Schlüssel beschreibt die Anfrage als JSON (Felder, Beispiel, Antwortfelder), für einen Agenten, der erst
 nachsieht, bevor er schreibt.
 
@@ -43,14 +50,14 @@ Zahl noch das Token.
 
 | Zustand | wann | Seite `/h/{code}` |
 |---|---|---|
-| `pending` | nach der Anlage, bis zu einer Wahl oder bis zum Ablauf | `freigabe`: was freigegeben wird und drei verschiedene zweistellige Zahlen, darunter `match` an zufälliger Stelle |
-| `done` | die richtige Zahl wurde gewählt | `erledigt` direkt nach der Wahl, danach `ungueltig` |
-| `burned` | eine falsche Zahl wurde gewählt; der Code ist verbrannt, auch die richtige Zahl gibt danach nichts mehr frei | `ungueltig` |
-| `expired` | 600 Sekunden nach der Anlage ohne Wahl | `ungueltig` |
+| `pending` | nach der Anlage, bis zu einer Wahl oder bis zum Ablauf | `approve`: was freigegeben wird und drei verschiedene zweistellige Zahlen, darunter `match` an zufälliger Stelle |
+| `done` | die richtige Zahl wurde gewählt | `approved` direkt nach der Wahl, danach `invalid` |
+| `burned` | eine falsche Zahl wurde gewählt; der Code ist verbrannt, auch die richtige Zahl gibt danach nichts mehr frei | `invalid` |
+| `expired` | 600 Sekunden nach der Anlage ohne Wahl | `invalid` |
 
-Die Seite antwortet für einen offenen Code mit 200, nach der richtigen Zahl mit 200 und `erledigt`, für einen bekannten Code, der
-nicht mehr offen ist, mit 410 und `ungueltig`. Jeder Code gilt genau einmal. Die Wahl ist ein Formular (`POST /h/{code}`, Feld `pick`), das ohne JavaScript funktioniert. Ein
-unbekannter Code ergibt 404 mit der Seite `ungueltig`; mehr unbekannte Codes von einer Adresse, als das Rate Limit erlaubt (20 in 10
+Die Seite antwortet für einen offenen Code mit 200, nach der richtigen Zahl mit 200 und `approved`, für einen bekannten Code, der
+nicht mehr offen ist, mit 410 und `invalid`. Jeder Code gilt genau einmal. Die Wahl ist ein Formular (`POST /h/{code}`, Feld `pick`), das ohne JavaScript funktioniert. Ein
+unbekannter Code ergibt 404 mit der Seite `invalid`; mehr unbekannte Codes von einer Adresse, als das Rate Limit erlaubt (20 in 10
 Minuten), ergeben 429. Jede Antwort von `/h/{code}` trägt `Cache-Control: no-store`, `Referrer-Policy: no-referrer` und `noindex`
 (Kopfzeile `X-Robots-Tag` und `<meta name="robots">`); der Pfad steht nicht in der Sitemap.
 

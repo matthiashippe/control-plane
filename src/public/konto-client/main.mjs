@@ -9,7 +9,7 @@
 // - `money-verify` (konto 05): opens the identity check of Bridge in a new tab.
 //
 // Once the server said done, the page shows the page of the code again (the state `approved` of konto 02). On any failure the
-// page sends the reason to POST /h/{code}/fehlgeschlagen as a form, which closes the code and shows why.
+// page sends the reason to POST /h/{code}/failed as a form, which closes the code and shows why.
 //
 // wirePage takes everything from the browser as one argument, so test/konto-signature-retry.test.ts runs it against a stand-in
 // page; in the browser it runs on load.
@@ -22,7 +22,7 @@ export function wirePage(env) {
   function fail(code, reason) {
     const form = document.createElement("form");
     form.method = "post";
-    form.action = go(code, "/fehlgeschlagen");
+    form.action = go(code, "/failed");
     const input = document.createElement("input");
     input.type = "hidden";
     input.name = "reason";

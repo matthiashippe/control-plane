@@ -15,7 +15,7 @@ import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSy
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { FONTS_CONF, FOLD, HANDOFF_BLOCK_MARKS, HANDOFF_STATES, WIDTHS, assessHandoff, decodePng, handoffFile, isLocal, pixelDiffCount, summaryHandoff } from "./soll-assess.mjs";
+import { FONTS_CONF, FOLD, HANDOFF_BLOCK_MARKS, HANDOFF_STATES, WIDTHS, assessHandoff, decodePng, isLocal, pixelDiffCount, summaryHandoff } from "./soll-assess.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const args = process.argv.slice(2);
@@ -30,10 +30,10 @@ for (let i = 0; i < args.length; i++) {
 }
 const SOURCES = value("--source", path.join(ROOT, "docs/soll/src"));
 const PICTURES = value("--pictures", path.join(ROOT, "docs/soll"));
-// The files keep the names of the approved pictures; the code names the states in English (handoffFile in ops/soll-assess.mjs).
-const sourceOf = (state) => path.join(SOURCES, `handoff-${handoffFile(state)}.html`);
-const pictureOf = (dir, state, w) => path.join(dir, `handoff-${handoffFile(state)}-${w}.png`);
-/** The block of the state approve: the approved source marks it with the name of its file, the page with the name of the state. */
+// Sources and pictures carry the names of the states in the code (goals/konto/06).
+const sourceOf = (state) => path.join(SOURCES, `handoff-${state}.html`);
+const pictureOf = (dir, state, w) => path.join(dir, `handoff-${state}-${w}.png`);
+/** The block of the state approve, marked the same way in the source and on the page. */
 const BLOCK = HANDOFF_BLOCK_MARKS.map((v) => `[data-soll="${v}"]`).join(", ");
 
 function findChrome() {
@@ -176,7 +176,7 @@ async function main() {
       const fresh = decodePng(r.png);
       let diffPixels = null, pngWidth;
       if (CHECK) {
-        writeFileSync(path.join(scratch, `handoff-${handoffFile(state)}-${width}.png`), r.png);
+        writeFileSync(path.join(scratch, `handoff-${state}-${width}.png`), r.png);
         const committed = pictureOf(PICTURES, state, width);
         if (existsSync(committed)) { const old = decodePng(readFileSync(committed)); pngWidth = old.width; diffPixels = pixelDiffCount(old, fresh); }
       } else {

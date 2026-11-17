@@ -3,7 +3,7 @@
  * docs/soll/konto-<state>-<width>.png and their sources docs/soll/src/konto-<state>.html.
  *
  * Two states: `passkey` says what the account allows (the daily limit, and for whom) and has the one button that creates the
- * passkey; `fehlgeschlagen` says that no account was created and sends the person back to the terminal. The frame (head, bar,
+ * passkey; `failed` says that no account was created and sends the person back to the terminal. The frame (head, bar,
  * footer, the blocks of konto 02) is phonePage() of src/public/handoff.ts; this page adds two blocks (docs/soll/README.md,
  * "Konto /h/{code}"). The heading is a bare h1 element: the goal changes the first one to prove that the comparison with the
  * picture notices.
@@ -13,7 +13,7 @@ import { phonePage, usd } from "./handoff.js";
 
 export type KontoPage =
   | { state: "passkey"; code: string; automatonName: string; dailyLimitUsdc: bigint; chainId: number; spender: string; token: string; authProxyId?: string | null }
-  | { state: "fehlgeschlagen"; reason: FailReason };
+  | { state: "failed"; reason: FailReason };
 
 /** Why no account was created. The SOLL picture shows `cancelled`. */
 export type FailReason = "cancelled" | "unreachable" | "refused";
@@ -26,7 +26,7 @@ export const FAIL_REASONS: Record<FailReason, string> = {
 
 const TITLES = {
   passkey: "Create your account | PostYourPrice",
-  fehlgeschlagen: "No account created | PostYourPrice",
+  failed: "No account created | PostYourPrice",
 } as const;
 
 /** The two blocks of the account step, as in the SOLL sources. */
