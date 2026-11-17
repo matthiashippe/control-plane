@@ -166,7 +166,7 @@ Automaton, der heute `https://postyourprice.com` oder `https://cp.hippe.eu` als 
       Zahlung, Anmeldung, Automaton, Harness noch CI, und bringt keinen Schlüssel ins Repo.
       MVP: Funktion, weil das Repo öffentlich ist (Grundregel 8), Compose nur Matthias ändert und der Rest des Umzugs in umzug 02 liegt.
       Prüfung: `git diff --name-only origin/dev...HEAD -- deploy/docker-compose.prod.yml src/payments src/auth src/automaton harness .github scripts/check.mjs | wc -l` muss 0 ausgeben.
-      Prüfung: `git diff --name-only origin/dev...HEAD | grep -vcE '^(src/app\.ts|src/public/site\.ts|src/sandbox/service\.ts|ops/sandbox/(sandboxd\.mjs|setup\.sh|cloudflare\.py)|ops/site-dns\.py|ops/live\.sh|deploy/Caddyfile|docs/umzug\.md|test/|goals/umzug/)'` muss 0 ausgeben.
+      Prüfung: `git diff --name-only origin/dev...HEAD | grep -vcE '^(src/app\.ts|src/public/site\.ts|src/sandbox/service\.ts|ops/sandbox/(sandboxd\.mjs|setup\.sh|cloudflare\.py)|ops/site-dns\.py|ops/live\.sh|deploy/Caddyfile|docs/umzug\.md|test/|goals/umzug/|goals/_vorschlaege/umzug-[a-z0-9.-]+\.md$)'` muss 0 ausgeben (Vorschläge der Kritik eingeschlossen, Tech Lead 17.11.2026).
       Prüfung: `git diff --name-only origin/dev...HEAD | grep -cE "\.(key|pem|crt|env)$"` muss 0 ausgeben.
       Prüfung: `git diff origin/dev...HEAD -- . ':(exclude)goals/' | grep -cE '^\+.*(cnwy_k_[0-9a-f]{32}|-{5}BEGIN [A-Z ]*PRIVATE KEY-{5}|Bearer [A-Za-z0-9_-]{30,})'` muss 0 ausgeben.
 - [x] `check` ist grün, und der Job `e2e` des Goal-PR ist grün.
