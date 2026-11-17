@@ -535,6 +535,10 @@ function migrate(db: Db): void {
       PRIMARY KEY (address, idempotency_key)
     );
   `);
+  // The end of a start (goals/hosting/01, point 2): createAs sets started_at right after `AUTOMATON_START ok`. An `active` row
+  // without it comes from before this column or from a start a restart cut off; src/automaton/sweep.ts tells the two apart.
+  const hostedColumns = db.prepare("PRAGMA table_info(hosted_automatons)").all() as { name: string }[];
+  if (!hostedColumns.some((c) => c.name === "started_at")) db.exec("ALTER TABLE hosted_automatons ADD COLUMN started_at TEXT");
   // A spend() that was sent and not yet settled (goals/konto/03, point 15): its hash and amount, written before the wait for the
   // receipt, so that a failed wait or a restart books it later instead of losing it or spending a second time.
   const kontoColumns = db.prepare("PRAGMA table_info(konto_accounts)").all() as { name: string }[];

@@ -1,7 +1,7 @@
 # Messung Goal 12: Nur Adressen zählen als eigene Adressen
 
 ## Status
-PLANNED
+PAUSED
 
 ## Active Objective
 `ops/own-ips.sh` nimmt am Kopf von `dev` (ebe2dd3) das erste Feld jeder Zeile der Liste als eigene Adresse, die nicht in Spalte 0
@@ -186,3 +186,4 @@ gefüllte gelesen wird und die Zählung fremder Automatons, Anmeldungen und Time
 
 ## Blockers
 - keine
+- Pause: Kurs-Check 2026-11-17, Härtung aus zwei Kritik-Vorschlägen Schwere 2 (messung 07) an einem Fall, den die Liste heute nicht hat, bringt das Abschlusskriterium (Ledger-Zeile einer fremden Sandbox) nicht näher; Detail-Anteil 61,9 % über der Schwelle 40 %

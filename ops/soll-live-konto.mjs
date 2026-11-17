@@ -51,10 +51,10 @@ const form = (body) => ({ method: "POST", headers: { "content-type": "applicatio
 const write = async (state, res) => {
   const html = await res.text();
   writeFileSync(path.join(out, `konto-${state}.html`), html);
-  console.log(`soll-live-konto: ${state} ${res.status}, ${html.length} bytes`);
+  console.error(`soll-live-konto: ${state} ${res.status}, ${html.length} bytes`);
 };
 
 const first = await create();
 await write("passkey", await ask("passkey", `/h/${first.code}`, form(`pick=${first.match}`), 200));
 await write("fehlgeschlagen", await ask("fehlgeschlagen", `/h/${first.code}/fehlgeschlagen`, form("reason=cancelled"), 200));
-console.log(`soll-live-konto: written to ${out}`);
+console.error(`soll-live-konto: written to ${out}`);

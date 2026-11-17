@@ -26,7 +26,7 @@
 # request's answer); the rest is `unattributed`. Origin is `own` for an address `own_ips` from
 # ops/own-ips.sh names (the list in CP_OWN_IPS_FILE, the address this machine is seen with live, every
 # address in CP_OWN_IPS_SEEN and in CP_OWN_IPS) and `foreign` otherwise. Only production and --join
-# ask `own_ips`; a list that is missing or names no address stops them with exit 2 before any number.
+# ask `own_ips_checked`; a list that is missing or names no address stops them with exit 2 before any number.
 # No address, wallet or balance is ever printed; the database is opened with `readonly: true` inside
 # the container.
 #
@@ -50,35 +50,18 @@ LIMIT_S="${TQ_LIMIT_S:-59.5}"
 # --selftest) pass this in place of the own list, so the counter keeps its argument positions.
 NO_OWN_LIST="-no-own-list-"
 
-# Writes our own addresses to $1, one per line, from `own_ips` (ops/own-ips.sh). Exits 2 with one
-# line on stderr when the list `own_ips` reads is missing, names no address itself, or `own_ips`
-# fails: a missing or empty list must never read as "every caller is foreign", and the live address
-# or a remembered one must not stand in for the list. The stderr of `own_ips` is dropped because it
-# can name the live address.
+# Writes our own addresses to $1, one per line, from `own_ips_checked` (ops/own-ips.sh). Exits 2 with one
+# line on stderr when it stops on a missing or empty list or a failed `own_ips`; that line names the file, no address.
 own_list() {
-  local target="$1" file list
+  local target="$1" err list
   # shellcheck source=ops/own-ips.sh
   source "$ROOT/ops/own-ips.sh"
-  file="$CP_OWN_IPS_FILE"
-  if [ ! -f "$file" ]; then
-    echo "TIMEOUT QUOTE FAIL: own_ips has no list of our own addresses ($file is missing), so nothing is counted." >&2
+  if ! err=$(own_ips_checked "$CP_OWN_IPS_FILE" 2>&1 >"$target"); then
+    echo "TIMEOUT QUOTE FAIL: $err, so nothing is counted." >&2
     exit 2
   fi
-  # Read the way `own_ips` reads it: a line not starting with # that has a first field.
-  if ! awk '!/^#/ && NF { n++ } END { exit !n }' "$file"; then
-    echo "TIMEOUT QUOTE FAIL: own_ips has an empty list of our own addresses ($file names none), so nothing is counted." >&2
-    exit 2
-  fi
-  # stdin stays with the caller: --join reads the Caddy log from it when CADDY is `-`, and ssh would eat it.
-  if ! list=$(own_ips 2>/dev/null </dev/null); then
-    echo "TIMEOUT QUOTE FAIL: own_ips could not name our own addresses, so nothing is counted." >&2
-    exit 2
-  fi
+  list=$(<"$target")
   printf '%s\n' "$list" | tr ' ' '\n' | grep -v '^$' >"$target"
-  if [ ! -s "$target" ]; then
-    echo "TIMEOUT QUOTE FAIL: own_ips named no own address, so nothing is counted." >&2
-    exit 2
-  fi
 }
 
 # The rows the database gives, one JSON object per line, without address: when the row was written,
@@ -283,8 +266,9 @@ load_env() {
   fi
 }
 
-fetch_rows() { # $1 = target file
-  ssh -i "$KEY" -o BatchMode=yes -o ConnectTimeout=10 "$CP_HOST" "docker exec deploy-cp-1 node -e $(printf %q "$ROWS_JS") /data/cp.db" >"$1" 2>/dev/null
+fetch_rows() { # $1 = target file; exits 2 when the ledger is not readable
+  ssh -i "$KEY" -o BatchMode=yes -o ConnectTimeout=10 "$CP_HOST" "docker exec deploy-cp-1 node -e $(printf %q "$ROWS_JS") /data/cp.db" >"$1" 2>/dev/null \
+    || { echo "TIMEOUT QUOTE FAIL: ledger not readable" >&2; exit 2; }
 }
 
 production() {
@@ -295,10 +279,7 @@ production() {
     echo "TIMEOUT QUOTE FAIL: access log not readable" >&2
     exit 2
   }
-  fetch_rows "$TQ_DIR/rows.jsonl" || {
-    echo "TIMEOUT QUOTE FAIL: ledger not readable" >&2
-    exit 2
-  }
+  fetch_rows "$TQ_DIR/rows.jsonl"
   CP_HOST="$CP_HOST" CP_SSH_KEY="$KEY" own_list "$TQ_DIR/own.txt"
   count join "$TQ_DIR/caddy.jsonl" "$TQ_DIR/rows.jsonl" "$TQ_DIR/own.txt" "$LIMIT_S"
 }
@@ -311,10 +292,7 @@ compare() {
     echo "TIMEOUT QUOTE FAIL: access log not readable" >&2
     exit 2
   }
-  fetch_rows "$TQ_DIR/rows.jsonl" || {
-    echo "TIMEOUT QUOTE FAIL: ledger not readable" >&2
-    exit 2
-  }
+  fetch_rows "$TQ_DIR/rows.jsonl"
   count compare "$TQ_DIR/caddy.jsonl" "$TQ_DIR/rows.jsonl" "$NO_OWN_LIST" "$LIMIT_S" "${TQ_SINCE:-}" "${TQ_UNTIL:-}"
 }
 
@@ -329,10 +307,7 @@ since_rollout() {
   load_env
   TQ_DIR="$(mktemp -d)"
   trap 'rm -rf "$TQ_DIR"' EXIT
-  fetch_rows "$TQ_DIR/rows.jsonl" || {
-    echo "TIMEOUT QUOTE FAIL: ledger not readable" >&2
-    exit 2
-  }
+  fetch_rows "$TQ_DIR/rows.jsonl"
   count rows "$TQ_DIR/rows.jsonl" "${TQ_SINCE:-}" "$NO_OWN_LIST" "$LIMIT_S"
 }
 

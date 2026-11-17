@@ -42,9 +42,9 @@ describe("soll judgement of the account step", () => {
       expect(defects).toEqual([]);
       results.push({ state, width, blockBottom: m.blockBottom, defects });
     }
-    expect(summaryKonto(results)).toBe("soll konto: 4 Bilder, passkey oben 390=527 1440=510, 0 Mängel");
+    expect(summaryKonto(results)).toBe("soll konto: 4 pictures, passkey top 390=527 1440=510, 0 defects");
     expect(summaryKonto([{ state: "passkey", width: 390, blockBottom: 527, defects: ["x"] }]))
-      .toBe("soll konto: 1 Bilder, passkey oben 390=527 1440=fehlt, 1 Mängel");
+      .toBe("soll konto: 1 pictures, passkey top 390=527 1440=missing, 1 defects");
   });
 
   it("rejects a picture with even one pixel that differs from a fresh render", () => {

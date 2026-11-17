@@ -33,3 +33,20 @@
   Tests ihre Regel am neuen Ort prüfen (Diff gelesen, kein Fall und keine Assertion weniger). Damit die Erweiterung nicht ungeprüft
   bleibt, sichert Punkt 7 diese fünf Tests wie Punkt 3 die ersten drei. Die Änderung am Vertrag schickt den Goal-PR in die Human
   Inbox; die liegt bei diesem Loop beim Tech Lead, der nach dieser Entscheidung nach `dev` merged.
+
+## Abgelöst durch seite 03 (Maker, 2026-11-16)
+
+- Abgelöst: seite 01 Punkt 1 durch seite 03 Punkt 1, Ausgabe dann genau `Exit 1, unknown argument: --pruefen` (Tech Lead, 2026-11-14)
+- Abgelöst: seite 01 Punkt 6 durch seite 03 Punkt 1, Ausgabe dann genau `Exit 1, unknown argument: --pruefen` (Tech Lead, 2026-11-14)
+- Abgelöst: seite 01 Punkt 3 durch seite 03 Punkt 2, Ausgabe dann genau `Exit 1, [ 'umzug', 'inhalt umzug' ]` (Tech Lead, 2026-11-14)
+- Abgelöst: seite 02 Punkt 2 durch seite 03 Punkt 1, Ausgabe dann genau `Exit 1, unknown argument: --pruefen` (Tech Lead, 2026-11-14)
+
+## seite 03 (Maker, 2026-11-16)
+
+- `ops/soll-limit.mjs` (konto 04) nimmt weiter `--pruefen` und bleibt unverändert, weil Punkt 7 diese Datei nicht zum Ändern zulässt; deshalb bleibt Punkt 6 offen. Der Tech Lead entscheidet nach Vorschlag seite-kritik-2026-11-16-1, ob seite 03 sie mit umbenennt.
+- `docs/soll/README.md` nennt für `ops/soll-limit.mjs` weiter `--pruefen`, weil das Werkzeug es so nimmt; mit `--check` würde es die Bilder neu schreiben, statt zu prüfen.
+- Die Live-Werkzeuge `ops/soll-live.mjs`, `ops/soll-live-handoff.mjs` und `ops/soll-live-konto.mjs` melden ihren Fortschritt auf stderr, damit stdout nur die Summenzeilen trägt, die Punkt 1 verlangt.
+- Abgelöst steht je Goal, Punkt und neuer Ausgabe eine Zeile; mehrere Befehle desselben Punkts mit derselben neuen Ausgabe teilen sie (konto 04 Punkt 2: drei Befehle, konto 03 Punkt 4 und konto 04 Punkt 4: je zwei).
+- Entscheidung (Tech Lead, Kritik seite 03, 2026-11-16): `ops/soll-limit.mjs` und `ops/soll-live-limit.mjs` gehören in die Umbenennung, weil konto 04 schon auf dev liegt und Punkt 6 sonst nie kippt; Punkt 7 lässt beide Dateien zu, der neue Punkt 8 prüft das vierte Werkzeug wie Punkt 1 die drei anderen, und Punkt 5 nimmt Abgelöst-Zeilen durch Punkt 8 an. Der Prüfbefehl von Punkt 4 nimmt `$(mktemp -u)` statt `$(mktemp)`, weil der Test eine vorhandene Cache-Datei, auch eine leere, als ausdrücklich genannten Cache liest; gemeint war ein Lauf ohne den Cache des Hosts wie in CI, der Test bleibt unverändert (Vorschläge seite-nacharbeit-2026-11-16-2 und seite-kritik-2026-11-16-1).
+- Nach der Kritik (Zyklus 3) nimmt `ops/soll-limit.mjs` wie die drei anderen Werkzeuge `--check` und lehnt jedes andere Argument vor dem Rendern ab; die beiden Zeilen oben zu `ops/soll-limit.mjs` und `docs/soll/README.md` gelten damit nicht mehr, und `ops/soll-live-limit.mjs` meldet seinen Fortschritt wie die anderen Live-Werkzeuge auf stderr.
+- Die Gegenprobe aus konto 04 Punkt 4 (geänderte Überschrift in `src/public/limit.ts`) endet mit `--pruefen` jetzt an `unknown argument` und gibt trotzdem `exit=1` aus; deshalb ist auch konto 04 Punkt 4 durch Punkt 8 abgelöst, und dieselbe Gegenprobe mit `--check` lief im Zyklus 3 einmal von Hand (Ergebnis im Progress Log).

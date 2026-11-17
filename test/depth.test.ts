@@ -55,7 +55,7 @@ describe("how far down the page a reader got", () => {
     expect(posOf("market")).toBeLessThan(posOf("close"));
     // The agent block that close.png used to follow is the move block at the top since goals/seite/02, and the
     // control sits inside it. close.png now follows the market directly and stays before the closing section.
-    const move = html.indexOf('id="umzug"');
+    const move = html.indexOf('id="move"');
     expect(posOf("top"), "the control sits in the move block").toBeGreaterThan(move);
     expect(posOf("top"), "before the move block ends").toBeLessThan(html.indexOf("</section>", move));
     expect(posOf("close"), "the close mark comes before the closing section").toBeLessThan(html.indexOf('id="start"'));

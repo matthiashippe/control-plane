@@ -135,12 +135,15 @@ elif delivered_age is not None and delivered_age > 26 * 3600:
 else:
     alarm_status = "ok"
 # alarm_path.received: what of the watchdog really stands on the topic. The answer comes on fd 3, not in the environment,
-# because it names the topic. Only messages titled `control-plane ...` count (the posts of ops/watchdog.sh, not those of
-# ops/backup.sh or ops/x402-series.sh); last_alive is the newest titled exactly `control-plane ALIVE`. A failed poll or a
+# because it names the topic. Only the five titles of ops/watchdog.sh count: `control-plane ALIVE`, `control-plane OK`,
+# `control-plane OUTAGE`, `control-plane WARN` and `control-plane WARNING`. Neither ops/backup.sh (`control-plane backup failed`)
+# nor the deploy alarm (`deploy-window 502`) counts; last_alive is the newest titled exactly `control-plane ALIVE`. A failed poll or a
 # non-empty line that is no JSON object makes the topic unreadable: "unknown". A delivery from the log is compared only while
 # it must still be in the cache of ntfy (12 hours), so only one younger than 11 hours, with 300 seconds for the clocks of the
 # server and of ntfy: red when no counted message is at most 300 seconds older than the delivery or later. Red turns
 # alarm_path red; unknown leaves it alone, so a run without CP_ALERT_WEBHOOK reports exactly what it reported before.
+WATCHDOG_SEVERITIES = ("ALIVE", "OK", "OUTAGE", "WARN", "WARNING")
+WATCHDOG_TITLES = {"control-plane " + s for s in WATCHDOG_SEVERITIES}
 received = {"last_alive": None, "last_message": None, "status": "unknown"}
 if os.environ.get("ALARM_TOPIC_RC") == "0":
     try:
@@ -154,7 +157,7 @@ if os.environ.get("ALARM_TOPIC_RC") == "0":
             if not isinstance(msg, dict):
                 raise ValueError("not an object")
             title = msg.get("title")
-            if msg.get("event") != "message" or not isinstance(title, str) or not title.startswith("control-plane "):
+            if msg.get("event") != "message" or not isinstance(title, str) or title not in WATCHDOG_TITLES:
                 continue
             sent_at = msg.get("time")
             if isinstance(sent_at, bool) or not isinstance(sent_at, (int, float)):

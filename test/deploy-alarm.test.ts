@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { spawnSync } from "node:child_process";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
 /**
  * ops/deploy-alarm.sh runs on the VM, sent there by ops/deploy-window.sh over `ssh … bash -s`. It takes the webhook from the
@@ -12,7 +12,11 @@ import { join } from "node:path";
  * Without network: the crontab is a planted file (CP_CRONTAB_FILE), and `curl` on PATH is a fake that writes its arguments
  * down and ends with 0, or with 22 where the POST is meant to fail.
  */
-const SCRIPT = join(__dirname, "..", "ops", "deploy-alarm.sh");
+// DEPLOY_ALARM_UNDER_TEST points the test at another copy of ops/deploy-alarm.sh, so the counter-proof can run it against a
+// changed one.
+const SCRIPT = process.env.DEPLOY_ALARM_UNDER_TEST
+  ? resolve(process.env.DEPLOY_ALARM_UNDER_TEST)
+  : join(__dirname, "..", "ops", "deploy-alarm.sh");
 const URL = "https://alarm.invalid/planted-topic";
 const CRON_LINE = `*/5 * * * * CP_ALERT_WEBHOOK=${URL} /opt/control-plane/repo/ops/watchdog.sh >> /var/log/cp-watchdog.log 2>&1`;
 
@@ -97,7 +101,8 @@ describe("ops/deploy-alarm.sh posts the deploy alarm to the webhook from the cro
     expect(headers(r.calls[0])).toContain("Priority: high");
     const title = titleOf(r.calls[0]);
     expect(title, r.calls[0].join(" ")).toBeDefined();
-    expect(title!.slice("Title: ".length).trim()).not.toBe("");
+    expect(title).toBe("Title: deploy-window 502");
+    expect(title!.startsWith("Title: control-plane "), title).toBe(false);
   });
 
   it("the title names no address and no URL", () => {

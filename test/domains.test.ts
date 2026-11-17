@@ -23,7 +23,7 @@ import { createApp } from "../src/app.js";
 import { openDb } from "../src/db.js";
 import { hashApiKey } from "../src/auth/siwe.js";
 
-const VERTRAG = path.join(__dirname, "..", "docs", "sandbox", "vertrag.md");
+const CONTRACT_FILE = path.join(__dirname, "..", "docs", "sandbox", "vertrag.md");
 
 /** The statuses the runtime's HTTP client retries and counts toward its circuit breaker (`src/types.ts:613`). */
 const RETRYABLE = [429, 500, 502, 503, 504];
@@ -32,7 +32,7 @@ type Row = { method: string; path: string; answer: string };
 
 /** The rows of `## Endpunkte` in docs/sandbox/vertrag.md that name `/v1/domains`. */
 function contractRows(): Row[] {
-  const text = fs.readFileSync(VERTRAG, "utf8");
+  const text = fs.readFileSync(CONTRACT_FILE, "utf8");
   const section = text.split(/^## /m).find((s) => s.startsWith("Endpunkte"));
   if (!section) throw new Error("docs/sandbox/vertrag.md has no section ## Endpunkte");
   return section
@@ -139,9 +139,9 @@ describe("domain endpoints from docs/sandbox/vertrag.md", () => {
   });
 
   it("GET /v1/domains/search: 501 not_implemented with the names it covers, which the runtime hands to search_domains as an error, never as a list of taken names", async () => {
-    // vertrag.md row: `results[]` oder `domains[]`, je Eintrag `domain`, `available` oder `purchasable`, ...;
-    // "Fehler an das Werkzeug `search_domains`". No list: the runtime would print every entry without a
-    // true `available` as taken (src/agent/tools.ts at d8f8168), so the answer is the error the tool shows.
+    // docs/sandbox/vertrag.md:21 (search): the runtime reads `results[]` or `domains[]`, each entry with `domain` and
+    // `available` or `purchasable`, and any error goes to the tool `search_domains`. No list: the runtime would print every
+    // entry without a true `available` as taken (src/agent/tools.ts at d8f8168), so the answer is the error the tool shows.
     const { call } = setup();
     const res = await call("GET", "/v1/domains/search?query=myagent&tlds=com,io,ai");
     expect(res.status).toBe(501);
@@ -161,7 +161,7 @@ describe("domain endpoints from docs/sandbox/vertrag.md", () => {
   });
 
   it("search_domains tool text: claims no name as taken and says that no domain can be registered here", async () => {
-    // vertrag.md row GET /v1/domains/search: "Fehler an das Werkzeug `search_domains`". Whatever status we pick,
+    // docs/sandbox/vertrag.md:21 (search): any error goes to the tool `search_domains`. Whatever status we pick,
     // the text the customer's agent reads must not call a name taken that may well be free.
     const { call } = setup();
     for (const path of ["/v1/domains/search?query=myagent&tlds=com,io,ai", "/v1/domains/search?query=myagent.dev"]) {
@@ -187,7 +187,7 @@ describe("domain endpoints from docs/sandbox/vertrag.md", () => {
   });
 
   it("POST /v1/domains/register: a purchase, so 501 not_implemented, which the runtime hands to register_domain as an error, never a registration", async () => {
-    // vertrag.md row: Fehler an das Werkzeug `register_domain`; ein 402 löst hier kein Topup aus.
+    // docs/sandbox/vertrag.md:22 (register): any error goes to the tool `register_domain`; a 402 starts no topup here.
     const { call, ledgerRows, balance } = setup();
     const res = await call("POST", "/v1/domains/register", { domain: "myagent.com", years: 1 });
     expect(res.status).toBe(501);
@@ -207,7 +207,8 @@ describe("domain endpoints from docs/sandbox/vertrag.md", () => {
   });
 
   it("GET /v1/domains/{domain}/dns: 403 domain_not_held, no records invented for a zone this service does not hold", async () => {
-    // vertrag.md row: `records[]` oder Array, je Eintrag `id`, `type`, `host`, `value`, `ttl`; Fehler an `manage_dns`.
+    // docs/sandbox/vertrag.md:23 (list records): `records[]` or an array, each entry with `id`, `type`, `host`, `value`,
+    // `ttl`; any error goes to the tool `manage_dns`.
     const { call } = setup();
     const res = await call("GET", `/v1/domains/${encodeURIComponent("myagent.com")}/dns`);
     expect(res.status).toBe(403);
@@ -220,7 +221,8 @@ describe("domain endpoints from docs/sandbox/vertrag.md", () => {
   });
 
   it("POST /v1/domains/{domain}/dns: 403 domain_not_held, nothing written", async () => {
-    // vertrag.md row: JSON `type`, `host`, `value`, `ttl`; Antwort `id` oder `record_id`; Fehler an `manage_dns`.
+    // docs/sandbox/vertrag.md:24 (add record): JSON `type`, `host`, `value`, `ttl`; the answer carries `id` or
+    // `record_id`; any error goes to the tool `manage_dns`.
     const { call, ledgerRows } = setup();
     const res = await call("POST", "/v1/domains/myagent.com/dns", { type: "A", host: "@", value: "192.0.2.1", ttl: 3600 });
     expect(res.status).toBe(403);
@@ -232,7 +234,7 @@ describe("domain endpoints from docs/sandbox/vertrag.md", () => {
   });
 
   it("DELETE /v1/domains/{domain}/dns/{record}: 403 domain_not_held, not the 2xx that would claim a deletion", async () => {
-    // vertrag.md row: nur Status 2xx; Fehler an `manage_dns`.
+    // docs/sandbox/vertrag.md:25 (delete record): only a 2xx status counts as done; any error goes to the tool `manage_dns`.
     const { call } = setup();
     const res = await call("DELETE", "/v1/domains/myagent.com/dns/rec-1");
     expect(res.status).toBe(403);

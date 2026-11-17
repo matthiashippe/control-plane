@@ -11,7 +11,7 @@ import { basename, dirname, isAbsolute, join, resolve } from "node:path";
  * documentation ranges (RFC 5737), because an unlisted public address may belong to a real visitor.
  *
  * The list keeps its own rules here as well, so that they hold after the goal that introduced them: every line has the form
- * <address> <kind> <evidence>, an address of kind erfunden stands only in files a goal may not change, and every entry still has
+ * <address> <kind> <evidence>, an address of kind invented stands only in files a goal may not change, and every entry still has
  * a finding outside the list, so the list never turns into a permit for an address that comes later. Findings are the tracked
  * files of the scan root and of the work tree that tracks the list.
  *
@@ -52,8 +52,8 @@ const LOOKUP = /\((ops\/fetchers\.py lookup|RIPE RDAP|ARIN RDAP) ([0-9]{4})-([0-
 const IPV4 = /\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b/g;
 
 // One line of ops/known-ips.txt besides comments and blank lines, the same pattern as the goal that introduced the list.
-const LINE = /^((?:[0-9]{1,3}\.){3}[0-9]{1,3}) (datacenter|crawler|erfunden|eigene) [^ ].*$/;
-// Paths no goal may change; an address of kind erfunden may only be left there.
+const LINE = /^((?:[0-9]{1,3}\.){3}[0-9]{1,3}) (datacenter|crawler|invented|own) [^ ].*$/;
+// Paths no goal may change; an address of kind invented may only be left there.
 const FROZEN = /^(?:goals\/|docs\/audit\/|\.github\/|deploy\/|harness\/|LOOP\.md$|loop-constraints\.md$|loop-dauerauftrag\.md$)/;
 
 // Ranges that are not public: this network, private, shared, loopback, link-local, IETF protocol assignments, the three
@@ -257,15 +257,15 @@ describe("no tracked file carries an unaccounted public IPv4 address", () => {
       .map((l) => l.line);
     expect(
       broken.length,
-      `${broken.length} line(s) of the address list break the form <address> <datacenter|crawler|erfunden|eigene> <evidence>: ` +
+      `${broken.length} line(s) of the address list break the form <address> <datacenter|crawler|invented|own> <evidence>: ` +
         `line(s) ${broken.join(", ")}.`,
     ).toBe(0);
   });
 
-  it("leaves an address of kind erfunden only in files a goal may not change", () => {
+  it("leaves an address of kind invented only in files a goal may not change", () => {
     const invented = listLines(KNOWN)
       .map((l) => l.entry)
-      .filter((e): e is ListEntry => e !== null && e.kind === "erfunden");
+      .filter((e): e is ListEntry => e !== null && e.kind === "invented");
     const files = findingFiles().filter((f) => !FROZEN.test(f.rel));
     const lines = new Set<number>();
     const where = new Set<string>();
@@ -280,7 +280,7 @@ describe("no tracked file carries an unaccounted public IPv4 address", () => {
     }
     expect(
       lines.size,
-      `${lines.size} address(es) of kind erfunden (list line(s) ${[...lines].join(", ")}) stand in file(s) a goal may change: ` +
+      `${lines.size} address(es) of kind invented (list line(s) ${[...lines].join(", ")}) stand in file(s) a goal may change: ` +
         `${[...where].join(", ")}. Replace them there with a documentation address.`,
     ).toBe(0);
   });
