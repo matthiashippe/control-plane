@@ -1,7 +1,7 @@
 # Konto Goal 08: Ein Browser-Treiber für alle SOLL-Werkzeuge, und keines endet nach einem beendeten Browser grün
 
 ## Status
-PLANNED
+DONE
 
 ## Active Objective
 Kein SOLL-Bild gilt als abgenommen, weil der Browser abgestürzt ist. Heute stehen `findChrome` und `launch` achtmal unter `ops/`: in
@@ -73,7 +73,7 @@ Lauf ohne Bild eine Änderung an zahlende Kunden durchlässt, die niemand gesehe
 - Was danach kommt: die Glieder, die `ROADMAP.md` in der Zeile konto danach nennt.
 
 ## Done Condition
-- [ ] `findChrome` und `launch` gibt es unter `ops/` nur noch in `ops/browser.mjs`, und alle acht Dateien importieren sie von dort.
+- [x] `findChrome` und `launch` gibt es unter `ops/` nur noch in `ops/browser.mjs`, und alle acht Dateien importieren sie von dort.
       MVP: Funktion, weil acht Kopien schon auseinandergelaufen sind und die nächste Korrektur am Treiber sonst wieder nur einen Teil
       der Werkzeuge erreicht (Vorschlag konto-nacharbeit-2026-11-17-3).
       Prüfung: `git grep -c -E '^(export )?(async )?function (findChrome|launch)\b' -- ops` muss genau `ops/browser.mjs:2` ausgeben.
@@ -82,14 +82,14 @@ Lauf ohne Bild eine Änderung an zahlende Kunden durchlässt, die niemand gesehe
       Prüfung: `git grep -c 'if (gone) return fail(gone)' -- ops` muss genau `ops/browser.mjs:1` ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/browser.test.ts --reporter=verbose 2>&1 | grep -cE '✓'` muss mindestens `5` ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/browser.test.ts` muss Exit-Code 0 haben.
-- [ ] Ein Test in `check` startet jedes der fünf SOLL-Werkzeuge mit einem Chrome, der sofort endet, und verlangt Exit ungleich 0 und
+- [x] Ein Test in `check` startet jedes der fünf SOLL-Werkzeuge mit einem Chrome, der sofort endet, und verlangt Exit ungleich 0 und
       keine Zeile mit `0 defects`; gegen den Stand der Merge-Basis ist er genau für `ops/soll.mjs` und `ops/soll-konto.mjs` rot.
       MVP: Funktion, weil ein stiller Exit 0 ohne Bild heute als abgenommenes SOLL-Bild durchgeht.
       Prüfung: `grep -cE '^\s*(it|test)\(' test/soll-browser-gone.test.ts` muss genau `1` ausgeben.
       Prüfung: `grep -cE 'from "\.\./ops/' test/soll-browser-gone.test.ts` muss genau `0` ausgeben.
       Prüfung: `T=$(mktemp -d); PATH=/usr/bin:$PATH pnpm -s vitest run test/soll-browser-gone.test.ts --reporter=json --outputFile=$T/r.json >/dev/null 2>&1; echo "exit=$?"; node -e 'const r=require(process.argv[1]);const a=r.testResults.flatMap(f=>f.assertionResults);console.log(a.length, a.filter(x=>x.status==="passed").length)' $T/r.json` muss genau `exit=0` und `5 5` ausgeben.
       Prüfung: `B=$(git merge-base origin/dev HEAD); T=$(mktemp -d); git archive $B | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; cp test/soll-browser-gone.test.ts $T/test/; (cd $T && PATH=/usr/bin:$PATH pnpm -s vitest run test/soll-browser-gone.test.ts --reporter=json --outputFile=r.json >/dev/null 2>&1); node -e 'const r=require(process.argv[1]);console.log(r.testResults.flatMap(f=>f.assertionResults).filter(x=>x.status!=="passed").map(x=>x.ancestorTitles.join(" ")).sort().join(" "))' $T/r.json` muss genau `ops/soll-konto.mjs ops/soll.mjs` ausgeben.
-- [ ] Die Werkzeuge verhalten sich auf ihren bisherigen Quellen wie vorher: dieselben Argumente für Chrome je Art, dieselben letzten
+- [x] Die Werkzeuge verhalten sich auf ihren bisherigen Quellen wie vorher: dieselben Argumente für Chrome je Art, dieselben letzten
       Zeilen der fünf SOLL-Werkzeuge mit `--check`, und die drei Sepolia-Läufe sind gültiges JavaScript.
       MVP: Funktion, weil die abgenommenen Bilder unter `docs/soll/` an genau diesen Argumenten und Schriften hängen und ein anderer
       Render jedes Bild rot machte.
@@ -101,14 +101,14 @@ Lauf ohne Bild eine Änderung an zahlende Kunden durchlässt, die niemand gesehe
       Prüfung: `T=$(mktemp -d); PATH=/usr/bin:$PATH node ops/soll-money.mjs --check > $T/o 2>&1; echo "exit=$?"; tail -n 1 $T/o | grep -cE '^soll money: 14 images, blocks end 390=[0-9]+ 1440=[0-9]+, 0 defects$'` muss genau die zwei Zeilen `exit=0` und `1` ausgeben.
       Prüfung: `for f in ops/browser.mjs ops/konto/sepolia-run.mjs ops/konto/sepolia-limit-run.mjs ops/konto/sepolia-payout-run.mjs; do node --check $f && echo ok; done | grep -c '^ok$'` muss `4` ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/soll-flags.test.ts test/soll.test.ts test/soll-handoff.test.ts test/soll-konto.test.ts test/soll-limit.test.ts test/soll-money.test.ts test/soll-fonts.test.ts` muss Exit-Code 0 haben.
-- [ ] Ohne die Sperre in `ops/browser.mjs` wird der Test aus Punkt 2 für alle fünf Werkzeuge rot, belegt an einer Kopie im
+- [x] Ohne die Sperre in `ops/browser.mjs` wird der Test aus Punkt 2 für alle fünf Werkzeuge rot, belegt an einer Kopie im
       `mktemp`-Ordner.
       MVP: Funktion, weil erst die Mutation beweist, dass die eine Sperre alle fünf Werkzeuge schützt und keine eigene Kopie mehr übrig ist.
       Prüfung: `T=$(mktemp -d); git archive HEAD | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; cp $T/ops/browser.mjs $T/orig; sed -i '/if (gone) return fail(gone)/d' $T/ops/browser.mjs; cmp -s $T/orig $T/ops/browser.mjs && echo sed-miss; (cd $T && PATH=/usr/bin:$PATH pnpm -s vitest run test/soll-browser-gone.test.ts --reporter=json --outputFile=r.json >/dev/null 2>&1); node -e 'const r=require(process.argv[1]);console.log(r.testResults.flatMap(f=>f.assertionResults).filter(x=>x.status!=="passed").length)' $T/r.json` muss genau `5` ausgeben und darf `sed-miss` nicht ausgeben.
-- [ ] Die Entscheidungen stehen mit Grund in `goals/konto/ANNAHMEN.md`.
+- [x] Die Entscheidungen stehen mit Grund in `goals/konto/ANNAHMEN.md`.
       MVP: Funktion, weil die Linsen und die nächsten Goals der Kette gegen diese Annahmen prüfen.
       Prüfung: `awk '/^## Goal 08/{f=1;next} /^## /{f=0} f' goals/konto/ANNAHMEN.md | grep -cE "^- .+, weil .+"` muss mindestens `4` ausgeben.
-- [ ] Der Diff bleibt in den Pfaden dieses Goals, `ops/` wird kürzer, kein Test wird schwächer, kein neues Paket, kein Schlüssel im
+- [x] Der Diff bleibt in den Pfaden dieses Goals, `ops/` wird kürzer, kein Test wird schwächer, kein neues Paket, kein Schlüssel im
       Diff, keine andere Goal-Datei geändert, und `check` ist grün.
       MVP: Funktion, weil `ops/**` mit dem Merge ausrollt und die SOLL-Werkzeuge das Gate jeder sichtbaren Änderung sind.
       Prüfung: `git diff --name-only origin/dev...HEAD | grep -vE '^(ops/(browser|soll|soll-handoff|soll-konto|soll-limit|soll-money)\.mjs|ops/konto/sepolia-(run|limit-run|payout-run)\.mjs|test/(browser|soll-browser-gone)\.test\.ts|goals/konto/08-ein-browser-treiber-fuer-alle-soll-werkzeuge\.md|goals/konto/verdicts/08-[A-Za-z0-9._-]+\.md|goals/konto/ANNAHMEN\.md|goals/_vorschlaege/konto-[a-z0-9.-]+\.md)$' | wc -l` muss `0` ausgeben.
@@ -120,7 +120,7 @@ Lauf ohne Bild eine Änderung an zahlende Kunden durchlässt, die niemand gesehe
       Prüfung: `git diff origin/dev...HEAD | grep -E '^[+]' | grep -iE "(api[_-]?key|secret|token|private[_-]?key)[\"' ]*[:=] *[\"']?[A-Za-z0-9_+/=-]{16,}|BEGIN [A-Z ]*PRIVATE KEY|cnwy_k_[A-Za-z0-9_-]{16,}" | wc -l` muss `0` ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung (Netz): `n=$(gh pr list -R matthiashippe/control-plane --head goal/konto-08 --state open --json number -q '.[0].number'); gh pr checks "$n" -R matthiashippe/control-plane | awk -F'\t' '$1=="check" && $2=="pass"' | wc -l` muss mindestens `1` ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Ein SOLL-Werkzeug, dessen Browser endet, endet mit Exit ungleich 0 und nennt den Grund; keines meldet danach `0 defects`.
@@ -148,5 +148,8 @@ Lauf ohne Bild eine Änderung an zahlende Kunden durchlässt, die niemand gesehe
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-17 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6 gebaut: `ops/browser.mjs` mit `findChrome`, `chromeArgs` und `launch` samt Sperre für die Arten `picture` und `passkey`, die acht Werkzeuge importieren es, `test/browser.test.ts` (an einer Kopie ohne Sperre rot: `2 failed | 8 passed`) und `test/soll-browser-gone.test.ts` (gegen die Merge-Basis rot für `ops/soll.mjs` und `ops/soll-konto.mjs`), Annahmen unter `## Goal 08`, Vorschlag `konto-nacharbeit-2026-11-17-5` zu `test/soll-fonts.test.ts`. Prüfbefehle: P1 `ops/browser.mjs:2`, `ops/browser.mjs`, achtmal `1`, `ops/browser.mjs:1`, `10`, Exit 0; P2 `1`, `0`, `exit=0` und `5 5`, `ops/soll-konto.mjs ops/soll.mjs`; P3 `argumente gleich` (Gegenprobe ohne `--mute-audio`: `argumente anders`), fünfmal `exit=0` und `1`, `4`, 7 Dateien 56 Tests Exit 0; P4 `5` ohne `sed-miss`; P5 `7`; P6 `0`, `kuerzer` (142 dazu, 415 weg), `bilder gleich`, `0`, `pakete gleich`, `goals gleich`, `0`, `check` Exit 0 (217 Dateien, 2330 Tests), Job `check` am PR #257 `1`.
+- 2026-11-17 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, nach dem Merge von `origin/dev` (187ac7a, nur `deploy/docker-compose.prod.yml`) in den Goal-Branch. Prüfbefehle: P1 `ops/browser.mjs:2`, `ops/browser.mjs`, achtmal `1`, `ops/browser.mjs:1`, `10`, Exit 0; P2 `1`, `0`, `exit=0` und `5 5`, `ops/soll-konto.mjs ops/soll.mjs`; P3 `argumente gleich`, fünfmal `exit=0` und `1`, `4`, 56 Tests Exit 0; P4 `5` ohne `sed-miss`; P5 `7`; P6 `0`, `kuerzer`, `bilder gleich`, `0`, `pakete gleich`, `goals gleich`, `0`, `check` Exit 0 (217 Dateien, 2330 Tests), Job `check` am PR #257 nach dem Push.
+- 2026-11-17 Release: PASS K und B (Zyklus 2), DONE.
 
 ## Blockers
