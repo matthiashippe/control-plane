@@ -39,3 +39,44 @@
   Rollout und nennt den kanonischen Host in `OK hosts: canonical <host>`; so ist dieselbe Prüfung vor und nach dem Wechsel grün.
   Bis Caddy das Zertifikat für `automatonhost.com` nach dem ersten Rollout hat, wäre sie rot; deshalb stehen die DNS-Einträge vor
   dem Merge.
+
+## Goal 02 (17.11.2026, Engineer CP)
+
+- **Der Name ist `automatonhost.com`, klein geschrieben**, weil Matthias seit dem 17.11.2026 unter dieser Domain verkauft und
+  ein Betreiber aus einem Conway-Issue den Namen der Seite wiederfinden soll (Entscheidung 1). In Sätzen, deren Subjekt der alte
+  Name war, steht „We“; der Design Reviewer hat das in den Bildern abgenommen.
+- **Maschinenverträge bleiben** (`handsel_notice`, `X-PostYourPrice-Hint`, `handsel-%`, `ctl.sbx.postyourprice.com`,
+  `SERVICE_HOSTS`, `PAYMENT_ZONES`, `src/handoff/routes.ts`, `src/payments/`), weil Runtimes, Plugins und Drittsysteme sie lesen
+  und ein neuer Name sie bräche (Entscheidung 2). Kommentare im Code, die den alten Host als Geschichte nennen, bleiben ebenso.
+- **Startseite: Knopf im Kopf „Switch now“ zu `/fix`**, weil der Kopf mit „Post a job“ den Markt vor den Wechsel stellte
+  (Entscheidung 3). „Agent stuck?“ trägt bei 390 px die vorhandene Klasse `hide-s`, weil der Kopf mit beiden Links in zwei Zeilen
+  brach und der Knopf dasselbe Ziel hat. Der Block `move` nennt keinen Start eines Automatons bei uns, weil Konto in der
+  Produktion aus ist und das Plugin ohne Konto nichts startet (Regel V: kein Versprechen, das nicht hält).
+- **Bisherige Tests erwarten den neuen Text**, weil sie dieselbe Sache am neuen Namen prüfen: In `test/public.test.ts` prüft das
+  Paar „Switch now“ zu `/fix` den Knopf im Kopf, wo vorher „Post a job“ zu `/post` stand; „Post your first job“ zu `/post`
+  bleibt geprüft. Keine Assertion fiel weg.
+- **SOLL-Quellen aus Textersatz, Seiten danach**, weil der Maker die fünf Seitendateien vor der Abnahme nicht ändern durfte: Die
+  15 Quellen wurden direkt geändert und gerendert (`f8f8b95`, 16:39 UTC), der Design Reviewer nahm sie um 16:41 UTC ab, die
+  Seiten folgten in `a78dce5` (16:46 UTC); die Live-Werkzeuge rendern seitdem pixelgleich mit 0 Mängeln.
+- **Vorschaubilder neu aufgenommen bei 2400 x 1260**, weil `og:image:width` und `og:image:height` diese Größe nennen: mit
+  `chrome-headless-shell` aus `~/.cache/ms-playwright/chromium_headless_shell-1248`, `--window-size=1200,630
+  --force-device-scale-factor=2` und `FONTCONFIG_FILE=$HOME/.config/control-plane/soll-fonts.conf`, damit die Schriften dieselben
+  wie in den SOLL-Bildern sind.
+  Der Inhalt der Karten blieb bis auf den Namen gleich, weil Entscheidung 7 nur den Namen ändert.
+- **`ops/og-card-says-the-truth.sh` fragt ohne `CP_URL` `https://automatonhost.com`**, weil das der Name nach außen ist und
+  `/v1/status` auf allen drei Hosts antwortet; `--selftest` bleibt grün.
+- **Kanal: `CANONICAL_HOST` ohne `CP_PUBLIC_HOST` ist `automatonhost.com`, `KNOWN_HOSTS` nennt drei Hosts**, weil jeder Kommentar
+  dauerhaft auf die Adresse verlinkt, die er nennt (Entscheidung 6). Die Fixtures von `test/answers-*.test.ts` nennen den neuen
+  Host, weil ihr Entwurf sonst als veraltet gälte; die Entwürfe fertiger Goals bleiben unverändert.
+- **Fremder kanonischer Host leitet nichts weiter**, weil ein 301 auf einen Host, den Caddy nicht bedient, in Browsern hängen
+  bleibt (Entscheidung 8): Die Middleware vergleicht den Host aus `CP_PUBLIC_URL` (klein, ohne Port, ohne Punkt am Ende) mit
+  `SERVICE_HOSTS`, ebenso den Host der Anfrage. Die Zeile im Log kommt einmal je Prozess und Host (`Set` auf Modulebene), weil jede Anfrage
+  sie sonst wiederholte.
+- **Konten mit Passkey vor dem Wechsel: `konto_accounts=0`**, gemessen am 17.11.2026 um 16:52 UTC nur lesend, weil Passkeys an
+  die rpId `postyourprice.com` gebunden wären (Entscheidung 9):
+  `ssh … 'docker exec -i deploy-cp-1 node -e "…require(\"better-sqlite3\")(\"/data/cp.db\",{readonly:true})…SELECT COUNT(*) AS n FROM konto_accounts…"'`
+  gab `konto_accounts=0`; Gegenprobe im selben Aufruf auf `api_keys` gab `api_keys_nonzero=true`.
+  `docker exec deploy-cp-1 sh -c 'test -n "$CP_KONTO_AUTH_PROXY_ID"'` gab `auth_proxy_id=empty`, `CP_PUBLIC_URL` im Container
+  `https://postyourprice.com`. `bash ops/live.sh` gab `OK hosts: canonical postyourprice.com, /health 200 on 3 hosts, / 301 to
+  https://postyourprice.com/ on 2 hosts, www.automatonhost.com/health 308 to https://automatonhost.com/health`. Damit fragt der
+  Maker den Tech Lead nicht und setzt das Human Gate.
