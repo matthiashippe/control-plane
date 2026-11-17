@@ -432,6 +432,8 @@ describe("the daily limit of an account", () => {
     const s = setup();
     const a = await account(s);
     s.db.prepare("DELETE FROM konto_accounts WHERE address = ?").run(a.address);
+    const handoffs = () => (s.db.prepare("SELECT COUNT(*) AS n FROM handoffs").get() as { n: number }).n;
+    const countBefore = handoffs();
     const read = await s.app.request("/v1/konto/limit", { headers: { authorization: `Bearer ${a.key}` } });
     expect(read.status).toBe(404);
     expect(await read.json()).toMatchObject({ error: "no_account" });
@@ -441,6 +443,7 @@ describe("the daily limit of an account", () => {
     const up = await raise(s, a.key, "10000000");
     expect(up.status).toBe(404);
     expect(await up.json()).toMatchObject({ error: "no_account" });
+    expect(handoffs()).toBe(countBefore);
     expect(s.db.prepare("SELECT COUNT(*) AS n FROM konto_accounts WHERE address = ?").get(a.address)).toEqual({ n: 0 });
   });
 });
