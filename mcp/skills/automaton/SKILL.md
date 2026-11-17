@@ -13,7 +13,7 @@ plugin.
 ## Start one
 
 1. Ask for what is missing: what the automaton should do (the genesis prompt), a short name
-   (letters, digits, spaces, dots, underscores, hyphens) and a daily limit in US dollars, such as
+   (1 to 32 letters, digits, spaces, underscores or hyphens, starting with a letter or digit) and a daily limit in US dollars, such as
    "5.00". Pass the limit as a string with at most two decimals.
 2. Call `start_automaton` with `genesis_prompt`, `name` and `daily_limit_usd`.
 3. If the answer has `qr`, the person has no account on this machine yet. Show `qr` unchanged in a

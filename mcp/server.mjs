@@ -535,8 +535,9 @@ export const AUTOMATON_TOOLS = [
         name: {
           type: "string",
           minLength: 1,
-          maxLength: 64,
-          description: "A short name: letters, digits, spaces, dots, underscores and hyphens.",
+          maxLength: 32,
+          pattern: "^[A-Za-z0-9][A-Za-z0-9 _-]{0,31}$",
+          description: "A short name of 1 to 32 characters: letters, digits, spaces, underscores and hyphens, starting with a letter or digit.",
         },
         daily_limit_usd: {
           type: "string",
