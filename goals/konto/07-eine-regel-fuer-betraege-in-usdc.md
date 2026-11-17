@@ -102,6 +102,13 @@ der nächsten Änderung auseinanderlaufen.
       Prüfung: `git diff origin/dev...HEAD | grep -E '^[+]' | grep -iE "(api[_-]?key|secret|token|private[_-]?key)[\"' ]*[:=] *[\"']?[A-Za-z0-9_+/=-]{16,}|BEGIN [A-Z ]*PRIVATE KEY|cnwy_k_[A-Za-z0-9_-]{16,}" | wc -l` muss `0` ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung (Netz): `n=$(gh pr list -R matthiashippe/control-plane --head goal/konto-07 --state open --json number -q '.[0].number'); gh pr checks "$n" -R matthiashippe/control-plane | awk -F'\t' '$1=="check" && $2=="pass"' | wc -l` muss mindestens `1` ausgeben.
+- [ ] Der Fall zu `no_account` in `test/konto-limit.test.ts` prüft auch, dass `step: "limit"` mit einem Schlüssel ohne Konto keinen
+      Handoff anlegt: Die Zahl der Zeilen in `handoffs` ist nach den drei Anfragen gleich wie davor.
+      MVP: Funktion, weil Acceptance Criterion 3 „legt nie einen Handoff an“ auch für einen Schlüssel ohne Konto verlangt und heute nur
+      der Fall zu `invalid_handoff` die Zeilen zählt; ein Handoff, der vor der Prüfung auf das Konto entsteht, bliebe grün (Kritik
+      Tech Lead, 2026-11-17).
+      Prüfung: `awk '/it\("answers 404 no_account/{f=1} f&&/^  }\);/{print; exit} f' test/konto-limit.test.ts | grep -c 'FROM handoffs'` muss mindestens `1` ausgeben.
+      Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/konto-limit.test.ts -t no_account` muss Exit-Code 0 haben.
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
