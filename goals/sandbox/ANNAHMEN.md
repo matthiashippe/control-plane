@@ -557,11 +557,11 @@
   `Set-Cookie` im Proxy fängt kein Cookie aus JavaScript; eine registrierbare Domain je Sandbox geht nicht. Der Filter im Proxy ist der
   Rückfall bei Ablehnung, als Vorschlag `goals/_vorschlaege/sandbox-nacharbeit-2026-11-16-1.md` mit Schwere 2, nicht in diesem Goal gebaut.
 - **Adresse im Eintrag.** `matthias@hanseatictech.de`, weil sie schon öffentlich in `README.md`, `LICENSE.md` und im Impressum steht.
-  Die Vorlage verlangt eine Rollenadresse; das Kästchen dazu bleibt leer, mit einem Satz im PR-Text, dass die Adresse die des
-  Impressums ist. Die Richtlinien verlangen außerdem, dass die Adresse zur Domain passt (meist über WHOIS); DENIC zeigt für `.de` keine
+  Die Vorlage verlangt eine Rollenadresse; das Kästchen dazu bleibt leer, mit einem Satz im PR-Text, dass die Adresse die
+  persönliche des Einreichers bei HTC ist (Zyklus 3). Die Richtlinien verlangen außerdem, dass die Adresse zur Domain passt (meist über WHOIS); DENIC zeigt für `.de` keine
   Kontaktdaten, also kann ein Maintainer nachfragen. Nennt Matthias am Gate eine Rollenadresse, ändern sich Eintrag und PR-Text und
   damit der Prüfwert.
-- **Prüfwert.** sha256 über `PR-Titel` mit Zeilenende, `psl-pr-body.md` und `psl-entry.txt`, erste 12 Zeichen, heute `797b2b2ddd05`. Er
+- **Prüfwert.** sha256 über `PR-Titel` mit Zeilenende, `psl-pr-body.md` und `psl-entry.txt`, erste 12 Zeichen, seit Zyklus 3 `669a014158af` (vorher `797b2b2ddd05`, zurückgezogen). Er
   bindet die Freigabe `public_post` an genau diese Bytes; vor dem Posten rechnet der Maker ihn neu, und weicht er ab, geht nichts raus.
 - **Kästchen.** Angekreuzt ist, was am Tag des Postens wahr ist, auch DNS-Prüfung (das TXT steht Minuten nach dem PR, vor
   `gh pr edit`) und zwei Jahre Restlaufzeit, weil Schritt 1 die Verlängerung vor dem Posten verlangt. Bietet INWX keine Verlängerung im
@@ -580,9 +580,19 @@
 - **Test vorher rot.** `test/cloudflare-psl-txt.test.ts` gegen das `cloudflare.py` von `dev`: `4 failed | 9 passed`, weil `COMMANDS` kein
   `psl-txt` kennt und das Skript den Docstring mit Exit 1 ausgibt; die Fälle mit abgelehnter URL und zwei TXT sind dort schon grün, weil
   jeder Aufruf scheitert, die vier Fälle mit Schreiben oder Nichtschreiben nicht.
-- **Kopfzeile.** `// PostYourPrice : https://postyourprice.com`, weil dort Dienst und Impressum stehen; unter `sandboxhost.de` antwortet
-  nichts. Einsortiert zwischen `// Postman, Inc : https://postman.com` und `// prequalifyme.today : https://prequalifyme.today`
-  (`LC_ALL=C sort -f`, Stand 2026-11-16 20:25 UTC).
+- **Kopfzeile** (Zyklus 3, Korrektur von Matthias am 17.11.2026, ersetzt die Fassung mit PostYourPrice). `// Hanseatic Tech Company :
+  https://hanseatictechcompany.com`, weil PostYourPrice nicht das Angebot hinter den Sandboxes ist und nach außen weder genannt noch
+  verlinkt wird. Einsortiert zwischen `// Hackclub Nest : https://hackclub.app` und `// Hashbang : https://hashbang.sh`
+  (`LC_ALL=C sort -f`, Stand 2026-11-17 08:00 UTC). Eintrag und PR-Text enthalten weder PostYourPrice noch `postyourprice.com`,
+  `cp.hippe.eu`, Handsel oder einen Link auf das Repo; Konto und Zahlung erwähnt der Text nur als „andere Domain“ ohne Namen.
+- **Firma im PR-Text** (Zyklus 3). Das Impressum `https://hanseatictechcompany.com/impressum` nennt am 2026-11-17 um 08:00 UTC
+  „Hanseatic Tech Company UG (haftungsbeschränkt)“ mit Sitz in Frankfurt am Main; so steht die Firma im Text, ohne Wohnort und ohne die
+  Geschäftsführung, weil der PR nur Firma, Dienst und Einreicher braucht. Matthias steht dort als der, der den Dienst bei HTC gebaut hat,
+  betreibt und einreicht, nicht als Geschäftsführer. Das Impressum nennt als Mail eine allgemeine Adresse von HTC, nicht die im Eintrag;
+  der Abuse Contact im PR ist deshalb die URL des Impressums (dort stehen Anschrift, Telefon und Mail), der Eintrag behält
+  `matthias@hanseatictech.de`, wie die Goal-Datei es vorgibt (die allgemeine Adresse stand vor dem Goal nicht im Repo, Punkt 8). Das
+  Kästchen zur Rollenadresse bleibt leer mit dem Satz, dass die Adresse die persönliche des Einreichers bei HTC ist. Will Matthias
+  statt dessen die allgemeine Adresse aus dem Impressum im Eintrag, ist das eine Änderung am Gate mit neuem Prüfwert.
 - **Zwei Beispieladressen der Vorlage fallen weg.** Ein HTML-Kommentar der Vorlage nennt als Beispiele eine Rollen- und eine
   persönliche Adresse unter `example.com`; Punkt 8 lässt keine Mailadresse zu, die vor dem Goal nicht öffentlich im Repo stand. Darum
   fehlen in `psl-pr-body.md` genau diese zwei Klammern, der Kommentar ist sonst wörtlich und im PR ohnehin unsichtbar. Alle Überschriften,

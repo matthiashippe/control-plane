@@ -102,7 +102,7 @@ This email address will be used for any required verification or inquiries regar
 
  * [ ] A role-based email address has been used and this inbox is actively monitored with a response time of no more than 30 days.
 
- Not checked: the address in the entry is the contact address published in our imprint (https://postyourprice.com/impressum), not a role address.
+ Not checked: the address in the entry is the personal address of the submitter at HTC, not a role address.
 
 **Abuse Contact:**
 
@@ -117,7 +117,7 @@ At a minimum, you must provide an abuse contact either in the form of an email a
   URL where abuse contact or abuse reporting form can be found: 
   <!-- Provide the URL where an Internet user can access the abuse contact information -->
   <!-- FILL IN: Abuse contact URL (keep this line and its END FILL IN) -->
-  https://postyourprice.com/impressum (redirects to https://postyourprice.com/terms#impressum, which lists the contact email address)
+  https://hanseatictechcompany.com/impressum (the imprint of Hanseatic Tech Company, which lists the postal address, phone number and contact email address)
   <!-- END FILL IN -->
 
 ---
@@ -176,17 +176,17 @@ to this request.
 -->
 
 <!-- FILL IN: Description of Organization (keep this line and its END FILL IN) -->
-Hanseatic Tech Company (HTC) is the software business of Matthias Hippe in Hamburg, Germany (imprint: https://postyourprice.com/impressum). HTC operates PostYourPrice, an open-source control plane for the open-source Automaton agent runtime (https://github.com/Conway-Research/automaton) that speaks the same API as the Conway control plane: agents sign in with Sign-In with Ethereum, pay for credits in USDC, and use OpenAI-compatible inference that is billed on the server. The source code is public at https://github.com/matthiashippe/control-plane.
+Hanseatic Tech Company UG (haftungsbeschränkt) (HTC) is a German company based in Frankfurt am Main (imprint: https://hanseatictechcompany.com/impressum). HTC hosts sandboxes for agents of Automaton, an open-source runtime for autonomous AI agents (https://github.com/Conway-Research/automaton).
 
-The newest part of the service is sandboxes: an agent rents an isolated Linux sandbox on a dedicated host that is separate from the payment service, runs its own code there, and can expose a port of the sandbox to the internet. sandboxhost.de is the domain under which these exposed ports get their names.
+Each Automaton agent can rent its own isolated Linux sandbox on a dedicated server, pays for it from its own prepaid balance, runs its own code there, and can expose a port of the sandbox to the internet. sandboxhost.de is the domain under which these exposed ports get their names, one name per sandbox and port, of the form `sbx-<id>-<port>.sandboxhost.de`. The domain is used for nothing else.
 
-I am submitting this request myself, as the owner and operator of the service and the registrant of sandboxhost.de.
+I am Matthias Hippe. I built this sandbox service at HTC, I operate it, and I registered sandboxhost.de for it. I am submitting this request on behalf of HTC as the person responsible for the service and the domain.
 <!-- END FILL IN -->
 
 **Organization Website:**
 <!-- Provide the website address of the org as a full URL (i.e. https://example.com) -->
 <!-- FILL IN: Organization Website (keep this line and its END FILL IN) -->
-https://postyourprice.com
+https://hanseatictechcompany.com
 <!-- END FILL IN -->
 
 ## Reason for PSL Inclusion
@@ -215,7 +215,7 @@ Cookie security between customers. When an agent exposes a port of its sandbox, 
 
 Without an entry in the PSL, browsers treat all of these names as one site. A service in one sandbox can answer with `Set-Cookie: session=...; Domain=sandboxhost.de`, or set the same cookie from JavaScript, and the browser then sends that cookie to every other sandbox. One customer could overwrite or plant session cookies in the service of another customer. Listing sandboxhost.de in the PRIVATE section makes every `sbx-<id>-<port>.sandboxhost.de` its own site, which is the same isolation that existing private entries give to other hosting platforms.
 
-We checked other ways, and none of them covers this case. The `__Host-` cookie prefix only protects services whose code uses it, and we neither write nor control the code our customers run. Removing the `Domain` attribute from `Set-Cookie` in our proxy would not catch cookies that JavaScript sets in the browser. A separate registrable domain per sandbox is not feasible. The payment service already runs under a different domain (postyourprice.com), so this request concerns the sandbox names only; sandboxhost.de itself serves no website.
+We checked other ways, and none of them covers this case. The `__Host-` cookie prefix only protects services whose code uses it, and we neither write nor control the code our customers run. Removing the `Domain` attribute from `Set-Cookie` in our proxy would not catch cookies that JavaScript sets in the browser. A separate registrable domain per sandbox is not feasible. Accounts and payments run under a different domain, so this request concerns the sandbox names only; sandboxhost.de itself serves no website.
 
 The product is new, and the user count below is small. We are submitting now because isolation between customers has to hold from the first customer on, not only once there are thousands of them.
 

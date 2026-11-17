@@ -9,8 +9,8 @@ Jeder freigegebene Port einer Sandbox heißt `sbx-<id>-<port>.sandboxhost.de`, u
 `sandboxhost.de` nicht auf der Public Suffix List (PSL) steht, hält ein Browser alle diese Namen für dieselbe Site: Der Dienst einer
 Sandbox kann mit `Set-Cookie: …; Domain=sandboxhost.de` oder per JavaScript ein Cookie setzen, das der Browser an jede andere Sandbox
 schickt, und so die Sitzung im Dienst eines anderen Kunden überschreiben oder unterschieben. Mit dem Eintrag in der privaten Sektion
-ist jeder Name unter `sandboxhost.de` eine eigene Site, und so ein Cookie wird nicht mehr angenommen. Die Zahlung läuft unter
-`postyourprice.com` und ist davon nicht betroffen.
+ist jeder Name unter `sandboxhost.de` eine eigene Site, und so ein Cookie wird nicht mehr angenommen. Konto und Zahlung laufen
+unter einer anderen Domain und sind davon nicht betroffen.
 
 ## Vorher
 
@@ -59,16 +59,17 @@ keinen PR und kein Issue zu `sandboxhost` in `publicsuffix/list`.
 Inhalt von `docs/sandbox/psl-entry.txt`, Byte für Byte so, wie er in die private Sektion von `public_suffix_list.dat` kommt:
 
 ```
-// PostYourPrice : https://postyourprice.com
+// Hanseatic Tech Company : https://hanseatictechcompany.com
 // Submitted by Matthias Hippe <matthias@hanseatictech.de>
 sandboxhost.de
 ```
 
-Die Adresse steht schon öffentlich in `README.md`, `LICENSE.md` und im Impressum (`src/public/terms.ts`). Sortiert wird nach dem
-Namen der Organisation ohne Rücksicht auf Groß- und Kleinschreibung. Nachbarn in der privaten Sektion am 2026-11-16 um 20:25 UTC:
+Die Adresse steht schon öffentlich in `README.md` und `LICENSE.md`. Kopfzeile und Website nennen Hanseatic Tech Company, nicht
+PostYourPrice (Korrektur von Matthias am 17.11.2026). Sortiert wird nach dem Namen der Organisation ohne Rücksicht auf Groß- und
+Kleinschreibung. Nachbarn in der privaten Sektion am 2026-11-17 um 08:00 UTC:
 
-Davor: // Postman, Inc : https://postman.com
-Danach: // prequalifyme.today : https://prequalifyme.today
+Davor: // Hackclub Nest : https://hackclub.app
+Danach: // Hashbang : https://hashbang.sh
 
 Der Eintrag kommt mit je einer Leerzeile davor und danach zwischen die beiden Abschnitte; geprüft mit
 `printf '%s\n' <Davor> <Kopfzeile> <Danach> | LC_ALL=C sort -fc`.
@@ -76,11 +77,11 @@ Der Eintrag kommt mit je einer Leerzeile davor und danach zwischen die beiden Ab
 ## PR
 
 PR-Titel: Add sandboxhost.de
-Prüfwert: 797b2b2ddd05
+Prüfwert: 669a014158af
 
 Der PR-Text ist `docs/sandbox/psl-pr-body.md`, Byte für Byte, wie `gh pr create --body-file` ihn postet. Er folgt der Vorlage
 `.github/pull_request_template.md` des PSL-Repos samt ihren Kommentaren, nur die Stellen zum Ausfüllen sind gefüllt. Angekreuzt ist
-jedes Kästchen, das am Tag des Postens wahr ist; das Kästchen zur Rollenadresse bleibt leer, weil die Adresse die des Impressums ist.
+jedes Kästchen, das am Tag des Postens wahr ist; das Kästchen zur Rollenadresse bleibt leer, weil die Adresse die persönliche des Einreichers ist.
 Das Kästchen zu zwei Jahren Restlaufzeit ist angekreuzt und gilt erst nach der Verlängerung bei INWX; geht die nicht, wird es leer,
 und es gibt einen neuen Prüfwert.
 
