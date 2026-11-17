@@ -14,6 +14,7 @@ import type { Context, Env, Hono } from "hono";
 import type { Db } from "../db.js";
 import { permissionFromJson, permissionJson } from "./account.js";
 import type { SpendPermission } from "./permission.js";
+import { parseUsdc } from "./usdc.js";
 import type { Hex } from "viem";
 
 const CONTRACT = "https://github.com/matthiashippe/control-plane/blob/dev/docs/konto/terminal.md";
@@ -75,13 +76,6 @@ export function finishLimit(db: Db, input: { code: string; account: string; perm
   })();
 }
 
-/** A positive whole number of atomic USDC in whole cents, as a string; anything else is null (the rule of POST /v1/handoff). */
-function parseLimit(v: unknown): bigint | null {
-  if (typeof v !== "string" || !/^[0-9]{1,18}$/.test(v)) return null;
-  const n = BigInt(v);
-  return n > 0n && n % 10_000n === 0n ? n : null;
-}
-
 const view = (l: AccountLimit) => ({ account: l.account, daily_limit_usdc: String(l.effective), signed_limit_usdc: String(l.signed) });
 
 /**
@@ -110,7 +104,7 @@ export function registerKontoLimit<E extends Env>(app: Hono<E>, deps: { db: Db; 
     c.header("Cache-Control", "no-store");
     if (!deps.on()) return off(c);
     const body = (await c.req.json().catch(() => null)) as Record<string, unknown> | null;
-    const wanted = parseLimit(body?.daily_limit_usdc);
+    const wanted = parseUsdc(body?.daily_limit_usdc);
     if (wanted === null) {
       return c.json(
         {
