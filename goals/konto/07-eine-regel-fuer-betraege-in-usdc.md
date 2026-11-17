@@ -1,7 +1,7 @@
 # Konto Goal 07: Eine Regel für Beträge in USDC, und ihre Fehlerantworten sind getestet
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Das Tageslimit eines zahlenden Kontos und der Betrag eines Handoffs nehmen nie verschiedene Beträge an, und eine Änderung an der
@@ -109,7 +109,7 @@ der nächsten Änderung auseinanderlaufen.
       Tech Lead, 2026-11-17).
       Prüfung: `awk '/it\("answers 404 no_account/{f=1} f&&/^  }\);/{print; exit} f' test/konto-limit.test.ts | grep -c 'FROM handoffs'` muss mindestens `1` ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/konto-limit.test.ts -t no_account` muss Exit-Code 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Für denselben Betrag geben `/v1/konto/limit` und `POST /v1/handoff` dieselbe Entscheidung, weil beide dieselbe Funktion fragen.
@@ -139,5 +139,6 @@ der nächsten Änderung auseinanderlaufen.
 - 2026-11-17 Zyklus 1: Punkte 1, 2, 3, 4, 5 gebaut: `parseUsdc` in `src/konto/usdc.ts`, `parseLimit` gestrichen, drei neue Fälle in `test/konto-limit.test.ts` (vor dem Umbau mit beiden Mutationen an den alten Kopien rot gesehen), Annahmen unter `## Goal 07`. Prüfbefehle: P1 `src/konto/usdc.ts:1`, `src/konto/usdc.ts`, `1`/`1`, `0`, `0`, 11 Dateien 103 Tests Exit 0; P2 `1`/`1`/`1`, `faelle ok`, `3`; P3 Mutationen `invalid_limit=1`, `invalid_handoff=1`, `invalid_limit=1`, `invalid_handoff=1` ohne `sed-miss`, unverändert `invalid_limit=0`, `invalid_handoff=0`, `no_account=0`; P4 `8`; P5 `0`, `0`, `pakete gleich`, `goals gleich`, `0`, `check` Exit 0 (215 Dateien, 2315 Tests), Job `check` am PR siehe Kommentar.
 - 2026-11-17 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, nach Merge von `dev` (f53113e) in den Goal-Branch alle Prüfbefehle neu gefahren. Prüfbefehle: P1 `src/konto/usdc.ts:1`, `src/konto/usdc.ts`, `1`/`1`, `0`, `0`, 11 Dateien 103 Tests Exit 0; P2 `1`/`1`/`1`, `faelle ok`, `3`; P3 Mutationen `invalid_limit=1`, `invalid_handoff=1`, `invalid_limit=1`, `invalid_handoff=1` ohne `sed-miss`, unverändert `invalid_limit=0`, `invalid_handoff=0`, `no_account=0`; P4 `8`; P5 `0`, `0`, `pakete gleich`, `goals gleich`, `0`, `check` Exit 0 (215 Dateien, 2315 Tests), Jobs `check` und `e2e` am Kopf siehe Kommentar.
 - 2026-11-17 Zyklus 3: Punkt 6 gebaut, der Fall zu `no_account` zählt die Zeilen in `handoffs` vor und nach den drei Anfragen (an einer Kopie im `mktemp`-Ordner rot gesehen mit einem Handoff vor der Prüfung auf das Konto: `expected 2 to be 1`), Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6. Prüfbefehle: P6 `1`, Exit 0; P1 `src/konto/usdc.ts:1`, `src/konto/usdc.ts`, `1`/`1`, `0`, `0`, 11 Dateien Exit 0; P2 `1`/`1`/`1`, `faelle ok`, `3`; P3 `invalid_limit=1`, `invalid_handoff=1`, `invalid_limit=1`, `invalid_handoff=1` ohne `sed-miss`, unverändert `invalid_limit=0`, `invalid_handoff=0`, `no_account=0`; P4 `8`; P5 `0`, `0`, `pakete gleich`, `goals gleich`, `0`, `check` Exit 0 (2315 Tests), Jobs `check` und `e2e` am Kopf siehe Kommentar.
+- 2026-11-17 Release: PASS K und B (Zyklus 3), DONE.
 
 ## Blockers
