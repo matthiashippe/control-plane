@@ -1,13 +1,13 @@
 {
   "name": "automaton",
   "version": "0.2.0",
-  "description": "Start, watch and stop an automaton on PostYourPrice from Claude Code. Your phone and its passkey create the account and set the daily limit; this machine only keeps the API key.",
+  "description": "Start, watch and stop an automaton on automatonhost.com from Claude Code. Your phone and its passkey create the account and set the daily limit; this machine only keeps the API key.",
   "mcpServers": {
-    "postyourprice": {
+    "automatonhost": {
       "command": "node",
       "args": ["${CLAUDE_PLUGIN_ROOT}/server.mjs"],
       "env": {
-        "CP_URL": "https://postyourprice.com"
+        "CP_URL": "https://automatonhost.com"
       }
     }
   }

@@ -1,11 +1,11 @@
 ---
 name: automaton
-description: Start, watch, limit and stop an automaton on PostYourPrice with a QR code and a passkey, and move money in by card and out to your bank account, from Claude Code.
+description: Start, watch, limit and stop an automaton on automatonhost.com with a QR code and a passkey, and move money in by card and out to your bank account, from Claude Code.
 ---
 
-# Running an automaton on PostYourPrice
+# Running an automaton on automatonhost.com
 
-An automaton is an agent that runs on its own in a sandbox of PostYourPrice and pays for its
+An automaton is an agent that runs on its own in a sandbox on automatonhost.com and pays for its
 thinking from the person's account, never more per day than the daily limit. Use this skill when
 the person asks to start, check, stop or limit one. The tools come from the MCP server of this
 plugin.

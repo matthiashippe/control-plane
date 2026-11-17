@@ -12,7 +12,7 @@ Node 20 or newer. Nothing is installed, nothing is compiled.
 
 One line installs the plugin, which brings this server and a skill that tells Claude how to use it:
 
-    claude plugin marketplace add matthiashippe/control-plane && claude plugin install automaton@postyourprice
+    claude plugin marketplace add matthiashippe/control-plane && claude plugin install automaton@automatonhost
 
 Then ask Claude to start an automaton. The first time, Claude shows a QR code, a link and a
 number: scan the code with your phone, pick that number and confirm with a passkey. That creates
@@ -53,12 +53,12 @@ destination, and the bank account is entered once on your phone.
         "control-plane-bounties": {
           "command": "node",
           "args": ["/absolute/path/to/server.mjs"],
-          "env": { "CP_API_KEY": "cnwy_k_…", "CP_URL": "https://cp.hippe.eu" }
+          "env": { "CP_API_KEY": "cnwy_k_…", "CP_URL": "https://automatonhost.com" }
         }
       }
     }
 
-`CP_URL` is optional and defaults to `https://cp.hippe.eu`. `CP_API_KEY` is the key from
+`CP_URL` is optional and defaults to `https://automatonhost.com`. `CP_API_KEY` is the key from
 `POST /v1/auth/api-keys`; how to get one is in [docs/bounties.md](../docs/bounties.md). Without a
 key the server still starts and `list_open_bounties` still works, because the open list is public.
 Every other tool answers with `no_api_key` instead of making a call.
