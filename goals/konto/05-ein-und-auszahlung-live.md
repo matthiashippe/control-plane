@@ -1,7 +1,7 @@
 # Konto Goal 05: Ein- und Auszahlung live
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Wer aus Claude Code einen Automaton betreibt und keine Wallet hat, bringt Geld per Karte auf sein Konto und bekommt die Einnahmen
@@ -326,7 +326,7 @@ Wallet ohne Karte kein Geld auf sein Konto bekommt.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/konto-payout-pending.test.ts test/konto-payout.test.ts test/mcp-money.test.ts` muss Exit-Code 0 haben.
       Prüfung: `grep -cE "^\s*(it|test)\(" test/konto-payout-pending.test.ts` muss mindestens 4 ausgeben (je ein Fall: `receipt` des `payout` wirft, die Route antwortet 202 `pending` mit dem Hash, und eine zweite Anfrage mit demselben Betrag sendet null Transaktionen und antwortet wieder `pending`; meldet die Quittung danach `success`, antwortet die nächste Anfrage `sent` mit dem ersten Hash und null neuen Transaktionen; meldet sie `reverted`, sendet die nächste genau ein `payout`; `runPayoutRules` mit offenem Hash sendet nichts und setzt `last_paid_day` nicht).
       Prüfung: `grep -c "pending" src/konto/payout.ts` muss mindestens `1` ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Ein Mensch ohne Wallet zahlt aus Claude Code per Karte auf sein Konto ein und lässt seine Einnahmen einmal oder jede Woche auf
@@ -401,6 +401,7 @@ Wallet ohne Karte kein Geld auf sein Konto bekommt.
   war einmal rot und danach in 15 Läufen grün, 3 davon neben einem vollen Testlauf; Ursache war die IBAN-Prüfung in `test/konto-payout.test.ts`, die in etwa einem von 600
   Läufen „0532“ in einer zufälligen Adresse fand (nachgerechnet: 0,16 % je Lauf). Behoben, indem Adressen vor der Suche
   herausgenommen werden; eine IBAN in der Datenbank fällt weiter auf.
+- 2026-11-17 Release: PASS K und B (Zyklus 5), DONE.
 
 ## Blockers
 - keine; das Human Gate `security_settings` ist erledigt, der Absatz „Ausnahme Hauptnetz“ liegt seit `5f77e64` auf `dev`.
