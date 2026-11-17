@@ -1,7 +1,7 @@
 # Konto Goal 05: Ein- und Auszahlung live
 
 ## Status
-BLOCKED matthias
+ACTIVE
 
 ## Active Objective
 Wer aus Claude Code einen Automaton betreibt und keine Wallet hat, bringt Geld per Karte auf sein Konto und bekommt die Einnahmen
@@ -278,7 +278,7 @@ Wallet ohne Karte kein Geld auf sein Konto bekommt.
       Prüfung (Netz): `node -e 'const fs=require("fs");const d=fs.readFileSync("docs/konto/sepolia-payout.md","utf8");const g=k=>{const m=d.match(new RegExp("^"+k+": (0x[0-9a-fA-F]+)$","m"));return m?m[1].toLowerCase():""};const rpc=(method,params)=>fetch("https://sepolia.base.org",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({jsonrpc:"2.0",id:1,method,params})}).then(r=>r.json());const SPM="0xf85210b21cc50302f477ba56686d2019dc9b67ad",USDC="0x036cbd53842c5426634e7929541ec2318f3dcf7e",PROXY="0x4e59b44847b379578588920ca78fbf26c0b4956c",T="0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";const pad=a=>"0x"+a.slice(2).padStart(64,"0");(async()=>{const bad=[];const cid=(await rpc("eth_chainId",[])).result;if(cid!=="0x14a34")bad.push("chain "+cid);const konto=g("konto"),ziel=g("ziel"),fw=g("forwarder"),fw2=g("forwarder-fremd");if(!konto||!ziel||!fw||!fw2)bad.push("konto, ziel oder forwarder fehlt");const want={"erlaubnis":[SPM,"0x1"],"anlage":[PROXY,"0x1"],"auszahlung":[fw,"0x1"],"fremd-spend":[SPM,"0x0"],"fremd-ziel":[fw2,"0x0"]};const rc={};for(const [k,[to,st]] of Object.entries(want)){const h=g(k);if(!h){bad.push("fehlt "+k);continue}const r=(await rpc("eth_getTransactionReceipt",[h])).result;if(!r){bad.push("kein beleg "+k);continue}rc[k]=r;if(r.status!==st)bad.push(k+" status "+r.status);if((r.to||"").toLowerCase()!==to)bad.push(k+" an "+r.to)}const code=(await rpc("eth_getCode",[fw,"latest"])).result;if(!code||code==="0x")bad.push("forwarder ohne code");const a=rc["auszahlung"];if(a){const tr=a.logs.filter(l=>l.address.toLowerCase()===USDC&&l.topics[0]===T);if(!tr.some(l=>l.topics[1]===pad(konto)&&l.topics[2]===pad(fw)))bad.push("kein transfer vom konto an die weiterleitung");if(!tr.some(l=>l.topics[1]===pad(fw)&&l.topics[2]===pad(ziel)&&BigInt(l.data)>0n))bad.push("kein transfer an das ziel");if(tr.some(l=>l.topics[2]!==pad(fw)&&l.topics[2]!==pad(ziel)))bad.push("transfer an ein anderes ziel")}if(bad.length){console.error(bad);process.exit(1)}console.log("sepolia payout ok")})()'` muss `sepolia payout ok` ausgeben.
       Prüfung: `z=$(sed -n 's/^ziel: //p' docs/konto/sepolia-payout.md); [ -n "$z" ] && ! grep -rqi -- "$z" src deploy mcp && echo ziel nicht im code` muss `ziel nicht im code` ausgeben.
       Prüfung: `f=~/.config/control-plane/konto-sepolia.key; k=$(tr -d '\n' < $f | sed 's/^0x//'); [ ${#k} -eq 64 ] || echo "kein schluessel"; git log -p origin/dev..HEAD | grep -ci -- "$k"` muss als einzige Ausgabe `0` haben.
-- [ ] Das Hauptnetz ist vorbereitet, aber nicht eingeschaltet: Der Code dafür entstand erst nach der Ausnahme in Regel 10, 8453 läuft
+- [x] Das Hauptnetz ist vorbereitet, aber nicht eingeschaltet: Der Code dafür entstand erst nach der Ausnahme in Regel 10, 8453 läuft
       nur mit `CP_KONTO_MAINNET=1`, jede andere Kette bleibt verweigert, die Verträge liegen auf Base, und unser Schlüssel hat dort
       nichts gesendet.
       MVP: Funktion, weil konto 06 in der Produktion nur noch Werte setzt und keinen Code mehr braucht, der Geld im Hauptnetz bewegt.
@@ -357,24 +357,12 @@ Wallet ohne Karte kein Geld auf sein Konto bekommt.
   `## Ehrliche Lücken` und die Breaker-Zeilen unter `## Blockers` entfernt, das Human Gate `security_settings` für Punkt 16 gilt
   wieder; kein Bauversuch. Prüfbefehle: `git show origin/dev:loop-constraints.md | grep -n Ausnahme` zeigt weiter nur
   „Ausnahme Base Sepolia“.
+- 2026-11-17 Zyklus 2: Abschluss gemeldet, Punkte 1 bis 18. Punkt 16 im Topic gebaut, nachdem Matthias den Absatz „Ausnahme
+  Hauptnetz“ auf `dev` eingetragen hatte (`5f77e64`, danach `4fb0cf1`); `dev` gemergt, dabei `assessMoney` auf `moveBottom` aus
+  seite 03 gebracht (`d74d8c6`). Prüfbefehle: alle 72 der Goal-Datei einzeln am Kopf, jeder mit seiner Erwartung, `check` Exit 0;
+  Punkt 16 `reihenfolge ok`, `hauptnetz bereit`, `hauptnetz nonce 0`. Gegenproben: `kontoNet` mit 8453 ohne Schalter und
+  `requireNet` ohne Prüfung je ein roter Fall in `test/konto-mainnet.test.ts`; `hauptnetz bereit` mit einer Adresse ohne Code
+  Exit 1, die Nonce-Abfrage an einem Konto mit Nonce 1 zeigt `hauptnetz nonce 1`.
 
 ## Blockers
-- Art: matthias
-- Gate: security_settings
-- Aufgabe: (a) In `loop-constraints.md` auf `dev` unter Regel 10, direkt nach der Ausnahme Base Sepolia, den Absatz eintragen:
-  „**Ausnahme Hauptnetz** (Matthias, <Datum>, für das Topic konto): Auf Base (chainId 8453) sendet das Control Plane nur
-  `approveWithSignature`, `revokeAsSpender` und `spend()` von Erlaubnissen, die ein Kunde mit seinem Passkey unterschrieben hat, dazu
-  das Anlegen und den Aufruf seiner Weiterleitung `PayoutForwarder`, deren einziges Ziel seine feste Auszahladresse ist. Gas zahlt ein
-  eigener Schlüssel, nie der Schlüssel der Betreiber-Wallet. Eingeschaltet wird das nur mit `CP_KONTO_MAINNET=1` in
-  `/opt/control-plane/.env`, die nur Matthias setzt. Credits bleiben unauszahlbar.“ (b) Die Anfrage an den Vertrieb von Bridge
-  für HTC selbst senden (Entwurf unter Empfehlung); die Unterlagen dafür stehen in `docs/konto/euro.md`, Abschnitt `## Für konto 06`,
-  Punkt 1.
-- Worum: Ohne den Absatz (a) darf der Code für das Hauptnetz nicht entstehen (Punkt 16 prüft die Reihenfolge an den Commits). Es
-  bewegt sich dadurch kein Geld: 8453 bleibt ohne `CP_KONTO_MAINNET=1` verweigert, und in der Produktion steht kein `CP_KONTO_*`.
-  Auf (b) wartet erst konto 06.
-- Empfehlung: (a) eintragen, das Goal läuft dann mit Punkt 16 weiter. (b) an `sales@bridge.xyz`, Betreff „Platform account for
-  Hanseatic Tech Company: EUR payouts via SEPA“, Text: „Hello, Hanseatic Tech Company (Germany) runs a developer platform where each
-  customer holds USDC on Base in their own smart wallet; we never hold customer funds or keys. We would like to use Bridge as a
-  platform to let our customers verify their identity through your hosted KYC links, add their own IBAN as an external account and
-  receive payouts in EUR over SEPA from a liquidation address on Base. Could you open a platform account for us and tell us which
-  documents you need for our business verification? We are ready to start with a small volume. Kind regards, Matthias Hippe“
+- keine; das Human Gate `security_settings` ist erledigt, der Absatz „Ausnahme Hauptnetz“ liegt seit `5f77e64` auf `dev`.
