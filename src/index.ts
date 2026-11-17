@@ -49,6 +49,7 @@ import { createSandboxdClient, loadOrCreateClientKey, SANDBOXD_URL_DEFAULT } fro
 import { createSandboxService } from "./sandbox/service.js";
 import { grantLiveSandbox } from "./sandbox/grant.js";
 import { grantLiveAutomaton } from "./automaton/grant.js";
+import { createAutomatonService } from "./automaton/service.js";
 import { kontoFromEnv } from "./konto/setup.js";
 
 const port = Number(process.env.CP_PORT || 8402);
@@ -87,10 +88,18 @@ const sandbox = (() => {
     return null;
   }
 })();
+// Hosted automatons (goals/sandbox/08): one service for the routes and the billing round below, so the round knows which
+// starts run in this process right now.
+const automatons = sandbox ? createAutomatonService({ db, sandboxes: sandbox, publicUrl: () => siteOrigin() }) : null;
 if (sandbox) {
   // The first tick waits three minutes: the rollout canary runs this image for a few seconds against a
-  // copy of the database in the same volume, with the same key, and must not bill or stop anything.
-  const billing = () => void sandbox.tick().catch((err) => console.error(`[sandbox] tick failed: ${err instanceof Error ? err.message : String(err)}`));
+  // copy of the database in the same volume, with the same key, and must not bill, stop or delete anything.
+  // After every tick the same round deletes the sandboxes of hosted automatons that do not run (goals/hosting/01).
+  const billing = () =>
+    void sandbox
+      .tick()
+      .catch((err) => console.error(`[sandbox] tick failed: ${err instanceof Error ? err.message : String(err)}`))
+      .then(() => automatons?.sweep());
   setTimeout(() => {
     billing();
     setInterval(billing, 60 * 1000).unref();
@@ -161,6 +170,7 @@ const app = createApp({
   // A round of changes writes on the same provider as the paid texts (HAN-95).
   rework: deliveryWriter(providers),
   sandbox,
+  automatons,
   // konto 03: off without CP_KONTO_CHAIN_ID; any value other than 84532 throws here and the service does not start.
   konto: kontoFromEnv(db, process.env),
 });

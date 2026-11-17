@@ -6,6 +6,7 @@
  * counter-check that none of these answers gives away internals.
  */
 
+import fs from "node:fs";
 import { describe, expect, it } from "vitest";
 import { privateKeyToAccount, generatePrivateKey } from "viem/accounts";
 import type { Address, Hex } from "viem";
@@ -132,7 +133,21 @@ describe("credit transfers: 501 with regulation as the reason", () => {
       expect(body.message, "a claim the bounty market makes untrue").not.toMatch(/not transferable/);
       expect(body.message, "the award exception must be named").toMatch(/awarding a bounty/i);
       expect(body.docs).toContain("#credit_transfers");
+      // A hosted automaton (POST /v1/automatons, goals/hosting/01) has a wallet whose key lies in its sandbox on our sandbox
+      // server: USDC sent there never becomes credits and never comes back. Its money is the account that started it.
+      expect(body.message, "a hosted automaton is named").toMatch(/runs here through POST \/v1\/automatons/);
+      expect(body.message).toMatch(/credits of the account that started it/);
+      expect(body.message).toMatch(/top up that account and never send USDC to its wallet/);
+      expect(body.message, "the wallet way only for a runtime run by its owner").toMatch(/runs its runtime itself/);
     }
+  });
+
+  it("docs/errors.md says the same for an automaton that runs through POST /v1/automatons", () => {
+    const doc = fs.readFileSync(new URL("../docs/errors.md", import.meta.url), "utf8");
+    const section = doc.split(/^## credit_transfers$/m)[1]?.split(/^## /m)[0] ?? "";
+    expect(section).toMatch(/POST \/v1\/automatons/);
+    expect(section).toMatch(/credits of the account that started it/);
+    expect(section).toMatch(/never send USDC to its wallet/);
   });
 });
 

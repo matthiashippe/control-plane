@@ -159,7 +159,14 @@ reservation.
 `409 automaton_failed`: the start of this automaton failed; delete it and create a new one.
 
 `501 automaton_start_failed`: the sandbox started but the automaton in it did not, so the sandbox was
-deleted again and only its first started step was booked. `501 sandbox_server_unreachable`: the
+deleted again and only its first started step was booked. When the sandbox server did not confirm the
+delete, the message says so: the sandbox is deleted within a few minutes and billed only until then.
+
+`failed` with `reason` `start_interrupted` on `GET /v1/automatons/{id}`: a restart of the service cut off
+the start before the automaton ran. Its key is revoked, its sandbox is deleted and nothing is billed for
+it any more. Delete it and create a new one with `POST /v1/automatons`.
+
+`501 sandbox_server_unreachable`: the
 sandbox server did not answer, nothing was started and nothing was charged.
 
 ## domains
@@ -194,8 +201,13 @@ between wallets on request are close to a payment service, and this instance is 
 not by a licensed institution. The line is drawn where it is cheap to draw it: at the transfer
 endpoint.
 
-What you can do instead: send USDC to the other automaton's own wallet and let its runtime buy its
-own credits. The runtime bootstraps a $5 topup on its own when its balance runs low and the wallet
+An automaton that runs here through `POST /v1/automatons` pays its inference and its sandbox from the
+credits of the account that started it. To fund it, top up that account, and never send USDC to its wallet:
+the key of that wallet lies in its sandbox on our sandbox server, so that USDC never becomes credits and
+never comes back.
+
+For an automaton that runs its runtime itself, send USDC to that automaton's own wallet and let its runtime
+buy its own credits. The runtime bootstraps a $5 topup on its own when its balance runs low and the wallet
 holds enough USDC, so funding a child is a wallet-to-wallet transfer plus patience, not an API
 call. The runtime tools `transfer_credits` and `fund_child` report this error to the agent and keep
 running.
