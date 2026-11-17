@@ -108,7 +108,7 @@ Lauf ohne Bild eine Änderung an zahlende Kunden durchlässt, die niemand gesehe
 - [x] Die Entscheidungen stehen mit Grund in `goals/konto/ANNAHMEN.md`.
       MVP: Funktion, weil die Linsen und die nächsten Goals der Kette gegen diese Annahmen prüfen.
       Prüfung: `awk '/^## Goal 08/{f=1;next} /^## /{f=0} f' goals/konto/ANNAHMEN.md | grep -cE "^- .+, weil .+"` muss mindestens `4` ausgeben.
-- [ ] Der Diff bleibt in den Pfaden dieses Goals, `ops/` wird kürzer, kein Test wird schwächer, kein neues Paket, kein Schlüssel im
+- [x] Der Diff bleibt in den Pfaden dieses Goals, `ops/` wird kürzer, kein Test wird schwächer, kein neues Paket, kein Schlüssel im
       Diff, keine andere Goal-Datei geändert, und `check` ist grün.
       MVP: Funktion, weil `ops/**` mit dem Merge ausrollt und die SOLL-Werkzeuge das Gate jeder sichtbaren Änderung sind.
       Prüfung: `git diff --name-only origin/dev...HEAD | grep -vE '^(ops/(browser|soll|soll-handoff|soll-konto|soll-limit|soll-money)\.mjs|ops/konto/sepolia-(run|limit-run|payout-run)\.mjs|test/(browser|soll-browser-gone)\.test\.ts|goals/konto/08-ein-browser-treiber-fuer-alle-soll-werkzeuge\.md|goals/konto/verdicts/08-[A-Za-z0-9._-]+\.md|goals/konto/ANNAHMEN\.md|goals/_vorschlaege/konto-[a-z0-9.-]+\.md)$' | wc -l` muss `0` ausgeben.
@@ -148,5 +148,6 @@ Lauf ohne Bild eine Änderung an zahlende Kunden durchlässt, die niemand gesehe
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-17 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6 gebaut: `ops/browser.mjs` mit `findChrome`, `chromeArgs` und `launch` samt Sperre für die Arten `picture` und `passkey`, die acht Werkzeuge importieren es, `test/browser.test.ts` (an einer Kopie ohne Sperre rot: `2 failed | 8 passed`) und `test/soll-browser-gone.test.ts` (gegen die Merge-Basis rot für `ops/soll.mjs` und `ops/soll-konto.mjs`), Annahmen unter `## Goal 08`, Vorschlag `konto-nacharbeit-2026-11-17-5` zu `test/soll-fonts.test.ts`. Prüfbefehle: P1 `ops/browser.mjs:2`, `ops/browser.mjs`, achtmal `1`, `ops/browser.mjs:1`, `10`, Exit 0; P2 `1`, `0`, `exit=0` und `5 5`, `ops/soll-konto.mjs ops/soll.mjs`; P3 `argumente gleich` (Gegenprobe ohne `--mute-audio`: `argumente anders`), fünfmal `exit=0` und `1`, `4`, 7 Dateien 56 Tests Exit 0; P4 `5` ohne `sed-miss`; P5 `7`; P6 `0`, `kuerzer` (142 dazu, 415 weg), `bilder gleich`, `0`, `pakete gleich`, `goals gleich`, `0`, `check` Exit 0 (217 Dateien, 2330 Tests), Job `check` am PR #257 `1`.
 
 ## Blockers
