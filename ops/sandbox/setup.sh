@@ -52,7 +52,7 @@ AUTOMATON_REV=$(sed -n 's/^ARG AUTOMATON_REV=//p' "$HERE/image/Dockerfile")
 IMPORT_LINE="import /etc/caddy/sandbox.caddy"
 PORTS_DOMAIN=$(sed -n 's/^Environment=SANDBOXD_DOMAIN=//p' "$HERE/sandboxd.service")
 case "$PORTS_DOMAIN" in
-  ""|postyourprice.com|*.postyourprice.com) echo "setup: SANDBOXD_DOMAIN in sandboxd.service must be a domain of its own" >&2; exit 2 ;;
+  ""|postyourprice.com|*.postyourprice.com|automatonhost.com|*.automatonhost.com) echo "setup: SANDBOXD_DOMAIN in sandboxd.service must be a domain of its own" >&2; exit 2 ;;
 esac
 
 # repo file -> path on the host

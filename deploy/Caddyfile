@@ -2,10 +2,11 @@
 	email matthias@hanseatictech.de
 }
 
-# cp.hippe.eu bleibt, damit nichts bricht, was heute darauf zeigt: die Issue-Kommentare, das
-# x402-Manifest der bisherigen Zahlungen, die veroeffentlichten CC0-Daten. Welche der beiden
-# Adressen die kanonische ist, entscheidet CP_PUBLIC_URL im Dienst, nicht diese Zeile.
-cp.hippe.eu, postyourprice.com {
+# cp.hippe.eu and postyourprice.com stay, so nothing breaks that points at them today: the issue
+# comments, the x402 manifest of past payments, the published CC0 data and every automaton with one
+# of these hosts as conwayApiUrl. Which of the three addresses is canonical is decided by
+# CP_PUBLIC_URL in the service, not by this line (docs/umzug.md).
+automatonhost.com, postyourprice.com, cp.hippe.eu {
 	encode zstd gzip
 
 	# Ohne Limit nimmt der Dienst beliebig grosse Bodies an; /v1/auth/nonce antwortete auf 3 MB
@@ -66,6 +67,10 @@ cp.hippe.eu, postyourprice.com {
 # der Unterschied zwischen einer Weiterleitung und einem verlorenen Request ist.
 www.postyourprice.com {
 	redir https://postyourprice.com{uri} 308
+}
+
+www.automatonhost.com {
+	redir https://automatonhost.com{uri} 308
 }
 
 # Vysyon (15.10.2026, Matthias' Go): vhost auf den Edge-Container von /opt/vysyon; Auth liegt dort, nicht hier.

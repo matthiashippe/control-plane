@@ -226,12 +226,12 @@ const hostFull = (): Reply =>
     message: "The sandbox server has no free place right now. Nothing was started and nothing was charged; try again later.",
     docs: DOC.sandboxes,
   });
-/** The zone every paid request goes through; a customer's service is never published under it. */
-const PAYMENT_ZONE = "postyourprice.com";
+/** The zones paid requests go through (goals/umzug/01); a customer's service is never published under one of them. */
+const PAYMENT_ZONES = ["postyourprice.com", "automatonhost.com"] as const;
 
 /**
- * The public URL sandboxd gave for an exposed port, if it may be passed on: https, and a host that is neither the
- * zone of the payment nor a name under it (any case, a trailing dot or a port does not change that). null otherwise.
+ * The public URL sandboxd gave for an exposed port, if it may be passed on: https, and a host that is neither
+ * a zone of the payment nor a name under one (any case, a trailing dot or a port does not change that). null otherwise.
  */
 export function passablePublicUrl(v: unknown): string | null {
   if (typeof v !== "string" || !v) return null;
@@ -243,7 +243,7 @@ export function passablePublicUrl(v: unknown): string | null {
   }
   if (u.protocol !== "https:") return null;
   const host = u.hostname.toLowerCase().replace(/\.+$/, "");
-  if (!host || host === PAYMENT_ZONE || host.endsWith(`.${PAYMENT_ZONE}`)) return null;
+  if (!host || PAYMENT_ZONES.some((zone) => host === zone || host.endsWith(`.${zone}`))) return null;
   return v;
 }
 

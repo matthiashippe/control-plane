@@ -34,6 +34,13 @@ import urllib.request
 from pathlib import Path
 
 PAYMENT_ZONE = "postyourprice.com"
+# Every zone the payment service answers under (goals/umzug/01). Exposed ports never get a name in one of them.
+PAYMENT_ZONES = ("postyourprice.com", "automatonhost.com")
+
+
+def in_payment_zone(d):
+    d = d.lower().rstrip(".")
+    return any(d == z or d.endswith("." + z) for z in PAYMENT_ZONES)
 API = "https://api.cloudflare.com/client/v4"
 HERE = Path(__file__).resolve().parent
 TOKENS = {"payment": "CLOUDFLARE_HTC_API_TOKEN", "ports": "CLOUDFLARE_SBX_API_TOKEN"}
@@ -46,8 +53,8 @@ def ports_domain():
     if not m:
         sys.exit("cloudflare: no SANDBOXD_DOMAIN in sandboxd.service")
     d = m.group(1)
-    if d == PAYMENT_ZONE or d.endswith("." + PAYMENT_ZONE):
-        sys.exit("cloudflare: SANDBOXD_DOMAIN is the payment zone")
+    if in_payment_zone(d):
+        sys.exit("cloudflare: SANDBOXD_DOMAIN is in a payment zone")
     return d
 
 
@@ -280,6 +287,11 @@ def selftest():
     expect("digest sees the ssl mode", True, base != digest([ctl, apex], "strict", PAYMENT_ZONE))
     expect("digest is 12 hex", True, bool(re.fullmatch(r"[0-9a-f]{12}", base)))
     expect("ports domain is not the payment zone", True, ports_domain() != PAYMENT_ZONE and not ports_domain().endswith("." + PAYMENT_ZONE))
+    expect("ports domain is in no payment zone", False, in_payment_zone(ports_domain()))
+    for d in ("automatonhost.com", "www.automatonhost.com", "AutomatonHost.COM.", "postyourprice.com", "sbx.postyourprice.com"):
+        expect(f"payment zone refuses {d}", True, in_payment_zone(d))
+    for d in ("notautomatonhost.com", "sandboxhost.de", "automatonhost.com.example"):
+        expect(f"payment zone lets {d} pass", False, in_payment_zone(d))
 
     print("CLOUDFLARE SELFTEST OK" if fails == 0 else f"CLOUDFLARE SELFTEST FAILED ({fails})")
     return 1 if fails else 0

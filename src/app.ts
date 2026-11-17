@@ -82,7 +82,7 @@ import {
 import { mcToCents, getBalanceCents, getBalanceMc, MC_PER_CENT } from "./db.js";
 import { block as ldBlock, dataset, howToFrom, organization, webPage, webSite } from "./public/jsonld.js";
 import { prefersHtml, renderApiPage } from "./public/apipage.js";
-import { siteOrigin, withOrigin } from "./public/site.js";
+import { SERVICE_HOSTS, siteHost, siteOrigin, withOrigin } from "./public/site.js";
 import { openApiDocument } from "./public/openapi.js";
 import { renderCheck, renderCheckIntro, renderPasteBox } from "./public/checkpage.js";
 import { germanFirstScreen } from "./public/landing.de.js";
@@ -530,21 +530,26 @@ export function createApp(opts: AppOptions) {
     "/receipts.json",
   ];
   app.use("*", async (c, next) => {
+    // Without CP_PUBLIC_URL there is no canonical host to send anybody to: every test that does
+    // not set it, and a local run.
+    if (!process.env.CP_PUBLIC_URL) return next();
     const canonical = siteOrigin();
-    const host = c.req.header("host")?.toLowerCase();
+    const host = c.req.header("host")?.toLowerCase().replace(/\.$/, "").replace(/:\d+$/, "");
     const method = c.req.method;
     if (
       !host ||
       (method !== "GET" && method !== "HEAD") ||
       PAGES_STAY.some((p) => c.req.path === p || c.req.path.startsWith(p)) ||
-      host === canonical.replace(/^https?:\/\//, "")
+      host === siteHost().toLowerCase().replace(/:\d+$/, "")
     ) {
       return next();
     }
-    // Only hosts this service is actually known by. Anything else is somebody pointing their own
-    // name at this address, and bouncing it would be this service deciding where their traffic
-    // goes.
-    if (host !== "cp.hippe.eu") return next();
+    // Only hosts this service is actually known by (SERVICE_HOSTS). Anything else is somebody
+    // pointing their own name at this address, and bouncing it would be this service deciding
+    // where their traffic goes. Before the move pages on automatonhost.com go to
+    // postyourprice.com, after it the other way round, so every form posts from the origin
+    // POST /start expects.
+    if (!(SERVICE_HOSTS as readonly string[]).includes(host)) return next();
     const url = new URL(c.req.url);
     return c.redirect(`${canonical}${url.pathname}${url.search}`, 301);
   });
