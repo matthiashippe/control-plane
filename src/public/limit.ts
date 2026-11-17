@@ -33,7 +33,7 @@ export type LimitPage =
       organizationId: string;
     };
 
-const TITLE = "Raise the daily limit | PostYourPrice";
+const TITLE = "Raise the daily limit | automatonhost.com";
 
 function body(page: LimitPage): string {
   // "your account Atlas", or "your account" alone when the account has no name.
@@ -76,7 +76,7 @@ ${buttons}
     <div class="hero-text balanced">
       <p class="eyebrow">Last step</p>
       <h1>Raise the daily limit for your account</h1>
-      <p class="sub">PostYourPrice can charge up to ${usd(page.dailyLimitUsdc)} a day for ${yourAccount}.</p>
+      <p class="sub">We can charge up to ${usd(page.dailyLimitUsdc)} a day for ${yourAccount}.</p>
       <div class="grant">
         <ul class="feats">
           <li>The limit of ${usd(page.previousLimitUsdc)} a day ends when you confirm.</li>

@@ -1,7 +1,7 @@
 # Umzug Goal 02: Seiten und Texte nennen Automatons
 
 ## Status
-PLANNED
+DONE
 
 ## Active Objective
 Nach außen heißt der Dienst `automatonhost.com`, und kein Text, den ein Besucher, ein Betreiber oder sein Automaton liest, nennt
@@ -136,7 +136,7 @@ und ein Betreiber aus einem Conway-Issue am Namen erkennen soll, was er hier bek
   in einem Conway-Issue führt auf eine Seite, deren erster Satz sagt, dass der Automaton hier weiterläuft.
 
 ## Done Condition
-- [ ] Die 30 SOLL-Bilder (Startseite 2, Handy-Seiten 28) kommen aus Quellen, die weder PostYourPrice noch Handsel nennen und im Kopf
+- [x] Die 30 SOLL-Bilder (Startseite 2, Handy-Seiten 28) kommen aus Quellen, die weder PostYourPrice noch Handsel nennen und im Kopf
       `automatonhost.com` tragen; der Block `move` der Startseite steht vor dem Markt für Menschen und zeigt `conwayApiUrl` mit
       `https://automatonhost.com`; jedes SOLL-Werkzeug meldet 0 Mängel.
       MVP: Funktion, weil die Seiten nur nach Bild gebaut werden dürfen und der Betreiber den neuen Namen zuerst auf der Startseite
@@ -150,11 +150,11 @@ und ein Betreiber aus einem Conway-Issue am Namen erkennen soll, was er hier bek
       Prüfung: `T=$(mktemp -d); FONTCONFIG_FILE=$HOME/.config/control-plane/soll-fonts.conf node ops/soll-konto.mjs --check > $T/o 2>&1; echo "exit=$? $(tail -n 1 $T/o | grep -o '0 defects$')"; rm -rf $T` muss `exit=0 0 defects` ausgeben.
       Prüfung: `T=$(mktemp -d); FONTCONFIG_FILE=$HOME/.config/control-plane/soll-fonts.conf node ops/soll-limit.mjs --check > $T/o 2>&1; echo "exit=$? $(tail -n 1 $T/o | grep -o '0 defects$')"; rm -rf $T` muss `exit=0 0 defects` ausgeben.
       Prüfung: `T=$(mktemp -d); FONTCONFIG_FILE=$HOME/.config/control-plane/soll-fonts.conf node ops/soll-money.mjs --check > $T/o 2>&1; echo "exit=$? $(tail -n 1 $T/o | grep -o '0 defects$')"; rm -rf $T` muss `exit=0 0 defects` ausgeben.
-- [ ] Der Design Reviewer hat die 30 Bilder nach ihrem letzten Commit abgenommen, bevor eine der fünf Seitendateien sich änderte.
+- [x] Der Design Reviewer hat die 30 Bilder nach ihrem letzten Commit abgenommen, bevor eine der fünf Seitendateien sich änderte.
       MVP: Funktion, weil kein UI ohne abgenommenes Bild gebaut wird (`LOOP.md`, Fläche nur nach SOLL-Bild).
       Prüfung: `grep -cE '^Abnahme-Issue umzug: PRO-[0-9]+$' docs/soll/README.md` muss 1 ausgeben.
       Prüfung (Netz): `i=$(sed -n 's/^Abnahme-Issue umzug: //p' docs/soll/README.md); t=$(git log -1 --format=%cI -- 'docs/soll/*.png' 'docs/soll/src/*.html'); b=$(git log --reverse --format=%cI origin/dev..HEAD -- src/public/index.html src/public/handoff.ts src/public/konto.ts src/public/limit.ts src/public/money.ts | head -1); curl -s -H "Authorization: Bearer $PAPERCLIP_API_KEY" "$PAPERCLIP_API_URL/api/issues/$i/comments" | T="$t" B="$b" node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{const t=Date.parse(process.env.T);const ok=JSON.parse(d).filter(c=>c.authorAgentId==="3412a0ea-cbf5-4f18-9360-0e8e20ba3313"&&/SOLL abgenommen/.test(c.body)).map(c=>Date.parse(c.createdAt));if(!process.env.T||!ok.some(x=>x>t)){console.error("keine abnahme nach "+process.env.T);process.exit(1)}if(process.env.B&&!(Math.min(...ok)<Date.parse(process.env.B))){console.error("gebaut vor der abnahme "+process.env.B);process.exit(1)}console.log("abnahme ok "+ok.length)})'` muss `abnahme ok <n>` mit n mindestens 1 ausgeben.
-- [ ] Die echte Startseite und alle Zustände der Handy-Seiten sind pixelgleich mit den neuen Bildern, gerendert mit
+- [x] Die echte Startseite und alle Zustände der Handy-Seiten sind pixelgleich mit den neuen Bildern, gerendert mit
       `CP_PUBLIC_URL=https://automatonhost.com`.
       MVP: Funktion, weil erst die echte Seite zeigt, was der Besucher liest.
       Prüfung: `grep -c 'https://postyourprice.com' ops/soll-live.mjs` muss 0 ausgeben.
@@ -163,7 +163,7 @@ und ein Betreiber aus einem Conway-Issue am Namen erkennen soll, was er hier bek
       Prüfung: `T=$(mktemp -d); node --import tsx ops/soll-live-konto.mjs --out $T && FONTCONFIG_FILE=$HOME/.config/control-plane/soll-fonts.conf node ops/soll-konto.mjs --check --source $T > $T/o 2>&1; echo "exit=$? $(tail -n 1 $T/o | grep -o '0 defects$')"; rm -rf $T` muss `exit=0 0 defects` ausgeben.
       Prüfung: `T=$(mktemp -d); node --import tsx ops/soll-live-limit.mjs --out $T && FONTCONFIG_FILE=$HOME/.config/control-plane/soll-fonts.conf node ops/soll-limit.mjs --check --source $T > $T/o 2>&1; echo "exit=$? $(tail -n 1 $T/o | grep -o '0 defects$')"; rm -rf $T` muss `exit=0 0 defects` ausgeben.
       Prüfung: `T=$(mktemp -d); node --import tsx ops/soll-live-money.mjs --out $T && FONTCONFIG_FILE=$HOME/.config/control-plane/soll-fonts.conf node ops/soll-money.mjs --check --source $T > $T/o 2>&1; echo "exit=$? $(tail -n 1 $T/o | grep -o '0 defects$')"; rm -rf $T` muss `exit=0 0 defects` ausgeben.
-- [ ] Keine ausgelieferte Seite nennt PostYourPrice oder Handsel: jede Seite aus `/sitemap.xml`, `/llms.txt`, `/openapi.json`, jeder
+- [x] Keine ausgelieferte Seite nennt PostYourPrice oder Handsel: jede Seite aus `/sitemap.xml`, `/llms.txt`, `/openapi.json`, jeder
       Zustand der Handy-Seiten und beide Vorschaubilder, außer dem Feldnamen `handsel_notice` auf `/terms`. Die neuen Fälle waren vor
       dem Fix rot.
       MVP: Funktion, weil jede Seite, die ein Betreiber aus einem Issue oder einem geteilten Link öffnet, sonst den Namen zeigt, unter
@@ -175,7 +175,7 @@ und ein Betreiber aus einem Conway-Issue am Namen erkennen soll, was er hier bek
       Prüfung: `cat src/public/og-card.html src/public/og-card-x402.html | grep -ciE 'postyourprice|handsel'` muss 0 ausgeben.
       Prüfung: `git diff --name-only origin/dev...HEAD -- src/public/og.png src/public/og-x402.png | wc -l` muss 2 ausgeben.
       Prüfung: `bash ops/og-card-says-the-truth.sh --selftest` muss Exit-Code 0 haben.
-- [ ] README, Plugin, MCP-Server und Skill nennen `automatonhost.com` statt PostYourPrice, Handsel oder `cp.hippe.eu`, das Plugin
+- [x] README, Plugin, MCP-Server und Skill nennen `automatonhost.com` statt PostYourPrice, Handsel oder `cp.hippe.eu`, das Plugin
       spricht ohne eigene Einstellung mit `https://automatonhost.com`, und die Installation heißt `automaton@automatonhost`.
       MVP: Funktion, weil das Plugin der Weg ist, auf dem ein Mensch aus Claude Code einen Automaton bei uns startet, und sein Name im
       Terminal derselbe sein muss wie auf der Seite.
@@ -185,7 +185,7 @@ und ein Betreiber aus einem Conway-Issue am Namen erkennen soll, was er hier bek
       Prüfung: `grep -cxF 'export const DEFAULT_BASE_URL = "https://automatonhost.com";' mcp/server.mjs` muss 1 ausgeben.
       Prüfung: `cat README.md mcp/README.md | grep -c 'claude plugin install automaton@automatonhost'` muss mindestens 2 ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/mcp.test.ts test/mcp-automaton.test.ts test/mcp-money.test.ts` muss Exit-Code 0 haben.
-- [ ] Der Passkey heißt `automatonhost.com <Datum>`, `rp.name` und `walletName` sind `automatonhost.com`, die rpId bleibt der Host der
+- [x] Der Passkey heißt `automatonhost.com <Datum>`, `rp.name` und `walletName` sind `automatonhost.com`, die rpId bleibt der Host der
       Seite, und `konto.js` ist aus den Quellen neu gebaut.
       MVP: Funktion, weil der Mensch den Passkey später in seinem Schlüsselbund unter dem Namen suchen muss, unter dem er das Konto
       angelegt hat.
@@ -195,7 +195,7 @@ und ein Betreiber aus einem Conway-Issue am Namen erkennen soll, was er hier bek
       Prüfung: `node --input-type=module -e 'import fs from "node:fs"; import { bundle, BUNDLE } from "./ops/konto/build-client.mjs"; console.log((await bundle()) === fs.readFileSync(BUNDLE, "utf8") ? "gleich" : "alt")'` muss `gleich` ausgeben.
       Prüfung: `grep -c 'automatonhost.com' test/konto-client.test.ts` muss mindestens 1 ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/konto-client.test.ts test/konto-client-limit.test.ts test/konto-client-deposit.test.ts` muss Exit-Code 0 haben.
-- [ ] Jeder neue Entwurf für den Kanal muss `https://automatonhost.com` nennen, ein Entwurf mit `postyourprice.com` oder
+- [x] Jeder neue Entwurf für den Kanal muss `https://automatonhost.com` nennen, ein Entwurf mit `postyourprice.com` oder
       `cp.hippe.eu` gilt als veraltet. Die neuen Fälle waren vor dem Fix rot.
       MVP: Funktion, weil der Kanal der einzige Weg ist, der je einen Leser gebracht hat, und jeder Kommentar dauerhaft auf die Adresse
       verlinkt, die er nennt.
@@ -204,7 +204,7 @@ und ein Betreiber aus einem Conway-Issue am Namen erkennen soll, was er hier bek
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/answers-host.test.ts test/answers-folder.test.ts test/answers-approved.test.ts` muss Exit-Code 0 haben.
       Prüfung: `grep -cE "^\s*(it|test)\(" test/answers-host.test.ts` muss mindestens 2 ausgeben.
       Prüfung: `T=$(mktemp -d); git archive HEAD | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; B=$(git merge-base origin/dev HEAD); git show $B:ops/before-the-answers.py > $T/ops/before-the-answers.py; (cd $T && PATH=/usr/bin:$PATH pnpm -s vitest run test/answers-host.test.ts --reporter=json --outputFile=$T/r.json >/dev/null 2>&1); node -p "JSON.parse(require('fs').readFileSync('$T/r.json','utf8')).numFailedTests"; rm -rf $T` muss mindestens 1 ausgeben.
-- [ ] Nennt `CP_PUBLIC_URL` einen Host außerhalb von `SERVICE_HOSTS`, leitet keine Seite weiter, und der Dienst loggt das einmal; ein
+- [x] Nennt `CP_PUBLIC_URL` einen Host außerhalb von `SERVICE_HOSTS`, leitet keine Seite weiter, und der Dienst loggt das einmal; ein
       Host mit `:443` oder mit Punkt am Ende wird wie der nackte Host weitergeleitet. Der Fall des fremden Hosts war vor dem Fix rot,
       die beiden anderen sind rot, wenn die Normalisierung fehlt.
       MVP: Funktion, weil ein Tippfehler im Wechsel sonst jede Seite aller drei Hosts per 301 auf einen Host schickt, den Caddy nicht
@@ -214,7 +214,7 @@ und ein Betreiber aus einem Conway-Issue am Namen erkennen soll, was er hier bek
       Prüfung: `grep -cF 'is not in SERVICE_HOSTS, pages are not redirected' src/app.ts` muss 1 ausgeben.
       Prüfung: `T=$(mktemp -d); git archive HEAD | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; B=$(git merge-base origin/dev HEAD); git show $B:src/app.ts > $T/src/app.ts; (cd $T && PATH=/usr/bin:$PATH pnpm -s vitest run test/automatonhost.test.ts --reporter=json --outputFile=$T/r.json >/dev/null 2>&1); node -p "JSON.parse(require('fs').readFileSync('$T/r.json','utf8')).numFailedTests"; rm -rf $T` muss mindestens 1 ausgeben.
       Prüfung: `T=$(mktemp -d); git archive HEAD | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; sed -i 's#header("host")?.toLowerCase().replace([^;]*;#header("host")?.toLowerCase();#' $T/src/app.ts; grep -q 'header("host")?.toLowerCase();' $T/src/app.ts || echo sed-miss; (cd $T && PATH=/usr/bin:$PATH pnpm -s vitest run test/automatonhost.test.ts --reporter=json --outputFile=$T/r.json >/dev/null 2>&1); node -p "JSON.parse(require('fs').readFileSync('$T/r.json','utf8')).numFailedTests"; rm -rf $T` muss eine Zahl von mindestens 2 ausgeben und darf `sed-miss` nicht ausgeben.
-- [ ] `automatonhost.com` ist der kanonische Host: `deploy/docker-compose.prod.yml` auf `dev` setzt `CP_PUBLIC_URL` auf
+- [x] `automatonhost.com` ist der kanonische Host: `deploy/docker-compose.prod.yml` auf `dev` setzt `CP_PUBLIC_URL` auf
       `https://automatonhost.com` (geändert von Matthias am Human Gate), `postyourprice.com` leitet seine Startseite dorthin, und vor
       dem Gate ist die Zahl der Konten mit Passkey mit Befehl in den Annahmen gemessen.
       MVP: Funktion, weil Seiten, Stripe-Rücksprung, x402-Angebote und die `curl`-Beispiele erst damit den neuen Namen tragen.
@@ -223,32 +223,32 @@ und ein Betreiber aus einem Conway-Issue am Namen erkennen soll, was er hier bek
       Prüfung (Netz): `curl -s -o /dev/null -w '%{http_code} %{redirect_url}' --max-time 15 https://postyourprice.com/` muss genau `301 https://automatonhost.com/` ausgeben.
       Prüfung (Netz): `curl -s -o /dev/null -w '%{http_code}' --max-time 15 https://automatonhost.com/` muss genau `200` ausgeben.
       Prüfung (Netz): `curl -s --max-time 15 https://automatonhost.com/ | grep -ciE 'postyourprice|handsel'` muss 0 ausgeben.
-- [ ] Jeder Prüfbefehl eines fertigen Goals, dessen Ausgabe sich durch dieses Goal ändert, steht als abgelöst in den Annahmen seines
+- [x] Jeder Prüfbefehl eines fertigen Goals, dessen Ausgabe sich durch dieses Goal ändert, steht als abgelöst in den Annahmen seines
       Topics, in der Form aus Entscheidung 10.
       MVP: Funktion, weil das Audit nachts jeden Prüfbefehl fertiger Goals fährt und jede unerklärte rote Zeile eine Reparatur ohne
       Ursache auf `dev` auslöst.
       Prüfung: `q=$(printf '\140'); cat goals/*/ANNAHMEN.md | grep -E '^- Abgelöst: .* durch umzug 02 ' | grep -vcE " durch umzug 02 Punkt [0-9]+, Ausgabe dann genau ${q}Exit [0-9]+, [^${q}]*${q} \\(Tech Lead, 2026-11-17\\)\$"` muss 0 ausgeben.
       Prüfung: `cat goals/*/ANNAHMEN.md | grep -cE '^- Abgelöst: .* durch umzug 02 '` muss mindestens 1 ausgeben.
       Prüfung: `grep -cE '^- [0-9-]+ Zyklus [0-9]+: .*abgelöst' goals/umzug/02-seiten-und-texte-nennen-automatons.md` muss mindestens 1 ausgeben.
-- [ ] Die Doku sagt, wie der Dienst nach außen heißt, was beim alten Namen bleibt und warum, wie das Plugin installiert wird, was beim
+- [x] Die Doku sagt, wie der Dienst nach außen heißt, was beim alten Namen bleibt und warum, wie das Plugin installiert wird, was beim
       Einschalten von Konto für den neuen Host zu tun ist und wie der Wechsel ausging; die Entscheidungen stehen mit Grund in den
       Annahmen.
       MVP: Funktion, weil das nächste Goal, das Text nach außen schreibt, sonst wieder den alten Namen nimmt.
       Prüfung: `for w in "OK hosts: canonical automatonhost.com" automaton@automatonhost handsel_notice X-PostYourPrice-Hint konto_accounts Turnkey before-the-answers.py; do grep -qF -- "$w" docs/umzug.md || echo "fehlt $w"; done` muss nichts ausgeben.
       Prüfung: `awk '/^## Goal 02/{f=1;next} /^## /{f=0} f' goals/umzug/ANNAHMEN.md | grep -cE "^- .+, weil .+"` muss mindestens 8 ausgeben.
-- [ ] Das Goal ändert nur Seiten, Texte, SOLL-Bilder und ihre Werkzeuge, Plugin, MCP, das Prüfwerkzeug des Kanals, die Weiterleitung,
+- [x] Das Goal ändert nur Seiten, Texte, SOLL-Bilder und ihre Werkzeuge, Plugin, MCP, das Prüfwerkzeug des Kanals, die Weiterleitung,
       Doku, Annahmen und Tests, weder Compose, Zahlung, Anmeldung, Automaton, Harness noch CI, und bringt keinen Schlüssel ins Repo.
       MVP: Funktion, weil das Repo öffentlich ist (Grundregel 8) und Compose nur Matthias ändert.
       Prüfung: `git diff --name-only origin/dev...HEAD -- deploy src/payments src/auth src/automaton src/handoff harness .github scripts/check.mjs loop.yaml gate.yaml LOOP.md loop-constraints.md | wc -l` muss 0 ausgeben.
       Prüfung: `git diff --name-only origin/dev...HEAD | grep -vcE '^(src/app\.ts|src/public/[^/]+|src/public/konto-client/(flow\.mjs|konto\.js)|docs/soll/.+|docs/umzug\.md|ops/soll[a-z-]*\.mjs|ops/before-the-answers\.py|ops/og-card-says-the-truth\.sh|test/.+|README\.md|mcp/.+|\.claude-plugin/marketplace\.json|goals/[a-z]+/ANNAHMEN\.md|goals/umzug/.+|goals/_vorschlaege/umzug-[a-z0-9.-]+\.md)$'` muss 0 ausgeben.
       Prüfung: `git diff --name-only origin/dev...HEAD | grep -cE "\.(key|pem|crt|env)$"` muss 0 ausgeben.
       Prüfung: `git diff origin/dev...HEAD -- . ':(exclude)goals/' | grep -cE '^\+.*(cnwy_k_[0-9a-f]{32}|-{5}BEGIN [A-Z ]*PRIVATE KEY-{5}|Bearer [A-Za-z0-9_-]{30,})'` muss 0 ausgeben.
-- [ ] `check` ist grün, und der Job `e2e` des Goal-PR ist grün.
+- [x] `check` ist grün, und der Job `e2e` des Goal-PR ist grün.
       MVP: Funktion, weil Seiten und Weiterleitung jede Anfrage sehen und erst der Gang mit der unveränderten Runtime zeigt, dass
       Anmeldung, Zahlung und Inferenz weiter laufen (Grundregel 13).
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung (Netz): `n=$(gh pr list -R matthiashippe/control-plane --head goal/umzug-02 --state all --json number -q '.[0].number'); gh pr checks "${n:?}" -R matthiashippe/control-plane --json name,state -q '.[] | select(.name=="e2e") | .state'` muss `SUCCESS` ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Jede neue Testdatei und jeder neue Fall, der ein neues Verhalten verlangt, war vor dem Fix rot; die Zeile im Progress Log
@@ -277,6 +277,11 @@ und ein Betreiber aus einem Conway-Issue am Namen erkennen soll, was er hier bek
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-17 Zyklus 1: Punkte 1 bis 8, 10, 12 und 13 gebaut; 7 Prüfbefehle fertiger Goals abgelöst (konto 02, 03, 04, 05, 06 je 1, seite 01 1, umzug 01 1), Punkt 11 bis auf den Ausgang des Wechsels, Punkt 9 wartet am Human Gate. SOLL-Bilder `f8f8b95` (16:39 UTC), Abnahme des Design Reviewers 16:41 UTC, Seiten erst danach (`a78dce5`). Rot vor dem Fix: `test/automaton-name.test.ts` mit dem `src` der Merge-Basis 4 von 4 rot, `test/answers-host.test.ts` am alten Prüfwerkzeug 2 rot, `test/automatonhost.test.ts` am alten `src/app.ts` 1 rot und ohne Normalisierung des Hosts 2 rot, der neue Fall in `test/konto-client.test.ts` am alten `flow.mjs` rot. Prüfbefehle: Punkt 1 `0`, nichts, `start ok`, `30`, fünfmal `exit=0 0 defects`; Punkt 2 `1`, `abnahme ok 1`; Punkt 3 `0`, fünfmal `exit=0 0 defects`; Punkt 4 Exit 0, `4`, nichts, `4`, `0`, `2`, Selbsttest Exit 0; Punkt 5 `0`, `1`, `plugin ok`, `1`, `2`, Exit 0; Punkt 6 `0`, `3`, `1`, `gleich`, `2`, Exit 0; Punkt 7 `1`, `3`, Exit 0, `3`, `2`; Punkt 8 Exit 0, `21`, `1`, `1`, `2` ohne `sed-miss`; Punkt 9 `0` (Wechsel steht aus), `2`, Netz offen; Punkt 10 `0`, `7`, diese Zeile; Punkt 11 nichts, `10`; Punkt 12 `0`, `0`, `0`, `0`; Punkt 13 `check: grün in 265 s`, `e2e` am PR #252 `SUCCESS` (`572bd9f`).
+- 2026-11-17 Zyklus 2: Abschluss gemeldet, Punkte 1 bis 13; nach Matthias' Wechsel (PR #255, `187ac7a`, `deploy.yml` grün) `dev` gemergt (Konflikt in `goals/konto/ANNAHMEN.md` aufgelöst, beide Abschnitte bleiben), Punkt 9 gemessen und Punkt 11 mit dem Ausgang des Wechsels in `docs/umzug.md` ergänzt; konto 07, seit Zyklus 1 fertig, hat 0 abgelöste Prüfbefehle. Prüfbefehle: Punkt 1 `0`, nichts, `start ok`, `30`, fünfmal `exit=0 0 defects`; Punkt 2 `1`, `abnahme ok 1`; Punkt 3 `0`, fünfmal `exit=0 0 defects`; Punkt 4 Exit 0, `4`, nichts, `4`, `0`, `2`, Selbsttest Exit 0; Punkt 5 `0`, `1`, `plugin ok`, `1`, `2`, Exit 0; Punkt 6 `0`, `3`, `1`, `gleich`, `2`, Exit 0; Punkt 7 `1`, `3`, Exit 0, `3`, `2`; Punkt 8 Exit 0, `21`, `1`, `1`, `2` ohne `sed-miss`; Punkt 9 `1`, `2`, `301 https://automatonhost.com/`, `200`, `8` (Startseite von `dev` ohne dieses Goal, belegt erst nach dem Rollout, `goals/umzug/ANNAHMEN.md`); Punkt 10 `0`, `7`, `1`; Punkt 11 nichts, `13`; Punkt 12 `0`, `0`, `0`, `0`; Punkt 13 `check: grün in 103 s`, `e2e` am PR #252 `SUCCESS` (`c0b26cc`).
+- 2026-11-17 Release: PASS K und B (Zyklus 2), DONE.
+- 2026-11-17 Zyklus 3: Abschluss gemeldet, Punkte 1 bis 13; `origin/dev` mit konto 08 (PR #257) in den Goal-Branch gemergt, weil der PR einen Konflikt in `goals/konto/ANNAHMEN.md` hatte (beide Abschnitte bleiben, `01bf57c`), dadurch Status wieder `ACTIVE` und der PASS aus Zyklus 2 offen; konto 08 hat 0 abgelöste Prüfbefehle (sein Zähler über `goals/konto/ANNAHMEN.md` gibt auf `dev` und am Goal-Branch `7`), kein eigener Code geändert. Prüfbefehle: Punkt 1 `0`, nichts, `start ok`, `30`, fünfmal `exit=0 0 defects`; Punkt 2 `1`, `abnahme ok 1`; Punkt 3 `0`, fünfmal `exit=0 0 defects`; Punkt 4 Exit 0, `4`, nichts, `4`, `0`, `2`, Selbsttest Exit 0; Punkt 5 `0`, `1`, `plugin ok`, `1`, `2`, Exit 0; Punkt 6 `0`, `3`, `1`, `gleich`, `2`, Exit 0; Punkt 7 `1`, `3`, Exit 0, `3`, `2`; Punkt 8 Exit 0, `21`, `1`, `1`, `2` ohne `sed-miss`; Punkt 9 `1`, `2`, `301 https://automatonhost.com/`, `200`, `8` (belegt erst nach dem Rollout dieses Goals, `goals/umzug/ANNAHMEN.md`); Punkt 10 `0`, `7`, `2`; Punkt 11 nichts, `13`; Punkt 12 `0`, `0`, `0`, `0`; Punkt 13 `check: grün in 150 s`, `e2e` am PR #252 `SUCCESS` (`01bf57c`).
+- 2026-11-17 Release: PASS K und B (Zyklus 3), DONE.
 
 ## Blockers
 Keine.

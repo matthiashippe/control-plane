@@ -21,7 +21,7 @@ if (at < 0 || !args[at + 1] || args.length !== 2) {
 const out = path.resolve(args[at + 1]);
 mkdirSync(out, { recursive: true });
 
-process.env.CP_PUBLIC_URL = "https://postyourprice.com";
+process.env.CP_PUBLIC_URL = "https://automatonhost.com";
 const { createApp } = await import("../src/app.ts");
 const { openDb, ensureWallet } = await import("../src/db.ts");
 const { createApiKey } = await import("../src/auth/siwe.ts");

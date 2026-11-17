@@ -268,3 +268,11 @@
 - `test/soll-browser-gone.test.ts` importiert nichts aus `ops/` und startet die Werkzeuge mit `spawnSync` und 20 s Grenze, weil derselbe Test gegen die Merge-Basis laufen muss, wo `ops/soll.mjs` und `ops/soll-konto.mjs` ohne Sperre hängen (dort `status` gleich `null`, also rot) und die anderen drei mit Exit 2 enden (Entscheidung 5).
 - Die Kopfkommentare von `ops/soll-handoff.mjs`, `ops/soll-konto.mjs`, `ops/soll-limit.mjs` und `ops/soll-money.mjs` nennen `ops/browser.mjs` statt einer anderen Datei, und die Sätze „bleibt, wie es ist, weil die Audits die eingefrorenen Prüfungen dagegen fahren“ sind gestrichen, weil die eingefrorenen Prüfungen von konto 02 bis 06 die Ausgaben der Werkzeuge oder Diffs auf ihren eigenen Goal-Branches messen, die gleich bleiben (Entscheidung 4).
 - Neue Tests waren rot: `test/soll-browser-gone.test.ts` gegen die Merge-Basis für `ops/soll.mjs` und `ops/soll-konto.mjs` (`expected 'object' to be 'number'`), `test/browser.test.ts` an einer Kopie ohne die Sperre mit `2 failed | 8 passed` (beide Fälle „fails every request at once“), weil jeder neue Test einmal rot gesehen sein muss (`loop-constraints.md`, Budget und Qualität).
+
+## Abgelöst durch umzug 02 (Maker, 2026-11-17)
+
+- Abgelöst: konto 02 Punkt 3 durch umzug 02 Punkt 2, Ausgabe dann genau `Exit 1, keine abnahme nach 2026-11-17T16:39:12+00:00` (Tech Lead, 2026-11-17)
+- Abgelöst: konto 03 Punkt 3 durch umzug 02 Punkt 2, Ausgabe dann genau `Exit 1, keine abnahme nach 2026-11-17T16:39:12+00:00` (Tech Lead, 2026-11-17)
+- Abgelöst: konto 04 Punkt 3 durch umzug 02 Punkt 2, Ausgabe dann genau `Exit 1, keine abnahme nach 2026-11-17T16:39:12+00:00` (Tech Lead, 2026-11-17)
+- Abgelöst: konto 05 Punkt 4 durch umzug 02 Punkt 2, Ausgabe dann genau `Exit 1, keine abnahme nach 2026-11-17T16:39:12+00:00` (Tech Lead, 2026-11-17)
+- Abgelöst: konto 06 Punkt 6 durch umzug 02 Punkt 2, Ausgabe dann genau `Exit 1, keine abnahme nach 2026-11-17T16:39:12+00:00` (Tech Lead, 2026-11-17)

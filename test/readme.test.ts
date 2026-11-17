@@ -16,7 +16,7 @@ const readme = () => readFileSync("README.md", "utf8");
 describe("README.md", () => {
   it("offers the free check, which is the only door that needs nothing", () => {
     const text = readme();
-    expect(text, "the page a reader can click").toContain("cp.hippe.eu/check");
+    expect(text, "the page a reader can click").toContain("automatonhost.com/check");
     expect(text, "and the call for whoever has a terminal").toContain("/v1/briefs/check");
   });
 
@@ -39,7 +39,7 @@ describe("README.md", () => {
    */
   it("links nothing on this service that does not answer", async () => {
     const app = createApp({ db: openDb(":memory:") });
-    const paths = [...readme().matchAll(/\]\(https:\/\/cp\.hippe\.eu(\/[a-z0-9/._-]*)\)/g)].map((m) => m[1]);
+    const paths = [...readme().matchAll(/\]\(https:\/\/automatonhost\.com(\/[a-z0-9/._-]*)\)/g)].map((m) => m[1]);
     expect(paths.length, "the README links nothing on the service at all").toBeGreaterThan(1);
     for (const path of new Set(paths)) {
       const res = await app.request(path);

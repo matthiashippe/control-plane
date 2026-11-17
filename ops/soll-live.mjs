@@ -1,5 +1,5 @@
 // The real start page as ops/soll.mjs compares it (goals/seite/02). Renders / from createApp with an empty database, without a
-// port and without network, as an English browser on https://postyourprice.com, and writes it to a file that ops/soll.mjs can
+// port and without network, as an English browser on https://automatonhost.com, and writes it to a file that ops/soll.mjs can
 // load with --source.
 //
 //   node --import tsx ops/soll-live.mjs --out <file>
@@ -20,7 +20,7 @@ if (at < 0 || !args[at + 1] || args.length !== 2) {
 const out = path.resolve(args[at + 1]);
 
 // Before the import: the page takes its origin from the environment on every request.
-process.env.CP_PUBLIC_URL = "https://postyourprice.com";
+process.env.CP_PUBLIC_URL = "https://automatonhost.com";
 const { createApp } = await import("../src/app.ts");
 const { openDb } = await import("../src/db.ts");
 

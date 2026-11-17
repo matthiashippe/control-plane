@@ -14,7 +14,7 @@
  *   CP_API_KEY   the key from POST /v1/auth/api-keys. Wins over the key file.
  *   CP_KEY_FILE  where the key of an account created by start_automaton is kept, default
  *                ~/.config/control-plane/api-key, mode 0600. A file other users can read is refused.
- *   CP_URL       base URL of the control plane, default https://cp.hippe.eu
+ *   CP_URL       base URL of the control plane, default https://automatonhost.com
  *
  * The key is never written to stdout or stderr: every tool result and every log line runs through
  * redact() or scrub() first, because an agent host shows tool output to a model and often logs it
@@ -34,7 +34,7 @@ import { dirname, join } from "node:path";
 
 export const SERVER_NAME = "control-plane-bounties";
 export const SERVER_VERSION = "0.1.0";
-export const DEFAULT_BASE_URL = "https://cp.hippe.eu";
+export const DEFAULT_BASE_URL = "https://automatonhost.com";
 
 /**
  * Protocol versions this server can speak. An MCP client sends the one it wants in `initialize`;
@@ -515,7 +515,7 @@ export const AUTOMATON_TOOLS = [
   {
     name: "start_automaton",
     description:
-      "Start an automaton: an agent that runs on its own in a sandbox of PostYourPrice and pays for " +
+      "Start an automaton: an agent that runs on its own in a sandbox on automatonhost.com and pays for " +
       "its thinking from your account, never more per day than the daily limit. The first time on " +
       "this machine there is no account yet: the answer then carries a QR code (`qr`), a link (`url`) " +
       "and a number (`match`). Show `qr` exactly as it is in a code block, with the link and the " +

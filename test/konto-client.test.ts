@@ -137,6 +137,11 @@ describe("konto client", () => {
     // One passkey, for this site.
     expect(seen).toHaveLength(1);
     expect((seen[0] as { publicKey: { rp: { id: string } } }).publicKey.rp.id).toBe("localhost");
+    // Named after the site the person created it on, so the key chain shows it under that name.
+    const publicKey = (seen[0] as { publicKey: { rp: { name: string }; user: { name: string; displayName: string } } }).publicKey;
+    expect(publicKey.rp.name).toBe("automatonhost.com");
+    expect(publicKey.user.name).toMatch(/^automatonhost\.com \d{4}-\d{2}-\d{2}$/);
+    expect(publicKey.user.displayName).toBe(publicKey.user.name);
 
     // The signup: the Auth Proxy configuration in its header, the passkey, a key of the tab for two minutes, one Ethereum wallet.
     const signup = turnkey.calls[0];
@@ -148,7 +153,7 @@ describe("konto client", () => {
     expect(auth.challenge).toMatch(/^[A-Za-z0-9_-]{43}$/);
     expect(signup.body.apiKeys).toEqual([expect.objectContaining({ curveType: "API_KEY_CURVE_P256", expirationSeconds: "120" })]);
     expect(signup.body.wallet).toEqual({
-      walletName: "PostYourPrice",
+      walletName: "automatonhost.com",
       accounts: [{ curve: "CURVE_SECP256K1", pathFormat: "PATH_FORMAT_BIP32", path: "m/44'/60'/0'/0/0", addressFormat: "ADDRESS_FORMAT_ETHEREUM" }],
     });
     expect(turnkey.calls).toHaveLength(2);

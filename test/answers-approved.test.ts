@@ -20,11 +20,11 @@ const OTHER = [
   "<!-- Zweiter Entwurf, intern -->",
   "The 402 comes from the proxy, not from the runtime. Retry with the header set.",
   "",
-  "Disclosure: I run PostYourPrice (https://postyourprice.com), a control plane for this runtime.",
+  "Disclosure: I run automatonhost.com (https://automatonhost.com), a control plane for this runtime.",
   "",
 ].join("\n");
 const OTHER_BODY =
-  "The 402 comes from the proxy, not from the runtime. Retry with the header set.\n\nDisclosure: I run PostYourPrice (https://postyourprice.com), a control plane for this runtime.\n";
+  "The 402 comes from the proxy, not from the runtime. Retry with the header set.\n\nDisclosure: I run automatonhost.com (https://automatonhost.com), a control plane for this runtime.\n";
 const FOLDER = ["--folder", "goals/kanal/antworten"];
 
 describe("the approval is the hash of the approved text", () => {

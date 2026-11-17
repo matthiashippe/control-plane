@@ -25,8 +25,8 @@ export const FAIL_REASONS: Record<FailReason, string> = {
 };
 
 const TITLES = {
-  passkey: "Create your account | PostYourPrice",
-  failed: "No account created | PostYourPrice",
+  passkey: "Create your account | automatonhost.com",
+  failed: "No account created | automatonhost.com",
 } as const;
 
 /** The two blocks of the account step, as in the SOLL sources. */
@@ -59,11 +59,11 @@ function body(page: KontoPage): string {
     <div class="hero-text balanced">
       <p class="eyebrow">Last step</p>
       <h1>Create your account with a passkey</h1>
-      <p class="sub">PostYourPrice can charge up to ${usd(page.dailyLimitUsdc)} a day, only for ${name}.</p>
+      <p class="sub">We can charge up to ${usd(page.dailyLimitUsdc)} a day, only for ${name}.</p>
       <div class="grant">
         <ul class="feats">
           <li>Only you can open the account, with your face or fingerprint.</li>
-          <li>PostYourPrice never sees your passkey and cannot open the account.</li>
+          <li>We never see your passkey and cannot open the account.</li>
         </ul>
       </div>
       <div class="cta wide">

@@ -1,13 +1,13 @@
 {
-  "name": "postyourprice",
+  "name": "automatonhost",
   "owner": {
-    "name": "PostYourPrice"
+    "name": "automatonhost.com"
   },
   "plugins": [
     {
       "name": "automaton",
       "source": "./mcp",
-      "description": "Start an automaton from Claude Code: it runs in a sandbox of PostYourPrice and pays from your account up to a daily limit you set on your phone."
+      "description": "Start an automaton from Claude Code: it runs in a sandbox on automatonhost.com and pays from your account up to a daily limit you set on your phone."
     }
   ]
 }
