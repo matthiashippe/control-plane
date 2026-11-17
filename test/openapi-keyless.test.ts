@@ -1,5 +1,5 @@
 import "./yield-between-tests";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createApp } from "../src/app.js";
 import { openDb } from "../src/db.js";
 
@@ -88,5 +88,95 @@ describe("POST /v1/auth/keyless in /openapi.json", () => {
     const { description } = await keylessOperation(setup());
     expect(description).toContain("everybody shares 7 keys a day");
     expect(description).toContain("own cap of 2 a day");
+  });
+});
+
+/**
+ * The 429 of the keyless door, described the way the door answers it.
+ *
+ * Three caps answer 429 on this path: the keys everybody shares today (`daily_limit`), the own cap of
+ * a declared crawler (`crawler_daily_limit`) and the limiter per address in front of every path that
+ * works without a key (`rate_limited`). An agent that reads only the document has to learn from it
+ * which one hit it, so the schema lists exactly these codes and each body of a real 429 fits it.
+ */
+type LimitSchema = {
+  type?: string;
+  minimum?: number;
+  description?: string;
+  enum?: string[];
+  properties?: Record<string, LimitSchema>;
+  required?: string[];
+};
+
+const CRAWLER_AGENT = "ExampleBot/1.0 (+https://example.com/bot)";
+
+async function limitSchema(app: ReturnType<typeof createApp>): Promise<LimitSchema> {
+  const res = await app.request("/openapi.json");
+  expect(res.status).toBe(200);
+  const doc = (await res.json()) as {
+    paths: Record<string, { post: { responses: Record<string, { content?: Record<string, { schema: LimitSchema }> }> } }>;
+  };
+  const schema = doc.paths["/v1/auth/keyless"].post.responses["429"].content?.["application/json"]?.schema;
+  expect(schema).toBeDefined();
+  return schema as LimitSchema;
+}
+
+async function mint(app: ReturnType<typeof createApp>, userAgent: string, address: string) {
+  return app.request("/v1/auth/keyless", {
+    method: "POST",
+    headers: { "user-agent": userAgent, "x-forwarded-for": address },
+  });
+}
+
+beforeEach(() => {
+  delete process.env.CP_AGENT_MINTS_PER_DAY;
+  delete process.env.CP_CRAWLER_MINTS_PER_DAY;
+});
+
+describe("the 429 of POST /v1/auth/keyless in /openapi.json", () => {
+  it("the 429 schema of POST /v1/auth/keyless lists exactly the codes the door answers with", async () => {
+    process.env.CP_AGENT_MINTS_PER_DAY = "1";
+    process.env.CP_CRAWLER_MINTS_PER_DAY = "1";
+    const capped = setup();
+    const bodies: Record<string, unknown>[] = [];
+
+    expect((await mint(capped, "node", "192.0.2.60")).status).toBe(201);
+    const everybody = await mint(capped, "node", "192.0.2.61");
+    expect(everybody.status).toBe(429);
+    bodies.push((await everybody.json()) as Record<string, unknown>);
+
+    expect((await mint(capped, CRAWLER_AGENT, "192.0.2.62")).status).toBe(201);
+    const crawler = await mint(capped, CRAWLER_AGENT, "192.0.2.63");
+    expect(crawler.status).toBe(429);
+    bodies.push((await crawler.json()) as Record<string, unknown>);
+
+    const limited = createApp({ db: openDb(":memory:"), rateLimit: { limit: 1, windowMs: 60_000 } });
+    expect((await mint(limited, "node", "192.0.2.64")).status).toBe(201);
+    const perAddress = await mint(limited, "node", "192.0.2.64");
+    expect(perAddress.status).toBe(429);
+    bodies.push((await perAddress.json()) as Record<string, unknown>);
+
+    const schema = await limitSchema(capped);
+    const codes = bodies.map((body) => body.error as string).sort();
+    expect(new Set(codes).size).toBe(3);
+    expect([...(schema.properties?.error?.enum ?? [])].sort()).toEqual(codes);
+
+    const properties = Object.keys(schema.properties ?? {});
+    for (const body of bodies) {
+      for (const field of schema.required ?? []) expect(body, `${body.error} lacks ${field}`).toHaveProperty(field);
+      for (const field of Object.keys(body)) expect(properties, `${body.error} sends ${field}`).toContain(field);
+    }
+  });
+
+  it("the 429 schema of POST /v1/auth/keyless says what each code means", async () => {
+    const schema = await limitSchema(setup());
+    const error = schema.properties?.error;
+    expect(error?.enum?.length ?? 0).toBeGreaterThan(0);
+    for (const code of error?.enum ?? []) expect(error?.description, code).toContain(code);
+    expect(error?.description).toContain("midnight UTC");
+
+    const retry = schema.properties?.retry_after_seconds;
+    expect(retry?.type).toBe("integer");
+    expect(retry?.minimum).toBe(0);
   });
 });
