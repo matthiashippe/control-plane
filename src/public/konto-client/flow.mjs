@@ -123,7 +123,7 @@ export async function createPasskey({ create, random, rpId, name }) {
   try {
     cred = await create({
       publicKey: {
-        rp: { id: rpId, name: "PostYourPrice" },
+        rp: { id: rpId, name: "automatonhost.com" },
         user: { id: random(32), name, displayName: name },
         challenge,
         pubKeyCredParams: [{ type: "public-key", alg: -7 }, { type: "public-key", alg: -257 }],
@@ -170,7 +170,7 @@ export async function signUpWithPasskey({ fetch: fetchFn, proxyId, passkey, sess
     authenticators: [{ authenticatorName: `passkey-${nowMs}`, challenge: passkey.challenge, attestation: passkey.attestation }],
     apiKeys: [{ apiKeyName: `tab-${nowMs}`, publicKey: sessionPublicKey, curveType: "API_KEY_CURVE_P256", expirationSeconds: SESSION_KEY_SECONDS }],
     oauthProviders: [],
-    wallet: { walletName: "PostYourPrice", accounts: [ETHEREUM_ACCOUNT] },
+    wallet: { walletName: "automatonhost.com", accounts: [ETHEREUM_ACCOUNT] },
   });
   const data = await postJson(fetchFn, `${AUTH_PROXY_URL}/v1/signup_v2`, { "X-Auth-Proxy-Config-ID": proxyId }, body);
   const owner = data.wallet && Array.isArray(data.wallet.addresses) ? data.wallet.addresses[0] : null;
@@ -440,7 +440,7 @@ export async function runKonto(deps, page) {
   }
   const nowMs = now();
   const key = await sessionKey(subtle);
-  const passkey = await createPasskey({ create, random, rpId, name: `PostYourPrice ${new Date(nowMs).toISOString().slice(0, 10)}` });
+  const passkey = await createPasskey({ create, random, rpId, name: `automatonhost.com ${new Date(nowMs).toISOString().slice(0, 10)}` });
   const { organizationId, owner, wallet } = await signUpWithPasskey({ fetch: fetchFn, proxyId: page.proxyId, passkey, sessionPublicKey: key.publicKey, nowMs });
   const salt = BigInt(`0x${hex(random(32))}`);
   const signed = await signPermission({
