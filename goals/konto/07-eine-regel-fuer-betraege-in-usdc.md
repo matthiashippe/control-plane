@@ -1,7 +1,7 @@
 # Konto Goal 07: Eine Regel für Beträge in USDC, und ihre Fehlerantworten sind getestet
 
 ## Status
-PLANNED
+DONE
 
 ## Active Objective
 Das Tageslimit eines zahlenden Kontos und der Betrag eines Handoffs nehmen nie verschiedene Beträge an, und eine Änderung an der
@@ -66,7 +66,7 @@ der nächsten Änderung auseinanderlaufen.
 - Was danach kommt: konto 08 legt den Browser-Treiber der SOLL-Werkzeuge zusammen.
 
 ## Done Condition
-- [ ] Beträge in atomaren USDC liest genau eine Funktion `parseUsdc` in `src/konto/usdc.ts`, `/v1/konto/limit` und `POST /v1/handoff`
+- [x] Beträge in atomaren USDC liest genau eine Funktion `parseUsdc` in `src/konto/usdc.ts`, `/v1/konto/limit` und `POST /v1/handoff`
       importieren sie, und keine Antwort ändert sich.
       MVP: Funktion, weil das Tageslimit des Kontos und der Betrag des Handoffs sonst bei der nächsten Änderung verschiedene Beträge
       annehmen (Vorschlag konto-nacharbeit-2026-11-17-1).
@@ -76,23 +76,23 @@ der nächsten Änderung auseinanderlaufen.
       Prüfung: `git grep -n parseLimit -- src test | wc -l` muss `0` ausgeben.
       Prüfung: `git diff origin/dev...HEAD -- src | grep -E '^[-+]' | grep -vE '^(\+\+\+|---) ' | grep -cE 'message|error: "|, (400|403|404|503)\)'` muss `0` ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/konto-limit.test.ts test/konto-limit-account.test.ts test/konto-limit-period.test.ts test/konto-limit-switch.test.ts test/konto-client-limit.test.ts test/handoff-api.test.ts test/handoff-page.test.ts test/konto-account.test.ts test/konto-deposit.test.ts test/konto-payout.test.ts test/mcp-automaton.test.ts` muss Exit-Code 0 haben.
-- [ ] `test/konto-limit.test.ts` prüft 400 `invalid_limit` an `POST /v1/konto/limit`, 400 `invalid_handoff` mit der Meldung zum Format an
+- [x] `test/konto-limit.test.ts` prüft 400 `invalid_limit` an `POST /v1/konto/limit`, 400 `invalid_handoff` mit der Meldung zum Format an
       `step: "limit"` von `POST /v1/handoff` und 404 `no_account` an allen drei Stellen, und das Limit bleibt danach unverändert.
       MVP: Funktion, weil ein falsch angenommener Betrag das Tageslimit eines zahlenden Kontos setzt und heute kein Test das bemerkt
       (Vorschlag konto-nacharbeit-2026-11-17-2).
       Prüfung: `for k in invalid_limit invalid_handoff no_account; do grep -cE "^\s*it\(\"[^\"]*\b$k\b" test/konto-limit.test.ts; done` muss dreimal genau `1` ausgeben.
       Prüfung: `node -e 'const s=require("fs").readFileSync("test/konto-limit.test.ts","utf8");const miss=["\"0\"","\"1.5\"","\"-10000\"","\"15000\"","\"10005000\"","positive whole number of atomic USDC","DELETE FROM konto_accounts","invalid_limit","invalid_handoff","no_account"].filter(x=>!s.includes(x));if(miss.length){console.error(miss);process.exit(1)}console.log("faelle ok")'` muss `faelle ok` ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/konto-limit.test.ts -t 'invalid_limit|invalid_handoff|no_account' --reporter=verbose 2>&1 | grep -cE '✓.*(invalid_limit|invalid_handoff|no_account)'` muss `3` ausgeben.
-- [ ] Jede der zwei Mutationen der einen Regel macht die Fälle zu `invalid_limit` und `invalid_handoff` rot, belegt an einer Kopie im
+- [x] Jede der zwei Mutationen der einen Regel macht die Fälle zu `invalid_limit` und `invalid_handoff` rot, belegt an einer Kopie im
       `mktemp`-Ordner; am unveränderten Stand sind sie grün.
       MVP: Funktion, weil erst die Mutation beweist, dass eine Änderung an der Regel in `check` rot wird, und das ist das Ziel dieses
       Goals.
       Prüfung: `for m in 's/ && n % 10_000n === 0n//' 's/n > 0n/n >= 0n/'; do T=$(mktemp -d); git archive HEAD | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; cp $T/src/konto/usdc.ts $T/orig; sed -i "$m" $T/src/konto/usdc.ts; cmp -s $T/orig $T/src/konto/usdc.ts && echo "sed-miss $m"; for k in invalid_limit invalid_handoff; do (cd $T && PATH=/usr/bin:$PATH pnpm -s vitest run test/konto-limit.test.ts -t $k >/dev/null 2>&1); echo "$k=$?"; done; done` muss genau die vier Zeilen `invalid_limit=1`, `invalid_handoff=1`, `invalid_limit=1`, `invalid_handoff=1` ausgeben (je Mutation beide Fälle rot) und darf `sed-miss` nicht ausgeben.
       Prüfung: `T=$(mktemp -d); git archive HEAD | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; for k in invalid_limit invalid_handoff no_account; do (cd $T && PATH=/usr/bin:$PATH pnpm -s vitest run test/konto-limit.test.ts -t $k >/dev/null 2>&1); echo "$k=$?"; done` muss genau `invalid_limit=0`, `invalid_handoff=0` und `no_account=0` ausgeben.
-- [ ] Die Entscheidungen stehen mit Grund in `goals/konto/ANNAHMEN.md`.
+- [x] Die Entscheidungen stehen mit Grund in `goals/konto/ANNAHMEN.md`.
       MVP: Funktion, weil die Linsen und die nächsten Goals der Kette gegen diese Annahmen prüfen.
       Prüfung: `awk '/^## Goal 07/{f=1;next} /^## /{f=0} f' goals/konto/ANNAHMEN.md | grep -cE "^- .+, weil .+"` muss mindestens `3` ausgeben.
-- [ ] Der Diff bleibt in den Pfaden dieses Goals, kein Test wird schwächer, kein neues Paket, kein Schlüssel im Diff, keine andere
+- [x] Der Diff bleibt in den Pfaden dieses Goals, kein Test wird schwächer, kein neues Paket, kein Schlüssel im Diff, keine andere
       Goal-Datei geändert, und `check` ist grün.
       MVP: Funktion, weil der Merge über `deploy.yml` ausrollt und zahlende Kunden den Stand tragen.
       Prüfung: `git diff --name-only origin/dev...HEAD | grep -vE '^(src/konto/(usdc|limit)\.ts|src/handoff/routes\.ts|test/konto-(limit|usdc)\.test\.ts|goals/konto/07-eine-regel-fuer-betraege-in-usdc\.md|goals/konto/verdicts/07-[A-Za-z0-9._-]+\.md|goals/konto/ANNAHMEN\.md|goals/_vorschlaege/konto-[a-z0-9.-]+\.md)$' | wc -l` muss `0` ausgeben.
@@ -102,7 +102,14 @@ der nächsten Änderung auseinanderlaufen.
       Prüfung: `git diff origin/dev...HEAD | grep -E '^[+]' | grep -iE "(api[_-]?key|secret|token|private[_-]?key)[\"' ]*[:=] *[\"']?[A-Za-z0-9_+/=-]{16,}|BEGIN [A-Z ]*PRIVATE KEY|cnwy_k_[A-Za-z0-9_-]{16,}" | wc -l` muss `0` ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung (Netz): `n=$(gh pr list -R matthiashippe/control-plane --head goal/konto-07 --state open --json number -q '.[0].number'); gh pr checks "$n" -R matthiashippe/control-plane | awk -F'\t' '$1=="check" && $2=="pass"' | wc -l` muss mindestens `1` ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] Der Fall zu `no_account` in `test/konto-limit.test.ts` prüft auch, dass `step: "limit"` mit einem Schlüssel ohne Konto keinen
+      Handoff anlegt: Die Zahl der Zeilen in `handoffs` ist nach den drei Anfragen gleich wie davor.
+      MVP: Funktion, weil Acceptance Criterion 3 „legt nie einen Handoff an“ auch für einen Schlüssel ohne Konto verlangt und heute nur
+      der Fall zu `invalid_handoff` die Zeilen zählt; ein Handoff, der vor der Prüfung auf das Konto entsteht, bliebe grün (Kritik
+      Tech Lead, 2026-11-17).
+      Prüfung: `awk '/it\("answers 404 no_account/{f=1} f&&/^  }\);/{print; exit} f' test/konto-limit.test.ts | grep -c 'FROM handoffs'` muss mindestens `1` ausgeben.
+      Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/konto-limit.test.ts -t no_account` muss Exit-Code 0 haben.
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Für denselben Betrag geben `/v1/konto/limit` und `POST /v1/handoff` dieselbe Entscheidung, weil beide dieselbe Funktion fragen.
@@ -129,5 +136,9 @@ der nächsten Änderung auseinanderlaufen.
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-17 Zyklus 1: Punkte 1, 2, 3, 4, 5 gebaut: `parseUsdc` in `src/konto/usdc.ts`, `parseLimit` gestrichen, drei neue Fälle in `test/konto-limit.test.ts` (vor dem Umbau mit beiden Mutationen an den alten Kopien rot gesehen), Annahmen unter `## Goal 07`. Prüfbefehle: P1 `src/konto/usdc.ts:1`, `src/konto/usdc.ts`, `1`/`1`, `0`, `0`, 11 Dateien 103 Tests Exit 0; P2 `1`/`1`/`1`, `faelle ok`, `3`; P3 Mutationen `invalid_limit=1`, `invalid_handoff=1`, `invalid_limit=1`, `invalid_handoff=1` ohne `sed-miss`, unverändert `invalid_limit=0`, `invalid_handoff=0`, `no_account=0`; P4 `8`; P5 `0`, `0`, `pakete gleich`, `goals gleich`, `0`, `check` Exit 0 (215 Dateien, 2315 Tests), Job `check` am PR siehe Kommentar.
+- 2026-11-17 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, nach Merge von `dev` (f53113e) in den Goal-Branch alle Prüfbefehle neu gefahren. Prüfbefehle: P1 `src/konto/usdc.ts:1`, `src/konto/usdc.ts`, `1`/`1`, `0`, `0`, 11 Dateien 103 Tests Exit 0; P2 `1`/`1`/`1`, `faelle ok`, `3`; P3 Mutationen `invalid_limit=1`, `invalid_handoff=1`, `invalid_limit=1`, `invalid_handoff=1` ohne `sed-miss`, unverändert `invalid_limit=0`, `invalid_handoff=0`, `no_account=0`; P4 `8`; P5 `0`, `0`, `pakete gleich`, `goals gleich`, `0`, `check` Exit 0 (215 Dateien, 2315 Tests), Jobs `check` und `e2e` am Kopf siehe Kommentar.
+- 2026-11-17 Zyklus 3: Punkt 6 gebaut, der Fall zu `no_account` zählt die Zeilen in `handoffs` vor und nach den drei Anfragen (an einer Kopie im `mktemp`-Ordner rot gesehen mit einem Handoff vor der Prüfung auf das Konto: `expected 2 to be 1`), Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6. Prüfbefehle: P6 `1`, Exit 0; P1 `src/konto/usdc.ts:1`, `src/konto/usdc.ts`, `1`/`1`, `0`, `0`, 11 Dateien Exit 0; P2 `1`/`1`/`1`, `faelle ok`, `3`; P3 `invalid_limit=1`, `invalid_handoff=1`, `invalid_limit=1`, `invalid_handoff=1` ohne `sed-miss`, unverändert `invalid_limit=0`, `invalid_handoff=0`, `no_account=0`; P4 `8`; P5 `0`, `0`, `pakete gleich`, `goals gleich`, `0`, `check` Exit 0 (2315 Tests), Jobs `check` und `e2e` am Kopf siehe Kommentar.
+- 2026-11-17 Release: PASS K und B (Zyklus 3), DONE.
 
 ## Blockers
