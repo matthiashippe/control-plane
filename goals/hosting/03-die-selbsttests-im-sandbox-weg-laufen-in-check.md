@@ -1,7 +1,7 @@
 # Hosting Goal 03: Die Selbsttests der Live-Läufe im Sandbox-Weg laufen in check
 
 ## Status
-PLANNED
+PAUSED
 
 ## Active Objective
 Die Selbsttests von `ops/automaton-live.sh` (Live-Prüfung des gehosteten Automatons, sandbox 08) und `ops/runtime-sandbox.sh`
@@ -134,3 +134,4 @@ des gehosteten Automatons oder den Stempel der Runtime bricht, und erst das näc
 
 ## Blockers
 Keine.
+- Pause: Kurs-Check 2026-11-17, Test-Härtung aus zwei Nacharbeit-Vorschlägen (sandbox-nacharbeit-2026-11-17-1 und -8) ohne Fehler eines echten Nutzers, bringt das Abschlusskriterium (Ledger-Zeile einer fremden Sandbox) nicht näher; gleiche Art wie messung 11 und 12, die der Kurs-Check vom 17.11., 02:30 pausiert hat
