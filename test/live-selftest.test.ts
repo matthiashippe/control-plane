@@ -126,9 +126,88 @@ describe("ops/live.sh", () => {
     expect(run.stdout).toContain(
       "planted key-cleanup foreign-living: FAIL key-cleanup: the next run deleted the folder of a run whose process lives",
     );
+    // The check `hosts` (goals/umzug/01, point 6): every host of the service and www.automatonhost.com, before and after
+    // the switch of the canonical host, in both directions.
+    expect(run.stdout).toContain("planted hosts step before: OK hosts: canonical postyourprice.com, ");
+    expect(run.stdout).toContain("planted hosts step after: OK hosts: canonical automatonhost.com, ");
+    expect(run.stdout).toContain("planted hosts step silent: FAIL hosts: cp.hippe.eu /health no answer");
+    expect(run.stdout).toContain(
+      "planted hosts step two-canonical: FAIL hosts: postyourprice.com / answered 200 next to automatonhost.com, two canonical hosts",
+    );
+    expect(run.stdout).toContain(
+      "planted hosts step foreign-301: FAIL hosts: cp.hippe.eu / answered 301 to https://example.com/, expected https://postyourprice.com/",
+    );
+    expect(run.stdout).toContain(
+      "planted hosts step health-301: FAIL hosts: automatonhost.com /health answered 301 to https://postyourprice.com/health, expected 200 without a redirect",
+    );
+    expect(run.stdout).toMatch(/^planted hosts step live: OK hosts: canonical postyourprice\.com, /m);
+    expect(run.stdout).toContain("planted hosts step live-silent: FAIL hosts: cp.hippe.eu /health no answer");
     expect(run.stdout.trim().split("\n").at(-1)).toBe("LIVE SELFTEST OK");
     expect(run.status).toBe(0);
   }, 300_000);
+});
+
+/**
+ * The check `hosts` (goals/umzug/01, point 6) through `ops/live.sh --judge hosts`: one measured line per request on stdin,
+ * `<host> <path> <status> <Location or ->`, as hosts_live prints them. Fast, so a broken judge shows here without the
+ * minute the selftest takes.
+ */
+describe("ops/live.sh check hosts", () => {
+  const HOSTS = ["automatonhost.com", "postyourprice.com", "cp.hippe.eu"];
+
+  function measured(canonical: string, changes: Record<string, string> = {}): string {
+    const lines = new Map<string, string>();
+    for (const h of HOSTS) {
+      lines.set(`${h} /health`, "200 -");
+      lines.set(`${h} /`, h === canonical ? "200 -" : `301 https://${canonical}/`);
+    }
+    lines.set("www.automatonhost.com /health", "308 https://automatonhost.com/health");
+    for (const [k, v] of Object.entries(changes)) lines.set(k, v);
+    return [...lines].map(([k, v]) => `${k} ${v}`).join("\n") + "\n";
+  }
+
+  function judgeHosts(input: string): string {
+    const run = spawnSync("bash", [LIVE_SH, "--judge", "hosts"], { input, encoding: "utf8", timeout: 30_000 });
+    expect(run.status).toBe(0);
+    return run.stdout.trim();
+  }
+
+  it("hosts: before the switch, canonical postyourprice.com, is OK", () => {
+    expect(judgeHosts(measured("postyourprice.com"))).toMatch(/^OK hosts: canonical postyourprice\.com, /);
+  });
+
+  it("hosts: after the switch, canonical automatonhost.com, is OK", () => {
+    expect(judgeHosts(measured("automatonhost.com"))).toMatch(/^OK hosts: canonical automatonhost\.com, /);
+  });
+
+  it("hosts: a host without an answer is FAIL", () => {
+    const got = judgeHosts(measured("postyourprice.com", { "automatonhost.com /health": "000 -", "automatonhost.com /": "000 -" }));
+    expect(got).toBe("FAIL hosts: automatonhost.com /health no answer");
+  });
+
+  it("hosts: two hosts answering 200 on / is FAIL", () => {
+    const got = judgeHosts(measured("postyourprice.com", { "cp.hippe.eu /": "200 -" }));
+    expect(got).toBe("FAIL hosts: cp.hippe.eu / answered 200 next to postyourprice.com, two canonical hosts");
+  });
+
+  it("hosts: a 301 to a foreign host is FAIL", () => {
+    const got = judgeHosts(measured("automatonhost.com", { "postyourprice.com /": "301 https://example.com/" }));
+    expect(got).toBe("FAIL hosts: postyourprice.com / answered 301 to https://example.com/, expected https://automatonhost.com/");
+  });
+
+  it("hosts: a redirect of /health is FAIL", () => {
+    const got = judgeHosts(measured("automatonhost.com", { "cp.hippe.eu /health": "301 https://automatonhost.com/health" }));
+    expect(got).toMatch(/^FAIL hosts: cp\.hippe\.eu \/health answered 301 /);
+  });
+
+  it("hosts: www.automatonhost.com without its 308 to the apex is FAIL", () => {
+    const got = judgeHosts(measured("automatonhost.com", { "www.automatonhost.com /health": "200 -" }));
+    expect(got).toMatch(/^FAIL hosts: www\.automatonhost\.com \/health answered 200, /);
+  });
+
+  it("hosts: live mode runs the check and counts its FAIL", () => {
+    expect(readFileSync(LIVE_SH, "utf8")).toMatch(/^\s*say "\$\(judge_hosts "\$\(hosts_live\)"\)"$/m);
+  });
 });
 
 /**

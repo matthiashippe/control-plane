@@ -5,6 +5,7 @@
 #   ops/live.sh              against https://postyourprice.com and, over ssh, the production ledger
 #   ops/live.sh --selftest   no network: proves every check against planted data, in both directions
 #   ops/live.sh --judge domains-search <status>   no network: judges one answer of the search, its body on stdin
+#   ops/live.sh --judge hosts   no network: judges the lines of hosts_live, `<host> <path> <status> <Location or ->`, on stdin
 #
 # One line per check, `OK <check>: ...` or `FAIL <check>: ...`, then `LIVE OK` or `LIVE FAIL`; exit 1
 # as soon as one check fails. Later goals append their live check here (a judge function, a planted
@@ -21,6 +22,11 @@
 # Checks:
 #   health   GET /health answers 200
 #   status   GET /v1/status answers 200 with a JSON object
+#   hosts    every host of the service (automatonhost.com, postyourprice.com, cp.hippe.eu, SERVICE_HOSTS in
+#            src/public/site.ts) answers https://<host>/health with 200 and no redirect; https://<host>/ answers 200 on
+#            exactly one of them, the canonical host, and 301 with Location https://<canonical>/ on the others; and
+#            https://www.automatonhost.com/health answers 308 with Location https://automatonhost.com/health (umzug 01).
+#            OK before and after the switch of CP_PUBLIC_URL, whichever host is canonical. Reads only
 #   refund   the credit for the five calls of 2026-11-10 whose answers never arrived
 #            (src/credits/aborted.ts) is in the ledger exactly once, over exactly 79229 mc
 #   domains  GET /v1/domains/search from the code-host (an own address, ops/own-ips.txt) without a key answers 401 from
@@ -239,6 +245,80 @@ judge_timeout_quote() {
   else
     echo "OK timeout-quote: ${head%%,*}: $summary"
   fi
+}
+
+# ---- hosts (umzug 01)
+
+# The hosts of the service (SERVICE_HOSTS in src/public/site.ts) and the www name Caddy sends to the apex with 308.
+HOSTS="automatonhost.com postyourprice.com cp.hippe.eu"
+HOSTS_WWW="www.automatonhost.com"
+HOSTS_WWW_TARGET="https://automatonhost.com/health"
+
+# $1 = the lines of hosts_live, one per request: `<host> <path> <status> <Location or ->`, status 000 without an answer; a
+# missing line counts as no answer. Judges /health of every host first, then / of every host, then the www name, and
+# names the first thing that is wrong as `<host> <path> <what>`.
+judge_hosts() {
+  local -A code=() loc=()
+  local h p c l canon="" n=0
+  while read -r h p c l; do
+    [ -n "$h" ] && [ -n "$p" ] || continue
+    code["$h $p"]="${c:-000}"
+    loc["$h $p"]="${l:--}"
+  done <<<"${1:-}"
+  for h in $HOSTS; do
+    c="${code["$h /health"]:-000}"
+    l="${loc["$h /health"]:--}"
+    case "$c" in
+      200) ;;
+      000) echo "FAIL hosts: $h /health no answer" && return ;;
+      3??) echo "FAIL hosts: $h /health answered $c to $l, expected 200 without a redirect" && return ;;
+      *) echo "FAIL hosts: $h /health answered $c, expected 200" && return ;;
+    esac
+  done
+  for h in $HOSTS; do
+    c="${code["$h /"]:-000}"
+    case "$c" in
+      200)
+        [ -z "$canon" ] || { echo "FAIL hosts: $h / answered 200 next to $canon, two canonical hosts" && return; }
+        canon="$h"
+        ;;
+      301) ;;
+      000) echo "FAIL hosts: $h / no answer" && return ;;
+      *) echo "FAIL hosts: $h / answered $c, expected 200 or 301" && return ;;
+    esac
+  done
+  [ -n "$canon" ] || { echo "FAIL hosts: ${HOSTS// /,} / answered 301 everywhere, no canonical host" && return; }
+  for h in $HOSTS; do
+    [ "$h" = "$canon" ] && continue
+    l="${loc["$h /"]:--}"
+    [ "$l" != - ] || { echo "FAIL hosts: $h / answered 301 without a Location, expected https://$canon/" && return; }
+    [ "$l" = "https://$canon/" ] || { echo "FAIL hosts: $h / answered 301 to $l, expected https://$canon/" && return; }
+    n=$((n + 1))
+  done
+  c="${code["$HOSTS_WWW /health"]:-000}"
+  l="${loc["$HOSTS_WWW /health"]:--}"
+  case "$c" in
+    308) ;;
+    000) echo "FAIL hosts: $HOSTS_WWW /health no answer" && return ;;
+    *) echo "FAIL hosts: $HOSTS_WWW /health answered $c, expected 308 to $HOSTS_WWW_TARGET" && return ;;
+  esac
+  [ "$l" = "$HOSTS_WWW_TARGET" ] || { echo "FAIL hosts: $HOSTS_WWW /health answered 308 to $l, expected $HOSTS_WWW_TARGET" && return; }
+  echo "OK hosts: canonical $canon, /health 200 on $((n + 1)) hosts, / 301 to https://$canon/ on $n hosts, $HOSTS_WWW/health 308 to $HOSTS_WWW_TARGET"
+}
+
+# The live part: /health and / of every host, /health of the www name, each without following a redirect. Prints one line
+# per request for judge_hosts; the Location keeps printable characters only and at most 200 of them.
+hosts_live() {
+  local h p out c l
+  for h in $HOSTS $HOSTS_WWW; do
+    for p in /health /; do
+      [ "$h" = "$HOSTS_WWW" ] && [ "$p" = / ] && continue
+      out="$(curl -s -o /dev/null -D - -w 'status=%{http_code}\n' --max-time 15 "https://$h$p")"
+      c="$(sed -n 's/^status=\([0-9][0-9][0-9]\)$/\1/p' <<<"$out" | tail -n 1)"
+      l="$(grep -i '^location:' <<<"$out" | tail -n 1 | sed 's/^[^:]*:[[:space:]]*//' | tr -cd '[:graph:]' | cut -c 1-200)"
+      echo "$h $p ${c:-000} ${l:--}"
+    done
+  done
 }
 
 # ---- handoff (konto 02)
@@ -1633,6 +1713,98 @@ selftest() {
   echo "planted key-cleanup leftover: $got"
   [ "${got%% *}" = FAIL ] || all_ok=0
 
+  # The check `hosts` (umzug 01), both directions: the measurement of a working setup before the switch of the canonical
+  # host (postyourprice.com) and after it (automatonhost.com), then one thing wrong at a time. An OK case must name its
+  # canonical host, a FAIL case must say FAIL hosts.
+  # $1 = canonical host, $2 = changed lines `<host> <path> <status> <Location or ->`, separated by `;`, each replacing
+  # the line of its host and path.
+  hosts_planted() {
+    local lines="" h ch ch_h ch_p
+    for h in $HOSTS; do
+      lines+="$h /health 200 -"$'\n'
+      if [ "$h" = "$1" ]; then lines+="$h / 200 -"$'\n'; else lines+="$h / 301 https://$1/"$'\n'; fi
+    done
+    lines+="$HOSTS_WWW /health 308 $HOSTS_WWW_TARGET"$'\n'
+    local -a chs=()
+    IFS=';' read -ra chs <<<"${2:-}"
+    for ch in "${chs[@]}"; do
+      read -r ch_h ch_p _ <<<"$ch"
+      [ -n "$ch_h" ] || continue
+      lines="$(awk -v k="$ch_h $ch_p " 'index($0, k) != 1' <<<"$lines")"$'\n'"$ch"$'\n'
+    done
+    printf '%s' "$lines"
+  }
+  local hc_case hc_name hc_canon hc_expect hc_changes
+  for hc_case in \
+    "before|postyourprice.com|OK postyourprice.com|" \
+    "after|automatonhost.com|OK automatonhost.com|" \
+    "cp-canonical|cp.hippe.eu|OK cp.hippe.eu|" \
+    "silent|postyourprice.com|FAIL|cp.hippe.eu /health 000 -;cp.hippe.eu / 000 -" \
+    "two-canonical|automatonhost.com|FAIL|postyourprice.com / 200 -" \
+    "foreign-301|postyourprice.com|FAIL|cp.hippe.eu / 301 https://example.com/" \
+    "health-301|postyourprice.com|FAIL|automatonhost.com /health 301 https://postyourprice.com/health" \
+    "health-502|automatonhost.com|FAIL|postyourprice.com /health 502 -" \
+    "no-location|automatonhost.com|FAIL|cp.hippe.eu / 301 -" \
+    "path-kept|automatonhost.com|FAIL|postyourprice.com / 301 https://automatonhost.com/health" \
+    "no-canonical|postyourprice.com|FAIL|postyourprice.com / 301 https://automatonhost.com/" \
+    "root-404|postyourprice.com|FAIL|automatonhost.com / 404 -" \
+    "missing-line|automatonhost.com|FAIL|cp.hippe.eu /health" \
+    "www-200|automatonhost.com|FAIL|$HOSTS_WWW /health 200 -" \
+    "www-301|automatonhost.com|FAIL|$HOSTS_WWW /health 301 $HOSTS_WWW_TARGET" \
+    "www-elsewhere|automatonhost.com|FAIL|$HOSTS_WWW /health 308 https://postyourprice.com/health" \
+    "www-silent|postyourprice.com|FAIL|$HOSTS_WWW /health 000 -"; do
+    IFS='|' read -r hc_name hc_canon hc_expect hc_changes <<<"$hc_case"
+    got="$(judge_hosts "$(hosts_planted "$hc_canon" "$hc_changes" | awk 'NF >= 3')")"
+    echo "planted hosts step $hc_name: $got"
+    case "$hc_expect" in
+      OK\ *) [[ "$got" == "OK hosts: canonical ${hc_expect#OK },"* ]] || all_ok=0 ;;
+      *) [[ "$got" == "FAIL hosts: "* ]] || all_ok=0 ;;
+    esac
+  done
+
+  # The same check through the real hosts_live, with a stand-in for curl that answers from the planted measurement of a
+  # working setup before the switch and writes every address it was asked for: each host and path once, seven requests,
+  # and the Location reaches judge_hosts. live-silent lets cp.hippe.eu give no answer, as curl does with 000.
+  hosts_curl() { # $1 = planted lines, then the arguments of curl
+    local lines="$1" prev="" w="" a url="" h p c l
+    shift
+    for a in "$@"; do
+      [ "$prev" = "-w" ] && w="$a"
+      prev="$a"
+      url="$a"
+    done
+    echo "$url" >>"$dir/hosts-urls"
+    h="${url#https://}"
+    p="/${h#*/}"
+    h="${h%%/*}"
+    read -r _ _ c l <<<"$(awk -v k="$h $p " 'index($0, k) == 1' <<<"$lines")"
+    c="${c:-000}"
+    if [ "$c" != 000 ]; then
+      printf 'HTTP/2 %s\r\ncontent-type: text/plain\r\n' "$c"
+      [ "${l:--}" = - ] || printf 'Location: %s\r\n' "$l"
+      printf '\r\n'
+    fi
+    printf '%b' "${w//%\{http_code\}/$c}"
+  }
+  local hl_case hl_name hl_changes hl_expect hl_n
+  for hl_case in "live||OK postyourprice.com" "live-silent|cp.hippe.eu /health 000 -;cp.hippe.eu / 000 -|FAIL"; do
+    IFS='|' read -r hl_name hl_changes hl_expect <<<"$hl_case"
+    : >"$dir/hosts-urls"
+    got="$(
+      HL_LINES="$(hosts_planted postyourprice.com "$hl_changes")"
+      curl() { hosts_curl "$HL_LINES" "$@"; }
+      judge_hosts "$(hosts_live)"
+    )"
+    echo "planted hosts step $hl_name: $got"
+    case "$hl_expect" in
+      OK\ *) [[ "$got" == "OK hosts: canonical ${hl_expect#OK },"* ]] || all_ok=0 ;;
+      *) [[ "$got" == "FAIL hosts: "* ]] || all_ok=0 ;;
+    esac
+    hl_n="$(sort -u "$dir/hosts-urls" | wc -l)"
+    [ "$hl_n" = 7 ] && [ "$(wc -l <"$dir/hosts-urls")" = 7 ] ||
+      { echo "FAIL selftest: hosts_live $hl_name asked for $hl_n different addresses, expected 7 once each"; all_ok=0; }
+  done
+
   if [ "$all_ok" = 1 ]; then
     echo "LIVE SELFTEST OK"
     return 0
@@ -1679,6 +1851,8 @@ live() {
   say "$(judge_status "$code" "$(head -c 1 "$body")")"
   rm -f "$body"
 
+  say "$(judge_hosts "$(hosts_live)")"
+
   body="$(mktemp -p "$LIVE_TMP")"
   code="$(curl -s -o "$body" -w '%{http_code}' --max-time 15 "$BASE$DOMAINS_PATH")"
   say "$(judge_domains "$code" "$(head -c 2000 "$body")")"
@@ -1719,6 +1893,7 @@ case "${1:-}" in
     # One judge without network, the answer's body on stdin (test/live-selftest.test.ts hands it the handler's answer).
     case "${2:-}" in
       domains-search) judge_domains_search "${3:-}" "$(head -c 4000)" ;;
+      hosts) judge_hosts "$(head -c 4000)" ;;
       sandbox-bg)
         # The start of the background exec of the check `sandbox`, the answer's body on stdin.
         bg_body="$(mktemp)"
