@@ -90,6 +90,19 @@
   `f8f8b95` (2026-11-17T16:39:12+00:00), und ihre Abnahme-Issues haben keine Abnahme danach; die Abnahme dieser Bilder steht in
   PRO-24257 (umzug 02 Punkt 2). kanal 01 und kanal 03 Punkt 3 bleiben `READY`. Die Zeilen stehen unter
   `## Abgelöst durch umzug 02` in `goals/konto/ANNAHMEN.md` (5), `goals/seite/ANNAHMEN.md` (1) und hier (1).
+- **Wechsel grün am 17.11.2026**, weil Matthias `CP_PUBLIC_URL` in PR #255 (`187ac7a`) auf `https://automatonhost.com` gesetzt
+  hat und `deploy.yml` grün durchlief: Die Abfragen von `hosts_live` aus `ops/live.sh`, nur lesend und ohne den vollen Lauf, der
+  eigene Sandboxes und Automatons anlegt, ergaben mit `bash ops/live.sh --judge hosts` die Zeile `OK hosts: canonical
+  automatonhost.com`; Gegenprobe mit gepflanztem `postyourprice.com / 200 -` ergab `FAIL hosts: … two canonical hosts`.
+  `curl` auf `https://postyourprice.com/` gab `301 https://automatonhost.com/`, auf `https://automatonhost.com/` `200`.
+- **Punkt 9, dritte Netz-Prüfung belegt erst den Rollout dieses Goals**, weil `LOOP.md` (Arbeitsweise) sagt, dass eine Zeile mit
+  `(Netz)` nur belegt, was schon ausgerollt ist, und die Live-Prüfung des Neuen der Release Manager nach dem Deploy macht: Am
+  17.11.2026 nach dem Wechsel zählt `curl -s https://automatonhost.com/` noch 8 Fundstellen des alten Namens, weil dort die
+  Startseite von `dev` ohne umzug 02 läuft; nach dem Merge dieses Goals und dem Rollout über `deploy.yml` muss sie 0 ausgeben.
+- **konto 07 ohne abgelöste Prüfbefehle**, weil es nach dem Lauf von Zyklus 1 auf `dev` fertig wurde und seine beiden Befehle,
+  die einen Pfad dieses Goals nennen (die vitest-Liste mit `test/konto-account.test.ts` und der Zähler über
+  `goals/konto/ANNAHMEN.md`), am Goal-Branch nach dem Merge von `dev` dieselbe Ausgabe wie auf `dev` geben (Exit 0, 103 Tests;
+  `8` und `8`).
 
 ## Abgelöst durch umzug 02 (Maker, 2026-11-17)
 

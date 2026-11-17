@@ -119,6 +119,9 @@ Danach Rollout über `deploy.yml` und `ops/live.sh`, das `OK hosts: canonical au
 ist es mehr als 0, kommt `/.well-known/webauthn` auf `postyourprice.com` vor den Wechsel.
 
 Stand des Wechsels: Gemessen am 17.11.2026 vor dem Gate, nur lesend: `konto_accounts=0`, `CP_KONTO_AUTH_PROXY_ID` leer,
-`bash ops/live.sh` mit `OK hosts: canonical postyourprice.com`. Der Wechsel liegt als Human Gate bei Matthias (umzug 02, Punkt 9).
-Grün ist er, wenn `ops/live.sh` danach `OK hosts: canonical automatonhost.com` meldet und `https://postyourprice.com/` mit 301 auf
-`https://automatonhost.com/` antwortet.
+`bash ops/live.sh` mit `OK hosts: canonical postyourprice.com`. Matthias hat die Zeile am 17.11.2026 geändert (PR #255, Merge
+`187ac7a` auf `dev`), `deploy.yml` lief grün durch. Danach, nur lesend gemessen mit den Abfragen von `hosts_live` aus
+`ops/live.sh` und `bash ops/live.sh --judge hosts`: `OK hosts: canonical automatonhost.com, /health 200 on 3 hosts, / 301 to
+https://automatonhost.com/ on 2 hosts, www.automatonhost.com/health 308 to https://automatonhost.com/health`. Der Wechsel ist
+damit grün. Bis umzug 02 selbst ausgerollt ist, zeigt `https://automatonhost.com/` noch die Seiten von `dev` mit dem alten Namen;
+das prüft der Release Manager nach dem Deploy.

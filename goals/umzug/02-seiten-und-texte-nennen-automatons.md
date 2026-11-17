@@ -1,7 +1,7 @@
 # Umzug Goal 02: Seiten und Texte nennen Automatons
 
 ## Status
-BLOCKED matthias
+ACTIVE
 
 ## Active Objective
 Nach außen heißt der Dienst `automatonhost.com`, und kein Text, den ein Besucher, ein Betreiber oder sein Automaton liest, nennt
@@ -214,7 +214,7 @@ und ein Betreiber aus einem Conway-Issue am Namen erkennen soll, was er hier bek
       Prüfung: `grep -cF 'is not in SERVICE_HOSTS, pages are not redirected' src/app.ts` muss 1 ausgeben.
       Prüfung: `T=$(mktemp -d); git archive HEAD | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; B=$(git merge-base origin/dev HEAD); git show $B:src/app.ts > $T/src/app.ts; (cd $T && PATH=/usr/bin:$PATH pnpm -s vitest run test/automatonhost.test.ts --reporter=json --outputFile=$T/r.json >/dev/null 2>&1); node -p "JSON.parse(require('fs').readFileSync('$T/r.json','utf8')).numFailedTests"; rm -rf $T` muss mindestens 1 ausgeben.
       Prüfung: `T=$(mktemp -d); git archive HEAD | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; sed -i 's#header("host")?.toLowerCase().replace([^;]*;#header("host")?.toLowerCase();#' $T/src/app.ts; grep -q 'header("host")?.toLowerCase();' $T/src/app.ts || echo sed-miss; (cd $T && PATH=/usr/bin:$PATH pnpm -s vitest run test/automatonhost.test.ts --reporter=json --outputFile=$T/r.json >/dev/null 2>&1); node -p "JSON.parse(require('fs').readFileSync('$T/r.json','utf8')).numFailedTests"; rm -rf $T` muss eine Zahl von mindestens 2 ausgeben und darf `sed-miss` nicht ausgeben.
-- [ ] `automatonhost.com` ist der kanonische Host: `deploy/docker-compose.prod.yml` auf `dev` setzt `CP_PUBLIC_URL` auf
+- [x] `automatonhost.com` ist der kanonische Host: `deploy/docker-compose.prod.yml` auf `dev` setzt `CP_PUBLIC_URL` auf
       `https://automatonhost.com` (geändert von Matthias am Human Gate), `postyourprice.com` leitet seine Startseite dorthin, und vor
       dem Gate ist die Zahl der Konten mit Passkey mit Befehl in den Annahmen gemessen.
       MVP: Funktion, weil Seiten, Stripe-Rücksprung, x402-Angebote und die `curl`-Beispiele erst damit den neuen Namen tragen.
@@ -230,7 +230,7 @@ und ein Betreiber aus einem Conway-Issue am Namen erkennen soll, was er hier bek
       Prüfung: `q=$(printf '\140'); cat goals/*/ANNAHMEN.md | grep -E '^- Abgelöst: .* durch umzug 02 ' | grep -vcE " durch umzug 02 Punkt [0-9]+, Ausgabe dann genau ${q}Exit [0-9]+, [^${q}]*${q} \\(Tech Lead, 2026-11-17\\)\$"` muss 0 ausgeben.
       Prüfung: `cat goals/*/ANNAHMEN.md | grep -cE '^- Abgelöst: .* durch umzug 02 '` muss mindestens 1 ausgeben.
       Prüfung: `grep -cE '^- [0-9-]+ Zyklus [0-9]+: .*abgelöst' goals/umzug/02-seiten-und-texte-nennen-automatons.md` muss mindestens 1 ausgeben.
-- [ ] Die Doku sagt, wie der Dienst nach außen heißt, was beim alten Namen bleibt und warum, wie das Plugin installiert wird, was beim
+- [x] Die Doku sagt, wie der Dienst nach außen heißt, was beim alten Namen bleibt und warum, wie das Plugin installiert wird, was beim
       Einschalten von Konto für den neuen Host zu tun ist und wie der Wechsel ausging; die Entscheidungen stehen mit Grund in den
       Annahmen.
       MVP: Funktion, weil das nächste Goal, das Text nach außen schreibt, sonst wieder den alten Namen nimmt.
@@ -280,7 +280,4 @@ und ein Betreiber aus einem Conway-Issue am Namen erkennen soll, was er hier bek
 - 2026-11-17 Zyklus 1: Punkte 1 bis 8, 10, 12 und 13 gebaut; 7 Prüfbefehle fertiger Goals abgelöst (konto 02, 03, 04, 05, 06 je 1, seite 01 1, umzug 01 1), Punkt 11 bis auf den Ausgang des Wechsels, Punkt 9 wartet am Human Gate. SOLL-Bilder `f8f8b95` (16:39 UTC), Abnahme des Design Reviewers 16:41 UTC, Seiten erst danach (`a78dce5`). Rot vor dem Fix: `test/automaton-name.test.ts` mit dem `src` der Merge-Basis 4 von 4 rot, `test/answers-host.test.ts` am alten Prüfwerkzeug 2 rot, `test/automatonhost.test.ts` am alten `src/app.ts` 1 rot und ohne Normalisierung des Hosts 2 rot, der neue Fall in `test/konto-client.test.ts` am alten `flow.mjs` rot. Prüfbefehle: Punkt 1 `0`, nichts, `start ok`, `30`, fünfmal `exit=0 0 defects`; Punkt 2 `1`, `abnahme ok 1`; Punkt 3 `0`, fünfmal `exit=0 0 defects`; Punkt 4 Exit 0, `4`, nichts, `4`, `0`, `2`, Selbsttest Exit 0; Punkt 5 `0`, `1`, `plugin ok`, `1`, `2`, Exit 0; Punkt 6 `0`, `3`, `1`, `gleich`, `2`, Exit 0; Punkt 7 `1`, `3`, Exit 0, `3`, `2`; Punkt 8 Exit 0, `21`, `1`, `1`, `2` ohne `sed-miss`; Punkt 9 `0` (Wechsel steht aus), `2`, Netz offen; Punkt 10 `0`, `7`, diese Zeile; Punkt 11 nichts, `10`; Punkt 12 `0`, `0`, `0`, `0`; Punkt 13 `check: grün in 265 s`, `e2e` am PR #252 `SUCCESS` (`572bd9f`).
 
 ## Blockers
-Art: matthias
-Aufgabe: In deploy/docker-compose.prod.yml auf dev die Zeile CP_PUBLIC_URL von https://postyourprice.com auf https://automatonhost.com ändern und mergen.
-Worum: Erst damit ist automatonhost.com der Name, unter dem Seiten, Stripe-Rücksprung und x402-Angebote erscheinen; die Datei ändert nur Matthias.
-Empfehlung: Im Terminal am Mac im Checkout von control-plane: git fetch origin && git switch -c umzug-wechsel origin/dev && sed -i '' 's#CP_PUBLIC_URL: https://postyourprice.com#CP_PUBLIC_URL: https://automatonhost.com#' deploy/docker-compose.prod.yml && git commit -am "umzug: CP_PUBLIC_URL auf automatonhost.com" && git push -u origin umzug-wechsel && gh pr create -B dev -f && gh pr merge --merge --admin
+Keine.
