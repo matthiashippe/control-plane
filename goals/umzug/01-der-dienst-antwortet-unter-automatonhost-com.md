@@ -1,7 +1,7 @@
 # Umzug Goal 01: Der Dienst antwortet unter automatonhost.com
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 `automatonhost.com` ist ein Host des Dienstes mit gültigem Zertifikat, `www.automatonhost.com` leitet mit 308 auf den Apex, und die
@@ -187,7 +187,7 @@ Automaton, der heute `https://postyourprice.com` oder `https://cp.hippe.eu` als 
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/host-lists.test.ts` muss Exit-Code 0 haben.
       Prüfung: `grep -cE 'from "\.\./src/public/site\.js"|from "\.\./ops/sandbox/sandboxd\.mjs"' test/host-lists.test.ts` muss mindestens 2 ausgeben.
       Prüfung: `T=$(mktemp -d); git archive HEAD | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; sed -i 's/^HOSTS=.*/HOSTS="automatonhost.com postyourprice.com"/' $T/ops/live.sh; sed -i 's/^PAYMENT_ZONES = .*/PAYMENT_ZONES = ("postyourprice.com",)/' $T/ops/sandbox/cloudflare.py; sed -i 's/|automatonhost\.com|\*\.automatonhost\.com//' $T/ops/sandbox/setup.sh; (cd $T && PATH=/usr/bin:$PATH pnpm -s vitest run test/host-lists.test.ts --reporter=json --outputFile=$T/r.json >/dev/null 2>&1); node -p "JSON.parse(require('fs').readFileSync('$T/r.json','utf8')).numFailedTests"; rm -rf $T` muss mindestens 3 ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Jede neue Testdatei und jeder neue Fall, der ein neues Verhalten verlangt, war vor dem Fix rot; die Zeile im Progress Log
@@ -216,6 +216,7 @@ Automaton, der heute `https://postyourprice.com` oder `https://cp.hippe.eu` als 
 - 2026-11-17 Zyklus 2: Abschluss gemeldet, Punkte 1 bis 9, nach Merge von `dev` (`8d69937`) am Kopf `91b7f21`. Prüfbefehle: Punkt 1 Exit 0, 17, 1, 0, Gegenprobe 5; Punkt 2 Exit 0, nichts fehlt; Punkt 3 1, 1, Valid configuration, 3; Punkt 4 SITE DNS SELFTEST OK, 0, `76.13.144.207`, `76.13.144.207`; Punkt 5 Exit 0, 16, 6, 1, Exit 0, Exit 0, Gegenprobe 3; Punkt 6 Exit 0, LIVE SELFTEST OK, 19, 10, 5; Punkt 7 nichts fehlt, 15; Punkt 8 0, 0, 0, 0; Punkt 9 `check` Exit 0, `e2e` SUCCESS.
 - 2026-11-17 Zyklus 3: Punkt 10 aus der Kritik gebaut, `test/host-lists.test.ts` mit einem Fall je Datei (`ops/live.sh`, `cloudflare.py`, `setup.sh`, `passablePublicUrl`, `sandboxd.mjs` gegen `SERVICE_HOSTS`), dazu `dev` (`c84d655`) gemergt; rot gesehen: drei verfälschte Dateien geben 3 rote Fälle, ein verfälschtes `service.ts` und ein zusätzlicher Host in `site.ts` färben die Fälle für live.sh, `passablePublicUrl` und sandboxd rot. Prüfbefehle am Kopf `7d99aa3`: Punkte 1 bis 8 wie in Zyklus 2 (Punkt 8 mit erlaubten Vorschlägen 0, 0, 0, 0); Punkt 9 `check` Exit 0, `e2e` SUCCESS; Punkt 10 Exit 0, 2, Gegenprobe 3.
 - 2026-11-17 Zyklus 4: Gap aus Verdict B Zyklus 3 behoben, die vier neuen Kommentarzeilen in `deploy/Caddyfile` stehen jetzt auf Englisch, dazu das überzählige Wort im Kommentar von `passablePublicUrl` (Hinweis K) entfernt und `dev` (`9f23369`) gemergt; kein neuer Test, weil sich nur Kommentare änderten. Prüfbefehle am Kopf `b96f93c`: Punkt 1 Exit 0, 17, 1, 0, Gegenprobe 5; Punkt 2 Exit 0, nichts fehlt; Punkt 3 1, 1, Valid configuration, 3; Punkt 4 SITE DNS SELFTEST OK, 0, `76.13.144.207`, `76.13.144.207`; Punkt 5 Exit 0, 16, 6, 1, Exit 0, Exit 0, Gegenprobe 3; Punkt 6 Exit 0, LIVE SELFTEST OK, 19, 10, 5; Punkt 7 nichts fehlt, 15; Punkt 8 0, 0, 0, 0; Punkt 9 `check` Exit 0, `e2e` SUCCESS; Punkt 10 Exit 0, 2, Gegenprobe 3.
+- 2026-11-17 Release: PASS K und B (Zyklus 4), DONE.
 
 ## Blockers
 Keine.
