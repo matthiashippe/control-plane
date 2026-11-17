@@ -1,7 +1,7 @@
 # Konto Goal 06: Die Seite zum Tageslimit sagt, wofür das Limit gilt
 
 ## Status
-PLANNED
+ACTIVE
 
 ## Active Objective
 Wer auf dem Handy das Tageslimit hebt, sieht, dass es für sein ganzes Konto gilt, und kein Text aus dem Terminal verspricht ihm etwas

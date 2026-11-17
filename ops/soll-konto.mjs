@@ -17,7 +17,7 @@ import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSy
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { FONTS_CONF, FOLD, KONTO_STATES, WIDTHS, assessKonto, decodePng, isLocal, pixelDiffCount, summaryKonto } from "./soll-assess.mjs";
+import { FONTS_CONF, FOLD, KONTO_FILES, KONTO_STATES, WIDTHS, assessKonto, decodePng, isLocal, pixelDiffCount, summaryKonto } from "./soll-assess.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const args = process.argv.slice(2);
@@ -32,8 +32,9 @@ for (let i = 0; i < args.length; i++) {
 }
 const SOURCES = value("--source", path.join(ROOT, "docs/soll/src"));
 const PICTURES = value("--pictures", path.join(ROOT, "docs/soll"));
-const sourceOf = (state) => path.join(SOURCES, `konto-${state}.html`);
-const pictureOf = (dir, state, w) => path.join(dir, `konto-${state}-${w}.png`);
+// The state failed keeps the file name of its approved pictures (KONTO_FILES in ops/soll-assess.mjs).
+const sourceOf = (state) => path.join(SOURCES, `konto-${KONTO_FILES[state]}.html`);
+const pictureOf = (dir, state, w) => path.join(dir, `konto-${KONTO_FILES[state]}-${w}.png`);
 
 function findChrome() {
   if (process.env.SOLL_CHROME) return process.env.SOLL_CHROME;
@@ -170,7 +171,7 @@ async function main() {
       const fresh = decodePng(r.png);
       let diffPixels = null, pngWidth;
       if (CHECK) {
-        writeFileSync(path.join(scratch, `konto-${state}-${width}.png`), r.png);
+        writeFileSync(path.join(scratch, `konto-${KONTO_FILES[state]}-${width}.png`), r.png);
         const committed = pictureOf(PICTURES, state, width);
         if (existsSync(committed)) { const old = decodePng(readFileSync(committed)); pngWidth = old.width; diffPixels = pixelDiffCount(old, fresh); }
       } else {

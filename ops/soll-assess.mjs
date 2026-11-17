@@ -119,20 +119,12 @@ export function summary(results) {
 // the defects of the start page, a word the reader would first have to translate is a defect (TEAM.md "Klare Wörter").
 
 /**
- * The states of /h/{code} as the code names them, each with the name its approved picture and source carry:
- * docs/soll/handoff-<file>-<width>.png and docs/soll/src/handoff-<file>.html. The pictures keep the names they were approved
- * under (goals/konto/04), and this is the only place that knows them; everything else asks handoffFile().
+ * The states of /h/{code}, each one source docs/soll/src/handoff-<state>.html and two pictures docs/soll/handoff-<state>-<width>.png,
+ * named after the state in the code (goals/konto/06).
  */
-export const HANDOFF_FILES = Object.freeze({ approve: "freigabe", approved: "erledigt", invalid: "ungueltig" });
-/** The states of /h/{code}, each one source and two pictures. */
-export const HANDOFF_STATES = Object.freeze(Object.keys(HANDOFF_FILES));
-/** The part of the file names of a state's picture and source. */
-export const handoffFile = (state) => HANDOFF_FILES[state];
-/**
- * The marks of the block that has to sit in the first screen: the approved source carries the name of its file, the page the
- * name of its state. Both describe the same block.
- */
-export const HANDOFF_BLOCK_MARKS = Object.freeze(["approve", handoffFile("approve")]);
+export const HANDOFF_STATES = Object.freeze(["approve", "approved", "invalid"]);
+/** The mark of the block that has to sit in the first screen, in the source and on the page alike. */
+export const HANDOFF_BLOCK_MARKS = Object.freeze(["approve"]);
 /** Words that name how the page is built instead of what happens; the same list the goal's source check uses. */
 export const HANDOFF_WORDS = /handoff|phishing|token|\bsse\b/i;
 
@@ -154,23 +146,28 @@ export function assessHandoff(m) {
   return out;
 }
 
-/** The last line of ops/soll-handoff.mjs. Wording fixed by goals/konto/02, Punkt 1, with the name of the approved picture. */
+/** The last line of ops/soll-handoff.mjs. Wording fixed by goals/konto/02, Punkt 1, with the state names of goals/konto/06. */
 export function summaryHandoff(results) {
   const y = WIDTHS.map((w) => {
     const r = results.find((x) => x.state === "approve" && x.width === w);
     return `${w}=${r?.blockBottom ?? "missing"}`;
   }).join(" ");
   const n = results.reduce((s, r) => s + r.defects.length, 0);
-  return `soll handoff: ${results.length} pictures, ${handoffFile("approve")} top ${y}, ${n} defects`;
+  return `soll handoff: ${results.length} pictures, ${HANDOFF_BLOCK_MARKS[0]} top ${y}, ${n} defects`;
 }
 
 // ---- /h/{code}, account step (goals/konto/03) ----------------------------------------------------------------------------
-// Two more states of the phone page: `passkey` (create the account and allow the daily charge) and `fehlgeschlagen` (no account
-// was created). The block that has to sit in the first screen is data-soll="passkey". On top of the defects of the start page,
+// Two more states of the phone page: `passkey` (create the account and allow the daily charge) and `failed` (no account was
+// created). The block that has to sit in the first screen is data-soll="passkey". On top of the defects of the start page,
 // a word the reader would first have to translate is a defect, with the list of goals/konto/03 ("passkey" is a known word).
 
-/** The states of the account step, each one source docs/soll/src/konto-<state>.html and two pictures. */
-export const KONTO_STATES = Object.freeze(["passkey", "fehlgeschlagen"]);
+/** The states of the account step, each one source and two pictures. */
+export const KONTO_STATES = Object.freeze(["passkey", "failed"]);
+/**
+ * The part of the file names of a state's source docs/soll/src/konto-<file>.html and pictures docs/soll/konto-<file>-<width>.png.
+ * The pictures of the state failed keep the name they were approved under (goals/konto/06, decision 5); no other place knows it.
+ */
+export const KONTO_FILES = Object.freeze({ passkey: "passkey", failed: "fehlgeschlagen" });
 /** Words that name how the account is built instead of what happens; the same list the goal's source check uses. */
 export const KONTO_WORDS = /handoff|token|wallet|smart|permission|sepolia|turnkey|\berc/i;
 
@@ -231,11 +228,11 @@ export function assessLimit(m) {
   return out;
 }
 
-/** The last line of ops/soll-limit.mjs. Wording fixed by goals/konto/04, Punkt 1. */
+/** The last line of ops/soll-limit.mjs. Wording fixed by goals/konto/04, Punkt 1, with `pictures` of goals/konto/06. */
 export function summaryLimit(results) {
   const top = (state) => WIDTHS.map((w) => `${w}=${results.find((x) => x.state === state && x.width === w)?.blockBottom ?? "missing"}`).join(" ");
   const n = results.reduce((s, r) => s + r.defects.length, 0);
-  return `soll limit: ${results.length} images, ${LIMIT_BLOCKS.approve} top ${top("approve")}, ${LIMIT_BLOCKS.passkey} top ${top("passkey")}, ${n} defects`;
+  return `soll limit: ${results.length} pictures, ${LIMIT_BLOCKS.approve} top ${top("approve")}, ${LIMIT_BLOCKS.passkey} top ${top("passkey")}, ${n} defects`;
 }
 
 // ---- /h/{code}, money in and out (goals/konto/05) -------------------------------------------------------------------------
