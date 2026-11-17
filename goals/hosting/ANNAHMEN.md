@@ -36,3 +36,9 @@
 - **Widerlegt?** Nein: Die neuen Fälle aus `test/automaton-sweep.test.ts` sind am Kopf von `dev` (`9e1804f`) rot, weil es dort
   weder Sweep noch `started_at` gibt; jede einzelne Mutation (Migration, `started_at` in `createAs`, alter Fehlerpfad, Frist ohne
   Grace, ohne `inFlight`, Abfrage ohne Antwort als leer gewertet) macht genau den zugehörigen Fall rot.
+- **Takt prüfbar (Zyklus 3, Gap der Linse K zu Punkt 3).** Der Takt aus `src/index.ts` liegt in `startBillingRound`
+  (`src/sandbox/round.ts`) mit Tick, Sweep, erster Frist und Intervall als Parametern, damit ein Test mit falscher Uhr zeigt, dass
+  vor drei Minuten weder Tick noch Sweep laufen und der Sweep erst nach dem Tick beginnt, auch nach einem roten Tick.
+  `test/billing-round.test.ts` liest dazu `src/index.ts`: Genau eine Zeile nennt den Sweep, und sie reicht ihn an
+  `startBillingRound` mit `firstDelayMs` von drei Minuten. Grund: Ein Sweep beim Start würde im Kanarienvogel des Rollouts
+  Sandboxes löschen, und vorher fing das kein Prüfbefehl. Am Verhalten ändert sich nichts.
