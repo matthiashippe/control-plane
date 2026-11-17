@@ -50,18 +50,18 @@ LIMIT_S="${TQ_LIMIT_S:-59.5}"
 # --selftest) pass this in place of the own list, so the counter keeps its argument positions.
 NO_OWN_LIST="-no-own-list-"
 
-# Writes our own addresses to $1, one per line, from `own_ips_checked` (ops/own-ips.sh). Exits 2 with one
-# line on stderr when it stops on a missing or empty list or a failed `own_ips`; that line names the file, no address.
+# Writes our own addresses to $1, one per line: the answer of `own_ips` behind its guard `own_ips_checked`
+# (ops/own-ips.sh). Exits 2 with one line on stderr when the guard stops on a missing or empty list or a failed
+# `own_ips`; that line names the file, no address. Until then $1 holds the guard's stderr.
 own_list() {
-  local target="$1" err list
+  local target="$1" own_ips
   # shellcheck source=ops/own-ips.sh
   source "$ROOT/ops/own-ips.sh"
-  if ! err=$(own_ips_checked "$CP_OWN_IPS_FILE" 2>&1 >"$target"); then
-    echo "TIMEOUT QUOTE FAIL: $err, so nothing is counted." >&2
+  if ! own_ips=$(own_ips_checked "$CP_OWN_IPS_FILE" 2>"$target"); then
+    echo "TIMEOUT QUOTE FAIL: $(<"$target"), so nothing is counted." >&2
     exit 2
   fi
-  list=$(<"$target")
-  printf '%s\n' "$list" | tr ' ' '\n' | grep -v '^$' >"$target"
+  tr ' ' '\n' <<<"$own_ips" | grep -v '^$' >"$target"
 }
 
 # The rows the database gives, one JSON object per line, without address: when the row was written,
