@@ -146,6 +146,38 @@ In `topUpIfLow` merkt sich der Server je Konto das Ende der Periode, in der `per
 Netz `period_used_up`. Eine Erlaubnis mit `end` in der Vergangenheit ergibt `permission_expired` ohne Aufruf, weil `spend()` dort
 ohnehin mit `AfterSpendPermissionEnd` scheitert. Eine Erhöhung aus konto 04 löscht das Gemerkte.
 
+## Wechsel des Gasschlüssels
+
+Jede Weiterleitung trägt unseren Gasschlüssel als festen `caller`, und ihre Adresse hängt an ihm. Nach einem Wechsel des Schlüssels
+(Leck, neuer Server) passt keine gespeicherte Weiterleitung mehr zu den heutigen Werten. `caller` bleibt trotzdem fest im Vertrag und
+wird keine änderbare Liste, weil eine Liste einen Verwalter bräuchte und genau der an ein anderes Ziel zahlen lassen könnte
+(`goals/konto/ANNAHMEN.md`, Goal 09).
+
+Für den Kunden: Die nächste Auszahlung über das Tool `payout` oder `POST /v1/konto/payout` antwortet 409 `payout_needs_phone` und
+sendet nichts. Das Tool `payout` öffnet dann den Handoff mit QR-Code: Zahl wählen, IBAN eingeben, mit dem Passkey die neue Erlaubnis
+für die Weiterleitung mit dem neuen Schlüssel bestätigen. Die Identitätsprüfung bei Bridge entfällt, wenn Bridge den Kunden schon
+freigegeben hat; Bridge legt eine neue Auszahladresse an. `automaton_status` zeigt unter `payout` den Stand mit Link und Zahl. Eine
+fällige Regel aus `set_payout_rule` zahlt bis dahin nichts und schreibt `payout_needs_phone` ins Log. Jedes Konto, das auszahlt, muss
+also einmal aufs Handy.
+
+Mit der alten Erlaubnis: `finishPayout` merkt jede alte Erlaubnis mit Weiterleitung als `retire_*` vor, auch eine, deren Quittung von
+`approveWithSignature` nie ankam. Wartet schon ein `retire_*`, bleibt es, und die Erlaubnis dazwischen wird verworfen, weil
+`approveWithSignature` erst nach einem gelungenen `retire` rausgeht und sie also nie on-chain war. Vor der nächsten Auszahlung fragt
+`sendPayout` den SpendPermissionManager mit `isApproved` und liest `caller()` der alten Weiterleitung:
+
+- nicht freigeschaltet: verworfen ohne Transaktion, Log-Zeile `[payout] retire skipped for <Weiterleitung>: not_approved`;
+- freigeschaltet, aber ein anderer `caller` als der heutige Schlüssel: verworfen ohne Transaktion, Log-Zeile mit `other_caller`, weil
+  `retire` dort an `only the fixed caller` scheitert und sonst jede Auszahlung des Kontos sperren würde;
+- sonst geht `retire` wie bisher zuerst raus.
+
+Danach legt der Server die neue Weiterleitung an, schickt `approveWithSignature` und zahlt aus. Scheitert einer der beiden Lesezugriffe,
+endet die Auszahlung mit `payout_failed` in der Stufe `retire`, und `retire_*` bleibt für den nächsten Versuch.
+
+Für den Betrieb: Neuer Schlüssel als Datei auf dem Server, `CP_KONTO_KEY_FILE` darauf, etwas ETH für Gas, dann der nächste fällige
+Deploy. Eine mit `other_caller` verworfene Erlaubnis bleibt on-chain freigeschaltet, aber ihr einziger Spender ist die alte
+Weiterleitung: Die ruft nur der alte Schlüssel auf, und sie zahlt nur an die alte Auszahladresse des Kunden bei Bridge. Widerrufen kann
+sie der Kunde selbst mit seinem Passkey; der Server tut es nicht.
+
 ## Hauptnetz
 
 `export const MAINNET_CHAIN_ID = 8453` in `src/konto/config.ts`. `readKontoConfig` nimmt 8453 nur mit `CP_KONTO_MAINNET=1` an und setzt
