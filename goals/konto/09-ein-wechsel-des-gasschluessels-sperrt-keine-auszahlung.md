@@ -1,7 +1,7 @@
 # Konto Goal 09: Ein Wechsel des Gasschlüssels sperrt keine Auszahlung, und keine freigeschaltete alte Erlaubnis bleibt stehen
 
 ## Status
-PLANNED
+ACTIVE
 
 ## Active Objective
 Ein Kunde, der Geld auf sein Bankkonto holt, bekommt es auch nach einem Wechsel unseres Gasschlüssels, und jede Erlaubnis, die er
@@ -85,7 +85,7 @@ abgelöste Erlaubnis nach einer abgebrochenen Quittung freigeschaltet bleibt.
 - Was danach kommt: konto 10 (was das Terminal ans Konto schickt, wird streng gelesen).
 
 ## Done Condition
-- [ ] `finishPayout` merkt jede alte Erlaubnis mit Weiterleitung zum Widerruf vor, und `sendPayout` verwirft vor dem `retire` ohne
+- [x] `finishPayout` merkt jede alte Erlaubnis mit Weiterleitung zum Widerruf vor, und `sendPayout` verwirft vor dem `retire` ohne
       Transaktion, was nicht freigeschaltet ist oder einen anderen `caller` hat, mit einer Log-Zeile.
       MVP: Funktion, weil nach einem Schlüsselwechsel sonst kein Konto mehr auszahlt und eine abgelöste Erlaubnis nach einer
       abgebrochenen Quittung freigeschaltet bleibt (Vorschläge konto-kritik-2026-11-17-1 und -2).
@@ -94,22 +94,22 @@ abgelöste Erlaubnis nach einer abgebrochenen Quittung freigeschaltet bleibt.
       Prüfung: `grep -c 'retire skipped for' src/konto/payout.ts` muss mindestens `1` ausgeben.
       Prüfung: `grep -cE 'callerOf\(forwarder: Address\): Promise<Address>' src/konto/payout.ts` muss genau `1` ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/konto-payout.test.ts test/konto-payout-pending.test.ts test/konto-payout-guard.test.ts` muss Exit-Code 0 haben.
-- [ ] Vier Fälle in `test/konto-payout.test.ts` decken abgebrochene Quittung, anderen `caller`, nie freigeschaltete Erlaubnis und ein
+- [x] Vier Fälle in `test/konto-payout.test.ts` decken abgebrochene Quittung, anderen `caller`, nie freigeschaltete Erlaubnis und ein
       wartendes `retire_*` ab; gegen den Stand der Merge-Basis sind genau die ersten drei rot.
       MVP: Funktion, weil erst der rote Lauf am alten Code zeigt, dass die Fälle den Fehler treffen, und der Wächter die Regel für ein
       wartendes `retire_*` festhält.
       Prüfung: `T=$(mktemp -d); PATH=/usr/bin:$PATH pnpm -s vitest run test/konto-payout.test.ts --reporter=json --outputFile=$T/r.json >/dev/null 2>&1; echo "exit=$?"; node -e 'const r=require(process.argv[1]);const a=r.testResults.flatMap(f=>f.assertionResults).filter(x=>x.ancestorTitles.includes("after a new gas key or a lost receipt"));console.log(a.length, a.filter(x=>x.status==="passed").length)' $T/r.json` muss genau `exit=0` und `4 4` ausgeben.
       Prüfung: `B=$(git merge-base origin/dev HEAD); T=$(mktemp -d); git archive $B | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; cp test/konto-payout.test.ts test/money-helpers.ts $T/test/; (cd $T && PATH=/usr/bin:$PATH pnpm -s vitest run test/konto-payout.test.ts --reporter=json --outputFile=r.json >/dev/null 2>&1); node -e 'const r=require(process.argv[1]);const a=r.testResults.flatMap(f=>f.assertionResults).filter(x=>x.ancestorTitles.includes("after a new gas key or a lost receipt"));console.log(a.filter(x=>x.status!=="passed").length, a.filter(x=>x.status==="passed").length)' $T/r.json` muss genau `3 1` ausgeben.
-- [ ] `docs/konto/euro.md` hat einen Abschnitt `## Wechsel des Gasschlüssels` mit dem Ablauf für Kunde und Betrieb.
+- [x] `docs/konto/euro.md` hat einen Abschnitt `## Wechsel des Gasschlüssels` mit dem Ablauf für Kunde und Betrieb.
       MVP: Funktion, weil wer den Schlüssel wechselt, wissen muss, dass jedes Konto einmal aufs Handy muss und was mit den alten
       Erlaubnissen geschieht.
       Prüfung: `grep -c '^## Wechsel des Gasschlüssels$' docs/konto/euro.md` muss genau `1` ausgeben.
       Prüfung: `awk '/^## Wechsel des Gasschlüssels$/{f=1;next} /^## /{f=0} f' docs/konto/euro.md | grep -oE 'payout_needs_phone|automaton_status|Passkey|Bridge|not_approved|other_caller|isApproved' | sort -u | wc -l` muss genau `7` ausgeben.
-- [ ] Die Entscheidungen stehen mit Grund in `goals/konto/ANNAHMEN.md`.
+- [x] Die Entscheidungen stehen mit Grund in `goals/konto/ANNAHMEN.md`.
       MVP: Funktion, weil die Linsen und die nächsten Goals der Kette gegen diese Annahmen prüfen.
       Prüfung: `awk '/^## Goal 09/{f=1;next} /^## /{f=0} f' goals/konto/ANNAHMEN.md | grep -cE "^- .+, weil .+"` muss mindestens `4` ausgeben.
       Prüfung: `awk '/^## Goal 09/{f=1;next} /^## /{f=0} f' goals/konto/ANNAHMEN.md | grep -cE 'caller.+Liste.+Verwalter'` muss mindestens `1` ausgeben.
-- [ ] Der Diff bleibt in den Pfaden dieses Goals, Vertrag und Bytecode bleiben gleich, kein Test wird schwächer, kein neues Paket,
+- [x] Der Diff bleibt in den Pfaden dieses Goals, Vertrag und Bytecode bleiben gleich, kein Test wird schwächer, kein neues Paket,
       kein Schlüssel im Diff, keine andere Goal-Datei geändert, und `check` ist grün.
       MVP: Funktion, weil `src/**` mit dem Merge ausrollt und eine Änderung am Vertrag jede Weiterleitung jedes Kunden verschöbe.
       Prüfung: `git diff --name-only origin/dev...HEAD | grep -vE '^(src/konto/payout\.ts|test/(konto-payout|konto-payout-pending|konto-payout-guard)\.test\.ts|test/money-helpers\.ts|docs/konto/euro\.md|goals/konto/09-ein-wechsel-des-gasschluessels-sperrt-keine-auszahlung\.md|goals/konto/verdicts/09-[A-Za-z0-9._-]+\.md|goals/konto/ANNAHMEN\.md|goals/_vorschlaege/konto-[a-z0-9.-]+\.md)$' | wc -l` muss `0` ausgeben.
@@ -148,5 +148,7 @@ abgelöste Erlaubnis nach einer abgebrochenen Quittung freigeschaltet bleibt.
 - max Versuche pro Gap: 3
 
 ## Progress Log
+
+- 2026-11-17 Zyklus 1: Punkte 1 bis 5 gebaut, `finishPayout` merkt jede alte Erlaubnis mit Weiterleitung vor, `sendPayout` verwirft vor dem `retire` mit `isApproved` und `callerOf` ohne Transaktion, Knoten mit `caller` und `withNewGasKey` im Test, Doku und Annahmen. Prüfbefehle: Punkt 1 `0`, `3`, `1`, `1`, vitest Exit 0 (26 Tests); Punkt 2 `exit=0` und `4 4`, gegen die Merge-Basis `3 1`; Punkt 3 `1`, `7`; Punkt 4 `8`, `1`; Punkt 5 `0`, `vertrag gleich`, `0`, `pakete gleich`, `goals gleich`, `0`, `check` Exit 0 (219 Dateien, 2347 Tests), Netz-Prüfung am PR nach dem Lauf des Jobs `check`.
 
 ## Blockers
