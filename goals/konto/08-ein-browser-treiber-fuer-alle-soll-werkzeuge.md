@@ -1,7 +1,7 @@
 # Konto Goal 08: Ein Browser-Treiber für alle SOLL-Werkzeuge, und keines endet nach einem beendeten Browser grün
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Kein SOLL-Bild gilt als abgenommen, weil der Browser abgestürzt ist. Heute stehen `findChrome` und `launch` achtmal unter `ops/`: in
@@ -120,7 +120,7 @@ Lauf ohne Bild eine Änderung an zahlende Kunden durchlässt, die niemand gesehe
       Prüfung: `git diff origin/dev...HEAD | grep -E '^[+]' | grep -iE "(api[_-]?key|secret|token|private[_-]?key)[\"' ]*[:=] *[\"']?[A-Za-z0-9_+/=-]{16,}|BEGIN [A-Z ]*PRIVATE KEY|cnwy_k_[A-Za-z0-9_-]{16,}" | wc -l` muss `0` ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung (Netz): `n=$(gh pr list -R matthiashippe/control-plane --head goal/konto-08 --state open --json number -q '.[0].number'); gh pr checks "$n" -R matthiashippe/control-plane | awk -F'\t' '$1=="check" && $2=="pass"' | wc -l` muss mindestens `1` ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Ein SOLL-Werkzeug, dessen Browser endet, endet mit Exit ungleich 0 und nennt den Grund; keines meldet danach `0 defects`.
@@ -150,5 +150,6 @@ Lauf ohne Bild eine Änderung an zahlende Kunden durchlässt, die niemand gesehe
 ## Progress Log
 - 2026-11-17 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6 gebaut: `ops/browser.mjs` mit `findChrome`, `chromeArgs` und `launch` samt Sperre für die Arten `picture` und `passkey`, die acht Werkzeuge importieren es, `test/browser.test.ts` (an einer Kopie ohne Sperre rot: `2 failed | 8 passed`) und `test/soll-browser-gone.test.ts` (gegen die Merge-Basis rot für `ops/soll.mjs` und `ops/soll-konto.mjs`), Annahmen unter `## Goal 08`, Vorschlag `konto-nacharbeit-2026-11-17-5` zu `test/soll-fonts.test.ts`. Prüfbefehle: P1 `ops/browser.mjs:2`, `ops/browser.mjs`, achtmal `1`, `ops/browser.mjs:1`, `10`, Exit 0; P2 `1`, `0`, `exit=0` und `5 5`, `ops/soll-konto.mjs ops/soll.mjs`; P3 `argumente gleich` (Gegenprobe ohne `--mute-audio`: `argumente anders`), fünfmal `exit=0` und `1`, `4`, 7 Dateien 56 Tests Exit 0; P4 `5` ohne `sed-miss`; P5 `7`; P6 `0`, `kuerzer` (142 dazu, 415 weg), `bilder gleich`, `0`, `pakete gleich`, `goals gleich`, `0`, `check` Exit 0 (217 Dateien, 2330 Tests), Job `check` am PR #257 `1`.
 - 2026-11-17 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, nach dem Merge von `origin/dev` (187ac7a, nur `deploy/docker-compose.prod.yml`) in den Goal-Branch. Prüfbefehle: P1 `ops/browser.mjs:2`, `ops/browser.mjs`, achtmal `1`, `ops/browser.mjs:1`, `10`, Exit 0; P2 `1`, `0`, `exit=0` und `5 5`, `ops/soll-konto.mjs ops/soll.mjs`; P3 `argumente gleich`, fünfmal `exit=0` und `1`, `4`, 56 Tests Exit 0; P4 `5` ohne `sed-miss`; P5 `7`; P6 `0`, `kuerzer`, `bilder gleich`, `0`, `pakete gleich`, `goals gleich`, `0`, `check` Exit 0 (217 Dateien, 2330 Tests), Job `check` am PR #257 nach dem Push.
+- 2026-11-17 Release: PASS K und B (Zyklus 2), DONE.
 
 ## Blockers
