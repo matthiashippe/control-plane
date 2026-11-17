@@ -10,7 +10,7 @@ derselben Fläche.
 | 390 | `startseite-390.png` | 390 x 844 |
 | 1440 | `startseite-1440.png` | 1440 x 900 |
 
-Quelle ist `src/startseite.html`: der gerenderte Stand von `/` (englisch, `CP_PUBLIC_URL=https://postyourprice.com`, leere
+Quelle ist `src/startseite.html`: der gerenderte Stand von `/` (englisch, `CP_PUBLIC_URL=https://automatonhost.com`, leere
 Datenbank), ohne Kommentare, Zählpixel und Skripte, mit dem Umzug für Conway-Betreiber als erstem Block (`data-soll="move"`). Der
 Block `#agents` vom Seitenende ist dorthin gewandert. Markt und Fußzeile zeigen den leeren Stand der Renderer, keine Zahl aus der
 Produktion; seite 02 füllt sie mit den echten Renderern.
@@ -131,7 +131,7 @@ Mensch das neue Limit mit dem Passkey, mit dem er das Konto angelegt hat. Zwei Z
 Überschrift fragt nach dem Limit des Kontos („Raise the daily limit of your account to $10.00?“), die Zeile über den Zahlen nennt
 den Namen des Kontos („The new limit applies to your account Atlas.“); der Block `data-soll="approve"` endet im ersten
 Bildschirm. `passkey` sagt in der Überschrift, was beim Tippen passiert („Raise the daily limit for your account“), darunter in
-einer Zeile das neue Limit für das Konto mit seinem Namen („PostYourPrice can charge up to $10.00 a day for your account Atlas.“),
+einer Zeile das neue Limit für das Konto mit seinem Namen („We can charge up to $10.00 a day for your account Atlas.“),
 zwei Haken (das alte Limit endet, derselbe Passkey) und einen Knopf über die ganze Breite; der Block `data-soll="limit"` endet im
 ersten Bildschirm (390 x 844 und 1440 x 900). Das Limit gilt für das ganze Konto, auch wenn es mehrere Automatons hat; deshalb
 bindet kein Satz die Grenze an einen Automaton, und der Name ist der Name des Kontos (Name des ältesten Schlüssels in
@@ -181,7 +181,7 @@ geschieht: „Add $20.00 to Atlas?“ mit Betrag und Karte, „Send money from A
 einzigem Ziel. `deposit-card` (Block `card`) nennt Betrag und Karte und hat einen Knopf. `payout-verify` (Block `verify`) sagt,
 dass Bridge einmal die Identität prüft, mit einem Knopf. `payout-bank` (Block `bank`) fragt IBAN (`name="iban"`) und Name des
 Kontoinhabers (`name="owner_name"`) ab, mit einem Knopf. `payout-passkey` (Block `payout`) sagt in der Überschrift, was beim Tippen
-passiert, darunter in einer Zeile „PostYourPrice can send money from Atlas only to your bank account ending 3000.“, zwei Haken und
+passiert, darunter in einer Zeile „We can send money from Atlas only to your bank account ending 3000.“, zwei Haken und
 einen Knopf über die ganze Breite. `retry` (Block `retry`) sagt, dass die Prüfung gerade nicht ging, und hat den Knopf „Tap
 again“. Jeder Block endet im ersten Bildschirm (390 x 844 und 1440 x 900). Abbruch und Fehler zeigen den Zustand `failed`
 aus dem Abschnitt Konto unverändert. Die Werte im Bild sind erfunden (`Atlas`, 20.00 USD, Beispiel-IBAN
@@ -214,3 +214,16 @@ aus dem Abschnitt Konto, jeweils mit demselben Zweck. Neu, in einem dritten `<st
   im Stil des Browsers auf der dunklen Seite steht.
 
 Abnahme-Issue money: PRO-23251
+
+## Name automatonhost.com (goals/umzug/02)
+
+Alle 30 Bilder tragen seit goals/umzug/02 den Namen `automatonhost.com` statt des alten Namens: im Kopf jeder Seite, im Titel
+(`<Seite> | automatonhost.com`) und in der Fußzeile der Handy-Seiten. Sätze, deren Subjekt der alte Name war, sagen „We“ („We can
+charge up to $5.00 a day, only for Atlas.“, „We never see your passkey and cannot open the account.“, „We never see your card
+number.“). Die Startseite heißt `automatonhost.com: keep your automaton running`, die Überschrift des Blocks `move` lautet
+„Conway not answering? Your automaton runs here.“, und der Block zeigt `conwayApiUrl` mit `https://automatonhost.com`. Der Knopf
+im Kopf führt zum Wechsel (`/fix`, „Switch now“) statt zu „Post a job“; der Link „Agent stuck?“ steht bei 390 px nicht mehr im Kopf,
+weil der Knopf dasselbe Ziel hat und der Kopf sonst in zwei Zeilen bricht. Aufbau, Bausteine und Werte sind sonst unverändert,
+neue Bausteine gibt es keine. Gerendert mit den Werkzeugen oben, `FONTCONFIG_FILE=$HOME/.config/control-plane/soll-fonts.conf`.
+
+Abnahme-Issue umzug: PRO-24257
