@@ -1,7 +1,7 @@
 # Umzug Goal 01: Der Dienst antwortet unter automatonhost.com
 
 ## Status
-PLANNED
+ACTIVE
 
 ## Active Objective
 `automatonhost.com` ist ein Host des Dienstes mit gültigem Zertifikat, `www.automatonhost.com` leitet mit 308 auf den Apex, und die
@@ -105,7 +105,7 @@ Automaton, der heute `https://postyourprice.com` oder `https://cp.hippe.eu` als 
   was er hier bekommt.
 
 ## Done Condition
-- [ ] Eine Seite auf einem Host aus `SERVICE_HOSTS`, der nicht der kanonische ist, antwortet 301 auf denselben Pfad samt Query am
+- [x] Eine Seite auf einem Host aus `SERVICE_HOSTS`, der nicht der kanonische ist, antwortet 301 auf denselben Pfad samt Query am
       kanonischen Host, mit `CP_PUBLIC_URL=https://automatonhost.com` und mit `CP_PUBLIC_URL=https://postyourprice.com`; `/v1/`,
       `/pay/`, `/.well-known/`, `/health` und `POST` antworten auf jedem Host ohne Weiterleitung, ein fremder Host bleibt unberührt.
       Die neuen Fälle waren vor dem Fix rot.
@@ -116,28 +116,28 @@ Automaton, der heute `https://postyourprice.com` oder `https://cp.hippe.eu` als 
       Prüfung: `grep -cE '^export const SERVICE_HOSTS = \["automatonhost\.com", "postyourprice\.com", "cp\.hippe\.eu"\]' src/public/site.ts` muss 1 ausgeben.
       Prüfung: `grep -cF 'host !== "cp.hippe.eu"' src/app.ts` muss 0 ausgeben.
       Prüfung: `T=$(mktemp -d); git archive HEAD | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; B=$(git merge-base origin/dev HEAD); git show $B:src/app.ts > $T/src/app.ts; git show $B:src/public/site.ts > $T/src/public/site.ts; (cd $T && PATH=/usr/bin:$PATH pnpm -s vitest run test/automatonhost.test.ts --reporter=json --outputFile=$T/r.json >/dev/null 2>&1); node -p "JSON.parse(require('fs').readFileSync('$T/r.json','utf8')).numFailedTests"; rm -rf $T` muss mindestens 4 ausgeben.
-- [ ] Mit `CP_PUBLIC_URL=https://automatonhost.com` nennen canonical der Startseite, `curl`-Beispiele, Rücksprung von Stripe,
+- [x] Mit `CP_PUBLIC_URL=https://automatonhost.com` nennen canonical der Startseite, `curl`-Beispiele, Rücksprung von Stripe,
       `resource` des x402-Angebots und `conwayApiUrl` eines gehosteten Automatons `https://automatonhost.com`, und `POST /start` nimmt
       den Origin `https://automatonhost.com` an; der Umzug ist damit eine Zeile.
       MVP: Funktion, weil Zahlung und Rücksprung nach dem Wechsel sonst auf den alten Host zeigten und ein Kauf auf einer Seite endete,
       die weiterleitet.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/automatonhost.test.ts test/automaton-setup.test.ts test/bazaar.test.ts` muss Exit-Code 0 haben.
       Prüfung: `for w in /katalog/danke resource conwayApiUrl /start canonical; do grep -qF -- "$w" test/automatonhost.test.ts || echo "fehlt $w"; done` muss nichts ausgeben.
-- [ ] `deploy/Caddyfile` bedient `automatonhost.com` im Block des Dienstes und leitet `www.automatonhost.com` mit 308 auf den Apex; die
+- [x] `deploy/Caddyfile` bedient `automatonhost.com` im Block des Dienstes und leitet `www.automatonhost.com` mit 308 auf den Apex; die
       Konfiguration ist gültig, und der Dienst hat weiter genau einen `reverse_proxy`.
       MVP: Funktion, weil ohne den Block kein Zertifikat für `automatonhost.com` entsteht und jeder Aufruf am TLS scheitert.
       Prüfung: `grep -cxF 'automatonhost.com, postyourprice.com, cp.hippe.eu {' deploy/Caddyfile` muss 1 ausgeben.
       Prüfung: `grep -cF 'redir https://automatonhost.com{uri} 308' deploy/Caddyfile` muss 1 ausgeben.
       Prüfung: `T=$(mktemp -d); sed "s#/var/log/caddy/access.log#$T/access.log#" deploy/Caddyfile > $T/Caddyfile && PATH=$HOME/.local/bin:$PATH caddy validate --config $T/Caddyfile --adapter caddyfile 2>&1 | tail -1; rm -rf $T` muss eine Zeile ausgeben, die `Valid configuration` enthält.
       Prüfung: `PATH=$HOME/.local/bin:$PATH caddy adapt --config deploy/Caddyfile --adapter caddyfile 2>/dev/null | grep -o '"www.automatonhost.com"' | wc -l` muss mindestens 1 ausgeben.
-- [ ] `ops/site-dns.py` legt nur fehlende A-Einträge der Zone `automatonhost.com` an und ändert oder löscht keinen; die Einträge für
+- [x] `ops/site-dns.py` legt nur fehlende A-Einträge der Zone `automatonhost.com` an und ändert oder löscht keinen; die Einträge für
       `automatonhost.com` und `www.automatonhost.com` zeigen ohne Proxy auf `76.13.144.207`.
       MVP: Funktion, weil Caddy ohne die Einträge beim Rollout kein Zertifikat holt und die Live-Prüfung danach rot wäre.
       Prüfung: `python3 ops/site-dns.py --selftest 2>&1 | tail -n 1` muss genau `SITE DNS SELFTEST OK` ausgeben.
       Prüfung: `grep -cE '"(DELETE|PUT|PATCH)"' ops/site-dns.py` muss 0 ausgeben.
       Prüfung (Netz): `dig +short automatonhost.com A` muss genau `76.13.144.207` ausgeben.
       Prüfung (Netz): `dig +short www.automatonhost.com A` muss genau `76.13.144.207` ausgeben.
-- [ ] Die Sperre der Zahlungsdomain gilt für `automatonhost.com` und jeden Namen darunter wie für `postyourprice.com`: im Control
+- [x] Die Sperre der Zahlungsdomain gilt für `automatonhost.com` und jeden Namen darunter wie für `postyourprice.com`: im Control
       Plane, in `sandboxd`, in `setup.sh` und in `cloudflare.py`. Die neuen Fälle waren vor dem Fix rot.
       MVP: Funktion, weil ein Dienst eines Kunden unter dem Namen, unter dem wir Zahlungen nehmen, Käufer täuschen könnte.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/sandbox-ports.test.ts test/sandboxd.test.ts` muss Exit-Code 0 haben.
@@ -147,7 +147,7 @@ Automaton, der heute `https://postyourprice.com` oder `https://cp.hippe.eu` als 
       Prüfung: `bash -n ops/sandbox/setup.sh` muss Exit-Code 0 haben.
       Prüfung: `python3 ops/sandbox/cloudflare.py --selftest` muss Exit-Code 0 haben.
       Prüfung: `T=$(mktemp -d); git archive HEAD | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; B=$(git merge-base origin/dev HEAD); git show $B:src/sandbox/service.ts > $T/src/sandbox/service.ts; git show $B:ops/sandbox/sandboxd.mjs > $T/ops/sandbox/sandboxd.mjs; (cd $T && PATH=/usr/bin:$PATH pnpm -s vitest run test/sandbox-ports.test.ts test/sandboxd.test.ts --reporter=json --outputFile=$T/r.json >/dev/null 2>&1); node -p "JSON.parse(require('fs').readFileSync('$T/r.json','utf8')).numFailedTests"; rm -rf $T` muss mindestens 2 ausgeben.
-- [ ] `ops/live.sh` prüft nach jedem Rollout alle drei Hosts und `www.automatonhost.com` und meldet `OK hosts:` vor und nach dem
+- [x] `ops/live.sh` prüft nach jedem Rollout alle drei Hosts und `www.automatonhost.com` und meldet `OK hosts:` vor und nach dem
       Wechsel des kanonischen Hosts, `FAIL hosts:` bei einem stummen Host, zwei kanonischen, einer Weiterleitung auf einen fremden Host
       oder einer Weiterleitung von `/health`.
       MVP: Funktion, weil ein Host, der nach einem Rollout ohne Zertifikat oder mit falscher Weiterleitung antwortet, Kunden trifft,
@@ -157,19 +157,19 @@ Automaton, der heute `https://postyourprice.com` oder `https://cp.hippe.eu` als 
       Prüfung: `PATH=/usr/bin:$PATH bash ops/live.sh --selftest 2>&1 | grep -c '^planted hosts step '` muss mindestens 6 ausgeben.
       Prüfung: `grep -c "FAIL hosts: " test/live-selftest.test.ts` muss mindestens 3 ausgeben.
       Prüfung: `grep -c "OK hosts: canonical " test/live-selftest.test.ts` muss mindestens 2 ausgeben.
-- [ ] Die Doku sagt, welche Hosts es gibt, was weiterleitet und was bleibt, wie die DNS-Einträge entstehen und welche eine Zeile
+- [x] Die Doku sagt, welche Hosts es gibt, was weiterleitet und was bleibt, wie die DNS-Einträge entstehen und welche eine Zeile
       Matthias für den Wechsel ändert; die Entscheidungen und die Zahl der Konten mit Passkey stehen mit Befehl in den Annahmen.
       MVP: Funktion, weil umzug 02 mit genau diesem Wechsel beginnt und ihn ohne die Doku nicht sicher vorlegen kann.
       Prüfung: `for w in automatonhost.com postyourprice.com cp.hippe.eu PAGES_STAY CP_PUBLIC_URL docker-compose.prod.yml site-dns.py "OK hosts"; do grep -qF -- "$w" docs/umzug.md || echo "fehlt $w"; done` muss nichts ausgeben.
       Prüfung: `awk '/^## Goal 01/{f=1} f' goals/umzug/ANNAHMEN.md | grep -ciE "SERVICE_HOSTS|PAYMENT_ZONES|site-dns|konto_accounts|CP_PUBLIC_URL|Caddyfile|live.sh"` muss mindestens 6 ausgeben.
-- [ ] Das Goal ändert nur Weiterleitung, Sperre der Zahlungsdomain, Caddy, DNS-Werkzeug, Live-Prüfung, Doku und Tests, weder Compose,
+- [x] Das Goal ändert nur Weiterleitung, Sperre der Zahlungsdomain, Caddy, DNS-Werkzeug, Live-Prüfung, Doku und Tests, weder Compose,
       Zahlung, Anmeldung, Automaton, Harness noch CI, und bringt keinen Schlüssel ins Repo.
       MVP: Funktion, weil das Repo öffentlich ist (Grundregel 8), Compose nur Matthias ändert und der Rest des Umzugs in umzug 02 liegt.
       Prüfung: `git diff --name-only origin/dev...HEAD -- deploy/docker-compose.prod.yml src/payments src/auth src/automaton harness .github scripts/check.mjs | wc -l` muss 0 ausgeben.
       Prüfung: `git diff --name-only origin/dev...HEAD | grep -vcE '^(src/app\.ts|src/public/site\.ts|src/sandbox/service\.ts|ops/sandbox/(sandboxd\.mjs|setup\.sh|cloudflare\.py)|ops/site-dns\.py|ops/live\.sh|deploy/Caddyfile|docs/umzug\.md|test/|goals/umzug/)'` muss 0 ausgeben.
       Prüfung: `git diff --name-only origin/dev...HEAD | grep -cE "\.(key|pem|crt|env)$"` muss 0 ausgeben.
       Prüfung: `git diff origin/dev...HEAD -- . ':(exclude)goals/' | grep -cE '^\+.*(cnwy_k_[0-9a-f]{32}|-{5}BEGIN [A-Z ]*PRIVATE KEY-{5}|Bearer [A-Za-z0-9_-]{30,})'` muss 0 ausgeben.
-- [ ] `check` ist grün, und der Job `e2e` des Goal-PR ist grün.
+- [x] `check` ist grün, und der Job `e2e` des Goal-PR ist grün.
       MVP: Funktion, weil die Middleware jede Anfrage sieht und erst der Gang mit der unveränderten Runtime zeigt, dass Anmeldung,
       Zahlung und Inferenz weiter ohne Weiterleitung laufen (Grundregel 13).
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
@@ -199,6 +199,7 @@ Automaton, der heute `https://postyourprice.com` oder `https://cp.hippe.eu` als 
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-17 Zyklus 1: Punkte 1 bis 9 gebaut (Kopf `773e55c`, PR #244 mit `check` und `e2e` grün): Weiterleitung über `SERVICE_HOSTS`, Caddy-Block mit `automatonhost.com` und www mit 308, `ops/site-dns.py` mit beiden A-Einträgen angelegt, `PAYMENT_ZONES` in Control Plane, sandboxd, cloudflare.py und setup.sh, Prüfung `hosts` in `ops/live.sh`, Doku und Annahmen. Rot vor dem Fix: `test/automatonhost.test.ts` 5 Fälle am alten `src/app.ts` und `src/public/site.ts`, `test/sandbox-ports.test.ts` und `test/sandboxd.test.ts` 3 Fälle am alten Stand, `test/live-selftest.test.ts` 9 Fälle vor der Änderung an `ops/live.sh`. Prüfbefehle: Punkt 1 Exit 0, 17 Fälle, 1, 0, Gegenprobe 5; Punkt 2 Exit 0, nichts fehlt; Punkt 3 1, 1, Valid configuration, 3; Punkt 4 SITE DNS SELFTEST OK, 0, `76.13.144.207`, `76.13.144.207`; Punkt 5 Exit 0, 16, 6, 1, Exit 0, Exit 0, Gegenprobe 3; Punkt 6 Exit 0, LIVE SELFTEST OK, 19, 10, 5; Punkt 7 nichts fehlt, 15; Punkt 8 0, 0, 0, 0; Punkt 9 `check` Exit 0, `e2e` SUCCESS.
 
 ## Blockers
 Keine.
