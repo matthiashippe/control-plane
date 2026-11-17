@@ -149,3 +149,61 @@ describe("the step limit shows the name of the account", () => {
     expect(res.status).toBe(400);
   });
 });
+
+/**
+ * goals/konto/10, point 2: the name the phone page shows next to the passkey button comes from the terminal at step konto (and
+ * confirm), so POST /v1/handoff takes only plain names there, and a stored name that already carries a sentence shows only up to its
+ * first other character. This block imports from src/ only what dev already had, because point 2 runs it against the merge base.
+ */
+describe("account names are read strictly", () => {
+  const steps = [{ step: "konto" }, {}];
+  const handoffRows = (db: Db) => (db.prepare("SELECT COUNT(*) AS n FROM handoffs").get() as { n: number }).n;
+
+  it("refuses a name with a dot, another script, a leading space or hyphen, or 33 characters on step konto and on confirm", async () => {
+    const s = setup();
+    const refused = ["Atlas. Only Atlas", "Atlas.v2", "Ätlas", " Atlas", "-Atlas", "x".repeat(33)];
+    for (const extra of steps) {
+      for (const name of refused) {
+        const res = await post(s.app, { automaton_name: name, daily_limit_usdc: "5000000", amount_usdc: "5000000", ...extra });
+        const label = `${JSON.stringify(name)} ${JSON.stringify(extra)}`;
+        expect(res.status, label).toBe(400);
+        const body = (await res.json()) as { error: string; message: string };
+        expect(body.error, label).toBe("invalid_handoff");
+        expect(body.message, label).toContain("32");
+      }
+    }
+    const rows = s.db.prepare("SELECT * FROM handoffs").all();
+    expect(rows).toHaveLength(0);
+  });
+
+  it("takes letters, digits, spaces, underscores and hyphens up to 32 characters on step konto and on confirm", async () => {
+    const s = setup();
+    let made = 0;
+    for (const extra of steps) {
+      for (const name of ["Atlas v2_b-1", "x".repeat(32)]) {
+        const res = await post(s.app, { automaton_name: name, daily_limit_usdc: "5000000", amount_usdc: "5000000", ...extra });
+        expect(res.status, `${JSON.stringify(name)} ${JSON.stringify(extra)}`).toBe(201);
+        made += 1;
+      }
+    }
+    expect(handoffRows(s.db)).toBe(made);
+    const names = (s.db.prepare("SELECT automaton_name FROM handoffs ORDER BY rowid").all() as { automaton_name: string }[]).map((r) => r.automaton_name);
+    expect(names).toEqual(["Atlas v2_b-1", "x".repeat(32), "Atlas v2_b-1", "x".repeat(32)]);
+  });
+
+  it("shows a stored name only up to its first other character", async () => {
+    const s = setup();
+    const a = account(s.db, "Atlas. Only Atlas may spend this");
+    expect(readAccountName(s.db, a.address)).toBe("Atlas");
+    const { approve, passkey } = await pages(s.app, a.key);
+    for (const html of [approve, passkey]) {
+      expect(html).toContain("your account Atlas");
+      expect(html).not.toContain("Only");
+      // The page itself ends a sentence after the name ("your account Atlas."), so "Atlas." is looked for only before the stored rest.
+      expect(html).not.toContain("Atlas. Only");
+      expect(html).not.toContain("may spend this");
+    }
+    const shown = s.db.prepare("SELECT automaton_name FROM handoffs WHERE step = 'limit'").get() as { automaton_name: string };
+    expect(shown.automaton_name).toBe("Atlas");
+  });
+});

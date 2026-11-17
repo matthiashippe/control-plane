@@ -3,7 +3,8 @@
  * and only for ten minutes. A code from a foreign session without the matching number approves nothing.
  */
 import { describe, expect, it } from "vitest";
-import { ATLAS, buttons, create, handoffApp, tap } from "./handoff-helpers.js";
+import { createHandoff } from "../src/handoff/store.js";
+import { ATLAS, START, buttons, create, handoffApp, tap } from "./handoff-helpers.js";
 
 const state = (db: ReturnType<typeof handoffApp>["db"], code: string) =>
   (db.prepare("SELECT state FROM handoffs WHERE code = ?").get(code) as { state: string }).state;
@@ -31,9 +32,10 @@ describe("GET /h/{code}", () => {
   });
 
   it("escapes a name that carries markup", async () => {
-    const { app } = handoffApp();
-    const h = await create(app, { ...ATLAS, automaton_name: '<script>alert("x")</script>' });
-    const html = await (await app.request(`/h/${h.code}`)).text();
+    const { app, db } = handoffApp();
+    // POST /v1/handoff refuses such a name since goals/konto/10, so the row is written as one stored before that rule.
+    const { handoff } = createHandoff(db, { automatonName: '<script>alert("x")</script>', dailyLimitUsdc: 5_000_000n, amountUsdc: 5_000_000n }, START);
+    const html = await (await app.request(`/h/${handoff.code}`)).text();
     expect(html).not.toContain("<script>");
     expect(html).toContain("&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt;");
   });

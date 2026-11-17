@@ -22,7 +22,7 @@ import { HANDOFF_TTL_MS, pollTokenMatches } from "./rules.js";
 import { chooseHandoff, createHandoff, readHandoff, type Handoff, type HandoffRandom, type HandoffState, type HandoffStep } from "./store.js";
 import { qrText } from "./qr.js";
 import type { Address, Hex, PublicClient } from "viem";
-import { burnMatched, finishKonto, permissionFromJson, readAccountName, takeApiKey } from "../konto/account.js";
+import { ACCOUNT_NAME_MAX, burnMatched, finishKonto, parseAccountName, permissionFromJson, readAccountName, takeApiKey } from "../konto/account.js";
 import { finishLimit, readAccountLimit } from "../konto/limit.js";
 import { parseUsdc } from "../konto/usdc.js";
 import { parsePermission, permissionMatches, SignatureCheckUnavailable, signatureValid, type SpendPermission } from "../konto/permission.js";
@@ -119,8 +119,9 @@ export interface HandoffDeps {
 export const DEFAULT_MISS_LIMIT: RateLimitOptions = { limit: 20, windowMs: 600_000 };
 const CONTRACT = "https://github.com/matthiashippe/control-plane/blob/dev/docs/konto/handoff.md";
 const NAME_MAX = 64;
+const ACCOUNT_NAME_RULE = `Send automaton_name: 1 to ${ACCOUNT_NAME_MAX} letters, digits, spaces, underscores or hyphens, starting with a letter or digit.`;
 
-/** 1 to 64 characters, no control characters. */
+/** 1 to 64 characters, no control characters: the name of a deposit or payout, which names no account (goals/konto/10, decision 2). */
 export function parseName(v: unknown): string | null {
   if (typeof v !== "string" || v.length < 1 || v.length > NAME_MAX || /[\u0000-\u001f\u007f]/.test(v)) return null;
   return v;
@@ -392,7 +393,8 @@ export function registerHandoff<E extends Env>(app: Hono<E>, deps: HandoffDeps):
     c.header("Cache-Control", "no-store");
     const body = (await c.req.json().catch(() => null)) as Record<string, unknown> | null;
     if (body && typeof body === "object" && (body.step === "deposit" || body.step === "payout")) return moneyHandoff(c, body);
-    const automatonName = parseName(body?.automaton_name);
+    // The name of the account the phone shows next to the passkey button (goals/konto/10, decision 2): only plain names here.
+    const automatonName = parseAccountName(body?.automaton_name);
     const dailyLimitUsdc = parseUsdc(body?.daily_limit_usdc);
     const step = body?.step === undefined ? "confirm" : body.step;
     // The first payment of an account is its first spend() (goals/konto/04): the lower of CP_KONTO_TOPUP_USDC and the daily limit,
@@ -412,10 +414,12 @@ export function registerHandoff<E extends Env>(app: Hono<E>, deps: HandoffDeps):
     }
     // A raise of the limit takes no name from the body (goals/konto/06, decision 2): the page shows the name of the account, which
     // the terminal cannot set. A name an older plugin still sends is passed over without an error.
+    if ((step === "confirm" || step === "konto") && body && typeof body === "object" && !automatonName) {
+      return c.json({ error: "invalid_handoff", message: ACCOUNT_NAME_RULE, docs: CONTRACT }, 400);
+    }
     if (
       !body ||
       typeof body !== "object" ||
-      (step !== "limit" && !automatonName) ||
       dailyLimitUsdc === null ||
       amountUsdc === null ||
       (step !== "confirm" && step !== "konto" && step !== "limit")
@@ -424,7 +428,7 @@ export function registerHandoff<E extends Env>(app: Hono<E>, deps: HandoffDeps):
         {
           error: "invalid_handoff",
           message:
-            "Send JSON with automaton_name (1 to 64 characters), daily_limit_usdc and amount_usdc, both a positive whole number of " +
+            "Send JSON with automaton_name (1 to 32 letters, digits, spaces, underscores or hyphens), daily_limit_usdc and amount_usdc, both a positive whole number of " +
             'atomic USDC (6 decimals) in whole cents, as a string, and optionally step "confirm" (the default), "konto" (amount_usdc ' +
             'may be left out) or "limit" (with your API key, without amount_usdc and without automaton_name): ' +
             '{"automaton_name":"Atlas","daily_limit_usdc":"5000000","amount_usdc":"5000000"}.',
