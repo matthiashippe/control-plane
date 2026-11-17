@@ -234,3 +234,15 @@
 - `test/state-names.test.ts` nimmt `fehlgeschlagen` ins Muster und `mcp/` in den Umfang und erlaubt das Wort nur in Zeilen mit `KONTO_FILES`, weil die Gegenprobe von Punkt 4 die alte Route in `src/handoff/routes.ts` finden muss und `ops/soll-assess.mjs` sonst das Schlupfloch wäre.
 - `summaryLimit` schreibt `pictures`, `ops/soll-money.mjs` und `14 images` bleiben, weil konto 08 die SOLL-Werkzeuge zusammenlegt und die Deny List `ops/soll-money.mjs` sperrt (Entscheidung 6).
 - `docs/konto/terminal.md` nennt beim Tool `set_daily_limit` noch das Argument `name`, weil die Datei nicht in den Pfaden dieses Goals steht (Punkt 10); ich nenne es im Abschlusskommentar für die Kritik.
+
+## Abgelöst durch konto 06 (Maker, 2026-11-17)
+
+- Abgelöst: konto 02 Punkt 1 durch konto 06 Punkt 3, Ausgabe dann genau `Exit 1, Node.js v22.23.5` (Tech Lead, 2026-11-17)
+- Abgelöst: konto 02 Punkt 1 durch konto 06 Punkt 3, Ausgabe dann genau `Exit 1, Node.js v22.23.5` (Tech Lead, 2026-11-17)
+- Abgelöst: konto 02 Punkt 3 durch konto 06 Punkt 6, Ausgabe dann genau `Exit 1, keine abnahme nach 2026-11-17T12:48:57+00:00` (Tech Lead, 2026-11-17)
+- Abgelöst: konto 04 Punkt 3 durch konto 06 Punkt 6, Ausgabe dann genau `Exit 1, keine abnahme nach 2026-11-17T12:48:57+00:00` (Tech Lead, 2026-11-17)
+- Abgelöst: konto 04 Punkt 5 durch konto 06 Punkt 3, Ausgabe dann genau `Exit 0, 0` (Tech Lead, 2026-11-17)
+- Abgelöst: konto 05 Punkt 3 durch konto 06 Punkt 3, Ausgabe dann genau `Exit 1, 0` (Tech Lead, 2026-11-17)
+- Abgelöst: konto 05 Punkt 3 durch konto 06 Punkt 1, Ausgabe dann genau `Exit 1, 0` (Tech Lead, 2026-11-17)
+- Abgelöst: konto 05 Punkt 5 durch konto 06 Punkt 7, Ausgabe dann genau `Exit 1, 0` (Tech Lead, 2026-11-17)
+- Abgelöst: konto 05 Punkt 5 durch konto 06 Punkt 7, Ausgabe dann genau `Exit 1, 0` (Tech Lead, 2026-11-17)
