@@ -2,8 +2,8 @@
 // ~/.cache/ms-playwright/ into docs/soll/startseite-390.png and docs/soll/startseite-1440.png, full page, width as in the name.
 //
 //   node ops/soll.mjs                    render and write both pictures, then report defects
-//   node ops/soll.mjs --pruefen          (German for "check") render into a mktemp folder, compare with the committed pictures, exit 1 on any defect
-//   node ops/soll.mjs --pruefen --source <file> --pictures <dir>
+//   node ops/soll.mjs --check            render into a mktemp folder, compare with the committed pictures, exit 1 on any defect
+//   node ops/soll.mjs --check --source <file> --pictures <dir>
 //                                        the same against another source or picture folder (counter-test with planted defects)
 //
 // No network: the browser talks over a pipe (no debugging port), every host name resolves to nothing, and every request that is
@@ -20,7 +20,13 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const args = process.argv.slice(2);
 const flag = (name) => args.includes(name);
 const value = (name, fallback) => { const i = args.indexOf(name); return i >= 0 && args[i + 1] ? path.resolve(args[i + 1]) : fallback; };
-const CHECK = flag("--pruefen");
+const CHECK = flag("--check");
+// Every argument is a known flag or the value right after --source or --pictures; anything else ends the tool here, before it
+// renders or writes a picture, so a check command with an old or misspelt flag cannot overwrite the committed pictures.
+for (let i = 0; i < args.length; i++) {
+  if (args[i] === "--source" || args[i] === "--pictures") { i++; continue; }
+  if (args[i] !== "--check") { console.error(`unknown argument: ${args[i]}`); process.exit(1); }
+}
 const SOURCE = value("--source", path.join(ROOT, "docs/soll/src/startseite.html"));
 const PICTURES = value("--pictures", path.join(ROOT, "docs/soll"));
 const pictureOf = (dir, w) => path.join(dir, `startseite-${w}.png`);
@@ -109,7 +115,7 @@ async function renderAt(browser, width, url) {
   }
   await settle();
   const m = await evaluate(`(() => {
-      const d = document.documentElement, b = document.body, u = document.querySelector('[data-soll="umzug"]');
+      const d = document.documentElement, b = document.body, u = document.querySelector('[data-soll="move"]');
       // The page sets overflow-x: clip on html and .hero, so scrollWidth alone stays at the viewport while content is cut off.
       // Every box that pokes out counts, except inside a container the reader can scroll sideways (tables, long code).
       const W = window.innerWidth;
@@ -122,7 +128,7 @@ async function renderAt(browser, width, url) {
         if (!scrolls) over = Math.max(over, Math.ceil(r.right), W + Math.ceil(-r.left));
       }
       return { scrollWidth: over, height: Math.max(d.scrollHeight, b.scrollHeight),
-               text: b.innerText, umzugBottom: u ? Math.round(u.getBoundingClientRect().bottom + window.scrollY) : null };
+               text: b.innerText, moveBottom: u ? Math.round(u.getBoundingClientRect().bottom + window.scrollY) : null };
     })()`);
   // The full page in one viewport instead of captureBeyondViewport, whose internal resize raced the paint under load.
   const pageHeight = () => evaluate("Math.max(document.documentElement.scrollHeight, document.body.scrollHeight)");
@@ -160,10 +166,10 @@ async function main() {
         writeFileSync(pictureOf(PICTURES, width), r.png);
         pngWidth = fresh.width; diffPixels = 0;
       }
-      const defects = assess({ width, pngWidth, diffPixels, scrollWidth: r.scrollWidth, text: r.text, foreign: r.foreign, umzugBottom: r.umzugBottom });
+      const defects = assess({ width, pngWidth, diffPixels, scrollWidth: r.scrollWidth, text: r.text, foreign: r.foreign, moveBottom: r.moveBottom });
       for (const d of defects) console.log(`soll: defect ${d}`);
       console.log(`soll: ${width} px, ${fresh.height} px tall, diff ${diffPixels === null ? "nothing to compare" : diffPixels + " px"}`);
-      results.push({ width, umzugBottom: r.umzugBottom, defects });
+      results.push({ width, moveBottom: r.moveBottom, defects });
     }
   } finally {
     await browser.close();

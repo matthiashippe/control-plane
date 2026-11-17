@@ -18,14 +18,13 @@ import type { Db } from "../db.js";
 import { DOC } from "../errors.js";
 import type { Reply, SandboxService } from "../sandbox/service.js";
 import { createAutomatonKey, isAutomatonKey, revokeAutomatonKey } from "./keys.js";
+import { START_TIMEOUT_MS, TURN_PATTERN } from "./runtime.js";
 import { buildSetup, SETUP_PATH } from "./setup.js";
+import { sweepAutomatons } from "./sweep.js";
 
 export const GENESIS_MAX = 8000;
 export const LOG_LINES = 200;
-/** A turn of the runtime in its log (src/agent/loop.ts at d8f8168), the same pattern harness/e2e/full.sh counts. */
-export const TURN_PATTERN = "Turn [0-9A-Za-z_-]*: [0-9]* tools";
-/** Held, not in the background: up to EXEC_HOLD_MAX_MS of src/sandbox/service.ts a command is answered with its result. */
-export const START_TIMEOUT_MS = 90_000;
+export { START_TIMEOUT_MS, TURN_PATTERN };
 export const START_COMMAND = `AUTOMATON_HOME=/root automaton-start ${SETUP_PATH}`;
 /** One exec for the status: the number of turns in the log and the wallet address from automaton.json, never the key file of the wallet. */
 export const STATUS_COMMAND =
@@ -46,6 +45,7 @@ interface Row {
   status: "active" | "failed" | "deleted";
   reason: string | null;
   created_at: string;
+  started_at: string | null;
 }
 
 const reply = (status: Status, body: Record<string, unknown>): Reply => ({ status: status as Reply["status"], body });
@@ -109,6 +109,10 @@ export function createAutomatonService(opts: AutomatonServiceOptions) {
     const wallet = /^wallet=(0x[0-9a-fA-F]{40})$/m.exec(out?.stdout ?? "")?.[1] ?? null;
     return { ...base, status: turns > 0 ? "running" : "starting", wallet_address: wallet, turns };
   }
+
+  /** The ids whose createAs runs in this process right now; the sweep leaves them alone (src/automaton/sweep.ts). */
+  const inFlight = new Set<string>();
+  let sweeping: Promise<{ removed: number; interrupted: number }> | null = null;
 
   /** Requests with an Idempotency-Key that are still running in this process, by address and key. */
   const pending = new Map<string, Promise<Reply>>();
@@ -196,6 +200,15 @@ export function createAutomatonService(opts: AutomatonServiceOptions) {
   }
 
   async function createAs(addr: string, id: string, name: string, prompt: string): Promise<Reply> {
+    inFlight.add(id);
+    try {
+      return await startAs(addr, id, name, prompt);
+    } finally {
+      inFlight.delete(id);
+    }
+  }
+
+  async function startAs(addr: string, id: string, name: string, prompt: string): Promise<Reply> {
     const sb = await sandboxes.create(addr, { name: `automaton-${id}` }, { keepRunning: true });
     if (sb.status !== 201 || typeof sb.body.id !== "string") return sb;
     const sandboxId = sb.body.id;
@@ -210,18 +223,25 @@ export function createAutomatonService(opts: AutomatonServiceOptions) {
     if (!started || started.exit_code !== 0 || !/AUTOMATON_START ok/.test(started.stdout)) {
       // Nothing of it may keep running or keep its key: the sandbox goes, its started step is booked, the key is revoked.
       log(`[automaton] ${id}: the start in the sandbox failed (${up.status !== 200 ? `upload ${up.status}` : started ? `exit ${started.exit_code}` : "exec"})`);
-      await sandboxes.remove(addr, sandboxId);
+      // A sandbox the sandbox server did not confirm deleting keeps running with keep_running and stays billed until the
+      // sweep deletes it (src/automaton/sweep.ts); the answer must not say it is gone.
+      const removed = await sandboxes.remove(addr, sandboxId);
+      const gone = removed.status === 200 || removed.status === 404;
+      if (!gone) log(`[automaton] ${id}: deleting sandbox ${sandboxId} failed (${removed.status}), the sweep deletes it`);
       revokeAutomatonKey(db, addr, id, now());
       setRow(id, { status: "failed", reason: "start_failed" });
       return reply(501, {
         error: "automaton_start_failed",
-        message:
-          "The sandbox started, but the automaton in it did not, so the sandbox was deleted again. Its first started step " +
-          "of 6 minutes was booked, nothing else. Try again in a few minutes.",
+        message: gone
+          ? "The sandbox started, but the automaton in it did not, so the sandbox was deleted again. Its first started step " +
+            "of 6 minutes was booked, nothing else. Try again in a few minutes."
+          : "The sandbox started, but the automaton in it did not. The sandbox server did not confirm deleting the sandbox, " +
+            "so it is deleted within a few minutes, and it is billed only until then. Try again in a few minutes.",
         id,
         docs: DOC.automatons,
       });
     }
+    setRow(id, { started_at: iso(now()) });
     log(`[automaton] ${id} started in sandbox ${sandboxId}`);
     return reply(201, {
       id,
@@ -312,5 +332,13 @@ export function createAutomatonService(opts: AutomatonServiceOptions) {
     return reply(200, { ok: true, id, status: "deleted" });
   }
 
-  return { create, list, get, logs, stop, start, remove };
+  /** One sweep at a time (src/automaton/sweep.ts); a call while one runs gets that one. Never throws. */
+  function sweep(): Promise<{ removed: number; interrupted: number }> {
+    sweeping ??= sweepAutomatons({ db, sandboxes, now, log, inFlight }).finally(() => {
+      sweeping = null;
+    });
+    return sweeping;
+  }
+
+  return { create, list, get, logs, stop, start, remove, sweep };
 }

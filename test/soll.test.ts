@@ -29,16 +29,16 @@ const clean = (over: Record<string, unknown> = {}) => ({
   scrollWidth: 390,
   text: "Conway not answering?\nKeep your automaton running.\nautomaton --provision",
   foreign: [] as string[],
-  umzugBottom: 801,
+  moveBottom: 801,
   ...over,
 });
 
 describe("soll judgement", () => {
   it("passes a clean render at both widths with no defect", () => {
     expect(assess(clean())).toEqual([]);
-    expect(assess(clean({ width: 1440, pngWidth: 1440, scrollWidth: 1440, umzugBottom: 656 }))).toEqual([]);
-    expect(summary([{ width: 390, umzugBottom: 801, defects: [] }, { width: 1440, umzugBottom: 656, defects: [] }]))
-      .toBe("soll: 2 Bilder, umzug oben 390=801 1440=656, 0 Mängel");
+    expect(assess(clean({ width: 1440, pngWidth: 1440, scrollWidth: 1440, moveBottom: 656 }))).toEqual([]);
+    expect(summary([{ width: 390, moveBottom: 801, defects: [] }, { width: 1440, moveBottom: 656, defects: [] }]))
+      .toBe("soll: 2 pictures, move top 390=801 1440=656, 0 defects");
   });
 
   it("rejects a picture with even one pixel that differs from a fresh render", () => {
@@ -81,10 +81,10 @@ describe("soll judgement", () => {
 
   it("rejects the move block ending below the first screen, and a page without it", () => {
     expect(FOLD).toEqual({ 390: 844, 1440: 900 });
-    expect(assess(clean({ umzugBottom: 845 })).join("\n")).toMatch(/ends at 845 px, below the first screen at 844/);
-    expect(assess(clean({ umzugBottom: 844 }))).toEqual([]);
-    expect(assess(clean({ width: 1440, pngWidth: 1440, scrollWidth: 1440, umzugBottom: 901 })).join("\n")).toMatch(/below the first screen at 900/);
-    expect(assess(clean({ umzugBottom: null })).join("\n")).toMatch(/data-soll="umzug" is missing/);
+    expect(assess(clean({ moveBottom: 845 })).join("\n")).toMatch(/ends at 845 px, below the first screen at 844/);
+    expect(assess(clean({ moveBottom: 844 }))).toEqual([]);
+    expect(assess(clean({ width: 1440, pngWidth: 1440, scrollWidth: 1440, moveBottom: 901 })).join("\n")).toMatch(/below the first screen at 900/);
+    expect(assess(clean({ moveBottom: null })).join("\n")).toMatch(/data-soll="move" is missing/);
   });
 
   it("decodes what it encodes, and reads the committed pictures at their own width", () => {

@@ -24,7 +24,7 @@ describe("README.md", () => {
     const html = await (await createApp({ db: openDb(":memory:") }).request("/")).text();
     // The promise is the first h1 after the move block. That block (goals/seite/02) leads the page for operators from
     // Conway issues and has its own h1, which is not what the service promises a buyer.
-    const move = html.indexOf('id="umzug"');
+    const move = html.indexOf('id="move"');
     expect(move, "no move block").toBeGreaterThan(-1);
     const h1 = html.slice(html.indexOf("</section>", move)).match(/<h1>([\s\S]*?)<\/h1>/)?.[1].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
     expect(h1).toBeTruthy();

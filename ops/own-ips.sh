@@ -23,6 +23,13 @@
 #
 #   source ops/own-ips.sh; OWN=$(own_ips)
 #   source ops/own-ips.sh; OWN=$(own_ips_offline)
+#   source ops/own-ips.sh; OWN=$(own_ips_checked "$CP_OWN_IPS_FILE") || exit 2
+#
+# own_ips_checked is the one guard a counter puts in front of own_ips, so no tool builds its own: it
+# returns 2 with one line on stderr that names the file and never an address when the list is missing,
+# names no address itself, or own_ips fails or names nothing; otherwise it prints what own_ips prints.
+# The live address and the remembered ones must not stand in for the list, or an emptied list would
+# count every address it used to name as a stranger.
 #
 # own_ips_offline is the same answer without the live address, for a log read from disk: the list,
 # CP_OWN_IPS and the seen file, nothing over the network, nothing written. It ends with 1 when the
@@ -138,4 +145,29 @@ own_ips_offline() {
     printf '%s\n' "$listed"
     _own_ips_seen "$(_own_ips_seen_file)"
   } | grep -v '^$' | sort -u | tr '\n' ' '
+}
+
+# The answer of own_ips for <file>, or 2 with one line on stderr (the file, never an address) when the
+# list is missing, names no address itself, or own_ips fails or names none. Returns, never exits: this
+# file is sourced. The stderr of own_ips is dropped because it can name the live address, and stdin is
+# /dev/null because a caller may read a log from its own stdin and ssh would eat it.
+own_ips_checked() {
+  local file="${1:-}" out
+  if [[ -z "$file" ]]; then
+    echo "own_ips_checked: no list file was given" >&2
+    return 2
+  fi
+  if [[ ! -f "$file" ]]; then
+    echo "own_ips_checked: the list of our own addresses $file is missing" >&2
+    return 2
+  fi
+  if [[ -z "$(_own_ips_listed "$file" 2>/dev/null)" ]]; then
+    echo "own_ips_checked: the list of our own addresses $file names no address" >&2
+    return 2
+  fi
+  if ! out=$(CP_OWN_IPS_FILE="$file" own_ips 2>/dev/null </dev/null) || [[ -z "${out// /}" ]]; then
+    echo "own_ips_checked: own_ips could not name our own addresses from $file" >&2
+    return 2
+  fi
+  printf '%s' "$out"
 }

@@ -204,3 +204,16 @@
 - Das Land der IBAN wird über eine Tabelle der SEPA-Länder auf drei Buchstaben gebracht, weil Bridge `iban.country` mit drei Buchstaben verlangt und eine Auszahlung außerhalb von SEPA nicht ankäme.
 - `keep_usd` darf 0 sein und `all: true` zahlt bei 0 USDC nichts (`nothing_to_pay`), unter 1,00 USD aber 400 `below_minimum`, weil Bridge Beträge unter 1 USD weder gutschreibt noch zurückgibt.
 - Ist der Mensch bei Bridge schon geprüft, zählen die Schritte „1 of 2“ und „2 of 2“ statt „of 3“, weil der Design Reviewer sonst einen fehlenden Schritt sah.
+
+## Abgelöst durch seite 03 (Maker, 2026-11-16)
+
+- Abgelöst: konto 02 Punkt 1 durch seite 03 Punkt 1, Ausgabe dann genau `Exit 1, unknown argument: --pruefen` (Tech Lead, 2026-11-14)
+- Abgelöst: konto 02 Punkt 2 durch seite 03 Punkt 1, Ausgabe dann genau `Exit 1, unknown argument: --pruefen` (Tech Lead, 2026-11-14)
+- Abgelöst: konto 02 Punkt 4 durch seite 03 Punkt 1, Ausgabe dann genau `Exit 1, unknown argument: --pruefen` (Tech Lead, 2026-11-14)
+- Abgelöst: konto 03 Punkt 1 durch seite 03 Punkt 1, Ausgabe dann genau `Exit 1, unknown argument: --pruefen` (Tech Lead, 2026-11-14)
+- Abgelöst: konto 03 Punkt 2 durch seite 03 Punkt 1, Ausgabe dann genau `Exit 1, unknown argument: --pruefen` (Tech Lead, 2026-11-14)
+- Abgelöst: konto 03 Punkt 4 durch seite 03 Punkt 1, Ausgabe dann genau `Exit 1, unknown argument: --pruefen` (Tech Lead, 2026-11-14)
+- Abgelöst: konto 04 Punkt 2 durch seite 03 Punkt 1, Ausgabe dann genau `Exit 1, unknown argument: --pruefen` (Tech Lead, 2026-11-14)
+- Abgelöst: konto 04 Punkt 4 durch seite 03 Punkt 1, Ausgabe dann genau `Exit 1, unknown argument: --pruefen` (Tech Lead, 2026-11-14)
+- Abgelöst: konto 04 Punkt 1 durch seite 03 Punkt 8, Ausgabe dann genau `Exit 1, unknown argument: --pruefen` (Tech Lead, 2026-11-14)
+- Abgelöst: konto 04 Punkt 4 durch seite 03 Punkt 8, Ausgabe dann genau `Exit 1, unknown argument: --pruefen` (Tech Lead, 2026-11-14)

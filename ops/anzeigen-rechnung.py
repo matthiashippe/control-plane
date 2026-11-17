@@ -36,15 +36,6 @@ ACCESS_LOG_TIMEOUT_S = 180.0
 FEE_PERCENT = 10
 
 
-# The list `own_ips` reads must name an address itself, read the way `own_ips` reads it (a line not
-# starting with # that has a first field). The live address and the remembered ones must not stand in
-# for it: an emptied list would then pass unnoticed and count the addresses it used to name as foreign.
-LIST_NAMES_AN_ADDRESS = (
-    '[ -f "$CP_OWN_IPS_FILE" ] || exit 3; '
-    "awk '!/^#/ && NF { n++ } END { exit !n }' \"$CP_OWN_IPS_FILE\" || exit 4"
-)
-
-
 class OwnListMissing(Exception):
     """`own_ips` could not name our own addresses; nothing is counted then."""
 
@@ -71,22 +62,20 @@ def own_addresses() -> set:
     """Our own addresses from `own_ips` in ops/own-ips.sh: the list, the live address, every
     address in CP_OWN_IPS_SEEN and in CP_OWN_IPS.
 
-    A missing list or one without an address raises instead of returning an empty set, because an
-    empty set would count our own visits as foreign ones. The stderr of `own_ips` is dropped, it can
-    name the live address.
+    A missing list, one without an address of its own or a failed `own_ips` raises instead of
+    returning an empty set, because an empty set would count our own visits as foreign ones. The
+    guard is `own_ips_checked`, the same one every counter uses; its one line on stderr names the
+    file and never an address, and it drops the stderr of `own_ips`, which can name the live address.
     """
     try:
-        r = subprocess.run(["bash", "-c", "source ops/own-ips.sh && " + LIST_NAMES_AN_ADDRESS + " && own_ips 2>/dev/null"],
+        r = subprocess.run(["bash", "-c", 'source ops/own-ips.sh && own_ips_checked "$CP_OWN_IPS_FILE"'],
                            capture_output=True, text=True, timeout=60, stdin=subprocess.DEVNULL)
     except Exception as exc:
         raise OwnListMissing("own_ips did not finish") from exc
-    if r.returncode == 3:
-        raise OwnListMissing("own_ips has no list of our own addresses (the file is missing)")
-    if r.returncode == 4:
-        raise OwnListMissing("own_ips has an empty list of our own addresses (it names none)")
     own = set(r.stdout.split())
     if r.returncode != 0 or not own:
-        raise OwnListMissing("own_ips could not name our own addresses")
+        reason = r.stderr.strip().splitlines()
+        raise OwnListMissing(reason[-1] if reason else "own_ips_checked could not name our own addresses")
     return own
 
 

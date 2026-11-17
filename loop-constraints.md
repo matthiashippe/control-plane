@@ -57,6 +57,11 @@ Geschichte.
     senden, mit Test-USDC und Gas aus einem Faucet, über einen eigenen Testschlüssel, der nur auf dem code-host liegt und nie im Repo,
     in einem Log oder in einer Ausgabe steht. Code, der sendet, prüft die chainId und verweigert jede andere; ein Test zeigt das mit
     chainId 8453. Im Hauptnetz gilt diese Regel unverändert, und der Schlüssel der Betreiber-Wallet bleibt auch hier tabu.
+    **Ausnahme Hauptnetz** (Matthias, 17.11.2026, für das Topic konto): Auf Base (chainId 8453) sendet das Control Plane nur
+    `approveWithSignature`, `revokeAsSpender` und `spend()` von Erlaubnissen, die ein Kunde mit seinem Passkey unterschrieben hat, dazu
+    das Anlegen und den Aufruf seiner Weiterleitung `PayoutForwarder`, deren einziges Ziel seine feste Auszahladresse ist. Gas zahlt ein
+    eigener Schlüssel, nie der Schlüssel der Betreiber-Wallet. Eingeschaltet wird das nur mit `CP_KONTO_MAINNET=1` in
+    `/opt/control-plane/.env`, die nur Matthias setzt. Credits bleiben unauszahlbar.
 11. **Kein Claude und kein Anthropic im Produkt.** In der Inferenz-Auswahl, in den Aliasen, in Vorschlägen und auf der Seite nie ein
     Claude- oder Anthropic-Modell; im Produkt nie ein `ANTHROPIC_API_KEY` und keine Anthropic-API (Standing Rule 29.09.2026). `check`
     prüft es.

@@ -121,7 +121,8 @@ looks for that file before the health check, so also during an outage, and posts
 `Title: deploy-window 502` and `Priority: high`, the text naming every count and time, no address and
 no URL. The file goes only after a delivered POST, which leaves `[INFO] deploy alarm delivered`
 instead of `[INFO] webhook delivered`, because `ops/webhook-last.sh` reads the latter as a delivery of
-the watchdog and `ops/status.sh` then looks for a message titled `control-plane ...` on the topic.
+the watchdog and `ops/status.sh` then looks for one of the five titles of the watchdog on the topic
+(`control-plane ALIVE`, `OK`, `OUTAGE`, `WARN`, `WARNING`).
 A failed POST keeps it and leaves `[WARN] webhook unreachable`; without `CP_ALERT_WEBHOOK` it stays as well and the log gets
 `[WARN] a deploy alarm is waiting, no webhook set`. The title is the same as that of
 `ops/deploy-alarm.sh`, so `ops/status.sh` does not count it as a message of the watchdog.
@@ -131,8 +132,9 @@ wrong or stale topic in the crontab the watchdog logs a delivery every day and n
 `ops/status.sh` reads the topic back when `CP_ALERT_WEBHOOK` is set in the local environment
 (`json?poll=1&since=12h`, the URL handed to `curl` on stdin with `-K -`, never as an argument and
 never in the output) and reports `alarm_path.received`: `last_alive` (the newest `control-plane
-ALIVE`), `last_message` (the newest message titled `control-plane ...`; posts of other scripts do
-not count) and `status`. ntfy keeps messages in its cache for 12 hours by default, so the sign of
+ALIVE`), `last_message` (the newest message with one of the five titles of the watchdog, `control-plane ALIVE`,
+`OK`, `OUTAGE`, `WARN`, `WARNING`; posts of other scripts such as `control-plane backup failed` of
+`ops/backup.sh` or `deploy-window 502` do not count) and `status`. ntfy keeps messages in its cache for 12 hours by default, so the sign of
 life from just after 00:00 UTC is gone by the afternoon. That is why the window is 11 h: only a
 last delivery younger than 11 h is compared with the topic (one hour of margin before the cache
 ends, 300 s for the clocks), and an older one gives `unknown`, never a false red. With the three
@@ -923,8 +925,8 @@ IPv4 addresses a tracked file may carry besides `ops/own-ips.txt` (our machines,
 |---|---|
 | `datacenter` | the operator, then exactly `(fetcher-cache)` at the end of the line, or a lookup `(<source> YYYY-MM-DD` with the source `ops/fetchers.py lookup`, `RIPE RDAP` or `ARIN RDAP` |
 | `crawler` | the PTR name, proven by the DNS round trip of `ops/crawlers.sh` |
-| `eigene` | which of our machines, and the file that names it (payment server, sandbox server in `docs/sandbox/server.md`) |
-| `erfunden` | the commit that brought it as a test value; only for an address left in a file a goal may not change (a DONE goal file, a verdict, `docs/audit/`) |
+| `own` | which of our machines, and the file that names it (payment server, sandbox server in `docs/sandbox/server.md`) |
+| `invented` | the commit that brought it as a test value; only for an address left in a file a goal may not change (a DONE goal file, a verdict, `docs/audit/`) |
 
 `test/known-ips.test.ts` reads the three lists and every file in `git ls-files`, without a lookup and without network, and fails
 `check` for any public address outside `192.0.2.0/24`, `198.51.100.0/24` and `203.0.113.0/24` that none of them names. The message
@@ -934,7 +936,7 @@ one is always replaced, because "invented" cannot be checked. `CP_KNOWN_IPS` rea
 `CP_SCAN_ROOT` scans another git work tree; both exist for the counter-test in both directions.
 
 The same test keeps the rules of the list itself, so they hold after the goal that brought them: every line has the form
-`<address> <kind> <evidence>` with one of the four kinds and an evidence, an address of kind `erfunden` stands only in paths no goal
+`<address> <kind> <evidence>` with one of the four kinds and an evidence, an address of kind `invented` stands only in paths no goal
 may change (`goals/`, `docs/audit/`, `LOOP.md`, `loop-constraints.md`, `loop-dauerauftrag.md`, `.github/`, `deploy/`, `harness/`),
 and every entry still stands in a tracked file besides the list. An entry whose finding is gone is removed, otherwise the list
 would let a later visitor with the same address through. Findings are the tracked files of the scan root and of the work tree

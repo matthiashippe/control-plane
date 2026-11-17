@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { spawnSync } from "node:child_process";
-import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -21,9 +21,13 @@ import { join, resolve } from "node:path";
  * STATUS_UNDER_TEST points the test at another copy of ops/status.sh, so the counter-proof can run it against an older one.
  * That copy runs next to the helper scripts of this ops/ (it finds them through its own directory), so an older copy fails
  * only for what it lacks itself and not for a missing ops/webhook-last.sh.
+ *
+ * SENDERS_UNDER_TEST points the check of the titles at another directory of shell scripts (default ops/), so the counter-proof
+ * can plant a title of the watchdog in a copy of ops/backup.sh. The severities always come from the real ops/watchdog.sh.
  */
 const OPS = join(__dirname, "..", "ops");
 const UNDER_TEST = process.env.STATUS_UNDER_TEST ? resolve(process.env.STATUS_UNDER_TEST) : null;
+const SENDERS = process.env.SENDERS_UNDER_TEST ? resolve(process.env.SENDERS_UNDER_TEST) : OPS;
 const HELPERS = ["webhook-unreachable.sh", "webhook-last.sh", "db-report.cjs"];
 const NOW = 1794571200;
 const HOST = "alerts.invalid";
@@ -229,6 +233,51 @@ describe("ops/status.sh checks that a delivery of the watchdog really reached th
       status: "ok",
       received: UNKNOWN,
     });
+  });
+
+  it("a message of ops/backup.sh or of the deploy alarm is no delivery of the watchdog", () => {
+    const r = run(delivered("2026-11-13T11:00:00Z"), {
+      topic: message("control-plane backup failed", "2026-11-13T11:00:00Z") + message("deploy-window 502", "2026-11-13T11:00:00Z"),
+    });
+    expect(r.status, r.out).toBe(0);
+    expect(r.alarm?.received, r.out).toEqual({ last_alive: null, last_message: null, status: "red" });
+    expect(r.alarm?.status, r.out).toBe("red");
+  });
+
+  it("every severity that ops/watchdog.sh reports counts as its delivery", () => {
+    const watchdog = readFileSync(join(OPS, "watchdog.sh"), "utf8");
+    const severities = [...new Set([...watchdog.matchAll(/report "([A-Z]+)"/g)].map((m) => m[1]))];
+    expect(severities.length, severities.join(" ")).toBeGreaterThanOrEqual(5);
+    for (const severity of severities) {
+      const r = run(delivered("2026-11-13T11:00:00Z"), { topic: message(`control-plane ${severity}`, "2026-11-13T11:00:00Z") });
+      expect(r.alarm?.received?.status, `${severity}: ${r.out}`).toBe("ok");
+    }
+  });
+
+  it("no other script under ops/ posts a title of the watchdog", () => {
+    const watchdog = readFileSync(join(OPS, "watchdog.sh"), "utf8");
+    const severities = [...new Set([...watchdog.matchAll(/report "([A-Z]+)"/g)].map((m) => m[1]))];
+    expect(severities.length, severities.join(" ")).toBeGreaterThanOrEqual(5);
+    const watchdogTitles = new Set(severities.map((s) => `control-plane ${s}`));
+    const titles = readdirSync(SENDERS)
+      .filter((f) => f.endsWith(".sh"))
+      .flatMap((f) => [...readFileSync(join(SENDERS, f), "utf8").matchAll(/"Title: ([^"]*)"/g)].map((m) => ({ file: f, title: m[1] })));
+    expect(titles.length, JSON.stringify(titles)).toBeGreaterThanOrEqual(2);
+    for (const { file, title } of titles) {
+      expect(watchdogTitles.has(title), `${file}: Title: ${title}`).toBe(false);
+    }
+  });
+
+  it("a delivery 10 h 59 min old without a message of the watchdog is red", () => {
+    const r = run(delivered("2026-11-13T01:01:00Z"));
+    expect(r.status, r.out).toBe(0);
+    expect(r.alarm?.received?.status, r.out).toBe("red");
+  });
+
+  it("a delivery 11 h 1 min old is unknown", () => {
+    const r = run(delivered("2026-11-13T00:59:00Z"));
+    expect(r.status, r.out).toBe(0);
+    expect(r.alarm?.received, r.out).toEqual(UNKNOWN);
   });
 
   it("never shows URL or topic, in the output or in the arguments of curl", () => {

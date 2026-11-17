@@ -100,7 +100,7 @@ import { handlePay, TOPUP_TIERS_USD, type PayConfig } from "./payments/pay.js";
 import { handleRegister } from "./registry.js";
 import { createSandboxService, type Reply as SandboxReply, type SandboxService } from "./sandbox/service.js";
 import { automatonOfKey, isOtherAutomatonSandbox, keysForbidden, otherAutomatonSandboxes } from "./automaton/scope.js";
-import { automatonNotFound, createAutomatonService } from "./automaton/service.js";
+import { automatonNotFound, createAutomatonService, type AutomatonService } from "./automaton/service.js";
 import { registerRelay } from "./relay/routes.js";
 import type { Settler } from "./payments/settler.js";
 import {
@@ -178,6 +178,11 @@ export interface AppOptions {
    * of src/public/site.ts (CP_PUBLIC_URL).
    */
   automatonPublicUrl?: string;
+  /**
+   * The service of hosted automatons (src/automaton/service.ts). src/index.ts passes the one whose sweep it runs after every
+   * billing tick (goals/hosting/01), so that the sweep sees which starts run in this process. Left out, one of its own.
+   */
+  automatons?: AutomatonService | null;
   /**
    * The way to the phone (goals/konto/02, src/handoff/routes.ts): how often the stream looks at the row, the cap on unknown codes
    * on /h/{code} and where the chance comes from. Left out, production values.
@@ -3562,9 +3567,12 @@ export function createApp(opts: AppOptions) {
       "Credits cannot be handed from one wallet to another for nothing, and that is a deliberate " +
       "line rather than a missing feature: a free transfer between users would make credits " +
       "behave like a currency. They are not. They buy usage of this service, they are not " +
-      "redeemable, and nothing leaves here as money. To fund another automaton, send USDC to " +
-      "that automaton's own wallet and let its runtime buy credits; it bootstraps a $5 topup " +
-      "when its balance runs low. " +
+      "redeemable, and nothing leaves here as money. An automaton that runs here through " +
+      "POST /v1/automatons pays its inference and its sandbox from the credits of the account " +
+      "that started it: to fund it, top up that account and never send USDC to its wallet, " +
+      "because that USDC never becomes credits and never comes back. To fund an automaton that " +
+      "runs its runtime itself, send USDC to that automaton's own wallet and let its runtime buy " +
+      "credits; it bootstraps a $5 topup when its balance runs low. " +
       "One movement between wallets does exist and it is not this one: awarding a bounty credits " +
       "the winning agent for work the buyer received and accepted. That is payment for a " +
       "delivered service inside this service, against consideration, and what the winner gets is " +
@@ -3678,7 +3686,7 @@ export function createApp(opts: AppOptions) {
 
   // An automaton that runs entirely here, in a sandbox of its own, billed like every sandbox plus its inference on the same
   // account. POST /v1/automatons/register stands above and keeps answering the runtime as before: `register` is never an id.
-  const automatons = createAutomatonService({ db, sandboxes, publicUrl: () => opts.automatonPublicUrl ?? siteOrigin() });
+  const automatons = opts.automatons ?? createAutomatonService({ db, sandboxes, publicUrl: () => opts.automatonPublicUrl ?? siteOrigin() });
   // The key of a hosted automaton reaches only its own automaton; every other one of its account answers 404 (point 12).
   app.get("/v1/automatons", (c) =>
     sandboxGuard(c, () => automatons.list(c.get("address"), automatonOfKey(db, c.req.header("authorization")))),

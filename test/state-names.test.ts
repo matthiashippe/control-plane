@@ -73,7 +73,7 @@ describe("English state names of the phone page", () => {
       { state: "approve", width: 390, blockBottom: 528, defects: [] },
       { state: "approve", width: 1440, blockBottom: 603, defects: [] },
     ];
-    expect(summaryHandoff(results)).toBe("soll handoff: 2 Bilder, freigabe oben 390=528 1440=603, 0 Mängel");
+    expect(summaryHandoff(results)).toBe("soll handoff: 2 pictures, freigabe top 390=528 1440=603, 0 defects");
   });
 
   it("reports a planted German state name with file and line", () => {
