@@ -10,7 +10,7 @@
  *   salt 0); the page lets the person sign exactly this address as spender.
  * - sendPayout: retire of the forwarder before a new IBAN, if one waits; the forwarder deployed if it has no code yet;
  *   approveWithSignature of the second permission the first time; then payout of the forwarder. Every transaction goes through
- *   sendKontoTx (src/konto/chain.ts), which refuses any chain but 84532.
+ *   sendKontoTx (src/konto/chain.ts), which refuses any chain but the one the account is set to.
  * - POST /v1/konto/payout, GET /v1/konto/payout and POST /v1/konto/payout-rule behind the auth middleware of src/app.ts.
  * - runPayoutRules: once an hour from src/index.ts, pays on the weekday of a rule what is above the amount to keep.
  */
@@ -30,13 +30,12 @@ import {
   type PublicClient,
   type Transport,
 } from "viem";
-import { baseSepolia } from "viem/chains";
 import type { Db } from "../db.js";
 import type { KontoDeps } from "../handoff/routes.js";
 import { permissionFromJson, permissionJson } from "./account.js";
 import type { Bridge } from "./bridge.js";
-import { requireSepolia, sendKontoTx, type KontoTx } from "./chain.js";
-import { SPEND_PERMISSION_MANAGER } from "./config.js";
+import { requireNet, sendKontoTx, type KontoTx } from "./chain.js";
+import { SEPOLIA_NET, SPEND_PERMISSION_MANAGER, type KontoNet } from "./config.js";
 import { FORWARDER_ABI, FORWARDER_BYTECODE } from "./forwarder.js";
 import { START_SKEW_SECONDS, type SpendPermission } from "./permission.js";
 import { receiptSucceeded, SPEND_PERMISSION_MANAGER_ABI, type TxReceiptLike } from "./topup.js";
@@ -116,14 +115,15 @@ const ERC20_ABI = [
 ] as const;
 
 /** The chain of production: reads over `transport`, every write through sendKontoTx with the gas key. */
-export function createPayoutChain(params: { chainId: number; account: LocalAccount; transport: Transport; token: Address; client?: PublicClient }): PayoutChain {
-  requireSepolia(params.chainId);
-  const client = params.client ?? (createPublicClient({ chain: baseSepolia, transport: params.transport }) as unknown as PublicClient);
+export function createPayoutChain(params: { chainId: number; net?: KontoNet; account: LocalAccount; transport: Transport; token: Address; client?: PublicClient }): PayoutChain {
+  const net = params.net ?? SEPOLIA_NET;
+  requireNet(params.chainId, net);
+  const client = params.client ?? (createPublicClient({ chain: net.chain, transport: params.transport }) as unknown as PublicClient);
   return {
     code: async (address) => (await client.getCode({ address })) ?? "0x",
     balanceOf: (account) => client.readContract({ address: params.token, abi: ERC20_ABI, functionName: "balanceOf", args: [account] }),
     isApproved: (p) => client.readContract({ address: SPEND_PERMISSION_MANAGER, abi: SPEND_PERMISSION_MANAGER_ABI, functionName: "isApproved", args: [p] }),
-    send: (tx) => sendKontoTx({ chainId: params.chainId, account: params.account, transport: params.transport, tx }),
+    send: (tx) => sendKontoTx({ chainId: params.chainId, net, account: params.account, transport: params.transport, tx }),
     receipt: (hash) => client.waitForTransactionReceipt({ hash }),
   };
 }

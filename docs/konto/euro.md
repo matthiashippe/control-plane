@@ -139,9 +139,12 @@ ohnehin mit `AfterSpendPermissionEnd` scheitert. Eine Erhöhung aus konto 04 lö
 
 `export const MAINNET_CHAIN_ID = 8453` in `src/konto/config.ts`. `readKontoConfig` nimmt 8453 nur mit `CP_KONTO_MAINNET=1` an und setzt
 dann USDC `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` und `https://mainnet.base.org` als Vorgabe für `CP_KONTO_RPC_URL`; ohne den
-Schalter bleibt 8453 ein Fehler beim Start. `requireKontoChain(chainId, config)` lässt nur die eingestellte Kette durch. Dieser Code
-entsteht erst, wenn Matthias den Absatz „Ausnahme Hauptnetz“ in Regel 10 von `loop-constraints.md` auf `dev` eingetragen hat. In
-diesem Goal geht keine Transaktion ins Hauptnetz; die Nonce des Gasschlüssels auf Base bleibt 0.
+Schalter bleibt 8453 ein Fehler beim Start, und jede andere Kette ist es auch mit dem Schalter. Die Einstellung ist ein `KontoNet`
+(`SEPOLIA_NET` oder `MAINNET_NET` mit Kette, USDC und RPC), das nur `kontoNet` in `readKontoConfig` erzeugt. `requireNet(chainId, net)`
+lässt nur die eingestellte Kette durch; `sendKontoTx`, `createKontoChain`, `createPayoutChain` und `topUpIfLow` nehmen `net` mit
+und fallen ohne Angabe auf `SEPOLIA_NET` zurück, eine Transaktion für eine andere Kette erreicht den Transport nicht. Der Code entstand
+nach dem Absatz „Ausnahme Hauptnetz“ in Regel 10 von `loop-constraints.md` (Matthias, 17.11.2026). In diesem Goal geht keine
+Transaktion ins Hauptnetz; die Nonce des Gasschlüssels auf Base bleibt 0.
 
 ## Entscheidung
 

@@ -29,12 +29,11 @@
  * the next run asks at once. The memory lives in the process: after a restart the first run asks once more.
  */
 import { createPublicClient, encodeFunctionData, type Address, type Hex, type LocalAccount, type PublicClient, type Transport } from "viem";
-import { baseSepolia } from "viem/chains";
 import { getAvailableMc, postLedger, type Db } from "../db.js";
 import { permissionFromJson } from "./account.js";
-import { requireSepolia, sendKontoTx } from "./chain.js";
+import { requireNet, sendKontoTx } from "./chain.js";
 import { nextPermission, spendableLimit } from "./limit.js";
-import { KONTO_CHAIN_ID, SPEND_PERMISSION_MANAGER } from "./config.js";
+import { SEPOLIA_NET, SPEND_PERMISSION_MANAGER, type KontoNet } from "./config.js";
 import type { SpendPermission } from "./permission.js";
 
 /** 100000 mc are one dollar, one dollar is 1000000 atomic USDC: ten atomic USDC are one mc. */
@@ -68,6 +67,8 @@ export interface TopUpDeps {
   topupUsdc: bigint;
   /** The clock in milliseconds, for the end of the period of a revoked permission; production uses Date.now. */
   now?: () => number;
+  /** The chain the account is set to; Base Sepolia when left out. An account row on another chain is never topped up. */
+  net?: KontoNet;
 }
 
 export type TopUpResult =
@@ -101,7 +102,7 @@ export function periodEnd(p: SpendPermission, nowSeconds: number): number {
 }
 
 /** Books a successful spend once: a second call with the same hash adds nothing. Returns whether a row was written. */
-export function bookTopup(db: Db, address: string, hash: Hex, usdc: bigint): boolean {
+export function bookTopup(db: Db, address: string, hash: Hex, usdc: bigint, chainId: number = SEPOLIA_NET.chainId): boolean {
   return db.transaction((): boolean => {
     const seen = db.prepare("SELECT 1 FROM ledger WHERE kind = 'topup' AND ref = ?").get(hash.toLowerCase());
     if (seen) return false;
@@ -110,16 +111,16 @@ export function bookTopup(db: Db, address: string, hash: Hex, usdc: bigint): boo
       kind: "topup",
       deltaMc: Number(usdc / ATOMIC_PER_MC),
       ref: hash.toLowerCase(),
-      meta: { source: "spend_permission", chain_id: KONTO_CHAIN_ID, usdc: String(usdc) },
+      meta: { source: "spend_permission", chain_id: chainId, usdc: String(usdc) },
     });
     return true;
   })();
 }
 
 /** Books a settled spend and closes it as the open one of the account, in one transaction. */
-function settle(db: Db, address: string, hash: Hex, usdc: bigint): void {
+function settle(db: Db, address: string, hash: Hex, usdc: bigint, chainId: number): void {
   db.transaction(() => {
-    bookTopup(db, address, hash, usdc);
+    bookTopup(db, address, hash, usdc, chainId);
     db.prepare("UPDATE konto_accounts SET pending_tx = NULL, pending_usdc = NULL WHERE address = ? AND pending_tx = ?").run(address, hash.toLowerCase());
   })();
 }
@@ -140,7 +141,7 @@ async function waitForSpend(deps: TopUpDeps, address: string, hash: Hex, usdc: b
     release(deps.db, address, hash);
     return { kind: "reverted", hash };
   }
-  settle(deps.db, address, hash, usdc);
+  settle(deps.db, address, hash, usdc, (deps.net ?? SEPOLIA_NET).chainId);
   return { kind: "booked", hash, usdc, mc: Number(usdc / ATOMIC_PER_MC) };
 }
 
@@ -198,7 +199,7 @@ async function topUp(deps: TopUpDeps, address: string): Promise<TopUpResult> {
     .get(address) as AccountRow | undefined;
   if (!row) return { kind: "none", reason: "no_account" };
   try {
-    requireSepolia(row.chain_id);
+    requireNet(row.chain_id, deps.net);
   } catch {
     return { kind: "none", reason: "wrong_chain" };
   }
@@ -297,11 +298,12 @@ export const SPEND_PERMISSION_MANAGER_ABI = [
 ] as const;
 
 /** The chain of production: reads over `transport`, writes only through sendKontoTx with the test key. */
-export function createKontoChain(params: { chainId: number; account: LocalAccount; transport: Transport; client?: PublicClient }): KontoChain {
-  requireSepolia(params.chainId);
-  const client = params.client ?? createPublicClient({ chain: baseSepolia, transport: params.transport });
+export function createKontoChain(params: { chainId: number; net?: KontoNet; account: LocalAccount; transport: Transport; client?: PublicClient }): KontoChain {
+  const net = params.net ?? SEPOLIA_NET;
+  requireNet(params.chainId, net);
+  const client = params.client ?? createPublicClient({ chain: net.chain, transport: params.transport });
   const address: Address = SPEND_PERMISSION_MANAGER;
-  const send = (data: Hex) => sendKontoTx({ chainId: params.chainId, account: params.account, transport: params.transport, tx: { to: address, data } });
+  const send = (data: Hex) => sendKontoTx({ chainId: params.chainId, net, account: params.account, transport: params.transport, tx: { to: address, data } });
   return {
     async spentThisPeriod(p) {
       const period = await client.readContract({ address, abi: SPEND_PERMISSION_MANAGER_ABI, functionName: "getCurrentPeriod", args: [p] });
