@@ -174,7 +174,7 @@ Automaton, der heute `https://postyourprice.com` oder `https://cp.hippe.eu` als 
       Zahlung und Inferenz weiter ohne Weiterleitung laufen (Grundregel 13).
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung (Netz): `n=$(gh pr list -R matthiashippe/control-plane --head goal/umzug-01 --state all --json number -q '.[0].number'); gh pr checks "${n:?}" -R matthiashippe/control-plane --json name,state -q '.[] | select(.name=="e2e") | .state'` muss `SUCCESS` ausgeben.
-- [ ] Die Liste der Hosts und die Liste der Zahlungsdomains stehen je an mehreren Stellen und dürfen nicht auseinanderlaufen:
+- [x] Die Liste der Hosts und die Liste der Zahlungsdomains stehen je an mehreren Stellen und dürfen nicht auseinanderlaufen:
       `test/host-lists.test.ts` importiert `SERVICE_HOSTS` aus `src/public/site.ts` und `PAYMENT_ZONES` aus
       `ops/sandbox/sandboxd.mjs` und prüft, dass die Zeile `HOSTS=` in `ops/live.sh` genau `SERVICE_HOSTS` in derselben
       Reihenfolge nennt, dass `PAYMENT_ZONES` in `ops/sandbox/cloudflare.py` dieselbe Menge ist, dass das `case`-Muster in
@@ -214,6 +214,7 @@ Automaton, der heute `https://postyourprice.com` oder `https://cp.hippe.eu` als 
 ## Progress Log
 - 2026-11-17 Zyklus 1: Punkte 1 bis 9 gebaut (Kopf `773e55c`, PR #244 mit `check` und `e2e` grün): Weiterleitung über `SERVICE_HOSTS`, Caddy-Block mit `automatonhost.com` und www mit 308, `ops/site-dns.py` mit beiden A-Einträgen angelegt, `PAYMENT_ZONES` in Control Plane, sandboxd, cloudflare.py und setup.sh, Prüfung `hosts` in `ops/live.sh`, Doku und Annahmen. Rot vor dem Fix: `test/automatonhost.test.ts` 5 Fälle am alten `src/app.ts` und `src/public/site.ts`, `test/sandbox-ports.test.ts` und `test/sandboxd.test.ts` 3 Fälle am alten Stand, `test/live-selftest.test.ts` 9 Fälle vor der Änderung an `ops/live.sh`. Prüfbefehle: Punkt 1 Exit 0, 17 Fälle, 1, 0, Gegenprobe 5; Punkt 2 Exit 0, nichts fehlt; Punkt 3 1, 1, Valid configuration, 3; Punkt 4 SITE DNS SELFTEST OK, 0, `76.13.144.207`, `76.13.144.207`; Punkt 5 Exit 0, 16, 6, 1, Exit 0, Exit 0, Gegenprobe 3; Punkt 6 Exit 0, LIVE SELFTEST OK, 19, 10, 5; Punkt 7 nichts fehlt, 15; Punkt 8 0, 0, 0, 0; Punkt 9 `check` Exit 0, `e2e` SUCCESS.
 - 2026-11-17 Zyklus 2: Abschluss gemeldet, Punkte 1 bis 9, nach Merge von `dev` (`8d69937`) am Kopf `91b7f21`. Prüfbefehle: Punkt 1 Exit 0, 17, 1, 0, Gegenprobe 5; Punkt 2 Exit 0, nichts fehlt; Punkt 3 1, 1, Valid configuration, 3; Punkt 4 SITE DNS SELFTEST OK, 0, `76.13.144.207`, `76.13.144.207`; Punkt 5 Exit 0, 16, 6, 1, Exit 0, Exit 0, Gegenprobe 3; Punkt 6 Exit 0, LIVE SELFTEST OK, 19, 10, 5; Punkt 7 nichts fehlt, 15; Punkt 8 0, 0, 0, 0; Punkt 9 `check` Exit 0, `e2e` SUCCESS.
+- 2026-11-17 Zyklus 3: Punkt 10 aus der Kritik gebaut, `test/host-lists.test.ts` mit einem Fall je Datei (`ops/live.sh`, `cloudflare.py`, `setup.sh`, `passablePublicUrl`, `sandboxd.mjs` gegen `SERVICE_HOSTS`), dazu `dev` (`c84d655`) gemergt; rot gesehen: drei verfälschte Dateien geben 3 rote Fälle, ein verfälschtes `service.ts` und ein zusätzlicher Host in `site.ts` färben die Fälle für live.sh, `passablePublicUrl` und sandboxd rot. Prüfbefehle am Kopf `7d99aa3`: Punkte 1 bis 8 wie in Zyklus 2 (Punkt 8 mit erlaubten Vorschlägen 0, 0, 0, 0); Punkt 9 `check` Exit 0, `e2e` SUCCESS; Punkt 10 Exit 0, 2, Gegenprobe 3.
 
 ## Blockers
 Keine.
