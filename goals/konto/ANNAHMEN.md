@@ -234,6 +234,7 @@
 - `test/state-names.test.ts` nimmt `fehlgeschlagen` ins Muster und `mcp/` in den Umfang und erlaubt das Wort nur in Zeilen mit `KONTO_FILES`, weil die Gegenprobe von Punkt 4 die alte Route in `src/handoff/routes.ts` finden muss und `ops/soll-assess.mjs` sonst das Schlupfloch wäre.
 - `summaryLimit` schreibt `pictures`, `ops/soll-money.mjs` und `14 images` bleiben, weil konto 08 die SOLL-Werkzeuge zusammenlegt und die Deny List `ops/soll-money.mjs` sperrt (Entscheidung 6).
 - `docs/konto/terminal.md` nennt beim Tool `set_daily_limit` noch das Argument `name`, weil die Datei nicht in den Pfaden dieses Goals steht (Punkt 10); ich nenne es im Abschlusskommentar für die Kritik.
+- Entscheidung (Tech Lead, Kritik 2026-11-17): Die vierte Prüfung von Punkt 10 nimmt diese Goal-Datei mit `':!goals/konto/06-die-seite-zum-tageslimit-sagt-wofuer-das-limit-gilt.md'` aus, bei gleichem Text und gleicher Erwartung `goals gleich`, weil der Stern einer Git-Pfadangabe über `/` geht und die Prüfung sonst die eigene Goal-Datei trifft, die der Maker in Status, Kästchen und Progress Log ändern muss; was er in ihr ändern darf, prüft das Gate mit `goalDrift` ohnehin, und gemeint war laut Deny List „alle Goal-Dateien außer dieser“.
 
 ## Abgelöst durch konto 06 (Maker, 2026-11-17)
 
