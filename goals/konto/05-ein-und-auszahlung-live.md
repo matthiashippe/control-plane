@@ -303,7 +303,7 @@ Wallet ohne Karte kein Geld auf sein Konto bekommt.
       Prüfung: `grep -rnE "CP_KONTO_|CP_BRIDGE_" deploy .github | wc -l` muss `0` ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung (Netz): `n=$(gh pr list -R matthiashippe/control-plane --head goal/konto-05 --state open --json number -q '.[0].number'); gh pr checks "$n" -R matthiashippe/control-plane | awk -F'\t' '$1=="check" && $2=="pass"' | wc -l` muss mindestens `1` ausgeben.
-- [ ] Eine Auszahlung geht nur über die Weiterleitung, die zu den heutigen Werten passt: Vor der ersten Transaktion prüft
+- [x] Eine Auszahlung geht nur über die Weiterleitung, die zu den heutigen Werten passt: Vor der ersten Transaktion prüft
       `sendPayout`, dass die gespeicherte Weiterleitung gleich `forwarderAddress(account, destination, fixed)` mit dem heutigen
       `fixed` ist, und nach einer Anlage, dass an dieser Adresse Code liegt. Sonst geht kein `payout` raus: Die Route antwortet 409
       `payout_needs_phone` ohne Transaktion, die Regel loggt `payout_needs_phone` und setzt `last_paid_day` nicht. Der Test war vor dem
@@ -386,6 +386,11 @@ Wallet ohne Karte kein Geld auf sein Konto bekommt.
   Punkt 16 `reihenfolge ok`, `hauptnetz bereit`, `hauptnetz nonce 0`. Gegenproben: `kontoNet` mit 8453 ohne Schalter und
   `requireNet` ohne Prüfung je ein roter Fall in `test/konto-mainnet.test.ts`; `hauptnetz bereit` mit einer Adresse ohne Code
   Exit 1, die Nonce-Abfrage an einem Konto mit Nonce 1 zeigt `hauptnetz nonce 1`.
+- 2026-11-17 Zyklus 3: Punkt 19 gebaut. `forwarderFits` vergleicht die gespeicherte Weiterleitung mit `forwarderAddress` und dem
+  heutigen `fixed`; `sendPayout` prüft das vor der ersten Transaktion, Route und `payout_ready` ebenso, und nach einer Anlage muss an
+  der Adresse Code liegen, sonst `PayoutFailed` mit Stufe `deploy`. Prüfbefehle: Vitest von Punkt 19 Exit 0, `test/konto-payout-guard.test.ts`
+  3 Fälle, `forwarderAddress(` 2 Treffer. Gegenprobe: vor dem Fix waren alle drei Fälle rot (502 statt 409, Regel `failed`, kein
+  `PayoutFailed`).
 
 ## Blockers
 - keine; das Human Gate `security_settings` ist erledigt, der Absatz „Ausnahme Hauptnetz“ liegt seit `5f77e64` auf `dev`.

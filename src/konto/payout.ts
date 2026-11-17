@@ -255,6 +255,12 @@ async function confirm(chain: PayoutChain, stage: PayoutFailed["stage"], tx: Kon
   throw new PayoutFailed(stage, hash);
 }
 
+/** Whether the stored forwarder is the one forwarderAddress computes for account and destination with today's fixed values. */
+export function forwarderFits(row: Pick<PayoutRow, "forwarder" | "destination">, account: string, fixed: ForwarderFixed): boolean {
+  if (!row.forwarder || !row.destination) return false;
+  return forwarderAddress(account as Address, row.destination as Address, fixed).toLowerCase() === row.forwarder.toLowerCase();
+}
+
 const running = new Set<string>();
 
 /**
@@ -269,6 +275,10 @@ export async function sendPayout(deps: PayoutDeps, address: string, value: bigin
     const { db, chain } = deps;
     const row = readPayout(db, account);
     if (!row?.permission || !row.signature || !row.forwarder || !row.destination) throw new Error("payout_needs_phone");
+    // The bank step stored the forwarder computed with the values of that day. When the gas key (the forwarder's `caller`), token
+    // or chain changed since, the contract would be deployed at another address than the stored one: then nothing is sent, and the
+    // phone sets up the forwarder again with today's values.
+    if (!forwarderFits(row, account, deps.fixed)) throw new Error("payout_needs_phone");
     // A new IBAN first: the permission of the old forwarder ends before money goes over the new one.
     if (row.retire_forwarder && row.retire_permission) {
       const old = permissionFromJson(row.retire_permission);
@@ -281,10 +291,14 @@ export async function sendPayout(deps: PayoutDeps, address: string, value: bigin
     const forwarder = getAddress(row.forwarder);
     const code = await chain.code(forwarder);
     if (!code || code === "0x") {
-      await confirm(chain, "deploy", {
+      const hash = await confirm(chain, "deploy", {
         to: DEPLOY_PROXY,
         data: concat([FORWARDER_SALT, forwarderInitCode(account as Address, row.destination as Address, deps.fixed)]),
       });
+      // The deployment went through, but `payout` is sent only to an address that now holds code: a call to an address without code
+      // succeeds on-chain and moves nothing.
+      const deployed = await chain.code(forwarder);
+      if (!deployed || deployed === "0x") throw new PayoutFailed("deploy", hash);
     }
     const permission = permissionFromJson(row.permission);
     if (!row.permission_approved) {
@@ -351,6 +365,11 @@ export async function runPayoutRules(deps: PayoutDeps, nowMs: number): Promise<{
       log(`[payout] rule paid ${formatUsd(value)} USD, tx ${sent.tx}`);
       out.push({ address: rule.address, outcome: "sent" });
     } catch (err) {
+      if (err instanceof Error && err.message === "payout_needs_phone") {
+        log("[payout] payout_needs_phone: a payout rule is due, but the forwarder no longer fits the gas key of the service; nothing was sent");
+        out.push({ address: rule.address, outcome: "payout_needs_phone" });
+        continue;
+      }
       log(`[payout] rule payout failed: ${err instanceof Error ? err.message.slice(0, 200) : "unknown error"}`);
       out.push({ address: rule.address, outcome: "failed" });
     }
@@ -391,7 +410,7 @@ export function registerKontoPayout<E extends Env>(app: Hono<E>, deps: { db: Db;
     const account = address(c);
     if (!hasAccount(account)) return noAccount(c);
     const row = readPayout(db, account);
-    if (!row?.permission || !row.forwarder) {
+    if (!row?.permission || !row.forwarder || !forwarderFits(row, account, payoutDeps.fixed)) {
       return c.json(
         {
           error: "payout_needs_phone",
@@ -420,6 +439,16 @@ export function registerKontoPayout<E extends Env>(app: Hono<E>, deps: { db: Db;
       const sent = await sendPayout(payoutDeps, account, value);
       return c.json({ state: "sent", tx: sent.tx, amount_usd: formatUsd(value), bank_last4: sent.bankLast4 }, 200);
     } catch (err) {
+      if (err instanceof Error && err.message === "payout_needs_phone") {
+        return c.json(
+          {
+            error: "payout_needs_phone",
+            message: 'This payout needs your phone once more: send POST /v1/handoff with step "payout", then this request again. Nothing was sent.',
+            docs: CONTRACT,
+          },
+          409,
+        );
+      }
       if (err instanceof Error && err.message === "busy") {
         return c.json({ error: "payout_busy", message: "A payout of this account is running. Try again in a minute.", docs: CONTRACT }, 409);
       }
@@ -440,7 +469,7 @@ export function registerKontoPayout<E extends Env>(app: Hono<E>, deps: { db: Db;
     return c.json({
       account,
       balance_usd: formatUsd(balance),
-      payout_ready: Boolean(bridge && row?.permission && row.forwarder),
+      payout_ready: Boolean(bridge && row?.permission && row.forwarder && forwarderFits(row, account, payoutDeps.fixed)),
       bank_last4: row?.bank_last4 ?? null,
       rule: ruleView(rule),
     });
