@@ -183,6 +183,9 @@ export interface MintedAgentIdentity extends MintedIdentity {
   keysLeftToday: number;
 }
 
+/** The codes of the two daily caps of the keyless door; /openapi.json lists them from here. */
+export const KEYLESS_LIMIT_CODES = { everybody: "daily_limit", crawler: "crawler_daily_limit" } as const;
+
 export class KeylessError extends Error {
   constructor(readonly code: string, readonly status: number, readonly hint: string) {
     super(code);
@@ -207,7 +210,7 @@ export function mintAgentIdentity(db: Db, now = Date.now(), userAgent?: string):
       const crawlerToday = crawlerMintsToday(db, new Date(now));
       if (crawlerToday >= crawlerCap) {
         throw new KeylessError(
-          "crawler_daily_limit",
+          KEYLESS_LIMIT_CODES.crawler,
           429,
           "Declared crawlers get their own few keyless keys a day, apart from everybody else, and " +
             "today's are gone. It refills at midnight UTC. With a wallet there is no limit: " +
@@ -221,7 +224,7 @@ export function mintAgentIdentity(db: Db, now = Date.now(), userAgent?: string):
     const agentToday = agentMintsToday(db, new Date(now));
     if (agentToday >= agentCap) {
       throw new KeylessError(
-        "daily_limit",
+        KEYLESS_LIMIT_CODES.everybody,
         429,
         "This service hands out a few keyless agent keys a day and today's are gone. They are " +
           "capped because a free key is a free submission, and an inflated competitor count would " +

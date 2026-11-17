@@ -1,7 +1,7 @@
 # Anmeldung Goal 05: Die Schnittstelle nennt beide Gründe für ein 429 der Anmeldung
 
 ## Status
-PLANNED
+DONE
 
 ## Active Objective
 `/openapi.json` beschreibt die Antwort 429 von `POST /v1/auth/keyless` heute nur mit `ERROR_SCHEMA` und freiem `error`
@@ -83,22 +83,22 @@ mit Wallet), nur die Grenze seiner Crawler-Kennung oder nur der Begrenzer je Adr
   `check` und vitest im Vordergrund mit eigenem Timeout. Kein `pkill -f`.
 
 ## Done Condition
-- [ ] Die Antwort 429 von `POST /v1/auth/keyless` in `/openapi.json` nennt in einem eigenen Schema genau die Codes, mit denen die
+- [x] Die Antwort 429 von `POST /v1/auth/keyless` in `/openapi.json` nennt in einem eigenen Schema genau die Codes, mit denen die
       Tür antwortet, und mit dem Stand von `src/public/openapi.ts` vor dem Goal ist der neue Test rot.
       Prüfung: `pnpm -s vitest run test/openapi-keyless.test.ts` muss Exit-Code 0 haben.
       Prüfung: `grep -cE "the 429 schema of POST /v1/auth/keyless lists exactly the codes the door answers with|the 429 schema of POST /v1/auth/keyless says what each code means" test/openapi-keyless.test.ts` muss mindestens 2 ausgeben.
       Prüfung: `grep -cE 'content: JSON_CONTENT\(KEYLESS_LIMIT_SCHEMA\)' src/public/openapi.ts` muss 1 ausgeben.
       Prüfung: `B=$(git merge-base origin/dev HEAD); T=$(mktemp -d); cp src/public/openapi.ts "$T/"; git show "$B:src/public/openapi.ts" > src/public/openapi.ts; pnpm -s vitest run test/openapi-keyless.test.ts >/dev/null 2>&1; echo "rc=$?"; cp "$T/openapi.ts" src/public/openapi.ts; git status --porcelain -- src | wc -l` muss `rc=1` und danach 0 ausgeben.
-- [ ] Die Codes der Tagesgrenzen stehen einmal in `src/auth/keyless.ts`, und Route und Dokument lesen sie von dort.
+- [x] Die Codes der Tagesgrenzen stehen einmal in `src/auth/keyless.ts`, und Route und Dokument lesen sie von dort.
       Prüfung: `grep -cE '^export const KEYLESS_LIMIT_CODES = \{ everybody: "daily_limit", crawler: "crawler_daily_limit" \} as const;$' src/auth/keyless.ts` muss 1 ausgeben.
       Prüfung: `grep -cE '"(crawler_)?daily_limit"' src/auth/keyless.ts` muss 1 ausgeben.
       Prüfung: `grep -cE 'KEYLESS_LIMIT_CODES\.(everybody|crawler)' src/auth/keyless.ts` muss mindestens 2 ausgeben.
       Prüfung: `grep -cE '^import \{ agentMintsPerDay, crawlerMintsPerDay, KEYLESS_LIMIT_CODES \} from "\.\./auth/keyless\.js";$' src/public/openapi.ts` muss 1 ausgeben.
       Prüfung: `grep -cE 'Object\.values\(KEYLESS_LIMIT_CODES\)' src/public/openapi.ts` muss 1 ausgeben.
-- [ ] Der Test hängt nicht an der Umgebung der Shell.
+- [x] Der Test hängt nicht an der Umgebung der Shell.
       Prüfung: `grep -c 'beforeEach' test/openapi-keyless.test.ts` muss mindestens 1 ausgeben.
       Prüfung: `CP_AGENT_MINTS_PER_DAY=9 CP_CRAWLER_MINTS_PER_DAY=9 pnpm -s vitest run test/openapi-keyless.test.ts` muss Exit-Code 0 haben.
-- [ ] Alles andere an Dokument und Tür bleibt gleich: die Antwort 201 und ihr Text, die übrigen Pfade, Grenzen und Hinweise der
+- [x] Alles andere an Dokument und Tür bleibt gleich: die Antwort 201 und ihr Text, die übrigen Pfade, Grenzen und Hinweise der
       Tür, Route, Begrenzer und die bestehenden Tests.
       Prüfung: `git diff -U0 $(git merge-base origin/dev HEAD) HEAD -- src/public/openapi.ts | grep -E '^-([^-]|$)' | grep -vcE "429: \{ description: \"The day.s mints are used up\", content: JSON_CONTENT\(ERROR_SCHEMA\) \}|^-import \{ agentMintsPerDay, crawlerMintsPerDay \} from"` muss 0 ausgeben.
       Prüfung: `git diff -U0 $(git merge-base origin/dev HEAD) HEAD -- src/public/openapi.ts | grep -cE '^-([^-]|$)'` muss höchstens 2 ausgeben.
@@ -107,13 +107,13 @@ mit Wallet), nur die Grenze seiner Crawler-Kennung oder nur der Begrenzer je Adr
       Prüfung: `git diff -U0 $(git merge-base origin/dev HEAD) HEAD -- test/openapi-keyless.test.ts | grep -E '^-([^-]|$)' | grep -vcE '^-import \{ afterEach, describe, expect, it \} from "vitest";$'` muss 0 ausgeben.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD -- src/app.ts src/errors.ts src/ratelimit.ts test/openapi.test.ts test/bazaar.test.ts test/goal-19-ein-dollar.test.ts test/not-for-sale.test.ts test/inference-sunset.test.ts test/goal-18-die-tuer.test.ts test/keyless.test.ts test/keyless-agent.test.ts test/keyless-crawler.test.ts ops | wc -l` muss 0 ausgeben.
       Prüfung: `pnpm -s vitest run test/openapi.test.ts test/bazaar.test.ts test/goal-19-ein-dollar.test.ts test/not-for-sale.test.ts test/inference-sunset.test.ts test/goal-18-die-tuer.test.ts test/keyless.test.ts test/keyless-agent.test.ts test/keyless-crawler.test.ts` muss Exit-Code 0 haben.
-- [ ] `check` ist grün, nur die genannten Dateien ändern sich, und `check` lässt die Liste der eigenen Adressen und das
+- [x] `check` ist grün, nur die genannten Dateien ändern sich, und `check` lässt die Liste der eigenen Adressen und das
       Zustandsverzeichnis unberührt.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD | grep -vcE '^(src/public/openapi\.ts|src/auth/keyless\.ts|test/openapi-keyless\.test\.ts|goals/anmeldung/.+)$'` muss 0 ausgeben.
       Prüfung: `node scripts/check.mjs >/dev/null 2>&1; git status --porcelain -- ops/own-ips.txt | wc -l` muss 0 ausgeben.
       Prüfung: `S=$(mktemp -d); XDG_STATE_HOME=$S node scripts/check.mjs >/dev/null 2>&1; find "$S" -type f | wc -l` muss 0 ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Jeder neue Fall war vor dem Fix rot; die Zeile im Progress Log nennt, welche und womit.
@@ -141,6 +141,9 @@ mit Wallet), nur die Grenze seiner Crawler-Kennung oder nur der Begrenzer je Adr
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-17 Zyklus 1: Punkte 1, 2, 3, 4, 5 gebaut: `KEYLESS_LIMIT_CODES` steht einmal in `src/auth/keyless.ts` und speist beide `KeylessError` und das neue `KEYLESS_LIMIT_SCHEMA` (`error` als `enum` aus `daily_limit`, `crawler_daily_limit`, `rate_limited`, dazu `message`, `docs`, `retry_after_seconds`) an der Antwort 429 von `POST /v1/auth/keyless`; der Test löscht die beiden Grenzen zusätzlich in `beforeEach`, Route, Begrenzer, Grenzen und Hinweise unverändert. Rot vor dem Fix: beide neuen Fälle (2 failed, 3 passed, kein `enum`). Produktion nicht aufgerufen. Prüfbefehle (Node 22.23.5, PATH=/usr/bin:$PATH, am Commit 26840f1): P1 vitest Exit 0 (5 passed), `2`, `1`, `rc=1` und `0`; P2 `1`, `1`, `2`, `1`, `1`; P3 `2`, vitest mit Grenzen 9 Exit 0; P4 `0`, `2`, `0`, `2`, `0`, `0`, vitest Exit 0 (98 passed in 9 Dateien); P5 `node scripts/check.mjs` Exit 0 (2332 passed in 217 Dateien, grün in 79 s), `0`, `0`, `0`.
+- 2026-11-17 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5; `dev` ohne neuen Commit seit der Merge-Basis 664866d, kein Merge nötig. Prüfbefehle (Node 22.23.5, PATH=/usr/bin:$PATH, am Commit 6dba186): P1 vitest Exit 0, `2`, `1`, `rc=1` und `0`; P2 `1`, `1`, `2`, `1`, `1`; P3 `2`, vitest mit Grenzen 9 Exit 0; P4 `0`, `2`, `0`, `2`, `0`, `0`, vitest Exit 0 (98 passed in 9 Dateien); P5 `node scripts/check.mjs` Exit 0 (grün in 51 s), `0`, `0`, `0`. Am PR #259 Kopf 6dba186: Job `check` pass, Job `e2e` pass (10m49s). Produktion nicht aufgerufen.
+- 2026-11-17 Release: PASS K und B (Zyklus 2), DONE.
 
 ## Blockers
 - keine

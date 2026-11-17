@@ -30,7 +30,7 @@ import { TOPUP_TIERS_USD } from "../payments/pay.js";
  * A description is a statement about the running service, so it comes from the running service.
  */
 import { FEE_PERCENT } from "../bounties/store.js";
-import { agentMintsPerDay, crawlerMintsPerDay } from "../auth/keyless.js";
+import { agentMintsPerDay, crawlerMintsPerDay, KEYLESS_LIMIT_CODES } from "../auth/keyless.js";
 
 const JSON_CONTENT = (schema: Record<string, unknown>) => ({ "application/json": { schema } });
 
@@ -65,6 +65,33 @@ const KEYLESS_KEY_SCHEMA = {
     docs: { type: "string", format: "uri", description: "The section of the documentation on authentication." },
   },
   required: ["key", "key_prefix", "address", "note", "keys_left_today", "docs"],
+} as const;
+
+/**
+ * The answer 429 of `POST /v1/auth/keyless`: the two daily caps of the door and the limiter per address
+ * in front of it, so an agent learns from the document which cap hit it and what to do then.
+ */
+const KEYLESS_LIMIT_SCHEMA = {
+  type: "object",
+  properties: {
+    error: {
+      type: "string",
+      enum: [...Object.values(KEYLESS_LIMIT_CODES), "rate_limited"],
+      description:
+        `${KEYLESS_LIMIT_CODES.everybody}: the keys everybody shares are gone for today, again from midnight UTC, ` +
+        "or with no cap through the wallet sign-in. " +
+        `${KEYLESS_LIMIT_CODES.crawler}: only the own cap of declared crawlers is full for today, again from midnight UTC. ` +
+        "rate_limited: too many calls from this address, call again after retry_after_seconds.",
+    },
+    message: { type: "string", description: "What happened and what to do next, in plain words." },
+    docs: { type: "string", format: "uri", description: "The section of the documentation for this answer." },
+    retry_after_seconds: {
+      type: "integer",
+      minimum: 0,
+      description: "Only with rate_limited: seconds until this address may call again.",
+    },
+  },
+  required: ["error", "message", "docs"],
 } as const;
 
 export function openApiDocument(
@@ -132,7 +159,11 @@ export function openApiDocument(
         security: [],
         responses: {
           201: { description: "The key", content: JSON_CONTENT(KEYLESS_KEY_SCHEMA) },
-          429: { description: "The day's mints are used up", content: JSON_CONTENT(ERROR_SCHEMA) },
+          429: {
+            description:
+              "A cap is reached: the keys everybody shares today, the own cap of a declared crawler, or too many calls from one address",
+            content: JSON_CONTENT(KEYLESS_LIMIT_SCHEMA),
+          },
         },
       },
     ),
