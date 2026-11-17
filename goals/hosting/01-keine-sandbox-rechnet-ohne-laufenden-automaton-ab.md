@@ -1,7 +1,7 @@
 # Hosting Goal 01: Keine Sandbox rechnet ohne laufenden Automaton ab
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Ein Sweep im Control Plane räumt jede Sandbox eines gehosteten Automatons ab, der nicht läuft: Er löscht die Sandbox jeder Zeile
@@ -136,7 +136,7 @@ eine Wallet zu schicken, deren Schlüssel auf unserem Sandbox-Server liegt.
       gehosteter Automaton weiter startet und läuft (Grundregel 13).
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung (Netz): `n=$(gh pr list -R matthiashippe/control-plane --head goal/hosting-01 --state all --json number -q '.[0].number'); gh pr checks "${n:?}" -R matthiashippe/control-plane --json name,state -q '.[] | select(.name=="e2e") | .state'` muss `SUCCESS` ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Jede neue Testdatei und jeder neue Fall war vor dem Fix rot; die Zeile im Progress Log nennt, womit.
@@ -163,6 +163,7 @@ eine Wallet zu schicken, deren Schlüssel auf unserem Sandbox-Server liegt.
 - 2026-11-17 Zyklus 2: Abschluss gemeldet, Punkte 1 bis 7; `dev` brachte nichts Neues (9e1804f schon enthalten), am Code nichts geändert. Prüfbefehle am Kopf 480801b: P1 vitest der vier Dateien Exit 0 (36 passed), Fälle 12, Wortliste leer, Konstante 1, Text 1, No-op-Gegenprobe ohne Ausgabe (sichtbar gefahren: 5 failed, 7 passed); P2 vitest Exit 0, Migrationsfall 1, Migration 1, Spalte im Dienst 2; P3 1, 1 und 0; P4 vitest Exit 0, 1, 1 und 2; P5 1 und 18; P6 0, 0 und 0; P7 `node scripts/check.mjs` Exit 0 (195 Dateien, 2159 passed, 254 s), (Netz) `e2e` an PR #230 für 480801b `SUCCESS`.
 - 2026-11-17 Zyklus 3: Gap der Linse K zu Punkt 3 abgearbeitet und Abschluss gemeldet, Punkte 1 bis 7: Der Takt aus `src/index.ts` liegt jetzt in `startBillingRound` (`src/sandbox/round.ts`), und `test/billing-round.test.ts` zeigt mit falscher Uhr, dass vor drei Minuten weder Tick noch Sweep laufen, der Sweep erst nach dem Tick beginnt (auch nach rotem Tick) und `src/index.ts` den Sweep nur in einer Zeile an den Takt reicht; Verhalten unverändert, Annahme in `goals/hosting/ANNAHMEN.md`; `dev` brachte nichts Neues. Rot gesehen: ohne Modul rot (Import fehlt), sieben Mutationen alle rot (Sweep sofort im Modul 4, Sweep vor Tick 4, Sweep parallel zum Tick 2, kein Sweep nach rotem Tick 1, in `src/index.ts` Sweep im Block vor dem Takt 1, Sweep nach dem Takt 1, erste Frist 0 je 1 von 6). Prüfbefehle am Kopf d76b98e: P1 vitest Exit 0 (36 passed), 12, Wortliste leer, 1, 1, No-op-Gegenprobe ohne Ausgabe; P2 vitest Exit 0 (12 passed), 1, 1, 2; P3 1, 1 und 0; P4 vitest Exit 0 (58 passed), 1, 1, 2; P5 1 und 22; P6 0, 0, 0; P7 `node scripts/check.mjs` Exit 0 (196 Dateien, 2165 passed, 107 s), (Netz) `e2e` an PR #230 für d76b98e `SUCCESS`.
 - 2026-11-17 Zyklus 4: Gap der Linse K zu Punkt 3 abgearbeitet und Abschluss gemeldet, Punkte 1 bis 7: `test/sweep-not-on-start.test.ts` baut Sandbox-Dienst, Automaton-Dienst und App wie `src/index.ts` neben einer Zeile `failed` mit laufender Sandbox und einem abgeschnittenen Start von vor einer Stunde, spult mit falscher Uhr zehn Minuten ohne den Takt vor und sieht weder Abfrage noch DELETE bei `sandboxd`, danach räumt derselbe Dienst auf Anruf beide ab; dazu ein Pin auf die Aufrufstellen des Sweeps in `src/`; Verhalten unverändert, Annahme in `goals/hosting/ANNAHMEN.md`; `dev` bis a6eaedf gemergt (nur zwei Vorschläge). Rot gesehen: acht Mutationen alle rot (im Dienst Timer 1 s, Timer mit `unref`, Intervall 2 min, `setImmediate`, Microtask je 1 von 8; in `createApp` Timer 1 s, direkter Aufruf, `sweepAutomatons` per Timer je 2 von 8). Prüfbefehle am Kopf bb3c683: P1 vitest Exit 0 (36 passed), 12, Wortliste leer, 1, 1, No-op-Gegenprobe ohne Ausgabe; P2 vitest Exit 0 (12 passed), 1, 1, 2; P3 1, 1 und 0; P4 vitest Exit 0 (58 passed), 1, 1, 2; P5 1 und 26; P6 0, 0, 0; P7 `node scripts/check.mjs` Exit 0 (197 Dateien, 2167 passed, 66 s), (Netz) `e2e` an PR #230 für b8da61e `SUCCESS`.
+- 2026-11-17 Release: PASS K und B (Zyklus 4), DONE.
 
 ## Blockers
 Keine.
