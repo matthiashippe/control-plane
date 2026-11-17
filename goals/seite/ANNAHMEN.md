@@ -55,3 +55,7 @@
 
 - Abgelöst: seite 03 Punkt 8 durch konto 06 Punkt 1, Ausgabe dann genau `Exit 0, anders:  | soll limit: 4 pictures, approve top 390=555 1440=603, limit top 390=486 1440=510, 0 defects` (Tech Lead, 2026-11-17)
 - Abgelöst: seite 03 Punkt 8 durch konto 06 Punkt 7, Ausgabe dann genau `Exit 0, soll limit: 4 pictures, approve top 390=555 1440=603, limit top 390=486 1440=510, 0 defects` (Tech Lead, 2026-11-17)
+
+## Abgelöst durch umzug 02 (Maker, 2026-11-17)
+
+- Abgelöst: seite 01 Punkt 4 durch umzug 02 Punkt 2, Ausgabe dann genau `Exit 1, keine abnahme nach 2026-11-17T16:39:12+00:00` (Tech Lead, 2026-11-17)

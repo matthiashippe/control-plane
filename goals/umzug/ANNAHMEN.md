@@ -80,3 +80,17 @@
   `https://postyourprice.com`. `bash ops/live.sh` gab `OK hosts: canonical postyourprice.com, /health 200 on 3 hosts, / 301 to
   https://postyourprice.com/ on 2 hosts, www.automatonhost.com/health 308 to https://automatonhost.com/health`. Damit fragt der
   Maker den Tech Lead nicht und setzt das Human Gate.
+- **Abgelöste Prüfbefehle: 7**, weil neue Bilder und Texte ihre Ausgabe ändern (Entscheidung 10): Gefahren wurden alle
+  Prüfbefehle von Goals mit Status `DONE`, die einen Pfad aus `git diff --name-only origin/dev...HEAD` oder den alten Namen nennen,
+  an der Merge-Basis `f53113e` und am Goal-Branch, je in einem eigenen Worktree, ohne Netz (Proxy `127.0.0.1:9`), verglichen über
+  Exit-Code und letzte Zeile (Dauern und Pfade unter `/tmp` ausgenommen). Ohne Netz: 136 Befehle, geändert nur umzug 01 Punkt 1
+  (Zahl der Fälle in `test/automatonhost.test.ts`, 17 auf 21, Erwartung bleibt erfüllt). Befehle, die den Integrationszweig im
+  Diff nennen, misst das Audit am Verdict-Commit ihres Goals und blieben außen vor. Mit Netz, nur lesend: Die Abnahme-Prüfungen
+  von konto 02, 03, 04, 05, 06 und seite 01 lesen den Zeitpunkt des letzten Commits an `docs/soll/*.png`, das ist jetzt
+  `f8f8b95` (2026-11-17T16:39:12+00:00), und ihre Abnahme-Issues haben keine Abnahme danach; die Abnahme dieser Bilder steht in
+  PRO-24257 (umzug 02 Punkt 2). kanal 01 und kanal 03 Punkt 3 bleiben `READY`. Die Zeilen stehen unter
+  `## Abgelöst durch umzug 02` in `goals/konto/ANNAHMEN.md` (5), `goals/seite/ANNAHMEN.md` (1) und hier (1).
+
+## Abgelöst durch umzug 02 (Maker, 2026-11-17)
+
+- Abgelöst: umzug 01 Punkt 1 durch umzug 02 Punkt 8, Ausgabe dann genau `Exit 0, 21` (Tech Lead, 2026-11-17)
