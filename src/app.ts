@@ -431,6 +431,14 @@ function requestOrigin(c: { req: { header: (name: string) => string | undefined;
   return `${proto}://${host}`;
 }
 
+/** Canonical hosts outside SERVICE_HOSTS already reported, so the line appears once per process and host. */
+const foreignCanonicalWarned = new Set<string>();
+function warnForeignCanonical(host: string): void {
+  if (foreignCanonicalWarned.has(host)) return;
+  foreignCanonicalWarned.add(host);
+  console.error(`[app] canonical host ${host} is not in SERVICE_HOSTS, pages are not redirected`);
+}
+
 export function createApp(opts: AppOptions) {
   const { db } = opts;
   const siweCfg: SiweConfig = { ...DEFAULT_SIWE_CONFIG, ...opts.siwe };
@@ -534,13 +542,20 @@ export function createApp(opts: AppOptions) {
     // not set it, and a local run.
     if (!process.env.CP_PUBLIC_URL) return next();
     const canonical = siteOrigin();
-    const host = c.req.header("host")?.toLowerCase().replace(/\.$/, "").replace(/:\d+$/, "");
+    const canonicalHost = siteHost().toLowerCase().replace(/:\d+$/, "").replace(/\.$/, "");
+    // A canonical host Caddy does not serve (a typo in the move, say automatonhost.de) would send every page of all three
+    // hosts with a 301 to an address that does not answer, and browsers keep a 301. Then no page moves at all.
+    if (!(SERVICE_HOSTS as readonly string[]).includes(canonicalHost)) {
+      warnForeignCanonical(canonicalHost);
+      return next();
+    }
+    const host = c.req.header("host")?.toLowerCase().replace(/:\d+$/, "").replace(/\.$/, "");
     const method = c.req.method;
     if (
       !host ||
       (method !== "GET" && method !== "HEAD") ||
       PAGES_STAY.some((p) => c.req.path === p || c.req.path.startsWith(p)) ||
-      host === siteHost().toLowerCase().replace(/:\d+$/, "")
+      host === canonicalHost
     ) {
       return next();
     }

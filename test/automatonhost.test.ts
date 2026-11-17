@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createApp } from "../src/app.js";
 import { openDb } from "../src/db.js";
 import { buildPaymentRequired, payConfigFromEnv } from "../src/payments/pay.js";
@@ -85,6 +85,43 @@ describe("a page on a host that is not the canonical one moves there", () => {
     process.env.CP_PUBLIC_URL = NEW;
     expect((await at("example.invalid", "/fix")).status).toBe(200);
     expect((await at("www.automatonhost.com.evil.example", "/fix")).status).toBe(200);
+  });
+
+  it("redirects no page and says so once when CP_PUBLIC_URL names a host this service is not known by", async () => {
+    // A typo in the move: Caddy does not serve this name, and a browser keeps a 301 to it.
+    process.env.CP_PUBLIC_URL = "https://automatonhost.de";
+    const said = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      for (const host of ["automatonhost.com", "postyourprice.com", "cp.hippe.eu", "automatonhost.com"]) {
+        const res = await at(host, "/fix");
+        expect(res.status, host).toBe(200);
+        expect(res.headers.get("location"), host).toBeNull();
+      }
+      const lines = said.mock.calls.map((c) => String(c[0])).filter((l) => l.includes("is not in SERVICE_HOSTS"));
+      expect(lines).toEqual(["[app] canonical host automatonhost.de is not in SERVICE_HOSTS, pages are not redirected"]);
+    } finally {
+      said.mockRestore();
+    }
+  });
+
+  it("sends a page on a host written with :443 like the bare host", async () => {
+    process.env.CP_PUBLIC_URL = NEW;
+    const res = await at("postyourprice.com:443", "/fix");
+    expect(res.status).toBe(301);
+    expect(res.headers.get("location")).toBe("https://automatonhost.com/fix");
+  });
+
+  it("sends a page on a host written with a dot at the end like the bare host", async () => {
+    process.env.CP_PUBLIC_URL = NEW;
+    const res = await at("cp.hippe.eu.", "/jobs?src=issue");
+    expect(res.status).toBe(301);
+    expect(res.headers.get("location")).toBe("https://automatonhost.com/jobs?src=issue");
+  });
+
+  it("leaves the canonical host alone when it is written with a dot at the end and :443", async () => {
+    process.env.CP_PUBLIC_URL = NEW;
+    expect((await at("automatonhost.com.:443", "/fix")).status).toBe(200);
+    expect((await at("automatonhost.com:443", "/fix")).status).toBe(200);
   });
 
   it("redirects nothing while CP_PUBLIC_URL is unset", async () => {
