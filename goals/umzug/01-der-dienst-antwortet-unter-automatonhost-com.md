@@ -174,6 +174,19 @@ Automaton, der heute `https://postyourprice.com` oder `https://cp.hippe.eu` als 
       Zahlung und Inferenz weiter ohne Weiterleitung laufen (Grundregel 13).
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung (Netz): `n=$(gh pr list -R matthiashippe/control-plane --head goal/umzug-01 --state all --json number -q '.[0].number'); gh pr checks "${n:?}" -R matthiashippe/control-plane --json name,state -q '.[] | select(.name=="e2e") | .state'` muss `SUCCESS` ausgeben.
+- [ ] Die Liste der Hosts und die Liste der Zahlungsdomains stehen je an mehreren Stellen und dürfen nicht auseinanderlaufen:
+      `test/host-lists.test.ts` importiert `SERVICE_HOSTS` aus `src/public/site.ts` und `PAYMENT_ZONES` aus
+      `ops/sandbox/sandboxd.mjs` und prüft, dass die Zeile `HOSTS=` in `ops/live.sh` genau `SERVICE_HOSTS` in derselben
+      Reihenfolge nennt, dass `PAYMENT_ZONES` in `ops/sandbox/cloudflare.py` dieselbe Menge ist, dass das `case`-Muster in
+      `ops/sandbox/setup.sh` jede Zone und `*.<Zone>` enthält, dass `passablePublicUrl` für jede Zone `https://<Zone>/` und
+      `https://x.<Zone>/` ablehnt und dass `PAYMENT_ZONES` gleich `SERVICE_HOSTS` ohne `cp.hippe.eu` ist (jede eigene Domain des
+      Dienstes ist Zahlungsdomain; `hippe.eu` ist eine private Zone und bleibt draußen, Tech Lead 17.11.2026). Je Datei ein
+      eigener Fall, damit eine Abweichung den Ort nennt.
+      MVP: Funktion, weil der nächste Host (umzug 02 oder später) sonst in `site.ts` landet, aber nicht in der Live-Prüfung oder
+      der Sperre, und das erst ein Kunde oder ein Revert zeigt.
+      Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/host-lists.test.ts` muss Exit-Code 0 haben.
+      Prüfung: `grep -cE 'from "\.\./src/public/site\.js"|from "\.\./ops/sandbox/sandboxd\.mjs"' test/host-lists.test.ts` muss mindestens 2 ausgeben.
+      Prüfung: `T=$(mktemp -d); git archive HEAD | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; sed -i 's/^HOSTS=.*/HOSTS="automatonhost.com postyourprice.com"/' $T/ops/live.sh; sed -i 's/^PAYMENT_ZONES = .*/PAYMENT_ZONES = ("postyourprice.com",)/' $T/ops/sandbox/cloudflare.py; sed -i 's/|automatonhost\.com|\*\.automatonhost\.com//' $T/ops/sandbox/setup.sh; (cd $T && PATH=/usr/bin:$PATH pnpm -s vitest run test/host-lists.test.ts --reporter=json --outputFile=$T/r.json >/dev/null 2>&1); node -p "JSON.parse(require('fs').readFileSync('$T/r.json','utf8')).numFailedTests"; rm -rf $T` muss mindestens 3 ausgeben.
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
