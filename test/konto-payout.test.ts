@@ -6,9 +6,12 @@
  * The forwarder the page asks to sign is compared with an address computed here from the CREATE2 rule (expectedForwarder), and
  * the deployed init code is read back from the raw transaction, so a forwarderAddress that returned anything else fails here.
  */
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import type { Hex } from "viem";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { postLedger, getBalanceMc } from "../src/db.js";
+import { SEPOLIA_USDC, SPEND_PERMISSION_MANAGER } from "../src/konto/config.js";
+import { createPayoutChain, type PayoutChain } from "../src/konto/payout.js";
 import { tap } from "./handoff-helpers.js";
 import {
   account,
@@ -21,6 +24,7 @@ import {
   payoutPermission,
   stateOf,
   toPasskey,
+  withNewGasKey,
   type MoneySetup,
 } from "./money-helpers.js";
 
@@ -279,5 +283,152 @@ describe("the payout to the person's bank account", () => {
     // Retired once: the payout after that goes over the new forwarder alone.
     expect((await payout(s, a.key, { amount_usd: "1.00" })).status).toBe(200);
     expect(s.node.sent.slice(7).map((t) => t.kind)).toEqual(["payout"]);
+  });
+});
+
+/**
+ * A setup whose chain can lose approveWithSignature: `mode.approveReceipt` makes the wait for its receipt break off after it went
+ * through on-chain, `mode.approveSend` makes the send fail before it reaches the node.
+ */
+function lossySetup() {
+  const mode = { approveReceipt: false, approveSend: false };
+  const inner: { chain: PayoutChain | null } = { chain: null };
+  const approvals = new Set<string>();
+  const chain: PayoutChain = {
+    code: (a) => inner.chain!.code(a),
+    balanceOf: (a) => inner.chain!.balanceOf(a),
+    isApproved: (p) => inner.chain!.isApproved(p),
+    callerOf: (f) => inner.chain!.callerOf(f),
+    async send(tx) {
+      const approve = tx.to.toLowerCase() === SPEND_PERMISSION_MANAGER;
+      if (approve && mode.approveSend) throw new Error("connection reset before the node got the transaction");
+      const hash = await inner.chain!.send(tx);
+      if (approve) approvals.add(hash);
+      return hash;
+    },
+    async receipt(hash: Hex) {
+      if (mode.approveReceipt && approvals.has(hash)) throw new Error("timed out waiting for the receipt");
+      return inner.chain!.receipt(hash);
+    },
+  };
+  const s = moneySetup({ konto: { payoutChain: chain } });
+  inner.chain = createPayoutChain({ chainId: 84532, account: s.gas, transport: s.node.transport, token: SEPOLIA_USDC });
+  return { s, mode };
+}
+
+/** Every line the service logged through console.log while the test ran. */
+function logLines() {
+  const spy = vi.spyOn(console, "log").mockImplementation(() => {});
+  return () => spy.mock.calls.map((c) => String(c[0]));
+}
+
+describe("after a new gas key or a lost receipt", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("retires the old permission before the next payout when the receipt of its approveWithSignature broke off", async () => {
+    const { s, mode } = lossySetup();
+    const a = await ready(s, 30n);
+    const oldForwarder = expectedForwarder(a.address, a.destination, s.gas.address);
+    mode.approveReceipt = true;
+    const lost = await payout(s, a.key, { amount_usd: "10.00" });
+    expect(lost.status).toBe(502);
+    expect(await lost.json()).toMatchObject({ error: "payout_failed", stage: "approve" });
+    mode.approveReceipt = false;
+    expect(s.node.sent.map((t) => t.kind)).toEqual(["deploy", "approveWithSignature"]);
+    // The approval went through on-chain although the service never saw its receipt.
+    expect(s.node.approved.has(`${a.address}:99`)).toBe(true);
+    const p = await toPasskey(s, a);
+    const newDestination = s.bridge.state.liquidation.at(-1)!;
+    const newForwarder = expectedForwarder(a.address, newDestination, s.gas.address);
+    expect(p.spender).toBe(newForwarder);
+    expect((await json(s, `/h/${p.h.code}/payout`, await payoutPermission(a.owner, a.address, newForwarder, { salt: 100n }))).status).toBe(200);
+    const res = await payout(s, a.key, { amount_usd: "5.00" });
+    expect(res.status).toBe(200);
+    const after = s.node.sent.slice(2);
+    expect(after.map((t) => t.kind)).toEqual(["retire", "deploy", "approveWithSignature", "payout"]);
+    expect(after[0]).toMatchObject({ to: oldForwarder, salt: 99n });
+    expect(after[1].target).toBe(newForwarder);
+    expect(after[3]).toMatchObject({ to: newForwarder, value: 5n * USD });
+    expect(s.node.approved.has(`${a.address}:99`)).toBe(false);
+    expect(s.node.balances.get(newDestination)).toBe(5n * USD);
+  });
+
+  it("pays again after a new gas key and one phone handoff, sends no retire to the forwarder of the old key and logs other_caller", async () => {
+    const s = moneySetup();
+    const a = await ready(s, 30n);
+    const oldForwarder = expectedForwarder(a.address, a.destination, s.gas.address);
+    expect((await payout(s, a.key, { amount_usd: "10.00" })).status).toBe(200);
+    expect(s.node.sent).toHaveLength(3);
+    const b = withNewGasKey(s);
+    const blocked = await payout(b, a.key, { amount_usd: "5.00" });
+    expect(blocked.status).toBe(409);
+    expect(await blocked.json()).toMatchObject({ error: "payout_needs_phone" });
+    expect(s.node.sent).toHaveLength(3);
+    const p = await toPasskey(b, a);
+    const newDestination = s.bridge.state.liquidation.at(-1)!;
+    const newForwarder = expectedForwarder(a.address, newDestination, b.gas.address);
+    expect(p.spender).toBe(newForwarder);
+    expect((await json(b, `/h/${p.h.code}/payout`, await payoutPermission(a.owner, a.address, newForwarder, { salt: 100n }))).status).toBe(200);
+    const lines = logLines();
+    const res = await payout(b, a.key, { amount_usd: "5.00" });
+    expect(res.status).toBe(200);
+    const after = s.node.sent.slice(3);
+    expect(after.map((t) => t.kind)).toEqual(["deploy", "approveWithSignature", "payout"]);
+    expect(after[0]).toMatchObject({ target: newForwarder });
+    expect(after[0].ctor![4]).toBe(b.gas.address.toLowerCase());
+    expect(after[2]).toMatchObject({ to: newForwarder, value: 5n * USD });
+    expect(s.node.balances.get(newDestination)).toBe(5n * USD);
+    expect(lines()).toContain(`[payout] retire skipped for ${oldForwarder}: other_caller`);
+  });
+
+  it("sends no retire for a permission whose approveWithSignature never reached the node and logs not_approved", async () => {
+    const { s, mode } = lossySetup();
+    const a = await ready(s, 30n);
+    const oldForwarder = expectedForwarder(a.address, a.destination, s.gas.address);
+    mode.approveSend = true;
+    const lost = await payout(s, a.key, { amount_usd: "10.00" });
+    expect(lost.status).toBe(502);
+    expect(await lost.json()).toMatchObject({ error: "payout_failed", stage: "approve" });
+    mode.approveSend = false;
+    expect(s.node.sent.map((t) => t.kind)).toEqual(["deploy"]);
+    expect(s.node.approved.has(`${a.address}:99`)).toBe(false);
+    const p = await toPasskey(s, a);
+    const newDestination = s.bridge.state.liquidation.at(-1)!;
+    const newForwarder = expectedForwarder(a.address, newDestination, s.gas.address);
+    expect((await json(s, `/h/${p.h.code}/payout`, await payoutPermission(a.owner, a.address, newForwarder, { salt: 100n }))).status).toBe(200);
+    const lines = logLines();
+    const res = await payout(s, a.key, { amount_usd: "5.00" });
+    expect(res.status).toBe(200);
+    const after = s.node.sent.slice(1);
+    expect(after.map((t) => t.kind)).toEqual(["deploy", "approveWithSignature", "payout"]);
+    expect(after[2]).toMatchObject({ to: newForwarder, value: 5n * USD });
+    expect(lines()).toContain(`[payout] retire skipped for ${oldForwarder}: not_approved`);
+  });
+
+  it("keeps a waiting retire through a second new IBAN and drops the permission between them, which never went on-chain", async () => {
+    const s = moneySetup();
+    const a = await ready(s, 30n);
+    const firstForwarder = expectedForwarder(a.address, a.destination, s.gas.address);
+    expect((await payout(s, a.key, { amount_usd: "10.00" })).status).toBe(200);
+    const second = await toPasskey(s, a);
+    expect((await json(s, `/h/${second.h.code}/payout`, await payoutPermission(a.owner, a.address, second.spender, { salt: 100n }))).status).toBe(200);
+    const third = await toPasskey(s, a);
+    const thirdDestination = s.bridge.state.liquidation.at(-1)!;
+    const thirdForwarder = expectedForwarder(a.address, thirdDestination, s.gas.address);
+    expect(third.spender).toBe(thirdForwarder);
+    expect(thirdForwarder).not.toBe(second.spender);
+    expect((await json(s, `/h/${third.h.code}/payout`, await payoutPermission(a.owner, a.address, thirdForwarder, { salt: 101n }))).status).toBe(200);
+    const res = await payout(s, a.key, { amount_usd: "5.00" });
+    expect(res.status).toBe(200);
+    const after = s.node.sent.slice(3);
+    expect(after.map((t) => t.kind)).toEqual(["retire", "deploy", "approveWithSignature", "payout"]);
+    expect(after[0]).toMatchObject({ to: firstForwarder, salt: 99n });
+    expect(after[1].target).toBe(thirdForwarder);
+    expect(after[2]).toMatchObject({ target: thirdForwarder, salt: 101n });
+    expect(after[3]).toMatchObject({ to: thirdForwarder, value: 5n * USD });
+    expect(s.node.code.has(second.spender)).toBe(false);
+    expect(s.node.balances.get(thirdDestination)).toBe(5n * USD);
   });
 });
