@@ -120,6 +120,17 @@ abgelöste Erlaubnis nach einer abgebrochenen Quittung freigeschaltet bleibt.
       Prüfung: `git diff origin/dev...HEAD | grep -E '^[+]' | grep -iE "(api[_-]?key|secret|token|private[_-]?key)[\"' ]*[:=] *[\"']?[A-Za-z0-9_+/=-]{16,}|BEGIN [A-Z ]*PRIVATE KEY|cnwy_k_[A-Za-z0-9_-]{16,}" | wc -l` muss `0` ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung (Netz): `n=$(gh pr list -R matthiashippe/control-plane --head goal/konto-09 --state open --json number -q '.[0].number'); gh pr checks "$n" -R matthiashippe/control-plane | awk -F'\t' '$1=="check" && $2=="pass"' | wc -l` muss mindestens `1` ausgeben.
+- [ ] Ein Lesefehler vor dem `retire` (`isApproved` der alten Erlaubnis oder `callerOf` der alten Weiterleitung wirft) beendet die
+      Auszahlung mit 502 `payout_failed` in der Stufe `retire`, sendet keine Transaktion und lässt `retire_*` stehen; geht das Lesen
+      wieder, sendet die nächste Auszahlung zuerst `retire` an die alte Weiterleitung, dann `deploy`, `approveWithSignature` und
+      `payout` über die neue. Zwei Fälle (einer je Lesezugriff) in genau einem `describe("when the chain cannot be read before the retire", …)`
+      in `test/konto-payout.test.ts`, erste Auszahlung über IBAN 1, neue IBAN 2, dann der Lesefehler; den Fehler wirft ein Wrapper um
+      die Kette nur für die alte Erlaubnis oder Weiterleitung (Form wählt der Maker, etwa wie `lossySetup`). `src/` ändert sich dafür nicht.
+      MVP: Funktion, weil Entscheidung 4 die abgelöste Erlaubnis bei einem Lesefehler stehen lässt, kein Fall das festhält und ein
+      `catch`, das statt abzubrechen verwirft, alle vier Fälle grün ließe, während eine freigeschaltete alte Erlaubnis stehen bliebe
+      (Kritik Tech Lead 2026-11-17).
+      Prüfung: `T=$(mktemp -d); PATH=/usr/bin:$PATH pnpm -s vitest run test/konto-payout.test.ts --reporter=json --outputFile=$T/r.json >/dev/null 2>&1; echo "exit=$?"; node -e 'const r=require(process.argv[1]);const a=r.testResults.flatMap(f=>f.assertionResults).filter(x=>x.ancestorTitles.includes("when the chain cannot be read before the retire"));console.log(a.length, a.filter(x=>x.status==="passed").length)' $T/r.json` muss genau `exit=0` und `2 2` ausgeben.
+      Prüfung: `T=$(mktemp -d); git archive HEAD | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; n=$(grep -c 'throw new PayoutFailed("retire", null);' $T/src/konto/payout.ts); sed -i 's/throw new PayoutFailed("retire", null);/skip = "not_approved";/' $T/src/konto/payout.ts; (cd $T && PATH=/usr/bin:$PATH pnpm -s vitest run test/konto-payout.test.ts --reporter=json --outputFile=r.json >/dev/null 2>&1); echo "$n $(node -e 'const r=require(process.argv[1]);const a=r.testResults.flatMap(f=>f.assertionResults).filter(x=>x.ancestorTitles.includes("when the chain cannot be read before the retire"));console.log(a.filter(x=>x.status!=="passed").length)' $T/r.json)"` muss genau `1 2` ausgeben.
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
