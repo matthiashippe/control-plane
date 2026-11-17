@@ -432,3 +432,83 @@ describe("after a new gas key or a lost receipt", () => {
     expect(s.node.balances.get(thirdDestination)).toBe(5n * USD);
   });
 });
+
+/**
+ * A setup whose chain cannot read the old permission or the old forwarder: `fail.approvedSalt` makes isApproved throw for the
+ * permission with that salt, `fail.callerOf` makes callerOf throw for that forwarder. Every other read and send goes through.
+ */
+function unreadableSetup() {
+  const fail: { approvedSalt: bigint | null; callerOf: string | null } = { approvedSalt: null, callerOf: null };
+  const inner: { chain: PayoutChain | null } = { chain: null };
+  const chain: PayoutChain = {
+    code: (a) => inner.chain!.code(a),
+    balanceOf: (a) => inner.chain!.balanceOf(a),
+    async isApproved(p) {
+      if (fail.approvedSalt !== null && BigInt(p.salt) === fail.approvedSalt) throw new Error("rpc timeout on isApproved");
+      return inner.chain!.isApproved(p);
+    },
+    async callerOf(f) {
+      if (fail.callerOf !== null && f.toLowerCase() === fail.callerOf) throw new Error("rpc timeout on caller");
+      return inner.chain!.callerOf(f);
+    },
+    send: (tx) => inner.chain!.send(tx),
+    receipt: (hash) => inner.chain!.receipt(hash),
+  };
+  const s = moneySetup({ konto: { payoutChain: chain } });
+  inner.chain = createPayoutChain({ chainId: 84532, account: s.gas, transport: s.node.transport, token: SEPOLIA_USDC });
+  return { s, fail };
+}
+
+describe("when the chain cannot be read before the retire", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const retireRow = (s: MoneySetup, address: string) =>
+    s.db.prepare("SELECT retire_forwarder, retire_permission FROM konto_payouts WHERE address = ?").get(address.toLowerCase()) as {
+      retire_forwarder: string | null;
+      retire_permission: string | null;
+    };
+
+  for (const read of ["isApproved", "callerOf"] as const) {
+    it(`stops in stage retire without a transaction when ${read} of the old one fails, keeps the retire and retires it on the next payout`, async () => {
+      const { s, fail } = unreadableSetup();
+      const a = await ready(s, 30n);
+      const oldForwarder = expectedForwarder(a.address, a.destination, s.gas.address);
+      expect((await payout(s, a.key, { amount_usd: "10.00" })).status).toBe(200);
+      expect(s.node.sent).toHaveLength(3);
+      const p = await toPasskey(s, a);
+      const newDestination = s.bridge.state.liquidation.at(-1)!;
+      const newForwarder = expectedForwarder(a.address, newDestination, s.gas.address);
+      expect(p.spender).toBe(newForwarder);
+      expect((await json(s, `/h/${p.h.code}/payout`, await payoutPermission(a.owner, a.address, newForwarder, { salt: 100n }))).status).toBe(200);
+      const waiting = retireRow(s, a.address);
+      expect(waiting.retire_forwarder?.toLowerCase()).toBe(oldForwarder);
+      expect(waiting.retire_permission).not.toBeNull();
+
+      if (read === "isApproved") fail.approvedSalt = 99n;
+      else fail.callerOf = oldForwarder;
+      const lines = logLines();
+      const broken = await payout(s, a.key, { amount_usd: "5.00" });
+      expect(broken.status).toBe(502);
+      expect(await broken.json()).toMatchObject({ error: "payout_failed", stage: "retire" });
+      expect(s.node.sent).toHaveLength(3);
+      expect(retireRow(s, a.address)).toEqual(waiting);
+      expect(lines().filter((l) => l.includes("retire skipped"))).toEqual([]);
+      expect(s.node.approved.has(`${a.address}:99`)).toBe(true);
+
+      fail.approvedSalt = null;
+      fail.callerOf = null;
+      const res = await payout(s, a.key, { amount_usd: "5.00" });
+      expect(res.status).toBe(200);
+      const after = s.node.sent.slice(3);
+      expect(after.map((t) => t.kind)).toEqual(["retire", "deploy", "approveWithSignature", "payout"]);
+      expect(after[0]).toMatchObject({ to: oldForwarder, salt: 99n });
+      expect(after[1].target).toBe(newForwarder);
+      expect(after[3]).toMatchObject({ to: newForwarder, value: 5n * USD });
+      expect(s.node.approved.has(`${a.address}:99`)).toBe(false);
+      expect(retireRow(s, a.address)).toEqual({ retire_forwarder: null, retire_permission: null });
+      expect(s.node.balances.get(newDestination)).toBe(5n * USD);
+    });
+  }
+});
