@@ -153,3 +153,27 @@ Karte, die den Auftrag verspricht, muss wie bisher die Zahl des Dienstes nennen 
 den kanonischen Host (`siteOrigin()`), dann `automaton --provision`, gleiche API, eigene Wallet. Der Absatz zum Markt („One job
 …“) folgt unverändert unter `## The market`, weil ein Automaton, das die Datei liest, zuerst die Zeile braucht, die es
 weiterlaufen lässt, und erst danach ein Angebot, das nicht seines ist. `test/automaton-name.test.ts` prüft beides.
+
+## Version der Bildadresse, Alt-Text je Karte, Werkzeuge in `check` (umzug 04)
+
+**Version in der Bildadresse.** `og:image` und `twitter:image` jeder Seite lauten `https://<Host>/og.png?v=<hash>` (für die
+x402-Seiten `og-x402.png?v=<hash>`), `<hash>` sind die ersten 8 Hex-Zeichen des sha256 über genau die Bytes, die `/og.png`
+ausliefert. Vorschaudienste (Slack, Discord, X, LinkedIn) halten ein Bild nach seiner Adresse tagelang; ohne Version zeigte ein
+geteilter Link nach einer neuen Karte weiter die alte. `createApp` rechnet die Version beim Start aus der Datei, die es ausliefert,
+`src/public/index.html` trägt sie nie, weil eine Zahl im Template falsch wäre, sobald jemand das Bild neu aufnimmt. Die Route wertet
+`?v=` nicht aus: Pfad, Bytes und Header (`Cache-Control: public, max-age=86400`) bleiben wie vorher. Fehlt ein Bild, entfällt
+seine Route, und die Adresse steht ohne Version.
+
+**Alt-Text je Karte.** `og:image:alt` kommt aus der Tabelle `OG_CARDS` in `src/public/og-cards.ts`, ein Eintrag je Bild unter
+`src/public/`. Der Eintrag `og.png` trägt den Text aus `src/public/index.html` Zeichen für Zeichen, `og-x402.png` einen eigenen
+Satz zur Messung des x402-Markts ohne `conwayApiUrl`. Vorher beschrieben `/x402` und `/conway` die Umzugskarte unter dem Bild der
+Messung. `page()` und die Route `/` setzen Adresse und Alt-Text über dieselbe Funktion; eine Karte ohne Eintrag wirft, statt still
+den Text der Startseite zu übernehmen. Wer eine Karte anlegt, braucht das Bild, den Eintrag in `OG_CARDS` und eine Seite, die den
+Namen an `page()` gibt; `test/og-cards.test.ts` hält je Karte eine Seite, die Version aus den ausgelieferten Bytes und den Alt-Text
+fest und schlägt an, wenn eine Karte aus `OG_CARDS` auf keiner Seite geprüft wird.
+
+**Werkzeuge des Umzugs in `check`.** `test/site-dns-selftest.test.ts` startet `python3 ops/site-dns.py --selftest` ohne Netz und
+ohne Token in Reichweite und verlangt Exit 0, keine Zeile `FAIL ` und als letzte Zeile `SITE DNS SELFTEST OK`; so bricht der
+Planer der A-Records nicht still zwischen zwei Wechseln. `test/host-lists.test.ts` hält jetzt sechs Kopien der Hostlisten fest,
+darunter `KNOWN_HOSTS` in `ops/before-the-answers.py` als Menge gegen `SERVICE_HOSTS` in `src/public/site.ts`. Wer einen Host
+hinzufügt, ändert alle Kopien; der Test nennt die vergessene Datei.

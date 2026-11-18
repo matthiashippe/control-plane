@@ -147,3 +147,30 @@
 - Abgelöst: umzug 02 Punkt 2 durch umzug 03 Punkt 3, Ausgabe dann genau `Exit 1, keine abnahme nach 2026-11-18T01:23:28+00:00` (Tech Lead, 2026-11-18)
 - Abgelöst: umzug 02 Punkt 4 durch umzug 03 Punkt 5, Ausgabe dann genau `Exit 0, 5` (Tech Lead, 2026-11-18)
 - Abgelöst: umzug 02 Punkt 4 durch umzug 03 Punkt 4, Ausgabe dann genau `Exit 0, SELFTEST OK: ten cases, both directions, including the number drifting apart and the card of the switch.` (Tech Lead, 2026-11-18)
+
+## Goal 04 (18.11.2026, Engineer CP)
+
+- **Tabelle `OG_CARDS` in `src/public/og-cards.ts` mit genau `og.png` und `og-x402.png`**, weil Bild und Alt-Text an einer Stelle
+  stehen müssen, damit sie nicht wieder auseinanderlaufen (Entscheidung 1). Der Text für `og.png` ist Zeichen für Zeichen der aus
+  `src/public/index.html`, `test/og-cards.test.ts` vergleicht beide; für `og-x402.png` gilt der Vorschlag des Tech Lead wörtlich.
+- **Version beim Start aus den ausgelieferten Bytes, nie im Template**, weil `index.html` sonst bei jeder neuen Aufnahme mitgeändert
+  werden müsste und eine vergessene Zahl still falsch wäre (Entscheidung 2). Gerechnet wird über den `ArrayBuffer`, den die Route
+  ausliefert, also auch über `dist/public/og.png`, wenn das Image ihn trägt.
+- **Eine Funktion `withCard()` für `page()` und `/`**, weil die Startseite nicht durch `page()` geht und zwei Stellen mit eigenen
+  Regeln wieder auseinanderlaufen würden. Der frühere globale Ersatz `og.png` durch den Kartennamen im Kopf entfiel, weil er nur die
+  beiden Bildzeilen traf und jetzt gezielt ersetzt wird.
+- **Eine Karte ohne Eintrag wirft, und der Parameter `card` von `page()` hat den Typ `OgCardName`**, weil ein Rückfall auf den Text
+  der Startseite das Bild falsch beschreibt (Entscheidung 3): `tsc` in `check` lehnt einen fremden Namen schon vor dem Start ab,
+  die Ausnahme in `withCard()` fängt alles, was zur Laufzeit hereinkommt.
+- **Alt-Text wird mit `esc()` aus `src/public/market.ts` eingesetzt**, weil er als Attribut im Kopf landet; beide heutigen Texte
+  enthalten kein zu maskierendes Zeichen, deshalb bleibt der Text der Startseite byte-gleich.
+- **`test/og-cards.test.ts` war gegen das alte `src/app.ts` rot (4 von 8 Fällen)**, weil die vier Seitenfälle die Version
+  verlangen (Entscheidung 4); die vier übrigen Fälle prüfen Tabelle und Bildroute und sind ohne Fix grün.
+- **`test/public.test.ts`, `test/x402-page.test.ts` und `test/conway-page.test.ts` verlangen die Adresse mit `?v=` und 8
+  Hex-Zeichen per `toMatch`**, weil die alte Erwartung das schließende Anführungszeichen direkt hinter dem Bildnamen verlangte
+  (Entscheidung 5); Zahl der Fälle und der `expect(` je Datei unverändert.
+- **`test/site-dns-selftest.test.ts` startet mit leerem `HOME`, leerem Token und einem Proxy auf `127.0.0.1:9`**, weil das Werkzeug
+  den Token sonst aus der Geheimnisdatei unter `HOME` liest und ein Test nie einen Weg nach Cloudflare haben darf (Entscheidung 6).
+  Gegenprobe: `if want != got` in einer Kopie macht ihn rot (1 Fehler).
+- **`KNOWN_HOSTS` wird als Menge gegen `SERVICE_HOSTS` verglichen**, weil die Reihenfolge in `ops/before-the-answers.py` nichts
+  bedeutet (Entscheidung 7); Gegenprobe: `automatonhost.com` aus der Kopie gestrichen macht ihn rot (1 Fehler).
