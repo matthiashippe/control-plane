@@ -20,11 +20,11 @@ import { phonePage, usd } from "./handoff.js";
 import { KEY_ICON, KONTO_STYLE } from "./konto.js";
 
 export type MoneyPage =
-  | { state: "deposit-approve"; automatonName: string; amountUsdc: bigint; choices: number[] }
+  | { state: "deposit-approve"; displayName: string; amountUsdc: bigint; choices: number[] }
   | {
       state: "deposit-card";
       code: string;
-      automatonName: string;
+      displayName: string;
       amountUsdc: bigint;
       /** The smart wallet of the account of the API key that asked; set by the server, never by the page or the terminal. */
       address: string;
@@ -34,16 +34,16 @@ export type MoneyPage =
     }
   | {
       state: "payout-approve";
-      automatonName: string;
+      displayName: string;
       choices: number[];
       /** The account has a payout set up before, and the passkey step ends that permission (goals/konto/11). */
       earlierApproval?: boolean;
     }
-  | { state: "payout-verify"; code: string; automatonName: string; kycLink: string }
+  | { state: "payout-verify"; code: string; displayName: string; kycLink: string }
   | {
       state: "payout-bank";
       code: string;
-      automatonName: string;
+      displayName: string;
       error?: string | null;
       /** 2 when Bridge had checked the person before this code, so the identity step was left out; else 3. */
       steps?: 2 | 3;
@@ -51,7 +51,7 @@ export type MoneyPage =
   | {
       state: "payout-passkey";
       code: string;
-      automatonName: string;
+      displayName: string;
       bankLast4: string;
       chainId: number;
       /** forwarderAddress(account, destination): the only spender the page asks the passkey to sign. */
@@ -68,7 +68,7 @@ export type MoneyPage =
        */
       revoke?: { hash: string; nonce: string } | null;
     }
-  | { state: "retry"; code: string; automatonName: string };
+  | { state: "retry"; code: string; displayName: string };
 
 export type MoneyState = MoneyPage["state"];
 
@@ -141,7 +141,7 @@ ${tail}    </div>
 }
 
 function body(page: MoneyPage): string {
-  const name = esc(page.automatonName);
+  const name = esc(page.displayName);
   switch (page.state) {
     case "deposit-approve":
       return `<section class="hero">

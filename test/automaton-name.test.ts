@@ -82,11 +82,11 @@ describe("the old name is gone from what we serve", () => {
 
   it("names automatonhost.com and no old brand in any state of the phone pages", () => {
     const pages = [
-      renderHandoffPage({ state: "approve", automatonName: "Atlas", dailyLimitUsdc: 5_000_000n, amountUsdc: 5_000_000n, choices: [62, 47, 18] }, ""),
+      renderHandoffPage({ state: "approve", displayName: "Atlas", dailyLimitUsdc: 5_000_000n, amountUsdc: 5_000_000n, choices: [62, 47, 18] }, ""),
       renderHandoffPage({ state: "approved" }, ""),
       ...(["expired", "used", "wrong", "unknown"] as const).map((reason) => renderHandoffPage({ state: "invalid", reason }, "")),
       renderKontoPage(
-        { state: "passkey", code: "abc", automatonName: "Atlas", dailyLimitUsdc: 5_000_000n, chainId: 84532, spender: "0x" + "1".repeat(40), token: "0x" + "2".repeat(40) },
+        { state: "passkey", code: "abc", displayName: "Atlas", dailyLimitUsdc: 5_000_000n, chainId: 84532, spender: "0x" + "1".repeat(40), token: "0x" + "2".repeat(40) },
         "",
       ),
       ...(["cancelled", "unreachable", "refused"] as const).map((reason) => renderKontoPage({ state: "failed", reason }, "")),
@@ -98,22 +98,22 @@ describe("the old name is gone from what we serve", () => {
         },
         "",
       ),
-      renderMoneyPage({ state: "deposit-approve", automatonName: "Atlas", amountUsdc: 20_000_000n, choices: [62, 47, 18] }, ""),
+      renderMoneyPage({ state: "deposit-approve", displayName: "Atlas", amountUsdc: 20_000_000n, choices: [62, 47, 18] }, ""),
       renderMoneyPage(
-        { state: "deposit-card", code: "abc", automatonName: "Atlas", amountUsdc: 20_000_000n, address: "0x" + "3".repeat(40), chainId: 84532, organizationId: "org", owner: "0x" + "4".repeat(40) },
+        { state: "deposit-card", code: "abc", displayName: "Atlas", amountUsdc: 20_000_000n, address: "0x" + "3".repeat(40), chainId: 84532, organizationId: "org", owner: "0x" + "4".repeat(40) },
         "",
       ),
-      renderMoneyPage({ state: "payout-approve", automatonName: "Atlas", choices: [62, 47, 18] }, ""),
-      renderMoneyPage({ state: "payout-verify", code: "abc", automatonName: "Atlas", kycLink: "https://example.com/kyc" }, ""),
-      renderMoneyPage({ state: "payout-bank", code: "abc", automatonName: "Atlas" }, ""),
+      renderMoneyPage({ state: "payout-approve", displayName: "Atlas", choices: [62, 47, 18] }, ""),
+      renderMoneyPage({ state: "payout-verify", code: "abc", displayName: "Atlas", kycLink: "https://example.com/kyc" }, ""),
+      renderMoneyPage({ state: "payout-bank", code: "abc", displayName: "Atlas" }, ""),
       renderMoneyPage(
         {
-          state: "payout-passkey", code: "abc", automatonName: "Atlas", bankLast4: "3000", chainId: 84532, spender: "0x" + "1".repeat(40),
+          state: "payout-passkey", code: "abc", displayName: "Atlas", bankLast4: "3000", chainId: 84532, spender: "0x" + "1".repeat(40),
           token: "0x" + "2".repeat(40), account: "0x" + "3".repeat(40), owner: "0x" + "4".repeat(40), organizationId: "org",
         },
         "",
       ),
-      renderMoneyPage({ state: "retry", code: "abc", automatonName: "Atlas" }, ""),
+      renderMoneyPage({ state: "retry", code: "abc", displayName: "Atlas" }, ""),
     ];
     for (const html of pages) {
       expect(hits(html)).toEqual([]);

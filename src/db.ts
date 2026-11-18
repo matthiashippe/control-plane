@@ -617,6 +617,12 @@ function migrate(db: Db): void {
       `);
     })();
   }
+  // konto 12: the column holds the name the page of a handoff shows, which for the step limit is the name of the account and not
+  // of an automaton. The rebuilds above keep the old name because they lift older schemas; this rename comes after them once, also
+  // for a fresh database, and keeps every row as it is.
+  if ((db.prepare("PRAGMA table_info(handoffs)").all() as { name: string }[]).some((c) => c.name === "automaton_name")) {
+    db.exec("ALTER TABLE handoffs RENAME COLUMN automaton_name TO display_name");
+  }
 
   // The payout of konto 05 (docs/konto/euro.md, "Auszahlung"), one row per account. From Bridge only the IDs: the customer, its
   // identity link and whether Bridge reported it `approved`, the bank account (external account) and the payout address

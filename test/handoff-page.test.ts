@@ -34,7 +34,7 @@ describe("GET /h/{code}", () => {
   it("escapes a name that carries markup", async () => {
     const { app, db } = handoffApp();
     // POST /v1/handoff refuses such a name since goals/konto/10, so the row is written as one stored before that rule.
-    const { handoff } = createHandoff(db, { automatonName: '<script>alert("x")</script>', dailyLimitUsdc: 5_000_000n, amountUsdc: 5_000_000n }, START);
+    const { handoff } = createHandoff(db, { displayName: '<script>alert("x")</script>', dailyLimitUsdc: 5_000_000n, amountUsdc: 5_000_000n }, START);
     const html = await (await app.request(`/h/${handoff.code}`)).text();
     expect(html).not.toContain("<script>");
     expect(html).toContain("&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt;");
