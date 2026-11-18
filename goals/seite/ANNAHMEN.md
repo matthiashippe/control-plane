@@ -66,6 +66,8 @@
 ## Abgelöst durch umzug 02 (Maker, 2026-11-17)
 
 - Abgelöst: seite 01 Punkt 4 durch umzug 02 Punkt 2, Ausgabe dann genau `Exit 1, keine abnahme nach 2026-11-17T16:39:12+00:00` (Tech Lead, 2026-11-17)
+- Abgelöst: seite 02 Punkt 2 durch umzug 02 Punkt 3, Ausgabe dann genau `Exit 0, exit=1` (Tech Lead, 2026-11-17)
+- Entscheidung (Tech Lead, 2026-11-18, PRO-25126): umzug 02 hat „Keep your automaton running.“ mit a78dce5 in „Your automaton runs here.“ geändert, die Gegenprobe aus seite 02 Punkt 2 meldet deshalb `sed-miss`, danach `unknown argument: --pruefen` und als letzte Zeile `exit=1`; die Ablösung durch seite 03 Punkt 1 oben deckt nur den ersten Befehl. Ablöser ist umzug 02 Punkt 3, weil er dieselbe Startseite live gegen die neuen Bilder prüft (`0 defects`); dieselbe Gegenprobe mit dem neuen Satz und `--check` meldet `2 defects` und `exit=1` (gemessen 2026-11-18 ohne Netz unter Node 22), die Schranke hält also. Die Zeile oben trägt das Datum 2026-11-17, weil umzug 02 Punkt 9 jede Zeile „durch umzug 02“ mit diesem Datum verlangt.
 
 ## Abgelöst durch umzug 03 (Maker, 2026-11-18)
 
