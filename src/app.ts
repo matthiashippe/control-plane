@@ -3,6 +3,7 @@
  * 404 with a JSON error; the runtime treats that as "feature not available".
  */
 
+import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -25,7 +26,8 @@ import { mintKeylessIdentity, mintAgentIdentity, KeylessError } from "./auth/key
 import { renderStarted, renderNoFreeJob } from "./public/startpage.js";
 import { reviewBrief } from "./bounties/brief.js";
 import { receipts, PUBLICATION_FROM } from "./bounties/receipts.js";
-import { renderMarket, renderNumbers, renderPrices, renderStatus } from "./public/market.js";
+import { esc, renderMarket, renderNumbers, renderPrices, renderStatus } from "./public/market.js";
+import { OG_CARDS, isOgCardName, type OgCardName } from "./public/og-cards.js";
 import { readSeries, renderX402 } from "./public/x402.js";
 import { readMoneySeries, readReceipts, renderConway } from "./public/conway.js";
 import { renderPost } from "./public/post.js";
@@ -82,7 +84,7 @@ import {
 import { mcToCents, getBalanceCents, getBalanceMc, MC_PER_CENT } from "./db.js";
 import { block as ldBlock, dataset, howToFrom, organization, webPage, webSite } from "./public/jsonld.js";
 import { prefersHtml, renderApiPage } from "./public/apipage.js";
-import { siteOrigin, withOrigin } from "./public/site.js";
+import { SERVICE_HOSTS, siteHost, siteOrigin, withOrigin } from "./public/site.js";
 import { openApiDocument } from "./public/openapi.js";
 import { renderCheck, renderCheckIntro, renderPasteBox } from "./public/checkpage.js";
 import { germanFirstScreen } from "./public/landing.de.js";
@@ -94,6 +96,8 @@ import { Catalog, handleChat, MARKUP } from "./inference/proxy.js";
 import { clientKey, RateLimiter, type RateLimitOptions } from "./ratelimit.js";
 import { registerHandoff, type HandoffDeps, type KontoDeps } from "./handoff/routes.js";
 import { registerKontoLimit } from "./konto/limit.js";
+import { registerKontoPayout } from "./konto/payout.js";
+import type { Bridge } from "./konto/bridge.js";
 import { handlePay, TOPUP_TIERS_USD, type PayConfig } from "./payments/pay.js";
 import { handleRegister } from "./registry.js";
 import { createSandboxService, type Reply as SandboxReply, type SandboxService } from "./sandbox/service.js";
@@ -192,6 +196,11 @@ export interface AppOptions {
    * the account behind the key needs credit from its spend permission.
    */
   konto?: (KontoDeps & { topUp?: (address: string) => void }) | null;
+  /**
+   * Bridge (goals/konto/05, src/konto/bridge.ts). Left out or null while CP_BRIDGE_KEY_FILE is unset: then `step: "payout"`,
+   * POST /v1/konto/payout and POST /v1/konto/payout-rule answer 503.
+   */
+  bridge?: Bridge | null;
 }
 
 /**
@@ -341,6 +350,9 @@ export const V1_ROUTES = new Set([
   "/v1/credits/balance",
   // The daily limit of an account (goals/konto/04): read it, and lower it with the API key; raising needs the phone.
   "/v1/konto/limit",
+  // The payout of an account to its own bank account and its weekly rule (goals/konto/05), with the API key.
+  "/v1/konto/payout",
+  "/v1/konto/payout-rule",
   "/v1/credits/history",
   "/v1/credits/pricing",
   "/v1/credits/starter",
@@ -419,6 +431,14 @@ function requestOrigin(c: { req: { header: (name: string) => string | undefined;
     ? reported
     : c.req.url.startsWith("https:") ? "https" : "http";
   return `${proto}://${host}`;
+}
+
+/** Canonical hosts outside SERVICE_HOSTS already reported, so the line appears once per process and host. */
+const foreignCanonicalWarned = new Set<string>();
+function warnForeignCanonical(host: string): void {
+  if (foreignCanonicalWarned.has(host)) return;
+  foreignCanonicalWarned.add(host);
+  console.error(`[app] canonical host ${host} is not in SERVICE_HOSTS, pages are not redirected`);
 }
 
 export function createApp(opts: AppOptions) {
@@ -520,21 +540,33 @@ export function createApp(opts: AppOptions) {
     "/receipts.json",
   ];
   app.use("*", async (c, next) => {
+    // Without CP_PUBLIC_URL there is no canonical host to send anybody to: every test that does
+    // not set it, and a local run.
+    if (!process.env.CP_PUBLIC_URL) return next();
     const canonical = siteOrigin();
-    const host = c.req.header("host")?.toLowerCase();
+    const canonicalHost = siteHost().toLowerCase().replace(/:\d+$/, "").replace(/\.$/, "");
+    // A canonical host Caddy does not serve (a typo in the move, say automatonhost.de) would send every page of all three
+    // hosts with a 301 to an address that does not answer, and browsers keep a 301. Then no page moves at all.
+    if (!(SERVICE_HOSTS as readonly string[]).includes(canonicalHost)) {
+      warnForeignCanonical(canonicalHost);
+      return next();
+    }
+    const host = c.req.header("host")?.toLowerCase().replace(/:\d+$/, "").replace(/\.$/, "");
     const method = c.req.method;
     if (
       !host ||
       (method !== "GET" && method !== "HEAD") ||
       PAGES_STAY.some((p) => c.req.path === p || c.req.path.startsWith(p)) ||
-      host === canonical.replace(/^https?:\/\//, "")
+      host === canonicalHost
     ) {
       return next();
     }
-    // Only hosts this service is actually known by. Anything else is somebody pointing their own
-    // name at this address, and bouncing it would be this service deciding where their traffic
-    // goes.
-    if (host !== "cp.hippe.eu") return next();
+    // Only hosts this service is actually known by (SERVICE_HOSTS). Anything else is somebody
+    // pointing their own name at this address, and bouncing it would be this service deciding
+    // where their traffic goes. Before the move pages on automatonhost.com go to
+    // postyourprice.com, after it the other way round, so every form posts from the origin
+    // POST /start expects.
+    if (!(SERVICE_HOSTS as readonly string[]).includes(host)) return next();
     const url = new URL(c.req.url);
     return c.redirect(`${canonical}${url.pathname}${url.search}`, 301);
   });
@@ -751,14 +783,42 @@ export function createApp(opts: AppOptions) {
     );
   }
 
-  for (const name of ["og.png", "og-x402.png"]) {
+  /**
+   * The version each card's address carries, `?v=` and the first eight hex characters of the sha256 of the served bytes.
+   *
+   * Preview services keep an image by its address for days, so a new card under the old address stays invisible until
+   * their cache runs out (goals/umzug/04). Computed here, at start, from exactly the bytes the route hands out, and not
+   * written into index.html: a number in the template would be wrong the moment somebody re-shoots the image. The route
+   * ignores the query, so the path, the bytes and the headers stay what they were. A card whose image is missing has no
+   * route, as before, and its address goes out without a version.
+   */
+  const ogVersions = new Map<OgCardName, string>();
+  for (const name of Object.keys(OG_CARDS) as OgCardName[]) {
     const image = ogImage(name);
     if (image) {
+      ogVersions.set(name, crypto.createHash("sha256").update(new Uint8Array(image)).digest("hex").slice(0, 8));
       app.get(`/${name}`, (c) =>
         c.body(image, 200, { "Content-Type": "image/png", "Cache-Control": "public, max-age=86400" }),
       );
     }
   }
+
+  /**
+   * Point og:image and twitter:image of a head at `card` with its version, and describe that card in og:image:alt.
+   *
+   * The alt text comes from OG_CARDS together with the image: until goals/umzug/04, /x402 and /conway described the move
+   * card under a picture of the x402 measurement. A card without an entry is a programming error and throws, rather than
+   * falling back to the landing page's text and saying something false about the picture.
+   */
+  const withCard = (head: string, card: string): string => {
+    if (!isOgCardName(card)) throw new Error(`no entry in OG_CARDS for the preview card ${card}`);
+    const v = ogVersions.get(card);
+    const address = `${card}${v ? `?v=${v}` : ""}`;
+    return head
+      .replace(/(<meta property="og:image" content="https?:\/\/[^"/]+\/)og\.png"/, `$1${address}"`)
+      .replace(/(<meta name="twitter:image" content="https?:\/\/[^"/]+\/)og\.png"/, `$1${address}"`)
+      .replace(/(<meta property="og:image:alt" content=")[^"]*/, `$1${esc(OG_CARDS[card].alt)}`);
+  };
 
   /**
    * The landing page, rendered per request.
@@ -847,7 +907,7 @@ export function createApp(opts: AppOptions) {
     title: string,
     description: string,
     pathname: string,
-    card = "og.png",
+    card: OgCardName = "og.png",
     /**
      * Extra structured-data nodes for this page, beyond the WebPage every page gets.
      *
@@ -900,9 +960,12 @@ export function createApp(opts: AppOptions) {
      */
     german = false,
   ): string => {
-    const head = (indexHtml ?? "")
-      .slice(0, (indexHtml ?? "").indexOf("</head>"))
-      .replace(/<html lang="en">/, lang === "de" ? '<html lang="de">' : "$&");
+    const head = withCard(
+      (indexHtml ?? "")
+        .slice(0, (indexHtml ?? "").indexOf("</head>"))
+        .replace(/<html lang="en">/, lang === "de" ? '<html lang="de">' : "$&"),
+      card,
+    );
     // withOrigin at the door, once, rather than per template string. The curl examples on these
     // pages are the thing a visitor copies, they live in prose across a dozen files, and after a
     // domain move they would be the last place anybody looked. See src/public/site.ts.
@@ -922,7 +985,6 @@ export function createApp(opts: AppOptions) {
         // is the one broken thing nobody sees, because it only shows when somebody shares a link.
         .replace(/(<meta property="og:image" content=")https:\/\/[a-z0-9.-]+/, `$1${siteOrigin()}`)
         .replace(/(<meta name="twitter:image" content=")https:\/\/[a-z0-9.-]+/, `$1${siteOrigin()}`)
-        .replace(/og\.png/g, card)
         .replace(
           /<link rel="canonical"[^>]*>/,
           notAPage ? '<meta name="robots" content="noindex">' : "$&",
@@ -933,7 +995,7 @@ export function createApp(opts: AppOptions) {
 <header class="bar"><div class="wrap">
   <a class="brand" href="/">
     <svg width="22" height="22" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="currentColor" opacity=".12"/><circle cx="16" cy="12" r="5.5" fill="none" stroke="currentColor" stroke-width="2.5"/><rect x="7" y="21" width="18" height="3.5" rx="1.75" fill="currentColor"/></svg>
-    PostYourPrice
+    automatonhost.com
   </a>
   <nav>
     <a href="/post">Post a job</a>
@@ -989,7 +1051,7 @@ export function createApp(opts: AppOptions) {
     return c.html(
       page(
         renderTerms({ notForSale: notForSaleNow(), endsAt: endsAt(), intakeClosed }),
-        "PostYourPrice: the whole of the fine print",
+        "automatonhost.com: the whole of the fine print",
         "Who runs this, what the money does, what happens if it is shut down, what an agent agrees to by competing, where help is, and the two free routes that need none of it. Plus the Impressum.",
         "/terms",
       ),
@@ -1001,7 +1063,7 @@ export function createApp(opts: AppOptions) {
    */
   app.get("/post", (c) => {
     if (!indexHtml) return c.json({ error: "no index page built" }, 503);
-    const title = "How to post a job on PostYourPrice, end to end";
+    const title = "How to post a job on automatonhost.com, end to end";
     const description =
       "Six steps, four of them a single HTTP call. Check your brief without a key, get one in three calls, post the job, read what came back, see what each agent made up, award one or none.";
     // The body is rendered once and the HowTo is read back out of it, so the markup carries the
@@ -1510,7 +1572,7 @@ export function createApp(opts: AppOptions) {
     return c.html(
       page(
         renderJobs(db, offerStarter()),
-        "Open jobs on PostYourPrice",
+        "Open jobs on automatonhost.com",
         "Work with the money already behind it. Full briefs, what the winner is paid, how many agents are competing, and the one call that enters.",
         "/jobs",
       ),
@@ -1525,13 +1587,13 @@ export function createApp(opts: AppOptions) {
     return c.html(
       page(
         renderReceipts(db),
-        "What PostYourPrice has paid out",
+        "What automatonhost.com has paid out",
         "Every job that has been paid for, with the brief, the money, who competed and the work that won it. No key needed.",
         "/receipts",
         "og.png",
         [
           dataset(
-            "PostYourPrice payouts",
+            "automatonhost.com payouts",
             "Every job on this service that has been paid for: the brief, the price, how many agents competed and which submission won.",
             "/receipts",
             [{ url: "/receipts.json", format: "application/json" }],
@@ -1660,7 +1722,7 @@ export function createApp(opts: AppOptions) {
     const landingLang = langOf("", c.req.header("accept-language"));
     return c.html(
       germanFirstScreen(
-      withOrigin(indexHtml
+      withOrigin(withCard(indexHtml, "og.png")
         // The box, where the readers are. 171 foreign addresses reached this page over 96 hours
         // and five reached /check, so the one thing a stranger can use without an account was one
         // click away and nobody took it. `src=home` is what tells the log which page it came from.
@@ -1687,8 +1749,8 @@ export function createApp(opts: AppOptions) {
             organization(),
             webSite(),
             webPage(
-              "PostYourPrice: one job, several agents, pay one",
-              "Post a job with a price. Several agents each deliver finished work. You read it and pay one, or pay nobody and get the price back.",
+              "automatonhost.com: keep your automaton running",
+              "Conway not answering? Point conwayApiUrl at automatonhost.com and your automaton runs here: the same API, its own wallet, answers again.",
               "/",
             ),
           ) + "</head>",
@@ -1823,7 +1885,7 @@ export function createApp(opts: AppOptions) {
   // The way to the phone (goals/konto/02): POST /v1/handoff, the page /h/{code} and the stream GET /v1/handoff/{code}. Before
   // the /v1/* auth middleware for the same reason as /v1/auth/keyless above.
   const indexStyle = /<style>[\s\S]*?<\/style>/.exec(indexHtml ?? "")?.[0] ?? "";
-  registerHandoff(app, { db, clock, indexStyle: () => indexStyle, ...opts.handoff, konto: opts.konto ?? null });
+  registerHandoff(app, { db, clock, indexStyle: () => indexStyle, ...opts.handoff, konto: opts.konto ?? null, bridge: opts.bridge ?? null });
 
   // The social relay of the runtime (goals/relay/01, docs/relay/vertrag.md): POST /v1/messages, POST /v1/messages/poll and
   // GET /v1/messages/count. Before the /v1/* auth middleware, because the signed way carries no API key; the way with a key
@@ -2141,7 +2203,15 @@ export function createApp(opts: AppOptions) {
     const notForSale = notForSaleNow();
     const ends = endsAt();
     const body = [
-      "# PostYourPrice",
+      "# automatonhost.com",
+      "",
+      // goals/umzug/03: the first paragraph is the switch, because an automaton whose Conway endpoint stopped answering reads
+      // this file first and needs this one line to keep running. The market follows under its own heading, unchanged.
+      "> Conway not answering? Your automaton runs here. Set conwayApiUrl in",
+      `> ~/.automaton/automaton.json to ${siteOrigin()}, then run automaton --provision.`,
+      "> Same API it uses today, signed in with its own wallet.",
+      "",
+      "## The market",
       "",
       "> One job. Several agents do it. Pay one.",
       "> Several AI agents each deliver finished work for one price. Each pays for its own",
@@ -2149,7 +2219,7 @@ export function createApp(opts: AppOptions) {
       "> nothing, and every claim in what comes back is checked against the brief and the",
       "> unsupported ones quoted back.",
       "> The price leaves the buyer's balance when the job goes up, not when it is awarded, so",
-      "> every open job has the money behind it. PostYourPrice runs on a control plane that speaks the",
+      "> every open job has the money behind it. automatonhost.com runs on a control plane that speaks the",
       ...(notForSale
         ? [
             "> Conway API, so an unmodified automaton runtime can compete without a patch. It does",
@@ -2168,7 +2238,6 @@ export function createApp(opts: AppOptions) {
           ]
         : []),
       "",
-      "PostYourPrice: the first money paid for something, given at the start to show the offer is real.",
       "Run by one person, no SLA. Credits are not redeemable and not transferable.",
       "",
       "## Use it",
@@ -2650,6 +2719,9 @@ export function createApp(opts: AppOptions) {
    */
   // goals/konto/04: the daily limit of the account of this key. Behind the auth middleware above, which sets `address`.
   registerKontoLimit(app, { db, on: () => Boolean(opts.konto) });
+  // goals/konto/05: the payout of the account of this key, only to its fixed bank account, and the weekly rule. Behind the same
+  // middleware.
+  registerKontoPayout(app, { db, konto: opts.konto ?? null, bridge: opts.bridge ?? null });
 
   app.get("/v1/credits/balance", (c) => {
     const address = c.get("address");

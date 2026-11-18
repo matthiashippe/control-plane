@@ -119,20 +119,12 @@ export function summary(results) {
 // the defects of the start page, a word the reader would first have to translate is a defect (TEAM.md "Klare Wörter").
 
 /**
- * The states of /h/{code} as the code names them, each with the name its approved picture and source carry:
- * docs/soll/handoff-<file>-<width>.png and docs/soll/src/handoff-<file>.html. The pictures keep the names they were approved
- * under (goals/konto/04), and this is the only place that knows them; everything else asks handoffFile().
+ * The states of /h/{code}, each one source docs/soll/src/handoff-<state>.html and two pictures docs/soll/handoff-<state>-<width>.png,
+ * named after the state in the code (goals/konto/06).
  */
-export const HANDOFF_FILES = Object.freeze({ approve: "freigabe", approved: "erledigt", invalid: "ungueltig" });
-/** The states of /h/{code}, each one source and two pictures. */
-export const HANDOFF_STATES = Object.freeze(Object.keys(HANDOFF_FILES));
-/** The part of the file names of a state's picture and source. */
-export const handoffFile = (state) => HANDOFF_FILES[state];
-/**
- * The marks of the block that has to sit in the first screen: the approved source carries the name of its file, the page the
- * name of its state. Both describe the same block.
- */
-export const HANDOFF_BLOCK_MARKS = Object.freeze(["approve", handoffFile("approve")]);
+export const HANDOFF_STATES = Object.freeze(["approve", "approved", "invalid"]);
+/** The mark of the block that has to sit in the first screen, in the source and on the page alike. */
+export const HANDOFF_BLOCK_MARKS = Object.freeze(["approve"]);
 /** Words that name how the page is built instead of what happens; the same list the goal's source check uses. */
 export const HANDOFF_WORDS = /handoff|phishing|token|\bsse\b/i;
 
@@ -154,23 +146,28 @@ export function assessHandoff(m) {
   return out;
 }
 
-/** The last line of ops/soll-handoff.mjs. Wording fixed by goals/konto/02, Punkt 1, with the name of the approved picture. */
+/** The last line of ops/soll-handoff.mjs. Wording fixed by goals/konto/02, Punkt 1, with the state names of goals/konto/06. */
 export function summaryHandoff(results) {
   const y = WIDTHS.map((w) => {
     const r = results.find((x) => x.state === "approve" && x.width === w);
     return `${w}=${r?.blockBottom ?? "missing"}`;
   }).join(" ");
   const n = results.reduce((s, r) => s + r.defects.length, 0);
-  return `soll handoff: ${results.length} pictures, ${handoffFile("approve")} top ${y}, ${n} defects`;
+  return `soll handoff: ${results.length} pictures, ${HANDOFF_BLOCK_MARKS[0]} top ${y}, ${n} defects`;
 }
 
 // ---- /h/{code}, account step (goals/konto/03) ----------------------------------------------------------------------------
-// Two more states of the phone page: `passkey` (create the account and allow the daily charge) and `fehlgeschlagen` (no account
-// was created). The block that has to sit in the first screen is data-soll="passkey". On top of the defects of the start page,
+// Two more states of the phone page: `passkey` (create the account and allow the daily charge) and `failed` (no account was
+// created). The block that has to sit in the first screen is data-soll="passkey". On top of the defects of the start page,
 // a word the reader would first have to translate is a defect, with the list of goals/konto/03 ("passkey" is a known word).
 
-/** The states of the account step, each one source docs/soll/src/konto-<state>.html and two pictures. */
-export const KONTO_STATES = Object.freeze(["passkey", "fehlgeschlagen"]);
+/** The states of the account step, each one source and two pictures. */
+export const KONTO_STATES = Object.freeze(["passkey", "failed"]);
+/**
+ * The part of the file names of a state's source docs/soll/src/konto-<file>.html and pictures docs/soll/konto-<file>-<width>.png.
+ * The pictures of the state failed keep the name they were approved under (goals/konto/06, decision 5); no other place knows it.
+ */
+export const KONTO_FILES = Object.freeze({ passkey: "passkey", failed: "fehlgeschlagen" });
 /** Words that name how the account is built instead of what happens; the same list the goal's source check uses. */
 export const KONTO_WORDS = /handoff|token|wallet|smart|permission|sepolia|turnkey|\berc/i;
 
@@ -231,11 +228,98 @@ export function assessLimit(m) {
   return out;
 }
 
-/** The last line of ops/soll-limit.mjs. Wording fixed by goals/konto/04, Punkt 1. */
+/** The last line of ops/soll-limit.mjs. Wording fixed by goals/konto/04, Punkt 1, with `pictures` of goals/konto/06. */
 export function summaryLimit(results) {
   const top = (state) => WIDTHS.map((w) => `${w}=${results.find((x) => x.state === state && x.width === w)?.blockBottom ?? "missing"}`).join(" ");
   const n = results.reduce((s, r) => s + r.defects.length, 0);
-  return `soll limit: ${results.length} images, ${LIMIT_BLOCKS.approve} top ${top("approve")}, ${LIMIT_BLOCKS.passkey} top ${top("passkey")}, ${n} defects`;
+  return `soll limit: ${results.length} pictures, ${LIMIT_BLOCKS.approve} top ${top("approve")}, ${LIMIT_BLOCKS.passkey} top ${top("passkey")}, ${n} defects`;
+}
+
+// ---- /h/{code}, money in and out (goals/konto/05) -------------------------------------------------------------------------
+// Seven more states of the phone page: adding money by card and sending money to the person's own bank account, plus `retry`
+// after a signature check that did not go through. Every state carries a block that has to end in the first screen. On top of
+// the defects of the start page, a word the reader would first have to translate is a defect, with the list of goals/konto/05
+// ("passkey", "IBAN", "card", "identity", Bridge and MoonPay are known words).
+
+/** The states of money in and out, each one source docs/soll/src/money-<state>.html and two pictures. */
+export const MONEY_STATES = Object.freeze(["deposit-approve", "deposit-card", "payout-approve", "payout-approve-revoke", "payout-verify", "payout-bank", "payout-passkey", "retry"]);
+/** The block of each state that has to end in the first screen, as its data-soll value. */
+export const MONEY_BLOCKS = Object.freeze({
+  "deposit-approve": "approve",
+  "deposit-card": "card",
+  "payout-approve": "approve",
+  "payout-approve-revoke": "approve",
+  "payout-verify": "verify",
+  "payout-bank": "bank",
+  "payout-passkey": "payout",
+  retry: "retry",
+});
+/** Words that name how money moves instead of what happens; the same list the goal's source check uses. */
+export const MONEY_WORDS = /handoff|token|wallet|smart|permission|sepolia|turnkey|\berc|allowance|liquidation|on-?ramp|\bkyc|forwarder|spender|usdc/i;
+
+/**
+ * Defects of one render of money in and out. `m` is what assessLimit() takes: `state`, `width`, `pngWidth`, `diffPixels`,
+ * `scrollWidth`, `text`, `foreign` and `blockBottom` (bottom edge of the block of the state in page pixels, null when missing).
+ */
+export function assessMoney(m) {
+  const out = assess({ ...m, moveBottom: 0 }).map((d) => `${m.state} ${d}`), fold = FOLD[m.width];
+  const block = MONEY_BLOCKS[m.state];
+  if (!MONEY_STATES.includes(m.state)) out.push(`${m.state} ${m.width}: unknown state`);
+  const word = String(m.text ?? "").split("\n").find((l) => MONEY_WORDS.test(l));
+  if (word !== undefined) out.push(`${m.state} ${m.width}: word the reader has to translate in the visible text: ${word.trim().slice(0, 80)}`);
+  if (block) {
+    if (m.blockBottom === null || m.blockBottom === undefined) out.push(`${m.state} ${m.width}: block data-soll="${block}" is missing`);
+    else if (fold && m.blockBottom > fold) out.push(`${m.state} ${m.width}: block ${block} ends at ${m.blockBottom} px, below the first screen at ${fold}`);
+  }
+  return out;
+}
+
+/**
+ * The last line of ops/soll-money.mjs. Wording fixed by goals/konto/05, Punkt 2: per width the block bottom furthest down of all
+ * states, `missing` when a state of that width has none.
+ */
+export function summaryMoney(results) {
+  const end = (w) => {
+    const at = results.filter((r) => r.width === w);
+    if (!at.length || at.some((r) => r.blockBottom === null || r.blockBottom === undefined)) return `${w}=missing`;
+    return `${w}=${Math.max(...at.map((r) => r.blockBottom))}`;
+  };
+  const n = results.reduce((s, r) => s + r.defects.length, 0);
+  return `soll money: ${results.length} images, blocks end ${WIDTHS.map(end).join(" ")}, ${n} defects`;
+}
+
+// ---- the preview card /og.png (goals/umzug/03) ---------------------------------------------------------------------------
+// One picture, the card every shared link shows: docs/soll/src/og-card.html rendered at 1200 x 630 CSS pixels with device scale
+// factor 2. No first screen and no block: the card is the first screen. On top of the pixel comparison, the defects are a picture
+// of another size, content that pokes out of the card, a dash in the visible text and a request to a foreign address.
+
+/** The size of the card in CSS pixels and the scale it is rendered at; the picture is 2400 x 1260. */
+export const OG_CARD = Object.freeze({ width: 1200, height: 630, scale: 2 });
+
+/**
+ * Defects of one render of the preview card. `m` holds what the browser measured: `width` and `height` of the fresh picture,
+ * `pngWidth` and `pngHeight` of the committed one (undefined when there is none), `diffPixels` (null when there is nothing to
+ * compare with), `contentWidth` and `contentHeight` (right and bottom edge of the furthest element), `text` (visible text) and
+ * `foreign` (addresses requested or named in an attribute).
+ */
+export function assessOg(m) {
+  const out = [], W = OG_CARD.width * OG_CARD.scale, H = OG_CARD.height * OG_CARD.scale;
+  if (m.width !== W || m.height !== H) out.push(`og: fresh picture is ${m.width} x ${m.height}, not ${W} x ${H}`);
+  if (m.pngWidth !== undefined && (m.pngWidth !== W || m.pngHeight !== H)) out.push(`og: committed picture is ${m.pngWidth} x ${m.pngHeight}, not ${W} x ${H}`);
+  if (m.diffPixels === null || m.diffPixels === undefined) out.push("og: no committed picture to compare with");
+  else if (m.diffPixels > MAX_DIFF_PIXELS) out.push(`og: ${m.diffPixels} pixels differ from a fresh render`);
+  if (m.contentWidth > OG_CARD.width) out.push(`og: content is ${m.contentWidth} px wide, wider than the card at ${OG_CARD.width}`);
+  if (m.contentHeight > OG_CARD.height) out.push(`og: content is ${m.contentHeight} px tall, taller than the card at ${OG_CARD.height}`);
+  const dash = String(m.text ?? "").split("\n").find((l) => DASHES.test(l));
+  if (dash !== undefined) out.push(`og: dash in the visible text: ${dash.trim().slice(0, 80)}`);
+  for (const url of m.foreign ?? []) out.push(`og: request to a foreign address: ${url}`);
+  return out;
+}
+
+/** The last line of ops/soll-og.mjs, ending in `<n> defects` like the other SOLL tools. */
+export function summaryOg(r) {
+  const diff = r.diffPixels === null || r.diffPixels === undefined ? "nothing to compare" : `${r.diffPixels} px`;
+  return `soll og: 1 picture, ${r.width}x${r.height}, diff ${diff}, ${r.defects.length} defects`;
 }
 
 /**

@@ -108,6 +108,12 @@ describe("exec with a long timeout", () => {
     // The last line is the command to wait with (goals/sandbox/09), the same as the field wait_command.
     expect(text.split("\n").pop()).toBe(first.res!.json.wait_command);
     expect(text).toMatch(/Do not start the command again/);
+    // A cut output is read in parts with exec, not with read_file, which returns the whole file (goals/hosting/02).
+    expect(text).toMatch(/grep -n or sed -n in exec, not with read_file/);
+    // The e2e walk judges the exec text cut to 2000 characters (text in harness/e2e/long-exec.mjs), so the whole answer
+    // with the wait command on its last line has to fit there, as the tool text of the runtime at d8f8168
+    // (`exit_code: X\nstdout: S\nstderr: E`, src/agent/tools.ts:139), up to the start of stderr that ends stdout.
+    expect(`exit_code: -1\nstdout: ${text}\nstderr: `.length).toBeLessThanOrEqual(2000);
 
     // A repeat with the same key starts nothing and gets the same answer at once.
     const again = track(a.call("POST", `/v1/sandboxes/${id}/exec`, body, key));

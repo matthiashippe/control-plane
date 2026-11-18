@@ -94,6 +94,46 @@ describe("a sandbox of another owner", () => {
   });
 });
 
+describe("a public_url under automatonhost.com", () => {
+  // The second zone the payment goes through (goals/umzug/01): the same refusal as for postyourprice.com.
+  const zoneUrls = (id: string) => [
+    `https://sbx-${id}-8080.automatonhost.com`,
+    `https://sbx-${id}-8080.sbx.automatonhost.com`,
+    `https://sbx-${id}-8080.AutomatonHost.COM`,
+    `https://sbx-${id}-8080.automatonhost.com.`,
+    `https://sbx-${id}-8080.automatonhost.com:443/`,
+    "https://automatonhost.com",
+    "https://www.automatonhost.com",
+  ];
+
+  it("answers 501 sandbox_server_unreachable and no URL under automatonhost.com leaks", async () => {
+    let planted = "";
+    const { w, a, id } = await started({
+      answer: (method, path) => (method === "POST" && path.endsWith("/ports/expose") ? { status: 200, body: { port: 8080, public_url: planted } } : undefined),
+    });
+    for (const url of zoneUrls(id)) {
+      planted = url;
+      const before = w.hits.length;
+      const res = await a.call("POST", `/v1/sandboxes/${id}/ports/expose`, { port: 8080 });
+      expect(w.hits.length, url).toBe(before + 1);
+      expect(res.status, url).toBe(501);
+      expect(res.json.error).toBe("sandbox_server_unreachable");
+      expect(res.json).not.toHaveProperty("public_url");
+      expect(JSON.stringify(res.json).toLowerCase()).not.toContain("automatonhost.com");
+    }
+  });
+
+  it("passes on a URL of another domain whose name merely ends in automatonhost.com", async () => {
+    const { a, id } = await started({
+      answer: (method, path) =>
+        method === "POST" && path.endsWith("/ports/expose") ? { status: 200, body: { port: 8080, public_url: `https://sbx-${id}-8080.notautomatonhost.com` } } : undefined,
+    });
+    const res = await a.call("POST", `/v1/sandboxes/${id}/ports/expose`, { port: 8080 });
+    expect(res.status).toBe(200);
+    expect(res.json.public_url).toBe(`https://sbx-${id}-8080.notautomatonhost.com`);
+  });
+});
+
 describe("a public_url under postyourprice.com", () => {
   // An older sandboxd still builds its URLs under the zone of the payment; the control plane never passes them on.
   const zoneUrls = (id: string) => [

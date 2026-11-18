@@ -257,7 +257,7 @@ describe("/conway", () => {
   /** Same reason as /x402: a measurement must not unfurl under the marketplace's headline. */
   it("shares under its own headline and its own card", async () => {
     const html = await (await createApp({ db: openDb(":memory:") }).request("/conway")).text();
-    expect(html).toContain('content="https://cp.hippe.eu/og-x402.png"');
+    expect(html).toMatch(/content="https:\/\/cp\.hippe\.eu\/og-x402\.png\?v=[0-9a-f]{8}"/);
     expect(html).not.toContain("/og.png");
     expect(html).toMatch(/og:title" content="People are still paying Conway/);
     expect(html).toContain('href="https://cp.hippe.eu/conway"');

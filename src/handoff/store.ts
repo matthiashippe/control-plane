@@ -13,13 +13,15 @@ export type HandoffState = "pending" | "matched" | "done" | "burned" | "expired"
 
 /**
  * What the right number leads to: `confirm` ends the handoff (konto 02), `konto` goes on to the passkey step that creates the
- * account (konto 03), `limit` to the passkey step that raises the daily limit of an existing account (konto 04).
+ * account (konto 03), `limit` to the passkey step that raises the daily limit of an existing account (konto 04), `deposit` to
+ * the card payment into the account of an API key and `payout` to the setup of the payout to the person's bank account (konto 05).
  */
-export type HandoffStep = "confirm" | "konto" | "limit";
+export type HandoffStep = "confirm" | "konto" | "limit" | "deposit" | "payout";
 
 export interface Handoff {
   code: string;
-  automatonName: string;
+  /** The name the page shows: the one the terminal sent, and for the step limit the name of the account (empty when it has none). */
+  displayName: string;
   dailyLimitUsdc: bigint;
   amountUsdc: bigint;
   match: number;
@@ -35,7 +37,7 @@ export interface Handoff {
 }
 
 export interface HandoffInput {
-  automatonName: string;
+  displayName: string;
   dailyLimitUsdc: bigint;
   amountUsdc: bigint;
   /** Left out, `confirm`: the handoff behaves exactly as in konto 02. */
@@ -98,12 +100,12 @@ export function createHandoff(
     const pollToken = random.bytes(32).toString("base64url");
     try {
       db.prepare(
-        `INSERT INTO handoffs (code, poll_hash, automaton_name, daily_limit_usdc, amount_usdc, match, choices, state, created_at, updated_at, step, account, previous_limit_usdc)
+        `INSERT INTO handoffs (code, poll_hash, display_name, daily_limit_usdc, amount_usdc, match, choices, state, created_at, updated_at, step, account, previous_limit_usdc)
          VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?)`,
       ).run(
         code,
         hashApiKey(pollToken),
-        input.automatonName,
+        input.displayName,
         String(input.dailyLimitUsdc),
         String(input.amountUsdc),
         match,
@@ -116,7 +118,7 @@ export function createHandoff(
       );
       const handoff: Handoff = {
         code,
-        automatonName: input.automatonName,
+        displayName: input.displayName,
         dailyLimitUsdc: input.dailyLimitUsdc,
         amountUsdc: input.amountUsdc,
         match,
@@ -137,7 +139,7 @@ export function createHandoff(
 interface Row {
   code: string;
   poll_hash: string;
-  automaton_name: string;
+  display_name: string;
   daily_limit_usdc: string;
   amount_usdc: string;
   match: number;
@@ -151,7 +153,7 @@ interface Row {
 
 const toHandoff = (r: Row): Handoff => ({
   code: r.code,
-  automatonName: r.automaton_name,
+  displayName: r.display_name,
   dailyLimitUsdc: BigInt(r.daily_limit_usdc),
   amountUsdc: BigInt(r.amount_usdc),
   match: r.match,

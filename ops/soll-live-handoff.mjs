@@ -20,7 +20,7 @@ if (at < 0 || !args[at + 1] || args.length !== 2) {
 const out = path.resolve(args[at + 1]);
 mkdirSync(out, { recursive: true });
 
-process.env.CP_PUBLIC_URL = "https://postyourprice.com";
+process.env.CP_PUBLIC_URL = "https://automatonhost.com";
 const { createApp } = await import("../src/app.ts");
 const { openDb } = await import("../src/db.ts");
 const { randomBytes } = await import("node:crypto");
@@ -45,11 +45,10 @@ const create = async () => (await (await ask("create", "/v1/handoff", {
   headers: { "content-type": "application/json" },
   body: JSON.stringify({ automaton_name: "Atlas", daily_limit_usdc: "5000000", amount_usdc: "5000000" }),
 }, 201)).json());
-// Each answer under the file name of the approved picture of its state, which ops/soll-assess.mjs knows.
-const { handoffFile } = await import("./soll-assess.mjs");
+// Each answer under the name of its state, as the approved pictures are named (goals/konto/06).
 const write = async (state, res) => {
   const html = await res.text();
-  writeFileSync(path.join(out, `handoff-${handoffFile(state)}.html`), html);
+  writeFileSync(path.join(out, `handoff-${state}.html`), html);
   console.error(`soll-live-handoff: ${state} ${res.status}, ${html.length} bytes`);
 };
 

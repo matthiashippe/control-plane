@@ -50,3 +50,17 @@
 - Entscheidung (Tech Lead, Kritik seite 03, 2026-11-16): `ops/soll-limit.mjs` und `ops/soll-live-limit.mjs` gehören in die Umbenennung, weil konto 04 schon auf dev liegt und Punkt 6 sonst nie kippt; Punkt 7 lässt beide Dateien zu, der neue Punkt 8 prüft das vierte Werkzeug wie Punkt 1 die drei anderen, und Punkt 5 nimmt Abgelöst-Zeilen durch Punkt 8 an. Der Prüfbefehl von Punkt 4 nimmt `$(mktemp -u)` statt `$(mktemp)`, weil der Test eine vorhandene Cache-Datei, auch eine leere, als ausdrücklich genannten Cache liest; gemeint war ein Lauf ohne den Cache des Hosts wie in CI, der Test bleibt unverändert (Vorschläge seite-nacharbeit-2026-11-16-2 und seite-kritik-2026-11-16-1).
 - Nach der Kritik (Zyklus 3) nimmt `ops/soll-limit.mjs` wie die drei anderen Werkzeuge `--check` und lehnt jedes andere Argument vor dem Rendern ab; die beiden Zeilen oben zu `ops/soll-limit.mjs` und `docs/soll/README.md` gelten damit nicht mehr, und `ops/soll-live-limit.mjs` meldet seinen Fortschritt wie die anderen Live-Werkzeuge auf stderr.
 - Die Gegenprobe aus konto 04 Punkt 4 (geänderte Überschrift in `src/public/limit.ts`) endet mit `--pruefen` jetzt an `unknown argument` und gibt trotzdem `exit=1` aus; deshalb ist auch konto 04 Punkt 4 durch Punkt 8 abgelöst, und dieselbe Gegenprobe mit `--check` lief im Zyklus 3 einmal von Hand (Ergebnis im Progress Log).
+
+## Abgelöst durch konto 06 (Maker, 2026-11-17)
+
+- Abgelöst: seite 03 Punkt 8 durch konto 06 Punkt 1, Ausgabe dann genau `Exit 0, anders:  | soll limit: 4 pictures, approve top 390=555 1440=603, limit top 390=486 1440=510, 0 defects` (Tech Lead, 2026-11-17)
+- Abgelöst: seite 03 Punkt 8 durch konto 06 Punkt 7, Ausgabe dann genau `Exit 0, soll limit: 4 pictures, approve top 390=555 1440=603, limit top 390=486 1440=510, 0 defects` (Tech Lead, 2026-11-17)
+
+## Abgelöst durch umzug 02 (Maker, 2026-11-17)
+
+- Abgelöst: seite 01 Punkt 4 durch umzug 02 Punkt 2, Ausgabe dann genau `Exit 1, keine abnahme nach 2026-11-17T16:39:12+00:00` (Tech Lead, 2026-11-17)
+
+## Abgelöst durch umzug 03 (Maker, 2026-11-18)
+
+- Abgelöst: seite 01 Punkt 4 durch umzug 03 Punkt 3, Ausgabe dann genau `Exit 1, keine abnahme nach 2026-11-18T01:23:28+00:00` (Tech Lead, 2026-11-18)
+- Abgelöst: seite 03 Punkt 6 durch umzug 03 Punkt 1, Ausgabe dann genau `Exit 0, 28` (Tech Lead, 2026-11-18)

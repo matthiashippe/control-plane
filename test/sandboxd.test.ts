@@ -535,6 +535,21 @@ describe("ports domain", () => {
     expect(assertPortsDomain("notpostyourprice.com")).toBe("notpostyourprice.com");
   });
 
+  const refusedNew = ["automatonhost.com", "AutomatonHost.COM", "automatonhost.com.", "www.automatonhost.com", "sbx.automatonhost.com"];
+
+  it("refuses automatonhost.com and every name under it, the second zone of the payment", () => {
+    for (const d of refusedNew) expect(() => assertPortsDomain(d), d).toThrow(/automatonhost\.com.*domain of their own/);
+    expect(assertPortsDomain("notautomatonhost.com")).toBe("notautomatonhost.com");
+  });
+
+  it("does not build a sandboxd that would hand out URLs under automatonhost.com", () => {
+    for (const domain of refusedNew) {
+      expect(() => createSandboxd({ run: async () => ({ code: 0, stdout: "", stderr: "", timedOut: false }), config: { domain }, log: () => {} }), domain).toThrow(
+        /automatonhost\.com/,
+      );
+    }
+  });
+
   it("has no fallback to postyourprice.com when SANDBOXD_DOMAIN is unset", () => {
     expect(loadConfig({}).domain).toBe("");
     expect(loadConfig({ SANDBOXD_DOMAIN: "Example.dev" }).domain).toBe("example.dev");

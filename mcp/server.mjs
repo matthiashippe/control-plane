@@ -3,16 +3,18 @@
  * MCP server for this control plane: the bounty market and the automatons.
  *
  * One file, no dependencies, no build step. An agent host that speaks MCP over stdio runs
- * `node server.mjs` and gets eleven tools. Six are the bounty market: read the open bounties,
+ * `node server.mjs` and gets fourteen tools. Six are the bounty market: read the open bounties,
  * submit work, read back its own submission, run the invention check, read its balance. Five run
  * an automaton (goals/konto/04): start_automaton, automaton_status, automaton_logs,
- * set_daily_limit and stop_automaton.
+ * set_daily_limit and stop_automaton. Three move money (goals/konto/05): deposit by card, payout
+ * to the person's own bank account and set_payout_rule. None of them takes a destination: the
+ * service knows only the bank account the person entered on the phone.
  *
  * Environment:
  *   CP_API_KEY   the key from POST /v1/auth/api-keys. Wins over the key file.
  *   CP_KEY_FILE  where the key of an account created by start_automaton is kept, default
  *                ~/.config/control-plane/api-key, mode 0600. A file other users can read is refused.
- *   CP_URL       base URL of the control plane, default https://cp.hippe.eu
+ *   CP_URL       base URL of the control plane, default https://automatonhost.com
  *
  * The key is never written to stdout or stderr: every tool result and every log line runs through
  * redact() or scrub() first, because an agent host shows tool output to a model and often logs it
@@ -32,7 +34,7 @@ import { dirname, join } from "node:path";
 
 export const SERVER_NAME = "control-plane-bounties";
 export const SERVER_VERSION = "0.1.0";
-export const DEFAULT_BASE_URL = "https://cp.hippe.eu";
+export const DEFAULT_BASE_URL = "https://automatonhost.com";
 
 /**
  * Protocol versions this server can speak. An MCP client sends the one it wants in `initialize`;
@@ -299,6 +301,11 @@ export function validateArgs(schema, args) {
         problems.push(`${name} is limited to ${spec.maxLength} characters, yours is ${value.length}`);
       }
       if (spec.enum && !spec.enum.includes(value)) problems.push(`${name} must be one of ${spec.enum.join(", ")}`);
+      if (spec.pattern !== undefined && !new RegExp(spec.pattern).test(value)) {
+        problems.push(`${name} has the wrong form: ${spec.description ?? spec.pattern}`);
+      }
+    } else if (spec.type === "boolean") {
+      if (typeof value !== "boolean") problems.push(`${name} must be true or false`);
     } else if (spec.type === "integer") {
       if (!Number.isInteger(value)) {
         problems.push(`${name} must be a whole number`);
@@ -475,6 +482,28 @@ export async function* readServerEvents(body) {
   }
 }
 
+/**
+ * Amounts of deposit, payout and set_payout_rule: US dollars as a string, up to seven digits and two
+ * decimals, the form the money routes accept. The pattern is checked before any request; that the
+ * amount is above zero is checked by the tool itself, because keep_usd may be "0".
+ */
+export const MONEY_PATTERN = "^[0-9]{1,7}(\\.[0-9]{1,2})?$";
+const MONEY = new RegExp(MONEY_PATTERN);
+export const WEEKDAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+
+function moneyArg(description) {
+  return { type: "string", minLength: 1, maxLength: 10, pattern: MONEY_PATTERN, description };
+}
+
+/** A money amount to atomic USDC, or null when it does not have the form; zero only with allowZero. */
+export function parseMoneyUsd(value, { allowZero = false } = {}) {
+  if (typeof value !== "string" || !MONEY.test(value)) return null;
+  const [whole, frac = ""] = value.split(".");
+  const atomic = BigInt(whole) * ATOMIC_PER_USD + BigInt(frac.padEnd(2, "0")) * 10_000n;
+  if (atomic === 0n && !allowZero) return null;
+  return atomic;
+}
+
 const ID_ARG = {
   type: "string",
   minLength: 1,
@@ -486,7 +515,7 @@ export const AUTOMATON_TOOLS = [
   {
     name: "start_automaton",
     description:
-      "Start an automaton: an agent that runs on its own in a sandbox of PostYourPrice and pays for " +
+      "Start an automaton: an agent that runs on its own in a sandbox on automatonhost.com and pays for " +
       "its thinking from your account, never more per day than the daily limit. The first time on " +
       "this machine there is no account yet: the answer then carries a QR code (`qr`), a link (`url`) " +
       "and a number (`match`). Show `qr` exactly as it is in a code block, with the link and the " +
@@ -506,8 +535,9 @@ export const AUTOMATON_TOOLS = [
         name: {
           type: "string",
           minLength: 1,
-          maxLength: 64,
-          description: "A short name: letters, digits, spaces, dots, underscores and hyphens.",
+          maxLength: 32,
+          pattern: "^[A-Za-z0-9][A-Za-z0-9 _-]{0,31}$",
+          description: "A short name of 1 to 32 characters: letters, digits, spaces, underscores and hyphens, starting with a letter or digit.",
         },
         daily_limit_usd: {
           type: "string",
@@ -555,12 +585,6 @@ export const AUTOMATON_TOOLS = [
           maxLength: 13,
           description: 'The new daily limit in US dollars with at most two decimals, as a string, e.g. "10.00".',
         },
-        name: {
-          type: "string",
-          minLength: 1,
-          maxLength: 64,
-          description: "The automaton name the phone shows when raising. Default: the automaton started from here, else the newest.",
-        },
       },
       required: ["daily_limit_usd"],
       additionalProperties: false,
@@ -572,6 +596,56 @@ export const AUTOMATON_TOOLS = [
       "Stop the automaton. Its sandbox halts, and stopped time costs nothing. Without id: the " +
       "automaton started from here, else the newest of the account.",
     inputSchema: { type: "object", properties: { id: ID_ARG }, required: [], additionalProperties: false },
+  },
+  {
+    name: "deposit",
+    description:
+      'Put money into the account by card, in US dollars as a string, e.g. "20.00". The answer carries ' +
+      "`qr`, `url` and `match`, shown exactly as with start_automaton. The person scans the code, picks " +
+      "that number and pays by card on the phone with MoonPay. automaton_status shows how it went and " +
+      "the balance once the money has arrived.",
+    inputSchema: {
+      type: "object",
+      properties: { amount_usd: moneyArg('The amount in US dollars with at most two decimals, as a string, e.g. "20.00".') },
+      required: ["amount_usd"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "payout",
+    description:
+      'Send money from the account to the person\'s bank account: amount_usd as a string, e.g. "10.00", ' +
+      "or all: true for the whole balance. Money can only go to the bank account the person entered on " +
+      "their phone; this tool takes no destination. The first time the answer carries `qr`, `url` and " +
+      "`match`, shown exactly as with start_automaton: the person scans the code, picks that number, " +
+      "confirms their identity once with Bridge, enters their IBAN and confirms with the passkey, and " +
+      "then the money is sent. After that, payout pays at once without the phone.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        amount_usd: moneyArg('The amount in US dollars with at most two decimals, as a string, e.g. "10.00". Leave out with all.'),
+        all: { type: "boolean", description: "true pays out the whole balance. Leave out with amount_usd." },
+      },
+      required: [],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "set_payout_rule",
+    description:
+      "Pay out once a week on its own: keep keep_usd in the account and send the rest to the person's " +
+      'bank account every weekday given, e.g. keep_usd "20.00" and weekday "monday". Nothing is sent ' +
+      "when the rest is below $1.00. off: true removes the rule. Needs one payout with the phone first.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        keep_usd: moneyArg('What stays in the account, in US dollars as a string, e.g. "20.00"; "0" sends everything.'),
+        weekday: { type: "string", enum: WEEKDAYS, description: "The day of the week the payout runs, monday to sunday." },
+        off: { type: "boolean", description: "true removes the rule. Leave out keep_usd and weekday then." },
+      },
+      required: [],
+      additionalProperties: false,
+    },
   },
 ];
 
@@ -586,6 +660,20 @@ const LIMIT_FAILED = {
   burned: "burned: a wrong number was picked on the phone, so the daily limit stays as it was. Call set_daily_limit again for a new code.",
   expired: "expired: the code ran out before the phone step was finished, so the daily limit stays as it was. Call set_daily_limit again.",
 };
+
+const DEPOSIT_FAILED = {
+  burned: "burned: a wrong number was picked on the phone, so nothing was paid. Call deposit again for a new code.",
+  expired: "expired: the code ran out before the card payment was opened, so nothing was paid. Call deposit again.",
+};
+
+const PAYOUT_FAILED = {
+  burned: "burned: a wrong number was picked on the phone, so no money was sent. Call payout again for a new code.",
+  expired: "expired: the code ran out before the phone step was finished, so no money was sent. Call payout again.",
+};
+
+/** What each kind of phone step says when it fails, and what its log line calls it. */
+const STEP_FAILED = { start: PHONE_FAILED, limit: LIMIT_FAILED, deposit: DEPOSIT_FAILED, payout: PAYOUT_FAILED };
+const STEP_LOG = { start: "automaton start", limit: "daily limit change", deposit: "deposit", payout: "payout" };
 
 function describeAutomaton(status, reason, turns) {
   if (status === "running") return `The automaton is running${Number.isInteger(turns) ? ` and has finished ${turns} turns` : ""}.`;
@@ -606,8 +694,8 @@ function defaultSleep(ms) {
 }
 
 /**
- * The five automaton tools with their state: the job this server started, the open stream of its
- * phone step, a pending raise of the daily limit. Every dependency is injectable, so the suite
+ * The automaton and money tools with their state: the job this server started, the open stream of
+ * its phone step, a pending raise of the daily limit, the last deposit and payout. Every dependency is injectable, so the suite
  * drives it with a stub fetch, a fake clock and a sleep that returns at once.
  */
 export function createAutomatonTools({
@@ -632,6 +720,8 @@ export function createAutomatonTools({
   let knownKey = "";
   let job = null;
   let limitJob = null;
+  let depositJob = null;
+  let payoutJob = null;
   let closed = false;
 
   function scrub(text) {
@@ -705,7 +795,7 @@ export function createAutomatonTools({
     target.status = "failed";
     target.reason = reason;
     target.message = message;
-    say(`${target.kind === "limit" ? "daily limit change" : "automaton start"} failed: ${reason}`);
+    say(`${STEP_LOG[target.kind] ?? STEP_LOG.start} failed: ${reason}`);
   }
 
   function jobView(j) {
@@ -729,6 +819,41 @@ export function createAutomatonTools({
       Object.assign(view, { url: limitJob.url, match: limitJob.match, expires_at: limitJob.expires_at });
     }
     return { daily_limit_change: view };
+  }
+
+  /** How the last deposit and payout started from here went, for automaton_status. */
+  function moneyJobsView() {
+    const out = {};
+    for (const [field, j] of [["deposit", depositJob], ["payout", payoutJob]]) {
+      if (!j) continue;
+      const view = { status: j.status };
+      if (j.amount_usd) view.amount_usd = j.amount_usd;
+      if (j.all) view.all = true;
+      if (j.bank_last4) view.bank_account = `ending ${j.bank_last4}`;
+      if (j.reason) view.reason = j.reason;
+      if (j.message) view.message = j.message;
+      if (j.status === "waiting_for_phone" || j.status === "matched") {
+        Object.assign(view, { url: j.url, match: j.match, expires_at: j.expires_at });
+      }
+      out[field] = view;
+    }
+    return out;
+  }
+
+  /**
+   * Balance and payout rule from GET /v1/konto/payout. An account without the money part (404, 503)
+   * or any other failure leaves the status as it was: this is extra, never a reason to fail.
+   */
+  async function balanceView(key) {
+    const res = await request({ path: "/v1/konto/payout", key });
+    if (!res.ok) return {};
+    const p = res.payload ?? {};
+    const view = {};
+    if (typeof p.balance_usd === "string") view.balance_usd = p.balance_usd;
+    const rule = p.rule && typeof p.rule === "object" ? p.rule : null;
+    view.payout_rule = rule ? { keep_usd: rule.keep_usd, weekday: rule.weekday } : "no payout rule";
+    if (typeof p.bank_last4 === "string" && p.bank_last4) view.bank_account = `ending ${p.bank_last4}`;
+    return view;
   }
 
   /** One POST /v1/automatons: "done", "retry" after a 402, or "failed". */
@@ -801,7 +926,7 @@ export function createAutomatonTools({
           say(`the connection for the phone step broke: ${e?.message ?? e}`);
         }
         if (res && !res.ok) {
-          if (res.status === 404) fail(j, "expired", (j.kind === "limit" ? LIMIT_FAILED : PHONE_FAILED).expired);
+          if (res.status === 404) fail(j, "expired", (STEP_FAILED[j.kind] ?? PHONE_FAILED).expired);
           else fail(j, `http_${res.status}`, "The control plane closed the connection for the phone step.");
           return;
         }
@@ -819,7 +944,7 @@ export function createAutomatonTools({
         }
         // The stream ended without a final state, so the connection dropped. Open it again while the code can still hold.
         if (attempt >= STREAM_RECONNECTS || (Number.isFinite(expiresMs) && now() > expiresMs + 60_000)) {
-          fail(j, "expired", (j.kind === "limit" ? LIMIT_FAILED : PHONE_FAILED).expired);
+          fail(j, "expired", (STEP_FAILED[j.kind] ?? PHONE_FAILED).expired);
           return;
         }
         await sleep(STREAM_RECONNECT_MS);
@@ -866,6 +991,61 @@ export function createAutomatonTools({
     return true;
   }
 
+  function onDepositState(j, data) {
+    if (data.state !== "done") return phoneState(j, data, DEPOSIT_FAILED);
+    j.status = "done";
+    j.message =
+      `The card payment of $${j.amount_usd} is open on the phone. ` +
+      "Once MoonPay has sent the money, automaton_status shows it in balance_usd.";
+    say(`deposit of ${j.amount_usd} opened on the phone`);
+    return true;
+  }
+
+  /** One POST /v1/konto/payout with exactly the arguments the person gave, nothing else. */
+  function sendPayout(key, body) {
+    return request({ method: "POST", path: "/v1/konto/payout", key, body });
+  }
+
+  function sentView(payload, fallbackAmount) {
+    const p = payload ?? {};
+    if (p.state === "nothing_to_pay") {
+      return { status: "nothing_to_pay", amount_usd: "0.00", message: "There is nothing to pay out: the balance is $0.00." };
+    }
+    const amount = typeof p.amount_usd === "string" ? p.amount_usd : fallbackAmount;
+    const last4 = typeof p.bank_last4 === "string" && p.bank_last4 ? p.bank_last4 : null;
+    if (p.state === "pending") {
+      // 202: the money left, but the confirmation is still missing. Asking again with the same request never pays twice.
+      const pending = {
+        status: "pending",
+        amount_usd: amount,
+        message: `$${amount} is on its way, but the confirmation has not arrived yet. Do not pay it again: call payout with the same amount later to see whether it arrived.`,
+      };
+      return { view: pending, last4 };
+    }
+    const view = { status: "sent", amount_usd: amount };
+    if (last4) view.bank_account = `ending ${last4}`;
+    view.message = `Sent $${amount} to your bank account${last4 ? ` ending ${last4}` : ""}.`;
+    return { view, last4 };
+  }
+
+  async function onPayoutState(j, data, key) {
+    if (data.state !== "done") return phoneState(j, data, PAYOUT_FAILED);
+    if (typeof data.bank_last4 === "string" && data.bank_last4) j.bank_last4 = data.bank_last4;
+    j.status = "sending";
+    j.message = "The phone step is done, the money is being sent.";
+    const res = await sendPayout(key, j.body);
+    if (!res.ok) {
+      const p = res.payload ?? {};
+      fail(j, p.error ?? `http_${res.status}`, p.message ?? "The control plane refused the payout after the phone step.");
+      return true;
+    }
+    const { view, last4 } = sentView(res.payload, j.amount_usd);
+    Object.assign(j, { status: view.status, amount_usd: view.amount_usd, message: view.message, reason: undefined });
+    if (last4) j.bank_last4 = last4;
+    say(`payout ${view.status}: ${view.amount_usd}`);
+    return true;
+  }
+
   function onLimitState(j, data) {
     if (data.state !== "done") return phoneState(j, data, LIMIT_FAILED);
     const confirmed = atomicFrom(data.daily_limit_usdc);
@@ -900,6 +1080,32 @@ export function createAutomatonTools({
       return { error: answer({ error: "no_automaton", message: "This account has no automaton yet. Use start_automaton." }, true) };
     }
     return { id: found.automaton.id };
+  }
+
+  /** The automaton name the phone shows: given, else the one started here, else the newest of the account. */
+  async function automatonName(key, given) {
+    if (given) return given;
+    if (job?.name) return job.name;
+    const found = await newestAutomaton(key);
+    return found.automaton?.name ?? "your automaton";
+  }
+
+  /** Open a phone step with the key of this machine and follow its stream in the background. */
+  async function openPhoneStep(key, body, j, onState) {
+    const res = await request({ method: "POST", path: "/v1/handoff", key, body });
+    if (!res.ok) return { error: httpError(res) };
+    const { code, url, qr, match, expires_at: expiresAt, poll_token: pollToken } = res.payload ?? {};
+    if (typeof pollToken === "string" && pollToken.length >= 12) secrets.add(pollToken);
+    Object.assign(j, { status: "waiting_for_phone", code, url, qr, match, expires_at: expiresAt });
+    track(follow(j, pollToken, (data) => onState(j, data)));
+    return { job: j };
+  }
+
+  function phoneAnswer(j, message) {
+    const view = { status: j.status, qr: j.qr, url: j.url, match: j.match, expires_at: j.expires_at, message };
+    if (j.amount_usd) view.amount_usd = j.amount_usd;
+    if (j.all) view.all = true;
+    return answer(view, false, j.qr ? [j.qr] : []);
   }
 
   function keyOrError() {
@@ -960,11 +1166,11 @@ export function createAutomatonTools({
     },
 
     async automaton_status(args) {
-      if (!args.id && job && !job.id) return answer({ ...jobView(job), ...limitView() });
+      if (!args.id && job && !job.id) return answer({ ...jobView(job), ...limitView(), ...moneyJobsView() });
       const k = resolveKey();
       if (k.error) return answer(k.error, true);
       if (!k.key) {
-        if (job) return answer({ ...jobView(job), ...limitView() });
+        if (job) return answer({ ...jobView(job), ...limitView(), ...moneyJobsView() });
         return answer({ status: "none", message: "No automaton has been started from this machine. Use start_automaton." });
       }
       const target = await resolveId(args.id, k.key);
@@ -980,7 +1186,7 @@ export function createAutomatonTools({
       const view = { id: target.id, name: p.name, status: p.status, message: describeAutomaton(p.status, p.reason, p.turns) };
       if (p.reason) view.reason = p.reason;
       if (p.turns !== undefined) view.turns = p.turns;
-      return answer({ ...view, ...limitView() });
+      return answer({ ...view, ...(await balanceView(k.key)), ...limitView(), ...moneyJobsView() });
     },
 
     async automaton_logs(args) {
@@ -1024,16 +1230,12 @@ export function createAutomatonTools({
       const before = atomicFrom(current.payload?.daily_limit_usdc);
 
       if (raiseNeedsPhone(wanted, signed)) {
-        let name = args.name ?? job?.name;
-        if (!name) {
-          const found = await newestAutomaton(k.key);
-          name = found.automaton?.name ?? "your automaton";
-        }
+        // No name: the phone shows the name of the account, which nothing on this machine sets (goals/konto/06).
         const res = await request({
           method: "POST",
           path: "/v1/handoff",
           key: k.key,
-          body: { automaton_name: name, daily_limit_usdc: wanted.toString(), step: "limit" },
+          body: { daily_limit_usdc: wanted.toString(), step: "limit" },
         });
         if (!res.ok) return httpError(res);
         const { code, url, qr, match, expires_at: expiresAt, poll_token: pollToken } = res.payload ?? {};
@@ -1061,6 +1263,103 @@ export function createAutomatonTools({
       if (!res.ok) return httpError(res);
       const now_ = atomicFrom(res.payload?.daily_limit_usdc) ?? wanted;
       return answer({ status: "done", daily_limit_usd: formatUsd(now_), message: `The daily limit is now $${formatUsd(now_)} a day.` });
+    },
+
+    async deposit(args) {
+      const atomic = parseMoneyUsd(args.amount_usd);
+      if (atomic === null) {
+        return invalid('amount_usd must be a positive amount in US dollars with at most two decimals, as a string, e.g. "20.00".');
+      }
+      const k = keyOrError();
+      if (k.error) return k.error;
+      const amount = formatUsd(atomic);
+      const name = await automatonName(k.key);
+      depositJob?.controller?.abort();
+      const next = { kind: "deposit", amount_usd: amount };
+      const opened = await openPhoneStep(k.key, { automaton_name: name, step: "deposit", amount_usd: amount }, next, onDepositState);
+      if (opened.error) return opened.error;
+      depositJob = next;
+      return phoneAnswer(
+        next,
+        `Scan the QR code with your phone, pick the number ${next.match} there and pay $${amount} by card. ` +
+          "automaton_status shows when the card payment is open and the balance once the money has arrived.",
+      );
+    },
+
+    async payout(args) {
+      const hasAmount = args.amount_usd !== undefined;
+      const hasAll = args.all !== undefined;
+      if (hasAmount === hasAll) {
+        return invalid('payout takes either amount_usd as a string, e.g. "10.00", or all: true, and not both.');
+      }
+      if (hasAll && args.all !== true) return invalid("all must be true; to pay a part of the balance give amount_usd.");
+      let body;
+      if (hasAmount) {
+        const atomic = parseMoneyUsd(args.amount_usd);
+        if (atomic === null) {
+          return invalid('amount_usd must be a positive amount in US dollars with at most two decimals, as a string, e.g. "10.00".');
+        }
+        body = { amount_usd: formatUsd(atomic) };
+      } else {
+        body = { all: true };
+      }
+      const k = keyOrError();
+      if (k.error) return k.error;
+
+      const res = await sendPayout(k.key, body);
+      if (res.ok) {
+        const { view } = sentView(res.payload, body.amount_usd);
+        return answer(view);
+      }
+      if (res.status !== 409 || res.payload?.error !== "payout_needs_phone") return httpError(res);
+
+      // The first payout: the phone sets up the bank account and the passkey confirms it once.
+      const name = await automatonName(k.key);
+      payoutJob?.controller?.abort();
+      const next = { kind: "payout", body, amount_usd: body.amount_usd, all: body.all === true };
+      const opened = await openPhoneStep(k.key, { automaton_name: name, step: "payout" }, next, (j, data) =>
+        onPayoutState(j, data, k.key),
+      );
+      if (opened.error) return opened.error;
+      payoutJob = next;
+      return phoneAnswer(
+        next,
+        `The first payout needs the phone once: scan the QR code, pick the number ${next.match}, confirm your identity once ` +
+          "with Bridge, enter your IBAN and confirm with your passkey. Money can only go to your bank account. " +
+          "Then the money is sent, and automaton_status shows when; after that, payout pays without the phone.",
+      );
+    },
+
+    async set_payout_rule(args) {
+      const hasRule = args.keep_usd !== undefined || args.weekday !== undefined;
+      if (args.off !== undefined) {
+        if (args.off !== true || hasRule) return invalid("set_payout_rule takes either keep_usd and weekday, or off: true alone.");
+      } else if (args.keep_usd === undefined || args.weekday === undefined) {
+        return invalid('set_payout_rule needs keep_usd as a string, e.g. "20.00", and weekday, e.g. "monday"; or off: true.');
+      }
+      let body;
+      if (args.off === true) {
+        body = { off: true };
+      } else {
+        const keep = parseMoneyUsd(args.keep_usd, { allowZero: true });
+        if (keep === null) {
+          return invalid('keep_usd must be an amount in US dollars with at most two decimals, as a string, e.g. "20.00" or "0".');
+        }
+        body = { keep_usd: formatUsd(keep), weekday: args.weekday };
+      }
+      const k = keyOrError();
+      if (k.error) return k.error;
+      const res = await request({ method: "POST", path: "/v1/konto/payout-rule", key: k.key, body });
+      if (!res.ok) return httpError(res);
+      const rule = res.payload?.rule && typeof res.payload.rule === "object" ? res.payload.rule : null;
+      if (!rule) return answer({ status: "done", payout_rule: "no payout rule", message: "The payout rule is off." });
+      return answer({
+        status: "done",
+        payout_rule: { keep_usd: rule.keep_usd, weekday: rule.weekday },
+        message:
+          `Every ${rule.weekday}, everything above $${rule.keep_usd} goes to your bank account, ` +
+          "when that is at least $1.00.",
+      });
     },
   };
 

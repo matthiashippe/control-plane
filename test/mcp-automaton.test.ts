@@ -110,7 +110,7 @@ describe("Automaton tools in mcp/server.mjs", () => {
     const h = harness({ routes: {} });
     const listed = (await handleMessage({ jsonrpc: "2.0", id: 1, method: "tools/list" }, { client: createClient({ baseUrl: BASE }), automaton: h.tools }))
       .result.tools.map((t: any) => t.name);
-    expect(listed).toHaveLength(11);
+    expect(listed).toHaveLength(14);
     expect(listed.slice(0, 6)).toEqual([
       "list_open_bounties",
       "submit_work",
@@ -119,7 +119,7 @@ describe("Automaton tools in mcp/server.mjs", () => {
       "check_submission",
       "read_balance",
     ]);
-    expect(listed.slice(6)).toEqual(["start_automaton", "automaton_status", "automaton_logs", "set_daily_limit", "stop_automaton"]);
+    expect(listed.slice(6, 11)).toEqual(["start_automaton", "automaton_status", "automaton_logs", "set_daily_limit", "stop_automaton"]);
   });
 
   it("start_automaton without a key makes one konto request without amount_usdc and answers with qr, url and match only", async () => {
@@ -266,6 +266,20 @@ describe("Automaton tools in mcp/server.mjs", () => {
     expect(status.json.message).toMatch(/90 seconds/);
   });
 
+  it("refuses a name the server would refuse for an account (dot, other script, 33 characters) with invalid_arguments and makes no call", async () => {
+    const h = harness({ routes: { "POST /v1/handoff": () => json(201, handoffAnswer("NAME")) } });
+    for (const name of ["Atlas.v2", "\u00c4tlas", "-Atlas", "x".repeat(33)]) {
+      const start = await h.call("start_automaton", { ...START, name });
+      expect(start.isError, name).toBe(true);
+      expect(start.json.error, name).toBe("invalid_arguments");
+    }
+    expect(h.calls, "no handoff for a name the server refuses").toHaveLength(0);
+    // Counter-check: a name of 32 allowed characters goes out as automaton_name with step konto.
+    await h.call("start_automaton", { ...START, name: "Atlas v2_b-1" + "x".repeat(20) });
+    expect(JSON.parse(h.callsTo("POST", "/v1/handoff")[0].body!)).toMatchObject({ automaton_name: "Atlas v2_b-1" + "x".repeat(20), step: "konto" });
+    await h.tools.settled?.();
+  });
+
   it("refuses a key file that others can read with key_file_mode and makes no call", async () => {
     const path = keyFileWith(KEY, 0o644);
     const h = harness({
@@ -332,7 +346,7 @@ describe("Automaton tools in mcp/server.mjs", () => {
     const posts = h.callsTo("POST", "/v1/handoff");
     expect(posts).toHaveLength(1);
     expect(posts[0].headers.authorization).toBe(`Bearer ${KEY}`);
-    expect(JSON.parse(posts[0].body!)).toEqual({ automaton_name: "Nova", daily_limit_usdc: "10000000", step: "limit" });
+    expect(JSON.parse(posts[0].body!)).toEqual({ daily_limit_usdc: "10000000", step: "limit" });
     expect(h.callsTo("POST", "/v1/konto/limit"), "the terminal never raises the limit itself").toHaveLength(0);
     expect(raise.json).toMatchObject({ status: "waiting_for_phone", url: `${BASE}/h/LIMT`, match: "17", daily_limit_usd: "10.00" });
     expect(raise.json.qr).toBe(handoffAnswer("LIMT").qr);

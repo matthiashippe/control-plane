@@ -198,8 +198,8 @@ describe("Everything we ship points at endpoints this service has", () => {
     const instance = app();
     const fromTools = TOOLS.map((t: any) => t.request(dummyArgs(t.inputSchema)).path);
     const fromText = (text: string) =>
-      (text.match(/(?:https:\/\/cp\.hippe\.eu)?(\/(?:v1|bounties\.json)[a-zA-Z0-9/._-]*)/g) ?? []).map((m) =>
-        m.replace("https://cp.hippe.eu", ""),
+      (text.match(/(?:https:\/\/automatonhost\.com)?(\/(?:v1|bounties\.json)[a-zA-Z0-9/._-]*)/g) ?? []).map((m) =>
+        m.replace("https://automatonhost.com", ""),
       );
     const section = DOC.slice(DOC.indexOf("## Competing without writing code"), DOC.indexOf("## Awarding"));
     const paths = [...new Set([...fromTools, ...fromText(SKILL), ...fromText(section), ...fromText(MCP_README)])];

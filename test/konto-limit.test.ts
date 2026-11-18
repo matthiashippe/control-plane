@@ -28,12 +28,21 @@ import { ATLAS, create, handoffApp, post, tap } from "./handoff-helpers.js";
 const DAY = 86_400;
 const START = Math.floor(Date.parse("2026-11-13T12:00:00Z") / 1000);
 
-/** A chain that counts every request and answers none: the ERC-6492 check of viem then falls back to ecrecover. */
+/**
+ * A chain that counts every request and answers only eth_call, with the false of the ERC-6492 validator for an address without
+ * code: viem then falls back to ecrecover. Since goals/konto/05 (point 7) a chain that cannot be asked is a 503, not a no.
+ */
 function countingChain() {
   const calls: string[] = [];
   const client = createPublicClient({
     chain: baseSepolia,
-    transport: custom({ request: async ({ method }: { method: string }) => { calls.push(method); throw new Error("no chain in unit tests"); } }),
+    transport: custom({
+      request: async ({ method }: { method: string }) => {
+        calls.push(method);
+        if (method === "eth_call") return "0x0000000000000000000000000000000000000000000000000000000000000000";
+        throw new Error("no chain in unit tests");
+      },
+    }),
   }) as unknown as PublicClient;
   return { calls, client };
 }
@@ -381,5 +390,60 @@ describe("the daily limit of an account", () => {
     const res = await s.app.request("/v1/konto/limit", { headers: { authorization: `Bearer ${a.key}` } });
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ account: a.address, daily_limit_usdc: "3000000", signed_limit_usdc: "5000000" });
+  });
+
+  it("answers 400 invalid_limit on POST /v1/konto/limit for amounts that are no positive whole cents, limit unchanged", async () => {
+    const s = setup();
+    const a = await account(s);
+    const read = async () => (await s.app.request("/v1/konto/limit", { headers: { authorization: `Bearer ${a.key}` } })).json();
+    const before = await read();
+    const capBefore = row(s.db, a.address).cap_usdc;
+    for (const v of ["0", "1.5", "-10000", "15000"]) {
+      const res = await setLimit(s, a.key, v);
+      expect(res.status, v).toBe(400);
+      expect(await res.json(), v).toMatchObject({ error: "invalid_limit" });
+    }
+    expect(await read()).toEqual(before);
+    expect(before).toMatchObject({ daily_limit_usdc: "5000000", signed_limit_usdc: "5000000" });
+    expect(row(s.db, a.address).cap_usdc).toBe(capBefore);
+  });
+
+  it("answers 400 invalid_handoff with the message on the format for step limit, no handoff created, limit unchanged", async () => {
+    const s = setup();
+    const a = await account(s);
+    const read = async () => (await s.app.request("/v1/konto/limit", { headers: { authorization: `Bearer ${a.key}` } })).json();
+    const handoffs = () => (s.db.prepare("SELECT COUNT(*) AS n FROM handoffs").get() as { n: number }).n;
+    const before = await read();
+    const countBefore = handoffs();
+    // "10005000" is above the signed 5000000 but no whole cent: without the rule it would become a handoff.
+    for (const v of ["0", "1.5", "-10000", "15000", "10005000"]) {
+      const res = await raise(s, a.key, v);
+      expect(res.status, v).toBe(400);
+      const body = (await res.json()) as { error: string; message: string };
+      expect(body.error, v).toBe("invalid_handoff");
+      expect(body.message, v).toMatch(/positive whole number of atomic USDC/);
+    }
+    expect(handoffs()).toBe(countBefore);
+    expect(await read()).toEqual(before);
+    expect(row(s.db, a.address).cap_usdc).toBeNull();
+  });
+
+  it("answers 404 no_account on GET and POST /v1/konto/limit and on step limit for a key whose account is gone", async () => {
+    const s = setup();
+    const a = await account(s);
+    s.db.prepare("DELETE FROM konto_accounts WHERE address = ?").run(a.address);
+    const handoffs = () => (s.db.prepare("SELECT COUNT(*) AS n FROM handoffs").get() as { n: number }).n;
+    const countBefore = handoffs();
+    const read = await s.app.request("/v1/konto/limit", { headers: { authorization: `Bearer ${a.key}` } });
+    expect(read.status).toBe(404);
+    expect(await read.json()).toMatchObject({ error: "no_account" });
+    const lower = await setLimit(s, a.key, "1000000");
+    expect(lower.status).toBe(404);
+    expect(await lower.json()).toMatchObject({ error: "no_account" });
+    const up = await raise(s, a.key, "10000000");
+    expect(up.status).toBe(404);
+    expect(await up.json()).toMatchObject({ error: "no_account" });
+    expect(handoffs()).toBe(countBefore);
+    expect(s.db.prepare("SELECT COUNT(*) AS n FROM konto_accounts WHERE address = ?").get(a.address)).toEqual({ n: 0 });
   });
 });

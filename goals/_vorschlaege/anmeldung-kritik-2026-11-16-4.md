@@ -6,3 +6,4 @@ Empfehlung: Die Wörter der Regel als exportierte Konstante in `src/auth/keyless
 MVP: Robustheit, weil `test/keyless-crawler.test.ts` heute nur Route und `ops/keyless-mints.sh` gleich hält, nicht das Dokument.
 
 Kritik Tech Lead an anmeldung 04 (PR #203). Nicht als Done-Punkt, weil `src/auth/**` auf der Deny List dieses Goals steht.
+Verworfen: MVP: Schönheit ohne belegten Fehler; der Text der OpenAPI ist Prosa, und ein Bruch der Regel selbst fiele in den Tests der Anmeldung auf (2026-11-18)

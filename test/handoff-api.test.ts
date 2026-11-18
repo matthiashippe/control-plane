@@ -7,7 +7,10 @@ import jsQR from "jsqr";
 import { siteOrigin } from "../src/public/site.js";
 import { ATLAS, START, create, handoffApp, post } from "./handoff-helpers.js";
 
-/** The half-block text back into a picture a camera would see: dark modules black, light white, four pixels a module. */
+/**
+ * The half-block text back into the picture a camera sees in a dark terminal (goals/konto/05, point 6): every character light on
+ * a dark background, four pixels a module, read without inverting.
+ */
 function readQr(text: string): string | null {
   const lines = text.split("\n");
   const size = lines[0].length;
@@ -23,12 +26,12 @@ function readQr(text: string): string | null {
   const scale = 4, w = size * scale, h = rows.length * scale;
   const data = new Uint8ClampedArray(w * h * 4);
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-    const dark = rows[Math.floor(y / scale)][Math.floor(x / scale)];
+    const lit = rows[Math.floor(y / scale)][Math.floor(x / scale)];
     const i = (y * w + x) * 4;
-    data[i] = data[i + 1] = data[i + 2] = dark ? 0 : 255;
+    data[i] = data[i + 1] = data[i + 2] = lit ? 255 : 0;
     data[i + 3] = 255;
   }
-  return jsQR(data, w, h)?.data ?? null;
+  return jsQR(data, w, h, { inversionAttempts: "dontInvert" })?.data ?? null;
 }
 
 describe("POST /v1/handoff", () => {
@@ -54,9 +57,9 @@ describe("POST /v1/handoff", () => {
     expect(h.qr).toMatch(/^[ ▀▄█\n]+$/);
     const lines = h.qr.split("\n");
     expect(new Set(lines.map((l) => l.length)).size, "every line equally wide").toBe(1);
-    // A quiet zone of four modules: the first two lines of text (four rows of modules) are empty.
-    expect(lines[0].trim()).toBe("");
-    expect(lines[1].trim()).toBe("");
+    // A quiet zone of four light modules: the first two lines of text (four rows of modules) are full blocks.
+    expect(lines[0].replaceAll("█", "")).toBe("");
+    expect(lines[1].replaceAll("█", "")).toBe("");
     expect(readQr(h.qr)).toBe(h.url);
     // The decoder is not just saying yes: a code for another link reads as that link.
     const other = await create(app);
@@ -74,14 +77,14 @@ describe("POST /v1/handoff", () => {
     expect(rows[0].state).toBe("pending");
   });
 
-  it("refuses an empty name and one of 65 characters with 400, and takes one of 64", async () => {
+  it("refuses an empty name and one of 33 characters with 400, and takes one of 32", async () => {
     const { app } = handoffApp();
-    for (const name of ["", "x".repeat(65), 42, null, "line\nbreak"]) {
+    for (const name of ["", "x".repeat(33), 42, null, "line\nbreak"]) {
       const res = await post(app, { ...ATLAS, automaton_name: name });
       expect(res.status, JSON.stringify(name)).toBe(400);
       expect((await res.json()).error).toBe("invalid_handoff");
     }
-    expect((await post(app, { ...ATLAS, automaton_name: "x".repeat(64) })).status).toBe(201);
+    expect((await post(app, { ...ATLAS, automaton_name: "x".repeat(32) })).status).toBe(201);
   });
 
   it("refuses amounts that are no whole cents or no whole number with 400", async () => {

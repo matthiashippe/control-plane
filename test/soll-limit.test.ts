@@ -44,9 +44,9 @@ describe("soll judgement of the step limit", () => {
       expect(defects).toEqual([]);
       results.push({ state, width, blockBottom, defects });
     }
-    expect(summaryLimit(results)).toBe("soll limit: 4 images, approve top 390=528 1440=603, limit top 390=486 1440=510, 0 defects");
+    expect(summaryLimit(results)).toBe("soll limit: 4 pictures, approve top 390=528 1440=603, limit top 390=486 1440=510, 0 defects");
     expect(summaryLimit([{ state: "passkey", width: 390, blockBottom: 486, defects: ["x"] }]))
-      .toBe("soll limit: 1 images, approve top 390=missing 1440=missing, limit top 390=486 1440=missing, 1 defects");
+      .toBe("soll limit: 1 pictures, approve top 390=missing 1440=missing, limit top 390=486 1440=missing, 1 defects");
   });
 
   it("rejects a picture with even one pixel that differs from a fresh render", () => {

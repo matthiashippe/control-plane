@@ -10,7 +10,7 @@ derselben Fläche.
 | 390 | `startseite-390.png` | 390 x 844 |
 | 1440 | `startseite-1440.png` | 1440 x 900 |
 
-Quelle ist `src/startseite.html`: der gerenderte Stand von `/` (englisch, `CP_PUBLIC_URL=https://postyourprice.com`, leere
+Quelle ist `src/startseite.html`: der gerenderte Stand von `/` (englisch, `CP_PUBLIC_URL=https://automatonhost.com`, leere
 Datenbank), ohne Kommentare, Zählpixel und Skripte, mit dem Umzug für Conway-Betreiber als erstem Block (`data-soll="move"`). Der
 Block `#agents` vom Seitenende ist dorthin gewandert. Markt und Fußzeile zeigen den leeren Stand der Renderer, keine Zahl aus der
 Produktion; seite 02 füllt sie mit den echten Renderern.
@@ -42,13 +42,16 @@ in drei Zuständen, je zwei Bilder:
 
 | Zustand | 390 | 1440 | Quelle |
 |---|---|---|---|
-| `freigabe` | `handoff-freigabe-390.png` | `handoff-freigabe-1440.png` | `src/handoff-freigabe.html` |
-| `erledigt` | `handoff-erledigt-390.png` | `handoff-erledigt-1440.png` | `src/handoff-erledigt.html` |
-| `ungueltig` | `handoff-ungueltig-390.png` | `handoff-ungueltig-1440.png` | `src/handoff-ungueltig.html` |
+| `approve` | `handoff-approve-390.png` | `handoff-approve-1440.png` | `src/handoff-approve.html` |
+| `approved` | `handoff-approved-390.png` | `handoff-approved-1440.png` | `src/handoff-approved.html` |
+| `invalid` | `handoff-invalid-390.png` | `handoff-invalid-1440.png` | `src/handoff-invalid.html` |
 
-`freigabe` zeigt, was freigegeben wird (Name des Automatons, Tageslimit, erste Zahlung), und drei Zahlen als Knöpfe in einem
-Formular ohne Skript; der Block `data-soll="freigabe"` endet im ersten Bildschirm (390 x 844 und 1440 x 900). `erledigt` schickt
-zurück ins Terminal. `ungueltig` zeigt den abgelaufenen Code; schon benutzt, falsche Zahl und unbekannt tauschen nur die Zeile unter
+Bilder und Quellen tragen seit goals/konto/06 die Namen der Zustände im Code, Byte für Byte die unter den alten deutschen Namen
+abgenommenen Bilder (abgenommen in PRO-19925, Umbenennung abgenommen mit dem Abnahme-Issue limit-account unten im Abschnitt Limit).
+
+`approve` zeigt, was freigegeben wird (Name des Automatons, Tageslimit, erste Zahlung), und drei Zahlen als Knöpfe in einem
+Formular ohne Skript; der Block `data-soll="approve"` endet im ersten Bildschirm (390 x 844 und 1440 x 900). `approved` schickt
+zurück ins Terminal. `invalid` zeigt den abgelaufenen Code; schon benutzt, falsche Zahl und unbekannt tauschen nur die Zeile unter
 der Überschrift. Die Werte im Bild sind erfunden (`Atlas`, 5.00 USD), keine Kundendaten.
 
 Bauen und prüfen, ohne Netz, mit dem Chromium aus `~/.cache/ms-playwright/`:
@@ -59,7 +62,7 @@ node ops/soll-handoff.mjs --check                  # neu rendern und vergleichen
 node ops/soll-handoff.mjs --check --source <dir>   # dieselbe Prüfung gegen die drei Quellen in <dir>
 ```
 
-Mängel wie bei der Startseite, dazu: Block `freigabe` endet unter dem ersten Bildschirm, und ein Wort, das der Leser erst übersetzen
+Mängel wie bei der Startseite, dazu: Block `approve` endet unter dem ersten Bildschirm, und ein Wort, das der Leser erst übersetzen
 muss (`handoff`, `phishing`, `token`, `SSE`), steht im sichtbaren Text. Die Auswertung ist `assessHandoff` in `ops/soll-assess.mjs`,
 geprüft von `test/soll-handoff.test.ts` ohne Browser.
 
@@ -80,14 +83,15 @@ erlaubt die tägliche Abbuchung. Zwei Zustände, je zwei Bilder:
 | Zustand | 390 | 1440 | Quelle |
 |---|---|---|---|
 | `passkey` | `konto-passkey-390.png` | `konto-passkey-1440.png` | `src/konto-passkey.html` |
-| `fehlgeschlagen` | `konto-fehlgeschlagen-390.png` | `konto-fehlgeschlagen-1440.png` | `src/konto-fehlgeschlagen.html` |
+| `failed` | `konto-fehlgeschlagen-390.png` | `konto-fehlgeschlagen-1440.png` | `src/konto-fehlgeschlagen.html` |
 
 `passkey` sagt in der Überschrift, was beim Tippen passiert, darunter in einer Zeile, was wir abbuchen dürfen (Tageslimit und für
 welchen Automaton), zwei Haken dazu, wer das Konto öffnen kann, und einen Knopf über die ganze Breite; der Block
-`data-soll="passkey"` endet im ersten Bildschirm (390 x 844 und 1440 x 900). `fehlgeschlagen` zeigt den abgebrochenen Passkey und
+`data-soll="passkey"` endet im ersten Bildschirm (390 x 844 und 1440 x 900). `failed` zeigt den abgebrochenen Passkey und
 schickt zurück ins Terminal für einen neuen Code; Anbieter nicht erreichbar und abgelehnte Erlaubnis tauschen nur die Zeile unter
-der Überschrift. Die Werte im Bild sind erfunden (`Atlas`, 5.00 USD), keine Kundendaten. `freigabe`, `erledigt` und `ungueltig`
-bleiben die Bilder aus dem Abschnitt Handoff.
+der Überschrift. Die Werte im Bild sind erfunden (`Atlas`, 5.00 USD), keine Kundendaten. `approve`, `approved` und `invalid`
+bleiben die Bilder aus dem Abschnitt Handoff. Der Zustand `failed` behält für Bilder und Quelle den Namen, unter dem sie
+abgenommen sind (`KONTO_FILES` in `ops/soll-assess.mjs`, goals/konto/06).
 
 Bauen und prüfen, ohne Netz, mit dem Chromium aus `~/.cache/ms-playwright/`:
 
@@ -115,7 +119,7 @@ Abnahme-Issue konto: PRO-20104
 
 ## Limit /h/{code}
 
-Der Schritt Limit derselben Handy-Seite (goals/konto/04): Ein Konto erhöht sein Tageslimit. Nach der richtigen Zahl bestätigt der
+Der Schritt Limit derselben Handy-Seite (goals/konto/04, Name des Kontos seit goals/konto/06): Ein Konto erhöht sein Tageslimit. Nach der richtigen Zahl bestätigt der
 Mensch das neue Limit mit dem Passkey, mit dem er das Konto angelegt hat. Zwei Zustände, je zwei Bilder:
 
 | Zustand | 390 | 1440 | Quelle |
@@ -123,11 +127,15 @@ Mensch das neue Limit mit dem Passkey, mit dem er das Konto angelegt hat. Zwei Z
 | `approve` | `limit-approve-390.png` | `limit-approve-1440.png` | `src/limit-approve.html` |
 | `passkey` | `limit-passkey-390.png` | `limit-passkey-1440.png` | `src/limit-passkey.html` |
 
-`approve` ist die Wahl der Zahl wie beim Handoff, zeigt aber das heutige und das neue Tageslimit statt der ersten Zahlung; der Block
-`data-soll="approve"` endet im ersten Bildschirm. `passkey` sagt in der Überschrift, was beim Tippen passiert, darunter in einer
-Zeile das neue Limit und für wen, zwei Haken (das alte Limit endet, derselbe Passkey) und einen Knopf über die ganze Breite; der
-Block `data-soll="limit"` endet im ersten Bildschirm (390 x 844 und 1440 x 900). Abbruch und Fehler zeigen den Zustand
-`fehlgeschlagen` aus dem Abschnitt Konto unverändert. Die Werte im Bild sind erfunden (`Atlas`, 5.00 auf 10.00 USD), keine
+`approve` ist die Wahl der Zahl wie beim Handoff, zeigt aber das heutige und das neue Tageslimit statt der ersten Zahlung; die
+Überschrift fragt nach dem Limit des Kontos („Raise the daily limit of your account to $10.00?“), die Zeile über den Zahlen nennt
+den Namen des Kontos („The new limit applies to your account Atlas.“); der Block `data-soll="approve"` endet im ersten
+Bildschirm. `passkey` sagt in der Überschrift, was beim Tippen passiert („Raise the daily limit for your account“), darunter in
+einer Zeile das neue Limit für das Konto mit seinem Namen („We can charge up to $10.00 a day for your account Atlas.“),
+zwei Haken (das alte Limit endet, derselbe Passkey) und einen Knopf über die ganze Breite; der Block `data-soll="limit"` endet im
+ersten Bildschirm (390 x 844 und 1440 x 900). Das Limit gilt für das ganze Konto, auch wenn es mehrere Automatons hat; deshalb
+bindet kein Satz die Grenze an einen Automaton, und der Name ist der Name des Kontos (Name des ältesten Schlüssels in
+`api_keys`), nie ein Text aus dem Terminal. Abbruch und Fehler zeigen den Zustand `failed` aus dem Abschnitt Konto unverändert. Die Werte im Bild sind erfunden (`Atlas`, 5.00 auf 10.00 USD), keine
 Kundendaten.
 
 Bauen und prüfen, ohne Netz, mit dem Chromium aus `~/.cache/ms-playwright/`:
@@ -150,3 +158,112 @@ Die Bilder sind wie alle anderen dieser Datei mit WenQuanYi Zen Hei als `sans-se
 `/etc/fonts/fonts.conf` einbindet und `/usr/share/fonts/truetype/dejavu/*` mit `rejectfont` ausschließt.
 
 Abnahme-Issue limit: PRO-22848
+Abnahme-Issue limit-account: PRO-24063
+
+## Geld /h/{code}
+
+Einzahlung und Auszahlung auf derselben Handy-Seite (goals/konto/05): Der Mensch zahlt per Karte Geld auf das Konto seines
+Automatons ein oder richtet beim ersten Mal die Auszahlung auf sein eigenes Bankkonto ein. Dazu der Zustand `retry`, wenn die
+Prüfung der Unterschrift gerade nicht ging. Acht Zustände, je zwei Bilder:
+
+| Zustand | 390 | 1440 | Quelle |
+|---|---|---|---|
+| `deposit-approve` | `money-deposit-approve-390.png` | `money-deposit-approve-1440.png` | `src/money-deposit-approve.html` |
+| `deposit-card` | `money-deposit-card-390.png` | `money-deposit-card-1440.png` | `src/money-deposit-card.html` |
+| `payout-approve` | `money-payout-approve-390.png` | `money-payout-approve-1440.png` | `src/money-payout-approve.html` |
+| `payout-approve-revoke` | `money-payout-approve-revoke-390.png` | `money-payout-approve-revoke-1440.png` | `src/money-payout-approve-revoke.html` |
+| `payout-verify` | `money-payout-verify-390.png` | `money-payout-verify-1440.png` | `src/money-payout-verify.html` |
+| `payout-bank` | `money-payout-bank-390.png` | `money-payout-bank-1440.png` | `src/money-payout-bank.html` |
+| `payout-passkey` | `money-payout-passkey-390.png` | `money-payout-passkey-1440.png` | `src/money-payout-passkey.html` |
+| `retry` | `money-retry-390.png` | `money-retry-1440.png` | `src/money-retry.html` |
+
+`deposit-approve` und `payout-approve` sind die Wahl der Zahl wie beim Limit (Block `data-soll="approve"`), sagen aber, was
+geschieht: „Add $20.00 to Atlas?“ mit Betrag und Karte, „Send money from Atlas to your bank account?“ mit dem eigenen Bankkonto als
+einzigem Ziel. `deposit-card` (Block `card`) nennt Betrag und Karte und hat einen Knopf. `payout-verify` (Block `verify`) sagt,
+dass Bridge einmal die Identität prüft, mit einem Knopf. `payout-bank` (Block `bank`) fragt IBAN (`name="iban"`) und Name des
+Kontoinhabers (`name="owner_name"`) ab, mit einem Knopf. `payout-passkey` (Block `payout`) sagt in der Überschrift, was beim Tippen
+passiert, darunter in einer Zeile „We can send money from Atlas only to your bank account ending 3000.“, zwei Haken und
+einen Knopf über die ganze Breite. `retry` (Block `retry`) sagt, dass die Prüfung gerade nicht ging, und hat den Knopf „Tap
+again“. Jeder Block endet im ersten Bildschirm (390 x 844 und 1440 x 900). Abbruch und Fehler zeigen den Zustand `failed`
+aus dem Abschnitt Konto unverändert. Die Werte im Bild sind erfunden (`Atlas`, 20.00 USD, Beispiel-IBAN
+`DE89 3704 0044 0532 0130 00` als Platzhalter, Bankkonto mit Endung 3000), keine Kundendaten. Die Quellen zeigen nur den sichtbaren
+Teil der Seite: Die `data-*`-Werte der Knöpfe, das Formularziel und das Skript setzt erst `src/public/money.ts`.
+
+Bauen und prüfen, ohne Netz, mit dem Chromium aus `~/.cache/ms-playwright/`, auf dem code-host mit
+`FONTCONFIG_FILE=~/.config/control-plane/soll-fonts.conf` wie beim Limit:
+
+```
+node ops/soll-money.mjs                         # Bilder neu schreiben
+node ops/soll-money.mjs --check                 # neu rendern und vergleichen, Exit 1 bei jedem Mangel
+node ops/soll-money.mjs --check --source <dir>  # dieselbe Prüfung gegen die acht Quellen money-<zustand>.html in <dir>
+```
+
+Ein unbekanntes Argument endet mit Exit 1, bevor der Browser startet, und schreibt kein Bild. Die letzte Zeile ist englisch:
+`soll money: 16 images, blocks end 390=<y> 1440=<y>, 0 defects`, y ist je Breite das tiefste Blockende aller Zustände.
+
+Mängel wie beim Limit: ein einziger Pixel weicht vom neuen Render ab, waagrechter Überlauf, Gedankenstrich im sichtbaren Text,
+fremde Adresse (angefragt oder in einem Attribut), Bild mit falscher Breite, Block fehlt oder endet unter dem ersten Bildschirm. Zur
+Sperrliste kommen `liquidation`, `onramp` (auch `on-ramp`), `kyc`, `forwarder`, `spender` und `usdc`, Groß- und Kleinschreibung
+egal; „passkey“, „IBAN“, „card“, „identity“, Bridge und MoonPay sind bekannte Wörter und stehen. Die Auswertung ist `assessMoney` in
+`ops/soll-assess.mjs`, geprüft von `test/soll-money.test.ts` ohne Browser.
+
+Die Quellen nutzen die Klassen der Startseite und die Bausteine grant und choices aus dem Abschnitt Handoff sowie wide und balanced
+aus dem Abschnitt Konto, jeweils mit demselben Zweck. Neu, in einem dritten `<style>` der Quellen und später der Seite:
+
+- `.field`: Beschriftung und Textfeld für IBAN und Kontoinhaber, das Feld so breit wie die Spalte und 52 px hoch, Beschriftung im
+  Stil der Zeile über der Überschrift, weil der Stil der Startseite kein Eingabefeld kennt und ein `<input>` sonst klein und hell
+  im Stil des Browsers auf der dunklen Seite steht.
+
+Abnahme-Issue money: PRO-23251
+
+`payout-approve-revoke` (goals/konto/11) ist `payout-approve` für ein Konto, das schon eine Auszahlung eingerichtet hat: Der Block
+`approve` trägt einen dritten Eintrag „Earlier approval“ mit „Ends with this, so money from Atlas goes only to the bank account you
+set now“, weil derselbe Passkey-Tipp, der die neue Erlaubnis unterschreibt, die frühere beendet. Auf dem Handy stehen die Einträge
+zwei nebeneinander, deshalb nimmt der dritte dort die ganze Zeile (`.stats .across`, ein vierter `<style>` der Quelle und später der
+Seite); ab 30rem stehen alle drei in einer Zeile. Die erste Einrichtung zeigt `payout-approve` unverändert.
+
+Abnahme-Issue payout-revoke: PRO-24730
+
+## Name automatonhost.com (goals/umzug/02)
+
+Alle 30 Bilder tragen seit goals/umzug/02 den Namen `automatonhost.com` statt des alten Namens: im Kopf jeder Seite, im Titel
+(`<Seite> | automatonhost.com`) und in der Fußzeile der Handy-Seiten. Sätze, deren Subjekt der alte Name war, sagen „We“ („We can
+charge up to $5.00 a day, only for Atlas.“, „We never see your passkey and cannot open the account.“, „We never see your card
+number.“). Die Startseite heißt `automatonhost.com: keep your automaton running`, die Überschrift des Blocks `move` lautet
+„Conway not answering? Your automaton runs here.“, und der Block zeigt `conwayApiUrl` mit `https://automatonhost.com`. Der Knopf
+im Kopf führt zum Wechsel (`/fix`, „Switch now“) statt zu „Post a job“; der Link „Agent stuck?“ steht bei 390 px nicht mehr im Kopf,
+weil der Knopf dasselbe Ziel hat und der Kopf sonst in zwei Zeilen bricht. Aufbau, Bausteine und Werte sind sonst unverändert,
+neue Bausteine gibt es keine. Gerendert mit den Werkzeugen oben, `FONTCONFIG_FILE=$HOME/.config/control-plane/soll-fonts.conf`.
+
+Abnahme-Issue umzug: PRO-24257
+
+## Vorschaukarte /og.png (goals/umzug/03)
+
+Das Bild, das jeder geteilte Link auf `automatonhost.com` zeigt, als SOLL-Bild `og-card.png` (2400 x 1260, also 1200 x 630 mit
+Faktor 2). Quelle ist `src/og-card.html`. Die Karte sagt, was der erste Block der Startseite sagt: die Überschrift des Blocks
+`move` in zwei Zeilen („Conway not answering?“ und „Your automaton runs here.“), darunter sein Satz zur eigenen Wallet und zur
+gleichen API, unten links die eine Zeile `"conwayApiUrl": "https://automatonhost.com"`, unten rechts wie bisher
+`automatonhost.com`. Markt, Provision und freier erster Auftrag stehen nicht mehr darauf. Farben, Schrift, Logo, Leuchten und
+Abstände sind die der bisherigen Karte.
+
+Bauen und prüfen, ohne Netz, mit `FONTCONFIG_FILE=$HOME/.config/control-plane/soll-fonts.conf`:
+
+```
+node ops/soll-og.mjs                                            # og-card.png neu schreiben
+node ops/soll-og.mjs --check                                    # neu rendern und vergleichen, Exit 1 bei jedem Mangel
+node ops/soll-og.mjs --check --source src/public/og-card.html   # die Karte des Dienstes gegen dasselbe Bild
+```
+
+Mängel: ein Pixel weicht ab (Kanaltoleranz 8), das Bild ist nicht 2400 x 1260, Inhalt ist breiter oder höher als die Karte,
+Gedankenstrich im sichtbaren Text, Anfrage an eine fremde Adresse. Die Auswertung ist `assessOg` in `ops/soll-assess.mjs`, geprüft
+von `test/soll-og.test.ts` ohne Browser. `ops/soll-og.mjs` schreibt nie nach `src/public/`: Nach der Abnahme ist
+`src/public/og-card.html` eine Kopie der Quelle und `src/public/og.png` eine Kopie von `og-card.png`.
+
+### Neue Bausteine
+
+`.line` mit einer Beschriftung im Stil der bisherigen Fakten (`.line b`, früher `.facts b`) und einem Codekasten `.line code`
+(Monospace 24 px, Rahmen in Grün mit 28 % Deckkraft, Feldname in Grün), weil die Zeile mit `conwayApiUrl` genau das ist, was der
+Betreiber abtippt, und als Code erkennbar sein muss. Er ersetzt die drei Fakten der alten Karte. Die Überschrift bricht fest nach
+dem ersten Satz (`h1 span { display: block; }`), weil die zwei Sätze die zwei Zeilen des Blocks `move` sind.
+
+Abnahme-Issue og-card: PRO-24699

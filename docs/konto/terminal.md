@@ -15,10 +15,10 @@ atomare USDC (6 Nachkommastellen) als Text.
 
 | Tool | Argumente | Was passiert |
 |---|---|---|
-| `start_automaton` | `genesis_prompt`, `name`, `daily_limit_usd` | Ohne Schlüssel: `POST /v1/handoff` mit `step: "konto"`, Name und Tageslimit, ohne `amount_usdc`; die Antwort kommt sofort mit `qr`, `url`, `match` und `expires_at` und nie mit `poll_token`. Den Strom `GET /v1/handoff/{code}` hält der MCP-Server im Hintergrund offen. Nach `done` liegt der Schlüssel in `CP_KEY_FILE`, dann `POST /v1/automatons`. Mit Schlüssel startet es sofort, ohne Handoff. |
+| `start_automaton` | `genesis_prompt`, `name` (1 bis 32 Buchstaben, Ziffern, Leerzeichen, `_` oder `-`, vorn Buchstabe oder Ziffer), `daily_limit_usd` | Ohne Schlüssel: `POST /v1/handoff` mit `step: "konto"`, Name und Tageslimit, ohne `amount_usdc`; die Antwort kommt sofort mit `qr`, `url`, `match` und `expires_at` und nie mit `poll_token`. Den Strom `GET /v1/handoff/{code}` hält der MCP-Server im Hintergrund offen. Nach `done` liegt der Schlüssel in `CP_KEY_FILE`, dann `POST /v1/automatons`. Mit Schlüssel startet es sofort, ohne Handoff. |
 | `automaton_status` | `id` (optional) | `waiting_for_phone`, `matched`, `starting`, `running`, `stopped` oder `failed` mit `reason` und Klartext; nach einer Erhöhung zusätzlich `daily_limit_change`. |
 | `automaton_logs` | `id` (optional) | die letzten Zeilen aus `GET /v1/automatons/{id}/logs`, Schlüssel und 64-stellige Hex-Folgen geschwärzt |
-| `set_daily_limit` | `daily_limit_usd`, `name` (optional) | liest `GET /v1/konto/limit`; `raiseNeedsPhone` entscheidet: niedriger oder gleich genau ein `POST /v1/konto/limit`, höher ein `POST /v1/handoff` mit `step: "limit"` und null Aufrufe an `/v1/konto/limit` |
+| `set_daily_limit` | `daily_limit_usd` | liest `GET /v1/konto/limit`; `raiseNeedsPhone` entscheidet: niedriger oder gleich genau ein `POST /v1/konto/limit`, höher ein `POST /v1/handoff` mit `step: "limit"` ohne `automaton_name` und null Aufrufe an `/v1/konto/limit`; bei der Erhöhung steht auf dem Handy der Name des Kontos, nie ein Name aus dem Terminal |
 | `stop_automaton` | `id` (optional) | `POST /v1/automatons/{id}/stop` |
 
 Ohne `id` meinen die Tools den Automaton, den dieser Server gestartet hat, sonst den neuesten des Kontos. Bei `burned` oder

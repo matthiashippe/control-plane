@@ -3,8 +3,12 @@
  * SOLL pictures docs/soll/limit-<state>-<width>.png and their sources docs/soll/src/limit-<state>.html.
  *
  * Two states: `approve` is the choice of the number as in konto 02, with today's and the new daily limit instead of the first
- * payment; `passkey` says what the tap does (the new limit, and for whom) and has the one button that confirms it with the passkey
- * the account was created with. Cancel and failure show the state `fehlgeschlagen` of konto 03 (src/public/konto.ts) unchanged.
+ * payment; `passkey` says what the tap does (the new limit of the account) and has the one button that confirms it with the passkey
+ * the account was created with. Cancel and failure show the state `failed` of konto 03 (src/public/konto.ts) unchanged.
+ *
+ * The limit holds for the whole account, whichever of its automatons spends (goals/konto/06). So the page names the account, by the
+ * name of its oldest API key (readAccountName in src/konto/account.ts), and never a name the terminal sent; no sentence ties the
+ * limit to one automaton. An account without a name is just "your account".
  * The frame and the blocks are those of konto 02 and 03 (phonePage, OWN_STYLE, KONTO_STYLE); this page adds none. Each heading is a
  * bare h1 element: the goal changes the first one to prove that the comparison with the picture notices.
  */
@@ -13,11 +17,11 @@ import { phonePage, usd } from "./handoff.js";
 import { KEY_ICON, KONTO_STYLE } from "./konto.js";
 
 export type LimitPage =
-  | { state: "approve"; automatonName: string; previousLimitUsdc: bigint; dailyLimitUsdc: bigint; choices: number[] }
+  | { state: "approve"; accountName: string | null; previousLimitUsdc: bigint; dailyLimitUsdc: bigint; choices: number[] }
   | {
       state: "passkey";
       code: string;
-      automatonName: string;
+      accountName: string | null;
       previousLimitUsdc: bigint;
       dailyLimitUsdc: bigint;
       chainId: number;
@@ -29,10 +33,11 @@ export type LimitPage =
       organizationId: string;
     };
 
-const TITLE = "Raise the daily limit | PostYourPrice";
+const TITLE = "Raise the daily limit | automatonhost.com";
 
 function body(page: LimitPage): string {
-  const name = esc(page.automatonName);
+  // "your account Atlas", or "your account" alone when the account has no name.
+  const yourAccount = page.accountName ? `your account ${esc(page.accountName)}` : "your account";
   if (page.state === "approve") {
     const buttons = page.choices
       .map((n) => `      <button class="btn" type="submit" name="pick" value="${n}">${n}</button>`)
@@ -40,12 +45,12 @@ function body(page: LimitPage): string {
     return `<section class="hero">
   <div class="wrap narrow" data-soll="approve">
     <p class="eyebrow">Raise the daily limit</p>
-    <h1>Allow ${name} to spend up to ${usd(page.dailyLimitUsdc)} a day?</h1>
+    <h1>Raise the daily limit of your account to ${usd(page.dailyLimitUsdc)}?</h1>
     <div class="stats grant">
       <div><span class="n">${usd(page.previousLimitUsdc)}</span><span class="l">Daily limit today</span></div>
-      <div><span class="n">${usd(page.dailyLimitUsdc)}</span><span class="l">New daily limit for ${name}</span></div>
+      <div><span class="n">${usd(page.dailyLimitUsdc)}</span><span class="l">New daily limit</span></div>
     </div>
-    <p class="sub">Tap the number shown in your terminal.</p>
+    <p class="sub">The new limit applies to ${yourAccount}. Tap the number shown in your terminal.</p>
     <form method="post" class="choices">
 ${buttons}
     </form>
@@ -70,8 +75,8 @@ ${buttons}
   <div class="wrap narrow" data-soll="limit">
     <div class="hero-text balanced">
       <p class="eyebrow">Last step</p>
-      <h1>Raise the daily limit for ${name}</h1>
-      <p class="sub">PostYourPrice can charge up to ${usd(page.dailyLimitUsdc)} a day, only for ${name}.</p>
+      <h1>Raise the daily limit for your account</h1>
+      <p class="sub">We can charge up to ${usd(page.dailyLimitUsdc)} a day for ${yourAccount}.</p>
       <div class="grant">
         <ul class="feats">
           <li>The limit of ${usd(page.previousLimitUsdc)} a day ends when you confirm.</li>

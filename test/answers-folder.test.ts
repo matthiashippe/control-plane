@@ -72,7 +72,7 @@ describe("the issue answers take a folder in the repository", () => {
     expect(sent.length).toBe(1);
     expect(sent[0][1]).toBe("repos/Conway-Research/automaton/issues/434/comments");
     expect(sent[0].find((a) => a.startsWith("body="))).toBe(
-      "body=The 401 is the retry, not the first answer. The first verify answers 500.\n\nDisclosure: I run PostYourPrice (https://postyourprice.com), a control plane for this runtime.\n",
+      "body=The 401 is the retry, not the first answer. The first verify answers 500.\n\nDisclosure: I run automatonhost.com (https://automatonhost.com), a control plane for this runtime.\n",
     );
     expect(r.log).toMatch(/\n\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ 434 https:\/\/github\.com\/Conway-Research\/automaton\/issues\/434#issuecomment-1\n$/);
   }, 120_000);
@@ -128,7 +128,7 @@ describe("the issue answers take a folder in the repository", () => {
       "2026-11-10T14:03:20Z 440 https://github.com/Conway-Research/automaton/issues/440#issuecomment-41",
       "2026-11-11T07:04:50Z 434 https://github.com/Conway-Research/automaton/issues/434#issuecomment-42",
     ]);
-    const live = "The 401 is the retry, not the first answer. The first verify answers 500.\n\nDisclosure: I run PostYourPrice (https://postyourprice.com), a control plane for this runtime.\n";
+    const live = "The 401 is the retry, not the first answer. The first verify answers 500.\n\nDisclosure: I run automatonhost.com (https://automatonhost.com), a control plane for this runtime.\n";
     const r = s.run("post-the-answers.py", ["--verify-posted", "--folder", "goals/kanal/antworten"], {
       FAKE_COMMENTS: JSON.stringify({ "42": live }),
     });
@@ -143,7 +143,7 @@ describe("the issue answers take a folder in the repository", () => {
   it("post-the-answers.py --verify-posted fails with exit 1 when the live comment differs by one character", () => {
     const s = sandbox({ "434.md": GOOD });
     s.posted(["2026-11-11T07:04:50Z 434 https://github.com/Conway-Research/automaton/issues/434#issuecomment-42"]);
-    const live = "The 401 is the retry, not the first answer. The first verify answers 501.\n\nDisclosure: I run PostYourPrice (https://postyourprice.com), a control plane for this runtime.\n";
+    const live = "The 401 is the retry, not the first answer. The first verify answers 501.\n\nDisclosure: I run automatonhost.com (https://automatonhost.com), a control plane for this runtime.\n";
     const r = s.run("post-the-answers.py", ["--verify-posted", "--folder=goals/kanal/antworten"], {
       FAKE_COMMENTS: JSON.stringify({ "42": live }),
     });

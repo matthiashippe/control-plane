@@ -58,16 +58,17 @@ export function loadConfig(env = process.env) {
 
 // ---- the domain of exposed ports (goals/sandbox/07)
 
-/** The zone of the payment service. A customer's service never gets a name in it (goals/sandbox/ANNAHMEN.md, Goal 07). */
-export const PAYMENT_ZONE = "postyourprice.com";
+/** The zones of the payment service. A customer's service never gets a name in one (goals/sandbox/ANNAHMEN.md, Goal 07; goals/umzug/01). */
+export const PAYMENT_ZONES = ["postyourprice.com", "automatonhost.com"];
 const DOMAIN_RE = /^(?=.{4,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
 
 /** The domain for public URLs of exposed ports, lowercased without a trailing dot; throws for an empty or malformed name and for the payment zone. */
 export function assertPortsDomain(domain) {
   const d = String(domain ?? "").trim().toLowerCase().replace(/\.$/, "");
   if (!d) throw new Error("SANDBOXD_DOMAIN is not set: exposed ports need a domain of their own");
-  if (d === PAYMENT_ZONE || d.endsWith(`.${PAYMENT_ZONE}`)) {
-    throw new Error(`SANDBOXD_DOMAIN ${d} is the zone of the payment service ${PAYMENT_ZONE}; exposed ports need a domain of their own`);
+  const zone = PAYMENT_ZONES.find((z) => d === z || d.endsWith(`.${z}`));
+  if (zone) {
+    throw new Error(`SANDBOXD_DOMAIN ${d} is in the zone of the payment service ${zone}; exposed ports need a domain of their own`);
   }
   if (!DOMAIN_RE.test(d)) throw new Error(`SANDBOXD_DOMAIN ${d} is not a domain name`);
   return d;

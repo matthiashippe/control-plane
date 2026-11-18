@@ -19,7 +19,7 @@ export function usd(atomic: bigint): string {
 }
 
 export type HandoffPage =
-  | { state: "approve"; automatonName: string; dailyLimitUsdc: bigint; amountUsdc: bigint; choices: number[] }
+  | { state: "approve"; displayName: string; dailyLimitUsdc: bigint; amountUsdc: bigint; choices: number[] }
   | { state: "approved" }
   | { state: "invalid"; reason: "expired" | "used" | "wrong" | "unknown" };
 
@@ -32,9 +32,9 @@ const REASONS = {
 } as const;
 
 const TITLES = {
-  approve: "Approve on your phone | PostYourPrice",
-  approved: "Approved | PostYourPrice",
-  invalid: "Nothing was approved | PostYourPrice",
+  approve: "Approve on your phone | automatonhost.com",
+  approved: "Approved | automatonhost.com",
+  invalid: "Nothing was approved | automatonhost.com",
 } as const;
 
 const ICON =
@@ -52,7 +52,7 @@ const OWN_STYLE = `<style>
 
 function body(page: HandoffPage): string {
   if (page.state === "approve") {
-    const name = esc(page.automatonName);
+    const name = esc(page.displayName);
     const buttons = page.choices
       .map((n) => `      <button class="btn" type="submit" name="pick" value="${n}">${n}</button>`)
       .join("\n");
@@ -124,13 +124,13 @@ ${OWN_STYLE}${extra}${head}
 <header class="bar"><div class="wrap narrow">
   <span class="brand">
     <svg width="22" height="22" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="currentColor" opacity=".12"/><circle cx="16" cy="12" r="5.5" fill="none" stroke="currentColor" stroke-width="2.5"/><rect x="7" y="21" width="18" height="3.5" rx="1.75" fill="currentColor"/></svg>
-    PostYourPrice
+    automatonhost.com
   </span>
 </div></header>
 <main>
 ${main}</main>
 <footer><div class="wrap narrow">
-  PostYourPrice, Matthias Hippe, San-Francisco-Straße 1, 20457 Hamburg, Germany.
+  automatonhost.com, Matthias Hippe, San-Francisco-Straße 1, 20457 Hamburg, Germany.
   <a href="/terms">The fine print</a>, the <a href="/terms#impressum">Impressum</a> and <a href="/datenschutz">Datenschutz</a>.
 </div></footer>
 </body>

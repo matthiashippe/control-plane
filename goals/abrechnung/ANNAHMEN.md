@@ -135,3 +135,32 @@
   `AP_MANAGEMENT_KEY_FILE`). Der Maker von abrechnung 05 findet den Punkt gebaut vor und belegt ihn mit seinen Prüfbefehlen.
 - **Format der Datei:** genau eine Zeile `OPENROUTER_MANAGEMENT_KEY=<Wert>`, Anführungszeichen um den Wert werden entfernt; die Datei
   wird nicht gesourct, der Wert nicht exportiert und nur auf stdin an `curl` gegeben.
+
+## Goal 05
+- **Grenzregel der Gegenrechnung (Engineer CP, 18.11.2026):** `--compare` legt ein Paar und eine bediente Wiederholung nach der Zeit
+  ihrer Zeile in den Zeitraum, seit abrechnung 05 auch eine Anfrage mit eigener Zeile ohne `duration_ms` (bisher nach ihrem Ende; so
+  trennt keine Grenze eine Anfrage von ihrer Zeile). Der Join (`--join` und die Gegenrechnung `check caddy`) legt eine Anfrage nach der
+  Zeit der Zeile, der er sie zuordnet (eigene Zeile, sonst die erste Zeile, die während der Anfrage geschrieben wurde), ohne Zeile nach
+  ihrem Ende; `--rows` und `check service` legen eine Zeile nach der Zeit, zu der sie geschrieben wurde. Damit fällt ein Paar, dessen
+  Anfrage vor `TQ_UNTIL` endet und dessen Zeile danach geschrieben wird, in allen drei Zählungen aus dem Zeitraum (Selftest
+  `compare check boundary`, mit einem Join nach dem Ende der Anfrage rot: `check caddy: compare 1 0, join 2 0`).
+- **Warum keine Selbstsumme:** Die Grenze ist für alle drei die Zeit der Buchung, aber gezählt wird in getrennten Durchläufen auf frisch
+  gelesenen Eingaben: der Join mit seiner eigenen Zuordnung und ohne die Klassen `pair`, `coalesced`, `caddy-only`, `service-only`,
+  `--rows` ganz ohne Caddy-Log. Eine falsch einsortierte Anfrage im Vergleich ändert deshalb `compare`, aber nicht `join` oder `rows`
+  (Test mit verfälschter Klassifikation in `test/timeout-quote-compare.test.ts`). Geteilt sind nur das Lesen der Zeilen und der erste
+  Abgleich Anfrage zu eigener Zeile (Generation-Start binnen 2 s); einen Fehler dort sieht die Gegenrechnung nicht.
+- **Rest, der Exit 3 auslösen kann:** Eine bediente Wiederholung legt `compare` nach der Zeile ihres Leaders, der Join nach der ersten
+  Zeile während ihrer Laufzeit; eine Anfrage ohne Zeile legt `compare` nach ihrem Ende, der Join nach einer Zeile, die bis 1 s danach
+  geschrieben wurde. Fallen diese Zeiten auf verschiedene Seiten von `TQ_SINCE` oder `TQ_UNTIL`, endet der Lauf mit Exit 3. Das bleibt
+  so, weil eine Angleichung die Klassen des Vergleichs in den Join tragen würde; über die sieben Tage trat es nicht auf.
+- **`--rows` mit `TQ_UNTIL`:** `--rows` und `--since-rollout` vergleichen den Zeitraum jetzt als Zeit statt als Text. Bisher lag eine
+  Zeile `2026-11-10T20:27:18.123Z` als Text vor `TQ_SINCE=2026-11-10T20:27:18Z` und fiel heraus; `TQ_UNTIL` las `--rows` gar nicht.
+  Die Kopfzeile beginnt weiter mit `since`, weil `ops/live.sh` sie so liest.
+- **Skalierung:** Zeilen nach Zeit sortiert, jede Anfrage liest nur die Zeilen in ihrem Fenster (Beginn minus 1 s bis Ende plus 15 s,
+  per Binärsuche). Bei gleich guten Zeilen gewinnt wie bisher die frühere in der Eingabe (`idx`), darum bleibt die Zuordnung dieselbe.
+  `--selftest-scale` mit 200000 Anfragen braucht rund 4 s; der Abgleich von abrechnung 04 lief auf denselben Dateien 3 min 52 s und
+  endete mit `RangeError: Maximum call stack size exceeded` (Spread in `Math.max`).
+- **Einkauf je Abbruch:** Der Prüfzeitraum 10. bis 17.11.2026 enthält den 10.11., an dem der Anbieter `openai/gpt-5.2` heute 3913 mc
+  höher meldet als am 11.11.2026 gemessen; der Tag wird `noise`, und das Werkzeug schätzt für das Modell nichts. Die Zeile nennt darum
+  keine Zahl und daneben die Messung ohne den 10.11. Die Toleranz bleibt 1000 mc, weil eine nachträgliche Korrektur des Anbieters
+  genau der Fall ist, den `noise` anzeigen soll.

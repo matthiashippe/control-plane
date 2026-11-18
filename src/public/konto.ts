@@ -3,7 +3,7 @@
  * docs/soll/konto-<state>-<width>.png and their sources docs/soll/src/konto-<state>.html.
  *
  * Two states: `passkey` says what the account allows (the daily limit, and for whom) and has the one button that creates the
- * passkey; `fehlgeschlagen` says that no account was created and sends the person back to the terminal. The frame (head, bar,
+ * passkey; `failed` says that no account was created and sends the person back to the terminal. The frame (head, bar,
  * footer, the blocks of konto 02) is phonePage() of src/public/handoff.ts; this page adds two blocks (docs/soll/README.md,
  * "Konto /h/{code}"). The heading is a bare h1 element: the goal changes the first one to prove that the comparison with the
  * picture notices.
@@ -12,8 +12,8 @@ import { esc } from "./market.js";
 import { phonePage, usd } from "./handoff.js";
 
 export type KontoPage =
-  | { state: "passkey"; code: string; automatonName: string; dailyLimitUsdc: bigint; chainId: number; spender: string; token: string; authProxyId?: string | null }
-  | { state: "fehlgeschlagen"; reason: FailReason };
+  | { state: "passkey"; code: string; displayName: string; dailyLimitUsdc: bigint; chainId: number; spender: string; token: string; authProxyId?: string | null }
+  | { state: "failed"; reason: FailReason };
 
 /** Why no account was created. The SOLL picture shows `cancelled`. */
 export type FailReason = "cancelled" | "unreachable" | "refused";
@@ -25,8 +25,8 @@ export const FAIL_REASONS: Record<FailReason, string> = {
 };
 
 const TITLES = {
-  passkey: "Create your account | PostYourPrice",
-  fehlgeschlagen: "No account created | PostYourPrice",
+  passkey: "Create your account | automatonhost.com",
+  failed: "No account created | automatonhost.com",
 } as const;
 
 /** The two blocks of the account step, as in the SOLL sources. */
@@ -44,7 +44,7 @@ export const KEY_ICON =
 
 function body(page: KontoPage): string {
   if (page.state === "passkey") {
-    const name = esc(page.automatonName);
+    const name = esc(page.displayName);
     // What the script of the page needs to ask for exactly this permission; none of it is secret.
     const data = [
       `data-code="${esc(page.code)}"`,
@@ -59,11 +59,11 @@ function body(page: KontoPage): string {
     <div class="hero-text balanced">
       <p class="eyebrow">Last step</p>
       <h1>Create your account with a passkey</h1>
-      <p class="sub">PostYourPrice can charge up to ${usd(page.dailyLimitUsdc)} a day, only for ${name}.</p>
+      <p class="sub">We can charge up to ${usd(page.dailyLimitUsdc)} a day, only for ${name}.</p>
       <div class="grant">
         <ul class="feats">
           <li>Only you can open the account, with your face or fingerprint.</li>
-          <li>PostYourPrice never sees your passkey and cannot open the account.</li>
+          <li>We never see your passkey and cannot open the account.</li>
         </ul>
       </div>
       <div class="cta wide">

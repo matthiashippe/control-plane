@@ -21,7 +21,7 @@ if (at < 0 || !args[at + 1] || args.length !== 2) {
 const out = path.resolve(args[at + 1]);
 mkdirSync(out, { recursive: true });
 
-process.env.CP_PUBLIC_URL = "https://postyourprice.com";
+process.env.CP_PUBLIC_URL = "https://automatonhost.com";
 const { createApp } = await import("../src/app.ts");
 const { openDb, ensureWallet } = await import("../src/db.ts");
 const { createApiKey } = await import("../src/auth/siwe.ts");
@@ -49,6 +49,7 @@ db.prepare("INSERT INTO konto_accounts (address, chain_id, permission, signature
   .run(account, 84532, permissionJson(permission), "0x" + "11".repeat(65), new Date(NOW).toISOString());
 const session = randomBytes(32).toString("hex");
 db.prepare("INSERT INTO sessions (token, address, expires_at) VALUES (?, ?, ?)").run(session, account, NOW + 60_000);
+// The name the page shows is the name of this first API key, the name of the account (goals/konto/06), not one from the body.
 const { key } = createApiKey(db, session, "Atlas", NOW);
 
 const app = createApp({ db, now: () => new Date(NOW), rateLimit: null, handoff: { random, missLimit: null }, konto });
@@ -69,7 +70,7 @@ const write = async (state, res) => {
 const raise = await (await ask("raise", "/v1/handoff", {
   method: "POST",
   headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
-  body: JSON.stringify({ automaton_name: "Atlas", daily_limit_usdc: "10000000", step: "limit" }),
+  body: JSON.stringify({ daily_limit_usdc: "10000000", step: "limit" }),
 }, 201)).json();
 await write("approve", await ask("approve", `/h/${raise.code}`, undefined, 200));
 await write("passkey", await ask("passkey", `/h/${raise.code}`, {

@@ -18,10 +18,20 @@ const MAINNET_USDC = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913";
 const DAY = 86_400;
 
 /**
- * A chain that is not there: every eth_call fails, so the ERC-6492 check of viem falls back to ecrecover. The account of these
- * tests is a plain key standing in for the smart wallet; the signature path of a real smart wallet runs in harness/e2e/konto-chain.mjs.
+ * A chain without code at the account: the ERC-6492 validator answers false for every eth_call, so viem falls back to ecrecover,
+ * and every other request fails. The account of these tests is a plain key standing in for the smart wallet; the signature path of
+ * a real smart wallet runs in harness/e2e/konto-chain.mjs. Since goals/konto/05 (point 7) a chain that cannot be asked at all is
+ * no longer a no but a 503 (test/konto-signature-retry.test.ts), so this one answers.
  */
-const noChain = createPublicClient({ chain: baseSepolia, transport: custom({ request: async () => { throw new Error("no chain in unit tests"); } }), }) as unknown as PublicClient;
+const noChain = createPublicClient({
+  chain: baseSepolia,
+  transport: custom({
+    request: async ({ method }: { method: string }) => {
+      if (method === "eth_call") return "0x0000000000000000000000000000000000000000000000000000000000000000";
+      throw new Error("no chain in unit tests");
+    },
+  }),
+}) as unknown as PublicClient;
 
 const spender = privateKeyToAccount(generatePrivateKey()).address;
 const kontoDeps = (over: Partial<KontoDeps> = {}): KontoDeps => ({
@@ -104,7 +114,7 @@ describe("handoff with step konto", () => {
     expect(res.status).toBe(200);
     const html = await res.text();
     expect(html).toContain('data-soll="passkey"');
-    expect(html).toContain("PostYourPrice can charge up to $5.00 a day, only for Atlas.");
+    expect(html).toContain("We can charge up to $5.00 a day, only for Atlas.");
     expect(html).toContain(`data-code="${h.code}"`);
     expect(stateOf(db, h.code)).toBe("matched");
     const again = await app.request(`/h/${h.code}`);
@@ -117,7 +127,7 @@ describe("handoff with step konto", () => {
     expect((await send(app, h.code, await permit())).status).toBe(200);
     const res = await app.request(`/h/${h.code}`);
     expect(res.status).toBe(200);
-    expect(await res.text()).toContain("<title>Approved | PostYourPrice</title>");
+    expect(await res.text()).toContain("<title>Approved | automatonhost.com</title>");
   });
 
   it("ends done with a matching permission; the first done event carries account and api_key, a second read none", async () => {
