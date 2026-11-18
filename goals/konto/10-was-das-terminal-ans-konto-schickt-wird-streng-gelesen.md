@@ -1,7 +1,7 @@
 # Konto Goal 10: Was das Terminal ans Konto schickt, wird streng gelesen
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Auf der Seite, auf der ein Mensch mit dem Passkey Geld freigibt, steht nur, was er selbst festgelegt hat, und ein Betrag kommt nie
@@ -135,7 +135,7 @@ dort wie eine Aussage von uns aussieht.
       Prüfung: `git diff origin/dev...HEAD | grep -E '^[+]' | grep -iE "(api[_-]?key|secret|token|private[_-]?key)[\"' ]*[:=] *[\"']?[A-Za-z0-9_+/=-]{16,}|BEGIN [A-Z ]*PRIVATE KEY|cnwy_k_[A-Za-z0-9_-]{16,}" | wc -l` muss `0` ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung (Netz): `n=$(gh pr list -R matthiashippe/control-plane --head goal/konto-10 --state open --json number -q '.[0].number'); gh pr checks "$n" -R matthiashippe/control-plane | awk -F'\t' '$1=="check" && $2=="pass"' | wc -l` muss mindestens `1` ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Ein Terminal kann bei der Anlage eines Kontos keinen Namen mit Punkt, Satzzeichen, fremder Schrift oder mehr als 32 Zeichen
@@ -171,4 +171,5 @@ dort wie eine Aussage von uns aussieht.
 - 2026-11-17 Zyklus 1: Punkte 1, 2, 3, 4, 5 gebaut, `parseAccountName` und gekürzter `readAccountName` in `src/konto/account.ts`, `POST /v1/handoff` liest den Namen für `konto` und `confirm` streng, `test/konto-usdc.test.ts` neu, Doku und Schema von `start_automaton` mit `pattern`; Punkt 6 bleibt offen, weil `test/handoff-page.test.ts` (Fall „escapes a name that carries markup“ legt die Übergabe jetzt mit `createHandoff` an) nicht in der Pfadliste steht. Prüfbefehle: Punkt 1 `1`, `1`, `0`, `1`, `1`, `0`, vitest Exit 0 (9 Dateien, 111 Tests); Punkt 2 `exit=0` und `3 3`, gegen die Merge-Basis `2 1`, `faelle ok`; Punkt 3 `exit=0` und `true 1 0`, `werte ok`, Mutationen `parseUsdc=1`, `JSON number 10000=1`, `parseUsdc=1`, `JSON number 10000=0` ohne `sed-miss`; Punkt 4 `1`, `1`, `1`, `1`, `1`, `0`, `0`; Punkt 5 `9`, `1`; Punkt 6 Pfadliste `1` (`test/handoff-page.test.ts`), `seite gleich`, `0`, `pakete gleich`, `goals gleich`, `0`, `node scripts/check.mjs` Exit 0 (grün in 75 s, 220 Dateien, 2370 Tests), Netz-Prüfung am PR nach dem Lauf des Jobs `check`.
 - 2026-11-17 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, nach Merge von `dev` (`f1cf467`, nur `ROADMAP.md`); Punkt 6 bleibt offen, weil seine erste Prüfung `test/handoff-page.test.ts` zählt, das sich ändern muss: Der Fall „escapes a name that carries markup“ schickte `<script>…` über `POST /v1/handoff` ohne `step`, was Punkt 1 jetzt mit 400 ablehnt (Annahme in `goals/konto/ANNAHMEN.md`, Goal 10, Entscheidung beim Tech Lead in der Kritik). Prüfbefehle: Punkt 1 `1`, `1`, `0`, `1`, `1`, `0`, vitest Exit 0 (9 Dateien, 112 Tests); Punkt 2 `exit=0` und `3 3`, gegen die Merge-Basis `f1cf467` `2 1`, `faelle ok`; Punkt 3 `exit=0` und `true 1 0`, `werte ok`, Mutationen `parseUsdc=1`, `JSON number 10000=1`, `parseUsdc=1`, `JSON number 10000=0` ohne `sed-miss`; Punkt 4 `1`, `1`, `1`, `1`, `1`, `0`, `0`; Punkt 5 `9`, `1`; Punkt 6 Pfadliste `1` (`test/handoff-page.test.ts`), `seite gleich`, `0`, `pakete gleich`, `goals gleich`, `0`, `node scripts/check.mjs` Exit 0 (grün in 57 s, 220 Dateien, 2370 Tests), Netz-Prüfung und Job `e2e` am PR #264 nach dem Push.
 - 2026-11-18 Zyklus 3: Punkt 6 nach der Kritik (Pfadliste um `test/handoff-page.test.ts` ergänzt, Commit `19919be` des Tech Lead) ohne Codeänderung ausgeführt und abgehakt, Abschluss gemeldet, Punkte 1 bis 6; `dev` `f1cf467` ist im Branch. Prüfbefehle: Punkt 5 `10`, `1`; Punkt 6 Pfadliste `0` (mit der alten Liste `1`), `seite gleich`, `0`, `pakete gleich`, `goals gleich`, `0`, `node scripts/check.mjs` Exit 0 (grün in 53 s, 220 Dateien, 2370 Tests), Netz-Prüfung und Job `e2e` am PR #264 nach dem Push; Punkte 1 bis 4 wie in Zyklus 2, Code seit `db13915` unverändert.
+- 2026-11-18 Release: PASS K und B (Zyklus 3), DONE.
 ## Blockers
