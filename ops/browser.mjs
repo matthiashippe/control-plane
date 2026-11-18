@@ -72,8 +72,14 @@ export function launch(chrome, profile, kind) {
   // Once the browser is gone every request fails at once: a request that waits for an answer that cannot come leaves the event
   // loop empty, and node then ends with exit 0 without a single line, a green check that rendered nothing.
   let gone = null;
+  // A caller that ends node without waiting for close() (the exit handlers of the Sepolia runs) would leave a browser that does
+  // not read the pipe running after node: kill it on the way out, and drop the listener once the browser ended, because a SOLL
+  // tool starts one browser per picture and would otherwise collect them (goals/konto/12, Punkt 3).
+  const killOnExit = () => { if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL"); };
+  process.once("exit", killOnExit);
   const exited = new Promise((resolve) => child.on("exit", resolve));
   exited.then(() => {
+    process.off("exit", killOnExit);
     gone = new Error(`browser exited: ${stderr.trim().split("\n").pop() ?? ""}`);
     for (const { fail } of waiting.values()) fail(gone);
     waiting.clear();
