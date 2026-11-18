@@ -3,7 +3,7 @@
  * bank account, after the SOLL sources docs/soll/src/money-<state>.html.
  *
  * Seven states. `deposit-approve` and `payout-approve` are the choice of the number as in konto 02 (block `approve`), saying what
- * happens; for an account that has set up a payout before, `payout-approve` adds the entry "Earlier approval" (SOLL state
+ * happens; for an account that has set up a payout before, `payout-approve` adds a third entry on the earlier approval (SOLL state
  * `payout-approve-revoke`, goals/konto/11), because the one tap of the passkey step also ends the permission set up before. `deposit-card` (block `card`) names amount and card and has the one button the script of the page opens the card
  * payment with. `payout-verify` (block `verify`) sends the person to Bridge to confirm their identity once, `payout-bank` (block
  * `bank`) asks for IBAN and account holder, `payout-passkey` (block `payout`) has the one button that signs with the existing
