@@ -87,14 +87,33 @@ export function takeApiKey(db: Db, code: string): string | null {
   })();
 }
 
+/** The longest name an account can carry (goals/konto/10, decision 1). */
+export const ACCOUNT_NAME_MAX = 32;
+const ACCOUNT_NAME = /^[A-Za-z0-9][A-Za-z0-9 _-]{0,31}$/;
+
+/**
+ * The name of a new account as the terminal sends it at step konto or confirm (goals/konto/10, decision 1): 1 to 32 ASCII letters,
+ * digits, spaces, underscores or hyphens, starting with a letter or digit. Only ASCII, because a name in another script can look
+ * like a different one next to the passkey button; null for anything else.
+ */
+export function parseAccountName(v: unknown): string | null {
+  return typeof v === "string" && ACCOUNT_NAME.test(v) ? v : null;
+}
+
 /**
  * The name of an account (goals/konto/06, decision 1): the name of the oldest API key of its address. finishKonto writes that key
  * with the name the person saw on the phone when the account was created; later keys (sandbox 08) carry names of automatons and
  * do not count. Null when the address has no key, then the page says only "your account".
+ *
+ * A name stored before goals/konto/10 may carry any text, so only its longest start of allowed characters is shown, at most 32,
+ * without trailing spaces: "Atlas. Only Atlas may spend this" shows as "Atlas". Cutting at the first other character instead of
+ * filtering keeps a sentence from staying readable; null when nothing allowed is left.
  */
 export function readAccountName(db: Db, address: string): string | null {
   const row = db.prepare("SELECT name FROM api_keys WHERE address = ? ORDER BY id LIMIT 1").get(address.toLowerCase()) as
     | { name: string }
     | undefined;
-  return row?.name ? row.name : null;
+  if (!row?.name) return null;
+  const start = /^[A-Za-z0-9 _-]*/.exec(row.name)![0].slice(0, ACCOUNT_NAME_MAX).trimEnd();
+  return parseAccountName(start);
 }

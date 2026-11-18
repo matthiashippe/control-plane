@@ -77,14 +77,14 @@ describe("POST /v1/handoff", () => {
     expect(rows[0].state).toBe("pending");
   });
 
-  it("refuses an empty name and one of 65 characters with 400, and takes one of 64", async () => {
+  it("refuses an empty name and one of 33 characters with 400, and takes one of 32", async () => {
     const { app } = handoffApp();
-    for (const name of ["", "x".repeat(65), 42, null, "line\nbreak"]) {
+    for (const name of ["", "x".repeat(33), 42, null, "line\nbreak"]) {
       const res = await post(app, { ...ATLAS, automaton_name: name });
       expect(res.status, JSON.stringify(name)).toBe(400);
       expect((await res.json()).error).toBe("invalid_handoff");
     }
-    expect((await post(app, { ...ATLAS, automaton_name: "x".repeat(64) })).status).toBe(201);
+    expect((await post(app, { ...ATLAS, automaton_name: "x".repeat(32) })).status).toBe(201);
   });
 
   it("refuses amounts that are no whole cents or no whole number with 400", async () => {

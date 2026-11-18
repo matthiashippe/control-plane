@@ -11,7 +11,7 @@ lesen kann. Gebaut in goals/konto/02, die Entscheidungen mit Grund stehen in `go
 
 | Feld | Typ | Regel |
 |---|---|---|
-| `automaton_name` | String | 1 bis 64 Zeichen, auf der Seite HTML-escaped |
+| `automaton_name` | String | Schritte `confirm` und `konto` (der Name des Kontos): 1 bis 32 ASCII-Buchstaben, Ziffern, Leerzeichen, `_` oder `-`, vorn Buchstabe oder Ziffer (`parseAccountName`); Schritte `deposit` und `payout`: 1 bis 64 Zeichen ohne Steuerzeichen (`parseName`); auf der Seite HTML-escaped |
 | `daily_limit_usdc` | String | ganze Zahl in atomaren USDC (6 Dezimalen), größer 0, Vielfaches von 10000 (ganze Cent) |
 | `amount_usdc` | String | wie `daily_limit_usdc`; die erste Zahlung |
 
@@ -25,7 +25,9 @@ Fehlt das Feld, gibt es kein 400; steht es da, wird es ohne Fehler übergangen, 
 Seite zeigt statt dessen den Namen des Kontos (account name): den Namen des ältesten Schlüssels des Kontos in `api_keys`, der beim
 Anlegen des Kontos entstand (`readAccountName` in `src/konto/account.ts`). Das Limit gilt für das ganze Konto, deshalb sagt die Seite
 „for your account Atlas“ und nie „only for“ einen Automaton; ohne Namen steht nur „your account“. Ein Text aus dem Terminal kommt auf
-diese Seite nicht. Die Schritte `confirm`, `konto`, `deposit` und `payout` verlangen `automaton_name` wie bisher.
+diese Seite nicht. Die Schritte `confirm`, `konto`, `deposit` und `payout` verlangen `automaton_name` wie bisher. Ein Name, der vor
+goals/konto/10 gespeichert wurde, erscheint nur bis zum ersten Zeichen außerhalb der Regel für `confirm` und `konto`, höchstens 32
+Zeichen: aus „Atlas. Only Atlas may spend this“ wird „Atlas“.
 
 `GET /v1/handoff` ohne Schlüssel beschreibt die Anfrage als JSON (Felder, Beispiel, Antwortfelder), für einen Agenten, der erst
 nachsieht, bevor er schreibt.
