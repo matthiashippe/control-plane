@@ -1,7 +1,7 @@
 # Abrechnung Goal 05: Quote nach außen nach sieben Tagen
 
 ## Status
-PLANNED
+ACTIVE
 
 ## Active Objective
 Die Timeout-Quote, die kanal und Seite nennen dürfen, ist gemessen: `ops/timeout-quote.sh --compare` läuft über den Zeitraum vom
@@ -71,7 +71,7 @@ Skalierung abbricht.
   (`check` prüft es).
 
 ## Done Condition
-- [ ] `--compare` und `--join` gleichen Anfragen und Zeilen nach Zeit sortiert in einem gleitenden Fenster ab, und kein Maximum oder
+- [x] `--compare` und `--join` gleichen Anfragen und Zeilen nach Zeit sortiert in einem gleitenden Fenster ab, und kein Maximum oder
       Minimum entsteht mehr mit Spread über eine Liste. `bash ops/timeout-quote.sh --selftest-scale` pflanzt ohne Netz 200000
       Caddy-Zeilen und 200000 passende Zeilen, fährt `--compare-files` darüber und gibt `ok   compare scale: 200000 requests` und als
       letzte Zeile `TIMEOUT QUOTE SCALE OK` aus, in unter 10 Sekunden. Mit dem Abgleich von heute bricht derselbe Lauf mit `RangeError`
@@ -81,7 +81,7 @@ Skalierung abbricht.
       Prüfung: `pnpm -s vitest run test/timeout-quote-scale.test.ts` muss Exit-Code 0 haben; der Test fährt `--selftest-scale` und
       verlangt die Zeile `ok   compare scale: 200000 requests`.
       Prüfung: `pnpm -s vitest run test/timeout-quote-compare.test.ts test/timeout-quote-selftest.test.ts` muss Exit-Code 0 haben.
-- [ ] `--compare` rechnet sich unabhängig gegen: Es gibt eine Zeile `check caddy: compare <Anfragen> <Timeouts>, join <Anfragen>
+- [x] `--compare` rechnet sich unabhängig gegen: Es gibt eine Zeile `check caddy: compare <Anfragen> <Timeouts>, join <Anfragen>
       <Timeouts>` und je Modell eine Zeile `check service <Modell>: compare <Anfragen> <Timeouts>, rows <Anfragen> <Timeouts>` aus, wobei
       `join` und `rows` aus den Modi `--join` und `--rows` über denselben Zeitraum stammen (beide beachten dafür `TQ_SINCE` und
       `TQ_UNTIL`). Weicht eine Zahl ab, endet der Lauf mit Exit 3, der Zeile `independent check failed: <welche>` auf stderr und ohne
@@ -95,7 +95,7 @@ Skalierung abbricht.
       Prüfung: `grep -cE "^\s*(it|test)\(.*independent" test/timeout-quote-compare.test.ts` muss mindestens 1 ausgeben.
       Prüfung: `pnpm -s vitest run test/timeout-quote-compare.test.ts` muss Exit-Code 0 haben.
       Prüfung: `grep -c "independent check failed" ops/timeout-quote.sh` muss mindestens 1 ausgeben.
-- [ ] `docs/abrechnung/timeouts.md` hat den Abschnitt `## Nach sieben Tagen`: der Befehl
+- [x] `docs/abrechnung/timeouts.md` hat den Abschnitt `## Nach sieben Tagen`: der Befehl
       `TQ_SINCE=2026-11-10T20:27:18Z TQ_UNTIL=2026-11-17T23:59:59Z bash ops/timeout-quote.sh --compare`, der Zeitraum in UTC, je Modell
       die Zeilen `caddy` und `service`, die Abweichung, die `check`-Zeilen, je Ursache eine Zeile mit Zahl und eine Zeile `Widerlegt:`.
       In der ganzen Datei steht genau eine Zeile `Quote nach außen:`, entweder
@@ -113,7 +113,7 @@ Skalierung abbricht.
       Prüfung: `sed -n '/^## Nach sieben Tagen/,/^## /p' docs/abrechnung/timeouts.md | grep -c "^Widerlegt: "` muss 1 ausgeben.
       Prüfung: `grep -c "^## Goal 05" goals/abrechnung/ANNAHMEN.md` muss 1 ausgeben.
       Prüfung: `grep -cE "0x[0-9a-fA-F]{40}|\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" docs/abrechnung/timeouts.md` muss 0 ausgeben.
-- [ ] Kritik: `ops/abort-purchase.sh` liest den Management-Key nur aus `~/.config/control-plane/openrouter-management.env` (0600),
+- [x] Kritik: `ops/abort-purchase.sh` liest den Management-Key nur aus `~/.config/control-plane/openrouter-management.env` (0600),
       nie aus der Umgebung oder aus `loop.env`. Der Test fährt das Skript ohne Netz mit einem `HOME` aus `mktemp`: Ein gepflanzter Key nur
       in `loop.env` oder nur in der Umgebung ergibt Exit 2 mit `OPENROUTER_MANAGEMENT_KEY missing`; eine Key-Datei mit 0644 ergibt Exit 2;
       eine Key-Datei mit 0600 kommt an der Key-Stufe vorbei und endet ohne `CP_HOST` mit Exit 2 und `CP_HOST and CP_SSH_KEY are not set`.
@@ -125,7 +125,7 @@ Skalierung abbricht.
       Prüfung: `grep -c '^OPENROUTER_MANAGEMENT_KEY=' ~/.config/control-plane/loop.env` muss 0 ausgeben.
       Prüfung: `stat -c %a ~/.config/control-plane/openrouter-management.env` muss `600` ausgeben.
       Prüfung: `bash ops/abort-purchase.sh --selftest` muss Exit-Code 0 haben.
-- [ ] Kritik: Der Einkauf je Abbruch ohne Antwort ist über dieselben Tage gemessen wie `--compare`. `docs/abrechnung/einkauf-abbrueche.md`
+- [x] Kritik: Der Einkauf je Abbruch ohne Antwort ist über dieselben Tage gemessen wie `--compare`. `docs/abrechnung/einkauf-abbrueche.md`
       hat den Abschnitt `## Nach sieben Tagen` mit dem Befehl `AP_SINCE=2026-11-10 AP_NOW=2026-11-18T00:00:00Z bash ops/abort-purchase.sh`,
       der Tabelle, den Zeilen `noise`, `baseline` und `purchase without sale` und genau einer Zeile
       `Einkauf je Abbruch ohne Antwort: <mc> mc (<n> Abbrüche, 10.11. bis 17.11.2026)` oder `Einkauf je Abbruch ohne Antwort: keine Zahl,
@@ -139,7 +139,7 @@ Skalierung abbricht.
       Prüfung: `grep -cE "^Einkauf je Abbruch ohne Antwort: ([0-9]+ mc \([0-9]+ Abbrüche, 10\.11\. bis 17\.11\.2026\)|keine Zahl, weil )" docs/abrechnung/einkauf-abbrueche.md` muss 1 ausgeben.
       Prüfung: `grep -cE "^Einkauf je Abbruch ohne Antwort: " docs/abrechnung/timeouts.md` muss 1 ausgeben.
       Prüfung: `grep -cE "0x[0-9a-fA-F]{40}|\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" docs/abrechnung/einkauf-abbrueche.md` muss 0 ausgeben.
-- [ ] Der Laufzeitpfad bleibt unverändert, und `check` ist grün.
+- [x] Der Laufzeitpfad bleibt unverändert, und `check` ist grün.
       Prüfung: `git diff --name-only origin/dev...HEAD -- src deploy | wc -l` muss 0 ausgeben.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
 - [ ] goal-verifier PASS (K und B)
@@ -162,5 +162,6 @@ Skalierung abbricht.
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-18 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6 gebaut: `ops/timeout-quote.sh` gleicht in `--compare` und `--join` Anfragen und Zeilen nach Zeit sortiert im Fenster ab (Binärsuche, Gleichstand an die frühere Zeile), Ende des Zeitraums mit `reduce`, `--selftest-scale` mit 200000 Anfragen; `--compare` rechnet `caddy` gegen den Join und `service` je Modell gegen `--rows` über denselben Zeitraum (`--join`, `--rows`, `--since-rollout` lesen jetzt `TQ_SINCE` und `TQ_UNTIL`), Exit 3 mit `independent check failed: <welche>` vor jeder Ursachenzeile; Grenzregel in `ANNAHMEN.md` Goal 05; gemessen 18.11.2026 00:17 UTC: 1220 Anfragen, 0 Timeouts in beiden Messungen, Gegenrechnung gleich, `Quote nach außen: 0,0 % (0 von 1220 …)` neben vorher 3 von 224; Einkauf je Abbruch über 10. bis 17.11.: keine Zahl wegen `noise` am 10.11. bei `openai/gpt-5.2`, daneben 8558 mc für 20 Abbrüche ohne den 10.11.; Punkt 4 lag seit der Reparatur vom 13.11.2026 gebaut vor. Rot vorher: Scale mit dem Abgleich von `origin/dev` auf denselben 200000 Zeilen `timeout 10` Exit 124, ohne Zeitlimit nach 3 min 52 s `RangeError: Maximum call stack size exceeded`; `test/timeout-quote-scale.test.ts` und die drei neuen Fälle `independent` in `test/timeout-quote-compare.test.ts` mit dem Skript von `origin/dev` 4 failed von 12; Selftest `compare check boundary` mit einem Join nach dem Ende der Anfrage `FAIL` (`check caddy: compare 1 0, join 2 0`, Exit 3); dieselbe Verfälschung (bediente Wiederholung als Paar) im Skript von `origin/dev` Exit 0 mit `cause`-Zeilen, die Summenprobe bleibt stumm (service 2 statt 1); `test/abort-purchase-key-file.test.ts` mit dem Skript von 57acba8 4 failed von 6, erster Fall „Key nur in `loop.env`“ rot. Prüfbefehle: P1 `timeout 10 … --selftest-scale` Exit 0, letzte Zeile `TIMEOUT QUOTE SCALE OK`; `Math.(max|min)(...` -> 0; vitest scale Exit 0; vitest compare und selftest Exit 0. P2 `--selftest` Exit 0, letzte Zeile `TIMEOUT QUOTE SELFTEST OK`; `^ok   compare check` -> 6; `independent` im Test -> 3; vitest compare Exit 0; `independent check failed` -> 2. P3 (Netz) `^check service openai/` -> 2; `## Nach sieben Tagen` -> 1; Befehl -> 1; Tabellenzeilen -> 4; `check`-Zeilen -> 3; `Quote nach außen:` -> 1 und 1; `Widerlegt:` -> 1; `## Goal 05` -> 1; Adressen -> 0. P4 vitest Exit 0; `openrouter-management.env` -> 2; `loop.env` -> 0; `stat` -> 600; `--selftest` Exit 0. P5 (Netz) `^purchase without sale ` -> 2; `## Nach sieben Tagen` -> 1; Befehl -> 1; Zeile -> 1; in `timeouts.md` -> 1; Adressen -> 0. P6 `git diff --name-only origin/dev...HEAD -- src deploy | wc -l` -> 0; `node scripts/check.mjs` Exit 0 (2353 passed, grün in 87 s).
 
 ## Blockers
