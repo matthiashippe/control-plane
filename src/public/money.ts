@@ -4,8 +4,8 @@
  *
  * Seven states. `deposit-approve` and `payout-approve` are the choice of the number as in konto 02 (block `approve`), saying what
  * happens; for an account that has set up a payout before, `payout-approve` adds a third entry on the earlier approval (SOLL state
- * `payout-approve-revoke`, goals/konto/11), because the one tap of the passkey step also ends the permission set up before. `deposit-card` (block `card`) names amount and card and has the one button the script of the page opens the card
- * payment with. `payout-verify` (block `verify`) sends the person to Bridge to confirm their identity once, `payout-bank` (block
+ * `payout-approve-revoke`, goals/konto/11), because the one tap of the passkey step also ends the permission set up before.
+ * `deposit-card` (block `card`) names amount and card and has the one button the script of the page opens the card payment with. `payout-verify` (block `verify`) sends the person to Bridge to confirm their identity once, `payout-bank` (block
  * `bank`) asks for IBAN and account holder, `payout-passkey` (block `payout`) has the one button that signs with the existing
  * passkey; with an earlier permission its button carries the hash and nonce of the revoke the same tap signs (goals/konto/11).
  * Bank and passkey step count three steps, or two when Bridge had checked the person before and the identity step was
