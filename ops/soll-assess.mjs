@@ -242,12 +242,13 @@ export function summaryLimit(results) {
 // ("passkey", "IBAN", "card", "identity", Bridge and MoonPay are known words).
 
 /** The states of money in and out, each one source docs/soll/src/money-<state>.html and two pictures. */
-export const MONEY_STATES = Object.freeze(["deposit-approve", "deposit-card", "payout-approve", "payout-verify", "payout-bank", "payout-passkey", "retry"]);
+export const MONEY_STATES = Object.freeze(["deposit-approve", "deposit-card", "payout-approve", "payout-approve-revoke", "payout-verify", "payout-bank", "payout-passkey", "retry"]);
 /** The block of each state that has to end in the first screen, as its data-soll value. */
 export const MONEY_BLOCKS = Object.freeze({
   "deposit-approve": "approve",
   "deposit-card": "card",
   "payout-approve": "approve",
+  "payout-approve-revoke": "approve",
   "payout-verify": "verify",
   "payout-bank": "bank",
   "payout-passkey": "payout",
