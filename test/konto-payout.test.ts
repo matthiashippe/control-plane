@@ -647,3 +647,76 @@ describe("the earlier permission ends with the same passkey", () => {
     expect(s.node.nonces.size).toBe(0);
   });
 });
+
+/**
+ * goals/konto/11, critique: a revoke that went out and did not end the old permission is never sent a second time. Either handleOps
+ * reverts (the wallet already used the nonce the passkey signed) or it goes through while its execute reverts inside, and the chain
+ * still approves the old permission. Both answer 502 in stage retire, drop retire_revoke and keep the retire; the next payout asks
+ * for the phone without a transaction, because only a new tap can end the permission of the old key.
+ */
+describe("a revoke that does not end the old permission", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const revokeRow = (s: MoneySetup, address: string) =>
+    (s.db.prepare("SELECT retire_revoke FROM konto_payouts WHERE address = ?").get(address.toLowerCase()) as { retire_revoke: string | null }).retire_revoke;
+
+  /** An account that paid with the old key, then a new gas key and one phone handoff whose revoke waits in retire_revoke. */
+  async function waitingRevoke() {
+    const s = moneySetup();
+    const a = await ready(s, 30n);
+    const oldForwarder = expectedForwarder(a.address, a.destination, s.gas.address);
+    expect((await payout(s, a.key, { amount_usd: "10.00" })).status).toBe(200);
+    expect(s.node.sent).toHaveLength(3);
+    const b = withNewGasKey(s);
+    const p = await toPasskey(b, a);
+    const newForwarder = expectedForwarder(a.address, s.bridge.state.liquidation.at(-1)!, b.gas.address);
+    expect(p.spender).toBe(newForwarder);
+    expect((await json(b, `/h/${p.h.code}/payout`, await payoutPermission(a.owner, a.address, newForwarder, { salt: 100n }))).status).toBe(200);
+    const waiting = retireRow(s, a.address);
+    expect(waiting.retire_forwarder?.toLowerCase()).toBe(oldForwarder);
+    expect(revokeRow(s, a.address)).not.toBeNull();
+    return { s, b, a, oldForwarder, waiting };
+  }
+
+  async function expectDroppedAndPhoneAsked(w: Awaited<ReturnType<typeof waitingRevoke>>, sentAfterRevoke: number) {
+    const { s, b, a, waiting } = w;
+    expect(revokeRow(s, a.address)).toBeNull();
+    expect(retireRow(s, a.address)).toEqual(waiting);
+    expect(s.node.approved.has(`${a.address}:99`)).toBe(true);
+    const lines = logLines();
+    const again = await payout(b, a.key, { amount_usd: "5.00" });
+    expect(again.status).toBe(409);
+    expect(await again.json()).toMatchObject({ error: "payout_needs_phone" });
+    expect(s.node.sent).toHaveLength(sentAfterRevoke);
+    expect(lines().filter((l) => l.includes("retire waits for the phone for"))).toHaveLength(1);
+    expect(retireRow(s, a.address)).toEqual(waiting);
+  }
+
+  it("drops the revoke and asks for the phone when its handleOps reverts, because the wallet already used that nonce", async () => {
+    const w = await waitingRevoke();
+    const { s, b, a } = w;
+    // The wallet sent another user operation with the nonce the passkey signed, so this one can never validate again.
+    s.node.nonces.set(a.address, 1n);
+    const broken = await payout(b, a.key, { amount_usd: "5.00" });
+    expect(broken.status).toBe(502);
+    expect(await broken.json()).toMatchObject({ error: "payout_failed", stage: "retire" });
+    expect(s.node.sent.slice(3)).toEqual([{ kind: "other", to: ENTRY_POINT_V06 }]);
+    expect(s.node.nonces.get(a.address)).toBe(1n);
+    await expectDroppedAndPhoneAsked(w, 4);
+  });
+
+  it("drops the revoke and asks for the phone when the chain still approves the old permission after handleOps", async () => {
+    const w = await waitingRevoke();
+    const { s, b, a } = w;
+    s.node.entryPoint.innerReverts = true;
+    const broken = await payout(b, a.key, { amount_usd: "5.00" });
+    expect(broken.status).toBe(502);
+    expect(await broken.json()).toMatchObject({ error: "payout_failed", stage: "retire" });
+    expect(s.node.sent.slice(3)).toEqual([{ kind: "other", to: ENTRY_POINT_V06 }]);
+    // The user operation validated and used its nonce; only its revoke did not happen.
+    expect(s.node.nonces.get(a.address)).toBe(1n);
+    await expectDroppedAndPhoneAsked(w, 4);
+  });
+});

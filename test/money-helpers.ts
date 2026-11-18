@@ -132,6 +132,8 @@ export interface Sent {
  * operation whose callData is execute(SpendPermissionManager, 0, revoke(p)) for the wallet's own permission, with the wallet's
  * nonce and a SignatureWrapper (ownerIndex 0) whose signature over getUserOperationHash recovers to the wallet's owner in
  * `owners`. Such a one ends p and counts the nonce up (`kind: "revoke"`); anything else reverts like a failed validation.
+ * With `entryPoint.innerReverts` the operation validates and its nonce counts up, but its execute reverts inside handleOps, as the
+ * EntryPoint v0.6 does it: the transaction goes through, p stays approved, and it is recorded as `kind: "other"`.
  */
 export function payoutNode(owners: Map<string, string> = new Map()) {
   const balances = new Map<string, bigint>();
@@ -142,6 +144,7 @@ export function payoutNode(owners: Map<string, string> = new Map()) {
   const sent: Sent[] = [];
   const reverted = new Set<string>();
   const nonces = new Map<string, bigint>();
+  const entryPoint = { innerReverts: false };
   let n = 0;
   const hashOf = () => `0x${String(++n).padStart(64, "0")}` as Hex;
   const key = (p: { salt: bigint; account: string }) => `${p.account.toLowerCase()}:${p.salt}`;
@@ -233,7 +236,10 @@ export function payoutNode(owners: Map<string, string> = new Map()) {
               const call = decodeFunctionData({ abi: entryPoint06Abi, data: tx.data! });
               const ops = call.functionName === "handleOps" ? (call.args[0] as Parameters<typeof revokeOf>[0][]) : [];
               const p = ops.length === 1 ? await revokeOf(ops[0]).catch(() => null) : null;
-              if (p) {
+              if (p && entryPoint.innerReverts) {
+                nonces.set(p.account.toLowerCase(), (nonces.get(p.account.toLowerCase()) ?? 0n) + 1n);
+                sent.push({ kind: "other", to });
+              } else if (p) {
                 approved.delete(key(p));
                 nonces.set(p.account.toLowerCase(), (nonces.get(p.account.toLowerCase()) ?? 0n) + 1n);
                 sent.push({ kind: "revoke", to, target: p.spender.toLowerCase(), salt: p.salt });
@@ -282,7 +288,7 @@ export function payoutNode(owners: Map<string, string> = new Map()) {
     },
     { retryCount: 0 },
   );
-  return { balances, code, approved, callers, nonces, sent, transport };
+  return { balances, code, approved, callers, nonces, entryPoint, sent, transport };
 }
 
 /** Bridge without a network: records every request; `kycStatus` is what the identity check reports. */
