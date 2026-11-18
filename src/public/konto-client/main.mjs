@@ -2,7 +2,8 @@
 //
 // - `konto-passkey` (konto 03): one tap runs flow.mjs, creates the account and sends the result to POST /h/{code}/konto. With
 //   data-mode="limit" (konto 04) the passkey the account already has signs the new limit for POST /h/{code}/limit, with
-//   data-mode="payout" (konto 05) the second permission for POST /h/{code}/payout.
+//   data-mode="payout" (konto 05) the second permission for POST /h/{code}/payout, with data-revoke-hash (konto 11) in the same
+//   tap the revoke of the permission it replaces.
 // - `konto-retry` (konto 05, point 7): after a 503 signature_check_unavailable the page kept what it sent in sessionStorage and
 //   came to /h/{code}/retry; the tap sends the very same body to the same route again, without a second passkey or signup.
 // - `money-card` (konto 05): the passkey of the account opens the card payment of MoonPay for its smart wallet.
@@ -58,7 +59,8 @@ export function wirePage(env) {
 
   onTap(document.getElementById("konto-passkey"), async (d, code) => {
     const page = { proxyId: d.proxy || "", limit: d.limit || "", chainId: Number(d.chain), spender: d.spender || "", token: d.token || "" };
-    const existing = { ...page, account: d.account || "", owner: d.owner || "", org: d.org || "" };
+    // data-revoke-hash and data-revoke-nonce (goals/konto/11): the earlier permission this payout setup ends with the same tap.
+    const existing = { ...page, account: d.account || "", owner: d.owner || "", org: d.org || "", revokeHash: d.revokeHash || "", revokeNonce: d.revokeNonce || "" };
     const route = d.mode === "limit" ? "limit" : d.mode === "payout" ? "payout" : "konto";
     const { body } = route === "limit" ? await runLimit(env, existing) : route === "payout" ? await runPayout(env, existing) : await runKonto(env, page);
     follow(code, await submitSigned(env, code, route, body));

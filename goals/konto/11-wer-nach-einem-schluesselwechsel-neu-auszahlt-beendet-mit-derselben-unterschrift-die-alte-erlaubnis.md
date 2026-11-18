@@ -1,7 +1,7 @@
 # Konto Goal 11: Wer nach einem Schlüsselwechsel neu auszahlt, beendet mit derselben Unterschrift die alte Erlaubnis
 
 ## Status
-PLANNED
+DONE
 
 ## Active Objective
 Nach einem Leck des Gasschlüssels bewegt niemand mehr Geld eines Kunden über eine Erlaubnis, die er abgelöst hat. Heute bleibt sie
@@ -124,7 +124,7 @@ das heute für das Geld auf dem Konto des Kunden nicht gilt.
   Weiterleitung), ein Abschalten der Auszahladresse bei Bridge, ein Widerruf der ersten Erlaubnis (Tageslimit), ein Paymaster.
 
 ## Done Condition
-- [ ] `docs/konto/euro.md` klärt aus der Doku von Bridge, ob eine abgelöste Auszahladresse abgeschaltet wird und was mit USDC
+- [x] `docs/konto/euro.md` klärt aus der Doku von Bridge, ob eine abgelöste Auszahladresse abgeschaltet wird und was mit USDC
       geschieht, das danach ankommt, nennt die Doku von Turnkey zu `sign_raw_payloads`, und der Abschnitt zum Wechsel des
       Gasschlüssels beschreibt den Widerruf über den Handoff statt ihn dem Kunden zu überlassen.
       MVP: Funktion, weil erst diese Antwort zeigt, ob nach dem Widerruf noch ein zweiter Weg zum Geld des Kunden offen ist.
@@ -134,7 +134,7 @@ das heute für das Geld auf dem Konto des Kunden nicht gilt.
       Prüfung: `grep -cE 'sign_raw_payloads|SIGN_RAW_PAYLOADS' docs/konto/euro.md` muss mindestens `1` ausgeben.
       Prüfung: `grep -c 'der Server tut es nicht' docs/konto/euro.md` muss genau `0` ausgeben.
       Prüfung: `awk '/^## Wechsel des Gasschlüssels$/{f=1;next} /^## /{f=0} f' docs/konto/euro.md | grep -cE 'revoke|retire_revoke'` muss mindestens `1` ausgeben.
-- [ ] Die zwei SOLL-Bilder des Zustands `payout-approve-revoke` kommen aus ihrer Quelle, ohne Netz und ohne Mangel, der Block steht ganz
+- [x] Die zwei SOLL-Bilder des Zustands `payout-approve-revoke` kommen aus ihrer Quelle, ohne Netz und ohne Mangel, der Block steht ganz
       im ersten Bildschirm, nennt die frühere Freigabe, und alle anderen Geld-Bilder bleiben Byte für Byte.
       MVP: Funktion, weil die Seite nur nach Bild gebaut werden darf und der Mensch vor dem Tipp sehen muss, dass er die frühere
       Freigabe beendet.
@@ -144,11 +144,11 @@ das heute für das Geld auf dem Konto des Kunden nicht gilt.
       Prüfung: `git diff --quiet --diff-filter=DMR origin/dev...HEAD -- 'docs/soll/money-*' 'docs/soll/src/money-*' && echo geld gleich` muss `geld gleich` ausgeben.
       Prüfung: `T=$(mktemp -d); cp docs/soll/src/money-*.html $T/; sed -i '0,/<h1>/s/<h1>/<h1>X /' $T/money-payout-approve-revoke.html; grep -q '<h1>X ' $T/money-payout-approve-revoke.html || echo sed-miss; PATH=/usr/bin:$PATH node ops/soll-money.mjs --check --source $T > $T/out 2>&1; echo "exit=$?" >> $T/out; grep -cE '^(soll money: defect payout-approve-revoke (390|1440): [0-9]+ pixels differ from a fresh render|exit=1)$' $T/out` muss `3` ausgeben und darf `sed-miss` nicht ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/soll-money.test.ts test/soll-flags.test.ts test/soll-fonts.test.ts` muss Exit-Code 0 haben.
-- [ ] Der Design Reviewer hat die zwei neuen Bilder abgenommen, bevor sich `src/public/money.ts` änderte.
+- [x] Der Design Reviewer hat die zwei neuen Bilder abgenommen, bevor sich `src/public/money.ts` änderte.
       MVP: Funktion, weil die Seite 1:1 nach einem abgenommenen Bild entsteht und nicht nach einer Beschreibung.
       Prüfung: `grep -cE '^Abnahme-Issue payout-revoke: PRO-[0-9]+$' docs/soll/README.md` muss genau `1` ausgeben.
       Prüfung (Netz): `i=$(sed -n 's/^Abnahme-Issue payout-revoke: //p' docs/soll/README.md); t=$(git log -1 --format=%cI -- 'docs/soll/money-payout-approve-revoke-*.png' 'docs/soll/src/money-payout-approve-revoke.html'); b=$(git log --reverse --format=%cI origin/dev..HEAD -- src/public/money.ts | head -1); curl -s -H "Authorization: Bearer $PAPERCLIP_API_KEY" "$PAPERCLIP_API_URL/api/issues/$i/comments" | T="$t" B="$b" node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{const t=Date.parse(process.env.T);const ok=JSON.parse(d).filter(c=>c.authorAgentId==="3412a0ea-cbf5-4f18-9360-0e8e20ba3313"&&/SOLL abgenommen/.test(c.body)).map(c=>Date.parse(c.createdAt));if(!process.env.T||!ok.some(x=>x>t)){console.error("keine abnahme nach "+process.env.T);process.exit(1)}if(process.env.B&&!(Math.min(...ok)<Date.parse(process.env.B))){console.error("gebaut vor der abnahme "+process.env.B);process.exit(1)}console.log("abnahme ok "+ok.length)})'` muss `abnahme ok <n>` mit n mindestens 1 ausgeben.
-- [ ] Server, Datenbank und Kette: `POST /h/{code}/payout` verlangt mit abzulösender Erlaubnis einen Widerruf, den der Eigentümer
+- [x] Server, Datenbank und Kette: `POST /h/{code}/payout` verlangt mit abzulösender Erlaubnis einen Widerruf, den der Eigentümer
       unterschrieben hat, `finishPayout` speichert ihn in `retire_revoke`, und `sendPayout` schickt ihn über `handleOps` und verwirft
       `retire_*` erst, wenn `isApproved` falsch ist.
       MVP: Funktion, weil an dieser Stelle die Widerlegung hängt: Eine abgelöste Erlaubnis mit fremdem `caller` darf nicht mehr
@@ -159,7 +159,7 @@ das heute für das Geld auf dem Konto des Kunden nicht gilt.
       Prüfung: `grep -cE 'retire_revoke +TEXT|ADD COLUMN retire_revoke' src/db.ts` muss mindestens `1` ausgeben.
       Prüfung: `grep -c 'retire waits for the phone for' src/konto/payout.ts` muss mindestens `1` ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/konto-payout.test.ts test/konto-payout-guard.test.ts test/konto-payout-pending.test.ts test/konto-payout-rule.test.ts test/mcp-money.test.ts test/money-adversarial.test.ts` muss Exit-Code 0 haben.
-- [ ] Vier Fälle in `test/konto-payout.test.ts` decken Widerruf nach neuem Schlüssel, wartendes `retire_*` ohne Widerruf, Handoff ohne
+- [x] Vier Fälle in `test/konto-payout.test.ts` decken Widerruf nach neuem Schlüssel, wartendes `retire_*` ohne Widerruf, Handoff ohne
       Widerruf und die erste Einrichtung ab; gegen den Stand der Merge-Basis sind genau drei rot.
       MVP: Funktion, weil erst der rote Lauf am alten Code zeigt, dass die Fälle den Fehler treffen, und der Wächter festhält, dass die
       erste Auszahlung keine zweite Unterschrift verlangt.
@@ -167,7 +167,7 @@ das heute für das Geld auf dem Konto des Kunden nicht gilt.
       Prüfung: `B=$(git merge-base origin/dev HEAD); T=$(mktemp -d); git archive $B | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; cp test/konto-payout.test.ts test/money-helpers.ts test/handoff-helpers.ts $T/test/; (cd $T && PATH=/usr/bin:$PATH pnpm -s vitest run test/konto-payout.test.ts --reporter=json --outputFile=r.json >/dev/null 2>&1); node -e 'const r=require(process.argv[1]);const a=r.testResults.flatMap(f=>f.assertionResults).filter(x=>x.ancestorTitles.includes("the earlier permission ends with the same passkey"));console.log(a.filter(x=>x.status!=="passed").length, a.filter(x=>x.status==="passed").length)' $T/r.json` muss genau `3 1` ausgeben.
       Prüfung: `node -e 'const s=require("fs").readFileSync("test/konto-payout.test.ts","utf8");const miss=["withNewGasKey","data-revoke-hash","payout_needs_phone","permission_refused","isApproved","\"revoke\"","Earlier approval","retire_forwarder"].filter(x=>!s.includes(x));if(miss.length){console.error(miss);process.exit(1)}console.log("faelle ok")'` muss `faelle ok` ausgeben.
       Prüfung: `node -e 'const s=require("fs").readFileSync("test/money-helpers.ts","utf8");const miss=["handleOps","getNonce","getUserOperationHash","revoke"].filter(x=>!s.includes(x));if(miss.length){console.error(miss);process.exit(1)}console.log("knoten ok")'` muss `knoten ok` ausgeben.
-- [ ] Seite und Client: `payout-approve` zeigt mit abzulösender Erlaubnis die Zeile aus dem Bild, `payout-passkey` trägt Hash und Nonce
+- [x] Seite und Client: `payout-approve` zeigt mit abzulösender Erlaubnis die Zeile aus dem Bild, `payout-passkey` trägt Hash und Nonce
       des Widerrufs, der Client unterschreibt beide Hashes mit einem Passkey-Tipp, und die echte Seite ist in allen acht Geld-Zuständen
       pixelgleich mit den Bildern.
       MVP: Funktion, weil der Kunde nur einmal tippen soll und sehen muss, was dieser Tipp beendet.
@@ -177,11 +177,11 @@ das heute für das Geld auf dem Konto des Kunden nicht gilt.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/konto-client.test.ts test/konto-client-deposit.test.ts test/konto-client-limit.test.ts test/soll-money.test.ts` muss Exit-Code 0 haben.
       Prüfung: `T=$(mktemp -d); PATH=/usr/bin:$PATH node --import tsx ops/soll-live-money.mjs --out $T && PATH=/usr/bin:$PATH node ops/soll-money.mjs --check --source $T > $T/o 2>&1; echo "exit=$?"; tail -n 1 $T/o | grep -cE '^soll money: 16 images, blocks end 390=[0-9]+ 1440=[0-9]+, 0 defects$'` muss genau die zwei Zeilen `exit=0` und `1` ausgeben.
       Prüfung: `T=$(mktemp -d); git archive HEAD | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; grep -n 'Earlier approval' $T/src/public/money.ts | head -1 | cut -d: -f1 > $T/n; test -s $T/n || echo sed-miss; sed -i "$(cat $T/n)s/Earlier approval/Earlier approvaL/" $T/src/public/money.ts; (cd $T && PATH=/usr/bin:$PATH node --import tsx ops/soll-live-money.mjs --out $T/out); PATH=/usr/bin:$PATH node ops/soll-money.mjs --check --source $T/out; echo "exit=$?"` muss als letzte Zeile `exit=1` ausgeben und darf `sed-miss` nicht ausgeben.
-- [ ] Die Entscheidungen stehen mit Grund in `goals/konto/ANNAHMEN.md`.
+- [x] Die Entscheidungen stehen mit Grund in `goals/konto/ANNAHMEN.md`.
       MVP: Funktion, weil die Linsen und die nächsten Goals der Kette gegen diese Annahmen prüfen.
       Prüfung: `awk '/^## Goal 11/{f=1;next} /^## /{f=0} f' goals/konto/ANNAHMEN.md | grep -cE "^- .+, weil .+"` muss mindestens `6` ausgeben.
       Prüfung: `awk '/^## Goal 11/{f=1;next} /^## /{f=0} f' goals/konto/ANNAHMEN.md | grep -cE 'maxFeePerGas.+0|handleOps'` muss mindestens `1` ausgeben.
-- [ ] Der Diff bleibt in den Pfaden dieses Goals, Verträge, Weiterleitung und die übrigen Geld-Bilder bleiben gleich, kein Test wird
+- [x] Der Diff bleibt in den Pfaden dieses Goals, Verträge, Weiterleitung und die übrigen Geld-Bilder bleiben gleich, kein Test wird
       schwächer, kein neues Paket, kein Schlüssel im Diff, keine andere Goal-Datei geändert, und `check` ist grün.
       MVP: Funktion, weil `src/**` mit dem Merge ausrollt und zahlende Kunden den Stand tragen.
       Prüfung: `git diff --name-only origin/dev...HEAD | grep -vE '^(src/konto/payout\.ts|src/handoff/routes\.ts|src/db\.ts|src/public/money\.ts|src/public/konto-client/(flow|main)\.mjs|src/public/konto-client/konto\.js|test/(konto-payout|konto-payout-guard|konto-payout-pending|konto-payout-rule|mcp-money|money-adversarial|konto-client|konto-client-deposit|konto-client-limit|soll-money)\.test\.ts|test/(money|handoff)-helpers\.ts|docs/konto/euro\.md|docs/soll/README\.md|docs/soll/money-payout-approve-revoke-(390|1440)\.png|docs/soll/src/money-payout-approve-revoke\.html|ops/soll-(money|assess|live-money)\.mjs|goals/konto/11-wer-nach-einem-schluesselwechsel-neu-auszahlt-beendet-mit-derselben-unterschrift-die-alte-erlaubnis\.md|goals/konto/verdicts/11-[A-Za-z0-9._-]+\.md|goals/konto/ANNAHMEN\.md|goals/_vorschlaege/konto-[a-z0-9.-]+\.md)$' | wc -l` muss `0` ausgeben.
@@ -192,7 +192,17 @@ das heute für das Geld auf dem Konto des Kunden nicht gilt.
       Prüfung: `git diff origin/dev...HEAD | grep -E '^[+]' | grep -iE "(api[_-]?key|secret|token|private[_-]?key)[\"' ]*[:=] *[\"']?[A-Za-z0-9_+/=-]{16,}|BEGIN [A-Z ]*PRIVATE KEY|cnwy_k_[A-Za-z0-9_-]{16,}" | wc -l` muss `0` ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung (Netz): `n=$(gh pr list -R matthiashippe/control-plane --head goal/konto-11 --state open --json number -q '.[0].number'); gh pr checks "$n" -R matthiashippe/control-plane | awk -F'\t' '$1=="check" && $2=="pass"' | wc -l` muss mindestens `1` ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] Kritik: Ein Widerruf, der die alte Erlaubnis nicht beendet, geht nie ein zweites Mal raus. Zwei Fälle in einem eigenen
+      `describe("a revoke that does not end the old permission", …)` in `test/konto-payout.test.ts` (nicht im `describe` aus Punkt 5,
+      dessen Zähler bleiben): `it("… when its handleOps reverts …")` (etwa eine Nonce, die die Wallet schon verbraucht hat) und
+      `it("… when the chain still approves the old permission after handleOps …")`. In beiden antwortet `POST /v1/konto/payout` 502
+      mit `stage: "retire"`, danach ist `retire_revoke` leer und `retire_forwarder` unverändert, und der nächste `POST /v1/konto/payout`
+      antwortet 409 `payout_needs_phone` ohne eine weitere Transaktion.
+      MVP: Funktion, weil `runPayoutRules` sonst bei jedem fälligen Lauf dieselbe tote User Operation mit unserem Gas schickt oder
+      `retire_*` leert, während die alte Erlaubnis freigeschaltet bleibt, und genau diese zwei Zweige aus Entscheidung 5 ohne Test sind.
+      Prüfung: `T=$(mktemp -d); PATH=/usr/bin:$PATH pnpm -s vitest run test/konto-payout.test.ts --reporter=json --outputFile=$T/r.json >/dev/null 2>&1; echo "exit=$?"; node -e 'const r=require(process.argv[1]);const a=r.testResults.flatMap(f=>f.assertionResults).filter(x=>x.ancestorTitles.includes("a revoke that does not end the old permission")&&/when its handleOps reverts|when the chain still approves the old permission after handleOps/.test(x.title));console.log(a.length, a.filter(x=>x.status==="passed").length)' $T/r.json` muss genau `exit=0` und `2 2` ausgeben.
+      Prüfung: `T=$(mktemp -d); git archive HEAD | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; grep -c 'SET retire_revoke = NULL WHERE' $T/src/konto/payout.ts; sed -i 's/SET retire_revoke = NULL WHERE/SET retire_revoke = retire_revoke WHERE/' $T/src/konto/payout.ts; (cd $T && PATH=/usr/bin:$PATH pnpm -s vitest run test/konto-payout.test.ts --reporter=json --outputFile=r.json >/dev/null 2>&1); node -e 'const r=require(process.argv[1]);const a=r.testResults.flatMap(f=>f.assertionResults).filter(x=>x.ancestorTitles.includes("a revoke that does not end the old permission")&&/when its handleOps reverts|when the chain still approves the old permission after handleOps/.test(x.title));console.log(a.filter(x=>x.status!=="passed").length, a.filter(x=>x.status==="passed").length)' $T/r.json` muss genau die zwei Zeilen `2` und `2 0` ausgeben.
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Nach einem neuen Gasschlüssel beendet der eine Passkey-Tipp für die neue IBAN auch die alte Erlaubnis, und die Kette bestätigt es
@@ -230,5 +240,10 @@ das heute für das Geld auf dem Konto des Kunden nicht gilt.
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-18 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6, 7, 8 gebaut: Bridge-Doku und Widerruf in `docs/konto/euro.md`, SOLL `payout-approve-revoke` (abgenommen auf PRO-24730 um 02:13:39Z, `src/public/money.ts` erst ab 02:18:14Z), Widerruf als User Operation über `handleOps` mit `retire_revoke`, vier Fälle, Seite und Client mit einem Tipp für beide Hashes, Annahmen; neue Tests waren rot: Fälle 1 bis 3 gegen die Merge-Basis (`3 1`), der Client-Fall `SIGN_RAW_PAYLOADS` gegen den Client vor Punkt 6. Prüfbefehle: P1 Links 5, Stand 5, usdc 4, sign_raw_payloads 2, alter Satz 0, revoke 5; P2 `exit=0` und `1` (16 Bilder, 390=655, 1440=684), `breiten ok`, `zeile ok`, `geld gleich`, Gegenprobe `3` ohne `sed-miss`, vitest Exit 0; P3 `1`, `abnahme ok 1`; P4 1, 1, 6, 2, 1, vitest Exit 0; P5 `exit=0` `4 4`, Merge-Basis `3 1`, `faelle ok`, `knoten ok`; P6 3, 1, 1, vitest Exit 0, live `exit=0` und `1`, Gegenprobe letzte Zeile `exit=1` ohne `sed-miss`; P7 15 und 4; P8 0, `vertrag gleich`, `0`, `pakete gleich`, `goals gleich`, 0, `check` grün (2379 Tests, 204 s), Job `check` am PR #269 `pass` (Netz-Prüfung `1`).
+- 2026-11-18 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, 7, 8; `dev` (`f076a93`) war schon im Branch, nichts zu mergen, jeder Prüfbefehl am Kopf `1f594cd` neu gelaufen. Prüfbefehle: P1 5, 5, 4, 2, 0, 5; P2 `exit=0` und `1`, `breiten ok`, `zeile ok`, `geld gleich`, Gegenprobe `3`, vitest Exit 0; P3 `1`, `abnahme ok 1`; P4 1, 1, 6, 2, 1, vitest Exit 0; P5 `exit=0` `4 4`, Merge-Basis `3 1`, `faelle ok`, `knoten ok`; P6 3, 1, 1, vitest Exit 0, live `exit=0` und `1`, Gegenprobe letzte Zeile `exit=1`; P7 15, 4; P8 0, `vertrag gleich`, `0`, `pakete gleich`, `goals gleich`, 0, `check` grün (2379 Tests, 426 s), Netz-Prüfung `1`; am PR #269 Jobs `check` und `e2e` grün (Run 44223541816).
+- 2026-11-18 Zyklus 3: Punkt 9 gebaut (Kritik Tech Lead): `describe("a revoke that does not end the old permission")` mit zwei Fällen in `test/konto-payout.test.ts`; im ersten revertiert `handleOps`, weil die Wallet die Nonce schon verbraucht hat, im zweiten geht `handleOps` durch, aber der innere Aufruf scheitert (Schalter `entryPoint.innerReverts` im nachgebauten Knoten), und die Erlaubnis bleibt freigeschaltet. Beide antworten 502 `stage: "retire"`, `retire_revoke` ist danach leer und `retire_*` unverändert, der nächste Aufruf antwortet 409 `payout_needs_phone` ohne Transaktion und schreibt die Log-Zeile `retire waits for the phone for`. Der Code von Entscheidung 5 war schon da; rot waren die Fälle in der Gegenprobe ohne `SET retire_revoke = NULL`. Prüfbefehle: P9 `exit=0` `2 2`, Gegenprobe `2` und `2 0`.
+- 2026-11-18 Zyklus 3: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, 7, 8, 9; `dev` (`c294bff`, umzug 03) in den Goal-Branch gemergt (`d5704f0`, Konflikt nur in `goals/konto/ANNAHMEN.md`: Abschnitt „Abgelöst durch umzug 03“ von `dev` unverändert, `## Goal 11` danach), jeder Prüfbefehl am Merge-Kopf neu gelaufen. Prüfbefehle: P1 5, 5, 4, 2, 0, 5; P2 `exit=0` und `1`, `breiten ok`, `zeile ok`, `geld gleich`, Gegenprobe `3`, vitest Exit 0; P3 `1`, `abnahme ok 1`; P4 1, 1, 6, 2, 1, vitest Exit 0; P5 `exit=0` `4 4`, Merge-Basis `3 1`, `faelle ok`, `knoten ok`; P6 3, 1, 1, vitest Exit 0, live `exit=0` und `1`, Gegenprobe letzte Zeile `exit=1`; P7 15, 4; P8 0, `vertrag gleich`, `0`, `pakete gleich`, `goals gleich`, 0, `check` grün (2392 Tests, 81 s); P9 `exit=0` `2 2`, Gegenprobe `2` und `2 0`.
+- 2026-11-18 Release: PASS K und B (Zyklus 3), DONE.
 
 ## Blockers

@@ -321,7 +321,31 @@ function accountSigner(deps, page) {
     const v = Number.parseInt(String(result.v), 16);
     return `0x${result.r.padStart(64, "0")}${result.s.padStart(64, "0")}${v === 0 || v === 27 ? "1b" : "1c"}`;
   };
-  return { owner, signRaw };
+  /**
+   * Several hashes with one passkey dialog (goals/konto/11): one activity ACTIVITY_TYPE_SIGN_RAW_PAYLOADS with one X-Stamp-WebAuthn,
+   * the signatures in the order of the hashes.
+   */
+  const signRawPayloads = async (hashes) => {
+    const body = JSON.stringify({
+      type: "ACTIVITY_TYPE_SIGN_RAW_PAYLOADS",
+      timestampMs: String(now()),
+      organizationId: page.org,
+      parameters: { signWith: page.owner, payloads: hashes, encoding: "PAYLOAD_ENCODING_HEXADECIMAL", hashFunction: "HASH_FUNCTION_NO_OP" },
+    });
+    const stamp = await passkeyStamp({ get, subtle, rpId, body });
+    const data = await postJson(fetchFn, `${TURNKEY_API_URL}/public/v1/submit/sign_raw_payloads`, { "X-Stamp-WebAuthn": stamp }, body);
+    const result = data.activity && data.activity.status === "ACTIVITY_STATUS_COMPLETED" && data.activity.result
+      ? data.activity.result.signRawPayloadsResult : null;
+    const list = result && Array.isArray(result.signatures) ? result.signatures : [];
+    if (list.length !== hashes.length || !list.every((r) => r && /^[0-9a-fA-F]{1,64}$/.test(r.r) && /^[0-9a-fA-F]{1,64}$/.test(r.s))) {
+      throw new KontoError("unreachable", `no signatures from the wallet (${data.activity ? data.activity.status : "no activity"})`);
+    }
+    return list.map((r) => {
+      const v = Number.parseInt(String(r.v), 16);
+      return `0x${r.r.padStart(64, "0")}${r.s.padStart(64, "0")}${v === 0 || v === 27 ? "1b" : "1c"}`;
+    });
+  };
+  return { owner, signRaw, signRawPayloads };
 }
 
 /**
@@ -356,13 +380,33 @@ export const PAYOUT_PERIOD_SECONDS = 2592000;
  * The passkey step of the first payout (goals/konto/05): the passkey of the account signs the second permission, whose spender
  * is the forwarder to the person's bank account (`spender` of the page, set by the server), USDC, no cap, 30 days, no end and
  * a salt of its own. Returns the body of POST /h/{code}/payout. Throws KontoError with the reason the page shows.
+ *
+ * With `revokeHash` and `revokeNonce` on the page (goals/konto/11, the account replaces an earlier permission) the same passkey
+ * dialog signs both: the hash of the new permission and the hash of the smart wallet's revoke of the earlier one, in one
+ * SIGN_RAW_PAYLOADS. The body then carries `revoke: { nonce, signature }`.
  */
 export async function runPayout(deps, page) {
   const { random, now } = deps;
   if (!/^0x[0-9a-fA-F]{40}$/.test(page.spender || "") || !/^0x[0-9a-fA-F]{40}$/.test(page.token || "")) {
     throw new KontoError("unreachable", "page data incomplete");
   }
-  const { owner, signRaw } = accountSigner(deps, page);
+  const revoke = page.revokeHash || page.revokeNonce ? { hash: page.revokeHash || "", nonce: page.revokeNonce || "" } : null;
+  if (revoke && (!/^0x[0-9a-fA-F]{64}$/.test(revoke.hash) || !/^[0-9]{1,78}$/.test(revoke.nonce))) {
+    throw new KontoError("unreachable", "page data incomplete");
+  }
+  const signer = accountSigner(deps, page);
+  const { owner } = signer;
+  // Without a revoke, one hash with sign_raw_payload as before. With one, signPermission hands over the hash of the permission
+  // first; both go to Turnkey in one activity, and the first signature goes back into signPermission.
+  let revokeSignature = null;
+  let signRaw = signer.signRaw;
+  if (revoke) {
+    signRaw = (hash) =>
+      signer.signRawPayloads([hash, revoke.hash]).then(([permissionSignature, revoked]) => {
+        revokeSignature = revoked;
+        return permissionSignature;
+      });
+  }
   const nowMs = now();
   const signed = await signPermission({
     owner,
@@ -376,7 +420,9 @@ export async function runPayout(deps, page) {
     nowSec: Math.floor(nowMs / 1000),
     salt: BigInt(`0x${hex(random(32))}`),
   });
-  return { body: signed };
+  if (!revoke) return { body: signed };
+  if (!revokeSignature) throw new KontoError("unreachable", "no signature for the revoke");
+  return { body: { ...signed, revoke: { nonce: revoke.nonce, signature: revokeSignature } } };
 }
 
 /** Turnkey takes an amount for the card payment only above 20 (docs/konto/euro.md, Einzahlung); below, MoonPay asks for it. */

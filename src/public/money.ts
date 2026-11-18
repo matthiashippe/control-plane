@@ -3,10 +3,12 @@
  * bank account, after the SOLL sources docs/soll/src/money-<state>.html.
  *
  * Seven states. `deposit-approve` and `payout-approve` are the choice of the number as in konto 02 (block `approve`), saying what
- * happens. `deposit-card` (block `card`) names amount and card and has the one button the script of the page opens the card
- * payment with. `payout-verify` (block `verify`) sends the person to Bridge to confirm their identity once, `payout-bank` (block
+ * happens; for an account that has set up a payout before, `payout-approve` adds a third entry on the earlier approval (SOLL state
+ * `payout-approve-revoke`, goals/konto/11), because the one tap of the passkey step also ends the permission set up before.
+ * `deposit-card` (block `card`) names amount and card and has the one button the script of the page opens the card payment with. `payout-verify` (block `verify`) sends the person to Bridge to confirm their identity once, `payout-bank` (block
  * `bank`) asks for IBAN and account holder, `payout-passkey` (block `payout`) has the one button that signs with the existing
- * passkey. Bank and passkey step count three steps, or two when Bridge had checked the person before and the identity step was
+ * passkey; with an earlier permission its button carries the hash and nonce of the revoke the same tap signs (goals/konto/11).
+ * Bank and passkey step count three steps, or two when Bridge had checked the person before and the identity step was
  * left out (`steps`). `retry` (block `retry`) comes after a signature that could not be checked and sends the same one again. Cancel and
  * failure show the state `failed` of konto 03 unchanged.
  *
@@ -30,7 +32,13 @@ export type MoneyPage =
       organizationId: string;
       owner: string;
     }
-  | { state: "payout-approve"; automatonName: string; choices: number[] }
+  | {
+      state: "payout-approve";
+      automatonName: string;
+      choices: number[];
+      /** The account has a payout set up before, and the passkey step ends that permission (goals/konto/11). */
+      earlierApproval?: boolean;
+    }
   | { state: "payout-verify"; code: string; automatonName: string; kycLink: string }
   | {
       state: "payout-bank";
@@ -54,6 +62,11 @@ export type MoneyPage =
       organizationId: string;
       /** As in payout-bank. */
       steps?: 2 | 3;
+      /**
+       * The revoke of the permission this setup replaces (goals/konto/11): the hash of the smart wallet's user operation and its
+       * nonce, which the same tap signs. Left out for the first setup.
+       */
+      revoke?: { hash: string; nonce: string } | null;
     }
   | { state: "retry"; code: string; automatonName: string };
 
@@ -79,6 +92,14 @@ export const MONEY_STYLE = `
                background: var(--panel); color: var(--fg); font: 500 var(--t-lead)/1 var(--mono); }
 .field input::placeholder { color: var(--dim); }
 .field input:focus { outline: none; border-color: var(--accent); }
+</style>`;
+
+/** The third figure of payout-approve with an earlier approval, as in the SOLL source of payout-approve-revoke. */
+export const EARLIER_STYLE = `
+<style>
+/* The earlier approval (goals/konto/11): on a phone the figures stand two across, so the third takes the whole row instead of
+   sitting next to an empty cell; wider screens show all three in one row. */
+@media (max-width: 30rem) { .stats .across { grid-column: 1 / -1; } }
 </style>`;
 
 const svg = (paths: string) =>
@@ -147,7 +168,7 @@ ${choices(page.choices)}
     <div class="stats grant">
       <div><span class="n">Your bank</span><span class="l">The only place money from ${name} can go</span></div>
       <div><span class="n">Once</span><span class="l">After this, a payout needs no phone</span></div>
-    </div>
+${page.earlierApproval ? `      <div class="across"><span class="n">Earlier approval</span><span class="l">Ends with this, so money from ${name} goes only to the bank account you set now</span></div>\n` : ""}    </div>
     <p class="sub">Tap the number shown in your terminal.</p>
     <form method="post" class="choices">
 ${choices(page.choices)}
@@ -230,6 +251,7 @@ ${error}      <form method="post" action="/h/${esc(page.code)}/payout-bank">
         `data-account="${esc(page.account)}"`,
         `data-owner="${esc(page.owner)}"`,
         `data-org="${esc(page.organizationId)}"`,
+        ...(page.revoke ? [`data-revoke-hash="${esc(page.revoke.hash)}"`, `data-revoke-nonce="${esc(page.revoke.nonce)}"`] : []),
       ].join(" ");
       return step(
         "payout",
@@ -258,5 +280,6 @@ ${error}      <form method="post" action="/h/${esc(page.code)}/payout-bank">
 
 /** The whole document. `indexStyle` is the <style> block of src/public/index.html. */
 export function renderMoneyPage(page: MoneyPage, indexStyle: string): string {
-  return phonePage(TITLES[page.state], body(page), indexStyle, KONTO_STYLE + (page.state === "payout-bank" ? MONEY_STYLE : ""));
+  const extra = page.state === "payout-bank" ? MONEY_STYLE : page.state === "payout-approve" && page.earlierApproval ? EARLIER_STYLE : "";
+  return phonePage(TITLES[page.state], body(page), indexStyle, KONTO_STYLE + extra);
 }

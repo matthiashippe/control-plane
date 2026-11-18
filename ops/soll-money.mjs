@@ -1,13 +1,13 @@
 // SOLL pictures of money in and out on the phone page /h/{code} (goals/konto/05): adding money by card, sending money to the
-// person's own bank account, and tapping again after a check that did not go through. Renders the seven sources
+// person's own bank account, and tapping again after a check that did not go through. Renders the eight sources
 // docs/soll/src/money-<state>.html with the headless Chromium from ~/.cache/ms-playwright/ into
 // docs/soll/money-<state>-<width>.png, full page, width as in the name.
 //
-//   node ops/soll-money.mjs                       render and write all fourteen pictures, then report defects
+//   node ops/soll-money.mjs                       render and write all sixteen pictures, then report defects
 //   node ops/soll-money.mjs --check               render into a mktemp folder, compare with the committed pictures, exit 1 on
 //                                                 any defect
 //   node ops/soll-money.mjs --check --source <dir> [--pictures <dir>]
-//                                                 the same with the seven sources money-<state>.html from another folder: the
+//                                                 the same with the eight sources money-<state>.html from another folder: the
 //                                                 real page written by ops/soll-live-money.mjs, or a counter-test with planted
 //                                                 defects
 //

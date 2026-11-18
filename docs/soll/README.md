@@ -164,13 +164,14 @@ Abnahme-Issue limit-account: PRO-24063
 
 Einzahlung und Auszahlung auf derselben Handy-Seite (goals/konto/05): Der Mensch zahlt per Karte Geld auf das Konto seines
 Automatons ein oder richtet beim ersten Mal die Auszahlung auf sein eigenes Bankkonto ein. Dazu der Zustand `retry`, wenn die
-Prüfung der Unterschrift gerade nicht ging. Sieben Zustände, je zwei Bilder:
+Prüfung der Unterschrift gerade nicht ging. Acht Zustände, je zwei Bilder:
 
 | Zustand | 390 | 1440 | Quelle |
 |---|---|---|---|
 | `deposit-approve` | `money-deposit-approve-390.png` | `money-deposit-approve-1440.png` | `src/money-deposit-approve.html` |
 | `deposit-card` | `money-deposit-card-390.png` | `money-deposit-card-1440.png` | `src/money-deposit-card.html` |
 | `payout-approve` | `money-payout-approve-390.png` | `money-payout-approve-1440.png` | `src/money-payout-approve.html` |
+| `payout-approve-revoke` | `money-payout-approve-revoke-390.png` | `money-payout-approve-revoke-1440.png` | `src/money-payout-approve-revoke.html` |
 | `payout-verify` | `money-payout-verify-390.png` | `money-payout-verify-1440.png` | `src/money-payout-verify.html` |
 | `payout-bank` | `money-payout-bank-390.png` | `money-payout-bank-1440.png` | `src/money-payout-bank.html` |
 | `payout-passkey` | `money-payout-passkey-390.png` | `money-payout-passkey-1440.png` | `src/money-payout-passkey.html` |
@@ -194,11 +195,11 @@ Bauen und prüfen, ohne Netz, mit dem Chromium aus `~/.cache/ms-playwright/`, au
 ```
 node ops/soll-money.mjs                         # Bilder neu schreiben
 node ops/soll-money.mjs --check                 # neu rendern und vergleichen, Exit 1 bei jedem Mangel
-node ops/soll-money.mjs --check --source <dir>  # dieselbe Prüfung gegen die sieben Quellen money-<zustand>.html in <dir>
+node ops/soll-money.mjs --check --source <dir>  # dieselbe Prüfung gegen die acht Quellen money-<zustand>.html in <dir>
 ```
 
 Ein unbekanntes Argument endet mit Exit 1, bevor der Browser startet, und schreibt kein Bild. Die letzte Zeile ist englisch:
-`soll money: 14 images, blocks end 390=<y> 1440=<y>, 0 defects`, y ist je Breite das tiefste Blockende aller Zustände.
+`soll money: 16 images, blocks end 390=<y> 1440=<y>, 0 defects`, y ist je Breite das tiefste Blockende aller Zustände.
 
 Mängel wie beim Limit: ein einziger Pixel weicht vom neuen Render ab, waagrechter Überlauf, Gedankenstrich im sichtbaren Text,
 fremde Adresse (angefragt oder in einem Attribut), Bild mit falscher Breite, Block fehlt oder endet unter dem ersten Bildschirm. Zur
@@ -214,6 +215,14 @@ aus dem Abschnitt Konto, jeweils mit demselben Zweck. Neu, in einem dritten `<st
   im Stil des Browsers auf der dunklen Seite steht.
 
 Abnahme-Issue money: PRO-23251
+
+`payout-approve-revoke` (goals/konto/11) ist `payout-approve` für ein Konto, das schon eine Auszahlung eingerichtet hat: Der Block
+`approve` trägt einen dritten Eintrag „Earlier approval“ mit „Ends with this, so money from Atlas goes only to the bank account you
+set now“, weil derselbe Passkey-Tipp, der die neue Erlaubnis unterschreibt, die frühere beendet. Auf dem Handy stehen die Einträge
+zwei nebeneinander, deshalb nimmt der dritte dort die ganze Zeile (`.stats .across`, ein vierter `<style>` der Quelle und später der
+Seite); ab 30rem stehen alle drei in einer Zeile. Die erste Einrichtung zeigt `payout-approve` unverändert.
+
+Abnahme-Issue payout-revoke: PRO-24730
 
 ## Name automatonhost.com (goals/umzug/02)
 

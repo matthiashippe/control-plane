@@ -160,23 +160,67 @@ freigegeben hat; Bridge legt eine neue Auszahladresse an. `automaton_status` zei
 fällige Regel aus `set_payout_rule` zahlt bis dahin nichts und schreibt `payout_needs_phone` ins Log. Jedes Konto, das auszahlt, muss
 also einmal aufs Handy.
 
-Mit der alten Erlaubnis: `finishPayout` merkt jede alte Erlaubnis mit Weiterleitung als `retire_*` vor, auch eine, deren Quittung von
-`approveWithSignature` nie ankam. Wartet schon ein `retire_*`, bleibt es, und die Erlaubnis dazwischen wird verworfen, weil
-`approveWithSignature` erst nach einem gelungenen `retire` rausgeht und sie also nie on-chain war. Vor der nächsten Auszahlung fragt
-`sendPayout` den SpendPermissionManager mit `isApproved` und liest `caller()` der alten Weiterleitung:
+Mit der alten Erlaubnis (goals/konto/11): Abzulösen ist, was `finishPayout` zu `retire_*` macht, also ein wartendes `retire_*`,
+sonst `permission` und `forwarder` der Zeile in `konto_payouts`. Gibt es sie, trägt jeder Auszahl-Handoff den Widerruf, nicht nur
+nach einem Wechsel des Schlüssels: Die Seite `payout-approve` zeigt dann den Eintrag „Earlier approval“, und der Schritt
+`payout-passkey` trägt am Knopf `data-revoke-hash` und `data-revoke-nonce`. Der Hash ist der einer User Operation der Smart Wallet
+an den EntryPoint v0.6 `0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789` mit genau einem Aufruf
+`execute(SpendPermissionManager, 0, revoke(<alte Erlaubnis>))`, ohne `initCode` und Paymaster und mit `maxFeePerGas` 0; die Nonce
+liest der Server mit `getNonce(account, 0)` beim EntryPoint. Derselbe Passkey-Tipp unterschreibt mit einer Aktivität
+`ACTIVITY_TYPE_SIGN_RAW_PAYLOADS` beide Hashes, die neue Erlaubnis und den Widerruf
+([Quelle](https://docs.turnkey.com/api-reference/activities/sign-raw-payloads), Stand 2026-11-18: `POST /public/v1/submit/sign_raw_payloads`,
+`parameters.payloads` als Liste, ein Header `X-Stamp-WebAuthn`, Antwort `signRawPayloadsResult.signatures`). Die Seite schickt an
+`POST /h/{code}/payout` zusätzlich `revoke: { nonce, signature }`; der Server baut die User Operation nach und nimmt sie nur, wenn
+`recoverAddress` über ihren Hash den Eigentümer des Kontos ergibt. Fehlt der Widerruf oder passt er nicht, antwortet die Route 400
+`permission_refused`, und der Handoff ist verbrannt. `finishPayout` speichert ihn als `retire_revoke` neben `retire_*`.
+
+Vor der nächsten Auszahlung fragt `sendPayout` den SpendPermissionManager mit `isApproved`:
 
 - nicht freigeschaltet: verworfen ohne Transaktion, Log-Zeile `[payout] retire skipped for <Weiterleitung>: not_approved`;
-- freigeschaltet, aber ein anderer `caller` als der heutige Schlüssel: verworfen ohne Transaktion, Log-Zeile mit `other_caller`, weil
-  `retire` dort an `only the fixed caller` scheitert und sonst jede Auszahlung des Kontos sperren würde;
-- sonst geht `retire` wie bisher zuerst raus.
+- freigeschaltet und ein Widerruf wartet: unser Gasschlüssel reicht die User Operation mit `handleOps([op], <Gasschlüssel>)` beim
+  EntryPoint ein und zahlt das Gas, die Wallet braucht kein ETH; danach muss `isApproved` falsch sein, sonst endet die Auszahlung
+  mit `payout_failed` in der Stufe `retire`. Scheitert `handleOps`, verwirft der Server nur den Widerruf, und die nächste
+  Auszahlung schickt den Kunden wieder aufs Handy, statt dieselbe User Operation noch einmal zu senden;
+- freigeschaltet, kein Widerruf und der heutige Schlüssel ist `caller` der alten Weiterleitung: `retire` wie bisher;
+- freigeschaltet, kein Widerruf und ein anderer `caller`: 409 `payout_needs_phone` ohne Transaktion, `retire_*` bleibt, Log-Zeile
+  `[payout] retire waits for the phone for <Weiterleitung>: other_caller`.
 
-Danach legt der Server die neue Weiterleitung an, schickt `approveWithSignature` und zahlt aus. Scheitert einer der beiden Lesezugriffe,
-endet die Auszahlung mit `payout_failed` in der Stufe `retire`, und `retire_*` bleibt für den nächsten Versuch.
+Erst danach leert der Server `retire_*` und `retire_revoke`, legt die neue Weiterleitung an, schickt `approveWithSignature` und zahlt
+aus. Scheitert ein Lesezugriff, endet die Auszahlung mit `payout_failed` in der Stufe `retire`, und `retire_*` bleibt für den nächsten
+Versuch.
 
 Für den Betrieb: Neuer Schlüssel als Datei auf dem Server, `CP_KONTO_KEY_FILE` darauf, etwas ETH für Gas, dann der nächste fällige
-Deploy. Eine mit `other_caller` verworfene Erlaubnis bleibt on-chain freigeschaltet, aber ihr einziger Spender ist die alte
-Weiterleitung: Die ruft nur der alte Schlüssel auf, und sie zahlt nur an die alte Auszahladresse des Kunden bei Bridge. Widerrufen kann
-sie der Kunde selbst mit seinem Passkey; der Server tut es nicht.
+Deploy. Wer den alten Schlüssel hat, kann über die alte Weiterleitung nichts mehr bewegen, sobald der Kunde einmal die neue IBAN
+freigegeben hat: Der Widerruf aus demselben Tipp beendet die alte Erlaubnis on-chain, bevor die erste Auszahlung mit dem neuen
+Schlüssel rausgeht.
+
+## Abgelöste Auszahladresse bei Bridge
+
+Die Frage aus goals/konto/11: Bedient Bridge die alte Auszahladresse (Liquidation Address) nach der neuen IBAN weiter, und was
+geschieht mit USDC, das danach dort ankommt?
+
+- Abschalten über die API: nicht dokumentiert. `PUT /v0/customers/{customerID}/liquidation_addresses/{liquidationAddressID}` ändert
+  nur `external_account_id`, `custom_developer_fee_percent`, `destination` und die Verwendungszwecke, ein Feld `state` nimmt der
+  Aufruf nicht an ([Quelle](https://apidocs.bridge.xyz/api-reference/liquidation-addresses/update-a-liquidation-address), Stand 2026-11-18).
+  Der Zustand einer Adresse ist nur lesbar, „active“ oder „deactivated“
+  ([Quelle](https://apidocs.bridge.xyz/api-reference/liquidation-addresses/get-a-liquidation-address), Stand 2026-11-18). Eine
+  Auszahladresse, die wir angelegt haben, bleibt also `active`, auch wenn der Kunde eine neue IBAN eingerichtet hat.
+- USDC, das danach ankommt: Bridge leitet es weiter wie vorher, an das Bankkonto der alten Adresse, also die alte IBAN desselben
+  Kunden; jede Weiterleitung ist ein Drain mit eigenem Zustand
+  ([Quelle](https://apidocs.bridge.xyz/platform/orchestration/liquidation_address/drains), Stand 2026-11-18). Kann Bridge nicht
+  auszahlen (alte IBAN geschlossen), endet der Drain in `undeliverable` oder `returned`; zurück geht das USDC an die `return_address`
+  der Adresse, sonst an die Rückgabe-Regel des Entwicklers, und ohne beide steht der Drain auf `missing_return_policy`
+  ([Quelle](https://apidocs.bridge.xyz/platform/orchestration/more/returns), Stand 2026-11-18). Unsere Adressen tragen keine
+  `return_address`.
+- Ein Bankkonto lässt sich löschen (`DELETE` eines External Account,
+  [Quelle](https://apidocs.bridge.xyz/api-reference/external-accounts/delete-a-single-external-account-object), Stand 2026-11-18);
+  was das für die Auszahladresse heißt, die darauf zeigt, sagt die Doku nicht.
+
+Folge für das Konto: Nach dem Widerruf hat die alte Weiterleitung keine Erlaubnis mehr, und nur sie konnte USDC aus der Smart Wallet
+an die alte Adresse schicken. Ein zweiter Weg zum Geld des Kunden bleibt damit nicht offen: Die alte Adresse bekommt nur noch, was
+jemand von sich aus hinschickt, und Bridge zahlt das an die alte IBAN desselben Kunden aus. Ein Abschalten bei Bridge ist für den
+Schutz nicht nötig und gehört nicht in dieses Goal; ob das Löschen des alten Bankkontos die Adresse stilllegt, steht als Vorschlag
+in `goals/_vorschlaege/konto-nacharbeit-2026-11-18-12.md`.
 
 ## Hauptnetz
 

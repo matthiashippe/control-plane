@@ -37,8 +37,12 @@ import {
   isPayoutAddress,
   namesTarget,
   parseUsd,
+  parseRevoke,
   payoutPermissionMatches,
   readPayout,
+  replacedPermission,
+  revokeHash,
+  revokeSignedBy,
   readPendingBank,
   ensurePayoutRow,
   type PayoutChain,
@@ -229,6 +233,20 @@ export function registerHandoff<E extends Env>(app: Hono<E>, deps: HandoffDeps):
     const bank = readPendingBank(db, h.code);
     if (bank) {
       const row = accountOf(account);
+      // goals/konto/11: with a permission to replace, the same tap signs the revoke of it, a user operation of the smart wallet whose
+      // nonce the EntryPoint gives. A chain that cannot be asked answers like Bridge does.
+      const replaced = replacedPermission(readPayout(db, account));
+      let revoke: { hash: string; nonce: string } | null = null;
+      if (replaced) {
+        let nonce: bigint;
+        try {
+          if (!konto.payoutChain) throw new Error("no payout chain");
+          nonce = await konto.payoutChain.nonceOf(account as Address);
+        } catch {
+          return c.text("The network could not be reached just now. Reload this page in a minute.", 502);
+        }
+        revoke = { hash: revokeHash(permissionFromJson(replaced.permission), nonce, konto.chainId), nonce: String(nonce) };
+      }
       return moneyPage(c, {
         state: "payout-passkey",
         code: h.code,
@@ -241,6 +259,7 @@ export function registerHandoff<E extends Env>(app: Hono<E>, deps: HandoffDeps):
         owner: row.owner ?? "",
         organizationId: row.organization_id ?? "",
         steps: stepsOf(h.code),
+        revoke,
       });
     }
     ensurePayoutRow(db, account, nowMs());
@@ -578,7 +597,11 @@ export function registerHandoff<E extends Env>(app: Hono<E>, deps: HandoffDeps):
       if (handoff.step === "deposit") {
         return moneyPage(c, { state: "deposit-approve", automatonName: handoff.automatonName, amountUsdc: handoff.amountUsdc, choices: handoff.choices });
       }
-      if (handoff.step === "payout") return moneyPage(c, { state: "payout-approve", automatonName: handoff.automatonName, choices: handoff.choices });
+      if (handoff.step === "payout") {
+        // goals/konto/11: an account that set up a payout before ends that permission with the passkey step of this one.
+        const earlierApproval = Boolean(handoff.account && replacedPermission(readPayout(db, handoff.account)));
+        return moneyPage(c, { state: "payout-approve", automatonName: handoff.automatonName, choices: handoff.choices, earlierApproval });
+      }
       return page(c, approve(handoff), 200);
     }
     if (handoff.state === "matched") return matchedPage(c, handoff);
@@ -844,10 +867,21 @@ export function registerHandoff<E extends Env>(app: Hono<E>, deps: HandoffDeps):
     if (!payoutPermissionMatches(permission, want)) return refuse("The permission is not the one this code asked for.");
     const current = readPayout(db, h.account!);
     if (current?.permission && permissionFromJson(current.permission).salt === permission.salt) return refuse("The permission is the one the account already has.");
+    // goals/konto/11: with a permission to replace, the same tap signs its revoke, and only one the owner of the account signed for
+    // exactly that permission counts. The first setup has nothing to replace and needs none.
+    const replaced = replacedPermission(current);
+    const revoke = replaced ? parseRevoke(body?.revoke) : null;
+    if (replaced) {
+      if (!revoke) return refuse("The request did not carry the end of the earlier approval.");
+      const owner = accountOf(h.account!).owner;
+      if (!owner || !(await revokeSignedBy(revoke, permissionFromJson(replaced.permission), konto.chainId, owner))) {
+        return refuse("The end of the earlier approval is not signed by this account.");
+      }
+    }
     const checked = await checkSignature(konto, permission, signature);
     if (checked === "unavailable") return c.json(SIGNATURE_CHECK_UNAVAILABLE, 503);
     if (!checked) return refuse("The signature does not belong to this account.");
-    if (!finishPayout(db, { code: h.code, account: h.account!, permission, signature, nowMs: nowMs() })) {
+    if (!finishPayout(db, { code: h.code, account: h.account!, permission, signature, revoke, nowMs: nowMs() })) {
       return c.json({ error: "handoff_closed", message: "This code no longer works. Start again in your terminal.", docs: CONTRACT }, 410);
     }
     return c.json({ state: "done", bank_last4: bank.bank_last4 }, 200);

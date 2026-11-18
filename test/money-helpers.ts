@@ -2,6 +2,9 @@
  * Shared setup of the money tests of goals/konto/05: a smart wallet that a plain key owns, a chain that answers like Base Sepolia
  * and records every transaction it gets through sendKontoTx, Bridge answered without a network, and an account made through the
  * handoff of konto 03. No port, no real key (generatePrivateKey at run time), only the example IBAN.
+ *
+ * goals/konto/11: the node also plays the EntryPoint v0.6, which the revoke of an earlier permission goes through (getNonce and
+ * handleOps). The ABIs for it are written here, not taken from src/, so the tests of that goal run against the code before it.
  */
 import { afterEach, expect } from "vitest";
 import {
@@ -24,6 +27,7 @@ import {
   type PrivateKeyAccount,
   type PublicClient,
 } from "viem";
+import { entryPoint06Abi, getUserOperationHash } from "viem/account-abstraction";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { baseSepolia } from "viem/chains";
 import type { Bridge, FetchLike } from "../src/konto/bridge.js";
@@ -77,11 +81,40 @@ export function walletChain() {
   return { owners, mode, calls, client };
 }
 
+/** The EntryPoint v0.6 on Base and Base Sepolia. */
+export const ENTRY_POINT_V06 = "0x5ff137d4b0fdcd49dca30c7cf57e578a026d2789";
+const PERMISSION_COMPONENTS = [
+  { name: "account", type: "address" },
+  { name: "spender", type: "address" },
+  { name: "token", type: "address" },
+  { name: "allowance", type: "uint160" },
+  { name: "period", type: "uint48" },
+  { name: "start", type: "uint48" },
+  { name: "end", type: "uint48" },
+  { name: "salt", type: "uint256" },
+  { name: "extraData", type: "bytes" },
+] as const;
+/** revoke(SpendPermission) of the SpendPermissionManager, which only the account itself may call. */
+const MANAGER_REVOKE_ABI = [
+  { type: "function", name: "revoke", stateMutability: "nonpayable", inputs: [{ name: "p", type: "tuple", components: PERMISSION_COMPONENTS }], outputs: [] },
+] as const;
+/** execute(target, value, data) of the Coinbase Smart Wallet v1. */
+const WALLET_EXECUTE_ABI = [
+  {
+    type: "function",
+    name: "execute",
+    stateMutability: "payable",
+    inputs: [{ name: "target", type: "address" }, { name: "value", type: "uint256" }, { name: "data", type: "bytes" }],
+    outputs: [],
+  },
+] as const;
+const SIGNATURE_WRAPPER = [{ type: "tuple", components: [{ name: "ownerIndex", type: "uint8" }, { name: "signatureData", type: "bytes" }] }] as const;
+
 /** One transaction the chain got, decoded. */
 export interface Sent {
-  kind: "deploy" | "approveWithSignature" | "payout" | "retire" | "other";
+  kind: "deploy" | "approveWithSignature" | "payout" | "retire" | "revoke" | "other";
   to: string;
-  /** deploy: the address it creates; payout and retire: the forwarder; approveWithSignature: the spender of the permission. */
+  /** deploy: the address it creates; payout and retire: the forwarder; approveWithSignature and revoke: the spender of the permission. */
   target?: string;
   value?: bigint;
   salt?: bigint;
@@ -94,8 +127,15 @@ export interface Sent {
  * raw transaction decoded and applied, so that a payout moves the USDC of the wallet to the destination of the forwarder.
  * Like PayoutForwarder.sol, each deployed forwarder keeps the fifth constructor argument as its `caller`, answers `caller()`
  * with it, and reverts `retire` and `payout` from any other sender.
+ *
+ * As the EntryPoint v0.6 (goals/konto/11): getNonce answers the next nonce of a wallet, and handleOps takes exactly one user
+ * operation whose callData is execute(SpendPermissionManager, 0, revoke(p)) for the wallet's own permission, with the wallet's
+ * nonce and a SignatureWrapper (ownerIndex 0) whose signature over getUserOperationHash recovers to the wallet's owner in
+ * `owners`. Such a one ends p and counts the nonce up (`kind: "revoke"`); anything else reverts like a failed validation.
+ * With `entryPoint.innerReverts` the operation validates and its nonce counts up, but its execute reverts inside handleOps, as the
+ * EntryPoint v0.6 does it: the transaction goes through, p stays approved, and it is recorded as `kind: "other"`.
  */
-export function payoutNode() {
+export function payoutNode(owners: Map<string, string> = new Map()) {
   const balances = new Map<string, bigint>();
   const code = new Map<string, Hex>();
   const approved = new Set<string>();
@@ -103,9 +143,45 @@ export function payoutNode() {
   const callers = new Map<string, string>();
   const sent: Sent[] = [];
   const reverted = new Set<string>();
+  const nonces = new Map<string, bigint>();
+  const entryPoint = { innerReverts: false };
   let n = 0;
   const hashOf = () => `0x${String(++n).padStart(64, "0")}` as Hex;
   const key = (p: { salt: bigint; account: string }) => `${p.account.toLowerCase()}:${p.salt}`;
+  /** The permission a user operation revokes, when it is exactly the revoke the wallet's owner signed with the right nonce. */
+  const revokeOf = async (op: {
+    sender: string;
+    nonce: bigint;
+    initCode: Hex;
+    callData: Hex;
+    callGasLimit: bigint;
+    verificationGasLimit: bigint;
+    preVerificationGas: bigint;
+    maxFeePerGas: bigint;
+    maxPriorityFeePerGas: bigint;
+    paymasterAndData: Hex;
+    signature: Hex;
+  }) => {
+    const sender = op.sender.toLowerCase();
+    const owner = owners.get(sender);
+    if (!owner || op.nonce !== (nonces.get(sender) ?? 0n)) return null;
+    const exec = decodeFunctionData({ abi: WALLET_EXECUTE_ABI, data: op.callData });
+    const [target, value, inner] = exec.args as readonly [Address, bigint, Hex];
+    if (target.toLowerCase() !== SPEND_PERMISSION_MANAGER || value !== 0n) return null;
+    const call = decodeFunctionData({ abi: MANAGER_REVOKE_ABI, data: inner });
+    const p = call.args[0] as { account: string; spender: string; salt: bigint };
+    if (p.account.toLowerCase() !== sender) return null;
+    const [wrapper] = decodeAbiParameters(SIGNATURE_WRAPPER, op.signature);
+    if (wrapper.ownerIndex !== 0) return null;
+    const hash = getUserOperationHash({
+      userOperation: { ...op, sender: getAddress(op.sender), signature: "0x" },
+      entryPointAddress: getAddress(ENTRY_POINT_V06),
+      entryPointVersion: "0.6",
+      chainId: 84532,
+    });
+    const signer = await recoverAddress({ hash, signature: wrapper.signatureData }).catch(() => null);
+    return signer?.toLowerCase() === owner ? p : null;
+  };
   const transport = custom(
     {
       async request({ method, params }: { method: string; params?: unknown[] }) {
@@ -123,6 +199,13 @@ export function payoutNode() {
             if (to.toLowerCase() === SEPOLIA_USDC) {
               const [who] = decodeAbiParameters([{ type: "address" }], `0x${data.slice(10)}` as Hex);
               return encodeAbiParameters([{ type: "uint256" }], [balances.get(who.toLowerCase()) ?? 0n]);
+            }
+            if (to.toLowerCase() === ENTRY_POINT_V06) {
+              const call = decodeFunctionData({ abi: entryPoint06Abi, data });
+              if (call.functionName !== "getNonce") throw new Error(`unexpected entry point eth_call ${call.functionName}`);
+              const [sender, nonceKey] = call.args as readonly [Address, bigint];
+              if (nonceKey !== 0n) throw new Error(`unexpected nonce key ${nonceKey}`);
+              return encodeAbiParameters([{ type: "uint256" }], [nonces.get(sender.toLowerCase()) ?? 0n]);
             }
             if (callers.has(to.toLowerCase())) {
               const fcall = decodeFunctionData({ abi: FORWARDER_ABI, data });
@@ -149,6 +232,21 @@ export function payoutNode() {
               destinations.set(at, ctor[1]);
               callers.set(at, ctor[4]);
               sent.push({ kind: "deploy", to, target: at, ctor });
+            } else if (to === ENTRY_POINT_V06) {
+              const call = decodeFunctionData({ abi: entryPoint06Abi, data: tx.data! });
+              const ops = call.functionName === "handleOps" ? (call.args[0] as Parameters<typeof revokeOf>[0][]) : [];
+              const p = ops.length === 1 ? await revokeOf(ops[0]).catch(() => null) : null;
+              if (p && entryPoint.innerReverts) {
+                nonces.set(p.account.toLowerCase(), (nonces.get(p.account.toLowerCase()) ?? 0n) + 1n);
+                sent.push({ kind: "other", to });
+              } else if (p) {
+                approved.delete(key(p));
+                nonces.set(p.account.toLowerCase(), (nonces.get(p.account.toLowerCase()) ?? 0n) + 1n);
+                sent.push({ kind: "revoke", to, target: p.spender.toLowerCase(), salt: p.salt });
+              } else {
+                reverted.add(hash);
+                sent.push({ kind: "other", to });
+              }
             } else if (to === SPEND_PERMISSION_MANAGER) {
               const call = decodeFunctionData({ abi: SPEND_PERMISSION_MANAGER_ABI, data: tx.data! });
               const p = call.args![0] as { spender: string; salt: bigint; account: string };
@@ -190,7 +288,7 @@ export function payoutNode() {
     },
     { retryCount: 0 },
   );
-  return { balances, code, approved, callers, sent, transport };
+  return { balances, code, approved, callers, nonces, entryPoint, sent, transport };
 }
 
 /** Bridge without a network: records every request; `kycStatus` is what the identity check reports. */
@@ -260,7 +358,7 @@ export async function signed(owner: PrivateKeyAccount, permission: Record<string
 /** The whole money setup: an app with account, payout chain and Bridge, and the helpers the tests use. */
 export function moneySetup(over: { konto?: Partial<KontoDeps> | null; bridge?: boolean } = {}) {
   const verify = walletChain();
-  const node = payoutNode();
+  const node = payoutNode(verify.owners);
   const gas = privateKeyToAccount(generatePrivateKey());
   const payoutChain = createPayoutChain({ chainId: 84532, account: gas, transport: node.transport, token: SEPOLIA_USDC });
   const bridge = bridgeFake();
@@ -347,9 +445,13 @@ export function dataOf(html: string, id: string, name: string): string | null {
   return tag ? (new RegExp(`data-${name}="([^"]*)"`).exec(tag)?.[1] ?? null) : null;
 }
 
-/** The second permission as the page builds it: spender `forwarder`, USDC, no cap, 30 days, no end. */
+/**
+ * The second permission as the page builds it: spender `forwarder`, USDC, no cap, 30 days, no end. When the passkey page of that
+ * forwarder asked to end an earlier permission (goals/konto/11), the owner signs its revoke hash too and the body carries
+ * `revoke: { nonce, signature }`, as the page sends it after the one tap.
+ */
 export async function payoutPermission(owner: PrivateKeyAccount, wallet: string, forwarder: string, over: Record<string, unknown> = {}) {
-  return signed(owner, {
+  const body = await signed(owner, {
     account: wallet,
     spender: forwarder,
     token: SEPOLIA_USDC,
@@ -360,23 +462,39 @@ export async function payoutPermission(owner: PrivateKeyAccount, wallet: string,
     salt: 99n,
     ...over,
   });
+  const asked = pageRevokes.get(forwarder.toLowerCase());
+  if (!asked) return body;
+  return { ...body, revoke: { nonce: asked.nonce, signature: await owner.sign({ hash: asked.hash }) } };
 }
 
 /**
+ * The revoke each passkey page asked for (goals/konto/11), by the spender it asks to sign: hash and nonce from `data-revoke-hash`
+ * and `data-revoke-nonce`. payoutPermission signs it along with the permission, as the one tap on the phone does.
+ */
+const pageRevokes = new Map<string, { hash: Hex; nonce: string }>();
+
+/**
  * A payout handoff from the API key to `payout-passkey`: right number, identity (approved at Bridge), IBAN. Returns the code,
- * the page and the spender the page asks to sign.
+ * the page before the number (`approve`), the passkey page and the spender it asks to sign.
  */
 export async function toPasskey(s: MoneySetup, a: { key: string }) {
   s.bridge.state.kycStatus = "approved";
   const created = await json(s, "/v1/handoff", { automaton_name: "Atlas", step: "payout" }, a.key);
   expect(created.status).toBe(201);
   const h = (await created.json()) as { code: string; match: number; poll_token: string };
+  const approvePage = await s.app.request(`/h/${h.code}`);
+  expect(approvePage.status).toBe(200);
+  const approve = await approvePage.text();
   const bank = await tap(s.app, h.code, h.match);
   expect(await bank.text()).toContain('data-soll="bank"');
   const passkey = await form(s, `/h/${h.code}/payout-bank`, { iban: EXAMPLE_IBAN, owner_name: "Erika Mustermann" });
   expect(passkey.status).toBe(200);
   const html = await passkey.text();
-  return { h, html, spender: dataOf(html, "konto-passkey", "spender")! };
+  const spender = dataOf(html, "konto-passkey", "spender")!;
+  const hash = dataOf(html, "konto-passkey", "revoke-hash");
+  const nonce = dataOf(html, "konto-passkey", "revoke-nonce");
+  if (hash && nonce) pageRevokes.set(spender.toLowerCase(), { hash: hash as Hex, nonce });
+  return { h, approve, html, spender };
 }
 
 /** The konto 03 row of an account: its permission and the one a raise brought. */

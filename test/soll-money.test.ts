@@ -38,10 +38,10 @@ const clean = (over: Record<string, unknown> = {}) => ({
 });
 
 describe("soll judgement of money in and out", () => {
-  it("passes a clean render of all seven states at both widths with no defect", () => {
-    expect(MONEY_STATES).toEqual(["deposit-approve", "deposit-card", "payout-approve", "payout-verify", "payout-bank", "payout-passkey", "retry"]);
+  it("passes a clean render of all eight states at both widths with no defect", () => {
+    expect(MONEY_STATES).toEqual(["deposit-approve", "deposit-card", "payout-approve", "payout-approve-revoke", "payout-verify", "payout-bank", "payout-passkey", "retry"]);
     expect(MONEY_BLOCKS).toEqual({
-      "deposit-approve": "approve", "deposit-card": "card", "payout-approve": "approve", "payout-verify": "verify",
+      "deposit-approve": "approve", "deposit-card": "card", "payout-approve": "approve", "payout-approve-revoke": "approve", "payout-verify": "verify",
       "payout-bank": "bank", "payout-passkey": "payout", retry: "retry",
     });
     const results = [];
@@ -51,7 +51,7 @@ describe("soll judgement of money in and out", () => {
       expect(defects).toEqual([]);
       results.push({ state, width, blockBottom, defects });
     }
-    expect(summaryMoney(results)).toBe("soll money: 14 images, blocks end 390=560 1440=540, 0 defects");
+    expect(summaryMoney(results)).toBe("soll money: 16 images, blocks end 390=570 1440=550, 0 defects");
     expect(summaryMoney([{ state: "retry", width: 390, blockBottom: 486, defects: ["x"] }, { state: "payout-bank", width: 390, blockBottom: null, defects: [] }]))
       .toBe("soll money: 2 images, blocks end 390=missing 1440=missing, 1 defects");
   });
