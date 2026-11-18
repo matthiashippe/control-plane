@@ -107,3 +107,43 @@
 ## Abgelöst durch umzug 02 (Maker, 2026-11-17)
 
 - Abgelöst: umzug 01 Punkt 1 durch umzug 02 Punkt 8, Ausgabe dann genau `Exit 0, 21` (Tech Lead, 2026-11-17)
+
+## Goal 03 (18.11.2026, Engineer CP)
+
+- **Die Karte sagt, was der Block `move` sagt**, weil ein Betreiber aus einem Conway-Issue zuerst den geteilten Link sieht
+  (Entscheidung 1): Überschrift in zwei festen Zeilen, Satz zu Wallet und API, die Zeile `"conwayApiUrl": "https://automatonhost.com"`
+  und unten rechts `automatonhost.com`. Markt, Provision und freier erster Auftrag sind weg.
+- **Neuer Baustein `.line` mit Codekasten**, weil die Zeile mit `conwayApiUrl` das ist, was der Betreiber abtippt, und als Code
+  erkennbar sein muss; Rahmen und Feldname im Grün der Karte, kein neuer Farbwert. Die Beschriftung lautet „One line to change“.
+- **`/og.png` gilt weiter für alle Seiten, die es tragen**, weil eine eigene Karte für Marktseiten keinen Bezug zum Ziel hat
+  (Entscheidung 2); `og-card-x402.html` und `og-x402.png` blieben unverändert.
+- **`ops/soll-og.mjs` misst Inhalt an den Kästen der Elemente, nicht an der Scrollbreite**, weil das Leuchten `body::before` mit
+  Absicht über den Rand reicht und abgeschnitten wird; über die Scrollbreite meldete das Werkzeug beim ersten Lauf 1320 px für
+  eine Karte, die nichts abschneidet. Das Werkzeug steht zusätzlich in den gemeinsamen Tests der SOLL-Werkzeuge (Flags, Browser
+  weg, Schriften).
+- **1:1 heißt byte- und pixelgleich**, weil Entscheidung 4 es so festlegt: `src/public/og-card.html` und `src/public/og.png` sind
+  Kopien von Quelle und SOLL-Bild, gemacht nach der Abnahme (Design Reviewer 01:19 UTC, Karte um 01:23 UTC).
+- **Test der Karte verlangt keinen freien ersten Auftrag**, weil ein Bild `starterOffer()` nicht fragen kann (Entscheidung 6):
+  „first job“, „free“ und der Betrag des Startguthabens fehlen. Der zweite Fall vergleicht mit der Überschrift des Blocks `move`
+  und prüft zusätzlich, dass sie aus zwei Sätzen besteht und die Frage vorn steht; Fälle 3 wie vorher, Zeilen mit `expect(` 15 statt 11.
+- **Das Prüfwerkzeug der Karte erkennt die Umzugskarte an `conwayApiUrl`**, weil sie keinen Auftrag verspricht und damit bei
+  jedem Topf wahr ist (Entscheidung 7); verspricht sie ihn doch, gilt die alte Prüfung. Die sechs alten Fälle stehen unverändert,
+  vier neue kamen dazu.
+- **`llms.txt` beginnt mit dem Wechsel**, weil ein Automaton die Datei zuerst liest (Entscheidung 8); der Markt-Absatz steht
+  unverändert unter `## The market`, deshalb bleiben die Tests, die dort die Sätze der Startseite suchen, grün.
+- **Prüfbefehl von Punkt 3 mit `soll-live.mjs` braucht Node 22 vorn im `PATH`**, weil better-sqlite3 im Worktree für Node 22
+  gebaut ist und die Shell des code-host Node 24 vorn hat; mit `PATH=/usr/bin:$PATH` gibt er `exit=0 0 defects`.
+- **Abgelöste Prüfbefehle: 7**, weil neue Tests, Kommentare und Zeitstempel unter `docs/soll/` ihre Ausgabe ändern
+  (Entscheidung 9): Von 79 Prüfbefehlen fertiger Goals, die einen Pfad dieses Diffs oder `og-card`, `og.png`, `llms` oder
+  `One job` nennen, liefen 49 ohne Netz an der Merge-Basis `d02070e` und am Goal-Branch `8dc5ed4`, je in einem eigenen Worktree,
+  verglichen über Exit-Code und letzte Zeile; 29 nennen `origin/dev` oder die Merge-Basis und laufen im Audit am Verdict-Commit
+  ihres Goals, die 7 mit `(Netz)` liefen zusätzlich an beiden Ständen und lesen nur die Paperclip-API. Geändert: konto 08 Punkt 2 und 4 (sechstes Werkzeug in
+  `test/soll-browser-gone.test.ts`), seite 03 Punkt 6 (18 auf 28, an der Merge-Basis schon rot, weil umzug 01 und 02 den Namen
+  der Goals in Kommentare schrieben), umzug 02 Punkt 4 zweimal (Erwartung bleibt erfüllt), dazu mit Netz seite 01 Punkt 4 und
+  umzug 02 Punkt 2, weil `docs/soll/src/startseite.html` jetzt den Commit von 01:23 UTC trägt.
+
+## Abgelöst durch umzug 03 (Maker, 2026-11-18)
+
+- Abgelöst: umzug 02 Punkt 2 durch umzug 03 Punkt 3, Ausgabe dann genau `Exit 1, keine abnahme nach 2026-11-18T01:23:28+00:00` (Tech Lead, 2026-11-18)
+- Abgelöst: umzug 02 Punkt 4 durch umzug 03 Punkt 5, Ausgabe dann genau `Exit 0, 5` (Tech Lead, 2026-11-18)
+- Abgelöst: umzug 02 Punkt 4 durch umzug 03 Punkt 4, Ausgabe dann genau `Exit 0, SELFTEST OK: ten cases, both directions, including the number drifting apart and the card of the switch.` (Tech Lead, 2026-11-18)

@@ -125,3 +125,31 @@ Stand des Wechsels: Gemessen am 17.11.2026 vor dem Gate, nur lesend: `konto_acco
 https://automatonhost.com/ on 2 hosts, www.automatonhost.com/health 308 to https://automatonhost.com/health`. Der Wechsel ist
 damit grün. Bis umzug 02 selbst ausgerollt ist, zeigt `https://automatonhost.com/` noch die Seiten von `dev` mit dem alten Namen;
 das prüft der Release Manager nach dem Deploy.
+
+## Vorschaukarte und llms.txt (umzug 03)
+
+Wer einen Link auf `automatonhost.com` geteilt bekommt oder `/llms.txt` liest, erfährt seit umzug 03 zuerst, dass sein Automaton
+hier weiterläuft, weil genau diese beiden Stellen ein Betreiber aus einem Conway-Issue und sein Automaton zuerst sehen.
+
+**Vorschaukarte.** `/og.png` ist das Vorschaubild von `/` und rund zwanzig weiteren Seiten. Es trägt die Überschrift des Blocks
+`move` („Conway not answering?“, „Your automaton runs here.“), den Satz zu eigener Wallet und gleicher API und die eine Zeile
+`"conwayApiUrl": "https://automatonhost.com"`. Markt, Provision und freier erster Auftrag stehen nicht mehr darauf, weil ein Bild
+nicht fragen kann, ob der Topf des Startguthabens noch zahlt, und weil der Markt nicht das Angebot an diesen Leser ist.
+`og:image:alt` in `src/public/index.html` beschreibt dieselbe Karte. `og-x402.png` für die x402-Seiten bleibt.
+
+**Nur nach Bild.** Die Karte wird nur über das SOLL-Bild geändert: zuerst `docs/soll/src/og-card.html`, dann
+`node ops/soll-og.mjs` (schreibt `docs/soll/og-card.png`, 2400 x 1260), dann die Abnahme durch den Design Reviewer, erst danach
+`cp docs/soll/src/og-card.html src/public/og-card.html` und `cp docs/soll/og-card.png src/public/og.png`. Neu aufgenommen wird nie
+von Hand, sondern mit `ops/soll-og.mjs` und `FONTCONFIG_FILE=$HOME/.config/control-plane/soll-fonts.conf`;
+`node ops/soll-og.mjs --check --source src/public/og-card.html` zeigt, dass die Karte des Dienstes pixelgleich mit dem Bild ist.
+Abschnitt Vorschaukarte in `docs/soll/README.md` nennt Mängel und Bausteine.
+
+**Prüfwerkzeug der Karte.** `ops/og-card-says-the-truth.sh` hält die Karte gegen den Topf des Startguthabens aus `/v1/status`.
+Eine Karte, die `conwayApiUrl` nennt und keinen freien ersten Auftrag verspricht, stimmt bei vollem wie bei leerem Topf; eine
+Karte, die den Auftrag verspricht, muss wie bisher die Zahl des Dienstes nennen und darf es bei leerem Topf nicht.
+`--selftest` fährt zehn Fälle, darunter die ausgelieferte Karte bei vollem und leerem Topf.
+
+**llms.txt.** Der erste Absatz nach `# automatonhost.com` ist der Wechsel: `conwayApiUrl` in `~/.automaton/automaton.json` auf
+den kanonischen Host (`siteOrigin()`), dann `automaton --provision`, gleiche API, eigene Wallet. Der Absatz zum Markt („One job
+…“) folgt unverändert unter `## The market`, weil ein Automaton, das die Datei liest, zuerst die Zeile braucht, die es
+weiterlaufen lässt, und erst danach ein Angebot, das nicht seines ist. `test/automaton-name.test.ts` prüft beides.
