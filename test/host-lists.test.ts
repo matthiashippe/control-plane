@@ -1,7 +1,7 @@
 /**
- * The hosts of the service and the zones of the payment are listed in several files (goals/umzug/01, point 10). These
- * cases hold every copy against the two lists in code, one case per file, so a host added in one place only fails here
- * with the name of the file that was missed instead of reaching a customer or a revert.
+ * The hosts of the service and the zones of the payment are listed in six files (goals/umzug/01, point 10, and
+ * goals/umzug/04). These cases hold every copy against the two lists in code, one case per file, so a host added in one
+ * place only fails here with the name of the file that was missed instead of reaching a customer or a revert.
  */
 import fs from "node:fs";
 import { describe, expect, it } from "vitest";
@@ -17,6 +17,13 @@ describe("host and payment zone lists stay in step", () => {
     const m = read("ops/live.sh").match(/^HOSTS="([^"]*)"$/m);
     expect(m, "no HOSTS= line in ops/live.sh").not.toBeNull();
     expect(m![1].split(/\s+/).filter(Boolean)).toEqual([...SERVICE_HOSTS]);
+  });
+
+  it("ops/before-the-answers.py: KNOWN_HOSTS is the same set as SERVICE_HOSTS", () => {
+    const m = read("ops/before-the-answers.py").match(/^KNOWN_HOSTS = \((.*)\)$/m);
+    expect(m, "no KNOWN_HOSTS line in ops/before-the-answers.py").not.toBeNull();
+    const hosts = [...m![1].matchAll(/"([^"]+)"/g)].map((x) => x[1]);
+    expect(sorted(hosts)).toEqual(sorted(SERVICE_HOSTS));
   });
 
   it("ops/sandbox/cloudflare.py: PAYMENT_ZONES is the same set as in sandboxd", () => {
