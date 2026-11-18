@@ -11,6 +11,11 @@
 #   ops/timeout-quote.sh --compare-files CADDY ROWS   the same from files
 #   ops/timeout-quote.sh --selftest           no network: planted lines, a quote above 0 where a long call was planted and
 #                                             exactly 0 where none was
+#   ops/timeout-quote.sh --selftest-scale     no network: 200000 planted requests with their rows through --compare-files
+#
+# --join, --rows and --since-rollout take the period from TQ_SINCE and TQ_UNTIL (ISO time in UTC) as well. --rows keeps a
+# row by the time it was written; --join keeps a request by the time of the row it is attributed to, or by its end when
+# it has none. Rows and requests are matched in a window over rows sorted by time, so seven days of traffic take seconds.
 #
 # A call counts when it is a POST to /v1/chat/completions that ended with status 200 or was aborted
 # by the client (Caddy logs status 0). It is a timeout when it ran at least TQ_LIMIT_S seconds,
@@ -42,6 +47,11 @@
 # `clock` (a timeout on Caddy's clock and not on the service's `duration_ms`, or the other way round),
 # `unmatched` (a request without a row, or a row without a request). The shares add up to the
 # deviation; if they do not, the tool exits 3 without printing a cause.
+# Since abrechnung 05 --compare also checks itself against code that does not share its classes: one
+# line `check caddy: compare <requests> <timeouts>, join <requests> <timeouts>` (the --join count over
+# the same input and period) and per model `check service <model>: compare ..., rows ...` (the --rows
+# count). Any difference ends the run with exit 3 and `independent check failed: <which>` on stderr,
+# before any cause is printed.
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -74,13 +84,68 @@ ROWS_JS='const file = process.argv[1] || "/data/cp.db"; const db = require("bett
 COUNT_JS='
 const fs = require("fs");
 const [mode, a, b, ownFile, limitS] = process.argv.slice(1);
+const sinceArg = process.argv[6] || "", untilArg = process.argv[7] || "";
 const limit = Number(limitS);
 const read = (f) => (f === "-" ? fs.readFileSync(0, "utf8") : fs.readFileSync(f, "utf8"));
 const parseLines = (text) => text.split("\n").filter((l) => l.trim()).flatMap((l) => { try { return [JSON.parse(l)]; } catch { return []; } });
-const rows = (f) => parseLines(read(f)).filter((r) => r && typeof r.model === "string" && typeof r.at === "string").map((r) => {
+// Rows keep their position in the input (idx): wherever two rows fit a request equally well, the earlier one wins, as it
+// always did when every request scanned the whole list.
+const rowsOf = (text) => parseLines(text).filter((r) => r && typeof r.model === "string" && typeof r.at === "string").map((r, idx) => {
   const m = /^gen-(\d{9,11})-/.exec(r.ref || "");
-  return { ...r, t: Date.parse(r.at) / 1000, start: m ? Number(m[1]) : null, used: false };
+  return { ...r, idx, t: Date.parse(r.at) / 1000, start: m ? Number(m[1]) : null, used: false };
 });
+const callsOf = (text) => parseLines(text).filter((j) => j.request && j.request.method === "POST" && /^\/v1\/chat\/completions(\?|$)/.test(j.request.uri || "") && (j.status === 200 || j.status === 0) && typeof j.ts === "number" && typeof j.duration === "number")
+  .map((j) => ({ end: j.ts, start: j.ts - j.duration, d: j.duration, ip: j.request.client_ip || j.request.remote_ip || "" }))
+  .sort((x, y) => x.end - y.end);
+const hasDuration = (x) => x.duration_ms !== null && x.duration_ms !== undefined && Number.isFinite(Number(x.duration_ms));
+const parseIso = (name, v) => {
+  if (!v) return null;
+  const t = Date.parse(v);
+  if (!/^\d{4}-\d{2}-\d{2}(T|$)/.test(v) || !Number.isFinite(t)) { console.error(`${name} is no ISO time in UTC: ${v}`); process.exit(2); }
+  return t / 1000;
+};
+const sinceSet = parseIso("TQ_SINCE", sinceArg), untilSet = parseIso("TQ_UNTIL", untilArg);
+const iso = (s) => new Date(s * 1000).toISOString();
+const inPeriod = (t, since, until) => (since === null || t >= since) && (until === null || t <= until);
+// First index of a list sorted by `key` whose value is at least v (binary search).
+const lowerBound = (list, key, v) => {
+  let lo = 0, hi = list.length;
+  while (lo < hi) { const mid = (lo + hi) >> 1; if (list[mid][key] < v) lo = mid + 1; else hi = mid; }
+  return lo;
+};
+// The rows sorted by the time they were written; a request only looks at the rows inside its own window, so the
+// matching grows with the number of rows, not with requests times rows.
+const byTime = (rs) => rs.filter((x) => Number.isFinite(x.t)).sort((x, y) => x.t - y.t || x.idx - y.idx);
+// The row of a request: generation start within 2 s of the request start (or, for a row without a generation ID, the
+// closest write to the request end), written from 1 s before the request started to 15 s after it ended, not taken yet.
+const ownRow = (sorted, r) => {
+  let best = null, bd = Infinity;
+  for (let k = lowerBound(sorted, "t", r.start - 1); k < sorted.length && sorted[k].t <= r.end + 15; k += 1) {
+    const x = sorted[k];
+    if (x.used) continue;
+    const dist = x.start !== null ? Math.abs(x.start - r.start) : Math.abs(x.t - r.end);
+    if (x.start !== null && dist > 2) continue;
+    if (dist < bd || (dist === bd && x.idx < best.idx)) { bd = dist; best = x; }
+  }
+  return best;
+};
+// The join: per request its own row, else the first row (in input order) written while it ran, else none. A request is
+// in the period by the time of the row it is attributed to, without one by its end: the time its answer was booked.
+const joinCalls = (reqs, rs) => {
+  const sorted = byTime(rs);
+  return reqs.map((r) => {
+    let row = ownRow(sorted, r);
+    if (row) row.used = true;
+    else {
+      for (let k = lowerBound(sorted, "t", r.start - 1); k < sorted.length && sorted[k].t <= r.end + 1; k += 1) {
+        if (!row || sorted[k].idx < row.idx) row = sorted[k];
+      }
+    }
+    return { r, model: row ? row.model : "unattributed", at: row ? row.t : r.end, timeout: r.d >= limit };
+  });
+};
+// The database alone: every row with a duration, in the period by the time it was written.
+const timedRows = (rs, since, until) => rs.filter((r) => hasDuration(r) && Number.isFinite(r.t) && inPeriod(r.t, since, until));
 const table = new Map();
 const add = (model, day, origin, timeout) => {
   for (const d of [day, "all"]) {
@@ -109,94 +174,71 @@ const print = (header) => {
 if (mode === "join") {
   const own = new Set(read(ownFile).split("\n").map((l) => l.replace(/#.*/, "").trim().split(/\s+/)[0]).filter(Boolean));
   if (!own.size) { console.error("own address list is empty or missing: " + ownFile); process.exit(2); }
-  const reqs = parseLines(read(a)).filter((j) => j.request && j.request.method === "POST" && /^\/v1\/chat\/completions(\?|$)/.test(j.request.uri || "") && (j.status === 200 || j.status === 0) && typeof j.ts === "number" && typeof j.duration === "number")
-    .map((j) => ({ end: j.ts, start: j.ts - j.duration, d: j.duration, ip: j.request.client_ip || j.request.remote_ip || "" }))
-    .sort((x, y) => x.end - y.end);
-  const rs = rows(b);
+  const calls = joinCalls(callsOf(read(a)), rowsOf(read(b))).filter((c) => inPeriod(c.at, sinceSet, untilSet));
   let unattributed = 0;
-  for (const r of reqs) {
-    let best = null, bd = Infinity;
-    for (const x of rs) {
-      if (x.used || x.t < r.start - 1 || x.t > r.end + 15) continue;
-      const dist = x.start !== null ? Math.abs(x.start - r.start) : Math.abs(x.t - r.end);
-      if (x.start !== null && dist > 2) continue;
-      if (dist < bd) { bd = dist; best = x; }
-    }
-    if (best) best.used = true;
-    else best = rs.find((x) => x.t >= r.start - 1 && x.t <= r.end + 1) || null;
-    if (!best) unattributed += 1;
-    add(best ? best.model : "unattributed", new Date(r.end * 1000).toISOString().slice(0, 10), own.has(r.ip) ? "own" : "foreign", r.d >= limit);
+  for (const c of calls) {
+    if (c.model === "unattributed") unattributed += 1;
+    add(c.model, new Date(c.r.end * 1000).toISOString().slice(0, 10), own.has(c.r.ip) ? "own" : "foreign", c.timeout);
   }
-  const first = reqs.length ? new Date(reqs[0].end * 1000).toISOString().slice(0, 16) : "-";
-  const last = reqs.length ? new Date(reqs[reqs.length - 1].end * 1000).toISOString().slice(0, 16) : "-";
-  print(`period ${first} to ${last} UTC, ${reqs.length} calls, ${unattributed} unattributed, timeout from ${limit} s`);
+  const ends = calls.map((c) => c.r.end);
+  const first = ends.length ? new Date(ends[0] * 1000).toISOString().slice(0, 16) : "-";
+  const last = ends.length ? new Date(ends[ends.length - 1] * 1000).toISOString().slice(0, 16) : "-";
+  print(`period ${first} to ${last} UTC, ${calls.length} calls, ${unattributed} unattributed, timeout from ${limit} s`);
 } else if (mode === "rows") {
-  const rs = rows(a).filter((r) => Number.isFinite(Number(r.duration_ms)) && r.duration_ms !== null);
-  const since = b || (rs.filter((r) => r.src === "ledger").map((r) => r.at).sort()[0] ?? "");
-  const kept = rs.filter((r) => since && r.at >= since);
+  const rs = rowsOf(read(a));
+  const firstLedger = rs.filter((r) => hasDuration(r) && r.src === "ledger" && Number.isFinite(r.t)).reduce((p, r) => (p === null || r.t < p.t ? r : p), null);
+  const since = sinceSet ?? (firstLedger ? firstLedger.t : null);
+  const kept = since === null ? [] : timedRows(rs, since, untilSet);
   for (const r of kept) add(r.model, r.at.slice(0, 10), r.src === "abort" ? "aborted" : "answered", Number(r.duration_ms) >= limit * 1000);
-  print(`since ${since || "the rollout (no call with a duration yet)"}, ${kept.length} calls, timeout from ${limit} s`);
+  const label = sinceArg || (firstLedger ? firstLedger.at : "");
+  print(`since ${label || "the rollout (no call with a duration yet)"}${untilArg ? ` until ${untilArg}` : ""}, ${kept.length} calls, timeout from ${limit} s`);
 } else if (mode === "compare") {
   // Both measurements over the same period (abrechnung 03). Every Caddy request is matched to its own
   // row first (generation start within 2 s, written before the request ended plus 15 s); then each
   // request and each row lands in exactly one class:
   //   pair       a request with its own row that carries a duration: counted by both measurements,
   //              a timeout on one clock and not on the other is cause "clock"
-  //   coalesced  a request without its own row that was answered by a row written while it ran
+  //   coalesced  a request without its own row that ended within 2 s of a request with one
   //   unmatched  a request without any row (or whose row has no duration), or a row without a request
-  // A pair and a coalesced request are in the period by the time their row was written, everything
-  // else by its own time, so a request and the row that answered it are never split by a boundary.
-  const sinceArg = process.argv[6] || "", untilArg = process.argv[7] || "";
-  const parseIso = (name, v) => {
-    if (!v) return null;
-    const t = Date.parse(v);
-    if (!/^\d{4}-\d{2}-\d{2}T/.test(v) || !Number.isFinite(t)) { console.error(`${name} is no ISO time in UTC: ${v}`); process.exit(2); }
-    return t / 1000;
-  };
-  const sinceSet = parseIso("TQ_SINCE", sinceArg), untilSet = parseIso("TQ_UNTIL", untilArg);
-  const reqs = parseLines(read(a)).filter((j) => j.request && j.request.method === "POST" && /^\/v1\/chat\/completions(\?|$)/.test(j.request.uri || "") && (j.status === 200 || j.status === 0) && typeof j.ts === "number" && typeof j.duration === "number")
-    .map((j) => ({ end: j.ts, start: j.ts - j.duration, d: j.duration }))
-    .sort((x, y) => x.end - y.end);
-  const rs = rows(b);
-  const hasDuration = (x) => x.duration_ms !== null && x.duration_ms !== undefined && Number.isFinite(Number(x.duration_ms));
-  const firstTimed = rs.filter((x) => hasDuration(x) && x.src === "ledger").map((x) => x.t).sort((p, q) => p - q)[0];
-  const since = sinceSet ?? firstTimed ?? null;
+  // A request with a row of its own and a coalesced request are in the period by the time their row
+  // was written, everything else by its own time, so a request and the row that answered it are never
+  // split by a boundary.
+  const textA = read(a), textB = read(b);
+  const reqs = callsOf(textA);
+  const rs = rowsOf(textB);
+  const sorted = byTime(rs);
+  const firstTimed = rs.reduce((p, x) => (hasDuration(x) && x.src === "ledger" && Number.isFinite(x.t) && (p === null || x.t < p) ? x.t : p), null);
+  const since = sinceSet ?? firstTimed;
   if (since === null) { console.error("no row with a duration yet, nothing to compare; set TQ_SINCE"); process.exit(2); }
   const items = [];
   // First pass: every request that finds its own row. Their end times are what a coalesced retry is matched against.
   const paired = [], lone = [];
   for (const r of reqs) {
-    let best = null, bd = Infinity;
-    for (const x of rs) {
-      if (x.used || x.t < r.start - 1 || x.t > r.end + 15) continue;
-      const dist = x.start !== null ? Math.abs(x.start - r.start) : Math.abs(x.t - r.end);
-      if (x.start !== null && dist > 2) continue;
-      if (dist < bd) { bd = dist; best = x; }
-    }
+    const best = ownRow(sorted, r);
     if (!best) { lone.push(r); continue; }
     best.used = true;
     const item = hasDuration(best)
       ? { kind: "pair", at: best.t, model: best.model, caddyTo: r.d >= limit, serviceTo: Number(best.duration_ms) >= limit * 1000 }
-      : { kind: "caddy-only", at: r.end, model: best.model, caddyTo: r.d >= limit };
+      : { kind: "caddy-only", at: best.t, model: best.model, caddyTo: r.d >= limit };
     items.push(item);
     paired.push({ end: r.end, item });
   }
   // Second pass: a request without a row of its own is coalesced only when it ended within COALESCE_S of a request that
   // has one, because the coalescer hands leader and retry the same answer at the same moment. A row merely written while
   // it ran is not enough: nearly every 60 s call overlaps a row of another request, and a timeout without an abort row (the lost
-  // booking this comparison exists to find) would hide under coalesced.
+  // booking this comparison exists to find) would hide under coalesced. `paired` is sorted by end, so only its window is read.
   const COALESCE_S = 2;
   for (const r of lone) {
     let leader = null, ld = Infinity;
-    for (const p of paired) {
-      const dist = Math.abs(p.end - r.end);
-      if (dist <= COALESCE_S && dist < ld) { ld = dist; leader = p.item; }
+    for (let k = lowerBound(paired, "end", r.end - COALESCE_S); k < paired.length && paired[k].end <= r.end + COALESCE_S; k += 1) {
+      const dist = Math.abs(paired[k].end - r.end);
+      if (dist < ld) { ld = dist; leader = paired[k].item; }
     }
     if (leader) items.push({ kind: "coalesced", at: leader.at, model: leader.model, caddyTo: r.d >= limit });
     else items.push({ kind: "caddy-only", at: r.end, model: "unattributed", caddyTo: r.d >= limit });
   }
   for (const x of rs) if (!x.used && hasDuration(x)) items.push({ kind: "service-only", at: x.t, model: x.model, serviceTo: Number(x.duration_ms) >= limit * 1000 });
-  const until = untilSet ?? Math.max(...items.map((i) => i.at), since);
+  const until = untilSet ?? items.reduce((m, i) => (i.at > m ? i.at : m), since);
   const kept = items.filter((i) => i.at >= since && i.at <= until);
   const per = new Map();
   const bump = (model, side, to) => {
@@ -221,7 +263,6 @@ if (mode === "join") {
     }
   }
   const quote = (e) => (e.n ? `${((100 * e.to) / e.n).toFixed(1)} %` : "-");
-  const iso = (s) => new Date(s * 1000).toISOString();
   console.log(`period ${iso(since)} to ${iso(until)} UTC, timeout from ${limit} s`);
   console.log("| model | measure | requests | timeouts | quote |");
   console.log("|---|---|---:|---:|---:|");
@@ -237,6 +278,32 @@ if (mode === "join") {
   const devReq = tot.caddy.n - tot.service.n, devTo = tot.caddy.to - tot.service.to;
   console.log(`deviation requests: ${devReq} (caddy ${tot.caddy.n}, service ${tot.service.n})`);
   console.log(`deviation timeouts: ${devTo} (caddy ${tot.caddy.to}, service ${tot.service.to})`);
+  // Independent check (abrechnung 05): the column caddy against the join and every model of the column service against the
+  // database alone, both run on fresh copies of the same input over the same period, without the classes above. The causes
+  // below are counted from those classes, so they cannot see a request filed in the wrong class; these two can.
+  const failed = [];
+  const joined = joinCalls(callsOf(textA), rowsOf(textB)).filter((c) => inPeriod(c.at, since, until));
+  const join = { n: joined.length, to: joined.filter((c) => c.timeout).length };
+  console.log(`check caddy: compare ${tot.caddy.n} ${tot.caddy.to}, join ${join.n} ${join.to}`);
+  if (join.n !== tot.caddy.n || join.to !== tot.caddy.to) failed.push("caddy");
+  const direct = new Map();
+  for (const r of timedRows(rowsOf(textB), since, until)) {
+    const e = direct.get(r.model) || { n: 0, to: 0 };
+    e.n += 1;
+    if (Number(r.duration_ms) >= limit * 1000) e.to += 1;
+    direct.set(r.model, e);
+  }
+  const models = new Set([...direct.keys(), ...[...per.keys()].filter((m) => per.get(m).service.n > 0)]);
+  for (const model of [...models].sort()) {
+    const s = per.has(model) ? per.get(model).service : { n: 0, to: 0 };
+    const d = direct.get(model) || { n: 0, to: 0 };
+    console.log(`check service ${model}: compare ${s.n} ${s.to}, rows ${d.n} ${d.to}`);
+    if (s.n !== d.n || s.to !== d.to) failed.push(`service ${model}`);
+  }
+  if (failed.length) {
+    console.error(`independent check failed: ${failed.join(", ")}`);
+    process.exit(3);
+  }
   const sumReq = cause.coalesced.req + cause.clock.req + cause.unmatched.req;
   const sumTo = cause.coalesced.to + cause.clock.to + cause.unmatched.to;
   if (sumReq !== devReq || sumTo !== devTo) {
@@ -281,7 +348,7 @@ production() {
   }
   fetch_rows "$TQ_DIR/rows.jsonl"
   CP_HOST="$CP_HOST" CP_SSH_KEY="$KEY" own_list "$TQ_DIR/own.txt"
-  count join "$TQ_DIR/caddy.jsonl" "$TQ_DIR/rows.jsonl" "$TQ_DIR/own.txt" "$LIMIT_S"
+  count join "$TQ_DIR/caddy.jsonl" "$TQ_DIR/rows.jsonl" "$TQ_DIR/own.txt" "$LIMIT_S" "${TQ_SINCE:-}" "${TQ_UNTIL:-}"
 }
 
 compare() {
@@ -300,7 +367,7 @@ join_files() { # $1 = CADDY file or -, $2 = ROWS file; own_ips with CP_HOST and 
   TQ_DIR="$(mktemp -d)"
   trap 'rm -rf "$TQ_DIR"' EXIT
   own_list "$TQ_DIR/own.txt"
-  count join "$1" "$2" "$TQ_DIR/own.txt" "$LIMIT_S"
+  count join "$1" "$2" "$TQ_DIR/own.txt" "$LIMIT_S" "${TQ_SINCE:-}" "${TQ_UNTIL:-}"
 }
 
 since_rollout() {
@@ -308,7 +375,7 @@ since_rollout() {
   TQ_DIR="$(mktemp -d)"
   trap 'rm -rf "$TQ_DIR"' EXIT
   fetch_rows "$TQ_DIR/rows.jsonl"
-  count rows "$TQ_DIR/rows.jsonl" "${TQ_SINCE:-}" "$NO_OWN_LIST" "$LIMIT_S"
+  count rows "$TQ_DIR/rows.jsonl" - "$NO_OWN_LIST" "$LIMIT_S" "${TQ_SINCE:-}" "${TQ_UNTIL:-}"
 }
 
 selftest() {
@@ -399,13 +466,13 @@ selftest() {
     printf '{"src":"abort","at":"2026-11-12T10:00:00.000Z","ref":null,"model":"openai/gpt-5.2","duration_ms":59950}\n'
     printf '{"src":"abort","at":"2026-11-10T05:37:53.000Z","ref":null,"model":"openai/gpt-5.2","duration_ms":59900}\n'
   } >"$dir/since.jsonl"
-  out="$(count rows "$dir/since.jsonl" "" "$dir/own.txt" "$LIMIT_S")" || all_ok=0
+  out="$(count rows "$dir/since.jsonl" - "$dir/own.txt" "$LIMIT_S" "" "")" || all_ok=0
   echo "$out" | sed 's/^/  planted since: /'
   expect "since rollout, long abort" "$out" "| openai/gpt-5.2 | 2026-11-12 | aborted | 1 | 1 | 100.0 % |"
   expect "since rollout, short answer" "$out" "| openai/gpt-5.2 | 2026-11-12 | answered | 1 | 0 | 0.0 % |"
   expect "before the rollout left out" "$out" "since 2026-11-12T09:00:00.000Z, 2 calls, timeout from $LIMIT_S s"
   printf '{"src":"ledger","at":"2026-11-12T09:00:00.000Z","ref":"gen-2","model":"openai/gpt-5.2","duration_ms":12000}\n' >"$dir/since-short.jsonl"
-  out="$(count rows "$dir/since-short.jsonl" "" "$dir/own.txt" "$LIMIT_S")" || all_ok=0
+  out="$(count rows "$dir/since-short.jsonl" - "$dir/own.txt" "$LIMIT_S" "" "")" || all_ok=0
   expect "since rollout, no long call, quote 0" "$out" "| openai/gpt-5.2 | all | answered | 1 | 0 | 0.0 % |"
 
   # Both measurements over the same period (abrechnung 03). `iso` turns a unix time into the form the rows carry.
@@ -432,6 +499,33 @@ selftest() {
   expect "compare equal, cause coalesced 0" "$out" "cause coalesced: 0 (requests 0, timeouts 0)"
   expect "compare equal, cause clock 0" "$out" "cause clock: 0 (requests 0, timeouts 0)"
   expect "compare equal, cause unmatched 0" "$out" "cause unmatched: 0 (requests 0, timeouts 0)"
+  # Independent check (abrechnung 05): the join and the rows alone count what compare counts.
+  expect "compare check equal, caddy against the join" "$out" "check caddy: compare 3 1, join 3 1"
+  expect "compare check equal, service against the rows" "$out" "check service openai/gpt-5.2: compare 2 1, rows 2 1"
+  expect "compare check equal, service against the rows" "$out" "check service openai/gpt-5-mini: compare 1 0, rows 1 0"
+
+  # Boundary: a pair whose request ends 5 s before TQ_UNTIL and whose row is written 3 s after it. compare files it by
+  # its row, so it is out; the join files a request by the row it is attributed to and the rows by their own time, so
+  # it is out there too, and the check does not fail on a pair split by the boundary.
+  {
+    line $((c + 10)) 9.0 200 "$stranger"
+    line $((c + 595)) 30.0 200 "$stranger"
+  } >"$dir/cmp-boundary.jsonl"
+  {
+    trow $((c + 11)) $((c + 1)) openai/gpt-5.2 8900
+    trow $((c + 603)) $((c + 565)) openai/gpt-5.2 29800
+  } >"$dir/cmp-boundary-rows.jsonl"
+  local rc=0
+  out="$(count compare "$dir/cmp-boundary.jsonl" "$dir/cmp-boundary-rows.jsonl" "$dir/own.txt" "$LIMIT_S" "$(iso "$c")" "$(iso $((c + 600)))" 2>&1)" || rc=$?
+  echo "$out" | sed 's/^/  planted boundary: /'
+  if [ "$rc" = 0 ]; then
+    echo "ok   compare check boundary: a pair split by TQ_UNTIL exits 0"
+  else
+    echo "FAIL compare check boundary: a pair split by TQ_UNTIL exits $rc"
+    all_ok=0
+  fi
+  expect "compare check boundary, caddy" "$out" "check caddy: compare 1 0, join 1 0"
+  expect "compare check boundary, service" "$out" "check service openai/gpt-5.2: compare 1 0, rows 1 0"
 
   # Causes: a leader of 59.7 s in the log and 58.9 s `duration_ms` (clock), a retry the coalescer answered (coalesced).
   # A pair and a request without a row outside TQ_SINCE and TQ_UNTIL must count in neither measurement.
@@ -481,15 +575,61 @@ selftest() {
   return 1
 }
 
+# 200000 Caddy lines and 200000 rows, one row per request, over about a week; every hundredth call a timeout on both
+# clocks. No network. --compare-files must count every request in both measurements and its independent check must agree.
+selftest_scale() {
+  curl() { echo "selftest must not reach the network (curl)" >&2; return 99; }
+  ssh() { echo "selftest must not reach the network (ssh)" >&2; return 99; }
+  local dir n=200000 out all_ok=1 started elapsed
+  dir="$(mktemp -d)"
+  trap 'rm -rf "$dir"' RETURN
+  # shellcheck disable=SC2016
+  NODE_NO_WARNINGS=1 node -e '
+    const fs = require("fs");
+    const [caddyFile, rowsFile, nArg] = process.argv.slice(1);
+    const n = Number(nArg), t0 = 1794700800;
+    const iso = (s) => new Date(s * 1000).toISOString();
+    const c = [], r = [];
+    for (let i = 0; i < n; i += 1) {
+      const long = i % 100 === 0, d = long ? 59.9 : 2.0, start = t0 + 3 * i, end = start + d;
+      const model = i % 2 ? "openai/gpt-5-mini" : "openai/gpt-5.2";
+      c.push(JSON.stringify({ ts: end, request: { client_ip: "198.51.100.7", method: "POST", uri: "/v1/chat/completions" }, duration: d, status: long ? 0 : 200 }));
+      r.push(long
+        ? JSON.stringify({ src: "abort", at: iso(end + 0.5), ref: null, model, duration_ms: 59800 })
+        : JSON.stringify({ src: "ledger", at: iso(end + 0.5), ref: `gen-${start}-planted`, model, duration_ms: 1900 }));
+    }
+    fs.writeFileSync(caddyFile, c.join("\n") + "\n");
+    fs.writeFileSync(rowsFile, r.join("\n") + "\n");
+  ' "$dir/caddy.jsonl" "$dir/rows.jsonl" "$n" || { echo "FAIL compare scale: planting failed"; echo "TIMEOUT QUOTE SCALE FAIL"; return 1; }
+  started=$(date +%s%N)
+  out="$(count compare "$dir/caddy.jsonl" "$dir/rows.jsonl" "$NO_OWN_LIST" "$LIMIT_S" "" "" 2>&1)" || all_ok=0
+  elapsed=$((($(date +%s%N) - started) / 1000000))
+  echo "$out" | grep -E '^(deviation|check|cause)' | sed 's/^/  planted scale: /'
+  for want in "deviation requests: 0 (caddy $n, service $n)" "deviation timeouts: 0 (caddy $((n / 100)), service $((n / 100)))" \
+    "check caddy: compare $n $((n / 100)), join $n $((n / 100))" "check service openai/gpt-5.2: compare $((n / 2)) $((n / 100)), rows $((n / 2)) $((n / 100))"; do
+    grep -qxF -- "$want" <<<"$out" || { echo "FAIL compare scale: missing $want"; all_ok=0; }
+  done
+  if [ "$all_ok" = 1 ]; then
+    echo "  took $elapsed ms"
+    echo "ok   compare scale: $n requests"
+    echo "TIMEOUT QUOTE SCALE OK"
+    return 0
+  fi
+  grep -m 3 -E 'Error|failed' <<<"$out"
+  echo "TIMEOUT QUOTE SCALE FAIL"
+  return 1
+}
+
 case "${1:-}" in
   --selftest) selftest ;;
+  --selftest-scale) selftest_scale ;;
   --join) join_files "${2:?CADDY file or -}" "${3:?ROWS file}" ;;
-  --rows) count rows "${2:?ROWS file or -}" "${TQ_SINCE:-}" "$NO_OWN_LIST" "$LIMIT_S" ;;
+  --rows) count rows "${2:?ROWS file or -}" - "$NO_OWN_LIST" "$LIMIT_S" "${TQ_SINCE:-}" "${TQ_UNTIL:-}" ;;
   --since-rollout) since_rollout ;;
   --compare) compare ;;
   --compare-files) count compare "${2:?CADDY file or -}" "${3:?ROWS file}" "$NO_OWN_LIST" "$LIMIT_S" "${TQ_SINCE:-}" "${TQ_UNTIL:-}" ;;
   "") production ;;
-  -h | --help) sed -n '2,44p' "$0" | sed 's/^# \{0,1\}//' ;;
+  -h | --help) sed -n '2,54p' "$0" | sed 's/^# \{0,1\}//' ;;
   *)
     echo "unknown switch: $1" >&2
     exit 2
