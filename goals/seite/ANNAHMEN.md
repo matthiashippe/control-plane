@@ -55,6 +55,13 @@
 
 - Abgelöst: seite 03 Punkt 8 durch konto 06 Punkt 1, Ausgabe dann genau `Exit 0, anders:  | soll limit: 4 pictures, approve top 390=555 1440=603, limit top 390=486 1440=510, 0 defects` (Tech Lead, 2026-11-17)
 - Abgelöst: seite 03 Punkt 8 durch konto 06 Punkt 7, Ausgabe dann genau `Exit 0, soll limit: 4 pictures, approve top 390=555 1440=603, limit top 390=486 1440=510, 0 defects` (Tech Lead, 2026-11-17)
+- Abgelöst: seite 03 Punkt 1 durch konto 06 Punkt 7, Ausgabe dann genau `Exit 0, soll konto: 4 pictures, passkey top 390=527 1440=510, 0 defects` (Tech Lead, 2026-11-17)
+- Entscheidung (Tech Lead, 2026-11-18, PRO-25107): konto 06 hat `freigabe top` mit Entscheidung 4 in `approve top` umbenannt, der Live-Befehl von seite 03 Punkt 1 meldet deshalb die Handoff-Zeile mit `approve top`; konto 06 Punkt 7 prüft dieselbe Seite mit dem neuen Namen. Die Zeile oben trägt das Datum 2026-11-17 wie alle Ablösungen durch konto 06, weil konto 06 Punkt 8 jede Zeile „durch konto 06“ mit diesem Datum verlangt; eingetragen hat sie der Tech Lead am 2026-11-18 nach eigenem Lauf ohne Netz unter Node 22.
+
+## Abgelöst durch konto 05 (Tech Lead, 2026-11-18)
+
+- Abgelöst: seite 03 Punkt 5 durch konto 05 Punkt 3, Ausgabe dann genau `Exit 0, fehlt konto 06` (Tech Lead, 2026-11-18)
+- Entscheidung (Tech Lead, 2026-11-18, PRO-25107): seite 03 Punkt 5 selbst ist abgelöst, nicht konto 05 oder konto 06, weil deren Prüfbefehle `--pruefen` und `Mängel` nur als Rückfall (konto 05 Punkt 3 und 5) oder im Ausschlussfilter (konto 06 Punkt 8) nennen und seite 03 an ihrer Ausgabe nichts ändert; eine Zeile „konto 05 Punkt n durch seite 03“ würde eine Ablösung behaupten, die es nicht gibt. Der Befehl gibt `fehlt konto 05` und als letzte Zeile `fehlt konto 06` aus. Ablöser ist konto 05 Punkt 3, weil dort der Rückfall zuerst steht; konto 06 Punkt 8 geht nicht, weil sein eigener Prüfbefehl nur Ablösungen durch konto 06 Punkt 1, 3, 6 und 7 zulässt. Nennt ein späteres DONE-Goal eines der Muster in einem Prüfbefehl, ändert sich die letzte Zeile, und das Audit meldet die Zeile wieder rot.
 
 ## Abgelöst durch umzug 02 (Maker, 2026-11-17)
 
@@ -64,3 +71,8 @@
 
 - Abgelöst: seite 01 Punkt 4 durch umzug 03 Punkt 3, Ausgabe dann genau `Exit 1, keine abnahme nach 2026-11-18T01:23:28+00:00` (Tech Lead, 2026-11-18)
 - Abgelöst: seite 03 Punkt 6 durch umzug 03 Punkt 1, Ausgabe dann genau `Exit 0, 28` (Tech Lead, 2026-11-18)
+
+## Abgelöst durch umzug 04 (Tech Lead, 2026-11-18)
+
+- Abgelöst: seite 03 Punkt 6 durch umzug 04 Punkt 6, Ausgabe dann genau `Exit 0, 36` (Tech Lead, 2026-11-18)
+- Entscheidung (Tech Lead, 2026-11-18, PRO-25107): Der Zähler bleibt ein Zähler, und Kommentare werden nicht für das Muster umgeschrieben, weil `\bumzug\b` seit dem Topic umzug auch dessen Namen in Verweisen wie `goals/umzug/04` oder `(umzug 01)` trifft und diese Verweise auf Englisch korrekt sind; seite 03 meinte den alten Bezeichner des Blocks oben (`id="umzug"`, `umzugBottom`), und den prüft Punkt 6 im zweiten Befehl weiter. Die acht neuen Treffer von 28 auf 36 kommen aus umzug 04 (`src/app.ts`, `src/public/og-cards.ts`, vier Tests); der einzige Treffer außerhalb eines Verweises bleibt `test/soll-money.test.ts:119`, der `--pruefen` absichtlich ablehnen lässt. Jedes spätere Goal, das den Zähler ändert, trägt seine Ablösung mit seinem eigenen Punkt für die Ablösungen ein, wie umzug 03 es tat.

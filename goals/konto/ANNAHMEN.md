@@ -238,8 +238,8 @@
 
 ## Abgelöst durch konto 06 (Maker, 2026-11-17)
 
-- Abgelöst: konto 02 Punkt 1 durch konto 06 Punkt 3, Ausgabe dann genau `Exit 1, Error: ENOENT: no such file or directory, open 'docs/soll/handoff-freigabe-390.png'` (Tech Lead, 2026-11-18, ersetzt die Zeile vom 2026-11-17 mit der Versionszeile von Node)
-- Abgelöst: konto 02 Punkt 1 durch konto 06 Punkt 3, Ausgabe dann genau `Exit 1, Error: ENOENT: no such file or directory, open 'docs/soll/src/handoff-freigabe.html'` (Tech Lead, 2026-11-18, ersetzt die Zeile vom 2026-11-17 mit der Versionszeile von Node)
+- Abgelöst: konto 02 Punkt 1 durch konto 06 Punkt 3, Ausgabe dann genau `Exit 1, Error: ENOENT: no such file or directory, open 'docs/soll/handoff-freigabe-390.png'` (Tech Lead, 2026-11-17)
+- Abgelöst: konto 02 Punkt 1 durch konto 06 Punkt 3, Ausgabe dann genau `Exit 1, Error: ENOENT: no such file or directory, open 'docs/soll/src/handoff-freigabe.html'` (Tech Lead, 2026-11-17)
 - Abgelöst: konto 02 Punkt 3 durch konto 06 Punkt 6, Ausgabe dann genau `Exit 1, keine abnahme nach 2026-11-17T12:48:57+00:00` (Tech Lead, 2026-11-17)
 - Abgelöst: konto 04 Punkt 3 durch konto 06 Punkt 6, Ausgabe dann genau `Exit 1, keine abnahme nach 2026-11-17T12:48:57+00:00` (Tech Lead, 2026-11-17)
 - Abgelöst: konto 04 Punkt 5 durch konto 06 Punkt 3, Ausgabe dann genau `Exit 0, 0` (Tech Lead, 2026-11-17)
@@ -247,6 +247,7 @@
 - Abgelöst: konto 05 Punkt 3 durch konto 06 Punkt 1, Ausgabe dann genau `Exit 1, 0` (Tech Lead, 2026-11-17)
 - Abgelöst: konto 05 Punkt 5 durch konto 06 Punkt 7, Ausgabe dann genau `Exit 1, 0` (Tech Lead, 2026-11-17)
 - Abgelöst: konto 05 Punkt 5 durch konto 06 Punkt 7, Ausgabe dann genau `Exit 1, 0` (Tech Lead, 2026-11-17)
+- Entscheidung (Tech Lead, 2026-11-18, PRO-25107): Die beiden Zeilen zu konto 02 Punkt 1 ersetzen seit ac5a836 die Zeilen vom 2026-11-17 mit der Versionszeile von Node und tragen wie jede Ablösung durch konto 06 das Datum 2026-11-17, weil konto 06 Punkt 8 jede Zeile „durch konto 06“ in genau diesem Format verlangt und mit dem Zusatz im Datum rot würde.
 
 ## Goal 07 (17.11.2026, Engineer CP)
 
