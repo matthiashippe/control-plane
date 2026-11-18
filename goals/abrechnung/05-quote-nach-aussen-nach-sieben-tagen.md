@@ -1,7 +1,7 @@
 # Abrechnung Goal 05: Quote nach außen nach sieben Tagen
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Die Timeout-Quote, die kanal und Seite nennen dürfen, ist gemessen: `ops/timeout-quote.sh --compare` läuft über den Zeitraum vom
@@ -154,7 +154,7 @@ Skalierung abbricht.
       Prüfung: `grep -c "bei beiden Modellen 0 mc" docs/abrechnung/timeouts.md` muss 0 ausgeben.
       Prüfung: `grep "^Anbieterwahl: " docs/abrechnung/timeouts.md | grep -c "17\.11\.2026"` muss 1 ausgeben.
       Prüfung: `grep "^Anbieterwahl: " docs/abrechnung/timeouts.md | grep -c "Nach sieben Tagen"` muss 1 ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Jede neue Testdatei und jede neue Selftest-Zeile war vor dem Fix rot; die Zeile im Progress Log nennt, womit.
@@ -178,5 +178,6 @@ Skalierung abbricht.
 - 2026-11-18 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6; `dev` hatte seit dem Start keinen neuen Commit, nichts zu mergen, jeder Prüfbefehl neu gefahren, die Messung über dieselben sieben Tage wiederholt sich mit denselben Zahlen. Prüfbefehle: P1 `timeout 10 … --selftest-scale` Exit 0, letzte Zeile `TIMEOUT QUOTE SCALE OK`; `Math.(max|min)(...` -> 0; vitest scale, compare, selftest Exit 0. P2 `--selftest` Exit 0, letzte Zeile `TIMEOUT QUOTE SELFTEST OK`; `^ok   compare check` -> 6; `independent` im Test -> 3; vitest compare Exit 0; `independent check failed` -> 2. P3 (Netz) `--compare` Exit 0, `^check service openai/` -> 2 (`check caddy: compare 1220 0, join 1220 0`, gpt-5-mini 995 0 gegen rows 995 0, gpt-5.2 225 0 gegen rows 225 0); `## Nach sieben Tagen` -> 1; Befehl -> 1; Tabellenzeilen -> 4; `check`-Zeilen -> 3; `Quote nach außen:` -> 1 und 1; `Widerlegt:` -> 1; `## Goal 05` -> 1; Adressen -> 0. P4 vitest Exit 0; `openrouter-management.env` -> 2; `loop.env` -> 0; `stat` -> 600; `--selftest` Exit 0. P5 (Netz) Exit 0, `^purchase without sale ` -> 2; `## Nach sieben Tagen` -> 1; Befehl -> 1; Zeile -> 1; in `timeouts.md` -> 1; Adressen -> 0. P6 `git diff --name-only origin/dev...HEAD -- src deploy | wc -l` -> 0; `node scripts/check.mjs` Exit 0 (2353 passed, grün in 216 s). Job `e2e` am Kopf 6bd5fb0 grün (`gh pr checks 266`: e2e pass 10m33s, check pass).
 - 2026-11-18 Zyklus 3: Punkt 7 gebaut: Die Zeile `Anbieterwahl:` in `docs/abrechnung/timeouts.md` steht auf der Messung bis 17.11.2026 und verweist auf `## Nach sieben Tagen`. Sie nennt die Quote nach außen 0,0 % (0 von 1220) und beim Einkauf je Abbruch „keine Zahl“ wegen `noise`. Ohne den 10.11. sind es bei gpt-5.2 8558 mc für 20 Abbrüche, also 1,8 % von 488347 mc Einkauf, und 7783 mc davon an einem einzigen Abbruch. Daraus folgt: Das Routing bleibt. Neu gemessen mit `AP_SINCE=2026-11-11 AP_NOW=2026-11-18T00:00:00Z bash ops/abort-purchase.sh`, Ergebnis `purchase without sale openai/gpt-5.2: 8558`, Spalte Einkauf mc für gpt-5.2 summiert 488347. Vor dem Fix lieferten dieselben greps auf der Datei von 4f49738 `bei beiden Modellen 0 mc` -> 1, `17.11.2026` in der Zeile -> 0, `Nach sieben Tagen` in der Zeile -> 0. Prüfbefehle: P7 `^Anbieterwahl: ` -> 1; `bei beiden Modellen 0 mc` -> 0; `17\.11\.2026` -> 1; `Nach sieben Tagen` -> 1. P3 `^Quote nach außen: ` -> 1, Adressen -> 0. P6 Diff gegen `src` und `deploy` -> 0; `node scripts/check.mjs` Exit 0 (grün in 109 s).
 - 2026-11-18 Zyklus 4: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, 7. `dev` (umzug 03, nur eine Goal-Datei) ist in den Goal-Branch gemergt, und jeder Prüfbefehl aller Punkte lief am Stand nach dem Merge neu. Prüfbefehle: P1 scale Exit 0, letzte Zeile `TIMEOUT QUOTE SCALE OK`; `Math.(max|min)(...` -> 0; vitest scale, compare, selftest, key-file 20 passed. P2 `--selftest` letzte Zeile `TIMEOUT QUOTE SELFTEST OK`; `^ok   compare check` -> 6; `independent` im Test -> 3; `independent check failed` -> 2. P3 (Netz) `check caddy: compare 1220 0, join 1220 0`, `^check service openai/` -> 2; Doku-greps -> 1, 1, 4, 3, 1, 1, 1, 1; Adressen -> 0. P4 `openrouter-management.env` -> 2; `loop.env` -> 0; `stat` -> 600; `--selftest` Exit 0. P5 (Netz) `^purchase without sale ` -> 2; Doku-greps -> 1, 1, 1, 1; Adressen -> 0. P6 Diff gegen `src` und `deploy` -> 0; `node scripts/check.mjs` Exit 0 (grün in 230 s). P7 `^Anbieterwahl: ` -> 1; `bei beiden Modellen 0 mc` -> 0; `17.11.2026` -> 1; `Nach sieben Tagen` -> 1.
+- 2026-11-18 Release: PASS K und B (Zyklus 4), DONE.
 
 ## Blockers
