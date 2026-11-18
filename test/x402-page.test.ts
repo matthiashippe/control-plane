@@ -148,7 +148,7 @@ describe("/x402", () => {
     const app = createApp({ db: openDb(":memory:") });
     const html = await (await app.request("/x402")).text();
 
-    expect(html).toContain('content="https://cp.hippe.eu/og-x402.png"');
+    expect(html).toMatch(/content="https:\/\/cp\.hippe\.eu\/og-x402\.png\?v=[0-9a-f]{8}"/);
     expect(html, "the landing page's card must not follow it").not.toContain("/og.png");
     expect(html).toMatch(/og:title" content="How big the paid-API market/);
     expect(html).toMatch(/og:url" content="https:\/\/cp\.hippe\.eu\/x402"/);

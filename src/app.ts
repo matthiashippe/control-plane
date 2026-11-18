@@ -3,6 +3,7 @@
  * 404 with a JSON error; the runtime treats that as "feature not available".
  */
 
+import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -25,7 +26,8 @@ import { mintKeylessIdentity, mintAgentIdentity, KeylessError } from "./auth/key
 import { renderStarted, renderNoFreeJob } from "./public/startpage.js";
 import { reviewBrief } from "./bounties/brief.js";
 import { receipts, PUBLICATION_FROM } from "./bounties/receipts.js";
-import { renderMarket, renderNumbers, renderPrices, renderStatus } from "./public/market.js";
+import { esc, renderMarket, renderNumbers, renderPrices, renderStatus } from "./public/market.js";
+import { OG_CARDS, isOgCardName, type OgCardName } from "./public/og-cards.js";
 import { readSeries, renderX402 } from "./public/x402.js";
 import { readMoneySeries, readReceipts, renderConway } from "./public/conway.js";
 import { renderPost } from "./public/post.js";
@@ -781,14 +783,42 @@ export function createApp(opts: AppOptions) {
     );
   }
 
-  for (const name of ["og.png", "og-x402.png"]) {
+  /**
+   * The version each card's address carries, `?v=` and the first eight hex characters of the sha256 of the served bytes.
+   *
+   * Preview services keep an image by its address for days, so a new card under the old address stays invisible until
+   * their cache runs out (goals/umzug/04). Computed here, at start, from exactly the bytes the route hands out, and not
+   * written into index.html: a number in the template would be wrong the moment somebody re-shoots the image. The route
+   * ignores the query, so the path, the bytes and the headers stay what they were. A card whose image is missing has no
+   * route, as before, and its address goes out without a version.
+   */
+  const ogVersions = new Map<OgCardName, string>();
+  for (const name of Object.keys(OG_CARDS) as OgCardName[]) {
     const image = ogImage(name);
     if (image) {
+      ogVersions.set(name, crypto.createHash("sha256").update(new Uint8Array(image)).digest("hex").slice(0, 8));
       app.get(`/${name}`, (c) =>
         c.body(image, 200, { "Content-Type": "image/png", "Cache-Control": "public, max-age=86400" }),
       );
     }
   }
+
+  /**
+   * Point og:image and twitter:image of a head at `card` with its version, and describe that card in og:image:alt.
+   *
+   * The alt text comes from OG_CARDS together with the image: until goals/umzug/04, /x402 and /conway described the move
+   * card under a picture of the x402 measurement. A card without an entry is a programming error and throws, rather than
+   * falling back to the landing page's text and saying something false about the picture.
+   */
+  const withCard = (head: string, card: string): string => {
+    if (!isOgCardName(card)) throw new Error(`no entry in OG_CARDS for the preview card ${card}`);
+    const v = ogVersions.get(card);
+    const address = `${card}${v ? `?v=${v}` : ""}`;
+    return head
+      .replace(/(<meta property="og:image" content="https?:\/\/[^"/]+\/)og\.png"/, `$1${address}"`)
+      .replace(/(<meta name="twitter:image" content="https?:\/\/[^"/]+\/)og\.png"/, `$1${address}"`)
+      .replace(/(<meta property="og:image:alt" content=")[^"]*/, `$1${esc(OG_CARDS[card].alt)}`);
+  };
 
   /**
    * The landing page, rendered per request.
@@ -877,7 +907,7 @@ export function createApp(opts: AppOptions) {
     title: string,
     description: string,
     pathname: string,
-    card = "og.png",
+    card: OgCardName = "og.png",
     /**
      * Extra structured-data nodes for this page, beyond the WebPage every page gets.
      *
@@ -930,9 +960,12 @@ export function createApp(opts: AppOptions) {
      */
     german = false,
   ): string => {
-    const head = (indexHtml ?? "")
-      .slice(0, (indexHtml ?? "").indexOf("</head>"))
-      .replace(/<html lang="en">/, lang === "de" ? '<html lang="de">' : "$&");
+    const head = withCard(
+      (indexHtml ?? "")
+        .slice(0, (indexHtml ?? "").indexOf("</head>"))
+        .replace(/<html lang="en">/, lang === "de" ? '<html lang="de">' : "$&"),
+      card,
+    );
     // withOrigin at the door, once, rather than per template string. The curl examples on these
     // pages are the thing a visitor copies, they live in prose across a dozen files, and after a
     // domain move they would be the last place anybody looked. See src/public/site.ts.
@@ -952,7 +985,6 @@ export function createApp(opts: AppOptions) {
         // is the one broken thing nobody sees, because it only shows when somebody shares a link.
         .replace(/(<meta property="og:image" content=")https:\/\/[a-z0-9.-]+/, `$1${siteOrigin()}`)
         .replace(/(<meta name="twitter:image" content=")https:\/\/[a-z0-9.-]+/, `$1${siteOrigin()}`)
-        .replace(/og\.png/g, card)
         .replace(
           /<link rel="canonical"[^>]*>/,
           notAPage ? '<meta name="robots" content="noindex">' : "$&",
@@ -1690,7 +1722,7 @@ export function createApp(opts: AppOptions) {
     const landingLang = langOf("", c.req.header("accept-language"));
     return c.html(
       germanFirstScreen(
-      withOrigin(indexHtml
+      withOrigin(withCard(indexHtml, "og.png")
         // The box, where the readers are. 171 foreign addresses reached this page over 96 hours
         // and five reached /check, so the one thing a stranger can use without an account was one
         // click away and nobody took it. `src=home` is what tells the log which page it came from.

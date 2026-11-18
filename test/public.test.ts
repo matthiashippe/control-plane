@@ -616,8 +616,9 @@ describe("the link preview", () => {
 
     const html = await (await app.request("/")).text();
     // Relative URLs are ignored by most unfurlers, so the absolute one is the whole point.
-    expect(html).toContain('property="og:image" content="https://cp.hippe.eu/og.png"');
-    expect(html).toContain('name="twitter:image" content="https://cp.hippe.eu/og.png"');
+    // With the version of the served bytes (goals/umzug/04), so a new card is not hidden behind a cached old one.
+    expect(html).toMatch(/property="og:image" content="https:\/\/cp\.hippe\.eu\/og\.png\?v=[0-9a-f]{8}"/);
+    expect(html).toMatch(/name="twitter:image" content="https:\/\/cp\.hippe\.eu\/og\.png\?v=[0-9a-f]{8}"/);
     expect(html, "summary shows a thumbnail, summary_large_image shows the card").toContain("summary_large_image");
     expect(html, "an alt text is what a screen reader and a bad connection get").toMatch(/og:image:alt/);
   });
