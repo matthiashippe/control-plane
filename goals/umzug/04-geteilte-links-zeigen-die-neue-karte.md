@@ -1,7 +1,7 @@
 # Umzug Goal 04: Geteilte Links zeigen die neue Karte
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Wer einen Link auf `automatonhost.com` teilt, sieht die Karte des Umzugs mit passendem Text, und die Werkzeuge des Umzugs laufen in
@@ -143,7 +143,7 @@ gebrochenes DNS- oder Hostwerkzeug beim nächsten Wechsel einen zahlenden Automa
       und Inferenz weiter laufen (Grundregel 13).
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung (Netz): `n=$(gh pr list -R matthiashippe/control-plane --head goal/umzug-04 --state all --json number -q '.[0].number'); gh pr checks "${n:?}" -R matthiashippe/control-plane --json name,state -q '.[] | select(.name=="e2e") | .state'` muss `SUCCESS` ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Jede neue Testdatei und jeder neue Fall, der ein neues Verhalten verlangt, war vor dem Fix rot oder hat eine Gegenprobe, die rot
@@ -174,6 +174,7 @@ gebrochenes DNS- oder Hostwerkzeug beim nächsten Wechsel einen zahlenden Automa
 ## Progress Log
 - 2026-11-18 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6, 7, 8 gebaut: Tabelle `OG_CARDS` in `src/public/og-cards.ts`, `withCard()` in `src/app.ts` setzt für `page()` und `/` Bildadresse mit `?v=` (8 Hex-Zeichen sha256 der ausgelieferten Bytes) und Alt-Text je Karte, `test/og-cards.test.ts` war gegen das alte `src/app.ts` rot (4 von 8 Fällen), `test/site-dns-selftest.test.ts` und der Fall `KNOWN_HOSTS` in `test/host-lists.test.ts` mit Gegenprobe je 1 roter Fall, Doku in `docs/umzug.md`, Annahmen unter `## Goal 04`; 25 Prüfbefehle fertiger Goals an Merge-Basis und Branch verglichen, einer abgelöst (umzug 01 Punkt 7, 26 auf 28). Prüfbefehle: Punkt 1 version ok, Header-Zeile wie verlangt, sechs Testdateien Exit 0 (93 Fälle), Gegenprobe 4; Punkt 2 alt ok, Schlüssel wie verlangt, 0; Punkt 3 Exit 0, nichts, 1, 0; Punkt 4 Exit 0, 3, 1, nichts; Punkt 5 0 und 1; Punkt 6 nichts und 9; Punkt 7 0, 0, 10, 0, 0; Punkt 8 `check` Exit 0 (2402 Tests), `e2e` am PR siehe Kommentar.
 - 2026-11-18 Zyklus 2: Abschluss gemeldet, Punkte 1 bis 8; `origin/dev` ohne neue Commits gegenüber dem Branch (Merge entfällt), jeder Prüfbefehl aller Punkte mit `PATH=/usr/bin:$PATH` am Kopf f3e51f8. Prüfbefehle: Punkt 1 version ok, Header-Zeile wie verlangt, Exit 0 (93 Fälle), Gegenprobe 4; Punkt 2 alt ok, Schlüssel wie verlangt, 0; Punkt 3 Exit 0, nichts, 1, 0; Punkt 4 Exit 0, 3, 1, nichts; Punkt 5 0 und 1; Punkt 6 nichts und 9; Punkt 7 0, 0, 11, 0, 0; Punkt 8 `check: grün in 328 s` (2402 Tests), Jobs `check` und `e2e` am PR #280 SUCCESS an f3e51f8.
+- 2026-11-18 Release: PASS K und B (Zyklus 2), DONE.
 
 ## Blockers
 Keine.
