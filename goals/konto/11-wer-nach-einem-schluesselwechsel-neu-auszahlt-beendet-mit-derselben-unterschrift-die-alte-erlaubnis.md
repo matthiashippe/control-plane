@@ -1,7 +1,7 @@
 # Konto Goal 11: Wer nach einem Schlüsselwechsel neu auszahlt, beendet mit derselben Unterschrift die alte Erlaubnis
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Nach einem Leck des Gasschlüssels bewegt niemand mehr Geld eines Kunden über eine Erlaubnis, die er abgelöst hat. Heute bleibt sie
@@ -202,7 +202,7 @@ das heute für das Geld auf dem Konto des Kunden nicht gilt.
       `retire_*` leert, während die alte Erlaubnis freigeschaltet bleibt, und genau diese zwei Zweige aus Entscheidung 5 ohne Test sind.
       Prüfung: `T=$(mktemp -d); PATH=/usr/bin:$PATH pnpm -s vitest run test/konto-payout.test.ts --reporter=json --outputFile=$T/r.json >/dev/null 2>&1; echo "exit=$?"; node -e 'const r=require(process.argv[1]);const a=r.testResults.flatMap(f=>f.assertionResults).filter(x=>x.ancestorTitles.includes("a revoke that does not end the old permission")&&/when its handleOps reverts|when the chain still approves the old permission after handleOps/.test(x.title));console.log(a.length, a.filter(x=>x.status==="passed").length)' $T/r.json` muss genau `exit=0` und `2 2` ausgeben.
       Prüfung: `T=$(mktemp -d); git archive HEAD | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; grep -c 'SET retire_revoke = NULL WHERE' $T/src/konto/payout.ts; sed -i 's/SET retire_revoke = NULL WHERE/SET retire_revoke = retire_revoke WHERE/' $T/src/konto/payout.ts; (cd $T && PATH=/usr/bin:$PATH pnpm -s vitest run test/konto-payout.test.ts --reporter=json --outputFile=r.json >/dev/null 2>&1); node -e 'const r=require(process.argv[1]);const a=r.testResults.flatMap(f=>f.assertionResults).filter(x=>x.ancestorTitles.includes("a revoke that does not end the old permission")&&/when its handleOps reverts|when the chain still approves the old permission after handleOps/.test(x.title));console.log(a.filter(x=>x.status!=="passed").length, a.filter(x=>x.status==="passed").length)' $T/r.json` muss genau die zwei Zeilen `2` und `2 0` ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Nach einem neuen Gasschlüssel beendet der eine Passkey-Tipp für die neue IBAN auch die alte Erlaubnis, und die Kette bestätigt es
@@ -244,5 +244,6 @@ das heute für das Geld auf dem Konto des Kunden nicht gilt.
 - 2026-11-18 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, 7, 8; `dev` (`f076a93`) war schon im Branch, nichts zu mergen, jeder Prüfbefehl am Kopf `1f594cd` neu gelaufen. Prüfbefehle: P1 5, 5, 4, 2, 0, 5; P2 `exit=0` und `1`, `breiten ok`, `zeile ok`, `geld gleich`, Gegenprobe `3`, vitest Exit 0; P3 `1`, `abnahme ok 1`; P4 1, 1, 6, 2, 1, vitest Exit 0; P5 `exit=0` `4 4`, Merge-Basis `3 1`, `faelle ok`, `knoten ok`; P6 3, 1, 1, vitest Exit 0, live `exit=0` und `1`, Gegenprobe letzte Zeile `exit=1`; P7 15, 4; P8 0, `vertrag gleich`, `0`, `pakete gleich`, `goals gleich`, 0, `check` grün (2379 Tests, 426 s), Netz-Prüfung `1`; am PR #269 Jobs `check` und `e2e` grün (Run 44223541816).
 - 2026-11-18 Zyklus 3: Punkt 9 gebaut (Kritik Tech Lead): `describe("a revoke that does not end the old permission")` mit zwei Fällen in `test/konto-payout.test.ts`; im ersten revertiert `handleOps`, weil die Wallet die Nonce schon verbraucht hat, im zweiten geht `handleOps` durch, aber der innere Aufruf scheitert (Schalter `entryPoint.innerReverts` im nachgebauten Knoten), und die Erlaubnis bleibt freigeschaltet. Beide antworten 502 `stage: "retire"`, `retire_revoke` ist danach leer und `retire_*` unverändert, der nächste Aufruf antwortet 409 `payout_needs_phone` ohne Transaktion und schreibt die Log-Zeile `retire waits for the phone for`. Der Code von Entscheidung 5 war schon da; rot waren die Fälle in der Gegenprobe ohne `SET retire_revoke = NULL`. Prüfbefehle: P9 `exit=0` `2 2`, Gegenprobe `2` und `2 0`.
 - 2026-11-18 Zyklus 3: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, 7, 8, 9; `dev` (`c294bff`, umzug 03) in den Goal-Branch gemergt (`d5704f0`, Konflikt nur in `goals/konto/ANNAHMEN.md`: Abschnitt „Abgelöst durch umzug 03“ von `dev` unverändert, `## Goal 11` danach), jeder Prüfbefehl am Merge-Kopf neu gelaufen. Prüfbefehle: P1 5, 5, 4, 2, 0, 5; P2 `exit=0` und `1`, `breiten ok`, `zeile ok`, `geld gleich`, Gegenprobe `3`, vitest Exit 0; P3 `1`, `abnahme ok 1`; P4 1, 1, 6, 2, 1, vitest Exit 0; P5 `exit=0` `4 4`, Merge-Basis `3 1`, `faelle ok`, `knoten ok`; P6 3, 1, 1, vitest Exit 0, live `exit=0` und `1`, Gegenprobe letzte Zeile `exit=1`; P7 15, 4; P8 0, `vertrag gleich`, `0`, `pakete gleich`, `goals gleich`, 0, `check` grün (2392 Tests, 81 s); P9 `exit=0` `2 2`, Gegenprobe `2` und `2 0`.
+- 2026-11-18 Release: PASS K und B (Zyklus 3), DONE.
 
 ## Blockers
