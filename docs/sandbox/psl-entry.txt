@@ -1,3 +1,0 @@
-// Hanseatic Tech Company : https://hanseatictechcompany.com
-// Submitted by Matthias Hippe <matthias@hanseatictech.de>
-sandboxhost.de
