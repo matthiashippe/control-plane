@@ -220,7 +220,7 @@ Folge für das Konto: Nach dem Widerruf hat die alte Weiterleitung keine Erlaubn
 an die alte Adresse schicken. Ein zweiter Weg zum Geld des Kunden bleibt damit nicht offen: Die alte Adresse bekommt nur noch, was
 jemand von sich aus hinschickt, und Bridge zahlt das an die alte IBAN desselben Kunden aus. Ein Abschalten bei Bridge ist für den
 Schutz nicht nötig und gehört nicht in dieses Goal; ob das Löschen des alten Bankkontos die Adresse stilllegt, steht als Vorschlag
-in `goals/_vorschlaege/konto-nacharbeit-2026-11-18-1.md`.
+in `goals/_vorschlaege/konto-nacharbeit-2026-11-18-12.md`.
 
 ## Hauptnetz
 

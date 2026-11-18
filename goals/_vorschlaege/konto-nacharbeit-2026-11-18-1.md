@@ -1,5 +1,6 @@
 Schwere: 2
-Goal: konto 11
-Befund: Bridge dokumentiert kein Abschalten einer Auszahladresse; ob das Löschen des alten Bankkontos (`DELETE` External Account) die alte Auszahladresse nach einer neuen IBAN stilllegt, ist offen.
-Beleg: `awk '/^## Abgelöste Auszahladresse bei Bridge$/{f=1;next} /^## /{f=0} f' docs/konto/euro.md | grep -c 'DELETE'` -> 1 | docs/konto/euro.md:Abschnitt „Abgelöste Auszahladresse bei Bridge“
-Empfehlung: Mit dem echten Zugang (konto 06) in der Sandbox von Bridge prüfen, welchen Zustand eine Liquidation Address nach dem Löschen ihres External Account meldet; stilllegt sie das, nach einem gelungenen Widerruf das alte Bankkonto löschen. Für den Schutz des Geldes ist es nicht nötig, weil der Widerruf aus goals/konto/11 die alte Weiterleitung schon ohne Erlaubnis lässt.
+Goal: konto 05
+Befund: konto 05 ersetzt in `src/konto/chain.ts` die Prüfung `requireSepolia` durch `requireNet`, lässt `requireSepolia` aber als exportierte Funktion ohne einen einzigen Aufrufer stehen, und `docs/konto/konto.md:86` beschreibt weiter, dass `sendKontoTx` sie ruft.
+Beleg: `git grep -nw requireSepolia origin/dev -- src test ops harness mcp` -> nur `src/konto/chain.ts:15:export function requireSepolia(chainId: unknown): void {` | src/konto/chain.ts:15
+Empfehlung: `requireSepolia` (und damit den Import `KONTO_CHAIN_ID` in `src/konto/chain.ts:12`) streichen, `docs/konto/konto.md:86` auf `requireNet` umschreiben und die Prüfbefehle von konto 03 Punkt 5, die nach `requireSepolia(` suchen, in `goals/konto/ANNAHMEN.md` als abgelöst durch `requireNet` und `test/konto-mainnet.test.ts` eintragen.
+MVP: Schönheit
