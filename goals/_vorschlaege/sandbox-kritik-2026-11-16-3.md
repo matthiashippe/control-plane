@@ -6,3 +6,4 @@ Empfehlung: Den Stempel um eine zweite Summe über die Pakete erweitern, die `di
 MVP: Funktion
 
 Kritik Tech Lead am Goal-Topic sandbox 10 (PRO-23101), 16.11.2026. Bewusst nicht als Done-Punkt in sandbox 10, weil die Wahl der Summe über `node_modules/` (Größe, pnpm-Store mit Symlinks) eine eigene Entscheidung braucht und das Goal sonst über sein Budget läuft.
+Übernommen: ROADMAP.md, Glied hosting 06 (2026-11-18)

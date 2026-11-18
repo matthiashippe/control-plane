@@ -6,3 +6,4 @@ Empfehlung: Ein Goal gibt der Antwort 429 von `/v1/auth/keyless` ein eigenes Sch
 MVP: Funktion, weil ein Agent nach 429 dann aus dem Dokument weiß, ob ein Wechsel auf den Weg mit Wallet nötig ist oder nur seine Kennung zählt.
 
 Kritik Tech Lead an anmeldung 04 (PR #203). Nicht als Done-Punkt, weil die Antwort 429 auf der Deny List dieses Goals steht.
+Übernommen: auf dev erledigt mit anmeldung 05 (PR #259), `src/public/openapi.ts:79` nennt das `enum` (2026-11-18)
