@@ -4,101 +4,21 @@
  * amount; the page then reports the card payment open and opens it. On `payout-passkey` the same passkey signs the second
  * permission for the forwarder the server named. The server side is test/konto-deposit.test.ts and test/konto-payout.test.ts.
  */
-import { createHash, generateKeyPairSync, sign as nodeSign, verify } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { decodeAbiParameters, hashTypedData, parseErc6492Signature, recoverAddress, type Hex } from "viem";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
+import { permissionJson } from "../src/konto/account.js";
 import { SEPOLIA_USDC } from "../src/konto/config.js";
 import { parsePermission, SPEND_PERMISSION_TYPES, spendPermissionDomain } from "../src/konto/permission.js";
-import { payoutPermissionMatches } from "../src/konto/payout.js";
+import { payoutPermissionMatches, revokeHash as revokeHashOf } from "../src/konto/payout.js";
+import { esc } from "../src/public/market.js";
 // @ts-expect-error plain browser module without types
 import * as flow from "../src/public/konto-client/flow.mjs";
 // @ts-expect-error plain browser module without types
 import { wirePage } from "../src/public/konto-client/main.mjs";
 import { START, tap } from "./handoff-helpers.js";
+import { buttonOf, CARD_PAGE, deps, fakePasskey, fakeTurnkey, ONRAMP, SIGN_MANY } from "./konto-client-helpers.js";
 import { account, dataOf, json, moneySetup, stateOf } from "./money-helpers.js";
-
-const ONRAMP = "https://api.turnkey.com/public/v1/submit/init_fiat_on_ramp";
-const SIGN = "https://api.turnkey.com/public/v1/submit/sign_raw_payload";
-const SIGN_MANY = "https://api.turnkey.com/public/v1/submit/sign_raw_payloads";
-const CARD_PAGE = "https://buy.moonpay.example/?txn=onramp-1";
-const b64url = (b: Uint8Array | Buffer) => Buffer.from(b).toString("base64url");
-
-/** The passkey on the phone: a P-256 key that signs authenticatorData || SHA-256(clientDataJSON), as WebAuthn does. */
-function fakePasskey() {
-  const { privateKey, publicKey } = generateKeyPairSync("ec", { namedCurve: "prime256v1" });
-  let used = 0;
-  const get = async (options: { publicKey: { challenge: Uint8Array; rpId: string } }) => {
-    used++;
-    const clientData = Buffer.from(JSON.stringify({ type: "webauthn.get", challenge: b64url(options.publicKey.challenge), origin: "https://localhost" }));
-    const authenticatorData = Buffer.concat([createHash("sha256").update(options.publicKey.rpId).digest(), Buffer.from([5, 0, 0, 0, 1])]);
-    const signature = nodeSign("sha256", Buffer.concat([authenticatorData, createHash("sha256").update(clientData).digest()]), privateKey);
-    return { rawId: new Uint8Array([7, 7, 7]).buffer, response: { authenticatorData, clientDataJSON: clientData, signature } };
-  };
-  return { get, publicKey, used: () => used };
-}
-
-/**
- * Turnkey for one group `org`: every request must carry a WebAuthn stamp of the passkey over exactly its body. The card payment
- * answers with a MoonPay address, a signature request with a signature of `owner`.
- */
-function fakeTurnkey(passkey: ReturnType<typeof fakePasskey>, org: string, owner = privateKeyToAccount(generatePrivateKey())) {
-  const calls: { url: string; body: Record<string, unknown> }[] = [];
-  const fetch = async (url: string, init: { headers: Record<string, string>; body: string }) => {
-    const body = JSON.parse(init.body) as Record<string, unknown>;
-    calls.push({ url, body });
-    const reply = (status: number, data: unknown) => new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json" } });
-    const stamp = JSON.parse(init.headers["X-Stamp-WebAuthn"] ?? "{}") as Record<string, string>;
-    const clientData = Buffer.from(stamp.clientDataJson ?? "", "base64url");
-    const challenge = JSON.parse(clientData.toString("utf8") || "{}").challenge as string;
-    const want = Buffer.from(createHash("sha256").update(init.body).digest("hex")).toString("base64url");
-    const signed = Buffer.concat([Buffer.from(stamp.authenticatorData ?? "", "base64url"), createHash("sha256").update(clientData).digest()]);
-    if (challenge !== want || !verify("sha256", signed, passkey.publicKey, Buffer.from(stamp.signature ?? "", "base64url"))) return reply(401, { message: "bad stamp" });
-    if (body.organizationId !== org) return reply(404, { message: "no such organization" });
-    if (url === ONRAMP) {
-      return reply(200, { activity: { id: "a-2", status: "ACTIVITY_STATUS_COMPLETED", result: { initFiatOnRampResult: { onRampUrl: CARD_PAGE, onRampTransactionId: "onramp-1" } } } });
-    }
-    if (url === SIGN) {
-      const p = body.parameters as { signWith: string; payload: Hex };
-      if (p.signWith !== owner.address) return reply(404, { message: "no such wallet" });
-      const sig = await owner.sign({ hash: p.payload });
-      const v = parseInt(sig.slice(130, 132), 16) === 27 ? "00" : "01";
-      return reply(200, { activity: { id: "a-1", status: "ACTIVITY_STATUS_COMPLETED", result: { signRawPayloadResult: { r: sig.slice(2, 66), s: sig.slice(66, 130), v } } } });
-    }
-    if (url === SIGN_MANY) {
-      const p = body.parameters as { signWith: string; payloads: Hex[] };
-      if (p.signWith !== owner.address) return reply(404, { message: "no such wallet" });
-      const signatures = [];
-      for (const payload of p.payloads) {
-        const sig = await owner.sign({ hash: payload });
-        signatures.push({ r: sig.slice(2, 66), s: sig.slice(66, 130), v: parseInt(sig.slice(130, 132), 16) === 27 ? "00" : "01" });
-      }
-      return reply(200, { activity: { id: "a-3", status: "ACTIVITY_STATUS_COMPLETED", result: { signRawPayloadsResult: { signatures } } } });
-    }
-    return reply(404, {});
-  };
-  return { fetch, calls, owner };
-}
-
-const deps = (passkey: ReturnType<typeof fakePasskey>, fetch: unknown, opened: string[] = []) => ({
-  get: passkey.get,
-  fetch,
-  subtle: globalThis.crypto.subtle,
-  random: (n: number) => globalThis.crypto.getRandomValues(new Uint8Array(n)),
-  now: () => START,
-  rpId: "localhost",
-  open: (url: string) => opened.push(url),
-});
-
-/** The button `id` of a page as the script sees it: its data attributes, read from the HTML the server sent. */
-function buttonOf(html: string, id: string) {
-  const tag = new RegExp(`<button[^>]*\\bid="${id}"[^>]*>`).exec(html)?.[0];
-  if (!tag) return null;
-  const dataset: Record<string, string> = {};
-  for (const m of tag.matchAll(/\bdata-([a-z-]+)="([^"]*)"/g)) dataset[m[1].replace(/-([a-z])/g, (_, c: string) => c.toUpperCase())] = m[2];
-  const listeners: (() => Promise<void>)[] = [];
-  return { dataset, disabled: false, listeners, addEventListener: (_t: string, f: () => Promise<void>) => listeners.push(f) };
-}
 
 describe("the page client of the deposit", () => {
   it("calls the card payment with exactly the address of the page, Base and the amount, reports it opened and opens it", async () => {
@@ -238,14 +158,26 @@ describe("the page client of the payout passkey", () => {
     const owner = turnkey.owner;
     const spender = privateKeyToAccount(generatePrivateKey()).address;
     const account = flow.smartWalletAddress(owner.address.toLowerCase()) as string;
-    const revokeHash = `0x${createHash("sha256").update("the revoke of the earlier permission").digest("hex")}` as Hex;
+    // The earlier payout permission of this account, as the row keeps it and the page carries it (goals/konto/13).
+    const earlier = {
+      account: account.toLowerCase() as Hex,
+      spender: privateKeyToAccount(generatePrivateKey()).address.toLowerCase() as Hex,
+      token: SEPOLIA_USDC as Hex,
+      allowance: 2n ** 160n - 1n,
+      period: 2_592_000,
+      start: Math.floor(START / 1000) - 86_400,
+      end: 2 ** 48 - 1,
+      salt: 99n,
+      extraData: "0x" as Hex,
+    };
+    const revokeHash = revokeHashOf(earlier, 3n, 84532);
     const posts: { url: string; body: string }[] = [];
     const fetch = async (url: string, init: { headers: Record<string, string>; body: string }) => {
       if (!url.startsWith("/h/")) return turnkey.fetch(url, init);
       posts.push({ url, body: init.body });
       return new Response('{"state":"done"}', { status: 200 });
     };
-    const html = `<button class="btn btn-1" type="button" id="konto-passkey" data-mode="payout" data-code="AB12" data-chain="84532" data-spender="${spender}" data-token="${SEPOLIA_USDC}" data-account="${account}" data-owner="${owner.address}" data-org="org-1" data-revoke-hash="${revokeHash}" data-revoke-nonce="3">`;
+    const html = `<button class="btn btn-1" type="button" id="konto-passkey" data-mode="payout" data-code="AB12" data-chain="84532" data-spender="${spender}" data-token="${SEPOLIA_USDC}" data-account="${account}" data-owner="${owner.address}" data-org="org-1" data-revoke-permission="${esc(permissionJson(earlier))}" data-revoke-hash="${revokeHash}" data-revoke-nonce="3">`;
     const button = buttonOf(html, "konto-passkey")!;
     const replaced: string[] = [];
     wirePage({

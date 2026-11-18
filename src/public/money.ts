@@ -7,7 +7,8 @@
  * `payout-approve-revoke`, goals/konto/11), because the one tap of the passkey step also ends the permission set up before.
  * `deposit-card` (block `card`) names amount and card and has the one button the script of the page opens the card payment with. `payout-verify` (block `verify`) sends the person to Bridge to confirm their identity once, `payout-bank` (block
  * `bank`) asks for IBAN and account holder, `payout-passkey` (block `payout`) has the one button that signs with the existing
- * passkey; with an earlier permission its button carries the hash and nonce of the revoke the same tap signs (goals/konto/11).
+ * passkey; with an earlier permission its button carries that permission, the nonce and the hash of the revoke the same tap
+ * signs (goals/konto/11 and 13).
  * Bank and passkey step count three steps, or two when Bridge had checked the person before and the identity step was
  * left out (`steps`). `retry` (block `retry`) comes after a signature that could not be checked and sends the same one again. Cancel and
  * failure show the state `failed` of konto 03 unchanged.
@@ -64,9 +65,10 @@ export type MoneyPage =
       steps?: 2 | 3;
       /**
        * The revoke of the permission this setup replaces (goals/konto/11): the hash of the smart wallet's user operation and its
-       * nonce, which the same tap signs. Left out for the first setup.
+       * nonce, which the same tap signs. Left out for the first setup. `permission` is the replaced permission as the row keeps it
+       * (goals/konto/13): the client builds the user operation and its hash from it and the nonce, and the hash is only its cross-check.
        */
-      revoke?: { hash: string; nonce: string } | null;
+      revoke?: { hash: string; nonce: string; permission: string } | null;
     }
   | { state: "retry"; code: string; displayName: string };
 
@@ -251,7 +253,13 @@ ${error}      <form method="post" action="/h/${esc(page.code)}/payout-bank">
         `data-account="${esc(page.account)}"`,
         `data-owner="${esc(page.owner)}"`,
         `data-org="${esc(page.organizationId)}"`,
-        ...(page.revoke ? [`data-revoke-hash="${esc(page.revoke.hash)}"`, `data-revoke-nonce="${esc(page.revoke.nonce)}"`] : []),
+        ...(page.revoke
+          ? [
+              `data-revoke-permission="${esc(page.revoke.permission)}"`,
+              `data-revoke-hash="${esc(page.revoke.hash)}"`,
+              `data-revoke-nonce="${esc(page.revoke.nonce)}"`,
+            ]
+          : []),
       ].join(" ");
       return step(
         "payout",

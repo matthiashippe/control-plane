@@ -236,7 +236,7 @@ export function registerHandoff<E extends Env>(app: Hono<E>, deps: HandoffDeps):
       // goals/konto/11: with a permission to replace, the same tap signs the revoke of it, a user operation of the smart wallet whose
       // nonce the EntryPoint gives. A chain that cannot be asked answers like Bridge does.
       const replaced = replacedPermission(readPayout(db, account));
-      let revoke: { hash: string; nonce: string } | null = null;
+      let revoke: { hash: string; nonce: string; permission: string } | null = null;
       if (replaced) {
         let nonce: bigint;
         try {
@@ -245,7 +245,8 @@ export function registerHandoff<E extends Env>(app: Hono<E>, deps: HandoffDeps):
         } catch {
           return c.text("The network could not be reached just now. Reload this page in a minute.", 502);
         }
-        revoke = { hash: revokeHash(permissionFromJson(replaced.permission), nonce, konto.chainId), nonce: String(nonce) };
+        // goals/konto/13: the page carries the replaced permission itself, so the client builds and checks the revoke it signs.
+        revoke = { hash: revokeHash(permissionFromJson(replaced.permission), nonce, konto.chainId), nonce: String(nonce), permission: replaced.permission };
       }
       return moneyPage(c, {
         state: "payout-passkey",
