@@ -1,7 +1,7 @@
 # Umzug Goal 03: Der geteilte Link nennt den Umzug
 
 ## Status
-PLANNED
+DONE
 
 ## Active Objective
 Wer einen Link auf `automatonhost.com` geteilt bekommt oder `llms.txt` liest, erfährt zuerst, dass sein Automaton hier weiterläuft:
@@ -106,7 +106,7 @@ und beide heute ein Angebot nennen, das nicht seines ist.
   Vorschaubild schon die eine Zeile, die der Betreiber ändern muss.
 
 ## Done Condition
-- [ ] Das SOLL-Bild der Vorschaukarte `docs/soll/og-card.png` (2400 x 1260) kommt aus `docs/soll/src/og-card.html`, das die
+- [x] Das SOLL-Bild der Vorschaukarte `docs/soll/og-card.png` (2400 x 1260) kommt aus `docs/soll/src/og-card.html`, das die
       Überschrift des Blocks `move` und `conwayApiUrl` mit `https://automatonhost.com` trägt und weder den Markt noch den freien
       ersten Auftrag nennt; `ops/soll-og.mjs --check` meldet 0 Mängel, und seine Auswertung ist ohne Browser getestet.
       MVP: Funktion, weil die Karte nur nach Bild gebaut werden darf (`LOOP.md`, Fläche nur nach SOLL-Bild).
@@ -118,11 +118,11 @@ und beide heute ein Angebot nennen, das nicht seines ist.
       Prüfung: `node ops/soll-og.mjs --chek; echo "exit=$?"; git status --porcelain docs/soll src/public | wc -l` muss `exit=1` und danach `0` ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/soll-og.test.ts test/soll.test.ts` muss Exit-Code 0 haben.
       Prüfung: `grep -cE "^\s*(it|test)\(" test/soll-og.test.ts` muss mindestens 4 ausgeben.
-- [ ] Der Design Reviewer hat das Bild nach seinem letzten Commit abgenommen, bevor Karte, `og.png` oder Startseite sich änderten.
+- [x] Der Design Reviewer hat das Bild nach seinem letzten Commit abgenommen, bevor Karte, `og.png` oder Startseite sich änderten.
       MVP: Funktion, weil kein UI ohne abgenommenes Bild gebaut wird (`LOOP.md`, Fläche nur nach SOLL-Bild).
       Prüfung: `grep -cE '^Abnahme-Issue og-card: PRO-[0-9]+$' docs/soll/README.md` muss 1 ausgeben.
       Prüfung (Netz): `i=$(sed -n 's/^Abnahme-Issue og-card: //p' docs/soll/README.md); t=$(git log -1 --format=%cI -- docs/soll/og-card.png docs/soll/src/og-card.html); b=$(git log --reverse --format=%cI origin/dev..HEAD -- src/public/og-card.html src/public/og.png src/public/index.html | head -1); curl -s -H "Authorization: Bearer $PAPERCLIP_API_KEY" "$PAPERCLIP_API_URL/api/issues/$i/comments" | T="$t" B="$b" node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{const t=Date.parse(process.env.T);const ok=JSON.parse(d).filter(c=>c.authorAgentId==="3412a0ea-cbf5-4f18-9360-0e8e20ba3313"&&/SOLL abgenommen/.test(c.body)).map(c=>Date.parse(c.createdAt));if(!process.env.T||!ok.some(x=>x>t)){console.error("keine abnahme nach "+process.env.T);process.exit(1)}if(process.env.B&&!(Math.min(...ok)<Date.parse(process.env.B))){console.error("gebaut vor der abnahme "+process.env.B);process.exit(1)}console.log("abnahme ok "+ok.length)})'` muss `abnahme ok <n>` mit n mindestens 1 ausgeben.
-- [ ] Karte, Bild und Bildbeschreibung sind 1:1 nach dem SOLL-Bild gebaut: `src/public/og-card.html` gleicht der SOLL-Quelle,
+- [x] Karte, Bild und Bildbeschreibung sind 1:1 nach dem SOLL-Bild gebaut: `src/public/og-card.html` gleicht der SOLL-Quelle,
       `src/public/og.png` ist pixelgleich mit `docs/soll/og-card.png`, und `og:image:alt` beschreibt die Karte des Umzugs, ohne dass
       sich die Bilder der Startseite ändern.
       MVP: Funktion, weil das Bild das ist, was jeder geteilte Link zeigt.
@@ -133,7 +133,7 @@ und beide heute ein Angebot nennen, das nicht seines ist.
       Prüfung: `cat src/public/index.html docs/soll/src/startseite.html | grep 'og:image:alt' | grep -ciE 'one job|pay one'` muss 0 ausgeben.
       Prüfung: `git diff --name-only origin/dev...HEAD -- docs/soll/startseite-390.png docs/soll/startseite-1440.png src/public/og-card-x402.html src/public/og-x402.png | wc -l` muss 0 ausgeben.
       Prüfung: `T=$(mktemp -d); node --import tsx ops/soll-live.mjs --out $T/s.html && FONTCONFIG_FILE=$HOME/.config/control-plane/soll-fonts.conf node ops/soll.mjs --check --source $T/s.html > $T/o 2>&1; echo "exit=$? $(tail -n 1 $T/o | grep -o '0 defects$')"; rm -rf $T` muss `exit=0 0 defects` ausgeben.
-- [ ] Die Tests der Karte verlangen die Botschaft des Umzugs und keinen freien ersten Auftrag, und das Prüfwerkzeug der Karte stimmt
+- [x] Die Tests der Karte verlangen die Botschaft des Umzugs und keinen freien ersten Auftrag, und das Prüfwerkzeug der Karte stimmt
       der Umzugskarte bei vollem wie bei leerem Topf zu, ohne dass einer der sechs alten Fälle seines Selbsttests fällt.
       MVP: Funktion, weil sonst `test/og-card.test.ts` und `ops/check-all.sh` die neue Karte als Fehler melden und jemand die alte
       zurückholt.
@@ -144,7 +144,7 @@ und beide heute ein Angebot nennen, das nicht seines ist.
       Prüfung: `git show origin/dev:ops/og-card-says-the-truth.sh | grep -E '^\s+judge [0-9]+ [0-9]+ "\$(with|without)"' | while IFS= read -r l; do grep -qxF -- "$l" ops/og-card-says-the-truth.sh || echo "fehlt $l"; done` muss nichts ausgeben.
       Prüfung: `B=$(git merge-base origin/dev HEAD); bash -c 'source <(git show '"$B"':ops/og-card-says-the-truth.sh | sed -n "/^judge()/,/^}/p"); judge 15 230 "$(cat src/public/og-card.html)" >/dev/null; echo "exit=$?"'` muss `exit=1` ausgeben (das alte Werkzeug meldet die neue Karte als stumm).
       Prüfung: `bash -c 'source <(sed -n "/^judge()/,/^}/p" ops/og-card-says-the-truth.sh); judge 15 230 "$(cat src/public/og-card.html)" >/dev/null; a=$?; judge 15 0 "$(cat src/public/og-card.html)" >/dev/null; echo "voll=$a leer=$?"'` muss `voll=0 leer=0` ausgeben.
-- [ ] `llms.txt` nennt im ersten Absatz den Wechsel mit `conwayApiUrl` auf den kanonischen Host, der Markt folgt unter
+- [x] `llms.txt` nennt im ersten Absatz den Wechsel mit `conwayApiUrl` auf den kanonischen Host, der Markt folgt unter
       `## The market`; der neue Fall war vor dem Fix rot.
       MVP: Funktion, weil ein Automaton, das die Datei liest, sonst zuerst ein fremdes Angebot liest statt der einen Zeile, die es
       weiterlaufen lässt.
@@ -152,19 +152,19 @@ und beide heute ein Angebot nennen, das nicht seines ist.
       Prüfung: `for w in 'The market' conwayApiUrl 'One job'; do grep -qF -- "$w" test/automaton-name.test.ts || echo "fehlt $w"; done` muss nichts ausgeben.
       Prüfung: `CP_PUBLIC_URL=https://automatonhost.com PATH=/usr/bin:$PATH node --import tsx --input-type=module -e 'const { createApp } = await import("./src/app.ts"); const { openDb } = await import("./src/db.ts"); const t = await (await createApp({ db: openDb(":memory:") }).request("/llms.txt")).text(); const p = t.split("\n\n")[1] ?? ""; const m = t.indexOf("## The market"); console.log([p.includes("conwayApiUrl"), p.includes("https://automatonhost.com"), !p.includes("One job"), m > 0 && t.indexOf("One job") > m].every(Boolean) ? "llms ok" : "llms falsch")'` muss `llms ok` ausgeben.
       Prüfung: `T=$(mktemp -d); git archive HEAD | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; B=$(git merge-base origin/dev HEAD); git show $B:src/app.ts > $T/src/app.ts; (cd $T && PATH=/usr/bin:$PATH pnpm -s vitest run test/automaton-name.test.ts --reporter=json --outputFile=$T/r.json >/dev/null 2>&1); node -p "JSON.parse(require('fs').readFileSync('$T/r.json','utf8')).numFailedTests"; rm -rf $T` muss mindestens 1 ausgeben.
-- [ ] Jeder Prüfbefehl eines fertigen Goals, dessen Ausgabe sich durch dieses Goal ändert, steht als abgelöst in den Annahmen seines
+- [x] Jeder Prüfbefehl eines fertigen Goals, dessen Ausgabe sich durch dieses Goal ändert, steht als abgelöst in den Annahmen seines
       Topics, in der Form aus Entscheidung 9.
       MVP: Funktion, weil das Audit nachts jeden Prüfbefehl fertiger Goals fährt und jede unerklärte rote Zeile eine Reparatur ohne
       Ursache auf `dev` auslöst.
       Prüfung: `q=$(printf '\140'); cat goals/*/ANNAHMEN.md | grep -E '^- Abgelöst: .* durch umzug 03 ' | grep -vcE " durch umzug 03 Punkt [0-9]+, Ausgabe dann genau ${q}Exit [0-9]+, [^${q}]*${q} \\(Tech Lead, 2026-11-18\\)\$"` muss 0 ausgeben.
       Prüfung: `grep -cE '^- [0-9-]+ Zyklus [0-9]+: .*(abgelöst|Abgelöst)' goals/umzug/03-der-geteilte-link-nennt-den-umzug.md` muss mindestens 1 ausgeben.
-- [ ] Die Doku sagt, was Vorschaukarte und `llms.txt` zuerst sagen und warum, wie die Karte neu aufgenommen wird und dass sie nur nach
+- [x] Die Doku sagt, was Vorschaukarte und `llms.txt` zuerst sagen und warum, wie die Karte neu aufgenommen wird und dass sie nur nach
       Bild geändert wird; die Entscheidungen stehen mit Grund in den Annahmen.
       MVP: Funktion, weil das nächste Goal, das die Karte anfasst, sonst wieder den Markt draufschreibt oder das Bild von Hand aufnimmt.
       Prüfung: `for w in og-card.png 'ops/soll-og.mjs' conwayApiUrl 'The market' og-card-says-the-truth.sh; do grep -qF -- "$w" docs/umzug.md || echo "fehlt $w"; done` muss nichts ausgeben.
       Prüfung: `awk '/^## Vorschaukarte/{f=1;next} /^## /{f=0} f' docs/soll/README.md | grep -cE 'ops/soll-og\.mjs|og-card\.png'` muss mindestens 2 ausgeben.
       Prüfung: `awk '/^## Goal 03/{f=1;next} /^## /{f=0} f' goals/umzug/ANNAHMEN.md | grep -cE "^- .+, weil .+"` muss mindestens 6 ausgeben.
-- [ ] Das Goal ändert nur Karte, Bild, Startseite, `llms.txt`, SOLL-Bild und Werkzeug, das Prüfwerkzeug der Karte, Doku, Annahmen und
+- [x] Das Goal ändert nur Karte, Bild, Startseite, `llms.txt`, SOLL-Bild und Werkzeug, das Prüfwerkzeug der Karte, Doku, Annahmen und
       Tests, weder Compose, Zahlung, Anmeldung, Automaton, Harness noch CI, und bringt keinen Schlüssel ins Repo.
       MVP: Funktion, weil das Repo öffentlich ist (Grundregel 8) und Compose nur Matthias ändert.
       Prüfung: `git diff --name-only origin/dev...HEAD -- deploy src/payments src/auth src/automaton src/handoff harness .github scripts/check.mjs loop.yaml gate.yaml LOOP.md loop-constraints.md | wc -l` muss 0 ausgeben.
@@ -172,12 +172,12 @@ und beide heute ein Angebot nennen, das nicht seines ist.
       Prüfung: `git diff --name-only origin/dev...HEAD | wc -l` muss höchstens 25 ausgeben.
       Prüfung: `git diff --name-only origin/dev...HEAD | grep -cE "\.(key|pem|crt|env)$"` muss 0 ausgeben.
       Prüfung: `git diff origin/dev...HEAD -- . ':(exclude)goals/' | grep -cE '^\+.*(cnwy_k_[0-9a-f]{32}|-{5}BEGIN [A-Z ]*PRIVATE KEY-{5}|Bearer [A-Za-z0-9_-]{30,})'` muss 0 ausgeben.
-- [ ] `check` ist grün, und der Job `e2e` des Goal-PR ist grün.
+- [x] `check` ist grün, und der Job `e2e` des Goal-PR ist grün.
       MVP: Funktion, weil `llms.txt` und die Startseite jede Anfrage sehen und erst der Gang mit der unveränderten Runtime zeigt, dass
       Anmeldung, Zahlung und Inferenz weiter laufen (Grundregel 13).
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung (Netz): `n=$(gh pr list -R matthiashippe/control-plane --head goal/umzug-03 --state all --json number -q '.[0].number'); gh pr checks "${n:?}" -R matthiashippe/control-plane --json name,state -q '.[] | select(.name=="e2e") | .state'` muss `SUCCESS` ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Jede neue Testdatei und jeder neue Fall, der ein neues Verhalten verlangt, war vor dem Fix rot; die Zeile im Progress Log
@@ -206,6 +206,9 @@ und beide heute ein Angebot nennen, das nicht seines ist.
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-18 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6, 7, 8, 9 gebaut: SOLL-Quelle und Bild der Vorschaukarte mit dem neuen Werkzeug `ops/soll-og.mjs` (`assessOg` mit Test ohne Browser), Abnahme durch den Design Reviewer am Topic PRO-24699 um 01:19 UTC nach dem Bild-Commit `d847d5a` (01:17 UTC) und vor der Karte `8dc5ed4` (01:23 UTC), Karte, `og.png` und `og:image:alt` danach als Kopien, Tests und Prüfwerkzeug der Karte für die Umzugskarte, `llms.txt` mit dem Wechsel als erstem Absatz und dem Markt unter eigener Überschrift, 7 abgelöste Prüfbefehle fertiger Goals (konto 08 Punkt 2 und 4, seite 01 Punkt 4, seite 03 Punkt 6, umzug 02 Punkt 2 und zweimal Punkt 4), Doku und Annahmen. Rot vorher: `test/soll-og.test.ts` 6 von 6 gegen das alte `ops/soll-assess.mjs`, der neue Fall in `test/automaton-name.test.ts` 1 rot gegen das alte `src/app.ts`, `test/og-card.test.ts` 2 rot gegen die alte Karte, der Selbsttest der Karte rot mit der alten Karte. Prüfbefehle: Punkt 1 `0`, nichts, `2400x1260`, `exit=0 0 defects`, `exit=1`, `exit=1` und `0`, Exit 0, `6`; Punkt 2 `1`, `abnahme ok 1`; Punkt 3 `gleich`, `2400x1260 0`, `exit=0 0 defects`, `2`, `0`, `0`, `exit=0 0 defects` (mit Node 22 vorn im `PATH`); Punkt 4 Exit 0, nichts, `2`, `SELFTEST OK: ten cases` mit Exit 0, nichts, `exit=1`, `voll=0 leer=0`; Punkt 5 Exit 0, nichts, `llms ok`, `1`; Punkt 6 `0`, `1`; Punkt 7 nichts, `6`, `10`; Punkt 8 `0`, `0`, `22`, `0`, `0`; Punkt 9 `check` Exit 0 (221 Dateien, 2381 Tests), `e2e` am PR #268 `SUCCESS` (Lauf am Kopf `0af1d26`).
+- 2026-11-18 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, 7, 8, 9; `origin/dev` `3aa3467` (Goal-Datei konto 11) und danach `f076a93` (abrechnung 05, ohne Konflikt, keine Datei dieses Goals) in den Goal-Branch gemergt, alle Prüfbefehle danach erneut mit derselben Ausgabe. Prüfbefehle (Node 22.23.5, `PATH=/usr/bin:$PATH`): Punkt 1 `0`, nichts, `2400x1260`, `exit=0 0 defects`, `exit=1`, `exit=1` und `0`, Exit 0, `6`; Punkt 2 `1`, `abnahme ok 1`; Punkt 3 `gleich`, `2400x1260 0`, `exit=0 0 defects`, `2`, `0`, `0`, `exit=0 0 defects`; Punkt 4 Exit 0, nichts, `2`, `SELFTEST OK: ten cases` mit Exit 0, nichts, `exit=1`, `voll=0 leer=0`; Punkt 5 Exit 0, nichts, `llms ok`, `1`; Punkt 6 `0`, `1`; Punkt 7 nichts, `6`, `10`; Punkt 8 `0`, `0`, `22`, `0`, `0`; Punkt 9 `check` Exit 0 (2385 Tests, grün in 117 s), `e2e` am PR #268 am Kopf dieses Commits.
+- 2026-11-18 Release: PASS K und B (Zyklus 2), DONE.
 
 ## Blockers
 Keine.
