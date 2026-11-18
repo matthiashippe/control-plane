@@ -6,3 +6,4 @@ Empfehlung: Beim nächsten Goal, das die Datei anfasst, dasselbe Löschen auch i
 MVP: Robustheit, weil der Test sonst an der Umgebung statt am Code scheitert.
 
 Kritik Tech Lead an anmeldung 04 (PR #203). Nicht als Done-Punkt, weil heute weder `check` noch CI die Variablen setzen (`grep -rn CP_AGENT_MINTS_PER_DAY scripts .github ops deploy` ist leer).
+Übernommen: auf dev erledigt mit anmeldung 05 (PR #259), `beforeEach` in `test/openapi-keyless.test.ts:131` (2026-11-18)

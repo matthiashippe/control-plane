@@ -4,3 +4,4 @@ Befund: `src/index.ts` bindet den Rückgabewert von `startBillingRound` an `bill
 Beleg: `git show origin/dev:src/index.ts | grep -n billing` -> `104: // \`billing\` stays as a name: the checks of goals/hosting/01 point 3 read this block from its line on.`, `105: const billing = startBillingRound({`, `112: void billing;` | src/index.ts:105, src/index.ts:112
 Empfehlung: Mit dem Umbau aus hosting-nacharbeit-2026-11-18-1 `startBillingRound(...)` ohne Bindung aufrufen und `void billing;` samt Kommentar in Zeile 104 streichen.
 MVP: Schönheit
+Verworfen: MVP: Schönheit ohne belegten Fehler; der ungenutzte Name ändert kein Verhalten (2026-11-18)
