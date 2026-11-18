@@ -192,6 +192,16 @@ das heute für das Geld auf dem Konto des Kunden nicht gilt.
       Prüfung: `git diff origin/dev...HEAD | grep -E '^[+]' | grep -iE "(api[_-]?key|secret|token|private[_-]?key)[\"' ]*[:=] *[\"']?[A-Za-z0-9_+/=-]{16,}|BEGIN [A-Z ]*PRIVATE KEY|cnwy_k_[A-Za-z0-9_-]{16,}" | wc -l` muss `0` ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung (Netz): `n=$(gh pr list -R matthiashippe/control-plane --head goal/konto-11 --state open --json number -q '.[0].number'); gh pr checks "$n" -R matthiashippe/control-plane | awk -F'\t' '$1=="check" && $2=="pass"' | wc -l` muss mindestens `1` ausgeben.
+- [ ] Kritik: Ein Widerruf, der die alte Erlaubnis nicht beendet, geht nie ein zweites Mal raus. Zwei Fälle in einem eigenen
+      `describe("a revoke that does not end the old permission", …)` in `test/konto-payout.test.ts` (nicht im `describe` aus Punkt 5,
+      dessen Zähler bleiben): `it("… when its handleOps reverts …")` (etwa eine Nonce, die die Wallet schon verbraucht hat) und
+      `it("… when the chain still approves the old permission after handleOps …")`. In beiden antwortet `POST /v1/konto/payout` 502
+      mit `stage: "retire"`, danach ist `retire_revoke` leer und `retire_forwarder` unverändert, und der nächste `POST /v1/konto/payout`
+      antwortet 409 `payout_needs_phone` ohne eine weitere Transaktion.
+      MVP: Funktion, weil `runPayoutRules` sonst bei jedem fälligen Lauf dieselbe tote User Operation mit unserem Gas schickt oder
+      `retire_*` leert, während die alte Erlaubnis freigeschaltet bleibt, und genau diese zwei Zweige aus Entscheidung 5 ohne Test sind.
+      Prüfung: `T=$(mktemp -d); PATH=/usr/bin:$PATH pnpm -s vitest run test/konto-payout.test.ts --reporter=json --outputFile=$T/r.json >/dev/null 2>&1; echo "exit=$?"; node -e 'const r=require(process.argv[1]);const a=r.testResults.flatMap(f=>f.assertionResults).filter(x=>x.ancestorTitles.includes("a revoke that does not end the old permission")&&/when its handleOps reverts|when the chain still approves the old permission after handleOps/.test(x.title));console.log(a.length, a.filter(x=>x.status==="passed").length)' $T/r.json` muss genau `exit=0` und `2 2` ausgeben.
+      Prüfung: `T=$(mktemp -d); git archive HEAD | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; grep -c 'SET retire_revoke = NULL WHERE' $T/src/konto/payout.ts; sed -i 's/SET retire_revoke = NULL WHERE/SET retire_revoke = retire_revoke WHERE/' $T/src/konto/payout.ts; (cd $T && PATH=/usr/bin:$PATH pnpm -s vitest run test/konto-payout.test.ts --reporter=json --outputFile=r.json >/dev/null 2>&1); node -e 'const r=require(process.argv[1]);const a=r.testResults.flatMap(f=>f.assertionResults).filter(x=>x.ancestorTitles.includes("a revoke that does not end the old permission")&&/when its handleOps reverts|when the chain still approves the old permission after handleOps/.test(x.title));console.log(a.filter(x=>x.status!=="passed").length, a.filter(x=>x.status==="passed").length)' $T/r.json` muss genau die zwei Zeilen `2` und `2 0` ausgeben.
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
