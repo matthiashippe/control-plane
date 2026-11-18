@@ -1,7 +1,7 @@
 # Umzug Goal 04: Geteilte Links zeigen die neue Karte
 
 ## Status
-PLANNED
+ACTIVE
 
 ## Active Objective
 Wer einen Link auf `automatonhost.com` teilt, sieht die Karte des Umzugs mit passendem Text, und die Werkzeuge des Umzugs laufen in
@@ -90,20 +90,20 @@ gebrochenes DNS- oder Hostwerkzeug beim nächsten Wechsel einen zahlenden Automa
   selben Tag, ohne dass jemand an Caches denken muss.
 
 ## Done Condition
-- [ ] Jede Seite trägt in `og:image` und `twitter:image` die Adresse ihrer Karte mit `?v=` und den ersten 8 Zeichen des sha256 des
+- [x] Jede Seite trägt in `og:image` und `twitter:image` die Adresse ihrer Karte mit `?v=` und den ersten 8 Zeichen des sha256 des
       ausgelieferten Bildes; `/og.png` und `/og-x402.png` antworten mit denselben Headern wie vorher; der neue Test war vor dem Fix rot.
       MVP: Funktion, weil Vorschaudienste ein Bild nach Adresse halten und die Karte des Umzugs sonst Tage nach dem Merge nicht zeigen.
       Prüfung: `PATH=/usr/bin:$PATH node --import tsx --input-type=module -e 'import fs from "node:fs"; import crypto from "node:crypto"; const { createApp } = await import("./src/app.ts"); const { openDb } = await import("./src/db.ts"); const app = createApp({ db: openDb(":memory:") }); const v = (f) => crypto.createHash("sha256").update(fs.readFileSync("src/public/" + f)).digest("hex").slice(0, 8); const bad = []; for (const [p, f] of [["/", "og.png"], ["/post", "og.png"], ["/x402", "og-x402.png"], ["/conway", "og-x402.png"]]) { const h = await (await app.request(p)).text(); for (const k of [/property="og:image" content="([^"]*)"/, /name="twitter:image" content="([^"]*)"/]) { const m = k.exec(h); if (!m || !m[1].endsWith("/" + f + "?v=" + v(f))) bad.push(p + " " + (m ? m[1] : "fehlt")); } } console.log(bad.length ? "version falsch " + bad.join(", ") : "version ok")'` muss `version ok` ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH node --import tsx --input-type=module -e 'const { createApp } = await import("./src/app.ts"); const { openDb } = await import("./src/db.ts"); const app = createApp({ db: openDb(":memory:") }); const out = []; for (const p of ["/og.png", "/og.png?v=0", "/og-x402.png"]) { const r = await app.request(p); out.push([r.status, r.headers.get("content-type"), r.headers.get("cache-control"), (await r.arrayBuffer()).byteLength > 10000].join(" ")); } console.log([...new Set(out)].join(" | "))'` muss genau `200 image/png public, max-age=86400 true` ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/og-cards.test.ts test/public.test.ts test/domain-move.test.ts test/x402-page.test.ts test/conway-page.test.ts test/og-card.test.ts` muss Exit-Code 0 haben.
       Prüfung: `T=$(mktemp -d); git archive HEAD | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; B=$(git merge-base origin/dev HEAD); git show $B:src/app.ts > $T/src/app.ts; (cd $T && PATH=/usr/bin:$PATH pnpm -s vitest run test/og-cards.test.ts --reporter=json --outputFile=$T/r.json >/dev/null 2>&1); node -p "JSON.parse(require('fs').readFileSync('$T/r.json','utf8')).numFailedTests"; rm -rf $T` muss mindestens 2 ausgeben.
-- [ ] `og:image:alt` beschreibt auf jeder Seite die Karte, die sie trägt: die Startseite und die Seiten mit `og.png` den Text aus
+- [x] `og:image:alt` beschreibt auf jeder Seite die Karte, die sie trägt: die Startseite und die Seiten mit `og.png` den Text aus
       `src/public/index.html`, `/x402` und `/conway` einen eigenen Satz zur x402-Karte ohne `conwayApiUrl`, beide aus `OG_CARDS`.
       MVP: Funktion, weil ein Alt-Text, der ein anderes Bild beschreibt, Screenreadern und Vorschaudiensten etwas Falsches sagt.
       Prüfung: `PATH=/usr/bin:$PATH node --import tsx --input-type=module -e 'import fs from "node:fs"; const { createApp } = await import("./src/app.ts"); const { openDb } = await import("./src/db.ts"); const app = createApp({ db: openDb(":memory:") }); const alt = (h) => (/property="og:image:alt" content="([^"]*)"/.exec(h) ?? [])[1] ?? ""; const home = alt(fs.readFileSync("src/public/index.html", "utf8")); const a = {}; for (const p of ["/", "/post", "/x402", "/conway"]) a[p] = alt(await (await app.request(p)).text()); const ok = a["/"] === home && a["/post"] === home && a["/x402"] === a["/conway"] && a["/x402"] !== "" && !a["/x402"].includes("conwayApiUrl") && a["/x402"].includes("x402"); console.log(ok ? "alt ok" : "alt falsch " + JSON.stringify(a["/x402"]))'` muss `alt ok` ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH node --import tsx --input-type=module -e 'const { OG_CARDS } = await import("./src/public/og-cards.ts"); console.log(Object.keys(OG_CARDS).sort().join(" "))'` muss genau `og-x402.png og.png` ausgeben.
       Prüfung: `git diff --name-only origin/dev...HEAD -- src/public/index.html src/public/og-card.html src/public/og.png src/public/og-card-x402.html src/public/og-x402.png docs/soll | wc -l` muss 0 ausgeben.
-- [ ] Der Selbsttest von `ops/site-dns.py` läuft in `check`: `test/site-dns-selftest.test.ts` verlangt Exit 0, keine Zeile `FAIL ` und
+- [x] Der Selbsttest von `ops/site-dns.py` läuft in `check`: `test/site-dns-selftest.test.ts` verlangt Exit 0, keine Zeile `FAIL ` und
       als letzte Zeile `SITE DNS SELFTEST OK`, und er wird rot, wenn der Selbsttest bricht.
       MVP: Funktion, weil das Werkzeug die A-Records von `automatonhost.com` setzt und ein still gebrochener Planer beim nächsten Wechsel
       den Dienst für zahlende Automatons unerreichbar macht.
@@ -111,7 +111,7 @@ gebrochenes DNS- oder Hostwerkzeug beim nächsten Wechsel einen zahlenden Automa
       Prüfung: `for w in 'ops/site-dns.py' --selftest 'SITE DNS SELFTEST OK' 'FAIL '; do grep -qF -- "$w" test/site-dns-selftest.test.ts || echo "fehlt $w"; done` muss nichts ausgeben.
       Prüfung: `T=$(mktemp -d); git archive HEAD | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; sed -i 's/^        if want == got:$/        if want != got:/' $T/ops/site-dns.py; (cd $T && PATH=/usr/bin:$PATH pnpm -s vitest run test/site-dns-selftest.test.ts --reporter=json --outputFile=$T/r.json >/dev/null 2>&1); node -p "JSON.parse(require('fs').readFileSync('$T/r.json','utf8')).numFailedTests"; rm -rf $T` muss mindestens 1 ausgeben.
       Prüfung: `git diff --name-only origin/dev...HEAD -- ops/site-dns.py ops/before-the-answers.py | wc -l` muss 0 ausgeben.
-- [ ] `test/host-lists.test.ts` hält `KNOWN_HOSTS` aus `ops/before-the-answers.py` als Menge gegen `SERVICE_HOSTS` fest und wird rot,
+- [x] `test/host-lists.test.ts` hält `KNOWN_HOSTS` aus `ops/before-the-answers.py` als Menge gegen `SERVICE_HOSTS` fest und wird rot,
       wenn dort ein Host fehlt.
       MVP: Funktion, weil das Werkzeug neue Antworten im Kanal auf den kanonischen Host prüft und eine vergessene Kopie der Hostliste
       Links auf einen Host durchlässt, unter dem wir nicht mehr verkaufen.
@@ -119,18 +119,18 @@ gebrochenes DNS- oder Hostwerkzeug beim nächsten Wechsel einen zahlenden Automa
       Prüfung: `grep -c 'KNOWN_HOSTS' test/host-lists.test.ts` muss mindestens 1 ausgeben.
       Prüfung: `T=$(mktemp -d); git archive HEAD | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; sed -i 's/^KNOWN_HOSTS = ("automatonhost.com", /KNOWN_HOSTS = (/' $T/ops/before-the-answers.py; (cd $T && PATH=/usr/bin:$PATH pnpm -s vitest run test/host-lists.test.ts --reporter=json --outputFile=$T/r.json >/dev/null 2>&1); node -p "JSON.parse(require('fs').readFileSync('$T/r.json','utf8')).numFailedTests"; rm -rf $T` muss mindestens 1 ausgeben.
       Prüfung: `for f in $(git diff --name-only origin/dev...HEAD -- test/ | grep -vxE 'test/(og-cards|site-dns-selftest)\.test\.ts'); do for k in '(it|test)\(' 'expect\('; do a=$(git show origin/dev:$f | grep -cE "^\s*$k"); b=$(grep -cE "^\s*$k" $f); [ "$b" -ge "$a" ] || echo "weniger $f $k $a $b"; done; done` muss nichts ausgeben.
-- [ ] Jeder Prüfbefehl eines fertigen Goals, dessen Ausgabe sich durch dieses Goal ändert, steht als abgelöst in den Annahmen seines
+- [x] Jeder Prüfbefehl eines fertigen Goals, dessen Ausgabe sich durch dieses Goal ändert, steht als abgelöst in den Annahmen seines
       Topics, in der Form aus Entscheidung 8.
       MVP: Funktion, weil das Audit nachts jeden Prüfbefehl fertiger Goals fährt und jede unerklärte rote Zeile eine Reparatur ohne
       Ursache auf `dev` auslöst.
       Prüfung: `q=$(printf '\140'); cat goals/*/ANNAHMEN.md | grep -E '^- Abgelöst: .* durch umzug 04 ' | grep -vcE " durch umzug 04 Punkt [0-9]+, Ausgabe dann genau ${q}Exit [0-9]+, [^${q}]*${q} \\(Tech Lead, 2026-11-18\\)\$"` muss 0 ausgeben.
       Prüfung: `grep -cE '^- [0-9-]+ Zyklus [0-9]+: .*(abgelöst|Abgelöst)' goals/umzug/04-geteilte-links-zeigen-die-neue-karte.md` muss mindestens 1 ausgeben.
-- [ ] Die Doku sagt, warum die Bildadresse eine Version trägt, woher der Alt-Text je Karte kommt und welche Tests die Werkzeuge des
+- [x] Die Doku sagt, warum die Bildadresse eine Version trägt, woher der Alt-Text je Karte kommt und welche Tests die Werkzeuge des
       Umzugs in `check` halten; die Entscheidungen stehen mit Grund in den Annahmen.
       MVP: Funktion, weil das nächste Goal, das eine Karte anlegt, sonst den Eintrag in `OG_CARDS` oder die Hostliste vergisst.
       Prüfung: `for w in 'og.png?v=' OG_CARDS og-cards.ts site-dns-selftest.test.ts KNOWN_HOSTS host-lists.test.ts; do grep -qF -- "$w" docs/umzug.md || echo "fehlt $w"; done` muss nichts ausgeben.
       Prüfung: `awk '/^## Goal 04/{f=1;next} /^## /{f=0} f' goals/umzug/ANNAHMEN.md | grep -cE "^- .+, weil .+"` muss mindestens 5 ausgeben.
-- [ ] Das Goal ändert nur `src/app.ts`, die neue Tabelle der Karten, Tests, Doku und Annahmen, weder Karten, Bilder, SOLL-Bilder,
+- [x] Das Goal ändert nur `src/app.ts`, die neue Tabelle der Karten, Tests, Doku und Annahmen, weder Karten, Bilder, SOLL-Bilder,
       Werkzeuge unter `ops/`, Compose, Zahlung, Anmeldung, Automaton, Harness noch CI, und bringt keinen Schlüssel ins Repo.
       MVP: Funktion, weil das Repo öffentlich ist (Grundregel 8) und Compose nur Matthias ändert.
       Prüfung: `git diff --name-only origin/dev...HEAD -- deploy src/payments src/auth src/automaton src/handoff harness .github scripts/check.mjs loop.yaml gate.yaml LOOP.md loop-constraints.md ops | wc -l` muss 0 ausgeben.
@@ -138,7 +138,7 @@ gebrochenes DNS- oder Hostwerkzeug beim nächsten Wechsel einen zahlenden Automa
       Prüfung: `git diff --name-only origin/dev...HEAD | wc -l` muss höchstens 18 ausgeben.
       Prüfung: `git diff --name-only origin/dev...HEAD | grep -cE "\.(key|pem|crt|env)$"` muss 0 ausgeben.
       Prüfung: `git diff origin/dev...HEAD -- . ':(exclude)goals/' | grep -cE '^\+.*(cnwy_k_[0-9a-f]{32}|-{5}BEGIN [A-Z ]*PRIVATE KEY-{5}|Bearer [A-Za-z0-9_-]{30,})'` muss 0 ausgeben.
-- [ ] `check` ist grün, und der Job `e2e` des Goal-PR ist grün.
+- [x] `check` ist grün, und der Job `e2e` des Goal-PR ist grün.
       MVP: Funktion, weil jede Seite durch `page()` geht und erst der Gang mit der unveränderten Runtime zeigt, dass Anmeldung, Zahlung
       und Inferenz weiter laufen (Grundregel 13).
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
@@ -172,6 +172,7 @@ gebrochenes DNS- oder Hostwerkzeug beim nächsten Wechsel einen zahlenden Automa
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-18 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6, 7, 8 gebaut: Tabelle `OG_CARDS` in `src/public/og-cards.ts`, `withCard()` in `src/app.ts` setzt für `page()` und `/` Bildadresse mit `?v=` (8 Hex-Zeichen sha256 der ausgelieferten Bytes) und Alt-Text je Karte, `test/og-cards.test.ts` war gegen das alte `src/app.ts` rot (4 von 8 Fällen), `test/site-dns-selftest.test.ts` und der Fall `KNOWN_HOSTS` in `test/host-lists.test.ts` mit Gegenprobe je 1 roter Fall, Doku in `docs/umzug.md`, Annahmen unter `## Goal 04`; 25 Prüfbefehle fertiger Goals an Merge-Basis und Branch verglichen, einer abgelöst (umzug 01 Punkt 7, 26 auf 28). Prüfbefehle: Punkt 1 version ok, Header-Zeile wie verlangt, sechs Testdateien Exit 0 (93 Fälle), Gegenprobe 4; Punkt 2 alt ok, Schlüssel wie verlangt, 0; Punkt 3 Exit 0, nichts, 1, 0; Punkt 4 Exit 0, 3, 1, nichts; Punkt 5 0 und 1; Punkt 6 nichts und 9; Punkt 7 0, 0, 10, 0, 0; Punkt 8 `check` Exit 0 (2402 Tests), `e2e` am PR siehe Kommentar.
 
 ## Blockers
 Keine.
