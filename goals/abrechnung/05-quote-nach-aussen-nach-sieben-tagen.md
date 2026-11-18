@@ -142,6 +142,18 @@ Skalierung abbricht.
 - [x] Der Laufzeitpfad bleibt unverändert, und `check` ist grün.
       Prüfung: `git diff --name-only origin/dev...HEAD -- src deploy | wc -l` muss 0 ausgeben.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
+- [ ] Kritik: Die Zeile `Anbieterwahl:` in `docs/abrechnung/timeouts.md` begründet das Routing mit der Messung über sieben Tage statt
+      mit dem 10.11.2026. Heute steht dort „weil der Einkauf ohne Verkauf im Zeitraum bei beiden Modellen 0 mc ist“, während
+      `## Nach sieben Tagen` in `docs/abrechnung/einkauf-abbrueche.md` ohne den 10.11. 8558 mc für 20 Abbrüche bei openai/gpt-5.2
+      nennt. Danach steht in `timeouts.md` genau eine Zeile `Anbieterwahl:`; sie nennt den Zeitraum bis 17.11.2026, verweist auf
+      `## Nach sieben Tagen`, nennt Quote nach außen und Einkauf je Abbruch (Zahl oder Grund) und entscheidet daraus, ob das Routing
+      bleibt. Die Begründung „bei beiden Modellen 0 mc“ steht nirgends mehr in der Datei.
+      MVP: Funktion, weil die Anbieterwahl sonst auf einer Zahl steht, die die eigene Messung desselben Goals widerlegt
+      (`ROADMAP.md`, abrechnung 04: die Anbieterwahl rechnet mit dieser Kostenzahl).
+      Prüfung: `grep -c "^Anbieterwahl: " docs/abrechnung/timeouts.md` muss 1 ausgeben.
+      Prüfung: `grep -c "bei beiden Modellen 0 mc" docs/abrechnung/timeouts.md` muss 0 ausgeben.
+      Prüfung: `grep "^Anbieterwahl: " docs/abrechnung/timeouts.md | grep -c "17\.11\.2026"` muss 1 ausgeben.
+      Prüfung: `grep "^Anbieterwahl: " docs/abrechnung/timeouts.md | grep -c "Nach sieben Tagen"` muss 1 ausgeben.
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
