@@ -174,3 +174,13 @@
   Gegenprobe: `if want != got` in einer Kopie macht ihn rot (1 Fehler).
 - **`KNOWN_HOSTS` wird als Menge gegen `SERVICE_HOSTS` verglichen**, weil die Reihenfolge in `ops/before-the-answers.py` nichts
   bedeutet (Entscheidung 7); Gegenprobe: `automatonhost.com` aus der Kopie gestrichen macht ihn rot (1 Fehler).
+- **Abgelöste Prüfbefehle: 1**, weil die neuen Annahmen unter `## Goal 04` den Zähler eines Befehls ohne Abschnittsende erhöhen
+  (Entscheidung 8): Von 38 Prüfbefehlen fertiger Goals, die einen Pfad dieses Diffs oder eines der Wörter aus Entscheidung 8
+  nennen, liefen 25 ohne Netz an der Merge-Basis `e76b200` und am Goal-Branch `b6825ca`, je in einem eigenen Worktree, verglichen
+  über Exit-Code und letzte Zeile; 13 nennen `origin/dev` oder die Merge-Basis (einer davon mit Netz) und laufen im Audit am
+  Verdict-Commit ihres Goals. Geändert hat sich nur umzug 01 Punkt 7 (26 auf 28, Erwartung bleibt erfüllt); bei drei
+  vitest-Läufen unterscheidet sich nur die Zeile mit der Laufzeit, Exit 0 an beiden Ständen.
+
+## Abgelöst durch umzug 04 (Maker, 2026-11-18)
+
+- Abgelöst: umzug 01 Punkt 7 durch umzug 04 Punkt 6, Ausgabe dann genau `Exit 0, 28` (Tech Lead, 2026-11-18)
