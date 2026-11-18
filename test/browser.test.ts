@@ -5,9 +5,11 @@
  * shell script that writes down its arguments and FONTCONFIG_FILE and ends at once with exit 0: after that every request has to
  * fail with `browser exited` instead of waiting for an answer that cannot come. No port, no network.
  */
+import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 // @ts-expect-error plain ESM module under ops/, no declaration file
 import { chromeArgs, findChrome, launch } from "../ops/browser.mjs";
@@ -113,4 +115,67 @@ describe.each(["picture", "passkey"])("launch, kind %s", (kind) => {
       expect(existsSync(fonts)).toBe(false);
     }
   });
+});
+
+/** A Chrome that writes its pid next to itself and then sleeps as that same process, without ever reading the pipe. */
+function sleepingChrome(): { chrome: string; dir: string } {
+  const dir = mkdtempSync(path.join(os.tmpdir(), "browser-sleep-"));
+  const chrome = path.join(dir, "chrome");
+  writeFileSync(chrome, '#!/bin/sh\nd=$(dirname "$0")\necho $$ > "$d/pid"\nexec sleep 30\n', { mode: 0o755 });
+  return { chrome, dir };
+}
+
+/**
+ * A node process that starts the browser, waits until it runs, and ends with a close() it does not wait for, as the Sepolia runs
+ * under ops/konto/ do in their exit handler (goals/konto/12, Punkt 3).
+ */
+const CHILD = `
+import { existsSync } from "node:fs";
+import path from "node:path";
+const [driver, chrome, profile, kind] = process.argv.slice(1);
+const { launch } = await import(driver);
+const browser = launch(chrome, profile, kind);
+const pid = path.join(path.dirname(chrome), "pid");
+for (let i = 0; i < 100 && !existsSync(pid); i++) await new Promise((r) => setTimeout(r, 50));
+process.on("exit", () => { browser?.close(); });
+process.exit(0);
+`;
+
+const alive = (pid: number) => {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ESRCH") return false;
+    throw err;
+  }
+};
+
+describe.each(["picture", "passkey"])("launch ends its browser when node ends, kind %s", (kind) => {
+  let pidFile = "";
+  afterEach(() => {
+    // The red run before the fix must not leave the sleeping stand-in behind.
+    if (!pidFile || !existsSync(pidFile)) return;
+    const pid = Number(readFileSync(pidFile, "utf8").trim());
+    if (pid > 1 && alive(pid)) process.kill(pid, "SIGKILL");
+  });
+
+  it("kills a browser the caller did not wait for when node exits", async () => {
+    const { chrome, dir } = sleepingChrome();
+    pidFile = path.join(dir, "pid");
+    const driver = pathToFileURL(path.resolve(__dirname, "../ops/browser.mjs")).href;
+    const child = spawn(process.execPath, ["--input-type=module", "-e", CHILD, driver, chrome, path.join(dir, "profile"), kind], {
+      stdio: ["ignore", "ignore", "pipe"],
+    });
+    let stderr = "";
+    child.stderr.on("data", (d) => { stderr += d; });
+    const code = await within(10_000, new Promise<number | null>((resolve) => child.on("exit", (c) => resolve(c))));
+    expect(stderr).toBe("");
+    expect(code).toBe(0);
+    expect(existsSync(pidFile)).toBe(true);
+    const pid = Number(readFileSync(pidFile, "utf8").trim());
+    expect(pid).toBeGreaterThan(1);
+    await new Promise((r) => setTimeout(r, 2000));
+    expect(alive(pid)).toBe(false);
+  }, 20_000);
 });

@@ -12,7 +12,7 @@ import { esc } from "./market.js";
 import { phonePage, usd } from "./handoff.js";
 
 export type KontoPage =
-  | { state: "passkey"; code: string; automatonName: string; dailyLimitUsdc: bigint; chainId: number; spender: string; token: string; authProxyId?: string | null }
+  | { state: "passkey"; code: string; displayName: string; dailyLimitUsdc: bigint; chainId: number; spender: string; token: string; authProxyId?: string | null }
   | { state: "failed"; reason: FailReason };
 
 /** Why no account was created. The SOLL picture shows `cancelled`. */
@@ -44,7 +44,7 @@ export const KEY_ICON =
 
 function body(page: KontoPage): string {
   if (page.state === "passkey") {
-    const name = esc(page.automatonName);
+    const name = esc(page.displayName);
     // What the script of the page needs to ask for exactly this permission; none of it is secret.
     const data = [
       `data-code="${esc(page.code)}"`,

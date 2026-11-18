@@ -1,7 +1,7 @@
 # Konto Goal 12: Der Name des Kontos heißt im Code so, und kein Browser überlebt einen Sepolia-Lauf
 
 ## Status
-PLANNED
+DONE
 
 ## Active Objective
 Wer den Handoff liest oder ändert, verwechselt Konto und Automaton nicht, und kein Prüflauf lässt einen Browser auf dem code-host
@@ -75,7 +75,7 @@ code-host Speicher hält, bis ihn ein Mensch findet.
   `src/public/limit.ts`, jede andere Tabelle.
 
 ## Done Condition
-- [ ] Der Handoff speichert den gezeigten Namen in der Spalte `display_name` und im Feld `displayName`, die Seiten lesen ihn als
+- [x] Der Handoff speichert den gezeigten Namen in der Spalte `display_name` und im Feld `displayName`, die Seiten lesen ihn als
       `displayName`, `accountNameOf` ist weg, und `automaton_name` steht in `src/handoff` nur noch als Name des Felds der Schnittstelle.
       MVP: Funktion, weil an dieser Stelle die Widerlegung hängt: Der Name des Kontos darf im Handoff nicht mehr unter dem Namen des
       Automatons liegen (Vorschlag konto-kritik-2026-11-17-4).
@@ -87,14 +87,14 @@ code-host Speicher hält, bis ihn ein Mensch findet.
       Prüfung: `grep -c 'RENAME COLUMN automaton_name TO display_name' src/db.ts` muss genau `1` ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH node --import tsx -e 'import("./src/db.ts").then(({openDb})=>{const c=openDb(":memory:").prepare("PRAGMA table_info(handoffs)").all().map(x=>x.name);console.log(c.includes("display_name"),c.includes("automaton_name"))})'` muss genau `true false` ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/handoff-display-name.test.ts test/automaton-name.test.ts test/handoff-page.test.ts test/handoff-api.test.ts test/handoff-events.test.ts test/konto-limit.test.ts test/konto-limit-account.test.ts test/konto-deposit.test.ts test/konto-payout.test.ts test/konto-signature-retry.test.ts test/konto-topup-period.test.ts test/mcp-automaton.test.ts test/mcp-money.test.ts` muss Exit-Code 0 haben.
-- [ ] Zwei Fälle in `test/handoff-display-name.test.ts` lesen eine Zeile aus dem bisherigen Schema unverändert als `display_name` und
+- [x] Zwei Fälle in `test/handoff-display-name.test.ts` lesen eine Zeile aus dem bisherigen Schema unverändert als `display_name` und
       prüfen eine frische Datenbank; gegen den Stand der Merge-Basis sind beide rot.
       MVP: Funktion, weil die Migration auf der Datenbank zahlender Kunden läuft und erst der rote Lauf am alten Code zeigt, dass der
       Test die Umbenennung trifft.
       Prüfung: `T=$(mktemp -d); PATH=/usr/bin:$PATH pnpm -s vitest run test/handoff-display-name.test.ts --reporter=json --outputFile=$T/r.json >/dev/null 2>&1; echo "exit=$?"; node -e 'const r=require(process.argv[1]);const a=r.testResults.flatMap(f=>f.assertionResults).filter(x=>x.ancestorTitles.includes("the name a handoff shows is display_name"));console.log(a.length, a.filter(x=>x.status==="passed").length)' $T/r.json` muss genau `exit=0` und `2 2` ausgeben.
       Prüfung: `B=$(git merge-base origin/dev HEAD); T=$(mktemp -d); git archive $B | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; cp test/handoff-display-name.test.ts $T/test/; (cd $T && PATH=/usr/bin:$PATH pnpm -s vitest run test/handoff-display-name.test.ts --reporter=json --outputFile=r.json >/dev/null 2>&1); node -e 'const r=require(process.argv[1]);const a=r.testResults.flatMap(f=>f.assertionResults).filter(x=>x.ancestorTitles.includes("the name a handoff shows is display_name"));console.log(a.filter(x=>x.status!=="passed").length, a.filter(x=>x.status==="passed").length)' $T/r.json` muss genau `2 0` ausgeben.
       Prüfung: `node -e 'const s=require("fs").readFileSync("test/handoff-display-name.test.ts","utf8");const miss=["openDb","automaton_name","display_name","PRAGMA table_info(handoffs)","mkdtemp","\x27payout\x27"].filter(x=>!s.includes(x));if(/from "\.\.\/src\/(?!db)/.test(s))miss.push("import");if(miss.length){console.error(miss);process.exit(1)}console.log("faelle ok")'` muss `faelle ok` ausgeben.
-- [ ] `launch` in `ops/browser.mjs` beendet seinen Browser beim Ende von Node, auch wenn der Aufrufer `close()` nicht abwartet, und
+- [x] `launch` in `ops/browser.mjs` beendet seinen Browser beim Ende von Node, auch wenn der Aufrufer `close()` nicht abwartet, und
       sammelt keine Listener an; vor dem Fix ist der neue Fall für beide Arten rot.
       MVP: Funktion, weil ein Browser, der einen Prüflauf überlebt, auf dem geteilten code-host Speicher hält und die Audits der Nacht
       bremst (Vorschlag konto-kritik-2026-11-17-8).
@@ -103,7 +103,7 @@ code-host Speicher hält, bis ihn ein Mensch findet.
       Prüfung: `B=$(git merge-base origin/dev HEAD); T=$(mktemp -d); git archive $B | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; cp test/browser.test.ts $T/test/; (cd $T && PATH=/usr/bin:$PATH pnpm -s vitest run test/browser.test.ts --reporter=json --outputFile=r.json >/dev/null 2>&1); node -e 'const r=require(process.argv[1]);const a=r.testResults.flatMap(f=>f.assertionResults).filter(x=>x.ancestorTitles.some(t=>t.startsWith("launch ends its browser when node ends")));console.log(a.filter(x=>x.status!=="passed").length, a.filter(x=>x.status==="passed").length)' $T/r.json` muss genau `2 0` ausgeben.
       Prüfung: `T=$(mktemp -d); printf '#!/bin/sh\nexit 0\n' > $T/chrome; chmod +x $T/chrome; PATH=/usr/bin:$PATH node --input-type=module -e 'import { launch } from "./ops/browser.mjs"; const base = process.listenerCount("exit"); const all = []; for (let i = 0; i < 12; i++) all.push(launch(process.argv[1], process.argv[1] + "-p" + i, "passkey").send("Browser.getVersion").catch(() => {})); await Promise.all(all); await new Promise((r) => setTimeout(r, 300)); console.log("exit listeners", process.listenerCount("exit") - base);' $T/chrome` muss genau `exit listeners 0` ausgeben.
       Prüfung: `git diff --quiet origin/dev...HEAD -- ops/konto && echo laeufe gleich` muss `laeufe gleich` ausgeben.
-- [ ] Seiten und SOLL-Bilder bleiben gleich: Die echten Seiten aller vier Strecken sind pixelgleich mit den Bildern, und weder Bilder
+- [x] Seiten und SOLL-Bilder bleiben gleich: Die echten Seiten aller vier Strecken sind pixelgleich mit den Bildern, und weder Bilder
       noch SOLL-Werkzeuge ändern sich.
       MVP: Funktion, weil die Umbenennung nur den Code betrifft und der Kunde auf dem Handy nichts davon sehen darf.
       Prüfung: `git diff --quiet origin/dev...HEAD -- docs/soll 'ops/soll*.mjs' && echo bilder gleich` muss `bilder gleich` ausgeben.
@@ -111,12 +111,12 @@ code-host Speicher hält, bis ihn ein Mensch findet.
       Prüfung: `T=$(mktemp -d); PATH=/usr/bin:$PATH node --import tsx ops/soll-live-konto.mjs --out $T >/dev/null && PATH=/usr/bin:$PATH node ops/soll-konto.mjs --check --source $T > $T/o 2>&1; echo "exit=$?"; tail -n 1 $T/o | grep -cE '^soll konto: 4 pictures, passkey top 390=[0-9]+ 1440=[0-9]+, 0 defects$'` muss genau die zwei Zeilen `exit=0` und `1` ausgeben.
       Prüfung: `T=$(mktemp -d); PATH=/usr/bin:$PATH node --import tsx ops/soll-live-limit.mjs --out $T >/dev/null && PATH=/usr/bin:$PATH node ops/soll-limit.mjs --check --source $T > $T/o 2>&1; echo "exit=$?"; tail -n 1 $T/o | grep -cE '^soll limit: 4 pictures, approve top 390=[0-9]+ 1440=[0-9]+, limit top 390=[0-9]+ 1440=[0-9]+, 0 defects$'` muss genau die zwei Zeilen `exit=0` und `1` ausgeben.
       Prüfung: `T=$(mktemp -d); PATH=/usr/bin:$PATH node --import tsx ops/soll-live-money.mjs --out $T >/dev/null && PATH=/usr/bin:$PATH node ops/soll-money.mjs --check --source $T > $T/o 2>&1; echo "exit=$?"; tail -n 1 $T/o | grep -cE '^soll money: 16 images, blocks end 390=[0-9]+ 1440=[0-9]+, 0 defects$'` muss genau die zwei Zeilen `exit=0` und `1` ausgeben.
-- [ ] Die Entscheidungen stehen mit Grund in `goals/konto/ANNAHMEN.md`.
+- [x] Die Entscheidungen stehen mit Grund in `goals/konto/ANNAHMEN.md`.
       MVP: Funktion, weil die Linsen und die nächsten Goals der Kette gegen diese Annahmen prüfen, vor allem gegen die eine Stelle, an
       der `automaton_name` bleibt.
       Prüfung: `awk '/^## Goal 12/{f=1;next} /^## /{f=0} f' goals/konto/ANNAHMEN.md | grep -cE "^- .+, weil .+"` muss mindestens `4` ausgeben.
       Prüfung: `awk '/^## Goal 12/{f=1;next} /^## /{f=0} f' goals/konto/ANNAHMEN.md | grep -cE 'NAME_FIELD|mcp/server\.mjs'` muss mindestens `1` ausgeben.
-- [ ] Der Diff bleibt in den Pfaden dieses Goals, Schnittstelle, Verträge und Sepolia-Läufe bleiben gleich, kein Test wird schwächer,
+- [x] Der Diff bleibt in den Pfaden dieses Goals, Schnittstelle, Verträge und Sepolia-Läufe bleiben gleich, kein Test wird schwächer,
       kein neues Paket, kein Schlüssel im Diff, keine andere Goal-Datei geändert, und `check` ist grün.
       MVP: Funktion, weil `src/**` mit dem Merge ausrollt und zahlende Kunden den Stand tragen.
       Prüfung: `git diff --name-only origin/dev...HEAD | grep -vE '^(src/handoff/(routes|store)\.ts|src/db\.ts|src/public/(handoff|konto|money)\.ts|ops/browser\.mjs|test/(handoff-display-name|browser|automaton-name|handoff-page|handoff-api|handoff-events|konto-limit|konto-limit-account|konto-deposit|konto-payout|konto-signature-retry|konto-topup-period|mcp-automaton|mcp-money)\.test\.ts|test/(money|handoff)-helpers\.ts|goals/konto/12-der-name-des-kontos-heisst-im-code-so\.md|goals/konto/verdicts/12-[A-Za-z0-9._-]+\.md|goals/konto/ANNAHMEN\.md|goals/_vorschlaege/konto-[a-z0-9.-]+\.md)$' | wc -l` muss `0` ausgeben.
@@ -127,7 +127,7 @@ code-host Speicher hält, bis ihn ein Mensch findet.
       Prüfung: `git diff origin/dev...HEAD | grep -E '^[+]' | grep -iE "(api[_-]?key|secret|token|private[_-]?key)[\"' ]*[:=] *[\"']?[A-Za-z0-9_+/=-]{16,}|BEGIN [A-Z ]*PRIVATE KEY|cnwy_k_[A-Za-z0-9_-]{16,}" | wc -l` muss `0` ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung (Netz): `n=$(gh pr list -R matthiashippe/control-plane --head goal/konto-12 --state open --json number -q '.[0].number'); gh pr checks "$n" -R matthiashippe/control-plane | awk -F'\t' '$1=="check" && $2=="pass"' | wc -l` muss mindestens `1` ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Im Handoff heißt der Name, den die Seite zeigt, überall `display_name` oder `displayName`, auch beim Schritt `limit`.
@@ -157,5 +157,9 @@ code-host Speicher hält, bis ihn ein Mensch findet.
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-18 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6 gebaut: Spalte `display_name` per Umbenennung nach den Umbauten von konto 02 bis 05, `displayName` in Handoff und Seiten, `NAME_FIELD` als einzige Stelle von `automaton_name` in `src/handoff`, `launch` beendet laufende Browser über einen gemeinsamen `exit`-Listener. Prüfbefehle: Punkt 1 `routes.ts:1`, `routes.ts:1`, 0, 0, 7, 1, `true false`, 13 Testdateien Exit 0; Punkt 2 `exit=0` `2 2`, Merge-Basis `2 0`, `faelle ok`; Punkt 3 1, `exit=0` `2 2`, Merge-Basis `2 0`, `exit listeners 0` (Gegenprobe ohne `process.off`: `exit listeners 1`), `laeufe gleich`; Punkt 4 `bilder gleich`, handoff, konto, limit und money je `exit=0` und `1` mit 0 defects; Punkt 5 7 und 1; Punkt 6 0, `schnittstelle gleich`, 0, `pakete gleich`, `goals gleich`, 0, `check` Exit 0 (2396 Tests grün in 509 s), `check` am PR siehe Kommentar.
+- 2026-11-18 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6; `dev` c54416a gemergt (nur `ROADMAP.md`, `STATE.md` und Goal-Dateien). Prüfbefehle am Merge d2a81a5: Punkt 1 `routes.ts:1`, `routes.ts:1`, 0, 0, 7, 1, `true false`, 13 Testdateien Exit 0 (125 Tests); Punkt 2 `exit=0` `2 2`, Merge-Basis c54416a `2 0`, `faelle ok`; Punkt 3 1, `exit=0` `2 2`, Merge-Basis `2 0`, `exit listeners 0`, `laeufe gleich`, kein `sleep` des nachgebauten Chrome übrig; Punkt 4 `bilder gleich`, handoff, konto, limit und money je `exit=0` und 0 defects; Punkt 5 7 und 1; Punkt 6 0, `schnittstelle gleich`, 0, `pakete gleich`, `goals gleich`, 0, `check` Exit 0 (2396 Tests in 223 Dateien, 374 s), Jobs `check` und `e2e` am PR siehe Kommentar.
+- 2026-11-18 Release: PASS K und B (Zyklus 2), DONE.
+- 2026-11-18 Zyklus 3: `dev` gemergt (c54416a bis e76b200, nur Goal-Dateien und Vorschläge; Konflikt in `konto-kritik-2026-11-18-4.md` gelöst, der Vorschlag der Kritik liegt als `-5`), damit K und B nach dem Merge am neuen Kopf urteilen; Code unverändert seit Zyklus 2 (`git diff --name-only 83011ba HEAD -- . ':!goals'` 0 Dateien). Prüfbefehle am Merge 2845c68: Punkt 5 7; Punkt 6 0, `schnittstelle gleich`, `pakete gleich`, `goals gleich`, 0, `check` Exit 0 (2396 Tests in 223 Dateien, 124 s); Punkte 1 bis 4 am selben Code in Zyklus 2 grün.
 
 ## Blockers

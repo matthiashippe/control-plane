@@ -52,7 +52,7 @@ import { resolveApiKey } from "../auth/siwe.js";
 /** What the passkey step shows: the page asks the person to create the account and to sign exactly this permission. */
 export interface PasskeyView {
   code: string;
-  automatonName: string;
+  displayName: string;
   dailyLimitUsdc: bigint;
   chainId: number;
   spender: Address;
@@ -123,7 +123,9 @@ export interface HandoffDeps {
 export const DEFAULT_MISS_LIMIT: RateLimitOptions = { limit: 20, windowMs: 600_000 };
 const CONTRACT = "https://github.com/matthiashippe/control-plane/blob/dev/docs/konto/handoff.md";
 const NAME_MAX = 64;
-const ACCOUNT_NAME_RULE = `Send automaton_name: 1 to ${ACCOUNT_NAME_MAX} letters, digits, spaces, underscores or hyphens, starting with a letter or digit.`;
+// The field of the body of POST /v1/handoff that carries the name: public, sent by mcp/server.mjs on the users' machines, so it keeps its name.
+const NAME_FIELD = "automaton_name";
+const ACCOUNT_NAME_RULE = `Send ${NAME_FIELD}: 1 to ${ACCOUNT_NAME_MAX} letters, digits, spaces, underscores or hyphens, starting with a letter or digit.`;
 
 /** 1 to 64 characters, no control characters: the name of a deposit or payout, which names no account (goals/konto/10, decision 2). */
 export function parseName(v: unknown): string | null {
@@ -183,11 +185,9 @@ export function registerHandoff<E extends Env>(app: Hono<E>, deps: HandoffDeps):
     private_(c);
     return c.html(renderLimitPage(view, deps.indexStyle()), status);
   };
-  /** The name of the account a raise shows: kept with the handoff of step limit, null when the account has none. */
-  const accountNameOf = (h: Handoff): string | null => (h.automatonName ? h.automatonName : null);
   const limitApprove = (h: Handoff): LimitPage => ({
     state: "approve",
-    accountName: accountNameOf(h),
+    accountName: h.displayName || null,
     previousLimitUsdc: h.previousLimitUsdc ?? 0n,
     dailyLimitUsdc: h.dailyLimitUsdc,
     choices: h.choices,
@@ -250,7 +250,7 @@ export function registerHandoff<E extends Env>(app: Hono<E>, deps: HandoffDeps):
       return moneyPage(c, {
         state: "payout-passkey",
         code: h.code,
-        automatonName: h.automatonName,
+        displayName: h.displayName,
         bankLast4: bank.bank_last4,
         chainId: konto.chainId,
         spender: bank.forwarder,
@@ -279,14 +279,14 @@ export function registerHandoff<E extends Env>(app: Hono<E>, deps: HandoffDeps):
         );
         if (!approved) {
           showedVerify.set(h.code, nowMs());
-          return moneyPage(c, { state: "payout-verify", code: h.code, automatonName: h.automatonName, kycLink: link.kycLink });
+          return moneyPage(c, { state: "payout-verify", code: h.code, displayName: h.displayName, kycLink: link.kycLink });
         }
       } catch (err) {
         if (!(err instanceof BridgeError)) throw err;
         return c.text("Bridge could not be reached just now. Reload this page in a minute.", 502);
       }
     }
-    return moneyPage(c, { state: "payout-bank", code: h.code, automatonName: h.automatonName, steps: stepsOf(h.code) });
+    return moneyPage(c, { state: "payout-bank", code: h.code, displayName: h.displayName, steps: stepsOf(h.code) });
   };
 
   /** The page of a matched handoff: the passkey step of konto and limit, the card of a deposit, the next step of a payout. */
@@ -299,7 +299,7 @@ export function registerHandoff<E extends Env>(app: Hono<E>, deps: HandoffDeps):
       return moneyPage(c, {
         state: "deposit-card",
         code: h.code,
-        automatonName: h.automatonName,
+        displayName: h.displayName,
         amountUsdc: h.amountUsdc,
         address: h.account ?? "",
         chainId: konto.chainId,
@@ -322,7 +322,7 @@ export function registerHandoff<E extends Env>(app: Hono<E>, deps: HandoffDeps):
         {
           state: "passkey",
           code: h.code,
-          accountName: accountNameOf(h),
+          accountName: h.displayName || null,
           previousLimitUsdc: h.previousLimitUsdc ?? 0n,
           dailyLimitUsdc: h.dailyLimitUsdc,
           chainId: konto.chainId,
@@ -337,7 +337,7 @@ export function registerHandoff<E extends Env>(app: Hono<E>, deps: HandoffDeps):
     }
     const view: PasskeyView = {
       code: h.code,
-      automatonName: h.automatonName,
+      displayName: h.displayName,
       dailyLimitUsdc: h.dailyLimitUsdc,
       chainId: konto.chainId,
       spender: konto.spender,
@@ -354,7 +354,7 @@ export function registerHandoff<E extends Env>(app: Hono<E>, deps: HandoffDeps):
 
   const approve = (h: Handoff): HandoffPage => ({
     state: "approve",
-    automatonName: h.automatonName,
+    displayName: h.displayName,
     dailyLimitUsdc: h.dailyLimitUsdc,
     amountUsdc: h.amountUsdc,
     choices: h.choices,
@@ -391,8 +391,8 @@ export function registerHandoff<E extends Env>(app: Hono<E>, deps: HandoffDeps):
     const step = body.step as "deposit" | "payout";
     const refuse = (message: string) => c.json({ error: "invalid_handoff", message, docs: CONTRACT }, 400);
     if (namesTarget(body)) return refuse("Money goes only to the account of your API key or to the bank account set up on your phone. Leave out every address.");
-    const automatonName = parseName(body.automaton_name);
-    if (!automatonName) return refuse("Send automaton_name, 1 to 64 characters.");
+    const displayName = parseName(body[NAME_FIELD]);
+    if (!displayName) return refuse(`Send ${NAME_FIELD}, 1 to ${NAME_MAX} characters.`);
     const amountUsdc = step === "deposit" ? parseUsd(body.amount_usd) : 0n;
     if (amountUsdc === null) return refuse('Send amount_usd, dollars as a string like "20.00".');
     if (!konto) return c.json(KONTO_OFF, 503);
@@ -405,7 +405,7 @@ export function registerHandoff<E extends Env>(app: Hono<E>, deps: HandoffDeps):
     if (!db.prepare("SELECT 1 FROM konto_accounts WHERE address = ?").get(account)) {
       return c.json({ error: "no_account", message: "This API key belongs to no account. Create one with step konto first.", docs: CONTRACT }, 404);
     }
-    return created(c, createHandoff(db, { automatonName, dailyLimitUsdc: 0n, amountUsdc, step, account }, nowMs(), deps.random));
+    return created(c, createHandoff(db, { displayName, dailyLimitUsdc: 0n, amountUsdc, step, account }, nowMs(), deps.random));
   };
 
   app.post("/v1/handoff", async (c) => {
@@ -413,7 +413,7 @@ export function registerHandoff<E extends Env>(app: Hono<E>, deps: HandoffDeps):
     const body = (await c.req.json().catch(() => null)) as Record<string, unknown> | null;
     if (body && typeof body === "object" && (body.step === "deposit" || body.step === "payout")) return moneyHandoff(c, body);
     // The name of the account the phone shows next to the passkey button (goals/konto/10, decision 2): only plain names here.
-    const automatonName = parseAccountName(body?.automaton_name);
+    const sentName = parseAccountName(body?.[NAME_FIELD]);
     const dailyLimitUsdc = parseUsdc(body?.daily_limit_usdc);
     const step = body?.step === undefined ? "confirm" : body.step;
     // The first payment of an account is its first spend() (goals/konto/04): the lower of CP_KONTO_TOPUP_USDC and the daily limit,
@@ -433,7 +433,7 @@ export function registerHandoff<E extends Env>(app: Hono<E>, deps: HandoffDeps):
     }
     // A raise of the limit takes no name from the body (goals/konto/06, decision 2): the page shows the name of the account, which
     // the terminal cannot set. A name an older plugin still sends is passed over without an error.
-    if ((step === "confirm" || step === "konto") && body && typeof body === "object" && !automatonName) {
+    if ((step === "confirm" || step === "konto") && body && typeof body === "object" && !sentName) {
       return c.json({ error: "invalid_handoff", message: ACCOUNT_NAME_RULE, docs: CONTRACT }, 400);
     }
     if (
@@ -447,10 +447,10 @@ export function registerHandoff<E extends Env>(app: Hono<E>, deps: HandoffDeps):
         {
           error: "invalid_handoff",
           message:
-            "Send JSON with automaton_name (1 to 32 letters, digits, spaces, underscores or hyphens), daily_limit_usdc and amount_usdc, both a positive whole number of " +
+            `Send JSON with ${NAME_FIELD} (1 to ${ACCOUNT_NAME_MAX} letters, digits, spaces, underscores or hyphens), daily_limit_usdc and amount_usdc, both a positive whole number of ` +
             'atomic USDC (6 decimals) in whole cents, as a string, and optionally step "confirm" (the default), "konto" (amount_usdc ' +
-            'may be left out) or "limit" (with your API key, without amount_usdc and without automaton_name): ' +
-            '{"automaton_name":"Atlas","daily_limit_usdc":"5000000","amount_usdc":"5000000"}.',
+            `may be left out) or "limit" (with your API key, without amount_usdc and without ${NAME_FIELD}): ` +
+            `{"${NAME_FIELD}":"Atlas","daily_limit_usdc":"5000000","amount_usdc":"5000000"}.`,
           docs: CONTRACT,
         },
         400,
@@ -458,7 +458,7 @@ export function registerHandoff<E extends Env>(app: Hono<E>, deps: HandoffDeps):
     }
     if ((step === "konto" || step === "limit") && !konto) return c.json(KONTO_OFF, 503);
     let limitOf: { account: string; previousLimitUsdc: bigint } | undefined;
-    let shownName = automatonName ?? "";
+    let displayName = sentName ?? "";
     if (step === "limit") {
       // A raise needs the API key of the account (goals/konto/04): the key alone can only lower the limit (POST /v1/konto/limit).
       const address = resolveApiKey(db, c.req.header("authorization"));
@@ -479,11 +479,11 @@ export function registerHandoff<E extends Env>(app: Hono<E>, deps: HandoffDeps):
       }
       limitOf = { account: limit.account, previousLimitUsdc: limit.signed };
       // The handoff of a raise keeps the name of the account (empty when it has none), never the one from the body.
-      shownName = readAccountName(db, limit.account) ?? "";
+      displayName = readAccountName(db, limit.account) ?? "";
     }
     const { handoff, pollToken, expiresAtMs } = createHandoff(
       db,
-      { automatonName: shownName, dailyLimitUsdc, amountUsdc, step: step as HandoffStep, ...limitOf },
+      { displayName, dailyLimitUsdc, amountUsdc, step: step as HandoffStep, ...limitOf },
       nowMs(),
       deps.random,
     );
@@ -506,7 +506,7 @@ export function registerHandoff<E extends Env>(app: Hono<E>, deps: HandoffDeps):
     c.json({
       method: "POST",
       path: "/v1/handoff",
-      body: { automaton_name: "Atlas", daily_limit_usdc: "5000000", amount_usdc: "5000000" },
+      body: { [NAME_FIELD]: "Atlas", daily_limit_usdc: "5000000", amount_usdc: "5000000" },
       optional: {
         step:
           "confirm (default), konto: creates an account with a passkey after the right number (amount_usdc may be left out), " +
@@ -595,12 +595,12 @@ export function registerHandoff<E extends Env>(app: Hono<E>, deps: HandoffDeps):
     if (handoff.state === "pending") {
       if (handoff.step === "limit") return konto ? limitPage(c, limitApprove(handoff), 200) : passkey(c, handoff);
       if (handoff.step === "deposit") {
-        return moneyPage(c, { state: "deposit-approve", automatonName: handoff.automatonName, amountUsdc: handoff.amountUsdc, choices: handoff.choices });
+        return moneyPage(c, { state: "deposit-approve", displayName: handoff.displayName, amountUsdc: handoff.amountUsdc, choices: handoff.choices });
       }
       if (handoff.step === "payout") {
         // goals/konto/11: an account that set up a payout before ends that permission with the passkey step of this one.
         const earlierApproval = Boolean(handoff.account && replacedPermission(readPayout(db, handoff.account)));
-        return moneyPage(c, { state: "payout-approve", automatonName: handoff.automatonName, choices: handoff.choices, earlierApproval });
+        return moneyPage(c, { state: "payout-approve", displayName: handoff.displayName, choices: handoff.choices, earlierApproval });
       }
       return page(c, approve(handoff), 200);
     }
@@ -661,7 +661,7 @@ export function registerHandoff<E extends Env>(app: Hono<E>, deps: HandoffDeps):
       chainId: konto.chainId,
       permission,
       signature,
-      name: handoff.automatonName,
+      name: handoff.displayName,
       nowMs: nowMs(),
       owner,
       organizationId,
@@ -736,7 +736,7 @@ export function registerHandoff<E extends Env>(app: Hono<E>, deps: HandoffDeps):
     if (!found) return unknown(c);
     const { handoff } = found;
     if (handoff.state === "matched" && (handoff.step === "konto" || handoff.step === "limit" || handoff.step === "payout")) {
-      return moneyPage(c, { state: "retry", code: handoff.code, automatonName: handoff.automatonName });
+      return moneyPage(c, { state: "retry", code: handoff.code, displayName: handoff.displayName });
     }
     if (handoff.state === "done" && handoff.step !== "confirm") return page(c, { state: "approved" }, 200);
     if (handoff.state === "pending") return page(c, { state: "invalid", reason: "used" }, 410);
@@ -806,7 +806,7 @@ export function registerHandoff<E extends Env>(app: Hono<E>, deps: HandoffDeps):
     const payout = readPayout(db, account);
     if (!payout?.kyc_approved || !payout.bridge_customer_id) return payoutStep(c, h);
     const form = (await c.req.parseBody().catch(() => ({}))) as Record<string, unknown>;
-    const again = (error: string) => moneyPage(c, { state: "payout-bank", code: h.code, automatonName: h.automatonName, error, steps: stepsOf(h.code) }, 400);
+    const again = (error: string) => moneyPage(c, { state: "payout-bank", code: h.code, displayName: h.displayName, error, steps: stepsOf(h.code) }, 400);
     const iban = parseIban(form.iban);
     if (!iban) return again("This IBAN is not valid. Check it and try again.");
     const ownerName = typeof form.owner_name === "string" ? form.owner_name.trim() : "";

@@ -19,7 +19,7 @@ export function usd(atomic: bigint): string {
 }
 
 export type HandoffPage =
-  | { state: "approve"; automatonName: string; dailyLimitUsdc: bigint; amountUsdc: bigint; choices: number[] }
+  | { state: "approve"; displayName: string; dailyLimitUsdc: bigint; amountUsdc: bigint; choices: number[] }
   | { state: "approved" }
   | { state: "invalid"; reason: "expired" | "used" | "wrong" | "unknown" };
 
@@ -52,7 +52,7 @@ const OWN_STYLE = `<style>
 
 function body(page: HandoffPage): string {
   if (page.state === "approve") {
-    const name = esc(page.automatonName);
+    const name = esc(page.displayName);
     const buttons = page.choices
       .map((n) => `      <button class="btn" type="submit" name="pick" value="${n}">${n}</button>`)
       .join("\n");

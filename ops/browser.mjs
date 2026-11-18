@@ -43,6 +43,12 @@ export function chromeArgs(kind, profile) {
   ];
 }
 
+// A caller that ends node without waiting for close() (the exit handlers of the Sepolia runs) would leave a browser that does not
+// read the pipe running after node, so every browser still running is killed on the way out (goals/konto/12, Punkt 3). One listener
+// for all of them, there while at least one runs: a SOLL tool starts one browser per picture and would otherwise collect listeners.
+const running = new Set();
+const killRunning = () => { for (const child of running) if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL"); };
+
 /** A DevTools session over --remote-debugging-pipe: fd 3 into the browser, fd 4 out of it, messages ending in NUL. */
 export function launch(chrome, profile, kind) {
   const env = { ...process.env };
@@ -72,8 +78,12 @@ export function launch(chrome, profile, kind) {
   // Once the browser is gone every request fails at once: a request that waits for an answer that cannot come leaves the event
   // loop empty, and node then ends with exit 0 without a single line, a green check that rendered nothing.
   let gone = null;
+  running.add(child);
+  if (running.size === 1) process.once("exit", killRunning);
   const exited = new Promise((resolve) => child.on("exit", resolve));
   exited.then(() => {
+    running.delete(child);
+    if (running.size === 0) process.off("exit", killRunning);
     gone = new Error(`browser exited: ${stderr.trim().split("\n").pop() ?? ""}`);
     for (const { fail } of waiting.values()) fail(gone);
     waiting.clear();

@@ -187,7 +187,7 @@ describe("account names are read strictly", () => {
       }
     }
     expect(handoffRows(s.db)).toBe(made);
-    const names = (s.db.prepare("SELECT automaton_name FROM handoffs ORDER BY rowid").all() as { automaton_name: string }[]).map((r) => r.automaton_name);
+    const names = (s.db.prepare("SELECT display_name FROM handoffs ORDER BY rowid").all() as { display_name: string }[]).map((r) => r.display_name);
     expect(names).toEqual(["Atlas v2_b-1", "x".repeat(32), "Atlas v2_b-1", "x".repeat(32)]);
   });
 
@@ -203,7 +203,7 @@ describe("account names are read strictly", () => {
       expect(html).not.toContain("Atlas. Only");
       expect(html).not.toContain("may spend this");
     }
-    const shown = s.db.prepare("SELECT automaton_name FROM handoffs WHERE step = 'limit'").get() as { automaton_name: string };
-    expect(shown.automaton_name).toBe("Atlas");
+    const shown = s.db.prepare("SELECT display_name FROM handoffs WHERE step = 'limit'").get() as { display_name: string };
+    expect(shown.display_name).toBe("Atlas");
   });
 });

@@ -102,7 +102,7 @@ describe("topUpIfLow remembers a used-up period (goals/konto/05, point 8)", () =
     expect(await topUpIfLow(deps(db, used.c, START + 3600), p.account)).toEqual({ kind: "none", reason: "period_used_up" });
     // The phone signed a raise to $10.00: the handoff row finishLimit needs, then the new permission waits on the account.
     db.prepare(
-      `INSERT INTO handoffs (code, poll_hash, automaton_name, daily_limit_usdc, amount_usdc, match, choices, state, created_at, updated_at, step, account, previous_limit_usdc)
+      `INSERT INTO handoffs (code, poll_hash, display_name, daily_limit_usdc, amount_usdc, match, choices, state, created_at, updated_at, step, account, previous_limit_usdc)
        VALUES ('RAISE0000000', 'x', 'Atlas', '10000000', '0', 47, '47,62,18', 'matched', 0, 0, 'limit', ?, '5000000')`,
     ).run(p.account);
     const raised = permission(p.account, { allowance: 10n * USD, start: START + 3700, salt: 8n });
