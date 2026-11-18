@@ -623,7 +623,9 @@ function migrate(db: Db): void {
   // (liquidation address, `destination`, the only target of the forwarder); of the IBAN only its last four characters. `forwarder`
   // is the PayoutForwarder for account and destination, `permission`/`signature` the second spend permission the person signed for
   // it (JSON with numbers as strings), `permission_approved` 1 once approveWithSignature went through. After a new IBAN,
-  // `retire_forwarder`/`retire_permission` are the forwarder and permission before it, which get `retire` before the next payout.
+  // `retire_forwarder`/`retire_permission` are the forwarder and permission before it, which end before the next payout;
+  // `retire_revoke` is the revoke of that permission the passkey signed with the new one (goals/konto/11): JSON with the nonce of
+  // the user operation as a string and the owner's signature over its hash.
   // `pending_tx`/`pending_usdc` are a sent `payout` whose receipt did not arrive yet (atomic USDC as a string); the next payout of
   // the account clears it first and sends nothing while it is open.
   // `payout_handoffs` holds what the bank step of one handoff brought until its passkey step ends it; `konto_payout_rules` the
@@ -644,6 +646,7 @@ function migrate(db: Db): void {
       permission_approved    INTEGER NOT NULL DEFAULT 0,
       retire_forwarder       TEXT,
       retire_permission      TEXT,
+      retire_revoke          TEXT,
       pending_tx             TEXT,
       pending_usdc           TEXT,
       updated_at             INTEGER NOT NULL
@@ -670,6 +673,8 @@ function migrate(db: Db): void {
   for (const column of ["pending_tx", "pending_usdc"]) {
     if (!payoutColumns.some((c) => c.name === column)) db.exec(`ALTER TABLE konto_payouts ADD COLUMN ${column} TEXT`);
   }
+  // goals/konto/11: the revoke that waits with retire_*; existing rows keep their values and start without one.
+  if (!payoutColumns.some((c) => c.name === "retire_revoke")) db.exec("ALTER TABLE konto_payouts ADD COLUMN retire_revoke TEXT");
 
   // The conversation that asks back (HAN-77). `fields` is what was understood so far, `turns` the
   // transcript; both are a person's words and are deleted after a day (`cleanupConversations` in

@@ -10,12 +10,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Hex } from "viem";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { postLedger, getBalanceMc } from "../src/db.js";
+import { permissionFromJson } from "../src/konto/account.js";
 import { SEPOLIA_USDC, SPEND_PERMISSION_MANAGER } from "../src/konto/config.js";
 import { createPayoutChain, type PayoutChain } from "../src/konto/payout.js";
 import { tap } from "./handoff-helpers.js";
 import {
   account,
   dataOf,
+  ENTRY_POINT_V06,
   EXAMPLE_IBAN,
   expectedForwarder,
   form,
@@ -259,7 +261,7 @@ describe("the payout to the person's bank account", () => {
     expect(on.node.sent).toEqual([]);
   });
 
-  it("makes a new IBAN a new forwarder and a new signature over the handoff, and sends retire to the old one before the next payout", async () => {
+  it("makes a new IBAN a new forwarder and a new signature over the handoff, and ends the old permission with its revoke before the next payout", async () => {
     const s = moneySetup();
     const a = await ready(s, 30n);
     const oldForwarder = expectedForwarder(a.address, a.destination, s.gas.address);
@@ -274,13 +276,13 @@ describe("the payout to the person's bank account", () => {
     const res = await payout(s, a.key, { amount_usd: "5.00" });
     expect(res.status).toBe(200);
     const after = s.node.sent.slice(3);
-    expect(after.map((t) => t.kind)).toEqual(["retire", "deploy", "approveWithSignature", "payout"]);
-    expect(after[0]).toMatchObject({ to: oldForwarder, salt: 99n });
+    expect(after.map((t) => t.kind)).toEqual(["revoke", "deploy", "approveWithSignature", "payout"]);
+    expect(after[0]).toMatchObject({ to: ENTRY_POINT_V06, target: oldForwarder, salt: 99n });
     expect(after[1].target).toBe(newForwarder);
     expect(after[3]).toMatchObject({ to: newForwarder, value: 5n * USD });
     expect(s.node.balances.get(newDestination)).toBe(5n * USD);
     expect(s.node.balances.get(a.destination)).toBe(10n * USD);
-    // Retired once: the payout after that goes over the new forwarder alone.
+    // Ended once: the payout after that goes over the new forwarder alone.
     expect((await payout(s, a.key, { amount_usd: "1.00" })).status).toBe(200);
     expect(s.node.sent.slice(7).map((t) => t.kind)).toEqual(["payout"]);
   });
@@ -299,6 +301,7 @@ function lossySetup() {
     balanceOf: (a) => inner.chain!.balanceOf(a),
     isApproved: (p) => inner.chain!.isApproved(p),
     callerOf: (f) => inner.chain!.callerOf(f),
+    nonceOf: (a) => inner.chain!.nonceOf(a),
     async send(tx) {
       const approve = tx.to.toLowerCase() === SPEND_PERMISSION_MANAGER;
       if (approve && mode.approveSend) throw new Error("connection reset before the node got the transaction");
@@ -335,7 +338,7 @@ describe("after a new gas key or a lost receipt", () => {
     vi.restoreAllMocks();
   });
 
-  it("retires the old permission before the next payout when the receipt of its approveWithSignature broke off", async () => {
+  it("ends the old permission before the next payout when the receipt of its approveWithSignature broke off", async () => {
     const { s, mode } = lossySetup();
     const a = await ready(s, 30n);
     const oldForwarder = expectedForwarder(a.address, a.destination, s.gas.address);
@@ -355,15 +358,15 @@ describe("after a new gas key or a lost receipt", () => {
     const res = await payout(s, a.key, { amount_usd: "5.00" });
     expect(res.status).toBe(200);
     const after = s.node.sent.slice(2);
-    expect(after.map((t) => t.kind)).toEqual(["retire", "deploy", "approveWithSignature", "payout"]);
-    expect(after[0]).toMatchObject({ to: oldForwarder, salt: 99n });
+    expect(after.map((t) => t.kind)).toEqual(["revoke", "deploy", "approveWithSignature", "payout"]);
+    expect(after[0]).toMatchObject({ to: ENTRY_POINT_V06, target: oldForwarder, salt: 99n });
     expect(after[1].target).toBe(newForwarder);
     expect(after[3]).toMatchObject({ to: newForwarder, value: 5n * USD });
     expect(s.node.approved.has(`${a.address}:99`)).toBe(false);
     expect(s.node.balances.get(newDestination)).toBe(5n * USD);
   });
 
-  it("pays again after a new gas key and one phone handoff, sends no retire to the forwarder of the old key and logs other_caller", async () => {
+  it("pays again after a new gas key and one phone handoff, ends the permission of the old key with the revoke of that handoff instead of a retire", async () => {
     const s = moneySetup();
     const a = await ready(s, 30n);
     const oldForwarder = expectedForwarder(a.address, a.destination, s.gas.address);
@@ -383,13 +386,15 @@ describe("after a new gas key or a lost receipt", () => {
     const res = await payout(b, a.key, { amount_usd: "5.00" });
     expect(res.status).toBe(200);
     const after = s.node.sent.slice(3);
-    expect(after.map((t) => t.kind)).toEqual(["deploy", "approveWithSignature", "payout"]);
-    expect(after[0]).toMatchObject({ target: newForwarder });
-    expect(after[0].ctor![4]).toBe(b.gas.address.toLowerCase());
-    expect(after[2]).toMatchObject({ to: newForwarder, value: 5n * USD });
+    expect(after.map((t) => t.kind)).toEqual(["revoke", "deploy", "approveWithSignature", "payout"]);
+    expect(after[0]).toMatchObject({ to: ENTRY_POINT_V06, target: oldForwarder, salt: 99n });
+    expect(after[1]).toMatchObject({ target: newForwarder });
+    expect(after[1].ctor![4]).toBe(b.gas.address.toLowerCase());
+    expect(after[3]).toMatchObject({ to: newForwarder, value: 5n * USD });
     expect(s.node.balances.get(newDestination)).toBe(5n * USD);
-    expect(lines()).toContain(`[payout] retire skipped for ${oldForwarder}: other_caller`);
-    // The dropped permission leaves no waiting retire behind, so the next new IBAN retires the one of today's key.
+    expect(s.node.approved.has(`${a.address}:99`)).toBe(false);
+    expect(lines().filter((l) => l.includes("other_caller"))).toEqual([]);
+    // The ended permission leaves no waiting retire behind, so the next new IBAN ends the one of today's key.
     expect(retireRow(s, a.address)).toEqual({ retire_forwarder: null, retire_permission: null });
     const third = await toPasskey(b, a);
     const thirdDestination = s.bridge.state.liquidation.at(-1)!;
@@ -398,9 +403,9 @@ describe("after a new gas key or a lost receipt", () => {
     expect((await json(b, `/h/${third.h.code}/payout`, await payoutPermission(a.owner, a.address, thirdForwarder, { salt: 101n }))).status).toBe(200);
     const next = await payout(b, a.key, { amount_usd: "5.00" });
     expect(next.status).toBe(200);
-    const last = s.node.sent.slice(6);
-    expect(last.map((t) => t.kind)).toEqual(["retire", "deploy", "approveWithSignature", "payout"]);
-    expect(last[0]).toMatchObject({ to: newForwarder, salt: 100n });
+    const last = s.node.sent.slice(7);
+    expect(last.map((t) => t.kind)).toEqual(["revoke", "deploy", "approveWithSignature", "payout"]);
+    expect(last[0]).toMatchObject({ to: ENTRY_POINT_V06, target: newForwarder, salt: 100n });
     expect(last[3]).toMatchObject({ to: thirdForwarder, value: 5n * USD });
     expect(s.node.approved.has(`${a.address}:100`)).toBe(false);
   });
@@ -446,8 +451,8 @@ describe("after a new gas key or a lost receipt", () => {
     const res = await payout(s, a.key, { amount_usd: "5.00" });
     expect(res.status).toBe(200);
     const after = s.node.sent.slice(3);
-    expect(after.map((t) => t.kind)).toEqual(["retire", "deploy", "approveWithSignature", "payout"]);
-    expect(after[0]).toMatchObject({ to: firstForwarder, salt: 99n });
+    expect(after.map((t) => t.kind)).toEqual(["revoke", "deploy", "approveWithSignature", "payout"]);
+    expect(after[0]).toMatchObject({ to: ENTRY_POINT_V06, target: firstForwarder, salt: 99n });
     expect(after[1].target).toBe(thirdForwarder);
     expect(after[2]).toMatchObject({ target: thirdForwarder, salt: 101n });
     expect(after[3]).toMatchObject({ to: thirdForwarder, value: 5n * USD });
@@ -474,6 +479,7 @@ function unreadableSetup() {
       if (fail.callerOf !== null && f.toLowerCase() === fail.callerOf) throw new Error("rpc timeout on caller");
       return inner.chain!.callerOf(f);
     },
+    nonceOf: (a) => inner.chain!.nonceOf(a),
     send: (tx) => inner.chain!.send(tx),
     receipt: (hash) => inner.chain!.receipt(hash),
   };
@@ -488,7 +494,7 @@ describe("when the chain cannot be read before the retire", () => {
   });
 
   for (const read of ["isApproved", "callerOf"] as const) {
-    it(`stops in stage retire without a transaction when ${read} of the old one fails, keeps the retire and retires it on the next payout`, async () => {
+    it(`stops in stage retire without a transaction when ${read} of the old one fails, keeps the retire and ends it on the next payout`, async () => {
       const { s, fail } = unreadableSetup();
       const a = await ready(s, 30n);
       const oldForwarder = expectedForwarder(a.address, a.destination, s.gas.address);
@@ -499,6 +505,8 @@ describe("when the chain cannot be read before the retire", () => {
       const newForwarder = expectedForwarder(a.address, newDestination, s.gas.address);
       expect(p.spender).toBe(newForwarder);
       expect((await json(s, `/h/${p.h.code}/payout`, await payoutPermission(a.owner, a.address, newForwarder, { salt: 100n }))).status).toBe(200);
+      // callerOf is read only for a retire without a revoke: a row from before goals/konto/11, which this one models.
+      if (read === "callerOf") s.db.prepare("UPDATE konto_payouts SET retire_revoke = NULL WHERE address = ?").run(a.address);
       const waiting = retireRow(s, a.address);
       expect(waiting.retire_forwarder?.toLowerCase()).toBe(oldForwarder);
       expect(waiting.retire_permission).not.toBeNull();
@@ -519,8 +527,8 @@ describe("when the chain cannot be read before the retire", () => {
       const res = await payout(s, a.key, { amount_usd: "5.00" });
       expect(res.status).toBe(200);
       const after = s.node.sent.slice(3);
-      expect(after.map((t) => t.kind)).toEqual(["retire", "deploy", "approveWithSignature", "payout"]);
-      expect(after[0]).toMatchObject({ to: oldForwarder, salt: 99n });
+      expect(after.map((t) => t.kind)).toEqual([read === "isApproved" ? "revoke" : "retire", "deploy", "approveWithSignature", "payout"]);
+      expect(after[0]).toMatchObject({ to: read === "isApproved" ? ENTRY_POINT_V06 : oldForwarder, target: oldForwarder, salt: 99n });
       expect(after[1].target).toBe(newForwarder);
       expect(after[3]).toMatchObject({ to: newForwarder, value: 5n * USD });
       expect(s.node.approved.has(`${a.address}:99`)).toBe(false);
@@ -528,4 +536,114 @@ describe("when the chain cannot be read before the retire", () => {
       expect(s.node.balances.get(newDestination)).toBe(5n * USD);
     });
   }
+});
+
+/**
+ * goals/konto/11: after a new gas key the old forwarder has a caller the service no longer holds, so only the person's passkey can
+ * end its permission. The same tap that signs the new permission signs a user operation of the smart wallet with revoke of the old
+ * one; the service sends it through handleOps and pays nothing out until isApproved says the old permission is gone. The hash the
+ * tap signs comes from data-revoke-hash of the page, never from this test. Three of these cases fail on the code before the goal;
+ * the fourth guards the first setup, which asks for no second signature.
+ */
+describe("the earlier permission ends with the same passkey", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const payoutRow = (s: MoneySetup, address: string) => s.db.prepare("SELECT * FROM konto_payouts WHERE address = ?").get(address.toLowerCase()) as Record<string, unknown>;
+
+  it("ends the old permission with the same passkey after a new gas key, through handleOps before the first payout of the new key", async () => {
+    const s = moneySetup();
+    const a = await ready(s, 30n);
+    const oldForwarder = expectedForwarder(a.address, a.destination, s.gas.address);
+    expect((await payout(s, a.key, { amount_usd: "10.00" })).status).toBe(200);
+    expect(s.node.sent).toHaveLength(3);
+    const oldPermission = permissionFromJson(String(payoutRow(s, a.address).permission));
+    const b = withNewGasKey(s);
+    expect((await payout(b, a.key, { amount_usd: "5.00" })).status).toBe(409);
+    const p = await toPasskey(b, a);
+    // The page before the number says that this ends the earlier approval.
+    expect(p.approve).toContain("Earlier approval");
+    const hash = dataOf(p.html, "konto-passkey", "revoke-hash");
+    const nonce = dataOf(p.html, "konto-passkey", "revoke-nonce");
+    expect(hash).toMatch(/^0x[0-9a-f]{64}$/);
+    expect(nonce).toBe("0");
+    const newDestination = s.bridge.state.liquidation.at(-1)!;
+    const newForwarder = expectedForwarder(a.address, newDestination, b.gas.address);
+    expect(p.spender).toBe(newForwarder);
+    // One tap, two signatures by the owner: the new permission and the revoke of the old one.
+    const body = { ...(await payoutPermission(a.owner, a.address, newForwarder, { salt: 100n })), revoke: { nonce, signature: await a.owner.sign({ hash: hash as Hex }) } };
+    const done = await json(b, `/h/${p.h.code}/payout`, body);
+    expect(done.status).toBe(200);
+    expect(await done.json()).toMatchObject({ state: "done" });
+    expect(await b.konto!.payoutChain!.isApproved(oldPermission)).toBe(true);
+    const res = await payout(b, a.key, { amount_usd: "5.00" });
+    expect(res.status).toBe(200);
+    const after = s.node.sent.slice(3);
+    expect(after.map((t) => t.kind)).toEqual(["revoke", "deploy", "approveWithSignature", "payout"]);
+    expect(after[0]).toMatchObject({ to: ENTRY_POINT_V06, target: oldForwarder, salt: 99n });
+    expect(after[1].ctor![4]).toBe(b.gas.address.toLowerCase());
+    expect(after[3]).toMatchObject({ to: newForwarder, value: 5n * USD });
+    expect(await b.konto!.payoutChain!.isApproved(oldPermission)).toBe(false);
+    expect(s.node.nonces.get(a.address)).toBe(1n);
+    expect(retireRow(s, a.address)).toEqual({ retire_forwarder: null, retire_permission: null });
+  });
+
+  it("answers 409 payout_needs_phone and keeps the retire when the old forwarder has another caller and no revoke waits", async () => {
+    const s = moneySetup();
+    const a = await ready(s, 30n);
+    const oldForwarder = expectedForwarder(a.address, a.destination, s.gas.address);
+    expect((await payout(s, a.key, { amount_usd: "10.00" })).status).toBe(200);
+    const b = withNewGasKey(s);
+    // A setup for the new key whose earlier permission waits as retire_* without a revoke, written straight into the row: the
+    // state a row from before this goal is in, or one whose revoke did not go through.
+    const before = payoutRow(s, a.address);
+    const newDestination = privateKeyToAccount(generatePrivateKey()).address.toLowerCase();
+    const newForwarder = expectedForwarder(a.address, newDestination, b.gas.address);
+    const next = await payoutPermission(a.owner, a.address, newForwarder, { salt: 100n });
+    s.db
+      .prepare(
+        `UPDATE konto_payouts SET destination = ?, forwarder = ?, permission = ?, signature = ?, permission_approved = 0,
+         retire_forwarder = ?, retire_permission = ? WHERE address = ?`,
+      )
+      .run(newDestination, newForwarder, JSON.stringify(next.permission), next.signature, oldForwarder, String(before.permission), a.address);
+    const lines = logLines();
+    const res = await payout(b, a.key, { amount_usd: "5.00" });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ error: "payout_needs_phone" });
+    expect(s.node.sent).toHaveLength(3);
+    expect(retireRow(s, a.address)).toEqual({ retire_forwarder: oldForwarder, retire_permission: String(before.permission) });
+    expect(s.node.approved.has(`${a.address}:99`)).toBe(true);
+    expect(lines()).toContain(`[payout] retire waits for the phone for ${oldForwarder}: other_caller`);
+  });
+
+  it("refuses a payout handoff without the revoke when an earlier permission exists, burns it and keeps the payout setup", async () => {
+    const s = moneySetup();
+    const a = await ready(s, 30n);
+    const before = payoutRow(s, a.address);
+    const p = await toPasskey(s, a);
+    const { revoke: _asked, ...bare } = (await payoutPermission(a.owner, a.address, p.spender, { salt: 100n })) as Record<string, unknown>;
+    const res = await json(s, `/h/${p.h.code}/payout`, bare);
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ error: "permission_refused" });
+    expect(stateOf(s, p.h.code)).toBe("burned");
+    expect(payoutRow(s, a.address)).toEqual(before);
+  });
+
+  it("keeps the first payout setup as it is: no revoke on the page, no earlier approval, deploy, approveWithSignature and payout", async () => {
+    const s = moneySetup();
+    const a = await account(s);
+    const p = await toPasskey(s, a);
+    expect(p.approve).toContain('data-soll="approve"');
+    expect(p.approve).not.toContain("Earlier approval");
+    expect(dataOf(p.html, "konto-passkey", "revoke-hash")).toBeNull();
+    expect(dataOf(p.html, "konto-passkey", "revoke-nonce")).toBeNull();
+    const done = await json(s, `/h/${p.h.code}/payout`, await payoutPermission(a.owner, a.address, p.spender));
+    expect(done.status).toBe(200);
+    s.node.balances.set(a.address, 30n * USD);
+    const res = await payout(s, a.key, { amount_usd: "10.00" });
+    expect(res.status).toBe(200);
+    expect(s.node.sent.map((t) => t.kind)).toEqual(["deploy", "approveWithSignature", "payout"]);
+    expect(s.node.nonces.size).toBe(0);
+  });
 });

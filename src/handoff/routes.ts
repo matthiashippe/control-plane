@@ -37,8 +37,11 @@ import {
   isPayoutAddress,
   namesTarget,
   parseUsd,
+  parseRevoke,
   payoutPermissionMatches,
   readPayout,
+  replacedPermission,
+  revokeSignedBy,
   readPendingBank,
   ensurePayoutRow,
   type PayoutChain,
@@ -844,10 +847,21 @@ export function registerHandoff<E extends Env>(app: Hono<E>, deps: HandoffDeps):
     if (!payoutPermissionMatches(permission, want)) return refuse("The permission is not the one this code asked for.");
     const current = readPayout(db, h.account!);
     if (current?.permission && permissionFromJson(current.permission).salt === permission.salt) return refuse("The permission is the one the account already has.");
+    // goals/konto/11: with a permission to replace, the same tap signs its revoke, and only one the owner of the account signed for
+    // exactly that permission counts. The first setup has nothing to replace and needs none.
+    const replaced = replacedPermission(current);
+    const revoke = replaced ? parseRevoke(body?.revoke) : null;
+    if (replaced) {
+      if (!revoke) return refuse("The request did not carry the end of the earlier approval.");
+      const owner = accountOf(h.account!).owner;
+      if (!owner || !(await revokeSignedBy(revoke, permissionFromJson(replaced.permission), konto.chainId, owner))) {
+        return refuse("The end of the earlier approval is not signed by this account.");
+      }
+    }
     const checked = await checkSignature(konto, permission, signature);
     if (checked === "unavailable") return c.json(SIGNATURE_CHECK_UNAVAILABLE, 503);
     if (!checked) return refuse("The signature does not belong to this account.");
-    if (!finishPayout(db, { code: h.code, account: h.account!, permission, signature, nowMs: nowMs() })) {
+    if (!finishPayout(db, { code: h.code, account: h.account!, permission, signature, revoke, nowMs: nowMs() })) {
       return c.json({ error: "handoff_closed", message: "This code no longer works. Start again in your terminal.", docs: CONTRACT }, 410);
     }
     return c.json({ state: "done", bank_last4: bank.bank_last4 }, 200);

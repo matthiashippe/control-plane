@@ -8,8 +8,10 @@
  *
  * - forwarderAddress: where the forwarder for account and destination lives (CREATE2 over the deterministic deployment proxy,
  *   salt 0); the page lets the person sign exactly this address as spender.
- * - sendPayout: retire of the forwarder before a new IBAN, if one waits and is still approved with our gas key as its caller (else
- *   it is dropped without a transaction and logged); the forwarder deployed if it has no code yet;
+ * - sendPayout: before a new IBAN, the old permission ends first (goals/konto/11): dropped when isApproved says it is not approved,
+ *   else revoked by the user operation the passkey signed with the new permission (handleOps at the EntryPoint, our gas key pays),
+ *   else retired at its forwarder when that has our gas key as caller, else nothing is sent and the phone is asked again; then the
+ *   forwarder deployed if it has no code yet;
  *   approveWithSignature of the second permission the first time; then payout of the forwarder. Every transaction goes through
  *   sendKontoTx (src/konto/chain.ts), which refuses any chain but the one the account is set to.
  * - POST /v1/konto/payout, GET /v1/konto/payout and POST /v1/konto/payout-rule behind the auth middleware of src/app.ts.
@@ -24,13 +26,16 @@ import {
   getAddress,
   getContractAddress,
   isAddress,
+  isHex,
   pad,
+  recoverAddress,
   type Address,
   type Hex,
   type LocalAccount,
   type PublicClient,
   type Transport,
 } from "viem";
+import { entryPoint06Abi, getUserOperationHash, type UserOperation } from "viem/account-abstraction";
 import type { Db } from "../db.js";
 import type { KontoDeps } from "../handoff/routes.js";
 import { permissionFromJson, permissionJson } from "./account.js";
@@ -60,6 +65,105 @@ export interface ForwarderFixed {
   manager: Address;
   caller: Address;
 }
+
+/**
+ * The revoke of a permission the account replaces (goals/konto/11): a user operation of the person's Coinbase Smart Wallet v1 to the
+ * EntryPoint v0.6, with one call execute(SPEND_PERMISSION_MANAGER, 0, revoke(permission)). No initCode (the wallet exists, its old
+ * permission was approved on-chain), no paymaster and fee 0: the wallet holds no ETH, our gas key sends handleOps and pays the gas.
+ */
+export const ENTRY_POINT: Address = "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789";
+export const REVOKE_CALL_GAS = 100_000n;
+export const REVOKE_VERIFICATION_GAS = 200_000n;
+export const REVOKE_PRE_VERIFICATION_GAS = 50_000n;
+
+const PERMISSION_COMPONENTS = [
+  { name: "account", type: "address" },
+  { name: "spender", type: "address" },
+  { name: "token", type: "address" },
+  { name: "allowance", type: "uint160" },
+  { name: "period", type: "uint48" },
+  { name: "start", type: "uint48" },
+  { name: "end", type: "uint48" },
+  { name: "salt", type: "uint256" },
+  { name: "extraData", type: "bytes" },
+] as const;
+/** revoke of the SpendPermissionManager: only the account itself may call it, so it goes through the wallet's execute. */
+export const REVOKE_ABI = [
+  { type: "function", name: "revoke", stateMutability: "nonpayable", inputs: [{ name: "spendPermission", type: "tuple", components: PERMISSION_COMPONENTS }], outputs: [] },
+] as const;
+export const WALLET_EXECUTE_ABI = [
+  {
+    type: "function",
+    name: "execute",
+    stateMutability: "payable",
+    inputs: [{ name: "target", type: "address" }, { name: "value", type: "uint256" }, { name: "data", type: "bytes" }],
+    outputs: [],
+  },
+] as const;
+
+/** The revoke as the passkey signed it: the nonce of the user operation and the owner's signature (65 bytes) over its hash. */
+export interface SignedRevoke {
+  nonce: bigint;
+  signature: Hex;
+}
+
+/** A user operation of the EntryPoint v0.6 with every field set, as handleOps takes it. */
+export type RevokeOperation = Required<Omit<UserOperation<"0.6">, "authorization" | "factory" | "factoryData" | "paymaster" | "paymasterData">> & {
+  initCode: Hex;
+  paymasterAndData: Hex;
+};
+
+/** The user operation that revokes `permission` from its account; `signature` is empty for the hash, wrapped for handleOps. */
+export function revokeUserOperation(permission: SpendPermission, nonce: bigint, signature: Hex = "0x"): RevokeOperation {
+  const revoke = encodeFunctionData({ abi: REVOKE_ABI, functionName: "revoke", args: [permission] });
+  return {
+    sender: getAddress(permission.account),
+    nonce,
+    initCode: "0x",
+    callData: encodeFunctionData({ abi: WALLET_EXECUTE_ABI, functionName: "execute", args: [SPEND_PERMISSION_MANAGER, 0n, revoke] }),
+    callGasLimit: REVOKE_CALL_GAS,
+    verificationGasLimit: REVOKE_VERIFICATION_GAS,
+    preVerificationGas: REVOKE_PRE_VERIFICATION_GAS,
+    maxFeePerGas: 0n,
+    maxPriorityFeePerGas: 0n,
+    paymasterAndData: "0x",
+    signature,
+  };
+}
+
+/** The hash the owner of the wallet signs for the revoke, as the EntryPoint v0.6 computes it on `chainId`. */
+export function revokeHash(permission: SpendPermission, nonce: bigint, chainId: number): Hex {
+  return getUserOperationHash({ userOperation: revokeUserOperation(permission, nonce), entryPointAddress: ENTRY_POINT, entryPointVersion: "0.6", chainId });
+}
+
+/** The signature as the wallet's validateUserOp reads it: SignatureWrapper with the owner at index 0 and the 65 bytes. */
+export function walletSignature(ownerSignature: Hex): Hex {
+  return encodeAbiParameters(
+    [{ type: "tuple", components: [{ name: "ownerIndex", type: "uint8" }, { name: "signatureData", type: "bytes" }] }],
+    [{ ownerIndex: 0, signatureData: ownerSignature }],
+  );
+}
+
+/** A revoke from the body of POST /h/{code}/payout: nonce as a decimal string, signature as 65 bytes of hex; else null. */
+export function parseRevoke(v: unknown): SignedRevoke | null {
+  if (!v || typeof v !== "object") return null;
+  const { nonce, signature } = v as Record<string, unknown>;
+  if (typeof nonce !== "string" || !/^[0-9]{1,78}$/.test(nonce) || typeof signature !== "string" || !isHex(signature) || signature.length !== 132) return null;
+  return { nonce: BigInt(nonce), signature: signature as Hex };
+}
+
+/** True when `revoke` is signed by `owner` for exactly the revoke of `permission` on `chainId`. */
+export async function revokeSignedBy(revoke: SignedRevoke, permission: SpendPermission, chainId: number, owner: string): Promise<boolean> {
+  try {
+    const signer = await recoverAddress({ hash: revokeHash(permission, revoke.nonce, chainId), signature: revoke.signature });
+    return signer.toLowerCase() === owner.toLowerCase();
+  } catch {
+    return false;
+  }
+}
+
+const revokeJson = (r: SignedRevoke) => JSON.stringify({ nonce: String(r.nonce), signature: r.signature });
+const revokeFromJson = (raw: string): SignedRevoke | null => parseRevoke(JSON.parse(raw));
 
 /** The fixed values from the account settings: token and our spender (the address of the key in CP_KONTO_KEY_FILE). */
 export function forwarderFixed(konto: Pick<KontoDeps, "token" | "spender">): ForwarderFixed {
@@ -108,6 +212,8 @@ export interface PayoutChain {
   isApproved(p: SpendPermission): Promise<boolean>;
   /** The fixed `caller` of a deployed forwarder: the only sender its retire and payout accept. */
   callerOf(forwarder: Address): Promise<Address>;
+  /** The next nonce of the smart wallet at the EntryPoint (getNonce with key 0), for the revoke of goals/konto/11. */
+  nonceOf(account: Address): Promise<bigint>;
   /** One transaction with our gas key, through sendKontoTx. */
   send(tx: KontoTx): Promise<Hex>;
   receipt(hash: Hex): Promise<TxReceiptLike>;
@@ -127,6 +233,7 @@ export function createPayoutChain(params: { chainId: number; net?: KontoNet; acc
     balanceOf: (account) => client.readContract({ address: params.token, abi: ERC20_ABI, functionName: "balanceOf", args: [account] }),
     isApproved: (p) => client.readContract({ address: SPEND_PERMISSION_MANAGER, abi: SPEND_PERMISSION_MANAGER_ABI, functionName: "isApproved", args: [p] }),
     callerOf: (forwarder) => client.readContract({ address: forwarder, abi: FORWARDER_ABI, functionName: "caller" }),
+    nonceOf: (account) => client.readContract({ address: ENTRY_POINT, abi: entryPoint06Abi, functionName: "getNonce", args: [account, 0n] }),
     send: (tx) => sendKontoTx({ chainId: params.chainId, net, account: params.account, transport: params.transport, tx }),
     receipt: (hash) => client.waitForTransactionReceipt({ hash }),
   };
@@ -148,6 +255,8 @@ export interface PayoutRow {
   permission_approved: number;
   retire_forwarder: string | null;
   retire_permission: string | null;
+  /** The revoke of retire_permission the passkey signed (JSON, goals/konto/11), or null. */
+  retire_revoke: string | null;
   /** A sent payout whose receipt did not arrive yet, and its amount in atomic USDC. */
   pending_tx: string | null;
   pending_usdc: string | null;
@@ -192,14 +301,29 @@ export function payoutPermissionMatches(p: SpendPermission, want: { account: str
 }
 
 /**
+ * The permission a new payout setup replaces (goals/konto/11, decision 1): a waiting `retire_*`, else the permission and forwarder
+ * of the row. Null for the first setup. finishPayout makes exactly this one the new `retire_*`, and the passkey step asks the
+ * person to revoke exactly this one.
+ */
+export function replacedPermission(row: Pick<PayoutRow, "retire_forwarder" | "retire_permission" | "permission" | "forwarder"> | null): { forwarder: string; permission: string } | null {
+  if (row?.retire_forwarder && row.retire_permission) return { forwarder: row.retire_forwarder, permission: row.retire_permission };
+  if (row?.permission && row.forwarder) return { forwarder: row.forwarder, permission: row.permission };
+  return null;
+}
+
+/**
  * Ends a payout handoff `done` in one transaction: the bank account of its bank step and the new permission become the payout
  * setup of the account. The permission before it waits as `retire_*` until sendPayout has ended it, whatever permission_approved
  * says: a wait for the receipt of approveWithSignature that broke off leaves it at 0 although the approval went through, and
  * sendPayout asks the chain before it sends anything. When a `retire_*` already waits, it stays and the permission before is
- * dropped: approveWithSignature goes out only after a retire went through, so that one never reached the chain. Returns false
- * when the handoff was no longer matched.
+ * dropped: approveWithSignature goes out only after a retire went through, so that one never reached the chain. The revoke the
+ * passkey signed for the replaced permission (goals/konto/11) is kept with it as `retire_revoke`; a waiting retire gets the new
+ * revoke, because it was signed for exactly that permission. Returns false when the handoff was no longer matched.
  */
-export function finishPayout(db: Db, input: { code: string; account: string; permission: SpendPermission; signature: Hex; nowMs: number }): boolean {
+export function finishPayout(
+  db: Db,
+  input: { code: string; account: string; permission: SpendPermission; signature: Hex; revoke?: SignedRevoke | null; nowMs: number },
+): boolean {
   return db.transaction((): boolean => {
     const h = db.prepare("SELECT state FROM handoffs WHERE code = ?").get(input.code) as { state: string } | undefined;
     if (h?.state !== "matched") return false;
@@ -207,16 +331,12 @@ export function finishPayout(db: Db, input: { code: string; account: string; per
     if (!bank) return false;
     const account = input.account.toLowerCase();
     ensurePayoutRow(db, account, input.nowMs);
-    const before = readPayout(db, account)!;
-    const retire =
-      before.retire_forwarder && before.retire_permission
-        ? { forwarder: before.retire_forwarder, permission: before.retire_permission }
-        : before.permission && before.forwarder
-          ? { forwarder: before.forwarder, permission: before.permission }
-          : { forwarder: null, permission: null };
+    const retire = replacedPermission(readPayout(db, account)) ?? { forwarder: null, permission: null };
+    const revoke = retire.permission && input.revoke ? revokeJson(input.revoke) : null;
     db.prepare(
       `UPDATE konto_payouts SET external_account_id = ?, liquidation_address_id = ?, destination = ?, bank_last4 = ?, forwarder = ?,
-       permission = ?, signature = ?, permission_approved = 0, retire_forwarder = ?, retire_permission = ?, updated_at = ? WHERE address = ?`,
+       permission = ?, signature = ?, permission_approved = 0, retire_forwarder = ?, retire_permission = ?, retire_revoke = ?,
+       updated_at = ? WHERE address = ?`,
     ).run(
       bank.external_account_id,
       bank.liquidation_address_id,
@@ -227,6 +347,7 @@ export function finishPayout(db: Db, input: { code: string; account: string; per
       input.signature,
       retire.forwarder,
       retire.permission,
+      revoke,
       input.nowMs,
       account,
     );
@@ -328,25 +449,60 @@ export async function sendPayout(deps: PayoutDeps, address: string, value: bigin
     // or chain changed since, the contract would be deployed at another address than the stored one: then nothing is sent, and the
     // phone sets up the forwarder again with today's values.
     if (!forwarderFits(row, account, deps.fixed)) throw new Error("payout_needs_phone");
-    // A new IBAN first: the permission of the old forwarder ends before money goes over the new one. Only what is approved and
-    // has today's gas key as caller can be retired by us; anything else is dropped without a transaction, because a retire of it
-    // would revert (`only the fixed caller`) and block every payout of the account. A read that fails stops here and keeps it.
+    // A new IBAN first: the permission of the old forwarder ends before money goes over the new one (goals/konto/11, decision 5).
+    // Not approved: nothing to end. A revoke the passkey signed: handleOps at the EntryPoint, and afterwards the chain has to say
+    // the permission is gone. No revoke, but today's gas key is the old forwarder's caller: retire there. No revoke and another
+    // caller (the gas key changed): nothing is sent and the phone is asked once more, because only the passkey can end it. A read
+    // that fails stops here and keeps it.
     if (row.retire_forwarder && row.retire_permission) {
       const old = permissionFromJson(row.retire_permission);
       const oldForwarder = getAddress(row.retire_forwarder);
-      let skip: "not_approved" | "other_caller" | null = null;
+      const revoke = row.retire_revoke ? revokeFromJson(row.retire_revoke) : null;
+      const log = deps.log ?? ((line: string) => console.log(line));
+      let approved: boolean;
       try {
-        if (!(await chain.isApproved(old))) skip = "not_approved";
-        else if ((await chain.callerOf(oldForwarder)).toLowerCase() !== deps.fixed.caller.toLowerCase()) skip = "other_caller";
+        approved = await chain.isApproved(old);
       } catch {
         throw new PayoutFailed("retire", null);
       }
-      if (skip) {
-        (deps.log ?? ((line: string) => console.log(line)))(`[payout] retire skipped for ${oldForwarder.toLowerCase()}: ${skip}`);
+      if (!approved) {
+        log(`[payout] retire skipped for ${oldForwarder.toLowerCase()}: not_approved`);
+      } else if (revoke) {
+        const op = revokeUserOperation(old, revoke.nonce, walletSignature(revoke.signature));
+        let hash: Hex | null = null;
+        try {
+          hash = await confirm(chain, "retire", { to: ENTRY_POINT, data: encodeFunctionData({ abi: entryPoint06Abi, functionName: "handleOps", args: [[op], deps.fixed.caller] }) });
+        } catch (err) {
+          // Sent but not through (a used nonce, a signature the wallet refuses): this revoke can never go through, so it is dropped
+          // and the next payout asks the phone instead of sending the same user operation again. A send that never left keeps it.
+          if (err instanceof PayoutFailed && err.hash) db.prepare("UPDATE konto_payouts SET retire_revoke = NULL WHERE address = ?").run(account);
+          throw err;
+        }
+        let still: boolean;
+        try {
+          still = await chain.isApproved(old);
+        } catch {
+          throw new PayoutFailed("retire", hash);
+        }
+        if (still) {
+          db.prepare("UPDATE konto_payouts SET retire_revoke = NULL WHERE address = ?").run(account);
+          throw new PayoutFailed("retire", hash);
+        }
+        log(`[payout] revoked the old permission of ${oldForwarder.toLowerCase()}, tx ${hash}`);
       } else {
+        let caller: Address;
+        try {
+          caller = await chain.callerOf(oldForwarder);
+        } catch {
+          throw new PayoutFailed("retire", null);
+        }
+        if (caller.toLowerCase() !== deps.fixed.caller.toLowerCase()) {
+          log(`[payout] retire waits for the phone for ${oldForwarder.toLowerCase()}: other_caller`);
+          throw new Error("payout_needs_phone");
+        }
         await confirm(chain, "retire", { to: oldForwarder, data: encodeFunctionData({ abi: FORWARDER_ABI, functionName: "retire", args: [old] }) });
       }
-      db.prepare("UPDATE konto_payouts SET retire_forwarder = NULL, retire_permission = NULL WHERE address = ?").run(account);
+      db.prepare("UPDATE konto_payouts SET retire_forwarder = NULL, retire_permission = NULL, retire_revoke = NULL WHERE address = ?").run(account);
     }
     const forwarder = getAddress(row.forwarder);
     const code = await chain.code(forwarder);
@@ -451,7 +607,7 @@ export async function runPayoutRules(deps: PayoutDeps, nowMs: number): Promise<{
       out.push({ address: rule.address, outcome: "sent" });
     } catch (err) {
       if (err instanceof Error && err.message === "payout_needs_phone") {
-        log("[payout] payout_needs_phone: a payout rule is due, but the forwarder no longer fits the gas key of the service; nothing was sent");
+        log("[payout] payout_needs_phone: a payout rule is due, but the payout setup needs the phone once more (new gas key, or an earlier approval only the passkey can end); nothing was sent");
         out.push({ address: rule.address, outcome: "payout_needs_phone" });
         continue;
       }
