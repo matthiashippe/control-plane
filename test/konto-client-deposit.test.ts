@@ -20,6 +20,7 @@ import { account, dataOf, json, moneySetup, stateOf } from "./money-helpers.js";
 
 const ONRAMP = "https://api.turnkey.com/public/v1/submit/init_fiat_on_ramp";
 const SIGN = "https://api.turnkey.com/public/v1/submit/sign_raw_payload";
+const SIGN_MANY = "https://api.turnkey.com/public/v1/submit/sign_raw_payloads";
 const CARD_PAGE = "https://buy.moonpay.example/?txn=onramp-1";
 const b64url = (b: Uint8Array | Buffer) => Buffer.from(b).toString("base64url");
 
@@ -63,6 +64,16 @@ function fakeTurnkey(passkey: ReturnType<typeof fakePasskey>, org: string, owner
       const sig = await owner.sign({ hash: p.payload });
       const v = parseInt(sig.slice(130, 132), 16) === 27 ? "00" : "01";
       return reply(200, { activity: { id: "a-1", status: "ACTIVITY_STATUS_COMPLETED", result: { signRawPayloadResult: { r: sig.slice(2, 66), s: sig.slice(66, 130), v } } } });
+    }
+    if (url === SIGN_MANY) {
+      const p = body.parameters as { signWith: string; payloads: Hex[] };
+      if (p.signWith !== owner.address) return reply(404, { message: "no such wallet" });
+      const signatures = [];
+      for (const payload of p.payloads) {
+        const sig = await owner.sign({ hash: payload });
+        signatures.push({ r: sig.slice(2, 66), s: sig.slice(66, 130), v: parseInt(sig.slice(130, 132), 16) === 27 ? "00" : "01" });
+      }
+      return reply(200, { activity: { id: "a-3", status: "ACTIVITY_STATUS_COMPLETED", result: { signRawPayloadsResult: { signatures } } } });
     }
     return reply(404, {});
   };
@@ -218,6 +229,58 @@ describe("the page client of the payout passkey", () => {
       primaryType: "CoinbaseSmartWalletMessage",
       message: { hash: hashTypedData({ domain: spendPermissionDomain(84532), types: SPEND_PERMISSION_TYPES, primaryType: "SpendPermission", message: permission }) },
     });
+    expect((await recoverAddress({ hash: replaySafe, signature: wrapper.signatureData })).toLowerCase()).toBe(owner.address.toLowerCase());
+  });
+
+  it("signs the new permission and the revoke of the earlier one with one passkey dialog and one SIGN_RAW_PAYLOADS (goals/konto/11)", async () => {
+    const passkey = fakePasskey();
+    const turnkey = fakeTurnkey(passkey, "org-1");
+    const owner = turnkey.owner;
+    const spender = privateKeyToAccount(generatePrivateKey()).address;
+    const account = flow.smartWalletAddress(owner.address.toLowerCase()) as string;
+    const revokeHash = `0x${createHash("sha256").update("the revoke of the earlier permission").digest("hex")}` as Hex;
+    const posts: { url: string; body: string }[] = [];
+    const fetch = async (url: string, init: { headers: Record<string, string>; body: string }) => {
+      if (!url.startsWith("/h/")) return turnkey.fetch(url, init);
+      posts.push({ url, body: init.body });
+      return new Response('{"state":"done"}', { status: 200 });
+    };
+    const html = `<button class="btn btn-1" type="button" id="konto-passkey" data-mode="payout" data-code="AB12" data-chain="84532" data-spender="${spender}" data-token="${SEPOLIA_USDC}" data-account="${account}" data-owner="${owner.address}" data-org="org-1" data-revoke-hash="${revokeHash}" data-revoke-nonce="3">`;
+    const button = buttonOf(html, "konto-passkey")!;
+    const replaced: string[] = [];
+    wirePage({
+      ...deps(passkey, fetch),
+      document: { getElementById: (id: string) => (id === "konto-passkey" ? button : null), createElement: () => ({}), body: { append: () => {} } },
+      location: { hostname: "localhost", assign: () => {}, replace: (u: string) => replaced.push(u) },
+      storage: { getItem: () => null, setItem: () => {}, removeItem: () => {} },
+      console: { error: () => {} },
+    });
+    for (const listener of button.listeners) await listener();
+    expect(passkey.used()).toBe(1);
+    expect(turnkey.calls.map((c) => c.url)).toEqual([SIGN_MANY]);
+    const activity = turnkey.calls[0].body as { type: string; parameters: { payloads: Hex[]; hashFunction: string } };
+    expect(activity.type).toBe("ACTIVITY_TYPE_SIGN_RAW_PAYLOADS");
+    expect(activity.parameters.payloads).toHaveLength(2);
+    expect(activity.parameters.payloads[1]).toBe(revokeHash);
+    expect(activity.parameters.hashFunction).toBe("HASH_FUNCTION_NO_OP");
+    expect(posts.map((p) => p.url)).toEqual(["/h/AB12/payout"]);
+    expect(replaced).toEqual(["/h/AB12"]);
+    const body = JSON.parse(posts[0].body) as { account: Hex; permission: unknown; signature: Hex; revoke: { nonce: string; signature: Hex } };
+    expect(body.revoke.nonce).toBe("3");
+    expect((await recoverAddress({ hash: revokeHash, signature: body.revoke.signature })).toLowerCase()).toBe(owner.address.toLowerCase());
+    const permission = parsePermission(body.permission)!;
+    expect(payoutPermissionMatches(permission, { account, forwarder: spender, token: SEPOLIA_USDC, nowSec: Math.floor(START / 1000) })).toBe(true);
+    const [wrapper] = decodeAbiParameters(
+      [{ type: "tuple", components: [{ name: "ownerIndex", type: "uint8" }, { name: "signatureData", type: "bytes" }] }],
+      parseErc6492Signature(body.signature).signature,
+    ) as [{ ownerIndex: number; signatureData: Hex }];
+    const replaySafe = hashTypedData({
+      domain: { name: "Coinbase Smart Wallet", version: "1", chainId: 84532, verifyingContract: body.account },
+      types: { CoinbaseSmartWalletMessage: [{ name: "hash", type: "bytes32" }] },
+      primaryType: "CoinbaseSmartWalletMessage",
+      message: { hash: hashTypedData({ domain: spendPermissionDomain(84532), types: SPEND_PERMISSION_TYPES, primaryType: "SpendPermission", message: permission }) },
+    });
+    expect(activity.parameters.payloads[0]).toBe(replaySafe);
     expect((await recoverAddress({ hash: replaySafe, signature: wrapper.signatureData })).toLowerCase()).toBe(owner.address.toLowerCase());
   });
 

@@ -41,6 +41,7 @@ import {
   payoutPermissionMatches,
   readPayout,
   replacedPermission,
+  revokeHash,
   revokeSignedBy,
   readPendingBank,
   ensurePayoutRow,
@@ -232,6 +233,20 @@ export function registerHandoff<E extends Env>(app: Hono<E>, deps: HandoffDeps):
     const bank = readPendingBank(db, h.code);
     if (bank) {
       const row = accountOf(account);
+      // goals/konto/11: with a permission to replace, the same tap signs the revoke of it, a user operation of the smart wallet whose
+      // nonce the EntryPoint gives. A chain that cannot be asked answers like Bridge does.
+      const replaced = replacedPermission(readPayout(db, account));
+      let revoke: { hash: string; nonce: string } | null = null;
+      if (replaced) {
+        let nonce: bigint;
+        try {
+          if (!konto.payoutChain) throw new Error("no payout chain");
+          nonce = await konto.payoutChain.nonceOf(account as Address);
+        } catch {
+          return c.text("The network could not be reached just now. Reload this page in a minute.", 502);
+        }
+        revoke = { hash: revokeHash(permissionFromJson(replaced.permission), nonce, konto.chainId), nonce: String(nonce) };
+      }
       return moneyPage(c, {
         state: "payout-passkey",
         code: h.code,
@@ -244,6 +259,7 @@ export function registerHandoff<E extends Env>(app: Hono<E>, deps: HandoffDeps):
         owner: row.owner ?? "",
         organizationId: row.organization_id ?? "",
         steps: stepsOf(h.code),
+        revoke,
       });
     }
     ensurePayoutRow(db, account, nowMs());
@@ -581,7 +597,11 @@ export function registerHandoff<E extends Env>(app: Hono<E>, deps: HandoffDeps):
       if (handoff.step === "deposit") {
         return moneyPage(c, { state: "deposit-approve", automatonName: handoff.automatonName, amountUsdc: handoff.amountUsdc, choices: handoff.choices });
       }
-      if (handoff.step === "payout") return moneyPage(c, { state: "payout-approve", automatonName: handoff.automatonName, choices: handoff.choices });
+      if (handoff.step === "payout") {
+        // goals/konto/11: an account that set up a payout before ends that permission with the passkey step of this one.
+        const earlierApproval = Boolean(handoff.account && replacedPermission(readPayout(db, handoff.account)));
+        return moneyPage(c, { state: "payout-approve", automatonName: handoff.automatonName, choices: handoff.choices, earlierApproval });
+      }
       return page(c, approve(handoff), 200);
     }
     if (handoff.state === "matched") return matchedPage(c, handoff);

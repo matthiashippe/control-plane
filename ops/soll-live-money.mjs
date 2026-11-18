@@ -1,6 +1,6 @@
 // The real money states of the phone page /h/{code} as ops/soll-money.mjs compares them (goals/konto/05, point 5). Drives
 // createApp with an empty database, the account switched on for chain 84532 and Bridge answered without a network, without a
-// port, through all seven states, and writes each answer unchanged to <dir>/money-<state>.html, which ops/soll-money.mjs loads
+// port, through all eight states, and writes each answer unchanged to <dir>/money-<state>.html, which ops/soll-money.mjs loads
 // with --check --source <dir>.
 //
 //   node --import tsx ops/soll-live-money.mjs --out <dir>
@@ -11,7 +11,8 @@
 // database the way finishKonto leaves it (an account of konto 03 needs a signature the chain checks, and there is no chain here);
 // from there on it goes through the doors a real terminal and a real phone use: POST /v1/handoff with the API key, the page of
 // the code, the right number, the identity check that Bridge first reports as not done and then as approved, the bank form,
-// and the page a tap comes back to after a signature that could not be checked.
+// and the page a tap comes back to after a signature that could not be checked. Last, the payout setup of that account is written
+// into the row the way finishPayout leaves it, and the page of a second payout code is payout-approve-revoke (goals/konto/11).
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
@@ -115,4 +116,11 @@ fakeBridge.kycStatus = "approved";
 await write("payout-bank", await ask("payout-bank", `/h/${payout.code}`, undefined, 200));
 await write("payout-passkey", await ask("payout-passkey", `/h/${payout.code}/payout-bank`, formPost({ iban: "DE89 3704 0044 0532 0130 00", owner_name: "Erika Mustermann" }), 200));
 await write("retry", await ask("retry", `/h/${payout.code}/retry`, undefined, 200));
+
+// An account that set up a payout before (goals/konto/11): its permission and forwarder in the row, as finishPayout writes them.
+const earlier = { ...permission, spender: privateKeyToAccount(generatePrivateKey()).address.toLowerCase(), allowance: 2n ** 160n - 1n, period: 2_592_000, end: 2 ** 48 - 1, salt: 2n };
+db.prepare("UPDATE konto_payouts SET forwarder = ?, permission = ?, signature = ?, permission_approved = 1 WHERE address = ?")
+  .run(earlier.spender, permissionJson(earlier), "0x" + "22".repeat(65), account);
+const again = await start({ automaton_name: "Atlas", step: "payout" });
+await write("payout-approve-revoke", await ask("payout-approve-revoke", `/h/${again.code}`, undefined, 200));
 console.log(`soll-live-money: written to ${out}`);
