@@ -1,6 +1,6 @@
 import { afterAll, describe, expect, it } from "vitest";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -30,13 +30,13 @@ const abort = (at: number, model: string, durationMs: number) =>
   JSON.stringify({ src: "abort", at: iso(at), ref: null, model, duration_ms: durationMs });
 
 let n = 0;
-function compare(caddyLines: string[], rowLines: string[], env: Record<string, string> = {}) {
+function compare(caddyLines: string[], rowLines: string[], env: Record<string, string> = {}, script = SCRIPT) {
   n += 1;
   const c = join(dir, `caddy-${n}.jsonl`);
   const r = join(dir, `rows-${n}.jsonl`);
   writeFileSync(c, caddyLines.join("\n") + "\n");
   writeFileSync(r, rowLines.join("\n") + "\n");
-  const run = spawnSync("bash", [SCRIPT, "--compare-files", c, r], {
+  const run = spawnSync("bash", [script, "--compare-files", c, r], {
     encoding: "utf8",
     timeout: 60_000,
     env: { ...process.env, TQ_SINCE: "", TQ_UNTIL: "", ...env },
@@ -226,5 +226,54 @@ describe("ops/timeout-quote.sh --compare-files", () => {
     const direct = rowsPerModel(rows, iso(T0 + 11));
     expect(direct.size).toBe(2);
     expect(Object.fromEntries(service)).toEqual(Object.fromEntries(direct));
+  });
+
+  it("independent check: prints the join and the rows next to compare with the same numbers", () => {
+    const run = compare(
+      [caddy(T0 + 10, 9.0), caddy(T0 + 60, 59.7), caddy(T0 + 60, 20.0), caddy(T0 + 130, 59.9, 0), caddy(T0 + 900, 4.0)],
+      [ledger(T0 + 11, T0 + 1, "openai/gpt-5.2", 8900), ledger(T0 + 61, T0 + 1, "openai/gpt-5.2", 58900), abort(T0 + 135, "openai/gpt-5.2", 59800), ledger(T0 + 400, T0 + 340, "openai/gpt-5-mini", 2000)],
+      { TQ_SINCE: iso(T0), TQ_UNTIL: iso(T0 + 3600) },
+    );
+    expect(run.status, run.stderr).toBe(0);
+    expect(run.out).toContain("check caddy: compare 5 2, join 5 2");
+    expect(run.out).toContain("check service openai/gpt-5.2: compare 3 1, rows 3 1");
+    expect(run.out).toContain("check service openai/gpt-5-mini: compare 1 0, rows 1 0");
+    expect(run.out).toMatch(/^cause coalesced: 1 /m);
+  });
+
+  it("independent check: a pair split by TQ_UNTIL (request before, row after) does not fail the check", () => {
+    const run = compare(
+      [caddy(T0 + 10, 9.0), caddy(T0 + 595, 30.0)],
+      [ledger(T0 + 11, T0 + 1, "openai/gpt-5.2", 8900), ledger(T0 + 603, T0 + 565, "openai/gpt-5.2", 29800)],
+      { TQ_SINCE: iso(T0), TQ_UNTIL: iso(T0 + 600) },
+    );
+    expect(run.status, run.stderr).toBe(0);
+    expect(run.out).toContain("check caddy: compare 1 0, join 1 0");
+    expect(run.out).toContain("check service openai/gpt-5.2: compare 1 0, rows 1 0");
+  });
+
+  it("independent check fails with exit 3 when compare files a served retry as a pair, where the old sum stays silent", () => {
+    // A copy of the tool whose classification is wrong: the retry the coalescer answered counts in service as well.
+    const original = readFileSync(SCRIPT, "utf8");
+    const right = 'items.push({ kind: "coalesced", at: leader.at, model: leader.model, caddyTo: r.d >= limit });';
+    const wrong = 'items.push({ kind: "pair", at: leader.at, model: leader.model, caddyTo: r.d >= limit, serviceTo: r.d >= limit });';
+    expect(original).toContain(right);
+    const opsDir = join(dir, "falsified", "ops");
+    mkdirSync(opsDir, { recursive: true });
+    const falsified = join(opsDir, "timeout-quote.sh");
+    writeFileSync(falsified, original.replace(right, wrong));
+    const lines = [caddy(T0 + 60, 59.7), caddy(T0 + 60, 20.0), caddy(T0 + 300, 3.0)];
+    const rows = [ledger(T0 + 61, T0 + 1, "openai/gpt-5.2", 58900), ledger(T0 + 300, T0 + 297, "openai/gpt-5-mini", 2800)];
+
+    const honest = compare(lines, rows);
+    expect(honest.status, honest.stderr).toBe(0);
+
+    const run = compare(lines, rows, {}, falsified);
+    expect(run.status).toBe(3);
+    expect(run.stderr).toContain("independent check failed: service openai/gpt-5.2");
+    expect(run.out).toContain("check service openai/gpt-5.2: compare 2 0, rows 1 0");
+    // The causes are counted from the same wrong classes, so their sum still matches the deviation and stays silent.
+    expect(run.stderr).not.toContain("causes do not add up");
+    expect(run.out).not.toMatch(/^cause /m);
   });
 });

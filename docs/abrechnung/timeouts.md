@@ -80,11 +80,8 @@ Ergeben die Ursachen nicht genau die Abweichung, bricht das Werkzeug mit Exit 3 
 
 Widerlegt: ja, beide Messungen zählen im Zeitraum dieselben 46 Anfragen und dieselben 0 Timeouts, Abweichung 0 bei Anfragen und Timeouts.
 
-Quote nach außen: noch keine. Nennen dürfen kanal und Seite später die Messung `service` (`bash ops/timeout-quote.sh --since-rollout`),
-weil sie im Vergleich dasselbe zählt wie der Join und ohne Caddy-Log auskommt, und immer mit Zeitraum und Zahl der Anfragen. Heute sind es
-46 Anfragen in gut zweieinhalb Stunden (10.11.2026 20:27 bis 23:01 UTC) ohne einen Timeout; vorher waren es 3 Timeouts in 224 Anfragen an
-einem Tag. Aus 0 von 46 folgt keine Besserung, darum frühestens nach sieben Tagen ab dem Rollout (17.11.2026, `docs/kette.md`,
-abrechnung 02) und erst nach einem neuen `--compare` über denselben Zeitraum.
+Die Quote nach außen dieses Abschnitts (noch keine, weil 0 Timeouts in 46 Anfragen in gut zweieinhalb Stunden keine Besserung tragen)
+ist abgelöst: Sie steht seit abrechnung 05 im Abschnitt `## Nach sieben Tagen`, gemessen über sieben Tage mit der Messung `service`.
 
 **Gegenprobe:** `bash ops/timeout-quote.sh --selftest` pflanzt Zeilen ohne Netz und verlangt bei gleich zählenden Zeilen Abweichung 0 und
 jede Ursache 0, bei einer bedienten Wiederholung und einem Paar mit 59,7 s im Log und 58,9 s `duration_ms` genau `cause coalesced: 1` und
@@ -94,6 +91,67 @@ Status 0, die eine fremde Buchung überdeckt und 20 s nach jeder Anfrage mit Zei
 wie `--rows` mit demselben `TQ_SINCE`. Gegen die echten Daten: An Kopien von Log
 und Ledger angehängt, eine Wiederholung während der letzten Buchung und ein Paar mit 59,7 s im Log und 58,9 s `duration_ms` heben die
 Abweichung auf 1 bei Anfragen und 1 bei Timeouts, mit `cause coalesced: 1` und `cause clock: 1`.
+
+## Nach sieben Tagen
+
+Gemessen am 18.11.2026 um 00:17 UTC, nur lesend, vom code-host aus mit
+
+```
+TQ_SINCE=2026-11-10T20:27:18Z TQ_UNTIL=2026-11-17T23:59:59Z bash ops/timeout-quote.sh --compare
+```
+
+**Zeitraum:** 10.11.2026 20:27:18 UTC (erste Buchung mit `duration_ms`, Rollout von abrechnung 02) bis 17.11.2026 23:59:59 UTC, fest,
+damit die Zahl wiederholbar ist. Das Caddy-Log deckt ihn ganz ab, seine erste Zeile ist vom 01.10.2026 14:59 UTC (`ops/access-log.sh`
+liest auch die gedrehten Dateien). Exit 0.
+
+**Ausfall im Zeitraum:** Vom 11.11.2026 02:01 UTC bis 12.11.2026 08:22 UTC war das Guthaben beim Anbieter leer, und der Dienst
+antwortete auf `POST /v1/chat/completions` 1393 Mal mit 503 (fehler 01; gezählt aus `bash ops/access-log.sh`, Status 503 auf diesem
+Pfad ab `TQ_SINCE`). Diese Anfragen sind weder Timeout noch Abbruch und zählen in keiner Messung, weil nur Status 200 und 0 zählen.
+
+| Modell | Messung | Anfragen | Timeouts | Quote |
+|---|---|---:|---:|---:|
+| openai/gpt-5-mini | caddy | 994 | 0 | 0,0 % |
+| openai/gpt-5-mini | service | 995 | 0 | 0,0 % |
+| openai/gpt-5.2 | caddy | 224 | 0 | 0,0 % |
+| openai/gpt-5.2 | service | 225 | 0 | 0,0 % |
+| unattributed | caddy | 2 | 0 | 0,0 % |
+| unattributed | service | 0 | 0 | - |
+
+**Abweichung** (caddy minus service): Anfragen 0 (1220 gegen 1220), Timeouts 0 (0 gegen 0).
+
+Die Gegenrechnung (`--join` und `--rows` über dieselben Eingaben und denselben Zeitraum, ohne die Klassen des Vergleichs) zählt gleich:
+
+```
+check caddy: compare 1220 0, join 1220 0
+check service openai/gpt-5-mini: compare 995 0, rows 995 0
+check service openai/gpt-5.2: compare 225 0, rows 225 0
+```
+
+Je Ursache die Zahl der Anfragen und Zeilen, die sie trifft:
+
+- coalesced: 0, keine Wiederholung, die der Coalescer mit der Antwort einer anderen Anfrage bediente.
+- clock: 0, keine Anfrage, die auf einer Uhr Timeout ist und auf der anderen nicht.
+- unmatched: 4, je zwei Anfragen ohne eigene Zeile (12.11.2026 15:00:57 und 14.11.2026 14:52:21 UTC) und zwei Zeilen ohne Anfrage, je
+  1 ms neben der Anfrage geschrieben. Die Generation beim Anbieter startete 3,5 s und 2,4 s nach dem Beginn der Anfrage im Log, also
+  außerhalb der 2 s, mit denen eine Anfrage ihre Zeile findet. Mit Vorzeichen heben sie sich auf (Anfragen 0, Timeouts 0); darum
+  stehen die beiden Anfragen als `unattributed` und ihre Zeilen bei ihrem Modell.
+
+Die längsten Anfragen im Zeitraum liefen 48,9 bis 53,9 s, sieben ab 45 s, alle am 12.11.2026 zwischen 14:22 und 14:48 UTC, kurz nach
+dem Ausfall; eine davon brach der Client nach 48,9 s ab.
+
+Widerlegt: nein, der Vergleich zählt gleich: beide Messungen und beide Gegenrechnungen zählen im Zeitraum dieselben 1220 Anfragen und dieselben 0 Timeouts, und
+jede Abweichung einer einzelnen Anfrage hat eine Ursache.
+
+Quote nach außen: 0,0 % (0 von 1220 Anfragen, 10.11.2026 20:27 bis 17.11.2026 23:59 UTC, Messung service), vorher 1,3 % (3 von 224 Anfragen am 10.11.2026 vor dem Rollout, Messung caddy). Aus 0 von 1220 folgt mit 95 % Sicherheit eine Quote unter 0,25 % (3 durch 1220). Die 503 des Ausfalls (oben) zählen nicht mit.
+
+**Gegenprobe:** `bash ops/timeout-quote.sh --selftest` verlangt bei gleich zählenden Zeilen die `check`-Zeilen mit gleichen Zahlen
+(`compare check equal`) und bei einem Paar, dessen Anfrage 5 s vor `TQ_UNTIL` endet und dessen Zeile 3 s danach geschrieben wird,
+Exit 0 (`compare check boundary`); mit einem Join, der nach dem Ende der Anfrage einordnet, ist genau diese Zeile rot
+(`check caddy: compare 1 0, join 2 0`, Exit 3). `test/timeout-quote-compare.test.ts` verfälscht in einer Kopie des Werkzeugs die
+Klassifikation (eine bediente Wiederholung zählt als Paar, also auch in `service`) und verlangt Exit 3 mit
+`independent check failed: service openai/gpt-5.2`; die Summenprobe der Ursachen bleibt dabei stumm, weil Ursachen und Abweichung aus
+denselben falschen Klassen gezählt werden. `bash ops/timeout-quote.sh --selftest-scale` fährt 200000 gepflanzte Anfragen samt Zeilen in
+wenigen Sekunden durch den Vergleich; der Abgleich bis abrechnung 04 brauchte dafür 3 min 52 s und endete mit `RangeError`.
 
 ## Einkauf ohne Verkauf
 
@@ -112,4 +170,9 @@ Die drei Timeouts bei `openai/gpt-5.2` liegen vor dem Rollout von `inference_abo
 Ledger, darum keine Zeile ohne Antwort. Die Lücke zwischen Anbieter und Ledger liegt bei beiden Modellen innerhalb der Toleranz (783 mc
 und -160 mc), also kauft keine Anfrage unbemerkt ein.
 
-Anbieterwahl: Das Routing `{ sort: "throughput", allow_fallbacks: true }` aus abrechnung 02 bleibt, weil der Einkauf ohne Verkauf im Zeitraum bei beiden Modellen 0 mc ist und seit dem Rollout kein Timeout auftrat; eine Zahl, die für ein anderes Routing spräche, gibt es nicht.
+Über sieben Tage (10. bis 17.11.2026, `AP_SINCE=2026-11-10 AP_NOW=2026-11-18T00:00:00Z bash ops/abort-purchase.sh`) steht die Messung
+in `docs/abrechnung/einkauf-abbrueche.md`, Abschnitt `## Nach sieben Tagen`:
+
+Einkauf je Abbruch ohne Antwort: keine Zahl, weil das Werkzeug für openai/gpt-5.2 wegen `noise` am 10.11.2026 (3753 mc Lücke ohne einen Abbruch) nicht schätzt; ohne den 10.11. sind es bei openai/gpt-5.2 8558 mc für 20 Abbrüche (428 mc je Abbruch, davon 7783 mc an einem Abbruch am 12.11.) und bei openai/gpt-5-mini 0 mc für 3 Abbrüche.
+
+Anbieterwahl: Das Routing `{ sort: "throughput", allow_fallbacks: true }` aus abrechnung 02 bleibt nach der Messung vom 10.11.2026 20:27 bis 17.11.2026 23:59 UTC (Abschnitt `## Nach sieben Tagen` hier und in `docs/abrechnung/einkauf-abbrueche.md`): Die Quote nach außen ist 0,0 % (0 Timeouts von 1220 Anfragen, Messung service), und der Einkauf je Abbruch ohne Antwort ist keine Zahl wegen `noise` am 10.11.; ohne den 10.11. kauft openai/gpt-5.2 8558 mc für 20 Abbrüche ohne Antwort ein, das sind 1,8 % seines Einkaufs von 488347 mc im selben Zeitraum, und 7783 mc davon entfallen auf einen einzigen Abbruch am 12.11., bei openai/gpt-5-mini sind es 0 mc für 3 Abbrüche (`AP_SINCE=2026-11-11 AP_NOW=2026-11-18T00:00:00Z bash ops/abort-purchase.sh`, gemessen 18.11.2026). Ein anderes Routing senkt diesen Einkauf nur, wenn es Abbrüche ohne Antwort verhindert, und ohne einen einzigen Timeout im Zeitraum zeigt keine Zahl dorthin.
