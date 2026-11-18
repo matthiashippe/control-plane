@@ -1,7 +1,7 @@
 # Umzug Goal 03: Der geteilte Link nennt den Umzug
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Wer einen Link auf `automatonhost.com` geteilt bekommt oder `llms.txt` liest, erfährt zuerst, dass sein Automaton hier weiterläuft:
@@ -177,7 +177,7 @@ und beide heute ein Angebot nennen, das nicht seines ist.
       Anmeldung, Zahlung und Inferenz weiter laufen (Grundregel 13).
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung (Netz): `n=$(gh pr list -R matthiashippe/control-plane --head goal/umzug-03 --state all --json number -q '.[0].number'); gh pr checks "${n:?}" -R matthiashippe/control-plane --json name,state -q '.[] | select(.name=="e2e") | .state'` muss `SUCCESS` ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Jede neue Testdatei und jeder neue Fall, der ein neues Verhalten verlangt, war vor dem Fix rot; die Zeile im Progress Log
@@ -208,6 +208,7 @@ und beide heute ein Angebot nennen, das nicht seines ist.
 ## Progress Log
 - 2026-11-18 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6, 7, 8, 9 gebaut: SOLL-Quelle und Bild der Vorschaukarte mit dem neuen Werkzeug `ops/soll-og.mjs` (`assessOg` mit Test ohne Browser), Abnahme durch den Design Reviewer am Topic PRO-24699 um 01:19 UTC nach dem Bild-Commit `d847d5a` (01:17 UTC) und vor der Karte `8dc5ed4` (01:23 UTC), Karte, `og.png` und `og:image:alt` danach als Kopien, Tests und Prüfwerkzeug der Karte für die Umzugskarte, `llms.txt` mit dem Wechsel als erstem Absatz und dem Markt unter eigener Überschrift, 7 abgelöste Prüfbefehle fertiger Goals (konto 08 Punkt 2 und 4, seite 01 Punkt 4, seite 03 Punkt 6, umzug 02 Punkt 2 und zweimal Punkt 4), Doku und Annahmen. Rot vorher: `test/soll-og.test.ts` 6 von 6 gegen das alte `ops/soll-assess.mjs`, der neue Fall in `test/automaton-name.test.ts` 1 rot gegen das alte `src/app.ts`, `test/og-card.test.ts` 2 rot gegen die alte Karte, der Selbsttest der Karte rot mit der alten Karte. Prüfbefehle: Punkt 1 `0`, nichts, `2400x1260`, `exit=0 0 defects`, `exit=1`, `exit=1` und `0`, Exit 0, `6`; Punkt 2 `1`, `abnahme ok 1`; Punkt 3 `gleich`, `2400x1260 0`, `exit=0 0 defects`, `2`, `0`, `0`, `exit=0 0 defects` (mit Node 22 vorn im `PATH`); Punkt 4 Exit 0, nichts, `2`, `SELFTEST OK: ten cases` mit Exit 0, nichts, `exit=1`, `voll=0 leer=0`; Punkt 5 Exit 0, nichts, `llms ok`, `1`; Punkt 6 `0`, `1`; Punkt 7 nichts, `6`, `10`; Punkt 8 `0`, `0`, `22`, `0`, `0`; Punkt 9 `check` Exit 0 (221 Dateien, 2381 Tests), `e2e` am PR #268 `SUCCESS` (Lauf am Kopf `0af1d26`).
 - 2026-11-18 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, 7, 8, 9; `origin/dev` `3aa3467` (Goal-Datei konto 11) und danach `f076a93` (abrechnung 05, ohne Konflikt, keine Datei dieses Goals) in den Goal-Branch gemergt, alle Prüfbefehle danach erneut mit derselben Ausgabe. Prüfbefehle (Node 22.23.5, `PATH=/usr/bin:$PATH`): Punkt 1 `0`, nichts, `2400x1260`, `exit=0 0 defects`, `exit=1`, `exit=1` und `0`, Exit 0, `6`; Punkt 2 `1`, `abnahme ok 1`; Punkt 3 `gleich`, `2400x1260 0`, `exit=0 0 defects`, `2`, `0`, `0`, `exit=0 0 defects`; Punkt 4 Exit 0, nichts, `2`, `SELFTEST OK: ten cases` mit Exit 0, nichts, `exit=1`, `voll=0 leer=0`; Punkt 5 Exit 0, nichts, `llms ok`, `1`; Punkt 6 `0`, `1`; Punkt 7 nichts, `6`, `10`; Punkt 8 `0`, `0`, `22`, `0`, `0`; Punkt 9 `check` Exit 0 (2385 Tests, grün in 117 s), `e2e` am PR #268 am Kopf dieses Commits.
+- 2026-11-18 Release: PASS K und B (Zyklus 2), DONE.
 
 ## Blockers
 Keine.
