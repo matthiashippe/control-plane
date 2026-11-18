@@ -1,7 +1,7 @@
 # Konto Goal 13: Der Widerruf trifft nur die Erlaubnis, die der Kunde ablöst
 
 ## Status
-PLANNED
+ACTIVE
 
 ## Active Objective
 Mit seinem Passkey beendet ein Kunde genau die Erlaubnis, die er ablöst, und keine Seite bringt ihn dazu, etwas anderes zu

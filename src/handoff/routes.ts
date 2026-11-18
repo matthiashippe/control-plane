@@ -881,7 +881,10 @@ export function registerHandoff<E extends Env>(app: Hono<E>, deps: HandoffDeps):
     const checked = await checkSignature(konto, permission, signature);
     if (checked === "unavailable") return c.json(SIGNATURE_CHECK_UNAVAILABLE, 503);
     if (!checked) return refuse("The signature does not belong to this account.");
-    if (!finishPayout(db, { code: h.code, account: h.account!, permission, signature, revoke, nowMs: nowMs() })) {
+    // goals/konto/13: finishPayout stores the revoke only next to the permission it was checked for; when the row changed while
+    // the chain checked the signature, the code ends and a new one shows the permission of now.
+    if (!finishPayout(db, { code: h.code, account: h.account!, permission, signature, revoke, replaced, nowMs: nowMs() })) {
+      burnMatched(db, h.code, nowMs());
       return c.json({ error: "handoff_closed", message: "This code no longer works. Start again in your terminal.", docs: CONTRACT }, 410);
     }
     return c.json({ state: "done", bank_last4: bank.bank_last4 }, 200);
