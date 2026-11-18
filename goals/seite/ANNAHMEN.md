@@ -59,3 +59,8 @@
 ## Abgelöst durch umzug 02 (Maker, 2026-11-17)
 
 - Abgelöst: seite 01 Punkt 4 durch umzug 02 Punkt 2, Ausgabe dann genau `Exit 1, keine abnahme nach 2026-11-17T16:39:12+00:00` (Tech Lead, 2026-11-17)
+
+## Abgelöst durch umzug 03 (Maker, 2026-11-18)
+
+- Abgelöst: seite 01 Punkt 4 durch umzug 03 Punkt 3, Ausgabe dann genau `Exit 1, keine abnahme nach 2026-11-18T01:23:28+00:00` (Tech Lead, 2026-11-18)
+- Abgelöst: seite 03 Punkt 6 durch umzug 03 Punkt 1, Ausgabe dann genau `Exit 0, 28` (Tech Lead, 2026-11-18)

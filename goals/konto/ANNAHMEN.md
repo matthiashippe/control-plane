@@ -301,6 +301,11 @@
 - Neue Tests waren rot: Fall 1 und Fall 3 von „account names are read strictly“ gegen die Merge-Basis (`expected 201 to be 400`, `expected 'Atlas. Only Atlas may spend this' to be 'Atlas'`), Fall 2 grün als Wächter; `test/konto-usdc.test.ts` mit gestrichener Typprüfung in beiden Fällen und mit `{1,19}` in der Tabelle, weil jeder neue Test einmal rot gesehen sein muss (`loop-constraints.md`, Budget und Qualität).
 - Entscheidung: `test/handoff-page.test.ts` steht in der Pfadliste der ersten Prüfung von Punkt 6, weil der Fall „escapes a name that carries markup“ sich mit Punkt 1 ändern musste und die Zählung von `it` und `expect` derselben Prüfung die Datei weiter gegen einen schwächeren Test hält (Tech Lead, Kritik 2026-11-18).
 
+## Abgelöst durch umzug 03 (Maker, 2026-11-18)
+
+- Abgelöst: konto 08 Punkt 2 durch umzug 03 Punkt 1, Ausgabe dann genau `Exit 0, 6 6` (Tech Lead, 2026-11-18)
+- Abgelöst: konto 08 Punkt 4 durch umzug 03 Punkt 1, Ausgabe dann genau `Exit 0, 6` (Tech Lead, 2026-11-18)
+
 ## Goal 11 (18.11.2026, Engineer CP)
 
 - Abzulösen ist genau die Erlaubnis, die `finishPayout` zu `retire_*` macht (`replacedPermission` in `src/konto/payout.ts`: ein wartendes `retire_*`, sonst `permission` und `forwarder` der Zeile), und dann trägt jeder Auszahl-Handoff den Widerruf, auch ohne Schlüsselwechsel, weil die Seite nicht weiß, wessen `caller` die alte Weiterleitung trägt, und ein wartendes `retire_*` mit fremdem `caller` sonst nie einen Widerruf bekäme (Entscheidung 1 des Tech Lead).

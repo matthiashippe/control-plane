@@ -236,3 +236,34 @@ weil der Knopf dasselbe Ziel hat und der Kopf sonst in zwei Zeilen bricht. Aufba
 neue Bausteine gibt es keine. Gerendert mit den Werkzeugen oben, `FONTCONFIG_FILE=$HOME/.config/control-plane/soll-fonts.conf`.
 
 Abnahme-Issue umzug: PRO-24257
+
+## Vorschaukarte /og.png (goals/umzug/03)
+
+Das Bild, das jeder geteilte Link auf `automatonhost.com` zeigt, als SOLL-Bild `og-card.png` (2400 x 1260, also 1200 x 630 mit
+Faktor 2). Quelle ist `src/og-card.html`. Die Karte sagt, was der erste Block der Startseite sagt: die Überschrift des Blocks
+`move` in zwei Zeilen („Conway not answering?“ und „Your automaton runs here.“), darunter sein Satz zur eigenen Wallet und zur
+gleichen API, unten links die eine Zeile `"conwayApiUrl": "https://automatonhost.com"`, unten rechts wie bisher
+`automatonhost.com`. Markt, Provision und freier erster Auftrag stehen nicht mehr darauf. Farben, Schrift, Logo, Leuchten und
+Abstände sind die der bisherigen Karte.
+
+Bauen und prüfen, ohne Netz, mit `FONTCONFIG_FILE=$HOME/.config/control-plane/soll-fonts.conf`:
+
+```
+node ops/soll-og.mjs                                            # og-card.png neu schreiben
+node ops/soll-og.mjs --check                                    # neu rendern und vergleichen, Exit 1 bei jedem Mangel
+node ops/soll-og.mjs --check --source src/public/og-card.html   # die Karte des Dienstes gegen dasselbe Bild
+```
+
+Mängel: ein Pixel weicht ab (Kanaltoleranz 8), das Bild ist nicht 2400 x 1260, Inhalt ist breiter oder höher als die Karte,
+Gedankenstrich im sichtbaren Text, Anfrage an eine fremde Adresse. Die Auswertung ist `assessOg` in `ops/soll-assess.mjs`, geprüft
+von `test/soll-og.test.ts` ohne Browser. `ops/soll-og.mjs` schreibt nie nach `src/public/`: Nach der Abnahme ist
+`src/public/og-card.html` eine Kopie der Quelle und `src/public/og.png` eine Kopie von `og-card.png`.
+
+### Neue Bausteine
+
+`.line` mit einer Beschriftung im Stil der bisherigen Fakten (`.line b`, früher `.facts b`) und einem Codekasten `.line code`
+(Monospace 24 px, Rahmen in Grün mit 28 % Deckkraft, Feldname in Grün), weil die Zeile mit `conwayApiUrl` genau das ist, was der
+Betreiber abtippt, und als Code erkennbar sein muss. Er ersetzt die drei Fakten der alten Karte. Die Überschrift bricht fest nach
+dem ersten Satz (`h1 span { display: block; }`), weil die zwei Sätze die zwei Zeilen des Blocks `move` sind.
+
+Abnahme-Issue og-card: PRO-24699

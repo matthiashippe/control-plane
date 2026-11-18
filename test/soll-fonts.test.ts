@@ -20,7 +20,7 @@ describe("SOLL render fonts", () => {
 
   it("is wired into every SOLL renderer", async () => {
     const { readFileSync } = await import("node:fs");
-    for (const f of ["ops/soll.mjs", "ops/soll-handoff.mjs", "ops/soll-konto.mjs", "ops/soll-limit.mjs"]) {
+    for (const f of ["ops/soll.mjs", "ops/soll-handoff.mjs", "ops/soll-konto.mjs", "ops/soll-limit.mjs", "ops/soll-og.mjs"]) {
       expect(readFileSync(f, "utf8"), f).toMatch(/env: \{ \.\.\.process\.env, FONTCONFIG_FILE: fonts \}/);
     }
   });

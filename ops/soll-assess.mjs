@@ -288,6 +288,40 @@ export function summaryMoney(results) {
   return `soll money: ${results.length} images, blocks end ${WIDTHS.map(end).join(" ")}, ${n} defects`;
 }
 
+// ---- the preview card /og.png (goals/umzug/03) ---------------------------------------------------------------------------
+// One picture, the card every shared link shows: docs/soll/src/og-card.html rendered at 1200 x 630 CSS pixels with device scale
+// factor 2. No first screen and no block: the card is the first screen. On top of the pixel comparison, the defects are a picture
+// of another size, content that pokes out of the card, a dash in the visible text and a request to a foreign address.
+
+/** The size of the card in CSS pixels and the scale it is rendered at; the picture is 2400 x 1260. */
+export const OG_CARD = Object.freeze({ width: 1200, height: 630, scale: 2 });
+
+/**
+ * Defects of one render of the preview card. `m` holds what the browser measured: `width` and `height` of the fresh picture,
+ * `pngWidth` and `pngHeight` of the committed one (undefined when there is none), `diffPixels` (null when there is nothing to
+ * compare with), `contentWidth` and `contentHeight` (right and bottom edge of the furthest element), `text` (visible text) and
+ * `foreign` (addresses requested or named in an attribute).
+ */
+export function assessOg(m) {
+  const out = [], W = OG_CARD.width * OG_CARD.scale, H = OG_CARD.height * OG_CARD.scale;
+  if (m.width !== W || m.height !== H) out.push(`og: fresh picture is ${m.width} x ${m.height}, not ${W} x ${H}`);
+  if (m.pngWidth !== undefined && (m.pngWidth !== W || m.pngHeight !== H)) out.push(`og: committed picture is ${m.pngWidth} x ${m.pngHeight}, not ${W} x ${H}`);
+  if (m.diffPixels === null || m.diffPixels === undefined) out.push("og: no committed picture to compare with");
+  else if (m.diffPixels > MAX_DIFF_PIXELS) out.push(`og: ${m.diffPixels} pixels differ from a fresh render`);
+  if (m.contentWidth > OG_CARD.width) out.push(`og: content is ${m.contentWidth} px wide, wider than the card at ${OG_CARD.width}`);
+  if (m.contentHeight > OG_CARD.height) out.push(`og: content is ${m.contentHeight} px tall, taller than the card at ${OG_CARD.height}`);
+  const dash = String(m.text ?? "").split("\n").find((l) => DASHES.test(l));
+  if (dash !== undefined) out.push(`og: dash in the visible text: ${dash.trim().slice(0, 80)}`);
+  for (const url of m.foreign ?? []) out.push(`og: request to a foreign address: ${url}`);
+  return out;
+}
+
+/** The last line of ops/soll-og.mjs, ending in `<n> defects` like the other SOLL tools. */
+export function summaryOg(r) {
+  const diff = r.diffPixels === null || r.diffPixels === undefined ? "nothing to compare" : `${r.diffPixels} px`;
+  return `soll og: 1 picture, ${r.width}x${r.height}, diff ${diff}, ${r.defects.length} defects`;
+}
+
 /**
  * Font configuration for the browser that renders the SOLL pictures. The page stacks start with system-ui and end in the
  * generic sans-serif and monospace, which resolve to whatever the host prefers: the committed pictures were rendered while

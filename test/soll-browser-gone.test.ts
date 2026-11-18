@@ -1,7 +1,7 @@
 /**
  * A SOLL tool whose browser is gone ends red (goals/konto/08, Punkt 2).
  *
- * Each of the five SOLL tools runs with `--check` against a stand-in Chrome that ends at once (a shell script `exit 0`, given
+ * Each of the SOLL tools runs with `--check` against a stand-in Chrome that ends at once (a shell script `exit 0`, given
  * through SOLL_CHROME). Without the guard in the browser driver a request to the dead browser waits for an answer that cannot
  * come, the event loop runs empty and node ends with exit 0 and no line: a green check that rendered nothing. Expected instead:
  * a numeric exit code other than 0, the reason `browser exited` on stderr, and no summary line ending in `, 0 defects`.
@@ -23,7 +23,7 @@ function goneChrome(): string {
   return file;
 }
 
-describe.each(["soll.mjs", "soll-handoff.mjs", "soll-konto.mjs", "soll-limit.mjs", "soll-money.mjs"])("ops/%s", (tool) => {
+describe.each(["soll.mjs", "soll-handoff.mjs", "soll-konto.mjs", "soll-limit.mjs", "soll-money.mjs", "soll-og.mjs"])("ops/%s", (tool) => {
   it("ends with a non-zero exit and the reason when the browser is gone, and reports no 0 defects", () => {
     const r = spawnSync(process.execPath, [path.join(ROOT, "ops", tool), "--check"], {
       cwd: ROOT, encoding: "utf8", timeout: 20_000, env: { ...process.env, SOLL_CHROME: goneChrome() },

@@ -1,5 +1,5 @@
 /**
- * The arguments of the four SOLL tools (goals/seite/03, Punkt 1 and Punkt 8).
+ * The arguments of the SOLL tools (goals/seite/03, Punkt 1 and Punkt 8; ops/soll-og.mjs since goals/umzug/03).
  *
  * The check flag is `--check`. Any other argument ends the tool before it renders or writes: exit 1, exactly one line
  * `unknown argument: <arg>` on stderr, nothing on stdout. So an old check command with the German flag `--pruefen` stops at once
@@ -36,7 +36,7 @@ function run(tool: string, args: string[], env: Record<string, string> = {}) {
   return { status: r.status, stdout: r.stdout, stderr: r.stderr };
 }
 
-describe.each(["soll.mjs", "soll-handoff.mjs", "soll-konto.mjs", "soll-limit.mjs"])("ops/%s", (tool) => {
+describe.each(["soll.mjs", "soll-handoff.mjs", "soll-konto.mjs", "soll-limit.mjs", "soll-og.mjs"])("ops/%s", (tool) => {
   it(`rejects the old flag ${OLD_FLAG} with exit 1 and one line on stderr, without writing a picture`, () => {
     const before = snapshot(PICTURES);
     const r = run(tool, [OLD_FLAG]);

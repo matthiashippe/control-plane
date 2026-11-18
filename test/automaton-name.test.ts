@@ -67,6 +67,19 @@ describe("the old name is gone from what we serve", () => {
     expect((JSON.parse(openapi) as { info: { title: string } }).info.title).toBe("automatonhost.com");
   });
 
+  it("leads /llms.txt with the switch to conwayApiUrl on the canonical host, and puts One job under The market after it", async () => {
+    // goals/umzug/03: an automaton that reads llms.txt first has to read the one line that keeps it running, not an offer that is
+    // not its own. The first paragraph is everything between the title and the next empty line.
+    const llms = await (await app().request("/llms.txt")).text();
+    const first = llms.split("\n\n")[1] ?? "";
+    expect(first, "the first paragraph names the field to change").toContain("conwayApiUrl");
+    expect(first, "and the canonical host it points at").toContain("https://automatonhost.com");
+    expect(first, "and not the market").not.toContain("One job");
+    const market = llms.indexOf("\n## The market\n");
+    expect(market, "the market has its own heading").toBeGreaterThan(-1);
+    expect(llms.indexOf("One job"), "the market follows under its heading").toBeGreaterThan(market);
+  });
+
   it("names automatonhost.com and no old brand in any state of the phone pages", () => {
     const pages = [
       renderHandoffPage({ state: "approve", automatonName: "Atlas", dailyLimitUsdc: 5_000_000n, amountUsdc: 5_000_000n, choices: [62, 47, 18] }, ""),
