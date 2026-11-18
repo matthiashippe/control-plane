@@ -1,7 +1,7 @@
 # Konto Goal 12: Der Name des Kontos heißt im Code so, und kein Browser überlebt einen Sepolia-Lauf
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Wer den Handoff liest oder ändert, verwechselt Konto und Automaton nicht, und kein Prüflauf lässt einen Browser auf dem code-host
@@ -127,7 +127,7 @@ code-host Speicher hält, bis ihn ein Mensch findet.
       Prüfung: `git diff origin/dev...HEAD | grep -E '^[+]' | grep -iE "(api[_-]?key|secret|token|private[_-]?key)[\"' ]*[:=] *[\"']?[A-Za-z0-9_+/=-]{16,}|BEGIN [A-Z ]*PRIVATE KEY|cnwy_k_[A-Za-z0-9_-]{16,}" | wc -l` muss `0` ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung (Netz): `n=$(gh pr list -R matthiashippe/control-plane --head goal/konto-12 --state open --json number -q '.[0].number'); gh pr checks "$n" -R matthiashippe/control-plane | awk -F'\t' '$1=="check" && $2=="pass"' | wc -l` muss mindestens `1` ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Im Handoff heißt der Name, den die Seite zeigt, überall `display_name` oder `displayName`, auch beim Schritt `limit`.
@@ -159,5 +159,6 @@ code-host Speicher hält, bis ihn ein Mensch findet.
 ## Progress Log
 - 2026-11-18 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6 gebaut: Spalte `display_name` per Umbenennung nach den Umbauten von konto 02 bis 05, `displayName` in Handoff und Seiten, `NAME_FIELD` als einzige Stelle von `automaton_name` in `src/handoff`, `launch` beendet laufende Browser über einen gemeinsamen `exit`-Listener. Prüfbefehle: Punkt 1 `routes.ts:1`, `routes.ts:1`, 0, 0, 7, 1, `true false`, 13 Testdateien Exit 0; Punkt 2 `exit=0` `2 2`, Merge-Basis `2 0`, `faelle ok`; Punkt 3 1, `exit=0` `2 2`, Merge-Basis `2 0`, `exit listeners 0` (Gegenprobe ohne `process.off`: `exit listeners 1`), `laeufe gleich`; Punkt 4 `bilder gleich`, handoff, konto, limit und money je `exit=0` und `1` mit 0 defects; Punkt 5 7 und 1; Punkt 6 0, `schnittstelle gleich`, 0, `pakete gleich`, `goals gleich`, 0, `check` Exit 0 (2396 Tests grün in 509 s), `check` am PR siehe Kommentar.
 - 2026-11-18 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6; `dev` c54416a gemergt (nur `ROADMAP.md`, `STATE.md` und Goal-Dateien). Prüfbefehle am Merge d2a81a5: Punkt 1 `routes.ts:1`, `routes.ts:1`, 0, 0, 7, 1, `true false`, 13 Testdateien Exit 0 (125 Tests); Punkt 2 `exit=0` `2 2`, Merge-Basis c54416a `2 0`, `faelle ok`; Punkt 3 1, `exit=0` `2 2`, Merge-Basis `2 0`, `exit listeners 0`, `laeufe gleich`, kein `sleep` des nachgebauten Chrome übrig; Punkt 4 `bilder gleich`, handoff, konto, limit und money je `exit=0` und 0 defects; Punkt 5 7 und 1; Punkt 6 0, `schnittstelle gleich`, 0, `pakete gleich`, `goals gleich`, 0, `check` Exit 0 (2396 Tests in 223 Dateien, 374 s), Jobs `check` und `e2e` am PR siehe Kommentar.
+- 2026-11-18 Release: PASS K und B (Zyklus 2), DONE.
 
 ## Blockers
