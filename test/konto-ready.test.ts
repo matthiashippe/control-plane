@@ -8,8 +8,9 @@ import { join } from "node:path";
 /*
  * ops/konto-ready.sh (goals/konto/14, point 3), offline. A stand-in `ssh` and `docker` sit first in PATH inside a
  * folder from mkdtemp: `ssh` runs the remote command right here with the script on stdin, and `docker ... test -r
- * <path>` tests that path here. CP_READY_ENV_FILE points the script at a rebuilt .env in the same folder. No network,
- * no port, no real server.
+ * <path>` tests that path here, `docker ... printenv <NAME>` answers from a rebuilt container environment (by default
+ * the same values as the .env, as compose reads them). CP_READY_ENV_FILE points the script at a rebuilt .env in the same
+ * folder. No network, no port, no real server.
  */
 
 const SCRIPT = join(__dirname, "..", "ops", "konto-ready.sh");
@@ -22,9 +23,13 @@ afterEach(() => {
 /** A value nobody else would print, so finding it in the output can only mean the script leaked it. */
 const unique = (label: string) => `${label}-${randomBytes(8).toString("hex")}`;
 
-type Setup = { env: Record<string, string | null>; keyReadable?: boolean; sshFails?: boolean };
+type Env = Record<string, string | null>;
+type Setup = { env: Env; container?: Env; keyReadable?: boolean; sshFails?: boolean };
 
-function run({ env, keyReadable = true, sshFails = false }: Setup) {
+/** What compose hands the container for an env_file line: the value without surrounding quotes. */
+const unquote = (v: string) => (/^(".*"|'.*')$/.test(v) ? v.slice(1, -1) : v);
+
+function run({ env, container, keyReadable = true, sshFails = false }: Setup) {
   const dir = mkdtempSync(join(tmpdir(), "cp-konto-ready-"));
   dirs.push(dir);
   const bin = join(dir, "bin");
@@ -36,7 +41,20 @@ function run({ env, keyReadable = true, sshFails = false }: Setup) {
       : // The last argument is the remote command; stdin (the script) is passed on unchanged.
         '#!/usr/bin/env bash\ncmd="${@: -1}"\nexec bash -c "$cmd"\n',
   );
-  writeFileSync(join(bin, "docker"), '#!/usr/bin/env bash\ntest -r "${@: -1}"\n');
+  const containerEnv = join(dir, "container-env");
+  writeFileSync(
+    join(bin, "docker"),
+    [
+      "#!/usr/bin/env bash",
+      'if [ "${@: -2:1}" = printenv ]; then',
+      `  line=$(grep -E "^\${@: -1}=" ${JSON.stringify(containerEnv)} | tail -n 1) || exit 1`,
+      '  printf "%s\\n" "${line#*=}"',
+      "  exit 0",
+      "fi",
+      'test -r "${@: -1}"',
+      "",
+    ].join("\n"),
+  );
   chmodSync(join(bin, "ssh"), 0o755);
   chmodSync(join(bin, "docker"), 0o755);
 
@@ -51,6 +69,13 @@ function run({ env, keyReadable = true, sshFails = false }: Setup) {
   }
   const envFile = join(dir, "env");
   writeFileSync(envFile, lines.join("\n") + "\n", { mode: 0o600 });
+
+  const running: string[] = [];
+  for (const [name, value] of Object.entries(container ?? env)) {
+    if (value === null) continue;
+    running.push(`${name}=${value === "@keyfile" ? keyFile : unquote(value)}`);
+  }
+  writeFileSync(containerEnv, running.join("\n") + "\n", { mode: 0o600 });
 
   const r = spawnSync("bash", [SCRIPT], {
     env: {
@@ -96,6 +121,7 @@ describe("ops/konto-ready.sh", () => {
       expect(r.status(name), name).toBe("set");
     }
     expect(r.status("key_file")).toBe("readable");
+    expect(r.status("container")).toBe("current");
   });
 
   it("says missing and exits 1 for a required name that is absent or empty", () => {
@@ -103,6 +129,7 @@ describe("ops/konto-ready.sh", () => {
     expect(absent.code, absent.out).toBe(1);
     expect(absent.status("CP_KONTO_AUTH_PROXY_ID")).toBe("missing");
     expect(absent.status("CP_KONTO_CHAIN_ID")).toBe("set");
+    expect(absent.status("container"), "a name absent in file and container counts as equal").toBe("current");
 
     const empty = run({ env: { ...full(), CP_KONTO_MAINNET: "" } });
     expect(empty.code, empty.out).toBe(1);
@@ -140,12 +167,28 @@ describe("ops/konto-ready.sh", () => {
     expect(r.status("key_file")).toBe("unreadable");
   });
 
+  it("says container stale and exits 1 when the running container still has other values than the file", () => {
+    const old = unique("old-proxy");
+    const r = run({ env: full(), container: { ...full(), CP_KONTO_AUTH_PROXY_ID: old } });
+    expect(r.code, r.out).toBe(1);
+    for (const name of REQUIRED) expect(r.status(name), name).toBe("set");
+    expect(r.status("key_file")).toBe("readable");
+    expect(r.status("container")).toBe("stale");
+    expect(r.out).not.toContain(PROXY);
+    expect(r.out).not.toContain(old);
+
+    const before = run({ env: full(), container: { CP_KONTO_CHAIN_ID: "84532", CP_KONTO_MAINNET: "0" } });
+    expect(before.code, before.out).toBe(1);
+    expect(before.status("container"), "a container started before any value was set").toBe("stale");
+  });
+
   it("never prints a value of the .env, in no case, not even a quoted one", () => {
     const cases: Setup[] = [
       { env: full() },
       { env: { ...full(), CP_KONTO_CHAIN_ID: "84532" } },
       { env: { ...full(), CP_KONTO_AUTH_PROXY_ID: `"${PROXY}"` } },
       { env: full(), keyReadable: false },
+      { env: full(), container: { ...full(), CP_KONTO_RPC_URL: `https://${unique("old-rpc")}.test` } },
     ];
     for (const c of cases) {
       const r = run(c);
@@ -154,7 +197,7 @@ describe("ops/konto-ready.sh", () => {
         expect(r.out).not.toContain(secret);
       }
       for (const line of r.out.trim().split("\n")) {
-        expect(line).toMatch(/^(CP_[A-Z_]+ (set|missing|wrong|default|empty)|key_file (readable|unreadable)|env_file unreadable)$/);
+        expect(line).toMatch(/^(CP_[A-Z_]+ (set|missing|wrong|default|empty)|key_file (readable|unreadable)|container (current|stale)|env_file unreadable)$/);
       }
     }
   });

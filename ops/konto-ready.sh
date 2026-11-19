@@ -5,12 +5,15 @@
 # Checks the values of docs/konto/euro.md, section "Für konto 06", point 4, in /opt/control-plane/.env on the server and
 # prints one line per name: `<NAME> set`, `<NAME> missing` or `<NAME> wrong` (CP_KONTO_RPC_URL is free: `set` or
 # `default`; CP_BRIDGE_URL and CP_BRIDGE_KEY_FILE: `set` or `empty`), then `key_file readable` or `key_file unreadable`,
-# tested inside the running container, because the container only sees its own paths.
+# tested inside the running container, because the container only sees its own paths, and last `container current`
+# or `container stale`: whether the running container `cp` has the same value as the file for every CP_KONTO_* name (a
+# name absent in both counts as equal). deploy.yml only rolls out when the runtime path changed, so a value set in the
+# file reaches the service only after a forced rollout; until then the service still answers 503 konto_unavailable.
 #
 # No value ever leaves the server: this file is sent over ssh to `bash -s`, it picks single lines out of the env file
 # with grep by name and compares them right there, and only the words above come back.
 #
-# Exit 0 when every required line says `set` and the key file is readable, 1 otherwise, 2 with `ssh failed` when the
+# Exit 0 when every required line says `set`, the key file is readable and the container is current, 1 otherwise, 2 with `ssh failed` when the
 # server could not be asked. The bridge values do not change the exit, they come after konto 16.
 set -uo pipefail
 
@@ -64,6 +67,16 @@ if [[ "${1:-}" == "--on-server" ]]; then
   else
     echo "key_file unreadable"; ready=1
   fi
+
+  # The container reads .env through env_file, so each CP_KONTO_* value it runs with must equal the file. Both values
+  # stay in variables on the server; only the word comes back.
+  container=current
+  for name in CP_KONTO_CHAIN_ID CP_KONTO_MAINNET CP_KONTO_RPC_URL CP_KONTO_KEY_FILE CP_KONTO_AUTH_PROXY_ID; do
+    file_value=$(value_of "$name")
+    running_value=$(docker compose -f "$COMPOSE_FILE" exec -T cp printenv "$name" </dev/null 2>/dev/null)
+    if [[ "$file_value" != "$running_value" ]]; then container=stale; fi
+  done
+  if [[ "$container" == current ]]; then echo "container current"; else echo "container stale"; ready=1; fi
   exit "$ready"
 fi
 
