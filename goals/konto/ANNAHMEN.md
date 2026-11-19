@@ -339,6 +339,7 @@
 
 - Abgelöst: konto 03 Punkt 5 durch konto 05 Punkt 16, Ausgabe dann genau `Exit 0, gruen ohne requireSepolia` (Tech Lead, 2026-11-18)
 - Entscheidung (Tech Lead, 2026-11-18, PRO-25126): Die Gegenprobe aus konto 03 Punkt 5 leert `requireSepolia`, aber seit konto 05 Punkt 16 (Hauptnetz über `CP_KONTO_MAINNET`) gehen `sendKontoTx`, `topup.ts` und `payout.ts` über `requireNet(chainId, net)`, und niemand ruft `requireSepolia` mehr auf; deshalb bleibt der Test grün. Die Schranke hält weiter, weil ein geleertes `requireNet` `test/konto-chain.test.ts` und `test/konto-mainnet.test.ts` rot macht (3 failed, gemessen 2026-11-18 ohne Netz unter Node 22), und konto 05 Punkt 16 prüft sie mit 14 Tests. Die tote Definition von `requireSepolia` in `src/konto/chain.ts` bleibt stehen, weil der zweite Zähler von konto 03 Punkt 5 (`grep -rlE "requireSepolia\(" src/konto`, mindestens 1) nur an ihr hängt; wer sie entfernt, trägt dafür eine eigene Ablösung ein.
+- Entscheidung (Tech Lead, 2026-11-19, PRO-25564): Ablöser bleibt konto 05 Punkt 16, weil erst dort `requireNet` an die Stelle von `requireSepolia` trat und kein anderer Punkt ohne Netz diese Schranke prüft. Seine drei Zeilen ohne Netz sind im Audit GRÜN, die zwei Zeilen gegen `mainnet.base.org` fährt das Audit als Produktionsaufruf nie; dass eine solche Zeile einen Ablöser nicht von GRÜN abhält, klärt code-host PR #856 in `loop-regeln`. Bis zu dessen Merge bleibt die Audit-Zeile von konto 03 Punkt 5 rot, die Ausgabe ist unverändert `Exit 0, gruen ohne requireSepolia`.
 
 ## Goal 13 (18.11.2026, Engineer CP)
 
