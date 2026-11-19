@@ -336,7 +336,7 @@ def referrer(value):
         return "(address)"
     except ValueError:
         pass
-    # A name that carries an address inside it (1.2.3.4.nip.io) would print the address all the same.
+    # A name that carries an address inside it (192.0.2.7.nip.io) would print the address all the same.
     if ADDRESS_INSIDE.search(host):
         return "(address)"
     return host
