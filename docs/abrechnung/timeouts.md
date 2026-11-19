@@ -78,7 +78,7 @@ Zeile). Alle 46 Anfragen kamen von fremden Adressen (`--join` auf denselben Zeit
 
 Ergeben die Ursachen nicht genau die Abweichung, bricht das Werkzeug mit Exit 3 ab und nennt keine Ursache.
 
-Widerlegt: ja, beide Messungen zählen im Zeitraum dieselben 46 Anfragen und dieselben 0 Timeouts, Abweichung 0 bei Anfragen und Timeouts.
+Ergebnis der Widerlegung: ja, beide Messungen zählen im Zeitraum dieselben 46 Anfragen und dieselben 0 Timeouts, Abweichung 0 bei Anfragen und Timeouts.
 
 Die Quote nach außen dieses Abschnitts (noch keine, weil 0 Timeouts in 46 Anfragen in gut zweieinhalb Stunden keine Besserung tragen)
 ist abgelöst: Sie steht seit abrechnung 05 im Abschnitt `## Nach sieben Tagen`, gemessen über sieben Tage mit der Messung `service`.
@@ -129,9 +129,9 @@ check service openai/gpt-5.2: compare 225 0, rows 225 0
 
 Je Ursache die Zahl der Anfragen und Zeilen, die sie trifft:
 
-- coalesced: 0, keine Wiederholung, die der Coalescer mit der Antwort einer anderen Anfrage bediente.
-- clock: 0, keine Anfrage, die auf einer Uhr Timeout ist und auf der anderen nicht.
-- unmatched: 4, je zwei Anfragen ohne eigene Zeile (12.11.2026 15:00:57 und 14.11.2026 14:52:21 UTC) und zwei Zeilen ohne Anfrage, je
+- Ursache coalesced: 0, keine Wiederholung, die der Coalescer mit der Antwort einer anderen Anfrage bediente.
+- Ursache clock: 0, keine Anfrage, die auf einer Uhr Timeout ist und auf der anderen nicht.
+- Ursache unmatched: 4, je zwei Anfragen ohne eigene Zeile (12.11.2026 15:00:57 und 14.11.2026 14:52:21 UTC) und zwei Zeilen ohne Anfrage, je
   1 ms neben der Anfrage geschrieben. Die Generation beim Anbieter startete 3,5 s und 2,4 s nach dem Beginn der Anfrage im Log, also
   außerhalb der 2 s, mit denen eine Anfrage ihre Zeile findet. Mit Vorzeichen heben sie sich auf (Anfragen 0, Timeouts 0); darum
   stehen die beiden Anfragen als `unattributed` und ihre Zeilen bei ihrem Modell.
