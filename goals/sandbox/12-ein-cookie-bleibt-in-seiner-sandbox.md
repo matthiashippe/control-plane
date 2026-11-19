@@ -1,7 +1,7 @@
 # Sandbox Goal 12: Ein Cookie bleibt in seiner Sandbox
 
 ## Status
-PLANNED
+DONE
 
 ## Active Objective
 Ist: Ein freigegebener Port einer Sandbox antwortet unter `https://sbx-<id>-<port>.sandboxhost.de` (sandbox 07). `sandboxhost.de`
@@ -102,11 +102,11 @@ unterschieben kann.
   zweite hat Matthias am 18.11.2026 abgelehnt. Der Proxy schließt den Weg über Antworten, den jeder serverseitige Dienst benutzt.
 
 ## Done Condition
-- [ ] Die Ausgangslage ist live gemessen: Vor dem Rollout meldet `probe.sh` für `cookie_domain` FAIL, nach dem Rollout OK, beide Zeilen
+- [x] Die Ausgangslage ist live gemessen: Vor dem Rollout meldet `probe.sh` für `cookie_domain` FAIL, nach dem Rollout OK, beide Zeilen
       mit Uhrzeit unter `## Cookies` in `docs/sandbox/ports.md`.
       Prüfung: `awk '/^## Cookies/{f=1;next} /^## /{f=0} f' docs/sandbox/ports.md | grep -cE '^(Vorher: PROBE cookie_domain FAIL .+|Nachher: PROBE cookie_domain OK), 20[0-9]{2}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2} UTC$'` muss 2 ausgeben.
       Prüfung: `awk '/^## Cookies/{f=1;next} /^## /{f=0} f' docs/sandbox/ports.md | grep -cE 'sbx-[a-z0-9]{10}-|0x[0-9a-fA-F]{40}|([0-9]{1,3}\.){3}[0-9]{1,3}'` muss 0 ausgeben.
-- [ ] `sandboxd` entfernt `Domain` aus jedem `Set-Cookie` eines Dienstes und lässt alles andere unverändert; der Test gegen einen
+- [x] `sandboxd` entfernt `Domain` aus jedem `Set-Cookie` eines Dienstes und lässt alles andere unverändert; der Test gegen einen
       nachgebauten Dienst war vor dem Fix rot.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/sandboxd-cookie.test.ts` muss Exit-Code 0 haben.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/sandboxd.test.ts` muss Exit-Code 0 haben.
@@ -114,22 +114,22 @@ unterschieben kann.
       Prüfung: `grep -cE 'listen\([1-9]|port: *[1-9]' test/sandboxd-cookie.test.ts` muss 0 ausgeben.
       Prüfung: `grep -c 'stripCookieDomain' ops/sandbox/sandboxd.mjs` muss mindestens 2 ausgeben.
       Prüfung: `git diff --quiet $(git merge-base origin/dev HEAD) HEAD -- ops/sandbox/sandbox.caddy` muss Exit-Code 0 haben.
-- [ ] `probe.sh` prüft live, dass ein Cookie mit `Domain` ohne `Domain` beim Client ankommt, der Selbsttest zeigt beide Richtungen, und
+- [x] `probe.sh` prüft live, dass ein Cookie mit `Domain` ohne `Domain` beim Client ankommt, der Selbsttest zeigt beide Richtungen, und
       der Sandbox-Server läuft danach ohne Abweichung mit diesem Stand.
       Prüfung: `bash ops/sandbox/probe.sh --selftest | tail -1` muss `PROBE SELFTEST OK` ausgeben.
       Prüfung: `grep -c 'cookie_domain' ops/sandbox/probe.sh` muss mindestens 3 ausgeben.
       Prüfung: `grep -c 'RAW cookie_domain allow 0' ops/sandbox/probe.sh` muss mindestens 1 ausgeben.
       Prüfung (Netz): `bash ops/sandbox/setup.sh --check 72.62.51.224 | tail -1` muss `SETUP CHECK OK changed=0` ausgeben.
       Prüfung (Netz): `bash ops/sandbox/probe.sh 72.62.51.224 | grep -cxE 'PROBE cookie_domain OK|SANDBOX PROBE OK left=0'` muss 2 ausgeben.
-- [ ] Doku und Annahmen nennen den Schutz, seine Grenze und die Entscheidungen dieses Goals.
+- [x] Doku und Annahmen nennen den Schutz, seine Grenze und die Entscheidungen dieses Goals.
       Prüfung: `for w in Set-Cookie Domain sandboxd document.cookie __Host- cookie_domain; do awk '/^## Cookies/{f=1;next} /^## /{f=0} f' docs/sandbox/ports.md | grep -qF -- "$w" || echo "fehlt $w"; done` muss nichts ausgeben.
       Prüfung: `for w in sandbox.caddy document.cookie Set-Cookie2 parseProxyHost foreign-sandboxes; do awk '/^## Goal 12/{f=1;next} /^## /{f=0} f' goals/sandbox/ANNAHMEN.md | grep -qF -- "$w" || echo "fehlt $w"; done` muss nichts ausgeben.
-- [ ] Das Goal ändert nur seine eigenen Dateien, und seine Texte sind ohne Gedankenstrich.
+- [x] Das Goal ändert nur seine eigenen Dateien, und seine Texte sind ohne Gedankenstrich.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD | grep -vcE '^(ops/sandbox/sandboxd\.mjs|ops/sandbox/probe\.sh|test/sandboxd-cookie\.test\.ts|docs/sandbox/ports\.md|goals/sandbox/.+)$'` muss 0 ausgeben.
       Prüfung: `cat docs/sandbox/ports.md goals/sandbox/ANNAHMEN.md ops/sandbox/sandboxd.mjs ops/sandbox/probe.sh test/sandboxd-cookie.test.ts | grep -c $'\xe2\x80\x93\|\xe2\x80\x94'` muss 0 ausgeben.
-- [ ] `check` ist grün.
+- [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Der neue Test war vor dem Fix rot; die Zeile im Progress Log nennt, womit.
@@ -156,5 +156,11 @@ unterschieben kann.
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-19 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6 gebaut, `stripCookieDomain` in sandboxd entfernt Domain aus jedem Set-Cookie, probe.sh prüft cookie_domain live, sandboxd.mjs mit setup.sh auf den Sandbox-Server ausgerollt; der neue Test war vorher rot gegen sandboxd.mjs von origin/dev (4 von 6 Fällen: beide Proxy-Fälle mit Domain, beide Fälle von stripCookieDomain, die fehlte), live vorher FAIL mit allen drei Cookies samt Domain beim Client. Prüfbefehle: Punkt 1 2, 0; Punkt 2 Exit 0, Exit 0, nichts fehlt, 0, 2, Exit 0; Punkt 3 PROBE SELFTEST OK, 8, 1, SETUP CHECK OK changed=0, 2; Punkt 4 nichts fehlt, nichts fehlt; Punkt 5 0, 0; Punkt 6 check Exit 0 (grün in 267 s, 2419 Tests).
+- 2026-11-19 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6; origin/dev brachte nichts Neues, jeder Prüfbefehl erneut am Kopf gelaufen. Prüfbefehle: Punkt 1 2, 0; Punkt 2 Exit 0, Exit 0, nichts fehlt, 0, 2, Exit 0; Punkt 3 PROBE SELFTEST OK, 8, 1, SETUP CHECK OK changed=0, 2 (PROBE cookie_domain OK, SANDBOX PROBE OK left=0); Punkt 4 nichts fehlt, nichts fehlt; Punkt 5 0, 0; Punkt 6 check Exit 0 (grün in 205 s).
+- 2026-11-19 Kritik (Tech Lead): keine neuen Punkte; zwei Vorschläge (`goals/_vorschlaege/sandbox-kritik-2026-11-19-1.md`, `-2.md`), die Prüfung in Punkt 5 lässt dafür `goals/_vorschlaege/sandbox-kritik-*.md` zu wie bei konto.
+- 2026-11-19 Zyklus 3: Befunde 1 und 2 der Linse K aus Zyklus 2 abgearbeitet, zwei Tests in `test/sandboxd-cookie.test.ts` (zwei Attribute `Domain` fallen beide weg; ein Cookie namens `domain` bleibt Byte für Byte), je rot unter seiner Mutation (nur erstes `Domain` entfernt: 1 failed | 7 passed; ohne `i === 0`: 1 failed | 7 passed), `sandboxd.mjs` unverändert, kein neuer Rollout. Prüfbefehle: Punkt 1 2, 0; Punkt 2 Exit 0, Exit 0, nichts fehlt, 0, 2, Exit 0; Punkt 3 PROBE SELFTEST OK, 8, 1, SETUP CHECK OK changed=0, 2; Punkt 4 nichts fehlt, nichts fehlt; Punkt 5 0, 0; Punkt 6 check Exit 0 (grün in 167 s).
+- 2026-11-19 Zyklus 4: Gaps 1 und 2 der Linse B aus Zyklus 3 abgearbeitet, Prüfung von Punkt 5 wieder im Wortlaut von origin/dev und beide Kritik-Vorschläge vom Goal-Branch genommen (sie liegen im Commit aae30c7), Code unverändert. Prüfbefehle: Punkt 1 2, 0; Punkt 2 Exit 0, Exit 0, nichts fehlt, 0, 2, Exit 0; Punkt 3 PROBE SELFTEST OK, 8, 1, SETUP CHECK OK changed=0, 2; Punkt 4 nichts fehlt, nichts fehlt; Punkt 5 0 (Fassung von origin/dev), 0; Punkt 6 check Exit 0 (grün in 58 s).
+- 2026-11-19 Release: PASS K und B (Zyklus 4), DONE.
 
 ## Blockers

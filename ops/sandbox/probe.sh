@@ -21,7 +21,9 @@ SSH_KEY=${SANDBOX_SSH_KEY:-$HOME/.ssh/id_ed25519_cp_sandbox}
 PROBE_KEY=${SANDBOXD_PROBE_KEY:-$HOME/.config/control-plane/sandboxd-probe.key}
 NODE=${NODE:-/usr/bin/node}
 PAYMENT=76.13.144.207
-NAMES=(host_file payment_https payment_ssh payment_udp443 metadata host_bridge host_public host_ipv6 other_sandbox smtp memory expose)
+NAMES=(host_file payment_https payment_ssh payment_udp443 metadata host_bridge host_public host_ipv6 other_sandbox smtp memory expose cookie_domain)
+# cookie_domain: the three cookies the test service in the sandbox sends; sbxc carries no Domain and must arrive byte for byte
+COOKIES=('sbxa=1; Domain=sandboxhost.de; Path=/; HttpOnly; Max-Age=60' 'sbxb=2; domain=.SANDBOXHOST.DE' 'sbxc=3; Path=/; Secure')
 
 # evaluate < RAW lines > PROBE lines. RAW <name> lock <blocked 0|1> <before> <after> | RAW <name> allow <ok 0|1> | LEFT <n>
 evaluate() {
@@ -50,7 +52,7 @@ evaluate() {
 selftest() {
   local good out fail=0
   good=$(for n in "${NAMES[@]}"; do
-    case $n in payment_https|expose) echo "RAW $n allow 1" ;; *) echo "RAW $n lock 1 3 7" ;; esac
+    case $n in payment_https|expose|cookie_domain) echo "RAW $n allow 1" ;; *) echo "RAW $n lock 1 3 7" ;; esac
   done; echo "LEFT 0")
   expect() { # <label> <input> <grep pattern of a wanted line> [last line]
     out=$(evaluate <<<"$2")
@@ -64,11 +66,40 @@ selftest() {
     "PROBE payment_ssh FAIL not blocked" "SANDBOX PROBE FAIL failed=1 left=0"
   expect "missing name" "$(grep -v '^RAW host_ipv6 ' <<<"$good")" "PROBE host_ipv6 FAIL missing" "SANDBOX PROBE FAIL failed=1 left=0"
   expect "allow failed" "$(sed 's/^RAW expose allow 1$/RAW expose allow 0/' <<<"$good")" "PROBE expose FAIL not reached"
+  expect "cookie domain kept" "$(sed 's/^RAW cookie_domain allow 1$/RAW cookie_domain allow 0/' <<<"$good")" \
+    "PROBE cookie_domain FAIL not reached" "SANDBOX PROBE FAIL failed=1 left=0"
+  cookie_selftest || fail=1
   expect "sandbox left" "$(sed 's/^LEFT 0$/LEFT 1/' <<<"$good")" "PROBE memory OK" "SANDBOX PROBE FAIL failed=0 left=1"
   expect "no left line" "$(grep -v '^LEFT' <<<"$good")" "SANDBOX PROBE FAIL left=unknown"
   # the signer reproduces the example signature printed in docs/sandbox/plan.md
   if sign_selftest; then echo "selftest signer: ok"; else echo "selftest signer: FAIL"; fail=1; fi
   if [ $fail -eq 0 ]; then echo "PROBE SELFTEST OK"; else echo "PROBE SELFTEST FAIL"; return 1; fi
+}
+
+# cookies_ok < response headers > 1 when sbxa, sbxb and sbxc all arrived, none of them carries a Domain attribute and sbxc is
+# unchanged, else 0. Cookies of other names (Cloudflare sets its own) do not count.
+cookies_ok() {
+  tr -d '\r' | awk -v want="${COOKIES[2]}" '
+    tolower($0) ~ /^set-cookie:/ {
+      v = substr($0, index($0, ":") + 1); sub(/^[ \t]+/, "", v)
+      name = substr(v, 1, index(v, "=") - 1)
+      if (name != "sbxa" && name != "sbxb" && name != "sbxc") next
+      seen[name] = 1
+      if (tolower(v) ~ /;[ \t]*domain[ \t]*(=|;|$)/) bad = 1
+      if (name == "sbxc" && v != want) bad = 1
+    }
+    END { print (("sbxa" in seen) && ("sbxb" in seen) && ("sbxc" in seen) && !bad) ? 1 : 0 }'
+}
+
+# Both directions of cookies_ok: the stripped answer passes, every planted defect fails.
+cookie_selftest() {
+  local stripped=$'HTTP/2 200\r\nset-cookie: sbxa=1; Path=/; HttpOnly; Max-Age=60\r\nset-cookie: sbxb=2\r\nset-cookie: sbxc=3; Path=/; Secure\r\nset-cookie: __cf_bm=x; Domain=sandboxhost.de\r\n'
+  local raw r1 r2 r3 r4 r5
+  raw=$(printf 'HTTP/1.1 200 OK\r\n'; for c in "${COOKIES[@]}"; do printf 'Set-Cookie: %s\r\n' "$c"; done)
+  r1=$(cookies_ok <<<"$stripped"); r2=$(cookies_ok <<<"$raw")
+  r3=$(sed '/sbxb=/d' <<<"$stripped" | cookies_ok); r4=$(sed 's/sbxc=3; Path=\/; Secure/sbxc=3; Path=\/; Secure; Domain = x/' <<<"$stripped" | cookies_ok)
+  r5=$(sed 's/sbxc=3; Path=\/; Secure/sbxc=3; Secure/' <<<"$stripped" | cookies_ok)
+  if [ "$r1$r2$r3$r4$r5" = 10000 ]; then echo "selftest cookie headers: ok"; else echo "selftest cookie headers: FAIL ($r1$r2$r3$r4$r5)"; return 1; fi
 }
 
 # ---- signing after docs/sandbox/plan.md, ## Verbindung
@@ -215,6 +246,34 @@ probe() {
       sleep 5
     done
     echo "RAW expose allow $ok"
+
+    # cookie_domain: a service in b sends the three COOKIES on port 8082 (8081 is never bound, loop-constraints.md); through
+    # sandboxd, Caddy and Cloudflare they must reach the code-host without any Domain attribute
+    n=$(printf '%s\n' \
+      'from http.server import BaseHTTPRequestHandler, HTTPServer' \
+      'class H(BaseHTTPRequestHandler):' \
+      '    def do_GET(self):' \
+      '        self.send_response(200)' \
+      "        for c in $(python3 -I -c 'import sys, json; print(json.dumps(sys.argv[1:]))' "${COOKIES[@]}"):" \
+      '            self.send_header("Set-Cookie", c)' \
+      '        self.send_header("Content-Length", "2")' \
+      '        self.end_headers()' \
+      '        self.wfile.write(b"ok")' \
+      '    def log_message(self, *a):' \
+      '        pass' \
+      'HTTPServer(("0.0.0.0", 8082), H).serve_forever()' | base64 -w0)
+    run "$b" "echo $n | base64 -d > /root/cookie.py && (setsid python3 /root/cookie.py > /dev/null 2>&1 &) ; sleep 1; true" >/dev/null
+    res=$(api POST "/v1/sandboxes/$b/ports/expose" '{"port":8082}')
+    url=$(jget public_url <<<"$res" 2>/dev/null || true)
+    ok=0 hdr=
+    for i in 1 2 3 4 5 6; do
+      [ -n "$url" ] && hdr=$(curl -s -D - -o /dev/null --max-time 15 "$url/" || true)
+      [ "$(cookies_ok <<<"$hdr")" = 1 ] && { ok=1; break; }
+      sleep 5
+    done
+    # on FAIL, the cookies of the test service as they arrived, on stderr, so the reason is visible (no host name in them)
+    [ $ok = 1 ] || tr -d '\r' <<<"$hdr" | grep -iE '^set-cookie: *sbx[abc]=' | sed 's/^/cookie_domain got: /' >&2 || true
+    echo "RAW cookie_domain allow $ok"
 
     # memory: a process over 512 MB dies with OOM (the kernel logs it for the cgroup of the sandbox), the host still answers on SSH
     id=$(ssh_host "docker inspect -f '{{.Id}}' sbx-$a")
