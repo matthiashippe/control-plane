@@ -265,11 +265,14 @@ probe() {
     run "$b" "echo $n | base64 -d > /root/cookie.py && (setsid python3 /root/cookie.py > /dev/null 2>&1 &) ; sleep 1; true" >/dev/null
     res=$(api POST "/v1/sandboxes/$b/ports/expose" '{"port":8082}')
     url=$(jget public_url <<<"$res" 2>/dev/null || true)
-    ok=0
+    ok=0 hdr=
     for i in 1 2 3 4 5 6; do
-      [ -n "$url" ] && [ "$(curl -s -D - -o /dev/null --max-time 15 "$url/" | cookies_ok)" = 1 ] && { ok=1; break; }
+      [ -n "$url" ] && hdr=$(curl -s -D - -o /dev/null --max-time 15 "$url/" || true)
+      [ "$(cookies_ok <<<"$hdr")" = 1 ] && { ok=1; break; }
       sleep 5
     done
+    # on FAIL, the cookies of the test service as they arrived, on stderr, so the reason is visible (no host name in them)
+    [ $ok = 1 ] || tr -d '\r' <<<"$hdr" | grep -iE '^set-cookie: *sbx[abc]=' | sed 's/^/cookie_domain got: /' >&2 || true
     echo "RAW cookie_domain allow $ok"
 
     # memory: a process over 512 MB dies with OOM (the kernel logs it for the cgroup of the sandbox), the host still answers on SSH
