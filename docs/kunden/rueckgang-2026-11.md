@@ -22,11 +22,11 @@ set -a; . ~/.config/control-plane/loop.env; set +a
 bash ops/customer-decline.sh --since 2026-11-05T00:00:00Z
 ```
 
-Exit 0, 104 Zeilen, keine Adresse; Beträge je Kunde durch `*.**` ersetzt:
+Exit 0, 104 Zeilen, keine Adresse; Beträge je Kunde durch `*.**`, Zeiten der letzten Aufladung durch `****-**-**T**:**:**Z` ersetzt:
 
 ```
 DECLINE since 2026-11-05T00:00:00Z until 2026-11-19T16:01:23Z: 5 foreign customers with inference
-CUSTOMER 1: first 2026-11-10T05:12:06Z, last 2026-11-13T05:05:18Z, balance *.** USD, last topup 2026-11-10T20:55:00Z, ips 1
+CUSTOMER 1: first 2026-11-10T05:12:06Z, last 2026-11-13T05:05:18Z, balance *.** USD, last topup ****-**-**T**:**:**Z, ips 1
 DAY 1 2026-11-05: 0 calls, *.** USD, models -, http 2xx 0 402 0 4xx 0 5xx 0
 DAY 1 2026-11-06: 0 calls, *.** USD, models -, http 2xx 0 402 0 4xx 0 5xx 0
 DAY 1 2026-11-07: 0 calls, *.** USD, models -, http 2xx 0 402 0 4xx 0 5xx 0
@@ -58,7 +58,7 @@ DAY 2 2026-11-16: 0 calls, *.** USD, models -, http 2xx 0 402 0 4xx 0 5xx 0
 DAY 2 2026-11-17: 0 calls, *.** USD, models -, http 2xx 0 402 0 4xx 0 5xx 0
 DAY 2 2026-11-18: 0 calls, *.** USD, models -, http 2xx 0 402 0 4xx 0 5xx 0
 DAY 2 2026-11-19: 0 calls, *.** USD, models -, http 2xx 0 402 0 4xx 0 5xx 0
-CUSTOMER 3: first 2026-11-12T14:09:24Z, last 2026-11-12T17:25:40Z, balance *.** USD, last topup 2026-11-12T14:10:44Z, ips 1
+CUSTOMER 3: first 2026-11-12T14:09:24Z, last 2026-11-12T17:25:40Z, balance *.** USD, last topup ****-**-**T**:**:**Z, ips 1
 DAY 3 2026-11-05: 0 calls, *.** USD, models -, http 2xx 0 402 0 4xx 0 5xx 0
 DAY 3 2026-11-06: 0 calls, *.** USD, models -, http 2xx 0 402 0 4xx 0 5xx 0
 DAY 3 2026-11-07: 0 calls, *.** USD, models -, http 2xx 0 402 0 4xx 0 5xx 0
@@ -90,7 +90,7 @@ DAY 4 2026-11-16: 0 calls, *.** USD, models -, http 2xx 0 402 0 4xx 0 5xx 0
 DAY 4 2026-11-17: 0 calls, *.** USD, models -, http 2xx 0 402 0 4xx 0 5xx 0
 DAY 4 2026-11-18: 0 calls, *.** USD, models -, http 2xx 0 402 0 4xx 0 5xx 0
 DAY 4 2026-11-19: 0 calls, *.** USD, models -, http 2xx 0 402 0 4xx 0 5xx 0
-CUSTOMER 5: first 2026-11-14T14:44:22Z, last 2026-11-19T11:01:32Z, balance *.** USD, last topup 2026-11-14T20:53:10Z, ips 1
+CUSTOMER 5: first 2026-11-14T14:44:22Z, last 2026-11-19T11:01:32Z, balance *.** USD, last topup ****-**-**T**:**:**Z, ips 1
 DAY 5 2026-11-05: 0 calls, *.** USD, models -, http 2xx 0 402 0 4xx 0 5xx 0
 DAY 5 2026-11-06: 0 calls, *.** USD, models -, http 2xx 0 402 0 4xx 0 5xx 0
 DAY 5 2026-11-07: 0 calls, *.** USD, models -, http 2xx 0 402 0 4xx 0 5xx 0
@@ -133,9 +133,9 @@ WEEK: 4.11 USD foreign inference in the 7 days before 2026-11-19T16:01:23Z
 
 ## Ursache je Kunde
 
-- Kunde 1: 1113 Anfragen seit 05.11., Saldo leer, letzte Inferenz 2026-11-13, Ursache: Fehler bei uns, weil seine beantworteten Anfragen am 11.11. von 368 auf 66 fielen, während er vom 11.11. 02:01 bis 12.11. 08:22 UTC 1393 Mal 503 auf `/v1/chat/completions` bekam (Zeilen `DAY 1 2026-11-11` und `DAY 1 2026-11-12`, 5xx 1001 und 392; das leere Guthaben beim Inferenz-Anbieter aus `goals/_vorschlaege/fehler-2026-11-11-1.md`); aufgehört hat er danach mit leerem Saldo: ab 13.11. 05:05 UTC nur noch 402, 1065 bis 1625 am Tag, eine Aufladung über `/pay/` versuchte er zuletzt am 10.11.
+- Kunde 1: 1113 Anfragen seit 05.11., Saldo leer, letzte Inferenz 2026-11-13, Ursache: Fehler bei uns, weil seine beantworteten Anfragen am 11.11. von 368 auf 66 fielen, während er vom 11.11. 02:01 bis 12.11. 08:22 UTC 1393 Mal 503 auf `/v1/chat/completions` bekam (Zeilen `DAY 1 2026-11-11` und `DAY 1 2026-11-12`, 5xx 1001 und 392; das leere Guthaben beim Inferenz-Anbieter aus `goals/_vorschlaege/fehler-2026-11-11-1.md`); aufgehört hat er danach mit leerem Saldo: ab 13.11. 05:05 UTC nur noch 402, 1065 bis 1625 am Tag, eine Aufladung über `/pay/` versuchte er danach nicht mehr.
 - Kunde 2: 1 Anfragen seit 05.11., Saldo reicht, letzte Inferenz 2026-11-10, Ursache: beim Betreiber, weil der Saldo für weitere Anfragen reicht, seine eine Anfrage 200 bekam und danach keine Anfrage mehr kam (alle `DAY 2` ohne Fehler).
-- Kunde 3: 219 Anfragen seit 05.11., Saldo leer, letzte Inferenz 2026-11-12, Ursache: Saldo leer, weil er die Aufladung vom 12.11. 14:10 UTC in drei Stunden verbrauchte, danach 270 Mal 402 bekam und ab dem 13.11. nichts mehr anfragte (`DAY 3 2026-11-12`; die eine 404 fiel auf den Tag, an dem seine Anfragen stiegen).
+- Kunde 3: 219 Anfragen seit 05.11., Saldo leer, letzte Inferenz 2026-11-12, Ursache: Saldo leer, weil er seine letzte Aufladung in drei Stunden verbrauchte, danach 270 Mal 402 bekam und ab dem 13.11. nichts mehr anfragte (`DAY 3 2026-11-12`; die eine 404 fiel auf den Tag, an dem seine Anfragen stiegen).
 - Kunde 4: 32 Anfragen seit 05.11., Saldo leer, letzte Inferenz 2026-11-13, Ursache: Saldo leer, weil er nie auflud, das Startguthaben am 13.11. aufgebraucht war, er 15 Mal 402 bekam und danach nichts mehr anfragte (`DAY 4 2026-11-13`).
 - Kunde 5: 160 Anfragen seit 05.11., Saldo reicht, letzte Inferenz 2026-11-19, Ursache: beim Betreiber, weil sein Saldo reicht, jede seiner Anfragen 200 bekam (alle `DAY 5` ohne 4xx und 5xx) und er nur seltener fragt, 50 am 14.11., 11 am 19.11.; keiner der Abbrüche vom 16. bis 19.11. liegt in den 90 s vor einer seiner Logzeilen.
 
