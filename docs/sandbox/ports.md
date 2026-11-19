@@ -77,3 +77,23 @@ Am 2026-11-14 um 16:07 UTC legte ein Lauf vom Stand `dev` den Eintrag wieder an 
 `goals/sandbox/ANNAHMEN.md`, Audit 2026-11-14 Zeile 465). Nach dem Kauf löschte ihn dieses Goal am 2026-11-15 um 17:04 UTC erneut mit
 `python3 ops/sandbox/cloudflare.py dns-apply 72.62.51.224` (`deleted A *.postyourprice.com`, `CF DNS OK changed=0`). Fingerabdruck
 davor und danach `29c9eb2596f4`, also gleich `Zone vorher`.
+
+## Cookies
+
+Alle freigegebenen Ports teilen sich die Domain `sandboxhost.de`. Setzt der Dienst einer Sandbox ein Cookie mit dem Attribut
+`Domain=sandboxhost.de`, schickt der Browser es an jede andere Sandbox mit, und der Dienst eines Kunden könnte so die Sitzung im
+Dienst eines anderen Kunden überschreiben. Deshalb entfernt `sandboxd` (Proxy der freigegebenen Ports, Funktion
+`stripCookieDomain`) aus jedem `Set-Cookie` einer Antwort das Attribut `Domain`, in jeder Schreibweise. Ohne `Domain` gilt ein
+Cookie nur für genau den Hostnamen der eigenen Sandbox. Name, Wert, alle anderen Attribute, alle anderen Header, Status und Body
+bleiben unverändert.
+
+Grenze: Ein Cookie, das JavaScript im Browser mit `document.cookie` und `domain=sandboxhost.de` setzt, geht nie durch den Proxy und
+wird nicht abgefangen. Ein Dienst schützt seine eigenen Cookies dagegen mit dem Präfix `__Host-` (dann nimmt der Browser für diesen
+Namen kein Cookie mit `Domain` an).
+
+Live geprüft wird das mit `bash ops/sandbox/probe.sh <Adresse>`, Prüfung `cookie_domain`: Ein Dienst in einer Sandbox sendet drei
+Cookies, zwei davon mit `Domain`, und vom code-host über Cloudflare, Caddy und `sandboxd` müssen alle drei ohne `Domain` ankommen,
+das dritte Byte für Byte. Vor dem Rollout kamen alle drei mit `Domain` an.
+
+Vorher: PROBE cookie_domain FAIL not reached, 2026-11-19 10:32 UTC
+Nachher: PROBE cookie_domain OK, 2026-11-19 10:34 UTC

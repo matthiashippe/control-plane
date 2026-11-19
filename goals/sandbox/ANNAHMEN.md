@@ -543,3 +543,29 @@
   Vorher rot: ohne die Zeile mit `rm -rf` gibt er `builds=1 stale=kept state=ok` (16.11.2026, code-host), mit ihr
   `builds=1 stale=gone state=ok`; der Selbsttest hat damit 27 Fälle.
 - **Kein Rollout.** `ops/runtime-sandbox.sh` läuft nur auf dem code-host; `src/`, `deploy/` und der Sandbox-Server bleiben unverändert.
+
+## Goal 12 (19.11.2026, Engineer CP)
+
+- **Ort `sandboxd`, nicht `sandbox.caddy`.** `handleProxy` hat die Header der Antwort schon als Objekt, `set-cookie` ist bei Node
+  immer ein Array, und der Test läuft mit vitest gegen `createSandboxd` und einen nachgebauten Dienst ohne Caddy. Der Block
+  `*.sandboxhost.de` in `ops/sandbox/sandbox.caddy` bleibt Byte für Byte.
+- **`document.cookie` bleibt offen.** JavaScript im Browser setzt Cookies ohne den Proxy. Trennen ließe sich das nur mit einer
+  eigenen registrierbaren Domain je Sandbox (nicht machbar) oder einem Eintrag auf der Public Suffix List (Matthias 18.11.2026
+  abgelehnt). Die Doku nennt `__Host-` als Schutz, den ein Dienst selbst wählen kann.
+- **`Set-Cookie2` nicht behandelt.** Der Header ist mit RFC 6265 veraltet, und kein heutiger Browser liest ihn.
+- **Auch ein `Domain` auf den eigenen Hostnamen fällt weg.** Ohne `Domain` gilt das Cookie genau für diesen Hostnamen; mit `Domain`
+  auf den eigenen Namen gälte es zusätzlich für dessen Unterdomains, und die leitet `parseProxyHost` nie weiter. Es geht also nichts
+  verloren, und die Funktion braucht den Hostnamen nicht zu kennen.
+- **Zerlegung an `;`.** Das erste Stück (Name und Wert) bleibt immer, auch mit `domain=` im Wert. Von den übrigen fällt jedes, dessen
+  Name ohne Leerzeichen und ohne Rücksicht auf Groß- und Kleinschreibung `domain` ist; die übrigen werden mit `;` in ihrer
+  Schreibweise wieder zusammengesetzt (`a=1;  Domain = x ; Path=/` wird `a=1; Path=/`). Ohne Treffer kommt der Wert unverändert zurück.
+- **Port 8082 statt 8081 für den Testdienst.** `loop-constraints.md` verbietet das Binden von `8081` auf jedem Host; der Kontext des
+  Goals nannte 8081. Der Testdienst in der Sandbox hört darum auf 8082, sonst gilt der Kontext unverändert.
+- **Angekommene Cookies auf stderr.** Bei FAIL druckt `probe.sh` die drei Testcookies, wie sie ankamen, auf stderr
+  (`cookie_domain got: …`), weil `evaluate` für jede Art `allow` nur `FAIL not reached` kennt. So zeigte die Vorher-Messung um
+  10:32 UTC, dass alle drei mit `Domain` ankamen und nicht etwa ausblieben.
+- **Fremde Sandboxes vor dem Neustart.** `bash ops/sandbox/setup.sh --foreign-sandboxes` meldete am 19.11.2026 um 10:32 UTC
+  `running=0 foreign=0`; `--check` davor nannte als einzige Abweichung `/opt/sandboxd/sandboxd.mjs`. Nach `setup.sh` meldete `--check`
+  `SETUP CHECK OK changed=0`.
+- **Rollout vor dem Merge** wie sandbox 07 (Annahme Tech Lead in der Goal-Datei). Bis zum Merge meldet ein `--check` von `dev` die
+  Abweichung `sandboxd.mjs`. Endet das Goal ohne PASS, rollt der Maker den Stand von `origin/dev` mit `setup.sh` zurück.
