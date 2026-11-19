@@ -137,4 +137,14 @@ describe("stripCookieDomain", () => {
       expect(stripCookieDomain(v)).toBe(v);
     }
   });
+
+  it("drops every Domain when a cookie carries more than one", () => {
+    // The browser applies the last Domain attribute, so a filter that stops after the first one leaks the cookie.
+    expect(stripCookieDomain("a=1; Domain=x.de; Domain=sandboxhost.de; Path=/")).toBe("a=1; Path=/");
+  });
+
+  it("never touches the first piece, even for a cookie named domain", () => {
+    expect(stripCookieDomain("domain=1; Path=/")).toBe("domain=1; Path=/");
+    expect(stripCookieDomain("Domain=sandboxhost.de")).toBe("Domain=sandboxhost.de");
+  });
 });
