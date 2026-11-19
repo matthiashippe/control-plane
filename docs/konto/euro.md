@@ -269,6 +269,22 @@ Was Matthias und der Loop zum Einschalten in der Produktion tun, in dieser Reihe
    `CP_KONTO_RPC_URL` (frei, Vorgabe `https://mainnet.base.org`), `CP_KONTO_KEY_FILE` (Pfad zum Gasschlüssel),
    `CP_KONTO_AUTH_PROXY_ID` (wie in konto 03), `CP_BRIDGE_URL=https://api.bridge.xyz` und `CP_BRIDGE_KEY_FILE` (Pfad zur Datei mit dem
    Produktionsschlüssel von Bridge). Kein Wert steht im Repo oder im Deploy.
+   Prüfen vom code-host mit `ops/konto-ready.sh` (liest über SSH nur die Namen in der Datei und vergleicht auf dem Server, gibt nie
+   einen Wert aus). Am Ende müssen dort genau diese Zeilen stehen, Exit 0:
+   ```
+   CP_KONTO_CHAIN_ID set
+   CP_KONTO_MAINNET set
+   CP_KONTO_RPC_URL set
+   CP_KONTO_KEY_FILE set
+   CP_KONTO_AUTH_PROXY_ID set
+   CP_BRIDGE_URL set
+   CP_BRIDGE_KEY_FILE set
+   key_file readable
+   ```
+   `CP_KONTO_RPC_URL default` heißt Vorgabe `https://mainnet.base.org` und ist auch in Ordnung; `CP_BRIDGE_URL empty` und
+   `CP_BRIDGE_KEY_FILE empty` ändern den Exit nicht, weil Bridge erst nach konto 16 kommt. `missing` oder `wrong` an einer anderen
+   Zeile oder `key_file unreadable` geben Exit 1, `ssh failed` Exit 2. Das Skript liest die Datei, nicht den laufenden Container:
+   Neue Werte gelten im Dienst erst, wenn der Container neu startet (nächster Rollout über `deploy.yml`).
 5. Erste echte Einzahlung: Matthias tippt `deposit` mit 25 USD, zahlt auf dem Handy per Karte bei MoonPay, und `automaton_status`
    zeigt danach `balance_usd`; `get_onramp_transaction_status` mit `onRampTransactionId` belegt den Kauf.
 6. Erste echte Auszahlung: Matthias tippt `payout` mit 5 USD, geht einmal durch Identität, IBAN und Passkey, und der Verlauf unter
