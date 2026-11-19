@@ -15,7 +15,9 @@ import { join } from "node:path";
  * No network, no port, documentation addresses only.
  */
 const REPO = join(__dirname, "..");
-const SCRIPT = join(REPO, "ops/traffic.sh");
+// TRAFFIC_UNDER_TEST points the cases at another copy of the script (with ops/ beside it), so each case can be shown
+// red against a script that lacks what it tests.
+const SCRIPT = process.env.TRAFFIC_UNDER_TEST ?? join(REPO, "ops/traffic.sh");
 const FIXTURE = join(REPO, "ops/fixtures/traffic-three-hosts.log");
 // 2026-11-20T12:00:00Z
 const NOW = "1795176000";
@@ -127,6 +129,8 @@ describe("ops/traffic.sh arrivals per host", () => {
     const r = run(["168"]);
     expect(r.stderr).not.toMatch(/fewer than five pages/);
     expect(r.stderr).not.toMatch(/did not parse/);
+    // A sitemap read in full is not mentioned at all; an empty one would be.
+    expect(r.stderr).not.toMatch(/sitemap/);
     expect(r.stdout).toMatch(/^Requests to automatonhost\.com in the last 168 hours$/m);
     expect(block(r.stdout)).toEqual(EXPECTED);
     expect(r.status).toBe(0);
@@ -136,6 +140,8 @@ describe("ops/traffic.sh arrivals per host", () => {
     const r = run(["168"], { CP_URL: "https://postyourprice.com" });
     expect(r.stderr).not.toMatch(/fewer than five pages/);
     expect(r.stderr).not.toMatch(/did not parse/);
+    // A sitemap read in full is not mentioned at all; an empty one would be.
+    expect(r.stderr).not.toMatch(/sitemap/);
     expect(block(r.stdout)).toEqual(EXPECTED);
     expect(r.status).toBe(0);
   }, 90_000);
