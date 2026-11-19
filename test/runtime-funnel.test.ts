@@ -280,6 +280,45 @@ describe("runtime_funnel in the standard report", () => {
     expect(unpaid.largest_drop).toEqual({ stage: "paid", lost: 1 });
   });
 
+  it("names the earlier stage when two stages lose the same number (tie)", () => {
+    // c1 never gets a starter grant, c2 gets grant and inference but never pays: losses 1, 0, 1.
+    const tie = withDb((p) => report(p).funnel, (db) => {
+      key(db, C1, "conway-automaton", "2026-11-18T10:00:00.000Z");
+      key(db, C2, "conway-automaton", "2026-11-17T10:00:00.000Z");
+      ledger(db, C2, "grant", "2026-11-17T10:00:01.000Z");
+      ledger(db, C2, "inference", "2026-11-17T10:05:00.000Z");
+    });
+    expect(tie.total).toEqual({ keys: 2, starter_credit: 1, inference: 1, paid: 0 });
+    expect(tie.largest_drop).toEqual({ stage: "starter_credit", lost: 1 });
+    // Counter-proof: one more runtime that stops before paying breaks the tie, and the later stage wins.
+    const broken = withDb((p) => report(p).funnel, (db) => {
+      key(db, C1, "conway-automaton", "2026-11-18T10:00:00.000Z");
+      key(db, C2, "conway-automaton", "2026-11-17T10:00:00.000Z");
+      ledger(db, C2, "grant", "2026-11-17T10:00:01.000Z");
+      ledger(db, C2, "inference", "2026-11-17T10:05:00.000Z");
+      key(db, C3, "conway-automaton", "2026-11-16T10:00:00.000Z");
+      ledger(db, C3, "grant", "2026-11-16T10:00:01.000Z");
+      ledger(db, C3, "inference", "2026-11-16T10:05:00.000Z");
+    });
+    expect(broken.largest_drop).toEqual({ stage: "paid", lost: 2 });
+  });
+
+  it("counts only stage events before CP_UNTIL, for a runtime inside the window", () => {
+    const fill = (at: string) => (db: Db) => {
+      key(db, C1, "conway-automaton", "2026-11-18T10:00:00.000Z");
+      ledger(db, C1, "grant", at);
+      ledger(db, C1, "inference", at);
+      payment(db, C1, C1, "settled", at);
+    };
+    // Exactly at CP_UNTIL is already outside, `to` is exclusive.
+    const atUntil = withDb((p) => report(p).funnel, fill("2026-11-19T12:00:00.000Z"));
+    const after = withDb((p) => report(p).funnel, fill("2026-11-19T13:00:00.000Z"));
+    for (const f of [atUntil, after]) expect(f.total).toEqual({ keys: 1, starter_credit: 0, inference: 0, paid: 0 });
+    // Counter-proof: the same events one second before CP_UNTIL count on every stage.
+    const before = withDb((p) => report(p).funnel, fill("2026-11-19T11:59:59.000Z"));
+    expect(before.total).toEqual({ keys: 1, starter_credit: 1, inference: 1, paid: 1 });
+  });
+
   it("stops with an exit other than 0 for an unreadable CP_UNTIL", () => {
     withDb((p) => {
       const r = spawnSync("node", ["-"], {
