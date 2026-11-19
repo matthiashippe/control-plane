@@ -1,7 +1,7 @@
 # Konto Goal 15: Das Konto ist in der Produktion an
 
 ## Status
-PLANNED
+BLOCKED matthias
 
 ## Active Objective
 Ein Mensch ohne Wallet startet aus Claude Code einen Automaton bei uns und bezahlt ihn per Karte. Heute (beim Schreiben am
@@ -90,7 +90,7 @@ MVP: Funktion, weil erst dann ein Mensch ohne Wallet einen Automaton bei uns sta
   durch einen Agent, die Werte `CP_BRIDGE_*`, die erste Auszahlung und die Prüfung der Freigabe für SEPA (konto 16).
 
 ## Done Condition
-- [ ] `ops/konto-live.sh` meldet `accounts <n>` und `balance_usd <Summe>` für die Konten mit `chain_id` 8453, liest die Datenbank
+- [x] `ops/konto-live.sh` meldet `accounts <n>` und `balance_usd <Summe>` für die Konten mit `chain_id` 8453, liest die Datenbank
       nur lesend und gibt nie eine Adresse aus; vier Fälle in `test/konto-live.test.ts` belegen das offline.
       MVP: Funktion, weil sonst kein Befehl zeigt, ob ein echter Mensch ein Konto angelegt und Geld darauf hat.
       Prüfung: `bash -n ops/konto-live.sh && echo syntax ok` muss `syntax ok` ausgeben.
@@ -162,5 +162,11 @@ MVP: Funktion, weil erst dann ein Mensch ohne Wallet einen Automaton bei uns sta
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-19 Zyklus 1: Punkt 1 gebaut (`ops/konto-live.sh` liest `konto_accounts` mit 8453 nur lesend im Container, `balanceOf` über den Token aus `dist/konto/config.js`, nur zwei Zeilen hinaus; vier Fälle in `test/konto-live.test.ts`, alle vier gegen die Merge-Basis rot, dazu Gegenproben ohne `chain_id`-Filter, mit verschlucktem RPC- und SSH-Fehler und mit gedruckter Adresse ohne Filter je rot), live gelesen: `accounts 0`, `balance_usd 0.00`, Exit 0, `ops/konto-ready.sh` Exit 1 (vier Pflichtwerte `missing`, `key_file unreadable`); Punkte 2 bis 5 warten auf das Human Gate, Status `BLOCKED matthias`. Prüfbefehle: Punkt 1 `syntax ok`, vitest Exit 0, `4`, `2`, `0`, `3`, `1`, live `2`; Punkt 2 `exit=1`, `1`, `2`; Punkt 3 `0`; Punkt 4 `0` (live.md fehlt), `0`, `1`; Punkt 5 `1`, `0`, `0`, `0`; Punkt 6 siehe Kommentar.
 
 ## Blockers
+Art: matthias
+Gate: security_settings
+Aufgabe: Einmal das Konto im Hauptnetz einschalten und selbst ausprobieren: MoonPay für HTC über Turnkey anlegen, einen neuen Gasschlüssel auf dem Server erzeugen und mit 0,003 ETH auf Base füllen, vier Werte in `/opt/control-plane/.env` eintragen und neu ausrollen, dann aus Claude Code einen Automaton starten, mit Handy und Passkey das Konto anlegen, 25 USD per Karte einzahlen und die Transaktionsnummer von MoonPay als Kommentar an diese Aufgabe schreiben.
+Worum: Ohne diese Werte antwortet der Dienst jedem Start aus Claude Code mit 503 `konto_unavailable`, und heute zeigt `ops/konto-live.sh` `accounts 0`.
+Empfehlung: (a) Im Dashboard von Turnkey unter Fiat Onramp dem Link zu MoonPay folgen, HTC anlegen, die Firmenprüfung durchlaufen und dort `pk_live_…` und `sk_live_…` eintragen. (b) Im Terminal: `ssh root@76.13.144.207 'docker exec deploy-cp-1 node -e "const a=require(\"viem/accounts\");const k=a.generatePrivateKey();require(\"fs\").writeFileSync(\"/data/konto-gas.key\",k+\"\\n\",{mode:0o600,flag:\"wx\"});console.log(a.privateKeyToAccount(k).address)"'` erzeugt den Schlüssel in `/data/konto-gas.key` (Rechte 600, überschreibt nie einen vorhandenen) und zeigt nur seine Adresse; an diese Adresse 0,003 ETH auf Base schicken (`server_kauf`, reicht für rund hundert Transaktionen mit Puffer). (c) In `/opt/control-plane/.env` vier Zeilen anhängen: `CP_KONTO_CHAIN_ID=8453`, `CP_KONTO_MAINNET=1`, `CP_KONTO_KEY_FILE=/data/konto-gas.key` und `CP_KONTO_AUTH_PROXY_ID=` mit der ID der Auth-Proxy-Konfiguration aus dem Dashboard von Turnkey; `CP_BRIDGE_URL` und `CP_BRIDGE_KEY_FILE` nicht setzen. Dann `gh workflow run deploy.yml -R matthiashippe/control-plane --ref dev -f force=true`; danach meldet `ops/konto-ready.sh` auf dem code-host Exit 0. (d) In Claude Code mit dem Plugin um einen Automaton bitten, den QR-Code mit dem Handy scannen, Passkey anlegen, dann um eine Einzahlung von 25 USD bitten und auf dem Handy per Karte bei MoonPay zahlen. (e) Die `onRampTransactionId` aus der Bestätigung von MoonPay als Kommentar an diese Aufgabe. Bridge (Mail an Dritte, sendet nur Matthias, entfällt, wenn sie schon raus ist): an `sales@bridge.xyz`, Betreff „Platform account for Hanseatic Tech Company (EUR payouts via SEPA)“, Text „Hello Bridge team, Hanseatic Tech Company runs automatonhost.com, where people fund an account in USDC on Base with a passkey wallet. We would like to use Bridge as a platform so these customers can pay out to their own EUR bank account via SEPA. HTC does not hold customer funds: every payout leaves the customer's own wallet. We can provide our company registration extract, articles of association, shareholder list covering 100 percent of shares, all beneficial owners above 25 percent, identity verification of the managing director, tax number, business description and website. Could you set up a platform account for us and let us know the next steps? Best regards, Matthias Hippe, Hanseatic Tech Company“.
