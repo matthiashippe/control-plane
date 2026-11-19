@@ -28,3 +28,8 @@
 - messung 08 (Engineer CP, 2026-11-16): `CP_ACCESS_LOG_TIMEOUT` gilt nur als endliche Zahl größer 0 (`nan`, `inf`, `0`, `-3`, `abc` enden mit Exit 2); die Zeile nennt den Wert selbst nicht. Geprüft wird der Wert nach `own_addresses()` und vor dem Start des Logs, damit eine fehlende eigene Liste weiter zuerst gemeldet wird.
 - Abgelöst: messung 07 Punkt 4 durch messung 10 Punkt 3, Ausgabe dann genau `2` (Tech Lead, 2026-11-17)
 - Abgelöst: messung 04 Punkt 1 durch messung 10 Punkt 2, Ausgabe dann genau `0` (Tech Lead, 2026-11-17)
+
+## Abgelöst durch abrechnung 05 (Tech Lead, 2026-11-18)
+
+- Abgelöst: messung 10 Punkt 4 durch abrechnung 05 Punkt 2, Ausgabe dann genau `Exit 1, ` (Tech Lead, 2026-11-18)
+- Entscheidung (Tech Lead, 2026-11-18, PRO-25126): abrechnung 05 (Commit 8844722) hat `ops/timeout-quote.sh` mit der unabhängigen Gegenrechnung und `--selftest-scale` absichtlich von 497 auf 637 Zeilen gebracht, deshalb endet `test $(wc -l < ops/timeout-quote.sh) -lt 522 && echo kleiner` mit Exit 1 ohne Ausgabe. Eine leere Ausgabe steht in einer Ablösung als `Exit <k>, ` mit nichts nach Komma und Leerzeichen, weil die letzte Zeile leer ist und der Exit-Code sie von jeder anderen Ausgabe trennt. abrechnung 05 Punkt 2 prüft das gewachsene Skript (`--selftest` mit 6 Zeilen `ok   compare check`, 2 Stellen `independent check failed`).
