@@ -1,7 +1,7 @@
 # Kunden Goal 01: Warum der zahlende Automaton aufhört
 
 ## Status
-PLANNED
+ACTIVE
 
 ## Active Objective
 Die fremde Inferenz-Ausgabe fiel von 8,19 USD am 12.11.2026 auf 0,13 USD am 18.11.2026, und seit dem 14.11. gibt nur noch eine
@@ -103,12 +103,12 @@ MVP: Funktion, weil ein zahlender Kunde, den wir verlieren, mehr kostet als jede
   Server.
 
 ## Done Condition
-- [ ] `ops/db-report.cjs` gibt mit `CP_REPORT=decline` je fremder Adresse mit Inferenz ihre Zeilen im Fenster ohne Adresse aus, ohne
+- [x] `ops/db-report.cjs` gibt mit `CP_REPORT=decline` je fremder Adresse mit Inferenz ihre Zeilen im Fenster ohne Adresse aus, ohne
       `CP_REPORT` unverändert; in beide Richtungen bewiesen.
       Prüfung: `pnpm -s vitest run test/customer-decline.test.ts` muss Exit-Code 0 haben.
       Prüfung: `pnpm -s vitest run test/customer-decline.test.ts --reporter=json 2>/dev/null | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const j=JSON.parse(s);const t=j.testResults.flatMap(f=>f.assertionResults).filter(a=>a.status==="passed").map(a=>a.title);console.log([/never lists our own/,/keeps every row/,/no address/,/default report unchanged/,/402/,/ours/].every(r=>t.some(x=>r.test(x)))?"alle":"fehlt")})'` muss `alle` ausgeben.
       Prüfung: `pnpm -s vitest run test/db-report.test.ts test/db-report-no-duplicate-keys.test.ts` muss Exit-Code 0 haben.
-- [ ] `ops/customer-decline.sh` ordnet die Anfragen im Zugriffslog dem Kunden zu, zählt je Tag Anfragen, Ausgabe, Modelle und
+- [x] `ops/customer-decline.sh` ordnet die Anfragen im Zugriffslog dem Kunden zu, zählt je Tag Anfragen, Ausgabe, Modelle und
       HTTP-Status, nie eine eigene Adresse, und nennt keine Adresse; in beide Richtungen bewiesen.
       Prüfung: `bash ops/customer-decline.sh --selftest | tail -1` muss mit `SELFTEST OK` beginnen.
       Prüfung: `bash ops/customer-decline.sh --selftest | grep -cE "^ok .*ours"` muss mindestens 1 ausgeben.
@@ -120,7 +120,7 @@ MVP: Funktion, weil ein zahlender Kunde, den wir verlieren, mehr kostet als jede
       Prüfung: `grep -ohE '"(remote_ip|client_ip)": ?"[^"]*"' ops/fixtures/customer-decline.log | grep -cvE '"(192\.0\.2|198\.51\.100|203\.0\.113)\.[0-9]+"'` muss 0 ausgeben.
       Prüfung: `CP_OWN_IPS=ops/fixtures/customer-decline-own-ips.txt bash ops/customer-decline.sh --db-json ops/fixtures/customer-decline-db.json --log ops/fixtures/customer-decline.log --since 2026-11-12T00:00:00Z --until 2026-11-12T00:00:00Z >/dev/null 2>&1; echo $?` muss `1` ausgeben.
       Prüfung: `CP_OWN_IPS=ops/fixtures/customer-decline-own-ips.txt bash ops/customer-decline.sh --db-json ops/fixtures/customer-decline-db.json --log ops/fixtures/no-such.log --since 2026-11-12T00:00:00Z >/dev/null 2>&1; echo $?` muss `2` ausgeben.
-- [ ] Die Ursache des Rückgangs steht je Kunde gemessen in `docs/kunden/rueckgang-2026-11.md`, mit Befehl, Ausgabe und Ergebnis, ohne
+- [x] Die Ursache des Rückgangs steht je Kunde gemessen in `docs/kunden/rueckgang-2026-11.md`, mit Befehl, Ausgabe und Ergebnis, ohne
       Adresse; liegt sie bei uns, gibt es den Vorschlag mit Schwere 5.
       Prüfung: `awk '/^Gemessen: /{print ($2 >= "2026-11-19T00:00:00Z") ? "spaet genug" : "zu frueh"}' docs/kunden/rueckgang-2026-11.md` muss genau `spaet genug` ausgeben.
       Prüfung: `grep -c "bash ops/customer-decline.sh --since 2026-11-05T00:00:00Z" docs/kunden/rueckgang-2026-11.md` muss mindestens 1 ausgeben.
@@ -134,7 +134,7 @@ MVP: Funktion, weil ein zahlender Kunde, den wir verlieren, mehr kostet als jede
       Prüfung: `grep -cE "^- [0-9-]+, kunden 01: " goals/kunden/ANNAHMEN.md` muss mindestens 1 ausgeben.
       Prüfung (Netz): `bash ops/customer-decline.sh --since 2026-11-05T00:00:00Z | grep -cE "^CUSTOMER [0-9]+: first "` muss mindestens 1 ausgeben.
       Prüfung (Netz): `bash ops/customer-decline.sh --since 2026-11-05T00:00:00Z | grep -cE "([0-9]{1,3}\.){3}[0-9]{1,3}|0x[0-9a-fA-F]{40}"` muss 0 ausgeben.
-- [ ] `check` ist grün.
+- [x] `check` ist grün.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
 - [ ] goal-verifier PASS (K und B)
 
@@ -160,5 +160,6 @@ MVP: Funktion, weil ein zahlender Kunde, den wir verlieren, mehr kostet als jede
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-19 Zyklus 1: Punkte 1, 2, 3, 4 gebaut: `CP_REPORT=decline` in `ops/db-report.cjs`, `ops/customer-decline.sh` mit Selftest und Fixtures aus RFC 5737, Messung gegen die Produktion (5 fremde Kunden, Kunde 1 bekam 30 Stunden 503, Vorschlag `goals/_vorschlaege/fehler-2026-11-19-1.md` mit Schwere 5). Neue Tests rot vor dem Werkzeug: `test/customer-decline.test.ts` mit den Fixtures in einem Worktree von `origin/dev` ohne Zweig und Skript, 9 von 9 failed, Selftest dort `No such file`. Prüfbefehle: Punkt 1 vitest Exit 0, `alle`, db-report-Tests 32 passed Exit 0; Punkt 2 `SELFTEST OK`, ours 4, 402 3, unmatched 3, Planspiel 9, Gegenprobe 2, Adressen 0, Fixture-Adressen 0, Exit 1, Exit 2; Punkt 3 `spaet genug`, 1, 35, `gleich`, 1, 1, 1, `stimmig`, 0, 5, Netz 5 und 0; Punkt 4 `node scripts/check.mjs` Exit 0 (2441 Tests).
 
 ## Blockers
