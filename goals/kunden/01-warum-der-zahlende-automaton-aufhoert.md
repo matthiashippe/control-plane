@@ -89,10 +89,11 @@ MVP: Funktion, weil ein zahlender Kunde, den wir verlieren, mehr kostet als jede
   der Ausgabe.
 - `docs/kunden/rueckgang-2026-11.md`, Deutsch, je eine Zeile:
   `Gemessen: <ISO UTC der Messung>`;
-  `Rückgang: <a> USD am 12.11., <b> USD am 18.11.` für den Kunden mit der größten Ausgabe am 12.11.;
+  `Rückgang über alle fremden Kunden: <a> USD am 12.11., <b> USD am 18.11.` (Summe, nie Umsatz je Kunde, Grundregel 8);
   `Leitzahl: <usd> USD fremde Inferenz-Ausgabe in den 7 Tagen bis <JJJJ-MM-TT>` aus der Zeile `WEEK`;
   je Zeile `CUSTOMER` der Ausgabe genau eine Zeile
-  `- Kunde <n>: <a> Anfragen, <b> USD seit 05.11., Saldo <c> USD, letzte Inferenz <JJJJ-MM-TT>, Ursache: <Wort>, weil <Beleg>`;
+  `- Kunde <n>: <a> Anfragen seit 05.11., Saldo leer|reicht, letzte Inferenz <JJJJ-MM-TT>, Ursache: <Wort>, weil <Beleg>`; Umsatz und
+  Saldo je Kunde stehen in den Zeilen `CUSTOMER` und `DAY` des Dokuments als `*.**`, im Repo nie als Betrag (Grundregel 8);
   genau eine Zeile `Ergebnis: Fehler bei uns, Vorschlag goals/_vorschlaege/fehler-<JJJJ-MM-TT>-<n>.md`, wenn ein Kunde `Fehler bei uns`
   hat, sonst `Ergebnis: kein Fehler bei uns, weil …`. Keine Adresse, keine Wallet, kein Name (Grundregel 8).
 - Bei `Fehler bei uns`: der Vorschlag im Format aus dem Skill (`Schwere: 5`, `Goal: kunden 01`, `Befund:`, `Beleg:` mit Befehl und
@@ -125,8 +126,9 @@ MVP: Funktion, weil ein zahlender Kunde, den wir verlieren, mehr kostet als jede
       Prüfung: `awk '/^Gemessen: /{print ($2 >= "2026-11-19T00:00:00Z") ? "spaet genug" : "zu frueh"}' docs/kunden/rueckgang-2026-11.md` muss genau `spaet genug` ausgeben.
       Prüfung: `grep -c "bash ops/customer-decline.sh --since 2026-11-05T00:00:00Z" docs/kunden/rueckgang-2026-11.md` muss mindestens 1 ausgeben.
       Prüfung: `grep -cE "^DAY [0-9]+ 2026-11-1[2-8]: [0-9]+ calls, " docs/kunden/rueckgang-2026-11.md` muss mindestens 7 ausgeben.
-      Prüfung: `c=$(grep -cE "^CUSTOMER [0-9]+: first " docs/kunden/rueckgang-2026-11.md); k=$(grep -cE "^- Kunde [0-9]+: [0-9]+ Anfragen, [0-9]+[.,][0-9]{2} USD seit 05\.11\., Saldo [0-9]+[.,][0-9]{2} USD, letzte Inferenz 2026-[0-9]{2}-[0-9]{2}, Ursache: (Saldo leer|Fehler bei uns|beim Betreiber|offen), weil " docs/kunden/rueckgang-2026-11.md); [ "$c" -ge 1 ] && [ "$c" = "$k" ] && echo gleich || echo ungleich` muss `gleich` ausgeben.
-      Prüfung: `grep -cE "^Rückgang: [0-9]+[.,][0-9]{2} USD am 12\.11\., [0-9]+[.,][0-9]{2} USD am 18\.11\.$" docs/kunden/rueckgang-2026-11.md` muss 1 ausgeben.
+      Prüfung: `c=$(grep -cE "^CUSTOMER [0-9]+: first " docs/kunden/rueckgang-2026-11.md); k=$(grep -cE "^- Kunde [0-9]+: [0-9]+ Anfragen seit 05\.11\., Saldo (leer|reicht), letzte Inferenz 2026-[0-9]{2}-[0-9]{2}, Ursache: (Saldo leer|Fehler bei uns|beim Betreiber|offen), weil " docs/kunden/rueckgang-2026-11.md); [ "$c" -ge 1 ] && [ "$c" = "$k" ] && echo gleich || echo ungleich` muss `gleich` ausgeben.
+      Prüfung: `grep -cE "^Rückgang über alle fremden Kunden: [0-9]+[.,][0-9]{2} USD am 12\.11\., [0-9]+[.,][0-9]{2} USD am 18\.11\." docs/kunden/rueckgang-2026-11.md` muss 1 ausgeben.
+      Prüfung: `cat docs/kunden/rueckgang-2026-11.md goals/_vorschlaege/fehler-2026-11-19-1.md goals/_vorschlaege/kunden-kritik-2026-11-19-1.md | grep -cE "^(DAY|CUSTOMER) .*[0-9]\.[0-9]{2} USD|^- Kunde .*[0-9][.,][0-9]{2} USD|Kunde [0-9]+[^.]*[0-9][.,][0-9]{2} USD"` muss 0 ausgeben.
       Prüfung: `grep -cE "^Leitzahl: [0-9]+[.,][0-9]{2} USD fremde Inferenz-Ausgabe in den 7 Tagen bis 2026-[0-9]{2}-[0-9]{2}$" docs/kunden/rueckgang-2026-11.md` muss 1 ausgeben.
       Prüfung: `grep -cE "^Ergebnis: " docs/kunden/rueckgang-2026-11.md` muss 1 ausgeben.
       Prüfung: `d=docs/kunden/rueckgang-2026-11.md; if grep -q "Ursache: Fehler bei uns" "$d"; then p=$(sed -nE 's/^Ergebnis: Fehler bei uns, Vorschlag (goals\/_vorschlaege\/fehler-[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]+\.md)$/\1/p' "$d"); [ -n "$p" ] && head -1 "$p" | grep -qx "Schwere: 5" && echo stimmig || echo unstimmig; else grep -qE "^Ergebnis: kein Fehler bei uns, weil " "$d" && echo stimmig || echo unstimmig; fi` muss `stimmig` ausgeben.
