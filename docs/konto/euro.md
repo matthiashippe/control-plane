@@ -173,6 +173,12 @@ liest der Server mit `getNonce(account, 0)` beim EntryPoint. Derselbe Passkey-Ti
 `POST /h/{code}/payout` zusätzlich `revoke: { nonce, signature }`; der Server baut die User Operation nach und nimmt sie nur, wenn
 `recoverAddress` über ihren Hash den Eigentümer des Kontos ergibt. Fehlt der Widerruf oder passt er nicht, antwortet die Route 400
 `permission_refused`, und der Handoff ist verbrannt. `finishPayout` speichert ihn als `retire_revoke` neben `retire_*`.
+Seit goals/konto/13 trägt der Knopf zusätzlich `data-revoke-permission` mit der abzulösenden Erlaubnis, wie die Zeile sie speichert;
+der Client baut User Operation und Hash daraus und aus der Nonce selbst, unterschreibt nur eine Auszahl-Erlaubnis dieses Kontos
+(USDC, ohne Obergrenze, 30 Tage) und nichts, wenn `data-revoke-hash` vom selbst gebauten Hash abweicht. Die Route reicht die
+Erlaubnis, deren Widerruf sie geprüft hat, als `replaced` an `finishPayout`; nennt die Zeile nach der Prüfung der Unterschrift eine
+andere (ein Auszahl-Lauf hat `retire_*` beendet oder ein zweiter Handoff des Kontos ist fertig), speichert `finishPayout` nichts,
+und die Route beendet den Handoff mit 410 `handoff_closed`.
 
 Vor der nächsten Auszahlung fragt `sendPayout` den SpendPermissionManager mit `isApproved`:
 

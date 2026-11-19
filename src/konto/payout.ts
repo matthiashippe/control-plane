@@ -311,6 +311,12 @@ export function replacedPermission(row: Pick<PayoutRow, "retire_forwarder" | "re
   return null;
 }
 
+/** True when both name no permission, or the same forwarder (in any case) and the same permission as stored JSON text. */
+function sameReplaced(a: { forwarder: string; permission: string } | null, b: { forwarder: string; permission: string } | null): boolean {
+  if (!a || !b) return a === b;
+  return a.forwarder.toLowerCase() === b.forwarder.toLowerCase() && a.permission === b.permission;
+}
+
 /**
  * Ends a payout handoff `done` in one transaction: the bank account of its bank step and the new permission become the payout
  * setup of the account. The permission before it waits as `retire_*` until sendPayout has ended it, whatever permission_approved
@@ -319,10 +325,22 @@ export function replacedPermission(row: Pick<PayoutRow, "retire_forwarder" | "re
  * dropped: approveWithSignature goes out only after a retire went through, so that one never reached the chain. The revoke the
  * passkey signed for the replaced permission (goals/konto/11) is kept with it as `retire_revoke`; a waiting retire gets the new
  * revoke, because it was signed for exactly that permission. Returns false when the handoff was no longer matched.
+ *
+ * `replaced` is the permission whose revoke the route checked, read before it waited for the chain (goals/konto/13, decision 1),
+ * null for the first setup. When the row names another one by now (a payout run ended the waiting retire, or another setup of
+ * the account finished), the revoke belongs to no permission this setup would retire: it returns false and stores nothing.
  */
 export function finishPayout(
   db: Db,
-  input: { code: string; account: string; permission: SpendPermission; signature: Hex; revoke?: SignedRevoke | null; nowMs: number },
+  input: {
+    code: string;
+    account: string;
+    permission: SpendPermission;
+    signature: Hex;
+    revoke?: SignedRevoke | null;
+    replaced: { forwarder: string; permission: string } | null;
+    nowMs: number;
+  },
 ): boolean {
   return db.transaction((): boolean => {
     const h = db.prepare("SELECT state FROM handoffs WHERE code = ?").get(input.code) as { state: string } | undefined;
@@ -330,8 +348,10 @@ export function finishPayout(
     const bank = readPendingBank(db, input.code);
     if (!bank) return false;
     const account = input.account.toLowerCase();
+    const replaced = replacedPermission(readPayout(db, account));
+    if (!sameReplaced(replaced, input.replaced)) return false;
     ensurePayoutRow(db, account, input.nowMs);
-    const retire = replacedPermission(readPayout(db, account)) ?? { forwarder: null, permission: null };
+    const retire = replaced ?? { forwarder: null, permission: null };
     const revoke = retire.permission && input.revoke ? revokeJson(input.revoke) : null;
     db.prepare(
       `UPDATE konto_payouts SET external_account_id = ?, liquidation_address_id = ?, destination = ?, bank_last4 = ?, forwarder = ?,

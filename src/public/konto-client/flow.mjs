@@ -9,9 +9,9 @@
 // Every outside dependency is passed in (`create`, `fetch`, `subtle`, `random`, `now`), so test/konto-client.test.ts runs the
 // whole flow in Node against a stand-in for Turnkey. main.mjs wires it to the page; ops/konto/build-client.mjs bundles both into
 // konto.js next to this file.
-import { encodeAbiParameters, getContractAddress, hashTypedData, keccak256, pad, createClient, custom } from "viem";
+import { encodeAbiParameters, encodeFunctionData, getAddress, getContractAddress, hashTypedData, keccak256, pad, createClient, custom } from "viem";
 import { toAccount } from "viem/accounts";
-import { toCoinbaseSmartAccount } from "viem/account-abstraction";
+import { getUserOperationHash, toCoinbaseSmartAccount } from "viem/account-abstraction";
 
 /** CoinbaseSmartWalletFactory v1, the same address on Base and Base Sepolia (harness/chain/konto/README.md). */
 export const FACTORY = "0x0ba5ed0c6aa8c49038f819e587e2633c4a9f428a";
@@ -376,23 +376,114 @@ export async function runLimit(deps, page) {
 export const PAYOUT_ALLOWANCE = 2n ** 160n - 1n;
 export const PAYOUT_PERIOD_SECONDS = 2592000;
 
+// The revoke of an earlier payout permission (goals/konto/11 and 13). These values must equal ENTRY_POINT, REVOKE_*_GAS and the
+// ABIs in src/konto/payout.ts; test/konto-client-revoke.test.ts checks it through the hash.
+export const ENTRY_POINT = "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789";
+export const REVOKE_CALL_GAS = 100000n;
+export const REVOKE_VERIFICATION_GAS = 200000n;
+export const REVOKE_PRE_VERIFICATION_GAS = 50000n;
+const PERMISSION_COMPONENTS = PERMISSION_TYPES.SpendPermission;
+const REVOKE_ABI = [
+  { type: "function", name: "revoke", stateMutability: "nonpayable", inputs: [{ name: "spendPermission", type: "tuple", components: PERMISSION_COMPONENTS }], outputs: [] },
+];
+const WALLET_EXECUTE_ABI = [
+  {
+    type: "function",
+    name: "execute",
+    stateMutability: "payable",
+    inputs: [{ name: "target", type: "address" }, { name: "value", type: "uint256" }, { name: "data", type: "bytes" }],
+    outputs: [],
+  },
+];
+
+const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
+const UINT = /^[0-9]{1,78}$/;
+
+/**
+ * The payout permission of `page.account` the page asks to end, read from `data-revoke-permission` (the JSON text of the row).
+ * Only a payout permission of this account in USDC counts: any other text, account, token, allowance or period, the daily limit
+ * among them, throws, because the passkey must never sign the revoke of something the person did not set up for payouts.
+ */
+export function revokedPermission(text, page) {
+  let o;
+  try {
+    o = JSON.parse(text);
+  } catch {
+    throw new KontoError("unreachable", "the earlier permission on the page is not readable");
+  }
+  const uint = (v) => (typeof v === "number" && Number.isSafeInteger(v) && v >= 0 ? BigInt(v) : typeof v === "string" && UINT.test(v) ? BigInt(v) : null);
+  const fields = o && typeof o === "object" ? o : {};
+  const allowance = uint(fields.allowance);
+  const period = uint(fields.period);
+  const start = uint(fields.start);
+  const end = uint(fields.end);
+  const salt = uint(fields.salt);
+  if (
+    !ADDRESS.test(fields.account || "") || !ADDRESS.test(fields.spender || "") || !ADDRESS.test(fields.token || "") ||
+    allowance === null || period === null || start === null || end === null || salt === null ||
+    typeof fields.extraData !== "string" || !/^0x([0-9a-fA-F]{2})*$/.test(fields.extraData)
+  ) {
+    throw new KontoError("unreachable", "the earlier permission on the page is not readable");
+  }
+  if (
+    fields.account.toLowerCase() !== page.account.toLowerCase() ||
+    fields.token.toLowerCase() !== page.token.toLowerCase() ||
+    allowance !== PAYOUT_ALLOWANCE ||
+    period !== BigInt(PAYOUT_PERIOD_SECONDS)
+  ) {
+    throw new KontoError("unreachable", "the earlier permission on the page is not a payout permission of this account");
+  }
+  return { account: fields.account, spender: fields.spender, token: fields.token, allowance, period: Number(period), start: Number(start), end: Number(end), salt, extraData: fields.extraData };
+}
+
+/**
+ * The hash the owner signs for the revoke of `permission`: the user operation of the smart wallet to the EntryPoint v0.6 with one
+ * call execute(SpendPermissionManager, 0, revoke(permission)), no initCode, no paymaster, fee 0, as revokeUserOperation builds it
+ * on the server.
+ */
+export function revokeHash(permission, nonce, chainId) {
+  const revoke = encodeFunctionData({ abi: REVOKE_ABI, functionName: "revoke", args: [permission] });
+  const userOperation = {
+    sender: getAddress(permission.account),
+    nonce,
+    initCode: "0x",
+    callData: encodeFunctionData({ abi: WALLET_EXECUTE_ABI, functionName: "execute", args: [getAddress(SPEND_PERMISSION_MANAGER), 0n, revoke] }),
+    callGasLimit: REVOKE_CALL_GAS,
+    verificationGasLimit: REVOKE_VERIFICATION_GAS,
+    preVerificationGas: REVOKE_PRE_VERIFICATION_GAS,
+    maxFeePerGas: 0n,
+    maxPriorityFeePerGas: 0n,
+    paymasterAndData: "0x",
+    signature: "0x",
+  };
+  return getUserOperationHash({ userOperation, entryPointAddress: ENTRY_POINT, entryPointVersion: "0.6", chainId });
+}
+
 /**
  * The passkey step of the first payout (goals/konto/05): the passkey of the account signs the second permission, whose spender
  * is the forwarder to the person's bank account (`spender` of the page, set by the server), USDC, no cap, 30 days, no end and
  * a salt of its own. Returns the body of POST /h/{code}/payout. Throws KontoError with the reason the page shows.
  *
- * With `revokeHash` and `revokeNonce` on the page (goals/konto/11, the account replaces an earlier permission) the same passkey
- * dialog signs both: the hash of the new permission and the hash of the smart wallet's revoke of the earlier one, in one
- * SIGN_RAW_PAYLOADS. The body then carries `revoke: { nonce, signature }`.
+ * With `revokePermission` and `revokeNonce` on the page (goals/konto/11, the account replaces an earlier permission) the same
+ * passkey dialog signs both: the hash of the new permission and the hash of the smart wallet's revoke of the earlier one, in one
+ * SIGN_RAW_PAYLOADS. The body then carries `revoke: { nonce, signature }`. The client builds that revoke itself from the
+ * permission and the nonce (goals/konto/13) and signs nothing when the permission is not a payout permission of this account or
+ * when `revokeCheck` (data-revoke-hash of the page) names another hash.
  */
 export async function runPayout(deps, page) {
   const { random, now } = deps;
-  if (!/^0x[0-9a-fA-F]{40}$/.test(page.spender || "") || !/^0x[0-9a-fA-F]{40}$/.test(page.token || "")) {
+  if (!ADDRESS.test(page.spender || "") || !ADDRESS.test(page.token || "") || !ADDRESS.test(page.account || "")) {
     throw new KontoError("unreachable", "page data incomplete");
   }
-  const revoke = page.revokeHash || page.revokeNonce ? { hash: page.revokeHash || "", nonce: page.revokeNonce || "" } : null;
-  if (revoke && (!/^0x[0-9a-fA-F]{64}$/.test(revoke.hash) || !/^[0-9]{1,78}$/.test(revoke.nonce))) {
-    throw new KontoError("unreachable", "page data incomplete");
+  let revoke = null;
+  if (page.revokePermission || page.revokeNonce || page.revokeCheck) {
+    if (!page.revokePermission || !UINT.test(page.revokeNonce || "")) throw new KontoError("unreachable", "page data incomplete");
+    const permission = revokedPermission(page.revokePermission, page);
+    const hash = revokeHash(permission, BigInt(page.revokeNonce), page.chainId);
+    if (page.revokeCheck && page.revokeCheck.toLowerCase() !== hash.toLowerCase()) {
+      throw new KontoError("unreachable", "the revoke on the page is not the one of the earlier permission");
+    }
+    revoke = { hash, nonce: page.revokeNonce };
   }
   const signer = accountSigner(deps, page);
   const { owner } = signer;

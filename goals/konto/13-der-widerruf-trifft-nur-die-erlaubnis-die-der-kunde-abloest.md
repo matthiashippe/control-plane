@@ -1,7 +1,7 @@
 # Konto Goal 13: Der Widerruf trifft nur die Erlaubnis, die der Kunde ablöst
 
 ## Status
-PLANNED
+DONE
 
 ## Active Objective
 Mit seinem Passkey beendet ein Kunde genau die Erlaubnis, die er ablöst, und keine Seite bringt ihn dazu, etwas anderes zu
@@ -108,7 +108,7 @@ Handy muss, und weil eine Unterschrift über einen Hash, den der Kunde nicht pr�
   Auszahlung (konto 14), der Sepolia-Beleg des Widerrufs (konto 15), jede andere Tabelle.
 
 ## Done Condition
-- [ ] `finishPayout` nimmt die Erlaubnis, deren Widerruf die Route geprüft hat, als `replaced` und speichert bei Abweichung nichts;
+- [x] `finishPayout` nimmt die Erlaubnis, deren Widerruf die Route geprüft hat, als `replaced` und speichert bei Abweichung nichts;
       die Route reicht sie durch und beendet den Handoff dann mit 410.
       MVP: Funktion, weil an dieser Stelle die Widerlegung hängt: Kein Widerruf darf neben einer anderen Erlaubnis gespeichert werden
       als der, für die er unterschrieben ist (Vorschlag konto-kritik-2026-11-18-2).
@@ -116,7 +116,7 @@ Handy muss, und weil eine Unterschrift über einen Hash, den der Kunde nicht pr�
       Prüfung: `awk '/^export function finishPayout/{f=1} f&&/^}/{print;exit} f' src/konto/payout.ts | grep -cE '\breplaced\b'` muss mindestens `2` ausgeben.
       Prüfung: `awk '/^export function finishPayout/{f=1} f&&/^}/{exit} f' src/konto/payout.ts | grep -cE 'replaced\?:'` muss genau `0` ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/konto-revoke-replaced.test.ts test/konto-payout.test.ts test/konto-payout-guard.test.ts test/konto-payout-pending.test.ts test/konto-payout-rule.test.ts test/konto-signature-retry.test.ts test/konto-deposit.test.ts test/handoff-api.test.ts` muss Exit-Code 0 haben.
-- [ ] Drei Fälle in `test/konto-revoke-replaced.test.ts` zeigen, dass eine Änderung der Zeile während der Prüfung der Unterschrift
+- [x] Drei Fälle in `test/konto-revoke-replaced.test.ts` zeigen, dass eine Änderung der Zeile während der Prüfung der Unterschrift
       nichts speichert und der unveränderte Weg den Widerruf behält; gegen den Stand der Merge-Basis sind die Fälle 1 und 2 rot und
       Fall 3 grün.
       MVP: Funktion, weil das Rennen zwischen Prüfung und Speichern nur ein Test mit geänderter Zeile zeigt und erst der rote Lauf am
@@ -124,7 +124,7 @@ Handy muss, und weil eine Unterschrift über einen Hash, den der Kunde nicht pr�
       Prüfung: `T=$(mktemp -d); PATH=/usr/bin:$PATH pnpm -s vitest run test/konto-revoke-replaced.test.ts --reporter=json --outputFile=$T/r.json >/dev/null 2>&1; echo "exit=$?"; node -e 'const r=require(process.argv[1]);const a=r.testResults.flatMap(f=>f.assertionResults).filter(x=>x.ancestorTitles.includes("the revoke ends only the permission the person replaces"));console.log(a.length, a.filter(x=>x.status==="passed").length)' $T/r.json` muss genau `exit=0` und `3 3` ausgeben.
       Prüfung: `B=$(git merge-base origin/dev HEAD); T=$(mktemp -d); git archive $B | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; cp test/konto-revoke-replaced.test.ts $T/test/; for f in $(git diff --name-only --diff-filter=A origin/dev...HEAD -- 'test/*-helpers.ts'); do cp $f $T/test/; done; (cd $T && PATH=/usr/bin:$PATH pnpm -s vitest run test/konto-revoke-replaced.test.ts --reporter=json --outputFile=r.json >/dev/null 2>&1); node -e 'const r=require(process.argv[1]);const a=r.testResults.flatMap(f=>f.assertionResults).filter(x=>x.ancestorTitles.includes("the revoke ends only the permission the person replaces"));console.log(a.filter(x=>x.status!=="passed").length, a.filter(x=>x.status==="passed").length, a.find(x=>x.title.startsWith("keeps the revoke"))?.status)' $T/r.json` muss genau `2 1 passed` ausgeben.
       Prüfung: `node -e 'const s=require("fs").readFileSync("test/konto-revoke-replaced.test.ts","utf8");const miss=["moneySetup","retire_permission","retire_revoke","burned","410","verifyClient"].filter(x=>!s.includes(x));if(miss.length){console.error(miss);process.exit(1)}console.log("faelle ok")'` muss `faelle ok` ausgeben.
-- [ ] Der Client baut User Operation und Hash des Widerrufs selbst aus `data-revoke-permission` und der Nonce, unterschreibt nur
+- [x] Der Client baut User Operation und Hash des Widerrufs selbst aus `data-revoke-permission` und der Nonce, unterschreibt nur
       eine Auszahl-Erlaubnis dieses Kontos und keinen abweichenden Hash der Seite, und `konto.js` ist das Bündel dieser Quellen.
       MVP: Funktion, weil der Passkey des Kunden sonst einen beliebigen Aufruf seiner Smart Wallet freigeben könnte (Vorschlag
       konto-kritik-2026-11-18-3).
@@ -135,7 +135,7 @@ Handy muss, und weil eine Unterschrift über einen Hash, den der Kunde nicht pr�
       Prüfung: `grep -c '0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789' src/public/konto-client/flow.mjs` muss mindestens `1` ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH node ops/konto/build-client.mjs --check; echo "exit=$?"` muss genau `exit=0` ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/konto-client-revoke.test.ts test/konto-client-deposit.test.ts test/konto-client.test.ts test/konto-client-limit.test.ts test/soll-money.test.ts` muss Exit-Code 0 haben.
-- [ ] Vier Fälle in `test/konto-client-revoke.test.ts` zeigen den selbst gebauten Hash, die Ablehnung eines fremden Hashes und einer
+- [x] Vier Fälle in `test/konto-client-revoke.test.ts` zeigen den selbst gebauten Hash, die Ablehnung eines fremden Hashes und einer
       fremden Erlaubnis und die Einigkeit mit dem Server an der echten Seite; gegen den Stand der Merge-Basis sind die Fälle 1 bis 3
       rot und Fall 4 grün.
       MVP: Funktion, weil erst der rote Lauf am alten Client zeigt, dass er heute einen fremden Hash unterschreibt, und Fall 4 belegt,
@@ -144,20 +144,20 @@ Handy muss, und weil eine Unterschrift über einen Hash, den der Kunde nicht pr�
       Prüfung: `B=$(git merge-base origin/dev HEAD); T=$(mktemp -d); git archive $B | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; cp test/konto-client-revoke.test.ts $T/test/; for f in $(git diff --name-only --diff-filter=A origin/dev...HEAD -- 'test/*-helpers.ts'); do cp $f $T/test/; done; (cd $T && PATH=/usr/bin:$PATH pnpm -s vitest run test/konto-client-revoke.test.ts --reporter=json --outputFile=r.json >/dev/null 2>&1); node -e 'const r=require(process.argv[1]);const a=r.testResults.flatMap(f=>f.assertionResults).filter(x=>x.ancestorTitles.includes("the client signs only the revoke it builds itself"));console.log(a.filter(x=>x.status!=="passed").length, a.filter(x=>x.status==="passed").length, a.find(x=>x.title.startsWith("agrees with the server"))?.status)' $T/r.json` muss genau `3 1 passed` ausgeben.
       Prüfung: `node -e 'const s=require("fs").readFileSync("test/konto-client-revoke.test.ts","utf8");const miss=["wirePage","revokeHash","data-revoke-permission","data-revoke-hash","ACTIVITY_TYPE_SIGN_RAW_PAYLOADS","recoverAddress","payout-passkey"].filter(x=>!s.includes(x));if(miss.length){console.error(miss);process.exit(1)}console.log("faelle ok")'` muss `faelle ok` ausgeben.
       Prüfung: `git diff origin/dev...HEAD -- test/konto-client-deposit.test.ts | grep -cE '^-.*createHash\("sha256"\)\.update\("the revoke of the earlier permission"\)'` muss genau `1` ausgeben.
-- [ ] Seite und SOLL-Bilder bleiben gleich: Die echten Seiten der Auszahlung sind pixelgleich mit den Bildern, und weder Bilder noch
+- [x] Seite und SOLL-Bilder bleiben gleich: Die echten Seiten der Auszahlung sind pixelgleich mit den Bildern, und weder Bilder noch
       SOLL-Werkzeuge ändern sich.
       MVP: Funktion, weil der Fix nur Daten am Knopf und die Prüfung im Hintergrund betrifft und der Kunde auf dem Handy nichts davon
       sehen darf.
       Prüfung: `git diff --quiet origin/dev...HEAD -- docs/soll 'ops/soll*.mjs' && echo bilder gleich` muss `bilder gleich` ausgeben.
       Prüfung: `T=$(mktemp -d); PATH=/usr/bin:$PATH node --import tsx ops/soll-live-money.mjs --out $T >/dev/null && PATH=/usr/bin:$PATH node ops/soll-money.mjs --check --source $T > $T/o 2>&1; echo "exit=$?"; tail -n 1 $T/o | grep -cE '^soll money: 16 images, blocks end 390=[0-9]+ 1440=[0-9]+, 0 defects$'` muss genau die zwei Zeilen `exit=0` und `1` ausgeben.
-- [ ] Die Entscheidungen stehen mit Grund in `goals/konto/ANNAHMEN.md`, und `docs/konto/euro.md` beschreibt den neuen Weg.
+- [x] Die Entscheidungen stehen mit Grund in `goals/konto/ANNAHMEN.md`, und `docs/konto/euro.md` beschreibt den neuen Weg.
       MVP: Funktion, weil konto 15 den Widerruf auf Base Sepolia belegt und dafür wissen muss, welche Erlaubnis die Seite zeigt und
       was der Client unterschreibt.
       Prüfung: `awk '/^## Goal 13/{f=1;next} /^## /{f=0} f' goals/konto/ANNAHMEN.md | grep -cE "^- .+, weil .+"` muss mindestens `5` ausgeben.
       Prüfung: `awk '/^## Goal 13/{f=1;next} /^## /{f=0} f' goals/konto/ANNAHMEN.md | grep -cE 'replaced|data-revoke-permission'` muss mindestens `2` ausgeben.
       Prüfung: `grep -c 'data-revoke-permission' docs/konto/euro.md` muss mindestens `1` ausgeben.
       Prüfung: `git diff --numstat origin/dev...HEAD -- docs | awk '{n++} END{print n+0}'` muss genau `1` ausgeben.
-- [ ] Der Diff bleibt in den Pfaden dieses Goals, Auszahl-Lauf, Schnittstelle und Sepolia-Läufe bleiben gleich, kein Test wird
+- [x] Der Diff bleibt in den Pfaden dieses Goals, Auszahl-Lauf, Schnittstelle und Sepolia-Läufe bleiben gleich, kein Test wird
       schwächer, kein neues Paket, kein Schlüssel im Diff, keine andere Goal-Datei geändert, und `check` ist grün.
       MVP: Funktion, weil `src/**` mit dem Merge ausrollt und zahlende Kunden den Stand tragen.
       Prüfung: `git diff --name-only origin/dev...HEAD | grep -vE '^(src/handoff/routes\.ts|src/konto/payout\.ts|src/public/money\.ts|src/public/konto-client/(main|flow)\.mjs|src/public/konto-client/konto\.js|docs/konto/euro\.md|test/(konto-revoke-replaced|konto-client-revoke|konto-client-deposit|konto-payout)\.test\.ts|test/[a-z-]+-helpers\.ts|goals/konto/13-der-widerruf-trifft-nur-die-erlaubnis-die-der-kunde-abloest\.md|goals/konto/verdicts/13-[A-Za-z0-9._-]+\.md|goals/konto/ANNAHMEN\.md|goals/_vorschlaege/konto-[a-z0-9.-]+\.md)$' | wc -l` muss `0` ausgeben.
@@ -169,7 +169,7 @@ Handy muss, und weil eine Unterschrift über einen Hash, den der Kunde nicht pr�
       Prüfung: `git diff origin/dev...HEAD -- . ':!src/public/konto-client/konto.js' | grep -E '^[+]' | grep -iE "(api[_-]?key|secret|token|private[_-]?key)[\"' ]*[:=] *[\"']?[A-Za-z0-9_+/=-]{16,}|BEGIN [A-Z ]*PRIVATE KEY|cnwy_k_[A-Za-z0-9_-]{16,}" | wc -l` muss `0` ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung (Netz): `n=$(gh pr list -R matthiashippe/control-plane --head goal/konto-13 --state open --json number -q '.[0].number'); gh pr checks "$n" -R matthiashippe/control-plane | awk -F'\t' '$1=="check" && $2=="pass"' | wc -l` muss mindestens `1` ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Ändert sich die abzulösende Erlaubnis zwischen Prüfung und Speichern, speichert der Server nichts und der Kunde startet neu.
@@ -200,5 +200,9 @@ Handy muss, und weil eine Unterschrift über einen Hash, den der Kunde nicht pr�
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-18 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6, 7 gebaut: `finishPayout` nimmt `replaced` und speichert bei Abweichung nichts, die Route verbrennt dann den Handoff mit 410, die Seite trägt `data-revoke-permission`, der Client baut Widerruf und Hash selbst, `konto.js` neu, Annahmen und `euro.md` nachgezogen. Prüfbefehle: P1 `1`, `4`, `0`, vitest 8 Dateien 66 Tests Exit 0; P2 `exit=0` `3 3`, Merge-Basis `2 1 passed`, `faelle ok`; P3 `0`, `1`, `2`, `1`, `1`, `exit=0`, vitest 5 Dateien 32 Tests Exit 0; P4 `exit=0` `4 4`, Merge-Basis `3 1 passed`, `faelle ok`, `1`; P5 `bilder gleich`, `exit=0` und `1` (`16 images, blocks end 390=655 1440=684, 0 defects`); P6 `8`, `3`, `1`, `1`; P7 `0`, `0`, `schnittstelle gleich`, `0`, `pakete gleich`, `goals gleich`, `0`, `check` Exit 0 (2413 Tests), Netz `1` (Job `check` an PR #286 pass).
+- 2026-11-19 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, 7; `dev` hatte nichts Neues, alle Prüfbefehle am Kopf bdd4513 erneut gefahren. Prüfbefehle: P1 `1`, `4`, `0`, vitest 66 Tests Exit 0; P2 `exit=0` `3 3`, Merge-Basis `2 1 passed`, `faelle ok`; P3 `0`, `1`, `2`, `1`, `1`, `exit=0`, vitest 32 Tests Exit 0; P4 `exit=0` `4 4`, Merge-Basis `3 1 passed`, `faelle ok`, `1`; P5 `bilder gleich`, `exit=0` und `1`; P6 `8`, `3`, `1`, `1`; P7 `0`, `0`, `schnittstelle gleich`, `0`, `pakete gleich`, `goals gleich`, `0`, `check` Exit 0 (2413 Tests), Netz `1`; Jobs `check` und `e2e` an PR #286 am Kopf pass.
+- 2026-11-19 Zyklus 3: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, 7; `dev` (586957e) in den Goal-Branch gemergt, den Konflikt in `goals/konto/ANNAHMEN.md` mit beiden Abschnitten gelöst (zuerst „Abgelöst durch konto 05“ von `dev`, dann „Goal 13“), PR #286 wieder ohne Konflikt. Prüfbefehle am Merge 6217002: P1 `1`, `4`, `0`, vitest 66 Tests Exit 0; P2 `exit=0` `3 3`, Merge-Basis `2 1 passed`, `faelle ok`; P3 `0`, `1`, `2`, `1`, `1`, `exit=0`, vitest 32 Tests Exit 0; P4 `exit=0` `4 4`, Merge-Basis `3 1 passed`, `faelle ok`, `1`; P5 `bilder gleich`, `exit=0` und `1`; P6 `8`, `3`, `1`, `1`; P7 `0`, `0`, `schnittstelle gleich`, `0`, `pakete gleich`, `goals gleich`, `0`, `check` Exit 0 (2413 Tests, 361 s bei Last 434 auf 30 Kernen), Netz `1`; Jobs `check` und `e2e` an PR #286 für 6217002 pass.
+- 2026-11-19 Release: PASS K und B (Zyklus 3), DONE.
 
 ## Blockers
