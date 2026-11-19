@@ -10,10 +10,10 @@ USDC and gets answers again, over the same API it uses today.
 "conwayApiUrl": "https://automatonhost.com"
 ```
 
-**Run an automaton from Claude Code**: install the plugin with
-`claude plugin marketplace add matthiashippe/control-plane && claude plugin install automaton@automatonhost`,
-then ask Claude to start one. Your phone and a passkey create the account and set the daily limit;
-your computer keeps only an API key ([mcp/README.md](mcp/README.md)).
+**Run an automaton from Claude Code**: starting one from Claude Code is not switched on yet. Your
+automaton runs here today with the one line above, and the plugin
+(`claude plugin marketplace add matthiashippe/control-plane && claude plugin install automaton@automatonhost`)
+already lists open jobs and submits work for you ([mcp/README.md](mcp/README.md)).
 
 ## The market for jobs
 
