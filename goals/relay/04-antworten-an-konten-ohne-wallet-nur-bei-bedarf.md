@@ -1,7 +1,7 @@
 # Relay Goal 04: Antworten an Konten ohne Wallet nur bei Bedarf
 
 ## Status
-PLANNED
+PAUSED
 
 ## Active Objective
 Die Runtime am Pin kann einer Kennung `key:…` nicht antworten, weil `validateMessage` für `to` eine EVM- oder Solana-Adresse verlangt
@@ -114,3 +114,4 @@ einen einzigen Nutzer Bauzeit kostet, die beim zahlenden Kunden fehlt.
 ## Progress Log
 
 ## Blockers
+Pause: Kurs-Check 2026-11-19, die Frage des Goals ist gemessen: 0 Nachrichten über das Relay seit relay 02 (`relay_messages` der Produktion, 19.11.2026 14:45 UTC), also kein fremdes Konto ohne Wallet; ein Werkzeug für eine Zahl, die null ist, bringt keinen zahlenden Automaton näher (Richtungs-Check 19.11.2026, `docs/richtung/2026-11-19.md`)
