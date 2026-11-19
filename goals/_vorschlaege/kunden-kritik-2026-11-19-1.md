@@ -1,0 +1,6 @@
+Schwere: 4
+Goal: kunden 01
+Befund: Der größte zahlende fremde Kunde (Kunde 1, 368 Anfragen am 10.11.) läuft weiter und fragt seit 2026-11-13 täglich 1065 bis 1625 Mal Inferenz mit leerem Saldo an, bekommt 402 und lädt nicht mehr auf; damit liegt der größte Hebel der Leitzahl beim Aufladen, nicht bei der 503 vom 11.11.
+Beleg: `bash ops/customer-decline.sh --since 2026-11-05T00:00:00Z` (gemessen 2026-11-19T16:01:23Z) -> `DAY 1 2026-11-14: 0 calls, *.** USD, models -, http 2xx 0 402 1625 4xx 0 5xx 0` bis `DAY 1 2026-11-19: … 402 1065 …`, `CUSTOMER 1: … balance *.** USD, last topup ****-**-**T**:**:**Z` | docs/kunden/rueckgang-2026-11.md:149 (täglich rund 3300 Mal `GET /v1/credits/balance`)
+Empfehlung: Als nächstes Glied am Topic `kunden` (vor jedem Glied für neue Kunden): nur lesend klären, warum die Runtime am Pin `d8f8168` nach unserer 402 nicht auflädt (Body und Header unserer 402 auf `/v1/chat/completions` gegen den Code der Runtime, der eine 402 liest, ihr Weg zu `/pay/` oder x402, USDC-Bestand seiner Wallet auf Base aus öffentlichen Daten ohne Adresse im Repo), Ursache als Wort aus `kein Geld`, `Fehler bei uns` oder `offen`; liegt sie bei uns, ein Fix-Goal mit Leitzahl fremde Zahlungen je Woche.
+MVP: Funktion, weil ein Kunde, der täglich über 1000 Mal bezahlen will und es nicht tut, der kürzeste Weg zu Umsatz ist.
