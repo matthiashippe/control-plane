@@ -115,10 +115,19 @@ async function run({ accounts, rpcFails = false, sshFails = false }: Setup) {
       : // The last argument is the remote command; stdin (the script) is passed on unchanged.
         '#!/usr/bin/env bash\ncmd="${@: -1}"\nexec bash -c "$cmd"\n',
   );
-  // `docker compose -f <file> exec -T cp <cmd...>`: everything after `cp` runs in the app folder, like WORKDIR /app.
+  // `docker compose -f <file> exec -T cp <cmd...>`: everything after `cp` runs in the app folder, like WORKDIR /app. `node`
+  // is the node running this test, because PATH below holds only the system folders and CI installs node elsewhere.
   writeFileSync(
     join(bin, "docker"),
-    `#!/usr/bin/env bash\nwhile [ "$#" -gt 0 ] && [ "$1" != cp ]; do shift; done\nshift\ncd ${JSON.stringify(app)}\nexec "$@"\n`,
+    [
+      "#!/usr/bin/env bash",
+      'while [ "$#" -gt 0 ] && [ "$1" != cp ]; do shift; done',
+      "shift",
+      `cd ${JSON.stringify(app)}`,
+      `if [ "$1" = node ]; then shift; exec ${JSON.stringify(process.execPath)} "$@"; fi`,
+      'exec "$@"',
+      "",
+    ].join("\n"),
   );
   chmodSync(join(bin, "ssh"), 0o755);
   chmodSync(join(bin, "docker"), 0o755);
