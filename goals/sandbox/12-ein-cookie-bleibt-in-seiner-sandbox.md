@@ -1,7 +1,7 @@
 # Sandbox Goal 12: Ein Cookie bleibt in seiner Sandbox
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Ist: Ein freigegebener Port einer Sandbox antwortet unter `https://sbx-<id>-<port>.sandboxhost.de` (sandbox 07). `sandboxhost.de`
@@ -129,7 +129,7 @@ unterschieben kann.
       Prüfung: `cat docs/sandbox/ports.md goals/sandbox/ANNAHMEN.md ops/sandbox/sandboxd.mjs ops/sandbox/probe.sh test/sandboxd-cookie.test.ts | grep -c $'\xe2\x80\x93\|\xe2\x80\x94'` muss 0 ausgeben.
 - [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Der neue Test war vor dem Fix rot; die Zeile im Progress Log nennt, womit.
@@ -161,5 +161,6 @@ unterschieben kann.
 - 2026-11-19 Kritik (Tech Lead): keine neuen Punkte; zwei Vorschläge (`goals/_vorschlaege/sandbox-kritik-2026-11-19-1.md`, `-2.md`), die Prüfung in Punkt 5 lässt dafür `goals/_vorschlaege/sandbox-kritik-*.md` zu wie bei konto.
 - 2026-11-19 Zyklus 3: Befunde 1 und 2 der Linse K aus Zyklus 2 abgearbeitet, zwei Tests in `test/sandboxd-cookie.test.ts` (zwei Attribute `Domain` fallen beide weg; ein Cookie namens `domain` bleibt Byte für Byte), je rot unter seiner Mutation (nur erstes `Domain` entfernt: 1 failed | 7 passed; ohne `i === 0`: 1 failed | 7 passed), `sandboxd.mjs` unverändert, kein neuer Rollout. Prüfbefehle: Punkt 1 2, 0; Punkt 2 Exit 0, Exit 0, nichts fehlt, 0, 2, Exit 0; Punkt 3 PROBE SELFTEST OK, 8, 1, SETUP CHECK OK changed=0, 2; Punkt 4 nichts fehlt, nichts fehlt; Punkt 5 0, 0; Punkt 6 check Exit 0 (grün in 167 s).
 - 2026-11-19 Zyklus 4: Gaps 1 und 2 der Linse B aus Zyklus 3 abgearbeitet, Prüfung von Punkt 5 wieder im Wortlaut von origin/dev und beide Kritik-Vorschläge vom Goal-Branch genommen (sie liegen im Commit aae30c7), Code unverändert. Prüfbefehle: Punkt 1 2, 0; Punkt 2 Exit 0, Exit 0, nichts fehlt, 0, 2, Exit 0; Punkt 3 PROBE SELFTEST OK, 8, 1, SETUP CHECK OK changed=0, 2; Punkt 4 nichts fehlt, nichts fehlt; Punkt 5 0 (Fassung von origin/dev), 0; Punkt 6 check Exit 0 (grün in 58 s).
+- 2026-11-19 Release: PASS K und B (Zyklus 4), DONE.
 
 ## Blockers
