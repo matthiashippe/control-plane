@@ -1,7 +1,7 @@
 # Konto Goal 14: Der Start aus Claude Code sagt, dass das Konto noch nicht an ist, und das Einschalten ist vorbereitet
 
 ## Status
-PLANNED
+DONE
 
 ## Active Objective
 Wer heute dem README folgt, scheitert nicht mehr an einem Versprechen, das der Dienst nicht hält, und Matthias kann das Konto in
@@ -58,19 +58,19 @@ Prüfwerkzeug am Server von Hand nachsehen müsste.
   `src/**`, `deploy/**`, das Einschalten und die erste Einzahlung (konto 15), die Prüfung der Freigabe für SEPA (konto 16).
 
 ## Done Condition
-- [ ] Der Absatz „Run an automaton from Claude Code“ in `README.md` sagt, dass der Start aus Claude Code noch nicht freigeschaltet
+- [x] Der Absatz „Run an automaton from Claude Code“ in `README.md` sagt, dass der Start aus Claude Code noch nicht freigeschaltet
       ist.
       MVP: Funktion, weil heute jeder, der dem Absatz folgt, an einer 503 scheitert.
       Prüfung: `awk '/Run an automaton from Claude Code/{f=1} f&&/^$/{exit} f' README.md | grep -c 'not switched on yet'` muss mindestens `1` ausgeben.
       Prüfung: `grep -c '—\|–' README.md` muss `0` ausgeben.
-- [ ] `start_automaton` antwortet bei 503 `konto_unavailable` mit `error: "konto_unavailable"` und dem Satz für den Menschen; ein Fall
+- [x] `start_automaton` antwortet bei 503 `konto_unavailable` mit `error: "konto_unavailable"` und dem Satz für den Menschen; ein Fall
       in `test/mcp-automaton.test.ts` zeigt das, und gegen den Stand der Merge-Basis ist dieser Fall rot.
       MVP: Funktion, weil Claude dem Menschen sonst einen Hinweis für API-Kunden vorliest.
       Prüfung: `grep -c 'Starting an automaton from Claude Code is not switched on yet. Nothing was charged.' mcp/server.mjs` muss genau `1` ausgeben.
       Prüfung: `grep -c 'konto_unavailable' test/mcp-automaton.test.ts` muss mindestens `1` ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/mcp-automaton.test.ts test/mcp.test.ts test/mcp-money.test.ts` muss Exit-Code 0 haben.
       Prüfung: `B=$(git merge-base origin/dev HEAD); T=$(mktemp -d); git archive $B | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; cp test/mcp-automaton.test.ts $T/test/; (cd $T && PATH=/usr/bin:$PATH pnpm -s vitest run test/mcp-automaton.test.ts >/dev/null 2>&1); echo "exit=$?"` muss genau `exit=1` ausgeben.
-- [ ] `ops/konto-ready.sh` meldet je Wert aus `docs/konto/euro.md`, Abschnitt `## Für konto 06`, Punkt 4 `set`, `missing` oder
+- [x] `ops/konto-ready.sh` meldet je Wert aus `docs/konto/euro.md`, Abschnitt `## Für konto 06`, Punkt 4 `set`, `missing` oder
       `wrong` und `key_file readable` oder `unreadable`, nie einen Wert; fünf Fälle in `test/konto-ready.test.ts` belegen das offline.
       MVP: Funktion, weil konto 15 das Einschalten damit belegt, ohne dass ein Wert den Server verlässt.
       Prüfung: `bash -n ops/konto-ready.sh && echo syntax ok` muss `syntax ok` ausgeben.
@@ -79,12 +79,12 @@ Prüfwerkzeug am Server von Hand nachsehen müsste.
       Prüfung: `grep -cE '(^|[^a-z])(cat|source|less|head|tail)[[:space:]][^|]*\.env|^[[:space:]]*\.[[:space:]][^[:space:]]*\.env' ops/konto-ready.sh` muss `0` ausgeben.
       Prüfung: `grep -c 'mkdtemp' test/konto-ready.test.ts` muss mindestens `1` ausgeben.
       Prüfung: `grep -cE 'rmSync\(' test/konto-ready.test.ts` muss mindestens `1` ausgeben.
-- [ ] `docs/konto/euro.md`, Abschnitt `## Für konto 06`, nennt nach Punkt 4 den Befehl `ops/konto-ready.sh` und die Ausgabe, die
+- [x] `docs/konto/euro.md`, Abschnitt `## Für konto 06`, nennt nach Punkt 4 den Befehl `ops/konto-ready.sh` und die Ausgabe, die
       dort am Ende stehen muss; die Entscheidungen stehen mit Grund unter `## Goal 14` in `goals/konto/ANNAHMEN.md`.
       MVP: Funktion, weil die Schritte für Matthias in konto 15 aus diesem Abschnitt kommen.
       Prüfung: `awk '/^## Für konto 06/{f=1} f' docs/konto/euro.md | grep -c 'ops/konto-ready.sh'` muss mindestens `1` ausgeben.
       Prüfung: `grep -c '^## Goal 14' goals/konto/ANNAHMEN.md` muss genau `1` ausgeben.
-- [ ] Der Diff bleibt in den Pfaden dieses Goals, `src/**` bleibt gleich, kein Test wird schwächer, kein neues Paket, kein Schlüssel
+- [x] Der Diff bleibt in den Pfaden dieses Goals, `src/**` bleibt gleich, kein Test wird schwächer, kein neues Paket, kein Schlüssel
       im Diff, keine andere Goal-Datei geändert, und `check` ist grün.
       MVP: Funktion, weil `ops/**` mit dem Merge ausrollt.
       Prüfung: `git diff --name-only origin/dev...HEAD | grep -vE '^(README\.md|mcp/server\.mjs|ops/konto-ready\.sh|docs/konto/euro\.md|test/(mcp-automaton|konto-ready)\.test\.ts|goals/konto/14-der-start-aus-claude-code-sagt-dass-das-konto-noch-nicht-an-ist\.md|goals/konto/verdicts/14-[A-Za-z0-9._-]+\.md|goals/konto/ANNAHMEN\.md|goals/_vorschlaege/konto-[a-z0-9.-]+\.md)$' | wc -l` muss `0` ausgeben.
@@ -94,7 +94,23 @@ Prüfwerkzeug am Server von Hand nachsehen müsste.
       Prüfung: `git diff origin/dev...HEAD | grep -E '^[+]' | grep -iE "(api[_-]?key|secret|token|private[_-]?key)[\"' ]*[:=] *[\"']?[A-Za-z0-9_+/=-]{16,}|BEGIN [A-Z ]*PRIVATE KEY|cnwy_k_[A-Za-z0-9_-]{16,}|pk_live_|sk_live_" | wc -l` muss `0` ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung (Netz): `n=$(gh pr list -R matthiashippe/control-plane --head goal/konto-14 --state open --json number -q '.[0].number'); gh pr checks "$n" -R matthiashippe/control-plane | awk -F'\t' '$1=="check" && $2=="pass"' | wc -l` muss mindestens `1` ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] `ops/konto-ready.sh` meldet nach `key_file` eine Zeile `container current`, wenn der laufende Container `cp` für jeden Namen
+      aus Punkt 3 außer `CP_BRIDGE_*` denselben Wert hat wie die Datei (fehlt ein Name in beiden, gilt er als gleich), sonst
+      `container stale` und Exit 1; verglichen wird auf dem Server (etwa `docker compose … exec -T cp printenv <NAME>` in eine
+      Variable), ausgegeben wird nur das Wort. `docs/konto/euro.md`, Abschnitt `## Für konto 06`, nennt `container current` in der
+      erwarteten Ausgabe und bei `container stale` den Weg, der den Container neu anlegt (`deploy.yml` von Hand mit `force: true`),
+      statt auf den nächsten Rollout zu warten.
+      MVP: Funktion, weil `deploy.yml` nur bei einer Änderung am Laufzeitpfad ausrollt (Schritt `plan`, „nichts am Laufzeitpfad,
+      kein Rollout“) und ein Container ohne die neuen Werte weiter 503 `konto_unavailable` antwortet, während das Skript heute
+      Exit 0 meldet; konto 15 läse dann ein grünes Werkzeug und einen roten Dienst (Kritik Tech Lead 2026-11-19).
+      Prüfung: `grep -cE 'container (current|stale)' ops/konto-ready.sh` muss mindestens `2` ausgeben.
+      Prüfung: `grep -c 'container stale' test/konto-ready.test.ts` muss mindestens `1` ausgeben.
+      Prüfung: `grep -cE "^\s*(it|test)\(" test/konto-ready.test.ts` muss mindestens `8` ausgeben (dazu ein Fall: Datei vollständig, Container
+      mit einem anderen `CP_KONTO_AUTH_PROXY_ID` gibt `container stale`, Exit 1 und keinen der beiden Werte in der Ausgabe).
+      Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/konto-ready.test.ts` muss Exit-Code 0 haben.
+      Prüfung: `awk '/^## Für konto 06/{f=1} f' docs/konto/euro.md | grep -c 'container current'` muss mindestens `1` ausgeben.
+      Prüfung: `awk '/^## Für konto 06/{f=1} f' docs/konto/euro.md | grep -c 'force: true'` muss mindestens `1` ausgeben.
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Wer dem README folgt, liest, dass der Start aus Claude Code noch nicht freigeschaltet ist.
@@ -121,5 +137,9 @@ Prüfwerkzeug am Server von Hand nachsehen müsste.
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-19 Zyklus 1: Punkte 1, 2, 3, 4, 5 gebaut (README-Absatz sagt "not switched on yet", start_automaton übersetzt 503 konto_unavailable, ops/konto-ready.sh mit 7 Offline-Fällen, euro.md und ANNAHMEN.md Goal 14). Prüfbefehle: P1 1 und 0; P2 1, 3, vitest Exit 0, Merge-Basis exit=1; P3 syntax ok, vitest Exit 0, 7, 0, 3, 1; P4 1 und 1; P5 0, laufzeit gleich, 0, goals gleich, 0, check grün (229 Dateien, 2430 Tests), Netz-Prüfung nach dem PR.
+- 2026-11-19 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5; `dev` (cf0ec18) war schon im Branch, alle Prüfbefehle am Kopf 3e76905 erneut gefahren. Prüfbefehle: P1 `1`, `0`; P2 `1`, `3`, vitest 48 Tests Exit 0, Merge-Basis `exit=1`; P3 `syntax ok`, vitest 7 Tests Exit 0, `7`, `0`, `3`, `1`; P4 `1`, `1`; P5 `0`, `laufzeit gleich`, `0`, `goals gleich`, `0`, `check` Exit 0 (229 Dateien, 2430 Tests, grün in 85 s), Netz `1`; Jobs `check` und `e2e` an PR #297 für 3e76905 pass.
+- 2026-11-19 Zyklus 3: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6; Punkt 6 aus der Kritik gebaut (`ops/konto-ready.sh` vergleicht je CP_KONTO_* die Datei mit `printenv` im Container und meldet `container current` oder `container stale`, ein neuer Fall, `euro.md` mit `container current` und `deploy.yml` mit `force: true`), der neue Fall war vorher rot (3 von 8), Gegenproben rot (2 und 1 von 8); `dev` (cf0ec18) ist im Branch. Prüfbefehle am Kopf 14b73da: P1 `1`, `0`; P2 `1`, `3`, vitest Exit 0, Merge-Basis `exit=1`; P3 `syntax ok`, vitest Exit 0, `8`, `0`, `3`, `1`; P4 `1`, `1`; P5 `0`, `laufzeit gleich`, `0`, `goals gleich`, `0`, `check` Exit 0 (2431 Tests, grün in 55 s), Netz nach dem Push; P6 `3`, `1`, `8`, vitest Exit 0, `1`, `1`.
+- 2026-11-19 Release: PASS K und B (Zyklus 3), DONE.
 
 ## Blockers

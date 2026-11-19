@@ -1152,6 +1152,18 @@ export function createAutomatonTools({
         path: "/v1/handoff",
         body: { automaton_name: args.name, daily_limit_usdc: wanted.toString(), step: "konto" },
       });
+      // The 503 of the service tells API clients how to work around it; a person in Claude Code needs to hear
+      // that this start is not offered yet and that it cost nothing (goals/konto/14).
+      if (res.status === 503 && res.payload?.error === "konto_unavailable") {
+        return answer(
+          {
+            error: "konto_unavailable",
+            http_status: 503,
+            message: "Starting an automaton from Claude Code is not switched on yet. Nothing was charged.",
+          },
+          true,
+        );
+      }
       if (!res.ok) return httpError(res);
       const { code, url, qr, match, expires_at: expiresAt, poll_token: pollToken } = res.payload ?? {};
       if (typeof pollToken === "string" && pollToken.length >= 12) secrets.add(pollToken);

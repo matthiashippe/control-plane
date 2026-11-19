@@ -146,6 +146,33 @@ describe("Automaton tools in mcp/server.mjs", () => {
     await h.tools.settled();
   });
 
+  it("start_automaton answers a 503 konto_unavailable with a sentence for the person, not the hint for API clients", async () => {
+    const apiHint = 'Creating an account is not switched on here yet. Leave out step or send step "confirm".';
+    const h = harness({
+      routes: {
+        "POST /v1/handoff": () => json(503, { error: "konto_unavailable", message: apiHint, docs: `${BASE}/docs` }),
+      },
+    });
+    const answer = await h.call("start_automaton", START);
+    expect(answer.isError).toBe(true);
+    expect(answer.json.error).toBe("konto_unavailable");
+    expect(answer.json.message).toBe("Starting an automaton from Claude Code is not switched on yet. Nothing was charged.");
+    expect(answer.all).not.toContain("Leave out step");
+    expect(answer.all).not.toContain("confirm");
+    expect(h.callsTo("POST", "/v1/handoff")).toHaveLength(1);
+    expect(h.callsTo("POST", "/v1/automatons")).toHaveLength(0);
+    const status = await h.call("automaton_status", {});
+    expect(status.json.status, "no start is left half open").toBe("none");
+
+    // Any other refusal still reaches the person unchanged.
+    const other = harness({
+      routes: { "POST /v1/handoff": () => json(503, { error: "busy", message: "Try again in a minute." }) },
+    });
+    const refused = await other.call("start_automaton", START);
+    expect(refused.isError).toBe(true);
+    expect(refused.json).toMatchObject({ error: "busy", http_status: 503, message: "Try again in a minute." });
+  });
+
   it("after done keeps the key in CP_KEY_FILE with mode 0600, starts with it and reports running", async () => {
     const h = harness({
       routes: {
