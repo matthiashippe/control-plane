@@ -93,7 +93,7 @@ const ask = async (name, url, init, status) => {
 const write = async (state, res) => {
   const html = await res.text();
   writeFileSync(path.join(out, `money-${state}.html`), html);
-  console.log(`soll-live-money: ${state} ${res.status}, ${html.length} bytes`);
+  console.error(`soll-live-money: ${state} ${res.status}, ${html.length} bytes`);
 };
 const start = async (body) => {
   draws.push(47, 62, 18, 1);
@@ -123,4 +123,4 @@ db.prepare("UPDATE konto_payouts SET forwarder = ?, permission = ?, signature = 
   .run(earlier.spender, permissionJson(earlier), "0x" + "22".repeat(65), account);
 const again = await start({ automaton_name: "Atlas", step: "payout" });
 await write("payout-approve-revoke", await ask("payout-approve-revoke", `/h/${again.code}`, undefined, 200));
-console.log(`soll-live-money: written to ${out}`);
+console.error(`soll-live-money: written to ${out}`);
