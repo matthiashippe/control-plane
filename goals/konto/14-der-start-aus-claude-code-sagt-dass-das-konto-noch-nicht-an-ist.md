@@ -122,5 +122,6 @@ Prüfwerkzeug am Server von Hand nachsehen müsste.
 
 ## Progress Log
 - 2026-11-19 Zyklus 1: Punkte 1, 2, 3, 4, 5 gebaut (README-Absatz sagt "not switched on yet", start_automaton übersetzt 503 konto_unavailable, ops/konto-ready.sh mit 7 Offline-Fällen, euro.md und ANNAHMEN.md Goal 14). Prüfbefehle: P1 1 und 0; P2 1, 3, vitest Exit 0, Merge-Basis exit=1; P3 syntax ok, vitest Exit 0, 7, 0, 3, 1; P4 1 und 1; P5 0, laufzeit gleich, 0, goals gleich, 0, check grün (229 Dateien, 2430 Tests), Netz-Prüfung nach dem PR.
+- 2026-11-19 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5; `dev` (cf0ec18) war schon im Branch, alle Prüfbefehle am Kopf 3e76905 erneut gefahren. Prüfbefehle: P1 `1`, `0`; P2 `1`, `3`, vitest 48 Tests Exit 0, Merge-Basis `exit=1`; P3 `syntax ok`, vitest 7 Tests Exit 0, `7`, `0`, `3`, `1`; P4 `1`, `1`; P5 `0`, `laufzeit gleich`, `0`, `goals gleich`, `0`, `check` Exit 0 (229 Dateien, 2430 Tests, grün in 85 s), Netz `1`; Jobs `check` und `e2e` an PR #297 für 3e76905 pass.
 
 ## Blockers
