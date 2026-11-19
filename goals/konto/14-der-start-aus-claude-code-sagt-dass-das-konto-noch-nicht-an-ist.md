@@ -1,7 +1,7 @@
 # Konto Goal 14: Der Start aus Claude Code sagt, dass das Konto noch nicht an ist, und das Einschalten ist vorbereitet
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Wer heute dem README folgt, scheitert nicht mehr an einem Versprechen, das der Dienst nicht hält, und Matthias kann das Konto in
@@ -110,7 +110,7 @@ Prüfwerkzeug am Server von Hand nachsehen müsste.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/konto-ready.test.ts` muss Exit-Code 0 haben.
       Prüfung: `awk '/^## Für konto 06/{f=1} f' docs/konto/euro.md | grep -c 'container current'` muss mindestens `1` ausgeben.
       Prüfung: `awk '/^## Für konto 06/{f=1} f' docs/konto/euro.md | grep -c 'force: true'` muss mindestens `1` ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Wer dem README folgt, liest, dass der Start aus Claude Code noch nicht freigeschaltet ist.
@@ -140,5 +140,6 @@ Prüfwerkzeug am Server von Hand nachsehen müsste.
 - 2026-11-19 Zyklus 1: Punkte 1, 2, 3, 4, 5 gebaut (README-Absatz sagt "not switched on yet", start_automaton übersetzt 503 konto_unavailable, ops/konto-ready.sh mit 7 Offline-Fällen, euro.md und ANNAHMEN.md Goal 14). Prüfbefehle: P1 1 und 0; P2 1, 3, vitest Exit 0, Merge-Basis exit=1; P3 syntax ok, vitest Exit 0, 7, 0, 3, 1; P4 1 und 1; P5 0, laufzeit gleich, 0, goals gleich, 0, check grün (229 Dateien, 2430 Tests), Netz-Prüfung nach dem PR.
 - 2026-11-19 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5; `dev` (cf0ec18) war schon im Branch, alle Prüfbefehle am Kopf 3e76905 erneut gefahren. Prüfbefehle: P1 `1`, `0`; P2 `1`, `3`, vitest 48 Tests Exit 0, Merge-Basis `exit=1`; P3 `syntax ok`, vitest 7 Tests Exit 0, `7`, `0`, `3`, `1`; P4 `1`, `1`; P5 `0`, `laufzeit gleich`, `0`, `goals gleich`, `0`, `check` Exit 0 (229 Dateien, 2430 Tests, grün in 85 s), Netz `1`; Jobs `check` und `e2e` an PR #297 für 3e76905 pass.
 - 2026-11-19 Zyklus 3: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6; Punkt 6 aus der Kritik gebaut (`ops/konto-ready.sh` vergleicht je CP_KONTO_* die Datei mit `printenv` im Container und meldet `container current` oder `container stale`, ein neuer Fall, `euro.md` mit `container current` und `deploy.yml` mit `force: true`), der neue Fall war vorher rot (3 von 8), Gegenproben rot (2 und 1 von 8); `dev` (cf0ec18) ist im Branch. Prüfbefehle am Kopf 14b73da: P1 `1`, `0`; P2 `1`, `3`, vitest Exit 0, Merge-Basis `exit=1`; P3 `syntax ok`, vitest Exit 0, `8`, `0`, `3`, `1`; P4 `1`, `1`; P5 `0`, `laufzeit gleich`, `0`, `goals gleich`, `0`, `check` Exit 0 (2431 Tests, grün in 55 s), Netz nach dem Push; P6 `3`, `1`, `8`, vitest Exit 0, `1`, `1`.
+- 2026-11-19 Release: PASS K und B (Zyklus 3), DONE.
 
 ## Blockers
