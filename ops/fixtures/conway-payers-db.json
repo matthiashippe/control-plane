@@ -1,0 +1,9 @@
+{
+  "ours": ["7604a8979d36b89efa0d24878bbd48540f91373fe45a280f8361b0d4f94d9406"],
+  "wallets": [
+    {"h": "4bfe247a0c436d910ea37a264089f9abb5958e301c8d83371f0cddda934f84b6", "wallet": true, "inference_rows": 120, "paid": 2, "last_paid_at": "2026-11-11T00:00:00.000Z"},
+    {"h": "2fa89c1c807f745227dba7574d1ee4d85e749f7a16c6591dbd295d4007fcc5f3", "wallet": true, "inference_rows": 0, "paid": 0, "last_paid_at": null},
+    {"h": "f76cdd2e287235bccb5c89b8f4d79c16a9a5d76214d03a858824867dda8759ff", "wallet": true, "inference_rows": 3, "paid": 0, "last_paid_at": null},
+    {"h": "edbe51ccea0f3b96d05a2b7e85d7359c3c0b1ff700d92b867625b2fdd58c07d5", "wallet": true, "inference_rows": 50, "paid": 1, "last_paid_at": "2026-11-15T00:00:00.000Z"}
+  ]
+}
