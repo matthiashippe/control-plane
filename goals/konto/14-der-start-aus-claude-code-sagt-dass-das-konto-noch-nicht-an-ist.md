@@ -94,6 +94,22 @@ Prüfwerkzeug am Server von Hand nachsehen müsste.
       Prüfung: `git diff origin/dev...HEAD | grep -E '^[+]' | grep -iE "(api[_-]?key|secret|token|private[_-]?key)[\"' ]*[:=] *[\"']?[A-Za-z0-9_+/=-]{16,}|BEGIN [A-Z ]*PRIVATE KEY|cnwy_k_[A-Za-z0-9_-]{16,}|pk_live_|sk_live_" | wc -l` muss `0` ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung (Netz): `n=$(gh pr list -R matthiashippe/control-plane --head goal/konto-14 --state open --json number -q '.[0].number'); gh pr checks "$n" -R matthiashippe/control-plane | awk -F'\t' '$1=="check" && $2=="pass"' | wc -l` muss mindestens `1` ausgeben.
+- [ ] `ops/konto-ready.sh` meldet nach `key_file` eine Zeile `container current`, wenn der laufende Container `cp` für jeden Namen
+      aus Punkt 3 außer `CP_BRIDGE_*` denselben Wert hat wie die Datei (fehlt ein Name in beiden, gilt er als gleich), sonst
+      `container stale` und Exit 1; verglichen wird auf dem Server (etwa `docker compose … exec -T cp printenv <NAME>` in eine
+      Variable), ausgegeben wird nur das Wort. `docs/konto/euro.md`, Abschnitt `## Für konto 06`, nennt `container current` in der
+      erwarteten Ausgabe und bei `container stale` den Weg, der den Container neu anlegt (`deploy.yml` von Hand mit `force: true`),
+      statt auf den nächsten Rollout zu warten.
+      MVP: Funktion, weil `deploy.yml` nur bei einer Änderung am Laufzeitpfad ausrollt (Schritt `plan`, „nichts am Laufzeitpfad,
+      kein Rollout“) und ein Container ohne die neuen Werte weiter 503 `konto_unavailable` antwortet, während das Skript heute
+      Exit 0 meldet; konto 15 läse dann ein grünes Werkzeug und einen roten Dienst (Kritik Tech Lead 2026-11-19).
+      Prüfung: `grep -cE 'container (current|stale)' ops/konto-ready.sh` muss mindestens `2` ausgeben.
+      Prüfung: `grep -c 'container stale' test/konto-ready.test.ts` muss mindestens `1` ausgeben.
+      Prüfung: `grep -cE "^\s*(it|test)\(" test/konto-ready.test.ts` muss mindestens `8` ausgeben (dazu ein Fall: Datei vollständig, Container
+      mit einem anderen `CP_KONTO_AUTH_PROXY_ID` gibt `container stale`, Exit 1 und keinen der beiden Werte in der Ausgabe).
+      Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/konto-ready.test.ts` muss Exit-Code 0 haben.
+      Prüfung: `awk '/^## Für konto 06/{f=1} f' docs/konto/euro.md | grep -c 'container current'` muss mindestens `1` ausgeben.
+      Prüfung: `awk '/^## Für konto 06/{f=1} f' docs/konto/euro.md | grep -c 'force: true'` muss mindestens `1` ausgeben.
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
