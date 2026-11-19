@@ -94,7 +94,7 @@ Prüfwerkzeug am Server von Hand nachsehen müsste.
       Prüfung: `git diff origin/dev...HEAD | grep -E '^[+]' | grep -iE "(api[_-]?key|secret|token|private[_-]?key)[\"' ]*[:=] *[\"']?[A-Za-z0-9_+/=-]{16,}|BEGIN [A-Z ]*PRIVATE KEY|cnwy_k_[A-Za-z0-9_-]{16,}|pk_live_|sk_live_" | wc -l` muss `0` ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung (Netz): `n=$(gh pr list -R matthiashippe/control-plane --head goal/konto-14 --state open --json number -q '.[0].number'); gh pr checks "$n" -R matthiashippe/control-plane | awk -F'\t' '$1=="check" && $2=="pass"' | wc -l` muss mindestens `1` ausgeben.
-- [ ] `ops/konto-ready.sh` meldet nach `key_file` eine Zeile `container current`, wenn der laufende Container `cp` für jeden Namen
+- [x] `ops/konto-ready.sh` meldet nach `key_file` eine Zeile `container current`, wenn der laufende Container `cp` für jeden Namen
       aus Punkt 3 außer `CP_BRIDGE_*` denselben Wert hat wie die Datei (fehlt ein Name in beiden, gilt er als gleich), sonst
       `container stale` und Exit 1; verglichen wird auf dem Server (etwa `docker compose … exec -T cp printenv <NAME>` in eine
       Variable), ausgegeben wird nur das Wort. `docs/konto/euro.md`, Abschnitt `## Für konto 06`, nennt `container current` in der
@@ -139,5 +139,6 @@ Prüfwerkzeug am Server von Hand nachsehen müsste.
 ## Progress Log
 - 2026-11-19 Zyklus 1: Punkte 1, 2, 3, 4, 5 gebaut (README-Absatz sagt "not switched on yet", start_automaton übersetzt 503 konto_unavailable, ops/konto-ready.sh mit 7 Offline-Fällen, euro.md und ANNAHMEN.md Goal 14). Prüfbefehle: P1 1 und 0; P2 1, 3, vitest Exit 0, Merge-Basis exit=1; P3 syntax ok, vitest Exit 0, 7, 0, 3, 1; P4 1 und 1; P5 0, laufzeit gleich, 0, goals gleich, 0, check grün (229 Dateien, 2430 Tests), Netz-Prüfung nach dem PR.
 - 2026-11-19 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5; `dev` (cf0ec18) war schon im Branch, alle Prüfbefehle am Kopf 3e76905 erneut gefahren. Prüfbefehle: P1 `1`, `0`; P2 `1`, `3`, vitest 48 Tests Exit 0, Merge-Basis `exit=1`; P3 `syntax ok`, vitest 7 Tests Exit 0, `7`, `0`, `3`, `1`; P4 `1`, `1`; P5 `0`, `laufzeit gleich`, `0`, `goals gleich`, `0`, `check` Exit 0 (229 Dateien, 2430 Tests, grün in 85 s), Netz `1`; Jobs `check` und `e2e` an PR #297 für 3e76905 pass.
+- 2026-11-19 Zyklus 3: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6; Punkt 6 aus der Kritik gebaut (`ops/konto-ready.sh` vergleicht je CP_KONTO_* die Datei mit `printenv` im Container und meldet `container current` oder `container stale`, ein neuer Fall, `euro.md` mit `container current` und `deploy.yml` mit `force: true`), der neue Fall war vorher rot (3 von 8), Gegenproben rot (2 und 1 von 8); `dev` (cf0ec18) ist im Branch. Prüfbefehle am Kopf 14b73da: P1 `1`, `0`; P2 `1`, `3`, vitest Exit 0, Merge-Basis `exit=1`; P3 `syntax ok`, vitest Exit 0, `8`, `0`, `3`, `1`; P4 `1`, `1`; P5 `0`, `laufzeit gleich`, `0`, `goals gleich`, `0`, `check` Exit 0 (2431 Tests, grün in 55 s), Netz nach dem Push; P6 `3`, `1`, `8`, vitest Exit 0, `1`, `1`.
 
 ## Blockers
