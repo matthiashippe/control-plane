@@ -26,21 +26,6 @@ Kunden die Cookies seiner Nutzer setzt, sonst bleibt er mit seinem Dienst nicht 
 - sandbox Goal 07 DONE
 
 ## Kontext für den Maker
-- Befund vom 17.11.2026 (Matthias im Kundenkonto bei INWX, Dialog „Verlängerungsoption“): `sandboxhost.de` läuft bis 15.11.2027
-  17:50 und verlängert sich jährlich automatisch. INWX verlängert eine `.de` nicht im Voraus: manuell erst ab 60 Tagen vor Ablauf
-  (`https://kb.inwx.com/en-us/19/47`), und eine `.de` läuft in Jahresschritten. Zwei Jahre Restlaufzeit sind damit nicht erreichbar.
-  Folge nach der Annahme zur Laufzeit unten: Das Kästchen zur Laufzeit im PR-Text bleibt leer, darunter ein ehrlicher Satz (eine `.de`
-  wird nur in Jahresschritten registriert und verlängert, `sandboxhost.de` verlängert sich jedes Jahr automatisch, bezahlt bis
-  2027-11-15, und wir halten sie verlängert, solange sie auf der Liste steht); der Satz in Reason for PSL Inclusion, die Registrierung
-  sei vor der Einreichung verlängert worden, fällt weg. Das Gate ist nur noch `public_post`, `server_kauf` entfällt, die Aufgabe an
-  Matthias hat keinen Schritt bei INWX mehr, und `Empfehlung:` nennt zusätzlich, dass das leere Kästchen eine Ablehnung
-  wahrscheinlicher macht; Matthias entscheidet am Gate, ob trotzdem gepostet wird. Der Schritt mit `INWX` unter `## Schritte` in
-  `psl.md` bleibt, als Blick auf die Laufzeit im Kundenkonto ohne Kauf. Zyklus 4 fasst PR-Text, Prüfwert und Blockers neu.
-- Korrektur von Matthias am 17.11.2026 (privates Board, Karte zum Human Gate): PostYourPrice wird nach außen weder genannt noch
-  verlinkt. Das Angebot, um das es hier geht, sind die Automatons: Sandboxes, in denen Automatons laufen, betrieben von HTC; mit
-  PostYourPrice hat das nichts zu tun. Zyklus 3 fasst deshalb Eintrag, PR-Text, Prüfwert und Blockers neu, alles andere bleibt.
-  In `psl-entry.txt` und `psl-pr-body.md` steht danach weder `PostYourPrice` noch `postyourprice.com`, weder `cp.hippe.eu` (leitet
-  dorthin um) noch `Handsel` noch ein Link auf `matthiashippe/control-plane` (die README dort nennt PostYourPrice).
 - Ziel: Der Dienst eines Kunden unter `sbx-<id>-<port>.sandboxhost.de` bekommt nie ein Cookie, das eine andere Sandbox gesetzt hat.
 - Herkunft: Zeile sandbox in ROADMAP.md, Glied 11. Übernimmt goals/_vorschlaege/sandbox-nacharbeit-2026-11-13-5.md (Schwere 2, Beleg
   `curl -s https://publicsuffix.org/list/public_suffix_list.dat | grep -c sandboxhost` gibt 0, `goals/sandbox/ANNAHMEN.md` Abschnitt
@@ -68,28 +53,24 @@ Kunden die Cookies seiner Nutzer setzt, sonst bleibt er mit seinem Dienst nicht 
   Spalte 0: `Davor: <Kopfzeile des Abschnitts davor>` und `Danach: <Kopfzeile des Abschnitts danach>`, je genau so, wie die Zeile
   `// <Organisation> : <URL>` am Tag der Messung in `public_suffix_list.dat` steht. Sortiert wird nach dem Namen der Organisation,
   ohne Rücksicht auf Groß- und Kleinschreibung (Format-Seite der Richtlinien).
-- `psl-entry.txt`: Zeile 1 `// Hanseatic Tech Company : https://hanseatictechcompany.com`, Zeile 2 `// Submitted by Matthias Hippe <Adresse>`,
+- `psl-entry.txt`: Zeile 1 `// PostYourPrice : https://postyourprice.com`, Zeile 2 `// Submitted by Matthias Hippe <Adresse>`,
   Zeile 3 `sandboxhost.de`. Welche Adresse, steht in der Annahme zur Mail unten.
 - `psl-pr-body.md` übernimmt die Vorlage vollständig, auch ihre HTML-Kommentare und die Zeilen `<!-- FILL IN: … -->` und
   `<!-- END FILL IN -->`, und füllt nur die Stellen dazwischen; die Beispielzeilen zu Cloudflare und Let's Encrypt und die Zeile
   „REMOVE THIS LINE …“ fallen weg, weil der PR keine Grenze eines Dritten umgeht (wir nutzen Origin-CA-Zertifikate von Cloudflare,
   nicht Let's Encrypt). Ein Kästchen wird nur angekreuzt, wenn es am Tag des Postens wahr ist. Inhalt: Description of Organization
-  (wer HTC ist: Hanseatic Tech Company UG (haftungsbeschränkt), Frankfurt am Main, so wie das Impressum
-  `https://hanseatictechcompany.com/impressum` sie nennt, kein Wohnort und keine Person als Firma; was HTC hier anbietet: gehostete
-  Sandboxes für Agents der Open-Source-Runtime Automaton (`https://github.com/Conway-Research/automaton`), je Automaton eine eigene
-  Sandbox auf einem eigenen Server, bezahlt aus seinem Guthaben, ein freigegebener Port unter `sbx-<id>-<port>.sandboxhost.de`;
-  dass Matthias Hippe den Dienst bei HTC gebaut hat, betreibt und einreicht; kein Produktname, keine Marke), Organization Website
-  `https://hanseatictechcompany.com`, Reason for PSL Inclusion (jede Sandbox bekommt für einen freigegebenen Port einen eigenen Namen
+  (wer HTC ist: Hanseatic Tech Company, Matthias Hippe, Hamburg, laut `LICENSE.md`; was PostYourPrice tut: ein Conway-kompatibles
+  Control Plane für Automatons mit Sandboxes auf einem eigenen Server; dass Matthias als Betreiber einreicht), Organization Website
+  `https://postyourprice.com`, Reason for PSL Inclusion (jede Sandbox bekommt für einen freigegebenen Port einen eigenen Namen
   `sbx-<id>-<port>.sandboxhost.de`, in dem fremder Code des Kunden läuft; ohne Eintrag kann dieser Code Cookies für die ganze Domain
   setzen; warum kein anderer Weg reicht: das Präfix `__Host-` schützt nur Dienste, deren Code es benutzt, und wir schreiben den Code
   der Kunden nicht vor, ein Filter für `Set-Cookie` im Proxy fängt kein Cookie, das JavaScript im Browser setzt, und eine eigene
-  registrierbare Domain je Sandbox ist nicht machbar; Konto und Zahlung laufen unter einer anderen Domain, die der Text nicht nennt; die Bestätigung zur Laufzeit von
+  registrierbare Domain je Sandbox ist nicht machbar; die Zahlung läuft unter einer anderen Domain; die Bestätigung zur Laufzeit von
   mindestens zwei Jahren), die Zahl der Nutzer als
   `0 (current actual count: at most <a> accounts with at least one sandbox, our own test accounts included, measured <JJJJ-MM-TT>)`
   mit `<a>` aus `## Vorher`, DNS Verification mit `dig +short TXT _psl.sandboxhost.de` und
   `"https://github.com/publicsuffix/list/pull/XXXX"` (Platzhalter `XXXX` wie in der Vorlage), Abuse Contact
-  `matthias@hanseatictech.de` (steht in `LICENSE.md`); die Frage nach der Rollenadresse bleibt ehrlich unangekreuzt, mit dem Satz,
-  dass die Adresse die des Einreichers bei HTC ist. Keine Zahl ohne Messung, nichts, was
+  `https://postyourprice.com/impressum` (Umleitung auf `/terms#impressum`, dort steht die Mail). Keine Zahl ohne Messung, nichts, was
   die Messungen nicht tragen.
 - `## PR` in `psl.md`: die Zeilen `PR-Titel: <Titel>` (Englisch, mit `sandboxhost.de`, etwa `Add sandboxhost.de`) und
   `Prüfwert: <12 Hex>`, die ersten 12 Zeichen von `sha256` über den Titel mit Zeilenende, dann `psl-pr-body.md`, dann
@@ -126,16 +107,15 @@ Kunden die Cookies seiner Nutzer setzt, sonst bleibt er mit seinem Dienst nicht 
   Cookies aus Antworten nur für den eigenen Namen gelten. Nicht in diesem Goal gebaut, weil es den Laufzeitpfad des Sandbox-Servers
   ändert und JavaScript im Browser nicht abfängt.
 - Human Gate am Ende des Baus: committen, pushen, dann `## Status` auf `BLOCKED matthias` und unter `## Blockers` je eine Zeile ab
-  Spalte 0: `Art: matthias`, `Gate: public_post` (seit 17.11.2026 ohne `server_kauf`, Befund oben),
+  Spalte 0: `Art: matthias`, `Gate: public_post, server_kauf` (`public_post` zuerst, weil der Loop Master den ersten Namen liest),
   `Aufgabe:`, `Worum:`, `Empfehlung:`. Darunter als nummerierter Punkt das Ziel `https://github.com/publicsuffix/list` (neuer PR),
   der PR-Titel, der vollständige PR-Text, der Eintrag und der Prüfwert, damit der Tech Lead sie ganz in die Karte übernimmt
-  (Matthias liest auf der Karte, nicht in einer MD-Datei). `Aufgabe:` nennt die Freigabe mit „ok“ (seit 17.11.2026 ohne
-  Verlängerung bei INWX, Befund oben). `Worum:` sagt in zwei
+  (Matthias liest auf der Karte, nicht in einer MD-Datei). `Aufgabe:` nennt zuerst die Verlängerung von `sandboxhost.de` bei INWX auf
+  mindestens zwei Jahre Restlaufzeit (Klicks im Kundenkonto, Preis laut INWX), dann die Freigabe mit „ok“. `Worum:` sagt in zwei
   Sätzen, warum (Cookies einer Sandbox an andere Sandboxes) und was gepostet wird. `Empfehlung:` nennt, dass die Richtlinien der PSL
   2000 bis 3000 Nutzer erwarten und der PR ehrlich `<a>` Konten nennt, die Aufnahme also abgelehnt werden oder lange liegen kann,
   empfiehlt trotzdem Verlängerung und Freigabe (wenige Euro, wenige Minuten, kein Schaden bei Ablehnung) und nennt den Rückfall im
-  Proxy. Nach dem Commit mit `BLOCKED matthias` ändert sich keine der drei Dateien unter `docs/sandbox/psl*` mehr (einzige
-  Ausnahme: die Korrektur von Matthias vom 17.11.2026 in Zyklus 3; für deren neuen Commit mit `BLOCKED matthias` gilt die Regel wieder).
+  Proxy. Nach dem Commit mit `BLOCKED matthias` ändert sich keine der drei Dateien unter `docs/sandbox/psl*` mehr.
 - Ablauf nach dem Gate (kein Done-Punkt): Erst wenn am Topic steht, dass Matthias auf seinem privaten Board mit „ok“ freigegeben und
   die Verlängerung bestätigt hat, schreibt der Maker ins Progress Log die Zeile
   `- <Datum> Freigabe public_post: ok, <JJJJ-MM-TT HH:MM> UTC (Matthias, privates Board), Prüfwert <12 Hex>` und führt `## Schritte`
@@ -175,11 +155,10 @@ Kunden die Cookies seiner Nutzer setzt, sonst bleibt er mit seinem Dienst nicht 
 - Annahme (Tech Lead, 16.11.2026): Der Token `sbx-ports` (`CLOUDFLARE_SBX_API_TOKEN`) hat Zone DNS Edit für `sandboxhost.de`
   (`goals/sandbox/ANNAHMEN.md`, `## Goal 07`, Zeile zur Domain `sandboxhost.de`), also legt `cloudflare.py psl-txt` das TXT an, ohne
   neuen Token und ohne weitere Karte an Matthias.
-- Entscheidung (Matthias, 17.11.2026, ersetzt die Annahme des Tech Leads vom 16.11.): Die Kopfzeile nennt HTC mit
-  `https://hanseatictechcompany.com`, nicht PostYourPrice. Grund: PostYourPrice ist nicht das Angebot hinter den Sandboxes und wird
-  nach außen nicht verlinkt; die Maintainer finden auf der Seite von HTC die Firma und im Impressum Anschrift und Kontakt, den Dienst
-  selbst beschreibt der PR-Text. Unter `sandboxhost.de` antwortet weiter nichts. Die Zeile „Kopfzeile“ unter `## Goal 11` in
-  `goals/sandbox/ANNAHMEN.md` zieht Zyklus 3 nach.
+- Annahme (Tech Lead, 16.11.2026): Die Kopfzeile des Eintrags nennt PostYourPrice mit `https://postyourprice.com`, die Beschreibung
+  nennt HTC als Betreiber. Grund: Dort finden die Maintainer den Dienst und die Kontaktadresse für Missbrauch
+  (`https://postyourprice.com/impressum`); unter `sandboxhost.de` selbst antwortet nichts (die Zone hat nur `*.sandboxhost.de`), und
+  eine Seite dort wäre eine DNS-Änderung über das TXT hinaus.
 - Annahme (Tech Lead, 16.11.2026): PR-Text und Eintrag liegen als eigene Dateien neben `psl.md`, weil `gh pr create --body-file` dann
   genau die freigegebenen Bytes postet und der Prüfwert über sie gerechnet wird; `psl.md` erklärt sie für Matthias.
 
@@ -196,7 +175,7 @@ Kunden die Cookies seiner Nutzer setzt, sonst bleibt er mit seinem Dienst nicht 
       Prüfung: `echo "$(wc -l < docs/sandbox/psl-entry.txt) $(sed -n 3p docs/sandbox/psl-entry.txt) $(grep -c '[[:space:]]$' docs/sandbox/psl-entry.txt)"` muss `3 sandboxhost.de 0` ausgeben.
       Prüfung: `m=$(sed -nE '2s/^.*<([^>]+)>$/\1/p' docs/sandbox/psl-entry.txt); [ -n "$m" ] && git grep -qF -- "$m" "$(git merge-base origin/dev HEAD)" -- README.md LICENSE.md src/public/terms.ts` muss Exit-Code 0 haben.
       Prüfung: `grep -cE '^(Davor|Danach): // .+ : https?://.+$' docs/sandbox/psl.md` muss 2 ausgeben.
-      Prüfung (Netz): `f=$(mktemp); curl -s https://publicsuffix.org/list/public_suffix_list.dat > "$f"; a=$(sed -nE 's/^Davor: (.+)$/\1/p' docs/sandbox/psl.md); b=$(sed -nE 's/^Danach: (.+)$/\1/p' docs/sandbox/psl.md); e=$(head -1 docs/sandbox/psl-entry.txt); [ "$(sed -n '/===BEGIN PRIVATE DOMAINS===/,/===END PRIVATE DOMAINS===/p' "$f" | grep -E '^// [^ ].* : https?://' | grep -A1 -xF -- "$a" | tail -1)" = "$b" ] && printf '%s\n' "$a" "$e" "$b" | LC_ALL=en_US.UTF-8 sort -fc` muss Exit-Code 0 haben.
+      Prüfung (Netz): `f=$(mktemp); curl -s https://publicsuffix.org/list/public_suffix_list.dat > "$f"; a=$(sed -nE 's/^Davor: (.+)$/\1/p' docs/sandbox/psl.md); b=$(sed -nE 's/^Danach: (.+)$/\1/p' docs/sandbox/psl.md); e=$(head -1 docs/sandbox/psl-entry.txt); [ "$(sed -n '/===BEGIN PRIVATE DOMAINS===/,/===END PRIVATE DOMAINS===/p' "$f" | grep -E '^// [^ ].* : https?://' | grep -A1 -xF -- "$a" | tail -1)" = "$b" ] && printf '%s\n' "$a" "$e" "$b" | LC_ALL=C sort -fc` muss Exit-Code 0 haben.
 - [ ] Der PR-Text in `docs/sandbox/psl-pr-body.md` folgt der Vorlage des PSL-Repos mit allen Abschnitten, jede Stelle zum Ausfüllen ist
       gefüllt, die Beispielzeilen sind entfernt, und die Zahl der Nutzer ist die gemessene.
       Prüfung: `head -1 docs/sandbox/psl-pr-body.md` muss `# Public Suffix List (PSL) Submission` ausgeben.
@@ -204,8 +183,7 @@ Kunden die Cookies seiner Nutzer setzt, sonst bleibt er mit seinem Dienst nicht 
       Prüfung: `echo "$(grep -c '<!-- FILL IN: ' docs/sandbox/psl-pr-body.md) $(grep -c '<!-- END FILL IN -->' docs/sandbox/psl-pr-body.md)"` muss `6 7` ausgeben.
       Prüfung: `awk '/<!-- FILL IN: /{f=1;n=0;next} /<!-- END FILL IN -->/{if(f&&n==0)e++;f=0} f&&NF{n++} END{print e+0}' docs/sandbox/psl-pr-body.md` muss 0 ausgeben.
       Prüfung: `grep -cE 'REMOVE THIS LINE|letsencrypt\.org/docs/rate-limits|add-domain-to-cf' docs/sandbox/psl-pr-body.md` muss 0 ausgeben.
-      Prüfung: `for w in sandboxhost.de _psl.sandboxhost.de https://hanseatictechcompany.com https://hanseatictechcompany.com/impressum https://github.com/Conway-Research/automaton Automaton Set-Cookie __Host- 'pull/XXXX' 'current actual count:'; do grep -qF -- "$w" docs/sandbox/psl-pr-body.md || echo "fehlt $w"; done` muss nichts ausgeben.
-      Prüfung: `cat docs/sandbox/psl-entry.txt docs/sandbox/psl-pr-body.md | grep -ciE 'postyourprice|cp\.hippe\.eu|handsel|matthiashippe/control-plane'` muss 0 ausgeben.
+      Prüfung: `for w in sandboxhost.de _psl.sandboxhost.de https://postyourprice.com https://postyourprice.com/impressum Set-Cookie __Host- 'pull/XXXX' 'current actual count:'; do grep -qF -- "$w" docs/sandbox/psl-pr-body.md || echo "fehlt $w"; done` muss nichts ausgeben.
       Prüfung: `n=$(sed -nE 's/^Konten mit Sandbox: ([0-9]+) .*/\1/p' docs/sandbox/psl.md); [ -n "$n" ] && grep -cF "current actual count: at most $n accounts" docs/sandbox/psl-pr-body.md` muss 1 ausgeben.
       Prüfung (Netz): `gh api repos/publicsuffix/list/contents/.github/pull_request_template.md -q .content | base64 -d | grep -E '^(#+ |\*\*)' | while IFS= read -r l; do grep -qxF -- "$l" docs/sandbox/psl-pr-body.md || echo "fehlt $l"; done` muss nichts ausgeben.
       Prüfung (Netz): `[ "$(gh api repos/publicsuffix/list/contents/.github/pull_request_template.md -q .content | base64 -d | grep -cE '^ *\* \[[ x]\]')" = "$(grep -cE '^ *\* \[[ x]\]' docs/sandbox/psl-pr-body.md)" ]` muss Exit-Code 0 haben.
@@ -234,11 +212,11 @@ Kunden die Cookies seiner Nutzer setzt, sonst bleibt er mit seinem Dienst nicht 
 - [ ] Alle neuen Texte sind ohne Gedankenstrich, und keine Mailadresse in ihnen ist neu im öffentlichen Repo.
       Prüfung: `cat docs/sandbox/psl.md docs/sandbox/psl-pr-body.md docs/sandbox/psl-entry.txt | grep -c $'\xe2\x80\x93\|\xe2\x80\x94'` muss 0 ausgeben.
       Prüfung: `cat docs/sandbox/psl.md docs/sandbox/psl-pr-body.md docs/sandbox/psl-entry.txt | grep -oE '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[a-z]{2,}' | sort -u | while read -r m; do git grep -qF -- "$m" "$(git merge-base origin/dev HEAD)" -- README.md LICENSE.md src/public || echo "neu $m"; done` muss nichts ausgeben.
-- [ ] Die Goal-Datei endet am Human Gate: `## Status` ist `BLOCKED matthias`, unter `## Blockers` stehen `Art: matthias`, das Gate
-      `public_post`, `Aufgabe:`, `Worum:`, `Empfehlung:` und der Prüfwert; ist die Freigabe schon da, steht statt
+- [ ] Die Goal-Datei endet am Human Gate: `## Status` ist `BLOCKED matthias`, unter `## Blockers` stehen `Art: matthias`, die Gates
+      `public_post` und `server_kauf`, `Aufgabe:`, `Worum:`, `Empfehlung:` und der Prüfwert; ist die Freigabe schon da, steht statt
       dessen ihre Zeile im Progress Log.
       Prüfung: `f=goals/sandbox/11-die-sandbox-domain-kommt-auf-die-public-suffix-list.md; [ "$(awk '/^## Status/{getline; print; exit}' "$f")" = "BLOCKED matthias" ] || grep -qE '^- .*Freigabe public_post: ok, .*Prüfwert [0-9a-f]{12}' "$f"` muss Exit-Code 0 haben.
-      Prüfung: `f=goals/sandbox/11-die-sandbox-domain-kommt-auf-die-public-suffix-list.md; grep -qE '^- .*Freigabe public_post: ok, .*Prüfwert [0-9a-f]{12}' "$f" || [ "$(awk '/^## Blockers/{f=1;next} /^## /{f=0} f' "$f" | grep -cE '^(Art: matthias|Gate: public_post|Aufgabe: .+|Worum: .+|Empfehlung: .+)$')" = 5 ]` muss Exit-Code 0 haben.
+      Prüfung: `f=goals/sandbox/11-die-sandbox-domain-kommt-auf-die-public-suffix-list.md; grep -qE '^- .*Freigabe public_post: ok, .*Prüfwert [0-9a-f]{12}' "$f" || [ "$(awk '/^## Blockers/{f=1;next} /^## /{f=0} f' "$f" | grep -cE '^(Art: matthias|Gate: public_post, server_kauf|Aufgabe: .*INWX.+|Worum: .+|Empfehlung: .+)$')" = 5 ]` muss Exit-Code 0 haben.
       Prüfung: `v=$(sed -nE 's/^Prüfwert: ([0-9a-f]{12})$/\1/p' docs/sandbox/psl.md); [ -n "$v" ] && grep -qF -- "$v" goals/sandbox/11-die-sandbox-domain-kommt-auf-die-public-suffix-list.md` muss Exit-Code 0 haben.
 - [x] Vor der Freigabe legt kein Lauf etwas in `publicsuffix/list` an (kein PR, kein Fork, kein Kommentar) und setzt kein TXT
       `_psl.sandboxhost.de`; geprüft wird lesend, und jede Prüfung gilt als erfüllt, sobald die Freigabe-Zeile im Progress Log steht.
@@ -257,7 +235,7 @@ Kunden die Cookies seiner Nutzer setzt, sonst bleibt er mit seinem Dienst nicht 
 - [ ] Jede Zahl in `docs/sandbox/psl.md` und im PR-Text mit dem Befehl und der Uhrzeit, aus denen sie stammt; keine Adresse, kein Name
       und keine Sandbox-ID eines Kunden, kein Token.
 - [ ] Jedes angekreuzte Kästchen im PR-Text ist am Tag des Postens wahr, und der Text behauptet nichts, was die Messungen nicht tragen.
-- [ ] Die Karte an Matthias enthält PR-Titel, PR-Text, Eintrag und Prüfwert vollständig, seit 17.11.2026 ohne Verlängerung bei INWX,
+- [ ] Die Karte an Matthias enthält PR-Titel, PR-Text, Eintrag und Prüfwert vollständig, dazu die Klicks der Verlängerung bei INWX,
       und dauert für ihn wenige Minuten.
 - [ ] Code, Kommentare und Testnamen Englisch, Goal-Datei und `psl.md` Deutsch, PR-Text und Eintrag Englisch, kein Gedankenstrich.
 
@@ -277,7 +255,7 @@ Kunden die Cookies seiner Nutzer setzt, sonst bleibt er mit seinem Dienst nicht 
 - loop-constraints.md gilt zusätzlich
 
 ## Budget
-- max Zyklen: 4 (ein Zyklus mehr für die Korrektur von Matthias vom 17.11.2026)
+- max Zyklen: 3
 - max Versuche pro Gap: 3
 
 ## Progress Log
@@ -293,6 +271,7 @@ Kunden die Cookies seiner Nutzer setzt, sonst bleibt er mit seinem Dienst nicht 
 - 2026-11-17 Zyklus 4: Punkte 3, 4 und 9 gebaut (Laufzeit nach dem Befund von INWX: Kästchen zu zwei Jahren Restlaufzeit leer mit Zeile „Not checked“, Satz zur Verlängerung in Reason durch „paid until 2027-11-15 … keep it renewed for as long as sandboxhost.de is listed“ ersetzt, Kästchen zur Einhaltung der Richtlinien ehrlich leer, `psl.md` Laufzeit und Schritt 1 ohne Kauf, Prüfwert 8bd619501adc statt 669a014158af, Human Gate neu nur `public_post`). Prüfbefehle: P1 3, leer, 0, Netz 1; P2 3, `3 sandboxhost.de 0`, Exit 0, 2, Netz Exit 0; P3 Kopfzeile, leer, `6 7`, 0, 0, leer, 0, 1, Netz leer, Netz Exit 0; P4 1, Exit 0; P5 vitest Exit 0 (13 passed), leer, 0, passt, `CLOUDFLARE SELFTEST OK`; P6 4, 3, `INWX Prüfwert gh repo fork gh pr create psl-txt gh pr edit`, 7, Netz `sandboxhost.de`; P7 1, leer; P8 0, leer; P9 drei mal Exit 0 (vorher am Kopf 6ec7b71 Exit 1, Status ACTIVE); P10 Netz vier mal Exit 0; P11 0; P12 `node scripts/check.mjs` Exit 0 (grün in 131 s, 198 Dateien, 2180 Tests, nach dem Merge von `origin/dev` 6d19b92).
 - 2026-11-17 Zyklus 4: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12; `origin/dev` (6d19b92) gemergt, alle Prüfbefehle danach neu gelaufen. Prüfbefehle: wie in der Zeile Zyklus 4 oben, unverändert nach dem Merge (P11 0, P4 Exit 0, P9 drei mal Exit 0); P12 `node scripts/check.mjs` Exit 0 (grün in 131 s, 2180 Tests).
 - 2026-11-18 BLOCKED fachlich: Matthias gibt den PR an die Public Suffix List nicht frei (18.11.2026, 20:28: kein PR an die Public Suffix List, nichts geht unter seinem GitHub-Konto raus), das Human Gate `public_post` bleibt zu, und das Soll dieses Goals ist nicht erreichbar; den Schutz gegen Cookies über Sandbox-Grenzen baut sandbox 12 im Proxy (ROADMAP.md auf dev, Commit 64264a2). `origin/dev` (c9554e3) gemergt, jede andere Datei des Branches auf die Merge-Basis zurückgesetzt (`docs/sandbox/psl.md`, `docs/sandbox/psl-pr-body.md`, `docs/sandbox/psl-entry.txt`, `ops/sandbox/cloudflare.py`, `test/cloudflare-psl-txt.test.ts`, `goals/sandbox/ANNAHMEN.md`, `goals/_vorschlaege/sandbox-nacharbeit-2026-11-16-1.md`), nichts gepostet, kein TXT gesetzt, Kästchen 1 bis 9 leer, weil ihre Dateien nicht mehr auf dem Branch liegen. Prüfbefehle: P10 Netz vier mal Exit 0; P11 0; P12 `node scripts/check.mjs` Exit 0 (grün in 147 s); P1 bis P9 nicht mehr erfüllbar (Dateien zurückgesetzt, Status nicht `BLOCKED matthias`).
+- 2026-11-19 Merge-Gate (Tech Lead, PRO-25161): Die Goal-Datei steht wieder auf dem Vertrag von `origin/dev` (Kontext für den Maker, Done-Punkte, Annahmen, Budget wie dev); geändert sind nur Status, Progress Log, Blockers, Ehrliche Lücken und die Kästchen 10 bis 12. Die Korrekturen vom 17.11. zu Kopfzeile, Laufzeit und Gate bleiben in der Historie des Branches (Kopf ded38ec), weil das Goal ohne PASS endet und sie nichts mehr steuern.
 
 ## Blockers
 Art: fachlich
