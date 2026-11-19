@@ -259,6 +259,68 @@ const oursClause = `(
 const OURS_ARGS = [...OURS, ...OUR_KEY_NAMES];
 const notOurs = `not ${oursClause}`;
 
+// CP_REPORT=decline (goals/kunden/01): instead of the report, one JSON of every foreign address with
+// inference in the window CP_SINCE..CP_UNTIL (ISO UTC, CP_UNTIL empty means now), numbered from 1 in
+// the order of its first inference row there. ops/customer-decline.sh reads it on the code-host and
+// matches it against the access log. No address, key or ref leaves this block: a customer is a number.
+// Written synchronously and ended here, so without CP_REPORT nothing below changes by a single byte.
+if (process.env.CP_REPORT === "decline") {
+  const iso = (name, fallback) => {
+    const raw = process.env[name];
+    if (!raw) return fallback;
+    const t = Date.parse(raw);
+    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/.test(raw) || Number.isNaN(t)) {
+      require("fs").writeSync(2, `db-report: ${name} is no ISO time in UTC\n`);
+      process.exit(1);
+    }
+    return new Date(t).toISOString();
+  };
+  const since = iso("CP_SINCE", new Date(0).toISOString());
+  const until = iso("CP_UNTIL", new Date().toISOString());
+  const inWindow = "created_at >= ? and created_at < ?";
+  const customers = all(
+    `select address, min(created_at) first_at from ledger
+      where kind = 'inference' and ${inWindow} and ${notOurs}
+      group by address order by first_at, min(id)`,
+    since, until, ...OURS_ARGS,
+  ).map((c, i) => ({
+    n: i + 1,
+    balance_mc: one("select balance_mc from wallets where address = ?", c.address)?.balance_mc ?? 0,
+    last_topup: one("select max(created_at) at from ledger where address = ? and kind = 'topup'", c.address).at,
+    rows: all(
+      `select created_at, meta, delta_mc from ledger
+        where address = ? and kind = 'inference' and ${inWindow} order by created_at, id`,
+      c.address, since, until,
+    ).map((r) => {
+      let model = null;
+      try {
+        model = JSON.parse(r.meta || "{}").model ?? null;
+      } catch {
+        /* a row without readable meta keeps its charge, the model stays unknown */
+      }
+      return { at: r.created_at, model, charged_mc: -r.delta_mc };
+    }),
+  }));
+  const hasAborts = one("select count(*) n from sqlite_master where type = 'table' and name = 'inference_aborts'").n > 0;
+  const aborts = hasAborts
+    ? all(
+        `select created_at at, model, answered, purchase_mc from inference_aborts
+          where ${inWindow} order by created_at, id`,
+        since, until,
+      )
+    : [];
+  // writeSync may write part of the buffer to a pipe, or meet EAGAIN on a non-blocking one.
+  const out = Buffer.from(JSON.stringify({ since, until, customers, aborts }) + "\n");
+  for (let off = 0; off < out.length; ) {
+    try {
+      off += require("fs").writeSync(1, out, off, out.length - off);
+    } catch (e) {
+      if (e.code !== "EAGAIN") throw e;
+    }
+  }
+  process.exit(0);
+}
+
 // The same test against a column that is not ledger.address.
 //
 // oursClause names ledger.address, so it only works inside a query on the ledger. The one number

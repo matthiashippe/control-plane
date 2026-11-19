@@ -1,0 +1,2 @@
+# Own addresses for the customer-decline fixture. Documentation range only (RFC 5737).
+203.0.113.99 2026-11-19  our own checker in the fixture

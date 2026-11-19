@@ -1,0 +1,12 @@
+{"ts": 1794441598.0, "status": 200, "request": {"remote_ip": "198.51.100.7", "client_ip": "198.51.100.7", "uri": "/v1/chat/completions", "method": "POST", "headers": {"User-Agent": ["node"]}}}
+{"ts": 1794477540.0, "status": 200, "request": {"remote_ip": "198.51.100.7", "client_ip": "198.51.100.7", "uri": "/v1/models", "method": "GET", "headers": {"User-Agent": ["node"]}}}
+{"ts": 1794477600.5, "status": 200, "request": {"remote_ip": "203.0.113.99", "client_ip": "203.0.113.99", "uri": "/v1/chat/completions", "method": "POST", "headers": {"User-Agent": ["node"]}}}
+{"ts": 1794477602.0, "status": 200, "request": {"remote_ip": "198.51.100.7", "client_ip": "198.51.100.7", "uri": "/v1/chat/completions", "method": "POST", "headers": {"User-Agent": ["node"]}}}
+{"ts": 1794477901.0, "status": 200, "request": {"remote_ip": "198.51.100.7", "client_ip": "198.51.100.7", "uri": "/v1/chat/completions?stream=false", "method": "POST", "headers": {"User-Agent": ["node"]}}}
+{"ts": 1794478203.0, "status": 200, "request": {"remote_ip": "198.51.100.7", "client_ip": "198.51.100.7", "uri": "/v1/check", "method": "POST", "headers": {"User-Agent": ["node"]}}}
+{"ts": 1794560401.0, "status": 200, "request": {"remote_ip": "198.51.100.7", "client_ip": "198.51.100.7", "uri": "/v1/chat/completions", "method": "POST", "headers": {"User-Agent": ["node"]}}}
+{"ts": 1794643200.0, "status": 402, "request": {"remote_ip": "198.51.100.7", "client_ip": "198.51.100.7", "uri": "/v1/chat/completions", "method": "POST", "headers": {"User-Agent": ["node"]}}}
+{"ts": 1794645000.0, "status": 402, "request": {"remote_ip": "198.51.100.7", "client_ip": "198.51.100.7", "uri": "/v1/chat/completions", "method": "POST", "headers": {"User-Agent": ["node"]}}}
+{"ts": 1794646800.0, "status": 500, "request": {"remote_ip": "198.51.100.50", "client_ip": "198.51.100.50", "uri": "/v1/chat/completions", "method": "POST", "headers": {"User-Agent": ["node"]}}}
+{"ts": 1794647400.0, "status": 404, "request": {"remote_ip": "198.51.100.50", "client_ip": "198.51.100.50", "uri": "/v1/chat/completions", "method": "GET", "headers": {"User-Agent": ["node"]}}}
+{"ts": 1794700800.0, "status": 402, "request": {"remote_ip": "198.51.100.7", "client_ip": "198.51.100.7", "uri": "/v1/chat/completions", "method": "POST", "headers": {"User-Agent": ["node"]}}}
