@@ -164,14 +164,18 @@ print(max(1, math.ceil((float(sys.argv[2] or time.time()) - min(stamps)) / 3600)
 fi
 
 HOURS="${1:-24}"
-BASE_URL="${CP_URL:-https://postyourprice.com}"
+# automatonhost.com is the canonical name since the move (umzug 01); postyourprice.com and cp.hippe.eu
+# still answer and redirect there, so the report is about the name visitors end up on.
+BASE_URL="${CP_URL:-https://automatonhost.com}"
 # Every name this service answers to. The referrer tests below decide whether a request came from
 # one of our own pages, and until 2026-09-23 they compared against the literal string cp.hippe.eu.
 # The day postyourprice.com went live, every visitor arriving through it was filed as "never ran
 # the page script" and vanished from the column, which is the one number this whole script exists
 # to print. Both names stay, because the old one still answers and is what the issue comments and
 # the settled x402 payments point at.
-CP_OWN_HOSTS="${CP_OWN_HOSTS:-cp.hippe.eu postyourprice.com}"
+# automatonhost.com joined with the move; without it a visitor coming from one of our pages under that
+# name was filed as a foreign referrer.
+CP_OWN_HOSTS="${CP_OWN_HOSTS:-automatonhost.com postyourprice.com cp.hippe.eu}"
 export CP_OWN_HOSTS
 # When we posted a public link, and why this report has to know.
 #
@@ -293,6 +297,89 @@ if [[ -n "$added" ]]; then
 fi
 echo
 
+# Arrivals per host (kunden 04, 2026-11-19). Three names answer since the move, and the question for
+# every channel is how many strangers arrive through which name and from where. An arrival is a
+# foreign address (not in the list above, the rule of this script) whose FIRST request in the whole
+# log lies inside the window; it counts once, under the host of that first request, with the host of
+# that request's referrer. Only hosts are printed, never an address: a referrer that is an address
+# reads (address), one of our own names reads (our page), none reads (none).
+python3 - "$log" "$since" "$HOURS" <<'ARRIVALS' || { echo "   (the arrivals block died; the traceback is above)" >&2; FUNNEL_BROKE=1; }
+import collections, ipaddress, json, os, re, sys, urllib.parse
+
+own = set(os.environ.get("CP_OWN_IPS_RESOLVED", "").split())
+own_hosts = {h.lower() for h in (os.environ.get("CP_OWN_HOSTS") or "").split() if h}
+HOSTS = ("automatonhost.com", "postyourprice.com", "cp.hippe.eu")
+ADDRESS_INSIDE = re.compile(r"([0-9]{1,3}[.-]){3}[0-9]{1,3}|[0-9a-f]{1,4}(:[0-9a-f]{1,4}){3,}")
+since, hours = float(sys.argv[2]), sys.argv[3]
+
+def bare_host(value):
+    value = (value or "").strip().lower()
+    if value.startswith("["):
+        return value[1:].split("]", 1)[0]
+    if value.count(":") == 1:
+        return value.split(":", 1)[0]
+    return value
+
+def referrer(value):
+    if not value:
+        return "(none)"
+    try:
+        host = (urllib.parse.urlsplit(value).hostname or "").lower()
+    except ValueError:
+        host = ""
+    if not host:
+        return "(unreadable)"
+    if host in own_hosts:
+        return "(our page)"
+    try:
+        ipaddress.ip_address(host)
+        return "(address)"
+    except ValueError:
+        pass
+    # A name that carries an address inside it (1.2.3.4.nip.io) would print the address all the same.
+    if ADDRESS_INSIDE.search(host):
+        return "(address)"
+    return host
+
+first = {}
+for raw in open(sys.argv[1], encoding="utf-8", errors="replace"):
+    raw = raw.strip()
+    if not raw.startswith("{"):
+        continue
+    try:
+        r = json.loads(raw)
+        ts = float(r.get("ts"))
+    except (TypeError, ValueError):
+        continue
+    q = r.get("request") or {}
+    ip = q.get("remote_ip") or ""
+    if not ip or ip in own:
+        continue
+    if ip not in first or ts < first[ip][0]:
+        ref = ((q.get("headers") or {}).get("Referer") or [""])[0] or ""
+        first[ip] = (ts, bare_host(q.get("host")), ref)
+
+per_host = {h: collections.Counter() for h in HOSTS}
+other = 0
+for ts, host, ref in first.values():
+    if ts < since:
+        continue
+    if host in per_host:
+        per_host[host][referrer(ref)] += 1
+    else:
+        other += 1
+
+total = sum(sum(c.values()) for c in per_host.values()) + other
+print("-- Arrivals per host --")
+print(f"   {total} foreign arrival(s) in the last {hours} hours")
+for host in HOSTS:
+    print(f"   {host}: {sum(per_host[host].values())} foreign arrival(s)")
+    for name, n in sorted(per_host[host].items(), key=lambda kv: (-kv[1], kv[0])):
+        print(f"      {n}  {name}")
+print(f"   other hosts: {other} foreign arrival(s)")
+print()
+ARRIVALS
+
 # The line every cycle reads first, and the one that did not exist until 2026-09-22.
 #
 # Answering "was a person here" took three scripts and a hand check of every address, five times in
@@ -337,7 +424,16 @@ if [[ -z "${CP_PAGES+x}" ]]; then
   # with nine strings like "<loc>https://postyourprice.com/" that equal no path a visitor can
   # request. Every address then failed the page test and the funnel printed "nobody arrived that
   # did not also look like a checker", which is a sentence about the log and was a bug in the sed.
-  CP_PAGES="$(curl -s -m 15 "$BASE_URL/sitemap.xml" | grep -oE '<loc>[^<]*' | sed -E 's|^<loc>https?://[^/]*||' | sed 's|^$|/|' | tr '\n' ' ')"
+  #
+  # -L since 2026-11-19: postyourprice.com/sitemap.xml answers 301 to automatonhost.com since the move,
+  # `curl -s` printed nothing, the grep exited 1 and `set -euo pipefail` ended the whole report right
+  # after its header. An empty or unreadable sitemap is now said on stderr and the run goes on with
+  # an empty CP_PAGES, which the check below already handles.
+  CP_PAGES="$( { curl -sL --max-redirs 5 -m 15 "$BASE_URL/sitemap.xml" || true; } | { grep -oE '<loc>[^<]*' || true; } | sed -E 's|^<loc>https?://[^/]*||' | sed 's|^$|/|' | tr '\n' ' ')"
+  if [[ -z "${CP_PAGES// /}" ]]; then
+    echo "   (the sitemap at $BASE_URL/sitemap.xml was empty or unreadable, so a page load is not checked against it)" >&2
+    CP_PAGES=""
+  fi
 fi
 # A path starts with a slash. Anything else in this list means the parse above went wrong, and the
 # damage is silent: the filter keeps running and rejects everybody.
