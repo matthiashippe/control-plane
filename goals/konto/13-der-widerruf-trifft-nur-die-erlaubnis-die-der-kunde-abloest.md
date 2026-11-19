@@ -1,7 +1,7 @@
 # Konto Goal 13: Der Widerruf trifft nur die Erlaubnis, die der Kunde ablöst
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Mit seinem Passkey beendet ein Kunde genau die Erlaubnis, die er ablöst, und keine Seite bringt ihn dazu, etwas anderes zu
@@ -169,7 +169,7 @@ Handy muss, und weil eine Unterschrift über einen Hash, den der Kunde nicht pr�
       Prüfung: `git diff origin/dev...HEAD -- . ':!src/public/konto-client/konto.js' | grep -E '^[+]' | grep -iE "(api[_-]?key|secret|token|private[_-]?key)[\"' ]*[:=] *[\"']?[A-Za-z0-9_+/=-]{16,}|BEGIN [A-Z ]*PRIVATE KEY|cnwy_k_[A-Za-z0-9_-]{16,}" | wc -l` muss `0` ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung (Netz): `n=$(gh pr list -R matthiashippe/control-plane --head goal/konto-13 --state open --json number -q '.[0].number'); gh pr checks "$n" -R matthiashippe/control-plane | awk -F'\t' '$1=="check" && $2=="pass"' | wc -l` muss mindestens `1` ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Ändert sich die abzulösende Erlaubnis zwischen Prüfung und Speichern, speichert der Server nichts und der Kunde startet neu.
@@ -203,5 +203,6 @@ Handy muss, und weil eine Unterschrift über einen Hash, den der Kunde nicht pr�
 - 2026-11-18 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6, 7 gebaut: `finishPayout` nimmt `replaced` und speichert bei Abweichung nichts, die Route verbrennt dann den Handoff mit 410, die Seite trägt `data-revoke-permission`, der Client baut Widerruf und Hash selbst, `konto.js` neu, Annahmen und `euro.md` nachgezogen. Prüfbefehle: P1 `1`, `4`, `0`, vitest 8 Dateien 66 Tests Exit 0; P2 `exit=0` `3 3`, Merge-Basis `2 1 passed`, `faelle ok`; P3 `0`, `1`, `2`, `1`, `1`, `exit=0`, vitest 5 Dateien 32 Tests Exit 0; P4 `exit=0` `4 4`, Merge-Basis `3 1 passed`, `faelle ok`, `1`; P5 `bilder gleich`, `exit=0` und `1` (`16 images, blocks end 390=655 1440=684, 0 defects`); P6 `8`, `3`, `1`, `1`; P7 `0`, `0`, `schnittstelle gleich`, `0`, `pakete gleich`, `goals gleich`, `0`, `check` Exit 0 (2413 Tests), Netz `1` (Job `check` an PR #286 pass).
 - 2026-11-19 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, 7; `dev` hatte nichts Neues, alle Prüfbefehle am Kopf bdd4513 erneut gefahren. Prüfbefehle: P1 `1`, `4`, `0`, vitest 66 Tests Exit 0; P2 `exit=0` `3 3`, Merge-Basis `2 1 passed`, `faelle ok`; P3 `0`, `1`, `2`, `1`, `1`, `exit=0`, vitest 32 Tests Exit 0; P4 `exit=0` `4 4`, Merge-Basis `3 1 passed`, `faelle ok`, `1`; P5 `bilder gleich`, `exit=0` und `1`; P6 `8`, `3`, `1`, `1`; P7 `0`, `0`, `schnittstelle gleich`, `0`, `pakete gleich`, `goals gleich`, `0`, `check` Exit 0 (2413 Tests), Netz `1`; Jobs `check` und `e2e` an PR #286 am Kopf pass.
 - 2026-11-19 Zyklus 3: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, 7; `dev` (586957e) in den Goal-Branch gemergt, den Konflikt in `goals/konto/ANNAHMEN.md` mit beiden Abschnitten gelöst (zuerst „Abgelöst durch konto 05“ von `dev`, dann „Goal 13“), PR #286 wieder ohne Konflikt. Prüfbefehle am Merge 6217002: P1 `1`, `4`, `0`, vitest 66 Tests Exit 0; P2 `exit=0` `3 3`, Merge-Basis `2 1 passed`, `faelle ok`; P3 `0`, `1`, `2`, `1`, `1`, `exit=0`, vitest 32 Tests Exit 0; P4 `exit=0` `4 4`, Merge-Basis `3 1 passed`, `faelle ok`, `1`; P5 `bilder gleich`, `exit=0` und `1`; P6 `8`, `3`, `1`, `1`; P7 `0`, `0`, `schnittstelle gleich`, `0`, `pakete gleich`, `goals gleich`, `0`, `check` Exit 0 (2413 Tests, 361 s bei Last 434 auf 30 Kernen), Netz `1`; Jobs `check` und `e2e` an PR #286 für 6217002 pass.
+- 2026-11-19 Release: PASS K und B (Zyklus 3), DONE.
 
 ## Blockers
