@@ -321,6 +321,63 @@ if (process.env.CP_REPORT === "decline") {
   process.exit(0);
 }
 
+// CP_REPORT=wallets (goals/kunden/02): instead of the report, one JSON that ops/conway-payers.sh matches
+// against the transfers to Conway on the code-host. Every address leaves this block only as the
+// SHA-256 (hex) of its lowercase form: `ours` for every address oursClause calls ours, `wallets` for
+// every other address in `wallets` or paying in `payments` with status settled, with counts only.
+// No address, key, ref or tx hash. Written synchronously and ended here, like the decline block.
+if (process.env.CP_REPORT === "wallets") {
+  const sha = (a) => require("crypto").createHash("sha256").update(String(a).toLowerCase()).digest("hex");
+  // oursClause itself, on a one-row table named like the ledger; its placeholders come first in the text.
+  const isOurs = (a) => one(`select ${oursClause} ours from (select ? address) ledger`, ...OURS_ARGS, a).ours === 1;
+  const candidates = new Set([
+    ...OURS,
+    ...all("select address from wallets").map((r) => r.address),
+    ...all("select from_address address from payments where status = 'settled'").map((r) => r.address),
+    ...all("select address from api_keys").map((r) => r.address),
+  ].map((a) => String(a).toLowerCase()));
+  // Counted once per table rather than once per address: the production ledger is long and the server has one core.
+  const inference = new Map(
+    all("select lower(address) a, count(*) n from ledger where kind = 'inference' group by lower(address)").map((r) => [r.a, r.n]),
+  );
+  const payments = new Map(
+    all(
+      "select lower(from_address) a, count(*) n, max(settled_at) last from payments where status = 'settled' group by lower(from_address)",
+    ).map((r) => [r.a, r]),
+  );
+  const known = new Set(all("select lower(address) a from wallets").map((r) => r.a));
+  const ours = [];
+  const wallets = [];
+  for (const a of [...candidates].sort()) {
+    if (isOurs(a)) {
+      ours.push(sha(a));
+      continue;
+    }
+    const paid = payments.get(a);
+    if (!known.has(a) && !paid) continue; // a key without a wallet or a settled payment is no payer
+    const last = paid && paid.last ? new Date(paid.last) : null;
+    wallets.push({
+      h: sha(a),
+      wallet: known.has(a),
+      inference_rows: inference.get(a) ?? 0,
+      paid: paid ? paid.n : 0,
+      last_paid_at: last && !Number.isNaN(last.getTime()) ? last.toISOString() : null,
+    });
+  }
+  ours.sort();
+  wallets.sort((x, y) => (x.h < y.h ? -1 : x.h > y.h ? 1 : 0));
+  // writeSync may write part of the buffer to a pipe, or meet EAGAIN on a non-blocking one.
+  const out = Buffer.from(JSON.stringify({ ours, wallets }) + "\n");
+  for (let off = 0; off < out.length; ) {
+    try {
+      off += require("fs").writeSync(1, out, off, out.length - off);
+    } catch (e) {
+      if (e.code !== "EAGAIN") throw e;
+    }
+  }
+  process.exit(0);
+}
+
 // The same test against a column that is not ledger.address.
 //
 // oursClause names ledger.address, so it only works inside a query on the ledger. The one number

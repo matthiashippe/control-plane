@@ -1,7 +1,7 @@
 # Kunden Goal 02: Wer bei Conway noch zahlt, und wie er uns findet
 
 ## Status
-PLANNED
+DONE
 
 ## Active Objective
 An Conways Zahlungsadresse gingen in den 30 Tagen bis 18.11.2026 noch 215 USDC von 21 Wallets, 16 davon haben aufgeladen
@@ -107,12 +107,12 @@ MVP: Funktion, weil 16 Wallets an einen Dienst zahlen, der mit 500 antwortet.
   Server.
 
 ## Done Condition
-- [ ] `ops/db-report.cjs` gibt mit `CP_REPORT=wallets` je fremder Wallet und je fremdem Zahler Zählungen unter einem Hash aus, eigene
+- [x] `ops/db-report.cjs` gibt mit `CP_REPORT=wallets` je fremder Wallet und je fremdem Zahler Zählungen unter einem Hash aus, eigene
       nur als Hash in `ours`, ohne `CP_REPORT` und mit `CP_REPORT=decline` unverändert; in beide Richtungen bewiesen.
       Prüfung: `pnpm -s vitest run test/conway-payers.test.ts` muss Exit-Code 0 haben.
       Prüfung: `pnpm -s vitest run test/conway-payers.test.ts --reporter=json 2>/dev/null | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const j=JSON.parse(s);const t=j.testResults.flatMap(f=>f.assertionResults).filter(a=>a.status==="passed").map(a=>a.title);console.log([/never lists our own/,/only settled/,/no address/,/default report unchanged/,/overlap/,/ours/].every(r=>t.some(x=>r.test(x)))?"alle":"fehlt")})'` muss `alle` ausgeben.
       Prüfung: `pnpm -s vitest run test/customer-decline.test.ts test/db-report.test.ts test/db-report-no-duplicate-keys.test.ts` muss Exit-Code 0 haben.
-- [ ] `ops/conway-payers.sh` gleicht die Conway-Zahler im Fenster gegen unsere Wallets und Zahlungen ab, zählt nie eine eigene Wallet
+- [x] `ops/conway-payers.sh` gleicht die Conway-Zahler im Fenster gegen unsere Wallets und Zahlungen ab, zählt nie eine eigene Wallet
       und nennt keine Adresse und keinen Hash; in beide Richtungen bewiesen.
       Prüfung: `bash ops/conway-payers.sh --selftest | tail -1` muss mit `SELFTEST OK` beginnen.
       Prüfung: `bash ops/conway-payers.sh --selftest | grep -cE "^ok .*ours"` muss mindestens 1 ausgeben.
@@ -125,7 +125,7 @@ MVP: Funktion, weil 16 Wallets an einen Dienst zahlen, der mit 500 antwortet.
       Prüfung: `tail -n +2 ops/fixtures/conway-payers-transfers.csv | cut -d, -f3 | grep -cvE '^0x0{36}[0-9a-f]{4}$'` muss 0 ausgeben.
       Prüfung: `bash ops/conway-payers.sh --db-json ops/fixtures/conway-payers-db.json --transfers ops/fixtures/no-such.csv >/dev/null 2>&1; echo $?` muss `2` ausgeben.
       Prüfung: `bash ops/conway-payers.sh --no-such-flag >/dev/null 2>&1; echo $?` muss `1` ausgeben.
-- [ ] Wie viele Conway-Zahler uns kennen und bei uns zahlen und welcher Weg wie viele Betreiber erreicht, steht gemessen in
+- [x] Wie viele Conway-Zahler uns kennen und bei uns zahlen und welcher Weg wie viele Betreiber erreicht, steht gemessen in
       `docs/kunden/conway-zahler.md`, mit Befehl, Ausgabe, Fundstellen und Ergebnis, ohne Adresse; erreicht ein Weg Betreiber, gibt es
       den Vorschlag.
       Prüfung: `awk '/^Gemessen: /{print ($2 >= "2026-11-19T00:00:00Z") ? "spaet genug" : "zu frueh"}' docs/kunden/conway-zahler.md` muss genau `spaet genug` ausgeben.
@@ -142,9 +142,9 @@ MVP: Funktion, weil 16 Wallets an einen Dienst zahlen, der mit 500 antwortet.
       Prüfung: `grep -cE "^- [0-9-]+, kunden 02: " goals/kunden/ANNAHMEN.md` muss mindestens 2 ausgeben.
       Prüfung (Netz): `bash ops/conway-payers.sh | grep -cE "^OVERLAP topped up: [0-9]+ wallets, "` muss 1 ausgeben.
       Prüfung (Netz): `bash ops/conway-payers.sh | grep -cE "0x[0-9a-fA-F]{40}|[0-9a-f]{64}"` muss 0 ausgeben.
-- [ ] `check` ist grün.
+- [x] `check` ist grün.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Jeder neue Test war vor dem Werkzeug rot; die Zeile im Progress Log nennt, womit.
@@ -172,5 +172,8 @@ MVP: Funktion, weil 16 Wallets an einen Dienst zahlen, der mit 500 antwortet.
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-19 Zyklus 1: Punkte 1, 2, 3, 4 gebaut: `CP_REPORT=wallets` in `ops/db-report.cjs` (nur Hashes und Zählungen), `ops/conway-payers.sh` mit Selftest und Fixtures aus erfundenen Adressen, `ops/conway-reach.py` für die Wege mit Selftest ohne Netz, Messung gegen die Produktion (0 von 16 Conway-Zahlern mit Aufladung zahlen bei uns, Gegenprobe mit gepflanztem Zahler und eigener Wallet auf denselben Produktionsdaten: 1 paid here, 1 ours left out), Wege ERC-8004 0, Social-Relay 0, Upstream-Issues 1 von 16, Vorschlag `goals/_vorschlaege/kunden-weg-2026-11-19-1.md`. Neue Tests rot vor dem Werkzeug: `test/conway-payers.test.ts` mit `ops/db-report.cjs` von `origin/dev` und ohne `ops/conway-payers.sh`, 8 von 8 failed; der neunte Fall ohne `ops/conway-reach.py` failed. Prüfbefehle: Punkt 1 vitest Exit 0, `alle`, db-report-Tests 41 passed Exit 0; Punkt 2 `SELFTEST OK`, ours 4, overlap 4, window 6, Planspiel 3, Gegenprobe 1, Abgleich mit `conway-money-metrics.py` 1, Adressen 0, Fixture-Adressen 0, Exit 2, Exit 1; Punkt 3 `spaet genug`, 1, 3, `stimmig`, `stimmig`, `d8f8168`, `belegt`, 1, `stimmig`, 0, 0, Annahmen 5, Netz 1 und 0; Punkt 4 `node scripts/check.mjs` Exit 0 (2452 Tests).
+- 2026-11-19 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4; `origin/dev` (ec48112) war schon im Goal-Branch, kein Merge nötig. Prüfbefehle: Punkt 1 vitest Exit 0, `alle`, db-report-Tests 41 passed Exit 0; Punkt 2 `SELFTEST OK`, ours 4, overlap 4, window 6, Planspiel 3, Gegenprobe 1, Abgleich mit `conway-money-metrics.py` 1, Adressen 0, Fixture-Adressen 0, Exit 2, Exit 1; Punkt 3 `spaet genug`, 1, 3, `stimmig`, `stimmig`, `d8f8168`, `belegt`, 1, `stimmig`, 0, 0, Annahmen 5, Netz 1 und 0; Punkt 4 `node scripts/check.mjs` Exit 0 (2452 Tests); PR #306 am Kopf 98bcf1f Jobs `check` und `e2e` pass.
+- 2026-11-19 Release: PASS K und B (Zyklus 2), DONE.
 
 ## Blockers
