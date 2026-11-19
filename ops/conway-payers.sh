@@ -8,6 +8,8 @@
 #   ops/conway-payers.sh --transfers <csv> [--transfers <csv> ...] --db-json <file>
 #                                              the same count from files; either flag alone replaces its source
 #   ops/conway-payers.sh --selftest            no network, both directions
+#   CP_PAYERS_LIST=<file>                      also writes the topped-up payers of the window to <file>
+#                                              (mode 0600, for ops/conway-reach.py); stdout stays the same
 #
 # Window and threshold as docs/research/data/conway-money-metrics.py: the 30 days before the newest
 # transfer in the data, a topup is a transfer of at least 5 USDC, duplicate rows (tx_hash, from, usdc)
@@ -25,12 +27,12 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BASE_CSV="$ROOT/docs/research/data/2026-09-19-conway-payto-transfers.csv"
 DELTA_REMOTE="/opt/control-plane/conway-money/delta.csv"
 
-usage() { sed -n '2,10p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' >&2; exit 1; }
+usage() { sed -n '2,12p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' >&2; exit 1; }
 
 # The counting, the same code for production, files and selftest. No address and no hash leaves it.
 # shellcheck disable=SC2016
 COUNT_PY='
-import csv, datetime, decimal, hashlib, json, sys
+import csv, datetime, decimal, hashlib, json, os, sys
 
 FIELDS = ["block", "timestamp_utc", "from", "usdc", "tx_hash"]
 TOPUP_MIN_USDC = decimal.Decimal("5")
@@ -110,6 +112,14 @@ def overlap(wallets):
     return (f"{len(wallets)} wallets, {known} known here, {inference} with inference here, "
             f"{paid} paid here, {after} paid Conway after their last payment here")
 
+# CP_PAYERS_LIST=<file>: the topped-up payers of the window, one lowercase address per line, for
+# ops/conway-reach.py on this machine. Never printed; the file is a temp file of the caller, mode 0600.
+target = os.environ.get("CP_PAYERS_LIST")
+if target:
+    fd = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as handle:
+        handle.write("".join(a + "\n" for a in sorted(topped)))
+
 total = usdc.quantize(decimal.Decimal("0.01"), rounding=decimal.ROUND_HALF_UP)
 print(f"PAYERS window {cutoff} to {newest}: {len(payers)} wallets, {len(topped)} topped up, {total} USDC, {len(left_out)} ours left out")
 print(f"OVERLAP topped up: {overlap(topped)}")
@@ -188,6 +198,10 @@ if [[ "${1:-}" == "--selftest" ]]; then
   head -1 "$tr" >"$stub/empty.csv"
   count "$db" "$stub/empty.csv" >/dev/null 2>&1; rc=$?
   want "$rc" "2" "a transfer file without a transfer exits 2"
+  CP_PAYERS_LIST="$stub/list.txt" count "$db" "$tr" >"$stub/with-list.out"
+  want "$(cat "$stub/list.txt" | tr '\n' ' ')" "0x00000000000000000000000000000000000000a1 0x00000000000000000000000000000000000000a2 0x00000000000000000000000000000000000000a3 " \
+    "ours: the list of topped-up payers holds the three, never our own"
+  want "$(cat "$stub/with-list.out")" "$out" "the list changes nothing on stdout"
   if [[ "$fail" -eq 0 ]]; then
     echo "planned payers, our own wallet, the overlap and the window counted, both directions"
     echo "SELFTEST OK"

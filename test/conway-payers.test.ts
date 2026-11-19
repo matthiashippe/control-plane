@@ -257,3 +257,18 @@ describe("ops/conway-payers.sh", () => {
     for (const word of ["ours", "overlap", "window"]) expect(r.stdout).toMatch(new RegExp(`^ok .*${word}`, "m"));
   });
 });
+
+describe("ops/conway-reach.py", () => {
+  it("passes its selftest, each way counted in both directions on a planted world, and prints no address", () => {
+    const r = spawnSync("python3", ["ops/conway-reach.py", "--selftest"], { encoding: "utf-8" });
+    expect(r.status).toBe(0);
+    expect(r.stdout.trim().split("\n").pop()).toBe("SELFTEST OK");
+    for (const way of ["erc8004", "social", "issues"]) {
+      expect(r.stdout).toMatch(new RegExp(`^ok   ${way}: `, "m"));
+      expect(r.stdout).toMatch(new RegExp(`^ok   ${way} counter-proof: `, "m"));
+    }
+    expect(r.stdout).not.toMatch(ADDRESS);
+    expect(spawnSync("python3", ["ops/conway-reach.py", "--way", "nowhere"]).status).toBe(1);
+    expect(spawnSync("python3", ["ops/conway-reach.py", "--way", "issues", "--payers", "/nonexistent/payers.txt"]).status).toBe(2);
+  });
+});
