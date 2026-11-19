@@ -1,0 +1,6 @@
+Schwere: 2
+Goal: kunden 03
+Befund: Der Block `runtime_funnel` zählt jede Stufe bis zum Ende des Fensters, deshalb hat die neueste Kohorte höchstens sieben Tage für Gutschrift, Inferenz und Zahlung, die älteste bis zu 28. Die Wochen sind darum nicht vergleichbar, und `total` sowie `largest_drop` mischen reife und unreife Kohorten: Eine Runtime vom Vortag zählt bei `paid` als Verlust, obwohl sie noch zahlen kann. Bei der ersten Messung standen `starter_credit` und `paid` mit je 3 gleich, die Wahl der Stufe folgt der Regel für Gleichstand.
+Beleg: `ops/db-report.cjs` Block `runtime_funnel` (`hasLedger` und `hasPaid` mit `created_at < untilIso` statt einer festen Frist ab dem ersten Schlüssel) | docs/kunden/trichter.md, Abschnitt „Wochen“ und „Verlust je Stufe“ (Startgutschrift 3, Zahlung 3)
+Empfehlung: Wenn ein späteres Glied am Topic `kunden` die Stufe `paid` angeht: je Stufe eine feste Frist ab dem ersten Schlüssel zählen (etwa Zahlung binnen 7 Tagen) und eine Kohorte, deren Frist noch läuft, als `offen` statt als Verlust führen; mit Planspiel, in dem eine Runtime am letzten Tag des Fensters anlegt. Leitzahl bleibt: Anteil neuer Runtimes mit erster Zahlung, dann je reifer Kohorte.
+MVP: Funktion, weil der Loop sonst eine junge Kohorte als Abbruch beim Zahlen liest und die falsche Stufe repariert.

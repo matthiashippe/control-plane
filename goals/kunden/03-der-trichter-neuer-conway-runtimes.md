@@ -1,7 +1,7 @@
 # Kunden Goal 03: Der Trichter neuer Conway-Runtimes
 
 ## Status
-PLANNED
+DONE
 
 ## Active Objective
 Vom 12. bis 19.11.2026 legten 10 neue Runtimes einen Schlüssel `conway-automaton` bei uns an, 3 bekamen eine Startgutschrift, und
@@ -102,7 +102,7 @@ MVP: Funktion, weil der Loop ab dann sieht, an welcher Stufe Umsteiger aussteige
   Server.
 
 ## Done Condition
-- [ ] `ops/db-report.cjs` gibt im Standardbericht `runtime_funnel` aus: neue fremde Runtimes mit Schlüssel `conway-automaton` je
+- [x] `ops/db-report.cjs` gibt im Standardbericht `runtime_funnel` aus: neue fremde Runtimes mit Schlüssel `conway-automaton` je
       Woche der letzten vier, davon mit Startgutschrift, Inferenz und Zahlung, Summe und größten Verlust, eigene nie, ohne Adresse;
       `ops/status.sh` zeigt den Block; in beide Richtungen bewiesen.
       Prüfung: `pnpm -s vitest run test/runtime-funnel.test.ts` muss Exit-Code 0 haben.
@@ -110,7 +110,7 @@ MVP: Funktion, weil der Loop ab dann sieht, an welcher Stufe Umsteiger aussteige
       Prüfung: `pnpm -s vitest run test/db-report.test.ts test/db-report-no-duplicate-keys.test.ts test/customer-decline.test.ts test/conway-payers.test.ts test/status-alarm-received.test.ts` muss Exit-Code 0 haben.
       Prüfung: `git diff $(git merge-base origin/dev HEAD) -- ops/db-report.cjs | grep -c '^-[^-]'` muss 0 ausgeben.
       Prüfung: `git diff --quiet $(git merge-base origin/dev HEAD) -- ops/status.sh; echo $?` muss `0` ausgeben.
-- [ ] Die erste Messung des Trichters steht in `docs/kunden/trichter.md` mit Befehl, Ausgabe, Wochen, Leitzahl und Ergebnis, ohne
+- [x] Die erste Messung des Trichters steht in `docs/kunden/trichter.md` mit Befehl, Ausgabe, Wochen, Leitzahl und Ergebnis, ohne
       Adresse; ist er nicht widerlegt, gibt es den Vorschlag zur Stufe mit dem größten Verlust.
       Prüfung: `awk '/^Gemessen: /{print ($2 >= "2026-11-19T20:00:00Z") ? "spaet genug" : "zu frueh"}' docs/kunden/trichter.md` muss genau `spaet genug` ausgeben.
       Prüfung: `grep -cxF "bash ops/status.sh | python3 -c 'import json,sys; print(json.dumps(json.load(sys.stdin)[\"db\"][\"runtime_funnel\"]))'" docs/kunden/trichter.md` muss mindestens 1 ausgeben.
@@ -121,9 +121,9 @@ MVP: Funktion, weil der Loop ab dann sieht, an welcher Stufe Umsteiger aussteige
       Prüfung: `cat docs/kunden/trichter.md goals/_vorschlaege/kunden-trichter-*.md goals/kunden/ANNAHMEN.md 2>/dev/null | grep -cE "0x[0-9a-fA-F]{40}|[0-9a-f]{64}|cnwy_k_"` muss 0 ausgeben.
       Prüfung: `grep -cE "^- [0-9-]+, kunden 03: " goals/kunden/ANNAHMEN.md` muss mindestens 2 ausgeben.
       Prüfung (Netz): `bash ops/status.sh | python3 -c 'import json,sys; print(len(json.load(sys.stdin)["db"]["runtime_funnel"]["weeks"]))'` muss `4` ausgeben.
-- [ ] `check` ist grün.
+- [x] `check` ist grün.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Jeder neue Test war vor dem Bericht rot; die Zeile im Progress Log nennt, womit.
@@ -151,5 +151,9 @@ MVP: Funktion, weil der Loop ab dann sieht, an welcher Stufe Umsteiger aussteige
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-19 Zyklus 1: Punkte 1, 2, 3 gebaut: Block `runtime_funnel` am Ende des Standardberichts von `ops/db-report.cjs` (nur hinzugefügte Zeilen, ohne `CP_UNTIL` endet das Fenster am Beginn der UTC-Stunde, damit der Bericht byte-gleich bleibt), `test/runtime-funnel.test.ts` mit Planspiel, Gegenprobe je Fall und `ops/status.sh` mit Fakes, Messung gegen die Produktion um 20:46 UTC (9 neue Runtimes, 6 mit Startgutschrift, 6 mit Inferenz, 3 mit Zahlung, größter Verlust `starter_credit` 3), Abgleich mit dem Richtungs-Check (er zählte Schlüssel: 9 an 4 Adressen, 3 neu), Vorschlag `goals/_vorschlaege/kunden-trichter-2026-11-19-1.md`, 4 Annahmen. Neue Tests rot vor dem Bericht: `REPORT_UNDER_TEST` mit `ops/db-report.cjs` von `origin/dev` 10 von 10 failed; Mutationen am Bericht (Filter für Eigene wirkungslos: 7 failed, darunter `never counts our own`; `failed` als bezahlt: 4 failed, darunter `only settled`). Prüfbefehle: Punkt 1 vitest Exit 0 (11 passed), `alle`, db-report-Tests Exit 0, 0, `0`; Punkt 2 `spaet genug`, 1, 4, `stimmig`, 1, `stimmig`, 0, 4, Netz 4; Punkt 3 `node scripts/check.mjs` Exit 0 (2463 Tests).
+- 2026-11-19 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3; `dev` ohne neue Commits gegenüber dem Branch, alle Prüfbefehle am Kopf neu gefahren. Prüfbefehle: Punkt 1 vitest Exit 0 (11 passed), `alle`, db-report-Tests Exit 0 (64 passed), 0, `0`; Punkt 2 `spaet genug`, 1, 4, `stimmig`, 1, `stimmig`, 0, 4, Netz 4; Punkt 3 `node scripts/check.mjs` Exit 0 (2463 Tests).
+- 2026-11-19 Zyklus 3: Gaps der Linse K aus Zyklus 2 behoben, zwei Fälle in `test/runtime-funnel.test.ts` (Gleichstand nennt die frühere Stufe; Gutschrift, Inferenz und Zahlung genau an und nach `CP_UNTIL` zählen nicht), Bericht unverändert. Neue Fälle rot vor dem Bericht: gegen `ops/db-report.cjs` von `origin/dev` 13 von 13 failed; Mutation `lost > 0 && lost >= largestDrop.lost` alte Tests 11 passed, neue 1 failed (`tie`); Ledger-Bedingung `(created_at < ? or 1 = 1)` alte 11 passed, neue 1 failed; Zahlung ohne `< until` alte 11 passed, neue 1 failed. Prüfbefehle: Punkt 1 vitest Exit 0 (13 passed), `alle`, db-report-Tests Exit 0 (64 passed), 0, `0`; Punkt 2 `spaet genug`, 4, 1, 0, 4, unverändert gegenüber Zyklus 2; Punkt 3 `node scripts/check.mjs` Exit 0 (2465 Tests).
+- 2026-11-19 Release: PASS K und B (Zyklus 3), DONE.
 
 ## Blockers
