@@ -824,4 +824,78 @@ if (db.prepare("select name from sqlite_master where type = 'table' and name = '
   ).length;
 }
 
+
+// runtime_funnel (goals/kunden/03): where a runtime that moves to us drops out between its first
+// `conway-automaton` key and its first payment. A cohort per week of the last four, by the week of
+// that first key: keys, then of those with a starter grant, with inference and with a settled
+// payment, each stage counted on its own. The window ends at CP_UNTIL (ISO UTC), else at the start
+// of the current UTC hour, every week is seven days, `from` included and `to` excluded, the newest
+// week first. Our own addresses never
+// count (notOursOn, on an alias other than `k` because notOursOn names `api_keys k` inside). Only
+// counts leave this block: no address, no hash, no key, no time of a single runtime.
+{
+  // Without CP_UNTIL the window ends at the start of the current UTC hour rather than at this
+  // millisecond, so two runs of the standard report print the same bytes (test/customer-decline and
+  // test/conway-payers compare them); an hour is nothing against a week.
+  const rawUntil = process.env.CP_UNTIL;
+  let funnelUntil = new Date(Math.floor(Date.now() / 3600e3) * 3600e3);
+  if (rawUntil) {
+    const t = Date.parse(rawUntil);
+    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/.test(rawUntil) || Number.isNaN(t)) {
+      require("fs").writeSync(2, "db-report: CP_UNTIL is no ISO time in UTC\n");
+      process.exit(1);
+    }
+    funnelUntil = new Date(t);
+  }
+  const untilIso = funnelUntil.toISOString();
+  const weeks = [0, 1, 2, 3].map((i) => ({
+    from: new Date(funnelUntil.getTime() - (i + 1) * 7 * 86400e3).toISOString(),
+    to: new Date(funnelUntil.getTime() - i * 7 * 86400e3).toISOString(),
+    keys: 0,
+    starter_credit: 0,
+    inference: 0,
+    paid: 0,
+  }));
+  const runtimes = all(
+    `select lower(rk.address) address, min(rk.created_at) first_key
+       from api_keys rk
+      where rk.name = 'conway-automaton' and ${notOursOn("rk.address")}
+      group by lower(rk.address)`,
+    ...OURS,
+    ...OUR_KEY_NAMES,
+  );
+  const hasLedger = (address, kind) =>
+    !!one("select 1 from ledger where address = ? and kind = ? and created_at < ? limit 1", address, kind, untilIso);
+  const hasPaid = (address) =>
+    !!one(
+      `select 1 from payments
+        where status = 'settled' and (lower(from_address) = ? or lower(to_address) = ?)
+          and coalesce(settled_at, created_at) < ? limit 1`,
+      address,
+      address,
+      untilIso,
+    );
+  for (const r of runtimes) {
+    const firstKey = Date.parse(r.first_key);
+    if (Number.isNaN(firstKey)) continue;
+    const at = new Date(firstKey).toISOString();
+    const week = weeks.find((w) => at >= w.from && at < w.to);
+    if (!week) continue;
+    week.keys += 1;
+    if (hasLedger(r.address, "grant")) week.starter_credit += 1;
+    if (hasLedger(r.address, "inference")) week.inference += 1;
+    if (hasPaid(r.address)) week.paid += 1;
+  }
+  const total = { keys: 0, starter_credit: 0, inference: 0, paid: 0 };
+  for (const w of weeks) for (const k of Object.keys(total)) total[k] += w[k];
+  const losses = [
+    ["starter_credit", total.keys - total.starter_credit],
+    ["inference", total.starter_credit - total.inference],
+    ["paid", total.inference - total.paid],
+  ];
+  let largestDrop = { stage: null, lost: 0 };
+  for (const [stage, lost] of losses) if (lost > largestDrop.lost) largestDrop = { stage, lost };
+  report.runtime_funnel = { until: untilIso, weeks, total, largest_drop: largestDrop };
+}
+
 console.log(JSON.stringify(report));
