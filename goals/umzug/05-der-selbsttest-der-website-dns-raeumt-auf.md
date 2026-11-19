@@ -1,7 +1,7 @@
 # Umzug Goal 05: Der Selbsttest der Website-DNS räumt sein Verzeichnis weg
 
 ## Status
-PLANNED
+PAUSED
 
 ## Active Objective
 `test/site-dns-selftest.test.ts` legt je Lauf mit `mkdtempSync` ein leeres `HOME` unter dem Temp-Verzeichnis an und löscht es nie,
@@ -107,3 +107,4 @@ MVP: Funktion, weil der code-host geteilt ist und jeder Lauf sonst Reste auf der
 ## Progress Log
 
 ## Blockers
+Pause: Kurs-Check 2026-11-19, Aufräumen eines Tests auf dem code-host schützt weder Geld noch Daten noch Rechte der Kunden und bringt keine fremde Sandbox näher
