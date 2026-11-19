@@ -277,6 +277,15 @@ export function spawnRun(cmd, args, { input, timeoutMs = 120_000 } = {}) {
 
 const HOP = new Set(["connection", "keep-alive", "proxy-connection", "proxy-authenticate", "proxy-authorization", "te", "trailer", "transfer-encoding", "upgrade"]);
 const stripHop = (h) => Object.fromEntries(Object.entries(h).filter(([k]) => !HOP.has(k.toLowerCase())));
+
+// A sandbox service must not set a cookie for the shared ports domain: the browser would send it to the
+// sandbox of every other customer. Without Domain a cookie applies to exactly its own host name.
+// The first piece (name and value) is never touched, even if the value contains "domain=".
+export function stripCookieDomain(value) {
+  const pieces = String(value).split(";");
+  const kept = pieces.filter((p, i) => i === 0 || p.split("=")[0].replace(/\s+/g, "").toLowerCase() !== "domain");
+  return kept.length === pieces.length ? value : kept.join(";");
+}
 const iso = (ms) => new Date(ms).toISOString();
 const newId = () => {
   const abc = "abcdefghijklmnopqrstuvwxyz0123456789";
@@ -640,7 +649,9 @@ export function createSandboxd({ run, now = Date.now, keys = [], state = memoryS
     }
     const up = http.request({ host: ip, port: target.port, method: req.method, path: req.url, headers: stripHop(req.headers) });
     up.on("response", (ur) => {
-      res.writeHead(ur.statusCode ?? 502, stripHop(ur.headers));
+      const headers = stripHop(ur.headers);
+      if (headers["set-cookie"]) headers["set-cookie"] = [].concat(headers["set-cookie"]).map(stripCookieDomain);
+      res.writeHead(ur.statusCode ?? 502, headers);
       ur.pipe(res);
     });
     up.on("error", (e) => {
