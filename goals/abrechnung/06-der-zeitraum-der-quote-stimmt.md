@@ -1,7 +1,7 @@
 # Abrechnung Goal 06: Der Zeitraum der Quote stimmt, und kein Tag zählt, den der Anbieter noch korrigiert
 
 ## Status
-PLANNED
+PAUSED
 
 ## Active Objective
 Jede Zahl, die kanal nach außen nennt, zählt jeden Tag ihres Zeitraums und keinen, den der Anbieter noch ändert. Danach weist
@@ -173,3 +173,4 @@ MVP: Funktion, weil kanal sonst eine Quote oder einen Einkauf nennt, dem ein Tag
 ## Progress Log
 
 ## Blockers
+Pause: Feinschliff an einem Messwerkzeug ohne Wirkung beim Kunden (0,0 % Quote, rund 0,09 USD Einkauf ohne Verkauf in sieben Tagen, keine Zahl davon geht nach außen), bringt weder neue zahlende Automatons noch das Abschlusskriterium näher; Vorschlag abrechnung-kritik-2026-11-19-1 (Loop-Kritik 2026-11-19)
