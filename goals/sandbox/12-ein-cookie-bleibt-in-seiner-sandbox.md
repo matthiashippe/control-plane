@@ -157,5 +157,6 @@ unterschieben kann.
 
 ## Progress Log
 - 2026-11-19 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6 gebaut, `stripCookieDomain` in sandboxd entfernt Domain aus jedem Set-Cookie, probe.sh prüft cookie_domain live, sandboxd.mjs mit setup.sh auf den Sandbox-Server ausgerollt; der neue Test war vorher rot gegen sandboxd.mjs von origin/dev (4 von 6 Fällen: beide Proxy-Fälle mit Domain, beide Fälle von stripCookieDomain, die fehlte), live vorher FAIL mit allen drei Cookies samt Domain beim Client. Prüfbefehle: Punkt 1 2, 0; Punkt 2 Exit 0, Exit 0, nichts fehlt, 0, 2, Exit 0; Punkt 3 PROBE SELFTEST OK, 8, 1, SETUP CHECK OK changed=0, 2; Punkt 4 nichts fehlt, nichts fehlt; Punkt 5 0, 0; Punkt 6 check Exit 0 (grün in 267 s, 2419 Tests).
+- 2026-11-19 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6; origin/dev brachte nichts Neues, jeder Prüfbefehl erneut am Kopf gelaufen. Prüfbefehle: Punkt 1 2, 0; Punkt 2 Exit 0, Exit 0, nichts fehlt, 0, 2, Exit 0; Punkt 3 PROBE SELFTEST OK, 8, 1, SETUP CHECK OK changed=0, 2 (PROBE cookie_domain OK, SANDBOX PROBE OK left=0); Punkt 4 nichts fehlt, nichts fehlt; Punkt 5 0, 0; Punkt 6 check Exit 0 (grün in 205 s).
 
 ## Blockers
