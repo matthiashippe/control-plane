@@ -1,7 +1,7 @@
 # Konto Goal 18: Die Bereitschaftsprüfung unterscheidet „Dienst unten“ von „Schlüssel fehlt“
 
 ## Status
-PLANNED
+PAUSED
 
 ## Active Objective
 `ops/konto-ready.sh` meldet `key_file unreadable`, wenn der Container `cp` nicht läuft oder `docker compose exec` aus einem anderen
@@ -71,3 +71,4 @@ das Konto so später an geht.
 ## Progress Log
 
 ## Blockers
+Pause: Prüfwerkzeug ohne Messauftrag (LOOP.md:36) am Gate von konto 15, das Matthias laut Richtungs-Check einfrieren soll; einen gestoppten Dienst meldet der Watchdog schon als OUTAGE (ops/watchdog.sh:177); Vorschlag konto-kritik-2026-11-20-1 (Loop-Kritik 2026-11-20)
