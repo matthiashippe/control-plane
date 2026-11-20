@@ -11,6 +11,7 @@ import { Hono, type Context } from "hono";
 import type { Db } from "./db.js";
 import {
   claimStarter,
+  grantOnFirstRead,
   grantToWaitingRuntime,
   poolLeftMc,
   starterAvailableMc,
@@ -2728,16 +2729,24 @@ export function createApp(opts: AppOptions) {
     // A runtime that has read an empty balance three times over more than a minute is stuck, not
     // browsing, and this is the call where it is handed its grant. See grantToWaitingRuntime().
     // Neither while intake is closed (HAN-62).
-    const granted = !intakeClosed && grantToWaitingRuntime(db, address, getBalanceMc(db, address), Date.now());
+    const waited = !intakeClosed && grantToWaitingRuntime(db, address, getBalanceMc(db, address), Date.now());
+    // A new runtime reads this before it first thinks, and the first read of an empty balance is where its grant goes
+    // (goals/kunden/06). See grantOnFirstRead(). After the waiting grant, so a runtime that polled its way there keeps
+    // the answer it has always had.
+    const firstRead =
+      !waited && !intakeClosed && grantOnFirstRead(db, address, c.req.header("authorization"), getBalanceMc(db, address));
+    const granted = waited || firstRead;
     const waiting = granted || intakeClosed ? 0 : starterAvailableMc(db, address);
     return c.json({
       balance_cents: getBalanceCents(db, address),
       ...(granted
         ? {
             granted_cents: mcToCents(GRANT_MC),
-            hint:
-              `You had nothing and kept asking, so the operator's pool put ${mcToCents(GRANT_MC)} cents ` +
-              "on this address. One per address, ever, free, and enough for about ten attempts at a job.",
+            hint: waited
+              ? `You had nothing and kept asking, so the operator's pool put ${mcToCents(GRANT_MC)} cents ` +
+                "on this address. One per address, ever, free, and enough for about ten attempts at a job."
+              : `You had nothing, so the operator's pool put ${mcToCents(GRANT_MC)} cents on this address ` +
+                "to start with. One per address, ever, free, and enough for your first thoughts here.",
             docs: DOC.transfers,
           }
         : {}),

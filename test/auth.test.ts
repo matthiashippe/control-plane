@@ -73,11 +73,13 @@ describe("SIWE provisioning", () => {
     // stranger who had come from Conway issue #390 provisioned exactly like this at 02:05 UTC and
     // then asked this endpoint twenty-eight times. It answered `{"balance_cents":0}` every time.
     // So the end of the provisioning route is pinned to say what happens next, not just that the
-    // balance is zero.
+    // balance is zero. Since kunden 06 (2026-11-20) what happens next is the grant itself: the
+    // runtime reads this before it first thinks, so the first read of an empty balance by a SIWE
+    // key named conway-automaton carries the fifteen cents (test/starter-first-call.test.ts).
     expect(await balance.json()).toEqual({
-      balance_cents: 0,
-      starter_available_cents: 15,
-      hint: expect.stringContaining("POST /v1/credits/starter"),
+      balance_cents: 15,
+      granted_cents: 15,
+      hint: expect.stringContaining("operator's pool put 15 cents"),
       docs: expect.stringContaining("errors.md"),
     });
   });
