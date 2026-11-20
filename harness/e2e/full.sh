@@ -50,13 +50,17 @@ echo "$balance"
 balance_cents=$(printf '%s\n' "$balance" | grep -o '"balance_cents":[0-9]*' | grep -o '[0-9]*$')
 ledger=$("${COMPOSE[@]}" exec -T cp node -e '
   const db = require("better-sqlite3")("/data/cp.db", { readonly: true });
-  const w = db.prepare("SELECT balance_mc FROM wallets ORDER BY created_at LIMIT 1").get();
+  const w = db.prepare("SELECT address, balance_mc FROM wallets ORDER BY created_at LIMIT 1").get();
   const sum = db.prepare("SELECT coalesce(sum(delta_mc),0) AS s FROM ledger").get().s;
+  // Everything ever credited to that wallet (topups and the start grant); inference is charged against it.
+  const credited = db.prepare("SELECT coalesce(sum(delta_mc),0) AS s FROM ledger WHERE address = ? AND kind IN (?, ?) AND delta_mc > 0").get(w.address, "topup", "grant").s;
   const kinds = db.prepare("SELECT kind, count(*) AS n FROM ledger GROUP BY kind").all();
   const automatons = db.prepare("SELECT automaton_id, address, name FROM automatons").all();
-  console.log(JSON.stringify({ balance_mc: w.balance_mc, ledger_sum_mc: sum, consistent: sum === w.balance_mc, kinds, automatons }));' 2>&1)
+  console.log(JSON.stringify({ balance_mc: w.balance_mc, credited_mc: credited, ledger_sum_mc: sum, consistent: sum === w.balance_mc, kinds, automatons }));' 2>&1)
 echo "$ledger"
 consistent=$(printf '%s\n' "$ledger" | grep -o '"consistent":[a-z]*' | grep -o '[a-z]*$')
+balance_mc=$(printf '%s\n' "$ledger" | grep -o '"balance_mc":-\?[0-9]*' | head -1 | grep -o -- '-\?[0-9]*$')
+credited_mc=$(printf '%s\n' "$ledger" | grep -o '"credited_mc":[0-9]*' | head -1 | grep -o '[0-9]*$')
 db_registered=$(printf '%s\n' "$ledger" | grep -c "\"address\":\"$(printf '%s' "$wallet" | tr 'A-F' 'a-f')\"" || true)
 
 # The five domain calls of docs/sandbox/vertrag.md, made by the runtime's own client
@@ -318,8 +322,8 @@ cleanup
 trap - EXIT
 remaining=$("${COMPOSE[@]}" ps -q | wc -l | tr -d ' ')
 [[ "$remaining" == "0" ]] || { echo "E2E FAIL: containers left behind"; exit 1; }
-if [[ "$turns" -lt 5 || "$registered" != "true" || "$api_errors" != "0" || "$consistent" != "true" || "$db_registered" != "1" || "$balance_cents" -ge 500 || "$domains_ok" != "true" || "$sandbox" != "true" || "$long_exec" != "true" || "$konto_chain" != "true" || "$terminal" != "true" || "$money" != "true" || "$relay" != "true" || "$automaton" != "true" ]]; then
-  echo "E2E FAIL turns=$turns registered=$registered api_errors=$api_errors ledger_consistent=$consistent db_registered=$db_registered balance_cents=$balance_cents money=$money konto_chain=$konto_chain terminal=$terminal domains=$domains_ok sandbox=$sandbox long_exec=$long_exec relay=$relay automaton=$automaton"
+if [[ "$turns" -lt 5 || "$registered" != "true" || "$api_errors" != "0" || "$consistent" != "true" || "$db_registered" != "1" || -z "$balance_mc" || -z "$credited_mc" || "$balance_mc" -ge "$credited_mc" || "$domains_ok" != "true" || "$sandbox" != "true" || "$long_exec" != "true" || "$konto_chain" != "true" || "$terminal" != "true" || "$money" != "true" || "$relay" != "true" || "$automaton" != "true" ]]; then
+  echo "E2E FAIL turns=$turns registered=$registered api_errors=$api_errors ledger_consistent=$consistent db_registered=$db_registered balance_cents=$balance_cents balance_mc=$balance_mc credited_mc=$credited_mc money=$money konto_chain=$konto_chain terminal=$terminal domains=$domains_ok sandbox=$sandbox long_exec=$long_exec relay=$relay automaton=$automaton"
   exit 1
 fi
-echo "E2E OK turns=$turns registered=$registered api_errors=$api_errors ledger_consistent=$consistent balance_cents=$balance_cents money=$money konto_chain=$konto_chain terminal=$terminal domains=$domains_ok sandbox=$sandbox long_exec=$long_exec relay=$relay automaton=$automaton"
+echo "E2E OK turns=$turns registered=$registered api_errors=$api_errors ledger_consistent=$consistent balance_cents=$balance_cents balance_mc=$balance_mc credited_mc=$credited_mc money=$money konto_chain=$konto_chain terminal=$terminal domains=$domains_ok sandbox=$sandbox long_exec=$long_exec relay=$relay automaton=$automaton"
