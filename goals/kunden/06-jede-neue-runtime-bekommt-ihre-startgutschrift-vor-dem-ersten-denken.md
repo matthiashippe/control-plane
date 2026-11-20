@@ -1,7 +1,7 @@
 # Kunden Goal 06: Jede neue Runtime bekommt ihre Startgutschrift vor dem ersten Denken
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Von 9 neuen fremden Runtimes der vier Wochen bis 19.11.2026 bekamen 3 keine Startgutschrift, die größte Verluststufe im Trichter,
@@ -97,7 +97,7 @@ MVP: Funktion, weil eine Runtime ohne Gutschrift nie denkt und damit nie zahlt.
       Prüfung: `d=docs/kunden/startgutschrift.md; grep -q "^Ergebnis: kein Aufruf nach dem Schlüssel" "$d" && echo entfaellt || { n=$(sed -nE 's/^Schutz des Pools: ([0-9]+) eigene Läufe hätten gezogen$/\1/p' "$d"); [ -n "$n" ] && { [ "$n" = 0 ] || [ "$(grep -c '^- Umgestellt: ' "$d")" -ge 1 ]; } && echo geschuetzt || echo offen; }` muss `geschuetzt` oder `entfaellt` ausgeben.
 - [x] `check` ist grün.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Jeder neue Test war vor der Änderung rot; die Zeile im Progress Log nennt, womit.
@@ -124,5 +124,6 @@ MVP: Funktion, weil eine Runtime ohne Gutschrift nie denkt und damit nie zahlt.
 ## Progress Log
 - 2026-11-20 Zyklus 1: Punkte 1, 2, 3, 4, 5 gebaut: `ops/starter-paths.sh` mit Zweig `CP_REPORT=starter-paths` in `ops/db-report.cjs` (Selftest in beide Richtungen, Test `test/starter-paths-report.test.ts` rot gegen `ops/db-report.cjs` von `origin/dev` mit 3 von 5); Messung 20.11. 07:58 UTC: 9 neue Runtimes, 6 mit Gutschrift, Runtime 9 las nach dem Schlüssel einmal `GET /v1/credits/balance` und ging, Runtime 1 rief nichts mehr, Runtime 5 teilt ihre Adresse mit einer anderen Wallet; Ergebnis Auslöser `GET /v1/credits/balance` (`src/index.ts:349` und `src/agent/loop.ts:956` am Pin), Schutz des Pools 0; `grantOnFirstRead` in `src/credits/starter.ts`, gerufen aus `src/app.ts`; `test/starter-first-call.test.ts` rot vor dem Fix (7 von 8, keine Gutschrift auf dem ersten Lesen), jeder Schutz einzeln als Mutation rot (ohne Prüfung auf schlüssellose Adresse, eigene Adresse, Schlüsselname, geschlossene Aufnahme je ein Test); `test/auth.test.ts` und `test/the-board-where-it-looks.test.ts` auf das neue Ende der SIWE-Strecke umgestellt (ANNAHMEN.md). Prüfbefehle: P1 `SELFTEST OK`, 7, 3, 4, 0, 0, vitest Exit 0; P2 `spaet genug`, 1, 5, 1, 1, 0, 4, Netz leer; P3 `alle`, vitest Exit 0; P4 `geschuetzt`; P5 `check` Exit 0 (grün in 263 s).
 - 2026-11-20 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5; `dev` `c04233f` (PR #318, Saldo-Prüfung des Jobs `e2e` gegen `credited_mc`) in den Goal-Branch gemergt, Job `e2e` am Kopf `5aeb7d6` grün (`E2E OK … balance_cents=505 balance_mc=505609 credited_mc=516000 …`). Prüfbefehle: P1 `SELFTEST OK`, 7, 3, 4, 0, 0, vitest Exit 0; P2 `spaet genug`, 1, 5, 1, 1, 0, 5, Netz leer; P3 `alle`, vitest Exit 0; P4 `geschuetzt`; P5 `check` Exit 0 (236 Dateien, 2492 Tests).
+- 2026-11-20 Release: PASS K und B (Zyklus 2), DONE.
 
 ## Blockers
