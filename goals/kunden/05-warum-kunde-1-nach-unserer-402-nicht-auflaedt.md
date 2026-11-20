@@ -1,7 +1,7 @@
 # Kunden Goal 05: Warum Kunde 1 nach unserer 402 nicht auflädt
 
 ## Status
-PLANNED
+DONE
 
 ## Active Objective
 Kunde 1, der größte zahlende fremde Automaton, fragt seit dem 13.11.2026 05:05 UTC täglich 1065 bis 1625 Mal Inferenz mit leerem
@@ -75,7 +75,7 @@ MVP: Funktion, weil ein Kunde, der täglich über 1000 Mal bezahlen will und es 
   `check` und vitest im Vordergrund mit eigenem Timeout. Kein Build, kein Test auf dem Server.
 
 ## Done Condition
-- [ ] Warum Kunde 1 nach unserer 402 nicht auflädt, steht gemessen in `docs/kunden/aufladung-2026-11.md`, belegt mit unserer 402 und
+- [x] Warum Kunde 1 nach unserer 402 nicht auflädt, steht gemessen in `docs/kunden/aufladung-2026-11.md`, belegt mit unserer 402 und
       dem Code der Runtime am Pin, ohne Adresse und ohne Betrag; liegt die Ursache bei uns, gibt es den Vorschlag mit Schwere 5.
       Prüfung: `awk '/^Gemessen: /{print ($2 >= "2026-11-20T00:00:00Z") ? "spaet genug" : "zu frueh"}' docs/kunden/aufladung-2026-11.md` muss genau `spaet genug` ausgeben.
       Prüfung: `grep -cE "^Unsere 402: src/inference/proxy\.ts:[0-9]+, Zweig (Aufladung offen|Aufladung geschlossen), Felder " docs/kunden/aufladung-2026-11.md` muss 1 ausgeben.
@@ -85,19 +85,19 @@ MVP: Funktion, weil ein Kunde, der täglich über 1000 Mal bezahlen will und es 
       Prüfung: `grep -cE "^Ursache: (kein Geld|Fehler bei uns|offen), weil " docs/kunden/aufladung-2026-11.md` muss 1 ausgeben.
       Prüfung: `d=docs/kunden/aufladung-2026-11.md; if grep -q "^Ursache: Fehler bei uns" "$d"; then p=$(sed -nE 's/^Vorschlag: (goals\/_vorschlaege\/kunden-kritik-[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]+\.md)$/\1/p' "$d" | head -1); [ -n "$p" ] && head -1 "$p" | grep -qx "Schwere: 5" && grep -q "^Goal: kunden 05" "$p" && echo stimmig || echo unstimmig; else echo stimmig; fi` muss `stimmig` ausgeben.
       Prüfung (Netz): `d=$(mktemp -d); git clone -q https://github.com/Conway-Research/automaton "$d" && git -C "$d" checkout -q d8f8168 && grep -oE "^- Runtime: src/[A-Za-z0-9_/.-]+\.ts:[0-9]+" docs/kunden/aufladung-2026-11.md | sed 's/^- Runtime: //' | while IFS=: read -r p n; do sed -n "${n}p" "$d/$p" | grep -qiE "topup|402|INSUFFICIENT|usdc|credit|balance" || echo "falsch $p:$n"; done` muss nichts ausgeben.
-- [ ] Ein Test belegt ohne Netz, dass der Watchdog einen fallenden Rest beim Anbieter meldet, bevor er leer ist, und das Dokument sagt
+- [x] Ein Test belegt ohne Netz, dass der Watchdog einen fallenden Rest beim Anbieter meldet, bevor er leer ist, und das Dokument sagt
       gemessen, ob Warnung und Aufladung das heute in der Produktion tun.
       Prüfung: `pnpm -s vitest run test/credit-before-503.test.ts` muss Exit-Code 0 haben.
       Prüfung: `pnpm -s vitest run test/credit-before-503.test.ts --reporter=json 2>/dev/null | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const j=JSON.parse(s);const t=j.testResults.flatMap(f=>f.assertionResults).filter(a=>a.status==="passed").map(a=>a.title);console.log(t.some(x=>/warns before empty/.test(x))?"da":"fehlt")})'` muss `da` ausgeben.
       Prüfung: `sed -n '/^## Vor der ersten 503/,/^## /p' docs/kunden/aufladung-2026-11.md | grep -cE "^(Watchdog: letzter Lauf 2026-[0-9]{2}-[0-9]{2}T[0-9:]+Z, credit (OK|LOW|empty|unreadable)|Alarmweg: received (ok|red|unknown)|Aufladung: Schwelle (passt|zu niedrig)|Ergebnis vor der ersten 503: (gemeldet|nicht gemeldet), weil .+)$"` muss 4 ausgeben.
       Prüfung: `d=docs/kunden/aufladung-2026-11.md; if grep -q "^Ergebnis vor der ersten 503: nicht gemeldet" "$d"; then n=$(grep -oE "goals/_vorschlaege/kunden-kritik-[0-9-]+\.md" "$d" | sort -u | while read -r p; do head -1 "$p" | grep -qx "Schwere: 5" && echo "$p"; done | wc -l); [ "$n" -ge 1 ] && echo stimmig || echo unstimmig; else echo stimmig; fi` muss `stimmig` ausgeben.
-- [ ] Nichts im Repo nennt eine Adresse, eine Wallet oder einen Betrag je Kunde, und die Annahmen stehen fest.
+- [x] Nichts im Repo nennt eine Adresse, eine Wallet oder einen Betrag je Kunde, und die Annahmen stehen fest.
       Prüfung: `cat docs/kunden/aufladung-2026-11.md goals/kunden/ANNAHMEN.md | grep -cE "([0-9]{1,3}\.){3}[0-9]{1,3}|0x[0-9a-fA-F]{40}"` muss 0 ausgeben.
       Prüfung: `grep -cE "Kunde [0-9]+[^.]*[0-9][.,][0-9]{2} (USD|USDC)" docs/kunden/aufladung-2026-11.md` muss 0 ausgeben.
       Prüfung: `grep -cE "^- [0-9-]+, kunden 05: " goals/kunden/ANNAHMEN.md` muss mindestens 2 ausgeben.
-- [ ] `check` ist grün.
+- [x] `check` ist grün.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Jeder neue Test war vor der Änderung rot oder gegen eine benannte Mutation rot; die Zeile im Progress Log nennt, womit.
@@ -121,5 +121,10 @@ MVP: Funktion, weil ein Kunde, der täglich über 1000 Mal bezahlen will und es 
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-20 Zyklus 1: Punkte 1, 2, 3, 4 gebaut: `docs/kunden/aufladung-2026-11.md` misst Ursache `kein Geld` (USDC von Kunde 1 unter der kleinsten Stufe, 0 Aufrufe von `/pay/` seit 13.11., unsere 402 im Zweig `Aufladung offen`, sieben Stellen der Runtime am Pin) und vor der ersten 503 `gemeldet`; neuer Test `test/credit-before-503.test.ts` (sechs Läufe von 9,37 USD auf 0), rot gegen die Mutation Schwelle 0 (`CP_CREDIT_WARN_USD=0`, `CP_CREDIT_WARN_DAYS=0`: nur eine Meldung `credit empty`, `expected 1 to be greater than or equal to 2`); den Fall mit festem Rest gab es schon in `test/watchdog-credit-kritik.test.ts` ("empty after LOW: two runs at 4 USD, three at 0 USD …"), nicht als fallende Folge; Messwerkzeuge mit Gegenprobe (gepflanzte Zeile `/pay/5` zählt 1, Schwelle 0 und früherer Block sagen `über der kleinsten Stufe`); Nebenbefund als `goals/_vorschlaege/kunden-kritik-2026-11-20-1.md` (Schwere 3), vier Annahmen. Prüfbefehle: P1 `spaet genug`, 1, 7, 1, 1, 1, `stimmig`, Netz leer; P2 vitest Exit 0, `da`, 4, `stimmig`; P3 0, 0, 4; P4 `check` Exit 0 (grün in 208 s).
+- 2026-11-20 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4; `origin/dev` hatte seit dem Start keinen neuen Commit, nichts zu mergen, jeder Prüfbefehl am Kopf `e3edb80` neu gefahren. Prüfbefehle: P1 `spaet genug`, 1, 7, 1, 1, 1, `stimmig`, Netz leer; P2 vitest Exit 0, `da`, 4, `stimmig`; P3 0, 0, 4; P4 `check` Exit 0 (grün in 59 s); PR #316 `check` pass, `e2e` pass (Lauf 44686235153).
+- 2026-11-20 Zyklus 3: Gaps aus Verdict `05-z2-B.md` behoben, Abschluss gemeldet, Punkte 1, 2, 3, 4: `goals/_vorschlaege/kunden-kritik-2026-11-20-1.md` entfernt und der Verweis darauf im Dokument gestrichen (der Nebenbefund bleibt als Absatz), der Halbsatz mit dem Betrag zu Kunde 1 gestrichen; `origin/dev` ohne neuen Commit. Prüfbefehle: P1 `spaet genug`, 1, 7, 1, 1, 1, `stimmig`, Netz leer; P2 vitest Exit 0, `da`, 4, `stimmig`; P3 0, 0, 4; P4 `check` Exit 0 (grün in 111 s).
+- 2026-11-20 Zyklus 4: Gaps aus Verdict `05-z3-B.md` behoben, Abschluss gemeldet, Punkte 1, 2, 3, 4: `origin/dev` am Stand `792a01c` (PR #315, Loop-Kritik, gemergt 06:30:58 UTC) in den Goal-Branch gemergt; die Angabe `origin/dev ohne neuen Commit` in Zyklus 3 war falsch, weil ich vor dem Commit nicht neu gefetcht hatte. Add/Add-Konflikt an `goals/_vorschlaege/kunden-kritik-2026-11-20-2.md`: Fassung von `dev` übernommen, der Vorschlag der Kritik zu kunden 05 liegt unverändert als `kunden-kritik-2026-11-20-3.md`; Dokument und Test unverändert. Prüfbefehle (Node 22.23.5, nach dem Merge): P1 `spaet genug`, 1, 7, 1, 1, 1, `stimmig`, Netz leer; P2 vitest Exit 0, `da`, 4, `stimmig`; P3 0, 0, 4; P4 `check` Exit 0 (grün in 143 s).
+- 2026-11-20 Release: PASS K und B (Zyklus 4), DONE.
 
 ## Blockers
