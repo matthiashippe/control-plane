@@ -1,7 +1,7 @@
 # Kunden Goal 07: Der eine erreichbare Conway-Zahler bekommt eine Antwort
 
 ## Status
-PLANNED
+ACTIVE
 
 ## Active Objective
 Von 16 Wallets, die in den 30 Tagen bis 18.11.2026 bei Conway aufgeladen haben, zahlt keine bei uns, und nur ein Betreiber ist
@@ -59,7 +59,7 @@ ob es geschieht.
   `check` und vitest im Vordergrund mit eigenem Timeout. Kein Build, kein Test auf dem Server.
 
 ## Done Condition
-- [ ] `ops/status.sh` zeigt die Zählungen der Zeile `OVERLAP topped up` als Feld `conway_overlap`, ohne Adresse und ohne Hash; in
+- [x] `ops/status.sh` zeigt die Zählungen der Zeile `OVERLAP topped up` als Feld `conway_overlap`, ohne Adresse und ohne Hash; in
       beide Richtungen bewiesen.
       Prüfung: `pnpm -s vitest run test/status-conway-overlap.test.ts` muss Exit-Code 0 haben.
       Prüfung: `pnpm -s vitest run test/status-conway-overlap.test.ts --reporter=json 2>/dev/null | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const j=JSON.parse(s);const t=j.testResults.flatMap(f=>f.assertionResults).filter(a=>a.status==="passed").map(a=>a.title);console.log([/counts/,/unknown/,/no address/].every(r=>t.some(x=>r.test(x)))?"alle":"fehlt")})'` muss `alle` ausgeben.
@@ -77,10 +77,10 @@ ob es geschieht.
       mit „ok“ freigegeben“ steht am Topic vor dem Eintrag.
       Prüfung: `grep -E "^[0-9]{4}-" ops/posted-answers.log | awk '$1 > "2026-11-20T00:00:00Z" {print $2}' | while read -r n; do test -f "goals/kunden/antworten-07/$n.md" && echo "$n"; done | wc -l` muss 1 ausgeben.
       Prüfung (Netz): `python3 ops/post-the-answers.py --verify-posted --folder goals/kunden/antworten-07 | tail -1` muss mit `VERIFY POSTED OK:` beginnen.
-- [ ] Die Annahmen stehen fest, und nichts im Repo verbindet das Issue mit einer Wallet.
+- [x] Die Annahmen stehen fest, und nichts im Repo verbindet das Issue mit einer Wallet.
       Prüfung: `grep -cE "^- [0-9-]+, kunden 07: " goals/kunden/ANNAHMEN.md` muss mindestens 2 ausgeben.
       Prüfung: `cat goals/kunden/ANNAHMEN.md goals/kunden/07-der-eine-erreichbare-conway-zahler-bekommt-eine-antwort.md | grep -cE "0x[0-9a-fA-F]{40}|[0-9a-f]{64}"` muss 0 ausgeben.
-- [ ] `check` ist grün.
+- [x] `check` ist grün.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
 - [ ] goal-verifier PASS (K und B)
 
@@ -103,5 +103,6 @@ ob es geschieht.
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-20 Zyklus 1: Punkte 1, 4, 5 gebaut: Feld `conway_overlap` in `ops/status.sh` aus den Zeilen `OVERLAP topped up` und `PAYERS` von `ops/conway-payers.sh`, `unknown` mit Grund bei nicht lesbarer Quelle, Abbruch bei Adresse oder Hash; `test/status-conway-overlap.test.ts` rot gegen `ops/status.sh` von `origin/dev` (7 von 7), als Mutation ohne die Prüfung auf Adresse oder Hash rot (1 von 7); gegen die Produktion 16 Wallets, 0 bekannt, 0 zahlend. Punkte 2 und 3 offen, weil die Widerlegung der Goal-Datei greift: Das eine erreichbare Issue trägt schon eine Antwort von uns (`ANNAHMEN.md`), also kein Entwurf und kein Gate. Prüfbefehle: P1 vitest Exit 0, `alle`, vitest Exit 0 (33 Tests), `SELFTEST OK`; P2 0 statt 1, kein Treffer statt mindestens 1, Prüfungen 3 bis 6 ohne Entwurf nicht gelaufen; P3 0 statt 1, `--verify-posted` nicht gelaufen; P4 4, 0; P5 `check` Exit 0 (237 Dateien, 2499 Tests).
 
 ## Blockers
