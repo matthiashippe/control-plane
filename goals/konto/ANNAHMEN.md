@@ -304,7 +304,7 @@
 
 ## Abgelöst durch umzug 03 (Maker, 2026-11-18)
 
-- Abgelöst: konto 08 Punkt 2 durch umzug 03 Punkt 1, Ausgabe dann genau `Exit 0, 6 6` (Tech Lead, 2026-11-18)
+- Abgelöst: konto 08 Punkt 2 durch umzug 03 Punkt 1, Ausgabe dann genau `Exit 0, exit=0 | 6 6` (Tech Lead, 2026-11-20)
 - Abgelöst: konto 08 Punkt 4 durch umzug 03 Punkt 1, Ausgabe dann genau `Exit 0, 6` (Tech Lead, 2026-11-18)
 
 ## Goal 11 (18.11.2026, Engineer CP)
