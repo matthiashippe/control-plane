@@ -1,6 +1,0 @@
-Schwere: 3
-Goal: kunden 05
-Befund: Unsere 402 nennt in `details.topup_url` und im Text den Pfad `/pay/5/<Wallet des Kunden>`, und genau diesen Pfad mit der Wallet von Kunde 1 riefen seit 13.11. 56 fremde Adressen 572 Mal ab, fast alle Verzeichnisse und Prüfer für x402 (meist `PayAI-Bazaar/1.0`); die Wallet eines Kunden steht damit samt unserem Dienst in fremden öffentlichen Verzeichnissen.
-Beleg: Zugriffslog über `bash ops/access-log.sh`, gezählt auf dem code-host: Zeilen ab 2026-11-13T00:00:00Z mit Pfad `/pay/5/<Wallet von Kunde 1>`, 572 Zeilen von 56 Adressen, keine davon eigene oder die von Kunde 1, alle mit 402 | src/inference/proxy.ts:371 (`topup_url: ${siteOrigin()}/pay/5/${address}`) | docs/kunden/aufladung-2026-11.md (Nebenbefund)
-Empfehlung: Ein Goal am Topic `kunden` klärt nur lesend, wie die Verzeichnisse den Pfad lernen (Antwort des Facilitators beim Settlement, `resource` im x402-Angebot von `/pay/{usd}/{address}`), und bietet dann eine Aufladung an, deren URL keine Wallet trägt (etwa `/pay/{usd}` mit der Wallet aus dem Schlüssel), ohne den Pfad zu brechen, den die Runtime am Pin aufruft (`src/conway/topup.ts:36`, `GET /pay/{amountUsd}/{address}`).
-MVP: Schutz, weil die Zuordnung Wallet zu Kunde sonst öffentlich wird, ohne dass das Repo sie nennt.

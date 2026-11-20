@@ -40,8 +40,7 @@ ab Zeile 321. Gemessen bestätigt: `GET /pay/5/<Wallet von Kunde 1>` bekam von f
 USDC von Kunde 1: `balanceOf` des USDC-Vertrags auf Base über `mainnet.base.org`, gerechnet auf dem code-host, die Adresse nur im
 Speicher aus `ops/db-report.cjs` (`CP_REPORT=decline`, `readonly: true`, Kunde 1 wie in `ops/customer-decline.sh` nummeriert).
 Ausgegeben wird nur das Wort. Gegenprobe in beide Richtungen: Mit der Schwelle 0 sagt dasselbe Werkzeug `über der kleinsten Stufe`,
-an einem früheren Block, an dem die Wallet nachweislich vor einer Aufladung stand, ebenfalls; der Bestand liegt auch unter 1 USD,
-also reichte er nicht einmal für unsere kleinste Stufe.
+an einem früheren Block, an dem die Wallet nachweislich vor einer Aufladung stand, ebenfalls.
 
 Aufrufe von `/pay/`: das ganze Zugriffslog über `ops/access-log.sh` (252072 Zeilen), die Adresse von Kunde 1 zugeordnet wie in
 `ops/customer-decline.sh` (Inferenz-Zeile und Logzeile mit 200 höchstens 5 s auseinander). Seit 2026-11-13T00:00:00Z stellte sie
@@ -51,9 +50,8 @@ Zeile `GET /pay/5` von ihrer Adresse zählt dasselbe Werkzeug 1.
 
 Nebenbefund: Den Pfad `/pay/5/<Wallet von Kunde 1>`, wie ihn unsere 402 in `details.topup_url` nennt, riefen seit 13.11. 56 fremde
 Adressen 572 Mal ab, fast alle Verzeichnisse und Prüfer für x402 (der größte Teil mit dem User-Agent `PayAI-Bazaar/1.0`). Die
-Wallet eines Kunden steht damit in fremden öffentlichen Verzeichnissen; Vorschlag
-`goals/_vorschlaege/kunden-kritik-2026-11-20-1.md`. Mit der Aufladung von Kunde 1 hat das nichts zu tun, er selbst rief den Pfad
-nicht auf.
+Wallet eines Kunden steht damit in fremden öffentlichen Verzeichnissen. Mit der Aufladung von Kunde 1 hat das nichts zu tun,
+er selbst rief den Pfad nicht auf.
 
 Befehle (Werte bleiben auf dem code-host): `bash ops/access-log.sh`, `docker exec -i -e CP_REPORT=decline deploy-cp-1 node -` mit
 `ops/db-report.cjs`, ein `eth_call` von `balanceOf` an `mainnet.base.org`, `docker inspect deploy-cp-1` (nur Namen und
