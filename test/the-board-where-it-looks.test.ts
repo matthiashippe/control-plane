@@ -26,7 +26,7 @@ import { describe, expect, it } from "vitest";
 process.env.CP_POOL_DAILY_MC = String(POOL_MC);
 
 import { createApp } from "../src/app.js";
-import { openDb, postLedger } from "../src/db.js";
+import { openDb, postLedger, MC_PER_CENT } from "../src/db.js";
 import { hashApiKey } from "../src/auth/siwe.js";
 import { POOL_MC, poolLeftMc, GRANT_MC, claimStarter } from "../src/credits/starter.js";
 import { privateKeyToAccount, generatePrivateKey } from "viem/accounts";
@@ -82,15 +82,41 @@ describe("a runtime that has run out asks the balance", () => {
     expect(body.bounties_url).toBeUndefined();
   });
 
-  it("says nothing about the board while a grant is still waiting, because the grant is the better step", async () => {
+  /** A full pool and one open job, so the board has something to say unless a grant comes first. */
+  function untouched(keyName: string) {
     const db = openDb(":memory:");
     db.prepare("INSERT INTO wallets (address, balance_mc, created_at) VALUES (?, 0, ?)")
       .run(ADDRESS, new Date().toISOString());
     db.prepare("INSERT INTO api_keys (address, key_hash, key_prefix, name, created_at) VALUES (?, ?, ?, ?, ?)")
-      .run(ADDRESS, hashApiKey(KEY), KEY.slice(0, 15), "conway-automaton", new Date().toISOString());
-    const app = createApp({ db });
-    const body = (await (await withKey(app, "/v1/credits/balance")).json()) as Record<string, unknown>;
+      .run(ADDRESS, hashApiKey(KEY), KEY.slice(0, 15), keyName, new Date().toISOString());
+    const buyer = "0x" + "b".repeat(40);
+    db.prepare("INSERT OR IGNORE INTO wallets (address, balance_mc, created_at) VALUES (?, 0, ?)").run(buyer, new Date().toISOString());
+    postLedger(db, { address: buyer, kind: "topup", deltaMc: 500_000, ref: "seed" });
+    db.prepare(
+      "INSERT INTO bounties (id, creator, kind, brief, price_mc, deadline, status, created_at) VALUES (?, ?, 'factual', ?, ?, ?, 'open', ?)",
+    ).run(
+      "job-1",
+      buyer,
+      "A brief long enough to be a brief, with a deliverable and a deadline in it.",
+      150_000,
+      new Date(Date.now() + 7 * 24 * 3600_000).toISOString(),
+      new Date().toISOString(),
+    );
+    return createApp({ db });
+  }
+
+  it("says nothing about the board while a grant is still waiting, because the grant is the better step", async () => {
+    // A key that is not the runtime's own name: its grant waits for POST /v1/credits/starter.
+    const body = (await (await withKey(untouched("some-tool"), "/v1/credits/balance")).json()) as Record<string, unknown>;
     expect(body.starter_available_cents, "the pool is untouched, so a grant is waiting").toBeGreaterThan(0);
+    expect(body.open_bounties, "one offer per answer").toBeUndefined();
+  });
+
+  it("says nothing about the board on the read that hands a new runtime its grant (kunden 06)", async () => {
+    // The runtime's own key name: since kunden 06 the first read of an empty balance carries the grant itself.
+    const body = (await (await withKey(untouched("conway-automaton"), "/v1/credits/balance")).json()) as Record<string, unknown>;
+    expect(body.granted_cents, "the pool is untouched, so the grant is given").toBe(GRANT_MC / MC_PER_CENT);
+    expect(body.starter_available_cents, "no offer of what was just given").toBeUndefined();
     expect(body.open_bounties, "one offer per answer").toBeUndefined();
   });
 });

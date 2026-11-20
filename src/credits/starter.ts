@@ -23,8 +23,10 @@
  */
 
 import type { Db } from "../db.js";
-import { OUR_ADDRESSES } from "../bounties/ours.js";
+import { OUR_ADDRESSES, ourAddresses } from "../bounties/ours.js";
 import { postLedger, mcToCents } from "../db.js";
+import { hashApiKey } from "../auth/siwe.js";
+import { isKeylessAddress } from "../auth/keyless.js";
 
 /** Ten attempts at about 1.5 cents each. */
 export const GRANT_MC = 15_000;
@@ -450,4 +452,36 @@ export function grantToWaitingRuntime(db: Db, address: string, balanceMc: number
   if (!row || row.n < WAITING_POLLS) return false;
   if (Date.parse(row.last_at) - Date.parse(row.first_at) < WAITING_MS) return false;
   return grantOnFirstUse(db, who);
+}
+
+/** The name the runtime at pin d8f8168 gives its key, and the one SIWE gives a key without a name. */
+export const RUNTIME_KEY_NAME = "conway-automaton";
+
+/**
+ * The grant on the call a new runtime makes before it first thinks (goals/kunden/06).
+ *
+ * Measured on 2026-11-20 (docs/kunden/startgutschrift.md): of nine new foreign runtimes in the four weeks before,
+ * three never got a grant, one of them after reading its empty balance exactly once. The runtime at the pin reads
+ * GET /v1/credits/balance right after its key (src/index.ts:349, before bootstrapTopup) and again at the top of its
+ * loop (src/agent/loop.ts:956), and only then asks for inference; `grantOnFirstUse` waits for that inference and
+ * `grantToWaitingRuntime` for a third read a minute later, and a runtime that sees zero twice can be gone by then.
+ *
+ * So the first read of an empty balance is the trigger, for exactly the caller this grant is for: the key on this
+ * request is named `conway-automaton`, its address came in over SIWE (not a handle of the keyless door, which
+ * anybody can mint by the dozen), and the address is not ours, neither on OURS nor by the name of any of its keys.
+ * The pool, the daily limit and "one per address, ever" are claimStarter's, unchanged.
+ *
+ * @param rawKey the Authorization header of the request, so the name is the presented key's and not any key's.
+ */
+export function grantOnFirstRead(db: Db, address: string, rawKey: string | undefined, balanceMc: number): boolean {
+  if (balanceMc > 0 || !rawKey) return false;
+  const who = address.toLowerCase();
+  if (isKeylessAddress(who)) return false;
+  const key = rawKey.startsWith("Bearer ") ? rawKey.slice(7) : rawKey;
+  const row = db
+    .prepare("SELECT name FROM api_keys WHERE key_hash = ? AND revoked_at IS NULL")
+    .get(hashApiKey(key)) as { name: string } | undefined;
+  if (!row || row.name !== RUNTIME_KEY_NAME) return false;
+  if (ourAddresses(db, [who]).size > 0) return false;
+  return grantOnFirstUse(db, who, GRANT_MC, { trigger: "first balance read" });
 }
