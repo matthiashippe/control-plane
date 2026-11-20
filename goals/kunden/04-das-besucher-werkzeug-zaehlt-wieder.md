@@ -1,7 +1,7 @@
 # Kunden Goal 04: Das Besucher-Werkzeug zählt nach dem Umzug wieder
 
 ## Status
-PLANNED
+DONE
 
 ## Active Objective
 `ops/traffic.sh 168` endete am 19.11.2026 mit Exit 1 direkt nach der Kopfzeile „Requests to postyourprice.com“
@@ -110,14 +110,14 @@ MVP: Funktion, weil ohne Besucherzahl kein Kanal zu bewerten ist.
   Server.
 
 ## Done Condition
-- [ ] `ops/traffic.sh` läuft nach dem Umzug durch, auch über eine Sitemap mit 301 und mit leerer Sitemap, kennt `automatonhost.com` als
+- [x] `ops/traffic.sh` läuft nach dem Umzug durch, auch über eine Sitemap mit 301 und mit leerer Sitemap, kennt `automatonhost.com` als
       eigenen Host und zählt im Block `-- Arrivals per host --` die fremden Ankünfte je Host mit dem Referrer der ersten Anfrage, eigene
       nie, ohne Adresse; in beide Richtungen bewiesen.
       Prüfung: `pnpm -s vitest run test/traffic-hosts.test.ts` muss Exit-Code 0 haben.
       Prüfung: `pnpm -s vitest run test/traffic-hosts.test.ts --reporter=json 2>/dev/null | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const j=JSON.parse(s);const t=j.testResults.flatMap(f=>f.assertionResults).filter(a=>a.status==="passed").map(a=>a.title);console.log([/sitemap redirect/,/postyourprice url/,/empty sitemap/,/per host/,/first request/,/our own/,/our page/,/window/,/other host/,/no address/,/selftest/].every(r=>t.some(x=>r.test(x)))?"alle":"fehlt")})'` muss `alle` ausgeben.
       Prüfung: `pnpm -s vitest run test/catalog-page.test.ts test/depth.test.ts test/page-weight.test.ts` muss Exit-Code 0 haben.
       Prüfung: `git diff --diff-filter=MDR --name-only $(git merge-base origin/dev HEAD) -- ops deploy src | grep -vxc 'ops/traffic.sh'` muss 0 ausgeben.
-- [ ] Die erste Messung über sieben Tage steht in `docs/kunden/besucher.md` mit Befehl, Ausgabe, Leitzahl, Ursache und Ergebnis, ohne
+- [x] Die erste Messung über sieben Tage steht in `docs/kunden/besucher.md` mit Befehl, Ausgabe, Leitzahl, Ursache und Ergebnis, ohne
       Adresse eines Besuchers.
       Prüfung: `awk '/^Gemessen: /{print ($2 >= "2026-11-19T20:00:00Z") ? "spaet genug" : "zu frueh"}' docs/kunden/besucher.md` muss genau `spaet genug` ausgeben.
       Prüfung: `grep -cxF "bash ops/traffic.sh 168 | sed -n '/^-- Arrivals per host --\$/,/^\$/p'" docs/kunden/besucher.md` muss mindestens 1 ausgeben.
@@ -127,9 +127,9 @@ MVP: Funktion, weil ohne Besucherzahl kein Kanal zu bewerten ist.
       Prüfung: `cat docs/kunden/besucher.md goals/kunden/ANNAHMEN.md | grep -cE "([0-9]{1,3}\.){3}[0-9]{1,3}|[0-9a-fA-F]{1,4}(:[0-9a-fA-F]{1,4}){3,}|0x[0-9a-fA-F]{40}"` muss 0 ausgeben.
       Prüfung: `grep -cE "^- [0-9-]+, kunden 04: " goals/kunden/ANNAHMEN.md` muss mindestens 2 ausgeben.
       Prüfung (Netz): `bash ops/traffic.sh 168 >/dev/null 2>&1; echo $?` muss `0` ausgeben.
-- [ ] `check` ist grün.
+- [x] `check` ist grün.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Jeder neue Test außer `selftest` war vor dem Fix rot; die Zeile im Progress Log nennt, womit.
@@ -158,5 +158,8 @@ MVP: Funktion, weil ohne Besucherzahl kein Kanal zu bewerten ist.
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-19 Zyklus 1: Punkte 1, 2, 3 gebaut: `ops/traffic.sh` liest die Sitemap mit `curl -sL`, läuft bei leerer Sitemap mit Meldung auf stderr weiter, nimmt `automatonhost.com` als Vorgabe für `BASE_URL` und `CP_OWN_HOSTS` und druckt `-- Arrivals per host --` nach der Kopfzeile; Fixture `ops/fixtures/traffic-three-hosts.log`, `test/traffic-hosts.test.ts` (11 Fälle), Messung gegen die Produktion um 22:54 UTC (2615 fremde Ankünfte in 168 h: 362 automatonhost.com, 2197 postyourprice.com, 56 cp.hippe.eu, 0 andere; der ältere Abschnitt desselben Laufs zählt ebenfalls 2615), 3 Annahmen. Neue Tests rot vor dem Fix: über `TRAFFIC_UNDER_TEST` gegen `ops/traffic.sh` von `origin/dev` 11 von 11 failed (Lauf endet nach der Kopfzeile, wie am 19.11.); Mutationen am neuen Stand: erste Anfrage im Fenster statt im Log 5 failed, darunter `window`; letzte statt erste Anfrage 7 failed, darunter `first request`; Eigene nicht gefiltert 5 failed, darunter `our own`; ohne `(our page)` 5 failed, darunter `our page`; Adresse als Referrer gedruckt 1 failed (`other host`); ohne `-L` 1 failed (`postyourprice url`); `grep` ohne `|| true` 1 failed (`empty sitemap`); andere Hosts unter automatonhost.com 6 failed, darunter `other host` und `no address`. Prüfbefehle: Punkt 1 vitest Exit 0 (11 passed), `alle`, catalog/depth/page-weight Exit 0 (24 passed), 0; Punkt 2 `spaet genug`, 1, `stimmig`, 1, 1, 0, 3, Netz `0` (Lauf 22:54 bis 23:13 UTC, Ausgabe in eine Datei außerhalb des Repos statt `/dev/null`, daraus der Block); Punkt 3 `node scripts/check.mjs` Exit 0 (2476 Tests).
+- 2026-11-19 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3; `origin/dev` brachte nichts Neues (kein Merge nötig). Prüfbefehle: Punkt 1 vitest Exit 0, `alle`, catalog/depth/page-weight Exit 0 (24 passed), 0; Punkt 2 `spaet genug`, 1, `stimmig`, 1, 1, 0, 3, Netz `0` (Lauf 23:30 bis 23:53 UTC); Punkt 3 `node scripts/check.mjs` Exit 0 (grün in 81 s); am PR #310 Kopf afefda9 Jobs `check` und `e2e` pass.
+- 2026-11-20 Release: PASS K und B (Zyklus 2), DONE.
 
 ## Blockers
