@@ -66,13 +66,25 @@ if [ -n "${CP_ALERT_WEBHOOK:-}" ]; then
   alarm_topic_rc=$?
   unset topic_url
 fi
+# Does a wallet that tops up at Conway also pay here (kunden 07)? The counts come from the line `OVERLAP topped up` of
+# ops/conway-payers.sh, the same source and the same reads (ssh cat of the delta, db-report with readonly: true), so the number
+# no longer waits for somebody to start that script by hand. CP_CONWAY_PAYERS_CMD replaces the call in tests. CP_PAYERS_LIST
+# is dropped for the call, because with it the script writes addresses into a file. The output goes to python on fd 4 and
+# never into the environment; an output that carries an address or a hash is not passed on at all.
+if [ -n "${CP_CONWAY_PAYERS_CMD:-}" ]; then
+  payers_out=$(env -u CP_PAYERS_LIST bash -c "$CP_CONWAY_PAYERS_CMD" 2>/dev/null)
+else
+  payers_out=$(env -u CP_PAYERS_LIST bash "$DIR/conway-payers.sh" 2>/dev/null)
+fi
+payers_rc=$?
 or_json=$(curl -s -m 10 https://openrouter.ai/api/v1/credits -H "Authorization: Bearer ${OPENROUTER_API_KEY:-none}" 2>/dev/null)
 payto_hex=$(curl -s -m 10 -X POST https://mainnet.base.org -H 'content-type: application/json' \
   --data '{"jsonrpc":"2.0","id":1,"method":"eth_call","params":[{"to":"0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913","data":"0x70a08231000000000000000000000000914102284463F4F58B1D2f6DB9aC80BFcaA7d614"},"latest"]}' 2>/dev/null)
 
 HEALTH_CODE="$health_code" HEALTH_BODY="$health_body" CERT_END="$cert_end" VM_STATS="$vm_stats" \
 DB_JSON="$db_json" OR_JSON="$or_json" PAYTO_HEX="$payto_hex" ALARM_COUNT="$alarm_count" ALARM_RC="$alarm_rc" \
-ALARM_LAST="$alarm_last" ALARM_LAST_RC="$alarm_last_rc" ALARM_TOPIC_RC="$alarm_topic_rc" python3 3<<<"$alarm_topic" <<'PY'
+ALARM_LAST="$alarm_last" ALARM_LAST_RC="$alarm_last_rc" ALARM_TOPIC_RC="$alarm_topic_rc" PAYERS_RC="$payers_rc" \
+  python3 3<<<"$alarm_topic" 4<<<"$payers_out" <<'PY'
 import os, json, datetime, re, time
 def j(s, default=None):
     try: return json.loads(s)
@@ -177,6 +189,31 @@ if received["status"] == "red":
     alarm_status = "red"
 alarm_path = {"unreachable_24h": alarm_count, "last_unreachable": last_unreachable,
               "last_delivered": last_delivered, "status": alarm_status, "received": received}
+# conway_overlap: the counts of `OVERLAP topped up` and the window of `PAYERS` from ops/conway-payers.sh. Anything else than
+# exit 0 with exactly one of each line, in the format of that script, is "unknown" with a short reason, never a zero. An
+# address or a hash anywhere in the output stops the field before any of it is read, so nothing of it can reach the report.
+def conway_overlap():
+    try:
+        with os.fdopen(4, encoding="utf-8", errors="replace") as source:
+            text = source.read()
+    except Exception:
+        return {"status": "unknown", "reason": "output of conway-payers not readable"}
+    if re.search(r"0x[0-9a-fA-F]{40}|[0-9a-fA-F]{64}", text):
+        return {"status": "unknown", "reason": "address or hash in the output of conway-payers, not passed on"}
+    if os.environ.get("PAYERS_RC") != "0":
+        return {"status": "unknown", "reason": "conway-payers exit " + re.sub(r"[^0-9-]", "", os.environ.get("PAYERS_RC", ""))[:4]}
+    lines = text.splitlines()
+    payers = [m for m in (re.match(r"^PAYERS window (\S+) to (\S+): ", l) for l in lines) if m]
+    overlap = [m for m in (re.match(
+        r"^OVERLAP topped up: (\d+) wallets, (\d+) known here, (\d+) with inference here, (\d+) paid here, "
+        r"(\d+) paid Conway after their last payment here$", l) for l in lines) if m]
+    if len(payers) != 1 or not all(ts_re.match(x) for x in payers[0].groups()):
+        return {"status": "unknown", "reason": "no PAYERS window line"}
+    if len(overlap) != 1:
+        return {"status": "unknown", "reason": "no OVERLAP topped up line"}
+    wallets, known, inference, paid, after = (int(x) for x in overlap[0].groups())
+    return {"status": "ok", "window": {"from": payers[0].group(1), "to": payers[0].group(2)}, "wallets": wallets,
+            "known": known, "inference": inference, "paid": paid, "paid_conway_after": after}
 orc = j(os.environ.get("OR_JSON", ""), {}) or {}
 ord_ = orc.get("data", {})
 payto = None
@@ -192,5 +229,6 @@ print(json.dumps({
     "openrouter": {"credits": ord_.get("total_credits"), "usage": round(ord_.get("total_usage", 0), 4),
                    "left": round(ord_.get("total_credits", 0) - ord_.get("total_usage", 0), 4)} if ord_ else None,
     "payto_usdc_base": payto,
+    "conway_overlap": conway_overlap(),
 }, indent=2))
 PY
