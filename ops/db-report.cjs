@@ -378,6 +378,63 @@ if (process.env.CP_REPORT === "wallets") {
   process.exit(0);
 }
 
+// CP_REPORT=starter-paths (goals/kunden/06): instead of the report, one JSON of every new foreign runtime in
+// the window CP_SINCE..CP_UNTIL (ISO UTC, CP_UNTIL empty means now): the first `conway-automaton` key of an
+// address that oursClause does not call ours (the list OURS and every key named after OUR_KEY_NAMES), like
+// runtime_funnel, numbered from 1 in the order of that key. Each runtime leaves this block only as
+// {n, key_at, granted, granted_at, funded_at}: funded_at is its first ledger row that raised the balance
+// (a grant included), so ops/starter-paths.sh --own-check can tell an empty balance from a funded one.
+// No address, key or ref. Written synchronously and ended here, like the decline block.
+if (process.env.CP_REPORT === "starter-paths") {
+  const iso = (name, fallback) => {
+    const raw = process.env[name];
+    if (!raw) return fallback;
+    const t = Date.parse(raw);
+    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/.test(raw) || Number.isNaN(t)) {
+      require("fs").writeSync(2, `db-report: ${name} is no ISO time in UTC\n`);
+      process.exit(1);
+    }
+    return new Date(t).toISOString();
+  };
+  const since = iso("CP_SINCE", new Date(0).toISOString());
+  const until = iso("CP_UNTIL", new Date().toISOString());
+  // oursClause names ledger.address, so it runs here on a derived table of that name, as in the wallets block.
+  const firstKeys = all(
+    `select address, first_key from (
+       select lower(rk.address) address, min(rk.created_at) first_key
+         from api_keys rk where rk.name = 'conway-automaton' group by lower(rk.address)
+     ) ledger
+     where first_key >= ? and first_key < ? and not ${oursClause}
+     order by first_key, address`,
+    since, until, ...OURS_ARGS,
+  );
+  const at = (v) => {
+    const t = Date.parse(v);
+    return Number.isNaN(t) ? null : new Date(t).toISOString();
+  };
+  const runtimes = firstKeys.map((r, i) => {
+    const grant = one("select min(created_at) at from ledger where lower(address) = ? and kind = 'grant'", r.address).at;
+    const funded = one("select min(created_at) at from ledger where lower(address) = ? and delta_mc > 0", r.address).at;
+    return {
+      n: i + 1,
+      key_at: at(r.first_key),
+      granted: grant !== null && grant < until,
+      granted_at: grant ? at(grant) : null,
+      funded_at: funded ? at(funded) : null,
+    };
+  });
+  // writeSync may write part of the buffer to a pipe, or meet EAGAIN on a non-blocking one.
+  const out = Buffer.from(JSON.stringify({ since, until, runtimes }) + "\n");
+  for (let off = 0; off < out.length; ) {
+    try {
+      off += require("fs").writeSync(1, out, off, out.length - off);
+    } catch (e) {
+      if (e.code !== "EAGAIN") throw e;
+    }
+  }
+  process.exit(0);
+}
+
 // The same test against a column that is not ledger.address.
 //
 // oursClause names ledger.address, so it only works inside a query on the ledger. The one number
