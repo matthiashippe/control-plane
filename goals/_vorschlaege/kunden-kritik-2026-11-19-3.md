@@ -4,3 +4,4 @@ Befund: Die Leitzahl „Conway-Zahler, die bei uns zahlen“ entsteht nur, wenn 
 Beleg: `bash ops/conway-payers.sh` -> `OVERLAP topped up: 16 wallets, 0 known here, 0 with inference here, 0 paid here, 0 paid Conway after their last payment here` | docs/kunden/conway-zahler.md:4
 Empfehlung: Im Glied, das den Betreiber anspricht, oder in kunden 03 die Zeile `OVERLAP topped up` als eine Zeile in `ops/status.sh` aufnehmen (nur die Zählungen, nie Adresse oder Hash, Quelle wie heute nur lesend), damit Triage und Kurs-Check die Leitzahl in jedem Takt sehen; Selftest ohne Netz in beide Richtungen wie bei `ops/conway-payers.sh --selftest`.
 MVP: Funktion, weil ohne laufende Messung niemand merkt, ob ein Conway-Zahler zu uns wechselt.
+Übernommen: Glied 3 an den Tech Lead (PRO-25825), Zeile OVERLAP topped up in ops/status.sh im Glied kunden 06 (Loop-Triage PRO-25822) (2026-11-20)

@@ -4,3 +4,4 @@ Befund: `ops/customer-decline.sh` zählt Logzeilen von Adressen, deren Ledger-Ze
 Beleg: `bash ops/customer-decline.sh --since 2026-11-05T00:00:00Z` -> `OTHER 2026-11-16: http 2xx 20 402 0 4xx 1721 5xx 0` | docs/kunden/rueckgang-2026-11.md:144
 Empfehlung: Bei der nächsten Arbeit an `ops/customer-decline.sh` die Adresse, von der das eigene Werkzeug ruft, in `ops/own-ips.txt` aufnehmen oder Logzeilen, deren nächste Inferenz-Zeile nach `oursClause` eigen ist, aus `OTHER` nehmen; bis dahin `OTHER 2xx` nicht als fremde Nachfrage lesen.
 MVP: Funktion, weil `OTHER` sonst fremde Nachfrage vortäuscht, wo eigene Läufe stehen.
+Übernommen: Watch List in STATE.md, OTHER 2xx in ops/customer-decline.sh nicht als fremde Nachfrage lesen, bis die nächste Arbeit am Werkzeug die eigene Adresse aufnimmt (Loop-Triage PRO-25822) (2026-11-20)

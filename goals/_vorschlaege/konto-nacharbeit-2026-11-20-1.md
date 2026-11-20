@@ -6,3 +6,4 @@ Empfehlung: In `test/konto-client-revoke.test.ts` je einen Fall für eine Erlaub
 
 Der Fall des Tageslimits ändert `allowance` und `period` gleichzeitig, deshalb deckt eine der beiden Prüfungen allein ihn schon ab. Der Bundle-Test ist kein Schutz für das Verhalten: Er wird grün, sobald jemand das Bundle neu baut.
 MVP: Funktion, weil der Passkey sonst den Widerruf einer Erlaubnis in einem anderen Token unterschreiben könnte, ohne dass ein Test es merkt.
+Übernommen: Watch List in STATE.md, Testlücke ohne Fehler im Verhalten: die Prüfungen auf token, allowance und period stehen in src/public/konto-client/flow.mjs:430 bis 432, nur der Verhaltenstest fehlt; reine Testnacharbeit pausiert der Kurs-Check (Loop-Triage PRO-25822) (2026-11-20)

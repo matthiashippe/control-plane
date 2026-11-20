@@ -4,3 +4,4 @@ Befund: Die Leitzahl zählt jede fremde Adresse als Ankunft, auch Scanner und Cr
 Beleg: docs/kunden/besucher.md, Block `-- Arrivals per host --` | `ops/traffic.sh` Block `ARRIVALS` filtert nur `CP_OWN_IPS_RESOLVED`, nicht das Kriterium aus `-- Who of them behaved like a person, over the whole log --`
 Empfehlung: Wenn ein späteres Glied am Topic `kunden` einen Kanal an Ankünften misst: je Host zusätzlich die Ankünfte zählen, die das Personen-Kriterium des Skripts erfüllen (Seite geladen und Seitenskript gelaufen), mit einer Fixture, in der ein Scanner ohne Referrer nicht mitzählt. Leitzahl dann: Ankünfte von Personen je Woche und Herkunft.
 MVP: Funktion, weil der Loop sonst einen Kanal an einer Zahl misst, die zu 97 % aus Anfragen ohne Referrer besteht.
+Übernommen: Watch List in STATE.md, Ankünfte von Personen statt aller Adressen; wird Teil des Glieds, das einen Kanal an Ankünften misst (Loop-Triage PRO-25822) (2026-11-20)
