@@ -65,18 +65,13 @@ ob es geschieht.
       Prüfung: `pnpm -s vitest run test/status-conway-overlap.test.ts --reporter=json 2>/dev/null | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const j=JSON.parse(s);const t=j.testResults.flatMap(f=>f.assertionResults).filter(a=>a.status==="passed").map(a=>a.title);console.log([/counts/,/unknown/,/no address/].every(r=>t.some(x=>r.test(x)))?"alle":"fehlt")})'` muss `alle` ausgeben.
       Prüfung: `pnpm -s vitest run test/status-alarm-path.test.ts test/status-alarm-received.test.ts test/conway-payers.test.ts` muss Exit-Code 0 haben.
       Prüfung: `bash ops/conway-payers.sh --selftest | tail -1` muss mit `SELFTEST OK` beginnen.
-- [ ] Der Entwurf der Antwort an den erreichbaren Betreiber liegt geprüft bereit, ohne Adresse, und nennt die geänderte Zeile
-      `conwayApiUrl`.
-      Prüfung: `ls goals/kunden/antworten-07/*.md | wc -l` muss 1 ausgeben.
-      Prüfung: `grep -c '"conwayApiUrl": "https://' goals/kunden/antworten-07/*.md` muss mindestens 1 ausgeben.
-      Prüfung: `cat goals/kunden/antworten-07/*.md | grep -cE "0x[0-9a-fA-F]{40}|[0-9a-f]{64}|([0-9]{1,3}\.){3}[0-9]{1,3}"` muss 0 ausgeben.
-      Prüfung: `cat goals/kunden/antworten-07/*.md | grep -ciE "pays? (at|to) conway|topped up at conway|your (usdc|payments?) (at|to) conway"` muss 0 ausgeben.
-      Prüfung: `grep -E "^[0-9]{4}-" ops/posted-answers.log | awk '$1 < "2026-11-20T00:00:00Z" {print $2}' | while read -r n; do test -f "goals/kunden/antworten-07/$n.md" && echo "schon beantwortet $n"; done` muss nichts ausgeben.
-      Prüfung (Netz): `python3 ops/before-the-answers.py --folder goals/kunden/antworten-07` muss Exit-Code 0 haben.
-- [ ] Gepostet ist genau der Text, den Matthias freigegeben hat; der Kommentar „Matthias hat den Kommentar auf seinem privaten Board
-      mit „ok“ freigegeben“ steht am Topic vor dem Eintrag.
-      Prüfung: `grep -E "^[0-9]{4}-" ops/posted-answers.log | awk '$1 > "2026-11-20T00:00:00Z" {print $2}' | while read -r n; do test -f "goals/kunden/antworten-07/$n.md" && echo "$n"; done | wc -l` muss 1 ausgeben.
-      Prüfung (Netz): `python3 ops/post-the-answers.py --verify-posted --folder goals/kunden/antworten-07 | tail -1` muss mit `VERIFY POSTED OK:` beginnen.
+- [ ] Die Antwort entfällt nach der Widerlegung: Das eine erreichbare Issue trägt schon eine Antwort von uns aus einer Runde vor dem
+      20.11.2026, und es liegt kein Entwurf bereit (Kritik Tech Lead 2026-11-20, `ANNAHMEN.md`).
+      Prüfung: `ls goals/kunden/antworten-07 2>/dev/null | wc -l` muss 0 ausgeben.
+      Prüfung: `grep -cE "^- 2026-11-20, kunden 07: Die Widerlegung der Goal-Datei greift" goals/kunden/ANNAHMEN.md` muss 1 ausgeben.
+      Prüfung (Netz): `set -a; . ~/.config/control-plane/loop.env; set +a; D=$(mktemp -d); CP_PAYERS_LIST=$D/p bash ops/conway-payers.sh >/dev/null 2>&1; while read -r a; do gh api -X GET search/issues -f "q=$a repo:Conway-Research/automaton" --jq '.items[].number'; sleep 2; done < $D/p | sort -u > $D/n; grep -E "^[0-9]{4}-" ops/posted-answers.log | awk '$1 < "2026-11-20T00:00:00Z" {print $2}' | sort -u > $D/a; echo "unanswered $(comm -23 $D/n $D/a | wc -l) of $(wc -l < $D/n)"; rm -rf $D` muss `unanswered 0 of 1` ausgeben.
+- [ ] Ohne freigegebenen Text ist nichts gepostet: Der Goal-Branch fügt `ops/posted-answers.log` keinen Eintrag hinzu.
+      Prüfung: `git diff $(git merge-base origin/dev HEAD) HEAD -- ops/posted-answers.log | grep -c "^+[0-9]"` muss 0 ausgeben.
 - [x] Die Annahmen stehen fest, und nichts im Repo verbindet das Issue mit einer Wallet.
       Prüfung: `grep -cE "^- [0-9-]+, kunden 07: " goals/kunden/ANNAHMEN.md` muss mindestens 2 ausgeben.
       Prüfung: `cat goals/kunden/ANNAHMEN.md goals/kunden/07-der-eine-erreichbare-conway-zahler-bekommt-eine-antwort.md | grep -cE "0x[0-9a-fA-F]{40}|[0-9a-f]{64}"` muss 0 ausgeben.
