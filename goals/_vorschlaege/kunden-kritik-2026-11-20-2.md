@@ -1,6 +1,7 @@
-Schwere: 4
-Goal: kunden 05
-Befund: Kunde 1 hat kein Geld für eine Aufladung, will aber weiter Inferenz: Seit 13.11. stellte er 11260 Anfragen mit 402 und rief 1044 Mal `/bounties.json` ab, auf das unsere 402 ihn mit `details.open_bounties` und `details.bounties_url` schickt. Ob er dort je Arbeit eingereicht hat, ob es offene Aufträge für ihn gab und ob eine angenommene Arbeit ihm Credits für Inferenz bringt, misst kunden 05 nicht. Bei `kein Geld` ist das der einzige Weg, auf dem dieser Kunde wieder zahlt.
-Beleg: docs/kunden/aufladung-2026-11.md (Belege, Aufrufe von `/pay/`: 1044 Mal `GET /bounties.json`) | src/inference/proxy.ts:336 und :384 (`open_bounties`, `bounties_url` in der 402) | ROADMAP.md:128 (`submitWork()` nimmt `{bountyId, agent, body}`)
-Empfehlung: Ein Goal am Topic `kunden` misst nur lesend aus Zugriffslog und Datenbank (`readonly: true`), wie oft Kunde 1 seit 13.11. Arbeit einreichte, wie viele Aufträge an diesen Tagen offen waren und ob eine angenommene Arbeit als Guthaben für Inferenz bucht; ist einer der drei Schritte leer, baut das Folge-Goal genau diesen Schritt, mit der Leitzahl fremde Zahlungen je Woche (eine bezahlte Inferenz aus verdientem Guthaben zählt mit). Keine Adresse, kein Betrag je Kunde im Repo.
-MVP: Funktion, weil ein Kunde mit über 1000 Anfragen am Tag und ohne USDC sonst gar nicht mehr zahlt.
+Schwere: 3
+Goal: kunden 06
+Befund: kunden 06 legt die Startgutschrift laut Kontext auf `GET /v1/credits/balance`, aber zwei der drei Runtimes ohne Gutschrift haben den Saldo nie gelesen, der neue Auslöser hätte also höchstens eine von neun Runtimes erreicht, während kunden 07 mit dem einzigen erreichbaren Conway-Zahler seriell dahinter wartet.
+Beleg: `git show origin/dev:docs/kunden/trichter.md | grep -n "zwei nie"` -> `41:Saldo gelesen, aber nicht dreimal über mehr als eine Minute, zwei nie.` | goals/kunden/06-jede-neue-runtime-bekommt-ihre-startgutschrift-vor-dem-ersten-denken.md:171
+Empfehlung: Tech Lead tauscht die Reihenfolge, sodass kunden 07 vor kunden 06 startet (Nummern tauschen, nicht pausieren, weil ein PAUSED-Glied das Topic hält); in kunden 06 den neuen Auslöser in `src/` nur bauen, wenn `ops/starter-paths.sh` mindestens zwei Runtimes zeigt, die genau diesen Aufruf gestellt haben, sonst endet das Goal mit der Messung.
+
+kunden 07 bringt die Leitzahl „Conway-Zahler, die bei uns zahlen“ direkt von 0 auf 1, und sein Issue kann bis zum Gate schließen (Widerlegung des Goals). kunden 06 kostet dagegen einen Rollout des Laufzeitpfads, also rund 16 Sekunden ohne Antwort für den zahlenden Kunden, für einen Effekt von höchstens einer Runtime in vier Wochen.
