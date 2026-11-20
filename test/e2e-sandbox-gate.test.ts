@@ -55,6 +55,10 @@ function good(): Planted {
     consistent: "true",
     db_registered: "1",
     balance_cents: "490",
+    // The balance of the first wallet and everything credited to it (topups and the start grant of goals/kunden/06);
+    // the run passes only when inference was charged against the credited amount.
+    balance_mc: "505609",
+    credited_mc: "515000",
     domains_ok: "true",
     // The relay walk of goals/relay/01 runs before this block; its verdict arrives here as relay=true or relay=false.
     relay: "true",
@@ -207,7 +211,10 @@ describe("sandbox gate of harness/e2e/full.sh", () => {
   it("keeps the earlier conditions: good walks do not pass failed domains or too few turns", () => {
     expectFail({ ...good(), domains_ok: "false" }, "true");
     expectFail({ ...good(), turns: "4" }, "true");
-    expectFail({ ...good(), balance_cents: "500" }, "true");
+    expectFail({ ...good(), balance_mc: "515000" }, "true");
+    expectFail({ ...good(), balance_mc: "515001" }, "true");
+    expectFail({ ...good(), balance_mc: "" }, "true");
+    expectFail({ ...good(), credited_mc: "" }, "true");
   });
 
   it("fails with long_exec=false when the long exec verdict is not ok", () => {
