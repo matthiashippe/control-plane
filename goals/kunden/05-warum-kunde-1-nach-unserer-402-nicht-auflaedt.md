@@ -1,7 +1,7 @@
 # Kunden Goal 05: Warum Kunde 1 nach unserer 402 nicht auflädt
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Kunde 1, der größte zahlende fremde Automaton, fragt seit dem 13.11.2026 05:05 UTC täglich 1065 bis 1625 Mal Inferenz mit leerem
@@ -97,7 +97,7 @@ MVP: Funktion, weil ein Kunde, der täglich über 1000 Mal bezahlen will und es 
       Prüfung: `grep -cE "^- [0-9-]+, kunden 05: " goals/kunden/ANNAHMEN.md` muss mindestens 2 ausgeben.
 - [x] `check` ist grün.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Jeder neue Test war vor der Änderung rot oder gegen eine benannte Mutation rot; die Zeile im Progress Log nennt, womit.
@@ -125,5 +125,6 @@ MVP: Funktion, weil ein Kunde, der täglich über 1000 Mal bezahlen will und es 
 - 2026-11-20 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4; `origin/dev` hatte seit dem Start keinen neuen Commit, nichts zu mergen, jeder Prüfbefehl am Kopf `e3edb80` neu gefahren. Prüfbefehle: P1 `spaet genug`, 1, 7, 1, 1, 1, `stimmig`, Netz leer; P2 vitest Exit 0, `da`, 4, `stimmig`; P3 0, 0, 4; P4 `check` Exit 0 (grün in 59 s); PR #316 `check` pass, `e2e` pass (Lauf 44686235153).
 - 2026-11-20 Zyklus 3: Gaps aus Verdict `05-z2-B.md` behoben, Abschluss gemeldet, Punkte 1, 2, 3, 4: `goals/_vorschlaege/kunden-kritik-2026-11-20-1.md` entfernt und der Verweis darauf im Dokument gestrichen (der Nebenbefund bleibt als Absatz), der Halbsatz mit dem Betrag zu Kunde 1 gestrichen; `origin/dev` ohne neuen Commit. Prüfbefehle: P1 `spaet genug`, 1, 7, 1, 1, 1, `stimmig`, Netz leer; P2 vitest Exit 0, `da`, 4, `stimmig`; P3 0, 0, 4; P4 `check` Exit 0 (grün in 111 s).
 - 2026-11-20 Zyklus 4: Gaps aus Verdict `05-z3-B.md` behoben, Abschluss gemeldet, Punkte 1, 2, 3, 4: `origin/dev` am Stand `792a01c` (PR #315, Loop-Kritik, gemergt 06:30:58 UTC) in den Goal-Branch gemergt; die Angabe `origin/dev ohne neuen Commit` in Zyklus 3 war falsch, weil ich vor dem Commit nicht neu gefetcht hatte. Add/Add-Konflikt an `goals/_vorschlaege/kunden-kritik-2026-11-20-2.md`: Fassung von `dev` übernommen, der Vorschlag der Kritik zu kunden 05 liegt unverändert als `kunden-kritik-2026-11-20-3.md`; Dokument und Test unverändert. Prüfbefehle (Node 22.23.5, nach dem Merge): P1 `spaet genug`, 1, 7, 1, 1, 1, `stimmig`, Netz leer; P2 vitest Exit 0, `da`, 4, `stimmig`; P3 0, 0, 4; P4 `check` Exit 0 (grün in 143 s).
+- 2026-11-20 Release: PASS K und B (Zyklus 4), DONE.
 
 ## Blockers
