@@ -164,7 +164,7 @@ print(max(1, math.ceil((float(sys.argv[2] or time.time()) - min(stamps)) / 3600)
 fi
 
 HOURS="${1:-24}"
-# automatonhost.com is the canonical name since the move (umzug 01); postyourprice.com and cp.hippe.eu
+# automatonhost.com is the canonical name since the move to the new host; postyourprice.com and cp.hippe.eu
 # still answer and redirect there, so the report is about the name visitors end up on.
 BASE_URL="${CP_URL:-https://automatonhost.com}"
 # Every name this service answers to. The referrer tests below decide whether a request came from
