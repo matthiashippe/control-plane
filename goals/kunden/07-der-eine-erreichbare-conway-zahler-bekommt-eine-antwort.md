@@ -1,7 +1,7 @@
 # Kunden Goal 07: Der eine erreichbare Conway-Zahler bekommt eine Antwort
 
 ## Status
-PLANNED
+DONE
 
 ## Active Objective
 Von 16 Wallets, die in den 30 Tagen bis 18.11.2026 bei Conway aufgeladen haben, zahlt keine bei uns, und nur ein Betreiber ist
@@ -59,30 +59,25 @@ ob es geschieht.
   `check` und vitest im Vordergrund mit eigenem Timeout. Kein Build, kein Test auf dem Server.
 
 ## Done Condition
-- [ ] `ops/status.sh` zeigt die Zählungen der Zeile `OVERLAP topped up` als Feld `conway_overlap`, ohne Adresse und ohne Hash; in
+- [x] `ops/status.sh` zeigt die Zählungen der Zeile `OVERLAP topped up` als Feld `conway_overlap`, ohne Adresse und ohne Hash; in
       beide Richtungen bewiesen.
       Prüfung: `pnpm -s vitest run test/status-conway-overlap.test.ts` muss Exit-Code 0 haben.
       Prüfung: `pnpm -s vitest run test/status-conway-overlap.test.ts --reporter=json 2>/dev/null | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const j=JSON.parse(s);const t=j.testResults.flatMap(f=>f.assertionResults).filter(a=>a.status==="passed").map(a=>a.title);console.log([/counts/,/unknown/,/no address/].every(r=>t.some(x=>r.test(x)))?"alle":"fehlt")})'` muss `alle` ausgeben.
       Prüfung: `pnpm -s vitest run test/status-alarm-path.test.ts test/status-alarm-received.test.ts test/conway-payers.test.ts` muss Exit-Code 0 haben.
       Prüfung: `bash ops/conway-payers.sh --selftest | tail -1` muss mit `SELFTEST OK` beginnen.
-- [ ] Der Entwurf der Antwort an den erreichbaren Betreiber liegt geprüft bereit, ohne Adresse, und nennt die geänderte Zeile
-      `conwayApiUrl`.
-      Prüfung: `ls goals/kunden/antworten-07/*.md | wc -l` muss 1 ausgeben.
-      Prüfung: `grep -c '"conwayApiUrl": "https://' goals/kunden/antworten-07/*.md` muss mindestens 1 ausgeben.
-      Prüfung: `cat goals/kunden/antworten-07/*.md | grep -cE "0x[0-9a-fA-F]{40}|[0-9a-f]{64}|([0-9]{1,3}\.){3}[0-9]{1,3}"` muss 0 ausgeben.
-      Prüfung: `cat goals/kunden/antworten-07/*.md | grep -ciE "pays? (at|to) conway|topped up at conway|your (usdc|payments?) (at|to) conway"` muss 0 ausgeben.
-      Prüfung: `grep -E "^[0-9]{4}-" ops/posted-answers.log | awk '$1 < "2026-11-20T00:00:00Z" {print $2}' | while read -r n; do test -f "goals/kunden/antworten-07/$n.md" && echo "schon beantwortet $n"; done` muss nichts ausgeben.
-      Prüfung (Netz): `python3 ops/before-the-answers.py --folder goals/kunden/antworten-07` muss Exit-Code 0 haben.
-- [ ] Gepostet ist genau der Text, den Matthias freigegeben hat; der Kommentar „Matthias hat den Kommentar auf seinem privaten Board
-      mit „ok“ freigegeben“ steht am Topic vor dem Eintrag.
-      Prüfung: `grep -E "^[0-9]{4}-" ops/posted-answers.log | awk '$1 > "2026-11-20T00:00:00Z" {print $2}' | while read -r n; do test -f "goals/kunden/antworten-07/$n.md" && echo "$n"; done | wc -l` muss 1 ausgeben.
-      Prüfung (Netz): `python3 ops/post-the-answers.py --verify-posted --folder goals/kunden/antworten-07 | tail -1` muss mit `VERIFY POSTED OK:` beginnen.
-- [ ] Die Annahmen stehen fest, und nichts im Repo verbindet das Issue mit einer Wallet.
+- [x] Die Antwort entfällt nach der Widerlegung: Das eine erreichbare Issue trägt schon eine Antwort von uns aus einer Runde vor dem
+      20.11.2026, und es liegt kein Entwurf bereit (Kritik Tech Lead 2026-11-20, `ANNAHMEN.md`).
+      Prüfung: `ls goals/kunden/antworten-07 2>/dev/null | wc -l` muss 0 ausgeben.
+      Prüfung: `grep -cE "^- 2026-11-20, kunden 07: Die Widerlegung der Goal-Datei greift" goals/kunden/ANNAHMEN.md` muss 1 ausgeben.
+      Prüfung (Netz): `set -a; . ~/.config/control-plane/loop.env; set +a; D=$(mktemp -d); CP_PAYERS_LIST=$D/p bash ops/conway-payers.sh >/dev/null 2>&1; while read -r a; do gh api -X GET search/issues -f "q=$a repo:Conway-Research/automaton" --jq '.items[].number'; sleep 2; done < $D/p | sort -u > $D/n; grep -E "^[0-9]{4}-" ops/posted-answers.log | awk '$1 < "2026-11-20T00:00:00Z" {print $2}' | sort -u > $D/a; echo "unanswered $(comm -23 $D/n $D/a | wc -l) of $(wc -l < $D/n)"; rm -rf $D` muss `unanswered 0 of 1` ausgeben.
+- [x] Ohne freigegebenen Text ist nichts gepostet: Der Goal-Branch fügt `ops/posted-answers.log` keinen Eintrag hinzu.
+      Prüfung: `git diff $(git merge-base origin/dev HEAD) HEAD -- ops/posted-answers.log | grep -c "^+[0-9]"` muss 0 ausgeben.
+- [x] Die Annahmen stehen fest, und nichts im Repo verbindet das Issue mit einer Wallet.
       Prüfung: `grep -cE "^- [0-9-]+, kunden 07: " goals/kunden/ANNAHMEN.md` muss mindestens 2 ausgeben.
       Prüfung: `cat goals/kunden/ANNAHMEN.md goals/kunden/07-der-eine-erreichbare-conway-zahler-bekommt-eine-antwort.md | grep -cE "0x[0-9a-fA-F]{40}|[0-9a-f]{64}"` muss 0 ausgeben.
-- [ ] `check` ist grün.
+- [x] `check` ist grün.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Jeder neue Test war vor der Änderung rot; die Zeile im Progress Log nennt, womit.
@@ -103,5 +98,9 @@ ob es geschieht.
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-20 Zyklus 1: Punkte 1, 4, 5 gebaut: Feld `conway_overlap` in `ops/status.sh` aus den Zeilen `OVERLAP topped up` und `PAYERS` von `ops/conway-payers.sh`, `unknown` mit Grund bei nicht lesbarer Quelle, Abbruch bei Adresse oder Hash; `test/status-conway-overlap.test.ts` rot gegen `ops/status.sh` von `origin/dev` (7 von 7), als Mutation ohne die Prüfung auf Adresse oder Hash rot (1 von 7); gegen die Produktion 16 Wallets, 0 bekannt, 0 zahlend. Punkte 2 und 3 offen, weil die Widerlegung der Goal-Datei greift: Das eine erreichbare Issue trägt schon eine Antwort von uns (`ANNAHMEN.md`), also kein Entwurf und kein Gate. Prüfbefehle: P1 vitest Exit 0, `alle`, vitest Exit 0 (33 Tests), `SELFTEST OK`; P2 0 statt 1, kein Treffer statt mindestens 1, Prüfungen 3 bis 6 ohne Entwurf nicht gelaufen; P3 0 statt 1, `--verify-posted` nicht gelaufen; P4 4, 0; P5 `check` Exit 0 (237 Dateien, 2499 Tests).
+- 2026-11-20 Zyklus 2: Abschluss gemeldet, Punkte 1, 4, 5; Punkte 2 und 3 bleiben offen, weil die Widerlegung der Goal-Datei greift (`ANNAHMEN.md`, kunden 07), über den Vertrag entscheidet der Tech Lead in der Kritik. Prüfbefehle: P1 vitest Exit 0, `alle`, vitest Exit 0 (33 Tests), `SELFTEST OK`; P2 0 statt 1, kein Treffer statt mindestens 1, Prüfung 5 gibt nichts aus, Prüfungen 3, 4 und 6 ohne Entwurf nicht gelaufen; P3 0 statt 1, `--verify-posted` nicht gelaufen; P4 4, 0; P5 `check` Exit 0 (2499 Tests, 242 s); `dev` ohne neue Commits, Merge ohne Änderung.
+- 2026-11-20 Zyklus 3: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5; die Punkte 2 und 3 in der Fassung der Kritik belegt, ohne Codeänderung. Prüfbefehle: P1 vitest Exit 0, vitest Exit 0, `SELFTEST OK`; P2 0, 1, Netz `unanswered 0 of 1` (Gegenprobe mit leerer Antwortliste `unanswered 1 of 1`, 16 Wallets); P3 0 (Gegenprobe mit gepflanzter Zeile im Log 1); P4 5, 0; P5 `check` Exit 0 (2499 Tests, 195 s).
+- 2026-11-20 Release: PASS K und B (Zyklus 3), DONE.
 
 ## Blockers
