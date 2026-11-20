@@ -6,3 +6,4 @@ Empfehlung: abrechnung 06 bleibt PAUSED, bis eine Zahl aus `ops/timeout-quote.sh
 MVP: Schönheit, weil danach weder ein Kunde mehr bekommt noch einer mehr zahlt.
 
 Die Kunden zahlen für Abbrüche schon nichts (abrechnung 01, `loop-constraints.md` Grundregel 6), die Quote ist 0 von 1220 Anfragen, und `Anbieterwahl:` in `docs/abrechnung/timeouts.md` hält das Routing ausdrücklich fest. Was bleibt, sind Randfälle im Werkzeug (Datum ohne Uhrzeit, Tage, die der Anbieter noch korrigiert) und die Frage nach einem einzigen Abbruch über 7783 mc. Das ist Feinschliff an einem Prüfwerkzeug nach „Erst validieren, dann perfektionieren“ und dieselbe Art Arbeit, die der Kurs-Check am 14. und 17.11. bei fehler 11, messung 11, messung 12 und hosting 03 pausiert hat.
+Übernommen: abrechnung 06 steht auf dev schon auf PAUSED mit der Zeile Pause: aus diesem Vorschlag (Loop-Kritik 2026-11-19), nichts weiter zu tun (Loop-Triage PRO-25822) (2026-11-20)

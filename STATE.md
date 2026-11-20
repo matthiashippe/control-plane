@@ -11,30 +11,34 @@ des alten Loops bis zum 10.11.2026 steht unverändert in `docs/state-bis-2026-11
 
 ## Lage
 
-Stand 19.11.2026, 06:40 (Loop-Triage, PRO-25197, `origin/dev` 3e9375a). Stufe L3, Kill Switch aus, Budget full (4 von 11 Konten
-mit mindestens 20 % Weekly-Rest), Drill grün (14.11., Gate-Hash e291578e5235). Seit 18.11., 20:40 läuft der Loop auf kleiner Flamme:
-ein Goal gleichzeitig, `share: 1` (Matthias, PR #284), deshalb meldet der Status 0 von 14 Plätzen frei.
+Stand 20.11.2026, 06:20 (Loop-Triage, PRO-25822, `origin/dev` 0237fc8). Stufe L3, Kill Switch aus, Budget full (6 von 11 Konten
+mit mindestens 20 % Weekly-Rest), Drill grün (14.11., Gate-Hash e291578e5235). Kleine Flamme seit 18.11. (ein Goal gleichzeitig,
+`share: 1`, Matthias, PR #284). Kurs-Check vom 20.11., 00:40 „auf Kurs“ (PRO-25693): Detail-Anteil 22,2 % (2 von 9 Maker-Runs in 24
+Stunden, Schwelle 40 %), 4 Stunden seit dem letzten gemergten Goal mit Prio 1 oder 2.
 
-Kurs-Check vom 19.11., 06:22 „abgedriftet“ (PRO-25202): Detail-Anteil 50 % (3 von 6 Maker-Runs in 24 Stunden, Schwelle 40 %), alle
-drei in der Audit-Reparatur PRO-25099 (PR #285, nur Doku und ANNAHMEN). Bis die Korrektur `loop/kurs/2026-11-19-0610` gemergt ist,
-längstens bis 08:22, startet kein neues Goal. Ein Teil der 46 roten Zeilen des Audits vom 18.11. kam aus dem Audit selbst (Worktree am
-Verdict-Commit ohne `node_modules`, `git show origin/dev` nicht ersetzt; loop-audit-2026-11-19-1 und -2, Glied 5 an den Tech Lead).
+Der Richtungs-Check vom 19.11. (PRO-25477, `docs/richtung/2026-11-19.md`, PR #300) hat das Topic `kunden` mit Prio 1 eingeführt: Die
+Kette baute eine Woche an Produkten ohne Nutzer, während der einzige zahlende Automaton fast aufhörte. kunden 01 bis 04 sind seit
+gestern gemergt. Ergebnis: Kunde 1 bekam vom 11.11., 02:01 bis 12.11., 08:22 UTC 1393 Mal 503 (30 Stunden, nicht 7,5) und fragt seit
+13.11. täglich über 1000 Mal mit leerem Saldo an, bekommt 402 und lädt nicht mehr auf (`docs/kunden/rueckgang-2026-11.md`); 3 von 9
+neuen Runtimes bekamen keine Startgutschrift (`docs/kunden/trichter.md`); von 16 Wallets, die bei Conway aufladen, zahlt keine bei uns,
+ein Betreiber ist erreichbar (`docs/kunden/conway-zahler.md`). Diese drei Befunde und `ops/konto-ready.sh` gehen als Glieder 1 bis 4
+an den Tech Lead (PRO-25825, Priorität high), dazu die kaputte Zeile 19 in `ROADMAP.md` als Glied 5.
 
-Seit der letzten Triage gemergt: konto 12 (PR #276), umzug 04 (PR #280), sandbox 11 als `BLOCKED fachlich` ohne Code (PR #218), die
-Goal-Datei konto 13 (PR #282), das Audit vom 18.11. (PR #281, 46 rote Zeilen) samt Reparatur (PR #285), die Abgelöst-Zeilen des Tech
-Lead (PRO-25107, PRO-25126), die Nacharbeit vom 19.11. (PR #287), die Glieder der letzten Triage (PR #273), dazu von Matthias die
-kleine Flamme (PR #284) und sandbox 12 als Cookie-Schutz im Proxy statt PSL-Eintrag (PR #283).
+Seit der letzten Triage gemergt: konto 13 (PR #286), konto 14 (PR #297), sandbox 12 (PR #295), kunden 01 (PR #303), kunden 02
+(PR #306), kunden 03 (PR #308), kunden 04 (PR #310), die Goal-Dateien umzug 05, konto 15 und kunden 01 bis 04 (PR #292, #299, #301,
+#305, #307, #309), die Kritik vom 19.11. (PR #291), die Glieder der letzten Triage (PR #290), zwei Kurs-Korrekturen (PR #294, #300),
+das Audit vom 19.11. (PR #298, 38 rote Zeilen) samt Reparatur (PR #304) und die Nacharbeit vom 20.11. (PR #311).
 
-Der Deploy läuft: `deploy.yml` grün für 61c7221, fe1291e und 3e9375a (19.11., 01:14 bis 05:25 UTC). Diese Triage hat die Produktion
-nicht gelesen.
+Der Deploy läuft: `deploy.yml` grün für alle zwölf Merges vom 19.11., 15:01 bis 20.11., 03:41 UTC (zuletzt 0237fc8). Diese Triage hat
+die Produktion nicht gelesen.
 
-Es baut konto 13 (PRO-25121, PR #286, Checks grün). Die Goal-Datei sandbox 12 liegt in PR #288 und wartet auf den Merge. Das
-Nachfüllen hängt: Es wartet seit 18.11., 06:33 auf `loop/roadmap/nachfuellen-2026-11-18-0633` (PR #275), der seit PR #273 im
-Konflikt steht und dieselben Glieder anders formuliert (Glied 2 an den Tech Lead). relay 04 und abrechnung 06 starten frühestens
-21.11., kanal 05 am 26.11., betrieb 05 am 27.11.
+Es baut nichts: Das einzige aktive Goal konto 15 (PRO-25496, PR #302, Checks grün) steht auf `BLOCKED matthias` am Gate
+`security_settings` (MoonPay über Turnkey, Gasschlüssel für Base, Werte `CP_KONTO_*`; Asana 1220710009513649 seit 19.11., 16:20).
+konto 16 und 17 hängen dahinter. Das Topic `kunden` hat nach kunden 04 kein Glied mehr, bis der Tech Lead PRO-25825 schreibt. kanal
+05 startet frühestens 26.11., betrieb 05 am 27.11.; relay 04, abrechnung 06 und umzug 05 hat der Kurs-Check oder die Kritik am 19.11.
+pausiert.
 
-Das Konto ist in der Produktion aus (kein `CP_KONTO_*` auf dem Server laut konto 05), aber `README.md:13` verspricht den Start aus
-Claude Code; kein Glied führt das Einschalten zu Matthias (konto-kritik-2026-11-18-4, Glied 1 an den Tech Lead).
+Das Audit vom 20.11. (PR #312, offen) meldet 46 rote Zeilen bei grünem `check`; damit sind die Audits vom 18., 19. und 20.11. rot.
 
 Guthaben beim Inferenz-Anbieter: Die Aufladung ist seit 12.11., 21:35 eingeschaltet (16 USD Schwelle, 25 USD Betrag,
 `docs/betrieb/guthaben.md`); ob sie hielt, misst betrieb 05 ab 27.11.
@@ -44,13 +48,13 @@ Entscheidung 30.10.2026: Inferenz wird wieder über OpenRouter verkauft, Matthia
 
 Entscheidungen 10.11.2026 (Matthias): Sandboxes sind das nächste Produkt, als PoC auf einem eigenen kleinen Server, getrennt vom
 Zahlungsdienst. Antworten, die beim Kunden nicht ankommen, berechnen wir nicht mehr. 12.11.2026: Neue zahlende Kunden und alles, was
-die zahlenden hält, haben Vorrang (Topic betrieb); zwei Goals parallel. 13.11.2026: Fast track für sandbox, konto und relay; Regel 10
-erlaubt on-chain nur auf Base Sepolia im Topic konto. 17.11.2026: Nach außen heißt das Angebot Automatons, der Dienst zieht auf
-`automatonhost.com` um (Topic umzug); Regel 10 erlaubt auf Base (chainId 8453) nur die Geldwege von konto 05, eingeschaltet allein
-mit `CP_KONTO_MAINNET=1`, das nur Matthias setzt.
+die zahlenden hält, haben Vorrang (Topic betrieb). 13.11.2026: Fast track für sandbox, konto und relay; Regel 10 erlaubt on-chain nur
+auf Base Sepolia im Topic konto. 17.11.2026: Nach außen heißt das Angebot Automatons, der Dienst zieht auf `automatonhost.com` um
+(Topic umzug); Regel 10 erlaubt auf Base (chainId 8453) nur die Geldwege von konto 05, eingeschaltet allein mit `CP_KONTO_MAINNET=1`,
+das nur Matthias setzt.
 
 18.11.2026: kleine Flamme, PropertyPilot braucht die Kapazität (ein Goal, `share: 1`); kein PR an die Public Suffix List, den Schutz
-gegen Cookies über Sandbox-Grenzen baut sandbox 12 im eigenen Proxy.
+gegen Cookies über Sandbox-Grenzen baut sandbox 12 im eigenen Proxy (gemergt, PR #295).
 
 ## Topics
 
@@ -58,25 +62,29 @@ gegen Cookies über Sandbox-Grenzen baut sandbox 12 im eigenen Proxy.
 |---|---|---|
 | fehler | 01 bis 10 | DONE (08 PR #120, 09 PR #139, 10 PR #154) |
 | fehler | 11 Der Abgleich mit dem Fetcher-Cache läuft auch in CI | PAUSED (Kurs-Check 14.11., reine Testnacharbeit) |
+| fehler | 12 (neu) 402 ohne Aufladung bei Kunde 1 | Glied 1 an den Tech Lead (PRO-25825), Datei fehlt |
+| kunden | 01 bis 04 | DONE (01 PR #303, 02 PR #306, 03 PR #308, 04 PR #310) |
+| kunden | 05, 06 (neu) Startgutschrift, Antwort an den Conway-Betreiber | Glieder 2 und 3 an den Tech Lead (PRO-25825), Dateien fehlen |
 | betrieb | 01 bis 04 | DONE (03 PR #79, 04 PR #96) |
 | betrieb | 05 Die Aufladung ist belegt und bleibt passend | PLANNED, startet frühestens 27.11.2026 |
 | sandbox | 01 bis 05 | DONE (05 PR #62) |
 | sandbox | 06 Freigegebene Ports unter einer eigenen Domain | BLOCKED fachlich, abgelöst durch 07 |
 | sandbox | 07 bis 10 | DONE (07 PR #100, 08 PR #197, 09 PR #210, 10 PR #213) |
-| sandbox | 11 Die Sandbox-Domain kommt auf die Public Suffix List | BLOCKED fachlich (PR #218, 19.11.): Matthias gibt keinen PR an die PSL frei |
-| sandbox | 12 Ein Cookie bleibt in seiner Sandbox | Goal-Datei in PR #288 (`loop/goal/sandbox-12`), wartet auf den Merge |
-| konto | 01 bis 12 | DONE (05 PR #220, 06 PR #247, 07 PR #251, 08 PR #257, 09 PR #261, 10 PR #264, 11 PR #269, 12 PR #276) |
-| konto | 13 Der Widerruf trifft nur die Erlaubnis, die der Kunde ablöst | ACTIVE (PRO-25121, PR #286) |
-| konto | 14, 15 | Glieder in `ROADMAP.md`, Dateien fehlen |
+| sandbox | 11 Die Sandbox-Domain kommt auf die Public Suffix List | BLOCKED fachlich (PR #218): Matthias gibt keinen PR an die PSL frei |
+| sandbox | 12 Ein Cookie bleibt in seiner Sandbox | DONE (PR #295) |
+| konto | 01 bis 14 | DONE (05 PR #220, 06 PR #247, 07 PR #251, 08 PR #257, 09 PR #261, 10 PR #264, 11 PR #269, 12 PR #276, 13 PR #286, 14 PR #297) |
+| konto | 15 Das Konto ist in der Produktion an | BLOCKED matthias (PRO-25496, PR #302, Gate `security_settings`, Asana 1220710009513649) |
+| konto | 16, 17 | Glieder in `ROADMAP.md`, Dateien fehlen; starten hinter konto 15 |
 | hosting | 01, 02 | DONE (01 PR #230, 02 PR #240) |
-| hosting | 03 Die Selbsttests im Sandbox-Weg laufen in `check` | PAUSED (Kurs-Check 17.11., 15:53, PR #248) |
+| hosting | 03 Die Selbsttests im Sandbox-Weg laufen in `check` | PAUSED (Kurs-Check 17.11., PR #248) |
 | hosting | 04 bis 07 | Glieder in `ROADMAP.md`, Dateien fehlen; starten hinter hosting 03 |
 | umzug | 01 bis 04 | DONE (01 PR #244, 02 PR #252, 03 PR #268, 04 PR #280) |
+| umzug | 05 Der Selbsttest der Website-DNS räumt auf | PAUSED (Kurs-Check 19.11.) |
 | relay | 01 bis 03 | DONE (02 PR #113, 03 PR #131) |
-| relay | 04 Antworten an Konten ohne Wallet nur bei Bedarf | PLANNED, startet frühestens 21.11.2026 |
+| relay | 04 Antworten an Konten ohne Wallet nur bei Bedarf | PAUSED (Kurs-Check 19.11.: 0 Nachrichten über das Relay seit relay 02) |
 | anmeldung | 01 bis 05 | DONE (03 PR #194, 04 PR #203, 05 PR #259) |
 | abrechnung | 01 bis 05 | DONE (05 PR #266) |
-| abrechnung | 06 Der Zeitraum der Quote stimmt | PLANNED, startet frühestens 21.11.2026 |
+| abrechnung | 06 Der Zeitraum der Quote stimmt | PAUSED (Loop-Kritik 19.11., abrechnung-kritik-2026-11-19-1) |
 | abrechnung | 07 | Glied in `ROADMAP.md`, Datei fehlt |
 | domains | 01 bis 06 | DONE (04 PR #116, 05 PR #132, 06 PR #155) |
 | domains | 07 Ein Neustart des Sandbox-Servers sperrt keinen Kunden aus | PAUSED (Kurs-Check 15.11., PR #186) |
@@ -91,10 +99,11 @@ gegen Cookies über Sandbox-Grenzen baut sandbox 12 im eigenen Proxy.
 
 ## Human Inbox
 
-- Keine PR mit Kommentar „Human Inbox“ offen (`gh pr list --search "Human Inbox in:comments"` leer), kein Human Gate offen; sandbox
-  11 hat Matthias am 18.11. abgelehnt, die Asana-Aufgabe 1220586742457641 hat damit keinen Zweck mehr.
-- Kritik-PR #260 (anmeldung 05, zwei Vorschläge): Sein Kopf d193cfd stammt laut Loop Master aus keinem Lauf des Growth Lead,
-  deshalb kein Merge-Auftrag, mergen kann nur ein Mensch.
+- Keine PR mit Kommentar „Human Inbox“ offen (`gh pr list --search "Human Inbox in:comments"` leer).
+- Human Gate konto 15 (`security_settings`): MoonPay für HTC über Turnkey, Gasschlüssel für Base mit 0,003 ETH, vier Werte
+  `CP_KONTO_*` in `/opt/control-plane/.env`; Asana 1220710009513649 seit 19.11., 16:20, Goal-PR #302 mit grünen Checks.
+- Kritik-PRs #260 (anmeldung 05) und #296 (sandbox 12), je zwei Vorschläge: Ihre Köpfe d193cfd und f5582d8 stammen laut Loop Master
+  aus keinem Lauf des Growth Lead, deshalb kein Merge-Auftrag; mergen kann nur ein Mensch.
 - Gate-Abgleich: `gate.yaml` und `loop-constraints.md` seit 5f77e64 (17.11.) unverändert, jede Pfadregel der Deny List hat ihren
   Eintrag in `deny_paths`. Kein neuer Vorschlag.
 
@@ -103,16 +112,22 @@ gegen Cookies über Sandbox-Grenzen baut sandbox 12 im eigenen Proxy.
 - `loop-constraints.md:127` bindet Opus für Maker, Linsen und Kritik, Linse B (`qa-scope`) läuft weiter auf Sonnet
   (`paperclip/company/.paperclip.yaml:288` im code-host). Angleichen oder zurückstellen kann nur Matthias
   (loop-redteam-2026-11-17-1).
-- Nachfüllen hängt an PR #275 im Konflikt (Glied 2); ohne Merge von #288 oder neue Nachfüllung baut nach konto 13 nur, was ab 21.11.
-  startet
-- Audit vom 19.11. weder auf `dev` noch als Branch (06:40); drei rote Audits in Folge (16. bis 18.11.), das vom 18.11. teils aus dem
-  Audit-Ablauf selbst (Glied 5)
-- konto 12 Punkt 3 (kein Ansammeln von `exit`-Listenern) prüft nur der Prüfbefehl der Goal-Datei, kein Test unter `test/`
-  (konto-nacharbeit-2026-11-19-1)
-- Rückweg nach konto 12: Das alte Image kann `handoffs` nach der Umbenennung `automaton_name` zu `display_name` nicht lesen; bis Glied
-  4 gemergt ist, braucht ein Rollback die Spalte von Hand zurück (konto-kritik-2026-11-18-5)
+- Drei rote Audits in Folge (18. bis 20.11.), das vom 20.11. mit 46 roten Zeilen in PR #312 noch offen
+- `ops/customer-decline.sh` zählt eigene Läufe, deren Adresse nicht in `ops/own-ips.txt` steht, unter `OTHER` als fremd; `OTHER 2xx`
+  ist bis zur nächsten Arbeit am Werkzeug keine fremde Nachfrage (kunden-kritik-2026-11-19-2)
+- `runtime_funnel` in `ops/db-report.cjs` mischt reife und junge Kohorten, eine Runtime vom Vortag zählt bei `paid` als Verlust; Teil
+  des Glieds, das die Stufe `paid` angeht (kunden-kritik-2026-11-19-4)
+- Die Ankünfte in `ops/traffic.sh` sind zu 97 % ohne Referrer, also vor allem Maschinen; wer einen Kanal an Ankünften misst, zählt
+  Personen (kunden-kritik-2026-11-19-5)
+- Die eigenen Hosts stehen in `ops/traffic.sh` zweimal fest (`CP_OWN_HOSTS` und `HOSTS`); der nächste Host muss beide ändern
+  (kunden-kritik-2026-11-19-6)
+- konto 13: Die Prüfungen auf `token`, `allowance` und `period` in `src/public/konto-client/flow.mjs:430` bis 432 hat kein
+  Verhaltenstest, nur der Bundle-Vergleich wird rot (konto-nacharbeit-2026-11-20-1); ebenso prüft konto 12 Punkt 3 nur der Prüfbefehl
+  der Goal-Datei (konto-nacharbeit-2026-11-19-1)
+- Rückweg nach konto 12: Das alte Image kann `handoffs` nach der Umbenennung `automaton_name` zu `display_name` nicht lesen; bis das
+  Glied dazu gemergt ist, braucht ein Rollback die Spalte von Hand zurück (konto-kritik-2026-11-18-5)
 - Die Ausnahme Hauptnetz läuft nur mit `CP_KONTO_MAINNET=1`, das nur Matthias setzt; ob ein Widerruf auf der Kette wirklich
-  durchgeht, belegt bisher nur ein nachgebauter Knoten (konto 15)
+  durchgeht, belegt bisher nur ein nachgebauter Knoten (konto 17)
 - Bridge dokumentiert kein Abschalten einer Auszahladresse; ob das Löschen des alten Bankkontos sie stilllegt, ist offen
   (konto-nacharbeit-2026-11-18-12), das Geld schützt schon der Widerruf aus konto 11
 - Exit 3 von `ops/deploy-window.sh` macht den Job in `deploy.yml:165` nicht rot (nur `::warning::`); nur ein Mensch ändert
@@ -121,16 +136,21 @@ gegen Cookies über Sandbox-Grenzen baut sandbox 12 im eigenen Proxy.
 - `LOOP.md:24` nennt noch die ungemessenen 0,37 USD; den Satz ändert nur ein Mensch
 - Der Pin `sandboxd-base-pin` hält das Basis-Image gegen den Prune-Cron des Mitbewohners; fällt `fact image_pin` in
   `ops/sandbox/setup.sh --check` auf `no`, scheitert nach 24 Stunden jede Anlage einer Sandbox mit 501
-- `ROADMAP.md` Zeile 18: 6 statt 5 Spalten, ein `|` im Text schneidet die Zeile ab (Hinweis des Loop Masters)
+- `ROADMAP.md` Zeile 19 (abrechnung): 6 statt 5 Spalten, `(T|$)` im Text schneidet die Zeile ab (Hinweis des Loop Masters, Glied 5
+  an den Tech Lead, PRO-25825)
+- `goals/_vorschlaege/fehler-2026-11-19-1.md` folgt nicht dem Schema `<topic>-<art>-<JJJJ-MM-TT>-<n>`, weil kunden 01 den Namen
+  `fehler-<Datum>-<n>` vorgab (Glied 1)
 
 ## Annahmen
 
+- `goals/kunden/ANNAHMEN.md`: Zuordnung von Ledger und Zugriffslog, Messung nur lesend gegen die Produktion, die Annahmen von
+  kunden 01 bis 04
 - `goals/abrechnung/ANNAHMEN.md`: die Quote nach außen seit abrechnung 05 (`docs/abrechnung/timeouts.md`, Abschnitt „Nach sieben
   Tagen“)
 - `goals/sandbox/ANNAHMEN.md`: Domain, Registrar, Token, Notschalter und Public Suffix List für freigegebene Ports (sandbox 07), die
-  Annahmen von sandbox 08 bis 11
+  Annahmen von sandbox 08 bis 12
 - `goals/konto/ANNAHMEN.md`: Turnkey für das Konto, Tagesgrenze über eine Coinbase Smart Wallet mit Spend Permission, Euro über
-  Bridge, die Annahmen von konto 07 bis 12 und die Ablösungen durch konto 06, umzug 02 und umzug 03
+  Bridge, die Annahmen von konto 07 bis 14 und die Ablösungen durch konto 06, umzug 02 und umzug 03
 - `goals/umzug/ANNAHMEN.md`: Umzug auf `automatonhost.com` (umzug 01 bis 04) samt ihren Ablösungen
 - `goals/hosting/ANNAHMEN.md`: Sweep und lange Befehle (hosting 01 und 02)
 - `goals/seite/ANNAHMEN.md`: Code auf Englisch, Reihenfolge konto 04 vor seite 03, Ablösungen von seite 02 und 03 (Tech Lead, 18.11.)

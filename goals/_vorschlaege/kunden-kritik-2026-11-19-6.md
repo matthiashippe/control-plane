@@ -4,3 +4,4 @@ Befund: Die Liste der eigenen Namen steht an zwei Stellen fest im Skript: als Vo
 Beleg: `ops/traffic.sh`, `CP_OWN_HOSTS="${CP_OWN_HOSTS:-automatonhost.com postyourprice.com cp.hippe.eu}"` und `HOSTS = ("automatonhost.com", "postyourprice.com", "cp.hippe.eu")` | `deploy/Caddyfile`, Block mit allen Hosts
 Empfehlung: Wenn ein Glied den nächsten Host einführt oder ändert: `HOSTS` aus `CP_OWN_HOSTS` ableiten und einen Test ergänzen, der die Namen aus `deploy/Caddyfile` gegen `CP_OWN_HOSTS` prüft (die Namen mit `www` als eigene Seite oder bewusst ausgenommen).
 MVP: nein, weil das heute stimmt und erst beim nächsten Umzug bricht.
+Übernommen: Watch List in STATE.md, doppelte Host-Liste in ops/traffic.sh; wird Teil des Glieds, das den nächsten Host einführt (Loop-Triage PRO-25822) (2026-11-20)

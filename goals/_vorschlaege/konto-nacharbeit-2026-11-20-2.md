@@ -6,3 +6,4 @@ Empfehlung: Den Widerruf des Clients (`ENTRY_POINT`, `REVOKE_*_GAS`, ABIs, `revo
 
 `src/handoff/routes.ts` (889 auf 893) steht mit gleicher Aussage schon in `konto-nacharbeit-2026-11-17-4.md` und zählt hier nicht.
 MVP: Schönheit
+Verworfen: MVP Schönheit, Größe einer Datei ohne Fehler im Verhalten, während der Loop auf kleiner Flamme läuft (Loop-Triage PRO-25822) (2026-11-20)
