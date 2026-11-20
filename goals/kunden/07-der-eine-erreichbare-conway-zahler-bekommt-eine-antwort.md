@@ -1,7 +1,7 @@
 # Kunden Goal 07: Der eine erreichbare Conway-Zahler bekommt eine Antwort
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Von 16 Wallets, die in den 30 Tagen bis 18.11.2026 bei Conway aufgeladen haben, zahlt keine bei uns, und nur ein Betreiber ist
@@ -77,7 +77,7 @@ ob es geschieht.
       Prüfung: `cat goals/kunden/ANNAHMEN.md goals/kunden/07-der-eine-erreichbare-conway-zahler-bekommt-eine-antwort.md | grep -cE "0x[0-9a-fA-F]{40}|[0-9a-f]{64}"` muss 0 ausgeben.
 - [x] `check` ist grün.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Jeder neue Test war vor der Änderung rot; die Zeile im Progress Log nennt, womit.
@@ -101,5 +101,6 @@ ob es geschieht.
 - 2026-11-20 Zyklus 1: Punkte 1, 4, 5 gebaut: Feld `conway_overlap` in `ops/status.sh` aus den Zeilen `OVERLAP topped up` und `PAYERS` von `ops/conway-payers.sh`, `unknown` mit Grund bei nicht lesbarer Quelle, Abbruch bei Adresse oder Hash; `test/status-conway-overlap.test.ts` rot gegen `ops/status.sh` von `origin/dev` (7 von 7), als Mutation ohne die Prüfung auf Adresse oder Hash rot (1 von 7); gegen die Produktion 16 Wallets, 0 bekannt, 0 zahlend. Punkte 2 und 3 offen, weil die Widerlegung der Goal-Datei greift: Das eine erreichbare Issue trägt schon eine Antwort von uns (`ANNAHMEN.md`), also kein Entwurf und kein Gate. Prüfbefehle: P1 vitest Exit 0, `alle`, vitest Exit 0 (33 Tests), `SELFTEST OK`; P2 0 statt 1, kein Treffer statt mindestens 1, Prüfungen 3 bis 6 ohne Entwurf nicht gelaufen; P3 0 statt 1, `--verify-posted` nicht gelaufen; P4 4, 0; P5 `check` Exit 0 (237 Dateien, 2499 Tests).
 - 2026-11-20 Zyklus 2: Abschluss gemeldet, Punkte 1, 4, 5; Punkte 2 und 3 bleiben offen, weil die Widerlegung der Goal-Datei greift (`ANNAHMEN.md`, kunden 07), über den Vertrag entscheidet der Tech Lead in der Kritik. Prüfbefehle: P1 vitest Exit 0, `alle`, vitest Exit 0 (33 Tests), `SELFTEST OK`; P2 0 statt 1, kein Treffer statt mindestens 1, Prüfung 5 gibt nichts aus, Prüfungen 3, 4 und 6 ohne Entwurf nicht gelaufen; P3 0 statt 1, `--verify-posted` nicht gelaufen; P4 4, 0; P5 `check` Exit 0 (2499 Tests, 242 s); `dev` ohne neue Commits, Merge ohne Änderung.
 - 2026-11-20 Zyklus 3: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5; die Punkte 2 und 3 in der Fassung der Kritik belegt, ohne Codeänderung. Prüfbefehle: P1 vitest Exit 0, vitest Exit 0, `SELFTEST OK`; P2 0, 1, Netz `unanswered 0 of 1` (Gegenprobe mit leerer Antwortliste `unanswered 1 of 1`, 16 Wallets); P3 0 (Gegenprobe mit gepflanzter Zeile im Log 1); P4 5, 0; P5 `check` Exit 0 (2499 Tests, 195 s).
+- 2026-11-20 Release: PASS K und B (Zyklus 3), DONE.
 
 ## Blockers
