@@ -111,7 +111,7 @@ MVP: Funktion, weil heute eine Sandbox, deren Löschen `sandboxd` dauerhaft able
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD | grep -cE "\.(key|pem|crt|env)$"` muss 0 ausgeben.
       Prüfung: `git diff $(git merge-base origin/dev HEAD) HEAD -- . ':(exclude)goals/' | grep -cE '^\+.*(cnwy_k_[0-9a-f]{32}|-{5}BEGIN [A-Z ]*PRIVATE KEY-{5}|0x[0-9a-fA-F]{64})'` muss 0 ausgeben.
       Prüfung: `git diff $(git merge-base origin/dev HEAD) HEAD -- . | grep '^+' | grep -c $'\xe2\x80\x93\|\xe2\x80\x94'` muss 0 ausgeben.
-- [ ] `check` ist lokal grün, und die Jobs `check` und `e2e` des Goal-PR sind auf dem GitHub-Rechner grün.
+- [x] `check` ist lokal grün, und die Jobs `check` und `e2e` des Goal-PR sind auf dem GitHub-Rechner grün.
       MVP: Funktion, weil der Sweep auf dem Laufzeitpfad liegt und erst `e2e` zeigt, dass der Start der unveränderten Runtime weiter geht.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung (Netz): `n=$(gh pr list -R matthiashippe/control-plane --head goal/hosting-07 --state all --json number -q '.[0].number'); gh pr checks "${n:?}" -R matthiashippe/control-plane --json name,state -q '.[] | select(.name=="check") | .state'` muss `SUCCESS` ausgeben.
@@ -139,6 +139,7 @@ MVP: Funktion, weil heute eine Sandbox, deren Löschen `sandboxd` dauerhaft able
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-21 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6, 7 gebaut (Log-Zeilen, Zähler im Rückgabewert von `sweepAutomatons`, neue Tabelle für den ersten Fehlschlag, Zahl im DB-Bericht mit Schwelle, Test mit 9 Fällen, Annahmen und Doku); Abweichung von Entscheidung 1: `sweep()` des Service behält `{ removed, interrupted }`, weil `test/sweep-not-on-start.test.ts:96` (Deny List) genau das erwartet und `check` sonst rot war (1 failed), Begründung in `ANNAHMEN.md`. Prüfbefehle: Punkt 1 vitest Exit 0 (21 Tests), Wortsuche leer, Zähler 1; Punkt 2 Wortsuche leer; Punkt 3 1, 1, 0; Punkt 4 Gegenprobe mit altem `src/automaton/sweep.ts` 9 rote Tests von 9, mit altem `ops/db-report.cjs` 4 rote von 9; Punkt 5 beide Suchen leer; Punkt 6 0, 0, leer, 0, 0, 0; Punkt 7 `check` lokal grün in 63 s, PR #350 Jobs `check` SUCCESS und `e2e` SUCCESS am Kopf 4ef4e8a.
 
 ## Blockers
 Keine.
