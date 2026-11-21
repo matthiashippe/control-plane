@@ -9,7 +9,8 @@
  * unique index on internal grants. Kind `internal_grant`, never drawn from the starter pot. Moving credit to our own account is
  * no wallet movement and no payout (loop-constraints.md, rule 10). Booked only where the account exists (production).
  */
-import { postLedger, type Db } from "../db.js";
+import type { Db } from "../db.js";
+import { grantInternal, type GrantOutcome } from "../credits/internal-grant.js";
 import { LIVE_SANDBOX_ADDRESS } from "../bounties/ours.js";
 
 /** The cost of one run of the check without reboot, in mc, measured against production (docs/sandbox/automaton.md). */
@@ -25,21 +26,6 @@ export function liveAutomatonGrantMc(runMc: number): number {
 
 export const LIVE_AUTOMATON_GRANT = { ref: "grant:live-automaton", mc: liveAutomatonGrantMc(LIVE_AUTOMATON_RUN_MC) } as const;
 
-export type GrantOutcome = { granted: true } | { granted: false; reason: "already_granted" | "no_account" };
-
 export function grantLiveAutomaton(db: Db, address: string = LIVE_SANDBOX_ADDRESS): GrantOutcome {
-  return db.transaction((): GrantOutcome => {
-    if (db.prepare("SELECT 1 FROM ledger WHERE kind = 'internal_grant' AND ref = ?").get(LIVE_AUTOMATON_GRANT.ref)) {
-      return { granted: false, reason: "already_granted" };
-    }
-    if (!db.prepare("SELECT 1 FROM wallets WHERE address = ?").get(address.toLowerCase())) return { granted: false, reason: "no_account" };
-    postLedger(db, {
-      address,
-      kind: "internal_grant",
-      deltaMc: LIVE_AUTOMATON_GRANT.mc,
-      ref: LIVE_AUTOMATON_GRANT.ref,
-      meta: { reason: "live-automaton: credit of the own live check of the automaton routes" },
-    });
-    return { granted: true };
-  })();
+  return grantInternal(db, { ...LIVE_AUTOMATON_GRANT, reason: "live-automaton: credit of the own live check of the automaton routes" }, address);
 }

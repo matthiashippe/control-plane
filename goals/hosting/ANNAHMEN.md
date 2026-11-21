@@ -96,3 +96,28 @@
 - **Widerlegt?** Nein: Am Kopf von `dev` (`11a4475`) sind 6 der 8 neuen Fälle aus `test/sandbox-background-output.test.ts` rot
   (leere Exit-Datei ohne Schreiber, leere mit spätem Code 3, `mv` der Hülle, 5 MB im Wartebefehl, 5 MB im Wrapper, 65537 Bytes);
   die beiden Fälle für unverändertes Verhalten (genau 65536 Bytes, kleine Ausgabe) sind dort grün, wie sie sollen.
+
+## Goal 04 (21.11.2026, Engineer CP)
+
+- **Widerlegt?** Nein: Am Kopf von `dev` (`757ecc6`) unterschieden sich `grantLiveSandbox` und `grantLiveAutomaton` nur in Ref,
+  Betrag und dem Text für `meta.reason`; Typ, Transaktion, Abfrage der Ref, Abfrage des Kontos und Buchung waren gleich.
+- **Ort und Form.** `grantInternal` steht in `src/credits/internal-grant.ts` neben `src/credits/aborted.ts`, weil beide
+  Live-Prüfungen sie nutzen und weder `src/sandbox/` von `src/automaton/` abhängen soll noch umgekehrt. Signatur
+  `grantInternal(db, { ref, mc, reason }, address)`, Rückgabe `GrantOutcome` aus derselben Datei; kein Re-Export aus den alten Dateien.
+  Die Art `internal_grant` steht fest in der Funktion, nie als Argument, weil eine Gutschrift der Art `grant` aus dem Startertopf ginge.
+  Die Adresse hat dort keinen Standardwert, den behalten die beiden Aufrufer. Die nächste interne Gutschrift ruft `grantInternal`.
+- **Prüfung auf die Ref.** Die Funktion fragt wie vorher in derselben Transaktion zuerst nach einer Zeile `internal_grant` mit dieser
+  Ref, dann nach dem Konto. Der eindeutige Index in `src/db.ts` bleibt die zweite Sicherung; ohne die Abfrage endete ein zweiter
+  Start mit einem Fehler statt mit `already_granted`.
+- **Ref und Betrag wechseln nie.** `LIVE_SANDBOX_GRANT`, `LIVE_AUTOMATON_GRANT`, `liveAutomatonGrantMc` und die beiden Texte für
+  `meta.reason` sind Byte für Byte wie auf `dev`, Name, Signatur und Rückgabe der beiden Aufrufer auch. In der Produktion entscheidet
+  allein die Ref, ob der Start bucht: eine neue Ref oder ein neuer Betrag buchte beim Rollout eine zweite Gutschrift. Darum ändern sich
+  `src/index.ts` und die beiden bestehenden Tests nicht, und nach dem Rollout bucht der Start keine neue Zeile.
+- **Der neue Test** `test/internal-grant.test.ts` nutzt eigene Test-Refs und eine Testadresse, nie die Refs der Live-Prüfungen: ohne
+  Konto `no_account` und keine Zeile; mit Konto erst gebucht, dann mit derselben Ref `already_granted` und genau eine Zeile mit Betrag
+  und Grund in `meta`; eine zweite Ref bucht ihre eigene Zeile.
+- **Gegenprobe.** In einer Kopie von `67cc418` trifft die Abfrage der Ref nie (Bedingung auf `WHERE 0` gesetzt): 1 von 3 Fällen rot,
+  der zweite Aufruf mit derselben Ref läuft in den eindeutigen Index (`UNIQUE constraint failed: ledger.ref`) statt
+  `already_granted` zu liefern. Mit dem unveränderten Stand sind alle 3 grün.
+- **`creditAbortedCharges` bleibt außen vor.** Sie bucht Art `refund` mit eigenen Prüfungen (Summe, Adresse aus den Abbuchungen) und
+  ist keine Gutschrift einer Live-Prüfung.

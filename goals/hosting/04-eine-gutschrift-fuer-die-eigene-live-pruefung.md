@@ -1,7 +1,7 @@
 # Hosting Goal 04: Eine Gutschrift für die eigene Live-Prüfung statt zwei
 
 ## Status
-PLANNED
+DONE
 
 ## Active Objective
 Die beiden internen Gutschriften der eigenen Live-Prüfung buchen über eine gemeinsame Funktion: `grantInternal` in
@@ -65,7 +65,7 @@ beiden Kopien landet; die andere bucht dann im schlimmsten Fall bei einem Rollou
   Automaton ihn mit 501 trifft.
 
 ## Done Condition
-- [ ] `src/credits/internal-grant.ts` exportiert `GrantOutcome` und `grantInternal` mit Ref, Betrag und Grund als Argument und der
+- [x] `src/credits/internal-grant.ts` exportiert `GrantOutcome` und `grantInternal` mit Ref, Betrag und Grund als Argument und der
       Prüfung auf eine vorhandene Ref; `test/internal-grant.test.ts` verlangt beim zweiten Aufruf mit derselben Ref `already_granted`
       und genau eine Zeile `internal_grant`.
       MVP: Funktion, weil die doppelte Buchung einer Gutschrift Geld auf ein Konto legt, das niemand bezahlt hat.
@@ -74,10 +74,10 @@ beiden Kopien landet; die andere bucht dann im schlimmsten Fall bei einem Rollou
       Prüfung: `grep -cF "SELECT 1 FROM ledger WHERE kind = 'internal_grant' AND ref = ?" src/credits/internal-grant.ts` muss 1 ausgeben.
       Prüfung: `for w in grantInternal already_granted no_account internal_grant; do grep -qF -- "$w" test/internal-grant.test.ts || echo "fehlt $w"; done` muss nichts ausgeben.
       Prüfung: `grep -cE "grant:live-(sandbox|automaton)" test/internal-grant.test.ts` muss 0 ausgeben.
-- [ ] Der neue Test ist rot gegen eine Kopie, in der die Prüfung auf eine vorhandene Ref nie trifft.
+- [x] Der neue Test ist rot gegen eine Kopie, in der die Prüfung auf eine vorhandene Ref nie trifft.
       MVP: Funktion, weil ein Test, der ohne die Prüfung grün bleibt, die Idempotenz nicht schützt, die dieses Goal an eine Stelle legt.
       Prüfung: `T=$(mktemp -d); git archive HEAD | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; sed -i "s/WHERE kind = 'internal_grant' AND ref = ?/WHERE 0 AND ref = ?/" $T/src/credits/internal-grant.ts; (cd $T && PATH=/usr/bin:$PATH pnpm -s vitest run test/internal-grant.test.ts --reporter=json --outputFile=$T/r.json >/dev/null 2>&1); node -p "JSON.parse(require('fs').readFileSync('$T/r.json','utf8')).numFailedTests"; rm -rf $T` muss mindestens 1 ausgeben.
-- [ ] `grantLiveSandbox` und `grantLiveAutomaton` rufen `grantInternal` mit ihrer unveränderten Konstante auf und buchen nicht mehr
+- [x] `grantLiveSandbox` und `grantLiveAutomaton` rufen `grantInternal` mit ihrer unveränderten Konstante auf und buchen nicht mehr
       selbst; es gibt einen Typ `GrantOutcome` und eine Abfrage auf vorhandene interne Gutschriften in `src/`, und die beiden
       bestehenden Tests sind unverändert grün.
       MVP: Funktion, weil die Produktion an Ref und Betrag erkennt, dass sie schon gebucht hat, und eine Kopie, die bleibt, die nächste
@@ -90,7 +90,7 @@ beiden Kopien landet; die andere bucht dann im schlimmsten Fall bei einem Rollou
       Prüfung: `grep -cF 'export const LIVE_SANDBOX_GRANT = { ref: "grant:live-sandbox", mc: 100_000 } as const;' src/sandbox/grant.ts` muss 1 ausgeben.
       Prüfung: `grep -cF 'export const LIVE_AUTOMATON_GRANT = { ref: "grant:live-automaton", mc: liveAutomatonGrantMc(LIVE_AUTOMATON_RUN_MC) } as const;' src/automaton/grant.ts` muss 1 ausgeben.
       Prüfung: `cat src/sandbox/grant.ts src/automaton/grant.ts | grep -cE '"live-(sandbox: credit of the own live check of the sandbox API|automaton: credit of the own live check of the automaton routes)"'` muss 2 ausgeben.
-- [ ] Das Goal ändert nur die neue Funktion, ihren Test, die beiden Aufrufer und `goals/hosting/`, weder `src/index.ts` noch die beiden
+- [x] Das Goal ändert nur die neue Funktion, ihren Test, die beiden Aufrufer und `goals/hosting/`, weder `src/index.ts` noch die beiden
       bestehenden Tests, Zahlung, Anmeldung, Sandbox-Server, Runtime, Deploy oder CI, und bringt keinen Schlüssel ins Repo.
       MVP: Funktion, weil das Repo öffentlich ist (Grundregel 8) und jede weitere Datei auf dem Laufzeitpfad den Rollout ohne Nutzen
       für den Kunden größer macht (Grundregel 5).
@@ -98,17 +98,17 @@ beiden Kopien landet; die andere bucht dann im schlimmsten Fall bei einem Rollou
       Prüfung: `git diff --name-only origin/dev...HEAD -- src/index.ts test/automaton-grant.test.ts test/sandbox-billing.test.ts | wc -l` muss 0 ausgeben.
       Prüfung: `git diff --name-only origin/dev...HEAD | grep -cE "\.(key|pem|crt|env)$"` muss 0 ausgeben.
       Prüfung: `git diff origin/dev...HEAD -- . ':(exclude)goals/' | grep -cE '^\+.*(cnwy_k_[0-9a-f]{32}|-{5}BEGIN [A-Z ]*PRIVATE KEY-{5})'` muss 0 ausgeben.
-- [ ] `check` ist lokal grün, und die Jobs `check` und `e2e` des Goal-PR sind auf dem GitHub-Rechner grün.
+- [x] `check` ist lokal grün, und die Jobs `check` und `e2e` des Goal-PR sind auf dem GitHub-Rechner grün.
       MVP: Funktion, weil beide Gutschriften beim Start des Dienstes laufen und erst der Gang mit der unveränderten Runtime zeigt, dass
       der Dienst danach weiter startet (Grundregel 13).
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung (Netz): `n=$(gh pr list -R matthiashippe/control-plane --head goal/hosting-04 --state all --json number -q '.[0].number'); gh pr checks "${n:?}" -R matthiashippe/control-plane --json name,state -q '.[] | select(.name=="check") | .state'` muss `SUCCESS` ausgeben.
       Prüfung (Netz): `n=$(gh pr list -R matthiashippe/control-plane --head goal/hosting-04 --state all --json number -q '.[0].number'); gh pr checks "${n:?}" -R matthiashippe/control-plane --json name,state -q '.[] | select(.name=="e2e") | .state'` muss `SUCCESS` ausgeben.
-- [ ] Die Entscheidungen stehen mit Grund unter `## Goal 04` in `goals/hosting/ANNAHMEN.md`, samt der Gegenprobe und ihrem Ergebnis.
+- [x] Die Entscheidungen stehen mit Grund unter `## Goal 04` in `goals/hosting/ANNAHMEN.md`, samt der Gegenprobe und ihrem Ergebnis.
       MVP: Funktion, weil die nächste interne Gutschrift wissen muss, dass sie `grantInternal` ruft und warum Ref und Betrag der
       bestehenden nie wechseln.
       Prüfung: `awk '/^## Goal 04/{f=1} f' goals/hosting/ANNAHMEN.md | grep -ciE "grantInternal|src/credits|Gegenprobe|Ref|index\.ts|refund"` muss mindestens 4 ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Die Gegenprobe war rot, wie sie soll; die Zeile im Progress Log nennt, womit.
@@ -129,6 +129,10 @@ beiden Kopien landet; die andere bucht dann im schlimmsten Fall bei einem Rollou
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-21 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6 gebaut, `grantInternal` in `src/credits/internal-grant.ts` mit neuem Test, beide Aufrufer buchen darüber, Entscheidungen in den Annahmen. Prüfbefehle: Punkt 1 vitest Exit 0 (3 Fälle), Zähler 1, 1, Schleife leer, 0; Punkt 2 Gegenprobe 1 (rot mit UNIQUE constraint failed am zweiten Aufruf, weil die Abfrage der Ref nie trifft); Punkt 3 vitest Exit 0 (17 Fälle), Zähler 1, 1, 2, 0, 1, 1, 2; Punkt 4 Zähler 0, 0, 0, 0; Punkt 5 check lokal Exit 0 (2510 Tests), PR #338 check SUCCESS, e2e SUCCESS; Punkt 6 Zähler 16.
+- 2026-11-21 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, dev (757ecc6) war schon enthalten. Prüfbefehle: Punkt 1 vitest Exit 0, Zähler 1, 1, Schleife leer, 0; Punkt 2 Gegenprobe 1; Punkt 3 vitest Exit 0, Zähler 1, 1, 2, 0, 1, 1, 2; Punkt 4 Zähler 0, 0, 0, 0; Punkt 5 check lokal Exit 0 (2510 Tests, 410 s), PR #338 am Kopf b13148f check SUCCESS, e2e SUCCESS; Punkt 6 Zähler 16.
+- 2026-11-21 Zyklus 3: Gap aus Verdict 04-z2-K behoben, die Vorschlagsdatei der Kritik liegt nicht mehr auf dem Goal-Branch, sondern unverändert im Pflege-PR #339 (`loop/kritik/2026-11-21-hosting-04`) gegen dev. Prüfbefehle: Punkt 1 vitest Exit 0, Zähler 1, 1, Schleife leer, 0; Punkt 2 Gegenprobe 1; Punkt 3 vitest Exit 0, Zähler 1, 1, 2, 0, 1, 1, 2; Punkt 4 Zähler 0, 0, 0, 0; Punkt 5 check lokal Exit 0 (2510 Tests), Jobs am PR #338 laufen am neuen Kopf; Punkt 6 Zähler 16.
+- 2026-11-21 Release: PASS K und B (Zyklus 3), DONE.
 
 ## Blockers
 Keine.
