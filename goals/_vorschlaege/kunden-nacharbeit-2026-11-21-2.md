@@ -5,3 +5,5 @@ Beleg: `git grep -n -E "is no ISO time|writeSync\(1, out" origin/dev -- ops/db-r
 Empfehlung: `iso` und die Ausgabe auf stdout einmal oben in `ops/db-report.cjs` definieren und in allen drei Blöcken aufrufen.
 
 Linse Q, Frage 2 (Logik-Duplikat).
+
+Verworfen: Doppelung des Helfers ohne Fehlerbild, MVP-Modus, keine Arbeit an Schönheit (2026-11-21)

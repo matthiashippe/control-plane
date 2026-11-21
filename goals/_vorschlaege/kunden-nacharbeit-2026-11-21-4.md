@@ -5,3 +5,5 @@ Beleg: `git grep -n -E 'name \|\| "conway-automaton"|body.name \?\? "conway-auto
 Empfehlung: An beiden Stellen `RUNTIME_KEY_NAME` importieren statt des Literals.
 
 Linse Q, Frage 2.
+
+Übernommen: Teil von Glied 3 an den Tech Lead, `RUNTIME_KEY_NAME` statt Literal (PRO-26356) (2026-11-21)

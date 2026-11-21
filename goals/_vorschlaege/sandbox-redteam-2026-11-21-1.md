@@ -11,3 +11,5 @@ Empfehlung: Das Audit streicht jeden Prüfbefehl, der `ops/sandbox/probe.sh` ode
 Gebrochen ist die Audit-Regel aus dem Skill `loop-regeln` (Nachtläufe, Loop-Audit): Ein Prüfbefehl, der einen Live-Lauf startet, läuft im Audit nie, auch nicht mit `(Netz)`, weil Prüfer keine Produktionssysteme aufrufen (seit 16.11.2026). Das Audit sperrt offenbar nur Prüfzeilen, die es schon kennt: sandbox 02 Punkt 4 und sandbox 07 Punkt 4 mit demselben `probe.sh` stehen vom 17. bis 20.11. auf NICHT GELAUFEN, sandbox 12 ist erst seit 19.11. `DONE` und lief am 20.11. durch. Vor der Regel lief `probe.sh` auch am 13., 15. und 16.11.
 
 Schwere 4 statt 5: `loop-constraints.md:75-82` (Produktion nur lesen) regelt wörtlich den Zahlungsserver, den `probe.sh` nur mit GET `/health` aufruft; verletzt sind die Audit-Regel des Skills und die Kern-Regel für Prüfagenten. Die Probe räumt ihre Sandboxes wieder ab (`left=0`).
+
+Übernommen: Glied 5 an den Tech Lead, Audit-Regel und Zeile in `goals/sandbox/ANNAHMEN.md` (PRO-26356) (2026-11-21)

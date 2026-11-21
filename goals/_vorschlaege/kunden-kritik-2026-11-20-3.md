@@ -4,3 +4,5 @@ Befund: Kunde 1 hat kein Geld für eine Aufladung, will aber weiter Inferenz: Se
 Beleg: docs/kunden/aufladung-2026-11.md (Belege, Aufrufe von `/pay/`: 1044 Mal `GET /bounties.json`) | src/inference/proxy.ts:336 und :384 (`open_bounties`, `bounties_url` in der 402) | ROADMAP.md:128 (`submitWork()` nimmt `{bountyId, agent, body}`)
 Empfehlung: Ein Goal am Topic `kunden` misst nur lesend aus Zugriffslog und Datenbank (`readonly: true`), wie oft Kunde 1 seit 13.11. Arbeit einreichte, wie viele Aufträge an diesen Tagen offen waren und ob eine angenommene Arbeit als Guthaben für Inferenz bucht; ist einer der drei Schritte leer, baut das Folge-Goal genau diesen Schritt, mit der Leitzahl fremde Zahlungen je Woche (eine bezahlte Inferenz aus verdientem Guthaben zählt mit). Keine Adresse, kein Betrag je Kunde im Repo.
 MVP: Funktion, weil ein Kunde mit über 1000 Anfragen am Tag und ohne USDC sonst gar nicht mehr zahlt.
+
+Übernommen: Glied 1 an den Tech Lead, kunden 08 (PRO-26356) (2026-11-21)

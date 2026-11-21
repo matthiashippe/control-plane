@@ -5,3 +5,5 @@ Beleg: `git show origin/dev:ops/watchdog.sh | grep -n OUTAGE` -> `177:  if [[ "$
 Empfehlung: konto 18 bleibt PAUSED, bis Matthias über das Einfrieren des Kontos entschieden hat und konto 15 durch ist; danach nur wieder PLANNED, wenn am Gate ein gestoppter Dienst wirklich zu einer falschen Suche geführt hat.
 
 `LOOP.md:36`: Prüfwerkzeuge ohne Messauftrag werden kein Done-Punkt, sondern ein Vorschlag. Das Topic konto hat 0 Konten in der Produktion (`docs/richtung/2026-11-19.md`, Tabelle, Zeile „Konten ohne Wallet“).
+
+Übernommen: schon umgesetzt, konto 18 steht seit der Loop-Kritik vom 20.11. auf PAUSED (2026-11-21)

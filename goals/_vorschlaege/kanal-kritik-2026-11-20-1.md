@@ -5,3 +5,5 @@ Beleg: `gh issue list -R Conway-Research/automaton --state all --search "created
 Empfehlung: Die Zeile `Nächste Runde: Antwortpaket, weil …` nur zulassen, wenn das Werkzeug zur Messzeit offene Issues mit Anmelde- oder Zahlungsfehlern seit der letzten Runde zählt (Zeile `NEW ISSUES since <t>: <n>`); bei 0 lautet das Urteil `anderer Kanal`, und das Goal nennt Idee 3 aus `docs/richtung/2026-11-19.md` (Paket der Runtime mit unserer Adresse) als Kandidat.
 
 Der Richtungs-Check vom 19.11. misst dasselbe (`docs/richtung/2026-11-19.md:28`, 0 neue Onboarding-Issues in der Woche ab 12.11.). Ohne diese Bedingung kann ein einzelner angemeldeter Besucher über eine alte Antwort das Urteil `Antwortpaket` auslösen, und kanal 06 und 07 bauen dann am Postwerkzeug für eine Runde, die niemand liest.
+
+Übernommen: Glied 4 an den Tech Lead, kanal 05 vor dem Start am 26.11. (PRO-26356) (2026-11-21)

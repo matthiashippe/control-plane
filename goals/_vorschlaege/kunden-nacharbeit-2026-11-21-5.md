@@ -5,3 +5,5 @@ Beleg: `git show 91597b5:ops/db-report.cjs | wc -l` -> 958 | ops/db-report.cjs:3
 Empfehlung: Begründung im nächsten Commit an diesen Dateien nachtragen oder wie `kunden-nacharbeit-2026-11-20-3` als bewusste Ausnahme in `ANNAHMEN.md` festhalten.
 
 Linse Q, Frage 6. Gegenprobe: `git log --format=%B 91597b5^1..91597b5^2 | grep -ci zeilen` -> 0.
+
+Verworfen: Dateigröße ohne Fehlerbild, wie kunden-nacharbeit-2026-11-20-3 eine bewusste Ausnahme im MVP-Modus (2026-11-21)

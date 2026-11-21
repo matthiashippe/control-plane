@@ -5,3 +5,5 @@ Beleg: `git grep -n -F 'from_env=$( set -a' origin/dev -- ops/` -> conway-payers
 Empfehlung: Den Block für `loop.env` als Funktion in ein gemeinsames Shell-Skript unter `ops/` legen und `parse`/`iso` nach `ops/conway_arrivals.py` ziehen.
 
 Linse Q, Frage 2. Zweiter Beleg: `git grep -n -E '^def (parse|iso)\(' origin/dev -- ops/` -> customer-decline.sh:53 und :61, starter-paths.sh:60 und :68.
+
+Verworfen: Doppelung in Werkzeugen unter `ops/` ohne Fehlerbild, MVP-Modus, keine Arbeit an Schönheit (2026-11-21)
