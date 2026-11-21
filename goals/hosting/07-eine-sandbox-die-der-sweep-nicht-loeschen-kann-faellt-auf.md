@@ -140,6 +140,7 @@ MVP: Funktion, weil heute eine Sandbox, deren Löschen `sandboxd` dauerhaft able
 
 ## Progress Log
 - 2026-11-21 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6, 7 gebaut (Log-Zeilen, Zähler im Rückgabewert von `sweepAutomatons`, neue Tabelle für den ersten Fehlschlag, Zahl im DB-Bericht mit Schwelle, Test mit 9 Fällen, Annahmen und Doku); Abweichung von Entscheidung 1: `sweep()` des Service behält `{ removed, interrupted }`, weil `test/sweep-not-on-start.test.ts:96` (Deny List) genau das erwartet und `check` sonst rot war (1 failed), Begründung in `ANNAHMEN.md`. Prüfbefehle: Punkt 1 vitest Exit 0 (21 Tests), Wortsuche leer, Zähler 1; Punkt 2 Wortsuche leer; Punkt 3 1, 1, 0; Punkt 4 Gegenprobe mit altem `src/automaton/sweep.ts` 9 rote Tests von 9, mit altem `ops/db-report.cjs` 4 rote von 9; Punkt 5 beide Suchen leer; Punkt 6 0, 0, leer, 0, 0, 0; Punkt 7 `check` lokal grün in 63 s, PR #350 Jobs `check` SUCCESS und `e2e` SUCCESS am Kopf 4ef4e8a.
+- 2026-11-21 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, 7; `dev` (33697eb) war schon im Branch, kein Merge nötig, kein Code geändert. Prüfbefehle am Kopf 98c0604: Punkt 1 vitest Exit 0 (2 Dateien, 21 Tests), Wortsuche leer, Zähler 1; Punkt 2 Wortsuche leer; Punkt 3 1, 1, 0; Punkt 4 Gegenprobe mit altem Sweep 9 rote Tests, mit altem Bericht 4 rote; Punkt 5 beide Suchen leer; Punkt 6 0, 0, leer, 0, 0, 0; Punkt 7 `check` lokal Exit 0 in 134 s (2546 Tests), PR #350 Job `check` SUCCESS, Job `e2e` SUCCESS.
 
 ## Blockers
 Keine.
