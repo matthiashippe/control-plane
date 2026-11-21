@@ -169,3 +169,32 @@
 
 Nachher: SETUP CHECK OK changed=0, 2026-11-21 15:55 UTC
 Nachher: image ok, 2026-11-21 15:55 UTC
+
+## Goal 06 (21.11.2026, Engineer CP)
+
+- **Die Summe deckt ganz `node_modules/`, nicht nur die Pakete, die `dist/` lädt** (Entscheidung 1 des Tech Lead). `deps_sum` nimmt
+  jede reguläre Datei unter `node_modules/` mit Inhalt und Pfad wie `dist_sum`, dazu jeden symbolischen Link mit Pfad und Ziel, beide
+  Listen mit `LC_ALL=C` sortiert, und `sha256sum` über beides. Welche Pakete `viem` transitiv lädt, zeigt erst ein Lauf, eine
+  Obermenge verfehlt keines. `node_modules/.pnpm/lock.yaml` gegen `pnpm-lock.yaml` sähe nur eine veraltete Installation, keine
+  veränderte Datei, und `node_modules/.modules.yaml` ändert sich bei einer veränderten Datei gar nicht; beide taugen darum nicht als
+  Summe. Die Links zählen mit, weil pnpm die Pakete als Links in den virtuellen Store `node_modules/.pnpm/` legt und ein Link auf eine
+  andere Version keine Datei ändert; der Selbsttest pflanzt dafür zwei Versionen mit gleichem Inhalt, und ohne die Links in der Summe
+  wird `deps-relinked` rot (Gegenprobe beim Bau). Fehlt `node_modules/`, ist die Summe das Wort `none` und passt nie zu einem Stempel
+  nach einem Bau mit Installation.
+- **Messung am Cache** `~/.cache/control-plane/automaton-d8f8168`, nur lesend (kein `pnpm`, kein Stempel), mit
+  `find node_modules -type f | wc -l`, `find node_modules -type l | wc -l` und der Funktion `deps_sum` aus dem Skript, dreimal
+  hintereinander bei Last 36 auf 30 Kernen: 2,9 s beim ersten Lauf (Dateien nicht im Seitencache), danach 0,56 und 0,57 s. Die Zeile
+  nennt den ersten, teuersten Lauf. Gegen die Dauer eines Gangs (Klon prüfen, Sandbox anlegen, nutzen, löschen) und einen Neubau mit
+  `pnpm install --frozen-lockfile` fällt das nicht ins Gewicht, darum keine kleinere Summe.
+Messung: deps_sum 19371 Dateien, 466 Links, 2,9 s, 2026-11-21
+- **Alter Stempel.** Ein Stempel mit nur `<HEAD> <dist_sum>` ist `deps` (Fall `deps-old-stamp`) und führt einmal zum Neubau. Der Cache
+  hat am 21.11.2026 gar keinen Stempel, der nächste Gang baut dort ohnehin neu.
+- **Neubau bei `deps` von Grund auf** (Entscheidung 3). `build_runtime` löscht bei `deps` `node_modules/` und `dist/` und ruft dann
+  `pnpm install --frozen-lockfile` und `pnpm build`. Das nachgebaute `pnpm` im Selbsttest legt die Pakete nur an, wenn
+  `node_modules/` fehlt, wie das echte pnpm, das eine veränderte Datei nicht sieht; ohne das Löschen wird `rebuild-changed-deps` rot,
+  weil der neue Stempel sonst die veränderte Datei deckt (Gegenprobe beim Bau). Bei `unbuilt` und `dist` bleibt `node_modules/`
+  stehen, damit ein Neubau von `dist/` keine Pakete neu lädt.
+- **Abweichung von `ROADMAP.md`.** Die Zeile nennt als Test `test/runtime-sandbox-selftest.test.ts` aus hosting 03. hosting 03 steht
+  seit dem Kurs-Check vom 17.11.2026 auf `PAUSED`, die Datei gibt es auf `dev` nicht. Dieses Goal bringt darum seinen eigenen, schmalen
+  Test `test/runtime-sandbox-deps.test.ts`; startet hosting 03 wieder, verlangt sein Test die Zeile für `deps-changed` laut
+  `ROADMAP.md` ohnehin.
