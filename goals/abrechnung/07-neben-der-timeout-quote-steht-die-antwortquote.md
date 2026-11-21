@@ -1,7 +1,7 @@
 # Abrechnung Goal 07: Neben der Timeout-Quote steht die Antwortquote
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Wer bei uns liest, dass seine Anfragen ankommen, bekommt eine Zahl, die auch unsere Ausfälle zählt. Heute zählt `Quote nach außen:` in
@@ -129,7 +129,7 @@ Anfragen im Zeitraum abgewiesen wurde.
       Prüfung: `git diff --name-only origin/dev...HEAD -- src deploy | wc -l` muss 0 ausgeben.
       Prüfung: `git diff --name-only origin/dev...HEAD -- ops/timeout-quote.sh ops/abort-purchase.sh | wc -l` muss 0 ausgeben.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Die beiden verfälschten Kopien in `test/answer-quote.test.ts` waren mit dem fertigen Skript rot und sind es nach jeder Änderung an
@@ -153,5 +153,6 @@ Anfragen im Zeitraum abgewiesen wurde.
 ## Progress Log
 - 2026-11-21 Zyklus 1: Punkte 1, 2, 3, 4, 5 gebaut: `ops/answer-quote.sh` mit Selftest (11 Fälle), `test/answer-quote.test.ts`, Messung über die sieben Tage (1197 von 2613, 45,8 %, 1393 mit 503 alle im Ausfall) und die Zeilen `Antwortquote nach außen:` und `Regel nach außen:` in `docs/abrechnung/timeouts.md`; Ende der Anfrage ist `ts` (ANNAHMEN.md). Rot gesehen: der Test mit einem Selftest, dessen 503-Fall nur 200 pflanzt (Fall 2 rot); die Kopie mit `status <= 599` endet mit `FAIL answers 503 counts against` und Exit 1, die mit `false` mit `FAIL answers 4xx excluded` und Exit 1; Gegenprobe auf der Produktionskopie mit vier gepflanzten Zeilen (+1 je 200, 402, 503) und mit gekürztem Log (Exit 2), `jq` zählt je Status gleich. Prüfbefehle: Punkt 1 alle 9 wie erwartet (Exit 0, letzte Zeile OK, je 1, FAIL 0, Adressen 0, access-log 2); Punkt 2 alle 7 (Exit 2, 2, 2, full form 1, answers 0, je 1); Punkt 3 (3, 1, 1, vitest Exit 0); Punkt 4 alle 12 (Netz 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 3, 0); Punkt 5 (0, 0, `check` Exit 0, 2507 Tests grün).
 - 2026-11-21 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5; `dev` ohne neue Commits seit dem Start, nichts zu mergen. Prüfbefehle: Punkt 1 alle 9 (Exit 0 mit `ANSWER QUOTE SELFTEST OK`, je 1, FAIL 0, Adressen 0, access-log 2); Punkt 2 alle 7 (Exit 2, full form 1, Exit 2, Exit 2, answers 0, je 1); Punkt 3 (3, 1, 1, vitest Exit 0 mit 3 Tests); Punkt 4 alle 12 (Netz 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 3, 0); Punkt 5 (0, 0, `check` Exit 0 mit 2507 Tests).
+- 2026-11-21 Release: PASS K und B (Zyklus 2), DONE.
 
 ## Blockers
