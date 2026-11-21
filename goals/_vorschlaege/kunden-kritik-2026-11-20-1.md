@@ -5,3 +5,5 @@ Beleg: `git show origin/dev:test/watchdog-credit-kritik.test.ts | grep -n "empty
 Empfehlung: Den Test aus Done-Punkt 2 streichen und nur die lesende Messung in der Produktion (Abschnitt `## Vor der ersten 503`) behalten; das Progress Log nennt den bestehenden Fall in `test/watchdog-credit-kritik.test.ts:112`.
 
 Ein Test, der schon vorhandenes Verhalten ein zweites Mal prüft, ist ein Prüfwerkzeug ohne Messauftrag (`LOOP.md:36`) und kostet einen Zyklus vor der Frage, die zählt: ob Kunde 1 wegen fehlender USDC oder wegen unserer 402 nicht auflädt.
+
+Verworfen: kunden 05 ist DONE (PR #316), der Test ist gemergt; die offene Gegenprobe führt kunden-nacharbeit-2026-11-21-1 auf der Watch List (2026-11-21)

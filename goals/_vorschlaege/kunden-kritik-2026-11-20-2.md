@@ -5,3 +5,5 @@ Beleg: `git show origin/dev:docs/kunden/trichter.md | grep -n "zwei nie"` -> `41
 Empfehlung: Tech Lead tauscht die Reihenfolge, sodass kunden 07 vor kunden 06 startet (Nummern tauschen, nicht pausieren, weil ein PAUSED-Glied das Topic hält); in kunden 06 den neuen Auslöser in `src/` nur bauen, wenn `ops/starter-paths.sh` mindestens zwei Runtimes zeigt, die genau diesen Aufruf gestellt haben, sonst endet das Goal mit der Messung.
 
 kunden 07 bringt die Leitzahl „Conway-Zahler, die bei uns zahlen“ direkt von 0 auf 1, und sein Issue kann bis zum Gate schließen (Widerlegung des Goals). kunden 06 kostet dagegen einen Rollout des Laufzeitpfads, also rund 16 Sekunden ohne Antwort für den zahlenden Kunden, für einen Effekt von höchstens einer Runtime in vier Wochen.
+
+Verworfen: kunden 06 und 07 sind beide DONE (PR #317, #319), die Reihenfolge ist entschieden (2026-11-21)
