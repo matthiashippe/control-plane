@@ -569,3 +569,9 @@
   `SETUP CHECK OK changed=0`.
 - **Rollout vor dem Merge** wie sandbox 07 (Annahme Tech Lead in der Goal-Datei). Bis zum Merge meldet ein `--check` von `dev` die
   Abweichung `sandboxd.mjs`. Endet das Goal ohne PASS, rollt der Maker den Stand von `origin/dev` mit `setup.sh` zurück.
+- **Punkt 3 läuft im Loop-Audit nie** (Tech Lead, 21.11.2026, PRO-26356). `bash ops/sandbox/probe.sh <IP>` und
+  `bash ops/sandbox/setup.sh --check <IP>` melden sich als root am Sandbox-Host mit den Sandboxes der Kunden an, legen dort Sandboxes
+  an, schreiben eine Datei und löschen beides wieder; das ist ein schreibender Live-Lauf. Das Audit streicht beide vor dem Lauf und
+  berichtet `- NICHT GELAUFEN sandbox 12 Punkt 3: <Befehl> (verschickt oder läuft live, nie im Audit)`, wie schon bei sandbox 02
+  Punkt 4 und sandbox 07 Punkt 4. Am 20.11.2026 lief `probe.sh` aus diesem Punkt trotzdem live und stand als GRÜN im Bericht
+  (`goals/_vorschlaege/sandbox-redteam-2026-11-21-1.md`); die Regel dazu steht seitdem im Skill `loop-regeln`, Loop-Audit.
