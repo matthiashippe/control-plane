@@ -7,9 +7,13 @@
 # Live mode builds the runtime in ${RUNTIME_DIR:-$HOME/.cache/control-plane/automaton-d8f8168} (clone of
 # Conway-Research/automaton, checkout of the pin, pnpm install --frozen-lockfile, pnpm build; no Docker on the
 # code-host), and before the walk checks that `git rev-parse HEAD` starts with the pin, `git status --porcelain` is
-# empty and dist/ (ignored by git) is the stamped build: after each build one line "<HEAD> <dist_sum>" goes to
-# $(git rev-parse --absolute-git-dir)/control-plane-dist.sha256, and a missing or other stamp, or another checksum over
-# dist/, ends with FAIL dist/ and makes the next live run rebuild dist/. Only then the runtime is unchanged. Then harness/e2e/sandbox-walk.mjs (the runtime's own client and tools) runs with
+# empty and dist/ and node_modules/ (both ignored by git) are the stamped install and build: after each build one line
+# "<HEAD> <dist_sum> <deps_sum>" goes to $(git rev-parse --absolute-git-dir)/control-plane-dist.sha256. A missing or
+# other stamp, or another checksum over dist/, ends with FAIL dist/ and makes the next live run rebuild dist/. A third
+# field that is missing (old stamp) or is not the checksum over node_modules/ (files and symlinks, the packages the
+# runtime loads) ends with FAIL node_modules/ and makes the next live run delete node_modules/ and dist/, then run
+# pnpm install --frozen-lockfile and pnpm build again. Only then the runtime is unchanged. Then
+# harness/e2e/sandbox-walk.mjs (the runtime's own client and tools) runs with
 # LIVE_SANDBOX_KEY from ~/.config/control-plane/live-sandbox.env, the own account of the live check, paid from the
 # credits it has. Then the ledger of production over CP_SSH_KEY from ~/.config/control-plane/loop.env, opened with
 # `readonly: true` inside the container, like ops/live.sh: only two numbers leave it, the rows of kind sandbox for this
@@ -65,6 +69,18 @@ dist_sum() {
   echo "${list%% *}"
 }
 
+# The checksum over node_modules/ of the clone in $1: every regular file with content and path relative to $1 like
+# dist_sum, plus every symlink with path and target (pnpm links the packages into its virtual store node_modules/.pnpm/,
+# so a link to another version changes no file), each list sorted with LC_ALL=C, and sha256sum over both.
+deps_sum() {
+  local dir="$1" files links list
+  [ -d "$dir/node_modules" ] || { echo none; return 0; }
+  files="$(cd "$dir" && find node_modules -type f -print0 | LC_ALL=C sort -z | xargs -0 -r sha256sum)" || return 1
+  links="$(cd "$dir" && find node_modules -type l -printf '%p -> %l\n' | LC_ALL=C sort)" || return 1
+  list="$(printf '%s\n--- links\n%s\n' "$files" "$links" | sha256sum)"
+  echo "${list%% *}"
+}
+
 # The stamp of the clone in $1: inside its git directory, so `git status --porcelain` stays empty and it moves with the clone.
 dist_stamp_file() {
   local gitdir
@@ -72,19 +88,21 @@ dist_stamp_file() {
   echo "$gitdir/control-plane-dist.sha256"
 }
 
-# Writes the one line "<git rev-parse HEAD> <dist_sum>" for the clone in $1, after each build.
+# Writes the one line "<git rev-parse HEAD> <dist_sum> <deps_sum>" for the clone in $1, after each build.
 write_dist_stamp() {
-  local dir="$1" head sum file
+  local dir="$1" head sum deps file
   head="$(git -C "$dir" rev-parse HEAD 2>/dev/null)" || return 1
   sum="$(dist_sum "$dir")" || return 1
+  deps="$(deps_sum "$dir")" || return 1
   file="$(dist_stamp_file "$dir")" || return 1
-  printf '%s %s\n' "$head" "$sum" >"$file"
+  printf '%s %s %s\n' "$head" "$sum" "$deps" >"$file"
 }
 
-# ok | missing | commit | changed | unbuilt | dist, for the clone in $1 against the pin $2. dist: dist/ is not the stamped
-# build at HEAD (no stamp, a stamp of another commit, or another checksum).
+# ok | missing | commit | changed | unbuilt | dist | deps, for the clone in $1 against the pin $2. dist: dist/ is not the
+# stamped build at HEAD (no stamp, a stamp of another commit, or another checksum). deps: node_modules/ is not the stamped
+# install (third field of the stamp missing, as in a stamp of the old format, or another checksum).
 runtime_state() {
-  local dir="$1" pin="$2" head porcelain stamp line=""
+  local dir="$1" pin="$2" head porcelain stamp line="" s_head="" s_dist="" s_deps=""
   [ -d "$dir/.git" ] || { echo missing; return; }
   head="$(git -C "$dir" rev-parse HEAD 2>/dev/null)" || { echo missing; return; }
   [[ -n "$pin" && "$head" == "$pin"* ]] || { echo commit; return; }
@@ -93,7 +111,9 @@ runtime_state() {
   [ -f "$dir/dist/conway/client.js" ] && [ -f "$dir/dist/agent/tools.js" ] || { echo unbuilt; return; }
   stamp="$(dist_stamp_file "$dir")" || { echo dist; return; }
   [ -f "$stamp" ] && read -r line <"$stamp"
-  [ "$line" = "$head $(dist_sum "$dir")" ] || { echo dist; return; }
+  read -r s_head s_dist s_deps _ <<<"$line"
+  [ -n "$s_head" ] && [ "$s_head $s_dist" = "$head $(dist_sum "$dir")" ] || { echo dist; return; }
+  [ -n "$s_deps" ] && [ "$s_deps" = "$(deps_sum "$dir")" ] || { echo deps; return; }
   echo ok
 }
 
@@ -104,6 +124,7 @@ judge() {
     commit) echo "RUNTIME SANDBOX FAIL the runtime clone is not at the pin $PIN"; return 1 ;;
     changed) echo "RUNTIME SANDBOX FAIL the runtime clone has changes (git status --porcelain is not empty)"; return 1 ;;
     dist) echo "RUNTIME SANDBOX FAIL dist/ is not the build at the pin"; return 1 ;;
+    deps) echo "RUNTIME SANDBOX FAIL node_modules/ is not the install at the pin (pnpm install --frozen-lockfile)"; return 1 ;;
     *) echo "RUNTIME SANDBOX FAIL the runtime clone is $1"; return 1 ;;
   esac
   node --input-type=module -e "${JUDGE_JS//__PIN__/$PIN}" "$WALK" "$2" "${3:-}"
@@ -116,9 +137,14 @@ build_runtime() {
   fi
   git -C "$RUNTIME_DIR" checkout -q "$PIN" || return 1
   # Build when dist/ is missing or is not the stamped build at the pin; a clone with changes is left as it is for judge.
-  case "$(runtime_state "$RUNTIME_DIR" "$PIN")" in
-    unbuilt | dist)
+  # When node_modules/ is not the stamped install, install from scratch: pnpm does not see a changed file under
+  # node_modules/ and would report everything up to date.
+  local state
+  state="$(runtime_state "$RUNTIME_DIR" "$PIN")"
+  case "$state" in
+    unbuilt | dist | deps)
       [ -d "$RUNTIME_DIR/.git" ] && rm -rf "$RUNTIME_DIR/dist"
+      [ "$state" = deps ] && [ -d "$RUNTIME_DIR/.git" ] && rm -rf "$RUNTIME_DIR/node_modules"
       (cd "$RUNTIME_DIR" && pnpm install --frozen-lockfile >/dev/null 2>&1 && pnpm build >/dev/null 2>&1) || return 1
       write_dist_stamp "$RUNTIME_DIR" || return 1
       ;;
@@ -194,9 +220,18 @@ selftest() {
   local tmp repo pin bad=0 n=0
   tmp="$(mktemp -d)"
   repo="$tmp/runtime"
-  # A planted clone: one commit, dist/ ignored like at the pin, built files present.
+  # A planted clone: one commit, dist/ and node_modules/ ignored like at the pin, built files and packages present.
+  # The packages like pnpm lays them out: files in the virtual store node_modules/.pnpm/, a symlink node_modules/viem to
+  # one version, and a second version with the same content that only a relinked node_modules/viem would point to.
+  plant_deps() {
+    mkdir -p "$1/node_modules/.pnpm/viem@0.0.0" "$1/node_modules/.pnpm/viem@0.0.1"
+    printf 'export const viem = "planted";\n' >"$1/node_modules/.pnpm/viem@0.0.0/index.js"
+    printf 'export const viem = "planted";\n' >"$1/node_modules/.pnpm/viem@0.0.1/index.js"
+    ln -sfn .pnpm/viem@0.0.0 "$1/node_modules/viem"
+  }
   mkdir -p "$repo/dist/conway" "$repo/dist/agent"
-  printf 'dist\n' >"$repo/.gitignore"
+  plant_deps "$repo"
+  printf 'dist\nnode_modules\n' >"$repo/.gitignore"
   printf 'export const planted = true;\n' >"$repo/index.ts"
   : >"$repo/dist/conway/client.js"
   : >"$repo/dist/agent/tools.js"
@@ -264,6 +299,21 @@ selftest() {
   printf '%s %s\n' 0000000000000000000000000000000000000000 "$(dist_sum "$repo")" >"$(dist_stamp_file "$repo")"
   check dist-other-commit "RUNTIME SANDBOX FAIL dist/ is not the build at the pin" "$(runtime_state "$repo" "$pin")" good "1 0"
   write_dist_stamp "$repo"
+  # node_modules/ is ignored by git as well, and the runtime loads viem and ulid from it: only the third field of the stamp
+  # tells the install at the pin from any other node_modules/.
+  local deps_fail="RUNTIME SANDBOX FAIL node_modules/ is not the install at the pin"
+  printf 'export const viem = "changed";\n' >"$repo/node_modules/.pnpm/viem@0.0.0/index.js"
+  check deps-changed "$deps_fail" "$(runtime_state "$repo" "$pin")" good "1 0"
+  plant_deps "$repo"
+  printf 'x\n' >"$repo/node_modules/.pnpm/viem@0.0.0/extra.js"
+  check deps-added "$deps_fail" "$(runtime_state "$repo" "$pin")" good "1 0"
+  rm -f "$repo/node_modules/.pnpm/viem@0.0.0/extra.js"
+  ln -sfn .pnpm/viem@0.0.1 "$repo/node_modules/viem"
+  check deps-relinked "$deps_fail" "$(runtime_state "$repo" "$pin")" good "1 0"
+  plant_deps "$repo"
+  printf '%s %s\n' "$(git -C "$repo" rev-parse HEAD)" "$(dist_sum "$repo")" >"$(dist_stamp_file "$repo")"
+  check deps-old-stamp "$deps_fail" "$(runtime_state "$repo" "$pin")" good "1 0"
+  write_dist_stamp "$repo"
 
   # build_runtime against the planted clone, with a pnpm that counts its calls and writes the built files on build.
   local calls="$tmp/pnpm.calls" got
@@ -274,6 +324,8 @@ selftest() {
       RUNTIME_DIR="$repo"
       pnpm() {
         echo "$*" >>"$calls"
+        # Like pnpm: an install over an existing node_modules/ sees no changed file and leaves it as it is.
+        [ "${1:-}" = install ] && [ ! -d node_modules ] && plant_deps .
         if [ "${1:-}" = build ]; then
           mkdir -p dist/conway dist/agent
           printf 'export const built = true;\n' >dist/conway/client.js
@@ -299,6 +351,13 @@ selftest() {
   build_case
   got="builds=$(grep -c '^build$' "$calls") stale=$([ -e "$repo/dist/stale.js" ] && echo kept || echo gone) state=$(runtime_state "$repo" "$pin")"
   if [ "$got" = "builds=1 stale=gone state=ok" ] && ! grep -q failed "$calls"; then echo "ok   rebuild-drops-stale: $got"; else echo "FAIL rebuild-drops-stale: expected 'builds=1 stale=gone state=ok', got '$got'"; bad=$((bad + 1)); fi
+
+  # A changed file under node_modules/: pnpm alone would call the install up to date, so build_runtime installs from scratch.
+  n=$((n + 1))
+  printf 'export const viem = "changed";\n' >"$repo/node_modules/.pnpm/viem@0.0.0/index.js"
+  build_case
+  got="installs=$(grep -c '^install --frozen-lockfile$' "$calls") builds=$(grep -c '^build$' "$calls") planted=$(grep -q changed "$repo/node_modules/.pnpm/viem@0.0.0/index.js" && echo kept || echo gone) state=$(runtime_state "$repo" "$pin")"
+  if [ "$got" = "installs=1 builds=1 planted=gone state=ok" ] && ! grep -q failed "$calls"; then echo "ok   rebuild-changed-deps: $got"; else echo "FAIL rebuild-changed-deps: expected 'installs=1 builds=1 planted=gone state=ok', got '$got'"; bad=$((bad + 1)); fi
 
   rm -f "$repo/dist/agent/tools.js"
   check unbuilt "RUNTIME SANDBOX FAIL the runtime clone is unbuilt" "$(runtime_state "$repo" "$pin")" good "1 0"
