@@ -21,6 +21,10 @@ STATE_FILE="${CP_WATCHDOG_STATE:-/var/lib/cp-watchdog.state}"
 WEBHOOK="${CP_ALERT_WEBHOOK:-}"
 CERT_WARN_DAYS="${CP_CERT_WARN_DAYS:-20}"
 CREDIT_TIMEOUT="${CP_CREDIT_TIMEOUT:-45}"
+# The sandbox server, the same way src/sandbox/ reaches it (SANDBOXD_URL_DEFAULT in src/sandbox/client.ts). Its Caddy lets only
+# the payment server through, so the watchdog needs no key for the two unsigned health routes.
+SANDBOXD_URL="${CP_SANDBOXD_URL:-https://ctl.sbx.postyourprice.com}"
+SANDBOXD_PAUSE="${CP_SANDBOXD_PAUSE:-20}"
 TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
 # The one POST to the webhook, for every message of this script. Exits non-zero when the POST failed: no answer or an
@@ -161,6 +165,64 @@ check_credit() {
   esac
 }
 
+# One GET to sandboxd with two attempts and a pause, like check_health. Sets SBX_CODE (000 without an answer) and SBX_BODY.
+sandboxd_get() {
+  local out attempt
+  for attempt in 1 2; do
+    out=$(curl -s -m 20 -w '\n%{http_code}' "$SANDBOXD_URL$1" 2>/dev/null)
+    SBX_CODE=${out##*$'\n'}
+    if [[ "$out" == *$'\n'* ]]; then SBX_BODY=${out%$'\n'*}; else SBX_BODY=""; fi
+    [[ "$SBX_CODE" =~ ^[0-9]{3}$ ]] || SBX_CODE=000
+    [[ "$SBX_CODE" == "200" ]] && return 0
+    [[ $attempt -eq 1 ]] && sleep "$SANDBOXD_PAUSE"
+  done
+  return 0
+}
+
+# The sandbox server. Until now the first foreign automaton that wanted a sandbox noticed an outage of sandboxd or a base image
+# the prune cron had removed, as 501. It asks /healthz and, when that answers 200, /healthz/image (ops/sandbox/sandboxd.mjs).
+# The verdict comes from the status code, the text only goes into the message: `ok`, `image` (503 on /healthz/image) or `down`
+# (any other answer). Like the other checks it reports the change only, and stores the new state only after the POST went
+# through, so the next run reports a lost message again. It runs after the health verdict: while the payment service is down
+# nobody can create a sandbox, and the outage alarm is already out.
+check_sandboxd() {
+  local previous now text posted=1
+  previous=$(cat "${STATE_FILE}.sandboxd" 2>/dev/null || echo "unknown")
+  sandboxd_get /healthz
+  if [[ "$SBX_CODE" != "200" ]]; then
+    now="down"
+    text="sandboxd unreachable (HTTP $SBX_CODE, twice in a row), every new sandbox fails with 501"
+  else
+    sandboxd_get /healthz/image
+    case "$SBX_CODE" in
+      200) now="ok" ;;
+      503)
+        now="image"
+        if [[ "$SBX_BODY" == *"image unpinned"* ]]; then
+          text="sandboxd base image not pinned, the prune cron removes it within 24 h, run ops/sandbox/setup.sh"
+        else
+          text="sandboxd base image missing, every new sandbox fails with 501"
+        fi ;;
+      *)
+        now="down"
+        text="sandboxd unreachable (HTTP $SBX_CODE on /healthz/image, twice in a row), every new sandbox fails with 501" ;;
+    esac
+  fi
+  if [[ "$now" == "ok" ]]; then
+    if [[ "$previous" == "down" || "$previous" == "image" ]]; then
+      report "OK" "sandboxd back, base image pinned" || posted=0
+    else
+      echo "$TS [INFO] sandboxd: ok"
+    fi
+  elif [[ "$now" == "$previous" ]]; then
+    echo "$TS [INFO] sandboxd: still $now"
+  else
+    report "WARN" "$text" || posted=0
+  fi
+  [[ $posted == 1 ]] && { echo "$now" > "${STATE_FILE}.sandboxd" 2>/dev/null || true; }
+  return 0
+}
+
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 check_credit
 sign_of_life
@@ -181,6 +243,8 @@ else
   docker ps -a --filter "name=deploy-" --format "{{.Names}} {{.Status}}" 2>/dev/null | sed "s/^/$TS [INFO] /"
   exit 1
 fi
+
+check_sandboxd
 
 # Certificate: `openssl -checkend` instead of date arithmetic, because `date -d` only exists on GNU
 # and the script should run on a Mac as well. Report only once a day, otherwise the warning turns
