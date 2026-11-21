@@ -181,7 +181,8 @@ Der private Schlüssel verlässt das Volume nie, und ein Rollout über `deploy.y
 antwortet das Control Plane wie heute mit 501, es startet also nichts halb.
 
 Signaturformat, Byte für Byte (gebaut in `ops/sandbox/sandboxd.mjs`, `canonicalMessage` und `signRequest`, die sandbox 03 und die
-Messung wiederverwenden). Jede Anfrage außer `GET /healthz` trägt zwei Header: `X-CP-Timestamp` ist die Unix-Zeit in ganzen Sekunden
+Messung wiederverwenden). Jede Anfrage außer `GET /healthz` und `GET /healthz/image` (hosting 05: 200 `image ok` oder 503 `image missing` oder
+`image unpinned` nach der Regel von `pin_fact`, gefragt von `ops/watchdog.sh`) trägt zwei Header: `X-CP-Timestamp` ist die Unix-Zeit in ganzen Sekunden
 als Dezimalzahl in ASCII, `X-CP-Signature` ist die 64 Byte lange Ed25519-Signatur in Standard-Base64 mit `=` am Ende (88 Zeichen).
 Signiert werden die UTF-8-Bytes von vier Zeilen, getrennt durch genau ein `\n` (0x0a) und ohne Zeilenumbruch am Ende: Methode in
 Großbuchstaben, Pfad genau so, wie er in der Anfragezeile steht (Pfad samt `?query`, ohne Schema und Host, Caddy reicht ihn
