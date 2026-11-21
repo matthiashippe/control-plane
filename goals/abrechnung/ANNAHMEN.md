@@ -164,3 +164,15 @@
   höher meldet als am 11.11.2026 gemessen; der Tag wird `noise`, und das Werkzeug schätzt für das Modell nichts. Die Zeile nennt darum
   keine Zahl und daneben die Messung ohne den 10.11. Die Toleranz bleibt 1000 mc, weil eine nachträgliche Korrektur des Anbieters
   genau der Fall ist, den `noise` anzeigen soll.
+
+## Goal 07 (21.11.2026, Engineer CP)
+
+- **Ende der Anfrage ist `ts`, nicht `ts` plus `duration`:** Der Kontext des Goals nennt das Ende `ts` plus `duration`. Caddy schreibt
+  die Zeile des Zugriffslogs aber erst, wenn die Antwort fertig ist; `ts` ist also das Ende und `ts` minus `duration` der Beginn. So
+  liest es schon `ops/timeout-quote.sh` (`end: j.ts, start: j.ts - j.duration`), und darauf beruht der Abgleich, der in abrechnung 05
+  alle 1220 Anfragen ihrer Ledger-Zeile zuordnete und zwei Zeilen „je 1 ms neben der Anfrage geschrieben“ fand. Mit `ts` plus
+  `duration` läge das Ende einer Anfrage von 50 s um 50 s zu spät. `ops/answer-quote.sh` ordnet deshalb nach `ts` ein, wie der
+  Done-Punkt verlangt („nach dem Ende der Anfrage“). Über die sieben Tage ändert das keine Zahl: Die 1393 Antworten mit 503 lagen
+  alle im Ausfall, weit weg von beiden Rändern.
+- **Erste lesbare Zeile:** Für „Log beginnt nach `TQ_SINCE`“ zählt die früheste `ts` aller lesbaren JSON-Zeilen, gleich welcher Pfad,
+  weil auch eine Zeile auf einem anderen Pfad zeigt, dass das Log so weit zurückreicht.
