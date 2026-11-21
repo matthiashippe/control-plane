@@ -121,3 +121,45 @@
   `already_granted` zu liefern. Mit dem unveränderten Stand sind alle 3 grün.
 - **`creditAbortedCharges` bleibt außen vor.** Sie bucht Art `refund` mit eigenen Prüfungen (Summe, Adresse aus den Abbuchungen) und
   ist keine Gutschrift einer Live-Prüfung.
+
+## Goal 05 (21.11.2026, Engineer CP)
+
+- **Widerlegt?** Nein: Am Kopf von `dev` (`b81b347`) fragte `ops/watchdog.sh` den Sandbox-Server nicht; das Wort `sandbox` kam darin
+  nicht vor.
+- **`/healthz` bleibt Byte für Byte.** 200 `ok` wie vorher, weil `test/sandboxd.test.ts` und die Healthchecks des Harness sie lesen;
+  der neue Test prüft es und dass dabei kein Docker-Aufruf läuft. Neu ist `GET /healthz/image`, ebenfalls ohne Signatur: Die Antwort
+  verrät nur den Zustand des Basis-Images, und durch Caddy kommt nur der Zahlungsserver. Jeder andere Pfad, auch
+  `/healthz/image/x`, braucht weiter die Signatur.
+- **Die Regel des Pins steht einmal.** `imageHealth({ imageId, pin })` in `ops/sandbox/sandboxd.mjs` ist eine reine Funktion nach
+  `pin_fact` aus `ops/sandbox/setup.sh`: ohne Image `missing`, `ok` nur bei einem nie gestarteten Pin (`created`) genau dieser
+  Image-ID ohne Label `sandboxd=1`, sonst `unpinned`. Die Route fragt Docker mit denselben zwei Abfragen wie `pin_fact`
+  (`docker image inspect`, `docker container inspect`), je mit 10 s Zeitlimit; scheitert eine, gilt der Teil als fehlend. Der Name
+  des Pins kommt aus `SANDBOXD_PIN` mit Vorgabe `sandboxd-base-pin`, der Test vergleicht sie mit `PIN=` in `setup.sh`.
+  `sandboxd.service` ändert sich nicht.
+- **Der Wächter entscheidet am Statuscode.** `check_sandboxd` fragt `<CP_SANDBOXD_URL>/healthz` und bei 200 `/healthz/image`, je
+  zwei Versuche mit `CP_SANDBOXD_PAUSE` Sekunden Pause (Vorgabe 20, die Tests setzen 0). Zustand in `<state file>.sandboxd`: `ok`,
+  `image` bei 503 auf `/healthz/image`, sonst `down`. Den Text liest er nur für die Meldung (`image unpinned` heißt ungepinnt, alles
+  andere fehlend). Nur der Wechsel geht über `report` hinaus, gespeichert erst nach dem POST; die Titel bleiben `WARN` und `OK`,
+  weil `ops/status.sh` die Meldungen des Wächters an ihren Titeln erkennt. Die Vorgabe von `CP_SANDBOXD_URL` ist
+  `SANDBOXD_URL_DEFAULT` aus `src/sandbox/client.ts`, der Test vergleicht beide.
+- **Abweichung von Entscheidung 3 des Tech Lead: `check_sandboxd` läuft nach dem Health-Urteil, nicht davor.** Der Kontext wollte
+  den Aufruf vor `check_health`, damit die Prüfung auch bei einem Ausfall des Zahlungsdienstes läuft. Das bricht den bestehenden
+  Test `test/watchdog-webhook-fail.test.ts` (Fall OUTAGE): Sein falsches `curl` antwortet jeder URL mit `/health` denselben Code
+  500, also meldete der Wächter dort zusätzlich `sandboxd unreachable`, und der erste, absichtlich gescheiterte POST träfe diese
+  Meldung statt des Ausfalls. Punkt 2 verlangt diesen Test grün und Punkt 6 verbietet, ihn zu ändern. Fachlich verliert der Aufruf
+  danach nichts: Solange der Zahlungsdienst nicht antwortet, legt kein Kunde eine Sandbox an, und der Ausfall ist schon gemeldet.
+  Der Zustand von `sandboxd` bleibt in der Zeit stehen, der erste Lauf nach der Rückkehr meldet einen Wechsel. Ein eigener Fall im
+  neuen Test belegt das (Ausfall des Zahlungsdienstes: keine Anfrage an `sandboxd`, eine Meldung, Zustand unverändert).
+- **Gegenproben.** Der neue Test des Wächters gegen `ops/watchdog.sh` der Merge-Basis: 13 von 13 Fällen rot. Der Test von
+  `sandboxd` gegen eine Kopie, in der `"exited"` statt `"created"` als nie gestartet gilt: 3 rot (Regel, `image ok` und gestarteter
+  Pin). Gegen `sandboxd.mjs` der Merge-Basis (ohne Route und Funktion): 9 von 11 rot, grün blieben nur `/healthz` und die
+  Signaturpflicht anderer Pfade.
+- **Rollout auf den Sandbox-Server** mit `ops/sandbox/setup.sh` vom code-host, vor dem Merge, wie im Goal festgelegt. Vorher am
+  21.11.2026 15:52 UTC `--foreign-sandboxes`: `running=0 foreign=0`, also unterbrach der Neustart keinen Kunden. `--check` meldete
+  genau eine Zeile `CHANGE` für `sandboxd.mjs` und `SETUP CHECK DRIFT changed=1`.
+- **Nachher.** `bash ops/sandbox/setup.sh 72.62.51.224` rollte `sandboxd.mjs` aus und startete `sandboxd` neu, danach meldete
+  `--check` keine Zeile `CHANGE` mehr; der lesende `curl` auf `127.0.0.1:8730/healthz/image` über den Schlüssel von `setup.sh`
+  antwortete `image ok`. Damit fragt der Wächter nach dem nächsten fälligen Deploy eine Route, die der Sandbox-Server kennt.
+
+Nachher: SETUP CHECK OK changed=0, 2026-11-21 15:55 UTC
+Nachher: image ok, 2026-11-21 15:55 UTC
