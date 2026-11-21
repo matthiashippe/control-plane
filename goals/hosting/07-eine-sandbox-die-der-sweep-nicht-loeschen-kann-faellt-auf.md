@@ -1,7 +1,7 @@
 # Hosting Goal 07: Eine Sandbox, die der Sweep nicht löschen kann, fällt auf
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 `sweepAutomatons` in `src/automaton/sweep.ts` meldet jedes gescheiterte Löschen der Sandbox eines Automatons mit Status `failed`
@@ -126,7 +126,7 @@ MVP: Funktion, weil heute eine Sandbox, deren Löschen `sandboxd` dauerhaft able
       Prüfung: `grep -c 'sandbox is gone' test/automaton-sweep-undeleted.test.ts` muss mindestens 1 ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/automaton-sweep-undeleted.test.ts -t 'sandbox is gone'` muss Exit-Code 0 haben.
       Prüfung: `T=$(mktemp -d); git archive HEAD | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; sed -i '0,/clearFailure(r\.id);/s//void 0;/' $T/src/automaton/sweep.ts; (cd $T && PATH=/usr/bin:$PATH pnpm -s vitest run test/automaton-sweep-undeleted.test.ts -t 'sandbox is gone' --reporter=json --outputFile=$T/r.json >/dev/null 2>&1); node -p "JSON.parse(require('fs').readFileSync('$T/r.json','utf8')).numFailedTests"; rm -rf $T` muss mindestens 1 ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Die Gegenproben waren rot, wie sie sollen; die Zeile im Progress Log nennt, womit.
@@ -152,6 +152,7 @@ MVP: Funktion, weil heute eine Sandbox, deren Löschen `sandboxd` dauerhaft able
 - 2026-11-21 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6, 7 gebaut (Log-Zeilen, Zähler im Rückgabewert von `sweepAutomatons`, neue Tabelle für den ersten Fehlschlag, Zahl im DB-Bericht mit Schwelle, Test mit 9 Fällen, Annahmen und Doku); Abweichung von Entscheidung 1: `sweep()` des Service behält `{ removed, interrupted }`, weil `test/sweep-not-on-start.test.ts:96` (Deny List) genau das erwartet und `check` sonst rot war (1 failed), Begründung in `ANNAHMEN.md`. Prüfbefehle: Punkt 1 vitest Exit 0 (21 Tests), Wortsuche leer, Zähler 1; Punkt 2 Wortsuche leer; Punkt 3 1, 1, 0; Punkt 4 Gegenprobe mit altem `src/automaton/sweep.ts` 9 rote Tests von 9, mit altem `ops/db-report.cjs` 4 rote von 9; Punkt 5 beide Suchen leer; Punkt 6 0, 0, leer, 0, 0, 0; Punkt 7 `check` lokal grün in 63 s, PR #350 Jobs `check` SUCCESS und `e2e` SUCCESS am Kopf 4ef4e8a.
 - 2026-11-21 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, 7; `dev` (33697eb) war schon im Branch, kein Merge nötig, kein Code geändert. Prüfbefehle am Kopf 98c0604: Punkt 1 vitest Exit 0 (2 Dateien, 21 Tests), Wortsuche leer, Zähler 1; Punkt 2 Wortsuche leer; Punkt 3 1, 1, 0; Punkt 4 Gegenprobe mit altem Sweep 9 rote Tests, mit altem Bericht 4 rote; Punkt 5 beide Suchen leer; Punkt 6 0, 0, leer, 0, 0, 0; Punkt 7 `check` lokal Exit 0 in 134 s (2546 Tests), PR #350 Job `check` SUCCESS, Job `e2e` SUCCESS.
 - 2026-11-21 Zyklus 3: Punkt 8 aus der Kritik gebaut (neuer Fall: der Betrieb löscht die Sandbox am Sandbox-Server von Hand, die Abrechnung führt sie danach als gelöscht, der nächste Sweep vergisst den Fehlschlag, die Zahl im Bericht fällt von 1 auf 0), Abschluss gemeldet, Punkte 1 bis 8; kein Code unter `src/` geändert. Prüfbefehle am Kopf b3f2f5b: Punkt 1 vitest Exit 0 (22 Tests), Wortsuche leer, Zähler 1; Punkt 2 Wortsuche leer; Punkt 3 1, 1, 0; Punkt 4 Gegenprobe mit altem Sweep 10 rote Tests, mit altem Bericht 5 rote; Punkt 5 beide Suchen leer; Punkt 6 0, 0, leer, 0, 0, 0; Punkt 7 `check` lokal Exit 0 in 92 s (2547 Tests), PR #350 Job `check` SUCCESS, Job `e2e` SUCCESS; Punkt 8 Zähler 2, vitest des neuen Falls Exit 0, Gegenprobe ohne den Zweig für die fehlende Sandbox 1 roter Test.
+- 2026-11-21 Release: PASS K und B (Zyklus 3), DONE.
 
 ## Blockers
 Keine.
