@@ -1,7 +1,7 @@
 # Hosting Goal 05: Ein Ausfall des Sandbox-Servers meldet sich, bevor ein Kunde ihn trifft
 
 ## Status
-PLANNED
+ACTIVE
 
 ## Active Objective
 Der Wächter `ops/watchdog.sh` auf dem Zahlungsserver fragt in jedem Lauf den Sandbox-Server über denselben Weg wie `src/sandbox/`
@@ -168,6 +168,7 @@ weggeräumtes Basis-Image bemerkt, und zwar als 501.
 
 ## Progress Log
 - 2026-11-21 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6, 7 gebaut: sandboxd beantwortet die neue Bildroute nach der Regel von pin_fact, der Wächter fragt sandboxd nach dem Health-Urteil und meldet nur den Wechsel (Abweichung von der Reihenfolge des Kontexts mit Grund in ANNAHMEN.md), Doku in ops/README.md und docs/sandbox/plan.md, Rollout mit setup.sh auf den Sandbox-Server vor dem Merge. Prüfbefehle: Punkt 1 vitest 52 grün, Zähler 1, 1, 1, nichts fehlt, 0; Punkt 2 vitest 13 grün, Zähler 1, nichts fehlt, nichts fehlt, sechs bestehende Wächter-Tests 25 grün; Punkt 3 Gegenprobe Wächter der Merge-Basis 13 rot, Gegenprobe Pin gestartet statt nie gestartet 3 rot, dazu sandboxd.mjs der Merge-Basis 9 von 11 rot; Punkt 4 zwei Nachher-Zeilen, nichts fehlt, 0; Punkt 5 nichts fehlt, 1; Punkt 6 0, 0, 0, 0, 0; Punkt 7 check lokal grün (242 Dateien, 2534 Tests, 261 s), Jobs check und e2e am PR siehe Kommentar.
+- 2026-11-21 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, 7; origin/dev ist die Merge-Basis b81b347, kein Merge nötig, Kopf a1fa727. Prüfbefehle: Punkt 1 vitest 52 grün, Zähler 1, 1, 1, nichts fehlt, 0; Punkt 2 vitest 13 grün, Zähler 1, nichts fehlt, nichts fehlt, sechs bestehende Wächter-Tests 25 grün; Punkt 3 Gegenprobe Wächter der Merge-Basis 13 rot, Gegenprobe Pin gestartet 3 rot; Punkt 4 2, nichts fehlt, 0; Punkt 5 nichts fehlt, 1; Punkt 6 0, 0, 0, 0, 0; Punkt 7 check lokal grün (242 Dateien, 2534 Tests, 136 s), Jobs check und e2e am PR #343 SUCCESS.
 
 ## Blockers
 Keine.
