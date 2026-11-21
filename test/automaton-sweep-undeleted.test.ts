@@ -157,3 +157,39 @@ describe("undeleted_sandboxes in ops/db-report.cjs", () => {
     expect(r.stuck_payments).toBe(0);
   });
 });
+
+describe("a failed automaton whose sandbox is gone at sandboxd", () => {
+  it("drops its row in sweep_failures once the sandbox is gone, and undeleted_sandboxes falls to 0", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "cp-gone-"));
+    const file = path.join(dir, "cp.db");
+    const report = () =>
+      JSON.parse(execFileSync("node", ["ops/db-report.cjs"], { env: { ...process.env, CP_DB_PATH: file }, encoding: "utf-8" })) as Record<string, any>;
+    try {
+      const db = openDb(file);
+      let refused = true;
+      const { w, sweep, id, sandboxId } = await failedWithSandbox(() => (refused ? { status: 500, body: { error: "down" } } : undefined), {
+        db,
+        t0: Date.now() - 2 * HOUR,
+      });
+      expect(await sweep()).toEqual({ removed: 0, interrupted: 0, failed: 1 });
+      expect(failures(w)).toHaveLength(1);
+      expect(report().undeleted_sandboxes).toBe(1);
+
+      // The operator deletes the sandbox by hand at sandboxd, as the threshold in ops/README.md says.
+      refused = false;
+      const gone = await w.client.request("DELETE", `/v1/sandboxes/${sandboxId}`);
+      expect(gone?.status).toBe(200);
+      w.clock.t += STEP;
+      await w.service.tick();
+      expect(w.row(sandboxId)).toMatchObject({ status: "deleted" });
+      expect(w.db.prepare("SELECT status FROM hosted_automatons WHERE id = ?").get(id)).toEqual({ status: "failed" });
+
+      expect(await sweep()).toEqual({ removed: 0, interrupted: 0, failed: 0 });
+      expect(failures(w)).toEqual([]);
+      db.close();
+      expect(report().undeleted_sandboxes).toBe(0);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
