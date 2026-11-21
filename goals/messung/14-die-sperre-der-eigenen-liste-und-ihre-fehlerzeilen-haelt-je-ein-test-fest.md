@@ -1,7 +1,7 @@
 # Messung Goal 14: Die Sperre der eigenen Liste und ihre Fehlerzeilen hält je ein Test fest
 
 ## Status
-PLANNED
+PAUSED
 
 ## Active Objective
 messung 10 hat die Sperre „eine fehlende oder leere eigene Liste hält die Zählung an“ in `own_ips_checked` (`ops/own-ips.sh`)
@@ -162,3 +162,4 @@ des Alarms zählen kann.
 
 ## Blockers
 - keine
+Pause: Kurs-Check 2026-11-21, Testabdeckung von Messwerkzeugen (eine Kopie der Sperre in `ops/keyless-mints.sh`, Fehlerzeilen, Severity-Menge), die keinen Fehler bei Kunden behebt und weder Geld, Daten noch Rechte der Kunden schützt; vor ihm braucht der Loop das Glied, mit dem Kunde 1 wieder zahlt (Vorschlag kunden-kritik-2026-11-21-3), und die erste fremde Sandbox
