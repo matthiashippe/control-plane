@@ -1,7 +1,7 @@
 # Messung Goal 13: Ein Zugriffslog, das nur zum Teil lesbar ist, zählt nie als ganzes
 
 ## Status
-PLANNED
+PAUSED
 
 ## Active Objective
 `ops/access-log.sh` liest am Kopf von `dev` (e506bf8) alle rotierten Dateien und dann `access.log` in einem Aufruf über ssh. In
@@ -181,4 +181,4 @@ und eine kaputte Rotation sonst still weniger fremde Kunden zählt, als da waren
 ## Progress Log
 
 ## Blockers
-- keine
+Pause: Kurs-Check 2026-11-21, Härtung eines Messwerkzeugs gegen eine kaputte Rotation, die noch nie aufgetreten ist, ohne Schutz für Geld, Daten oder Rechte der Kunden; vor ihm braucht der Loop ein Glied, das Kunde 1 wieder zahlen lässt (Vorschlag kunden-kritik-2026-11-21-3)

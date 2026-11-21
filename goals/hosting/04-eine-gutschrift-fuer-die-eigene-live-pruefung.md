@@ -1,7 +1,7 @@
 # Hosting Goal 04: Eine Gutschrift für die eigene Live-Prüfung statt zwei
 
 ## Status
-PLANNED
+PAUSED
 
 ## Active Objective
 Die beiden internen Gutschriften der eigenen Live-Prüfung buchen über eine gemeinsame Funktion: `grantInternal` in
@@ -131,4 +131,4 @@ beiden Kopien landet; die andere bucht dann im schlimmsten Fall bei einem Rollou
 ## Progress Log
 
 ## Blockers
-Keine.
+Pause: Kurs-Check 2026-11-21, Umbau der Gutschrift für die eigene Live-Prüfung (Ledger `internal_grant` auf eigene Adressen, kein Kundengeld) aus einem Nacharbeit-Vorschlag ohne Fehler eines echten Nutzers, bringt weder Käufer noch das Abschlusskriterium (erste fremde Sandbox) näher
