@@ -247,3 +247,6 @@ Die Entscheidungen 1 bis 7 des Tech Lead aus der Goal-Datei, so gebaut:
    `sweepAutomatons` kommt (Fall „leaves a start that still runs in this process alone“); die Fälle über `sweep()` des Service bleiben
    wegen der Abweichung unter 1 unverändert, auch „changes no row and does not throw while sandboxd does not answer“. Jeder andere Test
    unter `test/` bleibt, wie er ist.
+- Entscheidung: Die Abweichung unter 1 bleibt, `sweep()` des Service gibt weiter `{ removed, interrupted }` zurück, weil die Runde
+  der Abrechnung das Ergebnis nicht liest, Log-Zeile, Zähler und Tabelle in `sweepAutomatons` wirken und eine Änderung an
+  `test/sweep-not-on-start.test.ts` die Deny List bricht, ohne dem Betrieb etwas zu zeigen (Tech Lead, 21.11.2026).

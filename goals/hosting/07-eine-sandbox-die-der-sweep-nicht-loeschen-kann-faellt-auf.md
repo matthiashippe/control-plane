@@ -116,6 +116,16 @@ MVP: Funktion, weil heute eine Sandbox, deren Löschen `sandboxd` dauerhaft able
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung (Netz): `n=$(gh pr list -R matthiashippe/control-plane --head goal/hosting-07 --state all --json number -q '.[0].number'); gh pr checks "${n:?}" -R matthiashippe/control-plane --json name,state -q '.[] | select(.name=="check") | .state'` muss `SUCCESS` ausgeben.
       Prüfung (Netz): `n=$(gh pr list -R matthiashippe/control-plane --head goal/hosting-07 --state all --json number -q '.[0].number'); gh pr checks "${n:?}" -R matthiashippe/control-plane --json name,state -q '.[] | select(.name=="e2e") | .state'` muss `SUCCESS` ausgeben.
+- [ ] Verschwindet die Sandbox eines Automatons mit Status `failed` aus `sandboxes` (etwa weil der Betrieb sie nach der Schwelle in
+      `ops/README.md` auf dem Sandbox-Server von Hand löscht und die Abrechnungsrunde sie danach als `deleted` führt), löscht der
+      nächste Sweep ihre Zeile in `sweep_failures`, und `undeleted_sandboxes` im Bericht fällt auf 0. Ein Fall in
+      `test/automaton-sweep-undeleted.test.ts`, dessen Name `sandbox is gone` enthält, belegt das über den echten Weg (Tick der
+      Abrechnung mit einem `sandboxd`, das die Sandbox nicht mehr listet, dann `sweepAutomatons`, dann der Bericht über `CP_DB_PATH`).
+      MVP: Funktion, weil sonst genau die Sandbox, die der Betrieb nach dem Alarm aufgeräumt hat, für immer weiter als Befund zählt und
+      der Alarm danach niemanden mehr erreicht.
+      Prüfung: `grep -c 'sandbox is gone' test/automaton-sweep-undeleted.test.ts` muss mindestens 1 ausgeben.
+      Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/automaton-sweep-undeleted.test.ts -t 'sandbox is gone'` muss Exit-Code 0 haben.
+      Prüfung: `T=$(mktemp -d); git archive HEAD | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; sed -i '0,/clearFailure(r\.id);/s//void 0;/' $T/src/automaton/sweep.ts; (cd $T && PATH=/usr/bin:$PATH pnpm -s vitest run test/automaton-sweep-undeleted.test.ts -t 'sandbox is gone' --reporter=json --outputFile=$T/r.json >/dev/null 2>&1); node -p "JSON.parse(require('fs').readFileSync('$T/r.json','utf8')).numFailedTests"; rm -rf $T` muss mindestens 1 ausgeben.
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
