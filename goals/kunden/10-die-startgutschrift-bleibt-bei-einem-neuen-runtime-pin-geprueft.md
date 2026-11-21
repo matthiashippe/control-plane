@@ -1,7 +1,7 @@
 # Kunden Goal 10: Die Startgutschrift bleibt bei einem neuen Runtime-Pin geprüft
 
 ## Status
-PLANNED
+PAUSED
 
 ## Active Objective
 Der Auslöser aus kunden 06 hängt am Schlüsselnamen `conway-automaton`, den die Runtime am Pin `d8f8168` bei der Anmeldung über SIWE
@@ -85,3 +85,4 @@ MVP: Funktion, weil eine Runtime ohne Gutschrift nie denkt und damit nie zahlt, 
 ## Progress Log
 
 ## Blockers
+Pause: Kurs-Check 2026-11-21, reine Testpflege für einen Pin-Wechsel, der nicht ansteht (Pin d8f8168 bleibt, die Gutschrift aus kunden 06 ist mit Tests belegt); vor ihm laufen kunden 08 und 09, die an zahlenden Kunden messen
