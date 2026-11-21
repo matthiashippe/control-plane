@@ -1,7 +1,7 @@
 # Abrechnung Goal 07: Neben der Timeout-Quote steht die Antwortquote
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Wer bei uns liest, dass seine Anfragen ankommen, bekommt eine Zahl, die auch unsere Ausfälle zählt. Heute zählt `Quote nach außen:` in
@@ -129,7 +129,7 @@ Anfragen im Zeitraum abgewiesen wurde.
       Prüfung: `git diff --name-only origin/dev...HEAD -- src deploy | wc -l` muss 0 ausgeben.
       Prüfung: `git diff --name-only origin/dev...HEAD -- ops/timeout-quote.sh ops/abort-purchase.sh | wc -l` muss 0 ausgeben.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Die beiden verfälschten Kopien in `test/answer-quote.test.ts` waren mit dem fertigen Skript rot und sind es nach jeder Änderung an
@@ -155,5 +155,6 @@ Anfragen im Zeitraum abgewiesen wurde.
 - 2026-11-21 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5; `dev` ohne neue Commits seit dem Start, nichts zu mergen. Prüfbefehle: Punkt 1 alle 9 (Exit 0 mit `ANSWER QUOTE SELFTEST OK`, je 1, FAIL 0, Adressen 0, access-log 2); Punkt 2 alle 7 (Exit 2, full form 1, Exit 2, Exit 2, answers 0, je 1); Punkt 3 (3, 1, 1, vitest Exit 0 mit 3 Tests); Punkt 4 alle 12 (Netz 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 3, 0); Punkt 5 (0, 0, `check` Exit 0 mit 2507 Tests).
 - 2026-11-21 Release: PASS K und B (Zyklus 2), DONE.
 - 2026-11-21 Zyklus 3: `dev` mit dem Fix #335 (SIGPIPE-Race im Selftest von `ops/traffic.sh`, Ursache des roten `check` am Kopf `f536f4f`) in den Goal-Branch gemergt (`3a649dc`); das Gate verlangt dafür ein Verdict am neuen Kopf, der Goal-Diff gegen `dev` ist unverändert (9 Dateien), Status zurück auf ACTIVE bis zum PASS in Zyklus 3. Prüfbefehle: Punkt 1 alle 9 (Exit 0 mit `ANSWER QUOTE SELFTEST OK`, je 1, FAIL 0, Adressen 0, access-log 2); Punkt 2 alle 7 (Exit 2, full form 1, Exit 2, Exit 2, answers 0, je 1); Punkt 3 (3, 1, 1, vitest Exit 0); Punkt 4 alle 12 (Netz 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 3, 0); Punkt 5 (0, 0, `check` Exit 0 mit 2507 Tests); am PR `check` und `e2e` grün (Lauf 44891207059).
+- 2026-11-21 Release: PASS K und B (Zyklus 3), DONE.
 
 ## Blockers
