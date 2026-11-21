@@ -215,7 +215,14 @@ Die Entscheidungen 1 bis 7 des Tech Lead aus der Goal-Datei, so gebaut:
    ist heute immer (501), weil `remove` in `src/sandbox/service.ts` jede Antwort außer 200 und 404 und jeden Ausfall in 501
    `sandbox_server_unreachable` faltet. Grund: Zum Handeln reicht dem Betrieb „nicht gelöscht“, die Ursache steht im Log von
    `sandboxd`; `remove` bleibt unverändert, weil seine 501 auch die Antwort von `DELETE /v1/automatons/{id}` ist. Der Rückgabewert von
-   `sweepAutomatons` und `sweep()` ist jetzt `{ removed, interrupted, failed }` (Typ `SweepResult`).
+   `sweepAutomatons` ist jetzt `{ removed, interrupted, failed }` (Typ `SweepResult`).
+   **Abweichung:** `sweep()` in `src/automaton/service.ts` gibt weiter nur `{ removed, interrupted }` zurück. Grund:
+   `test/sweep-not-on-start.test.ts:96` erwartet genau `{ removed: 2, interrupted: 1 }` von `sweep()`, die Datei steht auf der Deny
+   List (bestehende Dateien unter `test/` außer `test/automaton-sweep.test.ts`), und mit `failed` im Ergebnis war `check` rot
+   (1 failed, 2545 passed, 21.11.2026). Die Runde der Abrechnung (`src/sandbox/round.ts`) liest das Ergebnis nicht; Meldung, Zähler
+   und Tabelle wirken in `sweepAutomatons` unverändert. Der neue Test ruft darum `sweepAutomatons` direkt, wie die Runde es über
+   `sweep()` tut. Soll `sweep()` `failed` doch zurückgeben, braucht es dafür die eine Zeile in `test/sweep-not-on-start.test.ts`,
+   also eine Entscheidung des Tech Lead über die Deny List.
 2. **Abfrage im Weg `active`.** Antwortet die Abfrage mit `PROBE_COMMAND` nicht mit 200, steht im Log die Zeile mit `could not ask`
    und dem Status. Sie zählt nicht in `failed`, weil dort noch keine Sandbox als verwaist feststeht; die Zeile bleibt `active`.
 3. **Eigene Tabelle `sweep_failures`** (`automaton_id` als Primärschlüssel, `sandbox_id`, `first_failed_at`, `last_status`) mit
@@ -231,10 +238,12 @@ Die Entscheidungen 1 bis 7 des Tech Lead aus der Goal-Datei, so gebaut:
    (Log lesen, `sandboxd` prüfen, Ursache in `STATE.md`) und dem Hinweis, dass `null` vor dem Deploy kein Befund ist. Grund: Die
    Ops-Triage liest nur diese Tabelle.
 6. **Test.** `test/automaton-sweep-undeleted.test.ts` mit `automatonWorld` und umschaltbarem `answer`: Ablehnung mit 500 und mit 409
-   (je `failed: 1`, die Zeile mit `(501)`, eine Zeile in `sweep_failures`), zweiter Sweep eine Stunde später lässt `first_failed_at`
+   über `sweepAutomatons` (je `failed: 1`, die Zeile mit `(501)`, eine Zeile in `sweep_failures`), zweiter Sweep eine Stunde später lässt `first_failed_at`
    stehen, Rückkehr mit 200 gibt `failed: 0` und löscht die Zeile, danach eine halbe Stunde ohne Ledger-Zeile der Sandbox, die
    Abfrage mit 503 auf `exec` schreibt die Zeile `could not ask` und zählt 0, und der Bericht über `CP_DB_PATH` (1 nach zwei Stunden,
    0 nach 30 Minuten, 0 nach `deleted`, `null` ohne Tabelle). Für den Bericht läuft die Welt mit `t0` zwei Stunden oder 30 Minuten vor
    der echten Uhr, weil `db-report.cjs` mit `Date.now()` rechnet; so legt der echte Sweep die Zeile an, statt dass der Test sie setzt.
-7. **Bestehende Tests.** In `test/automaton-sweep.test.ts` kam nur `failed: <n>` in die erwarteten Rückgabewerte, `failed: 1` genau
-   im Fall „changes no row and does not throw while sandboxd does not answer“ (dort lehnt `sandboxd` mit 503 ab), sonst `failed: 0`.
+7. **Bestehende Tests.** In `test/automaton-sweep.test.ts` kam nur `failed: 0` in den einen erwarteten Rückgabewert, der direkt von
+   `sweepAutomatons` kommt (Fall „leaves a start that still runs in this process alone“); die Fälle über `sweep()` des Service bleiben
+   wegen der Abweichung unter 1 unverändert, auch „changes no row and does not throw while sandboxd does not answer“. Jeder andere Test
+   unter `test/` bleibt, wie er ist.

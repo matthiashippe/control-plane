@@ -20,7 +20,7 @@ import type { Reply, SandboxService } from "../sandbox/service.js";
 import { createAutomatonKey, isAutomatonKey, revokeAutomatonKey } from "./keys.js";
 import { START_TIMEOUT_MS, TURN_PATTERN } from "./runtime.js";
 import { buildSetup, SETUP_PATH } from "./setup.js";
-import { sweepAutomatons, type SweepResult } from "./sweep.js";
+import { sweepAutomatons } from "./sweep.js";
 
 export const GENESIS_MAX = 8000;
 export const LOG_LINES = 200;
@@ -112,7 +112,7 @@ export function createAutomatonService(opts: AutomatonServiceOptions) {
 
   /** The ids whose createAs runs in this process right now; the sweep leaves them alone (src/automaton/sweep.ts). */
   const inFlight = new Set<string>();
-  let sweeping: Promise<SweepResult> | null = null;
+  let sweeping: Promise<{ removed: number; interrupted: number }> | null = null;
 
   /** Requests with an Idempotency-Key that are still running in this process, by address and key. */
   const pending = new Map<string, Promise<Reply>>();
@@ -332,11 +332,17 @@ export function createAutomatonService(opts: AutomatonServiceOptions) {
     return reply(200, { ok: true, id, status: "deleted" });
   }
 
-  /** One sweep at a time (src/automaton/sweep.ts); a call while one runs gets that one. Never throws. */
-  function sweep(): Promise<SweepResult> {
-    sweeping ??= sweepAutomatons({ db, sandboxes, now, log, inFlight }).finally(() => {
-      sweeping = null;
-    });
+  /**
+   * One sweep at a time (src/automaton/sweep.ts); a call while one runs gets that one. Never throws. The deletes sandboxd
+   * refused (`failed` of sweepAutomatons, goals/hosting/07) stay out of this result: they reach the operator through the log
+   * line and sweep_failures, and the billing round does not read the result.
+   */
+  function sweep(): Promise<{ removed: number; interrupted: number }> {
+    sweeping ??= sweepAutomatons({ db, sandboxes, now, log, inFlight })
+      .then(({ removed, interrupted }) => ({ removed, interrupted }))
+      .finally(() => {
+        sweeping = null;
+      });
     return sweeping;
   }
 

@@ -12,7 +12,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { openDb } from "../src/db.js";
 import { createAutomatonService, START_TIMEOUT_MS } from "../src/automaton/service.js";
-import { SWEEP_GRACE_MS } from "../src/automaton/sweep.js";
+import { SWEEP_GRACE_MS, sweepAutomatons } from "../src/automaton/sweep.js";
 import { closeWorlds, STEP } from "./sandbox-world.js";
 import { automatonWorld } from "./automaton-world.js";
 
@@ -26,8 +26,14 @@ type Answer = { status: number; body: unknown } | undefined;
 
 function hosted(w: World) {
   const lines: string[] = [];
-  const svc = createAutomatonService({ db: w.db, sandboxes: w.service, publicUrl: () => "https://example.dev", now: () => w.clock.t, log: (l) => lines.push(l) });
-  return { svc, lines };
+  const log = (l: string) => lines.push(l);
+  const svc = createAutomatonService({ db: w.db, sandboxes: w.service, publicUrl: () => "https://example.dev", now: () => w.clock.t, log });
+  /**
+   * One round of the sweep on the clock of the world, as the billing round runs it, with nothing in flight. Called directly
+   * because `sweep()` of the automaton service keeps its result to removed and interrupted (goals/hosting/ANNAHMEN.md, Goal 07).
+   */
+  const sweep = () => sweepAutomatons({ db: w.db, sandboxes: w.service, now: () => w.clock.t, log, inFlight: new Set() });
+  return { svc, sweep, lines };
 }
 
 const failures = (w: World) => w.db.prepare("SELECT * FROM sweep_failures ORDER BY automaton_id").all() as Record<string, any>[];
@@ -53,8 +59,8 @@ describe("a delete the sandbox server refuses", () => {
   ];
   for (const refused of refusals) {
     it(`with status ${refused.status} counts as failed, writes the line and keeps the first failure`, async () => {
-      const { w, svc, lines, id, sandboxId } = await failedWithSandbox(() => refused);
-      expect(await svc.sweep()).toEqual({ removed: 0, interrupted: 0, failed: 1 });
+      const { w, sweep, lines, id, sandboxId } = await failedWithSandbox(() => refused);
+      expect(await sweep()).toEqual({ removed: 0, interrupted: 0, failed: 1 });
       expect(lines).toContain(`[automaton] ${id}: sweep could not delete sandbox ${sandboxId} (501), retrying next round`);
       expect(failures(w)).toEqual([{ automaton_id: id, sandbox_id: sandboxId, first_failed_at: new Date(w.clock.t).toISOString(), last_status: 501 }]);
       expect(w.row(sandboxId)).toMatchObject({ status: "running" });
@@ -62,22 +68,22 @@ describe("a delete the sandbox server refuses", () => {
   }
 
   it("keeps first_failed_at at a second failed sweep an hour later", async () => {
-    const { w, svc, lines, id, sandboxId } = await failedWithSandbox(() => ({ status: 500, body: { error: "down" } }));
-    expect(await svc.sweep()).toEqual({ removed: 0, interrupted: 0, failed: 1 });
+    const { w, sweep, lines, id, sandboxId } = await failedWithSandbox(() => ({ status: 500, body: { error: "down" } }));
+    expect(await sweep()).toEqual({ removed: 0, interrupted: 0, failed: 1 });
     const first = new Date(w.clock.t).toISOString();
     w.clock.t += HOUR;
-    expect(await svc.sweep()).toEqual({ removed: 0, interrupted: 0, failed: 1 });
+    expect(await sweep()).toEqual({ removed: 0, interrupted: 0, failed: 1 });
     expect(failures(w)).toEqual([{ automaton_id: id, sandbox_id: sandboxId, first_failed_at: first, last_status: 501 }]);
     expect(lines.filter((l) => l.includes("sweep could not delete sandbox"))).toHaveLength(2);
   });
 
   it("is forgotten once the delete succeeds, and no ledger row of that sandbox follows for 30 minutes", async () => {
     let down = true;
-    const { w, svc, lines, id, sandboxId } = await failedWithSandbox(() => (down ? { status: 500, body: { error: "down" } } : undefined));
-    expect(await svc.sweep()).toEqual({ removed: 0, interrupted: 0, failed: 1 });
+    const { w, sweep, lines, id, sandboxId } = await failedWithSandbox(() => (down ? { status: 500, body: { error: "down" } } : undefined));
+    expect(await sweep()).toEqual({ removed: 0, interrupted: 0, failed: 1 });
     expect(failures(w)).toHaveLength(1);
     down = false;
-    expect(await svc.sweep()).toEqual({ removed: 1, interrupted: 0, failed: 0 });
+    expect(await sweep()).toEqual({ removed: 1, interrupted: 0, failed: 0 });
     expect(failures(w)).toEqual([]);
     expect(lines).toContain(`[automaton] ${id}: sweep removed the sandbox of a failed automaton`);
     expect(w.row(sandboxId)).toMatchObject({ status: "deleted", hold_mc: 0 });
@@ -95,14 +101,14 @@ describe("a probe the sandbox server does not answer", () => {
     let down = false;
     const w = await automatonWorld({ answer: (m, p) => (down && m === "POST" && p.endsWith("/exec") ? { status: 503, body: { error: "down" } } : undefined) });
     const acct = w.account();
-    const { svc, lines } = hosted(w);
+    const { svc, sweep, lines } = hosted(w);
     const res = await svc.create(acct.address, acct.key, { name: "old", genesis_prompt: PROMPT });
     const id = String(res.body.id);
     const sandboxId = String(res.body.sandbox_id);
     w.db.prepare("UPDATE hosted_automatons SET started_at = NULL WHERE id = ?").run(id);
     w.clock.t += START_TIMEOUT_MS + SWEEP_GRACE_MS + 60_000;
     down = true;
-    expect(await svc.sweep()).toEqual({ removed: 0, interrupted: 0, failed: 0 });
+    expect(await sweep()).toEqual({ removed: 0, interrupted: 0, failed: 0 });
     expect(lines.filter((l) => l.startsWith(`[automaton] ${id}: sweep could not ask sandbox ${sandboxId} (`) && l.endsWith("), retrying next round"))).toHaveLength(1);
     expect(w.db.prepare("SELECT status, started_at FROM hosted_automatons WHERE id = ?").get(id)).toEqual({ status: "active", started_at: null });
     expect(failures(w)).toEqual([]);
@@ -119,8 +125,8 @@ describe("undeleted_sandboxes in ops/db-report.cjs", () => {
     const file = path.join(dir, "cp.db");
     try {
       const db = openDb(file);
-      const { w, svc, id } = await failedWithSandbox(() => ({ status: 500, body: { error: "down" } }), { db, t0: Date.now() - ageMs });
-      expect(await svc.sweep()).toEqual({ removed: 0, interrupted: 0, failed: 1 });
+      const { w, sweep, id } = await failedWithSandbox(() => ({ status: 500, body: { error: "down" } }), { db, t0: Date.now() - ageMs });
+      expect(await sweep()).toEqual({ removed: 0, interrupted: 0, failed: 1 });
       expect(failures(w)).toHaveLength(1);
       fn(db, id);
       db.close();
