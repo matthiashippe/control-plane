@@ -534,6 +534,15 @@ function migrate(db: Db): void {
       created_at       TEXT NOT NULL,
       PRIMARY KEY (address, idempotency_key)
     );
+    -- The first failed delete of the sandbox of a failed automaton (goals/hosting/07): the sweep writes a row when sandboxd does
+    -- not delete it, keeps first_failed_at at every further failure (only last_status changes) and drops the row once the
+    -- delete succeeds or the sandbox is gone. ops/db-report.cjs counts the rows older than an hour as undeleted_sandboxes.
+    CREATE TABLE IF NOT EXISTS sweep_failures (
+      automaton_id     TEXT PRIMARY KEY,
+      sandbox_id       TEXT NOT NULL,
+      first_failed_at  TEXT NOT NULL,
+      last_status      INTEGER NOT NULL
+    );
   `);
   // The end of a start (goals/hosting/01, point 2): createAs sets started_at right after `AUTOMATON_START ok`. An `active` row
   // without it comes from before this column or from a start a restart cut off; src/automaton/sweep.ts tells the two apart.

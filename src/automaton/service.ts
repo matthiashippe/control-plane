@@ -332,11 +332,17 @@ export function createAutomatonService(opts: AutomatonServiceOptions) {
     return reply(200, { ok: true, id, status: "deleted" });
   }
 
-  /** One sweep at a time (src/automaton/sweep.ts); a call while one runs gets that one. Never throws. */
+  /**
+   * One sweep at a time (src/automaton/sweep.ts); a call while one runs gets that one. Never throws. The deletes sandboxd
+   * refused (`failed` of sweepAutomatons, goals/hosting/07) stay out of this result: they reach the operator through the log
+   * line and sweep_failures, and the billing round does not read the result.
+   */
   function sweep(): Promise<{ removed: number; interrupted: number }> {
-    sweeping ??= sweepAutomatons({ db, sandboxes, now, log, inFlight }).finally(() => {
-      sweeping = null;
-    });
+    sweeping ??= sweepAutomatons({ db, sandboxes, now, log, inFlight })
+      .then(({ removed, interrupted }) => ({ removed, interrupted }))
+      .finally(() => {
+        sweeping = null;
+      });
     return sweeping;
   }
 

@@ -61,6 +61,16 @@ zwei Fälle ab:
 Antwortet der Sandbox-Server nicht, ändert der Sweep nichts und versucht es im nächsten Takt wieder; ein Automaton wird nie auf
 Verdacht `failed`.
 
+Still bleibt das nicht (Goal hosting 07). Lehnt der Sandbox-Server das Löschen ab oder ist er nicht erreichbar, schreibt der Sweep
+in jeder Runde ins Log von `cp` die Zeile `[automaton] <id>: sweep could not delete sandbox <sandbox_id> (<status>), retrying next
+round`; `<status>` ist die Antwort von `remove` im Control Plane, heute 501 für Ablehnung (409, 500) wie für Ausfall, die genaue
+Ursache steht im Log von `sandboxd`. Der erste Fehlschlag steht in der Tabelle `sweep_failures`, bis das Löschen gelingt. Bleibt eine
+Sandbox länger als eine Stunde so stehen, zählt `ops/status.sh` sie im Block `db` als `db.undeleted_sandboxes`; die Schwelle steht in
+`ops/README.md` (über 0 heißt: Die Sandbox bucht weiter Credits des Kunden, obwohl kein Automaton in ihr läuft; Zeilen im Log lesen,
+`sandboxd` auf dem Sandbox-Server prüfen, Ursache in `STATE.md`). `null` heißt, die Datenbank ist vom Stand vor diesem Goal. Antwortet
+die Abfrage einer Zeile `active` nicht mit 200, steht `sweep could not ask sandbox <sandbox_id> (<status>), retrying next round` im
+Log; das zählt nicht als Fehlschlag, weil dort noch keine Sandbox als verwaist feststeht.
+
 ## Was in der Sandbox liegt
 
 Das Image `sandboxd-base:2` (`ops/sandbox/image/Dockerfile`) trägt Node 22, die Runtime als Klon am Pin unter `/opt/automaton`

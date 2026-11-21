@@ -11,6 +11,11 @@
  *
  * Never on suspicion: when sandboxd does not answer (the probe or the delete without 200), the row stays as it is and the
  * next round tries again. An error at one row does not hold up the others, and the sweep never throws.
+ *
+ * Never silent (goals/hosting/07): a delete without 200 writes `sweep could not delete sandbox <id> (<status>), retrying next
+ * round`, counts in `failed` and keeps its first failure in `sweep_failures` (first_failed_at stays, last_status changes) until
+ * the delete succeeds or the sandbox is gone; ops/db-report.cjs reports the rows older than an hour as undeleted_sandboxes. A
+ * probe without 200 writes `sweep could not ask sandbox <id> (<status>), retrying next round` and does not count in `failed`.
  */
 import type { Db } from "../db.js";
 import type { SandboxService } from "../sandbox/service.js";
@@ -42,9 +47,16 @@ interface SweepRow {
   created_at: string;
 }
 
-export async function sweepAutomatons(opts: SweepOptions): Promise<{ removed: number; interrupted: number }> {
+export interface SweepResult {
+  removed: number;
+  interrupted: number;
+  /** Deletes of the sandbox of a failed automaton that sandboxd did not confirm in this round. */
+  failed: number;
+}
+
+export async function sweepAutomatons(opts: SweepOptions): Promise<SweepResult> {
   const { db, sandboxes, now, log, inFlight } = opts;
-  const result = { removed: 0, interrupted: 0 };
+  const result: SweepResult = { removed: 0, interrupted: 0, failed: 0 };
   const iso = (ms: number) => new Date(ms).toISOString();
   const setRow = (id: string, fields: Record<string, string>) => {
     const keys = Object.keys(fields);
@@ -54,6 +66,7 @@ export async function sweepAutomatons(opts: SweepOptions): Promise<{ removed: nu
       id,
     );
   };
+  const clearFailure = (id: string) => db.prepare("DELETE FROM sweep_failures WHERE automaton_id = ?").run(id);
   const guard = async (id: string, fn: () => Promise<void>) => {
     try {
       await fn();
@@ -73,7 +86,10 @@ export async function sweepAutomatons(opts: SweepOptions): Promise<{ removed: nu
         if (!Number.isFinite(created) || now() - created <= START_TIMEOUT_MS + SWEEP_GRACE_MS) return;
         if (sandboxes.row(r.address, r.sandbox_id)?.status !== "running") return;
         const res = await sandboxes.exec(r.address, r.sandbox_id, { command: PROBE_COMMAND, timeout: 30_000 }, undefined);
-        if (res.status !== 200) return;
+        if (res.status !== 200) {
+          log(`[automaton] ${r.id}: sweep could not ask sandbox ${r.sandbox_id} (${res.status}), retrying next round`);
+          return;
+        }
         const stdout = String(res.body.stdout ?? "");
         const mark = /^mark=([01])$/m.exec(stdout)?.[1];
         const turns = /^turns=([0-9]+)$/m.exec(stdout)?.[1];
@@ -94,9 +110,22 @@ export async function sweepAutomatons(opts: SweepOptions): Promise<{ removed: nu
       .all() as SweepRow[];
     for (const r of failed) {
       await guard(r.id, async () => {
-        if (inFlight.has(r.id) || !sandboxes.row(r.address, r.sandbox_id!)) return;
+        if (inFlight.has(r.id)) return;
+        if (!sandboxes.row(r.address, r.sandbox_id!)) {
+          clearFailure(r.id);
+          return;
+        }
         const res = await sandboxes.remove(r.address, r.sandbox_id!);
-        if (res.status !== 200) return;
+        if (res.status !== 200) {
+          result.failed += 1;
+          db.prepare(
+            `INSERT INTO sweep_failures (automaton_id, sandbox_id, first_failed_at, last_status) VALUES (?, ?, ?, ?)
+             ON CONFLICT(automaton_id) DO UPDATE SET sandbox_id = excluded.sandbox_id, last_status = excluded.last_status`,
+          ).run(r.id, r.sandbox_id, iso(now()), res.status);
+          log(`[automaton] ${r.id}: sweep could not delete sandbox ${r.sandbox_id} (${res.status}), retrying next round`);
+          return;
+        }
+        clearFailure(r.id);
         result.removed += 1;
         log(`[automaton] ${r.id}: sweep removed the sandbox of a failed automaton`);
       });

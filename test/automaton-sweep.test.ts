@@ -170,7 +170,7 @@ describe("sweepAutomatons", () => {
     expect(await a.svc.sweep()).toEqual({ removed: 0, interrupted: 0 });
     // The same through sweepAutomatons with the set of ids that run in this process.
     const direct = await sweepAutomatons({ db: w.db, sandboxes: w.service, now: () => w.clock.t, log: () => {}, inFlight: new Set([id]) });
-    expect(direct).toEqual({ removed: 0, interrupted: 0 });
+    expect(direct).toEqual({ removed: 0, interrupted: 0, failed: 0 });
     expect(automatonRow(w, id)).toMatchObject({ status: "active", started_at: null });
     expect(keyRevoked(w, id)).toBe(false);
     expect(w.d.sandboxes()[sandboxId].status).toBe("running");
