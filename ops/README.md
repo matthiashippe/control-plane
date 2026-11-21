@@ -128,6 +128,29 @@ A failed POST keeps it and leaves `[WARN] webhook unreachable`; without `CP_ALER
 `[WARN] a deploy alarm is waiting, no webhook set`. The title is the same as that of
 `ops/deploy-alarm.sh`, so `ops/status.sh` does not count it as a message of the watchdog.
 
+The sandbox server is checked as well (`check_sandboxd`), so an outage of `sandboxd` or a base image the prune cron removed
+is heard before the first foreign automaton gets 501 on creating a sandbox. Every run after the health verdict asks
+`<CP_SANDBOXD_URL>/healthz` (default `https://ctl.sbx.postyourprice.com`, the same as `SANDBOXD_URL_DEFAULT` in
+`src/sandbox/client.ts`) and, when that answers 200, `<CP_SANDBOXD_URL>/healthz/image`, each with two attempts
+`CP_SANDBOXD_PAUSE` seconds apart (default 20). Both routes need no signature; the Caddy of the sandbox server lets only the
+payment server through. `/healthz/image` answers 200 `image ok` when the base image exists and its pin (`sandboxd-base-pin`) is a
+never started container of exactly this image, by the rule of `pin_fact` in `ops/sandbox/setup.sh`, and 503 `image missing` or
+`image unpinned` otherwise. The verdict comes from the status code; the state (`ok`, `down` or `image`) lives in
+`<state file>.sandboxd` and only its change is posted, stored after the POST went through:
+
+- `[WARN] sandboxd unreachable (HTTP <code>, twice in a row), every new sandbox fails with 501`: `sandboxd` or the sandbox server
+  does not answer. `bash ops/sandbox/setup.sh --check 72.62.51.224` from the code-host shows what differs from the repo, and
+  `bash ops/sandbox/setup.sh 72.62.51.224` rolls the repo state out again and restarts `sandboxd`.
+- `[WARN] sandboxd base image missing, every new sandbox fails with 501`: the image is gone, every create fails now.
+- `[WARN] sandboxd base image not pinned, the prune cron removes it within 24 h, run ops/sandbox/setup.sh`: the image is still
+  there, but without its pin.
+- `[OK] sandboxd back, base image pinned`: both answer 200 again.
+
+For both image messages `bash ops/sandbox/setup.sh 72.62.51.224` from the code-host restores image and pin; `--check` then shows
+`fact image_pin yes`. While the payment service itself is down the check does not run: nobody can create a sandbox then, and the
+outage is already reported. Every run leaves one line, `[INFO] sandboxd: ok`, `[INFO] sandboxd: still <down|image>` or the
+line of the message.
+
 A delivery in the log only proves that ntfy accepted the POST, and ntfy accepts any topic: with a
 wrong or stale topic in the crontab the watchdog logs a delivery every day and no phone rings. So
 `ops/status.sh` reads the topic back when `CP_ALERT_WEBHOOK` is set in the local environment
