@@ -80,7 +80,7 @@ Anfragen im Zeitraum abgewiesen wurde.
   zu den Bedingungen des Anbieters in Doku oder Code (`check` prüft es).
 
 ## Done Condition
-- [ ] `ops/answer-quote.sh` zählt den Anteil von `POST /v1/chat/completions` mit Status 200 an allen Antworten außer 4xx, nach dem Ende
+- [x] `ops/answer-quote.sh` zählt den Anteil von `POST /v1/chat/completions` mit Status 200 an allen Antworten außer 4xx, nach dem Ende
       der Anfrage im Zeitraum aus `TQ_SINCE` und `TQ_UNTIL`, und gibt `status <code>: <n>` je Status und genau eine Zeile `answers: …`
       aus. Der Selftest läuft ohne Netz und hat die Pflichtfälle aus dem Kontext, darunter je einen für 503 und für 4xx; keine Adresse in
       der Ausgabe.
@@ -93,7 +93,7 @@ Anfragen im Zeitraum abgewiesen wurde.
       Prüfung: `bash ops/answer-quote.sh --selftest | grep -c "^FAIL"` muss 0 ausgeben.
       Prüfung: `bash ops/answer-quote.sh --selftest | grep -cE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b|0x[0-9a-fA-F]{40}"` muss 0 ausgeben.
       Prüfung: `grep -c "ops/access-log.sh" ops/answer-quote.sh` muss mindestens 1 ausgeben.
-- [ ] Das Werkzeug ist nie blind still: Ein Datum ohne Uhrzeit, eine Uhrzeit ohne Zone, ein leeres Log und ein Log, das nach `TQ_SINCE`
+- [x] Das Werkzeug ist nie blind still: Ein Datum ohne Uhrzeit, eine Uhrzeit ohne Zone, ein leeres Log und ein Log, das nach `TQ_SINCE`
       beginnt, enden mit Exit 2, bevor eine Zahl erscheint; ein leerer Rand bleibt erlaubt.
       Prüfung: `TQ_SINCE=2026-11-10T20:27:18Z TQ_UNTIL=2026-11-17 bash ops/answer-quote.sh --files /dev/null` muss Exit-Code 2 haben.
       Prüfung: `TQ_SINCE=2026-11-10T20:27:18Z TQ_UNTIL=2026-11-17 bash ops/answer-quote.sh --files /dev/null 2>&1 | grep -c "full form"` muss mindestens 1 ausgeben.
@@ -102,13 +102,13 @@ Anfragen im Zeitraum abgewiesen wurde.
       Prüfung: `TQ_SINCE=2026-11-10T20:27:18Z TQ_UNTIL=2026-11-17T23:59:59Z bash ops/answer-quote.sh --files /dev/null 2>&1 | grep -c "^answers: "` muss 0 ausgeben.
       Prüfung: `bash ops/answer-quote.sh --selftest | grep -c "^ok   answers period date without time"` muss 1 ausgeben.
       Prüfung: `bash ops/answer-quote.sh --selftest | grep -c "^ok   answers log starts late"` muss 1 ausgeben.
-- [ ] `test/answer-quote.test.ts` fährt den Selftest und zwei verfälschte Kopien des Skripts: Eine, in der 503 herausfällt, endet mit
+- [x] `test/answer-quote.test.ts` fährt den Selftest und zwei verfälschte Kopien des Skripts: Eine, in der 503 herausfällt, endet mit
       `FAIL answers 503 counts against` und Exit 1, eine, in der 4xx mitzählt, mit `FAIL answers 4xx excluded` und Exit 1.
       Prüfung: `grep -cE "^\s*(it|test)\(" test/answer-quote.test.ts` muss mindestens 3 ausgeben.
       Prüfung: `grep -c "FAIL answers 503 counts against" test/answer-quote.test.ts` muss mindestens 1 ausgeben.
       Prüfung: `grep -c "FAIL answers 4xx excluded" test/answer-quote.test.ts` muss mindestens 1 ausgeben.
       Prüfung: `pnpm -s vitest run test/answer-quote.test.ts` muss Exit-Code 0 haben.
-- [ ] Die Antwortquote über die sieben Tage steht neben der Quote: `## Nach sieben Tagen` in `docs/abrechnung/timeouts.md` hat den Befehl
+- [x] Die Antwortquote über die sieben Tage steht neben der Quote: `## Nach sieben Tagen` in `docs/abrechnung/timeouts.md` hat den Befehl
       `TQ_SINCE=2026-11-10T20:27:18Z TQ_UNTIL=2026-11-17T23:59:59Z bash ops/answer-quote.sh`, das Datum der Messung und deren Ausgabe mit
       genau einer Zeile `answers: `; direkt unter `Quote nach außen:` steht genau eine Zeile `Antwortquote nach außen:` mit Zahl, Zeitraum
       und Anfragen oder `keine, weil `, danach genau eine Zeile `Regel nach außen:`, die beide Zeilen und den Zeitraum ohne Ausfall nennt.
@@ -125,7 +125,7 @@ Anfragen im Zeitraum abgewiesen wurde.
       Prüfung: `grep -cE "^Quote nach außen: ([0-9]+,[0-9] % \([0-9]+ von [0-9]+ Anfragen, 10\.11\.2026 20:27 bis 17\.11\.2026 23:59 UTC, Messung service\)|keine, weil )" docs/abrechnung/timeouts.md` muss 1 ausgeben.
       Prüfung: `grep -cE "^- (coalesced|clock|unmatched): [0-9]+" docs/abrechnung/timeouts.md` muss 3 ausgeben.
       Prüfung: `grep -cE "0x[0-9a-fA-F]{40}|\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" docs/abrechnung/timeouts.md` muss 0 ausgeben.
-- [ ] Der Laufzeitpfad und die Werkzeuge von abrechnung 06 bleiben unverändert, und `check` ist grün.
+- [x] Der Laufzeitpfad und die Werkzeuge von abrechnung 06 bleiben unverändert, und `check` ist grün.
       Prüfung: `git diff --name-only origin/dev...HEAD -- src deploy | wc -l` muss 0 ausgeben.
       Prüfung: `git diff --name-only origin/dev...HEAD -- ops/timeout-quote.sh ops/abort-purchase.sh | wc -l` muss 0 ausgeben.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
@@ -151,5 +151,6 @@ Anfragen im Zeitraum abgewiesen wurde.
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-21 Zyklus 1: Punkte 1, 2, 3, 4, 5 gebaut: `ops/answer-quote.sh` mit Selftest (11 Fälle), `test/answer-quote.test.ts`, Messung über die sieben Tage (1197 von 2613, 45,8 %, 1393 mit 503 alle im Ausfall) und die Zeilen `Antwortquote nach außen:` und `Regel nach außen:` in `docs/abrechnung/timeouts.md`; Ende der Anfrage ist `ts` (ANNAHMEN.md). Rot gesehen: der Test mit einem Selftest, dessen 503-Fall nur 200 pflanzt (Fall 2 rot); die Kopie mit `status <= 599` endet mit `FAIL answers 503 counts against` und Exit 1, die mit `false` mit `FAIL answers 4xx excluded` und Exit 1; Gegenprobe auf der Produktionskopie mit vier gepflanzten Zeilen (+1 je 200, 402, 503) und mit gekürztem Log (Exit 2), `jq` zählt je Status gleich. Prüfbefehle: Punkt 1 alle 9 wie erwartet (Exit 0, letzte Zeile OK, je 1, FAIL 0, Adressen 0, access-log 2); Punkt 2 alle 7 (Exit 2, 2, 2, full form 1, answers 0, je 1); Punkt 3 (3, 1, 1, vitest Exit 0); Punkt 4 alle 12 (Netz 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 3, 0); Punkt 5 (0, 0, `check` Exit 0, 2507 Tests grün).
 
 ## Blockers

@@ -87,18 +87,19 @@ production() {
     . "$HOME/.config/control-plane/loop.env"
     set +a
   fi
-  local key="${CP_SSH_KEY:-${CP_DEPLOY_KEY:-}}" dir
+  local key="${CP_SSH_KEY:-${CP_DEPLOY_KEY:-}}"
   if [ -z "${CP_HOST:-}" ] || [ -z "$key" ]; then
     echo "ANSWER QUOTE FAIL: CP_HOST and CP_SSH_KEY are not set (~/.config/control-plane/loop.env)" >&2
     exit 2
   fi
-  dir="$(mktemp -d)"
-  trap 'rm -rf "$dir"' EXIT
-  CP_SSH_KEY="$key" CP_HOST="$CP_HOST" bash "$ROOT/ops/access-log.sh" >"$dir/caddy.jsonl" || {
+  # Global, not local: the EXIT trap runs after this function has returned.
+  AQ_DIR="$(mktemp -d)"
+  trap 'rm -rf "$AQ_DIR"' EXIT
+  CP_SSH_KEY="$key" CP_HOST="$CP_HOST" bash "$ROOT/ops/access-log.sh" >"$AQ_DIR/caddy.jsonl" || {
     echo "ANSWER QUOTE FAIL: access log not readable" >&2
     exit 2
   }
-  count "$dir/caddy.jsonl"
+  count "$AQ_DIR/caddy.jsonl"
 }
 
 selftest() {

@@ -143,6 +143,8 @@ Widerlegt: nein, der Vergleich zählt gleich: beide Messungen und beide Gegenrec
 jede Abweichung einer einzelnen Anfrage hat eine Ursache.
 
 Quote nach außen: 0,0 % (0 von 1220 Anfragen, 10.11.2026 20:27 bis 17.11.2026 23:59 UTC, Messung service), vorher 1,3 % (3 von 224 Anfragen am 10.11.2026 vor dem Rollout, Messung caddy). Aus 0 von 1220 folgt mit 95 % Sicherheit eine Quote unter 0,25 % (3 durch 1220). Die 503 des Ausfalls (oben) zählen nicht mit.
+Antwortquote nach außen: 45,8 % (1197 von 2613 Anfragen, 10.11.2026 20:27 bis 17.11.2026 23:59 UTC, ohne 4xx), davon 1393 mit 503 während des Ausfalls 11.11. 02:01 bis 12.11.2026 08:22 UTC.
+Regel nach außen: Nach außen steht „Quote nach außen“ nur zusammen mit „Antwortquote nach außen“ oder für einen Zeitraum ohne Ausfall; ein Ausfall ist jede Stunde mit einer Antwort 5xx auf `POST /v1/chat/completions`.
 
 **Gegenprobe:** `bash ops/timeout-quote.sh --selftest` verlangt bei gleich zählenden Zeilen die `check`-Zeilen mit gleichen Zahlen
 (`compare check equal`) und bei einem Paar, dessen Anfrage 5 s vor `TQ_UNTIL` endet und dessen Zeile 3 s danach geschrieben wird,
@@ -152,6 +154,35 @@ Klassifikation (eine bediente Wiederholung zählt als Paar, also auch in `servic
 `independent check failed: service openai/gpt-5.2`; die Summenprobe der Ursachen bleibt dabei stumm, weil Ursachen und Abweichung aus
 denselben falschen Klassen gezählt werden. `bash ops/timeout-quote.sh --selftest-scale` fährt 200000 gepflanzte Anfragen samt Zeilen in
 wenigen Sekunden durch den Vergleich; der Abgleich bis abrechnung 04 brauchte dafür 3 min 52 s und endete mit `RangeError`.
+
+**Antwortquote:** Gemessen am 21.11.2026 um 08:38 UTC, nur lesend, vom code-host aus über denselben Zeitraum mit
+
+```
+TQ_SINCE=2026-11-10T20:27:18Z TQ_UNTIL=2026-11-17T23:59:59Z bash ops/answer-quote.sh
+```
+
+```
+period 2026-11-10T20:27:18.000Z to 2026-11-17T23:59:59.000Z
+status 0: 23
+status 200: 1197
+status 401: 4002
+status 402: 7965
+status 404: 1
+status 503: 1393
+answers: 1197 of 2613 (45.8 %), excluded 4xx 11968
+```
+
+Exit 0. Gezählt wird jede Anfrage `POST /v1/chat/completions` nach ihrem Ende: Status 200 zählt für uns, Status 0 (der Client
+brach ab) und jeder 5xx gegen uns, 4xx (401 ohne Anmeldung, 402 ohne Guthaben, 404) fällt heraus, weil es eine Antwort über die
+Anfrage selbst ist. Die 1197 Antworten mit 200 und die 23 Abbrüche sind zusammen die 1220 Anfragen der Quote; die 1393 mit 503 sind
+dieselben wie im Absatz „Ausfall im Zeitraum“ und liegen alle zwischen 11.11.2026 02:01:29 und 12.11.2026 08:22:49 UTC, einen anderen
+5xx gab es im Zeitraum nicht.
+
+**Gegenprobe der Antwortquote:** `jq` zählt über dieselbe Kopie des Logs je Status dieselben Zahlen. Vier gepflanzte Zeilen (503 und
+402 im Zeitraum, 200 genau auf `TQ_UNTIL`, 503 eine Sekunde danach) ergeben `answers: 1198 of 2615 (45.8 %), excluded 4xx 11969`,
+und dieselbe Kopie erst ab 11.11.2026 12:26 UTC endet mit Exit 2 (`access log starts after TQ_SINCE`). `bash ops/answer-quote.sh --selftest`
+pflanzt je Regel einen Fall, `test/answer-quote.test.ts` verfälscht die Statusregel in zwei Kopien (503 fällt heraus, 4xx zählt mit)
+und verlangt je den passenden `FAIL` mit Exit 1.
 
 ## Einkauf ohne Verkauf
 
