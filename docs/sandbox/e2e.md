@@ -42,6 +42,19 @@ eines nicht, endet der Lauf mit `RUNTIME SANDBOX FAIL dist/ is not the build at 
 ganz, damit keine alte Datei in den neuen Stempel gerät, baut neu und schreibt den Stempel; von Hand ist nichts zu tun. Der Cache vom 16.11.2026 hat noch keinen Stempel, der erste Lauf nach
 sandbox 10 baut ihn darum einmal neu (`pnpm install --frozen-lockfile`, `pnpm build`).
 
+## Stempel der Pakete (hosting 06)
+
+Die Runtime lädt `viem` und `ulid` aus `node_modules/`, und auch `node_modules/` ist von Git ignoriert. Seit hosting 06 hat der Stempel
+darum ein drittes Feld: `<HEAD> <Prüfsumme über dist/> <Prüfsumme über node_modules/>`. Die dritte Summe nimmt jede Datei unter
+`node_modules/` mit Inhalt und Pfad und jeden symbolischen Link mit Ziel, weil pnpm die Pakete als Links in `node_modules/.pnpm/`
+legt. Passt sie nicht, oder fehlt das dritte Feld wie in einem Stempel von sandbox 10, endet der Lauf mit
+`RUNTIME SANDBOX FAIL node_modules/ is not the install at the pin`. Der nächste Lauf löscht dann `node_modules/` und `dist/`, ruft
+`pnpm install --frozen-lockfile` und `pnpm build` und schreibt den Stempel neu; von Hand ist nichts zu tun. Gelöscht wird, weil pnpm
+eine veränderte Datei unter `node_modules/` nicht bemerkt. Auch ein Neubau nur wegen `dist/` (kein Stempel, etwa im frischen Cache
+oder nach einem Pin-Wechsel) installiert `node_modules/` von Grund auf, wenn das dritte Feld es nicht belegt, sonst schriebe der neue
+Stempel ein ungeprüftes `node_modules/` fest. Der Selbsttest hat dafür sechs Fälle mehr (33), und
+`test/runtime-sandbox-deps.test.ts` hält ihn in `check`.
+
 ## Was der Harness abdeckt und was nicht
 
 Abgedeckt: der ganze Weg der Runtime durch das Control Plane bis zu `sandboxd` mit echter Signatur (Schlüssel, den `cp` beim ersten
