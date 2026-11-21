@@ -114,8 +114,11 @@ print(max(1, math.ceil((float(sys.argv[2] or time.time()) - min(stamps)) / 3600)
   order_fixture="$(dirname "$fixture")/traffic-order-page.log"
   order_hours=$(fixture_hours "$order_fixture")
   order_run() { CP_PAGES="/ /katalog /check /fix /post" CP_TRAFFIC_LOG="$order_fixture" "$@" "${BASH_SOURCE[0]}" "$order_hours" 2>/dev/null; }
+  # Here-strings, not `printf | grep -q`: grep -q exits on the first match, the next write of the
+  # printf gets SIGPIPE, and with pipefail the pipeline fails although the line is there. That made
+  # this selftest fail intermittently under load in CI (PR #334, 2026-11-21).
   order_want() { # output, extended regex, reason
-    if ! printf '%s' "$1" | /usr/bin/grep -qE -- "$2"; then
+    if ! /usr/bin/grep -qE -- "$2" <<<"$1"; then
       echo "SELFTEST FAILED: the order block no longer says: $2"
       echo "                 ($3)"
       fail=1
@@ -136,7 +139,7 @@ print(max(1, math.ceil((float(sys.argv[2] or time.time()) - min(stamps)) / 3600)
     "two briefs by email against one foreign 303 by IP means one of ours slipped through"
   order_want "$(order_run env CP_ORDER_BRIEFS_30D=1)" "order_briefs_30d = 1, not more than the 1 foreign 303\(s\) here: consistent" \
     "one against one is no finding"
-  if order_run env CP_ORDER_BRIEFS_30D=1 | /usr/bin/grep -q "FINDING"; then
+  if /usr/bin/grep -q "FINDING" <<<"$(order_run env CP_ORDER_BRIEFS_30D=1)"; then
     echo "SELFTEST FAILED: one brief against one foreign 303 must not raise a finding"; fail=1
   fi
   # Foreign browsers on /katalog, and those from the ad (HAN-35, marker src=ads since HAN-91), in
