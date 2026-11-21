@@ -1,7 +1,7 @@
 # Kunden Goal 08: Verdient Kunde 1 Inferenz über Aufträge?
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Kunde 1, der größte zahlende fremde Automaton, hat laut kunden 05 kein Geld für eine Aufladung (`docs/kunden/aufladung-2026-11.md`,
@@ -99,7 +99,7 @@ MVP: Funktion, weil ein Kunde mit über 1000 Anfragen am Tag und ohne USDC sonst
       Prüfung: `grep -oE "^- Weg: src/[A-Za-z0-9_/.-]+\.ts:[0-9]+" docs/kunden/auftraege-2026-11.md | sed 's/^- Weg: //' | while IFS=: read -r p n; do sed -n "${n}p" "$p" | grep -qiE "bount|submi|award|ledger|chat|inference|402" || echo "falsch $p:$n"; done` muss nichts ausgeben.
 - [x] `check` ist grün.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Jeder neue Test war vor dem Werkzeug rot; die Zeile im Progress Log nennt, womit.
@@ -126,5 +126,6 @@ MVP: Funktion, weil ein Kunde mit über 1000 Anfragen am Tag und ohne USDC sonst
 ## Progress Log
 - 2026-11-21 Zyklus 1: Punkte 1, 2, 3, 4 gebaut: `ops/customer-work.sh` mit Zweig `CP_REPORT=customer-work` in `ops/db-report.cjs` und der Zuordnung aus `ops/customer-decline.sh` als `ops/customer_match.py`, Test `test/award-inference.test.ts`, Messung gegen die Produktion in `docs/kunden/auftraege-2026-11.md` (leerer Schritt Einreichen, seit 06.10. kein offener Auftrag), Vorschlag `goals/_vorschlaege/kunden-kritik-2026-11-21-3.md`. Rot gesehen: `test/award-inference.test.ts` mit beiden Tests rot, als `awardBounty` an `bounty.creator` statt an `submission.agent` buchte und die 402 `open_bounties` erst ab 2 nannte; der Selbsttest mit 6 FAIL, als der Zweig die eigenen Aufträge des Kunden mitzählte, nie schloss und nichts uns zuschrieb, und mit 18 FAIL am Stand `origin/dev` von `ops/db-report.cjs` (Mutationen danach zurückgesetzt, `git diff --exit-code src` leer). Standardbericht ohne `CP_REPORT` Byte für Byte gleich mit `origin/dev` (`cmp` auf der gepflanzten Datenbank). Prüfbefehle: Punkt 1 `SELFTEST OK`, submit 4, open 5, award 5, ours 5, Adressen 0, Fixtures 0, `vitest db-report` Exit 0; Punkt 2 `alle`; Punkt 3 `spaet genug`, 1, 1, 8, 1, 1, 1, 1, `belegt`, 0, 0, 4, keine Ausgabe; Punkt 4 `node scripts/check.mjs` Exit 0 (238 Dateien, 2503 Tests).
 - 2026-11-21 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4; `dev` ohne neue Commits seit dem Merge in Zyklus 1, alle Prüfbefehle auf `9aeb79b` neu gefahren. Prüfbefehle: Punkt 1 `SELFTEST OK`, submit 4, open 5, award 5, ours 5, Adressen 0, Fixtures 0, `vitest db-report` Exit 0; Punkt 2 `alle`; Punkt 3 `spaet genug`, 1, 1, 8, 1, 1, 1, 1, `belegt`, 0, 0, 4, keine Ausgabe; Punkt 4 `node scripts/check.mjs` Exit 0 (238 Dateien, 2503 Tests, 204 s); `src/**` unverändert, also kein Laufzeitpfad, Job `e2e` am PR läuft trotzdem mit.
+- 2026-11-21 Release: PASS K und B (Zyklus 2), DONE.
 
 ## Blockers
