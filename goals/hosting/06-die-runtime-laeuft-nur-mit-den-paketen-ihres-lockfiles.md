@@ -1,7 +1,7 @@
 # Hosting Goal 06: Die Runtime im Harness läuft nur mit den Paketen ihres Lockfiles
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 `ops/runtime-sandbox.sh` meldet die Runtime am Pin nur noch als unverändert, wenn neben `dist/` auch `node_modules/` genau die
@@ -133,7 +133,7 @@ verändertes `node_modules/` im Cache heute als Runtime am Pin durchläuft.
       Prüfung: `grep -c 'rebuild-unstamped-deps' test/runtime-sandbox-deps.test.ts` muss mindestens 1 ausgeben.
       Prüfung: `awk '/^## Goal 06/{f=1;next} /^## /{f=0} f' goals/hosting/ANNAHMEN.md | grep -c 'rebuild-unstamped-deps'` muss mindestens 1 ausgeben.
       Prüfung: `T=$(mktemp -d); git archive HEAD | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; git show 5032359:ops/runtime-sandbox.sh > $T/ops/runtime-sandbox.sh; (cd $T && PATH=/usr/bin:$PATH pnpm -s vitest run test/runtime-sandbox-deps.test.ts --reporter=json --outputFile=$T/r.json >/dev/null 2>&1); node -p "JSON.parse(require('fs').readFileSync('$T/r.json','utf8')).numFailedTests"; rm -rf $T` muss mindestens 1 ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Die Gegenproben waren rot, wie sie sollen; die Zeile im Progress Log nennt, womit.
@@ -159,6 +159,7 @@ verändertes `node_modules/` im Cache heute als Runtime am Pin durchläuft.
 - 2026-11-21 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6, 7 gebaut (Summe über `node_modules/` mit Links als drittes Feld des Stempels, Zustand `deps`, Neubau von Grund auf, fünf neue Fälle im Selbsttest, eigener Test, Messung und Annahmen, Doku). Prüfbefehle: Selbsttest 32 Fälle, letzte Zeile OK, Zähler 5, 4, 7 und 1 wie verlangt, keine Zeile FAIL, Wortsuche leer, Zeile des Zustands 1; vitest des neuen Tests Exit 0, Wortsuche leer; Gegenprobe gegen das Skript der Merge-Basis 1 roter Test, gegen die Kopie mit `ok` statt `deps` 1 roter Test; Annahmen Messzeile 1, Wortsuche leer; Kopfkommentar 3 Treffer, Doku 5; Umfang 0, 0, 0, 0, Gedankenstriche 0; `node scripts/check.mjs` Exit 0 (243 Dateien, 2537 Tests), Job `check` an PR #346 SUCCESS. Beim Bau zusätzlich rot gesehen: der neue Test vor den Fällen, `deps-relinked` ohne Links in der Summe, `rebuild-changed-deps` ohne Löschen von `node_modules/` und ohne `deps` im Neubau.
 - 2026-11-21 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, 7; `dev` (3b028f2) ist im Branch, alle Prüfbefehle am Kopf 76037d7 neu ausgeführt. Prüfbefehle: Selbsttest Exit 0, letzte Zeile OK, Zähler 5, 4, 7 und 1, keine Zeile FAIL, Wortsuche leer, Zeile des Zustands 1; vitest des neuen Tests Exit 0 (2 Tests), Wortsuche leer; Gegenprobe gegen das Skript der Merge-Basis 1 roter Test, gegen die Kopie mit `ok` statt `deps` 1 roter Test; Messzeile 1, Wortsuche leer; Kopfkommentar 3, Doku 5; Umfang 0, 0, 0, 0, Gedankenstriche 0; `node scripts/check.mjs` Exit 0; Job `check` an PR #346 SUCCESS.
 - 2026-11-21 Zyklus 3: Punkt 8 aus der Kritik gebaut (`build_runtime` löscht `node_modules/` auch bei `unbuilt` und `dist`, wenn das dritte Feld des Stempels es nicht belegt, Fall `rebuild-unstamped-deps`, Test, Annahme, Doku), Abschluss gemeldet, Punkte 1 bis 8. Prüfbefehle: Fall vorher rot (`planted=kept`), Test vorher rot; Punkt 8 Zähler 1 und 4, Test 1, Annahmen 1, Gegenprobe gegen das Skript von 5032359 1 roter Test; Punkte 1 bis 6 erneut grün (Selbsttest 33 Fälle, Zähler 5, 4, 7, 1, 0 FAIL, Gegenproben gegen Merge-Basis und `ok`-Kopie je 1 rot, Umfang 0, 0, 0, 0, Gedankenstriche 0); `node scripts/check.mjs` Exit 0 (243 Dateien, 2537 Tests).
+- 2026-11-21 Release: PASS K und B (Zyklus 3), DONE.
 
 ## Blockers
 Keine.
