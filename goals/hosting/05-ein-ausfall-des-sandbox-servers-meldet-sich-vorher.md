@@ -1,7 +1,7 @@
 # Hosting Goal 05: Ein Ausfall des Sandbox-Servers meldet sich, bevor ein Kunde ihn trifft
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Der Wächter `ops/watchdog.sh` auf dem Zahlungsserver fragt in jedem Lauf den Sandbox-Server über denselben Weg wie `src/sandbox/`
@@ -151,7 +151,7 @@ weggeräumtes Basis-Image bemerkt, und zwar als 501.
       speichert er als `image`, also gilt der Wechsel als „still image“, obwohl ab da jede neue Sandbox mit 501 scheitert.
       Prüfung: `T=$(mktemp -d); PATH=/usr/bin:$PATH pnpm -s vitest run test/watchdog-sandboxd.test.ts -t "unpinned to missing" --reporter=json --outputFile=$T/r.json >/dev/null 2>&1; node -p "const r=JSON.parse(require('fs').readFileSync('$T/r.json','utf8')); r.numFailedTests===0&&r.numPassedTests>0"; rm -rf $T` muss `true` ausgeben.
       Prüfung: `T=$(mktemp -d); git archive HEAD | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; git show 137b309:ops/watchdog.sh > $T/ops/watchdog.sh; (cd $T && PATH=/usr/bin:$PATH pnpm -s vitest run test/watchdog-sandboxd.test.ts -t "unpinned to missing" --reporter=json --outputFile=$T/r.json >/dev/null 2>&1); node -p "JSON.parse(require('fs').readFileSync('$T/r.json','utf8')).numFailedTests"; rm -rf $T` muss mindestens 1 ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Die Gegenproben waren rot, wie sie sollen; die Zeile im Progress Log nennt, womit.
@@ -178,6 +178,7 @@ weggeräumtes Basis-Image bemerkt, und zwar als 501.
 - 2026-11-21 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6, 7 gebaut: sandboxd beantwortet die neue Bildroute nach der Regel von pin_fact, der Wächter fragt sandboxd nach dem Health-Urteil und meldet nur den Wechsel (Abweichung von der Reihenfolge des Kontexts mit Grund in ANNAHMEN.md), Doku in ops/README.md und docs/sandbox/plan.md, Rollout mit setup.sh auf den Sandbox-Server vor dem Merge. Prüfbefehle: Punkt 1 vitest 52 grün, Zähler 1, 1, 1, nichts fehlt, 0; Punkt 2 vitest 13 grün, Zähler 1, nichts fehlt, nichts fehlt, sechs bestehende Wächter-Tests 25 grün; Punkt 3 Gegenprobe Wächter der Merge-Basis 13 rot, Gegenprobe Pin gestartet statt nie gestartet 3 rot, dazu sandboxd.mjs der Merge-Basis 9 von 11 rot; Punkt 4 zwei Nachher-Zeilen, nichts fehlt, 0; Punkt 5 nichts fehlt, 1; Punkt 6 0, 0, 0, 0, 0; Punkt 7 check lokal grün (242 Dateien, 2534 Tests, 261 s), Jobs check und e2e am PR siehe Kommentar.
 - 2026-11-21 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, 7; origin/dev ist die Merge-Basis b81b347, kein Merge nötig, Kopf a1fa727. Prüfbefehle: Punkt 1 vitest 52 grün, Zähler 1, 1, 1, nichts fehlt, 0; Punkt 2 vitest 13 grün, Zähler 1, nichts fehlt, nichts fehlt, sechs bestehende Wächter-Tests 25 grün; Punkt 3 Gegenprobe Wächter der Merge-Basis 13 rot, Gegenprobe Pin gestartet 3 rot; Punkt 4 2, nichts fehlt, 0; Punkt 5 nichts fehlt, 1; Punkt 6 0, 0, 0, 0, 0; Punkt 7 check lokal grün (242 Dateien, 2534 Tests, 136 s), Jobs check und e2e am PR #343 SUCCESS.
 - 2026-11-21 Zyklus 3: Punkt 8 gebaut, der Wächter speichert ein fehlendes und ein ungepinntes Basis-Image als zwei Zustände und meldet jeden Wechsel zwischen beiden, README und Annahmen nachgezogen, sandboxd.mjs unverändert und daher kein neuer Rollout; origin/dev 052dbad gemergt. Prüfbefehle: Punkt 8 neuer Test grün (true), Gegenprobe mit dem Wächter von 137b309 1 rot; Punkt 1 vitest 52 grün, Zähler 1, 1, 1, nichts fehlt, 0; Punkt 2 vitest 14 grün, Zähler 1, nichts fehlt, nichts fehlt, sechs bestehende Wächter-Tests 25 grün; Punkt 3 Gegenprobe Wächter der Merge-Basis 14 rot, Gegenprobe Pin gestartet 3 rot; Punkt 4 2, nichts fehlt, 0; Punkt 5 nichts fehlt, 1; Punkt 6 0, 0, 0, 0, 0; Punkt 7 check lokal grün nach dem Merge (242 Dateien, 77 s), Jobs am PR siehe Kommentar.
+- 2026-11-21 Release: PASS K und B (Zyklus 3), DONE.
 
 ## Blockers
 Keine.
