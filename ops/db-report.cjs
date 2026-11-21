@@ -1066,4 +1066,17 @@ if (db.prepare("select name from sqlite_master where type = 'table' and name = '
   report.runtime_funnel = { until: untilIso, weeks, total, largest_drop: largestDrop };
 }
 
+// Sandboxes the sweep could not delete (goals/hosting/07): automatons still `failed` whose first failed delete in
+// sweep_failures is more than an hour old. Each of them is a sandbox that may still book credits of its customer without an
+// automaton running in it; the cp log has a line `sweep could not delete sandbox` for every round. null means the table is
+// not there yet (a database from before that goal, opened readonly here, so the report cannot create it), not zero.
+const hasSweepFailures = one("select count(*) n from sqlite_master where type = 'table' and name = 'sweep_failures'").n > 0;
+report.undeleted_sandboxes = hasSweepFailures
+  ? one(
+      `select count(*) n from sweep_failures f join hosted_automatons h on h.id = f.automaton_id
+        where h.status = 'failed' and f.first_failed_at < ?`,
+      new Date(Date.now() - 3600e3).toISOString(),
+    ).n
+  : null;
+
 console.log(JSON.stringify(report));

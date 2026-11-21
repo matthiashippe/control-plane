@@ -20,7 +20,7 @@ import type { Reply, SandboxService } from "../sandbox/service.js";
 import { createAutomatonKey, isAutomatonKey, revokeAutomatonKey } from "./keys.js";
 import { START_TIMEOUT_MS, TURN_PATTERN } from "./runtime.js";
 import { buildSetup, SETUP_PATH } from "./setup.js";
-import { sweepAutomatons } from "./sweep.js";
+import { sweepAutomatons, type SweepResult } from "./sweep.js";
 
 export const GENESIS_MAX = 8000;
 export const LOG_LINES = 200;
@@ -112,7 +112,7 @@ export function createAutomatonService(opts: AutomatonServiceOptions) {
 
   /** The ids whose createAs runs in this process right now; the sweep leaves them alone (src/automaton/sweep.ts). */
   const inFlight = new Set<string>();
-  let sweeping: Promise<{ removed: number; interrupted: number }> | null = null;
+  let sweeping: Promise<SweepResult> | null = null;
 
   /** Requests with an Idempotency-Key that are still running in this process, by address and key. */
   const pending = new Map<string, Promise<Reply>>();
@@ -333,7 +333,7 @@ export function createAutomatonService(opts: AutomatonServiceOptions) {
   }
 
   /** One sweep at a time (src/automaton/sweep.ts); a call while one runs gets that one. Never throws. */
-  function sweep(): Promise<{ removed: number; interrupted: number }> {
+  function sweep(): Promise<SweepResult> {
     sweeping ??= sweepAutomatons({ db, sandboxes, now, log, inFlight }).finally(() => {
       sweeping = null;
     });

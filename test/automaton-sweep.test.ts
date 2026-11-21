@@ -92,7 +92,7 @@ describe("a start that failed and whose sandbox the sandbox server did not delet
     const res = await svc.create(acct.address, acct.key, { name: "failing", genesis_prompt: PROMPT });
     const sandboxId = automatonRow(w, String(res.body.id)).sandbox_id as string;
     down = false;
-    expect(await svc.sweep()).toEqual({ removed: 1, interrupted: 0 });
+    expect(await svc.sweep()).toEqual({ removed: 1, interrupted: 0, failed: 0 });
     expect(w.d.sandboxes()[sandboxId]).toBeUndefined();
     expect(w.row(sandboxId)).toMatchObject({ status: "deleted", hold_mc: 0 });
     expect(lines).toContain(`[automaton] ${res.body.id}: sweep removed the sandbox of a failed automaton`);
@@ -125,7 +125,7 @@ describe("sweepAutomatons", () => {
     w.clock.t += DEADLINE + 60_000;
     down = true;
     const before = { automatons: w.db.prepare("SELECT * FROM hosted_automatons ORDER BY id").all(), sandboxes: w.db.prepare("SELECT * FROM sandboxes ORDER BY id").all() };
-    await expect(svc.sweep()).resolves.toEqual({ removed: 0, interrupted: 0 });
+    await expect(svc.sweep()).resolves.toEqual({ removed: 0, interrupted: 0, failed: 1 });
     expect(w.db.prepare("SELECT * FROM hosted_automatons ORDER BY id").all()).toEqual(before.automatons);
     expect(w.db.prepare("SELECT * FROM sandboxes ORDER BY id").all()).toEqual(before.sandboxes);
   });
@@ -137,7 +137,7 @@ describe("sweepAutomatons", () => {
     const fresh = createSandboxService({ db: w.db, client: w.client, now: () => w.clock.t, log: () => {} });
     const b = hosted(w, fresh);
     w.clock.t = createdAt + DEADLINE + 1;
-    expect(await b.svc.sweep()).toEqual({ removed: 1, interrupted: 1 });
+    expect(await b.svc.sweep()).toEqual({ removed: 1, interrupted: 1, failed: 0 });
     expect(automatonRow(w, id)).toMatchObject({ status: "failed", reason: "start_interrupted", started_at: null });
     expect(keyRevoked(w, id)).toBe(true);
     expect(w.d.sandboxes()[sandboxId]).toBeUndefined();
@@ -156,7 +156,7 @@ describe("sweepAutomatons", () => {
     const { id, sandboxId, createdAt } = await cutOffStart(w);
     const b = hosted(w, createSandboxService({ db: w.db, client: w.client, now: () => w.clock.t, log: () => {} }));
     w.clock.t = createdAt + DEADLINE - 1;
-    expect(await b.svc.sweep()).toEqual({ removed: 0, interrupted: 0 });
+    expect(await b.svc.sweep()).toEqual({ removed: 0, interrupted: 0, failed: 0 });
     expect(automatonRow(w, id)).toMatchObject({ status: "active", started_at: null });
     expect(keyRevoked(w, id)).toBe(false);
     expect(w.d.sandboxes()[sandboxId].status).toBe("running");
@@ -167,10 +167,10 @@ describe("sweepAutomatons", () => {
     const w = await automatonWorld();
     const { a, id, sandboxId, createdAt } = await cutOffStart(w);
     w.clock.t = createdAt + DEADLINE + 60_000;
-    expect(await a.svc.sweep()).toEqual({ removed: 0, interrupted: 0 });
+    expect(await a.svc.sweep()).toEqual({ removed: 0, interrupted: 0, failed: 0 });
     // The same through sweepAutomatons with the set of ids that run in this process.
     const direct = await sweepAutomatons({ db: w.db, sandboxes: w.service, now: () => w.clock.t, log: () => {}, inFlight: new Set([id]) });
-    expect(direct).toEqual({ removed: 0, interrupted: 0 });
+    expect(direct).toEqual({ removed: 0, interrupted: 0, failed: 0 });
     expect(automatonRow(w, id)).toMatchObject({ status: "active", started_at: null });
     expect(keyRevoked(w, id)).toBe(false);
     expect(w.d.sandboxes()[sandboxId].status).toBe("running");
@@ -186,7 +186,7 @@ describe("sweepAutomatons", () => {
     const sandboxId = String(res.body.sandbox_id);
     w.db.prepare("UPDATE hosted_automatons SET started_at = NULL WHERE id = ?").run(id);
     w.clock.t += DEADLINE + 60_000;
-    expect(await svc.sweep()).toEqual({ removed: 0, interrupted: 0 });
+    expect(await svc.sweep()).toEqual({ removed: 0, interrupted: 0, failed: 0 });
     expect(automatonRow(w, id)).toMatchObject({ status: "active", started_at: new Date(w.clock.t).toISOString() });
     expect(w.d.sandboxes()[sandboxId].status).toBe("running");
     expect(keyRevoked(w, id)).toBe(false);
@@ -206,7 +206,7 @@ describe("sweepAutomatons", () => {
     w.started.delete(`sbx-${sandboxId}`);
     w.logOf(sandboxId, "[2026-11-17] Turn abc_1: 2 tools\n");
     w.clock.t += DEADLINE + 60_000;
-    expect(await svc.sweep()).toEqual({ removed: 0, interrupted: 0 });
+    expect(await svc.sweep()).toEqual({ removed: 0, interrupted: 0, failed: 0 });
     expect(automatonRow(w, id)).toMatchObject({ status: "active" });
     expect(automatonRow(w, id).started_at).not.toBeNull();
     expect(w.d.sandboxes()[sandboxId].status).toBe("running");
@@ -217,8 +217,8 @@ describe("sweepAutomatons", () => {
     const { id, sandboxId, createdAt } = await cutOffStart(w);
     const b = hosted(w, createSandboxService({ db: w.db, client: w.client, now: () => w.clock.t, log: () => {} }));
     w.clock.t = createdAt + DEADLINE + 1;
-    expect(await b.svc.sweep()).toEqual({ removed: 1, interrupted: 1 });
-    expect(await b.svc.sweep()).toEqual({ removed: 0, interrupted: 0 });
+    expect(await b.svc.sweep()).toEqual({ removed: 1, interrupted: 1, failed: 0 });
+    expect(await b.svc.sweep()).toEqual({ removed: 0, interrupted: 0, failed: 0 });
     expect(deletes(w, sandboxId)).toBe(1);
     expect(automatonRow(w, id)).toMatchObject({ status: "failed", reason: "start_interrupted" });
   });

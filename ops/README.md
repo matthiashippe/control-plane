@@ -38,6 +38,7 @@ local start and does not replace the run against the real endpoint.
 | `vm.restarts` | rises between two runs | read the logs of the last hour, put the cause in STATE.md |
 | `vm.errors_24h` | above 0 | tell `provider_unavailable` (OpenRouter) and `settlement_failed` (PayAI) apart |
 | `bg_max_ms` (line `OK sandbox:` of `ops/live.sh`) | 27000 ms or more (`BG_WARN_MS`, the line then carries `warning`, stays `OK`) | one call of the wait command comes close to the 30 s after which the runtime aborts it: read the start time of `docker exec` under gVisor on the sandbox server and lower `EXEC_WAIT_S` in `src/sandbox/service.ts` before a call breaks |
+| `db.undeleted_sandboxes` | above 0 | a sandbox books credits of its customer without a running automaton, because the sweep could not delete it for more than an hour: read the lines `sweep could not delete sandbox` in the log of `cp`, check the state of `sandboxd` on the sandbox server, put the cause in STATE.md. `null` means a database from before the deploy of goals/hosting/07 and is no finding |
 | `db.stuck_payments` | above 0 | a payment hangs in `pending`: check the nonce and the facilitator response |
 | `openrouter.left` | below 5 USD | ask Matthias whether to top up; otherwise every tenant faces a 503 |
 | `vm.disk_used` | above 80 % | rotate the logs (json-file max 20m x 5), check for old images |
