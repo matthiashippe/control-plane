@@ -1,7 +1,7 @@
 # Hosting Goal 07: Eine Sandbox, die der Sweep nicht löschen kann, fällt auf
 
 ## Status
-PLANNED
+ACTIVE
 
 ## Active Objective
 `sweepAutomatons` in `src/automaton/sweep.ts` meldet jedes gescheiterte Löschen der Sandbox eines Automatons mit Status `failed`
@@ -77,31 +77,31 @@ MVP: Funktion, weil heute eine Sandbox, deren Löschen `sandboxd` dauerhaft able
   diesem Befund in den Annahmen.
 
 ## Done Condition
-- [ ] Der Sweep schreibt je gescheitertem Löschen und je gescheiterter Abfrage eine Log-Zeile, zählt gescheiterte Löschungen als
+- [x] Der Sweep schreibt je gescheitertem Löschen und je gescheiterter Abfrage eine Log-Zeile, zählt gescheiterte Löschungen als
       `failed` und hält den ersten Fehlschlag in `sweep_failures`, bis das Löschen gelingt.
       MVP: Funktion, weil eine Sandbox, deren Löschen `sandboxd` dauerhaft ablehnt, sonst unbemerkt weiter Credits des Kunden bucht.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/automaton-sweep-undeleted.test.ts test/automaton-sweep.test.ts` muss Exit-Code 0 haben.
       Prüfung: `for w in 'sweep could not delete sandbox' 'sweep could not ask sandbox' 'retrying next round' 'sweep_failures' 'first_failed_at'; do grep -qF -- "$w" src/automaton/sweep.ts || echo "fehlt $w"; done` muss nichts ausgeben.
       Prüfung: `grep -c 'CREATE TABLE IF NOT EXISTS sweep_failures' src/db.ts` muss 1 ausgeben.
-- [ ] `test/automaton-sweep-undeleted.test.ts` deckt Ablehnung mit 500 und 409, den ersten Fehlschlag, die Rückkehr, die Abfrage und
+- [x] `test/automaton-sweep-undeleted.test.ts` deckt Ablehnung mit 500 und 409, den ersten Fehlschlag, die Rückkehr, die Abfrage und
       die Zahl im Bericht ab.
       MVP: Funktion, weil ein Merge, der die Meldung bricht, sonst erst auffällt, wenn eine Sandbox schon Tage bucht.
       Prüfung: `for w in 'sweep could not delete sandbox' 'sweep could not ask sandbox' '(501), retrying next round' 'status: 500' 'status: 409' 'failed: 1' 'failed: 0' first_failed_at undeleted_sandboxes 'DROP TABLE sweep_failures' CP_DB_PATH ops/db-report.cjs; do grep -qF -- "$w" test/automaton-sweep-undeleted.test.ts || echo "fehlt $w"; done` muss nichts ausgeben.
-- [ ] `ops/db-report.cjs` gibt `undeleted_sandboxes` aus, und `ops/README.md` nennt die Schwelle dafür.
+- [x] `ops/db-report.cjs` gibt `undeleted_sandboxes` aus, und `ops/README.md` nennt die Schwelle dafür.
       MVP: Funktion, weil die Ops-Triage nur sieht, was `ops/status.sh` ausgibt und `ops/README.md` als Schwelle nennt.
       Prüfung: `grep -c 'undeleted_sandboxes' ops/db-report.cjs` muss mindestens 1 ausgeben.
       Prüfung: `grep -cE '^\| .db\.undeleted_sandboxes. \| above 0 \|' ops/README.md` muss 1 ausgeben.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD -- ops/status.sh | wc -l` muss 0 ausgeben.
-- [ ] Der neue Test ist rot gegen den Sweep und gegen den Bericht vom Stand vor dem Fix.
+- [x] Der neue Test ist rot gegen den Sweep und gegen den Bericht vom Stand vor dem Fix.
       MVP: Funktion, weil ein Test, der ohne die Meldung grün bleibt, keinen Kunden vor einer verwaisten Sandbox schützt.
       Prüfung: `T=$(mktemp -d); git archive HEAD | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; git show $(git merge-base origin/dev HEAD):src/automaton/sweep.ts > $T/src/automaton/sweep.ts; (cd $T && PATH=/usr/bin:$PATH pnpm -s vitest run test/automaton-sweep-undeleted.test.ts --reporter=json --outputFile=$T/r.json >/dev/null 2>&1); node -p "JSON.parse(require('fs').readFileSync('$T/r.json','utf8')).numFailedTests"; rm -rf $T` muss mindestens 1 ausgeben.
       Prüfung: `T=$(mktemp -d); git archive HEAD | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; git show $(git merge-base origin/dev HEAD):ops/db-report.cjs > $T/ops/db-report.cjs; (cd $T && PATH=/usr/bin:$PATH pnpm -s vitest run test/automaton-sweep-undeleted.test.ts --reporter=json --outputFile=$T/r.json >/dev/null 2>&1); node -p "JSON.parse(require('fs').readFileSync('$T/r.json','utf8')).numFailedTests"; rm -rf $T` muss mindestens 1 ausgeben.
-- [ ] Die Entscheidungen 1 bis 7 stehen mit Grund unter `## Goal 07` in `goals/hosting/ANNAHMEN.md`, und `docs/sandbox/automaton.md`
+- [x] Die Entscheidungen 1 bis 7 stehen mit Grund unter `## Goal 07` in `goals/hosting/ANNAHMEN.md`, und `docs/sandbox/automaton.md`
       nennt die Log-Zeile und `db.undeleted_sandboxes`.
       MVP: Funktion, weil wer die Zeile im Log oder die Zahl im Status liest, ohne Suche wissen muss, was zu tun ist.
       Prüfung: `for w in 'sweep_failures' '(501)' 'could not ask' 'readonly' 'null' 'hosted_automatons'; do awk '/^## Goal 07/{f=1;next} /^## /{f=0} f' goals/hosting/ANNAHMEN.md | grep -qF -- "$w" || echo "fehlt $w"; done` muss nichts ausgeben.
       Prüfung: `for w in 'sweep could not delete sandbox' 'undeleted_sandboxes'; do grep -qF -- "$w" docs/sandbox/automaton.md || echo "fehlt $w"; done` muss nichts ausgeben.
-- [ ] Das Goal ändert nur seine eigenen Dateien, an bestehenden Tests nur die erwarteten Rückgabewerte in
+- [x] Das Goal ändert nur seine eigenen Dateien, an bestehenden Tests nur die erwarteten Rückgabewerte in
       `test/automaton-sweep.test.ts`, bringt keinen Schlüssel ins Repo, und seine Texte sind ohne Gedankenstrich.
       MVP: Funktion, weil das Repo öffentlich ist (Grundregel 8) und jede weitere Datei auf dem Laufzeitpfad einen Rollout ohne Nutzen
       für den Kunden auslöst (Grundregel 5).
