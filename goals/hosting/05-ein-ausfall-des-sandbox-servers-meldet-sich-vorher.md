@@ -98,7 +98,7 @@ weggeräumtes Basis-Image bemerkt, und zwar als 501.
   eines Kunden bei uns läuft.
 
 ## Done Condition
-- [ ] `sandboxd` beantwortet `GET /healthz/image` ohne Signatur nach der Regel von `pin_fact`, und `/healthz` bleibt `ok`.
+- [x] `sandboxd` beantwortet `GET /healthz/image` ohne Signatur nach der Regel von `pin_fact`, und `/healthz` bleibt `ok`.
       MVP: Funktion, weil der Wächter ohne diese Antwort ein weggeräumtes Basis-Image erst sieht, wenn eine Anlage mit 501 scheitert.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/sandboxd-image.test.ts test/sandboxd.test.ts` muss Exit-Code 0 haben.
       Prüfung: `grep -c "export function imageHealth(" ops/sandbox/sandboxd.mjs` muss 1 ausgeben.
@@ -106,30 +106,30 @@ weggeräumtes Basis-Image bemerkt, und zwar als 501.
       Prüfung: `grep -c '"created"' ops/sandbox/sandboxd.mjs` muss 1 ausgeben.
       Prüfung: `for w in imageHealth "image ok" "image missing" "image unpinned" sandboxd-base-pin setup.sh 'listen(0'; do grep -qF -- "$w" test/sandboxd-image.test.ts || echo "fehlt $w"; done` muss nichts ausgeben.
       Prüfung: `grep -cE 'listen\([1-9]|port: *[1-9]' test/sandboxd-image.test.ts` muss 0 ausgeben.
-- [ ] Der Wächter fragt in jedem Lauf `sandboxd` und sein Image und meldet nur den Wechsel über den bestehenden Alarmweg.
+- [x] Der Wächter fragt in jedem Lauf `sandboxd` und sein Image und meldet nur den Wechsel über den bestehenden Alarmweg.
       MVP: Funktion, weil ein Alarm bei jedem Lauf abgeschaltet wird und einer, der nach gescheitertem POST verloren geht, nie ankommt.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/watchdog-sandboxd.test.ts` muss Exit-Code 0 haben.
       Prüfung: `grep -c '^check_sandboxd$' ops/watchdog.sh` muss 1 ausgeben.
       Prüfung: `for w in "sandboxd unreachable" "base image missing" "base image not pinned" "sandboxd back" "sandboxd: ok" CP_SANDBOXD_URL CP_SANDBOXD_PAUSE /healthz/image; do grep -qF -- "$w" ops/watchdog.sh || echo "fehlt $w"; done` muss nichts ausgeben.
       Prüfung: `for w in "sandboxd unreachable" "base image missing" "base image not pinned" "sandboxd back" "sandboxd: ok" SANDBOXD_URL_DEFAULT CP_SANDBOXD_PAUSE; do grep -qF -- "$w" test/watchdog-sandboxd.test.ts || echo "fehlt $w"; done` muss nichts ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/watchdog-credit.test.ts test/watchdog-credit-kritik.test.ts test/watchdog-alive.test.ts test/watchdog-alive-slots.test.ts test/watchdog-webhook-fail.test.ts test/watchdog-webhook-fail-daily.test.ts` muss Exit-Code 0 haben.
-- [ ] Beide neuen Tests sind rot gegen den Stand vor dem Fix: der Test des Wächters gegen `ops/watchdog.sh` der Merge-Basis, der Test
+- [x] Beide neuen Tests sind rot gegen den Stand vor dem Fix: der Test des Wächters gegen `ops/watchdog.sh` der Merge-Basis, der Test
       von `sandboxd` gegen eine Kopie, in der ein gestarteter Pin als nie gestartet gilt.
       MVP: Funktion, weil ein Test, der ohne die Prüfung grün bleibt, den Alarm nicht schützt, den dieses Goal einführt.
       Prüfung: `T=$(mktemp -d); git archive HEAD | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; git show $(git merge-base origin/dev HEAD):ops/watchdog.sh > $T/ops/watchdog.sh; (cd $T && PATH=/usr/bin:$PATH pnpm -s vitest run test/watchdog-sandboxd.test.ts --reporter=json --outputFile=$T/r.json >/dev/null 2>&1); node -p "JSON.parse(require('fs').readFileSync('$T/r.json','utf8')).numFailedTests"; rm -rf $T` muss mindestens 3 ausgeben.
       Prüfung: `T=$(mktemp -d); git archive HEAD | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; sed -i 's/"created"/"exited"/' $T/ops/sandbox/sandboxd.mjs; (cd $T && PATH=/usr/bin:$PATH pnpm -s vitest run test/sandboxd-image.test.ts --reporter=json --outputFile=$T/r.json >/dev/null 2>&1); node -p "JSON.parse(require('fs').readFileSync('$T/r.json','utf8')).numFailedTests"; rm -rf $T` muss mindestens 1 ausgeben.
-- [ ] `sandboxd` läuft auf dem Sandbox-Server mit diesem Stand und meldet `image ok`; Messung und Entscheidungen stehen mit Grund
+- [x] `sandboxd` läuft auf dem Sandbox-Server mit diesem Stand und meldet `image ok`; Messung und Entscheidungen stehen mit Grund
       unter `## Goal 05` in `goals/hosting/ANNAHMEN.md`, mit den zwei Zeilen ab Spalte 0
       `Nachher: SETUP CHECK OK changed=0, <JJJJ-MM-TT HH:MM> UTC` und `Nachher: image ok, <JJJJ-MM-TT HH:MM> UTC`.
       MVP: Funktion, weil der Wächter nach dem Deploy sonst eine Route fragt, die der Sandbox-Server nicht kennt, und Fehlalarm gibt.
       Prüfung: `awk '/^## Goal 05/{f=1;next} /^## /{f=0} f' goals/hosting/ANNAHMEN.md | grep -cE '^Nachher: (SETUP CHECK OK changed=0|image ok), 20[0-9]{2}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2} UTC$'` muss 2 ausgeben.
       Prüfung: `for w in /healthz/image imageHealth pin_fact created CP_SANDBOXD_PAUSE foreign-sandboxes Statuscode; do awk '/^## Goal 05/{f=1;next} /^## /{f=0} f' goals/hosting/ANNAHMEN.md | grep -qF -- "$w" || echo "fehlt $w"; done` muss nichts ausgeben.
       Prüfung: `awk '/^## Goal 05/{f=1;next} /^## /{f=0} f' goals/hosting/ANNAHMEN.md | grep -cE 'sbx-[a-z0-9]{10}|0x[0-9a-fA-F]{40}'` muss 0 ausgeben.
-- [ ] `ops/README.md` und `docs/sandbox/plan.md` nennen die neue Prüfung und die neue Route.
+- [x] `ops/README.md` und `docs/sandbox/plan.md` nennen die neue Prüfung und die neue Route.
       MVP: Funktion, weil wer nachts die Meldung bekommt, ohne Suche wissen muss, was er tun kann.
       Prüfung: `for w in check_sandboxd /healthz/image "base image not pinned" "ops/sandbox/setup.sh"; do awk '/^## Watchdog on the VM/{f=1;next} /^## /{f=0} f' ops/README.md | grep -qF -- "$w" || echo "fehlt $w"; done` muss nichts ausgeben.
       Prüfung: `grep -c '/healthz/image' docs/sandbox/plan.md` muss mindestens 1 ausgeben.
-- [ ] Das Goal ändert nur seine eigenen Dateien, weder `src/`, die übrigen Dateien in `ops/sandbox/` noch bestehende Tests, bringt
+- [x] Das Goal ändert nur seine eigenen Dateien, weder `src/`, die übrigen Dateien in `ops/sandbox/` noch bestehende Tests, bringt
       keinen Schlüssel ins Repo, und seine Texte sind ohne Gedankenstrich.
       MVP: Funktion, weil das Repo öffentlich ist (Grundregel 8) und jede weitere Datei auf dem Laufzeitpfad einen Rollout ohne Nutzen
       für den Kunden auslöst (Grundregel 5).
@@ -138,7 +138,7 @@ weggeräumtes Basis-Image bemerkt, und zwar als 501.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD | grep -cE "\.(key|pem|crt|env)$"` muss 0 ausgeben.
       Prüfung: `git diff $(git merge-base origin/dev HEAD) HEAD -- . ':(exclude)goals/' | grep -cE '^\+.*(cnwy_k_[0-9a-f]{32}|-{5}BEGIN [A-Z ]*PRIVATE KEY-{5}|ntfy\.sh/[A-Za-z0-9_-]+)'` muss 0 ausgeben.
       Prüfung: `cat ops/watchdog.sh ops/sandbox/sandboxd.mjs ops/README.md test/watchdog-sandboxd.test.ts test/sandboxd-image.test.ts goals/hosting/ANNAHMEN.md | grep -c $'\xe2\x80\x93\|\xe2\x80\x94'` muss 0 ausgeben.
-- [ ] `check` ist lokal grün, und die Jobs `check` und `e2e` des Goal-PR sind auf dem GitHub-Rechner grün.
+- [x] `check` ist lokal grün, und die Jobs `check` und `e2e` des Goal-PR sind auf dem GitHub-Rechner grün.
       MVP: Funktion, weil `sandboxd` im Harness des Jobs `e2e` läuft und erst dieser Gang zeigt, dass die neue Route ihn nicht bricht.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung (Netz): `n=$(gh pr list -R matthiashippe/control-plane --head goal/hosting-05 --state all --json number -q '.[0].number'); gh pr checks "${n:?}" -R matthiashippe/control-plane --json name,state -q '.[] | select(.name=="check") | .state'` muss `SUCCESS` ausgeben.
@@ -167,6 +167,7 @@ weggeräumtes Basis-Image bemerkt, und zwar als 501.
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-21 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6, 7 gebaut: sandboxd beantwortet die neue Bildroute nach der Regel von pin_fact, der Wächter fragt sandboxd nach dem Health-Urteil und meldet nur den Wechsel (Abweichung von der Reihenfolge des Kontexts mit Grund in ANNAHMEN.md), Doku in ops/README.md und docs/sandbox/plan.md, Rollout mit setup.sh auf den Sandbox-Server vor dem Merge. Prüfbefehle: Punkt 1 vitest 52 grün, Zähler 1, 1, 1, nichts fehlt, 0; Punkt 2 vitest 13 grün, Zähler 1, nichts fehlt, nichts fehlt, sechs bestehende Wächter-Tests 25 grün; Punkt 3 Gegenprobe Wächter der Merge-Basis 13 rot, Gegenprobe Pin gestartet statt nie gestartet 3 rot, dazu sandboxd.mjs der Merge-Basis 9 von 11 rot; Punkt 4 zwei Nachher-Zeilen, nichts fehlt, 0; Punkt 5 nichts fehlt, 1; Punkt 6 0, 0, 0, 0, 0; Punkt 7 check lokal grün (242 Dateien, 2534 Tests, 261 s), Jobs check und e2e am PR siehe Kommentar.
 
 ## Blockers
 Keine.
