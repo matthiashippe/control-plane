@@ -130,6 +130,7 @@ beiden Kopien landet; die andere bucht dann im schlimmsten Fall bei einem Rollou
 
 ## Progress Log
 - 2026-11-21 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6 gebaut, `grantInternal` in `src/credits/internal-grant.ts` mit neuem Test, beide Aufrufer buchen darüber, Entscheidungen in den Annahmen. Prüfbefehle: Punkt 1 vitest Exit 0 (3 Fälle), Zähler 1, 1, Schleife leer, 0; Punkt 2 Gegenprobe 1 (rot mit UNIQUE constraint failed am zweiten Aufruf, weil die Abfrage der Ref nie trifft); Punkt 3 vitest Exit 0 (17 Fälle), Zähler 1, 1, 2, 0, 1, 1, 2; Punkt 4 Zähler 0, 0, 0, 0; Punkt 5 check lokal Exit 0 (2510 Tests), PR #338 check SUCCESS, e2e SUCCESS; Punkt 6 Zähler 16.
+- 2026-11-21 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, dev (757ecc6) war schon enthalten. Prüfbefehle: Punkt 1 vitest Exit 0, Zähler 1, 1, Schleife leer, 0; Punkt 2 Gegenprobe 1; Punkt 3 vitest Exit 0, Zähler 1, 1, 2, 0, 1, 1, 2; Punkt 4 Zähler 0, 0, 0, 0; Punkt 5 check lokal Exit 0 (2510 Tests, 410 s), PR #338 am Kopf b13148f check SUCCESS, e2e SUCCESS; Punkt 6 Zähler 16.
 
 ## Blockers
 Keine.
