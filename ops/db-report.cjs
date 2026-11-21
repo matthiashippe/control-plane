@@ -435,6 +435,117 @@ if (process.env.CP_REPORT === "starter-paths") {
   process.exit(0);
 }
 
+// CP_REPORT=customer-work (goals/kunden/08): instead of the report, one JSON of what one customer did on the
+// way from a bounty to credit, per UTC day of the window CP_SINCE..CP_UNTIL (ISO UTC, CP_UNTIL empty means
+// now). The customer's wallets come in CP_CUSTOMER_ADDRESSES (comma separated, held in memory by the caller);
+// without it the block takes customer CP_CUSTOMER (default 1) numbered like the decline block, from
+// CP_CUSTOMER_SINCE on, so the wallet need not leave the container at all. Per day: submissions stored for
+// the customer, bounties open that day that are not the customer's (posted before the day ends, neither
+// closed nor past the deadline before it begins), how many of those oursClause calls ours, bounty_award rows
+// to the customer and its inference rows after its first bounty_award. `inference_at` lists the times of
+// its inference rows from CP_CUSTOMER_SINCE on, for the match against the access log. No address, key, id,
+// brief or amount leaves this block. Written synchronously and ended here, like the decline block.
+if (process.env.CP_REPORT === "customer-work") {
+  const fail = (msg) => {
+    require("fs").writeSync(2, `db-report: ${msg}\n`);
+    process.exit(1);
+  };
+  const iso = (name, fallback) => {
+    const raw = process.env[name];
+    if (!raw) return fallback;
+    const t = Date.parse(raw);
+    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/.test(raw) || Number.isNaN(t)) fail(`${name} is no ISO time in UTC`);
+    return new Date(t).toISOString();
+  };
+  const since = iso("CP_SINCE", new Date(0).toISOString());
+  const until = iso("CP_UNTIL", new Date().toISOString());
+  const numberedFrom = iso("CP_CUSTOMER_SINCE", since);
+  if (until <= since) fail("CP_UNTIL is not after CP_SINCE");
+  const n = Number(process.env.CP_CUSTOMER || "1");
+  if (!Number.isInteger(n) || n < 1) fail("CP_CUSTOMER is no number from 1");
+  const ms = (v) => {
+    const t = Date.parse(v);
+    return Number.isNaN(t) ? null : t;
+  };
+  let addresses = String(process.env.CP_CUSTOMER_ADDRESSES || "")
+    .split(",")
+    .map((a) => a.trim().toLowerCase())
+    .filter(Boolean);
+  if (addresses.length === 0) {
+    // The order of the decline block: foreign wallets by their first inference row in the window, then id.
+    const customer = all(
+      `select address, min(created_at) first_at from ledger
+        where kind = 'inference' and created_at >= ? and created_at < ? and ${notOurs}
+        group by address order by first_at, min(id)`,
+      numberedFrom, until, ...OURS_ARGS,
+    )[n - 1];
+    if (customer) addresses = [customer.address.toLowerCase()];
+  }
+  const mine = new Set(addresses);
+  const marks = addresses.map(() => "?").join(",");
+  const rowsOf = (sql, ...args) => (addresses.length ? all(sql, ...addresses, ...args) : []);
+  const inferenceAt = rowsOf(
+    `select created_at at from ledger where lower(address) in (${marks}) and kind = 'inference'
+      and created_at >= ? and created_at < ? order by created_at, id`,
+    numberedFrom, until,
+  ).map((r) => new Date(ms(r.at)).toISOString());
+  const submissions = rowsOf(`select created_at at from submissions where lower(agent) in (${marks})`).map((r) => ms(r.at));
+  const awards = rowsOf(
+    `select created_at at from ledger where lower(address) in (${marks}) and kind = 'bounty_award'`,
+  ).map((r) => ms(r.at));
+  const firstAward = awards.filter((t) => t !== null && t < ms(until)).sort((a, b) => a - b)[0] ?? null;
+  const inferenceAfter = firstAward === null
+    ? []
+    : rowsOf(`select created_at at from ledger where lower(address) in (${marks}) and kind = 'inference'`)
+        .map((r) => ms(r.at))
+        .filter((t) => t !== null && t > firstAward);
+  // oursClause itself, on a one-row table named like the ledger, as in the wallets block.
+  const oursCache = new Map();
+  const isOurs = (a) => {
+    if (!oursCache.has(a)) {
+      oursCache.set(a, one(`select ${oursClause} ours from (select ? address) ledger`, ...OURS_ARGS, a).ours === 1);
+    }
+    return oursCache.get(a);
+  };
+  const bounties = all("select creator, created_at, closed_at, deadline from bounties")
+    .filter((b) => !mine.has(String(b.creator).toLowerCase()))
+    .map((b) => {
+      const opened = ms(b.created_at);
+      const ends = [ms(b.closed_at), ms(b.deadline)].filter((t) => t !== null);
+      return { opened, closes: ends.length ? Math.min(...ends) : Infinity, ours: isOurs(b.creator) };
+    })
+    .filter((b) => b.opened !== null);
+  const days = [];
+  const startOfDay = new Date(since);
+  startOfDay.setUTCHours(0, 0, 0, 0);
+  for (let d = startOfDay.getTime(); d < ms(until); d += 86400e3) {
+    const from = Math.max(d, ms(since));
+    const to = Math.min(d + 86400e3, ms(until));
+    const inDay = (t) => t !== null && t >= from && t < to;
+    const open = bounties.filter((b) => b.opened < to && b.closes >= from);
+    days.push({
+      day: new Date(d).toISOString().slice(0, 10),
+      submissions: submissions.filter(inDay).length,
+      open: open.length,
+      ours: open.filter((b) => b.ours).length,
+      awards: awards.filter(inDay).length,
+      inference_after_award: inferenceAfter.filter(inDay).length,
+    });
+  }
+  // writeSync may write part of the buffer to a pipe, or meet EAGAIN on a non-blocking one.
+  const out = Buffer.from(
+    JSON.stringify({ since, until, customer: n, found: addresses.length > 0, inference_at: inferenceAt, days }) + "\n",
+  );
+  for (let off = 0; off < out.length; ) {
+    try {
+      off += require("fs").writeSync(1, out, off, out.length - off);
+    } catch (e) {
+      if (e.code !== "EAGAIN") throw e;
+    }
+  }
+  process.exit(0);
+}
+
 // The same test against a column that is not ledger.address.
 //
 // oursClause names ledger.address, so it only works inside a query on the ledger. The one number

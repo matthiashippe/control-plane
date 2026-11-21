@@ -41,10 +41,9 @@ import collections, datetime, json, os, re, sys
 sys.dont_write_bytecode = True
 sys.path.insert(0, os.environ["CONWAY_ARRIVALS_DIR"])
 import conway_arrivals as ca
+import customer_match as cm
 
 ISO = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z")
-INFERENCE = {("POST", "/v1/chat/completions"), ("POST", "/v1/check")}
-MATCH_S = 5.0
 
 def fail(msg, code=2):
     print(f"customer-decline: {msg}", file=sys.stderr)
@@ -112,8 +111,8 @@ def in_window(t):
     return since <= t < until
 
 # Inference lines from foreign addresses; our own never enter, not even as a candidate for a match.
-foreign = [r for r in log if r.ip and r.ip not in own and (r.method, r.path) in INFERENCE]
-ok_lines = [r for r in foreign if r.status == 200]
+foreign = cm.inference_lines(log, own)
+ok_lines = cm.ok_lines(foreign)
 
 # Customers of the window, numbered again here: the JSON may reach back further for WEEK.
 customers = []
@@ -127,17 +126,8 @@ unmatched = 0
 owner = collections.defaultdict(set)   # address -> customer numbers; never printed
 ips = {}
 for n, (_, _, c, rows) in enumerate(customers, 1):
-    mine = set()
-    for r in rows:
-        best = None
-        for line in ok_lines:
-            d = abs(line.ts - r["t"])
-            if d <= MATCH_S and (best is None or d < best[0]):
-                best = (d, line.ip)
-        if best is None:
-            unmatched += 1
-        else:
-            mine.add(best[1])
+    mine, missed = cm.match_rows([r["t"] for r in rows], ok_lines)
+    unmatched += missed
     ips[n] = mine
     for ip in mine:
         owner[ip].add(n)

@@ -1,7 +1,7 @@
 # Kunden Goal 08: Verdient Kunde 1 Inferenz über Aufträge?
 
 ## Status
-PLANNED
+DONE
 
 ## Active Objective
 Kunde 1, der größte zahlende fremde Automaton, hat laut kunden 05 kein Geld für eine Aufladung (`docs/kunden/aufladung-2026-11.md`,
@@ -70,7 +70,7 @@ MVP: Funktion, weil ein Kunde mit über 1000 Anfragen am Tag und ohne USDC sonst
   kein Zuspruch in der Produktion.
 
 ## Done Condition
-- [ ] `ops/customer-work.sh` zählt je Tag, was Kunde 1 auf dem Weg vom Auftrag zum Guthaben tat und wie viele Aufträge offen waren,
+- [x] `ops/customer-work.sh` zählt je Tag, was Kunde 1 auf dem Weg vom Auftrag zum Guthaben tat und wie viele Aufträge offen waren,
       nie eine eigene Adresse, und nennt keine Adresse; in beide Richtungen bewiesen.
       Prüfung: `bash ops/customer-work.sh --selftest | tail -1` muss mit `SELFTEST OK` beginnen.
       Prüfung: `bash ops/customer-work.sh --selftest | grep -cE "^ok .*submit"` muss mindestens 1 ausgeben.
@@ -80,9 +80,9 @@ MVP: Funktion, weil ein Kunde mit über 1000 Anfragen am Tag und ohne USDC sonst
       Prüfung: `bash ops/customer-work.sh --selftest | grep -cE "([0-9]{1,3}\.){3}[0-9]{1,3}|0x[0-9a-fA-F]{40}"` muss 0 ausgeben.
       Prüfung: `cat ops/fixtures/customer-work-* | grep -oE '"(remote_ip|client_ip)": ?"[^"]*"' | grep -cvE '"(192\.0\.2|198\.51\.100|203\.0\.113)\.[0-9]+"'` muss 0 ausgeben.
       Prüfung: `pnpm -s vitest run test/db-report.test.ts test/db-report-no-duplicate-keys.test.ts` muss Exit-Code 0 haben.
-- [ ] Ob ein angenommenes Ergebnis heute Inferenz bezahlt, ist durch einen Test festgehalten.
+- [x] Ob ein angenommenes Ergebnis heute Inferenz bezahlt, ist durch einen Test festgehalten.
       Prüfung: `pnpm -s vitest run test/award-inference.test.ts --reporter=json 2>/dev/null | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const j=JSON.parse(s);const t=j.testResults.flatMap(f=>f.assertionResults).filter(a=>a.status==="passed").map(a=>a.title);console.log([/no award no inference/,/award then inference/].every(r=>t.some(x=>r.test(x)))?"alle":"fehlt")})'` muss `alle` ausgeben.
-- [ ] Die drei Schritte von Kunde 1 stehen gemessen in `docs/kunden/auftraege-2026-11.md`, mit Ergebnis und, bei einem leeren
+- [x] Die drei Schritte von Kunde 1 stehen gemessen in `docs/kunden/auftraege-2026-11.md`, mit Ergebnis und, bei einem leeren
       Schritt, dem Vorschlag für das Folge-Glied, ohne Adresse und ohne Betrag.
       Prüfung: `awk '/^Gemessen: /{print ($2 >= "2026-11-21T00:00:00Z") ? "spaet genug" : "zu frueh"}' docs/kunden/auftraege-2026-11.md` muss genau `spaet genug` ausgeben.
       Prüfung: `grep -cE "^WORK since .*: customer 1$" docs/kunden/auftraege-2026-11.md` muss 1 ausgeben.
@@ -97,9 +97,9 @@ MVP: Funktion, weil ein Kunde mit über 1000 Anfragen am Tag und ohne USDC sonst
       Prüfung: `grep -cE "[0-9]+([.,][0-9]+)? ?(USD|USDC|cents)\b" docs/kunden/auftraege-2026-11.md` muss 0 ausgeben.
       Prüfung: `grep -cE "^- [0-9-]+, kunden 08: " goals/kunden/ANNAHMEN.md` muss mindestens 2 ausgeben.
       Prüfung: `grep -oE "^- Weg: src/[A-Za-z0-9_/.-]+\.ts:[0-9]+" docs/kunden/auftraege-2026-11.md | sed 's/^- Weg: //' | while IFS=: read -r p n; do sed -n "${n}p" "$p" | grep -qiE "bount|submi|award|ledger|chat|inference|402" || echo "falsch $p:$n"; done` muss nichts ausgeben.
-- [ ] `check` ist grün.
+- [x] `check` ist grün.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Jeder neue Test war vor dem Werkzeug rot; die Zeile im Progress Log nennt, womit.
@@ -124,5 +124,8 @@ MVP: Funktion, weil ein Kunde mit über 1000 Anfragen am Tag und ohne USDC sonst
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-21 Zyklus 1: Punkte 1, 2, 3, 4 gebaut: `ops/customer-work.sh` mit Zweig `CP_REPORT=customer-work` in `ops/db-report.cjs` und der Zuordnung aus `ops/customer-decline.sh` als `ops/customer_match.py`, Test `test/award-inference.test.ts`, Messung gegen die Produktion in `docs/kunden/auftraege-2026-11.md` (leerer Schritt Einreichen, seit 06.10. kein offener Auftrag), Vorschlag `goals/_vorschlaege/kunden-kritik-2026-11-21-3.md`. Rot gesehen: `test/award-inference.test.ts` mit beiden Tests rot, als `awardBounty` an `bounty.creator` statt an `submission.agent` buchte und die 402 `open_bounties` erst ab 2 nannte; der Selbsttest mit 6 FAIL, als der Zweig die eigenen Aufträge des Kunden mitzählte, nie schloss und nichts uns zuschrieb, und mit 18 FAIL am Stand `origin/dev` von `ops/db-report.cjs` (Mutationen danach zurückgesetzt, `git diff --exit-code src` leer). Standardbericht ohne `CP_REPORT` Byte für Byte gleich mit `origin/dev` (`cmp` auf der gepflanzten Datenbank). Prüfbefehle: Punkt 1 `SELFTEST OK`, submit 4, open 5, award 5, ours 5, Adressen 0, Fixtures 0, `vitest db-report` Exit 0; Punkt 2 `alle`; Punkt 3 `spaet genug`, 1, 1, 8, 1, 1, 1, 1, `belegt`, 0, 0, 4, keine Ausgabe; Punkt 4 `node scripts/check.mjs` Exit 0 (238 Dateien, 2503 Tests).
+- 2026-11-21 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4; `dev` ohne neue Commits seit dem Merge in Zyklus 1, alle Prüfbefehle auf `9aeb79b` neu gefahren. Prüfbefehle: Punkt 1 `SELFTEST OK`, submit 4, open 5, award 5, ours 5, Adressen 0, Fixtures 0, `vitest db-report` Exit 0; Punkt 2 `alle`; Punkt 3 `spaet genug`, 1, 1, 8, 1, 1, 1, 1, `belegt`, 0, 0, 4, keine Ausgabe; Punkt 4 `node scripts/check.mjs` Exit 0 (238 Dateien, 2503 Tests, 204 s); `src/**` unverändert, also kein Laufzeitpfad, Job `e2e` am PR läuft trotzdem mit.
+- 2026-11-21 Release: PASS K und B (Zyklus 2), DONE.
 
 ## Blockers

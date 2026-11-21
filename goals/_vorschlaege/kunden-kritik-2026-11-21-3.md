@@ -1,0 +1,6 @@
+Schwere: 4
+Goal: kunden 08
+Befund: Kunde 1 reicht nie ein, weil es seit dem 06.10. keinen offenen Auftrag gibt: Er las das Brett seit 13.11. 1192 Mal und fand jedes Mal eine leere Liste, obwohl ein angenommenes Ergebnis heute als Guthaben bucht und seine nächste Inferenz bezahlt.
+Beleg: `bash ops/customer-work.sh --since 2026-11-13T00:00:00Z` -> `0 submissions stored, 0 open bounties (0 ours)` an allen 9 Tagen, `0 submit calls` | docs/kunden/auftraege-2026-11.md (Ergebnis) | test/award-inference.test.ts (`award then inference`)
+Empfehlung: Ein Glied am Topic `kunden` baut den Schritt Einreichen für Kunde 1: Auf dem Brett steht dauerhaft mindestens ein offener Auftrag mit echter Arbeit, deren Ergebnis wir nutzen, und die 402 nennt ihn mit `open_bounties` und `bounties_url`; gemessen wird mit `ops/customer-work.sh`, ob Kunde 1 binnen 48 Stunden einreicht und nach einem Zuspruch wieder Inferenz bezahlt. Leitzahl: fremde Zahlungen je Woche; eine Inferenz aus verdientem Guthaben zählt mit. Wer die Aufträge stellt und aus welchem Guthaben (Credits bleiben intern und unauszahlbar, Grundregel 10), entscheidet der Tech Lead im Glied.
+MVP: Funktion, weil ein Kunde mit über 1000 Anfragen am Tag und ohne USDC nur über verdientes Guthaben wieder zahlt.
