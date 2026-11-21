@@ -152,7 +152,7 @@ describe("ops/watchdog.sh asks sandboxd and its base image on every run and repo
     expect(posts.length).toBe(1);
     expect(posts[0]).toContain("sandboxd base image missing, every new sandbox fails with 501");
     expect(posts[0]).not.toContain("not pinned");
-    expect(s.stored()).toBe("image");
+    expect(s.stored()).toBe("missing");
   }, 180_000);
 
   it("a base image without its pin is its own message: one [WARN] base image not pinned, naming the remedy", () => {
@@ -185,6 +185,24 @@ describe("ops/watchdog.sh asks sandboxd and its base image on every run and repo
     expect(posts[1]).toContain("sandboxd base image missing");
     expect(posts[2]).toContain("sandboxd unreachable");
   }, 180_000);
+
+  it("unpinned to missing and missing to unpinned each report the new state", () => {
+    const s = sandbox();
+    s.run([OK], [IMAGE_OK]);
+    s.run([OK], [IMAGE_UNPINNED]);
+    expect(s.stored()).toBe("unpinned");
+    const gone = s.run([OK], [IMAGE_MISSING]);
+    expect(gone.out).toContain("[WARN] sandboxd base image missing");
+    expect(s.stored()).toBe("missing");
+    s.run([OK], [IMAGE_MISSING]);
+    s.run([OK], [IMAGE_UNPINNED]);
+    expect(s.stored()).toBe("unpinned");
+    const posts = sandboxdPosts(s.posts());
+    expect(posts.length).toBe(3);
+    expect(posts[0]).toContain("sandboxd base image not pinned");
+    expect(posts[1]).toContain("sandboxd base image missing, every new sandbox fails with 501");
+    expect(posts[2]).toContain("sandboxd base image not pinned");
+  }, 240_000);
 
   it("return: exactly one [OK] sandboxd back after an outage and after a missing image, then quiet again", () => {
     const s = sandbox();

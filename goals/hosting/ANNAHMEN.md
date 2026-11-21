@@ -138,10 +138,16 @@
   `sandboxd.service` ändert sich nicht.
 - **Der Wächter entscheidet am Statuscode.** `check_sandboxd` fragt `<CP_SANDBOXD_URL>/healthz` und bei 200 `/healthz/image`, je
   zwei Versuche mit `CP_SANDBOXD_PAUSE` Sekunden Pause (Vorgabe 20, die Tests setzen 0). Zustand in `<state file>.sandboxd`: `ok`,
-  `image` bei 503 auf `/healthz/image`, sonst `down`. Den Text liest er nur für die Meldung (`image unpinned` heißt ungepinnt, alles
-  andere fehlend). Nur der Wechsel geht über `report` hinaus, gespeichert erst nach dem POST; die Titel bleiben `WARN` und `OK`,
+  bei 503 auf `/healthz/image` `unpinned` (Text `image unpinned`) oder `missing` (jeder andere Text), sonst `down`. Den Text liest
+  er nur, um eine 503 in diese zwei Zustände zu teilen. Nur der Wechsel geht über `report` hinaus, gespeichert erst nach dem POST; die Titel bleiben `WARN` und `OK`,
   weil `ops/status.sh` die Meldungen des Wächters an ihren Titeln erkennt. Die Vorgabe von `CP_SANDBOXD_URL` ist
   `SANDBOXD_URL_DEFAULT` aus `src/sandbox/client.ts`, der Test vergleicht beide.
+- **Kritik (Punkt 8): `missing` und `unpinned` sind zwei Zustände statt eines Zustands `image`.** Mit einem gemeinsamen Zustand
+  schwieg der Wächter, wenn der Prune-Cron ein ungepinntes Image danach wirklich wegräumte: Er schrieb nur „still“ ins Log, obwohl ab
+  da jede neue Sandbox mit 501 scheitert. Jetzt meldet jeder Wechsel zwischen beiden genau ein `[WARN]` mit dem neuen Zustand, und
+  die Rückkehr nach `ok` meldet aus `down`, `missing` und `unpinned`. `sandboxd.mjs` ändert sich dafür nicht, also kein neuer
+  Rollout auf den Sandbox-Server; der Zustand `image` lag nie auf dem Zahlungsserver, weil der Wächter erst mit dem nächsten
+  Deploy dorthin kommt.
 - **Abweichung von Entscheidung 3 des Tech Lead: `check_sandboxd` läuft nach dem Health-Urteil, nicht davor.** Der Kontext wollte
   den Aufruf vor `check_health`, damit die Prüfung auch bei einem Ausfall des Zahlungsdienstes läuft. Das bricht den bestehenden
   Test `test/watchdog-webhook-fail.test.ts` (Fall OUTAGE): Sein falsches `curl` antwortet jeder URL mit `/health` denselben Code

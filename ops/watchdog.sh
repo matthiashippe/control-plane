@@ -181,8 +181,9 @@ sandboxd_get() {
 
 # The sandbox server. Until now the first foreign automaton that wanted a sandbox noticed an outage of sandboxd or a base image
 # the prune cron had removed, as 501. It asks /healthz and, when that answers 200, /healthz/image (ops/sandbox/sandboxd.mjs).
-# The verdict comes from the status code, the text only goes into the message: `ok`, `image` (503 on /healthz/image) or `down`
-# (any other answer). Like the other checks it reports the change only, and stores the new state only after the POST went
+# The verdict comes from the status code, the body only splits a 503 on /healthz/image into `missing` and `unpinned`: `ok`,
+# `missing`, `unpinned` or `down` (any other answer). Missing and unpinned are separate states, because an unpinned image that the
+# prune cron then removes is a new failure and must be reported, not logged as still the same. Like the other checks it reports the change only, and stores the new state only after the POST went
 # through, so the next run reports a lost message again. It runs after the health verdict: while the payment service is down
 # nobody can create a sandbox, and the outage alarm is already out.
 check_sandboxd() {
@@ -197,10 +198,11 @@ check_sandboxd() {
     case "$SBX_CODE" in
       200) now="ok" ;;
       503)
-        now="image"
         if [[ "$SBX_BODY" == *"image unpinned"* ]]; then
+          now="unpinned"
           text="sandboxd base image not pinned, the prune cron removes it within 24 h, run ops/sandbox/setup.sh"
         else
+          now="missing"
           text="sandboxd base image missing, every new sandbox fails with 501"
         fi ;;
       *)
@@ -209,7 +211,7 @@ check_sandboxd() {
     esac
   fi
   if [[ "$now" == "ok" ]]; then
-    if [[ "$previous" == "down" || "$previous" == "image" ]]; then
+    if [[ "$previous" == "down" || "$previous" == "missing" || "$previous" == "unpinned" ]]; then
       report "OK" "sandboxd back, base image pinned" || posted=0
     else
       echo "$TS [INFO] sandboxd: ok"

@@ -135,7 +135,7 @@ is heard before the first foreign automaton gets 501 on creating a sandbox. Ever
 `CP_SANDBOXD_PAUSE` seconds apart (default 20). Both routes need no signature; the Caddy of the sandbox server lets only the
 payment server through. `/healthz/image` answers 200 `image ok` when the base image exists and its pin (`sandboxd-base-pin`) is a
 never started container of exactly this image, by the rule of `pin_fact` in `ops/sandbox/setup.sh`, and 503 `image missing` or
-`image unpinned` otherwise. The verdict comes from the status code; the state (`ok`, `down` or `image`) lives in
+`image unpinned` otherwise. The verdict comes from the status code; the state (`ok`, `down`, `missing` or `unpinned`) lives in
 `<state file>.sandboxd` and only its change is posted, stored after the POST went through:
 
 - `[WARN] sandboxd unreachable (HTTP <code>, twice in a row), every new sandbox fails with 501`: `sandboxd` or the sandbox server
@@ -143,12 +143,13 @@ never started container of exactly this image, by the rule of `pin_fact` in `ops
   `bash ops/sandbox/setup.sh 72.62.51.224` rolls the repo state out again and restarts `sandboxd`.
 - `[WARN] sandboxd base image missing, every new sandbox fails with 501`: the image is gone, every create fails now.
 - `[WARN] sandboxd base image not pinned, the prune cron removes it within 24 h, run ops/sandbox/setup.sh`: the image is still
-  there, but without its pin.
+  there, but without its pin. If the prune cron removes it afterwards, the next run reports `base image missing` as a new
+  message, and the way back from missing to unpinned is reported as well.
 - `[OK] sandboxd back, base image pinned`: both answer 200 again.
 
 For both image messages `bash ops/sandbox/setup.sh 72.62.51.224` from the code-host restores image and pin; `--check` then shows
 `fact image_pin yes`. While the payment service itself is down the check does not run: nobody can create a sandbox then, and the
-outage is already reported. Every run leaves one line, `[INFO] sandboxd: ok`, `[INFO] sandboxd: still <down|image>` or the
+outage is already reported. Every run leaves one line, `[INFO] sandboxd: ok`, `[INFO] sandboxd: still <down|missing|unpinned>` or the
 line of the message.
 
 A delivery in the log only proves that ntfy accepted the POST, and ntfy accepts any topic: with a
