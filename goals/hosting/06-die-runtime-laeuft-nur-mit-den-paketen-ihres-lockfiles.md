@@ -1,7 +1,7 @@
 # Hosting Goal 06: Die Runtime im Harness läuft nur mit den Paketen ihres Lockfiles
 
 ## Status
-PLANNED
+ACTIVE
 
 ## Active Objective
 `ops/runtime-sandbox.sh` meldet die Runtime am Pin nur noch als unverändert, wenn neben `dist/` auch `node_modules/` genau die
@@ -78,7 +78,7 @@ verändertes `node_modules/` im Cache heute als Runtime am Pin durchläuft.
   Annahmen.
 
 ## Done Condition
-- [ ] `runtime_state` erkennt ein verändertes, ergänztes oder umgelinktes `node_modules/` und einen Stempel im alten Format als `deps`,
+- [x] `runtime_state` erkennt ein verändertes, ergänztes oder umgelinktes `node_modules/` und einen Stempel im alten Format als `deps`,
       `judge` meldet das, und `build_runtime` installiert und baut dann neu.
       MVP: Funktion, weil die Runtime ihre Pakete aus `node_modules/` lädt und ein grüner Gang sonst eine veränderte Runtime bestätigt.
       Prüfung: `PATH=/usr/bin:$PATH bash ops/runtime-sandbox.sh --selftest | tail -n 1` muss `RUNTIME SANDBOX SELFTEST OK` ausgeben.
@@ -89,24 +89,24 @@ verändertes `node_modules/` im Cache heute als Runtime am Pin durchläuft.
       Prüfung: `PATH=/usr/bin:$PATH bash ops/runtime-sandbox.sh --selftest | grep -c '^FAIL '` muss 0 ausgeben.
       Prüfung: `for w in 'deps_sum()' 'node_modules/ is not the install at the pin' 'frozen-lockfile' 'type l'; do grep -qF -- "$w" ops/runtime-sandbox.sh || echo "fehlt $w"; done` muss nichts ausgeben.
       Prüfung: `grep -c 'echo deps; return' ops/runtime-sandbox.sh` muss 1 ausgeben.
-- [ ] `test/runtime-sandbox-deps.test.ts` hält den Selbsttest samt den neuen Fällen in `check`.
+- [x] `test/runtime-sandbox-deps.test.ts` hält den Selbsttest samt den neuen Fällen in `check`.
       MVP: Funktion, weil ein Merge, der die Prüfung bricht, sonst erst im nächsten Audit auffällt.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/runtime-sandbox-deps.test.ts` muss Exit-Code 0 haben.
       Prüfung: `for w in deps-changed deps-added deps-relinked deps-old-stamp rebuild-changed-deps dist-changed reuse-stamped-dist rebuild-drops-stale "RUNTIME SANDBOX SELFTEST OK" --selftest timeout; do grep -qF -- "$w" test/runtime-sandbox-deps.test.ts || echo "fehlt $w"; done` muss nichts ausgeben.
-- [ ] Der neue Test ist rot gegen den Stand vor dem Fix und gegen eine Kopie, in der ein abweichendes `node_modules/` als `ok` gilt.
+- [x] Der neue Test ist rot gegen den Stand vor dem Fix und gegen eine Kopie, in der ein abweichendes `node_modules/` als `ok` gilt.
       MVP: Funktion, weil ein Test, der ohne die Prüfung grün bleibt, die Runtime am Pin nicht schützt.
       Prüfung: `T=$(mktemp -d); git archive HEAD | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; git show $(git merge-base origin/dev HEAD):ops/runtime-sandbox.sh > $T/ops/runtime-sandbox.sh; (cd $T && PATH=/usr/bin:$PATH pnpm -s vitest run test/runtime-sandbox-deps.test.ts --reporter=json --outputFile=$T/r.json >/dev/null 2>&1); node -p "JSON.parse(require('fs').readFileSync('$T/r.json','utf8')).numFailedTests"; rm -rf $T` muss mindestens 1 ausgeben.
       Prüfung: `T=$(mktemp -d); git archive HEAD | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; sed -i 's/echo deps; return/echo ok; return/' $T/ops/runtime-sandbox.sh; (cd $T && PATH=/usr/bin:$PATH pnpm -s vitest run test/runtime-sandbox-deps.test.ts --reporter=json --outputFile=$T/r.json >/dev/null 2>&1); node -p "JSON.parse(require('fs').readFileSync('$T/r.json','utf8')).numFailedTests"; rm -rf $T` muss mindestens 1 ausgeben.
-- [ ] Wahl der Summe, Messung am Cache und die Abweichung von `ROADMAP.md` stehen mit Grund unter `## Goal 06` in
+- [x] Wahl der Summe, Messung am Cache und die Abweichung von `ROADMAP.md` stehen mit Grund unter `## Goal 06` in
       `goals/hosting/ANNAHMEN.md`, mit einer Zeile ab Spalte 0 `Messung: deps_sum <n> Dateien, <m> Links, <s> s, <JJJJ-MM-TT>`.
       MVP: Funktion, weil die Summe bei jedem Gang läuft und ihre Kosten belegt sein müssen, bevor sie jemand verkleinert.
       Prüfung: `awk '/^## Goal 06/{f=1;next} /^## /{f=0} f' goals/hosting/ANNAHMEN.md | grep -cE '^Messung: deps_sum [0-9]+ Dateien, [0-9]+ Links, [0-9]+([.,][0-9]+)? s, 20[0-9]{2}-[0-9]{2}-[0-9]{2}$'` muss 1 ausgeben.
       Prüfung: `for w in lock.yaml .modules.yaml node_modules/.pnpm deps-old-stamp "hosting 03" frozen-lockfile; do awk '/^## Goal 06/{f=1;next} /^## /{f=0} f' goals/hosting/ANNAHMEN.md | grep -qF -- "$w" || echo "fehlt $w"; done` muss nichts ausgeben.
-- [ ] Kopfkommentar von `ops/runtime-sandbox.sh` und `docs/sandbox/e2e.md` nennen `node_modules/` und das dritte Feld des Stempels.
+- [x] Kopfkommentar von `ops/runtime-sandbox.sh` und `docs/sandbox/e2e.md` nennen `node_modules/` und das dritte Feld des Stempels.
       MVP: Funktion, weil wer eine Meldung `node_modules/ is not the install at the pin` liest, ohne Suche wissen muss, was neu gebaut wird.
       Prüfung: `sed -n '1,25p' ops/runtime-sandbox.sh | grep -c 'node_modules'` muss mindestens 1 ausgeben.
       Prüfung: `grep -c 'node_modules' docs/sandbox/e2e.md` muss mindestens 1 ausgeben.
-- [ ] Das Goal ändert nur seine eigenen Dateien, weder `src/`, `harness/` noch bestehende Tests, bringt keinen Schlüssel ins Repo, und
+- [x] Das Goal ändert nur seine eigenen Dateien, weder `src/`, `harness/` noch bestehende Tests, bringt keinen Schlüssel ins Repo, und
       seine Texte sind ohne Gedankenstrich.
       MVP: Funktion, weil das Repo öffentlich ist (Grundregel 8) und jede weitere Datei auf dem Laufzeitpfad einen Rollout ohne Nutzen
       für den Kunden auslöst (Grundregel 5).
@@ -142,6 +142,7 @@ verändertes `node_modules/` im Cache heute als Runtime am Pin durchläuft.
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-21 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6 gebaut (Summe über `node_modules/` mit Links als drittes Feld des Stempels, Zustand `deps`, Neubau von Grund auf, fünf neue Fälle im Selbsttest, eigener Test, Messung und Annahmen, Doku); Punkt 7 lokal grün, der Job `check` am PR steht noch aus. Prüfbefehle: Selbsttest 32 Fälle, letzte Zeile OK, Zähler 5, 4, 7 und 1 wie verlangt, keine Zeile FAIL, Wortsuche leer, Zeile des Zustands 1; vitest des neuen Tests Exit 0, Wortsuche leer; Gegenprobe gegen das Skript der Merge-Basis 1 roter Test, gegen die Kopie mit `ok` statt `deps` 1 roter Test; Annahmen Messzeile 1, Wortsuche leer; Kopfkommentar 3 Treffer, Doku 5; Umfang 0, 0, 0, 0, Gedankenstriche 0; `node scripts/check.mjs` Exit 0 (243 Dateien, 2537 Tests). Beim Bau zusätzlich rot gesehen: der neue Test vor den Fällen, `deps-relinked` ohne Links in der Summe, `rebuild-changed-deps` ohne Löschen von `node_modules/` und ohne `deps` im Neubau.
 
 ## Blockers
 Keine.
