@@ -115,7 +115,7 @@ verändertes `node_modules/` im Cache heute als Runtime am Pin durchläuft.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD | grep -cE "\.(key|pem|crt|env)$"` muss 0 ausgeben.
       Prüfung: `git diff $(git merge-base origin/dev HEAD) HEAD -- . ':(exclude)goals/' | grep -cE '^\+.*(cnwy_k_[0-9a-f]{32}|-{5}BEGIN [A-Z ]*PRIVATE KEY-{5}|0x[0-9a-fA-F]{64})'` muss 0 ausgeben.
       Prüfung: `cat ops/runtime-sandbox.sh docs/sandbox/e2e.md test/runtime-sandbox-deps.test.ts goals/hosting/ANNAHMEN.md | grep -c $'\xe2\x80\x93\|\xe2\x80\x94'` muss 0 ausgeben.
-- [ ] `check` ist lokal grün, und der Job `check` des Goal-PR ist auf dem GitHub-Rechner grün.
+- [x] `check` ist lokal grün, und der Job `check` des Goal-PR ist auf dem GitHub-Rechner grün.
       MVP: Funktion, weil erst der Gang auf dem GitHub-Rechner zeigt, dass der Selbsttest dort ohne den Cache des code-host läuft.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung (Netz): `n=$(gh pr list -R matthiashippe/control-plane --head goal/hosting-06 --state all --json number -q '.[0].number'); gh pr checks "${n:?}" -R matthiashippe/control-plane --json name,state -q '.[] | select(.name=="check") | .state'` muss `SUCCESS` ausgeben.
@@ -142,7 +142,7 @@ verändertes `node_modules/` im Cache heute als Runtime am Pin durchläuft.
 - max Versuche pro Gap: 3
 
 ## Progress Log
-- 2026-11-21 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6 gebaut (Summe über `node_modules/` mit Links als drittes Feld des Stempels, Zustand `deps`, Neubau von Grund auf, fünf neue Fälle im Selbsttest, eigener Test, Messung und Annahmen, Doku); Punkt 7 lokal grün, der Job `check` am PR steht noch aus. Prüfbefehle: Selbsttest 32 Fälle, letzte Zeile OK, Zähler 5, 4, 7 und 1 wie verlangt, keine Zeile FAIL, Wortsuche leer, Zeile des Zustands 1; vitest des neuen Tests Exit 0, Wortsuche leer; Gegenprobe gegen das Skript der Merge-Basis 1 roter Test, gegen die Kopie mit `ok` statt `deps` 1 roter Test; Annahmen Messzeile 1, Wortsuche leer; Kopfkommentar 3 Treffer, Doku 5; Umfang 0, 0, 0, 0, Gedankenstriche 0; `node scripts/check.mjs` Exit 0 (243 Dateien, 2537 Tests). Beim Bau zusätzlich rot gesehen: der neue Test vor den Fällen, `deps-relinked` ohne Links in der Summe, `rebuild-changed-deps` ohne Löschen von `node_modules/` und ohne `deps` im Neubau.
+- 2026-11-21 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6, 7 gebaut (Summe über `node_modules/` mit Links als drittes Feld des Stempels, Zustand `deps`, Neubau von Grund auf, fünf neue Fälle im Selbsttest, eigener Test, Messung und Annahmen, Doku). Prüfbefehle: Selbsttest 32 Fälle, letzte Zeile OK, Zähler 5, 4, 7 und 1 wie verlangt, keine Zeile FAIL, Wortsuche leer, Zeile des Zustands 1; vitest des neuen Tests Exit 0, Wortsuche leer; Gegenprobe gegen das Skript der Merge-Basis 1 roter Test, gegen die Kopie mit `ok` statt `deps` 1 roter Test; Annahmen Messzeile 1, Wortsuche leer; Kopfkommentar 3 Treffer, Doku 5; Umfang 0, 0, 0, 0, Gedankenstriche 0; `node scripts/check.mjs` Exit 0 (243 Dateien, 2537 Tests), Job `check` an PR #346 SUCCESS. Beim Bau zusätzlich rot gesehen: der neue Test vor den Fällen, `deps-relinked` ohne Links in der Summe, `rebuild-changed-deps` ohne Löschen von `node_modules/` und ohne `deps` im Neubau.
 
 ## Blockers
 Keine.
