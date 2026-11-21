@@ -143,6 +143,14 @@ weggeräumtes Basis-Image bemerkt, und zwar als 501.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung (Netz): `n=$(gh pr list -R matthiashippe/control-plane --head goal/hosting-05 --state all --json number -q '.[0].number'); gh pr checks "${n:?}" -R matthiashippe/control-plane --json name,state -q '.[] | select(.name=="check") | .state'` muss `SUCCESS` ausgeben.
       Prüfung (Netz): `n=$(gh pr list -R matthiashippe/control-plane --head goal/hosting-05 --state all --json number -q '.[0].number'); gh pr checks "${n:?}" -R matthiashippe/control-plane --json name,state -q '.[] | select(.name=="e2e") | .state'` muss `SUCCESS` ausgeben.
+- [ ] Kritik: Fällt ein ungepinntes Basis-Image danach weg, meldet der Wächter das als eigenen Wechsel: `<state file>.sandboxd` unterscheidet
+      `missing` und `unpinned` statt `image`, von `unpinned` nach `missing` geht genau ein `[WARN]` mit `base image missing`, von
+      `missing` nach `unpinned` genau eines mit `base image not pinned`; der Test dazu heißt `unpinned to missing and missing to
+      unpinned each report the new state` (Tech Lead, 21.11.2026).
+      MVP: Funktion, weil „not pinned“ genau diesen Wegfall ankündigt und der Wächter heute schweigt, wenn er eintritt: Beide Fälle
+      speichert er als `image`, also gilt der Wechsel als „still image“, obwohl ab da jede neue Sandbox mit 501 scheitert.
+      Prüfung: `T=$(mktemp -d); PATH=/usr/bin:$PATH pnpm -s vitest run test/watchdog-sandboxd.test.ts -t "unpinned to missing" --reporter=json --outputFile=$T/r.json >/dev/null 2>&1; node -p "const r=JSON.parse(require('fs').readFileSync('$T/r.json','utf8')); r.numFailedTests===0&&r.numPassedTests>0"; rm -rf $T` muss `true` ausgeben.
+      Prüfung: `T=$(mktemp -d); git archive HEAD | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; git show 137b309:ops/watchdog.sh > $T/ops/watchdog.sh; (cd $T && PATH=/usr/bin:$PATH pnpm -s vitest run test/watchdog-sandboxd.test.ts -t "unpinned to missing" --reporter=json --outputFile=$T/r.json >/dev/null 2>&1); node -p "JSON.parse(require('fs').readFileSync('$T/r.json','utf8')).numFailedTests"; rm -rf $T` muss mindestens 1 ausgeben.
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
