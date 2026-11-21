@@ -119,6 +119,20 @@ verändertes `node_modules/` im Cache heute als Runtime am Pin durchläuft.
       MVP: Funktion, weil erst der Gang auf dem GitHub-Rechner zeigt, dass der Selbsttest dort ohne den Cache des code-host läuft.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung (Netz): `n=$(gh pr list -R matthiashippe/control-plane --head goal/hosting-06 --state all --json number -q '.[0].number'); gh pr checks "${n:?}" -R matthiashippe/control-plane --json name,state -q '.[] | select(.name=="check") | .state'` muss `SUCCESS` ausgeben.
+- [ ] Ein Neubau aus `unbuilt` oder `dist` löscht `node_modules/` ebenfalls und installiert von Grund auf, wenn das dritte Feld des
+      Stempels nicht die Summe des vorhandenen `node_modules/` ist (kein Stempel, Stempel im alten Format, andere Summe); nur ein
+      `node_modules/`, das der Stempel belegt, bleibt beim Neubau von `dist/` stehen. Neuer Fall `rebuild-unstamped-deps` im Selbsttest:
+      Datei unter `node_modules/` verändert, Stempel gelöscht, dann `build_case`; erwartet genau ein `install` und ein `build`, die
+      Veränderung weg, Zustand danach `ok`. Grund und Fall stehen unter `## Goal 06` in `goals/hosting/ANNAHMEN.md`, der Satz, dass
+      `node_modules/` bei `unbuilt` und `dist` stehen bleibt, ist dort ersetzt.
+      MVP: Funktion, weil der Cache auf dem code-host heute keinen Stempel hat (Zustand `dist`) und der nächste Gang seine 19 371 Dateien
+      sonst ungeprüft in den ersten Stempel schreibt; dasselbe nach jedem Pin-Wechsel oder gelöschten Stempel (Kritik Tech Lead, Probe am
+      Kopf 5032359: `installs=1 planted=kept state=ok`).
+      Prüfung: `PATH=/usr/bin:$PATH bash ops/runtime-sandbox.sh --selftest | grep -cE '^ok   rebuild-unstamped-deps: installs=1 builds=1 planted=gone state=ok$'` muss 1 ausgeben.
+      Prüfung: `PATH=/usr/bin:$PATH bash ops/runtime-sandbox.sh --selftest | grep -cE '^ok   (rebuild-changed-dist|reuse-stamped-dist|rebuild-drops-stale|rebuild-changed-deps): '` muss 4 ausgeben.
+      Prüfung: `grep -c 'rebuild-unstamped-deps' test/runtime-sandbox-deps.test.ts` muss mindestens 1 ausgeben.
+      Prüfung: `awk '/^## Goal 06/{f=1;next} /^## /{f=0} f' goals/hosting/ANNAHMEN.md | grep -c 'rebuild-unstamped-deps'` muss mindestens 1 ausgeben.
+      Prüfung: `T=$(mktemp -d); git archive HEAD | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; git show 5032359:ops/runtime-sandbox.sh > $T/ops/runtime-sandbox.sh; (cd $T && PATH=/usr/bin:$PATH pnpm -s vitest run test/runtime-sandbox-deps.test.ts --reporter=json --outputFile=$T/r.json >/dev/null 2>&1); node -p "JSON.parse(require('fs').readFileSync('$T/r.json','utf8')).numFailedTests"; rm -rf $T` muss mindestens 1 ausgeben.
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
