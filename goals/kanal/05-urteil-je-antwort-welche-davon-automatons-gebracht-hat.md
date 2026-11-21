@@ -1,7 +1,7 @@
 # Kanal Goal 05: Urteil je Antwort, welche davon Automatons gebracht hat
 
 ## Status
-PLANNED
+PAUSED
 
 ## Active Objective
 `ops/github-yield.sh` zählt heute jede Ankunft mit Referrer `github.com/Conway-Research` in eine Summe über einen Zeitraum. Seit dem
@@ -173,3 +173,4 @@ unsere eigenen Wallets vermischt.
 ## Progress Log
 
 ## Blockers
+Pause: ersetzt durch kanal 06 laut ROADMAP.md (Tech Lead 21.11.2026, PRO-26350) (Loop-Kritik 2026-11-21)
