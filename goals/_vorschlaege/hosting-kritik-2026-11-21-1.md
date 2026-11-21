@@ -1,0 +1,5 @@
+Schwere: 3
+Goal: hosting 04
+Befund: `grantInternal` nimmt jeden ganzzahligen Betrag und jede Ref an. Ein künftiger Aufrufer mit `mc: 0` bucht eine Nullzeile und verbraucht die Ref für immer, sodass die spätere richtige Gutschrift mit derselben Ref nur noch `already_granted` meldet; ein negativer Betrag bucht unter der Art `internal_grant` eine Abbuchung von unserem eigenen Konto. Heute rufen nur die beiden Konstanten mit 100 000 mc und dem Betrag aus `liveAutomatonGrantMc` auf, deshalb kein Schaden am Stand des Goals.
+Beleg: `src/credits/internal-grant.ts:29` (keine Prüfung von `grant.mc` und `grant.ref` vor der Transaktion), `src/db.ts:824` (`postLedger` prüft nur, ob der Betrag ganzzahlig ist)
+Empfehlung: `grantInternal` wirft vor der Transaktion bei `mc <= 0` oder leerer Ref (`internal grant needs a positive amount and a ref`), Test in `test/internal-grant.test.ts` mit 0, -1 und `""`, je ohne Zeile im Ledger, rot vor dem Fix. Bei der Gelegenheit nennt der Kommentar an der Art `internal_grant` in `src/db.ts` (Zeile 794) `src/credits/internal-grant.ts` statt `src/sandbox/grant.ts`; `src/db.ts` steht in diesem Goal auf der Deny List.
