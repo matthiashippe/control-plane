@@ -1,7 +1,7 @@
 # Abrechnung Goal 07: Neben der Timeout-Quote steht die Antwortquote
 
 ## Status
-PLANNED
+ACTIVE
 
 ## Active Objective
 Wer bei uns liest, dass seine Anfragen ankommen, bekommt eine Zahl, die auch unsere Ausfälle zählt. Heute zählt `Quote nach außen:` in
