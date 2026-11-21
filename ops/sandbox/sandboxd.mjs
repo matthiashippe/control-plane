@@ -50,6 +50,8 @@ export function loadConfig(env = process.env) {
     disksDir: env.SANDBOXD_DISKS || "/var/lib/sandboxd/disks",
     mntDir: env.SANDBOXD_MNT || "/var/lib/sandboxd/mnt",
     image: env.SANDBOXD_IMAGE || "sandboxd-base:2",
+    // The never started container that keeps the base image from the prune cron; the name is PIN= in ops/sandbox/setup.sh.
+    pin: env.SANDBOXD_PIN || "sandboxd-base-pin",
     slots: int(env.SANDBOXD_SLOTS, 10),
     domain: (env.SANDBOXD_DOMAIN || "").trim().toLowerCase(),
     sweepS: int(env.SANDBOXD_SWEEP_S, 60),
@@ -315,6 +317,18 @@ function sendJson(res, status, payload) {
 function sendText(res, status, text) {
   res.writeHead(status, { "content-type": "text/plain; charset=utf-8", "content-length": Buffer.byteLength(text) });
   res.end(text);
+}
+
+/**
+ * The state of the base image by the rule of pin_fact in ops/sandbox/setup.sh. `imageId` is the ID of the base image or null,
+ * `pin` the `{ image, status, label }` of the pin container or null. "missing" without the image; "ok" only when the pin is a
+ * never started container of exactly this image ID without the label sandboxd=1; "unpinned" otherwise, because the prune cron
+ * of the host then removes the image within 24 h and every new sandbox fails with 501.
+ */
+export function imageHealth({ imageId, pin }) {
+  if (!imageId) return "missing";
+  if (pin && pin.image === imageId && pin.status === "created" && pin.label !== "1") return "ok";
+  return "unpinned";
 }
 
 export function createSandboxd({ run, now = Date.now, keys = [], state = memoryState(), config = {}, log = (l) => console.log(l), randomId = newId }) {
@@ -611,6 +625,11 @@ export function createSandboxd({ run, now = Date.now, keys = [], state = memoryS
   async function handleApi(req, res) {
     try {
       if (req.method === "GET" && req.url === "/healthz") return sendText(res, 200, "ok");
+      // Unsigned like /healthz: it tells no secret, and only the payment server gets through Caddy (ops/watchdog.sh asks it).
+      if (req.method === "GET" && req.url === "/healthz/image") {
+        const h = imageHealth(await imageFacts());
+        return sendText(res, h === "ok" ? 200 : 503, `image ${h}`);
+      }
       const raw = await readBody(req, BODY_LIMIT);
       if (raw == null) return sendJson(res, 413, { error: "body too large" });
       const v = verifier.verify({ method: req.method, target: req.url, headers: req.headers, body: raw });
@@ -625,6 +644,20 @@ export function createSandboxd({ run, now = Date.now, keys = [], state = memoryS
       if (!res.headersSent) sendJson(res, 500, { error: "internal error" });
       else res.destroy();
     }
+  }
+
+  /** Asks Docker the way pin_fact does; a query that fails counts as the part missing. */
+  async function imageFacts() {
+    const ok = (r) => r.code === 0 && !r.timedOut;
+    const img = await run("docker", ["image", "inspect", "--format", "{{.Id}}", cfg.image], { timeoutMs: 10_000 });
+    const imageId = ok(img) ? String(img.stdout).trim() || null : null;
+    const p = await run("docker", ["container", "inspect", "--format", '{{.Image}} {{.State.Status}} {{index .Config.Labels "sandboxd"}}', cfg.pin], { timeoutMs: 10_000 });
+    let pin = null;
+    if (ok(p)) {
+      const [image = "", status = "", label = ""] = String(p.stdout).trim().split(/\s+/);
+      pin = { image, status, label };
+    }
+    return { imageId, pin };
   }
 
   async function containerIp(id) {
