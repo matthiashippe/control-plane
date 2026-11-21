@@ -9,7 +9,8 @@
 # code-host), and before the walk checks that `git rev-parse HEAD` starts with the pin, `git status --porcelain` is
 # empty and dist/ and node_modules/ (both ignored by git) are the stamped install and build: after each build one line
 # "<HEAD> <dist_sum> <deps_sum>" goes to $(git rev-parse --absolute-git-dir)/control-plane-dist.sha256. A missing or
-# other stamp, or another checksum over dist/, ends with FAIL dist/ and makes the next live run rebuild dist/. A third
+# other stamp, or another checksum over dist/, ends with FAIL dist/ and makes the next live run rebuild dist/ (and
+# reinstall node_modules/ from scratch unless the third field of the stamp covers it). A third
 # field that is missing (old stamp) or is not the checksum over node_modules/ (files and symlinks, the packages the
 # runtime loads) ends with FAIL node_modules/ and makes the next live run delete node_modules/ and dist/, then run
 # pnpm install --frozen-lockfile and pnpm build again. Only then the runtime is unchanged. Then
@@ -98,6 +99,15 @@ write_dist_stamp() {
   printf '%s %s %s\n' "$head" "$sum" "$deps" >"$file"
 }
 
+# Succeeds when the third field of the stamp of the clone in $1 is the checksum over its node_modules/.
+stamped_deps() {
+  local stamp line="" s_deps=""
+  stamp="$(dist_stamp_file "$1")" || return 1
+  [ -f "$stamp" ] && read -r line <"$stamp"
+  read -r _ _ s_deps _ <<<"$line"
+  [ -n "$s_deps" ] && [ "$s_deps" = "$(deps_sum "$1")" ]
+}
+
 # ok | missing | commit | changed | unbuilt | dist | deps, for the clone in $1 against the pin $2. dist: dist/ is not the
 # stamped build at HEAD (no stamp, a stamp of another commit, or another checksum). deps: node_modules/ is not the stamped
 # install (third field of the stamp missing, as in a stamp of the old format, or another checksum).
@@ -137,14 +147,15 @@ build_runtime() {
   fi
   git -C "$RUNTIME_DIR" checkout -q "$PIN" || return 1
   # Build when dist/ is missing or is not the stamped build at the pin; a clone with changes is left as it is for judge.
-  # When node_modules/ is not the stamped install, install from scratch: pnpm does not see a changed file under
-  # node_modules/ and would report everything up to date.
+  # When node_modules/ is not the stamped install (state deps, and for unbuilt or dist no stamp, an old stamp or another
+  # checksum in its third field), install from scratch: pnpm does not see a changed file under node_modules/ and would
+  # report everything up to date, and the new stamp would cover it.
   local state
   state="$(runtime_state "$RUNTIME_DIR" "$PIN")"
   case "$state" in
     unbuilt | dist | deps)
       [ -d "$RUNTIME_DIR/.git" ] && rm -rf "$RUNTIME_DIR/dist"
-      [ "$state" = deps ] && [ -d "$RUNTIME_DIR/.git" ] && rm -rf "$RUNTIME_DIR/node_modules"
+      stamped_deps "$RUNTIME_DIR" || { [ -d "$RUNTIME_DIR/.git" ] && rm -rf "$RUNTIME_DIR/node_modules"; }
       (cd "$RUNTIME_DIR" && pnpm install --frozen-lockfile >/dev/null 2>&1 && pnpm build >/dev/null 2>&1) || return 1
       write_dist_stamp "$RUNTIME_DIR" || return 1
       ;;
@@ -358,6 +369,14 @@ selftest() {
   build_case
   got="installs=$(grep -c '^install --frozen-lockfile$' "$calls") builds=$(grep -c '^build$' "$calls") planted=$(grep -q changed "$repo/node_modules/.pnpm/viem@0.0.0/index.js" && echo kept || echo gone) state=$(runtime_state "$repo" "$pin")"
   if [ "$got" = "installs=1 builds=1 planted=gone state=ok" ] && ! grep -q failed "$calls"; then echo "ok   rebuild-changed-deps: $got"; else echo "FAIL rebuild-changed-deps: expected 'installs=1 builds=1 planted=gone state=ok', got '$got'"; bad=$((bad + 1)); fi
+  # No stamp (a fresh cache, a deleted stamp): the state is dist, and a rebuild of dist/ alone would write the changed
+  # node_modules/ into the first stamp, so build_runtime installs from scratch unless the stamp covers node_modules/.
+  n=$((n + 1))
+  printf 'export const viem = "changed";\n' >"$repo/node_modules/.pnpm/viem@0.0.0/index.js"
+  rm -f "$(dist_stamp_file "$repo")"
+  build_case
+  got="installs=$(grep -c '^install --frozen-lockfile$' "$calls") builds=$(grep -c '^build$' "$calls") planted=$(grep -q changed "$repo/node_modules/.pnpm/viem@0.0.0/index.js" && echo kept || echo gone) state=$(runtime_state "$repo" "$pin")"
+  if [ "$got" = "installs=1 builds=1 planted=gone state=ok" ] && ! grep -q failed "$calls"; then echo "ok   rebuild-unstamped-deps: $got"; else echo "FAIL rebuild-unstamped-deps: expected 'installs=1 builds=1 planted=gone state=ok', got '$got'"; bad=$((bad + 1)); fi
 
   rm -f "$repo/dist/agent/tools.js"
   check unbuilt "RUNTIME SANDBOX FAIL the runtime clone is unbuilt" "$(runtime_state "$repo" "$pin")" good "1 0"

@@ -50,7 +50,9 @@ darum ein drittes Feld: `<HEAD> <Prüfsumme über dist/> <Prüfsumme über node_
 legt. Passt sie nicht, oder fehlt das dritte Feld wie in einem Stempel von sandbox 10, endet der Lauf mit
 `RUNTIME SANDBOX FAIL node_modules/ is not the install at the pin`. Der nächste Lauf löscht dann `node_modules/` und `dist/`, ruft
 `pnpm install --frozen-lockfile` und `pnpm build` und schreibt den Stempel neu; von Hand ist nichts zu tun. Gelöscht wird, weil pnpm
-eine veränderte Datei unter `node_modules/` nicht bemerkt. Der Selbsttest hat dafür fünf Fälle mehr (32), und
+eine veränderte Datei unter `node_modules/` nicht bemerkt. Auch ein Neubau nur wegen `dist/` (kein Stempel, etwa im frischen Cache
+oder nach einem Pin-Wechsel) installiert `node_modules/` von Grund auf, wenn das dritte Feld es nicht belegt, sonst schriebe der neue
+Stempel ein ungeprüftes `node_modules/` fest. Der Selbsttest hat dafür sechs Fälle mehr (33), und
 `test/runtime-sandbox-deps.test.ts` hält ihn in `check`.
 
 ## Was der Harness abdeckt und was nicht

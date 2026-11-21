@@ -192,8 +192,15 @@ Messung: deps_sum 19371 Dateien, 466 Links, 2,9 s, 2026-11-21
 - **Neubau bei `deps` von Grund auf** (Entscheidung 3). `build_runtime` löscht bei `deps` `node_modules/` und `dist/` und ruft dann
   `pnpm install --frozen-lockfile` und `pnpm build`. Das nachgebaute `pnpm` im Selbsttest legt die Pakete nur an, wenn
   `node_modules/` fehlt, wie das echte pnpm, das eine veränderte Datei nicht sieht; ohne das Löschen wird `rebuild-changed-deps` rot,
-  weil der neue Stempel sonst die veränderte Datei deckt (Gegenprobe beim Bau). Bei `unbuilt` und `dist` bleibt `node_modules/`
-  stehen, damit ein Neubau von `dist/` keine Pakete neu lädt.
+  weil der neue Stempel sonst die veränderte Datei deckt (Gegenprobe beim Bau).
+- **Neubau aus `unbuilt` oder `dist` prüft `node_modules/` ebenfalls** (Kritik Tech Lead, 21.11.2026, Punkt 8). `build_runtime`
+  löscht auch bei `unbuilt` und `dist` `node_modules/`, wenn das dritte Feld des Stempels nicht die Summe des vorhandenen
+  `node_modules/` ist (kein Stempel, Stempel im alten Format, andere Summe); nur ein `node_modules/`, das der Stempel belegt, bleibt beim
+  Neubau von `dist/` stehen, und dann lädt der Neubau keine Pakete neu. Grund: Der Cache auf dem code-host hat heute keinen Stempel
+  (Zustand `dist`), und ein Neubau nur von `dist/` hätte seine 19 371 Dateien ungeprüft in den ersten Stempel geschrieben; dasselbe
+  nach einem Pin-Wechsel oder gelöschten Stempel. Die Prüfung steht in `stamped_deps`, der Fall `rebuild-unstamped-deps` verändert eine
+  Datei unter `node_modules/`, löscht den Stempel und verlangt nach `build_case` genau ein `install` und ein `build`, die Veränderung
+  weg und den Zustand `ok`; ohne den Fix war er rot (`planted=kept`).
 - **Abweichung von `ROADMAP.md`.** Die Zeile nennt als Test `test/runtime-sandbox-selftest.test.ts` aus hosting 03. hosting 03 steht
   seit dem Kurs-Check vom 17.11.2026 auf `PAUSED`, die Datei gibt es auf `dev` nicht. Dieses Goal bringt darum seinen eigenen, schmalen
   Test `test/runtime-sandbox-deps.test.ts`; startet hosting 03 wieder, verlangt sein Test die Zeile für `deps-changed` laut

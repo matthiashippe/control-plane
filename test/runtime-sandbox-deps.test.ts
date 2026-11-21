@@ -34,6 +34,7 @@ describe("ops/runtime-sandbox.sh --selftest", () => {
       expect(lines).toContainEqual(expect.stringMatching(new RegExp(`^ok   ${name}: ${DEPS_FAIL.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&")}`)));
     }
     expect(lines).toContain("ok   rebuild-changed-deps: installs=1 builds=1 planted=gone state=ok");
+    expect(lines).toContain("ok   rebuild-unstamped-deps: installs=1 builds=1 planted=gone state=ok");
   }, 150_000);
 
   it("keeps the dist/ cases of sandbox 10 and reuses a stamped clone without pnpm", async () => {
