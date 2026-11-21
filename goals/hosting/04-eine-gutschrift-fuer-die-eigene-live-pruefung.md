@@ -1,7 +1,7 @@
 # Hosting Goal 04: Eine Gutschrift für die eigene Live-Prüfung statt zwei
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Die beiden internen Gutschriften der eigenen Live-Prüfung buchen über eine gemeinsame Funktion: `grantInternal` in
@@ -108,7 +108,7 @@ beiden Kopien landet; die andere bucht dann im schlimmsten Fall bei einem Rollou
       MVP: Funktion, weil die nächste interne Gutschrift wissen muss, dass sie `grantInternal` ruft und warum Ref und Betrag der
       bestehenden nie wechseln.
       Prüfung: `awk '/^## Goal 04/{f=1} f' goals/hosting/ANNAHMEN.md | grep -ciE "grantInternal|src/credits|Gegenprobe|Ref|index\.ts|refund"` muss mindestens 4 ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Die Gegenprobe war rot, wie sie soll; die Zeile im Progress Log nennt, womit.
@@ -132,6 +132,7 @@ beiden Kopien landet; die andere bucht dann im schlimmsten Fall bei einem Rollou
 - 2026-11-21 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6 gebaut, `grantInternal` in `src/credits/internal-grant.ts` mit neuem Test, beide Aufrufer buchen darüber, Entscheidungen in den Annahmen. Prüfbefehle: Punkt 1 vitest Exit 0 (3 Fälle), Zähler 1, 1, Schleife leer, 0; Punkt 2 Gegenprobe 1 (rot mit UNIQUE constraint failed am zweiten Aufruf, weil die Abfrage der Ref nie trifft); Punkt 3 vitest Exit 0 (17 Fälle), Zähler 1, 1, 2, 0, 1, 1, 2; Punkt 4 Zähler 0, 0, 0, 0; Punkt 5 check lokal Exit 0 (2510 Tests), PR #338 check SUCCESS, e2e SUCCESS; Punkt 6 Zähler 16.
 - 2026-11-21 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, dev (757ecc6) war schon enthalten. Prüfbefehle: Punkt 1 vitest Exit 0, Zähler 1, 1, Schleife leer, 0; Punkt 2 Gegenprobe 1; Punkt 3 vitest Exit 0, Zähler 1, 1, 2, 0, 1, 1, 2; Punkt 4 Zähler 0, 0, 0, 0; Punkt 5 check lokal Exit 0 (2510 Tests, 410 s), PR #338 am Kopf b13148f check SUCCESS, e2e SUCCESS; Punkt 6 Zähler 16.
 - 2026-11-21 Zyklus 3: Gap aus Verdict 04-z2-K behoben, die Vorschlagsdatei der Kritik liegt nicht mehr auf dem Goal-Branch, sondern unverändert im Pflege-PR #339 (`loop/kritik/2026-11-21-hosting-04`) gegen dev. Prüfbefehle: Punkt 1 vitest Exit 0, Zähler 1, 1, Schleife leer, 0; Punkt 2 Gegenprobe 1; Punkt 3 vitest Exit 0, Zähler 1, 1, 2, 0, 1, 1, 2; Punkt 4 Zähler 0, 0, 0, 0; Punkt 5 check lokal Exit 0 (2510 Tests), Jobs am PR #338 laufen am neuen Kopf; Punkt 6 Zähler 16.
+- 2026-11-21 Release: PASS K und B (Zyklus 3), DONE.
 
 ## Blockers
 Keine.
