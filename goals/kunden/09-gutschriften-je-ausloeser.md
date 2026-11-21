@@ -1,7 +1,7 @@
 # Kunden Goal 09: Gutschriften je Auslöser
 
 ## Status
-PLANNED
+PAUSED
 
 ## Active Objective
 Seit kunden 06 gibt der Dienst die Startgutschrift auf drei Wegen: beim ersten Lesen eines leeren Saldos (`grantOnFirstRead`, schreibt
@@ -87,3 +87,4 @@ MVP: Funktion, weil der Loop sonst eine Woche nach kunden 06 nicht sagen kann, o
 ## Progress Log
 
 ## Blockers
+Pause: Kurs-Check 2026-11-21, reine Messpflege der Startgutschrift ohne Schutz für Geld, Daten oder Rechte der Kunden, während kunden 08 belegt, dass Kunde 1 nur am leeren Auftragsbrett scheitert (Vorschlag kunden-kritik-2026-11-21-3); vor ihm startet konto 15, das den ersten Kauf eines Menschen ohne Wallet freischaltet
