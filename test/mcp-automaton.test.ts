@@ -110,7 +110,7 @@ describe("Automaton tools in mcp/server.mjs", () => {
     const h = harness({ routes: {} });
     const listed = (await handleMessage({ jsonrpc: "2.0", id: 1, method: "tools/list" }, { client: createClient({ baseUrl: BASE }), automaton: h.tools }))
       .result.tools.map((t: any) => t.name);
-    expect(listed).toHaveLength(14);
+    expect(listed).toHaveLength(15);
     expect(listed.slice(0, 6)).toEqual([
       "list_open_bounties",
       "submit_work",

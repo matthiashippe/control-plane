@@ -118,6 +118,7 @@ describe("Money tools in mcp/server.mjs", () => {
       "deposit",
       "payout",
       "set_payout_rule",
+      "card_top_up",
     ]);
     for (const name of ["deposit", "payout", "set_payout_rule"]) {
       const tool = listed.find((t: any) => t.name === name);

@@ -35,7 +35,7 @@ export const SALES_PAGE = 'https://automatonhost.com/'
 // 7 is "electronically supplied service" in getGlobalSettings: prepaid credit for a hosted service. consumer: the price is gross.
 export const PRODUCT_TYPE = '7'
 export const BUYER_TYPE = 'consumer'
-export const REFUND_DAYS = 30
+export const REFUND_DAYS = 60
 export const SELLER_SENTENCE = 'Seller of this offer is Digistore24 GmbH. The charge is made by Digistore24.'
 export const THANKYOU_TEXT =
   '<p><strong>Thank you for your purchase.</strong> The credit is on your automaton within a few minutes.</p>' +
@@ -258,7 +258,7 @@ const SAMPLE = `export const CARD_PACKAGES: readonly CardPackage[] = [
   { productId: "", grossEurCents: 5000, label: "credit 50 EUR" },
 ];`
 
-/** An account with fixed answers that records every write. New products start the way Digistore24 creates them: USD, no form, refund 60. */
+/** An account with fixed answers that records every write. New products start the way Digistore24 creates them: USD, no form, refund 14. */
 function fakeAccount (start = []) {
   const products = start.map((p) => ({ ...p }))
   const plans = new Map()
@@ -273,7 +273,7 @@ function fakeAccount (start = []) {
     if (fn === 'listPaymentPlans') return { paymentplans: plans.get(String(params.product_id)) ?? [] }
     if (fn === 'createProduct') {
       const id = String(next++)
-      products.push({ ...fields(params), id, currency: 'USD', orderform_id: '0', refund_policy: { private: { refund_days: '60' } } })
+      products.push({ ...fields(params), id, currency: 'USD', orderform_id: '0', refund_policy: { private: { refund_days: '14' } } })
       return { product_id: id }
     }
     if (fn === 'updateProduct') { Object.assign(find(params.product_id), fields(params)); return {} }
@@ -316,11 +316,11 @@ export async function selftest (print = (l) => console.log(mask(l))) {
   await create(a.api, log, files)
   if (a.writes.length !== before) errors.push(`second create wrote ${a.writes.slice(before).join(',')}`)
 
-  // 3. The report: refund 60 days is a defect, refund 30 is not, differing IDs are a defect.
+  // 3. The report: refund 14 days is a defect, refund 60 is not, differing IDs are a defect.
   const reportLines = []
   const n60 = await report(a.api, (l) => reportLines.push(l), source)
-  if (n60 !== 3 || !reportLines.includes('ids: match')) errors.push(`report with refund 60: ${n60} defects, ${reportLines.join(' | ')}`)
-  for (const p of a.products) if (byName.has(p.name_intern)) p.refund_policy = { private: { refund_days: '30' } }
+  if (n60 !== 3 || !reportLines.includes('ids: match')) errors.push(`report with refund 14: ${n60} defects, ${reportLines.join(' | ')}`)
+  for (const p of a.products) if (byName.has(p.name_intern)) p.refund_policy = { private: { refund_days: '60' } }
   const good = []
   if (await report(a.api, (l) => good.push(l), source) !== 0) errors.push(`good report has defects: ${good.join(' | ')}`)
   const shape = /^product [0-9]+: credit (5|20|50) EUR, EUR (5|20|50)\.00, order form 254538, refund [0-9]+ days, thankyou yes, sales page https:\/\/automatonhost\.com\/$/

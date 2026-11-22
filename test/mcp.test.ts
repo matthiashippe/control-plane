@@ -92,6 +92,7 @@ describe("MCP protocol", () => {
       "deposit",
       "payout",
       "set_payout_rule",
+      "card_top_up",
     ]);
     for (const tool of listed) {
       expect(tool.inputSchema.type).toBe("object");
@@ -176,7 +177,7 @@ describe("Starting it without a build step", () => {
     expect(code).toBe(0);
     const lines = out.split("\n").filter(Boolean).map((l) => JSON.parse(l));
     expect(lines.map((l) => l.id)).toEqual([1, 2]);
-    expect(lines[1].result.tools).toHaveLength(14);
+    expect(lines[1].result.tools).toHaveLength(15);
     // Counter-check: the startup note goes to stderr. On stdout it would corrupt the protocol,
     // so every single line out there has to be a JSON-RPC message.
     expect(err).toContain("control-plane-bounties");

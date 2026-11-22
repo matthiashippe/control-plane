@@ -17,6 +17,7 @@ import { grantOnFirstUse } from "../credits/starter.js";
 import { openBountyCount } from "../bounties/store.js";
 import { siteOrigin } from "../public/site.js";
 import { TOPUP_TIERS_USD } from "../payments/pay.js";
+import { CARD_PACKAGES, cardCheckoutUrl } from "../payments/digistore.js";
 
 export const MARKUP = 1.3;
 const DEFAULT_MAX_TOKENS = 4096;
@@ -339,6 +340,9 @@ async function handleChatUncoalesced(
         },
       };
     }
+    // The way for an operator without USDC (goals/karte/02): the checkout of the smallest card package, 5 EUR like `topup_url`,
+    // with this wallet in `custom`. Additive only, like `topup_url`.
+    const cardUrl = cardCheckoutUrl(CARD_PACKAGES[0], address);
     return {
       status: 402,
       body: {
@@ -359,12 +363,15 @@ async function handleChatUncoalesced(
           `Buy credits at ${siteOrigin()}/pay/5/${address}: call it, take the 402, sign the x402 ` +
           `offer it carries and send it back in X-Payment. Tiers are ${TOPUP_TIERS_USD.join(", ")} USD; ` +
           `put another one in the path for a larger one. Sending USDC to ${address} on Base works ` +
-          "too, and the runtime's bootstrap topup picks it up. Nothing was charged for this call.",
+          "too, and the runtime's bootstrap topup picks it up. " +
+          (cardUrl ? `No USDC? Pay by card: ${cardUrl} ` : "") +
+          "Nothing was charged for this call.",
         docs: DOC.inference,
         details: {
           required_cents: Math.ceil(requiredMc / 1000),
           current_balance_cents: mcToCents(availableMc),
           model: req.model,
+          ...(cardUrl ? { card_url: cardUrl } : {}),
           // Added 2026-09-29, after two foreign automatons in a row failed to find the pay route
           // from the sentence above. Additive only: nothing upstream reads these, and the two
           // fields upstream does read are untouched.

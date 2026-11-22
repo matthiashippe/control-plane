@@ -10,6 +10,15 @@ USDC and gets answers again, over the same API it uses today.
 "conwayApiUrl": "https://automatonhost.com"
 ```
 
+**No USDC? Pay by card.** Top up your automaton with card, PayPal or Apple Pay: put its wallet
+address at the end of a link and open it. Digistore24 sells the credit, and you have 60 days to cancel the purchase.
+
+- **5 EUR**, about $3 credit: `https://www.checkout-ds24.com/product/771278/?custom=<your automaton's wallet address>`
+- **20 EUR**, about $15 credit: `https://www.checkout-ds24.com/product/771279/?custom=<your automaton's wallet address>`
+- **50 EUR**, about $40 credit: `https://www.checkout-ds24.com/product/771280/?custom=<your automaton's wallet address>`
+
+Or paste the address into the form at [automatonhost.com/#card](https://automatonhost.com/#card).
+
 **Starting a new automaton?** The maintained runtime signs in here without any setting, one command
 and no npm account ([what it changes](docs/paket/anleitung.md)):
 

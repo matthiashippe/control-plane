@@ -29,7 +29,16 @@ const PASSPHRASE = "test-passphrase-9f3c1e7a";
 const LINE_RE =
   /^(card_orders live \d+ test \d+ booked \d+ unassigned \d+ pending_rate \d+ reversed \d+|card_shortfall_usd \d+\.\d{2}|ipn_passphrase (set|missing))$/;
 
-type Order = { id: string; mode: "live" | "test"; status: string; address?: string | null; shortfall?: number };
+type Order = {
+  id: string;
+  mode: "live" | "test";
+  status: string;
+  address?: string | null;
+  shortfall?: number;
+  product?: string;
+  vendor?: number | null;
+  created?: string;
+};
 
 const CREATE = `CREATE TABLE card_orders (
   order_id TEXT PRIMARY KEY, product_id TEXT, address TEXT NULL, mode TEXT, status TEXT, vendor_eur_cents INTEGER,
@@ -45,7 +54,7 @@ const EVERY_STATUS: Order[] = [
   { id: "o-reversed-1", mode: "live", status: "reversed", address: ADDRESS },
 ];
 
-type Setup = { orders?: Order[] | null; passphrase?: string | null; sshFails?: boolean };
+type Setup = { orders?: Order[] | null; passphrase?: string | null; sshFails?: boolean; args?: string[] };
 
 function makeDb(dir: string, orders: Order[] | null): string {
   const path = join(dir, "cp.db");
@@ -55,10 +64,21 @@ function makeDb(dir: string, orders: Order[] | null): string {
   if (orders) {
     db.exec(CREATE);
     const add = db.prepare(
-      `INSERT INTO card_orders VALUES (@id, 'p-1', @address, @mode, @status, 1000, 10800, '2026-11-20', 0, 0, @shortfall,
-       '2026-11-21T10:00:00Z', '2026-11-21T10:00:00Z')`,
+      `INSERT INTO card_orders VALUES (@id, @product, @address, @mode, @status, @vendor, 10800, '2026-11-20', 0, 0, @shortfall,
+       @created, @created)`,
     );
-    for (const o of orders) add.run({ id: o.id, address: o.address ?? null, mode: o.mode, status: o.status, shortfall: o.shortfall ?? 0 });
+    for (const o of orders) {
+      add.run({
+        id: o.id,
+        product: o.product ?? "p-1",
+        address: o.address ?? null,
+        mode: o.mode,
+        status: o.status,
+        vendor: o.vendor === undefined ? 1000 : o.vendor,
+        shortfall: o.shortfall ?? 0,
+        created: o.created ?? "2026-11-21T10:00:00Z",
+      });
+    }
   }
   db.close();
   return path;
@@ -75,7 +95,7 @@ function fakeTools(bin: string, dbPath: string, passphrase: string | null, sshFa
           "#!/usr/bin/env bash",
           // Only the call of ops/card-orders.sh runs here; every other ssh of ops/status.sh gets no answer.
           'cmd="${@: -1}"',
-          'case "$cmd" in *"--on-server") exec bash -c "$cmd" ;; *) exit 255 ;; esac',
+          'case "$cmd" in *"--on-server" | *"--on-server test-vendor") exec bash -c "$cmd" ;; *) exit 255 ;; esac',
           "",
         ].join("\n"),
   );
@@ -107,13 +127,13 @@ function baseEnv(dir: string, bin: string): Record<string, string> {
   };
 }
 
-function run({ orders = EVERY_STATUS, passphrase = PASSPHRASE, sshFails = false }: Setup = {}) {
+function run({ orders = EVERY_STATUS, passphrase = PASSPHRASE, sshFails = false, args = [] }: Setup = {}) {
   const dir = mkdtempSync(join(tmpdir(), "cp-card-orders-"));
   dirs.push(dir);
   const bin = join(dir, "bin");
   const dbPath = makeDb(dir, orders);
   fakeTools(bin, dbPath, passphrase, sshFails);
-  const r = spawnSync("bash", [SCRIPT], { env: baseEnv(dir, bin), encoding: "utf8", timeout: 20_000 });
+  const r = spawnSync("bash", [SCRIPT, ...args], { env: baseEnv(dir, bin), encoding: "utf8", timeout: 20_000 });
   const out = `${r.stdout}${r.stderr}`;
   return { code: r.status, out, lines: r.stdout.trim().split("\n"), dir, dbPath };
 }
@@ -172,6 +192,50 @@ describe("ops/card-orders.sh", () => {
     const r = run({ sshFails: true });
     expect(r.code).toBe(2);
     expect(r.out.trim()).toBe("ssh failed");
+  });
+
+  /** Test orders of three products at different times, live orders and a test order without a vendor share in between. */
+  const TEST_ORDERS: Order[] = [
+    { id: "t-1", mode: "test", status: "test", product: "771278", vendor: 380, created: "2026-11-22T09:00:00Z", address: ADDRESS },
+    { id: "t-2", mode: "test", status: "test", product: "771278", vendor: 406, created: "2026-11-22T11:00:00Z", address: ADDRESS },
+    { id: "t-3", mode: "test", status: "test", product: "771279", vendor: 1640, created: "2026-11-22T10:00:00Z", address: ADDRESS },
+    { id: "t-4", mode: "test", status: "test", product: "771280", vendor: 4100, created: "2026-11-22T12:00:00Z", address: ADDRESS },
+    { id: "t-5", mode: "test", status: "test", product: "771280", vendor: 3900, created: "2026-11-22T08:00:00Z", address: ADDRESS },
+    { id: "l-1", mode: "live", status: "booked", product: "771279", vendor: 9999, created: "2026-11-22T13:00:00Z", address: ADDRESS },
+    { id: "x-1", mode: "test", status: "test", product: "758179", vendor: null, created: "2026-11-22T14:00:00Z", address: ADDRESS },
+  ];
+
+  it("prints the vendor share of the newest test order per product", () => {
+    const r = run({ orders: TEST_ORDERS, args: ["--test-vendor"] });
+    expect(r.code, r.out).toBe(0);
+    expect(r.lines).toEqual([
+      "card_test_vendor 758179 missing",
+      "card_test_vendor 771278 406",
+      "card_test_vendor 771279 1640",
+      "card_test_vendor 771280 4100",
+    ]);
+    const none = run({ orders: EVERY_STATUS.filter((o) => o.mode === "live"), args: ["--test-vendor"] });
+    expect(none.code, none.out).toBe(0);
+    expect(none.lines).toEqual(["card_test_vendor none"]);
+    const noTable = run({ orders: null, args: ["--test-vendor"] });
+    expect(noTable.lines).toEqual(["card_test_vendor none"]);
+  });
+
+  it("prints no address with --test-vendor", () => {
+    for (const orders of [TEST_ORDERS, [...TEST_ORDERS].reverse()]) {
+      const r = run({ orders, args: ["--test-vendor"] });
+      expect(r.out.length, "the script said something").toBeGreaterThan(20);
+      expect(r.out).not.toContain(ADDRESS);
+      expect(r.out).not.toMatch(ADDRESS_RE);
+      expect(r.out).not.toContain(PASSPHRASE);
+      for (const line of r.out.trim().split("\n")) expect(line).toMatch(/^card_test_vendor ([0-9]+ ([0-9]+|missing)|none)$/);
+    }
+  });
+
+  it("refuses any other argument before it asks the server", () => {
+    const r = run({ args: ["--test-vendors"] });
+    expect(r.code).toBe(2);
+    expect(r.out.trim()).toBe("usage: ops/card-orders.sh [--test-vendor]");
   });
 
   it("ops/status.sh shows the lines card_orders and card_shortfall_usd, and stays whole when the tool fails", () => {

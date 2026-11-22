@@ -13,7 +13,8 @@ import { describe, expect, it } from "vitest";
 import { createApp } from "../src/app.js";
 import { openDb } from "../src/db.js";
 
-const MARKS = ["top", "proof", "market", "close", "end"] as const;
+// `card` counts views of the card block right after the move block (goals/karte/02).
+const MARKS = ["top", "card", "proof", "market", "close", "end"] as const;
 
 describe("how far down the page a reader got", () => {
   it("serves a one-pixel PNG at each mark, uncached", async () => {

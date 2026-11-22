@@ -35,6 +35,23 @@ Keine. Der Umzug nutzt nur Klassen aus dem `<style>` von `src/public/index.html`
 
 Abnahme-Issue: PRO-18819
 
+## Karte #card (goals/karte/02)
+
+Der Block `card` steht in `src/startseite.html` direkt nach dem Umzug (`data-soll="card"`). Im Umzug führt ein zweiter Knopf
+„Pay by card“ (`btn btn-2`) neben „Switch in two steps“ auf `#card`; er steht in der Zeile, die schon da ist, also wächst der Umzug
+nicht (`move top` bleibt 828 und 656), und die Zeile `.fine` behält ihren Link auf `/fix`, den `test/public.test.ts` verlangt. Unter
+den Knöpfen steht „You have 60 days to cancel the purchase“ statt „money back“, weil Guthaben nie auszahlbar ist
+(`loop-constraints.md`, Grundregel 10) und `test/public.test.ts` „money back“ auf der Startseite sperrt. Der Block ist ein Formular ohne Skript: ein Feld `custom` und drei Knöpfe, die es direkt an die Kasse von
+Digistore24 schicken, je mit Preis und dem Guthaben aus `CARD_PACKAGES` (5 EUR about $3, 20 EUR about $15, 50 EUR about $40). Das
+Feld ist leer. Die Knöpfe nutzen die Karten des Katalogs (`grid-cards three`, `card pick`, `price`, `price-note`), dazu zwei neue
+Klassen (jede Karte trägt wie die des Katalogs ihre Handlung in `.go`, hier „Buy credit“):
+
+- `.card-field`: Label und Eingabefeld der Adresse, in den Farben der Formulare von `.shop`, Schrift `--mono`, weil eine Adresse Zeichen
+  für Zeichen gelesen wird.
+- `.card-buy`: setzt den Knopf auf die Schrift und Ausrichtung der Karten zurück, damit ein `<button>` aussieht wie die Karte darüber.
+
+Abnahme-Issue card: PRO-27652
+
 ## Handoff /h/{code}
 
 Die Seite, die ein Mensch auf dem Handy öffnet, wenn sein Terminal einen Schritt freigeben lassen will (goals/konto/02). Eine Fläche
