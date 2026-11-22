@@ -27,7 +27,7 @@ unsere eigenen Wallets vermischt.
 - frühestens 2026-11-26
 
 ## Kontext für den Maker
-- Ziel: Matthias entscheidet am Tag des Urteils mit gemessenen Zahlen je Antwort, ob die nächste Runde wieder Antworten in Conways
+- Ziel: der Tech Lead entscheidet am Tag des Urteils mit gemessenen Zahlen je Antwort, ob die nächste Runde wieder Antworten in Conways
   Tracker bringt oder ob neue zahlende Kunden über einen anderen Kanal kommen müssen.
 - Ersetzt kanal 05 (Tech Lead, 21.11.2026, Loop-Triage PRO-26350, PRO-26356): Das Glied 05 steht in `ROADMAP.md` auf `entfällt`, weil
   seine Goal-Datei nur über die Human Inbox zu ändern wäre; dieses Goal trägt alles aus kanal 05 und dazu die Bedingung auf neue Issues.
@@ -119,7 +119,7 @@ unsere eigenen Wallets vermischt.
   `anderer Kanal, weil …`, wenn `NEW ISSUES` 0 zählt, und die Zeile nennt `Idee 3` aus `docs/richtung/2026-11-19.md` (Paket der
   Runtime mit unserer Adresse) als Kandidat; sonst `Antwortpaket, weil …`, wenn mindestens eine der neun Zeilen eine Anmeldung zählt;
   sonst `offen, weil …`, wenn bei mindestens einer Runde die obere Grenze danach über davor liegt (Anstieg, den die untere Grenze nicht
-  sieht; Matthias entscheidet mit beiden Zahlen); sonst `anderer Kanal, weil …`, ebenfalls mit `Idee 3`. Die Zeile
+  sieht; der Tech Lead entscheidet mit beiden Zahlen); sonst `anderer Kanal, weil …`, ebenfalls mit `Idee 3`. Die Zeile
   `NEW ISSUES since <t>: <n>` aus dem Lauf mit `--issues` steht im Codeblock der Messung. Keine Adresse, keine Wallet.
 - `goals/kanal/ANNAHMEN.md`: Zeilen `- <Datum>, kanal 06: …` zur Zuordnung der Wallets (5 s, nächste Zeile, ohne Treffer fremd) und
   zur Startverschiebung auf den 26.11., dazu je eine zu Runde 0, zur oberen Grenze (Fenster, Überschneidung) und zur Zählung neuer

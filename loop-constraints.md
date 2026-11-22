@@ -43,11 +43,10 @@ Geschichte.
    Entscheidung wieder auf. `check` meldet Secrets und Texte über die Bedingungen des Anbieters.
 9. **Selbst erledigen** (Matthias, 02.11.2026: „immer überlegen kannst du die tasks selbst erledigen“). Eine Karte an Matthias
    entsteht nur, wenn wirklich nur er es kann; sie dauert höchstens ein paar Minuten und nennt Zweck, genaue Klicks oder fertigen Text
-   und Empfehlung. Die Gates stehen in `LOOP.md` (Human Gates): `server_kauf` für jeden Kauf und jede Aufladung, `public_post` für
-   jeden Kommentar in einem fremden Repo unter Matthias' GitHub-Konto (nur nach seinem „ok“ oder seinem eigenen Haken, Kairos Haken
-   zählt nie; die Freigabe „issues darfst du immer selbst“ vom 29.09.2026 gilt seit dem 10.11.2026 nicht mehr), dazu Passwort,
+   und Empfehlung. Die Gates stehen in `LOOP.md` (Human Gates): `server_kauf` für jeden Kauf und jede Aufladung, dazu Passwort,
    Steuer-, Konto- und Ausweisdaten, Sicherheitseinstellung, SMS-Code, bezahlte Werbung und jede Mail an Dritte. Alles andere erledigt
-   die Rolle selbst und meldet es höchstens danach im Progress Log.
+   die Rolle selbst und meldet es höchstens danach im Progress Log. Kommentare in fremden Repos unter
+   Matthias' GitHub-Konto gibt seit dem 22.11.2026 der Tech Lead frei, nicht Matthias (LOOP.md, Kommentare in fremden Repos).
 10. **Geld bewegt sich nicht** (Matthias, 10.11.2026). Keine Wallet-Bewegung, keine Überweisung, kein Trade, kein On-Chain-Senden,
     nie, auch kein Gas und kein Topup über x402; die Freigaben vom 29.09.2026 zu Gas und zu „Geld im Dienst arbeiten lassen“ gelten
     im Paperclip-Loop nicht. Credits sind nie auszahlbar und nie an Dritte übertragbar außer per `/v1/credits/transfer` innerhalb des
@@ -116,7 +115,7 @@ Geschichte.
 - `git push --force` auf `dev` oder `main`, ein Push direkt auf `dev`, ein Merge nach `main` außer durch den Tech Lead
 - Tests abschalten, `skip`, `only`, auskommentierte Assertions, gesenkte Schwellen, Mocks an der Stelle, die ein Done-Punkt prüft
 - Käufe, Aufladungen, Wallet-Bewegungen; die Sichtbarkeit des Repos ändern; ein Issue oder PR in einem fremden Repo kommentieren oder
-  schließen ohne freigegebenes `public_post`
+  schließen ohne das „ok“ des Tech Leads mit den Werten `sha12` (LOOP.md, Kommentare in fremden Repos)
 - Daten löschen außerhalb von Fixtures und temporären Ordnern
 - `git add -A` (19.09.2026: fremde, halbfertige Dateien unter falscher Commit-Message); Dateien beim Namen nennen. Commit-Texte über
   ein Heredoc mit `<<'EOF'` (20.09.2026: die Shell verschluckte Code mitten in der Message)

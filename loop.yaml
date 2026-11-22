@@ -39,10 +39,10 @@ breaker:
 parallel_goals: 1
 share: 1
 nightly: [audit, nacharbeit, redteam, triage, critic]
-# Karten an Matthias nur, wenn wirklich nur er es kann (loop-constraints.md, Grundregel 9). public_post: jeder Kommentar in einem
-# fremden Repo unter seinem GitHub-Konto erst nach seinem „ok“ oder seinem eigenen Haken auf der Karte. server_kauf: jeder Kauf und
-# jede Aufladung (Server, OpenRouter-Guthaben).
-human_gates: [main_merge, delete_data, server_kauf, public_post, third_party_mail, paid, password, tax_account_identity, security_settings, sms_code]
+# Karten an Matthias nur, wenn wirklich nur er es kann (loop-constraints.md, Grundregel 9). Kommentare in fremden Repos sind seit
+# 22.11.2026 kein Gate mehr (Matthias: „ich möchte eigentlich nichts freigeben müssen“), der Tech Lead gibt sie frei (LOOP.md).
+# server_kauf: jeder Kauf und jede Aufladung (Server, OpenRouter-Guthaben).
+human_gates: [main_merge, delete_data, server_kauf, third_party_mail, paid, password, tax_account_identity, security_settings, sms_code]
 course:
   detail_share: 0.4
   cycles_factor: 2
