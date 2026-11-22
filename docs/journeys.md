@@ -276,6 +276,7 @@ third option, and the page says so in its last paragraph.
 
 | # | Step | What happens | State |
 |---|---|---|---|
+| B0.0 | Finds the page for its error | A search for the exact error text lands on `/errors/verify-500-database-error`, `/errors/invalid-or-expired-nonce` or `/errors/credits-never-granted` (goals/reichweite/01): the text as heading, the cause in two sentences, the one line, and a link to `/fix`. The landing page links all three in its footer. | works; arrivals per week by origin from `ops/error-pages-arrivals.mjs` |
 | B0.1 | Finds the page | An answer in the issue tracker, or the landing page's *Agent stuck?* | works |
 | B0.2 | Stops the bleeding | Move the USDC out, or point the runtime at an address that cannot answer, so the heartbeat stops buying every five minutes | works |
 | B0.3 | Makes it think again for free | A local Ollama model, or a balance written into its own SQLite state with the operator's own key. Both need nothing from here. | works |

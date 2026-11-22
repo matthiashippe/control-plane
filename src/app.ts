@@ -33,6 +33,7 @@ import { readSeries, renderX402 } from "./public/x402.js";
 import { readMoneySeries, readReceipts, renderConway } from "./public/conway.js";
 import { renderPost } from "./public/post.js";
 import { renderFix } from "./public/fix.js";
+import { ERROR_PAGES, findErrorPage, renderErrorPage, renderErrorPageMissing } from "./public/error-pages.js";
 import { OFFERS, TEST_MODE_LINE, euro, renderCatalog, renderConversation, renderOrderPage, type ConversationTurn, type Offer } from "./public/catalog.js";
 import { renderPrivacy } from "./public/datenschutz.js";
 import {
@@ -1111,6 +1112,24 @@ export function createApp(opts: AppOptions) {
   });
 
   /**
+   * One page per error text a Conway operator searches for. See `src/public/error-pages.ts`.
+   *
+   * Title and description go into attributes of the head as they are, so their quotes are escaped
+   * here; the heading of two pages is a JSON body with quotes in it.
+   */
+  app.get("/errors/:slug", (c) => {
+    if (!indexHtml) return c.json({ error: "no index page built" }, 503);
+    const p = findErrorPage(c.req.param("slug"));
+    if (!p) {
+      return c.html(
+        page(renderErrorPageMissing(), "No page for this error | automatonhost.com", "The error pages that exist, and every step on one page.", "/errors", "og.png", [], true),
+        404,
+      );
+    }
+    return c.html(page(renderErrorPage(p), esc(p.title), esc(p.description), `/errors/${p.slug}`));
+  });
+
+  /**
    * What a person can buy here. See `src/public/catalog.ts`.
    */
   const checkoutProvider: CheckoutProvider | null =
@@ -1690,7 +1709,7 @@ export function createApp(opts: AppOptions) {
 
   app.get("/sitemap.xml", (c) => {
     const today = new Date().toISOString().slice(0, 10);
-    const pages = ["/", "/katalog", "/check", "/fix", "/post", "/jobs", "/receipts", "/x402", "/conway", "/terms", "/datenschutz"];
+    const pages = ["/", "/katalog", "/check", "/fix", ...ERROR_PAGES.map((p) => `/errors/${p.slug}`), "/post", "/jobs", "/receipts", "/x402", "/conway", "/terms", "/datenschutz"];
     return c.body(
       '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
         pages
