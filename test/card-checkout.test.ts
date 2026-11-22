@@ -181,10 +181,10 @@ describe("the card block of the landing page", () => {
     }
   });
 
-  it("says how to pay, who sells and that there are 30 days money back", async () => {
+  it("says how to pay, who sells and that there are 60 days to cancel", async () => {
     const { block } = await page();
     expect(block).toContain("Wallet address of your automaton");
-    for (const words of ["Card, PayPal or Apple Pay", "Digistore24 sells this credit", "30 days to cancel the purchase"]) {
+    for (const words of ["Card, PayPal or Apple Pay", "Digistore24 sells this credit", "60 days to cancel the purchase"]) {
       expect(block, words).toContain(words);
     }
     expect(block).not.toMatch(/[\u2013\u2014]/);
