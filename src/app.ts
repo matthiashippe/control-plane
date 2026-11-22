@@ -984,16 +984,21 @@ export function createApp(opts: AppOptions) {
     // withOrigin at the door, once, rather than per template string. The curl examples on these
     // pages are the thing a visitor copies, they live in prose across a dozen files, and after a
     // domain move they would be the last place anybody looked. See src/public/site.ts.
+    // Inside an attribute a raw double quote ends the value early, so it is escaped there and only
+    // there. Escaping it again is a no-op for a caller that already escaped it (no raw quote left),
+    // and the WebPage node below gets the text as it was passed: an entity in JSON-LD is not the
+    // text a search engine shows (goals/reichweite/01, Punkt 9).
+    const attr = (s: string) => s.replace(/"/g, "&quot;");
     const headPart =
       head
         .replace(/<title>[^<]*<\/title>/, `<title>${title}</title>`)
-        .replace(/(<meta name="description" content=")[^"]*/, `$1${description}`)
+        .replace(/(<meta name="description" content=")[^"]*/, `$1${attr(description)}`)
         .replace(/<link rel="canonical" href="https:\/\/[a-z0-9.-]+\//, `<link rel="canonical" href="${siteOrigin()}/`)
         .replace(/(<link rel="canonical" href="[^"]*?)\/"/, `$1${pathname}"`)
-        .replace(/(<meta property="og:title" content=")[^"]*/, `$1${title}`)
-        .replace(/(<meta property="og:description" content=")[^"]*/, `$1${description}`)
-        .replace(/(<meta name="twitter:title" content=")[^"]*/, `$1${title}`)
-        .replace(/(<meta name="twitter:description" content=")[^"]*/, `$1${description}`)
+        .replace(/(<meta property="og:title" content=")[^"]*/, `$1${attr(title)}`)
+        .replace(/(<meta property="og:description" content=")[^"]*/, `$1${attr(description)}`)
+        .replace(/(<meta name="twitter:title" content=")[^"]*/, `$1${attr(title)}`)
+        .replace(/(<meta name="twitter:description" content=")[^"]*/, `$1${attr(description)}`)
         .replace(/<meta property="og:url" content="https:\/\/[a-z0-9.-]+\//, `<meta property="og:url" content="${siteOrigin()}/`)
         .replace(/(<meta property="og:url" content="[^"]*?)\/"/, `$1${pathname}"`)
         // og:image is an absolute URL too, and a card that points at the old host after a move
@@ -1114,8 +1119,9 @@ export function createApp(opts: AppOptions) {
   /**
    * One page per error text a Conway operator searches for. See `src/public/error-pages.ts`.
    *
-   * Title and description go into attributes of the head as they are, so their quotes are escaped
-   * here; the heading of two pages is a JSON body with quotes in it.
+   * Title and description are passed as they are: the heading of two pages is a JSON body with
+   * quotes in it, page() escapes those quotes in the head attributes, and the WebPage node in the
+   * JSON-LD carries the exact text an operator searches for.
    */
   app.get("/errors/:slug", (c) => {
     if (!indexHtml) return c.json({ error: "no index page built" }, 503);
@@ -1126,7 +1132,7 @@ export function createApp(opts: AppOptions) {
         404,
       );
     }
-    return c.html(page(renderErrorPage(p), esc(p.title), esc(p.description), `/errors/${p.slug}`));
+    return c.html(page(renderErrorPage(p), p.title, p.description, `/errors/${p.slug}`));
   });
 
   /**

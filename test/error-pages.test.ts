@@ -112,4 +112,22 @@ describe("/errors/{slug}", () => {
     const block = html.slice(at, html.indexOf("</footer>", at));
     for (const slug of SLUGS) expect(block, slug).toContain(`href="/errors/${slug}"`);
   });
+
+  it("names each error page in its JSON-LD by the exact title and description", async () => {
+    // Search engines read the WebPage node, not the head attributes, so an escaped quote there is a different text than the one
+    // an operator searches for. The values are plain constants: nothing in them needs escaping in the <title> element.
+    for (const p of ERROR_PAGES) {
+      expect(`${p.title}${p.description}`, p.slug).not.toMatch(/[&<>]/);
+      const { html } = await get(`/errors/${p.slug}`);
+      const m = /<script type="application\/ld\+json">([\s\S]*?)<\/script>/.exec(html);
+      expect(m, p.slug).not.toBeNull();
+      expect(m![1], p.slug).not.toMatch(/&(quot|amp|lt|gt|#\d+);/);
+      const graph = (JSON.parse(m![1])["@graph"] ?? []) as Record<string, unknown>[];
+      const web = graph.find((n) => n["@type"] === "WebPage");
+      expect(web?.name, p.slug).toBe(p.title);
+      expect(web?.description, p.slug).toBe(p.description);
+      const desc = /<meta name="description" content="([^"]*)"/.exec(html);
+      expect(desc && decode(desc[1]), p.slug).toBe(p.description);
+    }
+  });
 });
