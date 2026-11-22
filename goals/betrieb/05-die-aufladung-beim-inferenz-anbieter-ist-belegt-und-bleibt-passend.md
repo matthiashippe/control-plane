@@ -1,7 +1,7 @@
 # Betrieb Goal 05: Die Aufladung beim Inferenz-Anbieter ist belegt und bleibt passend
 
 ## Status
-PLANNED
+PAUSED
 
 ## Active Objective
 Belegt ist, ob die automatische Aufladung aus betrieb 01 das Guthaben beim Inferenz-Anbieter in den 14 Tagen nach dem Einschalten
@@ -161,3 +161,4 @@ Schwelle hinter dem Verbrauch zurückbleibt, genau das wieder möglich macht, oh
 
 ## Blockers
 - keine
+Pause: ersetzt durch betrieb 07 (Tech Lead 22.11.2026, PRO-27251, PR #355), startet sonst am 27.11. vor betrieb 07 mit dem täglichen Alarm aus betrieb-kritik-2026-11-21-1; zurück auf PLANNED, falls PR #355 nicht gemergt wird (Loop-Kritik 2026-11-22)
