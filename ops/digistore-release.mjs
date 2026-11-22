@@ -349,7 +349,7 @@ function goodProduct (id, label, price) {
   return {
     id, name_intern: `Automaton ${label}`, name_en: `Automaton ${label}`, currency: 'EUR', orderform_id: '254538',
     salespage_url: 'https://automatonhost.com/', description_thankyou_page_en: thanks, is_active: 'Y',
-    refund_policy: { private: { refund_days: 30 } },
+    refund_policy: { private: { refund_days: 60 } },
     paymentplans: [{ first_amount: price, currency: 'EUR', number_of_installments: 1, is_active: 'Y' }],
     approval_status: '',
     approval_status_list: [{ reseller_id: '1', approval_status: 'new' }, { reseller_id: '2', approval_status: 'new' }]
@@ -357,7 +357,7 @@ function goodProduct (id, label, price) {
 }
 
 /** An account with fixed answers that records every call. */
-function fakeAccount ({ ipn: withIpn = false, testPurchases = OWN, refund = 30 } = {}) {
+function fakeAccount ({ ipn: withIpn = false, testPurchases = OWN, refund = 60 } = {}) {
   const products = {
     900101: goodProduct('900101', 'credit 5 EUR', '5.00'),
     900102: goodProduct('900102', 'credit 20 EUR', '20.00'),
