@@ -532,9 +532,75 @@ if (process.env.CP_REPORT === "customer-work") {
       inference_after_award: inferenceAfter.filter(inDay).length,
     });
   }
+  // The house job (goals/kunden/11): a bounty with a `house_fund` row behind it, ref `house-fund:<id>`, the
+  // rule of isHouseJob in src/bounties/house.ts. In the window: house jobs posted, valid house reports of
+  // addresses that oursClause does not call ours, `bounty_award` rows of house jobs to such addresses and
+  // those among them to the customer. The reports leave only as counts per method, path and status, each
+  // path with every wallet (0x and 40 hex digits) and every IPv4 address replaced by <address> first. A
+  // report counts only if checkHouseReport would take it; the service refuses any other with 422 before
+  // anything is stored, so this copy of the rule only keeps a stray row out of the count.
+  const HOUSE_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"];
+  const houseCalls = (body) => {
+    let raw;
+    try {
+      raw = JSON.parse(body);
+    } catch {
+      return null;
+    }
+    const isObject = (v) => typeof v === "object" && v !== null && !Array.isArray(v);
+    if (!isObject(raw) || Object.keys(raw).some((k) => k !== "runtime" && k !== "calls")) return null;
+    if (typeof raw.runtime !== "string" || !/^[0-9a-fA-F]{7,40}$/.test(raw.runtime)) return null;
+    if (!Array.isArray(raw.calls) || raw.calls.length < 1 || raw.calls.length > 20) return null;
+    for (const c of raw.calls) {
+      if (!isObject(c) || Object.keys(c).some((k) => k !== "method" && k !== "path" && k !== "status")) return null;
+      if (typeof c.method !== "string" || !HOUSE_METHODS.includes(c.method)) return null;
+      if (typeof c.path !== "string" || !c.path.startsWith("/") || c.path.length > 200) return null;
+      if (typeof c.status !== "number" || !Number.isInteger(c.status) || c.status < 100 || c.status > 599) return null;
+    }
+    return raw.calls;
+  };
+  const redact = (path) => path.replace(/0x[0-9a-fA-F]{40}/g, "<address>").replace(/[0-9]{1,3}(\.[0-9]{1,3}){3}/g, "<address>");
+  const inWindow = (v) => {
+    const t = ms(v);
+    return t !== null && t >= ms(since) && t < ms(until);
+  };
+  const foreign = (a) => !isOurs(String(a).toLowerCase());
+  const houseJobs = all(
+    `select b.created_at from bounties b
+      where exists (select 1 from ledger l where l.kind = 'house_fund' and l.ref = 'house-fund:' || b.id)`,
+  ).filter((b) => inWindow(b.created_at)).length;
+  const houseReports = all(
+    `select s.agent, s.body, s.created_at from submissions s
+      where exists (select 1 from ledger l where l.kind = 'house_fund' and l.ref = 'house-fund:' || s.bounty_id)`,
+  )
+    .filter((s) => inWindow(s.created_at) && foreign(s.agent))
+    .map((s) => houseCalls(s.body))
+    .filter((calls) => calls !== null);
+  const houseAwards = all(
+    `select a.address, a.created_at from ledger a
+      where a.kind = 'bounty_award'
+        and exists (select 1 from ledger l where l.kind = 'house_fund' and 'bounty-award:' || substr(l.ref, 12) = a.ref)`,
+  ).filter((a) => inWindow(a.created_at) && foreign(a.address));
+  const callCount = new Map();
+  for (const calls of houseReports) {
+    for (const c of calls) {
+      const key = JSON.stringify([c.method, redact(c.path), c.status]);
+      callCount.set(key, (callCount.get(key) || 0) + 1);
+    }
+  }
+  const house = {
+    jobs: houseJobs,
+    submissions: houseReports.length,
+    awards: houseAwards.length,
+    awards_customer: houseAwards.filter((a) => mine.has(String(a.address).toLowerCase())).length,
+    calls: [...callCount.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)).map(([key, count]) => {
+      const [method, path, status] = JSON.parse(key);
+      return { method, path, status, n: count };
+    }),
+  };
   // writeSync may write part of the buffer to a pipe, or meet EAGAIN on a non-blocking one.
   const out = Buffer.from(
-    JSON.stringify({ since, until, customer: n, found: addresses.length > 0, inference_at: inferenceAt, days }) + "\n",
+    JSON.stringify({ since, until, customer: n, found: addresses.length > 0, inference_at: inferenceAt, days, house }) + "\n",
   );
   for (let off = 0; off < out.length; ) {
     try {
