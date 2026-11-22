@@ -1,0 +1,5 @@
+Schwere: 3
+Goal: karte 02
+Befund: Der Link zur Kasse von Digistore24 steht nach karte 02 an vier Stellen, die wache 01 alle auf die Weiterleitung des Dienstes umstellen muss, und nur eine davon nutzt `cardCheckoutUrl`.
+Beleg: `grep -rln 'checkout-ds24.com' src mcp README.md docs/soll/src | grep -v test` -> `src/public/index.html` (drei `formaction`), `src/payments/digistore.ts` (`cardCheckoutUrl`, auch für `card_url` der 402), `mcp/server.mjs` (`cardLink`, eigene Kopie), `README.md` (drei Links), dazu `docs/soll/src/startseite.html` und `form-action` in `deploy/Caddyfile`
+Empfehlung: wache 01 setzt das Ziel einmal fest, etwa `https://automatonhost.com/card/<productId>?custom=<adresse>`, und stellt alle vier Stellen darauf um. `cardCheckoutUrl` und `cardLink` geben dann diese Adresse zurück, die Seite schickt das Formular dorthin, und `form-action` braucht nur noch `'self'`. Eine Prüfung im Goal zählt `checkout-ds24.com` außerhalb der Weiterleitung und der Tests mit 0, damit kein Weg an der Wache vorbei bleibt (Matthias 22.11.2026: „jeden Weg zur Kasse über eine Weiterleitung des Dienstes“).
