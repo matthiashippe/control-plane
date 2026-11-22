@@ -4,7 +4,9 @@
 //
 //   node ops/error-pages-arrivals.mjs                      the whole access log over ops/access-log.sh (read only, needs loop.env)
 //   node ops/error-pages-arrivals.mjs --log <file>         Caddy JSON lines from a file instead
-//   node ops/error-pages-arrivals.mjs --own-ips <file>     our own addresses (default ops/own-ips.txt, first word of each line)
+//   node ops/error-pages-arrivals.mjs --own-ips <file>     our own addresses from a file, first word of each line; without it they
+//                                                          come from own_ips in ops/own-ips.sh (the list ops/own-ips.txt, the live
+//                                                          address and the remembered ones; for --log the offline answer)
 //   node ops/error-pages-arrivals.mjs --days <n>           the window up to now, in days (default 7); CP_NOW in epoch seconds
 //                                                          replaces the clock
 //
@@ -107,7 +109,7 @@ export function formatArrivals(result, days, slugs) {
 }
 
 function parseArgs(argv) {
-  const out = { log: null, ownIps: path.join(ROOT, "ops/own-ips.txt"), days: 7 };
+  const out = { log: null, ownIps: null, days: 7 };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i], v = argv[i + 1];
     if (a === "--log" || a === "--own-ips" || a === "--days") {
@@ -142,7 +144,16 @@ function main() {
     text = r.stdout;
   }
   let own;
-  try { own = ownIpsOf(readFileSync(args.ownIps, "utf8")); } catch { console.error("own addresses unreadable"); process.exit(2); }
+  if (args.ownIps) {
+    try { own = ownIpsOf(readFileSync(args.ownIps, "utf8")); } catch { console.error("own addresses unreadable"); process.exit(2); }
+  } else {
+    // The one rule for our own addresses (test/own-ips-readers.test.ts): own_ips_checked for the live log, own_ips_offline for a
+    // log read from disk. Both end non-zero, naming no address, when the list is missing or empty.
+    const ask = args.log ? "own_ips_offline" : 'own_ips_checked "$CP_OWN_IPS_FILE"';
+    const r = spawnSync("bash", ["-c", `source "$1" && ${ask}`, "own-ips", path.join(ROOT, "ops/own-ips.sh")], { encoding: "utf8", timeout: 60000 });
+    if (r.status !== 0 || !r.stdout.trim()) { console.error("own addresses unreadable"); process.exit(2); }
+    own = new Set(r.stdout.split(/\s+/).filter(Boolean));
+  }
   const now = process.env.CP_NOW ? Number(process.env.CP_NOW) : Math.floor(Date.now() / 1000);
   if (!Number.isFinite(now)) { console.error("CP_NOW is not a number"); process.exit(1); }
   const result = countErrorArrivals(text.split("\n"), { slugs, searchHosts, ownIps: own, now, days: args.days });

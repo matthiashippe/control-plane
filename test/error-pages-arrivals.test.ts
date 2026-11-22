@@ -52,6 +52,24 @@ describe("ops/error-pages-arrivals.mjs", () => {
     expect(count([line({ ip: "203.0.113.5", referer: "https://www.google.com/" })], ["203.0.113.5"]).total).toEqual({ search: 0, github: 0, other: 0 });
     expect(count([line({ agent: "control-plane-check/1.0" })]).total).toEqual({ search: 0, github: 0, other: 0 });
     expect(ownIpsOf("# us\n203.0.113.5 2026-09-19  this machine\n\n")).toEqual(new Set(["203.0.113.5"]));
+    // Without --own-ips the tool asks own_ips in ops/own-ips.sh, offline for a log from disk: the list and the remembered ones.
+    const dir = mkdtempSync(path.join(os.tmpdir(), "error-pages-own-"));
+    try {
+      const log = path.join(dir, "access.log"), list = path.join(dir, "list.txt"), seen = path.join(dir, "seen.txt");
+      writeFileSync(log, [line({ ip: "203.0.113.5", referer: "https://www.google.com/" }), line({ ip: "203.0.113.6" }), line({ ip: "192.0.2.8" })].join("\n") + "\n");
+      writeFileSync(list, "203.0.113.5 2026-11-22  test\n");
+      writeFileSync(seen, "203.0.113.6 2026-11-22\n");
+      const env = { ...process.env, CP_NOW: String(NOW), CP_OWN_IPS_FILE: list, CP_OWN_IPS_SEEN: seen, CP_OWN_IPS: "" };
+      const r = spawnSync(process.execPath, [TOOL, "--log", log], { encoding: "utf8", timeout: 30000, env });
+      expect(r.status, r.stderr).toBe(0);
+      expect(r.stdout.split("\n")[0]).toBe("error_pages_arrivals days 7 search 0 github 0 other 1");
+      writeFileSync(list, "# names nobody\n");
+      const empty = spawnSync(process.execPath, [TOOL, "--log", log], { encoding: "utf8", timeout: 30000, env });
+      expect(empty.status).toBe(2);
+      expect(empty.stderr).toMatch(/own addresses unreadable/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it("leaves out crawlers", () => {
