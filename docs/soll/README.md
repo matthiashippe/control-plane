@@ -42,7 +42,7 @@ dem Link „No USDC? Pay by card.“ auf `#card` statt „Every step on one page
 bleibt 828 und 656). Der Block ist ein Formular ohne Skript: ein Feld `custom` und drei Knöpfe, die es direkt an die Kasse von
 Digistore24 schicken, je mit Preis und dem Guthaben aus `CARD_PACKAGES` (5 EUR about $3, 20 EUR about $15, 50 EUR about $40). Das
 Feld ist leer. Die Knöpfe nutzen die Karten des Katalogs (`grid-cards three`, `card pick`, `price`, `price-note`), dazu zwei neue
-Klassen:
+Klassen (jede Karte trägt wie die des Katalogs ihre Handlung in `.go`, hier „Buy credit“):
 
 - `.card-field`: Label und Eingabefeld der Adresse, in den Farben der Formulare von `.shop`, Schrift `--mono`, weil eine Adresse Zeichen
   für Zeichen gelesen wird.
