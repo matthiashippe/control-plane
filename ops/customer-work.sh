@@ -20,10 +20,17 @@
 #   DAY <YYYY-MM-DD>: <r> board reads, <s> submit calls, <a> submissions stored, <o> open bounties (<q> ours)
 #   SUBMIT STATUS <code>: <n>            each status of POST /v1/submissions in the window
 #   AWARD CALLS: <n> calls to POST /v1/bounties/award
+#   HOUSE: <j> house jobs posted, <s> house submissions, <a> house awards (<c> to the customer)
+#   HOUSE REPORT <METHOD> <path> <status>: <n>   each call named in the house reports of the window
 #   AWARDS: <w> awarded to the customer, <i> inference rows after the first award
 #
 # board reads are GET /bounties.json and GET /v1/bounties; open bounties are not the customer's own,
 # `ours` counts those that oursClause calls ours. No address, amount, id or brief is printed.
+# The house lines (kunden 11) count the house job, a bounty with a house_fund row behind it: house jobs
+# posted in the window, valid house reports of addresses that oursClause does not call ours, their house
+# awards and those to the customer. HOUSE REPORT adds up the calls of those reports over all of them, sorted
+# by method, path and status; in each path every wallet (0x and 40 hex digits) and every IPv4 address is
+# replaced by <address> before it is counted, inside the container and again here.
 # Exit 1 on a wrong argument, a time that is no ISO time in UTC, or --until not after --since.
 # Exit 2 when the own list is missing or empty, the log or the JSON cannot be read, or the customer is unknown.
 set -uo pipefail
@@ -50,6 +57,15 @@ ISO = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z")
 BOARD = {("GET", "/bounties.json"), ("GET", "/v1/bounties")}
 SUBMIT = ("POST", "/v1/submissions")
 AWARD = ("POST", "/v1/bounties/award")
+HOUSE_METHODS = {"GET", "POST", "PUT", "PATCH", "DELETE"}
+WALLET = re.compile(r"0x[0-9a-fA-F]{40}")
+IPV4 = re.compile(r"[0-9]{1,3}(\.[0-9]{1,3}){3}")
+
+def house_path(path):
+    # Every wallet and every IPv4 address becomes <address> before a call is counted; anything that is no
+    # visible ASCII becomes ?, so a path can neither hide an address nor break a line of the output.
+    path = IPV4.sub("<address>", WALLET.sub("<address>", path))
+    return "".join(ch if "!" <= ch <= "~" else "?" for ch in path)
 
 def fail(msg, code=2):
     print(f"customer-work: {msg}", file=sys.stderr)
@@ -107,6 +123,14 @@ try:
     for d in days_in.values():
         for k in ("submissions", "open", "ours", "awards", "inference_after_award"):
             assert isinstance(d[k], int)
+    house = data["house"]
+    for k in ("jobs", "submissions", "awards", "awards_customer"):
+        assert isinstance(house[k], int) and house[k] >= 0
+    house_calls = collections.Counter()
+    for c in house["calls"]:
+        assert c["method"] in HOUSE_METHODS and isinstance(c["status"], int) and 100 <= c["status"] <= 599
+        assert isinstance(c["path"], str) and c["path"].startswith("/") and isinstance(c["n"], int) and c["n"] > 0
+        house_calls[(c["method"], house_path(c["path"]), c["status"])] += c["n"]
 except Exception:
     fail("the database JSON is not readable. This says nothing about the customer.")
 if found is not True:
@@ -136,6 +160,10 @@ status = collections.Counter(str(l.status) for l in mine if (l.method, l.path) =
 for code in sorted(status):
     print(f"SUBMIT STATUS {code}: {status[code]}")
 print(f"AWARD CALLS: {sum(1 for l in mine if (l.method, l.path) == AWARD)} calls to POST /v1/bounties/award")
+hj, hs, ha, hc = (house[k] for k in ("jobs", "submissions", "awards", "awards_customer"))
+print(f"HOUSE: {hj} house jobs posted, {hs} house submissions, {ha} house awards ({hc} to the customer)")
+for (method, path, code), k in sorted(house_calls.items()):
+    print(f"HOUSE REPORT {method} {path} {code}: {k}")
 awards = sum(x["awards"] for x in days_in.values())
 after = sum(x["inference_after_award"] for x in days_in.values())
 print(f"AWARDS: {awards} awarded to the customer, {after} inference rows after the first award")
@@ -195,13 +223,17 @@ if [[ "${1:-}" == "--selftest" ]]; then
   plant_db() { # file variant
     (cd "$ROOT" && node --import tsx "$plant" "$1" "$2") >/dev/null 2>&1
   }
-  if ! plant_db "$stub/plain.db" plain || ! plant_db "$stub/foreign.db" foreign-operator; then
+  if ! plant_db "$stub/plain.db" plain || ! plant_db "$stub/foreign.db" foreign-operator \
+    || ! plant_db "$stub/house.db" house || ! plant_db "$stub/house-foreign.db" house-foreign; then
     echo "SELFTEST FAILED: the planted database could not be built (node, tsx, better-sqlite3)"; exit 1
   fi
   report_local "$stub/plain.db" "$S" "$U" 1 "$F" >"$stub/c1.json"
   report_local "$stub/plain.db" "$S" "$U" 2 "$F" >"$stub/c2.json"
   report_local "$stub/foreign.db" "$S" "$U" 1 "$F" >"$stub/c1-foreign.json"
   report_local "$stub/plain.db" "$S" "$U" 3 "$F" >"$stub/c3.json"
+  report_local "$stub/house.db" "$S" "$U" 1 "$F" >"$stub/h1.json"
+  report_local "$stub/house.db" "$S" "$U" 2 "$F" >"$stub/h2.json"
+  report_local "$stub/house-foreign.db" "$S" "$U" 1 "$F" >"$stub/h1-foreign.json"
 
   out=$(count "$stub/c1.json" "$log" "$S" "$U" 1 1); rc=$?
   want "$rc" "0" "the planted window exits 0"
@@ -246,6 +278,36 @@ if [[ "${1:-}" == "--selftest" ]]; then
     "submit counter-proof: without its 200 lines the customer has no address, so no call is its"
   want "$(line '^MATCH:' "$out5")" "MATCH: ips 0, 4 of 4 inference rows without a log line within 5 s" \
     "match counter-proof: without the 200 lines every row is unmatched"
+
+  # The house job (kunden 11), planted by the real functions of src/bounties/house.ts.
+  want "$(grep -E '^HOUSE' <<<"$out" | tr '\n' '|')" "HOUSE: 0 house jobs posted, 0 house submissions, 0 house awards (0 to the customer)|" \
+    "house: without a house job every house count is 0 and no call is reported"
+  hout=$(count "$stub/h1.json" "$log" "$S" "$U" 1 1); rc=$?
+  want "$rc" "0" "house: the planted window with house jobs exits 0"
+  want "$(line '^HOUSE:' "$hout")" "HOUSE: 3 house jobs posted, 2 house submissions, 2 house awards (1 to the customer)" \
+    "house: jobs posted after each award, the reports of two foreign runtimes and their awards, one to the customer; ours, the invalid one and the one after the window not counted"
+  want "$(line '^HOUSE REPORT GET /pay/5/' "$hout")" "HOUSE REPORT GET /pay/5/<address> 404: 1" \
+    "house report of the customer counted, address replaced"
+  want "$(grep -cE '^HOUSE REPORT .*/v1/ours-only' <<<"$hout")" "0" \
+    "house report of our own address not counted, neither its own call nor its call the customer also made"
+  want "$(line '^HOUSE REPORT GET /v1/node/' "$hout")" "HOUSE REPORT GET /v1/node/<address>/status 502: 1" \
+    "house report with an IPv4 address in its path counted, address replaced"
+  want "$(grep -cE '^HOUSE REPORT .*(invalid-report|after-window)' <<<"$hout")" "0" \
+    "house: an invalid report and one after the window are not counted"
+  want "$(grep -E '^HOUSE REPORT' <<<"$hout" | tr '\n' '|')" \
+    "HOUSE REPORT GET /pay/5/<address> 404: 1|HOUSE REPORT GET /v1/node/<address>/status 502: 1|HOUSE REPORT POST /v1/chat/completions 402: 2|" \
+    "house report lines: the same call of two runtimes adds up, sorted by method, path and status"
+  want "$(tail -1 <<<"$hout" | cut -c1-7)" "AWARDS:" "house lines come before AWARDS, which stays the last line"
+  want "$(grep -cE '([0-9]{1,3}\.){3}[0-9]{1,3}|0x[0-9a-fA-F]{40}' <<<"$hout")" "0" "house: no address and no wallet in the output"
+  want "$(grep -cE '([0-9]{1,3}\.){3}[0-9]{1,3}|0x[0-9a-fA-F]{40}' "$stub/h1.json")" "0" \
+    "house: the database report replaces the address in each path itself, so none leaves the container"
+  hout2=$(count "$stub/h1-foreign.json" "$log" "$S" "$U" 1 1)
+  want "$(grep -E '^HOUSE' <<<"$hout2" | grep -E 'HOUSE:|/pay/5/|ours-only' | tr '\n' '|')" \
+    "HOUSE: 3 house jobs posted, 3 house submissions, 2 house awards (1 to the customer)|HOUSE REPORT GET /pay/5/<address> 404: 2|HOUSE REPORT POST /v1/ours-only 500: 1|" \
+    "house counter-proof: the same report from an address that is not ours is counted, both of its calls"
+  hout3=$(count "$stub/h2.json" "$log" "$S" "$U" 2 1)
+  want "$(line '^HOUSE:' "$hout3")" "HOUSE: 3 house jobs posted, 2 house submissions, 2 house awards (0 to the customer)" \
+    "house counter-proof: for the other customer the award of customer 1 is not its own"
 
   count "$stub/c3.json" "$log" "$S" "$U" 3 1 >/dev/null 2>&1; rc=$?
   want "$rc" "2" "a customer number nobody has exits 2"
