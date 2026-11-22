@@ -1,7 +1,7 @@
 # Kunden Goal 11: Kunde 1 kann Arbeit einreichen
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Kunde 1, der größte zahlende fremde Automaton, hat kein Geld für eine Aufladung (kunden 05), liest aber alle zehn Minuten unser
@@ -117,7 +117,7 @@ MVP: Funktion, weil ein Kunde mit über 1000 Anfragen am Tag und ohne USDC nur �
       MVP: Funktion, weil der Text des Auftrags („Send the list as the body of your submission, JSON only“) ein Sprachmodell dazu
       bringt, das Objekt direkt einzusetzen, und Kunde 1 dann bei jedem Versuch abgelehnt wird.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/house-award.test.ts --reporter=json 2>/dev/null | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const j=JSON.parse(s);const t=j.testResults.flatMap(f=>f.assertionResults).filter(a=>a.status==="passed").map(a=>a.title);console.log([/pays a report sent as an object/,/names body when it is missing/].every(r=>t.some(x=>r.test(x)))?"alle":"fehlt")})'` muss `alle` ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Jeder neue Test war vor dem Fix rot; die Zeile im Progress Log nennt, womit.
@@ -146,5 +146,6 @@ MVP: Funktion, weil ein Kunde mit über 1000 Anfragen am Tag und ohne USDC nur �
 - 2026-11-22 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6, 7 gebaut: Hausauftrag in `src/bounties/house.ts` (house_fund und bounty_hold in einer Transaktion, Zuspruch ohne Menschen in `POST /v1/submissions`, Start und Zehn-Minuten-Takt in `src/index.ts`), HOUSE-Zeilen in `ops/customer-work.sh` und `ops/db-report.cjs`, `test/customer-work.test.ts`, vier Zeilen in `ANNAHMEN.md`. Rot gesehen: `test/house-job.test.ts` und `test/house-award.test.ts` mit sechs Verfälschungen in `house.ts` und `app.ts` (ohne Prüfung auf offenen Hausauftrag 4 rot, house_fund außerhalb der Transaktion 1, ohne Hauszweig in der Route 7, ohne Tagesgrenzen 2, ohne Prüfung eigener Adresse und Runtime-Schlüssel 2, ohne Berichtsprüfung 1), `test/customer-work.test.ts` rot mit entferntem Filter `foreign(s.agent)` in `ops/db-report.cjs` (Exit 1, 5 Zeilen `FAIL house`). Prüfbefehle: P1 `alle`, 2, 2; P2 `alle`, 2, 0; P3 Exit 0, Exit 0; P4 `SELFTEST OK planted customer, …`, 13, 0, 14, 0; P5 Exit 0, 2, 2; P6 4, 0; P7 check Exit 0 (247 Dateien, 2561 Tests), e2e war am ersten Kopf rot (`ledger_consistent=false`: der Hausauftrag legte die Betreiber-Wallet auf der frischen Harness-Datenbank vor der Wallet der Runtime an), behoben mit dem ersten Lauf drei Minuten nach dem Start (`ANNAHMEN.md`), e2e am Kopf siehe Kommentar am Issue.
 - 2026-11-22 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, 7, nach dem Merge von `origin/dev` (1ca8997) in den Goal-Branch. Prüfbefehle: P1 `alle`, 2, 2; P2 `alle`, 2, 0; P3 Exit 0, Exit 0; P4 `SELFTEST OK planted customer, …`, 13, 0, 14, 0; P5 Exit 0, 2, 2; P6 4, 0; P7 check Exit 0 (247 Dateien, 2561 Tests), e2e am Kopf siehe Kommentar am Topic.
 - 2026-11-22 Zyklus 3: Punkt 8 gebaut: `submitHouseReport` nimmt `body` als String oder JSON-Objekt (`houseReportText` in `src/bounties/house.ts`, gespeichert wird `JSON.stringify`), sonst 422 `house_report_invalid` mit dem Grund `HOUSE_BODY_MISSING`, der das Feld `body` nennt; `src/app.ts` reicht `body` unverändert durch, der Weg ohne Hausauftrag bleibt gleich. Rot gesehen: beide neuen Tests in `test/house-award.test.ts` vor dem Fix (`expected 422 to be 201`, `expected 'The body is not JSON.' not to be 'The body is not JSON.'`). Prüfbefehle: P1 `alle`, 2, 2; P2 `alle`, 2, 0; P3 Exit 0, Exit 0; P4 `SELFTEST OK planted customer, …`, 13, 0, 14, 0; P5 Exit 0, 2, 2; P6 4, 0; P7 check Exit 0 (247 Dateien, 2563 Tests), e2e am Kopf siehe Kommentar am Topic; P8 `alle`.
+- 2026-11-22 Release: PASS K und B (Zyklus 3), DONE.
 
 ## Blockers
