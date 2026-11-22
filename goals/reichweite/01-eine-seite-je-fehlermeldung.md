@@ -160,6 +160,12 @@ Seiten umlenkt.
       Prüfung: `cat goals/reichweite/ANNAHMEN.md src/public/error-pages.ts docs/soll/src/errors-*.html | grep -cE '0x[0-9a-fA-F]{40}'` muss `0` ausgeben.
 - [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
+- [ ] Kritik: Der JSON-LD-Knoten `WebPage` jeder Fehlerseite nennt Titel und Beschreibung Zeichen für Zeichen wie `ERROR_PAGES`,
+      ohne HTML-Entity im JSON-LD, und die anderen Seiten behalten ihr JSON-LD.
+      MVP: Funktion, weil Suchmaschinen den maschinenlesbaren Teil lesen und dort heute `{&quot;error&quot;:…}` und `Conway&#39;s`
+      statt des Fehlertexts steht, nach dem Betroffene suchen.
+      Prüfung: `CP_PUBLIC_URL=https://automatonhost.com PATH=/usr/bin:$PATH node --import tsx --input-type=module -e 'const { createApp } = await import("./src/app.ts"); const { openDb } = await import("./src/db.ts"); const { ERROR_PAGES } = await import("./src/public/error-pages.ts"); const app = createApp({ db: openDb(":memory:") }); const bad = []; for (const p of ERROR_PAGES) { const h = await (await app.request("/errors/" + p.slug)).text(); const m = h.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/); const g = m ? JSON.parse(m[1])["@graph"] || [] : []; const w = g.find((n) => n["@type"] === "WebPage"); if (!w || w.name !== p.title || w.description !== p.description) bad.push(p.slug + " ld: " + (w && w.name)); if (!m || /&(quot|amp|lt|gt|#\d+);/.test(m[1])) bad.push(p.slug + " ld entity"); if (!h.includes("<title>" + p.title.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;") + "</title>") && !h.includes("<title>" + p.title.replace(/&/g, "&amp;").replace(/</g, "&lt;") + "</title>")) bad.push(p.slug + " title"); } if (bad.length) { console.error(bad); process.exit(1); } console.log("ld ok")'` muss `ld ok` ausgeben.
+      Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/jsonld.test.ts test/error-pages.test.ts` muss Exit-Code 0 haben.
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
