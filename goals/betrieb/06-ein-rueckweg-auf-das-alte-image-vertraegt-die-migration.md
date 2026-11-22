@@ -1,7 +1,7 @@
 # Betrieb Goal 06: Ein Rückweg auf das alte Image verträgt die Migration
 
 ## Status
-PLANNED
+DONE
 
 ## Active Objective
 Ein Rückweg auf das alte Image nach einem Deploy legt die Handoffs nicht mehr still. Seit konto 12 benennt `src/db.ts` die Spalte
@@ -75,7 +75,7 @@ eingreift.
   `git status --short` prüfen, dass nichts im Checkout liegen blieb. Kein `pkill -f`.
 
 ## Done Condition
-- [ ] Schritt 8 in `deploy/README.md` nennt den Rückweg der Spalte: bei gestopptem Dienst, nur solange `PRAGMA table_info(handoffs)`
+- [x] Schritt 8 in `deploy/README.md` nennt den Rückweg der Spalte: bei gestopptem Dienst, nur solange `PRAGMA table_info(handoffs)`
       `display_name` zeigt, mit `ALTER TABLE handoffs RENAME COLUMN display_name TO automaton_name` über das Image, dann der Start;
       für den automatischen Rückweg wie für den von Hand.
       Prüfung: `awk '/^8\. /{f=1} /^9\. /{f=0} f' deploy/README.md | grep -c 'ALTER TABLE handoffs RENAME COLUMN display_name TO automaton_name'` muss mindestens 1 ausgeben.
@@ -84,29 +84,29 @@ eingreift.
       Prüfung: `awk '/^8\. /{f=1} /^9\. /{f=0} f' deploy/README.md | grep -c 'run --rm --no-deps --entrypoint node cp'` muss mindestens 1 ausgeben.
       Prüfung: `awk '/^8\. /{f=1} /^9\. /{f=0} f' deploy/README.md | grep -c 'docker tag control-plane:rollback control-plane:latest'` muss mindestens 1 ausgeben.
       Prüfung: `grep -c '^9\. \*\*Caddyfile\*\*' deploy/README.md` muss 1 ausgeben.
-- [ ] Der Test `test/rollback-schema.test.ts` zeigt, dass das alte Image nach dem Rückweg aus Schritt 8 wieder einen Handoff schreibt
+- [x] Der Test `test/rollback-schema.test.ts` zeigt, dass das alte Image nach dem Rückweg aus Schritt 8 wieder einen Handoff schreibt
       und der nächste Start des neuen Images die Spalte ohne Verlust wieder vorwärts umbenennt; die Anweisung kommt aus dem Text von
       Schritt 8.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/rollback-schema.test.ts test/handoff-display-name.test.ts` muss Exit-Code 0 haben.
       Prüfung: `grep -cE 'lets the old image write a handoff after the documented rename|renames the column forward again on the next start without losing a row' test/rollback-schema.test.ts` muss 2 ausgeben.
       Prüfung: `grep -c 'deploy/README.md' test/rollback-schema.test.ts` muss mindestens 1 ausgeben.
-- [ ] Derselbe Test wird rot, sobald `src/db.ts` eine Spalte umbenennt oder löscht, ohne dass Schritt 8 dafür einen Rückweg nennt; er
+- [x] Derselbe Test wird rot, sobald `src/db.ts` eine Spalte umbenennt oder löscht, ohne dass Schritt 8 dafür einen Rückweg nennt; er
       war rot gegen den Text von Schritt 8 auf dev.
       MVP: Funktion, weil die nächste Migration dieser Art sonst wieder erst beim Rückweg auffällt, wenn die Kunden schon stehen.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/rollback-schema.test.ts` muss Exit-Code 0 haben.
       Prüfung: `grep -cE 'documents a way back for every column rename and drop in src/db.ts|fails a column rename without a way back in deploy/README.md|fails a column drop without a way back in deploy/README.md' test/rollback-schema.test.ts` muss 3 ausgeben.
       Prüfung: `grep -cE 'RENAME COLUMN|DROP COLUMN' test/rollback-schema.test.ts` muss mindestens 2 ausgeben.
-- [ ] Der automatische Rückweg in `deploy/rollout-remote.sh` steht als Vorschlag da, mit Schwere und Bezug auf dieses Goal.
+- [x] Der automatische Rückweg in `deploy/rollout-remote.sh` steht als Vorschlag da, mit Schwere und Bezug auf dieses Goal.
       Prüfung: `for f in goals/_vorschlaege/betrieb-kritik-*.md; do grep -q '^Goal: betrieb 06$' "$f" && grep -q '^Schwere: [1-5]$' "$f" && grep -q 'deploy/rollout-remote\.sh' "$f" && echo "$f"; done | wc -l` muss mindestens 1 ausgeben.
-- [ ] `deploy/README.md` ändert sich nur in Schritt 8 und bringt keine Adresse und keinen Schlüssel mit, und das Goal ändert nur
+- [x] `deploy/README.md` ändert sich nur in Schritt 8 und bringt keine Adresse und keinen Schlüssel mit, und das Goal ändert nur
       `deploy/README.md`, den neuen Test, Dateien unter `goals/betrieb/` und neue Vorschläge `goals/_vorschlaege/betrieb-*`.
       Prüfung: `diff <(git show origin/dev:deploy/README.md | awk '/^8\. /{f=1} /^9\. /{f=0} !f') <(awk '/^8\. /{f=1} /^9\. /{f=0} !f' deploy/README.md) | wc -l` muss 0 ausgeben.
       Prüfung: `git diff origin/dev...HEAD -- deploy/README.md | grep '^+' | grep -cE "(^|[^0-9.])([0-9]{1,3}\.){3}[0-9]{1,3}([^0-9.]|$)|sk-or-[A-Za-z0-9-]{8,}"` muss 0 ausgeben.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD | grep -vE "^(deploy/README\.md|test/rollback-schema\.test\.ts|goals/betrieb/|goals/_vorschlaege/betrieb-[a-z0-9.-]+\.md$)" | wc -l` muss 0 ausgeben.
-- [ ] `check` ist grün und lässt den Checkout sauber.
+- [x] `check` ist grün und lässt den Checkout sauber.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs >/dev/null 2>&1; git status --porcelain | wc -l` muss 0 ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Der neue Test war vor dem Fix rot; die Zeile im Progress Log nennt, womit.
@@ -128,6 +128,9 @@ eingreift.
 - max Versuche pro Gap: 2
 
 ## Progress Log
+- 2026-11-22 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6 gebaut: Schritt 8 in `deploy/README.md` nennt den Rückweg der Spalte (stop, Skript über das Image, Start, beim Rückweg von Hand vorher das Zurücktaggen), neuer Wächtertest `test/rollback-schema.test.ts`, Vorschlag `goals/_vorschlaege/betrieb-kritik-2026-11-22-1.md` (Schwere 3) für `deploy/rollout-remote.sh`; der Test war gegen den Text von Schritt 8 auf dev rot (3 failed, 2 passed: Wächter, altes Image, Vorwärts-Umbenennung), eine gepflanzte Zeile `RENAME COLUMN reserved_mc TO held_mc` in `src/db.ts` macht ihn rot (1 failed, 4 passed), das Skript aus Schritt 8 lief nur lokal gegen eine Wegwerf-DB (`renamed`, dann `nothing to do`); kein Befehl aus Schritt 8 lief auf der VM. Prüfbefehle: Punkt 1 1, 2, 1, 1, 1, 1; Punkt 2 Exit 0, 2, 6; Punkt 3 Exit 0, 3, 7; Punkt 4 1; Punkt 5 0, 0, 0; Punkt 6 `check` Exit 0 (248 Dateien, 2568 Tests), `git status --porcelain` 0.
+- 2026-11-22 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6; `dev` (8cb5a0b) war schon im Goal-Branch, kein Befehl aus Schritt 8 lief auf der VM. Prüfbefehle: Punkt 1 1, 2, 1, 1, 1, 1; Punkt 2 Exit 0 (7 passed), 2, 6; Punkt 3 Exit 0, 3, 7; Punkt 4 1; Punkt 5 0, 0, 0; Punkt 6 `check` Exit 0 (248 Dateien, 2568 Tests), `git status --porcelain` 0.
+- 2026-11-22 Release: PASS K und B (Zyklus 2), DONE.
 
 ## Blockers
 - keine
