@@ -112,6 +112,25 @@ haben keine Wallet. Bis 23.09.2026 blieben 43 Besucher an der Wallet-Signatur h�
 - Das Terminal verlässt der Nutzer nur für einen QR-Code aufs Handy: beim Start (Passkey, Erlaubnis, erste Zahlung) und bei der
   ersten Auszahlung (Identitätsprüfung des Anbieters). Alles andere ist ein Tool in `mcp/server.mjs`.
 
+## karte: Guthaben per Karte über Digistore24
+
+Grundsatz für alle Glieder (Matthias 22.11.2026): Menschen ohne Wallet zahlen per Karte über Digistore24, nicht über MoonPay
+(konto 15 ruht). Digistore24 verkauft als Reseller im eigenen Namen und führt die Umsatzsteuer ab; es braucht weder einen neuen
+Zahlungsanbieter noch eine eigene Lösung für die Umsatzsteuer.
+
+- Es ist dasselbe Verkäuferkonto wie bei Personalplaner24, Bautagebuch24 und Aszendent24. Ein Goal ändert nur die eigenen neuen
+  Produkte, nie Produkte, IPN-Verbindungen oder Bestellformulare der anderen Projekte. Zugang über `DIGISTORE24_API_KEY` aus
+  `~/brain/connectors/secrets.env`, Werkzeuge und Fallen in `~/brain/connectors/digistore24.md`. Vorlage für Kasse, IPN und Freigabe
+  ist `~/work/personalplaner24` (`app/digistore_kasse.py`, `goals/46-erste-zahlung.md`), dazu der Abschnitt „Digistore24: was bei
+  Personalplaner24 Zeit gekostet hat“ in `~/work/aszendent24/loop-constraints.md`.
+- Pakete und Preise stehen fest: 5, 20 und 50 EUR brutto. Einen anderen Preis, einen Gutschein oder einen Rabatt setzt kein Goal.
+- Gutgeschrieben wird, was bei HTC ankommt: der Verkäuferanteil aus der IPN in USD zum Referenzkurs der EZB vom Kauftag. Die Marge
+  bleibt der Aufschlag auf Inferenz. Seite, Plugin und Kasse nennen vor dem Kauf das Guthaben, das ein Paket ergibt.
+- Guthaben bleibt unauszahlbar (Regel 10). Eine Rückerstattung oder Rückbuchung bucht das Guthaben zurück, soweit es noch da ist; den
+  Rest zeigt `ops/status.sh` als Fehlbetrag, ein Saldo wird nie negativ.
+- Die Adresse des Automatons reist nur im Parameter `custom` der Kasse und in der IPN; sie steht nie im Repo, in Logs von Actions
+  oder in Texten (Grundregel 8). Kein Text nach außen nennt PostYourPrice (Grundsatz umzug).
+
 ## umzug: Von PostYourPrice auf automatonhost.com
 
 Grundsatz (Matthias 17.11.2026): Nach außen (Seiten, README, Plugin, PRs, Einträge, Kommentare, Posts) wird PostYourPrice weder genannt
