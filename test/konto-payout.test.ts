@@ -720,3 +720,69 @@ describe("a revoke that does not end the old permission", () => {
     await expectDroppedAndPhoneAsked(w, 4);
   });
 });
+
+describe("the payout waits for the SEPA approval of Bridge", () => {
+  /** A matched payout handoff of a fresh account whose identity Bridge approved, and the page the tap on the number showed. */
+  async function matched(s: MoneySetup) {
+    const a = await account(s);
+    s.bridge.state.kycStatus = "approved";
+    const h = (await (await json(s, "/v1/handoff", { automaton_name: "Atlas", step: "payout" }, a.key)).json()) as { code: string; match: number };
+    const tapped = await tap(s.app, h.code, h.match);
+    return { a, h, tapped };
+  }
+  const customerCalls = (s: MoneySetup) => s.bridge.calls.filter((c) => c.method === "GET" && c.path === "/v0/customers/cus_1");
+  const bankCalls = (s: MoneySetup) =>
+    s.bridge.calls.filter((c) => c.method === "POST" && (c.path.endsWith("/external_accounts") || c.path.endsWith("/liquidation_addresses")));
+
+  it("stays on payout-verify while Bridge has not approved SEPA", async () => {
+    const s = moneySetup();
+    s.bridge.state.sepaStatus = "incomplete";
+    const { h, tapped } = await matched(s);
+    for (const html of [await tapped.text(), await (await s.app.request(`/h/${h.code}`)).text(), await (await form(s, `/h/${h.code}/payout-verify`, {})).text()]) {
+      expect(html).toContain('data-soll="verify"');
+      expect(html).toContain('data-href="https://bridge.example/verify/kyc_1"');
+      expect(html).not.toContain('data-soll="bank"');
+    }
+    expect(customerCalls(s).length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("makes no bank account at Bridge while SEPA is not approved", async () => {
+    const s = moneySetup();
+    s.bridge.state.sepaStatus = "incomplete";
+    const { h } = await matched(s);
+    const res = await form(s, `/h/${h.code}/payout-bank`, { iban: EXAMPLE_IBAN, owner_name: "Erika Mustermann" });
+    const html = await res.text();
+    expect(html).toContain('data-soll="verify"');
+    expect(html).not.toContain('data-soll="payout"');
+    expect(bankCalls(s)).toHaveLength(0);
+    expect(s.bridge.calls.filter((c) => c.path === "/v0/customers/cus_1/external_accounts")).toHaveLength(0);
+    expect(s.db.prepare("SELECT * FROM payout_handoffs WHERE code = ?").get(h.code)).toBeUndefined();
+    expect(stateOf(s, h.code)).toBe("matched");
+  });
+
+  it("moves on to the bank step once KYC and SEPA are approved", async () => {
+    const s = moneySetup();
+    s.bridge.state.sepaStatus = "incomplete";
+    const { h, tapped } = await matched(s);
+    expect(tapped.status).toBe(200);
+    s.bridge.state.sepaStatus = "approved";
+    const res = await s.app.request(`/h/${h.code}`);
+    expect(res.status).toBe(200);
+    const bank = await res.text();
+    expect(bank).toContain('data-soll="bank"');
+    expect(bank).toMatch(/<input[^>]+name="iban"/);
+  });
+
+  it("answers 502 when Bridge cannot report the customer", async () => {
+    const s = moneySetup();
+    s.bridge.state.customerFails = true;
+    const { h } = await matched(s);
+    const page = await s.app.request(`/h/${h.code}`);
+    expect(page.status).toBe(502);
+    expect(await page.text()).not.toContain('data-soll="bank"');
+    const res = await form(s, `/h/${h.code}/payout-bank`, { iban: EXAMPLE_IBAN, owner_name: "Erika Mustermann" });
+    expect(res.status).toBe(502);
+    expect(s.bridge.calls.filter((c) => c.path.endsWith("/external_accounts"))).toHaveLength(0);
+    expect(s.db.prepare("SELECT * FROM payout_handoffs WHERE code = ?").get(h.code)).toBeUndefined();
+  });
+});

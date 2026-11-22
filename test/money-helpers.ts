@@ -294,7 +294,13 @@ export function payoutNode(owners: Map<string, string> = new Map()) {
 /** Bridge without a network: records every request; `kycStatus` is what the identity check reports. */
 export function bridgeFake() {
   const calls: { method: string; path: string; headers: Record<string, string>; body: Record<string, unknown> | null }[] = [];
-  const state = { kycStatus: "not_started", liquidation: [] as string[] };
+  // sepaStatus is the status of the endorsement `sepa` that GET /v0/customers/cus_1 reports; customerFails makes that call a 500.
+  const state = {
+    kycStatus: "not_started",
+    sepaStatus: "approved",
+    customerFails: false,
+    liquidation: [] as string[],
+  };
   let next = 0;
   const fetch: FetchLike = async (input, init) => {
     const url = new URL(input);
@@ -305,6 +311,10 @@ export function bridgeFake() {
     const kyc = { id: "kyc_1", customer_id: "cus_1", kyc_link: "https://bridge.example/verify/kyc_1", kyc_status: state.kycStatus, tos_link: "https://bridge.example/tos", tos_status: "approved" };
     if (method === "POST" && url.pathname === "/v0/kyc_links") return ok(200, kyc);
     if (method === "GET" && url.pathname === "/v0/kyc_links/kyc_1") return ok(200, kyc);
+    if (method === "GET" && url.pathname === "/v0/customers/cus_1") {
+      if (state.customerFails) return ok(500, { code: "internal_error" });
+      return ok(200, { id: "cus_1", status: "active", endorsements: [{ name: "sepa", status: state.sepaStatus }] });
+    }
     if (method === "POST" && /^\/v0\/customers\/cus_1\/external_accounts$/.test(url.pathname)) {
       const iban = (body?.iban as { account_number: string }).account_number;
       return ok(201, { id: `ext_${++next}`, currency: "eur", account_type: "iban", iban: { last_4: iban.slice(-4) } });
