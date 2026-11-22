@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Card purchases (goals/karte/01, point 5). Read-only, changes nothing on the server.
 #   ops/card-orders.sh
+#   ops/card-orders.sh --test-vendor
 #
 # Prints exactly three lines:
 #   card_orders live <n> test <n> booked <n> unassigned <n> pending_rate <n> reversed <n>
@@ -13,9 +14,22 @@
 #
 # The query runs in the running container `cp` with node and better-sqlite3 on CP_DB_PATH, opened with readonly: true.
 #
+# With --test-vendor (goals/karte/02, point 2) it prints instead one line per product that has a test order (mode test):
+#   card_test_vendor <product_id> <vendor_eur_cents of its newest test order>|missing
+# sorted by product_id, or `card_test_vendor none`. These are the vendor shares CARD_PACKAGES is computed from. Again the
+# column address is never read.
+#
 # Exit 0 with the three lines, 1 when the container or the database could not be read (the lines then say so), 2 with
 # `ssh failed` when the server could not be asked.
 set -uo pipefail
+
+MODE=""
+case "${1:-}" in
+  "") ;;
+  --test-vendor) MODE="test-vendor" ;;
+  --on-server) MODE="${2:-}" ;;
+  *) echo "usage: ops/card-orders.sh [--test-vendor]"; exit 2 ;;
+esac
 
 if [[ "${1:-}" == "--on-server" ]]; then
   COMPOSE_FILE="/opt/control-plane/repo/deploy/docker-compose.prod.yml"
@@ -48,6 +62,37 @@ console.log(`card_shortfall_usd ${cents / 100n}.${String(cents % 100n).padStart(
 console.log("ipn_passphrase " + ipn);
 JS
 )
+  if [[ "$MODE" == "test-vendor" ]]; then
+    QUERY=$(cat <<'JS'
+const lines = [];
+try {
+  const db = require("better-sqlite3")(process.env.CP_DB_PATH || "/data/cp.db", { readonly: true, fileMustExist: true });
+  const table = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'card_orders'").get();
+  if (table) {
+    const rows = db
+      .prepare(
+        "SELECT product_id AS p, vendor_eur_cents AS v FROM card_orders WHERE mode = 'test' " +
+          "ORDER BY product_id ASC, created_at DESC, rowid DESC",
+      )
+      .safeIntegers(true)
+      .all();
+    const seen = new Set();
+    for (const r of rows) {
+      if (seen.has(r.p)) continue;
+      seen.add(r.p);
+      const v = r.v == null || BigInt(r.v) <= 0n ? "missing" : String(r.v);
+      if (/^[0-9]+$/.test(String(r.p))) lines.push(`card_test_vendor ${r.p} ${v}`);
+    }
+  }
+  db.close();
+} catch {
+  console.log("card_orders unreadable");
+  process.exit(1);
+}
+console.log(lines.length ? lines.join("\n") : "card_test_vendor none");
+JS
+)
+  fi
   # stdin from /dev/null: this script itself arrives on stdin, and docker would swallow the rest of it.
   out=$(docker compose -f "$COMPOSE_FILE" exec -T cp node -e "$QUERY" </dev/null 2>/dev/null)
   rc=$?
@@ -64,7 +109,8 @@ HOST="${CP_DEPLOY_HOST:-root@76.13.144.207}"
 KEY="${CP_DEPLOY_KEY:-$HOME/.ssh/id_ed25519_automaton}"
 SELF="${BASH_SOURCE[0]}"
 
-out=$(ssh -i "$KEY" -o BatchMode=yes -o ConnectTimeout=10 "$HOST" 'bash -s -- --on-server' <"$SELF" 2>/dev/null)
+REMOTE="bash -s -- --on-server${MODE:+ $MODE}"
+out=$(ssh -i "$KEY" -o BatchMode=yes -o ConnectTimeout=10 "$HOST" "$REMOTE" <"$SELF" 2>/dev/null)
 rc=$?
 if [[ $rc -ne 0 && $rc -ne 1 ]] || [[ -z "$out" ]]; then
   echo "ssh failed"
