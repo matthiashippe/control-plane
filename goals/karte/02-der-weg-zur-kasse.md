@@ -176,11 +176,11 @@ sieht. Übernimmt goals/_vorschlaege/karte-kritik-2026-11-22-1.md.
       Prüfung: `node --input-type=module -e 'import fs from "node:fs"; import { decodePng } from "./ops/soll-assess.mjs"; const bad = []; for (const w of [390, 1440]) { const p = decodePng(fs.readFileSync("docs/soll/startseite-" + w + ".png")); if (p.width !== w) bad.push(String(w)); } console.log(bad.length ? "falsch " + bad.join(" ") : "breiten ok")'` muss genau `breiten ok` ausgeben.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD -- docs/soll | grep -vE '^docs/soll/(startseite-(390|1440)\.png|src/startseite\.html|README\.md)$' | wc -l` muss 0 ausgeben.
       Prüfung: `grep -cE '^## Karte #card \(goals/karte/02\)$' docs/soll/README.md` muss genau 1 ausgeben.
-- [ ] Der Design Reviewer hat genau diese zwei Bilder abgenommen, bevor sich `src/public/index.html` änderte.
+- [x] Der Design Reviewer hat genau diese zwei Bilder abgenommen, bevor sich `src/public/index.html` änderte.
       MVP: Funktion, weil die Seite 1:1 nach einem abgenommenen Bild entsteht.
       Prüfung: `grep -cE '^Abnahme-Issue card: PRO-[0-9]+$' docs/soll/README.md` muss genau 1 ausgeben.
       Prüfung (Netz): `i=$(sed -n 's/^Abnahme-Issue card: //p' docs/soll/README.md); t=$(git log -1 --format=%cI -- docs/soll/startseite-390.png docs/soll/startseite-1440.png docs/soll/src/startseite.html); b=$(git log --reverse --format=%cI origin/dev..HEAD -- src/public/index.html | head -1); curl -s -H "Authorization: Bearer $PAPERCLIP_API_KEY" "$PAPERCLIP_API_URL/api/issues/$i/comments" | T="$t" B="$b" node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{const t=Date.parse(process.env.T);const ok=JSON.parse(d).filter(c=>c.authorAgentId==="3412a0ea-cbf5-4f18-9360-0e8e20ba3313"&&/SOLL abgenommen/.test(c.body)).map(c=>Date.parse(c.createdAt));if(!process.env.T||!ok.some(x=>x>t)){console.error("keine abnahme nach "+process.env.T);process.exit(1)}if(process.env.B&&!(Math.min(...ok.filter(x=>x>t))<Date.parse(process.env.B))){console.error("gebaut vor der abnahme "+process.env.B);process.exit(1)}console.log("abnahme ok "+ok.length)})'` muss `abnahme ok <n>` mit n mindestens 1 ausgeben.
-- [ ] Die echte Startseite zeigt den Block `card` direkt nach dem Umzugsblock mit Feld, drei Knöpfen direkt auf die Kasse, Preisen und
+- [x] Die echte Startseite zeigt den Block `card` direkt nach dem Umzugsblock mit Feld, drei Knöpfen direkt auf die Kasse, Preisen und
       Guthaben, zählt seine Sichtungen und ist pixelgleich mit dem abgenommenen Bild; eine geänderte Zeile fällt dabei auf, und das
       Skript der Seite und sein Hash bleiben, wie sie sind.
       MVP: Funktion, weil ein Betreiber hier ohne Wallet zur Kasse kommt und die Seite halten muss, was das Bild verspricht.
@@ -212,11 +212,11 @@ sieht. Übernimmt goals/_vorschlaege/karte-kritik-2026-11-22-1.md.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/the-way-to-pay.test.ts test/messages.test.ts test/inference-sunset.test.ts test/goal-18-die-tuer.test.ts` muss Exit-Code 0 haben.
       Prüfung: `grep -c 'card_url' src/inference/proxy.ts` muss mindestens 1 ausgeben.
       Prüfung (Netz): `gh pr checks $(gh pr list -R matthiashippe/control-plane --head goal/karte-02 --state open --json number -q '.[0].number') -R matthiashippe/control-plane 2>&1 | grep -E '^e2e\s' | grep -c pass` muss genau 1 ausgeben.
-- [ ] Die drei Produkte sind zur Freigabe eingereicht oder freigegeben.
+- [x] Die drei Produkte sind zur Freigabe eingereicht oder freigegeben.
       MVP: Funktion, weil Digistore24 erst nach der Freigabe an Fremde verkauft.
       Prüfung (Netz): `PATH=/usr/bin:$PATH node ops/digistore-release.mjs --report 2>&1 | grep -cE '^approval (771278|771279|771280): (pending|approved)$'` muss genau 3 ausgeben.
       Prüfung (Netz): `PATH=/usr/bin:$PATH node ops/digistore-release.mjs --report 2>&1 | tail -1` muss genau `release report: 0 defects` ausgeben.
-- [ ] Die Entscheidungen stehen in `goals/karte/ANNAHMEN.md`, der Diff bleibt in den Pfaden dieses Goals, kein Test fällt weg, und
+- [x] Die Entscheidungen stehen in `goals/karte/ANNAHMEN.md`, der Diff bleibt in den Pfaden dieses Goals, kein Test fällt weg, und
       nichts im Repo nennt eine Adresse eines Kunden, das Kennwort oder den Schlüssel.
       MVP: Funktion, weil karte 03 auf diesen Zahlen und Wegen misst und ein späteres Goal wissen muss, warum es kein Skript gibt.
       Prüfung: `grep -cE '^- [0-9-]+, karte 02: ' goals/karte/ANNAHMEN.md` muss mindestens 9 ausgeben.
@@ -224,7 +224,7 @@ sieht. Übernimmt goals/_vorschlaege/karte-kritik-2026-11-22-1.md.
       Prüfung: `git diff --diff-filter=D --name-only $(git merge-base origin/dev HEAD) HEAD -- test | wc -l` muss 0 ausgeben.
       Prüfung: `cat goals/karte/ANNAHMEN.md README.md mcp/README.md src/public/index.html docs/soll/src/startseite.html | grep -cE '0x[0-9a-fA-F]{40}'` muss 0 ausgeben.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD | grep -ciE '(^|/)\.env|passphrase|ipn-pass|digistore-ipn'` muss 0 ausgeben.
-- [ ] `check` ist grün.
+- [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
 - [ ] goal-verifier PASS (K und B)
 
@@ -264,5 +264,6 @@ sieht. Übernimmt goals/_vorschlaege/karte-kritik-2026-11-22-1.md.
 - 2026-11-22 Zyklus 2: Punkte 2, 3, 4, 8 und 9 gebaut (Gate von Matthias erledigt, Guthaben je Paket aus den Testkäufen 280, 1423 und 3707 Cent mit CARD_RATE_E4 10968 gleich about $3, $15 und $40, SOLL der Startseite mit Block card, README und Tool card_top_up, Zählmarke card in src/app.ts), Abnahme des SOLL beim Design Reviewer angefragt; Punkt 6 wartet auf die Abnahme, Punkt 11 kommt zuletzt. Prüfbefehle: Punkt 2 alle sieben wie erwartet (Exit 0, nichts fehlt, 0, 1, 3, 3, 1); Punkt 3 gerechnet, gemessen, 0, 3, Exit 0, der neue Fall in test/card-checkout.test.ts war vor den Zahlen rot, EZB-Kurs gegengeprüft (gepflanzte 0.5000 wird als Minimum gefunden); Punkt 4 exit=0 0 defects, karte ok (alte Quelle: card fehlt, link fehlt), breiten ok, 0, 1, move top 390=828 1440=656 unverändert; Punkt 8 readme ok (altes README: alle drei Links und seite fehlen), 0; Punkt 9 vitest 52 von 52, nichts fehlt, deposit gleich, 1, die vier Fälle in test/mcp-card.test.ts waren gegen den alten Server rot; die sechs Seitenfälle für Punkt 6 sind geschrieben und gegen die alte Seite rot.
 - 2026-11-22 Zyklus 3: Befund 1 der SOLL-Abnahme behoben (je Paket die Zeile `.go` „Buy credit“, Commit 2942c1d), neue Abnahme angefragt; Punkt 5 und 6 warten weiter darauf. Prüfbefehle: Punkt 4 exit=0 0 defects, karte ok, move top 390=828 1440=656, test/soll.test.ts 8 von 8.
 - 2026-11-22 Zyklus 4: SOLL nach der ersten Abnahme angepasst, weil der Bau der Seite drei Tests fertiger Goals rot machte (test/public.test.ts verlangt den Link auf /fix in der Zeile .fine und sperrt „money back“ und „within <n> days“, test/depth.test.ts zählt die Marken): Weg zur Karte als Knopf „Pay by card“ im Umzug, „You have 30 days to cancel the purchase.“, neue Abnahme angefragt (Commit cd331ac). Prüfbefehle: Punkt 4 exit=0 0 defects, move top 390=828 1440=656; Seite im Arbeitsstand pixelgleich mit dem neuen SOLL (soll-live exit=0 0 defects), vitest der Seite 118 von 118; 231 Prüfzeilen fertiger Goals, die Startseite, Caddyfile, Digistore, Plugin oder README nennen, vorher an origin/dev und nachher am Arbeitsstand: 202 gleich, die übrigen 29 nur in Laufzeit, Zählern dieses Goals oder dem noch nicht committeten index.html anders, Exit 0 vorher 183 und nachher 183.
+- 2026-11-22 Zyklus 5: Abschluss gemeldet, Punkte 1 bis 13 (Punkte 5, 6, 11, 12 und 13 in diesem Lauf gebaut: Startseite mit Block card nach dem SOLL aus cd331ac, abgenommen vor dem ersten Commit an index.html, drei Produkte eingereicht). Prüfbefehle: Punkt 1 SELFTEST OK, nichts fehlt, exit=1, 0, 0, bereit, 1; Punkt 2 Exit 0, nichts fehlt, 0, 1, 3, 3, 1; Punkt 3 gerechnet, gemessen, 0, 3, Exit 0; Punkt 4 exit=0 0 defects, karte ok, breiten ok, 0, 1; Punkt 5 1, abnahme ok 2; Punkt 6 Exit 0, nichts fehlt, seite ok, exit=0 0 defects, Mutationsprobe exit=1 ohne sed-miss, skript gleich, Exit 0; Punkt 7 nichts fehlt, csp sonst gleich, 0, Valid configuration; Punkt 8 readme ok, 0; Punkt 9 Exit 0, nichts fehlt, deposit gleich, 1; Punkt 10 Exit 0, 1, e2e am PR #378 pass (Kopf 77dbbcc, 10m40s), 1; Punkt 11 3, release report: 0 defects (approval pending je Produkt); Punkt 12 15, 0, 0, 0, 0; Punkt 13 check grün in 67 s. Die sechs Seitenfälle waren gegen die alte Seite rot, der Wächter gegen Gedankenstriche schlägt mit gepflanztem Strich an.
 
 ## Blockers
