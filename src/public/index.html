@@ -364,6 +364,18 @@ main > section:first-child { padding-block: var(--s-8) var(--s-16); }
 .human-cta a { color: var(--fg); font-weight: 500; text-decoration-color: var(--accent); }
 .human-agents { margin-top: var(--s-4); font-size: var(--t-ui); }
 .human-agents a { color: var(--muted); }
+/* The card block (goals/karte/02): one form without a script. The address goes as `custom` straight to the checkout of
+   Digistore24, each package is a submit button that looks like the cards of the catalogue above it. */
+#card { padding-block: var(--s-8) var(--s-12); border-bottom: 1px solid var(--line); }
+#card .grid-cards { margin-top: var(--s-6); }
+#card .wrap > p.sub { margin-top: var(--s-4); max-width: 40rem; }
+#card .wrap > p.fine { margin-top: var(--s-4); }
+.card-field { display: grid; gap: var(--s-2); margin-top: var(--s-6); max-width: 34rem; font-weight: 500; }
+.card-field input { display: block; width: 100%; margin: 0; font: 400 1.0625rem/1.45 var(--mono); color: var(--fg);
+  background: var(--panel); border: 1px solid var(--line-2); border-radius: var(--r-ctl); padding: .75rem .85rem; }
+.card-field input:focus { outline: none; border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent); }
+.card-buy { font: inherit; text-align: left; cursor: pointer; width: 100%; }
 
 /* ---- hero ------------------------------------------------------------ */
 .hero { position: relative; isolation: isolate; overflow: clip; padding-block: var(--s-12) var(--s-16); }
@@ -907,6 +919,7 @@ main .shop .wrap > p.fine:last-child { margin-top: var(--s-8); }
     <p class="sub prose">It signs in here with its own wallet and gets answers again, over the same API it uses today.</p>
     <div class="cta">
       <a class="btn btn-1" href="/fix">Switch in two steps</a>
+      <a class="btn btn-2" href="#card">Pay by card</a>
     </div>
     </div>
     <div class="demo">
@@ -920,6 +933,25 @@ main .shop .wrap > p.fine:last-child { margin-top: var(--s-8); }
   </div>
   <!-- The control. It is in the first screen, so every reader fetches it; a browser that fetches it together with the one at the bottom is telling us its lazy loading means nothing here. See the /px/ route in src/app.ts. It sits inside the move block, which is the first screen on every width. -->
   <img src="/px/top.png" alt="" width="1" height="1" loading="lazy" decoding="async" aria-hidden="true" class="px">
+</section>
+
+<section id="card" data-soll="card">
+  <div class="wrap">
+    <h2>No USDC? Pay by card.</h2>
+    <p class="sub prose">Buy credit for your automaton in two clicks. You need no USDC and no wallet of your own.</p>
+    <form method="get">
+      <label class="card-field">Wallet address of your automaton
+        <input name="custom" type="text" placeholder="0x…" pattern="0x[0-9a-fA-F]{40}" required autocomplete="off" spellcheck="false">
+      </label>
+      <div class="grid-cards three">
+        <button class="card pick card-buy" type="submit" formaction="https://www.checkout-ds24.com/product/771278/"><span class="price">5 EUR</span><span class="price-note">about $3 credit</span><span class="go">Buy credit</span></button>
+        <button class="card pick card-buy" type="submit" formaction="https://www.checkout-ds24.com/product/771279/"><span class="price">20 EUR</span><span class="price-note">about $15 credit</span><span class="go">Buy credit</span></button>
+        <button class="card pick card-buy" type="submit" formaction="https://www.checkout-ds24.com/product/771280/"><span class="price">50 EUR</span><span class="price-note">about $40 credit</span><span class="go">Buy credit</span></button>
+      </div>
+    </form>
+    <p class="fine">Card, PayPal or Apple Pay. Digistore24 sells this credit and charges you. You have 30 days to cancel the purchase.</p>
+  </div>
+  <img src="/px/card.png" alt="" width="1" height="1" loading="lazy" decoding="async" aria-hidden="true" class="px">
 </section>
 
 <!-- The first screen for a person, in German, rendered from src/public/humanfirst.ts (HAN-92). The

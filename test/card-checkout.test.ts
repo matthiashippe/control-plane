@@ -5,10 +5,11 @@
  * Every link here goes straight to the checkout of Digistore24 with the address in `custom`, because its review only accepts
  * links that go there directly, and the address comes back in the IPN (src/payments/digistore.ts).
  */
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { privateKeyToAccount, generatePrivateKey } from "viem/accounts";
+import { createApp } from "../src/app.js";
 import { openDb, postLedger } from "../src/db.js";
 import { MockProvider, MOCK_MODEL } from "../src/inference/mock.js";
 import { Catalog, handleChat } from "../src/inference/proxy.js";
@@ -112,5 +113,93 @@ describe("the credit of each package", () => {
     // A bigger package never gives less credit than a smaller one.
     const credits = CARD_PACKAGES.map((p) => p.aboutCreditUsd);
     expect([...credits].sort((a, b) => a - b)).toEqual(credits);
+  });
+});
+
+describe("the card block of the landing page", () => {
+  const before = process.env.CP_PUBLIC_URL;
+  beforeEach(() => {
+    process.env.CP_PUBLIC_URL = "https://automatonhost.com";
+  });
+  afterEach(() => {
+    if (before === undefined) delete process.env.CP_PUBLIC_URL;
+    else process.env.CP_PUBLIC_URL = before;
+  });
+
+  async function page() {
+    const app = createApp({ db: openDb(":memory:") });
+    const html = await (await app.request("/")).text();
+    const m = html.indexOf('data-soll="move"');
+    const moveEnd = html.indexOf("</section>", m);
+    const next = html.indexOf("<section", moveEnd);
+    const head = next < 0 ? "" : html.slice(next, html.indexOf(">", next));
+    const block = next < 0 ? "" : html.slice(next, html.indexOf("</section>", next));
+    return { app, move: m < 0 ? "" : html.slice(m, moveEnd), head, block };
+  }
+
+  it("puts the card block right after the move block", async () => {
+    const { head } = await page();
+    expect(head).toContain('id="card"');
+    expect(head).toContain('data-soll="card"');
+  });
+
+  it("links the card block from the move block", async () => {
+    const { move } = await page();
+    expect(move).toContain('href="#card"');
+  });
+
+  it("sends the address as custom straight to the digistore24 checkout of each package", async () => {
+    const { block } = await page();
+    // One form, sent by the browser itself: no script runs, and the address never reaches our access log.
+    expect(block.match(/<form\b[^>]*>/g)).toEqual(['<form method="get">']);
+    expect(block).not.toMatch(/<script\b/);
+    const inputs = block.match(/<input\b[^>]*>/g) ?? [];
+    expect(inputs).toHaveLength(1);
+    for (const attr of ['name="custom"', 'pattern="0x[0-9a-fA-F]{40}"', " required", 'autocomplete="off"', 'spellcheck="false"']) {
+      expect(inputs[0], attr).toContain(attr);
+    }
+    const targets = [...block.matchAll(/<button\b[^>]*type="submit"[^>]*formaction="([^"]+)"/g)].map((x) => x[1]);
+    expect(targets).toEqual(CARD_PACKAGES.map((p) => `https://www.checkout-ds24.com/product/${p.productId}/`));
+    // What the browser builds from the form is exactly the link the 402 and the plugin give out.
+    const address = privateKeyToAccount(generatePrivateKey()).address.toLowerCase();
+    for (const [i, p] of CARD_PACKAGES.entries()) {
+      const url = new URL(targets[i]);
+      url.search = new URLSearchParams({ custom: address }).toString();
+      expect(url.toString()).toBe(cardCheckoutUrl(p, address));
+    }
+  });
+
+  it("names the price and the credit of each package", async () => {
+    const { block } = await page();
+    const buttons = block.match(/<button\b[\s\S]*?<\/button>/g) ?? [];
+    expect(buttons).toHaveLength(CARD_PACKAGES.length);
+    for (const [i, p] of CARD_PACKAGES.entries()) {
+      expect(buttons[i]).toContain(`${p.grossEurCents / 100} EUR`);
+      expect(buttons[i]).toContain(`about $${p.aboutCreditUsd} credit`);
+      // Each button says what the click does, like the cards of the catalogue below it.
+      expect(buttons[i]).toContain('<span class="go">Buy credit</span>');
+    }
+  });
+
+  it("says how to pay, who sells and that there are 30 days money back", async () => {
+    const { block } = await page();
+    expect(block).toContain("Wallet address of your automaton");
+    for (const words of ["Card, PayPal or Apple Pay", "Digistore24 sells this credit", "30 days to cancel the purchase"]) {
+      expect(block, words).toContain(words);
+    }
+    expect(block).not.toMatch(/[–—]/);
+    expect(block.toLowerCase()).not.toContain("postyourprice");
+  });
+
+  it("counts views of the card block with the pixel /px/card.png", async () => {
+    const { app, block } = await page();
+    const tag = block.match(/<img src="\/px\/card\.png"[^>]*>/)?.[0];
+    expect(tag, "/px/card.png is not in the card block").toBeTruthy();
+    expect(tag).toContain('loading="lazy"');
+    expect(tag).toContain('class="px"');
+    const res = await app.request("/px/card.png");
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("image/png");
+    expect(res.headers.get("cache-control")).toBe("no-store");
   });
 });
