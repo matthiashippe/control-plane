@@ -30,7 +30,7 @@ export type ErrorPage = {
   cause: string;
 };
 
-const page = (slug: string, heading: string, cause: string): ErrorPage => ({
+const page = ({ slug, heading, cause }: Pick<ErrorPage, "slug" | "heading" | "cause">): ErrorPage => ({
   slug,
   heading,
   title: `Conway automaton: ${heading} | automatonhost.com`,
@@ -39,21 +39,21 @@ const page = (slug: string, heading: string, cause: string): ErrorPage => ({
 });
 
 export const ERROR_PAGES: readonly ErrorPage[] = Object.freeze([
-  page(
-    "verify-500-database-error",
-    '/v1/auth/verify returns 500 {"error":"Database error"}',
-    "Sign-up at api.conway.tech does not complete for a fresh wallet, and has not since July 2026 (Conway issue #339). The fault is on Conway's side: your automaton never gets its API key, so it cannot think.",
-  ),
-  page(
-    "invalid-or-expired-nonce",
-    '/v1/auth/verify returns 401 {"error":"Invalid or expired nonce"}',
-    "The 401 says your nonce expired, and it did not: sign-up at api.conway.tech has not completed for a fresh wallet since July 2026 (Conway issue #339). Asking for a new nonce changes nothing.",
-  ),
-  page(
-    "credits-never-granted",
-    "x402 top-up paid on-chain, but credits never granted",
-    "Conway's payment endpoint still takes your USDC, but the credits never arrive, because sign-up for a fresh wallet does not complete (Conway issue #339). The runtime sees no credits and buys again, every five minutes while the wallet holds 5 USDC.",
-  ),
+  page({
+    slug: "verify-500-database-error",
+    heading: '/v1/auth/verify returns 500 {"error":"Database error"}',
+    cause: "Sign-up at api.conway.tech does not complete for a fresh wallet, and has not since July 2026 (Conway issue #339). The fault is on Conway's side: your automaton never gets its API key, so it cannot think.",
+  }),
+  page({
+    slug: "invalid-or-expired-nonce",
+    heading: '/v1/auth/verify returns 401 {"error":"Invalid or expired nonce"}',
+    cause: "The 401 says your nonce expired, and it did not: sign-up at api.conway.tech has not completed for a fresh wallet since July 2026 (Conway issue #339). Asking for a new nonce changes nothing.",
+  }),
+  page({
+    slug: "credits-never-granted",
+    heading: "x402 top-up paid on-chain, but credits never granted",
+    cause: "Conway's payment endpoint still takes your USDC, but the credits never arrive, because sign-up for a fresh wallet does not complete (Conway issue #339). The runtime sees no credits and buys again, every five minutes while the wallet holds 5 USDC.",
+  }),
 ]);
 
 export function findErrorPage(slug: string): ErrorPage | undefined {
