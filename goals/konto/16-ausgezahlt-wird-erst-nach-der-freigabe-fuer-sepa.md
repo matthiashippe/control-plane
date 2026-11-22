@@ -1,7 +1,7 @@
 # Konto Goal 16: Ausgezahlt wird erst nach der Freigabe für SEPA
 
 ## Status
-PLANNED
+ACTIVE
 
 ## Active Objective
 Ein Kunde gibt seine IBAN erst ein, wenn Bridge ihm per SEPA auszahlen darf. Heute (beim Schreiben am 2026-11-22 am Code von `dev`
@@ -84,21 +84,21 @@ Auszahlung an eine Adresse geht, von der Bridge nicht in Euro auszahlen darf.
   `drains` (der zweite Teil des Vorschlags), `src/konto/bridge.ts`, `src/db.ts`, jede Seite und jedes SOLL-Bild.
 
 ## Done Condition
-- [ ] `payoutStep` und `POST /h/{code}/payout-bank` fragen nach bestandener Identitätsprüfung `getCustomer` und gehen erst bei
+- [x] `payoutStep` und `POST /h/{code}/payout-bank` fragen nach bestandener Identitätsprüfung `getCustomer` und gehen erst bei
       Endorsement `sepa` `approved` zur IBAN weiter; ein Fehler bei Bridge antwortet mit 502.
       MVP: Funktion, weil an dieser Stelle die Widerlegung hängt: Ohne Freigabe für SEPA darf keine IBAN bei Bridge landen.
       Prüfung: `grep -c 'bridge.getCustomer(' src/handoff/routes.ts` muss mindestens `2` ausgeben.
       Prüfung: `awk '/app\.post\("\/h\/:code\/payout-bank"/{f=1} f{print} f&&/^  \}\);/{exit}' src/handoff/routes.ts | grep -c 'getCustomer'` muss mindestens `1` ausgeben.
       Prüfung: `grep -cE 'function sepaApproved|const sepaApproved' src/handoff/routes.ts` muss genau `1` ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/konto-payout.test.ts test/konto-payout-guard.test.ts test/konto-payout-pending.test.ts test/konto-payout-rule.test.ts test/konto-revoke-replaced.test.ts test/konto-bridge.test.ts test/handoff-api.test.ts` muss Exit-Code 0 haben.
-- [ ] Vier Fälle in `test/konto-payout.test.ts` zeigen, dass ohne Freigabe für SEPA die Seite auf `payout-verify` bleibt und nichts
+- [x] Vier Fälle in `test/konto-payout.test.ts` zeigen, dass ohne Freigabe für SEPA die Seite auf `payout-verify` bleibt und nichts
       bei Bridge angelegt wird, mit Freigabe `payout-bank` folgt und ein Fehler bei Bridge 502 ist; gegen den Stand der Merge-Basis
       sind die Fälle 1, 2 und 4 rot und Fall 3 grün.
       MVP: Funktion, weil erst der rote Lauf am alten Code belegt, dass die Fälle die Lücke treffen.
       Prüfung: `T=$(mktemp -d); PATH=/usr/bin:$PATH pnpm -s vitest run test/konto-payout.test.ts --reporter=json --outputFile=$T/r.json >/dev/null 2>&1; echo "exit=$?"; node -e 'const r=require(process.argv[1]);const a=r.testResults.flatMap(f=>f.assertionResults).filter(x=>x.ancestorTitles.includes("the payout waits for the SEPA approval of Bridge"));console.log(a.length, a.filter(x=>x.status==="passed").length)' $T/r.json` muss genau `exit=0` und `4 4` ausgeben.
       Prüfung: `B=$(git merge-base origin/dev HEAD); T=$(mktemp -d); git archive $B | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; cp test/konto-payout.test.ts test/money-helpers.ts $T/test/; (cd $T && PATH=/usr/bin:$PATH pnpm -s vitest run test/konto-payout.test.ts --reporter=json --outputFile=r.json >/dev/null 2>&1); node -e 'const r=require(process.argv[1]);const a=r.testResults.flatMap(f=>f.assertionResults).filter(x=>x.ancestorTitles.includes("the payout waits for the SEPA approval of Bridge"));console.log(a.filter(x=>x.status!=="passed").length, a.filter(x=>x.status==="passed").length, a.find(x=>x.title.startsWith("moves on to the bank step"))?.status)' $T/r.json` muss genau `3 1 passed` ausgeben.
       Prüfung: `node -e 'const s=require("fs").readFileSync("test/konto-payout.test.ts","utf8");const miss=["sepaStatus","customerFails","/v0/customers/cus_1","external_accounts","payout_handoffs","EXAMPLE_IBAN","502"].filter(x=>!s.includes(x));if(miss.length){console.error(miss);process.exit(1)}console.log("faelle ok")'` muss `faelle ok` ausgeben.
-- [ ] Der nachgebaute Bridge kennt `GET /v0/customers/cus_1` mit Endorsement `sepa`, Vorgabe `approved`, und kann scheitern.
+- [x] Der nachgebaute Bridge kennt `GET /v0/customers/cus_1` mit Endorsement `sepa`, Vorgabe `approved`, und kann scheitern.
       MVP: Funktion, weil die heutigen Fälle sonst an einer 404 des nachgebauten Bridge scheitern und die neuen nichts zeigen.
       Prüfung: `awk '/^export function bridgeFake/{f=1} f{print} f&&/^}/{exit}' test/money-helpers.ts | grep -cE 'sepaStatus: "approved"|customerFails: false'` muss genau `2` ausgeben.
       Prüfung: `awk '/^export function bridgeFake/{f=1} f{print} f&&/^}/{exit}' test/money-helpers.ts | grep -c 'endorsements'` muss mindestens `1` ausgeben.
@@ -107,14 +107,14 @@ Auszahlung an eine Adresse geht, von der Bridge nicht in Euro auszahlen darf.
       MVP: Funktion, weil der Kunde nur später zur IBAN kommt und keine neue Fläche sieht.
       Prüfung: `git diff --quiet origin/dev...HEAD -- docs/soll 'ops/soll*.mjs' src/public && echo bilder gleich` muss `bilder gleich` ausgeben.
       Prüfung: `T=$(mktemp -d); PATH=/usr/bin:$PATH node --import tsx ops/soll-live-money.mjs --out $T >/dev/null && PATH=/usr/bin:$PATH node ops/soll-money.mjs --check --source $T > $T/o 2>&1; echo "exit=$?"; tail -n 1 $T/o | grep -cE '^soll money: 16 images, blocks end 390=[0-9]+ 1440=[0-9]+, 0 defects$'` muss genau die zwei Zeilen `exit=0` und `1` ausgeben.
-- [ ] Die Entscheidungen stehen mit Grund in `goals/konto/ANNAHMEN.md`, und `docs/konto/euro.md` beschreibt die Prüfung.
+- [x] Die Entscheidungen stehen mit Grund in `goals/konto/ANNAHMEN.md`, und `docs/konto/euro.md` beschreibt die Prüfung.
       MVP: Funktion, weil konto 15 die Werte `CP_BRIDGE_*` erst nach diesem Goal setzt und wissen muss, was vor der Auszahlung
       geprüft wird.
       Prüfung: `awk '/^## Goal 16/{f=1;next} /^## /{f=0} f' goals/konto/ANNAHMEN.md | grep -cE "^- .+, weil .+"` muss mindestens `4` ausgeben.
       Prüfung: `awk '/^## Goal 16/{f=1;next} /^## /{f=0} f' goals/konto/ANNAHMEN.md | grep -cE 'getCustomer|sepaApproved'` muss mindestens `2` ausgeben.
       Prüfung: `grep -c 'getCustomer' docs/konto/euro.md` muss mindestens `1` ausgeben.
       Prüfung: `git diff --numstat origin/dev...HEAD -- docs | awk '{n++} END{print n+0}'` muss genau `1` ausgeben.
-- [ ] Der Diff bleibt in den Pfaden dieses Goals, Client von Bridge, Datenbank, Auszahl-Lauf und Schnittstelle bleiben gleich,
+- [x] Der Diff bleibt in den Pfaden dieses Goals, Client von Bridge, Datenbank, Auszahl-Lauf und Schnittstelle bleiben gleich,
       kein Test wird schwächer, kein neues Paket, kein Schlüssel im Diff, keine andere Goal-Datei geändert, und `check` ist grün.
       MVP: Funktion, weil `src/**` mit dem Merge ausrollt und zahlende Kunden den Stand tragen.
       Prüfung: `git diff --name-only origin/dev...HEAD | grep -vE '^(src/handoff/routes\.ts|docs/konto/euro\.md|test/(konto-payout\.test|money-helpers)\.ts|goals/konto/16-ausgezahlt-wird-erst-nach-der-freigabe-fuer-sepa\.md|goals/konto/verdicts/16-[A-Za-z0-9._-]+\.md|goals/konto/ANNAHMEN\.md|goals/_vorschlaege/konto-[a-z0-9.-]+\.md)$' | wc -l` muss `0` ausgeben.
@@ -154,5 +154,6 @@ Auszahlung an eine Adresse geht, von der Bridge nicht in Euro auszahlen darf.
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-22 Zyklus 1: Punkte 1, 2, 3, 5 und 6 gebaut (getCustomer und sepaApproved in payoutStep und POST payout-bank, Bridge-Nachbau mit Kunde, vier Fälle, Annahmen, Doku), Punkt 4 offen, weil ops/soll-live-money.mjs (Deny List) einen eigenen Bridge-Nachbau ohne GET /v0/customers/cus_1 hat und payout-bank dort 502 wird (Vorschlag konto-nacharbeit-2026-11-22-1). Prüfbefehle: P1 2, 1, 1, vitest 7 Dateien 63 Tests Exit 0; P2 exit=0 und 4 4, Merge-Basis 3 1 passed, faelle ok; P3 2, 1; P4 bilder gleich, soll-live-money exit=2 (payout-bank answered 502) und 0, in einer Wegwerfkopie mit der Route exit=0 und 16 images 0 defects; P5 9, 5, 1, 1; P6 0, schnittstelle gleich, 0, pakete gleich, goals gleich, 0, check grün (2574 Tests), PR #368 check pass 1.
 
 ## Blockers
