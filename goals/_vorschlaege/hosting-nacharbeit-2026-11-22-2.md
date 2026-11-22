@@ -5,3 +5,5 @@ Beleg: `git grep -n -F 'SANDBOXD_PAUSE="${CP_SANDBOXD_PAUSE:-20}"' origin/dev --
 Empfehlung: Den Fall als Lauf bauen: `run` ohne `CP_SANDBOXD_PAUSE` mit `[DOWN]` aufrufen und `sleeps()` gegen `["20"]` prüfen (das falsche `sleep` schreibt sein Argument schon mit); der Textvergleich entfällt.
 
 Linse Q, Frage 1.
+
+Übernommen: Watch List in STATE.md, beim nächsten Goal an ops/watchdog.sh (2026-11-22)

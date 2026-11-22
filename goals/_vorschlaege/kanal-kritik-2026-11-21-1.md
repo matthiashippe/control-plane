@@ -4,3 +4,5 @@ Befund: kanal 05 stand auf PLANNED mit „frühestens 2026-11-26“, obwohl `ROA
 Beleg: `git show origin/dev:ROADMAP.md | grep -c "05 entfällt: ersetzt durch 06"` -> 1 | goals/kanal/05-urteil-je-antwort-welche-davon-automatons-gebracht-hat.md:4 `PLANNED`
 Empfehlung: kanal 05 bleibt PAUSED (in diesem PR gesetzt); löschen kann die Datei nur die Human Inbox.
 MVP: Detail.
+
+Verworfen: erledigt, kanal 05 steht auf PAUSED und in ROADMAP.md auf entfällt, kanal 06 ersetzt es (2026-11-22)

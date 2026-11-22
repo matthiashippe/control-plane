@@ -5,3 +5,5 @@ Beleg: `git grep -n -E 'const (parseIso|parseEdge) = ' origin/dev -- ops/` -> `o
 Empfehlung: Zeitraum und Routenfilter einmal in eine Datei unter `ops/` legen (etwa `ops/quote-period.cjs` mit `parseEdge` und `isCall`), die beide `COUNT_JS` per `require` laden; damit gilt die strengere Regel aus abrechnung 07 auch für die Timeout-Quote, was `abrechnung-kritik-2026-11-18-3.md` (Übernommen, auf `origin/dev` noch offen) verlangt. Selbsttest beider Skripte mit `TQ_UNTIL=2026-11-17`, rot vor dem Fix.
 
 Linse Q, Frage 2.
+
+Übernommen: Watch List in STATE.md, gehört zu abrechnung 06 (PAUSED) (2026-11-22)

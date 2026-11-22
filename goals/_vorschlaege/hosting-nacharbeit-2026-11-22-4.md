@@ -5,3 +5,5 @@ Beleg: `git show 79ed3d5^1:src/db.ts | wc -l; git show origin/dev:src/db.ts | wc
 Empfehlung: Die Größe in der nächsten Commit-Message an `src/db.ts` begründen oder als bewusste Ausnahme in `goals/hosting/ANNAHMEN.md` festhalten.
 
 Linse Q, Frage 6.
+
+Verworfen: Größe einer Datei ohne Fehlerbild, kein Gewinn für Kunden (2026-11-22)

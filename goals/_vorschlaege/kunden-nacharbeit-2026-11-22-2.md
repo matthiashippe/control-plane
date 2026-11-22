@@ -5,3 +5,5 @@ Beleg: `git grep -n CP_CUSTOMER_ADDRESSES origin/dev -- ops src test` -> nur `op
 Empfehlung: Den Eingang samt Kommentarsatz in Zeile 440 streichen und die Wallet nur aus `CP_CUSTOMER` wählen, wie es `goals/kunden/ANNAHMEN.md` für den Produktionslauf festhält; wird die Adressliste später gebraucht, kommt sie mit ihrem eigenen Selbsttestfall zurück.
 
 Linse Q, Frage 3.
+
+Übernommen: Watch List in STATE.md, beim nächsten Goal an ops/db-report.cjs (2026-11-22)

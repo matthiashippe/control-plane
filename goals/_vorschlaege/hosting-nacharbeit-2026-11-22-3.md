@@ -5,3 +5,5 @@ Beleg: `git show 63f14ac^1:ops/sandbox/sandboxd.mjs | wc -l; git show origin/dev
 Empfehlung: Die Größe in der nächsten Commit-Message an `ops/sandbox/sandboxd.mjs` begründen oder als bewusste Ausnahme in `goals/hosting/ANNAHMEN.md` festhalten; `imageHealth` und `imageFacts` wären ein Kandidat für eine eigene Datei unter `ops/sandbox/`.
 
 Linse Q, Frage 6.
+
+Verworfen: Größe einer Datei ohne Fehlerbild, kein Gewinn für Kunden (2026-11-22)

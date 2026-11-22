@@ -5,3 +5,5 @@ Beleg: `git grep -c -E 'customer-work|customer_match' origin/dev -- test/ script
 Empfehlung: `test/customer-work.test.ts` wie `test/runtime-sandbox-deps.test.ts` anlegen: `bash ops/customer-work.sh --selftest` starten, Exit 0, letzte Zeile `SELFTEST OK ...` und keine Zeile `FAIL` verlangen; dazu eine Kopie mit verfälschter Regel (etwa `MATCH_S = 0.0` in `ops/customer_match.py`), deren Selbsttest rot sein muss.
 
 Linse Q, Frage 1.
+
+Übernommen: Done-Punkt in Glied 1 an den Tech Lead, PRO-27251 (2026-11-22)
