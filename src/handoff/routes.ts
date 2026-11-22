@@ -29,7 +29,7 @@ import { parsePermission, permissionMatches, SignatureCheckUnavailable, signatur
 import { FAIL_REASONS, renderKontoPage, type FailReason } from "../public/konto.js";
 import { renderLimitPage, type LimitPage } from "../public/limit.js";
 import { renderMoneyPage, type MoneyPage } from "../public/money.js";
-import { BridgeError, parseIban, type Bridge } from "../konto/bridge.js";
+import { BridgeError, parseIban, type Bridge, type BridgeCustomer } from "../konto/bridge.js";
 import {
   finishPayout,
   forwarderAddress,
@@ -153,6 +153,15 @@ async function checkSignature(konto: KontoDeps, permission: SpendPermission, sig
   }
 }
 
+/**
+ * Whether Bridge may pay this customer out by SEPA (goals/konto/16, decision 1): only an endorsement `sepa` with status `approved`
+ * counts; a missing one, `incomplete`, `revoked` or any other status does not. The rule belongs to the payout, so it lives here
+ * and not in the client of Bridge, which only maps what Bridge reports.
+ */
+function sepaApproved(customer: BridgeCustomer): boolean {
+  return customer.endorsements.some((e) => e.name === "sepa" && e.status === "approved");
+}
+
 /** The headers of every answer of /h/{code}: the link is a one-time secret and stays out of caches, referrers and indexes. */
 function private_(c: Context): void {
   c.header("Cache-Control", "no-store");
@@ -264,9 +273,10 @@ export function registerHandoff<E extends Env>(app: Hono<E>, deps: HandoffDeps):
       });
     }
     ensurePayoutRow(db, account, nowMs());
-    const payout = readPayout(db, account)!;
-    if (!payout.kyc_approved) {
-      try {
+    let payout = readPayout(db, account)!;
+    try {
+      let kycLink: string | null = null;
+      if (!payout.kyc_approved) {
         const link = payout.kyc_link_id
           ? await bridge.getKycLink(payout.kyc_link_id)
           : await bridge.createKycLink({ email: payoutEmail(account), idempotencyKey: `kyc-link-${account}` });
@@ -282,10 +292,26 @@ export function registerHandoff<E extends Env>(app: Hono<E>, deps: HandoffDeps):
           showedVerify.set(h.code, nowMs());
           return moneyPage(c, { state: "payout-verify", code: h.code, displayName: h.displayName, kycLink: link.kycLink });
         }
-      } catch (err) {
-        if (!(err instanceof BridgeError)) throw err;
-        return c.text("Bridge could not be reached just now. Reload this page in a minute.", 502);
+        kycLink = link.kycLink;
+        payout = readPayout(db, account)!;
       }
+      // goals/konto/16: a passed identity check is not enough; Bridge must also allow SEPA for this customer. It can take that back
+      // (`revoked`), so every page view without pending bank details asks again. Until then the page stays on the identity step of
+      // Bridge, which also collects the SEPA approval.
+      const customer = payout.bridge_customer_id ? await bridge.getCustomer(payout.bridge_customer_id) : null;
+      if (!customer || !sepaApproved(customer)) {
+        const link =
+          kycLink ??
+          (payout.kyc_link_id
+            ? await bridge.getKycLink(payout.kyc_link_id)
+            : await bridge.createKycLink({ email: payoutEmail(account), idempotencyKey: `kyc-link-${account}` })
+          ).kycLink;
+        showedVerify.set(h.code, nowMs());
+        return moneyPage(c, { state: "payout-verify", code: h.code, displayName: h.displayName, kycLink: link });
+      }
+    } catch (err) {
+      if (!(err instanceof BridgeError)) throw err;
+      return c.text("Bridge could not be reached just now. Reload this page in a minute.", 502);
     }
     return moneyPage(c, { state: "payout-bank", code: h.code, displayName: h.displayName, steps: stepsOf(h.code) });
   };
@@ -812,6 +838,14 @@ export function registerHandoff<E extends Env>(app: Hono<E>, deps: HandoffDeps):
     if (!iban) return again("This IBAN is not valid. Check it and try again.");
     const ownerName = typeof form.owner_name === "string" ? form.owner_name.trim() : "";
     if (ownerName.length < 2 || ownerName.length > 100 || /[\u0000-\u001f\u007f]/.test(ownerName)) return again("Enter the name on the bank account.");
+    // goals/konto/16, decision 4: the page alone does not protect the bank step, a form of an older page or a direct POST would pass.
+    try {
+      if (!sepaApproved(await bridge.getCustomer(payout.bridge_customer_id))) return payoutStep(c, h);
+    } catch (err) {
+      if (!(err instanceof BridgeError)) throw err;
+      private_(c);
+      return c.text("Bridge could not be reached just now. Reload this page in a minute.", 502);
+    }
     let destination: string;
     let externalAccountId: string;
     let liquidationAddressId: string;
