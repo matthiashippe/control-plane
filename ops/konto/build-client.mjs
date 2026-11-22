@@ -38,7 +38,6 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
       console.error("konto client: src/public/konto-client/konto.js is not the bundle of its sources; run node ops/konto/build-client.mjs");
       process.exit(1);
     }
-    console.log(`konto client: bundle current, ${Buffer.byteLength(text)} bytes`);
   } else {
     writeFileSync(BUNDLE, text);
     console.log(`konto client: wrote ${path.relative(ROOT, BUNDLE)}, ${Buffer.byteLength(text)} bytes`);

@@ -225,6 +225,19 @@ describe("ops/actions-log-addresses.sh counts stranger addresses in Actions logs
     expect(r.lines).toEqual(["12 no-log", "13 1", "total 1"]);
   });
 
+  it("reports a run whose log archive is empty as no-log and still exits 0", () => {
+    const w = workspace();
+    writeFileSync(join(w.root, "archive.zip"), zip({ "0_deploy.txt": STRANGER_LINE }));
+    writeFileSync(join(w.root, "empty.zip"), zip({}));
+    w.gh(
+      `case "$*" in *runs/14/logs*) cat ${JSON.stringify(join(w.root, "empty.zip"))};;` +
+        ` *runs/15/logs*) cat ${JSON.stringify(join(w.root, "archive.zip"))};; *) exit 9;; esac`,
+    );
+    const r = w.run(["--runs", "14,15"]);
+    expect(r.status, r.out).toBe(0);
+    expect(r.lines).toEqual(["14 no-log", "15 1", "total 1"]);
+  });
+
   it("ends with exit 2 and no total line when gh fails to list the runs", () => {
     const w = workspace();
     w.gh("echo 'gh: error connecting to api.github.com' >&2; exit 1");

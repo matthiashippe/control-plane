@@ -569,3 +569,9 @@
   `SETUP CHECK OK changed=0`.
 - **Rollout vor dem Merge** wie sandbox 07 (Annahme Tech Lead in der Goal-Datei). Bis zum Merge meldet ein `--check` von `dev` die
   Abweichung `sandboxd.mjs`. Endet das Goal ohne PASS, rollt der Maker den Stand von `origin/dev` mit `setup.sh` zurück.
+
+## Abgelöst durch kunden 06 (Tech Lead, 2026-11-22)
+
+- Abgelöst: sandbox 04 Punkt 3 durch kunden 06 Punkt 3, Ausgabe dann genau `Exit 0, fehlt balance_cents" -ge 500` (Tech Lead, 2026-11-22)
+- Abgelöst: sandbox 05 Punkt 5 durch kunden 06 Punkt 3, Ausgabe dann genau `Exit 0, fehlt balance_cents" -ge 500` (Tech Lead, 2026-11-22)
+- Entscheidung (Tech Lead, 2026-11-22, PRO-27432): Seit kunden 06 Punkt 3 bekommt jede neue fremde Runtime ihre Startgutschrift, deshalb steht die Runtime im Lauf von `harness/e2e/full.sh` nach dem Topup bei 505 Cent, obwohl die Inferenz richtig gebucht wurde. 6efc5af (PRO-25899) ersetzte darum die feste Schwelle `"$balance_cents" -ge 500` durch `"$balance_mc" -ge "$credited_mc"`: Der Saldo muss unter dem gutgeschriebenen Guthaben (Topup und Gutschrift der ersten Wallet) liegen, das prüft dieselbe Sache ohne festen Betrag. Der Ablöser ist kunden 06 Punkt 3, weil erst die Gutschrift die alte Schwelle falsch machte; die neue Bedingung prüft der Job `e2e` an jedem PR.

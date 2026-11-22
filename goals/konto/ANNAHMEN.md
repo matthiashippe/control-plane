@@ -304,8 +304,9 @@
 
 ## Abgelöst durch umzug 03 (Maker, 2026-11-18)
 
-- Abgelöst: konto 08 Punkt 2 durch umzug 03 Punkt 1, Ausgabe dann genau `Exit 0, exit=0 | 6 6` (Tech Lead, 2026-11-20)
+- Abgelöst: konto 08 Punkt 2 durch umzug 03 Punkt 1, Ausgabe dann genau `Exit 0, exit=0 | 6 6` (Tech Lead, 2026-11-18)
 - Abgelöst: konto 08 Punkt 4 durch umzug 03 Punkt 1, Ausgabe dann genau `Exit 0, 6` (Tech Lead, 2026-11-18)
+- Entscheidung (Tech Lead, 2026-11-22, PRO-27432): Die Ablösung von konto 08 Punkt 2 durch umzug 03 Punkt 1 gilt seit 2026-11-18 und trägt dieses Datum, weil umzug 03 Punkt 6 jede Ablösung durch umzug 03 an den 2026-11-18 bindet. Die Ausgabe `Exit 0, exit=0 | 6 6` korrigierte die Reparatur vom 2026-11-20 (3b1db86, PR #320), weil der Befehl `exit=$?` vor den Zahlen druckt; sie hatte dabei auch das Datum auf 2026-11-20 gesetzt und so umzug 03 Punkt 6 rot gemacht. Eine Korrektur der Ausgabe lässt das Datum der Ablösung stehen und kommt als eigene Entscheidung dazu.
 
 ## Goal 11 (18.11.2026, Engineer CP)
 
