@@ -1,7 +1,7 @@
 # Paket Goal 01: Die Runtime kommt mit unserer Adresse
 
 ## Status
-PLANNED
+ACTIVE
 
 ## Active Objective
 Seit dem 11.11.2026 kam im Repo `Conway-Research/automaton` kein neues Issue (letztes #447 am 10.11.), unsere Antworten dort
@@ -57,29 +57,29 @@ MVP: Kauf, weil ohne neuen Kanal kein weiterer zahlender Automaton ankommt und d
   Endpunkten der Produktion; ob eine Runtime aus dem Paket sich anmeldet, prüft der Harness-Weg nicht, das misst paket 02 im Log.
 
 ## Done Condition
-- [ ] Die Runtime aus dem Release meldet sich ohne Einstellung bei `https://automatonhost.com` an: Voreinstellung in `src/config.ts`,
+- [x] Die Runtime aus dem Release meldet sich ohne Einstellung bei `https://automatonhost.com` an: Voreinstellung in `src/config.ts`,
       Enter im Setup wählt uns, `CONWAY_API_URL` und eine gespeicherte Wahl gehen vor; Tests im Fork, rot vor der Änderung.
       MVP: Kauf, weil nur die Voreinstellung jeden neuen Betreiber beim ersten Start erreicht.
       Prüfung (Netz): `t=$(grep -oE '^Release: \S+' docs/paket/anleitung.md | cut -d' ' -f2); gh api "repos/matthiashippe/automaton/contents/src/config.ts?ref=${t:?}" --jq .content | base64 -d | grep -c 'conwayApiUrl.*"https://automatonhost.com"'` muss mindestens 1 ausgeben.
       Prüfung (Netz): `t=$(grep -oE '^Release: \S+' docs/paket/anleitung.md | cut -d' ' -f2); d=$(mktemp -d); git clone -q --depth 1 --branch "${t:?}" https://github.com/matthiashippe/automaton "$d" && cd "$d" && PATH=/usr/bin:$PATH pnpm install --frozen-lockfile >/dev/null 2>&1 && PATH=/usr/bin:$PATH pnpm -s build >/dev/null 2>&1 && PATH=/usr/bin:$PATH pnpm -s test >/dev/null 2>&1 && echo gruen` muss `gruen` ausgeben.
-- [ ] Jede Anfrage des Conway-Clients trägt `User-Agent: automaton-maintained/<version>`; Test im Fork.
+- [x] Jede Anfrage des Conway-Clients trägt `User-Agent: automaton-maintained/<version>`; Test im Fork.
       MVP: Funktion, weil paket 02 sonst nicht unterscheiden kann, wer über das Paket kommt.
       Prüfung (Netz): `t=$(grep -oE '^Release: \S+' docs/paket/anleitung.md | cut -d' ' -f2); d=$(mktemp -d); git clone -q --depth 1 --branch "${t:?}" https://github.com/matthiashippe/automaton "$d" && git -C "$d" grep -c "automaton-maintained/" -- src | wc -l` muss mindestens 1 ausgeben.
-- [ ] Der Fork nennt nirgends mehr `postyourprice.com`.
+- [x] Der Fork nennt nirgends mehr `postyourprice.com`.
       Prüfung (Netz): `t=$(grep -oE '^Release: \S+' docs/paket/anleitung.md | cut -d' ' -f2); d=$(mktemp -d); git clone -q --depth 1 --branch "${t:?}" https://github.com/matthiashippe/automaton "$d" && (git -C "$d" grep -il "postyourprice" || true) | wc -l` muss 0 ausgeben.
-- [ ] Ein Befehl ohne npm-Konto installiert das Release, und `automaton --version` nennt die Version des Tags.
+- [x] Ein Befehl ohne npm-Konto installiert das Release, und `automaton --version` nennt die Version des Tags.
       MVP: Kauf, weil jeder weitere Schritt bei der Installation Betreiber verliert.
       Prüfung (Netz): `t=$(grep -oE '^Release: \S+' docs/paket/anleitung.md | cut -d' ' -f2); p=$(mktemp -d); PATH=/usr/bin:$PATH npm install -g --prefix "$p" "github:matthiashippe/automaton#${t:?}" >/dev/null 2>&1 && "$p/bin/automaton" --version | grep -c "${t#v}"` muss 1 ausgeben.
       Prüfung (Netz): `t=$(grep -oE '^Release: \S+' docs/paket/anleitung.md | cut -d' ' -f2); gh release view "${t:?}" -R matthiashippe/automaton --json tagName -q .tagName` muss den Tag ausgeben.
-- [ ] `docs/paket/anleitung.md` nennt Release, Installationsbefehl, die Commits über `d8f8168` und den Weg für neue Upstream-Commits,
+- [x] `docs/paket/anleitung.md` nennt Release, Installationsbefehl, die Commits über `d8f8168` und den Weg für neue Upstream-Commits,
       und `README.md` nennt das Paket.
       Prüfung: `grep -cE '^Release: v?[0-9]+\.[0-9]+\.[0-9]+-maintained\.[0-9]+$' docs/paket/anleitung.md` muss 1 ausgeben.
       Prüfung: `grep -c 'github:matthiashippe/automaton#' docs/paket/anleitung.md README.md | grep -c ':[1-9]'` muss 2 ausgeben.
       Prüfung: `grep -c 'd8f8168' docs/paket/anleitung.md` muss mindestens 1 ausgeben.
-- [ ] `goals/paket/ANNAHMEN.md` nennt die Entscheidungen dieses Goals, ohne Adresse.
+- [x] `goals/paket/ANNAHMEN.md` nennt die Entscheidungen dieses Goals, ohne Adresse.
       Prüfung: `grep -cE "^- [0-9-]+, paket 01: " goals/paket/ANNAHMEN.md` muss mindestens 2 ausgeben.
       Prüfung: `grep -cE "([0-9]{1,3}\.){3}[0-9]{1,3}|0x[0-9a-fA-F]{40}" goals/paket/ANNAHMEN.md docs/paket/anleitung.md` muss 0 ausgeben.
-- [ ] `check` ist grün.
+- [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
 - [ ] goal-verifier PASS (K und B)
 
@@ -105,5 +105,6 @@ MVP: Kauf, weil ohne neuen Kanal kein weiterer zahlender Automaton ankommt und d
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-22 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6, 7 gebaut: Fork-PR matthiashippe/automaton#1 (fünf Commits über `4d2f96f`, mit `--merge` gemergt, Historie erhalten) und Release `v0.2.2-maintained.1` mit Voreinstellung `https://automatonhost.com`, Enter im Setup, Vorrang von `CONWAY_API_URL` und gespeicherter Wahl, `User-Agent: automaton-maintained/<version>`, Fix des Token-Zählers (am Pin hing `context-hardening.test.ts`, `pnpm test` endete nie) und `dist/` im Repo, weil npm 10 und 11 eine Git-Abhängigkeit mit `prepare` global nicht installieren können (`goals/paket/ANNAHMEN.md`); dazu `docs/paket/anleitung.md`, README und ein Vorschlag für die Startseite. Rot vor der Änderung: `default-control-plane.test.ts` 6 von 8 rot (die zwei Vorrang-Tests rot mit gepflanzter Mutation in `loadConfig`), `token-counter-long-runs.test.ts` hing bis zum Timeout, `maintained-user-agent.test.ts` 5 von 5 rot, `dist-in-sync.test.ts` rot ohne `dist/` und mit einer veränderten Datei darin. Prüfbefehle: P1 `gh api …config.ts` -> 1 (Gegenprobe am alten Stand `4d2f96f` -> 0), P1 Klon mit install, build, test -> gruen (73 Dateien, 1682 Tests), P2 -> 2 (Gegenprobe -> 0), P3 -> 0 (Gegenprobe -> 3), P4 `npm install -g … --version` -> 1, P4 `gh release view` -> v0.2.2-maintained.1, P5 -> 1, 2, 2, P6 -> 8 und `anleitung.md:0`, `ANNAHMEN.md:0`, P7 `node scripts/check.mjs` -> Exit 0 (254 Dateien, 2623 Tests); Fork-CI am PR grün auf Node 20 und 22.
 
 ## Blockers
