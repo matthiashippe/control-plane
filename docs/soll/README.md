@@ -267,3 +267,53 @@ Betreiber abtippt, und als Code erkennbar sein muss. Er ersetzt die drei Fakten 
 dem ersten Satz (`h1 span { display: block; }`), weil die zwei Sätze die zwei Zeilen des Blocks `move` sind.
 
 Abnahme-Issue og-card: PRO-24699
+
+## Fehlerseiten /errors/{slug} (goals/reichweite/01)
+
+Je Fehler aus den Conway-Issues eine eigene Seite für die Suche nach dem genauen Text, englisch wie `/fix`. Drei Seiten, je zwei
+Bilder:
+
+| Slug | Überschrift | 390 | 1440 | Quelle |
+|---|---|---|---|---|
+| `verify-500-database-error` | `/v1/auth/verify returns 500 {"error":"Database error"}` | `errors-verify-500-database-error-390.png` | `errors-verify-500-database-error-1440.png` | `src/errors-verify-500-database-error.html` |
+| `invalid-or-expired-nonce` | `/v1/auth/verify returns 401 {"error":"Invalid or expired nonce"}` | `errors-invalid-or-expired-nonce-390.png` | `errors-invalid-or-expired-nonce-1440.png` | `src/errors-invalid-or-expired-nonce.html` |
+| `credits-never-granted` | `x402 top-up paid on-chain, but credits never granted` | `errors-credits-never-granted-390.png` | `errors-credits-never-granted-1440.png` | `src/errors-credits-never-granted.html` |
+
+Jede Seite steht im Rahmen von `/fix` und `/check` (Kopf, Fußzeile, `page()` in `src/app.ts`). Der Block `data-soll="fix"` trägt
+eine Zeile „Conway automaton error“, den Fehlertext als Überschrift, die Ursache in zwei Sätzen, darunter den Kasten des Blocks
+`move` der Startseite (`~/.automaton/automaton.json`, `{ "conwayApiUrl": "https://automatonhost.com" }`, `automaton --provision`)
+mit dem Link „Every step on one page“ auf `/fix`. Er endet im ersten Bildschirm (390 x 844 und 1440 x 900). Darunter eine Zeile im
+Stil `.fine`: automatonhost.com ist ein eigener Dienst, der mit der unveränderten Conway-Automaton-Runtime arbeitet, und gehört
+nicht zu Conway. Die Quellen zeigen, was `page()` schreibt, ohne kanonischen Link und ohne JSON-LD, die nichts zeichnen; dasselbe
+nimmt `ops/soll-live-errors.mjs` aus der echten Seite.
+
+Die Startseite bekommt in der Fußzeile den Block `data-soll="errors"`: „Conway errors and how to keep running:“ mit den drei Links
+„verify 500 Database error“, „Invalid or expired nonce“ und „Credits never granted“, im Stil der Zeile darüber (`.legal`). Der
+erste Bildschirm und der Abschnitt `#move` bleiben unverändert; `startseite-390.png` und `startseite-1440.png` sind dafür neu
+gerendert.
+
+Bauen und prüfen, ohne Netz, mit `FONTCONFIG_FILE=$HOME/.config/control-plane/soll-fonts.conf`:
+
+```
+node ops/soll-errors.mjs                         # Bilder neu schreiben
+node ops/soll-errors.mjs --check                 # neu rendern und vergleichen, Exit 1 bei jedem Mangel
+node ops/soll-errors.mjs --check --source <dir>  # dieselbe Prüfung gegen die drei Quellen errors-<slug>.html in <dir>
+```
+
+Ein unbekanntes Argument endet mit Exit 1, bevor der Browser startet, und schreibt kein Bild. Die letzte Zeile ist englisch:
+`soll errors: 6 images, blocks end 390=<y> 1440=<y>, 0 defects`, y ist je Breite das tiefste Ende des Blocks `fix`.
+
+Mängel wie beim Geld: ein einziger Pixel weicht vom neuen Render ab, waagrechter Überlauf, Gedankenstrich im sichtbaren Text,
+fremde Adresse, Bild mit falscher Breite, Block fehlt oder endet unter dem ersten Bildschirm. Als fremde Adresse zählt jede Anfrage
+und jede Adresse eines anderen Dienstes in einem Attribut, das etwas lädt (`src`, `srcset`, `poster`, `data`, `background`, `href`
+eines `<link>`, `url()` im Stil); ein Link zum Anklicken nicht, wie auf der Startseite, weil der Rahmen jeder Seite auf den Quelltext
+bei github.com verweist. Die Auswertung ist `assessErrors` in `ops/soll-assess.mjs`, geprüft von `test/soll-errors.test.ts` ohne
+Browser.
+
+### Neue Bausteine
+
+Keine. Die Quellen nutzen nur Klassen aus dem `<style>` von `src/public/index.html`: `bar`, `brand`, `hide-s`, `wrap`, `narrow`,
+`kicker`, `ph`, `sub`, `demo`, `eyebrow`, `code`, `pr`, `fine`. Der Abstand der Zeile unter dem Block ist ein `style`-Attribut wie
+auf `/fix`, weil `main .wrap > p.fine` den oberen Rand sonst auf null setzt.
+
+Abnahme-Issue errors: PRO-27594

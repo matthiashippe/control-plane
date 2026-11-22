@@ -338,3 +338,40 @@ export const FONTS_CONF = `<?xml version="1.0"?>
 ${REFERENCE_FONTS.map(([generic, font]) => `  <match target="pattern"><test name="family"><string>${generic}</string></test><edit name="family" mode="prepend" binding="strong"><string>${font}</string></edit></match>`).join("\n")}
 </fontconfig>
 `;
+
+// ---- the error pages /errors/{slug} (goals/reichweite/01) ----------------------------------------------------------------
+// Three pages, one per error text a Conway operator searches for. Each carries the block data-soll="fix" (the heading, the cause,
+// the conwayApiUrl line and the link to /fix), and it has to end in the first screen at both widths. The defects are those of the
+// start page; there is no word list, because the reader is an operator who knows the words of the runtime.
+
+/** The slugs of the error pages, each one source docs/soll/src/errors-<slug>.html and two pictures docs/soll/errors-<slug>-<width>.png. */
+export const ERROR_SLUGS = Object.freeze(["verify-500-database-error", "invalid-or-expired-nonce", "credits-never-granted"]);
+/** The block every error page has to end in the first screen, as its data-soll value. */
+export const ERROR_BLOCK = "fix";
+
+/**
+ * Defects of one render of an error page. `m` is what assessMoney() takes, with `slug` instead of `state`: `width`, `pngWidth`,
+ * `diffPixels`, `scrollWidth`, `text`, `foreign` (requests made and addresses named in attributes that load something) and
+ * `blockBottom` (bottom edge of data-soll="fix" in page pixels, null when missing).
+ */
+export function assessErrors(m) {
+  const out = assess({ ...m, moveBottom: 0 }).map((d) => `${m.slug} ${d}`), fold = FOLD[m.width];
+  if (!ERROR_SLUGS.includes(m.slug)) out.push(`${m.slug} ${m.width}: unknown error page`);
+  if (m.blockBottom === null || m.blockBottom === undefined) out.push(`${m.slug} ${m.width}: block data-soll="${ERROR_BLOCK}" is missing`);
+  else if (fold && m.blockBottom > fold) out.push(`${m.slug} ${m.width}: block ${ERROR_BLOCK} ends at ${m.blockBottom} px, below the first screen at ${fold}`);
+  return out;
+}
+
+/**
+ * The last line of ops/soll-errors.mjs. Wording fixed by goals/reichweite/01, Punkt 1: per width the block bottom furthest down
+ * of all pages, `missing` when a page of that width has none.
+ */
+export function summaryErrors(results) {
+  const end = (w) => {
+    const at = results.filter((r) => r.width === w);
+    if (!at.length || at.some((r) => r.blockBottom === null || r.blockBottom === undefined)) return `${w}=missing`;
+    return `${w}=${Math.max(...at.map((r) => r.blockBottom))}`;
+  };
+  const n = results.reduce((s, r) => s + r.defects.length, 0);
+  return `soll errors: ${results.length} images, blocks end ${WIDTHS.map(end).join(" ")}, ${n} defects`;
+}

@@ -33,6 +33,7 @@ import { readSeries, renderX402 } from "./public/x402.js";
 import { readMoneySeries, readReceipts, renderConway } from "./public/conway.js";
 import { renderPost } from "./public/post.js";
 import { renderFix } from "./public/fix.js";
+import { ERROR_PAGES, findErrorPage, renderErrorPage, renderErrorPageMissing } from "./public/error-pages.js";
 import { OFFERS, TEST_MODE_LINE, euro, renderCatalog, renderConversation, renderOrderPage, type ConversationTurn, type Offer } from "./public/catalog.js";
 import { renderPrivacy } from "./public/datenschutz.js";
 import {
@@ -983,16 +984,21 @@ export function createApp(opts: AppOptions) {
     // withOrigin at the door, once, rather than per template string. The curl examples on these
     // pages are the thing a visitor copies, they live in prose across a dozen files, and after a
     // domain move they would be the last place anybody looked. See src/public/site.ts.
+    // Inside an attribute a raw double quote ends the value early, so it is escaped there and only
+    // there. Escaping it again is a no-op for a caller that already escaped it (no raw quote left),
+    // and the WebPage node below gets the text as it was passed: an entity in JSON-LD is not the
+    // text a search engine shows (goals/reichweite/01, Punkt 9).
+    const attr = (s: string) => s.replace(/"/g, "&quot;");
     const headPart =
       head
         .replace(/<title>[^<]*<\/title>/, `<title>${title}</title>`)
-        .replace(/(<meta name="description" content=")[^"]*/, `$1${description}`)
+        .replace(/(<meta name="description" content=")[^"]*/, `$1${attr(description)}`)
         .replace(/<link rel="canonical" href="https:\/\/[a-z0-9.-]+\//, `<link rel="canonical" href="${siteOrigin()}/`)
         .replace(/(<link rel="canonical" href="[^"]*?)\/"/, `$1${pathname}"`)
-        .replace(/(<meta property="og:title" content=")[^"]*/, `$1${title}`)
-        .replace(/(<meta property="og:description" content=")[^"]*/, `$1${description}`)
-        .replace(/(<meta name="twitter:title" content=")[^"]*/, `$1${title}`)
-        .replace(/(<meta name="twitter:description" content=")[^"]*/, `$1${description}`)
+        .replace(/(<meta property="og:title" content=")[^"]*/, `$1${attr(title)}`)
+        .replace(/(<meta property="og:description" content=")[^"]*/, `$1${attr(description)}`)
+        .replace(/(<meta name="twitter:title" content=")[^"]*/, `$1${attr(title)}`)
+        .replace(/(<meta name="twitter:description" content=")[^"]*/, `$1${attr(description)}`)
         .replace(/<meta property="og:url" content="https:\/\/[a-z0-9.-]+\//, `<meta property="og:url" content="${siteOrigin()}/`)
         .replace(/(<meta property="og:url" content="[^"]*?)\/"/, `$1${pathname}"`)
         // og:image is an absolute URL too, and a card that points at the old host after a move
@@ -1108,6 +1114,25 @@ export function createApp(opts: AppOptions) {
         "/fix",
       ),
     );
+  });
+
+  /**
+   * One page per error text a Conway operator searches for. See `src/public/error-pages.ts`.
+   *
+   * Title and description are passed as they are: the heading of two pages is a JSON body with
+   * quotes in it, page() escapes those quotes in the head attributes, and the WebPage node in the
+   * JSON-LD carries the exact text an operator searches for.
+   */
+  app.get("/errors/:slug", (c) => {
+    if (!indexHtml) return c.json({ error: "no index page built" }, 503);
+    const p = findErrorPage(c.req.param("slug"));
+    if (!p) {
+      return c.html(
+        page(renderErrorPageMissing(), "No page for this error | automatonhost.com", "The error pages that exist, and every step on one page.", "/errors", "og.png", [], true),
+        404,
+      );
+    }
+    return c.html(page(renderErrorPage(p), p.title, p.description, `/errors/${p.slug}`));
   });
 
   /**
@@ -1690,7 +1715,7 @@ export function createApp(opts: AppOptions) {
 
   app.get("/sitemap.xml", (c) => {
     const today = new Date().toISOString().slice(0, 10);
-    const pages = ["/", "/katalog", "/check", "/fix", "/post", "/jobs", "/receipts", "/x402", "/conway", "/terms", "/datenschutz"];
+    const pages = ["/", "/katalog", "/check", "/fix", ...ERROR_PAGES.map((p) => `/errors/${p.slug}`), "/post", "/jobs", "/receipts", "/x402", "/conway", "/terms", "/datenschutz"];
     return c.body(
       '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
         pages
@@ -2334,6 +2359,7 @@ export function createApp(opts: AppOptions) {
       "- /fix: for an automaton that cannot sign up. How to stop the runtime buying 5 USDC of",
       "  credits it will never receive, the two free ways to make it think again that need nothing",
       "  from this service, and only then what this service does instead.",
+      ...ERROR_PAGES.map((p) => `- /errors/${p.slug}: one page for the error ${p.heading}, what is broken at Conway in two sentences, and the one line that keeps the automaton running.`),
       "- /check: the free brief check as a page, for a reader with no terminal open. Two drafts of",
       "  the same job to click, one nobody could work from and the same job said properly, and the",
       "  findings for each. GET /check?brief=... answers any draft the same way, and puts the draft",
