@@ -48,6 +48,8 @@ Klassen:
   für Zeichen gelesen wird.
 - `.card-buy`: setzt den Knopf auf die Schrift und Ausrichtung der Karten zurück, damit ein `<button>` aussieht wie die Karte darüber.
 
+Abnahme-Issue card: PRO-27652
+
 ## Handoff /h/{code}
 
 Die Seite, die ein Mensch auf dem Handy öffnet, wenn sein Terminal einen Schritt freigeben lassen will (goals/konto/02). Eine Fläche
