@@ -30,7 +30,7 @@
 # "(new own address <address>, written to own-ips.txt)" is no request line and does not count.
 #
 # Output: one line "<id> <n>" per run (distinct stranger addresses of that run) or "<id> no-log" (the
-# log is gone, gh answers 404 or 410), ascending by id, then "total <n>" (distinct over all runs).
+# log is gone, gh answers 404 or 410, or the archive is empty), ascending by id, then "total <n>" (distinct over all runs).
 #
 # Exit 0: counted. Exit 2: could not count (gh failed while listing or on a log for another reason
 # than a missing one, bad arguments, unreadable list). Exit 2 never prints a total line, so a network
@@ -113,6 +113,12 @@ if [[ -z "$dir" ]]; then
         continue
       fi
       die "gh failed on the log of run $id (${status:-no HTTP status})"
+    fi
+    # A run without any log lines (skipped, cancelled early) comes back as an empty archive: no log.
+    if [[ "$(stat -c %s "$work/$id.zip")" -le 22 ]]; then
+      echo "$id no-log" >> "$results"
+      rm -f "$work/$id.zip"
+      continue
     fi
     mkdir -p "$dir/$id"
     unzip -q -o "$work/$id.zip" -d "$dir/$id" > /dev/null 2>&1 || die "could not unpack the log of run $id"
