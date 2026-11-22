@@ -110,6 +110,13 @@ MVP: Funktion, weil ein Kunde mit über 1000 Anfragen am Tag und ohne USDC nur �
 - [x] `check` ist grün, und der Job `e2e` am Kopf des Goal-PR ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung (Netz): `n=$(gh pr list -R matthiashippe/control-plane --head goal/kunden-11 --state all --json number -q '.[0].number'); gh pr checks "${n:?}" -R matthiashippe/control-plane --json name,state -q '.[] | select(.name=="e2e") | .state'` muss `SUCCESS` ausgeben.
+- [ ] Kritik: Schickt eine Runtime ihren Bericht im Feld `body` als JSON-Objekt statt als String, prüft und zahlt der Hausauftrag
+      ihn wie denselben Bericht als String (gespeichert wird `JSON.stringify` des Objekts); fehlt `body` oder ist es weder String noch
+      Objekt, nennt der Grund der 422 `house_report_invalid` das Feld `body` statt „The body is not JSON.“. Heute macht
+      `src/app.ts` aus einem Objekt einen leeren String, und der Kunde liest einen falschen Grund.
+      MVP: Funktion, weil der Text des Auftrags („Send the list as the body of your submission, JSON only“) ein Sprachmodell dazu
+      bringt, das Objekt direkt einzusetzen, und Kunde 1 dann bei jedem Versuch abgelehnt wird.
+      Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/house-award.test.ts --reporter=json 2>/dev/null | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const j=JSON.parse(s);const t=j.testResults.flatMap(f=>f.assertionResults).filter(a=>a.status==="passed").map(a=>a.title);console.log([/pays a report sent as an object/,/names body when it is missing/].every(r=>t.some(x=>r.test(x)))?"alle":"fehlt")})'` muss `alle` ausgeben.
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
