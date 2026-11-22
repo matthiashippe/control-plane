@@ -81,6 +81,12 @@ MVP: Kauf, weil ohne neuen Kanal kein weiterer zahlender Automaton ankommt und d
       Prüfung: `grep -cE "([0-9]{1,3}\.){3}[0-9]{1,3}|0x[0-9a-fA-F]{40}" goals/paket/ANNAHMEN.md docs/paket/anleitung.md` muss 0 ausgeben.
 - [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
+- [ ] Wer den Fork auf GitHub findet (Suche, Liste der Forks, Link aus einer Conway-Antwort), sieht ohne das README zu öffnen,
+      dass die Runtime sich bei `automatonhost.com` anmeldet: Die Beschreibung des Repos `matthiashippe/automaton` nennt
+      `automatonhost.com`, Englisch und ohne Gedankenstrich, und die Website-Adresse des Repos ist `https://automatonhost.com`
+      (heute nennt die Beschreibung nur Fixes, die Website-Adresse ist leer). Nur Beschreibung und Website, nie die Sichtbarkeit.
+      MVP: Kauf, weil die Beschreibung das Erste ist, was ein Betreiber vom Paket sieht, und sie heute nicht sagt, wo es sich anmeldet.
+      Prüfung (Netz): `gh repo view matthiashippe/automaton --json homepageUrl,description -q 'select(.homepageUrl == "https://automatonhost.com" and (.description | test("automatonhost\\.com")) and (.description | test("[\u2013\u2014]") | not)) | "ok"'` muss `ok` ausgeben.
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
