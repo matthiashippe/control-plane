@@ -117,6 +117,20 @@ export interface HouseReport {
   calls: HouseCall[];
 }
 
+/**
+ * The report text of the field `body`: a string as sent, a JSON object as its JSON.stringify, anything else null.
+ * A language model that reads "send the list as the body" often puts the object itself into the field (kunden 11, point 8).
+ */
+export function houseReportText(body: unknown): string | null {
+  if (typeof body === "string") return body;
+  if (typeof body === "object" && body !== null && !Array.isArray(body)) return JSON.stringify(body);
+  return null;
+}
+
+/** The reason when `body` is missing or neither a string nor a JSON object. */
+export const HOUSE_BODY_MISSING =
+  'The field body is missing or not a report: send body as a JSON object {"runtime": "...", "calls": [...]} or as that object in a string.';
+
 /** Checks the body of a house submission. Pure; the reason says what is missing. */
 export function checkHouseReport(body: string): { ok: true; report: HouseReport } | { ok: false; reason: string } {
   let raw: unknown;
@@ -182,7 +196,7 @@ function houseAwardsOn(db: Db, day: string, agent?: string): number {
  */
 export function submitHouseReport(
   db: Db,
-  a: { bountyId: string; agent: string; body: string; feeTo?: string | null; now?: Date },
+  a: { bountyId: string; agent: string; body: unknown; feeTo?: string | null; now?: Date },
 ): { submission: Submission; bounty: Bounty; creditMc: number } {
   const agent = a.agent.toLowerCase();
   const now = a.now ?? new Date();
@@ -195,7 +209,8 @@ export function submitHouseReport(
       `The house job pays a runtime only: this address has no key named ${HOUSE_RUNTIME_KEY_NAME}, the name the automaton runtime gives its own.`,
     );
   }
-  const checked = checkHouseReport(a.body);
+  const text = houseReportText(a.body);
+  const checked = text === null ? ({ ok: false, reason: HOUSE_BODY_MISSING } as const) : checkHouseReport(text);
   if (!checked.ok) {
     throw new HouseError("house_report_invalid", 422, `This report is not valid: ${checked.reason}`, { reason: checked.reason });
   }
@@ -215,7 +230,7 @@ export function submitHouseReport(
     );
   }
   const run = db.transaction(() => {
-    const submission = submitWork(db, { bountyId: a.bountyId, agent, body: a.body });
+    const submission = submitWork(db, { bountyId: a.bountyId, agent, body: text as string });
     const bounty = awardBounty(db, { bountyId: a.bountyId, submissionId: submission.id, who: HOUSE_POSTER, feeTo: a.feeTo ?? null });
     const row = db
       .prepare("SELECT delta_mc FROM ledger WHERE kind = 'bounty_award' AND ref = ?")

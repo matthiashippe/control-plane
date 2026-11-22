@@ -3436,7 +3436,8 @@ export function createApp(opts: AppOptions) {
         const r = submitHouseReport(db, {
           bountyId: b.bounty_id,
           agent: c.get("address"),
-          body: typeof b.body === "string" ? b.body : "",
+          // A string or a JSON object; submitHouseReport names the field when it is neither.
+          body: b.body,
           feeTo,
         });
         try {

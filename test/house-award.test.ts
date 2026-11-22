@@ -153,4 +153,48 @@ describe("house award (goals/kunden/11)", () => {
     vi.setSystemTime(new Date("2026-11-24T00:00:01Z"));
     expect((await late.submit(ensureHouseJob(db).bounty.id, validReport())).status).toBe(201);
   });
+
+  it("pays a report sent as an object", async () => {
+    const { db, account } = houseWorld();
+    const customer = account();
+    const job = ensureHouseJob(db).bounty;
+    // A language model reads "send the list as the body" and puts the object itself into the field.
+    const report = JSON.parse(validReport("/v1/sandboxes", 404)) as Record<string, unknown>;
+    const res = await customer.post("/v1/submissions", { bounty_id: job.id, body: report });
+    expect(res.status).toBe(201);
+    const r = (await res.json()) as { id: string; award: string; credit_mc: number };
+    expect(r.award).toBe("paid");
+    expect(r.credit_mc).toBe(HOUSE_PRICE_MC);
+    expect(customer.balance()).toBe(HOUSE_PRICE_MC);
+    const stored = db.prepare("SELECT body FROM submissions WHERE id = ?").get(r.id) as { body: string };
+    expect(stored.body).toBe(JSON.stringify(report));
+    expect(stored.body).toBe(validReport("/v1/sandboxes", 404));
+  });
+
+  it("names body when it is missing", async () => {
+    const { db, account, ledgerRows, submissionRows } = houseWorld();
+    const customer = account();
+    const job = ensureHouseJob(db).bounty;
+    const ledger = ledgerRows();
+    const cases: Record<string, unknown>[] = [
+      { bounty_id: job.id },
+      { bounty_id: job.id, body: null },
+      { bounty_id: job.id, body: 42 },
+      { bounty_id: job.id, body: true },
+      { bounty_id: job.id, body: [{ method: "GET", path: "/v1/x", status: 404 }] },
+    ];
+    for (const payload of cases) {
+      const res = await customer.post("/v1/submissions", payload);
+      expect(res.status, JSON.stringify(payload)).toBe(422);
+      const r = (await res.json()) as Refusal;
+      expect(r.error).toBe("house_report_invalid");
+      expect(r.reason).toMatch(/\bbody\b/);
+      expect(r.reason).not.toBe("The body is not JSON.");
+      expect(r.message).toMatch(/\bbody\b/);
+    }
+    expect(submissionRows()).toBe(0);
+    expect(ledgerRows()).toBe(ledger);
+    expect(customer.balance()).toBe(0);
+    expect(openHouseJob(db)?.id).toBe(job.id);
+  });
 });
