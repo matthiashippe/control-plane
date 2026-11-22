@@ -226,6 +226,17 @@ sieht. Übernimmt goals/_vorschlaege/karte-kritik-2026-11-22-1.md.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD | grep -ciE '(^|/)\.env|passphrase|ipn-pass|digistore-ipn'` muss 0 ausgeben.
 - [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
+- [ ] Der Stand, den `--submit` je Produkt höchstens einmal einreicht, umfasst auch die Verkaufsseite: Eine neue exportierte
+      Funktion `salesPageState(html)` in `ops/digistore-release.mjs` gibt den Hash der Section `<section id="card" …>` aus
+      `src/public/index.html` zurück (Knöpfe mit `formaction`, Preise, Guthaben, Text) und `null`, wenn die Section fehlt;
+      `submit` nimmt diesen Hash in den Stand neben `stateHash` und reicht ohne Block `card` nichts ein. Ein abgelehntes Produkt
+      mit unveränderten Feldern geht damit nach einer Änderung am Block genau einmal neu hinein, ohne Änderung nie.
+      MVP: Funktion, weil die drei Produkte eingereicht wurden, während `https://automatonhost.com/` (die Verkaufsseite der
+      Produkte, `SALES_PAGE` in `ops/digistore.mjs`) noch keinen Knopf zur Kasse zeigte; lehnt Digistore24 deshalb ab, ändert der
+      Rollout nur die Seite und nie ein Produktfeld, und `--submit` meldete sonst für immer „this state was submitted already“.
+      Prüfung: `PATH=/usr/bin:$PATH node --input-type=module -e 'import fs from "node:fs"; const { salesPageState } = await import("./ops/digistore-release.mjs"); const h = fs.readFileSync("src/public/index.html", "utf8"); const a = salesPageState(h); const b = salesPageState(h.replace("about $3 credit", "about $4 credit")); const c = salesPageState(h.replace("Switch in two steps", "Switch in 2 steps")); const d = salesPageState(h.replace(/<section id="card"[\s\S]*?<\/section>/, "")); console.log(typeof a === "string" && a.length > 0 && a !== b && a === c && d === null ? "seite im stand" : "falsch")'` muss genau `seite im stand` ausgeben.
+      Prüfung: `PATH=/usr/bin:$PATH node ops/digistore-release.mjs --selftest 2>&1 | tail -1` muss genau `SELFTEST OK` ausgeben, und `--selftest` enthält die Fälle „abgelehnt, Felder gleich, Block geändert: genau ein neues Einreichen“, „abgelehnt, Felder und Block gleich: keins“ und „ohne Block card: keins“.
+      Prüfung: `grep -c 'salesPageState(' ops/digistore-release.mjs` muss mindestens 3 ausgeben.
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
