@@ -1,7 +1,7 @@
 # Karte Goal 02: Der Weg zur Kasse
 
 ## Status
-PLANNED
+BLOCKED matthias
 
 ## Active Objective
 Seit karte 01 nimmt der Dienst Kartengeld von Digistore24 an, aber kein Betreiber kommt zur Kasse: Kunde 1 und der Automaton vom
@@ -139,7 +139,7 @@ sieht. Übernimmt goals/_vorschlaege/karte-kritik-2026-11-22-1.md.
   einen Agent. Code, Bezeichner, Testnamen, Ausgaben und alle Texte auf Seite, README und Plugin englisch.
 
 ## Done Condition
-- [ ] Das Kennwort liegt nur auf dem code-host, die IPN-Verbindung `automaton-credit` zeigt mit Zahlung, Rückerstattung und
+- [x] Das Kennwort liegt nur auf dem code-host, die IPN-Verbindung `automaton-credit` zeigt mit Zahlung, Rückerstattung und
       Rückbuchung vor der Dankeseite auf `https://automatonhost.com/pay/digistore`, und das Werkzeug schreibt nur an die eigenen drei
       Produkte und reicht je Stand höchstens einmal ein.
       MVP: Funktion, weil ohne diese Verbindung kein Kartenkauf beim Dienst ankommt.
@@ -191,7 +191,7 @@ sieht. Übernimmt goals/_vorschlaege/karte-kritik-2026-11-22-1.md.
       Prüfung: `T=$(mktemp -d); git archive HEAD | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; sed -i 's/about \$/near $/g' $T/src/public/index.html; grep -q 'near \$' $T/src/public/index.html || echo sed-miss; (cd $T && PATH=/usr/bin:$PATH node --import tsx ops/soll-live.mjs --out $T/s.html); FONTCONFIG_FILE=$HOME/.config/control-plane/soll-fonts.conf node ops/soll.mjs --check --source $T/s.html > $T/o 2>&1; echo "exit=$?"; rm -rf $T` muss als letzte Zeile `exit=1` ausgeben und darf `sed-miss` nicht ausgeben.
       Prüfung: `B=$(git merge-base origin/dev HEAD); s() { sed -n '/^<script>$/,/<\/script>/p'; }; a=$(git show $B:src/public/index.html | s | sha256sum); b=$(s < src/public/index.html | sha256sum); [ "$a" = "$b" ] && [ -n "$(s < src/public/index.html)" ] && echo skript gleich` muss genau `skript gleich` ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/public.test.ts test/without-script.test.ts test/domain-move.test.ts test/journeys-cover-pages.test.ts test/sitemap-covers-pages.test.ts test/soll.test.ts` muss Exit-Code 0 haben.
-- [ ] Die CSP lässt das Formular zur Kasse von Digistore24 zu und ist sonst unverändert.
+- [x] Die CSP lässt das Formular zur Kasse von Digistore24 zu und ist sonst unverändert.
       MVP: Funktion, weil der Browser das Formular sonst nicht abschickt.
       Prüfung: `f=$(grep -oE "form-action [^;\"]*" deploy/Caddyfile); for x in "'self'" https://checkout.stripe.com https://www.checkout-ds24.com; do case "$f" in *"$x"*) ;; *) echo "fehlt $x";; esac; done` muss nichts ausgeben.
       Prüfung: `B=$(git merge-base origin/dev HEAD); c() { grep -o 'Content-Security-Policy "[^"]*"' | sed -E 's/form-action [^;]*;//'; }; [ "$(git show $B:deploy/Caddyfile | c)" = "$(c < deploy/Caddyfile)" ] && echo csp sonst gleich` muss genau `csp sonst gleich` ausgeben.
@@ -260,6 +260,10 @@ sieht. Übernimmt goals/_vorschlaege/karte-kritik-2026-11-22-1.md.
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-22 Zyklus 1: Punkte 1 und 7 gebaut (ops/digistore-release.mjs, IPN-Verbindung automaton-credit im Konto angelegt, form-action mit der Kasse), dazu ops/card-orders.sh --test-vendor, cardCheckoutUrl und card_url in der 402, zwölf Zeilen in ANNAHMEN.md; danach Human Gate für Kennwort, Rückgabe und Testkauf. Prüfbefehle: Punkt 1 alle sieben wie erwartet (SELFTEST OK, nichts fehlt, exit=1, 0, 0, bereit, 1); Gegenprobe des Selbsttests mit drei gepflanzten Fehlern rot (zweites ipnSetup, zweites Einreichen desselben Stands, Lesen fremder ID); Zählung der Testkäufe gegengeprüft (758179: 5, eigene: 0). Punkt 7 alle vier wie erwartet (nichts fehlt, csp sonst gleich, 0, Valid configuration). Punkt 2 ohne Netz grün (vitest 10 von 10, beide Namen da, 0); die drei neuen Fälle waren vor dem Skript rot; mit Netz `ops/card-orders.sh` ipn_passphrase missing, `--test-vendor` card_test_vendor none, `ops/digistore.mjs --report` refund 14 days, warten auf das Gate. Punkt 10: vitest 114 von 114, card_url 3 Treffer, e2e am PR #378 läuft; in test/card-checkout.test.ts war der Fall mit card_url gegen den alten proxy.ts rot, die Wächter für Felder und geschlossene Aufladung rot mit gepflanztem Fehler, der CSP-Fall rot gegen den alten Caddyfile. Punkt 13: check grün in 80 s (2631 Tests). Offen bis nach dem Gate: Punkte 2 bis 6, 8, 9, 11 (brauchen Verkäuferanteil der Testkäufe), 10 (e2e), 12, 13.
 
 ## Blockers
-keine
+Art: matthias
+Aufgabe: Kennwort der Kartenzahlung in die Produktion legen und ausrollen, Rückgabe der drei Guthaben-Produkte auf 30 Tage stellen, je Produkt einen Testkauf mit Testpay machen.
+Worum: Ohne Kennwort bucht der Dienst keinen Kartenkauf, und Digistore24 gibt die Produkte erst nach Testkauf und mit 30 Tagen Rückgabe frei.
+Empfehlung: 1. Terminal auf dem code-host: set -a; . ~/.config/control-plane/loop.env; set +a; P=$(cat ~/.config/control-plane/digistore-ipn.txt); ssh -i "$CP_SSH_KEY" "$CP_HOST" "grep -q '^CP_DIGISTORE_IPN_PASSPHRASE=' /opt/control-plane/.env || echo 'CP_DIGISTORE_IPN_PASSPHRASE=$P' >> /opt/control-plane/.env" && gh workflow run deploy.yml -R matthiashippe/control-plane --ref dev -f force=true. 2. Backoffice von Digistore24, Produkte 771278, 771279 und 771280: Rückgaberecht 30 Tage, speichern. 3. Je Produkt im selben Chrome wie das Backoffice die Kasse mit Testpay: https://www.checkout-ds24.com/product/771278/?custom=0x0000000000000000000000000000000000000001, https://www.checkout-ds24.com/product/771279/?custom=0x0000000000000000000000000000000000000001, https://www.checkout-ds24.com/product/771280/?custom=0x0000000000000000000000000000000000000001.
