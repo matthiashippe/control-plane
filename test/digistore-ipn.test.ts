@@ -314,6 +314,22 @@ describe("digistore24 ipn", () => {
     expect(getBalanceMc(db, f.custom)).toBe(500000);
   });
 
+  it("a payment ipn after its refund books nothing", async () => {
+    const app = appWith();
+    const f = payment({ order_id: "R1" });
+    // Digistore24 retries a failed payment IPN for days, so the refund can arrive first.
+    expect((await post(app, signed({ ...f, event: "on_refund" }))).text).toBe("OK");
+    expect(rows()).toHaveLength(1);
+    expect(rows()[0]).toMatchObject({ order_id: "R1", status: "reversed", address: null, credited_mc: 0 });
+    expect((await post(app, signed(f))).text).toBe("OK");
+    expect((await post(app, signed({ ...f, event: "on_chargeback" }))).text).toBe("OK");
+    await bookPendingCardOrders(db, { fetch: ecbUp as unknown as typeof fetch });
+    expect(ledger("topup")).toHaveLength(0);
+    expect(ledger("card_reversal")).toHaveLength(0);
+    expect(getBalanceMc(db, f.custom)).toBe(0);
+    expect(rows()[0]).toMatchObject({ status: "reversed", credited_mc: 0 });
+  });
+
   it("no log line carries the address or the passphrase", async () => {
     const lines: string[] = [];
     const keep = (...a: unknown[]) => void lines.push(a.map(String).join(" "));

@@ -222,11 +222,25 @@ export async function bookPendingCardOrders(
   return booked;
 }
 
-function reverse(db: Db, orderId: string, event: string, now: Date, log: (l: string) => void): void {
+function reverse(
+  db: Db,
+  order: { orderId: string; productId: string; mode: "live" | "test" },
+  event: string,
+  now: Date,
+  log: (l: string) => void,
+): void {
+  const { orderId } = order;
   const run = db.transaction(() => {
     const row = db.prepare("SELECT * FROM card_orders WHERE order_id = ?").get(orderId) as OrderRow | undefined;
-    if (!row) return `${event} for an unknown order, nothing booked`;
     const at = now.toISOString();
+    if (!row) {
+      // Digistore24 retries a failed payment IPN for days, so the refund can come first. The row blocks that late payment.
+      db.prepare(
+        "INSERT INTO card_orders (order_id, product_id, address, mode, status, credited_mc, reversed_mc, shortfall_mc, " +
+          "created_at, updated_at) VALUES (?, ?, NULL, ?, 'reversed', 0, 0, 0, ?, ?)",
+      ).run(orderId, order.productId, order.mode, at, at);
+      return `${event} before its payment, order blocked, nothing booked`;
+    }
     if (row.status === "booked" && row.address) {
       const take = Math.max(0, Math.min(row.credited_mc, getAvailableMc(db, row.address)));
       if (take > 0) {
@@ -268,7 +282,7 @@ export async function handleDigistoreIpn(db: Db, deps: DigistoreDeps, fields: Re
   if (!orderId) return { status: 200, body: "OK" };
 
   if (event === "on_refund" || event === "on_chargeback") {
-    reverse(db, orderId, event, now, log);
+    reverse(db, { orderId, productId: pkg.productId, mode: fields.api_mode === "live" ? "live" : "test" }, event, now, log);
     return { status: 200, body: "OK" };
   }
   if (event !== "on_payment") return { status: 200, body: "OK" };
