@@ -58,7 +58,10 @@ Der Weg: Das MCP-Tool `payout {amount_usd} | {all:true}` ruft `POST /v1/konto/pa
 Bridge (`payout-verify`), IBAN und Name (`payout-bank`) und die zweite Erlaubnis per Passkey (`payout-passkey`) mit Spender
 `forwarderAddress(account, destination)`. Danach ruft das Tool `payout` noch einmal mit denselben Argumenten, und jede weitere
 Auszahlung läuft ohne Handy. Fällt beim Prüfen der Unterschrift der RPC aus, antwortet die Route 503 `signature_check_unavailable`,
-der Handoff bleibt `matched`, und `retry` schickt dieselbe Unterschrift noch einmal.
+der Handoff bleibt `matched`, und `retry` schickt dieselbe Unterschrift noch einmal. Nach bestandener Identitätsprüfung fragt die
+Seite `getCustomer` und bleibt auf `payout-verify`, bis Bridge neben `kyc_status` `approved` auch das Endorsement `sepa` mit
+`approved` meldet; `POST /h/{code}/payout-bank` fragt das vor dem Anlegen von Bankkonto und Auszahladresse bei Bridge noch einmal,
+und ein Fehler bei Bridge antwortet in beiden Fällen 502.
 
 Vor der ersten Transaktion prüft `sendPayout` mit `forwarderFits`, dass die gespeicherte Weiterleitung gleich
 `forwarderAddress(account, destination, fixed)` mit den heutigen Werten ist; nach einem Wechsel des Gasschlüssels (`caller`), des
