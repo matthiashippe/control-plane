@@ -129,6 +129,7 @@ eingreift.
 
 ## Progress Log
 - 2026-11-22 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6 gebaut: Schritt 8 in `deploy/README.md` nennt den Rückweg der Spalte (stop, Skript über das Image, Start, beim Rückweg von Hand vorher das Zurücktaggen), neuer Wächtertest `test/rollback-schema.test.ts`, Vorschlag `goals/_vorschlaege/betrieb-kritik-2026-11-22-1.md` (Schwere 3) für `deploy/rollout-remote.sh`; der Test war gegen den Text von Schritt 8 auf dev rot (3 failed, 2 passed: Wächter, altes Image, Vorwärts-Umbenennung), eine gepflanzte Zeile `RENAME COLUMN reserved_mc TO held_mc` in `src/db.ts` macht ihn rot (1 failed, 4 passed), das Skript aus Schritt 8 lief nur lokal gegen eine Wegwerf-DB (`renamed`, dann `nothing to do`); kein Befehl aus Schritt 8 lief auf der VM. Prüfbefehle: Punkt 1 1, 2, 1, 1, 1, 1; Punkt 2 Exit 0, 2, 6; Punkt 3 Exit 0, 3, 7; Punkt 4 1; Punkt 5 0, 0, 0; Punkt 6 `check` Exit 0 (248 Dateien, 2568 Tests), `git status --porcelain` 0.
+- 2026-11-22 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6; `dev` (8cb5a0b) war schon im Goal-Branch, kein Befehl aus Schritt 8 lief auf der VM. Prüfbefehle: Punkt 1 1, 2, 1, 1, 1, 1; Punkt 2 Exit 0 (7 passed), 2, 6; Punkt 3 Exit 0, 3, 7; Punkt 4 1; Punkt 5 0, 0, 0; Punkt 6 `check` Exit 0 (248 Dateien, 2568 Tests), `git status --porcelain` 0.
 
 ## Blockers
 - keine
