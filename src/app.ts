@@ -2353,6 +2353,7 @@ export function createApp(opts: AppOptions) {
       "- /fix: for an automaton that cannot sign up. How to stop the runtime buying 5 USDC of",
       "  credits it will never receive, the two free ways to make it think again that need nothing",
       "  from this service, and only then what this service does instead.",
+      ...ERROR_PAGES.map((p) => `- /errors/${p.slug}: one page for the error ${p.heading}, what is broken at Conway in two sentences, and the one line that keeps the automaton running.`),
       "- /check: the free brief check as a page, for a reader with no terminal open. Two drafts of",
       "  the same job to click, one nobody could work from and the same job said properly, and the",
       "  findings for each. GET /check?brief=... answers any draft the same way, and puts the draft",
