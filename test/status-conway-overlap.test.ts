@@ -157,6 +157,7 @@ describe("ops/status.sh shows the counts of the line OVERLAP topped up as conway
       "openrouter",
       "payto_usdc_base",
       "conway_overlap",
+      "card_orders",
     ]);
   });
 });
