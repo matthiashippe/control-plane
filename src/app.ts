@@ -56,6 +56,7 @@ import {
 } from "./checkout/deliver.js";
 import { converse, ConversationError, findOffer, MAX_QUESTIONS } from "./checkout/conversation.js";
 import { stripeFromEnv } from "./payments/stripe.js";
+import { cardBreaker, cardRedirect, stripCardWay } from "./payments/card-way.js";
 import { isStripeTestKey } from "./payments/stripe-key.js";
 import { germanFrame } from "./public/frame.de.js";
 import { wallets, agentsPerBounty, marketSplit } from "./bounties/ours.js";
@@ -1761,7 +1762,9 @@ export function createApp(opts: AppOptions) {
     // arrived from Conway issue #376 with a German browser, read this page to its last depth
     // mark, and read it in English while /check had been answering in German since that morning.
     const landingLang = langOf("", c.req.header("accept-language"));
+    // The card block (goals/wache/01): gone while the breaker is on, so the page names no way to the checkout then.
     return c.html(
+      stripCardWay(
       germanFirstScreen(
       withOrigin(withCard(indexHtml, "og.png")
         // The box, where the readers are. 171 foreign addresses reached this page over 96 hours
@@ -1799,6 +1802,39 @@ export function createApp(opts: AppOptions) {
       ),
       landingLang,
     ),
+      cardBreaker(db, (opts.now ?? (() => new Date()))()).on,
+    ),
+    );
+  });
+
+  /**
+   * The one way to the card checkout (goals/wache/01). Open checkout: 302 to Digistore24 with the wallet in `custom`. Breaker on
+   * or a wallet that had a refund: the same sentence with the way over USDC, so nobody learns which of the two holds. Without a
+   * usable address a form asks for it with 200, because a 4xx here would count as an error of a real user. Never cached, never
+   * indexed, because the answer changes with the breaker.
+   */
+  app.get("/card/:package", (c) => {
+    c.header("Cache-Control", "no-store");
+    c.header("X-Robots-Tag", "noindex");
+    const way = cardRedirect(db, c.req.param("package"), c.req.query("address"), (opts.now ?? (() => new Date()))());
+    if (way.kind === "unknown_package") return c.text("Not found", 404);
+    if (way.kind === "checkout") return c.redirect(way.url, 302);
+    const head =
+      '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">' +
+      '<meta name="robots" content="noindex"><title>Pay by card</title></head><body>';
+    if (way.kind === "paused") {
+      return c.html(
+        head +
+          `<p>Card payment is paused. Your automaton can still top up with USDC on Base: <a href="${way.topupUrl}">${way.topupUrl}</a></p>` +
+          "</body></html>",
+      );
+    }
+    return c.html(
+      head +
+        `<form method="get"><label>Wallet address of your automaton <input name="address" type="text" placeholder="0x..." ` +
+        'pattern="0x[0-9a-fA-F]{40}" required autocomplete="off" spellcheck="false"></label> ' +
+        `<button type="submit">Pay ${way.pkg.grossEurCents / 100} EUR by card</button></form>` +
+        "</body></html>",
     );
   });
 
