@@ -9,7 +9,7 @@ ops/relink-comments.py; this file only says what a body becomes.
 
 An old link is a match of `(https?://)?(www\\.)?(postyourprice\\.com|cp\\.hippe\\.eu)(/<path>)?`, case does not matter. The path
 stops at whitespace, `)`, `]`, `>`, `"`, `'` and a backtick, and `.`, `,`, `;`, `:`, `!`, `?` at its end belong to the sentence,
-not to the link. The host must not be glued to a longer name (`api.postyourprice.com`, `x@cp.hippe.eu`, `postyourprice.community`).
+not to the link. The host must not be glued to a longer name (`api.postyourprice.com`, a mail address at `cp.hippe.eu`, `postyourprice.community`).
 
   - in prose without a path or with the path `/`: `https://automatonhost.com/errors/<slug>`, with `slug` None the home page
   - in prose with a path: `https://automatonhost.com<path>`
