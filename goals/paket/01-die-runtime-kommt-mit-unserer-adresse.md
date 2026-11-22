@@ -1,7 +1,7 @@
 # Paket Goal 01: Die Runtime kommt mit unserer Adresse
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Seit dem 11.11.2026 kam im Repo `Conway-Research/automaton` kein neues Issue (letztes #447 am 10.11.), unsere Antworten dort
@@ -87,7 +87,7 @@ MVP: Kauf, weil ohne neuen Kanal kein weiterer zahlender Automaton ankommt und d
       (heute nennt die Beschreibung nur Fixes, die Website-Adresse ist leer). Nur Beschreibung und Website, nie die Sichtbarkeit.
       MVP: Kauf, weil die Beschreibung das Erste ist, was ein Betreiber vom Paket sieht, und sie heute nicht sagt, wo es sich anmeldet.
       Prüfung (Netz): `gh repo view matthiashippe/automaton --json homepageUrl,description -q 'select(.homepageUrl == "https://automatonhost.com" and (.description | test("automatonhost\\.com")) and (.description | test("[\u2013\u2014]") | not)) | "ok"'` muss `ok` ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Jeder neue Test im Fork war vor seiner Änderung rot; die Zeile im Progress Log nennt, womit.
@@ -114,5 +114,6 @@ MVP: Kauf, weil ohne neuen Kanal kein weiterer zahlender Automaton ankommt und d
 - 2026-11-22 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6, 7 gebaut: Fork-PR matthiashippe/automaton#1 (fünf Commits über `4d2f96f`, mit `--merge` gemergt, Historie erhalten) und Release `v0.2.2-maintained.1` mit Voreinstellung `https://automatonhost.com`, Enter im Setup, Vorrang von `CONWAY_API_URL` und gespeicherter Wahl, `User-Agent: automaton-maintained/<version>`, Fix des Token-Zählers (am Pin hing `context-hardening.test.ts`, `pnpm test` endete nie) und `dist/` im Repo, weil npm 10 und 11 eine Git-Abhängigkeit mit `prepare` global nicht installieren können (`goals/paket/ANNAHMEN.md`); dazu `docs/paket/anleitung.md`, README und ein Vorschlag für die Startseite. Rot vor der Änderung: `default-control-plane.test.ts` 6 von 8 rot (die zwei Vorrang-Tests rot mit gepflanzter Mutation in `loadConfig`), `token-counter-long-runs.test.ts` hing bis zum Timeout, `maintained-user-agent.test.ts` 5 von 5 rot, `dist-in-sync.test.ts` rot ohne `dist/` und mit einer veränderten Datei darin. Prüfbefehle: P1 `gh api …config.ts` -> 1 (Gegenprobe am alten Stand `4d2f96f` -> 0), P1 Klon mit install, build, test -> gruen (73 Dateien, 1682 Tests), P2 -> 2 (Gegenprobe -> 0), P3 -> 0 (Gegenprobe -> 3), P4 `npm install -g … --version` -> 1, P4 `gh release view` -> v0.2.2-maintained.1, P5 -> 1, 2, 2, P6 -> 8 und `anleitung.md:0`, `ANNAHMEN.md:0`, P7 `node scripts/check.mjs` -> Exit 0 (254 Dateien, 2623 Tests); Fork-CI am PR grün auf Node 20 und 22.
 - 2026-11-22 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, 7, nach Merge von `dev` (7605368) in den Goal-Branch. Prüfbefehle: P1 `gh api …config.ts` -> 1, P1 Klon mit install, build, test -> gruen, P2 -> 2, P3 -> 0, P4 `npm install -g … --version` -> 1, P4 `gh release view` -> v0.2.2-maintained.1, P5 -> 1, 2, 2, P6 -> 8 und `anleitung.md:0`, `ANNAHMEN.md:0`, P7 `node scripts/check.mjs` -> Exit 0 (254 Dateien, 2623 Tests); der Diff gegen `dev` berührt den Laufzeitpfad nicht (nur README, Doku, Goal-Datei, ANNAHMEN, ein Vorschlag).
 - 2026-11-22 Zyklus 3: Punkt 8 gebaut, Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, 7, 8: Beschreibung von `matthiashippe/automaton` nennt jetzt `automatonhost.com` (Englisch, ohne Gedankenstrich), Website-Adresse `https://automatonhost.com`, Sichtbarkeit unverändert PUBLIC; per `gh repo edit --homepage --description`. Prüfbefehle: P8 `gh repo view … -q 'select(…) | "ok"'` vorher leer (rot), nachher `ok`, Gegenprobe mit gepflanztem U+2014 in der Beschreibung -> keine Ausgabe; P1 bis P6 unverändert gegen denselben Tag `v0.2.2-maintained.1` wie in Zyklus 2; P7 `node scripts/check.mjs` -> Exit 0. Job `e2e` am Kopf folgt am PR.
+- 2026-11-22 Release: PASS K und B (Zyklus 3), DONE.
 
 ## Blockers
