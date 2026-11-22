@@ -1,7 +1,7 @@
 # Karte Goal 01: Guthaben per Karte
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Ein Mensch ohne Wallet kann heute bei uns nicht bezahlen: Guthaben kommt nur als USDC über x402 auf Base (`/pay/:usd`), und der Weg
@@ -198,7 +198,7 @@ MVP: Funktion, weil erst dann ein Mensch ohne Wallet bei uns bezahlen kann.
       Prüfung: `grep -cF "a payment ipn after its refund books nothing" test/digistore-ipn.test.ts` muss genau 1 ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/digistore-ipn.test.ts -t "a payment ipn after its refund books nothing"` muss Exit-Code 0 haben.
       Prüfung: `grep -c "speichert nichts" goals/karte/ANNAHMEN.md` muss 0 ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Kein Kauf, kein Testkauf, keine Rückerstattung, kein `ipnSetup`, kein Einreichen zur Freigabe und kein POST an
@@ -225,5 +225,6 @@ MVP: Funktion, weil erst dann ein Mensch ohne Wallet bei uns bezahlen kann.
 - 2026-11-22 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6, 7, 8 gebaut: IPN-Annahme `src/payments/digistore.ts` mit Tabelle `card_orders` und Ledger-Art `card_reversal`, Routen `GET`/`POST /pay/digistore` vor `/pay/:usd`, Kurslauf alle 10 Minuten in `src/index.ts`, `ops/digistore.mjs` (per `--create` im Konto angelegt: 771278 credit 5 EUR, 771279 credit 20 EUR, 771280 credit 50 EUR; `--report` meldet Rückgabe 14 Tage als Mangel), `ops/card-orders.sh` mit Zeile in `ops/status.sh`, Vorschlag `goals/_vorschlaege/karte-kritik-2026-11-22-1.md`, `goals/karte/ANNAHMEN.md`. Rot gesehen: vor dem Anlegen 10 der 15 Fälle von `test/digistore-ipn.test.ts` mit leeren Produkt-IDs, danach jeder der 14 benannten Fälle einzeln per Mutation (Signatur immer gültig, Kennwortlänge ungeprüft, GET-Route entfernt, Sortierung `localeCompare`, fremdes Produkt angenommen, Kurs des Folgetags, alle drei Sperren gegen Doppelbuchung entfernt, Testmodus als live, Adresse ungeprüft, EZB-Ausfall als `unassigned`, Rücknahme ohne Deckel, zweite Rücknahme nach `reversed`, Adresse im Log); `--selftest` rot bei vier Mutationen (Sperre `PROTECTED`, Rückgabe-Prüfung, Maskierung, Anlegen trotz vorhandenem Produkt); `test/card-orders.test.ts` rot vor dem Skript (Exit 127) und je Fall per Mutation. Prüfbefehle: Punkt 1 vitest Exit 0, Namen nichts fehlt, `parseFloat|toFixed|Number(` 0, `timingSafeEqual` 2, `"card_reversal"` 1; Punkt 2 `vorher`, 16 Testdateien mit 182 Tests Exit 0, fremde Dateien unter `src/payments` und `src/auth` 0; Punkt 3 `SELFTEST OK`, Schalter nichts fehlt, `postyourprice` 0, IDs 8; Punkt 4 (Netz) 3 Zeilen, `ids: match` 1, `productId` 3; Punkt 5 `syntax ok`, vitest Exit 0, 7 Fälle, `readonly: true` 2, Schreibwörter 0, `status.sh` 3, (Netz) 3 Zeilen (`ipn_passphrase missing`, Tabelle vor dem Rollout leer); Punkt 6 `belegt`, Annahmen 7; Punkt 7 Adressen 0, Dateinamen 0; Punkt 8 `check` Exit 0 (251 Testdateien, 2593 Tests).
 - 2026-11-22 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, 7, 8; `origin/dev` (b974687) ist schon im Branch, kein Merge nötig. Prüfbefehle: Punkt 1 vitest Exit 0 (15 Tests), Namen nichts fehlt, `parseFloat|toFixed|Number(` 0, `timingSafeEqual` 2, `"card_reversal"` 1; Punkt 2 `vorher`, vitest Exit 0 (182 Tests), fremde Dateien unter `src/payments` und `src/auth` 0; Punkt 3 `SELFTEST OK`, Schalter nichts fehlt, `postyourprice` 0, IDs 8; Punkt 4 (Netz) 3 Zeilen, `ids: match` 1, `productId` 3 (`--report` meldet weiter Rückgabe 14 Tage als Mangel, Handgriff für karte 02); Punkt 5 `syntax ok`, vitest Exit 0 (7 Tests), 7 Fälle, `readonly: true` 2, Schreibwörter 0, `status.sh` 3, (Netz) 3 Zeilen; Punkt 6 `belegt`, Annahmen 7; Punkt 7 Adressen 0, Dateinamen 0; Punkt 8 `check` Exit 0 (2593 Tests); PR #369 am Kopf 279908e Jobs `check` und `e2e` grün.
 - 2026-11-22 Zyklus 3: Punkt 9 gebaut und Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, 7, 8, 9: `reverse` in `src/payments/digistore.ts` legt für eine Bestellung ohne Zeile eine Zeile `reversed` ohne Adresse und ohne Buchung an, die nachgeschickte `on_payment` trifft sie und bucht nichts; Annahme in `goals/karte/ANNAHMEN.md` angepasst. Rot gesehen: `a payment ipn after its refund books nothing` vor dem Fix (keine Zeile nach der Rückerstattung, `expected [] to have a length of 1`). Prüfbefehle: Punkt 9 Name 1, vitest `-t` Exit 0, `speichert nichts` 0; Punkt 1 vitest Exit 0 (16 Tests), Namen nichts fehlt, `parseFloat|toFixed|Number(` 0, `timingSafeEqual` 2, `"card_reversal"` 1; Punkt 2 `vorher`, vitest Exit 0 (182 Tests), fremde Dateien 0; Punkt 3 `SELFTEST OK`, Schalter nichts fehlt, `postyourprice` 0, IDs 8; Punkt 4 (Netz) 3 Zeilen, `ids: match` 1, `productId` 3; Punkt 5 `syntax ok`, vitest Exit 0, 7 Fälle, `readonly: true` 2, Schreibwörter 0, `status.sh` 3, (Netz) 3 Zeilen; Punkt 6 `belegt`, Annahmen 7; Punkt 7 Adressen 0, Dateinamen 0; Punkt 8 `check` Exit 0 (152 s).
+- 2026-11-22 Release: PASS K und B (Zyklus 3), DONE.
 
 ## Blockers
