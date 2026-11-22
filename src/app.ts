@@ -785,8 +785,10 @@ export function createApp(opts: AppOptions) {
   // The catalogue has five (HAN-14, 2026-09-30), for the same reason /fix has its own: a person
   // who scrolled / and then opened /katalog must not count as having read the catalogue.
   // `katalog-top` is the control in the first screen; the others sit after each offer and at the end.
+  // `card` sits in the card block right after the move block (goals/karte/02): a click on one of its buttons leaves for the
+  // checkout of Digistore24 without a trace here, so its views are what this side can count.
   for (const mark of [
-    "top", "proof", "market", "close", "end",
+    "top", "proof", "market", "close", "end", "card",
     "fix-top", "fix-stop", "fix-think", "fix-us",
     "katalog-top", "katalog-1", "katalog-2", "katalog-3", "katalog-end",
   ]) {
