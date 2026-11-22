@@ -27,14 +27,41 @@ export interface CardPackage {
   productId: string;
   grossEurCents: number;
   label: string;
+  /** The vendor share of a real test order of this product in EUR cents (goals/karte/02), measured, never estimated. */
+  vendorEurCents: number;
+  /** The credit page, README, plugin and checkout name before the purchase: floor(vendorEurCents * CARD_RATE_E4 / 1e6). */
+  aboutCreditUsd: number;
 }
 
+/**
+ * USD per EUR times 10000 for the credit named before the purchase: the lowest USD rate in eurofxref-hist-90d.xml of the ECB on
+ * 2026-11-22 (1.0968 of 2026-11-18). The IPN books with the rate of the day of the order, so the credit is "about" this much.
+ */
+export const CARD_RATE_E4 = 10968;
+
+/**
+ * Vendor share per product, from `ops/card-orders.sh --test-vendor` after the test orders of 2026-11-22. A buyer from a country
+ * with a higher VAT gets somewhat less, hence "about". Kept apart from the list below, because ops/digistore.mjs reads and writes
+ * each package of that list as exactly `{ productId, grossEurCents, label }`.
+ */
+const MEASURED: Readonly<Record<string, { vendorEurCents: number; aboutCreditUsd: number }>> = {
+  "771278": { vendorEurCents: 280, aboutCreditUsd: 3 },
+  "771279": { vendorEurCents: 1423, aboutCreditUsd: 15 },
+  "771280": { vendorEurCents: 3707, aboutCreditUsd: 40 },
+};
+
 /** The three packages, created in the vendor account with ops/digistore.mjs --create. */
-export const CARD_PACKAGES: readonly CardPackage[] = [
+const LISTED = [
   { productId: "771278", grossEurCents: 500, label: "credit 5 EUR" },
   { productId: "771279", grossEurCents: 2000, label: "credit 20 EUR" },
   { productId: "771280", grossEurCents: 5000, label: "credit 50 EUR" },
-];
+] as const;
+
+export const CARD_PACKAGES: readonly CardPackage[] = LISTED.map((p) => {
+  const m = MEASURED[p.productId];
+  if (!m) throw new Error(`no measured vendor share for product ${p.productId}`);
+  return { ...p, ...m };
+});
 
 /**
  * The link to the checkout of `pkg` for `address` (goals/karte/02), straight to Digistore24, because its review only accepts

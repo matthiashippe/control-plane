@@ -96,3 +96,21 @@ describe("the policy of the page", () => {
     expect(csp).toContain("default-src 'none';");
   });
 });
+
+describe("the credit of each package", () => {
+  it("computes the credit of each package from its measured vendor share", async () => {
+    const { CARD_RATE_E4 } = await import("../src/payments/digistore.js");
+    expect(Number.isInteger(CARD_RATE_E4)).toBe(true);
+    expect(CARD_RATE_E4).toBeGreaterThan(5000);
+    for (const p of CARD_PACKAGES) {
+      expect(Number.isInteger(p.vendorEurCents), p.productId).toBe(true);
+      expect(p.vendorEurCents, p.productId).toBeGreaterThan(0);
+      expect(p.vendorEurCents, p.productId).toBeLessThan(p.grossEurCents);
+      expect(p.aboutCreditUsd, p.productId).toBe(Math.floor((p.vendorEurCents * CARD_RATE_E4) / 1_000_000));
+      expect(p.aboutCreditUsd, p.productId).toBeGreaterThan(0);
+    }
+    // A bigger package never gives less credit than a smaller one.
+    const credits = CARD_PACKAGES.map((p) => p.aboutCreditUsd);
+    expect([...credits].sort((a, b) => a - b)).toEqual(credits);
+  });
+});

@@ -1,7 +1,7 @@
 # Karte Goal 02: Der Weg zur Kasse
 
 ## Status
-BLOCKED matthias
+ACTIVE
 
 ## Active Objective
 Seit karte 01 nimmt der Dienst Kartengeld von Digistore24 an, aber kein Betreiber kommt zur Kasse: Kunde 1 und der Automaton vom
@@ -150,7 +150,7 @@ sieht. Übernimmt goals/_vorschlaege/karte-kritik-2026-11-22-1.md.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD -- ops/digistore.mjs | wc -l` muss 0 ausgeben.
       Prüfung: `f=~/.config/control-plane/digistore-ipn.txt; [ "$(stat -c %a $f)" = 600 ] && [ "$(tr -d '\n' < $f | wc -c)" = 32 ] && echo bereit` muss genau `bereit` ausgeben.
       Prüfung (Netz): `PATH=/usr/bin:$PATH node ops/digistore-release.mjs --report 2>&1 | grep -cx 'ipn automaton-credit: url https://automatonhost.com/pay/digistore, products 771278,771279,771280, events payment refund chargeback, before thankyou'` muss genau 1 ausgeben.
-- [ ] Nach dem Human Gate ist das Kennwort in der Produktion gesetzt, die Rückgabe steht auf 30 Tagen, und je Produkt kam eine
+- [x] Nach dem Human Gate ist das Kennwort in der Produktion gesetzt, die Rückgabe steht auf 30 Tagen, und je Produkt kam eine
       Testbestellung an, deren Verkäuferanteil das Werkzeug ohne Adresse ausgibt.
       MVP: Funktion, weil Digistore24 die Produkte erst danach freigibt und erst dann ein Kauf Guthaben bucht.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/card-orders.test.ts` muss Exit-Code 0 haben.
@@ -160,7 +160,7 @@ sieht. Übernimmt goals/_vorschlaege/karte-kritik-2026-11-22-1.md.
       Prüfung (Netz): `bash -c 'set -a; . ~/.config/control-plane/loop.env; set +a; ops/card-orders.sh --test-vendor' | grep -cE '^card_test_vendor (771278|771279|771280) [1-9][0-9]*$'` muss genau 3 ausgeben.
       Prüfung (Netz): `node ops/digistore.mjs --report 2>&1 | grep -c ', refund 30 days, '` muss genau 3 ausgeben.
       Prüfung (Netz): `node ops/digistore.mjs --report 2>&1 | grep -cx 'report: 0 defects'` muss genau 1 ausgeben.
-- [ ] Das Guthaben je Paket ist aus dem gemessenen Verkäuferanteil und dem Kurs der EZB gerechnet, und die Regeln von karte 01 für
+- [x] Das Guthaben je Paket ist aus dem gemessenen Verkäuferanteil und dem Kurs der EZB gerechnet, und die Regeln von karte 01 für
       `src/payments/digistore.ts` gelten weiter.
       MVP: Funktion, weil Seite, README und Plugin vor dem Kauf eine Zahl nennen, die stimmen muss.
       Prüfung: `PATH=/usr/bin:$PATH node --import tsx --input-type=module -e 'const d = await import("./src/payments/digistore.ts"); const bad = d.CARD_PACKAGES.filter((p) => !(Number.isInteger(p.vendorEurCents) && p.vendorEurCents > 0 && p.vendorEurCents < p.grossEurCents) || p.aboutCreditUsd !== Math.floor((p.vendorEurCents * d.CARD_RATE_E4) / 1e6) || !(p.aboutCreditUsd > 0)); console.log(Number.isInteger(d.CARD_RATE_E4) && d.CARD_RATE_E4 > 5000 && bad.length === 0 ? "gerechnet" : "falsch")'` muss genau `gerechnet` ausgeben.
@@ -263,7 +263,3 @@ sieht. Übernimmt goals/_vorschlaege/karte-kritik-2026-11-22-1.md.
 - 2026-11-22 Zyklus 1: Punkte 1, 7 und 10 gebaut (ops/digistore-release.mjs, IPN-Verbindung automaton-credit im Konto angelegt, form-action mit der Kasse), dazu ops/card-orders.sh --test-vendor, cardCheckoutUrl und card_url in der 402, zwölf Zeilen in ANNAHMEN.md; danach Human Gate für Kennwort, Rückgabe und Testkauf. Prüfbefehle: Punkt 1 alle sieben wie erwartet (SELFTEST OK, nichts fehlt, exit=1, 0, 0, bereit, 1); Gegenprobe des Selbsttests mit drei gepflanzten Fehlern rot (zweites ipnSetup, zweites Einreichen desselben Stands, Lesen fremder ID); Zählung der Testkäufe gegengeprüft (758179: 5, eigene: 0). Punkt 7 alle vier wie erwartet (nichts fehlt, csp sonst gleich, 0, Valid configuration). Punkt 2 ohne Netz grün (vitest 10 von 10, beide Namen da, 0); die drei neuen Fälle waren vor dem Skript rot; mit Netz `ops/card-orders.sh` ipn_passphrase missing, `--test-vendor` card_test_vendor none, `ops/digistore.mjs --report` refund 14 days, warten auf das Gate. Punkt 10: vitest 114 von 114, card_url 3 Treffer, e2e am PR #378 pass (Kopf 6a875b0, 10m53s), Zähler 1; in test/card-checkout.test.ts war der Fall mit card_url gegen den alten proxy.ts rot, die Wächter für Felder und geschlossene Aufladung rot mit gepflanztem Fehler, der CSP-Fall rot gegen den alten Caddyfile. Punkt 13: check grün in 80 s (2631 Tests). Offen bis nach dem Gate: Punkte 2 bis 6, 8, 9, 11 (brauchen Verkäuferanteil der Testkäufe), 12 und 13 (erst am fertigen Diff).
 
 ## Blockers
-Art: matthias
-Aufgabe: Kennwort der Kartenzahlung in die Produktion legen und ausrollen, Rückgabe der drei Guthaben-Produkte auf 30 Tage stellen, je Produkt einen Testkauf mit Testpay machen.
-Worum: Ohne Kennwort bucht der Dienst keinen Kartenkauf, und Digistore24 gibt die Produkte erst nach Testkauf und mit 30 Tagen Rückgabe frei.
-Empfehlung: 1. Terminal auf dem code-host: set -a; . ~/.config/control-plane/loop.env; set +a; P=$(cat ~/.config/control-plane/digistore-ipn.txt); ssh -i "$CP_SSH_KEY" "$CP_HOST" "grep -q '^CP_DIGISTORE_IPN_PASSPHRASE=' /opt/control-plane/.env || echo 'CP_DIGISTORE_IPN_PASSPHRASE=$P' >> /opt/control-plane/.env" && gh workflow run deploy.yml -R matthiashippe/control-plane --ref dev -f force=true. 2. Backoffice von Digistore24, Produkte 771278, 771279 und 771280: Rückgaberecht 30 Tage, speichern. 3. Je Produkt im selben Chrome wie das Backoffice die Kasse mit Testpay: https://www.checkout-ds24.com/product/771278/?custom=0x0000000000000000000000000000000000000001, https://www.checkout-ds24.com/product/771279/?custom=0x0000000000000000000000000000000000000001, https://www.checkout-ds24.com/product/771280/?custom=0x0000000000000000000000000000000000000001.
