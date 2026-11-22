@@ -28,6 +28,10 @@ werbetrommel rühren, denn viele haben kein crypto“).
 - Ziel in einem Satz: Ein Betreiber ohne Krypto, der auf der Startseite, im README, auf einer Fehlerseite, in der 402 seines
   Automatons oder in unserer Antwort in einem Conway-Issue liest, erfährt im ersten Satz, dass er per Karte, PayPal oder Apple Pay
   zahlen kann, und kommt von dort in einem Klick zur Kasse.
+- Der erste Leser ist fast immer ein Agent: Wer einen Automaton betreibt, lässt ihn von Claude Code oder einer anderen
+  Agenten-Session reparieren. Die liest die 402 im Log, sucht im Netz, liest `/llms.txt` und die Conway-Issues und empfiehlt ihrem
+  Menschen dann einen Satz (Matthias 22.11.2026: „immer dran denken wie kommen die leute auf uns, durch claude code oder agent sessions!“). Jede Stelle ist darum zuerst für einen Agenten
+  geschrieben, der sie weitergibt: ein Satz, den er wörtlich übernehmen kann, mit dem genauen Link.
 - Was danach schneller zu mehr zahlenden fremden Automatons führt: Die Kasse aus karte 02 verkauft nur, wenn Leser ohne Wallet sie
   finden. reichweite 02 lenkt danach unsere Kommentare in den Conway-Issues auf die Fehlerseiten, und die nächste Runde des Topics
   kanal schreibt ihre Antworten aus der Vorlage dieses Goals; beide tragen dann dieselbe Botschaft.
@@ -175,6 +179,23 @@ werbetrommel rühren, denn viele haben kein crypto“).
       Prüfung: `node -e 'const s=require("fs").readFileSync("docs/kanal/antwort-vorlage.md","utf8");const bad=[];if(!/^Disclosure: /m.test(s))bad.push("disclosure");const d=(s.match(/^Disclosure: .*$/m)||[""])[0];const n=s.indexOf("No crypto needed"),u=s.indexOf("USDC");if(n<0||(u>=0&&u<n))bad.push("usdc vor der botschaft");for(const w of ["https://automatonhost.com","PayPal","Apple Pay","https://automatonhost.com/#card","60 days to cancel the purchase"])if(!s.includes(w))bad.push(w);if(!d.includes("https://automatonhost.com"))bad.push("host nicht in der zeile disclosure");if(/cp\.hippe\.eu|postyourprice|checkout-ds24|money back|refund|[\u2013\u2014]/i.test(s))bad.push("fremder host, kasse direkt, money back oder gedankenstrich");console.log(bad.length?bad.join("; "):"vorlage ok")'` muss genau `vorlage ok` ausgeben.
       Prüfung: `grep -qF '"keeps the answer template card first"' test/werbung.test.ts && echo da` muss genau `da` ausgeben.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD -- ops/before-the-answers.py ops/post-the-answers.py ops/answers_args.py goals/kanal | wc -l` muss 0 ausgeben.
+- [ ] Die 402 bei leerem Guthaben trägt zusätzlich das Feld `message_for_operator` mit genau einem Satz, den ein Agent seinem Menschen
+      wörtlich weitergeben kann: `No crypto needed: top up this automaton by card, PayPal or Apple Pay at <Link>`, der Link über die
+      Weiterleitung aus wache 01 mit der Wallet dieses Aufrufs; mit Notschalter an nennt das Feld nur den Weg über USDC. Das Feld kommt
+      dazu, nichts, was die Runtime liest, ändert sich.
+      MVP: Funktion, weil Betreiber ihren Automaton meist von einem Agenten reparieren lassen, der die 402 liest und dann einen Satz
+      empfiehlt (Matthias 22.11.2026: „immer dran denken wie kommen die leute auf uns, durch claude code oder agent sessions!“).
+      Prüfung: `for t in "gives an agent one sentence to pass on in message_for_operator" "names only usdc in message_for_operator while the card breaker is on"; do grep -qF "\"$t\"" test/werbung.test.ts || echo "fehlt: $t"; done` muss nichts ausgeben.
+      Prüfung: `grep -c 'message_for_operator' src/inference/proxy.ts` muss mindestens 1 ausgeben.
+      Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/werbung.test.ts test/messages.test.ts` muss Exit-Code 0 haben.
+- [ ] `/llms.txt` beginnt direkt unter der ersten Überschrift mit einem Block für Agenten, die einem Menschen mit einem kaputten
+      Conway-Automaton helfen: die Fehlertexte, an denen der Agent den Fall erkennt (mindestens `/v1/auth/verify` mit 500 und
+      `INSUFFICIENT_CREDITS`), die eine Zeile für `conwayApiUrl` und `No crypto needed` mit Karte, PayPal, Apple Pay und dem Link zum
+      Formular oder über die Weiterleitung, alles vor dem ersten USDC; mit Notschalter an fehlt die Karte im Block. Der Rest von
+      `/llms.txt` steht darunter wie heute.
+      MVP: Funktion, weil ein Agent mit Websuche `/llms.txt` liest, bevor er seinem Menschen einen Dienst empfiehlt.
+      Prüfung: `for t in "opens llms.txt with the block for agents helping an operator" "drops the card from the llms.txt block while the card breaker is on"; do grep -qF "\"$t\"" test/werbung.test.ts || echo "fehlt: $t"; done` muss nichts ausgeben.
+      Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/werbung.test.ts test/llms-txt.test.ts test/public.test.ts` muss Exit-Code 0 haben.
 - [ ] Keine der fünf Stellen verlinkt die Kasse von Digistore24 direkt, die Entscheidungen stehen in `goals/werbung/ANNAHMEN.md`, der
       Diff bleibt in den Pfaden dieses Goals, kein Test fällt weg, und nichts nennt eine Adresse eines Kunden oder PostYourPrice.
       MVP: Funktion, weil der Notschalter aus wache 01 nur wirkt, wenn jeder Weg zur Kasse über ihn geht.
@@ -192,6 +213,8 @@ werbetrommel rühren, denn viele haben kein crypto“).
 - [ ] Ein Betreiber ohne Krypto liest an jeder der fünf Stellen zuerst, dass sein Automaton per Karte, PayPal oder Apple Pay weiterläuft,
       und kommt von dort in einem Klick zum Formular oder zur Kasse über die Weiterleitung aus wache 01.
 - [ ] Ist der Notschalter an, verspricht weder die Startseite noch die 402 noch eine Fehlerseite eine Kasse.
+- [ ] Ein Agent, der für seinen Menschen einen Conway-Automaton repariert, findet in der 402 und in `/llms.txt` einen Satz, den er
+      weitergeben kann, mit dem Weg per Karte.
 - [ ] Kein Gedankenstrich, kein Name und keine Wallet-Adresse eines Kunden, kein Satz zu PostYourPrice, nichts zu den Bedingungen des
       Einkaufs bei OpenRouter, kein „money back“ und kein Vorbehalt im Verkaufstext.
 
