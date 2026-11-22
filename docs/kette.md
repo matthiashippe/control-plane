@@ -131,6 +131,8 @@ Zahlungsanbieter noch eine eigene Lösung für die Umsatzsteuer.
 - Die Adresse des Automatons reist nur im Parameter `custom` der Kasse und in der IPN; sie steht nie im Repo, in Logs von Actions
   oder in Texten (Grundregel 8). Kein Text nach außen nennt PostYourPrice (Grundsatz umzug).
 
+**Testkauf und Rückgabe ohne Matthias (22.11.2026):** Ein Testkauf braucht keine Anmeldung im Backoffice. `getProduct` liefert `orderform_preview_url` mit dem Schlüssel `testpay`; dieser Link plus `&custom=<adresse>` öffnet die Kasse mit der Zahlart Testpay, auch headless (Playwright), und der Kauf geht ohne Anmeldung durch. So liefen die drei Testkäufe zu karte 02 (Bestellungen XVKLH764, D9VUMT3K, JWZXV2AF); der Dienst legt sie als `test` ab und bucht nichts. Ein Testkauf ist darum nie ein Human Gate. Die Rückgabe von 30 Tagen hängt nicht am Produkt, sondern an der Rückgaberegel 59404 „Automaton credit 30 Tage“ (Backoffice, Meine Produkte, Rückgabe-Regelungen), die 771278, 771279 und 771280 umfasst; `getProduct` zeigt sie als `refund_policy.private.refund_days`. Ein neues Produkt kommt in diese Regel, das geht nur im Backoffice und erledigt die Mac-Session, nie eine Karte an Matthias.
+
 ## umzug: Von PostYourPrice auf automatonhost.com
 
 Grundsatz (Matthias 17.11.2026): Nach außen (Seiten, README, Plugin, PRs, Einträge, Kommentare, Posts) wird PostYourPrice weder genannt
