@@ -5,3 +5,5 @@ Beleg: `git grep -n -E 'status === "created"|"\$status" = created' origin/dev --
 Empfehlung: Eine gemeinsame Falltabelle (Image fehlt, Pin fehlt, Pin einer alten ID, Pin `exited` oder `running`, Pin mit Label `sandboxd=1`, alles passt) in `test/sandboxd-image.test.ts` gegen `imageHealth` und gegen `pin_fact` mit dem nachgebauten `docker` aus dem Selbsttest von `setup.sh` (`fake pin_fact`, `ops/sandbox/setup.sh:937`) laufen lassen, damit eine Abweichung rot wird.
 
 Linse Q, Frage 2.
+
+Übernommen: Watch List in STATE.md, beim nächsten Goal an ops/sandbox/setup.sh oder sandboxd.mjs (2026-11-22)
