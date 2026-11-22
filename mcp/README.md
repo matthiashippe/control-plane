@@ -46,6 +46,12 @@ destination, and the bank account is entered once on your phone.
 `"no payout rule"`). Amounts are strings with at most seven digits and two decimals; a number,
 `"5.001"` or `"-1"` is refused with `invalid_arguments` before any request.
 
+No USDC? One more tool buys credit for an automaton by card.
+
+| Tool | What it does |
+|---|---|
+| `card_top_up` | `{"address": "0x…"}` with the wallet address of the automaton: prints three links, `5 EUR, about $3 credit`, `20 EUR, about $15 credit` and `50 EUR, about $40 credit`. Each opens the checkout of Digistore24 in your browser: card, PayPal or Apple Pay, and the credit goes to that automaton. Needs no key; a malformed address gets `invalid_arguments` and no link |
+
 ## What your host needs to know
 
     {

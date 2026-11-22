@@ -3,12 +3,14 @@
  * MCP server for this control plane: the bounty market and the automatons.
  *
  * One file, no dependencies, no build step. An agent host that speaks MCP over stdio runs
- * `node server.mjs` and gets fourteen tools. Six are the bounty market: read the open bounties,
+ * `node server.mjs` and gets fifteen tools. Six are the bounty market: read the open bounties,
  * submit work, read back its own submission, run the invention check, read its balance. Five run
  * an automaton (goals/konto/04): start_automaton, automaton_status, automaton_logs,
  * set_daily_limit and stop_automaton. Three move money (goals/konto/05): deposit by card, payout
  * to the person's own bank account and set_payout_rule. None of them takes a destination: the
- * service knows only the bank account the person entered on the phone.
+ * service knows only the bank account the person entered on the phone. One buys credit for an
+ * automaton without USDC (goals/karte/02): card_top_up prints the three links to the checkout of
+ * Digistore24 for its wallet address and makes no request.
  *
  * Environment:
  *   CP_API_KEY   the key from POST /v1/auth/api-keys. Wins over the key file.
@@ -488,6 +490,8 @@ export async function* readServerEvents(body) {
  * amount is above zero is checked by the tool itself, because keep_usd may be "0".
  */
 export const MONEY_PATTERN = "^[0-9]{1,7}(\\.[0-9]{1,2})?$";
+/** A wallet address of an automaton, the only argument of card_top_up. */
+export const ADDRESS_PATTERN = "^0x[0-9a-fA-F]{40}$";
 const MONEY = new RegExp(MONEY_PATTERN);
 export const WEEKDAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
 
@@ -647,7 +651,57 @@ export const AUTOMATON_TOOLS = [
       additionalProperties: false,
     },
   },
+  {
+    name: "card_top_up",
+    description:
+      "Buy credit for an automaton by card, without USDC. Give the wallet address of the automaton and get three links, " +
+      "5, 20 and 50 EUR, each with the credit it gives. A link opens the checkout of Digistore24 in the browser, where the " +
+      "person pays by card, PayPal or Apple Pay, and the credit goes to that automaton. Needs no key and makes no request.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        address: {
+          type: "string",
+          pattern: ADDRESS_PATTERN,
+          description: "the wallet address of the automaton, 0x and 40 hex digits",
+        },
+      },
+      required: ["address"],
+      additionalProperties: false,
+    },
+  },
 ];
+
+/**
+ * The three card packages (goals/karte/02): product at Digistore24, price in EUR cents and the credit in US dollars that page,
+ * README and this tool name before the purchase. This file is plain Node and cannot import src/payments/digistore.ts, so the
+ * list is kept here as well, and test/mcp-card.test.ts holds it equal to CARD_PACKAGES there, number for number.
+ */
+export const CARD_PACKAGES = [
+  { productId: "771278", grossEurCents: 500, aboutCreditUsd: 3 },
+  { productId: "771279", grossEurCents: 2000, aboutCreditUsd: 15 },
+  { productId: "771280", grossEurCents: 5000, aboutCreditUsd: 40 },
+];
+
+/** The link to the checkout of one package for one automaton, the address in lower case in `custom`. Null without an address. */
+export function cardLink(pkg, address) {
+  if (typeof address !== "string" || !new RegExp(ADDRESS_PATTERN).test(address)) return null;
+  return `https://www.checkout-ds24.com/product/${pkg.productId}/?custom=${address.toLowerCase()}`;
+}
+
+/** What card_top_up prints: one line per package, then where the links lead. Null for a malformed address, so never a link. */
+export function cardTopUpText(address) {
+  const lines = [];
+  for (const pkg of CARD_PACKAGES) {
+    const link = cardLink(pkg, address);
+    if (!link) return null;
+    lines.push(`${pkg.grossEurCents / 100} EUR, about $${pkg.aboutCreditUsd} credit: ${link}`);
+  }
+  lines.push(
+    "Each link opens the checkout of Digistore24 in your browser: pay by card, PayPal or Apple Pay, and the credit goes to this automaton.",
+  );
+  return lines.join("\n");
+}
 
 const PHONE_FAILED = {
   burned:
@@ -1123,6 +1177,11 @@ export function createAutomatonTools({
   }
 
   const handlers = {
+    async card_top_up(args) {
+      const text = cardTopUpText(args.address);
+      if (text === null) return invalid("address must be the wallet address of the automaton, 0x and 40 hex digits.");
+      return textResult(scrub(text));
+    },
     async start_automaton(args) {
       const wanted = parseUsd(args.daily_limit_usd);
       if (wanted === null) {
