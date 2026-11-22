@@ -215,8 +215,11 @@ const cleanup = () => {
 cleanup();
 setInterval(cleanup, 60 * 60 * 1000).unref();
 
-// The house job (goals/kunden/11): one open job on the board at all times, on start and every ten minutes after that,
-// so an expired one is replaced within ten minutes. The route posts the next one right after an award.
+// The house job (goals/kunden/11): one open job on the board at all times, scheduled on start and every ten minutes after
+// that, so an expired one is replaced within ten minutes. The route posts the next one right after an award.
+// The first run waits three minutes, like the billing round above. Posting the job creates the operator wallet's row in
+// `wallets` on a fresh database, and the harness (harness/e2e/full.sh) reads the oldest wallet as the runtime's; the
+// runtime registers seconds after the start. In production that row has existed since 2026-09, so only the board waits.
 const houseJob = () => {
   try {
     const r = ensureHouseJob(db);
@@ -225,8 +228,10 @@ const houseJob = () => {
     console.error(`[house] failed: ${err instanceof Error ? err.message : String(err)}`);
   }
 };
-houseJob();
-setInterval(houseJob, 10 * 60 * 1000).unref();
+setTimeout(() => {
+  houseJob();
+  setInterval(houseJob, 10 * 60 * 1000).unref();
+}, 3 * 60 * 1000).unref();
 
 // Who writes the texts of a paid order (HAN-67): the first provider that is not the harness mock,
 // never the mock (HAN-72). No mailer until HAN-44: rows stay `written` and the buyer reads them on
