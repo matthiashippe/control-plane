@@ -1,7 +1,7 @@
 # Reichweite Goal 02: Unsere Kommentare zeigen auf die passende Seite
 
 ## Status
-PLANNED
+ACTIVE
 
 ## Active Objective
 Unsere Kommentare in `Conway-Research/automaton` sind der einzige Weg, auf dem Betroffene heute von den Conway-Issues zu uns
@@ -105,15 +105,15 @@ MVP: Funktion, weil ein Betroffener dann direkt auf der Seite zu seinem Fehler l
   Bezeichner, Testnamen und Ausgaben englisch.
 
 ## Done Condition
-- [ ] `relink` ersetzt jede alte Adresse nach den Regeln aus Entscheidung 2 und lässt jedes andere Zeichen stehen.
+- [x] `relink` ersetzt jede alte Adresse nach den Regeln aus Entscheidung 2 und lässt jedes andere Zeichen stehen.
       MVP: Funktion, weil die Zeile `conwayApiUrl` in Code eine Fehlerseite nie tragen darf und der Text der Kommentare bleiben muss.
       Prüfung: `python3 -I -c 'import sys; sys.path.insert(0, "ops"); from relink_rules import relink; q = chr(96) * 3; t = chr(96); b = "Disclosure: I run Handsel (https://postyourprice.com), see https://cp.hippe.eu/fix, or https://cp.hippe.eu.\n\n" + q + "json\n\"conwayApiUrl\": \"https://postyourprice.com\"\n" + q + "\n\nand " + t + "https://postyourprice.com/v1/status" + t + ", or http://www.postyourprice.com/ here, source https://github.com/matthiashippe/control-plane.\n"; w = lambda o: "Disclosure: I run Handsel (" + o + "), see https://automatonhost.com/fix, or " + o + ".\n\n" + q + "json\n\"conwayApiUrl\": \"https://automatonhost.com\"\n" + q + "\n\nand " + t + "https://automatonhost.com/v1/status" + t + ", or " + o + " here, source https://github.com/matthiashippe/control-plane.\n"; bad = [n for n, ok in [("slug", relink(b, "invalid-or-expired-nonce") == w("https://automatonhost.com/errors/invalid-or-expired-nonce")), ("home", relink(b, None) == w("https://automatonhost.com")), ("none", relink("no old link, https://github.com/x", None) == "no old link, https://github.com/x")] if not ok]; print("relink ok" if not bad else "falsch: " + " ".join(bad))'` muss genau `relink ok` ausgeben.
       Prüfung: `python3 -I -c 'import sys; sys.path.insert(0, "ops"); from relink_rules import relink; b = "See HTTPS://CP.HIPPE.EU/fix; and https://www.postyourprice.com!"; print(relink(b, "credits-never-granted"))'` muss genau `See https://automatonhost.com/fix; and https://automatonhost.com/errors/credits-never-granted!` ausgeben.
-- [ ] `page_for_title` wählt die Seite nach Entscheidung 3, und jeder Slug, den es nennt, steht in `ERROR_PAGES`.
+- [x] `page_for_title` wählt die Seite nach Entscheidung 3, und jeder Slug, den es nennt, steht in `ERROR_PAGES`.
       MVP: Funktion, weil der Link nur dann hilft, wenn er auf den Fehler des Issues zeigt, in dem er steht.
       Prüfung: `python3 -I -c 'import sys; sys.path.insert(0, "ops"); from relink_rules import page_for_title as p; ts = ["Provisioning fails on api.conway.tech: 401 \"Invalid or expired nonce\" and 500 \"Database error\" on POST /v1/auth/verify", "SIWE provisioning fails: /v1/auth/verify returns 500 Database error / 401 Invalid or expired nonce", "$30 USDC paid via EIP-3009 transferWithAuthorization but zero credits delivered - SIWE verify returns 500", "Retry-driven duplicate USDC topups: fresh EIP-3009 nonce + no idempotency key on x402Fetch", "tips for 401", "Conway authentication issue #442"]; print(" ".join(p(x) or "home" for x in ts))'` muss genau `invalid-or-expired-nonce verify-500-database-error credits-never-granted credits-never-granted invalid-or-expired-nonce home` ausgeben.
       Prüfung: `python3 -I -c 'import re, sys; sys.path.insert(0, "ops"); import relink_rules as r; src = set(re.findall(r"slug:\s*\"([a-z0-9-]+)\"", open("src/public/error-pages.ts").read())); used = set(r.SLUGS); print("slugs ok" if used and used <= src and len(used) == 3 else "falsch: " + " ".join(sorted(used - src)))'` muss genau `slugs ok` ausgeben.
-- [ ] `ops/relink-comments.py` ändert im Trockenlauf nichts, ändert mit `--send` nur freigegebene eigene Kommentare per PATCH, liest
+- [x] `ops/relink-comments.py` ändert im Trockenlauf nichts, ändert mit `--send` nur freigegebene eigene Kommentare per PATCH, liest
       jeden zurück, schreibt das Protokoll, postet nie und kennt nur seine Argumente.
       MVP: Funktion, weil unter Matthias' Namen nur der Text erscheinen darf, den der Tech Lead mit seinem Wert freigegeben hat.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/relink-comments.test.ts` muss Exit-Code 0 haben.
@@ -139,7 +139,7 @@ MVP: Funktion, weil ein Betroffener dann direkt auf der Seite zu seinem Fehler l
       Prüfung: `git diff --name-only origin/dev...HEAD -- src ops/post-the-answers.py ops/before-the-answers.py ops/answers_args.py ops/posted-answers.log ops/traffic.sh ops/github-yield.sh ops/error-pages-arrivals.mjs | wc -l` muss `0` ausgeben.
       Prüfung: `git diff --diff-filter=D --name-only $(git merge-base origin/dev HEAD) HEAD -- test | wc -l` muss `0` ausgeben.
       Prüfung: `cat ops/relinked-comments.log ops/relink_rules.py ops/relink-comments.py goals/reichweite/ANNAHMEN.md | grep -cE '0x[0-9a-fA-F]{40}|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[a-z]{2,}'` muss `0` ausgeben.
-- [ ] `check` ist grün.
+- [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
 - [ ] goal-verifier PASS (K und B)
 
@@ -171,5 +171,35 @@ MVP: Funktion, weil ein Betroffener dann direkt auf der Seite zu seinem Fehler l
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-22 Zyklus 1: Punkte 1, 2, 3, 6 gebaut (`ops/relink_rules.py`, `ops/relink-comments.py`, `ops/relinked-comments.log` nur mit Kopf, `test/relink-comments.test.ts` mit Sandkasten `test/relink-sandbox.ts` und Fixture), Trockenlauf gegen GitHub zur Freigabe auf PRO-27822 (29 zu ändern, 1 unverändert, 30 Kommentare), Punkt 4 wartet auf das „ok relink“ des Tech Lead, Punkt 5 offen, weil das Muster `test/relink-[a-z-]+\.ts` die von Punkt 3 verlangte Datei `test/relink-comments.test.ts` nicht zulässt. Jeder der 17 Tests war einmal rot, je mit einer Mutation an `ops/relink_rules.py` oder `ops/relink-comments.py` (etwa Satzzeichen am Pfad nicht abgeschnitten, Code als Fließtext, Reihenfolge der Muster vertauscht, Kontoprüfung, Zählprüfung, Wertprüfung, `ALREADY`, Zurücklesen, Adresse im Protokoll, Vergleich in `--verify`, PATCH ohne `-X`, unbekanntes Argument, Exit 2). Prüfbefehle: Punkt 1 `relink ok` und die erwartete Zeile; Punkt 2 die erwartete Zeile und `slugs ok`; Punkt 3 vitest 17 passed, keine fehlende Testzeile, `exit=1`, `0`; Punkt 4 (Netz) `deployed`, Freigabe-Zeile `1`, Protokoll `0` fremde Zeilen und `0` Änderungen, Rest erst nach der Freigabe; Punkt 5 `7` Zeilen, Pfade `1` (die Testdatei), `0`, `0`, `0`; Punkt 6 `check` grün in 104 s; die 61 Prüfbefehle der fertigen Goals kanal 01 bis 04, kunden 04 und 07 ohne Netz am Kopf von `dev` und nach dem Bau mit gleichen Exit-Codes und Ergebnissen.
+  - https://github.com/Conway-Research/automaton/issues/447#issuecomment-6835431307 page verify-500-database-error sha12 e7234e5f97ad: https://postyourprice.com -> https://automatonhost.com; https://postyourprice.com -> https://automatonhost.com/errors/verify-500-database-error
+  - https://github.com/Conway-Research/automaton/issues/443#issuecomment-6769421243 page home sha12 15a5360da2ff: https://postyourprice.com -> https://automatonhost.com
+  - https://github.com/Conway-Research/automaton/issues/442#issuecomment-6769384327 page verify-500-database-error sha12 8759152fdf91: https://postyourprice.com -> https://automatonhost.com/errors/verify-500-database-error
+  - https://github.com/Conway-Research/automaton/issues/440#issuecomment-6769349738 page invalid-or-expired-nonce sha12 d521faf411dd: https://postyourprice.com -> https://automatonhost.com/errors/invalid-or-expired-nonce
+  - https://github.com/Conway-Research/automaton/issues/435#issuecomment-6520848825 page verify-500-database-error sha12 5b54bb9acfa0: https://postyourprice.com -> https://automatonhost.com/errors/verify-500-database-error
+  - https://github.com/Conway-Research/automaton/issues/434#issuecomment-6789427945 page invalid-or-expired-nonce sha12 7455554d159f: https://postyourprice.com -> https://automatonhost.com; https://postyourprice.com -> https://automatonhost.com/errors/invalid-or-expired-nonce
+  - https://github.com/Conway-Research/automaton/issues/432#issuecomment-6520875093 page invalid-or-expired-nonce sha12 0d86032dba08: https://postyourprice.com -> https://automatonhost.com/errors/invalid-or-expired-nonce
+  - https://github.com/Conway-Research/automaton/issues/430#issuecomment-6789453609 page home sha12 8d78570a50e5: https://postyourprice.com -> https://automatonhost.com; https://postyourprice.com -> https://automatonhost.com
+  - https://github.com/Conway-Research/automaton/issues/427#issuecomment-6789479781 page credits-never-granted sha12 ec08748a4d8d: https://postyourprice.com -> https://automatonhost.com/errors/credits-never-granted
+  - https://github.com/Conway-Research/automaton/issues/419#issuecomment-6520901615 page verify-500-database-error sha12 2a287c864797: https://postyourprice.com -> https://automatonhost.com/errors/verify-500-database-error
+  - https://github.com/Conway-Research/automaton/issues/408#issuecomment-6835502716 page verify-500-database-error sha12 0298be62c02b: https://postyourprice.com -> https://automatonhost.com; https://postyourprice.com -> https://automatonhost.com/errors/verify-500-database-error
+  - https://github.com/Conway-Research/automaton/issues/406#issuecomment-6835466852 page invalid-or-expired-nonce sha12 212011c6a2c4: https://postyourprice.com -> https://automatonhost.com; https://postyourprice.com -> https://automatonhost.com/errors/invalid-or-expired-nonce
+  - https://github.com/Conway-Research/automaton/issues/393#issuecomment-5742781237 page credits-never-granted sha12 40b76337a9ab: https://cp.hippe.eu -> https://automatonhost.com/errors/credits-never-granted
+  - https://github.com/Conway-Research/automaton/issues/392#issuecomment-5781361252 page invalid-or-expired-nonce sha12 41d25213bac8: https://cp.hippe.eu -> https://automatonhost.com/errors/invalid-or-expired-nonce; https://cp.hippe.eu/fix -> https://automatonhost.com/fix
+  - https://github.com/Conway-Research/automaton/issues/390#issuecomment-5748925311 page home sha12 d7221bbd1eb8: https://cp.hippe.eu -> https://automatonhost.com
+  - https://github.com/Conway-Research/automaton/issues/385#issuecomment-5805015103 page home sha12 2916f7e70a59: https://postyourprice.com -> https://automatonhost.com
+  - https://github.com/Conway-Research/automaton/issues/379#issuecomment-5748925721 page verify-500-database-error sha12 b95b595c6352: https://cp.hippe.eu -> https://automatonhost.com/errors/verify-500-database-error
+  - https://github.com/Conway-Research/automaton/issues/377#issuecomment-5742781149 page verify-500-database-error sha12 ae905c8f9593: https://cp.hippe.eu -> https://automatonhost.com/errors/verify-500-database-error; https://cp.hippe.eu -> https://automatonhost.com
+  - https://github.com/Conway-Research/automaton/issues/376#issuecomment-5781362033 page invalid-or-expired-nonce sha12 0210e74e9ba0: https://cp.hippe.eu -> https://automatonhost.com/errors/invalid-or-expired-nonce; https://cp.hippe.eu/fix -> https://automatonhost.com/fix
+  - https://github.com/Conway-Research/automaton/issues/372#issuecomment-5781362775 page verify-500-database-error sha12 dc1b3c6b49b1: https://cp.hippe.eu -> https://automatonhost.com/errors/verify-500-database-error; https://cp.hippe.eu/fix -> https://automatonhost.com/fix
+  - https://github.com/Conway-Research/automaton/issues/359#issuecomment-5889884681 page invalid-or-expired-nonce sha12 0353e4c01e04: https://postyourprice.com -> https://automatonhost.com/errors/invalid-or-expired-nonce; https://postyourprice.com/fix -> https://automatonhost.com/fix
+  - https://github.com/Conway-Research/automaton/issues/356#issuecomment-5889856106 page invalid-or-expired-nonce sha12 27780f0c765a: https://postyourprice.com/fix -> https://automatonhost.com/fix
+  - https://github.com/Conway-Research/automaton/issues/355#issuecomment-5748924904 page invalid-or-expired-nonce sha12 9a3f68a42e6c: https://cp.hippe.eu -> https://automatonhost.com/errors/invalid-or-expired-nonce
+  - https://github.com/Conway-Research/automaton/issues/353#issuecomment-5889830336 page invalid-or-expired-nonce sha12 7cefd53311a6: https://postyourprice.com -> https://automatonhost.com/errors/invalid-or-expired-nonce; https://postyourprice.com/fix -> https://automatonhost.com/fix
+  - https://github.com/Conway-Research/automaton/issues/339#issuecomment-5742781023 page verify-500-database-error sha12 4a38e03cfa6d: https://cp.hippe.eu -> https://automatonhost.com
+  - https://github.com/Conway-Research/automaton/issues/335#issuecomment-5804984649 page home sha12 6c32c58fa015: https://postyourprice.com/v1/status -> https://automatonhost.com/v1/status; https://postyourprice.com -> https://automatonhost.com
+  - https://github.com/Conway-Research/automaton/issues/333#issuecomment-5796242563 page invalid-or-expired-nonce sha12 3be0ca54f422: https://postyourprice.com -> https://automatonhost.com/errors/invalid-or-expired-nonce; https://postyourprice.com/fix -> https://automatonhost.com/fix
+  - https://github.com/Conway-Research/automaton/issues/294#issuecomment-5796218247 page home sha12 26e8f71b12a2: https://postyourprice.com -> https://automatonhost.com; https://postyourprice.com/fix -> https://automatonhost.com/fix
+  - https://github.com/Conway-Research/automaton/issues/293#issuecomment-5796193319 page credits-never-granted sha12 3cb628087073: https://postyourprice.com/fix -> https://automatonhost.com/fix
 
 ## Blockers
