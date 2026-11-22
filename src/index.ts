@@ -42,6 +42,7 @@ import { OpenRouterProvider, openRouterFromEnv } from "./inference/openrouter.js
 import { aliasesFromEnv, Catalog, providersFromEnv } from "./inference/proxy.js";
 import { payConfigFromEnv } from "./payments/pay.js";
 import { settlerFromEnv } from "./payments/settler.js";
+import { bookPendingCardOrders } from "./payments/digistore.js";
 import { stripeFromEnv } from "./payments/stripe.js";
 import { reconcileCheckouts } from "./checkout/index.js";
 import { deliverPaidOrders, deliveryWriter, type Mailer } from "./checkout/deliver.js";
@@ -257,6 +258,18 @@ const reconcile = async () => {
 };
 void reconcile();
 setInterval(() => void reconcile(), 5 * 60 * 1000).unref();
+
+// Card orders of Digistore24 that came in while the ECB could not be reached (goals/karte/01): once on start, every ten minutes
+// after that, each booked as soon as its rate is there. Asks the ECB only when an order waits; a failed run is logged, never fatal.
+const cardRates = async () => {
+  try {
+    await bookPendingCardOrders(db);
+  } catch (err) {
+    console.error(`[digistore] pending run failed: ${err instanceof Error ? err.message : String(err)}`);
+  }
+};
+void cardRates();
+setInterval(() => void cardRates(), 10 * 60 * 1000).unref();
 
 const tlsCert = process.env.CP_TLS_CERT;
 const tlsKey = process.env.CP_TLS_KEY;

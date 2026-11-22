@@ -1,7 +1,7 @@
 # Karte Goal 01: Guthaben per Karte
 
 ## Status
-PLANNED
+DONE
 
 ## Active Objective
 Ein Mensch ohne Wallet kann heute bei uns nicht bezahlen: Guthaben kommt nur als USDC über x402 auf Base (`/pay/:usd`), und der Weg
@@ -140,7 +140,7 @@ MVP: Funktion, weil erst dann ein Mensch ohne Wallet bei uns bezahlen kann.
   `POST /pay/digistore` in der Produktion durch einen Agent. Code, Bezeichner, Testnamen, Log-Zeilen und Ausgaben englisch.
 
 ## Done Condition
-- [ ] Der Dienst nimmt die signierte IPN von Digistore24 an, bucht den Verkäuferanteil je Bestellung genau einmal als `topup` zum
+- [x] Der Dienst nimmt die signierte IPN von Digistore24 an, bucht den Verkäuferanteil je Bestellung genau einmal als `topup` zum
       Kurs der EZB vom Kauftag und bucht bei Rückerstattung oder Rückbuchung höchstens das freie Guthaben zurück; ohne Kennwort bucht
       er nichts.
       MVP: Funktion, weil das die Stelle ist, an der Kartengeld zu Guthaben wird, und jeder Fehler hier Geld falsch bucht.
@@ -149,25 +149,25 @@ MVP: Funktion, weil erst dann ein Mensch ohne Wallet bei uns bezahlen kann.
       Prüfung: `grep -cE 'parseFloat|toFixed|Number\(' src/payments/digistore.ts` muss 0 ausgeben.
       Prüfung: `grep -c 'timingSafeEqual' src/payments/digistore.ts` muss mindestens 1 ausgeben.
       Prüfung: `grep -cE '"card_reversal"' src/db.ts` muss mindestens 1 ausgeben.
-- [ ] `GET /pay/digistore` antwortet 200 und landet nie in der Route für x402, und die bestehenden Wege für Guthaben sind unverändert
+- [x] `GET /pay/digistore` antwortet 200 und landet nie in der Route für x402, und die bestehenden Wege für Guthaben sind unverändert
       grün.
       MVP: Funktion, weil Digistore24 die IPN-Verbindung nur auf eine Adresse legt, die auf GET mit 200 antwortet.
       Prüfung: `awk '/app\.(get|post)\("\/pay\/digistore"/{if(!d)d=NR} /app\.get\("\/pay\/:usd"/{if(!u)u=NR} END{print (d>0 && u>0 && d<u) ? "vorher" : "falsch"}' src/app.ts` muss genau `vorher` ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run $(ls test/*.test.ts | grep -E 'pay|topup|checkout|x402')` muss Exit-Code 0 haben.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD -- src/payments src/auth | grep -vx 'src/payments/digistore.ts' | wc -l` muss 0 ausgeben.
-- [ ] `ops/digistore.mjs` legt nur die eigenen drei Produkte an, schreibt nie an ein fremdes Produkt und gibt nie den Schlüssel aus.
+- [x] `ops/digistore.mjs` legt nur die eigenen drei Produkte an, schreibt nie an ein fremdes Produkt und gibt nie den Schlüssel aus.
       MVP: Funktion, weil das Verkäuferkonto mit Personalplaner24, Bautagebuch24 und Aszendent24 geteilt ist.
       Prüfung: `PATH=/usr/bin:$PATH node ops/digistore.mjs --selftest 2>&1 | tail -1` muss genau `SELFTEST OK` ausgeben.
       Prüfung: `for s in --create --report --selftest; do grep -q -- "'$s'" ops/digistore.mjs || echo "missing $s"; done` muss nichts ausgeben.
       Prüfung: `grep -ci 'postyourprice' ops/digistore.mjs` muss 0 ausgeben.
       Prüfung: `grep -oE "'(758179|758180|758181|758954|758955|758956|765137|767706)'" ops/digistore.mjs | sort -u | wc -l` muss genau 8 ausgeben.
-- [ ] Die drei Produkte stehen im Konto mit Preis, Währung EUR, Bestellformular 254538 und Dankeseite, und ihre IDs sind die aus
+- [x] Die drei Produkte stehen im Konto mit Preis, Währung EUR, Bestellformular 254538 und Dankeseite, und ihre IDs sind die aus
       `CARD_PACKAGES`.
       MVP: Funktion, weil ohne Produkte keine Kasse existiert, auf die karte 02 zeigen kann.
       Prüfung (Netz): `node ops/digistore.mjs --report 2>&1 | grep -cE '^product [0-9]+: credit (5|20|50) EUR, EUR (5|20|50)\.00, order form 254538, refund [0-9]+ days, thankyou yes, sales page https://automatonhost\.com/$'` muss genau 3 ausgeben.
       Prüfung (Netz): `node ops/digistore.mjs --report 2>&1 | grep -cx 'ids: match'` muss genau 1 ausgeben.
       Prüfung: `grep -cE 'productId: *"?[0-9]{5,}' src/payments/digistore.ts` muss genau 3 ausgeben.
-- [ ] `ops/card-orders.sh` zählt Kartenkäufe, Fehlbetrag und ob das Kennwort gesetzt ist, liest nur und nennt nie eine Adresse;
+- [x] `ops/card-orders.sh` zählt Kartenkäufe, Fehlbetrag und ob das Kennwort gesetzt ist, liest nur und nennt nie eine Adresse;
       `ops/status.sh` zeigt die Zeilen mit.
       MVP: Funktion, weil die Leitzahl (fremde Käufe per Karte je Woche) und jeder Fehlbetrag sonst unsichtbar bleiben.
       Prüfung: `bash -n ops/card-orders.sh && echo syntax ok` muss `syntax ok` ausgeben.
@@ -177,19 +177,28 @@ MVP: Funktion, weil erst dann ein Mensch ohne Wallet bei uns bezahlen kann.
       Prüfung: `grep -cE '\b(INSERT|UPDATE|DELETE|DROP|ALTER)\b' ops/card-orders.sh` muss 0 ausgeben.
       Prüfung: `grep -c 'card-orders.sh' ops/status.sh` muss mindestens 1 ausgeben.
       Prüfung (Netz): `bash -c 'set -a; . ~/.config/control-plane/loop.env; set +a; ops/card-orders.sh' | grep -cE '^(card_orders live [0-9]+ test [0-9]+ booked [0-9]+ unassigned [0-9]+ pending_rate [0-9]+ reversed [0-9]+|card_shortfall_usd [0-9]+\.[0-9]{2}|ipn_passphrase (set|missing))$'` muss genau 3 ausgeben.
-- [ ] Der Schritt in die Produktion ist festgehalten: ein Vorschlag nennt, was karte 02 zuerst tut (IPN-Verbindung per `ipnSetup`
+- [x] Der Schritt in die Produktion ist festgehalten: ein Vorschlag nennt, was karte 02 zuerst tut (IPN-Verbindung per `ipnSetup`
       auf `https://automatonhost.com/pay/digistore` mit `payment`, `refund` und `chargeback` vor der Dankeseite, das Kennwort in
       `/opt/control-plane/.env` als Handgriff für Matthias mit fertigem Befehl, Rückgabe 30 Tage im Backoffice, falls `--report` sie
       anders meldet, Testkauf je Produkt mit Testpay, einmal einreichen), und die Annahmen stehen fest.
       MVP: Funktion, weil die Produkte erst mit Freigabe verkaufen und dieser Schritt sonst zwischen zwei Goals verloren geht.
       Prüfung: `p=$(ls goals/_vorschlaege/karte-kritik-*.md 2>/dev/null | xargs -r grep -lx 'Goal: karte 01' | head -1); [ -n "$p" ] && head -1 "$p" | grep -qx 'Schwere: 4' && grep -q 'ipnSetup' "$p" && grep -q 'CP_DIGISTORE_IPN_PASSPHRASE' "$p" && grep -qi 'testpay' "$p" && echo belegt || echo fehlt` muss genau `belegt` ausgeben.
       Prüfung: `grep -cE "^- [0-9-]+, karte 01: " goals/karte/ANNAHMEN.md` muss mindestens 4 ausgeben.
-- [ ] Nichts im Repo nennt eine Adresse eines Kunden, das Kennwort oder den Schlüssel.
+- [x] Nichts im Repo nennt eine Adresse eines Kunden, das Kennwort oder den Schlüssel.
       Prüfung: `cat goals/karte/ANNAHMEN.md $(ls goals/_vorschlaege/karte-kritik-*.md 2>/dev/null) | grep -cE '0x[0-9a-fA-F]{40}'` muss 0 ausgeben.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD | grep -ciE '(^|/)\.env|passphrase|ipn-pass'` muss 0 ausgeben.
-- [ ] `check` ist grün.
+- [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] Kommt eine Rückerstattung oder Rückbuchung vor ihrer Zahlungs-IPN an, sperrt sie die Bestellung: Eine danach eintreffende
+      `on_payment` derselben Bestellung (Digistore24 schickt eine gescheiterte IPN bis zu 10 Tage lang nach) bucht nichts. Heute
+      speichert `reverse` in `src/payments/digistore.ts:228` für eine unbekannte Bestellung nichts, und die nachgeschickte Zahlung
+      bucht dann Guthaben für Geld, das der Käufer schon zurückhat. Die Rückerstattung legt dafür eine Zeile mit `status =
+      'reversed'` und ohne Buchung an, und die Zeile in `goals/karte/ANNAHMEN.md` zu Bestellungen ohne Zeile sagt das.
+      MVP: Funktion, weil sonst erstattetes Kartengeld als Guthaben stehen bleibt (Kritik Tech Lead, 22.11.2026).
+      Prüfung: `grep -cF "a payment ipn after its refund books nothing" test/digistore-ipn.test.ts` muss genau 1 ausgeben.
+      Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/digistore-ipn.test.ts -t "a payment ipn after its refund books nothing"` muss Exit-Code 0 haben.
+      Prüfung: `grep -c "speichert nichts" goals/karte/ANNAHMEN.md` muss 0 ausgeben.
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Kein Kauf, kein Testkauf, keine Rückerstattung, kein `ipnSetup`, kein Einreichen zur Freigabe und kein POST an
@@ -213,5 +222,9 @@ MVP: Funktion, weil erst dann ein Mensch ohne Wallet bei uns bezahlen kann.
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-22 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6, 7, 8 gebaut: IPN-Annahme `src/payments/digistore.ts` mit Tabelle `card_orders` und Ledger-Art `card_reversal`, Routen `GET`/`POST /pay/digistore` vor `/pay/:usd`, Kurslauf alle 10 Minuten in `src/index.ts`, `ops/digistore.mjs` (per `--create` im Konto angelegt: 771278 credit 5 EUR, 771279 credit 20 EUR, 771280 credit 50 EUR; `--report` meldet Rückgabe 14 Tage als Mangel), `ops/card-orders.sh` mit Zeile in `ops/status.sh`, Vorschlag `goals/_vorschlaege/karte-kritik-2026-11-22-1.md`, `goals/karte/ANNAHMEN.md`. Rot gesehen: vor dem Anlegen 10 der 15 Fälle von `test/digistore-ipn.test.ts` mit leeren Produkt-IDs, danach jeder der 14 benannten Fälle einzeln per Mutation (Signatur immer gültig, Kennwortlänge ungeprüft, GET-Route entfernt, Sortierung `localeCompare`, fremdes Produkt angenommen, Kurs des Folgetags, alle drei Sperren gegen Doppelbuchung entfernt, Testmodus als live, Adresse ungeprüft, EZB-Ausfall als `unassigned`, Rücknahme ohne Deckel, zweite Rücknahme nach `reversed`, Adresse im Log); `--selftest` rot bei vier Mutationen (Sperre `PROTECTED`, Rückgabe-Prüfung, Maskierung, Anlegen trotz vorhandenem Produkt); `test/card-orders.test.ts` rot vor dem Skript (Exit 127) und je Fall per Mutation. Prüfbefehle: Punkt 1 vitest Exit 0, Namen nichts fehlt, `parseFloat|toFixed|Number(` 0, `timingSafeEqual` 2, `"card_reversal"` 1; Punkt 2 `vorher`, 16 Testdateien mit 182 Tests Exit 0, fremde Dateien unter `src/payments` und `src/auth` 0; Punkt 3 `SELFTEST OK`, Schalter nichts fehlt, `postyourprice` 0, IDs 8; Punkt 4 (Netz) 3 Zeilen, `ids: match` 1, `productId` 3; Punkt 5 `syntax ok`, vitest Exit 0, 7 Fälle, `readonly: true` 2, Schreibwörter 0, `status.sh` 3, (Netz) 3 Zeilen (`ipn_passphrase missing`, Tabelle vor dem Rollout leer); Punkt 6 `belegt`, Annahmen 7; Punkt 7 Adressen 0, Dateinamen 0; Punkt 8 `check` Exit 0 (251 Testdateien, 2593 Tests).
+- 2026-11-22 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, 7, 8; `origin/dev` (b974687) ist schon im Branch, kein Merge nötig. Prüfbefehle: Punkt 1 vitest Exit 0 (15 Tests), Namen nichts fehlt, `parseFloat|toFixed|Number(` 0, `timingSafeEqual` 2, `"card_reversal"` 1; Punkt 2 `vorher`, vitest Exit 0 (182 Tests), fremde Dateien unter `src/payments` und `src/auth` 0; Punkt 3 `SELFTEST OK`, Schalter nichts fehlt, `postyourprice` 0, IDs 8; Punkt 4 (Netz) 3 Zeilen, `ids: match` 1, `productId` 3 (`--report` meldet weiter Rückgabe 14 Tage als Mangel, Handgriff für karte 02); Punkt 5 `syntax ok`, vitest Exit 0 (7 Tests), 7 Fälle, `readonly: true` 2, Schreibwörter 0, `status.sh` 3, (Netz) 3 Zeilen; Punkt 6 `belegt`, Annahmen 7; Punkt 7 Adressen 0, Dateinamen 0; Punkt 8 `check` Exit 0 (2593 Tests); PR #369 am Kopf 279908e Jobs `check` und `e2e` grün.
+- 2026-11-22 Zyklus 3: Punkt 9 gebaut und Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, 7, 8, 9: `reverse` in `src/payments/digistore.ts` legt für eine Bestellung ohne Zeile eine Zeile `reversed` ohne Adresse und ohne Buchung an, die nachgeschickte `on_payment` trifft sie und bucht nichts; Annahme in `goals/karte/ANNAHMEN.md` angepasst. Rot gesehen: `a payment ipn after its refund books nothing` vor dem Fix (keine Zeile nach der Rückerstattung, `expected [] to have a length of 1`). Prüfbefehle: Punkt 9 Name 1, vitest `-t` Exit 0, `speichert nichts` 0; Punkt 1 vitest Exit 0 (16 Tests), Namen nichts fehlt, `parseFloat|toFixed|Number(` 0, `timingSafeEqual` 2, `"card_reversal"` 1; Punkt 2 `vorher`, vitest Exit 0 (182 Tests), fremde Dateien 0; Punkt 3 `SELFTEST OK`, Schalter nichts fehlt, `postyourprice` 0, IDs 8; Punkt 4 (Netz) 3 Zeilen, `ids: match` 1, `productId` 3; Punkt 5 `syntax ok`, vitest Exit 0, 7 Fälle, `readonly: true` 2, Schreibwörter 0, `status.sh` 3, (Netz) 3 Zeilen; Punkt 6 `belegt`, Annahmen 7; Punkt 7 Adressen 0, Dateinamen 0; Punkt 8 `check` Exit 0 (152 s).
+- 2026-11-22 Release: PASS K und B (Zyklus 3), DONE.
 
 ## Blockers
