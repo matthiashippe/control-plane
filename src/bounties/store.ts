@@ -111,6 +111,8 @@ export class BountyError extends Error {
 }
 
 export interface NewBounty {
+  /** Set only by a caller that books against the id before the bounty exists (src/bounties/house.ts). */
+  id?: string;
   creator: string;
   kind: BountyKind;
   brief: string;
@@ -150,7 +152,7 @@ export function createBounty(db: Db, a: NewBounty): Bounty {
     throw new BountyError("deadline_too_far", 400, "The deadline must be within 30 days; a longer one ties up money for nothing.");
   }
 
-  const id = randomUUID();
+  const id = a.id ?? randomUUID();
   const now = new Date().toISOString();
   const creator = a.creator.toLowerCase();
 

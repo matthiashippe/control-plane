@@ -56,6 +56,7 @@ import { createAutomatonService } from "./automaton/service.js";
 import { kontoFromEnv } from "./konto/setup.js";
 import { bridgeFromEnv } from "./konto/bridge.js";
 import { forwarderFixed, runPayoutRules } from "./konto/payout.js";
+import { ensureHouseJob } from "./bounties/house.js";
 
 const port = Number(process.env.CP_PORT || 8402);
 const host = process.env.CP_HOST || "127.0.0.1";
@@ -213,6 +214,19 @@ const cleanup = () => {
 };
 cleanup();
 setInterval(cleanup, 60 * 60 * 1000).unref();
+
+// The house job (goals/kunden/11): one open job on the board at all times, on start and every ten minutes after that,
+// so an expired one is replaced within ten minutes. The route posts the next one right after an award.
+const houseJob = () => {
+  try {
+    const r = ensureHouseJob(db);
+    if (r.posted) console.log("[house] house job posted");
+  } catch (err) {
+    console.error(`[house] failed: ${err instanceof Error ? err.message : String(err)}`);
+  }
+};
+houseJob();
+setInterval(houseJob, 10 * 60 * 1000).unref();
 
 // Who writes the texts of a paid order (HAN-67): the first provider that is not the harness mock,
 // never the mock (HAN-72). No mailer until HAN-44: rows stay `written` and the buyer reads them on

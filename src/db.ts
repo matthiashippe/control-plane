@@ -804,7 +804,10 @@ export interface LedgerEntry {
     // starter pot and never a payout.
     | "sandbox" | "internal_grant"
     // relay is the price of a first contact on the social relay (src/relay/store.ts), one row per message.
-    | "relay";
+    | "relay"
+    // house_fund is the credit behind the house job (src/bounties/house.ts): booked to the operator wallet in the same
+    // transaction as the bounty_hold of that job, exactly its price. Internal credit only, never a payout.
+    | "house_fund";
   deltaMc: number;
   ref?: string;
   meta?: Record<string, unknown>;

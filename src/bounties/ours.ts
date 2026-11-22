@@ -113,6 +113,12 @@ export const OUR_ADDRESSES = [
   LIVE_SANDBOX_ADDRESS,
 ];
 
+/**
+ * The operator wallet, the first entry above. It posted the seed jobs by hand until 2026-10-06 and posts
+ * the house job (src/bounties/house.ts) from code since kunden 11, so every count already calls it ours.
+ */
+export const HOUSE_POSTER = OUR_ADDRESSES[0];
+
 /** SQL LIKE patterns. A key carrying one of these names was provisioned by a tool of ours. */
 export const OUR_KEY_NAMES = [
   "handsel-%",

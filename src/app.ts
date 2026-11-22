@@ -58,6 +58,7 @@ import { stripeFromEnv } from "./payments/stripe.js";
 import { isStripeTestKey } from "./payments/stripe-key.js";
 import { germanFrame } from "./public/frame.de.js";
 import { wallets, agentsPerBounty, marketSplit } from "./bounties/ours.js";
+import { ensureHouseJob, HouseError, isHouseJob, submitHouseReport } from "./bounties/house.js";
 import { renderTerms } from "./public/terms.js";
 import { renderJobs } from "./public/jobs.js";
 import { renderReceipts } from "./public/receipts-page.js";
@@ -3427,6 +3428,34 @@ export function createApp(opts: AppOptions) {
     const b = (typeof raw === "object" && raw !== null ? raw : {}) as Record<string, unknown>;
     if (typeof b.bounty_id !== "string" || !b.bounty_id) {
       return c.json({ error: "bounty_id_required", message: 'Send {"bounty_id": "...", "body": "..."}.', docs: DOC.payments }, 400);
+    }
+    // The house job (goals/kunden/11): a valid report is awarded right here, without a human, and the next house job goes
+    // up at once. Every other bounty takes the path below unchanged.
+    if (isHouseJob(db, b.bounty_id)) {
+      try {
+        const r = submitHouseReport(db, {
+          bountyId: b.bounty_id,
+          agent: c.get("address"),
+          body: typeof b.body === "string" ? b.body : "",
+          feeTo,
+        });
+        try {
+          ensureHouseJob(db);
+        } catch (err) {
+          console.error(`[house] next house job failed: ${err instanceof Error ? err.message : String(err)}`);
+        }
+        const s = r.submission;
+        return c.json(
+          { id: s.id, bounty_id: s.bounty_id, round: s.round, revises: s.revises, created_at: s.created_at, award: "paid", credit_mc: r.creditMc },
+          201,
+        );
+      } catch (e) {
+        if (e instanceof HouseError) {
+          return c.json({ error: e.code, message: e.hint, ...e.extra, docs: DOC.payments }, e.status as 400);
+        }
+        if (e instanceof BountyError) return c.json({ error: e.code, message: e.hint, docs: DOC.payments }, e.status as 400);
+        throw e;
+      }
     }
     try {
       const s = submitWork(db, {
