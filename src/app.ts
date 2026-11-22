@@ -108,6 +108,12 @@ import { automatonNotFound, createAutomatonService, type AutomatonService } from
 import { registerRelay } from "./relay/routes.js";
 import type { Settler } from "./payments/settler.js";
 import {
+  CARD_PAYMENTS_UNAVAILABLE,
+  handleDigistoreIpn,
+  usablePassphrase,
+  type DigistoreDeps,
+} from "./payments/digistore.js";
+import {
   AuthError,
   createApiKey,
   DEFAULT_SIWE_CONFIG,
@@ -198,6 +204,12 @@ export interface AppOptions {
    * the account behind the key needs credit from its spend permission.
    */
   konto?: (KontoDeps & { topUp?: (address: string) => void }) | null;
+  /**
+   * Credit by card over Digistore24 (goals/karte/01, src/payments/digistore.ts). Left out, the passphrase is
+   * CP_DIGISTORE_IPN_PASSPHRASE and the ECB is asked with the global fetch; without a passphrase every POST /pay/digistore
+   * answers 503 and books nothing.
+   */
+  digistore?: Partial<DigistoreDeps> | null;
   /**
    * Bridge (goals/konto/05, src/konto/bridge.ts). Left out or null while CP_BRIDGE_KEY_FILE is unset: then `step: "payout"`,
    * POST /v1/konto/payout and POST /v1/konto/payout-rule answer 503.
@@ -2438,6 +2450,23 @@ export function createApp(opts: AppOptions) {
       docs: DOC.payments,
     };
   };
+
+  // Card orders of Digistore24 (goals/karte/01). Both routes stand before /pay/:usd, so that `digistore` is never read as an
+  // amount. GET is what Digistore24 asks before it saves the IPN connection: 200 and nothing else.
+  const digistoreDeps: DigistoreDeps = {
+    passphrase: process.env.CP_DIGISTORE_IPN_PASSPHRASE,
+    ...(opts.digistore ?? {}),
+    ...(opts.digistore === null ? { passphrase: null } : {}),
+  };
+  app.get("/pay/digistore", (c) => c.text("OK", 200));
+  app.post("/pay/digistore", async (c) => {
+    if (!usablePassphrase(digistoreDeps.passphrase)) return c.json(CARD_PAYMENTS_UNAVAILABLE, 503);
+    const fields: Record<string, string> = {};
+    const raw = await c.req.text().catch(() => "");
+    for (const [k, v] of new URLSearchParams(raw)) fields[k] = v;
+    const res = await handleDigistoreIpn(db, digistoreDeps, fields);
+    return typeof res.body === "string" ? c.text(res.body, res.status) : c.json(res.body, res.status);
+  });
 
   app.get("/pay/:usd", async (c) => {
     const pay = opts.pay ?? null;

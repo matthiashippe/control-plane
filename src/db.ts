@@ -378,6 +378,28 @@ function migrate(db: Db): void {
     );
   }
 
+  // Card orders of Digistore24 (goals/karte/01, src/payments/digistore.ts). One row per order of one of our three products, written
+  // only after the signature of the IPN holds. `address` is null when `custom` carried none; `rate_date` is the day of the order
+  // while the row waits for its rate and the day of the ECB rate it was booked at afterwards. Money in whole cents and millicents.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS card_orders (
+      order_id         TEXT PRIMARY KEY,
+      product_id       TEXT NOT NULL,
+      address          TEXT,
+      mode             TEXT NOT NULL CHECK (mode IN ('live', 'test')),
+      status           TEXT NOT NULL CHECK (status IN ('booked', 'test', 'unassigned', 'pending_rate', 'reversed')),
+      vendor_eur_cents INTEGER,
+      rate_e4          INTEGER,
+      rate_date        TEXT,
+      credited_mc      INTEGER NOT NULL DEFAULT 0,
+      reversed_mc      INTEGER NOT NULL DEFAULT 0,
+      shortfall_mc     INTEGER NOT NULL DEFAULT 0,
+      created_at       TEXT NOT NULL,
+      updated_at       TEXT NOT NULL
+    );
+  `);
+  db.exec("CREATE UNIQUE INDEX IF NOT EXISTS ledger_card_reversal_once ON ledger(ref) WHERE kind = 'card_reversal'");
+
   // Balance right after the credit. Needed so the answer to a repeated payment header does not
   // leak the current balance: that answer is served without an API key.
   // abrechnung 02: the provider that actually answered an aborted call, next to its duration.
@@ -807,7 +829,10 @@ export interface LedgerEntry {
     | "relay"
     // house_fund is the credit behind the house job (src/bounties/house.ts): booked to the operator wallet in the same
     // transaction as the bounty_hold of that job, exactly its price. Internal credit only, never a payout.
-    | "house_fund";
+    | "house_fund"
+    // card_reversal takes back the credit of a card order of Digistore24 after a refund or chargeback (src/payments/digistore.ts),
+    // at most the free credit, so no balance goes negative; one row per order at most.
+    | "card_reversal";
   deltaMc: number;
   ref?: string;
   meta?: Record<string, unknown>;
