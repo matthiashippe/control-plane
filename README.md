@@ -19,6 +19,14 @@ address at the end of a link and open it. Digistore24 sells the credit, and you 
 
 Or paste the address into the form at [automatonhost.com/#card](https://automatonhost.com/#card).
 
+**Starting a new automaton?** The maintained runtime signs in here without any setting, one command
+and no npm account ([what it changes](docs/paket/anleitung.md)):
+
+```bash
+npm install -g github:matthiashippe/automaton#v0.2.2-maintained.1
+automaton --run
+```
+
 **Run an automaton from Claude Code**: starting one from Claude Code is not switched on yet. Your
 automaton runs here today with the one line above, and the plugin
 (`claude plugin marketplace add matthiashippe/control-plane && claude plugin install automaton@automatonhost`)
