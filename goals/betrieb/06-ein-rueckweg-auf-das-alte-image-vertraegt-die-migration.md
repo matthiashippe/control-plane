@@ -1,7 +1,7 @@
 # Betrieb Goal 06: Ein Rückweg auf das alte Image verträgt die Migration
 
 ## Status
-PLANNED
+ACTIVE
 
 ## Active Objective
 Ein Rückweg auf das alte Image nach einem Deploy legt die Handoffs nicht mehr still. Seit konto 12 benennt `src/db.ts` die Spalte
