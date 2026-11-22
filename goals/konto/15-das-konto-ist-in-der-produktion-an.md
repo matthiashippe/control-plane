@@ -1,7 +1,7 @@
 # Konto Goal 15: Das Konto ist in der Produktion an
 
 ## Status
-PLANNED
+PAUSED
 
 ## Active Objective
 Ein Mensch ohne Wallet startet aus Claude Code einen Automaton bei uns und bezahlt ihn per Karte. Heute (beim Schreiben am
@@ -164,3 +164,4 @@ MVP: Funktion, weil erst dann ein Mensch ohne Wallet einen Automaton bei uns sta
 ## Progress Log
 
 ## Blockers
+Entscheidung von Matthias am 2026-11-22: kein Zugang bei MoonPay. konto 15 ruht, bis ein anderer Weg für die Karte feststeht.
