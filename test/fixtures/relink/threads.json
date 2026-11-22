@@ -1,0 +1,313 @@
+{
+ "_comment": "Titles of the 30 issues of 2026-11-22 (goals/reichweite/02); every comment text and the second account are invented.",
+ "issues": [
+  {
+   "number": 447,
+   "title": "Provision: /v1/auth/verify returns 500 Database error"
+  },
+  {
+   "number": 443,
+   "title": "Conway authentication issue #442"
+  },
+  {
+   "number": 442,
+   "title": "Conway Tech SIWE verification returns HTTP 500 after fresh nonce; paid credits inaccessible"
+  },
+  {
+   "number": 440,
+   "title": "Provisioning fails on api.conway.tech: 401 \"Invalid or expired nonce\" and 500 \"Database error\" on POST /v1/auth/verify"
+  },
+  {
+   "number": 435,
+   "title": "SIWE provisioning fails with HTTP 500 Database error"
+  },
+  {
+   "number": 434,
+   "title": "SIWE verification failed: 401"
+  },
+  {
+   "number": 432,
+   "title": "--provision fails: SIWE verification failed (Invalid or expired nonce / 401)"
+  },
+  {
+   "number": 430,
+   "title": "Auto-provision failed"
+  },
+  {
+   "number": 427,
+   "title": "x402 auto-topup paid 10 USDC on-chain but credits never granted (self-hosted pilot; same failure as #408)"
+  },
+  {
+   "number": 419,
+   "title": "Provisioning fails with 500 Database error on /v1/auth/verify"
+  },
+  {
+   "number": 408,
+   "title": "API outage: /v1/auth/verify returns 500 Database error for all valid SIWE signatures (blocks provisioning) + x402 top-up paid on-chain but never credited"
+  },
+  {
+   "number": 406,
+   "title": "--provision fails immediately with \"Invalid or expired nonce\" even with a fresh nonce (22ms round-trip)"
+  },
+  {
+   "number": 393,
+   "title": "Retry-driven duplicate USDC topups: fresh EIP-3009 nonce + no idempotency key on x402Fetch's paid leg (matches #236, #288)"
+  },
+  {
+   "number": 392,
+   "title": "tips for 401"
+  },
+  {
+   "number": 390,
+   "title": "Having trouble installing Automaton"
+  },
+  {
+   "number": 385,
+   "title": "SUGGESTION  Why cant we run automaton with local models and VMs?"
+  },
+  {
+   "number": 379,
+   "title": "SIWE provisioning fails with 500 Database error on /v1/auth/verify"
+  },
+  {
+   "number": 377,
+   "title": "SIWE provisioning fails with 500 Database error"
+  },
+  {
+   "number": 376,
+   "title": "Provisioning fails \u2014 SIWE endpoint not issuing nonce (401 Invalid or expired nonce)"
+  },
+  {
+   "number": 373,
+   "title": "Windows: HOME is unset, so wallet and config land in C:\\root\\.automaton instead of the user profile"
+  },
+  {
+   "number": 372,
+   "title": "SIWE provisioning fails: /v1/auth/verify returns 500 Database error / 401 Invalid or expired nonce"
+  },
+  {
+   "number": 359,
+   "title": "SIWE provisioning fails with \"Invalid or expired nonce\" (401) \u2014 reproducible on latest main"
+  },
+  {
+   "number": 356,
+   "title": "SIWE provisioning fails with \"Invalid or expired nonce\" despite fast round-trip and correct clock"
+  },
+  {
+   "number": 355,
+   "title": "Windows: HOME env var defaults to /root causing invalid paths; SIWE provisioning fails with \"Invalid or expired nonce\" on --provision"
+  },
+  {
+   "number": 353,
+   "title": "Provision fails with SIWE verification: \"Invalid or expired nonce\" (401) on Windows v0.2.1"
+  },
+  {
+   "number": 339,
+   "title": "SIWE provisioning fails: POST /v1/auth/verify returns 500 Database error (fresh wallet)"
+  },
+  {
+   "number": 335,
+   "title": "Is there any verifiable evidence that an Automaton has become self-sustaining?"
+  },
+  {
+   "number": 333,
+   "title": "Do not retry SIWE /verify: single-use nonce masks the real error"
+  },
+  {
+   "number": 294,
+   "title": "I'm encountering a persistent SIWE authentication failure when trying to register my   agent to the Conway platform."
+  },
+  {
+   "number": 293,
+   "title": "$30 USDC paid via EIP-3009 transferWithAuthorization but zero credits delivered - SIWE verify returns 500"
+  }
+ ],
+ "comments": [
+  {
+   "id": 9000,
+   "issue": 447,
+   "user": "matthiashippe",
+   "body": "Invented reply 447: the verify call answers the same here.\n\nDisclosure: I run Handsel (https://postyourprice.com), a paid control plane.\n"
+  },
+  {
+   "id": 9001,
+   "issue": 443,
+   "user": "matthiashippe",
+   "body": "Invented reply 443. Written up at https://cp.hippe.eu/fix, with the steps.\n\nDisclosure: I run Handsel (https://cp.hippe.eu), a paid control plane.\n"
+  },
+  {
+   "id": 9002,
+   "issue": 442,
+   "user": "matthiashippe",
+   "body": "Invented reply 442. One line in `~/.automaton/automaton.json`:\n\n```json\n\"conwayApiUrl\": \"https://postyourprice.com\"\n```\n\nDisclosure: I run PostYourPrice (https://postyourprice.com).\n"
+  },
+  {
+   "id": 9003,
+   "issue": 440,
+   "user": "matthiashippe",
+   "body": "Invented reply 440: the verify call answers the same here.\n\nDisclosure: I run Handsel (https://postyourprice.com), a paid control plane.\n"
+  },
+  {
+   "id": 9004,
+   "issue": 435,
+   "user": "matthiashippe",
+   "body": "Invented reply 435. Written up at https://cp.hippe.eu/fix, with the steps.\n\nDisclosure: I run Handsel (https://cp.hippe.eu), a paid control plane.\n"
+  },
+  {
+   "id": 9005,
+   "issue": 434,
+   "user": "matthiashippe",
+   "body": "Invented reply 434. One line in `~/.automaton/automaton.json`:\n\n```json\n\"conwayApiUrl\": \"https://postyourprice.com\"\n```\n\nDisclosure: I run PostYourPrice (https://postyourprice.com).\n"
+  },
+  {
+   "id": 9006,
+   "issue": 432,
+   "user": "matthiashippe",
+   "body": "Invented reply 432: the verify call answers the same here.\n\nDisclosure: I run Handsel (https://postyourprice.com), a paid control plane.\n"
+  },
+  {
+   "id": 9007,
+   "issue": 430,
+   "user": "matthiashippe",
+   "body": "Invented reply 430. Written up at https://cp.hippe.eu/fix, with the steps.\n\nDisclosure: I run Handsel (https://cp.hippe.eu), a paid control plane.\n"
+  },
+  {
+   "id": 9008,
+   "issue": 427,
+   "user": "matthiashippe",
+   "body": "Invented reply 427. One line in `~/.automaton/automaton.json`:\n\n```json\n\"conwayApiUrl\": \"https://postyourprice.com\"\n```\n\nDisclosure: I run PostYourPrice (https://postyourprice.com).\n"
+  },
+  {
+   "id": 9009,
+   "issue": 419,
+   "user": "matthiashippe",
+   "body": "Invented reply 419: the verify call answers the same here.\n\nDisclosure: I run Handsel (https://postyourprice.com), a paid control plane.\n"
+  },
+  {
+   "id": 9010,
+   "issue": 408,
+   "user": "matthiashippe",
+   "body": "Invented reply 408. Written up at https://cp.hippe.eu/fix, with the steps.\n\nDisclosure: I run Handsel (https://cp.hippe.eu), a paid control plane.\n"
+  },
+  {
+   "id": 9011,
+   "issue": 406,
+   "user": "matthiashippe",
+   "body": "Invented reply 406. One line in `~/.automaton/automaton.json`:\n\n```json\n\"conwayApiUrl\": \"https://postyourprice.com\"\n```\n\nDisclosure: I run PostYourPrice (https://postyourprice.com).\n"
+  },
+  {
+   "id": 9012,
+   "issue": 393,
+   "user": "matthiashippe",
+   "body": "Invented reply 393: the verify call answers the same here.\n\nDisclosure: I run Handsel (https://postyourprice.com), a paid control plane.\n"
+  },
+  {
+   "id": 9013,
+   "issue": 392,
+   "user": "matthiashippe",
+   "body": "Invented reply 392. Written up at https://cp.hippe.eu/fix, with the steps.\n\nDisclosure: I run Handsel (https://cp.hippe.eu), a paid control plane.\n"
+  },
+  {
+   "id": 9014,
+   "issue": 390,
+   "user": "matthiashippe",
+   "body": "Invented reply 390. One line in `~/.automaton/automaton.json`:\n\n```json\n\"conwayApiUrl\": \"https://postyourprice.com\"\n```\n\nDisclosure: I run PostYourPrice (https://postyourprice.com).\n"
+  },
+  {
+   "id": 9015,
+   "issue": 385,
+   "user": "matthiashippe",
+   "body": "Invented reply 385: the verify call answers the same here.\n\nDisclosure: I run Handsel (https://postyourprice.com), a paid control plane.\n"
+  },
+  {
+   "id": 9016,
+   "issue": 379,
+   "user": "matthiashippe",
+   "body": "Invented reply 379. Written up at https://cp.hippe.eu/fix, with the steps.\n\nDisclosure: I run Handsel (https://cp.hippe.eu), a paid control plane.\n"
+  },
+  {
+   "id": 9017,
+   "issue": 377,
+   "user": "matthiashippe",
+   "body": "Invented reply 377. One line in `~/.automaton/automaton.json`:\n\n```json\n\"conwayApiUrl\": \"https://postyourprice.com\"\n```\n\nDisclosure: I run PostYourPrice (https://postyourprice.com).\n"
+  },
+  {
+   "id": 9018,
+   "issue": 376,
+   "user": "matthiashippe",
+   "body": "Invented reply 376: the verify call answers the same here.\n\nDisclosure: I run Handsel (https://postyourprice.com), a paid control plane.\n"
+  },
+  {
+   "id": 9019,
+   "issue": 373,
+   "user": "matthiashippe",
+   "body": "Invented reply 373: set HOME before the first run. Source at https://github.com/matthiashippe/control-plane.\n"
+  },
+  {
+   "id": 9020,
+   "issue": 372,
+   "user": "matthiashippe",
+   "body": "Invented reply 372. One line in `~/.automaton/automaton.json`:\n\n```json\n\"conwayApiUrl\": \"https://postyourprice.com\"\n```\n\nDisclosure: I run PostYourPrice (https://postyourprice.com).\n"
+  },
+  {
+   "id": 9021,
+   "issue": 359,
+   "user": "matthiashippe",
+   "body": "Invented reply 359: the verify call answers the same here.\n\nDisclosure: I run Handsel (https://postyourprice.com), a paid control plane.\n"
+  },
+  {
+   "id": 9022,
+   "issue": 356,
+   "user": "matthiashippe",
+   "body": "Invented reply 356. Written up at https://cp.hippe.eu/fix, with the steps.\n\nDisclosure: I run Handsel (https://cp.hippe.eu), a paid control plane.\n"
+  },
+  {
+   "id": 9023,
+   "issue": 355,
+   "user": "matthiashippe",
+   "body": "Invented reply 355. One line in `~/.automaton/automaton.json`:\n\n```json\n\"conwayApiUrl\": \"https://postyourprice.com\"\n```\n\nDisclosure: I run PostYourPrice (https://postyourprice.com).\n"
+  },
+  {
+   "id": 9024,
+   "issue": 353,
+   "user": "matthiashippe",
+   "body": "Invented reply 353: the verify call answers the same here.\n\nDisclosure: I run Handsel (https://postyourprice.com), a paid control plane.\n"
+  },
+  {
+   "id": 9025,
+   "issue": 339,
+   "user": "matthiashippe",
+   "body": "Invented reply 339. Written up at https://cp.hippe.eu/fix, with the steps.\n\nDisclosure: I run Handsel (https://cp.hippe.eu), a paid control plane.\n"
+  },
+  {
+   "id": 9026,
+   "issue": 335,
+   "user": "matthiashippe",
+   "body": "Invented reply 335. One line in `~/.automaton/automaton.json`:\n\n```json\n\"conwayApiUrl\": \"https://postyourprice.com\"\n```\n\nDisclosure: I run PostYourPrice (https://postyourprice.com).\n"
+  },
+  {
+   "id": 9027,
+   "issue": 333,
+   "user": "matthiashippe",
+   "body": "Invented reply 333: the verify call answers the same here.\n\nDisclosure: I run Handsel (https://postyourprice.com), a paid control plane.\n"
+  },
+  {
+   "id": 9028,
+   "issue": 294,
+   "user": "matthiashippe",
+   "body": "Invented reply 294. Written up at https://cp.hippe.eu/fix, with the steps.\n\nDisclosure: I run Handsel (https://cp.hippe.eu), a paid control plane.\n"
+  },
+  {
+   "id": 9029,
+   "issue": 293,
+   "user": "matthiashippe",
+   "body": "Invented reply 293. One line in `~/.automaton/automaton.json`:\n\n```json\n\"conwayApiUrl\": \"https://postyourprice.com\"\n```\n\nDisclosure: I run PostYourPrice (https://postyourprice.com).\n"
+  },
+  {
+   "id": 8001,
+   "issue": 447,
+   "user": "another-account",
+   "body": "Invented: we point at https://postyourprice.com as well.\n"
+  }
+ ]
+}
