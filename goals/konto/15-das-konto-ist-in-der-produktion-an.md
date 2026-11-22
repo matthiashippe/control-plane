@@ -1,7 +1,7 @@
 # Konto Goal 15: Das Konto ist in der Produktion an
 
 ## Status
-BLOCKED matthias
+PAUSED
 
 ## Active Objective
 Ein Mensch ohne Wallet startet aus Claude Code einen Automaton bei uns und bezahlt ihn per Karte. Heute (beim Schreiben am
@@ -165,6 +165,8 @@ MVP: Funktion, weil erst dann ein Mensch ohne Wallet einen Automaton bei uns sta
 - 2026-11-19 Zyklus 1: Punkt 1 gebaut (`ops/konto-live.sh` liest `konto_accounts` mit 8453 nur lesend im Container, `balanceOf` über den Token aus `dist/konto/config.js`, nur zwei Zeilen hinaus; vier Fälle in `test/konto-live.test.ts`, alle vier gegen die Merge-Basis rot, dazu Gegenproben ohne `chain_id`-Filter, mit verschlucktem RPC- und SSH-Fehler und mit gedruckter Adresse ohne Filter je rot), live gelesen: `accounts 0`, `balance_usd 0.00`, Exit 0, `ops/konto-ready.sh` Exit 1 (vier Pflichtwerte `missing`, `key_file unreadable`); Punkte 2 bis 5 warten auf das Human Gate, Status `BLOCKED matthias`. Prüfbefehle: Punkt 1 `syntax ok`, vitest Exit 0, `4`, `2`, `0`, `3`, `1`, live `2`; Punkt 2 `exit=1`, `1`, `2`; Punkt 3 `0`; Punkt 4 `0` (live.md fehlt), `0`, `1`; Punkt 5 `1`, `0`, `0`, `0`; Punkt 6 `0`, `laufzeit gleich`, `0`, `goals gleich`, `0`, `0`, `check` Exit 0 (2436 Tests), Job `check` am PR #302 `pass` (`1`) nach dem Fix des Stand-ins für `node` auf dem GitHub-Rechner; Punkt 6 bleibt offen, bis der Diff nach dem Gate fertig ist.
 
 ## Blockers
+Entscheidung von Matthias am 2026-11-22: kein Zugang bei MoonPay. konto 15 ruht, bis ein anderer Weg für die Karte feststeht.
+
 Art: matthias
 Gate: security_settings
 Aufgabe: Einmal das Konto im Hauptnetz einschalten und selbst ausprobieren: MoonPay für HTC über Turnkey anlegen, einen neuen Gasschlüssel auf dem Server erzeugen und mit 0,003 ETH auf Base füllen, vier Werte in `/opt/control-plane/.env` eintragen und neu ausrollen, dann aus Claude Code einen Automaton starten, mit Handy und Passkey das Konto anlegen, 25 USD per Karte einzahlen und die Transaktionsnummer von MoonPay als Kommentar an diese Aufgabe schreiben.
