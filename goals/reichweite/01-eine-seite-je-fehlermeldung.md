@@ -1,7 +1,7 @@
 # Reichweite Goal 01: Eine Seite je Fehlermeldung
 
 ## Status
-PLANNED
+ACTIVE
 
 ## Active Objective
 Wer bei Conway hängen bleibt, sucht nach dem genauen Text, den sein Automaton ausgibt, und findet heute höchstens `/fix`, dessen
@@ -105,7 +105,7 @@ Seiten umlenkt.
   neue Test war einmal rot, die Zeile im Progress Log sagt, womit. Code, Bezeichner, Testnamen und Ausgaben englisch.
 
 ## Done Condition
-- [ ] Die sechs SOLL-Bilder der Fehlerseiten und die zwei der Startseite kommen aus ihren Quellen, ohne Netz und ohne Mangel, der
+- [x] Die sechs SOLL-Bilder der Fehlerseiten und die zwei der Startseite kommen aus ihren Quellen, ohne Netz und ohne Mangel, der
       Block `fix` steht ganz im ersten Bildschirm, und die Quellen bauen aus den Bausteinen der Seite.
       MVP: Funktion, weil die Seiten nur nach Bild gebaut werden dürfen und der Betreiber die eine Zeile ohne Scrollen sehen muss.
       Prüfung: `T=$(mktemp -d); FONTCONFIG_FILE=$HOME/.config/control-plane/soll-fonts.conf node ops/soll-errors.mjs --check > $T/o 2>&1; echo "exit=$? $(tail -n 1 $T/o)"; rm -rf $T` muss genau `exit=0 soll errors: 6 images, blocks end 390=<y> 1440=<y>, 0 defects` ausgeben, mit y bei 390 höchstens 844 und bei 1440 höchstens 900.
@@ -115,7 +115,7 @@ Seiten umlenkt.
       Prüfung: `node -e 'const fs=require("fs");const css=(fs.readFileSync("src/public/index.html","utf8").match(/<style[^>]*>[\s\S]*?<\/style>/g)||[]).join("");const q=String.fromCharCode(96);const r=fs.readFileSync("docs/soll/README.md","utf8");const m=r.match(/^## Fehlerseiten \/errors\/\{slug\} \(goals\/reichweite\/01\)$([\s\S]*?)(?=^## |$(?![\s\S]))/m);const sec=m?m[1]:"";const cl=new Set();for(const s of ["verify-500-database-error","invalid-or-expired-nonce","credits-never-granted"]){const f=fs.readFileSync("docs/soll/src/errors-"+s+".html","utf8");for(const x of f.matchAll(/class="([^"]+)"/g))for(const c of x[1].split(/\s+/))if(c)cl.add(c)}const neu=[...cl].filter(c=>!new RegExp("\\."+c.replace(/[.*+?^${}()|[\]\\-]/g,"\\$&")+"(?![\\w-])").test(css));const ohne=neu.filter(c=>!sec.includes(q+"."+c+q));if(!m||ohne.length||neu.length>3){console.error({neu,ohne});process.exit(1)}console.log("bausteine ok neu="+neu.length)'` muss `bausteine ok neu=<n>` mit n höchstens 3 ausgeben.
       Prüfung: `node -e 'const fs=require("fs");const s=fs.readFileSync("docs/soll/src/startseite.html","utf8");const i=s.indexOf("data-soll=\"errors\"");const f=s.lastIndexOf("<footer",i);const blk=i<0?"":s.slice(i,s.indexOf("</footer>",i));const bad=[];if(i<0||f<0||f>i)bad.push("block errors nicht in der fusszeile");for(const x of ["verify-500-database-error","invalid-or-expired-nonce","credits-never-granted"])if(!blk.includes("href=\"/errors/"+x+"\""))bad.push("link "+x);if(bad.length){console.error(bad);process.exit(1)}console.log("fusszeile ok")'` muss `fusszeile ok` ausgeben.
       Prüfung: `B=$(git merge-base origin/dev HEAD); m() { sed -n '/<section class="hero" id="move" data-soll="move">/,/<\/section>/p'; }; a=$(git show $B:docs/soll/src/startseite.html | m | sha256sum); b=$(m < docs/soll/src/startseite.html | sha256sum); [ "$a" = "$b" ] && [ -n "$(m < docs/soll/src/startseite.html)" ] && echo move gleich` muss `move gleich` ausgeben.
-- [ ] Die Auswertung der Fehlerseiten-Bilder lehnt jeden Mangel ab und lässt den sauberen Stand durch, das Werkzeug kennt nur seine
+- [x] Die Auswertung der Fehlerseiten-Bilder lehnt jeden Mangel ab und lässt den sauberen Stand durch, das Werkzeug kennt nur seine
       Argumente, und die übrigen SOLL-Werkzeuge und Bilder bleiben, wie sie sind.
       MVP: Funktion, weil ein Bild, das seine Prüfung nicht in beide Richtungen besteht, kein SOLL ist.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/soll-errors.test.ts test/soll.test.ts test/soll-flags.test.ts` muss Exit-Code 0 haben.
@@ -191,6 +191,7 @@ Seiten umlenkt.
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-22 Zyklus 1: Punkte 1, 2 gebaut (drei SOLL-Quellen und sechs Bilder der Fehlerseiten, Fußzeile der Startseite neu gerendert, `ops/soll-errors.mjs` mit `assessErrors`, `test/soll-errors.test.ts`, `goals/reichweite/ANNAHMEN.md`); Fehlerseiten, Fußzeile in `src/public/index.html` und Messwerkzeug warten auf die Abnahme des Design Reviewers auf PRO-27594. Neue Tests einmal rot: drei Mutationen von `assessErrors` (Block-, Breiten- und Überlaufprüfung aus, alle Prüfungen von `assess` aus, Slug-Prüfung aus) und ohne `ops/soll-errors.mjs`. Prüfbefehle: P1 `soll errors: 6 images, blocks end 390=675 1440=637, 0 defects` exit 0, `soll.mjs --check` exit 0 0 defects, `breiten ok`, `quellen ok`, `bausteine ok neu=0`, `fusszeile ok`, `move gleich`; P2 vitest 3 Dateien grün, 9 Fälle, `--chek` exit=1 und 0, Gegenprobe `never booked` exit=1, beide Umfangszähler 0; P7 ANNAHMEN 8 Zeilen; check grün (252 Dateien, 2603 Tests).
 
 ## Blockers
 keine
