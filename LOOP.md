@@ -163,12 +163,14 @@ kann, und dauert höchstens ein paar Minuten:
 - `server_kauf`: jeder Kauf und jede Aufladung (der Sandbox-Server bei Hostinger, OpenRouter-Guthaben, eine Domain). Die Karte nennt
   Anbieter, Produkt, Preis im Monat, die genauen Klicks und was am Ende dastehen muss (etwa IP und Root-Zugang für den Schlüssel des
   code-host).
-- `public_post`: jeder Kommentar in einem fremden Repo unter Matthias' GitHub-Konto. Der Maker setzt das Goal auf `BLOCKED matthias`
-  mit `Gate: public_post` und legt die fertigen Kommentare unter `## Blockers` ab, je Kommentar Link des Issues und Text, mehrere
-  gebündelt; der Tech Lead prüft sie, der Loop Master legt sie auf Matthias' privates Board. Es geht nur raus, was er mit „ok“ oder
-  seinem eigenen Haken freigibt, Wort für Wort, über `ops/post-the-answers.py`, höchstens drei am Tag. Kairos Haken zählt nie.
 - Passwort, Steuer-, Konto- und Ausweisdaten, Sicherheitseinstellung, SMS-Code, bezahlte Werbung, jede Mail an Dritte
   (`third_party_mail`).
+
+Kommentare in fremden Repos (Matthias 22.11.2026: „ich möchte eigentlich nichts freigeben müssen“, löst das Gate `public_post` ab):
+Der Maker legt die fertigen Kommentare unter `## Progress Log` ab, je Kommentar Link des Issues und Text, und der Tech Lead prüft sie
+in der Kritik gegen `loop-constraints.md` (Grundregel 8, nichts zu PostYourPrice, keine erfundenen Zahlen). Sein „ok“ mit den Werten
+`sha12` ist die Freigabe; gepostet wird Wort für Wort über `ops/post-the-answers.py --send … --approved …`, höchstens drei am Tag,
+danach `--verify-posted`. Keine Karte an Matthias.
 
 Ohne Karte bleiben gesperrt: Merge nach `main` (geht an den Tech Lead), Wallet-Bewegungen, Überweisungen und Trades (nie, auch nicht
 mit Karte), Änderungen an Compose, Cron, `.env` und Datenbank der Produktion außer über `deploy.yml`, Secrets im Repo. Eine Karte hält
