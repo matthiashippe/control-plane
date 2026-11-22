@@ -66,6 +66,34 @@ gestasht oder überschrieben.
 8. **Geht der Start gegen die echte DB doch schief**, wird auf `control-plane:rollback`
    zurückgetaggt und neu gestartet. Die Logs des gescheiterten Containers stehen vorher im
    Protokoll, denn der Container überlebt das Rollback nicht.
+
+   Seit konto 12 heißt die Spalte `handoffs.automaton_name` in der DB `display_name`, und ein Image
+   von davor kann keinen Handoff mehr lesen oder schreiben, obwohl `/health` grün ist. Nach jedem
+   Rückweg auf das alte Image, dem automatischen wie dem von Hand, wird die Spalte deshalb
+   zurückbenannt, solange `PRAGMA table_info(handoffs)` `display_name` zeigt, und zwar bei
+   gestopptem Dienst, damit SQLite die Tabelle nicht unter einem laufenden Prozess ändert. Auf der
+   VM im Verzeichnis der Compose-Datei, in dieser Reihenfolge (beim Rückweg von Hand zuerst das
+   Zurücktaggen):
+
+   ```sh
+   docker tag control-plane:rollback control-plane:latest
+   docker compose -f docker-compose.prod.yml stop cp
+   docker compose -f docker-compose.prod.yml run --rm --no-deps --entrypoint node cp -e '
+     const db = require("better-sqlite3")("/data/cp.db");
+     const columns = db.prepare("PRAGMA table_info(handoffs)").all().map((c) => c.name);
+     if (columns.includes("display_name")) {
+       db.exec("ALTER TABLE handoffs RENAME COLUMN display_name TO automaton_name");
+       console.log("renamed");
+     } else console.log("nothing to do");
+     db.close();'
+   docker compose -f docker-compose.prod.yml up -d --no-deps --force-recreate cp
+   curl -s https://cp.hippe.eu/health
+   ```
+
+   Der nächste Start des neuen Images benennt die Spalte wieder vorwärts um, ohne dass eine Zeile
+   verloren geht; die Zeilen von `handoffs` leben ohnehin nur zehn Minuten. `deploy/rollout-remote.sh`
+   tut das beim automatischen Rückweg noch nicht selbst, das steht als Vorschlag in
+   `goals/_vorschlaege/betrieb-kritik-2026-11-22-1.md`.
 9. **Caddyfile** zuletzt, siehe unten.
 10. **Von außen nachsehen**, ob `https://cp.hippe.eu/health` 200 antwortet. `docker ps` beweist das
     nicht, weil Caddy und TLS dazwischen liegen.
