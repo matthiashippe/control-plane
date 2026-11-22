@@ -189,6 +189,15 @@ MVP: Funktion, weil erst dann ein Mensch ohne Wallet bei uns bezahlen kann.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD | grep -ciE '(^|/)\.env|passphrase|ipn-pass'` muss 0 ausgeben.
 - [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
+- [ ] Kommt eine Rückerstattung oder Rückbuchung vor ihrer Zahlungs-IPN an, sperrt sie die Bestellung: Eine danach eintreffende
+      `on_payment` derselben Bestellung (Digistore24 schickt eine gescheiterte IPN bis zu 10 Tage lang nach) bucht nichts. Heute
+      speichert `reverse` in `src/payments/digistore.ts:228` für eine unbekannte Bestellung nichts, und die nachgeschickte Zahlung
+      bucht dann Guthaben für Geld, das der Käufer schon zurückhat. Die Rückerstattung legt dafür eine Zeile mit `status =
+      'reversed'` und ohne Buchung an, und die Zeile in `goals/karte/ANNAHMEN.md` zu Bestellungen ohne Zeile sagt das.
+      MVP: Funktion, weil sonst erstattetes Kartengeld als Guthaben stehen bleibt (Kritik Tech Lead, 22.11.2026).
+      Prüfung: `grep -cF "a payment ipn after its refund books nothing" test/digistore-ipn.test.ts` muss genau 1 ausgeben.
+      Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/digistore-ipn.test.ts -t "a payment ipn after its refund books nothing"` muss Exit-Code 0 haben.
+      Prüfung: `grep -c "speichert nichts" goals/karte/ANNAHMEN.md` muss 0 ausgeben.
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
