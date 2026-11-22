@@ -1,7 +1,7 @@
 # Karte Goal 02: Der Weg zur Kasse
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Seit karte 01 nimmt der Dienst Kartengeld von Digistore24 an, aber kein Betreiber kommt zur Kasse: Kunde 1 und der Automaton vom
@@ -237,7 +237,7 @@ sieht. Übernimmt goals/_vorschlaege/karte-kritik-2026-11-22-1.md.
       Prüfung: `PATH=/usr/bin:$PATH node --input-type=module -e 'import fs from "node:fs"; const { salesPageState } = await import("./ops/digistore-release.mjs"); const h = fs.readFileSync("src/public/index.html", "utf8"); const a = salesPageState(h); const b = salesPageState(h.replace("about $3 credit", "about $4 credit")); const c = salesPageState(h.replace("Switch in two steps", "Switch in 2 steps")); const d = salesPageState(h.replace(/<section id="card"[\s\S]*?<\/section>/, "")); console.log(typeof a === "string" && a.length > 0 && a !== b && a === c && d === null ? "seite im stand" : "falsch")'` muss genau `seite im stand` ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH node ops/digistore-release.mjs --selftest 2>&1 | tail -1` muss genau `SELFTEST OK` ausgeben, und `--selftest` enthält die Fälle „abgelehnt, Felder gleich, Block geändert: genau ein neues Einreichen“, „abgelehnt, Felder und Block gleich: keins“ und „ohne Block card: keins“.
       Prüfung: `grep -c 'salesPageState(' ops/digistore-release.mjs` muss mindestens 3 ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Ein Betreiber ohne Wallet sieht auf der Startseite gleich nach der Zeile `conwayApiUrl` den Weg zur Karte, gibt die Adresse
@@ -280,5 +280,6 @@ sieht. Übernimmt goals/_vorschlaege/karte-kritik-2026-11-22-1.md.
 - 2026-11-22 Zyklus 7: Abschluss gemeldet, Punkte 1 bis 14. Vorher origin/dev (paket 01, fefdd84) gemergt, Konflikt nur im README: Absatz „No USDC? Pay by card.“ bleibt direkt unter conwayApiUrl, „Starting a new automaton?“ aus dev folgt darunter (Merge 2c2a6f2). Danach alle 47 Prüfzeilen dieses Goals mit demselben Ergebnis wie in Zyklus 6, die sechs Prüfzeilen von paket 01 wie dort verlangt, check grün in 63 s, am Kopf 2c2a6f2 check und e2e am PR #378 pass (Run 45063618316, e2e 10m48s). Offen wie in Zyklus 6: Die Umfangsprüfung aus Punkt 12 trifft allein den Vorschlag des Tech Leads goals/_vorschlaege/karte-kritik-2026-11-22-2.md aus a6397d4.
 - 2026-11-22 Zyklus 8: Rückgabe 60 Tage nach der Entscheidung des Tech Leads (0b52c1e) und der Ansage von Matthias auf dem Topic gebaut, Punkte 1, 2, 4, 8 und 11 wieder abgehakt (Commit ec7415b): `REFUND_DAYS = 60` in ops/digistore.mjs, im Selftest ein neues Produkt mit 14 Tagen als Mangel und 60 ohne Mangel (mit `REFUND_DAYS = 30` schlägt der Selftest an), der Fake in ops/digistore-release.mjs auf 60, README und SOLL der Startseite mit „You have 60 days to cancel the purchase.“; die Bilder ändern sich nur in der Ziffer (65 px bei 390, 62 px bei 1440). „60 days money back“ steht nicht auf der Seite, weil test/public.test.ts „money back“ auf der Startseite sperrt. In der Umfangsliste von Punkt 12 fehlte ops/digistore.mjs, das Punkt 1 und die Deny List seit 0b52c1e zulassen; ergänzt, weil Matthias die Goal-Datei nachziehen ließ. Prüfbefehle: Punkt 1 SELFTEST OK, nichts fehlt, exit=1, 0, 0, bereit, 1; Punkt 2 Exit 0, nichts fehlt, 0, 1, 3, 3 (refund 60 days), 1 (report: 0 defects); Punkt 4 exit=0 0 defects, karte ok, breiten ok, 0, 1; Punkt 8 readme ok, 0; Punkt 11 3 (approval approved je Produkt), release report: 0 defects; Punkt 12 16, 0, 0, 0, 0; Punkt 13 check grün in 57 s; Punkt 14 seite im stand, SELFTEST OK, 3. Offen: Punkt 5 (neue Abnahme angefragt) und Punkt 6 (src/public/index.html und test/card-checkout.test.ts folgen nach der Abnahme).
 - 2026-11-22 Zyklus 9: Abschluss gemeldet, Punkte 1 bis 14. Nach „SOLL abgenommen“ des Design Reviewers für ec7415b (20:32) sagt die Startseite „You have 60 days to cancel the purchase.“ und der Test heißt „says how to pay, who sells and that there are 60 days to cancel“ (Commit 1ab1f42, gegen die alte Seite rot, danach 12 von 12). Danach origin/dev (paket 02, 60 Tage in ROADMAP und docs/kette.md) ohne Konflikt gemergt (407e27b). Prüfbefehle: alle 56 Prüfzeilen der Punkte 1 bis 14 wie verlangt, darunter Punkt 2 3 und 1 (refund 60 days, report: 0 defects), Punkt 5 abnahme ok 3, Punkt 6 exit=0 0 defects und Mutationsprobe exit=1, Punkt 11 release report: 0 defects, Punkt 12 16, 0, 0, 0, 0; check grün in 67 s; die 231 Prüfzeilen fertiger Goals mit denselben Exit-Codes wie vor karte 02; am Kopf 407e27b check und e2e am PR #378 pass (Run 45067454140, e2e 11m02s). Kein `--submit` und kein `--update`, die drei Produkte sind freigegeben.
+- 2026-11-22 Release: PASS K und B (Zyklus 9), DONE.
 
 ## Blockers
