@@ -4,7 +4,8 @@
 //   node ops/digistore-release.mjs '--passphrase'   creates ~/.config/control-plane/digistore-ipn.txt (mode 600) if it is missing
 //   node ops/digistore-release.mjs '--ipn'          creates the IPN connection automaton-credit once; an existing one stays as it is
 //   node ops/digistore-release.mjs '--report'       reads only: the IPN, each product, its test purchase and approval, the defects
-//   node ops/digistore-release.mjs '--submit'       submits each product for approval, once per state and only without a defect
+//   node ops/digistore-release.mjs '--submit'       submits each product for approval, once per state of the product and of the
+//                                                   block card of src/public/index.html, and only without a defect
 //   node ops/digistore-release.mjs '--selftest'     the same flows against a fake account, no network
 //
 // The vendor account is shared with Personalplaner24, Bautagebuch24 and Aszendent24. Writes go only to the three IDs of
@@ -22,6 +23,7 @@ import { PROTECTED, classicApi, idsInSource, mask as maskKey, productVerdict, se
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const SOURCE = join(ROOT, 'src', 'payments', 'digistore.ts')
+const PAGE_FILE = join(ROOT, 'src', 'public', 'index.html')
 const CONFIG = join(homedir(), '.config', 'control-plane')
 export const PASSPHRASE_FILE = join(CONFIG, 'digistore-ipn.txt')
 const SUBMITTED_FILE = join(CONFIG, 'digistore-submitted.json')
@@ -150,6 +152,18 @@ export function stateHash (p) {
   return createHash('sha256').update(JSON.stringify(fields)).digest('hex')
 }
 
+/**
+ * The sales page Digistore24 reviews with the products (salespage_url): the hash of the block card of src/public/index.html with its
+ * buttons, prices, credit and text, or null without the block. Nothing outside the block changes it.
+ */
+export function salesPageState (html) {
+  const start = String(html ?? '').search(/<section id="card"[\s>]/)
+  if (start < 0) return null
+  const end = html.indexOf('</section>', start)
+  if (end < 0) return null
+  return createHash('sha256').update(html.slice(start, end + '</section>'.length)).digest('hex')
+}
+
 const productOf = (d) => d?.product ?? d ?? {}
 const plansOf = (p) => (Array.isArray(p?.paymentplans) ? p.paymentplans : [])
 
@@ -224,7 +238,9 @@ export async function ipn (deps) {
 
 /**
  * --submit: approval_status pending for each product that has no defect but its approval and is neither pending nor approved, at
- * most once per state. The state is written down before the call, so a crash never leads to a second submission.
+ * most once per state. The state is the product (stateHash) and its sales page (salesPageState), so a rejected product goes in once
+ * more after a change of the block card alone. Without the block nothing is submitted. The state is written down before the call,
+ * so a crash never leads to a second submission.
  */
 export async function submit (deps) {
   const r = await readRelease(deps)
@@ -233,6 +249,11 @@ export async function submit (deps) {
   if (blocking.length) {
     for (const d of blocking) deps.log(`defect: ${d}`)
     deps.log(`submit: nothing submitted, ${blocking.length} defects of the ipn`)
+    return 1
+  }
+  const page = salesPageState(deps.page())
+  if (page === null) {
+    deps.log('submit: nothing submitted, src/public/index.html has no block card')
     return 1
   }
   const store = deps.store.read()
@@ -249,12 +270,12 @@ export async function submit (deps) {
       continue
     }
     const hash = stateHash(r.products[id])
-    if (store[id]?.hash === hash) {
+    if (store[id]?.hash === hash && store[id]?.page === page) {
       deps.log(`submit ${id}: this state was submitted already (${store[id].at}), not a second time`)
       continue
     }
     assertOwn(r.own, [id])
-    store[id] = { hash, at: deps.now(), before: status }
+    store[id] = { hash, page, at: deps.now(), before: status }
     deps.store.write(store)
     await deps.api('updateProduct', { product_id: id, 'data[approval_status]': 'pending' })
     sent++
@@ -318,6 +339,10 @@ const SAMPLE = `export const CARD_PACKAGES = [
   { productId: "900103", grossEurCents: 5000, label: "credit 50 EUR" },
 ];`
 const OWN = ['900101', '900102', '900103']
+const PAGE = `<section id="move"><a href="#card">Pay by card</a></section>
+<section id="card" data-soll="card"><form method="get">
+<button class="card pick card-buy" type="submit" formaction="https://www.checkout-ds24.com/product/900101/">5 EUR about $3 credit</button>
+</form></section>`
 
 function goodProduct (id, label, price) {
   const thanks = '<p>Seller of this offer is Digistore24 GmbH. The charge is made by Digistore24. 30 days money back.</p>'
@@ -381,7 +406,7 @@ export async function selftest (print = (l) => console.log(mask(l))) {
     passphraseSecret = first
 
     const deps = (account, extra = {}) => ({
-      api: guarded(account.api, OWN), source: () => SAMPLE, passphrase: () => first, log, now: () => '2026-11-22T12:00:00Z',
+      api: guarded(account.api, OWN), source: () => SAMPLE, page: () => PAGE, passphrase: () => first, log, now: () => '2026-11-22T12:00:00Z',
       store: jsonStore(join(dir, 'submitted.json')), ...extra
     })
 
@@ -426,13 +451,34 @@ export async function selftest (print = (l) => console.log(mask(l))) {
     if (await report(deps(a, { log: (l) => after.push(l) })) !== 0 || after.at(-1) !== 'release report: 0 defects') {
       errors.push(`report after submit: ${after.at(-1)}`)
     }
-    for (const prod of OWN) a.products[prod].approval_status_list[0].approval_status = 'rejected'
+    const reject = () => { for (const prod of OWN) a.products[prod].approval_status_list[0].approval_status = 'rejected' }
+    const updates = () => a.writes().filter((c) => c.fn === 'updateProduct').map((c) => c.params.product_id)
+    // Rejected, fields and block equal: none.
+    reject()
     await submit(deps(a))
-    if (a.writes().filter((c) => c.fn === 'updateProduct').length !== 3) errors.push('submit sent the same state twice')
+    if (updates().length !== 3) errors.push('submit sent the same state twice')
     a.products['900102'].description_en = 'changed after the rejection'
     await submit(deps(a))
-    const resent = a.writes().filter((c) => c.fn === 'updateProduct').slice(3).map((c) => c.params.product_id)
+    const resent = updates().slice(3)
     if (resent.join() !== '900102') errors.push(`changed state submitted: ${resent.join() || 'none'}`)
+    // Rejected, fields equal, block changed: exactly one new submission of each product, then none.
+    reject()
+    const page = PAGE.replace('about $3 credit', 'about $4 credit')
+    if (salesPageState(page) === salesPageState(PAGE)) errors.push('a change in the block card keeps the state of the page')
+    await submit(deps(a, { page: () => page }))
+    const block = updates().slice(4)
+    if (block.join() !== OWN.join()) errors.push(`changed block card submitted: ${block.join() || 'none'}`)
+    reject()
+    await submit(deps(a, { page: () => page }))
+    if (updates().length !== 7) errors.push('submit sent the same block card twice')
+    // Without block card: none, and the log says why.
+    const bare = fakeAccount({ ipn: p })
+    const noBlock = []
+    const html = PAGE.replace(/<section id="card"[\s\S]*?<\/section>/, '')
+    if (salesPageState(html) !== null) errors.push('a page without block card has a state')
+    await submit(deps(bare, { page: () => html, store: jsonStore(join(dir, 'e.json')), log: (l) => noBlock.push(l) }))
+    if (bare.writes().length) errors.push('submit without block card wrote')
+    if (!noBlock.some((l) => l.includes('block card'))) errors.push('submit without block card does not say why')
 
     const b = fakeAccount({ ipn: p, testPurchases: ['900101'], refund: 14 })
     await submit(deps(b, { store: jsonStore(join(dir, 'b.json')) }))
@@ -503,7 +549,7 @@ async function main (argv) {
     return p
   }
   const deps = {
-    api: guarded(classicApi(readKey()), own), source, passphrase, log: say,
+    api: guarded(classicApi(readKey()), own), source, page: () => readFileSync(PAGE_FILE, 'utf8'), passphrase, log: say,
     now: () => new Date().toISOString(), store: jsonStore(SUBMITTED_FILE)
   }
   if (flag === '--ipn') return ipn(deps)
