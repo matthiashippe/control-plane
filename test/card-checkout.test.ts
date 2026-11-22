@@ -187,7 +187,7 @@ describe("the card block of the landing page", () => {
     for (const words of ["Card, PayPal or Apple Pay", "Digistore24 sells this credit", "30 days to cancel the purchase"]) {
       expect(block, words).toContain(words);
     }
-    expect(block).not.toMatch(/[–—]/);
+    expect(block).not.toMatch(/[\u2013\u2014]/);
     expect(block.toLowerCase()).not.toContain("postyourprice");
   });
 
