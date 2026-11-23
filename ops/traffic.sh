@@ -383,6 +383,62 @@ print(f"   other hosts: {other} foreign arrival(s)")
 print()
 ARRIVALS
 
+# Agent fetches (werbung 02, 2026-11-23). An operator whose automaton breaks often hands the problem to an
+# agent session, and an agent that fetches a page for a person names itself in the user agent: Claude-User,
+# ChatGPT-User and the others below. Such a fetch means an agent is reading our page for somebody right now,
+# which is the channel ops/agent-probe.sh asks about. Counted are requests in the window whose user agent holds
+# one of these names as a word (any case); a name in the referer does not count, and neither does a crawler that
+# indexes or trains (ClaudeBot, GPTBot, OAI-SearchBot, PerplexityBot), even if its user agent held a name too.
+# Fetches from our own addresses count and stand apart, because our own probe on the code-host fetches pages
+# too. Only in the full report, and before the first section that prints an address; it prints none itself.
+if (( ! ONLY_FUNNEL )); then
+python3 - "$log" "$since" "$HOURS" <<'AGENTS' || { echo "   (the agent block died; the traceback is above)" >&2; FUNNEL_BROKE=1; }
+import json, os, re, sys
+
+AGENTS = ("Claude-User", "ChatGPT-User", "Perplexity-User", "MistralAI-User", "DuckAssistBot")
+CRAWLERS = ("ClaudeBot", "GPTBot", "OAI-SearchBot", "PerplexityBot")
+
+def word(name):
+    return re.compile(r"(?<![A-Za-z0-9_-])" + re.escape(name) + r"(?![A-Za-z0-9_-])", re.I)
+
+agent_words = [(n, word(n)) for n in AGENTS]
+crawler_words = [word(n) for n in CRAWLERS]
+own = set(os.environ.get("CP_OWN_IPS_RESOLVED", "").split())
+since, hours = float(sys.argv[2]), sys.argv[3]
+
+per_name = {n: 0 for n in AGENTS}
+total = ours = 0
+for raw in open(sys.argv[1], encoding="utf-8", errors="replace"):
+    raw = raw.strip()
+    if not raw.startswith("{"):
+        continue
+    try:
+        r = json.loads(raw)
+        ts = float(r.get("ts"))
+    except (TypeError, ValueError):
+        continue
+    if ts < since:
+        continue
+    q = r.get("request") or {}
+    ua = " ".join((q.get("headers") or {}).get("User-Agent") or [])
+    if not ua or any(c.search(ua) for c in crawler_words):
+        continue
+    name = next((n for n, w in agent_words if w.search(ua)), None)
+    if name is None:
+        continue
+    per_name[name] += 1
+    total += 1
+    if (q.get("remote_ip") or "") in own:
+        ours += 1
+
+print("-- Agent fetches --")
+print(f"   {total} agent fetch(es) in the last {hours} hours, {ours} from our own addresses")
+for n in AGENTS:
+    print(f"      {per_name[n]}  {n}")
+print()
+AGENTS
+fi
+
 # The line every cycle reads first, and the one that did not exist until 2026-09-22.
 #
 # Answering "was a person here" took three scripts and a hand check of every address, five times in
