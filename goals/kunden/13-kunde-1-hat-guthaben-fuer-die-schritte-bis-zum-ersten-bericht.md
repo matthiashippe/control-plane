@@ -102,7 +102,14 @@ MVP: Funktion, weil Kunde 1 ohne ein paar bezahlte Schritte den Bericht nie schr
 - [x] `goals/kunden/ANNAHMEN.md` nennt die Entscheidungen dieses Goals, ohne Adresse.
       Prüfung: `grep -cE "^- [0-9-]+, kunden 13: " goals/kunden/ANNAHMEN.md` muss mindestens 2 ausgeben.
       Prüfung: `cat goals/kunden/ANNAHMEN.md src/bounties/house.ts | grep -cE "([0-9]{1,3}\.){3}[0-9]{1,3}|0x[0-9a-fA-F]{40}"` muss 0 ausgeben.
-- [x] `check` ist grün, und der Job `e2e` am Kopf des Goal-PR ist grün.
+- [ ] Ein Schrittguthaben wird nur gebucht, wenn der verfügbare Saldo und `HOUSE_STEP_MC` zusammen die Reservierung dieses Aufrufs
+      decken; sonst bleibt die 402 Byte für Byte wie auf `origin/dev`, es entsteht keine Zeile `house_step`, und die Adresse bekommt ihr
+      Schrittguthaben beim nächsten Aufruf, den es deckt, mit 200.
+      MVP: Funktion, weil ein gebuchtes Guthaben, das die nächste Inferenz nicht deckt, Kunde 1 sein einziges Schrittguthaben nimmt,
+      ohne dass sein Modell eine Antwort bekommt.
+      Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/house-step.test.ts --reporter=json 2>/dev/null | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const j=JSON.parse(s);const t=j.testResults.flatMap(f=>f.assertionResults).filter(a=>a.status==="passed").map(a=>a.title);console.log([/no step credit when it cannot cover the call/,/step credit kept for a call it covers/].every(r=>t.some(x=>r.test(x)))?"alle":"fehlt")})'` muss `alle` ausgeben.
+      Prüfung: `grep -c "ist die Gutschrift gebucht und die 402 bleibt" goals/kunden/ANNAHMEN.md` muss 0 ausgeben.
+- [ ] `check` ist grün, und der Job `e2e` am Kopf des Goal-PR ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung (Netz): `n=$(gh pr list -R matthiashippe/control-plane --head goal/kunden-13 --state all --json number -q '.[0].number'); gh pr checks "${n:?}" -R matthiashippe/control-plane --json name,state -q '.[] | select(.name=="e2e") | .state'` muss `SUCCESS` ausgeben.
 - [ ] goal-verifier PASS (K und B)
