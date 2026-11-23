@@ -155,6 +155,17 @@ describe("the start page", () => {
     expect(html.split('data-soll="move"')).toHaveLength(2);
   });
 
+  it("shows exactly one first screen while the card breaker is off", async () => {
+    // index.html carries the first screen twice, the one of this goal between the card marks and the one of wache 01 between
+    // the no-card marks; only stripCardWay and keepNoCardWay together leave one of them. A mistyped mark would show both.
+    const html = await get(freshDb(), "/");
+    expect(html.split('data-soll="move"')).toHaveLength(2);
+    expect(html.split('id="move"')).toHaveLength(2);
+    expect(mainOf(html).split("Your automaton runs here.")).toHaveLength(2);
+    expect(html).not.toMatch(/<!--\/?(NO)?CARD-->/);
+    expect(moveOf(html)).toContain(MESSAGE);
+  });
+
   it("leaves the card block of karte 02 as it is", async () => {
     const raw = readFileSync("src/public/index.html", "utf8");
     const start = raw.indexOf('<section id="card" data-soll="card">');
