@@ -36,8 +36,10 @@ MVP: Funktion, weil sonst jeder mit einer neuen Wallet beliebig oft kaufen, verb
   PostYourPrice). Die Annahme der IPN in `src/payments/digistore.ts` baute karte 01; sie bleibt, wie sie ist.
 - **Bestand.** `reverse()` in `src/payments/digistore.ts` setzt eine Live- oder Testbestellung bei `on_refund` und `on_chargeback`
   auf `status = 'reversed'`, schreibt `shortfall_mc` (gutgeschrieben minus zurückgeholt) und `updated_at`; danach ändert keine IPN die
-  Zeile mehr. 1 USD sind 100000 mc (`MC_PER_CENT` ist 1000). Auf `dev` gibt es heute keinen Link zur Kasse von Digistore24 in `src/`,
-  `mcp/` und `README.md` (`grep -rn 'checkout-ds24' src mcp README.md` ist leer); die Wege zur Kasse baut karte 02 nach diesem Goal.
+  Zeile mehr. 1 USD sind 100000 mc (`MC_PER_CENT` ist 1000). karte 02 ist vor diesem Goal gemergt: Auf `dev` führen Startseite
+  (`src/public/index.html`, drei Knöpfe mit `formaction` zu Digistore24, Feld `custom`), 402 (`cardCheckoutUrl` aus
+  `src/payments/digistore.ts` in `src/inference/proxy.ts`), `README.md` (drei Links) und `mcp/server.mjs` (`cardLink`) direkt zur Kasse.
+  Dieses Goal schreibt alle vier auf die Weiterleitung um (Entscheidung 8).
 - **Entscheidungen des Tech Lead (22.11.2026).** Der Maker schreibt jede davon mit Grund als Zeile `- <JJJJ-MM-TT>, wache 01: …` in
   `goals/wache/ANNAHMEN.md`.
   1. **Eine Stelle für die Rechnung.** Neue Datei `src/payments/card-way.ts`, die einzige Datei des Produkts, die den Host
@@ -63,8 +65,8 @@ MVP: Funktion, weil sonst jeder mit einer neuen Wallet beliebig oft kaufen, verb
      klare Wörter, keine Begründung, kein Vorbehalt.
   4. **Startseite und 402.** `/` in `src/app.ts` reicht den fertigen Text durch `stripCardWay(html, cardBreaker(db, now).on)`: Solange
      der Notschalter an ist, fällt alles zwischen `<!--CARD-->` und `<!--/CARD-->` samt der Marken weg, sonst fallen nur die Marken weg.
-     Heute steht keine Marke in `src/public/index.html`, also bleibt die Seite gleich; karte 02 setzt seinen Block zwischen diese
-     Marken und holt `card_url` der 402 aus `cardUrlFor`. `src/public/index.html` und `src/inference/proxy.ts` ändert dieses Goal nicht.
+     Die Marken setzt dieses Goal um den Block `#card` der Startseite, und `card_url` der 402 kommt aus `cardUrlFor`
+     (Entscheidung 8).
   5. **Messwerkzeug** `ops/card-breaker.sh` nach dem Muster von `ops/card-orders.sh` (gleiche Variablen, fragt per SSH im laufenden
      Container, öffnet die Datenbank mit `readonly: true`), mit `--container` für den Lauf auf dem Server wie
      `ops/credit-runway.sh --container`. Es rechnet nicht selbst, sondern importiert `cardBreaker` aus
@@ -82,12 +84,23 @@ MVP: Funktion, weil sonst jeder mit einer neuen Wallet beliebig oft kaufen, verb
      Zustand und meldet höchstens einmal am Tag. Der Text nennt keine Adresse.
   7. **Wächter in `check`.** Ein Test `test/card-way-guard.test.ts` liest `README.md` und jede Datei unter `src/` und `mcp/` von der
      Platte (nicht über git, damit er auch in einer Kopie ohne `.git` greift) und schlägt fehl, sobald außer `src/payments/card-way.ts`
-     eine Datei `checkout-ds24.com` nennt. So geht auch jeder spätere Weg zur Kasse über die Weiterleitung. karte 02 schreibt seine Wege
-     deshalb auf `cardLink` um; das schneidet der Tech Lead dort neu, bevor karte 02 startet.
+     eine Datei `checkout-ds24.com` nennt. So geht auch jeder spätere Weg zur Kasse über die Weiterleitung. Die Wege von karte 02 schreibt
+     dieses Goal auf `cardLink` um (Entscheidung 8).
+  8. **Die Wege von karte 02 über die Weiterleitung** (Kritik des Tech Lead, 2026-11-23; karte 02 wurde vor diesem Goal gemergt).
+     `cardCheckoutUrl` fällt aus `src/payments/digistore.ts`, die Annahme der IPN dort bleibt unverändert. Die 402 in
+     `src/inference/proxy.ts` holt `card_url` und den Satz „No USDC? Pay by card: …“ aus `cardUrlFor(db, address, now)`; beide fehlen,
+     solange der Notschalter an ist. In `src/public/index.html` stehen `<!--CARD-->` und `<!--/CARD-->` um den Block `#card`, das Feld
+     heißt `name="address"` statt `custom`, die Knöpfe haben `formaction="/card/5"`, `"/card/20"` und `"/card/50"`; auf dem Bildschirm
+     ändert sich nichts, also kein SOLL. `README.md` nennt die drei Links `https://automatonhost.com/card/<paket>?address=<your
+     automaton's wallet address>`. `cardLink` in `mcp/server.mjs` baut `<CP_URL>/card/<paket>?address=<address in Kleinbuchstaben>`,
+     `test/mcp-card.test.ts` und `test/card-checkout.test.ts` ziehen mit (ändern, nicht löschen). `deploy/Caddyfile` behält
+     `https://www.checkout-ds24.com` in `form-action`, weil der Browser das Ziel der 302 nach einem Formular dagegen prüft. Wird
+     dadurch ein Prüfbefehl von karte 02 rot, schreibt der Maker Befehl und beide Ausgaben auf das Topic, und der Tech Lead entscheidet
+     je Zeile `Abgelöst:` in `goals/karte/ANNAHMEN.md`.
 - **Tests** mit festen Zeiten und ohne Netz und festen Port: `test/card-way.test.ts` (Rechnung und Hilfen), `test/card-redirect.test.ts`
   (gegen `createApp` mit leerer Datenbank und `CP_PUBLIC_URL=https://automatonhost.com`), `test/card-breaker-ops.test.ts` (nachgebautes
   `ssh` und `docker` vorn im `PATH` wie `test/card-orders.test.ts`), `test/watchdog-card-breaker.test.ts` (wie
-  `test/watchdog-credit.test.ts`, nachgebautes `curl`, dessen POST scheitern kann), `test/card-way-guard.test.ts`. Die Namen prüfen
+  `test/watchdog-credit.test.ts`, nachgebautes `curl`, dessen POST scheitern kann), `test/card-way-guard.test.ts`, `test/card-way-pages.test.ts` (Startseite und 402 gegen `createApp`). Die Namen prüfen
   die Punkte. Testadressen sind nur Wiederholungen eines Hex-Paars (`0x` plus 20 Mal `ab`). Jeder neue Fall war einmal rot, die Zeile
   im Progress Log sagt, womit.
 - Vor dem Bau die Prüfbefehle der Goals mit Status `DONE`, die `card-orders`, `digistore`, `watchdog` oder `status.sh` nennen
@@ -117,15 +130,22 @@ MVP: Funktion, weil sonst jeder mit einer neuen Wallet beliebig oft kaufen, verb
       Prüfung: `for t in "sends an open checkout with 302 to digistore24 with the address as custom" "shows the way over USDC instead of the checkout once the breaker is on" "shows the same sentence for a wallet that had a refund" "asks for the address with a form when it is missing or malformed" "answers 404 for an unknown package" "is never cached and never indexed"; do grep -qF "\"$t\"" test/card-redirect.test.ts || echo "fehlt: $t"; done` muss nichts ausgeben.
       Prüfung: `CP_PUBLIC_URL=https://automatonhost.com PATH=/usr/bin:$PATH node --import tsx --input-type=module -e 'const { createApp } = await import("./src/app.ts"); const { openDb } = await import("./src/db.ts"); const bad = []; const a = "0x" + "aB".repeat(20); const al = a.toLowerCase(); const b = "0x" + "cd".repeat(20); const c = "0x" + "ef".repeat(20); const ins = (db, id, addr, mode, mc) => { const t = new Date().toISOString(); db.prepare("INSERT INTO card_orders (order_id, product_id, address, mode, status, credited_mc, reversed_mc, shortfall_mc, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?)").run(id, "771280", addr, mode, "reversed", mc, mc, t, t); }; const get = async (app, p) => { const r = await app.request(p); return { s: r.status, l: r.headers.get("location"), c: r.headers.get("cache-control") ?? "", t: await r.text() }; }; const db = openDb(":memory:"); const app = createApp({ db }); let r = await get(app, "/card/5?address=" + a); if (r.s !== 302 || r.l !== "https://www.checkout-ds24.com/product/771278/?custom=" + al || !r.c.includes("no-store")) bad.push("offen " + r.s); r = await get(app, "/card/50?address=" + a); if (r.l !== "https://www.checkout-ds24.com/product/771280/?custom=" + al) bad.push("paket 50"); r = await get(app, "/card/5?address=0x12"); if (r.s !== 200 || r.l || !r.t.includes("name=\"address\"")) bad.push("formular " + r.s); r = await get(app, "/card/7?address=" + a); if (r.s !== 404) bad.push("paket 7 " + r.s); ins(db, "W1", b, "live", 0); r = await get(app, "/card/20?address=" + b); if (r.s !== 200 || r.l || r.t.includes("checkout-ds24") || !r.t.includes("/pay/5/" + b)) bad.push("wallet " + r.s); r = await get(app, "/card/20?address=" + a); if (r.s !== 302) bad.push("andere wallet " + r.s); ins(db, "T1", c, "test", 5000000); r = await get(app, "/card/5?address=" + a); if (r.s !== 302) bad.push("test zaehlt " + r.s); ins(db, "L1", c, "live", 4999999); r = await get(app, "/card/5?address=" + a); if (r.s !== 302) bad.push("unter grenze " + r.s); ins(db, "L2", "0x" + "12".repeat(20), "live", 1); r = await get(app, "/card/5?address=" + a); if (r.s !== 200 || r.l || r.t.includes("checkout-ds24") || !r.t.includes("/pay/5/" + al)) bad.push("grenze " + r.s); console.log(bad.length ? bad.join("; ") : "weiterleitung ok")' 2>&1 | tail -1` muss genau `weiterleitung ok` ausgeben.
       Prüfung: `grep -cE 'app\.get\("/card/:package"' src/app.ts` muss genau 1 ausgeben.
-- [ ] Startseite und 402 holen den Weg zur Kasse nur aus `src/payments/card-way.ts` und lassen ihn weg, solange der Notschalter an ist;
-      kein anderer Ort im Produkt nennt die Kasse von Digistore24.
+- [ ] Startseite, 402, README und MCP führen nur über `/card/<paket>` zur Kasse, Startseite und 402 lassen den Weg weg, solange der
+      Notschalter an ist, und kein anderer Ort im Produkt nennt die Kasse von Digistore24.
       MVP: Funktion, weil ein Link an der Weiterleitung vorbei den Notschalter umgeht.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/card-way-guard.test.ts` muss Exit-Code 0 haben.
       Prüfung: `grep -qF '"links to the digistore24 checkout only from src/payments/card-way.ts"' test/card-way-guard.test.ts && echo name ok` muss genau `name ok` ausgeben.
       Prüfung: `grep -rl 'checkout-ds24' src mcp README.md | grep -vxc 'src/payments/card-way.ts'` muss 0 ausgeben.
       Prüfung: `T=$(mktemp -d); git archive HEAD | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; echo 'https://www.checkout-ds24.com/product/771278/' >> $T/README.md; (cd $T && PATH=/usr/bin:$PATH pnpm -s vitest run test/card-way-guard.test.ts > /dev/null 2>&1); echo "exit=$?"; rm -rf $T` muss genau `exit=1` ausgeben.
       Prüfung: `grep -c 'stripCardWay(' src/app.ts` muss mindestens 1 ausgeben.
-      Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD -- src/public/index.html src/inference/proxy.ts src/payments/digistore.ts ops/card-orders.sh | wc -l` muss 0 ausgeben.
+      Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/card-way-pages.test.ts test/mcp-card.test.ts test/card-checkout.test.ts` muss Exit-Code 0 haben.
+      Prüfung: `for t in "drops the card block of the start page while the breaker is on" "keeps the card block of the start page without the markers while the breaker is off" "offers card_url through /card/5 in the 402 while the breaker is off" "names no card in the 402 while the breaker is on"; do grep -qF "\"$t\"" test/card-way-pages.test.ts || echo "fehlt: $t"; done` muss nichts ausgeben.
+      Prüfung: `grep -cE 'formaction="/card/(5|20|50)"' src/public/index.html` muss genau 3 ausgeben.
+      Prüfung: `grep -c '<!--/CARD-->' src/public/index.html` muss genau 1 ausgeben.
+      Prüfung: `grep -c 'name="custom"' src/public/index.html` muss 0 ausgeben.
+      Prüfung: `grep -cE 'https://automatonhost\.com/card/(5|20|50)\?address=' README.md` muss genau 3 ausgeben.
+      Prüfung: `cat src/payments/digistore.ts src/inference/proxy.ts mcp/server.mjs | grep -c 'cardCheckoutUrl'` muss 0 ausgeben.
+      Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD -- ops/card-orders.sh ops/digistore.mjs | wc -l` muss 0 ausgeben.
 - [x] `ops/card-breaker.sh` meldet Erstattungen, Fehlbetrag und Notschalter der letzten 60 Tage aus der Rechnung des Dienstes, liest
       nur, nennt nie eine Adresse und kippt in beide Richtungen; `ops/status.sh` zeigt die Zeile als `card_breaker`.
       MVP: Funktion, weil Matthias' „hab ein auge drauf“ eine Zahl braucht, die jeder Lauf der Ops-Triage sieht.
@@ -147,7 +167,7 @@ MVP: Funktion, weil sonst jeder mit einer neuen Wallet beliebig oft kaufen, verb
       nichts im Repo nennt eine Adresse eines Kunden.
       MVP: Funktion, weil karte 02 und werbung 01 auf diesen Wegen bauen und wissen müssen, warum es nur einen Link zur Kasse gibt.
       Prüfung: `grep -cE '^- [0-9]{4}-[0-9]{2}-[0-9]{2}, wache 01: ' goals/wache/ANNAHMEN.md` muss mindestens 7 ausgeben.
-      Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD | grep -vE '^(src/payments/card-way\.ts|src/app\.ts|src/db\.ts|ops/card-breaker\.sh|ops/status\.sh|ops/watchdog\.sh|ops/README\.md|test/[a-z0-9-]+\.test\.ts|goals/wache/.*|goals/[a-z]+/ANNAHMEN\.md)$' | wc -l` muss 0 ausgeben.
+      Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD | grep -vE '^(src/payments/card-way\.ts|src/payments/digistore\.ts|src/inference/proxy\.ts|src/public/index\.html|mcp/server\.mjs|README\.md|src/app\.ts|src/db\.ts|ops/card-breaker\.sh|ops/status\.sh|ops/watchdog\.sh|ops/README\.md|test/[a-z0-9-]+\.test\.ts|goals/wache/.*|goals/[a-z]+/ANNAHMEN\.md)$' | wc -l` muss 0 ausgeben.
       Prüfung: `git diff --diff-filter=D --name-only $(git merge-base origin/dev HEAD) HEAD -- test | wc -l` muss 0 ausgeben.
       Prüfung: `git diff $(git merge-base origin/dev HEAD) HEAD -- . ':!goals' | grep '^+' | grep -oE '0x[0-9a-fA-F]{40}' | sort -u | awk '{s=substr($0,3,2); r=""; for(i=0;i<20;i++) r=r s; if (substr($0,3)!=r) n++} END{print n+0}'` muss 0 ausgeben.
       Prüfung: `grep -ci 'postyourprice' src/payments/card-way.ts` muss 0 ausgeben.
@@ -168,9 +188,10 @@ MVP: Funktion, weil sonst jeder mit einer neuen Wallet beliebig oft kaufen, verb
 ## Deny List
 - `loop.yaml`, `gate.yaml`, `loop-constraints.md`, `LOOP.md`, `ops/prompts/**`, `.github/**`, `scripts/check.mjs`, `harness/**`,
   `deploy/**`, `.env*`, `*.db`, `*.key`, `*.pem`
-- `src/payments/digistore.ts`: unverändert, die Annahme der IPN bleibt, wie karte 01 sie gebaut hat; `src/payments/**` sonst nur die
-  neue Datei `src/payments/card-way.ts`. `src/auth/**`, `src/konto/**`, `src/checkout/**`, `src/handoff/**`
-- `src/public/index.html`, `src/inference/proxy.ts`, `mcp/**`, `README.md`: unverändert (die Wege zur Kasse baut karte 02)
+- `src/payments/digistore.ts`: nur `cardCheckoutUrl` fällt weg (Entscheidung 8), die Annahme der IPN bleibt, wie karte 01 sie
+  gebaut hat; `src/payments/**` sonst nur die neue Datei `src/payments/card-way.ts`. `src/auth/**`, `src/konto/**`, `src/checkout/**`, `src/handoff/**`
+- `src/public/index.html`, `src/inference/proxy.ts`, `mcp/server.mjs`, `README.md`: nur der Weg zur Kasse nach Entscheidung 8, kein
+  anderer Text, nichts Sichtbares; `mcp/**` sonst unverändert
 - `ops/card-orders.sh` und `ops/digistore.mjs`: unverändert (karte 01 prüft beide jede Nacht)
 - `ROADMAP.md`, `docs/kette.md`, bestehende Goal-Dateien und Vorschläge: nur lesen; in fremden `ANNAHMEN.md` nur Zeilen `Abgelöst:`,
   die der Tech Lead entschieden hat
