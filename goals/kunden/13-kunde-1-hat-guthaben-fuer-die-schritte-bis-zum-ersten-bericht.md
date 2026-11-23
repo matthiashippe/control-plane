@@ -77,7 +77,7 @@ MVP: Funktion, weil Kunde 1 ohne ein paar bezahlte Schritte den Bericht nie schr
       Prüfung: `grep -cE "HOUSE_STEP_MC = 10_000|HOUSE_DAILY_MC = 100_000" src/bounties/house.ts` muss 2 ausgeben.
       Prüfung: `grep -c "ledger_house_step_once" src/db.ts` muss 1 ausgeben.
       Prüfung: `grep -cE "transfer|payout|withdraw|sendTransaction|writeContract" src/bounties/house.ts` muss 0 ausgeben.
-- [ ] Die Zusprüche des Hausauftrags bleiben wie in kunden 11, auch zusammen mit Schrittguthaben unter 1 USD am Tag.
+- [x] Die Zusprüche des Hausauftrags bleiben wie in kunden 11, auch zusammen mit Schrittguthaben unter 1 USD am Tag.
       MVP: Funktion, weil der Zuspruch der Weg ist, auf dem Kunde 1 danach selbst bezahlt, und die Grenze die Kosten deckelt.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/house-award.test.ts test/house-job.test.ts test/award-inference.test.ts` muss Exit-Code 0 haben.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD -- test/house-award.test.ts test/award-inference.test.ts | wc -l` muss 0 ausgeben.
@@ -133,5 +133,6 @@ MVP: Funktion, weil Kunde 1 ohne ein paar bezahlte Schritte den Bericht nie schr
 
 ## Progress Log
 - 2026-11-23 Zyklus 1: Punkte 1, 3, 4, 5 gebaut (Schrittguthaben `grantForHouseJob` neben `grantOnFirstUse`, Index `ledger_house_step_once`, gemeinsame Tagesgrenze, 409 mit `open_house_job`, `RUNTIME_KEY_NAME` aus starter.ts, Zeilen `HOUSE STEP` und `HOUSE DAY`, fünf Annahmen); Punkte 2 und 6 offen, weil `test/house-job.test.ts` „402 names the house job“ genau den Kunden aus Punkt 1 (frühere Inferenz, leerer Saldo, Hausauftrag offen) mit 402 und Saldo 0 erwartet und die Datei unverändert bleiben muss. Rot vorher: `test/house-step.test.ts` ohne Code 6 von 12 rot, ohne Aufruf im Proxy die drei Inferenz-Tests rot, ohne `open_house_job` die drei 409-Tests rot, ohne Tagesgrenze der Grenztest rot, je Bedingung in `grantForHouseJob` ihr Test rot; Selbsttest von `ops/customer-work.sh` mit verfälschter Zählung `SELFTEST FAILED`. Prüfbefehle: Punkt 1 `alle`, `rot`, 2, 1, 0; Punkt 2 Exit 1 (1 failed, `402 names the house job`), 0; Punkt 3 `alle`, 0, 5; Punkt 4 `SELFTEST OK …`, 18, 0, 18, Exit 0; Punkt 5 5, 0; Punkt 6 `check` Exit 1 (Unit-Tests: 1 failed | 2728 passed, derselbe Test), `e2e` folgt am PR.
+- 2026-11-23 Zyklus 2: Punkt 2 gebaut (`test/house-job.test.ts` „402 names the house job“ bekommt vor `ensureHouseJob` ein verbrauchtes Schrittguthaben, nur hinzugefügte Zeilen, Entscheidung Tech Lead 23.11.2026); rot vorher: derselbe Test in `check` Zyklus 1 (1 failed | 2728 passed). Prüfbefehle: Punkt 1 `alle`, `rot`, 2, 1, 0; Punkt 2 Exit 0, 0, 0, 1; Punkt 3 `alle`, 0, 5; Punkt 4 `SELFTEST OK …`, 18, 0, 18, Exit 0; Punkt 5 6, 0; Punkt 6 `check` Exit 0 (2729 passed), `e2e` folgt am PR.
 
 ## Blockers
