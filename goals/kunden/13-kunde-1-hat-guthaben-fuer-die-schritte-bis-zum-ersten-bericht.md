@@ -80,7 +80,9 @@ MVP: Funktion, weil Kunde 1 ohne ein paar bezahlte Schritte den Bericht nie schr
 - [ ] Die Zusprüche des Hausauftrags bleiben wie in kunden 11, auch zusammen mit Schrittguthaben unter 1 USD am Tag.
       MVP: Funktion, weil der Zuspruch der Weg ist, auf dem Kunde 1 danach selbst bezahlt, und die Grenze die Kosten deckelt.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/house-award.test.ts test/house-job.test.ts test/award-inference.test.ts` muss Exit-Code 0 haben.
-      Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD -- test/house-award.test.ts test/house-job.test.ts test/award-inference.test.ts | wc -l` muss 0 ausgeben.
+      Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD -- test/house-award.test.ts test/award-inference.test.ts | wc -l` muss 0 ausgeben.
+      Prüfung: `git diff --numstat $(git merge-base origin/dev HEAD) HEAD -- test/house-job.test.ts | awk '{d+=$2} END {print d+0}'` muss 0 ausgeben.
+      Prüfung: `git diff $(git merge-base origin/dev HEAD) HEAD -- test/house-job.test.ts | grep -c '^+.*house_step'` muss mindestens 1 ausgeben.
 - [x] Ein Bericht an einen geschlossenen oder abgelaufenen Hausauftrag nennt den offenen, und der Name des Runtime-Schlüssels steht
       nur an einer Stelle.
       MVP: Funktion, weil eine Runtime sonst bei jedem Wechsel des Auftrags das Brett neu lesen muss und ein neuer Pin den Hausauftrag
@@ -116,7 +118,8 @@ MVP: Funktion, weil Kunde 1 ohne ein paar bezahlte Schritte den Bericht nie schr
 - `loop.yaml`, `gate.yaml`, `loop-constraints.md`, `LOOP.md`, `ops/prompts/**`, `.github/**`, `scripts/check.mjs`, `deploy/**`,
   `harness/**`, `.env*`, `*.db`
 - `src/payments/**`, `src/auth/**`, `src/credits/**`: nur lesen
-- die bestehenden Tests unter `test/` außer `test/customer-work.test.ts`: unverändert
+- die bestehenden Tests unter `test/` außer `test/customer-work.test.ts`: unverändert; `test/house-job.test.ts` nur um hinzugefügte
+  Zeilen im Test „402 names the house job“ (Entscheidung Tech Lead 23.11.2026, `ANNAHMEN.md`)
 - `ops/customer-decline.sh`, `ops/customer_match.py`, `ops/status.sh`, `ops/access-log.sh`, `ops/own-ips.sh`, `ops/own-ips.txt`:
   unverändert
 - `ROADMAP.md`, `docs/kette.md`, `docs/richtung/**`, `docs/kunden/*.md` und alle bestehenden Vorschläge: nur lesen
