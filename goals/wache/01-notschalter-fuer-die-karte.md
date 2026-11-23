@@ -1,7 +1,7 @@
 # Wache Goal 01: Notschalter für die Karte
 
 ## Status
-PLANNED
+DONE
 
 ## Active Objective
 Seit karte 01 nimmt der Dienst Kartengeld von Digistore24 an, und Digistore24 erzwingt für englische Produkte 60 Tage Geld zurück.
@@ -176,7 +176,7 @@ MVP: Funktion, weil sonst jeder mit einer neuen Wallet beliebig oft kaufen, verb
       Prüfung (Netz): `gh pr checks $(gh pr list -R matthiashippe/control-plane --head goal/wache-01 --state open --json number -q '.[0].number') -R matthiashippe/control-plane 2>&1 | grep -E '^e2e\s' | grep -c pass` muss genau 1 ausgeben.
 - [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Wer mit immer neuen Wallets kauft, verbraucht und erstatten lässt, kommt nach 50 USD Fehlbetrag in 60 Tagen über keinen Weg
@@ -212,6 +212,7 @@ MVP: Funktion, weil sonst jeder mit einer neuen Wallet beliebig oft kaufen, verb
 - 2026-11-23 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 4, 5, 6, 7, 8 nach Merge von `dev` (86d28e1) in den Goal-Branch; Punkt 3 bleibt offen bis zum neuen Schnitt des Tech Leads in der Kritik. Prüfbefehle: Punkt 1 vitest Exit 0, Namen nichts fehlt, 1, 1, 0, exit=1 ohne sed-miss; Punkt 2 vitest Exit 0, Namen nichts fehlt, `weiterleitung ok`, 1; Punkt 3 (offen) guard-Test exit=1, `checkout-ds24` außerhalb 4, `stripCardWay(` 1, gesperrte Dateien 0; Punkt 4 `syntax ok`, vitest Exit 0, Namen nichts fehlt, 2, 0, 2, 3; Punkt 5 `syntax ok`, vitest Exit 0 (drei Dateien), Namen nichts fehlt, 2; Punkt 6 Annahmen 12, fremde Pfade 0, gelöschte Tests 0, Adressen 0, `postyourprice` 0; Punkt 7 PR #395 am Kopf 99c69da `e2e` pass (1), `check` pass; Punkt 8 `check` grün in 77 s.
 - 2026-11-23 Zyklus 3: Punkt 3 nach dem neuen Schnitt gebaut (Startseite mit Marken, Feld `address` und `/card/5`, `/card/20`, `/card/50`; 402 aus `cardUrlFor`; `cardCheckoutUrl` entfernt; README und `cardLink` in `mcp/server.mjs` auf `/card/<paket>?address=`; `test/card-checkout.test.ts` und `test/mcp-card.test.ts` nachgezogen; neu `test/card-way-pages.test.ts` und `test/card-way-guard.test.ts`, gegen b9be439 alle 5 Fälle rot). Punkt 6 wieder offen: die Prüfung des Umfangs gibt 1, weil `goals/_vorschlaege/wache-kritik-2026-11-23-1.md` aus dem Kritik-Commit b9be439 außerhalb der erlaubten Pfade liegt. Prüfbefehle: Punkt 1 vitest Exit 0, Namen nichts fehlt, 1, 1, 0, exit=1 ohne sed-miss; Punkt 2 vitest Exit 0, Namen nichts fehlt, `weiterleitung ok`, 1; Punkt 3 vitest Exit 0, `name ok`, 0, exit=1 (unverändert exit=0), 1, vitest Exit 0 (drei Dateien), Namen nichts fehlt, 3, 1, 0, 3, 0, 0; Punkt 4 `syntax ok`, vitest Exit 0, Namen nichts fehlt, 2, 0, 2, 3; Punkt 5 `syntax ok`, vitest Exit 0, Namen nichts fehlt, 2; Punkt 6 Annahmen 16, fremde Pfade 1 (Vorschlag), gelöschte Tests 0, Adressen 0, `postyourprice` 0; Punkt 7 PR #395 am Kopf e0304ec `e2e` pass, `check` pass; Punkt 8 `check` grün in 93 s. karte 02: Punkte der Zeilen 188, 189 und 202 rot, an den Tech Lead für `Abgelöst:`.
 - 2026-11-23 Zyklus 4: Abschluss gemeldet, Punkte 1 bis 8, nachdem der Tech Lead den Vorschlag vom Goal-Branch nahm und karte 02 Punkte 6 und 8 ablöste (b58b889); `dev` (86d28e1) ist enthalten. Prüfbefehle: Punkt 1 vitest Exit 0, Namen nichts fehlt, 1, 1, 0, exit=1 ohne sed-miss; Punkt 2 vitest Exit 0, Namen nichts fehlt, `weiterleitung ok`, 1; Punkt 3 vitest Exit 0, `name ok`, 0, exit=1 (unverändert exit=0), 1, vitest Exit 0 (drei Dateien), Namen nichts fehlt, 3, 1, 0, 3, 0, 0; Punkt 4 `syntax ok`, vitest Exit 0, Namen nichts fehlt, 2, 0, 2, 3; Punkt 5 `syntax ok`, vitest Exit 0, Namen nichts fehlt, 2; Punkt 6 Annahmen 19, fremde Pfade 0, gelöschte Tests 0, Adressen 0, `postyourprice` 0; Punkt 7 PR #395 am Kopf b58b889 `e2e` pass (1), `check` pass; Punkt 8 `check` grün in 78 s.
+- 2026-11-23 Release: PASS K und B (Zyklus 4), DONE.
 
 ## Blockers
 keine
