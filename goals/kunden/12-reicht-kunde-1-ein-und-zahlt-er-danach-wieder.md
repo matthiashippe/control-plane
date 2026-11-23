@@ -1,7 +1,7 @@
 # Kunden Goal 12: Reicht Kunde 1 ein, und zahlt er danach wieder?
 
 ## Status
-PLANNED
+PAUSED
 
 ## Active Objective
 Seit kunden 11 stellt der Dienst selbst dauerhaft einen offenen Hausauftrag, die 402 nennt ihn mit `open_bounties` und
@@ -120,3 +120,4 @@ ansetzen muss.
 ## Progress Log
 
 ## Blockers
+Pause: Tech Lead 23.11.2026 (PRO-28123), abgelöst durch kunden 14: Das Fenster dieses Goals hängt am Rollout von kunden 11, und in ihm endete jede Inferenz von Kunde 1 mit 402, also misst es nur den bekannten Ausfall. Erst kunden 13 gibt ihm Guthaben für die Schritte bis zum Bericht, kunden 14 misst danach.
