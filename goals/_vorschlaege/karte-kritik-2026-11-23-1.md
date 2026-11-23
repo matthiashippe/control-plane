@@ -1,0 +1,8 @@
+Schwere: 3
+Goal: karte 03
+Befund: Das Messfenster von karte 03 (sieben Tage ab dem Rollout von karte 02 am 22.11.2026) schließt den Rollout von werbung 01 ein, der Startseite, Fehlerseiten, README und 402 auf „No crypto needed“ umstellt, aber karte 03 rechnet Sichtungen, Klicks und Käufe über das ganze Fenster zusammen und schreibt ein `klickt nicht` der Stelle von karte 02 zu.
+Beleg: goals/karte/03-kauft-jemand-per-karte.md:9 („in den sieben Tagen nach dem Rollout von karte 02“) | goals/karte/03-kauft-jemand-per-karte.md:17 („dann ist auch karte 02 widerlegt: Der Block sitzt an der falschen Stelle“) | goals/karte/03-kauft-jemand-per-karte.md:92 (ohne fremde Sichtungen empfiehlt der Vorschlag werbung) | `git log -1 --format='%h %cI' origin/goal/werbung-01` -> `9f73d16 2026-11-23T05:49:15+00:00` (werbung 01 steht kurz vor PASS und rollt am 23.11. aus, einen Tag nach Beginn des Fensters)
+Empfehlung: Vor dem Start von karte 03 eine Zeile `Werbung ab: <completedAt des Jobs deploy von werbung 01>` wie `Klicks gezählt ab:` aufnehmen und `VIEWS`, `CLICKS` und `ORDERS` getrennt vor und nach diesem Zeitpunkt ausgeben; das Ergebnis und der Vorschlag für das Folge-Glied gelten für den Stand nach werbung 01, und `klickt nicht` empfiehlt nicht erneut werbung, wenn werbung 01 im Fenster lag.
+
+karte 03 soll entscheiden, ob das nächste Glied Sichtbarkeit, Kasse oder den Weg nach dem Kauf baut. Ändert werbung 01 mitten im Fenster genau die Sichtbarkeit, misst ein Summenwert zwei Zustände der Seite, und die Empfehlung „werbung“ wäre schon gebaut. Das kostet ein Glied in der Kette, die zu Kartenkäufen führen soll.
+MVP: Funktion, weil nur getrennte Zahlen zeigen, ob die Karte nach werbung 01 gekauft wird.

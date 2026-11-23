@@ -1,0 +1,8 @@
+Schwere: 3
+Goal: kanal 06
+Befund: kanal 06 urteilt nur über die neun Antworten der Runden 0 bis 2 und nennt bei 0 neuen Issues als einzigen Kandidaten Idee 3 (das Paket der Runtime), die paket 01 am 22.11.2026 schon gebaut hat, während die 30 Kommentare, die reichweite 02 auf automatonhost.com umgelinkt hat, kein Urteil bekommen.
+Beleg: goals/kanal/06-urteil-je-antwort-und-eine-neue-runde-nur-mit-neuen-issues.md:119 (`anderer Kanal, weil …` mit `Idee 3` als Kandidat) | goals/kanal/06-urteil-je-antwort-und-eine-neue-runde-nur-mit-neuen-issues.md:114 (je Nummer der drei Runden) | `git log --merges --first-parent --format='%h %cI %s' origin/dev | grep goal/paket-01` -> `fefdd84 2026-11-22T20:42:22+01:00 Merge pull request #381 from matthiashippe/goal/paket-01` | goals/reichweite/02-kommentare-zeigen-auf-die-passende-seite.md:8 (30 Kommentare in 30 Threads)
+Empfehlung: Vor dem Start am 26.11. das Urteil auf alle Threads mit einem Kommentar des Kontos ausdehnen (Zeile `ISSUE <n>` je Thread, dazu der Stand vor und nach dem Umlinken aus reichweite 02) und die Zeile `Nächste Runde:` streichen oder auf die Wahl zwischen weiteren Kommentaren und einem noch nicht gebauten Kanal umstellen, statt Idee 3 zu nennen.
+
+Neue Issues gibt es seit dem 10.11. nicht mehr, das Ergebnis `anderer Kanal, Idee 3` steht also schon fest, und Idee 3 läuft bereits als paket 01 mit Messung in paket 02. Der Teil von kanal 06, der dem Ziel mehr zahlender fremder Automatons dient, ist die Zuordnung je Issue; sie zeigt erst dann etwas Neues, wenn sie die umgelinkten Kommentare mitzählt.
+MVP: Funktion, weil die Zuordnung je Thread zeigt, welche Kommentare Anmeldungen bringen, und das Goal sonst nur ein feststehendes Urteil schreibt.
