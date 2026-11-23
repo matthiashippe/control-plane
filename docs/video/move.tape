@@ -1,6 +1,6 @@
 # The script of the video "one line moves an automaton" (goals/reichweite/03, decision 2).
 # ops/video-record.sh runs it in a sandbox of our own account on automatonhost.com, with the unmodified runtime at the
-# pin d8f8168 under /opt/automaton (image sandboxd-base:2), and writes docs/video/umzug.transcript.json.
+# pin d8f8168 under /opt/automaton (image sandboxd-base:2), and writes docs/video/move.transcript.json.
 # ops/video-render.mjs turns transcript and captions into the video; no network there.
 #
 #   setup <command>          runs before the recording, not shown, output not kept
