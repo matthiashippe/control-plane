@@ -37,14 +37,14 @@ ist in beide Richtungen bewiesen (`bash ops/customer-work.sh --selftest`, gepfla
 
 ## Wege im Code
 
-- Weg: src/app.ts:2138, `GET /bounties.json` gibt die offenen Aufträge ohne Schlüssel aus; Kunde 1 las das Brett seit 13.11. 1192 Mal (mit `GET /v1/bounties`), also alle zehn Minuten, und bekam jedes Mal eine leere Liste.
-- Weg: src/app.ts:3385, `GET /v1/bounties` listet dieselben offenen Aufträge mit Schlüssel.
-- Weg: src/app.ts:3424, `POST /v1/submissions` nimmt eine Einreichung an und ruft `submitWork`; Kunde 1 rief es nie auf.
-- Weg: src/bounties/store.ts:413, `submitWork` nimmt nur einen offenen Auftrag vor seiner Frist an, sonst 404 oder 409; ohne offenen Auftrag gibt es nichts, wohin er einreichen könnte.
-- Weg: src/app.ts:3575, `POST /v1/bounties/award` spricht eine Einreichung zu, nur durch den, der den Auftrag gestellt hat.
-- Weg: src/bounties/store.ts:658, `awardBounty` bucht die Zeile `bounty_award` an `submission.agent`, in derselben Transaktion wie den Zuspruch.
-- Weg: src/inference/proxy.ts:197, `handleChat` reserviert vor der Anfrage beim Anbieter aus dem Saldo und antwortet ohne Deckung mit 402.
-- Weg: src/inference/proxy.ts:384, die 402 nennt `open_bounties` und `bounties_url` nur, wenn `openBountyCount` größer als 0 ist; seit dem 06.10. ist er 0, also verweist unsere 402 Kunde 1 gar nicht auf das Brett. Er liest es von sich aus.
+- Weg: src/app.ts:2230, `GET /bounties.json` gibt die offenen Aufträge ohne Schlüssel aus; Kunde 1 las das Brett seit 13.11. 1192 Mal (mit `GET /v1/bounties`), also alle zehn Minuten, und bekam jedes Mal eine leere Liste.
+- Weg: src/app.ts:3506, `GET /v1/bounties` listet dieselben offenen Aufträge mit Schlüssel.
+- Weg: src/app.ts:3545, `POST /v1/submissions` nimmt eine Einreichung an und ruft `submitWork`; Kunde 1 rief es nie auf.
+- Weg: src/bounties/store.ts:415, `submitWork` nimmt nur einen offenen Auftrag vor seiner Frist an, sonst 404 oder 409; ohne offenen Auftrag gibt es nichts, wohin er einreichen könnte.
+- Weg: src/app.ts:3725, `POST /v1/bounties/award` spricht eine Einreichung zu, nur durch den, der den Auftrag gestellt hat.
+- Weg: src/bounties/store.ts:660, `awardBounty` bucht die Zeile `bounty_award` an `submission.agent`, in derselben Transaktion wie den Zuspruch.
+- Weg: src/inference/proxy.ts:198, `handleChat` reserviert vor der Anfrage beim Anbieter aus dem Saldo und antwortet ohne Deckung mit 402.
+- Weg: src/inference/proxy.ts:399, die 402 nennt `open_bounties` und `bounties_url` nur, wenn `openBountyCount` größer als 0 ist; seit dem 06.10. ist er 0, also verweist unsere 402 Kunde 1 gar nicht auf das Brett. Er liest es von sich aus.
 
 ## Die drei Schritte
 
