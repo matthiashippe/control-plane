@@ -26,3 +26,6 @@
 - Abgelöst: karte 02 Punkt 6 durch wache 01 Punkt 3, Ausgabe dann genau `fehlt: sends the address as custom straight to the digistore24 checkout of each package` (Tech Lead, 2026-11-23)
 - Abgelöst: karte 02 Punkt 6 durch wache 01 Punkt 3, Ausgabe dann genau `knoepfe ; feld` (Tech Lead, 2026-11-23)
 - Abgelöst: karte 02 Punkt 8 durch wache 01 Punkt 3, Ausgabe dann genau `link 771278; link 771279; link 771280` (Tech Lead, 2026-11-23)
+- Abgelöst: karte 02 Punkt 4 durch reichweite 03 Punkt 6, Ausgabe dann genau `card nicht direkt nach move; knoepfe ; feld; preis 771278; guthaben 771278; preis 771279; guthaben 771279; preis 771280; guthaben 771280; verkaeufer oder rueckgabe` (Tech Lead, 2026-11-23)
+- Abgelöst: karte 02 Punkt 6 durch reichweite 03 Punkt 6, Ausgabe dann genau die zwei Zeilen `fehlt: puts the card block right after the move block` und `fehlt: sends the address as custom straight to the digistore24 checkout of each package` (Tech Lead, 2026-11-23)
+- Abgelöst: karte 02 Punkt 6 durch reichweite 03 Punkt 6, Ausgabe dann genau `card nicht direkt nach move; knoepfe ; feld; guthaben 771278; guthaben 771279; guthaben 771280; pixel 200` (Tech Lead, 2026-11-23)

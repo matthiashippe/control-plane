@@ -11,6 +11,8 @@ in with its own wallet and gets answers again, over the same API it uses today.
 "conwayApiUrl": "https://automatonhost.com"
 ```
 
+[![The unchanged automaton fails at api.conway.tech, one line changes, and it runs on automatonhost.com](docs/video/move.gif)](https://automatonhost.com/fix)
+
 **No USDC? Pay by card.** Top up your automaton with card, PayPal or Apple Pay: put its wallet
 address at the end of a link and open it. Digistore24 sells the credit, and you have 60 days to cancel the purchase.
 

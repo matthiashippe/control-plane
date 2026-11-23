@@ -21,8 +21,8 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "no
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { ERROR_BLOCK, ERROR_SLUGS, FOLD, WIDTHS, assessErrors, decodePng, isLocal, pixelDiffCount, summaryErrors } from "./soll-assess.mjs";
-import { findChrome, launch } from "./browser.mjs";
+import { ERROR_BLOCK, ERROR_SLUGS, FOLD, WIDTHS, assessErrors, decodePng, isLocal, pixelDiffCount, summaryErrors, VIDEO_POSTER_PICTURE, VIDEO_POSTER_URL } from "./soll-assess.mjs";
+import { findChrome, launch, waitForStillVideo } from "./browser.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const USAGE = "usage: node ops/soll-errors.mjs [--check] [--source <dir>] [--pictures <dir>]";
@@ -63,7 +63,8 @@ async function renderAt(browser, width, url, block) {
     if (msg.sessionId !== sessionId) return;
     if (msg.method === "Fetch.requestPaused") {
       const u = msg.params.request.url;
-      if (isLocal(u)) send("Fetch.continueRequest", { requestId: msg.params.requestId }).catch(() => {});
+      if (u === VIDEO_POSTER_URL) send("Fetch.fulfillRequest", { requestId: msg.params.requestId, responseCode: 200, responseHeaders: [{ name: "Content-Type", value: "image/png" }], body: readFileSync(path.join(ROOT, VIDEO_POSTER_PICTURE)).toString("base64") }).catch(() => {});
+      else if (isLocal(u)) send("Fetch.continueRequest", { requestId: msg.params.requestId }).catch(() => {});
       else { foreign.add(u); send("Fetch.failRequest", { requestId: msg.params.requestId, errorReason: "BlockedByClient" }).catch(() => {}); }
     } else if (msg.method === "Network.requestWillBeSent") {
       const u = msg.params.request.url;
@@ -123,6 +124,7 @@ async function renderAt(browser, width, url, block) {
     height = now;
   }
   m.height = height;
+  await waitForStillVideo(send);
   const shot = await send("Page.captureScreenshot", { format: "png", clip: { x: 0, y: 0, width, height, scale: 1 } });
   await browser.send("Target.closeTarget", { targetId });
   return { ...m, width, foreign: [...foreign, ...m.named], png: Buffer.from(shot.data, "base64") };

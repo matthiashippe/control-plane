@@ -131,16 +131,26 @@ describe("the card block of the landing page", () => {
     const html = await (await app.request("/")).text();
     const m = html.indexOf('data-soll="move"');
     const moveEnd = html.indexOf("</section>", m);
-    const next = html.indexOf("<section", moveEnd);
-    const head = next < 0 ? "" : html.slice(next, html.indexOf(">", next));
-    const block = next < 0 ? "" : html.slice(next, html.indexOf("</section>", next));
-    return { app, move: m < 0 ? "" : html.slice(m, moveEnd), head, block };
+    // The card block by its head: since goals/reichweite/03 the video stands between move and card (Tech Lead, 23.11.2026).
+    const at = html.indexOf('<section id="card" data-soll="card">');
+    const head = at < 0 ? "" : html.slice(at, html.indexOf(">", at));
+    const block = at < 0 ? "" : html.slice(at, html.indexOf("</section>", at));
+    /** The heads of the first two sections after the move block, in their order. */
+    const after: string[] = [];
+    for (let from = moveEnd; after.length < 2; ) {
+      const next = html.indexOf("<section", from);
+      if (next < 0) break;
+      after.push(html.slice(next, html.indexOf(">", next) + 1));
+      from = html.indexOf("</section>", next);
+    }
+    return { app, move: m < 0 ? "" : html.slice(m, moveEnd), head, block, after };
   }
 
-  it("puts the card block right after the move block", async () => {
-    const { head } = await page();
+  it("puts the card block right after the video block below the move block", async () => {
+    const { head, after } = await page();
     expect(head).toContain('id="card"');
     expect(head).toContain('data-soll="card"');
+    expect(after).toEqual(['<section class="watch" data-soll="video">', '<section id="card" data-soll="card">']);
   });
 
   it("links the card block from the move block", async () => {

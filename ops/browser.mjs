@@ -96,3 +96,30 @@ export function launch(chrome, profile, kind) {
   const close = async () => { try { await send("Browser.close"); } catch { /* already gone */ } await Promise.race([exited, new Promise((r) => setTimeout(r, 3000))]); if (child.exitCode === null) child.kill("SIGKILL"); };
   return { send, on: (l) => listeners.push(l), close };
 }
+
+/**
+ * Waits until every <video> of the page shows a still picture (goals/reichweite/03): for the first seconds after a page loads,
+ * the media controls of Chromium draw a turning loading circle over the poster, also with preload="none", and two renders of
+ * the same source would differ. Clips of the video boxes 400 ms apart are compared; three equal ones in a row, at least 2.5 s
+ * after the call, end the wait. A page without a video returns at once. `send` is the session of the page; throws after `ms`.
+ */
+export async function waitForStillVideo(send, ms = 20000) {
+  const ev = async (expression) => (await send("Runtime.evaluate", { expression, returnByValue: true })).result.value;
+  const boxes = await ev(`[...document.querySelectorAll("video")].map((v) => { const r = v.getBoundingClientRect(); return [Math.floor(r.left + scrollX), Math.floor(r.top + scrollY), Math.ceil(r.width), Math.ceil(r.height)]; }).filter((b) => b[2] > 0 && b[3] > 0)`);
+  if (!boxes.length) return;
+  const clip = async () => {
+    const parts = [];
+    for (const [x, y, width, height] of boxes) parts.push((await send("Page.captureScreenshot", { format: "png", clip: { x, y, width, height, scale: 1 } })).data);
+    return parts.join("|");
+  };
+  const start = Date.now();
+  let prev = null, same = 0;
+  for (;;) {
+    const now = await clip();
+    same = now === prev ? same + 1 : 0;
+    if (same >= 2 && Date.now() - start >= 2500) return;
+    if (Date.now() - start > ms) throw new Error("the video box did not come to rest");
+    prev = now;
+    await new Promise((r) => setTimeout(r, 400));
+  }
+}

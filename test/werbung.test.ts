@@ -175,10 +175,13 @@ describe("the start page", () => {
     // sed prints up to and including the line with the first </section>.
     const end = raw.indexOf("\n", raw.indexOf("</section>", start)) + 1;
     expect(createHash("sha256").update(raw.slice(start, end)).digest("hex")).toBe(KARTE_02_CARD_BLOCK_SHA256);
-    // And the page serves it right after the first screen, with the breaker off.
+    // And the page serves it right after the video below the first screen, with the breaker off: move, video, card
+    // (goals/reichweite/03, Tech Lead 23.11.2026).
     const html = await get(freshDb(), "/");
     const move = html.indexOf('data-soll="move"');
-    const next = html.indexOf("<section", html.indexOf("</section>", move));
+    const video = html.indexOf("<section", html.indexOf("</section>", move));
+    expect(html.slice(video, video + 41)).toBe('<section class="watch" data-soll="video">');
+    const next = html.indexOf("<section", html.indexOf("</section>", video));
     expect(html.slice(next, next + 36)).toBe('<section id="card" data-soll="card">');
     expect(html.split('data-soll="move"')).toHaveLength(2);
     expect(html).not.toMatch(/<!--\/?(NO)?CARD-->/);
