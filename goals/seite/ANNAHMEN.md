@@ -86,4 +86,4 @@
 ## Tech Lead, Reparatur PRO-28328 (2026-11-23)
 
 - Entscheidung (Tech Lead, 2026-11-23, PRO-28328): Die Zeile `- Abgelöst:` zu seite 01 Punkt 3 gilt nur für den ersten Prüfbefehl (`quelle ok`), der am Kopf von PRO-28328 genau `Exit 1, [ 'umzug', 'inhalt umzug' ]` auf stderr gibt. Der zweite (`bausteine ok neu=<n>`) ist nicht abgelöst und gibt `bausteine ok neu=0`, also seine eigene Erwartung; er ist GRÜN und braucht keine neue Ausgabe, weil seite 03 Punkt 2 nur den Block umbenannt hat und keine Klasse.
-- Entscheidung (Tech Lead, 2026-11-23, PRO-28328): Für die Zeilen `- Abgelöst:` hier gilt dieselbe Ausgabe wie in `goals/konto/ANNAHMEN.md` (Abschnitt Reparatur PRO-28328): Exit-Code und stdout samt stderr, bei einer ungefangenen Ausnahme von Node nur die Zeile `Error: …`.
+- Entscheidung (Tech Lead, 2026-11-23, PRO-28328): Für die Zeilen `- Abgelöst:` hier gilt dieselbe Ausgabe wie in `goals/konto/ANNAHMEN.md` (Abschnitt Reparatur PRO-28328): Exit-Code und stdout samt stderr, bei einer ungefangenen Ausnahme von Node nur die Zeile `Error: …`, und die Fortschrittszeilen der Live-Werkzeuge auf stderr (`^soll-live(-[a-z]+)?: `) zählen nicht.
