@@ -25,7 +25,7 @@
 #   hosts    every host of the service (automatonhost.com, postyourprice.com, cp.hippe.eu, SERVICE_HOSTS in
 #            src/public/site.ts) answers https://<host>/health with 200 and no redirect; https://<host>/ answers 200 on
 #            exactly one of them, the canonical host, and 301 with Location https://<canonical>/ on the others; and
-#            https://www.automatonhost.com/health answers 308 with Location https://automatonhost.com/health (umzug 01).
+#            https://www.automatonhost.com/health answers 308 with Location https://automatonhost.com/health (move goal 01).
 #            OK before and after the switch of CP_PUBLIC_URL, whichever host is canonical. Reads only
 #   refund   the credit for the five calls of 2026-11-10 whose answers never arrived
 #            (src/credits/aborted.ts) is in the ledger exactly once, over exactly 79229 mc
@@ -247,7 +247,7 @@ judge_timeout_quote() {
   fi
 }
 
-# ---- hosts (umzug 01)
+# ---- hosts (move goal 01)
 
 # The hosts of the service (SERVICE_HOSTS in src/public/site.ts) and the www name Caddy sends to the apex with 308.
 HOSTS="automatonhost.com postyourprice.com cp.hippe.eu"
@@ -1741,7 +1741,7 @@ selftest() {
   echo "planted key-cleanup leftover: $got"
   [ "${got%% *}" = FAIL ] || all_ok=0
 
-  # The check `hosts` (umzug 01), both directions: the measurement of a working setup before the switch of the canonical
+  # The check `hosts` (move goal 01), both directions: the measurement of a working setup before the switch of the canonical
   # host (postyourprice.com) and after it (automatonhost.com), then one thing wrong at a time. An OK case must name its
   # canonical host, a FAIL case must say FAIL hosts.
   # $1 = canonical host, $2 = changed lines `<host> <path> <status> <Location or ->`, separated by `;`, each replacing

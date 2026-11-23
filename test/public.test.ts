@@ -616,7 +616,7 @@ describe("the link preview", () => {
 
     const html = await (await app.request("/")).text();
     // Relative URLs are ignored by most unfurlers, so the absolute one is the whole point.
-    // With the version of the served bytes (goals/umzug/04), so a new card is not hidden behind a cached old one.
+    // With the version of the served bytes (move goal 04), so a new card is not hidden behind a cached old one.
     expect(html).toMatch(/property="og:image" content="https:\/\/cp\.hippe\.eu\/og\.png\?v=[0-9a-f]{8}"/);
     expect(html).toMatch(/name="twitter:image" content="https:\/\/cp\.hippe\.eu\/og\.png\?v=[0-9a-f]{8}"/);
     expect(html, "summary shows a thumbnail, summary_large_image shows the card").toContain("summary_large_image");
@@ -1023,7 +1023,7 @@ describe("The buyer leads, not the plumbing", () => {
     const { app } = setup();
     const html = await (await app.request("/")).text();
     const pairs = [
-      { label: /Switch now/i, target: "/fix", why: "the switch is on /fix, and the header button leads with it since goals/umzug/02" },
+      { label: /Switch now/i, target: "/fix", why: "the switch is on /fix, and the header button leads with it since move goal 02" },
       { label: /Post your first job/i, target: "/post", why: "a buyer who wants to post needs the path that posts" },
       { label: /See open jobs/i, target: "/jobs", why: "the open market, which is what that label means" },
       { label: /Switch in two steps/i, target: "/fix", why: "the two steps are on /fix" },

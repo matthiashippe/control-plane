@@ -1,4 +1,4 @@
-import { spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { chmodSync, copyFileSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -76,6 +76,29 @@ export const HEADER = readFileSync(join(ROOT, "ops", "relinked-comments.log"), "
 /** The first 12 hex digits of sha256 over a text, computed here and not by the tool under test. */
 export const sha12 = (text: string) => createHash("sha256").update(text, "utf8").digest("hex").slice(0, 12);
 
+/**
+ * Runs a child asynchronously. A synchronous spawnSync blocks the worker event loop, and vitest 3.2 has a fixed 60 s RPC timer
+ * in the worker ("Timeout calling onTaskUpdate"): several blocking calls in one test under load tripped it (audit 2026-11-23).
+ * The timeout kills this child only.
+ */
+const exec = (cmd: string, args: string[], opts: { cwd: string; env?: NodeJS.ProcessEnv }) =>
+  new Promise<{ status: number | null; stdout: string; stderr: string }>((resolve, reject) => {
+    const child = spawn(cmd, args, { cwd: opts.cwd, env: opts.env, stdio: ["ignore", "pipe", "pipe"] });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.setEncoding("utf8").on("data", (d: string) => (stdout += d));
+    child.stderr.setEncoding("utf8").on("data", (d: string) => (stderr += d));
+    const timer = setTimeout(() => child.kill("SIGKILL"), 60_000);
+    child.on("error", (e) => {
+      clearTimeout(timer);
+      reject(e);
+    });
+    child.on("close", (status) => {
+      clearTimeout(timer);
+      resolve({ status, stdout, stderr });
+    });
+  });
+
 export type Call = { args: string[]; stdin: string | null };
 export type Run = { status: number | null; out: string; calls: Call[]; log: string };
 type Comment = (typeof FIXTURE.comments)[number] & { patched?: boolean };
@@ -92,13 +115,11 @@ export function sandbox(comments: Comment[] = FIXTURE.comments) {
   for (const f of ["gh", "curl", "ssh"]) chmodSync(join(root, "bin", f), 0o755);
   const stateFile = join(root, "state.json");
   writeFileSync(stateFile, JSON.stringify({ issues: FIXTURE.issues, comments }));
-  const run = (args: string[], env: Record<string, string> = {}): Run => {
+  const run = async (args: string[], env: Record<string, string> = {}): Promise<Run> => {
     const log = join(root, `gh-${Math.random().toString(36).slice(2)}.log`);
     writeFileSync(log, "");
-    const r = spawnSync("python3", ["-I", join("ops", "relink-comments.py"), ...args], {
+    const r = await exec("python3", ["-I", join("ops", "relink-comments.py"), ...args], {
       cwd: root,
-      encoding: "utf8",
-      timeout: 60_000,
       env: {
         ...process.env,
         PATH: `${join(root, "bin")}:${process.env.PATH}`,
@@ -112,11 +133,11 @@ export function sandbox(comments: Comment[] = FIXTURE.comments) {
     return { status: r.status, out: `${r.stdout}${r.stderr}`, calls, log: readFileSync(join(root, "ops", "relinked-comments.log"), "utf8") };
   };
   /** The rules of the copy, called directly: relink(body, slug). */
-  const relink = (body: string, slug: string | null): string => {
-    const r = spawnSync(
+  const relink = async (body: string, slug: string | null): Promise<string> => {
+    const r = await exec(
       "python3",
       ["-I", "-c", "import json, sys; sys.path.insert(0, 'ops'); from relink_rules import relink; print(json.dumps(relink(sys.argv[1], sys.argv[2] or None)))", body, slug ?? ""],
-      { cwd: root, encoding: "utf8", timeout: 60_000 },
+      { cwd: root },
     );
     if (r.status !== 0) throw new Error(r.stderr);
     return JSON.parse(r.stdout) as string;

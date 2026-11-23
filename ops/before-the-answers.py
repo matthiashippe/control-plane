@@ -41,7 +41,7 @@ FOLDER, wanted = ARGS.folder, ARGS.numbers
 # The address a new answer has to carry, and every address this service has ever answered to.
 # Not a literal typed once: this file enforced "cp.hippe.eu" for two days after the move, which
 # turned the guard into the thing that would have sent nine permanent links to the wrong host.
-# Since 2026-11-17 the service is sold as automatonhost.com (goals/umzug/02); the two older hosts still answer, but a new
+# Since 2026-11-17 the service is sold as automatonhost.com (move goal 02); the two older hosts still answer, but a new
 # comment that names them anchors a permanent link on a name we no longer sell under.
 CANONICAL_HOST = os.environ.get("CP_PUBLIC_HOST") or "automatonhost.com"
 KNOWN_HOSTS = ("automatonhost.com", "cp.hippe.eu", "postyourprice.com")

@@ -138,7 +138,7 @@ describe("ops/live.sh", () => {
     expect(run.stdout).toContain(
       "planted key-cleanup foreign-living: FAIL key-cleanup: the next run deleted the folder of a run whose process lives",
     );
-    // The check `hosts` (goals/umzug/01, point 6): every host of the service and www.automatonhost.com, before and after
+    // The check `hosts` (move goal 01, point 6): every host of the service and www.automatonhost.com, before and after
     // the switch of the canonical host, in both directions.
     expect(run.stdout).toContain("planted hosts step before: OK hosts: canonical postyourprice.com, ");
     expect(run.stdout).toContain("planted hosts step after: OK hosts: canonical automatonhost.com, ");
@@ -160,7 +160,7 @@ describe("ops/live.sh", () => {
 });
 
 /**
- * The check `hosts` (goals/umzug/01, point 6) through `ops/live.sh --judge hosts`: one measured line per request on stdin,
+ * The check `hosts` (move goal 01, point 6) through `ops/live.sh --judge hosts`: one measured line per request on stdin,
  * `<host> <path> <status> <Location or ->`, as hosts_live prints them. Fast, so a broken judge shows here without the
  * minute the selftest takes.
  */

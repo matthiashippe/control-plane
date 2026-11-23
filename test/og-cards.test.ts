@@ -1,5 +1,5 @@
 /**
- * Every page names its preview card with a version and describes the card it carries (goals/umzug/04, points 1 and 2).
+ * Every page names its preview card with a version and describes the card it carries (move goal 04, points 1 and 2).
  *
  * Preview services (Slack, Discord, X, LinkedIn) keep an image by its address for days. The card of the move was new on
  * the day of the merge and would have stayed invisible behind the old picture under the same address, so the address

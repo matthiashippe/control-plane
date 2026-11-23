@@ -3,7 +3,7 @@ import { describe, it, expect } from "vitest";
 import { OG_CARD, assessOg, pixelDiffCount, summaryOg } from "../ops/soll-assess.mjs";
 
 /**
- * The judgement of ops/soll-og.mjs over the preview card /og.png, without a browser (goals/umzug/03, Punkt 1). One case per
+ * The judgement of ops/soll-og.mjs over the preview card /og.png, without a browser (move goal 03, Punkt 1). One case per
  * defect the goal names, each planted on an otherwise clean render, and the clean render itself, which must pass with nothing.
  */
 

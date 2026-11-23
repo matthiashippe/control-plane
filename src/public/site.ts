@@ -14,7 +14,7 @@
 const FALLBACK = "https://cp.hippe.eu";
 
 /**
- * Every name this service answers under (goals/umzug/01). Pages live on the one CP_PUBLIC_URL names; a page asked for
+ * Every name this service answers under (move goal 01). Pages live on the one CP_PUBLIC_URL names; a page asked for
  * on any other of these is sent there with a 301. A host outside this list is somebody else pointing their own name at
  * this address and is left alone.
  */

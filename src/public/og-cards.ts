@@ -1,7 +1,7 @@
 /**
  * The preview cards a shared link unfurls into, and what each one says to somebody who cannot see it.
  *
- * One entry per image in src/public. Until goals/umzug/04 every page carried the alt text from index.html, so /x402 and
+ * One entry per image in src/public. Until move goal 04 every page carried the alt text from index.html, so /x402 and
  * /conway described the move card ("Set conwayApiUrl to ...") under a picture of the x402 market measurement. A page names
  * its card, and the alt text comes from here with it, so the two cannot drift apart again.
  *

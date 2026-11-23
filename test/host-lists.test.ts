@@ -1,6 +1,6 @@
 /**
- * The hosts of the service and the zones of the payment are listed in six files (goals/umzug/01, point 10, and
- * goals/umzug/04). These cases hold every copy against the two lists in code, one case per file, so a host added in one
+ * The hosts of the service and the zones of the payment are listed in six files (move goal 01, point 10, and
+ * move goal 04). These cases hold every copy against the two lists in code, one case per file, so a host added in one
  * place only fails here with the name of the file that was missed instead of reaching a customer or a revert.
  */
 import fs from "node:fs";

@@ -60,7 +60,7 @@ export function loadConfig(env = process.env) {
 
 // ---- the domain of exposed ports (goals/sandbox/07)
 
-/** The zones of the payment service. A customer's service never gets a name in one (goals/sandbox/ANNAHMEN.md, Goal 07; goals/umzug/01). */
+/** The zones of the payment service. A customer's service never gets a name in one (goals/sandbox/ANNAHMEN.md, Goal 07; move goal 01). */
 export const PAYMENT_ZONES = ["postyourprice.com", "automatonhost.com"];
 const DOMAIN_RE = /^(?=.{4,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
 

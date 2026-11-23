@@ -2,7 +2,7 @@
  * The preview card is what every shared link of automatonhost.com shows, and it is a picture.
  *
  * /og.png is a screenshot of src/public/og-card.html, taken by ops/soll-og.mjs from the approved
- * SOLL source docs/soll/src/og-card.html (goals/umzug/03). Since then the card says what the first
+ * SOLL source docs/soll/src/og-card.html (move goal 03). Since then the card says what the first
  * block of the landing page says: Conway not answering, your automaton runs here, and the one line
  * conwayApiUrl that makes the switch. It used to carry the market and "first job: free, 15 ¢" burned
  * in; a picture cannot ask starterOffer() whether the pool still pays, so a promise on it was a
@@ -54,7 +54,7 @@ describe("The preview card", () => {
   it("says the same thing the page says, so a shared link does not mis-sell", async () => {
     const app = createApp({ db: openDb(":memory:") });
     const html = await (await app.request("/")).text();
-    // The card carries the lead of the move block (goals/umzug/03): that block leads the page for operators from Conway issues,
+    // The card carries the lead of the move block (move goal 03): that block leads the page for operators from Conway issues,
     // and it is what a shared link has to say first. The market below it is not on the card any more.
     const move = html.indexOf('id="move"');
     expect(move, "no move block").toBeGreaterThan(-1);
@@ -62,7 +62,7 @@ describe("The preview card", () => {
     const h1 = block.match(/<h1>([\s\S]*?)<\/h1>/)?.[1].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
     expect(h1, "the move block lost its h1").toBeTruthy();
     // Since goals/werbung/01 the question stands in the pill of the move block and the h1 says "No crypto needed" in its second
-    // sentence, while the card stays as umzug 03 approved it (Tech Lead, 23.11.2026, goals/werbung/ANNAHMEN.md). So the card
+    // sentence, while the card stays as move goal 03 approved it (Tech Lead, 23.11.2026, goals/werbung/ANNAHMEN.md). So the card
     // carries the text of the pill and the first sentence of the h1, the question first.
     const pill = block.match(/<a class="pill"[^>]*>([\s\S]*?)<\/a>/)?.[1].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
     expect(pill, "the move block lost its pill").toBeTruthy();

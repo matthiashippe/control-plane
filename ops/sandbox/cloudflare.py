@@ -34,7 +34,7 @@ import urllib.request
 from pathlib import Path
 
 PAYMENT_ZONE = "postyourprice.com"
-# Every zone the payment service answers under (goals/umzug/01). Exposed ports never get a name in one of them.
+# Every zone the payment service answers under (move goal 01). Exposed ports never get a name in one of them.
 PAYMENT_ZONES = ("postyourprice.com", "automatonhost.com")
 
 

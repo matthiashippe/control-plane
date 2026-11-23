@@ -1,5 +1,5 @@
 /**
- * The service is sold as automatonhost.com since 2026-11-17 (goals/umzug/02). No page a visitor, an operator or their automaton
+ * The service is sold as automatonhost.com since 2026-11-17 (move goal 02). No page a visitor, an operator or their automaton
  * reads may name the old brand any more: every page in /sitemap.xml, /llms.txt, /openapi.json, every state of the phone pages
  * under /h/{code} and the sources of both preview cards. The one allowed mention is the JSON field handsel_notice on /terms,
  * named in <code> because runtimes read that field (Entscheidung 2 of the goal).
@@ -68,7 +68,7 @@ describe("the old name is gone from what we serve", () => {
   });
 
   it("leads /llms.txt with the switch to conwayApiUrl on the canonical host, and puts One job under The market after it", async () => {
-    // goals/umzug/03: an automaton that reads llms.txt first has to read the one line that keeps it running, not an offer that is
+    // move goal 03: an automaton that reads llms.txt first has to read the one line that keeps it running, not an offer that is
     // not its own. The first paragraph is everything between the title and the next empty line.
     const llms = await (await app().request("/llms.txt")).text();
     const first = llms.split("\n\n")[1] ?? "";
