@@ -101,7 +101,7 @@ MVP: Funktion, weil sonst jeder mit einer neuen Wallet beliebig oft kaufen, verb
   Seite englisch.
 
 ## Done Condition
-- [ ] Die Rechnung des Notschalters steht genau einmal in `src/payments/card-way.ts`, zählt nur Live-Erstattungen der letzten 60 Tage,
+- [x] Die Rechnung des Notschalters steht genau einmal in `src/payments/card-way.ts`, zählt nur Live-Erstattungen der letzten 60 Tage,
       schaltet bei genau 50 USD Fehlbetrag an, öffnet von selbst wieder und sperrt jede Wallet mit einer Erstattung.
       MVP: Funktion, weil die Grenze von 50 USD sonst nur auf dem Papier steht.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/card-way.test.ts` muss Exit-Code 0 haben.
@@ -110,7 +110,7 @@ MVP: Funktion, weil sonst jeder mit einer neuen Wallet beliebig oft kaufen, verb
       Prüfung: `grep -cE '^export const CARD_BREAKER_WINDOW_DAYS = 60;' src/payments/card-way.ts` muss genau 1 ausgeben.
       Prüfung: `grep -cE 'Number\(|parseFloat|toFixed' src/payments/card-way.ts` muss 0 ausgeben.
       Prüfung: `T=$(mktemp -d); git archive HEAD | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; sed -i 's/CARD_BREAKER_SHORTFALL_MC = 5_000_000;/CARD_BREAKER_SHORTFALL_MC = 5_000_001;/' $T/src/payments/card-way.ts; grep -q '5_000_001' $T/src/payments/card-way.ts || echo sed-miss; (cd $T && PATH=/usr/bin:$PATH pnpm -s vitest run test/card-way.test.ts > /dev/null 2>&1); echo "exit=$?"; rm -rf $T` muss als letzte Zeile `exit=1` ausgeben und darf `sed-miss` nicht ausgeben.
-- [ ] `GET /card/<paket>?address=<wallet>` schickt bei offener Kasse mit 302 zu Digistore24, zeigt im Fall (a) und (b) denselben Satz
+- [x] `GET /card/<paket>?address=<wallet>` schickt bei offener Kasse mit 302 zu Digistore24, zeigt im Fall (a) und (b) denselben Satz
       mit dem Weg über USDC und keinen Link zur Kasse, fragt bei fehlender Adresse mit einem Formular nach und wird nie zwischengespeichert.
       MVP: Funktion, weil nur ein Weg, den der Dienst selbst führt, sich abschalten lässt.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/card-redirect.test.ts` muss Exit-Code 0 haben.
@@ -126,7 +126,7 @@ MVP: Funktion, weil sonst jeder mit einer neuen Wallet beliebig oft kaufen, verb
       Prüfung: `T=$(mktemp -d); git archive HEAD | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; echo 'https://www.checkout-ds24.com/product/771278/' >> $T/README.md; (cd $T && PATH=/usr/bin:$PATH pnpm -s vitest run test/card-way-guard.test.ts > /dev/null 2>&1); echo "exit=$?"; rm -rf $T` muss genau `exit=1` ausgeben.
       Prüfung: `grep -c 'stripCardWay(' src/app.ts` muss mindestens 1 ausgeben.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD -- src/public/index.html src/inference/proxy.ts src/payments/digistore.ts ops/card-orders.sh | wc -l` muss 0 ausgeben.
-- [ ] `ops/card-breaker.sh` meldet Erstattungen, Fehlbetrag und Notschalter der letzten 60 Tage aus der Rechnung des Dienstes, liest
+- [x] `ops/card-breaker.sh` meldet Erstattungen, Fehlbetrag und Notschalter der letzten 60 Tage aus der Rechnung des Dienstes, liest
       nur, nennt nie eine Adresse und kippt in beide Richtungen; `ops/status.sh` zeigt die Zeile als `card_breaker`.
       MVP: Funktion, weil Matthias' „hab ein auge drauf“ eine Zahl braucht, die jeder Lauf der Ops-Triage sieht.
       Prüfung: `bash -n ops/card-breaker.sh && echo syntax ok` muss genau `syntax ok` ausgeben.
@@ -136,14 +136,14 @@ MVP: Funktion, weil sonst jeder mit einer neuen Wallet beliebig oft kaufen, verb
       Prüfung: `grep -cE '\b(INSERT|UPDATE|DELETE|DROP|ALTER)\b|shortfall_mc' ops/card-breaker.sh` muss 0 ausgeben.
       Prüfung: `grep -c 'dist/payments/card-way.js' ops/card-breaker.sh` muss mindestens 1 ausgeben.
       Prüfung: `grep -c 'card-breaker.sh' ops/status.sh` muss mindestens 1 ausgeben.
-- [ ] Der Watchdog meldet das Auslösen des Notschalters genau einmal über `CP_ALERT_WEBHOOK`, das Wiederöffnen einmal, und verliert
+- [x] Der Watchdog meldet das Auslösen des Notschalters genau einmal über `CP_ALERT_WEBHOOK`, das Wiederöffnen einmal, und verliert
       keine Meldung, wenn der POST scheitert.
       MVP: Funktion, weil ein Notschalter, von dem niemand erfährt, die Kasse still schließt.
       Prüfung: `bash -n ops/watchdog.sh && echo syntax ok` muss genau `syntax ok` ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/watchdog-card-breaker.test.ts test/watchdog-credit.test.ts test/watchdog-webhook-fail.test.ts` muss Exit-Code 0 haben.
       Prüfung: `for t in "posts one warning when the breaker turns on" "posts nothing more while the breaker stays on" "posts once when the checkout opens again" "keeps the state and posts again on the next run when the post failed" "keeps the state when ops/card-breaker.sh cannot be read"; do grep -qF "\"$t\"" test/watchdog-card-breaker.test.ts || echo "fehlt: $t"; done` muss nichts ausgeben.
       Prüfung: `grep -c 'check_card_breaker' ops/watchdog.sh` muss mindestens 2 ausgeben.
-- [ ] Die Entscheidungen stehen in `goals/wache/ANNAHMEN.md`, der Diff bleibt in den Pfaden dieses Goals, kein Test fällt weg, und
+- [x] Die Entscheidungen stehen in `goals/wache/ANNAHMEN.md`, der Diff bleibt in den Pfaden dieses Goals, kein Test fällt weg, und
       nichts im Repo nennt eine Adresse eines Kunden.
       MVP: Funktion, weil karte 02 und werbung 01 auf diesen Wegen bauen und wissen müssen, warum es nur einen Link zur Kasse gibt.
       Prüfung: `grep -cE '^- [0-9]{4}-[0-9]{2}-[0-9]{2}, wache 01: ' goals/wache/ANNAHMEN.md` muss mindestens 7 ausgeben.
@@ -151,10 +151,10 @@ MVP: Funktion, weil sonst jeder mit einer neuen Wallet beliebig oft kaufen, verb
       Prüfung: `git diff --diff-filter=D --name-only $(git merge-base origin/dev HEAD) HEAD -- test | wc -l` muss 0 ausgeben.
       Prüfung: `git diff $(git merge-base origin/dev HEAD) HEAD -- . ':!goals' | grep '^+' | grep -oE '0x[0-9a-fA-F]{40}' | sort -u | awk '{s=substr($0,3,2); r=""; for(i=0;i<20;i++) r=r s; if (substr($0,3)!=r) n++} END{print n+0}'` muss 0 ausgeben.
       Prüfung: `grep -ci 'postyourprice' src/payments/card-way.ts` muss 0 ausgeben.
-- [ ] Der Job `e2e` am Kopf des Goal-PR ist grün.
+- [x] Der Job `e2e` am Kopf des Goal-PR ist grün.
       MVP: Funktion, weil der Laufzeitpfad sich ändert und der code-host kein Docker hat.
       Prüfung (Netz): `gh pr checks $(gh pr list -R matthiashippe/control-plane --head goal/wache-01 --state open --json number -q '.[0].number') -R matthiashippe/control-plane 2>&1 | grep -E '^e2e\s' | grep -c pass` muss genau 1 ausgeben.
-- [ ] `check` ist grün.
+- [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
 - [ ] goal-verifier PASS (K und B)
 
@@ -187,6 +187,7 @@ MVP: Funktion, weil sonst jeder mit einer neuen Wallet beliebig oft kaufen, verb
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-23 Zyklus 1: Punkte 1, 2, 4, 5, 6, 7, 8 gebaut: `src/payments/card-way.ts` (Rechnung des Notschalters, Links nur über `/card/<paket>`, `stripCardWay`), Route `GET /card/:package` in `src/app.ts`, `ops/card-breaker.sh` mit Feld `card_breaker` in `ops/status.sh`, `check_card_breaker` in `ops/watchdog.sh`, 13 Zeilen in `goals/wache/ANNAHMEN.md`. Punkt 3 bleibt offen nach Entscheidung des Tech Leads (karte 02 ist vor diesem Goal gemergt, Startseite, 402, README und MCP führen auf dev direkt zur Kasse; neuer Schnitt in der Kritik). Rot gesehen: die vier neuen Testdateien gegen die Merge-Basis (card-way: Modul fehlt; card-redirect 5 von 6; card-breaker-ops 7 von 7; watchdog-card-breaker 5 von 5), Grenze 5_000_001 per Mutation exit=1. Prüfbefehle: Punkt 1 vitest Exit 0, Namen nichts fehlt, 1, 1, 0, exit=1 ohne sed-miss; Punkt 2 vitest Exit 0, Namen nichts fehlt, `weiterleitung ok`, 1; Punkt 3 (offen) guard-Test exit=1, `checkout-ds24` außerhalb 4, `stripCardWay(` 1, fremde Dateien 0; Punkt 4 `syntax ok`, vitest Exit 0, Namen nichts fehlt, `readonly: true` 2, Schreibwörter 0, Modul 2, `status.sh` 3; Punkt 5 `syntax ok`, vitest Exit 0 (drei Dateien), Namen nichts fehlt, `check_card_breaker` 2; Punkt 6 Annahmen 13, fremde Pfade 0, gelöschte Tests 0, Adressen 0, `postyourprice` 0; Punkt 7 PR #395 am Kopf 24c42c5 `check` und `e2e` pass; Punkt 8 `check` grün in 97 s.
 
 ## Blockers
 keine
