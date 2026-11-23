@@ -358,14 +358,23 @@ async function handleChatUncoalesced(
         // the caller to substitute two things; the URL below asks it to follow a link. It carries
         // the wallet the call was billed against, so an operator reading a log line can open it,
         // and `topup_url` is beside the prose because a machine reads fields, not sentences.
+        //
+        // The way without crypto comes right after the first sentence (goals/werbung/01), before x402 and USDC, because an
+        // operator without a wallet stops reading at the first word they cannot use. It is gone while the card breaker is on.
         message:
           `Insufficient credits: need ${mcToCents(requiredMc) + 1} cents, have ${mcToCents(availableMc)} cents. ` +
+          (cardUrl ? `No crypto needed: pay by card, PayPal or Apple Pay at ${cardUrl} ` : "") +
           `Buy credits at ${siteOrigin()}/pay/5/${address}: call it, take the 402, sign the x402 ` +
           `offer it carries and send it back in X-Payment. Tiers are ${TOPUP_TIERS_USD.join(", ")} USD; ` +
           `put another one in the path for a larger one. Sending USDC to ${address} on Base works ` +
           "too, and the runtime's bootstrap topup picks it up. " +
-          (cardUrl ? `No USDC? Pay by card: ${cardUrl} ` : "") +
           "Nothing was charged for this call.",
+        // One sentence an agent can pass on to its person word for word (goals/werbung/01): most operators let an agent
+        // repair their automaton, and the agent reads this answer and then recommends one thing. Additive only, like
+        // `topup_url`; nothing upstream reads it. While the card breaker is on it names only the way over USDC.
+        message_for_operator: cardUrl
+          ? `No crypto needed: top up this automaton by card, PayPal or Apple Pay at ${cardUrl}`
+          : `Top up this automaton with USDC on Base at ${siteOrigin()}/pay/5/${address}`,
         docs: DOC.inference,
         details: {
           required_cents: Math.ceil(requiredMc / 1000),

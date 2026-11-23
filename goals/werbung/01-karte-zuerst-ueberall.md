@@ -1,7 +1,7 @@
 # Werbung Goal 01: Karte zuerst, überall
 
 ## Status
-PLANNED
+DONE
 
 ## Active Objective
 Seit karte 02 gibt es die Kasse für Guthaben per Karte, PayPal und Apple Pay, und wache 01 führt jeden Weg dorthin über die
@@ -115,7 +115,7 @@ werbetrommel rühren, denn viele haben kein crypto“).
   Testnamen und alle Texte auf Seite, README, 402 und in der Vorlage englisch, Kopf der Vorlage und `ANNAHMEN.md` deutsch.
 
 ## Done Condition
-- [ ] Die zwei SOLL-Bilder der Startseite zeigen im ersten Bildschirm `No crypto needed` in der Überschrift, Karte, PayPal, Apple Pay
+- [x] Die zwei SOLL-Bilder der Startseite zeigen im ersten Bildschirm `No crypto needed` in der Überschrift, Karte, PayPal, Apple Pay
       und 60 Tage zum Widerrufen vor jedem USDC, kommen aus ihrer Quelle ohne Netz und ohne Mangel, und der Block `card` bleibt.
       MVP: Funktion, weil die Startseite 1:1 nach einem Bild entsteht und nicht nach einer Beschreibung.
       Prüfung: `T=$(mktemp -d); FONTCONFIG_FILE=$HOME/.config/control-plane/soll-fonts.conf node ops/soll.mjs --check > $T/o 2>&1; echo "exit=$? $(tail -n 1 $T/o | grep -o '0 defects$')"; rm -rf $T` muss `exit=0 0 defects` ausgeben.
@@ -123,7 +123,7 @@ werbetrommel rühren, denn viele haben kein crypto“).
       Prüfung: `node --input-type=module -e 'import fs from "node:fs"; import { decodePng } from "./ops/soll-assess.mjs"; const bad = []; for (const w of [390, 1440]) { const p = decodePng(fs.readFileSync("docs/soll/startseite-" + w + ".png")); if (p.width !== w) bad.push(String(w)); } console.log(bad.length ? "falsch " + bad.join(" ") : "breiten ok")'` muss genau `breiten ok` ausgeben.
       Prüfung: `B=$(git merge-base origin/dev HEAD); c() { sed -n '/<section id="card" data-soll="card">/,/<\/section>/p'; }; [ "$(git show $B:docs/soll/src/startseite.html | c | sha256sum)" = "$(c < docs/soll/src/startseite.html | sha256sum)" ] && [ -n "$(c < docs/soll/src/startseite.html)" ] && echo card gleich` muss genau `card gleich` ausgeben.
       Prüfung: `grep -cE '^## Werbung: Karte zuerst \(goals/werbung/01\)$' docs/soll/README.md` muss genau 1 ausgeben.
-- [ ] Die sechs SOLL-Bilder der Fehlerseiten zeigen über der Zeile mit USDC die Zeile mit `No crypto needed`, Karte, PayPal, Apple
+- [x] Die sechs SOLL-Bilder der Fehlerseiten zeigen über der Zeile mit USDC die Zeile mit `No crypto needed`, Karte, PayPal, Apple
       Pay und dem Link auf das Formular, kommen aus ihren Quellen ohne Netz und ohne Mangel, und der Block `fix` endet im ersten
       Bildschirm.
       MVP: Funktion, weil wer den Fehlertext sucht, auf diesen Seiten landet und dort heute nur USDC liest.
@@ -132,12 +132,12 @@ werbetrommel rühren, denn viele haben kein crypto“).
       Prüfung: `node --input-type=module -e 'import fs from "node:fs"; import { decodePng } from "./ops/soll-assess.mjs"; const bad = []; for (const s of ["verify-500-database-error", "invalid-or-expired-nonce", "credits-never-granted"]) for (const w of [390, 1440]) { const p = decodePng(fs.readFileSync("docs/soll/errors-" + s + "-" + w + ".png")); if (p.width !== w) bad.push(s + " " + w); } console.log(bad.length ? "falsch " + bad.join(" ") : "breiten ok")'` muss genau `breiten ok` ausgeben.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD -- docs/soll | grep -vE '^docs/soll/(startseite-(390|1440)\.png|src/startseite\.html|errors-[a-z0-9-]+-(390|1440)\.png|src/errors-[a-z0-9-]+\.html|README\.md)$' | wc -l` muss 0 ausgeben.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD -- ops/soll.mjs ops/soll-live.mjs ops/soll-errors.mjs ops/soll-live-errors.mjs ops/soll-assess.mjs ops/browser.mjs | wc -l` muss 0 ausgeben.
-- [ ] Der Design Reviewer hat genau diese acht Bilder abgenommen, bevor sich `src/public/index.html` oder `src/public/error-pages.ts`
+- [x] Der Design Reviewer hat genau diese acht Bilder abgenommen, bevor sich `src/public/index.html` oder `src/public/error-pages.ts`
       änderten.
       MVP: Funktion, weil Startseite und Fehlerseiten 1:1 nach einem abgenommenen Bild entstehen.
       Prüfung: `grep -cE '^Abnahme-Issue werbung: PRO-[0-9]+$' docs/soll/README.md` muss genau 1 ausgeben.
       Prüfung (Netz): `i=$(sed -n 's/^Abnahme-Issue werbung: //p' docs/soll/README.md); t=$(git log -1 --format=%cI -- docs/soll/startseite-390.png docs/soll/startseite-1440.png docs/soll/src/startseite.html 'docs/soll/errors-*.png' 'docs/soll/src/errors-*.html'); b=$(git log --reverse --format=%cI origin/dev..HEAD -- src/public/index.html src/public/error-pages.ts | head -1); curl -s -H "Authorization: Bearer $PAPERCLIP_API_KEY" "$PAPERCLIP_API_URL/api/issues/$i/comments" | T="$t" B="$b" node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{const t=Date.parse(process.env.T);const ok=JSON.parse(d).filter(c=>c.authorAgentId==="3412a0ea-cbf5-4f18-9360-0e8e20ba3313"&&/SOLL abgenommen/.test(c.body)).map(c=>Date.parse(c.createdAt));if(!process.env.T||!ok.some(x=>x>t)){console.error("keine abnahme nach "+process.env.T);process.exit(1)}if(process.env.B&&!(Math.min(...ok.filter(x=>x>t))<Date.parse(process.env.B))){console.error("gebaut vor der abnahme "+process.env.B);process.exit(1)}console.log("abnahme ok "+ok.length)})'` muss `abnahme ok <n>` mit n mindestens 1 ausgeben.
-- [ ] Die echte Startseite zeigt im ersten Bildschirm `No crypto needed` in der Überschrift, Karte, PayPal, Apple Pay und 60 Tage
+- [x] Die echte Startseite zeigt im ersten Bildschirm `No crypto needed` in der Überschrift, Karte, PayPal, Apple Pay und 60 Tage
       zum Widerrufen vor jedem USDC, ist pixelgleich mit dem abgenommenen Bild, eine geänderte Botschaft fällt dabei auf, mit
       Notschalter an zeigt sie den ersten Bildschirm von wache 01, und das Skript der Seite und sein Hash bleiben, wie sie sind.
       MVP: Funktion, weil die Startseite der erste Ort ist, an dem ein Betreiber ohne Krypto heute nur die Wallet sieht.
@@ -149,7 +149,7 @@ werbetrommel rühren, denn viele haben kein crypto“).
       Prüfung: `B=$(git merge-base origin/dev HEAD); s() { sed -n '/^<script>$/,/<\/script>/p'; }; a=$(git show $B:src/public/index.html | s | sha256sum); b=$(s < src/public/index.html | sha256sum); [ "$a" = "$b" ] && [ -n "$(s < src/public/index.html)" ] && echo skript gleich` muss genau `skript gleich` ausgeben.
       Prüfung: `B=$(git merge-base origin/dev HEAD); c() { sed -n '/<section id="card" data-soll="card">/,/<\/section>/p'; }; [ "$(git show $B:src/public/index.html | c | sha256sum)" = "$(c < src/public/index.html | sha256sum)" ] && [ -n "$(c < src/public/index.html)" ] && echo card gleich` muss genau `card gleich` ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/public.test.ts test/without-script.test.ts test/domain-move.test.ts test/journeys-cover-pages.test.ts test/sitemap-covers-pages.test.ts test/soll.test.ts test/card-checkout.test.ts` muss Exit-Code 0 haben.
-- [ ] Jede Fehlerseite zeigt über der Zeile mit USDC die Zeile mit `No crypto needed`, Karte, PayPal, Apple Pay und dem Link auf das
+- [x] Jede Fehlerseite zeigt über der Zeile mit USDC die Zeile mit `No crypto needed`, Karte, PayPal, Apple Pay und dem Link auf das
       Formular, ist pixelgleich mit ihren abgenommenen Bildern, eine geänderte Botschaft fällt dabei auf, und mit Notschalter an
       fehlt die Zeile.
       MVP: Funktion, weil wer bei Conway hängt und den Fehlertext sucht, hier im ersten Bildschirm den Weg ohne Krypto braucht.
@@ -158,12 +158,12 @@ werbetrommel rühren, denn viele haben kein crypto“).
       Prüfung: `T=$(mktemp -d); PATH=/usr/bin:$PATH node --import tsx ops/soll-live-errors.mjs --out $T && FONTCONFIG_FILE=$HOME/.config/control-plane/soll-fonts.conf node ops/soll-errors.mjs --check --source $T > $T/o 2>&1; echo "exit=$? $(tail -n 1 $T/o | grep -o '0 defects$')"; rm -rf $T` muss `exit=0 0 defects` ausgeben.
       Prüfung: `T=$(mktemp -d); git archive HEAD | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; sed -i 's/No crypto needed/No coins needed/g' $T/src/public/error-pages.ts; grep -q 'No coins needed' $T/src/public/error-pages.ts || echo sed-miss; (cd $T && PATH=/usr/bin:$PATH node --import tsx ops/soll-live-errors.mjs --out $T/out); FONTCONFIG_FILE=$HOME/.config/control-plane/soll-fonts.conf node ops/soll-errors.mjs --check --source $T/out > $T/o 2>&1; echo "exit=$?"; rm -rf $T` muss als letzte Zeile `exit=1` ausgeben und darf `sed-miss` nicht ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/error-pages.test.ts test/soll-errors.test.ts test/jsonld.test.ts test/error-pages-arrivals.test.ts` muss Exit-Code 0 haben.
-- [ ] Der erste Absatz des README beginnt mit `No crypto needed`, nennt Karte, PayPal und Apple Pay vor jedem USDC, und das README
+- [x] Der erste Absatz des README beginnt mit `No crypto needed`, nennt Karte, PayPal und Apple Pay vor jedem USDC, und das README
       verlinkt die Kasse nur über die Weiterleitung aus wache 01 oder über das Formular.
       MVP: Funktion, weil Betreiber, die über GitHub kommen, zuerst das README lesen.
       Prüfung: `node -e 'const r=require("fs").readFileSync("README.md","utf8");const bad=[];const ps=r.split(/\n\s*\n/).map(p=>p.trim()).filter(p=>p&&!p.startsWith("#"));const first=ps.find(p=>!/^\*\*[^*]+\*\*$/.test(p))||"";if(!first.startsWith("No crypto needed"))bad.push("erster absatz: "+first.slice(0,40));for(const w of ["PayPal","Apple Pay"])if(!first.includes(w))bad.push(w);if(!/card/i.test(first))bad.push("card");const n=r.indexOf("No crypto needed"),u=r.indexOf("USDC");if(n<0||(u>=0&&u<n))bad.push("usdc vor der botschaft");if(!r.includes("60 days to cancel the purchase"))bad.push("60 tage");if(/checkout-ds24|money back|[\u2013\u2014]/i.test(r))bad.push("kasse direkt, money back oder gedankenstrich");if(!r.includes("https://automatonhost.com/#card"))bad.push("formular");console.log(bad.length?bad.join("; "):"readme ok")'` muss genau `readme ok` ausgeben.
       Prüfung: `grep -ci 'postyourprice' README.md` muss 0 ausgeben.
-- [ ] Die 402 bei leerem Guthaben nennt direkt nach dem ersten Satz `No crypto needed` mit Karte, PayPal, Apple Pay und `card_url`,
+- [x] Die 402 bei leerem Guthaben nennt direkt nach dem ersten Satz `No crypto needed` mit Karte, PayPal, Apple Pay und `card_url`,
       vor jedem USDC; mit Notschalter an nennt sie keine Karte, und alles, was die Runtime liest, bleibt gleich.
       MVP: Funktion, weil Betreiber diese Antwort täglich im Log ihres Automatons lesen und dort heute zuerst x402 und USDC finden.
       Prüfung: `for t in "puts no crypto needed right after the first sentence of the 402" "names the card url before any usdc in the 402" "drops the card sentence from the 402 while the card breaker is on" "keeps error, required_cents, current_balance_cents and topup_url of the 402"; do grep -qF "\"$t\"" test/werbung.test.ts || echo "fehlt: $t"; done` muss nichts ausgeben.
@@ -172,14 +172,14 @@ werbetrommel rühren, denn viele haben kein crypto“).
       Prüfung: `grep -c 'checkout-ds24' src/inference/proxy.ts` muss 0 ausgeben.
       Prüfung: `git diff $(git merge-base origin/dev HEAD) HEAD -- test | grep -cE '^-\s*(it|test)(\.each\([^)]*\))?\('` muss 0 ausgeben.
       Prüfung (Netz): `gh pr checks $(gh pr list -R matthiashippe/control-plane --head goal/werbung-01 --state open --json number -q '.[0].number') -R matthiashippe/control-plane 2>&1 | grep -E '^e2e\s' | grep -c pass` muss genau 1 ausgeben.
-- [ ] Die Vorlage für Antworten in Conway-Issues steht in `docs/kanal/antwort-vorlage.md` mit `Disclosure:`, `No crypto needed` vor
+- [x] Die Vorlage für Antworten in Conway-Issues steht in `docs/kanal/antwort-vorlage.md` mit `Disclosure:`, `No crypto needed` vor
       jedem USDC, Karte, PayPal, Apple Pay, dem Link auf das Formular und nur dem Host automatonhost.com, und das Gatter und die
       Entwürfe des Topics kanal bleiben unverändert.
       MVP: Funktion, weil der Kanal, der bisher als einziger fremde Leser brachte, die Karte sonst nie nennt.
       Prüfung: `node -e 'const s=require("fs").readFileSync("docs/kanal/antwort-vorlage.md","utf8");const bad=[];if(!/^Disclosure: /m.test(s))bad.push("disclosure");const d=(s.match(/^Disclosure: .*$/m)||[""])[0];const n=s.indexOf("No crypto needed"),u=s.indexOf("USDC");if(n<0||(u>=0&&u<n))bad.push("usdc vor der botschaft");for(const w of ["https://automatonhost.com","PayPal","Apple Pay","https://automatonhost.com/#card","60 days to cancel the purchase"])if(!s.includes(w))bad.push(w);if(!d.includes("https://automatonhost.com"))bad.push("host nicht in der zeile disclosure");if(/cp\.hippe\.eu|postyourprice|checkout-ds24|money back|refund|[\u2013\u2014]/i.test(s))bad.push("fremder host, kasse direkt, money back oder gedankenstrich");console.log(bad.length?bad.join("; "):"vorlage ok")'` muss genau `vorlage ok` ausgeben.
       Prüfung: `grep -qF '"keeps the answer template card first"' test/werbung.test.ts && echo da` muss genau `da` ausgeben.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD -- ops/before-the-answers.py ops/post-the-answers.py ops/answers_args.py goals/kanal | wc -l` muss 0 ausgeben.
-- [ ] Die 402 bei leerem Guthaben trägt zusätzlich das Feld `message_for_operator` mit genau einem Satz, den ein Agent seinem Menschen
+- [x] Die 402 bei leerem Guthaben trägt zusätzlich das Feld `message_for_operator` mit genau einem Satz, den ein Agent seinem Menschen
       wörtlich weitergeben kann: `No crypto needed: top up this automaton by card, PayPal or Apple Pay at <Link>`, der Link über die
       Weiterleitung aus wache 01 mit der Wallet dieses Aufrufs; mit Notschalter an nennt das Feld nur den Weg über USDC. Das Feld kommt
       dazu, nichts, was die Runtime liest, ändert sich.
@@ -188,7 +188,7 @@ werbetrommel rühren, denn viele haben kein crypto“).
       Prüfung: `for t in "gives an agent one sentence to pass on in message_for_operator" "names only usdc in message_for_operator while the card breaker is on"; do grep -qF "\"$t\"" test/werbung.test.ts || echo "fehlt: $t"; done` muss nichts ausgeben.
       Prüfung: `grep -c 'message_for_operator' src/inference/proxy.ts` muss mindestens 1 ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/werbung.test.ts test/messages.test.ts` muss Exit-Code 0 haben.
-- [ ] `/llms.txt` beginnt direkt unter der ersten Überschrift mit einem Block für Agenten, die einem Menschen mit einem kaputten
+- [x] `/llms.txt` beginnt direkt unter der ersten Überschrift mit einem Block für Agenten, die einem Menschen mit einem kaputten
       Conway-Automaton helfen: die Fehlertexte, an denen der Agent den Fall erkennt (mindestens `/v1/auth/verify` mit 500 und
       `INSUFFICIENT_CREDITS`), die eine Zeile für `conwayApiUrl` und `No crypto needed` mit Karte, PayPal, Apple Pay und dem Link zum
       Formular oder über die Weiterleitung, alles vor dem ersten USDC; mit Notschalter an fehlt die Karte im Block. Der Rest von
@@ -196,7 +196,7 @@ werbetrommel rühren, denn viele haben kein crypto“).
       MVP: Funktion, weil ein Agent mit Websuche `/llms.txt` liest, bevor er seinem Menschen einen Dienst empfiehlt.
       Prüfung: `for t in "opens llms.txt with the block for agents helping an operator" "drops the card from the llms.txt block while the card breaker is on"; do grep -qF "\"$t\"" test/werbung.test.ts || echo "fehlt: $t"; done` muss nichts ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/werbung.test.ts test/llms-txt.test.ts test/public.test.ts` muss Exit-Code 0 haben.
-- [ ] Keine der fünf Stellen verlinkt die Kasse von Digistore24 direkt, die Entscheidungen stehen in `goals/werbung/ANNAHMEN.md`, der
+- [x] Keine der fünf Stellen verlinkt die Kasse von Digistore24 direkt, die Entscheidungen stehen in `goals/werbung/ANNAHMEN.md`, der
       Diff bleibt in den Pfaden dieses Goals, kein Test fällt weg, und nichts nennt eine Adresse eines Kunden oder PostYourPrice.
       MVP: Funktion, weil der Notschalter aus wache 01 nur wirkt, wenn jeder Weg zur Kasse über ihn geht.
       Prüfung: `cat README.md src/public/index.html src/public/error-pages.ts src/inference/proxy.ts docs/kanal/antwort-vorlage.md | grep -c 'checkout-ds24'` muss 0 ausgeben.
@@ -205,9 +205,18 @@ werbetrommel rühren, denn viele haben kein crypto“).
       Prüfung: `git diff --diff-filter=D --name-only $(git merge-base origin/dev HEAD) HEAD -- test | wc -l` muss 0 ausgeben.
       Prüfung: `cat goals/werbung/ANNAHMEN.md README.md src/public/error-pages.ts docs/kanal/antwort-vorlage.md docs/soll/src/startseite.html docs/soll/src/errors-*.html | grep -cE '0x[0-9a-fA-F]{40}'` muss 0 ausgeben.
       Prüfung: `cat src/public/error-pages.ts docs/kanal/antwort-vorlage.md docs/soll/src/errors-*.html | grep -ci 'postyourprice'` muss 0 ausgeben.
-- [ ] `check` ist grün.
+- [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] Bei Notschalter aus liefert `/` genau einen Block `move`, und keine der Marken `<!--CARD-->`, `<!--/CARD-->`, `<!--NOCARD-->`
+      und `<!--/NOCARD-->` erreicht den Browser; ein Fall in `test/werbung.test.ts` sichert das ab, wie es der Fall für Notschalter an
+      schon tut.
+      MVP: Funktion, weil `src/public/index.html` den ersten Bildschirm jetzt zweimal trägt und nur das Zusammenspiel von
+      `stripCardWay` und `keepNoCardWay` einen davon entfernt; eine vertippte Marke zeigt sonst zwei Überschriften, ohne dass ein
+      Test rot wird (Kritik des Tech Lead, 23.11.2026).
+      Prüfung: `grep -qF '"shows exactly one first screen while the card breaker is off"' test/werbung.test.ts && echo da` muss genau `da` ausgeben.
+      Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/werbung.test.ts -t "shows exactly one first screen while the card breaker is off"` muss Exit-Code 0 haben.
+      Prüfung: `T=$(mktemp -d); cp src/public/index.html $T/i; sed -i '0,/<!--NOCARD-->/s/<!--NOCARD-->//' src/public/index.html; PATH=/usr/bin:$PATH pnpm -s vitest run test/werbung.test.ts -t "shows exactly one first screen while the card breaker is off" > /dev/null 2>&1 && r=gruen || r=rot; cp $T/i src/public/index.html; rm -rf $T; echo $r` muss genau `rot` ausgeben.
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Ein Betreiber ohne Krypto liest an jeder der fünf Stellen zuerst, dass sein Automaton per Karte, PayPal oder Apple Pay weiterläuft,
@@ -245,6 +254,11 @@ werbetrommel rühren, denn viele haben kein crypto“).
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-23 Zyklus 1: Punkte 1 bis 12 gebaut: SOLL-Bilder der Startseite und der drei Fehlerseiten neu (`e92192b`), vom Design Reviewer auf PRO-28027 um 02:06 abgenommen, danach erster Bildschirm der Startseite mit `No crypto needed` in der `<h1>` (bei Notschalter an der erste Bildschirm von wache 01 über `<!--NOCARD-->` und `keepNoCardWay`), Zeile unter der Überschrift jeder Fehlerseite, 402 mit Karte als zweitem Satz und `message_for_operator`, Block für Agenten oben in `/llms.txt`, erster Absatz des README, `docs/kanal/antwort-vorlage.md`, 16 Zeilen in `goals/werbung/ANNAHMEN.md`; `test/og-card.test.ts` vergleicht nach Entscheidung des Tech Leads (PRO-28027, 02:23) die Karte mit Pill und erstem Satz der `<h1>`. Rot gesehen: `test/werbung.test.ts` gegen die Merge-Basis 13 von 19 rot, die sechs Wächter („shows the first screen of wache 01…“, „leaves the card block…“, „drops … while the card breaker is on“ dreimal, „keeps error, required_cents…“) sind dort grün und je mit einer gepflanzten Änderung am gebauten Stand rot; `test/og-card.test.ts` mit anderem Pill rot. Prüfbefehle: P1 `exit=0 0 defects`, `soll start ok`, `breiten ok`, `card gleich`, 1; P2 `exit=0 soll errors: 6 images, blocks end 390=728 1440=669, 0 defects`, `soll errors ok`, `breiten ok`, 0, 0; P3 1, `abnahme ok 1`; P4 vitest werbung grün, Namen vollständig, `start ok`, Live `exit=0 0 defects`, Gegenprobe `exit=1` ohne `sed-miss`, `skript gleich`, `card gleich`, sieben Suiten grün; P5 Namen vollständig, `errors ok`, Live `exit=0 0 defects`, Gegenprobe `exit=1` ohne `sed-miss`, vier Suiten grün; P6 `readme ok`, 0; P7 Namen vollständig, sechs Suiten grün, 1, 0, 0, e2e am Kopf `bc324b6` pass (1); P8 `vorlage ok`, `da`, 0; P9 Namen vollständig, 1, zwei Suiten grün; P10 Namen vollständig, drei Suiten grün; P11 0, 16, 0, 0, 0, 0; P12 `node scripts/check.mjs` auf dem GitHub-Rechner am Kopf `bc324b6` grün (3:02 min), lokal zweimal nach 600 s abgebrochen ohne roten Test, Last 199 bis 252 auf dem code-host.
+- 2026-11-23 Zyklus 2: Abschluss gemeldet, Punkte 1 bis 12; `dev` am Kopf `b5994b4` (nur sechs Vorschläge der Nacharbeit) in den Goal-Branch gemergt, die Befehle mit Merge-Basis danach erneut mit erwarteter Ausgabe. Prüfbefehle: alle 47 Befehle der Punkte 1 bis 12 am Kopf `a5761dd` mit erwarteter Ausgabe (P1 `exit=0 0 defects`, `soll start ok`, `breiten ok`, `card gleich`, 1; P2 `exit=0 soll errors: 6 images, blocks end 390=728 1440=669, 0 defects`, `soll errors ok`, `breiten ok`, 0, 0; P3 1, `abnahme ok 1`; P4 sieben Befehle grün, Gegenprobe `exit=1` ohne `sed-miss`; P5 fünf Befehle grün, Gegenprobe `exit=1` ohne `sed-miss`; P6 `readme ok`, 0; P7 Namen vollständig, sechs Suiten grün, 1, 0, 0, e2e pass (1); P8 `vorlage ok`, `da`, 0; P9 und P10 Namen vollständig und Suiten grün; P11 0, 17, 0, 0, 0, 0); P12 `check` auf GitHub am Kopf `a5761dd` grün (2:51 min, `e2e` 11:01 min grün), lokal bei Last 130 bis 370 auf 26 Kernen zweimal rot: Lauf 1 mit drei Fällen in `test/relink-comments.test.ts` und `test/traffic-hosts.test.ts` (Skripte außerhalb des Diffs, Unterprozess in der Zeitgrenze, beide Dateien allein 28 von 28 grün), Lauf 2 mit 264 von 264 Testdateien grün, aber nach 606 s an der Grenze `LIMIT_S` von 600 s in `scripts/check.mjs`.
+- 2026-11-23 Zyklus 3: Punkt 13 aus der Kritik gebaut: Fall "shows exactly one first screen while the card breaker is off" in `test/werbung.test.ts` zählt bei Notschalter aus je einmal `data-soll="move"`, `id="move"` und die erste Zeile der `<h1>` in `<main>`, keine Marke `CARD`/`NOCARD` und `No crypto needed` im Block `move`; rot gesehen mit der Gegenprobe (erste Marke `<!--NOCARD-->` entfernt: zwei Blöcke `move`). Prüfbefehle: P13 `da`, vitest Exit 0, Gegenprobe `rot`; `test/werbung.test.ts` und `test/public.test.ts` 79 von 79 grün.
+- 2026-11-23 Zyklus 4: Gap von K aus Zyklus 3 behoben: `goals/_vorschlaege/werbung-kritik-2026-11-23-1.md` (aus `fc7fa27`) vom Goal-Branch genommen, weil Punkt 11 keine Pfade außerhalb des Goals zulässt; der Vorschlag geht unverändert über einen Pflege-PR des Tech Lead nach `dev`, am Code ändert sich nichts. Prüfbefehle: P11 0, 17, 0, 0, 0, 0.
+- 2026-11-23 Release: PASS K und B (Zyklus 4), DONE.
 
 ## Blockers
 keine

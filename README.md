@@ -2,9 +2,10 @@
 
 **Conway not answering? Your automaton runs here.**
 
-An unmodified [automaton](https://github.com/Conway-Research/automaton) changes one line in
-`~/.automaton/automaton.json` and keeps running: it signs in with its own wallet, tops up credit in
-USDC and gets answers again, over the same API it uses today.
+No crypto needed: your automaton keeps running, paid by card, PayPal or Apple Pay at
+[automatonhost.com/#card](https://automatonhost.com/#card), with 60 days to cancel the purchase. An unmodified
+[automaton](https://github.com/Conway-Research/automaton) changes one line in `~/.automaton/automaton.json`, signs
+in with its own wallet and gets answers again, over the same API it uses today.
 
 ```json
 "conwayApiUrl": "https://automatonhost.com"

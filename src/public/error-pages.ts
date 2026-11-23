@@ -30,11 +30,15 @@ export type ErrorPage = {
   cause: string;
 };
 
-const page = ({ slug, heading, cause }: Pick<ErrorPage, "slug" | "heading" | "cause">): ErrorPage => ({
+/**
+ * `lead` replaces the first sentence of the cause in the description, for a cause that names USDC in it: the description is the
+ * first text of the page, and "No crypto needed" stands before every USDC (goals/werbung/01).
+ */
+const page = ({ slug, heading, cause, lead }: Pick<ErrorPage, "slug" | "heading" | "cause"> & { lead?: string }): ErrorPage => ({
   slug,
   heading,
   title: `Conway automaton: ${heading} | automatonhost.com`,
-  description: `${cause.split(". ")[0]}. Set conwayApiUrl to https://automatonhost.com and run automaton --provision to keep it running.`,
+  description: `${lead ?? cause.split(". ")[0]}. Set conwayApiUrl to https://automatonhost.com and run automaton --provision to keep it running.`,
   cause,
 });
 
@@ -53,6 +57,7 @@ export const ERROR_PAGES: readonly ErrorPage[] = Object.freeze([
     slug: "credits-never-granted",
     heading: "x402 top-up paid on-chain, but credits never granted",
     cause: "Conway's payment endpoint still takes your USDC, but the credits never arrive, because sign-up for a fresh wallet does not complete (Conway issue #339). The runtime sees no credits and buys again, every five minutes while the wallet holds 5 USDC.",
+    lead: "Conway takes the top-up on-chain, but the credits never arrive, because sign-up for a fresh wallet does not complete (Conway issue #339)",
   }),
 ]);
 
@@ -60,13 +65,24 @@ export function findErrorPage(slug: string): ErrorPage | undefined {
   return ERROR_PAGES.find((p) => p.slug === slug);
 }
 
-/** The body of one error page, inside the frame of page() in src/app.ts. */
-export function renderErrorPage(p: ErrorPage): string {
+/**
+ * The line of goals/werbung/01 under the heading: the way without crypto, before the cause, because the cause of
+ * credits-never-granted names USDC and the message stands before every USDC. The link goes to the form of the start page, which
+ * sends on through `/card/<package>` of goals/wache/01; there is no address on this page to build a link with.
+ */
+const CARD_LINE =
+  '<p class="fine"><strong>No crypto needed:</strong> pay by card, PayPal or Apple Pay, with 60 days to cancel the purchase. <a href="/#card">Buy credit</a>.</p>';
+
+/**
+ * The body of one error page, inside the frame of page() in src/app.ts. `cardOpen` is false while the card breaker of
+ * goals/wache/01 is on; the page is then the one of goals/reichweite/01 without the card line.
+ */
+export function renderErrorPage(p: ErrorPage, cardOpen = true): string {
   return `
   <section>
     <div class="wrap narrow" data-soll="fix">
       <p class="kicker">Conway automaton error</p>
-      <h1 class="ph">${esc(p.heading)}</h1>
+      <h1 class="ph">${esc(p.heading)}</h1>${cardOpen ? `\n      ${CARD_LINE}` : ""}
       <p class="sub">${esc(p.cause)}</p>
       <div class="demo">
         <p class="eyebrow">One line, one command</p>

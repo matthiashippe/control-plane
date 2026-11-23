@@ -90,7 +90,7 @@ describe("the 402 under the card breaker", () => {
     const body = await chat();
     const url = `https://automatonhost.com/card/5?address=${address}`;
     expect(body.details.card_url).toBe(url);
-    expect(body.message).toContain(`No USDC? Pay by card: ${url} `);
+    expect(body.message).toContain(`No crypto needed: pay by card, PayPal or Apple Pay at ${url} `);
     expect(JSON.stringify(body)).not.toContain("checkout-ds24");
   });
 
