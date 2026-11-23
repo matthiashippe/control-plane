@@ -174,6 +174,49 @@ describe("house step credit (goals/kunden/13)", () => {
     expect(late.rows("house_step")).toBe(1);
   });
 
+  // A call whose reservation the step credit cannot cover: about 50k prompt tokens and the largest max_tokens of the mock
+  // model come to more than HOUSE_STEP_MC.
+  const bigCall = (who: { post: (path: string, body: unknown) => Promise<Response> }) =>
+    who.post("/v1/chat/completions", {
+      model: "mock-1",
+      messages: [{ role: "user", content: "x".repeat(200_000) }],
+      max_tokens: 32_768,
+      stream: false,
+    });
+
+  it("no step credit when it cannot cover the call", async () => {
+    const { db, account, ledgerRows } = houseWorld();
+    ensureHouseJob(db);
+    // The twin has spent its step credit already, so its 402 is the one the service gives without any step credit.
+    const twin = account();
+    postLedger(db, { address: twin.address, kind: "house_step", deltaMc: HOUSE_STEP_MC, ref: `house-step:${twin.address}` });
+    postLedger(db, { address: twin.address, kind: "inference", deltaMc: -HOUSE_STEP_MC, ref: `spent-step-${twin.address}` });
+    const expected = await (await bigCall(twin)).text();
+    const customer = account();
+    const ledger = ledgerRows();
+
+    const res = await bigCall(customer);
+    expect(res.status).toBe(402);
+    expect(await res.text()).toBe(expected.split(twin.address).join(customer.address));
+    expect(customer.rows("house_step")).toBe(0);
+    expect(customer.balance()).toBe(0);
+    expect(ledgerRows()).toBe(ledger);
+  });
+
+  it("step credit kept for a call it covers", async () => {
+    const { db, account } = houseWorld();
+    ensureHouseJob(db);
+    const customer = account();
+    expect((await bigCall(customer)).status).toBe(402);
+    expect(customer.rows("house_step")).toBe(0);
+
+    const res = await customer.chat();
+    expect(res.status).toBe(200);
+    expect(customer.rows("house_step")).toBe(1);
+    expect(customer.balance()).toBeGreaterThan(0);
+    expect(customer.balance()).toBeLessThan(HOUSE_STEP_MC);
+  });
+
   it("not_open names the open house job", async () => {
     const { db, account } = houseWorld();
     const first = ensureHouseJob(db).bounty;

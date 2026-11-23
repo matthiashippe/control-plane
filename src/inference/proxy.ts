@@ -315,9 +315,10 @@ async function handleChatUncoalesced(
   if (!reserved && !chatOpts.topupsClosed) {
     if (grantOnFirstUse(db, address)) {
       reserved = reserveMc(db, address, requiredMc);
-    } else if (grantForHouseJob(db, address, new Date())) {
+    } else if (grantForHouseJob(db, address, new Date(), requiredMc)) {
       // No starter credit for this call, for whatever reason: a runtime that has thought here before takes its one step
       // credit while a house job is open, so that its model can read the job and write the report (goals/kunden/13).
+      // It is booked only for a call it covers; no await sits between the grant and this reservation.
       reserved = reserveMc(db, address, requiredMc);
     }
   }

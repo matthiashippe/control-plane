@@ -18,7 +18,7 @@
 
 import { randomUUID } from "node:crypto";
 import type { Db } from "../db.js";
-import { postLedger } from "../db.js";
+import { getAvailableMc, postLedger } from "../db.js";
 import { isKeylessAddress } from "../auth/keyless.js";
 import { RUNTIME_KEY_NAME } from "../credits/starter.js";
 import { HOUSE_POSTER, ourAddresses } from "./ours.js";
@@ -296,13 +296,15 @@ export function submitHouseReport(
  * this holds at once: a house job is open; the address is not ours and no handle of the keyless door; it holds a key
  * named RUNTIME_KEY_NAME; it has at least one earlier `inference` row, so a fresh wallet with that key name takes
  * nothing; it never had a step credit and never a house award; and awards and step credits of the UTC day stay within
- * HOUSE_DAILY_MC. The caller asks only after the starter credit gave nothing.
+ * HOUSE_DAILY_MC. The caller asks only after the starter credit gave nothing. `requiredMc` is the reservation of the call
+ * that asks: the step credit is booked only when it covers that call together with what the address can spend, because
+ * a credit that leaves the 402 standing would take the one step credit of the address without an answer for its model.
  *
  * One `house_step` row through postLedger, in the same transaction as the balance; the unique index
  * `ledger_house_step_once` keeps it to one per address even under a race. Credit inside this control plane, nothing
  * redeemable (loop-constraints.md, rule 10). Silent like grantOnFirstUse: true when credit was booked, false otherwise.
  */
-export function grantForHouseJob(db: Db, address: string, now = new Date()): boolean {
+export function grantForHouseJob(db: Db, address: string, now = new Date(), requiredMc = 0): boolean {
   const who = address.toLowerCase();
   if (isKeylessAddress(who)) return false;
   const run = db.transaction((): boolean => {
@@ -321,6 +323,7 @@ export function grantForHouseJob(db: Db, address: string, now = new Date()): boo
       .get(who);
     if (awarded) return false;
     if (houseSpentOnMc(db, utcDay(now)) + HOUSE_STEP_MC > HOUSE_DAILY_MC) return false;
+    if (getAvailableMc(db, who) + HOUSE_STEP_MC < requiredMc) return false;
     postLedger(db, {
       address: who,
       kind: "house_step",
