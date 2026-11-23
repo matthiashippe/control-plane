@@ -908,6 +908,37 @@ main .shop .wrap > p.fine:last-child { margin-top: var(--s-8); }
 <!-- The move from Conway, first on the page (goals/seite/02). Readers of our answers in Conway issues land here
      and see the one line and the one command without scrolling; it is English for every browser, because they
      write English. It replaces the block #agents that sat at the end of the page. -->
+<!-- goals/werbung/01: the first screen says first that no crypto is needed. While the card breaker of goals/wache/01 is on,
+     src/app.ts drops this block and shows the first screen of wache 01 below instead, so no line promises a closed checkout. -->
+<!--CARD-->
+<section class="hero" id="move" data-soll="move">
+  <div class="wrap hero-in">
+    <div class="hero-text">
+    <a class="pill" href="/fix"><span class="live-dot"></span>Conway not answering?</a>
+    <h1>
+      <span class="h1-line"><span>Your automaton runs here.</span></span>
+      <span class="h1-line"><span>No crypto needed.</span></span>
+    </h1>
+    <p class="sub prose">Pay by card, PayPal or Apple Pay, with 60 days to cancel the purchase. It signs in here with its own wallet and gets answers again.</p>
+    <div class="cta">
+      <a class="btn btn-1" href="#card">Pay by card</a>
+      <a class="btn btn-2" href="/fix">Switch in two steps</a>
+    </div>
+    </div>
+    <div class="demo">
+      <p class="eyebrow">One line, one command</p>
+      <div class="code"><pre><code><span class="pr">~/.automaton/automaton.json</span>
+{ "conwayApiUrl":
+  "https://cp.hippe.eu" }</code></pre>
+      <pre><code><span class="pr">$</span> automaton --provision</code></pre></div>
+      <p class="fine">With USDC in its wallet, the first start tops up $5 of credit here. <a href="/fix">Every step on one page</a>.</p>
+    </div>
+  </div>
+  <!-- The control. It is in the first screen, so every reader fetches it; a browser that fetches it together with the one at the bottom is telling us its lazy loading means nothing here. See the /px/ route in src/app.ts. It sits inside the move block, which is the first screen on every width. -->
+  <img src="/px/top.png" alt="" width="1" height="1" loading="lazy" decoding="async" aria-hidden="true" class="px">
+</section>
+<!--/CARD-->
+<!--NOCARD-->
 <section class="hero" id="move" data-soll="move">
   <div class="wrap hero-in">
     <div class="hero-text">
@@ -934,6 +965,7 @@ main .shop .wrap > p.fine:last-child { margin-top: var(--s-8); }
   <!-- The control. It is in the first screen, so every reader fetches it; a browser that fetches it together with the one at the bottom is telling us its lazy loading means nothing here. See the /px/ route in src/app.ts. It sits inside the move block, which is the first screen on every width. -->
   <img src="/px/top.png" alt="" width="1" height="1" loading="lazy" decoding="async" aria-hidden="true" class="px">
 </section>
+<!--/NOCARD-->
 
 <!--CARD-->
 <section id="card" data-soll="card">

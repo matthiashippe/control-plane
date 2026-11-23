@@ -49,7 +49,7 @@ describe("the 402 for an empty balance", () => {
     const url = cardLink(CARD_PACKAGES[0], address);
     expect(url).toMatch(new RegExp(`/card/5\\?address=${address}$`));
     expect(body.details.card_url).toBe(url);
-    expect(body.message).toContain(`No USDC? Pay by card: ${url} Nothing was charged for this call.`);
+    expect(body.message).toContain(`No crypto needed: pay by card, PayPal or Apple Pay at ${url} Buy credits at `);
   });
 
   it("leaves error, required_cents, current_balance_cents and topup_url of the 402 as they are", async () => {
