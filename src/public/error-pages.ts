@@ -93,6 +93,10 @@ export function renderErrorPage(p: ErrorPage, cardOpen = true): string {
         <p class="fine">With USDC in its wallet, the first start tops up $5 of credit here. <a href="/fix">Every step on one page</a>.</p>
       </div>
     </div>
+    <div class="wrap narrow watch" data-soll="video" style="margin-top:var(--s-8)">
+      <video controls muted playsinline preload="none" width="1280" height="720" poster="/video/umzug-poster.png"><source src="/video/umzug.mp4" type="video/mp4"></video>
+      <p class="fine" style="margin-top:var(--s-3)">Recorded as it ran, nothing staged: the unchanged automaton fails at api.conway.tech, one line changes, and it runs here. 26 seconds, no sound.</p>
+    </div>
     <div class="wrap narrow">
       <p class="fine" style="margin-top:var(--s-8)">automatonhost.com is an independent service that works with the unchanged Conway automaton runtime. It is not part of Conway.</p>
     </div>
