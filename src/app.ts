@@ -831,6 +831,52 @@ export function createApp(opts: AppOptions) {
   }
 
   /**
+   * The video of goals/reichweite/03 and its still: exactly these two files from src/public/video/, read once at start like
+   * the cards, every other name under /video/ is 404. Safari plays an MP4 only from a server that answers a Range request
+   * with 206 and Content-Range, so the route does that, and a single range it cannot serve answers 416. The pages load the
+   * file only when the reader presses play (preload="none"); the CSP in deploy/Caddyfile allows it with media-src 'self'.
+   * A Range header of another form (several ranges, another unit) is ignored and the whole file goes out, as RFC 9110 allows.
+   */
+  const VIDEO_TYPES = new Map([
+    ["umzug.mp4", "video/mp4"],
+    ["umzug-poster.png", "image/png"],
+  ]);
+  const videoFiles = new Map<string, ArrayBuffer>();
+  for (const name of VIDEO_TYPES.keys()) {
+    const file = ogImage(`video/${name}`);
+    if (file) videoFiles.set(name, file);
+  }
+  app.get("/video/:file", (c) => {
+    const name = c.req.param("file");
+    const file = videoFiles.get(name);
+    const type = VIDEO_TYPES.get(name);
+    // Not c.notFound(): that handler answers 405 for a path whose pattern has a route, and this pattern always has one.
+    if (!file || !type) return c.text("Not found", 404);
+    const size = file.byteLength;
+    const headers = { "Content-Type": type, "Accept-Ranges": "bytes", "Cache-Control": "public, max-age=86400" };
+    const m = /^bytes=([0-9]*)-([0-9]*)$/.exec((c.req.header("range") ?? "").trim());
+    if (!m || (m[1] === "" && m[2] === "")) return c.body(file, 200, { ...headers, "Content-Length": String(size) });
+    let start: number, end: number;
+    if (m[1] === "") {
+      // A suffix range: the last n bytes.
+      const n = Number(m[2]);
+      start = n === 0 ? size : Math.max(0, size - n);
+      end = size - 1;
+    } else {
+      start = Number(m[1]);
+      end = m[2] === "" ? size - 1 : Math.min(Number(m[2]), size - 1);
+    }
+    if (!(start < size) || end < start) {
+      return c.body(null, 416, { "Content-Range": `bytes */${size}`, "Accept-Ranges": "bytes" });
+    }
+    return c.body(file.slice(start, end + 1), 206, {
+      ...headers,
+      "Content-Range": `bytes ${start}-${end}/${size}`,
+      "Content-Length": String(end - start + 1),
+    });
+  });
+
+  /**
    * Point og:image and twitter:image of a head at `card` with its version, and describe that card in og:image:alt.
    *
    * The alt text comes from OG_CARDS together with the image: until move goal 04, /x402 and /conway described the move

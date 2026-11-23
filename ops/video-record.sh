@@ -463,7 +463,7 @@ FAKE
     shift 2
     (
       local S="$dir/$name" CREATE=201 UPLOAD=200 EXEC=200 CONWAY=fail LEAK=0 KEYS=1 INF=2
-      local USDC=0x0000000000000000000000000000000000000000000000000000000000000000 kv
+      local USDC="0x$(printf "%064d" 0)" kv
       for kv in "$@"; do local "${kv%%=*}=${kv#*=}"; done
       mkdir -p "$S/fs" "$S/home"
       : >"$S/calls"
@@ -601,7 +601,7 @@ FAKE
   expect credits-exec '^VIDEO RECORD FAIL credits$' deletes=1 transcript=0
   run_case upload-fails run_record UPLOAD=500
   expect upload-fails '^VIDEO RECORD FAIL upload \(wallet\) answered 500, expected 200$' deletes=1 transcript=0
-  run_case wallet-usdc run_record USDC=0x00000000000000000000000000000000000000000000000000000000000f4240
+  run_case wallet-usdc run_record "USDC=0x$(printf "%058d" 0)0f4240"
   expect wallet-usdc '^VIDEO RECORD FAIL the wallet holds USDC, a first start could buy credits$' deletes=0 transcript=0
   run_case verify run_verify
   expect verify '^VIDEO VERIFY OK key_prefix_seen=yes inference_rows=2$'

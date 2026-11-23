@@ -866,6 +866,9 @@ main .shop .wrap > p.fine:last-child { margin-top: var(--s-8); }
 .doc h2 { font-size: 1.25rem; letter-spacing: -.015em; line-height: 1.25; margin: var(--s-8) 0 var(--s-2); }
 .doc > p { color: var(--muted); }
 .doc > p.sub { margin-top: var(--s-2); }
+.watch video { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; background: var(--panel);
+               border: 1px solid var(--line); border-radius: var(--r-pan); }
+section.watch { padding-block: 0 var(--s-16); }
 </style>
 </head>
 <body>
@@ -898,6 +901,10 @@ main .shop .wrap > p.fine:last-child { margin-top: var(--s-8); }
         <pre><code><span class="pr">$</span> automaton --provision</code></pre></div>
         <p class="fine">With USDC in its wallet, the first start tops up $5 of credit here. <a href="/fix">Every step on one page</a>.</p>
       </div>
+    </div>
+    <div class="wrap narrow watch" data-soll="video" style="margin-top:var(--s-8)">
+      <video controls muted playsinline preload="none" width="1280" height="720" poster="/video/umzug-poster.png"><source src="/video/umzug.mp4" type="video/mp4"></video>
+      <p class="fine" style="margin-top:var(--s-3)">Recorded as it ran, nothing staged: the unchanged automaton fails at api.conway.tech, one line changes, and it runs here. 25 seconds, no sound.</p>
     </div>
     <div class="wrap narrow">
       <p class="fine" style="margin-top:var(--s-8)">automatonhost.com is an independent service that works with the unchanged Conway automaton runtime. It is not part of Conway.</p>
