@@ -195,9 +195,9 @@ describe("ops/agent-probe.sh", () => {
     expect(text).toContain("One that does is <old host> ; the operator wallet <address> shows the top-up.");
     // Counted before the replacement: q3 still counts as old.
     expect(counts(r.out)).toBe("host 2/5 card 1/5 old 1/5 failed 0/5");
-    const dashes = probe(null, { CP_PROBE_ANSWERS: answers(["PostYourPrice — or https://www.postyourprice.com – fine", NONE, NONE, NONE, NONE]) });
+    const dashes = probe(null, { CP_PROBE_ANSWERS: answers(["PostYourPrice \u2014 or https://www.postyourprice.com \u2013 fine", NONE, NONE, NONE, NONE]) });
     const t2 = readFileSync(join(dashes.dir, "2026-W48.md"), "utf8");
-    expect(t2).not.toMatch(/postyourprice|[–—]/i);
+    expect(t2).not.toMatch(/postyourprice|[\u2013\u2014]/i);
     expect(t2).toContain("<old host> - or <old host> - fine");
   });
 
