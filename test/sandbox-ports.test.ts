@@ -95,7 +95,7 @@ describe("a sandbox of another owner", () => {
 });
 
 describe("a public_url under automatonhost.com", () => {
-  // The second zone the payment goes through (goals/umzug/01): the same refusal as for postyourprice.com.
+  // The second zone the payment goes through (move goal 01): the same refusal as for postyourprice.com.
   const zoneUrls = (id: string) => [
     `https://sbx-${id}-8080.automatonhost.com`,
     `https://sbx-${id}-8080.sbx.automatonhost.com`,

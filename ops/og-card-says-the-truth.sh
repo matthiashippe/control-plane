@@ -21,7 +21,7 @@
 # fails, both have to move: the HTML, and a fresh screenshot of it. That limit is printed with the
 # failure rather than left for somebody to remember.
 #
-# Since goals/umzug/03 the card shows the switch to conwayApiUrl instead of the market and promises no
+# Since move goal 03 the card shows the switch to conwayApiUrl instead of the market and promises no
 # free first job, so it agrees with any pool; the checks above still hold any card that promises it.
 #
 #   ops/og-card-says-the-truth.sh
@@ -39,7 +39,7 @@ judge() { # credit-cents pool-cents card-html -> prints the verdict, returns 0 w
   local credit="$1" pool="$2" card="$3" promises=0
   # The card promises the offer when it names the free first job at all.
   case "$card" in *"first job"*) promises=1 ;; esac
-  # Since goals/umzug/03 the card is the one of the switch: it names conwayApiUrl and says nothing about the market. Silent about
+  # Since move goal 03 the card is the one of the switch: it names conwayApiUrl and says nothing about the market. Silent about
   # the free first job, it is true whatever the pool holds. A switch card that does promise the job is judged like any other.
   if [[ "$promises" -eq 0 && "$card" == *conwayApiUrl* ]]; then
     echo "AGREES  the card is the switch to conwayApiUrl and promises no free first job (${pool} c left, ${credit} c each)."
@@ -90,7 +90,7 @@ if [[ "${1:-}" == "--selftest" ]]; then
   judge 15 230 "$without" > /dev/null && { echo "SELFTEST FAILED: a full pool with a silent card must not agree"; fail=1; }
   # The number drifting apart is its own failure.
   judge 25 230 "$with" > /dev/null && { echo "SELFTEST FAILED: a card naming 15 against a 25 c grant must not agree"; fail=1; }
-  # The card of the switch as it is shipped (goals/umzug/03): silent about the job, true at a full and at an empty pool.
+  # The card of the switch as it is shipped (move goal 03): silent about the job, true at a full and at an empty pool.
   card="$(cat "$CARD" 2>/dev/null)"
   judge 15 230 "$card" > /dev/null || { echo "SELFTEST FAILED: the shipped card ($CARD) must agree with a full pool"; fail=1; }
   judge 15 0 "$card" > /dev/null || { echo "SELFTEST FAILED: the shipped card ($CARD) must agree with an empty pool"; fail=1; }
