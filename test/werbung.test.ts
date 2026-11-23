@@ -144,7 +144,7 @@ describe("the start page", () => {
     const move = moveOf(await get(freshDb(), "/"));
     expect(move).toContain("with 60 days to cancel the purchase");
     expect(move).not.toMatch(/money back|refund/i);
-    expect(move).not.toMatch(/[–—]/);
+    expect(move).not.toMatch(/[\u2013\u2014]/);
   });
 
   it("shows the first screen of wache 01 while the card breaker is on", async () => {
@@ -203,7 +203,7 @@ describe("the error pages", () => {
       // Heading and cause stay what reichweite 01 built.
       expect(main).toContain(`<h1 class="ph">`);
       expect(main.indexOf(MESSAGE)).toBeGreaterThan(main.indexOf("</h1>"));
-      expect(main).not.toMatch(/money back|refund|[–—]/i);
+      expect(main).not.toMatch(/money back|refund|[\u2013\u2014]/i);
     }
   });
 
@@ -290,7 +290,7 @@ describe("the 402 for an empty balance", () => {
     );
     // The link is the one of the 402 itself, through the redirect of wache 01 with the wallet of this call.
     expect(body.message_for_operator).toContain(String(body.details.card_url));
-    expect(body.message_for_operator).not.toMatch(/USDC|\n|[–—]/);
+    expect(body.message_for_operator).not.toMatch(/USDC|\n|[\u2013\u2014]/);
   });
 
   it("names only usdc in message_for_operator while the card breaker is on", async () => {
@@ -344,7 +344,7 @@ describe("the readme and the answer template", () => {
     expect(disclosure).toContain("60 days to cancel the purchase");
     const usdc = s.indexOf("USDC");
     if (usdc >= 0) expect(s.indexOf(MESSAGE)).toBeLessThan(usdc);
-    expect(s).not.toMatch(/cp\.hippe\.eu|postyourprice|checkout-ds24|money back|refund|[–—]/i);
+    expect(s).not.toMatch(/cp\.hippe\.eu|postyourprice|checkout-ds24|money back|refund|[\u2013\u2014]/i);
   });
 
   it("opens the readme with no crypto needed before any usdc", () => {
@@ -354,6 +354,6 @@ describe("the readme and the answer template", () => {
     expect(first.startsWith(`${MESSAGE}:`)).toBe(true);
     for (const words of ["card", "PayPal", "Apple Pay", "https://automatonhost.com/#card", "60 days to cancel the purchase"]) expect(first, words).toContain(words);
     expect(r.indexOf(MESSAGE)).toBeLessThan(r.indexOf("USDC"));
-    expect(r).not.toMatch(/checkout-ds24|money back|postyourprice|[–—]/i);
+    expect(r).not.toMatch(/checkout-ds24|money back|postyourprice|[\u2013\u2014]/i);
   });
 });
