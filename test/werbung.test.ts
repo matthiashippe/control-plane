@@ -64,7 +64,10 @@ function moveOf(html: string): string {
 /** Without comments and with every run of whitespace as one space, so only what the browser shows is compared. */
 const normal = (html: string) => html.replace(/<!--[\s\S]*?-->/g, "").replace(/\s+/g, " ").trim();
 
-/** The first screen as wache 01 left it on the merge base (src/public/index.html), after the origin rewrite of the page. */
+/**
+ * The first screen as wache 01 left it on the merge base (src/public/index.html), after the origin rewrite of the page,
+ * without the button to #card, which led nowhere while the card block is gone (goals/wache/02).
+ */
 const WACHE_01_FIRST_SCREEN = `<section class="hero" id="move" data-soll="move">
   <div class="wrap hero-in">
     <div class="hero-text">
@@ -76,7 +79,6 @@ const WACHE_01_FIRST_SCREEN = `<section class="hero" id="move" data-soll="move">
     <p class="sub prose">It signs in here with its own wallet and gets answers again, over the same API it uses today.</p>
     <div class="cta">
       <a class="btn btn-1" href="/fix">Switch in two steps</a>
-      <a class="btn btn-2" href="#card">Pay by card</a>
     </div>
     </div>
     <div class="demo">

@@ -10,7 +10,7 @@ import { openDb, type Db } from "../src/db.js";
 import { MockProvider, MOCK_MODEL } from "../src/inference/mock.js";
 import { Catalog, handleChat } from "../src/inference/proxy.js";
 import { claimStarter } from "../src/credits/starter.js";
-import { CARD_BREAKER_SHORTFALL_MC } from "../src/payments/card-way.js";
+import { CARD_BREAKER_SHORTFALL_MC, cardRedirect } from "../src/payments/card-way.js";
 
 const OTHER = "0x" + "ef".repeat(20);
 const savedUrl = process.env.CP_PUBLIC_URL;
@@ -73,6 +73,16 @@ describe("the start page under the card breaker", () => {
     expect(html).toContain('data-soll="move"');
   });
 
+  it("links nowhere to #card on the start page while the breaker is on", async () => {
+    const db = openDb(":memory:");
+    tripBreaker(db);
+    const html = await startPage(db);
+    // The block `card` is gone, so a link to it would lead nowhere (goals/wache/02).
+    expect(html).not.toContain('id="card"');
+    expect(html).not.toContain('href="#card"');
+    expect(html.split('id="move"').length - 1).toBe(1);
+  });
+
   it("keeps the card block of the start page without the markers while the breaker is off", async () => {
     const html = await startPage(openDb(":memory:"));
     expect(html).toContain('<section id="card" data-soll="card">');
@@ -103,5 +113,19 @@ describe("the 402 under the card breaker", () => {
     expect(JSON.stringify(body)).not.toMatch(/\/card\/|checkout-ds24/);
     // The way over USDC stays.
     expect(body.details.topup_url).toBe(`https://automatonhost.com/pay/5/${address}`);
+  });
+
+  it("names the same way over USDC in the 402 and on the paused page", async () => {
+    const { db, address, chat } = emptyWallet();
+    tripBreaker(db);
+    const body = await chat();
+    const paused = cardRedirect(db, "5", address, new Date());
+    expect(paused.kind).toBe("paused");
+    const topupUrl = (paused as { topupUrl: string }).topupUrl;
+    expect(body.details.topup_url).toBe(topupUrl);
+    expect(body.message).toContain(`Buy credits at ${topupUrl}: `);
+    expect((body as { message_for_operator?: string }).message_for_operator).toBe(
+      `Top up this automaton with USDC on Base at ${topupUrl}`,
+    );
   });
 });

@@ -18,7 +18,7 @@ import { openBountyCount } from "../bounties/store.js";
 import { grantForHouseJob } from "../bounties/house.js";
 import { siteOrigin } from "../public/site.js";
 import { TOPUP_TIERS_USD } from "../payments/pay.js";
-import { cardUrlFor } from "../payments/card-way.js";
+import { cardUrlFor, usdcTopupUrl } from "../payments/card-way.js";
 
 export const MARKUP = 1.3;
 const DEFAULT_MAX_TOKENS = 4096;
@@ -351,6 +351,9 @@ async function handleChatUncoalesced(
     // The way for an operator without USDC (goals/karte/02): the smallest card package, 5 EUR like `topup_url`, through
     // `/card/5` of this service, and nothing while the card breaker is on (goals/wache/01). Additive only, like `topup_url`.
     const cardUrl = cardUrlFor(db, address, new Date());
+    // The way over USDC comes from the same place as on the paused page of /card/<package> (goals/wache/02), so both
+    // always name the same link.
+    const topupUrl = usdcTopupUrl(address);
     return {
       status: 402,
       body: {
@@ -372,7 +375,7 @@ async function handleChatUncoalesced(
         message:
           `Insufficient credits: need ${mcToCents(requiredMc) + 1} cents, have ${mcToCents(availableMc)} cents. ` +
           (cardUrl ? `No crypto needed: pay by card, PayPal or Apple Pay at ${cardUrl} ` : "") +
-          `Buy credits at ${siteOrigin()}/pay/5/${address}: call it, take the 402, sign the x402 ` +
+          `Buy credits at ${topupUrl}: call it, take the 402, sign the x402 ` +
           `offer it carries and send it back in X-Payment. Tiers are ${TOPUP_TIERS_USD.join(", ")} USD; ` +
           `put another one in the path for a larger one. Sending USDC to ${address} on Base works ` +
           "too, and the runtime's bootstrap topup picks it up. " +
@@ -382,7 +385,7 @@ async function handleChatUncoalesced(
         // `topup_url`; nothing upstream reads it. While the card breaker is on it names only the way over USDC.
         message_for_operator: cardUrl
           ? `No crypto needed: top up this automaton by card, PayPal or Apple Pay at ${cardUrl}`
-          : `Top up this automaton with USDC on Base at ${siteOrigin()}/pay/5/${address}`,
+          : `Top up this automaton with USDC on Base at ${topupUrl}`,
         docs: DOC.inference,
         details: {
           required_cents: Math.ceil(requiredMc / 1000),
@@ -392,7 +395,7 @@ async function handleChatUncoalesced(
           // Added 2026-09-29, after two foreign automatons in a row failed to find the pay route
           // from the sentence above. Additive only: nothing upstream reads these, and the two
           // fields upstream does read are untouched.
-          topup_url: `${siteOrigin()}/pay/5/${address}`,
+          topup_url: topupUrl,
           topup_tiers_usd: [...TOPUP_TIERS_USD],
           wallet: address,
           // The other way forward, for the caller who has no USDC to top up with.
