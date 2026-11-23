@@ -1,7 +1,7 @@
 # Wache Goal 02: Kein toter Knopf zur Kasse
 
 ## Status
-PLANNED
+DONE
 
 ## Active Objective
 Seit wache 01 und werbung 01 zeigt die Startseite bei eingeschaltetem Notschalter den ersten Bildschirm von wache 01 (zwischen
@@ -85,7 +85,7 @@ der Schreibsperre die Kasse von drei anderen Produkten im geteilten Konto trifft
   Rollout und kein Neustart durch einen Agent. Code, Bezeichner, Testnamen und Ausgaben englisch.
 
 ## Done Condition
-- [ ] Ist der Notschalter an, steht auf `/` kein `href="#card"` und kein Block `card`; ist er aus, bleiben Knopf, Block und erster
+- [x] Ist der Notschalter an, steht auf `/` kein `href="#card"` und kein Block `card`; ist er aus, bleiben Knopf, Block und erster
       Bildschirm, wie sie sind.
       MVP: Funktion, weil bei Notschalter an jeder Klick auf den Knopf ins Leere geht, statt den Weg über USDC zu zeigen.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/card-way-pages.test.ts test/werbung.test.ts test/card-checkout.test.ts` muss Exit-Code 0 haben.
@@ -94,7 +94,7 @@ der Schreibsperre die Kasse von drei anderen Produkten im geteilten Konto trifft
       Prüfung: `git diff --numstat $(git merge-base origin/dev HEAD) HEAD -- src/public/index.html | tr '\t' ' '` muss genau `0 1 src/public/index.html` ausgeben.
       Prüfung: `git diff $(git merge-base origin/dev HEAD) HEAD -- src/public/index.html | grep -c '^-      <a class="btn btn-2" href="#card">Pay by card</a>$'` muss genau 1 ausgeben.
       Prüfung: `grep -c 'href="#card"' src/public/index.html` muss genau 1 ausgeben.
-- [ ] Die 402 nennt den Weg über USDC nur aus `usdcTopupUrl`, und er ist derselbe wie auf der Seite des Notschalters.
+- [x] Die 402 nennt den Weg über USDC nur aus `usdcTopupUrl`, und er ist derselbe wie auf der Seite des Notschalters.
       MVP: Funktion, weil sonst ein Goal, das Pfad oder Stufe ändert, auf der Seite des Notschalters einen anderen Weg zeigt als in der
       402, und ein Automaton dann an einer der beiden Stellen nicht zahlen kann.
       Prüfung: `grep -c '/pay/5/' src/inference/proxy.ts` muss 0 ausgeben.
@@ -102,7 +102,7 @@ der Schreibsperre die Kasse von drei anderen Produkten im geteilten Konto trifft
       Prüfung: `grep -qF '"names the same way over USDC in the 402 and on the paused page"' test/card-way-pages.test.ts && echo name ok` muss genau `name ok` ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/card-way-pages.test.ts test/card-way.test.ts test/werbung.test.ts test/messages.test.ts test/the-way-to-pay.test.ts test/inference-sunset.test.ts test/goal-18-die-tuer.test.ts test/automatonhost.test.ts` muss Exit-Code 0 haben.
       Prüfung: `T=$(mktemp -d); git archive HEAD | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; sed -i 's#/pay/5/\${address.toLowerCase()}#/pay/20/${address.toLowerCase()}#' $T/src/payments/card-way.ts; grep -q '/pay/20/' $T/src/payments/card-way.ts || echo sed-miss; (cd $T && PATH=/usr/bin:$PATH pnpm -s vitest run test/card-way-pages.test.ts -t "names no card in the 402 while the breaker is on" > /dev/null 2>&1); echo "exit=$?"; rm -rf $T` muss als letzte Zeile `exit=1` ausgeben und darf `sed-miss` nicht ausgeben.
-- [ ] `check` fährt die Selftests von `ops/digistore.mjs` und `ops/digistore-release.mjs` samt je einer Gegenprobe, und beide Werkzeuge
+- [x] `check` fährt die Selftests von `ops/digistore.mjs` und `ops/digistore-release.mjs` samt je einer Gegenprobe, und beide Werkzeuge
       bleiben, wie sie sind.
       MVP: Funktion, weil beide Werkzeuge in ein Konto schreiben, das wir mit Personalplaner24, Bautagebuch24 und Aszendent24 teilen,
       und ihre Schreibsperre bisher nur ein Prüfbefehl fertiger Goal-Dateien belegt, den nach dem Merge niemand mehr fährt.
@@ -111,7 +111,7 @@ der Schreibsperre die Kasse von drei anderen Produkten im geteilten Konto trifft
       Prüfung: `T=$(mktemp -d); git archive HEAD | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; sed -i 's/if (PROTECTED.has(id)) throw/if (false) throw/' $T/ops/digistore.mjs; grep -q 'if (false) throw' $T/ops/digistore.mjs || echo sed-miss; (cd $T && PATH=/usr/bin:$PATH pnpm -s vitest run test/digistore-tool.test.ts > /dev/null 2>&1); echo "exit=$?"; rm -rf $T` muss als letzte Zeile `exit=1` ausgeben und darf `sed-miss` nicht ausgeben.
       Prüfung: `T=$(mktemp -d); git archive HEAD | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; sed -i 's/if (!own.includes(String(id))) throw/if (false) throw/' $T/ops/digistore-release.mjs; grep -q 'if (false) throw' $T/ops/digistore-release.mjs || echo sed-miss; (cd $T && PATH=/usr/bin:$PATH pnpm -s vitest run test/digistore-tool.test.ts > /dev/null 2>&1); echo "exit=$?"; rm -rf $T` muss als letzte Zeile `exit=1` ausgeben und darf `sed-miss` nicht ausgeben.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD -- ops | wc -l` muss 0 ausgeben.
-- [ ] Die Entscheidungen stehen in `goals/wache/ANNAHMEN.md`, der Diff bleibt in den Pfaden dieses Goals, kein Test fällt weg, und
+- [x] Die Entscheidungen stehen in `goals/wache/ANNAHMEN.md`, der Diff bleibt in den Pfaden dieses Goals, kein Test fällt weg, und
       nichts im Repo nennt eine Adresse eines Kunden.
       MVP: Funktion, weil karte 03 und jedes spätere Glied der Karte wissen müssen, warum der Knopf fehlt und wo der Link über USDC
       entsteht.
@@ -119,12 +119,20 @@ der Schreibsperre die Kasse von drei anderen Produkten im geteilten Konto trifft
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD | grep -vE '^(src/public/index\.html|src/inference/proxy\.ts|test/(card-way-pages|card-way|werbung|card-checkout|digistore-tool)\.test\.ts|goals/wache/.*|goals/[a-z]+/ANNAHMEN\.md)$' | wc -l` muss 0 ausgeben.
       Prüfung: `git diff --diff-filter=D --name-only $(git merge-base origin/dev HEAD) HEAD -- test | wc -l` muss 0 ausgeben.
       Prüfung: `git diff $(git merge-base origin/dev HEAD) HEAD -- . ':!goals' | grep '^+' | grep -oE '0x[0-9a-fA-F]{40}' | sort -u | awk '{s=substr($0,3,2); r=""; for(i=0;i<20;i++) r=r s; if (substr($0,3)!=r) n++} END{print n+0}'` muss 0 ausgeben.
-- [ ] Der Job `e2e` am Kopf des Goal-PR ist grün.
+- [x] Der Job `e2e` am Kopf des Goal-PR ist grün.
       MVP: Funktion, weil sich die 402 im Laufzeitpfad ändert und der code-host kein Docker hat.
       Prüfung (Netz): `gh pr checks $(gh pr list -R matthiashippe/control-plane --head goal/wache-02 --state open --json number -q '.[0].number') -R matthiashippe/control-plane 2>&1 | grep -E '^e2e\s' | grep -c pass` muss genau 1 ausgeben.
-- [ ] `check` ist grün.
+- [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] Jeder Anker-Link auf `/` (`href="#…"`) trifft bei Notschalter an und aus ein `id` derselben Seite, und ein Test hält das für
+      jeden Anker fest, nicht nur für `#card`.
+      MVP: Funktion, weil der Fall aus Punkt 1 nur `#card` prüft: Lässt ein späteres Goal bei Notschalter an einen weiteren Block weg
+      (etwa den Markt), klickt der Besucher wieder ins Leere, und kein Test merkt es. Kritik des Tech Lead 2026-11-23.
+      Prüfung: `grep -qF '"links every anchor of the start page to an id on the page, breaker on and off"' test/card-way-pages.test.ts && echo name ok` muss genau `name ok` ausgeben.
+      Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/card-way-pages.test.ts` muss Exit-Code 0 haben.
+      Prüfung: `CP_PUBLIC_URL=https://automatonhost.com PATH=/usr/bin:$PATH node --import tsx --input-type=module -e 'const { createApp } = await import("./src/app.ts"); const { openDb } = await import("./src/db.ts"); const { CARD_BREAKER_SHORTFALL_MC: S } = await import("./src/payments/card-way.ts"); const page = async (on) => { const db = openDb(":memory:"); if (on) { const t = new Date().toISOString(); db.prepare("INSERT INTO card_orders (order_id, product_id, address, mode, status, credited_mc, reversed_mc, shortfall_mc, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?)").run("TRIP", "771278", "0x" + "ef".repeat(20), "live", "reversed", S, S, t, t); } return (await createApp({ db }).request("/")).text(); }; const bad = []; for (const on of [true, false]) { const h = await page(on); const ids = new Set([...h.matchAll(/\bid="([^"]+)"/g)].map((m) => m[1])); const refs = [...h.matchAll(/href="#([^"]*)"/g)].map((m) => m[1]); if (refs.length === 0) bad.push((on ? "an" : "aus") + " keine"); for (const r of refs) if (!ids.has(r)) bad.push((on ? "an " : "aus ") + "#" + r); } console.log(bad.length ? bad.join("; ") : "ziele ok")' 2>&1 | tail -1` muss genau `ziele ok` ausgeben.
+      Prüfung: `T=$(mktemp -d); git archive HEAD | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; sed -i 's/href="#market"/href="#nowhere"/g' $T/src/public/index.html; grep -q 'href="#nowhere"' $T/src/public/index.html || echo sed-miss; (cd $T && PATH=/usr/bin:$PATH pnpm -s vitest run test/card-way-pages.test.ts -t "links every anchor of the start page to an id on the page, breaker on and off" > /dev/null 2>&1); echo "exit=$?"; rm -rf $T` muss als letzte Zeile `exit=1` ausgeben und darf `sed-miss` nicht ausgeben.
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Ein Besucher sieht bei geschlossener Kasse auf der Startseite nur Knöpfe, die irgendwohin führen.
@@ -158,6 +166,10 @@ der Schreibsperre die Kasse von drei anderen Produkten im geteilten Konto trifft
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-23 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6 gebaut: Knopf `href="#card"` aus dem ersten Bildschirm für Notschalter an (eine Zeile in `src/public/index.html`), die 402 holt den Link über USDC an allen drei Stellen aus `usdcTopupUrl`, `test/digistore-tool.test.ts` fährt beide Selftests samt Gegenprobe, `WACHE_01_FIRST_SCREEN` ohne den Knopf, 4 Zeilen in `goals/wache/ANNAHMEN.md`. Rot gesehen: „links nowhere to #card on the start page while the breaker is on“ an der Merge-Basis (`href="#card"` stand noch auf `/`); „names the same way over USDC in the 402 and on the paused page“ mit `usdcTopupUrl` auf `/pay/20/` vor dem Umbau von `proxy.ts` (402 `/pay/5/`, Seite `/pay/20/`); beide Gegenproben in `test/digistore-tool.test.ts`, wenn die Ersetzung die Sperre stehen lässt (2 failed). Prüfbefehle der fertigen Goals mit `index.html`, `werbung.test`, `card-way-pages`, `card-checkout`, `proxy` oder `digistore` (674 ohne Netz, ohne `check` und Merge-Basis) an `dev` 354a326 und am Kopf gleich, ein Lastausreißer an `dev` einzeln nachgefahren gleich. Prüfbefehle: Punkt 1 vitest Exit 0, `name ok`, `anker ok`, `0 1 src/public/index.html`, 1, 1; Punkt 2 0, 2, `name ok`, vitest Exit 0, `exit=1` ohne `sed-miss`; Punkt 3 vitest Exit 0, nichts fehlt, `exit=1` und `exit=1` ohne `sed-miss`, 0; Punkt 4 4, 0, 0, 0; Punkt 5 PR #407 am Kopf 035da96 `check` und `e2e` pass; Punkt 6 `check` grün in 121 s.
+- 2026-11-23 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, nach Merge von `dev` b988ec7 in den Goal-Branch (Kopf eebdcce) jeden Prüfbefehl neu gefahren. Prüfbefehle: Punkt 1 vitest Exit 0, `name ok`, `anker ok`, `0 1 src/public/index.html`, 1, 1; Punkt 2 0, 2, `name ok`, vitest Exit 0, `exit=1` ohne `sed-miss`; Punkt 3 vitest Exit 0, nichts fehlt, `exit=1` und `exit=1` ohne `sed-miss`, 0; Punkt 4 4, 0, 0, 0; Punkt 5 PR #407 am Kopf eebdcce `e2e` pass (10m59s), Zähler 1; Punkt 6 `check` grün in 70 s.
+- 2026-11-23 Zyklus 3: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, 7, Punkt 7 aus der Kritik gebaut: Fall „links every anchor of the start page to an id on the page, breaker on and off“ in `test/card-way-pages.test.ts` prüft jeden Anker auf `/` bei Notschalter an und aus gegen die `id` der Seite. Rot gesehen mit `src/public/index.html` der Merge-Basis (`dead anchors with the breaker on: expected [ '#card' ] to deeply equal []`). Prüfbefehle: Punkt 1 vitest Exit 0, `0 1 src/public/index.html`, 1, 1; Punkt 2 0, 2, vitest Exit 0, `exit=1` ohne `sed-miss`; Punkt 3 vitest Exit 0, `exit=1` und `exit=1` ohne `sed-miss`, 0; Punkt 4 4, 0, 0, 0; Punkt 6 `check` grün in 201 s; Punkt 7 `name ok`, vitest Exit 0, `ziele ok`, `exit=1` ohne `sed-miss`; Punkt 5 `e2e` am Kopf im Kommentar am Topic.
+- 2026-11-23 Release: PASS K und B (Zyklus 3), DONE.
 
 ## Blockers
 keine
