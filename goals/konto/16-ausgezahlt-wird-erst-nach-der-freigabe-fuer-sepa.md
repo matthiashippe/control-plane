@@ -1,7 +1,7 @@
 # Konto Goal 16: Ausgezahlt wird erst nach der Freigabe für SEPA
 
 ## Status
-PLANNED
+PAUSED
 
 ## Active Objective
 Ein Kunde gibt seine IBAN erst ein, wenn Bridge ihm per SEPA auszahlen darf. Heute (beim Schreiben am 2026-11-22 am Code von `dev`
@@ -156,3 +156,4 @@ Auszahlung an eine Adresse geht, von der Bridge nicht in Euro auszahlen darf.
 ## Progress Log
 
 ## Blockers
+Pause: Tech Lead 23.11.2026 (PRO-28123), nach der Entscheidung von Matthias vom 22.11.2026 (Commit 5218f7a): konto 16 und 17 hängen an konto 15, das ruht, weil es keinen Zugang bei MoonPay gibt. Die Arbeit liegt auf dem Branch goal/konto-16 (Zyklus 2, Punkt 4 offen); PR #368 ist geschlossen, der Branch bleibt.
