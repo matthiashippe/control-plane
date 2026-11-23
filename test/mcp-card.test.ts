@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 import * as server from "../mcp/server.mjs";
 import { createAutomatonTools, createClient, handleMessage } from "../mcp/server.mjs";
-import { CARD_PACKAGES, cardCheckoutUrl } from "../src/payments/digistore.js";
+import { CARD_PACKAGES } from "../src/payments/digistore.js";
 
 /*
- * card_top_up of mcp/server.mjs (goals/karte/02, point 9): three links to the checkout of Digistore24 for one automaton, each
+ * card_top_up of mcp/server.mjs (goals/karte/02, point 9): three links to the card checkout for one automaton, through
+ * `/card/<package>` of the service (goals/wache/01), each
  * with the credit its package gives. Driven through tools/call against a stub fetch that records every request. The tool needs
  * no request at all, so the suite proves none is made. No network, no port.
  */
@@ -50,8 +51,9 @@ describe("card_top_up in mcp/server.mjs", () => {
     const h = harness();
     const r = await h.call("card_top_up", { address: ADDRESS });
     expect(r.isError).toBe(false);
-    const links = r.text.match(/https:\/\/www\.checkout-ds24\.com\/product\/\d+\/\?custom=0x[0-9a-f]{40}/g) ?? [];
-    expect(links).toEqual(CARD_PACKAGES.map((p) => `https://www.checkout-ds24.com/product/${p.productId}/?custom=${ADDRESS.toLowerCase()}`));
+    const links = r.text.match(/https?:\/\/\S+/g) ?? [];
+    expect(links).toEqual(CARD_PACKAGES.map((p) => `${BASE}/card/${p.grossEurCents / 100}?address=${ADDRESS.toLowerCase()}`));
+    expect(r.text, "no link past the redirect of the service").not.toContain("checkout-ds24");
     expect(r.text, "the address travels in lower case only").not.toContain(ADDRESS);
     expect(r.text).toMatch(/opens? the checkout of Digistore24 in (?:your|the) browser/i);
     expect(r.text).not.toMatch(/[\u2013\u2014]/);
@@ -61,9 +63,11 @@ describe("card_top_up in mcp/server.mjs", () => {
   it("names the credit each package gives", async () => {
     const h = harness();
     const r = await h.call("card_top_up", { address: ADDRESS });
-    const lines = r.text.split("\n").filter((l) => l.includes("checkout-ds24"));
+    const lines = r.text.split("\n").filter((l) => l.includes("/card/"));
     expect(lines).toEqual(
-      CARD_PACKAGES.map((p) => `${p.grossEurCents / 100} EUR, about $${p.aboutCreditUsd} credit: ${cardCheckoutUrl(p, ADDRESS)}`),
+      CARD_PACKAGES.map(
+        (p) => `${p.grossEurCents / 100} EUR, about $${p.aboutCreditUsd} credit: ${BASE}/card/${p.grossEurCents / 100}?address=${ADDRESS.toLowerCase()}`,
+      ),
     );
     // mcp/server.mjs is plain Node and cannot import src/, so it keeps its own copy of the packages. That copy has to be the
     // list of the service, number for number, or the plugin promises a credit the IPN does not book.

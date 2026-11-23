@@ -2,8 +2,8 @@
  * The way to the card checkout (goals/karte/02): the 402 for an empty balance and the policy that lets the browser go there.
  *
  * Customer 1 and the automaton of 2026-11-21 stopped after an empty balance, and no answer they got named a way without USDC.
- * Every link here goes straight to the checkout of Digistore24 with the address in `custom`, because its review only accepts
- * links that go there directly, and the address comes back in the IPN (src/payments/digistore.ts).
+ * Every link here goes through `/card/<package>` of this service, which sends on to the checkout of Digistore24 with the address
+ * in `custom` only while card payment is open (goals/wache/01), and the address comes back in the IPN (src/payments/digistore.ts).
  */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
@@ -14,7 +14,8 @@ import { openDb, postLedger } from "../src/db.js";
 import { MockProvider, MOCK_MODEL } from "../src/inference/mock.js";
 import { Catalog, handleChat } from "../src/inference/proxy.js";
 import { claimStarter } from "../src/credits/starter.js";
-import { CARD_PACKAGES, cardCheckoutUrl } from "../src/payments/digistore.js";
+import { CARD_PACKAGES } from "../src/payments/digistore.js";
+import { cardLink, packageKey } from "../src/payments/card-way.js";
 
 const ROOT = join(__dirname, "..");
 
@@ -45,7 +46,8 @@ describe("the 402 for an empty balance", () => {
     const res = await chat();
     expect(res.status).toBe(402);
     const body = res.body as Body402;
-    const url = `https://www.checkout-ds24.com/product/${CARD_PACKAGES[0].productId}/?custom=${address}`;
+    const url = cardLink(CARD_PACKAGES[0], address);
+    expect(url).toMatch(new RegExp(`/card/5\\?address=${address}$`));
     expect(body.details.card_url).toBe(url);
     expect(body.message).toContain(`No USDC? Pay by card: ${url} Nothing was charged for this call.`);
   });
@@ -76,12 +78,10 @@ describe("the 402 for an empty balance", () => {
 
   it("makes no card link for anything that is not an address", () => {
     for (const bad of ["", "0x123", "0x" + "g".repeat(40), "x".repeat(42), "0x" + "a".repeat(41)]) {
-      expect(cardCheckoutUrl(CARD_PACKAGES[0], bad), bad).toBeNull();
+      expect(cardLink(CARD_PACKAGES[0], bad), bad).toBeNull();
     }
     const mixed = "0x" + "Ab".repeat(20);
-    expect(cardCheckoutUrl(CARD_PACKAGES[1], mixed)).toBe(
-      `https://www.checkout-ds24.com/product/${CARD_PACKAGES[1].productId}/?custom=${mixed.toLowerCase()}`,
-    );
+    expect(cardLink(CARD_PACKAGES[1], mixed)).toMatch(new RegExp(`/card/20\\?address=${mixed.toLowerCase()}$`));
   });
 });
 
@@ -148,24 +148,24 @@ describe("the card block of the landing page", () => {
     expect(move).toContain('href="#card"');
   });
 
-  it("sends the address as custom straight to the digistore24 checkout of each package", async () => {
+  it("sends the address to /card/<package> of each package, which goes on to the digistore24 checkout", async () => {
     const { block } = await page();
     // One form, sent by the browser itself: no script runs, and the address never reaches our access log.
     expect(block.match(/<form\b[^>]*>/g)).toEqual(['<form method="get">']);
     expect(block).not.toMatch(/<script\b/);
     const inputs = block.match(/<input\b[^>]*>/g) ?? [];
     expect(inputs).toHaveLength(1);
-    for (const attr of ['name="custom"', 'pattern="0x[0-9a-fA-F]{40}"', " required", 'autocomplete="off"', 'spellcheck="false"']) {
+    for (const attr of ['name="address"', 'pattern="0x[0-9a-fA-F]{40}"', " required", 'autocomplete="off"', 'spellcheck="false"']) {
       expect(inputs[0], attr).toContain(attr);
     }
     const targets = [...block.matchAll(/<button\b[^>]*type="submit"[^>]*formaction="([^"]+)"/g)].map((x) => x[1]);
-    expect(targets).toEqual(CARD_PACKAGES.map((p) => `https://www.checkout-ds24.com/product/${p.productId}/`));
+    expect(targets).toEqual(CARD_PACKAGES.map((p) => `/card/${packageKey(p)}`));
     // What the browser builds from the form is exactly the link the 402 and the plugin give out.
     const address = privateKeyToAccount(generatePrivateKey()).address.toLowerCase();
     for (const [i, p] of CARD_PACKAGES.entries()) {
-      const url = new URL(targets[i]);
-      url.search = new URLSearchParams({ custom: address }).toString();
-      expect(url.toString()).toBe(cardCheckoutUrl(p, address));
+      const url = new URL(targets[i], "https://automatonhost.com");
+      url.search = new URLSearchParams({ address }).toString();
+      expect(url.toString()).toBe(cardLink(p, address));
     }
   });
 

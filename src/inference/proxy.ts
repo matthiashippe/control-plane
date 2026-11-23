@@ -17,7 +17,7 @@ import { grantOnFirstUse } from "../credits/starter.js";
 import { openBountyCount } from "../bounties/store.js";
 import { siteOrigin } from "../public/site.js";
 import { TOPUP_TIERS_USD } from "../payments/pay.js";
-import { CARD_PACKAGES, cardCheckoutUrl } from "../payments/digistore.js";
+import { cardUrlFor } from "../payments/card-way.js";
 
 export const MARKUP = 1.3;
 const DEFAULT_MAX_TOKENS = 4096;
@@ -340,9 +340,9 @@ async function handleChatUncoalesced(
         },
       };
     }
-    // The way for an operator without USDC (goals/karte/02): the checkout of the smallest card package, 5 EUR like `topup_url`,
-    // with this wallet in `custom`. Additive only, like `topup_url`.
-    const cardUrl = cardCheckoutUrl(CARD_PACKAGES[0], address);
+    // The way for an operator without USDC (goals/karte/02): the smallest card package, 5 EUR like `topup_url`, through
+    // `/card/5` of this service, and nothing while the card breaker is on (goals/wache/01). Additive only, like `topup_url`.
+    const cardUrl = cardUrlFor(db, address, new Date());
     return {
       status: 402,
       body: {

@@ -63,16 +63,6 @@ export const CARD_PACKAGES: readonly CardPackage[] = LISTED.map((p) => {
   return { ...p, ...m };
 });
 
-/**
- * The link to the checkout of `pkg` for `address` (goals/karte/02), straight to Digistore24, because its review only accepts
- * links that go there directly. The address goes only in `custom`, in lower case, and comes back in the IPN. Null for anything
- * that is not an address, so no link without one is ever made.
- */
-export function cardCheckoutUrl(pkg: CardPackage, address: string): string | null {
-  if (!/^0x[0-9a-fA-F]{40}$/.test(address) || !/^[1-9][0-9]*$/.test(pkg.productId)) return null;
-  return `https://www.checkout-ds24.com/product/${pkg.productId}/?custom=${address.toLowerCase()}`;
-}
-
 /** Digistore24 cuts the passphrase field to 40 characters without a word; a longer one could never match. */
 export const PASSPHRASE_MAX = 40;
 export const ECB_URL = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-hist-90d.xml";
