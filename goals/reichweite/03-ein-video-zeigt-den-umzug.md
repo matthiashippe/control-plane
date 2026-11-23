@@ -1,7 +1,7 @@
 # Reichweite Goal 03: Ein Video zeigt den Umzug
 
 ## Status
-BLOCKED umgebung
+ACTIVE
 
 ## Active Objective
 Wer aus einem Conway-Issue oder über die Suche auf automatonhost.com landet, liest heute, dass eine Zeile reicht, und muss es glauben,
@@ -230,17 +230,8 @@ MVP: Funktion, weil ein Besucher sieht, dass es wirklich eine Zeile ist, bevor e
 - 2026-11-23 Zyklus 2: Punkte 2, 3 gebaut (Befund 1 des Design Reviewers: Schrift im Video bei 390 zu klein). Jeder Schriftgrad im Video ist jetzt mindestens 44 px auf 1280, bei 358 px Breite (390er Seite, gemessen) also mindestens 12,3 px; Terminal mit 10 ganzen Reihen zu 46 Zeichen, jede Zeile mindestens 100 ms ganz im Bild, Video 26,3 s; zwölf Bilder neu, Satz unter dem Video „26 seconds“. Neue Tests in `test/video-render.test.ts` waren rot: zuerst ohne die Exporte (3 rot), dann je mit einer Mutation in `ops/video-render.mjs` (Zeilen 16 px, kein Mindestmoment, Sichtprüfung aus, Reihengrenze aus), jede kippt ihren Test. Prüfbefehle: Punkt 2 `video plan: 789 frames, 26.3 s, 4 scenes, 27 lines, 0 defects`, vitest grün, keine fehlende Testzeile, `exit=1` und `0`; Punkt 3 `exit=0 0 defects`, `exit=0 soll errors: 6 images, blocks end 390=728 1440=669, 0 defects`, `exit=0 video soll: 4 images, 0 defects`, `block video ok`, `schluesselbilder ok`, `bausteine ok neu=1`, `move gleich`.
 - 2026-11-23 Breaker no_progress_runs (PRO-28570): Status BLOCKED umgebung, kein Bauversuch. Commit `d606bc9` (Video, Standbild, GIF, Block in den Seiten, README) kam ohne Zeile im Progress Log auf den Branch, die Häkchen der Punkte 4, 5, 6, 7 und 9 lagen nur ungesichert im Arbeitsbaum und sind verworfen. Prüfbefehle: Punkt 4 `grep -cE` 1, Punkt 7 README-Diff 0, `stat` 830978 und 1229603 Byte, Job `check` an PR #409 rot (`test/werbung.test.ts`), Job `e2e` grün.
 
+- 2026-11-23 Zyklus 4: nach Changes requested des Tech Lead (Entscheidung `86b3c6a`: Folge `move`, `video`, `card` gewollt) Status zurück auf ACTIVE, Blockers und Ehrliche Lücken geleert; als Nächstes die Testdateien der Karte, der vollständige Vergleich der Prüfbefehle fertiger Goals und `check`.
+
 ## Blockers
-Art: umgebung
-- Breaker no_progress_runs: zwei Maker-Runs ohne neue Zeile im Progress Log (PRO-28570). Ein Mensch entscheidet über PR #409.
-- Widerspruch zu fertigen Goals: `PATH=/usr/bin:$PATH pnpm -s vitest run test/card-checkout.test.ts test/werbung.test.ts` gibt am Kopf `Tests 6 failed | 26 passed (32)` (an `dev` laut Topic-Run vom 23.11.2026 `32 passed`). Fünf Tests in `test/card-checkout.test.ts` und „leaves the card block of karte 02 as it is“ in `test/werbung.test.ts` lesen den ersten Block nach `move` als Kartenblock, Punkt 6 dieses Goals setzt dort den Block `video`; der Kartenblock selbst ist unverändert. Betroffen sind karte 02, wache 01, wache 02 und werbung 01. Lösen kann das nur der Tech Lead mit `Abgelöst:` im `ANNAHMEN.md` der alten Goals oder eine neue Reihenfolge im SOLL; im Breaker-Child baut der Maker nicht und ändert keine Tests fertiger Goals.
 
 ## Ehrliche Lücken
-- Punkt 4 (Abnahme der zwölf Bilder): Die Zeile `Abnahme-Issue video:` steht in `docs/soll/README.md` (Prüfung 1 gibt `1`), die Abnahme kam laut Commit `d606bc9` auf PRO-28535 um 17:44 UTC. Offen: Die Netz-Prüfung (Abnahme vor dem ersten Commit an Video und Seiten) lief nach dem Commit nicht und ist nicht belegt.
-- Punkt 5 (Video, Standbild, GIF nach Entscheidung 6): Dateien liegen in `d606bc9` (mp4 830978 Byte, GIF 1229603 Byte, beide unter der Grenze). `ops/video-assess.mjs` und `test/video-assess.test.ts` liegen im Branch. Offen: Beide wurden am Kopf nicht gefahren, die sechs Prüfbefehle des Punkts sind nicht belegt.
-- Punkt 6 (Route, CSP, Block `video` in den Seiten, pixelgleich): Route in `src/app.ts`, `media-src 'self'` im `deploy/Caddyfile` und `test/video.test.ts` liegen im Branch, der Block in `src/public/index.html` und `src/public/error-pages.ts` kam mit `d606bc9`. Offen: Tests, `caddy validate` und die Pixelprüfungen gegen die SOLL-Bilder liefen am Kopf nicht; dazu bricht der Block die Reihenfolge, die `test/werbung.test.ts` für karte 02 fordert (Blocker oben).
-- Punkt 7 (GIF im README): Das GIF steht unter `conwayApiUrl`, der README-Diff außer dieser Zeile ist leer (Prüfung 2 gibt `0`). Offen: Prüfung 1 lief nicht, der Punkt ist nicht beansprucht.
-- Punkt 9 (Entscheidungen, Pfade, keine Pakete, keine Schlüssel): Nicht am Kopf `d606bc9` gefahren; offen, ob jede neue Datei im Pfadmuster liegt und `ANNAHMEN.md` zehn Einträge trägt.
-- Punkt 10 (`check` grün): Job `check` an PR #409 ist rot, lokal am Kopf 6 rote Tests aus `test/card-checkout.test.ts` und `test/werbung.test.ts` (Blocker oben). Ohne Entscheidung des Tech Leads über die Reihenfolge der Startseite kippt der Punkt nicht.
-- Punkt 11 (goal-verifier PASS): Keine Linse hat geprüft; ohne grünes `check` nicht erreichbar.
-- Zu Punkt 4, 5, 6, 7 und 9 meldet der Topic-Run vom 23.11.2026 (Kommentar auf PRO-28570, 18:10 UTC) jeden Prüfbefehl am Kopf `d606bc9` grün; er schrieb dazu keine Zeile ins Progress Log, darum bleiben die Kästchen offen. Der Vergleich der Prüfbefehle fertiger Goals blieb unvollständig (50 von 387 gelaufen).
