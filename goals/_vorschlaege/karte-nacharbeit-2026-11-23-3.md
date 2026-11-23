@@ -5,3 +5,5 @@ Beleg: `git show d3732691c:ops/digistore-release.mjs | wc -l; git log --format=%
 Empfehlung: Den Selftest mit Fake-Konto und Beispielen (ab Zeile 335, rund 200 Zeilen) in eine eigene Datei `ops/digistore-release-selftest.mjs` legen oder die Größe in der nächsten Commit-Message an der Datei begründen.
 
 Linse Q, Frage 6.
+
+Verworfen: Größe einer Datei ohne Fehlerbild, kein Gewinn für Kunden (2026-11-23)

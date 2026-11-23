@@ -4,3 +4,5 @@ Befund: Der Wächter in `test/rollback-schema.test.ts` erkennt nur `RENAME COLUM
 Beleg: `grep -c 'COLUMN \${column}' src/db.ts` -> 2 | test/rollback-schema.test.ts:43
 Empfehlung: `missingWaysBack` meldet jedes `RENAME COLUMN` und `DROP COLUMN`, dessen Bezeichner mit `${` beginnt, als fehlenden Rückweg, mit einem Fall dazu, damit eine solche Migration ihre Spalten in Schritt 8 ausdrücklich nennen muss.
 MVP: Funktion.
+
+Übernommen: Watch List in STATE.md, beim nächsten Goal an test/rollback-schema.test.ts oder einer Migration mit ${column} (2026-11-23)

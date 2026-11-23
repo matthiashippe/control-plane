@@ -11,3 +11,5 @@ Empfehlung: karte 02 beginnt mit diesen Schritten, in dieser Reihenfolge.
 5. Rückgabe 30 Tage: `--report` meldet 14 Tage, und die API nimmt `refund_policy` nicht an. Handgriff für Matthias im Backoffice von Digistore24 je Produkt 771278, 771279 und 771280: Produkt öffnen, Rückgaberecht auf 30 Tage, speichern. Danach zeigt `node ops/digistore.mjs --report` `refund 30 days` und `report: 0 defects`.
 6. Testkauf je Produkt mit Testpay (Zahlart „Testpay“ in der Kasse `https://www.checkout-ds24.com/product/<id>/`, im selben Chrome-Fenster wie der Login im Backoffice), mit einer eigenen Test-Adresse in `custom`. Erwartung: `ops/card-orders.sh` zählt `test 3`, und kein Saldo ändert sich, weil eine Testbestellung nie bucht.
 7. Einmal einreichen zur Freigabe, je Produkt, erst wenn Schritte 4 bis 6 stehen und `--report` keinen Mangel meldet; nie zweimal denselben Stand. Lehnt Digistore24 zweimal mit demselben Grund ab, meldet das Glied den Grund an Matthias.
+
+Übernommen: karte 02 (goals/karte/02-der-weg-zur-kasse.md, Zeile 22 „Übernimmt“), gemergt PR #378 (2026-11-23)

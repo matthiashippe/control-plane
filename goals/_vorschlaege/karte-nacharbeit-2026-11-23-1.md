@@ -5,3 +5,5 @@ Beleg: `git grep -n -E 'digistore(-release)?\.mjs' e423d4d -- test scripts` -> k
 Empfehlung: Eine Testdatei `test/digistore-tool.test.ts` startet `node ops/digistore.mjs --selftest` per `spawnSync` und erwartet Exit 0 und als letzte Zeile `SELFTEST OK`, nach dem Muster von `test/abort-purchase.test.ts:93`.
 
 `verifier.md` (Für diesen Loop) nennt einen Prüfbefehl, den `check` nicht findet, eine Lücke; hier belegt den Selftest nur der Prüfbefehl der Goal-Datei (goals/karte/01-guthaben-per-karte.md:160), der nach dem Merge niemand mehr ausführt.
+
+Übernommen: Glied 4 an den Tech Lead, PRO-28123, mit karte 03 vor dem Start am 30.11. (2026-11-23)

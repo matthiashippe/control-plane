@@ -6,3 +6,5 @@ Empfehlung: Der Zweig „Rollback auf $ROLLBACK_TAG“ stoppt den neuen Containe
 MVP: Funktion.
 
 `deploy/rollout-remote.sh` steht in `deny_paths`, der PR dazu geht deshalb zu Matthias.
+
+Übernommen: Watch List in STATE.md; der Fall display_name ist zu, weil jedes Rollback-Image seit den Deploys nach konto 12 die Spalte kennt, die Probe des Rollback-Images gegen die Kopie ändert deploy/rollout-remote.sh (deny_paths, nur ein Mensch) und gehört zur nächsten Migration, die das alte Image nicht lesen kann (2026-11-23)

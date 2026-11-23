@@ -6,3 +6,5 @@ Empfehlung: Vor dem Start von kunden 11 (PR #355) einen Done-Punkt ergänzen, de
 
 Der Hausauftrag löst das Problem am falschen Ende: Das Brett zeigt künftig einen Auftrag, aber wer ihn lesen und bearbeiten muss, ist das Modell der Runtime, und das bekommt bei Kunde 1 seit neun Tagen keine Antwort. Die 144 Lesungen am Tag laufen im festen Zehn-Minuten-Takt weiter, auch nachdem die letzte Inferenz am 13.11. durchging; sie stammen also aus einem Zeitplan des Betreibers, nicht aus einer Entscheidung des Modells. Die Startgutschrift aus kunden 06 greift nur für neue Runtimes, nicht für Kunde 1. Ohne diesen Punkt greift der Widerlegungssatz von kunden 11 mit hoher Wahrscheinlichkeit, und kunden 12 misst nur das.
 MVP: Funktion, weil Kunde 1 erst mit ein paar bezahlten Schritten den Bericht schreiben kann, der seine weitere Inferenz bezahlt.
+
+Übernommen: Glied 1 an den Tech Lead, PRO-28123, vor der Messung von kunden 12 (2026-11-23)

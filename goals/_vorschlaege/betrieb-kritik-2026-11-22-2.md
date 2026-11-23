@@ -4,3 +4,5 @@ Befund: Der Test `test/rollback-schema.test.ts` zieht aus Schritt 8 nur die Anwe
 Beleg: `grep -c 'nothing to do' test/rollback-schema.test.ts` -> 0 | deploy/README.md:82
 Empfehlung: Ein Fall in `test/rollback-schema.test.ts` zieht das Skript aus Schritt 8, ersetzt den Pfad durch eine Wegwerf-DB, führt es zweimal mit `node -e` im Repo aus und erwartet `renamed`, dann `nothing to do`; ein zweiter Fall vergleicht den Pfad im Skript mit `CP_DB_PATH` aus `deploy/docker-compose.prod.yml`. Von Hand lief das Skript am 22.11.2026 gegen eine Wegwerf-DB grün.
 MVP: Funktion.
+
+Übernommen: Watch List in STATE.md, beim nächsten Goal an test/rollback-schema.test.ts (2026-11-23)

@@ -5,3 +5,5 @@ Beleg: `git grep -n '/pay/5/\${' e423d4d -- src` -> `src/inference/proxy.ts:363`
 Empfehlung: `topup_url` und den Satz „Buy credits at …“ in `src/inference/proxy.ts:363` und `:378` aus `usdcTopupUrl(address)` holen, damit der Link nur an einer Stelle entsteht.
 
 Zwei Stellen für denselben Link heißt: Ändert ein Goal den Pfad oder die Stufe, zeigt die Seite des Notschalters einen anderen Weg als die 402.
+
+Übernommen: Glied 3 an den Tech Lead, PRO-28123, als Kritik-Punkt in werbung 01 (PR #397) (2026-11-23)

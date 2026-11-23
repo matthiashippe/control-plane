@@ -5,3 +5,5 @@ Beleg: `git show e423d4d:src/public/index.html | grep -n 'href="#card"\|CARD-->'
 Empfehlung: Den Knopf mit einer eigenen Marke (etwa `<!--CARD-LINK-->`) in `stripCardWay` mit entfernen und in `test/card-way-pages.test.ts` beim Fall „drops the card block of the start page while the breaker is on“ zusätzlich `not.toContain('href="#card"')` prüfen.
 
 Die Goal-Datei sagt in Zeile 13, dass die Startseite den Weg zur Kasse bei Fall (a) ganz weglässt. Der Maker hat die Lücke in goals/wache/ANNAHMEN.md:17 festgehalten, weil der Prüfbefehl von Punkt 3 genau ein Markenpaar verlangt; eine Ausnahme in verifier.md oder loop-constraints.md gibt es dafür nicht.
+
+Übernommen: Glied 3 an den Tech Lead, PRO-28123, als Kritik-Punkt in werbung 01 (PR #397) (2026-11-23)
