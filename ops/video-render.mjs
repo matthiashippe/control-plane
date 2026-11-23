@@ -1,13 +1,13 @@
 // The video "one line moves an automaton" (goals/reichweite/03, decisions 1, 2 and 5): from the recorded transcript
-// docs/video/umzug.transcript.json and the captions of the tape docs/video/umzug.tape to pictures, then to the files.
+// docs/video/move.transcript.json and the captions of the tape docs/video/move.tape to pictures, then to the files.
 //
 //   node ops/video-render.mjs --plan      no browser: the timeline and its defects, last line
 //                                         video plan: <f> frames, <s> s, 4 scenes, <l> lines, <n> defects
-//   node ops/video-render.mjs --frames    the four key frames docs/soll/video-umzug-<n>-1280.png (the last picture of each scene)
+//   node ops/video-render.mjs --frames    the four key frames docs/soll/video-move-<n>-1280.png (the last picture of each scene)
 //   node ops/video-render.mjs --check     the four key frames into a mktemp folder, compared with the committed ones, last line
 //                                         video soll: 4 images, <n> defects
-//   node ops/video-render.mjs --video     every picture, then src/public/video/umzug.mp4, src/public/video/umzug-poster.png and
-//                                         docs/video/umzug.gif with ffmpeg (CP_FFMPEG, else the one of uvx --with imageio-ffmpeg)
+//   node ops/video-render.mjs --video     every picture, then src/public/video/move.mp4, src/public/video/move-poster.png and
+//                                         docs/video/move.gif with ffmpeg (CP_FFMPEG, else the one of uvx --with imageio-ffmpeg)
 //   --transcript <file> --tape <file>     other inputs (tests, counter-tests)
 //
 // Any other argument ends with exit 1 before the browser starts, so a mistyped flag never writes a picture. No network: the
@@ -221,7 +221,7 @@ export function planSummary(tl, defects) {
 const USAGE = "usage: node ops/video-render.mjs --plan | --frames | --check | --video [--transcript <file>] [--tape <file>]";
 /** The arguments, or null when one is unknown, a mode is missing or doubled, or a file is missing after its flag. */
 export function parseArgs(argv) {
-  const out = { mode: null, transcript: path.join(ROOT, "docs/video/umzug.transcript.json"), tape: path.join(ROOT, "docs/video/umzug.tape") };
+  const out = { mode: null, transcript: path.join(ROOT, "docs/video/move.transcript.json"), tape: path.join(ROOT, "docs/video/move.tape") };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (["--plan", "--frames", "--check", "--video"].includes(a)) { if (out.mode) return null; out.mode = a.slice(2); }
@@ -363,7 +363,7 @@ async function main() {
   const page = path.join(scratch, "video.html");
   writeFileSync(page, PAGE);
   const browser = launch(chrome, path.join(scratch, "profile"), "picture");
-  const keyOf = (dir, n) => path.join(dir, `video-umzug-${n}-1280.png`);
+  const keyOf = (dir, n) => path.join(dir, `video-move-${n}-1280.png`);
   try {
     await within(180000, "browser start", browser.send("Browser.getVersion"));
     const p = await within(120000, "page", openPage(browser, page));
@@ -403,7 +403,7 @@ async function main() {
     writeFileSync(path.join(scratch, "list.txt"), list);
     const bin = ffmpegPath();
     const comment = `transcript_sha256=${sha256(args.transcript)} tape_sha256=${sha256(args.tape)}`;
-    const mp4 = path.join(ROOT, "src/public/video/umzug.mp4"), poster = path.join(ROOT, "src/public/video/umzug-poster.png"), gif = path.join(ROOT, "docs/video/umzug.gif");
+    const mp4 = path.join(ROOT, "src/public/video/move.mp4"), poster = path.join(ROOT, "src/public/video/move-poster.png"), gif = path.join(ROOT, "docs/video/move.gif");
     mkdirSync(path.dirname(mp4), { recursive: true });
     const input = ["-f", "concat", "-safe", "0", "-i", path.join(scratch, "list.txt")];
     ffmpeg(bin, [...input, "-vf", `fps=${FPS},format=yuv420p`, "-c:v", "libx264", "-preset", "slow", "-crf", "24", "-tune", "stillimage",
@@ -414,7 +414,7 @@ async function main() {
     const k2 = keyOf(path.join(ROOT, "docs/soll"), 2);
     if (!existsSync(k2)) throw new Error("key frame 2 missing: run --frames first");
     copyFileSync(k2, poster);
-    console.log(`video: ${idx.length} frames, ${files.size} pictures, ${(tl.total / 1000).toFixed(1)} s, written umzug.mp4, umzug-poster.png, umzug.gif`);
+    console.log(`video: ${idx.length} frames, ${files.size} pictures, ${(tl.total / 1000).toFixed(1)} s, written move.mp4, move-poster.png, move.gif`);
   } finally {
     await browser.close();
     rmSync(scratch, { recursive: true, force: true });

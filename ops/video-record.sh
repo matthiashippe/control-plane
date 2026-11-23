@@ -2,7 +2,7 @@
 # The recording of the video "one line moves an automaton" (goals/reichweite/03, decisions 2 to 4).
 #
 #   bash ops/video-record.sh --record     network: one small sandbox of our own account on automatonhost.com, the tape
-#                                         docs/video/umzug.tape inside it, then docs/video/umzug.transcript.json
+#                                         docs/video/move.tape inside it, then docs/video/move.transcript.json
 #   bash ops/video-record.sh --verify     network, read only: the ledger of production knows the key of the transcript
 #   bash ops/video-record.sh --selftest   no network, no port: the whole run against stand-ins, in both directions
 #
@@ -35,8 +35,8 @@ BASE="${VIDEO_API_URL:-https://automatonhost.com}"
 BASE_RPC="${BASE_RPC_URL:-https://mainnet.base.org}"
 LIVE_SANDBOX_ENV="${LIVE_SANDBOX_ENV:-$HOME/.config/control-plane/live-sandbox.env}"
 LOOP_ENV="$HOME/.config/control-plane/loop.env"
-TAPE="${VIDEO_TAPE:-$ROOT/docs/video/umzug.tape}"
-TRANSCRIPT="${VIDEO_TRANSCRIPT:-$ROOT/docs/video/umzug.transcript.json}"
+TAPE="${VIDEO_TAPE:-$ROOT/docs/video/move.tape}"
+TRANSCRIPT="${VIDEO_TRANSCRIPT:-$ROOT/docs/video/move.transcript.json}"
 USDC_BASE="0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
 REC_DIR="/root/.rec"
 RECORD_WAIT_S=900
@@ -290,12 +290,12 @@ run_record() {
   wallet_key=""
   VR_REC_DIR="$REC_DIR" VR_NAME="video-automaton-$(rand_hex | head -c 6)" VR_GENESIS="$GENESIS_PROMPT" VR_MESSAGE="$CREATOR_MESSAGE" \
     VR_ADDRESS="$ADDRESS" VR_MODEL="$MODEL" upload setup
-  upload file "$TAPE" "$REC_DIR/umzug.tape"
+  upload file "$TAPE" "$REC_DIR/move.tape"
   printf '%s\n' "$REC_JS" >"$WORK/rec.js"
   upload file "$WORK/rec.js" "$REC_DIR/rec.js"
   progress "wallet, setup, tape and recorder uploaded"
 
-  sbx_exec "cd /root && setsid nohup node $REC_DIR/rec.js $REC_DIR/umzug.tape $REC_DIR/out.json > $REC_DIR/rec.log 2>&1 < /dev/null &" 30000
+  sbx_exec "cd /root && setsid nohup node $REC_DIR/rec.js $REC_DIR/move.tape $REC_DIR/out.json > $REC_DIR/rec.log 2>&1 < /dev/null &" 30000
   [ "$CODE" = 200 ] || fail "exec of the recorder answered $CODE, expected 200"
   progress "recording"
   deadline=$((SECONDS + RECORD_WAIT_S))
@@ -448,7 +448,7 @@ FAKE
   {
     echo "# stand-in tape of the selftest"
     echo "setup mkdir -p ~/.automaton && printf '{\\n  \"conwayApiUrl\": \"https://api.conway.tech\"\\n}\\n' > ~/.automaton/automaton.json"
-    grep -E '^(caption|run|until) ' "$ROOT/docs/video/umzug.tape"
+    grep -E '^(caption|run|until) ' "$ROOT/docs/video/move.tape"
   } >"$dir/tape"
 
   # A planted database for --verify: a key with the prefix of the transcript for the address in the window, one of another
@@ -506,7 +506,7 @@ FAKE
                 cp "$S/fs/root/.automaton/wallet.json" "$S/wallet.json" 2>/dev/null
                 mkdir -p "$S/home/.automaton"
                 HOME="$S/home" PATH="$dir/fake:$PATH" CASE_CONWAY="$CONWAY" CASE_LEAK="$LEAK" \
-                  node "$S/fs$REC_DIR/rec.js" "$S/fs$REC_DIR/umzug.tape" "$S/fs$REC_DIR/out.json" >/dev/null 2>&1
+                  node "$S/fs$REC_DIR/rec.js" "$S/fs$REC_DIR/move.tape" "$S/fs$REC_DIR/out.json" >/dev/null 2>&1
                 printf '{"stdout":"","stderr":"","exit_code":0}' >"$3"
                 ;;
               *) printf '{"stdout":"","stderr":"unknown","exit_code":127}' >"$3" ;;

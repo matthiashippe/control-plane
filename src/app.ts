@@ -838,8 +838,8 @@ export function createApp(opts: AppOptions) {
    * A Range header of another form (several ranges, another unit) is ignored and the whole file goes out, as RFC 9110 allows.
    */
   const VIDEO_TYPES = new Map([
-    ["umzug.mp4", "video/mp4"],
-    ["umzug-poster.png", "image/png"],
+    ["move.mp4", "video/mp4"],
+    ["move-poster.png", "image/png"],
   ]);
   const videoFiles = new Map<string, ArrayBuffer>();
   for (const name of VIDEO_TYPES.keys()) {

@@ -11,8 +11,8 @@ import { openDb } from "../src/db.js";
 import { ERROR_PAGES } from "../src/public/error-pages.js";
 
 const ORIGIN = "https://automatonhost.com";
-const MP4 = fs.readFileSync(new URL("../src/public/video/umzug.mp4", import.meta.url));
-const POSTER = fs.readFileSync(new URL("../src/public/video/umzug-poster.png", import.meta.url));
+const MP4 = fs.readFileSync(new URL("../src/public/video/move.mp4", import.meta.url));
+const POSTER = fs.readFileSync(new URL("../src/public/video/move-poster.png", import.meta.url));
 
 let before: string | undefined;
 beforeEach(() => {
@@ -37,7 +37,7 @@ function videoBlock(page: string): { at: number; block: string } {
 
 describe("/video/{file}", () => {
   it("serves the video as mp4 with accept-ranges", async () => {
-    const res = await app().request("/video/umzug.mp4");
+    const res = await app().request("/video/move.mp4");
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toBe("video/mp4");
     expect(res.headers.get("accept-ranges")).toBe("bytes");
@@ -46,41 +46,41 @@ describe("/video/{file}", () => {
   });
 
   it("answers a range request with 206 and content-range", async () => {
-    const res = await app().request("/video/umzug.mp4", { headers: { Range: "bytes=100-199" } });
+    const res = await app().request("/video/move.mp4", { headers: { Range: "bytes=100-199" } });
     expect(res.status).toBe(206);
     expect(res.headers.get("content-type")).toBe("video/mp4");
     expect(res.headers.get("content-range")).toBe(`bytes 100-199/${MP4.length}`);
     expect(res.headers.get("content-length")).toBe("100");
     expect(Buffer.from(await res.arrayBuffer()).equals(MP4.subarray(100, 200))).toBe(true);
     // Safari asks for the first two bytes first, then open ranges and the tail.
-    const first = await app().request("/video/umzug.mp4", { headers: { Range: "bytes=0-1" } });
+    const first = await app().request("/video/move.mp4", { headers: { Range: "bytes=0-1" } });
     expect(first.status).toBe(206);
     expect(Buffer.from(await first.arrayBuffer()).equals(MP4.subarray(0, 2))).toBe(true);
-    const open = await app().request("/video/umzug.mp4", { headers: { Range: `bytes=${MP4.length - 10}-` } });
+    const open = await app().request("/video/move.mp4", { headers: { Range: `bytes=${MP4.length - 10}-` } });
     expect(open.headers.get("content-range")).toBe(`bytes ${MP4.length - 10}-${MP4.length - 1}/${MP4.length}`);
-    const tail = await app().request("/video/umzug.mp4", { headers: { Range: "bytes=-5" } });
+    const tail = await app().request("/video/move.mp4", { headers: { Range: "bytes=-5" } });
     expect(Buffer.from(await tail.arrayBuffer()).equals(MP4.subarray(MP4.length - 5))).toBe(true);
-    const past = await app().request("/video/umzug.mp4", { headers: { Range: `bytes=0-${MP4.length + 1000}` } });
+    const past = await app().request("/video/move.mp4", { headers: { Range: `bytes=0-${MP4.length + 1000}` } });
     expect(past.headers.get("content-range")).toBe(`bytes 0-${MP4.length - 1}/${MP4.length}`);
   });
 
   it("answers an unsatisfiable range with 416", async () => {
     for (const range of [`bytes=${MP4.length}-`, `bytes=${MP4.length + 5}-${MP4.length + 9}`, "bytes=20-10", "bytes=-0"]) {
-      const res = await app().request("/video/umzug.mp4", { headers: { Range: range } });
+      const res = await app().request("/video/move.mp4", { headers: { Range: range } });
       expect(res.status, range).toBe(416);
       expect(res.headers.get("content-range"), range).toBe(`bytes */${MP4.length}`);
     }
   });
 
   it("serves the poster as png", async () => {
-    const res = await app().request("/video/umzug-poster.png");
+    const res = await app().request("/video/move-poster.png");
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toBe("image/png");
     expect(Buffer.from(await res.arrayBuffer()).equals(POSTER)).toBe(true);
   });
 
   it("answers 404 for any other file under /video/", async () => {
-    for (const p of ["/video/other.mp4", "/video/umzug.MP4", "/video/..%2Fapp.ts", "/video/umzug.mp4.bak", "/video/"]) {
+    for (const p of ["/video/other.mp4", "/video/move.MP4", "/video/..%2Fapp.ts", "/video/move.mp4.bak", "/video/"]) {
       const res = await app().request(p);
       expect(res.status, p).toBe(404);
       expect(res.headers.get("content-type") ?? "", p).not.toMatch(/video|image/);
@@ -98,8 +98,8 @@ describe("the block data-soll=\"video\"", () => {
     expect(at).toBeGreaterThan(moveEnd);
     // Directly after the block move: nothing but white space between them.
     expect(page.slice(moveEnd + "</section>".length, at).trim()).toBe("");
-    expect(block).toContain('<source src="/video/umzug.mp4" type="video/mp4">');
-    expect(block).toContain('poster="/video/umzug-poster.png"');
+    expect(block).toContain('<source src="/video/move.mp4" type="video/mp4">');
+    expect(block).toContain('poster="/video/move-poster.png"');
   });
 
   it("embeds the video below the fix block on every error page", async () => {
@@ -109,7 +109,7 @@ describe("the block data-soll=\"video\"", () => {
       const { at, block } = videoBlock(page);
       expect(fix, p.slug).toBeGreaterThan(-1);
       expect(at, p.slug).toBeGreaterThan(fix);
-      expect(block, p.slug).toContain('<source src="/video/umzug.mp4" type="video/mp4">');
+      expect(block, p.slug).toContain('<source src="/video/move.mp4" type="video/mp4">');
     }
   });
 

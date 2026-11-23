@@ -377,11 +377,11 @@ export function summaryErrors(results) {
 }
 
 // ---- the block data-soll="video" (goals/reichweite/03) -------------------------------------------------------------------
-// The start page and the error pages show the video with a still, poster="/video/umzug-poster.png". A render from a file asks
+// The start page and the error pages show the video with a still, poster="/video/move-poster.png". A render from a file asks
 // for it at the root of the file system; ops/soll.mjs and ops/soll-errors.mjs answer that one request with key frame 2, which
-// src/public/video/umzug-poster.png equals byte for byte (ops/video-assess.mjs), so the pictures show the still without network.
+// src/public/video/move-poster.png equals byte for byte (ops/video-assess.mjs), so the pictures show the still without network.
 
 /** The address of the still as a render from a file asks for it. */
-export const VIDEO_POSTER_URL = "file:///video/umzug-poster.png";
+export const VIDEO_POSTER_URL = "file:///video/move-poster.png";
 /** The picture that answers it, relative to the repository. */
-export const VIDEO_POSTER_PICTURE = "docs/soll/video-umzug-2-1280.png";
+export const VIDEO_POSTER_PICTURE = "docs/soll/video-move-2-1280.png";

@@ -29,7 +29,7 @@ const TAPE = [
   "caption 4 Top up by card, PayPal or Apple Pay.",
 ].join("\n");
 
-/** A made-up recording in the shape of docs/video/umzug.transcript.json. */
+/** A made-up recording in the shape of docs/video/move.transcript.json. */
 function transcript(): { runtime_rev: string; recorded_at: string; steps: Step[] } {
   return {
     runtime_rev: "d8f8168",

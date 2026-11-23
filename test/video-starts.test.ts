@@ -21,7 +21,7 @@ const ERROR_PAGE = "https://automatonhost.com/errors/invalid-or-expired-nonce";
 const NONE = { total: 0, home: 0, errors: 0, other: 0 };
 
 type Line = { ts?: number; status?: number; ip?: string; uri?: string; agent?: string; referer?: string };
-const line = ({ ts = NOW - 3600, status = 200, ip = "192.0.2.7", uri = "/video/umzug.mp4", agent = BROWSER, referer }: Line) =>
+const line = ({ ts = NOW - 3600, status = 200, ip = "192.0.2.7", uri = "/video/move.mp4", agent = BROWSER, referer }: Line) =>
   JSON.stringify({
     ts, status,
     request: { remote_ip: ip, client_ip: ip, uri, headers: { "User-Agent": [agent], ...(referer === undefined ? {} : { Referer: [referer] }) } },
@@ -34,7 +34,7 @@ describe("ops/video-starts.mjs", () => {
   it("counts a start on the start page", () => {
     expect(count([line({ referer: HOME })])).toEqual({ total: 1, home: 1, errors: 0, other: 0 });
     expect(count([line({ referer: "https://automatonhost.com/?ref=readme" })])).toEqual({ total: 1, home: 1, errors: 0, other: 0 });
-    expect(count([line({ uri: "/video/umzug.mp4?v=2", referer: HOME })])).toEqual({ total: 1, home: 1, errors: 0, other: 0 });
+    expect(count([line({ uri: "/video/move.mp4?v=2", referer: HOME })])).toEqual({ total: 1, home: 1, errors: 0, other: 0 });
     // No referrer, or a page that is neither the start page nor an error page, is other.
     expect(count([line({})])).toEqual({ total: 1, home: 0, errors: 0, other: 1 });
     expect(count([line({ referer: "https://automatonhost.com/fix" })])).toEqual({ total: 1, home: 0, errors: 0, other: 1 });
@@ -61,8 +61,8 @@ describe("ops/video-starts.mjs", () => {
   it("counts a 206 range request as a start", () => {
     expect(count([line({ status: 206, referer: HOME })])).toEqual({ total: 1, home: 1, errors: 0, other: 0 });
     for (const status of [304, 404, 416, 500]) expect(count([line({ status, referer: HOME })]), String(status)).toEqual(NONE);
-    expect(count([line({ uri: "/video/umzug-poster.png", referer: HOME })])).toEqual(NONE);
-    expect(count([line({ uri: "/video/umzug.mp4.bak", referer: HOME })])).toEqual(NONE);
+    expect(count([line({ uri: "/video/move-poster.png", referer: HOME })])).toEqual(NONE);
+    expect(count([line({ uri: "/video/move.mp4.bak", referer: HOME })])).toEqual(NONE);
   });
 
   it("leaves out our own addresses and our checker", () => {

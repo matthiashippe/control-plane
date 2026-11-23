@@ -361,17 +361,17 @@ Abnahme-Issue werbung: PRO-28027
 
 Ein Video von 26,3 Sekunden ohne Ton zeigt, wie ein unveränderter Automaton am Pin `d8f8168` den echten Fehler von `api.conway.tech`
 bekommt, wie die eine Zeile `conwayApiUrl` geändert wird und wie derselbe Automaton danach bei uns startet und seine erste Runde dreht.
-Jede Zeile im Video kommt aus der Aufnahme `docs/video/umzug.transcript.json` (`ops/video-record.sh`, Skript `docs/video/umzug.tape`);
+Jede Zeile im Video kommt aus der Aufnahme `docs/video/move.transcript.json` (`ops/video-record.sh`, Skript `docs/video/move.tape`);
 gekürzt sind nur Wartezeiten, jede auf höchstens 1 s.
 
 Vier Schlüsselbilder, je das letzte Bild einer Szene, 1280 x 720:
 
 | Szene | Einblendung | Bild |
 |---|---|---|
-| 1 | „Before: api.conway.tech fails.“ | `video-umzug-1-1280.png` |
-| 2 | „Change one line.“ | `video-umzug-2-1280.png`, zugleich das Standbild `src/public/video/umzug-poster.png` |
-| 3 | „After: it runs on automatonhost.com.“ | `video-umzug-3-1280.png` |
-| 4 | Schlusstafel „automatonhost.com/fix“ und „Top up by card, PayPal or Apple Pay.“ | `video-umzug-4-1280.png` |
+| 1 | „Before: api.conway.tech fails.“ | `video-move-1-1280.png` |
+| 2 | „Change one line.“ | `video-move-2-1280.png`, zugleich das Standbild `src/public/video/move-poster.png` |
+| 3 | „After: it runs on automatonhost.com.“ | `video-move-3-1280.png` |
+| 4 | Schlusstafel „automatonhost.com/fix“ und „Top up by card, PayPal or Apple Pay.“ | `video-move-4-1280.png` |
 
 Jede Szene 1 bis 3 beginnt mit ihrer Einblendung als Tafel für 1,5 s; danach steht sie im Kopf des Terminals, rechts die Szene als
 `1 / 3`. Befehle werden mit fester Geschwindigkeit getippt, Ausgaben erscheinen in ihrer aufgenommenen Reihenfolge und unverändert.
@@ -385,7 +385,7 @@ unchanged automaton fails at api.conway.tech, one line changes, and it runs here
 Abspielen (`preload="none"`), ohne Skript und ohne `autoplay`, mit den Bedienelementen des Browsers über dem Standbild.
 
 Die Seitenbilder zeigen das Standbild ohne Netz: `ops/soll.mjs` und `ops/soll-errors.mjs` beantworten die eine Anfrage nach
-`/video/umzug-poster.png` mit `video-umzug-2-1280.png` und warten vor dem Bild, bis die Bedienelemente des Videos stillstehen
+`/video/move-poster.png` mit `video-move-2-1280.png` und warten vor dem Bild, bis die Bedienelemente des Videos stillstehen
 (der Ladekreis von Chromium dreht sich in den ersten Sekunden auch mit `preload="none"`).
 
 Bauen und prüfen, ohne Netz, mit `FONTCONFIG_FILE=$HOME/.config/control-plane/soll-fonts.conf` und Node 22 vorn im `PATH`:

@@ -273,12 +273,12 @@ export function assessVideoFiles(files) {
 /** The committed files, relative to the repo root. */
 export function defaultPaths(root) {
   return {
-    mp4: path.join(root, "src/public/video/umzug.mp4"),
-    poster: path.join(root, "src/public/video/umzug-poster.png"),
-    gif: path.join(root, "docs/video/umzug.gif"),
-    keyframe: path.join(root, "docs/soll/video-umzug-2-1280.png"),
-    transcript: path.join(root, "docs/video/umzug.transcript.json"),
-    tape: path.join(root, "docs/video/umzug.tape"),
+    mp4: path.join(root, "src/public/video/move.mp4"),
+    poster: path.join(root, "src/public/video/move-poster.png"),
+    gif: path.join(root, "docs/video/move.gif"),
+    keyframe: path.join(root, "docs/soll/video-move-2-1280.png"),
+    transcript: path.join(root, "docs/video/move.transcript.json"),
+    tape: path.join(root, "docs/video/move.tape"),
   };
 }
 

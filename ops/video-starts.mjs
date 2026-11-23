@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Starts of the video /video/umzug.mp4, per week and by the page it was started on (goals/reichweite/03, Punkt 8). This is the lead
+// Starts of the video /video/move.mp4, per week and by the page it was started on (goals/reichweite/03, Punkt 8). This is the lead
 // number of the video: how many foreign people pressed play, and whether on the start page or on an error page.
 //
 //   node ops/video-starts.mjs                      the whole access log over ops/access-log.sh (read only, needs loop.env)
@@ -10,7 +10,7 @@
 //   node ops/video-starts.mjs --days <n>           the window up to now, in days (default 7); CP_NOW in epoch seconds replaces
 //                                                  the clock
 //
-// A start is a foreign address with its first request on /video/umzug.mp4 (path without query) that answered 200 or 206 inside
+// A start is a foreign address with its first request on /video/move.mp4 (path without query) that answered 200 or 206 inside
 // the window; each address counts once per window. Left out: our own addresses, our own checker (user agent
 // control-plane-check/1.0) and crawlers (bot, crawl, spider or slurp in the user agent, any case). The page is the path of the
 // referrer: `/` is home, `/errors/<slug>` is errors, anything else and no referrer at all is other.
@@ -25,7 +25,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const VIDEO = "/video/umzug.mp4";
+const VIDEO = "/video/move.mp4";
 const CHECKER = "control-plane-check/1.0";
 const CRAWLER = /bot|crawl|spider|slurp/i;
 const DAY = 86400;
