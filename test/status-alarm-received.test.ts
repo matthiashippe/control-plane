@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -49,7 +49,11 @@ type AlarmPath = {
 
 type Run = { status: number | null; stdout: string; stderr: string; out: string; args: string; config: string; alarm: AlarmPath | undefined };
 
-function run(log: string, opts: { topic?: string; curlRc?: number; webhook?: string | null } = {}): Run {
+/**
+ * Asynchronous on purpose: a blocking spawnSync holds the worker event loop, and vitest 3.2 has a fixed 60 s worker RPC timer
+ * (audit 2026-11-23, "Timeout calling onTaskUpdate").
+ */
+async function run(log: string, opts: { topic?: string; curlRc?: number; webhook?: string | null } = {}): Promise<Run> {
   const root = mkdtempSync(join(tmpdir(), "status-alarm-received-"));
   const bin = join(root, "bin");
   mkdirSync(bin);
@@ -99,7 +103,22 @@ function run(log: string, opts: { topic?: string; curlRc?: number; webhook?: str
     CP_NOW: String(NOW),
   };
   if (opts.webhook !== null) env.CP_ALERT_WEBHOOK = opts.webhook ?? WEBHOOK;
-  const r = spawnSync("bash", [status], { cwd: root, encoding: "utf8", timeout: 60_000, env });
+  const r = await new Promise<{ status: number | null; stdout: string; stderr: string }>((resolve, reject) => {
+    const child = spawn("bash", [status], { cwd: root, env, stdio: ["ignore", "pipe", "pipe"] });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.setEncoding("utf8").on("data", (d: string) => (stdout += d));
+    child.stderr.setEncoding("utf8").on("data", (d: string) => (stderr += d));
+    const timer = setTimeout(() => child.kill("SIGKILL"), 60_000);
+    child.on("error", (e) => {
+      clearTimeout(timer);
+      reject(e);
+    });
+    child.on("close", (code) => {
+      clearTimeout(timer);
+      resolve({ status: code, stdout, stderr });
+    });
+  });
   let alarm: AlarmPath | undefined;
   try {
     alarm = JSON.parse(r.stdout).alarm_path;
@@ -134,8 +153,8 @@ const message = (title: string | null, iso: string) =>
 const UNKNOWN: Received = { last_alive: null, last_message: null, status: "unknown" };
 
 describe("ops/status.sh checks that a delivery of the watchdog really reached the topic", () => {
-  it("a sign of life on the topic is ok", () => {
-    const r = run(delivered("2026-11-13T11:00:00Z"), { topic: message("control-plane ALIVE", "2026-11-13T11:00:00Z") });
+  it("a sign of life on the topic is ok", async () => {
+    const r = await run(delivered("2026-11-13T11:00:00Z"), { topic: message("control-plane ALIVE", "2026-11-13T11:00:00Z") });
     expect(r.status, r.out).toBe(0);
     expect(r.alarm, r.out).toEqual({
       unreachable_24h: 0,
@@ -147,8 +166,8 @@ describe("ops/status.sh checks that a delivery of the watchdog really reached th
     expect(r.config, r.out).toContain(`${WEBHOOK}/json?poll=1&since=12h`);
   });
 
-  it("a delivery that never reached the topic is red", () => {
-    const r = run(delivered("2026-11-13T11:00:00Z"), {
+  it("a delivery that never reached the topic is red", async () => {
+    const r = await run(delivered("2026-11-13T11:00:00Z"), {
       topic: message("nightly backup", "2026-11-13T11:00:00Z") + message("control-plane ALIVE", "2026-11-12T00:01:00Z"),
     });
     expect(r.status, r.out).toBe(0);
@@ -161,26 +180,26 @@ describe("ops/status.sh checks that a delivery of the watchdog really reached th
     });
   });
 
-  it("a message up to 300 seconds before the delivery counts, one second more does not", () => {
+  it("a message up to 300 seconds before the delivery counts, one second more does not", async () => {
     const topic = message("control-plane WARN", "2026-11-13T10:55:00Z");
-    const ok = run(delivered("2026-11-13T11:00:00Z"), { topic });
+    const ok = await run(delivered("2026-11-13T11:00:00Z"), { topic });
     expect(ok.alarm?.received, ok.out).toEqual({ last_alive: null, last_message: "2026-11-13T10:55:00Z", status: "ok" });
     expect(ok.alarm?.status, ok.out).toBe("ok");
-    const red = run(delivered("2026-11-13T11:00:01Z"), { topic });
+    const red = await run(delivered("2026-11-13T11:00:01Z"), { topic });
     expect(red.alarm?.received, red.out).toEqual({ last_alive: null, last_message: "2026-11-13T10:55:00Z", status: "red" });
     expect(red.alarm?.status, red.out).toBe("red");
   });
 
-  it("a message without the title of the watchdog does not count", () => {
-    const r = run(delivered("2026-11-13T11:00:00Z"), {
+  it("a message without the title of the watchdog does not count", async () => {
+    const r = await run(delivered("2026-11-13T11:00:00Z"), {
       topic: message(null, "2026-11-13T11:00:00Z") + message("control-plane", "2026-11-13T11:00:00Z"),
     });
     expect(r.alarm?.received, r.out).toEqual({ last_alive: null, last_message: null, status: "red" });
     expect(r.alarm?.status, r.out).toBe("red");
   });
 
-  it("an unreadable topic is unknown and leaves the status alone", () => {
-    const r = run(delivered("2026-11-13T11:00:00Z"), {
+  it("an unreadable topic is unknown and leaves the status alone", async () => {
+    const r = await run(delivered("2026-11-13T11:00:00Z"), {
       topic: message("nightly backup", "2026-11-13T11:00:00Z"),
       curlRc: 22,
     });
@@ -195,9 +214,9 @@ describe("ops/status.sh checks that a delivery of the watchdog really reached th
     expect(r.config, r.out).toContain("json?poll=1");
   });
 
-  it("a line that is no JSON makes the topic unreadable", () => {
+  it("a line that is no JSON makes the topic unreadable", async () => {
     for (const bad of ["<html>rate limited</html>\n", "42\n", '{"event": "message",\n']) {
-      const r = run(delivered("2026-11-13T11:00:00Z"), {
+      const r = await run(delivered("2026-11-13T11:00:00Z"), {
         topic: message("control-plane ALIVE", "2026-11-12T00:01:00Z") + bad,
       });
       expect(r.status, r.out).toBe(0);
@@ -211,9 +230,9 @@ describe("ops/status.sh checks that a delivery of the watchdog really reached th
     }
   });
 
-  it("without CP_ALERT_WEBHOOK it is unknown and asks nobody", () => {
+  it("without CP_ALERT_WEBHOOK it is unknown and asks nobody", async () => {
     for (const webhook of [null, ""]) {
-      const r = run(delivered("2026-11-13T11:00:00Z"), { webhook, topic: message("nightly backup", "2026-11-13T11:00:00Z") });
+      const r = await run(delivered("2026-11-13T11:00:00Z"), { webhook, topic: message("nightly backup", "2026-11-13T11:00:00Z") });
       expect(r.status, r.out).toBe(0);
       expect(r.alarm, r.out).toEqual({
         unreachable_24h: 0,
@@ -227,8 +246,8 @@ describe("ops/status.sh checks that a delivery of the watchdog really reached th
     }
   });
 
-  it("a delivery older than the cache of the topic is unknown", () => {
-    const r = run(delivered("2026-11-13T00:30:00Z"));
+  it("a delivery older than the cache of the topic is unknown", async () => {
+    const r = await run(delivered("2026-11-13T00:30:00Z"));
     expect(r.status, r.out).toBe(0);
     expect(r.alarm, r.out).toEqual({
       unreachable_24h: 0,
@@ -239,8 +258,8 @@ describe("ops/status.sh checks that a delivery of the watchdog really reached th
     });
   });
 
-  it("a message of ops/backup.sh or of the deploy alarm is no delivery of the watchdog", () => {
-    const r = run(delivered("2026-11-13T11:00:00Z"), {
+  it("a message of ops/backup.sh or of the deploy alarm is no delivery of the watchdog", async () => {
+    const r = await run(delivered("2026-11-13T11:00:00Z"), {
       topic: message("control-plane backup failed", "2026-11-13T11:00:00Z") + message("deploy-window 502", "2026-11-13T11:00:00Z"),
     });
     expect(r.status, r.out).toBe(0);
@@ -248,16 +267,16 @@ describe("ops/status.sh checks that a delivery of the watchdog really reached th
     expect(r.alarm?.status, r.out).toBe("red");
   });
 
-  it("every severity that ops/watchdog.sh reports counts as its delivery", () => {
+  it("every severity that ops/watchdog.sh reports counts as its delivery", async () => {
     const severities = watchdogSeverities();
     expect(severities.length, severities.join(" ")).toBeGreaterThanOrEqual(5);
     for (const severity of severities) {
-      const r = run(delivered("2026-11-13T11:00:00Z"), { topic: message(`control-plane ${severity}`, "2026-11-13T11:00:00Z") });
+      const r = await run(delivered("2026-11-13T11:00:00Z"), { topic: message(`control-plane ${severity}`, "2026-11-13T11:00:00Z") });
       expect(r.alarm?.received?.status, `${severity}: ${r.out}`).toBe("ok");
     }
   });
 
-  it("no other script under ops/ posts a title of the watchdog", () => {
+  it("no other script under ops/ posts a title of the watchdog", async () => {
     const severities = watchdogSeverities();
     expect(severities.length, severities.join(" ")).toBeGreaterThanOrEqual(5);
     const watchdogTitles = new Set(severities.map((s) => `control-plane ${s}`));
@@ -270,21 +289,21 @@ describe("ops/status.sh checks that a delivery of the watchdog really reached th
     }
   });
 
-  it("a delivery 10 h 59 min old without a message of the watchdog is red", () => {
-    const r = run(delivered("2026-11-13T01:01:00Z"));
+  it("a delivery 10 h 59 min old without a message of the watchdog is red", async () => {
+    const r = await run(delivered("2026-11-13T01:01:00Z"));
     expect(r.status, r.out).toBe(0);
     expect(r.alarm?.received?.status, r.out).toBe("red");
   });
 
-  it("a delivery 11 h 1 min old is unknown", () => {
-    const r = run(delivered("2026-11-13T00:59:00Z"));
+  it("a delivery 11 h 1 min old is unknown", async () => {
+    const r = await run(delivered("2026-11-13T00:59:00Z"));
     expect(r.status, r.out).toBe(0);
     expect(r.alarm?.received, r.out).toEqual(UNKNOWN);
   });
 
-  it("never shows URL or topic, in the output or in the arguments of curl", () => {
-    const red = run(delivered("2026-11-13T11:00:00Z"), { topic: message("nightly backup", "2026-11-13T11:00:00Z") });
-    const unreadable = run(delivered("2026-11-13T11:00:00Z"), { topic: message("nightly backup", "2026-11-13T11:00:00Z"), curlRc: 22 });
+  it("never shows URL or topic, in the output or in the arguments of curl", async () => {
+    const red = await run(delivered("2026-11-13T11:00:00Z"), { topic: message("nightly backup", "2026-11-13T11:00:00Z") });
+    const unreadable = await run(delivered("2026-11-13T11:00:00Z"), { topic: message("nightly backup", "2026-11-13T11:00:00Z"), curlRc: 22 });
     expect(red.alarm?.received?.status, red.out).toBe("red");
     expect(unreadable.alarm?.received?.status, unreadable.out).toBe("unknown");
     for (const r of [red, unreadable]) {
