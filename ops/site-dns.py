@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""A records of the service host automatonhost.com (goals/umzug/01, docs/umzug.md).
+"""A records of the service host automatonhost.com (move goal 01, the move notes under docs/).
 
 Runs on the code-host only. One zone, automatonhost.com, token CLOUDFLARE_HTC_API_TOKEN from the environment or from
 ~/brain/connectors/secrets.env, never printed. Wanted: A automatonhost.com and A www.automatonhost.com on <ip>, not

@@ -1,4 +1,4 @@
-// SOLL picture of the preview card /og.png (goals/umzug/03): the picture every shared link of automatonhost.com shows. Renders the
+// SOLL picture of the preview card /og.png (move goal 03): the picture every shared link of automatonhost.com shows. Renders the
 // source docs/soll/src/og-card.html with the headless Chromium from ~/.cache/ms-playwright/ at 1200 x 630 CSS pixels and device
 // scale factor 2 into docs/soll/og-card.png (2400 x 1260).
 //

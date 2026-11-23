@@ -226,7 +226,7 @@ const hostFull = (): Reply =>
     message: "The sandbox server has no free place right now. Nothing was started and nothing was charged; try again later.",
     docs: DOC.sandboxes,
   });
-/** The zones paid requests go through (goals/umzug/01); a customer's service is never published under one of them. */
+/** The zones paid requests go through (move goal 01); a customer's service is never published under one of them. */
 const PAYMENT_ZONES = ["postyourprice.com", "automatonhost.com"] as const;
 
 /**

@@ -288,7 +288,7 @@ export function summaryMoney(results) {
   return `soll money: ${results.length} images, blocks end ${WIDTHS.map(end).join(" ")}, ${n} defects`;
 }
 
-// ---- the preview card /og.png (goals/umzug/03) ---------------------------------------------------------------------------
+// ---- the preview card /og.png (move goal 03) ---------------------------------------------------------------------------
 // One picture, the card every shared link shows: docs/soll/src/og-card.html rendered at 1200 x 630 CSS pixels with device scale
 // factor 2. No first screen and no block: the card is the first screen. On top of the pixel comparison, the defects are a picture
 // of another size, content that pokes out of the card, a dash in the visible text and a request to a foreign address.

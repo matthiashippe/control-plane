@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { sandbox } from "./answers-sandbox";
 
 /**
- * Since 2026-11-17 the service is sold as automatonhost.com (goals/umzug/02). A comment on a public issue is permanent and its
+ * Since 2026-11-17 the service is sold as automatonhost.com (move goal 02). A comment on a public issue is permanent and its
  * link is the only backlink from that thread, so ops/before-the-answers.py has to demand the new address in every new draft and
  * report a draft that still names postyourprice.com or cp.hippe.eu as stale. CP_PUBLIC_HOST is emptied in every run, so the
  * default of the script is what is under test.

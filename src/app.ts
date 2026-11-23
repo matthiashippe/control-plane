@@ -814,7 +814,7 @@ export function createApp(opts: AppOptions) {
    * The version each card's address carries, `?v=` and the first eight hex characters of the sha256 of the served bytes.
    *
    * Preview services keep an image by its address for days, so a new card under the old address stays invisible until
-   * their cache runs out (goals/umzug/04). Computed here, at start, from exactly the bytes the route hands out, and not
+   * their cache runs out (move goal 04). Computed here, at start, from exactly the bytes the route hands out, and not
    * written into index.html: a number in the template would be wrong the moment somebody re-shoots the image. The route
    * ignores the query, so the path, the bytes and the headers stay what they were. A card whose image is missing has no
    * route, as before, and its address goes out without a version.
@@ -833,7 +833,7 @@ export function createApp(opts: AppOptions) {
   /**
    * Point og:image and twitter:image of a head at `card` with its version, and describe that card in og:image:alt.
    *
-   * The alt text comes from OG_CARDS together with the image: until goals/umzug/04, /x402 and /conway described the move
+   * The alt text comes from OG_CARDS together with the image: until move goal 04, /x402 and /conway described the move
    * card under a picture of the x402 measurement. A card without an entry is a programming error and throws, rather than
    * falling back to the landing page's text and saying something false about the picture.
    */
@@ -2298,7 +2298,7 @@ export function createApp(opts: AppOptions) {
     // goals/werbung/01: the first block is for an agent that helps a person with a broken Conway automaton, read before it
     // recommends anything: the error texts it recognises the case by, the one line, and the way to pay without crypto, all
     // before the first USDC. The card line is gone while the card breaker is on (goals/wache/01). One paragraph, so the
-    // switch to conwayApiUrl stays in the first paragraph as goals/umzug/03 wants it.
+    // switch to conwayApiUrl stays in the first paragraph as move goal 03 wants it.
     const cardOpen = !cardBreaker(db, (opts.now ?? (() => new Date()))()).on;
     const body = [
       "# automatonhost.com",
@@ -2309,7 +2309,7 @@ export function createApp(opts: AppOptions) {
       `One line keeps it running: set conwayApiUrl in ~/.automaton/automaton.json to ${siteOrigin()}, then run automaton --provision.`,
       ...(cardOpen ? [`No crypto needed: your person can top it up by card, PayPal or Apple Pay at ${siteOrigin()}/#card`] : []),
       "",
-      // goals/umzug/03: the first paragraph is the switch, because an automaton whose Conway endpoint stopped answering reads
+      // move goal 03: the first paragraph is the switch, because an automaton whose Conway endpoint stopped answering reads
       // this file first and needs this one line to keep running. The market follows under its own heading, unchanged.
       "> Conway not answering? Your automaton runs here. Set conwayApiUrl in",
       `> ~/.automaton/automaton.json to ${siteOrigin()}, then run automaton --provision.`,

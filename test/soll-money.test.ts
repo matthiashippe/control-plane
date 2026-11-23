@@ -116,7 +116,7 @@ describe("soll judgement of money in and out", () => {
     const dir = mkdtempSync(path.join(os.tmpdir(), "soll-money-args-"));
     try {
       const tool = fileURLToPath(new URL("../ops/soll-money.mjs", import.meta.url));
-      for (const args of [["--bogus", "--pictures", dir], ["--pruefen", "--pictures", dir], ["--check", "--pictures"]]) {
+      for (const args of [["--bogus", "--pictures", dir], ["--verify", "--pictures", dir], ["--check", "--pictures"]]) {
         const run = spawnSync(process.execPath, [tool, ...args], { encoding: "utf8", timeout: 30000 });
         expect(run.status, args.join(" ")).toBe(1);
         expect(run.stderr, args.join(" ")).toMatch(/^usage: node ops\/soll-money\.mjs/);

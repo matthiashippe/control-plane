@@ -1,8 +1,8 @@
 /**
- * ops/site-dns.py sets the A records of automatonhost.com (goals/umzug/02). Its planner is only ever called on a host
+ * ops/site-dns.py sets the A records of automatonhost.com (move goal 02). Its planner is only ever called on a host
  * change, so a planner that broke in between would be found on the day the service has to move, by the automatons that
  * stop getting answers. Its selftest proves every planner case against planted records without network; running it here
- * keeps it in check (goals/umzug/04, point 3). Nothing in the tool changes for this.
+ * keeps it in check (move goal 04, point 3). Nothing in the tool changes for this.
  */
 import { spawn } from "node:child_process";
 import { mkdtempSync } from "node:fs";

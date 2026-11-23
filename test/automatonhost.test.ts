@@ -8,7 +8,7 @@ import { closeWorlds } from "./sandbox-world.js";
 import { automatonWorld } from "./automaton-world.js";
 
 /**
- * The service answers under three names: automatonhost.com, postyourprice.com and cp.hippe.eu (goals/umzug/01).
+ * The service answers under three names: automatonhost.com, postyourprice.com and cp.hippe.eu (move goal 01).
  *
  * Pages live on exactly one of them, the one CP_PUBLIC_URL names, and the other two send a page there with a 301.
  * Everything a machine calls answers on every host, because a runtime that carries an old host as conwayApiUrl is a
