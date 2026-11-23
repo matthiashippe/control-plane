@@ -3,3 +3,5 @@ Goal: kunden 11
 Befund: Den Hausauftrag zahlt jede SIWE-Wallet mit einem Schlüssel namens `conway-automaton`, und den Namen setzt `POST /v1/auth/api-keys` für jeden, der ihn wählt; vier frische Wallets eines Akteurs nehmen so jeden Tag alle vier Zusprüche, bevor Kunde 1 einreicht, und ihre Berichte prüft niemand gegen unser Zugriffslog.
 Beleg: src/bounties/house.ts:159 (`hasRuntimeKey` liest nur den Namen) | src/app.ts:2537 (`body.name ?? "conway-automaton"`) | src/bounties/house.ts:212 (`house_pool_empty` ab 4 am Tag)
 Empfehlung: kunden 12 zählt je Tag, wie viele Zusprüche an Adressen ohne frühere Zeile `inference` gingen; liegt das über einem am Tag, verlangt ein Glied an `kunden` für den Zuspruch eine frühere Zeile `inference` oder eine Startgutschrift der Adresse, und die gemeldeten Aufrufe werden gegen die 4xx- und 5xx-Zeilen dieser Adresse im Zugriffslog gezählt (Anteil belegter Aufrufe in `ops/customer-work.sh`). Die Kosten bleiben bis dahin auf 1 USD am Tag gedeckelt.
+
+Übernommen: Glied 2 an den Tech Lead, PRO-28123, Zählung in kunden 12 vor dem Start (2026-11-23)

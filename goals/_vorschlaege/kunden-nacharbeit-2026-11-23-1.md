@@ -5,3 +5,5 @@ Beleg: `git grep -n -E 'calls.length > 20|path.length > 200|HOUSE_CALLS_MAX = |H
 Empfehlung: `ops/db-report.cjs` lädt `checkHouseReport` aus `./dist/bounties/house.js` mit demselben Rückfall wie bei `starter.js` (Zeile 27), oder ein Test vergleicht beide Regeln an denselben gültigen und ungültigen Berichten.
 
 Ändert ein Goal `HOUSE_CALLS_MAX` oder `HOUSE_PATH_MAX`, nimmt der Dienst Berichte an, die `ops/customer-work.sh` still nicht mehr zählt. Die Liste der Methoden steht ein drittes Mal in ops/customer-work.sh:60.
+
+Übernommen: Watch List in STATE.md, beim nächsten Goal an ops/db-report.cjs oder an HOUSE_CALLS_MAX und HOUSE_PATH_MAX (2026-11-23)

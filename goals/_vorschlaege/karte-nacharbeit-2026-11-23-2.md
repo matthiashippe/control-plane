@@ -5,3 +5,5 @@ Beleg: `git grep -n -E 'digistore(-release)?\.mjs' e423d4d -- test scripts` -> k
 Empfehlung: In derselben Testdatei wie für `ops/digistore.mjs` auch `node ops/digistore-release.mjs --selftest` starten und Exit 0 sowie die letzte Zeile `SELFTEST OK` erwarten.
 
 Der Selftest ist nur als Prüfbefehl in goals/karte/02-der-weg-zur-kasse.md:146 belegt. Das Werkzeug schreibt in ein Konto, das sich das Control Plane mit Personalplaner24, Bautagebuch24 und Aszendent24 teilt (ops/digistore-release.mjs:11).
+
+Übernommen: Glied 4 an den Tech Lead, PRO-28123, dieselbe Testdatei wie karte-nacharbeit-2026-11-23-1 (2026-11-23)
