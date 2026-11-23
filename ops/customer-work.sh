@@ -22,6 +22,8 @@
 #   AWARD CALLS: <n> calls to POST /v1/bounties/award
 #   HOUSE: <j> house jobs posted, <s> house submissions, <a> house awards (<c> to the customer)
 #   HOUSE REPORT <METHOD> <path> <status>: <n>   each call named in the house reports of the window
+#   HOUSE STEP: <n> step credits (<c> to the customer)
+#   HOUSE DAY <YYYY-MM-DD>: <a> house awards, <f> to addresses without earlier inference, <s> step credits
 #   AWARDS: <w> awarded to the customer, <i> inference rows after the first award
 #
 # board reads are GET /bounties.json and GET /v1/bounties; open bounties are not the customer's own,
@@ -31,6 +33,10 @@
 # awards and those to the customer. HOUSE REPORT adds up the calls of those reports over all of them, sorted
 # by method, path and status; in each path every wallet (0x and 40 hex digits) and every IPv4 address is
 # replaced by <address> before it is counted, inside the container and again here.
+# HOUSE STEP and HOUSE DAY (kunden 13) count the step credit, one ledger row house_step per address that the
+# service writes while a house job is open: step credits in the window at addresses that oursClause does not call
+# ours, and those to the customer. Per UTC day, the days of the DAY lines: the house awards of the HOUSE line by
+# the day of the award, those to an address without an inference row before the award, and the step credits.
 # Exit 1 on a wrong argument, a time that is no ISO time in UTC, or --until not after --since.
 # Exit 2 when the own list is missing or empty, the log or the JSON cannot be read, or the customer is unknown.
 set -uo pipefail
@@ -131,6 +137,16 @@ try:
         assert c["method"] in HOUSE_METHODS and isinstance(c["status"], int) and 100 <= c["status"] <= 599
         assert isinstance(c["path"], str) and c["path"].startswith("/") and isinstance(c["n"], int) and c["n"] > 0
         house_calls[(c["method"], house_path(c["path"]), c["status"])] += c["n"]
+    for k in ("steps", "steps_customer"):
+        assert isinstance(house[k], int) and house[k] >= 0
+    assert house["steps_customer"] <= house["steps"]
+    house_days = {}
+    for d in house["days"]:
+        assert isinstance(d["day"], str) and d["day"] not in house_days
+        for k in ("awards", "awards_without_inference", "steps"):
+            assert isinstance(d[k], int) and d[k] >= 0
+        assert d["awards_without_inference"] <= d["awards"]
+        house_days[d["day"]] = d
 except Exception:
     fail("the database JSON is not readable. This says nothing about the customer.")
 if found is not True:
@@ -143,7 +159,7 @@ t = datetime.datetime.fromtimestamp(since, datetime.timezone.utc).replace(hour=0
 while t.timestamp() < until:
     days.append(t.strftime("%Y-%m-%d"))
     t += datetime.timedelta(days=1)
-if set(days) != set(days_in):
+if set(days) != set(days_in) or set(days) != set(house_days):
     fail("the database JSON covers other days than the window. This says nothing about the customer.")
 
 mine = [l for l in log if l.ip in ips and l.ip not in own and since <= l.ts < until]
@@ -164,6 +180,11 @@ hj, hs, ha, hc = (house[k] for k in ("jobs", "submissions", "awards", "awards_cu
 print(f"HOUSE: {hj} house jobs posted, {hs} house submissions, {ha} house awards ({hc} to the customer)")
 for (method, path, code), k in sorted(house_calls.items()):
     print(f"HOUSE REPORT {method} {path} {code}: {k}")
+steps, steps_customer = (house[k] for k in ("steps", "steps_customer"))
+print(f"HOUSE STEP: {steps} step credits ({steps_customer} to the customer)")
+for d in days:
+    da, df, ds = (house_days[d][k] for k in ("awards", "awards_without_inference", "steps"))
+    print(f"HOUSE DAY {d}: {da} house awards, {df} to addresses without earlier inference, {ds} step credits")
 awards = sum(x["awards"] for x in days_in.values())
 after = sum(x["inference_after_award"] for x in days_in.values())
 print(f"AWARDS: {awards} awarded to the customer, {after} inference rows after the first award")
@@ -202,6 +223,46 @@ report_local() { # db since until customer numbered-from -> JSON on stdout
     CP_CUSTOMER_SINCE="$5" CP_CUSTOMER_ADDRESSES="" node - <"$ROOT/ops/db-report.cjs")
 }
 
+# The step credits of kunden 13 for the selftest, planted on a copy of a house database of
+# ops/fixtures/customer-work-plant.mts as grantForHouseJob and a house award write their rows: a step credit to
+# the customer (the runtime with a key conway-automaton and inference rows), one to our own address (the agent
+# of our own report, ours by its key ops-% only in the variant house), one to a fresh wallet and one after the
+# window; a house award to the fresh wallet before its first inference and one to a wallet that thought the day
+# before. The two new wallets are one hex digit repeated, so no address is written out in this file.
+# shellcheck disable=SC2016
+PLANT_STEPS_JS='
+const db = require("better-sqlite3")(process.argv[1]);
+const one = (sql, ...a) => db.prepare(sql).get(...a).a;
+const customer = one(`select k.address a from api_keys k where k.name = ?
+  and exists (select 1 from ledger l where l.address = k.address and l.kind = ?)`, "conway-automaton", "inference");
+const own = one("select agent a from submissions where created_at = ?", "2026-11-14T09:00:00.000Z");
+const poster = one("select address a from ledger where kind = ? order by id limit 1", "house_fund");
+const job = one("select substr(ref, 12) a from ledger where kind = ? order by id limit 1", "house_fund");
+const fresh = "0x" + "a".repeat(40);
+const prior = "0x" + "b".repeat(40);
+for (const a of [fresh, prior]) {
+  db.prepare("insert or ignore into wallets (address, balance_mc, created_at) values (?, 0, ?)").run(a, "2026-11-01T00:00:00.000Z");
+}
+const row = (address, kind, deltaMc, ref, meta, at) =>
+  db.prepare("insert into ledger (address, kind, delta_mc, ref, meta, created_at) values (?, ?, ?, ?, ?, ?)")
+    .run(address, kind, deltaMc, ref, JSON.stringify(meta), at);
+const step = (address, at) =>
+  row(address, "house_step", 10000, `house-step:${address}`, { trigger: "house job open", bounty_id: job }, at);
+const award = (id, address, at) => {
+  row(poster, "house_fund", 25000, `house-fund:${id}`, { bounty_id: id }, at);
+  row(address, "bounty_award", 22500, `bounty-award:${id}`, {}, at);
+};
+row(prior, "inference", -100, "planted-prior", {}, "2026-11-12T12:00:00.000Z");
+award("planted-fresh", fresh, "2026-11-13T12:00:00.000Z");
+row(fresh, "inference", -100, "planted-fresh-after", {}, "2026-11-13T13:00:00.000Z");
+step(customer, "2026-11-14T07:00:00.000Z");
+step(own, "2026-11-14T07:30:00.000Z");
+step(fresh, "2026-11-15T08:00:00.000Z");
+award("planted-prior", prior, "2026-11-15T11:00:00.000Z");
+step(prior, "2026-11-16T01:00:00.000Z");
+db.close();
+'
+
 if [[ "${1:-}" == "--selftest" ]]; then
   [[ $# -eq 1 ]] || usage
   # No network and nothing of this machine: a fake ssh answers nothing, the seen file is a temp file.
@@ -223,9 +284,15 @@ if [[ "${1:-}" == "--selftest" ]]; then
   plant_db() { # file variant
     (cd "$ROOT" && node --import tsx "$plant" "$1" "$2") >/dev/null 2>&1
   }
+  plant_steps() { # from to: a copy of a house database with the rows of PLANT_STEPS_JS
+    cp "$1" "$2" && (cd "$ROOT" && node -e "$PLANT_STEPS_JS" "$2") >/dev/null 2>&1
+  }
   if ! plant_db "$stub/plain.db" plain || ! plant_db "$stub/foreign.db" foreign-operator \
     || ! plant_db "$stub/house.db" house || ! plant_db "$stub/house-foreign.db" house-foreign; then
     echo "SELFTEST FAILED: the planted database could not be built (node, tsx, better-sqlite3)"; exit 1
+  fi
+  if ! plant_steps "$stub/house.db" "$stub/step.db" || ! plant_steps "$stub/house-foreign.db" "$stub/step-foreign.db"; then
+    echo "SELFTEST FAILED: the step credits could not be planted (node, better-sqlite3)"; exit 1
   fi
   report_local "$stub/plain.db" "$S" "$U" 1 "$F" >"$stub/c1.json"
   report_local "$stub/plain.db" "$S" "$U" 2 "$F" >"$stub/c2.json"
@@ -234,6 +301,9 @@ if [[ "${1:-}" == "--selftest" ]]; then
   report_local "$stub/house.db" "$S" "$U" 1 "$F" >"$stub/h1.json"
   report_local "$stub/house.db" "$S" "$U" 2 "$F" >"$stub/h2.json"
   report_local "$stub/house-foreign.db" "$S" "$U" 1 "$F" >"$stub/h1-foreign.json"
+  report_local "$stub/step.db" "$S" "$U" 1 "$F" >"$stub/s1.json"
+  report_local "$stub/step.db" "$S" "$U" 2 "$F" >"$stub/s2.json"
+  report_local "$stub/step-foreign.db" "$S" "$U" 1 "$F" >"$stub/s1-foreign.json"
 
   out=$(count "$stub/c1.json" "$log" "$S" "$U" 1 1); rc=$?
   want "$rc" "0" "the planted window exits 0"
@@ -280,8 +350,11 @@ if [[ "${1:-}" == "--selftest" ]]; then
     "match counter-proof: without the 200 lines every row is unmatched"
 
   # The house job (kunden 11), planted by the real functions of src/bounties/house.ts.
-  want "$(grep -E '^HOUSE' <<<"$out" | tr '\n' '|')" "HOUSE: 0 house jobs posted, 0 house submissions, 0 house awards (0 to the customer)|" \
+  want "$(grep -E '^HOUSE(:| REPORT )' <<<"$out" | tr '\n' '|')" "HOUSE: 0 house jobs posted, 0 house submissions, 0 house awards (0 to the customer)|" \
     "house: without a house job every house count is 0 and no call is reported"
+  want "$(grep -E '^HOUSE (STEP:|DAY) ' <<<"$out" | tr '\n' '|')" \
+    "HOUSE STEP: 0 step credits (0 to the customer)|HOUSE DAY 2026-11-13: 0 house awards, 0 to addresses without earlier inference, 0 step credits|HOUSE DAY 2026-11-14: 0 house awards, 0 to addresses without earlier inference, 0 step credits|HOUSE DAY 2026-11-15: 0 house awards, 0 to addresses without earlier inference, 0 step credits|" \
+    "house step: without a house job no step credit and one HOUSE DAY line per day of the window, all 0"
   hout=$(count "$stub/h1.json" "$log" "$S" "$U" 1 1); rc=$?
   want "$rc" "0" "house: the planted window with house jobs exits 0"
   want "$(line '^HOUSE:' "$hout")" "HOUSE: 3 house jobs posted, 2 house submissions, 2 house awards (1 to the customer)" \
@@ -308,6 +381,39 @@ if [[ "${1:-}" == "--selftest" ]]; then
   hout3=$(count "$stub/h2.json" "$log" "$S" "$U" 2 1)
   want "$(line '^HOUSE:' "$hout3")" "HOUSE: 3 house jobs posted, 2 house submissions, 2 house awards (0 to the customer)" \
     "house counter-proof: for the other customer the award of customer 1 is not its own"
+
+  # The step credit and the awards without earlier inference (kunden 13).
+  want "$(line '^HOUSE DAY 2026-11-14:' "$hout")" "HOUSE DAY 2026-11-14: 1 house awards, 0 to addresses without earlier inference, 0 step credits" \
+    "house award to the customer, who thought before, not counted as without earlier inference"
+  want "$(line '^HOUSE DAY 2026-11-15:' "$hout")" "HOUSE DAY 2026-11-15: 1 house awards, 1 to addresses without earlier inference, 0 step credits" \
+    "house award to a runtime that never thought counted as without earlier inference"
+  sout=$(count "$stub/s1.json" "$log" "$S" "$U" 1 1); rc=$?
+  want "$rc" "0" "house step: the planted window with step credits exits 0"
+  want "$(line '^HOUSE:' "$sout")" "HOUSE: 3 house jobs posted, 2 house submissions, 4 house awards (1 to the customer)" \
+    "house step: the two planted awards join the HOUSE line, whose format stays"
+  want "$(line '^HOUSE STEP:' "$sout")" "HOUSE STEP: 2 step credits (1 to the customer)" \
+    "step credit of the customer counted, with the one of a fresh wallet; ours and the one after the window not counted"
+  want "$(line '^HOUSE DAY 2026-11-14:' "$sout" | sed 's/.*inference, //')" "1 step credits" \
+    "step credit of our own address not counted, the customer's on the same day is"
+  want "$(line '^HOUSE DAY 2026-11-15:' "$sout" | sed 's/.*inference, //')" "1 step credits" \
+    "step credit of a fresh wallet counted on its day"
+  want "$(line '^HOUSE DAY 2026-11-13:' "$sout")" "HOUSE DAY 2026-11-13: 1 house awards, 1 to addresses without earlier inference, 0 step credits" \
+    "house award to a fresh wallet counted as without earlier inference, its inference after the award does not count"
+  want "$(line '^HOUSE DAY 2026-11-15:' "$sout" | cut -d, -f1-2)" "HOUSE DAY 2026-11-15: 2 house awards, 1 to addresses without earlier inference" \
+    "house award after an earlier inference not counted as without earlier inference, the fresh one that day is"
+  want "$(grep -cE '^HOUSE DAY ' <<<"$sout")" "3" "house step: one HOUSE DAY line per day of the window"
+  want "$(tail -1 <<<"$sout" | cut -c1-7)" "AWARDS:" "house step lines come before AWARDS, which stays the last line"
+  want "$(grep -cE '([0-9]{1,3}\.){3}[0-9]{1,3}|0x[0-9a-fA-F]{40}' <<<"$sout")" "0" "house step: no address and no wallet in the output"
+  want "$(grep -cE '([0-9]{1,3}\.){3}[0-9]{1,3}|0x[0-9a-fA-F]{40}' "$stub/s1.json")" "0" \
+    "house step: no address leaves the database report"
+  sout2=$(count "$stub/s1-foreign.json" "$log" "$S" "$U" 1 1)
+  want "$(line '^HOUSE STEP:' "$sout2")" "HOUSE STEP: 3 step credits (1 to the customer)" \
+    "step credit counter-proof: the same step credit at an address that is not ours is counted"
+  want "$(line '^HOUSE DAY 2026-11-14:' "$sout2" | sed 's/.*inference, //')" "2 step credits" \
+    "step credit counter-proof: off our list, that address counts on its day"
+  sout3=$(count "$stub/s2.json" "$log" "$S" "$U" 2 1)
+  want "$(line '^HOUSE STEP:' "$sout3")" "HOUSE STEP: 2 step credits (0 to the customer)" \
+    "step credit counter-proof: for the other customer the step credit of customer 1 is not its own"
 
   count "$stub/c3.json" "$log" "$S" "$U" 3 1 >/dev/null 2>&1; rc=$?
   want "$rc" "2" "a customer number nobody has exits 2"

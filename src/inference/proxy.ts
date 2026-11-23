@@ -15,6 +15,7 @@ import type { ChatProvider, ChatRequest, ChatResponse, ModelSpec, Usage } from "
 import { estimateTokens, ProviderBadRequestError, ProviderUnavailableError } from "./provider.js";
 import { grantOnFirstUse } from "../credits/starter.js";
 import { openBountyCount } from "../bounties/store.js";
+import { grantForHouseJob } from "../bounties/house.js";
 import { siteOrigin } from "../public/site.js";
 import { TOPUP_TIERS_USD } from "../payments/pay.js";
 import { cardUrlFor } from "../payments/card-way.js";
@@ -311,8 +312,14 @@ async function handleChatUncoalesced(
   // not at the endpoint built for it: a Conway runtime speaks the upstream API and never calls it,
   // so for the agents this service is trying to attract the free tier was invisible.
   let reserved = reserveMc(db, address, requiredMc);
-  if (!reserved && !chatOpts.topupsClosed && grantOnFirstUse(db, address)) {
-    reserved = reserveMc(db, address, requiredMc);
+  if (!reserved && !chatOpts.topupsClosed) {
+    if (grantOnFirstUse(db, address)) {
+      reserved = reserveMc(db, address, requiredMc);
+    } else if (grantForHouseJob(db, address, new Date())) {
+      // No starter credit for this call, for whatever reason: a runtime that has thought here before takes its one step
+      // credit while a house job is open, so that its model can read the job and write the report (goals/kunden/13).
+      reserved = reserveMc(db, address, requiredMc);
+    }
   }
 
   if (!reserved) {
