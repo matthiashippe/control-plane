@@ -646,6 +646,55 @@ Verified end to end on 2026-09-21 rather than assumed: a request carrying
 intact and, after two more requests, with the path it took. The instrument the whole GTM
 measurement hangs on had never been tested with a real referrer.
 
+## Do agents recommend us
+
+`bash ops/agent-probe.sh` (werbung 02). An operator whose automaton breaks usually asks an agent session,
+and the session searches the web and names a service. The probe asks a fresh Claude Code session on the
+code-host the five fixed questions from `bash ops/agent-probe.sh --questions`, one session per question,
+and appends one line to `docs/kunden/agenten-probe.md`:
+
+    - <UTC time> <YYYY-Www> model <model> host <h>/5 card <c>/5 old <o>/5 failed <f>/5 answers docs/kunden/agenten-probe/<YYYY-Www>.md
+
+`host` counts answers naming automatonhost.com, `card` those of them that also name card, PayPal or
+Apple Pay, `old` answers naming only an old host, `failed` sessions that ended without an answer (exit,
+timeout, `is_error`, empty result). A failed session is never counted as a miss, and any failure ends
+the run with exit 1 after the line is written. The answers of the week stand word for word in the file the
+line names, with old hosts and addresses replaced before they are written.
+
+At most one run per ISO week: a second run in the same week prints `already probed in <YYYY-Www>`, asks
+nothing and exits 0. Each run costs five sessions on the account of the config directory.
+
+The session sees nothing of ours: its working directory is a fresh `mktemp -d`, it gets
+`--no-session-persistence`, `--strict-mcp-config`, `--setting-sources project,local` (no user settings,
+so no CLAUDE.md, hooks, memory or plugins) and only the tools `WebSearch` and `WebFetch`, and its
+environment is built with `env -i` from `HOME`, `PATH`, `LANG`, `CLAUDE_CONFIG_DIR` and the setup token of
+that account (`~/.secrets/code-host-claude-<account>-oauth-token`), because the login files in the config
+directory are allowed to expire. No model is chosen; the line names the one the session used.
+
+    bash ops/agent-probe.sh --selftest   # the three fixtures, no network, last line SELFTEST OK
+    bash ops/agent-probe.sh --canary     # one session; must print "canary NONE"
+
+`--canary` asks one session with the same switches which instruction files it was given. `canary NONE`
+means it saw none of ours. The counter-proof was run on 2026-11-23: the same question with a planted
+`CLAUDE.md` in the working directory returned its first line, and with `--setting-sources user,...` it
+listed the user CLAUDE.md and the SessionStart hook.
+
+Tests: `test/agent-probe.test.ts` runs the script with the stand-in `ops/fixtures/agent-probe-claude.sh`
+(`CP_PROBE_CLAUDE`, answers from `CP_PROBE_ANSWERS`, a record of every call in `CP_PROBE_RECORD`) and
+writes only into a temporary directory (`CP_PROBE_OUT`, `CP_PROBE_ANSWERS_DIR`, clock `CP_NOW`).
+`AGENT_PROBE_UNDER_TEST` points the cases at another copy of the script.
+
+The other half of the question is the block `-- Agent fetches --` of `ops/traffic.sh`: requests in the
+window whose user agent names an agent that fetches a page for a person (`Claude-User`, `ChatGPT-User`,
+`Perplexity-User`, `MistralAI-User`, `DuckAssistBot`), per name, with fetches from our own addresses
+counted apart, never a crawler (`ClaudeBot`, `GPTBot`, `OAI-SearchBot`, `PerplexityBot`) and never a
+name in the referer. It stands before the first section that prints an address and prints none itself:
+
+    bash ops/traffic.sh 168 | sed -n '/^-- Agent fetches --$/,/^$/p'
+
+Running both once a week is a proposal to the loop master
+(`goals/_vorschlaege/werbung-probe-takt-2026-11-23-1.md`); no cron or timer runs them.
+
 ## Deciding a job, the way the product says a buyer should
 
 `ops/award.ts --bounty <id>` reads, `--award <submission-id>` pays, `--none` pays nobody.
