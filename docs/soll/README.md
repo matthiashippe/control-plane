@@ -359,7 +359,7 @@ Abnahme-Issue werbung: PRO-28027
 
 ## Video (goals/reichweite/03)
 
-Ein Video von 24,7 Sekunden ohne Ton zeigt, wie ein unveränderter Automaton am Pin `d8f8168` den echten Fehler von `api.conway.tech`
+Ein Video von 26,3 Sekunden ohne Ton zeigt, wie ein unveränderter Automaton am Pin `d8f8168` den echten Fehler von `api.conway.tech`
 bekommt, wie die eine Zeile `conwayApiUrl` geändert wird und wie derselbe Automaton danach bei uns startet und seine erste Runde dreht.
 Jede Zeile im Video kommt aus der Aufnahme `docs/video/umzug.transcript.json` (`ops/video-record.sh`, Skript `docs/video/umzug.tape`);
 gekürzt sind nur Wartezeiten, jede auf höchstens 1 s.
@@ -381,7 +381,7 @@ Startseite: Der Block `data-soll="video"` steht direkt nach `</section>` des Blo
 bleibt, wie er abgenommen ist (`move top` 828 bei 390 und 620 bei 1440). Fehlerseiten: Der Block steht direkt nach dem Block `fix`
 und vor der Zeile, dass automatonhost.com ein eigener Dienst ist; `fix` endet weiter im ersten Bildschirm (`blocks end` 728 bei 390,
 669 bei 1440). Unter dem Video steht auf allen vier Seiten derselbe Satz im Stil `.fine`: „Recorded as it ran, nothing staged: the
-unchanged automaton fails at api.conway.tech, one line changes, and it runs here. 25 seconds, no sound.“ Das Video lädt erst beim
+unchanged automaton fails at api.conway.tech, one line changes, and it runs here. 26 seconds, no sound.“ Das Video lädt erst beim
 Abspielen (`preload="none"`), ohne Skript und ohne `autoplay`, mit den Bedienelementen des Browsers über dem Standbild.
 
 Die Seitenbilder zeigen das Standbild ohne Netz: `ops/soll.mjs` und `ops/soll-errors.mjs` beantworten die eine Anfrage nach

@@ -10,7 +10,7 @@ import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 // @ts-expect-error plain ESM tool without types
-import { assessTimeline, buildTimeline, MAX_WAIT_MS, parseTape } from "../ops/video-render.mjs";
+import { assessTimeline, buildTimeline, COLS, MAX_WAIT_MS, MIN_LINE_MS, MIN_SHOWN_PX, NARROWEST_SHOWN_PX, PAGE, parseTape, ROWS, textDefects, WIDTH } from "../ops/video-render.mjs";
 
 type Line = { t_ms: number; text: string };
 type Step = { scene: number; command: string; exit_code: number; started_ms: number; lines: Line[] };
@@ -151,6 +151,41 @@ describe("ops/video-render.mjs", () => {
     const hex = transcript();
     hex.steps[4].lines[0].text += " " + "f".repeat(64);
     expect(plan(hex).defects).toContain("the transcript holds an api key");
+  });
+
+  it("keeps every text of the video at least 12 px on the narrowest page", () => {
+    // The video is 358 px wide on a 390 px page (measured on the SOLL pictures); every font of the picture, shrunk by that much,
+    // stays at the smallest size of the kit (--t-label, 12 px).
+    expect(MIN_SHOWN_PX).toBe(12);
+    expect(textDefects(PAGE)).toEqual([]);
+    const sizes = [...PAGE.matchAll(/(?:font-size:|font:[^;]*?)\s(\d+(?:\.\d+)?)px/g)].map((m) => Number(m[1]));
+    expect(sizes.length).toBeGreaterThan(5);
+    for (const px of sizes) expect((px * NARROWEST_SHOWN_PX) / WIDTH).toBeGreaterThanOrEqual(MIN_SHOWN_PX);
+    // A planted small font is a defect.
+    expect(textDefects(PAGE.replace(".bar b { margin-left: auto; font: 600 44px", ".bar b { margin-left: auto; font: 600 18px")).join("\n")).toMatch(/18 px is shown at 5\.0 px/);
+  });
+
+  it("shows every recorded line in full for a moment, also in a burst", () => {
+    // Fifteen lines in the same millisecond, two screen rows each: more than the screen holds at once.
+    const t = transcript();
+    const burst = Array.from({ length: 15 }, (_, i) => ({ t_ms: 5300, text: `10:00:2${i % 10} INFO  loop  burst line ${i} `.padEnd(COLS + 5, ".") }));
+    t.steps[4].lines.splice(2, 0, ...burst);
+    const { tl, defects } = plan(t);
+    expect(defects).toEqual([]);
+    for (let k = 1; k < tl.states.length; k++) {
+      if (tl.states[k].rows && tl.states[k - 1].rows && tl.states[k].rows.length > tl.states[k - 1].rows.length && tl.states[k].rows.at(-1).kind === "out") {
+        expect(tl.states[k].at - tl.states[k - 1].at).toBeGreaterThanOrEqual(tl.states[k - 1].rows.at(-1).kind === "out" ? MIN_LINE_MS : 0);
+      }
+    }
+    // The same burst without the moment: the first lines scroll away before any frame shows them.
+    const squeezed = { ...tl, states: tl.states.map((s: { at: number; rows?: { text: string }[] }) => (s.rows?.some((r) => /burst line/.test(r.text)) ? { ...s, at: tl.states.find((x: { rows?: { text: string }[] }) => x.rows?.some((r) => /burst line 0 /.test(r.text))).at } : s)) };
+    expect(assessTimeline(t, parseTape(TAPE), squeezed).join("\n")).toMatch(/is never in full on screen for \d+ ms/);
+  });
+
+  it("fails when a recorded line does not fit on the screen", () => {
+    const t = transcript();
+    t.steps[4].lines[0].text = "x".repeat(COLS * ROWS + 1);
+    expect(plan(t).defects.join("\n")).toMatch(/needs \d+ rows, the screen holds 10/);
   });
 
   it("exits 1 on an unknown argument before the browser", () => {

@@ -34,6 +34,22 @@ export const TYPE_MS = 30;
 export const MAX_WAIT_MS = 1000;
 /** A pause at the end of scenes 1 to 3 so the last line can be read; it is no recorded wait and never longer than one. */
 export const HOLD_MS = 1000;
+/**
+ * The text has to stay readable where the video is shown smallest: 358 px wide on a 390 px page (measured on the SOLL pictures of
+ * goals/reichweite/03), where every font, shrunk by 358 / 1280, keeps the smallest size of the kit (--t-label, 12 px).
+ */
+export const NARROWEST_SHOWN_PX = 358;
+export const MIN_SHOWN_PX = 12;
+/** The terminal: ROWS screen rows of LINE_PX, COLS characters each in the monospace font of TEXT_PX (checked in the browser). */
+export const TEXT_PX = 44;
+export const LINE_PX = 56;
+export const COLS = 46;
+export const ROWS = 10;
+/**
+ * Every recorded line is on screen in full for at least this long: a burst of lines in the same millisecond would otherwise
+ * scroll its first lines away before a frame shows them. Real waits shorter than this are lengthened to it, never longer ones.
+ */
+export const MIN_LINE_MS = 100;
 export const SCENES = Object.freeze([1, 2, 3, 4]);
 const TURN = /Turn [^:]+: [0-9]+ tools/;
 
@@ -77,7 +93,7 @@ export function buildTimeline(transcript, tape) {
       push({ scene, title, rows: [...rows] });
       let prev = 0;
       (step.lines ?? []).forEach((line, li) => {
-        const wait = Math.max(0, Math.min(MAX_WAIT_MS, line.t_ms - prev));
+        const wait = Math.max(MIN_LINE_MS, Math.min(MAX_WAIT_MS, line.t_ms - prev));
         waits.push(wait);
         t += wait;
         prev = line.t_ms;
@@ -125,6 +141,7 @@ export function assessTimeline(transcript, tape, tl) {
     out.push("scene 1 does not show an error from api.conway.tech");
   }
   if (!TURN.test(txt(3))) out.push("scene 3 does not reach a turn");
+  out.push(...visibilityDefects(steps, tl));
   const flat = JSON.stringify(transcript ?? {});
   const keys = [...flat.matchAll(/\\*"apiKey\\*"\s*:\s*\\*"([^"\\]*)/g)].map((m) => m[1]);
   if (keys.some((k) => k !== "<api key hidden>") || /cnwy_k_[0-9A-Za-z]{9,}/.test(flat) || /[0-9a-fA-F]{64}/.test(flat)) {
@@ -133,6 +150,50 @@ export function assessTimeline(transcript, tape, tl) {
   return out;
 }
 function countOut(seen, scene) { return seen.filter((x) => x.scene === scene).length; }
+
+/** The screen rows a row of the terminal takes: the prompt and the cursor count, a line breaks after COLS characters. */
+export function rowsOf(r) {
+  const len = r.kind === "cmd" ? 2 + r.text.length + (r.typing ? 1 : 0) : r.text.length;
+  return Math.max(1, Math.ceil(len / COLS));
+}
+
+/**
+ * Defects of what the screen shows: a recorded line that needs more rows than the screen holds, or one that is never in full on
+ * screen for MIN_LINE_MS. The screen shows the last ROWS rows of its scene; a row counts while all of its screen rows are shown.
+ */
+export function visibilityDefects(steps, tl) {
+  const out = [];
+  const texts = steps.flatMap((s) => (s.lines ?? []).map((l) => l.text));
+  texts.forEach((text, i) => { const n = rowsOf({ kind: "out", text }); if (n > ROWS) out.push(`recorded line ${i + 1} needs ${n} rows, the screen holds ${ROWS}`); });
+  const offset = {};
+  let k = 0;
+  for (const n of SCENES) { offset[n] = k; k += steps.filter((s) => s.scene === n).reduce((a, s) => a + (s.lines ?? []).length, 0); }
+  const seen = new Array(texts.length).fill(0);
+  tl.states.forEach((s, i) => {
+    if (!s.rows) return;
+    const until = i + 1 < tl.states.length ? tl.states[i + 1].at : tl.total;
+    let below = 0, o = s.rows.filter((r) => r.kind === "out").length;
+    for (let j = s.rows.length - 1; j >= 0; j--) {
+      const r = s.rows[j];
+      below += rowsOf(r);
+      if (r.kind !== "out") continue;
+      o--;
+      if (below <= ROWS) seen[offset[s.scene] + o] += until - s.at;
+    }
+  });
+  seen.forEach((ms, i) => { if (ms < MIN_LINE_MS) out.push(`recorded line ${i + 1} is never in full on screen for ${MIN_LINE_MS} ms`); });
+  return out;
+}
+
+/** Defects of the fonts of a page of the video: every size, shrunk to NARROWEST_SHOWN_PX, stays at MIN_SHOWN_PX or more. */
+export function textDefects(page) {
+  const out = [];
+  for (const m of page.matchAll(/(?:font-size:|font:[^;]*?)\s(\d+(?:\.\d+)?)px/g)) {
+    const px = Number(m[1]), shown = (px * NARROWEST_SHOWN_PX) / WIDTH;
+    if (shown < MIN_SHOWN_PX) out.push(`a font of ${px} px is shown at ${shown.toFixed(1)} px on a 390 px page, less than ${MIN_SHOWN_PX} px`);
+  }
+  return out;
+}
 
 /** The frames of the video: for frame f the index of the state shown at f / FPS seconds. */
 export function frameStates(tl, fps = FPS) {
@@ -202,26 +263,26 @@ html, body { width: ${WIDTH}px; height: ${HEIGHT}px; overflow: hidden; backgroun
   font-family: ui-sans-serif, system-ui, sans-serif; }
 #v { width: ${WIDTH}px; height: ${HEIGHT}px; }
 .card { height: 100%; display: flex; flex-direction: column; justify-content: center; padding: 0 120px; }
-.card .step { font: 600 22px/1 ui-monospace, monospace; color: var(--accent); margin-bottom: 28px; letter-spacing: .04em; }
+.card .step { font: 600 ${TEXT_PX}px/1 ui-monospace, monospace; color: var(--accent); margin-bottom: 28px; letter-spacing: .04em; }
 .card .big { font-size: 64px; line-height: 1.12; font-weight: 700; letter-spacing: -.01em; }
 .card.end { align-items: center; text-align: center; }
 .card.end .big { font-family: ui-monospace, monospace; color: var(--accent); font-size: 72px; }
-.card.end .sub { font-size: 36px; margin-top: 36px; color: var(--fg); }
-.term { position: absolute; inset: 24px; background: var(--panel); border: 1px solid var(--line); border-radius: 16px;
+.card.end .sub { font-size: 48px; margin-top: 36px; color: var(--fg); }
+.term { position: absolute; inset: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
   display: flex; flex-direction: column; overflow: hidden; }
-.bar { height: 52px; flex: none; display: flex; align-items: center; gap: 9px; padding: 0 20px; background: var(--panel-2);
+.bar { height: 80px; flex: none; display: flex; align-items: center; gap: 12px; padding: 0 18px; background: var(--panel-2);
   border-bottom: 1px solid var(--line); }
-.bar i { width: 12px; height: 12px; border-radius: 50%; background: var(--line); }
-.bar span { margin-left: 14px; font-size: 22px; font-weight: 600; }
-.bar b { margin-left: auto; font: 600 18px/1 ui-monospace, monospace; color: var(--dim); }
-.screen { flex: 1; overflow: hidden; padding: 10px 22px 18px; }
-.row { font: 16px/22px ui-monospace, monospace; white-space: pre-wrap; word-break: break-all; color: var(--dim); }
-.row.cmd { color: var(--fg); margin-top: 8px; }
+.bar i { width: 16px; height: 16px; border-radius: 50%; background: var(--line); }
+.bar span { margin-left: 12px; font-size: ${TEXT_PX}px; font-weight: 600; white-space: nowrap; }
+.bar b { margin-left: auto; font: 600 ${TEXT_PX}px/1 ui-monospace, monospace; color: var(--dim); }
+.screen { flex: none; height: ${ROWS * LINE_PX}px; overflow: hidden; margin: 20px 18px 0; padding: 0; }
+.row { font: ${TEXT_PX}px/${LINE_PX}px ui-monospace, monospace; white-space: pre-wrap; word-break: break-all; color: var(--dim); }
+.row.cmd { color: var(--fg); }
 .row.cmd .ps { color: var(--accent); }
 .row.bad { color: var(--warm); }
 .row.key { color: var(--fg); }
 .row.good { color: var(--accent); }
-.cur { display: inline-block; width: 9px; height: 18px; background: var(--fg); vertical-align: -3px; }
+.cur { display: inline-block; width: 24px; height: ${TEXT_PX}px; background: var(--fg); vertical-align: -8px; }
 </style></head><body><div id="v"></div></body></html>`;
 
 // ---- the browser part
@@ -253,7 +314,20 @@ async function openPage(browser, file) {
     const r = await send("Page.captureScreenshot", { format: "png", clip: { x: 0, y: 0, width: WIDTH, height: HEIGHT, scale: 1 } });
     return Buffer.from(r.data, "base64");
   };
-  return { shot, foreign, close: () => browser.send("Target.closeTarget", { targetId }) };
+  // The plan counts screen rows from COLS and ROWS; here the browser shows that a row of COLS characters takes one screen row, one
+  // more character two, and the screen holds ROWS rows, all of them whole.
+  const layout = async () => {
+    const probe = (n) => stateHtml({ scene: 1, title: "", rows: [{ kind: "out", text: "x".repeat(n) }] });
+    const measure = async (n) => {
+      return evaluate(`(() => { document.getElementById("v").innerHTML = ${JSON.stringify(probe(n))}; return document.fonts.ready.then(() => { const r = document.querySelector(".row"), sc = document.querySelector(".screen"); return { row: r.getBoundingClientRect().height, screen: sc.clientHeight }; }); })()`);
+    };
+    const a = await measure(COLS), b = await measure(COLS + 1), out = [];
+    if (a.row !== LINE_PX) out.push(`layout: a row of ${COLS} characters is ${a.row} px high, not ${LINE_PX}`);
+    if (b.row !== 2 * LINE_PX) out.push(`layout: a row of ${COLS + 1} characters is ${b.row} px high, not ${2 * LINE_PX}`);
+    if (a.screen !== ROWS * LINE_PX) out.push(`layout: the screen is ${a.screen} px high, not ${ROWS * LINE_PX}`);
+    return out;
+  };
+  return { shot, layout, foreign, close: () => browser.send("Target.closeTarget", { targetId }) };
 }
 
 function ffmpegPath() {
@@ -295,7 +369,7 @@ async function main() {
     const p = await within(120000, "page", openPage(browser, page));
     const keys = keyStates(tl);
     if (args.mode === "frames" || args.mode === "check") {
-      const out = [];
+      const out = await within(60000, "layout", p.layout());
       for (const [k, si] of keys.entries()) {
         const n = k + 1, png = await within(60000, `key frame ${n}`, p.shot(stateHtml(tl.states[si])));
         if (args.mode === "frames") { writeFileSync(keyOf(path.join(ROOT, "docs/soll"), n), png); console.log(`video soll: key frame ${n} written`); continue; }
@@ -312,6 +386,8 @@ async function main() {
       if (args.mode === "check") { console.log(`video soll: 4 images, ${out.length} defects`); process.exitCode = out.length ? 1 : 0; }
       return;
     }
+    const bad = await within(60000, "layout", p.layout());
+    if (bad.length) throw new Error(bad[0]);
     // --video: every state that some frame shows, once, then ffmpeg concat with the duration of each run of frames.
     const idx = frameStates(tl);
     const runs = [];
