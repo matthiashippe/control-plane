@@ -54,16 +54,21 @@ describe("The preview card", () => {
   it("says the same thing the page says, so a shared link does not mis-sell", async () => {
     const app = createApp({ db: openDb(":memory:") });
     const html = await (await app.request("/")).text();
-    // The card carries the h1 of the move block (goals/umzug/03): that block leads the page for operators from Conway issues,
+    // The card carries the lead of the move block (goals/umzug/03): that block leads the page for operators from Conway issues,
     // and it is what a shared link has to say first. The market below it is not on the card any more.
     const move = html.indexOf('id="move"');
     expect(move, "no move block").toBeGreaterThan(-1);
     const block = html.slice(move, html.indexOf("</section>", move));
     const h1 = block.match(/<h1>([\s\S]*?)<\/h1>/)?.[1].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
     expect(h1, "the move block lost its h1").toBeTruthy();
-    // The card carries both sentences of the h1, the question first.
-    const parts = h1!.split(/(?<=[.?])\s+/).map((s) => s.trim()).filter(Boolean);
-    expect(parts.length, `the h1 "${h1}" is not two sentences`).toBe(2);
+    // Since goals/werbung/01 the question stands in the pill of the move block and the h1 says "No crypto needed" in its second
+    // sentence, while the card stays as umzug 03 approved it (Tech Lead, 23.11.2026, goals/werbung/ANNAHMEN.md). So the card
+    // carries the text of the pill and the first sentence of the h1, the question first.
+    const pill = block.match(/<a class="pill"[^>]*>([\s\S]*?)<\/a>/)?.[1].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+    expect(pill, "the move block lost its pill").toBeTruthy();
+    const sentences = h1!.split(/(?<=[.?])\s+/).map((s) => s.trim()).filter(Boolean);
+    expect(sentences.length, `the h1 "${h1}" is not two sentences`).toBe(2);
+    const parts = [pill!, sentences[0]];
     for (const part of parts) {
       expect(card(), `the card does not carry "${part}", which the page leads with`).toContain(part);
     }
