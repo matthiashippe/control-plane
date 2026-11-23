@@ -1,7 +1,7 @@
 # Reichweite Goal 03: Ein Video zeigt den Umzug
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Wer aus einem Conway-Issue oder über die Suche auf automatonhost.com landet, liest heute, dass eine Zeile reicht, und muss es glauben,
@@ -189,7 +189,7 @@ MVP: Funktion, weil ein Besucher sieht, dass es wirklich eine Zeile ist, bevor e
       Prüfung: `cat goals/reichweite/ANNAHMEN.md ops/video-record.sh ops/video-render.mjs ops/video-assess.mjs ops/video-starts.mjs docs/video/move.tape | grep -cE '[0-9a-fA-F]{64}|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[a-z]{2,}'` muss `0` ausgeben.
 - [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Wer auf der Startseite oder einer Fehlerseite auf das Standbild tippt, sieht in höchstens 30 Sekunden ohne Ton den echten Fehler
@@ -240,6 +240,7 @@ MVP: Funktion, weil ein Besucher sieht, dass es wirklich eine Zeile ist, bevor e
 - 2026-11-23 Zyklus 5: Punkt 4 offen. `1`, (Netz) `keine abnahme nach 2026-11-23T20:48:14+00:00`: `t` fällt auf `09684bb`, weil Punkt 3 die Pfade `move` in den SOLL-Quellen verlangt und Punkt 4 Änderungen dieser Quellen mitzählt. Frage an den Tech Lead in Kommentar `b837b061`.
 - 2026-11-23 Zyklus 6: `docs/video/move.tape` Zeile 3 nennt jetzt `docs/video/move.transcript.json`; `node ops/video-render.mjs --video` gibt `video: 789 frames, 282 pictures, 26.3 s, written move.mp4, move-poster.png, move.gif` aus. Geändert hat sich nur `src/public/video/move.mp4` (Hash des Tapes im Kommentar); Standbild, GIF und die vier Schlüsselbilder sind byteweise gleich (`sha256sum -c` fünfmal `OK`, `git status` zeigt das GIF nicht).
 - 2026-11-23 Zyklus 6: Punkt 4 abgehakt mit dem Prüfbefehl aus `cb73cfb`, am Kopf `df42c96`: `1`, (Netz) `abnahme ok 1`. Neu gefahren am Kopf `df42c96`, alle wie verlangt: Punkt 1 `aufnahme ok 7`, `kein schluessel`, `0`, `VIDEO RECORD SELFTEST OK`, `exit=1`, (Netz) `VIDEO VERIFY OK key_prefix_seen=yes inference_rows=1`; Punkt 2 `video plan: 789 frames, 26.3 s, 4 scenes, 27 lines, 0 defects`, vitest Exit 0 (11 Tests), keine fehlende Testzeile, `exit=1` und `0`; Punkt 3 `exit=0 0 defects`, `exit=0 soll errors: 6 images, blocks end 390=728 1440=669, 0 defects`, `exit=0 video soll: 4 images, 0 defects`, `block video ok`, `schluesselbilder ok`, `bausteine ok neu=0`, `move gleich`; Punkt 5 `video files: mp4 1280x720 26.3 s, poster 1280x720, gif 800 px, 0 defects`, `exit=1`, `exit=1`, vitest Exit 0 (8 Tests), keine fehlende Testzeile, `830978 1229603`; Punkt 6 vitest Exit 0 (17 Tests), keine fehlende Testzeile, `csp ok`, `Valid configuration`, `exit=0 0 defects`, `exit=0 0 defects`, `eingebunden ok`; Punkt 7 `readme ok`, `0`; Punkt 8 vitest Exit 0 (9 Tests), keine fehlende Testzeile, `video_starts days 7 total 2 home 1 errors 1 other 0` und `exit=0`, `exit=2`, (Netz) `1`; Punkt 9 `19`, `0`, `0`, `0`, `0`. Punkt 10: der erste Lauf von `node scripts/check.mjs` brach bei Load 150 auf dem Host mit `check: Unit-Tests nach 600 s abgebrochen` ab, ohne roten Test; der zweite Lauf bei Load 29 endete mit Exit 0, 272 Testdateien, 2792 Tests, `check: grün in 495 s`. An PR #409 am Kopf `df42c96` Job `check` pass (3m31s) und Job `e2e` pass (10m55s).
+- 2026-11-23 Release: PASS K und B (Zyklus 6), DONE.
 
 ## Blockers
 
