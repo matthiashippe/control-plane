@@ -355,3 +355,4 @@ die Zeile `conwayApiUrl` bleiben. Der Block `fix` endet weiter im ersten Bildsch
 
 Keine Klasse. Die Botschaft auf den Fehlerseiten steht in `<strong>` innerhalb von `.fine`, damit Vorleser und Suchmaschinen sie als
 Hervorhebung lesen.
+Abnahme-Issue werbung: PRO-28027
