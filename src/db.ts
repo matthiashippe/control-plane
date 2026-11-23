@@ -276,6 +276,8 @@ function migrate(db: Db): void {
   // A database in exactly the state one bug produces therefore silently lost the defence against
   // an unrelated one.
   db.exec("CREATE UNIQUE INDEX IF NOT EXISTS ledger_grant_once ON ledger(address) WHERE kind = 'grant'");
+  // One step credit per address, ever (goals/kunden/13), held by the index and not only by the check in grantForHouseJob.
+  db.exec("CREATE UNIQUE INDEX IF NOT EXISTS ledger_house_step_once ON ledger(address) WHERE kind = 'house_step'");
 
   // One refund per batch key, ever: the second line of defence behind the check in
   // src/credits/aborted.ts, for the same reason as the grant index above.
@@ -830,6 +832,9 @@ export interface LedgerEntry {
     // house_fund is the credit behind the house job (src/bounties/house.ts): booked to the operator wallet in the same
     // transaction as the bounty_hold of that job, exactly its price. Internal credit only, never a payout.
     | "house_fund"
+    // house_step is the step credit of goals/kunden/13 (src/bounties/house.ts): once per address, ever, for a foreign runtime
+    // that has thought here before and cannot pay its next inference while a house job is open. Internal credit only.
+    | "house_step"
     // card_reversal takes back the credit of a card order of Digistore24 after a refund or chargeback (src/payments/digistore.ts),
     // at most the free credit, so no balance goes negative; one row per order at most.
     | "card_reversal";

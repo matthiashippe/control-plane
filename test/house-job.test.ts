@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ensureHouseJob, HOUSE_POSTER, HOUSE_PRICE_MC, openHouseJob } from "../src/bounties/house.js";
 import { getBounty, openBountyCount } from "../src/bounties/store.js";
 import { houseWorld, validReport } from "./house-helpers.js";
+import { HOUSE_STEP_MC } from "../src/bounties/house.js";
+import { postLedger } from "../src/db.js";
 
 // goals/kunden/11 points 1 and 3: the service keeps exactly one house job of the operator wallet on the board, covered
 // by a house_fund row in the same transaction, and the 402 of a foreign wallet without credit names it.
@@ -99,6 +101,10 @@ describe("house job (goals/kunden/11)", () => {
     expect(before.error).toBe("INSUFFICIENT_CREDITS");
     expect(before.details.open_bounties).toBeUndefined();
 
+    // Like customer 1 after goals/kunden/13: the one step credit already taken and spent, balance back to zero.
+    postLedger(db, { address: customer.address, kind: "house_step", deltaMc: HOUSE_STEP_MC, ref: `house-step:${customer.address}` });
+    postLedger(db, { address: customer.address, kind: "inference", deltaMc: -HOUSE_STEP_MC, ref: `spent-step-${customer.address}` });
+    expect(customer.balance()).toBe(0);
     ensureHouseJob(db);
     const res = await customer.chat();
     expect(res.status).toBe(402);

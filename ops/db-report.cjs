@@ -576,11 +576,41 @@ if (process.env.CP_REPORT === "customer-work") {
     .filter((s) => inWindow(s.created_at) && foreign(s.agent))
     .map((s) => houseCalls(s.body))
     .filter((calls) => calls !== null);
+  // first_inference is the earliest `inference` row of the award's address (postLedger writes addresses in
+  // lower case), for the count of awards to addresses without an inference before the award (kunden 13).
   const houseAwards = all(
-    `select a.address, a.created_at from ledger a
+    `select a.address, a.created_at,
+            (select min(i.created_at) from ledger i where i.address = a.address and i.kind = 'inference') first_inference
+       from ledger a
       where a.kind = 'bounty_award'
         and exists (select 1 from ledger l where l.kind = 'house_fund' and 'bounty-award:' || substr(l.ref, 12) = a.ref)`,
   ).filter((a) => inWindow(a.created_at) && foreign(a.address));
+  // The step credit of goals/kunden/13: one `house_step` row per address, ref `house-step:<address>`, written by
+  // grantForHouseJob while a house job is open. Counted in the window at addresses that oursClause does not
+  // call ours, and those among them to the customer. Per UTC day of `days`: house awards by the day of the
+  // award, those to an address with no `inference` row before the award, and step credits.
+  const houseSteps = all("select address, created_at from ledger where kind = 'house_step'").filter(
+    (s) => inWindow(s.created_at) && foreign(s.address),
+  );
+  const withoutEarlierInference = (a) => {
+    const first = a.first_inference === null ? null : ms(a.first_inference);
+    return first === null || first >= ms(a.created_at);
+  };
+  const houseDays = days.map(({ day: d }) => {
+    const from = Math.max(Date.parse(`${d}T00:00:00.000Z`), ms(since));
+    const to = Math.min(Date.parse(`${d}T00:00:00.000Z`) + 86400e3, ms(until));
+    const inDay = (v) => {
+      const t = ms(v);
+      return t !== null && t >= from && t < to;
+    };
+    const dayAwards = houseAwards.filter((a) => inDay(a.created_at));
+    return {
+      day: d,
+      awards: dayAwards.length,
+      awards_without_inference: dayAwards.filter(withoutEarlierInference).length,
+      steps: houseSteps.filter((s) => inDay(s.created_at)).length,
+    };
+  });
   const callCount = new Map();
   for (const calls of houseReports) {
     for (const c of calls) {
@@ -593,6 +623,9 @@ if (process.env.CP_REPORT === "customer-work") {
     submissions: houseReports.length,
     awards: houseAwards.length,
     awards_customer: houseAwards.filter((a) => mine.has(String(a.address).toLowerCase())).length,
+    steps: houseSteps.length,
+    steps_customer: houseSteps.filter((s) => mine.has(String(s.address).toLowerCase())).length,
+    days: houseDays,
     calls: [...callCount.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)).map(([key, count]) => {
       const [method, path, status] = JSON.parse(key);
       return { method, path, status, n: count };

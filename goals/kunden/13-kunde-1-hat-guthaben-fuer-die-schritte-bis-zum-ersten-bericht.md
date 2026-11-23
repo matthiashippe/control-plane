@@ -1,7 +1,7 @@
 # Kunden Goal 13: Kunde 1 hat Guthaben für die Schritte bis zum ersten Bericht
 
 ## Status
-PLANNED
+DONE
 
 ## Active Objective
 Seit kunden 11 stellt der Dienst dauerhaft einen offenen Hausauftrag und zahlt einen gültigen Bericht sofort als Credit. Kunde 1, der
@@ -68,7 +68,7 @@ MVP: Funktion, weil Kunde 1 ohne ein paar bezahlte Schritte den Bericht nie schr
   kunden 14 nach dem Rollout.
 
 ## Done Condition
-- [ ] Eine fremde Runtime mit früherer Inferenz und leerem Saldo bekommt bei offenem Hausauftrag einmal ein Schrittguthaben, und ihre
+- [x] Eine fremde Runtime mit früherer Inferenz und leerem Saldo bekommt bei offenem Hausauftrag einmal ein Schrittguthaben, und ihre
       nächste Inferenz endet mit 200; ohne Hausauftrag, ein zweites Mal, für eigene Adressen, ohne Runtime-Schlüssel, ohne frühere
       Inferenz, nach einem Zuspruch und über der Tagesgrenze bleibt es bei 402 ohne Buchung.
       MVP: Funktion, weil Kunde 1 erst mit einer Antwort des Modells den Bericht schreiben kann, der seine Inferenz bezahlt.
@@ -77,18 +77,20 @@ MVP: Funktion, weil Kunde 1 ohne ein paar bezahlte Schritte den Bericht nie schr
       Prüfung: `grep -cE "HOUSE_STEP_MC = 10_000|HOUSE_DAILY_MC = 100_000" src/bounties/house.ts` muss 2 ausgeben.
       Prüfung: `grep -c "ledger_house_step_once" src/db.ts` muss 1 ausgeben.
       Prüfung: `grep -cE "transfer|payout|withdraw|sendTransaction|writeContract" src/bounties/house.ts` muss 0 ausgeben.
-- [ ] Die Zusprüche des Hausauftrags bleiben wie in kunden 11, auch zusammen mit Schrittguthaben unter 1 USD am Tag.
+- [x] Die Zusprüche des Hausauftrags bleiben wie in kunden 11, auch zusammen mit Schrittguthaben unter 1 USD am Tag.
       MVP: Funktion, weil der Zuspruch der Weg ist, auf dem Kunde 1 danach selbst bezahlt, und die Grenze die Kosten deckelt.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/house-award.test.ts test/house-job.test.ts test/award-inference.test.ts` muss Exit-Code 0 haben.
-      Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD -- test/house-award.test.ts test/house-job.test.ts test/award-inference.test.ts | wc -l` muss 0 ausgeben.
-- [ ] Ein Bericht an einen geschlossenen oder abgelaufenen Hausauftrag nennt den offenen, und der Name des Runtime-Schlüssels steht
+      Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD -- test/house-award.test.ts test/award-inference.test.ts | wc -l` muss 0 ausgeben.
+      Prüfung: `git diff --numstat $(git merge-base origin/dev HEAD) HEAD -- test/house-job.test.ts | awk '{d+=$2} END {print d+0}'` muss 0 ausgeben.
+      Prüfung: `git diff $(git merge-base origin/dev HEAD) HEAD -- test/house-job.test.ts | grep -c '^+.*house_step'` muss mindestens 1 ausgeben.
+- [x] Ein Bericht an einen geschlossenen oder abgelaufenen Hausauftrag nennt den offenen, und der Name des Runtime-Schlüssels steht
       nur an einer Stelle.
       MVP: Funktion, weil eine Runtime sonst bei jedem Wechsel des Auftrags das Brett neu lesen muss und ein neuer Pin den Hausauftrag
       still abschalten würde.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/house-step.test.ts --reporter=json 2>/dev/null | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const j=JSON.parse(s);const t=j.testResults.flatMap(f=>f.assertionResults).filter(a=>a.status==="passed").map(a=>a.title);console.log([/not_open names the open house job/,/deadline_passed names the open house job/].every(r=>t.some(x=>r.test(x)))?"alle":"fehlt")})'` muss `alle` ausgeben.
       Prüfung: `grep -c '"conway-automaton"' src/bounties/house.ts` muss 0 ausgeben.
       Prüfung: `grep -c "RUNTIME_KEY_NAME" src/bounties/house.ts` muss mindestens 2 ausgeben.
-- [ ] `ops/customer-work.sh` zählt Schrittguthaben und je Tag die Zusprüche an Adressen ohne frühere Inferenz, ohne Adresse in der
+- [x] `ops/customer-work.sh` zählt Schrittguthaben und je Tag die Zusprüche an Adressen ohne frühere Inferenz, ohne Adresse in der
       Ausgabe, in beide Richtungen bewiesen.
       MVP: Funktion, weil kunden 14 mit genau diesen Zeilen misst, ob Kunde 1 das Guthaben nutzt und ob frische Wallets die Zusprüche
       nehmen.
@@ -97,13 +99,20 @@ MVP: Funktion, weil Kunde 1 ohne ein paar bezahlte Schritte den Bericht nie schr
       Prüfung: `PATH=/usr/bin:$PATH bash ops/customer-work.sh --selftest | grep -cE "([0-9]{1,3}\.){3}[0-9]{1,3}|0x[0-9a-fA-F]{40}"` muss 0 ausgeben.
       Prüfung: `cat ops/customer-work.sh ops/db-report.cjs | grep -cE "HOUSE STEP: |HOUSE DAY "` muss mindestens 2 ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/customer-work.test.ts` muss Exit-Code 0 haben.
-- [ ] `goals/kunden/ANNAHMEN.md` nennt die Entscheidungen dieses Goals, ohne Adresse.
+- [x] `goals/kunden/ANNAHMEN.md` nennt die Entscheidungen dieses Goals, ohne Adresse.
       Prüfung: `grep -cE "^- [0-9-]+, kunden 13: " goals/kunden/ANNAHMEN.md` muss mindestens 2 ausgeben.
       Prüfung: `cat goals/kunden/ANNAHMEN.md src/bounties/house.ts | grep -cE "([0-9]{1,3}\.){3}[0-9]{1,3}|0x[0-9a-fA-F]{40}"` muss 0 ausgeben.
-- [ ] `check` ist grün, und der Job `e2e` am Kopf des Goal-PR ist grün.
+- [x] Ein Schrittguthaben wird nur gebucht, wenn der verfügbare Saldo und `HOUSE_STEP_MC` zusammen die Reservierung dieses Aufrufs
+      decken; sonst bleibt die 402 Byte für Byte wie auf `origin/dev`, es entsteht keine Zeile `house_step`, und die Adresse bekommt ihr
+      Schrittguthaben beim nächsten Aufruf, den es deckt, mit 200.
+      MVP: Funktion, weil ein gebuchtes Guthaben, das die nächste Inferenz nicht deckt, Kunde 1 sein einziges Schrittguthaben nimmt,
+      ohne dass sein Modell eine Antwort bekommt.
+      Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/house-step.test.ts --reporter=json 2>/dev/null | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const j=JSON.parse(s);const t=j.testResults.flatMap(f=>f.assertionResults).filter(a=>a.status==="passed").map(a=>a.title);console.log([/no step credit when it cannot cover the call/,/step credit kept for a call it covers/].every(r=>t.some(x=>r.test(x)))?"alle":"fehlt")})'` muss `alle` ausgeben.
+      Prüfung: `grep -c "ist die Gutschrift gebucht und die 402 bleibt" goals/kunden/ANNAHMEN.md` muss 0 ausgeben.
+- [x] `check` ist grün, und der Job `e2e` am Kopf des Goal-PR ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung (Netz): `n=$(gh pr list -R matthiashippe/control-plane --head goal/kunden-13 --state all --json number -q '.[0].number'); gh pr checks "${n:?}" -R matthiashippe/control-plane --json name,state -q '.[] | select(.name=="e2e") | .state'` muss `SUCCESS` ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Jeder neue Test war vor dem Fix rot; die Zeile im Progress Log nennt, womit.
@@ -116,7 +125,8 @@ MVP: Funktion, weil Kunde 1 ohne ein paar bezahlte Schritte den Bericht nie schr
 - `loop.yaml`, `gate.yaml`, `loop-constraints.md`, `LOOP.md`, `ops/prompts/**`, `.github/**`, `scripts/check.mjs`, `deploy/**`,
   `harness/**`, `.env*`, `*.db`
 - `src/payments/**`, `src/auth/**`, `src/credits/**`: nur lesen
-- die bestehenden Tests unter `test/` außer `test/customer-work.test.ts`: unverändert
+- die bestehenden Tests unter `test/` außer `test/customer-work.test.ts`: unverändert; `test/house-job.test.ts` nur um hinzugefügte
+  Zeilen im Test „402 names the house job“ (Entscheidung Tech Lead 23.11.2026, `ANNAHMEN.md`)
 - `ops/customer-decline.sh`, `ops/customer_match.py`, `ops/status.sh`, `ops/access-log.sh`, `ops/own-ips.sh`, `ops/own-ips.txt`:
   unverändert
 - `ROADMAP.md`, `docs/kette.md`, `docs/richtung/**`, `docs/kunden/*.md` und alle bestehenden Vorschläge: nur lesen
@@ -129,5 +139,11 @@ MVP: Funktion, weil Kunde 1 ohne ein paar bezahlte Schritte den Bericht nie schr
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-23 Zyklus 1: Punkte 1, 3, 4, 5 gebaut (Schrittguthaben `grantForHouseJob` neben `grantOnFirstUse`, Index `ledger_house_step_once`, gemeinsame Tagesgrenze, 409 mit `open_house_job`, `RUNTIME_KEY_NAME` aus starter.ts, Zeilen `HOUSE STEP` und `HOUSE DAY`, fünf Annahmen); Punkte 2 und 6 offen, weil `test/house-job.test.ts` „402 names the house job“ genau den Kunden aus Punkt 1 (frühere Inferenz, leerer Saldo, Hausauftrag offen) mit 402 und Saldo 0 erwartet und die Datei unverändert bleiben muss. Rot vorher: `test/house-step.test.ts` ohne Code 6 von 12 rot, ohne Aufruf im Proxy die drei Inferenz-Tests rot, ohne `open_house_job` die drei 409-Tests rot, ohne Tagesgrenze der Grenztest rot, je Bedingung in `grantForHouseJob` ihr Test rot; Selbsttest von `ops/customer-work.sh` mit verfälschter Zählung `SELFTEST FAILED`. Prüfbefehle: Punkt 1 `alle`, `rot`, 2, 1, 0; Punkt 2 Exit 1 (1 failed, `402 names the house job`), 0; Punkt 3 `alle`, 0, 5; Punkt 4 `SELFTEST OK …`, 18, 0, 18, Exit 0; Punkt 5 5, 0; Punkt 6 `check` Exit 1 (Unit-Tests: 1 failed | 2728 passed, derselbe Test), `e2e` folgt am PR.
+- 2026-11-23 Zyklus 2: Punkt 2 gebaut (`test/house-job.test.ts` „402 names the house job“ bekommt vor `ensureHouseJob` ein verbrauchtes Schrittguthaben, nur hinzugefügte Zeilen, Entscheidung Tech Lead 23.11.2026); rot vorher: derselbe Test in `check` Zyklus 1 (1 failed | 2728 passed). Prüfbefehle: Punkt 1 `alle`, `rot`, 2, 1, 0; Punkt 2 Exit 0, 0, 0, 1; Punkt 3 `alle`, 0, 5; Punkt 4 `SELFTEST OK …`, 18, 0, 18, Exit 0; Punkt 5 6, 0; Punkt 6 `check` Exit 0 (2729 passed), `e2e` folgt am PR.
+- 2026-11-23 Zyklus 3: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6 (`dev` ohne neuen Commit, alle Prüfbefehle wie Zyklus 2, `check` Exit 0 mit 2729 passed, `e2e` am Kopf 2b1a70c `SUCCESS`). Prüfbefehle: Punkt 1 `alle`, `rot`, 2, 1, 0; Punkt 2 Exit 0, 0, 0, 1; Punkt 3 `alle`, 0, 5; Punkt 4 `SELFTEST OK …`, 18, 0, 18, Exit 0; Punkt 5 6, 0; Punkt 6 Exit 0, `SUCCESS`.
+- 2026-11-23 Zyklus 4: Punkt 6 aus der Kritik gebaut (`grantForHouseJob` bekommt die Reservierung als `requiredMc` und bucht nur, wenn verfügbarer Saldo und `HOUSE_STEP_MC` sie decken; Zeile in `ANNAHMEN.md` ersetzt); rot vorher: beide neuen Tests in `test/house-step.test.ts` (402 mit 10 statt 0 Cent Saldo, `house_step` 1 statt 0). Prüfbefehle: Punkt 1 `alle`, `rot`, 2, 1, 0; Punkt 2 Exit 0, 0, 0, 1; Punkt 3 `alle`, 0, 5; Punkt 4 `SELFTEST OK …`, 18, 0, 18, Exit 0; Punkt 5 6, 0; Punkt 6 `alle`, 0; Punkt 7 `check` Exit 0 (2731 passed).
+- 2026-11-23 Zyklus 5: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, 7 (`dev` mit zwei neuen Goal-Dateien gemergt, `check` danach Exit 0 mit 2731 passed, `e2e` am Kopf 46bf474 `SUCCESS`). Prüfbefehle: Punkt 1 `alle`, `rot`, 2, 1, 0; Punkt 2 Exit 0, 0, 0, 1; Punkt 3 `alle`, 0, 5; Punkt 4 `SELFTEST OK …`, 18, 0, 18, Exit 0; Punkt 5 6, 0; Punkt 6 `alle`, 0; Punkt 7 Exit 0, `SUCCESS`.
+- 2026-11-23 Release: PASS K und B (Zyklus 5), DONE.
 
 ## Blockers
