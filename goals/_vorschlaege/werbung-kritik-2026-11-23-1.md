@@ -1,0 +1,5 @@
+Schwere: 3
+Goal: werbung 01
+Befund: `src/public/index.html` trägt den ersten Bildschirm zweimal, den neuen zwischen `<!--CARD-->` und `<!--/CARD-->` und den von wache 01 zwischen `<!--NOCARD-->` und `<!--/NOCARD-->`. Kasten, Befehl, Zeile `.fine` und das Zählbild `/px/top.png` stehen in beiden Kopien gleich. Wer eins davon später ändert (neue Adresse in `conwayApiUrl`, anderer Satz zu USDC), muss es an zwei Stellen tun; vergisst er die zweite, sieht man den Unterschied nur bei Notschalter an, also genau dann, wenn niemand hinschaut.
+Beleg: `grep -c 'data-soll="move"' src/public/index.html` -> `2`; `grep -c '"https://cp.hippe.eu" }</code></pre>' src/public/index.html` zählt den Kasten in beiden Kopien.
+Empfehlung: Nur Pill, Überschrift, Satz `.sub` und Knöpfe wechseln mit dem Notschalter, der Kasten steht einmal danach; dafür trägt `keepNoCardWay` die Marken je Zeile statt je Block, und der Test für Notschalter an vergleicht weiter Zeichen für Zeichen mit dem ersten Bildschirm von wache 01. Eigenes Glied im Topic werbung, weil `src/payments/**` für dieses Goal gesperrt ist und `stripCardWay` dort liegt.
