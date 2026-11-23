@@ -92,6 +92,20 @@ describe("the start page under the card breaker", () => {
     expect(html).toContain('<input name="address"');
     expect(html).not.toContain("checkout-ds24");
   });
+
+  it("links every anchor of the start page to an id on the page, breaker on and off", async () => {
+    // Any block the breaker drops takes its anchors with it, not only `card` (goals/wache/02, point 7).
+    const on = openDb(":memory:");
+    tripBreaker(on);
+    for (const [state, db] of [["on", on], ["off", openDb(":memory:")]] as const) {
+      const html = await startPage(db);
+      const ids = new Set([...html.matchAll(/\bid="([^"]+)"/g)].map((m) => m[1]));
+      const anchors = [...html.matchAll(/href="#([^"]*)"/g)].map((m) => m[1]);
+      expect(anchors.length, `anchors with the breaker ${state}`).toBeGreaterThan(0);
+      const dead = anchors.filter((a) => !ids.has(a)).map((a) => `#${a}`);
+      expect(dead, `dead anchors with the breaker ${state}`).toEqual([]);
+    }
+  });
 });
 
 describe("the 402 under the card breaker", () => {
