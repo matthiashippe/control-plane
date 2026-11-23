@@ -334,3 +334,24 @@ Keine. Die Quellen nutzen nur Klassen aus dem `<style>` von `src/public/index.ht
 auf `/fix`, weil `main .wrap > p.fine` den oberen Rand sonst auf null setzt.
 
 Abnahme-Issue errors: PRO-27594
+
+## Werbung: Karte zuerst (goals/werbung/01)
+
+Startseite: Der erste Bildschirm (`data-soll="move"`) sagt zuerst, dass kein Krypto nötig ist. Das Pill über der Überschrift trägt
+„Conway not answering?“ mit Link auf `/fix`, die Überschrift „Your automaton runs here.“ und „No crypto needed.“ in zwei Zeilen, der
+Satz `.sub` „Pay by card, PayPal or Apple Pay, with 60 days to cancel the purchase. It signs in here with its own wallet and gets
+answers again.“ Vorn steht der Knopf „Pay by card“ (`btn-1`, auf `#card`), daneben „Switch in two steps“ (`btn-2`, auf `/fix`). Kasten
+und Zeile `.fine` mit USDC bleiben unter dem Code. Der Umzug wächst nicht: `move top` 828 bei 390 und 620 bei 1440. Der Block `card`
+aus karte 02 und alles darunter bleiben unverändert.
+
+Fehlerseiten: Direkt unter der Überschrift jeder Seite steht eine Zeile `.fine` „No crypto needed: pay by card, PayPal or Apple Pay,
+with 60 days to cancel the purchase. Buy credit.“ mit dem Link „Buy credit“ auf `/#card`, das Formular der Startseite. Sie steht dort
+und nicht unter dem Code, weil auf `credits-never-granted` schon die Ursache USDC nennt und die Botschaft vor jedem USDC stehen soll;
+alle drei Seiten tragen sie an derselben Stelle. Die Beschreibung im Kopf von `credits-never-granted` beginnt mit „Conway takes the
+top-up on-chain“ statt „Conway's payment endpoint still takes your USDC“, aus demselben Grund. Überschrift, Titel, Ursache, Slug und
+die Zeile `conwayApiUrl` bleiben. Der Block `fix` endet weiter im ersten Bildschirm (`blocks end` 728 bei 390, 669 bei 1440).
+
+### Neue Bausteine
+
+Keine Klasse. Die Botschaft auf den Fehlerseiten steht in `<strong>` innerhalb von `.fine`, damit Vorleser und Suchmaschinen sie als
+Hervorhebung lesen.
