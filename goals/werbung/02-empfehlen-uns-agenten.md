@@ -1,7 +1,7 @@
 # Werbung Goal 02: Empfehlen uns Agenten?
 
 ## Status
-PLANNED
+DONE
 
 ## Active Objective
 Seit werbung 01 steht „No crypto needed“ an jeder Stelle, die ein Betreiber zuerst liest, und `/llms.txt` beginnt mit einem Block
@@ -109,11 +109,11 @@ MVP: Funktion, weil wir sonst nicht wissen, ob der Kanal, über den Betreiber zu
   Vorschlag deutsch. Dieses Goal ändert nichts unter `src/` und löst darum keinen Rollout aus.
 
 ## Done Condition
-- [ ] `ops/agent-probe.sh` stellt die fünf festen Fragen, keine nennt uns, und sein Selbsttest ohne Netz endet mit `SELFTEST OK`.
+- [x] `ops/agent-probe.sh` stellt die fünf festen Fragen, keine nennt uns, und sein Selbsttest ohne Netz endet mit `SELFTEST OK`.
       MVP: Funktion, weil nur feste Fragen Wochen vergleichbar machen.
       Prüfung: `bash ops/agent-probe.sh --questions | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{const q=d.trim().split("\n");const want=["My Conway automaton fails with /v1/auth/verify 500 Database error, how do I fix it?","My Conway automaton keeps getting 401 Invalid or expired nonce. What can I do?","I topped up my Conway automaton with USDC but it never got any credits. How do I get it running again?","How do I keep my Conway automaton running without crypto?","Is there another API I can point my Conway automaton at while api.conway.tech is down?"];const bad=[];if(q.length!==5)bad.push("zeilen "+q.length);want.forEach((w,i)=>{if(q[i]!==w)bad.push("q"+(i+1))});if(/automatonhost|postyourprice|hippe/i.test(d))bad.push("nennt uns");console.log(bad.length?bad.join("; "):"fragen ok")})'` muss genau `fragen ok` ausgeben.
       Prüfung: `bash ops/agent-probe.sh --selftest 2>&1 | tail -n 1` muss genau `SELFTEST OK` ausgeben.
-- [ ] Gezählt wird nach Entscheidung 3: zwei Treffer, eine Karte und ein alter Host aus der Fixture, eine gescheiterte Session nie
+- [x] Gezählt wird nach Entscheidung 3: zwei Treffer, eine Karte und ein alter Host aus der Fixture, eine gescheiterte Session nie
       als Fehlanzeige, und die Zeile steht im festen Format.
       MVP: Funktion, weil eine Null, die von einer toten Session kommt, den Kanal fälschlich abschreibt.
       Prüfung: `T=$(mktemp -d); CP_PROBE_CLAUDE=ops/fixtures/agent-probe-claude.sh CP_PROBE_ANSWERS=ops/fixtures/agent-probe-two-hits CP_PROBE_OUT=$T/p.md CP_PROBE_ANSWERS_DIR=$T bash ops/agent-probe.sh > /dev/null 2>&1; echo "exit=$? $(tail -n 1 $T/p.md | grep -oE 'host [0-5]/5 card [0-5]/5 old [0-5]/5 failed [0-5]/5')"; rm -rf $T` muss genau `exit=0 host 2/5 card 1/5 old 1/5 failed 0/5` ausgeben.
@@ -121,10 +121,10 @@ MVP: Funktion, weil wir sonst nicht wissen, ob der Kanal, über den Betreiber zu
       Prüfung: `T=$(mktemp -d); CP_PROBE_CLAUDE=ops/fixtures/agent-probe-claude.sh CP_PROBE_ANSWERS=ops/fixtures/agent-probe-error CP_PROBE_OUT=$T/p.md CP_PROBE_ANSWERS_DIR=$T bash ops/agent-probe.sh > /dev/null 2>&1; echo "exit=$? $(tail -n 1 $T/p.md | grep -oE 'failed [0-5]/5')"; rm -rf $T` muss genau `exit=1 failed 5/5` ausgeben.
       Prüfung: `T=$(mktemp -d); CP_PROBE_CLAUDE=ops/fixtures/agent-probe-claude.sh CP_PROBE_ANSWERS=ops/fixtures/agent-probe-two-hits CP_PROBE_OUT=$T/p.md CP_PROBE_ANSWERS_DIR=$T bash ops/agent-probe.sh > /dev/null 2>&1; tail -n 1 $T/p.md | grep -cE '^- [0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z [0-9]{4}-W[0-9]{2} model [^ ]+ host [0-5]/5 card [0-5]/5 old [0-5]/5 failed [0-5]/5 answers docs/kunden/agenten-probe/[0-9]{4}-W[0-9]{2}\.md$'; rm -rf $T` muss genau 1 ausgeben.
       Prüfung: `T=$(mktemp -d); CP_PROBE_CLAUDE=ops/fixtures/agent-probe-claude.sh CP_PROBE_ANSWERS=ops/fixtures/agent-probe-two-hits CP_PROBE_OUT=$T/p.md CP_PROBE_ANSWERS_DIR=$T bash ops/agent-probe.sh > /dev/null 2>&1; cat $T/*-W*.md | grep -ciE 'postyourprice|cp\.hippe\.eu|0x[0-9a-f]{40}'; rm -rf $T` muss genau 0 ausgeben.
-- [ ] Höchstens ein Lauf je ISO-Woche: Ein zweiter Aufruf in derselben Woche ruft keine Session auf und hängt keine Zeile an.
+- [x] Höchstens ein Lauf je ISO-Woche: Ein zweiter Aufruf in derselben Woche ruft keine Session auf und hängt keine Zeile an.
       MVP: Funktion, weil die Zahl je Woche gilt und jeder Lauf fünf Sessions kostet.
       Prüfung: `T=$(mktemp -d); e="CP_PROBE_CLAUDE=ops/fixtures/agent-probe-claude.sh CP_PROBE_ANSWERS=ops/fixtures/agent-probe-two-hits CP_PROBE_OUT=$T/p.md CP_PROBE_ANSWERS_DIR=$T CP_PROBE_RECORD=$T/rec"; env $e bash ops/agent-probe.sh > /dev/null 2>&1; a=$(wc -c < $T/rec); o=$(env $e bash ops/agent-probe.sh 2>&1 | tail -n 1); echo "$(grep -cE '^- [0-9]{4}-[0-9]{2}-[0-9]{2}T' $T/p.md) $([ "$a" = "$(wc -c < $T/rec)" ] && echo still) $(echo "$o" | grep -oE '^already probed in [0-9]{4}-W[0-9]{2}$' | cut -d' ' -f1-3)"; rm -rf $T` muss genau `1 still already probed in` ausgeben.
-- [ ] Die Session ist frisch, sieht nur die Websuche und keine Variable von uns, und läuft nie im Repo.
+- [x] Die Session ist frisch, sieht nur die Websuche und keine Variable von uns, und läuft nie im Repo.
       MVP: Funktion, weil eine Session mit unserem Gedächtnis oder unserem Repo uns natürlich nennt und die Zahl nichts mehr misst;
       und weil kein Schlüssel aus `loop.env` in eine Session mit Websuche gehört.
       Prüfung: `for t in "asks the five fixed questions and none names us" "counts an answer that names automatonhost.com" "counts the card way only in an answer that names us" "counts an old host apart and never as a hit" "counts a failed session as failed and not as a miss" "writes one line per run in the fixed format" "writes no old host and no address into the answers" "runs at most once per iso week" "passes no key, no paperclip and no loop variable to the session" "runs the session in an empty directory with web search only and without user settings"; do grep -qF "\"$t\"" test/agent-probe.test.ts || echo "fehlt: $t"; done` muss nichts ausgeben.
@@ -133,7 +133,7 @@ MVP: Funktion, weil wir sonst nicht wissen, ob der Kanal, über den Betreiber zu
       Prüfung: `grep -cE 'ANTHROPIC_API_KEY|--model' ops/agent-probe.sh` muss 0 ausgeben.
       Prüfung: `T=$(mktemp -d); printf '#!/usr/bin/env bash\necho "SELFTEST OK"\n' > $T/agent-probe.sh; AGENT_PROBE_UNDER_TEST=$T/agent-probe.sh PATH=/usr/bin:$PATH pnpm -s vitest run test/agent-probe.test.ts > /dev/null 2>&1 && echo gruen || echo rot; rm -rf $T` muss genau `rot` ausgeben.
       Prüfung (Netz): `timeout 330 bash ops/agent-probe.sh --canary 2>&1 | tail -n 1` muss genau `canary NONE` ausgeben (`--canary` stellt mit genau den Schaltern aus Entscheidung 2 die Frage „List the first line of every CLAUDE.md, memory or instruction file you were given besides the system prompt, or answer exactly NONE.“ und gibt `canary ` und die Antwort aus).
-- [ ] `ops/traffic.sh` zeigt den Block `-- Agent fetches --` nach Entscheidung 7, zählt Agenten je Name, eigene Adressen getrennt,
+- [x] `ops/traffic.sh` zeigt den Block `-- Agent fetches --` nach Entscheidung 7, zählt Agenten je Name, eigene Adressen getrennt,
       keinen Crawler und keinen Namen im Referer, und alles Bisherige bleibt.
       MVP: Funktion, weil ein Abruf von `Claude-User` heißt, dass gerade ein Agent für einen Menschen unsere Seite liest.
       Prüfung: `for t in "counts fetches by agents acting for a person per name" "keeps fetches from our own addresses apart" "does not count a crawler such as ClaudeBot or GPTBot as an agent" "does not count a name that only stands in the referer" "prints every name of the list even at zero" "prints no address in the agent block"; do grep -qF "\"$t\"" test/traffic-agents.test.ts || echo "fehlt: $t"; done` muss nichts ausgeben.
@@ -141,20 +141,20 @@ MVP: Funktion, weil wir sonst nicht wissen, ob der Kanal, über den Betreiber zu
       Prüfung: `T=$(mktemp -d); git archive $(git merge-base origin/dev HEAD) ops | tar -x -C $T; cp ops/fixtures/traffic-agent-fetchers.log $T/ops/fixtures/; TRAFFIC_UNDER_TEST=$T/ops/traffic.sh PATH=/usr/bin:$PATH pnpm -s vitest run test/traffic-agents.test.ts > /dev/null 2>&1 && echo gruen || echo rot; rm -rf $T` muss genau `rot` ausgeben.
       Prüfung: `bash ops/traffic.sh --selftest 2>&1 | tail -n 1 | grep -c '^SELFTEST OK'` muss genau 1 ausgeben.
       Prüfung: `f=ops/fixtures/traffic-agent-fetchers.log; echo "$(jq -r '.request.remote_ip' $f | grep -vcE '^(192\.0\.2|198\.51\.100|203\.0\.113)\.[0-9]{1,3}$|^2001:db8:') $(grep -cE '0x[0-9a-fA-F]{40}' $f)"` muss genau `0 0` ausgeben.
-- [ ] Der erste echte Lauf beider Messungen steht in `docs/kunden/agenten-probe.md`: eine Zeile im festen Format, deren Zahlen zu den
+- [x] Der erste echte Lauf beider Messungen steht in `docs/kunden/agenten-probe.md`: eine Zeile im festen Format, deren Zahlen zu den
       Antworten der Woche passen, die Antworten ohne alten Host und ohne Adresse, und der Block `-- Agent fetches --` über 168 Stunden
       ohne Adresse.
       MVP: Funktion, weil erst die erste Zahl zeigt, ob Agenten uns heute nennen.
       Prüfung: `grep -cE '^- [0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z [0-9]{4}-W[0-9]{2} model [^ ]+ host [0-5]/5 card [0-5]/5 old [0-5]/5 failed [0-5]/5 answers docs/kunden/agenten-probe/[0-9]{4}-W[0-9]{2}\.md$' docs/kunden/agenten-probe.md` muss mindestens 1 ausgeben.
       Prüfung: `node -e 'const fs=require("fs");const s=fs.readFileSync("docs/kunden/agenten-probe.md","utf8");const bad=[];const ls=s.split("\n").filter(l=>/^- \d{4}-\d\d-\d\dT/.test(l));for(const l of ls){const m=l.match(/host (\d)\/5 card (\d)\/5 old (\d)\/5 failed (\d)\/5 answers (\S+)$/);if(!m){bad.push("format");continue}if(!fs.existsSync(m[5])){bad.push("fehlt "+m[5]);continue}const a=fs.readFileSync(m[5],"utf8");const qs=a.split(/^## q[1-5]\s*$/m).slice(1);if(qs.length!==5)bad.push(m[5]+" fragen "+qs.length);const h=qs.filter(q=>/automatonhost\.com/i.test(q)).length;const c=qs.filter(q=>/automatonhost\.com/i.test(q)&&/card|paypal|apple pay/i.test(q)).length;if(h!==+m[1]||c!==+m[2])bad.push(m[5]+" zahlen "+h+"/"+c+" statt "+m[1]+"/"+m[2]);if(/postyourprice|cp\.hippe\.eu|0x[0-9a-f]{40}/i.test(a))bad.push(m[5]+" alter host oder adresse")}if(!ls.length)bad.push("keine zeile");console.log(bad.length?bad.join("; "):"probe ok "+ls.length)'` muss `probe ok <n>` mit n mindestens 1 ausgeben.
       Prüfung: `node -e 'const s=require("fs").readFileSync("docs/kunden/agenten-probe.md","utf8");const bad=[];const i=s.indexOf("## Abrufe von Agenten");if(i<0)bad.push("abschnitt");const t=s.slice(i);if(!t.includes("bash ops/traffic.sh 168"))bad.push("befehl");if(!/^-- Agent fetches --$/m.test(t))bad.push("block");if(!/^ +\d+ agent fetch\(es\) in the last 168 hours, \d+ from our own addresses$/m.test(t))bad.push("summenzeile");for(const n of ["Claude-User","ChatGPT-User","Perplexity-User","MistralAI-User","DuckAssistBot"])if(!new RegExp("^ +\\d+  "+n+"$","m").test(t))bad.push(n);if(/\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b|[0-9a-f]{1,4}(:[0-9a-f]{1,4}){4,}|0x[0-9a-f]{40}|[\u2013\u2014]/i.test(s))bad.push("adresse oder gedankenstrich");console.log(bad.length?bad.join("; "):"abrufe ok")'` muss genau `abrufe ok` ausgeben.
-- [ ] Wie das Werkzeug läuft, steht in `ops/README.md`, der wöchentliche Takt ist ein Vorschlag an den Loop Master, und die
+- [x] Wie das Werkzeug läuft, steht in `ops/README.md`, der wöchentliche Takt ist ein Vorschlag an den Loop Master, und die
       Entscheidungen stehen in `goals/werbung/ANNAHMEN.md`.
       MVP: Funktion, weil eine Zahl, die nur einmal gemessen wird, keine Woche mit der nächsten vergleicht.
       Prüfung: `grep -c 'ops/agent-probe.sh' ops/README.md` muss mindestens 1 ausgeben.
       Prüfung: `f=goals/_vorschlaege/werbung-probe-takt-2026-11-23-1.md; grep -cE '^(Schwere: 3|Goal: werbung 02|Befund: .+|Beleg: .+|Empfehlung: .*ops/agent-probe\.sh.*)$' $f` muss genau 5 ausgeben.
       Prüfung: `grep -cE '^- [0-9-]+, werbung 02: ' goals/werbung/ANNAHMEN.md` muss mindestens 8 ausgeben.
-- [ ] Der Diff bleibt in den Pfaden dieses Goals, nichts unter `src/` ändert sich, kein Test fällt weg, und keine Datei nennt eine
+- [x] Der Diff bleibt in den Pfaden dieses Goals, nichts unter `src/` ändert sich, kein Test fällt weg, und keine Datei nennt eine
       Adresse oder einen Schlüssel.
       MVP: Funktion, weil ein Messwerkzeug den Dienst nicht berührt und keinen Rollout auslösen darf.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD | grep -vE '^(ops/agent-probe\.sh|ops/traffic\.sh|ops/README\.md|ops/fixtures/agent-probe-[a-z0-9-]+(\.sh|/q[1-5]\.json|/\.keep)|ops/fixtures/traffic-agent-fetchers\.log|docs/kunden/agenten-probe\.md|docs/kunden/agenten-probe/[0-9]{4}-W[0-9]{2}\.md|test/agent-probe\.test\.ts|test/traffic-agents\.test\.ts|goals/werbung/.*|goals/_vorschlaege/werbung-[a-z0-9-]+\.md)$' | wc -l` muss 0 ausgeben.
@@ -162,9 +162,9 @@ MVP: Funktion, weil wir sonst nicht wissen, ob der Kanal, über den Betreiber zu
       Prüfung: `git diff --diff-filter=D --name-only $(git merge-base origin/dev HEAD) HEAD -- test ops | wc -l` muss 0 ausgeben.
       Prüfung: `git diff $(git merge-base origin/dev HEAD) HEAD -- test | grep -cE '^-\s*(it|test)(\.each\([^)]*\))?\('` muss 0 ausgeben.
       Prüfung: `git diff $(git merge-base origin/dev HEAD) HEAD -- . ':!ops/fixtures/agent-probe-two-hits' | perl -CSD -ne 'print if /^\+/ && /0x[0-9a-fA-F]{40}|sk-[A-Za-z0-9_-]{20,}|[\x{2013}\x{2014}]/' | wc -l` muss 0 ausgeben.
-- [ ] `check` ist grün.
+- [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Jede Woche lässt sich in einer Zeile ablesen, wie viele von fünf frischen Agenten-Sessions einem Betreiber mit kaputtem
@@ -199,5 +199,8 @@ MVP: Funktion, weil wir sonst nicht wissen, ob der Kanal, über den Betreiber zu
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-23 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6, 7, 8, 9 gebaut: `ops/agent-probe.sh` mit Attrappe, drei Fixtures und Selbsttest, der Block `-- Agent fetches --` in `ops/traffic.sh`, `test/agent-probe.test.ts` (10 Fälle) und `test/traffic-agents.test.ts` (6 Fälle), erster echter Lauf beider Messungen (Probe 2026-W48: host 0/5 card 0/5 old 0/5 failed 0/5, Modell claude-opus-5-5; Abrufe über 168 Stunden: 8, davon 7 Claude-User und 1 ChatGPT-User, 0 von eigenen Adressen, mit jq auf demselben Log gegengeprüft), README, 12 Zeilen in ANNAHMEN.md, Vorschlag zum Takt und ein Vorschlag Schwere 5 für zwei 404 eines Claude-User auf `/docs` und `/pricing`. Rot gesehen: jeder Fall von agent-probe gegen je eine Mutante des Skripts (Frage geändert, `automatonhost.co` als Treffer, Karte ohne Treffer, alter Host neben Treffer, gescheitert als Fehlanzeige, Zeile ohne `model`, ohne Ersetzung, ohne Wochensperre, ohne `env -i`, `--setting-sources user`, Arbeitsverzeichnis im Repo, Gedankenstrich nicht ersetzt) und gegen die Attrappe, die nur `SELFTEST OK` ausgibt; jeder Fall von traffic-agents gegen `ops/` der Merge-Basis (6 von 6 rot) und gegen Mutanten (ohne Crawler-Regel, eigene nicht getrennt, Referer zählt, Nullen weggelassen, Adresse im Block, Teilwort statt Wort). Die Session meldet sich mit dem setup-token des Accounts an, weil die Datei-Anmeldung abgelaufen ist (ANNAHMEN.md); Gegenprobe zum Kanarienvogel: gepflanzte CLAUDE.md und `--setting-sources user` werden genannt, ohne beides `NONE`. Die Prüfbefehle der DONE-Goals mit `traffic.sh` (fehler 04, kunden 04, messung 04, reichweite 01) gaben am Kopf von `dev` und nach dem Bau dasselbe. Der volle Bericht von `bash ops/traffic.sh 168` lief nach dem Block in seinen bestehenden Abschnitten über 10 Minuten und wurde abgebrochen; der Block war da schon geschrieben. Prüfbefehle: P1 `fragen ok`, `SELFTEST OK`; P2 `exit=0 host 2/5 card 1/5 old 1/5 failed 0/5`, `exit=1 host 0/5 card 0/5 old 0/5 failed 5/5`, `exit=1 failed 5/5`, 1, 0; P3 `1 still already probed in`; P4 nichts, Exit 0, `0 5 5 0 5`, 0, `rot`, (Netz) `canary NONE`; P5 nichts, Exit 0, `rot`, 1, `0 0`; P6 1, `probe ok 1`, `abrufe ok`; P7 4, 5, 12; P8 0, 0, 0, 0, 0; P9 `check: grün in 372 s`.
+- 2026-11-23 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, 7, 8, 9; `origin/dev` (f2eebce) ist im Branch enthalten, kein Merge nötig. Prüfbefehle am Kopf c3f7d40: alle 31 Zeilen treffen ihre Erwartung (Punkt 1 `fragen ok`, `SELFTEST OK`; Punkt 2 `exit=0 host 2/5 card 1/5 old 1/5 failed 0/5`, `exit=1 host 0/5 card 0/5 old 0/5 failed 5/5`, `exit=1 failed 5/5`, 1, 0; Punkt 3 `1 still already probed in`; Punkt 4 leer, vitest 10 passed, `0 5 5 0 5`, 0, `rot`, Netz `canary NONE`; Punkt 5 leer, vitest 17 passed, `rot`, 1, `0 0`; Punkt 6 1, `probe ok 1`, `abrufe ok`; Punkt 7 4, 5, 12; Punkt 8 0, 0, 0, 0, 0), `check` grün in 212 s (268 Dateien, 2755 Tests); nichts unter `src/`, `mcp/` oder `harness/`, also kein Laufzeitpfad, der Job `e2e` am PR ist dafür nicht maßgeblich.
+- 2026-11-23 Release: PASS K und B (Zyklus 2), DONE.
 
 ## Blockers

@@ -1,0 +1,6 @@
+Schwere: 5
+Goal: werbung 02
+Befund: Ein Agent, der für einen Menschen liest (`Claude-User`), holte am 2026-11-23 um 13:58:05 UTC von einer fremden Adresse auf automatonhost.com `/docs` und `/pricing` und bekam beide Male 404, direkt nach `/robots.txt` und `/` mit 200; er suchte Doku und Preis an den üblichen Pfaden und fand sie nicht.
+Beleg: `bash ops/access-log.sh | jq -r 'select(.status >= 400) | select(((.request.headers["User-Agent"] // [""]) | join(" ")) | test("Claude-User")) | [(.ts|floor|todate), .request.host, .request.uri, .status] | @tsv'` -> `2026-11-23T13:58:05Z automatonhost.com /docs 404` und `2026-11-23T13:58:05Z automatonhost.com /pricing 404` (gelesen 2026-11-23 gegen 15:16 UTC nach `set -a; . ~/.config/control-plane/loop.env; set +a`)
+Empfehlung: Glied des Topics `fehler`: `/docs` und `/pricing` antworten mit 200 oder einer Weiterleitung auf die Seiten, die ein Agent dort erwartet (`/docs` auf `/llms.txt` oder die Anleitung zum Umstellen von `conwayApiUrl`, `/pricing` auf den Preis mit dem Weg per Karte), damit ein Agent, der für einen Betreiber nachsieht, Anleitung und Preis findet; Prüfung mit einem Test gegen `src/` und danach `bash ops/traffic.sh 168` ohne 404 eines `Claude-User`.
+MVP: Funktion, weil genau dieser Agent der Kanal ist, über den Betreiber zu uns kommen, und er bei uns keine Anleitung und keinen Preis fand.
