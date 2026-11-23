@@ -124,6 +124,14 @@ der Schreibsperre die Kasse von drei anderen Produkten im geteilten Konto trifft
       Prüfung (Netz): `gh pr checks $(gh pr list -R matthiashippe/control-plane --head goal/wache-02 --state open --json number -q '.[0].number') -R matthiashippe/control-plane 2>&1 | grep -E '^e2e\s' | grep -c pass` muss genau 1 ausgeben.
 - [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
+- [ ] Jeder Anker-Link auf `/` (`href="#…"`) trifft bei Notschalter an und aus ein `id` derselben Seite, und ein Test hält das für
+      jeden Anker fest, nicht nur für `#card`.
+      MVP: Funktion, weil der Fall aus Punkt 1 nur `#card` prüft: Lässt ein späteres Goal bei Notschalter an einen weiteren Block weg
+      (etwa den Markt), klickt der Besucher wieder ins Leere, und kein Test merkt es. Kritik des Tech Lead 2026-11-23.
+      Prüfung: `grep -qF '"links every anchor of the start page to an id on the page, breaker on and off"' test/card-way-pages.test.ts && echo name ok` muss genau `name ok` ausgeben.
+      Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/card-way-pages.test.ts` muss Exit-Code 0 haben.
+      Prüfung: `CP_PUBLIC_URL=https://automatonhost.com PATH=/usr/bin:$PATH node --import tsx --input-type=module -e 'const { createApp } = await import("./src/app.ts"); const { openDb } = await import("./src/db.ts"); const { CARD_BREAKER_SHORTFALL_MC: S } = await import("./src/payments/card-way.ts"); const page = async (on) => { const db = openDb(":memory:"); if (on) { const t = new Date().toISOString(); db.prepare("INSERT INTO card_orders (order_id, product_id, address, mode, status, credited_mc, reversed_mc, shortfall_mc, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?)").run("TRIP", "771278", "0x" + "ef".repeat(20), "live", "reversed", S, S, t, t); } return (await createApp({ db }).request("/")).text(); }; const bad = []; for (const on of [true, false]) { const h = await page(on); const ids = new Set([...h.matchAll(/\bid="([^"]+)"/g)].map((m) => m[1])); const refs = [...h.matchAll(/href="#([^"]*)"/g)].map((m) => m[1]); if (refs.length === 0) bad.push((on ? "an" : "aus") + " keine"); for (const r of refs) if (!ids.has(r)) bad.push((on ? "an " : "aus ") + "#" + r); } console.log(bad.length ? bad.join("; ") : "ziele ok")' 2>&1 | tail -1` muss genau `ziele ok` ausgeben.
+      Prüfung: `T=$(mktemp -d); git archive HEAD | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; sed -i 's/href="#market"/href="#nowhere"/g' $T/src/public/index.html; grep -q 'href="#nowhere"' $T/src/public/index.html || echo sed-miss; (cd $T && PATH=/usr/bin:$PATH pnpm -s vitest run test/card-way-pages.test.ts -t "links every anchor of the start page to an id on the page, breaker on and off" > /dev/null 2>&1); echo "exit=$?"; rm -rf $T` muss als letzte Zeile `exit=1` ausgeben und darf `sed-miss` nicht ausgeben.
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
