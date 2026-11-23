@@ -1,7 +1,7 @@
 # Kunden Goal 13: Kunde 1 hat Guthaben für die Schritte bis zum ersten Bericht
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Seit kunden 11 stellt der Dienst dauerhaft einen offenen Hausauftrag und zahlt einen gültigen Bericht sofort als Credit. Kunde 1, der
@@ -112,7 +112,7 @@ MVP: Funktion, weil Kunde 1 ohne ein paar bezahlte Schritte den Bericht nie schr
 - [x] `check` ist grün, und der Job `e2e` am Kopf des Goal-PR ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung (Netz): `n=$(gh pr list -R matthiashippe/control-plane --head goal/kunden-13 --state all --json number -q '.[0].number'); gh pr checks "${n:?}" -R matthiashippe/control-plane --json name,state -q '.[] | select(.name=="e2e") | .state'` muss `SUCCESS` ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Jeder neue Test war vor dem Fix rot; die Zeile im Progress Log nennt, womit.
@@ -144,5 +144,6 @@ MVP: Funktion, weil Kunde 1 ohne ein paar bezahlte Schritte den Bericht nie schr
 - 2026-11-23 Zyklus 3: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6 (`dev` ohne neuen Commit, alle Prüfbefehle wie Zyklus 2, `check` Exit 0 mit 2729 passed, `e2e` am Kopf 2b1a70c `SUCCESS`). Prüfbefehle: Punkt 1 `alle`, `rot`, 2, 1, 0; Punkt 2 Exit 0, 0, 0, 1; Punkt 3 `alle`, 0, 5; Punkt 4 `SELFTEST OK …`, 18, 0, 18, Exit 0; Punkt 5 6, 0; Punkt 6 Exit 0, `SUCCESS`.
 - 2026-11-23 Zyklus 4: Punkt 6 aus der Kritik gebaut (`grantForHouseJob` bekommt die Reservierung als `requiredMc` und bucht nur, wenn verfügbarer Saldo und `HOUSE_STEP_MC` sie decken; Zeile in `ANNAHMEN.md` ersetzt); rot vorher: beide neuen Tests in `test/house-step.test.ts` (402 mit 10 statt 0 Cent Saldo, `house_step` 1 statt 0). Prüfbefehle: Punkt 1 `alle`, `rot`, 2, 1, 0; Punkt 2 Exit 0, 0, 0, 1; Punkt 3 `alle`, 0, 5; Punkt 4 `SELFTEST OK …`, 18, 0, 18, Exit 0; Punkt 5 6, 0; Punkt 6 `alle`, 0; Punkt 7 `check` Exit 0 (2731 passed).
 - 2026-11-23 Zyklus 5: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, 7 (`dev` mit zwei neuen Goal-Dateien gemergt, `check` danach Exit 0 mit 2731 passed, `e2e` am Kopf 46bf474 `SUCCESS`). Prüfbefehle: Punkt 1 `alle`, `rot`, 2, 1, 0; Punkt 2 Exit 0, 0, 0, 1; Punkt 3 `alle`, 0, 5; Punkt 4 `SELFTEST OK …`, 18, 0, 18, Exit 0; Punkt 5 6, 0; Punkt 6 `alle`, 0; Punkt 7 Exit 0, `SUCCESS`.
+- 2026-11-23 Release: PASS K und B (Zyklus 5), DONE.
 
 ## Blockers
