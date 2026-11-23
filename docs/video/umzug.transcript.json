@@ -1,0 +1,169 @@
+{
+  "runtime_rev": "d8f8168",
+  "recorded_at": "2026-11-23T16:55:32.709Z",
+  "steps": [
+    {
+      "scene": 1,
+      "command": "grep conwayApiUrl ~/.automaton/automaton.json",
+      "exit_code": 0,
+      "started_ms": 2428,
+      "lines": [
+        {
+          "t_ms": 58,
+          "text": "  \"conwayApiUrl\": \"https://api.conway.tech\","
+        }
+      ]
+    },
+    {
+      "scene": 1,
+      "command": "automaton --provision",
+      "exit_code": 1,
+      "started_ms": 2492,
+      "lines": [
+        {
+          "t_ms": 7718,
+          "text": "{\"timestamp\":\"2026-11-23T16:55:42.918Z\",\"level\":\"error\",\"module\":\"main\",\"message\":\"Provision failed: SIWE verification failed: 401 {\\\"error\\\":\\\"Invalid or expired nonce\\\"}\"}"
+        }
+      ]
+    },
+    {
+      "scene": 2,
+      "command": "sed -i 's#https://api.conway.tech#https://automatonhost.com#' ~/.automaton/automaton.json",
+      "exit_code": 0,
+      "started_ms": 10229,
+      "lines": []
+    },
+    {
+      "scene": 2,
+      "command": "grep conwayApiUrl ~/.automaton/automaton.json",
+      "exit_code": 0,
+      "started_ms": 10312,
+      "lines": [
+        {
+          "t_ms": 36,
+          "text": "  \"conwayApiUrl\": \"https://automatonhost.com\","
+        }
+      ]
+    },
+    {
+      "scene": 3,
+      "command": "automaton --provision",
+      "exit_code": 0,
+      "started_ms": 10350,
+      "lines": [
+        {
+          "t_ms": 7003,
+          "text": "{\"timestamp\":\"2026-11-23T16:55:50.061Z\",\"level\":\"info\",\"module\":\"main\",\"message\":\"{\\\"apiKey\\\":\\\"<api key hidden>\\\",\\\"walletAddress\\\":\\\"0x2f2817D4985991bA3c078eDb4e7d328B051c8098\\\",\\\"keyPrefix\\\":\\\"cnwy_k_6d26de6f\\\"}\"}"
+        }
+      ]
+    },
+    {
+      "scene": 3,
+      "command": "grep apiKey ~/.automaton/config.json",
+      "exit_code": 0,
+      "started_ms": 17666,
+      "lines": [
+        {
+          "t_ms": 82,
+          "text": "  \"apiKey\": \"<api key hidden>\","
+        }
+      ]
+    },
+    {
+      "scene": 3,
+      "command": "automaton --run",
+      "exit_code": 0,
+      "started_ms": 17749,
+      "lines": [
+        {
+          "t_ms": 6440,
+          "text": "16:55:56 INFO  main         [2026-11-23T16:55:56.894Z] Conway Automaton v0.2.1 starting..."
+        },
+        {
+          "t_ms": 6780,
+          "text": "16:55:57 INFO  main         [2026-11-23T16:55:57.238Z] Automaton identity registered."
+        },
+        {
+          "t_ms": 6814,
+          "text": "16:55:57 INFO  main         [2026-11-23T16:55:57.269Z] Loaded 3 skills."
+        },
+        {
+          "t_ms": 7287,
+          "text": "16:55:57 INFO  main         [2026-11-23T16:55:57.745Z] State repo initialized."
+        },
+        {
+          "t_ms": 7498,
+          "text": "16:55:57 INFO  topup        Bootstrap topup skipped: USDC balance $0.00 below minimum tier ($5)"
+        },
+        {
+          "t_ms": 7508,
+          "text": "16:55:57 INFO  heartbeat    Daemon started. Tick interval: 60s (from config)"
+        },
+        {
+          "t_ms": 7509,
+          "text": "16:55:57 INFO  main         [2026-11-23T16:55:57.966Z] Heartbeat daemon started."
+        },
+        {
+          "t_ms": 7530,
+          "text": "16:55:57 INFO  main         [2026-11-23T16:55:57.988Z] State: waking"
+        },
+        {
+          "t_ms": 7715,
+          "text": "16:55:58 INFO  main         [2026-11-23T16:55:58.171Z] State: running"
+        },
+        {
+          "t_ms": 7715,
+          "text": "16:55:58 INFO  loop         [WAKE UP] video-automaton-972b15 is alive. Credits: $4.00"
+        },
+        {
+          "t_ms": 7922,
+          "text": "16:55:58 INFO  loop         [THINK] Routing inference (tier: normal, model: gpt-5-mini)..."
+        },
+        {
+          "t_ms": 11862,
+          "text": "16:56:02 INFO  loop         [TOOL] system_synopsis({})"
+        },
+        {
+          "t_ms": 11872,
+          "text": "16:56:02 INFO  loop         [TOOL RESULT] system_synopsis: === SYSTEM SYNOPSIS ==="
+        },
+        {
+          "t_ms": 11872,
+          "text": "Name: video-automaton-972b15"
+        },
+        {
+          "t_ms": 11872,
+          "text": "Creator: 0x2f2817d4985991ba3c078edb4e7d328b051c8098"
+        },
+        {
+          "t_ms": 11872,
+          "text": "State: running"
+        },
+        {
+          "t_ms": 11872,
+          "text": "Total turns: 0"
+        },
+        {
+          "t_ms": 11872,
+          "text": "Installed tools: 0"
+        },
+        {
+          "t_ms": 11872,
+          "text": "Active heartbeats: 5"
+        },
+        {
+          "t_ms": 11872,
+          "text": "Model: gpt-5-mini"
+        },
+        {
+          "t_ms": 11872,
+          "text": "======="
+        },
+        {
+          "t_ms": 11879,
+          "text": "16:56:02 INFO  main         [2026-11-23T16:56:02.336Z] Turn 01M84NC1GAZ9BZ8RHAHRJ8030V: 1 tools, 12197 tokens"
+        }
+      ]
+    }
+  ]
+}
