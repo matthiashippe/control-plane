@@ -207,6 +207,15 @@ werbetrommel rühren, denn viele haben kein crypto“).
       Prüfung: `cat src/public/error-pages.ts docs/kanal/antwort-vorlage.md docs/soll/src/errors-*.html | grep -ci 'postyourprice'` muss 0 ausgeben.
 - [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
+- [ ] Bei Notschalter aus liefert `/` genau einen Block `move`, und keine der Marken `<!--CARD-->`, `<!--/CARD-->`, `<!--NOCARD-->`
+      und `<!--/NOCARD-->` erreicht den Browser; ein Fall in `test/werbung.test.ts` sichert das ab, wie es der Fall für Notschalter an
+      schon tut.
+      MVP: Funktion, weil `src/public/index.html` den ersten Bildschirm jetzt zweimal trägt und nur das Zusammenspiel von
+      `stripCardWay` und `keepNoCardWay` einen davon entfernt; eine vertippte Marke zeigt sonst zwei Überschriften, ohne dass ein
+      Test rot wird (Kritik des Tech Lead, 23.11.2026).
+      Prüfung: `grep -qF '"shows exactly one first screen while the card breaker is off"' test/werbung.test.ts && echo da` muss genau `da` ausgeben.
+      Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/werbung.test.ts -t "shows exactly one first screen while the card breaker is off"` muss Exit-Code 0 haben.
+      Prüfung: `T=$(mktemp -d); cp src/public/index.html $T/i; sed -i '0,/<!--NOCARD-->/s/<!--NOCARD-->//' src/public/index.html; PATH=/usr/bin:$PATH pnpm -s vitest run test/werbung.test.ts -t "shows exactly one first screen while the card breaker is off" > /dev/null 2>&1 && r=gruen || r=rot; cp $T/i src/public/index.html; rm -rf $T; echo $r` muss genau `rot` ausgeben.
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
