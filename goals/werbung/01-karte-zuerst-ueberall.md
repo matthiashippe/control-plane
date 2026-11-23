@@ -1,7 +1,7 @@
 # Werbung Goal 01: Karte zuerst, überall
 
 ## Status
-PLANNED
+DONE
 
 ## Active Objective
 Seit karte 02 gibt es die Kasse für Guthaben per Karte, PayPal und Apple Pay, und wache 01 führt jeden Weg dorthin über die
@@ -216,7 +216,7 @@ werbetrommel rühren, denn viele haben kein crypto“).
       Prüfung: `grep -qF '"shows exactly one first screen while the card breaker is off"' test/werbung.test.ts && echo da` muss genau `da` ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/werbung.test.ts -t "shows exactly one first screen while the card breaker is off"` muss Exit-Code 0 haben.
       Prüfung: `T=$(mktemp -d); cp src/public/index.html $T/i; sed -i '0,/<!--NOCARD-->/s/<!--NOCARD-->//' src/public/index.html; PATH=/usr/bin:$PATH pnpm -s vitest run test/werbung.test.ts -t "shows exactly one first screen while the card breaker is off" > /dev/null 2>&1 && r=gruen || r=rot; cp $T/i src/public/index.html; rm -rf $T; echo $r` muss genau `rot` ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Ein Betreiber ohne Krypto liest an jeder der fünf Stellen zuerst, dass sein Automaton per Karte, PayPal oder Apple Pay weiterläuft,
@@ -258,6 +258,7 @@ werbetrommel rühren, denn viele haben kein crypto“).
 - 2026-11-23 Zyklus 2: Abschluss gemeldet, Punkte 1 bis 12; `dev` am Kopf `b5994b4` (nur sechs Vorschläge der Nacharbeit) in den Goal-Branch gemergt, die Befehle mit Merge-Basis danach erneut mit erwarteter Ausgabe. Prüfbefehle: alle 47 Befehle der Punkte 1 bis 12 am Kopf `a5761dd` mit erwarteter Ausgabe (P1 `exit=0 0 defects`, `soll start ok`, `breiten ok`, `card gleich`, 1; P2 `exit=0 soll errors: 6 images, blocks end 390=728 1440=669, 0 defects`, `soll errors ok`, `breiten ok`, 0, 0; P3 1, `abnahme ok 1`; P4 sieben Befehle grün, Gegenprobe `exit=1` ohne `sed-miss`; P5 fünf Befehle grün, Gegenprobe `exit=1` ohne `sed-miss`; P6 `readme ok`, 0; P7 Namen vollständig, sechs Suiten grün, 1, 0, 0, e2e pass (1); P8 `vorlage ok`, `da`, 0; P9 und P10 Namen vollständig und Suiten grün; P11 0, 17, 0, 0, 0, 0); P12 `check` auf GitHub am Kopf `a5761dd` grün (2:51 min, `e2e` 11:01 min grün), lokal bei Last 130 bis 370 auf 26 Kernen zweimal rot: Lauf 1 mit drei Fällen in `test/relink-comments.test.ts` und `test/traffic-hosts.test.ts` (Skripte außerhalb des Diffs, Unterprozess in der Zeitgrenze, beide Dateien allein 28 von 28 grün), Lauf 2 mit 264 von 264 Testdateien grün, aber nach 606 s an der Grenze `LIMIT_S` von 600 s in `scripts/check.mjs`.
 - 2026-11-23 Zyklus 3: Punkt 13 aus der Kritik gebaut: Fall "shows exactly one first screen while the card breaker is off" in `test/werbung.test.ts` zählt bei Notschalter aus je einmal `data-soll="move"`, `id="move"` und die erste Zeile der `<h1>` in `<main>`, keine Marke `CARD`/`NOCARD` und `No crypto needed` im Block `move`; rot gesehen mit der Gegenprobe (erste Marke `<!--NOCARD-->` entfernt: zwei Blöcke `move`). Prüfbefehle: P13 `da`, vitest Exit 0, Gegenprobe `rot`; `test/werbung.test.ts` und `test/public.test.ts` 79 von 79 grün.
 - 2026-11-23 Zyklus 4: Gap von K aus Zyklus 3 behoben: `goals/_vorschlaege/werbung-kritik-2026-11-23-1.md` (aus `fc7fa27`) vom Goal-Branch genommen, weil Punkt 11 keine Pfade außerhalb des Goals zulässt; der Vorschlag geht unverändert über einen Pflege-PR des Tech Lead nach `dev`, am Code ändert sich nichts. Prüfbefehle: P11 0, 17, 0, 0, 0, 0.
+- 2026-11-23 Release: PASS K und B (Zyklus 4), DONE.
 
 ## Blockers
 keine
