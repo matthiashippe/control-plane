@@ -46,6 +46,7 @@ local start and does not replace the run against the real endpoint.
 | `db.paying_without_thinking` | one entry older than 24 h | a customer paid and buys no inference. No alarm, but go and look |
 | `alarm_path.status` | `red` (3 or more `[WARN] webhook unreachable` in 24 h and no `[INFO] webhook delivered` after the last of them, see `last_unreachable` and `last_delivered`; or a `last_delivered` older than 26 h, even with 0 failed POSTs) | no alarm reaches anybody: with a `last_delivered` older than 26 h the watchdog itself no longer posts, so check `crontab -l` and the end of `/var/log/cp-watchdog.log` on the VM first; otherwise post to the webhook by hand, compare URL and topic in the crontab of the VM with `CP_ALERT_WEBHOOK` in `~/brain/connectors/secrets.env`, never write the URL into a file of this repo. A delivery after the last failure means the path works again and the status is `ok` even with 3 lines in 24 h. When `last_unreachable` and `last_delivered` are both `null` although lines were counted, `ops/webhook-last.sh` gave nothing readable and `red` holds from 3 lines as before. `unknown` (log not read) is no alarm, but two runs in a row are a finding like a missing `vm` block |
 | `alarm_path.received.status` | `red` (the last delivery of the watchdog, `alarm_path.last_delivered`, is younger than 11 h and no message of the watchdog on the topic is at most 300 s older than it or later; this also turns `alarm_path.status` red) | the watchdog posts to a topic nobody reads: compare URL and topic in the crontab of the VM (`crontab -l`) with `CP_ALERT_WEBHOOK` in `~/brain/connectors/secrets.env`, never write either into a file of this repo, then check `last_alive` and `last_message` on the next run. `unknown` (no `CP_ALERT_WEBHOOK` in the local environment, topic not readable, or no delivery younger than 11 h) is no alarm and leaves `alarm_path.status` alone. The ops triage passes `CP_ALERT_WEBHOOK` from `secrets.env` in the environment of `ops/status.sh` (step 2 of its skill), so there `red` is a finding and `unknown` in two runs in a row a hint |
+| `card_breaker.status` | `red` (`card_breaker.line` says `breaker on`: the shortfall of refunded or charged back live card orders of the last 60 days reached 50 USD) | the service has closed the card checkout by itself and offers only USDC: read `card_orders` (`ops/card-orders.sh`) for the refunds behind it, put the cause in STATE.md. The checkout opens again by itself once old refunds fall out of the 60 days. `unknown` (`ops/card-breaker.sh` gave `card_breaker unreadable` or `ssh failed`, see `reason`) before the rollout of goals/wache/01 is no finding, after it two runs in a row are |
 
 ### Paying without thinking
 
@@ -152,6 +153,19 @@ For both image messages `bash ops/sandbox/setup.sh 72.62.51.224` from the code-h
 `fact image_pin yes`. While the payment service itself is down the check does not run: nobody can create a sandbox then, and the
 outage is already reported. Every run leaves one line, `[INFO] sandboxd: ok`, `[INFO] sandboxd: still <down|missing|unpinned>` or the
 line of the message.
+
+The breaker of the card checkout is checked as well (`check_card_breaker`, goals/wache/01). Every run after the health verdict
+asks `ops/card-breaker.sh --container`, which imports `cardBreaker` from `/app/dist/payments/card-way.js` inside `deploy-cp-1` and
+opens the database read-only, with a time limit of `CP_CARD_BREAKER_TIMEOUT` seconds (default 20). The state (`on` or `off`) lives
+in `<state file>.card-breaker`, only its change is posted, and it is stored only after the POST went through:
+
+- `[WARN] card breaker on: shortfall <x> USD from <n> refunds in 60 days reached the limit of 50 USD, the card checkout is closed`
+- `[OK] card breaker off: shortfall <x> USD in 60 days is below the limit of 50 USD, the card checkout is open again`
+
+While the state stays, every run leaves `[INFO] card breaker still on|off, ...`. An unreadable answer keeps the stored state and
+leaves `[WARN] card breaker unreadable (<reason>), last known state <state>`; once the breaker was read at least once, that is
+posted at most once a day (`<state file>.card-breaker-fail`), before that (the module is missing until the rollout) it stays in the
+log. No message names an address.
 
 A delivery in the log only proves that ntfy accepted the POST, and ntfy accepts any topic: with a
 wrong or stale topic in the crontab the watchdog logs a delivery every day and no phone rings. So

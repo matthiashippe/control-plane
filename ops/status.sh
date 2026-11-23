@@ -82,6 +82,11 @@ payers_rc=$?
 # zero, and never stops this report. The output goes to python on fd 5.
 card_out=$(bash "$DIR/card-orders.sh" 2>/dev/null)
 card_rc=$?
+# The breaker of the card checkout (goals/wache/01, point 4): the one line of ops/card-breaker.sh, which asks the calculation of
+# the service with the database opened readonly: true and never prints an address. `ok` on `breaker off`, `red` on `breaker on`,
+# `unknown` with the exit for anything else. The output goes to python on fd 6.
+breaker_out=$(bash "$DIR/card-breaker.sh" 2>/dev/null)
+breaker_rc=$?
 or_json=$(curl -s -m 10 https://openrouter.ai/api/v1/credits -H "Authorization: Bearer ${OPENROUTER_API_KEY:-none}" 2>/dev/null)
 payto_hex=$(curl -s -m 10 -X POST https://mainnet.base.org -H 'content-type: application/json' \
   --data '{"jsonrpc":"2.0","id":1,"method":"eth_call","params":[{"to":"0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913","data":"0x70a08231000000000000000000000000914102284463F4F58B1D2f6DB9aC80BFcaA7d614"},"latest"]}' 2>/dev/null)
@@ -89,8 +94,8 @@ payto_hex=$(curl -s -m 10 -X POST https://mainnet.base.org -H 'content-type: app
 HEALTH_CODE="$health_code" HEALTH_BODY="$health_body" CERT_END="$cert_end" VM_STATS="$vm_stats" \
 DB_JSON="$db_json" OR_JSON="$or_json" PAYTO_HEX="$payto_hex" ALARM_COUNT="$alarm_count" ALARM_RC="$alarm_rc" \
 ALARM_LAST="$alarm_last" ALARM_LAST_RC="$alarm_last_rc" ALARM_TOPIC_RC="$alarm_topic_rc" PAYERS_RC="$payers_rc" \
-CARD_RC="$card_rc" \
-  python3 3<<<"$alarm_topic" 4<<<"$payers_out" 5<<<"$card_out" <<'PY'
+CARD_RC="$card_rc" BREAKER_RC="$breaker_rc" \
+  python3 3<<<"$alarm_topic" 4<<<"$payers_out" 5<<<"$card_out" 6<<<"$breaker_out" <<'PY'
 import os, json, datetime, re, time
 def j(s, default=None):
     try: return json.loads(s)
@@ -234,6 +239,19 @@ def card_orders():
     if len(orders) != 1 or len(shortfall) != 1:
         return {"status": "unknown", "reason": "no card_orders or card_shortfall_usd line"}
     return {"status": "ok", "lines": [orders[0], shortfall[0]]}
+# card_breaker: only the one line of ops/card-breaker.sh in exactly its format, so nothing else of its output can reach the report.
+def card_breaker():
+    try:
+        with os.fdopen(6, encoding="utf-8", errors="replace") as source:
+            lines = source.read().splitlines()
+    except Exception:
+        return {"status": "unknown", "reason": "output of card-breaker not readable"}
+    if os.environ.get("BREAKER_RC") != "0":
+        return {"status": "unknown", "reason": "card-breaker exit " + re.sub(r"[^0-9-]", "", os.environ.get("BREAKER_RC", ""))[:4]}
+    found = [m for m in (re.match(r"^card_refunds_60d \d+ shortfall_usd \d+\.\d{2} breaker (on|off)$", l) for l in lines) if m]
+    if len(found) != 1 or len(lines) != 1:
+        return {"status": "unknown", "reason": "no card_refunds_60d line"}
+    return {"status": "red" if found[0].group(1) == "on" else "ok", "line": found[0].group(0)}
 orc = j(os.environ.get("OR_JSON", ""), {}) or {}
 ord_ = orc.get("data", {})
 payto = None
@@ -251,5 +269,6 @@ print(json.dumps({
     "payto_usdc_base": payto,
     "conway_overlap": conway_overlap(),
     "card_orders": card_orders(),
+    "card_breaker": card_breaker(),
 }, indent=2))
 PY

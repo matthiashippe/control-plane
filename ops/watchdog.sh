@@ -21,6 +21,7 @@ STATE_FILE="${CP_WATCHDOG_STATE:-/var/lib/cp-watchdog.state}"
 WEBHOOK="${CP_ALERT_WEBHOOK:-}"
 CERT_WARN_DAYS="${CP_CERT_WARN_DAYS:-20}"
 CREDIT_TIMEOUT="${CP_CREDIT_TIMEOUT:-45}"
+CARD_BREAKER_TIMEOUT="${CP_CARD_BREAKER_TIMEOUT:-20}"
 # The sandbox server, the same way src/sandbox/ reaches it (SANDBOXD_URL_DEFAULT in src/sandbox/client.ts). Its Caddy lets only
 # the payment server through, so the watchdog needs no key for the two unsigned health routes.
 SANDBOXD_URL="${CP_SANDBOXD_URL:-https://ctl.sbx.postyourprice.com}"
@@ -165,6 +166,55 @@ check_credit() {
   esac
 }
 
+# The breaker of the card checkout (goals/wache/01, point 5). Once the shortfall of refunded live card orders of the last 60 days
+# reaches 50 USD (CARD_BREAKER_SHORTFALL_MC in src/payments/card-way.ts), the service closes the card checkout by itself, and a
+# breaker nobody hears of closes it silently. Like check_credit it reports the change only: one [WARN] when the breaker turns on,
+# one [OK] when it is off again, nothing while it stays. The line comes from ops/card-breaker.sh --container, which asks the
+# calculation of the service inside the container with the database opened read-only and prints no address; only its numbers
+# go into the text. The new state (`on` or `off` in `<state file>.card-breaker`) is stored only after the POST went through, so a
+# failed POST comes again in the next run. An unreadable answer keeps the stored state; once the breaker was read at least once it
+# posts at most once a day, before that (the module is missing until the rollout) it only leaves a line in the log. The query
+# has a time limit like check_credit, shorter (20 s), so that a hanging Docker daemon holds the run for at most both limits together.
+check_card_breaker() {
+  local line code previous today refunds shortfall now reason posted=1
+  if command -v timeout >/dev/null 2>&1; then
+    line=$(timeout -k 5 "$CARD_BREAKER_TIMEOUT" bash "$HERE"/card-breaker.sh --container 2>/dev/null | head -n 1)
+    code=${PIPESTATUS[0]}
+  else
+    # No coreutils timeout (a Mac without it): unbounded, the server always has one.
+    line=$(bash "$HERE"/card-breaker.sh --container 2>/dev/null | head -n 1)
+    code=${PIPESTATUS[0]}
+  fi
+  previous=$(cat "${STATE_FILE}.card-breaker" 2>/dev/null || echo "unknown")
+  if [[ "$code" == 0 && "$line" =~ ^card_refunds_60d\ ([0-9]+)\ shortfall_usd\ ([0-9]+\.[0-9]{2})\ breaker\ (on|off)$ ]]; then
+    refunds=${BASH_REMATCH[1]}; shortfall=${BASH_REMATCH[2]}; now=${BASH_REMATCH[3]}
+    if [[ "$now" == "on" && "$previous" != "on" ]]; then
+      report "WARN" "card breaker on: shortfall $shortfall USD from $refunds refunds in 60 days reached the limit of 50 USD, the card checkout is closed" || posted=0
+    elif [[ "$now" == "off" && "$previous" == "on" ]]; then
+      report "OK" "card breaker off: shortfall $shortfall USD in 60 days is below the limit of 50 USD, the card checkout is open again" || posted=0
+    else
+      echo "$TS [INFO] card breaker still $now, shortfall $shortfall USD from $refunds refunds in 60 days"
+    fi
+    [[ $posted == 1 ]] && { echo "$now" > "${STATE_FILE}.card-breaker" 2>/dev/null || true; }
+    return 0
+  fi
+  if [[ "$code" == 124 || "$code" == 137 ]]; then
+    reason="no answer from ops/card-breaker.sh within ${CARD_BREAKER_TIMEOUT} s"
+  elif [[ "$line" == "card_breaker unreadable" ]]; then
+    reason="$line"
+  else
+    reason="no readable answer from ops/card-breaker.sh"
+  fi
+  today=$(date -u +%F)
+  if [[ ( "$previous" == "on" || "$previous" == "off" ) && "$(cat "${STATE_FILE}.card-breaker-fail" 2>/dev/null)" != "$today" ]]; then
+    report "WARN" "card breaker unreadable ($reason), last known state $previous" &&
+      { echo "$today" > "${STATE_FILE}.card-breaker-fail" 2>/dev/null || true; }
+  else
+    echo "$TS [WARN] card breaker unreadable ($reason), last known state $previous"
+  fi
+  return 0
+}
+
 # One GET to sandboxd with two attempts and a pause, like check_health. Sets SBX_CODE (000 without an answer) and SBX_BODY.
 sandboxd_get() {
   local out attempt
@@ -247,6 +297,7 @@ else
 fi
 
 check_sandboxd
+check_card_breaker
 
 # Certificate: `openssl -checkend` instead of date arithmetic, because `date -d` only exists on GNU
 # and the script should run on a Mac as well. Report only once a day, otherwise the warning turns

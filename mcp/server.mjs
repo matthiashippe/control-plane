@@ -683,17 +683,20 @@ export const CARD_PACKAGES = [
   { productId: "771280", grossEurCents: 5000, aboutCreditUsd: 40 },
 ];
 
-/** The link to the checkout of one package for one automaton, the address in lower case in `custom`. Null without an address. */
-export function cardLink(pkg, address) {
+/**
+ * The link to the card checkout of one package for one automaton, the address in lower case. It goes through `/card/<package>` of
+ * the service (goals/wache/01), which sends to the checkout only while card payment is open. Null without an address.
+ */
+export function cardLink(pkg, address, baseUrl = DEFAULT_BASE_URL) {
   if (typeof address !== "string" || !new RegExp(ADDRESS_PATTERN).test(address)) return null;
-  return `https://www.checkout-ds24.com/product/${pkg.productId}/?custom=${address.toLowerCase()}`;
+  return `${baseUrl}/card/${pkg.grossEurCents / 100}?address=${address.toLowerCase()}`;
 }
 
 /** What card_top_up prints: one line per package, then where the links lead. Null for a malformed address, so never a link. */
-export function cardTopUpText(address) {
+export function cardTopUpText(address, baseUrl = DEFAULT_BASE_URL) {
   const lines = [];
   for (const pkg of CARD_PACKAGES) {
-    const link = cardLink(pkg, address);
+    const link = cardLink(pkg, address, baseUrl);
     if (!link) return null;
     lines.push(`${pkg.grossEurCents / 100} EUR, about $${pkg.aboutCreditUsd} credit: ${link}`);
   }
@@ -1178,7 +1181,7 @@ export function createAutomatonTools({
 
   const handlers = {
     async card_top_up(args) {
-      const text = cardTopUpText(args.address);
+      const text = cardTopUpText(args.address, baseUrl);
       if (text === null) return invalid("address must be the wallet address of the automaton, 0x and 40 hex digits.");
       return textResult(scrub(text));
     },
