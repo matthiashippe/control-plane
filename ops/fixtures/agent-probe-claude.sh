@@ -3,14 +3,15 @@
 #
 # It answers question n of the five fixed questions with q<n>.json from the directory the caller named in
 # CP_PROBE_ANSWERS; ops/agent-probe.sh hands that directory over as PROBE_FAKE_ANSWERS, because no CP_
-# variable may reach a session. A missing file is a failed session (exit 1). With a record file
-# (CP_PROBE_RECORD, handed over as PROBE_FAKE_RECORD) every call appends its working directory, its
-# arguments and the NAMES of its environment variables, never a value:
+# variable may reach a session, and the stand-in reads nothing else (it only ever runs under env -i). A
+# missing file is a failed session (exit 1). With a record file (CP_PROBE_RECORD, handed over as
+# PROBE_FAKE_RECORD) every call appends its working directory, its arguments and the NAMES of its
+# environment variables, never a value:
 #   cwd=<working directory>
 #   argv=<all arguments, joined by spaces>
 #   env=<NAME>
-answers="${PROBE_FAKE_ANSWERS:-${CP_PROBE_ANSWERS:-}}"
-record="${PROBE_FAKE_RECORD:-${CP_PROBE_RECORD:-}}"
+answers="${PROBE_FAKE_ANSWERS:-}"
+record="${PROBE_FAKE_RECORD:-}"
 if [[ -n "$record" ]]; then
   {
     printf 'cwd=%s\n' "$PWD"

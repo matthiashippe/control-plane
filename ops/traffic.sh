@@ -18,6 +18,13 @@ FUNNEL_BROKE=0
 ONLY_FUNNEL=0
 [[ "${1:-}" == "--funnel" ]] && { ONLY_FUNNEL=1; shift; }
 
+# Only the block `-- Agent fetches --` (werbung 03), for the weekly run of the course check. The full report
+# took over ten minutes on the production log for that one block, and a weekly run that dies in its time limit
+# writes no number. Same log, same window, same counting as the full report; stdout holds the block and the
+# blank line after it, nothing else (no header, so no address either). Parsed before HOURS, like --funnel.
+ONLY_AGENTS=0
+[[ "${1:-}" == "--agents" ]] && { ONLY_AGENTS=1; shift; }
+
 # The counter-proof, as a command instead of as a paragraph.
 #
 # CP_TRAFFIC_LOG has existed since 2026-09-22 so the evidence lines can be proved in both
@@ -293,12 +300,14 @@ export CP_OWN_IPS_RESOLVED="$OWN"
 # The name of the service this report is about, and not a name typed once in 2026-09. The header
 # said cp.hippe.eu for five hours after postyourprice.com became the canonical address, on a
 # report whose whole job is to say who came to which service.
+if (( ! ONLY_AGENTS )); then
 echo "Requests to ${BASE_URL#https://} in the last $HOURS hours"
 if [[ -n "$added" ]]; then
   echo "(counted as ours beyond the configured list: $(printf '%s' "$added" | tr '\n' ' '))"
   echo "(these sent our own checker UA; addresses of this machine live in own_ips (ops/own-ips.sh))"
 fi
 echo
+fi
 
 # Arrivals per host (kunden 04, 2026-11-19). Three names answer since the move, and the question for
 # every channel is how many strangers arrive through which name and from where. An arrival is a
@@ -306,6 +315,7 @@ echo
 # log lies inside the window; it counts once, under the host of that first request, with the host of
 # that request's referrer. Only hosts are printed, never an address: a referrer that is an address
 # reads (address), one of our own names reads (our page), none reads (none).
+if (( ! ONLY_AGENTS )); then
 python3 - "$log" "$since" "$HOURS" <<'ARRIVALS' || { echo "   (the arrivals block died; the traceback is above)" >&2; FUNNEL_BROKE=1; }
 import collections, ipaddress, json, os, re, sys, urllib.parse
 
@@ -382,6 +392,7 @@ for host in HOSTS:
 print(f"   other hosts: {other} foreign arrival(s)")
 print()
 ARRIVALS
+fi
 
 # Agent fetches (werbung 02, 2026-11-23). An operator whose automaton breaks often hands the problem to an
 # agent session, and an agent that fetches a page for a person names itself in the user agent: Claude-User,
@@ -437,6 +448,11 @@ for n in AGENTS:
     print(f"      {per_name[n]}  {n}")
 print()
 AGENTS
+fi
+# --agents ends here: the block above was all it prints, and a dead block still leaves through exit 1.
+if (( ONLY_AGENTS )); then
+  [[ "$FUNNEL_BROKE" == "0" ]] || exit 1
+  exit 0
 fi
 
 # The line every cycle reads first, and the one that did not exist until 2026-09-22.

@@ -1,7 +1,7 @@
 # Werbung Goal 03: Die Agenten-Probe läuft jede Woche und zählt sauber
 
 ## Status
-PLANNED
+ACTIVE
 
 ## Active Objective
 werbung 02 hat die Agenten-Probe gebaut, aber es gibt nur den Lauf vom 23.11.2026, und keiner startet den nächsten. Der volle

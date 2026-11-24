@@ -1,0 +1,1 @@
+{"type":"result","subtype":"success","is_error":false,"result":"Leave conwayApiUrl at https://api.conway.tech and wait for Conway.","session_id":"00000000-0000-0000-0000-000000000000","modelUsage":{"fixture-main-model":{"inputTokens":1200,"outputTokens":400,"costUSD":0.05},"fixture-small-model":{"inputTokens":300,"outputTokens":900,"costUSD":0.001}}}
