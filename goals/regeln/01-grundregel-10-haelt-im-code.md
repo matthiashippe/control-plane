@@ -1,7 +1,7 @@
 # Regeln Goal 01: Grundregel 10 hält im Code
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Grundregel 10 hält heute nur über die Konfiguration. `sendKontoTx` (`src/konto/chain.ts:52`) prüft die Kette, nicht die Art der
@@ -69,7 +69,7 @@ MVP: Funktion, weil eine Regel, die nur die Konfiguration hält, beim ersten fal
       heute lässt `requireRule10` beide Selektoren an jede Adresse außer Manager und Proxy durch, die Leitzahl ist nicht 0).
       Prüfung: `pnpm -s vitest run test/konto-send-guard.test.ts --reporter=json 2>/dev/null | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const j=JSON.parse(s);const t=j.testResults.flatMap(f=>f.assertionResults).filter(a=>a.status==="passed").map(a=>a.title);console.log([/refuses payout and retire at an address that is not the spender/,/sends every kind of rule 10 on 8453/].every(r=>t.some(x=>r.test(x)))?"alle":"fehlt")})'` muss `alle` ausgeben.
       Prüfung: `pnpm -s vitest run test/konto-send-guard.test.ts test/konto-mainnet.test.ts test/konto-payout.test.ts` muss Exit-Code 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Jeder neue Fall zur Verweigerung war vor dem Fix rot; die Zeile im Progress Log nennt, womit.
@@ -95,5 +95,6 @@ MVP: Funktion, weil eine Regel, die nur die Konfiguration hält, beim ersten fal
 - 2026-11-24 Zyklus 1: Punkte 1, 2, 3 gebaut: `requireRule10` in `sendKontoTx` sperrt auf 8453 alles außerhalb von Grundregel 10 (Selektoren aus den ABIs, Fehler nennt Ziel und Selektor), `LocalSettler` fragt vor dem ersten Senden `web3_clientVersion` und settlet nur bei `anvil/`; der Fall „sends on 8453 only under the setting 8453“ schickt `revokeAsSpender` statt `0x`. Rot vor dem Fix: `test/konto-send-guard.test.ts` am Stand c7d692a 3 failed | 2 passed (refuses handleOps, refuses empty data, refuses every other kind), `test/local-settler-guard.test.ts` am Stand 7f74820 2 failed (Gegenprobe des JSON-Prüfers dort: `fehlt`), der alte Fall in `test/konto-mainnet.test.ts` nach dem Fix rot mit `refused: rule 10 … selector none`. Prüfbefehle: konto-send-guard Exit 0, JSON `alle`, grep handleOps 1, konto-mainnet/payout/topup/chain Exit 0 (51 Tests mit send-guard), local-settler-guard Exit 0, JSON `alle`, grep web3_clientVersion 4, `e2e` an PR #430 `SUCCESS` (Kopf 9b1e833), `node scripts/check.mjs` Exit 0 (277 Dateien, 2854 Tests).
 - 2026-11-24 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3; `origin/dev` (c7d692a) liegt schon im Branch, kein Merge nötig. Prüfbefehle: konto-send-guard Exit 0, JSON `alle`, grep handleOps 1, konto-mainnet/payout/topup/chain Exit 0, local-settler-guard Exit 0, JSON `alle`, grep web3_clientVersion 4, `e2e` an PR #430 `SUCCESS` (Kopf 94ee76f), `node scripts/check.mjs` Exit 0 (277 Dateien, 2854 Tests).
 - 2026-11-24 Zyklus 3: Punkt 4 gebaut: `requireRule10` lässt `payout` und `retire` auf 8453 nur durch, wenn die Daten sich mit `FORWARDER_ABI` dekodieren lassen und das Ziel der `spender` der Erlaubnis darin ist; fremde Adresse, USDC, fremder `spender` an unserer Weiterleitung und abgeschnittene Argumente gehen nicht raus. Rot vor dem Fix: `refuses payout and retire at an address that is not the spender` am Stand 34f153e mit „promise resolved … instead of rejecting“ (1 failed | 5 passed), der JSON-Prüfer von Punkt 4 dort `fehlt`. Prüfbefehle: Punkt 4 JSON `alle`, send-guard/mainnet/payout Exit 0 (39 Tests); Punkt 1 Exit 0, JSON `alle`, grep handleOps 1, konto-mainnet/payout/topup/chain Exit 0; Punkt 2 Exit 0, JSON `alle`, grep web3_clientVersion 4, `e2e` an PR #430 `SUCCESS` (Kopf 8221cbb); `node scripts/check.mjs` Exit 0 (277 Dateien, 2855 Tests).
+- 2026-11-24 Release: PASS K und B (Zyklus 3), DONE.
 
 ## Blockers
