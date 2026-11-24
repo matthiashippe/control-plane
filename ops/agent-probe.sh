@@ -42,10 +42,13 @@
 # Its line starts with the week, so the old checks that recount every line "- <date>T..." leave it alone:
 #   - <YYYY-Www> <UTC time> model <m> host h/5 card c/5 seen s/5 old o/5 failed f/5 answers <file> via sessions
 # The raw JSON of every session and the line stay outside the repository in the state directory
-# ~/.local/state/control-plane/agent-probe/<YYYY-Www>/ (q<n>.json, line; mode 700), because a raw answer can
-# carry an old host or an address; only the scrubbed answers go into the repository. A week that already has a
-# line in the old format and its answers file is counted again from that file, without a session and without
-# touching the file ("via recount"). One week, one run, with or without the switch, and no switch lifts that.
+# ~/.local/state/control-plane/agent-probe/<YYYY-Www>/ (q<n>.json, line, answers.md; mode 700), because a raw
+# answer can carry an old host or an address; only the scrubbed answers go into the repository. A week that
+# already has a line in the old format and its answers file is counted again from that file, without a session
+# and without touching the file ("via recount"). One week, one run, with or without the switch, and no switch
+# lifts that. Every --week first carries each week of the state directory up to the current one that the file
+# lacks, in ascending order, with its scrubbed answers (answers.md) where the answers file is missing, so a run
+# made in another worktree still reaches the repository.
 #
 # Switches for tests and the selftest, so nothing writes into the repository:
 #   CP_PROBE_CLAUDE        command in place of claude (ops/fixtures/agent-probe-claude.sh)
@@ -301,6 +304,16 @@ if [[ "${1:-}" == "--selftest" ]]; then
   if [[ "$(wc -c < "$tmp/two-hits/rec")" != "$before" || "$got" != "host 2/5 card 1/5 seen 0/5 old 1/5 failed 0/5 via recount" ]]; then
     echo "SELFTEST FAILED: the recount of a week with answers gave '$got' or asked again"; fail=1
   fi
+  # A fresh file with the state directory of the weekly run above gets that week carried in, no session.
+  mkdir -p "$tmp/carry"
+  before="$(wc -c < "$wdir/rec")"
+  CP_PROBE_CLAUDE="$fixtures/agent-probe-claude.sh" CP_PROBE_ANSWERS="$fixtures/agent-probe-strict" \
+    CP_PROBE_OUT="$tmp/carry/p.md" CP_PROBE_ANSWERS_DIR="$tmp/carry" CP_PROBE_RECORD="$wdir/rec" \
+    CP_PROBE_STATE_DIR="$wdir/state" bash "$SELF" --week > /dev/null 2>&1
+  if [[ "$(wc -c < "$wdir/rec")" != "$before" || "$(cat "$tmp/carry/p.md" 2>/dev/null)" != "$(cat "$wdir/p.md")" ]] \
+        || ! cmp -s "$wdir"/*-W*.md "$tmp/carry"/*-W*.md; then
+    echo "SELFTEST FAILED: a week of the state directory was not carried into a fresh file without a session"; fail=1
+  fi
   [[ "$fail" -eq 0 ]] && echo "SELFTEST OK"
   exit "$fail"
 fi
@@ -325,6 +338,21 @@ if (( WEEK )); then
   case "$(absolute "$STATE_ROOT")/" in
     "$REPO"/*) echo "the state directory must lie outside the repository: $STATE_ROOT" >&2; exit 2 ;;
   esac
+  # Carry every week of the state directory up to this one that the file lacks, in ascending order and without
+  # a session, with its scrubbed answers if they are missing here (werbung 03, Kritik 1): the weekly run may happen
+  # in a worktree whose file never reaches the repository, and a later call elsewhere must still bring it in.
+  if [[ -d "$STATE_ROOT" ]]; then
+    while IFS= read -r w; do
+      [[ "$w" > "$week" ]] && continue
+      [[ -s "$STATE_ROOT/$w/line" ]] || continue
+      if [[ -f "$OUT" ]] && grep -qE "^- $w " "$OUT"; then continue; fi
+      if [[ -s "$STATE_ROOT/$w/answers.md" && ! -f "$ANSWERS_DIR/$w.md" ]]; then
+        mkdir -p "$ANSWERS_DIR" && cp "$STATE_ROOT/$w/answers.md" "$ANSWERS_DIR/$w.md"
+      fi
+      mkdir -p "$(dirname "$OUT")"
+      tail -n 1 "$STATE_ROOT/$w/line" >> "$OUT"
+    done < <(find "$STATE_ROOT" -mindepth 1 -maxdepth 1 -type d -regextype posix-extended -regex '.*/[0-9]{4}-W[0-9]{2}' -printf '%f\n' | LC_ALL=C sort)
+  fi
   if [[ -f "$OUT" ]] && stored="$(grep -E "^- $week " "$OUT" | tail -n 1)" && [[ -n "$stored" ]]; then
     echo "$stored"
     exit 0
@@ -349,6 +377,7 @@ if (( WEEK )); then
     line="- $week $old_stamp model ${model:-unknown} host $host/5 card $card/5 seen $seen/5 old $old/5 failed $failed/5 answers docs/kunden/agenten-probe/$week.md via recount"
     mkdir -p -m 700 "$STATE_ROOT" "$STATE" && chmod 700 "$STATE_ROOT" "$STATE"
     printf '%s\n' "$line" > "$STATE/line"
+    cp "$ANSWERS_DIR/$week.md" "$STATE/answers.md" && chmod 600 "$STATE/answers.md"
     printf '%s\n' "$line" >> "$OUT"
     echo "$line"
     (( failed > 0 )) && exit 1
@@ -426,6 +455,7 @@ line="- $stamp $week model $model host $host/5 card $card/5 old $old/5 failed $f
 if (( WEEK )); then
   line="- $week $stamp model $model host $host/5 card $card/5 seen $seen/5 old $old/5 failed $failed/5 answers docs/kunden/agenten-probe/$week.md via sessions"
   printf '%s\n' "$line" > "$STATE/line"
+  cp "$answers" "$STATE/answers.md" && chmod 600 "$STATE/answers.md"
 fi
 printf '%s\n' "$line" >> "$OUT"
 echo "$line"

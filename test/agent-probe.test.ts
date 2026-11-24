@@ -434,7 +434,7 @@ describe("ops/agent-probe.sh --week", () => {
     const r = week("agent-probe-two-hits");
     const state = join(r.dir, "state");
     const weekDir = join(state, "2026-W48");
-    expect(readdirSync(weekDir).sort()).toEqual(["line", "q1.json", "q2.json", "q3.json", "q4.json", "q5.json"]);
+    expect(readdirSync(weekDir).sort()).toEqual(["answers.md", "line", "q1.json", "q2.json", "q3.json", "q4.json", "q5.json"]);
     // Raw: the old host and the address of q3 are still there, and only there.
     expect(readFileSync(join(weekDir, "q3.json"), "utf8")).toContain("postyourprice.com");
     expect(readFileSync(join(weekDir, "line"), "utf8").trim()).toBe(lastLine(r.out));
@@ -492,6 +492,45 @@ describe("ops/agent-probe.sh --week", () => {
     expect(lastLine(done.stdout)).toBe("already probed in 2026-W48");
     expect(done.record).toBe("");
     expect(done.out).toBe(`${lastLine(old.out)}\n`);
+  });
+
+  it("carries a week from the state directory into a fresh file without a session", () => {
+    // The weekly run happens in one worktree; a later call from another one (a fresh file, the same state
+    // directory) carries the stored week into its file instead of only printing it.
+    const state = join(scratch(), "state");
+    const a = week("agent-probe-strict", { CP_PROBE_STATE_DIR: state });
+    expect(a.status).toBe(0);
+    expect(readFileSync(join(state, "2026-W48", "answers.md"), "utf8")).toBe(readFileSync(join(a.dir, "2026-W48.md"), "utf8"));
+    const b = week("agent-probe-two-hits", { CP_PROBE_STATE_DIR: state });
+    expect(b.status).toBe(0);
+    expect(b.record).toBe("");
+    expect(b.out).toBe(a.out);
+    expect(readFileSync(join(b.dir, "2026-W48.md"), "utf8")).toBe(readFileSync(join(a.dir, "2026-W48.md"), "utf8"));
+    expect(lastLine(b.stdout)).toBe(lastLine(a.out));
+    // A third call in the same file adds nothing.
+    const again = week("agent-probe-two-hits", { CP_PROBE_STATE_DIR: state }, b.dir);
+    expect(again.out).toBe(a.out);
+    // Older weeks come first, in ascending order, then the run of the current week; an answers file that is
+    // already there stays as it is.
+    const multi = join(scratch(), "state");
+    const w47 = week("agent-probe-strict", { CP_PROBE_STATE_DIR: multi, CP_NOW: "1795000000" });
+    const w46 = week("agent-probe-two-hits", { CP_PROBE_STATE_DIR: multi, CP_NOW: "1794400000" });
+    expect(lastLine(w46.out).startsWith("- 2026-W46 ")).toBe(true);
+    const fresh = scratch();
+    writeFileSync(join(fresh, "2026-W47.md"), "kept\n");
+    const c = week("agent-probe-strict", { CP_PROBE_STATE_DIR: multi }, fresh);
+    expect(c.status).toBe(0);
+    const lines = c.out.split("\n").filter((l) => l.startsWith("- "));
+    expect(lines).toHaveLength(3);
+    expect(lines[0]).toBe(lastLine(w46.out));
+    expect(lines[1]).toBe(lastLine(w47.out));
+    expect(lines[2]).toMatch(/^- 2026-W48 .* via sessions$/);
+    expect(records(c.record, "cwd")).toHaveLength(5);
+    expect(readFileSync(join(fresh, "2026-W47.md"), "utf8")).toBe("kept\n");
+    expect(readFileSync(join(fresh, "2026-W46.md"), "utf8")).toBe(readFileSync(join(w46.dir, "2026-W46.md"), "utf8"));
+    // A week after the current one is never carried.
+    const later = week("agent-probe-strict", { CP_PROBE_STATE_DIR: multi, CP_NOW: "1794400000" }, scratch());
+    expect(later.out.split("\n").filter((l) => l.startsWith("- ")).map((l) => l.split(" ")[1])).toEqual(["2026-W46"]);
   });
 
   it("shares one week lock between --week and the run without a switch", () => {
