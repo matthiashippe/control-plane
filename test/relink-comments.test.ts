@@ -340,6 +340,14 @@ const namedText = async (s: ReturnType<typeof sandbox>, c: (typeof OWN)[number])
   return firstParagraph(relinked).includes("automatonhost.com") ? renamed : `${LEAD}\n\n${renamed}`;
 };
 const lastLine = (out: string) => out.trim().split("\n").at(-1);
+/**
+ * Four comments of the fixture for the runs that send and verify: Handsel in prose, a link to the write-up in the first
+ * paragraph, PostYourPrice next to a block of code, no old link at all; plus the comment of the other account. Every fake `gh`
+ * call is a process, and sending all 30 several times per test took minutes under load on the code-host.
+ */
+const FEW_OWN = [OWN[0], OWN[1], OWN[2], OWN.find((c) => c.issue === 373)!];
+const FEW = [...FEW_OWN, FIXTURE.comments.find((c) => c.user !== "matthiashippe")!];
+const FEW_LINKED = FEW_OWN.filter((c) => c.issue !== 373);
 
 describe("ops/relink-comments.py --name", () => {
   it("the name dry run changes nothing and puts the lead in front of every comment without the name", async () => {
@@ -353,10 +361,13 @@ describe("ops/relink-comments.py --name", () => {
     expect(r.named).toBe(NAMED_HEADER);
     const v = values(r.out);
     expect(v.size).toBe(30);
-    for (const c of OWN) expect(v.get(String(c.id))).toBe(sha12(await namedText(s, c)));
     // Nine comments link to the write-up in their first paragraph, which after the relink says automatonhost.com already.
     const early: number[] = [];
-    for (const c of OWN) if (firstParagraph(await s.relink(c.body, pageOrHome(c.issue))).includes("automatonhost.com")) early.push(c.id);
+    for (const c of OWN) {
+      const want = await namedText(s, c);
+      expect(v.get(String(c.id))).toBe(sha12(want));
+      if (!want.startsWith(`${LEAD}\n\n`)) early.push(c.id);
+    }
     expect(early.length).toBe(9);
     const withLead = [...r.out.matchAll(/^comment (\d+) issue \d+ page \S+ sha12 [0-9a-f]{12}\n(?:  [-+] .*\n)*?  \+ lead\n/gm)].map((m) => Number(m[1]));
     expect(withLead.sort()).toEqual(OWN.map((c) => c.id).filter((id) => !early.includes(id)).sort());
@@ -459,10 +470,11 @@ describe("ops/relink-comments.py --name", () => {
       expect(now.body).toBe(c.id === a.id || c.id === b.id ? await namedText(s, c) : c.body);
     }
     // The read back differs: stop before the log.
-    const t = sandbox();
+    const t = sandbox(FEW);
     const w = values((await t.run(["--name"])).out);
-    const off = await t.run(["--name", "--send", "1", "--approved", approve(w, [String(a.id)])], { FAKE_READBACK: "something else\n" });
-    expect(off.out).toContain(`DIFFERS ${a.id}: live 15 characters`);
+    const first = FEW_OWN[0].id;
+    const off = await t.run(["--name", "--send", "1", "--approved", approve(w, [String(first)])], { FAKE_READBACK: "something else\n" });
+    expect(off.out).toContain(`DIFFERS ${first}: live 15 characters`);
     expect(off.status).toBe(1);
     expect(off.named).toBe(NAMED_HEADER);
   }, T);
@@ -488,7 +500,7 @@ describe("ops/relink-comments.py --name", () => {
   }, T);
 
   it("the name send refuses when a comment changed since it was approved", async () => {
-    const s = sandbox();
+    const s = sandbox(FEW);
     const v = values((await s.run(["--name"])).out);
     const [a, b] = OWN;
     const ok = approve(v, [String(a.id), String(b.id)]);
@@ -499,7 +511,7 @@ describe("ops/relink-comments.py --name", () => {
     expect(writes(r.calls)).toEqual([]);
     expect(r.named).toBe(NAMED_HEADER);
     // A value of the relink mode is not a value of the name: the same comment, approved for the other mode, is refused.
-    const relinkValues = values((await sandbox().run([])).out);
+    const relinkValues = values((await sandbox(FEW).run([])).out);
     const wrong = await s.run(["--name", "--send", "1", "--approved", approve(relinkValues, [String(a.id)])]);
     expect(wrong.out).toContain(`REFUSED: ${a.id} changed since it was approved`);
     expect(writes(wrong.calls)).toEqual([]);
@@ -514,65 +526,65 @@ describe("ops/relink-comments.py --name", () => {
   }, T);
 
   it("name verify reports every named comment as same and none to change", async () => {
-    const s = sandbox();
+    const s = sandbox(FEW);
     const empty = await s.run(["--name", "--verify"]);
-    expect(lastLine(empty.out)).toBe("name verify: 0 same, 0 differ, 30 to change");
+    expect(lastLine(empty.out)).toBe("name verify: 0 same, 0 differ, 4 to change");
     expect(empty.status).toBe(1);
     const v = values((await s.run(["--name"])).out);
-    expect((await s.run(["--name", "--send", "30", "--approved", approve(v)])).status).toBe(0);
+    expect((await s.run(["--name", "--send", "4", "--approved", approve(v)])).status).toBe(0);
     const r = await s.run(["--name", "--verify"]);
-    expect(lastLine(r.out)).toBe("name verify: 30 same, 0 differ, 0 to change");
+    expect(lastLine(r.out)).toBe("name verify: 4 same, 0 differ, 0 to change");
     expect(r.status).toBe(0);
     expect(writes(r.calls)).toEqual([]);
-    expect((await s.run(["--name"])).out).toContain("name: 0 to change, 30 already named, 30 comments of matthiashippe\n");
+    expect((await s.run(["--name"])).out).toContain("name: 0 to change, 4 already named, 4 comments of matthiashippe\n");
     // Counter-proof: one comment edited by hand afterwards is a difference.
     const c = OWN[0];
     s.setBody(c.id, `${await namedText(s, c)} `);
     const off = await s.run(["--name", "--verify"]);
     expect(off.out).toContain(`DIFFERS ${c.id}`);
-    expect(lastLine(off.out)).toBe("name verify: 29 same, 1 differ, 0 to change");
+    expect(lastLine(off.out)).toBe("name verify: 3 same, 1 differ, 0 to change");
     expect(off.status).toBe(1);
   }, T);
 
   it("relink verify compares a named comment with its newest logged value", async () => {
-    const s = sandbox();
+    const s = sandbox(FEW);
     const relinked = values((await s.run([])).out);
-    expect((await s.run(["--send", "29", "--approved", approve(relinked)])).status).toBe(0);
-    expect(lastLine((await s.run(["--verify"])).out)).toBe("relink verify: 29 same, 0 differ, 0 with old links");
+    expect((await s.run(["--send", "3", "--approved", approve(relinked)])).status).toBe(0);
+    expect(lastLine((await s.run(["--verify"])).out)).toBe("relink verify: 3 same, 0 differ, 0 with old links");
     const v = values((await s.run(["--name"])).out);
-    expect(v.size).toBe(30);
-    const sent = await s.run(["--name", "--send", "30", "--approved", approve(v)]);
+    expect(v.size).toBe(4);
+    const sent = await s.run(["--name", "--send", "4", "--approved", approve(v)]);
     expect(sent.status).toBe(0);
-    expect(sent.log.slice(HEADER.length).split("\n").filter(Boolean).length).toBe(29);
+    expect(sent.log.slice(HEADER.length).split("\n").filter(Boolean).length).toBe(3);
     const r = await s.run(["--verify"]);
     expect(r.out).not.toContain("DIFFERS");
-    expect(lastLine(r.out)).toBe("relink verify: 29 same, 0 differ, 0 with old links");
+    expect(lastLine(r.out)).toBe("relink verify: 3 same, 0 differ, 0 with old links");
     expect(r.status).toBe(0);
     expect(writes(r.calls)).toEqual([]);
     // Counter-proof: a named comment edited by hand afterwards is still a difference for the relink mode.
-    const c = WITH_LINK[0];
+    const c = FEW_LINKED[0];
     s.setBody(c.id, `${await namedText(s, c)} `);
     const off = await s.run(["--verify"]);
     expect(off.out).toContain(`DIFFERS ${c.id}: live sha12 `);
-    expect(lastLine(off.out)).toBe("relink verify: 28 same, 1 differ, 0 with old links");
+    expect(lastLine(off.out)).toBe("relink verify: 2 same, 1 differ, 0 with old links");
     expect(off.status).toBe(1);
   }, T);
 
   it("the name mode never posts a new comment", async () => {
-    const s = sandbox();
+    const s = sandbox(FEW);
     const v = values((await s.run(["--name"])).out);
     const all = [
       ...(await s.run(["--name"])).calls,
-      ...(await s.run(["--name", "--send", "30", "--approved", approve(v)])).calls,
+      ...(await s.run(["--name", "--send", "4", "--approved", approve(v)])).calls,
       ...(await s.run(["--name", "--verify"])).calls,
     ];
     const w = writes(all);
-    expect(w.length).toBe(30);
+    expect(w.length).toBe(4);
     for (const c of w) {
       expect(c.args.slice(0, 3)).toEqual(["api", "-X", "PATCH"]);
       expect(c.args[3]).toMatch(/^repos\/Conway-Research\/automaton\/issues\/comments\/\d+$/);
     }
-    expect(w.map((c) => c.args[3].split("/").at(-1)).sort()).toEqual(OWN.map((c) => String(c.id)).sort());
+    expect(w.map((c) => c.args[3].split("/").at(-1)).sort()).toEqual(FEW_OWN.map((c) => String(c.id)).sort());
     expect(all.some((c) => c.args.some((a) => /POST|DELETE|\/issues\/\d+\/comments$/.test(a) && c.args.includes("-X")))).toBe(false);
   }, T);
 
