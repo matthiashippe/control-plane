@@ -4,6 +4,10 @@
  * In production an external facilitator handles this (CDP or PayAI; Goal 5), the control plane
  * never settles itself (regulation, docs/research 6.3). LocalSettler exists only for the harness:
  * it sends `transferWithAuthorization` to a local Anvil chain.
+ *
+ * The harness chain runs with chainId 8453 like Base, so the chain id cannot tell the two apart (goals/regeln/01). Before its first
+ * transaction LocalSettler therefore asks the node with web3_clientVersion and settles only when the answer starts with `anvil/`;
+ * a node of Base never reports itself as anvil.
  */
 
 import {
@@ -13,6 +17,7 @@ import {
   parseSignature,
   type Address,
   type Hex,
+  type Transport,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { FacilitatorSettler } from "./facilitator.js";
@@ -65,13 +70,21 @@ export interface LocalSettlerConfig {
   usdcAddress: Address;
   /** Relayer that sends the transaction and pays the gas (Anvil account). */
   relayerKey: Hex;
+  /** The transport to the node; http(rpcUrl) when left out. */
+  transport?: Transport;
 }
+
+/** The prefix of web3_clientVersion of an Anvil node. */
+export const ANVIL_CLIENT_PREFIX = "anvil/";
 
 /** Harness only. Sends the authorization to the chain itself. */
 export class LocalSettler implements Settler {
   readonly kind = "local";
   private readonly chain;
   private readonly account;
+  private readonly transport: Transport;
+  /** Set once the node reported itself as anvil. */
+  private anvil = false;
 
   constructor(private readonly cfg: LocalSettlerConfig) {
     this.chain = {
@@ -81,17 +94,30 @@ export class LocalSettler implements Settler {
       rpcUrls: { default: { http: [cfg.rpcUrl] } },
     } as const;
     this.account = privateKeyToAccount(cfg.relayerKey);
+    this.transport = cfg.transport ?? http(cfg.rpcUrl, { timeout: 20_000 });
+  }
+
+  /** Whether the node reports itself as anvil; asked until it does once. A node that does not answer is not anvil. */
+  private async onAnvil(pub: { request: (args: { method: "web3_clientVersion" }) => Promise<unknown> }): Promise<boolean> {
+    if (this.anvil) return true;
+    let version: unknown;
+    try {
+      version = await pub.request({ method: "web3_clientVersion" });
+    } catch {
+      return false;
+    }
+    this.anvil = typeof version === "string" && version.startsWith(ANVIL_CLIENT_PREFIX);
+    return this.anvil;
   }
 
   async settle(auth: Authorization, signature: Hex): Promise<SettleResult> {
     try {
+      const pub = createPublicClient({ chain: this.chain, transport: this.transport });
+      if (!(await this.onAnvil(pub))) {
+        return { ok: false, error: "refused: the local settler sends only to an anvil node, and this node does not report itself as anvil" };
+      }
       const { v, r, s } = parseSignature(signature);
-      const wallet = createWalletClient({
-        account: this.account,
-        chain: this.chain,
-        transport: http(this.cfg.rpcUrl, { timeout: 20_000 }),
-      });
-      const pub = createPublicClient({ chain: this.chain, transport: http(this.cfg.rpcUrl, { timeout: 20_000 }) });
+      const wallet = createWalletClient({ account: this.account, chain: this.chain, transport: this.transport });
       const txHash = await wallet.writeContract({
         address: this.cfg.usdcAddress,
         abi: TRANSFER_WITH_AUTHORIZATION_ABI,
