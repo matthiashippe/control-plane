@@ -912,11 +912,13 @@ section.watch { padding-block: 0 var(--s-16); }
      and see the one line and the one command without scrolling; it is English for every browser, because they
      write English. It replaces the block #agents that sat at the end of the page. -->
 <!-- goals/werbung/01: the first screen says first that no crypto is needed. While the card breaker of goals/wache/01 is on,
-     src/app.ts drops this block and shows the first screen of wache 01 below instead, so no line promises a closed checkout. -->
-<!--CARD-->
+     src/app.ts drops the text between the CARD marks and keeps the text between the NOCARD marks, the first screen of wache 01, so no
+     line promises a closed checkout. Only the text differs; the shell, the demo and the control are in the file once, so the page
+     carries one block move whichever way the breaker is. -->
 <section class="hero" id="move" data-soll="move">
   <div class="wrap hero-in">
     <div class="hero-text">
+<!--CARD-->
     <a class="pill" href="/fix"><span class="live-dot"></span>Conway not answering?</a>
     <h1>
       <span class="h1-line"><span>Your automaton runs here.</span></span>
@@ -927,24 +929,8 @@ section.watch { padding-block: 0 var(--s-16); }
       <a class="btn btn-1" href="#card">Pay by card</a>
       <a class="btn btn-2" href="/fix">Switch in two steps</a>
     </div>
-    </div>
-    <div class="demo">
-      <p class="eyebrow">One line, one command</p>
-      <div class="code"><pre><code><span class="pr">~/.automaton/automaton.json</span>
-{ "conwayApiUrl":
-  "https://cp.hippe.eu" }</code></pre>
-      <pre><code><span class="pr">$</span> automaton --provision</code></pre></div>
-      <p class="fine">With USDC in its wallet, the first start tops up $5 of credit here. <a href="/fix">Every step on one page</a>.</p>
-    </div>
-  </div>
-  <!-- The control. It is in the first screen, so every reader fetches it; a browser that fetches it together with the one at the bottom is telling us its lazy loading means nothing here. See the /px/ route in src/app.ts. It sits inside the move block, which is the first screen on every width. -->
-  <img src="/px/top.png" alt="" width="1" height="1" loading="lazy" decoding="async" aria-hidden="true" class="px">
-</section>
 <!--/CARD-->
 <!--NOCARD-->
-<section class="hero" id="move" data-soll="move">
-  <div class="wrap hero-in">
-    <div class="hero-text">
     <a class="pill" href="/fix"><span class="live-dot"></span>For automaton operators</a>
     <h1>
       <span class="h1-line"><span>Conway not answering?</span></span>
@@ -954,6 +940,7 @@ section.watch { padding-block: 0 var(--s-16); }
     <div class="cta">
       <a class="btn btn-1" href="/fix">Switch in two steps</a>
     </div>
+<!--/NOCARD-->
     </div>
     <div class="demo">
       <p class="eyebrow">One line, one command</p>
@@ -967,7 +954,6 @@ section.watch { padding-block: 0 var(--s-16); }
   <!-- The control. It is in the first screen, so every reader fetches it; a browser that fetches it together with the one at the bottom is telling us its lazy loading means nothing here. See the /px/ route in src/app.ts. It sits inside the move block, which is the first screen on every width. -->
   <img src="/px/top.png" alt="" width="1" height="1" loading="lazy" decoding="async" aria-hidden="true" class="px">
 </section>
-<!--/NOCARD-->
 
 <section class="watch" data-soll="video">
   <div class="wrap">

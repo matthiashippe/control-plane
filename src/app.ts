@@ -134,7 +134,7 @@ export const VERSION = "0.1.0";
 const PUBLIC_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), "public");
 /**
  * The counterpart of `stripCardWay` (goals/werbung/01): keeps what stands between `<!--NOCARD-->` and `<!--/NOCARD-->` only while the
- * card breaker is on, and drops it with the marks otherwise. The start page puts the first screen of goals/wache/01 there, so that
+ * card breaker is on, and drops it with the marks otherwise. The start page puts the text of the first screen of goals/wache/01 there, so that
  * with the breaker on the page reads exactly as before "No crypto needed" and promises no checkout that is closed.
  */
 function keepNoCardWay(html: string, on: boolean): string {
@@ -1819,8 +1819,8 @@ export function createApp(opts: AppOptions) {
     // mark, and read it in English while /check had been answering in German since that morning.
     const landingLang = langOf("", c.req.header("accept-language"));
     // The card block (goals/wache/01): gone while the breaker is on, so the page names no way to the checkout then.
-    // goals/werbung/01: the first screen that says "No crypto needed" sits between the same marks, and the first screen of
-    // wache 01 between `<!--NOCARD-->` and `<!--/NOCARD-->` takes its place while the breaker is on.
+    // goals/werbung/01: the text of the first screen that says "No crypto needed" sits between the same marks, and the text of
+    // the first screen of wache 01 between `<!--NOCARD-->` and `<!--/NOCARD-->` takes its place while the breaker is on.
     const breakerOn = cardBreaker(db, (opts.now ?? (() => new Date()))()).on;
     return c.html(
       keepNoCardWay(
