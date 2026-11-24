@@ -21,6 +21,7 @@
  */
 import { createHash, timingSafeEqual } from "node:crypto";
 import { getAvailableMc, MC_PER_CENT, postLedger, type Db } from "../db.js";
+import { cardBreaker, walletRefunded } from "./card-way.js";
 
 export interface CardPackage {
   /** The product ID at Digistore24. Public: it stands in every order link. */
@@ -319,8 +320,18 @@ export async function handleDigistoreIpn(db: Db, deps: DigistoreDeps, fields: Re
   const address = ADDRESS.test(custom) ? custom.toLowerCase() : null;
   const cents = eurCents(fields.amount_vendor);
   const day = orderDay(fields, now);
-  const status =
+  const payable =
     mode === "test" ? "test" : !address || fields.currency !== "EUR" || cents == null ? "unassigned" : "pending_rate";
+  // wache 03: the checkout can be called without `/card/<package>`, so the breaker and a former refund also hold the payment here.
+  const heldFor =
+    payable !== "pending_rate" || !address
+      ? null
+      : cardBreaker(db, now).on
+        ? "card breaker on"
+        : walletRefunded(db, address)
+          ? "wallet had a refund"
+          : null;
+  const status = heldFor ? "held" : payable;
   const at = now.toISOString();
   const inserted = db
     .prepare(
@@ -331,6 +342,10 @@ export async function handleDigistoreIpn(db: Db, deps: DigistoreDeps, fields: Re
   const row = db.prepare("SELECT status FROM card_orders WHERE order_id = ?").get(orderId) as { status: string };
   if (!inserted && row.status !== "pending_rate") {
     log(`[digistore] order ${orderId} repeated, nothing booked`);
+    return { status: 200, body: "OK" };
+  }
+  if (row.status === "held") {
+    log(`[digistore] order ${orderId} held: ${heldFor ?? "card checkout closed"}`);
     return { status: 200, body: "OK" };
   }
   if (row.status !== "pending_rate") {

@@ -10,9 +10,12 @@ import { join } from "node:path";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { createApp } from "../src/app.js";
 import { getBalanceMc, openDb, postLedger, reserveMc, type Db } from "../src/db.js";
+import Database from "better-sqlite3";
+import { CARD_BREAKER_SHORTFALL_MC } from "../src/payments/card-way.js";
 import {
   bookPendingCardOrders,
   CARD_PACKAGES,
+  handleDigistoreIpn,
   signatureString,
   signFields,
   type DigistoreDeps,
@@ -357,5 +360,132 @@ describe("digistore24 ipn", () => {
     const all = [...lines, ...answers].join("\n").toLowerCase();
     for (const secret of [f.custom, g.custom, PASS, signed(f).sha_sign]) expect(all).not.toContain(secret.toLowerCase());
     expect(all).toContain("l1");
+  });
+});
+
+// goals/wache/03: the checkout of Digistore24 can be called without `/card/<package>`, so the IPN itself holds a payment while
+// the breaker is on or for a wallet that had a refund: status `held`, nothing credited, no ECB, and `OK` for Digistore24.
+describe("digistore24 ipn while the card checkout is closed", () => {
+  const lines: string[] = [];
+  const deps = (): DigistoreDeps => ({
+    passphrase: PASS,
+    fetch: ecbUp as unknown as typeof fetch,
+    now: () => NOW,
+    log: (l: string) => void lines.push(l),
+  });
+  const ipn = (fields: Record<string, string>) => handleDigistoreIpn(db, deps(), signed(fields));
+  const at = NOW.toISOString();
+  function reversedOrder(orderId: string, address: string, shortfallMc: number) {
+    db.prepare(
+      "INSERT INTO card_orders (order_id, product_id, address, mode, status, credited_mc, reversed_mc, shortfall_mc, " +
+        "created_at, updated_at) VALUES (?, ?, ?, 'live', 'reversed', ?, 0, ?, ?, ?)",
+    ).run(orderId, P5(), address.toLowerCase(), shortfallMc, shortfallMc, at, at);
+  }
+  const status = (orderId: string) =>
+    (db.prepare("SELECT status FROM card_orders WHERE order_id = ?").get(orderId) as { status: string } | undefined)?.status;
+  beforeEach(() => {
+    lines.length = 0;
+  });
+
+  it("holds a payment while the card breaker is on and credits nothing", async () => {
+    reversedOrder("TRIP", newAddress(), CARD_BREAKER_SHORTFALL_MC);
+    const f = payment({ order_id: "H1" });
+    expect(await ipn(f)).toEqual({ status: 200, body: "OK" });
+    expect(status("H1")).toBe("held");
+    expect(getBalanceMc(db, f.custom.toLowerCase())).toBe(0);
+    expect(ledger()).toEqual([]);
+    expect(ecbUp).not.toHaveBeenCalled();
+    expect(lines).toContain("[digistore] order H1 held: card breaker on");
+    expect(lines.join("\n").toLowerCase()).not.toContain(f.custom.toLowerCase());
+  });
+
+  it("holds a payment of a wallet that had a refund and credits nothing", async () => {
+    const wallet = newAddress();
+    reversedOrder("OLD", wallet, 0);
+    const f = payment({ order_id: "H2", custom: wallet });
+    expect(await ipn(f)).toEqual({ status: 200, body: "OK" });
+    expect(status("H2")).toBe("held");
+    expect(getBalanceMc(db, wallet.toLowerCase())).toBe(0);
+    expect(ledger()).toEqual([]);
+    expect(ecbUp).not.toHaveBeenCalled();
+    expect(lines).toContain("[digistore] order H2 held: wallet had a refund");
+    expect(lines.join("\n").toLowerCase()).not.toContain(wallet.toLowerCase());
+  });
+
+  it("still credits a payment while the card breaker is off", async () => {
+    // A refund of another wallet below the limit leaves the breaker off.
+    reversedOrder("SMALL", newAddress(), CARD_BREAKER_SHORTFALL_MC - 1);
+    const f = payment({ order_id: "B1" });
+    expect(await ipn(f)).toEqual({ status: 200, body: "OK" });
+    expect(status("B1")).toBe("booked");
+    expect(getBalanceMc(db, f.custom.toLowerCase())).toBe(426787);
+    expect(lines).toContain("[digistore] order B1 booked");
+  });
+
+  it("a repeated ipn or a refund of a held order books nothing", async () => {
+    reversedOrder("TRIP", newAddress(), CARD_BREAKER_SHORTFALL_MC);
+    const f = payment({ order_id: "H3" });
+    await ipn(f);
+    expect(await ipn(f)).toEqual({ status: 200, body: "OK" });
+    expect(await ipn({ ...f, event: "on_refund" })).toEqual({ status: 200, body: "OK" });
+    expect(await ipn({ ...f, event: "on_chargeback" })).toEqual({ status: 200, body: "OK" });
+    await bookPendingCardOrders(db, { fetch: ecbUp as unknown as typeof fetch, now: () => NOW });
+    expect(status("H3")).toBe("held");
+    expect(ledger()).toEqual([]);
+    expect(getBalanceMc(db, f.custom.toLowerCase())).toBe(0);
+    expect(db.prepare("SELECT credited_mc, reversed_mc, shortfall_mc FROM card_orders WHERE order_id = 'H3'").get()).toEqual({
+      credited_mc: 0,
+      reversed_mc: 0,
+      shortfall_mc: 0,
+    });
+  });
+
+  it("keeps every card order when an older database learns the status held", () => {
+    const file = join(dir, "old.db");
+    const old = new Database(file);
+    old.exec(`
+      CREATE TABLE card_orders (
+        order_id TEXT PRIMARY KEY, product_id TEXT NOT NULL, address TEXT,
+        mode TEXT NOT NULL CHECK (mode IN ('live', 'test')),
+        status TEXT NOT NULL CHECK (status IN ('booked', 'test', 'unassigned', 'pending_rate', 'reversed')),
+        vendor_eur_cents INTEGER, rate_e4 INTEGER, rate_date TEXT, credited_mc INTEGER NOT NULL DEFAULT 0,
+        reversed_mc INTEGER NOT NULL DEFAULT 0, shortfall_mc INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+      );
+    `);
+    const insert = old.prepare("INSERT INTO card_orders VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    const kept = [
+      ["K1", P5(), "0x" + "ab".repeat(20), "live", "booked", 280, 10512, "2026-11-20", 306400, 0, 0, at, at],
+      ["K2", P5(), "0x" + "cd".repeat(20), "live", "reversed", 280, 10512, "2026-11-20", 306400, 1000, 305400, at, at],
+      ["K3", P20(), null, "live", "unassigned", null, null, "2026-11-20", 0, 0, 0, at, at],
+      ["K4", P5(), "0x" + "ef".repeat(20), "test", "test", 280, null, "2026-11-20", 0, 0, 0, at, at],
+      ["K5", P5(), "0x" + "12".repeat(20), "live", "pending_rate", 280, null, "2026-11-21", 0, 0, 0, at, at],
+    ];
+    for (const r of kept) insert.run(...r);
+    const before = old.prepare("SELECT * FROM card_orders ORDER BY order_id").all();
+    old.close();
+
+    const learned = openDb(file);
+    expect(learned.prepare("SELECT * FROM card_orders ORDER BY order_id").all()).toEqual(before);
+    learned
+      .prepare("INSERT INTO card_orders (order_id, product_id, mode, status, created_at, updated_at) VALUES ('H', ?, 'live', 'held', ?, ?)")
+      .run(P5(), at, at);
+    expect(() =>
+      learned
+        .prepare("INSERT INTO card_orders (order_id, product_id, mode, status, created_at, updated_at) VALUES ('X', ?, 'live', 'bogus', ?, ?)")
+        .run(P5(), at, at),
+    ).toThrow(/CHECK/);
+    learned.close();
+
+    // A second open rebuilds nothing and keeps the held order.
+    const again = openDb(file);
+    expect(again.prepare("SELECT order_id, status FROM card_orders ORDER BY order_id").all()).toEqual([
+      { order_id: "H", status: "held" },
+      ...before.map((r) => ({ order_id: (r as { order_id: string }).order_id, status: (r as { status: string }).status })),
+    ]);
+    expect(
+      again.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE type = 'table' AND name LIKE 'card_orders%'").get(),
+    ).toEqual({ n: 1 });
+    again.close();
   });
 });

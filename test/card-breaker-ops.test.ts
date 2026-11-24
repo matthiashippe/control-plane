@@ -67,7 +67,7 @@ function fakeTools(bin: string, dbPath: string, sshFails: boolean, dockerLog: st
           "#!/usr/bin/env bash",
           // Only the call of ops/card-breaker.sh runs here; every other ssh of ops/status.sh gets no answer.
           'cmd="${@: -1}"',
-          'case "$cmd" in *"bash -s -- --container") exec bash -c "$cmd" ;; *) exit 255 ;; esac',
+          'case "$cmd" in *"bash -s -- --container" | *"bash -s -- --container --held") exec bash -c "$cmd" ;; *) exit 255 ;; esac',
           "",
         ].join("\n"),
   );
@@ -110,8 +110,8 @@ function setup({ orders = [], sshFails = false, now = NOW, module = CARD_WAY, no
   const dockerLog = join(dir, "docker.log");
   writeFileSync(dockerLog, "");
   fakeTools(bin, dbPath, sshFails, dockerLog);
-  const run = (at: string = now) => {
-    const r = spawnSync("bash", [SCRIPT], { env: baseEnv(dir, bin, at, module), encoding: "utf8", timeout: 60_000 });
+  const run = (at: string = now, args: string[] = []) => {
+    const r = spawnSync("bash", [SCRIPT, ...args], { env: baseEnv(dir, bin, at, module), encoding: "utf8", timeout: 60_000 });
     return { code: r.status, out: `${r.stdout}${r.stderr}`, lines: r.stdout.trim().split("\n") };
   };
   return { dir, bin, dbPath, run, module, docker: () => readFileSync(dockerLog, "utf8") };
@@ -222,5 +222,63 @@ describe("ops/card-breaker.sh", () => {
     expect(status(on, daysBefore(NOW, -60))).toEqual({ status: "ok", line: "card_refunds_60d 0 shortfall_usd 0.00 breaker off" });
     expect(status(setup({ orders, sshFails: true }))).toEqual({ status: "unknown", reason: "card-breaker exit 2" });
     expect(status(setup({ orders: null }))).toEqual({ status: "unknown", reason: "card-breaker exit 1" });
+  });
+
+  it("prints card_orders_held with the number of held orders", () => {
+    const s = setup({
+      orders: [
+        { id: "held-1", status: "held", shortfall: 0, updated: daysBefore(NOW, 1) },
+        { id: "held-2", status: "held", shortfall: 0, updated: daysBefore(NOW, 400) },
+        // Neither a booked, a pending nor a reversed order is held.
+        { id: "booked-1", status: "booked", shortfall: 0, updated: daysBefore(NOW, 1) },
+        { id: "pending-1", status: "pending_rate", shortfall: 0, updated: daysBefore(NOW, 1) },
+        { id: "reversed-1", shortfall: 5_000_000, updated: daysBefore(NOW, 1) },
+      ],
+    });
+    const held = s.run(NOW, ["--held"]);
+    expect(held.code, held.out).toBe(0);
+    expect(held.lines).toEqual(["card_orders_held 2"]);
+    expect(s.docker()).toContain("exec deploy-cp-1 node -e");
+    // On the server itself, the same line.
+    const inside = s.run(NOW, ["--container", "--held"]);
+    expect(inside.code, inside.out).toBe(0);
+    expect(inside.lines).toEqual(["card_orders_held 2"]);
+    // Without --held the tool prints the breaker as before.
+    expect(s.run().lines).toEqual(["card_refunds_60d 1 shortfall_usd 50.00 breaker on"]);
+    // No held order is a zero, not an empty answer.
+    expect(setup({ orders: [] }).run(NOW, ["--held"]).lines).toEqual(["card_orders_held 0"]);
+    // Missing module or table and a dead ssh end as for the breaker.
+    const noTable = setup({ orders: null }).run(NOW, ["--held"]);
+    expect([noTable.code, noTable.out.trim()]).toEqual([1, "card_breaker unreadable"]);
+    const noFn = setup({ orders: [], module: join(ROOT, "src", "db.ts") }).run(NOW, ["--held"]);
+    expect([noFn.code, noFn.out.trim()]).toEqual([1, "card_breaker unreadable"]);
+    const dead = setup({ orders: [], sshFails: true }).run(NOW, ["--held"]);
+    expect([dead.code, dead.out.trim()]).toEqual([2, "ssh failed"]);
+    const twice = setup({ orders: [] }).run(NOW, ["--held", "--held"]);
+    expect(twice.code).toBe(2);
+  });
+
+  it("never prints an address of a held order", () => {
+    const orders: Order[] = [
+      { id: "h-1", status: "held", shortfall: 0, updated: daysBefore(NOW, 1) },
+      { id: "h-2", status: "held", shortfall: 0, updated: daysBefore(NOW, 2) },
+    ];
+    for (const c of [{ orders }, { orders, module: join(ROOT, "no-such.js") }] as Setup[]) {
+      const s = setup(c);
+      for (const args of [["--held"], ["--container", "--held"]]) {
+        const r = s.run(NOW, args);
+        expect(r.out.length, "the script said something, so the check below has text to look at").toBeGreaterThan(15);
+        expect(r.out).not.toContain(ADDRESS);
+        expect(r.out).not.toMatch(ADDRESS_RE);
+        expect(r.out).not.toContain(s.dir);
+        for (const line of r.out.trim().split("\n")) expect(line).toMatch(/^(card_orders_held \d+|card_breaker unreadable)$/);
+      }
+    }
+    // The counter-proof: the held rows the script counted do carry the address.
+    const s = setup({ orders });
+    const db = new Database(s.dbPath, { readonly: true });
+    expect(db.prepare("SELECT address FROM card_orders WHERE status = ?").pluck().all("held")).toEqual([ADDRESS, ADDRESS]);
+    db.close();
+    expect(s.run(NOW, ["--held"]).lines).toEqual(["card_orders_held 2"]);
   });
 });

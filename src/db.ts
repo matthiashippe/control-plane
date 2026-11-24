@@ -389,7 +389,7 @@ function migrate(db: Db): void {
       product_id       TEXT NOT NULL,
       address          TEXT,
       mode             TEXT NOT NULL CHECK (mode IN ('live', 'test')),
-      status           TEXT NOT NULL CHECK (status IN ('booked', 'test', 'unassigned', 'pending_rate', 'reversed')),
+      status           TEXT NOT NULL CHECK (status IN ('booked', 'test', 'unassigned', 'pending_rate', 'reversed', 'held')),
       vendor_eur_cents INTEGER,
       rate_e4          INTEGER,
       rate_date        TEXT,
@@ -401,6 +401,37 @@ function migrate(db: Db): void {
     );
   `);
   db.exec("CREATE UNIQUE INDEX IF NOT EXISTS ledger_card_reversal_once ON ledger(ref) WHERE kind = 'card_reversal'");
+  // wache 03: a live payment that arrives while the card breaker is on, or for a wallet that had a refund, is stored as `held` and
+  // credits nothing. The CHECK of karte 01 does not know `held`, and SQLite cannot change a CHECK, so a table without it is rebuilt
+  // once in one transaction; every row is copied over.
+  const cardOrdersSql = (db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'card_orders'").get() as { sql: string }).sql;
+  if (!cardOrdersSql.includes("'held'")) {
+    db.transaction(() => {
+      db.exec(`
+        ALTER TABLE card_orders RENAME TO card_orders_wache02;
+        CREATE TABLE card_orders (
+          order_id         TEXT PRIMARY KEY,
+          product_id       TEXT NOT NULL,
+          address          TEXT,
+          mode             TEXT NOT NULL CHECK (mode IN ('live', 'test')),
+          status           TEXT NOT NULL CHECK (status IN ('booked', 'test', 'unassigned', 'pending_rate', 'reversed', 'held')),
+          vendor_eur_cents INTEGER,
+          rate_e4          INTEGER,
+          rate_date        TEXT,
+          credited_mc      INTEGER NOT NULL DEFAULT 0,
+          reversed_mc      INTEGER NOT NULL DEFAULT 0,
+          shortfall_mc     INTEGER NOT NULL DEFAULT 0,
+          created_at       TEXT NOT NULL,
+          updated_at       TEXT NOT NULL
+        );
+        INSERT INTO card_orders (order_id, product_id, address, mode, status, vendor_eur_cents, rate_e4, rate_date, credited_mc,
+          reversed_mc, shortfall_mc, created_at, updated_at)
+          SELECT order_id, product_id, address, mode, status, vendor_eur_cents, rate_e4, rate_date, credited_mc, reversed_mc,
+          shortfall_mc, created_at, updated_at FROM card_orders_wache02;
+        DROP TABLE card_orders_wache02;
+      `);
+    })();
+  }
 
   // Balance right after the credit. Needed so the answer to a repeated payment header does not
   // leak the current balance: that answer is served without an API key.

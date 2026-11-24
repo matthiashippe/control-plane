@@ -1,7 +1,7 @@
 # Wache Goal 03: Der Notschalter hält auch die direkt aufgerufene Kasse
 
 ## Status
-PLANNED
+DONE
 
 ## Active Objective
 Seit wache 01 schließt der Notschalter jeden Weg des Dienstes zur Kasse von Digistore24, aber nicht die Kasse selbst: Wer einmal auf
@@ -115,7 +115,7 @@ MVP: Funktion, weil der Notschalter sonst nur die Knöpfe sperrt, aber nicht das
   Code, Bezeichner, Testnamen, Log-Zeilen und Meldungen englisch.
 
 ## Done Condition
-- [ ] Die IPN schreibt bei Notschalter an und für eine Wallet mit früherer Erstattung nichts gut, speichert die Bestellung auf
+- [x] Die IPN schreibt bei Notschalter an und für eine Wallet mit früherer Erstattung nichts gut, speichert die Bestellung auf
       `held`, schreibt eine Log-Zeile mit Bestellnummer und Grund ohne Adresse, fragt die EZB nicht und antwortet `200` mit `OK`; eine
       Wiederholung und eine Erstattung dieser Bestellung buchen nichts, und bei Notschalter aus wird wie bisher gutgeschrieben.
       MVP: Funktion, weil sonst jeder mit einer neuen Wallet die direkt aufgerufene Kasse nutzt und der Fehlbetrag über 50 USD wächst.
@@ -125,11 +125,11 @@ MVP: Funktion, weil der Notschalter sonst nur die Knöpfe sperrt, aber nicht das
       Prüfung: `T=$(mktemp -d); git archive HEAD | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; sed -i 's/on: shortfallMc >= CARD_BREAKER_SHORTFALL_MC/on: false/' $T/src/payments/card-way.ts; grep -q 'on: false' $T/src/payments/card-way.ts || echo sed-miss; (cd $T && PATH=/usr/bin:$PATH pnpm -s vitest run test/digistore-ipn.test.ts -t "holds a payment while the card breaker is on and credits nothing" > /dev/null 2>&1); echo "exit=$?"; rm -rf $T` muss als letzte Zeile `exit=1` ausgeben und darf `sed-miss` nicht ausgeben.
       Prüfung: `T=$(mktemp -d); git archive HEAD | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; sed -i 's/^  return row !== undefined;$/  return false;/' $T/src/payments/card-way.ts; grep -q '^  return false;$' $T/src/payments/card-way.ts || echo sed-miss; (cd $T && PATH=/usr/bin:$PATH pnpm -s vitest run test/digistore-ipn.test.ts -t "holds a payment of a wallet that had a refund and credits nothing" > /dev/null 2>&1); echo "exit=$?"; rm -rf $T` muss als letzte Zeile `exit=1` ausgeben und darf `sed-miss` nicht ausgeben.
       Prüfung: `git diff $(git merge-base origin/dev HEAD) HEAD -- src/payments/card-way.ts | grep -E '^[-+]' | grep -vE '^(\+\+\+|---) ' | grep -c '^-'` muss 0 ausgeben.
-- [ ] Eine Datenbank, deren `card_orders` `held` noch nicht kennt, lernt den Status beim Öffnen, ohne eine Zeile zu verlieren.
+- [x] Eine Datenbank, deren `card_orders` `held` noch nicht kennt, lernt den Status beim Öffnen, ohne eine Zeile zu verlieren.
       MVP: Funktion, weil die Produktion Zeilen in `card_orders` hat und die erste gehaltene Bestellung sonst am CHECK scheitert.
       Prüfung: `for t in "keeps every card order when an older database learns the status held"; do grep -qF "\"$t\"" test/digistore-ipn.test.ts || echo "fehlt: $t"; done` muss nichts ausgeben.
       Prüfung: `T=$(mktemp -d); PATH=/usr/bin:$PATH T=$T node --import tsx --input-type=module -e 'const Database = (await import("better-sqlite3")).default; const { openDb } = await import("./src/db.ts"); const f = process.env.T + "/cp.db"; const q = (l) => l.map((s) => String.fromCharCode(39) + s + String.fromCharCode(39)).join(", "); const old = new Database(f); old.exec("CREATE TABLE card_orders (order_id TEXT PRIMARY KEY, product_id TEXT NOT NULL, address TEXT, mode TEXT NOT NULL CHECK (mode IN (" + q(["live", "test"]) + ")), status TEXT NOT NULL CHECK (status IN (" + q(["booked", "test", "unassigned", "pending_rate", "reversed"]) + ")), vendor_eur_cents INTEGER, rate_e4 INTEGER, rate_date TEXT, credited_mc INTEGER NOT NULL DEFAULT 0, reversed_mc INTEGER NOT NULL DEFAULT 0, shortfall_mc INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)"); old.prepare("INSERT INTO card_orders VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").run("KEEP", "771278", "0x" + "ab".repeat(20), "live", "booked", 280, 10512, "2026-11-20", 306400, 0, 0, "2026-11-20T10:00:00.000Z", "2026-11-20T10:00:00.000Z"); old.close(); const bad = []; const ins = (db, id, s) => db.prepare("INSERT INTO card_orders (order_id, product_id, address, mode, status, created_at, updated_at) VALUES (?, ?, NULL, ?, ?, ?, ?)").run(id, "771278", "live", s, "x", "x"); let db = openDb(f); const k = db.prepare("SELECT * FROM card_orders WHERE order_id = ?").get("KEEP"); if (!k || k.status !== "booked" || k.credited_mc !== 306400 || k.rate_e4 !== 10512) bad.push("zeile weg"); try { ins(db, "H", "held"); } catch { bad.push("held abgelehnt"); } try { ins(db, "X", "bogus"); bad.push("bogus angenommen"); } catch {} db.close(); db = openDb(f); const n = db.prepare("SELECT COUNT(*) AS n FROM card_orders").get().n; if (!bad.includes("held abgelehnt") && n !== 2) bad.push("zweites oeffnen " + n); db.close(); console.log(bad.length ? bad.join("; ") : "migration ok")' 2>&1 | tail -1; rm -rf $T` muss genau `migration ok` ausgeben.
-- [ ] `ops/card-breaker.sh --held` gibt die Zahl der gehaltenen Bestellungen als genau eine Zeile aus, die Regel steht nur in
+- [x] `ops/card-breaker.sh --held` gibt die Zahl der gehaltenen Bestellungen als genau eine Zeile aus, die Regel steht nur in
       `heldCardOrders` in `src/payments/card-way.ts`, und ohne `--held` bleibt das Werkzeug, wie es ist.
       MVP: Funktion, weil die Leitzahl dieses Goals ohne das Werkzeug nicht messbar ist.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/card-breaker-ops.test.ts` muss Exit-Code 0 haben.
@@ -139,7 +139,7 @@ MVP: Funktion, weil der Notschalter sonst nur die Knöpfe sperrt, aber nicht das
       Prüfung: `cat ops/card-breaker.sh ops/watchdog.sh | grep -c "'held'"` muss 0 ausgeben.
       Prüfung: `grep -cE '\b(INSERT|UPDATE|DELETE|DROP|ALTER)\b|shortfall_mc' ops/card-breaker.sh` muss 0 ausgeben.
       Prüfung: `bash -n ops/card-breaker.sh && echo syntax ok` muss genau `syntax ok` ausgeben.
-- [ ] `ops/watchdog.sh` meldet jede neue gehaltene Bestellung genau einmal über den bestehenden Alarmweg, ein gescheiterter POST
+- [x] `ops/watchdog.sh` meldet jede neue gehaltene Bestellung genau einmal über den bestehenden Alarmweg, ein gescheiterter POST
       kommt im nächsten Lauf wieder, und crontab, `deploy/` und `/opt/control-plane/.env` bleiben, wie sie sind.
       MVP: Funktion, weil eine gehaltene Bestellung eine echte Zahlung ohne Guthaben ist und jemand davon wissen muss, bevor der
       Käufer nachfragt.
@@ -153,7 +153,7 @@ MVP: Funktion, weil der Notschalter sonst nur die Knöpfe sperrt, aber nicht das
       Prüfung: `grep -c 'card_orders_held' ops/README.md` muss mindestens 1 ausgeben.
       Prüfung: `grep -cF '*/5 * * * * CP_ALERT_WEBHOOK=https://ntfy.sh/<random-topic> /opt/control-plane/repo/ops/watchdog.sh >> /var/log/cp-watchdog.log 2>&1' ops/README.md` muss genau 1 ausgeben.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD -- deploy .github | wc -l` muss 0 ausgeben.
-- [ ] Bei Notschalter an steht auf `/` und auf jeder Fehlerseite kein Block `video`; bei Notschalter aus stehen die Seiten bis auf
+- [x] Bei Notschalter an steht auf `/` und auf jeder Fehlerseite kein Block `video`; bei Notschalter aus stehen die Seiten bis auf
       Leerraum, wie sie sind, und Skript, Video und SOLL-Bilder bleiben unverändert.
       MVP: Funktion, weil das Video sonst bei geschlossener Kasse mit seiner Schlusstafel einen Weg zeigt, der nicht geht.
       Prüfung: `CP_PUBLIC_URL=https://automatonhost.com PATH=/usr/bin:$PATH node --import tsx --input-type=module -e 'const { createApp } = await import("./src/app.ts"); const { openDb } = await import("./src/db.ts"); const { CARD_BREAKER_SHORTFALL_MC: S } = await import("./src/payments/card-way.ts"); const { ERROR_PAGES } = await import("./src/public/error-pages.ts"); const app = (on) => { const db = openDb(":memory:"); if (on) { const t = new Date().toISOString(); db.prepare("INSERT INTO card_orders (order_id, product_id, address, mode, status, credited_mc, reversed_mc, shortfall_mc, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?)").run("TRIP", "771278", "0x" + "ef".repeat(20), "live", "reversed", S, S, t, t); } return createApp({ db }); }; const n = (s, w) => s.split(w).length - 1; const bad = []; const paths = ["/", ...ERROR_PAGES.map((p) => "/errors/" + p.slug)]; for (const on of [true, false]) { const a = app(on); for (const p of paths) { const h = await (await a.request(p)).text(); const v = n(h, "data-soll=\"video\""); if (v !== (on ? 0 : 1)) bad.push((on ? "an " : "aus ") + p + " " + v); if (n(h, "move.mp4") !== (on ? 0 : 1)) bad.push((on ? "an " : "aus ") + p + " mp4"); } } console.log(bad.length ? bad.join("; ") : "video ok " + paths.length)' 2>&1 | tail -1` muss genau `video ok 4` ausgeben.
@@ -163,19 +163,19 @@ MVP: Funktion, weil der Notschalter sonst nur die Knöpfe sperrt, aber nicht das
       Prüfung: `git diff --numstat $(git merge-base origin/dev HEAD) HEAD -- src/public/index.html | tr '\t' ' '` muss genau `1 1 src/public/index.html` ausgeben.
       Prüfung: `grep -B1 -F '<section class="watch" data-soll="video">' src/public/index.html | head -1` muss genau `<!--CARD-->` ausgeben.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD -- docs/video docs/soll src/public/video README.md | wc -l` muss 0 ausgeben.
-- [ ] Die Entscheidungen stehen in `goals/wache/ANNAHMEN.md`, der Diff bleibt in den Pfaden dieses Goals, kein Test fällt weg, und
+- [x] Die Entscheidungen stehen in `goals/wache/ANNAHMEN.md`, der Diff bleibt in den Pfaden dieses Goals, kein Test fällt weg, und
       nichts im Repo nennt eine Adresse eines Kunden.
       MVP: Funktion, weil jedes spätere Glied der Karte wissen muss, warum eine bezahlte Bestellung auf `held` steht und wer davon erfährt.
       Prüfung: `grep -cE '^- [0-9]{4}-[0-9]{2}-[0-9]{2}, wache 03: ' goals/wache/ANNAHMEN.md` muss mindestens 5 ausgeben.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD | grep -vE '^(src/payments/digistore\.ts|src/payments/card-way\.ts|src/db\.ts|src/public/index\.html|src/public/error-pages\.ts|ops/card-breaker\.sh|ops/watchdog\.sh|ops/README\.md|test/[a-z0-9-]+\.test\.ts|goals/wache/.*|goals/[a-z]+/ANNAHMEN\.md)$' | wc -l` muss 0 ausgeben.
       Prüfung: `git diff --diff-filter=D --name-only $(git merge-base origin/dev HEAD) HEAD -- test | wc -l` muss 0 ausgeben.
       Prüfung: `git diff $(git merge-base origin/dev HEAD) HEAD -- . ':!goals' | grep '^+' | grep -oE '0x[0-9a-fA-F]{40}' | sort -u | awk '{s=substr($0,3,2); r=""; for(i=0;i<20;i++) r=r s; if (substr($0,3)!=r) n++} END{print n+0}'` muss 0 ausgeben.
-- [ ] Der Job `e2e` am Kopf des Goal-PR ist grün.
+- [x] Der Job `e2e` am Kopf des Goal-PR ist grün.
       MVP: Funktion, weil sich die IPN und das Schema im Laufzeitpfad ändern und der code-host kein Docker hat.
       Prüfung (Netz): `gh pr checks $(gh pr list -R matthiashippe/control-plane --head goal/wache-03 --state open --json number -q '.[0].number') -R matthiashippe/control-plane 2>&1 | grep -E '^e2e\s' | grep -c pass` muss genau 1 ausgeben.
-- [ ] `check` ist grün.
+- [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Wer bei geschlossener Kasse oder mit einer Wallet nach Erstattung doch bei Digistore24 zahlt, bekommt kein Guthaben, und die
@@ -215,6 +215,9 @@ MVP: Funktion, weil der Notschalter sonst nur die Knöpfe sperrt, aber nicht das
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-24 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6, 7, 8 gebaut (IPN hält Zahlungen bei Notschalter an und nach Erstattung auf `held`, CHECK von `card_orders` mit einmaligem Neubau, `heldCardOrders` und `ops/card-breaker.sh --held`, `check_card_held` im Watchdog, Video nur bei offener Kasse, sieben Annahmen); jeder neue Fall war rot (IPN- und Migrationsfälle gegen `src/` von `dev`, `--held`-Fälle gegen `ops/card-breaker.sh` von `dev`, alle fünf Watchdog-Fälle gegen `ops/watchdog.sh` von `dev` über `WATCHDOG_UNDER_TEST`, der Videofall gegen `index.html` und `error-pages.ts` von `dev`, „still credits a payment while the card breaker is off“ gegen eine IPN, die jede Zahlung hält); die Prüfbefehle der 53 fertigen Goals, die die berührten Dateien nennen, geben an `dev` und am Kopf dasselbe aus, bis auf Umfangszähler gegen `origin/dev`. Prüfbefehle: Punkt 1 vitest 46 grün, Namen vollständig, `held ok`, beide Gegenproben `exit=1` ohne `sed-miss`, Minuszeilen in `card-way.ts` 0; Punkt 2 Name vorhanden, `migration ok`; Punkt 3 vitest 9 grün, Namen vollständig, `heldCardOrders` 1, im Werkzeug 4, `'held'` 0, Schreibwörter 0, `syntax ok`; Punkt 4 vitest 23 grün, Namen vollständig, Aufruf 1, Funktion 1, Gegenprobe `exit=1` ohne `sed-miss`, Kopie `exit=0`, `syntax ok`, README 1 und 1, `deploy`/`.github` 0; Punkt 5 `video ok 4`, `aus gleich` (gepflanzte Änderung gibt `aus anders`), Name vorhanden, vitest 76 grün, `1 1 src/public/index.html`, `<!--CARD-->`, Video/SOLL/README 0; Punkt 6 Annahmen 7, fremde Pfade 0, gelöschte Tests 0, Adressen 0; Punkt 7 `e2e` an PR #426 grün am Kopf b9d8289 (11 min, Prüfbefehl gibt 1); Punkt 8 `check` grün in 172 s (2833 Tests).
+- 2026-11-24 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, 7, 8 (`dev` ef2f48b liegt schon im Branch, kein Merge nötig). Prüfbefehle am Kopf b68ffb3: Punkt 1 vitest grün, Namen vollständig, `held ok`, beide Gegenproben `exit=1` ohne `sed-miss`, Minuszeilen 0; Punkt 2 Name vorhanden, `migration ok`; Punkt 3 vitest grün, Namen vollständig, 1, 4, 0, 0, `syntax ok`; Punkt 4 vitest grün, Namen vollständig, 1, 1, Gegenprobe `exit=1`, Kopie `exit=0`, `syntax ok`, 1, 1, 0; Punkt 5 `video ok 4`, `aus gleich`, Name vorhanden, vitest grün, `1 1 src/public/index.html`, `<!--CARD-->`, 0; Punkt 6 Annahmen 7, 0, 0, 0; Punkt 7 `e2e` pass (10m57s) an PR #426 am Kopf b68ffb3, Prüfbefehl gibt 1; Punkt 8 `check` grün in 176 s.
+- 2026-11-24 Release: PASS K und B (Zyklus 2), DONE.
 
 ## Blockers
 keine

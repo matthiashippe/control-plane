@@ -11,6 +11,7 @@ import { MockProvider, MOCK_MODEL } from "../src/inference/mock.js";
 import { Catalog, handleChat } from "../src/inference/proxy.js";
 import { claimStarter } from "../src/credits/starter.js";
 import { CARD_BREAKER_SHORTFALL_MC, cardRedirect } from "../src/payments/card-way.js";
+import { ERROR_PAGES } from "../src/public/error-pages.js";
 
 const OTHER = "0x" + "ef".repeat(20);
 const savedUrl = process.env.CP_PUBLIC_URL;
@@ -104,6 +105,31 @@ describe("the start page under the card breaker", () => {
       expect(anchors.length, `anchors with the breaker ${state}`).toBeGreaterThan(0);
       const dead = anchors.filter((a) => !ids.has(a)).map((a) => `#${a}`);
       expect(dead, `dead anchors with the breaker ${state}`).toEqual([]);
+    }
+  });
+});
+
+describe("the video under the card breaker", () => {
+  it("shows no video with the card on it while the breaker is on", async () => {
+    // The last frame of the video offers the top-up by card (goals/wache/03), so it goes with the card block.
+    const paths = ["/", ...ERROR_PAGES.map((p) => `/errors/${p.slug}`)];
+    expect(paths.length).toBeGreaterThan(1);
+    const on = openDb(":memory:");
+    tripBreaker(on);
+    for (const [state, db] of [["on", on], ["off", openDb(":memory:")]] as const) {
+      const app = createApp({ db });
+      for (const path of paths) {
+        const res = await app.request(path);
+        expect(res.status, `${path} with the breaker ${state}`).toBe(200);
+        const html = await res.text();
+        const count = (s: string) => html.split(s).length - 1;
+        const want = state === "on" ? 0 : 1;
+        expect(count('data-soll="video"'), `video block on ${path} with the breaker ${state}`).toBe(want);
+        expect(count("/video/move.mp4"), `video file on ${path} with the breaker ${state}`).toBe(want);
+        expect(count("/video/move-poster.png"), `poster on ${path} with the breaker ${state}`).toBe(want);
+        // The rest of the page stays.
+        expect(html).toContain(path === "/" ? 'data-soll="move"' : 'data-soll="fix"');
+      }
     }
   });
 });
