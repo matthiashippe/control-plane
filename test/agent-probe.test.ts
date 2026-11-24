@@ -294,3 +294,250 @@ describe("ops/agent-probe.sh", () => {
     }
   });
 });
+
+/**
+ * --week (werbung 03): the weekly run. Stricter counting (card only as a word in a sentence that names
+ * automatonhost.com, seen for our hint without our name), its own line format, one run per ISO week shared with
+ * the run without a switch, the raw answers in a state directory outside the repository, and the recount of a
+ * week that already has answers. Every case here is red against the script of werbung 02, which knows no --week.
+ */
+const WEEK_LINE =
+  /^- \d{4}-W\d{2} \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z model [^ ]+ host [0-5]\/5 card [0-5]\/5 seen [0-5]\/5 old [0-5]\/5 failed [0-5]\/5 answers docs\/kunden\/agenten-probe\/\d{4}-W\d{2}\.md via (sessions|recount)$/;
+
+/** One run with --week, its state directory inside the scratch directory unless the case names another. */
+function week(fixture: string | null, env: Record<string, string> = {}, dir = scratch()): Run {
+  return probe(fixture, { CP_PROBE_STATE_DIR: join(dir, "state"), ...env }, dir, ["--week"]);
+}
+
+function weekCounts(text: string): string {
+  return (lastLine(text).match(/host [0-5]\/5 card [0-5]\/5 seen [0-5]\/5 old [0-5]\/5 failed [0-5]\/5/) ?? [""])[0];
+}
+
+describe("ops/agent-probe.sh --week", () => {
+  it("counts card only as a word and never inside another word", () => {
+    const texts = [
+      "automatonhost.com keeps a scorecard.",
+      "automatonhost.com: discard the old key.",
+      "automatonhost.com takes cards.",
+      "automatonhost.com takes Mastercard.",
+      "automatonhost.com sells a visa2go plan.",
+    ];
+    const r = week(null, { CP_PROBE_ANSWERS: answers(texts) });
+    expect(r.status).toBe(0);
+    expect(weekCounts(r.out)).toBe("host 5/5 card 2/5 seen 0/5 old 0/5 failed 0/5");
+    // The run without a switch keeps counting the string, as werbung 02 built it: scorecard and discard count there.
+    expect(counts(probe(null, { CP_PROBE_ANSWERS: answers(texts) }).out)).toBe("host 5/5 card 4/5 old 0/5 failed 0/5");
+    // The fixture of the goal: a credit card and Visa or Mastercard count, a scorecard does not.
+    expect(weekCounts(week("agent-probe-strict").out)).toBe("host 3/5 card 2/5 seen 1/5 old 0/5 failed 0/5");
+  });
+
+  it("counts card only in a sentence that names automatonhost.com", () => {
+    const r = week(null, {
+      CP_PROBE_ANSWERS: answers([
+        "AutomatonHost.com is compatible. Some hosts take a card.",
+        "Pay by card at automatonhost.com.",
+        "automatonhost.com works.\nPayPal works elsewhere.",
+        "Use automatonhost.com, which takes Apple Pay!",
+        "Visit https://automatonhost.com. It takes a credit card.",
+      ]),
+    });
+    expect(r.status).toBe(0);
+    // The dot inside automatonhost.com ends no sentence; a dot, ! or ? before white space and a line break do.
+    expect(weekCounts(r.out)).toBe("host 5/5 card 2/5 seen 0/5 old 0/5 failed 0/5");
+  });
+
+  it("counts seen for an answer that finds our hint without our name", () => {
+    const r = week(null, {
+      CP_PROBE_ANSWERS: answers([
+        "Point conwayApiUrl at a third-party control plane.",
+        "Set CONWAY_API_URL to an alternative host.",
+        "Set conwayApiUrl to https://example.org/api instead.",
+        "Set conwayApiUrl to https://postyourprice.com as the issue says.",
+        NONE,
+      ]),
+    });
+    expect(r.status).toBe(0);
+    // The old host in the fourth is a URL off conway.tech, so it is seen and old at once.
+    expect(weekCounts(r.out)).toBe("host 0/5 card 0/5 seen 4/5 old 1/5 failed 0/5");
+  });
+
+  it("never counts seen for an answer that names us or keeps conway", () => {
+    const r = week(null, {
+      CP_PROBE_ANSWERS: answers([
+        "Point conwayApiUrl at AutomatonHost.com, a compatible control plane.",
+        "Credits are granted by the control plane.",
+        "Leave conwayApiUrl at https://api.conway.tech for now.",
+        "Set conwayApiUrl back to https://conway.tech.",
+        "A third-party control plane exists. Keep conwayApiUrl as it is.",
+      ]),
+    });
+    expect(r.status).toBe(0);
+    expect(weekCounts(r.out)).toBe("host 1/5 card 0/5 seen 0/5 old 0/5 failed 0/5");
+    // The fixture of werbung 02 names a control plane in q3, but not conwayApiUrl.
+    expect(weekCounts(week("agent-probe-two-hits").out)).toBe("host 2/5 card 1/5 seen 0/5 old 1/5 failed 0/5");
+  });
+
+  it("writes the weekly line in the new format with seen", () => {
+    const r = week("agent-probe-strict");
+    expect(r.status).toBe(0);
+    expect(r.out.split("\n").filter((l) => l.trim())).toHaveLength(1);
+    expect(lastLine(r.out)).toMatch(WEEK_LINE);
+    expect(lastLine(r.out)).toBe(
+      "- 2026-W48 2026-11-25T10:00:00Z model fixture-main-model host 3/5 card 2/5 seen 1/5 old 0/5 failed 0/5 answers docs/kunden/agenten-probe/2026-W48.md via sessions",
+    );
+    expect(lastLine(r.stdout)).toBe(lastLine(r.out));
+    // The line starts with the week, so the old format and the old recount (every "- <date>T" line) skip it.
+    expect(lastLine(r.out)).not.toMatch(LINE);
+    expect(lastLine(r.out)).not.toMatch(/^- \d{4}-\d\d-\d\dT/);
+    const text = readFileSync(join(r.dir, "2026-W48.md"), "utf8");
+    const parts = text.split(/^## q[1-5]\s*$/m).slice(1);
+    expect(parts).toHaveLength(5);
+    parts.forEach((p, i) => expect(p).toContain(`Question: ${QUESTIONS[i]}`));
+    // A failed session is failed and the run ends with exit 1, as without the switch.
+    const fails = week("agent-probe-fails");
+    expect(fails.status).toBe(1);
+    expect(lastLine(fails.out)).toMatch(WEEK_LINE);
+    expect(weekCounts(fails.out)).toBe("host 0/5 card 0/5 seen 0/5 old 0/5 failed 5/5");
+  });
+
+  it("asks at most once per iso week with --week and prints the stored line again", () => {
+    const dir = scratch();
+    const first = week("agent-probe-strict", {}, dir);
+    expect(first.status).toBe(0);
+    expect(records(first.record, "cwd")).toHaveLength(5);
+    const again = week("agent-probe-two-hits", {}, dir);
+    expect(again.status).toBe(0);
+    expect(lastLine(again.stdout)).toBe(lastLine(first.out));
+    expect(again.record).toBe(first.record);
+    expect(again.out).toBe(first.out);
+    // The line in the state directory holds the week even when the file of runs lacks it.
+    writeFileSync(join(dir, "p.md"), "");
+    const stateOnly = week("agent-probe-two-hits", {}, dir);
+    expect(stateOnly.status).toBe(0);
+    expect(lastLine(stateOnly.stdout)).toBe(lastLine(first.out));
+    expect(stateOnly.record).toBe(first.record);
+    // A failed first run of the week holds the week as well: no second try.
+    const failedDir = scratch();
+    const failedFirst = week("agent-probe-fails", {}, failedDir);
+    expect(failedFirst.status).toBe(1);
+    const retry = week("agent-probe-strict", {}, failedDir);
+    expect(retry.status).toBe(0);
+    expect(lastLine(retry.stdout)).toBe(lastLine(failedFirst.out));
+    expect(retry.record).toBe(failedFirst.record);
+    // The next ISO week asks again: 2026-11-30 is a Monday in 2026-W49.
+    const next = week("agent-probe-strict", { CP_NOW: "1796040000" }, dir);
+    expect(records(next.record, "cwd")).toHaveLength(10);
+    expect(lastLine(next.out).startsWith("- 2026-W49 ")).toBe(true);
+  });
+
+  it("keeps the raw answers of the week in the state directory and not in the repo", () => {
+    const r = week("agent-probe-two-hits");
+    const state = join(r.dir, "state");
+    const weekDir = join(state, "2026-W48");
+    expect(readdirSync(weekDir).sort()).toEqual(["line", "q1.json", "q2.json", "q3.json", "q4.json", "q5.json"]);
+    // Raw: the old host and the address of q3 are still there, and only there.
+    expect(readFileSync(join(weekDir, "q3.json"), "utf8")).toContain("postyourprice.com");
+    expect(readFileSync(join(weekDir, "line"), "utf8").trim()).toBe(lastLine(r.out));
+    expect(spawnSync("stat", ["-c", "%a", state], { encoding: "utf8" }).stdout.trim()).toBe("700");
+    expect(spawnSync("stat", ["-c", "%a", weekDir], { encoding: "utf8" }).stdout.trim()).toBe("700");
+    // What goes into the repository is scrubbed.
+    expect(readFileSync(join(r.dir, "2026-W48.md"), "utf8")).not.toMatch(/postyourprice|cp\.hippe\.eu|0x[0-9a-f]{40}/i);
+    // Without CP_PROBE_STATE_DIR the state lies under ~/.local/state/control-plane/agent-probe.
+    const home = scratch();
+    const plain = probe("agent-probe-two-hits", { HOME: home }, home, ["--week"]);
+    expect(plain.status).toBe(0);
+    expect(existsSync(join(home, ".local/state/control-plane/agent-probe/2026-W48/line"))).toBe(true);
+    // A state directory inside the repository is refused before any session.
+    const inside = week("agent-probe-two-hits", { CP_PROBE_STATE_DIR: join(REPO, "agent-probe-state-must-not-exist") });
+    expect(inside.status).toBe(2);
+    expect(inside.record).toBe("");
+    expect(existsSync(join(REPO, "agent-probe-state-must-not-exist"))).toBe(false);
+  });
+
+  it("counts a week that already has answers again from them without a session", () => {
+    const dir = scratch();
+    const old = probe("agent-probe-two-hits", {}, dir);
+    expect(old.status).toBe(0);
+    const answersFile = join(dir, "2026-W48.md");
+    const before = readFileSync(answersFile, "utf8");
+    const r = week(null, {}, dir);
+    expect(r.status).toBe(0);
+    expect(r.record).toBe(old.record);
+    expect(readFileSync(answersFile, "utf8")).toBe(before);
+    const lines = r.out.split("\n").filter((l) => l.startsWith("- "));
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toBe(lastLine(old.out));
+    // Time and model of the run the answers came from; the old host of q3 counts as old from <old host>.
+    expect(lines[1]).toBe(
+      "- 2026-W48 2026-11-25T10:00:00Z model fixture-main-model host 2/5 card 1/5 seen 0/5 old 1/5 failed 0/5 answers docs/kunden/agenten-probe/2026-W48.md via recount",
+    );
+    expect(lastLine(r.stdout)).toBe(lines[1]);
+    expect(readFileSync(join(dir, "state", "2026-W48", "line"), "utf8").trim()).toBe(lines[1]);
+    // A third call prints that line and adds nothing.
+    const third = week(null, {}, dir);
+    expect(lastLine(third.stdout)).toBe(lines[1]);
+    expect(third.out).toBe(r.out);
+    // The recount reads the stricter rules from the scrubbed text: a hint with the old host is seen, a failed
+    // session is failed and ends with exit 1.
+    const mixed = scratch();
+    probe(null, { CP_PROBE_ANSWERS: answers(["Set conwayApiUrl to https://postyourprice.com today.", null, "automatonhost.com keeps a scorecard.", NONE, NONE]) }, mixed);
+    const recount = week(null, {}, mixed);
+    expect(recount.status).toBe(1);
+    expect(weekCounts(recount.out)).toBe("host 1/5 card 0/5 seen 1/5 old 1/5 failed 1/5");
+    // An old line without its answers: the week is done, nothing is asked and nothing is written.
+    const bare = scratch();
+    writeFileSync(join(bare, "p.md"), `${lastLine(old.out)}\n`);
+    const done = week("agent-probe-strict", {}, bare);
+    expect(done.status).toBe(0);
+    expect(lastLine(done.stdout)).toBe("already probed in 2026-W48");
+    expect(done.record).toBe("");
+    expect(done.out).toBe(`${lastLine(old.out)}\n`);
+  });
+
+  it("shares one week lock between --week and the run without a switch", () => {
+    const dir = scratch();
+    const first = week("agent-probe-strict", {}, dir);
+    expect(first.status).toBe(0);
+    const plain = probe("agent-probe-two-hits", {}, dir);
+    expect(plain.status).toBe(0);
+    expect(lastLine(plain.stdout)).toBe("already probed in 2026-W48");
+    expect(plain.record).toBe(first.record);
+    expect(plain.out).toBe(first.out);
+    // The other way round: after a run without the switch, --week asks no session either (it recounts).
+    const other = scratch();
+    const old = probe("agent-probe-two-hits", {}, other);
+    const after = week("agent-probe-strict", {}, other);
+    expect(after.record).toBe(old.record);
+    expect(lastLine(after.out)).toMatch(/ via recount$/);
+  });
+
+  it("passes no key, no paperclip and no loop variable to the session with --week", () => {
+    const r = week("agent-probe-two-hits", {
+      PAPERCLIP_API_KEY: "x",
+      PAPERCLIP_RUN_ID: "x",
+      OPENROUTER_API_KEY: "x",
+      CP_SSH_KEY: "x",
+      CP_HOST: "x",
+      GH_TOKEN: "x",
+      ANTHROPIC_API_KEY: "x",
+      CLAUDECODE: "1",
+      SOME_OTHER_SECRET: "x",
+    });
+    expect(r.status).toBe(0);
+    const allowed = new Set(["HOME", "PATH", "LANG", "CLAUDE_CONFIG_DIR", "PROBE_FAKE_ANSWERS", "PROBE_FAKE_RECORD", "PWD", "SHLVL", "_"]);
+    expect([...new Set(records(r.record, "env"))].filter((n) => !allowed.has(n))).toEqual([]);
+    expect(r.record).not.toMatch(/^env=.*=/m);
+    const cwds = records(r.record, "cwd");
+    expect(cwds).toHaveLength(5);
+    for (const c of cwds) {
+      expect(c.startsWith(REPO)).toBe(false);
+      expect(existsSync(c)).toBe(false);
+    }
+    for (const a of records(r.record, "argv")) {
+      expect(a).toMatch(/ --no-session-persistence( |$)/);
+      expect(a).toMatch(/ --strict-mcp-config( |$)/);
+      expect(a).toMatch(/ --tools WebSearch,WebFetch( |$)/);
+      expect(a).not.toMatch(/--model|--dangerously|--add-dir|--mcp-config|--continue|--resume/);
+    }
+  });
+});
