@@ -11,32 +11,31 @@ des alten Loops bis zum 10.11.2026 steht unverändert in `docs/state-bis-2026-11
 
 ## Lage
 
-Stand 23.11.2026, 06:45 (Loop-Triage, PRO-28101, `origin/dev` b5994b4). Stufe L3, Kill Switch aus, Budget core (2 von 11 Konten
+Stand 24.11.2026, 06:00 (Loop-Triage, PRO-28893, `origin/dev` f7351e3). Stufe L3, Kill Switch aus, Budget full (3 von 11 Konten
 mit mindestens 20 % Weekly-Rest), Drill grün (21.11., Gate-Hash e291578e5235). Ein Goal gleichzeitig; seit 22.11. wechseln sich
 karte und Traction ab (kunden, kanal, seite, reichweite, werbung), Matthias: „ein goal bitte nur, dafür bitte abwechseln, immer eins
-traction dazwischen“. Kurs-Check vom 23.11., 02:53 „auf Kurs“ (PRO-28015): Detail-Anteil 12,5 %, 3 Stunden seit dem letzten gemergten
-Goal mit Prio 1 oder 2.
+traction dazwischen“. Kurs-Check vom 24.11., 05:10 „auf Kurs“ (PRO-28885), aber der Detail-Anteil liegt mit 42,9 % (3 von 7
+Maker-Runs) über der Schwelle von 40 %; 6 Stunden seit dem letzten gemergten Goal mit Prio 1 oder 2.
 
-Seit der letzten Triage gemergt: kunden 11 (PR #357), betrieb 06 (PR #361), karte 01 (PR #369), karte 02 (PR #378), reichweite 01
-(PR #375), reichweite 02 (PR #393), paket 01 (PR #381), wache 01 (PR #395), die Goal-Dateien kunden 11 und 12, betrieb 07, konto 16,
-karte 01 bis 03, reichweite 01 bis 03, paket 01 und 02, wache 01 und werbung 01, die neuen Topics karte, wache, werbung, reichweite
-und paket (#364, #371, #373, #384 bis #387), konto 15 ruht (#363), Kommentare in fremden Repos gibt seit 22.11. der Tech Lead frei
-(#366), die Reparatur des Audits vom 22.11. (#362), die Audits vom 21. und 22.11. (#390, #359), Kritik (#356, #376) und Nacharbeit
-(#398). Die Kasse per Karte ist gebaut: drei Produkte bei Digistore24 (5, 20 und 50 EUR, 60 Tage Rückgabe), Testkäufe gemacht, zur
-Freigabe eingereicht; ob Digistore24 freigegeben hat, hat diese Triage nicht geprüft.
+Seit der letzten Triage gemergt: werbung 01 (PR #397), werbung 02 (PR #408), wache 02 (PR #407), kunden 13 (PR #401), reichweite 03
+(PR #409), die Goal-Dateien werbung 02, wache 02 und kunden 14 (#403, #402, #405), die Triage-Glieder vom 23.11. (#400: kunden 13
+und 14, wache 02, kunden 12 und konto 16 ruhen), das Audit vom 23.11. (#404, 93 rote Zeilen) samt Reparatur (#406), Kritik (#396),
+Nacharbeit (#410), Red Team (#411) und die Triage vom 23.11. (#399). Die erste Agenten-Probe (werbung 02, 23.11.) fand 0 von 5
+Antworten mit automatonhost.com. Ob Digistore24 die drei Produkte freigegeben hat, hat diese Triage nicht geprüft.
 
-Der Deploy läuft: `deploy.yml` grün für die letzten Merges bis b5994b4 (23.11., 03:54 UTC). Diese Triage hat die Produktion nicht
+Der Deploy läuft: `deploy.yml` grün für die letzten Merges bis f7351e3 (24.11., 05:34 UTC). Diese Triage hat die Produktion nicht
 gelesen.
 
-Es baut werbung 01 (PRO-28027, PR #397, Zyklus 3). Danach wartet reichweite 03 auf den Platz; kunden 12 startet frühestens 25.11.,
-kanal 06 am 26.11., betrieb 07 am 27.11., karte 03 am 30.11., paket 02 am 07.12. Neue Glieder gehen an den Tech Lead (PRO-28123,
-Priorität high): Kunde 1 bekommt Guthaben für die Schritte bis zum ersten Bericht, weil seine Inferenz seit 13.11. mit 402 endet und
-der Hausauftrag aus kunden 11 erst wirkt, wenn sein Modell antwortet (Schwere 4, vor kunden 12); kunden 12 zählt Zusprüche an Adressen
-ohne frühere Inferenz; zwei Befunde am Notschalter gehen als Kritik in werbung 01; die Selbsttests der Digistore-Werkzeuge kommen in
-`check`; über den Goal-PR #368 von konto 16 entscheidet der Tech Lead, weil konto 15 ruht.
+Es baut kein Goal. Nach reichweite 03 ist laut Wechsel karte dran, karte 03 startet aber frühestens 30.11.; kunden 14 und kanal 06
+frühestens 26.11., betrieb 07 am 27.11., paket 02 am 07.12. Neue Glieder gehen an den Tech Lead (PRO-28911, Priorität high): ein
+Glied an fehler, weil ein Agent für einen Menschen am 23.11. `/docs` und `/pricing` mit 404 bekam (Schwere 5, vor jedem anderen
+Goal); der Notschalter hält die direkt aufgerufene Kasse nicht, und die IPN schreibt dann trotzdem gut (Schwere 4); unsere
+Kommentare nennen automatonhost.com beim Namen (Schwere 4); die Agenten-Probe läuft jede Woche; Regel 10 wird im Code geprüft
+(`sendKontoTx`, `LocalSettler`); kanal 06, karte 03 und kunden 14 werden vor dem Start geschärft; der Selbsttest von
+`ops/video-record.sh` kommt in `check`.
 
-Audits: die vom 21. und 22.11. sind gemergt (47 und 60 rote Zeilen), die Reparatur vom 22.11. ist gemergt (PR #362); der Loop Master
-meldet zwei rote Audits in Folge, die roten Zeilen repariert der Loop. Das Audit vom 23.11. lag bei dieser Triage nicht vor.
+Audits: das vom 23.11. ist gemergt (93 rote Zeilen), seine Reparatur auch (PR #406); der Loop Master meldet zwei rote Audits in Folge,
+die roten Zeilen repariert der Loop. Das Audit vom 24.11. lag bei dieser Triage nicht vor.
 
 Guthaben beim Inferenz-Anbieter: Die Aufladung ist seit 12.11., 21:35 eingeschaltet (16 USD Schwelle, 25 USD Betrag,
 `docs/betrieb/guthaben.md`); ob sie hielt, misst betrieb 07 ab 27.11. (betrieb 05 ruht).
@@ -62,16 +61,21 @@ Gate mehr); Guthaben per Karte über Digistore24 im Konto von HTC.
 |---|---|---|
 | fehler | 01 bis 10 | DONE (08 PR #120, 09 PR #139, 10 PR #154) |
 | fehler | 11 Der Abgleich mit dem Fetcher-Cache läuft auch in CI | PAUSED (Kurs-Check 14.11., reine Testnacharbeit) |
-| wache | 01 Notschalter für die Karte | DONE (PR #395) |
+| fehler | 12 | Glied beim Tech Lead (PRO-28911): `/docs` und `/pricing` antworten, Fehler eines echten Nutzers vom 23.11. |
+| wache | 01 Notschalter für die Karte, 02 Kein toter Knopf zur Kasse | DONE (01 PR #395, 02 PR #407) |
+| wache | 03 | Glied beim Tech Lead (PRO-28911): der Notschalter hält auch die direkt aufgerufene Kasse |
 | karte | 01 Guthaben per Karte, 02 Der Weg zur Kasse | DONE (01 PR #369, 02 PR #378) |
-| karte | 03 Kauft jemand per Karte, und denkt sein Automaton danach? | PLANNED, startet frühestens 30.11.2026; Selbsttests der Digistore-Werkzeuge vorher (PRO-28123) |
-| werbung | 01 Karte zuerst, überall | ACTIVE (PRO-28027, PR #397, Zyklus 3); zwei Befunde am Notschalter für die Kritik (PRO-28123) |
+| karte | 03 Kauft jemand per Karte, und denkt sein Automaton danach? | PLANNED, startet frühestens 30.11.2026; Zahlen vor und nach werbung 01 getrennt (PRO-28911) |
+| werbung | 01 Karte zuerst, überall, 02 Empfehlen uns Agenten? | DONE (01 PR #397, 02 PR #408); erste Probe 0 von 5, Wochenlauf als Glied (PRO-28911) |
 | kunden | 01 bis 08 | DONE (01 PR #303, 02 PR #306, 03 PR #308, 04 PR #310, 05 PR #316, 06 PR #317, 07 PR #319, 08 PR #329) |
 | kunden | 09 Gutschriften je Auslöser, 10 Startgutschrift bei neuem Runtime-Pin | PAUSED (Kurs-Check 21.11., PR #327) |
 | kunden | 11 Kunde 1 kann Arbeit einreichen | DONE (PR #357): Hausauftrag des Dienstes, 25 Cent je gültigem Bericht |
-| kunden | 12 Reicht Kunde 1 ein, und zahlt er danach wieder? | PLANNED, startet frühestens 25.11.2026; davor Guthaben bis zum Bericht und Zählung je Adresse (PRO-28123) |
+| kunden | 12 Reicht Kunde 1 ein, und zahlt er danach wieder? | PAUSED (Tech Lead 23.11., PRO-28123), abgelöst durch 14 |
+| kunden | 13 Kunde 1 hat Guthaben für die Schritte bis zum ersten Bericht | DONE (PR #401) |
+| kunden | 14 Denkt Kunde 1 mit dem Schrittguthaben, reicht er ein, und zahlt er danach wieder? | PLANNED, startet frühestens 26.11.2026; liest vorher die Reservierung der 402 (PRO-28911) |
 | reichweite | 01 Eine Seite je Fehlermeldung, 02 Unsere Kommentare zeigen auf die passende Seite | DONE (01 PR #375, 02 PR #393) |
-| reichweite | 03 Ein Video zeigt den Umzug | PLANNED, wartet auf den Platz (`parallel_goals 1`) |
+| reichweite | 03 Ein Video zeigt den Umzug | DONE (PR #409) |
+| reichweite | 04 | Glied beim Tech Lead (PRO-28911): unsere Kommentare nennen automatonhost.com beim Namen |
 | paket | 01 Die Runtime kommt mit unserer Adresse | DONE (PR #381) |
 | paket | 02 Was das Paket gebracht hat | PLANNED, startet frühestens 07.12.2026 |
 | betrieb | 01 bis 04 | DONE (03 PR #79, 04 PR #96) |
@@ -85,7 +89,7 @@ Gate mehr); Guthaben per Karte über Digistore24 im Konto von HTC.
 | sandbox | 12 Ein Cookie bleibt in seiner Sandbox | DONE (PR #295) |
 | konto | 01 bis 14 | DONE (05 PR #220, 06 PR #247, 07 PR #251, 08 PR #257, 09 PR #261, 10 PR #264, 11 PR #269, 12 PR #276, 13 PR #286, 14 PR #297) |
 | konto | 15 Das Konto ist in der Produktion an | PAUSED (Matthias 22.11.: kein Zugang bei MoonPay, ruht, PR #363); Goal-PR #302 offen |
-| konto | 16 Ausgezahlt wird erst nach der Freigabe für SEPA | PLANNED, gestartet 22.11. ohne offenes Topic, Goal-PR #368 offen; Entscheidung beim Tech Lead (PRO-28123) |
+| konto | 16 Ausgezahlt wird erst nach der Freigabe für SEPA | PAUSED (Tech Lead 23.11., PRO-28123): hängt an konto 15, PR #368 geschlossen, Branch bleibt |
 | konto | 17 | Glied in `ROADMAP.md`, Datei fehlt; hängt an konto 15 |
 | konto | 18 Die Bereitschaftsprüfung unterscheidet Dienst unten von Schlüssel fehlt | PAUSED (Loop-Kritik 20.11., konto-kritik-2026-11-20-1) |
 | hosting | 01, 02 | DONE (01 PR #230, 02 PR #240) |
@@ -103,7 +107,7 @@ Gate mehr); Guthaben per Karte über Digistore24 im Konto von HTC.
 | domains | 07 Ein Neustart des Sandbox-Servers sperrt keinen Kunden aus | PAUSED (Kurs-Check 15.11., PR #186) |
 | kanal | 01 bis 04 | DONE (04 PR #106); Urteil über den Ertrag am 25.11. (`goals/kanal/ertrag.md`) |
 | kanal | 05 Urteil je Antwort | PAUSED, in `ROADMAP.md` entfällt, ersetzt durch 06 |
-| kanal | 06 Urteil je Antwort und eine neue Runde nur mit neuen Issues | PLANNED, startet frühestens 26.11.2026; über die nächste Runde entscheidet der Tech Lead |
+| kanal | 06 Urteil je Antwort und eine neue Runde nur mit neuen Issues | PLANNED, startet frühestens 26.11.2026; Urteil auch über die umgelinkten Kommentare (PRO-28911) |
 | kanal | 07, 08 | Glieder in `ROADMAP.md` |
 | seite | 01 bis 03 | DONE (03 PR #222) |
 | adressen | 01 bis 03 | DONE (01 PR #118, 02 PR #161, 03 PR #224) |
@@ -118,12 +122,13 @@ Gate mehr); Guthaben per Karte über Digistore24 im Konto von HTC.
 - konto 15 ruht nach Matthias' Entscheidung vom 22.11. (kein Zugang bei MoonPay); die Asana-Aufgabe zum Gate `security_settings`
   (1220710009513649) wartet, bis ein anderer Weg für die Karte feststeht. Goal-PR #302 bleibt offen.
 - Ohne Merge-Auftrag, mergen kann nur ein Mensch: Kritik-PRs #260 (anmeldung 05), #296 (sandbox 12), #339 (hosting 04), #347
-  (hosting 06), #383 (karte 02, Freigabe verfolgen), #396 (wache 01, direkter Link zur Kasse), Nacharbeit-PR #336, Audit-PR #321;
+  (hosting 06), #383 (karte 02, Freigabe verfolgen), Nacharbeit-PR #336, Audit-PR #321 (#396 ist seit 23.11. gemergt);
   ihre Köpfe stammen laut Loop Master aus keinem Lauf der zuständigen Rolle. Dazu PR #326 (`goals/sandbox/ANNAHMEN.md`, Tech Lead,
   Grund `branch`).
-- Gate-Abgleich: `gate.yaml` (3f1ac20, 14.11.) unverändert, `loop-constraints.md` (187d0a5, 22.11.) ändert nur Regel 9 und die Zeile
-  zu Kommentaren in fremden Repos (`public_post` entfällt, Freigabe durch den Tech Lead) und bringt keinen neuen Pfad; jede Pfadregel
-  der Deny List hat ihren Eintrag in `deny_paths`. Kein neuer Vorschlag.
+- Gate-Abgleich: `gate.yaml` (3f1ac20, 14.11.) und `loop-constraints.md` (187d0a5, 22.11.) seit der letzten Triage unverändert; jede
+  Pfadregel der Deny List hat ihren Eintrag in `deny_paths`, `src/payments/**` und `src/auth/**` prüft wie bisher Linse B gegen die
+  Goal-Datei. Die zwei Befunde des Red Teams vom 24.11. zu Regel 10 betreffen Code, keinen Pfad, und gehen als Glied 5 an den Tech
+  Lead (PRO-28911). Kein neuer Vorschlag.
 
 ## Watch List
 
@@ -180,20 +185,35 @@ Gate mehr); Guthaben per Karte über Digistore24 im Konto von HTC.
 - `/errors/<slug>/` und `/errors` antworten 404; unsere Kommentare verlinken ohne Schrägstrich (reichweite-kritik-2026-11-22-1). Die
   Fehlerseiten tragen keinen JSON-LD-Knoten für Fehler und Lösung (reichweite-kritik-2026-11-22-2); beides beim nächsten Goal an den
   Fehlerseiten
-- `check` lief bei dieser Triage unter Last 33,5 je Kern nicht in 10 Minuten durch; `test/relink-comments.test.ts` (zwei Fälle) und
-  der Selbsttest von `ops/traffic.sh` rissen das Zeitlimit von 60 s
+- Ob der Widerruf über `handleOps` an den EntryPoint unter die Ausnahme Hauptnetz von Regel 10 fällt, entscheidet nur Matthias, und
+  erst bevor er `CP_KONTO_MAINNET=1` setzt; konto 15 ruht, die Code-Sperre dafür ist Glied 5 (konto-redteam-2026-11-24-1)
+- Die 409 `house_pool_empty` nennt fest 4 Zusprüche, auch wenn Schrittguthaben die Tagesgrenze füllen (kunden-kritik-2026-11-23-2),
+  und `HOUSE_RUNTIME_KEY_NAME` in `src/bounties/house.ts:56` ist ein toter Alias (kunden-nacharbeit-2026-11-24-1); beides beim nächsten
+  Goal an `src/bounties/house.ts`
+- `ops/video-starts.mjs` kopiert `ownIpsOf` und die Regeln für Checker und Crawler aus `ops/error-pages-arrivals.mjs`; zwei Leitzahlen
+  aus demselben Log können verschieden zählen (reichweite-nacharbeit-2026-11-24-3)
+- Element `<video>` und die Zeile „26 seconds“ stehen in `src/public/index.html` und `src/public/error-pages.ts` doppelt; beim
+  nächsten neuen Rendern des Videos (reichweite-nacharbeit-2026-11-24-4)
+- `src/public/index.html` trägt den ersten Bildschirm zweimal (Marken `CARD` und `NOCARD`), Kasten und Befehl gleich; beim nächsten
+  Goal am ersten Bildschirm (werbung-kritik-2026-11-23-1)
+- Der Rückfall auf `CP_PROBE_ANSWERS` und `CP_PROBE_RECORD` in `ops/fixtures/agent-probe-claude.sh:12` greift nie
+  (werbung-nacharbeit-2026-11-24-1)
+- `check` lief bei dieser Triage unter Last rund 300 nicht in 10 Minuten durch (Exit 124); Regeln grün über 1628 Dateien, bis zum
+  Abbruch kein roter Test. Unter Node 24 scheitert `better-sqlite3` am ABI, `check` läuft hier nur mit Node 22 (`/usr/bin/node`)
 
 ## Annahmen
 
 - `goals/kunden/ANNAHMEN.md`: Zuordnung von Ledger und Zugriffslog, Messung nur lesend gegen die Produktion, die Annahmen von
-  kunden 01 bis 04 und die Annahmen von kunden 07, 08 und 11
+  kunden 01 bis 04 und die Annahmen von kunden 07, 08, 11 und 13
 - `goals/karte/ANNAHMEN.md`: Kurs der EZB am Bestelltag, Testbestellungen buchen nie, Schreibsperre für fremde Produkte im geteilten
   Konto, gemessenes Guthaben je Paket und 60 Tage Rückgabe (karte 01 und 02)
 - `goals/wache/ANNAHMEN.md`: Rechnung des Notschalters nur in `src/payments/card-way.ts`, Erstattungen der letzten 60 Tage, die
-  Weiterleitung `/card/<paket>` (wache 01)
+  Weiterleitung `/card/<paket>` (wache 01), die Annahmen von wache 02
+- `goals/werbung/ANNAHMEN.md`: erster Bildschirm mit Karte zuerst (werbung 01), Agenten-Probe mit fünf festen Fragen, Block
+  `-- Agent fetches --` in `ops/traffic.sh` und der Wochentakt als Vorschlag (werbung 02)
 - `goals/paket/ANNAHMEN.md`: GitHub-Release im Fork `matthiashippe/automaton`, Kennung `automaton-maintained/<version>`, eine
   gespeicherte Wahl bleibt (paket 01)
-- `goals/reichweite/ANNAHMEN.md`: Slugs, Rahmen und Leitzahl der Fehlerseiten (reichweite 01), Regeln zum Umlinken (reichweite 02)
+- `goals/reichweite/ANNAHMEN.md`: Slugs, Rahmen und Leitzahl der Fehlerseiten (reichweite 01), Regeln zum Umlinken (reichweite 02), Aufnahme und Einbau des Videos (reichweite 03)
 - `goals/abrechnung/ANNAHMEN.md`: die Quote nach außen seit abrechnung 05 (`docs/abrechnung/timeouts.md`, Abschnitt „Nach sieben
   Tagen“)
 - `goals/sandbox/ANNAHMEN.md`: Domain, Registrar, Token, Notschalter und Public Suffix List für freigegebene Ports (sandbox 07), die

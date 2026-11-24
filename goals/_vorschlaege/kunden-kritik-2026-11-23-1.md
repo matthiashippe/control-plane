@@ -6,3 +6,4 @@ Empfehlung: kunden 14 liest vor seiner Messung die `required_cents` der letzten 
 
 Ein Automaton schickt meist dasselbe `max_tokens` bei jedem Aufruf. Liegt die Reservierung über 10 Cent, bekommt Kunde 1 auch mit dem neuen Punkt nie eine Antwort, und kunden 14 läse das nur als „Widerlegt“, ohne die Ursache zu kennen.
 MVP: Funktion, weil kunden 14 sonst eine falsche Ursache misst.
+Übernommen: Glied 6 an den Tech Lead, PRO-28911, in kunden 14 vor dem Start am 26.11. (24.11.2026)

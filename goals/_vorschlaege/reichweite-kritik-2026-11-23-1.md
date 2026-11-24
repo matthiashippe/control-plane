@@ -6,3 +6,4 @@ Empfehlung: Vor dem Start von reichweite 03 die Schlusstafel ohne Zahlweg schrei
 
 werbung 01 verlangt, dass bei Notschalter an weder Startseite noch Fehlerseite eine Kasse verspricht; ein Video mit eingebrannter Karte hebelt das aus, und das GIF im README lässt sich gar nicht abschalten. Landet der Block nach `<!--/CARD-->` und vor `<!--NOCARD-->`, steht das Video bei Notschalter an vor dem ersten Bildschirm, liegt er im Block `CARD`, fehlt es dann ganz.
 MVP: Funktion, weil das Video sonst bei geschlossener Kasse einen Weg zeigt, der nicht geht, oder an der falschen Stelle steht.
+Übernommen: Glied 2 an den Tech Lead, PRO-28911, offen ist nur die eingebrannte Kartentafel und der Block video bei Notschalter an; die Stelle nach NOCARD hat reichweite 03 schon (PR #409) (24.11.2026)

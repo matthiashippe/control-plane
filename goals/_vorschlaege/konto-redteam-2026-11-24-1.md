@@ -11,3 +11,4 @@ Die Ausnahme Hauptnetz (Matthias, 17.11.2026) erlaubt auf Base wörtlich nur `ap
 Was die Schwere senkt: `CP_KONTO_MAINNET` ist nicht gesetzt, konto 15 wartet auf Matthias, und die Operation widerruft nur eine Erlaubnis, bewegt also kein Geld.
 
 Gegenprüfung (frischer Subagent): bestätigt.
+Übernommen: Glied 5 an den Tech Lead, PRO-28911; ob handleOps in Regel 10 kommt, steht auf der Watch List in STATE.md bis vor CP_KONTO_MAINNET=1 (24.11.2026)

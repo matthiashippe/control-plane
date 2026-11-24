@@ -9,3 +9,4 @@ Empfehlung: `LocalSettler` zieht nach `harness/` um, oder `settlerFromEnv` verwe
 Grundregel 10 verbietet Facilitator-Code, der selbst settlet, außerhalb von `harness/`; keine der beiden Ausnahmen (Base Sepolia, Hauptnetz für das Topic konto) deckt einen USDC-`transferWithAuthorization`. Heute schützt nur die Konfiguration: `CP_SETTLER=facilitator` in der Produktions-Umgebung, dazu meldet `ops/sperren.sh:96-103` einen anderen Wert erst im Nachhinein. Kein `check`, kein Eintrag in `gate.yaml` und kein Test fängt den Code ab. Der Code stammt vom 18.09. und ist älter als der Loop-Vertrag, deshalb Schwere 3 statt 5: Geld bewegt sich heute nicht, aber ein falsch gesetzter Schalter würde im Hauptnetz settlen.
 
 Gegenprüfung (frischer Subagent): bestätigt.
+Übernommen: Glied 5 an den Tech Lead, PRO-28911 (24.11.2026)

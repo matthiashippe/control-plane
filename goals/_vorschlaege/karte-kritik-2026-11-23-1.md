@@ -6,3 +6,4 @@ Empfehlung: Vor dem Start von karte 03 eine Zeile `Werbung ab: <completedAt des 
 
 karte 03 soll entscheiden, ob das nächste Glied Sichtbarkeit, Kasse oder den Weg nach dem Kauf baut. Ändert werbung 01 mitten im Fenster genau die Sichtbarkeit, misst ein Summenwert zwei Zustände der Seite, und die Empfehlung „werbung“ wäre schon gebaut. Das kostet ein Glied in der Kette, die zu Kartenkäufen führen soll.
 MVP: Funktion, weil nur getrennte Zahlen zeigen, ob die Karte nach werbung 01 gekauft wird.
+Übernommen: Glied 6 an den Tech Lead, PRO-28911, in karte 03 vor dem Start am 30.11. (24.11.2026)

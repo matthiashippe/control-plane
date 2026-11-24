@@ -6,3 +6,4 @@ Empfehlung: Text „Today's paid reports are taken. The next one is paid from mi
 
 Eine Runtime, die den Text liest, rechnet sonst mit einer Zahl, die nicht stimmt.
 MVP: Schönheit, weil Code und `retry_after` die Antwort schon richtig steuern.
+Übernommen: Watch List in STATE.md, beim nächsten Goal an src/bounties/house.ts (24.11.2026)

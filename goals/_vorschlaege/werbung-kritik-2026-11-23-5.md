@@ -4,3 +4,4 @@ Befund: Der Fehler eines echten Nutzers (zwei 404 eines `Claude-User` auf `/docs
 Beleg: `LOOP.md:91`; `ls goals/_vorschlaege/ | grep -c '^fehler-2026-11-23'` -> 0
 Empfehlung: Die Triage übernimmt `werbung-fehler-2026-11-23-1.md` als Glied des Topics `fehler`, vor jedem anderen Goal; künftige Fehler echter Nutzer heißen `fehler-<JJJJ-MM-TT>-<n>.md`, auch wenn ein anderes Goal sie findet. Umbenennen geht hier nicht, weil Punkt 8 dieses Goals nur `werbung-*.md` unter `goals/_vorschlaege/` zulässt.
 MVP: Funktion, weil der Agent, der für einen Betreiber nachsah, bei uns weder Anleitung noch Preis fand.
+Übernommen: Glied 1 an den Tech Lead, PRO-28911, mit werbung-fehler-2026-11-23-1 als Fehler echter Nutzer an fehler (24.11.2026)

@@ -7,3 +7,4 @@ Empfehlung: `ops/video-starts.mjs` importiert `ownIpsOf` aus `./error-pages-arri
 Beide Werkzeuge liefern Leitzahlen (Ankünfte auf den Fehlerseiten, Starts des Videos) aus demselben Zugriffslog. Ändert ein Goal die Crawler-Regel nur in einem, zählen die zwei Zahlen dieselben Besucher verschieden.
 
 Linse Q, Frage 2.
+Übernommen: Watch List in STATE.md, beim nächsten Goal an einer der beiden Leitzahlen aus dem Zugriffslog (24.11.2026)

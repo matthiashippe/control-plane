@@ -7,3 +7,4 @@ Empfehlung: Den Alias samt Kommentar in `src/bounties/house.ts:52` bis `:56` str
 Zwei Namen für denselben Wert laden ein späteres Goal ein, wieder den falschen zu importieren; genau diese Lücke hatte kunden-kritik-2026-11-22-4 beschrieben.
 
 Linse Q, Frage 3.
+Übernommen: Watch List in STATE.md, beim nächsten Goal an src/bounties/house.ts (24.11.2026)

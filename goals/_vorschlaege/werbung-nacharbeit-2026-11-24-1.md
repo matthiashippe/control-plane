@@ -7,3 +7,4 @@ Empfehlung: Die Zeilen 12 und 13 auf `answers="${PROBE_FAKE_ANSWERS:-}"` und `re
 test/agent-probe.test.ts:248 lässt in der Sitzung nur `HOME`, `PATH`, `LANG`, `CLAUDE_CONFIG_DIR`, `PROBE_FAKE_ANSWERS` und `PROBE_FAKE_RECORD` zu, der Rückfall kann also nie greifen.
 
 Linse Q, Frage 3.
+Übernommen: Watch List in STATE.md, beim nächsten Goal an ops/fixtures/agent-probe-claude.sh (24.11.2026)
