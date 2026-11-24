@@ -122,6 +122,26 @@ describe("send guard of rule 10", () => {
     expect(main.calls).toEqual([]);
   });
 
+  it("refuses payout and retire at an address that is not the spender on 8453 before the first request", async () => {
+    const main = node("0x2105");
+    const otherForwarder = forwarderAddress(ACCOUNT, OTHER, fixed);
+    const foreign = { ...permission, spender: otherForwarder };
+    const cases: Array<[string, KontoTx]> = [
+      ["payout at another address", { to: OTHER, data: RULE_10[4][1].data }],
+      ["retire at another address", { to: OTHER, data: RULE_10[5][1].data }],
+      ["payout at USDC", { to: MAINNET_USDC, data: RULE_10[4][1].data }],
+      ["retire at USDC", { to: MAINNET_USDC, data: RULE_10[5][1].data }],
+      ["payout at our forwarder for another spender", { to: forwarder, data: encodeFunctionData({ abi: FORWARDER_ABI, functionName: "payout", args: [foreign, 1_000_000n] }) }],
+      ["retire at our forwarder for another spender", { to: forwarder, data: encodeFunctionData({ abi: FORWARDER_ABI, functionName: "retire", args: [foreign] }) }],
+      ["payout selector without arguments", { to: forwarder, data: RULE_10[4][1].data.slice(0, 10) as Hex }],
+      ["retire with cut arguments", { to: forwarder, data: RULE_10[5][1].data.slice(0, 200) as Hex }],
+    ];
+    for (const [name, tx] of cases) {
+      await expect(sendKontoTx({ chainId: 8453, net: MAINNET_NET, account, transport: main.transport, tx }), name).rejects.toThrow(/rule 10/);
+    }
+    expect(main.calls).toEqual([]);
+  });
+
   it("sends every kind of rule 10 on 8453, also with the target in mixed case", async () => {
     for (const [name, tx] of RULE_10) {
       for (const to of [tx.to.toLowerCase() as Address, tx.to]) {

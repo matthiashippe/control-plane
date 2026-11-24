@@ -8,11 +8,11 @@
  *
  * On Base (8453) `requireRule10` also checks the kind of transaction (goals/regeln/01, rule 10, exception main network): only
  * approveWithSignature, revokeAsSpender and spend at SPEND_PERMISSION_MANAGER, the deployment of a forwarder at DEPLOY_PROXY and a
- * call of payout or retire at a forwarder go out. Everything else, empty data and handleOps included, is refused before the first
- * request. On Base Sepolia only the chain is checked.
+ * call of payout or retire at the forwarder that is the spender of the permission in its data go out. Everything else, empty data
+ * and handleOps included, is refused before the first request. On Base Sepolia only the chain is checked.
  */
 import { readFileSync } from "node:fs";
-import { concat, createWalletClient, getAbiItem, slice, toFunctionSelector, type Address, type Hex, type LocalAccount, type Transport } from "viem";
+import { concat, createWalletClient, decodeFunctionData, getAbiItem, slice, toFunctionSelector, type Address, type Hex, type LocalAccount, type Transport } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { KONTO_CHAIN_ID, MAINNET_CHAIN_ID, SEPOLIA_NET, SPEND_PERMISSION_MANAGER, type KontoNet } from "./config.js";
 import { FORWARDER_ABI, FORWARDER_BYTECODE } from "./forwarder.js";
@@ -61,6 +61,20 @@ function rule10Kinds(): Rule10 {
 }
 
 /**
+ * The spender of the permission in a call of payout or retire, lower case; null when the data does not decode. A forwarder is the
+ * spender of its own permission, so a call whose target is not that spender is no call of our own forwarder.
+ */
+function spenderOf(data: Hex): string | null {
+  try {
+    const { args } = decodeFunctionData({ abi: FORWARDER_ABI, data });
+    const permission = args?.[0] as { spender?: unknown } | undefined;
+    return typeof permission?.spender === "string" ? permission.spender.toLowerCase() : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Throws for every transaction on Base (8453) that rule 10 does not name. The error names target and selector, never the data.
  * Other chains are not checked here.
  */
@@ -72,7 +86,7 @@ export function requireRule10(chainId: number, tx: Pick<KontoTx, "to" | "data">)
   const selector = /^0x[0-9a-f]{8}/.test(data) ? (slice(data, 0, 4) as Hex) : null;
   if (selector && to === SPEND_PERMISSION_MANAGER.toLowerCase() && kinds.manager.has(selector)) return;
   if (to === DEPLOY_PROXY.toLowerCase() && data.startsWith(kinds.deployPrefix)) return;
-  if (selector && to !== SPEND_PERMISSION_MANAGER.toLowerCase() && to !== DEPLOY_PROXY.toLowerCase() && kinds.forwarder.has(selector)) return;
+  if (selector && kinds.forwarder.has(selector) && spenderOf(data) === to) return;
   throw new Error(`refused: rule 10 sends nothing on chain ${chainId} to ${to} with selector ${selector ?? "none"}`);
 }
 
