@@ -2553,20 +2553,17 @@ export function createApp(opts: AppOptions) {
 
   /**
    * Every price from the code, in the words /llms.txt uses for the same state: the card packages only while the card breaker
-   * is off (goals/wache/01) and credits are sold at all, the USDC tiers from the same source as /llms.txt, and the inference
-   * sentence for the same state of notForSaleNow(). Plain text like /llms.txt, because the reader is an agent. Never cached,
-   * because the answer changes with the breaker.
+   * is off (goals/wache/01), the USDC tiers from the same source as /llms.txt, and the inference sentence for the same state of
+   * notForSaleNow(). Plain text like /llms.txt, because the reader is an agent. Never cached, because the answer changes with
+   * the breaker.
    */
   const pricing = (c: Context<Env>) => {
     c.header("Cache-Control", "no-store");
     const pay = opts.pay ?? null;
     const notForSale = notForSaleNow();
-    const ends = endsAt();
-    const cardOpen = !intakeClosed && !cardBreaker(db, (opts.now ?? (() => new Date()))()).on;
+    const cardOpen = !cardBreaker(db, (opts.now ?? (() => new Date()))()).on;
     const body = [
       "# Prices: automatonhost.com",
-      "",
-      "Prices for credit and inference. The guide for agents is at " + siteOrigin() + "/llms.txt",
       "",
       ...(cardOpen
         ? [
@@ -2574,28 +2571,20 @@ export function createApp(opts: AppOptions) {
             "",
             "No crypto needed: your person can buy credit for an automaton by card, PayPal or Apple Pay.",
             ...CARD_PACKAGES.map((p) => `- ${(p.grossEurCents / 100).toFixed(2)} EUR: ${siteOrigin()}/card/${packageKey(p)}`),
-            "The page asks for the wallet address of the automaton, then opens the checkout.",
             "",
           ]
         : []),
       "## Credit in USDC",
       "",
-      ...(intakeClosed
-        ? ["- Credits are no longer sold here."]
-        : [
-            "- Topup tiers in USD: " + (pay?.tiers ?? TOPUP_TIERS_USD).join(", ") + ".",
-            `- x402 topup at ${siteOrigin()}/pay/{usd}/{wallet}, where {usd} is one of the tiers and {wallet} is the`,
-            "  wallet that signs.",
-            pay ? "- Payment goes to " + pay.payTo + " on " + pay.network + " (USDC " + pay.usdcAddress + ")." : "- Payments are not configured on this instance.",
-          ]),
+      "- Topup tiers in USD: " + (pay?.tiers ?? TOPUP_TIERS_USD).join(", ") + ".",
+      `- x402 topup at ${siteOrigin()}/pay/{usd}/{wallet}, where {usd} is one of the tiers and {wallet} is the`,
+      "  wallet that signs.",
       "",
       "## Inference",
       "",
       notForSale
         ? "This service does not sell access to language models; credits pay for jobs."
         : "OpenAI-compatible inference at /v1/chat/completions, billed at purchase cost times " + MARKUP + ".",
-      ...(notForSale ? [] : ["GET /v1/credits/history shows every booking of yours with purchase price and margin."]),
-      ...(ends ? [`Inference ends on ${sunsetDay(ends)}: from then on this service does not sell access to language models.`] : []),
       "",
       "Credits are not redeemable and not transferable.",
       "",
