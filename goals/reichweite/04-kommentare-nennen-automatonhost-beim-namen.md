@@ -1,7 +1,7 @@
 # Reichweite Goal 04: Unsere Kommentare nennen automatonhost.com beim Namen
 
 ## Status
-PLANNED
+ACTIVE
 
 ## Active Objective
 Die Agenten-Sessions der ersten Probe finden unseren Hinweis in den Conway-Issues, nennen den Dienst aber nicht und stufen ihn als
@@ -110,7 +110,7 @@ If you need it running before Conway fixes this: automatonhost.com, which I run,
   Testnamen und Ausgaben englisch.
 
 ## Done Condition
-- [ ] `ops/relink_rules.py` hat `LEAD`, `name` und `named` nach Entscheidungen 1 und 2, und die Regeln aus reichweite 02 bleiben
+- [x] `ops/relink_rules.py` hat `LEAD`, `name` und `named` nach Entscheidungen 1 und 2, und die Regeln aus reichweite 02 bleiben
       unverändert.
       MVP: Funktion, weil der erste Satz jedes Kommentars genau dieser geprüfte Satz sein muss und kein anderer Teil des Texts kippen darf.
       Prüfung: `python3 -I -c 'import sys; sys.path.insert(0, "ops"); import relink_rules as r; print(r.LEAD)' | grep -cxF -f - goals/reichweite/04-kommentare-nennen-automatonhost-beim-namen.md` muss mindestens `1` ausgeben.
@@ -118,7 +118,7 @@ If you need it running before Conway fixes this: automatonhost.com, which I run,
       Prüfung: `python3 -I -c 'import sys; sys.path.insert(0, "ops"); import relink_rules as r; q = chr(96) * 3; t = chr(96); b = "Your setup is fine.\n\nDisclosure: I run Handsel (https://automatonhost.com/fix), see " + t + "PostYourPrice" + t + ".\n\n" + q + "\nHandsel\n" + q + "\nPostYourPrice, not handsel_notice."; e = r.LEAD + "\n\nYour setup is fine.\n\nDisclosure: I run automatonhost.com (https://automatonhost.com/fix), see " + t + "PostYourPrice" + t + ".\n\n" + q + "\nHandsel\n" + q + "\nautomatonhost.com, not handsel_notice."; n = r.name(b); print(n == e, r.name(n) == n, r.named(n), r.named(b))'` muss genau `True True True False` ausgeben.
       Prüfung: `python3 -I -c 'import sys; sys.path.insert(0, "ops"); import relink_rules as r; b = "Use automatonhost.com, it speaks the API.\n\nI run Handsel."; print(r.name(b) == "Use automatonhost.com, it speaks the API.\n\nI run automatonhost.com.", r.named(b))'` muss genau `True True` ausgeben.
       Prüfung: `git diff origin/dev...HEAD -- ops/relink_rules.py | grep -cE '^-[^-]'` muss `0` ausgeben.
-- [ ] `ops/relink-comments.py --name` ändert im Trockenlauf nichts, ändert mit `--send` nur freigegebene eigene Kommentare per
+- [x] `ops/relink-comments.py --name` ändert im Trockenlauf nichts, ändert mit `--send` nur freigegebene eigene Kommentare per
       PATCH, liest jeden zurück, schreibt nur `ops/named-comments.log`, postet nie und kennt nur seine Argumente.
       MVP: Funktion, weil unter Matthias' Namen nur der Text erscheinen darf, den der Tech Lead mit seinem Wert freigegeben hat.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/relink-comments.test.ts` muss Exit-Code 0 haben.
@@ -127,7 +127,7 @@ If you need it running before Conway fixes this: automatonhost.com, which I run,
       Prüfung: `python3 -I ops/relink-comments.py --name --send 1 > /dev/null 2>&1; echo "exit=$?"` muss genau `exit=1` ausgeben.
       Prüfung: `grep -cE '"(-X|--method)", *"POST"|-X POST|--method POST' ops/relink-comments.py` muss `0` ausgeben.
       Prüfung: `git diff origin/dev...HEAD -- ops/relinked-comments.log | wc -l` muss `0` ausgeben.
-- [ ] Die Art ohne `--name` aus reichweite 02 bleibt, wie sie war: alle 17 Fälle von damals grün und unverändert, und `--verify`
+- [x] Die Art ohne `--name` aus reichweite 02 bleibt, wie sie war: alle 17 Fälle von damals grün und unverändert, und `--verify`
       zählt einen umbenannten Kommentar nicht als `differ`.
       MVP: Funktion, weil das Umbenennen die Links aus reichweite 02 und deren Prüfung nicht brechen darf.
       Prüfung: `B=$(git merge-base origin/dev HEAD); for t in "the dry run changes nothing and prints sha12 for every comment it would change" "keeps every character outside the old links" "points a link in code at the same path on automatonhost.com" "maps the titles of 2026-11-22 to their pages" "leaves comments without an old link alone" "never touches a comment of another account" "refuses --send without --approved" "refuses when the count does not match the approved values" "refuses when a comment changed since it was approved" "skips a comment that already carries the approved text" "patches only the approved comments and reads each one back" "stops with DIFFERS when the read back differs" "writes one log line per patch without an address or a text" "verify reports every logged comment as same and no old link left" "never posts a new comment" "exits 1 on an unknown argument before asking GitHub" "exits 2 when GitHub cannot be read"; do a=$(git show $B:test/relink-comments.test.ts | awk -v t="\"$t\"" 'index($0,t){f=1} f{print} f&&/^  }, T\);$/{exit}' | sha256sum); b=$(awk -v t="\"$t\"" 'index($0,t){f=1} f{print} f&&/^  }, T\);$/{exit}' test/relink-comments.test.ts | sha256sum); [ "$a" = "$b" ] || echo "geändert: $t"; done` muss nichts ausgeben.
@@ -145,7 +145,7 @@ If you need it running before Conway fixes this: automatonhost.com, which I run,
       Prüfung (Netz): `python3 -I ops/relink-comments.py --name | grep -E '^name: '` muss `name: 0 to change, <u> already named, <a> comments of matthiashippe` mit a mindestens 30 und u gleich a ausgeben.
       Prüfung (Netz): `python3 -I ops/relink-comments.py --verify | tail -n 1` muss `relink verify: <s> same, 0 differ, 0 with old links` mit s gleich der Ausgabe von `grep -c '^[0-9]' ops/relinked-comments.log` ausgeben.
       Prüfung (Netz): `gh api -X GET search/issues -f q='repo:Conway-Research/automaton commenter:matthiashippe' -f per_page=100 --jq '.items[].number' | while read -r n; do gh api "repos/Conway-Research/automaton/issues/$n/comments" --paginate --jq '.[] | select(.user.login=="matthiashippe") | .body | split("\n\n")[0] | test("^If you need it running before Conway fixes this: automatonhost\\.com")'; done | sort | uniq -c | sed 's/^ *//'` muss genau eine Zeile `<n> true` mit n mindestens 30 ausgeben.
-- [ ] Ein Test hält den Selftest von `ops/video-record.sh` in beide Richtungen und die Gleichheit von `MODEL_JS` fest, ohne dass
+- [x] Ein Test hält den Selftest von `ops/video-record.sh` in beide Richtungen und die Gleichheit von `MODEL_JS` fest, ohne dass
       eines der beiden Skripte sich ändert.
       MVP: Funktion, weil der Wächter gegen Schlüssel im öffentlichen Transkript sonst unbemerkt brechen kann und die Modellwahl gegen
       Claude und Anthropic nur in einer der beiden Dateien gelten könnte.
@@ -155,7 +155,7 @@ If you need it running before Conway fixes this: automatonhost.com, which I run,
       Prüfung: `bash ops/video-record.sh --selftest 2>&1 | tail -n 1` muss genau `VIDEO RECORD SELFTEST OK` ausgeben.
       Prüfung: `a=$(grep -m1 '^MODEL_JS=' ops/automaton-live.sh); b=$(grep -m1 '^MODEL_JS=' ops/video-record.sh); [ -n "$a" ] && [ "$a" = "$b" ] && echo same || echo differ` muss genau `same` ausgeben.
       Prüfung: `git diff --name-only origin/dev...HEAD -- ops/video-record.sh ops/automaton-live.sh | wc -l` muss `0` ausgeben.
-- [ ] Die Entscheidungen stehen in `goals/reichweite/ANNAHMEN.md`, der Diff bleibt in den Pfaden dieses Goals, kein Test fällt weg,
+- [x] Die Entscheidungen stehen in `goals/reichweite/ANNAHMEN.md`, der Diff bleibt in den Pfaden dieses Goals, kein Test fällt weg,
       kein neues Paket, und nichts im Repo nennt einen Schlüssel, eine Adresse oder einen Namen eines Kunden.
       MVP: Funktion, weil ein späteres Goal wissen muss, welcher Text unter Matthias' Namen steht und warum.
       Prüfung: `grep -cE '^- [0-9-]+, reichweite 04: ' goals/reichweite/ANNAHMEN.md` muss mindestens `8` ausgeben.
@@ -163,7 +163,7 @@ If you need it running before Conway fixes this: automatonhost.com, which I run,
       Prüfung: `git diff --name-only origin/dev...HEAD -- src docs package.json pnpm-lock.yaml ops/relinked-comments.log ops/agent-probe.sh ops/card-breaker.sh ops/post-the-answers.py ops/before-the-answers.py ops/answers_args.py ops/posted-answers.log ops/traffic.sh ops/github-yield.sh ops/error-pages-arrivals.mjs | wc -l` muss `0` ausgeben.
       Prüfung: `git diff --diff-filter=D --name-only $(git merge-base origin/dev HEAD) HEAD -- test | wc -l` muss `0` ausgeben.
       Prüfung: `cat ops/named-comments.log ops/relink_rules.py ops/relink-comments.py goals/reichweite/ANNAHMEN.md test/video-record-selftest.test.ts | grep -cE '0x[0-9a-fA-F]{40}|[0-9a-fA-F]{64}|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[a-z]{2,}'` muss `0` ausgeben.
-- [ ] `check` ist grün.
+- [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
 - [ ] goal-verifier PASS (K und B)
 
@@ -198,5 +198,36 @@ If you need it running before Conway fixes this: automatonhost.com, which I run,
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-24 Zyklus 1: Punkte 1, 2, 3, 5, 6, 7 gebaut (`LEAD`, `name`, `named`, `ops/relink-comments.py --name` mit `ops/named-comments.log`, `--verify` über beide Protokolle, `test/video-record-selftest.test.ts`), Trockenlauf `--name` gegen GitHub zur Freigabe von Punkt 4 auf PRO-29176 (30 to change, 0 already named, 30 comments of matthiashippe, je Kommentar unten). Rot gesehen: die 10 neuen Fälle in `test/relink-comments.test.ts` gegen `ops/relink-comments.py` von `dev` (10 failed), „relink verify compares a named comment with its newest logged value“ mit Vergleich nur gegen die eigene Zeile (DIFFERS 9000), die drei Fälle in `test/video-record-selftest.test.ts` mit `guard() { cat; }` in `ops/video-record.sh` und geänderter Zeile `MODEL_JS=`, „fails its selftest when guard lets every line through“ dazu mit wirkungsloser Ersetzung (Selftest OK statt FAIL). Prüfbefehle: Punkt 1 `1`, `lead ok`, `True True True False`, `True True`, `0`; Punkt 2 vitest 27 passed Exit 0, keine Zeile `fehlt:`, `exit=1`, `exit=1`, `0`, `0`; Punkt 3 keine Zeile `geändert:`, vitest `-t` Exit 0; Punkt 5 vitest 3 passed Exit 0, keine Zeile `fehlt:`, `VIDEO RECORD SELFTEST FAIL`, `VIDEO RECORD SELFTEST OK`, `same`, `0`; Punkt 6 `10`, `0`, `0`, `0`, `0`; Punkt 7 `check: grün in 439 s` an ba644d6, Job `check` an PR #424 grün; Punkt 4 offen bis `ok name` des Tech Lead.
+  - https://github.com/Conway-Research/automaton/issues/447#issuecomment-6835431307 page verify-500-database-error sha12 039a737cf10b: Satz LEAD als erster Absatz, PostYourPrice wird automatonhost.com
+  - https://github.com/Conway-Research/automaton/issues/443#issuecomment-6769421243 page home sha12 9b0943bfa3b2: Satz LEAD als erster Absatz, PostYourPrice wird automatonhost.com
+  - https://github.com/Conway-Research/automaton/issues/442#issuecomment-6769384327 page verify-500-database-error sha12 d5fcf6a5488d: Satz LEAD als erster Absatz, PostYourPrice wird automatonhost.com
+  - https://github.com/Conway-Research/automaton/issues/440#issuecomment-6769349738 page invalid-or-expired-nonce sha12 55b84dbd2959: Satz LEAD als erster Absatz, PostYourPrice wird automatonhost.com
+  - https://github.com/Conway-Research/automaton/issues/435#issuecomment-6520848825 page verify-500-database-error sha12 82b9dd87b037: Satz LEAD als erster Absatz, PostYourPrice wird automatonhost.com
+  - https://github.com/Conway-Research/automaton/issues/434#issuecomment-6789427945 page invalid-or-expired-nonce sha12 495fb230d472: Satz LEAD als erster Absatz, PostYourPrice wird automatonhost.com
+  - https://github.com/Conway-Research/automaton/issues/432#issuecomment-6520875093 page invalid-or-expired-nonce sha12 aa7b8cdaa874: Satz LEAD als erster Absatz, PostYourPrice wird automatonhost.com
+  - https://github.com/Conway-Research/automaton/issues/430#issuecomment-6789453609 page home sha12 d658d8500b68: Satz LEAD als erster Absatz, PostYourPrice wird automatonhost.com
+  - https://github.com/Conway-Research/automaton/issues/427#issuecomment-6789479781 page credits-never-granted sha12 429ea2a3627b: Satz LEAD als erster Absatz, PostYourPrice wird automatonhost.com
+  - https://github.com/Conway-Research/automaton/issues/419#issuecomment-6520901615 page verify-500-database-error sha12 6105f9e9cc05: Satz LEAD als erster Absatz, PostYourPrice wird automatonhost.com
+  - https://github.com/Conway-Research/automaton/issues/408#issuecomment-6835502716 page verify-500-database-error sha12 6c6125f0827c: Satz LEAD als erster Absatz, PostYourPrice wird automatonhost.com
+  - https://github.com/Conway-Research/automaton/issues/406#issuecomment-6835466852 page invalid-or-expired-nonce sha12 2d18011c9d64: Satz LEAD als erster Absatz, PostYourPrice wird automatonhost.com
+  - https://github.com/Conway-Research/automaton/issues/393#issuecomment-5742781237 page credits-never-granted sha12 af0ce8e790db: Satz LEAD als erster Absatz, sonst unverändert
+  - https://github.com/Conway-Research/automaton/issues/392#issuecomment-5781361252 page invalid-or-expired-nonce sha12 a12bcd170b4e: Satz LEAD als erster Absatz, Handsel wird automatonhost.com
+  - https://github.com/Conway-Research/automaton/issues/390#issuecomment-5748925311 page home sha12 70e3d04036d0: Satz LEAD als erster Absatz, sonst unverändert
+  - https://github.com/Conway-Research/automaton/issues/385#issuecomment-5805015103 page home sha12 63cd7eadd92f: Satz LEAD als erster Absatz, Handsel wird automatonhost.com
+  - https://github.com/Conway-Research/automaton/issues/379#issuecomment-5748925721 page verify-500-database-error sha12 1102f099110e: Satz LEAD als erster Absatz, sonst unverändert
+  - https://github.com/Conway-Research/automaton/issues/377#issuecomment-5742781149 page verify-500-database-error sha12 8dadaeef387d: Satz LEAD als erster Absatz, sonst unverändert
+  - https://github.com/Conway-Research/automaton/issues/376#issuecomment-5781362033 page invalid-or-expired-nonce sha12 4eb0583ad7b9: Satz LEAD als erster Absatz, Handsel wird automatonhost.com
+  - https://github.com/Conway-Research/automaton/issues/373#issuecomment-5805000566 page home sha12 0255d69a3259: Satz LEAD als erster Absatz, sonst unverändert
+  - https://github.com/Conway-Research/automaton/issues/372#issuecomment-5781362775 page verify-500-database-error sha12 f3c20f73ab66: Satz LEAD als erster Absatz, Handsel wird automatonhost.com
+  - https://github.com/Conway-Research/automaton/issues/359#issuecomment-5889884681 page invalid-or-expired-nonce sha12 4fad7f5043e1: Satz LEAD als erster Absatz, Handsel wird automatonhost.com
+  - https://github.com/Conway-Research/automaton/issues/356#issuecomment-5889856106 page invalid-or-expired-nonce sha12 5f07d29d65f8: Satz LEAD als erster Absatz, Handsel wird automatonhost.com
+  - https://github.com/Conway-Research/automaton/issues/355#issuecomment-5748924904 page invalid-or-expired-nonce sha12 bb38eb651efb: Satz LEAD als erster Absatz, sonst unverändert
+  - https://github.com/Conway-Research/automaton/issues/353#issuecomment-5889830336 page invalid-or-expired-nonce sha12 1657c0d11255: Satz LEAD als erster Absatz, Handsel wird automatonhost.com
+  - https://github.com/Conway-Research/automaton/issues/339#issuecomment-5742781023 page verify-500-database-error sha12 d5938151de0a: Satz LEAD als erster Absatz, sonst unverändert
+  - https://github.com/Conway-Research/automaton/issues/335#issuecomment-5804984649 page home sha12 f1fcb524c9e5: Satz LEAD als erster Absatz, Handsel wird automatonhost.com
+  - https://github.com/Conway-Research/automaton/issues/333#issuecomment-5796242563 page invalid-or-expired-nonce sha12 d96028e7c580: Satz LEAD als erster Absatz, Handsel wird automatonhost.com
+  - https://github.com/Conway-Research/automaton/issues/294#issuecomment-5796218247 page home sha12 85d9b5ccc434: Satz LEAD als erster Absatz, Handsel wird automatonhost.com
+  - https://github.com/Conway-Research/automaton/issues/293#issuecomment-5796193319 page credits-never-granted sha12 5b4eaef9d703: Satz LEAD als erster Absatz, Handsel wird automatonhost.com
 
 ## Blockers
