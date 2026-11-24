@@ -64,6 +64,11 @@ MVP: Funktion, weil eine Regel, die nur die Konfiguration hält, beim ersten fal
       Prüfung (Netz): `n=$(gh pr list -R matthiashippe/control-plane --head goal/regeln-01 --state all --json number -q '.[0].number'); gh pr checks "${n:?}" -R matthiashippe/control-plane --json name,state -q '.[] | select(.name=="e2e") | .state'` muss `SUCCESS` ausgeben.
 - [x] `check` ist grün.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
+- [ ] Auf 8453 geht `payout` oder `retire` nur an die Adresse, die in der Erlaubnis der Daten als `spender` steht, also an die
+      Weiterleitung selbst; an jede andere Adresse verweigert `sendKontoTx` vor der ersten Anfrage (Kritik Tech Lead 24.11.2026:
+      heute lässt `requireRule10` beide Selektoren an jede Adresse außer Manager und Proxy durch, die Leitzahl ist nicht 0).
+      Prüfung: `pnpm -s vitest run test/konto-send-guard.test.ts --reporter=json 2>/dev/null | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const j=JSON.parse(s);const t=j.testResults.flatMap(f=>f.assertionResults).filter(a=>a.status==="passed").map(a=>a.title);console.log([/refuses payout and retire at an address that is not the spender/,/sends every kind of rule 10 on 8453/].every(r=>t.some(x=>r.test(x)))?"alle":"fehlt")})'` muss `alle` ausgeben.
+      Prüfung: `pnpm -s vitest run test/konto-send-guard.test.ts test/konto-mainnet.test.ts test/konto-payout.test.ts` muss Exit-Code 0 haben.
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
