@@ -2,9 +2,15 @@
 # The breaker of the card checkout (goals/wache/01, point 4). Read-only, changes nothing on the server.
 #   ops/card-breaker.sh                 asks the server over ssh (CP_DEPLOY_HOST, CP_DEPLOY_KEY as for ops/card-orders.sh)
 #   ops/card-breaker.sh --container     on the server itself: asks the running container deploy-cp-1 (used by ops/watchdog.sh)
+#   ops/card-breaker.sh [--container] --held
+#                                       the number of card orders the IPN held (goals/wache/03) instead of the breaker
 #
 # Prints exactly one line:
 #   card_refunds_60d <n> shortfall_usd <dollars>.<cents> breaker on|off
+# or with --held:
+#   card_orders_held <n>
+# With --held it imports heldCardOrders from the same module instead of cardBreaker, so the rule of a held order lives only in
+# src/payments/card-way.ts as well; only the count leaves the container.
 # It does not compute anything itself: inside the container it imports cardBreaker from the compiled service
 # (CARD_WAY_JS, default /app/dist/payments/card-way.js), so the rule of the breaker lives only in src/payments/card-way.ts.
 # The database (CP_DB_PATH of the container, default /data/cp.db) is opened here with readonly: true and handed to cardBreaker.
@@ -19,6 +25,7 @@
 set -uo pipefail
 
 LINE_RE='^card_refunds_60d [0-9]+ shortfall_usd [0-9]+\.[0-9]{2} breaker (on|off)$'
+HELD_RE='^card_orders_held [0-9]+$'
 NOW_RE='^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}(:[0-9]{2}(\.[0-9]{1,3})?)?Z$'
 NOW="${CP_WINDOW_NOW:-}"
 
@@ -27,15 +34,21 @@ unreadable() {
   exit 1
 }
 
-case "${1:-}" in
-  "" | --container) [[ $# -le 1 ]] || { echo "usage: ops/card-breaker.sh [--container]"; exit 2; } ;;
-  *) echo "usage: ops/card-breaker.sh [--container]"; exit 2 ;;
-esac
+IN_CONTAINER=0
+HELD=0
+for arg in "$@"; do
+  case "$arg" in
+    --container) [[ $IN_CONTAINER == 0 ]] || { echo "usage: ops/card-breaker.sh [--container] [--held]"; exit 2; }; IN_CONTAINER=1 ;;
+    --held) [[ $HELD == 0 ]] || { echo "usage: ops/card-breaker.sh [--container] [--held]"; exit 2; }; HELD=1 ;;
+    *) echo "usage: ops/card-breaker.sh [--container] [--held]"; exit 2 ;;
+  esac
+done
+[[ $HELD == 1 ]] && LINE_RE="$HELD_RE"
 
 # A clock in another format would end up in a command line on the server, so it never gets that far.
 [[ -z "$NOW" || "$NOW" =~ $NOW_RE ]] || unreadable
 
-if [[ "${1:-}" == "--container" ]]; then
+if [[ $IN_CONTAINER == 1 ]]; then
   CONTAINER="${CP_CARD_CONTAINER:-deploy-cp-1}"
   CARD_WAY_JS="${CP_CARD_WAY_JS:-/app/dist/payments/card-way.js}"
   # A quoted heredoc: the shell expands nothing inside it. Module and clock come as arguments after -e.
@@ -44,6 +57,20 @@ const [modulePath, nowRaw] = process.argv.slice(1);
 (async () => {
   try {
     const mod = await import(require("node:url").pathToFileURL(modulePath).href);
+    if (process.argv[3] === "--held") {
+      const heldCardOrders = mod.heldCardOrders || (mod.default && mod.default.heldCardOrders);
+      if (typeof heldCardOrders !== "function") throw new Error("no heldCardOrders");
+      const Database = require("better-sqlite3");
+      const db = new Database(process.env.CP_DB_PATH || "/data/cp.db", { readonly: true, fileMustExist: true });
+      let n;
+      try {
+        n = heldCardOrders(db);
+      } finally {
+        db.close();
+      }
+      console.log(`card_orders_held ${BigInt(n)}`);
+      return;
+    }
     const cardBreaker = mod.cardBreaker || (mod.default && mod.default.cardBreaker);
     if (typeof cardBreaker !== "function") throw new Error("no cardBreaker");
     const now = nowRaw ? new Date(nowRaw) : new Date();
@@ -69,7 +96,11 @@ const [modulePath, nowRaw] = process.argv.slice(1);
 JS
 )
   # stdin from /dev/null: over ssh this script itself arrives on stdin, and docker would swallow the rest of it.
-  out=$(docker exec "$CONTAINER" node -e "$QUERY" "$CARD_WAY_JS" "$NOW" </dev/null 2>/dev/null)
+  if [[ $HELD == 1 ]]; then
+    out=$(docker exec "$CONTAINER" node -e "$QUERY" "$CARD_WAY_JS" "$NOW" --held </dev/null 2>/dev/null)
+  else
+    out=$(docker exec "$CONTAINER" node -e "$QUERY" "$CARD_WAY_JS" "$NOW" </dev/null 2>/dev/null)
+  fi
   [[ "$out" =~ $LINE_RE ]] || unreadable
   printf '%s\n' "$out"
   exit 0
@@ -80,6 +111,7 @@ KEY="${CP_DEPLOY_KEY:-$HOME/.ssh/id_ed25519_automaton}"
 SELF="${BASH_SOURCE[0]}"
 
 REMOTE="bash -s -- --container"
+[[ $HELD == 1 ]] && REMOTE="$REMOTE --held"
 [[ -n "$NOW" ]] && REMOTE="CP_WINDOW_NOW=$NOW $REMOTE"
 out=$(ssh -i "$KEY" -o BatchMode=yes -o ConnectTimeout=10 "$HOST" "$REMOTE" <"$SELF" 2>/dev/null)
 rc=$?
