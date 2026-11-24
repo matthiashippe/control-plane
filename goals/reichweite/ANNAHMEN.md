@@ -53,3 +53,4 @@
 - 2026-11-24, reichweite 04: Freigabe-Issue name: PRO-29176
 - 2026-11-24, reichweite 04: vor --send: card_refunds_60d 0 shortfall_usd 0.00 breaker off
 - 2026-11-24, reichweite 04: Neuansatz 1 (Tech Lead): Punkt 4 ist neu gefasst, weil er `LEAD` vor allen 30 Kommentaren verlangte und der Satz in #335, #373, #385 und #393 falsch ist oder dem Kommentar widerspricht, die Freigabe dort also nie kommen kann; jetzt verlangt er `LEAD` vor allen außer diesen vier (`NO_LEAD`, nur Namenstausch), mindestens 28 statt 30 Zeilen in `ops/named-comments.log` (#373 und #393 tragen keinen alten Namen und bleiben unverändert) und prüft die Freigabe je Zeile gegen ein `ok name` vor genau dieser Zeile, weil die alte Prüfung jede Freigabe nach dem ersten Senden verwarf und eine zweite Freigabe damit unerreichbar war.
+- 2026-11-24, reichweite 04: vor --send: card_refunds_60d 0 shortfall_usd 0.00 breaker off
