@@ -56,7 +56,7 @@ import {
 } from "./checkout/deliver.js";
 import { converse, ConversationError, findOffer, MAX_QUESTIONS } from "./checkout/conversation.js";
 import { stripeFromEnv } from "./payments/stripe.js";
-import { cardBreaker, cardRedirect, stripCardWay } from "./payments/card-way.js";
+import { cardBreaker, cardRedirect, packageKey, stripCardWay } from "./payments/card-way.js";
 import { isStripeTestKey } from "./payments/stripe-key.js";
 import { germanFrame } from "./public/frame.de.js";
 import { wallets, agentsPerBounty, marketSplit } from "./bounties/ours.js";
@@ -110,6 +110,7 @@ import { automatonNotFound, createAutomatonService, type AutomatonService } from
 import { registerRelay } from "./relay/routes.js";
 import type { Settler } from "./payments/settler.js";
 import {
+  CARD_PACKAGES,
   CARD_PAYMENTS_UNAVAILABLE,
   handleDigistoreIpn,
   usablePassphrase,
@@ -2542,6 +2543,67 @@ export function createApp(opts: AppOptions) {
     ].join("\n");
     return c.text(body);
   });
+
+  /**
+   * goals/fehler/12: an agent reading for a person asked /docs and /pricing on 2026-11-23 and got 404 for both. /llms.txt is
+   * already the guide for agents, so /docs points there instead of to a second text that would drift apart; 302, so a page of
+   * its own can follow later without a cached redirect in the way.
+   */
+  for (const path of ["/docs", "/docs/"]) app.get(path, (c) => c.redirect(`${siteOrigin()}/llms.txt`, 302));
+
+  /**
+   * Every price from the code, in the words /llms.txt uses for the same state: the card packages only while the card breaker
+   * is off (goals/wache/01) and credits are sold at all, the USDC tiers from the same source as /llms.txt, and the inference
+   * sentence for the same state of notForSaleNow(). Plain text like /llms.txt, because the reader is an agent. Never cached,
+   * because the answer changes with the breaker.
+   */
+  const pricing = (c: Context<Env>) => {
+    c.header("Cache-Control", "no-store");
+    const pay = opts.pay ?? null;
+    const notForSale = notForSaleNow();
+    const ends = endsAt();
+    const cardOpen = !intakeClosed && !cardBreaker(db, (opts.now ?? (() => new Date()))()).on;
+    const body = [
+      "# Prices: automatonhost.com",
+      "",
+      "Prices for credit and inference. The guide for agents is at " + siteOrigin() + "/llms.txt",
+      "",
+      ...(cardOpen
+        ? [
+            "## Credit by card, PayPal or Apple Pay",
+            "",
+            "No crypto needed: your person can buy credit for an automaton by card, PayPal or Apple Pay.",
+            ...CARD_PACKAGES.map((p) => `- ${(p.grossEurCents / 100).toFixed(2)} EUR: ${siteOrigin()}/card/${packageKey(p)}`),
+            "The page asks for the wallet address of the automaton, then opens the checkout.",
+            "",
+          ]
+        : []),
+      "## Credit in USDC",
+      "",
+      ...(intakeClosed
+        ? ["- Credits are no longer sold here."]
+        : [
+            "- Topup tiers in USD: " + (pay?.tiers ?? TOPUP_TIERS_USD).join(", ") + ".",
+            `- x402 topup at ${siteOrigin()}/pay/{usd}/{wallet}, where {usd} is one of the tiers and {wallet} is the`,
+            "  wallet that signs.",
+            pay ? "- Payment goes to " + pay.payTo + " on " + pay.network + " (USDC " + pay.usdcAddress + ")." : "- Payments are not configured on this instance.",
+          ]),
+      "",
+      "## Inference",
+      "",
+      notForSale
+        ? "This service does not sell access to language models; credits pay for jobs."
+        : "OpenAI-compatible inference at /v1/chat/completions, billed at purchase cost times " + MARKUP + ".",
+      ...(notForSale ? [] : ["GET /v1/credits/history shows every booking of yours with purchase price and margin."]),
+      ...(ends ? [`Inference ends on ${sunsetDay(ends)}: from then on this service does not sell access to language models.`] : []),
+      "",
+      "Credits are not redeemable and not transferable.",
+      "",
+    ].join("\n");
+    return c.text(body);
+  };
+  app.get("/pricing", pricing);
+  app.get("/pricing/", pricing);
 
   // --- Topup (x402, without an API key: the runtime client sends none here) ---
 

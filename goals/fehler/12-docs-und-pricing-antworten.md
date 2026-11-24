@@ -1,7 +1,7 @@
 # Fehler Goal 12: /docs und /pricing antworten
 
 ## Status
-PLANNED
+ACTIVE
 
 ## Active Objective
 Am 2026-11-23 um 13:58:05 UTC holte ein Agent, der für einen Menschen liest (`Claude-User`), von einer fremden Adresse auf
