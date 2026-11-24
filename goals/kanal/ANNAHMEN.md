@@ -43,3 +43,4 @@
   `--send` ist ebenfalls `REFUSED`, weil der Trockenlauf die Werte selbst rechnet.
 - 2026-11-13, kanal 04: Die letzte Zeile von `--selftest` steht ohne Einrückung, damit `tail -1` mit `SELFTEST OK` beginnt, wie der
   Prüfbefehl von Punkt 3 es verlangt. Der Hinweis in `ops/sperren.sh` nennt statt `--send 3` den Trockenlauf und `--approved`.
+- 2026-11-24, Reparatur Audit 2026-11-24: --verify-posted nimmt als freigegebenen Stand auch den Entwurf nach dem freigegebenen Relink von reichweite 02 (PRO-27822), nur für Kommentare in ops/relinked-comments.log mit passendem Hash; jede andere Abweichung bleibt Exit 1.

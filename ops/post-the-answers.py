@@ -121,6 +121,34 @@ def live_differs(url: str, expected: str, called: str) -> str | None:
     return None
 
 
+def relinked_slug(url: str, number: str, live: str) -> str | None:
+    """The page slug of an approved relink (goals/reichweite/02, PRO-27822) that `live` is the result of, else None.
+
+    Only when ops/relinked-comments.log has a line for this comment id and issue number whose `new` value is the sha12 of `live`.
+    The value is `relink-comments.py`'s: first 12 hex digits of sha256 over the text in UTF-8.
+    """
+    cid = re.search(r"#issuecomment-(\d+)$", url).group(1)
+    path = OPS / "relinked-comments.log"
+    if not path.is_file():
+        return None
+    value = hashlib.sha256(live.encode("utf-8")).hexdigest()[:12]
+    for line in path.read_text(encoding="utf-8").splitlines():
+        f = line.split()
+        if len(f) == 11 and f[1] == "comment" and f[3] == "issue" and f[5] == "page" and f[7] == "old" and f[9] == "new" \
+                and f[2] == cid and f[4] == number and f[10] == value:
+            return f[6]
+    return None
+
+
+def live_text(url: str) -> str | None:
+    """The body of the comment at `url` as `live_differs` reads it, None when it cannot be read."""
+    cid = re.search(r"#issuecomment-(\d+)$", url).group(1)
+    r = subprocess.run(["gh", "api", f"repos/{REPO}/issues/comments/{cid}", "--jq", ".body"], capture_output=True, text=True)
+    if r.returncode != 0:
+        return None
+    return r.stdout[:-1] if r.stdout.endswith("\n") else r.stdout
+
+
 def gh(path: str, jq: str) -> str:
     r = subprocess.run(["gh", "api", path, "--jq", jq], capture_output=True, text=True)
     return r.stdout.strip()
@@ -170,6 +198,16 @@ def verify_posted(folder: pathlib.Path) -> int:
             continue
         why = live_differs(url, expected, "draft")
         if why:
+            # The one other state that counts as approved: the draft after the approved relink, for a comment that
+            # ops/relinked-comments.log names with the hash of exactly what stands there (kanal/ANNAHMEN.md, 2026-11-24).
+            live = live_text(url)
+            slug = relinked_slug(url, number, live) if live is not None else None
+            if slug is not None:
+                import relink_rules
+                if live == relink_rules.relink(expected, None if slug == "home" else slug):
+                    print(f"  same #{number} (after the approved relink)")
+                    same += 1
+                    continue
             print(f"  DIFFERS #{number}: {why}")
             bad.append(number)
             continue

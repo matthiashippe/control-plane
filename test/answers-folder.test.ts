@@ -166,4 +166,54 @@ describe("the issue answers take a folder in the repository", () => {
     expect(none.status).toBe(1);
     expect(posts([...missing.calls, ...none.calls])).toEqual([]);
   }, 120_000);
+
+  describe("--verify-posted after the approved relink", () => {
+    const OLD = "The 401 is the retry.\n\nSee https://postyourprice.com for the page.\n";
+    const RELINKED = "The 401 is the retry.\n\nSee https://automatonhost.com/errors/invalid-or-expired-nonce for the page.\n";
+    const POSTED = "2026-11-11T07:04:50Z 434 https://github.com/Conway-Research/automaton/issues/434#issuecomment-42";
+    const logLine = (id: string, issue: string, body: string) =>
+      `2026-11-22T22:10:06Z comment ${id} issue ${issue} page invalid-or-expired-nonce old ${sha12(OLD)} new ${sha12(body)}`;
+    const verify = (live: string, relinkLog: string[] | null) => {
+      const s = sandbox({ "434.md": OLD });
+      s.posted([POSTED]);
+      if (relinkLog) s.relinked(relinkLog);
+      const r = s.run("post-the-answers.py", ["--verify-posted", "--folder", "goals/kanal/antworten"], { FAKE_COMMENTS: JSON.stringify({ "42": live }) });
+      expect(posts(r.calls)).toEqual([]);
+      expect(r.calls.every((c) => !c.includes("PATCH") && !c.includes("-X") && !c.includes("-f"))).toBe(true);
+      return r;
+    };
+
+    it("says same for the relinked live text with a log entry and the matching hash", () => {
+      const r = verify(RELINKED, [logLine("42", "434", RELINKED)]);
+      expect(r.out).toContain("same #434");
+      expect(r.out.trim().split("\n").at(-1)).toBe("VERIFY POSTED OK: 1 same");
+      expect(r.status).toBe(0);
+    }, 120_000);
+
+    it("says DIFFERS for the same relinked text without a log entry", () => {
+      const r = verify(RELINKED, null);
+      expect(r.out).toContain("DIFFERS #434");
+      expect(r.out.trim().split("\n").at(-1)).toBe("VERIFY POSTED FAILED: 1 differ or unreadable, 0 same");
+      expect(r.status).toBe(1);
+    }, 120_000);
+
+    it("says DIFFERS when the log entry exists but one planted character is in the live text", () => {
+      const r = verify(RELINKED.replace("retry.", "retry.."), [logLine("42", "434", RELINKED)]);
+      expect(r.out).toContain("DIFFERS #434");
+      expect(r.status).toBe(1);
+    }, 120_000);
+
+    it("says DIFFERS when the hash in the log matches a live text that is not the relinked draft", () => {
+      const planted = RELINKED.replace("retry.", "retry..");
+      const r = verify(planted, [logLine("42", "434", planted)]);
+      expect(r.out).toContain("DIFFERS #434");
+      expect(r.status).toBe(1);
+    }, 120_000);
+
+    it("says DIFFERS when the log entry carries the wrong hash", () => {
+      const r = verify(RELINKED, [logLine("42", "434", "some other text")]);
+      expect(r.out).toContain("DIFFERS #434");
+      expect(r.status).toBe(1);
+    }, 120_000);
+  });
 });
