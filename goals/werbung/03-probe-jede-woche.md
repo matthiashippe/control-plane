@@ -176,6 +176,17 @@ MVP: Funktion, weil erst die zweite Woche zeigt, ob reichweite 04 die Empfehlung
       Prüfung: `git diff $(git merge-base origin/dev HEAD) HEAD -- . | perl -CSD -ne 'print if /^\+/ && /0x[0-9a-fA-F]{40}|sk-[A-Za-z0-9_-]{20,}|[\x{2013}\x{2014}]/' | wc -l` muss 0 ausgeben.
 - [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
+- [ ] Kritik 1: Steht die Zeile einer Woche im Zustand, aber nicht in der Datei aus `CP_PROBE_OUT`, trägt `--week` sie ohne Session
+      nach, für jede Woche im Zustand in aufsteigender Reihenfolge vor der laufenden Woche, und legt die ersetzten Antworten dieser
+      Woche aus dem Zustand nach `CP_PROBE_ANSWERS_DIR`, wenn die Datei dort fehlt (eine vorhandene bleibt, wie sie ist). Dafür
+      schreibt `--week` die ersetzten Antworten zusätzlich nach `<Zustand>/<JJJJ-Www>/answers.md`.
+      MVP: Funktion, weil der Richtungs-Check die Zeile in seinem Worktree schreibt, sein Pflege-PR `docs/kunden/` nicht committen
+      darf (`courseRule` in `paperclip/lib/loop-gate.mjs` des code-host) und jeder weitere Aufruf der Woche heute nur die gespeicherte
+      Zeile ausgibt: Die Zahl der Woche stünde dann nur noch auf dem code-host und käme nie ins Repo.
+      Prüfung: `T=$(mktemp -d); mkdir $T/a $T/b; s="CP_PROBE_CLAUDE=ops/fixtures/agent-probe-claude.sh CP_PROBE_ANSWERS=ops/fixtures/agent-probe-strict CP_PROBE_STATE_DIR=$T/state CP_PROBE_RECORD=$T/rec"; env $s CP_PROBE_OUT=$T/a/p.md CP_PROBE_ANSWERS_DIR=$T/a bash ops/agent-probe.sh --week > /dev/null 2>&1; n=$(wc -c < $T/rec); env $s CP_PROBE_OUT=$T/b/p.md CP_PROBE_ANSWERS_DIR=$T/b bash ops/agent-probe.sh --week > $T/o 2>/dev/null; r=$?; echo "exit=$r $(grep -c '^- ' $T/b/p.md) $([ "$(cat $T/a/p.md)" = "$(cat $T/b/p.md)" ] && echo line) $(cmp -s $T/a/*-W*.md $T/b/*-W*.md && echo answers) $([ "$n" = "$(wc -c < $T/rec)" ] && echo still) $([ "$(tail -n 1 $T/o)" = "$(tail -n 1 $T/b/p.md)" ] && echo printed)"; rm -rf $T` muss genau `exit=0 1 line answers still printed` ausgeben.
+      Prüfung: `T=$(mktemp -d); mkdir $T/a $T/b; s="CP_PROBE_CLAUDE=ops/fixtures/agent-probe-claude.sh CP_PROBE_ANSWERS=ops/fixtures/agent-probe-strict CP_PROBE_STATE_DIR=$T/state"; env $s CP_NOW=1795000000 CP_PROBE_OUT=$T/a/p.md CP_PROBE_ANSWERS_DIR=$T/a bash ops/agent-probe.sh --week > /dev/null 2>&1; env $s CP_NOW=1795604800 CP_PROBE_OUT=$T/b/p.md CP_PROBE_ANSWERS_DIR=$T/b bash ops/agent-probe.sh --week > /dev/null 2>&1; echo "exit=$? $(grep -c '^- ' $T/b/p.md) $([ "$(head -n 1 $T/b/p.md)" = "$(cat $T/a/p.md)" ] && echo first) $(tail -n 1 $T/b/p.md | grep -oE '^- [0-9]{4}-W[0-9]{2}|via [a-z]+$' | tr '\n' ' ')$(ls $T/b/*-W*.md | wc -l)"; rm -rf $T` muss genau `exit=0 2 first - 2026-W48 via sessions 2` ausgeben.
+      Prüfung: `grep -cF '"carries a week from the state directory into a fresh file without a session"' test/agent-probe.test.ts` muss genau 1 ausgeben, und `PATH=/usr/bin:$PATH pnpm -s vitest run test/agent-probe.test.ts` muss Exit-Code 0 haben.
+      Prüfung: `bash ops/agent-probe.sh --selftest 2>&1 | tail -n 1` muss genau `SELFTEST OK` ausgeben.
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
