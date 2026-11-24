@@ -374,7 +374,7 @@ describe("ops/relink-comments.py --name", () => {
     for (const id of early) expect(v.has(String(id))).toBe(true);
     expect(r.out).toContain("  + lead\n  - Handsel\n  + automatonhost.com\n");
     expect(r.out).toContain("  + lead\n  - PostYourPrice\n  + automatonhost.com\n");
-    expect(r.out).toContain("name: 30 to change, 0 already named, 30 comments of matthiashippe\n");
+    expect(r.out).toContain("name: 30 to change, 0 already named, 0 kept without lead, 30 comments of matthiashippe\n");
     expect(r.out).toContain(`send: ops/relink-comments.py --name --send 30 --approved ${approve(v)}\n`);
     const other = FIXTURE.comments.find((c) => c.user !== "matthiashippe")!;
     expect(r.out).not.toContain(`comment ${other.id} `);
@@ -388,7 +388,7 @@ describe("ops/relink-comments.py --name", () => {
     const s = sandbox([early, done, leadLater, crlf]);
     const r = await s.run(["--name"]);
     expect(r.status).toBe(0);
-    expect(r.out).toContain("name: 3 to change, 1 already named, 4 comments of matthiashippe\n");
+    expect(r.out).toContain("name: 3 to change, 1 already named, 0 kept without lead, 4 comments of matthiashippe\n");
     expect(r.out).not.toContain(`comment ${done.id} `);
     expect(r.out).toMatch(/^comment 1 issue 440 page \S+ sha12 [0-9a-f]{12}\n  - Handsel\n  \+ automatonhost\.com\ncomment /m);
     expect(r.out).toMatch(/^comment 3 issue 434 page \S+ sha12 [0-9a-f]{12}\n  - PostYourPrice\n  \+ automatonhost\.com\n/m);
@@ -401,7 +401,40 @@ describe("ops/relink-comments.py --name", () => {
     expect(after.get(3)).toBe(`${LEAD}\n\nInvented reply, I run automatonhost.com.\n`);
     expect(after.get(4)).toBe(`${LEAD}\n\n${crlf.body}`);
     for (const body of after.values()) expect(body.split(LEAD).length).toBeLessThanOrEqual(2);
-    expect((await s.run(["--name"])).out).toContain("name: 0 to change, 4 already named, 4 comments of matthiashippe\n");
+    expect((await s.run(["--name"])).out).toContain("name: 0 to change, 4 already named, 0 kept without lead, 4 comments of matthiashippe\n");
+  }, T);
+
+  it("the name dry run keeps the fixed exceptions without a lead and only renames them", async () => {
+    // Decision 7: the four ids of NO_LEAD never get LEAD, only the old names replaced; here one with Handsel, one without.
+    const renamed = { id: 5804984649, issue: 335, user: "matthiashippe", body: "No, see below.\n\nDisclosure: I run Handsel (https://automatonhost.com), see `PostYourPrice`.\n" };
+    const plain = { id: 5805000566, issue: 373, user: "matthiashippe", body: "Invented data point.\n\nSee https://automatonhost.com.\n" };
+    const other = { id: 9100, issue: 432, user: "matthiashippe", body: "Invented reply, I run Handsel.\n" };
+    const want = "No, see below.\n\nDisclosure: I run automatonhost.com (https://automatonhost.com), see `PostYourPrice`.\n";
+    const s = sandbox([renamed, plain, other]);
+    const r = await s.run(["--name"]);
+    expect(r.status).toBe(0);
+    expect(writes(r.calls)).toEqual([]);
+    expect(r.out).toMatch(/^comment 5804984649 issue 335 page home sha12 [0-9a-f]{12}\n  - Handsel\n  \+ automatonhost\.com\n/m);
+    expect(r.out).toMatch(/^comment 9100 issue 432 page \S+ sha12 [0-9a-f]{12}\n  \+ lead\n  - Handsel\n  \+ automatonhost\.com\n/m);
+    expect(r.out.match(/^  \+ lead$/gm)).toEqual(["  + lead"]);
+    expect(r.out).not.toContain(`comment ${plain.id} `);
+    expect(r.out).toContain("name: 2 to change, 0 already named, 1 kept without lead, 3 comments of matthiashippe\n");
+    const v = values(r.out);
+    expect(v.get(String(renamed.id))).toBe(sha12(want));
+    const sent = await s.run(["--name", "--send", "2", "--approved", approve(v)]);
+    expect(sent.status).toBe(0);
+    const after = new Map(s.state().comments.map((c) => [c.id, c.body]));
+    expect(after.get(renamed.id)).toBe(want);
+    expect(after.get(plain.id)).toBe(plain.body);
+    expect(after.get(other.id)).toBe(`${LEAD}\n\nInvented reply, I run automatonhost.com.\n`);
+    expect((await s.run(["--name"])).out).toContain("name: 0 to change, 1 already named, 2 kept without lead, 3 comments of matthiashippe\n");
+    expect(lastLine((await s.run(["--name", "--verify"])).out)).toBe("name verify: 2 same, 0 differ, 0 to change");
+    // Counter-proof: an exception that carries an old name again is a difference and one to change.
+    s.setBody(renamed.id, renamed.body);
+    const off = await s.run(["--name", "--verify"]);
+    expect(off.out).toContain(`DIFFERS ${renamed.id}`);
+    expect(lastLine(off.out)).toBe("name verify: 1 same, 1 differ, 1 to change");
+    expect(off.status).toBe(1);
   }, T);
 
   it("replaces Handsel and PostYourPrice in prose and keeps them in code", async () => {
@@ -536,7 +569,7 @@ describe("ops/relink-comments.py --name", () => {
     expect(lastLine(r.out)).toBe("name verify: 4 same, 0 differ, 0 to change");
     expect(r.status).toBe(0);
     expect(writes(r.calls)).toEqual([]);
-    expect((await s.run(["--name"])).out).toContain("name: 0 to change, 4 already named, 4 comments of matthiashippe\n");
+    expect((await s.run(["--name"])).out).toContain("name: 0 to change, 4 already named, 0 kept without lead, 4 comments of matthiashippe\n");
     // Counter-proof: one comment edited by hand afterwards is a difference.
     const c = OWN[0];
     s.setBody(c.id, `${await namedText(s, c)} `);

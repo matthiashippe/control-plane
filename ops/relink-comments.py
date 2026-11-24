@@ -27,7 +27,8 @@ gets an account flagged.
 
 `--name` (goals/reichweite/04) does the same for the name of the service: the new text of a comment is
 `name(relink(body, slug))` from ops/relink_rules.py, so every comment opens with the sentence LEAD and says automatonhost.com
-where it said Handsel or PostYourPrice in prose.
+where it said Handsel or PostYourPrice in prose. The comments in NO_LEAD are the exception (decision 7): the sentence would be
+wrong there or contradict the comment, so their new text is `rename(relink(body, slug))`, only the old names replaced.
 
     ops/relink-comments.py --name                            the dry run of the name: changes nothing
     ops/relink-comments.py --name --send <k> --approved <id>:<sha12>,...
@@ -37,7 +38,8 @@ where it said Handsel or PostYourPrice in prose.
                                                              dry run of the name; read-only
 
 The dry run of the name prints `comment <id> issue <n> page <slug|home> sha12 <value>` for every comment it would change, under
-it `  + lead` when the sentence comes in front, and `  - <old name>` and `  + automatonhost.com` for every name it replaces. A
+it `  + lead` when the sentence comes in front, and `  - <old name>` and `  + automatonhost.com` for every name it replaces; a comment
+of NO_LEAD never gets `  + lead`, and one that `rename` leaves alone is not listed but counted as `kept without lead`. A
 comment edited by both modes is compared by `--verify` (with or without `--name`) with the value of its newest line in either
 log, so a comment named after it was relinked is not a difference.
 
@@ -65,6 +67,8 @@ REPO = "Conway-Research/automaton"
 ACCOUNT = "matthiashippe"
 LOG = OPS / "relinked-comments.log"
 NAMED_LOG = OPS / "named-comments.log"
+# Decision 7 (Tech Lead, 2026-11-24): comment ids where LEAD is wrong or contradicts the comment; they only get the old names replaced.
+NO_LEAD = frozenset({5742781237, 5804984649, 5805000566, 5805015103})
 APPROVAL = re.compile(r"(\d+):([0-9a-f]{12})")
 USAGE = ("usage: ops/relink-comments.py [--name] [--send <k> --approved <id>:<sha12>,...] [--verify]\n"
          "  without --send or --verify a dry run that changes nothing")
@@ -171,30 +175,37 @@ def title(number: int) -> str:
     return json.loads(gh_lines([f"repos/{REPO}/issues/{number}", "--jq", "{title} | tojson"])[0])["title"]
 
 
-def plan(body: str, issue_title: str) -> tuple[str, str, list[tuple[str, str]]]:
-    """The page, the new text and the changed links of one comment."""
+def plan(body: str, issue_title: str, cid: str | int | None = None) -> tuple[str, str, list[tuple[str, str]]]:
+    """The page, the new text and the changed links of one comment; the id only matters under --name."""
     slug = relink_rules.page_for_title(issue_title)
     return slug or "home", relink_rules.relink(body, slug), relink_rules.changes(body, slug)
 
 
-def plan_name(body: str, issue_title: str) -> tuple[str, str, list[tuple[str, str]]]:
-    """The page, the new text and every change of one comment under --name: links, the lead and the old names."""
+def plan_name(body: str, issue_title: str, cid: str | int | None = None) -> tuple[str, str, list[tuple[str, str]]]:
+    """The page, the new text and every change of one comment under --name: links, the lead and the old names.
+
+    A comment in NO_LEAD gets no lead, only the old names replaced.
+    """
     page, relinked, links = plan(body, issue_title)
+    keep = cid is not None and int(cid) in NO_LEAD
     lines = [*links]
-    if relink_rules.leads(relinked):
+    if not keep and relink_rules.leads(relinked):
         lines.append(("", "lead"))
     lines += [(old, relink_rules.NAME) for old in relink_rules.renames(relinked)]
-    return page, relink_rules.name(relinked), lines
+    return page, (relink_rules.rename if keep else relink_rules.name)(relinked), lines
 
 
-def dry_run_name() -> tuple[int, int, int, list[tuple[str, str]]]:
-    """Prints what --name would change and returns (to change, already named, comments of the account, values)."""
-    to_change, already, values = 0, 0, []
+def dry_run_name() -> tuple[int, int, int, int, list[tuple[str, str]]]:
+    """Prints what --name would change and returns (to change, already named, kept without lead, comments, values)."""
+    to_change, already, kept, values = 0, 0, 0, []
     for number, issue_title in threads():
         for c in own_comments(number):
-            page, new, lines = plan_name(c["body"], issue_title)
+            page, new, lines = plan_name(c["body"], issue_title, c["id"])
             if new == c["body"]:
-                already += 1
+                if int(c["id"]) in NO_LEAD:
+                    kept += 1
+                else:
+                    already += 1
                 continue
             to_change += 1
             values.append((str(c["id"]), sha12(new)))
@@ -203,7 +214,7 @@ def dry_run_name() -> tuple[int, int, int, list[tuple[str, str]]]:
                 if old:
                     print(f"  - {old}")
                 print(f"  + {now}")
-    return to_change, already, to_change + already, values
+    return to_change, already, kept, to_change + already + kept, values
 
 
 def dry_run() -> tuple[int, int, int, list[tuple[str, str]]]:
@@ -244,7 +255,7 @@ def send(approved: dict[str, str], naming: bool = False) -> int:
         if sha12(c["body"]) == value:
             print(f"ALREADY {cid}")
             continue
-        page, new, _ = planner(c["body"], title(c["issue"]))
+        page, new, _ = planner(c["body"], title(c["issue"]), cid)
         if sha12(new) != value:
             refuse(f"{cid} changed since it was approved: its new text is sha12 {sha12(new)} now, approved was {value}. "
                    "Nothing was changed.")
@@ -335,8 +346,8 @@ def main(argv: list[str]) -> int:
     if args["send"] is not None:
         return send(args["approved"], args["name"])
     if args["name"]:
-        to_change, already, total, values = dry_run_name()
-        print(f"name: {to_change} to change, {already} already named, {total} comments of {ACCOUNT}")
+        to_change, already, kept, total, values = dry_run_name()
+        print(f"name: {to_change} to change, {already} already named, {kept} kept without lead, {total} comments of {ACCOUNT}")
         print(f"send: ops/relink-comments.py --name --send {to_change} --approved "
               f"{','.join(f'{c}:{v}' for c, v in values)}")
         return 0

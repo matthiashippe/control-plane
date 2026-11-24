@@ -164,8 +164,8 @@ def leads(body: str) -> bool:
     return not (body.startswith(LEAD + "\n\n") or named(body))
 
 
-def name(body: str) -> str:
-    """`body` with LEAD and a blank line in front, unless it already names us, and every old name in prose replaced.
+def rename(body: str) -> str:
+    """`body` with every old name in prose replaced by automatonhost.com and nothing in front (decision 7).
 
     Code (fenced blocks and pairs of single backticks, the same spans `relink` uses) keeps its words, and every other character
     stays as it was, so a second call changes nothing.
@@ -176,5 +176,10 @@ def name(body: str) -> str:
         parts.append(NAME)
         pos = end
     parts.append(body[pos:])
-    renamed = "".join(parts)
+    return "".join(parts)
+
+
+def name(body: str) -> str:
+    """`body` with LEAD and a blank line in front, unless it already names us, and every old name in prose replaced (`rename`)."""
+    renamed = rename(body)
     return f"{LEAD}\n\n{renamed}" if leads(body) else renamed
