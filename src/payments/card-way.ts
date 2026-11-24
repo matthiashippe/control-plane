@@ -89,10 +89,18 @@ export function cardUrlFor(db: Db, address: string, now: Date): string | null {
 
 const CARD_BLOCK = /<!--CARD-->[\s\S]*?<!--\/CARD-->/g;
 const CARD_MARKS = /<!--\/?CARD-->/g;
+// The text of the first screen that promises the card (goals/werbung/01) has its own pair of marks, so the
+// block `#card` is the only one between `<!--CARD-->` and `<!--/CARD-->`.
+const PAYTEXT_BLOCK = /<!--PAYTEXT-->[\s\S]*?<!--\/PAYTEXT-->/g;
+const PAYTEXT_MARKS = /<!--\/?PAYTEXT-->/g;
 
-/** Drops everything between `<!--CARD-->` and `<!--/CARD-->` with the marks while the breaker is on, otherwise only the marks. */
+/**
+ * Drops everything between `<!--CARD-->` and `<!--/CARD-->` and everything between `<!--PAYTEXT-->` and `<!--/PAYTEXT-->`
+ * with the marks while the breaker is on, otherwise only the marks.
+ */
 export function stripCardWay(html: string, on: boolean): string {
-  return on ? html.replace(CARD_BLOCK, "").replace(CARD_MARKS, "") : html.replace(CARD_MARKS, "");
+  const marks = (h: string): string => h.replace(CARD_MARKS, "").replace(PAYTEXT_MARKS, "");
+  return on ? marks(html.replace(CARD_BLOCK, "").replace(PAYTEXT_BLOCK, "")) : marks(html);
 }
 
 /** The way over USDC that the paused page names, the same link as `topup_url` of the 402. */

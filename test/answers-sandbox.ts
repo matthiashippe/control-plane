@@ -81,6 +81,9 @@ export function sandbox(drafts: Record<string, string>) {
   mkdirSync(join(root, "ops"));
   mkdirSync(join(root, "bin"));
   for (const f of ["answers_args.py", "before-the-answers.py", "post-the-answers.py"]) copyFileSync(join(OPS, f), join(root, "ops", f));
+  copyFileSync(join(OPS, "relink_rules.py"), join(root, "ops", "relink_rules.py"));
+  mkdirSync(join(root, "src", "public"), { recursive: true });
+  copyFileSync(join(OPS, "..", "src", "public", "error-pages.ts"), join(root, "src", "public", "error-pages.ts"));
   writeFileSync(join(root, "ops", "posted-answers.log"), HEADER);
   writeFileSync(join(root, "bin", "gh"), FAKE_GH);
   writeFileSync(join(root, "bin", "curl"), "#!/bin/sh\nexit 7\n");
@@ -104,8 +107,10 @@ export function sandbox(drafts: Record<string, string>) {
   };
   const posted = (lines: string[]) =>
     writeFileSync(join(root, "ops", "posted-answers.log"), ["# <iso8601-utc> <issue> <url>", ...lines, ""].join("\n"));
+  const relinked = (lines: string[]) =>
+    writeFileSync(join(root, "ops", "relinked-comments.log"), ["# header", "# <iso8601-utc> comment <id> issue <n> page <slug|home> old <sha12> new <sha12>", ...lines, ""].join("\n"));
   const write = (name: string, text: string) => writeFileSync(join(folder, name), text);
-  return { root, folder, run, posted, write };
+  return { root, folder, run, posted, relinked, write };
 }
 
 export const posts = (calls: string[][]) => calls.filter((c) => c.includes("-f"));
