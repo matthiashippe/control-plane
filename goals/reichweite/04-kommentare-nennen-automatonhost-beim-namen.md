@@ -251,5 +251,6 @@ If you need it running before Conway fixes this: automatonhost.com, which I run,
 - 2026-11-24 Zyklus 5 nach Neuansatz 1: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, 7, 8; `origin/dev` ohne neue Commits, jeder Prüfbefehl aller Punkte und `check` am Kopf grün.
 - 2026-11-24 Zyklus 6 nach Neuansatz 1: Befund 1 der Linse K (Verdict 04-z5-K, REJECT am Kopf f96017c) behoben: die beiden Vorschläge `goals/_vorschlaege/reichweite-kritik-2026-11-24-1.md` und `-2.md` aus dem Kritik-Commit fd6d4dd vom Goal-Branch genommen, weil Punkt 6 diese Pfade nicht erlaubt; ihr Text bleibt in fd6d4dd und geht über einen Pflege-PR Art `vorschlag` des Tech Lead nach `dev`. Rot gesehen: zweite Prüfung von Punkt 6 am Kopf 3370e04 `2`, danach `0`. `origin/dev` ohne neue Commits.
   Prüfbefehle: alle Prüfungen aus Punkt 6, wie in der Goal-Datei; `PATH=/usr/bin:$PATH node scripts/check.mjs`.
+- 2026-11-24 Zyklus 7 nach Neuansatz 1: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, 7, 8; `origin/dev` ohne neue Commits, alle Prüfungen aus Punkt 6 am Kopf 3410e69 `13`, `0`, `0`, `0`, `0`, `check` lokal grün in 209 s, Jobs `check` und `e2e` an PR #424 am Kopf 3410e69 grün.
 
 ## Blockers
