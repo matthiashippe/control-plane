@@ -122,7 +122,10 @@ Geschichte.
 
 ## Budget und Qualität
 
-- Pro Goal höchstens `cycles_per_goal` Zyklen ohne PASS, dann `BLOCKED fachlich` mit „Ehrliche Lücken“
+- Pro Goal startet nach `cycles_per_goal` Zyklen ohne PASS oder `same_gap` gleichen Gaps ein Neuansatz: Er benennt, warum die
+  Zyklen scheiterten, rahmt das Goal neu (Kontext, Deny List, Voraussetzungen, `## Neuansätze` mit jeweils anderem Weg), und der
+  Maker baut vom Kopf des Branches weiter. Kein Goal wird aufgegeben, kein Code auf die Merge-Basis zurückgesetzt, nie landet nur
+  die Goal-Datei (Matthias 24.11.2026, code-host #939)
 - Modell Opus für Maker, Linsen und Kritik; Subagents Opus 5.5, nie Fable
 - Jeder Done-Punkt hat einen Prüfbefehl, der ohne Netz läuft oder `(Netz)` trägt; Temp-Dateien nur per `mktemp`
 - Ein Test, der ohne den zugehörigen Fix grün bleibt, ist kein Test: Jeder neue Test eines Goals war einmal rot, und die Zeile im
