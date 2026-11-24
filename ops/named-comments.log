@@ -1,2 +1,15 @@
 # One line per comment edited by ops/relink-comments.py --name --send (goals/reichweite/04): no address, no name, no text.
 # <iso8601-utc> comment <id> issue <n> page <slug|home> old <sha12 of the old text> new <sha12 of the new text>
+2026-11-24T14:27:03Z comment 5796193319 issue 293 page credits-never-granted old 3cb628087073 new 5b4eaef9d703
+2026-11-24T14:27:25Z comment 5796218247 issue 294 page home old 26e8f71b12a2 new 85d9b5ccc434
+2026-11-24T14:27:46Z comment 5796242563 issue 333 page invalid-or-expired-nonce old 3be0ca54f422 new d96028e7c580
+2026-11-24T14:28:08Z comment 5742781023 issue 339 page verify-500-database-error old 4a38e03cfa6d new d5938151de0a
+2026-11-24T14:28:30Z comment 5889830336 issue 353 page invalid-or-expired-nonce old 7cefd53311a6 new 1657c0d11255
+2026-11-24T14:28:51Z comment 5748924904 issue 355 page invalid-or-expired-nonce old 9a3f68a42e6c new bb38eb651efb
+2026-11-24T14:29:13Z comment 5889856106 issue 356 page invalid-or-expired-nonce old 27780f0c765a new 5f07d29d65f8
+2026-11-24T14:29:34Z comment 5889884681 issue 359 page invalid-or-expired-nonce old 0353e4c01e04 new 4fad7f5043e1
+2026-11-24T14:29:56Z comment 5781362775 issue 372 page verify-500-database-error old dc1b3c6b49b1 new f3c20f73ab66
+2026-11-24T14:30:18Z comment 5781362033 issue 376 page invalid-or-expired-nonce old 0210e74e9ba0 new 4eb0583ad7b9
+2026-11-24T14:30:41Z comment 5742781149 issue 377 page verify-500-database-error old ae905c8f9593 new 8dadaeef387d
+2026-11-24T14:31:02Z comment 5748925721 issue 379 page verify-500-database-error old b95b595c6352 new 1102f099110e
+2026-11-24T14:31:24Z comment 5748925311 issue 390 page home old d7221bbd1eb8 new 70e3d04036d0
