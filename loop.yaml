@@ -29,7 +29,7 @@ verifiers:
 pass: [K, B]
 verify: goal                     # alle Done-Punkte eines Goals in einem Maker-Lauf, K und B einmal im Abschluss
 breaker:
-  cycles_per_goal: 4             # danach BLOCKED fachlich; ohne PASS landen nur Goal-Datei und Verdicts
+  cycles_per_goal: 4             # danach Neuansatz: Goal neu rahmen, vom Kopf weiterbauen, nie Abbruch (code-host #939)
   same_gap: 3
   no_progress_runs: 2            # zwei Maker-Runs ohne Progress-Log-Zeile: BLOCKED umgebung
   retry_after_hours: 4
