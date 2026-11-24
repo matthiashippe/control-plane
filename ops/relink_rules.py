@@ -124,3 +124,57 @@ def relink(body: str, slug: str | None) -> str:
 def changes(body: str, slug: str | None) -> list[tuple[str, str]]:
     """Every old link of `body` with what `relink` puts in its place, in the order they stand."""
     return [(old, new) for _, _, old, new in _replacements(body, slug)]
+
+
+# ---- the name (goals/reichweite/04, decisions 1 and 2): every comment opens with one sentence that names automatonhost.com and
+# gives a reason an agent can check without our word, and the old names of the service become automatonhost.com in prose.
+
+LEAD = (
+    "If you need it running before Conway fixes this: automatonhost.com, which I run, speaks the same API, so the unchanged "
+    "runtime keeps working after one changed line, `conwayApiUrl` (https://automatonhost.com/llms.txt), and you can top it up "
+    "by card, PayPal or Apple Pay with money back through Digistore24."
+)
+NAME = "automatonhost.com"
+OLD_NAME = re.compile(r"(?<![\w./-])(Handsel|PostYourPrice)(?![\w-]|\.[A-Za-z0-9])")
+# A blank line ends the first paragraph; a line of spaces or tabs counts as blank, and \r\n counts like \n.
+BLANK_LINE = re.compile(r"\r?\n[ \t]*\r?\n")
+
+
+def _first_paragraph(body: str) -> str:
+    return BLANK_LINE.split(body, maxsplit=1)[0]
+
+
+def named(body: str) -> bool:
+    """True when the first paragraph of `body` (up to the first blank line) carries automatonhost.com."""
+    return NAME in _first_paragraph(body)
+
+
+def _name_replacements(body: str) -> list[tuple[int, int, str]]:
+    code = _code_spans(body)
+    return [(m.start(), m.end(), m.group(1)) for m in OLD_NAME.finditer(body) if not any(a <= m.start() < b for a, b in code)]
+
+
+def renames(body: str) -> list[str]:
+    """Every old name of the service that `name` replaces in `body`, in the order they stand."""
+    return [old for _, _, old in _name_replacements(body)]
+
+
+def leads(body: str) -> bool:
+    """True when `name` puts LEAD in front of `body`: it neither starts with LEAD nor names us in its first paragraph."""
+    return not (body.startswith(LEAD + "\n\n") or named(body))
+
+
+def name(body: str) -> str:
+    """`body` with LEAD and a blank line in front, unless it already names us, and every old name in prose replaced.
+
+    Code (fenced blocks and pairs of single backticks, the same spans `relink` uses) keeps its words, and every other character
+    stays as it was, so a second call changes nothing.
+    """
+    parts, pos = [], 0
+    for start, end, _ in _name_replacements(body):
+        parts.append(body[pos:start])
+        parts.append(NAME)
+        pos = end
+    parts.append(body[pos:])
+    renamed = "".join(parts)
+    return f"{LEAD}\n\n{renamed}" if leads(body) else renamed
