@@ -215,6 +215,42 @@ check_card_breaker() {
   return 0
 }
 
+# Card orders the IPN held (goals/wache/03): a live payment that came while the card breaker was on, or for a wallet that had a
+# refund, is stored without any credit. That is real money without credit, so somebody has to know before the buyer asks. The
+# count comes from ops/card-breaker.sh --container --held (heldCardOrders of the service, database read-only, no address) with the
+# same time limit as check_card_breaker. It is compared with `<state file>.card-held` (0 when the file is missing): a higher count
+# posts exactly one [WARN], and the new count is stored only after the POST went through, so a failed POST comes again in the
+# next run. The same count leaves only an [INFO] line. An unreadable answer posts nothing and keeps the stored count, because
+# check_card_breaker already reports an unreadable tool once a day.
+check_card_held() {
+  local line code previous total posted=1
+  if command -v timeout >/dev/null 2>&1; then
+    line=$(timeout -k 5 "$CARD_BREAKER_TIMEOUT" bash "$HERE"/card-breaker.sh --container --held 2>/dev/null | head -n 1)
+    code=${PIPESTATUS[0]}
+  else
+    # No coreutils timeout (a Mac without it): unbounded, the server always has one.
+    line=$(bash "$HERE"/card-breaker.sh --container --held 2>/dev/null | head -n 1)
+    code=${PIPESTATUS[0]}
+  fi
+  if [[ "$code" == 0 && "$line" =~ ^card_orders_held\ ([0-9]{1,15})$ ]]; then
+    total=$((10#${BASH_REMATCH[1]}))
+  else
+    echo "$TS [WARN] card orders held unreadable, nothing posted"
+    return 0
+  fi
+  previous=$(cat "${STATE_FILE}.card-held" 2>/dev/null || echo 0)
+  [[ "$previous" =~ ^[0-9]{1,15}$ ]] || previous=0
+  previous=$((10#$previous))
+  if (( total > previous )); then
+    report "WARN" "card order held: $((total - previous)) new, $total in total, paid while the card checkout was closed, nothing credited" || posted=0
+    [[ $posted == 1 ]] && { echo "$total" > "${STATE_FILE}.card-held" 2>/dev/null || true; }
+  else
+    echo "$TS [INFO] card orders held still $total"
+    [[ "$total" == "$previous" ]] || { echo "$total" > "${STATE_FILE}.card-held" 2>/dev/null || true; }
+  fi
+  return 0
+}
+
 # One GET to sandboxd with two attempts and a pause, like check_health. Sets SBX_CODE (000 without an answer) and SBX_BODY.
 sandboxd_get() {
   local out attempt
@@ -298,6 +334,7 @@ fi
 
 check_sandboxd
 check_card_breaker
+check_card_held
 
 # Certificate: `openssl -checkend` instead of date arithmetic, because `date -d` only exists on GNU
 # and the script should run on a Mac as well. Report only once a day, otherwise the warning turns

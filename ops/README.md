@@ -167,6 +167,22 @@ leaves `[WARN] card breaker unreadable (<reason>), last known state <state>`; on
 posted at most once a day (`<state file>.card-breaker-fail`), before that (the module is missing until the rollout) it stays in the
 log. No message names an address.
 
+Right after it the watchdog counts the card orders the IPN held (`check_card_held`, goals/wache/03): a live payment that came
+while the breaker was on, or for a wallet that had a refund, is stored as held and credits nothing. Every run asks
+`ops/card-breaker.sh --container --held`, which imports `heldCardOrders` from the same module and prints exactly one line
+`card_orders_held <n>` (from the code-host: `ops/card-breaker.sh --held` over ssh). The count lives in `<state file>.card-held`
+(0 when the file is missing); a higher count posts once, and it is stored only after the POST went through, so a failed POST
+comes again in the next run:
+
+- `[WARN] card order held: <new> new, <n> in total, paid while the card checkout was closed, nothing credited`
+
+The same count leaves `[INFO] card orders held still <n>`. An unreadable answer posts nothing (`[WARN] card orders held
+unreadable, nothing posted` in the log), because `check_card_breaker` already reports an unreadable tool once a day. A held order
+is real money without credit: its order number and the reason stand in the log of `deploy-cp-1` as
+`[digistore] order <order_id> held: card breaker on|wallet had a refund`, and the buyer gets the money back over the 60 days of
+Digistore24.
+Neither the crontab line above nor `/opt/control-plane/.env` changes for this.
+
 A delivery in the log only proves that ntfy accepted the POST, and ntfy accepts any topic: with a
 wrong or stale topic in the crontab the watchdog logs a delivery every day and no phone rings. So
 `ops/status.sh` reads the topic back when `CP_ALERT_WEBHOOK` is set in the local environment
