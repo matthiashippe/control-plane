@@ -1,7 +1,7 @@
 # Sandbox Goal 06: Freigegebene Ports unter einer eigenen Domain
 
 ## Status
-BLOCKED fachlich
+DONE
 
 ## Active Objective
 Ein fremder Automaton gibt einen Port seiner Sandbox mit `expose_port` frei und bekommt eine öffentliche Adresse
@@ -182,11 +182,13 @@ uns) bleibt unerreichbar. Die eigene Domain hält eine Phishing-Seite eines Kund
 - 2026-11-13 Zyklus 2: Abschluss gemeldet, Punkte keine, das Goal bleibt `BLOCKED fachlich` (Nachfrage 0), aktuelles `dev` eingemergt, der Branch trägt gegenüber `dev` nur die Goal-Datei. Prüfbefehle: P1 Selftest rot (Werkzeug nach dem Zurücksetzen nicht auf dem Branch, liegt in 0ce27f0), P1 Zeile und Zahl rot (keine `docs/sandbox/ports.md`), P2 0, P3 bis P8 rot wie vor dem Goal, P9 Annahmen 0 (kein Abschnitt `## Goal 06`), Pfade 0, Schlüssel 0 und 0, P10 `check` Exit 0 (grün in 50 s).
 - 2026-11-13 Zyklus 3: Abschluss gemeldet, Punkte keine, Antwort auf das REJECT der Linse K aus Zyklus 2 (`verdicts/06-z2-K.md`): die Befunde 1 bis 10 sind die roten Punkte 1 bis 9 eines widerlegten Goals, ein Bauzyklus ändert sie nach „Kontext für den Maker“ nicht. Aktuelles `dev` eingemergt, der Branch trägt gegenüber `dev` nur Goal-Datei und Verdict. Nachfrage neu gemessen: `ops/ports-demand.sh` aus 0ce27f0 im Scratch-Verzeichnis, `--selftest` ergibt `PORTS DEMAND SELFTEST OK`, live `--since "2026-11-12 18:12:46"` ergibt `PORTS DEMAND: 0 foreign addresses, 0 calls` (2026-11-13 13:22 UTC). Prüfbefehle: P1 bis P9 rot wie in Zyklus 2, P10 `PATH=/usr/bin:$PATH node scripts/check.mjs` Exit 0 (grün in 52 s).
 - 2026-11-13 Zyklus 4: Abschluss gemeldet, Punkte keine, Antwort auf das REJECT der Linse K aus Zyklus 3 (`verdicts/06-z3-K.md`): Befunde 1 und 2 behoben, die Zeile für Zyklus 3 stand mitten in „Kontext für den Maker“ und steht jetzt hier, der Abschnitt ist wieder Wort für Wort wie auf `dev`. Aktuelles `dev` eingemergt. Befunde 3 bis 12 sind die roten Punkte 1 bis 9 wie in Zyklus 3, Nachfrage weiter 0. Prüfbefehle: `goalDrift` gegen `origin/dev` [], `readGoalHead` progress 4, P10 `PATH=/usr/bin:$PATH node scripts/check.mjs` Exit 0 (grün in 167 s).
+- 2026-11-24 Loop Master: BLOCKED fachlich auf dev war eine Altlast; sandbox 07 hat das Ziel übernommen und ist DONE, Status DONE
 
 ## Blockers
 Art: fachlich
 Grund: Die Messung aus Punkt 1 widerlegt das Goal (fremde Adressen mit 409 auf `ports/expose` seit dem Rollout von sandbox 03: 0, Aufrufe: 0). Nach „Kontext für den Maker“ heißt das: kein Kauf, kein Bau.
 Landung: `loop-master gate` erlässt die Verdict-Regel nur mit Breaker. Weiter geht es über den Vorschlag in PR #87 (neues Kettenglied ohne Mindestzahl) oder den Breaker nach `cycles_per_goal`.
+- Überholt: durch sandbox 07 (Loop Master 2026-11-24, BLOCKED fachlich auf dev war eine Altlast, sandbox 07 ist DONE)
 
 ## Ehrliche Lücken
 - Punkt 1: Werkzeug gebaut und in beide Richtungen bewiesen, die Zahl ist 0 statt mindestens 1. Befehl vom code-host mit `~/.config/control-plane/loop.env`: `bash ops/ports-demand.sh --since '2026-11-12 18:12:46'` -> `PORTS DEMAND: 0 foreign addresses, 0 calls, since 2026-11-12 18:12:46 UTC` (2026-11-13 12:38 UTC). Gegenprobe am echten Log: dieselbe Datei mit `--log` und leerer Liste der live gesehenen eigenen Adressen ergibt 1 Adresse, 1 Aufruf, also sieht das Werkzeug die Zeile und ordnet sie dem code-host zu. Das Log reicht bis 2026-10-01 zurück; in dieser Zeit rief keine fremde Adresse `ports/expose` auf. `docs/sandbox/ports.md` ist deshalb nicht angelegt. Das Werkzeug liegt in Commit 0ce27f0 auf diesem Branch (`git show 0ce27f0:ops/ports-demand.sh`) und landet nach der Regel für `BLOCKED fachlich` nicht auf `dev`; der Writer hängt das Glied neu an, sobald es eine fremde Adresse zeigt.
