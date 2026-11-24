@@ -123,5 +123,6 @@ kann.
 
 ## Progress Log
 - 2026-11-24 Zyklus 1: Punkte 1, 2, 3, 4, 5 gebaut: Routen `/docs`, `/docs/` (302 auf `/llms.txt`) und `/pricing`, `/pricing/` (200 Text, `no-store`, Karte nur bei Notschalter aus) in `src/app.ts`, vier Fälle in `test/docs-pricing.test.ts`, fünf Zeilen in `goals/fehler/ANNAHMEN.md`. Rot gesehen: alle vier Fälle vor dem Bau mit 404, Gegenprobe mit Karte immer an und anderem Preissatz macht „names no card …“ und „states the same inference price …“ rot. `/llms.txt`, `/`, `/robots.txt`, `/sitemap.xml` gleich wie `origin/dev` f835fd5, die 15 Prüfbefehle mit `createApp` der DONE-Goals vorher und nachher gleich. Prüfbefehle: P1 vitest Exit 0, `name ok`, `docs ok`; P2 keine fehlende Testzeile, `pricing ok`, `price ok`; P3 `5`, `0`, `0`; P4 `e2e` pass an PR #414 (Kopf 2667d98); P5 `check` Exit 0 (273 Dateien, 2796 Tests, 269 s).
+- 2026-11-24 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5; `dev` unverändert auf f835fd5, kein Merge nötig, alle Prüfbefehle am Kopf 74ec5e6 neu gefahren. Prüfbefehle: P1 vitest Exit 0, `name ok`, `docs ok`; P2 keine fehlende Testzeile, `pricing ok`, `price ok`; P3 `5`, `0`, `0`; P4 `e2e` pass an PR #414 (Kopf 74ec5e6, Zähler `1`); P5 `check` Exit 0 (273 Dateien, 2796 Tests, 91 s).
 
 ## Blockers
