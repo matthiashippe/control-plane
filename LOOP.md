@@ -151,7 +151,7 @@ Upstream-Repo mit Anmelde- oder Zahlungsfehlern. Jedes Glied nennt die Messung, 
 4. Widersprechen sich zwei Goal-Dateien, gewinnt das Topic mit der kleineren Prio-Zahl in `ROADMAP.md`.
 5. Eine Zahl, die sich nicht gegen die Produktion messen lässt, wird keine Zahl; ein Endpunkt, den die Runtime nicht so aufruft, wird
    nicht gebaut.
-6. Gate nach Budget nicht erreicht: `BLOCKED fachlich`, das nächste Goal startet, Merge bei grünem `check`.
+6. Gate nach Budget nicht erreicht: Neuansatz nach `loop-constraints.md` §Budget, nie Abbruch (code-host #939).
 7. Vor jeder Karte an Matthias prüfen, ob die Rolle es selbst kann. Art matthias nur für die Human Gates unten, mit `Aufgabe:`,
    `Worum:` und `Empfehlung:` samt fertigem Text oder genauen Klicks.
 
