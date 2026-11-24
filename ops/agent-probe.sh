@@ -8,6 +8,9 @@
 # docs/kunden/agenten-probe.md, the answers word for word to docs/kunden/agenten-probe/<YYYY-Www>.md.
 #
 #   bash ops/agent-probe.sh              one run, at most one per ISO week (five sessions)
+#   bash ops/agent-probe.sh --week       the weekly run (werbung 03): the same five sessions, at most once per ISO
+#                                        week, counted by the stricter rules below, a line with seen; every further
+#                                        call in the same week prints the stored line and asks nothing
 #   bash ops/agent-probe.sh --questions  the five questions, one per line
 #   bash ops/agent-probe.sh --selftest   the counting against the fixtures, no network; last line SELFTEST OK
 #   bash ops/agent-probe.sh --canary     one session asked which instruction files it was given; prints
@@ -29,12 +32,31 @@
 # failed = exit not 0, timeout, is_error or an empty result. A failed session never counts as a miss, and
 # any failed session ends the run with exit 1 after the line is written, so blindness cannot read as zero.
 #
+# With --week (werbung 03, decisions 2 to 6 of that goal) the counting is stricter and has one number more:
+#   card = a sentence names automatonhost.com and, in the same sentence, card, cards, credit card, debit card,
+#          Visa, Mastercard, PayPal or Apple Pay as a whole word (no letter or digit before or after);
+#   seen = no host, and a sentence names conwayApiUrl or CONWAY_API_URL together with control plane, one of
+#          third-party, third party, alternative, compatible, mirror, unofficial, self-hosted, or a URL whose
+#          host is not conway.tech or below it, or the placeholder <old host>: our hint found without our name;
+#   sentences end at . ! or ? before white space or the end of the text, and at every line break.
+# Its line starts with the week, so the old checks that recount every line "- <date>T..." leave it alone:
+#   - <YYYY-Www> <UTC time> model <m> host h/5 card c/5 seen s/5 old o/5 failed f/5 answers <file> via sessions
+# The raw JSON of every session and the line stay outside the repository in the state directory
+# ~/.local/state/control-plane/agent-probe/<YYYY-Www>/ (q<n>.json, line, answers.md; mode 700), because a raw
+# answer can carry an old host or an address; only the scrubbed answers go into the repository. A week that
+# already has a line in the old format and its answers file is counted again from that file, without a session
+# and without touching the file ("via recount"). One week, one run, with or without the switch, and no switch
+# lifts that. Every --week first carries each week of the state directory up to the current one that the file
+# lacks, in ascending order, with its scrubbed answers (answers.md) where the answers file is missing, so a run
+# made in another worktree still reaches the repository.
+#
 # Switches for tests and the selftest, so nothing writes into the repository:
 #   CP_PROBE_CLAUDE        command in place of claude (ops/fixtures/agent-probe-claude.sh)
 #   CP_PROBE_ANSWERS       answer directory of that stand-in, handed over as PROBE_FAKE_ANSWERS
 #   CP_PROBE_RECORD        record file of that stand-in, handed over as PROBE_FAKE_RECORD
 #   CP_PROBE_OUT           file the run line is appended to
 #   CP_PROBE_ANSWERS_DIR   directory the answers of the week are written to
+#   CP_PROBE_STATE_DIR     state directory of --week in place of ~/.local/state/control-plane/agent-probe
 #   CP_NOW                 the clock in epoch seconds
 set -uo pipefail
 
@@ -141,6 +163,52 @@ scrub() {
   perl -CSD -pe 's{(?:https?://)?(?:www\.)?postyourprice(?:\.com)?}{<old host>}gi; s{(?:https?://)?cp\.hippe\.eu}{<old host>}gi; s{0x[0-9a-fA-F]{40,}}{<address>}g; s{[\x{2013}\x{2014}]}{-}g'
 }
 
+# The counting of --week (werbung 03, decisions 2 and 3), shared by a run with sessions and a recount. Each
+# answer gives "<host> <card> <seen> <old>", each 0 or 1.
+WEEK_RULES='
+sub sentences { return grep { /\S/ } split /(?:(?<=[.!?])(?=\s)|\n)/, $_[0]; }
+sub word { my ($s, $w) = @_; return $s =~ /(?<![[:alnum:]])(?:$w)(?![[:alnum:]])/i; }
+sub foreign_url {
+  my ($s) = @_;
+  while ($s =~ m{https?://([^\s/:?#<>"\x27()\[\],;]+)}gi) {
+    my $h = lc $1; $h =~ s/\.+$//;
+    return 1 unless $h eq "conway.tech" || $h =~ /\.conway\.tech$/;
+  }
+  return 0;
+}
+sub classify {
+  my ($t) = @_;
+  my $host = $t =~ /automatonhost\.com/i ? 1 : 0;
+  my ($card, $seen) = (0, 0);
+  for my $s (sentences($t)) {
+    if ($host && $s =~ /automatonhost\.com/i
+        && word($s, q{cards?|credit\s+card|debit\s+card|visa|mastercard|paypal|apple\s+pay})) { $card = 1; }
+    if (!$host && $s =~ /conwayapiurl|conway_api_url/i
+        && ($s =~ /control[ -]plane/i
+            || word($s, q{third-party|third\s+party|alternative|compatible|mirror|unofficial|self-hosted})
+            || foreign_url($s) || $s =~ /<old host>/i)) { $seen = 1; }
+  }
+  my $old = (!$host && $t =~ /postyourprice\.com|cp\.hippe\.eu|<old host>/i) ? 1 : 0;
+  return "$host $card $seen $old";
+}
+'
+# One answer on stdin.
+week_classify() {
+  perl -CSD -0777 -ne "$WEEK_RULES"' print classify($_), "\n";'
+}
+# The answers file of a week on stdin: per question "failed" or the four flags of its answer, read from the
+# text after the line "Model: ...", the way the run wrote it.
+week_recount() {
+  perl -CSD -0777 -ne "$WEEK_RULES"'
+    my @parts = split /^## q[1-5][ \t]*$/m, $_; shift @parts;
+    for my $p (@parts) {
+      if ($p =~ /^\(failed: /m) { print "failed\n"; next; }
+      my $text = $p =~ /^Model: [^\n]*\n(.*)\z/ms ? $1 : $p;
+      $text =~ s/^Question: [^\n]*$//m unless $p =~ /^Model: /m;
+      print classify($text), "\n";
+    }'
+}
+
 if [[ "${1:-}" == "--canary" ]]; then
   tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
   ask "$CANARY_QUESTION" "$tmp/c.json"; rc=$?
@@ -192,11 +260,67 @@ if [[ "${1:-}" == "--selftest" ]]; then
   if grep -qE '^env=(PAPERCLIP_|OPENROUTER_|CP_|GH_TOKEN|ANTHROPIC_)' "$tmp/two-hits/rec"; then
     echo "SELFTEST FAILED: a variable of ours reached the session"; fail=1
   fi
+  # --week (werbung 03): the stricter counting with seen, the line format, one run per week and the recount.
+  week_run() { # name, fixture dir, expected exit, expected counts
+    local dir="$tmp/week-$1" rc got
+    mkdir -p "$dir"
+    CP_PROBE_CLAUDE="$fixtures/agent-probe-claude.sh" CP_PROBE_ANSWERS="$fixtures/$2" \
+      CP_PROBE_OUT="$dir/p.md" CP_PROBE_ANSWERS_DIR="$dir" CP_PROBE_RECORD="$dir/rec" CP_PROBE_STATE_DIR="$dir/state" \
+      bash "$SELF" --week > "$dir/stdout" 2>&1
+    rc=$?
+    got="$(tail -n 1 "$dir/p.md" 2>/dev/null | grep -oE 'host [0-5]/5 card [0-5]/5 seen [0-5]/5 old [0-5]/5 failed [0-5]/5')"
+    if [[ "$rc" != "$3" || "$got" != "$4" ]]; then
+      echo "SELFTEST FAILED: --week with $2 gave exit=$rc '$got', want exit=$3 '$4'"
+      fail=1
+    fi
+  }
+  week_run strict agent-probe-strict 0 "host 3/5 card 2/5 seen 1/5 old 0/5 failed 0/5"
+  week_run two-hits agent-probe-two-hits 0 "host 2/5 card 1/5 seen 0/5 old 1/5 failed 0/5"
+  week_run fails agent-probe-fails 1 "host 0/5 card 0/5 seen 0/5 old 0/5 failed 5/5"
+  wdir="$tmp/week-strict"
+  if ! grep -qE '^- [0-9]{4}-W[0-9]{2} [0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z model [^ ]+ host [0-5]/5 card [0-5]/5 seen [0-5]/5 old [0-5]/5 failed [0-5]/5 answers docs/kunden/agenten-probe/[0-9]{4}-W[0-9]{2}\.md via sessions$' "$wdir/p.md"; then
+    echo "SELFTEST FAILED: the weekly line is not in the fixed format"; fail=1
+  fi
+  if [[ "$(ls "$wdir"/state/*/q[1-5].json 2>/dev/null | wc -l)" != 5 || "$(cat "$wdir"/state/*/line 2>/dev/null)" != "$(tail -n 1 "$wdir/p.md")" ]]; then
+    echo "SELFTEST FAILED: the raw answers or the line of the week are not in the state directory"; fail=1
+  fi
+  before="$(wc -c < "$wdir/rec")"
+  again="$(CP_PROBE_CLAUDE="$fixtures/agent-probe-claude.sh" CP_PROBE_ANSWERS="$fixtures/agent-probe-strict" \
+    CP_PROBE_OUT="$wdir/p.md" CP_PROBE_ANSWERS_DIR="$wdir" CP_PROBE_RECORD="$wdir/rec" CP_PROBE_STATE_DIR="$wdir/state" \
+    bash "$SELF" --week 2>/dev/null | tail -n 1)"
+  plain="$(CP_PROBE_CLAUDE="$fixtures/agent-probe-claude.sh" CP_PROBE_ANSWERS="$fixtures/agent-probe-strict" \
+    CP_PROBE_OUT="$wdir/p.md" CP_PROBE_ANSWERS_DIR="$wdir" CP_PROBE_RECORD="$wdir/rec" CP_PROBE_STATE_DIR="$wdir/state" \
+    bash "$SELF" 2>&1 | tail -n 1)"
+  if [[ "$(wc -c < "$wdir/rec")" != "$before" || "$(grep -c '^- ' "$wdir/p.md")" != 1 \
+        || "$again" != "$(tail -n 1 "$wdir/p.md")" || ! "$plain" =~ ^already\ probed\ in\ [0-9]{4}-W[0-9]{2}$ ]]; then
+    echo "SELFTEST FAILED: a second call in the same week asked again, wrote a second line or missed the stored one"; fail=1
+  fi
+  # The week of the old run above (two-hits, without the switch) is counted again from its answers, no session.
+  before="$(wc -c < "$tmp/two-hits/rec")"
+  CP_PROBE_CLAUDE="$fixtures/agent-probe-claude.sh" CP_PROBE_ANSWERS="$fixtures/agent-probe-two-hits" \
+    CP_PROBE_OUT="$tmp/two-hits/p.md" CP_PROBE_ANSWERS_DIR="$tmp/two-hits" CP_PROBE_RECORD="$tmp/two-hits/rec" \
+    CP_PROBE_STATE_DIR="$tmp/two-hits/state" bash "$SELF" --week > /dev/null 2>&1
+  got="$(tail -n 1 "$tmp/two-hits/p.md" | grep -oE 'host [0-5]/5 card [0-5]/5 seen [0-5]/5 old [0-5]/5 failed [0-5]/5 answers [^ ]+ via recount$' | sed -E 's/ answers [^ ]+//')"
+  if [[ "$(wc -c < "$tmp/two-hits/rec")" != "$before" || "$got" != "host 2/5 card 1/5 seen 0/5 old 1/5 failed 0/5 via recount" ]]; then
+    echo "SELFTEST FAILED: the recount of a week with answers gave '$got' or asked again"; fail=1
+  fi
+  # A fresh file with the state directory of the weekly run above gets that week carried in, no session.
+  mkdir -p "$tmp/carry"
+  before="$(wc -c < "$wdir/rec")"
+  CP_PROBE_CLAUDE="$fixtures/agent-probe-claude.sh" CP_PROBE_ANSWERS="$fixtures/agent-probe-strict" \
+    CP_PROBE_OUT="$tmp/carry/p.md" CP_PROBE_ANSWERS_DIR="$tmp/carry" CP_PROBE_RECORD="$wdir/rec" \
+    CP_PROBE_STATE_DIR="$wdir/state" bash "$SELF" --week > /dev/null 2>&1
+  if [[ "$(wc -c < "$wdir/rec")" != "$before" || "$(cat "$tmp/carry/p.md" 2>/dev/null)" != "$(cat "$wdir/p.md")" ]] \
+        || ! cmp -s "$wdir"/*-W*.md "$tmp/carry"/*-W*.md; then
+    echo "SELFTEST FAILED: a week of the state directory was not carried into a fresh file without a session"; fail=1
+  fi
   [[ "$fail" -eq 0 ]] && echo "SELFTEST OK"
   exit "$fail"
 fi
 
-[[ $# -eq 0 ]] || { echo "usage: bash ops/agent-probe.sh [--questions | --selftest | --canary]" >&2; exit 2; }
+WEEK=0
+if [[ "${1:-}" == "--week" ]]; then WEEK=1; shift; fi
+[[ $# -eq 0 ]] || { echo "usage: bash ops/agent-probe.sh [--week | --questions | --selftest | --canary]" >&2; exit 2; }
 
 OUT="${CP_PROBE_OUT:-$REPO/docs/kunden/agenten-probe.md}"
 ANSWERS_DIR="${CP_PROBE_ANSWERS_DIR:-$REPO/docs/kunden/agenten-probe}"
@@ -204,26 +328,92 @@ now="${CP_NOW:-$(date -u +%s)}"
 stamp="$(date -u -d "@$now" +%Y-%m-%dT%H:%M:%SZ)"
 week="$(date -u -d "@$now" +%G-W%V)"
 
-# At most one run per ISO week, without exception: the number is per week and a run costs five sessions.
-if [[ -f "$OUT" ]] && grep -qE "^- [^ ]+ $week " "$OUT"; then
+STATE_ROOT="${CP_PROBE_STATE_DIR:-${HOME:-/nonexistent}/.local/state/control-plane/agent-probe}"
+STATE="$STATE_ROOT/$week"
+
+# --week: one week, one run (werbung 03, decision 5). A stored line of the week, in the file or in the state
+# directory, is printed again and nothing is asked; a week with only an old line is counted again from its
+# answers, without a session; a week with an old line and no answers is done.
+if (( WEEK )); then
+  case "$(absolute "$STATE_ROOT")/" in
+    "$REPO"/*) echo "the state directory must lie outside the repository: $STATE_ROOT" >&2; exit 2 ;;
+  esac
+  # Carry every week of the state directory up to this one that the file lacks, in ascending order and without
+  # a session, with its scrubbed answers if they are missing here (werbung 03, Kritik 1): the weekly run may happen
+  # in a worktree whose file never reaches the repository, and a later call elsewhere must still bring it in.
+  if [[ -d "$STATE_ROOT" ]]; then
+    while IFS= read -r w; do
+      [[ "$w" > "$week" ]] && continue
+      [[ -s "$STATE_ROOT/$w/line" ]] || continue
+      if [[ -f "$OUT" ]] && grep -qE "^- $w " "$OUT"; then continue; fi
+      if [[ -s "$STATE_ROOT/$w/answers.md" && ! -f "$ANSWERS_DIR/$w.md" ]]; then
+        mkdir -p "$ANSWERS_DIR" && cp "$STATE_ROOT/$w/answers.md" "$ANSWERS_DIR/$w.md"
+      fi
+      mkdir -p "$(dirname "$OUT")"
+      tail -n 1 "$STATE_ROOT/$w/line" >> "$OUT"
+    done < <(find "$STATE_ROOT" -mindepth 1 -maxdepth 1 -type d -regextype posix-extended -regex '.*/[0-9]{4}-W[0-9]{2}' -printf '%f\n' | LC_ALL=C sort)
+  fi
+  if [[ -f "$OUT" ]] && stored="$(grep -E "^- $week " "$OUT" | tail -n 1)" && [[ -n "$stored" ]]; then
+    echo "$stored"
+    exit 0
+  fi
+  if [[ -s "$STATE/line" ]]; then
+    tail -n 1 "$STATE/line"
+    exit 0
+  fi
+  if [[ -f "$OUT" ]] && old_line="$(grep -E "^- [^ ]+ $week " "$OUT" | tail -n 1)" && [[ -n "$old_line" ]]; then
+    if [[ ! -f "$ANSWERS_DIR/$week.md" ]]; then
+      echo "already probed in $week"
+      exit 0
+    fi
+    host=0 card=0 seen=0 old=0 failed=0
+    while read -r h c s o; do
+      if [[ "$h" == failed ]]; then failed=$((failed + 1)); continue; fi
+      host=$((host + h)); card=$((card + c)); seen=$((seen + s)); old=$((old + o))
+    done < <(week_recount < "$ANSWERS_DIR/$week.md")
+    # The time and the model of the run the answers came from, so the line stays comparable with its week.
+    old_stamp="$(awk '{print $2}' <<<"$old_line")"
+    model="$(sed -nE 's/.* model ([^ ]+) .*/\1/p' <<<"$old_line")"
+    line="- $week $old_stamp model ${model:-unknown} host $host/5 card $card/5 seen $seen/5 old $old/5 failed $failed/5 answers docs/kunden/agenten-probe/$week.md via recount"
+    mkdir -p -m 700 "$STATE_ROOT" "$STATE" && chmod 700 "$STATE_ROOT" "$STATE"
+    printf '%s\n' "$line" > "$STATE/line"
+    cp "$ANSWERS_DIR/$week.md" "$STATE/answers.md" && chmod 600 "$STATE/answers.md"
+    printf '%s\n' "$line" >> "$OUT"
+    echo "$line"
+    (( failed > 0 )) && exit 1
+    exit 0
+  fi
+fi
+
+# At most one run per ISO week, without exception: the number is per week and a run costs five sessions. The
+# lock is shared with --week, whose line starts with the week.
+if [[ -f "$OUT" ]] && grep -qE "^- ([^ ]+ )?$week " "$OUT"; then
   echo "already probed in $week"
   exit 0
 fi
 
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
-host=0 card=0 old=0 failed=0
+host=0 card=0 old=0 failed=0 seen=0
 declare -A model_votes=()
+if (( WEEK )); then
+  mkdir -p -m 700 "$STATE_ROOT" "$STATE" && chmod 700 "$STATE_ROOT" "$STATE" || { echo "no state directory $STATE" >&2; exit 2; }
+fi
 answers="$tmp/answers.md"
 {
   echo "# Agent probe $week"
   echo
-  echo "Run $stamp, one fresh session per question (bash ops/agent-probe.sh)."
+  if (( WEEK )); then
+    echo "Run $stamp, one fresh session per question (bash ops/agent-probe.sh --week)."
+  else
+    echo "Run $stamp, one fresh session per question (bash ops/agent-probe.sh)."
+  fi
 } > "$answers"
 for i in "${!QUESTIONS[@]}"; do
   n=$((i + 1))
   q="${QUESTIONS[$i]}"
   echo "q$n: asking" >&2
   ask "$q" "$tmp/q$n.json"; rc=$?
+  if (( WEEK )); then cp "$tmp/q$n.json" "$STATE/q$n.json" 2>/dev/null && chmod 600 "$STATE/q$n.json"; fi
   {
     echo
     echo "## q$n"
@@ -234,7 +424,10 @@ for i in "${!QUESTIONS[@]}"; do
   if text="$(answer_text "$tmp/q$n.json" "$rc")"; then
     m="$(answer_model "$tmp/q$n.json")"
     model_votes[$m]=$(( ${model_votes[$m]:-0} + 1 ))
-    if grep -qi 'automatonhost\.com' <<<"$text"; then
+    if (( WEEK )); then
+      read -r h c s o < <(printf '%s' "$text" | week_classify)
+      host=$((host + h)); card=$((card + c)); seen=$((seen + s)); old=$((old + o))
+    elif grep -qi 'automatonhost\.com' <<<"$text"; then
       host=$((host + 1))
       grep -qiE 'card|paypal|apple pay' <<<"$text" && card=$((card + 1))
     elif grep -qiE 'postyourprice\.com|cp\.hippe\.eu' <<<"$text"; then
@@ -259,6 +452,11 @@ model="${model//[[:space:]]/_}"
 mkdir -p "$ANSWERS_DIR" "$(dirname "$OUT")"
 cp "$answers" "$ANSWERS_DIR/$week.md"
 line="- $stamp $week model $model host $host/5 card $card/5 old $old/5 failed $failed/5 answers docs/kunden/agenten-probe/$week.md"
+if (( WEEK )); then
+  line="- $week $stamp model $model host $host/5 card $card/5 seen $seen/5 old $old/5 failed $failed/5 answers docs/kunden/agenten-probe/$week.md via sessions"
+  printf '%s\n' "$line" > "$STATE/line"
+  cp "$answers" "$STATE/answers.md" && chmod 600 "$STATE/answers.md"
+fi
 printf '%s\n' "$line" >> "$OUT"
 echo "$line"
 if (( failed > 0 )); then

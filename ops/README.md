@@ -711,6 +711,41 @@ name in the referer. It stands before the first section that prints an address a
 Running both once a week is a proposal to the loop master
 (`goals/_vorschlaege/werbung-probe-takt-2026-11-23-1.md`); no cron or timer runs them.
 
+### Weekly run
+
+Since werbung 03 the course check (the direction check every 7 days, ROADMAP werbung 03) runs these two
+commands on the code-host, after `set -a; . ~/.config/control-plane/loop.env; set +a`, and puts both results
+into its analysis under `docs/richtung/`. No cron, timer or routine runs them, and running them twice in a
+week costs nothing:
+
+    bash ops/agent-probe.sh --week
+    bash ops/traffic.sh --agents 168
+
+`bash ops/agent-probe.sh --week` asks the same five questions in the same fresh sessions, at most once per
+ISO week, and appends a line that starts with the week:
+
+    - <YYYY-Www> <UTC time> model <model> host <h>/5 card <c>/5 seen <s>/5 old <o>/5 failed <f>/5 answers docs/kunden/agenten-probe/<YYYY-Www>.md via <sessions|recount>
+
+It counts more strictly than the run without a switch: `card` only when a sentence names automatonhost.com
+and, as a whole word in the same sentence, card, cards, credit card, debit card, Visa, Mastercard, PayPal or
+Apple Pay; `seen` for an answer without `host` that has a sentence naming `conwayApiUrl` or
+`CONWAY_API_URL` together with control plane, third-party, alternative, compatible, mirror, unofficial,
+self-hosted, a URL off conway.tech or `<old host>`: it found our hint but did not name us. Sentences end at
+`.`, `!` or `?` before white space and at every line break.
+
+One week, one run, shared with the run without a switch: once the week has a line in the new format (in
+`docs/kunden/agenten-probe.md` or in the state directory), every further `--week` prints that line, asks
+nothing and exits 0; the run without a switch prints `already probed in <YYYY-Www>`. A week that only has a
+line of the old format and its answers file is counted again from that file, without a session and without
+touching it (`via recount`). The raw JSON of each session and the line stay on the code-host in
+`~/.local/state/control-plane/agent-probe/<YYYY-Www>/` (mode 700, `CP_PROBE_STATE_DIR` in tests), because a
+raw answer can carry an old host or an address; only the scrubbed answers go into the repository.
+
+`bash ops/traffic.sh --agents 168` prints only the block `-- Agent fetches --` and the blank line after it,
+from the same log and window and counted the same way as in the full report, without the header and the
+sections that print addresses. The full report took over ten minutes on the production log for that block.
+Tests: `test/traffic-agents.test.ts` (`TRAFFIC_UNDER_TEST`) and `test/agent-probe.test.ts`.
+
 ## Deciding a job, the way the product says a buyer should
 
 `ops/award.ts --bounty <id>` reads, `--award <submission-id>` pays, `--none` pays nobody.

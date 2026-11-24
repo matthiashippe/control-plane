@@ -200,3 +200,55 @@ describe("ops/traffic.sh agent fetches", () => {
     expect(run(["--funnel", "168"]).stdout).not.toContain("-- Agent fetches --");
   }, 90_000);
 });
+
+/**
+ * --agents (werbung 03): only the block `-- Agent fetches --`, for the weekly run, counted as in the full report.
+ * Red against the script of werbung 02, which reads --agents as the window.
+ */
+describe("ops/traffic.sh --agents", () => {
+  it("prints only the agent block with --agents", () => {
+    const r = run(["--agents", "168"]);
+    expect(r.status).toBe(0);
+    expect(r.stdout).toBe(
+      [
+        "-- Agent fetches --",
+        "   6 agent fetch(es) in the last 168 hours, 1 from our own addresses",
+        "      3  Claude-User",
+        "      1  ChatGPT-User",
+        "      1  Perplexity-User",
+        "      1  MistralAI-User",
+        "      0  DuckAssistBot",
+        "",
+        "",
+      ].join("\n"),
+    );
+    expect(r.stdout).not.toMatch(ADDRESS);
+    // Without a window it takes the window of the full report, 24 hours.
+    expect(run(["--agents"]).stdout.split("\n")[1]).toMatch(/ in the last 24 hours, /);
+  }, 90_000);
+
+  it("finishes --agents on the fixture log within 20 seconds", () => {
+    const started = Date.now();
+    const r = run(["--agents", "168"]);
+    const seconds = (Date.now() - started) / 1000;
+    expect(r.status).toBe(0);
+    expect(block(r.stdout)).toHaveLength(7);
+    expect(seconds).toBeLessThan(20);
+  }, 90_000);
+
+  it("counts the same with --agents as in the full report", () => {
+    const ours = only((r) => r.ip === OUR_ADDRESS);
+    const cases: [string, Record<string, string>, string | undefined][] = [
+      ["168", {}, undefined],
+      ["201", {}, undefined],
+      ["24", {}, undefined],
+      ["168", { CP_OWN_IPS: "192.0.2.250" }, undefined],
+      ["168", {}, ours],
+    ];
+    for (const [hours, env, log] of cases) {
+      const full = block(run([hours], env, log).stdout);
+      expect(full.length).toBe(7);
+      expect(block(run(["--agents", hours], env, log).stdout)).toEqual(full);
+    }
+  }, 180_000);
+});
