@@ -1,0 +1,30 @@
+# One line per comment edited by ops/relink-comments.py --name --send (goals/reichweite/04): no address, no name, no text.
+# <iso8601-utc> comment <id> issue <n> page <slug|home> old <sha12 of the old text> new <sha12 of the new text>
+2026-11-24T14:27:03Z comment 5796193319 issue 293 page credits-never-granted old 3cb628087073 new 5b4eaef9d703
+2026-11-24T14:27:25Z comment 5796218247 issue 294 page home old 26e8f71b12a2 new 85d9b5ccc434
+2026-11-24T14:27:46Z comment 5796242563 issue 333 page invalid-or-expired-nonce old 3be0ca54f422 new d96028e7c580
+2026-11-24T14:28:08Z comment 5742781023 issue 339 page verify-500-database-error old 4a38e03cfa6d new d5938151de0a
+2026-11-24T14:28:30Z comment 5889830336 issue 353 page invalid-or-expired-nonce old 7cefd53311a6 new 1657c0d11255
+2026-11-24T14:28:51Z comment 5748924904 issue 355 page invalid-or-expired-nonce old 9a3f68a42e6c new bb38eb651efb
+2026-11-24T14:29:13Z comment 5889856106 issue 356 page invalid-or-expired-nonce old 27780f0c765a new 5f07d29d65f8
+2026-11-24T14:29:34Z comment 5889884681 issue 359 page invalid-or-expired-nonce old 0353e4c01e04 new 4fad7f5043e1
+2026-11-24T14:29:56Z comment 5781362775 issue 372 page verify-500-database-error old dc1b3c6b49b1 new f3c20f73ab66
+2026-11-24T14:30:18Z comment 5781362033 issue 376 page invalid-or-expired-nonce old 0210e74e9ba0 new 4eb0583ad7b9
+2026-11-24T14:30:41Z comment 5742781149 issue 377 page verify-500-database-error old ae905c8f9593 new 8dadaeef387d
+2026-11-24T14:31:02Z comment 5748925721 issue 379 page verify-500-database-error old b95b595c6352 new 1102f099110e
+2026-11-24T14:31:24Z comment 5748925311 issue 390 page home old d7221bbd1eb8 new 70e3d04036d0
+2026-11-24T14:31:48Z comment 5781361252 issue 392 page invalid-or-expired-nonce old 41d25213bac8 new a12bcd170b4e
+2026-11-24T14:32:09Z comment 6835466852 issue 406 page invalid-or-expired-nonce old 212011c6a2c4 new 2d18011c9d64
+2026-11-24T14:32:31Z comment 6835502716 issue 408 page verify-500-database-error old 0298be62c02b new 6c6125f0827c
+2026-11-24T14:32:53Z comment 6520901615 issue 419 page verify-500-database-error old 2a287c864797 new 6105f9e9cc05
+2026-11-24T14:33:15Z comment 6789479781 issue 427 page credits-never-granted old ec08748a4d8d new 429ea2a3627b
+2026-11-24T14:33:36Z comment 6789453609 issue 430 page home old 8d78570a50e5 new d658d8500b68
+2026-11-24T14:33:58Z comment 6520875093 issue 432 page invalid-or-expired-nonce old 0d86032dba08 new aa7b8cdaa874
+2026-11-24T14:34:20Z comment 6789427945 issue 434 page invalid-or-expired-nonce old 7455554d159f new 495fb230d472
+2026-11-24T14:34:42Z comment 6520848825 issue 435 page verify-500-database-error old 5b54bb9acfa0 new 82b9dd87b037
+2026-11-24T14:35:04Z comment 6769349738 issue 440 page invalid-or-expired-nonce old d521faf411dd new 55b84dbd2959
+2026-11-24T14:35:25Z comment 6769384327 issue 442 page verify-500-database-error old 8759152fdf91 new d5fcf6a5488d
+2026-11-24T14:35:47Z comment 6769421243 issue 443 page home old 15a5360da2ff new 9b0943bfa3b2
+2026-11-24T14:36:08Z comment 6835431307 issue 447 page verify-500-database-error old e7234e5f97ad new 039a737cf10b
+2026-11-24T15:02:01Z comment 5805015103 issue 385 page home old 2916f7e70a59 new 0f150b32afe5
+2026-11-24T15:02:22Z comment 5804984649 issue 335 page home old 6c32c58fa015 new 0e18046ec2fc
