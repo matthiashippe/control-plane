@@ -74,8 +74,18 @@ const CARD_LINE =
   '<p class="fine"><strong>No crypto needed:</strong> pay by card, PayPal or Apple Pay, with 60 days to cancel the purchase. <a href="/#card">Buy credit</a>.</p>';
 
 /**
+ * The video of goals/reichweite/03. Its last frame offers the top-up by card, so it stands only while the card checkout is open
+ * (goals/wache/03), like CARD_LINE.
+ */
+const VIDEO_BLOCK = `
+    <div class="wrap narrow watch" data-soll="video" style="margin-top:var(--s-8)">
+      <video controls muted playsinline preload="none" width="1280" height="720" poster="/video/move-poster.png"><source src="/video/move.mp4" type="video/mp4"></video>
+      <p class="fine" style="margin-top:var(--s-3)">Recorded as it ran, nothing staged: the unchanged automaton fails at api.conway.tech, one line changes, and it runs here. 26 seconds, no sound.</p>
+    </div>`;
+
+/**
  * The body of one error page, inside the frame of page() in src/app.ts. `cardOpen` is false while the card breaker of
- * goals/wache/01 is on; the page is then the one of goals/reichweite/01 without the card line.
+ * goals/wache/01 is on; the page is then the one of goals/reichweite/01 without the card line and without the video.
  */
 export function renderErrorPage(p: ErrorPage, cardOpen = true): string {
   return `
@@ -92,11 +102,7 @@ export function renderErrorPage(p: ErrorPage, cardOpen = true): string {
         <pre><code><span class="pr">$</span> automaton --provision</code></pre></div>
         <p class="fine">With USDC in its wallet, the first start tops up $5 of credit here. <a href="/fix">Every step on one page</a>.</p>
       </div>
-    </div>
-    <div class="wrap narrow watch" data-soll="video" style="margin-top:var(--s-8)">
-      <video controls muted playsinline preload="none" width="1280" height="720" poster="/video/move-poster.png"><source src="/video/move.mp4" type="video/mp4"></video>
-      <p class="fine" style="margin-top:var(--s-3)">Recorded as it ran, nothing staged: the unchanged automaton fails at api.conway.tech, one line changes, and it runs here. 26 seconds, no sound.</p>
-    </div>
+    </div>${cardOpen ? VIDEO_BLOCK : ""}
     <div class="wrap narrow">
       <p class="fine" style="margin-top:var(--s-8)">automatonhost.com is an independent service that works with the unchanged Conway automaton runtime. It is not part of Conway.</p>
     </div>
