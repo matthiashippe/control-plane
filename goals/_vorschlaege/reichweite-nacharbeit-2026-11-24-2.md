@@ -7,3 +7,4 @@ Empfehlung: Im nächsten Goal, das `ops/automaton-live.sh` ändern darf, `MODEL_
 Die Kopie war erzwungen, weil die Deny List von reichweite 03 `ops/automaton-live.sh` sperrt. Sie ist auch der Grund, warum `ops/video-record.sh` neu mit 646 Zeilen kommt, ohne dass eine Commit-Message des Goal-Branches die Größe begründet (`git log --format=%B b2f58e7^1..b2f58e7^2 | grep -ciE '500|zeilen|größe'` -> `0`). Lockert ein späteres Goal den Modellfilter nur in einer Datei, wählt die andere weiter nach der alten Regel.
 
 Linse Q, Frage 2.
+Übernommen: Glied 7 an den Tech Lead, PRO-28911, der Gleichheitstest für MODEL_JS; die Auslagerung beim nächsten Goal an ops/automaton-live.sh (24.11.2026)

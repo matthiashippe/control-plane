@@ -7,3 +7,4 @@ Empfehlung: Element und Zeile als eine Konstante in `src/public/error-pages.ts` 
 Wird das Video neu gerendert (Zyklus 6 änderte die Länge schon von 24,7 auf 26,3 s), muss die Zahl an zwei Stellen nachgezogen werden, und kein Test bemerkt es.
 
 Linse Q, Frage 2.
+Übernommen: Watch List in STATE.md, beim nächsten neuen Rendern des Videos (24.11.2026)

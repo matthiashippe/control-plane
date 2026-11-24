@@ -6,3 +6,4 @@ Empfehlung: Vor dem Start am 26.11. das Urteil auf alle Threads mit einem Kommen
 
 Neue Issues gibt es seit dem 10.11. nicht mehr, das Ergebnis `anderer Kanal, Idee 3` steht also schon fest, und Idee 3 läuft bereits als paket 01 mit Messung in paket 02. Der Teil von kanal 06, der dem Ziel mehr zahlender fremder Automatons dient, ist die Zuordnung je Issue; sie zeigt erst dann etwas Neues, wenn sie die umgelinkten Kommentare mitzählt.
 MVP: Funktion, weil die Zuordnung je Thread zeigt, welche Kommentare Anmeldungen bringen, und das Goal sonst nur ein feststehendes Urteil schreibt.
+Übernommen: Glied 6 an den Tech Lead, PRO-28911, in kanal 06 vor dem Start am 26.11. (24.11.2026)

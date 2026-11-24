@@ -7,3 +7,4 @@ Empfehlung: Eine Testdatei `test/video-record-selftest.test.ts` startet `bash op
 Belegt ist der Selftest nur als Prüfbefehl in goals/reichweite/03-ein-video-zeigt-den-umzug.md:128, den nach dem Merge niemand mehr fährt. Das Werkzeug lädt den Schlüssel der Wallet des eigenen Kontos in eine Sandbox, und das Transkript landet im öffentlichen Repo.
 
 Linse Q, Frage 1.
+Übernommen: Glied 7 an den Tech Lead, PRO-28911 (24.11.2026)
