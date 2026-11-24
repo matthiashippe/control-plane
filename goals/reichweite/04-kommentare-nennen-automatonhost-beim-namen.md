@@ -158,6 +158,19 @@ If you need it running before Conway fixes this: automatonhost.com, which I run,
       Prüfung: `cat ops/named-comments.log ops/relink_rules.py ops/relink-comments.py goals/reichweite/ANNAHMEN.md test/video-record-selftest.test.ts | grep -cE '0x[0-9a-fA-F]{40}|[0-9a-fA-F]{64}|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[a-z]{2,}'` muss `0` ausgeben.
 - [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
+- [ ] Geht der Notschalter der Karte an, gibt es einen fertigen Weg, das Kartenversprechen aus allen 26 Kommentaren mit `LEAD` zu
+      nehmen, und einen zurück: `ops/relink_rules.py` hat `LEAD_NO_CARD` (genau `LEAD` bis einschließlich `(https://automatonhost.com/llms.txt)`,
+      dann ein Punkt, also ohne „and you can top it up …“, so wie `/llms.txt` die Kartenzeile bei eingeschaltetem Notschalter weglässt),
+      und `ops/relink-comments.py --name --no-card` tauscht im Trockenlauf, mit `--send` (Freigabe wie Entscheidung 5) und mit `--verify`
+      in jedem Kommentar, der mit `LEAD` und einer Leerzeile beginnt, genau diesen Satz gegen `LEAD_NO_CARD`; `--name` ohne `--no-card`
+      tauscht einen Kommentar, der mit `LEAD_NO_CARD` und einer Leerzeile beginnt, wieder zurück, nie ein zweiter Satz davor. Die vier aus
+      `NO_LEAD` und jedes andere Zeichen bleiben. Gesendet wird in diesem Goal nichts (Kritik, Tech Lead 24.11.2026).
+      MVP: Funktion, weil die 26 Kommentare unter Matthias' Namen sonst Karte, PayPal und Apple Pay versprechen, während der Notschalter
+      sie abschaltet, und das wäre eine falsche Aussage gegenüber genau den Betreibern, die wir gewinnen wollen.
+      Prüfung: `python3 -I -c 'import sys; sys.path.insert(0, "ops"); import relink_rules as r; k = "(https://automatonhost.com/llms.txt)"; print(r.LEAD_NO_CARD == r.LEAD[:r.LEAD.index(k) + len(k)] + ".")'` muss genau `True` ausgeben.
+      Prüfung: `for t in "the no-card dry run swaps the lead for the lead without the card and changes nothing else" "the no-card send patches only approved comments and reads each one back" "the name dry run swaps the lead without the card back to the lead and never adds a second one" "no-card leaves the comments of NO_LEAD alone"; do grep -qF "\"$t\"" test/relink-comments.test.ts || echo "fehlt: $t"; done` muss nichts ausgeben.
+      Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/relink-comments.test.ts -t "no-card"` muss Exit-Code 0 haben.
+      Prüfung: `python3 -I ops/relink-comments.py --no-card > /dev/null 2>&1; echo "exit=$?"` muss genau `exit=1` ausgeben.
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
