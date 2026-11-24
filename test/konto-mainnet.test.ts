@@ -6,17 +6,28 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { custom, type Hex } from "viem";
+import { custom, encodeFunctionData, type Hex } from "viem";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { openDb } from "../src/db.js";
 import { sendKontoTx } from "../src/konto/chain.js";
 import { MAINNET_NET, SEPOLIA_NET, SEPOLIA_USDC, readKontoConfig } from "../src/konto/config.js";
 import { createPayoutChain } from "../src/konto/payout.js";
 import { kontoFromEnv } from "../src/konto/setup.js";
-import { createKontoChain } from "../src/konto/topup.js";
+import { createKontoChain, SPEND_PERMISSION_MANAGER_ABI } from "../src/konto/topup.js";
 
 const TO = "0xf85210b21cc50302f477ba56686d2019dc9b67ad";
 const HASH = ("0x" + "cd".repeat(32)) as Hex;
+const PERMISSION = {
+  account: "0x1111111111111111111111111111111111111111",
+  spender: "0x2222222222222222222222222222222222222222",
+  token: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+  allowance: 1_000_000n,
+  period: 2_592_000,
+  start: 1,
+  end: 2 ** 48 - 1,
+  salt: 1n,
+  extraData: "0x",
+} as const;
 const offline = custom({ request: async () => { throw new Error("no network in unit tests"); } });
 
 /** A transport that records every request and answers like a node of the chain `chainIdHex`. */
@@ -96,7 +107,9 @@ describe("main network 8453", () => {
   it("sends on 8453 only under the setting 8453, against a node of Base", async () => {
     const account = privateKeyToAccount(generatePrivateKey());
     const main = node("0x2105");
-    const hash = await sendKontoTx({ chainId: 8453, net: MAINNET_NET, account, transport: main.transport, tx: { to: TO, data: "0x", gas: 100_000n } });
+    // goals/regeln/01: on 8453 only a kind of rule 10 goes out, here revokeAsSpender at the Spend Permission Manager (TO).
+    const data = encodeFunctionData({ abi: SPEND_PERMISSION_MANAGER_ABI, functionName: "revokeAsSpender", args: [PERMISSION] });
+    const hash = await sendKontoTx({ chainId: 8453, net: MAINNET_NET, account, transport: main.transport, tx: { to: TO, data, gas: 100_000n } });
     expect(hash).toBe(HASH);
     expect(main.calls).toContain("eth_sendRawTransaction");
   });
