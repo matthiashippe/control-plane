@@ -1,7 +1,7 @@
 # Fehler Goal 12: /docs und /pricing antworten
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Am 2026-11-23 um 13:58:05 UTC holte ein Agent, der für einen Menschen liest (`Claude-User`), von einer fremden Adresse auf
@@ -93,7 +93,7 @@ kann.
       Prüfung (Netz): `gh pr checks $(gh pr list -R matthiashippe/control-plane --head goal/fehler-12 --state open --json number -q '.[0].number') -R matthiashippe/control-plane 2>&1 | grep -E '^e2e\s' | grep -c pass` muss genau 1 ausgeben.
 - [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Ein Agent, der `/docs` aufruft, landet auf der Anleitung in `/llms.txt`.
@@ -126,5 +126,6 @@ kann.
 - 2026-11-24 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5; `dev` unverändert auf f835fd5, kein Merge nötig, alle Prüfbefehle am Kopf 74ec5e6 neu gefahren. Prüfbefehle: P1 vitest Exit 0, `name ok`, `docs ok`; P2 keine fehlende Testzeile, `pricing ok`, `price ok`; P3 `5`, `0`, `0`; P4 `e2e` pass an PR #414 (Kopf 74ec5e6, Zähler `1`); P5 `check` Exit 0 (273 Dateien, 2796 Tests, 91 s).
 - 2026-11-24 Zyklus 3: Punkt 2 nachgebessert nach Linse B (REJECT 12-z2-B): `/pricing` trägt nur noch die Zeilen aus Entscheidung 2, gestrichen sind Verweis auf `/llms.txt`, Satz zu `/card/:package`, Zustand `intakeClosed`, Zahlungsadresse, Hinweis auf `/v1/credits/history` und Enddatum der Inferenz; ANNAHMEN-Zeile 4 angepasst. Kein neuer Test, die vier Fälle prüfen weiter genau diese Zeilen. `dev` 2f911eb gemergt (nur Goal- und Regeldateien). Abschluss gemeldet, Punkte 1, 2, 3, 4, 5. Prüfbefehle am Kopf a407b07: P1 vitest Exit 0 (4 von 4), `name ok`, `docs ok`; P2 keine fehlende Testzeile, `pricing ok`, `price ok`; P3 `5`, `0`, `0`; P4 `e2e` pass an PR #414 (Kopf a407b07, Zähler `1`); P5 `check` Exit 0 (273 Dateien, 2796 Tests, vor und nach dem Merge).
 - 2026-11-24 Zyklus 4: Punkt 2 nachgebessert nach Linse K (REJECT 12-z3-K): Stufen über USDC und `/pay/{usd}/{wallet}` stehen auf `/pricing` nur bei offener Annahme (`!intakeClosed`), wie in `/llms.txt`, weil `/pay/…` sonst 410 antwortet; kein Ersatzsatz. Neuer Fall „names no USDC topup on /pricing while topups are closed“, vor dem Fix rot (`expected … not to contain 'Topup tiers in USD'`). Einzeiler aus 12-z3-K jetzt `pricing /pay/: false | llms /pay/{usd}: false | /pay/5 status: 410`. ANNAHMEN-Zeile 4 angepasst. `dev` bab9e56 gemergt (nur Doku, Goal- und Vorschlagsdateien). Abschluss gemeldet, Punkte 1, 2, 3, 4, 5. Prüfbefehle am Kopf c004535: P1 vitest Exit 0 (5 von 5), `name ok`, `docs ok`; P2 keine fehlende Testzeile, `pricing ok`, `price ok`; P3 `5`, `0`, `0`; P4 `e2e` pass an PR #414 (Kopf c004535, Zähler `1`); P5 `check` Exit 0 (273 Dateien, 2797 Tests).
+- 2026-11-24 Release: PASS K und B (Zyklus 4), DONE.
 
 ## Blockers
