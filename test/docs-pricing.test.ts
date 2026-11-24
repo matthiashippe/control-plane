@@ -9,7 +9,8 @@ import { openDb, type Db } from "../src/db.js";
 import { CARD_BREAKER_SHORTFALL_MC, packageKey } from "../src/payments/card-way.js";
 import { CARD_PACKAGES } from "../src/payments/digistore.js";
 import { TOPUP_TIERS_USD } from "../src/payments/pay.js";
-import { MARKUP } from "../src/inference/proxy.js";
+import { Catalog, MARKUP } from "../src/inference/proxy.js";
+import { OpenRouterProvider } from "../src/inference/openrouter.js";
 
 const OTHER = "0x" + "ef".repeat(20);
 const ORIGIN = "https://automatonhost.com";
@@ -37,6 +38,28 @@ async function get(path: string, breakerOn = false) {
   if (breakerOn) tripBreaker(db);
   const res = await createApp({ db }).request(path);
   return { res, body: await res.text() };
+}
+
+/**
+ * An app whose topups are closed: OpenRouter may not be sold (CP_OPENROUTER_RESALE=0), so intake is closed and /pay answers
+ * 410, as in test/not-for-sale.test.ts. The provider never reaches the network.
+ */
+async function closedApp() {
+  const models = { data: [{ id: "openai/gpt-5-mini", context_length: 400000, pricing: { prompt: "0.00000025", completion: "0.000002" } }] };
+  const provider = new OpenRouterProvider({
+    apiKey: "sk-or-v1-test",
+    models: ["openai/gpt-5-mini"],
+    fetch: (async () => new Response(JSON.stringify(models), { headers: { "content-type": "application/json" } })) as typeof fetch,
+    priceRefreshMs: 0,
+    baseUrl: "https://openrouter.ai/api/v1",
+    resale: false,
+  });
+  await provider.init();
+  return createApp({
+    db: openDb(":memory:"),
+    catalog: new Catalog([provider], provider.defaultAliases()),
+    pay: { payTo: "0x" + "1".repeat(40), tiers: [5, 25, 100] } as never,
+  });
 }
 
 describe("/docs and /pricing", () => {
@@ -83,5 +106,20 @@ describe("/docs and /pricing", () => {
     const sentence = `billed at purchase cost times ${MARKUP}`;
     expect(llms).toContain(sentence);
     expect(pricing).toContain(sentence);
+  });
+
+  it("names no USDC topup on /pricing while topups are closed", async () => {
+    const app = await closedApp();
+    const llms = await (await app.request("/llms.txt")).text();
+    expect(llms).not.toContain("Topup tiers in USD");
+    expect((await app.request(`/pay/5/${OTHER}`)).status).toBe(410);
+    for (const path of ["/pricing", "/pricing/"]) {
+      const res = await app.request(path);
+      const body = await res.text();
+      expect(res.status, path).toBe(200);
+      expect(body, path).not.toContain("Topup tiers in USD");
+      expect(body, path).not.toContain("/pay/");
+      expect(body, path).toContain("Credits are not redeemable and not transferable.");
+    }
   });
 });

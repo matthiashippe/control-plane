@@ -2553,8 +2553,8 @@ export function createApp(opts: AppOptions) {
 
   /**
    * Every price from the code, in the words /llms.txt uses for the same state: the card packages only while the card breaker
-   * is off (goals/wache/01), the USDC tiers from the same source as /llms.txt, and the inference sentence for the same state of
-   * notForSaleNow(). Plain text like /llms.txt, because the reader is an agent. Never cached, because the answer changes with
+   * is off (goals/wache/01), the USDC tiers from the same source and under the same condition as /llms.txt, and the inference
+   * sentence for the same state of notForSaleNow(). Plain text like /llms.txt, because the reader is an agent. Never cached, because the answer changes with
    * the breaker.
    */
   const pricing = (c: Context<Env>) => {
@@ -2574,12 +2574,17 @@ export function createApp(opts: AppOptions) {
             "",
           ]
         : []),
-      "## Credit in USDC",
-      "",
-      "- Topup tiers in USD: " + (pay?.tiers ?? TOPUP_TIERS_USD).join(", ") + ".",
-      `- x402 topup at ${siteOrigin()}/pay/{usd}/{wallet}, where {usd} is one of the tiers and {wallet} is the`,
-      "  wallet that signs.",
-      "",
+      // No tiers and no /pay/ while topups are closed: /pay answers 410 then, and /llms.txt leaves both out (HAN-62).
+      ...(intakeClosed
+        ? []
+        : [
+            "## Credit in USDC",
+            "",
+            "- Topup tiers in USD: " + (pay?.tiers ?? TOPUP_TIERS_USD).join(", ") + ".",
+            `- x402 topup at ${siteOrigin()}/pay/{usd}/{wallet}, where {usd} is one of the tiers and {wallet} is the`,
+            "  wallet that signs.",
+            "",
+          ]),
       "## Inference",
       "",
       notForSale
