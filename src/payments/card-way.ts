@@ -126,3 +126,9 @@ export function cardRedirect(db: Db, key: string, address: string | null | undef
   const url = checkoutUrl(pkg, address);
   return url ? { kind: "checkout", url } : { kind: "unknown_package" };
 }
+
+/** The number of card orders held by the IPN (goals/wache/03): paid while the checkout was closed, nothing credited. */
+export function heldCardOrders(db: Db): number {
+  const row = db.prepare("SELECT COUNT(*) AS n FROM card_orders WHERE status = 'held'").get() as { n: number };
+  return row.n;
+}
