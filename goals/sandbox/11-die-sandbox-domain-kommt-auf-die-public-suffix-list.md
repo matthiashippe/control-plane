@@ -1,7 +1,7 @@
 # Sandbox Goal 11: Die Sandbox-Domain kommt auf die Public Suffix List
 
 ## Status
-BLOCKED fachlich
+DONE
 
 ## Active Objective
 Ist: `sandboxhost.de`, die Domain der freigegebenen Ports aus sandbox 07, steht nicht auf der Public Suffix List (PSL). Gemessen am
@@ -272,11 +272,13 @@ Kunden die Cookies seiner Nutzer setzt, sonst bleibt er mit seinem Dienst nicht 
 - 2026-11-17 Zyklus 4: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12; `origin/dev` (6d19b92) gemergt, alle Prüfbefehle danach neu gelaufen. Prüfbefehle: wie in der Zeile Zyklus 4 oben, unverändert nach dem Merge (P11 0, P4 Exit 0, P9 drei mal Exit 0); P12 `node scripts/check.mjs` Exit 0 (grün in 131 s, 2180 Tests).
 - 2026-11-18 BLOCKED fachlich: Matthias gibt den PR an die Public Suffix List nicht frei (18.11.2026, 20:28: kein PR an die Public Suffix List, nichts geht unter seinem GitHub-Konto raus), das Human Gate `public_post` bleibt zu, und das Soll dieses Goals ist nicht erreichbar; den Schutz gegen Cookies über Sandbox-Grenzen baut sandbox 12 im Proxy (ROADMAP.md auf dev, Commit 64264a2). `origin/dev` (c9554e3) gemergt, jede andere Datei des Branches auf die Merge-Basis zurückgesetzt (`docs/sandbox/psl.md`, `docs/sandbox/psl-pr-body.md`, `docs/sandbox/psl-entry.txt`, `ops/sandbox/cloudflare.py`, `test/cloudflare-psl-txt.test.ts`, `goals/sandbox/ANNAHMEN.md`, `goals/_vorschlaege/sandbox-nacharbeit-2026-11-16-1.md`), nichts gepostet, kein TXT gesetzt, Kästchen 1 bis 9 leer, weil ihre Dateien nicht mehr auf dem Branch liegen. Prüfbefehle: P10 Netz vier mal Exit 0; P11 0; P12 `node scripts/check.mjs` Exit 0 (grün in 147 s); P1 bis P9 nicht mehr erfüllbar (Dateien zurückgesetzt, Status nicht `BLOCKED matthias`).
 - 2026-11-19 Merge-Gate (Tech Lead, PRO-25161): Die Goal-Datei steht wieder auf dem Vertrag von `origin/dev` (Kontext für den Maker, Done-Punkte, Annahmen, Budget wie dev); geändert sind nur Status, Progress Log, Blockers, Ehrliche Lücken und die Kästchen 10 bis 12. Die Korrekturen vom 17.11. zu Kopfzeile, Laufzeit und Gate bleiben in der Historie des Branches (Kopf ded38ec), weil das Goal ohne PASS endet und sie nichts mehr steuern.
+- 2026-11-24 Loop Master: BLOCKED fachlich auf dev war eine Altlast; sandbox 12 hat das Ziel übernommen und ist DONE, Status DONE
 
 ## Blockers
 Art: fachlich
 Grund: Matthias gibt den PR an die Public Suffix List nicht frei (18.11.2026, 20:28): Kein PR an die Public Suffix List, nichts geht unter seinem GitHub-Konto raus. Das Human Gate `public_post` öffnet sich damit nie, und das Soll dieses Goals (PR fertig vorbereitet, gepostet erst nach Freigabe) hat keinen Zweck mehr. Den Schutz gegen Cookies über Sandbox-Grenzen baut sandbox 12 im eigenen Proxy: `sandboxd` oder `ops/sandbox/sandbox.caddy` entfernt `Domain` aus jedem `Set-Cookie` (ROADMAP.md auf dev, Commit 64264a2). Die Deny List dieses Goals sperrt `ops/sandbox/` außer `cloudflare.py`, darum gehört der Bau nicht hierher.
 Merge: ohne PASS landen nur diese Goal-Datei und die Verdicts; nichts aus dem PSL-Paket kommt nach dev.
+- Überholt: durch sandbox 12 (Loop Master 2026-11-24, BLOCKED fachlich auf dev war eine Altlast, sandbox 12 ist DONE)
 
 ## Ehrliche Lücken
 - Punkte 1 bis 8: gebaut und von K und B in Zyklus 4 mit PASS beurteilt (Commit 075ffae, Verdicts `11-z4-K.md` und `11-z4-B.md`). Nach Matthias' Absage sind Messung, Eintrag, PR-Text, Prüfwert, `cloudflare.py psl-txt` samt Test, Doku zu TXT und Laufzeit und der Vorschlag zum Rückfall ohne Zweck und auf die Merge-Basis zurückgesetzt; die Arbeit bleibt in der Historie des Branches (Kopf vor dem Zurücksetzen 74db551). Ihre Prüfbefehle finden die Dateien nicht mehr.
