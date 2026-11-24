@@ -20,6 +20,8 @@ export function requireSepolia(chainId: unknown): void {
 
 /** Throws for every chain except the one the account is set to (Base Sepolia when no setting is given). */
 export function requireNet(chainId: unknown, net: KontoNet = SEPOLIA_NET): void {
+  // Base Sepolia, the default, is guarded by requireSepolia alone; only the main network (CP_KONTO_MAINNET=1) has its own check.
+  if (net.chainId === KONTO_CHAIN_ID) return requireSepolia(chainId);
   if (chainId !== net.chainId) {
     throw new Error(`refused: the account is set to chain ${net.chainId} (${net.name}) and sends nothing on ${String(chainId)}`);
   }
