@@ -72,6 +72,8 @@ else:
 `;
 
 export const HEADER = readFileSync(join(ROOT, "ops", "relinked-comments.log"), "utf8").replace(/^[^#].*\n/gm, "");
+/** The header of ops/named-comments.log, the log of --name --send (goals/reichweite/04). */
+export const NAMED_HEADER = readFileSync(join(ROOT, "ops", "named-comments.log"), "utf8").replace(/^[^#].*\n/gm, "");
 
 /** The first 12 hex digits of sha256 over a text, computed here and not by the tool under test. */
 export const sha12 = (text: string) => createHash("sha256").update(text, "utf8").digest("hex").slice(0, 12);
@@ -100,7 +102,7 @@ const exec = (cmd: string, args: string[], opts: { cwd: string; env?: NodeJS.Pro
   });
 
 export type Call = { args: string[]; stdin: string | null };
-export type Run = { status: number | null; out: string; calls: Call[]; log: string };
+export type Run = { status: number | null; out: string; calls: Call[]; log: string; named: string };
 type Comment = (typeof FIXTURE.comments)[number] & { patched?: boolean };
 
 export function sandbox(comments: Comment[] = FIXTURE.comments) {
@@ -109,6 +111,7 @@ export function sandbox(comments: Comment[] = FIXTURE.comments) {
   for (const f of ["relink_rules.py", "relink-comments.py"]) copyFileSync(join(ROOT, "ops", f), join(root, "ops", f));
   copyFileSync(join(ROOT, "src", "public", "error-pages.ts"), join(root, "src", "public", "error-pages.ts"));
   writeFileSync(join(root, "ops", "relinked-comments.log"), HEADER);
+  writeFileSync(join(root, "ops", "named-comments.log"), NAMED_HEADER);
   writeFileSync(join(root, "bin", "gh"), FAKE_GH);
   writeFileSync(join(root, "bin", "curl"), "#!/bin/sh\nexit 7\n");
   writeFileSync(join(root, "bin", "ssh"), "#!/bin/sh\nexit 255\n");
@@ -130,7 +133,13 @@ export function sandbox(comments: Comment[] = FIXTURE.comments) {
       },
     });
     const calls = readFileSync(log, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l) as Call);
-    return { status: r.status, out: `${r.stdout}${r.stderr}`, calls, log: readFileSync(join(root, "ops", "relinked-comments.log"), "utf8") };
+    return {
+      status: r.status,
+      out: `${r.stdout}${r.stderr}`,
+      calls,
+      log: readFileSync(join(root, "ops", "relinked-comments.log"), "utf8"),
+      named: readFileSync(join(root, "ops", "named-comments.log"), "utf8"),
+    };
   };
   /** The rules of the copy, called directly: relink(body, slug). */
   const relink = async (body: string, slug: string | null): Promise<string> => {
@@ -142,13 +151,23 @@ export function sandbox(comments: Comment[] = FIXTURE.comments) {
     if (r.status !== 0) throw new Error(r.stderr);
     return JSON.parse(r.stdout) as string;
   };
+  /** The rules of the copy, called directly: name(body). */
+  const name = async (body: string): Promise<string> => {
+    const r = await exec(
+      "python3",
+      ["-I", "-c", "import json, sys; sys.path.insert(0, 'ops'); from relink_rules import name; print(json.dumps(name(sys.argv[1])))", body],
+      { cwd: root },
+    );
+    if (r.status !== 0) throw new Error(r.stderr);
+    return JSON.parse(r.stdout) as string;
+  };
   const state = () => JSON.parse(readFileSync(stateFile, "utf8")) as { comments: Comment[] };
   const setBody = (id: number, body: string) => {
     const s = JSON.parse(readFileSync(stateFile, "utf8"));
     s.comments.find((c: Comment) => c.id === id).body = body;
     writeFileSync(stateFile, JSON.stringify(s));
   };
-  return { root, run, relink, state, setBody };
+  return { root, run, relink, name, state, setBody };
 }
 
 /** Every call that writes: a method other than GET, or a field or an input, which makes `gh api` default to POST. */

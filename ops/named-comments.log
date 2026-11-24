@@ -1,0 +1,2 @@
+# One line per comment edited by ops/relink-comments.py --name --send (goals/reichweite/04): no address, no name, no text.
+# <iso8601-utc> comment <id> issue <n> page <slug|home> old <sha12 of the old text> new <sha12 of the new text>
