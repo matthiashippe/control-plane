@@ -158,7 +158,7 @@ If you need it running before Conway fixes this: automatonhost.com, which I run,
       Prüfung: `cat ops/named-comments.log ops/relink_rules.py ops/relink-comments.py goals/reichweite/ANNAHMEN.md test/video-record-selftest.test.ts | grep -cE '0x[0-9a-fA-F]{40}|[0-9a-fA-F]{64}|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[a-z]{2,}'` muss `0` ausgeben.
 - [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
-- [ ] Geht der Notschalter der Karte an, gibt es einen fertigen Weg, das Kartenversprechen aus allen 26 Kommentaren mit `LEAD` zu
+- [x] Geht der Notschalter der Karte an, gibt es einen fertigen Weg, das Kartenversprechen aus allen 26 Kommentaren mit `LEAD` zu
       nehmen, und einen zurück: `ops/relink_rules.py` hat `LEAD_NO_CARD` (genau `LEAD` bis einschließlich `(https://automatonhost.com/llms.txt)`,
       dann ein Punkt, also ohne „and you can top it up …“, so wie `/llms.txt` die Kartenzeile bei eingeschaltetem Notschalter weglässt),
       und `ops/relink-comments.py --name --no-card` tauscht im Trockenlauf, mit `--send` (Freigabe wie Entscheidung 5) und mit `--verify`
@@ -246,5 +246,8 @@ If you need it running before Conway fixes this: automatonhost.com, which I run,
 - 2026-11-24 Zyklus 2 nach Neuansatz 1: Punkt 4 gebaut: nach dem zweiten `ok name` des Tech Lead (PRO-29176, Werte 5805015103:0f150b32afe5 und 5804984649:0e18046ec2fc) und `breaker off` beide per `--name --send 2 --approved` umbenannt, je `read back same`, `ops/named-comments.log` jetzt 28 Zeilen; #373 und #393 unverändert. Gemessen: `name verify: 28 same, 0 differ, 0 to change`, `name: 0 to change, 26 already named, 4 kept without lead, 30 comments of matthiashippe`, `relink verify: 29 same, 0 differ, 0 with old links` bei 29 Zeilen im Log, erster Absatz auf GitHub `ok 30`, `freigabe ok 28`.
   Prüfbefehle: alle Prüfungen aus Punkt 4, auch die mit `(Netz)`, wie in der Goal-Datei; `PATH=/usr/bin:$PATH node scripts/check.mjs`.
 - 2026-11-24 Zyklus 3 nach Neuansatz 1: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, 7; `origin/dev` ohne neue Commits, jeder Prüfbefehl aller Punkte und `check` am Kopf grün.
+- 2026-11-24 Zyklus 4 nach Neuansatz 1: Punkt 8 aus der Kritik gebaut: `LEAD_NO_CARD` und `no_card` in `ops/relink_rules.py`, `name` tauscht `LEAD_NO_CARD` mit Leerzeile wieder gegen `LEAD`; `ops/relink-comments.py --name --no-card` mit Trockenlauf (`  - lead`, `  + lead without card`, Zählzeile `no-card: …`), `--send` mit Freigabe und Rücklesen in `ops/named-comments.log`, `--verify`; `--no-card` ohne `--name` endet mit Exit 1, die vier aus `NO_LEAD` bleiben. Vier neue Testfälle, alle vier einmal rot gesehen (ohne `--no-card` im Werkzeug), dann 32 von 32 grün. Lesend gegen GitHub: `no-card: 26 to change, 4 unchanged, 30 comments of matthiashippe`, `--name` weiter `0 to change, 26 already named, 4 kept without lead`. Gesendet nichts.
+  Prüfbefehle: alle Prüfungen aus Punkt 8 und die ohne Netz aus Punkt 1 bis 4, wie in der Goal-Datei, grün; `PATH=/usr/bin:$PATH pnpm -s vitest run test/relink-comments.test.ts`; `PATH=/usr/bin:$PATH node scripts/check.mjs` grün in 352 s.
+- 2026-11-24 Zyklus 5 nach Neuansatz 1: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, 7, 8; `origin/dev` ohne neue Commits, jeder Prüfbefehl aller Punkte und `check` am Kopf grün.
 
 ## Blockers

@@ -134,6 +134,12 @@ LEAD = (
     "runtime keeps working after one changed line, `conwayApiUrl` (https://automatonhost.com/llms.txt), and you can top it up "
     "by card, PayPal or Apple Pay with money back through Digistore24."
 )
+# Point 8 (critique, Tech Lead 2026-11-24): LEAD without the card promise, for the time the emergency switch of the card is on and
+# /llms.txt drops the card line; `no_card` swaps LEAD for it and `name` swaps it back.
+LEAD_NO_CARD = (
+    "If you need it running before Conway fixes this: automatonhost.com, which I run, speaks the same API, so the unchanged "
+    "runtime keeps working after one changed line, `conwayApiUrl` (https://automatonhost.com/llms.txt)."
+)
 NAME = "automatonhost.com"
 OLD_NAME = re.compile(r"(?<![\w./-])(Handsel|PostYourPrice)(?![\w-]|\.[A-Za-z0-9])")
 # A blank line ends the first paragraph; a line of spaces or tabs counts as blank, and \r\n counts like \n.
@@ -180,6 +186,16 @@ def rename(body: str) -> str:
 
 
 def name(body: str) -> str:
-    """`body` with LEAD and a blank line in front, unless it already names us, and every old name in prose replaced (`rename`)."""
+    """`body` with LEAD and a blank line in front, unless it already names us, and every old name in prose replaced (`rename`).
+
+    A body that opens with LEAD_NO_CARD and a blank line gets LEAD back in its place, never a second sentence in front.
+    """
+    if body.startswith(LEAD_NO_CARD + "\n\n"):
+        body = LEAD + body[len(LEAD_NO_CARD):]
     renamed = rename(body)
     return f"{LEAD}\n\n{renamed}" if leads(body) else renamed
+
+
+def no_card(body: str) -> str:
+    """`body` with LEAD swapped for LEAD_NO_CARD when it opens with LEAD and a blank line; every other character stays."""
+    return LEAD_NO_CARD + body[len(LEAD):] if body.startswith(LEAD + "\n\n") else body

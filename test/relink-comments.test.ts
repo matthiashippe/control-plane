@@ -638,3 +638,123 @@ describe("ops/relink-comments.py --name", () => {
     }
   }, T);
 });
+
+/**
+ * ops/relink-comments.py --name --no-card (goals/reichweite/04, point 8): when the emergency switch of the card is on, /llms.txt
+ * drops the card line, so the comments must drop the card promise too. --no-card swaps LEAD for LEAD_NO_CARD in every comment that
+ * opens with LEAD and a blank line, and --name swaps it back. Every other character stays, the comments of NO_LEAD stay, and the
+ * same approval, read back and log as for --name hold.
+ */
+const LEAD_NO_CARD =
+  "If you need it running before Conway fixes this: automatonhost.com, which I run, speaks the same API, so the unchanged runtime " +
+  "keeps working after one changed line, `conwayApiUrl` (https://automatonhost.com/llms.txt).";
+
+describe("ops/relink-comments.py --name --no-card", () => {
+  it("the no-card dry run swaps the lead for the lead without the card and changes nothing else", async () => {
+    const a = { id: 1, issue: 440, user: "matthiashippe", body: `${LEAD}\n\nInvented reply, I run automatonhost.com.\n` };
+    const b = { id: 2, issue: 434, user: "matthiashippe", body: "Invented reply without the lead, I run Handsel.\n" };
+    const c = { id: 3, issue: 432, user: "matthiashippe", body: `${LEAD}\n\nInvented reply, see \`PostYourPrice\` and postyourprice.com.\r\n` };
+    const s = sandbox([a, b, c]);
+    const before = JSON.stringify(s.state());
+    const r = await s.run(["--name", "--no-card"]);
+    expect(r.status).toBe(0);
+    expect(writes(r.calls)).toEqual([]);
+    expect(JSON.stringify(s.state())).toBe(before);
+    expect(r.named).toBe(NAMED_HEADER);
+    expect(r.out).toMatch(/^comment 1 issue 440 page \S+ sha12 [0-9a-f]{12}\n  - lead\n  \+ lead without card\ncomment 3 /m);
+    expect(r.out).toMatch(/^comment 3 issue 432 page \S+ sha12 [0-9a-f]{12}\n  - lead\n  \+ lead without card\nno-card: /m);
+    expect(r.out).not.toContain("comment 2 ");
+    const v = values(r.out);
+    expect(v.get("1")).toBe(sha12(`${LEAD_NO_CARD}\n\nInvented reply, I run automatonhost.com.\n`));
+    expect(v.get("3")).toBe(sha12(`${LEAD_NO_CARD}\n\nInvented reply, see \`PostYourPrice\` and postyourprice.com.\r\n`));
+    expect(r.out).toContain("no-card: 2 to change, 1 unchanged, 3 comments of matthiashippe\n");
+    expect(r.out).toContain(`send: ops/relink-comments.py --name --no-card --send 2 --approved ${approve(v)}\n`);
+    // Without --name, or given twice, --no-card stops before GitHub is asked.
+    for (const args of [["--no-card"], ["--no-card", "--verify"], ["--name", "--no-card", "--no-card"]]) {
+      const x = await s.run(args);
+      expect(x.status).toBe(1);
+      expect(x.out).toContain("REFUSED: ");
+      expect(x.calls).toEqual([]);
+    }
+  }, T);
+
+  it("the no-card send patches only approved comments and reads each one back", async () => {
+    const a = { id: 1, issue: 440, user: "matthiashippe", body: `${LEAD}\n\nInvented reply one.\n` };
+    const b = { id: 2, issue: 434, user: "matthiashippe", body: `${LEAD}\n\nInvented reply two.\n` };
+    const s = sandbox([a, b]);
+    const v = values((await s.run(["--name", "--no-card"])).out);
+    const r = await s.run(["--name", "--no-card", "--send", "1", "--approved", approve(v, ["1"])]);
+    expect(r.status).toBe(0);
+    const p = patches(r.calls);
+    expect(p.map((c) => c.args[3])).toEqual(["repos/Conway-Research/automaton/issues/comments/1"]);
+    expect(JSON.parse(p[0].stdin ?? "{}").body).toBe(`${LEAD_NO_CARD}\n\nInvented reply one.\n`);
+    const at = r.calls.indexOf(p[0]);
+    expect(r.calls.slice(at + 1).some((x) => !x.args.includes("PATCH") && x.args[1] === "repos/Conway-Research/automaton/issues/comments/1")).toBe(true);
+    expect(r.out).toContain("edited 1 issue 440 page ");
+    expect(r.out).toContain("no-card send: 1 edited, 0 already\n");
+    expect(r.log).toBe(HEADER);
+    const lines = r.named.slice(NAMED_HEADER.length).split("\n").filter(Boolean);
+    expect(lines.length).toBe(1);
+    expect(lines[0]).toMatch(LOG_LINE);
+    expect(lines[0]).toContain(` comment 1 issue 440 page ${TABLE[440]} old ${sha12(a.body)} new ${v.get("1")}`);
+    expect(new Map(s.state().comments.map((c) => [c.id, c.body])).get(2)).toBe(b.body);
+    const half = await s.run(["--name", "--no-card", "--verify"]);
+    expect(lastLine(half.out)).toBe("no-card verify: 1 same, 0 differ, 1 to change");
+    expect(half.status).toBe(1);
+    expect(writes(half.calls)).toEqual([]);
+    // A value of the name mode is not a value of no-card.
+    const nameValues = values((await sandbox([a, b]).run(["--name"])).out);
+    expect(nameValues.size).toBe(0);
+    const stale = await s.run(["--name", "--no-card", "--send", "1", "--approved", `2:${sha12(b.body)}`]);
+    expect(stale.out).toContain("ALREADY 2");
+    expect(patches(stale.calls)).toEqual([]);
+    const wrong = await s.run(["--name", "--no-card", "--send", "1", "--approved", "2:0123456789ab"]);
+    expect(wrong.out).toContain("REFUSED: 2 changed since it was approved");
+    expect(writes(wrong.calls)).toEqual([]);
+    expect((await s.run(["--name", "--no-card", "--send", "1", "--approved", approve(v, ["2"])])).status).toBe(0);
+    const full = await s.run(["--name", "--no-card", "--verify"]);
+    expect(lastLine(full.out)).toBe("no-card verify: 2 same, 0 differ, 0 to change");
+    expect(full.status).toBe(0);
+  }, T);
+
+  it("the name dry run swaps the lead without the card back to the lead and never adds a second one", async () => {
+    const d = { id: 1, issue: 440, user: "matthiashippe", body: `${LEAD_NO_CARD}\n\nInvented reply, I run Handsel.\n` };
+    const e = { id: 2, issue: 434, user: "matthiashippe", body: `${LEAD_NO_CARD}\n\nInvented reply.\n` };
+    const s = sandbox([d, e]);
+    expect(await s.name(d.body)).toBe(`${LEAD}\n\nInvented reply, I run automatonhost.com.\n`);
+    const r = await s.run(["--name"]);
+    expect(r.status).toBe(0);
+    expect(writes(r.calls)).toEqual([]);
+    expect(r.out).toMatch(/^comment 1 issue 440 page \S+ sha12 [0-9a-f]{12}\n  - lead without card\n  \+ lead\n  - Handsel\n  \+ automatonhost\.com\n/m);
+    expect(r.out).toMatch(/^comment 2 issue 434 page \S+ sha12 [0-9a-f]{12}\n  - lead without card\n  \+ lead\nname: /m);
+    expect(r.out).toContain("name: 2 to change, 0 already named, 0 kept without lead, 2 comments of matthiashippe\n");
+    expect((await s.run(["--name", "--send", "2", "--approved", approve(values(r.out))])).status).toBe(0);
+    const after = new Map(s.state().comments.map((c) => [c.id, c.body]));
+    expect(after.get(1)).toBe(`${LEAD}\n\nInvented reply, I run automatonhost.com.\n`);
+    expect(after.get(2)).toBe(`${LEAD}\n\nInvented reply.\n`);
+    for (const body of after.values()) {
+      expect(body.split("If you need it running").length).toBe(2);
+      expect(body.startsWith(`${LEAD_NO_CARD}\n\n`)).toBe(false);
+    }
+    expect((await s.run(["--name"])).out).toContain("name: 0 to change, 2 already named, 0 kept without lead, 2 comments of matthiashippe\n");
+    expect(lastLine((await s.run(["--name", "--verify"])).out)).toBe("name verify: 2 same, 0 differ, 0 to change");
+  }, T);
+
+  it("no-card leaves the comments of NO_LEAD alone", async () => {
+    const kept = { id: 5804984649, issue: 335, user: "matthiashippe", body: `${LEAD}\n\nInvented exception that opens with the lead.\n` };
+    const plain = { id: 5805000566, issue: 373, user: "matthiashippe", body: "Invented data point.\n\nSee https://automatonhost.com.\n" };
+    const other = { id: 9100, issue: 432, user: "matthiashippe", body: `${LEAD}\n\nInvented reply.\n` };
+    const s = sandbox([kept, plain, other]);
+    const r = await s.run(["--name", "--no-card"]);
+    expect(r.status).toBe(0);
+    expect(r.out).not.toContain(`comment ${kept.id} `);
+    expect(r.out).not.toContain(`comment ${plain.id} `);
+    expect(r.out).toMatch(/^comment 9100 issue 432 page \S+ sha12 [0-9a-f]{12}\n  - lead\n  \+ lead without card\n/m);
+    expect(r.out).toContain("no-card: 1 to change, 2 unchanged, 3 comments of matthiashippe\n");
+    expect((await s.run(["--name", "--no-card", "--send", "1", "--approved", approve(values(r.out))])).status).toBe(0);
+    const after = new Map(s.state().comments.map((c) => [c.id, c.body]));
+    expect(after.get(kept.id)).toBe(kept.body);
+    expect(after.get(plain.id)).toBe(plain.body);
+    expect(after.get(other.id)).toBe(`${LEAD_NO_CARD}\n\nInvented reply.\n`);
+  }, T);
+});

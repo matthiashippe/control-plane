@@ -43,6 +43,19 @@ of NO_LEAD never gets `  + lead`, and one that `rename` leaves alone is not list
 comment edited by both modes is compared by `--verify` (with or without `--name`) with the value of its newest line in either
 log, so a comment named after it was relinked is not a difference.
 
+`--name --no-card` (point 8 of goals/reichweite/04) is the way out when the emergency switch of the card goes on and /llms.txt
+drops the card line: in every comment that opens with LEAD and a blank line it swaps LEAD for LEAD_NO_CARD and changes nothing else;
+the comments of NO_LEAD stay. `--name` alone swaps LEAD_NO_CARD back to LEAD.
+
+    ops/relink-comments.py --name --no-card                  the dry run: `  - lead` and `  + lead without card` per comment
+    ops/relink-comments.py --name --no-card --send <k> --approved <id>:<sha12>,...
+                                                             edits exactly those k comments, checked the same way as --send,
+                                                             and logs them in ops/named-comments.log
+    ops/relink-comments.py --name --no-card --verify         reads every comment in ops/named-comments.log back and runs the
+                                                             dry run of no-card; read-only
+
+`--no-card` without `--name` stops with exit 1.
+
 This file never creates a comment, never closes or deletes anything and never touches a comment of another account. An argument it
 does not know stops it with exit 1 before GitHub is asked; GitHub not readable is exit 2.
 """
@@ -70,7 +83,7 @@ NAMED_LOG = OPS / "named-comments.log"
 # Decision 7 (Tech Lead, 2026-11-24): comment ids where LEAD is wrong or contradicts the comment; they only get the old names replaced.
 NO_LEAD = frozenset({5742781237, 5804984649, 5805000566, 5805015103})
 APPROVAL = re.compile(r"(\d+):([0-9a-f]{12})")
-USAGE = ("usage: ops/relink-comments.py [--name] [--send <k> --approved <id>:<sha12>,...] [--verify]\n"
+USAGE = ("usage: ops/relink-comments.py [--name [--no-card]] [--send <k> --approved <id>:<sha12>,...] [--verify]\n"
          "  without --send or --verify a dry run that changes nothing")
 
 
@@ -86,7 +99,7 @@ def refuse(reason: str) -> None:
 
 def parse(argv: list[str]) -> dict:
     """Every argument, read before anything else runs; anything unknown ends with exit 1."""
-    out: dict = {"send": None, "approved": None, "verify": False, "name": False}
+    out: dict = {"send": None, "approved": None, "verify": False, "name": False, "no_card": False}
     i = 0
     while i < len(argv):
         name, eq, inline = argv[i].partition("=")
@@ -109,8 +122,15 @@ def parse(argv: list[str]) -> dict:
                 refuse("--name is given twice")
             out["name"] = True
             i += 1
+        elif argv[i] == "--no-card":
+            if out["no_card"]:
+                refuse("--no-card is given twice")
+            out["no_card"] = True
+            i += 1
         else:
             refuse(f"unknown argument {argv[i]}\n{USAGE}")
+    if out["no_card"] and not out["name"]:
+        refuse("--no-card goes with --name: ops/relink-comments.py --name --no-card")
     if out["verify"] and (out["send"] is not None or out["approved"] is not None):
         refuse("--verify only reads; it does not take --send or --approved")
     if out["send"] is not None:
@@ -189,10 +209,39 @@ def plan_name(body: str, issue_title: str, cid: str | int | None = None) -> tupl
     page, relinked, links = plan(body, issue_title)
     keep = cid is not None and int(cid) in NO_LEAD
     lines = [*links]
-    if not keep and relink_rules.leads(relinked):
+    if not keep and relinked.startswith(relink_rules.LEAD_NO_CARD + "\n\n"):
+        lines.append(("lead without card", "lead"))
+    elif not keep and relink_rules.leads(relinked):
         lines.append(("", "lead"))
     lines += [(old, relink_rules.NAME) for old in relink_rules.renames(relinked)]
     return page, (relink_rules.rename if keep else relink_rules.name)(relinked), lines
+
+
+def plan_no_card(body: str, issue_title: str, cid: str | int | None = None) -> tuple[str, str, list[tuple[str, str]]]:
+    """The page, the new text and the change of one comment under --name --no-card: LEAD becomes LEAD_NO_CARD, nothing else."""
+    slug = relink_rules.page_for_title(issue_title)
+    if cid is not None and int(cid) in NO_LEAD:
+        return slug or "home", body, []
+    new = relink_rules.no_card(body)
+    return slug or "home", new, [("lead", "lead without card")] if new != body else []
+
+
+def dry_run_no_card() -> tuple[int, int, int, list[tuple[str, str]]]:
+    """Prints what --name --no-card would change and returns (to change, unchanged, comments of the account, values)."""
+    to_change, unchanged, values = 0, 0, []
+    for number, issue_title in threads():
+        for c in own_comments(number):
+            page, new, lines = plan_no_card(c["body"], issue_title, c["id"])
+            if new == c["body"]:
+                unchanged += 1
+                continue
+            to_change += 1
+            values.append((str(c["id"]), sha12(new)))
+            print(f"comment {c['id']} issue {number} page {page} sha12 {values[-1][1]}")
+            for old, now in lines:
+                print(f"  - {old}")
+                print(f"  + {now}")
+    return to_change, unchanged, to_change + unchanged, values
 
 
 def dry_run_name() -> tuple[int, int, int, int, list[tuple[str, str]]]:
@@ -244,8 +293,9 @@ def differs(cid: str, expected: str) -> str | None:
     return f"live {len(live)} characters, sent {len(expected)}, first difference at {at}"
 
 
-def send(approved: dict[str, str], naming: bool = False) -> int:
-    planner, log, label = (plan_name, NAMED_LOG, "name") if naming else (plan, LOG, "relink")
+def send(approved: dict[str, str], naming: bool = False, no_card: bool = False) -> int:
+    planner, log, label = ((plan_no_card, NAMED_LOG, "no-card") if no_card else (plan_name, NAMED_LOG, "name") if naming
+                           else (plan, LOG, "relink"))
     # Every approved comment, checked before the first PATCH: ours, and its new text still has the approved value.
     todo = []
     for cid, value in approved.items():
@@ -339,12 +389,25 @@ def verify_name() -> int:
     return 0 if same and not differ and not to_change else 1
 
 
+def verify_no_card() -> int:
+    same, differ = compare(NAMED_LOG)
+    to_change, *_ = dry_run_no_card()
+    print(f"no-card verify: {same} same, {differ} differ, {to_change} to change")
+    return 0 if same and not differ and not to_change else 1
+
+
 def main(argv: list[str]) -> int:
     args = parse(argv)
     if args["verify"]:
-        return verify_name() if args["name"] else verify()
+        return verify_no_card() if args["no_card"] else verify_name() if args["name"] else verify()
     if args["send"] is not None:
-        return send(args["approved"], args["name"])
+        return send(args["approved"], args["name"], args["no_card"])
+    if args["no_card"]:
+        to_change, unchanged, total, values = dry_run_no_card()
+        print(f"no-card: {to_change} to change, {unchanged} unchanged, {total} comments of {ACCOUNT}")
+        print(f"send: ops/relink-comments.py --name --no-card --send {to_change} --approved "
+              f"{','.join(f'{c}:{v}' for c, v in values)}")
+        return 0
     if args["name"]:
         to_change, already, kept, total, values = dry_run_name()
         print(f"name: {to_change} to change, {already} already named, {kept} kept without lead, {total} comments of {ACCOUNT}")
