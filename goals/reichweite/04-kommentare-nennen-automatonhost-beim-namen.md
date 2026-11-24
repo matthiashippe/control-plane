@@ -10,8 +10,8 @@ pitch“), die Leitzahl der Probe steht bei 0 von 5. Am 24.11.2026 trägt keiner
 `Conway-Research/automaton` `automatonhost.com` im ersten Absatz (0 von 30, `gh api -X GET search/issues -f
 q='repo:Conway-Research/automaton commenter:matthiashippe'`, dann je Thread die Kommentare des Kontos, erster Absatz bis zur ersten
 Leerzeile), und 23 davon nennen den Dienst noch mit den alten Namen `Handsel` oder `PostYourPrice`. `/llms.txt`
-nennt den Namen schon in der ersten Zeile (`src/app.ts:2350`). Nach diesem Goal beginnt jeder dieser Kommentare mit genau einem
-neuen Satz, der `automatonhost.com` nennt und einen Grund, den ein Agent ohne unser Wort prüfen kann: Die Runtime bleibt unverändert,
+nennt den Namen schon in der ersten Zeile (`src/app.ts:2350`). Nach diesem Goal beginnt jeder dieser Kommentare außer vier, in denen er falsch wäre
+(Entscheidung 7), mit genau einem neuen Satz, der `automatonhost.com` nennt und einen Grund, den ein Agent ohne unser Wort prüfen kann: Die Runtime bleibt unverändert,
 nur `conwayApiUrl` wechselt (Link auf `/llms.txt`), Aufladen per Karte, PayPal oder Apple Pay mit Geld zurück über Digistore24. Die
 alten Namen `Handsel` und `PostYourPrice` werden im Fließtext `automatonhost.com`; sonst bleibt jeder Kommentar Zeichen für Zeichen.
 Geändert wird über `ops/relink-comments.py` mit einer neuen Art `--name` und neuen Regeln in `ops/relink_rules.py`, freigegeben vom
@@ -31,80 +31,67 @@ MVP: Funktion, weil genau dieser Schritt aus einer gelesenen Seite eine Empfehlu
 
 ## Kontext für den Maker
 - Ziel in einem Satz: Eine Agenten-Session, die für einen Betreiber mit kaputtem Conway-Automaton die Issues liest, nennt danach
-  `automatonhost.com` als Weg, weil schon der erste Satz unseres Kommentars den Namen und einen Grund trägt, den sie selbst prüfen kann.
-- Was danach schneller zu mehr zahlenden fremden Automatons führt: Die Sessions finden uns schon (Probe 2026-W48), sie empfehlen uns
-  nur nicht, weil der Hinweis namenlos am Ende steht und wie eine Anzeige des Autors klingt. Ein Name im ersten Satz plus ein
-  prüfbarer Grund (die eine Zeile, `/llms.txt`, Karte mit Geld zurück) ist der kleinste Schritt von „gelesen“ zu „genannt“. Die Zahl
-  `seen` (Hinweis ohne Namen) gehört zum Topic werbung, nicht hierher. Quelle: `ROADMAP.md`, Topic `reichweite`, Glied 04;
-  `goals/_vorschlaege/werbung-kritik-2026-11-23-2.md`.
+  `automatonhost.com` als Weg, weil schon der erste Satz unseres Kommentars den Namen und einen Grund trägt, den sie selbst prüfen kann,
+  und nirgends steht unter Matthias' Namen ein Satz, der falsch ist oder dem Kommentar darunter widerspricht.
+- **Stand nach Neuansatz 1 (24.11.2026).** Gebaut und abgehakt sind Punkte 1, 2, 3, 5, 6 und 7 (Kopf 8ca98b1). Von den 30 Kommentaren
+  des Kontos tragen 26 den Satz `LEAD` auf GitHub, freigegeben mit `ok name` auf PRO-29176 und gesendet bei `breaker off`
+  (`ops/named-comments.log` 26 Zeilen). Offen sind vier Kommentare, die der Tech Lead nicht freigegeben hat, weil `LEAD` dort falsch
+  ist oder dem Kommentar widerspricht:
+  - #335 (5804984649): Thread, ob sich ein Automaton selbst trägt; es gibt kein „this“, das Conway beheben könnte, und ein Werbesatz
+    über einem Kommentar, der unsere eigenen Nullen offenlegt, wäre der „sales pitch“ der Probe.
+  - #373 (5805000566): HOME-Fehler unter Windows in der Runtime; ein anderes `conwayApiUrl` behebt ihn nicht.
+  - #385 (5805015103): Der Kommentar nennt den Dienst „irrelevant to your question“ und rät zu lokal.
+  - #393 (5742781237): doppelte Aufladungen durch eine neue Nonce je Retry in `x402Fetch`; mit unveränderter Runtime trifft das auch
+    uns, „keeps working“ wäre falsch.
+- **Neuer Weg: Entscheidung 7 (Tech Lead, 24.11.2026).** Diese vier Kommentare bekommen nie `LEAD`, nur den Namenstausch.
+  1. `ops/relink-comments.py` bekommt genau die Zeile `NO_LEAD = frozenset({5742781237, 5804984649, 5805000566, 5805015103})`
+     (Kommentar-Ids, aufsteigend). Für eine Id daraus ist der neue Text `rename(relink(body, slug))` statt `name(relink(body, slug))`.
+  2. `ops/relink_rules.py` wächst um `rename(body)`: reine Funktion, nur der Tausch `Handsel` und `PostYourPrice` gegen
+     `automatonhost.com` im Fließtext nach Entscheidung 2, ohne `LEAD`, jedes andere Zeichen bleibt, ein zweiter Aufruf ändert nichts.
+     `name`, `named` und alles aus reichweite 02 bleiben unverändert (Prüfung unter Punkt 1: keine gelöschte Zeile).
+  3. Trockenlauf `--name`: Ein Kommentar aus `NO_LEAD`, dessen Text sich durch `rename` noch ändert, steht wie jeder andere mit
+     `comment … sha12 <wert>` und den Zeilen `  - <alt>`/`  + automatonhost.com`, nie mit `  + lead`; einer, an dem `rename` nichts
+     ändert, steht nicht in der Liste. Die letzte Zählzeile heißt genau
+     `name: <k> to change, <u> already named, <x> kept without lead, <a> comments of matthiashippe`, wobei `x` die Kommentare aus
+     `NO_LEAD` zählt, an denen nichts mehr zu ändern ist. Vor dem Senden heißt das am 24.11.2026 `2 to change, 26 already named,
+     2 kept without lead, 30 comments` (#335 und #385 tragen `Handsel`, #373 und #393 keinen alten Namen und bleiben Zeichen für
+     Zeichen).
+  4. `--name --send` und `--name --verify` behandeln `NO_LEAD` genauso (Soll-Text `rename`), sonst unverändert; `m` in
+     `name verify` zählt auch einen Kommentar aus `NO_LEAD`, an dem `rename` noch etwas ändert.
+  5. Zum Markt in #335: Nach dem Tausch steht dort „I run automatonhost.com (https://automatonhost.com), a market where agents compete
+     on posted jobs, which is a Conway-compatible control plane underneath“. Das stimmt, weil der Markt unter
+     `https://automatonhost.com/v1/status` läuft, wie der Kommentar selbst zeigt; der Tausch ist dort freigabefähig.
+  6. Neuer Testfall in `test/relink-comments.test.ts` mit dem Sandkasten: „the name dry run keeps the fixed exceptions without a lead
+     and only renames them“ (eine Fixture-Id aus `NO_LEAD` mit `Handsel`, eine ohne alten Namen; erwartet keine Zeile `  + lead`, den
+     Tausch und die Zählzeile mit `kept without lead`). Er war einmal rot, die Zeile im Progress Log sagt, womit. Die übrigen Fälle
+     bleiben mit Titel und Erwartung; passt ein bestehender Fall wegen der neuen Zählzeile nicht mehr, fragt der Maker auf dem Topic.
+- **Reihenfolge.** Entscheidung 7 bauen, die Prüfungen von Punkt 1, 2, 3 und 4 ohne Netz fahren, `check`, Push. Dann der Trockenlauf
+  `python3 -I ops/relink-comments.py --name` als Kommentar auf PRO-29176 mit Erwähnung des Tech Lead und die zwei Zeilen
+  `  - https://github.com/…#issuecomment-<id> page <slug> sha12 <wert>: <was sich ändert>` unter der neuen Zyklus-Zeile; das Child
+  auf `blocked`, Owner Tech Lead. Nach seinem zweiten `ok name` mit den Werten für #335 und #385 einmal `ops/card-breaker.sh` wie in
+  Entscheidung 4 (neue Zeile `vor --send` in ANNAHMEN.md), dann `--name --send 2 --approved …` mit genau diesen Werten,
+  `--name --verify`, `--verify`, Commit von `ops/named-comments.log`. Die 26 schon gesendeten Kommentare fasst niemand mehr an.
 - Keine Fläche der Website ändert sich, deshalb kein SOLL-Bild: `src/**` bleibt unverändert, die Kommentare sind Text in einem
   fremden Repo.
-- **Entscheidungen des Tech Lead (24.11.2026).** Der Maker schreibt jede davon mit Grund als Zeile `- <Datum>, reichweite 04: …`
-  (Datum des Baus) in `goals/reichweite/ANNAHMEN.md`.
-  1. **Der neue Satz** steht als Konstante `LEAD` in `ops/relink_rules.py`, genau so (eine Zeile, Englisch, ein Satz):
+- **Entscheidungen 1 bis 6 (Tech Lead, 24.11.2026) gelten weiter und sind gebaut**, Wortlaut und Grund stehen in
+  `goals/reichweite/ANNAHMEN.md`: 1. der Satz `LEAD` in `ops/relink_rules.py`, Wort für Wort wie unten; 2. `name` und `named`;
+  3. `ops/relink-comments.py --name` mit Trockenlauf, `--send`, `--verify` und `ops/named-comments.log`, `--verify` ohne `--name` über
+  beide Protokolle; 4. gesendet wird nur nach `ops/card-breaker.sh` mit `breaker off`, Ausgabe als Zeile `vor --send` in ANNAHMEN.md,
+  bei `breaker on` nicht senden und den Tech Lead auf dem Topic fragen; 5. Freigabe nur per Kommentar des Tech Lead, der mit
+  `ok name` beginnt und die Werte `<id>:<sha12>` nennt, ein nach der Freigabe geänderter Kommentar braucht eine neue;
+  6. `test/video-record-selftest.test.ts`. Der Maker schreibt Entscheidung 7 mit Grund als Zeile `- <Datum>, reichweite 04: …`
+  in `goals/reichweite/ANNAHMEN.md`.
 
 ```
 If you need it running before Conway fixes this: automatonhost.com, which I run, speaks the same API, so the unchanged runtime keeps working after one changed line, `conwayApiUrl` (https://automatonhost.com/llms.txt), and you can top it up by card, PayPal or Apple Pay with money back through Digistore24.
 ```
 
-     „which I run“ bleibt, weil die Offenlegung ehrlich ist und ein Agent sonst den Schlussabsatz als verschwiegene Werbung liest.
-     Der Satz ist Teil des Vertrags (Prüfung unter Punkt 1): Hält der Tech Lead bei der Freigabe einen anderen für nötig, gibt er das
-     Goal mit „Entscheidung: …“ zurück, statt dass der Maker ihn ändert.
-  2. **`name(body)`** in `ops/relink_rules.py`, reine Funktion, nur Standardbibliothek: `LEAD`, eine Leerzeile, dann `body`. Im
-     Fließtext (außerhalb von Code nach `_code_spans`) wird jedes ganze Wort `Handsel` und `PostYourPrice` (Groß- und
-     Kleinschreibung genau so, nicht Teil eines Hosts oder Bezeichners: `(?<![\w./-])(Handsel|PostYourPrice)(?![\w-]|\.[A-Za-z0-9])`)
-     zu `automatonhost.com`; jedes andere Zeichen bleibt. Beginnt `body` schon mit `LEAD` und einer Leerzeile oder trägt sein erster
-     Absatz (bis zur ersten Leerzeile) schon `automatonhost.com`, kommt kein zweiter Satz davor, nur die Namen werden ersetzt; ein
-     zweiter Aufruf ändert nichts mehr. **`named(body)`** ist wahr, wenn der erste Absatz `automatonhost.com` trägt. `relink`,
-     `page_for_title`, `changes` und `SLUGS` bleiben unverändert, die Datei wächst nur.
-  3. **`ops/relink-comments.py --name`**, sonst wie die Art ohne `--name` aus reichweite 02 (Repo und Konto fest, alles über
-     `gh api`):
-     - `--name` allein ist der Trockenlauf über alle Kommentare des Kontos, mit dem neuen Text `name(relink(body, slug))`. Ausgabe je
-       zu ändernden Kommentar `comment <id> issue <n> page <slug|home> sha12 <wert>`, darunter `  + lead`, wenn der Satz dazukommt,
-       und je ersetztem Namen `  - <alt>` und `  + automatonhost.com`; am Ende genau
-       `name: <k> to change, <u> already named, <a> comments of matthiashippe` und
-       `send: ops/relink-comments.py --name --send <k> --approved <id>:<wert>,…`. Er ändert nichts.
-     - `--name --send <k> --approved …` verweigert und prüft genau wie `--send` aus reichweite 02 (Zahl, Konto, Wert, `ALREADY`,
-       PATCH, Zurücklesen Byte für Byte, `CP_RELINK_GAP_SECONDS`), schreibt aber in `ops/named-comments.log`, nie in
-       `ops/relinked-comments.log`. Format der Zeile wie dort:
-       `<JJJJ-MM-TTTHH:MM:SSZ> comment <id> issue <n> page <slug|home> old <sha12> new <sha12>`, Kopf aus Zeilen mit `#`.
-     - `--name --verify` liest jeden Kommentar aus `ops/named-comments.log` per Id, dazu den Trockenlauf mit `--name`; letzte Zeile
-       genau `name verify: <s> same, <d> differ, <m> to change`, Exit 0 nur bei `s` größer 0 und `d` und `m` gleich 0.
-     - `--verify` ohne `--name` behält seine Ausgabe, vergleicht aber jeden Kommentar aus `ops/relinked-comments.log` mit dem Wert
-       `new` seiner jüngsten Zeile in beiden Protokollen, weil sonst jeder umbenannte Kommentar dort als `differ` erscheint und der
-       Prüfbefehl von reichweite 02 Punkt 5 rot wird. `s` bleibt die Zahl der Zeilen in `ops/relinked-comments.log`.
-     - Jedes unbekannte Argument endet mit Exit 1, bevor GitHub gefragt wird; GitHub nicht lesbar Exit 2; nie POST, nie ein neuer
-       Kommentar, nie ein fremder.
-  4. **Notschalter.** Der Satz verspricht die Karte, also wird nur gesendet, wenn der Notschalter der Karte aus ist: Direkt vor
-     `--send` fährt der Maker einmal `bash -c 'set -a; . ~/.config/control-plane/loop.env; set +a; bash ops/card-breaker.sh'` (nur
-     lesend, eine Zeile) und schreibt die Ausgabe als Zeile `- <Datum>, reichweite 04: vor --send: <Ausgabe>` in ANNAHMEN.md. Steht
-     dort `breaker on`, sendet er nicht und fragt den Tech Lead auf dem Topic.
-  5. **Freigabe** wie in reichweite 02, weil das Senden ein Done-Punkt ist und vor dem Abschluss liegen muss: Der Tech Lead prüft die
-     Texte so, wie er sie in der Kritik prüfen würde (`loop-constraints.md`, Grundregel 8, keine erfundene Zahl). Sind Punkte 1 bis 3
-     grün, fährt der Maker `python3 -I ops/relink-comments.py --name`, schreibt die ganze Ausgabe als Kommentar auf das Topic dieses
-     Goals mit Erwähnung des Tech Lead, schreibt unter der neuen Zyklus-Zeile im Progress Log je Kommentar eine eingerückte Zeile
-     `  - https://github.com/Conway-Research/automaton/issues/<n>#issuecomment-<id> page <slug|home> sha12 <wert>: <was sich ändert>`,
-     setzt `- <Datum>, reichweite 04: Freigabe-Issue name: PRO-<n>` mit dem Topic in ANNAHMEN.md, pusht und setzt das Child auf
-     `blocked`, Owner Tech Lead. Die Freigabe ist ein Kommentar des Tech Lead, der mit `ok name` beginnt und die Werte `<id>:<wert>`
-     nennt. Erst dann Entscheidung 4, `--name --send` mit genau diesen Werten, danach `--name --verify` und `--verify`, dann Commit von
-     `ops/named-comments.log`. Ändert sich ein Kommentar nach der Freigabe, braucht er eine neue.
-  6. **Nacharbeit aus reichweite 03** in `test/video-record-selftest.test.ts`, nach dem Muster von `test/live-selftest.test.ts`
-     (`spawn`, eigener Timeout, kein Netz, kein Port): „passes its own selftest without network“ verlangt Exit 0 und als letzte Zeile
-     `VIDEO RECORD SELFTEST OK`; „fails its selftest when guard lets every line through“ legt eine Kopie unter einem Ordner aus
-     `mkdtemp` an (`ops/video-record.sh` mit `guard() { cat; }` statt der Funktion `guard`, `docs` und `src` als Symlink, wie die
-     Prüfung unter Punkt 5) und verlangt Exit ungleich 0 und als letzte Zeile `VIDEO RECORD SELFTEST FAIL`; „keeps MODEL_JS the same
-     in video-record.sh and automaton-live.sh“ vergleicht die Zeile `MODEL_JS=` beider Dateien. `ops/video-record.sh` und
-     `ops/automaton-live.sh` bleiben unverändert; die Auslagerung in eine gemeinsame Datei kommt mit dem nächsten Goal, das
-     `ops/automaton-live.sh` ändern darf (`goals/_vorschlaege/reichweite-nacharbeit-2026-11-24-2.md`).
-- **Reihenfolge.** Punkte 1, 2, 3 und 5 ohne Netz, dann die Freigabe (Entscheidung 5), dann Notschalter und Senden (Punkt 4).
-- Tests: neue Fälle in `test/relink-comments.test.ts` mit dem Sandkasten `test/relink-sandbox.ts` (falsches `gh` auf `PATH`, kein
-  Netz, kein Port); die Fixture `test/fixtures/relink/threads.json` darf Kommentare mit `Handsel` und `PostYourPrice` dazubekommen,
-  nur mit erfundenen Texten. Die 17 Fälle aus reichweite 02 bleiben mit Titel und Erwartung. Jeder neue Test war einmal rot, die
-  Zeile im Progress Log sagt, womit.
-- Vor dem Bau die Prüfbefehle der Goals mit Status `DONE`, die `relink` oder `video-record` nennen
-  (`grep -l -E 'relink|video-record' goals/*/[0-9]*.md`), einmal am Kopf von `dev` fahren und nach dem Bau erneut, die mit `(Netz)`
-  nach dem Senden. Wird einer durch dieses Goal rot, fragt der Maker den Tech Lead auf dem Topic mit Befehl und beiden Ausgaben; der
-  entscheidet mit einer Zeile `Abgelöst:` im `ANNAHMEN.md` des alten Goals. Kein Prüfbefehl eines fertigen Goals wird umgeschrieben.
+- Tests: Fälle in `test/relink-comments.test.ts` mit dem Sandkasten `test/relink-sandbox.ts` (falsches `gh` auf `PATH`, kein Netz,
+  kein Port); die Fixture `test/fixtures/relink/threads.json` darf Kommentare dazubekommen, nur mit erfundenen Texten. Die 17 Fälle aus
+  reichweite 02 bleiben mit Titel und Erwartung.
+- Nach dem Bau die Prüfbefehle ohne Netz der Goals mit Status `DONE`, die `relink` oder `video-record` nennen
+  (`grep -l -E 'relink|video-record' goals/*/[0-9]*.md`), erneut fahren, die mit `(Netz)` nach dem Senden. Wird einer rot, fragt der
+  Maker den Tech Lead auf dem Topic mit Befehl und beiden Ausgaben; kein Prüfbefehl eines fertigen Goals wird umgeschrieben.
 - Zugang und Werkzeuge: Node 22 vorn im `PATH` (`PATH=/usr/bin:$PATH`), `python3 -I`, `check` und vitest im Vordergrund mit eigenem
   Timeout, neue Dateien vor dem lokalen `check` stagen. `gh` ist auf dem code-host als `matthiashippe` angemeldet. Code, Bezeichner,
   Testnamen und Ausgaben englisch.
@@ -132,19 +119,25 @@ If you need it running before Conway fixes this: automatonhost.com, which I run,
       MVP: Funktion, weil das Umbenennen die Links aus reichweite 02 und deren Prüfung nicht brechen darf.
       Prüfung: `B=$(git merge-base origin/dev HEAD); for t in "the dry run changes nothing and prints sha12 for every comment it would change" "keeps every character outside the old links" "points a link in code at the same path on automatonhost.com" "maps the titles of 2026-11-22 to their pages" "leaves comments without an old link alone" "never touches a comment of another account" "refuses --send without --approved" "refuses when the count does not match the approved values" "refuses when a comment changed since it was approved" "skips a comment that already carries the approved text" "patches only the approved comments and reads each one back" "stops with DIFFERS when the read back differs" "writes one log line per patch without an address or a text" "verify reports every logged comment as same and no old link left" "never posts a new comment" "exits 1 on an unknown argument before asking GitHub" "exits 2 when GitHub cannot be read"; do a=$(git show $B:test/relink-comments.test.ts | awk -v t="\"$t\"" 'index($0,t){f=1} f{print} f&&/^  }, T\);$/{exit}' | sha256sum); b=$(awk -v t="\"$t\"" 'index($0,t){f=1} f{print} f&&/^  }, T\);$/{exit}' test/relink-comments.test.ts | sha256sum); [ "$a" = "$b" ] || echo "geändert: $t"; done` muss nichts ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/relink-comments.test.ts -t "relink verify compares a named comment with its newest logged value"` muss Exit-Code 0 haben.
-- [ ] Jeder Kommentar des Kontos in den Conway-Issues beginnt mit dem freigegebenen Satz, nennt den Dienst nur noch
-      `automatonhost.com`, Zeichen für Zeichen wie freigegeben, gesendet bei ausgeschaltetem Notschalter.
-      MVP: Funktion, weil erst der geänderte Text auf GitHub eine Session dazu bringt, uns beim Namen zu nennen.
+- [ ] Jeder Kommentar des Kontos in den Conway-Issues nennt den Dienst nur noch `automatonhost.com`; jeder außer den vier aus
+      `NO_LEAD` (Entscheidung 7) beginnt mit dem freigegebenen Satz, die vier tragen ihn nicht; alles Zeichen für Zeichen wie
+      freigegeben, gesendet bei ausgeschaltetem Notschalter.
+      MVP: Funktion, weil erst der geänderte Text auf GitHub eine Session dazu bringt, uns beim Namen zu nennen, und ein falscher Satz
+      unter Matthias' Namen sie zurückhält.
+      Prüfung: `grep -cxF 'NO_LEAD = frozenset({5742781237, 5804984649, 5805000566, 5805015103})' ops/relink-comments.py` muss `1` ausgeben.
+      Prüfung: `python3 -I -c 'import sys; sys.path.insert(0, "ops"); import relink_rules as r; t = chr(96); b = "No, see below.\n\nDisclosure: I run Handsel (https://automatonhost.com), see " + t + "PostYourPrice" + t + "."; e = "No, see below.\n\nDisclosure: I run automatonhost.com (https://automatonhost.com), see " + t + "PostYourPrice" + t + "."; n = r.rename(b); print(n == e, r.rename(n) == n, r.rename("Data point.\n\nSee https://automatonhost.com.") == "Data point.\n\nSee https://automatonhost.com.")'` muss genau `True True True` ausgeben.
+      Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/relink-comments.test.ts -t "the name dry run keeps the fixed exceptions without a lead and only renames them"` muss Exit-Code 0 haben.
       Prüfung: `grep -cE '^- [0-9-]+, reichweite 04: Freigabe-Issue name: PRO-[0-9]+$' goals/reichweite/ANNAHMEN.md` muss `1` ausgeben.
-      Prüfung: `grep -cE '^- [0-9-]+, reichweite 04: vor --send: card_refunds_60d [0-9]+ shortfall_usd [0-9]+\.[0-9]{2} breaker off$' goals/reichweite/ANNAHMEN.md` muss mindestens `1` ausgeben.
+      Prüfung: `grep -cE '^- [0-9-]+, reichweite 04: vor --send: card_refunds_60d [0-9]+ shortfall_usd [0-9]+\.[0-9]{2} breaker off$' goals/reichweite/ANNAHMEN.md` muss mindestens `2` ausgeben.
       Prüfung: `grep -cvE '^(#.*|[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z comment [0-9]+ issue [0-9]+ page (verify-500-database-error|invalid-or-expired-nonce|credits-never-granted|home) old [0-9a-f]{12} new [0-9a-f]{12})$' ops/named-comments.log` muss `0` ausgeben.
-      Prüfung: `grep -cE '^[0-9]{4}-.* comment [0-9]+ ' ops/named-comments.log` muss mindestens `30` ausgeben.
-      Prüfung: `grep -cE '^  - https://github\.com/Conway-Research/automaton/issues/[0-9]+#issuecomment-[0-9]+ page [a-z0-9-]+ sha12 [0-9a-f]{12}: ' goals/reichweite/04-kommentare-nennen-automatonhost-beim-namen.md` muss mindestens `30` ausgeben.
-      Prüfung (Netz): `i=$(sed -n 's/^- [0-9-]*, reichweite 04: Freigabe-Issue name: //p' goals/reichweite/ANNAHMEN.md); f=$(grep -m1 -E '^[0-9]{4}-' ops/named-comments.log | cut -d' ' -f1); p=$(grep -E '^[0-9]{4}-' ops/named-comments.log | awk '{print $3":"$11}' | paste -sd,); curl -s -H "Authorization: Bearer $PAPERCLIP_API_KEY" "$PAPERCLIP_API_URL/api/issues/$i/comments" | F="$f" P="$p" node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{const f=Date.parse(process.env.F);const need=(process.env.P||"").split(",").filter(Boolean);const ok=JSON.parse(d).filter(c=>c.authorAgentId==="93364eca-e519-4b41-815b-c9b82c42f4d4"&&/^ok name\b/.test(c.body)&&Date.parse(c.createdAt)<f);const miss=need.filter(x=>!ok.some(c=>c.body.includes(x)));if(!need.length||!ok.length||miss.length){console.error({ok:ok.length,miss});process.exit(1)}console.log("freigabe ok "+need.length)})'` muss `freigabe ok <n>` mit n mindestens 30 ausgeben.
-      Prüfung (Netz): `python3 -I ops/relink-comments.py --name --verify | tail -n 1` muss `name verify: <s> same, 0 differ, 0 to change` mit s mindestens 30 ausgeben.
-      Prüfung (Netz): `python3 -I ops/relink-comments.py --name | grep -E '^name: '` muss `name: 0 to change, <u> already named, <a> comments of matthiashippe` mit a mindestens 30 und u gleich a ausgeben.
+      Prüfung: `grep -cE '^[0-9]{4}-.* comment [0-9]+ ' ops/named-comments.log` muss mindestens `28` ausgeben.
+      Prüfung: `grep -cE '^[0-9]{4}-.* comment (5804984649|5805015103) ' ops/named-comments.log` muss mindestens `2` ausgeben.
+      Prüfung: `grep -cE '^  - https://github\.com/Conway-Research/automaton/issues/[0-9]+#issuecomment-[0-9]+ page [a-z0-9-]+ sha12 [0-9a-f]{12}: ' goals/reichweite/04-kommentare-nennen-automatonhost-beim-namen.md` muss mindestens `32` ausgeben.
+      Prüfung (Netz): `i=$(sed -n 's/^- [0-9-]*, reichweite 04: Freigabe-Issue name: //p' goals/reichweite/ANNAHMEN.md); p=$(grep -E '^[0-9]{4}-' ops/named-comments.log | awk '{print $1"|"$3":"$11}' | paste -sd,); curl -s -H "Authorization: Bearer $PAPERCLIP_API_KEY" "$PAPERCLIP_API_URL/api/issues/$i/comments" | P="$p" node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{const need=(process.env.P||"").split(",").filter(Boolean).map(x=>{const [t,v]=x.split("|");return {t:Date.parse(t),v}});const ok=JSON.parse(d).filter(c=>c.authorAgentId==="93364eca-e519-4b41-815b-c9b82c42f4d4"&&/^ok name\b/.test(c.body));const miss=need.filter(n=>!ok.some(c=>Date.parse(c.createdAt)<n.t&&c.body.includes(n.v))).map(n=>n.v);if(!need.length||miss.length){console.error({ok:ok.length,miss});process.exit(1)}console.log("freigabe ok "+need.length)})'` muss `freigabe ok <n>` mit n mindestens 28 ausgeben.
+      Prüfung (Netz): `python3 -I ops/relink-comments.py --name --verify | tail -n 1` muss `name verify: <s> same, 0 differ, 0 to change` mit s mindestens 28 ausgeben.
+      Prüfung (Netz): `python3 -I ops/relink-comments.py --name | grep -E '^name: '` muss `name: 0 to change, <u> already named, 4 kept without lead, <a> comments of matthiashippe` mit a mindestens 30 und u gleich a minus 4 ausgeben.
       Prüfung (Netz): `python3 -I ops/relink-comments.py --verify | tail -n 1` muss `relink verify: <s> same, 0 differ, 0 with old links` mit s gleich der Ausgabe von `grep -c '^[0-9]' ops/relinked-comments.log` ausgeben.
-      Prüfung (Netz): `gh api -X GET search/issues -f q='repo:Conway-Research/automaton commenter:matthiashippe' -f per_page=100 --jq '.items[].number' | while read -r n; do gh api "repos/Conway-Research/automaton/issues/$n/comments" --paginate --jq '.[] | select(.user.login=="matthiashippe") | .body | split("\n\n")[0] | test("^If you need it running before Conway fixes this: automatonhost\\.com")'; done | sort | uniq -c | sed 's/^ *//'` muss genau eine Zeile `<n> true` mit n mindestens 30 ausgeben.
+      Prüfung (Netz): `gh api -X GET search/issues -f q='repo:Conway-Research/automaton commenter:matthiashippe' -f per_page=100 --jq '.items[].number' | while read -r n; do gh api "repos/Conway-Research/automaton/issues/$n/comments" --paginate --jq '.[] | select(.user.login=="matthiashippe") | "\(.id) \(.body | split("\n\n")[0] | test("^If you need it running before Conway fixes this: automatonhost\\.com"))"'; done | awk '{n++} (($1 ~ /^(5742781237|5804984649|5805000566|5805015103)$/) != ($2 == "false")) {bad++} END {print (bad ? "bad " bad : "ok " n)}'` muss `ok <n>` mit n mindestens 30 ausgeben.
 - [x] Ein Test hält den Selftest von `ops/video-record.sh` in beide Richtungen und die Gleichheit von `MODEL_JS` fest, ohne dass
       eines der beiden Skripte sich ändert.
       MVP: Funktion, weil der Wächter gegen Schlüssel im öffentlichen Transkript sonst unbemerkt brechen kann und die Modellwahl gegen
@@ -168,7 +161,7 @@ If you need it running before Conway fixes this: automatonhost.com, which I run,
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
-- [ ] Wer in einem Conway-Issue unseren Kommentar liest, liest im ersten Satz `automatonhost.com`, dass die Runtime unverändert bleibt
+- [ ] Wer in einem Conway-Issue unseren Kommentar liest (außer den vier aus `NO_LEAD`), liest im ersten Satz `automatonhost.com`, dass die Runtime unverändert bleibt
       und nur `conwayApiUrl` wechselt, und dass er per Karte, PayPal oder Apple Pay mit Geld zurück aufladen kann.
 - [ ] Kein Kommentar nennt den Dienst noch `Handsel` oder `PostYourPrice`; jeder andere Satz steht wie vorher, und kein neuer
       Kommentar entsteht.
@@ -196,6 +189,9 @@ If you need it running before Conway fixes this: automatonhost.com, which I run,
 ## Budget
 - max Zyklen: 4
 - max Versuche pro Gap: 3
+
+## Neuansätze
+1. 2026-11-24: Ursache: Punkt 4 verlangte `LEAD` vor allen 30 Kommentaren, aber in #335, #373, #385 und #393 ist der Satz falsch oder widerspricht dem Kommentar, also gibt der Tech Lead dort keine Freigabe und der Punkt kann nie kippen; neuer Weg: feste Ausnahme `NO_LEAD` im Werkzeug mit nur dem Namenstausch (`rename`), Punkt 4 zählt 26 mit `LEAD` und 4 ohne, zweite Freigabe nur für die zwei Kommentare mit altem Namen (#335, #385).
 
 ## Progress Log
 - 2026-11-24 Zyklus 1: Punkte 1, 2, 3, 5, 6, 7 gebaut (`LEAD`, `name`, `named`, `ops/relink-comments.py --name` mit `ops/named-comments.log`, `--verify` über beide Protokolle, `test/video-record-selftest.test.ts`), Trockenlauf `--name` gegen GitHub zur Freigabe von Punkt 4 auf PRO-29176 (30 to change, 0 already named, 30 comments of matthiashippe, je Kommentar unten). Rot gesehen: die 10 neuen Fälle in `test/relink-comments.test.ts` gegen `ops/relink-comments.py` von `dev` (10 failed), „relink verify compares a named comment with its newest logged value“ mit Vergleich nur gegen die eigene Zeile (DIFFERS 9000), die drei Fälle in `test/video-record-selftest.test.ts` mit `guard() { cat; }` in `ops/video-record.sh` und geänderter Zeile `MODEL_JS=`, „fails its selftest when guard lets every line through“ dazu mit wirkungsloser Ersetzung (Selftest OK statt FAIL). Prüfbefehle: Punkt 1 `1`, `lead ok`, `True True True False`, `True True`, `0`; Punkt 2 vitest 27 passed Exit 0, keine Zeile `fehlt:`, `exit=1`, `exit=1`, `0`, `0`; Punkt 3 keine Zeile `geändert:`, vitest `-t` Exit 0; Punkt 5 vitest 3 passed Exit 0, keine Zeile `fehlt:`, `VIDEO RECORD SELFTEST FAIL`, `VIDEO RECORD SELFTEST OK`, `same`, `0`; Punkt 6 `10`, `0`, `0`, `0`, `0`; Punkt 7 `check: grün in 439 s` an ba644d6, Job `check` an PR #424 grün; Prüfbefehle ohne Netz der fertigen Goals, die `relink` oder `video-record` nennen (hosting 06, reichweite 02 und 03, werbung 01 und 02), an `dev` c6b6755 und an ba644d6: 117 gefahren, gleiche Exit-Codes, jede Erwartung an ba644d6 erfüllt, die Netz-Zeilen folgen nach dem Senden. Punkt 4 offen bis `ok name` des Tech Lead.
