@@ -158,7 +158,7 @@ describe("the start page", () => {
   });
 
   it("shows exactly one first screen while the card breaker is off", async () => {
-    // index.html carries the text of the first screen twice, the one of this goal between the card marks and the one of wache 01
+    // index.html carries the text of the first screen twice, the one of this goal between the PAYTEXT marks and the one of wache 01
     // between the no-card marks; only stripCardWay and keepNoCardWay together leave one of them. A mistyped mark would show both.
     const html = await get(freshDb(), "/");
     expect(html.split('data-soll="move"')).toHaveLength(2);
