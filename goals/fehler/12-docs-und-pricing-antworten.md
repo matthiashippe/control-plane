@@ -1,7 +1,7 @@
 # Fehler Goal 12: /docs und /pricing antworten
 
 ## Status
-PLANNED
+DONE
 
 ## Active Objective
 Am 2026-11-23 um 13:58:05 UTC holte ein Agent, der für einen Menschen liest (`Claude-User`), von einer fremden Adresse auf
@@ -70,30 +70,30 @@ kann.
   Rollout und kein Neustart durch einen Agent. Code, Bezeichner, Testnamen und Ausgaben englisch.
 
 ## Done Condition
-- [ ] `/docs` und `/docs/` leiten mit 302 auf `/llms.txt` weiter.
+- [x] `/docs` und `/docs/` leiten mit 302 auf `/llms.txt` weiter.
       MVP: Funktion, weil ein Agent, der die Anleitung an diesem Pfad sucht, sie dann findet.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/docs-pricing.test.ts` muss Exit-Code 0 haben.
       Prüfung: `grep -qF '"redirects /docs to /llms.txt"' test/docs-pricing.test.ts && echo name ok` muss genau `name ok` ausgeben.
       Prüfung: `CP_PUBLIC_URL=https://automatonhost.com PATH=/usr/bin:$PATH node --import tsx --input-type=module -e 'const { createApp } = await import("./src/app.ts"); const { openDb } = await import("./src/db.ts"); const app = createApp({ db: openDb(":memory:") }); const bad = []; for (const p of ["/docs", "/docs/"]) { const r = await app.request(p); const l = r.headers.get("location") || ""; if (r.status !== 302 || !l.endsWith("/llms.txt")) bad.push(p + " " + r.status + " " + l); } console.log(bad.length ? bad.join("; ") : "docs ok")' 2>&1 | tail -1` muss genau `docs ok` ausgeben.
-- [ ] `/pricing` und `/pricing/` antworten mit 200 und Text: bei Notschalter aus mit jedem Paket per Karte, bei Notschalter an ohne
+- [x] `/pricing` und `/pricing/` antworten mit 200 und Text: bei Notschalter aus mit jedem Paket per Karte, bei Notschalter an ohne
       Karte, beide Male mit den Stufen über USDC und demselben Preis der Inferenz wie `/llms.txt`.
       MVP: Funktion, weil ein Agent, der den Preis an diesem Pfad sucht, ihn dann findet, und bei geschlossener Kasse keinen Weg sieht,
       der nicht geht.
       Prüfung: `for t in "answers /pricing with every card package while the breaker is off" "names no card on /pricing while the breaker is on" "states the same inference price on /pricing as in /llms.txt"; do grep -qF "\"$t\"" test/docs-pricing.test.ts || echo "fehlt: $t"; done` muss nichts ausgeben.
       Prüfung: `CP_PUBLIC_URL=https://automatonhost.com PATH=/usr/bin:$PATH node --import tsx --input-type=module -e 'const { createApp } = await import("./src/app.ts"); const { openDb } = await import("./src/db.ts"); const { CARD_BREAKER_SHORTFALL_MC: S } = await import("./src/payments/card-way.ts"); const { CARD_PACKAGES } = await import("./src/payments/digistore.ts"); const bad = []; const get = async (on, p) => { const db = openDb(":memory:"); if (on) { const t = new Date().toISOString(); db.prepare("INSERT INTO card_orders (order_id, product_id, address, mode, status, credited_mc, reversed_mc, shortfall_mc, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?)").run("TRIP", "771278", "0x" + "ef".repeat(20), "live", "reversed", S, S, t, t); } const r = await createApp({ db }).request(p); return { s: r.status, ct: r.headers.get("content-type") || "", b: await r.text() }; }; for (const p of ["/pricing", "/pricing/"]) { const off = await get(false, p); const on = await get(true, p); if (off.s !== 200 || on.s !== 200) bad.push(p + " status " + off.s + "/" + on.s); if (!off.ct.startsWith("text/plain")) bad.push(p + " type " + off.ct); for (const k of CARD_PACKAGES) { const e = String(k.grossEurCents / 100); if (!off.b.includes("/card/" + e)) bad.push(p + " card " + e + " missing"); } if (/\/card\/|card|paypal|apple pay/i.test(on.b)) bad.push(p + " card while on"); if (!off.b.includes("/pay/") || !on.b.includes("/pay/")) bad.push(p + " usdc missing"); } console.log(bad.length ? bad.join("; ") : "pricing ok")' 2>&1 | tail -1` muss genau `pricing ok` ausgeben.
       Prüfung: `CP_PUBLIC_URL=https://automatonhost.com PATH=/usr/bin:$PATH node --import tsx --input-type=module -e 'const { createApp } = await import("./src/app.ts"); const { openDb } = await import("./src/db.ts"); const app = createApp({ db: openDb(":memory:") }); const llms = await (await app.request("/llms.txt")).text(); const pr = await (await app.request("/pricing")).text(); const key = /purchase cost times [0-9]+(\.[0-9]+)?/.exec(llms)?.[0] || /not sell access to language models/.exec(llms)?.[0] || "NONE"; console.log(key !== "NONE" && pr.includes(key) ? "price ok" : "price differs: " + key)' 2>&1 | tail -1` muss genau `price ok` ausgeben.
-- [ ] Die Entscheidungen stehen in `goals/fehler/ANNAHMEN.md`, der Diff bleibt in den Pfaden dieses Goals, kein Test fällt weg, und
+- [x] Die Entscheidungen stehen in `goals/fehler/ANNAHMEN.md`, der Diff bleibt in den Pfaden dieses Goals, kein Test fällt weg, und
       nichts im Repo nennt eine Adresse eines Kunden.
       MVP: Funktion, weil das nächste Glied wissen muss, warum `/docs` weiterleitet und woher jede Zahl auf `/pricing` kommt.
       Prüfung: `grep -cE '^- [0-9]{4}-[0-9]{2}-[0-9]{2}, fehler 12: ' goals/fehler/ANNAHMEN.md` muss mindestens 3 ausgeben.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD | grep -vE '^(src/app\.ts|test/docs-pricing\.test\.ts|goals/fehler/.*|goals/[a-z]+/ANNAHMEN\.md)$' | wc -l` muss 0 ausgeben.
       Prüfung: `git diff --diff-filter=D --name-only $(git merge-base origin/dev HEAD) HEAD -- test | wc -l` muss 0 ausgeben.
-- [ ] Der Job `e2e` am Kopf des Goal-PR ist grün.
+- [x] Der Job `e2e` am Kopf des Goal-PR ist grün.
       MVP: Funktion, weil sich `src/app.ts` im Laufzeitpfad ändert und der code-host kein Docker hat.
       Prüfung (Netz): `gh pr checks $(gh pr list -R matthiashippe/control-plane --head goal/fehler-12 --state open --json number -q '.[0].number') -R matthiashippe/control-plane 2>&1 | grep -E '^e2e\s' | grep -c pass` muss genau 1 ausgeben.
-- [ ] `check` ist grün.
+- [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Ein Agent, der `/docs` aufruft, landet auf der Anleitung in `/llms.txt`.
@@ -122,5 +122,10 @@ kann.
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-24 Zyklus 1: Punkte 1, 2, 3, 4, 5 gebaut: Routen `/docs`, `/docs/` (302 auf `/llms.txt`) und `/pricing`, `/pricing/` (200 Text, `no-store`, Karte nur bei Notschalter aus) in `src/app.ts`, vier Fälle in `test/docs-pricing.test.ts`, fünf Zeilen in `goals/fehler/ANNAHMEN.md`. Rot gesehen: alle vier Fälle vor dem Bau mit 404, Gegenprobe mit Karte immer an und anderem Preissatz macht „names no card …“ und „states the same inference price …“ rot. `/llms.txt`, `/`, `/robots.txt`, `/sitemap.xml` gleich wie `origin/dev` f835fd5, die 15 Prüfbefehle mit `createApp` der DONE-Goals vorher und nachher gleich. Prüfbefehle: P1 vitest Exit 0, `name ok`, `docs ok`; P2 keine fehlende Testzeile, `pricing ok`, `price ok`; P3 `5`, `0`, `0`; P4 `e2e` pass an PR #414 (Kopf 2667d98); P5 `check` Exit 0 (273 Dateien, 2796 Tests, 269 s).
+- 2026-11-24 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5; `dev` unverändert auf f835fd5, kein Merge nötig, alle Prüfbefehle am Kopf 74ec5e6 neu gefahren. Prüfbefehle: P1 vitest Exit 0, `name ok`, `docs ok`; P2 keine fehlende Testzeile, `pricing ok`, `price ok`; P3 `5`, `0`, `0`; P4 `e2e` pass an PR #414 (Kopf 74ec5e6, Zähler `1`); P5 `check` Exit 0 (273 Dateien, 2796 Tests, 91 s).
+- 2026-11-24 Zyklus 3: Punkt 2 nachgebessert nach Linse B (REJECT 12-z2-B): `/pricing` trägt nur noch die Zeilen aus Entscheidung 2, gestrichen sind Verweis auf `/llms.txt`, Satz zu `/card/:package`, Zustand `intakeClosed`, Zahlungsadresse, Hinweis auf `/v1/credits/history` und Enddatum der Inferenz; ANNAHMEN-Zeile 4 angepasst. Kein neuer Test, die vier Fälle prüfen weiter genau diese Zeilen. `dev` 2f911eb gemergt (nur Goal- und Regeldateien). Abschluss gemeldet, Punkte 1, 2, 3, 4, 5. Prüfbefehle am Kopf a407b07: P1 vitest Exit 0 (4 von 4), `name ok`, `docs ok`; P2 keine fehlende Testzeile, `pricing ok`, `price ok`; P3 `5`, `0`, `0`; P4 `e2e` pass an PR #414 (Kopf a407b07, Zähler `1`); P5 `check` Exit 0 (273 Dateien, 2796 Tests, vor und nach dem Merge).
+- 2026-11-24 Zyklus 4: Punkt 2 nachgebessert nach Linse K (REJECT 12-z3-K): Stufen über USDC und `/pay/{usd}/{wallet}` stehen auf `/pricing` nur bei offener Annahme (`!intakeClosed`), wie in `/llms.txt`, weil `/pay/…` sonst 410 antwortet; kein Ersatzsatz. Neuer Fall „names no USDC topup on /pricing while topups are closed“, vor dem Fix rot (`expected … not to contain 'Topup tiers in USD'`). Einzeiler aus 12-z3-K jetzt `pricing /pay/: false | llms /pay/{usd}: false | /pay/5 status: 410`. ANNAHMEN-Zeile 4 angepasst. `dev` bab9e56 gemergt (nur Doku, Goal- und Vorschlagsdateien). Abschluss gemeldet, Punkte 1, 2, 3, 4, 5. Prüfbefehle am Kopf c004535: P1 vitest Exit 0 (5 von 5), `name ok`, `docs ok`; P2 keine fehlende Testzeile, `pricing ok`, `price ok`; P3 `5`, `0`, `0`; P4 `e2e` pass an PR #414 (Kopf c004535, Zähler `1`); P5 `check` Exit 0 (273 Dateien, 2797 Tests).
+- 2026-11-24 Release: PASS K und B (Zyklus 4), DONE.
 
 ## Blockers
