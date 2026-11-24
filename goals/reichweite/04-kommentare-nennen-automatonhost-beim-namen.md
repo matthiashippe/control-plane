@@ -1,7 +1,7 @@
 # Reichweite Goal 04: Unsere Kommentare nennen automatonhost.com beim Namen
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Die Agenten-Sessions der ersten Probe finden unseren Hinweis in den Conway-Issues, nennen den Dienst aber nicht und stufen ihn als
@@ -171,7 +171,7 @@ If you need it running before Conway fixes this: automatonhost.com, which I run,
       Prüfung: `for t in "the no-card dry run swaps the lead for the lead without the card and changes nothing else" "the no-card send patches only approved comments and reads each one back" "the name dry run swaps the lead without the card back to the lead and never adds a second one" "no-card leaves the comments of NO_LEAD alone"; do grep -qF "\"$t\"" test/relink-comments.test.ts || echo "fehlt: $t"; done` muss nichts ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/relink-comments.test.ts -t "no-card"` muss Exit-Code 0 haben.
       Prüfung: `python3 -I ops/relink-comments.py --no-card > /dev/null 2>&1; echo "exit=$?"` muss genau `exit=1` ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Wer in einem Conway-Issue unseren Kommentar liest (außer den vier aus `NO_LEAD`), liest im ersten Satz `automatonhost.com`, dass die Runtime unverändert bleibt
@@ -252,5 +252,6 @@ If you need it running before Conway fixes this: automatonhost.com, which I run,
 - 2026-11-24 Zyklus 6 nach Neuansatz 1: Befund 1 der Linse K (Verdict 04-z5-K, REJECT am Kopf f96017c) behoben: die beiden Vorschläge `goals/_vorschlaege/reichweite-kritik-2026-11-24-1.md` und `-2.md` aus dem Kritik-Commit fd6d4dd vom Goal-Branch genommen, weil Punkt 6 diese Pfade nicht erlaubt; ihr Text bleibt in fd6d4dd und geht über einen Pflege-PR Art `vorschlag` des Tech Lead nach `dev`. Rot gesehen: zweite Prüfung von Punkt 6 am Kopf 3370e04 `2`, danach `0`. `origin/dev` ohne neue Commits.
   Prüfbefehle: alle Prüfungen aus Punkt 6, wie in der Goal-Datei; `PATH=/usr/bin:$PATH node scripts/check.mjs`.
 - 2026-11-24 Zyklus 7 nach Neuansatz 1: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, 7, 8; `origin/dev` ohne neue Commits, alle Prüfungen aus Punkt 6 am Kopf 3410e69 `13`, `0`, `0`, `0`, `0`, `check` lokal grün in 209 s, Jobs `check` und `e2e` an PR #424 am Kopf 3410e69 grün.
+- 2026-11-24 Release: PASS K und B (Zyklus 7), DONE.
 
 ## Blockers
