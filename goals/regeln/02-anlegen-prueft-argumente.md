@@ -1,7 +1,7 @@
 # Regeln Goal 02: Auf 8453 prüft das Anlegen der Weiterleitung auch die Argumente
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 `requireRule10` (`src/konto/chain.ts:81`) lässt auf chainId 8453 das Anlegen über `DEPLOY_PROXY` zu, sobald die Daten mit
@@ -75,7 +75,7 @@ bewegen.
       forwarder deploy with an odd number of hex digits behind the prefix on 8453 as length`, rot vor dem Fix.
       Prüfung: `pnpm -s vitest run test/konto-send-guard.test.ts --reporter=json 2>/dev/null | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const j=JSON.parse(s);const t=j.testResults.flatMap(f=>f.assertionResults).filter(a=>a.status==="passed").map(a=>a.title);console.log(t.some(x=>/refuses a forwarder deploy with an odd number of hex digits behind the prefix on 8453 as length/.test(x))?"ja":"nein")})'` muss `ja` ausgeben.
       Prüfung: `grep -A8 "carry bits above the address" test/konto-send-guard.test.ts | grep -c "account"` muss mindestens 1 ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Jeder neue Fall zur Verweigerung war vor dem Fix rot; die Zeile im Progress Log nennt, womit.
@@ -101,5 +101,6 @@ bewegen.
 - 2026-11-25 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3; `origin/dev` (5a279bb) ist im Branch enthalten, nichts hereinzuholen. Prüfbefehle: `pnpm -s vitest run test/konto-send-guard.test.ts` Exit 0 (12 passed); JSON-Prüfer `alle`; `grep -c "decodeAbiParameters" src/konto/chain.ts` 2; die sechs Dateien aus Punkt 2 Exit 0 (55 passed); `node scripts/check.mjs` Exit 0 (2887 Tests); am PR #444 Jobs `check` und `e2e` grün an e04b123 (Run 45603101109).
 - 2026-11-25 Zyklus 3: Punkt 4 gebaut: Test `keeps 84532 unchanged for forwarder deploys that 8453 refuses` schickt fremden token, manager, caller, ein Wort weniger und fünf angehängte fremde Wörter auf 8453 (verweigert, Transport leer) und auf 84532 mit und ohne `SEPOLIA_NET` (Hash zurück, `eth_sendRawTransaction` gesehen); Gegenprobe mit gepflanzter Sperre auf 84532 in `requireRule10`: der Test rot (1 failed). Prüfbefehle: JSON-Prüfer aus Punkt 4 `ja`; `pnpm -s vitest run test/konto-send-guard.test.ts` Exit 0 (13 passed).
 - 2026-11-25 Zyklus 4: Punkt 5 gebaut und Abschluss gemeldet, Punkte 1, 2, 3, 4, 5: `deployArgumentFault` zählt hinter dem Präfix Hex-Ziffern statt Bytes, jede Länge ungleich 320 Ziffern ergibt `length`; der Fall mit dem schmutzigen account-Wort erwartet jetzt `forwarder argument account does not fit`. Der neue Test `refuses a forwarder deploy with an odd number of hex digits behind the prefix on 8453 as length` war an 4fb5ce0 rot (1 failed, 13 passed). Der grep-Prüfer aus Punkt 5 gab schon an 4e49ca1 2 aus (Kommentar und Parameter `account`), belastbar ist `grep -c "forwarder argument account"` in denselben Zeilen: vorher 0, jetzt 1. `origin/dev` ist im Branch. Prüfbefehle: `pnpm -s vitest run test/konto-send-guard.test.ts` Exit 0 (14 passed); JSON-Prüfer Punkt 1 `alle`; `grep -c "decodeAbiParameters" src/konto/chain.ts` 2; die sechs Dateien aus Punkt 2 Exit 0 (55 passed); `node scripts/check.mjs` Exit 0; JSON-Prüfer Punkt 4 `ja`; JSON-Prüfer Punkt 5 `ja`; grep-Prüfer Punkt 5 3.
+- 2026-11-25 Release: PASS K und B (Zyklus 4), DONE.
 
 ## Blockers
