@@ -198,6 +198,38 @@ windows of the sign of life a quiet day always has such a delivery. The ops tria
 (`.claude/skills/ops-triage/SKILL.md`, step 2) passes `CP_ALERT_WEBHOOK` from `secrets.env` in the
 environment of its call of `ops/status.sh`, never exported and never as an argument.
 
+### Card breaker and comments
+
+Our comments in Conway-Research/automaton open with `LEAD` from `ops/relink_rules.py`, which promises the card (goals/reichweite/04).
+While the card breaker is on, `/llms.txt` drops the card line, so the comments have to say `LEAD_NO_CARD` instead, and `LEAD` again
+once it is off. The watchdog above only posts the change to the alarm path; `ops/breaker-comments.sh` (goals/reichweite/05) turns
+it into work: one issue for the Tech Lead in the Paperclip project Control Plane per change, with the dry run of the new direction.
+
+- Tool: `bash ops/breaker-comments.sh` on the code-host in a checkout of `dev`, with the variables of
+  `~/.config/control-plane/loop.env` and `PAPERCLIP_API_URL`, `PAPERCLIP_API_KEY` and `PAPERCLIP_COMPANY_ID` of the Paperclip run.
+  It reads the breaker with `ops/card-breaker.sh` (read-only over ssh) and compares it with the stored state. On a change it runs
+  the dry run `python3 -I ops/relink-comments.py --name --no-card` (breaker on) or `python3 -I ops/relink-comments.py --name`
+  (breaker off), never with `--send`. With nothing to change it only stores the state. Otherwise it looks for an open issue
+  (`todo`, `in_progress`, `in_review`, `blocked`) with the same title in the project and creates one only if there is none: title
+  `control-plane: card breaker on, comments without card` or `control-plane: card breaker off, comments with card`, assignee by
+  the urlKey `tech-lead`, status `todo`, in the description the breaker line, the dry run unchanged in a code block and the steps.
+  No id of a project, an agent or the company is in the repo; the key goes to curl on stdin, never into an argument or the output.
+- Steps in the issue: the Tech Lead approves with a comment that starts with `ok name` and names the values `<id>:<sha12>`; the
+  Maker runs `ops/card-breaker.sh` again (another state: send nothing), then the same mode with
+  `--send <n> --approved <id>:<sha12>,...` and afterwards with `--verify`.
+- State: `${CP_STATE_DIR:-$HOME/.local/state/control-plane}/card-breaker-comments`, exactly `on` or `off`, outside the checkout. A
+  missing file counts as `off` (the comments were sent while the breaker was off) and shows as `last none`. It is written only after
+  a POST answered 2xx, after an open issue with the same title was found, or when the dry run has nothing to change, so a failed
+  run creates the issue in the next one.
+- Output, the last line: `breaker <on|off>, last <on|off|none>, no change`, `… comments already match`, `… issue <PRO-n>`,
+  `… issue <PRO-n> already open`, with `--dry-run` `… would create issue` (no POST, no state written; `--dry-run` reads Paperclip
+  even without a change, so it proves the way of the routine). Exit 0 then; exit 2 with a line ending in `unreadable` when the
+  breaker, GitHub or Paperclip cannot be read or the POST fails; exit 1 on an unknown argument before anything is asked.
+- Routine: „control-plane: Notschalter und Kommentare“ of the company Privat, Maker engineer-cp, every 6 hours, task
+  `bash ops/breaker-comments.sh`, then a comment with its last line and `done`. The Tech Lead creates it over the API after the
+  release of goals/reichweite/05 and enters it in `paperclip/routines.privat.allow` of code-host, like „store-of-luxus: Auszug
+  anstoßen“; it is not part of this repo.
+
 ## Backup
 
 `ops/backup.sh` runs daily at 3:17 UTC by cron on the VM (`/var/log/cp-backup.log`), writes to

@@ -1,7 +1,7 @@
 # Reichweite Goal 05: Unsere Kommentare folgen dem Notschalter der Karte
 
 ## Status
-PLANNED
+ACTIVE
 
 ## Active Objective
 Seit reichweite 04 tragen 26 Kommentare des Kontos `matthiashippe` in `Conway-Research/automaton` den Satz `LEAD` aus

@@ -1,0 +1,11 @@
+{
+  "note": "Invented comments for test/breaker-comments.test.ts. The issue numbers come from test/fixtures/relink/threads.json, so the fake gh of test/relink-sandbox.ts finds their threads. Each text gets LEAD or LEAD_NO_CARD from ops/relink_rules.py and a blank line in front in the test.",
+  "comments": [
+    { "id": 910001, "issue": 447, "user": "matthiashippe", "text": "The verify call fails before the wallet is written, so a retry with a fresh nonce returns the same error." },
+    { "id": 910002, "issue": 440, "user": "matthiashippe", "text": "Clearing the cached key and provisioning again gets past the 401, the 500 stays." },
+    { "id": 910003, "issue": 443, "user": "matthiashippe", "text": "Same here on two machines, both on the current release of the runtime." }
+  ],
+  "others": [
+    { "id": 910101, "issue": 447, "user": "someone-else", "text": "Any update on this one?" }
+  ]
+}
