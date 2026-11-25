@@ -128,6 +128,20 @@ MVP: Funktion, weil ohne die Zeile im Repo keine Woche mit der vorigen vergliche
       Prüfung: `git diff $(git merge-base origin/dev HEAD) HEAD -- . | perl -CSD -ne 'print if /^\+/ && /0x[0-9a-fA-F]{40}|sk-[A-Za-z0-9_-]{20,}|[\x{2013}\x{2014}]/' | wc -l` muss 0 ausgeben.
 - [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
+- [ ] Kritik 1: `### Weekly run` unterscheidet die zwei Wege, auf denen `--week` mit Exit 1 endet. Fallen Sessions aus
+      (stderr `<n> of 5 sessions failed; …`), hat `--week` die Zeile mit `failed <n>/5` und die Antwortdatei schon angelegt und die
+      Woche im Zustand als gefragt vermerkt; beide gehören wie jede Woche in den PR, weil das Gate die Zeile annimmt und die Woche
+      sonst erst eine Woche später über den Nachtrag aus dem Zustand ins Repo kommt oder fehlt, wenn der nächste Lauf einen anderen
+      Zustand hat. Nur bei `cannot recount <YYYY-Www>: …` kommt keine Zeile in den PR. Ein Fall in `test/agent-probe-week.test.ts`
+      belegt, dass eine Woche mit ausgefallenen Sessions an einer Datei ohne Zeilenende am Schluss eine Zeile ergibt, die das Gate
+      annimmt.
+      MVP: Funktion, weil der heutige Satz „When `--week` ends with exit 1, no line goes into the PR“ den Richtungs-Check eine
+      gemessene Woche zurückhalten lässt, die das Gate annehmen würde (Tech Lead, Kritik 25.11.2026, gemessen mit
+      `ops/fixtures/agent-probe-fails` gegen die Datei auf `dev`: Zeile `failed 5/5 … via sessions` angehängt, Exit 1).
+      Prüfung: `node -e 'const s=require("fs").readFileSync("ops/README.md","utf8");const i=s.indexOf("### Weekly run");const j=s.indexOf("\n#",i+5);const t=(i<0?"":s.slice(i,j<0?undefined:j)).replace(/\s+/g," ");const miss=["of 5 sessions failed","cannot recount <YYYY-Www>"].filter(n=>!t.includes(n));console.log(miss.length?"fehlt: "+miss.join(", "):t.includes("When `--week` ends with exit 1, no line goes into the PR")?"widerspruch":"exit ok")'` muss genau `exit ok` ausgeben.
+      Prüfung: `grep -cF '"keeps a week with failed sessions as a line the gate accepts"' test/agent-probe-week.test.ts` muss genau 1 ausgeben.
+      Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/agent-probe-week.test.ts -t "keeps a week with failed sessions as a line the gate accepts"` muss Exit-Code 0 haben.
+      Prüfung: `T=$(mktemp -d); git archive $(git merge-base origin/dev HEAD) ops | tar -x -C $T; AGENT_PROBE_UNDER_TEST=$T/ops/agent-probe.sh PATH=/usr/bin:$PATH pnpm -s vitest run test/agent-probe-week.test.ts -t "keeps a week with failed sessions as a line the gate accepts" > /dev/null 2>&1 && echo gruen || echo rot; rm -rf $T` muss genau `rot` ausgeben.
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
