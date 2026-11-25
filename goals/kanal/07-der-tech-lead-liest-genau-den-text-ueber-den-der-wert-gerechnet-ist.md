@@ -1,7 +1,7 @@
 # Kanal Goal 07: Der Tech Lead liest genau den Text, über den der Wert gerechnet ist
 
 ## Status
-PLANNED
+PAUSED
 
 ## Active Objective
 Seit dem 22.11.2026 gibt der Tech Lead jeden Kommentar in `Conway-Research/automaton` frei, nicht mehr Matthias (`LOOP.md`,
@@ -109,3 +109,4 @@ aus derselben Ausgabe gelesen hat, aus der der Wert stammt.
 ## Progress Log
 
 ## Blockers
+Pause: Kurs-Check 2026-11-25, Detail-Goal am Freigabeweg für Kommentare in Conway-Research/automaton, wo seit dem 11.11.2026 kein neues Issue kommt und Antworten niemanden erreichen (ROADMAP.md, Zeile paket); bringt weder Nutzer noch Käufe
