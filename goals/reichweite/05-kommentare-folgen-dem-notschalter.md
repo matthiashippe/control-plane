@@ -90,7 +90,7 @@ MVP: Funktion, weil ein Betreiber, der über unseren Kommentar kommt, sonst eine
   Timeout, neue Dateien vor dem lokalen `check` stagen. Code, Bezeichner, Testnamen und Ausgaben englisch.
 
 ## Done Condition
-- [ ] `ops/breaker-comments.sh` legt je Wechsel des Notschalters genau ein Issue beim Tech Lead mit dem Trockenlauf der neuen
+- [x] `ops/breaker-comments.sh` legt je Wechsel des Notschalters genau ein Issue beim Tech Lead mit dem Trockenlauf der neuen
       Richtung an, bei gleichem Zustand keins, und speichert den Zustand nur nach Entscheidung 2.
       MVP: Funktion, weil erst dieser Auftrag aus einem Wechsel, den heute nur der Alarmweg sieht, geänderte Kommentare macht.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/breaker-comments.test.ts` muss Exit-Code 0 haben.
@@ -99,17 +99,17 @@ MVP: Funktion, weil ein Betreiber, der über unseren Kommentar kommt, sonst eine
       Prüfung: `grep -cF 'control-plane: card breaker on, comments without card' ops/breaker-comments.sh` muss mindestens `1` ausgeben.
       Prüfung: `grep -cF 'control-plane: card breaker off, comments with card' ops/breaker-comments.sh` muss mindestens `1` ausgeben.
       Prüfung: `cat ops/breaker-comments.sh test/breaker-comments*.ts | grep -ciE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'` muss `0` ausgeben.
-- [ ] Ein Test hält fest, dass `/llms.txt` sagt, was `LEAD` bei offenem und `LEAD_NO_CARD` bei eingeschaltetem Notschalter versprechen.
+- [x] Ein Test hält fest, dass `/llms.txt` sagt, was `LEAD` bei offenem und `LEAD_NO_CARD` bei eingeschaltetem Notschalter versprechen.
       MVP: Funktion, weil `LEAD` auf `/llms.txt` als Beleg verlinkt und ein späterer Umbau dort sonst 26 Kommentare still falsch macht.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/llms-txt-lead.test.ts` muss Exit-Code 0 haben.
       Prüfung: `for t in "llms.txt carries every promise of LEAD while the card breaker is off" "llms.txt drops the card exactly as LEAD_NO_CARD does while the card breaker is on"; do grep -qF "\"$t\"" test/llms-txt-lead.test.ts || echo "fehlt: $t"; done` muss nichts ausgeben.
       Prüfung: `grep -c 'ops/relink_rules.py' test/llms-txt-lead.test.ts` muss mindestens `1` ausgeben.
       Prüfung: `grep -ciE '^- [0-9-]+ Zyklus [0-9]+: .*rot gesehen' goals/reichweite/05-kommentare-folgen-dem-notschalter.md` muss mindestens `1` ausgeben.
-- [ ] `ops/README.md` beschreibt Werkzeug, Zustand, Ausgabe und die Routine aus Entscheidung 1.
+- [x] `ops/README.md` beschreibt Werkzeug, Zustand, Ausgabe und die Routine aus Entscheidung 1.
       MVP: Funktion, weil die Routine und der Tech Lead den Ablauf nur aus dieser Stelle kennen.
       Prüfung: `grep -cxF '### Card breaker and comments' ops/README.md` muss `1` ausgeben.
       Prüfung: `awk '/^### Card breaker and comments$/{f=1;next} /^#+ /{f=0} f' ops/README.md | grep -cE 'breaker-comments\.sh|card-breaker-comments|control-plane: Notschalter und Kommentare|ok name'` muss mindestens `4` ausgeben.
-- [ ] Die Entscheidungen stehen in `goals/reichweite/ANNAHMEN.md`, der Diff bleibt in den Pfaden dieses Goals, kein Test fällt weg,
+- [x] Die Entscheidungen stehen in `goals/reichweite/ANNAHMEN.md`, der Diff bleibt in den Pfaden dieses Goals, kein Test fällt weg,
       kein neues Paket, und nichts im Repo nennt einen Schlüssel, eine Adresse oder einen Namen eines Kunden.
       MVP: Funktion, weil ein späteres Goal wissen muss, wer die Kommentare beim Wechsel umstellt und warum.
       Prüfung: `grep -cE '^- [0-9-]+, reichweite 05: ' goals/reichweite/ANNAHMEN.md` muss mindestens `7` ausgeben.
@@ -117,10 +117,10 @@ MVP: Funktion, weil ein Betreiber, der über unseren Kommentar kommt, sonst eine
       Prüfung: `git diff --name-only origin/dev...HEAD -- src docs package.json pnpm-lock.yaml ops/relink-comments.py ops/relink_rules.py ops/named-comments.log ops/relinked-comments.log ops/card-breaker.sh ops/watchdog.sh ops/status.sh test/relink-sandbox.ts test/fixtures/relink | wc -l` muss `0` ausgeben.
       Prüfung: `git diff --diff-filter=D --name-only $(git merge-base origin/dev HEAD) HEAD -- test | wc -l` muss `0` ausgeben.
       Prüfung: `cat ops/breaker-comments.sh test/breaker-comments*.ts test/llms-txt-lead.test.ts goals/reichweite/ANNAHMEN.md | grep -cE '0x[0-9a-fA-F]{40}|[0-9a-fA-F]{64}|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[a-z]{2,}'` muss `0` ausgeben.
-- [ ] Auf dem code-host liest das Werkzeug Notschalter und Paperclip und meldet, ohne etwas anzulegen oder zu speichern.
+- [x] Auf dem code-host liest das Werkzeug Notschalter und Paperclip und meldet, ohne etwas anzulegen oder zu speichern.
       MVP: Funktion, weil der Takt der Routine nur trägt, wenn Zugang über ssh und Paperclip-Run dort wirklich reichen.
       Prüfung (Netz): `set -a; . ~/.config/control-plane/loop.env; set +a; bash ops/breaker-comments.sh --dry-run | tail -n 1` muss eine Zeile `breaker <on|off>, last <on|off|none>, no change`, `… comments already match` oder `… would create issue` ausgeben.
-- [ ] `check` ist grün.
+- [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
 - [ ] goal-verifier PASS (K und B)
 
@@ -155,5 +155,6 @@ MVP: Funktion, weil ein Betreiber, der über unseren Kommentar kommt, sonst eine
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-25 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6 gebaut (`ops/breaker-comments.sh`, `test/breaker-comments.test.ts` mit `test/breaker-comments-sandbox.ts` und erfundenen Kommentaren unter `test/fixtures/breaker-comments/`, `test/llms-txt-lead.test.ts`, Abschnitt „Card breaker and comments“ in `ops/README.md`, 10 Zeilen in `goals/reichweite/ANNAHMEN.md`). Rot gesehen: `test/breaker-comments.test.ts` ohne `ops/breaker-comments.sh` (11 failed), dazu sieben Mutationen des Werkzeugs (POST-Fehler ignoriert, keine Suche nach offenem Titel, Zustand bei `--dry-run` geschrieben, fehlende Datei nicht als `off`, falsche Richtung des Trockenlaufs, Zustand bei `comments already match` nicht gespeichert, Schlüssel als `-H` in argv) mit 2, 2, 1, 2, 8, 1 und 7 failed; `test/llms-txt-lead.test.ts` gegen eine Kopie von `src/app.ts` mit `cardOpenNow` immer wahr (Fall „on“ failed) und immer falsch (Fall „off“ failed), `src/app.ts` danach unverändert. Prüfbefehle: siehe Zeile darunter.
 
 ## Blockers
