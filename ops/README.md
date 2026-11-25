@@ -1202,4 +1202,6 @@ lists. The private IPv6 ranges `::`, `::1`, `fe80::/10` and `fc00::/7` never cou
 address, and a clock time like `05:57:46` is no address.
 The output is one line `<id> <n>` or `<id> no-log` per run and a last line `total <n>` (distinct over all runs). It never prints
 an address, not on stdout and not on stderr. If `gh` fails while listing or on a log for another reason than a missing one
-(404 or 410), it exits 2 without a `total` line, so a network error is never read as zero. `CP_REPO` picks another repository.
+(404 or 410), it exits 2 without a `total` line, so a network error is never read as zero. A log download that fails without an
+HTTP status (connection reset, timeout) or with a 5xx is tried up to three times first (pause `CP_GH_RETRY_PAUSE`, default 5 s),
+so one dropped download among hundreds of runs does not abort the count. `CP_REPO` picks another repository.

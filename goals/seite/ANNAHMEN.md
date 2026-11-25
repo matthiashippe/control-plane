@@ -66,7 +66,7 @@
 ## Abgelöst durch umzug 02 (Maker, 2026-11-17)
 
 - Abgelöst: seite 01 Punkt 4 durch umzug 02 Punkt 2, Ausgabe dann genau `Exit 1, keine abnahme nach 2026-11-17T16:39:12+00:00` (Tech Lead, 2026-11-17)
-- Abgelöst: seite 02 Punkt 2 durch umzug 02 Punkt 3, Ausgabe dann genau `Exit 0, sed-miss | exit=1` (Tech Lead, 2026-11-17)
+- Abgelöst: seite 02 Punkt 2 durch umzug 02 Punkt 3, Ausgabe dann genau `Exit 0, sed-miss | unknown argument: --pruefen | exit=1` (Tech Lead, 2026-11-17)
 - Entscheidung (Tech Lead, 2026-11-18, PRO-25126): umzug 02 hat „Keep your automaton running.“ mit a78dce5 in „Your automaton runs here.“ geändert, die Gegenprobe aus seite 02 Punkt 2 meldet deshalb `sed-miss`, danach `unknown argument: --pruefen` und als letzte Zeile `exit=1`; die Ablösung durch seite 03 Punkt 1 oben deckt nur den ersten Befehl. Ablöser ist umzug 02 Punkt 3, weil er dieselbe Startseite live gegen die neuen Bilder prüft (`0 defects`); dieselbe Gegenprobe mit dem neuen Satz und `--check` meldet `2 defects` und `exit=1` (gemessen 2026-11-18 ohne Netz unter Node 22), die Schranke hält also. Die Zeile oben trägt das Datum 2026-11-17, weil umzug 02 Punkt 9 jede Zeile „durch umzug 02“ mit diesem Datum verlangt.
 
 ## Abgelöst durch umzug 03 (Maker, 2026-11-18)
@@ -87,3 +87,7 @@
 
 - Entscheidung (Tech Lead, 2026-11-23, PRO-28328): Die Zeile `- Abgelöst:` zu seite 01 Punkt 3 gilt nur für den ersten Prüfbefehl (`quelle ok`), der am Kopf von PRO-28328 genau `Exit 1, [ 'umzug', 'inhalt umzug' ]` auf stderr gibt. Der zweite (`bausteine ok neu=<n>`) ist nicht abgelöst und gibt `bausteine ok neu=0`, also seine eigene Erwartung; er ist GRÜN und braucht keine neue Ausgabe, weil seite 03 Punkt 2 nur den Block umbenannt hat und keine Klasse.
 - Entscheidung (Tech Lead, 2026-11-23, PRO-28328): Für die Zeilen `- Abgelöst:` hier gilt dieselbe Ausgabe wie in `goals/konto/ANNAHMEN.md` (Abschnitt Reparatur PRO-28328): Exit-Code und stdout samt stderr, bei einer ungefangenen Ausnahme von Node nur die Zeile `Error: …`, und die Fortschrittszeilen der Live-Werkzeuge auf stderr (`^soll-live(-[a-z]+)?: `) zählen nicht.
+
+## Tech Lead, Reparatur PRO-30060 (2026-11-25)
+
+- Entscheidung (Tech Lead, 2026-11-25, PRO-30060): Die Ablösung von seite 02 Punkt 2 durch umzug 02 Punkt 3 trägt jetzt auch `unknown argument: --pruefen`, weil seit der Entscheidung PRO-28328 (`goals/konto/ANNAHMEN.md`) stdout und stderr zusammen zählen und nur die Zeilen `soll-live…` auf stderr herausfallen; die Fassung vom 2026-11-19 nannte nur stdout. Gemessen auf origin/dev 925b662 ohne Netz unter Node 22: stdout `sed-miss` und `exit=1`, stderr `soll-live: / rendered, …` und `unknown argument: --pruefen`, Exit 0. Ablöser und Datum bleiben.
