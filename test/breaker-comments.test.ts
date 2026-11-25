@@ -18,7 +18,8 @@ import {
  * ops/breaker-comments.sh turns every change of the card breaker into exactly one issue for the Tech Lead with the dry run of the
  * new direction (goals/reichweite/05): on means our comments have to drop the card (`--name --no-card`), off means they get it
  * back (`--name`). The state is stored only after the issue exists, after an open issue with the same title was found, or when
- * the comments already match, so a failed run comes again. Every run happens in the sandbox of test/breaker-comments-sandbox.ts:
+ * the comments already match, so a failed run comes again. Without a change it still compares the comments with the breaker
+ * (critique of the Tech Lead, point 7): an issue that was closed without a full send is created again. Every run happens in the sandbox of test/breaker-comments-sandbox.ts:
  * fake ssh, gh and curl, no network, no port, the state in a mktemp folder.
  */
 const T = 120_000;
@@ -63,9 +64,9 @@ describe("ops/breaker-comments.sh", () => {
     // The breaker is asked read-only over ssh, the way ops/card-breaker.sh does it.
     expect(r.ssh).toHaveLength(1);
     expect(r.ssh[0].args.join(" ")).toContain("bash -s -- --container");
-    // The next run with the same breaker finds the stored state.
+    // The next run with the same breaker finds the stored state and the open issue, and creates no second one.
     const again = await s.run([], { FAKE_BREAKER: BREAKER_ON });
-    expect(again.last).toBe("breaker on, last on, no change");
+    expect(again.last).toBe("breaker on, last on, issue PRO-100 already open");
     expect(again.posts).toEqual([]);
   }, T);
 
@@ -89,17 +90,16 @@ describe("ops/breaker-comments.sh", () => {
 
   it("the same state creates no issue", async () => {
     for (const [stored, breaker, lead] of [
-      ["on", BREAKER_ON, LEAD],
-      ["off", BREAKER_OFF, LEAD_NO_CARD],
+      ["on", BREAKER_ON, LEAD_NO_CARD],
+      ["off", BREAKER_OFF, LEAD],
     ] as const) {
-      // The comments do not match on purpose: without a change of the breaker the tool does not even look.
+      // The comments match the breaker: the dry run of its direction finds nothing to change.
       const s = sandbox(lead, { stored });
       const r = await s.run([], { FAKE_BREAKER: breaker });
       expect(r.status).toBe(0);
       expect(r.last).toBe(`breaker ${stored}, last ${stored}, no change`);
       expect(r.posts).toEqual([]);
-      expect(r.curl).toEqual([]);
-      expect(r.gh).toEqual([]);
+      expect(getsAndPosts(r).every((m) => m === "GET")).toBe(true);
       expect(r.state).toBe(`${stored}\n`);
     }
   }, T);
@@ -201,6 +201,75 @@ describe("ops/breaker-comments.sh", () => {
     expect(r.last).toBe("breaker on, last off, paperclip unreadable");
     expect(r.posts).toEqual([]);
     expect(r.state).toBe("off\n");
+    // A list of exactly 500 open issues may be cut by Paperclip, so the open issue may be missing: unreadable, not a second issue.
+    const full = sandbox(LEAD, {
+      stored: "on",
+      issues: Array.from({ length: 500 }, (_, n) => ({ title: `other ${n}`, status: "todo", projectId: PROJECT, identifier: `PRO-${n + 1}` })),
+    });
+    const r2 = await full.run([], { FAKE_BREAKER: BREAKER_ON });
+    expect(r2.status).toBe(2);
+    expect(r2.last).toBe("breaker on, last on, paperclip unreadable");
+    expect(r2.posts).toEqual([]);
+    expect(r2.state).toBe("on\n");
+  }, T);
+
+  it("the same state with comments that do not match and no open issue creates the issue", async () => {
+    for (const [stored, breaker, lead, title, dry] of [
+      ["on", BREAKER_ON, LEAD, TITLE_ON, "`python3 -I ops/relink-comments.py --name --no-card`"],
+      ["off", BREAKER_OFF, LEAD_NO_CARD, TITLE_OFF, "`python3 -I ops/relink-comments.py --name`"],
+    ] as const) {
+      // A finished or cancelled issue of the direction and an open one of the other direction do not hold it back.
+      const other = stored === "on" ? TITLE_OFF : TITLE_ON;
+      const s = sandbox(lead, {
+        stored,
+        issues: [
+          { title, status: "done", projectId: PROJECT, identifier: "PRO-1" },
+          { title, status: "cancelled", projectId: PROJECT, identifier: "PRO-2" },
+          { title: other, status: "todo", projectId: PROJECT, identifier: "PRO-3" },
+        ],
+      });
+      const preview = await s.run(["--dry-run"], { FAKE_BREAKER: breaker });
+      expect(preview.status).toBe(0);
+      expect(preview.last).toBe(`breaker ${stored}, last ${stored}, would create issue`);
+      expect(preview.posts).toEqual([]);
+      const r = await s.run([], { FAKE_BREAKER: breaker });
+      expect(r.status).toBe(0);
+      expect(r.last).toBe(`breaker ${stored}, last ${stored}, issue PRO-103`);
+      expect(r.posts).toHaveLength(1);
+      expect(r.posts[0].title).toBe(title);
+      expect(r.posts[0].assigneeAgentId).toBe(TECH_LEAD);
+      expect(r.posts[0].description).toContain(dry);
+      expect(r.posts[0].description).toContain(`\`${breaker}\``);
+      expect(r.state).toBe(`${stored}\n`);
+    }
+    // The case of the critique: the issue of a change is closed without a full send, the next run asks again.
+    const s = sandbox(LEAD, { stored: "off" });
+    expect((await s.run([], { FAKE_BREAKER: BREAKER_ON })).last).toBe("breaker on, last off, issue PRO-100");
+    s.setIssueStatus("PRO-100", "done");
+    const again = await s.run([], { FAKE_BREAKER: BREAKER_ON });
+    expect(again.last).toBe("breaker on, last on, issue PRO-101");
+    expect(again.posts.map((i) => i.title)).toEqual([TITLE_ON]);
+    // Once the approved texts are sent, the same breaker leaves it at that.
+    s.setIssueStatus("PRO-101", "done");
+    s.setLead(LEAD_NO_CARD);
+    const sent = await s.run([], { FAKE_BREAKER: BREAKER_ON });
+    expect(sent.last).toBe("breaker on, last on, no change");
+    expect(sent.posts).toEqual([]);
+  }, T);
+
+  it("the same state with an open issue of its direction runs no dry run", async () => {
+    for (const status of ["todo", "in_progress", "in_review", "blocked"]) {
+      const s = sandbox(LEAD, { stored: "on", issues: [{ title: TITLE_ON, status, projectId: PROJECT, identifier: "PRO-7" }] });
+      for (const args of [[], ["--dry-run"]]) {
+        const r = await s.run(args, { FAKE_BREAKER: BREAKER_ON });
+        expect(r.status).toBe(0);
+        expect(r.last).toBe("breaker on, last on, issue PRO-7 already open");
+        expect(r.gh).toEqual([]);
+        expect(getsAndPosts(r).every((m) => m === "GET")).toBe(true);
+        expect(r.posts).toEqual([]);
+        expect(r.state).toBe("on\n");
+      }
+    }
   }, T);
 
   it("the dry-run flag creates no issue and writes no state", async () => {

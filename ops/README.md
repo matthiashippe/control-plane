@@ -203,14 +203,19 @@ environment of its call of `ops/status.sh`, never exported and never as an argum
 Our comments in Conway-Research/automaton open with `LEAD` from `ops/relink_rules.py`, which promises the card (goals/reichweite/04).
 While the card breaker is on, `/llms.txt` drops the card line, so the comments have to say `LEAD_NO_CARD` instead, and `LEAD` again
 once it is off. The watchdog above only posts the change to the alarm path; `ops/breaker-comments.sh` (goals/reichweite/05) turns
-it into work: one issue for the Tech Lead in the Paperclip project Control Plane per change, with the dry run of the new direction.
+it into work: one issue for the Tech Lead in the Paperclip project Control Plane per change, with the dry run of the new direction,
+and again whenever the comments still do not match the breaker and no issue of its direction is open.
 
 - Tool: `bash ops/breaker-comments.sh` on the code-host in a checkout of `dev`, with the variables of
   `~/.config/control-plane/loop.env` and `PAPERCLIP_API_URL`, `PAPERCLIP_API_KEY` and `PAPERCLIP_COMPANY_ID` of the Paperclip run.
   It reads the breaker with `ops/card-breaker.sh` (read-only over ssh) and compares it with the stored state. On a change it runs
   the dry run `python3 -I ops/relink-comments.py --name --no-card` (breaker on) or `python3 -I ops/relink-comments.py --name`
   (breaker off), never with `--send`. With nothing to change it only stores the state. Otherwise it looks for an open issue
-  (`todo`, `in_progress`, `in_review`, `blocked`) with the same title in the project and creates one only if there is none: title
+  (`todo`, `in_progress`, `in_review`, `blocked`) with the same title in the project and creates one only if there is none.
+  Without a change it looks for that open issue first and stops there if it finds one; otherwise it runs the same dry run, so an
+  issue that was closed without a full send (approval refused, a partial `--send`, a `--verify` with a difference) comes again in
+  the next run, and comments that match end in `no change`. A list of exactly 500 open issues may be cut by Paperclip and counts as
+  unreadable rather than risk a second issue. The issue: title
   `control-plane: card breaker on, comments without card` or `control-plane: card breaker off, comments with card`, assignee by
   the urlKey `tech-lead`, status `todo`, in the description the breaker line, the dry run unchanged in a code block and the steps.
   No id of a project, an agent or the company is in the repo; the key goes to curl on stdin, never into an argument or the output.
@@ -221,7 +226,8 @@ it into work: one issue for the Tech Lead in the Paperclip project Control Plane
   missing file counts as `off` (the comments were sent while the breaker was off) and shows as `last none`. It is written only after
   a POST answered 2xx, after an open issue with the same title was found, or when the dry run has nothing to change, so a failed
   run creates the issue in the next one.
-- Output, the last line: `breaker <on|off>, last <on|off|none>, no change`, `… comments already match`, `… issue <PRO-n>`,
+- Output, the last line: `breaker <on|off>, last <on|off|none>, no change` (same state, comments match), `… comments already
+  match` (a change, comments match already), `… issue <PRO-n>`,
   `… issue <PRO-n> already open`, with `--dry-run` `… would create issue` (no POST, no state written; `--dry-run` reads Paperclip
   even without a change, so it proves the way of the routine). Exit 0 then; exit 2 with a line ending in `unreadable` when the
   breaker, GitHub or Paperclip cannot be read or the POST fails; exit 1 on an unknown argument before anything is asked.

@@ -208,5 +208,13 @@ export function sandbox(lead: string, opts: { stored?: string | null; issues?: I
   const setLead = (next: string) => {
     for (const c of FIXTURE.comments) s.setBody(c.id, `${next}\n\n${c.text}`);
   };
-  return { root: s.root, stateDir, stateFile, run, setLead };
+  /** Sets the status of an issue in the fake Paperclip, e.g. done or cancelled without a full send. */
+  const setIssueStatus = (identifier: string, status: string) => {
+    const state = JSON.parse(readFileSync(pcState, "utf8")) as { issues: Issue[] };
+    const issue = state.issues.find((i) => i.identifier === identifier);
+    if (!issue) throw new Error(`no issue ${identifier} in the sandbox`);
+    issue.status = status;
+    writeFileSync(pcState, JSON.stringify(state));
+  };
+  return { root: s.root, stateDir, stateFile, run, setLead, setIssueStatus };
 }
