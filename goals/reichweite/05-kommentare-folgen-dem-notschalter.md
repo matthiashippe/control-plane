@@ -89,6 +89,9 @@ MVP: Funktion, weil ein Betreiber, der über unseren Kommentar kommt, sonst eine
   Regeln aus Entscheidung 2. Der Test „the same state creates no issue“ behält seinen Namen und prüft künftig passende Kommentare;
   seine Zeile, dass GitHub nicht gefragt wird, fällt weg. Eine Zeile `- 2026-11-25, reichweite 05: Kritik (Tech Lead): …` in
   `goals/reichweite/ANNAHMEN.md`, `ops/README.md` nachziehen. Kosten: ein lesender Trockenlauf gegen GitHub alle 6 Stunden.
+  Nebenbei, kein Done-Punkt: Der Kopfkommentar „so he only has to approve it“ wird „so the Tech Lead only has to approve it“.
+  Die Suche nach dem offenen Issue trägt `status=`; ohne den Filter liefert Paperclip im Projekt genau 500 Einträge (gedeckelt),
+  mit ihm 5 (25.11.2026). Bei genau 500 Einträgen ist `paperclip unreadable` sicherer als ein zweites Issue.
 - **Reihenfolge.** Tests zuerst gegen `dev` rot sehen (Werkzeug fehlt) und den Test zu `/llms.txt` gegen eine Kopie der App mit
   `cardOpen` immer wahr rot sehen, dann bauen, alle Prüfungen ohne Netz, `check`, Push. Danach einmal `--dry-run` mit Netz auf dem
   code-host (Punkt 5). Gesendet wird in diesem Goal nichts, kein Kommentar auf GitHub ändert sich.
