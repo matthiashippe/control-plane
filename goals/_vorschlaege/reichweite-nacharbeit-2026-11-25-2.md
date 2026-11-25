@@ -6,3 +6,5 @@ Empfehlung: Die Fälle von `--name` und `--name --no-card` in eine eigene Datei 
 MVP: Schönheit
 
 Linse Q, Frage 6.
+
+Übernommen: Watch List in STATE.md (2026-11-25)

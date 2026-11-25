@@ -6,3 +6,5 @@ Empfehlung: `node(chainIdHex)` mit dem Zweig `default` samt Code -32601 nach `te
 MVP: Schönheit
 
 Linse Q, Frage 2. Die drei Kopien weichen schon jetzt im Zweig `default` ab: Nur die neue antwortet wie ein Knoten ohne die Methode, die anderen werfen einen Fehler ohne Code, auf den viem anders reagieren kann.
+
+Übernommen: Watch List in STATE.md (2026-11-25)

@@ -6,3 +6,5 @@ Empfehlung: Die Fälle von `--week` (neuer Block `describe("ops/agent-probe.sh -
 MVP: Schönheit
 
 Linse Q, Frage 6. `ops/traffic.sh` (1570 auf 1586) und `ops/README.md` lagen schon vor dem Goal über 500 Zeilen und zählen hier nicht.
+
+Übernommen: Watch List in STATE.md (2026-11-25)

@@ -6,3 +6,5 @@ Empfehlung: Eine Funktion `cardClosedFor(db, address, now)` in `src/payments/car
 MVP: Funktion, weil ein dritter Grund zum Sperren sonst nur an einer Stelle landet und eine Zahlung über den direkten Link wieder Credits bucht, die der Notschalter halten soll.
 
 Linse Q, Frage 2. Genau diese Lücke zwischen Weiterleitung und IPN hatte wache-kritik-2026-11-23-1 beschrieben.
+
+Übernommen: Watch List in STATE.md (2026-11-25)

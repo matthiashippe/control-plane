@@ -6,3 +6,5 @@ Empfehlung: Ein `dry_run(planner)` mit dem Planer als Argument, wie `send` ihn s
 MVP: Schönheit
 
 Linse Q, Frage 2. Ein vierter Modus müsste sonst Schleife, Ausgabe und Prüfung ein viertes Mal kopieren.
+
+Übernommen: Watch List in STATE.md (2026-11-25)

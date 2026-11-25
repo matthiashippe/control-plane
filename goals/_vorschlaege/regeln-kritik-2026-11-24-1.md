@@ -6,3 +6,5 @@ Empfehlung: Ein Goal prüft auf 8453 nach dem Präfix die ABI-kodierten Argument
 MVP: Funktion, weil der Gas-Schlüssel dann nur Weiterleitungen anlegt, die er selbst bedienen kann und die nur USDC über den Manager bewegen.
 
 Kritik Tech Lead an regeln 01 (PR #430). Nicht als Done-Punkt, weil die Ausnahme Hauptnetz das Anlegen nur über Salt und Bytecode beschreibt und das Goal genau das verlangt; der eine Done-Punkt dieser Kritik deckt den Weg ab, der Geld bewegt.
+
+Übernommen: Tech Lead, PRO-29721 Glied 3 (2026-11-25)
