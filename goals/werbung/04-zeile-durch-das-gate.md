@@ -1,7 +1,7 @@
 # Werbung Goal 04: Die Zeile der Woche kommt durch das Gate
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Seit code-host 4e741a19 (PRO-29405) committet der Richtungs-Check die Agenten-Probe der Woche in seinem Pflege-PR kurs. Das Gate
@@ -142,7 +142,7 @@ MVP: Funktion, weil ohne die Zeile im Repo keine Woche mit der vorigen vergliche
       Prüfung: `grep -cF '"keeps a week with failed sessions as a line the gate accepts"' test/agent-probe-week.test.ts` muss genau 1 ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/agent-probe-week.test.ts -t "keeps a week with failed sessions as a line the gate accepts"` muss Exit-Code 0 haben.
       Prüfung: `T=$(mktemp -d); git archive $(git merge-base origin/dev HEAD) ops | tar -x -C $T; AGENT_PROBE_UNDER_TEST=$T/ops/agent-probe.sh PATH=/usr/bin:$PATH pnpm -s vitest run test/agent-probe-week.test.ts -t "keeps a week with failed sessions as a line the gate accepts" > /dev/null 2>&1 && echo gruen || echo rot; rm -rf $T` muss genau `rot` ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Die Zeile jeder Woche und ihre Antwortdatei kommen mit dem Pflege-PR des Richtungs-Checks durch das Gate.
@@ -181,5 +181,6 @@ MVP: Funktion, weil ohne die Zeile im Repo keine Woche mit der vorigen vergliche
 - 2026-11-25 Zyklus 2: Abschluss gemeldet, Punkte 1 bis 7; `dev` ohne neuen Commit seit der Merge-Basis, kein Merge nötig, alle 21 Prüfbefehle am Kopf 1098b68 erneut gefahren. Prüfbefehle: P1 `exit=0 growth ok 1`, `exit=0 growth ok 3 kept 3`, `exit=0 prefix 1`; P2 `exit=0 still kept host 2/5 card 1/5 seen 0/5 old 1/5 failed 0/5 via recount`, `exit=1 0 still kept 1`; P3 nichts fehlt, `1`, `1`, `13`, vitest Exit 0 (6 Tests), `rot`; P4 `pr ok`, `6`; P5 vitest Exit 0 (30 Tests), `SELFTEST OK`, `exit=0 host 3/5 card 2/5 seen 1/5 old 0/5 failed 0/5`, `unveraendert`; P6 `0`, `0`, `0`, `0`; P7 check grün in 155 s (280 Dateien, 2880 Tests).
 - 2026-11-25 Zyklus 3: Kritik 1 gebaut: `### Weekly run` trennt Exit 1 nach ausgefallenen Sessions (Zeile `failed <n>/5` und neue Antwortdatei gehen in den PR) von `cannot recount <YYYY-Www>` (keine Zeile), der Satz „When `--week` ends with exit 1, no line goes into the PR“ ist ersetzt; neuer Fall `keeps a week with failed sessions as a line the gate accepts` an einer Datei ohne Zeilenende am Schluss, rot gegen das Skript der Merge-Basis (die Zeile klebt an der letzten, `test/agent-probe-week.test.ts:313`); das Skript bleibt unverändert, eine Annahme dazu. Prüfbefehle: P1 bis P6 wie in Zyklus 2 (P3 `14` statt `13`, vitest 7 Tests), P4 `pr ok`, `7`; P7 check grün in 237 s (2881 Tests); P8 `exit ok`, `1`, vitest Exit 0, `rot`.
 - 2026-11-25 Zyklus 4: Abschluss gemeldet, Punkte 1 bis 8; `dev` ohne neuen Commit seit der Merge-Basis, alle 25 Prüfbefehle und `check` am Stand von 1d4dc5a gefahren. Prüfbefehle: alle wie erwartet (P1 bis P6 wie in Zyklus 2 mit P3 `14` und vitest 7 Tests, P4 `pr ok`, `7`; P7 check grün in 237 s, 2881 Tests; P8 `exit ok`, `1`, vitest Exit 0, `rot`).
+- 2026-11-25 Release: PASS K und B (Zyklus 4), DONE.
 
 ## Blockers
