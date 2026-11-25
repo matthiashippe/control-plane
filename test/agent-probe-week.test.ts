@@ -172,7 +172,7 @@ describe("ops/agent-probe.sh --week through the loop gate", () => {
   it("writes only lines that the loop gate accepts as PROBE_LINE", () => {
     // The copy of the rule turns red, so a green result below means something.
     expect(gateAcceptsProbeLog("a\nb\n", "a\nb- 2026-W47 x\n")).not.toEqual([]);
-    expect(gateAcceptsProbeLog("a\n", "a\n- 2026-W47 2026-11-18T11:06:40Z model x — via sessions\n")).not.toEqual([]);
+    expect(gateAcceptsProbeLog("a\n", `a\n- 2026-W47 2026-11-18T11:06:40Z model x ${String.fromCharCode(8212)} via sessions\n`)).not.toEqual([]);
     expect(gateAcceptsProbeLog("a\n", "a\nfree text\n")).not.toEqual([]);
 
     const cases: Run[] = [];
