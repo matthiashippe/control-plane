@@ -1,7 +1,7 @@
 # Betrieb Goal 07: Die Nachmessung der Aufladung nach 14 Tagen
 
 ## Status
-PLANNED
+PAUSED
 
 ## Active Objective
 Belegt ist, ob die automatische Aufladung aus betrieb 01 das Guthaben beim Inferenz-Anbieter in den 14 Tagen nach dem Einschalten
@@ -110,3 +110,4 @@ ob die Aufladung das verhindert.
 ## Progress Log
 
 ## Blockers
+Pause: Das feste Fenster bis 26.11. kann die Aufladung nicht belegen, weil der Rest (30,86 USD am 20.11. bei 1 USD am Tag) nie unter die Schwelle von 16 USD fällt; zurück auf PLANNED mit neuem Fenster, sobald der Watchdog einen Rest unter 20 USD meldet (Loop-Kritik 2026-11-25)
