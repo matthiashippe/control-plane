@@ -779,6 +779,31 @@ touching it (`via recount`). The raw JSON of each session and the line stay on t
 `~/.local/state/control-plane/agent-probe/<YYYY-Www>/` (mode 700, `CP_PROBE_STATE_DIR` in tests), because a
 raw answer can carry an old host or an address; only the scrubbed answers go into the repository.
 
+Since werbung 04 every line of `--week` goes on its own line after the last one: a file that does not end in
+a line break gets exactly one first, an empty file none, and no existing line, blank line or answers file
+changes, also when it carries several weeks from the state directory. An answers file of the current week
+without any line of that week is counted again from that file, without a session and without touching it
+(`via recount`, time from its line `Run <UTC>, ...`, model the most frequent `Model:`). An answers file
+without exactly the sections `## q1` to `## q5` stops the run with exit 1, no line and no session, and the
+message `cannot recount <YYYY-Www>: answers file has <n> of 5 questions` on stderr.
+
+What the direction check puts into its PR: on its branch `loop/kurs/<YYYY-MM-DD-HHMM>-richtung` it commits the
+line that `bash ops/agent-probe.sh --week` appended to `docs/kunden/agenten-probe.md` and the new file
+`docs/kunden/agenten-probe/<YYYY-Www>.md`, and nothing else under `docs/kunden/`. Its analysis
+`docs/richtung/<YYYY-MM-DD>.md` quotes the line of the week word for word. The block of
+`bash ops/traffic.sh --agents 168` goes only into the analysis, never into `docs/kunden/agenten-probe.md`,
+because the gate accepts there only lines appended in the format of `--week` and refuses a changed line or a
+changed answers file.
+
+`--week` ends with exit 1 in two ways, and only one of them keeps the line out of the PR. When sessions failed
+(stderr `<n> of 5 sessions failed; they count as failed, not as answers without us`), or a recount found
+failed answers, `--week` has already appended the line with `failed <n>/5` and marked the week as asked in
+the state directory, and a run with sessions has written its answers file: the line it printed and a new
+answers file go into the PR like every week, because the gate accepts them and a later run would only carry the same line over from the state
+directory a week late, or never when that run sees another state directory. Only a run that prints
+`cannot recount <YYYY-Www>: answers file has <n> of 5 questions` has written nothing: then no line goes into
+the PR, and the analysis quotes that output instead.
+
 `bash ops/traffic.sh --agents 168` prints only the block `-- Agent fetches --` and the blank line after it,
 from the same log and window and counted the same way as in the full report, without the header and the
 sections that print addresses. The full report took over ten minutes on the production log for that block.

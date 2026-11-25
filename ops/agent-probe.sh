@@ -49,6 +49,11 @@
 # lifts that. Every --week first carries each week of the state directory up to the current one that the file
 # lacks, in ascending order, with its scrubbed answers (answers.md) where the answers file is missing, so a run
 # made in another worktree still reaches the repository.
+# Every line of --week goes on its own line after the last one, also when the file lacks a final line break, and
+# no existing line or answers file changes, because the gate of a Richtungs-Check accepts nothing else (werbung 04).
+# An answers file of the current week without any line of that week is counted again from that file, without a
+# session and without touching it ("via recount"); one without exactly the sections q1 to q5 stops the run with
+# exit 1 and no line.
 #
 # Switches for tests and the selftest, so nothing writes into the repository:
 #   CP_PROBE_CLAUDE        command in place of claude (ops/fixtures/agent-probe-claude.sh)
@@ -209,6 +214,41 @@ week_recount() {
     }'
 }
 
+# Append one line to the file of runs on a line of its own after the last one (werbung 04, decision 1): a file
+# that does not end in a line break gets exactly one first, an empty or missing file gets none, and nothing
+# that is already there changes.
+append_run_line() { # line
+  mkdir -p "$(dirname "$OUT")" || return 1
+  if [[ -s "$OUT" && -n "$(tail -c 1 "$OUT")" ]]; then printf '\n' >> "$OUT"; fi
+  printf '%s\n' "$1" >> "$OUT"
+}
+
+# Count the answers file of the current week again, without a session and without touching it, and append its
+# line with "via recount" (werbung 03, decision 5; werbung 04, decisions 2 and 3). An answers file without exactly
+# the sections q1 to q5 in this order stops the run with exit 1 and writes nothing.
+recount_week() { # UTC time of the run, model
+  local file="$ANSWERS_DIR/$week.md" heads n line h c s o
+  heads="$(grep -E '^## q[1-5][[:blank:]]*$' "$file" | tr -d '[:blank:]' | paste -sd' ')"
+  n="$(grep -cE '^## q[1-5][[:blank:]]*$' "$file")"
+  if [[ "$heads" != "##q1 ##q2 ##q3 ##q4 ##q5" ]]; then
+    echo "cannot recount $week: answers file has $n of 5 questions" >&2
+    exit 1
+  fi
+  host=0 card=0 seen=0 old=0 failed=0
+  while read -r h c s o; do
+    if [[ "$h" == failed ]]; then failed=$((failed + 1)); continue; fi
+    host=$((host + h)); card=$((card + c)); seen=$((seen + s)); old=$((old + o))
+  done < <(week_recount < "$file")
+  line="- $week $1 model ${2:-unknown} host $host/5 card $card/5 seen $seen/5 old $old/5 failed $failed/5 answers docs/kunden/agenten-probe/$week.md via recount"
+  mkdir -p -m 700 "$STATE_ROOT" "$STATE" && chmod 700 "$STATE_ROOT" "$STATE"
+  printf '%s\n' "$line" > "$STATE/line"
+  cp "$file" "$STATE/answers.md" && chmod 600 "$STATE/answers.md"
+  append_run_line "$line"
+  echo "$line"
+  (( failed > 0 )) && exit 1
+  exit 0
+}
+
 if [[ "${1:-}" == "--canary" ]]; then
   tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
   ask "$CANARY_QUESTION" "$tmp/c.json"; rc=$?
@@ -349,8 +389,7 @@ if (( WEEK )); then
       if [[ -s "$STATE_ROOT/$w/answers.md" && ! -f "$ANSWERS_DIR/$w.md" ]]; then
         mkdir -p "$ANSWERS_DIR" && cp "$STATE_ROOT/$w/answers.md" "$ANSWERS_DIR/$w.md"
       fi
-      mkdir -p "$(dirname "$OUT")"
-      tail -n 1 "$STATE_ROOT/$w/line" >> "$OUT"
+      append_run_line "$(tail -n 1 "$STATE_ROOT/$w/line")"
     done < <(find "$STATE_ROOT" -mindepth 1 -maxdepth 1 -type d -regextype posix-extended -regex '.*/[0-9]{4}-W[0-9]{2}' -printf '%f\n' | LC_ALL=C sort)
   fi
   if [[ -f "$OUT" ]] && stored="$(grep -E "^- $week " "$OUT" | tail -n 1)" && [[ -n "$stored" ]]; then
@@ -366,22 +405,18 @@ if (( WEEK )); then
       echo "already probed in $week"
       exit 0
     fi
-    host=0 card=0 seen=0 old=0 failed=0
-    while read -r h c s o; do
-      if [[ "$h" == failed ]]; then failed=$((failed + 1)); continue; fi
-      host=$((host + h)); card=$((card + c)); seen=$((seen + s)); old=$((old + o))
-    done < <(week_recount < "$ANSWERS_DIR/$week.md")
     # The time and the model of the run the answers came from, so the line stays comparable with its week.
-    old_stamp="$(awk '{print $2}' <<<"$old_line")"
-    model="$(sed -nE 's/.* model ([^ ]+) .*/\1/p' <<<"$old_line")"
-    line="- $week $old_stamp model ${model:-unknown} host $host/5 card $card/5 seen $seen/5 old $old/5 failed $failed/5 answers docs/kunden/agenten-probe/$week.md via recount"
-    mkdir -p -m 700 "$STATE_ROOT" "$STATE" && chmod 700 "$STATE_ROOT" "$STATE"
-    printf '%s\n' "$line" > "$STATE/line"
-    cp "$ANSWERS_DIR/$week.md" "$STATE/answers.md" && chmod 600 "$STATE/answers.md"
-    printf '%s\n' "$line" >> "$OUT"
-    echo "$line"
-    (( failed > 0 )) && exit 1
-    exit 0
+    recount_week "$(awk '{print $2}' <<<"$old_line")" "$(sed -nE 's/.* model ([^ ]+) .*/\1/p' <<<"$old_line")"
+  fi
+  # The answers of this week are there, but no line of it (werbung 04, decision 2): a run whose line never reached
+  # the file. Time from the line "Run <UTC>, ..." of its head, model the most frequent "Model: ..." (the first
+  # named on a tie), as in a run with sessions.
+  if [[ -f "$ANSWERS_DIR/$week.md" ]]; then
+    run_stamp="$(sed -nE 's/^Run ([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z), .*/\1/p' "$ANSWERS_DIR/$week.md" | head -n 1)"
+    run_model="$(sed -nE 's/^Model: (.+)$/\1/p' "$ANSWERS_DIR/$week.md" \
+      | awk '{ if (!($0 in n)) order[++k] = $0; n[$0]++ } END { b = 0; m = ""; for (i = 1; i <= k; i++) if (n[order[i]] > b) { b = n[order[i]]; m = order[i] } print m }')"
+    run_model="${run_model//[[:space:]]/_}"
+    recount_week "${run_stamp:-$stamp}" "${run_model:-unknown}"
   fi
 fi
 
@@ -456,8 +491,10 @@ if (( WEEK )); then
   line="- $week $stamp model $model host $host/5 card $card/5 seen $seen/5 old $old/5 failed $failed/5 answers docs/kunden/agenten-probe/$week.md via sessions"
   printf '%s\n' "$line" > "$STATE/line"
   cp "$answers" "$STATE/answers.md" && chmod 600 "$STATE/answers.md"
+  append_run_line "$line"
+else
+  printf '%s\n' "$line" >> "$OUT"
 fi
-printf '%s\n' "$line" >> "$OUT"
 echo "$line"
 if (( failed > 0 )); then
   echo "$failed of 5 sessions failed; they count as failed, not as answers without us" >&2
