@@ -1,7 +1,7 @@
 # Kanal Goal 06: Urteil je Antwort, und eine neue Runde nur mit neuen Issues
 
 ## Status
-PLANNED
+PAUSED
 
 ## Active Objective
 `ops/github-yield.sh` zählt heute jede Ankunft mit Referrer `github.com/Conway-Research` in eine Summe über einen Zeitraum. Seit dem
@@ -203,3 +203,4 @@ unsere eigenen Wallets vermischt.
 ## Progress Log
 
 ## Blockers
+Pause: Die übernommene Schärfung aus kanal-kritik-2026-11-23-1 fehlt noch (Zuordnung der Kommentare aus reichweite 02, Idee 3 läuft schon als paket 01); zurück auf PLANNED, sobald der Tech Lead sie eingearbeitet hat (Loop-Kritik 2026-11-25)
