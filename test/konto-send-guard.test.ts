@@ -203,6 +203,19 @@ describe("send guard of rule 10", () => {
     const main = node("0x2105");
     await expect(sendKontoTx({ chainId: 8453, net: MAINNET_NET, account, transport: main.transport, tx: { to: DEPLOY_PROXY, data: dirty } })).rejects.toThrow(/rule 10/);
     expect(main.calls).toEqual([]);
+    await expectDeployRefused([["account word with bits above the address", { to: DEPLOY_PROXY, data: dirty }]], "forwarder argument account does not fit");
+  });
+
+  it("refuses a forwarder deploy with an odd number of hex digits behind the prefix on 8453 as length", async () => {
+    const own = RULE_10[3][1].data;
+    await expectDeployRefused(
+      [
+        ["one hex digit less", own.slice(0, own.length - 1) as Hex],
+        ["one hex digit more", (own + "0") as Hex],
+        ["one word and one hex digit less", own.slice(0, own.length - 65) as Hex],
+      ].map(([name, data]) => [name, { to: DEPLOY_PROXY, data: data as Hex }] as [string, KontoTx]),
+      "forwarder argument length does not fit",
+    );
   });
 
   it("sends a forwarder deploy on 8453 with the own values, also with token, manager and caller in mixed case", async () => {

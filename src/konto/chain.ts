@@ -24,7 +24,6 @@ import {
   decodeFunctionData,
   encodeAbiParameters,
   getAbiItem,
-  size,
   slice,
   toFunctionSelector,
   type Address,
@@ -110,7 +109,8 @@ const FORWARDER_ARGS_SIZE = 32 * FORWARDER_ARGS.length;
  */
 function deployArgumentFault(data: Hex, prefix: Hex, sender: Address): string | null {
   const args = `0x${data.slice(prefix.length)}` as Hex;
-  if (size(args) !== FORWARDER_ARGS_SIZE) return "length";
+  // Count hex digits, not bytes: a byte count rounds an odd number of digits up, so one missing digit would pass as five words.
+  if (args.length - 2 !== 2 * FORWARDER_ARGS_SIZE) return "length";
   let values: readonly [Address, Address, Address, Address, Address];
   try {
     values = decodeAbiParameters(FORWARDER_ARGS, args);
