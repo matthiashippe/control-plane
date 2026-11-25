@@ -175,7 +175,7 @@ export function sandbox(lead: string, opts: { stored?: string | null; issues?: I
         PATH: `${join(s.root, "bin")}:${process.env.PATH}`,
         TMPDIR: tmpdir(),
         CP_STATE_DIR: stateDir,
-        CP_DEPLOY_HOST: "root@server.invalid",
+        CP_DEPLOY_HOST: "server.invalid",
         CP_DEPLOY_KEY: join(s.root, "no-key"),
         PAPERCLIP_API_URL: "http://paperclip.invalid",
         PAPERCLIP_API_KEY: API_KEY,
