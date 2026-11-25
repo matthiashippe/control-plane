@@ -301,4 +301,29 @@ describe("ops/agent-probe.sh --week through the loop gate", () => {
       expect(existsSync(join(dir, "state", "2026-W47", "line"))).toBe(false);
     }
   });
+
+  it("keeps a week with failed sessions as a line the gate accepts", () => {
+    // Exit 1 after failed sessions still leaves a measured week: its line and new answers file belong in the PR.
+    const dir = scratch();
+    const before = `# Agent probe\n\nText.\n\n${OLD_W40}`;
+    writeFileSync(join(dir, "p.md"), before);
+    const r = week("agent-probe-fails", {}, dir);
+    expect(r.status).toBe(1);
+    expect(r.stderr.split("\n")).toContain("5 of 5 sessions failed; they count as failed, not as answers without us");
+    expect(r.out.startsWith(`${before}\n- 2026-W47 `)).toBe(true);
+    expect(gateAcceptsProbeLog(before, r.out)).toEqual([]);
+    expect(newLines(`${before}\n`, r.out)).toHaveLength(1);
+    expect(weekCounts(lastLine(r.out))).toBe("host 0/5 card 0/5 seen 0/5 old 0/5 failed 5/5");
+    expect(lastLine(r.out)).toMatch(/ via sessions$/);
+    expect(lastLine(r.stdout)).toBe(lastLine(r.out));
+    const answers = readFileSync(join(dir, "2026-W47.md"), "utf8");
+    expect(answers.match(/^## q[1-5]$/gm)).toHaveLength(5);
+    // The week counts as asked: a further call asks nothing and leaves the file and the answers as they are.
+    writeFileSync(join(dir, "rec"), "");
+    const again = week("agent-probe-strict", {}, dir);
+    expect(again.status).toBe(0);
+    expect(again.record).toBe("");
+    expect(again.out).toBe(r.out);
+    expect(readFileSync(join(dir, "2026-W47.md"), "utf8")).toBe(answers);
+  });
 });

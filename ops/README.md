@@ -793,8 +793,16 @@ line that `bash ops/agent-probe.sh --week` appended to `docs/kunden/agenten-prob
 `docs/richtung/<YYYY-MM-DD>.md` quotes the line of the week word for word. The block of
 `bash ops/traffic.sh --agents 168` goes only into the analysis, never into `docs/kunden/agenten-probe.md`,
 because the gate accepts there only lines appended in the format of `--week` and refuses a changed line or a
-changed answers file. When `--week` ends with exit 1, no line goes into the PR, and the analysis quotes the
-output instead.
+changed answers file.
+
+`--week` ends with exit 1 in two ways, and only one of them keeps the line out of the PR. When sessions failed
+(stderr `<n> of 5 sessions failed; they count as failed, not as answers without us`), or a recount found
+failed answers, `--week` has already appended the line with `failed <n>/5` and marked the week as asked in
+the state directory, and a run with sessions has written its answers file: the line it printed and a new
+answers file go into the PR like every week, because the gate accepts them and a later run would only carry the same line over from the state
+directory a week late, or never when that run sees another state directory. Only a run that prints
+`cannot recount <YYYY-Www>: answers file has <n> of 5 questions` has written nothing: then no line goes into
+the PR, and the analysis quotes that output instead.
 
 `bash ops/traffic.sh --agents 168` prints only the block `-- Agent fetches --` and the blank line after it,
 from the same log and window and counted the same way as in the full report, without the header and the
