@@ -1,6 +1,8 @@
 /**
  * goals/regeln/01, point 1: on Base (8453) sendKontoTx sends only the kinds of transaction that rule 10 (exception main network)
  * names, and refuses everything else before the transport sees a request. On Base Sepolia (84532) only the chain is checked.
+ * goals/regeln/02: a forwarder deploy on 8453 also carries exactly five addresses behind the prefix, with our token, manager and
+ * caller (the address of the sending key).
  */
 import { describe, expect, it } from "vitest";
 import { concat, custom, encodeFunctionData, type Address, type Hex } from "viem";
@@ -140,6 +142,76 @@ describe("send guard of rule 10", () => {
       await expect(sendKontoTx({ chainId: 8453, net: MAINNET_NET, account, transport: main.transport, tx }), name).rejects.toThrow(/rule 10/);
     }
     expect(main.calls).toEqual([]);
+  });
+
+  /** Sends `tx` on 8453 and expects a refusal that names `arg` and leaves the transport untouched. */
+  async function expectDeployRefused(cases: Array<[string, KontoTx]>, arg: string) {
+    for (const [name, tx] of cases) {
+      const main = node("0x2105");
+      const err = await sendKontoTx({ chainId: 8453, net: MAINNET_NET, account, transport: main.transport, tx }).catch((e: unknown) => e);
+      expect(err, name).toBeInstanceOf(Error);
+      const message = (err as Error).message;
+      expect(message, name).toMatch(/rule 10/);
+      expect(message, name).toContain(arg);
+      expect(message.toLowerCase(), name).toContain(DEPLOY_PROXY.toLowerCase());
+      expect(message.toLowerCase(), name).not.toContain(OTHER.slice(2).toLowerCase());
+      expect(main.calls, name).toEqual([]);
+    }
+  }
+
+  const deploy = (f: ForwarderFixed): KontoTx => ({ to: DEPLOY_PROXY, data: concat([FORWARDER_SALT, forwarderInitCode(ACCOUNT, DESTINATION, f)]) });
+
+  it("refuses a forwarder deploy with a foreign token on 8453 before the first request", async () => {
+    await expectDeployRefused([["token is another address", deploy({ ...fixed, token: OTHER })]], "token");
+  });
+
+  it("refuses a forwarder deploy with a foreign manager on 8453 before the first request", async () => {
+    await expectDeployRefused([["manager is another address", deploy({ ...fixed, manager: OTHER })]], "manager");
+  });
+
+  it("refuses a forwarder deploy with a foreign caller on 8453 before the first request", async () => {
+    const stranger = privateKeyToAccount(generatePrivateKey());
+    await expectDeployRefused(
+      [
+        ["caller is another address", deploy({ ...fixed, caller: OTHER })],
+        ["caller is another key", deploy({ ...fixed, caller: stranger.address })],
+      ],
+      "caller",
+    );
+  });
+
+  it("refuses a forwarder deploy whose arguments are not exactly five addresses on 8453 before the first request", async () => {
+    const own = RULE_10[3][1].data;
+    const word = (a: Address) => ("0x" + a.slice(2).toLowerCase().padStart(64, "0")) as Hex;
+    const foreignArgs = concat([word(ACCOUNT), word(OTHER), word(OTHER), word(OTHER), word(OTHER)]);
+    await expectDeployRefused(
+      [
+        ["one word less", own.slice(0, own.length - 64) as Hex],
+        ["no arguments", own.slice(0, own.length - 64 * 5) as Hex],
+        ["five foreign words appended", concat([own, foreignArgs])],
+        ["one byte more", concat([own, "0x00"])],
+        ["one byte less", own.slice(0, own.length - 2) as Hex],
+      ].map(([name, data]) => [name, { to: DEPLOY_PROXY, data: data as Hex }] as [string, KontoTx]),
+      "length",
+    );
+  });
+
+  it("refuses a forwarder deploy whose address words carry bits above the address on 8453 before the first request", async () => {
+    const own = RULE_10[3][1].data;
+    // The account word with a high bit set: the five words still have the right length, but they are no clean ABI addresses.
+    const dirty = (own.slice(0, own.length - 64 * 5) + "ff" + own.slice(own.length - 64 * 5 + 2)) as Hex;
+    const main = node("0x2105");
+    await expect(sendKontoTx({ chainId: 8453, net: MAINNET_NET, account, transport: main.transport, tx: { to: DEPLOY_PROXY, data: dirty } })).rejects.toThrow(/rule 10/);
+    expect(main.calls).toEqual([]);
+  });
+
+  it("sends a forwarder deploy on 8453 with the own values, also with token, manager and caller in mixed case", async () => {
+    const mixed: ForwarderFixed = { token: MAINNET_USDC.toLowerCase() as Address, manager: SPEND_PERMISSION_MANAGER.toUpperCase().replace("0X", "0x") as Address, caller: account.address.toLowerCase() as Address };
+    for (const f of [fixed, mixed]) {
+      const main = node("0x2105");
+      expect(await sendKontoTx({ chainId: 8453, net: MAINNET_NET, account, transport: main.transport, tx: { ...deploy(f), gas: 100_000n } })).toBe(HASH);
+      expect(main.calls).toContain("eth_sendRawTransaction");
+    }
   });
 
   it("sends every kind of rule 10 on 8453, also with the target in mixed case", async () => {
