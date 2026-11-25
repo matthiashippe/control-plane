@@ -51,7 +51,7 @@ MVP: Funktion, weil ein Betreiber, der über unseren Kommentar kommt, sonst eine
      mit demselben Titel oder wenn der Trockenlauf `0 to change` meldet, sonst nie (Muster `check_card_breaker` in
      `ops/watchdog.sh`: der Zustand erst nach dem erfolgreichen POST).
   3. Ablauf je Lauf: genau eine Zeile von `bash ops/card-breaker.sh` (über ssh, nur lesend, wie in reichweite 04 Entscheidung 4),
-     sonst Exit 2 ohne Issue. Gleich dem Zustand: nichts weiter. Anders: der Trockenlauf der neuen Richtung, also bei `on`
+     sonst Exit 2 ohne Issue. Gleich dem Zustand: nichts weiter (abgelöst durch die Kritik unten, Punkt 7). Anders: der Trockenlauf der neuen Richtung, also bei `on`
      `python3 -I ops/relink-comments.py --name --no-card`, bei `off` `python3 -I ops/relink-comments.py --name`, ohne `--send`; die
      Zählzeile (`no-card: <k> to change, …` oder `name: <k> to change, …`) entscheidet: `k` gleich 0 heißt Zustand speichern ohne
      Issue, `k` größer 0 heißt Issue. Vor dem POST sucht das Werkzeug ein offenes Issue (`todo`, `in_progress`, `in_review`,
@@ -79,6 +79,16 @@ MVP: Funktion, weil ein Betreiber, der über unseren Kommentar kommt, sonst eine
      Test), holt `/llms.txt` per `app.request` aus `createApp` und verlangt bei offenem Notschalter `conwayApiUrl` und
      `card, PayPal or Apple Pay` in `/llms.txt` und in `LEAD`, bei eingeschaltetem (eine erstattete Live-Bestellung wie
      `tripBreaker` in `test/card-way-pages.test.ts`) `conwayApiUrl` in beiden und `card, PayPal or Apple Pay` in keinem.
+- **Kritik (Tech Lead, 25.11.2026), Punkt 7.** Entscheidung 3 ist flankengesteuert: Nach dem ersten Issue steht der Zustand
+  auf der neuen Richtung, auch wenn kein Kommentar umgestellt wurde. Geht das Issue ohne vollständiges `--send` auf `done` oder
+  `cancelled` (Freigabe verweigert, `--send` scheitert an einem Teil, `--verify` meldet Abweichung), fragt danach kein Lauf mehr,
+  und die Kommentare versprechen die Karte, solange der Notschalter steht. Neu: Bei gleichem Zustand liest das Werkzeug Paperclip;
+  ist ein Issue mit dem Titel der aktuellen Richtung offen, endet es mit `issue <PRO-n> already open`, sonst fährt es den
+  Trockenlauf der aktuellen Richtung (`--name --no-card` bei `on`, `--name` bei `off`). `0 to change` heißt `no change` ohne
+  Issue, mehr heißt Issue wie bei einem Wechsel (mit `--dry-run` `would create issue`). Der Zustand bleibt für `last` und für die
+  Regeln aus Entscheidung 2. Der Test „the same state creates no issue“ behält seinen Namen und prüft künftig passende Kommentare;
+  seine Zeile, dass GitHub nicht gefragt wird, fällt weg. Eine Zeile `- 2026-11-25, reichweite 05: Kritik (Tech Lead): …` in
+  `goals/reichweite/ANNAHMEN.md`, `ops/README.md` nachziehen. Kosten: ein lesender Trockenlauf gegen GitHub alle 6 Stunden.
 - **Reihenfolge.** Tests zuerst gegen `dev` rot sehen (Werkzeug fehlt) und den Test zu `/llms.txt` gegen eine Kopie der App mit
   `cardOpen` immer wahr rot sehen, dann bauen, alle Prüfungen ohne Netz, `check`, Push. Danach einmal `--dry-run` mit Netz auf dem
   code-host (Punkt 5). Gesendet wird in diesem Goal nichts, kein Kommentar auf GitHub ändert sich.
@@ -122,6 +132,13 @@ MVP: Funktion, weil ein Betreiber, der über unseren Kommentar kommt, sonst eine
       Prüfung (Netz): `set -a; . ~/.config/control-plane/loop.env; set +a; bash ops/breaker-comments.sh --dry-run | tail -n 1` muss eine Zeile `breaker <on|off>, last <on|off|none>, no change`, `… comments already match` oder `… would create issue` ausgeben.
 - [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
+- [ ] Bleibt der Notschalter gleich, passen die Kommentare aber nicht zu ihm und ist kein Issue mit dem Titel seiner Richtung offen,
+      legt der nächste Lauf das Issue mit dem Trockenlauf an; passen sie, endet er mit `no change` ohne Issue.
+      MVP: Funktion, weil ein Issue, das ohne vollständiges Senden erledigt wird, sonst die Kommentare dauerhaft gegen die Karte
+      stehen lässt und kein Lauf mehr nachfragt.
+      Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/breaker-comments.test.ts` muss Exit-Code 0 haben.
+      Prüfung: `for t in "the same state with comments that do not match and no open issue creates the issue" "the same state with an open issue of its direction runs no dry run"; do grep -qF "\"$t\"" test/breaker-comments.test.ts || echo "fehlt: $t"; done` muss nichts ausgeben.
+      Prüfung: `grep -cE '^- [0-9-]+, reichweite 05: Kritik' goals/reichweite/ANNAHMEN.md` muss mindestens `1` ausgeben.
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
