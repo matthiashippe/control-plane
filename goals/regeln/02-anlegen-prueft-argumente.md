@@ -86,5 +86,6 @@ bewegen.
 
 ## Progress Log
 - 2026-11-25 Zyklus 1: Punkte 1, 2, 3 gebaut: `requireRule10` bekommt die Adresse des sendenden Schlüssels und prüft beim Anlegen auf 8453 mit `decodeAbiParameters` genau fünf saubere Adressen hinter dem Präfix, token, manager und caller (Commit aa42958); die fünf neuen Verweigerungsfälle waren am Stand 5a279bb rot (`pnpm -s vitest run test/konto-send-guard.test.ts` -> 5 failed, 7 passed), der JSON-Prüfer gab dort `fehlt`. Prüfbefehle: `pnpm -s vitest run test/konto-send-guard.test.ts` Exit 0 (12 passed); JSON-Prüfer `alle`; `grep -c "decodeAbiParameters" src/konto/chain.ts` 2; die sechs Dateien aus Punkt 2 Exit 0 (55 passed); `node scripts/check.mjs` Exit 0 (2887 Tests).
+- 2026-11-25 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3; `origin/dev` (5a279bb) ist im Branch enthalten, nichts hereinzuholen. Prüfbefehle: `pnpm -s vitest run test/konto-send-guard.test.ts` Exit 0 (12 passed); JSON-Prüfer `alle`; `grep -c "decodeAbiParameters" src/konto/chain.ts` 2; die sechs Dateien aus Punkt 2 Exit 0 (55 passed); `node scripts/check.mjs` Exit 0 (2887 Tests); am PR #444 Jobs `check` und `e2e` grün an e04b123 (Run 45603101109).
 
 ## Blockers
