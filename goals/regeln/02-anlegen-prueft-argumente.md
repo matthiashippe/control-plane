@@ -1,7 +1,7 @@
 # Regeln Goal 02: Auf 8453 prüft das Anlegen der Weiterleitung auch die Argumente
 
 ## Status
-PLANNED
+ACTIVE
 
 ## Active Objective
 `requireRule10` (`src/konto/chain.ts:81`) lässt auf chainId 8453 das Anlegen über `DEPLOY_PROXY` zu, sobald die Daten mit
@@ -54,14 +54,14 @@ bewegen.
   kein Rollout außer dem normalen über `deploy.yml`.
 
 ## Done Condition
-- [ ] Auf 8453 verweigert `sendKontoTx` das Anlegen einer Weiterleitung mit fremdem token, fremdem manager, fremdem caller oder einer
+- [x] Auf 8453 verweigert `sendKontoTx` das Anlegen einer Weiterleitung mit fremdem token, fremdem manager, fremdem caller oder einer
       Länge hinter dem Präfix ungleich fünf Adressen vor der ersten Anfrage, und sendet das Anlegen mit den eigenen Werten.
       Prüfung: `pnpm -s vitest run test/konto-send-guard.test.ts` muss Exit-Code 0 haben.
       Prüfung: `pnpm -s vitest run test/konto-send-guard.test.ts --reporter=json 2>/dev/null | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const j=JSON.parse(s);const t=j.testResults.flatMap(f=>f.assertionResults).filter(a=>a.status==="passed").map(a=>a.title);console.log([/refuses a forwarder deploy with a foreign token on 8453/,/refuses a forwarder deploy with a foreign manager on 8453/,/refuses a forwarder deploy with a foreign caller on 8453/,/refuses a forwarder deploy whose arguments are not exactly five addresses on 8453/,/sends every kind of rule 10 on 8453/,/keeps 84532 unchanged/].every(r=>t.some(x=>r.test(x)))?"alle":"fehlt")})'` muss `alle` ausgeben.
       Prüfung: `grep -c "decodeAbiParameters" src/konto/chain.ts` muss mindestens 1 ausgeben.
-- [ ] Die Wege, die heute auf 8453 und 84532 senden, bleiben grün.
+- [x] Die Wege, die heute auf 8453 und 84532 senden, bleiben grün.
       Prüfung: `pnpm -s vitest run test/konto-mainnet.test.ts test/konto-payout.test.ts test/konto-payout-guard.test.ts test/konto-forwarder.test.ts test/konto-topup.test.ts test/konto-chain.test.ts` muss Exit-Code 0 haben.
-- [ ] `check` ist grün.
+- [x] `check` ist grün.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
 - [ ] goal-verifier PASS (K und B)
 
@@ -85,5 +85,6 @@ bewegen.
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-25 Zyklus 1: Punkte 1, 2, 3 gebaut: `requireRule10` bekommt die Adresse des sendenden Schlüssels und prüft beim Anlegen auf 8453 mit `decodeAbiParameters` genau fünf saubere Adressen hinter dem Präfix, token, manager und caller (Commit aa42958); die fünf neuen Verweigerungsfälle waren am Stand 5a279bb rot (`pnpm -s vitest run test/konto-send-guard.test.ts` -> 5 failed, 7 passed), der JSON-Prüfer gab dort `fehlt`. Prüfbefehle: `pnpm -s vitest run test/konto-send-guard.test.ts` Exit 0 (12 passed); JSON-Prüfer `alle`; `grep -c "decodeAbiParameters" src/konto/chain.ts` 2; die sechs Dateien aus Punkt 2 Exit 0 (55 passed); `node scripts/check.mjs` Exit 0 (2887 Tests).
 
 ## Blockers
