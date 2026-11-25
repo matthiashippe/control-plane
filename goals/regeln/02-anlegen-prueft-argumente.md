@@ -63,6 +63,18 @@ bewegen.
       Prüfung: `pnpm -s vitest run test/konto-mainnet.test.ts test/konto-payout.test.ts test/konto-payout-guard.test.ts test/konto-forwarder.test.ts test/konto-topup.test.ts test/konto-chain.test.ts` muss Exit-Code 0 haben.
 - [x] `check` ist grün.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
+- [ ] Kritik Tech Lead 1: Auf 84532 gehen auch die Anlagen hinaus, die 8453 jetzt verweigert (fremder token, manager, caller, ein Wort
+      weniger, fünf fremde Wörter angehängt), damit ein späteres Umstellen der Reihenfolge in `requireRule10` Base Sepolia nicht still
+      mitsperrt. Neuer Testname: `keeps 84532 unchanged for forwarder deploys that 8453 refuses`, im Muster von `keeps 84532 unchanged`
+      (Hash zurück, `eth_sendRawTransaction` gesehen).
+      Prüfung: `pnpm -s vitest run test/konto-send-guard.test.ts --reporter=json 2>/dev/null | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const j=JSON.parse(s);const t=j.testResults.flatMap(f=>f.assertionResults).filter(a=>a.status==="passed").map(a=>a.title);console.log(t.some(x=>/keeps 84532 unchanged for forwarder deploys that 8453 refuses/.test(x))?"ja":"nein")})'` muss `ja` ausgeben.
+- [ ] Kritik Tech Lead 2: Der Fehler nennt immer das richtige Argument. Heute meldet ein Anlegen, dem hinter dem Präfix eine Hex-Ziffer
+      fehlt (ungerade Zahl von Ziffern), `forwarder argument account does not fit` statt `length`, weil `size` aufrundet; und der Fall
+      mit gesetzten Bits über der Adresse prüft nur `/rule 10/`, nicht `account`. Danach ergibt jede Länge hinter dem Präfix ungleich
+      genau 320 Hex-Ziffern `length`, und der Fall mit dem schmutzigen account-Wort erwartet `account`. Neuer Testname: `refuses a
+      forwarder deploy with an odd number of hex digits behind the prefix on 8453 as length`, rot vor dem Fix.
+      Prüfung: `pnpm -s vitest run test/konto-send-guard.test.ts --reporter=json 2>/dev/null | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const j=JSON.parse(s);const t=j.testResults.flatMap(f=>f.assertionResults).filter(a=>a.status==="passed").map(a=>a.title);console.log(t.some(x=>/refuses a forwarder deploy with an odd number of hex digits behind the prefix on 8453 as length/.test(x))?"ja":"nein")})'` muss `ja` ausgeben.
+      Prüfung: `grep -A8 "carry bits above the address" test/konto-send-guard.test.ts | grep -c "account"` muss mindestens 1 ausgeben.
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
