@@ -62,6 +62,52 @@ async function closedApp() {
   });
 }
 
+const SUNSET = new Date("2026-10-17T00:00:00Z");
+const PAY = { payTo: "0x" + "1".repeat(40), network: "base", usdcAddress: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", tiers: [5, 25, 100] };
+const CARD = /\/card\/|\/#card|paypal|apple pay/i;
+const NO_CREDITS = "Credits are no longer sold here.";
+const SOLD = `billed at purchase cost times ${MARKUP}`;
+const NOT_SOLD = "not sell access to language models";
+
+/** An OpenRouter catalogue that may not be sold (resale: false), so a sunset is set; the provider never reaches the network. */
+async function sunsetCatalog() {
+  const models = { data: [{ id: "openai/gpt-5-mini", context_length: 400000, pricing: { prompt: "0.00000025", completion: "0.000002" } }] };
+  const provider = new OpenRouterProvider({
+    apiKey: "sk-or-v1-test",
+    models: ["openai/gpt-5-mini"],
+    fetch: (async () => new Response(JSON.stringify(models), { headers: { "content-type": "application/json" } })) as typeof fetch,
+    priceRefreshMs: 0,
+    baseUrl: "https://openrouter.ai/api/v1",
+    resale: false,
+  });
+  await provider.init();
+  return new Catalog([provider], provider.defaultAliases());
+}
+
+/** /llms.txt and /pricing of one app, read in the same state. */
+async function bothPages(app: ReturnType<typeof createApp>) {
+  const llms = await (await app.request("/llms.txt")).text();
+  const pricing = await (await app.request("/pricing")).text();
+  return { llms, pricing };
+}
+
+/** The one inference sentence a page carries: sold with the markup, or not sold at all. */
+const inferenceSentence = (body: string) => [body.includes(SOLD), body.includes(NOT_SOLD)];
+
+/** Topups closed by the sunset: neither page names the card or /pay/, both say no credits are sold and agree on inference. */
+async function expectSunset(now: () => Date, inference: string) {
+  const app = createApp({ db: openDb(":memory:"), pay: PAY as never, catalog: await sunsetCatalog(), inferenceSunsetAt: SUNSET, now });
+  const pages = await bothPages(app);
+  for (const [name, body] of Object.entries(pages)) {
+    expect(body, name).not.toMatch(CARD);
+    expect(body, name).not.toContain("/pay/");
+    expect(body, name).toContain(NO_CREDITS);
+    expect(body, name).toContain(inference);
+  }
+  expect(pages.pricing).toContain(`## Credit\n\n${NO_CREDITS}\n`);
+  expect(inferenceSentence(pages.pricing)).toEqual(inferenceSentence(pages.llms));
+}
+
 describe("/docs and /pricing", () => {
   it("redirects /docs to /llms.txt", async () => {
     for (const path of ["/docs", "/docs/"]) {
@@ -121,5 +167,24 @@ describe("/docs and /pricing", () => {
       expect(body, path).not.toContain("/pay/");
       expect(body, path).toContain("Credits are not redeemable and not transferable.");
     }
+  });
+
+  it("keeps card and USDC on /pricing and /llms.txt while topups are open", async () => {
+    const pages = await bothPages(createApp({ db: openDb(":memory:"), pay: PAY as never }));
+    for (const [name, body] of Object.entries(pages)) {
+      expect(body, name).toMatch(CARD);
+      expect(body, name).toContain("/pay/");
+      expect(body, name).not.toContain(NO_CREDITS);
+      expect(body, name).toContain(SOLD);
+    }
+    expect(inferenceSentence(pages.pricing)).toEqual(inferenceSentence(pages.llms));
+  });
+
+  it("offers no card and sells no credits on /pricing and /llms.txt before the sunset", async () => {
+    await expectSunset(() => new Date("2026-10-01T12:00:00Z"), SOLD);
+  });
+
+  it("offers no card and sells no credits on /pricing and /llms.txt after the sunset", async () => {
+    await expectSunset(() => new Date(SUNSET.getTime() + 1000), NOT_SOLD);
   });
 });
