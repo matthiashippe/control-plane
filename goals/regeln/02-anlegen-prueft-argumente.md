@@ -63,7 +63,7 @@ bewegen.
       Prüfung: `pnpm -s vitest run test/konto-mainnet.test.ts test/konto-payout.test.ts test/konto-payout-guard.test.ts test/konto-forwarder.test.ts test/konto-topup.test.ts test/konto-chain.test.ts` muss Exit-Code 0 haben.
 - [x] `check` ist grün.
       Prüfung: `node scripts/check.mjs` muss Exit-Code 0 haben.
-- [ ] Kritik Tech Lead 1: Auf 84532 gehen auch die Anlagen hinaus, die 8453 jetzt verweigert (fremder token, manager, caller, ein Wort
+- [x] Kritik Tech Lead 1: Auf 84532 gehen auch die Anlagen hinaus, die 8453 jetzt verweigert (fremder token, manager, caller, ein Wort
       weniger, fünf fremde Wörter angehängt), damit ein späteres Umstellen der Reihenfolge in `requireRule10` Base Sepolia nicht still
       mitsperrt. Neuer Testname: `keeps 84532 unchanged for forwarder deploys that 8453 refuses`, im Muster von `keeps 84532 unchanged`
       (Hash zurück, `eth_sendRawTransaction` gesehen).
@@ -99,5 +99,6 @@ bewegen.
 ## Progress Log
 - 2026-11-25 Zyklus 1: Punkte 1, 2, 3 gebaut: `requireRule10` bekommt die Adresse des sendenden Schlüssels und prüft beim Anlegen auf 8453 mit `decodeAbiParameters` genau fünf saubere Adressen hinter dem Präfix, token, manager und caller (Commit aa42958); die fünf neuen Verweigerungsfälle waren am Stand 5a279bb rot (`pnpm -s vitest run test/konto-send-guard.test.ts` -> 5 failed, 7 passed), der JSON-Prüfer gab dort `fehlt`. Prüfbefehle: `pnpm -s vitest run test/konto-send-guard.test.ts` Exit 0 (12 passed); JSON-Prüfer `alle`; `grep -c "decodeAbiParameters" src/konto/chain.ts` 2; die sechs Dateien aus Punkt 2 Exit 0 (55 passed); `node scripts/check.mjs` Exit 0 (2887 Tests).
 - 2026-11-25 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3; `origin/dev` (5a279bb) ist im Branch enthalten, nichts hereinzuholen. Prüfbefehle: `pnpm -s vitest run test/konto-send-guard.test.ts` Exit 0 (12 passed); JSON-Prüfer `alle`; `grep -c "decodeAbiParameters" src/konto/chain.ts` 2; die sechs Dateien aus Punkt 2 Exit 0 (55 passed); `node scripts/check.mjs` Exit 0 (2887 Tests); am PR #444 Jobs `check` und `e2e` grün an e04b123 (Run 45603101109).
+- 2026-11-25 Zyklus 3: Punkt 4 gebaut: Test `keeps 84532 unchanged for forwarder deploys that 8453 refuses` schickt fremden token, manager, caller, ein Wort weniger und fünf angehängte fremde Wörter auf 8453 (verweigert, Transport leer) und auf 84532 mit und ohne `SEPOLIA_NET` (Hash zurück, `eth_sendRawTransaction` gesehen); Gegenprobe mit gepflanzter Sperre auf 84532 in `requireRule10`: der Test rot (1 failed). Prüfbefehle: JSON-Prüfer aus Punkt 4 `ja`; `pnpm -s vitest run test/konto-send-guard.test.ts` Exit 0 (13 passed).
 
 ## Blockers

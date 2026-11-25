@@ -225,6 +225,31 @@ describe("send guard of rule 10", () => {
     }
   });
 
+  it("keeps 84532 unchanged for forwarder deploys that 8453 refuses", async () => {
+    const own = RULE_10[3][1].data;
+    const word = (a: Address) => ("0x" + a.slice(2).toLowerCase().padStart(64, "0")) as Hex;
+    const refused: Array<[string, KontoTx]> = [
+      ["foreign token", deploy({ ...fixed, token: OTHER })],
+      ["foreign manager", deploy({ ...fixed, manager: OTHER })],
+      ["foreign caller", deploy({ ...fixed, caller: OTHER })],
+      ["one word less", { to: DEPLOY_PROXY, data: own.slice(0, own.length - 64) as Hex }],
+      ["five foreign words appended", { to: DEPLOY_PROXY, data: concat([own, word(ACCOUNT), word(OTHER), word(OTHER), word(OTHER), word(OTHER)]) }],
+    ];
+    for (const [name, tx] of refused) {
+      // The same deploy is refused on 8453 ...
+      const main = node("0x2105");
+      await expect(sendKontoTx({ chainId: 8453, net: MAINNET_NET, account, transport: main.transport, tx }), name).rejects.toThrow(/rule 10/);
+      expect(main.calls, name).toEqual([]);
+      // ... and goes out on 84532.
+      const sepolia = node("0x14a34");
+      expect(await sendKontoTx({ chainId: 84532, account, transport: sepolia.transport, tx: { ...tx, gas: 100_000n } }), name).toBe(HASH);
+      expect(sepolia.calls, name).toContain("eth_sendRawTransaction");
+      const explicit = node("0x14a34");
+      expect(await sendKontoTx({ chainId: 84532, net: SEPOLIA_NET, account, transport: explicit.transport, tx: { ...tx, gas: 100_000n } }), name).toBe(HASH);
+      expect(explicit.calls, name).toContain("eth_sendRawTransaction");
+    }
+  });
+
   it("keeps 84532 unchanged: every transaction goes out, inside or outside rule 10", async () => {
     for (const [name, tx] of [...RULE_10, ...OUTSIDE]) {
       const sepolia = node("0x14a34");
