@@ -2339,14 +2339,13 @@ export function createApp(opts: AppOptions) {
    */
   app.get("/llms.txt", (c) => {
     const pay = opts.pay ?? null;
-    const tiers = (pay?.tiers ?? TOPUP_TIERS_USD).join(", ");
     const notForSale = notForSaleNow();
     const ends = endsAt();
     // goals/werbung/01: the first block is for an agent that helps a person with a broken Conway automaton, read before it
     // recommends anything: the error texts it recognises the case by, the one line, and the way to pay without crypto, all
-    // before the first USDC. The card line is gone while the card breaker is on (goals/wache/01). One paragraph, so the
-    // switch to conwayApiUrl stays in the first paragraph as move goal 03 wants it.
-    const cardOpen = !cardBreaker(db, (opts.now ?? (() => new Date()))()).on;
+    // before the first USDC. The card line is gone while the card breaker is on (goals/wache/01) and while topups are closed
+    // (goals/fehler/13), the same rule as /pricing. One paragraph, so the switch to conwayApiUrl stays in the first paragraph
+    // as move goal 03 wants it.
     const body = [
       "# automatonhost.com",
       "",
@@ -2354,7 +2353,7 @@ export function createApp(opts: AppOptions) {
       ...ERROR_PAGES.map((p) => `${p.heading},`),
       "or a 402 with INSUFFICIENT_CREDITS.",
       `One line keeps it running: set conwayApiUrl in ~/.automaton/automaton.json to ${siteOrigin()}, then run automaton --provision.`,
-      ...(cardOpen ? [`No crypto needed: your person can top it up by card, PayPal or Apple Pay at ${siteOrigin()}/#card`] : []),
+      ...(cardOpenNow() ? [`No crypto needed: your person can top it up by card, PayPal or Apple Pay at ${siteOrigin()}/#card`] : []),
       "",
       // move goal 03: the first paragraph is the switch, because an automaton whose Conway endpoint stopped answering reads
       // this file first and needs this one line to keep running. The market follows under its own heading, unchanged.
@@ -2378,7 +2377,7 @@ export function createApp(opts: AppOptions) {
           ]
         : [
             "> Conway API, so an unmodified automaton runtime can compete without a patch. Inference is",
-            "> billed at purchase cost times " + MARKUP + ".",
+            "> " + inferenceBilled(),
           ]),
       ...(ends
         ? [
@@ -2422,9 +2421,9 @@ export function createApp(opts: AppOptions) {
       "  https://github.com/matthiashippe/control-plane/blob/main/docs/api-key.md",
       // No tiers and no payee while topups are closed (HAN-62).
       ...(intakeClosed
-        ? ["- Credits are no longer sold here."]
+        ? ["- " + NO_CREDITS_SOLD]
         : [
-            "- Topup tiers in USD: " + tiers + ".",
+            "- " + topupTiersLine(pay?.tiers ?? TOPUP_TIERS_USD),
             pay ? "- Payment goes to " + pay.payTo + " on " + pay.network + " (USDC " + pay.usdcAddress + ")." : "- Payments are not configured on this instance.",
           ]),
       "",
@@ -2551,6 +2550,13 @@ export function createApp(opts: AppOptions) {
    */
   for (const path of ["/docs", "/docs/"]) app.get(path, (c) => c.redirect(`${siteOrigin()}/llms.txt`, 302));
 
+  // goals/fehler/13: the sentences /llms.txt and /pricing share, each written once, and the one rule for the card on both.
+  // Closed topups sell nothing an automaton can still use for inference, so neither page names the card then.
+  const cardOpenNow = () => !intakeClosed && !cardBreaker(db, clock()).on;
+  const NO_CREDITS_SOLD = "Credits are no longer sold here.";
+  const inferenceBilled = () => "billed at purchase cost times " + MARKUP + ".";
+  const topupTiersLine = (tiers: readonly number[]) => "Topup tiers in USD: " + tiers.join(", ") + ".";
+
   /**
    * Every price from the code, in the words /llms.txt uses for the same state: the card packages only while the card breaker
    * is off (goals/wache/01), the USDC tiers from the same source and under the same condition as /llms.txt, and the inference
@@ -2561,11 +2567,10 @@ export function createApp(opts: AppOptions) {
     c.header("Cache-Control", "no-store");
     const pay = opts.pay ?? null;
     const notForSale = notForSaleNow();
-    const cardOpen = !cardBreaker(db, (opts.now ?? (() => new Date()))()).on;
     const body = [
       "# Prices: automatonhost.com",
       "",
-      ...(cardOpen
+      ...(cardOpenNow()
         ? [
             "## Credit by card, PayPal or Apple Pay",
             "",
@@ -2574,13 +2579,14 @@ export function createApp(opts: AppOptions) {
             "",
           ]
         : []),
-      // No tiers and no /pay/ while topups are closed: /pay answers 410 then, and /llms.txt leaves both out (HAN-62).
+      // No tiers and no /pay/ while topups are closed: /pay answers 410 then, and /llms.txt leaves both out (HAN-62). The page
+      // says so in the sentence /llms.txt uses (goals/fehler/13).
       ...(intakeClosed
-        ? []
+        ? ["## Credit", "", NO_CREDITS_SOLD, ""]
         : [
             "## Credit in USDC",
             "",
-            "- Topup tiers in USD: " + (pay?.tiers ?? TOPUP_TIERS_USD).join(", ") + ".",
+            "- " + topupTiersLine(pay?.tiers ?? TOPUP_TIERS_USD),
             `- x402 topup at ${siteOrigin()}/pay/{usd}/{wallet}, where {usd} is one of the tiers and {wallet} is the`,
             "  wallet that signs.",
             "",
@@ -2589,7 +2595,7 @@ export function createApp(opts: AppOptions) {
       "",
       notForSale
         ? "This service does not sell access to language models; credits pay for jobs."
-        : "OpenAI-compatible inference at /v1/chat/completions, billed at purchase cost times " + MARKUP + ".",
+        : "OpenAI-compatible inference at /v1/chat/completions, " + inferenceBilled(),
       "",
       "Credits are not redeemable and not transferable.",
       "",
