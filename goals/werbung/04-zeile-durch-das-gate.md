@@ -1,7 +1,7 @@
 # Werbung Goal 04: Die Zeile der Woche kommt durch das Gate
 
 ## Status
-PLANNED
+ACTIVE
 
 ## Active Objective
 Seit code-host 4e741a19 (PRO-29405) committet der Richtungs-Check die Agenten-Probe der Woche in seinem Pflege-PR kurs. Das Gate
@@ -88,18 +88,18 @@ MVP: Funktion, weil ohne die Zeile im Repo keine Woche mit der vorigen vergliche
   ändert nichts unter `src/` und löst darum keinen Rollout aus.
 
 ## Done Condition
-- [ ] `--week` hängt jede Zeile auf eine eigene Zeile hinter die letzte, auch wenn der Datei das Zeilenende am Schluss fehlt, und
+- [x] `--week` hängt jede Zeile auf eine eigene Zeile hinter die letzte, auch wenn der Datei das Zeilenende am Schluss fehlt, und
       ändert dabei keine bestehende Zeile und keine bestehende Antwortdatei, auch nicht beim Nachtrag mehrerer Wochen.
       MVP: Funktion, weil das Gate jede andere Änderung an `docs/kunden/agenten-probe.md` ablehnt und die Woche dann fehlt.
       Prüfung: `T=$(mktemp -d); printf '# Kopf\n\nText.\n\n- 2026-W40 2026-10-01T00:00:00Z model x host 0/5 card 0/5 seen 0/5 old 0/5 failed 0/5 answers docs/kunden/agenten-probe/2026-W40.md via sessions' > $T/p.md; cp $T/p.md $T/b.md; CP_NOW=1795000000 CP_PROBE_CLAUDE=ops/fixtures/agent-probe-claude.sh CP_PROBE_ANSWERS=ops/fixtures/agent-probe-strict CP_PROBE_OUT=$T/p.md CP_PROBE_ANSWERS_DIR=$T CP_PROBE_STATE_DIR=$T/state bash ops/agent-probe.sh --week > /dev/null 2>&1; echo "exit=$? $(node -e 'const fs=require("fs");const L=t=>{const s=t.replace(/\r?\n$/,"");return s?s.split(/\r?\n/):[]};const a=L(fs.readFileSync(process.argv[1],"utf8")),b=L(fs.readFileSync(process.argv[2],"utf8"));const R=/^- \d{4}-W\d{2} \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z model \S.* via (?:sessions|recount)$/;const at=a.findIndex((l,i)=>b[i]!==l);const bad=b.slice(a.length).filter(l=>!R.test(l)||/[\u2013\u2014]/.test(l)).length;console.log(at>=0?"changed "+(at+1):bad?"bad "+bad:"growth ok "+(b.length-a.length))' $T/b.md $T/p.md)"; rm -rf $T` muss genau `exit=0 growth ok 1` ausgeben.
       Prüfung: `T=$(mktemp -d); mkdir $T/a $T/b; s="CP_PROBE_CLAUDE=ops/fixtures/agent-probe-claude.sh CP_PROBE_ANSWERS=ops/fixtures/agent-probe-strict CP_PROBE_STATE_DIR=$T/state"; env $s CP_NOW=1795000000 CP_PROBE_OUT=$T/a/p.md CP_PROBE_ANSWERS_DIR=$T/a bash ops/agent-probe.sh --week > /dev/null 2>&1; env $s CP_NOW=1795604800 CP_PROBE_OUT=$T/a/p.md CP_PROBE_ANSWERS_DIR=$T/a bash ops/agent-probe.sh --week > /dev/null 2>&1; printf '# Kopf\n\nText mit Absatz.\n\n## Läufe\n\n- 2026-W40 2026-10-01T00:00:00Z model x host 0/5 card 0/5 seen 0/5 old 0/5 failed 0/5 answers docs/kunden/agenten-probe/2026-W40.md via sessions\n' > $T/b/p.md; cp $T/b/p.md $T/b.md; printf 'keep\n' > $T/b/2026-W47.md; env $s CP_NOW=1796209600 CP_PROBE_OUT=$T/b/p.md CP_PROBE_ANSWERS_DIR=$T/b bash ops/agent-probe.sh --week > /dev/null 2>&1; echo "exit=$? $(node -e 'const fs=require("fs");const L=t=>{const s=t.replace(/\r?\n$/,"");return s?s.split(/\r?\n/):[]};const a=L(fs.readFileSync(process.argv[1],"utf8")),b=L(fs.readFileSync(process.argv[2],"utf8"));const R=/^- \d{4}-W\d{2} \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z model \S.* via (?:sessions|recount)$/;const at=a.findIndex((l,i)=>b[i]!==l);const bad=b.slice(a.length).filter(l=>!R.test(l)||/[\u2013\u2014]/.test(l)).length;console.log(at>=0?"changed "+(at+1):bad?"bad "+bad:"growth ok "+(b.length-a.length))' $T/b.md $T/b/p.md) $([ "$(cat $T/b/2026-W47.md)" = keep ] && echo kept) $(ls $T/b/*-W*.md | wc -l)"; rm -rf $T` muss genau `exit=0 growth ok 3 kept 3` ausgeben.
       Prüfung: `T=$(mktemp -d); printf '# Kopf\n\nText.\n\n' > $T/p.md; cp $T/p.md $T/b.md; CP_NOW=1795000000 CP_PROBE_CLAUDE=ops/fixtures/agent-probe-claude.sh CP_PROBE_ANSWERS=ops/fixtures/agent-probe-strict CP_PROBE_OUT=$T/p.md CP_PROBE_ANSWERS_DIR=$T CP_PROBE_STATE_DIR=$T/state bash ops/agent-probe.sh --week > /dev/null 2>&1; echo "exit=$? $(head -c $(wc -c < $T/b.md) $T/p.md | cmp -s - $T/b.md && echo prefix) $(tail -n 1 $T/p.md | grep -cE '^- 2026-W47 ')"; rm -rf $T` muss genau `exit=0 prefix 1` ausgeben.
-- [ ] Liegt die Antwortdatei der Woche schon vor, aber keine Zeile, zählt `--week` sie ohne Session neu und lässt sie unverändert;
+- [x] Liegt die Antwortdatei der Woche schon vor, aber keine Zeile, zählt `--week` sie ohne Session neu und lässt sie unverändert;
       eine Antwortdatei ohne fünf Fragen hält den Lauf mit Exit 1 an (Entscheidungen 2 und 3).
       MVP: Funktion, weil ein zweiter Lauf fünf Sessions kostet und eine überschriebene Antwortdatei das Gate ablehnt.
       Prüfung: `T=$(mktemp -d); mkdir $T/a $T/b; s="CP_NOW=1795000000 CP_PROBE_CLAUDE=ops/fixtures/agent-probe-claude.sh"; env $s CP_PROBE_ANSWERS=ops/fixtures/agent-probe-two-hits CP_PROBE_OUT=$T/a/p.md CP_PROBE_ANSWERS_DIR=$T/a CP_PROBE_STATE_DIR=$T/as bash ops/agent-probe.sh --week > /dev/null 2>&1; cp $T/a/2026-W47.md $T/b/; printf '# Kopf\n' > $T/b/p.md; env $s CP_PROBE_ANSWERS=ops/fixtures/agent-probe-strict CP_PROBE_OUT=$T/b/p.md CP_PROBE_ANSWERS_DIR=$T/b CP_PROBE_STATE_DIR=$T/bs CP_PROBE_RECORD=$T/rec bash ops/agent-probe.sh --week > /dev/null 2>&1; echo "exit=$? $([ -s $T/rec ] || echo still) $(cmp -s $T/a/2026-W47.md $T/b/2026-W47.md && echo kept) $(tail -n 1 $T/b/p.md | grep -oE '^- 2026-W47 2026-11-18T11:06:40Z model [^ ]+ host [0-5]/5 card [0-5]/5 seen [0-5]/5 old [0-5]/5 failed [0-5]/5|via [a-z]+$' | sed -E 's/^- 2026-W47 [^ ]+ model [^ ]+ //' | paste -sd' ')"; rm -rf $T` muss genau `exit=0 still kept host 2/5 card 1/5 seen 0/5 old 1/5 failed 0/5 via recount` ausgeben.
       Prüfung: `T=$(mktemp -d); printf '# Kopf\n' > $T/p.md; printf 'alt\n' > $T/2026-W47.md; CP_NOW=1795000000 CP_PROBE_CLAUDE=ops/fixtures/agent-probe-claude.sh CP_PROBE_ANSWERS=ops/fixtures/agent-probe-strict CP_PROBE_OUT=$T/p.md CP_PROBE_ANSWERS_DIR=$T CP_PROBE_STATE_DIR=$T/state CP_PROBE_RECORD=$T/rec bash ops/agent-probe.sh --week > $T/o 2>&1; echo "exit=$? $(grep -c '^- ' $T/p.md) $([ -s $T/rec ] || echo still) $([ "$(cat $T/2026-W47.md)" = alt ] && echo kept) $(grep -cE '^cannot recount 2026-W47: answers file has 0 of 5 questions$' $T/o)"; rm -rf $T` muss genau `exit=1 0 still kept 1` ausgeben.
-- [ ] Je Regel ein Fall in `test/agent-probe-week.test.ts`, die Regel des Gates steht dort als Kopie mit Herkunft, und die neuen
+- [x] Je Regel ein Fall in `test/agent-probe-week.test.ts`, die Regel des Gates steht dort als Kopie mit Herkunft, und die neuen
       Fälle sind gegen das Skript der Merge-Basis rot.
       MVP: Funktion, weil eine Regel ohne roten Fall nicht bewiesen ist (`loop-constraints.md`, Grundregel 3).
       Prüfung: `for t in "appends the weekly line on its own line when the log lacks a final newline" "appends only after the last line of a log with prose and headings" "writes only lines that the loop gate accepts as PROBE_LINE" "keeps every existing line and answers file when it carries several weeks" "counts an answers file of the week without a line again instead of asking" "refuses to recount an answers file without five questions"; do grep -qF "\"$t\"" test/agent-probe-week.test.ts || echo "fehlt: $t"; done` muss nichts ausgeben.
@@ -108,25 +108,25 @@ MVP: Funktion, weil ohne die Zeile im Repo keine Woche mit der vorigen vergliche
       Prüfung: `grep -c 'gateAcceptsProbeLog' test/agent-probe-week.test.ts` muss mindestens 2 ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/agent-probe-week.test.ts` muss Exit-Code 0 haben.
       Prüfung: `T=$(mktemp -d); git archive $(git merge-base origin/dev HEAD) ops | tar -x -C $T; AGENT_PROBE_UNDER_TEST=$T/ops/agent-probe.sh PATH=/usr/bin:$PATH pnpm -s vitest run test/agent-probe-week.test.ts > /dev/null 2>&1 && echo gruen || echo rot; rm -rf $T` muss genau `rot` ausgeben.
-- [ ] `### Weekly run` in `ops/README.md` sagt, was der Richtungs-Check in seinen PR legt (Entscheidung 6), und die Entscheidungen
+- [x] `### Weekly run` in `ops/README.md` sagt, was der Richtungs-Check in seinen PR legt (Entscheidung 6), und die Entscheidungen
       stehen in `goals/werbung/ANNAHMEN.md`.
       MVP: Funktion, weil der Richtungs-Check den Wochenlauf aus genau diesem Abschnitt liest.
       Prüfung: `node -e 'const s=require("fs").readFileSync("ops/README.md","utf8");const i=s.indexOf("### Weekly run");const j=s.indexOf("\n#",i+5);const t=i<0?"":s.slice(i,j<0?undefined:j);const need=["loop/kurs/<YYYY-MM-DD-HHMM>-richtung","docs/kunden/agenten-probe/<YYYY-Www>.md","docs/richtung/<YYYY-MM-DD>.md","bash ops/agent-probe.sh --week","bash ops/traffic.sh --agents 168","exit 1"];const miss=need.filter(n=>!t.toLowerCase().includes(n.toLowerCase()));console.log(miss.length?"fehlt: "+miss.join(", "):"pr ok")'` muss genau `pr ok` ausgeben.
       Prüfung: `grep -cE '^- [0-9-]+, werbung 04: ' goals/werbung/ANNAHMEN.md` muss mindestens 6 ausgeben.
-- [ ] Was werbung 03 prüft, bleibt: Die Fälle und Daten von werbung 02 und 03 sind unverändert und grün, und der Selbsttest läuft.
+- [x] Was werbung 03 prüft, bleibt: Die Fälle und Daten von werbung 02 und 03 sind unverändert und grün, und der Selbsttest läuft.
       MVP: Funktion, weil ein fertiges Goal nicht rot werden darf, nur weil ein neues daneben baut.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/agent-probe.test.ts test/traffic-agents.test.ts` muss Exit-Code 0 haben.
       Prüfung: `bash ops/agent-probe.sh --selftest 2>&1 | tail -n 1` muss genau `SELFTEST OK` ausgeben.
       Prüfung: `T=$(mktemp -d); CP_PROBE_CLAUDE=ops/fixtures/agent-probe-claude.sh CP_PROBE_ANSWERS=ops/fixtures/agent-probe-strict CP_PROBE_OUT=$T/p.md CP_PROBE_ANSWERS_DIR=$T CP_PROBE_STATE_DIR=$T/state bash ops/agent-probe.sh --week > /dev/null 2>&1; echo "exit=$? $(tail -n 1 $T/p.md | grep -oE 'host [0-5]/5 card [0-5]/5 seen [0-5]/5 old [0-5]/5 failed [0-5]/5')"; rm -rf $T` muss genau `exit=0 host 3/5 card 2/5 seen 1/5 old 0/5 failed 0/5` ausgeben.
       Prüfung: `git diff --quiet $(git merge-base origin/dev HEAD) HEAD -- test/agent-probe.test.ts test/traffic-agents.test.ts docs/kunden ops/fixtures goals/werbung/01-karte-zuerst-ueberall.md goals/werbung/02-empfehlen-uns-agenten.md goals/werbung/03-probe-jede-woche.md && echo unveraendert` muss genau `unveraendert` ausgeben.
-- [ ] Der Diff bleibt in den Pfaden dieses Goals, nichts unter `src/` ändert sich, kein Test fällt weg, und keine Datei nennt eine
+- [x] Der Diff bleibt in den Pfaden dieses Goals, nichts unter `src/` ändert sich, kein Test fällt weg, und keine Datei nennt eine
       Adresse oder einen Schlüssel.
       MVP: Funktion, weil ein Messwerkzeug den Dienst nicht berührt und keinen Rollout auslösen darf.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD | grep -vE '^(ops/agent-probe\.sh|ops/README\.md|test/agent-probe-week\.test\.ts|goals/werbung/.*|goals/_vorschlaege/werbung-[a-z0-9-]+\.md)$' | wc -l` muss 0 ausgeben.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD -- src deploy mcp harness .github | wc -l` muss 0 ausgeben.
       Prüfung: `git diff --diff-filter=D --name-only $(git merge-base origin/dev HEAD) HEAD -- test ops docs | wc -l` muss 0 ausgeben.
       Prüfung: `git diff $(git merge-base origin/dev HEAD) HEAD -- . | perl -CSD -ne 'print if /^\+/ && /0x[0-9a-fA-F]{40}|sk-[A-Za-z0-9_-]{20,}|[\x{2013}\x{2014}]/' | wc -l` muss 0 ausgeben.
-- [ ] `check` ist grün.
+- [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
 - [ ] goal-verifier PASS (K und B)
 
@@ -163,5 +163,6 @@ MVP: Funktion, weil ohne die Zeile im Repo keine Woche mit der vorigen vergliche
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-25 Zyklus 1: Punkte 1 bis 7 gebaut: `--week` hängt über `append_run_line` an allen drei Stellen jede Zeile auf eine eigene Zeile hinter die letzte, zählt eine Antwortdatei der Woche ohne Zeile ohne Session neu (`via recount`, Zeit aus `Run`, häufigstes Modell) und hält bei einer Antwortdatei ohne `## q1` bis `## q5` mit Exit 1 an; 6 Fälle in `test/agent-probe-week.test.ts` mit `PROBE_LINE` als Kopie aus code-host d1d1f67b und `gateAcceptsProbeLog`, zwei Absätze unter `### Weekly run`, 6 Annahmen. Rot gesehen: Fälle 1, 5 und 6 gegen das Skript der Merge-Basis; Fall 2 gegen eine Mutante, die vor der letzten Zeile einfügt, Fall 3 gegen eine mit Gedankenstrich in der Zeile, Fall 4 gegen eine, die beim Nachtrag eine vorhandene Antwortdatei überschreibt. Die 40 Prüfbefehle von werbung 03 an Merge-Basis und Kopf gleich im Ergebnis, außer den Umfangszählern von werbung 03 (Punkte 9.1 und 9.5 messen den Diff dieses Branches) und einem Fall in `test/agent-probe.test.ts`, den ein Ordner `agent-probe-state-must-not-exist` im Worktree rot machte: Die Gegenprobe von werbung 03 mit dem Skript aus `git archive` legt ihn an, weil der Zustand dann außerhalb von dessen Repo liegt; entfernt, danach grün. Prüfbefehle: P1 `exit=0 growth ok 1`, `exit=0 growth ok 3 kept 3`, `exit=0 prefix 1`; P2 `exit=0 still kept host 2/5 card 1/5 seen 0/5 old 1/5 failed 0/5 via recount`, `exit=1 0 still kept 1`; P3 nichts fehlt, `1`, `1`, `13`, vitest Exit 0, `rot`; P4 `pr ok`, `6`; P5 vitest Exit 0, `SELFTEST OK`, `exit=0 host 3/5 card 2/5 seen 1/5 old 0/5 failed 0/5`, `unveraendert`; P6 `0`, `0`, `0`, `0`; P7 check grün in 147 s (280 Dateien, 2880 Tests).
 
 ## Blockers
