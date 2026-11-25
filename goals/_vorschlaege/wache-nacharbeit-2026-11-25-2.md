@@ -6,3 +6,5 @@ Empfehlung: `${heldFor}` ohne Rückfall loggen und die Bedingung in `:347` auf `
 MVP: Schönheit
 
 Linse Q, Frage 3.
+
+Übernommen: Watch List in STATE.md (2026-11-25)
