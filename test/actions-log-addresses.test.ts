@@ -38,6 +38,7 @@ function workspace() {
         CP_OWN_IPS_FILE: own,
         CP_KNOWN_IPS: empty,
         CP_CRAWLER_IPS: empty,
+        CP_GH_RETRY_PAUSE: "0",
         ...env,
       },
     });
@@ -236,6 +237,31 @@ describe("ops/actions-log-addresses.sh counts stranger addresses in Actions logs
     const r = w.run(["--runs", "14,15"]);
     expect(r.status, r.out).toBe(0);
     expect(r.lines).toEqual(["14 no-log", "15 1", "total 1"]);
+  });
+
+  it("tries a log again when gh fails without an HTTP status or with a 5xx once, and counts it", () => {
+    const w = workspace();
+    writeFileSync(join(w.root, "archive.zip"), zip({ "0_deploy.txt": STRANGER_LINE }));
+    const tries = join(w.root, "tries");
+    w.gh(
+      `echo "$*" >> ${JSON.stringify(tries)}; n=$(grep -c "runs/$(echo "$*" | sed 's|.*runs/\\([0-9]*\\)/logs.*|\\1|')/logs" ${JSON.stringify(tries)});` +
+        ` case "$*" in *runs/16/logs*) [ "$n" -ge 2 ] || { echo 'unexpected EOF' >&2; exit 1; };;` +
+        ` *runs/17/logs*) [ "$n" -ge 3 ] || { echo 'gh: Server Error (HTTP 502)' >&2; exit 1; };; *) exit 9;; esac;` +
+        ` cat ${JSON.stringify(join(w.root, "archive.zip"))}`,
+    );
+    const r = w.run(["--runs", "16,17"]);
+    expect(r.status, r.out).toBe(0);
+    expect(r.lines).toEqual(["16 1", "17 1", "total 1"]);
+  });
+
+  it("gives up with exit 2 and no total line when gh keeps failing on a log without an HTTP status", () => {
+    const w = workspace();
+    const tries = join(w.root, "tries");
+    w.gh(`echo "$*" >> ${JSON.stringify(tries)}; echo 'read: connection reset by peer' >&2; exit 1`);
+    const r = w.run(["--runs", "18"]);
+    expect(r.status, r.out).toBe(2);
+    expect(r.stdout).not.toMatch(/^total/m);
+    expect(spawnSync("grep", ["-c", "runs/18/logs", tries], { encoding: "utf8" }).stdout.trim()).toBe("3");
   });
 
   it("ends with exit 2 and no total line when gh fails to list the runs", () => {

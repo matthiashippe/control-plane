@@ -33,7 +33,8 @@
 # log is gone, gh answers 404 or 410, or the archive is empty), ascending by id, then "total <n>" (distinct over all runs).
 #
 # Exit 0: counted. Exit 2: could not count (gh failed while listing or on a log for another reason
-# than a missing one, bad arguments, unreadable list). Exit 2 never prints a total line, so a network
+# than a missing one, after three tries when it failed without an HTTP status or with a 5xx, bad arguments,
+# unreadable list). Exit 2 never prints a total line, so a network
 # error is never read as zero.
 set -uo pipefail
 
@@ -105,8 +106,20 @@ if [[ -z "$dir" ]]; then
   dir="$work/logs"
   mkdir -p "$dir"
   for id in $(sort -un "$ids"); do
-    if ! gh api "repos/$REPO/actions/runs/$id/logs" > "$work/$id.zip" 2> "$work/err"; then
+    # A failure without an HTTP status (connection reset, timeout) or with a 5xx is transient: try the log up to three
+    # times, so one dropped download among hundreds does not abort the count. Every other failure ends at once.
+    attempt=1 fetched=0
+    while true; do
+      if gh api "repos/$REPO/actions/runs/$id/logs" > "$work/$id.zip" 2> "$work/err"; then
+        fetched=1
+        break
+      fi
       status="$(http_status "$work/err" || true)"
+      [[ $attempt -lt 3 && ( -z "$status" || "$status" == "HTTP 5"* ) ]] || break
+      attempt=$((attempt + 1))
+      sleep "${CP_GH_RETRY_PAUSE:-5}"
+    done
+    if [[ $fetched -eq 0 ]]; then
       if [[ "$status" == "HTTP 404" || "$status" == "HTTP 410" ]]; then
         echo "$id no-log" >> "$results"
         rm -f "$work/$id.zip"
