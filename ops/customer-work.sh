@@ -23,6 +23,7 @@
 #   HOUSE: <j> house jobs posted, <s> house submissions, <a> house awards (<c> to the customer)
 #   HOUSE REPORT <METHOD> <path> <status>: <n>   each call named in the house reports of the window
 #   HOUSE STEP: <n> step credits (<c> to the customer)
+#   HOUSE STEP USE: <i> inference rows of the customer after his step credit
 #   HOUSE DAY <YYYY-MM-DD>: <a> house awards, <f> to addresses without earlier inference, <s> step credits
 #   AWARDS: <w> awarded to the customer, <i> inference rows after the first award
 #
@@ -37,6 +38,9 @@
 # service writes while a house job is open: step credits in the window at addresses that oursClause does not call
 # ours, and those to the customer. Per UTC day, the days of the DAY lines: the house awards of the HOUSE line by
 # the day of the award, those to an address without an inference row before the award, and the step credits.
+# HOUSE STEP USE (kunden 14) counts the customer's inference rows after his step credit in the window and before
+# --until, 0 without one; the service writes an inference row only after a billed answer, so above 0 means his
+# next inference after the step credit ended with 200.
 # Exit 1 on a wrong argument, a time that is no ISO time in UTC, or --until not after --since.
 # Exit 2 when the own list is missing or empty, the log or the JSON cannot be read, or the customer is unknown.
 set -uo pipefail
@@ -137,7 +141,7 @@ try:
         assert c["method"] in HOUSE_METHODS and isinstance(c["status"], int) and 100 <= c["status"] <= 599
         assert isinstance(c["path"], str) and c["path"].startswith("/") and isinstance(c["n"], int) and c["n"] > 0
         house_calls[(c["method"], house_path(c["path"]), c["status"])] += c["n"]
-    for k in ("steps", "steps_customer"):
+    for k in ("steps", "steps_customer", "steps_customer_inference"):
         assert isinstance(house[k], int) and house[k] >= 0
     assert house["steps_customer"] <= house["steps"]
     house_days = {}
@@ -182,6 +186,8 @@ for (method, path, code), k in sorted(house_calls.items()):
     print(f"HOUSE REPORT {method} {path} {code}: {k}")
 steps, steps_customer = (house[k] for k in ("steps", "steps_customer"))
 print(f"HOUSE STEP: {steps} step credits ({steps_customer} to the customer)")
+step_use = house["steps_customer_inference"]
+print(f"HOUSE STEP USE: {step_use} inference rows of the customer after his step credit")
 for d in days:
     da, df, ds = (house_days[d][k] for k in ("awards", "awards_without_inference", "steps"))
     print(f"HOUSE DAY {d}: {da} house awards, {df} to addresses without earlier inference, {ds} step credits")
@@ -255,7 +261,10 @@ const award = (id, address, at) => {
 row(prior, "inference", -100, "planted-prior", {}, "2026-11-12T12:00:00.000Z");
 award("planted-fresh", fresh, "2026-11-13T12:00:00.000Z");
 row(fresh, "inference", -100, "planted-fresh-after", {}, "2026-11-13T13:00:00.000Z");
+row(customer, "inference", -100, "planted-before-step", {}, "2026-11-14T06:30:00.000Z");
 step(customer, "2026-11-14T07:00:00.000Z");
+row(prior, "inference", -100, "planted-other-after-step", {}, "2026-11-14T10:00:00.000Z");
+row(customer, "inference", -100, "planted-after-until", {}, "2026-11-16T03:00:00.000Z");
 step(own, "2026-11-14T07:30:00.000Z");
 step(fresh, "2026-11-15T08:00:00.000Z");
 award("planted-prior", prior, "2026-11-15T11:00:00.000Z");
@@ -275,7 +284,7 @@ if [[ "${1:-}" == "--selftest" ]]; then
   log="$fx/customer-work.log"; plant="$fx/customer-work-plant.mts"
   export CP_OWN_IPS="$fx/customer-work-own-ips.txt"
   [[ -f "$log" && -f "$plant" && -f "$CP_OWN_IPS" ]] || { echo "SELFTEST FAILED: fixture missing in $fx"; exit 1; }
-  S=2026-11-13T00:00:00Z; U=2026-11-16T00:00:00Z; F=$NUMBERED_FROM_DEFAULT
+  S=2026-11-13T00:00:00Z; U=2026-11-16T00:00:00Z; U3=2026-11-17T00:00:00Z; F=$NUMBERED_FROM_DEFAULT
   fail=0
   want() { # actual, expected, reason
     if [[ "$1" == "$2" ]]; then echo "ok   $3"; else echo "FAIL $3"; echo "     want: $2"; echo "     got:  $1"; fail=1; fi
@@ -304,6 +313,7 @@ if [[ "${1:-}" == "--selftest" ]]; then
   report_local "$stub/step.db" "$S" "$U" 1 "$F" >"$stub/s1.json"
   report_local "$stub/step.db" "$S" "$U" 2 "$F" >"$stub/s2.json"
   report_local "$stub/step-foreign.db" "$S" "$U" 1 "$F" >"$stub/s1-foreign.json"
+  report_local "$stub/step.db" "$S" "$U3" 1 "$F" >"$stub/s1-later.json"
 
   out=$(count "$stub/c1.json" "$log" "$S" "$U" 1 1); rc=$?
   want "$rc" "0" "the planted window exits 0"
@@ -414,6 +424,19 @@ if [[ "${1:-}" == "--selftest" ]]; then
   sout3=$(count "$stub/s2.json" "$log" "$S" "$U" 2 1)
   want "$(line '^HOUSE STEP:' "$sout3")" "HOUSE STEP: 2 step credits (0 to the customer)" \
     "step credit counter-proof: for the other customer the step credit of customer 1 is not its own"
+
+  # The inference rows of the customer after his step credit (kunden 14).
+  want "$(line '^HOUSE STEP USE:' "$sout")" "HOUSE STEP USE: 2 inference rows of the customer after his step credit" \
+    "step use: the customer's inference rows after his step credit and before --until counted; the one before it, the one after --until and those of another address not"
+  want "$(grep -A1 -E '^HOUSE STEP:' <<<"$sout" | sed -n 2p | cut -d: -f1)" "HOUSE STEP USE" \
+    "step use line comes right after HOUSE STEP"
+  want "$(line '^HOUSE STEP USE:' "$(count "$stub/s1-later.json" "$log" "$S" "$U3" 1 1)")" \
+    "HOUSE STEP USE: 3 inference rows of the customer after his step credit" \
+    "step use counter-proof: with --until after his later inference row that row is counted too"
+  want "$(line '^HOUSE STEP USE:' "$hout")" "HOUSE STEP USE: 0 inference rows of the customer after his step credit" \
+    "step use counter-proof: without a step credit his inference rows in the window are not counted"
+  want "$(line '^HOUSE STEP USE:' "$sout3")" "HOUSE STEP USE: 0 inference rows of the customer after his step credit" \
+    "step use counter-proof: the other customer has no step credit, so the rows after the step credit of customer 1 are not its own"
 
   count "$stub/c3.json" "$log" "$S" "$U" 3 1 >/dev/null 2>&1; rc=$?
   want "$rc" "2" "a customer number nobody has exits 2"

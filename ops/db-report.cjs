@@ -592,6 +592,19 @@ if (process.env.CP_REPORT === "customer-work") {
   const houseSteps = all("select address, created_at from ledger where kind = 'house_step'").filter(
     (s) => inWindow(s.created_at) && foreign(s.address),
   );
+  // kunden 14: the customer's `inference` rows after his `house_step` row and before CP_UNTIL, 0 without a step
+  // credit in the window. src/inference/proxy.ts writes an `inference` row only after a billed answer, so a count
+  // above 0 means his next inference after the step credit ended with 200.
+  const stepAt = houseSteps
+    .filter((s) => mine.has(String(s.address).toLowerCase()))
+    .map((s) => ms(s.created_at))
+    .sort((a, b) => a - b)[0] ?? null;
+  const stepsCustomerInference = stepAt === null
+    ? 0
+    : all("select address, created_at from ledger where kind = 'inference'")
+        .filter((r) => mine.has(String(r.address).toLowerCase()))
+        .map((r) => ms(r.created_at))
+        .filter((t) => t !== null && t > stepAt && t < ms(until)).length;
   const withoutEarlierInference = (a) => {
     const first = a.first_inference === null ? null : ms(a.first_inference);
     return first === null || first >= ms(a.created_at);
@@ -625,6 +638,7 @@ if (process.env.CP_REPORT === "customer-work") {
     awards_customer: houseAwards.filter((a) => mine.has(String(a.address).toLowerCase())).length,
     steps: houseSteps.length,
     steps_customer: houseSteps.filter((s) => mine.has(String(s.address).toLowerCase())).length,
+    steps_customer_inference: stepsCustomerInference,
     days: houseDays,
     calls: [...callCount.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)).map(([key, count]) => {
       const [method, path, status] = JSON.parse(key);
