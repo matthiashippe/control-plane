@@ -6,3 +6,4 @@ Empfehlung: Ein Goal prüft auf 8453 beim Aufruf von `payout` und `retire`, dass
 MVP: Funktion, weil die Ausnahme Hauptnetz dann nur noch Aufrufe an Weiterleitungen zulässt, die der Schlüssel selbst geprüft angelegt hat.
 
 Kritik Tech Lead an regeln 02 (PR #444). Nicht als Done-Punkt, weil die Deny List von regeln 02 den Aufrufweg nicht umfasst und die Frage nach der Quelle der destination einen eigenen Schnitt braucht.
+Übernommen: als Glied an den Tech Lead (PRO-30347, Glied an regeln: payout und retire nur an die eigene Weiterleitung) (2026-11-26)
