@@ -186,6 +186,14 @@ MVP: Funktion, weil der einzige Kunde, der Sandbox und Inferenz zugleich bezahlt
       Prüfung: `/usr/bin/grep -cE "^- [0-9-]+, kunden 16: " goals/kunden/ANNAHMEN.md` muss mindestens 3 ausgeben.
 - [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
+- [ ] Jede Zahl im Abschnitt `## Befund` von `docs/kunden/sandbox-kunde-2026-11.md`, die nicht im Codeblock der Ausgabe steht
+      (verfügbares Guthaben gegen die Reservierung einer Anfrage mit 4096 Tokens, Tokens der letzten 30 Prompts, Zeiten der Salven
+      und der letzten Abfrage des Guthabens, Wallet unter 5 USD), steht mit dem nur lesenden Befehl, aus dem sie stammt, als eigene
+      Zeile `$ <Befehl>` und darunter seiner Ausgabe in einem Codeblock, ohne Adresse, Wallet, Sandbox-ID oder Betrag je Kunde; eine
+      Adresse steht nie im Befehl, er liest sie selbst im Container (Grundregel 3).
+      MVP: Funktion, weil das Wort `kein Geld` statt `Fehler bei uns` genau an diesen Zahlen hängt und sie heute niemand nachfahren kann.
+      Prüfung: `/usr/bin/grep -cE '^\$ ' docs/kunden/sandbox-kunde-2026-11.md` muss mindestens 5 ausgeben.
+      Prüfung: `/usr/bin/grep -cE '^\$ .*(reserve|costMc|requiredMc)' docs/kunden/sandbox-kunde-2026-11.md` muss mindestens 1 ausgeben.
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
