@@ -136,6 +136,13 @@ MVP: Funktion, weil Runtimes ankommen und denken, aber keine zahlt, und der Mens
       Prüfung: `grep -cE "^- [0-9-]+, kunden 15: " goals/kunden/ANNAHMEN.md` muss mindestens 3 ausgeben.
 - [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
+- [ ] `automaton --status` zeigt die Zeile auch, während die Runtime schläft, wenn ihr zuletzt gelesenes Guthaben
+      (`last_known_balance`) in der Stufe `critical` oder `dead` liegt, und mit gutem Guthaben weiter nicht; als neues Release.
+      MVP: Funktion, weil die Runtime ohne Guthaben nach fünf 402 in Folge fünf Minuten schläft (`MAX_CONSECUTIVE_ERRORS = 5` in
+      `src/agent/loop.ts` des Forks, passt zu rund einer 402 je Minute), `--status` deshalb fast immer `sleeping` liest und die Zeile
+      heute gerade dem Menschen verschweigt, der nachsieht, warum seine Runtime nichts tut.
+      Prüfung (Netz): `t=$(grep -oE '^Release: \S+' docs/paket/anleitung.md | cut -d' ' -f2); d=$(mktemp -d); git clone -q --depth 1 --branch "${t:?}" https://github.com/matthiashippe/automaton "$d" && grep -c 'it("--status while sleeping shows it when the last known balance is critical, not when it is healthy"' "$d/src/__tests__/card-line.test.ts"` muss 1 ausgeben.
+      Prüfung (Netz): `t=$(grep -oE '^Release: \S+' docs/paket/anleitung.md | cut -d' ' -f2); d=$(mktemp -d); git clone -q --depth 1 --branch "${t:?}" https://github.com/matthiashippe/automaton "$d" && cat "$d/src/index.ts" "$d/src/survival/card-line.ts" | grep -c "last_known_balance"` muss mindestens 1 ausgeben.
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
