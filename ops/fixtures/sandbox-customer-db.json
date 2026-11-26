@@ -1,0 +1,57 @@
+{
+  "since": "2026-11-21T00:00:00.000Z",
+  "until": "2026-11-22T00:00:00.000Z",
+  "hold_mc": 1000,
+  "foreign_topups_week": 1,
+  "customers": [
+    {
+      "n": 1,
+      "balance_mc": 500,
+      "reserved_mc": 0,
+      "sandboxes": [
+        {
+          "tier": "medium",
+          "status": "stopped",
+          "stop_reason": "credit",
+          "steps_billed": 3,
+          "created_at": "2026-11-21T02:27:00.000Z",
+          "last_step_at": "2026-11-21T02:45:00.000Z"
+        }
+      ],
+      "ledger": [
+        {
+          "at": "2026-11-21T02:13:00.000Z",
+          "kind": "grant"
+        },
+        {
+          "at": "2026-11-21T02:20:00.000Z",
+          "kind": "inference"
+        },
+        {
+          "at": "2026-11-21T02:33:00.000Z",
+          "kind": "sandbox"
+        },
+        {
+          "at": "2026-11-21T02:39:00.000Z",
+          "kind": "sandbox"
+        },
+        {
+          "at": "2026-11-21T02:45:00.000Z",
+          "kind": "sandbox"
+        },
+        {
+          "at": "2026-11-21T02:50:00.000Z",
+          "kind": "inference"
+        },
+        {
+          "at": "2026-11-21T03:00:00.000Z",
+          "kind": "topup"
+        },
+        {
+          "at": "2026-11-21T03:10:00.000Z",
+          "kind": "inference"
+        }
+      ]
+    }
+  ]
+}
