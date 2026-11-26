@@ -1,7 +1,7 @@
 # Regeln Goal 03: Auf 8453 gehen `payout` und `retire` nur an eine eigene Weiterleitung
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 `requireRule10` (`src/konto/chain.ts:138`) lässt auf chainId 8453 einen Aufruf von `payout` oder `retire` zu, sobald das Ziel gleich
@@ -79,7 +79,7 @@ anlegt.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD | grep -vE '^(src/konto/chain\.ts|src/konto/payout\.ts|src/konto/forwarder\.ts|src/db\.ts|test/konto-[a-z-]+\.test\.ts|goals/regeln/.*)$' | wc -l` muss 0 ausgeben.
 - [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Jeder neue Fall zur Verweigerung war vor dem Fix rot; die Zeile im Progress Log nennt, womit.
@@ -105,5 +105,6 @@ anlegt.
 ## Progress Log
 - 2026-11-26 Zyklus 1: Punkte 1, 2, 3, 4 gebaut: `requireRule10` lässt `payout` und `retire` auf 8453 nur an `forwarderAddress(Konto der Erlaubnis, tx.forwarder.destination, feste Werte mit dem sendenden Schlüssel)` zu, `konto_payouts.retire_destination` neu, `sendPayout` reicht die destination durch (f02ebd9, c425ffe); die neuen Fälle waren rot auf 6eb1531 (send-guard 4 failed | 15 passed, Transaktion ging hinaus) und vor dem Weg (konto-payout 3 failed | 27 passed). Prüfbefehle: send-guard Exit 0; Titel `alle`; forwarderAddress in chain.ts 3; retire_destination in db.ts 3, in payout.ts 7; `passes the forwarder destination` `ja`; sechs konto-Dateien Exit 0; Dateien außerhalb des Umfangs 0; check Exit 0 (281 Dateien, 2903 Tests, 587 s unter Last).
 - 2026-11-26 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4; `dev` (6eb1531) lag schon im Branch, alle Prüfbefehle am Kopf 11827b0 neu gefahren. Prüfbefehle: send-guard Exit 0; Titel `alle`; forwarderAddress in chain.ts 3; retire_destination in db.ts 3, in payout.ts 7; `passes the forwarder destination` `ja`; sechs konto-Dateien Exit 0 (58 Tests); Dateien außerhalb des Umfangs 0; check Exit 0 (2903 Tests, 192 s); Job check am PR #455 pass.
+- 2026-11-26 Release: PASS K und B (Zyklus 2), DONE.
 
 ## Blockers
