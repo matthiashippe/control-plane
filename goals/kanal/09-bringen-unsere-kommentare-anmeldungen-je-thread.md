@@ -1,7 +1,7 @@
 # Kanal Goal 09: Bringen unsere Kommentare in den Conway-Threads Anmeldungen, je Thread?
 
 ## Status
-PLANNED
+PAUSED
 
 ## Active Objective
 Das Konto hat in `Conway-Research/automaton` Kommentare in 29 Threads: neun Antworten der Runden 0 bis 2 vom 10. bis 12.11.2026
@@ -249,3 +249,4 @@ MVP: Funktion, weil reichweite 02 bis 05 die Kommentare pflegen und erst diese Z
 ## Progress Log
 
 ## Blockers
+Pause: Kurs-Check 2026-11-26, Messung eines Kanals ohne Nachschub: 0 Ankünfte von github.com/Conway-Research vom 19. bis 26.11. (ops/github-yield.sh), letzte eigene Antwort am 12.11. (ops/posted-answers.log), während die gepflegte Runtime (paket 01) in vier Tagen 2 fremde Anmeldungen brachte; zurück auf PLANNED, sobald ein neues Onboarding-Issue in Conway-Research/automaton kommt
