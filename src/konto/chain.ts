@@ -8,13 +8,19 @@
  *
  * On Base (8453) `requireRule10` also checks the kind of transaction (goals/regeln/01, rule 10, exception main network): only
  * approveWithSignature, revokeAsSpender and spend at SPEND_PERMISSION_MANAGER, the deployment of a forwarder at DEPLOY_PROXY and a
- * call of payout or retire at the forwarder that is the spender of the permission in its data go out. Everything else, empty data
+ * call of payout or retire at our own forwarder (the spender of the permission in its data, see goals/regeln/03 below) go out. Everything else, empty data
  * and handleOps included, is refused before the first request. On Base Sepolia only the chain is checked.
  *
  * A deployment of a forwarder on Base also has its arguments checked (goals/regeln/02): behind the prefix stand exactly five
  * ABI-encoded addresses (account, destination, token, manager, caller), token is MAINNET_USDC, manager is SPEND_PERMISSION_MANAGER
  * and caller is the address of the key that sends. The length is exact because the constructor reads its arguments from the end of
  * the init code: words appended behind our own five would be the ones it builds with.
+ *
+ * A call of payout or retire on Base also has its target checked against CREATE2 (goals/regeln/03): the caller names the
+ * destination in `tx.forwarder`, and the target must be forwarderAddress for the account of the permission, that destination and
+ * our fixed values with the sending key as caller. Only a deployment through DEPLOY_PROXY with exactly our bytecode and these five
+ * arguments can hold code there, so a foreign contract that names itself as spender is refused. Without the destination the call
+ * is refused as well.
  */
 import { readFileSync } from "node:fs";
 import {
@@ -34,7 +40,7 @@ import {
 import { privateKeyToAccount } from "viem/accounts";
 import { KONTO_CHAIN_ID, MAINNET_CHAIN_ID, MAINNET_USDC, SEPOLIA_NET, SPEND_PERMISSION_MANAGER, type KontoNet } from "./config.js";
 import { FORWARDER_ABI, FORWARDER_BYTECODE } from "./forwarder.js";
-import { DEPLOY_PROXY, FORWARDER_SALT } from "./payout.js";
+import { DEPLOY_PROXY, FORWARDER_SALT, forwarderAddress } from "./payout.js";
 import { SPEND_PERMISSION_MANAGER_ABI } from "./topup.js";
 
 /** Throws for every chain except Base Sepolia (84532). */
@@ -78,18 +84,34 @@ function rule10Kinds(): Rule10 {
   return rule10;
 }
 
-/**
- * The spender of the permission in a call of payout or retire, lower case; null when the data does not decode. A forwarder is the
- * spender of its own permission, so a call whose target is not that spender is no call of our own forwarder.
- */
-function spenderOf(data: Hex): string | null {
+/** Account and spender of the permission in a call of payout or retire, lower case; null when the data does not decode. */
+function permissionOf(data: Hex): { account: Address; spender: string } | null {
   try {
     const { args } = decodeFunctionData({ abi: FORWARDER_ABI, data });
-    const permission = args?.[0] as { spender?: unknown } | undefined;
-    return typeof permission?.spender === "string" ? permission.spender.toLowerCase() : null;
+    const permission = args?.[0] as { account?: unknown; spender?: unknown } | undefined;
+    if (typeof permission?.spender !== "string" || typeof permission.account !== "string") return null;
+    return { account: permission.account as Address, spender: permission.spender.toLowerCase() };
   } catch {
     return null;
   }
+}
+
+/**
+ * Why a call of payout or retire at `to` is no call of our own forwarder on Base, or null when it is. A forwarder is the spender of
+ * its own permission; on top of that `to` must be the CREATE2 address of our bytecode for the account of the permission, the
+ * destination the caller names and our fixed values with `sender` as caller. Names no value, only the reason.
+ */
+function forwarderCallFault(to: string, data: Hex, forwarder: KontoTx["forwarder"], sender: Address): string | null {
+  const permission = permissionOf(data);
+  if (!permission || permission.spender !== to) return "spender";
+  if (!forwarder?.destination) return "forwarder destination missing";
+  let own: string;
+  try {
+    own = forwarderAddress(permission.account, forwarder.destination, { token: MAINNET_USDC, manager: SPEND_PERMISSION_MANAGER, caller: sender }).toLowerCase();
+  } catch {
+    return "not our forwarder";
+  }
+  return own === to ? null : "not our forwarder";
 }
 
 /** The constructor arguments of the forwarder, in the order forwarderInitCode encodes them. */
@@ -135,7 +157,7 @@ function deployArgumentFault(data: Hex, prefix: Hex, sender: Address): string | 
  * forwarder deployment must name it as caller. The error names target, selector and the argument that does not fit, never the
  * data or a value. Other chains are not checked here.
  */
-export function requireRule10(chainId: number, tx: Pick<KontoTx, "to" | "data">, sender: Address): void {
+export function requireRule10(chainId: number, tx: Pick<KontoTx, "to" | "data" | "forwarder">, sender: Address): void {
   if (chainId !== MAINNET_CHAIN_ID) return;
   const kinds = rule10Kinds();
   const to = String(tx.to).toLowerCase();
@@ -147,7 +169,12 @@ export function requireRule10(chainId: number, tx: Pick<KontoTx, "to" | "data">,
     if (!fault) return;
     throw new Error(`refused: rule 10 sends nothing on chain ${chainId} to ${to} with selector ${selector ?? "none"}: forwarder argument ${fault} does not fit`);
   }
-  if (selector && kinds.forwarder.has(selector) && spenderOf(data) === to) return;
+  if (selector && kinds.forwarder.has(selector)) {
+    const fault = forwarderCallFault(to, data, tx.forwarder, sender);
+    if (!fault) return;
+    // The plain refusal for a target that is not the spender, as before goals/regeln/03; the two new reasons are named.
+    if (fault !== "spender") throw new Error(`refused: rule 10 sends nothing on chain ${chainId} to ${to} with selector ${selector}: ${fault}`);
+  }
   throw new Error(`refused: rule 10 sends nothing on chain ${chainId} to ${to} with selector ${selector ?? "none"}`);
 }
 
@@ -169,6 +196,11 @@ export interface KontoTx {
   data: Hex;
   /** A fixed gas limit; without it the node estimates one (and refuses a call that would revert). */
   gas?: bigint;
+  /**
+   * For payout and retire: the destination the forwarder was deployed with. On Base the target must be the forwarder computed from
+   * it (goals/regeln/03); never sent to the chain, only used to compute that address.
+   */
+  forwarder?: { destination: Address };
 }
 
 /**
