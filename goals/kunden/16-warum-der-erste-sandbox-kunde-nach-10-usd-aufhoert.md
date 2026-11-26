@@ -1,7 +1,7 @@
 # Kunden Goal 16: Warum der erste Sandbox-Kunde nach 10 USD aufhört
 
 ## Status
-PLANNED
+DONE
 
 ## Active Objective
 Am 21.11.2026 hat eine fremde Runtime (Schlüssel `conway-automaton`) das Abschlusskriterium erfüllt: Startgutschrift, Sandbox Stufe
@@ -194,7 +194,7 @@ MVP: Funktion, weil der einzige Kunde, der Sandbox und Inferenz zugleich bezahlt
       MVP: Funktion, weil das Wort `kein Geld` statt `Fehler bei uns` genau an diesen Zahlen hängt und sie heute niemand nachfahren kann.
       Prüfung: `/usr/bin/grep -cE '^\$ ' docs/kunden/sandbox-kunde-2026-11.md` muss mindestens 5 ausgeben.
       Prüfung: `/usr/bin/grep -cE '^\$ .*(reserve|costMc|requiredMc)' docs/kunden/sandbox-kunde-2026-11.md` muss mindestens 1 ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Kein Aufruf in der Produktion, der etwas anlegt oder bucht; gelesen wird nur über `ops/sandbox-customer.sh` und die Werkzeuge,
@@ -227,5 +227,6 @@ MVP: Funktion, weil der einzige Kunde, der Sandbox und Inferenz zugleich bezahlt
 - 2026-11-26 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, `dev` war schon enthalten, alle Prüfbefehle am Kopf 9d41e0b neu gefahren. Prüfbefehle: P1 vitest sandbox-customer Exit 0, Titel `alle`, db-report, no-duplicate-keys und customer-decline Exit 0; P2 `SELFTEST OK`, `halt` 3, `ours` 5, `hold` 3, Planspiel 16, `PATH 1 halt` 4, Gegenprobe eigene Liste 2, `covers hold` 1, Adressen 0, Fixture-Adressen 0, leeres Fenster Exit 1, fehlendes Log Exit 2; P3 `spaet genug`, 1, 1, `gleich`, 1, 2, `stimmig`, `stimmig`, 0, 0, Netz SANDBOX 1, Netz Adressen 0; P4 0, 5; P5 `check` grün in 163 s; Job `e2e` am Kopf pass (10m31s).
 - 2026-11-26 Zyklus 3: Punkt 6 gebaut: In `docs/kunden/sandbox-kunde-2026-11.md` steht unter `### Befehle zu den Zahlen im Befund` je Zahl des Befunds ihr nur lesender Befehl mit Ausgabe (Tokens der letzten 30 Prompts, Guthaben gegen `costMc` mit 4096 und als Gegenprobe 0 Tokens, letzte Ledger-Zeile mit Gegenprobe, Salven der 402, Abfragen des Guthabens, Wallet unter 5 USD mit Gegenprobe `totalSupply`), gefahren 2026-11-26T20:04:12Z, ohne Adresse in Befehl und Ausgabe; jeder der sechs Befehle wurde danach so, wie er im Dokument steht, noch einmal gefahren und gab dieselbe Ausgabe. Rot vorher: am Kopf `eb12c4f` gaben die Prüfungen 1 und 0 aus. Prüfbefehle: P6 `$`-Zeilen 7, `costMc`-Zeile 1; P3 unverändert grün (`spaet genug`, 1, 1, `gleich`, 1, 2, `stimmig`, `stimmig`, 0, 0); P4 0; P5 `check` grün in 146 s.
 - 2026-11-26 Zyklus 4: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, `dev` schon enthalten, Prüfbefehle am Kopf 9589d41 neu gefahren. Prüfbefehle: P1 Exit 0, `alle`, Exit 0; P2 `SELFTEST OK`, `halt` 3, `ours` 5, `hold` 3, Planspiel 16, `PATH 1 halt` 4, Gegenprobe eigene Liste 2, Adressen 0, leeres Fenster Exit 1, fehlendes Log Exit 2; P3 wie Zyklus 3 grün, Netz SANDBOX 1, Netz Adressen 0; P4 0, 5; P5 `check` grün in 146 s; P6 7 und 1; Job `e2e` am Kopf 9589d41 pass (10m52s).
+- 2026-11-26 Release: PASS K und B (Zyklus 4), DONE.
 
 ## Blockers
