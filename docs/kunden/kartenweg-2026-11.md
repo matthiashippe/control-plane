@@ -30,4 +30,4 @@ nennt 4395 Antworten 402, weil er bis 14:41 UTC zählte und dieses Fenster um 14
 `bash ops/card-visits.sh --since 2026-11-19T14:30:00Z --until 2026-11-26T14:41:00Z` zählt das Werkzeug genau 4395, alle an die
 Version `0.2.2-maintained.1`.
 
-Release: v0.2.2-maintained.2
+Release: v0.2.2-maintained.3

@@ -5,14 +5,14 @@ Das gepflegte Paket der Automaton-Runtime liegt im öffentlichen Repo
 Einstellung bei `https://automatonhost.com` an, und jede Anfrage an den Control Plane trägt
 `User-Agent: automaton-maintained/<version>`. Darüber zählt paket 02, wer über das Paket kommt.
 
-Release: v0.2.2-maintained.2
+Release: v0.2.2-maintained.3
 
 ## Installieren
 
 Ein Befehl, ohne npm-Konto:
 
 ```bash
-npm install -g github:matthiashippe/automaton#v0.2.2-maintained.2
+npm install -g github:matthiashippe/automaton#v0.2.2-maintained.3
 automaton --run
 ```
 
@@ -45,6 +45,9 @@ liegen diese Commits, jeder mit Test:
   „No crypto needed: pay by card, PayPal or Apple Pay at <Link>“ mit dem Kartenlink ihrer Wallet, beim Start, beim Eintritt in
   `critical` oder `dead`, bei einer 402 mit `card_url` höchstens einmal je Stunde und in `--status`, nur mit `automatonhost.com`.
 - `04f23ee` release: Version `0.2.2-maintained.2`, das README des Forks nennt den neuen Tag.
+- `08dbd38` fix(status): `automaton --status` zeigt die Kartenzeile auch, während die Runtime ohne Guthaben schläft; dann entscheidet
+  das zuletzt gelesene Guthaben (`last_known_balance`).
+- `df9dea9` release: Version `0.2.2-maintained.3`, das README des Forks nennt den neuen Tag.
 
 ## Neuer Upstream-Commit
 
