@@ -153,7 +153,7 @@ if [[ "${1:-}" == "--selftest" ]]; then
   want "$(run | sed -n 2p)" "$(m402 0)" "a 200, a GET and a 402 to our own address are not counted for the package"
   want "$(CP_OWN_IPS="$stub/other.txt" run | sed -n 2p)" "$(m402 1)" \
     "without its own list entry the 402 to our own address counts, so the filter is what keeps it out"
-  plant <<<"$(line $((T0 + 60)) 203.0.113.25 POST "$chat" 402 "automaton-maintained/1.2.3.4"
+  plant <<<"$(line $((T0 + 60)) 203.0.113.25 POST "$chat" 402 "automaton-maintained/203.0.113.99"
     line $((T0 + 61)) 203.0.113.26 POST "$chat" 402 "automaton-maintained/$wallet")"
   want "$(run | sed -n 3p)" "$(ver other 2)" "a version token that reads like an address or a wallet is printed as other"
 
