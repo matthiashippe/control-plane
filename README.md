@@ -26,7 +26,7 @@ Or paste the address into the form at [automatonhost.com/#card](https://automato
 and no npm account ([what it changes](docs/paket/anleitung.md)):
 
 ```bash
-npm install -g github:matthiashippe/automaton#v0.2.2-maintained.1
+npm install -g github:matthiashippe/automaton#v0.2.2-maintained.2
 automaton --run
 ```
 

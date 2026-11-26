@@ -1,7 +1,7 @@
 # Kunden Goal 15: Der Mensch hinter einer Runtime ohne Guthaben sieht den Weg per Karte
 
 ## Status
-PLANNED
+IN_PROGRESS
 
 ## Active Objective
 Die gepflegte Runtime aus paket 01 brachte vom 22. bis 26.11.2026 zwei fremde Anmeldungen mit der Kennung `automaton-maintained`.
@@ -97,44 +97,44 @@ MVP: Funktion, weil Runtimes ankommen und denken, aber keine zahlt, und der Mens
   Startgutschrift aus dem Pool).
 
 ## Done Condition
-- [ ] `ops/card-visits.sh` zählt Abrufe von `/card/` durch Menschen, durch Bots und von eigenen Adressen und die 402 an Runtimes des
+- [x] `ops/card-visits.sh` zählt Abrufe von `/card/` durch Menschen, durch Bots und von eigenen Adressen und die 402 an Runtimes des
       Pakets je Version, ohne Adresse in der Ausgabe, in beide Richtungen bewiesen.
       MVP: Funktion, weil ohne diese Zählung nach dem Release niemand weiß, ob die neue Zeile einen Menschen zur Kasse bringt.
       Prüfung: `PATH=/usr/bin:$PATH bash ops/card-visits.sh --selftest | tail -1` muss mit `SELFTEST OK` beginnen.
       Prüfung: `PATH=/usr/bin:$PATH bash ops/card-visits.sh --selftest | grep -cE "^ok "` muss mindestens 8 ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH bash ops/card-visits.sh --selftest | grep -cE "([0-9]{1,3}\.){3}[0-9]{1,3}|0x[0-9a-fA-F]{40}|address="` muss 0 ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/card-visits.test.ts` muss Exit-Code 0 haben.
-- [ ] Die Woche vor dem Release steht gemessen in `docs/kunden/kartenweg-2026-11.md`, die Zeile `Vorher:` folgt aus den Codeblöcken.
+- [x] Die Woche vor dem Release steht gemessen in `docs/kunden/kartenweg-2026-11.md`, die Zeile `Vorher:` folgt aus den Codeblöcken.
       MVP: Funktion, weil die Leitzahl ohne Ausgangswert keinen Unterschied zeigen kann.
       Prüfung: `d=docs/kunden/kartenweg-2026-11.md; g=$(sed -nE 's/^Gemessen: ([0-9T:-]+Z)$/\1/p' "$d"); [ -n "$g" ] && [ "$g" \> "2026-11-26T14:30:00Z" ] && grep -qx '$ bash ops/card-visits.sh --since 2026-11-19T14:30:00Z --until 2026-11-26T14:30:00Z' "$d" && echo stimmig || echo unstimmig` muss genau `stimmig` ausgeben.
       Prüfung: `cat docs/kunden/kartenweg-2026-11.md | grep -cE "^(CARD VISITS since 2026-11-19T14:30:00Z until 2026-11-26T14:30:00Z: [0-9]+ by people, [0-9]+ by bots, [0-9]+ from own addresses|MAINTAINED 402 since 2026-11-19T14:30:00Z until 2026-11-26T14:30:00Z: [0-9]+ answers 402 on /v1/chat/completions to automaton-maintained runtimes|card_orders live [0-9]+ test [0-9]+ .*)$"` muss 3 ausgeben.
       Prüfung: `d=docs/kunden/kartenweg-2026-11.md; awk '/^CARD VISITS since /{h=$7; b=$10} /^MAINTAINED 402 since /{n=$7} /^card_orders live /{k=$3} END{printf "Vorher: %d Abrufe von /card durch Menschen, %d durch Bots, %d Antworten 402 an Runtimes des Pakets, %d Kartenkäufe live\n", h, b, n, k}' "$d" | grep -qxFf - "$d" && echo stimmig || echo unstimmig` muss genau `stimmig` ausgeben.
       Prüfung (Netz): `set -a; . ~/.config/control-plane/loop.env; set +a; d=docs/kunden/kartenweg-2026-11.md; diff <(bash ops/card-visits.sh --since 2026-11-19T14:30:00Z --until 2026-11-26T14:30:00Z 2>/dev/null) <(awk '/^CARD VISITS since/{p=1} p&&/^[^A-Z]/{exit} p' "$d")` muss nichts ausgeben.
-- [ ] Die Runtime aus dem neuen Release schreibt ihrem Menschen beim Start, bei leerem Guthaben und in `--status` die Zeile mit dem
+- [x] Die Runtime aus dem neuen Release schreibt ihrem Menschen beim Start, bei leerem Guthaben und in `--status` die Zeile mit dem
       Kartenlink ihrer eigenen Wallet, nur mit `automatonhost.com`; Tests im Fork, rot vor der Änderung.
       MVP: Funktion, weil nur eine eigene Zeile im Terminal den Menschen erreicht, der die JSON-Fehlerzeilen nicht liest.
       Prüfung (Netz): `t=$(grep -oE '^Release: \S+' docs/paket/anleitung.md | cut -d' ' -f2); d=$(mktemp -d); git clone -q --depth 1 --branch "${t:?}" https://github.com/matthiashippe/automaton "$d" && git -C "$d" grep -l "No crypto needed: pay by card, PayPal or Apple Pay at " -- src | grep -vc "__tests__"` muss mindestens 1 ausgeben.
       Prüfung (Netz): `t=$(grep -oE '^Release: \S+' docs/paket/anleitung.md | cut -d' ' -f2); d=$(mktemp -d); git clone -q --depth 1 --branch "${t:?}" https://github.com/matthiashippe/automaton "$d" && grep -c 'describe("card line"' "$d/src/__tests__/card-line.test.ts"` muss 1 ausgeben.
       Prüfung (Netz): `t=$(grep -oE '^Release: \S+' docs/paket/anleitung.md | cut -d' ' -f2); d=$(mktemp -d); git clone -q --depth 1 --branch "${t:?}" https://github.com/matthiashippe/automaton "$d" && grep -cE "^\s*(it|test)\(" "$d/src/__tests__/card-line.test.ts"` muss mindestens 6 ausgeben.
       Prüfung (Netz): `t=$(grep -oE '^Release: \S+' docs/paket/anleitung.md | cut -d' ' -f2); d=$(mktemp -d); git clone -q --depth 1 --branch "${t:?}" https://github.com/matthiashippe/automaton "$d" && cd "$d" && PATH=/usr/bin:$PATH pnpm install --frozen-lockfile >/dev/null 2>&1 && PATH=/usr/bin:$PATH pnpm -s build >/dev/null 2>&1 && PATH=/usr/bin:$PATH pnpm -s test >/dev/null 2>&1 && echo gruen` muss `gruen` ausgeben.
-- [ ] Das neue Release liegt über `v0.2.2-maintained.1` auf `main` des Forks, lässt sich mit einem Befehl installieren und nennt seine
+- [x] Das neue Release liegt über `v0.2.2-maintained.1` auf `main` des Forks, lässt sich mit einem Befehl installieren und nennt seine
       Version.
       MVP: Funktion, weil nur ein neues Release mit neuer Version die Runtimes mit der Zeile von den alten unterscheidbar macht.
       Prüfung (Netz): `t=$(grep -oE '^Release: \S+' docs/paket/anleitung.md | cut -d' ' -f2); gh release view "${t:?}" -R matthiashippe/automaton --json tagName,isDraft -q 'select(.isDraft == false) | .tagName'` muss den Tag ausgeben.
       Prüfung (Netz): `t=$(grep -oE '^Release: \S+' docs/paket/anleitung.md | cut -d' ' -f2); gh api "repos/matthiashippe/automaton/compare/v0.2.2-maintained.1...${t:?}" --jq .status` muss `ahead` ausgeben.
       Prüfung (Netz): `t=$(grep -oE '^Release: \S+' docs/paket/anleitung.md | cut -d' ' -f2); gh api "repos/matthiashippe/automaton/compare/${t:?}...main" --jq .status` muss `identical` oder `ahead` ausgeben.
       Prüfung (Netz): `t=$(grep -oE '^Release: \S+' docs/paket/anleitung.md | cut -d' ' -f2); p=$(mktemp -d); PATH=/usr/bin:$PATH npm install -g --prefix "$p" "github:matthiashippe/automaton#${t:?}" >/dev/null 2>&1 && "$p/bin/automaton" --version | grep -c "${t#v}"` muss 1 ausgeben.
-- [ ] `docs/paket/anleitung.md` und `README.md` nennen das neue Release, und die Liste in der Anleitung nennt jeden neuen Commit des
+- [x] `docs/paket/anleitung.md` und `README.md` nennen das neue Release, und die Liste in der Anleitung nennt jeden neuen Commit des
       Forks; `docs/kunden/kartenweg-2026-11.md` nennt dasselbe Release.
       Prüfung: `grep -cE '^Release: v0\.2\.2-maintained\.([2-9]|[1-9][0-9]+)$' docs/paket/anleitung.md` muss 1 ausgeben.
       Prüfung: `t=$(grep -oE '^Release: \S+' docs/paket/anleitung.md | cut -d' ' -f2); grep -c "github:matthiashippe/automaton#${t:?}" docs/paket/anleitung.md README.md | grep -c ':[1-9]'` muss 2 ausgeben.
       Prüfung: `[ "$(grep -oE '^Release: \S+' docs/paket/anleitung.md)" = "$(grep -oE '^Release: \S+' docs/kunden/kartenweg-2026-11.md)" ] && echo gleich || echo verschieden` muss genau `gleich` ausgeben.
       Prüfung (Netz): `t=$(grep -oE '^Release: \S+' docs/paket/anleitung.md | cut -d' ' -f2); gh api "repos/matthiashippe/automaton/compare/v0.2.2-maintained.1...${t:?}" --jq '.commits[] | select(.parents | length == 1) | .sha[0:7]' | while read -r s; do grep -q "\`$s\`" docs/paket/anleitung.md || echo "$s"; done | wc -l` muss 0 ausgeben.
-- [ ] Nichts im Repo nennt eine Adresse oder eine Wallet, der Dienst ist unverändert, und die Annahmen stehen fest.
+- [x] Nichts im Repo nennt eine Adresse oder eine Wallet, der Dienst ist unverändert, und die Annahmen stehen fest.
       Prüfung: `cat docs/kunden/kartenweg-2026-11.md docs/paket/anleitung.md goals/kunden/ANNAHMEN.md | grep -cE "([0-9]{1,3}\.){3}[0-9]{1,3}|0x[0-9a-fA-F]{40}"` muss 0 ausgeben.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD -- src ops test harness deploy | grep -cvxE "ops/card-visits.sh|ops/card_visits.py|test/card-visits.test.ts"` muss 0 ausgeben.
       Prüfung: `grep -cE "^- [0-9-]+, kunden 15: " goals/kunden/ANNAHMEN.md` muss mindestens 3 ausgeben.
-- [ ] `check` ist grün.
+- [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
 - [ ] goal-verifier PASS (K und B)
 
@@ -170,5 +170,7 @@ MVP: Funktion, weil Runtimes ankommen und denken, aber keine zahlt, und der Mens
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-26, Zyklus 1: Punkte 1, 2, 3, 4, 5, 6, 7 gebaut. `ops/card-visits.sh` mit `ops/card_visits.py` und `test/card-visits.test.ts` (Test vor dem Skript rot: 10 failed; Selbsttest mit abgeschalteter Bot-Regel rot: 4 FAIL, SELFTEST FAILED). Woche vor dem Release gegen die Produktion gemessen (0 Menschen, 3 Bots, 4380 Antworten 402, 0 Kartenkäufe live; bis 14:41 UTC genau die 4395 des Richtungs-Checks). Fork: PR #2 in `matthiashippe/automaton` mit Merge-Commit gemergt, Commits `1530489` (Kartenzeile, `src/survival/card-line.ts`, Test `src/__tests__/card-line.test.ts` mit 8 Fällen, vor der Änderung rot: Modul fehlt, gegen einen leeren Platzhalter 8 failed) und `04f23ee` (Version), Release `v0.2.2-maintained.2` auf dem Merge `769eebb`, `main` identisch. Anleitung, README, Annahmen nachgezogen.
+  Prüfbefehle: alle Prüfungen der Punkte 1 bis 7 wörtlich, die Netz-Prüfungen der Punkte 2 bis 5 mit Netz; alle wie verlangt (SELFTEST OK, 27 Zeilen ok, 0 Adressen, vitest Exit 0, stimmig, 3, stimmig, kein diff, 1, 1, 8, gruen, Tag, ahead, identical, 1, 1, 2, gleich, 0, 0, 0, 5, check Exit 0). Die grep-Prüfungen liefen mit `/usr/bin/grep`; die ugrep-Hülle der Shell des code-host liest das führende `$` in Prüfung 2a anders.
 
 ## Blockers
