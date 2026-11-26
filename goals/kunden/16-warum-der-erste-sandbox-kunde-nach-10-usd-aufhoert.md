@@ -143,14 +143,14 @@ MVP: Funktion, weil der einzige Kunde, der Sandbox und Inferenz zugleich bezahlt
   Endpunkts der Produktion außer dem Lesen über `ops/sandbox-customer.sh`; keine Sandbox, keine Runtime und kein Kauf zum Testen.
 
 ## Done Condition
-- [ ] `ops/db-report.cjs` gibt mit `CP_REPORT=sandbox-customer` je fremdem Kunden mit Sandbox im Fenster seine Sandboxes, die Zeit
+- [x] `ops/db-report.cjs` gibt mit `CP_REPORT=sandbox-customer` je fremdem Kunden mit Sandbox im Fenster seine Sandboxes, die Zeit
       ihres letzten Schritts und seine Ledger-Arten ohne Adresse, Sandbox-ID und Betrag aus, ohne `CP_REPORT` unverändert; in beide
       Richtungen bewiesen.
       MVP: Funktion, weil ohne den Verlauf der Sandbox niemand sagen kann, wann und warum sie hielt.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/sandbox-customer.test.ts` muss Exit-Code 0 haben.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/sandbox-customer.test.ts --reporter=json 2>/dev/null | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const j=JSON.parse(s);const t=j.testResults.flatMap(f=>f.assertionResults).filter(a=>a.status==="passed").map(a=>a.title);console.log([/never lists our own/,/keeps every sandbox/,/last step/,/no address/,/default report unchanged/,/halt/,/ours/,/covers hold/].every(r=>t.some(x=>r.test(x)))?"alle":"fehlt")})'` muss `alle` ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/db-report.test.ts test/db-report-no-duplicate-keys.test.ts test/customer-decline.test.ts` muss Exit-Code 0 haben.
-- [ ] `ops/sandbox-customer.sh` ordnet die Anfragen im Zugriffslog dem Kunden zu und zeigt je Pfad und Status, was er nach dem Halt
+- [x] `ops/sandbox-customer.sh` ordnet die Anfragen im Zugriffslog dem Kunden zu und zeigt je Pfad und Status, was er nach dem Halt
       und nach der letzten Inferenz aufrief, nie eine eigene Adresse und ohne Adresse in der Ausgabe; in beide Richtungen bewiesen.
       MVP: Funktion, weil erst die Anfragen nach dem Halt zeigen, ob eine Antwort des Servers die Runtime stoppte.
       Prüfung: `PATH=/usr/bin:$PATH bash ops/sandbox-customer.sh --selftest | tail -1` muss mit `SELFTEST OK` beginnen.
@@ -165,7 +165,7 @@ MVP: Funktion, weil der einzige Kunde, der Sandbox und Inferenz zugleich bezahlt
       Prüfung: `grep -ohE '"(remote_ip|client_ip)": ?"[^"]*"' ops/fixtures/sandbox-customer.log | grep -cvE '"(192\.0\.2|198\.51\.100|203\.0\.113)\.[0-9]+"'` muss 0 ausgeben.
       Prüfung: `CP_OWN_IPS=ops/fixtures/sandbox-customer-own-ips.txt PATH=/usr/bin:$PATH bash ops/sandbox-customer.sh --db-json ops/fixtures/sandbox-customer-db.json --log ops/fixtures/sandbox-customer.log --since 2026-11-21T00:00:00Z --until 2026-11-21T00:00:00Z >/dev/null 2>&1; echo $?` muss `1` ausgeben.
       Prüfung: `CP_OWN_IPS=ops/fixtures/sandbox-customer-own-ips.txt PATH=/usr/bin:$PATH bash ops/sandbox-customer.sh --db-json ops/fixtures/sandbox-customer-db.json --log ops/fixtures/no-such.log --since 2026-11-21T00:00:00Z >/dev/null 2>&1; echo $?` muss `2` ausgeben.
-- [ ] Die Ursache steht für den Kunden vom 21.11. gemessen in `docs/kunden/sandbox-kunde-2026-11.md`, mit Befehl, Ausgabe, Fundstelle
+- [x] Die Ursache steht für den Kunden vom 21.11. gemessen in `docs/kunden/sandbox-kunde-2026-11.md`, mit Befehl, Ausgabe, Fundstelle
       in der Runtime, Ergebnis und der Zeile `Widerlegt:`, ohne Adresse und ohne Betrag je Kunde; liegt sie bei uns, gibt es den
       Vorschlag mit Schwere 5.
       MVP: Funktion, weil erst das Wort mit Beleg sagt, ob das nächste Glied einen Fehler bei uns behebt oder nach dem Preis fragt.
@@ -181,10 +181,10 @@ MVP: Funktion, weil der einzige Kunde, der Sandbox und Inferenz zugleich bezahlt
       Prüfung: `/usr/bin/grep -cE "^- Kunde [0-9]+:.*[0-9][.,][0-9]{2} USD|^(CUSTOMER|SANDBOX|LEDGER|AFTER|PATH|LAST) .*[0-9]\.[0-9]{2} USD" docs/kunden/sandbox-kunde-2026-11.md` muss 0 ausgeben.
       Prüfung (Netz): `set -a; . ~/.config/control-plane/loop.env; set +a; bash ops/sandbox-customer.sh --since 2026-11-21T00:00:00Z --until 2026-11-22T00:00:00Z | /usr/bin/grep -cE "^SANDBOX [0-9]+\.[0-9]+: tier medium, created 2026-11-21T02:2[0-9]:[0-9]{2}Z, .*stop credit, "` muss mindestens 1 ausgeben.
       Prüfung (Netz): `set -a; . ~/.config/control-plane/loop.env; set +a; bash ops/sandbox-customer.sh --since 2026-11-21T00:00:00Z | /usr/bin/grep -cE "([0-9]{1,3}\.){3}[0-9]{1,3}|0x[0-9a-fA-F]{40}"` muss 0 ausgeben.
-- [ ] Der Dienst ist unverändert, und die Annahmen stehen fest.
+- [x] Der Dienst ist unverändert, und die Annahmen stehen fest.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD -- src ops test harness deploy scripts | /usr/bin/grep -cvxE "ops/db-report.cjs|ops/sandbox-customer.sh|ops/fixtures/sandbox-customer-db.json|ops/fixtures/sandbox-customer.log|ops/fixtures/sandbox-customer-own-ips.txt|test/sandbox-customer.test.ts"` muss 0 ausgeben.
       Prüfung: `/usr/bin/grep -cE "^- [0-9-]+, kunden 16: " goals/kunden/ANNAHMEN.md` muss mindestens 3 ausgeben.
-- [ ] `check` ist grün.
+- [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
 - [ ] goal-verifier PASS (K und B)
 
@@ -215,5 +215,6 @@ MVP: Funktion, weil der einzige Kunde, der Sandbox und Inferenz zugleich bezahlt
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-26 Zyklus 1: Punkte 1, 2, 3, 4, 5 gebaut: Zweig `CP_REPORT=sandbox-customer` in `ops/db-report.cjs`, `ops/sandbox-customer.sh` mit Selbsttest und drei Fixtures, `test/sandbox-customer.test.ts` (13 Fälle), Messung gegen die Produktion (2026-11-26T19:31:37Z) mit Ergebnis `kein Geld` in `docs/kunden/sandbox-kunde-2026-11.md`, Vorschlag `goals/_vorschlaege/fehler-2026-11-26-1.md` (Schwere 5, 404 und 501 nach dem Halt, nicht die Ursache), fünf Annahmen. Rot vorher: `test/sandbox-customer.test.ts` mit seinen Fixtures in einem Worktree auf `origin/dev` 1897fa6 13 von 13 rot; der Selbsttest wurde mit gepflanzten Fehlern rot (eigene Adresse nicht ausgeschlossen: `ours` und `halt` FAIL; Abstand 0 s: `last-inference` FAIL; Grenze `<=` statt `<`: `hold` FAIL). Prüfbefehle: P1 vitest sandbox-customer Exit 0, Titel `alle`, db-report, no-duplicate-keys und customer-decline 41 von 41 Exit 0; P2 Selbsttest `SELFTEST OK`, `ok … halt` 3, `ours` 5, `hold` 3, Planspiel 16, `PATH 1 halt` 4, Gegenprobe eigene Liste 2, `covers hold` 1, Adressen 0, Fixture-Adressen 0, leeres Fenster Exit 1, fehlendes Log Exit 2; P3 `spaet genug`, Befehlszeile 1, SANDBOX-Zeile 1, `gleich`, Leitzahl 1, Runtime 2, Widerlegt `stimmig`, Ergebnis `stimmig`, Adressen 0, Beträge 0, Netz SANDBOX 1, Netz Adressen 0; P4 fremde Dateien 0, Annahmen 5; P5 `check` grün in 173 s.
 
 ## Blockers
