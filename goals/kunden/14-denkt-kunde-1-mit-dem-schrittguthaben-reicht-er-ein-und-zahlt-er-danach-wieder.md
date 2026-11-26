@@ -142,6 +142,8 @@ Glied woanders ansetzen muss.
       Prüfung: `grep -cE "^- [0-9-]+, kunden 14: " goals/kunden/ANNAHMEN.md` muss mindestens 2 ausgeben.
 - [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
+- [ ] Kein Vorschlag dieses Goals nennt einen Saldo oder ein Guthaben von Kunde 1 als Betrag, auch nicht in Cent (Kritik).
+      Prüfung: `d=docs/kunden/einreichen-2026-11.md; cat "$d" $(grep -ohE "goals/_vorschlaege/(kunden|fehler)-kritik-[0-9-]+\.md" "$d" | sort -u) | grep -ciE "(Saldo|Guthaben)[^.;,]* (bei|von|auf) (rund |etwa |knapp |ca\. )?[0-9]+([.,][0-9]+)? ?(Cent|USD|USDC|cents)"` muss 0 ausgeben.
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
