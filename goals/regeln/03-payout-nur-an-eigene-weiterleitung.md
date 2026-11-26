@@ -104,5 +104,6 @@ anlegt.
 
 ## Progress Log
 - 2026-11-26 Zyklus 1: Punkte 1, 2, 3, 4 gebaut: `requireRule10` lässt `payout` und `retire` auf 8453 nur an `forwarderAddress(Konto der Erlaubnis, tx.forwarder.destination, feste Werte mit dem sendenden Schlüssel)` zu, `konto_payouts.retire_destination` neu, `sendPayout` reicht die destination durch (f02ebd9, c425ffe); die neuen Fälle waren rot auf 6eb1531 (send-guard 4 failed | 15 passed, Transaktion ging hinaus) und vor dem Weg (konto-payout 3 failed | 27 passed). Prüfbefehle: send-guard Exit 0; Titel `alle`; forwarderAddress in chain.ts 3; retire_destination in db.ts 3, in payout.ts 7; `passes the forwarder destination` `ja`; sechs konto-Dateien Exit 0; Dateien außerhalb des Umfangs 0; check Exit 0 (281 Dateien, 2903 Tests, 587 s unter Last).
+- 2026-11-26 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4; `dev` (6eb1531) lag schon im Branch, alle Prüfbefehle am Kopf 11827b0 neu gefahren. Prüfbefehle: send-guard Exit 0; Titel `alle`; forwarderAddress in chain.ts 3; retire_destination in db.ts 3, in payout.ts 7; `passes the forwarder destination` `ja`; sechs konto-Dateien Exit 0 (58 Tests); Dateien außerhalb des Umfangs 0; check Exit 0 (2903 Tests, 192 s); Job check am PR #455 pass.
 
 ## Blockers
