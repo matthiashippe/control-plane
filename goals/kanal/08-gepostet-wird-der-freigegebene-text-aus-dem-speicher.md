@@ -1,7 +1,7 @@
 # Kanal Goal 08: Gepostet wird der freigegebene Text aus dem Speicher
 
 ## Status
-PLANNED
+PAUSED
 
 ## Active Objective
 Seit kanal 04 postet `ops/post-the-answers.py --send … --approved …` nur Entwürfe, deren `sha12` gleich dem freigegebenen Wert ist,
@@ -95,3 +95,4 @@ Kommentar eines Pakets wäre nicht mehr an die Freigabe gebunden.
 ## Progress Log
 
 ## Blockers
+Pause: Kurs-Check 2026-11-26, Detail-Goal am Postweg für Kommentare in Conway-Research/automaton, wo seit dem 11.11.2026 kein neues Issue kommt (ROADMAP.md, Zeile paket); kanal 06 steht auf PAUSED, der Zwischenstand in goals/kanal/ertrag.md spricht für einen anderen Kanal, und der Code am Stand dev ist laut Goal schon richtig; bringt weder Nutzer noch Käufe
