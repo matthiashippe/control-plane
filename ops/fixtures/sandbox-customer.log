@@ -1,0 +1,10 @@
+{"ts": 1795227600.5, "status": 200, "request": {"remote_ip": "203.0.113.99", "client_ip": "203.0.113.99", "uri": "/v1/chat/completions", "method": "POST", "headers": {"User-Agent": ["node"]}}}
+{"ts": 1795227601.0, "status": 200, "request": {"remote_ip": "198.51.100.7", "client_ip": "198.51.100.7", "uri": "/v1/chat/completions", "method": "POST", "headers": {"User-Agent": ["node"]}}}
+{"ts": 1795229402.0, "status": 200, "request": {"remote_ip": "198.51.100.7", "client_ip": "198.51.100.7", "uri": "/v1/chat/completions?stream=false", "method": "POST", "headers": {"User-Agent": ["node"]}}}
+{"ts": 1795229430.0, "status": 402, "request": {"remote_ip": "198.51.100.7", "client_ip": "198.51.100.7", "uri": "/v1/sandboxes/sbx-a1/exec", "method": "POST", "headers": {"User-Agent": ["node"]}}}
+{"ts": 1795230000.0, "status": 402, "request": {"remote_ip": "203.0.113.99", "client_ip": "203.0.113.99", "uri": "/v1/sandboxes/sbx-own/exec", "method": "POST", "headers": {"User-Agent": ["node"]}}}
+{"ts": 1795230601.0, "status": 200, "request": {"remote_ip": "198.51.100.7", "client_ip": "198.51.100.7", "uri": "/v1/chat/completions", "method": "POST", "headers": {"User-Agent": ["node"]}}}
+{"ts": 1795231200.0, "status": 402, "request": {"remote_ip": "198.51.100.7", "client_ip": "198.51.100.7", "uri": "/v1/sandboxes/sbx-a1/exec", "method": "POST", "headers": {"User-Agent": ["node"]}}}
+{"ts": 1795231800.0, "status": 402, "request": {"remote_ip": "198.51.100.7", "client_ip": "198.51.100.7", "uri": "/v1/chat/completions", "method": "POST", "headers": {"User-Agent": ["node"]}}}
+{"ts": 1795231860.0, "status": 200, "request": {"remote_ip": "198.51.100.7", "client_ip": "198.51.100.7", "uri": "/v1/credits/balance", "method": "GET", "headers": {"User-Agent": ["node"]}}}
+{"ts": 1795233600.0, "status": 401, "request": {"remote_ip": "198.51.100.50", "client_ip": "198.51.100.50", "uri": "/v1/sandboxes", "method": "GET", "headers": {"User-Agent": ["node"]}}}

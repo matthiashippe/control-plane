@@ -659,6 +659,90 @@ if (process.env.CP_REPORT === "customer-work") {
   process.exit(0);
 }
 
+// CP_REPORT=sandbox-customer (goals/kunden/16): instead of the report, one JSON of every foreign address with a
+// sandbox created in the window CP_SINCE..CP_UNTIL (ISO UTC, CP_UNTIL empty means now), numbered from 1 in the
+// order of its first such sandbox. Per customer: balance and reservation from `wallets`, its sandboxes of the
+// window with the time of the last `sandbox` ledger row of each (its last step), and its ledger rows of the
+// window as time and kind only. ops/sandbox-customer.sh reads it on the code-host and matches it against the
+// access log. No address, key, sandbox id, ref or ledger amount leaves this block: a customer is a number.
+// Written synchronously and ended here, like the decline block.
+if (process.env.CP_REPORT === "sandbox-customer") {
+  const fail = (msg) => {
+    require("fs").writeSync(2, `db-report: ${msg}\n`);
+    process.exit(1);
+  };
+  const iso = (name, fallback) => {
+    const raw = process.env[name];
+    if (!raw) return fallback;
+    const t = Date.parse(raw);
+    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/.test(raw) || Number.isNaN(t)) fail(`${name} is no ISO time in UTC`);
+    return new Date(t).toISOString();
+  };
+  const since = iso("CP_SINCE", new Date(0).toISOString());
+  const until = iso("CP_UNTIL", new Date().toISOString());
+  if (until <= since) fail("CP_UNTIL is not after CP_SINCE");
+  // HOLD_MC of src/sandbox/service.ts, which test/sandbox-customer.test.ts holds against this number.
+  const HOLD_MC = 1000;
+  const weekFrom = new Date(Date.parse(until) - 7 * 86400e3).toISOString();
+  const foreignTopupsWeek = one(
+    `select count(*) n from ledger where kind = 'topup' and created_at >= ? and created_at < ? and ${notOurs}`,
+    weekFrom, until, ...OURS_ARGS,
+  ).n;
+  const hasSandboxes = one("select count(*) n from sqlite_master where type = 'table' and name = 'sandboxes'").n > 0;
+  // oursClause names ledger.address, so it runs here on a derived table of that name, as in the wallets block.
+  const owners = hasSandboxes
+    ? all(
+        `select address, first_at from (
+           select address, min(created_at) first_at, min(rowid) first_row from sandboxes
+            where created_at >= ? and created_at < ? group by address
+         ) ledger where not ${oursClause} order by first_at, first_row`,
+        since, until, ...OURS_ARGS,
+      )
+    : [];
+  const customers = owners.map((c, i) => {
+    const w = one("select balance_mc, reserved_mc from wallets where address = ?", c.address);
+    const sandboxes = all(
+      `select id, tier, status, stop_reason, steps_billed, created_at from sandboxes
+        where address = ? and created_at >= ? and created_at < ? order by created_at, rowid`,
+      c.address, since, until,
+    ).map((s) => {
+      // A step row carries the ref `sandbox:<id>:<step>` (src/sandbox/service.ts, bookStep); compared as a prefix
+      // without LIKE, so an underscore or percent sign in an id matches only itself.
+      const prefix = `sandbox:${s.id}:`;
+      const last = one(
+        "select max(created_at) at from ledger where kind = 'sandbox' and substr(ref, 1, length(?)) = ?",
+        prefix, prefix,
+      ).at;
+      return {
+        tier: s.tier,
+        status: s.status,
+        stop_reason: s.stop_reason ?? null,
+        steps_billed: s.steps_billed,
+        created_at: s.created_at,
+        last_step_at: last ?? null,
+      };
+    });
+    const ledger = all(
+      `select created_at at, kind from ledger where address = ? and created_at >= ? and created_at < ?
+        order by created_at, id`,
+      c.address, since, until,
+    );
+    return { n: i + 1, balance_mc: w?.balance_mc ?? 0, reserved_mc: w?.reserved_mc ?? 0, sandboxes, ledger };
+  });
+  // writeSync may write part of the buffer to a pipe, or meet EAGAIN on a non-blocking one.
+  const out = Buffer.from(
+    JSON.stringify({ since, until, hold_mc: HOLD_MC, foreign_topups_week: foreignTopupsWeek, customers }) + "\n",
+  );
+  for (let off = 0; off < out.length; ) {
+    try {
+      off += require("fs").writeSync(1, out, off, out.length - off);
+    } catch (e) {
+      if (e.code !== "EAGAIN") throw e;
+    }
+  }
+  process.exit(0);
+}
+
 // The same test against a column that is not ledger.address.
 //
 // oursClause names ledger.address, so it only works inside a query on the ledger. The one number
