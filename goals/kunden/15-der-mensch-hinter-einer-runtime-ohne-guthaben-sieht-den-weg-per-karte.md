@@ -1,7 +1,7 @@
 # Kunden Goal 15: Der Mensch hinter einer Runtime ohne Guthaben sieht den Weg per Karte
 
 ## Status
-IN_PROGRESS
+DONE
 
 ## Active Objective
 Die gepflegte Runtime aus paket 01 brachte vom 22. bis 26.11.2026 zwei fremde Anmeldungen mit der Kennung `automaton-maintained`.
@@ -143,7 +143,7 @@ MVP: Funktion, weil Runtimes ankommen und denken, aber keine zahlt, und der Mens
       heute gerade dem Menschen verschweigt, der nachsieht, warum seine Runtime nichts tut.
       Prüfung (Netz): `t=$(grep -oE '^Release: \S+' docs/paket/anleitung.md | cut -d' ' -f2); d=$(mktemp -d); git clone -q --depth 1 --branch "${t:?}" https://github.com/matthiashippe/automaton "$d" && grep -c 'it("--status while sleeping shows it when the last known balance is critical, not when it is healthy"' "$d/src/__tests__/card-line.test.ts"` muss 1 ausgeben.
       Prüfung (Netz): `t=$(grep -oE '^Release: \S+' docs/paket/anleitung.md | cut -d' ' -f2); d=$(mktemp -d); git clone -q --depth 1 --branch "${t:?}" https://github.com/matthiashippe/automaton "$d" && cat "$d/src/index.ts" "$d/src/survival/card-line.ts" | grep -c "last_known_balance"` muss mindestens 1 ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Kein Aufruf in der Produktion, der etwas anlegt oder bucht; gelesen wird nur über `ops/card-visits.sh`, `ops/card-orders.sh`,
@@ -183,5 +183,6 @@ MVP: Funktion, weil Runtimes ankommen und denken, aber keine zahlt, und der Mens
 - 2026-11-26 Zyklus 3: Punkt 8 aus der Kritik gebaut. Fork: PR #3 in `matthiashippe/automaton` mit Merge-Commit gemergt, Commits `08dbd38` (`statusCardLine` nimmt im Zustand `sleeping` die Stufe aus `last_known_balance`, `showStatus()` reicht den Wert aus der Datenbank durch) und `df9dea9` (Version), Release `v0.2.2-maintained.3` auf dem Merge `380261f`, `main` identisch; der neue Test in `src/__tests__/card-line.test.ts` war vor der Änderung rot (1 failed | 8 passed), danach 1691 passed im Fork. Anleitung (Zeile `Release:`, Installationsbefehl, zwei Commits), README und `docs/kunden/kartenweg-2026-11.md` nennen das neue Release. Gegenprobe: beide Prüfungen von Punkt 8 gegen `v0.2.2-maintained.2` geben 0 aus.
   Prüfbefehle: Punkt 8 1, 4; Punkt 3 1, 1, 9, gruen; Punkt 4 `v0.2.2-maintained.3`, ahead, identical, 1; Punkt 5 1, 2, gleich, 0; Punkt 1 `SELFTEST OK`, 27, 0, vitest Exit 0; Punkt 2 stimmig (mit `/usr/bin/grep`), 3, stimmig, kein diff gegen die Produktion; Punkt 6 0, 0, 5; Punkt 7 `check` Exit 0.
 - 2026-11-26 Zyklus 4: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, 7, 8; `dev` ohne neuen Commit (kein Merge nötig), alle Prüfbefehle am Inhalt von `84a193c` gefahren, ohne Codeänderung danach. Prüfbefehle: Punkt 1 `SELFTEST OK`, 27, 0, vitest Exit 0; Punkt 2 stimmig (mit `/usr/bin/grep`), 3, stimmig, kein diff gegen die Produktion; Punkt 3 1, 1, 9, gruen; Punkt 4 `v0.2.2-maintained.3`, ahead, identical, 1; Punkt 5 1, 2, gleich, 0; Punkt 6 0, 0, 5; Punkt 7 `check` Exit 0; Punkt 8 1, 4; Job `e2e` am Kopf siehe PR #458.
+- 2026-11-26 Release: PASS K und B (Zyklus 4), DONE.
 
 ## Blockers
