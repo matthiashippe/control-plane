@@ -257,6 +257,8 @@ export interface PayoutRow {
   retire_permission: string | null;
   /** The revoke of retire_permission the passkey signed (JSON, goals/konto/11), or null. */
   retire_revoke: string | null;
+  /** The destination retire_forwarder was computed with (goals/regeln/03), or null for a row from before that column. */
+  retire_destination: string | null;
   /** A sent payout whose receipt did not arrive yet, and its amount in atomic USDC. */
   pending_tx: string | null;
   pending_usdc: string | null;
@@ -311,6 +313,16 @@ export function replacedPermission(row: Pick<PayoutRow, "retire_forwarder" | "re
   return null;
 }
 
+/**
+ * The destination of the forwarder replacedPermission names (goals/regeln/03): `retire_destination` of a waiting retire, else the
+ * destination of the row. Null when it names none, or for a waiting retire from before that column.
+ */
+function replacedDestination(row: PayoutRow | null): string | null {
+  if (row?.retire_forwarder && row.retire_permission) return row.retire_destination ?? null;
+  if (row?.permission && row.forwarder) return row.destination;
+  return null;
+}
+
 /** True when both name no permission, or the same forwarder (in any case) and the same permission as stored JSON text. */
 function sameReplaced(a: { forwarder: string; permission: string } | null, b: { forwarder: string; permission: string } | null): boolean {
   if (!a || !b) return a === b;
@@ -348,7 +360,8 @@ export function finishPayout(
     const bank = readPendingBank(db, input.code);
     if (!bank) return false;
     const account = input.account.toLowerCase();
-    const replaced = replacedPermission(readPayout(db, account));
+    const before = readPayout(db, account);
+    const replaced = replacedPermission(before);
     if (!sameReplaced(replaced, input.replaced)) return false;
     ensurePayoutRow(db, account, input.nowMs);
     const retire = replaced ?? { forwarder: null, permission: null };
@@ -356,7 +369,7 @@ export function finishPayout(
     db.prepare(
       `UPDATE konto_payouts SET external_account_id = ?, liquidation_address_id = ?, destination = ?, bank_last4 = ?, forwarder = ?,
        permission = ?, signature = ?, permission_approved = 0, retire_forwarder = ?, retire_permission = ?, retire_revoke = ?,
-       updated_at = ? WHERE address = ?`,
+       retire_destination = ?, updated_at = ? WHERE address = ?`,
     ).run(
       bank.external_account_id,
       bank.liquidation_address_id,
@@ -368,6 +381,7 @@ export function finishPayout(
       retire.forwarder,
       retire.permission,
       revoke,
+      replacedDestination(before),
       input.nowMs,
       account,
     );
@@ -520,9 +534,14 @@ export async function sendPayout(deps: PayoutDeps, address: string, value: bigin
           log(`[payout] retire waits for the phone for ${oldForwarder.toLowerCase()}: other_caller`);
           throw new Error("payout_needs_phone");
         }
-        await confirm(chain, "retire", { to: oldForwarder, data: encodeFunctionData({ abi: FORWARDER_ABI, functionName: "retire", args: [old] }) });
+        // On Base the target must be the forwarder computed from this destination (goals/regeln/03); a row from before
+        // retire_destination goes without it, which Base Sepolia sends and Base refuses.
+        const destination = row.retire_destination ? { forwarder: { destination: row.retire_destination as Address } } : {};
+        await confirm(chain, "retire", { to: oldForwarder, data: encodeFunctionData({ abi: FORWARDER_ABI, functionName: "retire", args: [old] }), ...destination });
       }
-      db.prepare("UPDATE konto_payouts SET retire_forwarder = NULL, retire_permission = NULL, retire_revoke = NULL WHERE address = ?").run(account);
+      db.prepare(
+        "UPDATE konto_payouts SET retire_forwarder = NULL, retire_permission = NULL, retire_revoke = NULL, retire_destination = NULL WHERE address = ?",
+      ).run(account);
     }
     const forwarder = getAddress(row.forwarder);
     const code = await chain.code(forwarder);
@@ -550,7 +569,11 @@ export async function sendPayout(deps: PayoutDeps, address: string, value: bigin
     // leaves an open payout that the next one clears instead of sending the money a second time.
     let tx: Hex;
     try {
-      tx = await chain.send({ to: forwarder, data: encodeFunctionData({ abi: FORWARDER_ABI, functionName: "payout", args: [permission, value] }) });
+      tx = await chain.send({
+        to: forwarder,
+        data: encodeFunctionData({ abi: FORWARDER_ABI, functionName: "payout", args: [permission, value] }),
+        forwarder: { destination: row.destination as Address },
+      });
     } catch {
       throw new PayoutFailed("payout", null);
     }

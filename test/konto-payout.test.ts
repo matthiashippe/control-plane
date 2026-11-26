@@ -13,6 +13,7 @@ import { postLedger, getBalanceMc } from "../src/db.js";
 import { permissionFromJson } from "../src/konto/account.js";
 import { SEPOLIA_USDC, SPEND_PERMISSION_MANAGER } from "../src/konto/config.js";
 import { createPayoutChain, type PayoutChain } from "../src/konto/payout.js";
+import type { KontoTx } from "../src/konto/chain.js";
 import { tap } from "./handoff-helpers.js";
 import {
   account,
@@ -718,5 +719,102 @@ describe("a revoke that does not end the old permission", () => {
     // The user operation validated and used its nonce; only its revoke did not happen.
     expect(s.node.nonces.get(a.address)).toBe(1n);
     await expectDroppedAndPhoneAsked(w, 4);
+  });
+});
+
+/**
+ * goals/regeln/03: on Base sendKontoTx sends payout and retire only at the forwarder it computes from the destination the caller
+ * names, so the way of sendPayout hands it over: payout with the destination of the row, retire of the old forwarder with
+ * `retire_destination`, the destination of the setup it replaced. A row from before that column retires without it.
+ */
+function recordingSetup() {
+  const inner: { chain: PayoutChain | null } = { chain: null };
+  const txs: KontoTx[] = [];
+  const chain: PayoutChain = {
+    code: (a) => inner.chain!.code(a),
+    balanceOf: (a) => inner.chain!.balanceOf(a),
+    isApproved: (p) => inner.chain!.isApproved(p),
+    callerOf: (f) => inner.chain!.callerOf(f),
+    nonceOf: (a) => inner.chain!.nonceOf(a),
+    send(tx) {
+      txs.push(tx);
+      return inner.chain!.send(tx);
+    },
+    receipt: (hash) => inner.chain!.receipt(hash),
+  };
+  const s = moneySetup({ konto: { payoutChain: chain } });
+  inner.chain = createPayoutChain({ chainId: 84532, account: s.gas, transport: s.node.transport, token: SEPOLIA_USDC });
+  return { s, txs };
+}
+
+function retireDestination(s: MoneySetup, address: string): string | null {
+  const row = s.db.prepare("SELECT retire_destination FROM konto_payouts WHERE address = ?").get(address.toLowerCase()) as { retire_destination: string | null };
+  return row.retire_destination;
+}
+
+const destinationOf = (tx: KontoTx | undefined) => tx?.forwarder?.destination.toLowerCase() ?? null;
+
+describe("the forwarder destination of payout and retire", () => {
+  it("passes the forwarder destination of the row with payout and the one of the replaced setup with retire", async () => {
+    const { s, txs } = recordingSetup();
+    const a = await ready(s, 30n);
+    const oldForwarder = expectedForwarder(a.address, a.destination, s.gas.address);
+    expect((await payout(s, a.key, { amount_usd: "10.00" })).status).toBe(200);
+    expect(s.node.sent.map((t) => t.kind)).toEqual(["deploy", "approveWithSignature", "payout"]);
+    expect(txs).toHaveLength(3);
+    expect(destinationOf(txs[2])).toBe(a.destination.toLowerCase());
+    // Only payout and retire carry it: the deploy names its destination in the init code, approve has none.
+    expect(txs[0].forwarder).toBeUndefined();
+    expect(txs[1].forwarder).toBeUndefined();
+
+    const p = await toPasskey(s, a);
+    const newDestination = s.bridge.state.liquidation.at(-1)!;
+    const newForwarder = expectedForwarder(a.address, newDestination, s.gas.address);
+    expect((await json(s, `/h/${p.h.code}/payout`, await payoutPermission(a.owner, a.address, newForwarder, { salt: 100n }))).status).toBe(200);
+    expect(retireDestination(s, a.address)?.toLowerCase()).toBe(a.destination.toLowerCase());
+    // Without the revoke the old permission ends with retire at the old forwarder, the call that needs the destination.
+    s.db.prepare("UPDATE konto_payouts SET retire_revoke = NULL WHERE address = ?").run(a.address);
+
+    expect((await payout(s, a.key, { amount_usd: "5.00" })).status).toBe(200);
+    expect(s.node.sent.slice(3).map((t) => t.kind)).toEqual(["retire", "deploy", "approveWithSignature", "payout"]);
+    const [retire, , , pay] = txs.slice(3);
+    expect(retire.to.toLowerCase()).toBe(oldForwarder);
+    expect(destinationOf(retire)).toBe(a.destination.toLowerCase());
+    expect(pay.to.toLowerCase()).toBe(newForwarder);
+    expect(destinationOf(pay)).toBe(newDestination.toLowerCase());
+    // Ended: the column empties with the other retire_* columns.
+    expect(retireDestination(s, a.address)).toBeNull();
+    expect(retireRow(s, a.address)).toEqual({ retire_forwarder: null, retire_permission: null });
+  });
+
+  it("keeps the destination of a waiting retire through a second new IBAN", async () => {
+    const { s } = recordingSetup();
+    const a = await ready(s, 30n);
+    expect((await payout(s, a.key, { amount_usd: "10.00" })).status).toBe(200);
+    for (const salt of [100n, 101n]) {
+      const p = await toPasskey(s, a);
+      const destination = s.bridge.state.liquidation.at(-1)!;
+      const forwarder = expectedForwarder(a.address, destination, s.gas.address);
+      expect((await json(s, `/h/${p.h.code}/payout`, await payoutPermission(a.owner, a.address, forwarder, { salt }))).status).toBe(200);
+      expect(retireDestination(s, a.address)?.toLowerCase()).toBe(a.destination.toLowerCase());
+    }
+  });
+
+  it("retires a row from before retire_destination without the forwarder destination on 84532", async () => {
+    const { s, txs } = recordingSetup();
+    const a = await ready(s, 30n);
+    const oldForwarder = expectedForwarder(a.address, a.destination, s.gas.address);
+    expect((await payout(s, a.key, { amount_usd: "10.00" })).status).toBe(200);
+    const p = await toPasskey(s, a);
+    const newDestination = s.bridge.state.liquidation.at(-1)!;
+    const newForwarder = expectedForwarder(a.address, newDestination, s.gas.address);
+    expect((await json(s, `/h/${p.h.code}/payout`, await payoutPermission(a.owner, a.address, newForwarder, { salt: 100n }))).status).toBe(200);
+    s.db.prepare("UPDATE konto_payouts SET retire_revoke = NULL, retire_destination = NULL WHERE address = ?").run(a.address);
+    expect((await payout(s, a.key, { amount_usd: "5.00" })).status).toBe(200);
+    expect(s.node.sent.slice(3).map((t) => t.kind)).toEqual(["retire", "deploy", "approveWithSignature", "payout"]);
+    expect(txs[3].to.toLowerCase()).toBe(oldForwarder);
+    expect(txs[3].forwarder).toBeUndefined();
+    expect(destinationOf(txs[6])).toBe(newDestination.toLowerCase());
+    expect(s.node.balances.get(newDestination)).toBe(5n * USD);
   });
 });

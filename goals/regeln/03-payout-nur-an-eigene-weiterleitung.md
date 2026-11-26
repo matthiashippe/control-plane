@@ -1,7 +1,7 @@
 # Regeln Goal 03: Auf 8453 gehen `payout` und `retire` nur an eine eigene Weiterleitung
 
 ## Status
-PLANNED
+DONE
 
 ## Active Objective
 `requireRule10` (`src/konto/chain.ts:138`) lässt auf chainId 8453 einen Aufruf von `payout` oder `retire` zu, sobald das Ziel gleich
@@ -65,21 +65,21 @@ anlegt.
   kein Rollout außer dem normalen über `deploy.yml`.
 
 ## Done Condition
-- [ ] Auf 8453 verweigert `sendKontoTx` `payout` und `retire` an einem fremden Vertrag, der sich als spender einträgt, ohne
+- [x] Auf 8453 verweigert `sendKontoTx` `payout` und `retire` an einem fremden Vertrag, der sich als spender einträgt, ohne
       destination und an der Weiterleitung einer anderen destination vor der ersten Anfrage, und sendet beide an der eigenen.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/konto-send-guard.test.ts` muss Exit-Code 0 haben.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/konto-send-guard.test.ts --reporter=json 2>/dev/null | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const j=JSON.parse(s);const t=j.testResults.flatMap(f=>f.assertionResults).filter(a=>a.status==="passed").map(a=>a.title);console.log([/refuses payout and retire on 8453 at a foreign contract that names itself as spender/,/refuses payout and retire on 8453 without the forwarder destination/,/refuses payout and retire on 8453 at the forwarder of another destination/,/keeps 84532 unchanged for payout and retire that 8453 refuses/,/sends every kind of rule 10 on 8453/,/keeps 84532 unchanged: every transaction/].every(r=>t.some(x=>r.test(x)))?"alle":"fehlt")})'` muss `alle` ausgeben.
       Prüfung: `grep -c "forwarderAddress" src/konto/chain.ts` muss mindestens 1 ausgeben.
-- [ ] Der Weg in `src/konto/payout.ts` reicht die destination durch, für `retire` aus `retire_destination`.
+- [x] Der Weg in `src/konto/payout.ts` reicht die destination durch, für `retire` aus `retire_destination`.
       Prüfung: `grep -c "retire_destination" src/db.ts` muss mindestens 1 ausgeben.
       Prüfung: `grep -c "retire_destination" src/konto/payout.ts` muss mindestens 2 ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/konto-payout.test.ts test/konto-payout-guard.test.ts --reporter=json 2>/dev/null | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const j=JSON.parse(s);const t=j.testResults.flatMap(f=>f.assertionResults).filter(a=>a.status==="passed").map(a=>a.title);console.log(t.some(x=>/passes the forwarder destination/.test(x))?"ja":"nein")})'` muss `ja` ausgeben.
-- [ ] Die Wege, die heute auf 8453 und 84532 senden, bleiben grün.
+- [x] Die Wege, die heute auf 8453 und 84532 senden, bleiben grün.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/konto-mainnet.test.ts test/konto-payout.test.ts test/konto-payout-guard.test.ts test/konto-forwarder.test.ts test/konto-topup.test.ts test/konto-chain.test.ts` muss Exit-Code 0 haben.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD | grep -vE '^(src/konto/chain\.ts|src/konto/payout\.ts|src/konto/forwarder\.ts|src/db\.ts|test/konto-[a-z-]+\.test\.ts|goals/regeln/.*)$' | wc -l` muss 0 ausgeben.
-- [ ] `check` ist grün.
+- [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Jeder neue Fall zur Verweigerung war vor dem Fix rot; die Zeile im Progress Log nennt, womit.
@@ -103,5 +103,8 @@ anlegt.
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-26 Zyklus 1: Punkte 1, 2, 3, 4 gebaut: `requireRule10` lässt `payout` und `retire` auf 8453 nur an `forwarderAddress(Konto der Erlaubnis, tx.forwarder.destination, feste Werte mit dem sendenden Schlüssel)` zu, `konto_payouts.retire_destination` neu, `sendPayout` reicht die destination durch (f02ebd9, c425ffe); die neuen Fälle waren rot auf 6eb1531 (send-guard 4 failed | 15 passed, Transaktion ging hinaus) und vor dem Weg (konto-payout 3 failed | 27 passed). Prüfbefehle: send-guard Exit 0; Titel `alle`; forwarderAddress in chain.ts 3; retire_destination in db.ts 3, in payout.ts 7; `passes the forwarder destination` `ja`; sechs konto-Dateien Exit 0; Dateien außerhalb des Umfangs 0; check Exit 0 (281 Dateien, 2903 Tests, 587 s unter Last).
+- 2026-11-26 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4; `dev` (6eb1531) lag schon im Branch, alle Prüfbefehle am Kopf 11827b0 neu gefahren. Prüfbefehle: send-guard Exit 0; Titel `alle`; forwarderAddress in chain.ts 3; retire_destination in db.ts 3, in payout.ts 7; `passes the forwarder destination` `ja`; sechs konto-Dateien Exit 0 (58 Tests); Dateien außerhalb des Umfangs 0; check Exit 0 (2903 Tests, 192 s); Job check am PR #455 pass.
+- 2026-11-26 Release: PASS K und B (Zyklus 2), DONE.
 
 ## Blockers

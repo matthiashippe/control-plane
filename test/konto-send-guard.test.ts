@@ -3,6 +3,8 @@
  * names, and refuses everything else before the transport sees a request. On Base Sepolia (84532) only the chain is checked.
  * goals/regeln/02: a forwarder deploy on 8453 also carries exactly five addresses behind the prefix, with our token, manager and
  * caller (the address of the sending key).
+ * goals/regeln/03: payout and retire on 8453 go out only at the forwarder that forwarderAddress computes for the account of the
+ * permission, the destination the caller names and our fixed values; without the destination they are refused.
  */
 import { describe, expect, it } from "vitest";
 import { concat, custom, encodeFunctionData, type Address, type Hex } from "viem";
@@ -72,8 +74,8 @@ const RULE_10: Array<[string, KontoTx]> = [
   ["revokeAsSpender", { to: SPEND_PERMISSION_MANAGER, data: encodeFunctionData({ abi: SPEND_PERMISSION_MANAGER_ABI, functionName: "revokeAsSpender", args: [permission] }) }],
   ["spend", { to: SPEND_PERMISSION_MANAGER, data: encodeFunctionData({ abi: SPEND_PERMISSION_MANAGER_ABI, functionName: "spend", args: [permission, 1_000_000n] }) }],
   ["deploy of the forwarder", { to: DEPLOY_PROXY, data: concat([FORWARDER_SALT, forwarderInitCode(ACCOUNT, DESTINATION, fixed)]) }],
-  ["payout", { to: forwarder, data: encodeFunctionData({ abi: FORWARDER_ABI, functionName: "payout", args: [permission, 1_000_000n] }) }],
-  ["retire", { to: forwarder, data: encodeFunctionData({ abi: FORWARDER_ABI, functionName: "retire", args: [permission] }) }],
+  ["payout", { to: forwarder, data: encodeFunctionData({ abi: FORWARDER_ABI, functionName: "payout", args: [permission, 1_000_000n] }), forwarder: { destination: DESTINATION } }],
+  ["retire", { to: forwarder, data: encodeFunctionData({ abi: FORWARDER_ABI, functionName: "retire", args: [permission] }), forwarder: { destination: DESTINATION } }],
 ];
 
 const handleOps: KontoTx = {
@@ -138,10 +140,102 @@ describe("send guard of rule 10", () => {
       ["payout selector without arguments", { to: forwarder, data: RULE_10[4][1].data.slice(0, 10) as Hex }],
       ["retire with cut arguments", { to: forwarder, data: RULE_10[5][1].data.slice(0, 200) as Hex }],
     ];
+    // The same cases with the destination of our forwarder: naming it does not make another target or cut data pass.
+    cases.push(...cases.map(([name, tx]): [string, KontoTx] => [`${name}, with the forwarder destination`, { ...tx, forwarder: { destination: DESTINATION } }]));
     for (const [name, tx] of cases) {
       await expect(sendKontoTx({ chainId: 8453, net: MAINNET_NET, account, transport: main.transport, tx }), name).rejects.toThrow(/rule 10/);
     }
     expect(main.calls).toEqual([]);
+  });
+
+  /** Payout and retire of `p` at `to`, as src/konto/payout.ts builds them, with the forwarder destination `destination` if given. */
+  const forwarderCalls = (to: Address, p: SpendPermission, destination?: Address): Array<[string, KontoTx]> => {
+    const extra = destination ? { forwarder: { destination } } : {};
+    return [
+      ["payout", { to, data: encodeFunctionData({ abi: FORWARDER_ABI, functionName: "payout", args: [p, 1_000_000n] }), ...extra }],
+      ["retire", { to, data: encodeFunctionData({ abi: FORWARDER_ABI, functionName: "retire", args: [p] }), ...extra }],
+    ];
+  };
+
+  /** A contract no proxy deployment of ours made, which names itself as spender of a permission of ACCOUNT. */
+  const FOREIGN: Address = "0x4444444444444444444444444444444444444444";
+  /** The forwarder of the same account for another destination, the spender of its own permission. */
+  const otherDestinationForwarder = forwarderAddress(ACCOUNT, OTHER, fixed);
+  /** The forwarder of the same account and destination, but deployed for another caller (a gas key that is not the sending one). */
+  const otherCallerForwarder = forwarderAddress(ACCOUNT, DESTINATION, { ...fixed, caller: OTHER });
+
+  const foreignCases = (): Array<[string, KontoTx]> => [
+    ...forwarderCalls(FOREIGN, { ...permission, spender: FOREIGN }, DESTINATION).map(([n, tx]): [string, KontoTx] => [`${n} naming our destination`, tx]),
+    ...forwarderCalls(FOREIGN, { ...permission, spender: FOREIGN }, OTHER).map(([n, tx]): [string, KontoTx] => [`${n} naming another destination`, tx]),
+    ...forwarderCalls(FOREIGN, { ...permission, spender: FOREIGN }, FOREIGN).map(([n, tx]): [string, KontoTx] => [`${n} naming itself as destination`, tx]),
+    ...forwarderCalls(FOREIGN, { ...permission, spender: FOREIGN }).map(([n, tx]): [string, KontoTx] => [`${n} without a destination`, tx]),
+  ];
+  const missingCases = (): Array<[string, KontoTx]> => [
+    ...forwarderCalls(forwarder, permission),
+    ...forwarderCalls(otherDestinationForwarder, { ...permission, spender: otherDestinationForwarder }).map(([n, tx]): [string, KontoTx] => [`${n} at the forwarder of another destination`, tx]),
+  ];
+  const otherDestinationCases = (): Array<[string, KontoTx]> => [
+    ...forwarderCalls(otherDestinationForwarder, { ...permission, spender: otherDestinationForwarder }, DESTINATION),
+    ...forwarderCalls(forwarder, permission, OTHER).map(([n, tx]): [string, KontoTx] => [`${n} at our forwarder naming another destination`, tx]),
+    ...forwarderCalls(otherCallerForwarder, { ...permission, spender: otherCallerForwarder }, DESTINATION).map(([n, tx]): [string, KontoTx] => [`${n} at the forwarder of another caller`, tx]),
+    ...forwarderCalls(forwarder, permission, "0x12" as Address).map(([n, tx]): [string, KontoTx] => [`${n} with a destination that is no address`, tx]),
+  ];
+
+  /** Sends every case on 8453 and expects a refusal naming target, selector and `reason`, never the data or a destination. */
+  async function expectForwarderRefused(cases: Array<[string, KontoTx]>, reason: string) {
+    for (const [name, tx] of cases) {
+      const main = node("0x2105");
+      const err = await sendKontoTx({ chainId: 8453, net: MAINNET_NET, account, transport: main.transport, tx: { ...tx, gas: 100_000n } }).catch((e: unknown) => e);
+      expect(err, name).toBeInstanceOf(Error);
+      const message = (err as Error).message;
+      expect(message, name).toMatch(/rule 10/);
+      expect(message, name).toContain(reason);
+      expect(message.toLowerCase(), name).toContain(tx.to.toLowerCase());
+      expect(message, name).toContain(tx.data.slice(0, 10));
+      expect(message, name).not.toContain(tx.data.slice(10, 74));
+      const destination = tx.forwarder?.destination;
+      if (destination?.length === 42 && destination.toLowerCase() !== tx.to.toLowerCase()) expect(message.toLowerCase(), name).not.toContain(destination.slice(2).toLowerCase());
+      expect(main.calls, name).toEqual([]);
+    }
+  }
+
+  it("refuses payout and retire on 8453 at a foreign contract that names itself as spender, before the first request", async () => {
+    await expectForwarderRefused(foreignCases().filter(([, tx]) => tx.forwarder), "not our forwarder");
+    await expectForwarderRefused(foreignCases().filter(([, tx]) => !tx.forwarder), "forwarder destination missing");
+  });
+
+  it("refuses payout and retire on 8453 without the forwarder destination, also at our own forwarder", async () => {
+    await expectForwarderRefused(missingCases(), "forwarder destination missing");
+  });
+
+  it("refuses payout and retire on 8453 at the forwarder of another destination or another caller, before the first request", async () => {
+    await expectForwarderRefused(otherDestinationCases(), "not our forwarder");
+  });
+
+  it("sends payout and retire on 8453 at our own forwarder, with target and destination in any case", async () => {
+    const cases: Array<[string, KontoTx]> = [
+      ...forwarderCalls(forwarder, permission, DESTINATION),
+      ...forwarderCalls(forwarder.toLowerCase() as Address, permission, DESTINATION.toUpperCase().replace("0X", "0x") as Address).map(([n, tx]): [string, KontoTx] => [`${n} in mixed case`, tx]),
+    ];
+    for (const [name, tx] of cases) {
+      const main = node("0x2105");
+      expect(await sendKontoTx({ chainId: 8453, net: MAINNET_NET, account, transport: main.transport, tx: { ...tx, gas: 100_000n } }), name).toBe(HASH);
+      expect(main.calls, name).toContain("eth_sendRawTransaction");
+    }
+  });
+
+  it("keeps 84532 unchanged for payout and retire that 8453 refuses", async () => {
+    for (const [name, tx] of [...foreignCases(), ...missingCases(), ...otherDestinationCases()]) {
+      const main = node("0x2105");
+      await expect(sendKontoTx({ chainId: 8453, net: MAINNET_NET, account, transport: main.transport, tx }), name).rejects.toThrow(/rule 10/);
+      expect(main.calls, name).toEqual([]);
+      const sepolia = node("0x14a34");
+      expect(await sendKontoTx({ chainId: 84532, account, transport: sepolia.transport, tx: { ...tx, gas: 100_000n } }), name).toBe(HASH);
+      expect(sepolia.calls, name).toContain("eth_sendRawTransaction");
+      const explicit = node("0x14a34");
+      expect(await sendKontoTx({ chainId: 84532, net: SEPOLIA_NET, account, transport: explicit.transport, tx: { ...tx, gas: 100_000n } }), name).toBe(HASH);
+      expect(explicit.calls, name).toContain("eth_sendRawTransaction");
+    }
   });
 
   /** Sends `tx` on 8453 and expects a refusal that names `arg` and leaves the transport untouched. */
