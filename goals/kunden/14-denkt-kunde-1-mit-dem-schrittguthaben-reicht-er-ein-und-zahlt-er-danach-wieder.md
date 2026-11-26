@@ -1,7 +1,7 @@
 # Kunden Goal 14: Denkt Kunde 1 mit dem Schrittguthaben, reicht er ein, und zahlt er danach wieder?
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Seit kunden 13 bekommt eine fremde Runtime, die schon einmal bei uns gedacht hat und deren Saldo die nächste Inferenz nicht deckt,
@@ -144,7 +144,7 @@ Glied woanders ansetzen muss.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
 - [x] Kein Vorschlag dieses Goals nennt einen Saldo oder ein Guthaben von Kunde 1 als Betrag, auch nicht in Cent (Kritik).
       Prüfung: `d=docs/kunden/einreichen-2026-11.md; cat "$d" $(grep -ohE "goals/_vorschlaege/(kunden|fehler)-kritik-[0-9-]+\.md" "$d" | sort -u) | grep -ciE "(Saldo|Guthaben)[^.;,]* (bei|von|auf) (rund |etwa |knapp |ca\. )?[0-9]+([.,][0-9]+)? ?(Cent|USD|USDC|cents)"` muss 0 ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Kein Aufruf in der Produktion, der etwas anlegt oder bucht; gelesen wird nur über `ops/customer-work.sh`,
@@ -174,5 +174,6 @@ Glied woanders ansetzen muss.
 - 2026-11-26 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6, 7, 8 gebaut (Zeile `HOUSE STEP USE` und Feld `steps_customer_inference`, Test `test/house-report-parity.test.ts`, Messung des Fensters 2026-11-23T11:52:30Z bis 2026-11-25T11:52:30Z in `docs/kunden/einreichen-2026-11.md`, Ergebnis `kein Hausauftrag`, Vorschlag kunden-kritik-2026-11-26-1 mit Schwere 5, drei Annahmen); rot vorher: die fünf neuen Selbsttestzeilen `step use` ohne Code `FAIL` (`SELFTEST FAILED`), die drei neuen Fälschungstests in `test/customer-work.test.ts` belegen je eine Richtung, der Paritätstest rot mit `calls.length > 21`, `c.path.length > 201`, `HEAD` in der Methodenliste und `c.status > 600`. Befund ab dem Merge gemessen: Schrittguthaben an Kunde 1 vor `completedAt`, 10 Antworten danach, keine Einreichung. Prüfbefehle: Punkt 1 `SELFTEST OK …`, 5, 0, 9, 0, Exit 0; Punkt 2 Exit 0, `rot`; Punkt 3 `stimmig`, 1, `stimmig`; Punkt 4 5, `stimmig`, `stimmig`, `belegt`, `entfaellt`, kein Diff; Punkt 5 `stimmig`; Punkt 6 `stimmig`; Punkt 7 0, 0, 0, 3; Punkt 8 `check` Exit 0 (2895 passed), `e2e` folgt am PR.
 - 2026-11-26 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, 7, 8, nach dem Merge von `origin/dev` (4811f63, nur die Goal-Datei kanal 08) am Kopf a5497f4 jeden Prüfbefehl erneut gefahren, ohne Codeänderung. Prüfbefehle: Punkt 1 `SELFTEST OK …`, 5, 0, 9, 0, Exit 0; Punkt 2 Exit 0, `rot`; Punkt 3 `stimmig`, 1, `stimmig`; Punkt 4 5, `stimmig`, `stimmig`, `belegt`, `entfaellt`, kein Diff gegen die Produktion; Punkt 5 `stimmig`; Punkt 6 `stimmig`; Punkt 7 0, 0, 0, 3; Punkt 8 `check` Exit 0 (2895 passed); Job `e2e` am Kopf siehe PR #451.
 - 2026-11-26 Zyklus 3: Punkt 9 gebaut, im Vorschlag kunden-kritik-2026-11-26-1 steht statt des Saldos von Kunde 1 als Betrag „knapp über dem Schrittguthaben selbst“, Code und Messung unverändert; rot vorher: die Prüfung von Punkt 9 gab am Kopf 2d27dbe 1 aus. Prüfbefehle: Punkt 9 0 (vorher 1); Punkt 4 `belegt`, `entfaellt`; Punkt 7 0, 0; `check` Exit 0 (2895 passed); Job `e2e` am Kopf siehe PR #451.
+- 2026-11-26 Release: PASS K und B (Zyklus 3), DONE.
 
 ## Blockers
