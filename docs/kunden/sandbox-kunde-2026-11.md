@@ -57,7 +57,7 @@ wiederholt (`retryableStatuses` ohne 402, harness/runtime/src/types.ts:616). Der
 - Nach dem Halt arbeitete er weiter: 662 Anfragen, darunter 117 beantwortete Inferenzen und um 14:50 eine zweite Aufladung über
   `/pay/5/{address}` (erst 402, dann 200).
 - Die letzte Ledger-Zeile ist die Inferenz um 16:25:30 (`last inference`); danach bekam jede seiner 16 Inferenzen eine 402. Laut
-  Zugriffslog kamen sie in Salven am 21.11. um 20:51 und 20:57, dazwischen und bis 20:59:40 die Abfrage des Guthabens im Minutentakt
+  Zugriffslog kamen sie in Salven am 21.11. um 20:51 bis 20:52 und um 20:57, dazwischen und bis 20:59:40 die Abfrage des Guthabens im Minutentakt
   des Heartbeats, danach nichts mehr bis zu einer einzelnen 402 am 23.11. um 03:39:36 (`LAST 1`). Seitdem 87 Stunden Ruhe.
 - Warum 402, obwohl die Zeile `CUSTOMER 1` `covers hold` sagt: `covers hold` ist der Hold der Sandbox (`HOLD_MC`, 1000 mc). Eine
   Inferenz reserviert dagegen den Preis von geschätztem Prompt und `max_tokens` (`src/inference/proxy.ts`, `reserveMc`). Die Runtime
@@ -72,6 +72,73 @@ wiederholt (`retryableStatuses` ohne 402, harness/runtime/src/types.ts:616). Der
   berechnet wurde keiner. Die 404 auf `/v1/chat/completions` und die zwei 501 auf `/v1/domains/search` nach dem Halt hielten ihn
   nicht an, nach ihnen kamen weitere beantwortete Inferenzen; als Fehler eines echten Nutzers stehen sie in
   `goals/_vorschlaege/fehler-2026-11-26-1.md` mit Schwere 5.
+
+### Befehle zu den Zahlen im Befund
+
+Jede Zahl im Befund oben, die nicht im Codeblock der Ausgabe steht, mit dem nur lesenden Befehl, aus dem sie stammt, gefahren am
+2026-11-26T20:04:12Z im Repo nach `set -a; . ~/.config/control-plane/loop.env; set +a`. Die Datenbank öffnet jeder Befehl mit `readonly: true`
+im laufenden Container; den Kunden findet er selbst über seine Sandbox (`stop_reason = 'credit'`, angelegt 2026-11-21 um 02:2x),
+keine Adresse steht im Befehl oder in der Ausgabe.
+
+Tokens der Prompts seiner letzten 30 Inferenzen, aus `usage.prompt_tokens` in `meta` der Ledger-Zeilen:
+
+$ ssh -i "$CP_DEPLOY_KEY" "$CP_DEPLOY_HOST" docker exec -i -w /app deploy-cp-1 node - <<<'const db=new (require("better-sqlite3"))("/data/cp.db",{readonly:true});const a=db.prepare("SELECT address FROM sandboxes WHERE stop_reason=? AND created_at LIKE ? ORDER BY created_at LIMIT 1").pluck().get("credit","2026-11-21T02:2%");const t=db.prepare("SELECT meta FROM ledger WHERE address=? AND kind=? ORDER BY id DESC LIMIT 30").pluck().all(a,"inference").map(m=>JSON.parse(m).usage.prompt_tokens);console.log("last",t.length,"inference prompts: prompt_tokens min",Math.min(...t),"max",Math.max(...t))'
+
+```
+last 30 inference prompts: prompt_tokens min 26652 max 33638
+```
+
+Verfügbares Guthaben (`balance_mc - reserved_mc`) gegen die Reservierung mit `costMc` aus `dist/inference/proxy.js` für den kleinsten dieser Prompts, einmal mit 4096 Tokens Ausgabe und als Gegenprobe mit 0. Die Preise sind die des gespeicherten Katalogs von heute (`openrouter_price_snapshot`), nicht die vom 21.11., und der Dienst reserviert mit seiner Schätzung des Prompts (`estimateTokens`), nicht mit `prompt_tokens` des Anbieters; beides kann den Abstand verschieben, das Ergebnis steht nur als wahr oder falsch, nie als Betrag:
+
+$ ssh -i "$CP_DEPLOY_KEY" "$CP_DEPLOY_HOST" docker exec -i -w /app deploy-cp-1 node --input-type=module - <<<'import D from "better-sqlite3";import {costMc} from "/app/dist/inference/proxy.js";const db=new D("/data/cp.db",{readonly:true});const a=db.prepare("SELECT address FROM sandboxes WHERE stop_reason=? AND created_at LIKE ? ORDER BY created_at LIMIT 1").pluck().get("credit","2026-11-21T02:2%");const w=db.prepare("SELECT balance_mc-reserved_mc FROM wallets WHERE address=?").pluck().get(a);const m=db.prepare("SELECT meta FROM ledger WHERE address=? AND kind=? ORDER BY id DESC LIMIT 30").pluck().all(a,"inference").map(x=>JSON.parse(x));const p=Math.min(...m.map(x=>x.usage.prompt_tokens));const k=db.prepare("SELECT value,updated_at FROM kv WHERE key=?").get("openrouter_price_snapshot");const s=JSON.parse(k.value).find(x=>x.id===m[0].model);console.log("model",s.id,"prices from snapshot",k.updated_at);console.log("avail < costMc(prompt min, 4096 tokens):",w<costMc(s,{prompt_tokens:p,completion_tokens:4096}));console.log("avail < costMc(prompt min, 0 tokens):",w<costMc(s,{prompt_tokens:p,completion_tokens:0}))'
+
+```
+model openai/gpt-5-mini prices from snapshot 2026-11-26T19:27:41.065Z
+avail < costMc(prompt min, 4096 tokens): true
+avail < costMc(prompt min, 0 tokens): false
+```
+
+Letzte Ledger-Zeile des Kunden, Zahl der Zeilen nach 16:25:31 und als Gegenprobe nach 16:00:00 (das Guthaben war bei jeder 402 danach dasselbe):
+
+$ ssh -i "$CP_DEPLOY_KEY" "$CP_DEPLOY_HOST" docker exec -i -w /app deploy-cp-1 node - <<<'const db=new (require("better-sqlite3"))("/data/cp.db",{readonly:true});const a=db.prepare("SELECT address FROM sandboxes WHERE stop_reason=? AND created_at LIKE ? ORDER BY created_at LIMIT 1").pluck().get("credit","2026-11-21T02:2%");const r=db.prepare("SELECT created_at,kind FROM ledger WHERE address=? ORDER BY id DESC LIMIT 1").get(a);const n=t=>db.prepare("SELECT count(*) FROM ledger WHERE address=? AND created_at>?").pluck().get(a,t);console.log("last ledger row",r.created_at,r.kind);console.log("rows after 2026-11-21T16:25:31Z:",n("2026-11-21T16:25:31Z"));console.log("rows after 2026-11-21T16:00:00Z:",n("2026-11-21T16:00:00Z"))'
+
+```
+last ledger row 2026-11-21T16:25:30.428Z inference
+rows after 2026-11-21T16:25:31Z: 0
+rows after 2026-11-21T16:00:00Z: 22
+```
+
+Zeiten der 402 auf `/v1/chat/completions` nach der letzten Inferenz, je Minute. Die Adresse des Kunden ist die eine, die die Zeile `LAST 1` (2026-11-23T03:39:36Z, 402) schickte; der Befehl zählt sie, statt sie zu nennen:
+
+$ bash ops/access-log.sh | python3 -c 'import sys,json,datetime as d;L=[json.loads(x) for x in sys.stdin if x.startswith("{")];T=lambda e:d.datetime.fromtimestamp(e["ts"],d.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ");U=lambda e:e["request"]["uri"].split("?")[0];I=lambda e:e["request"].get("client_ip") or e["request"]["remote_ip"];ips={I(e) for e in L if T(e)=="2026-11-23T03:39:36Z" and e["status"]==402 and U(e)=="/v1/chat/completions"};print("customer ips (LAST 1):",len(ips));C={};[C.__setitem__(T(e)[:16],C.get(T(e)[:16],0)+1) for e in L if I(e) in ips and e["status"]==402 and U(e)=="/v1/chat/completions" and T(e)>"2026-11-21T16:25:35Z"];[print("402 /v1/chat/completions",k,"x%d"%v) for k,v in sorted(C.items())]'
+
+```
+customer ips (LAST 1): 1
+402 /v1/chat/completions 2026-11-21T20:51 x5
+402 /v1/chat/completions 2026-11-21T20:52 x5
+402 /v1/chat/completions 2026-11-21T20:57 x5
+402 /v1/chat/completions 2026-11-23T03:39 x1
+```
+
+Abfragen des Guthabens derselben Adresse nach der letzten Inferenz bis zum Ende des 21.11.:
+
+$ bash ops/access-log.sh | python3 -c 'import sys,json,datetime as d;L=[json.loads(x) for x in sys.stdin if x.startswith("{")];T=lambda e:d.datetime.fromtimestamp(e["ts"],d.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ");U=lambda e:e["request"]["uri"].split("?")[0];I=lambda e:e["request"].get("client_ip") or e["request"]["remote_ip"];ips={I(e) for e in L if T(e)=="2026-11-23T03:39:36Z" and e["status"]==402 and U(e)=="/v1/chat/completions"};B=sorted(T(e) for e in L if I(e) in ips and U(e)=="/v1/credits/balance" and "2026-11-21T16:25:35Z"<T(e)<"2026-11-23");print("customer ips (LAST 1):",len(ips));print("GET /v1/credits/balance after 16:25:35 on 2026-11-21: x%d, first %s, last %s"%(len(B),B[0],B[-1]));print("from 2026-11-21T20:50:00Z: x%d"%len([b for b in B if b>="2026-11-21T20:50:00Z"]))'
+
+```
+customer ips (LAST 1): 1
+GET /v1/credits/balance after 16:25:35 on 2026-11-21: x16, first 2026-11-21T16:25:37Z, last 2026-11-21T20:59:40Z
+from 2026-11-21T20:50:00Z: x15
+```
+
+Wallet unter 5 USD nach öffentlichen Daten auf Base: Die Adresse liest der Container und gibt sie nur in die Pipe, die Adresse des USDC-Vertrags kommt aus `src/konto/config.ts` (`MAINNET_USDC`); Gegenprobe `totalSupply` desselben Vertrags und ob überhaupt eine Adresse ankam:
+
+$ ssh -i "$CP_DEPLOY_KEY" "$CP_DEPLOY_HOST" docker exec -i -w /app deploy-cp-1 node - <<<'const db=new (require("better-sqlite3"))("/data/cp.db",{readonly:true});process.stdout.write(db.prepare("SELECT address FROM sandboxes WHERE stop_reason=? AND created_at LIKE ? ORDER BY created_at LIMIT 1").pluck().get("credit","2026-11-21T02:2%"))' | U="$(sed -nE 's/.*MAINNET_USDC = "(0x[0-9a-fA-F]{40})".*/\1/p' src/konto/config.ts)" node -e 'let a="";process.stdin.on("data",d=>a+=d).on("end",async()=>{const q=async data=>BigInt((await (await fetch("https://mainnet.base.org",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({jsonrpc:"2.0",id:1,method:"eth_call",params:[{to:process.env.U,data},"latest"]})})).json()).result);const b=await q("0x70a08231"+a.trim().slice(2).toLowerCase().padStart(64,"0"));const s=await q("0x18160ddd");console.log("address read from the container:",/^0x[0-9a-fA-F]{40}$/.test(a.trim()));console.log("customer wallet USDC < 5 USD:",b<5000000n);console.log("USDC totalSupply < 5 USD:",s<5000000n)})'
+
+```
+address read from the container: true
+customer wallet USDC < 5 USD: true
+USDC totalSupply < 5 USD: false
+```
 
 ## Ursache
 
