@@ -7,13 +7,13 @@ Summe zurück, und `ops/live.sh` erwartet sie als `REFUND_MC`.
 
 | Ende (UTC) | Dauer im Caddy-Log | Betrag | Generation-ID |
 |---|---:|---:|---|
-| 2026-11-10 05:16:27 | 22,8 s | 8883 mc | `gen-1794287765-SupdXvMT0JLDL224yBtY` |
-| 2026-11-10 05:18:17 | 18,5 s | 8702 mc | `gen-1794287878-doiF42ITx3lfTwxRWfqU` |
-| 2026-11-10 05:25:58 | 59,9 s | 19040 mc | `gen-1794288298-yWUHf9MpFBbR93vpJ7ET` |
-| 2026-11-10 05:36:46 | 59,9 s | 21605 mc | `gen-1794288946-oKnNy3iW6PaglDoYV2tH` |
-| 2026-11-10 05:37:53 | 59,9 s | 20999 mc | `gen-1794289014-dNsPPbkW0sMRJPZnCbiA` |
+| 2026-11-10 05:16:27 | 22,8 s | ***** mc | `gen-1794287765-SupdXvMT0JLDL224yBtY` |
+| 2026-11-10 05:18:17 | 18,5 s | ***** mc | `gen-1794287878-doiF42ITx3lfTwxRWfqU` |
+| 2026-11-10 05:25:58 | 59,9 s | ***** mc | `gen-1794288298-yWUHf9MpFBbR93vpJ7ET` |
+| 2026-11-10 05:36:46 | 59,9 s | ***** mc | `gen-1794288946-oKnNy3iW6PaglDoYV2tH` |
+| 2026-11-10 05:37:53 | 59,9 s | ***** mc | `gen-1794289014-dNsPPbkW0sMRJPZnCbiA` |
 
-**Summe:** 79229 mc, also 0,79229 USD (100000 mc = 1 USD), gerundet 0,79 USD. Die 0,37 USD aus dem ersten Beleg nahmen nur drei Fälle an
+**Summe:** ***** mc, also *.** USD (100000 mc = 1 USD), gerundet *.** USD. Die *.** USD aus dem ersten Beleg nahmen nur drei Fälle an
 und lassen sich gegen die Produktion nicht bestätigen.
 
 ## Befehle

@@ -1,7 +1,7 @@
 # Woher kam der erste zahlende Kunde?
 
 Stand 19.09.2026, 23:30. Anlass: Am selben Tag, an dem der Dienst öffentlich wurde, hat eine fremde
-Wallet 5 USDC bezahlt. Ohne Artikel, ohne Werbung, ohne Verzeichniseintrag. Die Frage, über welchen
+Wallet *.** USDC bezahlt. Ohne Artikel, ohne Werbung, ohne Verzeichniseintrag. Die Frage, über welchen
 Weg sie kam, entscheidet, wo die nächsten vier herkommen sollen.
 
 ## Die Zeitlinie
@@ -14,7 +14,7 @@ Weg sie kam, entscheidet, wo die nächsten vier herkommen sollen.
 | **14:46:18-20** | **Drei Kommentare in den Conway-Issues #339, #377, #393** |
 | ~15:00 | PR `xpaysh/awesome-x402#1564` eröffnet (bis heute offen, nicht gemerged) |
 | **17:36:16** | **Fremde Wallet `0x0629a685…488e` provisioniert sich** |
-| 18:40:42 | Dieselbe Wallet zahlt 5 USDC, on-chain bestätigt (Block 51526948) |
+| **:** | Dieselbe Wallet zahlt *.** USDC, on-chain bestätigt (Block und Betrag je Kunde nicht im öffentlichen Repo, Grundregel 8) |
 | 20:30 | `/.well-known/x402` und `llms.txt` gehen live (also **nach** ihm) |
 | 21:38 | Erster Crawler auf der Startseite |
 | 21:44 | Erster Crawler auf `/.well-known/x402` |

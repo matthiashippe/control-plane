@@ -2,12 +2,13 @@
 
 Ziel: Wir wissen gemessen, warum der einzige Kunde, der Sandbox und Inferenz bezahlt hat, nach einem Tag aufhörte, und beheben
 eine Ursache bei uns als Nächstes, statt weiter für Kunden zu bauen, die noch nicht da sind. Goal:
-`goals/kunden/16-warum-der-erste-sandbox-kunde-nach-10-usd-aufhoert.md`.
+`goals/kunden/16-warum-der-erste-sandbox-kunde-nach-einem-tag-aufhoert.md`.
 
 Gemessen: 2026-11-26T19:31:37Z
 Gelesen wurde nur: das Ledger über `ops/db-report.cjs` mit `CP_REPORT=sandbox-customer` (`readonly: true`, im Container `cp`) und
 das Caddy-Zugriffslog über `ops/access-log.sh`. Adressen, Wallet, Sandbox-ID und Beträge je Kunde stehen nicht in der Ausgabe und
-nicht in diesem Dokument (`loop-constraints.md`, Grundregel 8).
+nicht in diesem Dokument (`loop-constraints.md`, Grundregel 8); den Betrag im Pfad `/pay/<usd>/` und die Uhrzeit seiner
+Aufladung ersetzen `*` und `**:**` (fehler 14).
 
 ## Befehl und Ausgabe
 
@@ -21,8 +22,8 @@ LEDGER 1: grant 1, inference 304, sandbox 50, topup 2, last inference 2026-11-21
 AFTER 1 halt 2026-11-21T07:21:36Z: 662 requests
 PATH 1 halt GET /v1/credits/balance 200 x451
 PATH 1 halt POST /v1/chat/completions 402 x86
-PATH 1 halt GET /pay/5/{address} 402 x1
-PATH 1 halt GET /pay/5/{address} 200 x1
+PATH 1 halt GET /pay/*/{address} 402 x1
+PATH 1 halt GET /pay/*/{address} 200 x1
 PATH 1 halt POST /v1/chat/completions 200 x117
 PATH 1 halt GET /v1/domains/search 501 x2
 PATH 1 halt POST /v1/chat/completions 404 x1
@@ -54,8 +55,8 @@ wiederholt (`retryableStatuses` ohne 402, harness/runtime/src/types.ts:616). Der
 - Halt der Sandbox: Sie lief ab 02:27 UTC 50 Schritte aus Credits und hielt um 07:21:36 für Credits (`stop credit`). Danach rief
   der Kunde nie wieder einen Pfad unter `/v1/sandboxes/` auf: Keine Zeile `PATH 1 halt` nennt ihn. Das passt zur Fundstelle oben,
   die Runtime kommt auf eine gehaltene Sandbox nicht von selbst zurück.
-- Nach dem Halt arbeitete er weiter: 662 Anfragen, darunter 117 beantwortete Inferenzen und um 14:50 eine zweite Aufladung über
-  `/pay/5/{address}` (erst 402, dann 200).
+- Nach dem Halt arbeitete er weiter: 662 Anfragen, darunter 117 beantwortete Inferenzen und um **:** eine zweite Aufladung über
+  `/pay/*/{address}` (erst 402, dann 200).
 - Die letzte Ledger-Zeile ist die Inferenz um 16:25:30 (`last inference`); danach bekam jede seiner 16 Inferenzen eine 402. Laut
   Zugriffslog kamen sie in Salven am 21.11. um 20:51 bis 20:52 und um 20:57, dazwischen und bis 20:59:40 die Abfrage des Guthabens im Minutentakt
   des Heartbeats, danach nichts mehr bis zu einer einzelnen 402 am 23.11. um 03:39:36 (`LAST 1`). Seitdem 87 Stunden Ruhe.
@@ -148,7 +149,7 @@ Ergebnis: kein Fehler bei uns, weil der Kunde aufhörte, als sein Guthaben die n
 
 Widerlegt: nein, weil 662 Anfragen nach dem Halt kamen
 
-Für das nächste Glied: Er hat für eine Sandbox und rund 300 Inferenzen zweimal 5 USD gezahlt und dann aufgehört, als die Wallet
+Für das nächste Glied: Er hat für eine Sandbox und rund 300 Inferenzen zweimal *.** USD gezahlt und dann aufgehört, als die Wallet
 leer war. Ob er bei einem anderen Preis der Sandbox wiederkäme, sagt diese Messung nicht; sie sagt nur, dass ihm das Geld ausging,
 nicht dass ihn eine Antwort des Servers stoppte. Offen bleibt, dass ein Rest unter einer Reservierung, aber über den tatsächlichen
 Kosten der meisten seiner Anfragen, ungenutzt liegen bleibt.

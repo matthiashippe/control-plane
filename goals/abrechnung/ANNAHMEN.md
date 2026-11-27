@@ -2,15 +2,15 @@
 
 ## Goal 01 (10.11.2026, Engineer CP)
 
-- **Fünf Fälle, Summe 79229 mc (0,79 USD), nicht drei über 0,37 USD.** Gemessen lesend in der Produktion: Das Caddy-Zugriffslog (alle
+- **Fünf Fälle, Summe ***** mc (*.** USD), nicht drei über *.** USD.** Gemessen lesend in der Produktion: Das Caddy-Zugriffslog (alle
   Dateien `access.log*`) zeigt am 10.11.2026 fünf Anfragen an `/v1/chat/completions` mit Status 0, alle vom selben Client: Ende 05:16:27
   (22,8 s), 05:18:17 (18,5 s), 05:25:58, 05:36:46 und 05:37:53 UTC (je 59,9 s). Befehl
   `ssh … 'docker exec deploy-caddy-1 sh -c "cat /var/log/caddy/access.log*"'`, gefiltert auf Datum, URI und `status == 0`; Gegenprobe mit
   einer gepflanzten Zeile Status 0 (Treffer) und einer mit Status 200 (kein Treffer). Die passenden Zeilen `kind = 'inference'` (Generation-ID
   beginnt mit der Startzeit der Anfrage, gebucht rund 1 bis 8 s nach dem Abbruch) liefert
   `docker exec -i deploy-cp-1 node - <refs> < q.js` mit `require("better-sqlite3")("/data/cp.db", { readonly: true })` als
-  `{"n":5,"a":1,"s":-79229}`: fünf Zeilen, eine Adresse, Summe 79229 mc; Gegenprobe mit einer erfundenen `ref`: `n` 0. Die erste Fassung
-  nahm nur die drei nach 59,9 s (61644 mc); die Kritik vom 10.11.2026 fand die zwei kürzeren. Die 0,37 USD aus Goal und `LOOP.md` lassen
+  `{"n":5,"a":1,"s":-*****}`: fünf Zeilen, eine Adresse, Summe ***** mc; Gegenprobe mit einer erfundenen `ref`: `n` 0. Die erste Fassung
+  nahm nur die drei nach 59,9 s (***** mc); die Kritik vom 10.11.2026 fand die zwei kürzeren. Die *.** USD aus Goal und `LOOP.md` lassen
   sich gegen die Produktion nicht bestätigen. Gutgeschrieben wird, was abgebucht wurde.
 - **Die Gutschrift bucht nur, wenn genau diese fünf Zeilen auf einer Adresse mit genau dieser Summe stehen.** Sonst nichts und eine
   Log-Zeile. Die Adresse steht nirgends im Repo, sie kommt aus den Abbuchungen selbst.
@@ -87,8 +87,8 @@
 - **Quote nach außen noch keine.** Die Messung `service` darf es später sein, weil sie im Vergleich dasselbe zählt; 0 Timeouts in 46
   Anfragen über 2,5 Stunden belegen keine Besserung gegenüber 3 in 224 an einem Tag. Frühestens nach sieben Tagen ab dem Rollout von
   abrechnung 02, wie `docs/kette.md` es für den Vergleich vorsieht.
-- **Summe der Abbrüche neu gemessen:** 79229 mc aus den fünf Abbuchungen (Ledger, `readonly: true`), dieselben fünf Anfragen mit Status 0
-  im Caddy-Log; die `ref` liest die Abfrage aus der Gutschrift selbst. `LOOP.md` nennt weiter 0,37 USD; den Satz ändert nur ein Mensch.
+- **Summe der Abbrüche neu gemessen:** ***** mc aus den fünf Abbuchungen (Ledger, `readonly: true`), dieselben fünf Anfragen mit Status 0
+  im Caddy-Log; die `ref` liest die Abfrage aus der Gutschrift selbst. `LOOP.md` nennt weiter *.** USD; den Satz ändert nur ein Mensch.
 
 ## Goal 04 (11.11.2026, Engineer CP)
 
@@ -176,3 +176,10 @@
   alle im Ausfall, weit weg von beiden Rändern.
 - **Erste lesbare Zeile:** Für „Log beginnt nach `TQ_SINCE`“ zählt die früheste `ts` aller lesbaren JSON-Zeilen, gleich welcher Pfad,
   weil auch eine Zeile auf einem anderen Pfad zeigt, dass das Log so weit zurückreicht.
+
+## Abgelöst durch fehler 14 (Tech Lead, 2026-11-27)
+
+- Abgelöst: abrechnung 03 Punkt 3, Prüfung `grep -c "$(sed -n 's/^REFUND_MC=//p' ops/live.sh)" docs/abrechnung/abbrueche-2026-11-10.md` (Zeile 72) durch `f=docs/abrechnung/abbrueche-2026-11-10.md; grep -c "$(sed -n 's/^REFUND_MC=//p' ops/live.sh)" $f; grep -c 'REFUND_MC' $f`, Ausgabe dann genau `0` und `1` (Tech Lead, 2026-11-27, fehler 14, PRO-31732). Grund: Die Summe der fünf Abbrüche gehört einem einzelnen fremden Automaton (Ledger `"a":1` in Zeile 12) und ist ein Betrag je Kunde (Grundregel 8); `docs/kette.md` Zeile 17 und `ROADMAP.md` maskieren denselben Fall schon. Die Datei nennt weiter, dass `ops/live.sh` die Summe als `REFUND_MC` erwartet; die Gleichheit prüfen abrechnung 01 Zeile 88 und `test/credit-aborted.test.ts` im Code. Maskiert werden in der Datei die Summe in mc und USD, den Betrag des ersten Belegs und die Spalte „Betrag“ der fünf Tabellenzeilen, weil die Zeilen zusammen die Summe ergeben; die fünf Zeilen selbst bleiben (Zeile 73).
+- Abgelöst: abrechnung 03 Punkt 3, Prüfung `grep -c "$(sed -n 's/^REFUND_MC=//p' ops/live.sh)" docs/abrechnung/abbrueche-2026-11-10.md` (Zeile 72) durch `grep -cE '^\*\*Summe:\*\* \*+ mc' docs/abrechnung/abbrueche-2026-11-10.md`, Ausgabe dann genau `1` (Tech Lead, 2026-11-27, fehler 14: die Summe gehört einem einzelnen fremden Automaton, Grundregel 8)
+- Abgelöst: abrechnung 01 Punkt 8, Prüfung `totalMc: …` (Zeile 87) durch `[ "$(sed -n 's/^  totalMc: \([0-9_]*\),$/\1/p' src/credits/aborted.ts | tr -d _)" = "$(sed -n 's/^REFUND_MC=//p' ops/live.sh)" ] && echo gleich`, Ausgabe dann genau `gleich` (Tech Lead, 2026-11-27, fehler 14, PRO-31732). Grund: Der alte Befehl trägt die Summe, die einem einzelnen fremden Automaton gutgeschrieben wurde (Grundregel 8), und jeder Loop-Audit schreibt ihn mit dem Betrag neu nach `docs/audit/`; dass die Summe die fünf Abbuchungen trifft, prüft weiter die Prüfung in Zeile 89 (`test/credit-aborted.test.ts`).
+- Abgelöst: abrechnung 01 Punkt 8, Prüfung `^REFUND_MC=…` (Zeile 88) durch `grep -cE '^REFUND_MC=[0-9]+$' ops/live.sh`, Ausgabe dann genau `1` (Tech Lead, 2026-11-27, fehler 14, PRO-31732). Grund wie bei Zeile 87; dass der Wert in `ops/live.sh` gleich der Gutschrift im Code ist, prüft der Befehl, der Zeile 87 ablöst, und die Prüfung in Zeile 90 (`bash ops/live.sh --selftest`).

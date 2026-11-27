@@ -1,11 +1,11 @@
-# Kunden Goal 16: Warum der erste Sandbox-Kunde nach 10 USD aufhört
+# Kunden Goal 16: Warum der erste Sandbox-Kunde nach einem Tag aufhört
 
 ## Status
 DONE
 
 ## Active Objective
 Am 21.11.2026 hat eine fremde Runtime (Schlüssel `conway-automaton`) das Abschlusskriterium erfüllt: Startgutschrift, Sandbox Stufe
-medium ab 02:27 UTC, 50 Schritte aus Credits bis zum Halt `credit` um 07:21, zwei Aufladungen über x402 (03:00 und 14:50),
+medium ab 02:27 UTC, 50 Schritte aus Credits bis zum Halt `credit` um 07:21, zwei Aufladungen über x402 (**:** und **:**),
 Inferenz bis zur letzten Ledger-Zeile um 16:25, seitdem keine zweite Sandbox und keine Inferenz mehr (Richtungs-Check 26.11.2026,
 `docs/richtung/2026-11-26.md`, Idee 5). Niemand weiß, warum sie aufhörte: Ihr Betreiber hat sie abgestellt, ihr fehlt das Geld,
 oder eine Antwort des Servers hat sie gestoppt. Nach diesem Goal gibt es ein Werkzeug `ops/sandbox-customer.sh`, das je fremdem

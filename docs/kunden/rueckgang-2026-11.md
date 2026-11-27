@@ -1,12 +1,12 @@
 # Warum der zahlende Automaton aufhört (Rückgang November 2026)
 
-Ziel: Wir wissen gemessen, warum die fremde Inferenz-Ausgabe von 8,19 USD am 12.11. auf 0,13 USD am 18.11. fiel, je Kunde, und
+Ziel: Wir wissen gemessen, warum die fremde Inferenz-Ausgabe von 8,19 USD am 12.11. auf *.** USD am 18.11. fiel, je Kunde, und
 beheben eine Ursache bei uns als Nächstes (Topic `fehler`). Goal: `goals/kunden/01-warum-der-zahlende-automaton-aufhoert.md`.
 
 Gemessen: 2026-11-19T16:01:23Z
-Rückgang über alle fremden Kunden: 8,19 USD am 12.11., 0,13 USD am 18.11. (Beträge je Kunde nicht im öffentlichen Repo,
+Rückgang über alle fremden Kunden: 8,19 USD am 12.11., *.** USD am 18.11. (Beträge je Kunde nicht im öffentlichen Repo,
 `loop-constraints.md` Grundregel 8)
-Leitzahl: 4,11 USD fremde Inferenz-Ausgabe in den 7 Tagen bis 2026-11-19
+Leitzahl: *.** USD fremde Inferenz-Ausgabe in den 7 Tagen bis 2026-11-19
 
 Das sind dieselben Summen wie in `docs/richtung/2026-11-19.md`. Am 12.11. gaben Kunde 1, 3 und 4 aus. Umsatz und Saldo je Kunde
 stehen nur in der Ausgabe des Werkzeugs auf dem code-host; unten sind sie durch `*.**` ersetzt (Grundregel 8: nie Umsatz je Kunde ins
@@ -128,7 +128,7 @@ ABORTS 2026-11-17: 9 aborted, 0 answered after, 0.00 USD bought
 ABORTS 2026-11-18: 7 aborted, 0 answered after, 0.00 USD bought
 ABORTS 2026-11-19: 2 aborted, 0 answered after, 0.00 USD bought
 UNMATCHED: 3 inference rows without a log line within 5 s
-WEEK: 4.11 USD foreign inference in the 7 days before 2026-11-19T16:01:23Z
+WEEK: *.** USD foreign inference in the 7 days before 2026-11-19T16:01:23Z
 ```
 
 ## Ursache je Kunde
