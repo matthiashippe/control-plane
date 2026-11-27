@@ -1,0 +1,5 @@
+Schwere: 3
+Goal: abrechnung 08
+Befund: Hinter der 402 nutzt der Code `requiredMc` und `maxTokens` als `const` weiter (Anfrage an den Anbieter, Abrechnung, Freigabe der Reservierung), die Deny List erlaubt Änderungen aber nur auf dem Weg bis zur 402; bleibt die Freigabe beim vollen Betrag, gibt sie Reservierungen paralleler Anfragen derselben Wallet frei und öffnet das Rennen vom 19.09.2026 wieder.
+Beleg: `git show origin/dev:src/inference/proxy.ts | grep -n -E 'requiredMc|maxTokens\b'` -> :300 und :303 `const`, danach :420, :428, :461 (`maxTokens` an den Anbieter), :471, :534 (`releaseReservedMc: requiredMc`), :554 | src/db.ts:1001 (`reserved_mc = max(0, reserved_mc - ?)` je Wallet, nicht je Anfrage)
+Empfehlung: Die Deny List erlaubt ausdrücklich `let` in :300 und :303 und die Neuzuweisung auf den gekürzten Wert; dazu ein fünfter Test „releases only the shortened reservation“ mit zwei parallelen Anfragen derselben Wallet, von denen die zweite ihre Reservierung behält, nachdem die gekürzte erste fertig ist.
