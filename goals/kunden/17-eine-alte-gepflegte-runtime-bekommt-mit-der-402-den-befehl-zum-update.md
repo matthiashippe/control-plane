@@ -59,32 +59,32 @@ MVP: Funktion, weil die eine Runtime, die heute 402 bekommt, sonst nie die Zeile
   (`PATH=/usr/bin:$PATH`), `check` und vitest im Vordergrund mit eigenem Timeout. Code, Bezeichner, Testnamen und Felder englisch.
 
 ## Done Condition
-- [ ] `docs/kunden/kennung-2026-11.md` zeigt die Kennungen der gepflegten Runtimes seit dem Release mit Befehl und vollständiger
+- [x] `docs/kunden/kennung-2026-11.md` zeigt die Kennungen der gepflegten Runtimes seit dem Release mit Befehl und vollständiger
       Ausgabe und sagt, ob eine neue Kennung kam.
       MVP: Funktion, weil die Leitzahl ohne den Stand vorher nichts zeigt.
       Prüfung: `grep -c -E '^Neue Kennung seit dem Release: (ja|nein), [0-9]+ Antworten 402' docs/kunden/kennung-2026-11.md` muss genau 1 ausgeben.
       Prüfung: `grep -c -E '^MAINTAINED 402 (since|VERSION) ' docs/kunden/kennung-2026-11.md` muss mindestens 1 ausgeben.
       Prüfung: `grep -c -E '0x[0-9a-fA-F]{40}|[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' docs/kunden/kennung-2026-11.md` muss 0 ausgeben.
-- [ ] Die 402 an eine ältere gepflegte Kennung trägt `details.update_command` und den Satz in `message_for_operator`; jede andere 402
+- [x] Die 402 an eine ältere gepflegte Kennung trägt `details.update_command` und den Satz in `message_for_operator`; jede andere 402
       bleibt Byte für Byte.
       MVP: Funktion, weil die alte Installation sonst nie die Zeile zeigt, die ihren Menschen zur Karte führt.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/inference-maintained-update.test.ts` muss Exit-Code 0 haben.
       Prüfung: `for t in "names the update command in the 402 for an older maintained runtime" "keeps the 402 unchanged for the current maintained runtime" "keeps the 402 unchanged for an upstream runtime" "keeps MAINTAINED_RELEASE equal to the Release line of the guide" "names only the released version in the guide"; do grep -qF "\"$t\"" test/inference-maintained-update.test.ts || echo "fehlt: $t"; done` muss nichts ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/inference.test.ts` muss Exit-Code 0 haben.
-- [ ] `docs/paket/anleitung.md` nennt außerhalb der Liste der Commits nur die Fassung aus `Release:`.
+- [x] `docs/paket/anleitung.md` nennt außerhalb der Liste der Commits nur die Fassung aus `Release:`.
       MVP: Funktion, weil der Mensch, den die 402 zum Update schickt, mit `automaton --version` prüft, ob es geklappt hat, und die
       Anleitung ihm heute die alte Kennung als Erfolg nennt.
       Prüfung: `grep -c 'automaton-maintained 0.2.2-maintained.1\b' docs/paket/anleitung.md` muss 0 ausgeben.
       Prüfung: `grep -c "releases/tag/$(sed -n 's/^Release: //p' docs/paket/anleitung.md)$" docs/paket/anleitung.md` muss genau 1 ausgeben.
-- [ ] Die Entscheidungen stehen in `goals/kunden/ANNAHMEN.md`, der Diff bleibt in den Pfaden dieses Goals, kein Test fällt weg.
+- [x] Die Entscheidungen stehen in `goals/kunden/ANNAHMEN.md`, der Diff bleibt in den Pfaden dieses Goals, kein Test fällt weg.
       MVP: Funktion, weil das nächste Glied wissen muss, warum nur ältere Kennungen den Befehl bekommen.
       Prüfung: `grep -cE '^- [0-9]{4}-[0-9]{2}-[0-9]{2}, kunden 17: ' goals/kunden/ANNAHMEN.md` muss mindestens 5 ausgeben.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD | grep -vE '^(src/inference/proxy\.ts|src/inference/maintained[a-z-]*\.ts|src/app\.ts|test/inference-maintained-update\.test\.ts|docs/kunden/kennung-2026-11\.md|docs/paket/anleitung\.md|goals/kunden/.*|goals/[a-z]+/ANNAHMEN\.md)$' | wc -l` muss 0 ausgeben.
       Prüfung: `git diff --diff-filter=D --name-only $(git merge-base origin/dev HEAD) HEAD -- test | wc -l` muss 0 ausgeben.
-- [ ] Der Job `e2e` am Kopf des Goal-PR ist grün.
+- [x] Der Job `e2e` am Kopf des Goal-PR ist grün.
       MVP: Funktion, weil sich die 402 im Laufzeitpfad ändert und der code-host kein Docker hat.
       Prüfung (Netz): `gh pr checks $(gh pr list -R matthiashippe/control-plane --head goal/kunden-17 --state open --json number -q '.[0].number') -R matthiashippe/control-plane 2>&1 | grep -E '^e2e\s' | grep -c pass` muss genau 1 ausgeben.
-- [ ] `check` ist grün.
+- [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
 - [ ] goal-verifier PASS (K und B)
 
@@ -115,5 +115,6 @@ MVP: Funktion, weil die eine Runtime, die heute 402 bekommt, sonst nie die Zeile
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-27 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6 gebaut (Messung seit dem Release in `docs/kunden/kennung-2026-11.md`, `MAINTAINED_RELEASE` in `src/inference/maintained.ts`, `details.update_command` und Satz in `message_for_operator` nur für ältere Kennungen `automaton-maintained/`, Zeilen 19 und 20 der Anleitung auf die Fassung aus `Release:`). Rot am Kopf von `dev` (70e5599, nur mit `src/inference/maintained.ts` daneben): „names the update command in the 402 for an older maintained runtime“ mit `0.2.2-maintained.1: expected undefined to be 'npm install -g github:matthiashippe/a…'`, „names only the released version in the guide“ mit `expected [ '0.2.2-maintained.3', …(1) ] to deeply equal [ '0.2.2-maintained.3' ]`, ohne die Datei scheitert schon der Import. Was mitzieht: 354 Prüfbefehle ohne Netz der DONE-Goals vorher und nachher gleich; ABGELÖST kunden 08 Punkt 3 (Zeile 99) und abrechnung 08 Punkt 4 (Zeile 105), alter Befehl am Kopf `falsch src/app.ts:3614`, `falsch src/app.ts:3653`, `falsch src/app.ts:3833`, `falsch src/inference/proxy.ts:224`, `falsch src/inference/proxy.ts:465`, neuer Befehl aus den Zeilen `Abgelöst:` in `goals/kunden/ANNAHMEN.md` und `goals/abrechnung/ANNAHMEN.md` am Kopf `ende` (Tech Lead, PRO-32051). Prüfbefehle: Punkt 1 1, 4, 0; Punkt 2 Exit 0 (6 Tests), keine Ausgabe, Exit 0 (20 Tests); Punkt 3 0, 1; Punkt 4 7, 0, 0; Punkt 5 Job `e2e` am gepushten Kopf, Ergebnis im Kommentar des Childs; Punkt 6 Exit 0 (`check: grün in 245 s`).
 
 ## Blockers
