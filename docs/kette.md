@@ -14,7 +14,7 @@ Rollout zeigt, dass derselbe Weg für eine eigene Adresse nicht mehr scheitert.
 ## abrechnung 01: Keine Abbuchung ohne angekommene Antwort
 
 Beleg vom 10.11.2026: Ein fremder Automaton brach 5 Anfragen an `/v1/chat/completions` vor der fertigen Antwort ab, 3 davon in
-seinem Timeout von 60 Sekunden, berechnet wurden sie trotzdem, zusammen 79229 mc (0,79 USD, gemessen mit Befehl in
+seinem Timeout von 60 Sekunden, berechnet wurden sie trotzdem, zusammen ***** mc (*.** USD, Betrag je Kunde nicht im öffentlichen Repo, Grundregel 8; gemessen mit Befehl in
 `docs/abrechnung/abbrueche-2026-11-10.md`). Die fünf Fälle stehen im Ledger (`kind = 'inference'`) und im Caddy-Zugriffslog. Ursache im Code: `handleChatUncoalesced` in `src/inference/proxy.ts` bucht, sobald der Anbieter antwortet, ohne zu
 wissen, ob der Client noch wartet.
 

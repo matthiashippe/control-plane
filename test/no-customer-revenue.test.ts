@@ -23,6 +23,7 @@ const CUSTOMER_PATTERNS: readonly RegExp[] = [
   /\bKunden? [0-9]+\b(?![.,][0-9])/,
   /\b(?:CUSTOMER|DAY|LEDGER|SANDBOX|AFTER|PATH|LAST|QUIET) [0-9]+\b/,
   /Sandbox-Kunde/,
+  /\b[Ee]in(?:e[mnr])? (?:einzelne[mnr]? )?fremde[mnr]? Automaton\b/,
   /von einer Adresse/,
   /\bseine[mnrs]? Wallet/,
   /\bihre[mnrs]? Wallet/,
@@ -175,6 +176,12 @@ describe("no revenue of a single customer in the public repo", () => {
     expect(customerAmountLines("Kunde 9 gab 12,34 USD aus.")).toEqual([1]);
     expect(customerAmountLines("Kunde 9 gab 12.34 USDC aus.")).toEqual([1]);
     expect(customerAmountLines("Der Sandbox-Kunde hat noch 0,85 USD.")).toEqual([1]);
+  });
+
+  it("catches an amount of one single foreign automaton", () => {
+    expect(customerAmountLines("Ein fremder Automaton brach 4 Anfragen ab, berechnet wurden 3,57 USD.")).toEqual([1]);
+    expect(customerAmountLines("Einem einzelnen fremden Automaton haben wir 3,57 USD berechnet.")).toEqual([1]);
+    expect(customerAmountLines("Ein fremder Automaton brach 4 Anfragen ab, berechnet wurden *.** USD.")).toEqual([]);
   });
 
   it("catches an amount that a line break separates from the customer", () => {
