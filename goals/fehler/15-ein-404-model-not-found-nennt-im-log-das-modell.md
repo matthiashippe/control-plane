@@ -1,7 +1,7 @@
 # Fehler Goal 15: Ein 404 `model_not_found` nennt im Log das Modell
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Der einzige fremde Kunde mit Sandbox und Inferenz bekam am 2026-11-21 fünfmal 404 auf `POST /v1/chat/completions` (`bash
@@ -87,7 +87,7 @@ MVP: Funktion, weil ein Fehler eines echten Nutzers (Grundregel 4) nur behoben w
       Prüfung (Netz): `gh pr checks $(gh pr list -R matthiashippe/control-plane --head goal/fehler-15 --state open --json number -q '.[0].number') -R matthiashippe/control-plane 2>&1 | grep -E '^e2e\s' | grep -c pass` muss genau 1 ausgeben.
 - [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Nach dem Rollout steht bei jedem 404 `model_not_found` das angefragte Modell im Log des Dienstes, ohne Adresse.
@@ -117,5 +117,6 @@ MVP: Funktion, weil ein Fehler eines echten Nutzers (Grundregel 4) nur behoben w
 ## Progress Log
 - 2026-11-27 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6 gebaut: Log-Zeile `[inference] model_not_found model=<id> known=<n>` an der 404 in `src/inference/proxy.ts`, Test `test/inference-model-not-found.test.ts` (5 Fälle; am Kopf von `dev` `102ccd0` 3 rot mit `expected [] to deeply equal [ Array(1) ]`, der Fall mit dem Zeilenumbruch hinter der Kürzung rot gegen eine Fassung, die nur die ersten 120 Zeichen prüft), `docs/fehler/modelle-am-pin.md` mit sechs IDs am Pin (zwei über bestehende Aliase bedient, `gpt-5.3` und die drei `gpt-4.1`-IDs `missing` mit Grund, kein neuer Alias, Gründe in `goals/fehler/ANNAHMEN.md`), 404 seit 2026-11-21 gezählt mit Gegenprobe; die 310 lokalen Prüfbefehle der 14 DONE-Goals, die `proxy.ts` oder `openrouter.ts` nennen, vorher und nachher mit gleichen Exit-Codes (abweichende Ausgaben nur bei Temp-Pfaden, vitest-Zeilen langsamer Tests, der neuen Log-Zeile und den Umfangsprüfungen fremder Goals, die hier den Diff dieses Goals zählen). Prüfbefehle: P1 vitest Exit 0 (5 passed), Testnamen-Schleife leer, grep 1; P2 6, 2, 0; P3 Schleife leer, 0; P4 4, 0, 0; P5 `e2e pass` am Kopf `ac1860c` (Lauf 46019509890), Zählung 1; P6 `check: grün in 201 s` Exit 0.
 - 2026-11-27 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6; `dev` ohne neuen Stand seit der Merge-Basis `102ccd0`, kein Merge nötig. Prüfbefehle am Kopf `78456c0`: P1 vitest Exit 0 (5 passed), Testnamen-Schleife leer, grep 1; P2 6, 2, 0; P3 Schleife leer, 0; P4 4, 0, 0; P5 `e2e pass` am Kopf `78456c0` (Lauf 46021360985), Zählung 1; P6 `check: grün in 289 s` Exit 0.
+- 2026-11-27 Release: PASS K und B (Zyklus 2), DONE.
 
 ## Blockers
