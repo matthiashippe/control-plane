@@ -5,3 +5,4 @@ Beleg: goals/_vorschlaege/kunden-kritik-2026-11-26-1.md:17 auf origin/goal/kunde
 Empfehlung: Das Folge-Glied von kunden 14 baut nicht weiter am Hausauftrag für Kunde 1, sondern setzt an den Wallets an, die bei Conway noch aufladen, oder an einem Weg, den die unveränderte Runtime von selbst geht (402 mit Aufladung); der Tech Lead entscheidet das vor dem Schreibauftrag für kunden 15.
 
 Das Produkt verspricht, dass eine unveränderte Runtime bei uns ohne Änderung weiterläuft (`LOOP.md`, Produkt in einem Satz). Ein Weg, auf dem ihr Modell einen Auftrag erst über `exec` oder `x402_fetch` selbst erfinden muss, erreicht keinen weiteren Kunden und bei Kunde 1 nach vier Gliedern keine Zahlung.
+Übernommen: Tech Lead, PRO-31352 Glied 3 (2026-11-27)

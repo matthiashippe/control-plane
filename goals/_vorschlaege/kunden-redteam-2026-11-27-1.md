@@ -21,3 +21,4 @@ Die Beträge stehen hier bewusst nicht, weil dieser Vorschlag im selben öffentl
 ## Gegenprüfung
 
 Ein frischer Subagent sollte den Befund widerlegen und bestätigte ihn: Das Repo ist öffentlich (`gh repo view matthiashippe/control-plane --json visibility` -> `PUBLIC`), keine Annahme und kein Vorschlag erlaubt Beträge je Kunde, und gemeldet war es noch nicht.
+Übernommen: Tech Lead, PRO-31352 Glied 1, Schwere 5 (Grundregel 8), Goal-Datei, Dateiname, Prüfung der Linse B und Git-Historie als Vorlage an Matthias (2026-11-27)

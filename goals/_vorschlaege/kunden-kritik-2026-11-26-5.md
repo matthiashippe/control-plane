@@ -4,3 +4,4 @@ Befund: `docs/paket/anleitung.md` sagt unter dem Installationsbefehl weiter, `au
 Beleg: `docs/paket/anleitung.md:19` und `:20`, `goals/kunden/ANNAHMEN.md` (letzte Zeile zu kunden 15)
 Empfehlung: Beim nächsten Glied, das die Anleitung berührt, beide Zeilen aus der Zeile `Release:` ableiten und eine Prüfung ergänzen, die jede Nennung von `0.2.2-maintained.` außerhalb der Commit-Liste gegen den Tag in `Release:` abgleicht.
 MVP: Schönheit, weil der Befehl selbst stimmt und nur die erwartete Ausgabe veraltet ist.
+Übernommen: Tech Lead, PRO-31352 Glied 5 (2026-11-27)

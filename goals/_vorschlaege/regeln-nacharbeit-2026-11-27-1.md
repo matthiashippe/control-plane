@@ -6,3 +6,4 @@ Empfehlung: Einen Test in `test/konto-payout.test.ts` anlegen, der eine Datei mi
 MVP: Funktion, weil die Auszahlung bestehender Konten nach dem nächsten Rollout nur mit dieser Migration läuft und Kompatibilität keine Schönheit ist.
 
 Linse Q, Frage 1. Der Fall „retires a row from before retire_destination“ in `test/konto-payout.test.ts` setzt die Spalte nur auf NULL, die Spalte selbst fehlt dort nie; Linse K hat die Migration im Verdict `goals/regeln/verdicts/03-z2-K.md:36` nur mit einer Probe von Hand belegt.
+Übernommen: Tech Lead, PRO-31352 Glied 6 (2026-11-27)

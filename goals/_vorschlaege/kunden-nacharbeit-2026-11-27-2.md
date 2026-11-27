@@ -6,3 +6,4 @@ Empfehlung: In `PLANT_STEPS_JS` je eine Zeile `inference` des Kunden genau auf `
 MVP: Schönheit
 
 Linse Q, Frage 1. Die drei neuen Mutationsfälle in `test/customer-work.test.ts` nehmen nur eine Grenze ganz weg, keiner verschiebt sie um den Randfall; Linse K nennt das im Verdict `goals/kunden/verdicts/14-z3-K.md:40` als Kandidaten für die Nacharbeit (hier gelesen, nicht ausgeführt: kein `node_modules` im Checkout).
+Übernommen: Tech Lead, PRO-31352 Glied 8, beim nächsten Goal an der Datei, Watch List in STATE.md (2026-11-27)

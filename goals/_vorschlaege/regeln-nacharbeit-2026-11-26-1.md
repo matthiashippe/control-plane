@@ -6,3 +6,4 @@ Empfehlung: `FORWARDER_ARGS` aus den `inputs` des Eintrags mit `type: "construct
 MVP: Schönheit
 
 Linse Q, Frage 2. Ändert ein neuer Build des Vertrags die Reihenfolge, prüft `test/konto-forwarder.test.ts` nur das ABI; `forwarderInitCode` und die Sperre aus regeln 02 blieben gemeinsam auf der alten Reihenfolge, und der Test `sends a forwarder deploy on 8453 with the own values` bliebe grün.
+Übernommen: Tech Lead, PRO-31352 Glied 8, beim nächsten Goal an der Datei, Watch List in STATE.md (2026-11-27)
