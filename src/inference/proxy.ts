@@ -279,6 +279,11 @@ async function handleChatUncoalesced(
     // matrix ("gpt-5.2", "gpt-5-mini", "gpt-5.3") and not for the configured model, and whoever
     // does not serve one of them would otherwise search at the wrong end.
     const available = catalog.modelIds();
+    // One line with the model and nothing about the caller: on 2026-11-21 an outside runtime got
+    // five of these and nobody could tell afterwards what it had asked for (goals/fehler/15). Only
+    // a plain ID gets into the log, so a line break in `model` cannot forge a second line.
+    const logged = /^[A-Za-z0-9._:/@+-]+$/.test(req.model) ? req.model.slice(0, 120) : "<invalid>";
+    console.log(`[inference] model_not_found model=${logged} known=${available.length}`);
     const shown = available.slice(0, 12);
     const rest = available.length - shown.length;
     return {

@@ -1,7 +1,7 @@
 # Fehler Goal 15: Ein 404 `model_not_found` nennt im Log das Modell
 
 ## Status
-PLANNED
+DONE
 
 ## Active Objective
 Der einzige fremde Kunde mit Sandbox und Inferenz bekam am 2026-11-21 fünfmal 404 auf `POST /v1/chat/completions` (`bash
@@ -60,34 +60,34 @@ MVP: Funktion, weil ein Fehler eines echten Nutzers (Grundregel 4) nur behoben w
   Bezeichner, Testnamen und Log-Zeilen englisch.
 
 ## Done Condition
-- [ ] Bei `model_not_found` schreibt der Dienst genau eine Zeile `[inference] model_not_found model=<id> known=<n>` ohne Adresse; die
+- [x] Bei `model_not_found` schreibt der Dienst genau eine Zeile `[inference] model_not_found model=<id> known=<n>` ohne Adresse; die
       Antwort bleibt, wie sie ist.
       MVP: Funktion, weil der nächste 404 eines fremden Kunden sonst wieder ohne das Modell verschwindet.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/inference-model-not-found.test.ts` muss Exit-Code 0 haben.
       Prüfung: `for t in "logs the requested model on model_not_found without the address" "logs model=<invalid> for a model with a line break"; do grep -qF "\"$t\"" test/inference-model-not-found.test.ts || echo "fehlt: $t"; done` muss nichts ausgeben.
       Prüfung: `grep -c 'model_not_found model=' src/inference/proxy.ts` muss genau 1 ausgeben.
-- [ ] `docs/fehler/modelle-am-pin.md` nennt jede Modell-ID der Runtime am Pin mit Fundstelle und Ergebnis, dazu die 404 seit
+- [x] `docs/fehler/modelle-am-pin.md` nennt jede Modell-ID der Runtime am Pin mit Fundstelle und Ergebnis, dazu die 404 seit
       2026-11-21 als Zählung; jede ID mit `missing` trägt ihren Grund.
       MVP: Funktion, weil erst die Liste zeigt, welche Züge einer fremden Runtime bei uns ins Leere gehen.
       Prüfung: `grep -c -E '^MODEL [A-Za-z0-9._/-]+: (served|alias [A-Za-z0-9._/-]+|missing, .+), [^ ]+:[0-9]+ am Pin d8f8168' docs/fehler/modelle-am-pin.md` muss mindestens 3 ausgeben.
       Prüfung: `grep -c -E '^(## 404 seit 2026-11-21|Gelesen: )' docs/fehler/modelle-am-pin.md` muss genau 2 ausgeben.
       Prüfung: `grep -c -E '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}|0x[0-9a-fA-F]{40}' docs/fehler/modelle-am-pin.md` muss 0 ausgeben.
-- [ ] Jede ID mit `alias` im Dokument steht in `DEFAULT_OPENROUTER_ALIASES`, keine ID mit `missing` steht dort, und kein Alias zeigt
+- [x] Jede ID mit `alias` im Dokument steht in `DEFAULT_OPENROUTER_ALIASES`, keine ID mit `missing` steht dort, und kein Alias zeigt
       auf ein Claude- oder Anthropic-Modell.
       MVP: Funktion, weil ein Alias, den das Dokument nennt und der Code nicht hat, die 404 bestehen lässt.
       Prüfung: `for id in $(grep -oE '^MODEL [A-Za-z0-9._/-]+: alias' docs/fehler/modelle-am-pin.md | cut -d' ' -f2 | tr -d :); do grep -qF "\"$id\":" src/inference/openrouter.ts || echo "fehlt: $id"; done` muss nichts ausgeben.
       Prüfung: `sed -n '/DEFAULT_OPENROUTER_ALIASES/,/^};/p' src/inference/openrouter.ts | grep -ciE 'claude|anthropic'` muss 0 ausgeben.
-- [ ] Die Entscheidungen stehen in `goals/fehler/ANNAHMEN.md`, der Diff bleibt in den Pfaden dieses Goals, kein Test fällt weg.
+- [x] Die Entscheidungen stehen in `goals/fehler/ANNAHMEN.md`, der Diff bleibt in den Pfaden dieses Goals, kein Test fällt weg.
       MVP: Funktion, weil das nächste Glied wissen muss, warum eine ID ohne Alias bleibt.
       Prüfung: `grep -cE '^- [0-9]{4}-[0-9]{2}-[0-9]{2}, fehler 15: ' goals/fehler/ANNAHMEN.md` muss mindestens 3 ausgeben.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD | grep -vE '^(src/inference/proxy\.ts|src/inference/openrouter\.ts|test/inference-model-not-found\.test\.ts|docs/fehler/modelle-am-pin\.md|goals/fehler/.*|goals/[a-z]+/ANNAHMEN\.md)$' | wc -l` muss 0 ausgeben.
       Prüfung: `git diff --diff-filter=D --name-only $(git merge-base origin/dev HEAD) HEAD -- test | wc -l` muss 0 ausgeben.
-- [ ] Der Job `e2e` am Kopf des Goal-PR ist grün.
+- [x] Der Job `e2e` am Kopf des Goal-PR ist grün.
       MVP: Funktion, weil sich `src/inference/proxy.ts` im Laufzeitpfad ändert und der code-host kein Docker hat.
       Prüfung (Netz): `gh pr checks $(gh pr list -R matthiashippe/control-plane --head goal/fehler-15 --state open --json number -q '.[0].number') -R matthiashippe/control-plane 2>&1 | grep -E '^e2e\s' | grep -c pass` muss genau 1 ausgeben.
-- [ ] `check` ist grün.
+- [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Nach dem Rollout steht bei jedem 404 `model_not_found` das angefragte Modell im Log des Dienstes, ohne Adresse.
@@ -115,5 +115,8 @@ MVP: Funktion, weil ein Fehler eines echten Nutzers (Grundregel 4) nur behoben w
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-27 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6 gebaut: Log-Zeile `[inference] model_not_found model=<id> known=<n>` an der 404 in `src/inference/proxy.ts`, Test `test/inference-model-not-found.test.ts` (5 Fälle; am Kopf von `dev` `102ccd0` 3 rot mit `expected [] to deeply equal [ Array(1) ]`, der Fall mit dem Zeilenumbruch hinter der Kürzung rot gegen eine Fassung, die nur die ersten 120 Zeichen prüft), `docs/fehler/modelle-am-pin.md` mit sechs IDs am Pin (zwei über bestehende Aliase bedient, `gpt-5.3` und die drei `gpt-4.1`-IDs `missing` mit Grund, kein neuer Alias, Gründe in `goals/fehler/ANNAHMEN.md`), 404 seit 2026-11-21 gezählt mit Gegenprobe; die 310 lokalen Prüfbefehle der 14 DONE-Goals, die `proxy.ts` oder `openrouter.ts` nennen, vorher und nachher mit gleichen Exit-Codes (abweichende Ausgaben nur bei Temp-Pfaden, vitest-Zeilen langsamer Tests, der neuen Log-Zeile und den Umfangsprüfungen fremder Goals, die hier den Diff dieses Goals zählen). Prüfbefehle: P1 vitest Exit 0 (5 passed), Testnamen-Schleife leer, grep 1; P2 6, 2, 0; P3 Schleife leer, 0; P4 4, 0, 0; P5 `e2e pass` am Kopf `ac1860c` (Lauf 46019509890), Zählung 1; P6 `check: grün in 201 s` Exit 0.
+- 2026-11-27 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6; `dev` ohne neuen Stand seit der Merge-Basis `102ccd0`, kein Merge nötig. Prüfbefehle am Kopf `78456c0`: P1 vitest Exit 0 (5 passed), Testnamen-Schleife leer, grep 1; P2 6, 2, 0; P3 Schleife leer, 0; P4 4, 0, 0; P5 `e2e pass` am Kopf `78456c0` (Lauf 46021360985), Zählung 1; P6 `check: grün in 289 s` Exit 0.
+- 2026-11-27 Release: PASS K und B (Zyklus 2), DONE.
 
 ## Blockers
