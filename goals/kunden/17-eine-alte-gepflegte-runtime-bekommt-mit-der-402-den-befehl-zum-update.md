@@ -1,7 +1,7 @@
 # Kunden Goal 17: Eine alte gepflegte Runtime bekommt mit der 402 den Befehl zum Update
 
 ## Status
-PLANNED
+DONE
 
 ## Active Objective
 In der Woche vor dem Release `v0.2.2-maintained.3` (2026-11-26T17:28:50Z) gingen alle 4380 Antworten 402 an gepflegte Runtimes an
@@ -93,7 +93,7 @@ MVP: Funktion, weil die eine Runtime, die heute 402 bekommt, sonst nie die Zeile
       sie neu startet; ohne den Neustart sieht der Mensch nach dem Befehl dieselbe 402 und nie die Kartenzeile.
       Prüfung: `grep -cF '"names the restart before the update command"' test/inference-maintained-update.test.ts` muss genau 1 ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/inference-maintained-update.test.ts -t "names the restart before the update command"` muss Exit-Code 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Der Agent einer alten gepflegten Runtime liest in der 402 einen Befehl, den er seinem Menschen wörtlich weitergeben kann.
@@ -126,5 +126,6 @@ MVP: Funktion, weil die eine Runtime, die heute 402 bekommt, sonst nie die Zeile
 - 2026-11-27 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6 (`dev` 70e5599 schon im Branch, kein Merge nötig). Prüfbefehle: Punkt 1 1, 4, 0; Punkt 2 Exit 0, keine Ausgabe, Exit 0; Punkt 3 0, 1; Punkt 4 7, 0, 0; Punkt 5 1 (Job `e2e` grün an e4d1838, am neuen Kopf im Kommentar des Topics); Punkt 6 Exit 0 (`check: grün in 199 s`).
 - 2026-11-27 Zyklus 3: Punkt 7 gebaut (Satz `Update this automaton so it shows this itself, then restart it with automaton --run: <Befehl>`, `MAINTAINED_START_COMMAND` in `src/inference/maintained.ts`, Entscheidung 4 geändert in `goals/kunden/ANNAHMEN.md`). Rot vor dem Bau: „names the restart before the update command“ mit `expected undefined to be 'automaton --run'`, dazu der erste Test mit dem alten Satz. Was mitzieht: kein anderes Goal nennt den Satz oder `update_command`. Prüfbefehle: Punkt 7 1, Exit 0; Punkt 1 1, 4, 0; Punkt 2 Exit 0 (7 Tests), keine Ausgabe, Exit 0; Punkt 3 0, 1; Punkt 4 8, 0, 0; Punkt 5 Job `e2e` am gepushten Kopf, Ergebnis im Kommentar des Topics; Punkt 6 Exit 0 (`check: grün in 166 s`).
 - 2026-11-27 Zyklus 4: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, 7 (`dev` 70e5599 schon im Branch, kein Merge nötig). Prüfbefehle am Kopf 3e73d8b: Punkt 1 1, 4, 0; Punkt 2 Exit 0, keine Ausgabe, Exit 0; Punkt 3 0, 1; Punkt 4 8, 0, 0; Punkt 5 1 (Job `e2e` grün an 3e73d8b, am neuen Kopf im Kommentar des Topics); Punkt 6 Exit 0 (`check: grün in 166 s`); Punkt 7 1, Exit 0.
+- 2026-11-27 Release: PASS K und B (Zyklus 4), DONE.
 
 ## Blockers
