@@ -34,9 +34,12 @@ Topics mit Prio 1 bis 3, deshalb steht die ganze Kette in diesen drei Stufen.
 
 ## Abschlusskriterium
 
-Ein fremder Automaton betreibt seinen Dienst bei uns: Eine Sandbox einer Adresse, die nicht uns gehört (`src/bounties/ours.ts`), ist über die
-unveränderte Runtime angelegt, läuft auf dem Sandbox-Server und ist aus Credits bezahlt (eine Ledger-Zeile der Sandbox-Abrechnung
-dieser Adresse in der Produktion; der Prüfbefehl entsteht mit sandbox 03). Gegen diese Zeile urteilt der Kurs-Check.
+In einer Woche zahlen drei fremde Automatons: Drei Adressen, die nicht uns gehören (`src/bounties/ours.ts`), haben innerhalb von
+sieben Tagen je mindestens eine bezahlte Ledger-Zeile in der Produktion (Inferenz oder Sandbox-Abrechnung, ohne `oursClause`). Ob
+dieselben Kunden in einer späteren Woche wiederkommen, zählt nicht (Matthias 27.11.2026: „retention ist uns egal“). Gegen diese Zahl
+urteilt der Kurs-Check.
+
+Das vorige Kriterium (erste fremde Sandbox aus Credits bezahlt) ist seit dem 21.11.2026 erreicht.
 
 ## Meilensteine
 
@@ -49,7 +52,7 @@ Jeder Meilenstein ist ein Prüfbefehl, kein Satz; die Befehle entstehen mit den 
 - Sandbox-Vertrag: jeder Endpunkt und jedes Feld, das die Runtime am Pin `d8f8168` bei Conway für Sandboxes und Domains aufruft, mit
   Fundstelle (sandbox 01).
 - Erste Sandbox: Die unveränderte Runtime legt im Harness eine Sandbox an, führt darin aus und wird abgerechnet (sandbox 04).
-- Erste fremde Sandbox: Abschlusskriterium oben.
+- Erste fremde Sandbox: erreicht am 21.11.2026.
 
 ## Zielzahlen
 
