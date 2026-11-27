@@ -43,8 +43,8 @@ ist in beide Richtungen bewiesen (`bash ops/customer-work.sh --selftest`, gepfla
 - Weg: src/bounties/store.ts:415, `submitWork` nimmt nur einen offenen Auftrag vor seiner Frist an, sonst 404 oder 409; ohne offenen Auftrag gibt es nichts, wohin er einreichen könnte.
 - Weg: src/app.ts:3833, `POST /v1/bounties/award` spricht eine Einreichung zu, nur durch den, der den Auftrag gestellt hat.
 - Weg: src/bounties/store.ts:660, `awardBounty` bucht die Zeile `bounty_award` an `submission.agent`, in derselben Transaktion wie den Zuspruch.
-- Weg: src/inference/proxy.ts:199, `handleChat` reserviert vor der Anfrage beim Anbieter aus dem Saldo und antwortet ohne Deckung mit 402.
-- Weg: src/inference/proxy.ts:410, die 402 nennt `open_bounties` und `bounties_url` nur, wenn `openBountyCount` größer als 0 ist; seit dem 06.10. ist er 0, also verweist unsere 402 Kunde 1 gar nicht auf das Brett. Er liest es von sich aus.
+- Weg: src/inference/proxy.ts:224, `handleChat` reserviert vor der Anfrage beim Anbieter aus dem Saldo und antwortet ohne Deckung mit 402.
+- Weg: src/inference/proxy.ts:465, die 402 nennt `open_bounties` und `bounties_url` nur, wenn `openBountyCount` größer als 0 ist; seit dem 06.10. ist er 0, also verweist unsere 402 Kunde 1 gar nicht auf das Brett. Er liest es von sich aus.
 
 ## Die drei Schritte
 

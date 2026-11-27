@@ -3188,7 +3188,7 @@ export function createApp(opts: AppOptions) {
     if (!sold) return c.json(INFERENCE_NOT_FOR_SALE, 503);
     const body = await c.req.json().catch(() => null);
     const res = await handleChat(db, sold, c.get("address"), body, { topupsClosed: intakeClosed, signal });
-    return c.json(res.body as Record<string, unknown>, res.status as 200);
+    return c.json(res.body as Record<string, unknown>, res.status as 200, res.headers);
   });
 
   /**

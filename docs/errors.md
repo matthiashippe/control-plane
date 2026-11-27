@@ -293,7 +293,9 @@ mean different things on two instances, and an id that exists on one can be miss
 - `402 INSUFFICIENT_CREDITS` carries `details.required_cents` and `details.current_balance_cents`;
   the runtime reads them to pick a topup tier. Nothing is charged for the rejected call. Buy
   credits at `/pay/{usd}/{your wallet}`, or send USDC to the wallet and let the bootstrap topup
-  handle it.
+  handle it. A credit that covers the prompt and at least 256 tokens of answer gets no 402 but the
+  answer with `max_tokens` cut to what it pays for, so the 402 comes only below that, and its
+  `details.affordable_max_tokens` says how many tokens of answer the credit would carry.
 - `400 streaming_not_supported`: usage is metered and charged server side from the provider's usage
   report once the answer is complete, which a stream does not give us. Send `"stream": false`.
 - `400 provider_rejected_request`: the upstream provider refused the body. Its answer is in
