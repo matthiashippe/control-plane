@@ -6,3 +6,4 @@ Empfehlung: Beim nächsten Goal an der Kasse (zusammen mit `cardClosedFor` aus w
 MVP: Funktion, weil nach `CP_OPENROUTER_RESALE=0` die Startseite und jede Fehlerseite weiter „top it up by card“ zeigen und `/card/:package` weiter zur Kasse leitet, während `/llms.txt` und `/pricing` „Credits are no longer sold here.“ sagen, und eine Person dann Credits per Karte kauft, die das Control Plane selbst nicht mehr verkaufen will.
 
 Linse Q, Frage 2. Entscheidung 5 von fehler 13 lässt Kasse, Startseite und Fehlerseiten bewusst ohne Sunset; der Vorschlag hält die Lücke fest, damit sie nicht nur in der Goal-Datei steht.
+Übernommen: Tech Lead, PRO-31352 Glied 7, Sunset in der Zeile der Watch List in STATE.md ergänzt (2026-11-27)

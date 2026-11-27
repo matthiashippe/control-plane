@@ -6,3 +6,4 @@ Empfehlung: `return FORWARDER_ARGS[at].name;` ohne Rückfall, damit der Zweig si
 MVP: Schönheit
 
 Linse Q, Frage 3.
+Übernommen: Tech Lead, PRO-31352 Glied 8, beim nächsten Goal an der Datei, Watch List in STATE.md (2026-11-27)

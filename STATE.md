@@ -11,32 +11,32 @@ des alten Loops bis zum 10.11.2026 steht unverändert in `docs/state-bis-2026-11
 
 ## Lage
 
-Stand 26.11.2026, 06:15 Berliner Zeit (Loop-Triage, PRO-30316, `origin/dev` 4811f63). Stufe L3, Kill Switch aus, Budget full (3
-von 11 Konten mit mindestens 20 % Weekly-Rest), 4 von 20 Plätzen frei, Drill grün (21.11., Gate-Hash e291578e5235). Ein Goal
+Stand 27.11.2026, 06:15 Berliner Zeit (Loop-Triage, PRO-31345, `origin/dev` 06726e0). Stufe L3, Kill Switch aus, Budget core (2
+von 11 Konten mit mindestens 20 % Weekly-Rest), 7 von 20 Plätzen frei, Drill grün (21.11., Gate-Hash e291578e5235). Ein Goal
 gleichzeitig; seit 22.11. wechseln sich karte und Traction ab (kunden, kanal, seite, reichweite, werbung), Matthias: „ein goal bitte
-nur, dafür bitte abwechseln, immer eins traction dazwischen“. Kurs-Check vom 26.11., 04:10 (PRO-30302): abgedriftet, weil der
-Detail-Anteil bei 44,4 % über der Schwelle von 40 % stand und mit kanal 08 das nächste Detail-Goal am toten Kommentarweg in
-Conway-Research/automaton bereitlag; dazu 16 Stunden seit dem letzten gemergten Goal mit Prio 1 oder 2 (Schwelle 12). Der Kurs-Check
-hat kanal 08 pausiert (PR #449), kanal 07 schon am 25.11. (PR #447). Die Wache meldete am 25.11. viermal Überlast auf dem Host
-(07:00 bis 10:00, 11:40 bis 12:06, 16:00 bis 18:40, 19:30 bis 20:03; PRO-29809 bis PRO-30219 an den Tech Lead), seit 20:03 ist sie
-vorbei.
+nur, dafür bitte abwechseln, immer eins traction dazwischen“. Kurs-Check vom 26.11., 22:10 (PRO-30931): auf Kurs (Detail-Anteil 0 %,
+7 Stunden seit dem letzten gemergten Goal mit Prio 1 oder 2, Schwelle 12). Der Richtungs-Check vom 26.11. (PRO-30661, PR #456,
+`docs/richtung/2026-11-26.md`) urteilte abgedriftet, weil das Abschlusskriterium in `ROADMAP.md` seit dem 21.11. erfüllt ist und die
+Kette weiter maß, statt die Runtimes an der 402 abzuholen; er brachte kunden 15 und 16 in die Kette und legte kanal 09 still. Die Wache meldete
+am 26.11. zweimal Überlast (08:20 bis 10:00, 10:50 bis 18:10; PRO-30419 bis PRO-30736 an den Tech Lead), seit 18:10 ist sie vorbei.
 
-Seit der letzten Triage gemergt: fehler 13 (PR #441, `/pricing` sagt bei Sunset dasselbe wie `/llms.txt`), reichweite 05 (PR #442,
-die Kommentare folgen dem Notschalter der Karte), werbung 04 (PR #443, die Zeile der Woche kommt durch das Gate) und regeln 02 (PR
-#444, auf 8453 prüft das Anlegen der Weiterleitung token, manager und caller), die Goal-Dateien dazu (#435, #437 bis #440, #448 für
-kanal 08), die Triage-Glieder vom 25.11. (#433), das Nachfüllen (#434), die Kritik (#436, betrieb 07 und kanal 06 pausiert), zwei
-Kurs-Checks (#447, #449), das Audit vom 25.11. (#445, 80 rote Zeilen) samt Reparatur (#446, PRO-30060 erledigt)
-und die Triage vom 25.11. (#432). Damit ist PRO-29721 erledigt: alle drei Glieder sind gebaut und gemergt.
+Seit der letzten Triage gemergt: kunden 14 (PR #451, Ergebnis `kein Hausauftrag`), regeln 03 (PR #455, auf 8453 gehen `payout` und
+`retire` nur an die eigene Weiterleitung), kunden 15 (PR #458, Kartenzeile im Release der gepflegten Runtime, Kartenbesuche gezählt)
+und kunden 16 (PR #460, Ergebnis `kein Geld`, kein Fehler bei uns), die Goal-Dateien dazu (#457, #459), die Triage-Glieder vom 26.11.
+(#453), die Kritik vom 26.11. (#454, zwei Vorschläge), der Richtungs-Check (#456), die Nacharbeit vom 26.11. (#450, 6 Vorschläge) und
+vom 27.11. (#461, 4 Vorschläge), das Red Team vom 27.11. (#462, ein Vorschlag mit Schwere 5) und die Triage vom 26.11. (#452). Damit ist
+PRO-30347 erledigt: karte 03 entfällt, ersetzt durch karte 04 (`ROADMAP.md` Zeile 15, Goal-Datei mit `Werbung ab:`), kanal 06 entfällt,
+ersetzt durch kanal 09 (Zeile 29), regeln 03 ist gemergt.
 
-Es baut kunden 14 (PRO-30299, Goal-PR #451 offen), Traction nach werbung 04; als Nächstes ist laut Wechsel karte dran, karte 03
-startet aber frühestens 30.11., paket 02 am 07.12. Neue Glieder gehen an den Tech Lead (PRO-30347, Priorität medium): karte 03 trennt
-vor dem Start die Zahlen vor und nach werbung 01; kanal 06 bekommt die fehlende Schärfung oder der Tech Lead stellt den Kommentarweg
-hinter einen neuen Kanal; auf 8453 gehen `payout` und `retire` nur an die eigene Weiterleitung (regeln). Die Schärfung von kunden 14
-aus PRO-28911 Punkt 6 ist in der Goal-Datei (Reservierung der 402).
+Es baut kein Goal. Laut Wechsel ist karte dran, karte 04 startet frühestens 30.11., paket 02 am 07.12.; das Topic `fehler` behält
+seinen Platz außerhalb des Wechsels. Neue Glieder gehen an den Tech Lead (PRO-31352, Priorität medium), darunter drei mit Schwere 5:
+Beträge des einen Sandbox-Kunden im öffentlichen Repo (Grundregel 8), fünf 404 `model_not_found` eines fremden Kunden am 21.11. als
+Glied an `fehler` (Grundregel 4), und die Frage, ob die Kette kunden nach kunden 14 am Hausauftrag weiterbaut (Schwere 5 nach Datei,
+der Richtungs-Check empfiehlt Verwerfen).
 
-Audits: das vom 25.11. ist gemergt (80 rote Zeilen), seine Reparatur auch (PR #446); der Loop Master meldet zwei rote Audits in
-Folge, die roten Zeilen repariert der Loop. Audit und Red Team vom 26.11. lagen bei dieser Triage nicht vor; die Nacharbeit vom
-26.11. (PR #450, 6 Vorschläge) ist noch nicht auf dev und kommt in die nächste Triage.
+Audits: Das letzte gemergte ist das vom 25.11. (80 rote Zeilen, Reparatur PR #446); der Loop Master meldet zwei rote Audits in Folge
+(24.11. und 25.11.), die roten Zeilen repariert der Loop. Für den 26.11. und den 27.11. gibt es weder einen Branch `loop/audit/…` noch
+einen PR. Nacharbeit und Red Team vom 27.11. sind gemergt und in dieser Triage entschieden.
 
 Guthaben beim Inferenz-Anbieter: Die Aufladung ist seit 12.11., 21:35 eingeschaltet (16 USD Schwelle, 25 USD Betrag,
 `docs/betrieb/guthaben.md`). betrieb 07 ruht seit der Kritik vom 25.11., weil der Rest (30,86 USD am 20.11. bei 1 USD am Tag) im
@@ -65,20 +65,24 @@ Gate mehr); Guthaben per Karte über Digistore24 im Konto von HTC.
 | fehler | 11 Der Abgleich mit dem Fetcher-Cache läuft auch in CI | PAUSED (Kurs-Check 14.11., reine Testnacharbeit) |
 | fehler | 12 /docs und /pricing antworten | DONE (PR #414) |
 | fehler | 13 /pricing sagt bei Sunset dasselbe wie /llms.txt | DONE (PR #441) |
+| fehler | nächstes Glied | beim Tech Lead (PRO-31352 Glied 2, Schwere 5): fünf 404 `model_not_found` eines fremden Kunden am 21.11., das Modell fehlt im Log |
 | wache | 01 Notschalter für die Karte, 02 Kein toter Knopf zur Kasse, 03 Der Notschalter hält auch die direkt aufgerufene Kasse | DONE (01 PR #395, 02 PR #407, 03 PR #426) |
 | karte | 01 Guthaben per Karte, 02 Der Weg zur Kasse | DONE (01 PR #369, 02 PR #378) |
-| karte | 03 Kauft jemand per Karte, und denkt sein Automaton danach? | PLANNED, startet frühestens 30.11.2026; die Trennung vor und nach werbung 01 fehlt noch, Glied beim Tech Lead (PRO-30347) |
+| karte | 03 Kauft jemand per Karte, und denkt sein Automaton danach? | in `ROADMAP.md` entfällt, ersetzt durch 04 (PRO-30347, PR #453); die Datei steht auf dev noch auf PLANNED |
+| karte | 04 Kauft jemand per Karte, vor und nach werbung 01 getrennt | PLANNED, startet frühestens 30.11.2026 (PR #453) |
 | werbung | 01 Karte zuerst, überall, 02 Empfehlen uns Agenten?, 03 Die Agenten-Probe läuft jede Woche und zählt sauber | DONE (01 PR #397, 02 PR #408, 03 PR #429); den Wochenlauf fährt der Richtungs-Check (PRO-29405) |
 | werbung | 04 Die Zeile der Woche kommt durch das Gate | DONE (PR #443) |
 | regeln | 01 Grundregel 10 hält im Code | DONE (PR #430) |
 | regeln | 02 Auf 8453 prüft das Anlegen der Weiterleitung auch die Argumente | DONE (PR #444) |
-| regeln | 03 | Glied beim Tech Lead (PRO-30347): auf 8453 gehen `payout` und `retire` nur an die eigene Weiterleitung |
+| regeln | 03 Auf 8453 gehen `payout` und `retire` nur an eine eigene Weiterleitung | DONE (PR #455) |
 | kunden | 01 bis 08 | DONE (01 PR #303, 02 PR #306, 03 PR #308, 04 PR #310, 05 PR #316, 06 PR #317, 07 PR #319, 08 PR #329) |
 | kunden | 09 Gutschriften je Auslöser, 10 Startgutschrift bei neuem Runtime-Pin | PAUSED (Kurs-Check 21.11., PR #327) |
 | kunden | 11 Kunde 1 kann Arbeit einreichen | DONE (PR #357): Hausauftrag des Dienstes, 25 Cent je gültigem Bericht |
 | kunden | 12 Reicht Kunde 1 ein, und zahlt er danach wieder? | PAUSED (Tech Lead 23.11., PRO-28123), abgelöst durch 14 |
 | kunden | 13 Kunde 1 hat Guthaben für die Schritte bis zum ersten Bericht | DONE (PR #401) |
-| kunden | 14 Denkt Kunde 1 mit dem Schrittguthaben, reicht er ein, und zahlt er danach wieder? | aktiv (PRO-30299, Goal-PR #451 offen); liest vorher die Reservierung der 402 |
+| kunden | 14 Denkt Kunde 1 mit dem Schrittguthaben, reicht er ein, und zahlt er danach wieder? | DONE (PR #451), Ergebnis `kein Hausauftrag`; wie es am Hausauftrag weitergeht, entscheidet der Tech Lead (PRO-31352 Glied 3) |
+| kunden | 15 Der Mensch hinter einer Runtime ohne Guthaben sieht den Weg per Karte | DONE (PR #458) |
+| kunden | 16 Warum der erste Sandbox-Kunde aufhört (Titel hier ohne den Betrag, kunden-redteam-2026-11-27-1) | DONE (PR #460), Ergebnis `kein Geld` |
 | reichweite | 01 Eine Seite je Fehlermeldung, 02 Unsere Kommentare zeigen auf die passende Seite | DONE (01 PR #375, 02 PR #393) |
 | reichweite | 03 Ein Video zeigt den Umzug | DONE (PR #409) |
 | reichweite | 04 Unsere Kommentare nennen automatonhost.com beim Namen | DONE (PR #424) |
@@ -114,8 +118,9 @@ Gate mehr); Guthaben per Karte über Digistore24 im Konto von HTC.
 | domains | 07 Ein Neustart des Sandbox-Servers sperrt keinen Kunden aus | PAUSED (Kurs-Check 15.11., PR #186) |
 | kanal | 01 bis 04 | DONE (04 PR #106); Urteil über den Ertrag am 25.11. (`goals/kanal/ertrag.md`) |
 | kanal | 05 Urteil je Antwort | PAUSED, in `ROADMAP.md` entfällt, ersetzt durch 06 |
-| kanal | 06 Urteil je Antwort und eine neue Runde nur mit neuen Issues | PAUSED (Loop-Kritik 25.11.: die Schärfung fehlt), Glied beim Tech Lead (PRO-30347) |
-| kanal | 07 Der Tech Lead liest genau den Text, über den der Wert gerechnet ist, 08 Gepostet wird der freigegebene Text aus dem Speicher | PAUSED (Kurs-Check 25.11. und 26.11.: Detail-Goals am Kommentarweg in Conway-Research/automaton, dort seit 11.11. kein neues Issue) |
+| kanal | 06 Urteil je Antwort und eine neue Runde nur mit neuen Issues | PAUSED, in `ROADMAP.md` entfällt, ersetzt durch 09 (PRO-30347, PR #453) |
+| kanal | 07 Der Tech Lead liest genau den Text, über den der Wert gerechnet ist, 08 Gepostet wird der freigegebene Text aus dem Speicher | PAUSED (Kurs-Check 25.11. und 26.11.: Detail-Goals am Kommentarweg in Conway-Research/automaton, dort seit 11.11. kein neues Issue); laufen nur, wenn kanal 09 `Nächste Runde: weitere Kommentare` schreibt |
+| kanal | 09 Bringen unsere Kommentare in den Conway-Threads Anmeldungen, je Thread? | PAUSED (Richtungs-Check 26.11., PR #456: 0 Ankünfte von github.com/Conway-Research vom 19. bis 26.11.); zurück auf PLANNED bei einem neuen Onboarding-Issue |
 | seite | 01 bis 03 | DONE (03 PR #222) |
 | adressen | 01 bis 03 | DONE (01 PR #118, 02 PR #161, 03 PR #224) |
 | messung | 01 bis 10 | DONE (07 PR #184, 08 PR #205, 09 PR #216, 10 PR #223) |
@@ -131,12 +136,34 @@ Gate mehr); Guthaben per Karte über Digistore24 im Konto von HTC.
 - Ohne Merge-Auftrag, mergen kann nur ein Mensch: Kritik-PRs #260 (anmeldung 05), #296 (sandbox 12), #339 (hosting 04), #347
   (hosting 06), #383 (karte 02, Freigabe verfolgen), Nacharbeit-PR #336 und Audit-PR #321; ihre Köpfe stammen laut Loop Master aus
   keinem Lauf der zuständigen Rolle. Dazu PR #326 (`goals/sandbox/ANNAHMEN.md`, Tech Lead, Grund `branch`).
+- Der Richtungs-Check vom 26.11. legt Matthias drei Entscheidungen vor (`docs/richtung/2026-11-26.md`, Abschnitt „Entscheidungen für
+  Matthias“): ein neues Abschlusskriterium, weil das alte seit dem 21.11. erfüllt ist (Frist vor dem nächsten Richtungs-Check am
+  03.12.), eine höhere Startgutschrift für die gepflegte Runtime und Sandboxes nicht mehr als nächstes Produkt. Die Human Inbox dieses
+  Loops ist der Tech Lead.
+- Aus kunden-redteam-2026-11-27-1 (Schwere 5) brauchen einen Menschen: Goal-Datei und Dateiname von kunden 16 (DONE), die Prüfung der
+  Linse B auf ganze Beträge (`ops/prompts/**`, Deny List) und ob die Git-Historie bereinigt wird (wie am 19.11., `goals/RISIKEN.md:9`);
+  die Vorlage dazu schreibt der Tech Lead (PRO-31352 Glied 1).
 - Gate-Abgleich: `gate.yaml` (3f1ac20, 14.11.) und `loop-constraints.md` (7eb842e, 24.11.) seit der letzten Triage unverändert. Jede
   Pfadregel der Deny List hat ihren Eintrag in `deny_paths`, `src/payments/**` und `src/auth/**` prüft wie bisher Linse B gegen die
   Goal-Datei. Kein neuer Vorschlag.
 
 ## Watch List
 
+- Schwere 5, Grundregel 8 (kunden-redteam-2026-11-27-1, PRO-31352 Glied 1): Zahl und Höhe der Aufladungen des einen Sandbox-Kunden
+  stehen auf dev im öffentlichen Repo (`docs/kunden/sandbox-kunde-2026-11.md:151`, weitere Fundstellen im Vorschlag ohne Betrag);
+  Goal-Datei und Dateiname von kunden 16 (DONE), die Prüfung der Linse B und die Git-Historie ändert nur ein Mensch. Dieser Text
+  nennt deshalb keinen Betrag.
+- Schwere 5, Grundregel 4 (fehler-2026-11-26-1, PRO-31352 Glied 2): fünf 404 `model_not_found` eines fremden Kunden am 21.11.,
+  welches Modell er wollte, steht nirgends mehr, weil das Log des Dienstes am 26.11. um 08:27 UTC neu beginnt
+- Schwere 5 nach Datei (kunden-kritik-2026-11-26-1, PRO-31352 Glied 3): bricht laut kunden-kritik-2026-11-26-3 keine Regel, der
+  Richtungs-Check empfiehlt Verwerfen (`docs/richtung/2026-11-26.md:134`); ob die Kette kunden am Hausauftrag weiterbaut, entscheidet
+  der Tech Lead
+- `goals/karte/03-kauft-jemand-per-karte.md` steht auf PLANNED, obwohl `ROADMAP.md` Zeile 15 sie als entfallen führt und sagt, die
+  Loop-Kritik setze sie auf PAUSED; der Loop Master führt nur karte 04 als wartend
+- Der Loop Master meldet `ROADMAP.md` Zeile 29 (kanal) mit 6 statt 5 Spalten, ein `|` im Text schneidet die Zeile ab; ändern kann
+  das ein Pflege-PR `roadmap` des Writers
+- Kein Audit vom 26.11. und 27.11.: weder ein Branch `loop/audit/2026-11-26` oder `-27` noch ein PR; das letzte gemergte ist das vom
+  25.11.
 - `loop-constraints.md:127` bindet Opus für Maker, Linsen und Kritik, Linse B (`qa-scope`) läuft weiter auf Sonnet
   (`paperclip/company/.paperclip.yaml:288` im code-host). Angleichen oder zurückstellen kann nur Matthias
   (loop-redteam-2026-11-17-1).
@@ -171,8 +198,9 @@ Gate mehr); Guthaben per Karte über Digistore24 im Konto von HTC.
   `fehler-<Datum>-<n>` vorgab (Glied 1 der Triage vom 20.11., daraus wurde kunden 05)
 - `test/credit-before-503.test.ts` hat den Parameter `extraEnv`, aber keinen Fall mit `CP_CREDIT_WARN_USD=0`; die Gegenprobe, die
   `docs/kunden/aufladung-2026-11.md` dem Test zuschreibt, fehlt (kunden-nacharbeit-2026-11-21-1)
-- Das Audit vom 20.11. fuhr `bash ops/sandbox/probe.sh <IP>` live gegen den Sandbox-Host (`docs/audit/2026-11-20.md:1769`); bis
-  Glied 5 (PRO-26356) gemergt ist, kann das nächste Audit es wieder tun (sandbox-redteam-2026-11-21-1)
+- Das Audit vom 20.11. fuhr `bash ops/sandbox/probe.sh <IP>` live gegen den Sandbox-Host (`docs/audit/2026-11-20.md:1769`); PRO-26356
+  ist erledigt, sein Glied 5 liegt als PR #326 (`goals/sandbox/ANNAHMEN.md`) offen und braucht einen Menschen zum Merge
+  (sandbox-redteam-2026-11-21-1)
 - `ops/answer-quote.sh` sagt nicht, ob ein Zeitraum einen Ausfall hatte; nötig erst, wenn kanal oder die Seite eine Quote nach außen
   nennt (abrechnung-kritik-2026-11-21-1). Die Hilfe druckt eine Zeile zu viel (abrechnung-kritik-2026-11-21-2)
 - `ops/answer-quote.sh` und `ops/timeout-quote.sh` lesen `TQ_UNTIL` verschieden; gehört zu abrechnung 06, das pausiert
@@ -206,7 +234,10 @@ Gate mehr); Guthaben per Karte über Digistore24 im Konto von HTC.
 - Die Regel „Kasse per Karte zu“ (Notschalter an oder Wallet mit Erstattung) steht in `cardRedirect` (`src/payments/card-way.ts:125`)
   und in `handleDigistoreIpn` (`src/payments/digistore.ts:326`) doppelt; eine Funktion `cardClosedFor` beim nächsten Goal an der
   Kasse (wache-nacharbeit-2026-11-25-1), dort auch den toten Rückfall `heldFor ?? "card checkout closed"` in
-  `src/payments/digistore.ts:348` entfernen (wache-nacharbeit-2026-11-25-2)
+  `src/payments/digistore.ts:348` entfernen (wache-nacharbeit-2026-11-25-2). Den Sunset fragt nur `cardOpenNow` in
+  `src/app.ts:2555` (`!intakeClosed`), Fehlerseiten (`:1195`), Startseite (`:1825`) und `/card/:package` zeigen nach
+  `CP_OPENROUTER_RESALE=0` weiter die Karte; die Funktion nimmt ihn als dritten Grund (fehler-nacharbeit-2026-11-26-1, PRO-31352
+  Glied 7)
 - `node(chainIdHex)` steht in `test/konto-send-guard.test.ts`, `test/konto-mainnet.test.ts` und `test/konto-chain.test.ts` dreimal,
   mit verschiedenem Zweig `default`; nach `test/money-helpers.ts` beim nächsten Goal an einer der Dateien
   (regeln-nacharbeit-2026-11-25-1)
@@ -217,15 +248,24 @@ Gate mehr); Guthaben per Karte über Digistore24 im Konto von HTC.
 - `ops/agent-probe.sh`: `seen` zählt auch localhost und example.com als fremde URL (werbung-kritik-2026-11-24-2), und zwei
   gleichzeitige Läufe mit `--week` fragen beide fünf Sessions, weil kein Lock hält (werbung-kritik-2026-11-24-3); beides beim
   nächsten Goal an der Probe
+- Beim nächsten Goal an der Datei (PRO-31352 Glied 8, Schwere 1): `ops/customer-work.sh` (516 Zeilen) und `ops/agent-probe.sh`
+  (503 Zeilen) über 500 Zeilen ohne Begründung, Selbsttest je in eine eigene Datei (kunden-nacharbeit-2026-11-27-1,
+  werbung-nacharbeit-2026-11-26-2); die Grenzen von `HOUSE STEP USE` in `ops/db-report.cjs:607` ohne Randfall
+  (kunden-nacharbeit-2026-11-27-2); `own_list` viermal wörtlich gleich in `ops/customer-decline.sh`, `ops/customer-work.sh`,
+  `ops/sandbox-customer.sh` und `ops/starter-paths.sh` (kunden-nacharbeit-2026-11-27-3); die Reihenfolge der Argumente der
+  Weiterleitung dreimal und der tote Rückfall `?? "length"` in `src/konto/chain.ts:146` (regeln-nacharbeit-2026-11-26-1 und -2);
+  `tripBreaker` viermal unter `test/` (reichweite-nacharbeit-2026-11-26-1); die Hilfen von `test/agent-probe-week.test.ts` als Kopie
+  aus `test/agent-probe.test.ts` (werbung-nacharbeit-2026-11-26-1)
 - betrieb 07 ruht, bis der Watchdog einen Rest beim Inferenz-Anbieter unter 20 USD meldet; dann zurück auf PLANNED mit neuem Fenster,
   bis dahin deckt `CREDIT RUNWAY LOW` den leeren Saldo (betrieb-kritik-2026-11-25-1)
-- `check` lief bei dieser Triage nicht, weil die Last je Kern über 0,75 lag; maßgeblich ist der Required Check des PR. Unter Node 24
+- `check` lief bei dieser Triage nicht, weil die Last je Kern über 0,75 lag (6,67 um 06:09); maßgeblich ist der Required Check des PR. Unter Node 24
   scheitert `better-sqlite3` am ABI, `check` läuft hier nur mit Node 22 (`/usr/bin/node`)
 
 ## Annahmen
 
 - `goals/kunden/ANNAHMEN.md`: Zuordnung von Ledger und Zugriffslog, Messung nur lesend gegen die Produktion, die Annahmen von
-  kunden 01 bis 04 und die Annahmen von kunden 07, 08, 11 und 13
+  kunden 01 bis 04 und die Annahmen von kunden 07, 08, 11 und 13 bis 16 (Fenster ab `completedAt` des Jobs `deploy` in kunden 14,
+  Kartenzeile im Fork in kunden 15, Grenze zwischen `kein Geld` und `Fehler bei uns` in kunden 16 samt Entscheidung des Tech Leads)
 - `goals/karte/ANNAHMEN.md`: Kurs der EZB am Bestelltag, Testbestellungen buchen nie, Schreibsperre für fremde Produkte im geteilten
   Konto, gemessenes Guthaben je Paket und 60 Tage Rückgabe (karte 01 und 02)
 - `goals/wache/ANNAHMEN.md`: Rechnung des Notschalters nur in `src/payments/card-way.ts`, Erstattungen der letzten 60 Tage, die
@@ -248,4 +288,5 @@ Gate mehr); Guthaben per Karte über Digistore24 im Konto von HTC.
   anmeldung 04 (Tech Lead, 18.11.)
 - `goals/betrieb/ANNAHMEN.md`, `goals/fehler/ANNAHMEN.md`, `goals/domains/ANNAHMEN.md`, `goals/kanal/ANNAHMEN.md`,
   `goals/messung/ANNAHMEN.md`, `goals/relay/ANNAHMEN.md` und `goals/adressen/ANNAHMEN.md`: Annahmen der Goals vom 12. bis 25.11. (fehler 12 und kanal am 24.11., fehler 13 am 25.11.)
-- `goals/regeln/ANNAHMEN.md`: saubere ABI-Adressen in den fünf Argumenten der Weiterleitung (regeln 02)
+- `goals/regeln/ANNAHMEN.md`: saubere ABI-Adressen in den fünf Argumenten der Weiterleitung (regeln 02), `retire_destination` für
+  Zeilen aus der Zeit vor regeln 03 und der Vergleich `spender === to` in `requireRule10` (regeln 03)

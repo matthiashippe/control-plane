@@ -6,3 +6,4 @@ Empfehlung: `own_list` mit beiden Zweigen als eine Funktion neben `conway_own_li
 MVP: Schönheit
 
 Linse Q, Frage 2. Dieselbe Klasse (Kopien aus `ops/customer-decline.sh` in ein neues Werkzeug, dort `loop.env` und `parse`/`iso`) wurde in kunden-nacharbeit-2026-11-21-3 verworfen; `own_list` entscheidet aber, welche Anfragen als fremd zählen, und eine auseinanderlaufende Kopie zählt eigene Läufe als Kunden (vgl. messung-nacharbeit-2026-11-15-2, übernommen).
+Übernommen: Tech Lead, PRO-31352 Glied 8, beim nächsten Goal an der Datei, Watch List in STATE.md (2026-11-27)

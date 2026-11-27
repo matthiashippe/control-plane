@@ -6,3 +6,4 @@ Empfehlung: Die Hilfen nach `test/agent-probe-helpers.ts` ziehen (wie `test/mone
 MVP: Schönheit
 
 Linse Q, Frage 2. Eine neue Umgebungsvariable des Skripts (wie `CP_PROBE_STATE_DIR` in werbung 03) müsste sonst in zwei Kopien von `probe` landen, und eine vergessene Kopie läuft still gegen den echten Zustand unter `HOME`.
+Übernommen: Tech Lead, PRO-31352 Glied 8, beim nächsten Goal an der Datei, Watch List in STATE.md (2026-11-27)

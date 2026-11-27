@@ -6,3 +6,4 @@ Empfehlung: In `test/llms-txt-lead.test.ts` `leads()` aus `test/breaker-comments
 MVP: Schönheit
 
 Linse Q, Frage 2. Ändert ein Goal die Regel des Notschalters in `cardBreaker` (Fenster, Status oder Modus der Bestellung), müssen vier gleiche INSERT-Anweisungen mitgehen; bleibt eine zurück, prüft ihr Fall den eingeschalteten Notschalter nicht mehr und bleibt trotzdem grün, wenn er nur das Fehlen der Karte erwartet.
+Übernommen: Tech Lead, PRO-31352 Glied 8, beim nächsten Goal an der Datei, Watch List in STATE.md (2026-11-27)
