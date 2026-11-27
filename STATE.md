@@ -191,7 +191,7 @@ Gate mehr); Guthaben per Karte über Digistore24 im Konto von HTC.
 - Exit 3 von `ops/deploy-window.sh` macht den Job in `deploy.yml:165` nicht rot (nur `::warning::`); nur ein Mensch ändert
   `.github/**`, der Watchdog holt den Alarm nach (messung 06)
 - Der Zähler der Actions-Logs (`ops/actions-log-addresses.sh --workflow deploy.yml`) läuft nur von Hand
-- `LOOP.md:24` nennt noch die ungemessenen 0,37 USD; den Satz ändert nur ein Mensch
+- `LOOP.md:24` nennt noch einen ungemessenen Betrag je Kunde (*.** USD, Grundregel 8); den Satz ändert nur ein Mensch
 - Der Pin `sandboxd-base-pin` hält das Basis-Image gegen den Prune-Cron des Mitbewohners; fällt `fact image_pin` in
   `ops/sandbox/setup.sh --check` auf `no`, scheitert nach 24 Stunden jede Anlage einer Sandbox mit 501
 - `goals/_vorschlaege/fehler-2026-11-19-1.md` folgt nicht dem Schema `<topic>-<art>-<JJJJ-MM-TT>-<n>`, weil kunden 01 den Namen
