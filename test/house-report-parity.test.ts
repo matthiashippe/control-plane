@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it, vi } from "vitest";
 import { spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -56,7 +56,17 @@ const plant = () => {
   temps.push(dir);
   const file = join(dir, "cp.db");
   const db = openDb(file);
-  const { bounty } = ensureHouseJob(db, new Date("2026-11-20T06:00:00.000Z"));
+  // createBounty measures the deadline against the clock, not against the now given to ensureHouseJob: the clock
+  // stands at the same instant, so the job and its submissions stay inside the window of report() on every day.
+  const posted = new Date("2026-11-20T06:00:00.000Z");
+  vi.useFakeTimers({ now: posted, toFake: ["Date"] });
+  const bounty = (() => {
+    try {
+      return ensureHouseJob(db, posted).bounty;
+    } finally {
+      vi.useRealTimers();
+    }
+  })();
   cases.forEach((c, i) => {
     const agent = `0x${(i + 1).toString(16).padStart(40, "c")}`;
     db.prepare("INSERT INTO wallets (address, balance_mc, created_at) VALUES (?, 0, ?)").run(agent, "2026-11-01T00:00:00.000Z");
