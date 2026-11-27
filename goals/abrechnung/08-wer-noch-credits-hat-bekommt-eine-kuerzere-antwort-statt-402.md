@@ -1,7 +1,7 @@
 # Abrechnung Goal 08: Wer noch Credits hat, bekommt eine kürzere Antwort statt 402
 
 ## Status
-PLANNED
+BLOCKED fachlich
 
 ## Active Objective
 Eine Inferenz reserviert den Preis von geschätztem Prompt und vollem `max_tokens` (`src/inference/proxy.ts:303`) und antwortet 402,
@@ -65,23 +65,23 @@ Rest von wenigen Cent die Runtime trotzdem anhält.
   und vitest im Vordergrund mit eigenem Timeout. Code, Bezeichner, Testnamen und Felder englisch.
 
 ## Done Condition
-- [ ] `docs/abrechnung/rest-2026-11.md` nennt vorher gemessen, wie viele fremde Wallets einen Rest zwischen 256 und 4096 Tokens
+- [x] `docs/abrechnung/rest-2026-11.md` nennt vorher gemessen, wie viele fremde Wallets einen Rest zwischen 256 und 4096 Tokens
       Antwort halten, mit Befehl, Ausgabe und Gegenprobe in beide Richtungen, ohne Betrag je Kunde.
       MVP: Funktion, weil die Leitzahl ohne den Stand vorher nichts zeigt.
       Prüfung: `grep -c -E '^Fremde Wallets mit Rest zwischen 256 und 4096 Tokens: [0-9]+' docs/abrechnung/rest-2026-11.md` muss genau 1 ausgeben.
       Prüfung: `grep -c -E '^Gegenprobe: (im Fenster 1, außerhalb 0)$' docs/abrechnung/rest-2026-11.md` muss genau 1 ausgeben.
       Prüfung: `grep -c -E '0x[0-9a-fA-F]{40}|[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' docs/abrechnung/rest-2026-11.md` muss 0 ausgeben.
-- [ ] Deckt das Guthaben Prompt und mindestens 256 Tokens, antwortet der Dienst 200 mit gekürztem `max_tokens`; knapp darunter 402
+- [x] Deckt das Guthaben Prompt und mindestens 256 Tokens, antwortet der Dienst 200 mit gekürztem `max_tokens`; knapp darunter 402
       mit `details.affordable_max_tokens`; die Reservierung liegt nie über dem Guthaben.
       MVP: Funktion, weil die Runtime mit Rest sonst stehen bleibt, obwohl sie bezahlen kann.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/inference-shortened.test.ts` muss Exit-Code 0 haben.
       Prüfung: `for t in "shortens max_tokens when the balance covers the prompt and 256 tokens" "answers 402 with affordable_max_tokens just below 256 tokens" "keeps the full request when the balance covers it" "never reserves more than the balance"; do grep -qF "\"$t\"" test/inference-shortened.test.ts || echo "fehlt: $t"; done` muss nichts ausgeben.
       Prüfung: `grep -c 'MIN_SHORTENED_TOKENS = 256' src/inference/proxy.ts` muss genau 1 ausgeben.
-- [ ] Die bestehenden Tests der Inferenz bleiben grün und unverändert, die 402 behält Text und Felder.
+- [x] Die bestehenden Tests der Inferenz bleiben grün und unverändert, die 402 behält Text und Felder.
       MVP: Funktion, weil die Runtime am Pin den Marker und zwei Felder der 402 liest (Grundregel 13).
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/inference.test.ts test/inference-abort.test.ts test/inference-sunset.test.ts` muss Exit-Code 0 haben.
       Prüfung: `git diff $(git merge-base origin/dev HEAD) HEAD -- test/inference.test.ts test/inference-abort.test.ts test/inference-sunset.test.ts | wc -l` muss 0 ausgeben.
-- [ ] Die Entscheidungen stehen in `goals/abrechnung/ANNAHMEN.md`, der Diff bleibt in den Pfaden dieses Goals, kein Test fällt weg.
+- [x] Die Entscheidungen stehen in `goals/abrechnung/ANNAHMEN.md`, der Diff bleibt in den Pfaden dieses Goals, kein Test fällt weg.
       MVP: Funktion, weil das nächste Glied wissen muss, warum 256 Tokens die Grenze sind und was die Runtime mit `length` tut.
       Prüfung: `grep -cE '^- [0-9]{4}-[0-9]{2}-[0-9]{2}, abrechnung 08: ' goals/abrechnung/ANNAHMEN.md` muss mindestens 5 ausgeben.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD | grep -vE '^(src/inference/proxy\.ts|test/inference-shortened\.test\.ts|docs/abrechnung/rest-2026-11\.md|docs/errors\.md|goals/abrechnung/.*|goals/[a-z]+/ANNAHMEN\.md)$' | wc -l` muss 0 ausgeben.
@@ -119,5 +119,13 @@ Rest von wenigen Cent die Runtime trotzdem anhält.
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-27 Zyklus 1: Punkte 1, 2, 3, 4 gebaut (Kürzung von `max_tokens` in `src/inference/proxy.ts`, `details.affordable_max_tokens` in beiden 402, Messung vorher mit 2 fremden Wallets im Fenster), Punkt 5 und 6 offen, weil `test/card-checkout.test.ts` (karte 02, Deny List) bei 300 mc eine 402 erwartet, die jetzt eine gekürzte Antwort ist. Neuer Test am Kopf von `dev` rot: „shortens …“ mit `expected 402 to be 200`, „answers 402 …“ mit `expected undefined to be 255`, „never reserves …“ mit `balance 3357: expected 3357 to be less than 3357`, „keeps the full request …“ grün und erst mit der Mutante `shortenedTo === -1` rot (`expected { 'X-Max-Tokens-Shortened': 'null' } to be undefined`). Prüfbefehle: P1 `1`, `1`, `0`; P2 Exit 0, nichts, `1`; P3 Exit 0 (44 passed), `0`; P4 `8`, `0`, `0`; P5 `e2e` am PR #482 lief bei Übergabe noch; P6 Exit 1 (`1 failed | 2950 passed`, `test/card-checkout.test.ts` > „leaves error, required_cents, current_balance_cents and topup_url of the 402 as they are“: `expected undefined to be 'INSUFFICIENT_CREDITS'`).
 
 ## Blockers
+Art: fachlich
+Punkt 6 ist mit der Deny List nicht erreichbar: `test/card-checkout.test.ts:55` („leaves error, required_cents, current_balance_cents and topup_url of the 402 as they are“, karte 02) ruft `handleChat` mit 300 mc und dem Mock-Modell (2 USD je Million Tokens Antwort) und erwartet eine 402. 300 mc tragen dort rund 1150 Tokens Antwort, also antwortet der Dienst nach Entscheidung 2 jetzt 200 mit gekürztem `max_tokens`. Die Deny List lässt `test/**` außer `test/inference-shortened.test.ts` unverändert, also bleibt `check` rot. Frage an den Tech Lead mit beiden Ausgaben auf dem Topic.
+
+## Ehrliche Lücken
+- Punkt 6 (`check`): rot nur durch `test/card-checkout.test.ts:55`, sonst 2950 Tests grün. Versucht: kein Weg im Code, der die Kürzung behält und bei 300 mc mit dem Mock-Modell 402 antwortet, denn das widerspräche Punkt 2. Nötig: Der Test nimmt für die 402 einen Saldo unter Prompt plus 256 Tokens (etwa 50 mc statt 300 mc, die Felder bleiben dieselben), und die Deny List erlaubt genau diese Zahl in `test/card-checkout.test.ts`.
+- Punkt 5 (`e2e`): Der Job lief am Kopf der Übergabe noch; er hängt nicht an Punkt 6 und wird im Abschluss am Kopf gelesen.
+- Daneben, ohne Done-Punkt: Die Prüfung von kunden 08 (`grep -oE "^- Weg: src/[A-Za-z0-9_/.-]+\.ts:[0-9]+" docs/kunden/auftraege-2026-11.md …`) meldet nach dem Bau `falsch src/inference/proxy.ts:199` und `falsch src/inference/proxy.ts:410`, weil die neuen Zeilen in `proxy.ts` die Zeilennummern verschieben; `docs/kunden/` liegt außerhalb der Pfade dieses Goals.
