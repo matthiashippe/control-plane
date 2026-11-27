@@ -176,3 +176,7 @@
   alle im Ausfall, weit weg von beiden Rändern.
 - **Erste lesbare Zeile:** Für „Log beginnt nach `TQ_SINCE`“ zählt die früheste `ts` aller lesbaren JSON-Zeilen, gleich welcher Pfad,
   weil auch eine Zeile auf einem anderen Pfad zeigt, dass das Log so weit zurückreicht.
+
+## Abgelöst durch fehler 14 (Tech Lead, 2026-11-27)
+
+- Abgelöst: abrechnung 03 Punkt 3, Prüfung `grep -c "$(sed -n 's/^REFUND_MC=//p' ops/live.sh)" docs/abrechnung/abbrueche-2026-11-10.md` (Zeile 72) durch `f=docs/abrechnung/abbrueche-2026-11-10.md; grep -c "$(sed -n 's/^REFUND_MC=//p' ops/live.sh)" $f; grep -c 'REFUND_MC' $f`, Ausgabe dann genau `0` und `1` (Tech Lead, 2026-11-27, fehler 14, PRO-31732). Grund: Die Summe der fünf Abbrüche gehört einem einzelnen fremden Automaton (Ledger `"a":1` in Zeile 12) und ist ein Betrag je Kunde (Grundregel 8); `docs/kette.md` Zeile 17 und `ROADMAP.md` maskieren denselben Fall schon. Die Datei nennt weiter, dass `ops/live.sh` die Summe als `REFUND_MC` erwartet; die Gleichheit prüfen abrechnung 01 Zeile 88 und `test/credit-aborted.test.ts` im Code. Maskiert werden in der Datei die Summe in mc und USD, den Betrag des ersten Belegs und die Spalte „Betrag“ der fünf Tabellenzeilen, weil die Zeilen zusammen die Summe ergeben; die fünf Zeilen selbst bleiben (Zeile 73).
