@@ -1,7 +1,7 @@
 # Fehler Goal 14: Kein Umsatz je Kunde im öffentlichen Repo
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Auf `dev` stehen Zahl und Höhe der Aufladungen und die Inferenz-Ausgabe des einen Sandbox-Kunden als Beträge, an zwei Stellen mit
@@ -132,7 +132,7 @@ MVP: Funktion, weil das Repo öffentlich ist und jede Stunde mit diesen Zeilen a
       Prüfung: `git grep -n -E '(\b1 über [0-9]+([.,][0-9]+)? ?USDC?|[0-9]+([.,][0-9]+)? ?USDC? \(1 (Adresse|Zahler|Wallet)\b|derselben Woche [0-9]+([.,][0-9]+)? ?USDC? davon)' HEAD -- 'docs/kunden/*.md' 'docs/richtung/*.md' docs/kette.md ROADMAP.md STATE.md 'goals/kunden/[0-9]*.md' | wc -l` muss 0 ausgeben.
       Prüfung: `for t in '1 über 4,56 USD (1 Zahler)' '0,97 USD (1 Adresse)'; do grep -qF "$t" test/no-customer-revenue.test.ts || echo "fehlt: $t"; done` muss nichts ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/no-customer-revenue.test.ts` muss Exit-Code 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Wer `dev` liest, findet keinen Betrag und keine Zeit einer Aufladung, die einem einzelnen Kunden gehört.
@@ -173,6 +173,7 @@ MVP: Funktion, weil das Repo öffentlich ist und jede Stunde mit diesen Zeilen a
 - 2026-11-27 Zyklus 7: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5 und 6, nach der Wertsuche des Tech Lead (PRO-31732, `goals/fehler/ANNAHMEN.md`): `dev` mit PR #475 (`a854cb6`, `STATE.md` Zeile 194) gemergt, `docs/abrechnung/abbrueche-2026-11-10.md` Zeile 10 bis 14 und 16 und `goals/abrechnung/ANNAHMEN.md` Zeile 5, 12, 13, 90 und 91 maskiert, Fundstellen in `goals/RISIKEN.md` nachgezogen (kunden 02 Zeile 8, `goals/kunden/verdicts/01-z4-K.md` Zeile 35, `goals/abrechnung/verdicts/01-z4-K.md` Zeile 20, `src/credits/aborted.ts` Zeile 38, `test/credit-aborted.test.ts` Zeile 73 und 93, Audit-Berichte bis zum Merge). Gegenprobe: beide Wertsuchen zu Acceptance 1 zählen am Stand `f10e2ae` 11 und 1 Stelle, am Kopf 0 und nichts. Abgelöste Prüfungen: abrechnung 03 Zeile 72 `0` und `1` sowie `1`, Zeile 73 weiter 5; abrechnung 01 Zeile 87 `gleich`, Zeile 88 `1`. Prüfbefehle: P1 0, 9; P2 vitest Exit 0 (13 von 13), nichts fehlt, 0, 0; P3 genau der neue Name, `klein`, 0, 1; P4 1, 18, 0, 0; P5 `check` Exit 0 (2942 von 2942); P6 0, nichts fehlt, vitest Exit 0.
 - 2026-11-27 Zyklus 8: Befund 1 der Linse K aus Zyklus 7 gebaut: in `docs/research/2026-09-19-woher-kam-der-kunde.md` Betrag (Zeile 4, 17), Uhrzeit und Blocknummer (Zeile 17) der Aufladung des ersten zahlenden fremden Kunden maskiert; der Beleg der Linse K zählt am Stand davor 1, am Kopf 0. Befund 2 bis 4 liegen beim Tech Lead.
 - 2026-11-27 Zyklus 9: Abschluss ohne Bau gemeldet, Punkte 1 bis 6, am Kopf `8d259cb` nach der Entscheidung des Tech Lead (PRO-31770, Rahmen geschlossen, Befund 2 bis 4 im Vorschlag `goals/_vorschlaege/fehler-kunden-september-2026-11-27-1.md`). Prüfbefehle: P1 0, 9; P2 vitest Exit 0 (13 von 13), nichts fehlt, 0, 0; P3 genau der neue Name, `klein`, 0, 1; P4 1, 21, 0, 0; P5 `check` Exit 0 (279 s); P6 0, nichts fehlt, vitest Exit 0. Acceptance 1 nach `goals/fehler/ANNAHMEN.md`: Wertsuche im Codeblock 0, Wertsuche der Zeile PRO-31732 nichts, Prüfung der Datei vom 19.09. 0; Gegenprobe: dieselben drei zählen am alten Stand 27 (`d668966`), 11 Zeilen (`d668966`) und 1 (`148624f`). Am PR #466 sind `check` und `e2e` grün (Lauf 46002500696).
+- 2026-11-27 Release: PASS K und B (Zyklus 9), DONE.
 
 ## Blockers
 - keine; Befund 2 bis 4 der Linse K aus Zyklus 7 entschieden (Tech Lead, PRO-31770, `goals/fehler/ANNAHMEN.md`): Rahmen geschlossen, die Kunden vom September kommen in ein eigenes Glied.
