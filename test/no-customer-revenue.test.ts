@@ -3,7 +3,7 @@
  *
  * On 2026-11-26 two reports named how often, how much and at what time the one sandbox customer topped
  * up. Time and amount together lead to the public USDC transfer on Base and from there to the wallet.
- * The check that should have caught it only looked for amounts with two decimals, so "5 USD" passed.
+ * The check that should have caught it only looked for amounts with two decimals, so a whole amount passed.
  *
  * This test reads every file that carries reports about customers and fails on each paragraph that
  * names a single customer and also carries an amount that is not masked as `*.**`. A paragraph (lines
@@ -146,57 +146,57 @@ function scannedFiles(): string[] {
 
 describe("no revenue of a single customer in the public repo", () => {
   it("catches a whole amount of a single customer", () => {
-    expect(customerAmountLines("Er hat zweimal 5 USD gezahlt und dann aufgehört.")).toEqual([1]);
+    expect(customerAmountLines("Er hat dreimal 7 USD gezahlt und dann aufgehört.")).toEqual([1]);
     expect(customerAmountLines("Kunde 2 zahlte 20 USD.")).toEqual([1]);
   });
 
   it("catches an amount with decimals of a single customer", () => {
-    expect(customerAmountLines("Kunde 1 gab 10,06 USD aus.")).toEqual([1]);
-    expect(customerAmountLines("Kunde 1 gab 10.06 USDC aus.")).toEqual([1]);
-    expect(customerAmountLines("Der Sandbox-Kunde hat noch 0,01 USD.")).toEqual([1]);
+    expect(customerAmountLines("Kunde 9 gab 12,34 USD aus.")).toEqual([1]);
+    expect(customerAmountLines("Kunde 9 gab 12.34 USDC aus.")).toEqual([1]);
+    expect(customerAmountLines("Der Sandbox-Kunde hat noch 0,85 USD.")).toEqual([1]);
   });
 
   it("catches an amount that a line break separates from the customer", () => {
-    const text = ["Intro.", "", "Kunde 3 kam am Montag wieder und", "gab dann 7 USD aus.", "", "Next."].join("\n");
+    const text = ["Intro.", "", "Kunde 3 kam am Montag wieder und", "gab dann 17 USD aus.", "", "Next."].join("\n");
     expect(customerAmountLines(text)).toEqual([3]);
   });
 
   it("catches a forbidden amount next to an allowed one in the same paragraph", () => {
-    expect(customerAmountLines("Kunde 1 lag unter 5 USD und gab 3 USD aus.")).toEqual([1]);
+    expect(customerAmountLines("Kunde 1 lag unter 5 USD und gab 13 USD aus.")).toEqual([1]);
   });
 
   it("lets totals over all customers through", () => {
-    expect(customerAmountLines("Summe aller fremden Kunden: 24,77 USD in der Woche.")).toEqual([]);
-    expect(customerAmountLines("Kunde 1 war dabei. Summe aller fremden Kunden: 24,77 USD in der Woche.")).toEqual([]);
+    expect(customerAmountLines("Summe aller fremden Kunden: 56,78 USD in der Woche.")).toEqual([]);
+    expect(customerAmountLines("Kunde 1 war dabei. Summe aller fremden Kunden: 56,78 USD in der Woche.")).toEqual([]);
   });
 
   it("lets fixed amounts of the product through", () => {
     expect(customerAmountLines("Kunde 1 bekam ein Schrittguthaben von 10 Cent.")).toEqual([]);
-    expect(customerAmountLines("Kunde 1 bekam ein Schrittguthaben von 0,10 USD.")).toEqual([]);
+    expect(customerAmountLines("Kunde 1 bekam ein Schrittguthaben von 2,19 USD.")).toEqual([]);
     expect(customerAmountLines("Seine Wallet liegt unter 5 USD, die kleinste Stufe ist 5 USD.")).toEqual([]);
     expect(customerAmountLines("Kunde 1 kaufte das Paket zu 20 USD nicht, der Preis von 2 USD blieb.")).toEqual([]);
   });
 
   it("lets totals over two or more addresses through, not over one", () => {
-    expect(customerAmountLines("| Sandbox-Kunde | 24,77 USD (3 Adressen) | 30,06 USD (2 Zahler) |")).toEqual([]);
-    expect(customerAmountLines("| Sandbox-Kunde | 10,02 USD (1 Zahler) |")).toEqual([1]);
+    expect(customerAmountLines("| Sandbox-Kunde | 43,21 USD (3 Adressen) | 65,43 USD (2 Zahler) |")).toEqual([]);
+    expect(customerAmountLines("| Sandbox-Kunde | 87,65 USD (1 Zahler) |")).toEqual([1]);
   });
 
   it("reads every line of a fenced block as a record of its own", () => {
-    const block = ["```", "CUSTOMER 1: first 2026-11-10, balance *.** USD", "WEEK: 4.11 USD foreign inference", "```"];
+    const block = ["```", "CUSTOMER 1: first 2026-11-10, balance *.** USD", "WEEK: 8.76 USD foreign inference", "```"];
     expect(customerAmountLines(block.join("\n"))).toEqual([]);
-    const leak = ["```", "WEEK: 4.11 USD foreign inference", "DAY 1 2026-11-12: 3 calls, 3.00 USD", "```"];
+    const leak = ["```", "WEEK: 8.76 USD foreign inference", "DAY 1 2026-11-12: 3 calls, 4.32 USD", "```"];
     expect(customerAmountLines(leak.join("\n"))).toEqual([3]);
   });
 
   it("lets made-up amounts of fixtures and named tests through", () => {
-    expect(customerAmountLines("Fixture: Kunde 1 ruft von `198.51.100.7` und hat 3.00 USD ausgegeben.")).toEqual([]);
-    expect(customerAmountLines("Kunde 1 ohne Geld; neuer Test `test/x.test.ts` (sechs Läufe von 9,37 USD auf 0).")).toEqual([]);
-    expect(customerAmountLines("Kunde 1 ohne Geld; Test `test/x.test.ts`, dann gab Kunde 1 9,37 USD aus.")).toEqual([1]);
+    expect(customerAmountLines("Fixture: Kunde 1 ruft von `198.51.100.7` und hat 5.43 USD ausgegeben.")).toEqual([]);
+    expect(customerAmountLines("Kunde 1 ohne Geld; neuer Test `test/x.test.ts` (sechs Läufe von 3,21 USD auf 0).")).toEqual([]);
+    expect(customerAmountLines("Kunde 1 ohne Geld; Test `test/x.test.ts`, dann gab Kunde 1 3,21 USD aus.")).toEqual([1]);
   });
 
   it("lets masked amounts through", () => {
-    expect(customerAmountLines("Er hat zweimal *.** USD gezahlt, um **:** UTC.")).toEqual([]);
+    expect(customerAmountLines("Er hat dreimal *.** USD gezahlt, um **:** UTC.")).toEqual([]);
   });
 
   it("finds no amount of a single customer in the reports about customers", () => {
