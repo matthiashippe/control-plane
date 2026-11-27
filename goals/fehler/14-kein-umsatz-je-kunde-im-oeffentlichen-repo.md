@@ -1,7 +1,7 @@
 # Fehler Goal 14: Kein Umsatz je Kunde im öffentlichen Repo
 
 ## Status
-PLANNED
+PAUSED
 
 ## Active Objective
 Auf `dev` stehen Zahl und Höhe der Aufladungen und die Inferenz-Ausgabe des einen Sandbox-Kunden als Beträge, an zwei Stellen mit
@@ -125,3 +125,4 @@ MVP: Funktion, weil das Repo öffentlich ist und jede Stunde mit diesen Zeilen a
 ## Progress Log
 
 ## Blockers
+Pause: Entscheidung 5 und der Prüfbefehl in Zeile 85 schreiben echte Beträge des Sandbox-Kunden in einen Test des öffentlichen Repos, Grundregel 8 (goals/_vorschlaege/fehler-kritik-2026-11-27-1.md); zurück auf PLANNED, sobald beide Stellen erfundene Beträge tragen (Loop-Kritik 2026-11-27)

@@ -1,7 +1,7 @@
 # Regeln Goal 04: Die Migration von `konto_payouts` ist getestet
 
 ## Status
-PLANNED
+PAUSED
 
 ## Active Objective
 `openDb` fügt an eine bestehende Tabelle `konto_payouts` die Spalten `pending_tx`, `pending_usdc`, `retire_revoke` und
@@ -85,3 +85,4 @@ keine Schönheit ist.
 ## Progress Log
 
 ## Blockers
+Pause: die Wirkung hängt an konto 15, das ruht (goals/_vorschlaege/regeln-kritik-2026-11-27-1.md); zurück auf PLANNED, sobald konto 15 wieder PLANNED ist (Loop-Kritik 2026-11-27)
