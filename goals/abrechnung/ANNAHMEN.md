@@ -2,15 +2,15 @@
 
 ## Goal 01 (10.11.2026, Engineer CP)
 
-- **Fünf Fälle, Summe 79229 mc (0,79 USD), nicht drei über 0,37 USD.** Gemessen lesend in der Produktion: Das Caddy-Zugriffslog (alle
+- **Fünf Fälle, Summe ***** mc (*.** USD), nicht drei über *.** USD.** Gemessen lesend in der Produktion: Das Caddy-Zugriffslog (alle
   Dateien `access.log*`) zeigt am 10.11.2026 fünf Anfragen an `/v1/chat/completions` mit Status 0, alle vom selben Client: Ende 05:16:27
   (22,8 s), 05:18:17 (18,5 s), 05:25:58, 05:36:46 und 05:37:53 UTC (je 59,9 s). Befehl
   `ssh … 'docker exec deploy-caddy-1 sh -c "cat /var/log/caddy/access.log*"'`, gefiltert auf Datum, URI und `status == 0`; Gegenprobe mit
   einer gepflanzten Zeile Status 0 (Treffer) und einer mit Status 200 (kein Treffer). Die passenden Zeilen `kind = 'inference'` (Generation-ID
   beginnt mit der Startzeit der Anfrage, gebucht rund 1 bis 8 s nach dem Abbruch) liefert
   `docker exec -i deploy-cp-1 node - <refs> < q.js` mit `require("better-sqlite3")("/data/cp.db", { readonly: true })` als
-  `{"n":5,"a":1,"s":-79229}`: fünf Zeilen, eine Adresse, Summe 79229 mc; Gegenprobe mit einer erfundenen `ref`: `n` 0. Die erste Fassung
-  nahm nur die drei nach 59,9 s (61644 mc); die Kritik vom 10.11.2026 fand die zwei kürzeren. Die 0,37 USD aus Goal und `LOOP.md` lassen
+  `{"n":5,"a":1,"s":-*****}`: fünf Zeilen, eine Adresse, Summe ***** mc; Gegenprobe mit einer erfundenen `ref`: `n` 0. Die erste Fassung
+  nahm nur die drei nach 59,9 s (***** mc); die Kritik vom 10.11.2026 fand die zwei kürzeren. Die *.** USD aus Goal und `LOOP.md` lassen
   sich gegen die Produktion nicht bestätigen. Gutgeschrieben wird, was abgebucht wurde.
 - **Die Gutschrift bucht nur, wenn genau diese fünf Zeilen auf einer Adresse mit genau dieser Summe stehen.** Sonst nichts und eine
   Log-Zeile. Die Adresse steht nirgends im Repo, sie kommt aus den Abbuchungen selbst.
@@ -87,8 +87,8 @@
 - **Quote nach außen noch keine.** Die Messung `service` darf es später sein, weil sie im Vergleich dasselbe zählt; 0 Timeouts in 46
   Anfragen über 2,5 Stunden belegen keine Besserung gegenüber 3 in 224 an einem Tag. Frühestens nach sieben Tagen ab dem Rollout von
   abrechnung 02, wie `docs/kette.md` es für den Vergleich vorsieht.
-- **Summe der Abbrüche neu gemessen:** 79229 mc aus den fünf Abbuchungen (Ledger, `readonly: true`), dieselben fünf Anfragen mit Status 0
-  im Caddy-Log; die `ref` liest die Abfrage aus der Gutschrift selbst. `LOOP.md` nennt weiter 0,37 USD; den Satz ändert nur ein Mensch.
+- **Summe der Abbrüche neu gemessen:** ***** mc aus den fünf Abbuchungen (Ledger, `readonly: true`), dieselben fünf Anfragen mit Status 0
+  im Caddy-Log; die `ref` liest die Abfrage aus der Gutschrift selbst. `LOOP.md` nennt weiter *.** USD; den Satz ändert nur ein Mensch.
 
 ## Goal 04 (11.11.2026, Engineer CP)
 
