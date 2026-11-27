@@ -23,6 +23,13 @@ import { cardUrlFor, usdcTopupUrl } from "../payments/card-way.js";
 export const MARKUP = 1.3;
 const DEFAULT_MAX_TOKENS = 4096;
 const HARD_MAX_TOKENS = 32_768;
+/**
+ * The shortest answer a call is cut down to rather than refused (abrechnung 08). The runtime asks
+ * for 4096 tokens on every turn and stops after a 402, so a remainder that covers the prompt and a
+ * shorter answer used to strand it with credit left. Below 256 tokens a turn rarely gets one tool
+ * call out, so the 402 with the way to top up serves the caller better than a cut-off answer.
+ */
+export const MIN_SHORTENED_TOKENS = 256;
 
 export interface CatalogEntry {
   spec: ModelSpec;
@@ -156,6 +163,24 @@ export function purchaseMc(spec: ModelSpec, usage: Pick<Usage, "prompt_tokens" |
 export interface ChatResult {
   status: number;
   body: Record<string, unknown> | ChatResponse;
+  /** Response headers beside the body; today only `X-Max-Tokens-Shortened` (abrechnung 08). */
+  headers?: Record<string, string>;
+}
+
+/**
+ * The longest answer `availableMc` pays for on top of the estimated prompt, at most `maxTokens`, and
+ * below zero when not even the prompt is covered. Starts from the integer division, which rounds
+ * down, and then holds the result against `costMc` itself, so the reservation built from it is the
+ * same number `reserveMc` checks and never lies above the balance.
+ */
+export function affordableMaxTokens(spec: ModelSpec, promptTokens: number, maxTokens: number, availableMc: number): number {
+  const promptMc = costMc(spec, { prompt_tokens: promptTokens, completion_tokens: 0 });
+  if (availableMc < promptMc) return -1;
+  const perTokenMc = spec.outputPerMillion * 0.1 * MARKUP;
+  let n = perTokenMc > 0 ? Math.min(maxTokens, Math.floor((availableMc - promptMc) / perTokenMc)) : maxTokens;
+  while (n > 0 && costMc(spec, { prompt_tokens: promptTokens, completion_tokens: n }) > availableMc) n -= 1;
+  while (n < maxTokens && costMc(spec, { prompt_tokens: promptTokens, completion_tokens: n + 1 }) <= availableMc) n += 1;
+  return n;
 }
 
 /**
@@ -302,10 +327,10 @@ async function handleChatUncoalesced(
   }
 
   const requested = req.max_completion_tokens ?? req.max_tokens ?? DEFAULT_MAX_TOKENS;
-  const maxTokens = Math.max(1, Math.min(HARD_MAX_TOKENS, Math.floor(Number(requested) || DEFAULT_MAX_TOKENS)));
+  let maxTokens = Math.max(1, Math.min(HARD_MAX_TOKENS, Math.floor(Number(requested) || DEFAULT_MAX_TOKENS)));
 
   const estimatedPrompt = estimateTokens(req.messages, req.tools);
-  const requiredMc = costMc(entry.spec, { prompt_tokens: estimatedPrompt, completion_tokens: maxTokens });
+  let requiredMc = costMc(entry.spec, { prompt_tokens: estimatedPrompt, completion_tokens: maxTokens });
 
   // Reserve instead of merely checking. Between the check and the charge sits the provider call,
   // that is an `await`: whoever only reads the balance here lets any number of concurrent calls see
@@ -328,6 +353,28 @@ async function handleChatUncoalesced(
     }
   }
 
+  // What is left after the grants may still pay for a shorter answer (abrechnung 08): then the call
+  // goes out with `max_tokens` cut to what the credit carries, and only below MIN_SHORTENED_TOKENS
+  // does it bounce. The 402 keeps its wording and fields and names that number beside them.
+  let affordable = 0;
+  let shortenedTo: number | null = null;
+  if (!reserved) {
+    affordable = affordableMaxTokens(entry.spec, estimatedPrompt, maxTokens, getAvailableMc(db, address));
+    if (affordable >= MIN_SHORTENED_TOKENS && affordable < maxTokens) {
+      const shortenedMc = costMc(entry.spec, { prompt_tokens: estimatedPrompt, completion_tokens: affordable });
+      if (reserveMc(db, address, shortenedMc)) {
+        reserved = true;
+        requiredMc = shortenedMc;
+        maxTokens = affordable;
+        shortenedTo = affordable;
+        // The provider gets the cut value in the field the request used; `maxTokens` carries it to
+        // the providers that build their own body.
+        if (req.max_completion_tokens !== undefined) req.max_completion_tokens = affordable;
+        if (req.max_tokens !== undefined) req.max_tokens = affordable;
+      }
+    }
+  }
+
   if (!reserved) {
     const availableMc = getAvailableMc(db, address);
     if (chatOpts.topupsClosed) {
@@ -346,6 +393,7 @@ async function handleChatUncoalesced(
             current_balance_cents: mcToCents(availableMc),
             model: req.model,
             wallet: address,
+            affordable_max_tokens: Math.max(0, affordable),
             ...(openBountyCount(db) > 0
               ? { open_bounties: openBountyCount(db), bounties_url: `${siteOrigin()}/bounties.json` }
               : {}),
@@ -403,6 +451,8 @@ async function handleChatUncoalesced(
           topup_url: topupUrl,
           topup_tiers_usd: [...TOPUP_TIERS_USD],
           wallet: address,
+          // How long an answer the credit would carry (abrechnung 08). Additive only, like `topup_url`.
+          affordable_max_tokens: Math.max(0, affordable),
           // The other way forward, for the caller who has no USDC to top up with.
           //
           // The runtime that took this answer 145 times on 2026-09-28 had a wallet with 0.00 USDC
@@ -559,7 +609,9 @@ async function handleChatUncoalesced(
     if (!booked) releaseMc(db, address, requiredMc);
   }
 
-  return { status: 200, body: response };
+  return shortenedTo === null
+    ? { status: 200, body: response }
+    : { status: 200, body: response, headers: { "X-Max-Tokens-Shortened": String(shortenedTo) } };
 }
 
 export function providersFromEnv(env: NodeJS.ProcessEnv, factories: Record<string, () => ChatProvider>): ChatProvider[] {
