@@ -33,7 +33,7 @@ Ausgabe der Live-Prüfung mit Zeitstempel je Zeile:
 2026-11-14T01:36:32Z OK status: /v1/status 200
 2026-11-14T01:36:33Z OK domains: /v1/domains/search 401 without a key, the route is there
 2026-11-14T01:36:34Z OK domains-search: /v1/domains/search with a key 501 not_implemented, livecheck.com named, nothing called taken
-2026-11-14T01:36:36Z OK refund: credited once, 79229 mc
+2026-11-14T01:36:36Z OK refund: credited once, ***** mc (Betrag je Kunde nicht im öffentlichen Repo, Grundregel 8)
 2026-11-14T01:36:38Z OK timeout-quote: since 2026-11-10T20:27:18.047Z: openai/gpt-5-mini 0/877 (0.0 %), openai/gpt-5.2 0/168 (0.0 %)
 2026-11-14T01:36:44Z OK handoff: POST /v1/handoff 201, /h/{code} shows match among three numbers, the stream says pending; nothing approved
 2026-11-14T01:36:49Z WAIT sandbox: new client key, 75 s before the create
