@@ -99,7 +99,7 @@ MVP: Funktion, weil das Repo öffentlich ist und jede Stunde mit diesen Zeilen a
       MVP: Funktion, weil diese beiden Dateien heute Zahl, Höhe und Zeit seiner Zahlungen öffentlich nennen.
       Prüfung: `cat docs/kunden/sandbox-kunde-2026-11.md docs/richtung/2026-11-26.md | grep -c -E 'zweimal [0-9]+ USD|je [0-9]+ USD auf|[0-9]+,[0-9]{2} USD Inferenz'` muss 0 ausgeben.
       Prüfung: `cat docs/kunden/sandbox-kunde-2026-11.md docs/richtung/2026-11-26.md | grep -c -F '*.**'` muss mindestens 3 ausgeben.
-- [ ] `test/no-customer-revenue.test.ts` fängt jeden Betrag je Kunde in den Dateien aus Entscheidung 4, ganz oder mit
+- [x] `test/no-customer-revenue.test.ts` fängt jeden Betrag je Kunde in den Dateien aus Entscheidung 4, ganz oder mit
       Nachkommastellen, und lässt Summen und feste Beträge des Produkts durch; er war am Kopf von `dev` rot.
       MVP: Funktion, weil die Prüfung der Linse B nur Beträge mit zwei Nachkommastellen fing und der nächste Bericht über einen Kunden
       sonst denselben Fehler wieder nach `dev` bringt.
@@ -121,7 +121,7 @@ MVP: Funktion, weil das Repo öffentlich ist und jede Stunde mit diesen Zeilen a
       Prüfung: `grep -cE '^- [0-9]{4}-[0-9]{2}-[0-9]{2}, fehler 14: ' goals/fehler/ANNAHMEN.md` muss mindestens 4 ausgeben.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD | grep -vE '^(docs/.*\.md|test/no-customer-revenue\.test\.ts|goals/fehler/.*|goals/kunden/16-.*\.md|goals/RISIKEN\.md|goals/[a-z]+/ANNAHMEN\.md)$' | wc -l` muss 0 ausgeben.
       Prüfung: `git diff --diff-filter=D --name-only $(git merge-base origin/dev HEAD) HEAD -- test goals/kunden/verdicts | wc -l` muss 0 ausgeben.
-- [ ] `check` ist grün.
+- [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
 - [ ] goal-verifier PASS (K und B)
 
@@ -153,6 +153,7 @@ MVP: Funktion, weil das Repo öffentlich ist und jede Stunde mit diesen Zeilen a
 ## Progress Log
 - 2026-11-27 Zyklus 1: Punkte 1, 3 und 4 gebaut, 2 und 5 offen: Beträge, Zahl und Uhrzeiten der Aufladungen des Sandbox-Kunden in `docs/kunden/sandbox-kunde-2026-11.md`, `docs/richtung/2026-11-26.md` und `docs/richtung/2026-11-19.md` maskiert, kunden 16 umbenannt (2 Zeilen), `test/no-customer-revenue.test.ts` neu, am Kopf von `dev` d668966 rot mit 10 Fundstellen (`ROADMAP.md:18`, `ROADMAP.md:24`, `docs/kunden/sandbox-kunde-2026-11.md:151`, `docs/richtung/2026-11-19.md:31`, `docs/richtung/2026-11-26.md:17`, `:29`, `:105`, `:109`, `:129`, kunden 16 Zeile 1), am Kopf nur noch `ROADMAP.md:18` und `:24`; die Prüfbefehle der DONE-Goals, die die geänderten Dateien nennen, liefern vor und nach dem Bau dieselbe Ausgabe. Prüfbefehle: P1 0, 9; P2 vitest Exit 1 (nur `ROADMAP.md:18` und `:24`), nichts fehlt; P3 genau der neue Name, `klein`, 0; P4 1, 7, 0, 0; P5 `check` Exit 1 (2 von 2940 rot: dieser Test und `test/house-report-parity.test.ts`, `deadline_too_soon`).
 - 2026-11-27 Zyklus 1 (nach Neuansatz 1): Punkt 2 nachgezogen, 2 und 5 offen wegen `ROADMAP.md:18` und `:24` (PR #467 noch offen): `dev` (`eb60d8a`, mit `8da56a4`) in den Branch gemergt, in `test/no-customer-revenue.test.ts` jeden Betrag in gepflanzten Texten und Kommentaren durch erfundene ersetzt (`f2e7296`). Gegenprobe: je eine Wegwerf-Kopie unter `test/` mit entschärftem Muster (`gezahlt` weg, `AMOUNT` ohne Dezimalteil, Kontext `Summe aller`, `Schrittguthaben`, `ALLOWED_AFTER`, `FIXTURE_ADDRESS`, Klammer nach Test, Fence-Zeilen) macht jeweils genau die zugehörige Erwartung rot; P2c und P2d zählen gegen den Teststand von `e1762a3` 15 und 1, am Kopf 0. Prüfbefehle: P1 0, 9; P2 vitest Exit 1 (10 von 11 grün, Treffer nur `ROADMAP.md:18`, `ROADMAP.md:24`), nichts fehlt, 0, 0; P3 genau der neue Name, `klein`, 0, 1; P4 1, 9, 0, 0; P5 `check` Exit 1 (1 von 2940 rot: nur dieser Test, `test/house-report-parity.test.ts` grün).
+- 2026-11-27 Zyklus 2: Punkte 2 und 5 gebaut: `dev` mit PR #467 (`85dc59d`, Maske in `ROADMAP.md`) in den Branch gemergt, am Test nichts geändert. Gegenprobe: `test/no-customer-revenue.test.ts` vom Kopf in einem Worktree auf `d668966` rot (1 von 11, Exit 1), am Kopf grün. Prüfbefehle: P1 0, 9; P2 vitest Exit 0 (11 von 11), nichts fehlt, 0, 0; P3 genau der neue Name, `klein`, 0, 1; P4 1, 9, 0, 0; P5 `check` Exit 0 (2940 von 2940).
 
 ## Blockers
-- Punkt 2 und 5: `ROADMAP.md` Zeile 18 und 24 tragen Beträge in Einheiten, die einen einzelnen Kunden nennen; `ROADMAP.md` ist für dieses Goal nur zu lesen (Deny List). Die Maske kommt mit PR #467 (Tech Lead), danach `dev` noch einmal in den Goal-Branch.
+- keine
