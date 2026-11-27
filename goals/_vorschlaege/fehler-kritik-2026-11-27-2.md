@@ -1,0 +1,5 @@
+Schwere: 3
+Goal: fehler 14
+Befund: Der Scan aus Entscheidung 4 trifft auch eingefrorene DONE-Goals unter `goals/kunden/`, die nur feste Preisstufen des Produkts oder Fixture-Beträge neben „Kunde 1“ tragen; die Deny List verbietet, sie zu ändern, und Entscheidung 4 verbietet Ausnahmen je Datei, also wird der Test nie grün oder nur mit aufgeweichten Mustern.
+Beleg: Nachbau der Muster aus Entscheidung 4 mit der Absatz-Regel über `git show origin/dev:<datei>` -> Treffer in goals/kunden/01, 05, 11 und 13 (alle DONE) | goals/kunden/05-warum-kunde-1-nach-unserer-402-nicht-auflaedt.md:17 (zwischen „Stufe“ und Betrag steht ein weiteres Wort) | goals/kunden/11-kunde-1-kann-arbeit-einreichen.md:26 und :38 (ein Absatz ohne Leerzeile mit „Kunde 1“ und einer Tagesgrenze)
+Empfehlung: Den Scan auf `docs/kunden/**`, `docs/richtung/*.md`, kunden 16 und Goal-Dateien begrenzen, die nach der Merge-Basis neu sind oder geändert wurden, oder für Treffer in eingefrorenen Goal-Dateien denselben Weg wie für ROADMAP.md und STATE.md vorsehen (Frage an den Tech Lead); die erlaubte Ausnahme „Beträge aus Fixtures“ braucht im Test einen eigenen Mechanismus.
