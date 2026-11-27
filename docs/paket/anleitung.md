@@ -16,8 +16,8 @@ npm install -g github:matthiashippe/automaton#v0.2.2-maintained.3
 automaton --run
 ```
 
-`automaton --version` gibt `automaton-maintained 0.2.2-maintained.1` aus. Release-Seite:
-https://github.com/matthiashippe/automaton/releases/tag/v0.2.2-maintained.1
+`automaton --version` gibt `automaton-maintained 0.2.2-maintained.3` aus. Release-Seite:
+https://github.com/matthiashippe/automaton/releases/tag/v0.2.2-maintained.3
 
 ## Was das Paket gegenüber Upstream ändert
 
