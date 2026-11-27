@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -45,6 +45,19 @@ const cases: { name: string; valid: boolean; body: string }[] = [
   { name: "not-json", valid: false, body: "calls: none" },
 ];
 
+/**
+ * The moment the house job is posted. createBounty measures its deadline against Date.now(), so the clock is
+ * held there while the test runs; with the real clock the job's seven days ran out on 2026-11-27.
+ */
+const POSTED_AT = new Date("2026-11-20T06:00:00.000Z");
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(POSTED_AT);
+});
+afterEach(() => {
+  vi.useRealTimers();
+});
+
 const temps: string[] = [];
 afterAll(() => {
   for (const dir of temps) rmSync(dir, { recursive: true, force: true });
@@ -56,7 +69,7 @@ const plant = () => {
   temps.push(dir);
   const file = join(dir, "cp.db");
   const db = openDb(file);
-  const { bounty } = ensureHouseJob(db, new Date("2026-11-20T06:00:00.000Z"));
+  const { bounty } = ensureHouseJob(db, POSTED_AT);
   cases.forEach((c, i) => {
     const agent = `0x${(i + 1).toString(16).padStart(40, "c")}`;
     db.prepare("INSERT INTO wallets (address, balance_mc, created_at) VALUES (?, 0, ?)").run(agent, "2026-11-01T00:00:00.000Z");
