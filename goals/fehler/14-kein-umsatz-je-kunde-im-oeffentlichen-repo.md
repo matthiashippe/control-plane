@@ -174,4 +174,4 @@ MVP: Funktion, weil das Repo öffentlich ist und jede Stunde mit diesen Zeilen a
 - 2026-11-27 Zyklus 8: Befund 1 der Linse K aus Zyklus 7 gebaut: in `docs/research/2026-09-19-woher-kam-der-kunde.md` Betrag (Zeile 4, 17), Uhrzeit und Blocknummer (Zeile 17) der Aufladung des ersten zahlenden fremden Kunden maskiert; der Beleg der Linse K zählt am Stand davor 1, am Kopf 0. Befund 2 bis 4 liegen beim Tech Lead.
 
 ## Blockers
-- Befund 2 bis 4 der Linse K aus Zyklus 7 (zweiter zahlender Kunde vom September, `loop-dauerauftrag.md` Zeile 171, Pfadbeträge unter `src/` und `ops/`, Wertsuche ab dem 19.09.): Entscheidung beim Tech Lead.
+- keine; Befund 2 bis 4 der Linse K aus Zyklus 7 entschieden (Tech Lead, PRO-31770, `goals/fehler/ANNAHMEN.md`): Rahmen geschlossen, die Kunden vom September kommen in ein eigenes Glied.
