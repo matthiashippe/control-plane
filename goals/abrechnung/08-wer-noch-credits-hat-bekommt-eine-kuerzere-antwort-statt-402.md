@@ -97,7 +97,7 @@ Rest von wenigen Cent die Runtime trotzdem anhält.
       MVP: Funktion, weil die Runtime am Pin den Marker und zwei Felder der 402 liest (Grundregel 13).
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/inference.test.ts test/inference-abort.test.ts test/inference-sunset.test.ts` muss Exit-Code 0 haben.
       Prüfung: `git diff $(git merge-base origin/dev HEAD) HEAD -- test/inference.test.ts test/inference-abort.test.ts test/inference-sunset.test.ts | wc -l` muss 0 ausgeben.
-- [ ] Die Entscheidungen stehen in `goals/abrechnung/ANNAHMEN.md`, der Diff bleibt in den Pfaden dieses Goals, kein Test fällt weg.
+- [x] Die Entscheidungen stehen in `goals/abrechnung/ANNAHMEN.md`, der Diff bleibt in den Pfaden dieses Goals, kein Test fällt weg.
       MVP: Funktion, weil das nächste Glied wissen muss, warum 256 Tokens die Grenze sind und was die Runtime mit `length` tut.
       Prüfung: `grep -cE '^- [0-9]{4}-[0-9]{2}-[0-9]{2}, abrechnung 08: ' goals/abrechnung/ANNAHMEN.md` muss mindestens 5 ausgeben.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD | grep -vE '^(src/inference/proxy\.ts|src/app\.ts|test/inference-shortened\.test\.ts|test/card-checkout\.test\.ts|docs/abrechnung/rest-2026-11\.md|docs/kunden/auftraege-2026-11\.md|docs/errors\.md|goals/abrechnung/.*|goals/[a-z]+/ANNAHMEN\.md)$' | wc -l` muss 0 ausgeben.
@@ -107,7 +107,7 @@ Rest von wenigen Cent die Runtime trotzdem anhält.
 - [ ] Der Job `e2e` am Kopf des Goal-PR ist grün.
       MVP: Funktion, weil sich die Abrechnung im Laufzeitpfad ändert und der code-host kein Docker hat.
       Prüfung (Netz): `gh pr checks $(gh pr list -R matthiashippe/control-plane --head goal/abrechnung-08 --state open --json number -q '.[0].number') -R matthiashippe/control-plane 2>&1 | grep -E '^e2e\s' | grep -c pass` muss genau 1 ausgeben.
-- [ ] `check` ist grün.
+- [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
 - [ ] goal-verifier PASS (K und B)
 
@@ -142,6 +142,7 @@ Rest von wenigen Cent die Runtime trotzdem anhält.
 
 ## Progress Log
 - 2026-11-27 Zyklus 1: Punkte 1, 2, 3, 4 gebaut (Kürzung von `max_tokens` in `src/inference/proxy.ts`, `details.affordable_max_tokens` in beiden 402, Messung vorher mit 2 fremden Wallets im Fenster), Punkt 5 und 6 offen, weil `test/card-checkout.test.ts` (karte 02, Deny List) bei 300 mc eine 402 erwartet, die jetzt eine gekürzte Antwort ist. Neuer Test am Kopf von `dev` rot: „shortens …“ mit `expected 402 to be 200`, „answers 402 …“ mit `expected undefined to be 255`, „never reserves …“ mit `balance 3357: expected 3357 to be less than 3357`, „keeps the full request …“ grün und erst mit der Mutante `shortenedTo === -1` rot (`expected { 'X-Max-Tokens-Shortened': 'null' } to be undefined`). Prüfbefehle: P1 `1`, `1`, `0`; P2 Exit 0, nichts, `1`; P3 Exit 0 (44 passed), `0`; P4 `8`, `0`, `0`; P5 `e2e` am PR #482 lief bei Übergabe noch; P6 Exit 1 (`1 failed | 2950 passed`, `test/card-checkout.test.ts` > „leaves error, required_cents, current_balance_cents and topup_url of the 402 as they are“: `expected undefined to be 'INSUFFICIENT_CREDITS'`).
+- 2026-11-27 Zyklus 1 nach Neuansatz 1: Punkte 4, 6 gebaut (`emptyWallet(50)` in `test/card-checkout.test.ts:56`, kunden 08 auf `src/inference/proxy.ts:224` und `:465`, `res.headers` in der Route `POST /v1/chat/completions`, Fall „sends X-Max-Tokens-Shortened to the client“, ohne die Route rot mit `expected null to be '256'`); Punkte 1 bis 3 am Kopf nachgeprüft und grün; Punkt 5 wartet auf `e2e` am neuen Kopf von PR #482. Prüfbefehle: P1 `1`, `1`, `0`; P2 Exit 0 (5 passed), nichts, `1`; P3 Exit 0 (44 passed), `0`; P4 `10`, `0`, `+const{address,chat}=emptyWallet(50);|-const{address,chat}=emptyWallet(300);|`, nichts, `0`; P6 Exit 0 (`2952 passed`, „check: grün in 339 s“).
 
 ## Neuansätze
 1. 2026-11-27: Ursache: Punkt 6 (`check`) war nur an `test/card-checkout.test.ts:56` rot, dessen 402 mit 300 mc die Kürzung zu einer 200 macht, und Deny List samt Pfadprüfung von Punkt 4 verboten die Zahl im Test, dazu verschob der Code die Zeilen, auf die kunden 08 in `docs/kunden/auftraege-2026-11.md` zeigt; neuer Weg: Der Code von Zyklus 1 bleibt, die Deny List öffnet genau `emptyWallet(50)` in diesem Test, die beiden Zeilennummern von kunden 08 und die Weitergabe der Köpfe in der Route `POST /v1/chat/completions`, Punkt 4 prüft die Pfade und beide Nachzüge.
