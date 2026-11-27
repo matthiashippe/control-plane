@@ -1,7 +1,7 @@
 # Fehler Goal 14: Kein Umsatz je Kunde im öffentlichen Repo
 
 ## Status
-PLANNED
+ACTIVE
 
 ## Active Objective
 Auf `dev` stehen Zahl und Höhe der Aufladungen und die Inferenz-Ausgabe des einen Sandbox-Kunden als Beträge, an zwei Stellen mit
@@ -25,6 +25,27 @@ MVP: Funktion, weil das Repo öffentlich ist und jede Stunde mit diesen Zeilen a
   wann bezahlt oder ausgegeben hat.
 - Was danach schneller zu mehr zahlenden fremden Automatons führt: Ein Betreiber, der sieht, dass wir seine Zahlungen öffentlich
   nachzeichnen, kommt nicht; und ohne den Test fängt der nächste Bericht über einen Kunden denselben Fehler wieder ein.
+- **Stand und Weg nach Neuansatz 1 (Tech Lead, 27.11.2026).** Zyklus 1 hat Punkt 1, 3 und 4 gebaut (`e1762a3`), kein
+  Verdict gibt es noch. Gescheitert ist das Goal nicht am Code, sondern an seinem eigenen Text: Entscheidung 5 und die zweite
+  Prüfung von Punkt 2 schrieben echte Beträge des Sandbox-Kunden als gepflanzte Texte vor, und der Test auf dem Branch trägt sie
+  (Vorschlag `goals/_vorschlaege/fehler-kritik-2026-11-27-1.md`, Schwere 5). Der Test hätte damit genau den Fehler, den er fangen
+  soll, in einer Datei festgeschrieben, die kein Scan liest. Neuer Weg, in dieser Reihenfolge:
+  1. `dev` in den Goal-Branch holen (Merge, kein Rebase). Auf `dev` liegt schon `8da56a4` (feste Uhr in
+     `test/house-report-parity.test.ts`, PRO-31442), damit ist der zweite Blocker von Punkt 5 weg. Die Maske für `ROADMAP.md`
+     Zeile 18 und 24 kommt mit PR #467; ist er noch offen, baust du Schritt 2 und 3 trotzdem und holst `dev` nach seinem Merge
+     noch einmal.
+  2. In `test/no-customer-revenue.test.ts` jeden Betrag in gepflanzten Texten und Kommentaren durch einen erfundenen ersetzen,
+     der in keinem Bericht des Repos vorkommt: mindestens „Er hat dreimal 7 USD gezahlt“ (ganzer Betrag) und „Kunde 9 gab
+     12,34 USD aus“ (Nachkommastellen) als Treffer, „Summe aller fremden Kunden: 56,78 USD in der Woche“ und „Schrittguthaben von
+     10 Cent“ als kein Treffer. Das gilt für jeden Betrag mit Nachkommastellen im Test, auch für Tabellenzeilen, Summen über
+     mehrere Adressen, Fixture-Klammern und Werkzeugzeilen, denn auch eine Summe über zwei Zahler oder eine Wochensumme mit nur
+     einer fremden Adresse ist ein Betrag je Kunde. Ob ein Betrag erfunden ist, prüft Punkt 2 gegen `d668966`, den Kopf von `dev`
+     vor jeder Maske; die Prüfung gibt nur eine Zahl aus, nie den Betrag.
+  3. Gegenprobe (Grundregel 3): Jede neue Erwartung einmal rot sehen (Muster kurz entschärfen, Lauf, zurück) und die Zeile im
+     Progress Log nennt, womit; Datei und Zeile der echten Treffer, nie Beträge.
+  4. Dann Punkt 2, 5 und alle Prüfbefehle neu fahren und als Zyklus 1 übergeben (die Zählung beginnt nach dem Neuansatz neu).
+- **Was der Text dieses Goals nie enthält:** einen Betrag, eine Zeit oder einen Dateinamen mit Betrag, der einem einzelnen Kunden
+  gehört, auch nicht in einem Prüfbefehl. Prüfbefehle suchen nach Mustern (`[0-9]+ USD`) oder vergleichen gegen einen Commit.
 - Quelle: `ROADMAP.md`, Topic `fehler`, Glied 14 (Tech Lead 27.11.2026, PRO-31352 aus der Triage PRO-31345). Übernimmt
   `goals/_vorschlaege/kunden-redteam-2026-11-27-1.md`. Muster der Maske: `docs/kunden/rueckgang-2026-11.md` (Betrag `*.**`, Zeit
   der Aufladung `**:**` oder `****-**-**T**:**:**Z`), Vorfall vom 19.11.2026 in `goals/RISIKEN.md` Zeile 9.
@@ -57,10 +78,11 @@ MVP: Funktion, weil das Repo öffentlich ist und jede Stunde mit diesen Zeilen a
      zwischen „Kunde 1“ und dem Betrag nicht durchrutscht. Erlaubte Zusammenhänge (Schwelle mit `unter`, `über` oder `ab` vor dem
      Betrag, Paket, Preis, Stufe, Tier, Startgutschrift, Schrittguthaben, Summe über alle) stehen als zweite Konstante daneben und
      gelten nur für den Betrag direkt dahinter. Keine Ausnahmeliste für einzelne Dateien oder Zeilen.
-  5. **Gegenprobe in beide Richtungen** (Grundregel 3): Der Test prüft seine Muster an gepflanzten Texten, mindestens „Er hat
-     zweimal 5 USD gezahlt“ (ganzer Betrag) und „Kunde 1 gab 10,06 USD aus“ (Nachkommastellen) als Treffer und „Summe aller fremden
-     Kunden: 24,77 USD in der Woche“ sowie „Schrittguthaben von 10 Cent“ als kein Treffer. Am Kopf von `dev` ist der Test über die
-     echten Dateien rot; die Zeile im Progress Log nennt Datei und Zeile der Treffer, nicht die Beträge.
+  5. **Gegenprobe in beide Richtungen** (Grundregel 3, neu gefasst im Neuansatz 1): Der Test prüft seine Muster an gepflanzten
+     Texten mit erfundenen Beträgen, mindestens „Er hat dreimal 7 USD gezahlt“ (ganzer Betrag) und „Kunde 9 gab 12,34 USD aus“
+     (Nachkommastellen) als Treffer und „Summe aller fremden Kunden: 56,78 USD in der Woche“ sowie „Schrittguthaben von 10 Cent“
+     als kein Treffer. Kein Betrag im Test stammt aus einem Bericht über Kunden. Am Kopf von `dev` ist der Test über die echten
+     Dateien rot; die Zeile im Progress Log nennt Datei und Zeile der Treffer, nicht die Beträge.
 - **Was mitzieht.** Vor dem Bau die Prüfbefehle der Goals mit Status `DONE`, die eine der geänderten Dateien nennen
   (`grep -l -E 'sandbox-kunde-2026-11|richtung/2026-11-26|kunden/16-' goals/*/[0-9]*.md`), einmal am Kopf von `dev` fahren und nach
   dem Bau erneut. Wird ein fremder Prüfbefehl rot, weil er einen Betrag je Kunde erwartet, fragt der Maker den Tech Lead auf dem Topic
@@ -82,13 +104,16 @@ MVP: Funktion, weil das Repo öffentlich ist und jede Stunde mit diesen Zeilen a
       MVP: Funktion, weil die Prüfung der Linse B nur Beträge mit zwei Nachkommastellen fing und der nächste Bericht über einen Kunden
       sonst denselben Fehler wieder nach `dev` bringt.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/no-customer-revenue.test.ts` muss Exit-Code 0 haben.
-      Prüfung: `for t in 'zweimal 5 USD gezahlt' '10,06 USD' '24,77 USD' '10 Cent'; do grep -qF "$t" test/no-customer-revenue.test.ts || echo "fehlt: $t"; done` muss nichts ausgeben.
+      Prüfung: `for t in 'dreimal 7 USD gezahlt' 'Kunde 9 gab 12,34 USD aus' 'Summe aller fremden Kunden: 56,78 USD' '10 Cent'; do grep -qF "$t" test/no-customer-revenue.test.ts || echo "fehlt: $t"; done` muss nichts ausgeben.
+      Prüfung: `grep -oE '[0-9]+[.,][0-9]+ ?USDC?' test/no-customer-revenue.test.ts | grep -oE '^[0-9]+[.,][0-9]+' | tr . , | sort -u | while read -r a; do git grep -qF "$a" d668966 -- 'docs/*.md' ROADMAP.md STATE.md 'goals/kunden/*.md' && echo x; git grep -qF "$(echo "$a" | tr , .)" d668966 -- 'docs/*.md' ROADMAP.md STATE.md 'goals/kunden/*.md' && echo x; done | wc -l` muss 0 ausgeben.
+      Prüfung: `grep -oE '[a-zäöü]+mal [0-9]+ USD' test/no-customer-revenue.test.ts | sort -u | while read -r a; do git grep -qF "$a" d668966 -- 'docs/*.md' ROADMAP.md STATE.md 'goals/kunden/*.md' && echo x; done | wc -l` muss 0 ausgeben.
 - [x] kunden 16 trägt im Dateinamen und in der ersten Zeile keinen Betrag und im Active Objective keine Uhrzeit einer Aufladung;
       sonst ist die Datei unverändert.
       MVP: Funktion, weil Dateiname und Titel heute den Gesamtbetrag des einen Kunden nennen.
       Prüfung: `ls goals/kunden/16-*.md` muss genau `goals/kunden/16-warum-der-erste-sandbox-kunde-nach-einem-tag-aufhoert.md` ausgeben.
       Prüfung: `git diff --numstat $(git merge-base origin/dev HEAD) HEAD -M -- goals/kunden/ | grep -F '16-warum-der-erste-sandbox-kunde' | awk '{print ($1<=3 && $2<=3) ? "klein" : "zu viel"}'` muss genau `klein` ausgeben.
-      Prüfung: `grep -c 'nach-10-usd' docs/kunden/sandbox-kunde-2026-11.md` muss 0 ausgeben.
+      Prüfung: `grep -c -E 'kunden/16-[a-z0-9-]*usd' docs/kunden/sandbox-kunde-2026-11.md` muss 0 ausgeben.
+      Prüfung: `grep -c -F 'goals/kunden/16-warum-der-erste-sandbox-kunde-nach-einem-tag-aufhoert.md' docs/kunden/sandbox-kunde-2026-11.md` muss 1 ausgeben.
 - [x] `goals/RISIKEN.md` trägt die Zeile vom 2026-11-27 mit Fundstellen und Entscheidung, `goals/fehler/ANNAHMEN.md` die
       Entscheidungen, und der Diff bleibt in den Pfaden dieses Goals.
       MVP: Funktion, weil das nächste Glied wissen muss, warum Historie und Verdicts bleiben und die Prüfung im Test sitzt.
@@ -122,9 +147,12 @@ MVP: Funktion, weil das Repo öffentlich ist und jede Stunde mit diesen Zeilen a
 - max Zyklen: 4
 - max Versuche pro Gap: 3
 
+## Neuansätze
+1. 2026-11-27: Ursache: Entscheidung 5 und die zweite Prüfung von Punkt 2 schrieben echte Beträge des Sandbox-Kunden als gepflanzte Testtexte vor, so war Punkt 2 nicht regelkonform erreichbar (Grundregel 8); neuer Weg: nur erfundene Beträge im Test, geprüft gegen `d668966` mit einer Zählung statt einer Liste, die Goal-Datei selbst ohne Kundenbetrag, `dev` mit der festen Uhr von `test/house-report-parity.test.ts` zuerst in den Branch.
+
 ## Progress Log
 - 2026-11-27 Zyklus 1: Punkte 1, 3 und 4 gebaut, 2 und 5 offen: Beträge, Zahl und Uhrzeiten der Aufladungen des Sandbox-Kunden in `docs/kunden/sandbox-kunde-2026-11.md`, `docs/richtung/2026-11-26.md` und `docs/richtung/2026-11-19.md` maskiert, kunden 16 umbenannt (2 Zeilen), `test/no-customer-revenue.test.ts` neu, am Kopf von `dev` d668966 rot mit 10 Fundstellen (`ROADMAP.md:18`, `ROADMAP.md:24`, `docs/kunden/sandbox-kunde-2026-11.md:151`, `docs/richtung/2026-11-19.md:31`, `docs/richtung/2026-11-26.md:17`, `:29`, `:105`, `:109`, `:129`, kunden 16 Zeile 1), am Kopf nur noch `ROADMAP.md:18` und `:24`; die Prüfbefehle der DONE-Goals, die die geänderten Dateien nennen, liefern vor und nach dem Bau dieselbe Ausgabe. Prüfbefehle: P1 0, 9; P2 vitest Exit 1 (nur `ROADMAP.md:18` und `:24`), nichts fehlt; P3 genau der neue Name, `klein`, 0; P4 1, 7, 0, 0; P5 `check` Exit 1 (2 von 2940 rot: dieser Test und `test/house-report-parity.test.ts`, `deadline_too_soon`).
 
 ## Blockers
 - Punkt 2 und 5: `ROADMAP.md` Zeile 18 und 24 tragen Beträge in Einheiten, die einen einzelnen Kunden nennen; `ROADMAP.md` ist für dieses Goal nur zu lesen (Deny List), maskieren kann nur der Tech Lead.
-- Punkt 5: `test/house-report-parity.test.ts` legt den Hausauftrag am 2026-11-20T06:00Z mit 7 Tagen Frist an und ist seit 2026-11-27T06:00Z rot (`deadline_too_soon`), auch auf `dev`; `test/**` ist für dieses Goal gesperrt.
+- Punkt 5: `test/house-report-parity.test.ts` war seit 2026-11-27T06:00Z rot (`deadline_too_soon`); behoben auf `dev` mit `8da56a4` (PRO-31442), weg nach dem Merge von `dev` in den Goal-Branch.
