@@ -72,7 +72,7 @@ MVP: Funktion, weil das Repo öffentlich ist und jede Stunde mit diesen Zeilen a
   Kein Betrag je Kunde in Commit-Text, PR-Text, Kommentar oder Progress Log.
 
 ## Done Condition
-- [ ] In `docs/kunden/sandbox-kunde-2026-11.md` und `docs/richtung/2026-11-26.md` steht kein Betrag und keine Uhrzeit einer Aufladung
+- [x] In `docs/kunden/sandbox-kunde-2026-11.md` und `docs/richtung/2026-11-26.md` steht kein Betrag und keine Uhrzeit einer Aufladung
       des Sandbox-Kunden mehr; die Sätze stehen maskiert da.
       MVP: Funktion, weil diese beiden Dateien heute Zahl, Höhe und Zeit seiner Zahlungen öffentlich nennen.
       Prüfung: `cat docs/kunden/sandbox-kunde-2026-11.md docs/richtung/2026-11-26.md | grep -c -E 'zweimal [0-9]+ USD|je [0-9]+ USD auf|[0-9]+,[0-9]{2} USD Inferenz'` muss 0 ausgeben.
@@ -83,13 +83,13 @@ MVP: Funktion, weil das Repo öffentlich ist und jede Stunde mit diesen Zeilen a
       sonst denselben Fehler wieder nach `dev` bringt.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/no-customer-revenue.test.ts` muss Exit-Code 0 haben.
       Prüfung: `for t in 'zweimal 5 USD gezahlt' '10,06 USD' '24,77 USD' '10 Cent'; do grep -qF "$t" test/no-customer-revenue.test.ts || echo "fehlt: $t"; done` muss nichts ausgeben.
-- [ ] kunden 16 trägt im Dateinamen und in der ersten Zeile keinen Betrag und im Active Objective keine Uhrzeit einer Aufladung;
+- [x] kunden 16 trägt im Dateinamen und in der ersten Zeile keinen Betrag und im Active Objective keine Uhrzeit einer Aufladung;
       sonst ist die Datei unverändert.
       MVP: Funktion, weil Dateiname und Titel heute den Gesamtbetrag des einen Kunden nennen.
       Prüfung: `ls goals/kunden/16-*.md` muss genau `goals/kunden/16-warum-der-erste-sandbox-kunde-nach-einem-tag-aufhoert.md` ausgeben.
       Prüfung: `git diff --numstat $(git merge-base origin/dev HEAD) HEAD -M -- goals/kunden/ | grep -F '16-warum-der-erste-sandbox-kunde' | awk '{print ($1<=3 && $2<=3) ? "klein" : "zu viel"}'` muss genau `klein` ausgeben.
       Prüfung: `grep -c 'nach-10-usd' docs/kunden/sandbox-kunde-2026-11.md` muss 0 ausgeben.
-- [ ] `goals/RISIKEN.md` trägt die Zeile vom 2026-11-27 mit Fundstellen und Entscheidung, `goals/fehler/ANNAHMEN.md` die
+- [x] `goals/RISIKEN.md` trägt die Zeile vom 2026-11-27 mit Fundstellen und Entscheidung, `goals/fehler/ANNAHMEN.md` die
       Entscheidungen, und der Diff bleibt in den Pfaden dieses Goals.
       MVP: Funktion, weil das nächste Glied wissen muss, warum Historie und Verdicts bleiben und die Prüfung im Test sitzt.
       Prüfung: `grep -c -E '^\| 2026-11-27 \| Grundregel 8, Umsatz je Kunde' goals/RISIKEN.md` muss genau 1 ausgeben.
@@ -123,5 +123,8 @@ MVP: Funktion, weil das Repo öffentlich ist und jede Stunde mit diesen Zeilen a
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-27 Zyklus 1: Punkte 1, 3 und 4 gebaut, 2 und 5 offen: Beträge, Zahl und Uhrzeiten der Aufladungen des Sandbox-Kunden in `docs/kunden/sandbox-kunde-2026-11.md`, `docs/richtung/2026-11-26.md` und `docs/richtung/2026-11-19.md` maskiert, kunden 16 umbenannt (2 Zeilen), `test/no-customer-revenue.test.ts` neu, am Kopf von `dev` d668966 rot mit 10 Fundstellen (`ROADMAP.md:18`, `ROADMAP.md:24`, `docs/kunden/sandbox-kunde-2026-11.md:151`, `docs/richtung/2026-11-19.md:31`, `docs/richtung/2026-11-26.md:17`, `:29`, `:105`, `:109`, `:129`, kunden 16 Zeile 1), am Kopf nur noch `ROADMAP.md:18` und `:24`; die Prüfbefehle der DONE-Goals, die die geänderten Dateien nennen, liefern vor und nach dem Bau dieselbe Ausgabe. Prüfbefehle: P1 0, 9; P2 vitest Exit 1 (nur `ROADMAP.md:18` und `:24`), nichts fehlt; P3 genau der neue Name, `klein`, 0; P4 1, 7, 0, 0; P5 `check` Exit 1 (2 von 2940 rot: dieser Test und `test/house-report-parity.test.ts`, `deadline_too_soon`).
 
 ## Blockers
+- Punkt 2 und 5: `ROADMAP.md` Zeile 18 und 24 tragen Beträge in Einheiten, die einen einzelnen Kunden nennen; `ROADMAP.md` ist für dieses Goal nur zu lesen (Deny List), maskieren kann nur der Tech Lead.
+- Punkt 5: `test/house-report-parity.test.ts` legt den Hausauftrag am 2026-11-20T06:00Z mit 7 Tagen Frist an und ist seit 2026-11-27T06:00Z rot (`deadline_too_soon`), auch auf `dev`; `test/**` ist für dieses Goal gesperrt.
