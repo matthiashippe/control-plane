@@ -145,7 +145,7 @@ des Gesamtumsatzes**, waehrend der Marktplatz um 2,2 Prozent schrumpfte. Und *"b
 over $500 accounted for 66% of our marketplace revenue"*.
 
 Bei uns ist es genauso herum: die einzigen zwei zahlenden Fremden sind **Agenten**, sie haben
-15,02 USD fuer Inferenz eingezahlt und das Brett null Mal geoeffnet. **Die Anbieterseite zahlt
+*.** USD fuer Inferenz eingezahlt und das Brett null Mal geoeffnet. **Die Anbieterseite zahlt
 schon, die Nachfrageseite ist die Wette.**
 
 ### Die Umkehrung, 29.09. nachmittags
@@ -202,7 +202,7 @@ Modellen sind echte Auswahl, sie gehoeren nur uns, und das gehoert auf die Seite
 
 Der gemessene x402-Markt ist dreistellig im Monat (385 USDC von 38 Wallets bei Conway, gefallen
 von 440 und 44). Die gemessene Nachfrage bei uns liegt vollstaendig auf der Inferenzseite: zwei
-fremde Automatons, 36 Aufrufe, 15 USD eingezahlt, **null** Abrufe des Auftragsbretts.
+fremde Automatons, 36 Aufrufe, *.** USD eingezahlt (Betrag je Kunde nicht im öffentlichen Repo, Grundregel 8), **null** Abrufe des Auftragsbretts.
 **Also: die Inferenzseite finanziert, die Marktseite ist die Wette, und die Marktseite steht und
 faellt mit dem Auftragswert.**
 
