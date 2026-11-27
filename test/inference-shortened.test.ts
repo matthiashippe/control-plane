@@ -14,7 +14,7 @@ import { describe, expect, it } from "vitest";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { createApp } from "../src/app.js";
 import { hashApiKey } from "../src/auth/siwe.js";
-import { openDb, postLedger } from "../src/db.js";
+import { openDb, postLedger, reserveMc } from "../src/db.js";
 import { MockProvider } from "../src/inference/mock.js";
 import { Catalog, costMc, handleChat, MIN_SHORTENED_TOKENS } from "../src/inference/proxy.js";
 import { estimateTokens, type ChatRequest, type ChatResponse, type ModelSpec } from "../src/inference/provider.js";
@@ -188,6 +188,25 @@ describe("inference with a remainder (abrechnung 08)", () => {
     // Both sides of the edge were walked.
     expect(provider.seen.length).toBeGreaterThan(0);
     expect(provider.seen.length).toBeLessThan(mcFor(270) - mcFor(250) + 1);
+  });
+});
+
+describe("the reservation of a shortened call (abrechnung 08)", () => {
+  it("releases only its own reservation when a shortened call ends beside a running one", async () => {
+    const { db, provider, catalog, wallet, state } = setup();
+    // A full call of the same wallet still waiting for its provider holds its reservation, which
+    // is the state the second call meets. Its credit is reserved straight away here, as handleChat
+    // does it, so the test does not depend on timing.
+    const running = mcFor(4096);
+    const address = wallet(running + mcFor(300));
+    expect(reserveMc(db, address, running)).toBe(true);
+
+    const res = await handleChat(db, catalog, address, { model: "priced-1", messages: MESSAGES, max_completion_tokens: 4096 });
+    expect(res.status).toBe(200);
+    expect(res.headers?.["X-Max-Tokens-Shortened"]).toBe("300");
+    expect(provider.seen[0].reservedMc).toBe(running + mcFor(300));
+    // The shortened call gave back what it reserved and nothing of the running call.
+    expect(state(address).reserved_mc).toBe(running);
   });
 });
 
