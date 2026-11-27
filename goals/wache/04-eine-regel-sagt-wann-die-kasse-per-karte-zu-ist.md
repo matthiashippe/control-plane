@@ -1,7 +1,7 @@
 # Wache Goal 04: Eine Regel sagt, wann die Kasse per Karte zu ist
 
 ## Status
-PLANNED
+PAUSED
 
 ## Active Objective
 Wann die Kasse per Karte zu ist, steht heute an sechs Stellen in drei Fassungen. `cardOpenNow` (`src/app.ts:2555`) fragt Sunset und
@@ -120,3 +120,4 @@ ein vierter Grund zum Sperren sonst wieder nur an einer Stelle landet.
 ## Progress Log
 
 ## Blockers
+Pause: Kurs-Check 2026-11-27, Detail-Anteil 57,1 % über der Schwelle 40 %, und dieses Goal räumt sechs Stellen auf, an denen die Kasse für den Sunset fehlt, den heute niemand gesetzt hat (`CP_OPENROUTER_RESALE` fehlt im Container, `docs/kunden/aufladung-2026-11.md:33`); vorher starten abrechnung 08 und kunden 17, die an zahlenden Kunden ansetzen. Zurück auf PLANNED, wenn beide gemergt sind oder der Sunset geplant wird (PRO-31814).
