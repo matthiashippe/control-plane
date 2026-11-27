@@ -12,11 +12,16 @@ import { hashApiKey } from "../src/auth/siwe.js";
 import { claimStarter } from "../src/credits/starter.js";
 import { MockProvider, MOCK_MODEL } from "../src/inference/mock.js";
 import { Catalog, handleChat } from "../src/inference/proxy.js";
-import { isOlderMaintained, MAINTAINED_RELEASE, MAINTAINED_UPDATE_COMMAND } from "../src/inference/maintained.js";
+import {
+  isOlderMaintained,
+  MAINTAINED_RELEASE,
+  MAINTAINED_START_COMMAND,
+  MAINTAINED_UPDATE_COMMAND,
+} from "../src/inference/maintained.js";
 
 const HOST = "https://automatonhost.com";
 const GUIDE = new URL("../docs/paket/anleitung.md", import.meta.url);
-const SENTENCE = "Update this automaton so it shows this itself: ";
+const SENTENCE = "Update this automaton so it shows this itself, then restart it with automaton --run: ";
 const savedUrl = process.env.CP_PUBLIC_URL;
 
 beforeEach(() => {
@@ -63,6 +68,17 @@ function emptyAccount() {
     return res.text();
   };
   return { db, catalog, address, body, chat };
+}
+
+/** The lines of the code block under `## Installieren` of the guide, in order. */
+function installBlock(): string[] {
+  const guide = readFileSync(GUIDE, "utf8");
+  const start = guide.indexOf("## Installieren");
+  expect(start, "the section ## Installieren").toBeGreaterThan(0);
+  const section = guide.slice(start, guide.indexOf("\n## ", start + 1));
+  const block = section.match(/```bash\n([\s\S]*?)\n```/);
+  expect(block, "a bash block under ## Installieren").not.toBeNull();
+  return block![1].split("\n").map((l) => l.trim()).filter((l) => l !== "");
 }
 
 /** The guide without the section that lists the commits of the fork, which names older versions on purpose. */
@@ -130,6 +146,29 @@ describe("402 to an older maintained runtime (goals/kunden/17)", () => {
     }
     expect(isOlderMaintained(undefined)).toBe(false);
     expect(isOlderMaintained(null)).toBe(false);
+  });
+
+  it("names the restart before the update command", async () => {
+    // The guide installs with the update command and then starts with the line after it; npm install -g only swaps
+    // the files, so the running runtime keeps its old version until it is started again.
+    const lines = installBlock();
+    const at = lines.indexOf(MAINTAINED_UPDATE_COMMAND);
+    expect(at, "the update command in the install block").toBeGreaterThanOrEqual(0);
+    const start = lines[at + 1];
+    expect(start).toBe("automaton --run");
+    expect(MAINTAINED_START_COMMAND).toBe(start);
+
+    const { chat } = emptyAccount();
+    const before = JSON.parse(await chat()) as Body402;
+    const body = JSON.parse(await chat("automaton-maintained/0.2.2-maintained.1")) as Body402;
+    const sentence = `Update this automaton so it shows this itself, then restart it with ${start}: ${MAINTAINED_UPDATE_COMMAND}`;
+    expect(body.message_for_operator).toBe(`${before.message_for_operator} ${sentence}`);
+    const text = body.message_for_operator!;
+    expect(text.indexOf(`restart it with ${start}`)).toBeGreaterThan(0);
+    expect(text.indexOf(`restart it with ${start}`)).toBeLessThan(text.lastIndexOf(MAINTAINED_UPDATE_COMMAND));
+    // The command closes the line, so the agent can pass it on without a trailing mark.
+    expect(text.endsWith(`: ${MAINTAINED_UPDATE_COMMAND}`)).toBe(true);
+    expect(body.details.update_command).toBe(MAINTAINED_UPDATE_COMMAND);
   });
 
   it("keeps the 402 unchanged while topups are closed", async () => {

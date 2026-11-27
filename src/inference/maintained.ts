@@ -13,6 +13,12 @@ export const MAINTAINED_RELEASE = "v0.2.2-maintained.3";
 /** The command from the block under `## Installieren` of `docs/paket/anleitung.md`, word for word. */
 export const MAINTAINED_UPDATE_COMMAND = `npm install -g github:matthiashippe/automaton#${MAINTAINED_RELEASE}`;
 
+/**
+ * The start command from the line after the update command in the same block. `npm install -g` only swaps the files,
+ * so the running runtime keeps its old version until it is started again with this command.
+ */
+export const MAINTAINED_START_COMMAND = "automaton --run";
+
 const PREFIX = "automaton-maintained/";
 const VERSION = /^0\.2\.2-maintained\.([0-9]{1,9})$/;
 

@@ -19,7 +19,7 @@ import { grantForHouseJob } from "../bounties/house.js";
 import { siteOrigin } from "../public/site.js";
 import { TOPUP_TIERS_USD } from "../payments/pay.js";
 import { cardUrlFor, usdcTopupUrl } from "../payments/card-way.js";
-import { isOlderMaintained, MAINTAINED_UPDATE_COMMAND } from "./maintained.js";
+import { isOlderMaintained, MAINTAINED_START_COMMAND, MAINTAINED_UPDATE_COMMAND } from "./maintained.js";
 
 export const MARKUP = 1.3;
 const DEFAULT_MAX_TOKENS = 4096;
@@ -449,7 +449,7 @@ async function handleChatUncoalesced(
         // repair their automaton, and the agent reads this answer and then recommends one thing. Additive only, like
         // `topup_url`; nothing upstream reads it. While the card breaker is on it names only the way over USDC.
         message_for_operator: updateCommand
-          ? `${operatorLine} Update this automaton so it shows this itself: ${updateCommand}`
+          ? `${operatorLine} Update this automaton so it shows this itself, then restart it with ${MAINTAINED_START_COMMAND}: ${updateCommand}`
           : operatorLine,
         docs: DOC.inference,
         details: {
