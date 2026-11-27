@@ -123,6 +123,15 @@ MVP: Funktion, weil das Repo öffentlich ist und jede Stunde mit diesen Zeilen a
       Prüfung: `git diff --diff-filter=D --name-only $(git merge-base origin/dev HEAD) HEAD -- test goals/kunden/verdicts | wc -l` muss 0 ausgeben.
 - [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
+- [ ] Ein Betrag, dessen Zusammenhang genau eine Zahlung, einen Zahler oder eine Adresse nennt, gilt als Betrag je Kunde, auch ohne
+      Kundenmuster im Absatz und auch hinter `über`: `test/no-customer-revenue.test.ts` meldet `1 über <Betrag>` und
+      `<Betrag> (1 Adresse)` oder `(1 Zahler`, und die Fundstellen dieser Art in den Dateien aus Entscheidung 4 stehen maskiert, dazu
+      der Satz zur einen Zahlung derselben Woche in `docs/richtung/2026-11-19.md`. Kritik des Tech Lead, 27.11.2026.
+      MVP: Funktion, weil die Tabellen der Richtungs-Checks die eine fremde Zahlung einer Woche als Betrag nennen und die Zeilen kein
+      Kundenmuster tragen, so dass der Test sie heute durchlässt.
+      Prüfung: `git grep -n -E '(\b1 über [0-9]+([.,][0-9]+)? ?USDC?|[0-9]+([.,][0-9]+)? ?USDC? \(1 (Adresse|Zahler|Wallet)\b|derselben Woche [0-9]+([.,][0-9]+)? ?USDC? davon)' HEAD -- 'docs/kunden/*.md' 'docs/richtung/*.md' docs/kette.md ROADMAP.md STATE.md 'goals/kunden/[0-9]*.md' | wc -l` muss 0 ausgeben.
+      Prüfung: `for t in '1 über 4,56 USD (1 Zahler)' '0,09 USD (1 Adresse)'; do grep -qF "$t" test/no-customer-revenue.test.ts || echo "fehlt: $t"; done` muss nichts ausgeben.
+      Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/no-customer-revenue.test.ts` muss Exit-Code 0 haben.
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
