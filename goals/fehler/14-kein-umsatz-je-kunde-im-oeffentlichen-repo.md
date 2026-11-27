@@ -123,7 +123,7 @@ MVP: Funktion, weil das Repo öffentlich ist und jede Stunde mit diesen Zeilen a
       Prüfung: `git diff --diff-filter=D --name-only $(git merge-base origin/dev HEAD) HEAD -- test goals/kunden/verdicts | wc -l` muss 0 ausgeben.
 - [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
-- [ ] Ein Betrag, dessen Zusammenhang genau eine Zahlung, einen Zahler oder eine Adresse nennt, gilt als Betrag je Kunde, auch ohne
+- [x] Ein Betrag, dessen Zusammenhang genau eine Zahlung, einen Zahler oder eine Adresse nennt, gilt als Betrag je Kunde, auch ohne
       Kundenmuster im Absatz und auch hinter `über`: `test/no-customer-revenue.test.ts` meldet `1 über <Betrag>` und
       `<Betrag> (1 Adresse)` oder `(1 Zahler`, und die Fundstellen dieser Art in den Dateien aus Entscheidung 4 stehen maskiert, dazu
       der Satz zur einen Zahlung derselben Woche in `docs/richtung/2026-11-19.md`. Kritik des Tech Lead, 27.11.2026.
@@ -165,6 +165,7 @@ MVP: Funktion, weil das Repo öffentlich ist und jede Stunde mit diesen Zeilen a
 - 2026-11-27 Zyklus 2: Punkte 2 und 5 gebaut: `dev` mit PR #467 (`85dc59d`, Maske in `ROADMAP.md`) in den Branch gemergt, am Test nichts geändert. Gegenprobe: `test/no-customer-revenue.test.ts` vom Kopf in einem Worktree auf `d668966` rot (1 von 11, Exit 1), am Kopf grün. Prüfbefehle: P1 0, 9; P2 vitest Exit 0 (11 von 11), nichts fehlt, 0, 0; P3 genau der neue Name, `klein`, 0, 1; P4 1, 9, 0, 0; P5 `check` Exit 0 (2940 von 2940).
 - 2026-11-27 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4 und 5: alle Prüfbefehle am Kopf `997f0be` wie in der Zeile davor, am PR #466 `check` und `e2e` grün.
 - 2026-11-27 Zyklus 3: Punkt 6 gebaut, offen wegen der zweiten Prüfung: `docs/richtung/2026-11-19.md` Zeile 19, 20 und 40 und `docs/richtung/2026-11-26.md` Zeile 30 maskiert; `test/no-customer-revenue.test.ts` meldet einen Betrag hinter `1 über` oder vor `(1 Adresse`, `(1 Zahler` oder `(1 Wallet` auch ohne Kundenmuster und hinter `über`. Gegenprobe: `SINGLE_BEFORE` oder `SINGLE_AFTER` leer macht je die neue Erwartung rot; ohne die Maske meldet der Test 3 Absätze (`docs/richtung/2026-11-19.md:19`, `:20`, `docs/richtung/2026-11-26.md:30`). Mit `0,09 USD (1 Adresse)` im Test zählt die dritte Prüfung von Punkt 2 1 (Teil von Daten wie „20.09.“ in `d668966`), deshalb steht dort `0,97 USD` (`goals/fehler/ANNAHMEN.md`). Prüfbefehle: P1 0, 9; P2 vitest Exit 0 (12 von 12), nichts fehlt, 0, 0; P3 genau der neue Name, `klein`, 0, 1; P4 1, 9, 0, 0; P5 `check` Exit 0 (2941 von 2941); P6 0 (vorher 4), `fehlt: 0,09 USD (1 Adresse)`, vitest Exit 0.
+- 2026-11-27 Zyklus 3: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5 und 6: `dev` (`74b7d70`) in den Branch gemergt, am Kopf alle Prüfbefehle: P1 0, 9; P2 vitest Exit 0 (12 von 12), nichts fehlt, 0, 0; P3 genau der neue Name, `klein`, 0, 1; P4 1, 10, 0, 0; P5 `check` Exit 0 (2941 von 2941); P6 0, nichts fehlt (Betrag in der Prüfung vom Tech Lead getauscht, `e54f97a`), vitest Exit 0.
 
 ## Blockers
-- Punkt 6, zweite Prüfung: verlangt `0,09 USD (1 Adresse)` im Test, das macht die dritte Prüfung von Punkt 2 rot; den Betrag im Prüfbefehl kann nur der Tech Lead tauschen (Vorschlag `0,97 USD`).
+- keine
