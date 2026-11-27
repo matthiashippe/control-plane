@@ -1,7 +1,7 @@
 # Abrechnung Goal 08: Wer noch Credits hat, bekommt eine kürzere Antwort statt 402
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Eine Inferenz reserviert den Preis von geschätztem Prompt und vollem `max_tokens` (`src/inference/proxy.ts:303`) und antwortet 402,
@@ -117,7 +117,7 @@ Rest von wenigen Cent die Runtime trotzdem anhält.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/inference-shortened.test.ts` muss Exit-Code 0 haben.
       Prüfung: `for t in "records shortened_to in the ledger row of a shortened call" "leaves the ledger row of a full call without shortened_to"; do grep -qF "\"$t\"" test/inference-shortened.test.ts || echo "fehlt: $t"; done` muss nichts ausgeben.
       Prüfung: `grep -c 'shortened_to' src/inference/proxy.ts` muss mindestens 1 ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Eine Runtime mit Restguthaben bekommt Antworten, bis der Rest keine 256 Tokens mehr trägt, und zahlt nie mehr, als sie hat.
@@ -157,6 +157,7 @@ Rest von wenigen Cent die Runtime trotzdem anhält.
 - 2026-11-27 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, 7. `dev` unverändert seit der Merge-Basis `2595e4f`, kein Merge nötig. Prüfbefehle: wie in der Zeile davor; P5 `1` (Job `e2e` pass in 10m40s am Kopf `6dc1889`, Lauf 46046302469).
 - 2026-11-27 Zyklus 3: Befund 1 der Linse K (Zyklus 2) gebaut, `dev` (`24de71c`) gemergt. Neuer Fall „releases only its own reservation when a shortened call ends beside a running one“ in `test/inference-shortened.test.ts`: mit entferntem `requiredMc = shortenedMc;` rot (`expected 3929 to be 53277`), am Kopf grün. Prüfbefehle: P1 `1`, `1`, `0`; P2 Exit 0 (8 passed), nichts, `1`; P3 Exit 0 (44 passed), `0`; P4 `12`, `0`, `+const{address,chat}=emptyWallet(50);|-const{address,chat}=emptyWallet(300);|`, nichts (kunden 08), `0`; P6 Exit 0 (`2955 passed`, „check: grün in 244 s“); P7 Exit 0, nichts, `1`.
 - 2026-11-27 Zyklus 3: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, 7. P5 (`e2e` am Kopf dieses Commits) steht im Kommentar am Topic.
+- 2026-11-27 Release: PASS K und B (Zyklus 3), DONE.
 
 ## Neuansätze
 1. 2026-11-27: Ursache: Punkt 6 (`check`) war nur an `test/card-checkout.test.ts:56` rot, dessen 402 mit 300 mc die Kürzung zu einer 200 macht, und Deny List samt Pfadprüfung von Punkt 4 verboten die Zahl im Test, dazu verschob der Code die Zeilen, auf die kunden 08 in `docs/kunden/auftraege-2026-11.md` zeigt; neuer Weg: Der Code von Zyklus 1 bleibt, die Deny List öffnet genau `emptyWallet(50)` in diesem Test, die beiden Zeilennummern von kunden 08 und die Weitergabe der Köpfe in der Route `POST /v1/chat/completions`, Punkt 4 prüft die Pfade und beide Nachzüge.
