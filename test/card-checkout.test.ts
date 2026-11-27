@@ -53,7 +53,7 @@ describe("the 402 for an empty balance", () => {
   });
 
   it("leaves error, required_cents, current_balance_cents and topup_url of the 402 as they are", async () => {
-    const { address, chat } = emptyWallet(300);
+    const { address, chat } = emptyWallet(50);
     const body = (await chat()).body as Body402;
     // What upstream src/conway/topup.ts:103 reads: the marker and the two numbers, and the topup_url beside them.
     expect(body.error).toBe("INSUFFICIENT_CREDITS");

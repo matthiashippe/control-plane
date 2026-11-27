@@ -12,6 +12,8 @@
  */
 import { describe, expect, it } from "vitest";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
+import { createApp } from "../src/app.js";
+import { hashApiKey } from "../src/auth/siwe.js";
 import { openDb, postLedger } from "../src/db.js";
 import { MockProvider } from "../src/inference/mock.js";
 import { Catalog, costMc, handleChat, MIN_SHORTENED_TOKENS } from "../src/inference/proxy.js";
@@ -186,5 +188,37 @@ describe("inference with a remainder (abrechnung 08)", () => {
     // Both sides of the edge were walked.
     expect(provider.seen.length).toBeGreaterThan(0);
     expect(provider.seen.length).toBeLessThan(mcFor(270) - mcFor(250) + 1);
+  });
+});
+
+describe("the route POST /v1/chat/completions with a remainder (abrechnung 08)", () => {
+  it("sends X-Max-Tokens-Shortened to the client", async () => {
+    const { db, catalog, wallet } = setup();
+    const app = createApp({ db, catalog, rateLimit: null });
+    const key = "cnwy_k_" + "cd".repeat(16);
+    const keyFor = (address: string) =>
+      db
+        .prepare("INSERT INTO api_keys (address, key_hash, key_prefix, name, created_at) VALUES (?, ?, ?, ?, ?)")
+        .run(address, hashApiKey(key), key.slice(0, 15), "test", new Date().toISOString());
+    const send = () =>
+      app.request("/v1/chat/completions", {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: key },
+        body: JSON.stringify({ model: "priced-1", messages: MESSAGES, max_completion_tokens: 4096 }),
+      });
+
+    const short = wallet(mcFor(256));
+    keyFor(short);
+    const res = await send();
+    expect(res.status).toBe(200);
+    expect(res.headers.get("X-Max-Tokens-Shortened")).toBe("256");
+    expect(((await res.json()) as ChatResponse).choices[0].finish_reason).toBeTypeOf("string");
+
+    // A balance that covers the full request gets no such header.
+    db.prepare("DELETE FROM api_keys").run();
+    keyFor(wallet(mcFor(4096) * 2));
+    const full = await send();
+    expect(full.status).toBe(200);
+    expect(full.headers.get("X-Max-Tokens-Shortened")).toBeNull();
   });
 });
