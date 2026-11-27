@@ -70,6 +70,13 @@ const ALLOWED_BEFORE: readonly RegExp[] = [
 /** Context right after the amount: a total over two or more addresses or payers. */
 const ALLOWED_AFTER: readonly RegExp[] = [/^ \((?:[2-9]|[1-9][0-9]+) (?:Adressen|Zahler)\b/];
 
+/**
+ * Context that makes an amount the amount of exactly one payment, payer or address. Such an amount belongs
+ * to one customer even when the paragraph names no customer and even behind `über`, so it always counts.
+ */
+const SINGLE_BEFORE: readonly RegExp[] = [/(?<![\p{N}.,])1 über $/u];
+const SINGLE_AFTER: readonly RegExp[] = [/^ \(1 (?:Adresse|Zahler|Wallet)\b/];
+
 const SCANNED_DIRS: readonly { dir: string; recursive: boolean; name: RegExp }[] = [
   { dir: "docs/kunden", recursive: true, name: /\.md$/ },
   { dir: "docs/richtung", recursive: false, name: /\.md$/ },
@@ -113,19 +120,33 @@ function paragraphs(content: string): Unit[] {
   return units;
 }
 
+function around(text: string, index: number, length: number): { head: string; tail: string } {
+  return { head: text.slice(Math.max(0, index - 160), index), tail: text.slice(index + length, index + length + 40) };
+}
+
 function allowedAmount(text: string, index: number, length: number): boolean {
-  const head = text.slice(Math.max(0, index - 160), index);
-  const tail = text.slice(index + length, index + length + 40);
+  const { head, tail } = around(text, index, length);
   return ALLOWED_BEFORE.some((re) => re.test(head)) || ALLOWED_AFTER.some((re) => re.test(tail));
+}
+
+function singlePayerAmount(text: string, index: number, length: number): boolean {
+  const { head, tail } = around(text, index, length);
+  return SINGLE_BEFORE.some((re) => re.test(head)) || SINGLE_AFTER.some((re) => re.test(tail));
 }
 
 /** Line numbers (first line of the paragraph) of every paragraph with an amount of a single customer. */
 function customerAmountLines(content: string): number[] {
   const hits: number[] = [];
   for (const unit of paragraphs(content)) {
-    if (!CUSTOMER_PATTERNS.some((re) => re.test(unit.text)) || FIXTURE_ADDRESS.test(unit.text)) continue;
+    if (FIXTURE_ADDRESS.test(unit.text)) continue;
+    const customer = CUSTOMER_PATTERNS.some((re) => re.test(unit.text));
     const amounts = [...unit.text.matchAll(AMOUNT)];
-    if (amounts.some((m) => !allowedAmount(unit.text, m.index, m[0].length))) hits.push(unit.line);
+    const leaks = amounts.some(
+      (m) =>
+        singlePayerAmount(unit.text, m.index, m[0].length) ||
+        (customer && !allowedAmount(unit.text, m.index, m[0].length)),
+    );
+    if (leaks) hits.push(unit.line);
   }
   return hits;
 }
@@ -168,6 +189,14 @@ describe("no revenue of a single customer in the public repo", () => {
   it("lets totals over all customers through", () => {
     expect(customerAmountLines("Summe aller fremden Kunden: 56,78 USD in der Woche.")).toEqual([]);
     expect(customerAmountLines("Kunde 1 war dabei. Summe aller fremden Kunden: 56,78 USD in der Woche.")).toEqual([]);
+  });
+
+  it("catches an amount of exactly one payment, payer or address without a customer pattern", () => {
+    expect(customerAmountLines("| Fremde Zahlungen | 1 über 4,56 USD (1 Zahler) |")).toEqual([1]);
+    expect(customerAmountLines("| Fremde Zahlungen | 1 über 4,56 USD |")).toEqual([1]);
+    expect(customerAmountLines("| Fremde Inferenz-Ausgabe | 0,97 USD (1 Adresse) |")).toEqual([1]);
+    expect(customerAmountLines("| Fremde Zahlungen | 6 über 43,21 USD (2 Zahler) | 11 über 4,56 USD |")).toEqual([]);
+    expect(customerAmountLines("| Fremde Zahlungen | 1 über *.** USD (1 Zahler) |")).toEqual([]);
   });
 
   it("lets fixed amounts of the product through", () => {
