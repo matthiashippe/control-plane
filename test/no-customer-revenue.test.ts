@@ -68,15 +68,19 @@ const ALLOWED_BEFORE: readonly RegExp[] = [
   /\.test\.ts` \([^()]*$/,
 ];
 
-/** Context right after the amount: a total over two or more addresses or payers. */
-const ALLOWED_AFTER: readonly RegExp[] = [/^ \((?:[2-9]|[1-9][0-9]+) (?:Adressen|Zahler)\b/];
+/**
+ * Context right after the amount: a total over three or more addresses or payers. A total over two is
+ * not allowed, because each of the two knows the amount of the other from its own.
+ */
+const ALLOWED_AFTER: readonly RegExp[] = [/^ \((?:[3-9]|[1-9][0-9]+) (?:Adressen|Zahler)\b/];
 
 /**
- * Context that makes an amount the amount of exactly one payment, payer or address. Such an amount belongs
- * to one customer even when the paragraph names no customer and even behind `über`, so it always counts.
+ * Context that makes an amount the amount of exactly one payment, payer or address, or a total over exactly
+ * two payers or addresses. Such an amount belongs to one customer even when the paragraph names no customer
+ * and even behind `über`, so it always counts.
  */
 const SINGLE_BEFORE: readonly RegExp[] = [/(?<![\p{N}.,])1 über $/u];
-const SINGLE_AFTER: readonly RegExp[] = [/^ \(1 (?:Adresse|Zahler|Wallet)\b/];
+const SINGLE_AFTER: readonly RegExp[] = [/^ \(1 (?:Adresse|Zahler|Wallet)\b/, /^ \(2 (?:Adressen|Zahler|Wallets)\b/];
 
 const SCANNED_DIRS: readonly { dir: string; recursive: boolean; name: RegExp }[] = [
   { dir: "docs/kunden", recursive: true, name: /\.md$/ },
@@ -202,7 +206,7 @@ describe("no revenue of a single customer in the public repo", () => {
     expect(customerAmountLines("| Fremde Zahlungen | 1 über 4,56 USD (1 Zahler) |")).toEqual([1]);
     expect(customerAmountLines("| Fremde Zahlungen | 1 über 4,56 USD |")).toEqual([1]);
     expect(customerAmountLines("| Fremde Inferenz-Ausgabe | 0,97 USD (1 Adresse) |")).toEqual([1]);
-    expect(customerAmountLines("| Fremde Zahlungen | 6 über 43,21 USD (2 Zahler) | 11 über 4,56 USD |")).toEqual([]);
+    expect(customerAmountLines("| Fremde Zahlungen | 6 über 43,21 USD (3 Zahler) | 11 über 4,56 USD |")).toEqual([]);
     expect(customerAmountLines("| Fremde Zahlungen | 1 über *.** USD (1 Zahler) |")).toEqual([]);
   });
 
@@ -213,8 +217,10 @@ describe("no revenue of a single customer in the public repo", () => {
     expect(customerAmountLines("Kunde 1 kaufte das Paket zu 20 USD nicht, der Preis von 2 USD blieb.")).toEqual([]);
   });
 
-  it("lets totals over two or more addresses through, not over one", () => {
-    expect(customerAmountLines("| Sandbox-Kunde | 43,21 USD (3 Adressen) | 65,43 USD (2 Zahler) |")).toEqual([]);
+  it("lets totals over three or more addresses through, not over one or two", () => {
+    expect(customerAmountLines("| Sandbox-Kunde | 43,21 USD (3 Adressen) | 65,43 USD (4 Zahler) |")).toEqual([]);
+    expect(customerAmountLines("| Fremde Aufladungen | 6 über 65,43 USD (2 Zahler) |")).toEqual([1]);
+    expect(customerAmountLines("| Fremde Inferenz-Ausgabe | 9,64 USD (2 Adressen) |")).toEqual([1]);
     expect(customerAmountLines("| Sandbox-Kunde | 87,65 USD (1 Zahler) |")).toEqual([1]);
   });
 
