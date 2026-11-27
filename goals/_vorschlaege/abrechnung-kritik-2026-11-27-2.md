@@ -1,0 +1,6 @@
+Schwere: 3
+Goal: abrechnung 08
+Befund: Eine gekürzte Anfrage an ein Modell mit Reasoning (`openai/gpt-5-mini`, `openai/gpt-5.2`) kann die 256 bis wenige hundert Tokens ganz für Reasoning verbrauchen und kommt dann ohne Inhalt und ohne Tool-Aufruf mit `finish_reason: "length"` zurück. Die Runtime am Pin läuft bei `length` in den nächsten Zug (`src/agent/loop.ts:884 am Pin d8f8168`), also kann ein Rest in mehreren leeren, aber berechneten Antworten verbraucht werden, bevor die 402 kommt.
+Beleg: `src/inference/proxy.ts` (`affordableMaxTokens` rechnet nur Antwort-Tokens, die Grenze `MIN_SHORTENED_TOKENS = 256` gilt für jedes Modell); `goals/abrechnung/ANNAHMEN.md`, Zeile zu `finish_reason: "length"`.
+Empfehlung: Ein Glied misst nach dem Rollout aus dem Ledger (nur lesend, `meta.usage`, `meta.shortened_to` aus abrechnung 08 Punkt 7) je Modell, wie viele gekürzte Antworten leer blieben und wie viele Reasoning-Tokens ein Zug sonst braucht. Ist der Anteil leerer gekürzter Antworten über 10 %, wird die Grenze je Modell aus dieser Messung gesetzt, und eine leere gekürzte Antwort wird wie eine nicht angekommene behandelt (Grundregel 6), mit Test.
+MVP: Funktion, weil ein Kunde mit Rest sonst für leere Antworten zahlt, statt die 402 mit dem Weg zum Aufladen zu sehen.
