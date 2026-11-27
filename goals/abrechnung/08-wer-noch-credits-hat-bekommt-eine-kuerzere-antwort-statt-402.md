@@ -109,6 +109,14 @@ Rest von wenigen Cent die Runtime trotzdem anhält.
       Prüfung (Netz): `gh pr checks $(gh pr list -R matthiashippe/control-plane --head goal/abrechnung-08 --state open --json number -q '.[0].number') -R matthiashippe/control-plane 2>&1 | grep -E '^e2e\s' | grep -c pass` muss genau 1 ausgeben.
 - [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
+- [ ] Die Ledger-Zeile `inference` einer gekürzten Anfrage trägt in `meta` den Schlüssel `shortened_to` mit dem gekürzten Wert; eine
+      volle Anfrage hat den Schlüssel nicht, ihre Zeile bleibt, wie sie ist (Kritik, Tech Lead 27.11.2026).
+      MVP: Funktion, weil die Leitzahl und der Nutzen der Kürzung nach dem Rollout nur aus der Produktion gemessen werden dürfen
+      (Grundregel 3) und heute weder Ledger noch Caddy-Log eine gekürzte Antwort von einer vollen unterscheiden; ohne die Spur
+      bleibt offen, ob Runtimes mit Rest danach weiterarbeiten oder aufladen.
+      Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/inference-shortened.test.ts` muss Exit-Code 0 haben.
+      Prüfung: `for t in "records shortened_to in the ledger row of a shortened call" "leaves the ledger row of a full call without shortened_to"; do grep -qF "\"$t\"" test/inference-shortened.test.ts || echo "fehlt: $t"; done` muss nichts ausgeben.
+      Prüfung: `grep -c 'shortened_to' src/inference/proxy.ts` muss mindestens 1 ausgeben.
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
@@ -120,7 +128,8 @@ Rest von wenigen Cent die Runtime trotzdem anhält.
 - `loop.yaml`, `gate.yaml`, `loop-constraints.md`, `LOOP.md`, `ops/prompts/**`, `.github/**`, `scripts/check.mjs`, `harness/**`,
   `deploy/**`, `.env*`, `*.db`, `*.key`, `*.pem`
 - `src/inference/proxy.ts`: nur der Weg vom Scheitern der vollen Reservierung bis zur 402 und das neue Feld; Coalescing, Abbruch,
-  Abrechnung nach `usage`, 404, 400 und die Texte der 402 bleiben Zeichen für Zeichen
+  Abrechnung nach `usage`, 404, 400 und die Texte der 402 bleiben Zeichen für Zeichen; einzige Ausnahme in der Abrechnung ist der
+  Schlüssel `shortened_to` im `meta` der Ledger-Zeile `inference`, nur bei gekürzter Anfrage (Kritik)
 - `src/app.ts`: nur in der Route `POST /v1/chat/completions` die Köpfe aus `res.headers` an die Antwort geben (Neuansatz 1)
 - `src/**` sonst, `src/db.ts`, `src/payments/**`, `src/auth/**`, `ops/**`, `mcp/**`, `README.md`: unverändert
 - `docs/errors.md`: nur ein Satz zu `affordable_max_tokens` im Abschnitt der 402
