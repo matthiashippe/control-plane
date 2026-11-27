@@ -19,6 +19,7 @@ import { grantForHouseJob } from "../bounties/house.js";
 import { siteOrigin } from "../public/site.js";
 import { TOPUP_TIERS_USD } from "../payments/pay.js";
 import { cardUrlFor, usdcTopupUrl } from "../payments/card-way.js";
+import { isOlderMaintained, MAINTAINED_UPDATE_COMMAND } from "./maintained.js";
 
 export const MARKUP = 1.3;
 const DEFAULT_MAX_TOKENS = 4096;
@@ -206,6 +207,11 @@ export interface ChatOptions {
    * more, and an answer that does not arrive is not charged (Matthias, 2026-11-10).
    */
   signal?: AbortSignal;
+  /**
+   * The request header `User-Agent`, only to tell an older `automaton-maintained` runtime the command that installs
+   * the release (goals/kunden/17, `maintained.ts`). Never logged, never stored.
+   */
+  userAgent?: string;
 }
 
 /**
@@ -407,6 +413,12 @@ async function handleChatUncoalesced(
     // The way over USDC comes from the same place as on the paused page of /card/<package> (goals/wache/02), so both
     // always name the same link.
     const topupUrl = usdcTopupUrl(address);
+    // An older maintained runtime never updates itself and so never shows its person the card line (goals/kunden/17):
+    // its 402 names the command that installs the release. Additive only, and nothing for any other caller.
+    const updateCommand = isOlderMaintained(chatOpts.userAgent) ? MAINTAINED_UPDATE_COMMAND : null;
+    const operatorLine = cardUrl
+      ? `No crypto needed: top up this automaton by card, PayPal or Apple Pay at ${cardUrl}`
+      : `Top up this automaton with USDC on Base at ${topupUrl}`;
     return {
       status: 402,
       body: {
@@ -436,9 +448,9 @@ async function handleChatUncoalesced(
         // One sentence an agent can pass on to its person word for word (goals/werbung/01): most operators let an agent
         // repair their automaton, and the agent reads this answer and then recommends one thing. Additive only, like
         // `topup_url`; nothing upstream reads it. While the card breaker is on it names only the way over USDC.
-        message_for_operator: cardUrl
-          ? `No crypto needed: top up this automaton by card, PayPal or Apple Pay at ${cardUrl}`
-          : `Top up this automaton with USDC on Base at ${topupUrl}`,
+        message_for_operator: updateCommand
+          ? `${operatorLine} Update this automaton so it shows this itself: ${updateCommand}`
+          : operatorLine,
         docs: DOC.inference,
         details: {
           required_cents: Math.ceil(requiredMc / 1000),
@@ -465,6 +477,8 @@ async function handleChatUncoalesced(
           ...(openBountyCount(db) > 0
             ? { open_bounties: openBountyCount(db), bounties_url: `${siteOrigin()}/bounties.json` }
             : {}),
+          // The command for the person behind an older maintained runtime (goals/kunden/17). Additive only.
+          ...(updateCommand ? { update_command: updateCommand } : {}),
         },
       },
     };
