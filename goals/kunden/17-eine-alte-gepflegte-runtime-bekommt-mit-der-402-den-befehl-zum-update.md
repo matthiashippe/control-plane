@@ -86,6 +86,13 @@ MVP: Funktion, weil die eine Runtime, die heute 402 bekommt, sonst nie die Zeile
       Prüfung (Netz): `gh pr checks $(gh pr list -R matthiashippe/control-plane --head goal/kunden-17 --state open --json number -q '.[0].number') -R matthiashippe/control-plane 2>&1 | grep -E '^e2e\s' | grep -c pass` muss genau 1 ausgeben.
 - [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
+- [ ] Der Satz in `message_for_operator` nennt vor dem Befehl den Neustart mit dem Startbefehl aus dem Block unter `## Installieren`:
+      genau `Update this automaton so it shows this itself, then restart it with automaton --run: <Befehl>`, der Befehl am Ende;
+      `details.update_command` bleibt genau der Befehl (Kritik Tech Lead, 2026-11-27).
+      MVP: Funktion, weil `npm install -g` nur die Dateien tauscht und die laufende Runtime mit der alten Fassung weiterläuft, bis
+      sie neu startet; ohne den Neustart sieht der Mensch nach dem Befehl dieselbe 402 und nie die Kartenzeile.
+      Prüfung: `grep -cF '"names the restart before the update command"' test/inference-maintained-update.test.ts` muss genau 1 ausgeben.
+      Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/inference-maintained-update.test.ts -t "names the restart before the update command"` muss Exit-Code 0 haben.
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
