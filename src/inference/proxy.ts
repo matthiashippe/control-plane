@@ -600,6 +600,8 @@ async function handleChatUncoalesced(
         purchase_mc: boughtMc,
         margin_mc: chargeMc - boughtMc,
         uncollected_mc: actualMc - chargeMc,
+        // Only a cut request carries it, so production can tell a shortened answer from a full one.
+        ...(shortenedTo === null ? {} : { shortened_to: shortenedTo }),
       },
     });
     booked = true;

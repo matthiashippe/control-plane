@@ -191,6 +191,37 @@ describe("inference with a remainder (abrechnung 08)", () => {
   });
 });
 
+describe("the ledger trace of a shortened call (abrechnung 08)", () => {
+  const meta = (db: ReturnType<typeof openDb>, address: string) => {
+    const rows = db.prepare("SELECT meta FROM ledger WHERE address = ? AND kind = 'inference'").all(address) as { meta: string }[];
+    expect(rows).toHaveLength(1);
+    return JSON.parse(rows[0].meta) as Record<string, unknown>;
+  };
+
+  it("records shortened_to in the ledger row of a shortened call", async () => {
+    const { db, catalog, wallet } = setup();
+    const address = wallet(mcFor(300));
+    const res = await handleChat(db, catalog, address, { model: "priced-1", messages: MESSAGES, max_completion_tokens: 4096 });
+    expect(res.status).toBe(200);
+    expect(res.headers?.["X-Max-Tokens-Shortened"]).toBe("300");
+    expect(meta(db, address).shortened_to).toBe(300);
+  });
+
+  it("leaves the ledger row of a full call without shortened_to", async () => {
+    const { db, catalog, wallet } = setup();
+    const address = wallet(mcFor(4096) * 2);
+    const res = await handleChat(db, catalog, address, { model: "priced-1", messages: MESSAGES, max_completion_tokens: 4096 });
+    expect(res.status).toBe(200);
+    expect(res.headers).toBeUndefined();
+    const row = meta(db, address);
+    expect(Object.keys(row)).not.toContain("shortened_to");
+    // The row of a full call keeps exactly the keys it had before abrechnung 08.
+    expect(Object.keys(row).sort()).toEqual(
+      ["cost_mc", "cost_usd", "duration_ms", "margin_mc", "model", "provider", "purchase_mc", "requested_model", "uncollected_mc", "upstream", "usage"].sort(),
+    );
+  });
+});
+
 describe("the route POST /v1/chat/completions with a remainder (abrechnung 08)", () => {
   it("sends X-Max-Tokens-Shortened to the client", async () => {
     const { db, catalog, wallet } = setup();
