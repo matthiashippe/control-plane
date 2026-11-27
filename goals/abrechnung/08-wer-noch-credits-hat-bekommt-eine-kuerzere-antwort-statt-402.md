@@ -1,7 +1,7 @@
 # Abrechnung Goal 08: Wer noch Credits hat, bekommt eine kürzere Antwort statt 402
 
 ## Status
-BLOCKED fachlich
+ACTIVE
 
 ## Active Objective
 Eine Inferenz reserviert den Preis von geschätztem Prompt und vollem `max_tokens` (`src/inference/proxy.ts:303`) und antwortet 402,
@@ -21,6 +21,22 @@ Rest von wenigen Cent die Runtime trotzdem anhält.
 - abrechnung Goal 07 DONE
 
 ## Kontext für den Maker
+- **Neuansatz 1 (Tech Lead, 27.11.2026), zuerst lesen.** Der Code von Zyklus 1 (`2738e8b`) bleibt und ist der Ausgangspunkt,
+  nichts wird zurückgesetzt. Gescheitert ist Zyklus 1 nicht am Code, sondern am Vertrag: Die Kürzung macht aus der 402 in
+  `test/card-checkout.test.ts:56` (karte 02, `emptyWallet(300)`, 300 mc tragen mit dem Mock-Preis rund 1150 Tokens) eine 200, und
+  Deny List und Pfadprüfung von Punkt 4 verboten genau die eine Zahl, die den Test wieder auf eine Wallet unter der Grenze setzt.
+  Jetzt erlaubt, in dieser Reihenfolge:
+  1. `test/card-checkout.test.ts:56`: genau `emptyWallet(300)` wird `emptyWallet(50)`, sonst nichts (50 mc tragen höchstens 250
+     Tokens, also bleibt es bei der 402; Testname, Erwartungen und der Prüfbefehl von karte 02 bleiben). Neue Prüfung in Punkt 4.
+  2. `docs/kunden/auftraege-2026-11.md`, nur die Zeilennummern in den beiden Zeilen `- Weg: src/inference/proxy.ts:<n>` (kunden 08):
+     die erste auf die Zeile `export async function handleChat(`, die zweite auf die Zeile, die dort heute gemeint ist (Zweig
+     `openBountyCount` der 402 mit `bounties_url`). Fertig, wenn die Prüfung von kunden 08 (neue Prüfung in Punkt 4) nichts ausgibt.
+  3. `src/app.ts`, nur die Route `POST /v1/chat/completions` (heute `:3190`, `c.json(res.body …, res.status …)`): die Köpfe aus
+     `res.headers` mitgeben, damit `X-Max-Tokens-Shortened` (Entscheidung 4) beim Client ankommt; die Route der Prüfung von
+     Einreichungen und jede andere Zeile bleiben. Ein Fall in `test/inference-shortened.test.ts` gegen `createApp` ohne festen Port,
+     „sends X-Max-Tokens-Shortened to the client“, ist erwünscht, aber kein Done-Punkt.
+  Danach `check` und alle Prüfbefehle, dann Punkt 5 am neuen Kopf des PR #482. Was Zyklus 1 sonst gebaut und abgehakt hat, prüft
+  der Maker am Kopf einmal nach und übernimmt es nur, wenn es grün bleibt.
 - Ziel in einem Satz: Eine fremde Runtime mit Restguthaben bekommt so lange Antworten, wie das Guthaben eine Antwort von 256 Tokens
   trägt, und sieht erst danach die 402 mit dem Weg zum Aufladen.
 - Was danach schneller zu mehr zahlenden fremden Automatons führt: Eine Runtime, die weiterdenkt, kann in ihrem nächsten Zug
@@ -81,10 +97,12 @@ Rest von wenigen Cent die Runtime trotzdem anhält.
       MVP: Funktion, weil die Runtime am Pin den Marker und zwei Felder der 402 liest (Grundregel 13).
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/inference.test.ts test/inference-abort.test.ts test/inference-sunset.test.ts` muss Exit-Code 0 haben.
       Prüfung: `git diff $(git merge-base origin/dev HEAD) HEAD -- test/inference.test.ts test/inference-abort.test.ts test/inference-sunset.test.ts | wc -l` muss 0 ausgeben.
-- [x] Die Entscheidungen stehen in `goals/abrechnung/ANNAHMEN.md`, der Diff bleibt in den Pfaden dieses Goals, kein Test fällt weg.
+- [ ] Die Entscheidungen stehen in `goals/abrechnung/ANNAHMEN.md`, der Diff bleibt in den Pfaden dieses Goals, kein Test fällt weg.
       MVP: Funktion, weil das nächste Glied wissen muss, warum 256 Tokens die Grenze sind und was die Runtime mit `length` tut.
       Prüfung: `grep -cE '^- [0-9]{4}-[0-9]{2}-[0-9]{2}, abrechnung 08: ' goals/abrechnung/ANNAHMEN.md` muss mindestens 5 ausgeben.
-      Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD | grep -vE '^(src/inference/proxy\.ts|test/inference-shortened\.test\.ts|docs/abrechnung/rest-2026-11\.md|docs/errors\.md|goals/abrechnung/.*|goals/[a-z]+/ANNAHMEN\.md)$' | wc -l` muss 0 ausgeben.
+      Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD | grep -vE '^(src/inference/proxy\.ts|src/app\.ts|test/inference-shortened\.test\.ts|test/card-checkout\.test\.ts|docs/abrechnung/rest-2026-11\.md|docs/kunden/auftraege-2026-11\.md|docs/errors\.md|goals/abrechnung/.*|goals/[a-z]+/ANNAHMEN\.md)$' | wc -l` muss 0 ausgeben.
+      Prüfung: `git diff $(git merge-base origin/dev HEAD) HEAD -- test/card-checkout.test.ts | grep -E '^[-+] ' | tr -d ' ' | LC_ALL=C sort | tr '\n' '|'` muss genau `+const{address,chat}=emptyWallet(50);|-const{address,chat}=emptyWallet(300);|` ausgeben.
+      Prüfung: `grep -oE "^- Weg: src/[A-Za-z0-9_/.-]+\.ts:[0-9]+" docs/kunden/auftraege-2026-11.md | sed 's/^- Weg: //' | while IFS=: read -r p n; do sed -n "${n}p" "$p" | grep -qiE "bount|submi|award|ledger|chat|inference|402" || echo "falsch $p:$n"; done` muss nichts ausgeben.
       Prüfung: `git diff --diff-filter=D --name-only $(git merge-base origin/dev HEAD) HEAD -- test | wc -l` muss 0 ausgeben.
 - [ ] Der Job `e2e` am Kopf des Goal-PR ist grün.
       MVP: Funktion, weil sich die Abrechnung im Laufzeitpfad ändert und der code-host kein Docker hat.
@@ -103,9 +121,13 @@ Rest von wenigen Cent die Runtime trotzdem anhält.
   `deploy/**`, `.env*`, `*.db`, `*.key`, `*.pem`
 - `src/inference/proxy.ts`: nur der Weg vom Scheitern der vollen Reservierung bis zur 402 und das neue Feld; Coalescing, Abbruch,
   Abrechnung nach `usage`, 404, 400 und die Texte der 402 bleiben Zeichen für Zeichen
+- `src/app.ts`: nur in der Route `POST /v1/chat/completions` die Köpfe aus `res.headers` an die Antwort geben (Neuansatz 1)
 - `src/**` sonst, `src/db.ts`, `src/payments/**`, `src/auth/**`, `ops/**`, `mcp/**`, `README.md`: unverändert
 - `docs/errors.md`: nur ein Satz zu `affordable_max_tokens` im Abschnitt der 402
-- `test/**` außer `test/inference-shortened.test.ts`: unverändert
+- `docs/kunden/auftraege-2026-11.md`: nur die Zeilennummern der beiden Zeilen `- Weg: src/inference/proxy.ts:<n>` (Neuansatz 1)
+- `test/card-checkout.test.ts`: nur `emptyWallet(300)` wird `emptyWallet(50)` im Fall „leaves error, required_cents,
+  current_balance_cents and topup_url of the 402 as they are“ (Neuansatz 1)
+- `test/**` sonst außer `test/inference-shortened.test.ts`: unverändert
 - `ROADMAP.md`, `docs/kette.md`, bestehende Goal-Dateien und Vorschläge: nur lesen; in fremden `ANNAHMEN.md` nur Zeilen `Abgelöst:`,
   die der Tech Lead entschieden hat
 - `package.json` und `pnpm-lock.yaml`: kein neues Paket
@@ -121,11 +143,8 @@ Rest von wenigen Cent die Runtime trotzdem anhält.
 ## Progress Log
 - 2026-11-27 Zyklus 1: Punkte 1, 2, 3, 4 gebaut (Kürzung von `max_tokens` in `src/inference/proxy.ts`, `details.affordable_max_tokens` in beiden 402, Messung vorher mit 2 fremden Wallets im Fenster), Punkt 5 und 6 offen, weil `test/card-checkout.test.ts` (karte 02, Deny List) bei 300 mc eine 402 erwartet, die jetzt eine gekürzte Antwort ist. Neuer Test am Kopf von `dev` rot: „shortens …“ mit `expected 402 to be 200`, „answers 402 …“ mit `expected undefined to be 255`, „never reserves …“ mit `balance 3357: expected 3357 to be less than 3357`, „keeps the full request …“ grün und erst mit der Mutante `shortenedTo === -1` rot (`expected { 'X-Max-Tokens-Shortened': 'null' } to be undefined`). Prüfbefehle: P1 `1`, `1`, `0`; P2 Exit 0, nichts, `1`; P3 Exit 0 (44 passed), `0`; P4 `8`, `0`, `0`; P5 `e2e` am PR #482 lief bei Übergabe noch; P6 Exit 1 (`1 failed | 2950 passed`, `test/card-checkout.test.ts` > „leaves error, required_cents, current_balance_cents and topup_url of the 402 as they are“: `expected undefined to be 'INSUFFICIENT_CREDITS'`).
 
-## Blockers
-Art: fachlich
-Punkt 6 ist mit der Deny List nicht erreichbar: `test/card-checkout.test.ts:55` („leaves error, required_cents, current_balance_cents and topup_url of the 402 as they are“, karte 02) ruft `handleChat` mit 300 mc und dem Mock-Modell (2 USD je Million Tokens Antwort) und erwartet eine 402. 300 mc tragen dort rund 1150 Tokens Antwort, also antwortet der Dienst nach Entscheidung 2 jetzt 200 mit gekürztem `max_tokens`. Die Deny List lässt `test/**` außer `test/inference-shortened.test.ts` unverändert, also bleibt `check` rot. Frage an den Tech Lead mit beiden Ausgaben auf dem Topic.
+## Neuansätze
+1. 2026-11-27: Ursache: Punkt 6 (`check`) war nur an `test/card-checkout.test.ts:56` rot, dessen 402 mit 300 mc die Kürzung zu einer 200 macht, und Deny List samt Pfadprüfung von Punkt 4 verboten die Zahl im Test, dazu verschob der Code die Zeilen, auf die kunden 08 in `docs/kunden/auftraege-2026-11.md` zeigt; neuer Weg: Der Code von Zyklus 1 bleibt, die Deny List öffnet genau `emptyWallet(50)` in diesem Test, die beiden Zeilennummern von kunden 08 und die Weitergabe der Köpfe in der Route `POST /v1/chat/completions`, Punkt 4 prüft die Pfade und beide Nachzüge.
 
-## Ehrliche Lücken
-- Punkt 6 (`check`): rot nur durch `test/card-checkout.test.ts:55`, sonst 2950 Tests grün. Versucht: kein Weg im Code, der die Kürzung behält und bei 300 mc mit dem Mock-Modell 402 antwortet, denn das widerspräche Punkt 2. Nötig: Der Test nimmt für die 402 einen Saldo unter Prompt plus 256 Tokens (etwa 50 mc statt 300 mc, die Felder bleiben dieselben), und die Deny List erlaubt genau diese Zahl in `test/card-checkout.test.ts`.
-- Punkt 5 (`e2e`): Der Job lief am Kopf der Übergabe noch; er hängt nicht an Punkt 6 und wird im Abschluss am Kopf gelesen.
-- Daneben, ohne Done-Punkt: Die Prüfung von kunden 08 (`grep -oE "^- Weg: src/[A-Za-z0-9_/.-]+\.ts:[0-9]+" docs/kunden/auftraege-2026-11.md …`) meldet nach dem Bau `falsch src/inference/proxy.ts:199` und `falsch src/inference/proxy.ts:410`, weil die neuen Zeilen in `proxy.ts` die Zeilennummern verschieben; `docs/kunden/` liegt außerhalb der Pfade dieses Goals.
+## Blockers
+- keine
