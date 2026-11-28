@@ -184,3 +184,64 @@
 ## Abgelöst durch umzug 04 (Maker, 2026-11-18)
 
 - Abgelöst: umzug 01 Punkt 7 durch umzug 04 Punkt 6, Ausgabe dann genau `Exit 0, 28` (Tech Lead, 2026-11-18)
+
+## Goal 06 (28.11.2026, Engineer CP)
+
+- Eine Funktion `handoff_urls <code>` druckt die drei Adressen der Prüfung `handoff` (POST und Stream auf `BASE`, die Seite auf
+  `PAGE_BASE="${LIVE_PAGE_URL:-https://automatonhost.com}"`), weil Prüfung und Live-Lauf sonst auseinanderlaufen können: `handoff_live`
+  liest Seite und Stream aus ihrer Ausgabe, `--handoff-urls` druckt genau dieselbe (Entscheidung 1 des Tech Lead).
+- Die POST-Adresse holt `handoff_live` mit dem Platzhalter `HANDOFF_ANY_CODE=0000000000` aus der ersten Zeile von `handoff_urls`, weil
+  es vor dem POST noch keinen Code gibt und die POST-Adresse nicht vom Code abhängt; so kommt auch sie aus derselben Funktion
+  (Punkt 2), ohne eine zweite Stelle, die `BASE` zusammensetzt.
+- `PAGE_BASE` hängt nicht an `LIVE_URL`, weil die App jede Seite eines alten Hosts mit 301 auf den kanonischen Host schickt
+  (`src/app.ts`, `PAGES_STAY` nennt `/h/` nicht); wer die Seite anderswo prüfen will, setzt `LIVE_PAGE_URL`.
+- `--handoff-urls` mit einem Code, der nicht auf `^[0-9A-Z]{10,32}$` passt, endet mit Exit 2 und schreibt nur auf stderr, weil der Code
+  in eine URL geht und ein fremdes Zeichen (`;`, `/`, `..`) dort nichts zu suchen hat; derselbe Ausdruck prüft in
+  `HANDOFF_PREP_JS` schon den Code der Antwort (Entscheidung 2).
+- Die Seite wird weiter ohne `-L` geholt, weil ein 301 des kanonischen Hosts selbst ein echter Fehler ist und rot bleiben muss
+  (Entscheidung 3); der gepflanzte Fall `page301` (POST 201 mit Match, Seite 301, Stream pending, Kopfzeilen ok) zeigt im Selbsttest,
+  dass die Prüfung ihn als `FAIL handoff: /h/{code} answered 301` sieht (Entscheidung 4).
+- Der vitest-Fall in `test/live-selftest.test.ts` (`describe("ops/live.sh --handoff-urls")`, vier Fälle mit `handoff-urls` im Namen)
+  liest dazu den Rumpf von `handoff_live`, weil eine Prüfung allein der Ausgabe von `--handoff-urls` grün bliebe, wenn der Live-Lauf
+  wieder eine eigene Adresse baut. Gegen das `ops/live.sh` der Merge-Basis sind drei der vier rot (der Fall mit dem falschen Code
+  ist dort zufällig grün, weil der unbekannte Schalter auch Exit 2 ohne stdout gibt), am Goal-Branch alle vier grün.
+- Abgelöste Prüfbefehle (Entscheidung 6), gemessen ohne Netz am 28.11.2026 an der Merge-Basis `8fbdb47` und am Goal-Branch, Vergleich
+  über Exit-Code und letzte Zeile, weil das die Form der Zeilen `- Abgelöst:` ist: 74 Prüfbefehle aus 19 Goal-Dateien mit Status
+  `DONE`, die `live.sh` oder `live-selftest` nennen (Zeilen mit mehreren Befehlen in Backticks einzeln gezählt). Geändert hat sich nur
+  konto 02 Punkt 8, zweiter Befehl (Zahl der roten gepflanzten handoff-Fälle 8 auf 9, Erwartung „mindestens 3“ bleibt erfüllt), weil
+  der neue Fall `page301` rot ist. Bei den elf vitest-Läufen unterscheiden sich nur die Laufzeit und die Zahl der Tests, die letzte
+  Zeile ist die Laufzeit; abrechnung 03 Punkt 3 endet an beiden Ständen gleich mit Exit 1 (abgelöst durch fehler 14). Der
+  Vergleich der ganzen Ausgabe fand 23 Unterschiede (die neue Zeile `planted handoff page301`, Zahl der Tests, Laufzeiten), er ist
+  also nicht blind.
+- Punkt 8 (Kritik des Tech Lead, Zyklus 3): `HANDOFF_JS` bekommt als siebtes Argument die Seitenadresse, die die Prüfung abruft
+  (`${urls[1]#GET }` aus `handoff_urls`), und meldet `url=ok` nur, wenn `url` der Antwort genau diese Adresse ist, weil der Mensch die
+  `url` öffnet, die sein Automaton ihm schickt, und eine fest gewählte Seite eine tote Adresse in der Antwort grün durchließe.
+  Entscheidung 5 („`HANDOFF_JS` bleibt“) gilt dafür nicht, weil die Kritik genau dieses Feld verlangt.
+- Weicht `url` ab, stehen beide Adressen mit dem Code als `{code}` in der Ergebniszeile, und eine Adresse, die danach nicht auf
+  `^https://<host>/h/{code}$` passt, erscheint nur als `other` (fehlt sie, als `missing`), weil die Zeile im Bericht steht und weder ein
+  Code noch fremder Text aus der Antwort dort hingehört.
+- `judge_handoff` prüft `url` direkt nach `match` und vor der Seite, weil eine falsche `url` die Ursache ist und ein späterer Fehler der
+  Seite sie sonst verdecken würde; die gepflanzten Fälle lesen ihre Seitenadresse wie der Live-Lauf aus `handoff_urls`, deshalb trägt
+  das gepflanzte `h_ok` diese Adresse und der neue Fall `urlhost` dieselbe Antwort mit `https://postyourprice.com/h/7KQ2M9XC4D7K`.
+- Abgelöste Prüfbefehle nach Punkt 8 (Entscheidung 6), neu gemessen ohne Netz am 28.11.2026 an der Merge-Basis `8fbdb47` und am Kopf
+  nach Punkt 8, weil die Zahl der roten gepflanzten handoff-Fälle wieder steigt: 77 Prüfbefehle aus 19 Goal-Dateien mit Status `DONE`,
+  die `live.sh` oder `live-selftest` nennen (jeder Befehl in Backticks einzeln, deshalb drei mehr als in Zyklus 1). Geändert haben sich
+  konto 02 Punkt 8, zweiter Befehl (8 auf 10, Erwartung „mindestens 3“ bleibt erfüllt), und umzug 01 Punkt 7, weil sein `awk` ab
+  `## Goal 01` bis zum Dateiende zählt und damit auch diesen Abschnitt; den hatte die Messung in Zyklus 1 übersehen. Sonst ändern sich
+  nur Laufzeiten der vitest-Läufe, und umzug 01 Punkt 10 endet an beiden Ständen mit `3`.
+- Zyklus 4 (Befund 1 der Linse K, Zyklus 3): `handoff_live` setzt die Seitenadresse `page` erst, wenn `handoff_urls` drei Zeilen
+  geliefert hat, und gibt sonst `""` an `HANDOFF_JS`, weil ein gescheiterter POST unter `set -u` sonst an `urls[1]` abbricht und die
+  Prüfung nur `no result` statt der Ursache meldet.
+- Der Selbsttest fährt `handoff_live` selbst mit einer Funktion `curl` als Stand-in in einer Subshell (Fälle `ok`, `urlhost`,
+  `post404`) und vergleicht die ganze Zeile, weil ein Abbruch auch `FAIL` sagt und ein Vergleich nur des ersten Worts ihn
+  durchließe. Die Zeilen heißen `planted live handoff <Fall>`, weil konto 02 Punkt 8 jede Zeile mit `^planted handoff ` zählt und
+  genau ein OK verlangt.
+- Der zweite Prüfbefehl von Punkt 6 zählt seit dem Verdict von K in Zyklus 3 die Datei `goals/umzug/verdicts/06-z3-K.md` mit und gibt
+  1 aus, ohne die Verdicts 0. Das ist eine Annahme des Makers, weil Verdicts die Linsen schreiben und ein belegtes Verdict nicht
+  umgeschrieben wird; ob der Befehl ohne `goals/umzug/verdicts/` gilt wie in sandbox (Punkt 9, Tech Lead, 2026-11-15), entscheidet
+  der Tech Lead.
+- Entscheidung: Der zweite und der dritte Prüfbefehl von Punkt 6 gelten ab Zyklus 4 ohne `goals/umzug/verdicts/`, also `git diff --name-only origin/dev...HEAD -- . ':(exclude)goals/umzug/verdicts/' | grep -vcE '^(ops/live\.sh|test/live-selftest\.test\.ts|goals/[a-z]+/ANNAHMEN\.md|goals/umzug/06-die-live-pruefung-ruft-die-seite-auf-dem-kanonischen-host-auf\.md)$'` muss 0 ausgeben und `git diff --name-only origin/dev...HEAD -- . ':(exclude)goals/umzug/verdicts/' | wc -l` muss höchstens 6 ausgeben; für die Verdicts gilt `git diff --name-only origin/dev...HEAD -- goals/umzug/verdicts/ | grep -vcE '^goals/umzug/verdicts/06-z[0-9]+-[KB]\.md$'` muss 0 ausgeben, weil die Verdicts die Linsen schreiben, das Gate sie auf dem Goal-Branch verlangt und ein belegtes Verdict nie umgeschrieben wird, Punkt 6 aber den Umfang des Makers misst; die dritte Zeile hält dabei fest, dass unter `verdicts/` nur Urteile der Linsen K und B zu diesem Goal liegen. Gemessen am Kopf `e529767` ohne Netz: 0, 5, 0 (Tech Lead, 2026-11-28, wie sandbox Punkt 9 am 2026-11-15)
+
+## Abgelöst durch umzug 06 (Maker, 2026-11-28)
+
+- Abgelöst: umzug 01 Punkt 7 durch umzug 06 Punkt 5, Ausgabe dann genau `Exit 0, 32` (Tech Lead, 2026-11-28)
