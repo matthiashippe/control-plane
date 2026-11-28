@@ -4,3 +4,4 @@ Befund: kunden 17 misst nur die Zahl vorher (1780 Antworten 402 an `automaton-ma
 Beleg: `docs/kunden/kennung-2026-11.md` (Satz „das Folge-Glied misst mit demselben Werkzeug ab dem Rollout dieses Goals“) | `ROADMAP.md`, Topic `kunden`, letztes Glied 17
 Empfehlung: Ein Glied, das sieben Tage nach dem Rollout von kunden 17 mit `bash ops/card-visits.sh --since <Rollout> --until <Rollout + 7 Tage>` misst: Antworten 402 je Kennung, Kartenbesuche durch Menschen und erste Zahlung einer gepflegten Runtime mit der neuen Kennung. Kommt keine neue Kennung, ist der nächste Schritt, dass der Agent den Befehl gar nicht weitergibt; dann zeigt der Verlauf einer Runtime am Pin (`harness/`), was der Agent mit `message_for_operator` tut.
 MVP: Funktion, weil die Leitzahl „gepflegte Runtimes mit der neuen Kennung je Woche“ sonst nie gemessen wird und das Topic nicht erfährt, ob der Weg zur Karte jetzt offen ist.
+Übernommen: Tech Lead, PRO-32469 Glied 3 (2026-11-28)
