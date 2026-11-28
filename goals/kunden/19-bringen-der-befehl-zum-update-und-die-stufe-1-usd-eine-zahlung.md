@@ -94,6 +94,19 @@ und der Richtungs-Check (spätestens 04.12.) sonst auf einer falschen Null entsc
       Prüfung: `git diff --diff-filter=D --name-only $(git merge-base origin/dev HEAD) HEAD -- test ops docs | wc -l` muss 0 ausgeben.
 - [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
+- [ ] `CP_REPORT=topup-bands` zählt auch den Kauf, der auf `/pay/5/` nur die kleinste Stufe bezahlt (101000 mc, `meta.usd` 5,
+      `meta.value_atomic` `"1000000"`), als Stufe 1, und einen bezahlten Kauf von 5 USD (`meta.value_atomic` `"5000000"`) nie:
+      Wo `meta.value_atomic` steht, entscheidet es, sonst gilt Entscheidung 1. Test und Selbsttest pflanzen beide Fälle, der Test
+      heißt `counts a topup on /pay/5/ that paid only the cheapest tier as the tier 1`, der Selbsttest nennt
+      `paid only the cheapest tier`, beide waren vor dem Fix rot (die Zeile im Progress Log sagt, womit), und eine Zeile
+      `- <JJJJ-MM-TT>, kunden 19: Kritik: …` in `goals/kunden/ANNAHMEN.md` ersetzt die Zeile, nach der dieser Kauf nicht zählt.
+      MVP: Funktion, weil die zweite Zeile des Angebots in der 402 auf `/pay/5/` genau für eine Wallet mit 1 USD Ausgabegrenze da
+      ist (`src/payments/pay.ts:505` bis `:513`, gutgeschrieben wird `bezahlt`), und ihr Kauf für 1 USD heute in `TOPUPS 1 USD`
+      fehlt, also der Richtungs-Check am 04.12. wieder auf einer blinden Null stünde.
+      Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/usdc-bands.test.ts -t "paid only the cheapest tier"` muss Exit-Code 0 liefern und in der Ausgabe `1 passed` enthalten.
+      Prüfung: `PATH=/usr/bin:$PATH bash ops/usdc-bands.sh --selftest | /usr/bin/grep -c 'paid only the cheapest tier'` muss mindestens 1 ausgeben.
+      Prüfung: `PATH=/usr/bin:$PATH bash ops/usdc-bands.sh --selftest | tail -1` muss mit `SELFTEST OK` beginnen.
+      Prüfung: `/usr/bin/grep -cE '^- [0-9]{4}-[0-9]{2}-[0-9]{2}, kunden 19: Kritik: ' goals/kunden/ANNAHMEN.md` muss mindestens 1 ausgeben.
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
