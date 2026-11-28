@@ -262,4 +262,20 @@ describe("ops/usdc-bands.sh --selftest", () => {
     expect(lines.some((l) => l.startsWith("FAIL"))).toBe(false);
     expect(r.stdout).not.toMatch(ADDRESS);
   });
+
+  it("passes with a dead proxy set, because the planted RPC is on loopback", async () => {
+    // A port the system picked and that nobody listens on any more: every request through it fails.
+    const closed = createServer();
+    await new Promise<void>((r) => closed.listen(0, "127.0.0.1", r));
+    const dead = `http://127.0.0.1:${(closed.address() as AddressInfo).port}`;
+    await new Promise((r) => closed.close(r));
+    const env: Record<string, string | undefined> = { ...process.env };
+    for (const k of ["NO_PROXY", "no_proxy"]) delete env[k];
+    for (const k of ["HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy"]) env[k] = dead;
+    const r = spawnSync("bash", [SCRIPT, "--selftest"], { encoding: "utf-8", cwd: ROOT, timeout: 60_000, env });
+    const lines = r.stdout.trim().split("\n");
+    expect(r.status, r.stdout + r.stderr).toBe(0);
+    expect(lines[lines.length - 1]).toMatch(/^SELFTEST OK/);
+    expect(lines.filter((l) => l.startsWith("ok ")).length).toBeGreaterThanOrEqual(8);
+  });
 });

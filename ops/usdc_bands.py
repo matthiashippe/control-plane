@@ -35,6 +35,7 @@ import re
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 
 sys.dont_write_bytecode = True
@@ -44,6 +45,13 @@ import conway_arrivals as ca  # noqa: E402
 ISO = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z")
 ADDRESS = re.compile(r"0x[0-9a-f]{40}")
 RPC = os.environ.get("CP_USDC_RPC", "https://mainnet.base.org")
+# A RPC on loopback (the planted one of the selftest) never goes through a proxy: urllib sends 127.0.0.1 to http_proxy
+# too, and a dead proxy would turn every read into unreadable. Any other RPC keeps the proxy settings of the environment.
+OPEN = (
+    urllib.request.build_opener(urllib.request.ProxyHandler({})).open
+    if urllib.parse.urlsplit(RPC).hostname in ("127.0.0.1", "localhost", "::1")
+    else urllib.request.urlopen
+)
 USDC = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"  # USDC on Base, the asset of /pay/ (src/payments/pay.ts)
 BALANCE_OF = "0x70a08231"
 BASE_CHAIN_ID = 8453
@@ -82,7 +90,7 @@ def rpc(method, params):
     for attempt in range(6):
         try:
             req = urllib.request.Request(RPC, body, {"content-type": "application/json", "user-agent": AGENT})
-            answer = json.load(urllib.request.urlopen(req, timeout=20))
+            answer = json.load(OPEN(req, timeout=20))
         except urllib.error.HTTPError as e:
             if e.code == 429:
                 time.sleep(1 + 2 * attempt)
