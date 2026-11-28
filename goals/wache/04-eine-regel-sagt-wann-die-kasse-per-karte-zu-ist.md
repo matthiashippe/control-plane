@@ -1,7 +1,7 @@
 # Wache Goal 04: Eine Regel sagt, wann die Kasse per Karte zu ist
 
 ## Status
-PAUSED
+PLANNED
 
 ## Active Objective
 Wann die Kasse per Karte zu ist, steht heute an sechs Stellen in drei Fassungen. `cardOpenNow` (`src/app.ts:2555`) fragt Sunset und
@@ -75,7 +75,8 @@ ein vierter Grund zum Sperren sonst wieder nur an einer Stelle landet.
       MVP: Funktion, weil ein weiterer Grund zum Sperren sonst wieder nur an einer Stelle landet.
       Prüfung: `grep -c '^export function cardClosedFor(' src/payments/card-way.ts` muss genau 1 ausgeben.
       Prüfung: `cat src/app.ts src/payments/digistore.ts | grep -c -E 'cardBreaker\(|walletRefunded\('` muss 0 ausgeben.
-      Prüfung: `grep -c -E 'cardBreaker\(db|walletRefunded\(db' src/payments/card-way.ts` muss genau 2 ausgeben.
+      Prüfung: `grep -v 'export function' src/payments/card-way.ts | grep -oE '\b(cardBreaker|walletRefunded)\(' | wc -l` muss genau 2 ausgeben.
+      Prüfung: `awk '/^export function cardClosedFor\(/{p=1} p&&/^}/{p=0} p' src/payments/card-way.ts | grep -oE '\b(cardBreaker|walletRefunded)\(' | wc -l` muss genau 2 ausgeben.
       Prüfung: `grep -c 'opts.now ?? (() => new Date())' src/app.ts` muss genau 1 ausgeben.
       Prüfung: `grep -c 'card checkout closed' src/payments/digistore.ts` muss 0 ausgeben.
 - [ ] Die Entscheidungen stehen in `goals/wache/ANNAHMEN.md`, der Diff bleibt in den Pfaden dieses Goals, kein Test fällt weg.
@@ -120,4 +121,4 @@ ein vierter Grund zum Sperren sonst wieder nur an einer Stelle landet.
 ## Progress Log
 
 ## Blockers
-Pause: Kurs-Check 2026-11-27, Detail-Anteil 57,1 % über der Schwelle 40 %, und dieses Goal räumt sechs Stellen auf, an denen die Kasse für den Sunset fehlt, den heute niemand gesetzt hat (`CP_OPENROUTER_RESALE` fehlt im Container, `docs/kunden/aufladung-2026-11.md:33`); vorher starten abrechnung 08 und kunden 17, die an zahlenden Kunden ansetzen. Zurück auf PLANNED, wenn beide gemergt sind oder der Sunset geplant wird (PRO-31814).
+- keine
