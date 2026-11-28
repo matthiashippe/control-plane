@@ -156,6 +156,17 @@ der Weg per Karte gebaut wurde.
       Prüfung (Netz): `gh pr checks $(gh pr list -R matthiashippe/control-plane --head goal/kunden-18 --state open --json number -q '.[0].number') -R matthiashippe/control-plane 2>&1 | grep -E '^e2e\s' | grep -c pass` muss genau 1 ausgeben.
 - [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
+- [ ] Bei `Bau: ja` wählt die Aufladung nach der 402 einer Sandbox gegen jeden anderen Control Plane wie Upstream, auch wenn die
+      402 `details.topup_tiers_usd` nennt: die kleinste Stufe, die das Defizit deckt, und nichts, wenn die Wallet sie nicht hält;
+      Test im Fork, rot vor der Änderung, im neuen Release, und eine Zeile `- 2026-11-28, kunden 18: …` in
+      `goals/kunden/ANNAHMEN.md` ergänzt Entscheidung 5 (aus der Kritik, Tech Lead 2026-11-28).
+      MVP: Funktion, weil `topupForSandbox` am Tag `v0.2.2-maintained.4` über `offeredTiers || isCardHost(apiUrl)` schon bei
+      vorhandenem Feld `pickTopupTier` nimmt und gegen `api.conway.tech` mit 30 USDC und 100 USD Defizit 25 USD kauft, wo Upstream
+      nichts kauft; der Test „keeps the upstream tiers for another control plane“ schickt die 402 ohne das Feld und sieht das nicht,
+      und das Abnahmekriterium verlangt „wie vorher“.
+      Prüfung (Netz): `b=$(sed -nE 's/^Bau: (ja|nein),.*/\1/p' docs/kunden/stufe-1-2026-11.md); [ "$b" = nein ] && echo entfaellt || { t=$(grep -oE '^Release: \S+' docs/paket/anleitung.md | cut -d' ' -f2); d=$(mktemp -d); git clone -q --depth 1 --branch "${t:?}" https://github.com/matthiashippe/automaton "$d" && grep -cF '"keeps the upstream sandbox choice for another control plane when the 402 names tiers"' "$d/src/__tests__/topup-one-dollar.test.ts"; }` muss `1` oder `entfaellt` ausgeben.
+      Prüfung (Netz): `b=$(sed -nE 's/^Bau: (ja|nein),.*/\1/p' docs/kunden/stufe-1-2026-11.md); [ "$b" = nein ] && echo entfaellt || { t=$(grep -oE '^Release: \S+' docs/paket/anleitung.md | cut -d' ' -f2); d=$(mktemp -d); git clone -q --depth 1 --branch "${t:?}" https://github.com/matthiashippe/automaton "$d" && awk -v n='keeps the upstream sandbox choice for another control plane when the 402 names tiers' 'index($0,n){p=1;next} p&&/^  it\(/{p=0} p&&/apiUrl: CONWAY/{c++} p&&/topup_tiers_usd: \[5, 25, 100, 500, 1000, 2500\]/{t++} END{print (c>=1&&t>=1)?"stimmig":"unstimmig"}' "$d/src/__tests__/topup-one-dollar.test.ts"; }` muss `stimmig` oder `entfaellt` ausgeben.
+      Prüfung: `grep -cE '^- 2026-11-[0-9]{2}, kunden 18: .*topup_tiers_usd.*(Upstream|upstream)' goals/kunden/ANNAHMEN.md` muss mindestens 1 ausgeben.
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
