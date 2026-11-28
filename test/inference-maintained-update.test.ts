@@ -116,7 +116,7 @@ describe("402 to an older maintained runtime (goals/kunden/17)", () => {
   it("keeps the 402 unchanged for the current maintained runtime", async () => {
     const { chat } = emptyAccount();
     const before = await chat();
-    for (const version of [MAINTAINED_RELEASE.slice(1), "0.2.2-maintained.4", "0.2.2-maintained.10"]) {
+    for (const version of [MAINTAINED_RELEASE.slice(1), `0.2.2-maintained.${Number(MAINTAINED_RELEASE.split(".").pop()) + 1}`, "0.2.2-maintained.10"]) {
       expect(await chat(`automaton-maintained/${version}`), version).toBe(before);
     }
     expect(await chat(`automaton-maintained/${MAINTAINED_RELEASE.slice(1)} (linux)`)).toBe(before);

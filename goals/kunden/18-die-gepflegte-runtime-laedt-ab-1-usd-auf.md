@@ -1,7 +1,7 @@
 # Kunden Goal 18: Die gepflegte Runtime lädt ab 1 USD auf
 
 ## Status
-PLANNED
+DONE
 
 ## Active Objective
 Beide fremden Zahler, deren Abgang gemessen ist (`docs/kunden/aufladung-2026-11.md`, Ergebnis;
@@ -109,14 +109,14 @@ der Weg per Karte gebaut wurde.
   Felder englisch.
 
 ## Done Condition
-- [ ] `ops/usdc-bands.sh` zählt die fremden Adressen mit Startgutschrift oder Aufladung nach USDC-Bestand auf Base, die Aufladungen
+- [x] `ops/usdc-bands.sh` zählt die fremden Adressen mit Startgutschrift oder Aufladung nach USDC-Bestand auf Base, die Aufladungen
       der Stufe 1 USD und die Antworten auf `/pay/1/`, ohne Adresse in der Ausgabe, in beide Richtungen bewiesen.
       MVP: Funktion, weil ohne diese Zählung niemand weiß, ob die Stufe 1 einen Kunden erreicht, und die Leitzahl keinen Stand vorher hat.
       Prüfung: `PATH=/usr/bin:$PATH bash ops/usdc-bands.sh --selftest | tail -1` muss mit `SELFTEST OK` beginnen.
       Prüfung: `PATH=/usr/bin:$PATH bash ops/usdc-bands.sh --selftest | grep -cE "^ok "` muss mindestens 8 ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH bash ops/usdc-bands.sh --selftest | grep -cE "0x[0-9a-fA-F]{40}|([0-9]{1,3}\.){3}[0-9]{1,3}"` muss 0 ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/usdc-bands.test.ts` muss Exit-Code 0 haben.
-- [ ] `docs/kunden/stufe-1-2026-11.md` zeigt die Messung seit dem 06.11. mit Befehl und vollständiger Ausgabe, und die Zeile `Bau:`
+- [x] `docs/kunden/stufe-1-2026-11.md` zeigt die Messung seit dem 06.11. mit Befehl und vollständiger Ausgabe, und die Zeile `Bau:`
       folgt aus ihr.
       MVP: Funktion, weil die Messung entscheidet, ob der Bau sich lohnt, und die Leitzahl ohne Ausgangswert nichts zeigt.
       Prüfung: `d=docs/kunden/stufe-1-2026-11.md; g=$(sed -nE 's/^Gemessen: ([0-9T:-]+Z)$/\1/p' "$d"); [ -n "$g" ] && [ "$g" \> "2026-11-27T22:00:00Z" ] && /usr/bin/grep -qE '^\$ bash ops/usdc-bands\.sh --since 2026-11-06T00:00:00Z --until [0-9T:-]+Z$' "$d" && echo stimmig || echo unstimmig` muss genau `stimmig` ausgeben.
@@ -124,7 +124,7 @@ der Weg per Karte gebaut wurde.
       Prüfung: `awk '/^USDC BANDS since /{b=$18} /^TIER 1 SOLD: /{s=$4} /^Bau: /{z=$2; n++} END{w=(b>=1 && s=="yes")?"ja,":"nein,"; print (n==1 && z==w)?"stimmig":"unstimmig"}' docs/kunden/stufe-1-2026-11.md` muss genau `stimmig` ausgeben.
       Prüfung: `grep -cE "0x[0-9a-fA-F]{40}|([0-9]{1,3}\.){3}[0-9]{1,3}" docs/kunden/stufe-1-2026-11.md` muss 0 ausgeben.
       Prüfung (Netz): `set -a; . ~/.config/control-plane/loop.env; set +a; d=docs/kunden/stufe-1-2026-11.md; u=$(sed -nE 's/^\$ bash ops\/usdc-bands\.sh --since 2026-11-06T00:00:00Z --until ([0-9T:-]+Z)$/\1/p' "$d"); diff <(bash ops/usdc-bands.sh --since 2026-11-06T00:00:00Z --until "${u:?}" 2>/dev/null | grep -E '^(TOPUPS|PAY) 1 ') <(grep -E '^(TOPUPS|PAY) 1 ' "$d")` muss nichts ausgeben.
-- [ ] Bei `Bau: ja` kauft die Runtime im Fork gegen `automatonhost.com` ab 1 USDC die kleinste Stufe, die das Defizit deckt und die
+- [x] Bei `Bau: ja` kauft die Runtime im Fork gegen `automatonhost.com` ab 1 USDC die kleinste Stufe, die das Defizit deckt und die
       Wallet hält, beim Start, mitten im Lauf, im Heartbeat und bei der Sandbox, und gegen jeden anderen Control Plane wie vorher;
       Tests im Fork, rot vor der Änderung.
       MVP: Funktion, weil eine Wallet mit 1 bis knapp 5 USDC heute nie `/pay/` aufruft, obwohl wir ihr eine Stufe verkaufen.
@@ -132,31 +132,42 @@ der Weg per Karte gebaut wurde.
       Prüfung (Netz): `b=$(sed -nE 's/^Bau: (ja|nein),.*/\1/p' docs/kunden/stufe-1-2026-11.md); [ "$b" = nein ] && echo entfaellt || { t=$(grep -oE '^Release: \S+' docs/paket/anleitung.md | cut -d' ' -f2); d=$(mktemp -d); git clone -q --depth 1 --branch "${t:?}" https://github.com/matthiashippe/automaton "$d" && cat "$d/src/agent/loop.ts" "$d/src/heartbeat/tasks.ts" | grep -cE 'usdcBalance >= 5\b|MIN_TOPUP_USD = 5\b'; }` muss `0` oder `entfaellt` ausgeben.
       Prüfung (Netz): `b=$(sed -nE 's/^Bau: (ja|nein),.*/\1/p' docs/kunden/stufe-1-2026-11.md); [ "$b" = nein ] && echo entfaellt || { t=$(grep -oE '^Release: \S+' docs/paket/anleitung.md | cut -d' ' -f2); d=$(mktemp -d); git clone -q --depth 1 --branch "${t:?}" https://github.com/matthiashippe/automaton "$d" && f="$d/src/__tests__/topup-one-dollar.test.ts" && for n in "bootstrap buys 1 USD with 1 to under 5 USDC on automatonhost.com" "bootstrap still buys 5 USD with 5 USDC or more" "buys nothing with less than 1 USDC" "keeps the upstream tiers for another control plane" "sandbox topup takes the known tiers from details.topup_tiers_usd of the 402" "heartbeat and loop top up from 1 USDC on automatonhost.com" "topup_credits accepts 1 only where the control plane sells it"; do grep -qF "\"$n\"" "$f" || echo "fehlt: $n"; done; grep -c 'describe("one dollar tier"' "$f"; }` muss genau `1` oder `entfaellt` ausgeben.
       Prüfung (Netz): `b=$(sed -nE 's/^Bau: (ja|nein),.*/\1/p' docs/kunden/stufe-1-2026-11.md); [ "$b" = nein ] && echo entfaellt || { t=$(grep -oE '^Release: \S+' docs/paket/anleitung.md | cut -d' ' -f2); d=$(mktemp -d); git clone -q --depth 1 --branch "${t:?}" https://github.com/matthiashippe/automaton "$d" && cd "$d" && PATH=/usr/bin:$PATH pnpm install --frozen-lockfile >/dev/null 2>&1 && PATH=/usr/bin:$PATH pnpm -s build >/dev/null 2>&1 && PATH=/usr/bin:$PATH pnpm -s test >/dev/null 2>&1 && echo gruen; }` muss `gruen` oder `entfaellt` ausgeben.
-- [ ] Bei `Bau: ja` liegt das neue Release über `v0.2.2-maintained.3` auf `main` des Forks, lässt sich mit einem Befehl
+- [x] Bei `Bau: ja` liegt das neue Release über `v0.2.2-maintained.3` auf `main` des Forks, lässt sich mit einem Befehl
       installieren und nennt seine Version.
       MVP: Funktion, weil nur ein neues Release die Stufe 1 zu den Runtimes bringt und kunden 17 ältere Kennungen dorthin schickt.
       Prüfung (Netz): `b=$(sed -nE 's/^Bau: (ja|nein),.*/\1/p' docs/kunden/stufe-1-2026-11.md); [ "$b" = nein ] && echo entfaellt || { t=$(grep -oE '^Release: \S+' docs/paket/anleitung.md | cut -d' ' -f2); gh release view "${t:?}" -R matthiashippe/automaton --json tagName,isDraft -q 'select(.isDraft == false) | .tagName'; }` muss den Tag aus `Release:` oder `entfaellt` ausgeben.
       Prüfung (Netz): `b=$(sed -nE 's/^Bau: (ja|nein),.*/\1/p' docs/kunden/stufe-1-2026-11.md); [ "$b" = nein ] && echo entfaellt || { t=$(grep -oE '^Release: \S+' docs/paket/anleitung.md | cut -d' ' -f2); gh api "repos/matthiashippe/automaton/compare/v0.2.2-maintained.3...${t:?}" --jq .status; }` muss `ahead` oder `entfaellt` ausgeben.
       Prüfung (Netz): `b=$(sed -nE 's/^Bau: (ja|nein),.*/\1/p' docs/kunden/stufe-1-2026-11.md); [ "$b" = nein ] && echo entfaellt || { t=$(grep -oE '^Release: \S+' docs/paket/anleitung.md | cut -d' ' -f2); gh api "repos/matthiashippe/automaton/compare/${t:?}...main" --jq .status; }` muss `identical`, `ahead` oder `entfaellt` ausgeben.
       Prüfung (Netz): `b=$(sed -nE 's/^Bau: (ja|nein),.*/\1/p' docs/kunden/stufe-1-2026-11.md); [ "$b" = nein ] && echo entfaellt || { t=$(grep -oE '^Release: \S+' docs/paket/anleitung.md | cut -d' ' -f2); p=$(mktemp -d); PATH=/usr/bin:$PATH npm install -g --prefix "$p" "github:matthiashippe/automaton#${t:?}" >/dev/null 2>&1 && "$p/bin/automaton" --version | grep -c "${t#v}"; }` muss `1` oder `entfaellt` ausgeben.
-- [ ] Bei `Bau: ja` nennen `docs/paket/anleitung.md`, `README.md` und `MAINTAINED_RELEASE` das neue Release, und die Liste der
+- [x] Bei `Bau: ja` nennen `docs/paket/anleitung.md`, `README.md` und `MAINTAINED_RELEASE` das neue Release, und die Liste der
       Anleitung nennt jeden neuen Commit des Forks.
       MVP: Funktion, weil der Befehl zum Update in der 402 (kunden 17) und die Anleitung sonst auf das Release ohne Stufe 1 zeigen.
       Prüfung: `b=$(sed -nE 's/^Bau: (ja|nein),.*/\1/p' docs/kunden/stufe-1-2026-11.md); [ "$b" = nein ] && echo entfaellt || grep -cE '^Release: v0\.2\.2-maintained\.([4-9]|[1-9][0-9]+)$' docs/paket/anleitung.md` muss `1` oder `entfaellt` ausgeben.
       Prüfung: `t=$(grep -oE '^Release: \S+' docs/paket/anleitung.md | cut -d' ' -f2); grep -c "github:matthiashippe/automaton#${t:?}" docs/paket/anleitung.md README.md | grep -c ':[1-9]'` muss 2 ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/inference-maintained-update.test.ts` muss Exit-Code 0 haben.
       Prüfung (Netz): `b=$(sed -nE 's/^Bau: (ja|nein),.*/\1/p' docs/kunden/stufe-1-2026-11.md); [ "$b" = nein ] && echo entfaellt || { t=$(grep -oE '^Release: \S+' docs/paket/anleitung.md | cut -d' ' -f2); gh api "repos/matthiashippe/automaton/compare/v0.2.2-maintained.3...${t:?}" --jq '.commits[] | select(.parents | length == 1) | .sha[0:7]' | while read -r s; do grep -q "\`$s\`" docs/paket/anleitung.md || echo "$s"; done | wc -l; }` muss `0` oder `entfaellt` ausgeben.
-- [ ] Die Entscheidungen stehen in `goals/kunden/ANNAHMEN.md`, der Diff bleibt in den Pfaden dieses Goals, kein Test fällt weg.
+- [x] Die Entscheidungen stehen in `goals/kunden/ANNAHMEN.md`, der Diff bleibt in den Pfaden dieses Goals, kein Test fällt weg.
       MVP: Funktion, weil das nächste Glied wissen muss, warum die Stufe 1 nur gegen `automatonhost.com` gilt.
       Prüfung: `grep -cE '^- [0-9]{4}-[0-9]{2}-[0-9]{2}, kunden 18: ' goals/kunden/ANNAHMEN.md` muss mindestens 6 ausgeben.
-      Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD | grep -vE '^(src/inference/maintained\.ts|ops/usdc-bands\.sh|ops/usdc_bands\.py|ops/db-report\.cjs|test/usdc-bands\.test\.ts|docs/kunden/stufe-1-2026-11\.md|docs/paket/anleitung\.md|README\.md|goals/kunden/.*|goals/_vorschlaege/fehler-[0-9-]+\.md|goals/[a-z]+/ANNAHMEN\.md)$' | wc -l` muss 0 ausgeben.
+      Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD | grep -vE '^(src/inference/maintained\.ts|ops/usdc-bands\.sh|ops/usdc_bands\.py|ops/db-report\.cjs|test/usdc-bands\.test\.ts|test/inference-maintained-update\.test\.ts|docs/kunden/stufe-1-2026-11\.md|docs/paket/anleitung\.md|README\.md|goals/kunden/.*|goals/_vorschlaege/fehler-[0-9-]+\.md|goals/[a-z]+/ANNAHMEN\.md)$' | wc -l` muss 0 ausgeben.
       Prüfung: `git diff --diff-filter=D --name-only $(git merge-base origin/dev HEAD) HEAD -- test ops | wc -l` muss 0 ausgeben.
-- [ ] Der Job `e2e` am Kopf des Goal-PR ist grün.
+- [x] Der Job `e2e` am Kopf des Goal-PR ist grün.
       MVP: Funktion, weil sich mit `MAINTAINED_RELEASE` die 402 im Laufzeitpfad ändert und der code-host kein Docker hat.
       Prüfung (Netz): `gh pr checks $(gh pr list -R matthiashippe/control-plane --head goal/kunden-18 --state open --json number -q '.[0].number') -R matthiashippe/control-plane 2>&1 | grep -E '^e2e\s' | grep -c pass` muss genau 1 ausgeben.
-- [ ] `check` ist grün.
+- [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] Bei `Bau: ja` wählt die Aufladung nach der 402 einer Sandbox gegen jeden anderen Control Plane wie Upstream, auch wenn die
+      402 `details.topup_tiers_usd` nennt: die kleinste Stufe, die das Defizit deckt, und nichts, wenn die Wallet sie nicht hält;
+      Test im Fork, rot vor der Änderung, im neuen Release, und eine Zeile `- 2026-11-28, kunden 18: …` in
+      `goals/kunden/ANNAHMEN.md` ergänzt Entscheidung 5 (aus der Kritik, Tech Lead 2026-11-28).
+      MVP: Funktion, weil `topupForSandbox` am Tag `v0.2.2-maintained.4` über `offeredTiers || isCardHost(apiUrl)` schon bei
+      vorhandenem Feld `pickTopupTier` nimmt und gegen `api.conway.tech` mit 30 USDC und 100 USD Defizit 25 USD kauft, wo Upstream
+      nichts kauft; der Test „keeps the upstream tiers for another control plane“ schickt die 402 ohne das Feld und sieht das nicht,
+      und das Abnahmekriterium verlangt „wie vorher“.
+      Prüfung (Netz): `b=$(sed -nE 's/^Bau: (ja|nein),.*/\1/p' docs/kunden/stufe-1-2026-11.md); [ "$b" = nein ] && echo entfaellt || { t=$(grep -oE '^Release: \S+' docs/paket/anleitung.md | cut -d' ' -f2); d=$(mktemp -d); git clone -q --depth 1 --branch "${t:?}" https://github.com/matthiashippe/automaton "$d" && grep -cF '"keeps the upstream sandbox choice for another control plane when the 402 names tiers"' "$d/src/__tests__/topup-one-dollar.test.ts"; }` muss `1` oder `entfaellt` ausgeben.
+      Prüfung (Netz): `b=$(sed -nE 's/^Bau: (ja|nein),.*/\1/p' docs/kunden/stufe-1-2026-11.md); [ "$b" = nein ] && echo entfaellt || { t=$(grep -oE '^Release: \S+' docs/paket/anleitung.md | cut -d' ' -f2); d=$(mktemp -d); git clone -q --depth 1 --branch "${t:?}" https://github.com/matthiashippe/automaton "$d" && awk -v n='keeps the upstream sandbox choice for another control plane when the 402 names tiers' 'index($0,n){p=1;next} p&&/^  it\(/{p=0} p&&/apiUrl: CONWAY/{c++} p&&/topup_tiers_usd: \[5, 25, 100, 500, 1000, 2500\]/{t++} END{print (c>=1&&t>=1)?"stimmig":"unstimmig"}' "$d/src/__tests__/topup-one-dollar.test.ts"; }` muss `stimmig` oder `entfaellt` ausgeben.
+      Prüfung: `grep -cE '^- 2026-11-[0-9]{2}, kunden 18: .*topup_tiers_usd.*(Upstream|upstream)' goals/kunden/ANNAHMEN.md` muss mindestens 1 ausgeben.
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Kein Aufruf in der Produktion, der etwas anlegt oder bucht; gelesen wird nur über `ops/usdc-bands.sh`, `ops/access-log.sh`,
@@ -173,7 +184,9 @@ der Weg per Karte gebaut wurde.
 - `src/inference/maintained.ts`: nur der Wert von `MAINTAINED_RELEASE`; `src/**` sonst, `src/payments/**`, `src/auth/**`: unverändert
 - `ops/db-report.cjs`: nur ein neuer Bericht, die bestehenden bleiben Byte für Byte; `ops/**` sonst außer den neuen
   `ops/usdc-bands.sh` und `ops/usdc_bands.py`: unverändert
-- `test/**` außer dem neuen `test/usdc-bands.test.ts`: unverändert
+- `test/**` außer dem neuen `test/usdc-bands.test.ts`: unverändert; in `test/inference-maintained-update.test.ts` nur die feste
+  Kennung `"0.2.2-maintained.4"` in „keeps the 402 unchanged for the current maintained runtime“, ersetzt durch die Kennung eine
+  Nummer über `MAINTAINED_RELEASE` (Tech Lead 2026-11-28, Punkt 9)
 - `docs/paket/anleitung.md`: nur Zeile `Release:`, Installationsbefehl, die Zeilen mit `automaton --version` und Release-Seite und
   die Liste der Commits; `README.md` nur der Tag im Installationsbefehl
 - `ROADMAP.md`, `docs/kette.md`, `docs/richtung/**`, die übrigen Dateien unter `docs/kunden/`, bestehende Goal-Dateien und
@@ -193,5 +206,11 @@ der Weg per Karte gebaut wurde.
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-28 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6, 7, 8 gebaut: `ops/usdc-bands.sh` mit `ops/usdc_bands.py` und Bericht `CP_REPORT=topup-bands`, Messung in `docs/kunden/stufe-1-2026-11.md` (1 von 9 fremden Adressen hält 1 bis unter 5 USDC, `TIER 1 SOLD: yes`, also `Bau: ja`), im Fork PR #4 und Release `v0.2.2-maintained.4` (Commits `3d161a6`, `90ecb04`, `5416f3c`), Anleitung, README und `MAINTAINED_RELEASE` auf dem neuen Tag, 10 Zeilen in `goals/kunden/ANNAHMEN.md`. Rot vorher: Selbsttest und `test/usdc-bands.test.ts` ohne den Bericht `topup-bands` (7 von 11 Tests rot, Selbsttest FAILED), mit Grenzen `<=` statt `<` in `usdc_bands.py` (5 Zeilen FAIL), ohne Filter der eigenen Adressen und mit Stufe immer `yes` (2 Zeilen FAIL); im Fork alle sieben Fälle von `topup-one-dollar.test.ts` am unveränderten `main` rot (fehlende `pickTopupTier`, `UPSTREAM_TOPUP_TIERS`, kein Aufruf von `/pay/1/`), die Erweiterung um Restguthaben 400 bis 499 Cent rot vor `5416f3c` (expected 1 to be 5). Prüfbefehle: P1 `SELFTEST OK`, 26 Zeilen ok, 0 Adressen, vitest Exit 0; P2 stimmig, 4, stimmig, 0, diff leer; P3 1, 0, 1, gruen; P4 `v0.2.2-maintained.4`, ahead, identical, 1; P5 1, 2, Exit 0, 0; P6 10, 0, 0; P7 e2e pass am Kopf `948d3f0`; P8 `check` Exit 0 (2975 Tests). Mitgezogen: von 169 Prüfbefehlen ohne Netz fertiger Goals zu diesen Dateien ändert sich außer den Umfangsprüfungen fremder Branches nur kunden 15 (`Release:` der Anleitung gleich `docs/kunden/kartenweg-2026-11.md`), Frage an den Tech Lead auf dem Topic.
+- 2026-11-28 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, 7, 8, am Kopf `6b42ff4` mit `dev` (`0eb3818`) enthalten; Frage zu kunden 15 vom Tech Lead entschieden (Zeile `Abgelöst:` in `goals/kunden/ANNAHMEN.md`, Kartenweg unverändert), neue Prüfung `gleich` am Kopf und `verschieden` mit gepflanztem `Release: v0.2.2-maintained.4`. Prüfbefehle: P1 `SELFTEST OK`, 26, 0, Exit 0; P2 stimmig, 4, stimmig, 0, diff leer; P3 1, 0, 1, gruen am Tag `v0.2.2-maintained.4`; P4 `v0.2.2-maintained.4`, ahead, identical, 1; P5 1, 2, Exit 0, 0; P6 10, 0, 0; P7 1 (e2e pass am Kopf `6b42ff4`, Run 46090189494); P8 `check` Exit 0.
+- 2026-11-28 Zyklus 3: Punkt 9 im Fork gebaut, Fix `e354ac9` (gegen jeden anderen Control Plane liest `topupForSandbox` `details.topup_tiers_usd` nicht und wählt wie Upstream), PR #5 nach grüner CI gemergt (`82ad4e8`), Tag und Release `v0.2.2-maintained.5` (`970d683`), Zeile in `goals/kunden/ANNAHMEN.md`; Anleitung, README und `MAINTAINED_RELEASE` bleiben auf `v0.2.2-maintained.4`, weil `test/inference-maintained-update.test.ts:119` (kunden 17, für mich unveränderlich) `0.2.2-maintained.4` fest als nicht ältere Kennung erwartet und mit `.5` rot wird, Frage an den Tech Lead auf dem Topic. Rot vorher: der neue Test „keeps the upstream sandbox choice for another control plane when the 402 names tiers“ am Fork-`main` `1e77f01` (expected amountUsd 25 to be null). Prüfbefehle: P9 (Netz) am Tag `.4` aus der Anleitung 0 und unstimmig, am Tag `.5` 1 und stimmig; P9c 1; Fork am Tag `.5` typecheck, build, 1699 Tests grün; P1 bis P6 wie Zyklus 2 (P6a 11); P5c mit `.5` hier 1 failed von 7, mit `.4` Exit 0.
+- 2026-11-28 Zyklus 4: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, 7, 8, 9: Anleitung (Zeilen für `e354ac9` und `970d683`), README und `MAINTAINED_RELEASE` auf `v0.2.2-maintained.5`, die neuere Kennung in `test/inference-maintained-update.test.ts:119` folgt `MAINTAINED_RELEASE` (Entscheidung Tech Lead 7). Rot vorher: dieser Test mit `.5` und fester Kennung `.4` (1 failed von 7), nach der Änderung rot mit gepflanztem `n !== RELEASED` in `isOlderMaintained` (1 failed von 7), sonst Exit 0. Mitgezogen: 124 Prüfbefehle ohne Netz fertiger Goals zu diesen Dateien an `281f07e` und `07eec4f`, abweichend nur zwei Laufzeitangaben und zwei Umfangsprüfungen fremder Branches. Prüfbefehle: P1 `SELFTEST OK`, 26, 0, Exit 0; P2 stimmig, 4, stimmig, 0, diff leer; P3 1, 0, 1, gruen am Tag `.5`; P4 `v0.2.2-maintained.5`, ahead, identical, 1; P5 1, 2, Exit 0, 0; P6 12, 0, 0; P7 e2e pass am Kopf `07eec4f` (Run 46092820293); P8 `check` Exit 0; P9 1, stimmig, 1; kunden 15 abgelöst `gleich`.
+- 2026-11-28 Zyklus 5: Abschluss gemeldet, Punkte 1 bis 9, Befund K aus Zyklus 4 behoben: `ops/usdc_bands.py` fragt einen RPC auf Loopback ohne Proxy (`ProxyHandler({})`), jeder andere RPC behält die Proxy-Einstellung, und `test/usdc-bands.test.ts` fährt den Selbsttest mit totem Proxy auf einem Port, den das System vergibt. Rot vorher: der neue Test „passes with a dead proxy set, because the planted RPC is on loopback“ ohne den Fix (`SELFTEST FAILED`, 1 failed von 12), mit Sperre ohne Fix 8 Zeilen `ok` und `SELFTEST FAILED`. Prüfbefehle: P1 mit und ohne Proxy-Sperre `SELFTEST OK`, 26, 0, Exit 0; P2 diff gegen die Produktion leer, Zeile `USDC BANDS` gleich dem Dokument; P5c Exit 0 mit Sperre; P8 `check` Exit 0; P7 `e2e` am Kopf dieses Commits steht im Kommentar auf dem Topic; P2 bis P6 und P9 sonst unverändert seit Zyklus 4.
+- 2026-11-28 Release: PASS K und B (Zyklus 5), DONE.
 
 ## Blockers

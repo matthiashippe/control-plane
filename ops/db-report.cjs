@@ -743,6 +743,50 @@ if (process.env.CP_REPORT === "sandbox-customer") {
   process.exit(0);
 }
 
+// CP_REPORT=topup-bands (goals/kunden/18): instead of the report, one JSON for ops/usdc-bands.sh: every foreign
+// address with a `grant` or `topup` ledger row in the window CP_SINCE..CP_UNTIL (ISO UTC, CP_UNTIL empty means now),
+// lowercase and each once, and the number of foreign `topup` rows of exactly 1 USD (100000 mc) in the window.
+// The addresses are needed to read their USDC on Base; ops/usdc-bands.sh keeps them in a temp file of mode 0600,
+// deletes it and prints counts only. Written synchronously and ended here, like the decline block.
+if (process.env.CP_REPORT === "topup-bands") {
+  const fail = (msg) => {
+    require("fs").writeSync(2, `db-report: ${msg}\n`);
+    process.exit(1);
+  };
+  const iso = (name, fallback) => {
+    const raw = process.env[name];
+    if (!raw) return fallback;
+    const t = Date.parse(raw);
+    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/.test(raw) || Number.isNaN(t)) fail(`${name} is no ISO time in UTC`);
+    return new Date(t).toISOString();
+  };
+  const since = iso("CP_SINCE", new Date(0).toISOString());
+  const until = iso("CP_UNTIL", new Date().toISOString());
+  if (until <= since) fail("CP_UNTIL is not after CP_SINCE");
+  const ONE_USD_MC = 100000;
+  const addresses = all(
+    `select distinct lower(address) address from ledger
+      where kind in ('grant', 'topup') and created_at >= ? and created_at < ? and ${notOurs}
+      order by 1`,
+    since, until, ...OURS_ARGS,
+  ).map((r) => r.address);
+  const topups1Usd = one(
+    `select count(*) n from ledger
+      where kind = 'topup' and delta_mc = ? and created_at >= ? and created_at < ? and ${notOurs}`,
+    ONE_USD_MC, since, until, ...OURS_ARGS,
+  ).n;
+  // writeSync may write part of the buffer to a pipe, or meet EAGAIN on a non-blocking one.
+  const out = Buffer.from(JSON.stringify({ since, until, addresses, topups_1usd: topups1Usd }) + "\n");
+  for (let off = 0; off < out.length; ) {
+    try {
+      off += require("fs").writeSync(1, out, off, out.length - off);
+    } catch (e) {
+      if (e.code !== "EAGAIN") throw e;
+    }
+  }
+  process.exit(0);
+}
+
 // The same test against a column that is not ledger.address.
 //
 // oursClause names ledger.address, so it only works inside a query on the ledger. The one number
