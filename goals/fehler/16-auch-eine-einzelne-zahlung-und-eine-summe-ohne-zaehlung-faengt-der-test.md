@@ -126,6 +126,7 @@ MVP: Funktion, weil das Repo öffentlich ist und ein Betrag je Kunde, den der Te
 
 ## Progress Log
 - 2026-11-28 Zyklus 1: Punkte 1, 2, 3, 4 und 5 gebaut: `test/no-customer-revenue.test.ts` meldet einen Betrag hinter „eine (fremde) Zahlung über“ (`SINGLE_BEFORE`) und hinter „Summe aller …: “ ohne Zählung ab 3 bis zum nächsten Punkt, Semikolon oder Tabellenstrich (`TOTAL_BEFORE`, `TOTAL_COUNT`), kunden 02 Zeile 8 und der Vorschlag vom 27.11. Zeile 13 maskiert, `goals/RISIKEN.md` und `goals/fehler/ANNAHMEN.md` nachgezogen. Rot gesehen: die neuen Erwartungen mit den alten Regeln (2 von 16 rot); Gegenprobe je Regel: ohne die Regel für „eine Zahlung über“, ohne die Meldung der Summe ohne Zählung, mit einer Zählung ab 1 und mit einer Zählung ohne Grenze am Satzende wird je ein neuer Fall rot, ohne erkannte Zählung dazu `ROADMAP.md:19`; ohne die Maske meldet der Test `goals/kunden/02-wer-bei-conway-noch-zahlt.md:6`. Die Prüfungen von fehler 14 ohne Netz geben vor und nach dem Bau dieselben Werte aus. Prüfbefehle: P1 vitest Exit 0 (16 von 16), nichts fehlt, 11; P2 0, 1, `klein`; P3 0, 2, `klein`, 1; P4 6, 0, 0; P5 `check` Exit 0 (2979 von 2979, 212 s).
+- 2026-11-28 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4 und 5, `dev` am Kopf `5baa0cc` ohne neuen Commit gegenüber der Merge-Basis, kein Merge nötig. Prüfbefehle: P1 vitest Exit 0 (16 von 16), nichts fehlt, 11; P2 0, 1, `klein`; P3 0, 2, `klein`, 1; P4 6, 0, 0; P5 `check` Exit 0 (2979 von 2979, 169 s).
 
 ## Blockers
 - keine
