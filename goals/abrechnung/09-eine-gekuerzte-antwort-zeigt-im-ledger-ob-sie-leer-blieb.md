@@ -67,7 +67,7 @@ Messung das zeigt.
       Prüfung: `grep -cE '^- [0-9]{4}-[0-9]{2}-[0-9]{2}, abrechnung 09: ' goals/abrechnung/ANNAHMEN.md` muss mindestens 3 ausgeben.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD | grep -vE '^(src/inference/proxy\.ts|test/inference-shortened-empty\.test\.ts|goals/abrechnung/.*|goals/[a-z]+/ANNAHMEN\.md)$' | wc -l` muss 0 ausgeben.
       Prüfung: `git diff --diff-filter=D --name-only $(git merge-base origin/dev HEAD) HEAD -- test | wc -l` muss 0 ausgeben.
-- [ ] Der Job `e2e` am Kopf des Goal-PR ist grün.
+- [x] Der Job `e2e` am Kopf des Goal-PR ist grün.
       MVP: Funktion, weil sich die Ledger-Zeile im Laufzeitpfad der Inferenz ändert und der code-host kein Docker hat.
       Prüfung (Netz): `gh pr checks $(gh pr list -R matthiashippe/control-plane --head goal/abrechnung-09 --state open --json number -q '.[0].number') -R matthiashippe/control-plane 2>&1 | grep -E '^e2e\s' | grep -c pass` muss genau 1 ausgeben.
 - [x] `check` ist grün.
@@ -96,7 +96,7 @@ Messung das zeigt.
 - max Versuche pro Gap: 3
 
 ## Progress Log
-- 2026-11-28 Zyklus 1: Punkte 1, 2 und 4 gebaut, `shortened_finish` und `shortened_empty` nur in der `meta` gekürzter Antworten, die fünf Fälle in `test/inference-shortened-empty.test.ts` vor der Änderung alle rot (`expected undefined to be true`, `expected undefined to be false`, `expected undefined to be 'length'`, Schlüsselliste mit 12 statt 14 Einträgen), Entscheidungen und Nachzug in `goals/abrechnung/ANNAHMEN.md`. Prüfbefehle: vitest der beiden Dateien Exit 0 (13 passed), Testnamen nichts fehlt, `grep -c` in proxy.ts 2, Diff von `test/inference-shortened.test.ts` 0, ANNAHMEN-Zeilen 5, Pfade außerhalb 0, gelöschte Tests 0, `node scripts/check.mjs` Exit 0 (290 Dateien, 2989 Tests); Punkt 3 (e2e am PR) folgt nach dem Push.
+- 2026-11-28 Zyklus 1: Punkte 1, 2, 3 und 4 gebaut, `shortened_finish` und `shortened_empty` nur in der `meta` gekürzter Antworten, die fünf Fälle in `test/inference-shortened-empty.test.ts` vor der Änderung alle rot (`expected undefined to be true`, `expected undefined to be false`, `expected undefined to be 'length'`, Schlüsselliste mit 12 statt 14 Einträgen), Entscheidungen und Nachzug in `goals/abrechnung/ANNAHMEN.md`. Prüfbefehle: vitest der beiden Dateien Exit 0 (13 passed), Testnamen nichts fehlt, `grep -c` in proxy.ts 2, Diff von `test/inference-shortened.test.ts` 0, ANNAHMEN-Zeilen 5, Pfade außerhalb 0, gelöschte Tests 0, `node scripts/check.mjs` Exit 0 (290 Dateien, 2989 Tests), Job `e2e` an PR #502 am Kopf e847287 pass (`E2E OK turns=5 registered=true api_errors=0 ledger_consistent=true`), `gh pr checks` zählt 1.
 
 ## Blockers
 - keine
