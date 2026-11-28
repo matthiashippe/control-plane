@@ -124,6 +124,7 @@ und der Richtungs-Check (spätestens 04.12.) sonst auf einer falschen Null entsc
 
 ## Progress Log
 - 2026-11-28 Zyklus 1: Punkte 1, 2, 3, 4 gebaut: `CP_REPORT=topup-bands` zählt `meta.usd` 1 oder ohne `meta.usd` 100000 mc (gegen den Bericht von `71202a7` 6 von 14 Tests rot, Selbsttest 3 FAIL), Messung am 2026-11-28T13:05:16Z in `docs/kunden/nach-dem-update-2026-11.md` (1000 Antworten 402 nur an `0.2.2-maintained.1`, 0 Aufladungen der Stufe 1, Korrektur seit 06.11. bleibt 0), 9 Zeilen kunden 19 in `ANNAHMEN.md`, die 45 mitziehenden Prüfbefehle vor und nach dem Bau wie erwartet. Prüfbefehle: vitest usdc-bands Exit 0 (14 passed); Selbsttest `SELFTEST OK`; `101000` im Test 8, im Skript 6; `json_extract(meta, '$.usd')` 2 (GNU grep); Punkt 2 `stimmig`, 3, `stimmig`, 0, Netz-diff leer; Punkt 3 9, 0, 0; `check` Exit 0 (3000 passed).
+- 2026-11-28 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, `dev` (`71202a7`) war schon im Branch, jeder Prüfbefehl am Kopf `39fc0b2` erneut gefahren. Prüfbefehle: vitest usdc-bands Exit 0 (14 passed); Selbsttest `SELFTEST OK`; `101000` im Test 8, im Skript 6; `json_extract(meta, '$.usd')` 2 mit `/usr/bin/grep` (die `grep`-Funktion der Claude-Shell ist ugrep, liest `$` als Anker und zählt 0); Punkt 2 `stimmig`, 3, `stimmig`, 0, Netz-diff leer (`--until 2026-11-28T13:05:16Z`); Punkt 3 9, 0, 0; `check` Exit 0 (3000 passed, 158 s).
 
 ## Blockers
 - keine
