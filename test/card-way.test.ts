@@ -10,6 +10,7 @@ import {
   CARD_BREAKER_SHORTFALL_MC,
   CARD_BREAKER_WINDOW_DAYS,
   cardBreaker,
+  cardClosedFor,
   cardLink,
   cardRedirect,
   cardUrlFor,
@@ -132,5 +133,44 @@ describe("the links", () => {
     expect(cardUrlFor(db, A, NOW)).toBeNull();
     expect(cardRedirect(db, "5", A, NOW)).toEqual({ kind: "paused", topupUrl: `https://automatonhost.com/pay/5/${A}` });
     expect(cardUrlFor(db, A, new Date(NOW.getTime() + 61 * DAY))).toBe(`https://automatonhost.com/card/5?address=${A}`);
+  });
+});
+
+describe("the one rule for the card checkout", () => {
+  // goals/wache/04: every page, link, redirect and IPN asks only cardClosedFor, so each reason is one case here.
+  it("names the breaker first", () => {
+    order({ address: A, shortfallMc: CARD_BREAKER_SHORTFALL_MC });
+    expect(cardClosedFor(db, A, NOW, { intakeClosed: true })).toBe("card breaker on");
+    expect(cardClosedFor(db, null, NOW, { intakeClosed: false })).toBe("card breaker on");
+  });
+
+  it("names a refund of the wallet, and only with a wallet", () => {
+    order({ address: A });
+    expect(cardClosedFor(db, A, NOW, { intakeClosed: true })).toBe("wallet had a refund");
+    expect(cardClosedFor(db, A.toUpperCase().replace("0X", "0x"), NOW, { intakeClosed: false })).toBe("wallet had a refund");
+    expect(cardClosedFor(db, null, NOW, { intakeClosed: false })).toBeNull();
+    expect(cardClosedFor(db, B, NOW, { intakeClosed: false })).toBeNull();
+    // The 402 names no card link that /card/<package> would pause anyway.
+    expect(cardUrlFor(db, A, NOW)).toBeNull();
+    expect(cardUrlFor(db, B, NOW)).toBe(`https://automatonhost.com/card/5?address=${B}`);
+  });
+
+  it("names the sunset when credits are no longer sold", () => {
+    expect(cardClosedFor(db, A, NOW, { intakeClosed: true })).toBe("credits no longer sold");
+    expect(cardClosedFor(db, null, NOW, { intakeClosed: true })).toBe("credits no longer sold");
+    expect(cardRedirect(db, "5", A, NOW, { intakeClosed: true })).toEqual({
+      kind: "paused",
+      topupUrl: `https://automatonhost.com/pay/5/${A}`,
+    });
+    // The 402 has its own text after the sunset, so card_url asks without it.
+    expect(cardUrlFor(db, A, NOW)).toBe(`https://automatonhost.com/card/5?address=${A}`);
+  });
+
+  it("reports no reason while the checkout is open", () => {
+    order({ address: A, mode: "test" });
+    order({ address: B, status: "booked" });
+    order({ shortfallMc: CARD_BREAKER_SHORTFALL_MC, at: new Date(NOW.getTime() - (CARD_BREAKER_WINDOW_DAYS + 1) * DAY) });
+    for (const address of [A, B, null]) expect(cardClosedFor(db, address, NOW, { intakeClosed: false })).toBeNull();
+    expect(cardRedirect(db, "5", A, NOW, { intakeClosed: false }).kind).toBe("checkout");
   });
 });

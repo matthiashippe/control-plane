@@ -2,6 +2,9 @@
  * Start page and 402 under the card breaker (goals/wache/01): both take the way to the card checkout only from
  * src/payments/card-way.ts and drop it while the breaker is on. Against createApp and handleChat with an in-memory database,
  * the refunds stamped with the current time because the 402 reads the clock. No network, no port.
+ *
+ * After the sunset (goals/wache/04) the card checkout is closed for the same rule `cardClosedFor`: start page, error pages and
+ * `/card/<package>` answer byte for byte as under the breaker, and a paid order is held without credit.
  */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { privateKeyToAccount, generatePrivateKey } from "viem/accounts";
@@ -10,7 +13,9 @@ import { openDb, type Db } from "../src/db.js";
 import { MockProvider, MOCK_MODEL } from "../src/inference/mock.js";
 import { Catalog, handleChat } from "../src/inference/proxy.js";
 import { claimStarter } from "../src/credits/starter.js";
+import { OpenRouterProvider } from "../src/inference/openrouter.js";
 import { CARD_BREAKER_SHORTFALL_MC, cardRedirect } from "../src/payments/card-way.js";
+import { CARD_PACKAGES, signFields } from "../src/payments/digistore.js";
 import { ERROR_PAGES } from "../src/public/error-pages.js";
 
 const OTHER = "0x" + "ef".repeat(20);
@@ -167,5 +172,135 @@ describe("the 402 under the card breaker", () => {
     expect((body as { message_for_operator?: string }).message_for_operator).toBe(
       `Top up this automaton with USDC on Base at ${topupUrl}`,
     );
+  });
+});
+
+// The sunset as in test/inference-sunset.test.ts: OpenRouter may not be sold (`resale: false`) and the sunset lies before `now`.
+const SUNSET = new Date("2026-10-17T00:00:00Z");
+const AFTER = () => new Date(SUNSET.getTime() + 1000);
+const MODELS_BODY = {
+  data: [{ id: "openai/gpt-5-mini", context_length: 400000, pricing: { prompt: "0.00000025", completion: "0.000002" } }],
+};
+const PASS = "test-passphrase-wache-04";
+const A = "0x" + "ab".repeat(20);
+
+async function sunsetCatalog() {
+  const provider = new OpenRouterProvider({
+    apiKey: "sk-or-v1-test",
+    models: ["openai/gpt-5-mini"],
+    fetch: (async () =>
+      new Response(JSON.stringify(MODELS_BODY), { status: 200, headers: { "content-type": "application/json" } })) as typeof fetch,
+    priceRefreshMs: 0,
+    baseUrl: "https://openrouter.ai/api/v1",
+    resale: false,
+  });
+  await provider.init();
+  return new Catalog([provider], provider.defaultAliases());
+}
+
+async function sunsetApp(db: Db, digistore?: Parameters<typeof createApp>[0]["digistore"]) {
+  return createApp({ db, catalog: await sunsetCatalog(), inferenceSunsetAt: SUNSET, now: AFTER, rateLimit: null, digistore });
+}
+
+/** The same path under the breaker, the state of goals/wache/01 the sunset has to look like. */
+async function underBreaker(path: string) {
+  const db = openDb(":memory:");
+  tripBreaker(db);
+  return createApp({ db, rateLimit: null }).request(path);
+}
+
+describe("the card checkout after the sunset", () => {
+  it("hides the card on the landing page after the sunset", async () => {
+    const res = await (await sunsetApp(openDb(":memory:"))).request("/");
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).not.toContain('id="card"');
+    expect(html).not.toContain('href="#card"');
+    expect(html).not.toContain("/card/5");
+    expect(html).not.toContain("checkout-ds24");
+    expect(html).not.toMatch(/<!--\/?CARD-->/);
+    // Byte for byte the page under the breaker, so the sunset is no new state of the page.
+    expect(html).toBe(await (await underBreaker("/")).text());
+  });
+
+  it("hides the card on error pages after the sunset", async () => {
+    expect(ERROR_PAGES.length).toBeGreaterThan(1);
+    const app = await sunsetApp(openDb(":memory:"));
+    for (const p of ERROR_PAGES) {
+      const path = `/errors/${p.slug}`;
+      const res = await app.request(path);
+      expect(res.status, path).toBe(200);
+      const html = await res.text();
+      expect(html, path).not.toContain('href="/#card"');
+      expect(html, path).not.toContain("No crypto needed");
+      expect(html, path).not.toContain("/video/move.mp4");
+      expect(html, path).toBe(await (await underBreaker(path)).text());
+    }
+  });
+
+  it("pauses /card/:package after the sunset", async () => {
+    const app = await sunsetApp(openDb(":memory:"));
+    for (const pkg of CARD_PACKAGES) {
+      const path = `/card/${pkg.grossEurCents / 100}?address=${A}`;
+      const res = await app.request(path);
+      expect(res.status, path).toBe(200);
+      expect(res.headers.get("location"), path).toBeNull();
+      const body = await res.text();
+      expect(body, path).toContain("Card payment is paused.");
+      expect(body, path).toContain(`https://automatonhost.com/pay/5/${A}`);
+      expect(body, path).not.toContain("checkout-ds24");
+      // The same answer as under the breaker, so nobody learns which reason holds.
+      expect(body, path).toBe(await (await underBreaker(path)).text());
+    }
+  });
+
+  it("holds a card order paid after the sunset", async () => {
+    const lines: string[] = [];
+    let ecbCalls = 0;
+    const ecb = (async () => {
+      ecbCalls++;
+      return new Response(
+        "<Cube><Cube time='2026-11-20'><Cube currency='USD' rate='1.0512'/></Cube></Cube>",
+        { status: 200 },
+      );
+    }) as typeof fetch;
+    const deps = { passphrase: PASS, fetch: ecb, now: AFTER, log: (l: string) => lines.push(l) };
+    const address = privateKeyToAccount(generatePrivateKey()).address;
+    const fields = (orderId: string) => {
+      const f: Record<string, string> = {
+        event: "on_payment",
+        api_mode: "live",
+        order_id: orderId,
+        order_date: "2026-11-20",
+        product_id: CARD_PACKAGES[0].productId,
+        currency: "EUR",
+        amount_vendor: "4.06",
+        transaction_type: "payment",
+        custom: address,
+      };
+      return new URLSearchParams({ ...f, sha_sign: signFields(f, PASS) }).toString();
+    };
+    const post = (app: ReturnType<typeof createApp>, orderId: string) =>
+      app.request("/pay/digistore", {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: fields(orderId),
+      });
+
+    const db = openDb(":memory:");
+    const res = await post(await sunsetApp(db, deps), "SUNSET1");
+    expect(res.status).toBe(200);
+    expect(await res.text()).toBe("OK");
+    const row = db.prepare("SELECT status, credited_mc FROM card_orders WHERE order_id = 'SUNSET1'").get();
+    expect(row).toEqual({ status: "held", credited_mc: 0 });
+    expect(db.prepare("SELECT COUNT(*) AS n FROM ledger").get()).toEqual({ n: 0 });
+    expect(ecbCalls).toBe(0);
+    expect(lines).toContain("[digistore] order SUNSET1 held: credits no longer sold");
+    expect(lines.join("\n").toLowerCase()).not.toContain(address.toLowerCase());
+
+    // The same order before the sunset is no question of the rule: without a reason it is booked.
+    const open = openDb(":memory:");
+    await post(createApp({ db: open, rateLimit: null, digistore: deps }), "OPEN1");
+    expect(open.prepare("SELECT status FROM card_orders WHERE order_id = 'OPEN1'").get()).toEqual({ status: "booked" });
   });
 });

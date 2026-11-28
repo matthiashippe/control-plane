@@ -56,7 +56,7 @@ import {
 } from "./checkout/deliver.js";
 import { converse, ConversationError, findOffer, MAX_QUESTIONS } from "./checkout/conversation.js";
 import { stripeFromEnv } from "./payments/stripe.js";
-import { cardBreaker, cardRedirect, packageKey, stripCardWay } from "./payments/card-way.js";
+import { cardClosedFor, cardRedirect, packageKey, stripCardWay } from "./payments/card-way.js";
 import { isStripeTestKey } from "./payments/stripe-key.js";
 import { germanFrame } from "./public/frame.de.js";
 import { wallets, agentsPerBounty, marketSplit } from "./bounties/ours.js";
@@ -1191,8 +1191,8 @@ export function createApp(opts: AppOptions) {
         404,
       );
     }
-    // The card line of goals/werbung/01 is gone while the card breaker of goals/wache/01 is on.
-    return c.html(page(renderErrorPage(p, !cardBreaker(db, (opts.now ?? (() => new Date()))()).on), p.title, p.description, `/errors/${p.slug}`));
+    // The card line of goals/werbung/01 is gone while the card checkout is closed (goals/wache/01, goals/wache/04).
+    return c.html(page(renderErrorPage(p, cardClosedFor(db, null, clock(), { intakeClosed }) === null), p.title, p.description, `/errors/${p.slug}`));
   });
 
   /**
@@ -1819,10 +1819,10 @@ export function createApp(opts: AppOptions) {
     // arrived from Conway issue #376 with a German browser, read this page to its last depth
     // mark, and read it in English while /check had been answering in German since that morning.
     const landingLang = langOf("", c.req.header("accept-language"));
-    // The card block (goals/wache/01): gone while the breaker is on, so the page names no way to the checkout then.
-    // goals/werbung/01: the text of the first screen that says "No crypto needed" sits between the same marks, and the text of
-    // the first screen of wache 01 between `<!--NOCARD-->` and `<!--/NOCARD-->` takes its place while the breaker is on.
-    const breakerOn = cardBreaker(db, (opts.now ?? (() => new Date()))()).on;
+    // The card block (goals/wache/01): gone while the card checkout is closed (breaker or sunset, goals/wache/04), so the page names
+    // no way to the checkout then. goals/werbung/01: the text of the first screen that says "No crypto needed" sits between the same
+    // marks, and the text of the first screen of wache 01 between `<!--NOCARD-->` and `<!--/NOCARD-->` takes its place then.
+    const cardClosed = cardClosedFor(db, null, clock(), { intakeClosed }) !== null;
     return c.html(
       keepNoCardWay(
       stripCardWay(
@@ -1863,23 +1863,23 @@ export function createApp(opts: AppOptions) {
       ),
       landingLang,
     ),
-      breakerOn,
+      cardClosed,
     ),
-      breakerOn,
+      cardClosed,
     ),
     );
   });
 
   /**
-   * The one way to the card checkout (goals/wache/01). Open checkout: 302 to Digistore24 with the wallet in `custom`. Breaker on
-   * or a wallet that had a refund: the same sentence with the way over USDC, so nobody learns which of the two holds. Without a
+   * The one way to the card checkout (goals/wache/01). Open checkout: 302 to Digistore24 with the wallet in `custom`. Any reason of
+   * cardClosedFor (breaker, refund, sunset): the same sentence with the way over USDC, so nobody learns which one holds. Without a
    * usable address a form asks for it with 200, because a 4xx here would count as an error of a real user. Never cached, never
    * indexed, because the answer changes with the breaker.
    */
   app.get("/card/:package", (c) => {
     c.header("Cache-Control", "no-store");
     c.header("X-Robots-Tag", "noindex");
-    const way = cardRedirect(db, c.req.param("package"), c.req.query("address"), (opts.now ?? (() => new Date()))());
+    const way = cardRedirect(db, c.req.param("package"), c.req.query("address"), clock(), { intakeClosed });
     if (way.kind === "unknown_package") return c.text("Not found", 404);
     if (way.kind === "checkout") return c.redirect(way.url, 302);
     const head =
@@ -2550,9 +2550,8 @@ export function createApp(opts: AppOptions) {
    */
   for (const path of ["/docs", "/docs/"]) app.get(path, (c) => c.redirect(`${siteOrigin()}/llms.txt`, 302));
 
-  // goals/fehler/13: the sentences /llms.txt and /pricing share, each written once, and the one rule for the card on both.
-  // Closed topups sell nothing an automaton can still use for inference, so neither page names the card then.
-  const cardOpenNow = () => !intakeClosed && !cardBreaker(db, clock()).on;
+  // goals/fehler/13: the sentences /llms.txt and /pricing share, each written once; the card on both follows cardClosedFor.
+  const cardOpenNow = () => cardClosedFor(db, null, clock(), { intakeClosed }) === null;
   const NO_CREDITS_SOLD = "Credits are no longer sold here.";
   const inferenceBilled = () => "billed at purchase cost times " + MARKUP + ".";
   const topupTiersLine = (tiers: readonly number[]) => "Topup tiers in USD: " + tiers.join(", ") + ".";
@@ -2654,6 +2653,7 @@ export function createApp(opts: AppOptions) {
   // amount. GET is what Digistore24 asks before it saves the IPN connection: 200 and nothing else.
   const digistoreDeps: DigistoreDeps = {
     passphrase: process.env.CP_DIGISTORE_IPN_PASSPHRASE,
+    now: clock, intakeClosed: () => intakeClosed, // goals/wache/04: the same clock and the same sunset as the pages.
     ...(opts.digistore ?? {}),
     ...(opts.digistore === null ? { passphrase: null } : {}),
   };
