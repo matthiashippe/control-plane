@@ -1,7 +1,7 @@
 # Kunden Goal 18: Die gepflegte Runtime lädt ab 1 USD auf
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Beide fremden Zahler, deren Abgang gemessen ist (`docs/kunden/aufladung-2026-11.md`, Ergebnis;
@@ -167,7 +167,7 @@ der Weg per Karte gebaut wurde.
       Prüfung (Netz): `b=$(sed -nE 's/^Bau: (ja|nein),.*/\1/p' docs/kunden/stufe-1-2026-11.md); [ "$b" = nein ] && echo entfaellt || { t=$(grep -oE '^Release: \S+' docs/paket/anleitung.md | cut -d' ' -f2); d=$(mktemp -d); git clone -q --depth 1 --branch "${t:?}" https://github.com/matthiashippe/automaton "$d" && grep -cF '"keeps the upstream sandbox choice for another control plane when the 402 names tiers"' "$d/src/__tests__/topup-one-dollar.test.ts"; }` muss `1` oder `entfaellt` ausgeben.
       Prüfung (Netz): `b=$(sed -nE 's/^Bau: (ja|nein),.*/\1/p' docs/kunden/stufe-1-2026-11.md); [ "$b" = nein ] && echo entfaellt || { t=$(grep -oE '^Release: \S+' docs/paket/anleitung.md | cut -d' ' -f2); d=$(mktemp -d); git clone -q --depth 1 --branch "${t:?}" https://github.com/matthiashippe/automaton "$d" && awk -v n='keeps the upstream sandbox choice for another control plane when the 402 names tiers' 'index($0,n){p=1;next} p&&/^  it\(/{p=0} p&&/apiUrl: CONWAY/{c++} p&&/topup_tiers_usd: \[5, 25, 100, 500, 1000, 2500\]/{t++} END{print (c>=1&&t>=1)?"stimmig":"unstimmig"}' "$d/src/__tests__/topup-one-dollar.test.ts"; }` muss `stimmig` oder `entfaellt` ausgeben.
       Prüfung: `grep -cE '^- 2026-11-[0-9]{2}, kunden 18: .*topup_tiers_usd.*(Upstream|upstream)' goals/kunden/ANNAHMEN.md` muss mindestens 1 ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Kein Aufruf in der Produktion, der etwas anlegt oder bucht; gelesen wird nur über `ops/usdc-bands.sh`, `ops/access-log.sh`,
@@ -211,5 +211,6 @@ der Weg per Karte gebaut wurde.
 - 2026-11-28 Zyklus 3: Punkt 9 im Fork gebaut, Fix `e354ac9` (gegen jeden anderen Control Plane liest `topupForSandbox` `details.topup_tiers_usd` nicht und wählt wie Upstream), PR #5 nach grüner CI gemergt (`82ad4e8`), Tag und Release `v0.2.2-maintained.5` (`970d683`), Zeile in `goals/kunden/ANNAHMEN.md`; Anleitung, README und `MAINTAINED_RELEASE` bleiben auf `v0.2.2-maintained.4`, weil `test/inference-maintained-update.test.ts:119` (kunden 17, für mich unveränderlich) `0.2.2-maintained.4` fest als nicht ältere Kennung erwartet und mit `.5` rot wird, Frage an den Tech Lead auf dem Topic. Rot vorher: der neue Test „keeps the upstream sandbox choice for another control plane when the 402 names tiers“ am Fork-`main` `1e77f01` (expected amountUsd 25 to be null). Prüfbefehle: P9 (Netz) am Tag `.4` aus der Anleitung 0 und unstimmig, am Tag `.5` 1 und stimmig; P9c 1; Fork am Tag `.5` typecheck, build, 1699 Tests grün; P1 bis P6 wie Zyklus 2 (P6a 11); P5c mit `.5` hier 1 failed von 7, mit `.4` Exit 0.
 - 2026-11-28 Zyklus 4: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, 7, 8, 9: Anleitung (Zeilen für `e354ac9` und `970d683`), README und `MAINTAINED_RELEASE` auf `v0.2.2-maintained.5`, die neuere Kennung in `test/inference-maintained-update.test.ts:119` folgt `MAINTAINED_RELEASE` (Entscheidung Tech Lead 7). Rot vorher: dieser Test mit `.5` und fester Kennung `.4` (1 failed von 7), nach der Änderung rot mit gepflanztem `n !== RELEASED` in `isOlderMaintained` (1 failed von 7), sonst Exit 0. Mitgezogen: 124 Prüfbefehle ohne Netz fertiger Goals zu diesen Dateien an `281f07e` und `07eec4f`, abweichend nur zwei Laufzeitangaben und zwei Umfangsprüfungen fremder Branches. Prüfbefehle: P1 `SELFTEST OK`, 26, 0, Exit 0; P2 stimmig, 4, stimmig, 0, diff leer; P3 1, 0, 1, gruen am Tag `.5`; P4 `v0.2.2-maintained.5`, ahead, identical, 1; P5 1, 2, Exit 0, 0; P6 12, 0, 0; P7 e2e pass am Kopf `07eec4f` (Run 46092820293); P8 `check` Exit 0; P9 1, stimmig, 1; kunden 15 abgelöst `gleich`.
 - 2026-11-28 Zyklus 5: Abschluss gemeldet, Punkte 1 bis 9, Befund K aus Zyklus 4 behoben: `ops/usdc_bands.py` fragt einen RPC auf Loopback ohne Proxy (`ProxyHandler({})`), jeder andere RPC behält die Proxy-Einstellung, und `test/usdc-bands.test.ts` fährt den Selbsttest mit totem Proxy auf einem Port, den das System vergibt. Rot vorher: der neue Test „passes with a dead proxy set, because the planted RPC is on loopback“ ohne den Fix (`SELFTEST FAILED`, 1 failed von 12), mit Sperre ohne Fix 8 Zeilen `ok` und `SELFTEST FAILED`. Prüfbefehle: P1 mit und ohne Proxy-Sperre `SELFTEST OK`, 26, 0, Exit 0; P2 diff gegen die Produktion leer, Zeile `USDC BANDS` gleich dem Dokument; P5c Exit 0 mit Sperre; P8 `check` Exit 0; P7 `e2e` am Kopf dieses Commits steht im Kommentar auf dem Topic; P2 bis P6 und P9 sonst unverändert seit Zyklus 4.
+- 2026-11-28 Release: PASS K und B (Zyklus 5), DONE.
 
 ## Blockers
