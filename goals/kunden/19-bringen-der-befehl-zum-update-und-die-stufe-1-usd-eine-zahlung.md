@@ -69,7 +69,7 @@ und der Richtungs-Check (spätestens 04.12.) sonst auf einer falschen Null entsc
   Laufzeitpfad). Code, Bezeichner, Testnamen und Ausgaben englisch.
 
 ## Done Condition
-- [ ] `CP_REPORT=topup-bands` zählt jeden Kauf der Stufe 1, über `/pay/1/` mit Bonus wie per direkter Überweisung, und nie eine
+- [x] `CP_REPORT=topup-bands` zählt jeden Kauf der Stufe 1, über `/pay/1/` mit Bonus wie per direkter Überweisung, und nie eine
       andere Stufe; Test und Selbsttest pflanzen die echte Buchung und waren vor dem Fix rot.
       MVP: Funktion, weil die Zeile `TOPUPS 1 USD` heute jeden Kauf über `/pay/1/` übersieht und die Leitzahl von kunden 18 auf einer
       falschen Null steht.
