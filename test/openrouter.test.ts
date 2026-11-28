@@ -92,7 +92,7 @@ describe("OpenRouterProvider", () => {
     expect(gpt52.inputPerMillion).toBeCloseTo(1.75, 6);
     expect(gpt52.outputPerMillion).toBeCloseTo(14, 6);
     expect(gpt52.contextWindow).toBe(400000);
-    expect(provider.defaultAliases()).toEqual(DEFAULT_OPENROUTER_ALIASES);
+    expect(provider.defaultAliases()).toEqual({ "gpt-5.2": DEFAULT_OPENROUTER_ALIASES["gpt-5.2"], "gpt-5-mini": DEFAULT_OPENROUTER_ALIASES["gpt-5-mini"] });
   });
 
   it("aborts the start when a configured model is missing at OpenRouter", async () => {
