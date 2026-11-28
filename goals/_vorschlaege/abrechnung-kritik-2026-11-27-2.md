@@ -4,3 +4,4 @@ Befund: Eine gekürzte Anfrage an ein Modell mit Reasoning (`openai/gpt-5-mini`,
 Beleg: `src/inference/proxy.ts` (`affordableMaxTokens` rechnet nur Antwort-Tokens, die Grenze `MIN_SHORTENED_TOKENS = 256` gilt für jedes Modell); `goals/abrechnung/ANNAHMEN.md`, Zeile zu `finish_reason: "length"`.
 Empfehlung: Ein Glied misst nach dem Rollout aus dem Ledger (nur lesend, `meta.usage`, `meta.shortened_to` aus abrechnung 08 Punkt 7) je Modell, wie viele gekürzte Antworten leer blieben und wie viele Reasoning-Tokens ein Zug sonst braucht. Ist der Anteil leerer gekürzter Antworten über 10 %, wird die Grenze je Modell aus dieser Messung gesetzt, und eine leere gekürzte Antwort wird wie eine nicht angekommene behandelt (Grundregel 6), mit Test.
 MVP: Funktion, weil ein Kunde mit Rest sonst für leere Antworten zahlt, statt die 402 mit dem Weg zum Aufladen zu sehen.
+Übernommen: Tech Lead, PRO-32469 Glied 4 (2026-11-28)

@@ -19,3 +19,4 @@ Beide Zeiten stehen schon in Commit `5aff3f1`, den `goals/RISIKEN.md` Zeile 10 f
 ## Gegenprüfung
 
 Ein frischer Subagent sollte den Befund widerlegen und bestätigte ihn: Das Repo ist öffentlich (`gh repo view matthiashippe/control-plane --json visibility` -> `PUBLIC`), die Zeiten sind dieselben, die `docs/richtung/2026-11-26.md` in einer früheren Fassung trug und später maskierte, und keine Annahme, kein Vorschlag und `goals/RISIKEN.md` führen Zeile 13.
+Übernommen: Tech Lead, PRO-32469 Glied 1 (2026-11-28)
