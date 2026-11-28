@@ -213,3 +213,23 @@
   Zeile ist die Laufzeit; abrechnung 03 Punkt 3 endet an beiden Ständen gleich mit Exit 1 (abgelöst durch fehler 14). Der
   Vergleich der ganzen Ausgabe fand 23 Unterschiede (die neue Zeile `planted handoff page301`, Zahl der Tests, Laufzeiten), er ist
   also nicht blind.
+- Punkt 8 (Kritik des Tech Lead, Zyklus 3): `HANDOFF_JS` bekommt als siebtes Argument die Seitenadresse, die die Prüfung abruft
+  (`${urls[1]#GET }` aus `handoff_urls`), und meldet `url=ok` nur, wenn `url` der Antwort genau diese Adresse ist, weil der Mensch die
+  `url` öffnet, die sein Automaton ihm schickt, und eine fest gewählte Seite eine tote Adresse in der Antwort grün durchließe.
+  Entscheidung 5 („`HANDOFF_JS` bleibt“) gilt dafür nicht, weil die Kritik genau dieses Feld verlangt.
+- Weicht `url` ab, stehen beide Adressen mit dem Code als `{code}` in der Ergebniszeile, und eine Adresse, die danach nicht auf
+  `^https://<host>/h/{code}$` passt, erscheint nur als `other` (fehlt sie, als `missing`), weil die Zeile im Bericht steht und weder ein
+  Code noch fremder Text aus der Antwort dort hingehört.
+- `judge_handoff` prüft `url` direkt nach `match` und vor der Seite, weil eine falsche `url` die Ursache ist und ein späterer Fehler der
+  Seite sie sonst verdecken würde; die gepflanzten Fälle lesen ihre Seitenadresse wie der Live-Lauf aus `handoff_urls`, deshalb trägt
+  das gepflanzte `h_ok` diese Adresse und der neue Fall `urlhost` dieselbe Antwort mit `https://postyourprice.com/h/7KQ2M9XC4D7K`.
+- Abgelöste Prüfbefehle nach Punkt 8 (Entscheidung 6), neu gemessen ohne Netz am 28.11.2026 an der Merge-Basis `8fbdb47` und am Kopf
+  nach Punkt 8, weil die Zahl der roten gepflanzten handoff-Fälle wieder steigt: 77 Prüfbefehle aus 19 Goal-Dateien mit Status `DONE`,
+  die `live.sh` oder `live-selftest` nennen (jeder Befehl in Backticks einzeln, deshalb drei mehr als in Zyklus 1). Geändert haben sich
+  konto 02 Punkt 8, zweiter Befehl (8 auf 10, Erwartung „mindestens 3“ bleibt erfüllt), und umzug 01 Punkt 7, weil sein `awk` ab
+  `## Goal 01` bis zum Dateiende zählt und damit auch diesen Abschnitt; den hatte die Messung in Zyklus 1 übersehen. Sonst ändern sich
+  nur Laufzeiten der vitest-Läufe, und umzug 01 Punkt 10 endet an beiden Ständen mit `3`.
+
+## Abgelöst durch umzug 06 (Maker, 2026-11-28)
+
+- Abgelöst: umzug 01 Punkt 7 durch umzug 06 Punkt 5, Ausgabe dann genau `Exit 0, 32` (Tech Lead, 2026-11-28)

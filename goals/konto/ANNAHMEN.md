@@ -382,4 +382,4 @@
 
 ## Abgelöst durch umzug 06 (Maker, 2026-11-28)
 
-- Abgelöst: konto 02 Punkt 8 durch umzug 06 Punkt 3, Ausgabe dann genau `Exit 0, 9` (Tech Lead, 2026-11-28)
+- Abgelöst: konto 02 Punkt 8 durch umzug 06 Punkt 8, Ausgabe dann genau `Exit 0, 10` (Tech Lead, 2026-11-28)
