@@ -10,7 +10,7 @@ Die Beträge stehen hier bewusst nicht, weil dieser Vorschlag im selben öffentl
 
 - `goals/kunden/16-warum-der-erste-sandbox-kunde-nach-10-usd-aufhoert.md` Zeile 1 und Dateiname: der Gesamtbetrag des einen Kunden.
 - `docs/kunden/sandbox-kunde-2026-11.md` Zeile 151: Zahl und Höhe seiner Aufladungen. Das Dokument sagt in Zeile 9 bis 10 selbst, Beträge je Kunde stünden dort nicht.
-- `docs/richtung/2026-11-26.md` Zeile 19 bis 21: Sandbox-Kosten, Höhe beider Aufladungen mit Uhrzeit (03:00 und 14:50 am 21.11.) und Inferenz-Ausgabe desselben Kunden; dazu Zeile 105 und 131.
+- `docs/richtung/2026-11-26.md` Zeile 19 bis 21: Sandbox-Kosten, Höhe beider Aufladungen mit Uhrzeit (**:** und **:** am 21.11.) und Inferenz-Ausgabe desselben Kunden; dazu Zeile 105 und 131.
 - `ROADMAP.md` Zeile 18: Ausgabe einer einzelnen Adresse am 19.11.
 - Goal 16, Abschnitt Active Objective: die Uhrzeiten beider Aufladungen. `goals/kunden/ANNAHMEN.md` Zeile 10 hält Zeiten der Aufladung je Kunde gerade deshalb aus dem Repo, weil Zeit und Betrag zusammen die öffentliche USDC-Überweisung auf Base und damit die Wallet kenntlich machen.
 
