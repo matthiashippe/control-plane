@@ -229,6 +229,17 @@
   konto 02 Punkt 8, zweiter Befehl (8 auf 10, Erwartung „mindestens 3“ bleibt erfüllt), und umzug 01 Punkt 7, weil sein `awk` ab
   `## Goal 01` bis zum Dateiende zählt und damit auch diesen Abschnitt; den hatte die Messung in Zyklus 1 übersehen. Sonst ändern sich
   nur Laufzeiten der vitest-Läufe, und umzug 01 Punkt 10 endet an beiden Ständen mit `3`.
+- Zyklus 4 (Befund 1 der Linse K, Zyklus 3): `handoff_live` setzt die Seitenadresse `page` erst, wenn `handoff_urls` drei Zeilen
+  geliefert hat, und gibt sonst `""` an `HANDOFF_JS`, weil ein gescheiterter POST unter `set -u` sonst an `urls[1]` abbricht und die
+  Prüfung nur `no result` statt der Ursache meldet.
+- Der Selbsttest fährt `handoff_live` selbst mit einer Funktion `curl` als Stand-in in einer Subshell (Fälle `ok`, `urlhost`,
+  `post404`) und vergleicht die ganze Zeile, weil ein Abbruch auch `FAIL` sagt und ein Vergleich nur des ersten Worts ihn
+  durchließe. Die Zeilen heißen `planted live handoff <Fall>`, weil konto 02 Punkt 8 jede Zeile mit `^planted handoff ` zählt und
+  genau ein OK verlangt.
+- Der zweite Prüfbefehl von Punkt 6 zählt seit dem Verdict von K in Zyklus 3 die Datei `goals/umzug/verdicts/06-z3-K.md` mit und gibt
+  1 aus, ohne die Verdicts 0. Das ist eine Annahme des Makers, weil Verdicts die Linsen schreiben und ein belegtes Verdict nicht
+  umgeschrieben wird; ob der Befehl ohne `goals/umzug/verdicts/` gilt wie in sandbox (Punkt 9, Tech Lead, 2026-11-15), entscheidet
+  der Tech Lead.
 
 ## Abgelöst durch umzug 06 (Maker, 2026-11-28)
 
