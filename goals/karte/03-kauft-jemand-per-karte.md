@@ -1,7 +1,7 @@
 # Karte Goal 03: Kauft jemand per Karte, und denkt sein Automaton danach?
 
 ## Status
-PLANNED
+PAUSED
 
 ## Active Objective
 Seit karte 02 steht der Weg zur Kasse von Digistore24 auf der Startseite (Block `card` direkt nach dem Umzug), im README, im Plugin
@@ -166,3 +166,4 @@ MVP: Funktion, weil erst die Messung zeigt, ob die Karte Zahler bringt und an we
 ## Progress Log
 
 ## Blockers
+Pause: entfällt laut `ROADMAP.md`, ersetzt durch karte 04, die dasselbe Fenster vor und nach werbung 01 getrennt misst; ohne Pause startete karte 03 als kleinere Nummer am 30.11. vor karte 04 (Tech Lead 2026-11-28, PRO-32469, PRO-30347)
