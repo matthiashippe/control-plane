@@ -1,7 +1,7 @@
 # Abrechnung Goal 09: Eine gekürzte Antwort zeigt im Ledger, ob sie leer blieb
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Seit abrechnung 08 (ausgerollt mit dem Lauf von `deploy.yml` an `70e5599`, Job `deploy` fertig 2026-11-27T19:51:06Z) bekommt eine
@@ -85,7 +85,7 @@ Messung das zeigt.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/inference-shortened-empty.test.ts` muss Exit-Code 0 haben.
       Prüfung: `grep -cF '"marks a shortened reasoning-only answer from OpenRouter as empty"' test/inference-shortened-empty.test.ts` muss `1` ausgeben.
       Prüfung: `grep -c 'new OpenRouterProvider' test/inference-shortened-empty.test.ts` muss mindestens 1 ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Wer genug Guthaben hat, merkt nichts: gleiche Anfrage, gleiche Antwort, gleiche Ledger-Zeile.
@@ -112,6 +112,7 @@ Messung das zeigt.
 - 2026-11-28 Zyklus 1: Punkte 1, 2, 3 und 4 gebaut, `shortened_finish` und `shortened_empty` nur in der `meta` gekürzter Antworten, die fünf Fälle in `test/inference-shortened-empty.test.ts` vor der Änderung alle rot (`expected undefined to be true`, `expected undefined to be false`, `expected undefined to be 'length'`, Schlüsselliste mit 12 statt 14 Einträgen), Entscheidungen und Nachzug in `goals/abrechnung/ANNAHMEN.md`. Prüfbefehle: vitest der beiden Dateien Exit 0 (13 passed), Testnamen nichts fehlt, `grep -c` in proxy.ts 2, Diff von `test/inference-shortened.test.ts` 0, ANNAHMEN-Zeilen 5, Pfade außerhalb 0, gelöschte Tests 0, `node scripts/check.mjs` Exit 0 (290 Dateien, 2989 Tests), Job `e2e` an PR #502 am Kopf e847287 pass (`E2E OK turns=5 registered=true api_errors=0 ledger_consistent=true`), `gh pr checks` zählt 1.
 - 2026-11-28 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3 und 4, `dev` unverändert auf 0a50d21, kein Merge nötig. Prüfbefehle am Kopf a2186ff: vitest der beiden Dateien Exit 0 (13 passed), Testnamen nichts fehlt, `grep -c` in proxy.ts 2, Diff von `test/inference-shortened.test.ts` 0, ANNAHMEN-Zeilen 5, Pfade außerhalb 0, gelöschte Tests 0, `node scripts/check.mjs` Exit 0 (2989 Tests), Job `e2e` an PR #502 am Kopf a2186ff pass (Lauf 46132182879), `gh pr checks` zählt 1.
 - 2026-11-28 Zyklus 3: Punkt 5 aus der Kritik gebaut und Abschluss gemeldet, Punkte 1, 2, 3, 4 und 5, der Fall „marks a shortened reasoning-only answer from OpenRouter as empty“ schickt `content: ""` und `content: null` mit `reasoning` und `finish_reason: "length"` durch `OpenRouterProvider` mit nachgebautem `fetch`, Gegenprobe mit `src/inference/proxy.ts` vom Stand 0a50d21 rot (`expected undefined to be true`), am Code des Goals grün; die Kürzung ist bei den Preisen von OpenRouter durch das Aufrunden 300 oder 301, der Test prüft Kopf und gesendetes `max_tokens` gegen `shortened_to`. `dev` unverändert auf 0a50d21. Prüfbefehle am Kopf 52879f9: vitest der beiden Dateien Exit 0, Testnamen nichts fehlt, `grep -c` in proxy.ts 2, Diff von `test/inference-shortened.test.ts` 0, ANNAHMEN-Zeilen 5, Pfade außerhalb 0, gelöschte Tests 0, vitest Punkt 5 Exit 0 (6 passed), Testname Punkt 5 1, `new OpenRouterProvider` 1, `node scripts/check.mjs` Exit 0 (2990 Tests), Job `e2e` an PR #502 am Kopf 52879f9 pass (Lauf 46134120820, `E2E OK turns=5 registered=true api_errors=0 ledger_consistent=true`), `gh pr checks` zählt 1.
+- 2026-11-28 Release: PASS K und B (Zyklus 3), DONE.
 
 ## Blockers
 - keine
