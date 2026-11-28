@@ -87,12 +87,12 @@ und der Richtungs-Check (spätestens 04.12.) sonst auf einer falschen Null entsc
       Prüfung: `awk '/^MAINTAINED 402 VERSION automaton-maintained\/0\.2\.2-maintained\.([2-9]|[1-9][0-9]+): [1-9]/{k=1} /^TOPUPS 1 USD since 2026-11-27T22:09:54Z /{t=$(NF-3)} /^Neue Kennung: /{a=$3; n++} /^Stufe 1 gekauft: /{b=$4; m++} /^Nächster Schritt: /{s++} END{print (n==1 && m==1 && s==1 && a==(k?"ja,":"nein,") && b==((t>=1)?"ja,":"nein,")) ? "stimmig" : "unstimmig"}' docs/kunden/nach-dem-update-2026-11.md` muss genau `stimmig` ausgeben.
       Prüfung: `grep -cE '0x[0-9a-fA-F]{40}|([0-9]{1,3}\.){3}[0-9]{1,3}' docs/kunden/nach-dem-update-2026-11.md` muss 0 ausgeben.
       Prüfung (Netz): `set -a; . ~/.config/control-plane/loop.env; set +a; d=docs/kunden/nach-dem-update-2026-11.md; u=$(sed -nE 's/^\$ bash ops\/usdc-bands\.sh --since 2026-11-06T00:00:00Z --until ([0-9T:-]+Z)$/\1/p' "$d"); diff <(bash ops/usdc-bands.sh --since 2026-11-06T00:00:00Z --until "${u:?}" 2>/dev/null | grep -E '^TOPUPS 1 USD ') <(grep -E '^TOPUPS 1 USD since 2026-11-06T' "$d")` muss nichts ausgeben.
-- [ ] Die Entscheidungen stehen in `goals/kunden/ANNAHMEN.md`, der Diff bleibt in den Pfaden dieses Goals, kein Test fällt weg.
+- [x] Die Entscheidungen stehen in `goals/kunden/ANNAHMEN.md`, der Diff bleibt in den Pfaden dieses Goals, kein Test fällt weg.
       MVP: Funktion, weil das nächste Glied wissen muss, was als Kauf der Stufe 1 zählt und warum das Fenster am Rollout beginnt.
       Prüfung: `grep -cE '^- [0-9]{4}-[0-9]{2}-[0-9]{2}, kunden 19: ' goals/kunden/ANNAHMEN.md` muss mindestens 4 ausgeben.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD | grep -vE '^(ops/db-report\.cjs|ops/usdc-bands\.sh|ops/usdc_bands\.py|test/usdc-bands\.test\.ts|docs/kunden/nach-dem-update-2026-11\.md|goals/kunden/.*|goals/[a-z]+/ANNAHMEN\.md)$' | wc -l` muss 0 ausgeben.
       Prüfung: `git diff --diff-filter=D --name-only $(git merge-base origin/dev HEAD) HEAD -- test ops docs | wc -l` muss 0 ausgeben.
-- [ ] `check` ist grün.
+- [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
 - [ ] goal-verifier PASS (K und B)
 
@@ -123,6 +123,7 @@ und der Richtungs-Check (spätestens 04.12.) sonst auf einer falschen Null entsc
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-28 Zyklus 1: Punkte 1, 2, 3, 4 gebaut: `CP_REPORT=topup-bands` zählt `meta.usd` 1 oder ohne `meta.usd` 100000 mc (gegen den Bericht von `71202a7` 6 von 14 Tests rot, Selbsttest 3 FAIL), Messung am 2026-11-28T13:05:16Z in `docs/kunden/nach-dem-update-2026-11.md` (1000 Antworten 402 nur an `0.2.2-maintained.1`, 0 Aufladungen der Stufe 1, Korrektur seit 06.11. bleibt 0), 9 Zeilen kunden 19 in `ANNAHMEN.md`, die 45 mitziehenden Prüfbefehle vor und nach dem Bau wie erwartet. Prüfbefehle: vitest usdc-bands Exit 0 (14 passed); Selbsttest `SELFTEST OK`; `101000` im Test 8, im Skript 6; `json_extract(meta, '$.usd')` 2 (GNU grep); Punkt 2 `stimmig`, 3, `stimmig`, 0, Netz-diff leer; Punkt 3 9, 0, 0; `check` Exit 0 (3000 passed).
 
 ## Blockers
 - keine
