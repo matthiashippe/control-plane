@@ -78,7 +78,7 @@ und der Richtungs-Check (spätestens 04.12.) sonst auf einer falschen Null entsc
       Prüfung: `grep -c '101000' test/usdc-bands.test.ts` muss mindestens 1 ausgeben.
       Prüfung: `grep -c '101000' ops/usdc-bands.sh` muss mindestens 1 ausgeben.
       Prüfung: `grep -c "json_extract(meta, '\$.usd')" ops/db-report.cjs` muss mindestens 1 ausgeben.
-- [ ] `docs/kunden/nach-dem-update-2026-11.md` zeigt ab dem Rollout von kunden 17 die Antworten 402 je Kennung, die Kartenbesuche und
+- [x] `docs/kunden/nach-dem-update-2026-11.md` zeigt ab dem Rollout von kunden 17 die Antworten 402 je Kennung, die Kartenbesuche und
       die Aufladungen der Stufe 1 mit Befehl und vollständiger Ausgabe, dazu die Korrektur seit dem 06.11., und die Zeilen
       `Neue Kennung:`, `Stufe 1 gekauft:` und `Nächster Schritt:` folgen aus ihr.
       MVP: Funktion, weil erst diese Zahlen zeigen, ob der Befehl zum Update und die Stufe 1 einen zahlenden Kunden bringen.
