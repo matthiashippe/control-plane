@@ -1,7 +1,7 @@
 # Abrechnung Goal 09: Eine gekürzte Antwort zeigt im Ledger, ob sie leer blieb
 
 ## Status
-PLANNED
+DONE
 
 ## Active Objective
 Seit abrechnung 08 (ausgerollt mit dem Lauf von `deploy.yml` an `70e5599`, Job `deploy` fertig 2026-11-27T19:51:06Z) bekommt eine
@@ -55,24 +55,37 @@ Messung das zeigt.
   Zugriff auf die Produktion nötig. Rollout mit dem Merge (`src/**`). Code, Bezeichner, Testnamen und Schlüssel englisch.
 
 ## Done Condition
-- [ ] Die Ledger-Zeile einer gekürzten Antwort trägt `shortened_finish` und `shortened_empty`, die einer vollen keinen von beiden;
+- [x] Die Ledger-Zeile einer gekürzten Antwort trägt `shortened_finish` und `shortened_empty`, die einer vollen keinen von beiden;
       Tests rot vor der Änderung.
       MVP: Funktion, weil ohne diese Felder keine Messung zeigt, ob gekürzte Antworten leer bleiben und trotzdem berechnet werden.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/inference-shortened-empty.test.ts test/inference-shortened.test.ts` muss Exit-Code 0 haben.
       Prüfung: `for t in "marks a shortened answer without content and without tool calls as empty" "marks a shortened answer with content as not empty" "marks a shortened answer with only a tool call as not empty" "records the finish reason of a shortened answer" "leaves the ledger row of a full answer without shortened_finish and shortened_empty"; do grep -qF "\"$t\"" test/inference-shortened-empty.test.ts || echo "fehlt: $t"; done` muss nichts ausgeben.
       Prüfung: `grep -c -E 'shortened_finish|shortened_empty' src/inference/proxy.ts` muss mindestens 2 ausgeben.
       Prüfung: `git diff $(git merge-base origin/dev HEAD) HEAD -- test/inference-shortened.test.ts | wc -l` muss 0 ausgeben.
-- [ ] Die Entscheidungen stehen in `goals/abrechnung/ANNAHMEN.md`, der Diff bleibt in den Pfaden dieses Goals, kein Test fällt weg.
+- [x] Die Entscheidungen stehen in `goals/abrechnung/ANNAHMEN.md`, der Diff bleibt in den Pfaden dieses Goals, kein Test fällt weg.
       MVP: Funktion, weil abrechnung 10 wissen muss, wann eine gekürzte Antwort als leer gilt.
       Prüfung: `grep -cE '^- [0-9]{4}-[0-9]{2}-[0-9]{2}, abrechnung 09: ' goals/abrechnung/ANNAHMEN.md` muss mindestens 3 ausgeben.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD | grep -vE '^(src/inference/proxy\.ts|test/inference-shortened-empty\.test\.ts|goals/abrechnung/.*|goals/[a-z]+/ANNAHMEN\.md)$' | wc -l` muss 0 ausgeben.
       Prüfung: `git diff --diff-filter=D --name-only $(git merge-base origin/dev HEAD) HEAD -- test | wc -l` muss 0 ausgeben.
-- [ ] Der Job `e2e` am Kopf des Goal-PR ist grün.
+- [x] Der Job `e2e` am Kopf des Goal-PR ist grün.
       MVP: Funktion, weil sich die Ledger-Zeile im Laufzeitpfad der Inferenz ändert und der code-host kein Docker hat.
       Prüfung (Netz): `gh pr checks $(gh pr list -R matthiashippe/control-plane --head goal/abrechnung-09 --state open --json number -q '.[0].number') -R matthiashippe/control-plane 2>&1 | grep -E '^e2e\s' | grep -c pass` muss genau 1 ausgeben.
-- [ ] `check` ist grün.
+- [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] Auch eine gekürzte Antwort, die über `OpenRouterProvider` kommt und nur Reasoning trägt, gilt in der Ledger-Zeile als leer,
+      und das Reasoning landet nicht im Ledger. Ein Fall „marks a shortened reasoning-only answer from OpenRouter as empty“ in
+      `test/inference-shortened-empty.test.ts` schickt die Anfrage mit einem Guthaben für 300 Antwort-Tokens durch `handleChat` an einen
+      `OpenRouterProvider` mit nachgebautem `fetch` wie in `test/openrouter.test.ts` (kein Netz) und antwortet zweimal in der Form von
+      OpenRouter für ein Modell mit Reasoning: `content: ""` und `content: null`, je mit einem Feld `reasoning` (Text),
+      `finish_reason: "length"` und `usage.completion_tokens_details.reasoning_tokens`. Erwartet: `shortened_empty` ist `true`,
+      `shortened_finish` ist `"length"`, und `JSON.stringify` der `meta` enthält den Reasoning-Text nicht.
+      MVP: Funktion, weil die Produktion über `OpenRouterProvider` geht, die Fälle aus Punkt 1 dessen Umbau der Antwort
+      (`src/inference/openrouter.ts`: `content ?? null`, `finish_reason` auf `length`, `tool_calls` oder `stop`) aber umgehen und
+      abrechnung 10 sonst auf einer Zählung misst, die am echten Weg nie geprüft wurde.
+      Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/inference-shortened-empty.test.ts` muss Exit-Code 0 haben.
+      Prüfung: `grep -cF '"marks a shortened reasoning-only answer from OpenRouter as empty"' test/inference-shortened-empty.test.ts` muss `1` ausgeben.
+      Prüfung: `grep -c 'new OpenRouterProvider' test/inference-shortened-empty.test.ts` muss mindestens 1 ausgeben.
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Wer genug Guthaben hat, merkt nichts: gleiche Anfrage, gleiche Antwort, gleiche Ledger-Zeile.
@@ -96,6 +109,10 @@ Messung das zeigt.
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-28 Zyklus 1: Punkte 1, 2, 3 und 4 gebaut, `shortened_finish` und `shortened_empty` nur in der `meta` gekürzter Antworten, die fünf Fälle in `test/inference-shortened-empty.test.ts` vor der Änderung alle rot (`expected undefined to be true`, `expected undefined to be false`, `expected undefined to be 'length'`, Schlüsselliste mit 12 statt 14 Einträgen), Entscheidungen und Nachzug in `goals/abrechnung/ANNAHMEN.md`. Prüfbefehle: vitest der beiden Dateien Exit 0 (13 passed), Testnamen nichts fehlt, `grep -c` in proxy.ts 2, Diff von `test/inference-shortened.test.ts` 0, ANNAHMEN-Zeilen 5, Pfade außerhalb 0, gelöschte Tests 0, `node scripts/check.mjs` Exit 0 (290 Dateien, 2989 Tests), Job `e2e` an PR #502 am Kopf e847287 pass (`E2E OK turns=5 registered=true api_errors=0 ledger_consistent=true`), `gh pr checks` zählt 1.
+- 2026-11-28 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3 und 4, `dev` unverändert auf 0a50d21, kein Merge nötig. Prüfbefehle am Kopf a2186ff: vitest der beiden Dateien Exit 0 (13 passed), Testnamen nichts fehlt, `grep -c` in proxy.ts 2, Diff von `test/inference-shortened.test.ts` 0, ANNAHMEN-Zeilen 5, Pfade außerhalb 0, gelöschte Tests 0, `node scripts/check.mjs` Exit 0 (2989 Tests), Job `e2e` an PR #502 am Kopf a2186ff pass (Lauf 46132182879), `gh pr checks` zählt 1.
+- 2026-11-28 Zyklus 3: Punkt 5 aus der Kritik gebaut und Abschluss gemeldet, Punkte 1, 2, 3, 4 und 5, der Fall „marks a shortened reasoning-only answer from OpenRouter as empty“ schickt `content: ""` und `content: null` mit `reasoning` und `finish_reason: "length"` durch `OpenRouterProvider` mit nachgebautem `fetch`, Gegenprobe mit `src/inference/proxy.ts` vom Stand 0a50d21 rot (`expected undefined to be true`), am Code des Goals grün; die Kürzung ist bei den Preisen von OpenRouter durch das Aufrunden 300 oder 301, der Test prüft Kopf und gesendetes `max_tokens` gegen `shortened_to`. `dev` unverändert auf 0a50d21. Prüfbefehle am Kopf 52879f9: vitest der beiden Dateien Exit 0, Testnamen nichts fehlt, `grep -c` in proxy.ts 2, Diff von `test/inference-shortened.test.ts` 0, ANNAHMEN-Zeilen 5, Pfade außerhalb 0, gelöschte Tests 0, vitest Punkt 5 Exit 0 (6 passed), Testname Punkt 5 1, `new OpenRouterProvider` 1, `node scripts/check.mjs` Exit 0 (2990 Tests), Job `e2e` an PR #502 am Kopf 52879f9 pass (Lauf 46134120820, `E2E OK turns=5 registered=true api_errors=0 ledger_consistent=true`), `gh pr checks` zählt 1.
+- 2026-11-28 Release: PASS K und B (Zyklus 3), DONE.
 
 ## Blockers
 - keine
