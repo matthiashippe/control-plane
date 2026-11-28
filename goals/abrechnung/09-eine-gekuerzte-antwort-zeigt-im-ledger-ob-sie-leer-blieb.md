@@ -1,7 +1,7 @@
 # Abrechnung Goal 09: Eine gekürzte Antwort zeigt im Ledger, ob sie leer blieb
 
 ## Status
-PLANNED
+ACTIVE
 
 ## Active Objective
 Seit abrechnung 08 (ausgerollt mit dem Lauf von `deploy.yml` an `70e5599`, Job `deploy` fertig 2026-11-27T19:51:06Z) bekommt eine
@@ -55,14 +55,14 @@ Messung das zeigt.
   Zugriff auf die Produktion nötig. Rollout mit dem Merge (`src/**`). Code, Bezeichner, Testnamen und Schlüssel englisch.
 
 ## Done Condition
-- [ ] Die Ledger-Zeile einer gekürzten Antwort trägt `shortened_finish` und `shortened_empty`, die einer vollen keinen von beiden;
+- [x] Die Ledger-Zeile einer gekürzten Antwort trägt `shortened_finish` und `shortened_empty`, die einer vollen keinen von beiden;
       Tests rot vor der Änderung.
       MVP: Funktion, weil ohne diese Felder keine Messung zeigt, ob gekürzte Antworten leer bleiben und trotzdem berechnet werden.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/inference-shortened-empty.test.ts test/inference-shortened.test.ts` muss Exit-Code 0 haben.
       Prüfung: `for t in "marks a shortened answer without content and without tool calls as empty" "marks a shortened answer with content as not empty" "marks a shortened answer with only a tool call as not empty" "records the finish reason of a shortened answer" "leaves the ledger row of a full answer without shortened_finish and shortened_empty"; do grep -qF "\"$t\"" test/inference-shortened-empty.test.ts || echo "fehlt: $t"; done` muss nichts ausgeben.
       Prüfung: `grep -c -E 'shortened_finish|shortened_empty' src/inference/proxy.ts` muss mindestens 2 ausgeben.
       Prüfung: `git diff $(git merge-base origin/dev HEAD) HEAD -- test/inference-shortened.test.ts | wc -l` muss 0 ausgeben.
-- [ ] Die Entscheidungen stehen in `goals/abrechnung/ANNAHMEN.md`, der Diff bleibt in den Pfaden dieses Goals, kein Test fällt weg.
+- [x] Die Entscheidungen stehen in `goals/abrechnung/ANNAHMEN.md`, der Diff bleibt in den Pfaden dieses Goals, kein Test fällt weg.
       MVP: Funktion, weil abrechnung 10 wissen muss, wann eine gekürzte Antwort als leer gilt.
       Prüfung: `grep -cE '^- [0-9]{4}-[0-9]{2}-[0-9]{2}, abrechnung 09: ' goals/abrechnung/ANNAHMEN.md` muss mindestens 3 ausgeben.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD | grep -vE '^(src/inference/proxy\.ts|test/inference-shortened-empty\.test\.ts|goals/abrechnung/.*|goals/[a-z]+/ANNAHMEN\.md)$' | wc -l` muss 0 ausgeben.
@@ -70,7 +70,7 @@ Messung das zeigt.
 - [ ] Der Job `e2e` am Kopf des Goal-PR ist grün.
       MVP: Funktion, weil sich die Ledger-Zeile im Laufzeitpfad der Inferenz ändert und der code-host kein Docker hat.
       Prüfung (Netz): `gh pr checks $(gh pr list -R matthiashippe/control-plane --head goal/abrechnung-09 --state open --json number -q '.[0].number') -R matthiashippe/control-plane 2>&1 | grep -E '^e2e\s' | grep -c pass` muss genau 1 ausgeben.
-- [ ] `check` ist grün.
+- [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
 - [ ] goal-verifier PASS (K und B)
 
@@ -96,6 +96,7 @@ Messung das zeigt.
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-28 Zyklus 1: Punkte 1, 2 und 4 gebaut, `shortened_finish` und `shortened_empty` nur in der `meta` gekürzter Antworten, die fünf Fälle in `test/inference-shortened-empty.test.ts` vor der Änderung alle rot (`expected undefined to be true`, `expected undefined to be false`, `expected undefined to be 'length'`, Schlüsselliste mit 12 statt 14 Einträgen), Entscheidungen und Nachzug in `goals/abrechnung/ANNAHMEN.md`. Prüfbefehle: vitest der beiden Dateien Exit 0 (13 passed), Testnamen nichts fehlt, `grep -c` in proxy.ts 2, Diff von `test/inference-shortened.test.ts` 0, ANNAHMEN-Zeilen 5, Pfade außerhalb 0, gelöschte Tests 0, `node scripts/check.mjs` Exit 0 (290 Dateien, 2989 Tests); Punkt 3 (e2e am PR) folgt nach dem Push.
 
 ## Blockers
 - keine
