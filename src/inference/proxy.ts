@@ -615,7 +615,21 @@ async function handleChatUncoalesced(
         margin_mc: chargeMc - boughtMc,
         uncollected_mc: actualMc - chargeMc,
         // Only a cut request carries it, so production can tell a shortened answer from a full one.
-        ...(shortenedTo === null ? {} : { shortened_to: shortenedTo }),
+        // Next to it, whether the cut answer brought the client anything: a reasoning model can spend
+        // the whole cut budget on reasoning and come back with `length`, no content and no tool call
+        // (abrechnung 09). Only these two keys, never the content itself.
+        ...(shortenedTo === null
+          ? {}
+          : {
+              shortened_to: shortenedTo,
+              shortened_finish: response.choices?.[0]?.finish_reason ?? null,
+              shortened_empty: ((first) => {
+                const content = first?.message?.content;
+                const hasContent = typeof content === "string" ? content.trim() !== "" : content != null;
+                const hasToolCall = Array.isArray(first?.message?.tool_calls) && first.message.tool_calls.length > 0;
+                return !hasContent && !hasToolCall;
+              })(response.choices?.[0]),
+            }),
       },
     });
     booked = true;
