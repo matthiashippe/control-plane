@@ -1,7 +1,7 @@
 # Fehler Goal 17: gpt-4.1, -mini und -nano bekommen eine Antwort statt 404
 
 ## Status
-PLANNED
+ACTIVE
 
 ## Active Objective
 Worker und Planer der unveränderten Runtime fragen ohne eigenen OpenAI-Schlüssel bei uns nach `gpt-4.1`, `gpt-4.1-mini` und
@@ -73,12 +73,12 @@ nicht tut.
   Bezeichner, Testnamen, Log-Zeilen englisch. Kein Claude- und kein Anthropic-Modell (Grundregel 11).
 
 ## Done Condition
-- [ ] `docs/fehler/modelle-am-pin.md` nennt je ID, wie oft sie seit dem Rollout von fehler 15 404 bekam, mit Befehl und Gegenprobe.
+- [x] `docs/fehler/modelle-am-pin.md` nennt je ID, wie oft sie seit dem Rollout von fehler 15 404 bekam, mit Befehl und Gegenprobe.
       MVP: Funktion, weil die Leitzahl ohne Stand vorher nicht zeigt, ob das Goal einen 404 weniger bringt.
       Prüfung: `grep -cE '^NOT_FOUND (gpt-4\.1|gpt-4\.1-mini|gpt-4\.1-nano|other) since 2026-11-27T16:10:23Z: [0-9]+$' docs/fehler/modelle-am-pin.md` muss genau 4 ausgeben.
       Prüfung: `d=docs/fehler/modelle-am-pin.md; g=$(sed -nE 's/^Gemessen: ([0-9T:-]+Z)$/\1/p' "$d" | tail -1); [ -n "$g" ] && [ "$g" \> "2026-11-28T06:00:00Z" ] && echo stimmig || echo unstimmig` muss genau `stimmig` ausgeben.
       Prüfung: `grep -cE '0x[0-9a-fA-F]{40}|([0-9]{1,3}\.){3}[0-9]{1,3}' docs/fehler/modelle-am-pin.md` muss 0 ausgeben.
-- [ ] Der Dienst lädt `openai/gpt-4.1`, `openai/gpt-4.1-mini` und `openai/gpt-4.1-nano` zusätzlich zu `CP_OPENROUTER_MODELS`, mit
+- [x] Der Dienst lädt `openai/gpt-4.1`, `openai/gpt-4.1-mini` und `openai/gpt-4.1-nano` zusätzlich zu `CP_OPENROUTER_MODELS`, mit
       Alias auf die ID der Runtime, und startet auch, wenn OpenRouter eines davon nicht führt; Tests rot vor der Änderung.
       MVP: Funktion, weil Worker und Planer der Runtime sonst auf jede Anfrage 404 bekommen.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/openrouter-pin-models.test.ts test/openrouter.test.ts` muss Exit-Code 0 haben.
@@ -86,19 +86,19 @@ nicht tut.
       Prüfung: `grep -cE '"gpt-4\.1(-mini|-nano)?": "openai/gpt-4\.1(-mini|-nano)?"' src/inference/openrouter.ts` muss genau 3 ausgeben.
       Prüfung: `grep -c '^export const RUNTIME_PIN_MODELS = \["openai/gpt-4.1", "openai/gpt-4.1-mini", "openai/gpt-4.1-nano"\];$' src/inference/openrouter.ts` muss genau 1 ausgeben.
       Prüfung: `grep -c -E 'claude|anthropic' src/inference/openrouter.ts` muss 0 ausgeben.
-- [ ] `docs/fehler/modelle-am-pin.md` führt die drei IDs als Alias statt als missing.
+- [x] `docs/fehler/modelle-am-pin.md` führt die drei IDs als Alias statt als missing.
       MVP: Funktion, weil das nächste Glied aus dieser Liste liest, welche IDs der Runtime noch 404 bekommen.
       Prüfung: `grep -cE '^MODEL gpt-4\.1(-mini|-nano)?: alias openai/gpt-4\.1(-mini|-nano)?, ' docs/fehler/modelle-am-pin.md` muss genau 3 ausgeben.
       Prüfung: `grep -cE '^MODEL gpt-4\.1(-mini|-nano)?: missing' docs/fehler/modelle-am-pin.md` muss 0 ausgeben.
-- [ ] Die Entscheidungen stehen in `goals/fehler/ANNAHMEN.md`, der Diff bleibt in den Pfaden dieses Goals, kein Test fällt weg.
+- [x] Die Entscheidungen stehen in `goals/fehler/ANNAHMEN.md`, der Diff bleibt in den Pfaden dieses Goals, kein Test fällt weg.
       MVP: Funktion, weil das nächste Glied wissen muss, warum der Katalog Modelle außerhalb von `CP_OPENROUTER_MODELS` lädt.
       Prüfung: `grep -cE '^- [0-9]{4}-[0-9]{2}-[0-9]{2}, fehler 17: ' goals/fehler/ANNAHMEN.md` muss mindestens 5 ausgeben.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD | grep -vE '^(src/inference/openrouter\.ts|test/openrouter-pin-models\.test\.ts|test/openrouter\.test\.ts|docs/fehler/modelle-am-pin\.md|goals/fehler/.*|goals/[a-z]+/ANNAHMEN\.md)$' | wc -l` muss 0 ausgeben.
       Prüfung: `git diff --diff-filter=D --name-only $(git merge-base origin/dev HEAD) HEAD -- test | wc -l` muss 0 ausgeben.
-- [ ] Der Job `e2e` am Kopf des Goal-PR ist grün.
+- [x] Der Job `e2e` am Kopf des Goal-PR ist grün.
       MVP: Funktion, weil sich der Katalog im Laufzeitpfad ändert und der code-host kein Docker hat.
       Prüfung (Netz): `gh pr checks $(gh pr list -R matthiashippe/control-plane --head goal/fehler-17 --state open --json number -q '.[0].number') -R matthiashippe/control-plane 2>&1 | grep -E '^e2e\s' | grep -c pass` muss genau 1 ausgeben.
-- [ ] `check` ist grün.
+- [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
 - [ ] goal-verifier PASS (K und B)
 
@@ -127,6 +127,7 @@ nicht tut.
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-28 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6 gebaut: `RUNTIME_PIN_MODELS` lädt gpt-4.1, -mini und -nano als `optionalModels` hinter `CP_OPENROUTER_MODELS` mit drei Aliasen, ein fehlendes Modell der Runtime hält den Start nicht auf, gpt-4.1-nano bekommt die Grenze in `max_completion_tokens`, weil OpenRouter für nano nur dieses Feld listet; Messung 404 je ID seit fehler 15 je 0 (Gegenprobe je ID 1). Neue Tests rot vor der Änderung: alle fünf in `test/openrouter-pin-models.test.ts` (vier mit `expected [ 'openai/gpt-5.2', …(1) ]` statt der Pin-Modelle, einer mit `RUNTIME_PIN_MODELS is not iterable`). Fremde DONE-Goals (fehler 13, 15, abrechnung 01) vor und nach dem Bau grün. Prüfbefehle: P1 `4`, `stimmig`, `0`; P2 vitest Exit 0 (21 Tests), Testnamen nichts fehlt, Aliase `3`, `RUNTIME_PIN_MODELS` `1`, claude/anthropic `0`; P3 `3`, `0`; P4 `7`, Pfade `0`, gelöschte Tests `0`; P5 `e2e pass` am Code-Commit 7a292c8 (PR #500); P6 `check: grün in 202 s`.
 
 ## Blockers
 - keine
