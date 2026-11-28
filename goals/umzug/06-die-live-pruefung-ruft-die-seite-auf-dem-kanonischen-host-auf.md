@@ -94,6 +94,12 @@ unterscheiden lässt und der Release Manager dann einen Revert ohne Ursache ausl
       MVP: Funktion, weil `check` das Merge-Gate auf `dev` ist und der Selbsttest darin läuft.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
       Prüfung (Netz): `n=$(gh pr list -R matthiashippe/control-plane --head goal/umzug-06 --state all --json number -q '.[0].number'); gh pr checks "${n:?}" -R matthiashippe/control-plane --json name,state -q '.[] | select(.name=="check") | .state'` muss `SUCCESS` ausgeben.
+- [ ] Die Prüfung `handoff` ist rot, wenn die Antwort von `POST /v1/handoff` im Feld `url` eine andere Seite nennt als die, die
+      sie abruft.
+      MVP: Funktion, weil der Mensch die Seite aus `url` öffnet, die sein Automaton ihm schickt, und eine Prüfung, die nur eine fest
+      gewählte Adresse liest, eine tote Adresse in der Antwort (etwa nach einem falschen `CP_PUBLIC_URL`) grün durchließe.
+      Prüfung: `bash ops/live.sh --selftest | grep -cxF 'planted handoff urlhost: FAIL handoff: POST /v1/handoff names the page https://postyourprice.com/h/{code}, the check reads https://automatonhost.com/h/{code}'` muss 1 ausgeben.
+      Prüfung: `bash ops/live.sh --selftest | grep -cxF 'planted handoff ok: OK handoff: POST /v1/handoff 201, /h/{code} shows match among three numbers with Referrer-Policy no-referrer, the stream says pending; nothing approved'` muss 1 ausgeben.
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
