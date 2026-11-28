@@ -149,7 +149,7 @@ der Weg per Karte gebaut wurde.
 - [x] Die Entscheidungen stehen in `goals/kunden/ANNAHMEN.md`, der Diff bleibt in den Pfaden dieses Goals, kein Test fällt weg.
       MVP: Funktion, weil das nächste Glied wissen muss, warum die Stufe 1 nur gegen `automatonhost.com` gilt.
       Prüfung: `grep -cE '^- [0-9]{4}-[0-9]{2}-[0-9]{2}, kunden 18: ' goals/kunden/ANNAHMEN.md` muss mindestens 6 ausgeben.
-      Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD | grep -vE '^(src/inference/maintained\.ts|ops/usdc-bands\.sh|ops/usdc_bands\.py|ops/db-report\.cjs|test/usdc-bands\.test\.ts|docs/kunden/stufe-1-2026-11\.md|docs/paket/anleitung\.md|README\.md|goals/kunden/.*|goals/_vorschlaege/fehler-[0-9-]+\.md|goals/[a-z]+/ANNAHMEN\.md)$' | wc -l` muss 0 ausgeben.
+      Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD | grep -vE '^(src/inference/maintained\.ts|ops/usdc-bands\.sh|ops/usdc_bands\.py|ops/db-report\.cjs|test/usdc-bands\.test\.ts|test/inference-maintained-update\.test\.ts|docs/kunden/stufe-1-2026-11\.md|docs/paket/anleitung\.md|README\.md|goals/kunden/.*|goals/_vorschlaege/fehler-[0-9-]+\.md|goals/[a-z]+/ANNAHMEN\.md)$' | wc -l` muss 0 ausgeben.
       Prüfung: `git diff --diff-filter=D --name-only $(git merge-base origin/dev HEAD) HEAD -- test ops | wc -l` muss 0 ausgeben.
 - [x] Der Job `e2e` am Kopf des Goal-PR ist grün.
       MVP: Funktion, weil sich mit `MAINTAINED_RELEASE` die 402 im Laufzeitpfad ändert und der code-host kein Docker hat.
@@ -184,7 +184,9 @@ der Weg per Karte gebaut wurde.
 - `src/inference/maintained.ts`: nur der Wert von `MAINTAINED_RELEASE`; `src/**` sonst, `src/payments/**`, `src/auth/**`: unverändert
 - `ops/db-report.cjs`: nur ein neuer Bericht, die bestehenden bleiben Byte für Byte; `ops/**` sonst außer den neuen
   `ops/usdc-bands.sh` und `ops/usdc_bands.py`: unverändert
-- `test/**` außer dem neuen `test/usdc-bands.test.ts`: unverändert
+- `test/**` außer dem neuen `test/usdc-bands.test.ts`: unverändert; in `test/inference-maintained-update.test.ts` nur die feste
+  Kennung `"0.2.2-maintained.4"` in „keeps the 402 unchanged for the current maintained runtime“, ersetzt durch die Kennung eine
+  Nummer über `MAINTAINED_RELEASE` (Tech Lead 2026-11-28, Punkt 9)
 - `docs/paket/anleitung.md`: nur Zeile `Release:`, Installationsbefehl, die Zeilen mit `automaton --version` und Release-Seite und
   die Liste der Commits; `README.md` nur der Tag im Installationsbefehl
 - `ROADMAP.md`, `docs/kette.md`, `docs/richtung/**`, die übrigen Dateien unter `docs/kunden/`, bestehende Goal-Dateien und
