@@ -9,11 +9,14 @@
  * `shortened_finish` and `shortened_empty`; the row of a full answer carries neither.
  *
  * The provider here answers with exactly the choice a test hands it, so each case is one shape of
- * answer and nothing else differs.
+ * answer and nothing else differs. The last case goes the way production goes, through
+ * OpenRouterProvider with a stubbed fetch, because that provider reshapes the answer before the
+ * ledger sees it.
  */
 import { describe, expect, it } from "vitest";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { openDb, postLedger } from "../src/db.js";
+import { OpenRouterProvider } from "../src/inference/openrouter.js";
 import { Catalog, costMc, handleChat } from "../src/inference/proxy.js";
 import {
   estimateTokens,
@@ -180,4 +183,76 @@ describe("the ledger row of a shortened answer (abrechnung 09)", () => {
       expect(Object.keys(meta).sort()).toEqual([...keysBefore].sort());
     }
   });
+
+  it("marks a shortened reasoning-only answer from OpenRouter as empty", async () => {
+    const reasoning = "Let me think about which tool to call first and how many credits remain for it.";
+    for (const content of ["", null]) {
+      const { res, sentMaxTokens, meta } = await callOpenRouterWith(
+        {
+          id: "gen-reasoning-only",
+          model: OR_MODEL,
+          provider: "OpenAI",
+          created: 1700000000,
+          choices: [{ index: 0, message: { role: "assistant", content, reasoning }, finish_reason: "length" }],
+          usage: {
+            prompt_tokens: PROMPT,
+            completion_tokens: 300,
+            total_tokens: PROMPT + 300,
+            completion_tokens_details: { reasoning_tokens: 300 },
+          },
+        },
+        300,
+      );
+      expect(res.status, `content ${JSON.stringify(content)}`).toBe(200);
+      // Rounding up to whole mc lets one more token fit at OpenRouter prices, so the cut is 300 or 301.
+      const shortenedTo = meta.shortened_to as number;
+      expect(shortenedTo).toBeGreaterThanOrEqual(300);
+      expect(shortenedTo).toBeLessThanOrEqual(301);
+      expect(res.headers?.["X-Max-Tokens-Shortened"]).toBe(String(shortenedTo));
+      expect(sentMaxTokens).toEqual([shortenedTo]);
+      expect(meta.shortened_empty, `content ${JSON.stringify(content)}`).toBe(true);
+      expect(meta.shortened_finish).toBe("length");
+      // Neither the reasoning nor any other text of the answer goes into the ledger.
+      expect(JSON.stringify(meta)).not.toContain(reasoning);
+      expect(JSON.stringify(meta)).not.toContain("reasoning");
+    }
+  });
 });
+
+const OR_MODEL = "openai/gpt-5-mini";
+
+/**
+ * One call through handleChat to an OpenRouterProvider whose fetch answers the chat call with the
+ * given body in the shape OpenRouter sends, with a balance that carries `answerTokens` answer tokens.
+ */
+async function callOpenRouterWith(chatBody: unknown, answerTokens: number) {
+  const sentMaxTokens: unknown[] = [];
+  const json = (body: unknown) => new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } });
+  const fetchStub = (async (input: string | URL | Request, init?: RequestInit) => {
+    const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+    const path = new URL(url).pathname.replace(/^\/api\/v1/, "");
+    if (path === "/models") {
+      return json({ data: [{ id: OR_MODEL, context_length: 400000, pricing: { prompt: "0.00000025", completion: "0.000002" } }] });
+    }
+    if (path === "/chat/completions") {
+      const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      sentMaxTokens.push(body.max_tokens ?? body.max_completion_tokens);
+      return json(chatBody);
+    }
+    return new Response(JSON.stringify({ error: "no stub for " + path }), { status: 500 });
+  }) as typeof fetch;
+  const provider = new OpenRouterProvider({ apiKey: "sk-or-v1-test", models: [OR_MODEL], fetch: fetchStub, priceRefreshMs: 0, baseUrl: "https://openrouter.ai/api/v1" });
+  await provider.init();
+  const spec = provider.models().find((m) => m.id === OR_MODEL);
+  expect(spec).toBeDefined();
+
+  const db = openDb(":memory:");
+  const catalog = new Catalog([provider], provider.defaultAliases());
+  const address = privateKeyToAccount(generatePrivateKey()).address.toLowerCase();
+  db.prepare("INSERT INTO wallets (address, balance_mc, created_at) VALUES (?, 0, ?)").run(address, new Date().toISOString());
+  postLedger(db, { address, kind: "grant", deltaMc: costMc(spec!, { prompt_tokens: PROMPT, completion_tokens: answerTokens }), ref: `starter:${address}` });
+  const res = await handleChat(db, catalog, address, { model: OR_MODEL, messages: MESSAGES, max_completion_tokens: 4096 });
+  const rows = db.prepare("SELECT meta FROM ledger WHERE address = ? AND kind = 'inference'").all(address) as { meta: string }[];
+  expect(rows).toHaveLength(1);
+  return { res, sentMaxTokens, meta: JSON.parse(rows[0].meta) as Record<string, unknown> };
+}
