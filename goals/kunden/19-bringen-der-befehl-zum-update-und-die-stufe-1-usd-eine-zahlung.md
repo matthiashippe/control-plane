@@ -1,7 +1,7 @@
 # Kunden Goal 19: Bringen der Befehl zum Update und die Stufe 1 USD eine Zahlung?
 
 ## Status
-PLANNED
+DONE
 
 ## Active Objective
 kunden 17 gibt älteren gepflegten Runtimes mit der 402 den Befehl zum Update (ausgerollt mit dem Lauf von `deploy.yml` an `7173b70`,
@@ -107,7 +107,7 @@ und der Richtungs-Check (spätestens 04.12.) sonst auf einer falschen Null entsc
       Prüfung: `PATH=/usr/bin:$PATH bash ops/usdc-bands.sh --selftest | /usr/bin/grep -c 'paid only the cheapest tier'` muss mindestens 1 ausgeben.
       Prüfung: `PATH=/usr/bin:$PATH bash ops/usdc-bands.sh --selftest | tail -1` muss mit `SELFTEST OK` beginnen.
       Prüfung: `/usr/bin/grep -cE '^- [0-9]{4}-[0-9]{2}-[0-9]{2}, kunden 19: Kritik: ' goals/kunden/ANNAHMEN.md` muss mindestens 1 ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Kein Aufruf in der Produktion, der etwas anlegt oder bucht; gelesen wird nur über `ops/card-visits.sh`, `ops/usdc-bands.sh`,
@@ -139,6 +139,7 @@ und der Richtungs-Check (spätestens 04.12.) sonst auf einer falschen Null entsc
 - 2026-11-28 Zyklus 1: Punkte 1, 2, 3, 4 gebaut: `CP_REPORT=topup-bands` zählt `meta.usd` 1 oder ohne `meta.usd` 100000 mc (gegen den Bericht von `71202a7` 6 von 14 Tests rot, Selbsttest 3 FAIL), Messung am 2026-11-28T13:05:16Z in `docs/kunden/nach-dem-update-2026-11.md` (1000 Antworten 402 nur an `0.2.2-maintained.1`, 0 Aufladungen der Stufe 1, Korrektur seit 06.11. bleibt 0), 9 Zeilen kunden 19 in `ANNAHMEN.md`, die 45 mitziehenden Prüfbefehle vor und nach dem Bau wie erwartet. Prüfbefehle: vitest usdc-bands Exit 0 (14 passed); Selbsttest `SELFTEST OK`; `101000` im Test 8, im Skript 6; `json_extract(meta, '$.usd')` 2 (GNU grep); Punkt 2 `stimmig`, 3, `stimmig`, 0, Netz-diff leer; Punkt 3 9, 0, 0; `check` Exit 0 (3000 passed).
 - 2026-11-28 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, `dev` (`71202a7`) war schon im Branch, jeder Prüfbefehl am Kopf `39fc0b2` erneut gefahren. Prüfbefehle: vitest usdc-bands Exit 0 (14 passed); Selbsttest `SELFTEST OK`; `101000` im Test 8, im Skript 6; `json_extract(meta, '$.usd')` 2 mit `/usr/bin/grep` (die `grep`-Funktion der Claude-Shell ist ugrep, liest `$` als Anker und zählt 0); Punkt 2 `stimmig`, 3, `stimmig`, 0, Netz-diff leer (`--until 2026-11-28T13:05:16Z`); Punkt 3 9, 0, 0; `check` Exit 0 (3000 passed, 158 s).
 - 2026-11-28 Zyklus 3: Punkt 5 aus der Kritik gebaut und Abschluss gemeldet, Punkte 1, 2, 3, 4, 5: wo `meta.value_atomic` steht, entscheidet es (1000000 ist Stufe 1), sonst Entscheidung 1; vor dem Fix gegen `ops/db-report.cjs` von `6100909` 3 von 15 Tests rot (der neue Test mit `expected +0 to be 1`, zweimal der Selbsttest) und im Selbsttest 1 FAIL (`paid only the cheapest tier`), danach 15 grün und `SELFTEST OK`; `dev` (`4e25fa9`) gemergt. Prüfbefehle: Punkt 5 `1 passed | 14 skipped`, 1, `SELFTEST OK`, 1; Punkt 1 Exit 0, `101000` 10 und 9, `json_extract(meta, '$.usd')` 2 (`/usr/bin/grep`); Punkt 2 `stimmig`, 3, `stimmig`, 0, Netz-diff nach dem Bau leer (seit 06.11. und seit dem Rollout bleibt `TOPUPS 1 USD` 0); Punkt 3 9, Pfade außerhalb 2 (nur die beiden Vorschläge `goals/_vorschlaege/kunden-kritik-2026-11-28-2.md` und `-3.md` aus dem Kritik-Commit `6100909`, ohne sie 0), 0; `check` Exit 0 (3001 passed, 153 s).
+- 2026-11-28 Release: PASS K und B (Zyklus 3), DONE.
 
 ## Blockers
 - keine
