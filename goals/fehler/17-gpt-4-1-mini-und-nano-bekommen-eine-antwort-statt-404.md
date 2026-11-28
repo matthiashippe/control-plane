@@ -1,7 +1,7 @@
 # Fehler Goal 17: gpt-4.1, -mini und -nano bekommen eine Antwort statt 404
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Worker und Planer der unveränderten Runtime fragen ohne eigenen OpenAI-Schlüssel bei uns nach `gpt-4.1`, `gpt-4.1-mini` und
@@ -100,7 +100,7 @@ nicht tut.
       Prüfung (Netz): `gh pr checks $(gh pr list -R matthiashippe/control-plane --head goal/fehler-17 --state open --json number -q '.[0].number') -R matthiashippe/control-plane 2>&1 | grep -E '^e2e\s' | grep -c pass` muss genau 1 ausgeben.
 - [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Eine Anfrage mit `model: "gpt-4.1-mini"` bekommt nach dem Rollout 200 und wird nach `usage` mal 1,3 abgerechnet.
@@ -129,6 +129,7 @@ nicht tut.
 ## Progress Log
 - 2026-11-28 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6 gebaut: `RUNTIME_PIN_MODELS` lädt gpt-4.1, -mini und -nano als `optionalModels` hinter `CP_OPENROUTER_MODELS` mit drei Aliasen, ein fehlendes Modell der Runtime hält den Start nicht auf, gpt-4.1-nano bekommt die Grenze in `max_completion_tokens`, weil OpenRouter für nano nur dieses Feld listet; Messung 404 je ID seit fehler 15 je 0 (Gegenprobe je ID 1). Neue Tests rot vor der Änderung: alle fünf in `test/openrouter-pin-models.test.ts` (vier mit `expected [ 'openai/gpt-5.2', …(1) ]` statt der Pin-Modelle, einer mit `RUNTIME_PIN_MODELS is not iterable`). Fremde DONE-Goals (fehler 13, 15, abrechnung 01) vor und nach dem Bau grün. Prüfbefehle: P1 `4`, `stimmig`, `0`; P2 vitest Exit 0 (21 Tests), Testnamen nichts fehlt, Aliase `3`, `RUNTIME_PIN_MODELS` `1`, claude/anthropic `0`; P3 `3`, `0`; P4 `7`, Pfade `0`, gelöschte Tests `0`; P5 `e2e pass` am Code-Commit 7a292c8 (PR #500); P6 `check: grün in 202 s`.
 - 2026-11-28 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6; dev (f1306aa) war schon im Branch. Prüfbefehle am Kopf 62afaf7: P1 `4`, `stimmig`, `0`; P2 vitest Exit 0 (21 Tests), Testnamen nichts fehlt, Aliase `3`, `RUNTIME_PIN_MODELS` `1`, claude/anthropic `0`; P3 `3`, `0`; P4 `7`, Pfade `0`, gelöschte Tests `0`; P5 `1` (e2e pass am Kopf 62afaf7, Lauf 46124271505); P6 `check: grün in 187 s`.
+- 2026-11-28 Release: PASS K und B (Zyklus 2), DONE.
 
 ## Blockers
 - keine
