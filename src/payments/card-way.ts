@@ -80,9 +80,27 @@ export function cardLink(pkg: CardPackage, address: string): string | null {
   return `${siteOrigin()}/card/${packageKey(pkg)}?address=${address.toLowerCase()}`;
 }
 
-/** `card_url` for a 402: the link of the 5 EUR package, or null while the breaker is on. */
+/** Why the card checkout is closed (goals/wache/04), in the order `cardClosedFor` asks. */
+export type CardClosedReason = "card breaker on" | "wallet had a refund" | "credits no longer sold";
+
+/**
+ * The one rule that says whether the card checkout is closed and why, or null while it is open. Every page, link, redirect and IPN
+ * asks only this. `address` may be null (a page without a wallet), then a former refund does not count. `intakeClosed` is the
+ * sunset of createApp: credits are no longer sold. No network, no writes.
+ */
+export function cardClosedFor(db: Db, address: string | null, now: Date, opts: { intakeClosed: boolean }): CardClosedReason | null {
+  if (cardBreaker(db, now).on) return "card breaker on";
+  if (address !== null && walletRefunded(db, address)) return "wallet had a refund";
+  if (opts.intakeClosed) return "credits no longer sold";
+  return null;
+}
+
+/**
+ * `card_url` for a 402: the link of the 5 EUR package, or null while the checkout is closed for this wallet. Asked without the
+ * sunset, because the 402 has its own text then (`topupsClosed`).
+ */
 export function cardUrlFor(db: Db, address: string, now: Date): string | null {
-  if (cardBreaker(db, now).on) return null;
+  if (cardClosedFor(db, address, now, { intakeClosed: false })) return null;
   const pkg = packageByKey("5");
   return pkg ? cardLink(pkg, address) : null;
 }
@@ -115,14 +133,20 @@ export type CardRedirect =
   | { kind: "paused"; topupUrl: string };
 
 /**
- * What `GET /card/<package>?address=<wallet>` answers. Breaker on and a wallet with a refund give the same `paused`, so that nobody
- * learns which of the two holds.
+ * What `GET /card/<package>?address=<wallet>` answers. Every reason of `cardClosedFor` (breaker on, a wallet with a refund, the
+ * sunset) gives the same `paused`, so that nobody learns which one holds.
  */
-export function cardRedirect(db: Db, key: string, address: string | null | undefined, now: Date): CardRedirect {
+export function cardRedirect(
+  db: Db,
+  key: string,
+  address: string | null | undefined,
+  now: Date,
+  opts: { intakeClosed: boolean } = { intakeClosed: false },
+): CardRedirect {
   const pkg = packageByKey(key);
   if (!pkg) return { kind: "unknown_package" };
   if (!isAddress(address)) return { kind: "ask_address", pkg };
-  if (cardBreaker(db, now).on || walletRefunded(db, address)) return { kind: "paused", topupUrl: usdcTopupUrl(address) };
+  if (cardClosedFor(db, address, now, opts)) return { kind: "paused", topupUrl: usdcTopupUrl(address) };
   const url = checkoutUrl(pkg, address);
   return url ? { kind: "checkout", url } : { kind: "unknown_package" };
 }

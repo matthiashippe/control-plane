@@ -21,7 +21,7 @@
  */
 import { createHash, timingSafeEqual } from "node:crypto";
 import { getAvailableMc, MC_PER_CENT, postLedger, type Db } from "../db.js";
-import { cardBreaker, walletRefunded } from "./card-way.js";
+import { cardClosedFor } from "./card-way.js";
 
 export interface CardPackage {
   /** The product ID at Digistore24. Public: it stands in every order link. */
@@ -76,6 +76,8 @@ export interface DigistoreDeps {
   fetch?: typeof fetch;
   now?: () => Date;
   log?: (line: string) => void;
+  /** True after the sunset of createApp (goals/wache/04): credits are no longer sold, so a paid order is held like under the breaker. */
+  intakeClosed?: () => boolean;
 }
 
 export interface IpnAnswer {
@@ -322,15 +324,12 @@ export async function handleDigistoreIpn(db: Db, deps: DigistoreDeps, fields: Re
   const day = orderDay(fields, now);
   const payable =
     mode === "test" ? "test" : !address || fields.currency !== "EUR" || cents == null ? "unassigned" : "pending_rate";
-  // wache 03: the checkout can be called without `/card/<package>`, so the breaker and a former refund also hold the payment here.
+  // wache 03: the checkout can be called without `/card/<package>`, so every reason that closes it (wache 04: the one rule
+  // `cardClosedFor`, with the sunset) also holds the payment here.
   const heldFor =
     payable !== "pending_rate" || !address
       ? null
-      : cardBreaker(db, now).on
-        ? "card breaker on"
-        : walletRefunded(db, address)
-          ? "wallet had a refund"
-          : null;
+      : cardClosedFor(db, address, now, { intakeClosed: deps.intakeClosed?.() ?? false });
   const status = heldFor ? "held" : payable;
   const at = now.toISOString();
   const inserted = db
@@ -344,8 +343,8 @@ export async function handleDigistoreIpn(db: Db, deps: DigistoreDeps, fields: Re
     log(`[digistore] order ${orderId} repeated, nothing booked`);
     return { status: 200, body: "OK" };
   }
-  if (row.status === "held") {
-    log(`[digistore] order ${orderId} held: ${heldFor ?? "card checkout closed"}`);
+  if (inserted && heldFor) {
+    log(`[digistore] order ${orderId} held: ${heldFor}`);
     return { status: 200, body: "OK" };
   }
   if (row.status !== "pending_rate") {
