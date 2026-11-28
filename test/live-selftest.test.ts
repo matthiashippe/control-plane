@@ -154,6 +154,8 @@ describe("ops/live.sh", () => {
     );
     expect(run.stdout).toMatch(/^planted hosts step live: OK hosts: canonical postyourprice\.com, /m);
     expect(run.stdout).toContain("planted hosts step live-silent: FAIL hosts: cp.hippe.eu /health no answer");
+    // The page of the check `handoff` answering 301 is red (move goal 06): the check does not follow it to another host.
+    expect(run.stdout).toMatch(/^planted handoff page301: FAIL handoff: \/h\/\{code\} answered 301$/m);
     expect(run.stdout.trim().split("\n").at(-1)).toBe("LIVE SELFTEST OK");
     expect(run.status).toBe(0);
   }, 300_000);
@@ -219,6 +221,57 @@ describe("ops/live.sh check hosts", () => {
 
   it("hosts: live mode runs the check and counts its FAIL", () => {
     expect(readFileSync(LIVE_SH, "utf8")).toMatch(/^\s*say "\$\(judge_hosts "\$\(hosts_live\)"\)"$/m);
+  });
+});
+
+/**
+ * The addresses of the check `handoff` (move goal 06) through `ops/live.sh --handoff-urls <code>`, without network. Since
+ * move goal 01 the app answers every page of an old host with a 301 to the canonical host, so the page /h/{code} must be
+ * fetched from automatonhost.com, while POST /v1/handoff and the stream stay on BASE, where machine paths answer on every
+ * host. A later change of BASE or of the hosts breaks this case instead of turning the live run red after a rollout.
+ */
+describe("ops/live.sh --handoff-urls", () => {
+  function handoffUrls(code: string, env: Record<string, string> = {}) {
+    const base = { ...process.env };
+    delete base.LIVE_URL;
+    delete base.LIVE_PAGE_URL;
+    return spawnSync("bash", [LIVE_SH, "--handoff-urls", code], { env: { ...base, ...env }, encoding: "utf8", timeout: 30_000 });
+  }
+
+  it("handoff-urls: POST and stream on postyourprice.com, the page on automatonhost.com", () => {
+    const run = handoffUrls("7KQ2M9XC4D7K");
+    expect(run.status).toBe(0);
+    expect(run.stdout).toBe(
+      "POST https://postyourprice.com/v1/handoff\n" +
+        "GET https://automatonhost.com/h/7KQ2M9XC4D7K\n" +
+        "GET https://postyourprice.com/v1/handoff/7KQ2M9XC4D7K\n",
+    );
+  });
+
+  it("handoff-urls: LIVE_URL moves POST and stream, the page stays on the canonical host", () => {
+    const run = handoffUrls("7KQ2M9XC4D7K", { LIVE_URL: "https://cp.hippe.eu" });
+    expect(run.status).toBe(0);
+    expect(run.stdout.split("\n").slice(0, 3)).toEqual([
+      "POST https://cp.hippe.eu/v1/handoff",
+      "GET https://automatonhost.com/h/7KQ2M9XC4D7K",
+      "GET https://cp.hippe.eu/v1/handoff/7KQ2M9XC4D7K",
+    ]);
+  });
+
+  it("handoff-urls: a code outside ^[0-9A-Z]{10,32}$ exits 2 and prints nothing", () => {
+    for (const code of ["ab;c", "", "7KQ2M9XC4", "7KQ2M9XC4D7K/../x"]) {
+      const run = handoffUrls(code);
+      expect(run.status).toBe(2);
+      expect(run.stdout).toBe("");
+    }
+  });
+
+  it("handoff-urls: live mode takes every address from handoff_urls and follows no redirect", () => {
+    const src = readFileSync(LIVE_SH, "utf8");
+    const body = /^handoff_live\(\) \{\n([\s\S]*?)^\}$/m.exec(src)?.[1] ?? "";
+    expect(body).toContain("handoff_urls");
+    expect(body).not.toMatch(/\$BASE\//);
+    expect(body).not.toMatch(/curl [^|\n]*-L/);
   });
 });
 

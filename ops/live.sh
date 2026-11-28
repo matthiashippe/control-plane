@@ -6,6 +6,7 @@
 #   ops/live.sh --selftest   no network: proves every check against planted data, in both directions
 #   ops/live.sh --judge domains-search <status>   no network: judges one answer of the search, its body on stdin
 #   ops/live.sh --judge hosts   no network: judges the lines of hosts_live, `<host> <path> <status> <Location or ->`, on stdin
+#   ops/live.sh --handoff-urls <code>   no network: prints the three addresses the check `handoff` calls for that code
 #
 # One line per check, `OK <check>: ...` or `FAIL <check>: ...`, then `LIVE OK` or `LIVE FAIL`; exit 1
 # as soon as one check fails. Later goals append their live check here (a judge function, a planted
@@ -59,7 +60,9 @@
 #   handoff  POST /v1/handoff with example values answers 201 with a two-digit match, GET /h/{code} shows three different
 #            two-digit numbers with match among them, and the stream GET /v1/handoff/{code} with the poll token says pending
 #            within 5 s (konto 02). Approves nothing: the code runs out unused after ten minutes. The poll token goes through
-#            a header file in a mktemp -d folder that a trap deletes, never onto a command line or into the output
+#            a header file in a mktemp -d folder that a trap deletes, never onto a command line or into the output.
+#            POST and stream go to BASE, the page to PAGE_BASE, the canonical host (move goal 06): on an old host the app
+#            answers every page with a 301. The page is fetched without following redirects, so a 301 there stays a FAIL
 #   sandbox-foreign  the number of foreign accounts (no address and no key name of src/bounties/ours.ts) with at least one
 #            ledger row of kind sandbox, the measure of the ROADMAP criterion; shown, and FAIL only when it cannot be read
 #   automaton  with our own account (LIVE_SANDBOX_KEY) POST /v1/automatons answers 201, within AUTOMATON_WAIT (180) s
@@ -77,6 +80,9 @@ set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BASE="${LIVE_URL:-https://postyourprice.com}"
+# The host of the handoff page /h/{code} (move goal 06): the canonical host, whatever LIVE_URL says, because the app sends
+# every page of an old host to it with a 301.
+PAGE_BASE="${LIVE_PAGE_URL:-https://automatonhost.com}"
 REFUND_KEY="refund:client-aborted-2026-11-10"
 REFUND_MC=79229
 
@@ -365,16 +371,29 @@ judge_handoff() { # $1 = result line from HANDOFF_JS
   esac
 }
 
-# The live part: one handoff with example values, its page and 5 s of its stream. Prints the result line only.
+# The three addresses of the check `handoff` for the code $1, one `<METHOD> <URL>` per line in the order POST, page, stream
+# (move goal 06): POST and stream on BASE, where machine paths answer on every host, the page on PAGE_BASE. handoff_live
+# takes its addresses from here and `--handoff-urls` prints them, so what is shown without network is what the live run
+# calls. A code that does not match ^[0-9A-Z]{10,32}$ prints nothing and returns 2.
+handoff_urls() {
+  [[ "${1:-}" =~ ^[0-9A-Z]{10,32}$ ]] || return 2
+  printf 'POST %s/v1/handoff\nGET %s/h/%s\nGET %s/v1/handoff/%s\n' "$BASE" "$PAGE_BASE" "$1" "$BASE" "$1"
+}
+# The POST address does not depend on the code, so before there is one it is read with this placeholder.
+HANDOFF_ANY_CODE=0000000000
+
+# The live part: one handoff with example values, its page and 5 s of its stream. Prints the result line only. The page
+# is fetched without following redirects: a 301 there is a FAIL, not a hop to another host.
 handoff_live() {
-  local d c_code p_code="none" code
+  local d c_code p_code="none" code post urls=()
   d="$(mktemp -d -p "$(live_tmp)")"
   trap 'rm -rf "$d"' RETURN
-  c_code="$(curl -s -o "$d/create" -w '%{http_code}' --max-time 15 -H 'content-type: application/json' --data "$HANDOFF_BODY" "$BASE/v1/handoff")"
+  post="$(handoff_urls "$HANDOFF_ANY_CODE" | sed -n '1s/^POST //p')"
+  c_code="$(curl -s -o "$d/create" -w '%{http_code}' --max-time 15 -H 'content-type: application/json' --data "$HANDOFF_BODY" "$post")"
   code="$(NODE_NO_WARNINGS=1 node -e "$HANDOFF_PREP_JS" "$d/create" "$d/hdr" 2>/dev/null)"
-  if [ -n "$code" ]; then
-    p_code="$(curl -s -o "$d/page" -D "$d/page-headers" -w '%{http_code}' --max-time 15 "$BASE/h/$code")"
-    curl -s -N --max-time 5 -H "@$d/hdr" "$BASE/v1/handoff/$code" >"$d/stream" 2>/dev/null
+  if [ -n "$code" ] && mapfile -t urls < <(handoff_urls "$code") && [ "${#urls[@]}" = 3 ]; then
+    p_code="$(curl -s -o "$d/page" -D "$d/page-headers" -w '%{http_code}' --max-time 15 "${urls[1]#GET }")"
+    curl -s -N --max-time 5 -H "@$d/hdr" "${urls[2]#GET }" >"$d/stream" 2>/dev/null
   fi
   NODE_NO_WARNINGS=1 node -e "$HANDOFF_JS" "${c_code:-none}" "$d/create" "${p_code:-none}" "$d/page" "$d/stream" "$d/page-headers"
 }
@@ -1391,7 +1410,8 @@ selftest() {
 
   # The check `handoff` through the real parts (HANDOFF_PREP_JS, HANDOFF_JS, judge_handoff), both directions: the answer of a
   # working service, then a 404 of the POST, an answer without match, a stream without pending, a page without match among
-  # its numbers and a 404 of the page. The poll token of the planted answer is made here, not written out.
+  # its numbers, a 404 of the page and a 301 of the page (move goal 06: an old host sends the page on to the canonical one,
+  # and the check does not follow it). The poll token of the planted answer is made here, not written out.
   local h_tok h_ok h_page h_pending h_case h_name h_cs h_cf h_ps h_pf h_sf h_hf h_expect
   h_tok="$(head -c 43 /dev/zero | tr '\0' 'q')"
   h_ok="{\"code\":\"7KQ2M9XC4D7K\",\"url\":\"https://postyourprice.com/h/7KQ2M9XC4D7K\",\"qr\":\" \",\"match\":47,\"expires_at\":\"2026-11-13T12:10:00.000Z\",\"poll_token\":\"$h_tok\"}"
@@ -1403,6 +1423,7 @@ selftest() {
   printf '%s' "$h_page" >"$dir/h-page-ok"
   printf '%s' "${h_page//47/33}" >"$dir/h-page-nomatch"
   printf '%s' '<h1>This code no longer works.</h1>' >"$dir/h-page-404"
+  printf '%s' '<a href="https://automatonhost.com/h/7KQ2M9XC4D7K">Moved Permanently</a>.' >"$dir/h-page-301"
   printf '%s' "$h_pending" >"$dir/h-stream-ok"
   printf '%s' ': keep-alive' >"$dir/h-stream-none"
   # The headers of the page: what the app sends behind Caddy with ?Referrer-Policy, what Caddy sent before konto 03 instead of
@@ -1416,7 +1437,7 @@ selftest() {
   [ -z "$(NODE_NO_WARNINGS=1 node -e "$HANDOFF_PREP_JS" "$dir/h-create-404" "$dir/h-hdr-404")" ] && [ ! -e "$dir/h-hdr-404" ] ||
     { echo "FAIL selftest: HANDOFF_PREP_JS took a 404"; all_ok=0; }
   for h_case in "ok 201 ok 200 ok ok ok OK" "404 404 404 none 404 none ok FAIL" "nomatch 201 nomatch 200 ok ok ok FAIL" \
-    "nopending 201 ok 200 ok none ok FAIL" "pagenomatch 201 ok 200 nomatch ok ok FAIL" "page404 201 ok 404 404 ok ok FAIL" \
+    "nopending 201 ok 200 ok none ok FAIL" "pagenomatch 201 ok 200 nomatch ok ok FAIL" "page404 201 ok 404 404 ok ok FAIL" "page301 201 ok 301 301 ok ok FAIL" \
     "referrer-caddy 201 ok 200 ok ok caddy FAIL" "referrer-both 201 ok 200 ok ok both FAIL" "referrer-none 201 ok 200 ok ok none FAIL"; do
     read -r h_name h_cs h_cf h_ps h_pf h_sf h_hf h_expect <<<"$h_case"
     got="$(judge_handoff "$(NODE_NO_WARNINGS=1 node -e "$HANDOFF_JS" "$h_cs" "$dir/h-create-$h_cf" "$h_ps" "$dir/h-page-$h_pf" "$dir/h-stream-$h_sf" "$dir/h-headers-$h_hf")")"
@@ -1917,6 +1938,13 @@ live() {
 
 case "${1:-}" in
   --selftest) selftest ;;
+  --handoff-urls)
+    # The addresses of the check `handoff` for one code, without network (test/live-selftest.test.ts).
+    handoff_urls "${2:-}" || {
+      echo "not a handoff code: expected ^[0-9A-Z]{10,32}\$" >&2
+      exit 2
+    }
+    ;;
   --judge)
     # One judge without network, the answer's body on stdin (test/live-selftest.test.ts hands it the handler's answer).
     case "${2:-}" in
