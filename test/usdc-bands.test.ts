@@ -31,16 +31,27 @@ const USDC = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913";
 
 type Db = ReturnType<typeof openDb>;
 
-function row(db: Db, address: string, kind: string, deltaMc: number, at: string, ref: string) {
+function row(db: Db, address: string, kind: string, deltaMc: number, at: string, ref: string, meta: string | null = "{}") {
   db.prepare("INSERT INTO ledger (address, kind, delta_mc, ref, meta, created_at) VALUES (?, ?, ?, ?, ?, ?)").run(
     address,
     kind,
     deltaMc,
     ref,
-    "{}",
+    meta,
     at,
   );
 }
+
+// The meta of a topup as the service books it (kunden 19): /pay/1/ credits 1 USD plus the bonus of one cent,
+// 101000 mc, with meta.usd 1 (src/payments/pay.ts); a direct transfer of 1 USDC books 100000 mc without
+// meta.usd (src/konto/topup.ts). Only these two are the tier 1.
+const PAY = (usd: number) =>
+  JSON.stringify({ tx_hash: "0x" + "ab".repeat(32), from: STRANGER, value_atomic: String(usd * 1_000_000), usd, bonus_cents: 1 });
+const DIRECT = JSON.stringify({ source: "spend_permission", chain_id: 8453, usdc: "1000000" });
+// The offer on /pay/5/ also lists the cheapest tier (src/payments/pay.ts), and what was paid is credited: a wallet
+// that signs only 1 USD there books 101000 mc with meta.usd 5 and meta.value_atomic "1000000".
+const PAID = (pathUsd: number, paidUsd: number) =>
+  JSON.stringify({ tx_hash: "0x" + "ab".repeat(32), from: STRANGER, value_atomic: String(paidUsd * 1_000_000), usd: pathUsd, bonus_cents: 1 });
 
 function plant(db: Db) {
   for (const a of [OURS, TOOL, STRANGER, MIXED, EARLY, THINKER]) {
@@ -57,15 +68,17 @@ function plant(db: Db) {
     "2026-11-01T00:00:00.000Z",
   );
   row(db, STRANGER, "grant", 15000, "2026-11-06T00:00:00.000Z", "grant-s"); // exactly at --since: counts
-  row(db, STRANGER, "topup", 100000, "2026-11-07T00:00:00.000Z", "x402-s-1"); // 1 USD
-  row(db, MIXED, "topup", 100000, "2026-11-08T00:00:00.000Z", "x402-m-1"); // 1 USD
-  row(db, MIXED, "topup", 500000, "2026-11-09T00:00:00.000Z", "x402-m-5"); // 5 USD: not the tier 1
-  row(db, EARLY, "topup", 100000, "2026-11-05T23:59:59.000Z", "x402-e-1"); // before --since
+  row(db, STRANGER, "topup", 101000, "2026-11-07T00:00:00.000Z", "x402-s-1", PAY(1)); // 1 USD over /pay/1/ with the bonus
+  row(db, MIXED, "topup", 100000, "2026-11-08T00:00:00.000Z", "spend-m-1", DIRECT); // 1 USDC by direct transfer
+  row(db, MIXED, "topup", 505000, "2026-11-09T00:00:00.000Z", "x402-m-5", PAY(5)); // 5 USD: not the tier 1
+  row(db, MIXED, "topup", 501000, "2026-11-09T01:00:00.000Z", "x402-m-5b", PAY(5)); // 5 USD as /pay/5/ books it
+  row(db, STRANGER, "topup", 100000, "2026-11-09T02:00:00.000Z", "x402-s-5", PAY(5)); // 100000 mc, but meta.usd 5
+  row(db, EARLY, "topup", 101000, "2026-11-05T23:59:59.000Z", "x402-e-1", PAY(1)); // before --since
   row(db, EARLY, "grant", 15000, "2026-11-28T00:00:00.000Z", "grant-e"); // exactly at --until: outside
   row(db, THINKER, "inference", -100, "2026-11-10T00:00:00.000Z", "gen-t"); // no grant, no topup
-  row(db, OURS, "topup", 100000, "2026-11-10T00:00:00.000Z", "x402-ours");
+  row(db, OURS, "topup", 101000, "2026-11-10T00:00:00.000Z", "x402-ours", PAY(1));
   row(db, TOOL, "grant", 15000, "2026-11-10T00:00:00.000Z", "grant-tool");
-  row(db, TOOL, "topup", 100000, "2026-11-10T01:00:00.000Z", "x402-tool");
+  row(db, TOOL, "topup", 101000, "2026-11-10T01:00:00.000Z", "x402-tool", PAY(1));
 }
 
 function run(script: string, dbPath: string, env: Record<string, string>) {
@@ -106,6 +119,60 @@ describe("ops/db-report.cjs with CP_REPORT=topup-bands", () => {
 
   it("counts the foreign topups of exactly 1 USD in the window", () => {
     expect(withDb((p) => report(p)).topups_1usd).toBe(2);
+  });
+
+  it("counts a topup over /pay/1/ with its bonus of 101000 mc and meta.usd 1 as the tier 1", () => {
+    const only = (meta: string | null, deltaMc: number) =>
+      withDb(
+        (p) => report(p).topups_1usd,
+        (db) => {
+          db.prepare("INSERT INTO wallets (address, balance_mc, reserved_mc, created_at) VALUES (?, 0, 0, ?)").run(
+            STRANGER,
+            "2026-11-01T00:00:00.000Z",
+          );
+          row(db, STRANGER, "topup", deltaMc, "2026-11-07T00:00:00.000Z", "only", meta);
+        },
+      );
+    expect(only(PAY(1), 101000)).toBe(1);
+    expect(only(DIRECT, 100000)).toBe(1);
+    expect(only(null, 100000)).toBe(1); // no meta at all: a direct transfer by its amount
+    expect(only("not json", 100000)).toBe(1); // unreadable meta: the amount decides, the report does not fail
+  });
+
+  it("never counts another tier as the tier 1, whatever its amount", () => {
+    const only = (meta: string | null, deltaMc: number) =>
+      withDb(
+        (p) => report(p).topups_1usd,
+        (db) => {
+          db.prepare("INSERT INTO wallets (address, balance_mc, reserved_mc, created_at) VALUES (?, 0, 0, ?)").run(
+            STRANGER,
+            "2026-11-01T00:00:00.000Z",
+          );
+          row(db, STRANGER, "topup", deltaMc, "2026-11-07T00:00:00.000Z", "only", meta);
+        },
+      );
+    expect(only(PAY(5), 505000)).toBe(0);
+    expect(only(PAY(5), 501000)).toBe(0);
+    expect(only(PAY(5), 100000)).toBe(0);
+    expect(only(DIRECT.replace("1000000", "5000000"), 500000)).toBe(0);
+    expect(only(null, 101000)).toBe(0); // no meta.usd and not exactly 1 USDC
+  });
+
+  it("counts a topup on /pay/5/ that paid only the cheapest tier as the tier 1", () => {
+    const only = (meta: string | null, deltaMc: number) =>
+      withDb(
+        (p) => report(p).topups_1usd,
+        (db) => {
+          db.prepare("INSERT INTO wallets (address, balance_mc, reserved_mc, created_at) VALUES (?, 0, 0, ?)").run(
+            STRANGER,
+            "2026-11-01T00:00:00.000Z",
+          );
+          row(db, STRANGER, "topup", deltaMc, "2026-11-07T00:00:00.000Z", "only", meta);
+        },
+      );
+    expect(only(PAID(5, 1), 101000)).toBe(1); // paid 1 USD on /pay/5/: meta.value_atomic decides
+    expect(only(PAID(5, 5), 501000)).toBe(0); // paid 5 USD on /pay/5/: never the tier 1
+    expect(only(PAID(1, 5), 100000)).toBe(0); // meta.value_atomic 5000000 wins over meta.usd 1 and the amount
   });
 
   it("takes the rows at the edges in when the window moves, so the window is what keeps them out", () => {

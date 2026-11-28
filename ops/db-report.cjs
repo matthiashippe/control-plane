@@ -745,7 +745,10 @@ if (process.env.CP_REPORT === "sandbox-customer") {
 
 // CP_REPORT=topup-bands (goals/kunden/18): instead of the report, one JSON for ops/usdc-bands.sh: every foreign
 // address with a `grant` or `topup` ledger row in the window CP_SINCE..CP_UNTIL (ISO UTC, CP_UNTIL empty means now),
-// lowercase and each once, and the number of foreign `topup` rows of exactly 1 USD (100000 mc) in the window.
+// lowercase and each once, and the number of foreign `topup` rows of the tier 1 USD in the window: what the
+// customer bought for 1 USD, not an amount in the ledger (kunden 19). /pay/1/ books 1 USD plus the bonus, 101000 mc,
+// with meta.usd 1 (src/payments/pay.ts); a direct transfer of 1 USDC books 100000 mc without meta.usd
+// (src/konto/topup.ts). A row with meta.usd of another tier never counts, whatever its amount.
 // The addresses are needed to read their USDC on Base; ops/usdc-bands.sh keeps them in a temp file of mode 0600,
 // deletes it and prints counts only. Written synchronously and ended here, like the decline block.
 if (process.env.CP_REPORT === "topup-bands") {
@@ -770,10 +773,21 @@ if (process.env.CP_REPORT === "topup-bands") {
       order by 1`,
     since, until, ...OURS_ARGS,
   ).map((r) => r.address);
+  const ONE_USD_ATOMIC = 1000000;
+  // json_valid first: json_extract fails the whole query on one row whose meta is not JSON; such a row has no
+  // meta.usd and counts by its amount. Where meta.value_atomic stands (every topup over /pay/), what was paid
+  // decides: /pay/5/ also offers the cheapest tier and credits 1 USD paid there with meta.usd 5.
   const topups1Usd = one(
     `select count(*) n from ledger
-      where kind = 'topup' and delta_mc = ? and created_at >= ? and created_at < ? and ${notOurs}`,
-    ONE_USD_MC, since, until, ...OURS_ARGS,
+      where kind = 'topup' and created_at >= ? and created_at < ? and ${notOurs}
+        and (case
+               when not coalesce(json_valid(meta), 0) then delta_mc = ?
+               when json_extract(meta, '$.value_atomic') is not null
+                 then cast(json_extract(meta, '$.value_atomic') as integer) = ?
+               else (json_extract(meta, '$.usd') = 1
+                     or (json_extract(meta, '$.usd') is null and delta_mc = ?))
+             end)`,
+    since, until, ...OURS_ARGS, ONE_USD_MC, ONE_USD_ATOMIC, ONE_USD_MC,
   ).n;
   // writeSync may write part of the buffer to a pipe, or meet EAGAIN on a non-blocking one.
   const out = Buffer.from(JSON.stringify({ since, until, addresses, topups_1usd: topups1Usd }) + "\n");

@@ -1,7 +1,7 @@
 # Kunden Goal 19: Bringen der Befehl zum Update und die Stufe 1 USD eine Zahlung?
 
 ## Status
-PLANNED
+DONE
 
 ## Active Objective
 kunden 17 gibt älteren gepflegten Runtimes mit der 402 den Befehl zum Update (ausgerollt mit dem Lauf von `deploy.yml` an `7173b70`,
@@ -69,7 +69,7 @@ und der Richtungs-Check (spätestens 04.12.) sonst auf einer falschen Null entsc
   Laufzeitpfad). Code, Bezeichner, Testnamen und Ausgaben englisch.
 
 ## Done Condition
-- [ ] `CP_REPORT=topup-bands` zählt jeden Kauf der Stufe 1, über `/pay/1/` mit Bonus wie per direkter Überweisung, und nie eine
+- [x] `CP_REPORT=topup-bands` zählt jeden Kauf der Stufe 1, über `/pay/1/` mit Bonus wie per direkter Überweisung, und nie eine
       andere Stufe; Test und Selbsttest pflanzen die echte Buchung und waren vor dem Fix rot.
       MVP: Funktion, weil die Zeile `TOPUPS 1 USD` heute jeden Kauf über `/pay/1/` übersieht und die Leitzahl von kunden 18 auf einer
       falschen Null steht.
@@ -78,7 +78,7 @@ und der Richtungs-Check (spätestens 04.12.) sonst auf einer falschen Null entsc
       Prüfung: `grep -c '101000' test/usdc-bands.test.ts` muss mindestens 1 ausgeben.
       Prüfung: `grep -c '101000' ops/usdc-bands.sh` muss mindestens 1 ausgeben.
       Prüfung: `grep -c "json_extract(meta, '\$.usd')" ops/db-report.cjs` muss mindestens 1 ausgeben.
-- [ ] `docs/kunden/nach-dem-update-2026-11.md` zeigt ab dem Rollout von kunden 17 die Antworten 402 je Kennung, die Kartenbesuche und
+- [x] `docs/kunden/nach-dem-update-2026-11.md` zeigt ab dem Rollout von kunden 17 die Antworten 402 je Kennung, die Kartenbesuche und
       die Aufladungen der Stufe 1 mit Befehl und vollständiger Ausgabe, dazu die Korrektur seit dem 06.11., und die Zeilen
       `Neue Kennung:`, `Stufe 1 gekauft:` und `Nächster Schritt:` folgen aus ihr.
       MVP: Funktion, weil erst diese Zahlen zeigen, ob der Befehl zum Update und die Stufe 1 einen zahlenden Kunden bringen.
@@ -87,14 +87,27 @@ und der Richtungs-Check (spätestens 04.12.) sonst auf einer falschen Null entsc
       Prüfung: `awk '/^MAINTAINED 402 VERSION automaton-maintained\/0\.2\.2-maintained\.([2-9]|[1-9][0-9]+): [1-9]/{k=1} /^TOPUPS 1 USD since 2026-11-27T22:09:54Z /{t=$(NF-3)} /^Neue Kennung: /{a=$3; n++} /^Stufe 1 gekauft: /{b=$4; m++} /^Nächster Schritt: /{s++} END{print (n==1 && m==1 && s==1 && a==(k?"ja,":"nein,") && b==((t>=1)?"ja,":"nein,")) ? "stimmig" : "unstimmig"}' docs/kunden/nach-dem-update-2026-11.md` muss genau `stimmig` ausgeben.
       Prüfung: `grep -cE '0x[0-9a-fA-F]{40}|([0-9]{1,3}\.){3}[0-9]{1,3}' docs/kunden/nach-dem-update-2026-11.md` muss 0 ausgeben.
       Prüfung (Netz): `set -a; . ~/.config/control-plane/loop.env; set +a; d=docs/kunden/nach-dem-update-2026-11.md; u=$(sed -nE 's/^\$ bash ops\/usdc-bands\.sh --since 2026-11-06T00:00:00Z --until ([0-9T:-]+Z)$/\1/p' "$d"); diff <(bash ops/usdc-bands.sh --since 2026-11-06T00:00:00Z --until "${u:?}" 2>/dev/null | grep -E '^TOPUPS 1 USD ') <(grep -E '^TOPUPS 1 USD since 2026-11-06T' "$d")` muss nichts ausgeben.
-- [ ] Die Entscheidungen stehen in `goals/kunden/ANNAHMEN.md`, der Diff bleibt in den Pfaden dieses Goals, kein Test fällt weg.
+- [x] Die Entscheidungen stehen in `goals/kunden/ANNAHMEN.md`, der Diff bleibt in den Pfaden dieses Goals, kein Test fällt weg.
       MVP: Funktion, weil das nächste Glied wissen muss, was als Kauf der Stufe 1 zählt und warum das Fenster am Rollout beginnt.
       Prüfung: `grep -cE '^- [0-9]{4}-[0-9]{2}-[0-9]{2}, kunden 19: ' goals/kunden/ANNAHMEN.md` muss mindestens 4 ausgeben.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD | grep -vE '^(ops/db-report\.cjs|ops/usdc-bands\.sh|ops/usdc_bands\.py|test/usdc-bands\.test\.ts|docs/kunden/nach-dem-update-2026-11\.md|goals/kunden/.*|goals/[a-z]+/ANNAHMEN\.md)$' | wc -l` muss 0 ausgeben.
       Prüfung: `git diff --diff-filter=D --name-only $(git merge-base origin/dev HEAD) HEAD -- test ops docs | wc -l` muss 0 ausgeben.
-- [ ] `check` ist grün.
+- [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] `CP_REPORT=topup-bands` zählt auch den Kauf, der auf `/pay/5/` nur die kleinste Stufe bezahlt (101000 mc, `meta.usd` 5,
+      `meta.value_atomic` `"1000000"`), als Stufe 1, und einen bezahlten Kauf von 5 USD (`meta.value_atomic` `"5000000"`) nie:
+      Wo `meta.value_atomic` steht, entscheidet es, sonst gilt Entscheidung 1. Test und Selbsttest pflanzen beide Fälle, der Test
+      heißt `counts a topup on /pay/5/ that paid only the cheapest tier as the tier 1`, der Selbsttest nennt
+      `paid only the cheapest tier`, beide waren vor dem Fix rot (die Zeile im Progress Log sagt, womit), und eine Zeile
+      `- <JJJJ-MM-TT>, kunden 19: Kritik: …` in `goals/kunden/ANNAHMEN.md` ersetzt die Zeile, nach der dieser Kauf nicht zählt.
+      MVP: Funktion, weil die zweite Zeile des Angebots in der 402 auf `/pay/5/` genau für eine Wallet mit 1 USD Ausgabegrenze da
+      ist (`src/payments/pay.ts:505` bis `:513`, gutgeschrieben wird `bezahlt`), und ihr Kauf für 1 USD heute in `TOPUPS 1 USD`
+      fehlt, also der Richtungs-Check am 04.12. wieder auf einer blinden Null stünde.
+      Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/usdc-bands.test.ts -t "paid only the cheapest tier"` muss Exit-Code 0 liefern und in der Ausgabe `1 passed` enthalten.
+      Prüfung: `PATH=/usr/bin:$PATH bash ops/usdc-bands.sh --selftest | /usr/bin/grep -c 'paid only the cheapest tier'` muss mindestens 1 ausgeben.
+      Prüfung: `PATH=/usr/bin:$PATH bash ops/usdc-bands.sh --selftest | tail -1` muss mit `SELFTEST OK` beginnen.
+      Prüfung: `/usr/bin/grep -cE '^- [0-9]{4}-[0-9]{2}-[0-9]{2}, kunden 19: Kritik: ' goals/kunden/ANNAHMEN.md` muss mindestens 1 ausgeben.
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Kein Aufruf in der Produktion, der etwas anlegt oder bucht; gelesen wird nur über `ops/card-visits.sh`, `ops/usdc-bands.sh`,
@@ -123,6 +136,10 @@ und der Richtungs-Check (spätestens 04.12.) sonst auf einer falschen Null entsc
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-28 Zyklus 1: Punkte 1, 2, 3, 4 gebaut: `CP_REPORT=topup-bands` zählt `meta.usd` 1 oder ohne `meta.usd` 100000 mc (gegen den Bericht von `71202a7` 6 von 14 Tests rot, Selbsttest 3 FAIL), Messung am 2026-11-28T13:05:16Z in `docs/kunden/nach-dem-update-2026-11.md` (1000 Antworten 402 nur an `0.2.2-maintained.1`, 0 Aufladungen der Stufe 1, Korrektur seit 06.11. bleibt 0), 9 Zeilen kunden 19 in `ANNAHMEN.md`, die 45 mitziehenden Prüfbefehle vor und nach dem Bau wie erwartet. Prüfbefehle: vitest usdc-bands Exit 0 (14 passed); Selbsttest `SELFTEST OK`; `101000` im Test 8, im Skript 6; `json_extract(meta, '$.usd')` 2 (GNU grep); Punkt 2 `stimmig`, 3, `stimmig`, 0, Netz-diff leer; Punkt 3 9, 0, 0; `check` Exit 0 (3000 passed).
+- 2026-11-28 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, `dev` (`71202a7`) war schon im Branch, jeder Prüfbefehl am Kopf `39fc0b2` erneut gefahren. Prüfbefehle: vitest usdc-bands Exit 0 (14 passed); Selbsttest `SELFTEST OK`; `101000` im Test 8, im Skript 6; `json_extract(meta, '$.usd')` 2 mit `/usr/bin/grep` (die `grep`-Funktion der Claude-Shell ist ugrep, liest `$` als Anker und zählt 0); Punkt 2 `stimmig`, 3, `stimmig`, 0, Netz-diff leer (`--until 2026-11-28T13:05:16Z`); Punkt 3 9, 0, 0; `check` Exit 0 (3000 passed, 158 s).
+- 2026-11-28 Zyklus 3: Punkt 5 aus der Kritik gebaut und Abschluss gemeldet, Punkte 1, 2, 3, 4, 5: wo `meta.value_atomic` steht, entscheidet es (1000000 ist Stufe 1), sonst Entscheidung 1; vor dem Fix gegen `ops/db-report.cjs` von `6100909` 3 von 15 Tests rot (der neue Test mit `expected +0 to be 1`, zweimal der Selbsttest) und im Selbsttest 1 FAIL (`paid only the cheapest tier`), danach 15 grün und `SELFTEST OK`; `dev` (`4e25fa9`) gemergt. Prüfbefehle: Punkt 5 `1 passed | 14 skipped`, 1, `SELFTEST OK`, 1; Punkt 1 Exit 0, `101000` 10 und 9, `json_extract(meta, '$.usd')` 2 (`/usr/bin/grep`); Punkt 2 `stimmig`, 3, `stimmig`, 0, Netz-diff nach dem Bau leer (seit 06.11. und seit dem Rollout bleibt `TOPUPS 1 USD` 0); Punkt 3 9, Pfade außerhalb 2 (nur die beiden Vorschläge `goals/_vorschlaege/kunden-kritik-2026-11-28-2.md` und `-3.md` aus dem Kritik-Commit `6100909`, ohne sie 0), 0; `check` Exit 0 (3001 passed, 153 s).
+- 2026-11-28 Release: PASS K und B (Zyklus 3), DONE.
 
 ## Blockers
 - keine
