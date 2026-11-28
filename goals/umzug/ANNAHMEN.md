@@ -184,3 +184,32 @@
 ## Abgelöst durch umzug 04 (Maker, 2026-11-18)
 
 - Abgelöst: umzug 01 Punkt 7 durch umzug 04 Punkt 6, Ausgabe dann genau `Exit 0, 28` (Tech Lead, 2026-11-18)
+
+## Goal 06 (28.11.2026, Engineer CP)
+
+- Eine Funktion `handoff_urls <code>` druckt die drei Adressen der Prüfung `handoff` (POST und Stream auf `BASE`, die Seite auf
+  `PAGE_BASE="${LIVE_PAGE_URL:-https://automatonhost.com}"`), weil Prüfung und Live-Lauf sonst auseinanderlaufen können: `handoff_live`
+  liest Seite und Stream aus ihrer Ausgabe, `--handoff-urls` druckt genau dieselbe (Entscheidung 1 des Tech Lead).
+- Die POST-Adresse holt `handoff_live` mit dem Platzhalter `HANDOFF_ANY_CODE=0000000000` aus der ersten Zeile von `handoff_urls`, weil
+  es vor dem POST noch keinen Code gibt und die POST-Adresse nicht vom Code abhängt; so kommt auch sie aus derselben Funktion
+  (Punkt 2), ohne eine zweite Stelle, die `BASE` zusammensetzt.
+- `PAGE_BASE` hängt nicht an `LIVE_URL`, weil die App jede Seite eines alten Hosts mit 301 auf den kanonischen Host schickt
+  (`src/app.ts`, `PAGES_STAY` nennt `/h/` nicht); wer die Seite anderswo prüfen will, setzt `LIVE_PAGE_URL`.
+- `--handoff-urls` mit einem Code, der nicht auf `^[0-9A-Z]{10,32}$` passt, endet mit Exit 2 und schreibt nur auf stderr, weil der Code
+  in eine URL geht und ein fremdes Zeichen (`;`, `/`, `..`) dort nichts zu suchen hat; derselbe Ausdruck prüft in
+  `HANDOFF_PREP_JS` schon den Code der Antwort (Entscheidung 2).
+- Die Seite wird weiter ohne `-L` geholt, weil ein 301 des kanonischen Hosts selbst ein echter Fehler ist und rot bleiben muss
+  (Entscheidung 3); der gepflanzte Fall `page301` (POST 201 mit Match, Seite 301, Stream pending, Kopfzeilen ok) zeigt im Selbsttest,
+  dass die Prüfung ihn als `FAIL handoff: /h/{code} answered 301` sieht (Entscheidung 4).
+- Der vitest-Fall in `test/live-selftest.test.ts` (`describe("ops/live.sh --handoff-urls")`, vier Fälle mit `handoff-urls` im Namen)
+  liest dazu den Rumpf von `handoff_live`, weil eine Prüfung allein der Ausgabe von `--handoff-urls` grün bliebe, wenn der Live-Lauf
+  wieder eine eigene Adresse baut. Gegen das `ops/live.sh` der Merge-Basis sind drei der vier rot (der Fall mit dem falschen Code
+  ist dort zufällig grün, weil der unbekannte Schalter auch Exit 2 ohne stdout gibt), am Goal-Branch alle vier grün.
+- Abgelöste Prüfbefehle (Entscheidung 6), gemessen ohne Netz am 28.11.2026 an der Merge-Basis `8fbdb47` und am Goal-Branch, Vergleich
+  über Exit-Code und letzte Zeile, weil das die Form der Zeilen `- Abgelöst:` ist: 74 Prüfbefehle aus 19 Goal-Dateien mit Status
+  `DONE`, die `live.sh` oder `live-selftest` nennen (Zeilen mit mehreren Befehlen in Backticks einzeln gezählt). Geändert hat sich nur
+  konto 02 Punkt 8, zweiter Befehl (Zahl der roten gepflanzten handoff-Fälle 8 auf 9, Erwartung „mindestens 3“ bleibt erfüllt), weil
+  der neue Fall `page301` rot ist. Bei den elf vitest-Läufen unterscheiden sich nur die Laufzeit und die Zahl der Tests, die letzte
+  Zeile ist die Laufzeit; abrechnung 03 Punkt 3 endet an beiden Ständen gleich mit Exit 1 (abgelöst durch fehler 14). Der
+  Vergleich der ganzen Ausgabe fand 23 Unterschiede (die neue Zeile `planted handoff page301`, Zahl der Tests, Laufzeiten), er ist
+  also nicht blind.
