@@ -72,6 +72,19 @@ Messung das zeigt.
       Prüfung (Netz): `gh pr checks $(gh pr list -R matthiashippe/control-plane --head goal/abrechnung-09 --state open --json number -q '.[0].number') -R matthiashippe/control-plane 2>&1 | grep -E '^e2e\s' | grep -c pass` muss genau 1 ausgeben.
 - [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
+- [ ] Auch eine gekürzte Antwort, die über `OpenRouterProvider` kommt und nur Reasoning trägt, gilt in der Ledger-Zeile als leer,
+      und das Reasoning landet nicht im Ledger. Ein Fall „marks a shortened reasoning-only answer from OpenRouter as empty“ in
+      `test/inference-shortened-empty.test.ts` schickt die Anfrage mit einem Guthaben für 300 Antwort-Tokens durch `handleChat` an einen
+      `OpenRouterProvider` mit nachgebautem `fetch` wie in `test/openrouter.test.ts` (kein Netz) und antwortet zweimal in der Form von
+      OpenRouter für ein Modell mit Reasoning: `content: ""` und `content: null`, je mit einem Feld `reasoning` (Text),
+      `finish_reason: "length"` und `usage.completion_tokens_details.reasoning_tokens`. Erwartet: `shortened_empty` ist `true`,
+      `shortened_finish` ist `"length"`, und `JSON.stringify` der `meta` enthält den Reasoning-Text nicht.
+      MVP: Funktion, weil die Produktion über `OpenRouterProvider` geht, die Fälle aus Punkt 1 dessen Umbau der Antwort
+      (`src/inference/openrouter.ts`: `content ?? null`, `finish_reason` auf `length`, `tool_calls` oder `stop`) aber umgehen und
+      abrechnung 10 sonst auf einer Zählung misst, die am echten Weg nie geprüft wurde.
+      Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/inference-shortened-empty.test.ts` muss Exit-Code 0 haben.
+      Prüfung: `grep -cF '"marks a shortened reasoning-only answer from OpenRouter as empty"' test/inference-shortened-empty.test.ts` muss `1` ausgeben.
+      Prüfung: `grep -c 'new OpenRouterProvider' test/inference-shortened-empty.test.ts` muss mindestens 1 ausgeben.
 - [ ] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
