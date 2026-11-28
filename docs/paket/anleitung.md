@@ -5,19 +5,19 @@ Das gepflegte Paket der Automaton-Runtime liegt im öffentlichen Repo
 Einstellung bei `https://automatonhost.com` an, und jede Anfrage an den Control Plane trägt
 `User-Agent: automaton-maintained/<version>`. Darüber zählt paket 02, wer über das Paket kommt.
 
-Release: v0.2.2-maintained.3
+Release: v0.2.2-maintained.4
 
 ## Installieren
 
 Ein Befehl, ohne npm-Konto:
 
 ```bash
-npm install -g github:matthiashippe/automaton#v0.2.2-maintained.3
+npm install -g github:matthiashippe/automaton#v0.2.2-maintained.4
 automaton --run
 ```
 
-`automaton --version` gibt `automaton-maintained 0.2.2-maintained.3` aus. Release-Seite:
-https://github.com/matthiashippe/automaton/releases/tag/v0.2.2-maintained.3
+`automaton --version` gibt `automaton-maintained 0.2.2-maintained.4` aus. Release-Seite:
+https://github.com/matthiashippe/automaton/releases/tag/v0.2.2-maintained.4
 
 ## Was das Paket gegenüber Upstream ändert
 
@@ -48,6 +48,12 @@ liegen diese Commits, jeder mit Test:
 - `08dbd38` fix(status): `automaton --status` zeigt die Kartenzeile auch, während die Runtime ohne Guthaben schläft; dann entscheidet
   das zuletzt gelesene Guthaben (`last_known_balance`).
 - `df9dea9` release: Version `0.2.2-maintained.3`, das README des Forks nennt den neuen Tag.
+- `3d161a6` feat(topup): Gegen `automatonhost.com` lädt die Runtime ab 1 USD selbst auf, beim Start, mitten im Lauf, im
+  Heartbeat und bei der Sandbox, und zwar die kleinste Stufe, die das Defizit deckt und die die Wallet hält; gegen jeden anderen
+  Control Plane bleiben die Stufen ab 5 USD.
+- `90ecb04` release: Version `0.2.2-maintained.4`, das README des Forks nennt den neuen Tag.
+- `5416f3c` fix(topup): Eine Wallet ab 5 USDC kauft beim Start weiter genau 5 USD wie vorher, auch mit Restguthaben knapp unter
+  der Schwelle.
 
 ## Neuer Upstream-Commit
 

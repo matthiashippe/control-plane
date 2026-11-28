@@ -8,7 +8,7 @@
  * One source for the version: `MAINTAINED_RELEASE` is the tag of the line `Release:` in `docs/paket/anleitung.md`,
  * and test/inference-maintained-update.test.ts turns `check` red when the two differ.
  */
-export const MAINTAINED_RELEASE = "v0.2.2-maintained.3";
+export const MAINTAINED_RELEASE = "v0.2.2-maintained.4";
 
 /** The command from the block under `## Installieren` of `docs/paket/anleitung.md`, word for word. */
 export const MAINTAINED_UPDATE_COMMAND = `npm install -g github:matthiashippe/automaton#${MAINTAINED_RELEASE}`;
