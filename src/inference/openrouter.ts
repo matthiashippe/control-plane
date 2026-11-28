@@ -12,8 +12,14 @@ import { ProviderBadRequestError, ProviderUnavailableError } from "./provider.js
 
 export interface OpenRouterOptions {
   apiKey: string;
-  /** OpenRouter IDs that end up in the catalogue. */
+  /** OpenRouter IDs that end up in the catalogue. One that OpenRouter does not offer stops the start. */
   models: string[];
+  /**
+   * OpenRouter IDs loaded on top of `models` when OpenRouter offers them (goals/fehler/17). One
+   * that OpenRouter does not offer stays out, never stops the start, and gets one log line per
+   * process. An ID already in `models` counts as configured and is not listed twice.
+   */
+  optionalModels?: string[];
   baseUrl?: string;
   fetch?: typeof fetch;
   referer?: string;
@@ -35,6 +41,16 @@ export interface OpenRouterOptions {
 }
 
 export const DEFAULT_OPENROUTER_MODELS = ["openai/gpt-5.2", "openai/gpt-5-mini"];
+
+/**
+ * Models the unchanged runtime at pin d8f8168 asks us for, whatever CP_OPENROUTER_MODELS says:
+ * without its own OpenAI key the runtime points its provider `openai` at us (src/agent/loop.ts:154
+ * to :169 upstream), and that provider's tiers are gpt-4.1, gpt-4.1-mini and gpt-4.1-nano
+ * (src/inference/provider-registry.ts:79, :90, :101). They also sit in the baseline the operator
+ * picks a model from. Loaded on top of the configured list so workers and planner get an answer
+ * instead of 404 without anyone editing the production environment (goals/fehler/17).
+ */
+export const RUNTIME_PIN_MODELS = ["openai/gpt-4.1", "openai/gpt-4.1-mini", "openai/gpt-4.1-nano"];
 
 /**
  * Provider routing on every call (abrechnung 02): the endpoints of a model sorted by throughput
@@ -71,6 +87,9 @@ export function maxPriceFor(spec: ModelSpec | undefined): { prompt: number; comp
 export const DEFAULT_OPENROUTER_ALIASES: Record<string, string> = {
   "gpt-5.2": "openai/gpt-5.2",
   "gpt-5-mini": "openai/gpt-5-mini",
+  "gpt-4.1": "openai/gpt-4.1",
+  "gpt-4.1-mini": "openai/gpt-4.1-mini",
+  "gpt-4.1-nano": "openai/gpt-4.1-nano",
 };
 
 interface OpenRouterModelRow {
@@ -90,6 +109,14 @@ export class OpenRouterProvider implements ChatProvider {
    */
   readonly resale: boolean;
   private readonly specs = new Map<string, ModelSpec>();
+  /**
+   * Models whose OpenRouter row lists `max_completion_tokens` but not `max_tokens` (gpt-4.1-nano on
+   * 2026-11-28). The output cap goes into that field for them, because a parameter a model does not
+   * list may be dropped, and an uncapped answer can outgrow the reservation.
+   */
+  private readonly completionTokensOnly = new Set<string>();
+  /** Optional models already reported as not offered, so the hourly fetch does not repeat the line. */
+  private readonly reportedMissing = new Set<string>();
   private readonly baseUrl: string;
   private readonly fetchImpl: typeof fetch;
   private readonly timeoutMs: number;
@@ -151,12 +178,21 @@ export class OpenRouterProvider implements ChatProvider {
     }
     const rows = new Map((body.data ?? []).map((m) => [m.id, m]));
     const missing: string[] = [];
-    for (const id of this.opts.models) {
+    const required = new Set(this.opts.models);
+    const optional = (this.opts.optionalModels ?? []).filter((id) => !required.has(id));
+    for (const id of [...required, ...optional]) {
       const row = rows.get(id);
       if (!row) {
-        missing.push(id);
+        if (required.has(id)) missing.push(id);
+        else if (!this.reportedMissing.has(id)) {
+          this.reportedMissing.add(id);
+          console.error(`[inference] pin model not offered model=${id}`);
+        }
         continue;
       }
+      const params = row.supported_parameters;
+      if (params && !params.includes("max_tokens") && params.includes("max_completion_tokens")) this.completionTokensOnly.add(id);
+      else this.completionTokensOnly.delete(id);
       // OpenRouter quotes USD per token; we keep USD per million.
       const inputPerMillion = Number(row.pricing?.prompt ?? 0) * 1_000_000;
       const outputPerMillion = Number(row.pricing?.completion ?? 0) * 1_000_000;
@@ -246,7 +282,7 @@ export class OpenRouterProvider implements ChatProvider {
     const body: Record<string, unknown> = {
       model: req.model,
       messages: req.messages,
-      max_tokens: req.maxTokens,
+      [this.completionTokensOnly.has(req.model) ? "max_completion_tokens" : "max_tokens"]: req.maxTokens,
       stream: false,
       usage: { include: true },
     };
@@ -358,6 +394,7 @@ export function openRouterFromEnv(env: NodeJS.ProcessEnv): OpenRouterProvider {
   return new OpenRouterProvider({
     apiKey,
     models,
+    optionalModels: RUNTIME_PIN_MODELS,
     baseUrl: env.CP_OPENROUTER_BASE_URL,
     resale: env.CP_OPENROUTER_RESALE !== "0",
   });

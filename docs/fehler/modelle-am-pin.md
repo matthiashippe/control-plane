@@ -10,9 +10,9 @@ am Pin in einem Verzeichnis aus `mktemp -d`, nur lesend. Ergebnis je ID: `served
 MODEL gpt-5.2: alias openai/gpt-5.2, src/inference/types.ts:142 am Pin d8f8168
 MODEL gpt-5-mini: alias openai/gpt-5-mini, src/inference/types.ts:143 am Pin d8f8168
 MODEL gpt-5.3: missing, OpenRouter führt kein openai/gpt-5.3, nur die Variante openai/gpt-5.3-codex, und ein Alias auf eine Variante ist nach Entscheidung 3 ausgeschlossen, src/inference/types.ts:142 am Pin d8f8168
-MODEL gpt-4.1: missing, OpenRouter führt openai/gpt-4.1, aber der Katalog der Produktion lädt es nicht (CP_OPENROUTER_MODELS nennt nur openai/gpt-5.2 und openai/gpt-5-mini) und ein Alias ohne geladenes Ziel fällt in defaultAliases() weg, src/inference/provider-registry.ts:79 am Pin d8f8168
-MODEL gpt-4.1-mini: missing, OpenRouter führt openai/gpt-4.1-mini, aber der Katalog der Produktion lädt es nicht (CP_OPENROUTER_MODELS nennt nur openai/gpt-5.2 und openai/gpt-5-mini) und ein Alias ohne geladenes Ziel fällt in defaultAliases() weg, src/inference/provider-registry.ts:90 am Pin d8f8168
-MODEL gpt-4.1-nano: missing, OpenRouter führt openai/gpt-4.1-nano, aber der Katalog der Produktion lädt es nicht (CP_OPENROUTER_MODELS nennt nur openai/gpt-5.2 und openai/gpt-5-mini) und ein Alias ohne geladenes Ziel fällt in defaultAliases() weg, src/inference/provider-registry.ts:101 am Pin d8f8168
+MODEL gpt-4.1: alias openai/gpt-4.1, src/inference/provider-registry.ts:79 am Pin d8f8168
+MODEL gpt-4.1-mini: alias openai/gpt-4.1-mini, src/inference/provider-registry.ts:90 am Pin d8f8168
+MODEL gpt-4.1-nano: alias openai/gpt-4.1-nano, src/inference/provider-registry.ts:101 am Pin d8f8168
 
 ## Wie die IDs zu uns kommen
 
@@ -100,3 +100,40 @@ Er zählt den fremden 404 und lässt die eigene Adresse, den 200 und den Tag vor
 Welches Modell diese fünf Anfragen wollten, ist nicht mehr lesbar: Der Dienst schrieb bei `model_not_found` keine Zeile, und sein Log
 beginnt mit dem Neustart vom 2026-11-26. Seit fehler 15 steht bei jedem `model_not_found` die Zeile
 `[inference] model_not_found model=<id> known=<n>` im Log; sie liest der Release Manager nach dem Rollout in der Live-Prüfung.
+
+## 404 je Modell seit fehler 15
+
+Zeilen `[inference] model_not_found model=<id>` im Log des Dienstes seit dem Rollout von fehler 15 (Job `deploy` fertig
+2026-11-27T16:10:23Z), je ID gezählt, ohne Adresse. Gelesen werden die gesicherten Logs ersetzter Container, deren Dateiname nach
+dem Rollout liegt (`cp-20261127T194647Z`, `cp-20261127T220538Z`, `cp-20261128T030722Z`; `cp-20261127T160619Z` ist der Container vor
+dem Rollout und kennt die Zeile noch nicht), und das Log des laufenden Containers (gestartet 2026-11-28T03:08 UTC). Die Zeile gibt es
+erst seit fehler 15, ältere Logs können also keinen Treffer haben.
+
+Gemessen: 2026-11-28T07:47:02Z
+
+NOT_FOUND gpt-4.1 since 2026-11-27T16:10:23Z: 0
+NOT_FOUND gpt-4.1-mini since 2026-11-27T16:10:23Z: 0
+NOT_FOUND gpt-4.1-nano since 2026-11-27T16:10:23Z: 0
+NOT_FOUND other since 2026-11-27T16:10:23Z: 0
+
+Befehl, nur lesend (`docker logs` und `zcat`), der Zähler läuft auf dem code-host:
+
+```
+set -a; . ~/.config/control-plane/loop.env; set +a
+ssh -i "$CP_SSH_KEY" "$CP_HOST" 'for f in /var/log/cp-history/cp-*.log.gz; do t=$(basename "$f" .log.gz); t=${t#cp-}; if [ "$t" \> "20261127T161023Z" ]; then zcat "$f"; fi; done; docker logs deploy-cp-1 2>&1' \
+  | grep -oE '\[inference\] model_not_found model=[^ ]+' | sed 's/.*model=//' | awk '
+  { if ($0=="gpt-4.1"||$0=="gpt-4.1-mini"||$0=="gpt-4.1-nano") c[$0]++; else c["other"]++ }
+  END { n=split("gpt-4.1 gpt-4.1-mini gpt-4.1-nano other",k," "); for(i=1;i<=n;i++) printf "NOT_FOUND %s since 2026-11-27T16:10:23Z: %d\n", k[i], c[k[i]]+0 }'
+```
+
+Der Strom hatte 392 Zeilen. Gegenprobe: Derselbe Zähler über denselben Strom mit vier gepflanzten Zeilen am Ende
+(`[inference] model_not_found model=<id> known=4` für `gpt-4.1`, `gpt-4.1-mini`, `gpt-4.1-nano` und `gpt-5.3`) gab je ID 1 aus: Er
+sieht jede der drei IDs und zählt jede andere unter `other`. Die Null ist also keine Blindheit des Zählers, sondern heißt, dass seit
+dem Rollout keine Runtime eine dieser IDs bei uns angefragt hat. Gebaut wird trotzdem (`goals/fehler/ANNAHMEN.md`, fehler 17
+Entscheidung 1), weil die Runtime am Pin sie nachweislich schickt.
+
+Seit fehler 17 lädt der Dienst `openai/gpt-4.1`, `openai/gpt-4.1-mini` und `openai/gpt-4.1-nano` aus `RUNTIME_PIN_MODELS` in
+`src/inference/openrouter.ts` zu `CP_OPENROUTER_MODELS` dazu, wenn OpenRouter sie führt, und `DEFAULT_OPENROUTER_ALIASES` setzt die
+drei IDs der Runtime darauf. Damit gilt der Absatz unter „OpenRouter“, nach dem die drei keinen Alias bekommen, nicht mehr; die Zeilen
+`MODEL gpt-4.1…` oben stehen deshalb als `alias`. Ein Modell der Runtime, das OpenRouter nicht führt, bleibt draußen, bekommt beim
+Start die Zeile `[inference] pin model not offered model=<id>` und hält den Start nicht auf.
