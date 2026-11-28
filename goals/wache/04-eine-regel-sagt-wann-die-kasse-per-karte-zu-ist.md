@@ -1,7 +1,7 @@
 # Wache Goal 04: Eine Regel sagt, wann die Kasse per Karte zu ist
 
 ## Status
-PLANNED
+ACTIVE
 
 ## Active Objective
 Wann die Kasse per Karte zu ist, steht heute an sechs Stellen in drei Fassungen. `cardOpenNow` (`src/app.ts:2555`) fragt Sunset und
@@ -65,13 +65,13 @@ ein vierter Grund zum Sperren sonst wieder nur an einer Stelle landet.
   Bezeichner, Testnamen und Log-Zeilen englisch.
 
 ## Done Condition
-- [ ] Bei Sunset zeigen Startseite und Fehlerseiten keine Karte, `/card/<paket>` leitet nicht zur Kasse, und eine bezahlte Bestellung
+- [x] Bei Sunset zeigen Startseite und Fehlerseiten keine Karte, `/card/<paket>` leitet nicht zur Kasse, und eine bezahlte Bestellung
       wird `held` ohne Gutschrift.
       MVP: Funktion, weil nach dem Sunset sonst eine Person Credits per Karte kauft, die hier nicht mehr verkauft werden.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/card-way-pages.test.ts test/card-way.test.ts` muss Exit-Code 0 haben.
       Prüfung: `for t in "hides the card on the landing page after the sunset" "hides the card on error pages after the sunset" "pauses /card/:package after the sunset" "holds a card order paid after the sunset"; do grep -qF "\"$t\"" test/card-way-pages.test.ts || echo "fehlt: $t"; done` muss nichts ausgeben.
       Prüfung: `grep -c '"reports no reason while the checkout is open"' test/card-way.test.ts` muss genau 1 ausgeben.
-- [ ] Genau eine Funktion entscheidet, ob die Kasse per Karte zu ist, und alle Stellen nehmen dieselbe Uhr.
+- [x] Genau eine Funktion entscheidet, ob die Kasse per Karte zu ist, und alle Stellen nehmen dieselbe Uhr.
       MVP: Funktion, weil ein weiterer Grund zum Sperren sonst wieder nur an einer Stelle landet.
       Prüfung: `grep -c '^export function cardClosedFor(' src/payments/card-way.ts` muss genau 1 ausgeben.
       Prüfung: `cat src/app.ts src/payments/digistore.ts | grep -c -E 'cardBreaker\(|walletRefunded\('` muss 0 ausgeben.
@@ -79,7 +79,7 @@ ein vierter Grund zum Sperren sonst wieder nur an einer Stelle landet.
       Prüfung: `awk '/^export function cardClosedFor\(/{p=1} p&&/^}/{p=0} p' src/payments/card-way.ts | grep -oE '\b(cardBreaker|walletRefunded)\(' | wc -l` muss genau 2 ausgeben.
       Prüfung: `grep -c 'opts.now ?? (() => new Date())' src/app.ts` muss genau 1 ausgeben.
       Prüfung: `grep -c 'card checkout closed' src/payments/digistore.ts` muss 0 ausgeben.
-- [ ] Die Entscheidungen stehen in `goals/wache/ANNAHMEN.md`, der Diff bleibt in den Pfaden dieses Goals, kein Test fällt weg.
+- [x] Die Entscheidungen stehen in `goals/wache/ANNAHMEN.md`, der Diff bleibt in den Pfaden dieses Goals, kein Test fällt weg.
       MVP: Funktion, weil das nächste Glied an der Kasse wissen muss, warum Sunset wie der Notschalter aussieht.
       Prüfung: `grep -cE '^- [0-9]{4}-[0-9]{2}-[0-9]{2}, wache 04: ' goals/wache/ANNAHMEN.md` muss mindestens 5 ausgeben.
       Prüfung: `git diff --name-only $(git merge-base origin/dev HEAD) HEAD | grep -vE '^(src/app\.ts|src/payments/card-way\.ts|src/payments/digistore\.ts|test/card-way-pages\.test\.ts|test/card-way\.test\.ts|goals/wache/.*|goals/[a-z]+/ANNAHMEN\.md)$' | wc -l` muss 0 ausgeben.
@@ -87,7 +87,7 @@ ein vierter Grund zum Sperren sonst wieder nur an einer Stelle landet.
 - [ ] Der Job `e2e` am Kopf des Goal-PR ist grün.
       MVP: Funktion, weil sich `src/app.ts` und `src/payments/**` im Laufzeitpfad ändern und der code-host kein Docker hat.
       Prüfung (Netz): `gh pr checks $(gh pr list -R matthiashippe/control-plane --head goal/wache-04 --state open --json number -q '.[0].number') -R matthiashippe/control-plane 2>&1 | grep -E '^e2e\s' | grep -c pass` muss genau 1 ausgeben.
-- [ ] `check` ist grün.
+- [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
 - [ ] goal-verifier PASS (K und B)
 
@@ -119,6 +119,7 @@ ein vierter Grund zum Sperren sonst wieder nur an einer Stelle landet.
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-28 Zyklus 1: Punkte 1, 2, 3 und 5 gebaut: `cardClosedFor` in `src/payments/card-way.ts` ist die einzige Stelle mit `cardBreaker` und `walletRefunded`, Startseite, Fehlerseiten, `/card/:package`, `cardOpenNow`, `cardUrlFor` und die IPN fragen nur sie mit `clock()`, bei Sunset antworten `/`, die Fehlerseiten und `/card/<paket>` wie bei Notschalter an und die IPN hält mit `credits no longer sold`; Punkt 4 wartet auf den Job `e2e` am Draft-PR. Rot am Kopf von `dev` (07f1bd6) mit `src` von `origin/dev` und den neuen Tests: Startseite `expected ... not to contain 'id="card"'`, Fehlerseiten `not to contain 'href="/#card"'`, `/card/5` `expected 302 to be 200`, IPN `expected { status: 'booked', ... } to deeply equal { status: 'held', credited_mc: +0 }`, die vier Fälle von `cardClosedFor` `TypeError: (0 , cardClosedFor) is not a function`. Byte für Byte (sha256 der ersten 16 Zeichen über Körper und Location, `createApp` mit Datenbank im Speicher, gleich am Kopf von `dev` und nach dem Bau): offen `/` 285f02387bdba95a, `/errors/verify-500-database-error` 01c5431b59a7b5bd, `/llms.txt` b81f1efcdb7ba934, `/pricing` 4d50dbfce12049a6, `/card/5` e5a48255fad5cfba (302); Notschalter an `/` 98ff86c170adb927, Fehlerseite 2c57220c905d30f2, `/llms.txt` aa24dd0922ac6a04, `/pricing` f0a15fd1158ad36c, `/card/5` 8945720f698cf76d (200); Sunset vorher `/` 285f02387bdba95a, Fehlerseite 01c5431b59a7b5bd, `/card/5` 302 zur Kasse, nachher dieselben drei Hashes wie bei Notschalter an, `/llms.txt` 63ff08c96b54adf4 und `/pricing` 1bc98651fcd97bb5 unverändert. Was mitzieht: die 736 Prüfbefehle ohne Netz, vitest und `check` aus den 45 Goals mit Status DONE, die `card-way`, `digistore` oder `app.ts` nennen, vor und nach dem Bau mit gleichem Exit-Code und gleicher Ausgabe bis auf Pfade aus `mktemp`; ihre 154 Testdateien vorher 1538 grün, nachher 1546 grün, kein Fall weggefallen. Prüfbefehle: Punkt 1 vitest Exit 0 (25 Fälle), Namensschleife leer, `reports no reason` 1; Punkt 2 1, 0, 2, 2, 1, 0; Punkt 3 5, 0, 0; Punkt 5 `check` Exit 0 (2998 Fälle).
 
 ## Blockers
 - keine
