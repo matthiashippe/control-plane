@@ -240,6 +240,7 @@
   1 aus, ohne die Verdicts 0. Das ist eine Annahme des Makers, weil Verdicts die Linsen schreiben und ein belegtes Verdict nicht
   umgeschrieben wird; ob der Befehl ohne `goals/umzug/verdicts/` gilt wie in sandbox (Punkt 9, Tech Lead, 2026-11-15), entscheidet
   der Tech Lead.
+- Entscheidung: Der zweite und der dritte Prüfbefehl von Punkt 6 gelten ab Zyklus 4 ohne `goals/umzug/verdicts/`, also `git diff --name-only origin/dev...HEAD -- . ':(exclude)goals/umzug/verdicts/' | grep -vcE '^(ops/live\.sh|test/live-selftest\.test\.ts|goals/[a-z]+/ANNAHMEN\.md|goals/umzug/06-die-live-pruefung-ruft-die-seite-auf-dem-kanonischen-host-auf\.md)$'` muss 0 ausgeben und `git diff --name-only origin/dev...HEAD -- . ':(exclude)goals/umzug/verdicts/' | wc -l` muss höchstens 6 ausgeben; für die Verdicts gilt `git diff --name-only origin/dev...HEAD -- goals/umzug/verdicts/ | grep -vcE '^goals/umzug/verdicts/06-z[0-9]+-[KB]\.md$'` muss 0 ausgeben, weil die Verdicts die Linsen schreiben, das Gate sie auf dem Goal-Branch verlangt und ein belegtes Verdict nie umgeschrieben wird, Punkt 6 aber den Umfang des Makers misst; die dritte Zeile hält dabei fest, dass unter `verdicts/` nur Urteile der Linsen K und B zu diesem Goal liegen. Gemessen am Kopf `e529767` ohne Netz: 0, 5, 0 (Tech Lead, 2026-11-28, wie sandbox Punkt 9 am 2026-11-15)
 
 ## Abgelöst durch umzug 06 (Maker, 2026-11-28)
 
