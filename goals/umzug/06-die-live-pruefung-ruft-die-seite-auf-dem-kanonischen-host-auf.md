@@ -56,34 +56,34 @@ unterscheiden lässt und der Release Manager dann einen Revert ohne Ursache ausl
   mit dieser Messung in den Annahmen.
 
 ## Done Condition
-- [ ] `ops/live.sh --handoff-urls` nennt ohne Netz die drei Adressen der Prüfung `handoff`, die Seite auf `automatonhost.com`.
+- [x] `ops/live.sh --handoff-urls` nennt ohne Netz die drei Adressen der Prüfung `handoff`, die Seite auf `automatonhost.com`.
       MVP: Funktion, weil nur ein Aufruf ohne Netz zeigt, wohin der Live-Lauf geht, ohne die Produktion zu berühren.
       Prüfung: `diff <(env -u LIVE_URL -u LIVE_PAGE_URL bash ops/live.sh --handoff-urls 7KQ2M9XC4D7K) <(printf 'POST https://postyourprice.com/v1/handoff\nGET https://automatonhost.com/h/7KQ2M9XC4D7K\nGET https://postyourprice.com/v1/handoff/7KQ2M9XC4D7K\n')` muss nichts ausgeben und Exit-Code 0 haben.
       Prüfung: `env -u LIVE_PAGE_URL LIVE_URL=https://cp.hippe.eu bash ops/live.sh --handoff-urls 7KQ2M9XC4D7K | sed -n 2p` muss genau `GET https://automatonhost.com/h/7KQ2M9XC4D7K` ausgeben.
       Prüfung: `o=$(bash ops/live.sh --handoff-urls 'ab;c' 2>/dev/null); echo "$? ${#o}"` muss genau `2 0` ausgeben.
-- [ ] Der Live-Lauf holt seine Adressen aus derselben Funktion und ruft keine Seite mehr auf `$BASE` ab.
+- [x] Der Live-Lauf holt seine Adressen aus derselben Funktion und ruft keine Seite mehr auf `$BASE` ab.
       MVP: Funktion, weil sonst die Prüfung von Punkt 1 grün sein kann, während der Live-Lauf weiter den alten Host fragt.
       Prüfung: `awk '/^handoff_live\(\)/,/^}/' ops/live.sh | grep -c 'BASE/h/'` muss 0 ausgeben.
       Prüfung: `awk '/^handoff_live\(\)/,/^}/' ops/live.sh | grep -c 'handoff_urls'` muss mindestens 1 ausgeben.
       Prüfung: `awk '/^handoff_live\(\)/,/^}/' ops/live.sh | grep -cE 'curl [^|]*-L'` muss 0 ausgeben.
-- [ ] Der Selbsttest kennt die Weiterleitung als roten Fall und bleibt grün.
+- [x] Der Selbsttest kennt die Weiterleitung als roten Fall und bleibt grün.
       MVP: Funktion, weil die Prüfung beweisen muss, dass sie einen 301 auf der Seite rot sieht (Grundregel 3, beide Richtungen).
       Prüfung: `bash ops/live.sh --selftest | grep -cxF 'planted handoff page301: FAIL handoff: /h/{code} answered 301'` muss 1 ausgeben.
       Prüfung: `bash ops/live.sh --selftest | grep -cxF 'planted handoff ok: OK handoff: POST /v1/handoff 201, /h/{code} shows match among three numbers with Referrer-Policy no-referrer, the stream says pending; nothing approved'` muss 1 ausgeben.
       Prüfung: `bash ops/live.sh --selftest | tail -1` muss genau `LIVE SELFTEST OK` ausgeben.
-- [ ] Ein Fall in `test/live-selftest.test.ts` prüft `--handoff-urls`, grün am Goal-Branch und rot gegen das `ops/live.sh` der
+- [x] Ein Fall in `test/live-selftest.test.ts` prüft `--handoff-urls`, grün am Goal-Branch und rot gegen das `ops/live.sh` der
       Merge-Basis.
       MVP: Funktion, weil `check` den Fall bei jedem Merge fährt und eine spätere Änderung an `BASE` oder den Hosts ihn sonst still bricht.
       Prüfung: `PATH=/usr/bin:$PATH pnpm -s vitest run test/live-selftest.test.ts` muss Exit-Code 0 haben.
       Prüfung: `T=$(mktemp -d); git archive HEAD | tar -x -C $T; ln -s "$PWD/node_modules" $T/node_modules; git show $(git merge-base origin/dev HEAD):ops/live.sh > $T/ops/live.sh; (cd $T && PATH=/usr/bin:$PATH pnpm -s vitest run test/live-selftest.test.ts -t 'handoff-urls' --reporter=json --outputFile=$T/r.json >/dev/null 2>&1); f=$(node -p "JSON.parse(require('fs').readFileSync('$T/r.json','utf8')).numFailedTests"); rm -rf $T; echo "$f"` muss mindestens 1 ausgeben.
-- [ ] Die Entscheidungen stehen mit Grund in den Annahmen, und jeder Prüfbefehl eines fertigen Goals, dessen Ausgabe sich durch dieses
+- [x] Die Entscheidungen stehen mit Grund in den Annahmen, und jeder Prüfbefehl eines fertigen Goals, dessen Ausgabe sich durch dieses
       Goal ändert, steht als abgelöst in den Annahmen seines Topics, in der Form aus Entscheidung 6.
       MVP: Funktion, weil das Audit nachts jeden Prüfbefehl fertiger Goals fährt und jede unerklärte rote Zeile eine Reparatur ohne
       Ursache auf `dev` auslöst.
       Prüfung: `awk '/^## Goal 06/{f=1;next} /^## /{f=0} f' goals/umzug/ANNAHMEN.md | grep -cE "^- .+, weil .+"` muss mindestens 3 ausgeben.
       Prüfung: `q=$(printf '\140'); cat goals/*/ANNAHMEN.md | grep -E '^- Abgelöst: .* durch umzug 06 ' | grep -vcE " durch umzug 06 Punkt [0-9]+, Ausgabe dann genau ${q}Exit [0-9]+, [^${q}]*${q} \\(Tech Lead, 2026-11-28\\)\$"` muss 0 ausgeben.
       Prüfung: `grep -cE '^- [0-9-]+ Zyklus [0-9]+: .*(abgelöst|Abgelöst)' goals/umzug/06-die-live-pruefung-ruft-die-seite-auf-dem-kanonischen-host-auf.md` muss mindestens 1 ausgeben.
-- [ ] Das Goal ändert nur `ops/live.sh`, seinen Test, die Goal-Datei und Annahmen, keinen Laufzeitpfad, kein Compose, keine CI, und
+- [x] Das Goal ändert nur `ops/live.sh`, seinen Test, die Goal-Datei und Annahmen, keinen Laufzeitpfad, kein Compose, keine CI, und
       bringt keinen Schlüssel ins Repo.
       MVP: Funktion, weil das Repo öffentlich ist (Grundregel 8) und der Merge sonst ausrollen würde.
       Prüfung: `git diff --name-only origin/dev...HEAD -- src deploy harness .github scripts docs/soll loop.yaml gate.yaml LOOP.md loop-constraints.md package.json pnpm-lock.yaml | wc -l` muss 0 ausgeben.
@@ -120,3 +120,4 @@ unterscheiden lässt und der Release Manager dann einen Revert ohne Ursache ausl
 - max Versuche pro Gap: 3
 
 ## Progress Log
+- 2026-11-28 Zyklus 1: Punkte 1, 2, 3, 4, 5, 6 gebaut: `handoff_urls` mit `PAGE_BASE` (Seite auf automatonhost.com, POST und Stream auf `BASE`), `--handoff-urls` ohne Netz, `handoff_live` holt alle drei Adressen daraus ohne `-L` (mit einem Stand-in für curl gefahren: POST und Stream postyourprice.com, Seite automatonhost.com), gepflanzter Fall `page301`, vier vitest-Fälle `handoff-urls`; abgelöst ist nur konto 02 Punkt 8 (zweiter Befehl 8 auf 9), von 74 Prüfbefehlen fertiger Goals mit `live.sh` oder `live-selftest` an Merge-Basis `8fbdb47` und Kopf verglichen. Punkt 7 offen bis zum Job `check` am PR. Prüfbefehle: Punkt 1 diff leer Exit 0, `GET https://automatonhost.com/h/7KQ2M9XC4D7K`, `2 0`; Punkt 2 0, 2, 0 (an der Merge-Basis zählt `BASE/h/` 1); Punkt 3 1, 1, `LIVE SELFTEST OK`; Punkt 4 Exit 0 (19 passed), Gegenprobe gegen das `ops/live.sh` der Merge-Basis 3 failed (am Kopf 0 failed, 4 passed); Punkt 5 3, 0 (gepflanzte Zeile mit falschem Datum zählt 1), dieser Eintrag; Punkt 6 0, 0, 4, 0; `check` Exit 0 (3005 passed, 173 s).
