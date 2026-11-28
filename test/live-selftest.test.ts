@@ -161,6 +161,9 @@ describe("ops/live.sh", () => {
       "\nplanted handoff urlhost: FAIL handoff: POST /v1/handoff names the page https://postyourprice.com/h/{code}, " +
         "the check reads https://automatonhost.com/h/{code}\n",
     );
+    // The live run itself with a POST answering 404 names that cause (move goal 06): with no code there is no page address,
+    // and under set -u it must not stop on it and leave only "no result".
+    expect(run.stdout).toContain("\nplanted live handoff post404: FAIL handoff: POST /v1/handoff answered 404\n");
     expect(run.stdout.trim().split("\n").at(-1)).toBe("LIVE SELFTEST OK");
     expect(run.status).toBe(0);
   }, 300_000);

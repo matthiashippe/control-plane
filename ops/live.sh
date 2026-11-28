@@ -397,17 +397,18 @@ HANDOFF_ANY_CODE=0000000000
 # The live part: one handoff with example values, its page and 5 s of its stream. Prints the result line only. The page
 # is fetched without following redirects: a 301 there is a FAIL, not a hop to another host.
 handoff_live() {
-  local d c_code p_code="none" code post urls=()
+  local d c_code p_code="none" code post page="" urls=()
   d="$(mktemp -d -p "$(live_tmp)")"
   trap 'rm -rf "$d"' RETURN
   post="$(handoff_urls "$HANDOFF_ANY_CODE" | sed -n '1s/^POST //p')"
   c_code="$(curl -s -o "$d/create" -w '%{http_code}' --max-time 15 -H 'content-type: application/json' --data "$HANDOFF_BODY" "$post")"
   code="$(NODE_NO_WARNINGS=1 node -e "$HANDOFF_PREP_JS" "$d/create" "$d/hdr" 2>/dev/null)"
   if [ -n "$code" ] && mapfile -t urls < <(handoff_urls "$code") && [ "${#urls[@]}" = 3 ]; then
-    p_code="$(curl -s -o "$d/page" -D "$d/page-headers" -w '%{http_code}' --max-time 15 "${urls[1]#GET }")"
+    page="${urls[1]#GET }"
+    p_code="$(curl -s -o "$d/page" -D "$d/page-headers" -w '%{http_code}' --max-time 15 "$page")"
     curl -s -N --max-time 5 -H "@$d/hdr" "${urls[2]#GET }" >"$d/stream" 2>/dev/null
   fi
-  NODE_NO_WARNINGS=1 node -e "$HANDOFF_JS" "${c_code:-none}" "$d/create" "${p_code:-none}" "$d/page" "$d/stream" "$d/page-headers" "${urls[1]#GET }"
+  NODE_NO_WARNINGS=1 node -e "$HANDOFF_JS" "${c_code:-none}" "$d/create" "${p_code:-none}" "$d/page" "$d/stream" "$d/page-headers" "$page"
 }
 
 # ---- sandbox (sandbox 03)
@@ -1460,6 +1461,46 @@ selftest() {
     got="$(judge_handoff "$(NODE_NO_WARNINGS=1 node -e "$HANDOFF_JS" "$h_cs" "$dir/h-create-$h_cf" "$h_ps" "$dir/h-page-$h_pf" "$dir/h-stream-$h_sf" "$dir/h-headers-$h_hf" "$h_pu")")"
     echo "planted handoff $h_name: $got"
     [ "${got%% *}" = "$h_expect" ] || all_ok=0
+  done
+  # handoff_live itself with a stand-in for curl (move goal 06): a working service, an answer whose url names another page,
+  # and a POST answering 404, where there is no code and so no page address. Under set -u the live run must still reach
+  # HANDOFF_JS and name the cause, not stop on an unset address.
+  handoff_live_run() { # $1 = stand-in mode: ok, urlhost or post404
+    (
+      LIVE_TMP="$dir"
+      curl() {
+        local out="" hdr="" url="" a
+        while [ $# -gt 0 ]; do
+          case "$1" in
+            -o) out="$2"; shift ;;
+            -D) hdr="$2"; shift ;;
+            -w | --max-time | -H | --data) shift ;;
+            -*) ;;
+            *) url="$1" ;;
+          esac
+          shift
+        done
+        case "$H_LIVE_MODE:$url" in
+          post404:*) [ -z "$out" ] || printf '%s' '{"error":"not_found"}' >"$out"; printf 404 ;;
+          *:"$BASE/v1/handoff") sed "s|\"url\":\"[^\"]*\"|\"url\":\"$H_LIVE_URL\"|" "$dir/h-create-ok" >"$out"; printf 201 ;;
+          *:"$PAGE_BASE/h/7KQ2M9XC4D7K") cp "$dir/h-page-ok" "$out"; cp "$dir/h-headers-ok" "$hdr"; printf 200 ;;
+          *:"$BASE/v1/handoff/7KQ2M9XC4D7K") cat "$dir/h-stream-ok" ;;
+          *) printf 000; return 7 ;;
+        esac
+      }
+      H_LIVE_MODE="$1" H_LIVE_URL="$h_pu"
+      [ "$1" = urlhost ] && H_LIVE_URL="https://postyourprice.com/h/7KQ2M9XC4D7K"
+      judge_handoff "$(handoff_live 2>/dev/null)"
+    )
+  }
+  # Each live case is compared by its whole line, because a run that stops early still says FAIL, only without the cause.
+  for h_case in "ok|$(judge_handoff "$HANDOFF_GOOD")" \
+    "urlhost|FAIL handoff: POST /v1/handoff names the page https://postyourprice.com/h/{code}, the check reads $PAGE_BASE/h/{code}" \
+    "post404|FAIL handoff: POST /v1/handoff answered 404"; do
+    h_name="${h_case%%|*}" h_expect="${h_case#*|}"
+    got="$(handoff_live_run "$h_name")"
+    echo "planted live handoff $h_name: $got"
+    [ "$got" = "$h_expect" ] || { echo "FAIL selftest: live handoff $h_name, expected: $h_expect"; all_ok=0; }
   done
 
   # A made-up key for the runs below, never a real one; the stand-in for ops/sandbox/setup.sh prints only its last line,
