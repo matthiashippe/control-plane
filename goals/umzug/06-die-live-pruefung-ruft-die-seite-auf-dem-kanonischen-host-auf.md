@@ -1,7 +1,7 @@
 # Umzug Goal 06: Die Live-Prüfung ruft die Übergabeseite auf dem kanonischen Host auf
 
 ## Status
-PLANNED
+DONE
 
 ## Active Objective
 Beim Release wache 04 (PRO-32862, 28.11.2026) meldete `ops/live.sh` `FAIL handoff: /h/{code} answered 301`, obwohl wache 04 die
@@ -100,7 +100,7 @@ unterscheiden lässt und der Release Manager dann einen Revert ohne Ursache ausl
       gewählte Adresse liest, eine tote Adresse in der Antwort (etwa nach einem falschen `CP_PUBLIC_URL`) grün durchließe.
       Prüfung: `bash ops/live.sh --selftest | grep -cxF 'planted handoff urlhost: FAIL handoff: POST /v1/handoff names the page https://postyourprice.com/h/{code}, the check reads https://automatonhost.com/h/{code}'` muss 1 ausgeben.
       Prüfung: `bash ops/live.sh --selftest | grep -cxF 'planted handoff ok: OK handoff: POST /v1/handoff 201, /h/{code} shows match among three numbers with Referrer-Policy no-referrer, the stream says pending; nothing approved'` muss 1 ausgeben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Die Gegenprobe gegen das `ops/live.sh` der Merge-Basis (Punkt 4, zweite Prüfung) zeigt, dass der neue Fall den alten Stand rot
@@ -130,3 +130,4 @@ unterscheiden lässt und der Release Manager dann einen Revert ohne Ursache ausl
 - 2026-11-28 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3, 4, 5, 6, 7; `dev` steht weiter auf der Merge-Basis `8fbdb47`, nichts zu mergen. Prüfbefehle: Punkt 1 diff leer Exit 0, `GET https://automatonhost.com/h/7KQ2M9XC4D7K`, `2 0`; Punkt 2 0, 2, 0; Punkt 3 1, 1, `LIVE SELFTEST OK`; Punkt 4 Exit 0 (19 passed), Gegenprobe gegen das `ops/live.sh` der Merge-Basis 3 failed; Punkt 5 3, 0, 1; Punkt 6 0, 0, 5, 0; Punkt 7 `check` Exit 0 (3005 passed, 146 s), Job `check` am PR #510 für diesen Kopf folgt im Kommentar.
 - 2026-11-28 Zyklus 3: Punkt 8 gebaut: `HANDOFF_JS` vergleicht `url` der Antwort genau mit der abgerufenen Seite aus `handoff_urls` (siebtes Argument, im Live-Lauf `${urls[1]#GET }`), `judge_handoff` meldet eine Abweichung vor der Seite, gepflanzter Fall `urlhost`, `h_ok` mit der Seitenadresse aus `handoff_urls`, eine vitest-Erwartung mehr (gegen das `ops/live.sh` von `2e6b438` rot); Stand-in für curl: `url` auf automatonhost.com OK, auf postyourprice.com FAIL, abgerufen weiter POST und Stream auf postyourprice.com, Seite auf automatonhost.com; neu abgelöst nach 77 Prüfbefehlen fertiger Goals an Merge-Basis und Kopf: konto 02 Punkt 8 (8 auf 10) und umzug 01 Punkt 7 (28 auf 32, in Zyklus 1 übersehen). Prüfbefehle: Punkt 1 diff leer Exit 0, `GET https://automatonhost.com/h/7KQ2M9XC4D7K`, `2 0`; Punkt 2 0, 2, 0; Punkt 3 1, 1, `LIVE SELFTEST OK`; Punkt 4 Exit 0, Gegenprobe 3 failed; Punkt 5 4, 0, 1; Punkt 6 0, 0, 5, 0; Punkt 7 `check` Exit 0 (3005 passed, 141 s), Job `check` am PR im Kommentar; Punkt 8 1 (an `2e6b438` 0), 1.
 - 2026-11-28 Zyklus 4: Befund 1 der Linse K aus Zyklus 3 behoben: `handoff_live` gibt ohne Code `""` statt `${urls[1]}` an `HANDOFF_JS` und meldet bei einem POST mit 404 wieder `FAIL handoff: POST /v1/handoff answered 404`; der Selbsttest fährt `handoff_live` mit einer Funktion `curl` als Stand-in (`planted live handoff ok`, `urlhost`, `post404`, ganze Zeile verglichen), mit dem `handoff_live` von `b9ed5c5` `LIVE SELFTEST FAIL`, die neue vitest-Erwartung dort rot; `dev` (`399501d`) gemergt. Prüfbefehle: Punkt 1 diff leer Exit 0, `GET https://automatonhost.com/h/7KQ2M9XC4D7K`, `2 0`; Punkt 2 0, 2, 0; Punkt 3 1, 1, `LIVE SELFTEST OK`; Punkt 4 Exit 0, Gegenprobe 3 failed; Punkt 5 4, 0, 2; Punkt 6 0, 1 (nur `goals/umzug/verdicts/06-z3-K.md`, ohne Verdicts 0, Frage an den Tech Lead in den Annahmen), 6, 0; Punkt 7 `check` Exit 0 (3005 passed, 151 s), Job `check` am PR im Kommentar; Punkt 8 1, 1; 77 Prüfbefehle fertiger Goals neu gemessen, nur die zwei schon abgelösten Zeilen ändern sich (10 und 32).
+- 2026-11-28 Release: PASS K und B (Zyklus 4), DONE.
