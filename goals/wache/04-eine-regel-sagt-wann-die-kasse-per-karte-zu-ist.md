@@ -1,7 +1,7 @@
 # Wache Goal 04: Eine Regel sagt, wann die Kasse per Karte zu ist
 
 ## Status
-ACTIVE
+DONE
 
 ## Active Objective
 Wann die Kasse per Karte zu ist, steht heute an sechs Stellen in drei Fassungen. `cardOpenNow` (`src/app.ts:2555`) fragt Sunset und
@@ -89,7 +89,7 @@ ein vierter Grund zum Sperren sonst wieder nur an einer Stelle landet.
       Prüfung (Netz): `gh pr checks $(gh pr list -R matthiashippe/control-plane --head goal/wache-04 --state open --json number -q '.[0].number') -R matthiashippe/control-plane 2>&1 | grep -E '^e2e\s' | grep -c pass` muss genau 1 ausgeben.
 - [x] `check` ist grün.
       Prüfung: `PATH=/usr/bin:$PATH node scripts/check.mjs` muss Exit-Code 0 haben.
-- [ ] goal-verifier PASS (K und B)
+- [x] goal-verifier PASS (K und B)
 
 ## Acceptance Criteria
 - [ ] Bei Sunset findet eine Person auf keiner Seite und unter keinem Link einen Weg, Credits per Karte zu kaufen.
@@ -121,6 +121,7 @@ ein vierter Grund zum Sperren sonst wieder nur an einer Stelle landet.
 ## Progress Log
 - 2026-11-28 Zyklus 1: Punkte 1 bis 5 gebaut: `cardClosedFor` in `src/payments/card-way.ts` ist die einzige Stelle mit `cardBreaker` und `walletRefunded`, Startseite, Fehlerseiten, `/card/:package`, `cardOpenNow`, `cardUrlFor` und die IPN fragen nur sie mit `clock()`, bei Sunset antworten `/`, die Fehlerseiten und `/card/<paket>` wie bei Notschalter an und die IPN hält mit `credits no longer sold`; Rot am Kopf von `dev` (07f1bd6) mit `src` von `origin/dev` und den neuen Tests: Startseite `expected ... not to contain 'id="card"'`, Fehlerseiten `not to contain 'href="/#card"'`, `/card/5` `expected 302 to be 200`, IPN `expected { status: 'booked', ... } to deeply equal { status: 'held', credited_mc: +0 }`, die vier Fälle von `cardClosedFor` `TypeError: (0 , cardClosedFor) is not a function`. Byte für Byte (sha256 der ersten 16 Zeichen über Körper und Location, `createApp` mit Datenbank im Speicher, gleich am Kopf von `dev` und nach dem Bau): offen `/` 285f02387bdba95a, `/errors/verify-500-database-error` 01c5431b59a7b5bd, `/llms.txt` b81f1efcdb7ba934, `/pricing` 4d50dbfce12049a6, `/card/5` e5a48255fad5cfba (302); Notschalter an `/` 98ff86c170adb927, Fehlerseite 2c57220c905d30f2, `/llms.txt` aa24dd0922ac6a04, `/pricing` f0a15fd1158ad36c, `/card/5` 8945720f698cf76d (200); Sunset vorher `/` 285f02387bdba95a, Fehlerseite 01c5431b59a7b5bd, `/card/5` 302 zur Kasse, nachher dieselben drei Hashes wie bei Notschalter an, `/llms.txt` 63ff08c96b54adf4 und `/pricing` 1bc98651fcd97bb5 unverändert. Was mitzieht: die 736 Prüfbefehle ohne Netz, vitest und `check` aus den 45 Goals mit Status DONE, die `card-way`, `digistore` oder `app.ts` nennen, vor und nach dem Bau mit gleichem Exit-Code und gleicher Ausgabe bis auf Pfade aus `mktemp`; ihre 154 Testdateien vorher 1538 grün, nachher 1546 grün, kein Fall weggefallen. Prüfbefehle: Punkt 1 vitest Exit 0 (25 Fälle), Namensschleife leer, `reports no reason` 1; Punkt 2 1, 0, 2, 2, 1, 0; Punkt 3 5, 0, 0; Punkt 4 1 (Job `e2e` am Draft-PR #505, Lauf 46140321030 am Kopf 3d9cb8a, pass in 10m56s); Punkt 5 `check` Exit 0 (2998 Fälle).
 - 2026-11-28 Zyklus 2: Abschluss gemeldet, Punkte 1 bis 5, nach dem Merge von `dev` (133db8c, nur eine neue Goal-Datei) am Kopf 9ca9522. Prüfbefehle: Punkt 1 vitest Exit 0 (25 Fälle), Namensschleife leer, `reports no reason` 1; Punkt 2 1, 0, 2, 2, 1, 0; Punkt 3 5, 0, 0; Punkt 4 Job `e2e` am Kopf dieses Commits, Ergebnis im Kommentar am Topic; Punkt 5 `check` Exit 0 (2998 Fälle, 146 s).
+- 2026-11-28 Release: PASS K und B (Zyklus 2), DONE.
 
 ## Blockers
 - keine
