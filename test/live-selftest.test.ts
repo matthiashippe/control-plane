@@ -156,6 +156,11 @@ describe("ops/live.sh", () => {
     expect(run.stdout).toContain("planted hosts step live-silent: FAIL hosts: cp.hippe.eu /health no answer");
     // The page of the check `handoff` answering 301 is red (move goal 06): the check does not follow it to another host.
     expect(run.stdout).toMatch(/^planted handoff page301: FAIL handoff: \/h\/\{code\} answered 301$/m);
+    // The url of the answer naming another page than the one the check reads is red (move goal 06): the human opens that url.
+    expect(run.stdout).toContain(
+      "\nplanted handoff urlhost: FAIL handoff: POST /v1/handoff names the page https://postyourprice.com/h/{code}, " +
+        "the check reads https://automatonhost.com/h/{code}\n",
+    );
     expect(run.stdout.trim().split("\n").at(-1)).toBe("LIVE SELFTEST OK");
     expect(run.status).toBe(0);
   }, 300_000);
