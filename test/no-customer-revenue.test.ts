@@ -8,8 +8,10 @@
  * This test reads every file that carries reports about customers and fails on each paragraph that
  * names a single customer and also carries an amount that is not masked as `*.**`. A paragraph (lines
  * up to the next blank line) is one unit, so a line break between "Kunde 1" and the amount does not
- * hide it. Totals over all customers and fixed amounts of the product stay allowed, but only through
- * the context directly in front of the amount; there is no exception for a file or a line.
+ * hide it. Totals over three or more customers and fixed amounts of the product stay allowed, but only
+ * through the context directly around the amount; there is no exception for a file or a line. One single
+ * payment ("eine Zahlung über") and a total without a count of three or more payers count even when the
+ * paragraph names no customer.
  * The failure names file and line, never the amount.
  */
 import { describe, expect, it } from "vitest";
@@ -63,7 +65,6 @@ const ALLOWED_BEFORE: readonly RegExp[] = [
   before("Startgutschrift\\p{L}*"),
   before("Schrittguthaben\\p{L}*"),
   before("Marge"),
-  /(?<![\p{L}\p{N}_])Summe (?:aller|über alle) [^.;:]*: $/iu,
   // inside the parentheses right after a named test: the made-up amounts of its fixture
   /\.test\.ts` \([^()]*$/,
 ];
@@ -75,11 +76,29 @@ const ALLOWED_BEFORE: readonly RegExp[] = [
 const ALLOWED_AFTER: readonly RegExp[] = [/^ \((?:[3-9]|[1-9][0-9]+) (?:Adressen|Zahler)\b/];
 
 /**
+ * A total over all customers: "Summe aller …: " or "Summe über alle …: " right before the amount. It is a
+ * total only when a count of three or more follows before the next full stop, semicolon or table bar, as
+ * "(<n> Adressen)", "(<n> Zahler)" or "von <n> (…) Adressen|Zahlern|Wallets|Kunden". Without that count
+ * the total may stand for one or two customers, so it always counts, with or without a customer pattern.
+ */
+const TOTAL_BEFORE = /(?<![\p{L}\p{N}_])Summe (?:aller|über alle) [^.;:]*: $/iu;
+const TOTAL_SCOPE = /^[^.;|]*/;
+const THREE_OR_MORE = "(?:[3-9]|[1-9][0-9]+)";
+const TOTAL_COUNT = new RegExp(
+  `\\(${THREE_OR_MORE} (?:Adressen|Zahler)\\b|(?<![\\p{L}\\p{N}_])von ${THREE_OR_MORE}(?: [\\p{L}-]+){0,3}? (?:Adressen|Zahlern|Wallets|Kunden)(?![\\p{L}\\p{N}_])`,
+  "u",
+);
+
+/**
  * Context that makes an amount the amount of exactly one payment, payer or address, or a total over exactly
  * two payers or addresses. Such an amount belongs to one customer even when the paragraph names no customer
  * and even behind `über`, so it always counts.
  */
-const SINGLE_BEFORE: readonly RegExp[] = [/(?<![\p{N}.,])1 über $/u];
+const SINGLE_BEFORE: readonly RegExp[] = [
+  /(?<![\p{N}.,])1 über $/u,
+  // "eine Zahlung über" or "eine fremde Zahlung über": one single payment; "jede" and "Zahlungen" stay thresholds
+  /(?<![\p{L}\p{N}_])eine (?:fremde )?Zahlung über $/iu,
+];
 const SINGLE_AFTER: readonly RegExp[] = [/^ \(1 (?:Adresse|Zahler|Wallet)\b/, /^ \(2 (?:Adressen|Zahler|Wallets)\b/];
 
 const SCANNED_DIRS: readonly { dir: string; recursive: boolean; name: RegExp }[] = [
@@ -129,14 +148,31 @@ function around(text: string, index: number, length: number): { head: string; ta
   return { head: text.slice(Math.max(0, index - 160), index), tail: text.slice(index + length, index + length + 40) };
 }
 
+/** Whether the amount is a total over all customers, and whether that total counts three or more. */
+function total(text: string, index: number, length: number): { total: boolean; counted: boolean } {
+  const { head } = around(text, index, length);
+  if (!TOTAL_BEFORE.test(head)) return { total: false, counted: false };
+  const scope = text.slice(index + length).match(TOTAL_SCOPE)?.[0] ?? "";
+  return { total: true, counted: TOTAL_COUNT.test(scope) };
+}
+
 function allowedAmount(text: string, index: number, length: number): boolean {
   const { head, tail } = around(text, index, length);
-  return ALLOWED_BEFORE.some((re) => re.test(head)) || ALLOWED_AFTER.some((re) => re.test(tail));
+  return (
+    ALLOWED_BEFORE.some((re) => re.test(head)) ||
+    ALLOWED_AFTER.some((re) => re.test(tail)) ||
+    total(text, index, length).counted
+  );
 }
 
 function singlePayerAmount(text: string, index: number, length: number): boolean {
   const { head, tail } = around(text, index, length);
-  return SINGLE_BEFORE.some((re) => re.test(head)) || SINGLE_AFTER.some((re) => re.test(tail));
+  const sum = total(text, index, length);
+  return (
+    SINGLE_BEFORE.some((re) => re.test(head)) ||
+    SINGLE_AFTER.some((re) => re.test(tail)) ||
+    (sum.total && !sum.counted)
+  );
 }
 
 /** Line numbers (first line of the paragraph) of every paragraph with an amount of a single customer. */
@@ -197,9 +233,34 @@ describe("no revenue of a single customer in the public repo", () => {
     expect(customerAmountLines("Kunde 1 lag unter 5 USD und gab 13 USD aus.")).toEqual([1]);
   });
 
-  it("lets totals over all customers through", () => {
-    expect(customerAmountLines("Summe aller fremden Kunden: 56,78 USD in der Woche.")).toEqual([]);
-    expect(customerAmountLines("Kunde 1 war dabei. Summe aller fremden Kunden: 56,78 USD in der Woche.")).toEqual([]);
+  it("lets totals over all customers through when they count three or more payers", () => {
+    expect(customerAmountLines("Summe aller fremden Kunden: 56,78 USD in der Woche (4 Zahler).")).toEqual([]);
+    expect(customerAmountLines("Kunde 1 war dabei. Summe aller fremden Kunden: 56,78 USD in der Woche (4 Zahler).")).toEqual([]);
+    expect(customerAmountLines("Summe aller Conway-Zahler: 432 USDC in 30 Tagen von 17 aufladenden Wallets")).toEqual([]);
+    expect(customerAmountLines("| Woche | Summe über alle Adressen: 56,78 USD (3 Adressen) |")).toEqual([]);
+  });
+
+  it("catches a total over all customers without a count of three or more", () => {
+    expect(customerAmountLines("Summe aller fremden Kunden: 56,78 USD in der Woche.")).toEqual([1]);
+    expect(customerAmountLines("Kunde 1 war dabei. Summe aller fremden Kunden: 56,78 USD in der Woche.")).toEqual([1]);
+    expect(customerAmountLines("Summe aller fremden Kunden: 56,78 USD in der Woche von 2 Wallets.")).toEqual([1]);
+    expect(customerAmountLines("Summe aller fremden Kunden: 56,78 USD in der Woche. Im Monat kamen Zahlungen von 4 Wallets.")).toEqual([1]);
+    expect(customerAmountLines("| Summe über alle Adressen: 56,78 USD | 65,43 USD (4 Zahler) |")).toEqual([1]);
+    expect(customerAmountLines("Summe aller fremden Kunden: *.** USD in der Woche.")).toEqual([]);
+  });
+
+  it("catches an amount of exactly one payment behind eine Zahlung über", () => {
+    expect(customerAmountLines("Bei uns kam eine fremde Zahlung über 3,21 USD an.")).toEqual([1]);
+    expect(customerAmountLines("Es gab eine Zahlung über 8 USD.")).toEqual([1]);
+    expect(customerAmountLines("Eine fremde Zahlung über 3,21 USD kam an, Kunde 1 war es nicht.")).toEqual([1]);
+    expect(customerAmountLines("Eine Zahlung über *.** USD")).toEqual([]);
+  });
+
+  it("lets thresholds on payments through", () => {
+    expect(customerAmountLines("Bonus auf jede Zahlung über 5 USD")).toEqual([]);
+    expect(customerAmountLines("Kunde 1 bekommt den Bonus auf jede Zahlung über 5 USD.")).toEqual([]);
+    expect(customerAmountLines("Kunde 1 sah keine Zahlungen über 5 USD.")).toEqual([]);
+    expect(customerAmountLines("Keine Zahlung über 5 USD kam an.")).toEqual([]);
   });
 
   it("catches an amount of exactly one payment, payer or address without a customer pattern", () => {

@@ -5,7 +5,7 @@ DONE
 
 ## Active Objective
 An Conways Zahlungsadresse gingen in den 30 Tagen bis 18.11.2026 noch 215 USDC von 21 Wallets, 16 davon haben aufgeladen
-(`conway-money/metrics.ndjson`, `docs/richtung/2026-11-19.md`), während bei uns in derselben Woche eine fremde Zahlung über 5,01 USD
+(`conway-money/metrics.ndjson`, `docs/richtung/2026-11-19.md`), während bei uns in derselben Woche eine fremde Zahlung über *.** USD
 ankam. Niemand weiß, wie viele dieser Wallets uns schon kennen, wie viele bei beiden zahlen und über welchen öffentlichen Weg ihre
 Betreiber überhaupt zu erreichen sind. Nach diesem Goal gibt es ein Werkzeug `ops/conway-payers.sh`, das die Conway-Zahler der
 letzten 30 Tage gegen unsere Wallets und Zahlungen abgleicht und nur Zählungen ausgibt, und `docs/kunden/conway-zahler.md` nennt mit
