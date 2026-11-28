@@ -48,6 +48,10 @@ function row(db: Db, address: string, kind: string, deltaMc: number, at: string,
 const PAY = (usd: number) =>
   JSON.stringify({ tx_hash: "0x" + "ab".repeat(32), from: STRANGER, value_atomic: String(usd * 1_000_000), usd, bonus_cents: 1 });
 const DIRECT = JSON.stringify({ source: "spend_permission", chain_id: 8453, usdc: "1000000" });
+// The offer on /pay/5/ also lists the cheapest tier (src/payments/pay.ts), and what was paid is credited: a wallet
+// that signs only 1 USD there books 101000 mc with meta.usd 5 and meta.value_atomic "1000000".
+const PAID = (pathUsd: number, paidUsd: number) =>
+  JSON.stringify({ tx_hash: "0x" + "ab".repeat(32), from: STRANGER, value_atomic: String(paidUsd * 1_000_000), usd: pathUsd, bonus_cents: 1 });
 
 function plant(db: Db) {
   for (const a of [OURS, TOOL, STRANGER, MIXED, EARLY, THINKER]) {
@@ -152,6 +156,23 @@ describe("ops/db-report.cjs with CP_REPORT=topup-bands", () => {
     expect(only(PAY(5), 100000)).toBe(0);
     expect(only(DIRECT.replace("1000000", "5000000"), 500000)).toBe(0);
     expect(only(null, 101000)).toBe(0); // no meta.usd and not exactly 1 USDC
+  });
+
+  it("counts a topup on /pay/5/ that paid only the cheapest tier as the tier 1", () => {
+    const only = (meta: string | null, deltaMc: number) =>
+      withDb(
+        (p) => report(p).topups_1usd,
+        (db) => {
+          db.prepare("INSERT INTO wallets (address, balance_mc, reserved_mc, created_at) VALUES (?, 0, 0, ?)").run(
+            STRANGER,
+            "2026-11-01T00:00:00.000Z",
+          );
+          row(db, STRANGER, "topup", deltaMc, "2026-11-07T00:00:00.000Z", "only", meta);
+        },
+      );
+    expect(only(PAID(5, 1), 101000)).toBe(1); // paid 1 USD on /pay/5/: meta.value_atomic decides
+    expect(only(PAID(5, 5), 501000)).toBe(0); // paid 5 USD on /pay/5/: never the tier 1
+    expect(only(PAID(1, 5), 100000)).toBe(0); // meta.value_atomic 5000000 wins over meta.usd 1 and the amount
   });
 
   it("takes the rows at the edges in when the window moves, so the window is what keeps them out", () => {

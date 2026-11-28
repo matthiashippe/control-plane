@@ -773,14 +773,21 @@ if (process.env.CP_REPORT === "topup-bands") {
       order by 1`,
     since, until, ...OURS_ARGS,
   ).map((r) => r.address);
+  const ONE_USD_ATOMIC = 1000000;
   // json_valid first: json_extract fails the whole query on one row whose meta is not JSON; such a row has no
-  // meta.usd and counts by its amount.
+  // meta.usd and counts by its amount. Where meta.value_atomic stands (every topup over /pay/), what was paid
+  // decides: /pay/5/ also offers the cheapest tier and credits 1 USD paid there with meta.usd 5.
   const topups1Usd = one(
     `select count(*) n from ledger
       where kind = 'topup' and created_at >= ? and created_at < ? and ${notOurs}
-        and (case when json_valid(meta) then json_extract(meta, '$.usd') end = 1
-             or (case when json_valid(meta) then json_extract(meta, '$.usd') end is null and delta_mc = ?))`,
-    since, until, ...OURS_ARGS, ONE_USD_MC,
+        and (case
+               when not coalesce(json_valid(meta), 0) then delta_mc = ?
+               when json_extract(meta, '$.value_atomic') is not null
+                 then cast(json_extract(meta, '$.value_atomic') as integer) = ?
+               else (json_extract(meta, '$.usd') = 1
+                     or (json_extract(meta, '$.usd') is null and delta_mc = ?))
+             end)`,
+    since, until, ...OURS_ARGS, ONE_USD_MC, ONE_USD_ATOMIC, ONE_USD_MC,
   ).n;
   // writeSync may write part of the buffer to a pipe, or meet EAGAIN on a non-blocking one.
   const out = Buffer.from(JSON.stringify({ since, until, addresses, topups_1usd: topups1Usd }) + "\n");

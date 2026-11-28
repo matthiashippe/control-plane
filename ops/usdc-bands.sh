@@ -22,8 +22,9 @@
 #
 # A foreign address is one that oursClause in ops/db-report.cjs does not call ours, with a `grant` or `topup`
 # ledger row at since <= created_at < until. Its USDC is read today (block latest): the public RPC gives no
-# reliable older state. TOPUPS counts its `topup` rows of the tier 1 in the window: meta.usd 1 (/pay/1/, 101000 mc
-# with the bonus), or 100000 mc without meta.usd (a direct transfer); see CP_REPORT=topup-bands. PAY 1 counts every
+# reliable older state. TOPUPS counts its `topup` rows of the tier 1 in the window: meta.value_atomic 1000000 where
+# it stands (1 USD paid on any /pay/ path, 101000 mc with the bonus), else meta.usd 1, or 100000 mc without
+# meta.usd (a direct transfer); see CP_REPORT=topup-bands. PAY 1 counts every
 # request on /pay/1 or below /pay/1/ from an address not on the own list, since <= ts < until, by status.
 # The tier 1 is sold when CP_TOPUP_TIERS_USD holds 1; empty or not set means the list TOPUP_TIERS_USD of the
 # image, as payConfigFromEnv in src/payments/pay.ts reads it. The counting lives in ops/usdc_bands.py.
@@ -103,6 +104,9 @@ create table ledger (id integer primary key, address text, kind text, delta_mc i
 # with meta.usd 1; a direct transfer of 1 USDC books 100000 mc without meta.usd.
 pay = lambda usd: json.dumps({"tx_hash": "0x" + "ab" * 32, "value_atomic": str(usd * 1000000), "usd": usd, "bonus_cents": 1})
 direct = json.dumps({"source": "spend_permission", "chain_id": 8453, "usdc": "1000000"})
+# /pay/5/ also offers the cheapest tier and credits what was paid: 1 USD paid there books 101000 mc with
+# meta.usd 5 and meta.value_atomic "1000000".
+paid = lambda path_usd, paid_usd: json.dumps({"tx_hash": "0x" + "ab" * 32, "value_atomic": str(paid_usd * 1000000), "usd": path_usd, "bonus_cents": 1})
 rows = [
     (a099, "grant", 15000, "2026-11-06T00:00:00.000Z", "{}"),   # exactly at --since: counts
     (a100, "topup", 101000, "2026-11-10T12:00:00.000Z", pay(1)),  # 1 USD over /pay/1/ with the bonus
@@ -116,6 +120,8 @@ rows = [
     (aold, "inference", -500, "2026-11-20T12:00:00.000Z", "{}"),  # a row of another kind does not count
     (ours, "topup", 101000, "2026-11-15T12:00:00.000Z", pay(1)),  # ours: neither address nor topup
     (ours, "grant", 15000, "2026-11-15T11:00:00.000Z", "{}"),
+    (a500, "topup", 101000, "2026-11-29T12:00:00.000Z", paid(5, 1)),  # after --until: paid only the cheapest tier on /pay/5/
+    (a500, "topup", 501000, "2026-11-30T12:00:00.000Z", paid(5, 5)),  # after --until: paid 5 USD on /pay/5/
 ]
 db.executemany("insert into ledger (address, kind, delta_mc, ref, meta, created_at) values (?, ?, ?, '', ?, ?)",
                [(a, k, d, m, t) for a, k, d, t, m in rows])
@@ -210,6 +216,10 @@ d = json.load(open(sys.argv[1])); d["addresses"].append(sys.argv[2]); json.dump(
     "a direct transfer of 100000 mc without meta.usd counts as the tier 1"
   want "$(topups 2026-11-14T00:00:00Z 2026-11-15T00:00:00Z 2>/dev/null)" "0" \
     "505000 and 501000 mc with meta.usd 5 and 100000 mc with meta.usd 5 never count as the tier 1"
+  want "$(topups 2026-11-29T00:00:00Z 2026-11-30T00:00:00Z 2>/dev/null)" "1" \
+    "a topup on /pay/5/ that paid only the cheapest tier, 101000 mc with meta.value_atomic 1000000, counts as the tier 1"
+  want "$(topups 2026-11-30T00:00:00Z 2026-12-01T00:00:00Z 2>/dev/null)" "0" \
+    "a topup on /pay/5/ that paid 5 USD, meta.value_atomic 5000000, never counts as the tier 1"
 
   want "$(run | sed -n 3p)" "PAY 1 since $S until $U: 2 answers 402, 1 answers 200, 1 other" \
     "PAY 1 counts the foreign answers on /pay/1 by status; own, other tiers and lines outside the window do not count"
