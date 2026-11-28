@@ -5,19 +5,19 @@ Das gepflegte Paket der Automaton-Runtime liegt im öffentlichen Repo
 Einstellung bei `https://automatonhost.com` an, und jede Anfrage an den Control Plane trägt
 `User-Agent: automaton-maintained/<version>`. Darüber zählt paket 02, wer über das Paket kommt.
 
-Release: v0.2.2-maintained.4
+Release: v0.2.2-maintained.5
 
 ## Installieren
 
 Ein Befehl, ohne npm-Konto:
 
 ```bash
-npm install -g github:matthiashippe/automaton#v0.2.2-maintained.4
+npm install -g github:matthiashippe/automaton#v0.2.2-maintained.5
 automaton --run
 ```
 
-`automaton --version` gibt `automaton-maintained 0.2.2-maintained.4` aus. Release-Seite:
-https://github.com/matthiashippe/automaton/releases/tag/v0.2.2-maintained.4
+`automaton --version` gibt `automaton-maintained 0.2.2-maintained.5` aus. Release-Seite:
+https://github.com/matthiashippe/automaton/releases/tag/v0.2.2-maintained.5
 
 ## Was das Paket gegenüber Upstream ändert
 
@@ -54,6 +54,9 @@ liegen diese Commits, jeder mit Test:
 - `90ecb04` release: Version `0.2.2-maintained.4`, das README des Forks nennt den neuen Tag.
 - `5416f3c` fix(topup): Eine Wallet ab 5 USDC kauft beim Start weiter genau 5 USD wie vorher, auch mit Restguthaben knapp unter
   der Schwelle.
+- `e354ac9` fix(topup): Gegen jeden anderen Control Plane als `automatonhost.com` wählt die Aufladung nach der 402 einer Sandbox
+  wie Upstream, auch wenn die 402 `details.topup_tiers_usd` nennt.
+- `970d683` release: Version `0.2.2-maintained.5`, das README des Forks nennt den neuen Tag.
 
 ## Neuer Upstream-Commit
 
