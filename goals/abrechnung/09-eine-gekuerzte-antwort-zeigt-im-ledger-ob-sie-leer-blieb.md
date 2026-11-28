@@ -97,6 +97,7 @@ Messung das zeigt.
 
 ## Progress Log
 - 2026-11-28 Zyklus 1: Punkte 1, 2, 3 und 4 gebaut, `shortened_finish` und `shortened_empty` nur in der `meta` gekürzter Antworten, die fünf Fälle in `test/inference-shortened-empty.test.ts` vor der Änderung alle rot (`expected undefined to be true`, `expected undefined to be false`, `expected undefined to be 'length'`, Schlüsselliste mit 12 statt 14 Einträgen), Entscheidungen und Nachzug in `goals/abrechnung/ANNAHMEN.md`. Prüfbefehle: vitest der beiden Dateien Exit 0 (13 passed), Testnamen nichts fehlt, `grep -c` in proxy.ts 2, Diff von `test/inference-shortened.test.ts` 0, ANNAHMEN-Zeilen 5, Pfade außerhalb 0, gelöschte Tests 0, `node scripts/check.mjs` Exit 0 (290 Dateien, 2989 Tests), Job `e2e` an PR #502 am Kopf e847287 pass (`E2E OK turns=5 registered=true api_errors=0 ledger_consistent=true`), `gh pr checks` zählt 1.
+- 2026-11-28 Zyklus 2: Abschluss gemeldet, Punkte 1, 2, 3 und 4, `dev` unverändert auf 0a50d21, kein Merge nötig. Prüfbefehle am Kopf a2186ff: vitest der beiden Dateien Exit 0 (13 passed), Testnamen nichts fehlt, `grep -c` in proxy.ts 2, Diff von `test/inference-shortened.test.ts` 0, ANNAHMEN-Zeilen 5, Pfade außerhalb 0, gelöschte Tests 0, `node scripts/check.mjs` Exit 0 (2989 Tests), Job `e2e` an PR #502 am Kopf a2186ff pass (Lauf 46132182879), `gh pr checks` zählt 1.
 
 ## Blockers
 - keine
